@@ -1,30 +1,75 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 11 Aug 2016 10:20:56 -0600
-Subject: [PATCH V5 1/9] tools: Copy the header file needed by perf tools
+Date: Thu, 11 Aug 2016 10:20:57 -0600
+Subject: [PATCH V5 2/9] perf tools: making coresight PMU listable
 In-Reply-To: <1470932464-726-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1470932464-726-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1470932464-726-2-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1470932464-726-3-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Directly accessing kernel files is not allowed anymore.  As such
-making file coresight-pmu.h accessible by the perf tools and complain
-if this copy strays from the one found in the main kernel tree.
+Adding the required mechanic allowing 'perf list pmu' to
+discover coresight ETM/PTM tracers.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 ---
- tools/include/linux/coresight-pmu.h | 39 +++++++++++++++++++++++++++++++++++++
- tools/perf/MANIFEST                 |  1 +
- tools/perf/Makefile.perf            |  3 +++
- 3 files changed, 43 insertions(+)
- create mode 100644 tools/include/linux/coresight-pmu.h
+ MAINTAINERS                    |  1 +
+ tools/perf/Makefile.config     | 11 +++++++----
+ tools/perf/arch/arm/util/Build |  2 ++
+ tools/perf/arch/arm/util/pmu.c | 34 ++++++++++++++++++++++++++++++++++
+ 4 files changed, 44 insertions(+), 4 deletions(-)
+ create mode 100644 tools/perf/arch/arm/util/pmu.c
 
-diff --git a/tools/include/linux/coresight-pmu.h b/tools/include/linux/coresight-pmu.h
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 20bb1d00098c..3b21796981f1 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1112,6 +1112,7 @@ F:	drivers/hwtracing/coresight/*
+ F:	Documentation/trace/coresight.txt
+ F:	Documentation/devicetree/bindings/arm/coresight.txt
+ F:	Documentation/ABI/testing/sysfs-bus-coresight-devices-*
++F:	tools/perf/arch/arm/util/pmu.c
+ 
+ ARM/CORGI MACHINE SUPPORT
+ M:	Richard Purdie <rpurdie@rpsys.net>
+diff --git a/tools/perf/Makefile.config b/tools/perf/Makefile.config
+index 24803c58049a..72edf83d76b7 100644
+--- a/tools/perf/Makefile.config
++++ b/tools/perf/Makefile.config
+@@ -746,10 +746,13 @@ ifdef LIBBABELTRACE
+ endif
+ 
+ ifndef NO_AUXTRACE
+-  ifeq ($(feature-get_cpuid), 0)
+-    msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
+-    NO_AUXTRACE := 1
+-  else
++  ifeq ($(ARCH),x86)
++    ifeq ($(feature-get_cpuid), 0)
++      msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
++      NO_AUXTRACE := 1
++    endif
++  endif
++  ifndef NO_AUXTRACE
+     $(call detected,CONFIG_AUXTRACE)
+     CFLAGS += -DHAVE_AUXTRACE_SUPPORT
+   endif
+diff --git a/tools/perf/arch/arm/util/Build b/tools/perf/arch/arm/util/Build
+index f98da17357c0..4093fd146f46 100644
+--- a/tools/perf/arch/arm/util/Build
++++ b/tools/perf/arch/arm/util/Build
+@@ -2,3 +2,5 @@ libperf-$(CONFIG_DWARF) += dwarf-regs.o
+ 
+ libperf-$(CONFIG_LOCAL_LIBUNWIND)    += unwind-libunwind.o
+ libperf-$(CONFIG_LIBDW_DWARF_UNWIND) += unwind-libdw.o
++
++libperf-$(CONFIG_AUXTRACE) += pmu.o
+diff --git a/tools/perf/arch/arm/util/pmu.c b/tools/perf/arch/arm/util/pmu.c
 new file mode 100644
-index 000000000000..7d410260661b
+index 000000000000..af9fb666b44f
 --- /dev/null
-+++ b/tools/include/linux/coresight-pmu.h
-@@ -0,0 +1,39 @@
++++ b/tools/perf/arch/arm/util/pmu.c
+@@ -0,0 +1,34 @@
 +/*
 + * Copyright(C) 2015 Linaro Limited. All rights reserved.
 + * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
@@ -42,51 +87,22 @@ index 000000000000..7d410260661b
 + * this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#ifndef _LINUX_CORESIGHT_PMU_H
-+#define _LINUX_CORESIGHT_PMU_H
++#include <string.h>
++#include <linux/coresight-pmu.h>
++#include <linux/perf_event.h>
 +
-+#define CORESIGHT_ETM_PMU_NAME "cs_etm"
-+#define CORESIGHT_ETM_PMU_SEED  0x10
++#include "../../util/pmu.h"
 +
-+/* ETMv3.5/PTM's ETMCR config bit */
-+#define ETM_OPT_CYCACC  12
-+#define ETM_OPT_TS      28
-+
-+static inline int coresight_get_trace_id(int cpu)
++struct perf_event_attr
++*perf_pmu__get_default_config(struct perf_pmu *pmu __maybe_unused)
 +{
-+	/*
-+	 * A trace ID of value 0 is invalid, so let's start at some
-+	 * random value that fits in 7 bits and go from there.  Since
-+	 * the common convention is to have data trace IDs be I(N) + 1,
-+	 * set instruction trace IDs as a function of the CPU number.
-+	 */
-+	return (CORESIGHT_ETM_PMU_SEED + (cpu * 2));
-+}
-+
++#ifdef HAVE_AUXTRACE_SUPPORT
++	if (!strcmp(pmu->name, CORESIGHT_ETM_PMU_NAME)) {
++		/* add ETM default config here */
++		pmu->selectable = true;
++	}
 +#endif
-diff --git a/tools/perf/MANIFEST b/tools/perf/MANIFEST
-index ad2534df4ba6..f181c613d9aa 100644
---- a/tools/perf/MANIFEST
-+++ b/tools/perf/MANIFEST
-@@ -77,4 +77,5 @@ tools/include/linux/stringify.h
- tools/include/linux/types.h
- tools/include/linux/err.h
- tools/include/linux/bitmap.h
-+tools/include/linux/coresight-pmu.h
- tools/arch/*/include/uapi/asm/perf_regs.h
-diff --git a/tools/perf/Makefile.perf b/tools/perf/Makefile.perf
-index 2d9087501633..aa7ab23fbc9f 100644
---- a/tools/perf/Makefile.perf
-+++ b/tools/perf/Makefile.perf
-@@ -429,6 +429,9 @@ $(PERF_IN): prepare FORCE
- 	@(test -f ../../include/asm-generic/bitops/fls64.h && ( \
-         (diff -B ../include/asm-generic/bitops/fls64.h ../../include/asm-generic/bitops/fls64.h >/dev/null) \
-         || echo "Warning: tools/include/asm-generic/bitops/fls64.h differs from kernel" >&2 )) || true
-+	@(test -f ../../include/linux/coresight-pmu.h && ( \
-+	(diff -B ../include/linux/coresight-pmu.h ../../include/linux/coresight-pmu.h >/dev/null) \
-+	|| echo "Warning: tools/include/linux/coresight-pmu.h differs from kernel" >&2 )) || true
- 	$(Q)$(MAKE) $(build)=perf
- 
- $(OUTPUT)perf: $(PERFLIBS) $(PERF_IN) $(LIBTRACEEVENT_DYNAMIC_LIST)
++	return NULL;
++}
 -- 
 2.7.4
