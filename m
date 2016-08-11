@@ -1,103 +1,45 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Thu, 11 Aug 2016 18:06:54 -0400
-Subject: [PATCH V6 0/6] iommu/msm: Add DT adaptation and generic bindings
- support
-In-Reply-To: <CAF6AEGsF5M1sfwaXKW0x=Mu=nQJR-9+xqrtXd=7Vz_+6G_u25A@mail.gmail.com>
-References: <1465817767-9856-1-git-send-email-sricharan@codeaurora.org>
- <CAF6AEGsF5M1sfwaXKW0x=Mu=nQJR-9+xqrtXd=7Vz_+6G_u25A@mail.gmail.com>
-Message-ID: <CAF6AEGsLGDqRuB97+qN1g7X60A49Wv1HGbAiaeZoxogMmHY9HA@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 11 Aug 2016 15:16:50 -0700
+Subject: [PATCH 2/2] arm: apply more __ro_after_init
+In-Reply-To: <2188666.QKZtt2vNXZ@wuerfel>
+References: <1464979224-2085-1-git-send-email-keescook@chromium.org>
+ <2760702.46Rp2Juk5b@wuerfel> <20160810230645.GP1041@n2100.armlinux.org.uk>
+ <2188666.QKZtt2vNXZ@wuerfel>
+Message-ID: <CAGXu5j+RA+fepUEXoqXEBmyhBokQxv0csO=VuzFpHd4Fk4dH4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2016 at 4:11 PM, Rob Clark <robdclark@gmail.com> wrote:
-> On Mon, Jun 13, 2016 at 7:36 AM, Sricharan R <sricharan@codeaurora.org> wrote:
->> The msm_iommu.c driver currently works based on platform data.
->> A single master device can be connected to more than one iommu and multiple
->> contexts in each of the iommu. This association between master and iommus was
->> represented from platform data using parent/child devices. The master drivers
->> were responsible for attaching all of the iommus/context to a domain. Now the
->> platform data support is removed and DT support is added. The master/iommus are
->> added through generic iommu bindings.
+On Thu, Aug 11, 2016 at 8:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday, August 11, 2016 12:06:45 AM CEST Russell King - ARM Linux wrote:
+>> On Wed, Aug 10, 2016 at 09:41:23PM +0200, Arnd Bergmann wrote:
+>> > It might be better to start by making the fixed mapping readonly,
+>> > as KASLR doesn't protect that one at all, and change the TLS
+>> > code accordingly.
 >>
->> This is essentially rework of the patch posted earlier by
->> Rob Clark <robdclark@gmail.com>. This series folds the changes in to the
->> existing driver with the addition of generic bindings.
+>> I think that's impossible, because we gave userspace permission to
+>> read 0xffff0ff0 directly without using __kuser_get_tls.  You're
+>> talking about potentially breaking userspace.
 >>
->>         http://www.spinics.net/lists/linux-arm-msm/msg10077.html
->>
->> Tested this series on ifc6410 board.
+>> If you disable kuser helpers, then the page becomes read-only and
+>> invisible to userspace anyway.  So, everything is being done there
+>> which can be done - if you have kuser helpers enabled, then you
+>> lose some opportunities for these security improvements.
 >
-> btw, the current state, at least on linaro integration branch, fault
-> handling doesn't work so well (ie. device never gets resumed).. which
-> is a bit unfortunate for a gpu (and results in a *lot* of rebooting on
-> my part when debugging userspace).  I haven't had time yet to compare
-> to the ancient downstream driver, but not sure if you have any ideas?
+> What I meant was writing to the page through the linear mapping
+> rather than the virtual mapping at 0xffff0000 so we can leave that
+> one read-only (I did not consider whether that might cause cache
+> aliasing problems when reading from the other address).
 >
-> I guess probably disabling stall on fault would help.  But I'm not
-> even getting the "Fault occurred in context.." prints.  Seeing the
-> fault iova is pretty useful since that plus gpu cmdstream trace helps
-> me figure out which texture/etc is being accessed out of bounds.
-
-fyi, it looks like it is not getting any fault irq..  it's *possible*
-that I screwed up the irq #'s when translating from downstream, so you
-might want to double check that.  I thought I had it right, I assume I
-would have noticed during piglit runs if fault recovery wasn't working
-(since the result is that *everything* after the faulting test would
-have failed since gpu is wedged with no access to memory), but it was
-long enough ago that I can't claim that definitively.
-
-If you need an easy way to trigger a gpu fault, msmtest is a good way,
-change this line:
-
-  https://github.com/freedreno/msmtest/blob/master/msmtest.c#L247
-
-from OUT_RELOC() to OUT_RING(ring, 0x00000000) will trigger a fault.
-
-BR,
--R
-
+> Your other point is more important though: if one really cares
+> about optimizing security here, they probably should disable
+> kuser helpers completely anyway.
 >
->> [V6] After some discussions on patch 6 [1] from previous post,
->>      it was concluded that the changes for using relaxed writes
->>      in all places should not be a part of this series, so should
->>      be moved it. So removed that patch and added Acked/Tested tags.
->>      [1] https://patchwork.kernel.org/patch/9129231/
->>
->> [V5] Changed the compatible binding name as per comments, added comments
->>      for usage of barriers in patch 6.
->>
->> [V4] Addressed comments for making the iommu compatible binding more soc
->>      specific and updated the documentation for the iommu clocks.
->>
->> [V3] Addressed comments to correct the usage
->>      of the #iommu-cells binding, improve the flush_iotlb_range function,
->>      added a new patch to use writel_relaxed for register access and split
->>      up the documentation patch.
->>
->> [V2] Adapted the driver to use generic ARMV7S short descriptor pagetable ops
->>      and addressed comments.
->>
->> [V1]
->>    https://lists.linuxfoundation.org/pipermail/iommu/2015-August/014074.html
->>
->> Sricharan R (6):
->>   iommu/msm: Add DT adaptation
->>   documentation: iommu: Add bindings for msm,iommu-v0 ip
->>   iommu/msm: Move the contents from msm_iommu_dev.c to msm_iommu.c
->>   iommu/msm: Add support for generic master bindings
->>   iommu/msm: use generic ARMV7S short descriptor pagetable ops
->>   iommu/msm: Remove driver BROKEN
->>
->>  .../devicetree/bindings/iommu/msm,iommu-v0.txt     |  64 ++
->>  drivers/iommu/Kconfig                              |   2 +-
->>  drivers/iommu/Makefile                             |   2 +-
->>  drivers/iommu/msm_iommu.c                          | 870 +++++++++++----------
->>  drivers/iommu/msm_iommu.h                          |  73 +-
->>  drivers/iommu/msm_iommu_dev.c                      | 381 ---------
->>  6 files changed, 564 insertions(+), 828 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt
->>  delete mode 100644 drivers/iommu/msm_iommu_dev.c
->>
->> --
->> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
->>
+> Kees, is that something you have on your radar already?
+
+It wasn't no. I will add it. :)
+
+-Kees
+
+-- 
+Kees Cook
+Nexus Security
