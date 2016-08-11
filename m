@@ -1,21 +1,39 @@
-From: Yuval.Mintz@qlogic.com (Yuval Mintz)
-Date: Thu, 11 Aug 2016 09:36:10 +0000
-Subject: [PATCH 04/21] net: thunderx: Set queue count based on number of
- CPUs
-In-Reply-To: <1470811373-28277-5-git-send-email-sunil.kovvuri@gmail.com>
-References: <1470811373-28277-1-git-send-email-sunil.kovvuri@gmail.com>
- <1470811373-28277-5-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <CO2PR11MB008837F849AB5891E076DF41971E0@CO2PR11MB0088.namprd11.prod.outlook.com>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Thu, 11 Aug 2016 17:33:38 +0800
+Subject: [PATCH v6 04/14] of/numa: remove a duplicated warning
+In-Reply-To: <1470908028-8596-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1470908028-8596-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1470908028-8596-5-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 81xx has only 4 CPUs, so it doesn't make sense to initialize entire Qset i.e 8
-> queues by default. Made changes to queue initialization to init queues equal to
-> number of CPUs or
-> 8 queues whichever is lesser. Also this will be applicable to VMs with VNIC VF
-> attached and having less VCPUs
-...
-> -	qcount = MAX_CMP_QUEUES_PER_QS;
-> +	qcount = min_t(int, MAX_CMP_QUEUES_PER_QS, num_online_cpus());
+This warning has been printed in of_numa_parse_cpu_nodes before.
 
-We have netif_get_num_default_rss_queues() which does this.
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ drivers/of/of_numa.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
+index afaeb9c..8723f64 100644
+--- a/drivers/of/of_numa.c
++++ b/drivers/of/of_numa.c
+@@ -179,13 +179,8 @@ int of_node_to_nid(struct device_node *device)
+ 			np->name);
+ 	of_node_put(np);
+
+-	if (!r) {
+-		if (nid >= MAX_NUMNODES)
+-			pr_warn("NUMA: Node id %u exceeds maximum value\n",
+-				nid);
+-		else
+-			return nid;
+-	}
++	if (!r)
++		return nid;
+
+ 	return NUMA_NO_NODE;
+ }
+--
+2.5.0
