@@ -1,31 +1,23 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Aug 2016 08:29:59 +0100
-Subject: [PATCH 1/1] arm64: Remove stack duplicating code from jprobes
-In-Reply-To: <1470861891-13315-1-git-send-email-dave.long@linaro.org>
-References: <1470861891-13315-1-git-send-email-dave.long@linaro.org>
-Message-ID: <57AC2977.40507@arm.com>
+From: roger.chen@rock-chips.com (Roger Chen)
+Date: Thu, 11 Aug 2016 15:24:45 +0800
+Subject: [PATCH 0/3] support GMAC for RK3399 & RK3366
+Message-ID: <1470900288-10109-1-git-send-email-roger.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/16 21:44, David Long wrote:
-> From: "David A. Long" <dave.long@linaro.org>
-> 
-> Because the arm64 calling standard allows stacked function arguments to be
-> anywhere in the stack frame, do not attempt to duplicate the stack frame for
-> jprobes handler functions.
-> 
-> Documenation changes to describe this issue have been broken out into a
+This series adds registers description for RK3366 & RK3399 GMAC.
+And also DT nodes for RK3399 SoC and EVB.
 
-nit: "Documentation"
+Roger Chen (3):
+  net: stmmac: dwmac-rk: add rk3366 & rk3399 specific data
+  arm64: dts: rockchip: add GMAC dt nodes for rk3399 SoC
+  arm64: dts: rockchip: add GMAC dt nodes for RK3399 evb
 
-> separate patch in order to simultaneously address them in other
-> architecture(s).
-> 
-> Signed-off-by: David A. Long <dave.long@linaro.org>
-> Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
+ .../devicetree/bindings/net/rockchip-dwmac.txt     |   4 +-
+ arch/arm64/boot/dts/rockchip/rk3399-evb.dts        |  23 +++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |  79 +++++++
+ drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 226 +++++++++++++++++++++
+ 4 files changed, 330 insertions(+), 2 deletions(-)
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
