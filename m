@@ -1,102 +1,95 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Thu, 11 Aug 2016 10:06:19 +0530
-Subject: [PATCH RESEND v2 0/8] Cache-coherent DMA access using UIO
-In-Reply-To: <20160810221601.0005c017@t450s.home>
-References: <1470635557-13416-1-git-send-email-anup.patel@broadcom.com>
- <1983237.mRdWv2BGBr@wuerfel>
- <CAALAos9eT4N-RM6-gswKcSTJK7tirFeVAxrzGsNbYOyuL4M83Q@mail.gmail.com>
- <20160810221601.0005c017@t450s.home>
-Message-ID: <CAALAos-jJqLFoUjNMGnRKiD4EuvwOoQ_4V2L6coe+s0+M8We5Q@mail.gmail.com>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Thu, 11 Aug 2016 10:59:52 +0530
+Subject: [RFC PATCH v2 0/4] arm/arm64: vgic-new: Implement API for vGICv3
+ live migration
+In-Reply-To: <CAFEAcA-z+iM+=p0riWreJCewPPxw9wtHgg+_4MDtxV=ccwe-tg@mail.gmail.com>
+References: <1470740326-27751-1-git-send-email-vijay.kilari@gmail.com>
+ <CAFEAcA-z+iM+=p0riWreJCewPPxw9wtHgg+_4MDtxV=ccwe-tg@mail.gmail.com>
+Message-ID: <CALicx6sdGgkf_neZ_F0OUu3cg36VBoWT581HAG=v2FecN6omJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
-
-On Thu, Aug 11, 2016 at 9:46 AM, Alex Williamson
-<alex.williamson@redhat.com> wrote:
-> On Thu, 11 Aug 2016 09:30:19 +0530
-> Anup Patel <anup.patel@broadcom.com> wrote:
+On Tue, Aug 9, 2016 at 5:22 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
+> On 9 August 2016 at 11:58,  <vijay.kilari@gmail.com> wrote:
+>> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+>>
+>> This patchset adds API for saving and restoring
+>> of VGICv3 registers to support live migration with new vgic feature.
+>> This API definition is as per version of VGICv3 specification
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
+>>
+>> To test live migration with QEMU, use below patch series
+>> https://lists.gnu.org/archive/html/qemu-devel/2016-08/msg01444.html
+>>
+>> The patch 3 & 4 are picked from the Pavel's previous implementation.
+>> http://www.spinics.net/lists/kvm/msg122040.html
+>>
+>> v1 => v2:
+>>  - The init sequence change patch is no more required.
+>>    Fixed in patch 2 by using static vgic_io_dev regions structure instead
+>>    of using dynamic allocation pointer.
+>>  - Updated commit message of patch 4.
+>>  - Dropped usage of union to manage 32-bit and 64-bit access in patch 1.
+>>    Used local variable for 32-bit access.
+>>  - Updated macro __ARM64_SYS_REG and ARM64_SYS_REG in
+>>    arch/arm64/include/uapi/asm/kvm.h as per qemu requirements.
 >
->> Hi Arnd,
->>
->> On Wed, Aug 10, 2016 at 9:25 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Monday, August 8, 2016 11:22:29 AM CEST Anup Patel wrote:
->> >> The goal of this patchset is to improve UIO framework and UIO dmem
->> >> driver to allow cache-coherent DMA accesses from user-space.
->> >>
->> >> This patchset is based on two previous patchsets:
->> >> 1) [PATCH v5 0/6] UIO driver for APM X-Gene QMTM
->> >> (Refer, http://www.spinics.net/lists/devicetree/msg58244.html)
->> >> 2) [PATCH 0/4] Fix and extend uio_dmem_genirq
->> >> (Refer, https://lkml.org/lkml/2016/5/17/141)
->> >>
->> >> We have adopted only patch0-3 of patchset1 which was abandoned
->> >> long time back. We have taken care of last few unaddressed comments
->> >> on these patches.
->> >>
->> >> The patchset2 is quite recent has been adopted entirely. We have
->> >> taken care review comments on these patches too.
->> >>
->> >> This patchset is based on v4.7-rc7 tag and it is available in uio-v2
->> >> branch of https://github.com/Broadcom/arm64-linux.git
->> >
->> >
->> > UIO devices are generally meant to be things that do not
->> > perform DMA and that don't screw up the rest of the system
->> > when misused. A device that is able to access any physical
->> > memory doesn't belong into this category. The way that
->> > uio_dmem_genirq.c gets around this is by requiring the device
->> > to be created by some code that sets up a separate IOMMU
->> > domain first, but the DT probing here doesn't do that.
->> > Note that IOMMU domains typically use 32-bit addressing,
->> > so the entire "dma_mask from property" dance isn't even
->> > required.
->>
->> IMHO, UIO devices are meant for things that are not behind
->> any IOMMU hardware.
->>
->> Yes, any mis-programming in user space using UIO can
->> potentially screw-up the rest of the system but this is
->> generally a known/assumed fact for people who are using UIO.
->>
->> >
->> > Also, this seems to duplicate a lot of the work that
->> > went into "vfio". Can you explain why we need another way
->> > of doing the same thing here?
->>
->> We can only use "vfio" for devices that are behind some
->> kind of IOMMU (Right??). For devices not having IOMMU
->> support will have to use UIO for user space access.
->>
->> Particularly, there are lot of FPGA-based solutions and legacy
->> hardware which do not have IOMMU support (devices on
->> FPGA or specific devices).
->>
->> In our use case, we have some FPGA-based device which
->> does not have IOMMU support and we are accessing this
->> FPGA-based device from user-space.
->>
->> This patchset only tries to extend "uio" and "uio_dmem_genirq".
->> There is no intention of duplicating what has been already
->> done for "vfio".
->>
->> I do agree that "vfio" should eventually become defacto method
->> of accessing devices in user space but that requires devices to
->> always have IOMMU support.
+> I only scanned briefly through this patchset, but I didn't
+> see any code implementing:
+>  * KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO
+
+If irq->pending is updated by kernel based on irq->line_level when interrupt
+is asserted by device or guest. Do we still need to extract
+irq->line_level using
+this ioctl and while writing back GIC{D|R}_ISPENDR with line_level
++(OR) GIC{D|R}_ISPENDR?
+
+>  * the different behaviour for accesses to GICD_STATUSR, GICR_STATUSR,
+
+QEMU is saving and restoring this register, but kernel implementation
+is missing. Kernel is silently returning zero. So could not catch. I
+will fix it.
+
+However, Specification says as below for STATUSR.
+
+"    The GICD_STATUSR and GICR_STATUSR registers are architecturally
+defined such
+     that a write of a clear bit has no effect, whereas a write with a set bit
+     clears that value.  To allow userspace to freely set the values
+of these two
+     registers, setting the attributes with the register offsets for these two
+     registers simply sets the non-reserved bits to the value written."
+
+Question is during restore, the set bit will clear the value STATUSR.
+So it will reset the STATUSR after migrating the VM.
+
+>    GICD_ISPENDR, GICR_ISPENDR0, GICD_ICPENDR, and GICR_ICPENDR0, which
+>    don't act the same via this API as for a guest access to the register
 >
-> A vfio no-iommu mode exists since v4.5:
+> Did I miss something?
+
+In kernel (as shown in below code snippet),
+ GICD_ISPENDR, GICR_ISPENDR0, GICD_ICPENDR, and GICR_ICPENDR0
+all register access using KVM_DEV_ARM_VGIC_GRP_{RE|DIST}_REGS ioctl
+is accessing irq->pending state.
+
+unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
+                                     gpa_t addr, unsigned int len)
+{
+        u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+        u32 value = 0;
+        int i;
+
+        /* Loop over all IRQs affected by this read */
+        for (i = 0; i < len * 8; i++) {
+                struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+
+                if (irq->pending)
+                        value |= (1U << i);
+        }
+
+  ...
+}
 >
-> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=03a76b60f8ba27974e2d252bc555d2c103420e15
-
-It's good that we have "No-IOMMU" mode in VFIO now but I see
-that it's for vfio_pci only. Has this been extended for vfio_platform?
-
-We would certainly like to move to VFIO if "No-IOMMU" mode
-is available for vfio_platform devices because in-our use case
-devices are memory-mapped FPGA devices.
-
-Meanwhile, I would like to have this patchset for benefit of
-people who already using UIO.
-
-Regards,
-Anup
+> thanks
+> -- PMM
