@@ -1,87 +1,82 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 11 Aug 2016 17:51:24 +0200
-Subject: [PATCH 3/3] arm: dts: thermal: add thermal/auxadc node.
-In-Reply-To: <1467882386-40544-4-git-send-email-dawei.chien@mediatek.com>
-References: <1467882386-40544-1-git-send-email-dawei.chien@mediatek.com>
- <1467882386-40544-4-git-send-email-dawei.chien@mediatek.com>
-Message-ID: <fd3f0c2f-f0ad-dd0f-cf2b-eb658f72d735@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 11 Aug 2016 16:54:10 +0100
+Subject: [RFC] arm64: Enforce gettimeofday vdso structure read ordering
+In-Reply-To: <20160811153744.3212-1-cov@codeaurora.org>
+References: <20160811153744.3212-1-cov@codeaurora.org>
+Message-ID: <20160811155409.GE8232@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Aug 11, 2016 at 11:37:44AM -0400, Christopher Covington wrote:
+> From: Brent DeGraaf <bdegraaf@codeaurora.org>
+> 
+> Prior gettimeofday code register read code is not architecturally
+> correct as there is no control flow gating logic enforced
+> immediately prior to the required isb.  Introduce explicit
+> control-flow logic prior to register read in all cases so that
+> the mrs read will always be done after all vdso data elements are
+> read, and read all data elements within the protection logic
+> provided by the sequence counter.
 
+-ENOPARSE
 
-On 07/07/16 11:06, Dawei Chien wrote:
-> This adds the thermal controller and auxadc nodes
-> to the Mediatek MT2701 dtsi file.
->
-> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
+Can you explain the problem that you're fixing here, please?
+
+> Signed-off-by: Brent DeGraaf <bdegraaf@codeaurora.org>
 > ---
-> This patch depned on:
-> https://patchwork.kernel.org/patch/9213545/
-> ---
->  arch/arm/boot/dts/mt2701.dtsi |   43 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 43 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-> index 2ac8b50..0834a23 100644
-> --- a/arch/arm/boot/dts/mt2701.dtsi
-> +++ b/arch/arm/boot/dts/mt2701.dtsi
-> @@ -77,6 +77,36 @@
->  		#clock-cells = <0>;
->  	};
->
-> +	thermal-zones {
-> +		cpu_thermal: cpu_thermal {
-> +			polling-delay-passive = <1000>; /* milliseconds */
-> +			polling-delay = <1000>; /* milliseconds */
-> +
-> +			thermal-sensors = <&thermal 0>;
-> +			sustainable-power = <1000>;
-> +
-> +			trips {
-> +				threshold: trip-point at 0 {
-> +					temperature = <68000>;
-> +					hysteresis = <2000>;
-> +					type = "passive";
-> +				};
-> +
-> +				target: trip-point at 1 {
-> +					temperature = <85000>;
-> +					hysteresis = <2000>;
-> +					type = "passive";
-> +				};
-> +
-> +				cpu_crit: cpu_crit at 0 {
-> +					temperature = <115000>;
-> +					hysteresis = <2000>;
-> +					type = "critical";
-> +				};
-> +			};
-> +		};
-> +	};
-> +
->  	timer {
->  		compatible = "arm,armv7-timer";
->  		interrupt-parent = <&gic>;
-> @@ -183,4 +213,17 @@
->  		clocks = <&uart_clk>;
->  		status = "disabled";
->  	};
-> +
-> +	thermal: thermal at 1100b000 {
-> +		#thermal-sensor-cells = <0>;
-> +		compatible = "mediatek,mt2701-thermal";
-> +		reg = <0 0x1100b000 0 0x1000>;
-> +		interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
-> +		clock-names = "therm", "auxadc";
-> +		resets = <&pericfg 0x10>;
-> +		reset-names = "therm";
-> +		mediatek,auxadc = <&auxadc>;
-> +		mediatek,apmixedsys = <&apmixedsys>;
-> +	};
+>  arch/arm64/include/asm/vdso_datapage.h |   4 +-
+>  arch/arm64/kernel/vdso.c               |  11 ++--
+>  arch/arm64/kernel/vdso/gettimeofday.S  | 106 +++++++++++++++------------------
+>  3 files changed, 56 insertions(+), 65 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/vdso_datapage.h b/arch/arm64/include/asm/vdso_datapage.h
+> index 2b9a637..49a0a51 100644
+> --- a/arch/arm64/include/asm/vdso_datapage.h
+> +++ b/arch/arm64/include/asm/vdso_datapage.h
+> @@ -21,6 +21,8 @@
+>  #ifndef __ASSEMBLY__
+>  
+>  struct vdso_data {
+> +	__u32 tb_seq_count;	/* Timebase sequence counter */
+> +	__u32 use_syscall;
+>  	__u64 cs_cycle_last;	/* Timebase at clocksource init */
+>  	__u64 raw_time_sec;	/* Raw time */
+>  	__u64 raw_time_nsec;
+> @@ -30,14 +32,12 @@ struct vdso_data {
+>  	__u64 xtime_coarse_nsec;
+>  	__u64 wtm_clock_sec;	/* Wall to monotonic time */
+>  	__u64 wtm_clock_nsec;
+> -	__u32 tb_seq_count;	/* Timebase sequence counter */
+>  	/* cs_* members must be adjacent and in this order (ldp accesses) */
+>  	__u32 cs_mono_mult;	/* NTP-adjusted clocksource multiplier */
+>  	__u32 cs_shift;		/* Clocksource shift (mono = raw) */
+>  	__u32 cs_raw_mult;	/* Raw clocksource multiplier */
+>  	__u32 tz_minuteswest;	/* Whacky timezone stuff */
+>  	__u32 tz_dsttime;
+> -	__u32 use_syscall;
 >  };
->
+>  
+>  #endif /* !__ASSEMBLY__ */
+> diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+> index 076312b..7751667 100644
+> --- a/arch/arm64/kernel/vdso.c
+> +++ b/arch/arm64/kernel/vdso.c
+> @@ -201,10 +201,12 @@ up_fail:
+>   */
+>  void update_vsyscall(struct timekeeper *tk)
+>  {
+> +	register u32 tmp;
+>  	u32 use_syscall = strcmp(tk->tkr_mono.clock->name, "arch_sys_counter");
+>  
+> -	++vdso_data->tb_seq_count;
+> -	smp_wmb();
+> +	tmp = smp_load_acquire(&vdso_data->tb_seq_count);
+> +	++tmp;
+> +	smp_store_release(&vdso_data->tb_seq_count, tmp);
 
-what about:
-status = "disabled"; ?
+This looks busted -- the writes to vdso_data can be reordered before the
+update of tb_seq_count.
+
+/confused
+
+Will
