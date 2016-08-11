@@ -1,95 +1,30 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Thu, 11 Aug 2016 18:31:41 +0300
-Subject: [PATCH v9 4/4] serial: pl011: add console matching function
-In-Reply-To: <20160811153152.755-1-aleksey.makarov@linaro.org>
-References: <20160811153152.755-1-aleksey.makarov@linaro.org>
-Message-ID: <20160811153152.755-5-aleksey.makarov@linaro.org>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 11 Aug 2016 17:36:45 +0200
+Subject: [PATCH v7 4/4] nmi_backtrace: generate one-line reports for idle
+ cpus
+In-Reply-To: <20160811152538.GH13300@pathway.suse.cz>
+References: <1470672218-16059-1-git-send-email-cmetcalf@mellanox.com>
+ <1470672218-16059-5-git-send-email-cmetcalf@mellanox.com>
+ <20160809124325.GG13300@pathway.suse.cz>
+ <feaaca8f-cc09-5847-ea3f-d27052704d9b@mellanox.com>
+ <20160811152538.GH13300@pathway.suse.cz>
+Message-ID: <20160811153645.GX30192@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds function pl011_console_match() that implements
-method match of struct console.  It allows to match consoles against
-data specified in a string, for example taken from command line or
-compiled by ACPI SPCR table handler.
+On Thu, Aug 11, 2016 at 05:25:38PM +0200, Petr Mladek wrote:
+> diff --git a/arch/x86/include/asm/irqflags.h b/arch/x86/include/asm/irqflags.h
+> index b77f5edb03b0..e31d50acd491 100644
+> --- a/arch/x86/include/asm/irqflags.h
+> +++ b/arch/x86/include/asm/irqflags.h
+> @@ -44,7 +44,7 @@ static inline void native_irq_enable(void)
+>  	asm volatile("sti": : :"memory");
+>  }
+>  
+> -static inline void native_safe_halt(void)
+> +static inline __attribute__((__section__(".cpuidle.text"))) void native_safe_halt(void)
+>  {
+>  	asm volatile("sti; hlt": : :"memory");
+>  }
 
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
----
- drivers/tty/serial/amba-pl011.c | 56 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
-
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 8a9e213..d6a51cb 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -2288,12 +2288,68 @@ static int __init pl011_console_setup(struct console *co, char *options)
- 	return uart_set_options(&uap->port, co, baud, parity, bits, flow);
- }
- 
-+/**
-+ *	pl011_console_match - non-standard console matching
-+ *	@co:	  registering console
-+ *	@name:	  name from console command line
-+ *	@idx:	  index from console command line
-+ *	@options: ptr to option string from console command line
-+ *
-+ *	Only attempts to match console command lines of the form:
-+ *	    console=pl011,mmio|mmio32,<addr>[,<options>]
-+ *	    console=pl011,0x<addr>[,<options>]
-+ *	This form is used to register an initial earlycon boot console and
-+ *	replace it with the amba_console at pl011 driver init.
-+ *
-+ *	Performs console setup for a match (as required by interface)
-+ *	If no <options> are specified, then assume the h/w is already setup.
-+ *
-+ *	Returns 0 if console matches; otherwise non-zero to use default matching
-+ */
-+static int __init pl011_console_match(struct console *co, char *name, int idx,
-+				      char *options)
-+{
-+	char match[] = "pl011";	/* pl011-specific earlycon name */
-+	unsigned char iotype;
-+	unsigned long addr;
-+	int i;
-+
-+	if (strncmp(name, match, 5) != 0)
-+		return -ENODEV;
-+
-+	if (uart_parse_earlycon(options, &iotype, &addr, &options))
-+		return -ENODEV;
-+
-+	if (iotype != UPIO_MEM && iotype != UPIO_MEM32)
-+		return -ENODEV;
-+
-+	/* try to match the port specified on the command line */
-+	for (i = 0; i < ARRAY_SIZE(amba_ports); i++) {
-+		struct uart_port *port;
-+
-+		if (!amba_ports[i])
-+			continue;
-+
-+		port = &amba_ports[i]->port;
-+
-+		if (port->mapbase != addr)
-+			continue;
-+
-+		co->index = i;
-+		port->cons = co;
-+		return pl011_console_setup(co, options);
-+	}
-+
-+	return -ENODEV;
-+}
-+
- static struct uart_driver amba_reg;
- static struct console amba_console = {
- 	.name		= "ttyAMA",
- 	.write		= pl011_console_write,
- 	.device		= uart_console_device,
- 	.setup		= pl011_console_setup,
-+	.match		= pl011_console_match,
- 	.flags		= CON_PRINTBUFFER,
- 	.index		= -1,
- 	.data		= &amba_reg,
--- 
-2.9.2
+An alternative is to use __always_inline I suppose.
