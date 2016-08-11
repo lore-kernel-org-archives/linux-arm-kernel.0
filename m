@@ -1,90 +1,28 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu, 11 Aug 2016 12:06:37 +0200
-Subject: [PATCH V8 7/8] irqchip/gicv3-its: Factor out PCI-MSI part that might
- be reused for ACPI
-In-Reply-To: <1470909998-16710-1-git-send-email-tn@semihalf.com>
-References: <1470909998-16710-1-git-send-email-tn@semihalf.com>
-Message-ID: <1470909998-16710-8-git-send-email-tn@semihalf.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 11 Aug 2016 18:15:50 +0800
+Subject: [PATCH v10 0/8] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <0befd611-91a7-88e9-1686-82929c1745e8@semihalf.com>
+References: <1469535565-20924-1-git-send-email-fu.wei@linaro.org>
+ <0befd611-91a7-88e9-1686-82929c1745e8@semihalf.com>
+Message-ID: <510fa357-a729-4ce1-7c10-4cef06feb7b7@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Firmware agnostic code lands in common functions which do necessary
-domain initialization based on unique domain handler. DT specific
-code goes to DT specific init call.
+Hi,
 
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3-its-pci-msi.c | 44 +++++++++++++++++++++-----------
- 1 file changed, 29 insertions(+), 15 deletions(-)
+On 2016/8/11 17:37, Tomasz Nowicki wrote:
+> Hi Fu,
+>
+> Do you mind if I send IORT series where new drivers/acpi/arm64 directory
+> would be introduced in first place ? This means your GTDT set would
+> depend on IORT.
 
-diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-index aee60ed..d2c2496 100644
---- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-@@ -106,34 +106,48 @@ static struct of_device_id its_device_id[] = {
- 	{},
- };
- 
--static int __init its_pci_msi_init(void)
-+static int __init its_pci_msi_init_one(struct fwnode_handle *handle,
-+				       const char *name)
- {
--	struct device_node *np;
- 	struct irq_domain *parent;
- 
-+	parent = irq_find_matching_fwnode(handle, DOMAIN_BUS_NEXUS);
-+	if (!parent || !msi_get_domain_info(parent)) {
-+		pr_err("%s: Unable to locate ITS domain\n", name);
-+		return -ENXIO;
-+	}
-+
-+	if (!pci_msi_create_irq_domain(handle, &its_pci_msi_domain_info,
-+				       parent)) {
-+		pr_err("%s: Unable to create PCI domain\n", name);
-+		return -ENOMEM;
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init its_pci_of_msi_init(void)
-+{
-+	struct device_node *np;
-+
- 	for (np = of_find_matching_node(NULL, its_device_id); np;
- 	     np = of_find_matching_node(np, its_device_id)) {
- 		if (!of_property_read_bool(np, "msi-controller"))
- 			continue;
- 
--		parent = irq_find_matching_host(np, DOMAIN_BUS_NEXUS);
--		if (!parent || !msi_get_domain_info(parent)) {
--			pr_err("%s: unable to locate ITS domain\n",
--			       np->full_name);
-+		if (its_pci_msi_init_one(of_node_to_fwnode(np), np->full_name))
- 			continue;
--		}
--
--		if (!pci_msi_create_irq_domain(of_node_to_fwnode(np),
--					       &its_pci_msi_domain_info,
--					       parent)) {
--			pr_err("%s: unable to create PCI domain\n",
--			       np->full_name);
--			continue;
--		}
- 
- 		pr_info("PCI/MSI: %s domain created\n", np->full_name);
- 	}
- 
- 	return 0;
- }
-+
-+static int __init its_pci_msi_init(void)
-+{
-+	its_pci_of_msi_init();
-+
-+	return 0;
-+}
- early_initcall(its_pci_msi_init);
--- 
-1.9.1
+I think it's reasonable as the IORT for ITS is the key device enablement
+for PCI MSI. I talked to Fuwei offline and he is fine with it.
+
+But both the GTDT patchset and IORT are in good shape now, can we
+targeting both of them for 4.9 kernel (since all go via tip tree)?
+
+Thanks
+Hanjun
