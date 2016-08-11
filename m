@@ -1,67 +1,37 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 11 Aug 2016 21:52:19 +0800
-Subject: [PATCH v2] ARM: VDSO: put RO and RO after init objects into proper
- sections
-Message-ID: <1470923539-958-1-git-send-email-jszhang@marvell.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 11 Aug 2016 16:07:52 +0200
+Subject: [PATCH 1/4] pinctrl: st: Use second parameter to gpio specifier
+In-Reply-To: <1470834781-23232-2-git-send-email-patrice.chotard@st.com>
+References: <1470834781-23232-1-git-send-email-patrice.chotard@st.com>
+ <1470834781-23232-2-git-send-email-patrice.chotard@st.com>
+Message-ID: <CACRpkdb9GHvb1Fxvjrg+Qb5K8z=Xqu0NkGL3Uovdh0tgrVmofg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vdso_data_mapping is never modified, so mark it as const.
+On Wed, Aug 10, 2016 at 3:12 PM,  <patrice.chotard@st.com> wrote:
 
-vdso_total_pages, vdso_data_page, vdso_text_mapping and cntvct_ok are
-initialized by vdso_init(), thereafter are read only.
+> From: Patrice Chotard <patrice.chotard@st.com>
+>
+> This patch allows to use the second parameter of gpio
+> specifier, which is used to specify whether the gpio is
+> active high or low.
+>
+> Simply remove specific of_xlate callback() and of_gpio_n_cells
+> and use default one set by of_gpiochip_add() which allows
+> to use second parameter gpio specifier.
+>
+> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 
-The fact that they are read only after init makes them candidates for
-__ro_after_init declarations.
+Patch applied.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
+It seems this is one of those drivers that could also implement
+.set_single_ended() and support native open drain.
 
-Since v1:
-  - use __ro_after_init instead of __read_mostly
-  - apply __ro_after_init for vdso_total_pages and cntvct_ok as well
+Either it can do so by poking that pin config directly from the
+gpiochip callback or by figuring out how to interface with the
+pin config backend and do it genercially... I've been thinking a
+bit about that.
 
- arch/arm/kernel/vdso.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
-index 994e971..b81c7197 100644
---- a/arch/arm/kernel/vdso.c
-+++ b/arch/arm/kernel/vdso.c
-@@ -39,7 +39,7 @@
- static struct page **vdso_text_pagelist;
- 
- /* Total number of pages needed for the data and text portions of the VDSO. */
--unsigned int vdso_total_pages __read_mostly;
-+unsigned int vdso_total_pages __ro_after_init;
- 
- /*
-  * The VDSO data page.
-@@ -47,13 +47,13 @@ unsigned int vdso_total_pages __read_mostly;
- static union vdso_data_store vdso_data_store __page_aligned_data;
- static struct vdso_data *vdso_data = &vdso_data_store.data;
- 
--static struct page *vdso_data_page;
--static struct vm_special_mapping vdso_data_mapping = {
-+static struct page *vdso_data_page __ro_after_init;
-+static const struct vm_special_mapping vdso_data_mapping = {
- 	.name = "[vvar]",
- 	.pages = &vdso_data_page,
- };
- 
--static struct vm_special_mapping vdso_text_mapping = {
-+static struct vm_special_mapping vdso_text_mapping __ro_after_init = {
- 	.name = "[vdso]",
- };
- 
-@@ -67,7 +67,7 @@ struct elfinfo {
- /* Cached result of boot-time check for whether the arch timer exists,
-  * and if so, whether the virtual counter is useable.
-  */
--static bool cntvct_ok __read_mostly;
-+static bool cntvct_ok __ro_after_init;
- 
- static bool __init cntvct_functional(void)
- {
--- 
-2.8.1
+Yours,
+Linus Walleij
