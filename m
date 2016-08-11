@@ -1,34 +1,45 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 11 Aug 2016 17:33:37 +0800
-Subject: [PATCH v6 03/14] arm64/numa: add nid check for memory block
+Date: Thu, 11 Aug 2016 17:33:40 +0800
+Subject: [PATCH v6 06/14] of_numa: Use of_get_next_parent to simplify code
 In-Reply-To: <1470908028-8596-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1470908028-8596-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1470908028-8596-4-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1470908028-8596-7-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the same tactic to cpu and numa-distance nodes.
+From: Kefeng Wang <wangkefeng.wang@huawei.com>
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+Use of_get_next_parent() instead of open-code.
+
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/of/of_numa.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/of/of_numa.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
 diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
-index 7b3fbdc..afaeb9c 100644
+index 8723f64..ed103e6 100644
 --- a/drivers/of/of_numa.c
 +++ b/drivers/of/of_numa.c
-@@ -75,6 +75,11 @@ static int __init of_numa_parse_memory_nodes(void)
- 			 */
- 			continue;
+@@ -158,8 +158,6 @@ int of_node_to_nid(struct device_node *device)
+ 	np = of_node_get(device);
 
-+		if (nid >= MAX_NUMNODES) {
-+			pr_warn("NUMA: Node id %u exceeds maximum value\n", nid);
-+			return -EINVAL;
-+		}
-+
- 		for (i = 0; !r && !of_address_to_resource(np, i, &rsrc); i++)
- 			r = numa_add_memblk(nid, rsrc.start, rsrc.end + 1);
+ 	while (np) {
+-		struct device_node *parent;
+-
+ 		r = of_property_read_u32(np, "numa-node-id", &nid);
+ 		/*
+ 		 * -EINVAL indicates the property was not found, and
+@@ -170,9 +168,7 @@ int of_node_to_nid(struct device_node *device)
+ 		if (r != -EINVAL)
+ 			break;
 
+-		parent = of_get_parent(np);
+-		of_node_put(np);
+-		np = parent;
++		np = of_get_next_parent(np);
+ 	}
+ 	if (np && r)
+ 		pr_warn("NUMA: Invalid \"numa-node-id\" property in node %s\n",
 --
 2.5.0
