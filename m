@@ -1,82 +1,71 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 11 Aug 2016 08:36:57 +0100
-Subject: [PATCH 1/9] remoteproc: core: Ensure error message is clear
-In-Reply-To: <68ec0dd7-676d-47a9-19ba-9dcfc9569902@ti.com>
-References: <20160804092153.23032-1-lee.jones@linaro.org>
- <20160804092153.23032-2-lee.jones@linaro.org>
- <20160809172825.GB26240@tuxbot> <20160809181243.GC1581@dell>
- <68ec0dd7-676d-47a9-19ba-9dcfc9569902@ti.com>
-Message-ID: <20160811073657.GB1715@dell>
+From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
+Date: Thu, 11 Aug 2016 15:35:01 +0800
+Subject: [PATCH 05/19] arm64: rename COMPAT to AARCH32_EL0 in Kconfig
+In-Reply-To: <1466207668-10549-6-git-send-email-ynorov@caviumnetworks.com>
+References: <1466207668-10549-1-git-send-email-ynorov@caviumnetworks.com>
+ <1466207668-10549-6-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <57AC2AA5.1030808@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Aug 2016, Suman Anna wrote:
+Hi, Yury
 
-> On 08/09/2016 01:12 PM, Lee Jones wrote:
-> > On Tue, 09 Aug 2016, Bjorn Andersson wrote:
-> > 
-> >> On Thu 04 Aug 02:21 PDT 2016, Lee Jones wrote:
-> >>
-> >>> Before this patch, the dma_alloc_coherent() failure path printed out:
-> >>>
-> >>>   "dma_alloc_coherent err: 16760832"
-> >>>
-> >>> ... alluding to the Linux error code being 16760832, but seeing as
-> >>> Linux error codes are all negative, this looks like a signed/unsigned
-> >>> issue.  In fact, the message is trying to print the length of the
-> >>> requested memory region.  Let's clear that up.
-> >>>
-> >>> While we're at it, let's standardise the way 'len' is printed.  In
-> >>> all other locations 'len' is in hex prefixed by a '0x' for clarity.
-> >>>
-> >>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >>
-> >> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> > 
-> > Again, this can just be applied.
-> > 
-> >>> ---
-> >>>  drivers/remoteproc/remoteproc_core.c | 5 +++--
-> >>>  1 file changed, 3 insertions(+), 2 deletions(-)
-> >>>
-> >>> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-> >>> index aea29a75c..3566dc9 100644
-> >>> --- a/drivers/remoteproc/remoteproc_core.c
-> >>> +++ b/drivers/remoteproc/remoteproc_core.c
-> >>> @@ -581,7 +581,7 @@ static int rproc_handle_carveout(struct rproc *rproc,
-> >>>  		return -EINVAL;
-> >>>  	}
-> >>>  
-> >>> -	dev_dbg(dev, "carveout rsc: da %x, pa %x, len %x, flags %x\n",
-> >>> +	dev_dbg(dev, "carveout rsc: da %x, pa %x, len 0x%x, flags %x\n",
-> >>>  			rsc->da, rsc->pa, rsc->len, rsc->flags);
-> 
-> If you are modifying this trace, it's better to following the leading 0x
-> convention on all arguments rather than just the length.
+On 2016/6/18 7:54, Yury Norov wrote:
+> From: Andrew Pinski <apinski@cavium.com>
+>
+> In this patchset  ILP32 ABI support is added. Additionally to AARCH32,
+> which is binary-compatible with ARM, ILP32 is (mostly) ABI-compatible.
+>
+>  From now, AARCH32_EL0 (former COMPAT) config option means the support of
+> AARCH32 userspace, ARM64_ILP32 - support of ILP32 ABI (see next patches),
+> and COMPAT indicates that one of them, or both, is enabled.
+>
+> Where needed, CONFIG_COMPAT is changed over to use CONFIG_AARCH32_EL0 instead
+>
+> Reviewed-by: David Daney <ddaney@caviumnetworks.com>
+> Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+> Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+> Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+> Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
+> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+...
+> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+> index c173d32..af200a8 100644
+> --- a/arch/arm64/kernel/cpuinfo.c
+> +++ b/arch/arm64/kernel/cpuinfo.c
+> @@ -134,15 +134,17 @@ static int c_show(struct seq_file *m, void *v)
+>   		 */
+>   		seq_puts(m, "Features\t:");
+>   		if (compat) {
+> -#ifdef CONFIG_COMPAT
+> -			for (j = 0; compat_hwcap_str[j]; j++)
+> -				if (compat_elf_hwcap & (1 << j))
+> -					seq_printf(m, " %s", compat_hwcap_str[j]);
+> -
+> -			for (j = 0; compat_hwcap2_str[j]; j++)
+> -				if (compat_elf_hwcap2 & (1 << j))
+> -					seq_printf(m, " %s", compat_hwcap2_str[j]);
+> -#endif /* CONFIG_COMPAT */
+> +#ifdef CONFIG_AARCH32_EL0
+I saw that compat_hwcap_str and compat_hwcap2_str is defined when
+"CONFIG_COMPAT" is true. Why we only change it to CONFIG_AARCH32_EL0
+in c show()?
+> +			if (personality(current->personality) == PER_LINUX32) {
+And "compat" is "personality(current->personality) == PER_LINUX32;",
+it seems that there is no need to add this twice.
 
-I'd be concerned if anyone thought it a good idea to print out memory
-addresses !0x.  The length is the only parameter there which could
-(and has) cause confusion.
+Regards
 
-However, the fix-up is trivial, so I'm happy to oblige.  I'll leave
-the final decision to Bjorn and fix-up if he sees it necessary.
-
-> >>>  	carveout = kzalloc(sizeof(*carveout), GFP_KERNEL);
-> >>> @@ -590,7 +590,8 @@ static int rproc_handle_carveout(struct rproc *rproc,
-> >>>  
-> >>>  	va = dma_alloc_coherent(dev->parent, rsc->len, &dma, GFP_KERNEL);
-> >>>  	if (!va) {
-> >>> -		dev_err(dev->parent, "dma_alloc_coherent err: %d\n", rsc->len);
-> >>> +		dev_err(dev->parent,
-> >>> +			"failed to allocate dma memory: len 0x%x\n", rsc->len);
-> >>>  		ret = -ENOMEM;
-> >>>  		goto free_carv;
-> >>>  	}
-> > 
-> 
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Bamvor
+> +				for (j = 0; compat_hwcap_str[j]; j++)
+> +					if (compat_elf_hwcap & (1 << j))
+> +						seq_printf(m, " %s", compat_hwcap_str[j]);
+> +
+> +				for (j = 0; compat_hwcap2_str[j]; j++)
+> +					if (compat_elf_hwcap2 & (1 << j))
+> +						seq_printf(m, " %s", compat_hwcap2_str[j]);
+> +			}
+> +#endif /* CONFIG_AARCH32_EL0 */
+>   		} else {
+>   			for (j = 0; hwcap_str[j]; j++)
+>   				if (elf_hwcap & (1 << j))
