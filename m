@@ -1,10 +1,10 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 11 Aug 2016 16:09:03 +0200
-Subject: [PATCH 3/4] ARM: dts: STiH418-B2199: Update gpio specifier
-In-Reply-To: <1470834781-23232-4-git-send-email-patrice.chotard@st.com>
+Date: Thu, 11 Aug 2016 16:09:29 +0200
+Subject: [PATCH 4/4] ARM: dts: STiH41x-b2020: Update gpio specifier
+In-Reply-To: <1470834781-23232-5-git-send-email-patrice.chotard@st.com>
 References: <1470834781-23232-1-git-send-email-patrice.chotard@st.com>
- <1470834781-23232-4-git-send-email-patrice.chotard@st.com>
-Message-ID: <CACRpkdavwMmfMngLd8_Hb8vtkMq4jiJwO1cc7d+pB8PHTCOnKg@mail.gmail.com>
+ <1470834781-23232-5-git-send-email-patrice.chotard@st.com>
+Message-ID: <CACRpkdYKtYTsFnMh67ggtF1Ej51hNXD8Jkax=J96+fEhZeYzhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
