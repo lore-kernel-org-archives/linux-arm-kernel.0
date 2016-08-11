@@ -1,38 +1,89 @@
 From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Thu, 11 Aug 2016 09:54:06 -0700
-Subject: [PATCH 1/1] ARM: dts: imx6q-evi: Use GPIO_6 for fec irq
-Message-ID: <1470934446-22536-1-git-send-email-stillcompiling@gmail.com>
+Date: Thu, 11 Aug 2016 09:59:12 -0700
+Subject: [PATCH 1/1] sbs-battery: add ability to get battery capacity
+Message-ID: <1470934752-22719-1-git-send-email-stillcompiling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apply hardware workaround for ethernet problem
-See nxp erratum err006687
+Battery capacity level is a standard feature of sbs battery
+That can be used to tell what the remainig battery capacity is, and
+can tell if the battery has not been calibrated/initialized, which makes
+the capacity and charging/discharging percentages invalid.
 
 Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
 ---
- arch/arm/boot/dts/imx6q-evi.dts | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/power/sbs-battery.c | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
-index 49c6f61..33bd04b 100644
---- a/arch/arm/boot/dts/imx6q-evi.dts
-+++ b/arch/arm/boot/dts/imx6q-evi.dts
-@@ -127,6 +127,8 @@
- 	pinctrl-0 = <&pinctrl_enet>;
- 	phy-mode = "rgmii";
- 	phy-reset-gpios = <&gpio1 25 0>;
-+	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
-+			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
- 	status = "okay";
- };
+diff --git a/drivers/power/sbs-battery.c b/drivers/power/sbs-battery.c
+index 768b9fc..4f913b6 100644
+--- a/drivers/power/sbs-battery.c
++++ b/drivers/power/sbs-battery.c
+@@ -41,6 +41,7 @@ enum {
+ 	REG_TIME_TO_EMPTY,
+ 	REG_TIME_TO_FULL,
+ 	REG_STATUS,
++	REG_CAPACITY_LEVEL,
+ 	REG_CYCLE_COUNT,
+ 	REG_SERIAL_NUMBER,
+ 	REG_REMAINING_CAPACITY,
+@@ -68,6 +69,7 @@ enum sbs_battery_mode {
+ #define MANUFACTURER_ACCESS_SLEEP	0x0011
  
-@@ -312,6 +314,7 @@
- 			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
- 			MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN 0x4001b0a8
- 			MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25 0x1b0b0
-+			MX6QDL_PAD_GPIO_6__ENET_IRQ 0x000b1
- 		>;
- 	};
+ /* battery status value bits */
++#define BATTERY_INITIALIZED		0x80
+ #define BATTERY_DISCHARGING		0x40
+ #define BATTERY_FULL_CHARGED		0x20
+ #define BATTERY_FULL_DISCHARGED		0x10
+@@ -110,6 +112,8 @@ static const struct chip_data {
+ 		SBS_DATA(POWER_SUPPLY_PROP_TIME_TO_FULL_AVG, 0x13, 0, 65535),
+ 	[REG_STATUS] =
+ 		SBS_DATA(POWER_SUPPLY_PROP_STATUS, 0x16, 0, 65535),
++	[REG_CAPACITY_LEVEL] =
++		SBS_DATA(POWER_SUPPLY_PROP_CAPACITY_LEVEL, 0x16, 0, 65535),
+ 	[REG_CYCLE_COUNT] =
+ 		SBS_DATA(POWER_SUPPLY_PROP_CYCLE_COUNT, 0x17, 0, 65535),
+ 	[REG_DESIGN_CAPACITY] =
+@@ -131,6 +135,7 @@ static const struct chip_data {
  
+ static enum power_supply_property sbs_properties[] = {
+ 	POWER_SUPPLY_PROP_STATUS,
++	POWER_SUPPLY_PROP_CAPACITY_LEVEL,
+ 	POWER_SUPPLY_PROP_HEALTH,
+ 	POWER_SUPPLY_PROP_PRESENT,
+ 	POWER_SUPPLY_PROP_TECHNOLOGY,
+@@ -377,8 +382,23 @@ static int sbs_get_battery_property(struct i2c_client *client,
+ 	if (ret >= sbs_data[reg_offset].min_value &&
+ 	    ret <= sbs_data[reg_offset].max_value) {
+ 		val->intval = ret;
+-		if (psp != POWER_SUPPLY_PROP_STATUS)
++		if (psp == POWER_SUPPLY_PROP_CAPACITY_LEVEL) {
++			if (!(ret & BATTERY_INITIALIZED))
++				val->intval =
++					POWER_SUPPLY_CAPACITY_LEVEL_UNKNOWN;
++			else if (ret & BATTERY_FULL_CHARGED)
++				val->intval =
++					POWER_SUPPLY_CAPACITY_LEVEL_FULL;
++			else if (ret & BATTERY_FULL_DISCHARGED)
++				val->intval =
++					POWER_SUPPLY_CAPACITY_LEVEL_CRITICAL;
++			else
++				val->intval =
++					POWER_SUPPLY_CAPACITY_LEVEL_NORMAL;
+ 			return 0;
++		} else if (psp != POWER_SUPPLY_PROP_STATUS) {
++			return 0;
++		}
+ 
+ 		if (ret & BATTERY_FULL_CHARGED)
+ 			val->intval = POWER_SUPPLY_STATUS_FULL;
+@@ -590,6 +610,7 @@ static int sbs_get_property(struct power_supply *psy,
+ 		break;
+ 
+ 	case POWER_SUPPLY_PROP_STATUS:
++	case POWER_SUPPLY_PROP_CAPACITY_LEVEL:
+ 	case POWER_SUPPLY_PROP_CYCLE_COUNT:
+ 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+ 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 -- 
 2.7.4
