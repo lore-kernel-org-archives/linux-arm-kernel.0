@@ -1,21 +1,29 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 11 Aug 2016 10:18 +0200
-Subject: [PATCH v2 2/4] ARM: dts: rockchip: update compatible strings for
- Rockchip efuse
-In-Reply-To: <1470878029-11878-3-git-send-email-finley.xiao@rock-chips.com>
-References: <1470878029-11878-1-git-send-email-finley.xiao@rock-chips.com>
- <1470878029-11878-3-git-send-email-finley.xiao@rock-chips.com>
-Message-ID: <4317581.3Ap4cvVWdH@diego>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 11 Aug 2016 10:19:32 +0200
+Subject: [PATCH] pinctrl: qcom: Add generic ssbi and spmi GPIO/MPP bindings
+In-Reply-To: <20160711190109.16758-1-sboyd@codeaurora.org>
+References: <20160711190109.16758-1-sboyd@codeaurora.org>
+Message-ID: <CACRpkdazPheA1s2FX2ugEyCFmrKiq36QEmEuCGJRt-vQTFWFVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 11. August 2016, 09:13:47 schrieb Finlye Xiao:
-> From: Finley Xiao <finley.xiao@rock-chips.com>
-> 
-> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+On Mon, Jul 11, 2016 at 9:01 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-due to the renaming of the compatibles and to not introduce regressions, this 
-patch should probably go through the nvmem-tree as well (instead of my 
-rockchip-tree), so
+> The drivers don't really need to know which PMIC they're for, so
+> make a generic binding for them. This alleviates us from updating
+> the drivers every time a new PMIC comes out. It's still
+> recommended that we update the binding with new PMIC models and
+> always specify the specific model for the MPPs and gpios before
+> the generic compatible string in devicetree, but this at least
+> cuts down on adding more and more compatible strings to the
+> drivers until we actually need them.
+>
+> Cc: <devicetree@vger.kernel.org>
+> Acked-by: "Ivan T. Ivanov" <iivanov.xz@gmail.com>
+> Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Patch applied with Rob's ACK.
+
+Yours,
+Linus Walleij
