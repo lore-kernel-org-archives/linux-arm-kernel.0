@@ -1,33 +1,35 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 11 Aug 2016 21:36:46 +0800
-Subject: [PATCH v2 1/4] arm64: vdso: add __init section marker to
- alloc_vectors_page
+Date: Thu, 11 Aug 2016 21:36:48 +0800
+Subject: [PATCH v2 3/4] arm64: kaslr: Fix incorrect placement of __initdata
+ and __read_mostly
 In-Reply-To: <1470922609-754-1-git-send-email-jszhang@marvell.com>
 References: <1470922609-754-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1470922609-754-2-git-send-email-jszhang@marvell.com>
+Message-ID: <1470922609-754-4-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is not needed after booting, this patch moves the alloc_vectors_page
-function to the __init section.
+__initdata and __read_mostly should be placed after the variable name
+for the variable to be placed in the intended section.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- arch/arm64/kernel/vdso.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/kernel/kaslr.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 076312b..e320e8f 100644
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -55,7 +55,7 @@ struct vdso_data *vdso_data = &vdso_data_store.data;
-  */
- static struct page *vectors_page[1];
+diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
+index b054691..8ebabc4 100644
+--- a/arch/arm64/kernel/kaslr.c
++++ b/arch/arm64/kernel/kaslr.c
+@@ -20,8 +20,8 @@
+ #include <asm/pgtable.h>
+ #include <asm/sections.h>
  
--static int alloc_vectors_page(void)
-+static int __init alloc_vectors_page(void)
+-u64 __read_mostly module_alloc_base;
+-u16 __initdata memstart_offset_seed;
++u64 module_alloc_base __read_mostly;
++u16 memstart_offset_seed __initdata;
+ 
+ static __init u64 get_kaslr_seed(void *fdt)
  {
- 	extern char __kuser_helper_start[], __kuser_helper_end[];
- 	extern char __aarch32_sigret_code_start[], __aarch32_sigret_code_end[];
 -- 
 2.8.1
