@@ -1,46 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 11 Aug 2016 12:01:43 +0100
-Subject: [PATCH] arm64: suspend: avoid potential TLB conflict
-In-Reply-To: <57AAF666.2030501@arm.com>
-References: <1470651050-18291-1-git-send-email-mark.rutland@arm.com>
- <57AA0401.1020809@arm.com> <20160809175157.GC13591@leverpostej>
- <57AAF666.2030501@arm.com>
-Message-ID: <20160811110143.GB3805@leverpostej>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 11 Aug 2016 14:04:17 +0300
+Subject: [PATCH 1/2] ahci: st: Add ports-implemented property in support
+In-Reply-To: <1470843450-20068-2-git-send-email-patrice.chotard@st.com>
+References: <1470843450-20068-1-git-send-email-patrice.chotard@st.com>
+ <1470843450-20068-2-git-send-email-patrice.chotard@st.com>
+Message-ID: <72e008b8-25dd-ae87-fd8c-b9e60b6fb1a8@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 10:39:50AM +0100, James Morse wrote:
-> Hi Mark,
-> 
-> On 09/08/16 18:51, Mark Rutland wrote:
-> > On Tue, Aug 09, 2016 at 05:25:37PM +0100, James Morse wrote:
-> >> fe12c00d21bb ("PM / hibernate: Introduce test_resume mode for hibernation") came
-> >> in with the merge window, this does a suspend followed by a resume with the user
-> >> page tables still loaded in ttbr0_el1.
-> > 
-> > Hmmm... given that, it looks like if we bail out in swsusp_arch_resume()
-> > after the call to create_safe_exec_page(), we may return to userspace
-> > with a corrupted TTBR0.
-> 
-> Ah, didn't spot that.
-> 
-> > We probably need to defer the call to create_safe_exec_page() after the
-> > other potential failure sites so as to avoid that.
-> > 
-> > Looking around it's not clear to me how/where the get_safe_page()
-> > allocations are cleaned up when a failure occurs.
-> 
-> Its dealt with by the core code: they get added to to one of
-> kernel/power/snapshot.c's plethora of bitmaps, and freed via
-> free_basic_memory_bitmaps() -> memory_bm_free() -> free_list_of_pages() ->
-> free_image_page().
-> 
-> It looks like pages allocated by get_safe_page() are on the 'forbidden_pages_map'.
+On 8/10/2016 6:37 PM, patrice.chotard at st.com wrote:
 
-Thanks for the pointer!
+> From: Patrice Chotard <patrice.chotard@st.com>
+>
+> Despite ST AHCI version = 1.3, reading HOST_PORTS_IMPL
+> returns 0. So force_port_map to 1 by using ports-implemented
+> DT property.
+>
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> ---
+>  drivers/ata/ahci_st.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/drivers/ata/ahci_st.c b/drivers/ata/ahci_st.c
+> index 8ff428f..bc345f2 100644
+> --- a/drivers/ata/ahci_st.c
+> +++ b/drivers/ata/ahci_st.c
+> @@ -147,6 +147,7 @@ static struct scsi_host_template ahci_platform_sht = {
+>
+>  static int st_ahci_probe(struct platform_device *pdev)
+>  {
+> +	struct device *dev = &pdev->dev;
 
-Given that, it looks like a simple reshuffling of swsusp_arch_resume is
-all that's necessary. I'll spin that along with v2 of this patch.
+    Why? You could just use 'pdev'.
 
-Thanks,
-Mark.
+>  	struct st_ahci_drv_data *drv_data;
+>  	struct ahci_host_priv *hpriv;
+>  	int err;
+> @@ -170,6 +171,9 @@ static int st_ahci_probe(struct platform_device *pdev)
+>
+>  	st_ahci_configure_oob(hpriv->mmio);
+>
+> +	of_property_read_u32(dev->of_node,
+
+    pdev->dev.of_node
+
+> +			     "ports-implemented", &hpriv->force_port_map);
+> +
+>  	err = ahci_platform_init_host(pdev, hpriv, &st_ahci_port_info,
+>  				      &ahci_platform_sht);
+>  	if (err) {
+
+MBR, Sergei
