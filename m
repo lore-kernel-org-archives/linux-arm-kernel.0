@@ -1,35 +1,234 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 11 Aug 2016 17:59:46 +0100
-Subject: [PATCH] arm64: remove traces of perf_ops_bp
-Message-ID: <1470934786-4052-1-git-send-email-mark.rutland@arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Thu, 11 Aug 2016 19:00:35 +0200
+Subject: [PATCH 1/5] arm/defconfigs: Remove CONFIG_IPV6_PRIVACY
+In-Reply-To: <571752E8.2040103@mleia.com>
+References: <1459338168-29334-1-git-send-email-bp@alien8.de>
+ <1459338168-29334-2-git-send-email-bp@alien8.de>
+ <571752E8.2040103@mleia.com>
+Message-ID: <20160811170035.GD7296@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even though perf_ops_bp was removed/renamed back in commit
-b0a873ebbf87bf38 ("perf: Register PMU implementations"), as part of
-v2.6.37, its definition still lives on in some arch headers.
+On Wed, Apr 20, 2016 at 12:59:04PM +0300, Vladimir Zapolskiy wrote:
+> Probably you may do something similar for S3C24xx and send the change
+> to Samsung maintainers.
 
-This patch removes the vestigal definition from arm64.
+How does that look like?
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/hw_breakpoint.h | 2 --
- 1 file changed, 2 deletions(-)
+From: Borislav Petkov <bp@suse.de>
+Date: Thu, 11 Aug 2016 18:57:13 +0200
+Subject: [PATCH] arm/s3c2410: Update defconfig
 
-diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
-index 115ea2a..2487891 100644
---- a/arch/arm64/include/asm/hw_breakpoint.h
-+++ b/arch/arm64/include/asm/hw_breakpoint.h
-@@ -141,8 +141,6 @@ static inline void ptrace_hw_copy_thread(struct task_struct *task)
- }
- #endif
- 
--extern struct pmu perf_ops_bp;
--
- /* Determine number of BRP registers available. */
- static inline int get_num_brps(void)
- {
+Run:
+
+  make s3c2410_defconfig
+  make savedefconfig
+
+to update s3c2410 defconfig.
+
+Suggested-by: Vladimir Zapolskiy <vz@mleia.com>
+Signed-off-by: Borislav Petkov <bp@suse.de>
+---
+ arch/arm/configs/s3c2410_defconfig | 35 +++--------------------------------
+ 1 file changed, 3 insertions(+), 32 deletions(-)
+
+diff --git a/arch/arm/configs/s3c2410_defconfig b/arch/arm/configs/s3c2410_defconfig
+index b3ade552a2a5..7339d6f5d71b 100644
+--- a/arch/arm/configs/s3c2410_defconfig
++++ b/arch/arm/configs/s3c2410_defconfig
+@@ -1,4 +1,3 @@
+-CONFIG_EXPERIMENTAL=y
+ CONFIG_SYSVIPC=y
+ CONFIG_IKCONFIG=m
+ CONFIG_IKCONFIG_PROC=y
+@@ -12,9 +11,6 @@ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_BSD_DISKLABEL=y
+ CONFIG_SOLARIS_X86_PARTITION=y
+ CONFIG_ARCH_S3C24XX=y
+-CONFIG_S3C_BOOT_ERROR_RESET=y
+-CONFIG_S3C_ADC=y
+-CONFIG_S3C24XX_PWM=y
+ CONFIG_CPU_S3C2412=y
+ CONFIG_CPU_S3C2416=y
+ CONFIG_CPU_S3C2440=y
+@@ -38,20 +34,18 @@ CONFIG_MACH_AT2440EVB=y
+ CONFIG_MACH_MINI2440=y
+ CONFIG_MACH_NEXCODER_2440=y
+ CONFIG_MACH_OSIRIS=y
+-CONFIG_MACH_OSIRIS_DVS=m
+ CONFIG_MACH_RX3715=y
+ CONFIG_ARCH_S3C2440=y
+ CONFIG_MACH_NEO1973_GTA02=y
+ CONFIG_MACH_RX1950=y
+-CONFIG_SMDK2440_CPU2442=y
+ CONFIG_MACH_SMDK2443=y
++CONFIG_S3C_ADC=y
+ # CONFIG_ARM_THUMB is not set
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_CMDLINE="root=/dev/hda1 ro init=/bin/bash console=ttySAC0"
+ CONFIG_FPE_NWFPE=y
+ CONFIG_FPE_NWFPE_XP=y
+-CONFIG_BINFMT_AOUT=y
+ CONFIG_APM_EMULATION=m
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+@@ -67,7 +61,6 @@ CONFIG_NET_IPIP=m
+ CONFIG_INET_AH=m
+ CONFIG_INET_ESP=m
+ CONFIG_INET_IPCOMP=m
+-# CONFIG_INET_LRO is not set
+ CONFIG_TCP_CONG_ADVANCED=y
+ CONFIG_TCP_CONG_HSTCP=m
+ CONFIG_TCP_CONG_HYBLA=m
+@@ -76,7 +69,6 @@ CONFIG_TCP_CONG_LP=m
+ CONFIG_TCP_CONG_VENO=m
+ CONFIG_TCP_CONG_YEAH=m
+ CONFIG_TCP_CONG_ILLINOIS=m
+-CONFIG_IPV6_PRIVACY=y
+ CONFIG_IPV6_ROUTER_PREF=y
+ CONFIG_INET6_AH=m
+ CONFIG_INET6_ESP=m
+@@ -140,19 +132,12 @@ CONFIG_NETFILTER_XT_MATCH_TIME=m
+ CONFIG_NETFILTER_XT_MATCH_U32=m
+ CONFIG_IP_VS=m
+ CONFIG_NF_CONNTRACK_IPV4=m
+-CONFIG_IP_NF_QUEUE=m
+ CONFIG_IP_NF_IPTABLES=m
+ CONFIG_IP_NF_MATCH_AH=m
+ CONFIG_IP_NF_MATCH_ECN=m
+ CONFIG_IP_NF_MATCH_TTL=m
+ CONFIG_IP_NF_FILTER=m
+ CONFIG_IP_NF_TARGET_REJECT=m
+-CONFIG_IP_NF_TARGET_LOG=m
+-CONFIG_IP_NF_TARGET_ULOG=m
+-CONFIG_NF_NAT=m
+-CONFIG_IP_NF_TARGET_MASQUERADE=m
+-CONFIG_IP_NF_TARGET_NETMAP=m
+-CONFIG_IP_NF_TARGET_REDIRECT=m
+ CONFIG_IP_NF_MANGLE=m
+ CONFIG_IP_NF_TARGET_CLUSTERIP=m
+ CONFIG_IP_NF_TARGET_ECN=m
+@@ -162,7 +147,6 @@ CONFIG_IP_NF_ARPTABLES=m
+ CONFIG_IP_NF_ARPFILTER=m
+ CONFIG_IP_NF_ARP_MANGLE=m
+ CONFIG_NF_CONNTRACK_IPV6=m
+-CONFIG_IP6_NF_QUEUE=m
+ CONFIG_IP6_NF_IPTABLES=m
+ CONFIG_IP6_NF_MATCH_AH=m
+ CONFIG_IP6_NF_MATCH_EUI64=m
+@@ -173,7 +157,6 @@ CONFIG_IP6_NF_MATCH_IPV6HEADER=m
+ CONFIG_IP6_NF_MATCH_MH=m
+ CONFIG_IP6_NF_MATCH_RT=m
+ CONFIG_IP6_NF_TARGET_HL=m
+-CONFIG_IP6_NF_TARGET_LOG=m
+ CONFIG_IP6_NF_FILTER=m
+ CONFIG_IP6_NF_TARGET_REJECT=m
+ CONFIG_IP6_NF_MANGLE=m
+@@ -186,7 +169,6 @@ CONFIG_BT_BNEP_MC_FILTER=y
+ CONFIG_BT_BNEP_PROTO_FILTER=y
+ CONFIG_BT_HIDP=m
+ CONFIG_BT_HCIUART=m
+-CONFIG_BT_HCIUART_H4=y
+ CONFIG_BT_HCIUART_BCSP=y
+ CONFIG_BT_HCIUART_LL=y
+ CONFIG_BT_HCIBCM203X=m
+@@ -202,7 +184,6 @@ CONFIG_MTD=y
+ CONFIG_MTD_REDBOOT_PARTS=y
+ CONFIG_MTD_REDBOOT_PARTS_UNALLOCATED=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+-CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_JEDECPROBE=y
+@@ -217,9 +198,9 @@ CONFIG_PARPORT_AX88796=m
+ CONFIG_PARPORT_1284=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_NBD=m
+-CONFIG_BLK_DEV_UB=m
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_ATA_OVER_ETH=m
++CONFIG_EEPROM_AT24=y
+ CONFIG_IDE=y
+ CONFIG_BLK_DEV_IDECD=y
+ CONFIG_BLK_DEV_IDETAPE=m
+@@ -231,7 +212,6 @@ CONFIG_BLK_DEV_SR=m
+ CONFIG_BLK_DEV_SR_VENDOR=y
+ CONFIG_CHR_DEV_SG=y
+ CONFIG_CHR_DEV_SCH=m
+-CONFIG_SCSI_MULTI_LUN=y
+ CONFIG_SCSI_CONSTANTS=y
+ CONFIG_SCSI_SCAN_ASYNC=y
+ CONFIG_NETDEVICES=y
+@@ -290,7 +270,6 @@ CONFIG_HW_RANDOM=y
+ CONFIG_I2C_CHARDEV=m
+ CONFIG_I2C_S3C2410=y
+ CONFIG_I2C_SIMTEC=y
+-CONFIG_EEPROM_AT24=y
+ CONFIG_SPI=y
+ CONFIG_SPI_GPIO=m
+ CONFIG_SPI_S3C24XX=m
+@@ -341,7 +320,6 @@ CONFIG_USB_STORAGE_ALAUDA=m
+ CONFIG_USB_STORAGE_ONETOUCH=m
+ CONFIG_USB_STORAGE_KARMA=m
+ CONFIG_USB_STORAGE_CYPRESS_ATACB=m
+-CONFIG_USB_LIBUSUAL=y
+ CONFIG_USB_MDC800=m
+ CONFIG_USB_MICROTEK=m
+ CONFIG_USB_USS720=m
+@@ -358,7 +336,6 @@ CONFIG_USB_SEVSEG=m
+ CONFIG_USB_RIO500=m
+ CONFIG_USB_LEGOTOWER=m
+ CONFIG_USB_LCD=m
+-CONFIG_USB_LED=m
+ CONFIG_USB_CYPRESS_CY7C63=m
+ CONFIG_USB_CYTHERM=m
+ CONFIG_USB_IDMOUSE=m
+@@ -373,7 +350,6 @@ CONFIG_SDIO_UART=m
+ CONFIG_MMC_TEST=m
+ CONFIG_MMC_SDHCI=m
+ CONFIG_MMC_SPI=m
+-CONFIG_MMC_S3C=y
+ CONFIG_LEDS_S3C24XX=m
+ CONFIG_LEDS_PCA9532=m
+ CONFIG_LEDS_GPIO=m
+@@ -393,8 +369,6 @@ CONFIG_EXT2_FS_POSIX_ACL=y
+ CONFIG_EXT2_FS_SECURITY=y
+ CONFIG_EXT3_FS=y
+ CONFIG_EXT3_FS_POSIX_ACL=y
+-CONFIG_EXT4_FS=m
+-CONFIG_EXT4_FS_POSIX_ACL=y
+ CONFIG_AUTOFS4_FS=m
+ CONFIG_FUSE_FS=m
+ CONFIG_ISO9660_FS=y
+@@ -412,7 +386,6 @@ CONFIG_CRAMFS=y
+ CONFIG_SQUASHFS=m
+ CONFIG_ROMFS_FS=y
+ CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+ CONFIG_NFS_V3_ACL=y
+ CONFIG_ROOT_NFS=y
+ CONFIG_NFSD=m
+@@ -457,11 +430,9 @@ CONFIG_NLS_ISO8859_15=m
+ CONFIG_NLS_KOI8_R=m
+ CONFIG_NLS_KOI8_U=m
+ CONFIG_NLS_UTF8=m
++CONFIG_DEBUG_INFO=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_KERNEL=y
+ CONFIG_DEBUG_MUTEXES=y
+-CONFIG_DEBUG_INFO=y
+-CONFIG_SYSCTL_SYSCALL_CHECK=y
+ CONFIG_DEBUG_USER=y
+ CONFIG_DEBUG_LL=y
+-# CONFIG_CRYPTO_ANSI_CPRNG is not set
 -- 
-1.9.1
+2.8.4
+
+-- 
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
+--
