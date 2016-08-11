@@ -1,37 +1,53 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 11 Aug 2016 11:38:10 +0200
-Subject: [PATCH V5 1/4] drm/imx-ldb: Add support to drm-bridge
-In-Reply-To: <1d76685746a1524127aa6747994dd8fd84ad1c38.1470739193.git.peter.senna@collabora.com>
-References: <1464626385-19253-1-git-send-email-peter.senna@collabora.com>
- <cover.1470739193.git.peter.senna@collabora.com>
- <1d76685746a1524127aa6747994dd8fd84ad1c38.1470739193.git.peter.senna@collabora.com>
-Message-ID: <1470908290.2493.37.camel@pengutronix.de>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Thu, 11 Aug 2016 17:33:46 +0800
+Subject: [PATCH v6 12/14] arm64/numa: remove some useless code
+In-Reply-To: <1470908028-8596-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1470908028-8596-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1470908028-8596-13-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 09.08.2016, 18:41 +0200 schrieb Peter Senna Tschudin:
-> Add support to attach a drm_bridge to imx-ldb in addition to
-> existing support to attach a LVDS panel.
-> 
-> This patch does a simple code refactoring by moving code
-> from for_each_child_of_node iterator to a new function named
-> imx_ldb_panel_ddc(). This was necessary to allow the panel ddc
-> code to run only when the imx_ldb is not attached to a bridge.
-> 
-> Cc: Martyn Welch <martyn.welch@collabora.co.uk>
-> Cc: Martin Donnelly <martin.donnelly@ge.com>
-> Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: David Airlie <airlied@linux.ie>
-> Cc: Thierry Reding <treding@nvidia.com>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
-> ---
-> Unchanged from V4
+1. Currently only cpu0 set on cpu_possible_mask and percpu areas have not
+   been initialized.
+2. No reason to limit cpu0 must belongs to node0.
 
-I've rebased and applied patch 1.
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+---
+ arch/arm64/mm/numa.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
-thanks
-Philipp
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index 30d3279..1796789 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -93,7 +93,6 @@ void numa_clear_node(unsigned int cpu)
+  */
+ static void __init setup_node_to_cpumask_map(void)
+ {
+-	unsigned int cpu;
+ 	int node;
+
+ 	/* setup nr_node_ids if not done yet */
+@@ -106,9 +105,6 @@ static void __init setup_node_to_cpumask_map(void)
+ 		cpumask_clear(node_to_cpumask_map[node]);
+ 	}
+
+-	for_each_possible_cpu(cpu)
+-		set_cpu_numa_node(cpu, NUMA_NO_NODE);
+-
+ 	/* cpumask_of_node() will now work */
+ 	pr_debug("Node to cpumask map for %d nodes\n", nr_node_ids);
+ }
+@@ -374,10 +370,6 @@ static int __init numa_init(int (*init_func)(void))
+
+ 	setup_node_to_cpumask_map();
+
+-	/* init boot processor */
+-	cpu_to_node_map[0] = 0;
+-	map_cpu_to_node(0, 0);
+-
+ 	return 0;
+ }
+
+--
+2.5.0
