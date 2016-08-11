@@ -1,29 +1,25 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 12 Aug 2016 00:17:15 +0200
-Subject: [v2 PATCH] clk: rockchip: mark rk3399 hdcp_noc and vio_noc as
- critical
-In-Reply-To: <1470765753-11619-1-git-send-email-zyw@rock-chips.com>
-References: <1470765753-11619-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1721159.V5xB9fz0jT@diego>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 11 Aug 2016 15:19:48 -0700
+Subject: [PATCH v2] arm64: dts: qcom: Fix broken interrupt trigger settings
+In-Reply-To: <1470937850-10492-1-git-send-email-marc.zyngier@arm.com>
+References: <1470937850-10492-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160811221948.GL2996@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 9. August 2016, 11:02:33 schrieb Chris Zhong:
-> Fix incorrect rk3399 aclk_vio gating bit, it should be 0, not 10. With
-> this modification, the aclk_vio_noc should be put into critical list,
-> since it is required by VOP.
-> And the Type-C DP need these clocks: aclk_hdcp_noc, hclk_hdcp_noc,
-> pclk_hdcp_noc. Mark them as critical to avoid someone close them.
+On 08/11, Marc Zyngier wrote:
+> When a device uses the GIC as its interrupt controller and generates
+> SPIs, only the values 1 (edge rising) and 4 (level high) are legal.
 > 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> Anything else is just plain wrong (can't be programmed into the HW),
+> and leads to aborted driver probes (USB doesn't work with 4.8-rc1
+> on a Dragonboard 410C).
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
 
-I've split that patch in two and applied them there:
-https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commit/?h=v4.8-clk/fixes&id=a3f457d9636b3f5ae4fc6502cb0c95f60f5e342b
-(gate-bit-fix)
-https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commit/?h=v4.9-clk/next&id=54479449c801e46ee2b6ba08e2f19cd810f74f94
-(critical clocks)
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
-with the provided Reviewed-bys.
-
-
-Heiko
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
