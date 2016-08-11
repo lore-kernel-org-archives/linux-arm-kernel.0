@@ -1,153 +1,116 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 11 Aug 2016 11:21:44 +0200
-Subject: [PATCH 1/4] input: touchscreen: Add generic touchscreen
- softbutton handling code
-In-Reply-To: <58cfd727-bb46-3ea8-85b9-8c17fbed72c5@redhat.com>
-References: <1469978590-14081-1-git-send-email-hdegoede@redhat.com>
- <1469978590-14081-2-git-send-email-hdegoede@redhat.com>
- <20160801165430.GA30345@rob-hp-laptop> <20160801174154.GA3231@dtor-ws>
- <58cfd727-bb46-3ea8-85b9-8c17fbed72c5@redhat.com>
-Message-ID: <d95d5b9a-51c2-d45d-62dc-a9e52177a97c@redhat.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 11 Aug 2016 12:25:53 +0300
+Subject: [PATCH] ARM: dts: am335x-wega: Add audio support
+In-Reply-To: <1470841935-14190-1-git-send-email-s.mueller-klieser@phytec.de>
+References: <1470841935-14190-1-git-send-email-s.mueller-klieser@phytec.de>
+Message-ID: <7109f6e5-e7fd-4b60-98b7-85b9d78ef690@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 08/10/16 18:12, Stefan M?ller-Klieser wrote:
+> The wega board has a TLV320AIC3007 connected via McASP0. In the default
+> configuration, no external crystal is mounted. We run a system clock of
+> 25 MHz, so we use the audio codec PLL for audio clock generation.
+
+It is great that the "ti,da830-evm-audio" works for you. I hope I will have
+time soon to work on the McASP driver's CCF support in the near future.
+
+Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+
+> Signed-off-by: Stefan M?ller-Klieser <s.mueller-klieser@phytec.de>
+> ---
+>  arch/arm/boot/dts/am335x-wega.dtsi | 62 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 62 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/am335x-wega.dtsi b/arch/arm/boot/dts/am335x-wega.dtsi
+> index 282f6d4..7f5f8ed 100644
+> --- a/arch/arm/boot/dts/am335x-wega.dtsi
+> +++ b/arch/arm/boot/dts/am335x-wega.dtsi
+> @@ -11,6 +11,10 @@
+>  	model = "Phytec AM335x phyBOARD-WEGA";
+>  	compatible = "phytec,am335x-wega", "phytec,am335x-phycore-som", "ti,am33xx";
+>  
+> +	sound: sound_iface {
+> +		compatible = "ti,da830-evm-audio";
+> +	};
+> +
+>  	regulators {
+>  		compatible = "simple-bus";
+>  
+> @@ -24,6 +28,58 @@
+>  	};
+>  };
+>  
+> +/* Audio */
+> +&am33xx_pinmux {
+> +	mcasp0_pins: pinmux_mcasp0 {
+> +		pinctrl-single,pins = <
+> +			AM33XX_IOPAD(0x9AC, PIN_OUTPUT_PULLDOWN | MUX_MODE0) /* mcasp0_ahclkx.mcasp0_ahclkx */
+> +			AM33XX_IOPAD(0x990, PIN_INPUT_PULLDOWN | MUX_MODE0)  /* mcasp0_aclkx.mcasp0_aclkx */
+> +			AM33XX_IOPAD(0x994, PIN_INPUT_PULLDOWN | MUX_MODE0)  /* mcasp0_fsx.mcasp0_fsx */
+> +			AM33XX_IOPAD(0x998, PIN_INPUT_PULLDOWN | MUX_MODE0)  /* mcasp0_axr0.mcasp0_axr0 */
+> +			AM33XX_IOPAD(0x9A8, PIN_OUTPUT_PULLDOWN | MUX_MODE0) /* mcasp0_axr1.mcasp0_axr1 */
+> +		>;
+> +	};
+> +};
+> +
+> +&i2c0 {
+> +	tlv320aic3007: tlv320aic3007 at 18 {
+> +		compatible = "ti,tlv320aic3007";
+> +		reg = <0x18>;
+> +		AVDD-supply = <&vcc3v3>;
+> +		IOVDD-supply = <&vcc3v3>;
+> +		DRVDD-supply = <&vcc3v3>;
+> +		DVDD-supply = <&vdig1_reg>;
+> +		status = "okay";
+> +	};
+> +};
+> +
+> +&mcasp0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mcasp0_pins>;
+> +	op-mode = <0>; /* DAVINCI_MCASP_IIS_MODE */
+> +	tdm-slots = <2>;
+> +	serial-dir = <
+> +		2 1 0 0 /* # 0: INACTIVE, 1: TX, 2: RX */
+> +	>;
+> +	tx-num-evt = <16>;
+> +	rt-num-evt = <16>;
+> +	status = "okay";
+> +};
+> +
+> +&sound {
+> +	ti,model = "AM335x-Wega";
+> +	ti,audio-codec = <&tlv320aic3007>;
+> +	ti,mcasp-controller = <&mcasp0>;
+> +	ti,audio-routing =
+> +		"Line Out",		"LLOUT",
+> +		"Line Out",		"RLOUT",
+> +		"LINE1L",		"Line In",
+> +		"LINE1R",		"Line In";
+> +	clocks = <&mcasp0_fck>;
+> +	clock-names = "mclk";
+> +	status = "okay";
+> +};
+> +
+>  /* CAN Busses */
+>  &am33xx_pinmux {
+>  	dcan1_pins: pinmux_dcan1 {
+> @@ -99,6 +155,12 @@
+>  	status = "okay";
+>  };
+>  
+> +/* Power */
+> +&vdig1_reg {
+> +	regulator-boot-on;
+> +	regulator-always-on;
+> +};
+> +
+>  /* UARTs */
+>  &am33xx_pinmux {
+>  	uart0_pins: pinmux_uart0 {
+> 
 
 
-On 02-08-16 10:33, Hans de Goede wrote:
-> Hi,
->
-> On 01-08-16 19:41, Dmitry Torokhov wrote:
->> On Mon, Aug 01, 2016 at 11:54:30AM -0500, Rob Herring wrote:
->>> On Sun, Jul 31, 2016 at 05:23:07PM +0200, Hans de Goede wrote:
->>>> Some touchscreens extend over the display they cover and have a number
->>>> of capacative softbuttons outside of the display the cover.
->>>>
->>>> With some hardware these softbuttons simply report touches with
->>>> coordinates outside of the normal coordinate space for touches on the
->>>> display.
->>>>
->>>> This commit adds a devicetree binding for describing such buttons in
->>>> devicetree and a bunch of helper functions to easily add support for
->>>> these to existing touchscreen drivers.
->>>>
->>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>> ---
->>>>  .../bindings/input/touchscreen/softbuttons.txt     |  58 +++++++++
->>>>  drivers/input/touchscreen/Makefile                 |   2 +-
->>>>  drivers/input/touchscreen/softbuttons.c            | 145 +++++++++++++++++++++
->>>>  include/linux/input/touchscreen.h                  |   9 ++
->>>>  4 files changed, 213 insertions(+), 1 deletion(-)
->>>>  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
->>>>  create mode 100644 drivers/input/touchscreen/softbuttons.c
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt b/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
->>>> new file mode 100644
->>>> index 0000000..3eb6f4c
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
->>>> @@ -0,0 +1,58 @@
->>>> +General Touchscreen Softbutton Properties:
->>>> +
->>>> +Some touchscreens extend over the display they cover and have a number
->>>> +of capacative softbuttons outside of the display the cover.
->>>> +
->>>> +Some of these softbuttons simply report touches with coordinates outside of
->>>> +the normal coordinate space for touches on the display. This binding is for
->>>> +describing such buttons in devicetree.
->>>> +
->>>> +Each softkey is represented as a sub-node of the touchscreen node.
->>>> +
->>>> +Required subnode-properties:
->>>> + - label            : Descriptive name of the key.
->>>> + - linux,code            : Keycode to emit.
->>>> + - softbutton-min-x        : X start of the area the softbutton area covers
->>>> + - softbutton-max-x        : X end of the area the softbutton area covers
->>>> + - softbutton-min-y        : Y start of the area the softbutton area covers
->>>> + - softbutton-max-y        : Y end of the area the softbutton area covers
->>>
->>> This generally looks fine to me, but I am wondering one thing. If the
->>> buttons are located at the origin of an axis, can we handle that case? I
->>> don't think you can unless you assume softbutton-max-? is 0 for the
->>> touchscreen. To put it another way, you have a gap from 1024 to 1084
->>> which you can't express for buttons at the origin unless you do negative
->>> numbers.
->>
->> I do not this this should be done in kernel: I do not see nay difference
->> in softbuttons or sliders or circular controls or... They are not
->> controller-specific and I think are better handled in userspace. We do
->> that for Synaptics touchpads with softbuttons, we can do that for other
->> controllers.
->>
->> Also, what is or stance when there is no bezel and we sill want to have
->> the softbutons (i.e. all Nexus phones and tablets)?
->
-> Maybe softbuttons is not the best name (I googled and it seemed to match),
-> so first lets make clear what I'm talking about here, I wrote this patch-set
-> for this tablet:
->
-> https://content.hwigroup.net/images/products_xl/157078/dserve-dsrv-9703c.jpg
->
-> I decided to make it generic, since it seemed to me that there will likely
-> be other hardware which is similar (but uses a different touch screen
-> controller) out there, so keeping this generic seemed best.
->
-> Now back to the kernelspace vs userspace solution question, if you look at
-> the picture you will see 3 clearly marked buttons on the front of the tablet,
-> outside of the display: menu, home and back. These are not buttons which get
-> generated / drawn on the display when you touch the bottom of the screen, these
-> are separate single-purpose buttons which happen to report presses via the
-> touchscreen controller then via a separate hw mechanism.
->
-> If these buttons used a separate capacative button controller as used in
-> e.g. capacitive numpads, say something like this:
->
-> http://www.ebay.com/itm/2PCS-TTP223-Capacitive-Touch-Switch-Button-Self-Lock-Module-for-Arduino-/131662428748
->
-> Then there would be no question that this belongs in the kernel. I do not
-> see how these are any different really. These cannot be runtime re-configured,
-> they are separate dedicated buttons which happens to report presses via
-> the touchscreen controllers.
->
-> There also is the question of hardware description, no matter where we
-> put support for this, we need some place were we describe the presence
-> of these buttons to the software bits which end up dealing with them.
->
-> And we already have a mechanism for describing "fixed" hardware for a
-> certain model machine / board in the form of devicetree. To me putting
-> the hardware description for this anywhere but in devicetree makes
-> no sense because then we start scattering the description of a single
-> device-type over multiple places which seems like a bad idea.
->
-> And once we decided to put the description in devicetree, then dealing
-> with this in the kernel becomes the logical thing to do.
->
-> Regards,
->
-> Hans
->
->
-> p.s.
->
-> One other example of buttons like these are those on the nexus one:
->
-> http://www.informatica.com.do/7BZ-PortalImageUpload/image/2010151059110.google-nexus-one-01.jpg
->
-> Note I'm not saying this binding will work for those, I've no idea how
-> they are hooked up, but they are the same in that they are really
-> 4 dedicated separate buttons which happen to be part of the main digitizer.
-
-Dmitry, ping? Any reaction to the above ?
-
-Regards,
-
-Hans
-
-
-p.s.
-
-I've been thinking a bit more about this, trying to envision a reasonable
-user-space solution and I do not really see any. IMHO this really belongs
-in the kernel, and it is not a lot of code, the basic softbutton core is
-quite small, and the actually needed touchscreen driver changer are
-only a couple of line, so it is not like doing this in the kernel is
-a hassle, where as doing this in userspace will be a hassle.
+-- 
+P?ter
