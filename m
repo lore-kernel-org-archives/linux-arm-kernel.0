@@ -1,74 +1,29 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 12 Aug 2016 11:08:11 +0100
-Subject: [PATCH v3 02/15] dt/bindings: Update binding for PM domain idle
- states
-In-Reply-To: <20160811211023.GC1401@linaro.org>
-References: <1470351902-43103-1-git-send-email-lina.iyer@linaro.org>
- <1470351902-43103-3-git-send-email-lina.iyer@linaro.org>
- <99e35b6c-6698-6d27-f4d7-fa032796869e@arm.com>
- <20160810164034.GA1401@linaro.org>
- <5e59874c-bbb7-270a-199c-da1ff5932554@arm.com>
- <20160811211023.GC1401@linaro.org>
-Message-ID: <697d8ac2-34ee-db3e-940b-5ce3365c5aa1@arm.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 12 Aug 2016 18:33:00 +0800
+Subject: [PATCH] arm64: defconfig: enable BERLIN_BG4CT pinctrl support
+Message-ID: <1470997980-477-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch enables pinctrl support required to boot Marvell BG4CT
+boards.
 
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-On 11/08/16 22:10, Lina Iyer wrote:
-> On Wed, Aug 10 2016 at 12:09 -0600, Sudeep Holla wrote:
->>
-
-[...]
-
->> cluster0
->>     CLUSTER_RET(Retention)
->>     CLUSTER_PG(Power Gate)
->>     core0
->>         CORE_RET
->>         CORE_PG
->>     core1
->>         CORE_RET
->>         CORE_PG
->>
->> cluster1
->>     CLUSTER_RET
->>     CLUSTER_PG
->>     core0
->>         CORE_RET
->>         CORE_PG
->>     core1
->>         CORE_RET
->>         CORE_PG
->>
->> Platform Co-ordinate supports the following states and we should be
->> able to determine that from the binding:
->>
->> CORE_RET
->> CORE_PG
->> CORE_RET + CLUSTER_RET
->
-> The problem that we have to sove here is knowing that CORE_RET +
-> CLUSTER_PG (hypothetically) an invalid combination. Kevin and
-> I debated it in the earlier RFC and we dont have a good way to solve
-> this generically for all devices.
->
-
-Yes, I agree it's complex. But that needs to be solved IMO.
-
-I can think of 2 possible solutions:
-
-1. Index the states(which people have not liked, but as along as we
-    don't use it in the code as it for any other purpose, it should be
-    fine) and then have each state mentioning what parent state can be
-    entered at this child state(i.e. starting index and all states below
-    it)
-
-2. Something similar to (1) but without index instead phandles.
-
-Again these are just thoughts, others may think of some better
-solution(s). Sorry I haven't followed all the previous threads in detail.
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 0555b7c..52fff49 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -195,6 +195,7 @@ CONFIG_SPI_QUP=y
+ CONFIG_SPI_SPIDEV=m
+ CONFIG_SPI_S3C64XX=y
+ CONFIG_SPMI=y
++CONFIG_PINCTRL_BERLIN_BG4CT=y
+ CONFIG_PINCTRL_SINGLE=y
+ CONFIG_PINCTRL_MAX77620=y
+ CONFIG_PINCTRL_MSM8916=y
 -- 
-Regards,
-Sudeep
+2.8.1
