@@ -1,42 +1,48 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 12 Aug 2016 17:25:53 +0100
-Subject: [PATCH 2/5] bus: arm-ccn: Do not attempt to configure XPs for cycle
- counter
+Date: Fri, 12 Aug 2016 17:25:54 +0100
+Subject: [PATCH 3/5] bus: arm-ccn: Fix XP watchpoint settings bitmask
 In-Reply-To: <1471019156-5485-1-git-send-email-pawel.moll@arm.com>
 References: <1471019156-5485-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1471019156-5485-3-git-send-email-pawel.moll@arm.com>
+Message-ID: <1471019156-5485-4-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fuzzing the CCN perf driver revealed a small but definitely dangerous
-mistake in the event setup code. When a cycle counter is requested, the
-driver should not reconfigure the events bus at all, otherwise it will
-corrupt (in most but the simplest cases) its configuration and may end
-up accessing XP array out of its bounds.
+The code setting XP watchpoint comparator and mask registers should, in
+order to be fully compliant with specification, zero one or more most
+significant bits of each field. In both L cases it means zeroing bit 63.
+The bitmask doing this was wrong, though, zeroing bit 60 instead.
+Fortunately, due to a lucky coincidence, this turned out to be fairly
+innocent with the existing hardware.
 
-Reported-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
+Fixed now.
+
 Cc: stable at vger.kernel.org # 3.17+
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- drivers/bus/arm-ccn.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/bus/arm-ccn.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-index a11b9bb..9bbb0ab 100644
+index 9bbb0ab..647a27b 100644
 --- a/drivers/bus/arm-ccn.c
 +++ b/drivers/bus/arm-ccn.c
-@@ -897,6 +897,10 @@ static void arm_ccn_pmu_xp_dt_config(struct perf_event *event, int enable)
- 	struct arm_ccn_component *xp;
- 	u32 val, dt_cfg;
+@@ -1003,7 +1003,7 @@ static void arm_ccn_pmu_xp_watchpoint_config(struct perf_event *event)
  
-+	/* Nothing to do for cycle counter */
-+	if (hw->idx == CCN_IDX_PMU_CYCLE_COUNTER)
-+		return;
-+
- 	if (CCN_CONFIG_TYPE(event->attr.config) == CCN_TYPE_XP)
- 		xp = &ccn->xp[CCN_CONFIG_XP(event->attr.config)];
- 	else
+ 	/* Comparison values */
+ 	writel(cmp_l & 0xffffffff, source->base + CCN_XP_DT_CMP_VAL_L(wp));
+-	writel((cmp_l >> 32) & 0xefffffff,
++	writel((cmp_l >> 32) & 0x7fffffff,
+ 			source->base + CCN_XP_DT_CMP_VAL_L(wp) + 4);
+ 	writel(cmp_h & 0xffffffff, source->base + CCN_XP_DT_CMP_VAL_H(wp));
+ 	writel((cmp_h >> 32) & 0x0fffffff,
+@@ -1011,7 +1011,7 @@ static void arm_ccn_pmu_xp_watchpoint_config(struct perf_event *event)
+ 
+ 	/* Mask */
+ 	writel(mask_l & 0xffffffff, source->base + CCN_XP_DT_CMP_MASK_L(wp));
+-	writel((mask_l >> 32) & 0xefffffff,
++	writel((mask_l >> 32) & 0x7fffffff,
+ 			source->base + CCN_XP_DT_CMP_MASK_L(wp) + 4);
+ 	writel(mask_h & 0xffffffff, source->base + CCN_XP_DT_CMP_MASK_H(wp));
+ 	writel((mask_h >> 32) & 0x0fffffff,
 -- 
 2.7.4
