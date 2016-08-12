@@ -1,75 +1,68 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 12 Aug 2016 15:15:00 +0100
-Subject: [PATCH RFC 2/5] drm/bridge: dw_hdmi: remove CEC engine register
- definitions
+Date: Fri, 12 Aug 2016 15:15:05 +0100
+Subject: [PATCH RFC 3/5] drm/bridge: dw_hdmi: add HDMI notifier support
 In-Reply-To: <20160812141421.GB1041@n2100.armlinux.org.uk>
 References: <20160812141421.GB1041@n2100.armlinux.org.uk>
-Message-ID: <E1bYDEi-0004rf-8C@rmk-PC.armlinux.org.uk>
+Message-ID: <E1bYDEn-0004rl-CH@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't need the CEC engine register definitions, so let's remove them.
+Add HDMI notifiers to the HDMI bridge driver.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/gpu/drm/bridge/dw-hdmi.h | 45 ----------------------------------------
- 1 file changed, 45 deletions(-)
+ drivers/gpu/drm/bridge/Kconfig   | 1 +
+ drivers/gpu/drm/bridge/dw-hdmi.c | 9 +++++++++
+ 2 files changed, 10 insertions(+)
 
-diff --git a/drivers/gpu/drm/bridge/dw-hdmi.h b/drivers/gpu/drm/bridge/dw-hdmi.h
-index fc9a560429d6..26d6845efad6 100644
---- a/drivers/gpu/drm/bridge/dw-hdmi.h
-+++ b/drivers/gpu/drm/bridge/dw-hdmi.h
-@@ -478,51 +478,6 @@
- #define HDMI_A_PRESETUP                         0x501A
- #define HDMI_A_SRM_BASE                         0x5020
+diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+index 8f7423f18da5..6d97d9f2b164 100644
+--- a/drivers/gpu/drm/bridge/Kconfig
++++ b/drivers/gpu/drm/bridge/Kconfig
+@@ -20,6 +20,7 @@ config DRM_ANALOGIX_ANX78XX
+ config DRM_DW_HDMI
+ 	tristate
+ 	select DRM_KMS_HELPER
++	select HDMI_NOTIFIERS
  
--/* CEC Engine Registers */
--#define HDMI_CEC_CTRL                           0x7D00
--#define HDMI_CEC_STAT                           0x7D01
--#define HDMI_CEC_MASK                           0x7D02
--#define HDMI_CEC_POLARITY                       0x7D03
--#define HDMI_CEC_INT                            0x7D04
--#define HDMI_CEC_ADDR_L                         0x7D05
--#define HDMI_CEC_ADDR_H                         0x7D06
--#define HDMI_CEC_TX_CNT                         0x7D07
--#define HDMI_CEC_RX_CNT                         0x7D08
--#define HDMI_CEC_TX_DATA0                       0x7D10
--#define HDMI_CEC_TX_DATA1                       0x7D11
--#define HDMI_CEC_TX_DATA2                       0x7D12
--#define HDMI_CEC_TX_DATA3                       0x7D13
--#define HDMI_CEC_TX_DATA4                       0x7D14
--#define HDMI_CEC_TX_DATA5                       0x7D15
--#define HDMI_CEC_TX_DATA6                       0x7D16
--#define HDMI_CEC_TX_DATA7                       0x7D17
--#define HDMI_CEC_TX_DATA8                       0x7D18
--#define HDMI_CEC_TX_DATA9                       0x7D19
--#define HDMI_CEC_TX_DATA10                      0x7D1a
--#define HDMI_CEC_TX_DATA11                      0x7D1b
--#define HDMI_CEC_TX_DATA12                      0x7D1c
--#define HDMI_CEC_TX_DATA13                      0x7D1d
--#define HDMI_CEC_TX_DATA14                      0x7D1e
--#define HDMI_CEC_TX_DATA15                      0x7D1f
--#define HDMI_CEC_RX_DATA0                       0x7D20
--#define HDMI_CEC_RX_DATA1                       0x7D21
--#define HDMI_CEC_RX_DATA2                       0x7D22
--#define HDMI_CEC_RX_DATA3                       0x7D23
--#define HDMI_CEC_RX_DATA4                       0x7D24
--#define HDMI_CEC_RX_DATA5                       0x7D25
--#define HDMI_CEC_RX_DATA6                       0x7D26
--#define HDMI_CEC_RX_DATA7                       0x7D27
--#define HDMI_CEC_RX_DATA8                       0x7D28
--#define HDMI_CEC_RX_DATA9                       0x7D29
--#define HDMI_CEC_RX_DATA10                      0x7D2a
--#define HDMI_CEC_RX_DATA11                      0x7D2b
--#define HDMI_CEC_RX_DATA12                      0x7D2c
--#define HDMI_CEC_RX_DATA13                      0x7D2d
--#define HDMI_CEC_RX_DATA14                      0x7D2e
--#define HDMI_CEC_RX_DATA15                      0x7D2f
--#define HDMI_CEC_LOCK                           0x7D30
--#define HDMI_CEC_WKUPCTRL                       0x7D31
--
- /* I2C Master Registers (E-DDC) */
- #define HDMI_I2CM_SLAVE                         0x7E00
- #define HDMI_I2CM_ADDRESS                       0x7E01
+ config DRM_DW_HDMI_AHB_AUDIO
+ 	tristate "Synopsis Designware AHB Audio interface"
+diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c b/drivers/gpu/drm/bridge/dw-hdmi.c
+index c9d941283d30..cb6e03efbebf 100644
+--- a/drivers/gpu/drm/bridge/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/dw-hdmi.c
+@@ -16,6 +16,7 @@
+ #include <linux/err.h>
+ #include <linux/clk.h>
+ #include <linux/hdmi.h>
++#include <linux/hdmi-notifier.h>
+ #include <linux/mutex.h>
+ #include <linux/of_device.h>
+ #include <linux/spinlock.h>
+@@ -1447,9 +1448,11 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
+ 		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
+ 		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
+ 		drm_mode_connector_update_edid_property(connector, edid);
++		hdmi_event_new_edid(hdmi->dev, edid, 0);
+ 		ret = drm_add_edid_modes(connector, edid);
+ 		/* Store the ELD */
+ 		drm_edid_to_eld(connector, edid);
++		hdmi_event_new_eld(hdmi->dev, connector->eld);
+ 		kfree(edid);
+ 	} else {
+ 		dev_dbg(hdmi->dev, "failed to get edid\n");
+@@ -1601,6 +1604,12 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
+ 			dw_hdmi_update_phy_mask(hdmi);
+ 		}
+ 		mutex_unlock(&hdmi->mutex);
++
++		if ((phy_stat & (HDMI_PHY_RX_SENSE | HDMI_PHY_HPD)) == 0)
++			hdmi_event_disconnect(hdmi->dev);
++		else if ((phy_stat & (HDMI_PHY_RX_SENSE | HDMI_PHY_HPD)) ==
++			 (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_PHY_HPD))
++			hdmi_event_connect(hdmi->dev);
+ 	}
+ 
+ 	if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
 -- 
 2.1.0
