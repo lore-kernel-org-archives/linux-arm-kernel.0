@@ -1,8 +1,10 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 12 Aug 2016 19:11:19 +0100
-Subject: [stable:PATCH 1/2] arm64: kernel: Save and restore addr_limit on
+Date: Fri, 12 Aug 2016 19:11:20 +0100
+Subject: [stable:PATCH 2/2] arm64: kernel: Save and restore addr_limit on
  exception entry
-Message-ID: <1471025480-10394-1-git-send-email-james.morse@arm.com>
+In-Reply-To: <1471025480-10394-1-git-send-email-james.morse@arm.com>
+References: <1471025480-10394-1-git-send-email-james.morse@arm.com>
+Message-ID: <1471025480-10394-2-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,7 +25,7 @@ Signed-off-by: Will Deacon <will.deacon@arm.com>
   Removed code interacting with UAO and the irqstack ]
 Link: https://bugs.chromium.org/p/project-zero/issues/detail?id=822
 Signed-off-by: James Morse <james.morse@arm.com>
-Cc: <stable@vger.kernel.org> #4.1
+Cc: <stable@vger.kernel.org> #4.4
 ---
  arch/arm64/include/asm/ptrace.h |  2 ++
  arch/arm64/kernel/asm-offsets.c |  1 +
@@ -31,10 +33,10 @@ Cc: <stable@vger.kernel.org> #4.1
  3 files changed, 17 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index d4264bb0a409..31f7344c503b 100644
+index a307eb6e7fa8..7f94755089e2 100644
 --- a/arch/arm64/include/asm/ptrace.h
 +++ b/arch/arm64/include/asm/ptrace.h
-@@ -116,6 +116,8 @@ struct pt_regs {
+@@ -117,6 +117,8 @@ struct pt_regs {
  	};
  	u64 orig_x0;
  	u64 syscallno;
@@ -44,7 +46,7 @@ index d4264bb0a409..31f7344c503b 100644
  
  #define arch_has_single_step()	(1)
 diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index da675cc5dfae..4106ac64f95e 100644
+index 25de8b244961..087cf9a65359 100644
 --- a/arch/arm64/kernel/asm-offsets.c
 +++ b/arch/arm64/kernel/asm-offsets.c
 @@ -58,6 +58,7 @@ int main(void)
@@ -54,9 +56,9 @@ index da675cc5dfae..4106ac64f95e 100644
 +  DEFINE(S_ORIG_ADDR_LIMIT,	offsetof(struct pt_regs, orig_addr_limit));
    DEFINE(S_FRAME_SIZE,		sizeof(struct pt_regs));
    BLANK();
-   DEFINE(MM_CONTEXT_ID,		offsetof(struct mm_struct, context.id));
+   DEFINE(MM_CONTEXT_ID,		offsetof(struct mm_struct, context.id.counter));
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index bddd04d031db..05012cdb555f 100644
+index 7ed3d75f6304..5a3753d09e20 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
 @@ -27,6 +27,7 @@
@@ -85,7 +87,7 @@ index bddd04d031db..05012cdb555f 100644
 @@ -117,6 +124,12 @@
  	.endm
  
- 	.macro	kernel_exit, el, ret = 0
+ 	.macro	kernel_exit, el
 +	.if	\el != 0
 +	/* Restore the task's original addr_limit. */
 +	ldr	x20, [sp, #S_ORIG_ADDR_LIMIT]
