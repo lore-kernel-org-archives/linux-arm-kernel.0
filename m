@@ -1,44 +1,63 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 12 Aug 2016 09:03:50 -0400
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable SECCOMP
-In-Reply-To: <1471005243-6409-2-git-send-email-k.kozlowski@samsung.com>
-References: <1471005243-6409-1-git-send-email-k.kozlowski@samsung.com>
- <1471005243-6409-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <ddcc04de-1428-3b38-70cd-e0ce294a0103@osg.samsung.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Fri, 12 Aug 2016 18:33:52 +0530
+Subject: [PATCH V6 0/6] iommu/msm: Add DT adaptation and generic bindings
+ support
+In-Reply-To: <CAF6AEGsRVULNpSe_s460biNhV0dRaKLv6tf2Y244HEjGVOV3bw@mail.gmail.com>
+References: <1465817767-9856-1-git-send-email-sricharan@codeaurora.org>
+ <CAF6AEGsF5M1sfwaXKW0x=Mu=nQJR-9+xqrtXd=7Vz_+6G_u25A@mail.gmail.com>
+ <CAF6AEGsLGDqRuB97+qN1g7X60A49Wv1HGbAiaeZoxogMmHY9HA@mail.gmail.com>
+ <003a01d1f467$2b180ba0$814822e0$@codeaurora.org>
+ <CAF6AEGsRVULNpSe_s460biNhV0dRaKLv6tf2Y244HEjGVOV3bw@mail.gmail.com>
+Message-ID: <000001d1f499$fe2caf50$fa860df0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Hi Rob,
 
-On 08/12/2016 08:34 AM, Krzysztof Kozlowski wrote:
-> Systemd already supports seccomp.  It seems some distros are building
-> systemd with seccomp, e.g. Arch on ARM, thus leading to boot errors:
-> 
-> systemd-logind.service: Failed at step SECCOMP spawning /usr/lib/systemd/systemd-logind: Invalid argument
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 7db8dce3da5f..0ccaa519f588 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -126,6 +126,7 @@ CONFIG_SMP=y
->  CONFIG_NR_CPUS=16
->  CONFIG_HIGHPTE=y
->  CONFIG_CMA=y
-> +CONFIG_SECCOMP=y
->  CONFIG_ARM_APPENDED_DTB=y
->  CONFIG_ARM_ATAG_DTB_COMPAT=y
->  CONFIG_KEXEC=y
-> 
+>>>> btw, the current state, at least on linaro integration branch, fault
+>>>> handling doesn't work so well (ie. device never gets resumed).. which
+>>>> is a bit unfortunate for a gpu (and results in a *lot* of rebooting on
+>>>> my part when debugging userspace).  I haven't had time yet to compare
+>>>> to the ancient downstream driver, but not sure if you have any ideas?
+>>>>
+>>>> I guess probably disabling stall on fault would help.  But I'm not
+>>>> even getting the "Fault occurred in context.." prints.  Seeing the
+>>>> fault iova is pretty useful since that plus gpu cmdstream trace helps
+>>>> me figure out which texture/etc is being accessed out of bounds.
+>>>
+>>>fyi, it looks like it is not getting any fault irq..  it's *possible*
+>>>that I screwed up the irq #'s when translating from downstream, so you
+>>>might want to double check that.  I thought I had it right, I assume I
+>>>would have noticed during piglit runs if fault recovery wasn't working
+>>>(since the result is that *everything* after the faulting test would
+>>>have failed since gpu is wedged with no access to memory), but it was
+>>>long enough ago that I can't claim that definitively.
+>>>
+>>>If you need an easy way to trigger a gpu fault, msmtest is a good way,
+>>>change this line:
+>>>
+>>>  https://github.com/freedreno/msmtest/blob/master/msmtest.c#L247
+>>>
+>>>from OUT_RELOC() to OUT_RING(ring, 0x00000000) will trigger a fault.
+>>>
+>>    So for the irq to be triggered, 'non-secure' irq line has to be
+>>   populated in DT. There is a 'secure'and 'non-secure' irq lines for these iommus
+>>   and  non-secure irq number is secure + 1. I tested this by having a 'return 0'
+>>  from the msm_iommu_map (no mapping), and the faults were getting triggered.
+>>
+>>   Can you share me your dts data ?
+>>
+>
+>I think this is what you want:
+>
+>https://github.com/freedreno/kernel-msm/blob/integration-linux-qcomlt/arch/arm/boot/dts/qcom-apq8064.dtsi#L2008
+>
+>I haven't tested a display fault, so I suppose it is possible that
+>irq's are working for some iommu instances but not others?
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+So in your DT, for gfx3d, the non-secure line is '70' and not '69' (This is secure) .
+ Infact only '70' should be populated. The driver sets the irq line based on resource 0.
+ This applies for all iommu nodes in your DT. (only the second irq line is needed).
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Regards,
+ Sricharan
