@@ -1,41 +1,75 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 12 Aug 2016 19:07:27 +0100
-Subject: [PATCHv2 2/2] arm64: hibernate: handle allocation failures
-In-Reply-To: <1470921066-27421-3-git-send-email-mark.rutland@arm.com>
-References: <1470921066-27421-1-git-send-email-mark.rutland@arm.com>
- <1470921066-27421-3-git-send-email-mark.rutland@arm.com>
-Message-ID: <57AE105F.2050800@arm.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Fri, 12 Aug 2016 11:07:51 -0700
+Subject: [PATCH 1/2] remoteproc: core: Add rproc OF look-up functions
+In-Reply-To: <06f795ef-e71c-2cda-5306-5b75e0f15125@ti.com>
+References: <20160810174049.GO26240@tuxbot>
+ <7650e5fa-f52c-1ab5-e197-8630fd7d0322@ti.com>
+ <20160810204049.GV26240@tuxbot>
+ <f9641050-0a3f-11de-fa69-e587034e0527@ti.com>
+ <20160810211947.GW26240@tuxbot>
+ <b1a01567-7a5d-20de-a2b5-b673b9ce67ec@ti.com>
+ <20160811073122.GA1715@dell>
+ <05d4c9c1-79ea-bde3-e5e5-d26e6b07c916@ti.com>
+ <b1b2a510-e0cb-5d8f-9f44-48c9dd747d4d@ti.com>
+ <06f795ef-e71c-2cda-5306-5b75e0f15125@ti.com>
+Message-ID: <20160812180751.GH26240@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/16 14:11, Mark Rutland wrote:
-> In create_safe_exec_page(), we create a copy of the hibernate exit text,
-> along with some page tables to map this via TTBR0. We then install the
-> new tables in TTBR0.
+On Fri 12 Aug 09:37 PDT 2016, Suman Anna wrote:
+
+> Hi Bjorn,
 > 
-> In swsusp_arch_resume() we call create_safe_exec_page() before trying a
-> number of operations which may fail (e.g. copying the linear map page
-> tables). If these fail, we bail out of swsusp_arch_resume() and return
-> an error code, but leave TTBR0 as-is. Subsequently, the core hibernate
-> code will call free_basic_memory_bitmaps(), which will free all of the
-> memory allocations we made, including the page tables installed in
-> TTBR0.
+> >> On 08/11/2016 02:31 AM, Lee Jones wrote:
+> >>> On Wed, 10 Aug 2016, Suman Anna wrote:
+> >>>
+> >>>> On 08/10/2016 04:19 PM, Bjorn Andersson wrote:
+> >>>>> On Wed 10 Aug 14:04 PDT 2016, Suman Anna wrote:
+> >>>>>
+> >>>>>> On 08/10/2016 03:40 PM, Bjorn Andersson wrote:
+> >>>>>>> On Wed 10 Aug 12:37 PDT 2016, Suman Anna wrote:
+> >>>>>>>
+> >>>>>>>> Hi Lee, Bjorn,
+> >>>>>>>>
+> >>>>>>>> On 08/10/2016 12:40 PM, Bjorn Andersson wrote:
+> >>>>>>>>> On Tue 19 Jul 08:49 PDT 2016, Lee Jones wrote:
+> >>>>>>>>>
+> >>>>>>>>>> - of_rproc_by_index(): look-up and obtain a reference to a rproc
+> >>>>>>>>>>                        using the DT phandle "rprocs" and a index.
+> >>>>>>>>>>
+> >>>>>>>>>> - of_rproc_by_name():  lookup and obtain a reference to a rproc
+> >>>>>>>>>>                        using the DT phandle "rprocs" and "rproc-names".
+> >>>>>>>>>>
+> >>>>>>>>>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> >>>>>>>>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >>>>>>>>>> ---
+> >>>>>>>>>
+> >>>>>>>>> I'm happy with this, so I whipped up a binding document describing our
+> >>>>>>>>> two new properties. Waiting for an opinion on that before I merge this.
 > 
-> Thus, we may have TTBR0 pointing at dangling freed memory for some
-> period of time. If the hibernate attempt was triggered by a user
-> requesting a hibernate test via the reboot syscall, we may return to
-> userspace with the clobbered TTBR0 value.
+> One last comment on this is the return code convention change on these
+> rproc_get APIs. I am fine in general with returning ERR_PTRs, but most
+> of the remoteproc code is using NULL checking for rproc. If you remember
+> the discussion back during the hwspinlock DT conversion [1], Ohad
+> preferred to return NULL, and that's why even the rproc_get_by_phandle
+> was returning NULL. We ought to make this consistent across the board if
+> we want to make this switch.
 > 
-> Avoid these issues by reorganising swsusp_arch_resume() such that we
-> have no failure paths after create_safe_exec_page(). We also add a check
-> that the zero page allocation succeeded, matching what we have for other
-> allocations.
 
-Looks good to me.
+I think it makes sense to return the actual error from these functions,
+if nothing else to keep it consistent with other frameworks.
 
-Acked-by: James Morse <james.morse@arm.com>
+The other case I see returning NULL is rproc_alloc(), which is think is
+analog to kmalloc(), so I think that's fine to keep.
 
 
-Thanks,
+Luckily wkup_m3 is the only consumer of this API in the kernel today, so
+we shouldn't have any issues wrt changing the return value here.
 
-James
+> regards
+> Suman
+> 
+> [1] http://marc.info/?t=138965891200008
+
+Regards,
+Bjorn
