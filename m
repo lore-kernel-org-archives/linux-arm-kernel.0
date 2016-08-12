@@ -1,124 +1,42 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 11 Aug 2016 19:35:29 -0500
-Subject: [PATCH] soc: ti: wkup_m3_ipc: switch to using remoteproc OF
- infrastructure
-Message-ID: <20160812003529.519-1-s-anna@ti.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Fri, 12 Aug 2016 08:39:29 +0800
+Subject: [v2 PATCH] clk: rockchip: mark rk3399 hdcp_noc and vio_noc as
+ critical
+In-Reply-To: <1721159.V5xB9fz0jT@diego>
+References: <1470765753-11619-1-git-send-email-zyw@rock-chips.com>
+ <1721159.V5xB9fz0jT@diego>
+Message-ID: <57AD1AC1.5080600@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The remoteproc framework has been enhanced recently to provide new
-OF API to retrieve a remoteproc handle by client drivers through a
-standard 'rprocs' property in client nodes. The wkup_m3_ipc driver
-has been using a custom 'ti,rproc' property until now, switch this
-to use this new OF infrastructure. The wkup_m3_ipc driver has been
-fixed up to provide backward compatibility for older DTBs by
-replacing the older property with the standard newer property.
+Hi Heiko
 
-The wkup_m3_ipc binding has also been updated accordingly.
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
-This patch is based on the discussion [1] for introducing new standard
-OF API in remoteproc core series [2] and the exporting of couple of
-functions in OF base code [3].
+On 08/12/2016 06:17 AM, Heiko St?bner wrote:
+> Am Dienstag, 9. August 2016, 11:02:33 schrieb Chris Zhong:
+>> Fix incorrect rk3399 aclk_vio gating bit, it should be 0, not 10. With
+>> this modification, the aclk_vio_noc should be put into critical list,
+>> since it is required by VOP.
+>> And the Type-C DP need these clocks: aclk_hdcp_noc, hclk_hdcp_noc,
+>> pclk_hdcp_noc. Mark them as critical to avoid someone close them.
+>>
+>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> I've split that patch in two and applied them there:
+> https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commit/?h=v4.8-clk/fixes&id=a3f457d9636b3f5ae4fc6502cb0c95f60f5e342b
+> (gate-bit-fix)
+> https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commit/?h=v4.9-clk/next&id=54479449c801e46ee2b6ba08e2f19cd810f74f94
+> (critical clocks)
+>
+> with the provided Reviewed-bys.
+with the "gate-bit-fix" patch, probably someone will find the panel can 
+not display, since the aclk_vio_noc would be disabled default, and this 
+noc clk is required by VOP.
+So, if someone want to pick up "gate-bit-fix", please get the one 
+"critical clocks" firstly.
 
-With this in place, the remoteproc core need not be looking for the
-TI specific property anymore. I will submit the DTS changes once this
-makes it to mainline.
-
-regards
-Suman
-
-[1] https://patchwork.kernel.org/patch/9237767/
-[2] http://marc.info/?l=linux-kernel&m=146894341701010&w=2
-[3] https://patchwork.kernel.org/patch/9276181/
-
- .../devicetree/bindings/soc/ti/wkup_m3_ipc.txt     |  9 ++++++--
- drivers/soc/ti/wkup_m3_ipc.c                       | 26 +++++++++++++++++++++-
- 2 files changed, 32 insertions(+), 3 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt b/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
-index 401550487ed6..2ea7dd91acff 100644
---- a/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
-+++ b/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
-@@ -23,12 +23,17 @@ Required properties:
- 			with the Wakeup M3 processor
- - interrupts:		Contains the interrupt information for the wkup_m3
- 			interrupt that signals the MPU.
--- ti,rproc:		phandle to the wkup_m3 rproc node so the IPC driver
-+- rprocs:		phandle to the wkup_m3 rproc node so the IPC driver
- 			can boot it.
- - mboxes:		phandles used by IPC framework to get correct mbox
- 			channel for communication. Must point to appropriate
- 			mbox_wkupm3 child node.
- 
-+Deprecated properties:
-+----------------------
-+- ti,rproc:		This property has been replaced with the "rprocs"
-+			property.
-+
- Example:
- --------
- /* AM33xx */
-@@ -48,7 +53,7 @@ Example:
- 				compatible = "ti,am3352-wkup-m3-ipc";
- 				reg = <0x1324 0x24>;
- 				interrupts = <78>;
--				ti,rproc = <&wkup_m3>;
-+				rprocs = <&wkup_m3>;
- 				mboxes = <&mailbox &mbox_wkupm3>;
- 			};
- 
-diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
-index 8823cc81ae45..86085f9bf6a8 100644
---- a/drivers/soc/ti/wkup_m3_ipc.c
-+++ b/drivers/soc/ti/wkup_m3_ipc.c
-@@ -1,7 +1,7 @@
- /*
-  * AMx3 Wkup M3 IPC driver
-  *
-- * Copyright (C) 2015 Texas Instruments, Inc.
-+ * Copyright (C) 2015-2016 Texas Instruments, Inc.
-  *
-  * Dave Gerlach <d-gerlach@ti.com>
-  *
-@@ -390,6 +390,8 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	struct task_struct *task;
- 	struct wkup_m3_ipc *m3_ipc;
-+	struct property *nprop, *oprop;
-+	const char nprop_name[] = "rprocs";
- 
- 	m3_ipc = devm_kzalloc(dev, sizeof(*m3_ipc), GFP_KERNEL);
- 	if (!m3_ipc)
-@@ -415,6 +417,28 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	/* provide compatibility for older DTBs using ti,rproc property */
-+	nprop = of_find_property(dev->of_node, "rprocs", NULL);
-+	if (!nprop) {
-+		oprop = of_find_property(dev->of_node, "ti,rproc", NULL);
-+		if (!oprop) {
-+			dev_err(&pdev->dev, "node is missing ti,rproc property\n");
-+			return -ENODEV;
-+		}
-+
-+		nprop = kzalloc(sizeof(*nprop) + sizeof(nprop_name),
-+				GFP_KERNEL);
-+		if (!nprop)
-+			return -ENOMEM;
-+
-+		nprop->name = (char *)nprop + sizeof(*nprop);
-+		snprintf(nprop->name, sizeof(nprop_name), nprop_name);
-+		nprop->value = oprop->value;
-+		nprop->length = oprop->length;
-+		of_update_property(dev->of_node, nprop);
-+		of_remove_property(dev->of_node, oprop);
-+	}
-+
- 	m3_ipc->mbox_client.dev = dev;
- 	m3_ipc->mbox_client.tx_done = NULL;
- 	m3_ipc->mbox_client.tx_prepare = NULL;
--- 
-2.9.0
+>
+>
+> Heiko
+>
+>
+>
