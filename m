@@ -1,52 +1,39 @@
-From: npiggin@gmail.com (Nicholas Piggin)
-Date: Fri, 12 Aug 2016 23:15:03 +1000
-Subject: [PATCH] arm: add an option for erratum 657417
-In-Reply-To: <20160812123314.GX1041@n2100.armlinux.org.uk>
-References: <1470989957-23671-1-git-send-email-npiggin@gmail.com>
- <20160812123314.GX1041@n2100.armlinux.org.uk>
-Message-ID: <20160812231503.3e2e059b@roar.ozlabs.ibm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 12 Aug 2016 15:18:13 +0200
+Subject: [PATCH 02/12] pinctrl: Add core pinctrl support for Aspeed SoCs
+In-Reply-To: <1470962022.27272.68.camel@aj.id.au>
+References: <1468994313-13538-1-git-send-email-andrew@aj.id.au>
+ <1468994313-13538-3-git-send-email-andrew@aj.id.au>
+ <CACRpkdZ0p+jNHBV1AqhVWQ2Q8RRrHVfsAz3XU3_+f6My22=Zxg@mail.gmail.com>
+ <1470962022.27272.68.camel@aj.id.au>
+Message-ID: <CACRpkdaN=wR4amskqMapTJzaTTMJZe2EQWRnyLMQkq_zuhr2eA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Aug 2016 13:33:14 +0100
-Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+On Fri, Aug 12, 2016 at 2:33 AM, Andrew Jeffery <andrew@aj.id.au> wrote:
 
-> On Fri, Aug 12, 2016 at 06:19:17PM +1000, Nicholas Piggin wrote:
-> > This patch adds an option which defaults to "y" in cases where we
-> > could possibly be running Cortex A8 and using Thumb2 instructions.
-> > In reality the workaround might not be required at all for the kernel
-> > if virtual instruction memory is linear in physical memory.  
-> 
-> Hmm.
-> 
-> The main kernel image is guaranteed to be contiguous in physical memory
-> for all sorts of reasons, so this really isn't a concern for the kernel
-> itself.
+>> > +
+>> > +       while (*exprs) {
+>> > +               if (strncmp((*exprs)->signal, "GPIO", 4) == 0)
+>> > +                       return true;
+>> This looks a bit fragile and hard to debug. Do you have some better
+>> idea of how to do this but not resort to string comparison?
+>
+> Yes, this is a little unfortunate. GPIO is not always a pin's lowest
+> priority function (e.g. the RGMII/RMII pins), so this makes the GPIO
+> case like any other mux function: We need to know when to stop
+> iterating the arrays when disabling mux functions of higher priority.
+> The alternative is probably to introduce another field to struct
+> aspeed_sig_expr and set that as necessary, but that feels redundant if
+> we keep to a consistent naming for the GPIOs.
 
-That's what it *seems* like. I wanted to be conservative because I don't
-know the architecture nor have actually looked at the errata docs. You
-can probably make stronger guarantees to avoid it. Perhaps enabling just
-for modules would be workable.
+I would probably prefer that option (introduce another field)
+but you should make the overall decision, it's no strong opinion
+from my side.
 
+> Would it be acceptable to document that requirement?
 
-> Modules, however, are a different matter, as they are mapped in using
-> individual pages, and are most likely to be non-contiguous in physical
-> memory.  The kernel's module linker knows nothing about this errata,
-> so it'll generally just fix up the relocations in the most basic of
-> ways.
-> 
-> So, I think we should always use this --no-fix-cortex-a8 option where
-> the linker supports it irrespective of whether we're running on a core
-> needing this workaround, but we probably need to fix the kernel module
-> linker to know about this.
+Sure.
 
-It looks like it would be a bit of work to go that route. The linker of
-course would not give you relocations or stubs for the branches you
-need them.
-
-Anyway do what you think best with the patch. It seems to eliminate the
-link time regression on ARM allyesconfig when using thin archives for
-building which is the main thing I was concerned about.
-
-Thanks,
-Nick
+Yours,
+Linus Walleij
