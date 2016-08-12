@@ -1,82 +1,55 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 12 Aug 2016 13:45:22 -0500
-Subject: [PATCH 1/2] remoteproc: core: Add rproc OF look-up functions
-In-Reply-To: <20160812180751.GH26240@tuxbot>
-References: <20160810174049.GO26240@tuxbot>
- <7650e5fa-f52c-1ab5-e197-8630fd7d0322@ti.com> <20160810204049.GV26240@tuxbot>
- <f9641050-0a3f-11de-fa69-e587034e0527@ti.com> <20160810211947.GW26240@tuxbot>
- <b1a01567-7a5d-20de-a2b5-b673b9ce67ec@ti.com> <20160811073122.GA1715@dell>
- <05d4c9c1-79ea-bde3-e5e5-d26e6b07c916@ti.com>
- <b1b2a510-e0cb-5d8f-9f44-48c9dd747d4d@ti.com>
- <06f795ef-e71c-2cda-5306-5b75e0f15125@ti.com> <20160812180751.GH26240@tuxbot>
-Message-ID: <abae5c30-62ab-55c7-a144-cb8707832941@ti.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 12 Aug 2016 13:59:47 -0500
+Subject: [PATCH 1/2] input: misc: Add generic input driver to read
+ encoded GPIO lines
+In-Reply-To: <20160812045229.29241-2-vigneshr@ti.com>
+References: <20160812045229.29241-1-vigneshr@ti.com>
+ <20160812045229.29241-2-vigneshr@ti.com>
+Message-ID: <20160812185947.GA14685@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2016 01:07 PM, Bjorn Andersson wrote:
-> On Fri 12 Aug 09:37 PDT 2016, Suman Anna wrote:
+On Fri, Aug 12, 2016 at 10:22:28AM +0530, Vignesh R wrote:
+> Add a driver to read group of GPIO lines and provide its status as a
+> numerical value as input event to the system. This will help in
+> intefacing devices, that can be connected over GPIOs, that provide input
+> to the system by driving GPIO lines connected to them like a rotary dial
+> or a switch.
 > 
->> Hi Bjorn,
->>
->>>> On 08/11/2016 02:31 AM, Lee Jones wrote:
->>>>> On Wed, 10 Aug 2016, Suman Anna wrote:
->>>>>
->>>>>> On 08/10/2016 04:19 PM, Bjorn Andersson wrote:
->>>>>>> On Wed 10 Aug 14:04 PDT 2016, Suman Anna wrote:
->>>>>>>
->>>>>>>> On 08/10/2016 03:40 PM, Bjorn Andersson wrote:
->>>>>>>>> On Wed 10 Aug 12:37 PDT 2016, Suman Anna wrote:
->>>>>>>>>
->>>>>>>>>> Hi Lee, Bjorn,
->>>>>>>>>>
->>>>>>>>>> On 08/10/2016 12:40 PM, Bjorn Andersson wrote:
->>>>>>>>>>> On Tue 19 Jul 08:49 PDT 2016, Lee Jones wrote:
->>>>>>>>>>>
->>>>>>>>>>>> - of_rproc_by_index(): look-up and obtain a reference to a rproc
->>>>>>>>>>>>                        using the DT phandle "rprocs" and a index.
->>>>>>>>>>>>
->>>>>>>>>>>> - of_rproc_by_name():  lookup and obtain a reference to a rproc
->>>>>>>>>>>>                        using the DT phandle "rprocs" and "rproc-names".
->>>>>>>>>>>>
->>>>>>>>>>>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
->>>>>>>>>>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>>>>>>>>>>> ---
->>>>>>>>>>>
->>>>>>>>>>> I'm happy with this, so I whipped up a binding document describing our
->>>>>>>>>>> two new properties. Waiting for an opinion on that before I merge this.
->>
->> One last comment on this is the return code convention change on these
->> rproc_get APIs. I am fine in general with returning ERR_PTRs, but most
->> of the remoteproc code is using NULL checking for rproc. If you remember
->> the discussion back during the hwspinlock DT conversion [1], Ohad
->> preferred to return NULL, and that's why even the rproc_get_by_phandle
->> was returning NULL. We ought to make this consistent across the board if
->> we want to make this switch.
->>
+> For example, a rotary switch can be connected to four GPIO lines. The
+> status of the GPIO lines reflect the actual position of the rotary
+> switch dial. For example, if dial points to 9, then the four GPIO lines
+> connected to the switch will read HLLH(0b'1001 = 9). This value
+> can be reported as an ABS_* event to the input subsystem.
 > 
-> I think it makes sense to return the actual error from these functions,
-> if nothing else to keep it consistent with other frameworks.
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+>  .../devicetree/bindings/input/gpio-decoder.txt     |  23 ++++
+>  drivers/input/misc/Kconfig                         |  12 ++
+>  drivers/input/misc/Makefile                        |   1 +
+>  drivers/input/misc/gpio_decoder.c                  | 128 +++++++++++++++++++++
+>  4 files changed, 164 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/input/gpio-decoder.txt
+>  create mode 100644 drivers/input/misc/gpio_decoder.c
 > 
-> The other case I see returning NULL is rproc_alloc(), which is think is
-> analog to kmalloc(), so I think that's fine to keep.
-> 
-> Luckily wkup_m3 is the only consumer of this API in the kernel today, so
-> we shouldn't have any issues wrt changing the return value here.
+> diff --git a/Documentation/devicetree/bindings/input/gpio-decoder.txt b/Documentation/devicetree/bindings/input/gpio-decoder.txt
+> new file mode 100644
+> index 000000000000..efd947f52cb3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/input/gpio-decoder.txt
+> @@ -0,0 +1,23 @@
+> +* GPIO Decoder DT bindings
+> +
+> +Required Properties:
+> +- compatible: should be "gpio-decoder"
+> +- gpios: a spec of gpios (atleast two) to be decoded to a number with
+> +  first entry representing the MSB.
+> +
+> +Optional Properties:
+> +- gpio-decoder,max-value: Maximum possible value that can be reported by
 
-Yeah, not worried about the consumers, I am talking about the few
-functions in remoteproc core code that do some checking like in
-rproc_del(), __rproc_boot() or rproc_report_crash(). We would need to
-modify these to use IS_ERR_OR_NULL instead of a NULL check atleast.
+Just "decoder-max-value".
 
-regards
-Suman
+With that, the binding looks fine to me:
 
-> 
->> regards
->> Suman
->>
->> [1] http://marc.info/?t=138965891200008
-> 
-> Regards,
-> Bjorn
-> 
+Acked-by: Rob Herring <robh@kernel.org>
