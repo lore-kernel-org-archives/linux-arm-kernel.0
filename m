@@ -1,200 +1,422 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Fri, 12 Aug 2016 16:51:32 +0530
-Subject: [PATCH v2 09/21] net: thunderx: Add QSGMII interface type support
+Date: Fri, 12 Aug 2016 16:51:30 +0530
+Subject: [PATCH v2 07/21] net: thunderx: Support for different LMAC types
+ within BGX
 In-Reply-To: <1471000904-21715-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1471000904-21715-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1471000904-21715-10-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1471000904-21715-8-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sunil Goutham <sgoutham@cavium.com>
 
-This patch adds support for QSGMII interface type to
-the BGX driver. This type of interface is supported by
-81xx SOC.
+On 88xx all LMACs in a BGX will be in same mode but on 81xx
+BGX can be split as two and there can be LMACs configured in
+different modes.
+
+These changes move lmac_type, lane2serdes fields into per lmac
+struct from BGX struct. Got rid of qlm_mode field which has become
+redundant with these changes. And now no of valid LMACs is read
+from CSRs configured by low level firmware and figuring out the
+same based on QLM mode is discarded
 
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 65 ++++++++++++++++++-----
- drivers/net/ethernet/cavium/thunder/thunder_bgx.h |  1 +
- 2 files changed, 54 insertions(+), 12 deletions(-)
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 224 ++++++++++------------
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h |  10 -
+ 2 files changed, 98 insertions(+), 136 deletions(-)
 
 diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-index 9c3c273..0bf8d24 100644
+index 63a39ac..4497427 100644
 --- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
 +++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-@@ -379,8 +379,9 @@ void bgx_lmac_internal_loopback(int node, int bgx_idx,
- }
- EXPORT_SYMBOL(bgx_lmac_internal_loopback);
+@@ -28,6 +28,9 @@ struct lmac {
+ 	struct bgx		*bgx;
+ 	int			dmac;
+ 	u8			mac[ETH_ALEN];
++	u8                      lmac_type;
++	u8                      lane_to_sds;
++	bool                    use_training;
+ 	bool			link_up;
+ 	int			lmacid; /* ID within BGX */
+ 	int			lmacid_bd; /* ID on board */
+@@ -43,12 +46,8 @@ struct lmac {
  
--static int bgx_lmac_sgmii_init(struct bgx *bgx, int lmacid)
-+static int bgx_lmac_sgmii_init(struct bgx *bgx, struct lmac *lmac)
+ struct bgx {
+ 	u8			bgx_id;
+-	u8			qlm_mode;
+ 	struct	lmac		lmac[MAX_LMAC_PER_BGX];
+ 	int			lmac_count;
+-	int                     lmac_type;
+-	int                     lane_to_sds;
+-	int			use_training;
+ 	void __iomem		*reg_base;
+ 	struct pci_dev		*pdev;
+ };
+@@ -418,9 +417,10 @@ static int bgx_lmac_sgmii_init(struct bgx *bgx, int lmacid)
+ 	return 0;
+ }
+ 
+-static int bgx_lmac_xaui_init(struct bgx *bgx, int lmacid, int lmac_type)
++static int bgx_lmac_xaui_init(struct bgx *bgx, struct lmac *lmac)
  {
+ 	u64 cfg;
 +	int lmacid = lmac->lmacid;
+ 
+ 	/* Reset SPU */
+ 	bgx_reg_modify(bgx, lmacid, BGX_SPUX_CONTROL1, SPU_CTL_RESET);
+@@ -436,7 +436,7 @@ static int bgx_lmac_xaui_init(struct bgx *bgx, int lmacid, int lmac_type)
+ 
+ 	bgx_reg_modify(bgx, lmacid, BGX_SPUX_CONTROL1, SPU_CTL_LOW_POWER);
+ 	/* Set interleaved running disparity for RXAUI */
+-	if (bgx->lmac_type != BGX_MODE_RXAUI)
++	if (lmac->lmac_type != BGX_MODE_RXAUI)
+ 		bgx_reg_modify(bgx, lmacid,
+ 			       BGX_SPUX_MISC_CONTROL, SPU_MISC_CTL_RX_DIS);
+ 	else
+@@ -451,7 +451,7 @@ static int bgx_lmac_xaui_init(struct bgx *bgx, int lmacid, int lmac_type)
+ 	cfg = bgx_reg_read(bgx, lmacid, BGX_SPUX_INT);
+ 	bgx_reg_write(bgx, lmacid, BGX_SPUX_INT, cfg);
+ 
+-	if (bgx->use_training) {
++	if (lmac->use_training) {
+ 		bgx_reg_write(bgx, lmacid, BGX_SPUX_BR_PMD_LP_CUP, 0x00);
+ 		bgx_reg_write(bgx, lmacid, BGX_SPUX_BR_PMD_LD_CUP, 0x00);
+ 		bgx_reg_write(bgx, lmacid, BGX_SPUX_BR_PMD_LD_REP, 0x00);
+@@ -474,9 +474,9 @@ static int bgx_lmac_xaui_init(struct bgx *bgx, int lmacid, int lmac_type)
+ 	bgx_reg_write(bgx, lmacid, BGX_SPUX_AN_CONTROL, cfg);
+ 
+ 	cfg = bgx_reg_read(bgx, lmacid, BGX_SPUX_AN_ADV);
+-	if (bgx->lmac_type == BGX_MODE_10G_KR)
++	if (lmac->lmac_type == BGX_MODE_10G_KR)
+ 		cfg |= (1 << 23);
+-	else if (bgx->lmac_type == BGX_MODE_40G_KR)
++	else if (lmac->lmac_type == BGX_MODE_40G_KR)
+ 		cfg |= (1 << 24);
+ 	else
+ 		cfg &= ~((1 << 23) | (1 << 24));
+@@ -511,11 +511,11 @@ static int bgx_xaui_check_link(struct lmac *lmac)
+ {
+ 	struct bgx *bgx = lmac->bgx;
+ 	int lmacid = lmac->lmacid;
+-	int lmac_type = bgx->lmac_type;
++	int lmac_type = lmac->lmac_type;
  	u64 cfg;
  
- 	bgx_reg_modify(bgx, lmacid, BGX_GMP_GMI_TXX_THRESH, 0x30);
-@@ -409,6 +410,14 @@ static int bgx_lmac_sgmii_init(struct bgx *bgx, int lmacid)
- 	cfg |= (PCS_MRX_CTL_RST_AN | PCS_MRX_CTL_AN_EN);
- 	bgx_reg_write(bgx, lmacid, BGX_GMP_PCS_MRX_CTL, cfg);
+ 	bgx_reg_modify(bgx, lmacid, BGX_SPUX_MISC_CONTROL, SPU_MISC_CTL_RX_DIS);
+-	if (bgx->use_training) {
++	if (lmac->use_training) {
+ 		cfg = bgx_reg_read(bgx, lmacid, BGX_SPUX_INT);
+ 		if (!(cfg & (1ull << 13))) {
+ 			cfg = (1ull << 13) | (1ull << 14);
+@@ -556,7 +556,7 @@ static int bgx_xaui_check_link(struct lmac *lmac)
+ 			       BGX_SPUX_STATUS2, SPU_STATUS2_RCVFLT);
+ 	if (bgx_reg_read(bgx, lmacid, BGX_SPUX_STATUS2) & SPU_STATUS2_RCVFLT) {
+ 		dev_err(&bgx->pdev->dev, "Receive fault, retry training\n");
+-		if (bgx->use_training) {
++		if (lmac->use_training) {
+ 			cfg = bgx_reg_read(bgx, lmacid, BGX_SPUX_INT);
+ 			if (!(cfg & (1ull << 13))) {
+ 				cfg = (1ull << 13) | (1ull << 14);
+@@ -599,7 +599,7 @@ static int bgx_xaui_check_link(struct lmac *lmac)
+ 	/* Rx local/remote fault seen.
+ 	 * Do lmac reinit to see if condition recovers
+ 	 */
+-	bgx_lmac_xaui_init(bgx, lmacid, bgx->lmac_type);
++	bgx_lmac_xaui_init(bgx, lmac);
  
-+	if (lmac->lmac_type == BGX_MODE_QSGMII) {
-+		/* Disable disparity check for QSGMII */
-+		cfg = bgx_reg_read(bgx, lmacid, BGX_GMP_PCS_MISCX_CTL);
-+		cfg &= ~PCS_MISC_CTL_DISP_EN;
-+		bgx_reg_write(bgx, lmacid, BGX_GMP_PCS_MISCX_CTL, cfg);
-+		return 0;
-+	}
-+
- 	if (bgx_poll_reg(bgx, lmacid, BGX_GMP_PCS_MRX_STATUS,
- 			 PCS_MRX_STATUS_AN_CPT, false)) {
- 		dev_err(&bgx->pdev->dev, "BGX AN_CPT not completed\n");
-@@ -650,6 +659,14 @@ static void bgx_poll_for_link(struct work_struct *work)
- 	queue_delayed_work(lmac->check_link, &lmac->dwork, HZ * 2);
+ 	return -1;
  }
- 
-+static int phy_interface_mode(u8 lmac_type)
-+{
-+	if (lmac_type == BGX_MODE_QSGMII)
-+		return PHY_INTERFACE_MODE_QSGMII;
-+
-+	return PHY_INTERFACE_MODE_SGMII;
-+}
-+
- static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
- {
- 	struct lmac *lmac;
-@@ -658,9 +675,10 @@ static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
+@@ -623,7 +623,7 @@ static void bgx_poll_for_link(struct work_struct *work)
+ 	if ((spu_link & SPU_STATUS1_RCV_LNK) &&
+ 	    !(smu_link & SMU_RX_CTL_STATUS)) {
+ 		lmac->link_up = 1;
+-		if (lmac->bgx->lmac_type == BGX_MODE_XLAUI)
++		if (lmac->lmac_type == BGX_MODE_XLAUI)
+ 			lmac->last_speed = 40000;
+ 		else
+ 			lmac->last_speed = 10000;
+@@ -657,13 +657,13 @@ static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
  	lmac = &bgx->lmac[lmacid];
  	lmac->bgx = bgx;
  
--	if (lmac->lmac_type == BGX_MODE_SGMII) {
-+	if ((lmac->lmac_type == BGX_MODE_SGMII) ||
-+	    (lmac->lmac_type == BGX_MODE_QSGMII)) {
+-	if (bgx->lmac_type == BGX_MODE_SGMII) {
++	if (lmac->lmac_type == BGX_MODE_SGMII) {
  		lmac->is_sgmii = 1;
--		if (bgx_lmac_sgmii_init(bgx, lmacid))
-+		if (bgx_lmac_sgmii_init(bgx, lmac))
+ 		if (bgx_lmac_sgmii_init(bgx, lmacid))
  			return -1;
  	} else {
  		lmac->is_sgmii = 0;
-@@ -697,7 +715,7 @@ static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
+-		if (bgx_lmac_xaui_init(bgx, lmacid, bgx->lmac_type))
++		if (bgx_lmac_xaui_init(bgx, lmac))
+ 			return -1;
+ 	}
  
- 		if (phy_connect_direct(&lmac->netdev, lmac->phydev,
- 				       bgx_lmac_handler,
--				       PHY_INTERFACE_MODE_SGMII))
-+				       phy_interface_mode(lmac->lmac_type)))
+@@ -685,10 +685,10 @@ static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
+ 	/* Restore default cfg, incase low level firmware changed it */
+ 	bgx_reg_write(bgx, lmacid, BGX_CMRX_RX_DMAC_CTL, 0x03);
+ 
+-	if ((bgx->lmac_type != BGX_MODE_XFI) &&
+-	    (bgx->lmac_type != BGX_MODE_XLAUI) &&
+-	    (bgx->lmac_type != BGX_MODE_40G_KR) &&
+-	    (bgx->lmac_type != BGX_MODE_10G_KR)) {
++	if ((lmac->lmac_type != BGX_MODE_XFI) &&
++	    (lmac->lmac_type != BGX_MODE_XLAUI) &&
++	    (lmac->lmac_type != BGX_MODE_40G_KR) &&
++	    (lmac->lmac_type != BGX_MODE_10G_KR)) {
+ 		if (!lmac->phydev)
  			return -ENODEV;
  
- 		phy_start_aneg(lmac->phydev);
-@@ -799,6 +817,11 @@ static void bgx_init_hw(struct bgx *bgx)
+@@ -753,76 +753,19 @@ static void bgx_lmac_disable(struct bgx *bgx, u8 lmacid)
+ 
+ 	bgx_flush_dmac_addrs(bgx, lmacid);
+ 
+-	if ((bgx->lmac_type != BGX_MODE_XFI) &&
+-	    (bgx->lmac_type != BGX_MODE_XLAUI) &&
+-	    (bgx->lmac_type != BGX_MODE_40G_KR) &&
+-	    (bgx->lmac_type != BGX_MODE_10G_KR) && lmac->phydev)
++	if ((lmac->lmac_type != BGX_MODE_XFI) &&
++	    (lmac->lmac_type != BGX_MODE_XLAUI) &&
++	    (lmac->lmac_type != BGX_MODE_40G_KR) &&
++	    (lmac->lmac_type != BGX_MODE_10G_KR) && lmac->phydev)
+ 		phy_disconnect(lmac->phydev);
+ 
+ 	lmac->phydev = NULL;
+ }
+ 
+-static void bgx_set_num_ports(struct bgx *bgx)
+-{
+-	u64 lmac_count;
+-
+-	switch (bgx->qlm_mode) {
+-	case QLM_MODE_SGMII:
+-		bgx->lmac_count = 4;
+-		bgx->lmac_type = BGX_MODE_SGMII;
+-		bgx->lane_to_sds = 0;
+-		break;
+-	case QLM_MODE_XAUI_1X4:
+-		bgx->lmac_count = 1;
+-		bgx->lmac_type = BGX_MODE_XAUI;
+-		bgx->lane_to_sds = 0xE4;
+-			break;
+-	case QLM_MODE_RXAUI_2X2:
+-		bgx->lmac_count = 2;
+-		bgx->lmac_type = BGX_MODE_RXAUI;
+-		bgx->lane_to_sds = 0xE4;
+-			break;
+-	case QLM_MODE_XFI_4X1:
+-		bgx->lmac_count = 4;
+-		bgx->lmac_type = BGX_MODE_XFI;
+-		bgx->lane_to_sds = 0;
+-		break;
+-	case QLM_MODE_XLAUI_1X4:
+-		bgx->lmac_count = 1;
+-		bgx->lmac_type = BGX_MODE_XLAUI;
+-		bgx->lane_to_sds = 0xE4;
+-		break;
+-	case QLM_MODE_10G_KR_4X1:
+-		bgx->lmac_count = 4;
+-		bgx->lmac_type = BGX_MODE_10G_KR;
+-		bgx->lane_to_sds = 0;
+-		bgx->use_training = 1;
+-		break;
+-	case QLM_MODE_40G_KR4_1X4:
+-		bgx->lmac_count = 1;
+-		bgx->lmac_type = BGX_MODE_40G_KR;
+-		bgx->lane_to_sds = 0xE4;
+-		bgx->use_training = 1;
+-		break;
+-	default:
+-		bgx->lmac_count = 0;
+-		break;
+-	}
+-
+-	/* Check if low level firmware has programmed LMAC count
+-	 * based on board type, if yes consider that otherwise
+-	 * the default static values
+-	 */
+-	lmac_count = bgx_reg_read(bgx, 0, BGX_CMR_RX_LMACS) & 0x7;
+-	if (lmac_count != 4)
+-		bgx->lmac_count = lmac_count;
+-}
+-
+ static void bgx_init_hw(struct bgx *bgx)
+ {
+ 	int i;
+-
+-	bgx_set_num_ports(bgx);
++	struct lmac *lmac;
+ 
+ 	bgx_reg_modify(bgx, 0, BGX_CMR_GLOBAL_CFG, CMR_GLOBAL_CFG_FCS_STRIP);
+ 	if (bgx_reg_read(bgx, 0, BGX_CMR_BIST_STATUS))
+@@ -830,17 +773,9 @@ static void bgx_init_hw(struct bgx *bgx)
+ 
+ 	/* Set lmac type and lane2serdes mapping */
+ 	for (i = 0; i < bgx->lmac_count; i++) {
+-		if (bgx->lmac_type == BGX_MODE_RXAUI) {
+-			if (i)
+-				bgx->lane_to_sds = 0x0e;
+-			else
+-				bgx->lane_to_sds = 0x04;
+-			bgx_reg_write(bgx, i, BGX_CMRX_CFG,
+-				      (bgx->lmac_type << 8) | bgx->lane_to_sds);
+-			continue;
+-		}
++		lmac = &bgx->lmac[i];
+ 		bgx_reg_write(bgx, i, BGX_CMRX_CFG,
+-			      (bgx->lmac_type << 8) | (bgx->lane_to_sds + i));
++			      (lmac->lmac_type << 8) | lmac->lane_to_sds);
+ 		bgx->lmac[i].lmacid_bd = lmac_count;
+ 		lmac_count++;
+ 	}
+@@ -863,58 +798,95 @@ static void bgx_init_hw(struct bgx *bgx)
  		bgx_reg_write(bgx, 0, BGX_CMR_RX_STREERING + (i * 8), 0x00);
  }
  
-+static u8 bgx_get_lane2sds_cfg(struct bgx *bgx, struct lmac *lmac)
-+{
-+	return (u8)(bgx_reg_read(bgx, lmac->lmacid, BGX_CMRX_CFG) & 0xFF);
-+}
-+
- static void bgx_print_qlm_mode(struct bgx *bgx, u8 lmacid)
+-static void bgx_get_qlm_mode(struct bgx *bgx)
++static void bgx_print_qlm_mode(struct bgx *bgx, u8 lmacid)
  {
  	struct device *dev = &bgx->pdev->dev;
-@@ -838,12 +861,22 @@ static void bgx_print_qlm_mode(struct bgx *bgx, u8 lmacid)
- 		else
- 			dev_info(dev, "%s: 40G_KR4\n", (char *)str);
- 		break;
--	default:
--		dev_info(dev, "%s: INVALID\n", (char *)str);
-+	case BGX_MODE_QSGMII:
-+		if ((lmacid == 0) &&
-+		    (bgx_get_lane2sds_cfg(bgx, lmac) != lmacid))
-+			return;
-+		if ((lmacid == 2) &&
-+		    (bgx_get_lane2sds_cfg(bgx, lmac) == lmacid))
-+			return;
-+		dev_info(dev, "%s: QSGMII\n", (char *)str);
-+		break;
-+	case BGX_MODE_INVALID:
-+		/* Nothing to do */
-+		break;
- 	}
- }
+-	int lmac_type;
+-	int train_en;
+-
+-	/* Read LMAC0 type to figure out QLM mode
+-	 * This is configured by low level firmware
+-	 */
+-	lmac_type = bgx_reg_read(bgx, 0, BGX_CMRX_CFG);
+-	lmac_type = (lmac_type >> 8) & 0x07;
++	struct lmac *lmac;
++	char str[20];
  
--static void lmac_set_lane2sds(struct lmac *lmac)
-+static void lmac_set_lane2sds(struct bgx *bgx, struct lmac *lmac)
- {
- 	switch (lmac->lmac_type) {
+-	train_en = bgx_reg_read(bgx, 0, BGX_SPUX_BR_PMD_CRTL) &
+-				SPU_PMD_CRTL_TRAIN_EN;
++	lmac = &bgx->lmac[lmacid];
++	sprintf(str, "BGX%d QLM mode", bgx->bgx_id);
+ 
+-	switch (lmac_type) {
++	switch (lmac->lmac_type) {
  	case BGX_MODE_SGMII:
-@@ -857,6 +890,14 @@ static void lmac_set_lane2sds(struct lmac *lmac)
+-		bgx->qlm_mode = QLM_MODE_SGMII;
+-		dev_info(dev, "BGX%d QLM mode: SGMII\n", bgx->bgx_id);
++		dev_info(dev, "%s: SGMII\n", (char *)str);
+ 		break;
+ 	case BGX_MODE_XAUI:
+-		bgx->qlm_mode = QLM_MODE_XAUI_1X4;
+-		dev_info(dev, "BGX%d QLM mode: XAUI\n", bgx->bgx_id);
++		dev_info(dev, "%s: XAUI\n", (char *)str);
+ 		break;
  	case BGX_MODE_RXAUI:
- 		lmac->lane_to_sds = (lmac->lmacid) ? 0xE : 0x4;
+-		bgx->qlm_mode = QLM_MODE_RXAUI_2X2;
+-		dev_info(dev, "BGX%d QLM mode: RXAUI\n", bgx->bgx_id);
++		dev_info(dev, "%s: RXAUI\n", (char *)str);
  		break;
-+	case BGX_MODE_QSGMII:
-+		/* There is no way to determine if DLM0/2 is QSGMII or
-+		 * DLM1/3 is configured to QSGMII as bootloader will
-+		 * configure all LMACs, so take whatever is configured
-+		 * by low level firmware.
-+		 */
-+		lmac->lane_to_sds = bgx_get_lane2sds_cfg(bgx, lmac);
-+		break;
+ 	case BGX_MODE_XFI:
+-		if (!train_en) {
+-			bgx->qlm_mode = QLM_MODE_XFI_4X1;
+-			dev_info(dev, "BGX%d QLM mode: XFI\n", bgx->bgx_id);
+-		} else {
+-			bgx->qlm_mode = QLM_MODE_10G_KR_4X1;
+-			dev_info(dev, "BGX%d QLM mode: 10G_KR\n", bgx->bgx_id);
+-		}
++		if (!lmac->use_training)
++			dev_info(dev, "%s: XFI\n", (char *)str);
++		else
++			dev_info(dev, "%s: 10G_KR\n", (char *)str);
+ 		break;
+ 	case BGX_MODE_XLAUI:
+-		if (!train_en) {
+-			bgx->qlm_mode = QLM_MODE_XLAUI_1X4;
+-			dev_info(dev, "BGX%d QLM mode: XLAUI\n", bgx->bgx_id);
+-		} else {
+-			bgx->qlm_mode = QLM_MODE_40G_KR4_1X4;
+-			dev_info(dev, "BGX%d QLM mode: 40G_KR4\n", bgx->bgx_id);
+-		}
++		if (!lmac->use_training)
++			dev_info(dev, "%s: XLAUI\n", (char *)str);
++		else
++			dev_info(dev, "%s: 40G_KR4\n", (char *)str);
+ 		break;
  	default:
- 		lmac->lane_to_sds = 0;
- 		break;
-@@ -882,7 +923,7 @@ static void bgx_set_lmac_config(struct bgx *bgx, u8 idx)
- 		lmac->use_training =
- 			bgx_reg_read(bgx, 0, BGX_SPUX_BR_PMD_CRTL) &
- 				SPU_PMD_CRTL_TRAIN_EN;
--		lmac_set_lane2sds(lmac);
-+		lmac_set_lane2sds(bgx, lmac);
- 		return;
- 	}
- 
-@@ -901,7 +942,7 @@ static void bgx_set_lmac_config(struct bgx *bgx, u8 idx)
- 		lmac->use_training =
- 			bgx_reg_read(bgx, idx, BGX_SPUX_BR_PMD_CRTL) &
- 				SPU_PMD_CRTL_TRAIN_EN;
--		lmac_set_lane2sds(lmac);
-+		lmac_set_lane2sds(bgx, lmac);
- 
- 		/* Set LMAC type of other lmac on same DLM i.e LMAC 1/3 */
- 		olmac = &bgx->lmac[idx + 1];
-@@ -909,7 +950,7 @@ static void bgx_set_lmac_config(struct bgx *bgx, u8 idx)
- 		olmac->use_training =
- 		bgx_reg_read(bgx, idx + 1, BGX_SPUX_BR_PMD_CRTL) &
- 			SPU_PMD_CRTL_TRAIN_EN;
--		lmac_set_lane2sds(olmac);
-+		lmac_set_lane2sds(bgx, olmac);
+-		bgx->qlm_mode = QLM_MODE_SGMII;
+-		dev_info(dev, "BGX%d QLM default mode: SGMII\n", bgx->bgx_id);
++		dev_info(dev, "%s: INVALID\n", (char *)str);
  	}
  }
  
-@@ -920,7 +961,7 @@ static bool is_dlm0_in_bgx_mode(struct bgx *bgx)
- 	if (!bgx->is_81xx)
- 		return true;
++static void lmac_set_lane2sds(struct lmac *lmac)
++{
++	switch (lmac->lmac_type) {
++	case BGX_MODE_SGMII:
++	case BGX_MODE_XFI:
++		lmac->lane_to_sds = lmac->lmacid;
++		break;
++	case BGX_MODE_XAUI:
++	case BGX_MODE_XLAUI:
++		lmac->lane_to_sds = 0xE4;
++		break;
++	case BGX_MODE_RXAUI:
++		lmac->lane_to_sds = (lmac->lmacid) ? 0xE : 0x4;
++		break;
++	default:
++		lmac->lane_to_sds = 0;
++		break;
++	}
++}
++
++static void bgx_set_lmac_config(struct bgx *bgx, u8 idx)
++{
++	struct lmac *lmac;
++	u64 cmr_cfg;
++
++	lmac = &bgx->lmac[idx];
++	lmac->lmacid = idx;
++
++	/* Read LMAC0 type to figure out QLM mode
++	 * This is configured by low level firmware
++	 */
++	cmr_cfg = bgx_reg_read(bgx, 0, BGX_CMRX_CFG);
++	lmac->lmac_type = (cmr_cfg >> 8) & 0x07;
++	lmac->use_training =
++		bgx_reg_read(bgx, 0, BGX_SPUX_BR_PMD_CRTL) &
++			SPU_PMD_CRTL_TRAIN_EN;
++	lmac_set_lane2sds(lmac);
++}
++
++static void bgx_get_qlm_mode(struct bgx *bgx)
++{
++	u8  idx;
++
++	/* It is assumed that low level firmware sets this value */
++	bgx->lmac_count = bgx_reg_read(bgx, 0, BGX_CMR_RX_LMACS) & 0x7;
++	if (bgx->lmac_count > MAX_LMAC_PER_BGX)
++		bgx->lmac_count = MAX_LMAC_PER_BGX;
++
++	for (idx = 0; idx < bgx->lmac_count; idx++)
++		bgx_set_lmac_config(bgx, idx);
++	bgx_print_qlm_mode(bgx, 0);
++}
++
+ #ifdef CONFIG_ACPI
  
--	lmac = &bgx->lmac[1];
-+	lmac = &bgx->lmac[0];
- 	if (lmac->lmac_type == BGX_MODE_INVALID)
- 		return false;
- 
-@@ -946,7 +987,7 @@ static void bgx_get_qlm_mode(struct bgx *bgx)
- 	if (bgx->lmac_count > MAX_LMAC_PER_BGX)
- 		bgx->lmac_count = MAX_LMAC_PER_BGX;
- 
--	for (idx = 0; idx < bgx->lmac_count; idx++)
-+	for (idx = 0; idx < MAX_LMAC_PER_BGX; idx++)
- 		bgx_set_lmac_config(bgx, idx);
- 
- 	if (!bgx->is_81xx) {
+ static int acpi_get_mac_address(struct device *dev, struct acpi_device *adev,
 diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-index 38e9fb4..0705863 100644
+index 9f5e49a..b7b91c8 100644
 --- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
 +++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-@@ -146,6 +146,7 @@
- #define BGX_GMP_PCS_ANX_AN_RESULTS	0x30020
- #define BGX_GMP_PCS_SGM_AN_ADV		0x30068
- #define BGX_GMP_PCS_MISCX_CTL		0x30078
-+#define  PCS_MISC_CTL_DISP_EN			BIT_ULL(13)
- #define  PCS_MISC_CTL_GMX_ENO			BIT_ULL(11)
- #define  PCS_MISC_CTL_SAMP_PT_MASK	0x7Full
- #define BGX_GMP_GMI_PRTX_CFG		0x38020
+@@ -217,14 +217,4 @@ enum LMAC_TYPE {
+ 	BGX_MODE_40G_KR = 4,/* 4 lanes, 10.3125 Gbaud */
+ };
+ 
+-enum qlm_mode {
+-	QLM_MODE_SGMII,         /* SGMII, each lane independent */
+-	QLM_MODE_XAUI_1X4,      /* 1 XAUI or DXAUI, 4 lanes */
+-	QLM_MODE_RXAUI_2X2,     /* 2 RXAUI, 2 lanes each */
+-	QLM_MODE_XFI_4X1,       /* 4 XFI, 1 lane each */
+-	QLM_MODE_XLAUI_1X4,     /* 1 XLAUI, 4 lanes each */
+-	QLM_MODE_10G_KR_4X1,    /* 4 10GBASE-KR, 1 lane each */
+-	QLM_MODE_40G_KR4_1X4,   /* 1 40GBASE-KR4, 4 lanes each */
+-};
+-
+ #endif /* THUNDER_BGX_H */
 -- 
 2.7.4
