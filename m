@@ -1,32 +1,25 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 12 Aug 2016 14:06:46 +0530
-Subject: [PATCH resend 0/1] phy-sun4i-usb: Add support for peripheral-only
- mode
-In-Reply-To: <1470686139-19893-1-git-send-email-hdegoede@redhat.com>
-References: <1470686139-19893-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <57AD8A9E.5000106@ti.com>
+Date: Fri, 12 Aug 2016 14:11:44 +0530
+Subject: [PATCH] phy: sun9i-usb: fix error handling
+In-Reply-To: <CAGb2v64D-AcrG8Xot79_7PnUKFnHonU65Crfw7QONj_TFLwv5A@mail.gmail.com>
+References: <1467784806-17091-1-git-send-email-christophe.jaillet@wanadoo.fr>
+ <CAGb2v64D-AcrG8Xot79_7PnUKFnHonU65Crfw7QONj_TFLwv5A@mail.gmail.com>
+Message-ID: <57AD8BC8.7090609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On Tuesday 09 August 2016 01:25 AM, Hans de Goede wrote:
-> Hi Kishon,
+On Wednesday 06 July 2016 11:36 AM, Chen-Yu Tsai wrote:
+> On Wed, Jul 6, 2016 at 2:00 PM, Christophe JAILLET
+> <christophe.jaillet@wanadoo.fr> wrote:
+>> This is likely that checking 'phy->hsic_clk' instead of 'phy->clk' is
+>> expected here.
+>>
+>> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
 > 
-> As discussed before, here is a resend now that rc1 is out (and includes
-> the new of_usb_get_dr_mode_by_phy helper this patch needs).
-> 
-> Please merge this for 4.9-rcX some of the musb-sunxi glue changes
-> already merged have a runtime dependency on this patch, without
-> this patch boards using the musb controller in host-only mode
-> will break.
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-merged, thanks.
+merged, thanks
 
 -Kishon
-> 
-> Thanks & Regards,
-> 
-> Hans
-> 
-> 
