@@ -1,61 +1,54 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 12 Aug 2016 09:11:56 -0700
-Subject: [RFC][PATCH 3/4] arm64: dts: hikey: Add hikey support for
- syscon-reboot-mode
-In-Reply-To: <57ADD052.9030000@hisilicon.com>
-References: <1470697426-16426-1-git-send-email-john.stultz@linaro.org>
- <1470697426-16426-3-git-send-email-john.stultz@linaro.org>
- <20160810043424.GH26240@tuxbot>
- <CALAqxLVQrL52Z_A5yO+UfBWcva7gUvawq=gv+WWyV51rz2iuyw@mail.gmail.com>
- <57ADD052.9030000@hisilicon.com>
-Message-ID: <20160812161156.GE26240@tuxbot>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 12 Aug 2016 17:24:14 +0100
+Subject: [PATCH 2/2] arm: apply more __ro_after_init
+In-Reply-To: <2188666.QKZtt2vNXZ@wuerfel>
+References: <1464979224-2085-1-git-send-email-keescook@chromium.org>
+ <2760702.46Rp2Juk5b@wuerfel>
+ <20160810230645.GP1041@n2100.armlinux.org.uk>
+ <2188666.QKZtt2vNXZ@wuerfel>
+Message-ID: <20160812162414.GI1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 12 Aug 06:34 PDT 2016, Wei Xu wrote:
-
-> Hi All,
-> 
-> On 10/08/2016 05:58, John Stultz wrote:
-> > On Tue, Aug 9, 2016 at 9:34 PM, Bjorn Andersson
-> > <bjorn.andersson@linaro.org> wrote:
-> >> On Mon 08 Aug 16:03 PDT 2016, John Stultz wrote:
-> >>
-> >> [..]
-> >>> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> >> [..]
-> >>>       memory at 0 {
-> >>>               device_type = "memory";
-> >>>               reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
-> >>> -                   <0x00000000 0x05f00000 0x00000000 0x00eff000>,
-> >>> +                   <0x00000000 0x05f00000 0x00000000 0x00001000>,
-> >>> +                   <0x00000000 0x05f02000 0x00000000 0x00efd000>,
-> >>>                     <0x00000000 0x06e00000 0x00000000 0x0060f000>,
-> >>>                     <0x00000000 0x07410000 0x00000000 0x36bf0000>;
-> >>>       };
-> >>
-> >> As I said when talked about this, I don't think you should punch holes
-> >> in the /memory node, but rather add these regions as no-map in a
-> >> /reserved-memory node. But that's a unrelated matter.
+On Thu, Aug 11, 2016 at 05:54:08PM +0200, Arnd Bergmann wrote:
+> On Thursday, August 11, 2016 12:06:45 AM CEST Russell King - ARM Linux wrote:
+> > On Wed, Aug 10, 2016 at 09:41:23PM +0200, Arnd Bergmann wrote:
+> > > It might be better to start by making the fixed mapping readonly,
+> > > as KASLR doesn't protect that one at all, and change the TLS
+> > > code accordingly.
 > > 
-> > Yea. I need to sync w/ Wei and Guodong to see about reworking all of
-> > those to use /reserved-memory, but for now I'd like to stay in sync w/
-> > how they have it setup.
+> > I think that's impossible, because we gave userspace permission to
+> > read 0xffff0ff0 directly without using __kuser_get_tls.  You're
+> > talking about potentially breaking userspace.
 > > 
+> > If you disable kuser helpers, then the page becomes read-only and
+> > invisible to userspace anyway.  So, everything is being done there
+> > which can be done - if you have kuser helpers enabled, then you
+> > lose some opportunities for these security improvements.
 > 
-> Both are fine to me.
-> I remember before we had a discussion [1].
-> How about we add these functions this time and clean the memory node
-> in the future if needed?
-> 
-> [1] http://patches.linaro.org/patch/54682/
+> What I meant was writing to the page through the linear mapping
+> rather than the virtual mapping at 0xffff0000 so we can leave that
+> one read-only (I did not consider whether that might cause cache
+> aliasing problems when reading from the other address).
 
-I agree, you should not hold up John's addition on changing to
-reserve-memory, as these are unrelated changes..
+Kees original patch was about moving the vector pages into the
+read-only area after init, so the linear mapping of them becomes
+read-only as well.  So that won't work.  We need at least one
+read-write mapping for FIQ, and for context switching for kuser
+helpers.
 
-But I would recommend that you take the time to do the switch to
-/reserve-memory before next change to /memory comes in, as that change
-will be just as unrelated.
+> Your other point is more important though: if one really cares
+> about optimizing security here, they probably should disable
+> kuser helpers completely anyway.
 
-Regards,
-Bjorn
+We could probably predicate moving the vectors page into the RO
+section when kuser helpers are enabled.
+
+> Kees, is that something you have on your radar already?
+
+I believe Android already disable kuser helpers as of a few years ago.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
