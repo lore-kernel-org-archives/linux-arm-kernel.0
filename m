@@ -1,71 +1,73 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Fri, 12 Aug 2016 09:28:15 -0400
-Subject: [PATCH V6 0/6] iommu/msm: Add DT adaptation and generic bindings
- support
-In-Reply-To: <000001d1f499$fe2caf50$fa860df0$@codeaurora.org>
-References: <1465817767-9856-1-git-send-email-sricharan@codeaurora.org>
- <CAF6AEGsF5M1sfwaXKW0x=Mu=nQJR-9+xqrtXd=7Vz_+6G_u25A@mail.gmail.com>
- <CAF6AEGsLGDqRuB97+qN1g7X60A49Wv1HGbAiaeZoxogMmHY9HA@mail.gmail.com>
- <003a01d1f467$2b180ba0$814822e0$@codeaurora.org>
- <CAF6AEGsRVULNpSe_s460biNhV0dRaKLv6tf2Y244HEjGVOV3bw@mail.gmail.com>
- <000001d1f499$fe2caf50$fa860df0$@codeaurora.org>
-Message-ID: <CAF6AEGuitSWt9dhXrMfBDqAkXzpZObuj6A_8XxL+TVSWnbkwaQ@mail.gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 12 Aug 2016 14:34:10 +0100
+Subject: [RFC][PATCH 3/4] arm64: dts: hikey: Add hikey support for
+ syscon-reboot-mode
+In-Reply-To: <CALAqxLVQrL52Z_A5yO+UfBWcva7gUvawq=gv+WWyV51rz2iuyw@mail.gmail.com>
+References: <1470697426-16426-1-git-send-email-john.stultz@linaro.org>
+ <1470697426-16426-3-git-send-email-john.stultz@linaro.org>
+ <20160810043424.GH26240@tuxbot>
+ <CALAqxLVQrL52Z_A5yO+UfBWcva7gUvawq=gv+WWyV51rz2iuyw@mail.gmail.com>
+Message-ID: <57ADD052.9030000@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 12, 2016 at 9:03 AM, Sricharan <sricharan@codeaurora.org> wrote:
-> Hi Rob,
->
->>>>> btw, the current state, at least on linaro integration branch, fault
->>>>> handling doesn't work so well (ie. device never gets resumed).. which
->>>>> is a bit unfortunate for a gpu (and results in a *lot* of rebooting on
->>>>> my part when debugging userspace).  I haven't had time yet to compare
->>>>> to the ancient downstream driver, but not sure if you have any ideas?
->>>>>
->>>>> I guess probably disabling stall on fault would help.  But I'm not
->>>>> even getting the "Fault occurred in context.." prints.  Seeing the
->>>>> fault iova is pretty useful since that plus gpu cmdstream trace helps
->>>>> me figure out which texture/etc is being accessed out of bounds.
->>>>
->>>>fyi, it looks like it is not getting any fault irq..  it's *possible*
->>>>that I screwed up the irq #'s when translating from downstream, so you
->>>>might want to double check that.  I thought I had it right, I assume I
->>>>would have noticed during piglit runs if fault recovery wasn't working
->>>>(since the result is that *everything* after the faulting test would
->>>>have failed since gpu is wedged with no access to memory), but it was
->>>>long enough ago that I can't claim that definitively.
->>>>
->>>>If you need an easy way to trigger a gpu fault, msmtest is a good way,
->>>>change this line:
->>>>
->>>>  https://github.com/freedreno/msmtest/blob/master/msmtest.c#L247
->>>>
->>>>from OUT_RELOC() to OUT_RING(ring, 0x00000000) will trigger a fault.
->>>>
->>>    So for the irq to be triggered, 'non-secure' irq line has to be
->>>   populated in DT. There is a 'secure'and 'non-secure' irq lines for these iommus
->>>   and  non-secure irq number is secure + 1. I tested this by having a 'return 0'
->>>  from the msm_iommu_map (no mapping), and the faults were getting triggered.
+Hi All,
+
+On 10/08/2016 05:58, John Stultz wrote:
+> On Tue, Aug 9, 2016 at 9:34 PM, Bjorn Andersson
+> <bjorn.andersson@linaro.org> wrote:
+>> On Mon 08 Aug 16:03 PDT 2016, John Stultz wrote:
+>>
+>> [..]
+>>> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+>> [..]
+>>>       memory at 0 {
+>>>               device_type = "memory";
+>>>               reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
+>>> -                   <0x00000000 0x05f00000 0x00000000 0x00eff000>,
+>>> +                   <0x00000000 0x05f00000 0x00000000 0x00001000>,
+>>> +                   <0x00000000 0x05f02000 0x00000000 0x00efd000>,
+>>>                     <0x00000000 0x06e00000 0x00000000 0x0060f000>,
+>>>                     <0x00000000 0x07410000 0x00000000 0x36bf0000>;
+>>>       };
+>>
+>> As I said when talked about this, I don't think you should punch holes
+>> in the /memory node, but rather add these regions as no-map in a
+>> /reserved-memory node. But that's a unrelated matter.
+> 
+> Yea. I need to sync w/ Wei and Guodong to see about reworking all of
+> those to use /reserved-memory, but for now I'd like to stay in sync w/
+> how they have it setup.
+> 
+
+Both are fine to me.
+I remember before we had a discussion [1].
+How about we add these functions this time and clean the memory node
+in the future if needed?
+
+[1] http://patches.linaro.org/patch/54682/
+
+Best Regards,
+Wei
+
 >>>
->>>   Can you share me your dts data ?
->>>
+>>> +     reboot-mode-syscon at 5f01000 {
+>>> +             compatible = "syscon", "simple-mfd";
+>>> +             reg = <0x0 0x05f01000 0x0 0x00001000>;
+>>> +
+>>> +             reboot-mode at 0 {
 >>
->>I think this is what you want:
+>> Drop the @0
+> 
+> Will do.
+> 
+> 
 >>
->>https://github.com/freedreno/kernel-msm/blob/integration-linux-qcomlt/arch/arm/boot/dts/qcom-apq8064.dtsi#L2008
->>
->>I haven't tested a display fault, so I suppose it is possible that
->>irq's are working for some iommu instances but not others?
->
-> So in your DT, for gfx3d, the non-secure line is '70' and not '69' (This is secure) .
->  Infact only '70' should be populated. The driver sets the irq line based on resource 0.
->  This applies for all iommu nodes in your DT. (only the second irq line is needed).
-
-ahh, that would explain.
-
-Is it better to remove the extra entry, or should I just swap them
-all?  Ie. might there be some point in the future where the driver
-would want both?
-
-BR,
--R
+>> Other than that:
+>> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> 
+> Thanks!
+> -john
+> 
+> .
+> 
