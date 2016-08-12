@@ -1,97 +1,82 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Fri, 12 Aug 2016 16:17:53 +0800
-Subject: [PATCH v9 01/10] clk: fix initial state of critical clock's
- parents
-In-Reply-To: <20160810210922.GD2996@codeaurora.org>
-References: <1466581229-2342-1-git-send-email-erin.lo@mediatek.com>
- <1466581229-2342-2-git-send-email-erin.lo@mediatek.com>
- <20160702012140.GB17071@codeaurora.org>
- <1467604308.26485.4.camel@mtksdaap41>
- <146802073038.73491.6675612765998057903@resonance>
- <1468225452.31247.7.camel@mtksdaap41> <1470203182.17063.3.camel@mtksdaap41>
- <1470721183.8551.6.camel@mtksdaap41> <20160810210922.GD2996@codeaurora.org>
-Message-ID: <1470989873.8551.10.camel@mtksdaap41>
+From: npiggin@gmail.com (Nicholas Piggin)
+Date: Fri, 12 Aug 2016 18:19:17 +1000
+Subject: [PATCH] arm: add an option for erratum 657417
+Message-ID: <1470989957-23671-1-git-send-email-npiggin@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-08-10 at 14:09 -0700, Stephen Boyd wrote:
-> (Including lists)
-> 
-> On 08/09, James Liao wrote:
-> > On Wed, 2016-08-03 at 13:46 +0800, James Liao wrote:
-> >>
-> >> Hi Mike,
-> >>
-> >> Do you have new patches to fix new clock parents? If not, I think we can
-> >> use my patch first. Is it okay?
-> >>
-> >
-> > Hi Stephen,
-> >
-> > Do you have comments for the bug fixing? I prefer to use my patch (clk:
-> > fix initial state of critical clock's parents). How do you think?
-> >
-> 
-> How about we recalc accuracies and rates in addition to the patch
-> from Mike? That will fix everything?
+Erratum 657417 is worked around by the linker by inserting additional
+branch trampolines to avoid problematic branch target locations. This
+results in much higher linking time and presumably slower and larger
+generated code. The workaround also seems to only be required when
+linking thumb2 code, but the linker applies it for non-thumb2 code as
+well.
 
-Hi Stephen,
+The workaround today is left to the linker to apply, which is overly
+conservative.
 
-It works!
+https://sourceware.org/ml/binutils/2009-05/msg00297.html
 
-I'll send a new series of MT2701 clock support in few days. Should I
-include this patch in my series? Or you'll merge it into clk-next
-directly?
+This patch adds an option which defaults to "y" in cases where we
+could possibly be running Cortex A8 and using Thumb2 instructions.
+In reality the workaround might not be required at all for the kernel
+if virtual instruction memory is linear in physical memory. However it
+is more conservative to keep the workaround, and it may be the case
+that the TLB lookup would be required in order to catch branches to
+unmapped or no-execute pages.
 
+In an allyesconfig build, this workaround causes a large load on
+the linker's branch stub hash and slows down the final link by a
+factor of 5.
 
-Best regards,
+Signed-off-by: Nicholas Piggin <npiggin@gmail.com>
+---
+ arch/arm/Kconfig  | 14 ++++++++++++++
+ arch/arm/Makefile |  7 +++++++
+ 2 files changed, 21 insertions(+)
 
-James
-
-> ---8<----
-> From: Michael Turquette <mturquette@baylibre.com>
-> Subject: [PATCH] clk: migrate ref counts when orphans are reunited
-> 
-> It's always nice to see families reunited, and this is equally true when
-> talking about parent clocks and their children. However, if the orphan
-> clk had a positive prepare_count or enable_count, then we would not
-> migrate those counts up the parent chain correctly.
-> 
-> This has manifested with the recent critical clocks feature, which often
-> enables clocks very early, before their parents have been registered.
-> 
-> Fixed by replacing the call to clk_core_reparent with calls to
-> __clk_set_parent_{before,after}.
-> 
-> Cc: James Liao <jamesjj.liao@mediatek.com>
-> Cc: Erin Lo <erin.lo@mediatek.com>
-> Signed-off-by: Michael Turquette <mturquette@baylibre.com>
-> [sboyd at codeaurora.org: Recalc accuracies and rates too]
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/clk/clk.c | 12 ++++++++++--
->  1 file changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 820a939fb6bb..dc3fff2bf839 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -2449,8 +2449,16 @@ static int __clk_core_init(struct clk_core *core)
->  	hlist_for_each_entry_safe(orphan, tmp2, &clk_orphan_list, child_node) {
->  		struct clk_core *parent = __clk_init_parent(orphan);
->  
-> -		if (parent)
-> -			clk_core_reparent(orphan, parent);
-> +		/*
-> +		 * we could call __clk_set_parent, but that would result in a
-> +		 * reducant call to the .set_rate op, if it exists
-> +		 */
-> +		if (parent) {
-> +			__clk_set_parent_before(orphan, parent);
-> +			__clk_set_parent_after(orphan, parent, NULL);
-> +			__clk_recalc_accuracies(orphan);
-> +			__clk_recalc_rates(orphan, 0);
-> +		}
->  	}
->  
->  	/*
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 90542db..3c7dde1 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1033,6 +1033,20 @@ config ARM_ERRATA_460075
+ 	  ACTLR register. Note that setting specific bits in the ACTLR register
+ 	  may not be available in non-secure mode.
+ 
++config ARM_ERRATA_657417
++	bool "ARM errata: A 32-bit branch instruction that spans two 4K regions can result in an incorrect operation"
++	depends on CPU_V7
++	depends on THUMB2_KERNEL
++	default y
++	help
++	  This option enables the workaround for the 657417 Cortex-A8 erratum.
++	  If, while executing code in Thumb or ThumbEE state, a 32-bit Thumb-2
++	  branch instruction is executed that spans two 4KB regions, and the
++	  target address of the branch falls within the first region, it is
++	  possible for the processor to behave incorrectly. This workaround
++	  enables a linker workaround that adds branch trampolines that bounce
++	  offending branches via a safe location.
++
+ config ARM_ERRATA_742230
+ 	bool "ARM errata: DMB operation may be faulty"
+ 	depends on CPU_V7 && SMP
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 274e8a6..b49a2e0 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -43,6 +43,13 @@ ifeq ($(CONFIG_FRAME_POINTER),y)
+ KBUILD_CFLAGS	+=-fno-omit-frame-pointer -mapcs -mno-sched-prolog
+ endif
+ 
++ifneq ($(CONFIG_ARM_ERRATA_657417),y)
++# ld-option has to run before we override LD otherwise it fails on
++# cross compile with mismatched endian (C compiler outputs one endian,
++# LD accepts another)
++LDFLAGS		+=$(call ld-option, --no-fix-cortex-a8,)
++endif
++
+ ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
+ KBUILD_CPPFLAGS	+= -mbig-endian
+ AS		+= -EB
+-- 
+2.8.1
