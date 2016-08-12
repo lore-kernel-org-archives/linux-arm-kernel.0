@@ -1,129 +1,99 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 12 Aug 2016 12:41:11 +0100
-Subject: [RFC] arm64: Enforce gettimeofday vdso structure read ordering
-In-Reply-To: <8375bf253e2f9034e5c5943e68876935@codeaurora.org>
-References: <20160811153744.3212-1-cov@codeaurora.org>
- <20160811155409.GE8232@arm.com>
- <8375bf253e2f9034e5c5943e68876935@codeaurora.org>
-Message-ID: <20160812114111.GA21484@leverpostej>
+From: loic.pallardy@st.com (loic pallardy)
+Date: Fri, 12 Aug 2016 13:54:25 +0200
+Subject: [PATCH 6/9] remoteproc: core: Add function to append a new
+ resource table entry
+In-Reply-To: <20160811202036.GC26240@tuxbot>
+References: <20160804092153.23032-1-lee.jones@linaro.org>
+ <20160804092153.23032-7-lee.jones@linaro.org> <57AC2E64.9010209@st.com>
+ <20160811202036.GC26240@tuxbot>
+Message-ID: <57ADB8F1.8070103@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Thu, Aug 11, 2016 at 03:39:11PM -0400, bdegraaf at codeaurora.org wrote:
-> Sorry, this is my first go at proper email etiquette. I think I've
-> got it now.
 
-Please just reply inline, with the previous email '>' prefixed, as with
-this reply. Most mail clients do this for plain text email, and there
-are plenty of examples in the archive.
+On 08/11/2016 10:20 PM, Bjorn Andersson wrote:
+> On Thu 11 Aug 00:51 PDT 2016, loic pallardy wrote:
+>
+>> Hi Lee,
+>>
+>
+> Loic, please don't top-post.
 
-This style makes it clear who said what, even when arbitrary liens (of
-unnecessary context) are removed.
+Hi Bjorn,
 
-> ------------------------------------------------------------------------------
-> "Can you explain the problem that you're fixing here, please?"
-> ------------------------------------------------------------------------------
-> Since your question included only the vdso_data structure itself and the
-> vdso.c file changes, I'm assuming that's what you meant by "here."
-> I moved tb_seq_count to the start of the vdso_data structure because
-> of the
-> nature of the ldar/strl instructions, which do not support offsets.
-> This avoided the extra math to locate the structure offset, while at
-> the same
-> time using the same base pointer for the structure.  ia64 does something
-> similar and also puts this as the first field.  I moved the use_syscall
-> field up next to it just to keep most elements aligned according to
-> their
-> width. That "use_syscall" is the first element used in the logic was an
-> additional reason I decided to move that one in particular.
+Thanks for the advice, I'll.
 
-This explains what has *changed*, but not *why*.
+>
+>> I just tested your series and found issue with append mechanism.
+>> There is no problem to add resources when working on Linux side, but the
+>> resource table is growing and when copying it at loaded location (ie
+>> overwriting existing prebuilt resource table of firmware), you have an
+>> overflow corrupting part of firmware code.
+>>
+>
+> Suman brought up the same concern. For one it shows that we must check
+> the size of the .resource_table to know if we can fit an expanded table
+> before installing it.
+>
+Yes I saw Suman's reply just after my answer.
 
-The title of this commit implies that this is enforcing something that
-wasn't previously enforced. That makes is sound like a bug fix of some
-sort, yet the bug is not described.
+>> Moreover firmware code is in general tuned to a feature set. Resource table
+>> is created according to supported features. In most of the cases, new
+>> resource won't be handled by firmware.
+>>
+>
+> For the case behind this implementation, where you have resource
+> information from e.g. DT and build up a resource table (to be installed)
+> from that, how would you deal with this? Would you build your firmware
+> with room for some amount of resources?
+>
+In general host is filling existing resources defined in firmware 
+resource table (using DT information).
+Resource table is built according to firmware capabilities. No room with 
+current firmware (current status on ST side).
 
-Is this a bug fix? If so, can you describe what goes wrong with the
-current code?
+>
+>
+> As my (not the maintainer-me) need for this is purely on the Linux side
+> I originally envisioned something where we during firmware load parse
+> the resource_table into some Linux side data structures; we would allow
+> for these to be merged with additional data or new ones added and Linux
+> would handle these.
+>
+Yes agree, working on this point to differentiate:
+- resource we want to modify in firmware resource table,
+- resource we want to handle on Linux side,
+- resource we want to append is possible to existing resource table
 
-Or is this an optimisation? Or a rework for other reasons?
+> At the end we would have modified the referenced resource_table (through
+> references as it isn't the primary data structure) and could copy this.
 
-> --- a/arch/arm64/include/asm/vdso_datapage.h
-> +++ b/arch/arm64/include/asm/vdso_datapage.h
-> @@ -21,6 +21,8 @@
->  #ifndef __ASSEMBLY__
-> 
->  struct vdso_data {
-> +    __u32 tb_seq_count;    /* Timebase sequence counter */
-> +    __u32 use_syscall;
->      __u64 cs_cycle_last;    /* Timebase at clocksource init */
->      __u64 raw_time_sec;    /* Raw time */
->      __u64 raw_time_nsec;
-> @@ -30,14 +32,12 @@ struct vdso_data {
->      __u64 xtime_coarse_nsec;
->      __u64 wtm_clock_sec;    /* Wall to monotonic time */
->      __u64 wtm_clock_nsec;
-> -    __u32 tb_seq_count;    /* Timebase sequence counter */
->      /* cs_* members must be adjacent and in this order (ldp
-> accesses) */
->      __u32 cs_mono_mult;    /* NTP-adjusted clocksource multiplier */
->      __u32 cs_shift;        /* Clocksource shift (mono = raw) */
->      __u32 cs_raw_mult;    /* Raw clocksource multiplier */
->      __u32 tz_minuteswest;    /* Whacky timezone stuff */
->      __u32 tz_dsttime;
-> -    __u32 use_syscall;
->  };
-> 
-> ----------------------------------------------------------------------------
-> As to vdso.c, I changed the instructions used to access tb_seq_count
-> (both
-> in vdso.c and the gettimeofday.S file) to the load-acquire/store-release
-> instructions because those instructions seem to be designed for this
-> particular scenario: their "one-way" barriers enforce the order we need,
-> on top of eliminating the explicit barriers.
-> ----------------------------------------------------------------------------
+Copy is an issue if not spare bytes are reserved on firmware side.
+Moreover firmware should be able to handle new resources on it side.
+In general, resource table fits firmware capabilities. If a resource is 
+not present, that means firmware won't be able to handle it.
+(I'm speaking about basic firmware with limited feature set)
 
-As Will pointed out, the use of acquire/release one-way barriers doesn't
-provide the guarantee you need. Two half barriers do not always combine
-to form a full barrier.
+>
+> Or alternatively, in the case you described with an empty start and
+> resources only from DT, we could have a resource-table-installer that
+> would make up a resource table from these Linux-side lists of resources.
+>
+I had long discussion with Lee about firmware resource table extension. 
+Indeed we can create some "free" resource slots that host can 
+dynamically fill, or a new resource type (like RSV_SPARE) providing 
+information about spare bytes which can be used by host to append 
+resource table.
+Lee should work on a proposal...
 
-For example, see commit 8e86f0b409a44193 ("arm64: atomics: fix use of
-acquire + release for full barrier semantics), which fixes a similar
-misuse of acquire/release to the example below.
-
-> -    ++vdso_data->tb_seq_count;
-> -    smp_wmb();
-> +    tmp = smp_load_acquire(&vdso_data->tb_seq_count);
-> +    ++tmp;
-> +    smp_store_release(&vdso_data->tb_seq_count, tmp);
-> 
-> "This looks busted -- the writes to vdso_data can be reordered
-> before the
-> update of tb_seq_count.
-> 
-> /confused
-> 
-> Will"
-> 
-> --------------------------------------------------------------------------
-> 
-> Hopefully, this more detailed explanation helps make things clearer.
-
-As will points out (and as covered in the description of commit
-8e86f0b409a44193), the use of half-barriers allows accesses to be pulled
-into the critical section, where they can be reordered w.r.t. each
-other.
-
-The data update after the release can be reordered before the release
-(but not the acquire). As it can be moved before the release, the new
-data can be seen with the old seq count. Similar applies to the other
-end, after the update, with acquire/release swapped - the updated seq
-count can be seen before the data update.
-
-So to another observer, the updates of the data can be observed in an
-arbitrary order w.r.t. the seq count.
-
-Thanks,
-Mark.
+Regards,
+Loic
+>
+> This path would solve the case that we would not automatically grow the
+> table with new resources, but for the case where we generate a resource
+> table at the end we would still have the same issues to conclude on.
+>
+> Regards,
+> Bjorn
+>
