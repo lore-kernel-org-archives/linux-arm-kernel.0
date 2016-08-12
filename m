@@ -1,102 +1,75 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Fri, 12 Aug 2016 14:07:14 +0300
-Subject: [PATCH v9 1/4] of/serial: move earlycon early_param handling to serial
-In-Reply-To: <201608120110.sf8xniKf%fengguang.wu@intel.com>
-References: <201608120110.sf8xniKf%fengguang.wu@intel.com>
-Message-ID: <20160812110717.12351-1-aleksey.makarov@linaro.org>
+From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
+Date: Fri, 12 Aug 2016 16:51:23 +0530
+Subject: [PATCH v2 00/21] net: thunderx: Support for newer chips and
+ miscellaneous patches
+Message-ID: <1471000904-21715-1-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Leif Lindholm <leif.lindholm@linaro.org>
+From: Sunil Goutham <sgoutham@cavium.com>
 
-We have multiple "earlycon" early_param handlers - merge the DT one into
-the main earlycon one.  It's a cleanup that also will be useful
-to defer setting up DT console until ACPI/DT decision is made.
+This patch series adds support for VNIC on 81xx and 83xx SOCs.
+81xx/83xx is different from 88xx in terms of capabilities and new type
+of interfaces supported (eg: QSGMII, RGMII) and have DLMs instead of
+QLMs which allows single BGX to have interfaces of different LMAC types.
 
-Rename the exported function to avoid clashing with the function from
-arch/microblaze/kernel/prom.c
+Also included some patches which are common for all 88xx/81xx/83xx
+SOCs like using netdev's name while registering irqs, reset receive
+queue stats and some changes to use standard API for split buffer Rx
+packets, generating RSS key e.t.c
 
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
-Tested-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- drivers/of/fdt.c              | 11 +----------
- drivers/tty/serial/earlycon.c |  2 +-
- include/linux/of_fdt.h        |  3 +++
- 3 files changed, 5 insertions(+), 11 deletions(-)
+PS: Most of the patches were submitted earlier under different series but
+for some reason were not picked up by patchwork. Since new patches have been
+added in the meantime, resubmitting all as a new patchset.
 
-diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index 55f1b83..741cac53 100644
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -924,7 +924,7 @@ static inline void early_init_dt_check_for_initrd(unsigned long node)
- 
- #ifdef CONFIG_SERIAL_EARLYCON
- 
--static int __init early_init_dt_scan_chosen_serial(void)
-+int __init early_init_dt_scan_chosen_stdout(void)
- {
- 	int offset;
- 	const char *p, *q, *options = NULL;
-@@ -968,15 +968,6 @@ static int __init early_init_dt_scan_chosen_serial(void)
- 	}
- 	return -ENODEV;
- }
--
--static int __init setup_of_earlycon(char *buf)
--{
--	if (buf)
--		return 0;
--
--	return early_init_dt_scan_chosen_serial();
--}
--early_param("earlycon", setup_of_earlycon);
- #endif
- 
- /**
-diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
-index 067783f..7aae655 100644
---- a/drivers/tty/serial/earlycon.c
-+++ b/drivers/tty/serial/earlycon.c
-@@ -209,7 +209,7 @@ static int __init param_setup_earlycon(char *buf)
- 	 * don't generate a warning from parse_early_params() in that case
- 	 */
- 	if (!buf || !buf[0])
--		return 0;
-+		return early_init_dt_scan_chosen_stdout();
- 
- 	err = setup_earlycon(buf);
- 	if (err == -ENOENT || err == -EALREADY)
-diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-index 26c3302..4341f32 100644
---- a/include/linux/of_fdt.h
-+++ b/include/linux/of_fdt.h
-@@ -14,6 +14,7 @@
- 
- #include <linux/types.h>
- #include <linux/init.h>
-+#include <linux/errno.h>
- 
- /* Definitions used by the flattened device tree */
- #define OF_DT_HEADER		0xd00dfeed	/* marker */
-@@ -66,6 +67,7 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
- 				     int depth, void *data);
- extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
- 				     int depth, void *data);
-+extern int early_init_dt_scan_chosen_stdout(void);
- extern void early_init_fdt_scan_reserved_mem(void);
- extern void early_init_fdt_reserve_self(void);
- extern void early_init_dt_add_memory_arch(u64 base, u64 size);
-@@ -94,6 +96,7 @@ extern void early_get_first_memblock_info(void *, phys_addr_t *);
- extern u64 of_flat_dt_translate_address(unsigned long node);
- extern void of_fdt_limit_memory(int limit);
- #else /* CONFIG_OF_FLATTREE */
-+static inline int early_init_dt_scan_chosen_stdout(void) { return -ENODEV; }
- static inline void early_init_fdt_scan_reserved_mem(void) {}
- static inline void early_init_fdt_reserve_self(void) {}
- static inline const char *of_flat_dt_get_machine_name(void) { return NULL; }
+Changes from v1:
+- Incorporated Yuval Mintz's suggestion to use generic API to set minimum
+  queue count i.e by using netif_get_num_default_rss_queues().
+- Resolved a compilation issue reported by test robot while compiling
+  patch 'Add support for 16 LMACs of 83xx'
+
+Jerin Jacob (1):
+  net: thunderx: Reset RXQ HW stats when interface is brought down
+
+Radoslaw Biernacki (1):
+  net: thunderx: Improvement for MBX interface debug messages
+
+Sunil Goutham (18):
+  net: thunderx: Moved HW capability info from macros to structure
+  net: thunderx: Add VNIC's PCI devid on future chips
+  net: thunderx: Add support for 81xx and 83xx chips
+  net: thunderx: Set queue count based on number of CPUs
+  net: thunderx: Enable CQE_RX desc's extension fields
+  net: thunderx: Enable mailbox interrupts on 81xx/83xx
+  net: thunderx: Support for different LMAC types within BGX
+  net: thunderx: Add 81xx support to BGX driver
+  net: thunderx: Add QSGMII interface type support
+  net: thunderx: Add RGMII interface type support
+  net: thunderx: Add support for 16 LMACs of 83xx
+  net: thunderx: Support for 83xx mixed QLM/DLM config
+  net: thunderx: Use netdev's name for naming VF's interrupts
+  net: thunderx: Use skb_add_rx_frag() for split buffer Rx pkts
+  net: thunderx: Don't set mac address for secondary Qset VFs
+  net: thunderx: Use napi_consume_skb for bulk free
+  net: thunderx: Use netdev_rss_key_fill() helper
+  net: thunderx: Don't set RX_PACKET_DIS while initializing
+
+Zyta Szpak (1):
+  net: thunderx: Configure tunnelling protocol parsing
+
+ drivers/net/ethernet/cavium/Kconfig                |  10 +
+ drivers/net/ethernet/cavium/thunder/Makefile       |   1 +
+ drivers/net/ethernet/cavium/thunder/nic.h          |  85 ++--
+ drivers/net/ethernet/cavium/thunder/nic_main.c     | 433 +++++++++++++++----
+ drivers/net/ethernet/cavium/thunder/nic_reg.h      |  15 +
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   |  67 +--
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c |  59 +--
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.h |   5 +-
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c  | 460 ++++++++++++++-------
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h  |  33 +-
+ drivers/net/ethernet/cavium/thunder/thunder_xcv.c  | 237 +++++++++++
+ 11 files changed, 1059 insertions(+), 346 deletions(-)
+ create mode 100644 drivers/net/ethernet/cavium/thunder/thunder_xcv.c
+
 -- 
-2.9.2
+2.7.4
