@@ -1,54 +1,95 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Aug 2016 17:24:14 +0100
-Subject: [PATCH 2/2] arm: apply more __ro_after_init
-In-Reply-To: <2188666.QKZtt2vNXZ@wuerfel>
-References: <1464979224-2085-1-git-send-email-keescook@chromium.org>
- <2760702.46Rp2Juk5b@wuerfel>
- <20160810230645.GP1041@n2100.armlinux.org.uk>
- <2188666.QKZtt2vNXZ@wuerfel>
-Message-ID: <20160812162414.GI1041@n2100.armlinux.org.uk>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 12 Aug 2016 17:25:52 +0100
+Subject: [PATCH 1/5] bus: arm-ccn: Fix PMU handling of MN
+In-Reply-To: <1471019156-5485-1-git-send-email-pawel.moll@arm.com>
+References: <1471019156-5485-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1471019156-5485-2-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2016 at 05:54:08PM +0200, Arnd Bergmann wrote:
-> On Thursday, August 11, 2016 12:06:45 AM CEST Russell King - ARM Linux wrote:
-> > On Wed, Aug 10, 2016 at 09:41:23PM +0200, Arnd Bergmann wrote:
-> > > It might be better to start by making the fixed mapping readonly,
-> > > as KASLR doesn't protect that one at all, and change the TLS
-> > > code accordingly.
-> > 
-> > I think that's impossible, because we gave userspace permission to
-> > read 0xffff0ff0 directly without using __kuser_get_tls.  You're
-> > talking about potentially breaking userspace.
-> > 
-> > If you disable kuser helpers, then the page becomes read-only and
-> > invisible to userspace anyway.  So, everything is being done there
-> > which can be done - if you have kuser helpers enabled, then you
-> > lose some opportunities for these security improvements.
-> 
-> What I meant was writing to the page through the linear mapping
-> rather than the virtual mapping at 0xffff0000 so we can leave that
-> one read-only (I did not consider whether that might cause cache
-> aliasing problems when reading from the other address).
+The "Miscellaneous Node" fell through cracks of node initialisation,
+as its ID is shared with HN-I.
 
-Kees original patch was about moving the vector pages into the
-read-only area after init, so the linear mapping of them becomes
-read-only as well.  So that won't work.  We need at least one
-read-write mapping for FIQ, and for context switching for kuser
-helpers.
+This patch treats MN as a special case (which it is), adding separate
+validation check for it and pre-defining the node ID in relevant events
+descriptions. That way one can simply run:
 
-> Your other point is more important though: if one really cares
-> about optimizing security here, they probably should disable
-> kuser helpers completely anyway.
+	# perf stat -a -e ccn/mn_ecbarrier/ <workload>
 
-We could probably predicate moving the vectors page into the RO
-section when kuser helpers are enabled.
+Additionally, direction in the MN pseudo-events XP watchpoint
+definitions is corrected to be "TX" (1) as they are defined from the
+crosspoint point of view (thus barriers are transmitted from XP to MN).
 
-> Kees, is that something you have on your radar already?
+Cc: stable at vger.kernel.org # 3.17+
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ drivers/bus/arm-ccn.c | 19 ++++++++++++++++---
+ 1 file changed, 16 insertions(+), 3 deletions(-)
 
-I believe Android already disable kuser helpers as of a few years ago.
-
+diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
+index 97a9185..a11b9bb 100644
+--- a/drivers/bus/arm-ccn.c
++++ b/drivers/bus/arm-ccn.c
+@@ -187,6 +187,7 @@ struct arm_ccn {
+ 	struct arm_ccn_component *xp;
+ 
+ 	struct arm_ccn_dt dt;
++	int mn_id;
+ };
+ 
+ static DEFINE_MUTEX(arm_ccn_mutex);
+@@ -328,6 +329,7 @@ struct arm_ccn_pmu_event {
+ static ssize_t arm_ccn_pmu_event_show(struct device *dev,
+ 		struct device_attribute *attr, char *buf)
+ {
++	struct arm_ccn *ccn = pmu_to_arm_ccn(dev_get_drvdata(dev));
+ 	struct arm_ccn_pmu_event *event = container_of(attr,
+ 			struct arm_ccn_pmu_event, attr);
+ 	ssize_t res;
+@@ -354,6 +356,9 @@ static ssize_t arm_ccn_pmu_event_show(struct device *dev,
+ 			res += snprintf(buf + res, PAGE_SIZE - res,
+ 					",cmp_l=?,cmp_h=?,mask=?");
+ 		break;
++	case CCN_TYPE_MN:
++		res += snprintf(buf + res, PAGE_SIZE - res, ",node=%d", ccn->mn_id);
++		break;
+ 	default:
+ 		res += snprintf(buf + res, PAGE_SIZE - res, ",node=?");
+ 		break;
+@@ -383,9 +388,9 @@ static umode_t arm_ccn_pmu_events_is_visible(struct kobject *kobj,
+ }
+ 
+ static struct arm_ccn_pmu_event arm_ccn_pmu_events[] = {
+-	CCN_EVENT_MN(eobarrier, "dir=0,vc=0,cmp_h=0x1c00", CCN_IDX_MASK_OPCODE),
+-	CCN_EVENT_MN(ecbarrier, "dir=0,vc=0,cmp_h=0x1e00", CCN_IDX_MASK_OPCODE),
+-	CCN_EVENT_MN(dvmop, "dir=0,vc=0,cmp_h=0x2800", CCN_IDX_MASK_OPCODE),
++	CCN_EVENT_MN(eobarrier, "dir=1,vc=0,cmp_h=0x1c00", CCN_IDX_MASK_OPCODE),
++	CCN_EVENT_MN(ecbarrier, "dir=1,vc=0,cmp_h=0x1e00", CCN_IDX_MASK_OPCODE),
++	CCN_EVENT_MN(dvmop, "dir=1,vc=0,cmp_h=0x2800", CCN_IDX_MASK_OPCODE),
+ 	CCN_EVENT_HNI(txdatflits, "dir=1,vc=3", CCN_IDX_MASK_ANY),
+ 	CCN_EVENT_HNI(rxdatflits, "dir=0,vc=3", CCN_IDX_MASK_ANY),
+ 	CCN_EVENT_HNI(txreqflits, "dir=1,vc=0", CCN_IDX_MASK_ANY),
+@@ -759,6 +764,12 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
+ 
+ 	/* Validate node/xp vs topology */
+ 	switch (type) {
++	case CCN_TYPE_MN:
++		if (node_xp != ccn->mn_id) {
++			dev_warn(ccn->dev, "Invalid MN ID %d!\n", node_xp);
++			return -EINVAL;
++		}
++		break;
+ 	case CCN_TYPE_XP:
+ 		if (node_xp >= ccn->num_xps) {
+ 			dev_warn(ccn->dev, "Invalid XP ID %d!\n", node_xp);
+@@ -1361,6 +1372,8 @@ static int arm_ccn_init_nodes(struct arm_ccn *ccn, int region,
+ 
+ 	switch (type) {
+ 	case CCN_TYPE_MN:
++		ccn->mn_id = id;
++		return 0;
+ 	case CCN_TYPE_DT:
+ 		return 0;
+ 	case CCN_TYPE_XP:
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.7.4
