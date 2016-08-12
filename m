@@ -1,96 +1,177 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Fri, 12 Aug 2016 08:20:06 -0700
-Subject: [PATCH 3/3] ARM: dts: imx6q-evi: Fix onboard hub reset line
-In-Reply-To: <20160812031158.GH18967@shlinux2>
-References: <20160810030254.GD1879@shlinux2>
- <1470933632-22133-1-git-send-email-stillcompiling@gmail.com>
- <1470933632-22133-4-git-send-email-stillcompiling@gmail.com>
- <20160812031158.GH18967@shlinux2>
-Message-ID: <57ADE926.8070703@gmail.com>
+From: hansverk@cisco.com (Hans Verkuil)
+Date: Fri, 12 Aug 2016 17:26:22 +0200
+Subject: [PATCH RFC 1/5] video: add HDMI state notifier support
+In-Reply-To: <E1bYDEd-0004rZ-3i@rmk-PC.armlinux.org.uk>
+References: <20160812141421.GB1041@n2100.armlinux.org.uk>
+ <E1bYDEd-0004rZ-3i@rmk-PC.armlinux.org.uk>
+Message-ID: <f09827f5-c207-80b7-ca36-bf84a1273633@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-On 08/11/2016 08:11 PM, Peter Chen wrote:
-> On Thu, Aug 11, 2016 at 09:40:32AM -0700, Joshua Clayton wrote:
->> Previously the onboard hub was made to work by treating its
->> reset gpio as a regulator enable.
->> Get rid of that kludge now that pwseq has added reset gpio support
->> Move pin muxing the hub reset pin into the usbh1 group
->>
->> Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
->> ---
->>  arch/arm/boot/dts/imx6q-evi.dts | 25 +++++++------------------
->>  1 file changed, 7 insertions(+), 18 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
->> index 4fa5601..49c6f61 100644
->> --- a/arch/arm/boot/dts/imx6q-evi.dts
->> +++ b/arch/arm/boot/dts/imx6q-evi.dts
->> @@ -54,18 +54,6 @@
->>  		reg = <0x10000000 0x40000000>;
->>  	};
->>  
->> -	reg_usbh1_vbus: regulator-usbhubreset {
->> -		compatible = "regulator-fixed";
->> -		regulator-name = "usbh1_vbus";
->> -		regulator-min-microvolt = <5000000>;
->> -		regulator-max-microvolt = <5000000>;
->> -		enable-active-high;
->> -		startup-delay-us = <2>;
->> -		pinctrl-names = "default";
->> -		pinctrl-0 = <&pinctrl_usbh1_hubreset>;
->> -		gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
->> -	};
->> -
->>  	reg_usb_otg_vbus: regulator-usbotgvbus {
->>  		compatible = "regulator-fixed";
->>  		regulator-name = "usb_otg_vbus";
->> @@ -204,12 +192,18 @@
->>  };
->>  
->>  &usbh1 {
->> -	vbus-supply = <&reg_usbh1_vbus>;
->>  	pinctrl-names = "default";
->>  	pinctrl-0 = <&pinctrl_usbh1>;
->>  	dr_mode = "host";
->>  	disable-over-current;
->>  	status = "okay";
->> +
->> +	usb2415host: hub at 1 {
->> +		compatible = "usb424,2513";
->> +		reg = <1>;
->> +		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
->> +		reset-duration-us = <3000>;
->> +	};
->>  };
->>  
->>  &usbotg {
->> @@ -467,11 +461,6 @@
->>  			MX6QDL_PAD_GPIO_3__USB_H1_OC 0x1b0b0
->>  			/* usbh1_b OC */
-> This comment should be for above pin, do you mind I change it in
-> this patch?
-Better leave it alone
-
-I checked te schematic. GPIO_0 (below that line) is indeed
-connected to a second OC detect line for a second
-usb port... It can't possibly be working as designed, but
-that is how it is connected up.
-
-I guess I need to consult with my EE colleagues
+On 08/12/2016 04:14 PM, Russell King wrote:
+> Add support for HDMI hotplug and EDID notifiers, which is used to convey
+> information from HDMI drivers to their CEC and audio counterparts.
 >
->>  			MX6QDL_PAD_GPIO_0__GPIO1_IO00 0x1b0b0
->> -		>;
->> -	};
->> -
->> -	pinctrl_usbh1_hubreset: usbh1hubresetgrp {
->> -		fsl,pins = <
->>  			MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x1b0b0
->>  		>;
->>  	};
-> This changes remind me that I need to change the same thing for udoo
-> board.
+> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+I still don't really like the void *, but not enough to block this, so:
+
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
+
+Regards,
+
+	Hans
+
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  drivers/video/Kconfig         |  3 +++
+>  drivers/video/Makefile        |  1 +
+>  drivers/video/hdmi-notifier.c | 61 +++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/hdmi-notifier.h | 44 +++++++++++++++++++++++++++++++
+>  4 files changed, 109 insertions(+)
+>  create mode 100644 drivers/video/hdmi-notifier.c
+>  create mode 100644 include/linux/hdmi-notifier.h
 >
-Sorry I didn't think of it first.
+> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+> index 3c20af999893..1ee7b9f9bb25 100644
+> --- a/drivers/video/Kconfig
+> +++ b/drivers/video/Kconfig
+> @@ -36,6 +36,9 @@ config VIDEOMODE_HELPERS
+>  config HDMI
+>  	bool
+>
+> +config HDMI_NOTIFIERS
+> +	bool
+> +
+>  if VT
+>  	source "drivers/video/console/Kconfig"
+>  endif
+> diff --git a/drivers/video/Makefile b/drivers/video/Makefile
+> index 9ad3c17d6456..65f564906fb4 100644
+> --- a/drivers/video/Makefile
+> +++ b/drivers/video/Makefile
+> @@ -1,5 +1,6 @@
+>  obj-$(CONFIG_VGASTATE)            += vgastate.o
+>  obj-$(CONFIG_HDMI)                += hdmi.o
+> +obj-$(CONFIG_HDMI_NOTIFIERS)      += hdmi-notifier.o
+>
+>  obj-$(CONFIG_VT)		  += console/
+>  obj-$(CONFIG_LOGO)		  += logo/
+> diff --git a/drivers/video/hdmi-notifier.c b/drivers/video/hdmi-notifier.c
+> new file mode 100644
+> index 000000000000..f3b16552b0fe
+> --- /dev/null
+> +++ b/drivers/video/hdmi-notifier.c
+> @@ -0,0 +1,61 @@
+> +#include <linux/export.h>
+> +#include <linux/hdmi-notifier.h>
+> +#include <linux/notifier.h>
+> +#include <linux/string.h>
+> +
+> +static BLOCKING_NOTIFIER_HEAD(hdmi_notifier);
+> +
+> +int hdmi_register_notifier(struct notifier_block *nb)
+> +{
+> +	return blocking_notifier_chain_register(&hdmi_notifier, nb);
+> +}
+> +EXPORT_SYMBOL_GPL(hdmi_register_notifier);
+> +
+> +int hdmi_unregister_notifier(struct notifier_block *nb)
+> +{
+> +	return blocking_notifier_chain_unregister(&hdmi_notifier, nb);
+> +}
+> +EXPORT_SYMBOL_GPL(hdmi_unregister_notifier);
+> +
+> +void hdmi_event_connect(struct device *dev)
+> +{
+> +	struct hdmi_event_base base;
+> +
+> +	base.source = dev;
+> +
+> +	blocking_notifier_call_chain(&hdmi_notifier, HDMI_CONNECTED, &base);
+> +}
+> +EXPORT_SYMBOL_GPL(hdmi_event_connect);
+> +
+> +void hdmi_event_disconnect(struct device *dev)
+> +{
+> +	struct hdmi_event_base base;
+> +
+> +	base.source = dev;
+> +
+> +	blocking_notifier_call_chain(&hdmi_notifier, HDMI_DISCONNECTED, &base);
+> +}
+> +EXPORT_SYMBOL_GPL(hdmi_event_disconnect);
+> +
+> +void hdmi_event_new_edid(struct device *dev, const void *edid, size_t size)
+> +{
+> +	struct hdmi_event_new_edid new_edid;
+> +
+> +	new_edid.base.source = dev;
+> +	new_edid.edid = edid;
+> +	new_edid.size = size;
+> +
+> +	blocking_notifier_call_chain(&hdmi_notifier, HDMI_NEW_EDID, &new_edid);
+> +}
+> +EXPORT_SYMBOL_GPL(hdmi_event_new_edid);
+> +
+> +void hdmi_event_new_eld(struct device *dev, const u8 eld[128])
+> +{
+> +	struct hdmi_event_new_eld new_eld;
+> +
+> +	new_eld.base.source = dev;
+> +	memcpy(new_eld.eld, eld, sizeof(new_eld.eld));
+> +
+> +	blocking_notifier_call_chain(&hdmi_notifier, HDMI_NEW_ELD, &new_eld);
+> +}
+> +EXPORT_SYMBOL_GPL(hdmi_event_new_eld);
+> diff --git a/include/linux/hdmi-notifier.h b/include/linux/hdmi-notifier.h
+> new file mode 100644
+> index 000000000000..5fb710e5d68a
+> --- /dev/null
+> +++ b/include/linux/hdmi-notifier.h
+> @@ -0,0 +1,44 @@
+> +#ifndef LINUX_HDMI_NOTIFIER_H
+> +#define LINUX_HDMI_NOTIFIER_H
+> +
+> +#include <linux/types.h>
+> +
+> +enum {
+> +	HDMI_CONNECTED,
+> +	HDMI_DISCONNECTED,
+> +	HDMI_NEW_EDID,
+> +	HDMI_NEW_ELD,
+> +};
+> +
+> +struct hdmi_event_base {
+> +	struct device *source;
+> +};
+> +
+> +struct hdmi_event_new_edid {
+> +	struct hdmi_event_base base;
+> +	const void *edid;
+> +	size_t size;
+> +};
+> +
+> +struct hdmi_event_new_eld {
+> +	struct hdmi_event_base base;
+> +	unsigned char eld[128];
+> +};
+> +
+> +union hdmi_event {
+> +	struct hdmi_event_base base;
+> +	struct hdmi_event_new_edid edid;
+> +	struct hdmi_event_new_eld eld;
+> +};
+> +
+> +struct notifier_block;
+> +
+> +int hdmi_register_notifier(struct notifier_block *nb);
+> +int hdmi_unregister_notifier(struct notifier_block *nb);
+> +
+> +void hdmi_event_connect(struct device *dev);
+> +void hdmi_event_disconnect(struct device *dev);
+> +void hdmi_event_new_edid(struct device *dev, const void *edid, size_t size);
+> +void hdmi_event_new_eld(struct device *dev, const u8 eld[128]);
+> +
+> +#endif
+>
