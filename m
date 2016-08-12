@@ -1,41 +1,96 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 12 Aug 2016 18:18:04 +0300
-Subject: [PATCH 4/8] of: dma: Split of_configure_dma() into mask and ops
- configuration
-In-Reply-To: <CAAFQd5BkpHrF=2=UXFA2mPKe0VQAD3J_XSNrZYHP0br5hw=Gsw@mail.gmail.com>
-References: <1470696550-3416-1-git-send-email-sricharan@codeaurora.org>
- <1470696550-3416-5-git-send-email-sricharan@codeaurora.org>
- <CAAFQd5BkpHrF=2=UXFA2mPKe0VQAD3J_XSNrZYHP0br5hw=Gsw@mail.gmail.com>
-Message-ID: <1651151.fes0RShRSW@avalon>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Fri, 12 Aug 2016 08:20:06 -0700
+Subject: [PATCH 3/3] ARM: dts: imx6q-evi: Fix onboard hub reset line
+In-Reply-To: <20160812031158.GH18967@shlinux2>
+References: <20160810030254.GD1879@shlinux2>
+ <1470933632-22133-1-git-send-email-stillcompiling@gmail.com>
+ <1470933632-22133-4-git-send-email-stillcompiling@gmail.com>
+ <20160812031158.GH18967@shlinux2>
+Message-ID: <57ADE926.8070703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Hi Peter,
 
-On Friday 12 Aug 2016 16:31:47 Tomasz Figa wrote:
-> On Tue, Aug 9, 2016 at 7:49 AM, Sricharan R wrote:
-> > From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > 
-> > The of_configure_dma() function configures both the DMA masks and ops.
-> > Moving DMA ops configuration to probe time would thus also delay
-> > configuration of the DMA masks, which might not be safe. To avoid issues
-> 
-> Do we know any example cases when it might be unsafe? I think we kind
-> of rely on the fact that DMA mapping (and so DMA masks as well) is not
-> used before probing the device anyway, because we let the IOMMU
-> attachment happen at probe time, which essentially makes any earlier
-> attempts to use DMA mapping on such device incorrect.
+On 08/11/2016 08:11 PM, Peter Chen wrote:
+> On Thu, Aug 11, 2016 at 09:40:32AM -0700, Joshua Clayton wrote:
+>> Previously the onboard hub was made to work by treating its
+>> reset gpio as a regulator enable.
+>> Get rid of that kludge now that pwseq has added reset gpio support
+>> Move pin muxing the hub reset pin into the usbh1 group
+>>
+>> Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/imx6q-evi.dts | 25 +++++++------------------
+>>  1 file changed, 7 insertions(+), 18 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
+>> index 4fa5601..49c6f61 100644
+>> --- a/arch/arm/boot/dts/imx6q-evi.dts
+>> +++ b/arch/arm/boot/dts/imx6q-evi.dts
+>> @@ -54,18 +54,6 @@
+>>  		reg = <0x10000000 0x40000000>;
+>>  	};
+>>  
+>> -	reg_usbh1_vbus: regulator-usbhubreset {
+>> -		compatible = "regulator-fixed";
+>> -		regulator-name = "usbh1_vbus";
+>> -		regulator-min-microvolt = <5000000>;
+>> -		regulator-max-microvolt = <5000000>;
+>> -		enable-active-high;
+>> -		startup-delay-us = <2>;
+>> -		pinctrl-names = "default";
+>> -		pinctrl-0 = <&pinctrl_usbh1_hubreset>;
+>> -		gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
+>> -	};
+>> -
+>>  	reg_usb_otg_vbus: regulator-usbotgvbus {
+>>  		compatible = "regulator-fixed";
+>>  		regulator-name = "usb_otg_vbus";
+>> @@ -204,12 +192,18 @@
+>>  };
+>>  
+>>  &usbh1 {
+>> -	vbus-supply = <&reg_usbh1_vbus>;
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&pinctrl_usbh1>;
+>>  	dr_mode = "host";
+>>  	disable-over-current;
+>>  	status = "okay";
+>> +
+>> +	usb2415host: hub at 1 {
+>> +		compatible = "usb424,2513";
+>> +		reg = <1>;
+>> +		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
+>> +		reset-duration-us = <3000>;
+>> +	};
+>>  };
+>>  
+>>  &usbotg {
+>> @@ -467,11 +461,6 @@
+>>  			MX6QDL_PAD_GPIO_3__USB_H1_OC 0x1b0b0
+>>  			/* usbh1_b OC */
+> This comment should be for above pin, do you mind I change it in
+> this patch?
+Better leave it alone
 
-I don't know of any such situation, but (if I remember correctly) when I 
-discussed the IOMMU rework with Arnd Bergman and Will Deacon there was a 
-concern that someone, somewhere was relying on the mask being set early.
+I checked te schematic. GPIO_0 (below that line) is indeed
+connected to a second OC detect line for a second
+usb port... It can't possibly be working as designed, but
+that is how it is connected up.
 
-I personally would like to drop this patch, but it might be difficult to 
-ensure this wouldn't cause a regression. There should certainly be no DMA 
-mapping created before IOMMU attachment, but the DMA mask could possibly be 
-used somewhere else.
-
--- 
-Regards,
-
-Laurent Pinchart
+I guess I need to consult with my EE colleagues
+>
+>>  			MX6QDL_PAD_GPIO_0__GPIO1_IO00 0x1b0b0
+>> -		>;
+>> -	};
+>> -
+>> -	pinctrl_usbh1_hubreset: usbh1hubresetgrp {
+>> -		fsl,pins = <
+>>  			MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x1b0b0
+>>  		>;
+>>  	};
+> This changes remind me that I need to change the same thing for udoo
+> board.
+>
+Sorry I didn't think of it first.
