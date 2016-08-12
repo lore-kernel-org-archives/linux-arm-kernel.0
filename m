@@ -1,57 +1,73 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 12 Aug 2016 15:36:12 +0100
-Subject: [PATCH 05/19] arm64: rename COMPAT to AARCH32_EL0 in Kconfig
-In-Reply-To: <2034620.lN3lAEBAXs@wuerfel>
-References: <1466207668-10549-1-git-send-email-ynorov@caviumnetworks.com>
- <6457502.FRufylo3sd@wuerfel>
- <20160811163003.GD18366@e104818-lin.cambridge.arm.com>
- <2034620.lN3lAEBAXs@wuerfel>
-Message-ID: <20160812143612.GH12939@e104818-lin.cambridge.arm.com>
+From: hansverk@cisco.com (Hans Verkuil)
+Date: Fri, 12 Aug 2016 16:38:04 +0200
+Subject: [PATCH RFC 5/5] drm/i2c: add tda998x/tda9950 CEC driver
+In-Reply-To: <E1bYDEx-0004ry-Jg@rmk-PC.armlinux.org.uk>
+References: <20160812141421.GB1041@n2100.armlinux.org.uk>
+ <E1bYDEx-0004ry-Jg@rmk-PC.armlinux.org.uk>
+Message-ID: <a9bc07ee-ae77-1791-ccf8-cb654cd4c302@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2016 at 10:29:03PM +0200, Arnd Bergmann wrote:
-> On Thursday, August 11, 2016 5:30:03 PM CEST Catalin Marinas wrote:
-> > > > > and you can have ARM binaries with
-> > > > > PER_LINUX (using the arm64 uname) just like you can have
-> > > > > arm64 binaries running with PER_LINUX32.
-> > > > 
-> > > > I was actually looking to enforce the 32-bit binaries to only see
-> > > > PER_LINUX32, though with a risk of breaking the ABI. OTOH, people are
-> > > > abusing this and write 32-bit apps relying on the 64-bit /proc/cpuinfo:
-> > > > 
-> > > > http://lkml.kernel.org/g/1464706504-25224-3-git-send-email-catalin.marinas at arm.com
-> > > > 
-> > > > (you were summoned on that discussion couple of times ;))
-> > > 
-> > > Hmm, I thought I saw the thread and didn't have any good idea for
-> > > the uname information, but didn't notice it was for /proc/cpuinfo.
-> > > 
-> > > What's wrong with always showing both the 32-bit and the 64-bit
-> > > hwcap strings here (minus the duplicates, which hopefully have
-> > > the same meaning here)?
-> > 
-> > As I said above, some of them have the same name (which may be a good
-> > thing at a first look) but we don't have an architecture guarantee that
-> > the feature is present in both AArch32 and AArch64 modes (e.g. AES may
-> > only be available in AArch64).
-> 
-> Is this the case on actual implementations that exist today? If they
-> are actually always both present, we might be able to get away with it.
+On 08/12/2016 04:15 PM, Russell King wrote:
+> Add a CEC driver for the TDA9950, which is a stand-alone I2C CEC device.
+> The TDA9950 contains a command processor which handles retransmissions
+> and the low level bus protocol.  The driver just has to read and write
+> the messages, and handle error conditions.
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  drivers/gpu/drm/i2c/Kconfig           |   5 +
+>  drivers/gpu/drm/i2c/Makefile          |   1 +
+>  drivers/gpu/drm/i2c/tda9950.c         | 514 ++++++++++++++++++++++++++++++++++
+>  include/linux/platform_data/tda9950.h |  15 +
+>  4 files changed, 535 insertions(+)
+>  create mode 100644 drivers/gpu/drm/i2c/tda9950.c
+>  create mode 100644 include/linux/platform_data/tda9950.h
+>
 
-It may be fine on current implementations but what would we do when/if
-we actually find such discrepancy? It's not just ARM Ltd designing the
-chips, so as long as the architecture doesn't mandate it you may find
-strange implementations.
+<snip>
 
-Imposing such restriction in the architecture doesn't make sense if the
-only reason is the /proc/cpuinfo file (and I can't think of any other
-reason why this should be enforced).
+> +static int tda9950_cec_adap_log_addr(struct cec_adapter *adap, u8 addr)
+> +{
+> +	struct tda9950_priv *priv = adap->priv;
+> +	u16 addresses;
+> +	u8 buf[2];
+> +
+> +	if (addr == CEC_LOG_ADDR_INVALID)
+> +		addresses = priv->addresses = BIT(15);
 
-What I'm worried about is 32-bit apps running on an arm64 kernel and
-making use of the 64-bit /proc/cpuinfo without any guarantee that the
-AArch32 state has such features. In my patch proposal linked above I
-wanted to always force the compat /proc/cpuinfo for 32-bit tasks.
+I saw this in patch 4/5 as well: why set bit 15? I would expect that this
+is just set to 0. And priv->addresses doesn't seem to be used anywhere.
 
--- 
-Catalin
+> +	else
+> +		addresses = priv->addresses |= BIT(addr);
+> +
+> +	/* TDA9950 doesn't want address 15 set */
+> +	addr &= 0x7fff;
+> +	buf[0] = addresses >> 8;
+> +	buf[1] = addresses;
+> +
+> +	return tda9950_write_range(priv->client, REG_ACKH, buf, 2);
+> +}
+> +
+
+<snip>
+
+> +static int tda9950_cec_adap_enable(struct cec_adapter *adap, bool enable)
+> +{
+> +	struct tda9950_priv *priv = adap->priv;
+> +
+> +	if (!enable) {
+> +		tda9950_release(priv);
+> +		return 0;
+> +	} else {
+
+Nitpick: no need for 'else' here since the 'if' always returns.
+
+> +		return tda9950_open(priv);
+> +	}
+> +}
+
+Regards,
+
+	Hans
