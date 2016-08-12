@@ -1,158 +1,113 @@
-From: brendan.jackman@arm.com (Brendan Jackman)
-Date: Fri, 12 Aug 2016 13:35:17 +0100
-Subject: [PATCH v3 02/15] dt/bindings: Update binding for PM domain idle
- states
-In-Reply-To: <20160811211023.GC1401@linaro.org>
-References: <1470351902-43103-1-git-send-email-lina.iyer@linaro.org>
- <1470351902-43103-3-git-send-email-lina.iyer@linaro.org>
- <99e35b6c-6698-6d27-f4d7-fa032796869e@arm.com>
- <20160810164034.GA1401@linaro.org>
- <5e59874c-bbb7-270a-199c-da1ff5932554@arm.com>
- <20160811211023.GC1401@linaro.org>
-Message-ID: <20160812123516.GA24194@brendan-thinkstation>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 12 Aug 2016 13:43:45 +0100
+Subject: [PATCH v3 4/4] arm64: apply __ro_after_init to some objects
+In-Reply-To: <1470988871-2799-5-git-send-email-jszhang@marvell.com>
+References: <1470988871-2799-1-git-send-email-jszhang@marvell.com>
+ <1470988871-2799-5-git-send-email-jszhang@marvell.com>
+Message-ID: <20160812124344.GB21484@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lina,
+Hi,
 
-Apologies, I sent this reply before and automatically included an "IMPORTANT
-NOTICE" footer, please disregard that email, here's the same thing without the
-footer.
+There are still a few missing includes as of this patch, and I have a
+small nit about one file as commented below.
 
-On Thu, Aug 11, 2016 at 03:10:23PM -0600, Lina Iyer wrote:
-> On Wed, Aug 10 2016 at 12:09 -0600, Sudeep Holla wrote:
-> >
-> >
-> >On 10/08/16 17:40, Lina Iyer wrote:
-> >>Hi Sudeep,
-> >>
-> >>On Wed, Aug 10 2016 at 09:15 -0600, Sudeep Holla wrote:
-> >>>Hi Lina,
-> >>>
-> >>>I have few concerns mainly due to the lack of description and not the
-> >>>binding per say.
-> >
-> >[...]
-> >
-> >>It is pretty clear that CPUs cannot not define the domain idle states.
-> >>Domains define their own idle states. Just as you mention above. CPU is
-> >>just a single component in its domain. There may be other devices like
-> >>PMUs, Coresights etc that also may have a say in the idle state the
-> >>domain may be put in, when the devices are idle. As such, adding domain
-> >>idle states to the CPU's idle state property is not appropriate.
-> >>
-> >
-> >No I am not saying we need to add domain idle states to the CPU's idle
-> >state property. I am saying we need to remove cpu-idle-states or ignore
-> >it when PD is present. And get all the idle state information for PD.
-> >
-> >I am objecting the split we are creating across CPU and higher level
-> >power domains. And this binding document is incomplete as it skips all
-> >those details. We just need PD handle in CPU and no idle state
-> >information there. Create PD hierarchy and have all idle state
-> >information at one place.
-> >
-> Let me think about this a bit and see what I can come up with.
->
-> >>Our kernel has runtime PM for devices and then there is CPUidle, both
-> >>are diverging without one knowing about the other. We have to start
-> >>unifying them inorder to have better holistic power management in the
-> >>SoC. To that regard, we have to start imagining CPUs as just another
-> >>device, albeit a special device. But for our purposes in determining
-> >>domain idle state, it will just be a device attached to the domain.
-> >>
-> >
-> >Absolutely agree on that. No arguments. I am asking to go a step ahead
-> >to include even cpu/core level power domains not just cluster/higher
-> >level domains.
-> >
-> >>>We need to have all the idle state information at one place and in this
-> >>>case PD seems more appropriate instead of splitting them across.
-> >>>
-> >>That approach isn't correct. Where will we put the idle states of other
-> >>devices that are also part of the domain? We are thinking about a model,
-> >>where every device defines its own idle states and we define
-> >>relationships between those idle states and their parents' idle states.
-> >
-> >Yes I understand. You confused me here. Won't that be one-to-one
-> >relationship ? If not, how is that dealt in the current bindings ?
-> >
-> >>Ofcourse, devices don't have idle states today, but that is something we
-> >>have been pondering over.
-> >>
-> >
-> >Yes we these binding should be easily extensible, I don't see any issue.
-> >
-> >>>We can also keep the code clean and not break compatibility. Whenever
-> >>>both PD and CPU contains idle-states, PD must take precedence.
-> >>>
-> >>Why?
-> >>The CPU and PD states are orthogonal. While the PD state is dependent on
-> >>the CPU state, the latter is not true. Devices determine their own
-> >>states. Based on the individual device states, we then determine the
-> >>state of the parent and bubble up on the hierarchy.
-> >>
-> >
-> >I may be missing something. Now with your example in the binding, if
-> >another device shares the cluster PD, can it have different idle states?
-> >If so how does it map ?
-> >
-> >
-> >In general whatever binding we come up must not just address OS
-> >coordinated mode. Also I was thinking to have better coverage in
-> >the description by having a bit more complex system like:
-> >
-> >cluster0
-> >	CLUSTER_RET(Retention)
-> >	CLUSTER_PG(Power Gate)
-> >	core0
-> >		CORE_RET
-> >		CORE_PG
-> >	core1
-> >		CORE_RET
-> >		CORE_PG
-> >
-> >cluster1
-> >	CLUSTER_RET
-> >	CLUSTER_PG
-> >	core0
-> >		CORE_RET
-> >		CORE_PG
-> >	core1
-> >		CORE_RET
-> >		CORE_PG
-> >
-> >Platform Co-ordinate supports the following states and we should
-> >be able to determine that from the binding:
-> >
-> >CORE_RET
-> >CORE_PG
-> >CORE_RET + CLUSTER_RET
->
-> The problem that we have to sove here is knowing that CORE_RET +
-> CLUSTER_PG (hypothetically) an invalid combination. Kevin and
-> I debated it in the earlier RFC and we dont have a good way to solve
-> this generically for all devices.
->
+Please fix up the includes.
 
+On Fri, Aug 12, 2016 at 04:01:11PM +0800, Jisheng Zhang wrote:
+> diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
+> index c7cfb8f..6d32d1a 100644
+> --- a/arch/arm64/kernel/cpu_ops.c
+> +++ b/arch/arm64/kernel/cpu_ops.c
+> @@ -28,7 +28,7 @@ extern const struct cpu_operations smp_spin_table_ops;
+>  extern const struct cpu_operations acpi_parking_protocol_ops;
+>  extern const struct cpu_operations cpu_psci_ops;
+>  
+> -const struct cpu_operations *cpu_ops[NR_CPUS];
+> +const struct cpu_operations *cpu_ops[NR_CPUS] __ro_after_init;
 
-This is interesting. I had been working on the assumption that a parent
-power domain cannot enter any idle state until its children were all in
-their deepest idle state. I now realise that it's easy to imagine
-platforms where this isn't the case.
+This file is missing a <linux/cache.h> include for __ro_after_init.
 
-However, I don't understand how your current bindings solve this issue
-and why using domain-power-states for all states (i.e. ignoring
-cpu-idle-states and putting CPU idle states in the domain-idle-states of
-a per-CPU power domain - I believe this is what Sudeep is suggesting)
-makes it any more difficult.
+>  static const struct cpu_operations *dt_supported_cpu_ops[] __initconst = {
+>  	&smp_spin_table_ops,
+> diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
+> index 8ebabc4..93c47e1 100644
+> --- a/arch/arm64/kernel/kaslr.c
+> +++ b/arch/arm64/kernel/kaslr.c
+> @@ -20,7 +20,7 @@
+>  #include <asm/pgtable.h>
+>  #include <asm/sections.h>
+>  
+> -u64 module_alloc_base __read_mostly;
+> +u64 module_alloc_base __ro_after_init;
 
-Could you link to this previous discussion you mentioned? I'm having
-trouble finding it (R.I.P Gmane).
+Likewise.
 
-> >CORE_PG + CLUSTER_RET
-> >CORE_PG + CLUSTER_PG
-> >
+>  u16 memstart_offset_seed __initdata;
+>  
+>  static __init u64 get_kaslr_seed(void *fdt)
+> diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+> index 10ad8ab..c1ff7c2 100644
+> --- a/arch/arm64/kernel/vdso.c
+> +++ b/arch/arm64/kernel/vdso.c
+> @@ -19,6 +19,7 @@
+>   */
+>  
+>  #include <linux/kernel.h>
+> +#include <linux/cache.h>
+>  #include <linux/clocksource.h>
+>  #include <linux/elf.h>
+>  #include <linux/err.h>
 
-Cheers,
-Brendan
+Nit: Could you please sort this list? Everything but <linux/kernel.h> is
+already in order.
+
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index c4284c4..59d44e7 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -30,7 +30,7 @@
+>  
+>  #include <asm/cacheflush.h>
+>  
+> -static int swiotlb __read_mostly;
+> +static int swiotlb __ro_after_init;
+
+This file is missing a <linux/cache.h> include for __ro_after_init.
+
+>  
+>  static pgprot_t __get_dma_pgprot(unsigned long attrs, pgprot_t prot,
+>  				 bool coherent)
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index bbb7ee7..e8b81ea 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -55,8 +55,8 @@
+>   * executes, which assigns it its actual value. So use a default value
+>   * that cannot be mistaken for a real physical address.
+>   */
+> -s64 memstart_addr __read_mostly = -1;
+> -phys_addr_t arm64_dma_phys_limit __read_mostly;
+> +s64 memstart_addr __ro_after_init = -1;
+> +phys_addr_t arm64_dma_phys_limit __ro_after_init;
+
+Likewise.
+
+>  #ifdef CONFIG_BLK_DEV_INITRD
+>  static int __init early_initrd(char *p)
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 4989948..6029bed 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -46,7 +46,7 @@
+>  
+>  u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
+>  
+> -u64 kimage_voffset __read_mostly;
+> +u64 kimage_voffset __ro_after_init;
+
+Likewise.
+
+Thanks,
+Mark.
