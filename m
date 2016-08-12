@@ -1,101 +1,67 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Fri, 12 Aug 2016 16:51:38 +0530
-Subject: [PATCH v2 15/21] net: thunderx: Improvement for MBX interface debug
- messages
+Date: Fri, 12 Aug 2016 16:51:37 +0530
+Subject: [PATCH v2 14/21] net: thunderx: Use skb_add_rx_frag() for split
+ buffer Rx pkts
 In-Reply-To: <1471000904-21715-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1471000904-21715-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1471000904-21715-16-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1471000904-21715-15-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Radoslaw Biernacki <rad@semihalf.com>
+From: Sunil Goutham <sgoutham@cavium.com>
 
-Adding debug messages in case of NACK for a mailbox message, also
-did small cleanups.
+Instead of a round about way of converting buffers to SKBs and
+combining them into a frag list, use standard skb_add_rx_frag()
+API to merge page fragments. This code is useful when incoming
+packets are of size more than RCV_FRAG_LEN which is currently
+set to 2048bytes.
 
-Signed-off-by: Radoslaw Biernacki <rad@semihalf.com>
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nic_main.c   | 16 ++++++++++------
- drivers/net/ethernet/cavium/thunder/nicvf_main.c |  8 ++++++--
- 2 files changed, 16 insertions(+), 8 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 24 ++++++----------------
+ 1 file changed, 6 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
-index b982e5f..c706b2e 100644
---- a/drivers/net/ethernet/cavium/thunder/nic_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
-@@ -831,7 +831,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
- 		mbx_addr += sizeof(u64);
- 	}
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+index ca223aa..ed2fe72 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+@@ -1184,8 +1184,8 @@ struct sk_buff *nicvf_get_rcv_skb(struct nicvf *nic, struct cqe_rx_t *cqe_rx)
+ 	int frag;
+ 	int payload_len = 0;
+ 	struct sk_buff *skb = NULL;
+-	struct sk_buff *skb_frag = NULL;
+-	struct sk_buff *prev_frag = NULL;
++	struct page *page;
++	int offset;
+ 	u16 *rb_lens = NULL;
+ 	u64 *rb_ptrs = NULL;
  
--	dev_dbg(&nic->pdev->dev, "%s: Mailbox msg %d from VF%d\n",
-+	dev_dbg(&nic->pdev->dev, "%s: Mailbox msg 0x%02x from VF%d\n",
- 		__func__, mbx.msg.msg, vf);
- 	switch (mbx.msg.msg) {
- 	case NIC_MBOX_MSG_READY:
-@@ -841,8 +841,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
- 			nic->duplex[vf] = 0;
- 			nic->speed[vf] = 0;
+@@ -1218,22 +1218,10 @@ struct sk_buff *nicvf_get_rcv_skb(struct nicvf *nic, struct cqe_rx_t *cqe_rx)
+ 			skb_put(skb, payload_len);
+ 		} else {
+ 			/* Add fragments */
+-			skb_frag = nicvf_rb_ptr_to_skb(nic, *rb_ptrs,
+-						       payload_len);
+-			if (!skb_frag) {
+-				dev_kfree_skb(skb);
+-				return NULL;
+-			}
+-
+-			if (!skb_shinfo(skb)->frag_list)
+-				skb_shinfo(skb)->frag_list = skb_frag;
+-			else
+-				prev_frag->next = skb_frag;
+-
+-			prev_frag = skb_frag;
+-			skb->len += payload_len;
+-			skb->data_len += payload_len;
+-			skb_frag->len = payload_len;
++			page = virt_to_page(phys_to_virt(*rb_ptrs));
++			offset = phys_to_virt(*rb_ptrs) - page_address(page);
++			skb_add_rx_frag(skb, skb_shinfo(skb)->nr_frags, page,
++					offset, payload_len, RCV_FRAG_LEN);
  		}
--		ret = 1;
--		break;
-+		goto unlock;
- 	case NIC_MBOX_MSG_QS_CFG:
- 		reg_addr = NIC_PF_QSET_0_127_CFG |
- 			   (mbx.qs.num << NIC_QS_ID_SHIFT);
-@@ -891,8 +890,10 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
- 		nic_tx_channel_cfg(nic, mbx.qs.num, &mbx.sq);
- 		break;
- 	case NIC_MBOX_MSG_SET_MAC:
--		if (vf >= nic->num_vf_en)
-+		if (vf >= nic->num_vf_en) {
-+			ret = -1; /* NACK */
- 			break;
-+		}
- 		lmac = mbx.mac.vf_id;
- 		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[lmac]);
- 		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[lmac]);
-@@ -947,10 +948,13 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
- 		break;
- 	}
- 
--	if (!ret)
-+	if (!ret) {
- 		nic_mbx_send_ack(nic, vf);
--	else if (mbx.msg.msg != NIC_MBOX_MSG_READY)
-+	} else if (mbx.msg.msg != NIC_MBOX_MSG_READY) {
-+		dev_err(&nic->pdev->dev, "NACK for MBOX 0x%02x from VF %d\n",
-+			mbx.msg.msg, vf);
- 		nic_mbx_send_nack(nic, vf);
-+	}
- unlock:
- 	nic->mbx_lock[vf] = false;
- }
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index 5335ff1..dd57361 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -144,15 +144,19 @@ int nicvf_send_msg_to_pf(struct nicvf *nic, union nic_mbx *mbx)
- 
- 	/* Wait for previous message to be acked, timeout 2sec */
- 	while (!nic->pf_acked) {
--		if (nic->pf_nacked)
-+		if (nic->pf_nacked) {
-+			netdev_err(nic->netdev,
-+				   "PF NACK to mbox msg 0x%02x from VF%d\n",
-+				   (mbx->msg.msg & 0xFF), nic->vf_id);
- 			return -EINVAL;
-+		}
- 		msleep(sleep);
- 		if (nic->pf_acked)
- 			break;
- 		timeout -= sleep;
- 		if (!timeout) {
- 			netdev_err(nic->netdev,
--				   "PF didn't ack to mbox msg %d from VF%d\n",
-+				   "PF didn't ACK to mbox msg 0x%02x from VF%d\n",
- 				   (mbx->msg.msg & 0xFF), nic->vf_id);
- 			return -EBUSY;
- 		}
+ 		/* Next buffer pointer */
+ 		rb_ptrs++;
 -- 
 2.7.4
