@@ -1,180 +1,168 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 12 Aug 2016 09:43:35 -0700
-Subject: [PATCH] soc: ti: wkup_m3_ipc: switch to using remoteproc OF
- infrastructure
-In-Reply-To: <55d90506-eb1b-c8f9-02b5-8484b9a4babd@ti.com>
-References: <20160812003529.519-1-s-anna@ti.com> <20160812110201.GD25844@dell>
- <55d90506-eb1b-c8f9-02b5-8484b9a4babd@ti.com>
-Message-ID: <20160812164335.GG26240@tuxbot>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sat, 13 Aug 2016 01:01:12 +0800
+Subject: [arm64:ttbr0-pan 1/7] arch/arm64/lib/clear_user.S:40: Error: unknown
+ mnemonic `user' -- `user(9f, str xzr,[x0],8)'
+Message-ID: <201608130106.YbIf6lrl%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 12 Aug 09:00 PDT 2016, Suman Anna wrote:
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git ttbr0-pan
+head:   d83997941fc4c1162a9084b8b7e98ed6dc130f84
+commit: 1209a972f4ffa3cbbb374be6145518f30cd30d6e [1/7] arm64: Factor out PAN enabling/disabling into separate uaccess_* macros
+config: arm64-allnoconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 1209a972f4ffa3cbbb374be6145518f30cd30d6e
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-> On 08/12/2016 06:02 AM, Lee Jones wrote:
-> > On Thu, 11 Aug 2016, Suman Anna wrote:
-> > 
-> >> The remoteproc framework has been enhanced recently to provide new
-> >> OF API to retrieve a remoteproc handle by client drivers through a
-> >> standard 'rprocs' property in client nodes. The wkup_m3_ipc driver
-> >> has been using a custom 'ti,rproc' property until now, switch this
-> >> to use this new OF infrastructure. The wkup_m3_ipc driver has been
-> >> fixed up to provide backward compatibility for older DTBs by
-> >> replacing the older property with the standard newer property.
-> >>
-> >> The wkup_m3_ipc binding has also been updated accordingly.
-> >>
-> >> Signed-off-by: Suman Anna <s-anna@ti.com>
-> >> ---
-> >> This patch is based on the discussion [1] for introducing new standard
-> >> OF API in remoteproc core series [2] and the exporting of couple of
-> >> functions in OF base code [3].
-> >>
-> >> With this in place, the remoteproc core need not be looking for the
-> >> TI specific property anymore. I will submit the DTS changes once this
-> >> makes it to mainline.
-> >>
-> >> regards
-> >> Suman
-> >>
-> >> [1] https://patchwork.kernel.org/patch/9237767/
-> >> [2] http://marc.info/?l=linux-kernel&m=146894341701010&w=2
-> >> [3] https://patchwork.kernel.org/patch/9276181/
-> >>
-> >>  .../devicetree/bindings/soc/ti/wkup_m3_ipc.txt     |  9 ++++++--
-> >>  drivers/soc/ti/wkup_m3_ipc.c                       | 26 +++++++++++++++++++++-
-> >>  2 files changed, 32 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt b/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
-> >> index 401550487ed6..2ea7dd91acff 100644
-> >> --- a/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
-> >> +++ b/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
-> >> @@ -23,12 +23,17 @@ Required properties:
-> >>  			with the Wakeup M3 processor
-> >>  - interrupts:		Contains the interrupt information for the wkup_m3
-> >>  			interrupt that signals the MPU.
-> >> -- ti,rproc:		phandle to the wkup_m3 rproc node so the IPC driver
-> >> +- rprocs:		phandle to the wkup_m3 rproc node so the IPC driver
-> >>  			can boot it.
-> >>  - mboxes:		phandles used by IPC framework to get correct mbox
-> >>  			channel for communication. Must point to appropriate
-> >>  			mbox_wkupm3 child node.
-> >>  
-> >> +Deprecated properties:
-> >> +----------------------
-> >> +- ti,rproc:		This property has been replaced with the "rprocs"
-> >> +			property.
-> >> +
-> >>  Example:
-> >>  --------
-> >>  /* AM33xx */
-> >> @@ -48,7 +53,7 @@ Example:
-> >>  				compatible = "ti,am3352-wkup-m3-ipc";
-> >>  				reg = <0x1324 0x24>;
-> >>  				interrupts = <78>;
-> >> -				ti,rproc = <&wkup_m3>;
-> >> +				rprocs = <&wkup_m3>;
-> >>  				mboxes = <&mailbox &mbox_wkupm3>;
-> >>  			};
-> >>  
-> >> diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
-> >> index 8823cc81ae45..86085f9bf6a8 100644
-> >> --- a/drivers/soc/ti/wkup_m3_ipc.c
-> >> +++ b/drivers/soc/ti/wkup_m3_ipc.c
-> >> @@ -1,7 +1,7 @@
-> >>  /*
-> >>   * AMx3 Wkup M3 IPC driver
-> >>   *
-> >> - * Copyright (C) 2015 Texas Instruments, Inc.
-> >> + * Copyright (C) 2015-2016 Texas Instruments, Inc.
-> >>   *
-> >>   * Dave Gerlach <d-gerlach@ti.com>
-> >>   *
-> >> @@ -390,6 +390,8 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
-> >>  	struct resource *res;
-> >>  	struct task_struct *task;
-> >>  	struct wkup_m3_ipc *m3_ipc;
-> >> +	struct property *nprop, *oprop;
-> >> +	const char nprop_name[] = "rprocs";
-> >>  
-> >>  	m3_ipc = devm_kzalloc(dev, sizeof(*m3_ipc), GFP_KERNEL);
-> >>  	if (!m3_ipc)
-> >> @@ -415,6 +417,28 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
-> >>  		return ret;
-> >>  	}
-> >>  
-> >> +	/* provide compatibility for older DTBs using ti,rproc property */
-> >> +	nprop = of_find_property(dev->of_node, "rprocs", NULL);
-> >> +	if (!nprop) {
-> >> +		oprop = of_find_property(dev->of_node, "ti,rproc", NULL);
-> >> +		if (!oprop) {
-> >> +			dev_err(&pdev->dev, "node is missing ti,rproc property\n");
-> >> +			return -ENODEV;
-> >> +		}
-> >> +
-> >> +		nprop = kzalloc(sizeof(*nprop) + sizeof(nprop_name),
-> >> +				GFP_KERNEL);
-> >> +		if (!nprop)
-> >> +			return -ENOMEM;
-> >> +
-> >> +		nprop->name = (char *)nprop + sizeof(*nprop);
-> >> +		snprintf(nprop->name, sizeof(nprop_name), nprop_name);
-> >> +		nprop->value = oprop->value;
-> >> +		nprop->length = oprop->length;
-> >> +		of_update_property(dev->of_node, nprop);
-> >> +		of_remove_property(dev->of_node, oprop);
-> >> +	}
-> >> +
-> > 
-> > +1 for getting the functionality out of core code.
-> > 
-> > -100 for having to jump though all these hoops.
-> > 
-> > If you are going to keep all of this, I would at least tuck it away in
-> > a header file or something.
-> 
-> Hiding it somewhere else won't make much of a difference though. If this
-> is such an eyesore, we still can do this cleanly without jumping through
-> these hoops. I would say this is a direct result of the removal of the
-> rproc_get_by_phandle API in Patch 2 of your OF remoteproc series [2].
-> That API is still an agnostic API. We can just add the of_rproc_get()
-> convenience helper in your Patch 1 and drop patch 2 completely with no
-> references to ti,rproc in the core code in the first place. The other
-> option, if we do want to remove that API is to add an additional
-> property name argument (NULL to mean "rprocs") to
-> of_rproc_get_by_index(), and it can be hidden away under of_rproc_get()
-> API - which is what I am expecting most of the new client users would
-> use anyway.
-> 
-> Once "rprocs" hits mainline, I will definitely switch over the
-> wkup_m3_ipc nodes to use that standard property and can fix this driver
-> independently.
-> 
+All errors (new ones prefixed by >>):
 
-We're stuck with this problem all over the place, as the world continues
-to evolve we will have issues with DT being static. This has been
-discussed many times before and the suggested solution is always what
-you implemented here - make the code deal with both versions, preferably
-by patching.
+   arch/arm64/lib/clear_user.S: Assembler messages:
+>> arch/arm64/lib/clear_user.S:40: Error: unknown mnemonic `user' -- `user(9f, str xzr,[x0],8)'
+>> arch/arm64/lib/clear_user.S:45: Error: unknown mnemonic `user' -- `user(9f, str wzr,[x0],4)'
+>> arch/arm64/lib/clear_user.S:49: Error: unknown mnemonic `user' -- `user(9f, strh wzr,[x0],2)'
+>> arch/arm64/lib/clear_user.S:53: Error: unknown mnemonic `user' -- `user(9f, strb wzr,[x0],0)'
+--
+   arch/arm64/lib/copy_template.S: Assembler messages:
+>> arch/arm64/lib/copy_template.S:70: Error: unknown mnemonic `user' -- `user(9998f, ldrb tmp1w,[src],#1)'
+>> arch/arm64/lib/copy_template.S:74: Error: unknown mnemonic `user' -- `user(9998f, ldrh tmp1w,[src],#2)'
+>> arch/arm64/lib/copy_template.S:78: Error: unknown mnemonic `user' -- `user(9998f, ldr tmp1w,[src],#4)'
+>> arch/arm64/lib/copy_template.S:82: Error: unknown mnemonic `user' -- `user(9998f, ldr tmp1,[src],#8)'
+>> arch/arm64/lib/copy_template.S:102: Error: unknown mnemonic `user' -- `user(9998f, ldp A_l,A_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:105: Error: unknown mnemonic `user' -- `user(9998f, ldp A_l,A_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:108: Error: unknown mnemonic `user' -- `user(9998f, ldp A_l,A_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:123: Error: unknown mnemonic `user' -- `user(9998f, ldr tmp1,[src],#8)'
+   arch/arm64/lib/copy_template.S:127: Error: unknown mnemonic `user' -- `user(9998f, ldr tmp1w,[src],#4)'
+   arch/arm64/lib/copy_template.S:131: Error: unknown mnemonic `user' -- `user(9998f, ldrh tmp1w,[src],#2)'
+   arch/arm64/lib/copy_template.S:135: Error: unknown mnemonic `user' -- `user(9998f, ldrb tmp1w,[src],#1)'
+   arch/arm64/lib/copy_template.S:147: Error: unknown mnemonic `user' -- `user(9998f, ldp A_l,A_h,[src],#16)'
+>> arch/arm64/lib/copy_template.S:149: Error: unknown mnemonic `user' -- `user(9998f, ldp B_l,B_h,[src],#16)'
+>> arch/arm64/lib/copy_template.S:150: Error: unknown mnemonic `user' -- `user(9998f, ldp C_l,C_h,[src],#16)'
+>> arch/arm64/lib/copy_template.S:153: Error: unknown mnemonic `user' -- `user(9998f, ldp D_l,D_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:167: Error: unknown mnemonic `user' -- `user(9998f, ldp A_l,A_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:168: Error: unknown mnemonic `user' -- `user(9998f, ldp B_l,B_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:169: Error: unknown mnemonic `user' -- `user(9998f, ldp C_l,C_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:170: Error: unknown mnemonic `user' -- `user(9998f, ldp D_l,D_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:177: Error: unknown mnemonic `user' -- `user(9998f, ldp A_l,A_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:179: Error: unknown mnemonic `user' -- `user(9998f, ldp B_l,B_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:181: Error: unknown mnemonic `user' -- `user(9998f, ldp C_l,C_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:183: Error: unknown mnemonic `user' -- `user(9998f, ldp D_l,D_h,[src],#16)'
+--
+   arch/arm64/lib/copy_template.S: Assembler messages:
+>> arch/arm64/lib/copy_template.S:70: Error: unknown mnemonic `user' -- `user(9998f, ldrb tmp1w,[src],#1)'
+>> arch/arm64/lib/copy_template.S:71: Error: unknown mnemonic `user' -- `user(9998f, strb tmp1w,[dst],#1)'
+>> arch/arm64/lib/copy_template.S:74: Error: unknown mnemonic `user' -- `user(9998f, ldrh tmp1w,[src],#2)'
+>> arch/arm64/lib/copy_template.S:75: Error: unknown mnemonic `user' -- `user(9998f, strh tmp1w,[dst],#2)'
+>> arch/arm64/lib/copy_template.S:78: Error: unknown mnemonic `user' -- `user(9998f, ldr tmp1w,[src],#4)'
+>> arch/arm64/lib/copy_template.S:79: Error: unknown mnemonic `user' -- `user(9998f, str tmp1w,[dst],#4)'
+>> arch/arm64/lib/copy_template.S:82: Error: unknown mnemonic `user' -- `user(9998f, ldr tmp1,[src],#8)'
+>> arch/arm64/lib/copy_template.S:83: Error: unknown mnemonic `user' -- `user(9998f, str tmp1,[dst],#8)'
+>> arch/arm64/lib/copy_template.S:102: Error: unknown mnemonic `user' -- `user(9998f, ldp A_l,A_h,[src],#16)'
+>> arch/arm64/lib/copy_template.S:103: Error: unknown mnemonic `user' -- `user(9998f, stp A_l,A_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:105: Error: unknown mnemonic `user' -- `user(9998f, ldp A_l,A_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:106: Error: unknown mnemonic `user' -- `user(9998f, stp A_l,A_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:108: Error: unknown mnemonic `user' -- `user(9998f, ldp A_l,A_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:109: Error: unknown mnemonic `user' -- `user(9998f, stp A_l,A_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:123: Error: unknown mnemonic `user' -- `user(9998f, ldr tmp1,[src],#8)'
+   arch/arm64/lib/copy_template.S:124: Error: unknown mnemonic `user' -- `user(9998f, str tmp1,[dst],#8)'
+   arch/arm64/lib/copy_template.S:127: Error: unknown mnemonic `user' -- `user(9998f, ldr tmp1w,[src],#4)'
+   arch/arm64/lib/copy_template.S:128: Error: unknown mnemonic `user' -- `user(9998f, str tmp1w,[dst],#4)'
+   arch/arm64/lib/copy_template.S:131: Error: unknown mnemonic `user' -- `user(9998f, ldrh tmp1w,[src],#2)'
+   arch/arm64/lib/copy_template.S:132: Error: unknown mnemonic `user' -- `user(9998f, strh tmp1w,[dst],#2)'
+   arch/arm64/lib/copy_template.S:135: Error: unknown mnemonic `user' -- `user(9998f, ldrb tmp1w,[src],#1)'
+   arch/arm64/lib/copy_template.S:136: Error: unknown mnemonic `user' -- `user(9998f, strb tmp1w,[dst],#1)'
+   arch/arm64/lib/copy_template.S:147: Error: unknown mnemonic `user' -- `user(9998f, ldp A_l,A_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:148: Error: unknown mnemonic `user' -- `user(9998f, stp A_l,A_h,[dst],#16)'
+>> arch/arm64/lib/copy_template.S:149: Error: unknown mnemonic `user' -- `user(9998f, ldp B_l,B_h,[src],#16)'
+>> arch/arm64/lib/copy_template.S:150: Error: unknown mnemonic `user' -- `user(9998f, ldp C_l,C_h,[src],#16)'
+>> arch/arm64/lib/copy_template.S:151: Error: unknown mnemonic `user' -- `user(9998f, stp B_l,B_h,[dst],#16)'
+>> arch/arm64/lib/copy_template.S:152: Error: unknown mnemonic `user' -- `user(9998f, stp C_l,C_h,[dst],#16)'
+>> arch/arm64/lib/copy_template.S:153: Error: unknown mnemonic `user' -- `user(9998f, ldp D_l,D_h,[src],#16)'
+>> arch/arm64/lib/copy_template.S:154: Error: unknown mnemonic `user' -- `user(9998f, stp D_l,D_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:167: Error: unknown mnemonic `user' -- `user(9998f, ldp A_l,A_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:168: Error: unknown mnemonic `user' -- `user(9998f, ldp B_l,B_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:169: Error: unknown mnemonic `user' -- `user(9998f, ldp C_l,C_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:170: Error: unknown mnemonic `user' -- `user(9998f, ldp D_l,D_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:176: Error: unknown mnemonic `user' -- `user(9998f, stp A_l,A_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:177: Error: unknown mnemonic `user' -- `user(9998f, ldp A_l,A_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:178: Error: unknown mnemonic `user' -- `user(9998f, stp B_l,B_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:179: Error: unknown mnemonic `user' -- `user(9998f, ldp B_l,B_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:180: Error: unknown mnemonic `user' -- `user(9998f, stp C_l,C_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:181: Error: unknown mnemonic `user' -- `user(9998f, ldp C_l,C_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:182: Error: unknown mnemonic `user' -- `user(9998f, stp D_l,D_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:183: Error: unknown mnemonic `user' -- `user(9998f, ldp D_l,D_h,[src],#16)'
+   arch/arm64/lib/copy_template.S:186: Error: unknown mnemonic `user' -- `user(9998f, stp A_l,A_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:187: Error: unknown mnemonic `user' -- `user(9998f, stp B_l,B_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:188: Error: unknown mnemonic `user' -- `user(9998f, stp C_l,C_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:189: Error: unknown mnemonic `user' -- `user(9998f, stp D_l,D_h,[dst],#16)'
+--
+   arch/arm64/lib/copy_template.S: Assembler messages:
+>> arch/arm64/lib/copy_template.S:71: Error: unknown mnemonic `user' -- `user(9998f, strb tmp1w,[dst],#1)'
+>> arch/arm64/lib/copy_template.S:75: Error: unknown mnemonic `user' -- `user(9998f, strh tmp1w,[dst],#2)'
+>> arch/arm64/lib/copy_template.S:79: Error: unknown mnemonic `user' -- `user(9998f, str tmp1w,[dst],#4)'
+>> arch/arm64/lib/copy_template.S:83: Error: unknown mnemonic `user' -- `user(9998f, str tmp1,[dst],#8)'
+>> arch/arm64/lib/copy_template.S:103: Error: unknown mnemonic `user' -- `user(9998f, stp A_l,A_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:106: Error: unknown mnemonic `user' -- `user(9998f, stp A_l,A_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:109: Error: unknown mnemonic `user' -- `user(9998f, stp A_l,A_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:124: Error: unknown mnemonic `user' -- `user(9998f, str tmp1,[dst],#8)'
+   arch/arm64/lib/copy_template.S:128: Error: unknown mnemonic `user' -- `user(9998f, str tmp1w,[dst],#4)'
+   arch/arm64/lib/copy_template.S:132: Error: unknown mnemonic `user' -- `user(9998f, strh tmp1w,[dst],#2)'
+   arch/arm64/lib/copy_template.S:136: Error: unknown mnemonic `user' -- `user(9998f, strb tmp1w,[dst],#1)'
+   arch/arm64/lib/copy_template.S:148: Error: unknown mnemonic `user' -- `user(9998f, stp A_l,A_h,[dst],#16)'
+>> arch/arm64/lib/copy_template.S:151: Error: unknown mnemonic `user' -- `user(9998f, stp B_l,B_h,[dst],#16)'
+>> arch/arm64/lib/copy_template.S:152: Error: unknown mnemonic `user' -- `user(9998f, stp C_l,C_h,[dst],#16)'
+>> arch/arm64/lib/copy_template.S:154: Error: unknown mnemonic `user' -- `user(9998f, stp D_l,D_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:176: Error: unknown mnemonic `user' -- `user(9998f, stp A_l,A_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:178: Error: unknown mnemonic `user' -- `user(9998f, stp B_l,B_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:180: Error: unknown mnemonic `user' -- `user(9998f, stp C_l,C_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:182: Error: unknown mnemonic `user' -- `user(9998f, stp D_l,D_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:186: Error: unknown mnemonic `user' -- `user(9998f, stp A_l,A_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:187: Error: unknown mnemonic `user' -- `user(9998f, stp B_l,B_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:188: Error: unknown mnemonic `user' -- `user(9998f, stp C_l,C_h,[dst],#16)'
+   arch/arm64/lib/copy_template.S:189: Error: unknown mnemonic `user' -- `user(9998f, stp D_l,D_h,[dst],#16)'
 
-The fact that you had to export the of_ operations indicates that no-one
-has tried this before and I'm happy you did. I'm however not happy about
-the size of the chunk of code it takes to do this dance.
+vim +40 arch/arm64/lib/clear_user.S
 
-I think for this to be practical we need to provide higher level
-operations for DT modification - in this case a of_rename_property().
+0aea86a2 Catalin Marinas 2012-03-05  34  ENTRY(__clear_user)
+1209a972 Catalin Marinas 2016-07-01  35  	uaccess_enable x2, x3, x4
+0aea86a2 Catalin Marinas 2012-03-05  36  	mov	x2, x1			// save the size for fixup return
+0aea86a2 Catalin Marinas 2012-03-05  37  	subs	x1, x1, #8
+0aea86a2 Catalin Marinas 2012-03-05  38  	b.mi	2f
+0aea86a2 Catalin Marinas 2012-03-05  39  1:
+57f4959b James Morse     2016-02-05 @40  uao_user_alternative 9f, str, sttr, xzr, x0, 8
+0aea86a2 Catalin Marinas 2012-03-05  41  	subs	x1, x1, #8
+0aea86a2 Catalin Marinas 2012-03-05  42  	b.pl	1b
+0aea86a2 Catalin Marinas 2012-03-05  43  2:	adds	x1, x1, #4
+0aea86a2 Catalin Marinas 2012-03-05  44  	b.mi	3f
+57f4959b James Morse     2016-02-05 @45  uao_user_alternative 9f, str, sttr, wzr, x0, 4
+0aea86a2 Catalin Marinas 2012-03-05  46  	sub	x1, x1, #4
+0aea86a2 Catalin Marinas 2012-03-05  47  3:	adds	x1, x1, #2
+0aea86a2 Catalin Marinas 2012-03-05  48  	b.mi	4f
+57f4959b James Morse     2016-02-05 @49  uao_user_alternative 9f, strh, sttrh, wzr, x0, 2
+0aea86a2 Catalin Marinas 2012-03-05  50  	sub	x1, x1, #2
+0aea86a2 Catalin Marinas 2012-03-05  51  4:	adds	x1, x1, #1
+0aea86a2 Catalin Marinas 2012-03-05  52  	b.mi	5f
+57f4959b James Morse     2016-02-05 @53  uao_user_alternative 9f, strb, sttrb, wzr, x0, 0
+0aea86a2 Catalin Marinas 2012-03-05  54  5:	mov	x0, #0
+1209a972 Catalin Marinas 2016-07-01  55  	uaccess_disable x2
+0aea86a2 Catalin Marinas 2012-03-05  56  	ret
 
-@Rob, any comments on this?
+:::::: The code at line 40 was first introduced by commit
+:::::: 57f4959bad0a154aeca125b7d38d1d9471a12422 arm64: kernel: Add support for User Access Override
 
-> Anyway, I have given all sorts of inputs to arrive at a clean solution
-> in both remoteproc core and this driver. I will leave it to Bjorn and
-> Tony/Santosh to decide what they want in each driver. As it is, this
-> patch will be moot if the core OF exports patch falls through.
-> 
+:::::: TO: James Morse <james.morse@arm.com>
+:::::: CC: Catalin Marinas <catalin.marinas@arm.com>
 
-I appreciate your input and we need to settle above discussion
-regardless of this case - and by then have it implemented as you have
-suggested.
-
-Regards,
-Bjorn
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 6126 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160813/32d7e87c/attachment-0001.obj>
