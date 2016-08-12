@@ -1,41 +1,69 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 11 Aug 2016 16:57:48 -0700
-Subject: [PATCH] clk: imx7d: do not set the parent of
- IMX7D_ENET_AXI_ROOT_SRC
-In-Reply-To: <CAOMZO5Dns1eNwzo2qz+Zh506D+JzdgJGYOzL8URTMfrxLq1XxQ@mail.gmail.com>
-References: <1468590782-8436-1-git-send-email-fabio.estevam@nxp.com>
- <CAOMZO5BjdhCDNU-Vr7OT81ag0LqgFQ3+oP1D_o0FUOZVafneqQ@mail.gmail.com>
- <20160811222842.GM2996@codeaurora.org>
- <CAOMZO5Dns1eNwzo2qz+Zh506D+JzdgJGYOzL8URTMfrxLq1XxQ@mail.gmail.com>
-Message-ID: <88d5c57d3047176ebf2eec0f21e86613@agner.ch>
+Date: Thu, 11 Aug 2016 17:11:06 -0700
+Subject: [PATCH 1/2] ARM: dts: imx7d: move CPU operating points to imx7d.dtsi
+Message-ID: <20160812001107.17016-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Only i.MX 7Dual SoC supports CPU frequencies of up to 1GHz. The i.MX
+7Solo can run with up to 800MHz and does so without making use of DVFS
+usually. While the device tree clearly specified a too fast operating
+point for i.MX 7Solo, the kernel did not used it in practise so far
+because the CPUfreq driver does not get loaded on i.MX 7Solo devices
+(since the fsl,imx7s compatible string is not in the list of devices
+making use of the cpufreq-dt driver...).
 
-On 2016-08-11 16:53, Fabio Estevam wrote:
-> Hi Stephen,
-> 
-> On Thu, Aug 11, 2016 at 7:28 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> 
->> Is there a "Fixes:" tag that can be applied here? Does this
-> 
-> This parent assignment exists since the mx7d clk driver was introduced
-> in commit 8f6d8094b21 ("ARM: imx: add imx7d clk tree support").
-> 
->> depend on some sort of DTS changes to add assigned clocks and
->> parents?
-> 
-> All the mx7 dts users assign the ENET clocks in their dts files.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+Hi Shawn,
 
-I don't think so, at least not that root clock.
+This is based on my earlier patchset:
+ARM: dts: imx7d: move ARM platform peripherals inside soc
 
-Otherwise grep -e IMX7D_PLL_ENET_MAIN_250M_CLK arch/arm/boot/dts/imx7*
-should return something...
-
-I guess in practice it is not a problem because the boot loader
-configures the clock selection already. Still, I think we should also
-fix our device trees and select the root clock there...
+This are kind of fixes too, so if possible I would like to see them
+in v4.8, what do you think?
 
 --
 Stefan
+
+ arch/arm/boot/dts/imx7d.dtsi | 8 ++++++++
+ arch/arm/boot/dts/imx7s.dtsi | 5 -----
+ 2 files changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index 3d77d95..d0b199c 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -45,6 +45,14 @@
+ 
+ / {
+ 	cpus {
++		cpu0: cpu at 0 {
++			operating-points = <
++				/* KHz	uV */
++				996000	1075000
++				792000	975000
++			>;
++		};
++
+ 		cpu1: cpu at 1 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index c63591c..5132e2f 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -85,11 +85,6 @@
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <0>;
+-			operating-points = <
+-				/* KHz	uV */
+-				996000	1075000
+-				792000	975000
+-			>;
+ 			clock-latency = <61036>; /* two CLK32 periods */
+ 			clocks = <&clks IMX7D_CLK_ARM>;
+ 		};
+-- 
+2.9.0
