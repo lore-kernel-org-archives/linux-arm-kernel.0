@@ -1,63 +1,40 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 12 Aug 2016 07:22:17 +0200
-Subject: [PATCH 1/5] arm/defconfigs: Remove CONFIG_IPV6_PRIVACY
-In-Reply-To: <1769762.X0BZWCkYAE@wuerfel>
-References: <1459338168-29334-1-git-send-email-bp@alien8.de>
- <4958578.R1lMSWqhcA@wuerfel> <20160811213521.GD10636@nazgul.tnic>
- <1769762.X0BZWCkYAE@wuerfel>
-Message-ID: <20160812052217.GA12013@nazgul.tnic>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 12 Aug 2016 14:17:48 +0800
+Subject: [PATCH] soc: ti: wkup_m3_ipc: switch to using remoteproc OF
+ infrastructure
+In-Reply-To: <20160812003529.519-1-s-anna@ti.com>
+Message-ID: <201608121427.KnlsFKGE%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2016 at 11:51:38PM +0200, Arnd Bergmann wrote:
-> That patch looks good, sorry I missed it. I see that Vladimir already
-> did the lpc32xx portion of it, can you send the part for s3c24xx
-> to the exynos maintainers?
+Hi Suman,
 
-I see you've added them to CC, thanks Arnd. Here it is:
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.8-rc1 next-20160811]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Suman-Anna/soc-ti-wkup_m3_ipc-switch-to-using-remoteproc-OF-infrastructure/20160812-085217
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+>> ERROR: "of_update_property" [drivers/soc/ti/wkup_m3_ipc.ko] undefined!
+>> ERROR: "of_remove_property" [drivers/soc/ti/wkup_m3_ipc.ko] undefined!
 
 ---
-From: Borislav Petkov <bp@suse.de>
-Date: Fri, 12 Aug 2016 07:18:20 +0200
-Subject: [PATCH] arm/s3c2410_defconfig: Remove CONFIG_IPV6_PRIVACY
-
-Option is long gone, see
-
-  5d9efa7ee99e ("ipv6: Remove privacy config option.")
-
-Signed-off-by: Borislav Petkov <bp@suse.de>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/configs/s3c2410_defconfig | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/configs/s3c2410_defconfig b/arch/arm/configs/s3c2410_defconfig
-index b3ade552a2a5..bc4bfe02e611 100644
---- a/arch/arm/configs/s3c2410_defconfig
-+++ b/arch/arm/configs/s3c2410_defconfig
-@@ -76,7 +76,6 @@ CONFIG_TCP_CONG_LP=m
- CONFIG_TCP_CONG_VENO=m
- CONFIG_TCP_CONG_YEAH=m
- CONFIG_TCP_CONG_ILLINOIS=m
--CONFIG_IPV6_PRIVACY=y
- CONFIG_IPV6_ROUTER_PREF=y
- CONFIG_INET6_AH=m
- CONFIG_INET6_ESP=m
--- 
-2.8.4
-
-> If you have larger chunks like CONFIG_INET_LRO removal, we can take
-> that directly through arm-soc as a single patch for all defconfigs.
-
-I'll leave that to someone who wants to get their feet wet with patching
-the kernel - should be a simple task. :-)
-
-Thanks!
-
--- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 58499 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160812/cb144d63/attachment-0001.obj>
