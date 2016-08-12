@@ -1,85 +1,41 @@
-From: bauerman@linux.vnet.ibm.com (Thiago Jung Bauermann)
-Date: Fri, 12 Aug 2016 18:44:16 -0300
-Subject: [PATCH v2 2/2] kexec: extend kexec_file_load system call
-In-Reply-To: <20160812081739.GB22218@350D>
-References: <1470956638-3589-1-git-send-email-bauerman@linux.vnet.ibm.com>
- <1470956638-3589-3-git-send-email-bauerman@linux.vnet.ibm.com>
- <20160812081739.GB22218@350D>
-Message-ID: <1606244.4vNzhVNUBR@hactar>
+From: fabf@skynet.be (Fabian Frederick)
+Date: Fri, 12 Aug 2016 23:47:18 +0200
+Subject: [PATCH 1/1 linux-next] ARM: mvebu_v5_defconfig: use MV88E6XXX
+Message-ID: <1471038438-12632-1-git-send-email-fabf@skynet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Balbir,
+Commit f81ec90fe9cb
+("net: dsa: mv88e6xxx: factorize the switch driver")
 
-Thank you for the review!
+merged
+CONFIG_NET_DSA_MV88E6131
+CONFIG_NET_DSA_MV88E6123
+CONFIG_NET_DSA_MV88E6171
+CONFIG_NET_DSA_MV88E6352
+to
+CONFIG_NET_DSA_MV88E6XXX
 
-Am Freitag, 12 August 2016, 18:17:39 schrieb Balbir Singh:
-> On Thu, Aug 11, 2016 at 08:03:58PM -0300, Thiago Jung Bauermann wrote:
-> > diff --git a/include/linux/fs.h b/include/linux/fs.h
-> > index 3523bf62f328..847d9c31f428 100644
-> > --- a/include/linux/fs.h
-> > +++ b/include/linux/fs.h
-> > @@ -2656,6 +2656,7 @@ extern int do_pipe_flags(int *, int);
-> > 
-> >  	id(MODULE, kernel-module)		\
-> >  	id(KEXEC_IMAGE, kexec-image)		\
-> >  	id(KEXEC_INITRAMFS, kexec-initramfs)	\
-> > 
-> > +	id(KEXEC_PARTIAL_DTB, kexec-partial-dtb)		\
-> 
-> The backspace is over-indented?
+Signed-off-by: Fabian Frederick <fabf@skynet.be>
+---
+ arch/arm/configs/mvebu_v5_defconfig | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-Indeed, I'll fix that. But to keep it aligned with the other backslashes, 
-there would be no spaces between it and the final closing parenthesis. 
-Either that, or reindent the other backslashes one more level. I think I 
-prefer the former.
- 
-> > @@ -160,6 +180,55 @@ kimage_file_prepare_segments(struct kimage *image,
-> > int kernel_fd, int initrd_fd,> 
-> >  		image->initrd_buf_len = size;
-> >  	
-> >  	}
-> > 
-> > +	if (flags & KEXEC_FILE_EXTRA_FDS) {
-> > +		int nr_fds, i;
-> > +		size_t fdset_size;
-> > +		char fdset_buf[MAX_FDSET_SIZE];
-> 
-> Do we really want this on the stack?  I presume the size is not large
-
-It has 132 bytes. Would it be better to use kmalloc instead?
-
-> > +		struct kexec_fdset *fdset = (struct kexec_fdset *) 
-fdset_buf;
-> > +
-> > +		ret = copy_from_user(&nr_fds, ufdset, sizeof(int));
-> > +		if (ret) {
-> > +			ret = -EFAULT;
-> > +			goto out;
-> > +		}
-> > +
-> > +		if (nr_fds > KEXEC_SEGMENT_MAX) {
-> 
-> We need an nr_fds < 0 check as well
-
-Indeed, I forgot to do that. I will add the check.
-
-> > +			ret = -E2BIG;
-> > +			goto out;
-> > +		}
-> > +
-> > +		fdset_size = sizeof(struct kexec_fdset)
-> > +				+ nr_fds * sizeof(struct kexec_file_fd);
-> > +
-> > +		ret = copy_from_user(fdset, ufdset, fdset_size);
-> 
-> Can the user change nr_fds between the two copy_from_users, ideally not,
-> but we should validate it.
-
-Good catch. I'll check if nr_fds == fdset->nr_fds and return with an error 
-if they're different.
-
+diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
+index 6051c51..f7f6039 100644
+--- a/arch/arm/configs/mvebu_v5_defconfig
++++ b/arch/arm/configs/mvebu_v5_defconfig
+@@ -91,10 +91,7 @@ CONFIG_SATA_AHCI=y
+ CONFIG_SATA_MV=y
+ CONFIG_NETDEVICES=y
+ CONFIG_NET_DSA_MV88E6060=y
+-CONFIG_NET_DSA_MV88E6131=y
+-CONFIG_NET_DSA_MV88E6123=y
+-CONFIG_NET_DSA_MV88E6171=y
+-CONFIG_NET_DSA_MV88E6352=y
++CONFIG_NET_DSA_MV88E6XXX=y
+ CONFIG_MV643XX_ETH=y
+ CONFIG_R8169=y
+ CONFIG_MARVELL_PHY=y
 -- 
-[]'s
-Thiago Jung Bauermann
-IBM Linux Technology Center
+2.8.1
