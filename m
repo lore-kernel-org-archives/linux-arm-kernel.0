@@ -1,89 +1,139 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 12 Aug 2016 11:11:58 +0800
-Subject: [PATCH 3/3] ARM: dts: imx6q-evi: Fix onboard hub reset line
-In-Reply-To: <1470933632-22133-4-git-send-email-stillcompiling@gmail.com>
-References: <20160810030254.GD1879@shlinux2>
- <1470933632-22133-1-git-send-email-stillcompiling@gmail.com>
- <1470933632-22133-4-git-send-email-stillcompiling@gmail.com>
-Message-ID: <20160812031158.GH18967@shlinux2>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 12 Aug 2016 12:44:22 +0900
+Subject: debug tip after earlycon is closed?
+In-Reply-To: <20160728122022.GZ1041@n2100.armlinux.org.uk>
+References: <CAK7LNASrqbt+RzD64zcAMjmBjJqa2sc2UG+mnEX8npZ9DBJodQ@mail.gmail.com>
+ <3860396.RT1mlU0LAT@wuerfel>
+ <CAK7LNARtm_2uT3nbga4X0dMYs9jhKa8a2FTGJrYbVRg8P3vHQw@mail.gmail.com>
+ <7034241.kLArk8ex69@wuerfel> <20160728122022.GZ1041@n2100.armlinux.org.uk>
+Message-ID: <CAK7LNARYUCGxK1Z0JSCY9SLtacVqn21VammGC=WAOz3ou-+c2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2016 at 09:40:32AM -0700, Joshua Clayton wrote:
-> Previously the onboard hub was made to work by treating its
-> reset gpio as a regulator enable.
-> Get rid of that kludge now that pwseq has added reset gpio support
-> Move pin muxing the hub reset pin into the usbh1 group
-> 
-> Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-> ---
->  arch/arm/boot/dts/imx6q-evi.dts | 25 +++++++------------------
->  1 file changed, 7 insertions(+), 18 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
-> index 4fa5601..49c6f61 100644
-> --- a/arch/arm/boot/dts/imx6q-evi.dts
-> +++ b/arch/arm/boot/dts/imx6q-evi.dts
-> @@ -54,18 +54,6 @@
->  		reg = <0x10000000 0x40000000>;
->  	};
->  
-> -	reg_usbh1_vbus: regulator-usbhubreset {
-> -		compatible = "regulator-fixed";
-> -		regulator-name = "usbh1_vbus";
-> -		regulator-min-microvolt = <5000000>;
-> -		regulator-max-microvolt = <5000000>;
-> -		enable-active-high;
-> -		startup-delay-us = <2>;
-> -		pinctrl-names = "default";
-> -		pinctrl-0 = <&pinctrl_usbh1_hubreset>;
-> -		gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
-> -	};
-> -
->  	reg_usb_otg_vbus: regulator-usbotgvbus {
->  		compatible = "regulator-fixed";
->  		regulator-name = "usb_otg_vbus";
-> @@ -204,12 +192,18 @@
->  };
->  
->  &usbh1 {
-> -	vbus-supply = <&reg_usbh1_vbus>;
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_usbh1>;
->  	dr_mode = "host";
->  	disable-over-current;
->  	status = "okay";
-> +
-> +	usb2415host: hub at 1 {
-> +		compatible = "usb424,2513";
-> +		reg = <1>;
-> +		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-> +		reset-duration-us = <3000>;
-> +	};
->  };
->  
->  &usbotg {
-> @@ -467,11 +461,6 @@
->  			MX6QDL_PAD_GPIO_3__USB_H1_OC 0x1b0b0
->  			/* usbh1_b OC */
+Hi.
 
-This comment should be for above pin, do you mind I change it in
-this patch?
 
->  			MX6QDL_PAD_GPIO_0__GPIO1_IO00 0x1b0b0
-> -		>;
-> -	};
-> -
-> -	pinctrl_usbh1_hubreset: usbh1hubresetgrp {
-> -		fsl,pins = <
->  			MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x1b0b0
->  		>;
->  	};
 
-This changes remind me that I need to change the same thing for udoo
-board.
+
+2016-07-28 16:44 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+>
+> I think the problem is that you have three consoles:
+>
+> - the boot console that stays active until a real console comes up
+> - the framebuffer console that is initialized early and goes on to
+>   disable the bootconsole
+> - the serial console that you are looking at but which doesn't get
+>   initialized until much later
+>
+> Clearly something is wrong in this setup and we don't want to
+> disable the boot console before the serial console is up.
+>
+> I guess you could work around it by disabling the framebuffer console
+> at compile time, or by having the serial console initialized earlier
+> than the framebuffer, but I wonder if this is something that could
+> use a more general solution.
+
+
+Looks like this comes from:
+
+#elif defined(CONFIG_DUMMY_CONSOLE)
+        conswitchp = &dummy_con;
+#endif
+
+
+console= in the kernel-parameter is no problem,
+but stdout-path in the chose node goes wrong with it.
+
+
+
+
+
+
+2016-07-28 21:20 GMT+09:00 Russell King - ARM Linux <linux@armlinux.org.uk>:
+> I think this is down to how the linux,stdout property is handled.
+>
+> Normally, with command line specified consoles, if you don't specify
+> anything, you get the framebuffer console (actually, it's the first
+> registered console, but practically this is the framebuffer if enabled)
+> by default.
+>
+> If you specify a console (or consoles) on the command line, you get
+> all of those you specified, (iirc) with /dev/console's input connected
+> to the first specified console.
+>
+> This happens because the command line is parsed for consoles, and
+> add_preferred_console() is called for each that are found, whether or
+> not drivers are discovered for them.  __add_preferred_console()
+> prevents the first registered console being automatically initialised
+> by setting selected_console to a non-negative number.
+>
+> However, the parsing of DT specified consoles occurs at driver
+> initialisation time - in uart_add_one_port() via of_console_check().
+> Only at this time is add_preferred_console() called, which means that
+> the first console registered prior to _any_ selected UART console
+> driver mentioned in DT will become active.
+>
+> When the first console becomes active, the earlycon is disabled, which
+> means that in the DT case, if we have a framebuffer enabled which
+> registers prior to any selected UART console, the framebuffer will
+> stop the earlycon output immediately.
+>
+> To me, what this means is that the DT parsing of linux,stdout is
+> broken - while it may look nice from a design point of view, the
+> design is wrong and fails to take account of non-UART consoles in
+> the system.
+
+
+Thanks for clarification.
+I agree that stdout-path is something wrong.
+
+
+
+Since I switched
+from
+
+chosen {
+
+         bootargs = "console=ttyS0,115200";
+};
+
+to
+
+chosen {
+        stdout-path = "serial0:115200n8";
+};
+
+
+I have had bad experiences.
+
+
+
+The combination of stdout-path and earlycon gives doubled log.
+I reported this in  https://lkml.org/lkml/2015/11/27/170
+but not fixed yet.
+
+
+
+I could fix the problem by changing
+
+
+chosen {
+         stdout-path = "serial0:115200n8";
+         bootargs = "earlycon";
+};
+
+to
+
+chosen {
+         bootargs = "console=ttyS0,115200
+earlycon=uniphier,mmio32,0x54006800,115200";
+};
+
+
+
+
+
 
 -- 
-
-Best Regards,
-Peter Chen
+Best Regards
+Masahiro Yamada
