@@ -1,30 +1,57 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Aug 2016 15:32:31 +0100
-Subject: [PATCH] arm: add an option for erratum 657417
-In-Reply-To: <20160812142325.GC1041@n2100.armlinux.org.uk>
-References: <1470989957-23671-1-git-send-email-npiggin@gmail.com>
- <20160812123314.GX1041@n2100.armlinux.org.uk>
- <6bc288d9-6bea-1ee2-572f-d397221adaff@arm.com>
- <20160812142325.GC1041@n2100.armlinux.org.uk>
-Message-ID: <20160812143231.GE1041@n2100.armlinux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 12 Aug 2016 15:36:12 +0100
+Subject: [PATCH 05/19] arm64: rename COMPAT to AARCH32_EL0 in Kconfig
+In-Reply-To: <2034620.lN3lAEBAXs@wuerfel>
+References: <1466207668-10549-1-git-send-email-ynorov@caviumnetworks.com>
+ <6457502.FRufylo3sd@wuerfel>
+ <20160811163003.GD18366@e104818-lin.cambridge.arm.com>
+ <2034620.lN3lAEBAXs@wuerfel>
+Message-ID: <20160812143612.GH12939@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 12, 2016 at 03:23:25PM +0100, Russell King - ARM Linux wrote:
-> I've not actually looked at the errata document - I need to jump through
-> all sorts of stupid hoops to get it through the ARM website.  Ever since
-> I requested a change of my email address, it now wants all sorts of
-> personal information that I'm refusing to type in again.  I've no idea
-> why ARM Ltd wiped out all that information just because I asked for my
-> email address to be changed.
+On Thu, Aug 11, 2016 at 10:29:03PM +0200, Arnd Bergmann wrote:
+> On Thursday, August 11, 2016 5:30:03 PM CEST Catalin Marinas wrote:
+> > > > > and you can have ARM binaries with
+> > > > > PER_LINUX (using the arm64 uname) just like you can have
+> > > > > arm64 binaries running with PER_LINUX32.
+> > > > 
+> > > > I was actually looking to enforce the 32-bit binaries to only see
+> > > > PER_LINUX32, though with a risk of breaking the ABI. OTOH, people are
+> > > > abusing this and write 32-bit apps relying on the 64-bit /proc/cpuinfo:
+> > > > 
+> > > > http://lkml.kernel.org/g/1464706504-25224-3-git-send-email-catalin.marinas at arm.com
+> > > > 
+> > > > (you were summoned on that discussion couple of times ;))
+> > > 
+> > > Hmm, I thought I saw the thread and didn't have any good idea for
+> > > the uname information, but didn't notice it was for /proc/cpuinfo.
+> > > 
+> > > What's wrong with always showing both the 32-bit and the 64-bit
+> > > hwcap strings here (minus the duplicates, which hopefully have
+> > > the same meaning here)?
+> > 
+> > As I said above, some of them have the same name (which may be a good
+> > thing at a first look) but we don't have an architecture guarantee that
+> > the feature is present in both AArch32 and AArch64 modes (e.g. AES may
+> > only be available in AArch64).
+> 
+> Is this the case on actual implementations that exist today? If they
+> are actually always both present, we might be able to get away with it.
 
-... oh, and it's forgotten that I'm supposed to be able to access
-that information too - it wants me to apply for approval to access
-errata documents.
+It may be fine on current implementations but what would we do when/if
+we actually find such discrepancy? It's not just ARM Ltd designing the
+chips, so as long as the architecture doesn't mandate it you may find
+strange implementations.
 
-Maybe someone can send the appropriate document(s) my way instead.
+Imposing such restriction in the architecture doesn't make sense if the
+only reason is the /proc/cpuinfo file (and I can't think of any other
+reason why this should be enforced).
+
+What I'm worried about is 32-bit apps running on an arm64 kernel and
+making use of the 64-bit /proc/cpuinfo without any guarantee that the
+AArch32 state has such features. In my patch proposal linked above I
+wanted to always force the compat /proc/cpuinfo for 32-bit tasks.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Catalin
