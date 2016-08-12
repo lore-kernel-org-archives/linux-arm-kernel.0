@@ -1,43 +1,21 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Aug 2016 15:23:25 +0100
-Subject: [PATCH] arm: add an option for erratum 657417
-In-Reply-To: <6bc288d9-6bea-1ee2-572f-d397221adaff@arm.com>
-References: <1470989957-23671-1-git-send-email-npiggin@gmail.com>
- <20160812123314.GX1041@n2100.armlinux.org.uk>
- <6bc288d9-6bea-1ee2-572f-d397221adaff@arm.com>
-Message-ID: <20160812142325.GC1041@n2100.armlinux.org.uk>
+From: hansverk@cisco.com (Hans Verkuil)
+Date: Fri, 12 Aug 2016 16:25:02 +0200
+Subject: [PATCH RFC 4/5] drm/bridge: add dw-hdmi cec driver using Hans
+ Verkil's CEC code
+In-Reply-To: <E1bYDEs-0004rs-FP@rmk-PC.armlinux.org.uk>
+References: <20160812141421.GB1041@n2100.armlinux.org.uk>
+ <E1bYDEs-0004rs-FP@rmk-PC.armlinux.org.uk>
+Message-ID: <d417880e-8628-5d90-9487-e88d283f309c@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 12, 2016 at 03:17:06PM +0100, Robin Murphy wrote:
-> On 12/08/16 13:33, Russell King - ARM Linux wrote:
-> > On Fri, Aug 12, 2016 at 06:19:17PM +1000, Nicholas Piggin wrote:
-> >> This patch adds an option which defaults to "y" in cases where we
-> >> could possibly be running Cortex A8 and using Thumb2 instructions.
-> >> In reality the workaround might not be required at all for the kernel
-> >> if virtual instruction memory is linear in physical memory.
-> > 
-> > Hmm.
-> > 
-> > The main kernel image is guaranteed to be contiguous in physical memory
-> > for all sorts of reasons, so this really isn't a concern for the kernel
-> > itself.
-> 
-> I'm not sure being contiguous matters much - looking at the errata doc,
-> the implication is that the branch is supposed to use bits 31:12 of the
-> address of the first page, but under the erratum conditions ends up
-> taking bits 31:12 of the address of the _second_ page instead. There
-> doesn't seem to be any importance of where those pages actually are
-> relative to each other.
+On 08/12/2016 04:15 PM, Russell King wrote:
+> Add a CEC driver for the dw-hdmi hardware using Hans Verkil's CEC
 
-I've not actually looked at the errata document - I need to jump through
-all sorts of stupid hoops to get it through the ARM website.  Ever since
-I requested a change of my email address, it now wants all sorts of
-personal information that I'm refusing to type in again.  I've no idea
-why ARM Ltd wiped out all that information just because I asked for my
-email address to be changed.
+That's Verkuil :-)
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+BTW, since cec is part of the media subsystem please include linux-media for the next round.
+
+Regards,
+
+	Hans
