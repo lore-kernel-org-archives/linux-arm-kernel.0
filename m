@@ -1,41 +1,78 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 12 Aug 2016 10:15:27 +0200
-Subject: [PATCH RESEND v2 1/3] dt: bindings: add bindings for Allwinner
- A64 usb phy
-In-Reply-To: <20160812030622.4492-1-icenowy@aosc.xyz>
-References: <20160812030622.4492-1-icenowy@aosc.xyz>
-Message-ID: <03c1154e-5d40-f0d9-0990-8b3aa8f47ba0@redhat.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 12 Aug 2016 16:12:18 +0800
+Subject: [PATCH v3] ARM: VDSO: put RO and RO after init objects into proper
+ sections
+Message-ID: <1470989538-2953-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+vdso_data_mapping is never modified, so mark it as const.
 
-On 12-08-16 05:06, Icenowy Zheng wrote:
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+vdso_total_pages, vdso_data_page, vdso_text_mapping and cntvct_ok are
+initialized by vdso_init(), thereafter are read only.
 
-Series is still:
+The fact that they are read only after init makes them candidates for
+__ro_after_init declarations.
 
-Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
 
-Regards,
+Since v2:
+  - include <linux/cache.h> explicitly for __ro_after_init
 
-Hans
+Since v1:
+  - use __ro_after_init instead of __read_mostly
+  - apply __ro_after_init for vdso_total_pages and cntvct_ok as well
 
+ arch/arm/kernel/vdso.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-> ---
->  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> index 95736d7..287150d 100644
-> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> @@ -10,6 +10,7 @@ Required properties:
->    * allwinner,sun8i-a23-usb-phy
->    * allwinner,sun8i-a33-usb-phy
->    * allwinner,sun8i-h3-usb-phy
-> +  * allwinner,sun50i-a64-usb-phy
->  - reg : a list of offset + length pairs
->  - reg-names :
->    * "phy_ctrl"
->
+diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+index 994e971..bbbffe94 100644
+--- a/arch/arm/kernel/vdso.c
++++ b/arch/arm/kernel/vdso.c
+@@ -17,6 +17,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/cache.h>
+ #include <linux/elf.h>
+ #include <linux/err.h>
+ #include <linux/kernel.h>
+@@ -39,7 +40,7 @@
+ static struct page **vdso_text_pagelist;
+ 
+ /* Total number of pages needed for the data and text portions of the VDSO. */
+-unsigned int vdso_total_pages __read_mostly;
++unsigned int vdso_total_pages __ro_after_init;
+ 
+ /*
+  * The VDSO data page.
+@@ -47,13 +48,13 @@ unsigned int vdso_total_pages __read_mostly;
+ static union vdso_data_store vdso_data_store __page_aligned_data;
+ static struct vdso_data *vdso_data = &vdso_data_store.data;
+ 
+-static struct page *vdso_data_page;
+-static struct vm_special_mapping vdso_data_mapping = {
++static struct page *vdso_data_page __ro_after_init;
++static const struct vm_special_mapping vdso_data_mapping = {
+ 	.name = "[vvar]",
+ 	.pages = &vdso_data_page,
+ };
+ 
+-static struct vm_special_mapping vdso_text_mapping = {
++static struct vm_special_mapping vdso_text_mapping __ro_after_init = {
+ 	.name = "[vdso]",
+ };
+ 
+@@ -67,7 +68,7 @@ struct elfinfo {
+ /* Cached result of boot-time check for whether the arch timer exists,
+  * and if so, whether the virtual counter is useable.
+  */
+-static bool cntvct_ok __read_mostly;
++static bool cntvct_ok __ro_after_init;
+ 
+ static bool __init cntvct_functional(void)
+ {
+-- 
+2.8.1
