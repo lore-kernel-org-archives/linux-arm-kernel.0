@@ -1,82 +1,71 @@
-From: npiggin@gmail.com (Nicholas Piggin)
-Date: Fri, 12 Aug 2016 18:19:17 +1000
-Subject: [PATCH] arm: add an option for erratum 657417
-Message-ID: <1470989957-23671-1-git-send-email-npiggin@gmail.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Fri, 12 Aug 2016 10:26:36 +0200
+Subject: [PATCH soc/next?] ARM: BCM53573: Initial support for Broadcom
+ BCM53573 SoCs
+Message-ID: <1470990396-23701-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Erratum 657417 is worked around by the linker by inserting additional
-branch trampolines to avoid problematic branch target locations. This
-results in much higher linking time and presumably slower and larger
-generated code. The workaround also seems to only be required when
-linking thumb2 code, but the linker applies it for non-thumb2 code as
-well.
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-The workaround today is left to the linker to apply, which is overly
-conservative.
+BCM53573 series is a new family with embedded wireless. By marketing
+people it's sometimes called Northstar but it uses different CPU and has
+different architecture so we need a new symbol for it.
+Fortunately it shares some peripherals with other iProc based SoCs so we
+will be able to reuse some drivers/bindings.
 
-https://sourceware.org/ml/binutils/2009-05/msg00297.html
-
-This patch adds an option which defaults to "y" in cases where we
-could possibly be running Cortex A8 and using Thumb2 instructions.
-In reality the workaround might not be required at all for the kernel
-if virtual instruction memory is linear in physical memory. However it
-is more conservative to keep the workaround, and it may be the case
-that the TLB lookup would be required in order to catch branches to
-unmapped or no-execute pages.
-
-In an allyesconfig build, this workaround causes a large load on
-the linker's branch stub hash and slows down the final link by a
-factor of 5.
-
-Signed-off-by: Nicholas Piggin <npiggin@gmail.com>
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 ---
- arch/arm/Kconfig  | 14 ++++++++++++++
- arch/arm/Makefile |  7 +++++++
- 2 files changed, 21 insertions(+)
+Resending as linux-arm-kernel ML rejected my e-mail due to the wrong address:
+bcm-kernel-feedback-list at broadcom.com>
+---
+ MAINTAINERS               |  7 +++++++
+ arch/arm/mach-bcm/Kconfig | 15 +++++++++++++++
+ 2 files changed, 22 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 90542db..3c7dde1 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1033,6 +1033,20 @@ config ARM_ERRATA_460075
- 	  ACTLR register. Note that setting specific bits in the ACTLR register
- 	  may not be available in non-secure mode.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7304d2e..9e2db2e 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2517,6 +2517,13 @@ F:	arch/arm/mach-bcm/bcm_5301x.c
+ F:	arch/arm/boot/dts/bcm5301x.dtsi
+ F:	arch/arm/boot/dts/bcm470*
  
-+config ARM_ERRATA_657417
-+	bool "ARM errata: A 32-bit branch instruction that spans two 4K regions can result in an incorrect operation"
-+	depends on CPU_V7
-+	depends on THUMB2_KERNEL
-+	default y
++BROADCOM BCM53573 ARM ARCHITECTURE
++M:	Rafa? Mi?ecki <rafal@milecki.pl>
++L:	linux-arm-kernel at lists.infradead.org
++S:	Maintained
++F:	arch/arm/boot/dts/bcm53573*
++F:	arch/arm/boot/dts/bcm47189*
++
+ BROADCOM BCM63XX ARM ARCHITECTURE
+ M:	Florian Fainelli <f.fainelli@gmail.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 5832dba..9a6c3ae 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -76,6 +76,21 @@ config ARCH_BCM_5301X
+ 	  different SoC or with the older BCM47XX and BCM53XX based
+ 	  network SoC using a MIPS CPU, they are supported by arch/mips/bcm47xx
+ 
++config ARCH_BCM_53573
++	bool "Broadcom BCM53573 SoC series support"
++	depends on ARCH_MULTI_V7
++	select ARCH_BCM_IPROC
++	select HAVE_ARM_ARCH_TIMER
++
 +	help
-+	  This option enables the workaround for the 657417 Cortex-A8 erratum.
-+	  If, while executing code in Thumb or ThumbEE state, a 32-bit Thumb-2
-+	  branch instruction is executed that spans two 4KB regions, and the
-+	  target address of the branch falls within the first region, it is
-+	  possible for the processor to behave incorrectly. This workaround
-+	  enables a linker workaround that adds branch trampolines that bounce
-+	  offending branches via a safe location.
++	  BCM53573 series is set of SoCs using ARM Cortex-A7 CPUs with wireless
++	  embedded in the chipset.
++	  This SoC line is mostly used in home routers and is some cheaper
++	  alternative for Northstar family.
 +
- config ARM_ERRATA_742230
- 	bool "ARM errata: DMB operation may be faulty"
- 	depends on CPU_V7 && SMP
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 274e8a6..b49a2e0 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -43,6 +43,13 @@ ifeq ($(CONFIG_FRAME_POINTER),y)
- KBUILD_CFLAGS	+=-fno-omit-frame-pointer -mapcs -mno-sched-prolog
- endif
++	  The base chip is BCM53573 and there are some packaging modifications
++	  like BCM47189 and BCM47452.
++
+ comment "KONA architected SoCs"
  
-+ifneq ($(CONFIG_ARM_ERRATA_657417),y)
-+# ld-option has to run before we override LD otherwise it fails on
-+# cross compile with mismatched endian (C compiler outputs one endian,
-+# LD accepts another)
-+LDFLAGS		+=$(call ld-option, --no-fix-cortex-a8,)
-+endif
-+
- ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
- KBUILD_CPPFLAGS	+= -mbig-endian
- AS		+= -EB
+ config ARCH_BCM_MOBILE
 -- 
-2.8.1
+1.8.4.5
