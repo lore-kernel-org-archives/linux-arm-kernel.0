@@ -1,177 +1,93 @@
-From: hansverk@cisco.com (Hans Verkuil)
-Date: Fri, 12 Aug 2016 17:26:22 +0200
-Subject: [PATCH RFC 1/5] video: add HDMI state notifier support
-In-Reply-To: <E1bYDEd-0004rZ-3i@rmk-PC.armlinux.org.uk>
-References: <20160812141421.GB1041@n2100.armlinux.org.uk>
- <E1bYDEd-0004rZ-3i@rmk-PC.armlinux.org.uk>
-Message-ID: <f09827f5-c207-80b7-ca36-bf84a1273633@cisco.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 12 Aug 2016 16:27:41 +0100
+Subject: [PATCH 2/7] arm64: Factor out TTBR0_EL1 setting into a specific asm
+ macro
+In-Reply-To: <1471015666-23125-1-git-send-email-catalin.marinas@arm.com>
+References: <1471015666-23125-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1471015666-23125-3-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2016 04:14 PM, Russell King wrote:
-> Add support for HDMI hotplug and EDID notifiers, which is used to convey
-> information from HDMI drivers to their CEC and audio counterparts.
->
-> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+This patch takes the TTBR0_EL1 setting code out of cpu_do_switch_mm into
+a dedicated cpu_set_ttbr0 macro which will be reused in a subsequent
+patch.
 
-I still don't really like the void *, but not enough to block this, so:
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Kees Cook <keescook@chromium.org>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/include/asm/assembler.h | 25 +++++++++++++++++++++++++
+ arch/arm64/mm/proc.S               | 16 +---------------
+ 2 files changed, 26 insertions(+), 15 deletions(-)
 
-Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
-
-Regards,
-
-	Hans
-
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  drivers/video/Kconfig         |  3 +++
->  drivers/video/Makefile        |  1 +
->  drivers/video/hdmi-notifier.c | 61 +++++++++++++++++++++++++++++++++++++++++++
->  include/linux/hdmi-notifier.h | 44 +++++++++++++++++++++++++++++++
->  4 files changed, 109 insertions(+)
->  create mode 100644 drivers/video/hdmi-notifier.c
->  create mode 100644 include/linux/hdmi-notifier.h
->
-> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-> index 3c20af999893..1ee7b9f9bb25 100644
-> --- a/drivers/video/Kconfig
-> +++ b/drivers/video/Kconfig
-> @@ -36,6 +36,9 @@ config VIDEOMODE_HELPERS
->  config HDMI
->  	bool
->
-> +config HDMI_NOTIFIERS
-> +	bool
-> +
->  if VT
->  	source "drivers/video/console/Kconfig"
->  endif
-> diff --git a/drivers/video/Makefile b/drivers/video/Makefile
-> index 9ad3c17d6456..65f564906fb4 100644
-> --- a/drivers/video/Makefile
-> +++ b/drivers/video/Makefile
-> @@ -1,5 +1,6 @@
->  obj-$(CONFIG_VGASTATE)            += vgastate.o
->  obj-$(CONFIG_HDMI)                += hdmi.o
-> +obj-$(CONFIG_HDMI_NOTIFIERS)      += hdmi-notifier.o
->
->  obj-$(CONFIG_VT)		  += console/
->  obj-$(CONFIG_LOGO)		  += logo/
-> diff --git a/drivers/video/hdmi-notifier.c b/drivers/video/hdmi-notifier.c
-> new file mode 100644
-> index 000000000000..f3b16552b0fe
-> --- /dev/null
-> +++ b/drivers/video/hdmi-notifier.c
-> @@ -0,0 +1,61 @@
-> +#include <linux/export.h>
-> +#include <linux/hdmi-notifier.h>
-> +#include <linux/notifier.h>
-> +#include <linux/string.h>
-> +
-> +static BLOCKING_NOTIFIER_HEAD(hdmi_notifier);
-> +
-> +int hdmi_register_notifier(struct notifier_block *nb)
-> +{
-> +	return blocking_notifier_chain_register(&hdmi_notifier, nb);
-> +}
-> +EXPORT_SYMBOL_GPL(hdmi_register_notifier);
-> +
-> +int hdmi_unregister_notifier(struct notifier_block *nb)
-> +{
-> +	return blocking_notifier_chain_unregister(&hdmi_notifier, nb);
-> +}
-> +EXPORT_SYMBOL_GPL(hdmi_unregister_notifier);
-> +
-> +void hdmi_event_connect(struct device *dev)
-> +{
-> +	struct hdmi_event_base base;
-> +
-> +	base.source = dev;
-> +
-> +	blocking_notifier_call_chain(&hdmi_notifier, HDMI_CONNECTED, &base);
-> +}
-> +EXPORT_SYMBOL_GPL(hdmi_event_connect);
-> +
-> +void hdmi_event_disconnect(struct device *dev)
-> +{
-> +	struct hdmi_event_base base;
-> +
-> +	base.source = dev;
-> +
-> +	blocking_notifier_call_chain(&hdmi_notifier, HDMI_DISCONNECTED, &base);
-> +}
-> +EXPORT_SYMBOL_GPL(hdmi_event_disconnect);
-> +
-> +void hdmi_event_new_edid(struct device *dev, const void *edid, size_t size)
-> +{
-> +	struct hdmi_event_new_edid new_edid;
-> +
-> +	new_edid.base.source = dev;
-> +	new_edid.edid = edid;
-> +	new_edid.size = size;
-> +
-> +	blocking_notifier_call_chain(&hdmi_notifier, HDMI_NEW_EDID, &new_edid);
-> +}
-> +EXPORT_SYMBOL_GPL(hdmi_event_new_edid);
-> +
-> +void hdmi_event_new_eld(struct device *dev, const u8 eld[128])
-> +{
-> +	struct hdmi_event_new_eld new_eld;
-> +
-> +	new_eld.base.source = dev;
-> +	memcpy(new_eld.eld, eld, sizeof(new_eld.eld));
-> +
-> +	blocking_notifier_call_chain(&hdmi_notifier, HDMI_NEW_ELD, &new_eld);
-> +}
-> +EXPORT_SYMBOL_GPL(hdmi_event_new_eld);
-> diff --git a/include/linux/hdmi-notifier.h b/include/linux/hdmi-notifier.h
-> new file mode 100644
-> index 000000000000..5fb710e5d68a
-> --- /dev/null
-> +++ b/include/linux/hdmi-notifier.h
-> @@ -0,0 +1,44 @@
-> +#ifndef LINUX_HDMI_NOTIFIER_H
-> +#define LINUX_HDMI_NOTIFIER_H
-> +
-> +#include <linux/types.h>
-> +
-> +enum {
-> +	HDMI_CONNECTED,
-> +	HDMI_DISCONNECTED,
-> +	HDMI_NEW_EDID,
-> +	HDMI_NEW_ELD,
-> +};
-> +
-> +struct hdmi_event_base {
-> +	struct device *source;
-> +};
-> +
-> +struct hdmi_event_new_edid {
-> +	struct hdmi_event_base base;
-> +	const void *edid;
-> +	size_t size;
-> +};
-> +
-> +struct hdmi_event_new_eld {
-> +	struct hdmi_event_base base;
-> +	unsigned char eld[128];
-> +};
-> +
-> +union hdmi_event {
-> +	struct hdmi_event_base base;
-> +	struct hdmi_event_new_edid edid;
-> +	struct hdmi_event_new_eld eld;
-> +};
-> +
-> +struct notifier_block;
-> +
-> +int hdmi_register_notifier(struct notifier_block *nb);
-> +int hdmi_unregister_notifier(struct notifier_block *nb);
-> +
-> +void hdmi_event_connect(struct device *dev);
-> +void hdmi_event_disconnect(struct device *dev);
-> +void hdmi_event_new_edid(struct device *dev, const void *edid, size_t size);
-> +void hdmi_event_new_eld(struct device *dev, const u8 eld[128]);
-> +
-> +#endif
->
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index bbed373f4ab7..039db634a693 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -352,6 +352,31 @@ alternative_endif
+ 	.endm
+ 
+ /*
++ * TTBR0_EL1 update macro.
++ */
++	.macro	cpu_set_ttbr0, ttbr0, errata = 0, ret = 0
++	msr	ttbr0_el1, \ttbr0
++	isb
++	.if	\errata
++alternative_if_not ARM64_WORKAROUND_CAVIUM_27456
++	.if	\ret
++	ret
++	.endif
++	nop
++	nop
++	nop
++alternative_else
++	ic	iallu
++	dsb	nsh
++	isb
++	.if	\ret
++	ret
++	.endif
++alternative_endif
++	.endif
++	.endm
++
++/*
+  * User access enabling/disabling macros.
+  */
+ 	.macro	uaccess_disable, tmp1
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 5bb61de23201..442ade0f44eb 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -25,8 +25,6 @@
+ #include <asm/hwcap.h>
+ #include <asm/pgtable.h>
+ #include <asm/pgtable-hwdef.h>
+-#include <asm/cpufeature.h>
+-#include <asm/alternative.h>
+ 
+ #ifdef CONFIG_ARM64_64K_PAGES
+ #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
+@@ -123,19 +121,7 @@ ENDPROC(cpu_do_resume)
+ ENTRY(cpu_do_switch_mm)
+ 	mmid	x1, x1				// get mm->context.id
+ 	bfi	x0, x1, #48, #16		// set the ASID
+-	msr	ttbr0_el1, x0			// set TTBR0
+-	isb
+-alternative_if_not ARM64_WORKAROUND_CAVIUM_27456
+-	ret
+-	nop
+-	nop
+-	nop
+-alternative_else
+-	ic	iallu
+-	dsb	nsh
+-	isb
+-	ret
+-alternative_endif
++	cpu_set_ttbr0 x0, errata = 1, ret = 1
+ ENDPROC(cpu_do_switch_mm)
+ 
+ 	.pushsection ".idmap.text", "ax"
