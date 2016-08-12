@@ -1,127 +1,109 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Fri, 12 Aug 2016 02:24:03 +0200
-Subject: [RFC PATCH 6/8] PM / Domains: Remove a provider by referencing
- the data pointer
-In-Reply-To: <18ad702c-83fe-fd6d-89ae-57e6f2715860@nvidia.com>
-References: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
- <1457090634-14785-7-git-send-email-jonathanh@nvidia.com>
- <CAPDyKFpLcnLvQmpQgzhOExq67XrbaW9Nf1Gk2Y+CND8dn_cmyA@mail.gmail.com>
- <5769455C.9010809@nvidia.com>
- <CAPDyKFovC07Z9y-4RQ4MKGtjJx5w1D8er3Fv-8HF2qyTKgVViQ@mail.gmail.com>
- <18ad702c-83fe-fd6d-89ae-57e6f2715860@nvidia.com>
-Message-ID: <CAJZ5v0j9axtg2vhyxb-5sYSXPCEb+xu=d9tKYdA4g6aHASthNQ@mail.gmail.com>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Fri, 12 Aug 2016 10:03:42 +0930
+Subject: [PATCH 02/12] pinctrl: Add core pinctrl support for Aspeed SoCs
+In-Reply-To: <CACRpkdZ0p+jNHBV1AqhVWQ2Q8RRrHVfsAz3XU3_+f6My22=Zxg@mail.gmail.com>
+References: <1468994313-13538-1-git-send-email-andrew@aj.id.au>
+ <1468994313-13538-3-git-send-email-andrew@aj.id.au>
+ <CACRpkdZ0p+jNHBV1AqhVWQ2Q8RRrHVfsAz3XU3_+f6My22=Zxg@mail.gmail.com>
+Message-ID: <1470962022.27272.68.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2016 at 6:39 PM, Jon Hunter <jonathanh@nvidia.com> wrote:
->
-> On 05/08/16 12:55, Ulf Hansson wrote:
->> On 21 June 2016 at 15:47, Jon Hunter <jonathanh@nvidia.com> wrote:
->>>
->>> On 15/06/16 15:38, Ulf Hansson wrote:
->>>> On 4 March 2016 at 12:23, Jon Hunter <jonathanh@nvidia.com> wrote:
->>>>> To remove a PM domain from the system, it is necessary to ensure
->>>>> that any PM domain providers associated with the PM domain have
->>>>> been removed. Otherwise it could be possible to obtain a pointer
->>>>> to a PM domain structure that has been removed.
->>>>>
->>>>> PM domains now have a reference to the pointer for the PM domain
->>>>> provider's data variable. Add a function so that a PM domain can
->>>>> remove a PM domain provider by referencing the data pointer.
->>
->>
->>>>>
->>>>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
->>>>> ---
->>>>>  drivers/base/power/domain.c | 24 ++++++++++++++++++++++++
->>>>>  include/linux/pm_domain.h   |  2 ++
->>>>>  2 files changed, 26 insertions(+)
->>>>>
->>>>> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
->>>>> index 72055fef6256..438885f2455f 100644
->>>>> --- a/drivers/base/power/domain.c
->>>>> +++ b/drivers/base/power/domain.c
->>>>> @@ -1738,6 +1738,30 @@ void of_genpd_del_provider(struct device_node *np)
->>>>>  EXPORT_SYMBOL_GPL(of_genpd_del_provider);
->>>>>
->>>>>  /**
->>>>> + * of_genpd_del_provider_by_data() - Remove a registered PM domain provider
->>>>> + * @data: Pointer to the data associated with the PM domain provider
->>>>> + *
->>>>> + * Look up a PM domain provider based upon a pointer to it's data and
->>>>> + * remove the PM domain provider from the list of providers.
->>>>> + */
->>>>> +void of_genpd_del_provider_by_data(void *data)
->>>>> +{
->>>>> +       struct of_genpd_provider *c, *cp;
->>>>> +
->>>>> +       mutex_lock(&of_genpd_mutex);
->>>>> +       list_for_each_entry_safe(cp, c, &of_genpd_providers, link) {
->>>>> +               if (cp->data == data) {
->>>>> +                       list_del(&cp->link);
->>>>> +                       of_node_put(cp->node);
->>>>> +                       kfree(cp);
->>>>> +                       break;
->>>>> +               }
->>>>> +       }
->>>>> +       mutex_unlock(&of_genpd_mutex);
->>>>> +}
->>>>> +EXPORT_SYMBOL_GPL(of_genpd_del_provider_by_data);
->>>>> +
->>>>> +/**
->>>>>   * of_genpd_get_from_provider() - Look-up PM domain
->>>>>   * @genpdspec: OF phandle args to use for look-up
->>>>>   *
->>>>> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
->>>>> index bed84413546f..7b7921a65cb0 100644
->>>>> --- a/include/linux/pm_domain.h
->>>>> +++ b/include/linux/pm_domain.h
->>>>> @@ -199,6 +199,7 @@ int of_genpd_add_provider_simple(struct device_node *np,
->>>>>  int of_genpd_add_provider_onecell(struct device_node *np,
->>>>>                                   struct genpd_onecell_data *data);
->>>>>  void of_genpd_del_provider(struct device_node *np);
->>>>
->>>> There's currently only one user of of_genpd_del_provider().
->>>>
->>>> Could this patch just convert that user to the new API, so we don't
->>>> need to keep both the legacy and new one?
->>>>
->>>> I guess we could then just stick to the name "of_genpd_del_provider()".
->>>
->>> I had a look at this and to do that we would end up with
->>> of_genpd_del_provider(struct device_node *np, void *data) where the user
->>> should only pass one of the arguments. It seems a bit odd. However,
->>> unless I have forgotten something, I wonder if we should just make
->>> of_genpd_del_provider_by_name() a local function and not export this at
->>> all? It seems more natural for users to delete a provider by the
->>> device_node than by name rather than the data argument.
->>>
->>> The only problem I see with making of_genpd_del_provider_by_name() local
->>> is that I need to add a prototype for the function at the top of the
->>> domain.c source file so that it builds because __pm_genpd_remove() is
->>> defined above it. Yes I could move __pm_genpd_remove() to the bottom of
->>> the file but then it is not located next to pm_genpd_init() which seems odd.
->>>
->>> Let me know what you think.
->>
->> Sorry for delay! I have now looked into this in more detail.
->
-> No problem. Thanks!
->
->> When an genpd provider is added today, it's supposed to get a
->> corresponding *unique* OF device node associated with it, right!?
->>
->> If we store this OF device node from the provider in the struct
->> generic_pm_domain, instead of the "provider_data pointer", we wouldn't
->> need to the add of_genpd_del_provider_by_data() at all. Because we can
->> use the currently available of_genpd_del_provider(), right!?
->>
->> Or what am I missing? :-)
+On Thu, 2016-08-11 at 10:41 +0200, Linus Walleij wrote:
+> On Wed, Jul 20, 2016 at 7:58 AM, Andrew Jeffery <andrew@aj.id.au> wrote:
+> 
+> > 
+> > --- a/arch/arm/mach-aspeed/Kconfig
+> > +++ b/arch/arm/mach-aspeed/Kconfig
+> > @@ -5,6 +5,7 @@ menuconfig ARCH_ASPEED
+> > ????????select WATCHDOG
+> > ????????select ASPEED_WATCHDOG
+> > ????????select MOXART_TIMER
+> > +???????select PINCTRL
+> > ????????help
+> > ??????????Say Y here if you want to run your kernel on an ASpeed BMC SoC.
+> This needs to be a separate patch sent to the ARM SoC tree.
+> I don't like to merge patches to other subsystems if it can be
+> avoided.
 
-Please don't store device_node pointers in generic data structures at
-least in the code that I maintain (some other people may not care).
+Okay, I'll split it out.
 
-Store struct fwnode_handle pointers instead if you have to.
+> 
+> > 
+> > +static inline void aspeed_sig_desc_print_val(
+> > +???????????????const struct aspeed_sig_desc *desc, bool enable, u32 rv)
+> > +{
+> > +#if defined(CONFIG_DEBUG_PINCTRL)
+> > +???????pr_debug("SCU%x[0x%08x]=0x%x, got 0x%x from 0x%08x\n", desc->reg,
+> > +???????????????????????desc->mask, enable ? desc->enable : desc->disable,
+> > +???????????????????????(rv & desc->mask) >> __ffs(desc->mask), rv);
+> > +#endif
+> > +}
+> You can just use pr_debug(). CONFIG_DEBUG_PINCTRL enables
+> DEBUG_KERNEL which activates debug prints so this is a truism.
 
-Thanks,
-Rafael
+Right, I will clean that up.
+
+> 
+> > 
+> > +static bool aspeed_sig_desc_eval(const struct aspeed_sig_desc *desc,
+> > +???????????????bool enabled, struct regmap *map)
+> > +static bool aspeed_sig_expr_eval(const struct aspeed_sig_expr *expr,
+> > +???????????????bool enabled, struct regmap *map)
+> These need kerneldoc too, they are kind of hard to understand.
+
+Will do.
+
+> 
+> > 
+> > +static bool aspeed_gpio_in_exprs(const struct aspeed_sig_expr **exprs)
+> > +{
+> > +???????if (!exprs)
+> > +???????????????return false;
+> > +
+> > +???????while (*exprs) {
+> > +???????????????if (strncmp((*exprs)->signal, "GPIO", 4) == 0)
+> > +???????????????????????return true;
+> This looks a bit fragile and hard to debug. Do you have some better
+> idea of how to do this but not resort to string comparison?
+
+Yes, this is a little unfortunate. GPIO is not always a pin's lowest
+priority function (e.g. the RGMII/RMII pins), so this makes the GPIO
+case like any other mux function: We need to know when to stop
+iterating the arrays when disabling mux functions of higher priority.
+The alternative is probably to introduce another field to struct
+aspeed_sig_expr and set that as necessary, but that feels redundant if
+we keep to a consistent naming for the GPIOs.
+
+Would it be acceptable to document that requirement? Maybe that's just
+punting on the problem because it doesn't make it any less difficult to
+debug. However, the failure case is already tested in
+aspeed_gpio_request_enable() (where all aspeed_gpio_in_exprs() calls
+fail for a pin) and to make it easier to debug I can dev_warn() at that
+point.
+
+I will do both of the above as part of a v2 unless you are really keen
+for an alternative.
+
+> 
+> Apart from that it looks pretty alright, complex but such is life
+> with complex hardware.
+
+Mmm, yes. I keep hoping for a day when someone else points out that it
+actually has a simple solution so I stop dreading the explanation of
+the implementation's mechanics to others.
+
+Anyway, thanks for the review!
+
+Andrew
+
+> 
+> Yours,
+> Linus Walleij
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160812/22a0ffe5/attachment.sig>
