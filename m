@@ -1,35 +1,29 @@
 From: fabf@skynet.be (Fabian Frederick)
-Date: Fri, 12 Aug 2016 23:05:07 +0200
-Subject: [RFC linux-next] ARM: clps711x: update defconfig
-Message-ID: <1471035907-8856-1-git-send-email-fabf@skynet.be>
+Date: Fri, 12 Aug 2016 23:28:55 +0200
+Subject: [PATCH 1/1 linux-next] ARM: imx: remove platform-mxc_rnga
+Message-ID: <1471037335-11149-1-git-send-email-fabf@skynet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sync defconfig to commit 4a56f46a7dc6
-("ARM: clps711x: Remove boards support")
-
-or maybe we could just remove it ?
+According to commit c9ee94965dce
+("ARM: imx: deconstruct mxc_rnga initialization")
 
 Signed-off-by: Fabian Frederick <fabf@skynet.be>
 ---
- arch/arm/configs/clps711x_defconfig | 5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/mach-imx/devices/Makefile | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/configs/clps711x_defconfig b/arch/arm/configs/clps711x_defconfig
-index fc105c9..64a0ad6 100644
---- a/arch/arm/configs/clps711x_defconfig
-+++ b/arch/arm/configs/clps711x_defconfig
-@@ -10,11 +10,6 @@ CONFIG_JUMP_LABEL=y
- CONFIG_PARTITION_ADVANCED=y
- # CONFIG_IOSCHED_CFQ is not set
- CONFIG_ARCH_CLPS711X=y
--CONFIG_ARCH_AUTCPU12=y
--CONFIG_ARCH_CDB89712=y
--CONFIG_ARCH_CLEP7312=y
--CONFIG_ARCH_EDB7211=y
--CONFIG_ARCH_P720T=y
- CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
+diff --git a/arch/arm/mach-imx/devices/Makefile b/arch/arm/mach-imx/devices/Makefile
+index e5cf587..aa6cee8 100644
+--- a/arch/arm/mach-imx/devices/Makefile
++++ b/arch/arm/mach-imx/devices/Makefile
+@@ -20,7 +20,6 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_MX2_CAMERA) += platform-mx2-camera.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_EHCI) += platform-mxc-ehci.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_MMC) += platform-mxc-mmc.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_NAND) += platform-mxc_nand.o
+-obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_RNGA) += platform-mxc_rnga.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_RTC) += platform-mxc_rtc.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_W1) += platform-mxc_w1.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX) += platform-sdhci-esdhc-imx.o
 -- 
 2.8.1
