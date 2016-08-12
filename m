@@ -1,31 +1,82 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Fri, 12 Aug 2016 13:40:18 -0500
-Subject: [PATCH v3] ARM: VDSO: put RO and RO after init objects into
- proper sections
-In-Reply-To: <CAGXu5jL9=R7mASn7JJnODOUbxQ-yDi9eV-92bZHvEep38ezbdQ@mail.gmail.com>
-References: <1470989538-2953-1-git-send-email-jszhang@marvell.com>
- <CAGXu5jL9=R7mASn7JJnODOUbxQ-yDi9eV-92bZHvEep38ezbdQ@mail.gmail.com>
-Message-ID: <b2e1495f-b172-45e5-7329-016687623f3a@mentor.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 12 Aug 2016 13:45:22 -0500
+Subject: [PATCH 1/2] remoteproc: core: Add rproc OF look-up functions
+In-Reply-To: <20160812180751.GH26240@tuxbot>
+References: <20160810174049.GO26240@tuxbot>
+ <7650e5fa-f52c-1ab5-e197-8630fd7d0322@ti.com> <20160810204049.GV26240@tuxbot>
+ <f9641050-0a3f-11de-fa69-e587034e0527@ti.com> <20160810211947.GW26240@tuxbot>
+ <b1a01567-7a5d-20de-a2b5-b673b9ce67ec@ti.com> <20160811073122.GA1715@dell>
+ <05d4c9c1-79ea-bde3-e5e5-d26e6b07c916@ti.com>
+ <b1b2a510-e0cb-5d8f-9f44-48c9dd747d4d@ti.com>
+ <06f795ef-e71c-2cda-5306-5b75e0f15125@ti.com> <20160812180751.GH26240@tuxbot>
+Message-ID: <abae5c30-62ab-55c7-a144-cb8707832941@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2016 01:06 PM, Kees Cook wrote:
-> On Fri, Aug 12, 2016 at 1:12 AM, Jisheng Zhang <jszhang@marvell.com> wrote:
->> vdso_data_mapping is never modified, so mark it as const.
->>
->> vdso_total_pages, vdso_data_page, vdso_text_mapping and cntvct_ok are
->> initialized by vdso_init(), thereafter are read only.
->>
->> The fact that they are read only after init makes them candidates for
->> __ro_after_init declarations.
->>
->> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+On 08/12/2016 01:07 PM, Bjorn Andersson wrote:
+> On Fri 12 Aug 09:37 PDT 2016, Suman Anna wrote:
 > 
-> Looks great; thanks for keeping __ro_after_init in mind. :)
+>> Hi Bjorn,
+>>
+>>>> On 08/11/2016 02:31 AM, Lee Jones wrote:
+>>>>> On Wed, 10 Aug 2016, Suman Anna wrote:
+>>>>>
+>>>>>> On 08/10/2016 04:19 PM, Bjorn Andersson wrote:
+>>>>>>> On Wed 10 Aug 14:04 PDT 2016, Suman Anna wrote:
+>>>>>>>
+>>>>>>>> On 08/10/2016 03:40 PM, Bjorn Andersson wrote:
+>>>>>>>>> On Wed 10 Aug 12:37 PDT 2016, Suman Anna wrote:
+>>>>>>>>>
+>>>>>>>>>> Hi Lee, Bjorn,
+>>>>>>>>>>
+>>>>>>>>>> On 08/10/2016 12:40 PM, Bjorn Andersson wrote:
+>>>>>>>>>>> On Tue 19 Jul 08:49 PDT 2016, Lee Jones wrote:
+>>>>>>>>>>>
+>>>>>>>>>>>> - of_rproc_by_index(): look-up and obtain a reference to a rproc
+>>>>>>>>>>>>                        using the DT phandle "rprocs" and a index.
+>>>>>>>>>>>>
+>>>>>>>>>>>> - of_rproc_by_name():  lookup and obtain a reference to a rproc
+>>>>>>>>>>>>                        using the DT phandle "rprocs" and "rproc-names".
+>>>>>>>>>>>>
+>>>>>>>>>>>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+>>>>>>>>>>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>>>>>>>>>>> ---
+>>>>>>>>>>>
+>>>>>>>>>>> I'm happy with this, so I whipped up a binding document describing our
+>>>>>>>>>>> two new properties. Waiting for an opinion on that before I merge this.
+>>
+>> One last comment on this is the return code convention change on these
+>> rproc_get APIs. I am fine in general with returning ERR_PTRs, but most
+>> of the remoteproc code is using NULL checking for rproc. If you remember
+>> the discussion back during the hwspinlock DT conversion [1], Ohad
+>> preferred to return NULL, and that's why even the rproc_get_by_phandle
+>> was returning NULL. We ought to make this consistent across the board if
+>> we want to make this switch.
+>>
 > 
-> Reviewed-by: Kees Cook <keescook@chromium.org>
+> I think it makes sense to return the actual error from these functions,
+> if nothing else to keep it consistent with other frameworks.
+> 
+> The other case I see returning NULL is rproc_alloc(), which is think is
+> analog to kmalloc(), so I think that's fine to keep.
+> 
+> Luckily wkup_m3 is the only consumer of this API in the kernel today, so
+> we shouldn't have any issues wrt changing the return value here.
 
-Looks fine and nothing goes wrong with my vdso tests.  Please send it
-through Russell.
+Yeah, not worried about the consumers, I am talking about the few
+functions in remoteproc core code that do some checking like in
+rproc_del(), __rproc_boot() or rproc_report_crash(). We would need to
+modify these to use IS_ERR_OR_NULL instead of a NULL check atleast.
 
-Acked-by: Nathan Lynch <nathan_lynch@mentor.com>
+regards
+Suman
+
+> 
+>> regards
+>> Suman
+>>
+>> [1] http://marc.info/?t=138965891200008
+> 
+> Regards,
+> Bjorn
+> 
