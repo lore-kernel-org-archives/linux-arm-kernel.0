@@ -1,95 +1,58 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 12 Aug 2016 11:06:14 -0700
-Subject: [PATCH v3] ARM: VDSO: put RO and RO after init objects into
- proper sections
-In-Reply-To: <1470989538-2953-1-git-send-email-jszhang@marvell.com>
-References: <1470989538-2953-1-git-send-email-jszhang@marvell.com>
-Message-ID: <CAGXu5jL9=R7mASn7JJnODOUbxQ-yDi9eV-92bZHvEep38ezbdQ@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 12 Aug 2016 19:07:07 +0100
+Subject: [PATCH] arm64: hibernate: reduce TLB maintenance scope
+In-Reply-To: <1470651127-18386-1-git-send-email-mark.rutland@arm.com>
+References: <1470651127-18386-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <57AE104B.7010209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 12, 2016 at 1:12 AM, Jisheng Zhang <jszhang@marvell.com> wrote:
-> vdso_data_mapping is never modified, so mark it as const.
->
-> vdso_total_pages, vdso_data_page, vdso_text_mapping and cntvct_ok are
-> initialized by vdso_init(), thereafter are read only.
->
-> The fact that they are read only after init makes them candidates for
-> __ro_after_init declarations.
->
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-
-Looks great; thanks for keeping __ro_after_init in mind. :)
-
-Reviewed-by: Kees Cook <keescook@chromium.org>
-
--Kees
-
+On 08/08/16 11:12, Mark Rutland wrote:
+> In break_before_make_ttbr_switch we perform broadcast TLB maintenance
+> for the inner shareable domain, and use a DSB ISH to complete this.
+> However, at the point we execute this, secondary CPUs are either
+> physically offline, or executing code outside of the kernel. Upon
+> entering the kernel, secondary CPUs will invalidate their TLBs before
+> enabling their MMUs.
+> 
+> Thus we do not need to invalidate TLBs of other CPUs, and as with
+> idmap_cpu_replace_ttbr1 we can reduce the scope of maintenance to the
+> TLBs of the local CPU. This keeps our TLB maintenance code consistent,
+> and is a minor optimisation.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: James Morse <james.morse@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 > ---
->
-> Since v2:
->   - include <linux/cache.h> explicitly for __ro_after_init
->
-> Since v1:
->   - use __ro_after_init instead of __read_mostly
->   - apply __ro_after_init for vdso_total_pages and cntvct_ok as well
->
->  arch/arm/kernel/vdso.c | 11 ++++++-----
->  1 file changed, 6 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
-> index 994e971..bbbffe94 100644
-> --- a/arch/arm/kernel/vdso.c
-> +++ b/arch/arm/kernel/vdso.c
-> @@ -17,6 +17,7 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->
-> +#include <linux/cache.h>
->  #include <linux/elf.h>
->  #include <linux/err.h>
->  #include <linux/kernel.h>
-> @@ -39,7 +40,7 @@
->  static struct page **vdso_text_pagelist;
->
->  /* Total number of pages needed for the data and text portions of the VDSO. */
-> -unsigned int vdso_total_pages __read_mostly;
-> +unsigned int vdso_total_pages __ro_after_init;
->
->  /*
->   * The VDSO data page.
-> @@ -47,13 +48,13 @@ unsigned int vdso_total_pages __read_mostly;
->  static union vdso_data_store vdso_data_store __page_aligned_data;
->  static struct vdso_data *vdso_data = &vdso_data_store.data;
->
-> -static struct page *vdso_data_page;
-> -static struct vm_special_mapping vdso_data_mapping = {
-> +static struct page *vdso_data_page __ro_after_init;
-> +static const struct vm_special_mapping vdso_data_mapping = {
->         .name = "[vvar]",
->         .pages = &vdso_data_page,
->  };
->
-> -static struct vm_special_mapping vdso_text_mapping = {
-> +static struct vm_special_mapping vdso_text_mapping __ro_after_init = {
->         .name = "[vdso]",
->  };
->
-> @@ -67,7 +68,7 @@ struct elfinfo {
->  /* Cached result of boot-time check for whether the arch timer exists,
->   * and if so, whether the virtual counter is useable.
->   */
-> -static bool cntvct_ok __read_mostly;
-> +static bool cntvct_ok __ro_after_init;
->
->  static bool __init cntvct_functional(void)
->  {
-> --
-> 2.8.1
->
+>  arch/arm64/kernel/hibernate-asm.S | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/hibernate-asm.S b/arch/arm64/kernel/hibernate-asm.S
+> index 46f29b6..7734f3e 100644
+> --- a/arch/arm64/kernel/hibernate-asm.S
+> +++ b/arch/arm64/kernel/hibernate-asm.S
+> @@ -36,8 +36,8 @@
+>  .macro break_before_make_ttbr_switch zero_page, page_table
+>  	msr	ttbr1_el1, \zero_page
+>  	isb
+> -	tlbi	vmalle1is
+> -	dsb	ish
+> +	tlbi	vmalle1
+> +	dsb	nsh
+>  	msr	ttbr1_el1, \page_table
+>  	isb
+>  .endm
+> 
 
 
+Looks like what I should have done from the beginning!
 
--- 
-Kees Cook
-Nexus Security
+Acked-by: James Morse <james.morse@arm.com>
+
+
+Thanks,
+
+
+James
