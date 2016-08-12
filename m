@@ -1,55 +1,225 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 12 Aug 2016 11:37:06 -0500
-Subject: [PATCH 1/2] remoteproc: core: Add rproc OF look-up functions
-In-Reply-To: <b1b2a510-e0cb-5d8f-9f44-48c9dd747d4d@ti.com>
-References: <20160719154905.23344-1-lee.jones@linaro.org>
- <20160810174049.GO26240@tuxbot> <7650e5fa-f52c-1ab5-e197-8630fd7d0322@ti.com>
- <20160810204049.GV26240@tuxbot> <f9641050-0a3f-11de-fa69-e587034e0527@ti.com>
- <20160810211947.GW26240@tuxbot> <b1a01567-7a5d-20de-a2b5-b673b9ce67ec@ti.com>
- <20160811073122.GA1715@dell> <05d4c9c1-79ea-bde3-e5e5-d26e6b07c916@ti.com>
- <b1b2a510-e0cb-5d8f-9f44-48c9dd747d4d@ti.com>
-Message-ID: <06f795ef-e71c-2cda-5306-5b75e0f15125@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 12 Aug 2016 17:42:35 +0100
+Subject: [PATCH V8 2/8] ACPI: Add new IORT functions to support MSI
+ domain handling
+In-Reply-To: <1470909998-16710-3-git-send-email-tn@semihalf.com>
+References: <1470909998-16710-1-git-send-email-tn@semihalf.com>
+ <1470909998-16710-3-git-send-email-tn@semihalf.com>
+Message-ID: <20160812164234.GB17734@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On Thu, Aug 11, 2016 at 12:06:32PM +0200, Tomasz Nowicki wrote:
 
->> On 08/11/2016 02:31 AM, Lee Jones wrote:
->>> On Wed, 10 Aug 2016, Suman Anna wrote:
->>>
->>>> On 08/10/2016 04:19 PM, Bjorn Andersson wrote:
->>>>> On Wed 10 Aug 14:04 PDT 2016, Suman Anna wrote:
->>>>>
->>>>>> On 08/10/2016 03:40 PM, Bjorn Andersson wrote:
->>>>>>> On Wed 10 Aug 12:37 PDT 2016, Suman Anna wrote:
->>>>>>>
->>>>>>>> Hi Lee, Bjorn,
->>>>>>>>
->>>>>>>> On 08/10/2016 12:40 PM, Bjorn Andersson wrote:
->>>>>>>>> On Tue 19 Jul 08:49 PDT 2016, Lee Jones wrote:
->>>>>>>>>
->>>>>>>>>> - of_rproc_by_index(): look-up and obtain a reference to a rproc
->>>>>>>>>>                        using the DT phandle "rprocs" and a index.
->>>>>>>>>>
->>>>>>>>>> - of_rproc_by_name():  lookup and obtain a reference to a rproc
->>>>>>>>>>                        using the DT phandle "rprocs" and "rproc-names".
->>>>>>>>>>
->>>>>>>>>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
->>>>>>>>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>>>>>>>>> ---
->>>>>>>>>
->>>>>>>>> I'm happy with this, so I whipped up a binding document describing our
->>>>>>>>> two new properties. Waiting for an opinion on that before I merge this.
+[...]
 
-One last comment on this is the return code convention change on these
-rproc_get APIs. I am fine in general with returning ERR_PTRs, but most
-of the remoteproc code is using NULL checking for rproc. If you remember
-the discussion back during the hwspinlock DT conversion [1], Ohad
-preferred to return NULL, and that's why even the rproc_get_by_phandle
-was returning NULL. We ought to make this consistent across the board if
-we want to make this switch.
+> +/**
+> + * iort_register_domain_token() - register domain token and related ITS ID
+> + * to the list from where we can get it back later on.
+> + * @trans_id: ITS ID.
+> + * @fw_node: Domain token.
+> + *
+> + * Returns: 0 on success, -ENOMEM if no memory when allocating list element
+> + */
+> +int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
+> +{
+> +	struct iort_its_msi_chip *its_msi_chip;
+> +
+> +	its_msi_chip = kzalloc(sizeof(*its_msi_chip), GFP_KERNEL);
 
-regards
-Suman
+I spotted this while reworking my ARM SMMU series, this may sleep
+and that's no good given that we call it within the acpi_probe_lock.
 
-[1] http://marc.info/?t=138965891200008
+Same goes for irq_domain_alloc_fwnode() (that we call in
+gic_v2_acpi_init()), we have got to fix this usage, I will see with
+Marc what's the best way to do it.
+
+Lorenzo
+
+> +	if (!its_msi_chip)
+> +		return -ENOMEM;
+> +
+> +	its_msi_chip->fw_node = fw_node;
+> +	its_msi_chip->translation_id = trans_id;
+> +
+> +	spin_lock(&iort_msi_chip_lock);
+> +	list_add(&its_msi_chip->list, &iort_msi_chip_list);
+> +	spin_unlock(&iort_msi_chip_lock);
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+> + * iort_deregister_domain_token() - Deregister domain token based on ITS ID
+> + * @trans_id: ITS ID.
+> + *
+> + * Returns: none.
+> + */
+> +void iort_deregister_domain_token(int trans_id)
+> +{
+> +	struct iort_its_msi_chip *its_msi_chip, *t;
+> +
+> +	spin_lock(&iort_msi_chip_lock);
+> +	list_for_each_entry_safe(its_msi_chip, t, &iort_msi_chip_list, list) {
+> +		if (its_msi_chip->translation_id == trans_id) {
+> +			list_del(&its_msi_chip->list);
+> +			kfree(its_msi_chip);
+> +			break;
+> +		}
+> +	}
+> +	spin_unlock(&iort_msi_chip_lock);
+> +}
+> +
+> +/**
+> + * iort_find_domain_token() - Find domain token based on given ITS ID
+> + * @trans_id: ITS ID.
+> + *
+> + * Returns: domain token when find on the list, NULL otherwise
+> + */
+> +struct fwnode_handle *iort_find_domain_token(int trans_id)
+> +{
+> +	struct fwnode_handle *fw_node = NULL;
+> +	struct iort_its_msi_chip *its_msi_chip;
+> +
+> +	spin_lock(&iort_msi_chip_lock);
+> +	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
+> +		if (its_msi_chip->translation_id == trans_id) {
+> +			fw_node = its_msi_chip->fw_node;
+> +			break;
+> +		}
+> +	}
+> +	spin_unlock(&iort_msi_chip_lock);
+> +
+> +	return fw_node;
+> +}
+> +
+>  static struct acpi_iort_node *
+>  iort_scan_node(enum acpi_iort_node_type type,
+>  	       iort_find_node_callback callback, void *context)
+> @@ -206,6 +285,96 @@ iort_find_dev_node(struct device *dev)
+>  			      iort_match_node_callback, &pbus->dev);
+>  }
+>  
+> +/**
+> + * iort_msi_map_rid() - Map a MSI requester ID for a device
+> + * @dev: The device for which the mapping is to be done.
+> + * @req_id: The device requester ID.
+> + *
+> + * Returns: mapped MSI RID on success, input requester ID otherwise
+> + */
+> +u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+> +{
+> +	struct acpi_iort_node *node;
+> +	u32 dev_id;
+> +
+> +	if (!iort_table)
+> +		return req_id;
+> +
+> +	node = iort_find_dev_node(dev);
+> +	if (!node) {
+> +		dev_err(dev, "can't find related IORT node\n");
+> +		return req_id;
+> +	}
+> +
+> +	iort_node_map_rid(node, req_id, &dev_id, ACPI_IORT_NODE_ITS_GROUP);
+> +	return dev_id;
+> +}
+> +
+> +/**
+> + * iort_dev_find_its_id() - Find the ITS identifier for a device
+> + * @dev: The device.
+> + * @idx: Index of the ITS identifier list.
+> + * @its_id: ITS identifier.
+> + *
+> + * Returns: 0 on success, appropriate error value otherwise
+> + */
+> +static int
+> +iort_dev_find_its_id(struct device *dev, u32 req_id, unsigned int idx,
+> +		     int *its_id)
+> +{
+> +	struct acpi_iort_its_group *its;
+> +	struct acpi_iort_node *node;
+> +
+> +	node = iort_find_dev_node(dev);
+> +	if (!node) {
+> +		dev_err(dev, "can't find related IORT node\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	node = iort_node_map_rid(node, req_id, NULL, ACPI_IORT_NODE_ITS_GROUP);
+> +	if (!node) {
+> +		dev_err(dev, "can't find related ITS node\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	/* Move to ITS specific data */
+> +	its = (struct acpi_iort_its_group *)node->node_data;
+> +	if (idx > its->its_count) {
+> +		dev_err(dev, "requested ITS ID index [%d] is greater than available [%d]\n",
+> +			idx, its->its_count);
+> +		return -ENXIO;
+> +	}
+> +
+> +	*its_id = its->identifiers[idx];
+> +	return 0;
+> +}
+> +
+> +/**
+> + * iort_get_device_domain() - Find MSI domain related to a device
+> + * @dev: The device.
+> + * @req_id: Requester ID for the device.
+> + *
+> + * Returns: the MSI domain for this device, NULL otherwise
+> + */
+> +struct irq_domain *
+> +iort_get_device_domain(struct device *dev, u32 req_id)
+> +{
+> +	static struct fwnode_handle *handle;
+> +	int its_id;
+> +
+> +	if (!iort_table)
+> +		return NULL;
+> +
+> +	if (iort_dev_find_its_id(dev, req_id, 0, &its_id))
+> +		return NULL;
+> +
+> +	handle = iort_find_domain_token(its_id);
+> +	if (!handle)
+> +		return NULL;
+> +
+> +	return irq_find_matching_fwnode(handle, DOMAIN_BUS_PCI_MSI);
+> +}
+> +
+>  void __init iort_table_detect(void)
+>  {
+>  	acpi_status status;
+> diff --git a/include/linux/iort.h b/include/linux/iort.h
+> index cde6809..d7daba1 100644
+> --- a/include/linux/iort.h
+> +++ b/include/linux/iort.h
+> @@ -20,11 +20,22 @@
+>  #define __IORT_H__
+>  
+>  #include <linux/acpi.h>
+> +#include <linux/fwnode.h>
+> +#include <linux/irqdomain.h>
+>  
+> +int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
+> +void iort_deregister_domain_token(int trans_id);
+> +struct fwnode_handle *iort_find_domain_token(int trans_id);
+>  #ifdef CONFIG_IORT_TABLE
+>  void iort_table_detect(void);
+> +u32 iort_msi_map_rid(struct device *dev, u32 req_id);
+> +struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
+>  #else
+>  static inline void iort_table_detect(void) { }
+> +static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+> +{ return req_id; }
+> +static inline struct irq_domain *
+> +iort_get_device_domain(struct device *dev, u32 req_id) { return NULL; }
+>  #endif
+>  
+>  #endif /* __IORT_H__ */
+> -- 
+> 1.9.1
+> 
