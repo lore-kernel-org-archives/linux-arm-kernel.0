@@ -1,36 +1,31 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Aug 2016 13:33:14 +0100
-Subject: [PATCH] arm: add an option for erratum 657417
-In-Reply-To: <1470989957-23671-1-git-send-email-npiggin@gmail.com>
-References: <1470989957-23671-1-git-send-email-npiggin@gmail.com>
-Message-ID: <20160812123314.GX1041@n2100.armlinux.org.uk>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 12 Aug 2016 14:34:02 +0200
+Subject: [PATCH 1/2] ARM: exynos_defconfig: Enable SECCOMP
+Message-ID: <1471005243-6409-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 12, 2016 at 06:19:17PM +1000, Nicholas Piggin wrote:
-> This patch adds an option which defaults to "y" in cases where we
-> could possibly be running Cortex A8 and using Thumb2 instructions.
-> In reality the workaround might not be required at all for the kernel
-> if virtual instruction memory is linear in physical memory.
+Systemd already supports seccomp.  It seems some distros are building
+systemd with seccomp, e.g. Arch on ARM, thus leading to boot errors:
 
-Hmm.
+systemd-logind.service: Failed at step SECCOMP spawning /usr/lib/systemd/systemd-logind: Invalid argument
 
-The main kernel image is guaranteed to be contiguous in physical memory
-for all sorts of reasons, so this really isn't a concern for the kernel
-itself.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/configs/exynos_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Modules, however, are a different matter, as they are mapped in using
-individual pages, and are most likely to be non-contiguous in physical
-memory.  The kernel's module linker knows nothing about this errata,
-so it'll generally just fix up the relocations in the most basic of
-ways.
-
-So, I think we should always use this --no-fix-cortex-a8 option where
-the linker supports it irrespective of whether we're running on a core
-needing this workaround, but we probably need to fix the kernel module
-linker to know about this.
-
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 81862a77dddf..5476be3be686 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -17,6 +17,7 @@ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+ CONFIG_CMA=y
++CONFIG_SECCOMP=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
