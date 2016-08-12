@@ -1,34 +1,102 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 12 Aug 2016 14:02:47 +0300
-Subject: [GIT PULL] omap-gpmc fixes for v4.8-rc1
-Message-ID: <a2bf20d0-c446-2fab-5de2-33636eab79a7@ti.com>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Fri, 12 Aug 2016 14:07:14 +0300
+Subject: [PATCH v9 1/4] of/serial: move earlycon early_param handling to serial
+In-Reply-To: <201608120110.sf8xniKf%fengguang.wu@intel.com>
+References: <201608120110.sf8xniKf%fengguang.wu@intel.com>
+Message-ID: <20160812110717.12351-1-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd/Olof,
+From: Leif Lindholm <leif.lindholm@linaro.org>
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+We have multiple "earlycon" early_param handlers - merge the DT one into
+the main earlycon one.  It's a cleanup that also will be useful
+to defer setting up DT console until ACPI/DT decision is made.
 
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+Rename the exported function to avoid clashing with the function from
+arch/microblaze/kernel/prom.c
 
-are available in the git repository at:
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+Tested-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ drivers/of/fdt.c              | 11 +----------
+ drivers/tty/serial/earlycon.c |  2 +-
+ include/linux/of_fdt.h        |  3 +++
+ 3 files changed, 5 insertions(+), 11 deletions(-)
 
-  https://github.com/rogerq/linux.git tags/gpmc-omap-v4.8-rc1
-
-for you to fetch changes up to 23540d6e2f3193b946c4de43e3f9654fa6d23fe7:
-
-  memory: omap-gpmc: allow probe of child nodes to fail (2016-08-08 11:18:40 +0300)
-
-----------------------------------------------------------------
-OMAP-GPMC: fixes for v4.8-rc1
-
-* Allow other children of GPMC to probe even if any child fails.
-This fixes problem on Overo boards where networking device child
-doesn't probe due to broken NAND child.
-
-----------------------------------------------------------------
-Johan Hovold (1):
-      memory: omap-gpmc: allow probe of child nodes to fail
-
- drivers/memory/omap-gpmc.c | 21 +++++++--------------
- 1 file changed, 7 insertions(+), 14 deletions(-)
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index 55f1b83..741cac53 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -924,7 +924,7 @@ static inline void early_init_dt_check_for_initrd(unsigned long node)
+ 
+ #ifdef CONFIG_SERIAL_EARLYCON
+ 
+-static int __init early_init_dt_scan_chosen_serial(void)
++int __init early_init_dt_scan_chosen_stdout(void)
+ {
+ 	int offset;
+ 	const char *p, *q, *options = NULL;
+@@ -968,15 +968,6 @@ static int __init early_init_dt_scan_chosen_serial(void)
+ 	}
+ 	return -ENODEV;
+ }
+-
+-static int __init setup_of_earlycon(char *buf)
+-{
+-	if (buf)
+-		return 0;
+-
+-	return early_init_dt_scan_chosen_serial();
+-}
+-early_param("earlycon", setup_of_earlycon);
+ #endif
+ 
+ /**
+diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+index 067783f..7aae655 100644
+--- a/drivers/tty/serial/earlycon.c
++++ b/drivers/tty/serial/earlycon.c
+@@ -209,7 +209,7 @@ static int __init param_setup_earlycon(char *buf)
+ 	 * don't generate a warning from parse_early_params() in that case
+ 	 */
+ 	if (!buf || !buf[0])
+-		return 0;
++		return early_init_dt_scan_chosen_stdout();
+ 
+ 	err = setup_earlycon(buf);
+ 	if (err == -ENOENT || err == -EALREADY)
+diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+index 26c3302..4341f32 100644
+--- a/include/linux/of_fdt.h
++++ b/include/linux/of_fdt.h
+@@ -14,6 +14,7 @@
+ 
+ #include <linux/types.h>
+ #include <linux/init.h>
++#include <linux/errno.h>
+ 
+ /* Definitions used by the flattened device tree */
+ #define OF_DT_HEADER		0xd00dfeed	/* marker */
+@@ -66,6 +67,7 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
+ 				     int depth, void *data);
+ extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
+ 				     int depth, void *data);
++extern int early_init_dt_scan_chosen_stdout(void);
+ extern void early_init_fdt_scan_reserved_mem(void);
+ extern void early_init_fdt_reserve_self(void);
+ extern void early_init_dt_add_memory_arch(u64 base, u64 size);
+@@ -94,6 +96,7 @@ extern void early_get_first_memblock_info(void *, phys_addr_t *);
+ extern u64 of_flat_dt_translate_address(unsigned long node);
+ extern void of_fdt_limit_memory(int limit);
+ #else /* CONFIG_OF_FLATTREE */
++static inline int early_init_dt_scan_chosen_stdout(void) { return -ENODEV; }
+ static inline void early_init_fdt_scan_reserved_mem(void) {}
+ static inline void early_init_fdt_reserve_self(void) {}
+ static inline const char *of_flat_dt_get_machine_name(void) { return NULL; }
+-- 
+2.9.2
