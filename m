@@ -1,35 +1,40 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Fri, 12 Aug 2016 16:51:40 +0530
-Subject: [PATCH v2 17/21] net: thunderx: Don't set mac address for secondary
- Qset VFs
+Date: Fri, 12 Aug 2016 16:51:43 +0530
+Subject: [PATCH v2 20/21] net: thunderx: Use netdev_rss_key_fill() helper
 In-Reply-To: <1471000904-21715-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1471000904-21715-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1471000904-21715-18-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1471000904-21715-21-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sunil Goutham <sgoutham@cavium.com>
 
-Set MAC addresses only for primary VF's and don't for
-secondary VFs.
+Use standard API to generate a random RSS hash key
+on every boot.
 
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nicvf_main.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c | 8 +-------
+ 1 file changed, 1 insertion(+), 7 deletions(-)
 
 diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index dd57361..0b68f2b 100644
+index eb48d33..06c014e 100644
 --- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
 +++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -1209,7 +1209,7 @@ int nicvf_open(struct net_device *netdev)
- 	}
+@@ -366,13 +366,7 @@ static int nicvf_rss_init(struct nicvf *nic)
  
- 	/* Check if we got MAC address from PF or else generate a radom MAC */
--	if (is_zero_ether_addr(netdev->dev_addr)) {
-+	if (!nic->sqs_mode && is_zero_ether_addr(netdev->dev_addr)) {
- 		eth_hw_addr_random(netdev);
- 		nicvf_hw_set_mac_addr(nic, netdev);
- 	}
+ 	rss->enable = true;
+ 
+-	/* Using the HW reset value for now */
+-	rss->key[0] = 0xFEED0BADFEED0BADULL;
+-	rss->key[1] = 0xFEED0BADFEED0BADULL;
+-	rss->key[2] = 0xFEED0BADFEED0BADULL;
+-	rss->key[3] = 0xFEED0BADFEED0BADULL;
+-	rss->key[4] = 0xFEED0BADFEED0BADULL;
+-
++	netdev_rss_key_fill(rss->key, RSS_HASH_KEY_SIZE * sizeof(u64));
+ 	nicvf_set_rss_key(nic);
+ 
+ 	rss->cfg = RSS_IP_HASH_ENA | RSS_TCP_HASH_ENA | RSS_UDP_HASH_ENA;
 -- 
 2.7.4
