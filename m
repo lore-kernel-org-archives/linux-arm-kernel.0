@@ -1,32 +1,49 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 12 Aug 2016 11:13:54 +0200
-Subject: [Patch v4 9/9] arm64: Update device tree for Layerscape SoCs
-In-Reply-To: <1470780000-16750-1-git-send-email-york.sun@nxp.com>
-References: <1470780000-16750-1-git-send-email-york.sun@nxp.com>
-Message-ID: <20160812091354.GB333@nazgul.tnic>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 12 Aug 2016 18:19:39 +0900
+Subject: [PATCH v5 0/2] mmc: dw_mmc: host controller reset support
+In-Reply-To: <1470991886-22412-1-git-send-email-guodong.xu@linaro.org>
+References: <CGME20160812085218epcas1p34d84a42a931dcc09fe7a77be59065499@epcas1p3.samsung.com>
+ <1470991886-22412-1-git-send-email-guodong.xu@linaro.org>
+Message-ID: <724bc267-1f6b-0211-4645-10cc49eedd48@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2016 at 02:59:39PM -0700, York Sun wrote:
-> Add DDR memory controller nodes to enable EDAC driver.
-> 
-> Signed-off-by: York Sun <york.sun@nxp.com>
-> 
-> ---
-> Change log
->   v4: no change
->   v3: no change
->   v2: no change
-> 
->  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |  7 +++++++
->  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 14 ++++++++++++++
->  2 files changed, 21 insertions(+)
+Hi Guodong,
 
-This needs an ACK from DT people.
+On 08/12/2016 05:51 PM, Guodong Xu wrote:
+> mmc host controller registers may in abnormal state if mmc is used in
+> bootloader, eg. to load kernel from eMMC. Some controllers cann't
+> clear their registers when clk is set. They use dedicated reset
+> logics to do this.
+> 
+> In this patch, a 'resets' property is added into dw_mmc dts
+> node. When driver does parse_dt and probe, it calls reset API to
+> triiger 'reset' of dwmmc host controller. When probe error or
+> remove, it calls reset API to assert it.
+> 
+> Chip vendor's actual reset logics is implemented in reset driver, not
+> in dw_mmc code.
+> 
+> Please also refer to Documentation/devicetree/bindings/reset/reset.txt
+> 
+> Changelog:
+> v5:
+>  * rebase onto https://github.com/jh80chung/dw-mmc
+> v4:
+>  * add reset_control_assert() and usleep() before calling _deassert().
+> 
+> Guodong Xu (2):
+>   Documentation: synopsys-dw-mshc: add binding for resets
+>   mmc: dw_mmc: add reset support to dwmmc host controller
 
--- 
-Regards/Gruss,
-    Boris.
+Applied on my dw-mmc tree. Thanks!
 
-ECO tip #101: Trim your mails when you reply.
---
+Best Regards,
+Jaehoon Chung
+
+> 
+>  .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |  4 ++++
+>  drivers/mmc/host/dw_mmc.c                          | 23 +++++++++++++++++++++-
+>  include/linux/mmc/dw_mmc.h                         |  2 ++
+>  3 files changed, 28 insertions(+), 1 deletion(-)
+> 
