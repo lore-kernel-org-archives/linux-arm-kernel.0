@@ -1,75 +1,99 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 12 Aug 2016 11:07:51 -0700
-Subject: [PATCH 1/2] remoteproc: core: Add rproc OF look-up functions
-In-Reply-To: <06f795ef-e71c-2cda-5306-5b75e0f15125@ti.com>
-References: <20160810174049.GO26240@tuxbot>
- <7650e5fa-f52c-1ab5-e197-8630fd7d0322@ti.com>
- <20160810204049.GV26240@tuxbot>
- <f9641050-0a3f-11de-fa69-e587034e0527@ti.com>
- <20160810211947.GW26240@tuxbot>
- <b1a01567-7a5d-20de-a2b5-b673b9ce67ec@ti.com>
- <20160811073122.GA1715@dell>
- <05d4c9c1-79ea-bde3-e5e5-d26e6b07c916@ti.com>
- <b1b2a510-e0cb-5d8f-9f44-48c9dd747d4d@ti.com>
- <06f795ef-e71c-2cda-5306-5b75e0f15125@ti.com>
-Message-ID: <20160812180751.GH26240@tuxbot>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 12 Aug 2016 19:11:19 +0100
+Subject: [stable:PATCH 1/2] arm64: kernel: Save and restore addr_limit on
+ exception entry
+Message-ID: <1471025480-10394-1-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 12 Aug 09:37 PDT 2016, Suman Anna wrote:
+commit e19a6ee2460bdd0d0055a6029383422773f9999a upstream.
 
-> Hi Bjorn,
-> 
-> >> On 08/11/2016 02:31 AM, Lee Jones wrote:
-> >>> On Wed, 10 Aug 2016, Suman Anna wrote:
-> >>>
-> >>>> On 08/10/2016 04:19 PM, Bjorn Andersson wrote:
-> >>>>> On Wed 10 Aug 14:04 PDT 2016, Suman Anna wrote:
-> >>>>>
-> >>>>>> On 08/10/2016 03:40 PM, Bjorn Andersson wrote:
-> >>>>>>> On Wed 10 Aug 12:37 PDT 2016, Suman Anna wrote:
-> >>>>>>>
-> >>>>>>>> Hi Lee, Bjorn,
-> >>>>>>>>
-> >>>>>>>> On 08/10/2016 12:40 PM, Bjorn Andersson wrote:
-> >>>>>>>>> On Tue 19 Jul 08:49 PDT 2016, Lee Jones wrote:
-> >>>>>>>>>
-> >>>>>>>>>> - of_rproc_by_index(): look-up and obtain a reference to a rproc
-> >>>>>>>>>>                        using the DT phandle "rprocs" and a index.
-> >>>>>>>>>>
-> >>>>>>>>>> - of_rproc_by_name():  lookup and obtain a reference to a rproc
-> >>>>>>>>>>                        using the DT phandle "rprocs" and "rproc-names".
-> >>>>>>>>>>
-> >>>>>>>>>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> >>>>>>>>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >>>>>>>>>> ---
-> >>>>>>>>>
-> >>>>>>>>> I'm happy with this, so I whipped up a binding document describing our
-> >>>>>>>>> two new properties. Waiting for an opinion on that before I merge this.
-> 
-> One last comment on this is the return code convention change on these
-> rproc_get APIs. I am fine in general with returning ERR_PTRs, but most
-> of the remoteproc code is using NULL checking for rproc. If you remember
-> the discussion back during the hwspinlock DT conversion [1], Ohad
-> preferred to return NULL, and that's why even the rproc_get_by_phandle
-> was returning NULL. We ought to make this consistent across the board if
-> we want to make this switch.
-> 
+If we take an exception while at EL1, the exception handler inherits
+the original context's addr_limit value. To be consistent always reset
+addr_limit and PSTATE.UAO on (re-)entry to EL1. This prevents accidental
+re-use of the original context's addr_limit.
 
-I think it makes sense to return the actual error from these functions,
-if nothing else to keep it consistent with other frameworks.
+Based on a similar patch for arm from Russell King.
 
-The other case I see returning NULL is rproc_alloc(), which is think is
-analog to kmalloc(), so I think that's fine to keep.
+Acked-by: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: James Morse <james.morse@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+[ backport to stop perf misusing inherited addr_limit.
+  Removed code interacting with UAO and the irqstack ]
+Link: https://bugs.chromium.org/p/project-zero/issues/detail?id=822
+Signed-off-by: James Morse <james.morse@arm.com>
+Cc: <stable@vger.kernel.org> #4.1
+---
+ arch/arm64/include/asm/ptrace.h |  2 ++
+ arch/arm64/kernel/asm-offsets.c |  1 +
+ arch/arm64/kernel/entry.S       | 15 ++++++++++++++-
+ 3 files changed, 17 insertions(+), 1 deletion(-)
 
-
-Luckily wkup_m3 is the only consumer of this API in the kernel today, so
-we shouldn't have any issues wrt changing the return value here.
-
-> regards
-> Suman
-> 
-> [1] http://marc.info/?t=138965891200008
-
-Regards,
-Bjorn
+diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+index d4264bb0a409..31f7344c503b 100644
+--- a/arch/arm64/include/asm/ptrace.h
++++ b/arch/arm64/include/asm/ptrace.h
+@@ -116,6 +116,8 @@ struct pt_regs {
+ 	};
+ 	u64 orig_x0;
+ 	u64 syscallno;
++	u64 orig_addr_limit;
++	u64 unused;	// maintain 16 byte alignment
+ };
+ 
+ #define arch_has_single_step()	(1)
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index da675cc5dfae..4106ac64f95e 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -58,6 +58,7 @@ int main(void)
+   DEFINE(S_PC,			offsetof(struct pt_regs, pc));
+   DEFINE(S_ORIG_X0,		offsetof(struct pt_regs, orig_x0));
+   DEFINE(S_SYSCALLNO,		offsetof(struct pt_regs, syscallno));
++  DEFINE(S_ORIG_ADDR_LIMIT,	offsetof(struct pt_regs, orig_addr_limit));
+   DEFINE(S_FRAME_SIZE,		sizeof(struct pt_regs));
+   BLANK();
+   DEFINE(MM_CONTEXT_ID,		offsetof(struct mm_struct, context.id));
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index bddd04d031db..05012cdb555f 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -27,6 +27,7 @@
+ #include <asm/cpufeature.h>
+ #include <asm/errno.h>
+ #include <asm/esr.h>
++#include <asm/memory.h>
+ #include <asm/thread_info.h>
+ #include <asm/unistd.h>
+ 
+@@ -93,7 +94,13 @@
+ 	disable_step_tsk x19, x20		// exceptions when scheduling.
+ 	.else
+ 	add	x21, sp, #S_FRAME_SIZE
+-	.endif
++	get_thread_info tsk
++	/* Save the task's original addr_limit and set USER_DS (TASK_SIZE_64) */
++	ldr	x20, [tsk, #TI_ADDR_LIMIT]
++	str	x20, [sp, #S_ORIG_ADDR_LIMIT]
++	mov	x20, #TASK_SIZE_64
++	str	x20, [tsk, #TI_ADDR_LIMIT]
++	.endif /* \el == 0 */
+ 	mrs	x22, elr_el1
+ 	mrs	x23, spsr_el1
+ 	stp	lr, x21, [sp, #S_LR]
+@@ -117,6 +124,12 @@
+ 	.endm
+ 
+ 	.macro	kernel_exit, el, ret = 0
++	.if	\el != 0
++	/* Restore the task's original addr_limit. */
++	ldr	x20, [sp, #S_ORIG_ADDR_LIMIT]
++	str	x20, [tsk, #TI_ADDR_LIMIT]
++	.endif
++
+ 	ldp	x21, x22, [sp, #S_PC]		// load ELR, SPSR
+ 	.if	\el == 0
+ 	ct_user_enter
+-- 
+2.8.0.rc3
