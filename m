@@ -1,58 +1,37 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Sat, 13 Aug 2016 08:46:26 +0900
-Subject: [PATCH] Documentation: kprobes: Document jprobes stack copying
- limitations
-In-Reply-To: <1471033484-2709-1-git-send-email-dave.long@linaro.org>
-References: <1471033484-2709-1-git-send-email-dave.long@linaro.org>
-Message-ID: <20160813084626.06b972afea3814959ab64ebc@kernel.org>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 12 Aug 2016 16:57:53 -0700 (PDT)
+Subject: [PATCH v6 0/3] net: phy: Add xilinx gmiitorgmii converter support
+In-Reply-To: <1470808208-32133-1-git-send-email-appanad@xilinx.com>
+References: <1470808208-32133-1-git-send-email-appanad@xilinx.com>
+Message-ID: <20160812.165753.1652467337612232120.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Aug 2016 16:24:44 -0400
-David Long <dave.long@linaro.org> wrote:
+From: Kedareswara rao Appana <appana.durga.rao@xilinx.com>
+Date: Wed, 10 Aug 2016 11:20:05 +0530
 
-> From: "David A. Long" <dave.long@linaro.org>
+> The Gigabit Media Independent Interface (GMII) to Reduced Gigabit Media
+> Independent Interface (RGMII) core provides the RGMII between RGMII-compliant
+> Ethernet physical media devices (PHY) and the Gigabit Ethernet controller.
+> This core can be used in all three modes of operation(10/100/1000 Mb/s).
+> The Management Data Input/Output (MDIO) interface is used to configure the
+> Speed of operation. This core can switch dynamically between the three
+> Different speed modes by configuring the conveter register through mdio write.
 > 
-> Some architectures (i.e.: sparc64 and arm64) make reasonable partial stack
-> duplication for jprobes problematic. Document this.
+> The conveter sits b/w the MAC and external phy like below
 > 
-> Signed-off-by: David A. Long <dave.long@linaro.org>
-
-Looks good to me.
-
-Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
-
-Thanks!
-
-> ---
->  Documentation/kprobes.txt | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+> MACB <==> GMII2RGMII <==> RGMII_PHY
 > 
-> diff --git a/Documentation/kprobes.txt b/Documentation/kprobes.txt
-> index 1f9b3e2..1f6d45a 100644
-> --- a/Documentation/kprobes.txt
-> +++ b/Documentation/kprobes.txt
-> @@ -103,6 +103,16 @@ Note that the probed function's args may be passed on the stack
->  or in registers.  The jprobe will work in either case, so long as the
->  handler's prototype matches that of the probed function.
->  
-> +Note that in some architectures (e.g.: arm64 and sparc64) the stack
-> +copy is not done, as the actual location of stacked parameters may be
-> +outside of a reasonable MAX_STACK_SIZE value and because that location
-> +cannot be determined by the jprobes code. In this case the jprobes
-> +user must be careful to make certain the calling signature of the
-> +function does not cause parameters to be passed on the stack (e.g.:
-> +more than eight function arguments, an argument of more than sixteen
-> +bytes, or more than 64 bytes of argument data, depending on
-> +architecture).
-> +
->  1.3 Return Probes
->  
->  1.3.1 How Does a Return Probe Work?
-> -- 
-> 2.5.0
+>         MDIO    <========> GMII2RGMII
+> MCAB <=======>
+>                 <========> RGMII
 > 
+> Using MAC MDIO bus we can access both the converter and the external PHY.
+> We need to program the line speed of the converter during run time based
+> On the external phy negotiated speed.
+> 
+> This patch series does the below
+> ---> Add mask for Control register 10Mbps speed.
+> ---> Add support for xilinx gmiitorgmii converter.
 
-
--- 
-Masami Hiramatsu <mhiramat@kernel.org>
+Series applied, thanks.
