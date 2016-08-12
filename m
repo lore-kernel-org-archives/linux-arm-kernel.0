@@ -1,5 +1,5 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Fri, 12 Aug 2016 20:46:40 +0530
+From: robdclark@gmail.com (Rob Clark)
+Date: Fri, 12 Aug 2016 11:17:17 -0400
 Subject: [PATCH V6 0/6] iommu/msm: Add DT adaptation and generic bindings
  support
 In-Reply-To: <CAF6AEGs=m5qZJhBqBa90RS-1aO1zb3w_U=izF3MjyvMOPGSJ+A@mail.gmail.com>
@@ -13,12 +13,14 @@ References: <1465817767-9856-1-git-send-email-sricharan@codeaurora.org>
  <000501d1f4a0$325f0dd0$971d2970$@codeaurora.org>
  <CAF6AEGuagnVu_cxkHB4vjBT_=XSpHyWAkKdB8=++z-FBnvMB3A@mail.gmail.com>
  <CAF6AEGs=m5qZJhBqBa90RS-1aO1zb3w_U=izF3MjyvMOPGSJ+A@mail.gmail.com>
-Message-ID: <000701d1f4ac$8bb4f6e0$a31ee4a0$@codeaurora.org>
+Message-ID: <CAF6AEGvy4efaA4PSYNAJ3gDzxP9xX4b32uQDCfh4b=gtnqJpFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
+On Fri, Aug 12, 2016 at 10:40 AM, Rob Clark <robdclark@gmail.com> wrote:
+> On Fri, Aug 12, 2016 at 10:32 AM, Rob Clark <robdclark@gmail.com> wrote:
+>> On Fri, Aug 12, 2016 at 9:48 AM, Sricharan <sricharan@codeaurora.org> wrote:
+>>> Hi,
 >>>
 >>>>>>>>> btw, the current state, at least on linaro integration branch, fault
 >>>>>>>>> handling doesn't work so well (ie. device never gets resumed).. which
@@ -77,30 +79,35 @@ Hi,
 >> but at least we are getting a fault interrupt..
 >
 >
->ok, seems like we need:
+> ok, seems like we need:
 >
->-------
->diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
->index b09692b..f6f596f 100644
->--- a/drivers/iommu/msm_iommu.c
->+++ b/drivers/iommu/msm_iommu.c
->@@ -628,6 +628,7 @@ irqreturn_t msm_iommu_fault_handler(int irq, void *dev_id)
->             pr_err("Interesting registers:\n");
->             print_ctx_regs(iommu->base, i);
->             SET_FSR(iommu->base, i, 0x4000000F);
->+            SET_RESUME(iommu->base, i, 1);
->         }
-    ok, ya this is required for disabling the stall.
-    I can send a patch to change this.
-
->     }
->     __disable_clocks(iommu);
->-------
+> -------
+> diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
+> index b09692b..f6f596f 100644
+> --- a/drivers/iommu/msm_iommu.c
+> +++ b/drivers/iommu/msm_iommu.c
+> @@ -628,6 +628,7 @@ irqreturn_t msm_iommu_fault_handler(int irq, void *dev_id)
+>              pr_err("Interesting registers:\n");
+>              print_ctx_regs(iommu->base, i);
+>              SET_FSR(iommu->base, i, 0x4000000F);
+> +            SET_RESUME(iommu->base, i, 1);
+>          }
+>      }
+>      __disable_clocks(iommu);
+> -------
 >
->with that it seems like it kinda/mostly recovers, although there is
->still a bit of strangeness..
-  hmm ok, can test it and check something particular ?
+> with that it seems like it kinda/mostly recovers, although there is
+> still a bit of strangeness..
 
-Regards,
- Sricharan
-   
+ok, the "still a bit of strangeness" was a false alarm (unrelated
+problem).. I'll send a patch to add the SET_RESUME().
+
+And also one to wire up fault reporting.  When things go wrong we can
+get thousands of faults from the GPU, so I'd rather it hit my simpler
+ratelimited print from the fault handler ;-)
+
+BR,
+-R
+
+> BR,
+> -R
