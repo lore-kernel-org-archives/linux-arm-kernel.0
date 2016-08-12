@@ -1,45 +1,167 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Aug 2016 15:14:21 +0100
-Subject: [PATCH RFC 0/5] CEC drivers for iMX6 and TDA9950
-Message-ID: <20160812141421.GB1041@n2100.armlinux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 12 Aug 2016 15:14:55 +0100
+Subject: [PATCH RFC 1/5] video: add HDMI state notifier support
+In-Reply-To: <20160812141421.GB1041@n2100.armlinux.org.uk>
+References: <20160812141421.GB1041@n2100.armlinux.org.uk>
+Message-ID: <E1bYDEd-0004rZ-3i@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds CEC drivers for the dw-hdmi and TDA9950 devices.
+Add support for HDMI hotplug and EDID notifiers, which is used to convey
+information from HDMI drivers to their CEC and audio counterparts.
 
-dw-hdmi integrates a CEC engine in the same device as the video
-and audio blocks, and so shares the IO space and IRQ with the
-main video driver.
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/video/Kconfig         |  3 +++
+ drivers/video/Makefile        |  1 +
+ drivers/video/hdmi-notifier.c | 61 +++++++++++++++++++++++++++++++++++++++++++
+ include/linux/hdmi-notifier.h | 44 +++++++++++++++++++++++++++++++
+ 4 files changed, 109 insertions(+)
+ create mode 100644 drivers/video/hdmi-notifier.c
+ create mode 100644 include/linux/hdmi-notifier.h
 
-The TDA9950 is not only a separate CEC device in its own right,
-but can also be found on the TDA998x family of HDMI encoders as
-a separate I2C device from the main TDA998x device.
-
-The drivers are placed along-side their HDMI encoder drivers to
-keep the code for these drivers nearby.  However, if there's a
-better location (eg, a CEC drivers subdirectory) then that would
-probably be a better location for these.
-
-Both sets of drivers rely on the hdmi-notifier code, hence why
-they're part of the same patch series.
-
- drivers/gpu/drm/bridge/Kconfig            |   8 +
- drivers/gpu/drm/bridge/Makefile           |   1 +
- drivers/gpu/drm/bridge/dw-hdmi-cec.c      | 344 ++++++++++++++++++++
- drivers/gpu/drm/bridge/dw-hdmi.c          |  73 ++++-
- drivers/gpu/drm/bridge/dw-hdmi.h          |  45 ---
- drivers/gpu/drm/i2c/Kconfig               |   5 +
- drivers/gpu/drm/i2c/Makefile              |   1 +
- drivers/gpu/drm/i2c/tda9950.c             | 514 ++++++++++++++++++++++++++++++
- drivers/video/Kconfig                     |   3 +
- drivers/video/Makefile                    |   1 +
- drivers/video/hdmi-notifier.c             |  61 ++++
- include/linux/hdmi-notifier.h             |  44 +++
- include/linux/platform_data/dw_hdmi-cec.h |  16 +
- include/linux/platform_data/tda9950.h     |  15 +
- 14 files changed, 1075 insertions(+), 56 deletions(-)
-
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 3c20af999893..1ee7b9f9bb25 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -36,6 +36,9 @@ config VIDEOMODE_HELPERS
+ config HDMI
+ 	bool
+ 
++config HDMI_NOTIFIERS
++	bool
++
+ if VT
+ 	source "drivers/video/console/Kconfig"
+ endif
+diff --git a/drivers/video/Makefile b/drivers/video/Makefile
+index 9ad3c17d6456..65f564906fb4 100644
+--- a/drivers/video/Makefile
++++ b/drivers/video/Makefile
+@@ -1,5 +1,6 @@
+ obj-$(CONFIG_VGASTATE)            += vgastate.o
+ obj-$(CONFIG_HDMI)                += hdmi.o
++obj-$(CONFIG_HDMI_NOTIFIERS)      += hdmi-notifier.o
+ 
+ obj-$(CONFIG_VT)		  += console/
+ obj-$(CONFIG_LOGO)		  += logo/
+diff --git a/drivers/video/hdmi-notifier.c b/drivers/video/hdmi-notifier.c
+new file mode 100644
+index 000000000000..f3b16552b0fe
+--- /dev/null
++++ b/drivers/video/hdmi-notifier.c
+@@ -0,0 +1,61 @@
++#include <linux/export.h>
++#include <linux/hdmi-notifier.h>
++#include <linux/notifier.h>
++#include <linux/string.h>
++
++static BLOCKING_NOTIFIER_HEAD(hdmi_notifier);
++
++int hdmi_register_notifier(struct notifier_block *nb)
++{
++	return blocking_notifier_chain_register(&hdmi_notifier, nb);
++}
++EXPORT_SYMBOL_GPL(hdmi_register_notifier);
++
++int hdmi_unregister_notifier(struct notifier_block *nb)
++{
++	return blocking_notifier_chain_unregister(&hdmi_notifier, nb);
++}
++EXPORT_SYMBOL_GPL(hdmi_unregister_notifier);
++
++void hdmi_event_connect(struct device *dev)
++{
++	struct hdmi_event_base base;
++
++	base.source = dev;
++
++	blocking_notifier_call_chain(&hdmi_notifier, HDMI_CONNECTED, &base);
++}
++EXPORT_SYMBOL_GPL(hdmi_event_connect);
++
++void hdmi_event_disconnect(struct device *dev)
++{
++	struct hdmi_event_base base;
++
++	base.source = dev;
++
++	blocking_notifier_call_chain(&hdmi_notifier, HDMI_DISCONNECTED, &base);
++}
++EXPORT_SYMBOL_GPL(hdmi_event_disconnect);
++
++void hdmi_event_new_edid(struct device *dev, const void *edid, size_t size)
++{
++	struct hdmi_event_new_edid new_edid;
++
++	new_edid.base.source = dev;
++	new_edid.edid = edid;
++	new_edid.size = size;
++
++	blocking_notifier_call_chain(&hdmi_notifier, HDMI_NEW_EDID, &new_edid);
++}
++EXPORT_SYMBOL_GPL(hdmi_event_new_edid);
++
++void hdmi_event_new_eld(struct device *dev, const u8 eld[128])
++{
++	struct hdmi_event_new_eld new_eld;
++
++	new_eld.base.source = dev;
++	memcpy(new_eld.eld, eld, sizeof(new_eld.eld));
++
++	blocking_notifier_call_chain(&hdmi_notifier, HDMI_NEW_ELD, &new_eld);
++}
++EXPORT_SYMBOL_GPL(hdmi_event_new_eld);
+diff --git a/include/linux/hdmi-notifier.h b/include/linux/hdmi-notifier.h
+new file mode 100644
+index 000000000000..5fb710e5d68a
+--- /dev/null
++++ b/include/linux/hdmi-notifier.h
+@@ -0,0 +1,44 @@
++#ifndef LINUX_HDMI_NOTIFIER_H
++#define LINUX_HDMI_NOTIFIER_H
++
++#include <linux/types.h>
++
++enum {
++	HDMI_CONNECTED,
++	HDMI_DISCONNECTED,
++	HDMI_NEW_EDID,
++	HDMI_NEW_ELD,
++};
++
++struct hdmi_event_base {
++	struct device *source;
++};
++
++struct hdmi_event_new_edid {
++	struct hdmi_event_base base;
++	const void *edid;
++	size_t size;
++};
++
++struct hdmi_event_new_eld {
++	struct hdmi_event_base base;
++	unsigned char eld[128];
++};
++
++union hdmi_event {
++	struct hdmi_event_base base;
++	struct hdmi_event_new_edid edid;
++	struct hdmi_event_new_eld eld;
++};
++
++struct notifier_block;
++
++int hdmi_register_notifier(struct notifier_block *nb);
++int hdmi_unregister_notifier(struct notifier_block *nb);
++
++void hdmi_event_connect(struct device *dev);
++void hdmi_event_disconnect(struct device *dev);
++void hdmi_event_new_edid(struct device *dev, const void *edid, size_t size);
++void hdmi_event_new_eld(struct device *dev, const u8 eld[128]);
++
++#endif
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.1.0
