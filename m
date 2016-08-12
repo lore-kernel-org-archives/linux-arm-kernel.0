@@ -1,35 +1,41 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Fri, 12 Aug 2016 14:53:53 -0500
-Subject: [PATCH] ARM: dts: socfpga: Add Macnica sodia board
-In-Reply-To: <1469482208-5071-1-git-send-email-iwamatsu@nigauri.org>
-References: <1469482208-5071-1-git-send-email-iwamatsu@nigauri.org>
-Message-ID: <57AE2951.3050404@opensource.altera.com>
+From: dave.long@linaro.org (David Long)
+Date: Fri, 12 Aug 2016 16:24:44 -0400
+Subject: [PATCH] Documentation: kprobes: Document jprobes stack copying
+ limitations
+Message-ID: <1471033484-2709-1-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2016 04:30 PM, Nobuhiro Iwamatsu wrote:
-> Add support for board based on the Altera Cyclone V SoC.
-> This board has the following functions:
->     - 1 GiB of DRAM
->     - 1 Gigabit ethernet
->     - 1 SD card slot
->     - 1 USB gadget port
->     - QSPI NOR Flash
->     - I2C EEPROMs and I2C RTC
->     - DVI output
->     - Audio port
-> 
-> This commit supports without QSPI, DVI and Audio.
-> 
-> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> ---
->  arch/arm/boot/dts/Makefile                   |   1 +
->  arch/arm/boot/dts/socfpga_cyclone5_sodia.dts | 115 +++++++++++++++++++++++++++
->  2 files changed, 116 insertions(+)
->  create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
-> 
+From: "David A. Long" <dave.long@linaro.org>
 
-Applied!
+Some architectures (i.e.: sparc64 and arm64) make reasonable partial stack
+duplication for jprobes problematic. Document this.
 
-Thanks,
-Dinh
+Signed-off-by: David A. Long <dave.long@linaro.org>
+---
+ Documentation/kprobes.txt | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/Documentation/kprobes.txt b/Documentation/kprobes.txt
+index 1f9b3e2..1f6d45a 100644
+--- a/Documentation/kprobes.txt
++++ b/Documentation/kprobes.txt
+@@ -103,6 +103,16 @@ Note that the probed function's args may be passed on the stack
+ or in registers.  The jprobe will work in either case, so long as the
+ handler's prototype matches that of the probed function.
+ 
++Note that in some architectures (e.g.: arm64 and sparc64) the stack
++copy is not done, as the actual location of stacked parameters may be
++outside of a reasonable MAX_STACK_SIZE value and because that location
++cannot be determined by the jprobes code. In this case the jprobes
++user must be careful to make certain the calling signature of the
++function does not cause parameters to be passed on the stack (e.g.:
++more than eight function arguments, an argument of more than sixteen
++bytes, or more than 64 bytes of argument data, depending on
++architecture).
++
+ 1.3 Return Probes
+ 
+ 1.3.1 How Does a Return Probe Work?
+-- 
+2.5.0
