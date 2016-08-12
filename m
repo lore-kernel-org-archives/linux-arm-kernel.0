@@ -1,109 +1,124 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Fri, 12 Aug 2016 10:03:42 +0930
-Subject: [PATCH 02/12] pinctrl: Add core pinctrl support for Aspeed SoCs
-In-Reply-To: <CACRpkdZ0p+jNHBV1AqhVWQ2Q8RRrHVfsAz3XU3_+f6My22=Zxg@mail.gmail.com>
-References: <1468994313-13538-1-git-send-email-andrew@aj.id.au>
- <1468994313-13538-3-git-send-email-andrew@aj.id.au>
- <CACRpkdZ0p+jNHBV1AqhVWQ2Q8RRrHVfsAz3XU3_+f6My22=Zxg@mail.gmail.com>
-Message-ID: <1470962022.27272.68.camel@aj.id.au>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 11 Aug 2016 19:35:29 -0500
+Subject: [PATCH] soc: ti: wkup_m3_ipc: switch to using remoteproc OF
+ infrastructure
+Message-ID: <20160812003529.519-1-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-08-11 at 10:41 +0200, Linus Walleij wrote:
-> On Wed, Jul 20, 2016 at 7:58 AM, Andrew Jeffery <andrew@aj.id.au> wrote:
-> 
-> > 
-> > --- a/arch/arm/mach-aspeed/Kconfig
-> > +++ b/arch/arm/mach-aspeed/Kconfig
-> > @@ -5,6 +5,7 @@ menuconfig ARCH_ASPEED
-> > ????????select WATCHDOG
-> > ????????select ASPEED_WATCHDOG
-> > ????????select MOXART_TIMER
-> > +???????select PINCTRL
-> > ????????help
-> > ??????????Say Y here if you want to run your kernel on an ASpeed BMC SoC.
-> This needs to be a separate patch sent to the ARM SoC tree.
-> I don't like to merge patches to other subsystems if it can be
-> avoided.
+The remoteproc framework has been enhanced recently to provide new
+OF API to retrieve a remoteproc handle by client drivers through a
+standard 'rprocs' property in client nodes. The wkup_m3_ipc driver
+has been using a custom 'ti,rproc' property until now, switch this
+to use this new OF infrastructure. The wkup_m3_ipc driver has been
+fixed up to provide backward compatibility for older DTBs by
+replacing the older property with the standard newer property.
 
-Okay, I'll split it out.
+The wkup_m3_ipc binding has also been updated accordingly.
 
-> 
-> > 
-> > +static inline void aspeed_sig_desc_print_val(
-> > +???????????????const struct aspeed_sig_desc *desc, bool enable, u32 rv)
-> > +{
-> > +#if defined(CONFIG_DEBUG_PINCTRL)
-> > +???????pr_debug("SCU%x[0x%08x]=0x%x, got 0x%x from 0x%08x\n", desc->reg,
-> > +???????????????????????desc->mask, enable ? desc->enable : desc->disable,
-> > +???????????????????????(rv & desc->mask) >> __ffs(desc->mask), rv);
-> > +#endif
-> > +}
-> You can just use pr_debug(). CONFIG_DEBUG_PINCTRL enables
-> DEBUG_KERNEL which activates debug prints so this is a truism.
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+This patch is based on the discussion [1] for introducing new standard
+OF API in remoteproc core series [2] and the exporting of couple of
+functions in OF base code [3].
 
-Right, I will clean that up.
+With this in place, the remoteproc core need not be looking for the
+TI specific property anymore. I will submit the DTS changes once this
+makes it to mainline.
 
-> 
-> > 
-> > +static bool aspeed_sig_desc_eval(const struct aspeed_sig_desc *desc,
-> > +???????????????bool enabled, struct regmap *map)
-> > +static bool aspeed_sig_expr_eval(const struct aspeed_sig_expr *expr,
-> > +???????????????bool enabled, struct regmap *map)
-> These need kerneldoc too, they are kind of hard to understand.
+regards
+Suman
 
-Will do.
+[1] https://patchwork.kernel.org/patch/9237767/
+[2] http://marc.info/?l=linux-kernel&m=146894341701010&w=2
+[3] https://patchwork.kernel.org/patch/9276181/
 
-> 
-> > 
-> > +static bool aspeed_gpio_in_exprs(const struct aspeed_sig_expr **exprs)
-> > +{
-> > +???????if (!exprs)
-> > +???????????????return false;
-> > +
-> > +???????while (*exprs) {
-> > +???????????????if (strncmp((*exprs)->signal, "GPIO", 4) == 0)
-> > +???????????????????????return true;
-> This looks a bit fragile and hard to debug. Do you have some better
-> idea of how to do this but not resort to string comparison?
+ .../devicetree/bindings/soc/ti/wkup_m3_ipc.txt     |  9 ++++++--
+ drivers/soc/ti/wkup_m3_ipc.c                       | 26 +++++++++++++++++++++-
+ 2 files changed, 32 insertions(+), 3 deletions(-)
 
-Yes, this is a little unfortunate. GPIO is not always a pin's lowest
-priority function (e.g. the RGMII/RMII pins), so this makes the GPIO
-case like any other mux function: We need to know when to stop
-iterating the arrays when disabling mux functions of higher priority.
-The alternative is probably to introduce another field to struct
-aspeed_sig_expr and set that as necessary, but that feels redundant if
-we keep to a consistent naming for the GPIOs.
-
-Would it be acceptable to document that requirement? Maybe that's just
-punting on the problem because it doesn't make it any less difficult to
-debug. However, the failure case is already tested in
-aspeed_gpio_request_enable() (where all aspeed_gpio_in_exprs() calls
-fail for a pin) and to make it easier to debug I can dev_warn() at that
-point.
-
-I will do both of the above as part of a v2 unless you are really keen
-for an alternative.
-
-> 
-> Apart from that it looks pretty alright, complex but such is life
-> with complex hardware.
-
-Mmm, yes. I keep hoping for a day when someone else points out that it
-actually has a simple solution so I stop dreading the explanation of
-the implementation's mechanics to others.
-
-Anyway, thanks for the review!
-
-Andrew
-
-> 
-> Yours,
-> Linus Walleij
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160812/22a0ffe5/attachment.sig>
+diff --git a/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt b/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
+index 401550487ed6..2ea7dd91acff 100644
+--- a/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
++++ b/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
+@@ -23,12 +23,17 @@ Required properties:
+ 			with the Wakeup M3 processor
+ - interrupts:		Contains the interrupt information for the wkup_m3
+ 			interrupt that signals the MPU.
+-- ti,rproc:		phandle to the wkup_m3 rproc node so the IPC driver
++- rprocs:		phandle to the wkup_m3 rproc node so the IPC driver
+ 			can boot it.
+ - mboxes:		phandles used by IPC framework to get correct mbox
+ 			channel for communication. Must point to appropriate
+ 			mbox_wkupm3 child node.
+ 
++Deprecated properties:
++----------------------
++- ti,rproc:		This property has been replaced with the "rprocs"
++			property.
++
+ Example:
+ --------
+ /* AM33xx */
+@@ -48,7 +53,7 @@ Example:
+ 				compatible = "ti,am3352-wkup-m3-ipc";
+ 				reg = <0x1324 0x24>;
+ 				interrupts = <78>;
+-				ti,rproc = <&wkup_m3>;
++				rprocs = <&wkup_m3>;
+ 				mboxes = <&mailbox &mbox_wkupm3>;
+ 			};
+ 
+diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
+index 8823cc81ae45..86085f9bf6a8 100644
+--- a/drivers/soc/ti/wkup_m3_ipc.c
++++ b/drivers/soc/ti/wkup_m3_ipc.c
+@@ -1,7 +1,7 @@
+ /*
+  * AMx3 Wkup M3 IPC driver
+  *
+- * Copyright (C) 2015 Texas Instruments, Inc.
++ * Copyright (C) 2015-2016 Texas Instruments, Inc.
+  *
+  * Dave Gerlach <d-gerlach@ti.com>
+  *
+@@ -390,6 +390,8 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	struct task_struct *task;
+ 	struct wkup_m3_ipc *m3_ipc;
++	struct property *nprop, *oprop;
++	const char nprop_name[] = "rprocs";
+ 
+ 	m3_ipc = devm_kzalloc(dev, sizeof(*m3_ipc), GFP_KERNEL);
+ 	if (!m3_ipc)
+@@ -415,6 +417,28 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++	/* provide compatibility for older DTBs using ti,rproc property */
++	nprop = of_find_property(dev->of_node, "rprocs", NULL);
++	if (!nprop) {
++		oprop = of_find_property(dev->of_node, "ti,rproc", NULL);
++		if (!oprop) {
++			dev_err(&pdev->dev, "node is missing ti,rproc property\n");
++			return -ENODEV;
++		}
++
++		nprop = kzalloc(sizeof(*nprop) + sizeof(nprop_name),
++				GFP_KERNEL);
++		if (!nprop)
++			return -ENOMEM;
++
++		nprop->name = (char *)nprop + sizeof(*nprop);
++		snprintf(nprop->name, sizeof(nprop_name), nprop_name);
++		nprop->value = oprop->value;
++		nprop->length = oprop->length;
++		of_update_property(dev->of_node, nprop);
++		of_remove_property(dev->of_node, oprop);
++	}
++
+ 	m3_ipc->mbox_client.dev = dev;
+ 	m3_ipc->mbox_client.tx_done = NULL;
+ 	m3_ipc->mbox_client.tx_prepare = NULL;
+-- 
+2.9.0
