@@ -1,73 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 12 Aug 2016 13:29:46 +0100
-Subject: Applied "ASoC: sunxi: Add bindings for sun6i to SPDIF" to the asoc
- tree
-In-Reply-To: <20160730155638.24455-2-codekipper@gmail.com>
-Message-ID: <E1bYBas-0002hU-56@debutante>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 12 Aug 2016 13:33:14 +0100
+Subject: [PATCH] arm: add an option for erratum 657417
+In-Reply-To: <1470989957-23671-1-git-send-email-npiggin@gmail.com>
+References: <1470989957-23671-1-git-send-email-npiggin@gmail.com>
+Message-ID: <20160812123314.GX1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Fri, Aug 12, 2016 at 06:19:17PM +1000, Nicholas Piggin wrote:
+> This patch adds an option which defaults to "y" in cases where we
+> could possibly be running Cortex A8 and using Thumb2 instructions.
+> In reality the workaround might not be required at all for the kernel
+> if virtual instruction memory is linear in physical memory.
 
-   ASoC: sunxi: Add bindings for sun6i to SPDIF
+Hmm.
 
-has been applied to the asoc tree at
+The main kernel image is guaranteed to be contiguous in physical memory
+for all sorts of reasons, so this really isn't a concern for the kernel
+itself.
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+Modules, however, are a different matter, as they are mapped in using
+individual pages, and are most likely to be non-contiguous in physical
+memory.  The kernel's module linker knows nothing about this errata,
+so it'll generally just fix up the relocations in the most basic of
+ways.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+So, I think we should always use this --no-fix-cortex-a8 option where
+the linker supports it irrespective of whether we're running on a core
+needing this workaround, but we probably need to fix the kernel module
+linker to know about this.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From fbb016a25dd0f4160df90bb1319e64e8209c7619 Mon Sep 17 00:00:00 2001
-From: Marcus Cooper <codekipper@gmail.com>
-Date: Sat, 30 Jul 2016 17:56:37 +0200
-Subject: [PATCH] ASoC: sunxi: Add bindings for sun6i to SPDIF
-
-The A31 SoC uses the same SPDIF block as found in earlier SoCs, but its
-reset is controlled via a separate reset controller.
-
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt b/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
-index 13503aa505a9..0230c4d20506 100644
---- a/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
-+++ b/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
-@@ -9,6 +9,7 @@ Required properties:
- 
-   - compatible		: should be one of the following:
-     - "allwinner,sun4i-a10-spdif": for the Allwinner A10 SoC
-+    - "allwinner,sun6i-a31-spdif": for the Allwinner A31 SoC
- 
-   - reg			: Offset and length of the register set for the device.
- 
-@@ -25,6 +26,8 @@ Required properties:
- 	"apb"		  clock for the spdif bus.
- 	"spdif"		  clock for spdif controller.
- 
-+  - resets		: reset specifier for the ahb reset (A31 and newer only)
-+
- Example:
- 
- spdif: spdif at 01c21000 {
 -- 
-2.8.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
