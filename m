@@ -1,40 +1,25 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 12 Aug 2016 13:26:21 -0700
-Subject: [PATCH] ARM: dts: socfpga: Add Macnica sodia board
-In-Reply-To: <57AE2951.3050404@opensource.altera.com>
-References: <1469482208-5071-1-git-send-email-iwamatsu@nigauri.org>
- <57AE2951.3050404@opensource.altera.com>
-Message-ID: <32814CCC-93D0-4D39-8CE8-89F17D742583@gmail.com>
+From: eif.int@europe.com (PROJECT & BUSINESS FUNDING LIAISON)
+Date: Fri, 12 Aug 2016 21:30:17 +0100
+Subject: Business and Project FINANCING!
+Message-ID: <mailman.34.1471033863.1636.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On August 12, 2016 12:53:53 PM MST, Dinh Nguyen <dinguyen@opensource.altera.com> wrote:
->On 07/25/2016 04:30 PM, Nobuhiro Iwamatsu wrote:
->> Add support for board based on the Altera Cyclone V SoC.
->> This board has the following functions:
->>     - 1 GiB of DRAM
->>     - 1 Gigabit ethernet
->>     - 1 SD card slot
->>     - 1 USB gadget port
->>     - QSPI NOR Flash
->>     - I2C EEPROMs and I2C RTC
->>     - DVI output
->>     - Audio port
->> 
->> This commit supports without QSPI, DVI and Audio.
->> 
->> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
->> ---
->>  arch/arm/boot/dts/Makefile                   |   1 +
->>  arch/arm/boot/dts/socfpga_cyclone5_sodia.dts | 115
->+++++++++++++++++++++++++++
->>  2 files changed, 116 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
->> 
->
->Applied!
+ARE YOU LOOKING TO START A NEW BUSINESS?
+ARE YOU LOOKING TO DEVELOP AN EXISTING BUSINESS?
+ARE YOU LOOKING FOR FINANCE FOR A PROJECT OR BUSINESS?
+ARE YOU LOOKING SEEKING FINANCE FOR A REAL-ESTATE DEVELOPMENT?
+ARE YOU SEEKING FINANCE TO PURCHASE OR INVEST IN PROPERTIES?
+OR YOU SEEK A 100% BUSINESS/PROJECT PARTNERSHIP INVESTOR?
 
-This DTS still has Ethernet PHY properties (skew et al.) that are at the Ethernet MAC node level while they should be at the Ethetnet PHY node level, it is not like you tripped over that before..
+We?re a marketplace that connects established businesses looking to borrow, with people and other investors who want to lend. By cutting out the costs and complexity of dealing with banks, you can get an affordable loan for your business in just one week. As active Investors and Financiers in sectors and geographies that hold potential and tangible returns, we work in partnership with a number of world-class organizations with a combined International pool of nearly Half a Trillion in available Liquidity.
 
--- 
-Florian
+We have a confirmed Cash Backed Financial Facility ready to be invested only in your country. The Board of Directors of the Investment Institution today approved EUR 9.4 billion of new financing for 56 projects across Europe and around the world. This include more than EUR 2.8 billion for new loans for projects backed by guarantee for Strategic Investments.
+
+If you have a viable project or business requiring financing, do contact me with SERIOUS ENQUIRIES ONLY on email business-rbs at europe.com providing us with your full names and contact telephone number for an assessment.
+
+The Senior Consultant
+BUSINESS RBS
+125 Old Broad Street
+EC2N 1AR London
+business-rbs at europe.com 
