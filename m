@@ -1,95 +1,42 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 12 Aug 2016 17:25:52 +0100
-Subject: [PATCH 1/5] bus: arm-ccn: Fix PMU handling of MN
+Date: Fri, 12 Aug 2016 17:25:53 +0100
+Subject: [PATCH 2/5] bus: arm-ccn: Do not attempt to configure XPs for cycle
+ counter
 In-Reply-To: <1471019156-5485-1-git-send-email-pawel.moll@arm.com>
 References: <1471019156-5485-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1471019156-5485-2-git-send-email-pawel.moll@arm.com>
+Message-ID: <1471019156-5485-3-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "Miscellaneous Node" fell through cracks of node initialisation,
-as its ID is shared with HN-I.
+Fuzzing the CCN perf driver revealed a small but definitely dangerous
+mistake in the event setup code. When a cycle counter is requested, the
+driver should not reconfigure the events bus at all, otherwise it will
+corrupt (in most but the simplest cases) its configuration and may end
+up accessing XP array out of its bounds.
 
-This patch treats MN as a special case (which it is), adding separate
-validation check for it and pre-defining the node ID in relevant events
-descriptions. That way one can simply run:
-
-	# perf stat -a -e ccn/mn_ecbarrier/ <workload>
-
-Additionally, direction in the MN pseudo-events XP watchpoint
-definitions is corrected to be "TX" (1) as they are defined from the
-crosspoint point of view (thus barriers are transmitted from XP to MN).
-
+Reported-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
 Cc: stable at vger.kernel.org # 3.17+
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- drivers/bus/arm-ccn.c | 19 ++++++++++++++++---
- 1 file changed, 16 insertions(+), 3 deletions(-)
+ drivers/bus/arm-ccn.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-index 97a9185..a11b9bb 100644
+index a11b9bb..9bbb0ab 100644
 --- a/drivers/bus/arm-ccn.c
 +++ b/drivers/bus/arm-ccn.c
-@@ -187,6 +187,7 @@ struct arm_ccn {
+@@ -897,6 +897,10 @@ static void arm_ccn_pmu_xp_dt_config(struct perf_event *event, int enable)
  	struct arm_ccn_component *xp;
+ 	u32 val, dt_cfg;
  
- 	struct arm_ccn_dt dt;
-+	int mn_id;
- };
- 
- static DEFINE_MUTEX(arm_ccn_mutex);
-@@ -328,6 +329,7 @@ struct arm_ccn_pmu_event {
- static ssize_t arm_ccn_pmu_event_show(struct device *dev,
- 		struct device_attribute *attr, char *buf)
- {
-+	struct arm_ccn *ccn = pmu_to_arm_ccn(dev_get_drvdata(dev));
- 	struct arm_ccn_pmu_event *event = container_of(attr,
- 			struct arm_ccn_pmu_event, attr);
- 	ssize_t res;
-@@ -354,6 +356,9 @@ static ssize_t arm_ccn_pmu_event_show(struct device *dev,
- 			res += snprintf(buf + res, PAGE_SIZE - res,
- 					",cmp_l=?,cmp_h=?,mask=?");
- 		break;
-+	case CCN_TYPE_MN:
-+		res += snprintf(buf + res, PAGE_SIZE - res, ",node=%d", ccn->mn_id);
-+		break;
- 	default:
- 		res += snprintf(buf + res, PAGE_SIZE - res, ",node=?");
- 		break;
-@@ -383,9 +388,9 @@ static umode_t arm_ccn_pmu_events_is_visible(struct kobject *kobj,
- }
- 
- static struct arm_ccn_pmu_event arm_ccn_pmu_events[] = {
--	CCN_EVENT_MN(eobarrier, "dir=0,vc=0,cmp_h=0x1c00", CCN_IDX_MASK_OPCODE),
--	CCN_EVENT_MN(ecbarrier, "dir=0,vc=0,cmp_h=0x1e00", CCN_IDX_MASK_OPCODE),
--	CCN_EVENT_MN(dvmop, "dir=0,vc=0,cmp_h=0x2800", CCN_IDX_MASK_OPCODE),
-+	CCN_EVENT_MN(eobarrier, "dir=1,vc=0,cmp_h=0x1c00", CCN_IDX_MASK_OPCODE),
-+	CCN_EVENT_MN(ecbarrier, "dir=1,vc=0,cmp_h=0x1e00", CCN_IDX_MASK_OPCODE),
-+	CCN_EVENT_MN(dvmop, "dir=1,vc=0,cmp_h=0x2800", CCN_IDX_MASK_OPCODE),
- 	CCN_EVENT_HNI(txdatflits, "dir=1,vc=3", CCN_IDX_MASK_ANY),
- 	CCN_EVENT_HNI(rxdatflits, "dir=0,vc=3", CCN_IDX_MASK_ANY),
- 	CCN_EVENT_HNI(txreqflits, "dir=1,vc=0", CCN_IDX_MASK_ANY),
-@@ -759,6 +764,12 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
- 
- 	/* Validate node/xp vs topology */
- 	switch (type) {
-+	case CCN_TYPE_MN:
-+		if (node_xp != ccn->mn_id) {
-+			dev_warn(ccn->dev, "Invalid MN ID %d!\n", node_xp);
-+			return -EINVAL;
-+		}
-+		break;
- 	case CCN_TYPE_XP:
- 		if (node_xp >= ccn->num_xps) {
- 			dev_warn(ccn->dev, "Invalid XP ID %d!\n", node_xp);
-@@ -1361,6 +1372,8 @@ static int arm_ccn_init_nodes(struct arm_ccn *ccn, int region,
- 
- 	switch (type) {
- 	case CCN_TYPE_MN:
-+		ccn->mn_id = id;
-+		return 0;
- 	case CCN_TYPE_DT:
- 		return 0;
- 	case CCN_TYPE_XP:
++	/* Nothing to do for cycle counter */
++	if (hw->idx == CCN_IDX_PMU_CYCLE_COUNTER)
++		return;
++
+ 	if (CCN_CONFIG_TYPE(event->attr.config) == CCN_TYPE_XP)
+ 		xp = &ccn->xp[CCN_CONFIG_XP(event->attr.config)];
+ 	else
 -- 
 2.7.4
