@@ -1,71 +1,32 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Fri, 12 Aug 2016 10:26:36 +0200
-Subject: [PATCH soc/next?] ARM: BCM53573: Initial support for Broadcom
- BCM53573 SoCs
-Message-ID: <1470990396-23701-1-git-send-email-zajec5@gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 12 Aug 2016 14:06:46 +0530
+Subject: [PATCH resend 0/1] phy-sun4i-usb: Add support for peripheral-only
+ mode
+In-Reply-To: <1470686139-19893-1-git-send-email-hdegoede@redhat.com>
+References: <1470686139-19893-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <57AD8A9E.5000106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-BCM53573 series is a new family with embedded wireless. By marketing
-people it's sometimes called Northstar but it uses different CPU and has
-different architecture so we need a new symbol for it.
-Fortunately it shares some peripherals with other iProc based SoCs so we
-will be able to reuse some drivers/bindings.
 
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
----
-Resending as linux-arm-kernel ML rejected my e-mail due to the wrong address:
-bcm-kernel-feedback-list at broadcom.com>
----
- MAINTAINERS               |  7 +++++++
- arch/arm/mach-bcm/Kconfig | 15 +++++++++++++++
- 2 files changed, 22 insertions(+)
+On Tuesday 09 August 2016 01:25 AM, Hans de Goede wrote:
+> Hi Kishon,
+> 
+> As discussed before, here is a resend now that rc1 is out (and includes
+> the new of_usb_get_dr_mode_by_phy helper this patch needs).
+> 
+> Please merge this for 4.9-rcX some of the musb-sunxi glue changes
+> already merged have a runtime dependency on this patch, without
+> this patch boards using the musb controller in host-only mode
+> will break.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7304d2e..9e2db2e 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2517,6 +2517,13 @@ F:	arch/arm/mach-bcm/bcm_5301x.c
- F:	arch/arm/boot/dts/bcm5301x.dtsi
- F:	arch/arm/boot/dts/bcm470*
- 
-+BROADCOM BCM53573 ARM ARCHITECTURE
-+M:	Rafa? Mi?ecki <rafal@milecki.pl>
-+L:	linux-arm-kernel at lists.infradead.org
-+S:	Maintained
-+F:	arch/arm/boot/dts/bcm53573*
-+F:	arch/arm/boot/dts/bcm47189*
-+
- BROADCOM BCM63XX ARM ARCHITECTURE
- M:	Florian Fainelli <f.fainelli@gmail.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 5832dba..9a6c3ae 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -76,6 +76,21 @@ config ARCH_BCM_5301X
- 	  different SoC or with the older BCM47XX and BCM53XX based
- 	  network SoC using a MIPS CPU, they are supported by arch/mips/bcm47xx
- 
-+config ARCH_BCM_53573
-+	bool "Broadcom BCM53573 SoC series support"
-+	depends on ARCH_MULTI_V7
-+	select ARCH_BCM_IPROC
-+	select HAVE_ARM_ARCH_TIMER
-+
-+	help
-+	  BCM53573 series is set of SoCs using ARM Cortex-A7 CPUs with wireless
-+	  embedded in the chipset.
-+	  This SoC line is mostly used in home routers and is some cheaper
-+	  alternative for Northstar family.
-+
-+	  The base chip is BCM53573 and there are some packaging modifications
-+	  like BCM47189 and BCM47452.
-+
- comment "KONA architected SoCs"
- 
- config ARCH_BCM_MOBILE
--- 
-1.8.4.5
+merged, thanks.
+
+-Kishon
+> 
+> Thanks & Regards,
+> 
+> Hans
+> 
+> 
