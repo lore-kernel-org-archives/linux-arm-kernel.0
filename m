@@ -1,49 +1,105 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Fri, 12 Aug 2016 18:19:39 +0900
-Subject: [PATCH v5 0/2] mmc: dw_mmc: host controller reset support
-In-Reply-To: <1470991886-22412-1-git-send-email-guodong.xu@linaro.org>
-References: <CGME20160812085218epcas1p34d84a42a931dcc09fe7a77be59065499@epcas1p3.samsung.com>
- <1470991886-22412-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <724bc267-1f6b-0211-4645-10cc49eedd48@samsung.com>
+From: tiffany.lin@mediatek.com (Tiffany Lin)
+Date: Fri, 12 Aug 2016 17:21:43 +0800
+Subject: [PATCH v4 9/9] arm64: dts: mediatek: Add Video Decoder for MT8173
+In-Reply-To: <de51caf8-6db5-4754-0683-d3390dd2ac09@gmail.com>
+References: <1470840534-4788-1-git-send-email-tiffany.lin@mediatek.com>
+ <1470840534-4788-2-git-send-email-tiffany.lin@mediatek.com>
+ <1470840534-4788-3-git-send-email-tiffany.lin@mediatek.com>
+ <1470840534-4788-4-git-send-email-tiffany.lin@mediatek.com>
+ <1470840534-4788-5-git-send-email-tiffany.lin@mediatek.com>
+ <1470840534-4788-6-git-send-email-tiffany.lin@mediatek.com>
+ <1470840534-4788-7-git-send-email-tiffany.lin@mediatek.com>
+ <1470840534-4788-8-git-send-email-tiffany.lin@mediatek.com>
+ <1470840534-4788-9-git-send-email-tiffany.lin@mediatek.com>
+ <1470840534-4788-10-git-send-email-tiffany.lin@mediatek.com>
+ <de51caf8-6db5-4754-0683-d3390dd2ac09@gmail.com>
+Message-ID: <1470993703.12736.6.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guodong,
+Hi Matthias,
 
-On 08/12/2016 05:51 PM, Guodong Xu wrote:
-> mmc host controller registers may in abnormal state if mmc is used in
-> bootloader, eg. to load kernel from eMMC. Some controllers cann't
-> clear their registers when clk is set. They use dedicated reset
-> logics to do this.
+On Thu, 2016-08-11 at 17:44 +0200, Matthias Brugger wrote:
 > 
-> In this patch, a 'resets' property is added into dw_mmc dts
-> node. When driver does parse_dt and probe, it calls reset API to
-> triiger 'reset' of dwmmc host controller. When probe error or
-> remove, it calls reset API to assert it.
+> On 10/08/16 16:48, Tiffany Lin wrote:
+> > Add video decoder node for MT8173
+> >
+> > Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+> > ---
+> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi |   44 ++++++++++++++++++++++++++++++
+> >  1 file changed, 44 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > index 10f638f..2872cd7 100644
+> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > @@ -974,6 +974,50 @@
+> >  			#clock-cells = <1>;
+> >  		};
+> >
+> > +		vcodec_dec: vcodec at 16000000 {
+> > +			compatible = "mediatek,mt8173-vcodec-dec";
+> > +			reg = <0 0x16000000 0 0x100>,	/* VDEC_SYS */
+> > +			      <0 0x16020000 0 0x1000>,	/* VDEC_MISC */
+> > +			      <0 0x16021000 0 0x800>,	/* VDEC_LD */
+> > +			      <0 0x16021800 0 0x800>,	/* VDEC_TOP */
+> > +			      <0 0x16022000 0 0x1000>,	/* VDEC_CM */
+> > +			      <0 0x16023000 0 0x1000>,	/* VDEC_AD */
+> > +			      <0 0x16024000 0 0x1000>,	/* VDEC_AV */
+> > +			      <0 0x16025000 0 0x1000>,	/* VDEC_PP */
+> > +			      <0 0x16026800 0 0x800>,	/* VDEC_HWD */
+> > +			      <0 0x16027000 0 0x800>,	/* VDEC_HWQ */
+> > +			      <0 0x16027800 0 0x800>,	/* VDEC_HWB */
+> > +			      <0 0x16028400 0 0x400>;	/* VDEC_HWG */
+> > +			interrupts = <GIC_SPI 204 IRQ_TYPE_LEVEL_LOW>;
+> > +			mediatek,larb = <&larb1>;
+> > +			iommus = <&iommu M4U_PORT_HW_VDEC_MC_EXT>,
+> > +				 <&iommu M4U_PORT_HW_VDEC_PP_EXT>,
+> > +				 <&iommu M4U_PORT_HW_VDEC_AVC_MV_EXT>,
+> > +				 <&iommu M4U_PORT_HW_VDEC_PRED_RD_EXT>,
+> > +				 <&iommu M4U_PORT_HW_VDEC_PRED_WR_EXT>,
+> > +				 <&iommu M4U_PORT_HW_VDEC_UFO_EXT>,
+> > +				 <&iommu M4U_PORT_HW_VDEC_VLD_EXT>,
+> > +				 <&iommu M4U_PORT_HW_VDEC_VLD2_EXT>;
+> > +			mediatek,vpu = <&vpu>;
+> > +			power-domains = <&scpsys MT8173_POWER_DOMAIN_VDEC>;
+> > +			clocks = <&apmixedsys CLK_APMIXED_VCODECPLL>,
+> > +				 <&topckgen CLK_TOP_UNIVPLL_D2>,
+> > +				 <&topckgen CLK_TOP_CCI400_SEL>,
+> > +				 <&topckgen CLK_TOP_VDEC_SEL>,
+> > +				 <&topckgen CLK_TOP_VCODECPLL>,
+> > +				 <&apmixedsys CLK_APMIXED_VENCPLL>,
+> > +				 <&topckgen CLK_TOP_VENC_LT_SEL>,
+> > +				 <&topckgen CLK_TOP_VCODECPLL_370P5>;
+> > +			clock-names = "vcodecpll",
+> > +				      "univpll_d2",
+> > +				      "clk_cci400_sel",
+> > +				      "vdec_sel",
+> > +				      "vdecpll",
+> > +				      "vencpll",
+> > +				      "venc_lt_sel",
+> > +				      "vdec_bus_clk_src";
+> > +		};
+> > +
 > 
-> Chip vendor's actual reset logics is implemented in reset driver, not
-> in dw_mmc code.
+> Shouldn't we set here:
+> status = "disabled";
 > 
-> Please also refer to Documentation/devicetree/bindings/reset/reset.txt
+> To save power on headless systems?
 > 
-> Changelog:
-> v5:
->  * rebase onto https://github.com/jh80chung/dw-mmc
-> v4:
->  * add reset_control_assert() and usleep() before calling _deassert().
-> 
-> Guodong Xu (2):
->   Documentation: synopsys-dw-mshc: add binding for resets
->   mmc: dw_mmc: add reset support to dwmmc host controller
+We only power on when there is at least one decode instance created.
+In this case, do we need "status = "disabled";" here?
+I see some other device nodes in dtsi do not add this.
+Sorry, I am just confused when should we add status for device node.
 
-Applied on my dw-mmc tree. Thanks!
 
-Best Regards,
-Jaehoon Chung
+best regards,
+Tiffany
 
+> Regards,
+> Matthias
 > 
->  .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |  4 ++++
->  drivers/mmc/host/dw_mmc.c                          | 23 +++++++++++++++++++++-
->  include/linux/mmc/dw_mmc.h                         |  2 ++
->  3 files changed, 28 insertions(+), 1 deletion(-)
-> 
+> >  		larb1: larb at 16010000 {
+> >  			compatible = "mediatek,mt8173-smi-larb";
+> >  			reg = <0 0x16010000 0 0x1000>;
+> >
