@@ -1,166 +1,158 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 12 Aug 2016 15:10:21 +0530
-Subject: [PATCH RESEND v2 2/3] phy: sun4i: add support for A64 usb phy
-In-Reply-To: <20160812030622.4492-2-icenowy@aosc.xyz>
-References: <20160812030622.4492-1-icenowy@aosc.xyz>
- <20160812030622.4492-2-icenowy@aosc.xyz>
-Message-ID: <57AD9985.7020809@ti.com>
+From: brendan.jackman@arm.com (Brendan Jackman)
+Date: Fri, 12 Aug 2016 10:47:44 +0100
+Subject: [PATCH v3 02/15] dt/bindings: Update binding for PM domain idle
+ states
+In-Reply-To: <20160811211023.GC1401@linaro.org>
+References: <1470351902-43103-1-git-send-email-lina.iyer@linaro.org>
+ <1470351902-43103-3-git-send-email-lina.iyer@linaro.org>
+ <99e35b6c-6698-6d27-f4d7-fa032796869e@arm.com>
+ <20160810164034.GA1401@linaro.org>
+ <5e59874c-bbb7-270a-199c-da1ff5932554@arm.com>
+ <20160811211023.GC1401@linaro.org>
+Message-ID: <57AD9B40.9040001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Lina
 
+On 11/08/16 22:10, Lina Iyer wrote:
+> On Wed, Aug 10 2016 at 12:09 -0600, Sudeep Holla wrote:
+>>
+>>
+>> On 10/08/16 17:40, Lina Iyer wrote:
+>>> Hi Sudeep,
+>>>
+>>> On Wed, Aug 10 2016 at 09:15 -0600, Sudeep Holla wrote:
+>>>> Hi Lina,
+>>>>
+>>>> I have few concerns mainly due to the lack of description and not the
+>>>> binding per say.
+>>
+>> [...]
+>>
+>>> It is pretty clear that CPUs cannot not define the domain idle states.
+>>> Domains define their own idle states. Just as you mention above. CPU is
+>>> just a single component in its domain. There may be other devices like
+>>> PMUs, Coresights etc that also may have a say in the idle state the
+>>> domain may be put in, when the devices are idle. As such, adding domain
+>>> idle states to the CPU's idle state property is not appropriate.
+>>>
+>>
+>> No I am not saying we need to add domain idle states to the CPU's idle
+>> state property. I am saying we need to remove cpu-idle-states or ignore
+>> it when PD is present. And get all the idle state information for PD.
+>>
+>> I am objecting the split we are creating across CPU and higher level
+>> power domains. And this binding document is incomplete as it skips all
+>> those details. We just need PD handle in CPU and no idle state
+>> information there. Create PD hierarchy and have all idle state
+>> information at one place.
+>>
+> Let me think about this a bit and see what I can come up with.
+>
+>>> Our kernel has runtime PM for devices and then there is CPUidle, both
+>>> are diverging without one knowing about the other. We have to start
+>>> unifying them inorder to have better holistic power management in the
+>>> SoC. To that regard, we have to start imagining CPUs as just another
+>>> device, albeit a special device. But for our purposes in determining
+>>> domain idle state, it will just be a device attached to the domain.
+>>>
+>>
+>> Absolutely agree on that. No arguments. I am asking to go a step ahead
+>> to include even cpu/core level power domains not just cluster/higher
+>> level domains.
+>>
+>>>> We need to have all the idle state information at one place and in this
+>>>> case PD seems more appropriate instead of splitting them across.
+>>>>
+>>> That approach isn't correct. Where will we put the idle states of other
+>>> devices that are also part of the domain? We are thinking about a model,
+>>> where every device defines its own idle states and we define
+>>> relationships between those idle states and their parents' idle states.
+>>
+>> Yes I understand. You confused me here. Won't that be one-to-one
+>> relationship ? If not, how is that dealt in the current bindings ?
+>>
+>>> Ofcourse, devices don't have idle states today, but that is something we
+>>> have been pondering over.
+>>>
+>>
+>> Yes we these binding should be easily extensible, I don't see any issue.
+>>
+>>>> We can also keep the code clean and not break compatibility. Whenever
+>>>> both PD and CPU contains idle-states, PD must take precedence.
+>>>>
+>>> Why?
+>>> The CPU and PD states are orthogonal. While the PD state is dependent on
+>>> the CPU state, the latter is not true. Devices determine their own
+>>> states. Based on the individual device states, we then determine the
+>>> state of the parent and bubble up on the hierarchy.
+>>>
+>>
+>> I may be missing something. Now with your example in the binding, if
+>> another device shares the cluster PD, can it have different idle states?
+>> If so how does it map ?
+>>
+>>
+>> In general whatever binding we come up must not just address OS
+>> coordinated mode. Also I was thinking to have better coverage in the
+>> description by having a bit more complex system like:
+>>
+>> cluster0
+>>     CLUSTER_RET(Retention)
+>>     CLUSTER_PG(Power Gate)
+>>     core0
+>>         CORE_RET
+>>         CORE_PG
+>>     core1
+>>         CORE_RET
+>>         CORE_PG
+>>
+>> cluster1
+>>     CLUSTER_RET
+>>     CLUSTER_PG
+>>     core0
+>>         CORE_RET
+>>         CORE_PG
+>>     core1
+>>         CORE_RET
+>>         CORE_PG
+>>
+>> Platform Co-ordinate supports the following states and we should be
+>> able to determine that from the binding:
+>>
+>> CORE_RET
+>> CORE_PG
+>> CORE_RET + CLUSTER_RET
+>
+> The problem that we have to sove here is knowing that CORE_RET +
+> CLUSTER_PG (hypothetically) an invalid combination. Kevin and
+> I debated it in the earlier RFC and we dont have a good way to solve
+> this generically for all devices.
+>
 
-On Friday 12 August 2016 08:36 AM, Icenowy Zheng wrote:
-> There's something unknown in the pmu part that shared with H3.
-> It's renamed as PMU_UNK1 from PMU_UNK_H3.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+This is interesting. I had been working on the assumption that a parent
+power domain cannot enter any idle state until its children were all in
+their deepest idle state. I now realise that it's easy to imagine
+platforms where this isn't the case.
 
-Fixed the following checkpatch warning and merged this to linux-phy tree.
+However, I don't understand how your current bindings solve this issue
+and why using domain-power-states for all states (i.e. ignoring
+cpu-idle-states and putting CPU idle states in the domain-idle-states of
+a per-CPU power domain - I believe this is what Sudeep is suggesting)
+makes it any more difficult.
 
-WARNING: line over 80 characters
-#311: FILE: drivers/phy/phy-sun4i-usb.c:794:
-+	{ .compatible = "allwinner,sun50i-a64-usb-phy", .data = &sun50i_a64_cfg},
+Could you link to this previous discussion you mentioned? I'm having
+trouble finding it (R.I.P Gmane).
 
-Thanks
-Kishon
+>> CORE_PG + CLUSTER_RET
+>> CORE_PG + CLUSTER_PG
+>>
+>>
+> Thanks,
+> Lina
+>
 
-> ---
->  drivers/phy/phy-sun4i-usb.c | 34 ++++++++++++++++++++++++++++------
->  1 file changed, 28 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index 0a45bc6..a4db658 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -49,7 +49,7 @@
->  #define REG_PHYCTL_A33			0x10
->  #define REG_PHY_UNK_H3			0x20
->  
-> -#define REG_PMU_UNK_H3			0x10
-> +#define REG_PMU_UNK1			0x10
->  
->  #define PHYCTL_DATA			BIT(7)
->  
-> @@ -97,6 +97,7 @@ enum sun4i_usb_phy_type {
->  	sun6i_a31_phy,
->  	sun8i_a33_phy,
->  	sun8i_h3_phy,
-> +	sun50i_a64_phy,
->  };
->  
->  struct sun4i_usb_phy_cfg {
-> @@ -105,6 +106,7 @@ struct sun4i_usb_phy_cfg {
->  	u32 disc_thresh;
->  	u8 phyctl_offset;
->  	bool dedicated_clocks;
-> +	bool enable_pmu_unk1;
->  };
->  
->  struct sun4i_usb_phy_data {
-> @@ -180,8 +182,9 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
->  
->  	mutex_lock(&phy_data->mutex);
->  
-> -	if (phy_data->cfg->type == sun8i_a33_phy) {
-> -		/* A33 needs us to set phyctl to 0 explicitly */
-> +	if (phy_data->cfg->type == sun8i_a33_phy ||
-> +	    phy_data->cfg->type == sun50i_a64_phy) {
-> +		/* A33 or A64 needs us to set phyctl to 0 explicitly */
->  		writel(0, phyctl);
->  	}
->  
-> @@ -255,14 +258,16 @@ static int sun4i_usb_phy_init(struct phy *_phy)
->  		return ret;
->  	}
->  
-> +	if (data->cfg->enable_pmu_unk1) {
-> +		val = readl(phy->pmu + REG_PMU_UNK1);
-> +		writel(val & ~2, phy->pmu + REG_PMU_UNK1);
-> +	}
-> +
->  	if (data->cfg->type == sun8i_h3_phy) {
->  		if (phy->index == 0) {
->  			val = readl(data->base + REG_PHY_UNK_H3);
->  			writel(val & ~1, data->base + REG_PHY_UNK_H3);
->  		}
-> -
-> -		val = readl(phy->pmu + REG_PMU_UNK_H3);
-> -		writel(val & ~2, phy->pmu + REG_PMU_UNK_H3);
->  	} else {
->  		/* Enable USB 45 Ohm resistor calibration */
->  		if (phy->index == 0)
-> @@ -713,6 +718,7 @@ static const struct sun4i_usb_phy_cfg sun4i_a10_cfg = {
->  	.disc_thresh = 3,
->  	.phyctl_offset = REG_PHYCTL_A10,
->  	.dedicated_clocks = false,
-> +	.enable_pmu_unk1 = false,
->  };
->  
->  static const struct sun4i_usb_phy_cfg sun5i_a13_cfg = {
-> @@ -721,6 +727,7 @@ static const struct sun4i_usb_phy_cfg sun5i_a13_cfg = {
->  	.disc_thresh = 2,
->  	.phyctl_offset = REG_PHYCTL_A10,
->  	.dedicated_clocks = false,
-> +	.enable_pmu_unk1 = false,
->  };
->  
->  static const struct sun4i_usb_phy_cfg sun6i_a31_cfg = {
-> @@ -729,6 +736,7 @@ static const struct sun4i_usb_phy_cfg sun6i_a31_cfg = {
->  	.disc_thresh = 3,
->  	.phyctl_offset = REG_PHYCTL_A10,
->  	.dedicated_clocks = true,
-> +	.enable_pmu_unk1 = false,
->  };
->  
->  static const struct sun4i_usb_phy_cfg sun7i_a20_cfg = {
-> @@ -737,6 +745,7 @@ static const struct sun4i_usb_phy_cfg sun7i_a20_cfg = {
->  	.disc_thresh = 2,
->  	.phyctl_offset = REG_PHYCTL_A10,
->  	.dedicated_clocks = false,
-> +	.enable_pmu_unk1 = false,
->  };
->  
->  static const struct sun4i_usb_phy_cfg sun8i_a23_cfg = {
-> @@ -745,6 +754,7 @@ static const struct sun4i_usb_phy_cfg sun8i_a23_cfg = {
->  	.disc_thresh = 3,
->  	.phyctl_offset = REG_PHYCTL_A10,
->  	.dedicated_clocks = true,
-> +	.enable_pmu_unk1 = false,
->  };
->  
->  static const struct sun4i_usb_phy_cfg sun8i_a33_cfg = {
-> @@ -753,6 +763,7 @@ static const struct sun4i_usb_phy_cfg sun8i_a33_cfg = {
->  	.disc_thresh = 3,
->  	.phyctl_offset = REG_PHYCTL_A33,
->  	.dedicated_clocks = true,
-> +	.enable_pmu_unk1 = false,
->  };
->  
->  static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
-> @@ -760,6 +771,16 @@ static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
->  	.type = sun8i_h3_phy,
->  	.disc_thresh = 3,
->  	.dedicated_clocks = true,
-> +	.enable_pmu_unk1 = true,
-> +};
-> +
-> +static const struct sun4i_usb_phy_cfg sun50i_a64_cfg = {
-> +	.num_phys = 2,
-> +	.type = sun50i_a64_phy,
-> +	.disc_thresh = 3,
-> +	.phyctl_offset = REG_PHYCTL_A33,
-> +	.dedicated_clocks = true,
-> +	.enable_pmu_unk1 = true,
->  };
->  
->  static const struct of_device_id sun4i_usb_phy_of_match[] = {
-> @@ -770,6 +791,7 @@ static const struct of_device_id sun4i_usb_phy_of_match[] = {
->  	{ .compatible = "allwinner,sun8i-a23-usb-phy", .data = &sun8i_a23_cfg },
->  	{ .compatible = "allwinner,sun8i-a33-usb-phy", .data = &sun8i_a33_cfg },
->  	{ .compatible = "allwinner,sun8i-h3-usb-phy", .data = &sun8i_h3_cfg },
-> +	{ .compatible = "allwinner,sun50i-a64-usb-phy", .data = &sun50i_a64_cfg},
->  	{ },
->  };
->  MODULE_DEVICE_TABLE(of, sun4i_usb_phy_of_match);
-> 
+Cheers,
+Brendan
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
