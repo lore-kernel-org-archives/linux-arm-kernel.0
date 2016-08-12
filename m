@@ -1,41 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 12 Aug 2016 16:27:46 +0100
-Subject: [PATCH 7/7] arm64: Enable CONFIG_ARM64_TTBR0_PAN
-In-Reply-To: <1471015666-23125-1-git-send-email-catalin.marinas@arm.com>
-References: <1471015666-23125-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1471015666-23125-8-git-send-email-catalin.marinas@arm.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 12 Aug 2016 11:28:49 -0400 (EDT)
+Subject: [PATCH RESEND v2 3/3] ehci-platform: add the max clock number to 4
+In-Reply-To: <20160812030622.4492-3-icenowy@aosc.xyz>
+Message-ID: <Pine.LNX.4.44L0.1608121128340.2361-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the Kconfig option to enable support for TTBR0 PAN. The
-option is default off because of a slight performance hit when enabled,
-caused by the additional TTBR0_EL1 switching during user access
-operations or exception entry/exit code.
+On Fri, 12 Aug 2016, Icenowy Zheng wrote:
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Kees Cook <keescook@chromium.org>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/Kconfig | 8 ++++++++
- 1 file changed, 8 insertions(+)
+> Allwinner A64 EHCI requires 4 clocks to be enabled.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+>  drivers/usb/host/ehci-platform.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+> index 6816b8c..876dca4 100644
+> --- a/drivers/usb/host/ehci-platform.c
+> +++ b/drivers/usb/host/ehci-platform.c
+> @@ -38,7 +38,7 @@
+>  #include "ehci.h"
+>  
+>  #define DRIVER_DESC "EHCI generic platform driver"
+> -#define EHCI_MAX_CLKS 3
+> +#define EHCI_MAX_CLKS 4
+>  #define EHCI_MAX_RSTS 3
+>  #define hcd_to_ehci_priv(h) ((struct ehci_platform_priv *)hcd_to_ehci(h)->priv)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 69c8787bec7d..e7d5d0a7f6b4 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -784,6 +784,14 @@ config SETEND_EMULATION
- 	  If unsure, say Y
- endif
- 
-+config ARM64_TTBR0_PAN
-+	bool "Priviledged Access Never using TTBR0_EL1 switching"
-+	help
-+	  Enabling this option prevents the kernel from accessing
-+	  user-space memory directly by pointing TTBR0_EL1 to a reserved
-+	  zeroed area and reserved ASID. The user access routines
-+	  restore the valid TTBR0_EL1 temporarily.
-+
- menu "ARMv8.1 architectural features"
- 
- config ARM64_HW_AFDBM
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
