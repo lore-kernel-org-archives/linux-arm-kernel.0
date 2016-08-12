@@ -1,55 +1,129 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 12 Aug 2016 12:34:06 +0100
-Subject: [PATCH 2/2] arm: apply more __ro_after_init
-In-Reply-To: <28485373.pjx0rukqdF@wuerfel>
-References: <1464979224-2085-1-git-send-email-keescook@chromium.org>
- <2096112.OBiRuggdEi@wuerfel> <20160810230242.GO1041@n2100.armlinux.org.uk>
- <28485373.pjx0rukqdF@wuerfel>
-Message-ID: <957a3755-96a6-6e39-f17e-421de029ca79@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 12 Aug 2016 12:41:11 +0100
+Subject: [RFC] arm64: Enforce gettimeofday vdso structure read ordering
+In-Reply-To: <8375bf253e2f9034e5c5943e68876935@codeaurora.org>
+References: <20160811153744.3212-1-cov@codeaurora.org>
+ <20160811155409.GE8232@arm.com>
+ <8375bf253e2f9034e5c5943e68876935@codeaurora.org>
+Message-ID: <20160812114111.GA21484@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/16 17:02, Arnd Bergmann wrote:
-> On Thursday, August 11, 2016 12:02:42 AM CEST Russell King - ARM Linux wrote:
->> On Wed, Aug 10, 2016 at 09:31:05PM +0200, Arnd Bergmann wrote:
->>> On Wednesday, August 10, 2016 11:12:53 AM CEST Russell King - ARM Linux wrote:
->>>> There's the TLS emulation too, but that writes via the vectors mapping
->>>> at 0xffff0ff0.
->>>
->>> Ok, so that should be safe. Can we change the fiq code to also use the
->>> high mapping and then take the __ro_after_init patch on top?
->>
->> We can't - if the kernel is configured without the kuser helpers in
->> the vectors page, it's mapped read-only. I'm not sure what the
->> intersection is between platforms that can have FIQs and platforms
->> that can disable the kuser helpers.
->
-> From Kconfig logic and callers of set_fiq_handler(), theoretically
-> there is just i.MX3, but I think they never use fiq in their
-> audio drivers in practice already, and Mark Brown mentioned
-> that we could remove fiq support in the imx audio driver (don't
-> remember the details at the moment).
->
-> If we can prove that i.MX3 PCM FIQ support is never used, then the
-> intersection is empty, and all machines that use FIQ require kuser
-> helpers.
->
-> This may change with Daniel Thompson's patches that use the FIQ
-> for NMI backtrace.
+Hi,
 
-It shouldn't do!
+On Thu, Aug 11, 2016 at 03:39:11PM -0400, bdegraaf at codeaurora.org wrote:
+> Sorry, this is my first go at proper email etiquette. I think I've
+> got it now.
 
-All the work I did (and am, very slowly, still doing) worked by using 
-the default FIQ handler provided at boot time to jump into the perf code.
+Please just reply inline, with the previous email '>' prefixed, as with
+this reply. Most mail clients do this for plain text email, and there
+are plenty of examples in the archive.
 
-Nothing I have done or plan to do needs set_fiq_handler() to remain 
-functional.
+This style makes it clear who said what, even when arbitrary liens (of
+unnecessary context) are removed.
 
-Likewise, nothing I have done should cause set_fiq_handler() to stop 
-working for people who do still use it. FWIW I got the impression over 
-the last few years that the most significant uses of FIQ on modern 
-systems are out-of-tree uses who have designed custom FPGA hardware (and 
-presumably designed them with very short FIFOs).
+> ------------------------------------------------------------------------------
+> "Can you explain the problem that you're fixing here, please?"
+> ------------------------------------------------------------------------------
+> Since your question included only the vdso_data structure itself and the
+> vdso.c file changes, I'm assuming that's what you meant by "here."
+> I moved tb_seq_count to the start of the vdso_data structure because
+> of the
+> nature of the ldar/strl instructions, which do not support offsets.
+> This avoided the extra math to locate the structure offset, while at
+> the same
+> time using the same base pointer for the structure.  ia64 does something
+> similar and also puts this as the first field.  I moved the use_syscall
+> field up next to it just to keep most elements aligned according to
+> their
+> width. That "use_syscall" is the first element used in the logic was an
+> additional reason I decided to move that one in particular.
 
+This explains what has *changed*, but not *why*.
 
-Daniel.
+The title of this commit implies that this is enforcing something that
+wasn't previously enforced. That makes is sound like a bug fix of some
+sort, yet the bug is not described.
+
+Is this a bug fix? If so, can you describe what goes wrong with the
+current code?
+
+Or is this an optimisation? Or a rework for other reasons?
+
+> --- a/arch/arm64/include/asm/vdso_datapage.h
+> +++ b/arch/arm64/include/asm/vdso_datapage.h
+> @@ -21,6 +21,8 @@
+>  #ifndef __ASSEMBLY__
+> 
+>  struct vdso_data {
+> +    __u32 tb_seq_count;    /* Timebase sequence counter */
+> +    __u32 use_syscall;
+>      __u64 cs_cycle_last;    /* Timebase at clocksource init */
+>      __u64 raw_time_sec;    /* Raw time */
+>      __u64 raw_time_nsec;
+> @@ -30,14 +32,12 @@ struct vdso_data {
+>      __u64 xtime_coarse_nsec;
+>      __u64 wtm_clock_sec;    /* Wall to monotonic time */
+>      __u64 wtm_clock_nsec;
+> -    __u32 tb_seq_count;    /* Timebase sequence counter */
+>      /* cs_* members must be adjacent and in this order (ldp
+> accesses) */
+>      __u32 cs_mono_mult;    /* NTP-adjusted clocksource multiplier */
+>      __u32 cs_shift;        /* Clocksource shift (mono = raw) */
+>      __u32 cs_raw_mult;    /* Raw clocksource multiplier */
+>      __u32 tz_minuteswest;    /* Whacky timezone stuff */
+>      __u32 tz_dsttime;
+> -    __u32 use_syscall;
+>  };
+> 
+> ----------------------------------------------------------------------------
+> As to vdso.c, I changed the instructions used to access tb_seq_count
+> (both
+> in vdso.c and the gettimeofday.S file) to the load-acquire/store-release
+> instructions because those instructions seem to be designed for this
+> particular scenario: their "one-way" barriers enforce the order we need,
+> on top of eliminating the explicit barriers.
+> ----------------------------------------------------------------------------
+
+As Will pointed out, the use of acquire/release one-way barriers doesn't
+provide the guarantee you need. Two half barriers do not always combine
+to form a full barrier.
+
+For example, see commit 8e86f0b409a44193 ("arm64: atomics: fix use of
+acquire + release for full barrier semantics), which fixes a similar
+misuse of acquire/release to the example below.
+
+> -    ++vdso_data->tb_seq_count;
+> -    smp_wmb();
+> +    tmp = smp_load_acquire(&vdso_data->tb_seq_count);
+> +    ++tmp;
+> +    smp_store_release(&vdso_data->tb_seq_count, tmp);
+> 
+> "This looks busted -- the writes to vdso_data can be reordered
+> before the
+> update of tb_seq_count.
+> 
+> /confused
+> 
+> Will"
+> 
+> --------------------------------------------------------------------------
+> 
+> Hopefully, this more detailed explanation helps make things clearer.
+
+As will points out (and as covered in the description of commit
+8e86f0b409a44193), the use of half-barriers allows accesses to be pulled
+into the critical section, where they can be reordered w.r.t. each
+other.
+
+The data update after the release can be reordered before the release
+(but not the acquire). As it can be moved before the release, the new
+data can be seen with the old seq count. Similar applies to the other
+end, after the update, with acquire/release swapped - the updated seq
+count can be seen before the data update.
+
+So to another observer, the updates of the data can be observed in an
+arbitrary order w.r.t. the seq count.
+
+Thanks,
+Mark.
