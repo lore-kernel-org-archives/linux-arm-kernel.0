@@ -1,39 +1,54 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 12 Aug 2016 18:06:00 +0100
-Subject: [PATCH RESEND] MAINTAINERS: add ARM ARCHITECTED TIMER entry
-In-Reply-To: <1470737036-2082-1-git-send-email-mark.rutland@arm.com>
-References: <1470737036-2082-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160812170600.GJ12939@e104818-lin.cambridge.arm.com>
+Date: Fri, 12 Aug 2016 18:10:30 +0100
+Subject: [PATCHv5] arm64: Handle el1 synchronous instruction aborts cleanly
+In-Reply-To: <20160812170508.GI12939@e104818-lin.cambridge.arm.com>
+References: <1470792326-565-1-git-send-email-labbott@redhat.com>
+ <20160812170508.GI12939@e104818-lin.cambridge.arm.com>
+Message-ID: <20160812171030.GK12939@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2016 at 11:03:56AM +0100, Mark Rutland wrote:
-> The ARM architected timer driver falls under the drivers/clocksource/
-> catch-all in MAINTAINERS, and get_maintainers.pl doesn't suggest a
-> number of people who should be Cc'd.
+On Fri, Aug 12, 2016 at 06:05:09PM +0100, Catalin Marinas wrote:
+> On Tue, Aug 09, 2016 at 06:25:26PM -0700, Laura Abbott wrote:
+> > Executing from a non-executable area gives an ugly message:
+> > 
+> > lkdtm: Performing direct entry EXEC_RODATA
+> > lkdtm: attempting ok execution at ffff0000084c0e08
+> > lkdtm: attempting bad execution at ffff000008880700
+> > Bad mode in Synchronous Abort handler detected on CPU2, code 0x8400000e -- IABT (current EL)
+> > CPU: 2 PID: 998 Comm: sh Not tainted 4.7.0-rc2+ #13
+> > Hardware name: linux,dummy-virt (DT)
+> > task: ffff800077e35780 ti: ffff800077970000 task.ti: ffff800077970000
+> > PC is at lkdtm_rodata_do_nothing+0x0/0x8
+> > LR is at execute_location+0x74/0x88
+> > 
+> > The 'IABT (current EL)' indicates the error but it's a bit cryptic
+> > without knowledge of the ARM ARM. There is also no indication of the
+> > specific address which triggered the fault. The increase in kernel
+> > page permissions makes hitting this case more likely as well.
+> > Handling the case in the vectors gives a much more familiar looking
+> > error message:
+> > 
+> > lkdtm: Performing direct entry EXEC_RODATA
+> > lkdtm: attempting ok execution at ffff0000084c0840
+> > lkdtm: attempting bad execution at ffff000008880680
+> > Unable to handle kernel paging request at virtual address ffff000008880680
+> > pgd = ffff8000089b2000
+> > [ffff000008880680] *pgd=00000000489b4003, *pud=0000000048904003, *pmd=0000000000000000
+> > Internal error: Oops: 8400000e [#1] PREEMPT SMP
+> > Modules linked in:
+> > CPU: 1 PID: 997 Comm: sh Not tainted 4.7.0-rc1+ #24
+> > Hardware name: linux,dummy-virt (DT)
+> > task: ffff800077f9f080 ti: ffff800008a1c000 task.ti: ffff800008a1c000
+> > PC is at lkdtm_rodata_do_nothing+0x0/0x8
+> > LR is at execute_location+0x74/0x88
+> > 
+> > Acked-by: Mark Rutland <mark.rutland@arm.com>
+> > Signed-off-by: Laura Abbott <labbott@redhat.com>
 > 
-> The ARM architected timer is a core component of ARMv7+VE and ARMv8, and
-> is critical to the correct operation of both architecture ports (and
-> their respective KVM code), and patches to it should have review by
-> knowledgeable interested parties.
-> 
-> This patch adds a MAINTAINERS entry for the driver and its low-level
-> arch components, such that get_maintainer.pl will always include
-> relevant interested parties for modifications to the driver. For the
-> timebeing, this means myself and Marc Zyngier.
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Applied. Thanks.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-
-I guess this could go in via arm-soc?
+Actually, Will queued it already for 4.9.
 
 -- 
 Catalin
