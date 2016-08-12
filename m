@@ -1,25 +1,41 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 12 Aug 2016 10:05:37 +0200
-Subject: [PATCH v3 4/7] clk: rockchip: rk3399: fix incorrect aclk_emmc
- source gate bits
-In-Reply-To: <1470122401-31934-5-git-send-email-zhengxing@rock-chips.com>
-References: <1470122401-31934-1-git-send-email-zhengxing@rock-chips.com>
- <1470122401-31934-5-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <2820412.n3i6OJSAzs@diego>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 12 Aug 2016 10:15:27 +0200
+Subject: [PATCH RESEND v2 1/3] dt: bindings: add bindings for Allwinner
+ A64 usb phy
+In-Reply-To: <20160812030622.4492-1-icenowy@aosc.xyz>
+References: <20160812030622.4492-1-icenowy@aosc.xyz>
+Message-ID: <03c1154e-5d40-f0d9-0990-8b3aa8f47ba0@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 2. August 2016, 15:19:58 schrieb Xing Zheng:
-> Dues to incorrect diagram, we need to fix incorrect bits for
-> (c/g)pll_aclk_emmc_src:
-> cpll_aclk_emmc_src --> G6[13]
-> gpll_aclk_emmc_src --> G6[12]
-> 
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
+Hi,
 
-applied to my clk-fixes branch for 4.8
+On 12-08-16 05:06, Icenowy Zheng wrote:
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+
+Series is still:
+
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+
+Regards,
+
+Hans
 
 
-Thanks
-Heiko
+> ---
+>  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> index 95736d7..287150d 100644
+> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> @@ -10,6 +10,7 @@ Required properties:
+>    * allwinner,sun8i-a23-usb-phy
+>    * allwinner,sun8i-a33-usb-phy
+>    * allwinner,sun8i-h3-usb-phy
+> +  * allwinner,sun50i-a64-usb-phy
+>  - reg : a list of offset + length pairs
+>  - reg-names :
+>    * "phy_ctrl"
+>
