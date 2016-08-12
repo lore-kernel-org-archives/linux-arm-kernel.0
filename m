@@ -1,167 +1,75 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 12 Aug 2016 15:14:55 +0100
-Subject: [PATCH RFC 1/5] video: add HDMI state notifier support
+Date: Fri, 12 Aug 2016 15:15:00 +0100
+Subject: [PATCH RFC 2/5] drm/bridge: dw_hdmi: remove CEC engine register
+ definitions
 In-Reply-To: <20160812141421.GB1041@n2100.armlinux.org.uk>
 References: <20160812141421.GB1041@n2100.armlinux.org.uk>
-Message-ID: <E1bYDEd-0004rZ-3i@rmk-PC.armlinux.org.uk>
+Message-ID: <E1bYDEi-0004rf-8C@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for HDMI hotplug and EDID notifiers, which is used to convey
-information from HDMI drivers to their CEC and audio counterparts.
+We don't need the CEC engine register definitions, so let's remove them.
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/video/Kconfig         |  3 +++
- drivers/video/Makefile        |  1 +
- drivers/video/hdmi-notifier.c | 61 +++++++++++++++++++++++++++++++++++++++++++
- include/linux/hdmi-notifier.h | 44 +++++++++++++++++++++++++++++++
- 4 files changed, 109 insertions(+)
- create mode 100644 drivers/video/hdmi-notifier.c
- create mode 100644 include/linux/hdmi-notifier.h
+ drivers/gpu/drm/bridge/dw-hdmi.h | 45 ----------------------------------------
+ 1 file changed, 45 deletions(-)
 
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index 3c20af999893..1ee7b9f9bb25 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -36,6 +36,9 @@ config VIDEOMODE_HELPERS
- config HDMI
- 	bool
+diff --git a/drivers/gpu/drm/bridge/dw-hdmi.h b/drivers/gpu/drm/bridge/dw-hdmi.h
+index fc9a560429d6..26d6845efad6 100644
+--- a/drivers/gpu/drm/bridge/dw-hdmi.h
++++ b/drivers/gpu/drm/bridge/dw-hdmi.h
+@@ -478,51 +478,6 @@
+ #define HDMI_A_PRESETUP                         0x501A
+ #define HDMI_A_SRM_BASE                         0x5020
  
-+config HDMI_NOTIFIERS
-+	bool
-+
- if VT
- 	source "drivers/video/console/Kconfig"
- endif
-diff --git a/drivers/video/Makefile b/drivers/video/Makefile
-index 9ad3c17d6456..65f564906fb4 100644
---- a/drivers/video/Makefile
-+++ b/drivers/video/Makefile
-@@ -1,5 +1,6 @@
- obj-$(CONFIG_VGASTATE)            += vgastate.o
- obj-$(CONFIG_HDMI)                += hdmi.o
-+obj-$(CONFIG_HDMI_NOTIFIERS)      += hdmi-notifier.o
- 
- obj-$(CONFIG_VT)		  += console/
- obj-$(CONFIG_LOGO)		  += logo/
-diff --git a/drivers/video/hdmi-notifier.c b/drivers/video/hdmi-notifier.c
-new file mode 100644
-index 000000000000..f3b16552b0fe
---- /dev/null
-+++ b/drivers/video/hdmi-notifier.c
-@@ -0,0 +1,61 @@
-+#include <linux/export.h>
-+#include <linux/hdmi-notifier.h>
-+#include <linux/notifier.h>
-+#include <linux/string.h>
-+
-+static BLOCKING_NOTIFIER_HEAD(hdmi_notifier);
-+
-+int hdmi_register_notifier(struct notifier_block *nb)
-+{
-+	return blocking_notifier_chain_register(&hdmi_notifier, nb);
-+}
-+EXPORT_SYMBOL_GPL(hdmi_register_notifier);
-+
-+int hdmi_unregister_notifier(struct notifier_block *nb)
-+{
-+	return blocking_notifier_chain_unregister(&hdmi_notifier, nb);
-+}
-+EXPORT_SYMBOL_GPL(hdmi_unregister_notifier);
-+
-+void hdmi_event_connect(struct device *dev)
-+{
-+	struct hdmi_event_base base;
-+
-+	base.source = dev;
-+
-+	blocking_notifier_call_chain(&hdmi_notifier, HDMI_CONNECTED, &base);
-+}
-+EXPORT_SYMBOL_GPL(hdmi_event_connect);
-+
-+void hdmi_event_disconnect(struct device *dev)
-+{
-+	struct hdmi_event_base base;
-+
-+	base.source = dev;
-+
-+	blocking_notifier_call_chain(&hdmi_notifier, HDMI_DISCONNECTED, &base);
-+}
-+EXPORT_SYMBOL_GPL(hdmi_event_disconnect);
-+
-+void hdmi_event_new_edid(struct device *dev, const void *edid, size_t size)
-+{
-+	struct hdmi_event_new_edid new_edid;
-+
-+	new_edid.base.source = dev;
-+	new_edid.edid = edid;
-+	new_edid.size = size;
-+
-+	blocking_notifier_call_chain(&hdmi_notifier, HDMI_NEW_EDID, &new_edid);
-+}
-+EXPORT_SYMBOL_GPL(hdmi_event_new_edid);
-+
-+void hdmi_event_new_eld(struct device *dev, const u8 eld[128])
-+{
-+	struct hdmi_event_new_eld new_eld;
-+
-+	new_eld.base.source = dev;
-+	memcpy(new_eld.eld, eld, sizeof(new_eld.eld));
-+
-+	blocking_notifier_call_chain(&hdmi_notifier, HDMI_NEW_ELD, &new_eld);
-+}
-+EXPORT_SYMBOL_GPL(hdmi_event_new_eld);
-diff --git a/include/linux/hdmi-notifier.h b/include/linux/hdmi-notifier.h
-new file mode 100644
-index 000000000000..5fb710e5d68a
---- /dev/null
-+++ b/include/linux/hdmi-notifier.h
-@@ -0,0 +1,44 @@
-+#ifndef LINUX_HDMI_NOTIFIER_H
-+#define LINUX_HDMI_NOTIFIER_H
-+
-+#include <linux/types.h>
-+
-+enum {
-+	HDMI_CONNECTED,
-+	HDMI_DISCONNECTED,
-+	HDMI_NEW_EDID,
-+	HDMI_NEW_ELD,
-+};
-+
-+struct hdmi_event_base {
-+	struct device *source;
-+};
-+
-+struct hdmi_event_new_edid {
-+	struct hdmi_event_base base;
-+	const void *edid;
-+	size_t size;
-+};
-+
-+struct hdmi_event_new_eld {
-+	struct hdmi_event_base base;
-+	unsigned char eld[128];
-+};
-+
-+union hdmi_event {
-+	struct hdmi_event_base base;
-+	struct hdmi_event_new_edid edid;
-+	struct hdmi_event_new_eld eld;
-+};
-+
-+struct notifier_block;
-+
-+int hdmi_register_notifier(struct notifier_block *nb);
-+int hdmi_unregister_notifier(struct notifier_block *nb);
-+
-+void hdmi_event_connect(struct device *dev);
-+void hdmi_event_disconnect(struct device *dev);
-+void hdmi_event_new_edid(struct device *dev, const void *edid, size_t size);
-+void hdmi_event_new_eld(struct device *dev, const u8 eld[128]);
-+
-+#endif
+-/* CEC Engine Registers */
+-#define HDMI_CEC_CTRL                           0x7D00
+-#define HDMI_CEC_STAT                           0x7D01
+-#define HDMI_CEC_MASK                           0x7D02
+-#define HDMI_CEC_POLARITY                       0x7D03
+-#define HDMI_CEC_INT                            0x7D04
+-#define HDMI_CEC_ADDR_L                         0x7D05
+-#define HDMI_CEC_ADDR_H                         0x7D06
+-#define HDMI_CEC_TX_CNT                         0x7D07
+-#define HDMI_CEC_RX_CNT                         0x7D08
+-#define HDMI_CEC_TX_DATA0                       0x7D10
+-#define HDMI_CEC_TX_DATA1                       0x7D11
+-#define HDMI_CEC_TX_DATA2                       0x7D12
+-#define HDMI_CEC_TX_DATA3                       0x7D13
+-#define HDMI_CEC_TX_DATA4                       0x7D14
+-#define HDMI_CEC_TX_DATA5                       0x7D15
+-#define HDMI_CEC_TX_DATA6                       0x7D16
+-#define HDMI_CEC_TX_DATA7                       0x7D17
+-#define HDMI_CEC_TX_DATA8                       0x7D18
+-#define HDMI_CEC_TX_DATA9                       0x7D19
+-#define HDMI_CEC_TX_DATA10                      0x7D1a
+-#define HDMI_CEC_TX_DATA11                      0x7D1b
+-#define HDMI_CEC_TX_DATA12                      0x7D1c
+-#define HDMI_CEC_TX_DATA13                      0x7D1d
+-#define HDMI_CEC_TX_DATA14                      0x7D1e
+-#define HDMI_CEC_TX_DATA15                      0x7D1f
+-#define HDMI_CEC_RX_DATA0                       0x7D20
+-#define HDMI_CEC_RX_DATA1                       0x7D21
+-#define HDMI_CEC_RX_DATA2                       0x7D22
+-#define HDMI_CEC_RX_DATA3                       0x7D23
+-#define HDMI_CEC_RX_DATA4                       0x7D24
+-#define HDMI_CEC_RX_DATA5                       0x7D25
+-#define HDMI_CEC_RX_DATA6                       0x7D26
+-#define HDMI_CEC_RX_DATA7                       0x7D27
+-#define HDMI_CEC_RX_DATA8                       0x7D28
+-#define HDMI_CEC_RX_DATA9                       0x7D29
+-#define HDMI_CEC_RX_DATA10                      0x7D2a
+-#define HDMI_CEC_RX_DATA11                      0x7D2b
+-#define HDMI_CEC_RX_DATA12                      0x7D2c
+-#define HDMI_CEC_RX_DATA13                      0x7D2d
+-#define HDMI_CEC_RX_DATA14                      0x7D2e
+-#define HDMI_CEC_RX_DATA15                      0x7D2f
+-#define HDMI_CEC_LOCK                           0x7D30
+-#define HDMI_CEC_WKUPCTRL                       0x7D31
+-
+ /* I2C Master Registers (E-DDC) */
+ #define HDMI_I2CM_SLAVE                         0x7E00
+ #define HDMI_I2CM_ADDRESS                       0x7E01
 -- 
 2.1.0
