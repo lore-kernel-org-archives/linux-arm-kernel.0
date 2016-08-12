@@ -1,297 +1,97 @@
-From: bsingharora@gmail.com (Balbir Singh)
-Date: Fri, 12 Aug 2016 18:17:39 +1000
-Subject: [PATCH v2 2/2] kexec: extend kexec_file_load system call
-In-Reply-To: <1470956638-3589-3-git-send-email-bauerman@linux.vnet.ibm.com>
-References: <1470956638-3589-1-git-send-email-bauerman@linux.vnet.ibm.com>
- <1470956638-3589-3-git-send-email-bauerman@linux.vnet.ibm.com>
-Message-ID: <20160812081739.GB22218@350D>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Fri, 12 Aug 2016 16:17:53 +0800
+Subject: [PATCH v9 01/10] clk: fix initial state of critical clock's
+ parents
+In-Reply-To: <20160810210922.GD2996@codeaurora.org>
+References: <1466581229-2342-1-git-send-email-erin.lo@mediatek.com>
+ <1466581229-2342-2-git-send-email-erin.lo@mediatek.com>
+ <20160702012140.GB17071@codeaurora.org>
+ <1467604308.26485.4.camel@mtksdaap41>
+ <146802073038.73491.6675612765998057903@resonance>
+ <1468225452.31247.7.camel@mtksdaap41> <1470203182.17063.3.camel@mtksdaap41>
+ <1470721183.8551.6.camel@mtksdaap41> <20160810210922.GD2996@codeaurora.org>
+Message-ID: <1470989873.8551.10.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2016 at 08:03:58PM -0300, Thiago Jung Bauermann wrote:
-> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+On Wed, 2016-08-10 at 14:09 -0700, Stephen Boyd wrote:
+> (Including lists)
 > 
-> Device tree blob must be passed to a second kernel on DTB-capable
-> archs, like powerpc and arm64, but the current kernel interface
-> lacks this support.
+> On 08/09, James Liao wrote:
+> > On Wed, 2016-08-03 at 13:46 +0800, James Liao wrote:
+> >>
+> >> Hi Mike,
+> >>
+> >> Do you have new patches to fix new clock parents? If not, I think we can
+> >> use my patch first. Is it okay?
+> >>
+> >
+> > Hi Stephen,
+> >
+> > Do you have comments for the bug fixing? I prefer to use my patch (clk:
+> > fix initial state of critical clock's parents). How do you think?
+> >
 > 
-> This patch extends kexec_file_load system call by adding an extra
-> argument to this syscall so that an arbitrary number of file descriptors
-> can be handed out from user space to the kernel.
+> How about we recalc accuracies and rates in addition to the patch
+> from Mike? That will fix everything?
+
+Hi Stephen,
+
+It works!
+
+I'll send a new series of MT2701 clock support in few days. Should I
+include this patch in my series? Or you'll merge it into clk-next
+directly?
+
+
+Best regards,
+
+James
+
+> ---8<----
+> From: Michael Turquette <mturquette@baylibre.com>
+> Subject: [PATCH] clk: migrate ref counts when orphans are reunited
 > 
-> 	long sys_kexec_file_load(int kernel_fd, int initrd_fd,
-> 				 unsigned long cmdline_len,
-> 				 const char __user *cmdline_ptr,
-> 				 unsigned long flags,
-> 				 const struct kexec_fdset __user *ufdset);
+> It's always nice to see families reunited, and this is equally true when
+> talking about parent clocks and their children. However, if the orphan
+> clk had a positive prepare_count or enable_count, then we would not
+> migrate those counts up the parent chain correctly.
 > 
-> If KEXEC_FILE_EXTRA_FDS is set to the "flags" argument, the "ufdset"
-> argument points to the following struct buffer:
+> This has manifested with the recent critical clocks feature, which often
+> enables clocks very early, before their parents have been registered.
 > 
-> 	struct kexec_fdset {
-> 		int nr_fds;
-> 		struct kexec_file_fd fds[0];
-> 	}
+> Fixed by replacing the call to clk_core_reparent with calls to
+> __clk_set_parent_{before,after}.
 > 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Signed-off-by: Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com>
+> Cc: James Liao <jamesjj.liao@mediatek.com>
+> Cc: Erin Lo <erin.lo@mediatek.com>
+> Signed-off-by: Michael Turquette <mturquette@baylibre.com>
+> [sboyd at codeaurora.org: Recalc accuracies and rates too]
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->  include/linux/fs.h         |  1 +
->  include/linux/kexec.h      |  7 ++--
->  include/linux/syscalls.h   |  4 ++-
->  include/uapi/linux/kexec.h | 22 ++++++++++++
->  kernel/kexec_file.c        | 83 ++++++++++++++++++++++++++++++++++++++++++----
->  5 files changed, 108 insertions(+), 9 deletions(-)
+>  drivers/clk/clk.c | 12 ++++++++++--
+>  1 file changed, 10 insertions(+), 2 deletions(-)
 > 
-> diff --git a/include/linux/fs.h b/include/linux/fs.h
-> index 3523bf62f328..847d9c31f428 100644
-> --- a/include/linux/fs.h
-> +++ b/include/linux/fs.h
-> @@ -2656,6 +2656,7 @@ extern int do_pipe_flags(int *, int);
->  	id(MODULE, kernel-module)		\
->  	id(KEXEC_IMAGE, kexec-image)		\
->  	id(KEXEC_INITRAMFS, kexec-initramfs)	\
-> +	id(KEXEC_PARTIAL_DTB, kexec-partial-dtb)		\
-
-The backspace is over-indented?
-
->  	id(POLICY, security-policy)		\
->  	id(MAX_ID, )
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 820a939fb6bb..dc3fff2bf839 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -2449,8 +2449,16 @@ static int __clk_core_init(struct clk_core *core)
+>  	hlist_for_each_entry_safe(orphan, tmp2, &clk_orphan_list, child_node) {
+>  		struct clk_core *parent = __clk_init_parent(orphan);
 >  
-> diff --git a/include/linux/kexec.h b/include/linux/kexec.h
-> index 4f85d284ed0b..29202935055d 100644
-> --- a/include/linux/kexec.h
-> +++ b/include/linux/kexec.h
-> @@ -148,7 +148,10 @@ struct kexec_file_ops {
->  	kexec_verify_sig_t *verify_sig;
->  #endif
->  };
-> -#endif
-> +
-> +int __weak arch_kexec_verify_buffer(enum kexec_file_type type, const void *buf,
-> +				    unsigned long size);
-> +#endif /* CONFIG_KEXEC_FILE */
->  
->  struct kimage {
->  	kimage_entry_t head;
-> @@ -280,7 +283,7 @@ extern int kexec_load_disabled;
->  
->  /* List of defined/legal kexec file flags */
->  #define KEXEC_FILE_FLAGS	(KEXEC_FILE_UNLOAD | KEXEC_FILE_ON_CRASH | \
-> -				 KEXEC_FILE_NO_INITRAMFS)
-> +				 KEXEC_FILE_NO_INITRAMFS | KEXEC_FILE_EXTRA_FDS)
->  
->  #define VMCOREINFO_BYTES           (4096)
->  #define VMCOREINFO_NOTE_NAME       "VMCOREINFO"
-> diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
-> index d02239022bd0..fc072bdb74e3 100644
-> --- a/include/linux/syscalls.h
-> +++ b/include/linux/syscalls.h
-> @@ -66,6 +66,7 @@ struct perf_event_attr;
->  struct file_handle;
->  struct sigaltstack;
->  union bpf_attr;
-> +struct kexec_fdset;
->  
->  #include <linux/types.h>
->  #include <linux/aio_abi.h>
-> @@ -321,7 +322,8 @@ asmlinkage long sys_kexec_load(unsigned long entry, unsigned long nr_segments,
->  asmlinkage long sys_kexec_file_load(int kernel_fd, int initrd_fd,
->  				    unsigned long cmdline_len,
->  				    const char __user *cmdline_ptr,
-> -				    unsigned long flags);
-> +				    unsigned long flags,
-> +				    const struct kexec_fdset __user *ufdset);
->  
->  asmlinkage long sys_exit(int error_code);
->  asmlinkage long sys_exit_group(int error_code);
-> diff --git a/include/uapi/linux/kexec.h b/include/uapi/linux/kexec.h
-> index aae5ebf2022b..6279be79efba 100644
-> --- a/include/uapi/linux/kexec.h
-> +++ b/include/uapi/linux/kexec.h
-> @@ -23,6 +23,28 @@
->  #define KEXEC_FILE_UNLOAD	0x00000001
->  #define KEXEC_FILE_ON_CRASH	0x00000002
->  #define KEXEC_FILE_NO_INITRAMFS	0x00000004
-> +#define KEXEC_FILE_EXTRA_FDS	0x00000008
-> +
-> +enum kexec_file_type {
-> +	KEXEC_FILE_TYPE_KERNEL,
-> +	KEXEC_FILE_TYPE_INITRAMFS,
-> +
-> +	/*
-> +	 * Device Tree Blob containing just the nodes and properties that
-> +	 * the kexec_file_load caller wants to add or modify.
-> +	 */
-> +	KEXEC_FILE_TYPE_PARTIAL_DTB,
-> +};
-> +
-> +struct kexec_file_fd {
-> +	enum kexec_file_type type;
-> +	int fd;
-> +};
-> +
-> +struct kexec_fdset {
-> +	int nr_fds;
-> +	struct kexec_file_fd fds[0];
-> +};
->  
->  /* These values match the ELF architecture values.
->   * Unless there is a good reason that should continue to be the case.
-> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-> index 113af2f219b9..d6803dd884e2 100644
-> --- a/kernel/kexec_file.c
-> +++ b/kernel/kexec_file.c
-> @@ -25,6 +25,9 @@
->  #include <linux/vmalloc.h>
->  #include "kexec_internal.h"
->  
-> +#define MAX_FDSET_SIZE	(sizeof(struct kexec_fdset) + \
-> +				KEXEC_SEGMENT_MAX * sizeof(struct kexec_file_fd))
-> +
->  /*
->   * Declare these symbols weak so that if architecture provides a purgatory,
->   * these will be overridden.
-> @@ -116,6 +119,22 @@ void kimage_file_post_load_cleanup(struct kimage *image)
->  	image->image_loader_data = NULL;
->  }
->  
-> +/**
-> + * arch_kexec_verify_buffer() - check that the given kexec file is valid
-> + *
-> + * Device trees in particular can contain properties that may make the kernel
-> + * execute code that it wasn't supposed to (e.g., use the wrong entry point
-> + * when calling firmware functions). Because of this, the kernel needs to
-> + * verify that it is safe to use the device tree blob passed from userspace.
-> + *
-> + * Return: 0 on success, negative errno on error.
-> + */
-> +int __weak arch_kexec_verify_buffer(enum kexec_file_type type, const void *buf,
-> +				    unsigned long size)
-> +{
-> +	return -EINVAL;
-> +}
-> +
->  /*
->   * In file mode list of segments is prepared by kernel. Copy relevant
->   * data from user space, do error checking, prepare segment list
-> @@ -123,7 +142,8 @@ void kimage_file_post_load_cleanup(struct kimage *image)
->  static int
->  kimage_file_prepare_segments(struct kimage *image, int kernel_fd, int initrd_fd,
->  			     const char __user *cmdline_ptr,
-> -			     unsigned long cmdline_len, unsigned flags)
-> +			     unsigned long cmdline_len, unsigned long flags,
-> +			     const struct kexec_fdset __user *ufdset)
->  {
->  	int ret = 0;
->  	void *ldata;
-> @@ -160,6 +180,55 @@ kimage_file_prepare_segments(struct kimage *image, int kernel_fd, int initrd_fd,
->  		image->initrd_buf_len = size;
+> -		if (parent)
+> -			clk_core_reparent(orphan, parent);
+> +		/*
+> +		 * we could call __clk_set_parent, but that would result in a
+> +		 * reducant call to the .set_rate op, if it exists
+> +		 */
+> +		if (parent) {
+> +			__clk_set_parent_before(orphan, parent);
+> +			__clk_set_parent_after(orphan, parent, NULL);
+> +			__clk_recalc_accuracies(orphan);
+> +			__clk_recalc_rates(orphan, 0);
+> +		}
 >  	}
 >  
-> +	if (flags & KEXEC_FILE_EXTRA_FDS) {
-> +		int nr_fds, i;
-> +		size_t fdset_size;
-> +		char fdset_buf[MAX_FDSET_SIZE];
-
-Do we really want this on the stack?  I presume the size is not large
-
-> +		struct kexec_fdset *fdset = (struct kexec_fdset *) fdset_buf;
-> +
-> +		ret = copy_from_user(&nr_fds, ufdset, sizeof(int));
-> +		if (ret) {
-> +			ret = -EFAULT;
-> +			goto out;
-> +		}
-> +
-> +		if (nr_fds > KEXEC_SEGMENT_MAX) {
-
-We need an nr_fds < 0 check as well
-
-> +			ret = -E2BIG;
-> +			goto out;
-> +		}
-> +
-> +		fdset_size = sizeof(struct kexec_fdset)
-> +				+ nr_fds * sizeof(struct kexec_file_fd);
-> +
-> +		ret = copy_from_user(fdset, ufdset, fdset_size);
-
-Can the user change nr_fds between the two copy_from_users, ideally not,
-but we should validate it.
-
-> +		if (ret) {
-> +			ret = -EFAULT;
-> +			goto out;
-> +		}
-> +
-> +		for (i = 0; i < fdset->nr_fds; i++) {
-> +			if (fdset->fds[i].type == KEXEC_FILE_TYPE_PARTIAL_DTB) {
-> +				ret = kernel_read_file_from_fd(fdset->fds[i].fd,
-> +						&image->dtb_buf, &size, INT_MAX,
-> +						READING_KEXEC_PARTIAL_DTB);
-> +				if (ret)
-> +					goto out;
-> +				image->dtb_buf_len = size;
-> +
-> +				ret = arch_kexec_verify_buffer(KEXEC_FILE_TYPE_PARTIAL_DTB,
-> +							       image->dtb_buf,
-> +							       image->dtb_buf_len);
-> +				if (ret)
-> +					goto out;
-> +			} else {
-> +				pr_debug("unknown file type %d failed.\n",
-> +						fdset->fds[i].type);
-> +				ret = -EINVAL;
-> +				goto out;
-> +			}
-> +		}
-> +	}
-> +
->  	if (cmdline_len) {
->  		image->cmdline_buf = kzalloc(cmdline_len, GFP_KERNEL);
->  		if (!image->cmdline_buf) {
-> @@ -202,7 +271,8 @@ out:
->  static int
->  kimage_file_alloc_init(struct kimage **rimage, int kernel_fd,
->  		       int initrd_fd, const char __user *cmdline_ptr,
-> -		       unsigned long cmdline_len, unsigned long flags)
-> +		       unsigned long cmdline_len, unsigned long flags,
-> +		       const struct kexec_fdset __user *ufdset)
->  {
->  	int ret;
->  	struct kimage *image;
-> @@ -221,7 +291,8 @@ kimage_file_alloc_init(struct kimage **rimage, int kernel_fd,
->  	}
->  
->  	ret = kimage_file_prepare_segments(image, kernel_fd, initrd_fd,
-> -					   cmdline_ptr, cmdline_len, flags);
-> +					   cmdline_ptr, cmdline_len, flags,
-> +					   ufdset);
->  	if (ret)
->  		goto out_free_image;
->  
-> @@ -256,9 +327,9 @@ out_free_image:
->  	return ret;
->  }
->  
-> -SYSCALL_DEFINE5(kexec_file_load, int, kernel_fd, int, initrd_fd,
-> +SYSCALL_DEFINE6(kexec_file_load, int, kernel_fd, int, initrd_fd,
->  		unsigned long, cmdline_len, const char __user *, cmdline_ptr,
-> -		unsigned long, flags)
-> +		unsigned long, flags, const struct kexec_fdset __user *, ufdset)
->  {
->  	int ret = 0, i;
->  	struct kimage **dest_image, *image;
-> @@ -295,7 +366,7 @@ SYSCALL_DEFINE5(kexec_file_load, int, kernel_fd, int, initrd_fd,
->  		kimage_free(xchg(&kexec_crash_image, NULL));
->  
->  	ret = kimage_file_alloc_init(&image, kernel_fd, initrd_fd, cmdline_ptr,
-> -				     cmdline_len, flags);
-> +				     cmdline_len, flags, ufdset);
->  	if (ret)
->  		goto out;
->
-
-
-Balbir Singh.  
+>  	/*
