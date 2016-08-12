@@ -1,33 +1,158 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 12 Aug 2016 14:34:03 +0200
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable SECCOMP
-In-Reply-To: <1471005243-6409-1-git-send-email-k.kozlowski@samsung.com>
-References: <1471005243-6409-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1471005243-6409-2-git-send-email-k.kozlowski@samsung.com>
+From: brendan.jackman@arm.com (Brendan Jackman)
+Date: Fri, 12 Aug 2016 13:35:17 +0100
+Subject: [PATCH v3 02/15] dt/bindings: Update binding for PM domain idle
+ states
+In-Reply-To: <20160811211023.GC1401@linaro.org>
+References: <1470351902-43103-1-git-send-email-lina.iyer@linaro.org>
+ <1470351902-43103-3-git-send-email-lina.iyer@linaro.org>
+ <99e35b6c-6698-6d27-f4d7-fa032796869e@arm.com>
+ <20160810164034.GA1401@linaro.org>
+ <5e59874c-bbb7-270a-199c-da1ff5932554@arm.com>
+ <20160811211023.GC1401@linaro.org>
+Message-ID: <20160812123516.GA24194@brendan-thinkstation>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Systemd already supports seccomp.  It seems some distros are building
-systemd with seccomp, e.g. Arch on ARM, thus leading to boot errors:
+Hi Lina,
 
-systemd-logind.service: Failed at step SECCOMP spawning /usr/lib/systemd/systemd-logind: Invalid argument
+Apologies, I sent this reply before and automatically included an "IMPORTANT
+NOTICE" footer, please disregard that email, here's the same thing without the
+footer.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+On Thu, Aug 11, 2016 at 03:10:23PM -0600, Lina Iyer wrote:
+> On Wed, Aug 10 2016 at 12:09 -0600, Sudeep Holla wrote:
+> >
+> >
+> >On 10/08/16 17:40, Lina Iyer wrote:
+> >>Hi Sudeep,
+> >>
+> >>On Wed, Aug 10 2016 at 09:15 -0600, Sudeep Holla wrote:
+> >>>Hi Lina,
+> >>>
+> >>>I have few concerns mainly due to the lack of description and not the
+> >>>binding per say.
+> >
+> >[...]
+> >
+> >>It is pretty clear that CPUs cannot not define the domain idle states.
+> >>Domains define their own idle states. Just as you mention above. CPU is
+> >>just a single component in its domain. There may be other devices like
+> >>PMUs, Coresights etc that also may have a say in the idle state the
+> >>domain may be put in, when the devices are idle. As such, adding domain
+> >>idle states to the CPU's idle state property is not appropriate.
+> >>
+> >
+> >No I am not saying we need to add domain idle states to the CPU's idle
+> >state property. I am saying we need to remove cpu-idle-states or ignore
+> >it when PD is present. And get all the idle state information for PD.
+> >
+> >I am objecting the split we are creating across CPU and higher level
+> >power domains. And this binding document is incomplete as it skips all
+> >those details. We just need PD handle in CPU and no idle state
+> >information there. Create PD hierarchy and have all idle state
+> >information at one place.
+> >
+> Let me think about this a bit and see what I can come up with.
+>
+> >>Our kernel has runtime PM for devices and then there is CPUidle, both
+> >>are diverging without one knowing about the other. We have to start
+> >>unifying them inorder to have better holistic power management in the
+> >>SoC. To that regard, we have to start imagining CPUs as just another
+> >>device, albeit a special device. But for our purposes in determining
+> >>domain idle state, it will just be a device attached to the domain.
+> >>
+> >
+> >Absolutely agree on that. No arguments. I am asking to go a step ahead
+> >to include even cpu/core level power domains not just cluster/higher
+> >level domains.
+> >
+> >>>We need to have all the idle state information at one place and in this
+> >>>case PD seems more appropriate instead of splitting them across.
+> >>>
+> >>That approach isn't correct. Where will we put the idle states of other
+> >>devices that are also part of the domain? We are thinking about a model,
+> >>where every device defines its own idle states and we define
+> >>relationships between those idle states and their parents' idle states.
+> >
+> >Yes I understand. You confused me here. Won't that be one-to-one
+> >relationship ? If not, how is that dealt in the current bindings ?
+> >
+> >>Ofcourse, devices don't have idle states today, but that is something we
+> >>have been pondering over.
+> >>
+> >
+> >Yes we these binding should be easily extensible, I don't see any issue.
+> >
+> >>>We can also keep the code clean and not break compatibility. Whenever
+> >>>both PD and CPU contains idle-states, PD must take precedence.
+> >>>
+> >>Why?
+> >>The CPU and PD states are orthogonal. While the PD state is dependent on
+> >>the CPU state, the latter is not true. Devices determine their own
+> >>states. Based on the individual device states, we then determine the
+> >>state of the parent and bubble up on the hierarchy.
+> >>
+> >
+> >I may be missing something. Now with your example in the binding, if
+> >another device shares the cluster PD, can it have different idle states?
+> >If so how does it map ?
+> >
+> >
+> >In general whatever binding we come up must not just address OS
+> >coordinated mode. Also I was thinking to have better coverage in
+> >the description by having a bit more complex system like:
+> >
+> >cluster0
+> >	CLUSTER_RET(Retention)
+> >	CLUSTER_PG(Power Gate)
+> >	core0
+> >		CORE_RET
+> >		CORE_PG
+> >	core1
+> >		CORE_RET
+> >		CORE_PG
+> >
+> >cluster1
+> >	CLUSTER_RET
+> >	CLUSTER_PG
+> >	core0
+> >		CORE_RET
+> >		CORE_PG
+> >	core1
+> >		CORE_RET
+> >		CORE_PG
+> >
+> >Platform Co-ordinate supports the following states and we should
+> >be able to determine that from the binding:
+> >
+> >CORE_RET
+> >CORE_PG
+> >CORE_RET + CLUSTER_RET
+>
+> The problem that we have to sove here is knowing that CORE_RET +
+> CLUSTER_PG (hypothetically) an invalid combination. Kevin and
+> I debated it in the earlier RFC and we dont have a good way to solve
+> this generically for all devices.
+>
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 7db8dce3da5f..0ccaa519f588 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -126,6 +126,7 @@ CONFIG_SMP=y
- CONFIG_NR_CPUS=16
- CONFIG_HIGHPTE=y
- CONFIG_CMA=y
-+CONFIG_SECCOMP=y
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_KEXEC=y
--- 
-1.9.1
+
+This is interesting. I had been working on the assumption that a parent
+power domain cannot enter any idle state until its children were all in
+their deepest idle state. I now realise that it's easy to imagine
+platforms where this isn't the case.
+
+However, I don't understand how your current bindings solve this issue
+and why using domain-power-states for all states (i.e. ignoring
+cpu-idle-states and putting CPU idle states in the domain-idle-states of
+a per-CPU power domain - I believe this is what Sudeep is suggesting)
+makes it any more difficult.
+
+Could you link to this previous discussion you mentioned? I'm having
+trouble finding it (R.I.P Gmane).
+
+> >CORE_PG + CLUSTER_RET
+> >CORE_PG + CLUSTER_PG
+> >
+
+Cheers,
+Brendan
