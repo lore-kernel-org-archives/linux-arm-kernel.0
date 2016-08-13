@@ -1,71 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 13 Aug 2016 11:13:58 +0200
-Subject: [kernel-hardening] [PATCH 0/7] arm64: Privileged Access Never
- using TTBR0_EL1 switching
-In-Reply-To: <1471015666-23125-1-git-send-email-catalin.marinas@arm.com>
-References: <1471015666-23125-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <CAKv+Gu9hz_=GSRYgW3RueVhUA8F3HaM5DC_8Jkbx1JHF3x5mKg@mail.gmail.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Sat, 13 Aug 2016 10:45:45 +0100
+Subject: [PATCH RFC] Revert "of/irq: Mark initialised interrupt controllers as
+ populated"
+Message-ID: <E1bYVVh-0001eq-BI@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 August 2016 at 17:27, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> This is the first (public) attempt at emulating PAN by disabling
-> TTBR0_EL1 accesses on arm64.
+This reverts commit 15cc2ed6dcf91a8658e084be4e140147161819d7, which
+causes a regression with iMX6 power domains.  iMX6 GPC contains both an
+interrupt controller and power domains.  The iMX6 GPC code is setup to
+register an interrupt controller using IRQCHIP_DECLARE(), but then to
+register the power domains using the platform device.
 
-I take it using TCR_EL1.EPD0 is too expensive?
+This commit prevents the platform device being created, thereby breaking
+iMX6 power domain support.
 
-> I chose to use a per-CPU saved_ttbr0_el1
-> variable to store the actual TTBR0 as, IMO, it looks better w.r.t. the
-> context switching code, to the detriment of a slightly more complex
-> uaccess_enable() implementation. The alternative was storing the saved
-> TTBR0 in thread_info but with more complex thread switching since TTBR0
-> is normally tied to switch_mm() rather than switch_to(). The latter may
-> also get more complicated if we are to decouple the kernel stack from
-> thread_info at some point (vmalloc'ed stacks).
->
-> The code requires more testing, especially for combinations where UAO is
-> present but PAN is not.
->
-> The patches are also available on this branch:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux ttbr0-pan
->
-> Thanks for reviewing/testing.
->
-> Catalin Marinas (7):
->   arm64: Factor out PAN enabling/disabling into separate uaccess_*
->     macros
->   arm64: Factor out TTBR0_EL1 setting into a specific asm macro
->   arm64: Introduce uaccess_{disable,enable} functionality based on
->     TTBR0_EL1
->   arm64: Disable TTBR0_EL1 during normal kernel execution
->   arm64: Handle faults caused by inadvertent user access with PAN
->     enabled
->   arm64: xen: Enable user access before a privcmd hvc call
->   arm64: Enable CONFIG_ARM64_TTBR0_PAN
->
->  arch/arm64/Kconfig                      |   8 +++
->  arch/arm64/include/asm/assembler.h      | 106 +++++++++++++++++++++++++++++++-
->  arch/arm64/include/asm/cpufeature.h     |   6 ++
->  arch/arm64/include/asm/efi.h            |  14 +++++
->  arch/arm64/include/asm/futex.h          |  14 ++---
->  arch/arm64/include/asm/kernel-pgtable.h |   7 +++
->  arch/arm64/include/asm/mmu_context.h    |   3 +-
->  arch/arm64/include/asm/uaccess.h        |  57 ++++++++++++++---
->  arch/arm64/include/uapi/asm/ptrace.h    |   2 +
->  arch/arm64/kernel/armv8_deprecated.c    |  10 +--
->  arch/arm64/kernel/cpufeature.c          |   1 +
->  arch/arm64/kernel/entry.S               |  62 +++++++++++++++++++
->  arch/arm64/kernel/head.S                |   6 +-
->  arch/arm64/kernel/suspend.c             |  12 ++--
->  arch/arm64/kernel/vmlinux.lds.S         |   5 ++
->  arch/arm64/lib/clear_user.S             |   7 +--
->  arch/arm64/lib/copy_from_user.S         |   7 +--
->  arch/arm64/lib/copy_in_user.S           |   7 +--
->  arch/arm64/lib/copy_to_user.S           |   7 +--
->  arch/arm64/mm/context.c                 |  25 +++++++-
->  arch/arm64/mm/fault.c                   |  21 ++++---
->  arch/arm64/mm/proc.S                    |  16 +----
->  arch/arm64/xen/hypercall.S              |  18 ++++++
->  23 files changed, 347 insertions(+), 74 deletions(-)
->
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+Please argue amongst yourselves about how to fix this regression caused
+by this commit...
+
+Marc introduced the code which used OF_DECLARE_2()/IRQCHIP_DECLARE() in
+
+	commit b923ff6af0d5a806a3996dac6d4393cd9792d0f4
+	Author: Marc Zyngier <marc.zyngier@arm.com>
+	Date:   Mon Feb 23 17:45:18 2015 +0000
+
+while the PM domain code was introduced at around the same time by:
+
+	commit 00eb60a8b4f7a4aa00fd8abd68c2dc7aec55df19
+	Author: Philipp Zabel <p.zabel@pengutronix.de>
+	Date:   Mon Feb 23 18:40:12 2015 +0100
+
+I guess distributed development is fun!
+
+ drivers/of/irq.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+index 89a71c6074fc..7d3f93fdc4ad 100644
+--- a/drivers/of/irq.c
++++ b/drivers/of/irq.c
+@@ -559,8 +559,6 @@ void __init of_irq_init(const struct of_device_id *matches)
+ 			 * its children can get processed in a subsequent pass.
+ 			 */
+ 			list_add_tail(&desc->list, &intc_parent_list);
+-
+-			of_node_set_flag(desc->dev, OF_POPULATED);
+ 		}
+ 
+ 		/* Get the next pending parent that might have children */
+-- 
+2.1.0
