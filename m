@@ -1,64 +1,68 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Sat, 13 Aug 2016 17:54:03 +0300
-Subject: [PATCH 18/19] arm64:ilp32: add vdso-ilp32 and use for signal
- return
-In-Reply-To: <mvminx3ud0m.fsf@hawking.suse.de>
+Date: Sat, 13 Aug 2016 18:17:03 +0300
+Subject: [PATCH 05/19] arm64: rename COMPAT to AARCH32_EL0 in Kconfig
+In-Reply-To: <20160812143612.GH12939@e104818-lin.cambridge.arm.com>
 References: <1466207668-10549-1-git-send-email-ynorov@caviumnetworks.com>
- <1466207668-10549-19-git-send-email-ynorov@caviumnetworks.com>
- <mvminx3ud0m.fsf@hawking.suse.de>
-Message-ID: <20160813145403.GB24335@yury-N73SV>
+ <6457502.FRufylo3sd@wuerfel>
+ <20160811163003.GD18366@e104818-lin.cambridge.arm.com>
+ <2034620.lN3lAEBAXs@wuerfel>
+ <20160812143612.GH12939@e104818-lin.cambridge.arm.com>
+Message-ID: <20160813151703.GC24335@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2016 at 04:54:17PM +0200, Andreas Schwab wrote:
-> Yury Norov <ynorov@caviumnetworks.com> writes:
+On Fri, Aug 12, 2016 at 03:36:12PM +0100, Catalin Marinas wrote:
+> On Thu, Aug 11, 2016 at 10:29:03PM +0200, Arnd Bergmann wrote:
+> > On Thursday, August 11, 2016 5:30:03 PM CEST Catalin Marinas wrote:
+> > > > > > and you can have ARM binaries with
+> > > > > > PER_LINUX (using the arm64 uname) just like you can have
+> > > > > > arm64 binaries running with PER_LINUX32.
+> > > > > 
+> > > > > I was actually looking to enforce the 32-bit binaries to only see
+> > > > > PER_LINUX32, though with a risk of breaking the ABI. OTOH, people are
+> > > > > abusing this and write 32-bit apps relying on the 64-bit /proc/cpuinfo:
+> > > > > 
+> > > > > http://lkml.kernel.org/g/1464706504-25224-3-git-send-email-catalin.marinas at arm.com
+> > > > > 
+> > > > > (you were summoned on that discussion couple of times ;))
+> > > > 
+> > > > Hmm, I thought I saw the thread and didn't have any good idea for
+> > > > the uname information, but didn't notice it was for /proc/cpuinfo.
+> > > > 
+> > > > What's wrong with always showing both the 32-bit and the 64-bit
+> > > > hwcap strings here (minus the duplicates, which hopefully have
+> > > > the same meaning here)?
+> > > 
+> > > As I said above, some of them have the same name (which may be a good
+> > > thing at a first look) but we don't have an architecture guarantee that
+> > > the feature is present in both AArch32 and AArch64 modes (e.g. AES may
+> > > only be available in AArch64).
+> > 
+> > Is this the case on actual implementations that exist today? If they
+> > are actually always both present, we might be able to get away with it.
 > 
-> > diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-> > index 2a0de6f..e48ea34 100644
-> > --- a/arch/arm64/kernel/vdso.c
-> > +++ b/arch/arm64/kernel/vdso.c
-> > @@ -40,6 +40,12 @@ extern char vdso_start, vdso_end;
-> >  static unsigned long vdso_pages;
-> >  static struct page **vdso_pagelist;
-> >  
-> > +#ifdef CONFIG_ARM64_ILP32
-> > +extern char vdso_ilp32_start, vdso_ilp32_end;
-> > +static unsigned long vdso_ilp32_pages;
-> > +static struct page **vdso_ilp32_pagelist;
-> > +#endif
-> > +
-> >  /*
-> >   * The vDSO data page.
-> >   */
-> > @@ -110,24 +116,29 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
-> >  }
-> >  #endif /* CONFIG_AARCH32_EL0 */
-> >  
-> > -static struct vm_special_mapping vdso_spec[2];
-> > -
-> > -static int __init vdso_init(void)
-> > +static int __init vdso_init_common(char *vdso_start, char *vdso_end,
+> It may be fine on current implementations but what would we do when/if
+> we actually find such discrepancy? It's not just ARM Ltd designing the
+> chips, so as long as the architecture doesn't mandate it you may find
+> strange implementations.
 > 
-> Using the same name for the parameter as for the global variable is
-> dangerous ....
+> Imposing such restriction in the architecture doesn't make sense if the
+> only reason is the /proc/cpuinfo file (and I can't think of any other
+> reason why this should be enforced).
 > 
-> > +					  unsigned long *vdso_pagesp,
-> > +					  struct page ***vdso_pagelistp,
-> > +					  struct vm_special_mapping* vdso_spec)
-> >  {
-> >  	int i;
-> > +	unsigned long vdso_pages;
-> > +	struct page **vdso_pagelist;
-> >  
-> > -	if (memcmp(&vdso_start, "\177ELF", 4)) {
-> > +	if (memcmp(vdso_start, "\177ELF", 4)) {
-> 
-> ... because forgetting to remove & can be fatal, and your compiler may
-> not even warn you.
-> 
-> Andreas.
+> What I'm worried about is 32-bit apps running on an arm64 kernel and
+> making use of the 64-bit /proc/cpuinfo without any guarantee that the
+> AArch32 state has such features. In my patch proposal linked above I
+> wanted to always force the compat /proc/cpuinfo for 32-bit tasks.
 
-Fixed. See here: https://github.com/norov/linux/tree/ilp32-4.8
-Thanks.
+The link doesn't work for me. Is there other link, or what's the
+maillist there?
+
+So, what we decided finally? Is my understanding correct that we leave
+everything as is in ilp32 series, and it will be resolved separately?
 
 Yury.
+
+> 
+> -- 
+> Catalin
