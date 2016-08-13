@@ -1,54 +1,41 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Sat, 13 Aug 2016 10:45:45 +0100
-Subject: [PATCH RFC] Revert "of/irq: Mark initialised interrupt controllers as
- populated"
-Message-ID: <E1bYVVh-0001eq-BI@rmk-PC.armlinux.org.uk>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Sat, 13 Aug 2016 18:01:13 +0800
+Subject: [PATCH v2] Documentation: sunxi: Update Allwinner SoC documentation
+Message-ID: <20160813100113.3756-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 15cc2ed6dcf91a8658e084be4e140147161819d7, which
-causes a regression with iMX6 power domains.  iMX6 GPC contains both an
-interrupt controller and power domains.  The iMX6 GPC code is setup to
-register an interrupt controller using IRQCHIP_DECLARE(), but then to
-register the power domains using the platform device.
+Now, the A83T and A64 SoC user manuals are available.
+Update the documentation to add the links.
 
-This commit prevents the platform device being created, thereby breaking
-iMX6 power domain support.
+An updated version of A83T datasheet is also included now.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
-Please argue amongst yourselves about how to fix this regression caused
-by this commit...
+Changes in v2:
+- Add updated A83T Datasheet.
 
-Marc introduced the code which used OF_DECLARE_2()/IRQCHIP_DECLARE() in
+ Documentation/arm/sunxi/README | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-	commit b923ff6af0d5a806a3996dac6d4393cd9792d0f4
-	Author: Marc Zyngier <marc.zyngier@arm.com>
-	Date:   Mon Feb 23 17:45:18 2015 +0000
-
-while the PM domain code was introduced at around the same time by:
-
-	commit 00eb60a8b4f7a4aa00fd8abd68c2dc7aec55df19
-	Author: Philipp Zabel <p.zabel@pengutronix.de>
-	Date:   Mon Feb 23 18:40:12 2015 +0100
-
-I guess distributed development is fun!
-
- drivers/of/irq.c | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-index 89a71c6074fc..7d3f93fdc4ad 100644
---- a/drivers/of/irq.c
-+++ b/drivers/of/irq.c
-@@ -559,8 +559,6 @@ void __init of_irq_init(const struct of_device_id *matches)
- 			 * its children can get processed in a subsequent pass.
- 			 */
- 			list_add_tail(&desc->list, &intc_parent_list);
--
--			of_node_set_flag(desc->dev, OF_POPULATED);
- 		}
- 
- 		/* Get the next pending parent that might have children */
+diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
+index e5a115f..c7a0554 100644
+--- a/Documentation/arm/sunxi/README
++++ b/Documentation/arm/sunxi/README
+@@ -73,4 +73,13 @@ SunXi family
+     * Octa ARM Cortex-A7 based SoCs
+       - Allwinner A83T
+         + Datasheet
+-          http://dl.linux-sunxi.org/A83T/A83T_datasheet_Revision_1.1.pdf
++          https://github.com/allwinner-zh/documents/raw/master/A83T/A83T_Datasheet_v1.3_20150510.pdf
++        + User Manual
++          https://github.com/allwinner-zh/documents/raw/master/A83T/A83T_User_Manual_v1.5.1_20150513.pdf
++
++    * Quad ARM Cortex-A53 based SoCs
++      - Allwinner A64
++        + Datasheet
++          http://dl.linux-sunxi.org/A64/A64_Datasheet_V1.1.pdf
++        + User Manual
++          http://dl.linux-sunxi.org/A64/Allwinner%20A64%20User%20Manual%20v1.0.pdf
 -- 
-2.1.0
+2.9.2
