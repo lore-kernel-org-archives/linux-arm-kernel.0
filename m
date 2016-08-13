@@ -1,52 +1,31 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 12 Aug 2016 22:05:47 -0700
-Subject: [PATCH net-next v2 11/12] drivers: net: xgene: Fix backward
- compatibility
+Date: Fri, 12 Aug 2016 22:05:48 -0700
+Subject: [PATCH net-next v2 12/12] dtb: xgene: Fix backward compatibility
 In-Reply-To: <1471064748-28033-1-git-send-email-isubramanian@apm.com>
 References: <1471064748-28033-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1471064748-28033-12-git-send-email-isubramanian@apm.com>
+Message-ID: <1471064748-28033-13-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the backward compatibility on handling phy_connect(), by
-iterating over the phy-handle, when new DT is used with older kernel.
+This patch fixes the backward compatibility when used with older kernel.
 
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 ---
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.c | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+ arch/arm64/boot/dts/apm/apm-storm.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-index 18bb955..321fb19 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-@@ -761,18 +761,18 @@ int xgene_enet_phy_connect(struct net_device *ndev)
- 	if (dev->of_node) {
- 		for (i = 0 ; i < 2; i++) {
- 			np = of_parse_phandle(dev->of_node, "phy-handle", i);
--			if (np)
--				break;
--		}
- 
--		if (!np) {
--			netdev_dbg(ndev, "No phy-handle found in DT\n");
--			return -ENODEV;
-+			if (!np)
-+				continue;
-+
-+			phy_dev = of_phy_connect(ndev, np,
-+						 &xgene_enet_adjust_link,
-+						 0, pdata->phy_mode);
-+			of_node_put(np);
-+			if (phy_dev)
-+				break;
- 		}
- 
--		phy_dev = of_phy_connect(ndev, np, &xgene_enet_adjust_link,
--					 0, pdata->phy_mode);
--		of_node_put(np);
- 		if (!phy_dev) {
- 			netdev_err(ndev, "Could not connect to PHY\n");
- 			return -ENODEV;
+diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+index f1c2c71..d5c3435 100644
+--- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+@@ -923,7 +923,7 @@
+ 			/* mac address will be overwritten by the bootloader */
+ 			local-mac-address = [00 00 00 00 00 00];
+ 			phy-connection-type = "rgmii";
+-			phy-handle = <&menet0phy>,<&menetphy>;
++			phy-handle = <&menetphy>,<&menet0phy>;
+ 			mdio {
+ 				compatible = "apm,xgene-mdio";
+ 				#address-cells = <1>;
 -- 
 1.9.1
