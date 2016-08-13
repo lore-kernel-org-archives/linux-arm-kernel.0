@@ -1,102 +1,274 @@
-From: kbeldan@baylibre.com (Karl Beldan)
-Date: Sat, 13 Aug 2016 11:42:46 +0000
-Subject: [PATCH 2/4] ARM: dts: da850: Add an aemif node
-In-Reply-To: <57AAE728.8000209@ti.com>
-References: <20160809171518.22690-1-kbeldan@baylibre.com>
- <20160809171518.22690-3-kbeldan@baylibre.com>
- <57AADC63.90405@ti.com> <57AADF7B.1070102@ti.com>
- <20160810080713.GB16481@gobelin> <57AAE1D1.5080000@ti.com>
- <20160810082631.GC16481@gobelin> <57AAE5E6.8090304@ti.com>
- <20160810083421.GD16481@gobelin> <57AAE728.8000209@ti.com>
-Message-ID: <20160813114246.GB27739@gobelin>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Sat, 13 Aug 2016 17:52:28 +0300
+Subject: [PATCH] ilp32: fix {GET,SET}SIGMASK request for ptrace
+In-Reply-To: <5770B041.3040509@huawei.com>
+References: <1466207668-10549-1-git-send-email-ynorov@caviumnetworks.com>
+ <1466207668-10549-13-git-send-email-ynorov@caviumnetworks.com>
+ <5770B041.3040509@huawei.com>
+Message-ID: <20160813145228.GA24335@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 02:04:48PM +0530, Sekhar Nori wrote:
-> On Wednesday 10 August 2016 02:04 PM, Karl Beldan wrote:
-> > On Wed, Aug 10, 2016 at 01:59:26PM +0530, Sekhar Nori wrote:
-> >> On Wednesday 10 August 2016 01:56 PM, Karl Beldan wrote:
-> >>> On Wed, Aug 10, 2016 at 01:42:01PM +0530, Sekhar Nori wrote:
-> >>>> On Wednesday 10 August 2016 01:37 PM, Karl Beldan wrote:
-> >>>>> On Wed, Aug 10, 2016 at 01:32:03PM +0530, Sekhar Nori wrote:
-> >>>>>> On Wednesday 10 August 2016 01:18 PM, Sekhar Nori wrote:
-> >>>>>>> On Tuesday 09 August 2016 10:45 PM, Karl Beldan wrote:
-> >>>>>>>> Currently the davinci da8xx boards use the mach-davinci aemif code.
-> >>>>>>>> Instantiating an aemif node into the DT allows to use the ti-aemif
-> >>>>>>>> memory driver and is another step to better DT support.
-> >>>>>>>> Also it will allow to properly pass the emif timings via DT.
-> >>>>>>>>
-> >>>>>>>> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
-> >>>>>>>> ---
-> >>>>>>>>  arch/arm/boot/dts/da850.dtsi | 10 ++++++++++
-> >>>>>>>>  1 file changed, 10 insertions(+)
-> >>>>>>>>
-> >>>>>>>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> >>>>>>>> index bc10e7e..f62928c 100644
-> >>>>>>>> --- a/arch/arm/boot/dts/da850.dtsi
-> >>>>>>>> +++ b/arch/arm/boot/dts/da850.dtsi
-> >>>>>>>> @@ -411,6 +411,16 @@
-> >>>>>>>>  			dma-names = "tx", "rx";
-> >>>>>>>>  		};
-> >>>>>>>>  	};
-> >>>>>>>> +	aemif: aemif at 68000000 {
-> >>>>>>>> +		compatible = "ti,da850-aemif";
-> >>>>>>>> +		#address-cells = <2>;
-> >>>>>>>> +		#size-cells = <1>;
-> >>>>>>>> +
-> >>>>>>>> +		reg = <0x68000000 0x00008000>;
-> >>>>>>>> +		ranges = <0 0 0x60000000 0x08000000
-> >>>>>>>> +			  1 0 0x68000000 0x00008000>;
-> >>>>>>>> +		status = "disabled";
-> >>>>>>>> +	};
-> >>>>>>>>  	nand_cs3 at 62000000 {
-> >>>>>>>>  		compatible = "ti,davinci-nand";
-> >>>>>>>>  		reg = <0x62000000 0x807ff
-> >>>>>>>
-> >>>>>>> The nand node should be part of aemif node like it is done for keystone
-> >>>>>>> boards.
-> >>>>>>
-> >>>>>> Actually, can you move the nand node out of da850.dtsi completely. Its
-> >>>>>> much better to keep da850.dtsi restricted to soc-internal devices and
-> >>>>>> keep the board level devices like NAND flash in <board>.dts file.
-> >>>>>>
-> >>>>>> Similarly, can you move the NAND pinmux definitions too to the
-> >>>>>> da850-evm.dts file?
-> >>>>>>
-> >>>>>> There is advantage in keeping common pinmux definitions in da850.dtsi so
-> >>>>>> each board doe not have to repeat them. But AEMIF is an exception as its
-> >>>>>> usage can really be varied (NAND, NOR, SRAM, other). Plus, different
-> >>>>>> boards are likely to use different chip selects so coming up with some
-> >>>>>> pinmux definitions which will be reused widely is really unlikely.
-> >>>>>>
-> >>>>> This is exactly what I just did for the LCDK.
-> >>>>> If everybody is happy with it I will do the same for the evm as I put it
-> >>>>> in the cover letter.
-> >>>>
-> >>>> Yes please. We dont want duplication of data between da850.dtsi and
-> >>>> da850-lcdk.dts files.
-> >>>>
-> >>> Then I'll wait for this series to be applied and then apply my changes
-> >>> to the EVM while retiring the nand_cs3 together.
-> >>
-> >> No, I prefer the fixup happens first. In the same series, you can first
-> >> fixup existing EVM and then add LCDK support.
-> >>
-> > 
-> > Well in that case you'll have to do the testing since I only have an
-> > LCDK. I should be able to send the series within the hour.
-> 
-> Sure. I can test it.
-> 
+On Mon, Jun 27, 2016 at 12:49:05PM +0800, zhouchengming wrote:
+> The function compat_ptrace_request(used by ilp32) don't handle
+> {GET,SET}SIGMASK request, so it will be handled by ptrace_request.
+> But it's wrong because the compat_sigset_t of ilp32 differs from
+> the sigset_t of aarch64. The patch fixes it.
 
-Yesterday I got my hands on an EVM TI just sent and could test it on it.
-The change proper is fine, but I was surprised mainline was broken wrt
-4-bit ECC on top of 8bits NANDs, so I tested with 1-bit ECC, 'enough'
-for this device.
+Hi Zhou, all,
 
-FYI, the NAND socket had a
-  nand: device found, Manufacturer ID: 0x2c, Chip ID: 0xdc
-  nand: Micron MT29F4G08AAC
-  nand: 512 MiB, SLC, erase size: 128 KiB, page size: 2048, OOB size: 64
+Reviewing your patch I found that we have 2 identical declarations of
+put_sigset_t() and get_sigset_t(). So I moved it under 
+arch/arm64/include/asm/signal32_common.h
+
+I also reworked related code to remove unneeded function and variable
+declarations. With all that your patch is looking like below. You can
+try latest series here: https://github.com/norov/linux/tree/ilp32-4.8
+
+It's based on v4.8, and addresses some comments. I'm going to meld
+this patch with current patchset as it basicly the bugfux and update
+submission when I'll finish with all comments.
+
+Yury.
+
+
+>From 6a023da977713e9eade0a404c4f000d432d1fd67 Mon Sep 17 00:00:00 2001
+From: Yury Norov <ynorov@caviumnetworks.com>
+Date: Sat, 13 Aug 2016 17:36:59 +0300
+Subject: [PATCH] aaa
+
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+---
+ arch/arm64/include/asm/signal32.h        |  3 ++
+ arch/arm64/include/asm/signal32_common.h |  3 ++
+ arch/arm64/include/asm/signal_ilp32.h    |  4 +++
+ arch/arm64/kernel/ptrace.c               | 47 ++++++++++++++++++++++++++++++--
+ arch/arm64/kernel/signal32.c             | 22 ---------------
+ arch/arm64/kernel/signal32_common.c      | 21 ++++++++++++++
+ arch/arm64/kernel/signal_ilp32.c         | 25 +----------------
+ 7 files changed, 76 insertions(+), 49 deletions(-)
+
+diff --git a/arch/arm64/include/asm/signal32.h b/arch/arm64/include/asm/signal32.h
+index e68fcce..1c4ede7 100644
+--- a/arch/arm64/include/asm/signal32.h
++++ b/arch/arm64/include/asm/signal32.h
+@@ -13,6 +13,9 @@
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
++
++#include <asm/signal32_common.h>
++
+ #ifndef __ASM_SIGNAL32_H
+ #define __ASM_SIGNAL32_H
  
-Karl
+diff --git a/arch/arm64/include/asm/signal32_common.h b/arch/arm64/include/asm/signal32_common.h
+index b4f2099..e3e2d01 100644
+--- a/arch/arm64/include/asm/signal32_common.h
++++ b/arch/arm64/include/asm/signal32_common.h
+@@ -19,6 +19,9 @@
+ int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from);
+ int copy_siginfo_from_user32(siginfo_t *to, compat_siginfo_t __user *from);
+ 
++int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set);
++int get_sigset_t(sigset_t *set, const compat_sigset_t __user *uset);
++
+ #endif /* CONFIG_COMPAT*/
+ 
+ #endif /* __ASM_SIGNAL32_COMMON_H */
+diff --git a/arch/arm64/include/asm/signal_ilp32.h b/arch/arm64/include/asm/signal_ilp32.h
+index 30eff23..3c6d737 100644
+--- a/arch/arm64/include/asm/signal_ilp32.h
++++ b/arch/arm64/include/asm/signal_ilp32.h
+@@ -11,6 +11,10 @@
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
++
++#include <asm/signal32_common.h>
++#include <asm/signal_common.h>
++
+ #ifndef __ASM_SIGNAL_ILP32_H
+ #define __ASM_SIGNAL_ILP32_H
+ 
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index e69c79a..4f0df07 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -41,6 +41,7 @@
+ 
+ #include <asm/debug-monitors.h>
+ #include <asm/pgtable.h>
++#include <asm/signal32_common.h>
+ #include <asm/syscall.h>
+ #include <asm/traps.h>
+ #include <asm/system_misc.h>
+@@ -1332,15 +1333,55 @@ COMPAT_SYSCALL_DEFINE4(aarch32_ptrace, compat_long_t, request, compat_long_t, pi
+ 
+ #endif /* CONFIG_AARCH32_EL0 */
+ 
+-#ifdef CONFIG_COMPAT
++#ifdef CONFIG_ARM64_ILP32
+ 
+ long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
+ 			compat_ulong_t caddr, compat_ulong_t cdata)
+ {
+-	return compat_ptrace_request(child, request, caddr, cdata);
++	sigset_t new_set;
++
++	switch (request) {
++	case PTRACE_GETSIGMASK:
++		if (caddr != sizeof(compat_sigset_t))
++			return -EINVAL;
++
++		return put_sigset_t((compat_sigset_t __user *) (u64) cdata,
++					&child->blocked);
++
++	case PTRACE_SETSIGMASK:
++		if (caddr != sizeof(compat_sigset_t))
++			return -EINVAL;
++
++		if (get_sigset_t(&new_set, (compat_sigset_t __user *) (u64) cdata))
++			return -EFAULT;
++
++		sigdelsetmask(&new_set, sigmask(SIGKILL)|sigmask(SIGSTOP));
++
++		/*
++		 * Every thread does recalc_sigpending() after resume, so
++		 * retarget_shared_pending() and recalc_sigpending() are not
++		 * called here.
++		 */
++		spin_lock_irq(&child->sighand->siglock);
++		child->blocked = new_set;
++		spin_unlock_irq(&child->sighand->siglock);
++
++		return 0;
++
++	default:
++		return compat_ptrace_request(child, request, caddr, cdata);
++	}
+ }
+ 
+-#endif /* CONFIG_COMPAT */
++#elif defined (CONFIG_COMPAT)
++
++long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
++		compat_ulong_t caddr, compat_ulong_t cdata)
++{
++	return 0;
++}
++
++#endif
+ 
+ const struct user_regset_view *task_user_regset_view(struct task_struct *task)
+ {
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index b103af3..f2c1a38 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -103,28 +103,6 @@ struct compat_rt_sigframe {
+ 
+ #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
+ 
+-static inline int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set)
+-{
+-	compat_sigset_t	cset;
+-
+-	cset.sig[0] = set->sig[0] & 0xffffffffull;
+-	cset.sig[1] = set->sig[0] >> 32;
+-
+-	return copy_to_user(uset, &cset, sizeof(*uset));
+-}
+-
+-static inline int get_sigset_t(sigset_t *set,
+-			       const compat_sigset_t __user *uset)
+-{
+-	compat_sigset_t s32;
+-
+-	if (copy_from_user(&s32, uset, sizeof(*uset)))
+-		return -EFAULT;
+-
+-	set->sig[0] = s32.sig[0] | (((long)s32.sig[1]) << 32);
+-	return 0;
+-}
+-
+ /*
+  * VFP save/restore code.
+  *
+diff --git a/arch/arm64/kernel/signal32_common.c b/arch/arm64/kernel/signal32_common.c
+index 8fbb609..4a45aa6 100644
+--- a/arch/arm64/kernel/signal32_common.c
++++ b/arch/arm64/kernel/signal32_common.c
+@@ -28,6 +28,27 @@
+ #include <asm/uaccess.h>
+ #include <asm/unistd.h>
+ 
++int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set)
++{
++	compat_sigset_t	cset;
++
++	cset.sig[0] = set->sig[0] & 0xffffffffull;
++	cset.sig[1] = set->sig[0] >> 32;
++
++	return copy_to_user(uset, &cset, sizeof(*uset));
++}
++
++int get_sigset_t(sigset_t *set, const compat_sigset_t __user *uset)
++{
++	compat_sigset_t s32;
++
++	if (copy_from_user(&s32, uset, sizeof(*uset)))
++		return -EFAULT;
++
++	set->sig[0] = s32.sig[0] | (((long)s32.sig[1]) << 32);
++	return 0;
++}
++
+ int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
+ {
+ 	int err;
+diff --git a/arch/arm64/kernel/signal_ilp32.c b/arch/arm64/kernel/signal_ilp32.c
+index 8ca64b9..7cc9122 100644
+--- a/arch/arm64/kernel/signal_ilp32.c
++++ b/arch/arm64/kernel/signal_ilp32.c
+@@ -26,8 +26,7 @@
+ 
+ #include <asm/esr.h>
+ #include <asm/fpsimd.h>
+-#include <asm/signal32_common.h>
+-#include <asm/signal_common.h>
++#include <asm/signal_ilp32.h>
+ #include <asm/uaccess.h>
+ #include <asm/unistd.h>
+ #include <asm/ucontext.h>
+@@ -58,28 +57,6 @@ struct ilp32_rt_sigframe {
+ 	struct ilp32_sigframe sig;
+ };
+ 
+-static inline int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set)
+-{
+-	compat_sigset_t cset;
+-
+-	cset.sig[0] = set->sig[0] & 0xffffffffull;
+-	cset.sig[1] = set->sig[0] >> 32;
+-
+-	return copy_to_user(uset, &cset, sizeof(*uset));
+-}
+-
+-static inline int get_sigset_t(sigset_t *set,
+-                               const compat_sigset_t __user *uset)
+-{
+-	compat_sigset_t s32;
+-
+-	if (copy_from_user(&s32, uset, sizeof(*uset)))
+-		return -EFAULT;
+-
+-	set->sig[0] = s32.sig[0] | (((long)s32.sig[1]) << 32);
+-	return 0;
+-}
+-
+ static int restore_ilp32_sigframe(struct pt_regs *regs,
+                             struct ilp32_sigframe __user *sf)
+ {
+-- 
+2.7.4
