@@ -1,47 +1,71 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 13 Aug 2016 16:36:10 +0800
-Subject: [PATCH] Documentation: sunxi: Update Allwinner SoC documentation
-In-Reply-To: <20160802120117.4848-1-icenowy@aosc.xyz>
-References: <20160802120117.4848-1-icenowy@aosc.xyz>
-Message-ID: <CAGb2v64BqQ9d7sb=ry56YjznuFiNT0AogDO4a6nUZut+H5jVFg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 13 Aug 2016 11:13:58 +0200
+Subject: [kernel-hardening] [PATCH 0/7] arm64: Privileged Access Never
+ using TTBR0_EL1 switching
+In-Reply-To: <1471015666-23125-1-git-send-email-catalin.marinas@arm.com>
+References: <1471015666-23125-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <CAKv+Gu9hz_=GSRYgW3RueVhUA8F3HaM5DC_8Jkbx1JHF3x5mKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 12 August 2016 at 17:27, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> This is the first (public) attempt at emulating PAN by disabling
+> TTBR0_EL1 accesses on arm64.
 
-On Tue, Aug 2, 2016 at 8:01 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
-> Now, the A83T and A64 SoC user manuals are available.
-> Update the documentation to add the links.
+I take it using TCR_EL1.EPD0 is too expensive?
+
+> I chose to use a per-CPU saved_ttbr0_el1
+> variable to store the actual TTBR0 as, IMO, it looks better w.r.t. the
+> context switching code, to the detriment of a slightly more complex
+> uaccess_enable() implementation. The alternative was storing the saved
+> TTBR0 in thread_info but with more complex thread switching since TTBR0
+> is normally tied to switch_mm() rather than switch_to(). The latter may
+> also get more complicated if we are to decouple the kernel stack from
+> thread_info at some point (vmalloc'ed stacks).
 >
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
->  Documentation/arm/sunxi/README | 9 +++++++++
->  1 file changed, 9 insertions(+)
+> The code requires more testing, especially for combinations where UAO is
+> present but PAN is not.
 >
-> diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
-> index e5a115f..302d947 100644
-> --- a/Documentation/arm/sunxi/README
-> +++ b/Documentation/arm/sunxi/README
-> @@ -74,3 +74,12 @@ SunXi family
->        - Allwinner A83T
->          + Datasheet
->            http://dl.linux-sunxi.org/A83T/A83T_datasheet_Revision_1.1.pdf
-> +        + User Manual
-> +          https://github.com/allwinner-zh/documents/raw/master/A83T/A83T_User_Manual_v1.5.1_20150513.pdf
-
-Allwinner's github repo also has an updated A83T datasheet.
-Could you update the link above as well?
-
-Thanks
-ChenYu
-
-> +
-> +    * Quad ARM Cortex-A53 based SoCs
-> +      - Allwinner A64
-> +        + Datasheet
-> +          http://dl.linux-sunxi.org/A64/A64_Datasheet_V1.1.pdf
-> +        + User Manual
-> +          http://dl.linux-sunxi.org/A64/Allwinner%20A64%20User%20Manual%20v1.0.pdf
-> --
-> 2.9.0
+> The patches are also available on this branch:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux ttbr0-pan
+>
+> Thanks for reviewing/testing.
+>
+> Catalin Marinas (7):
+>   arm64: Factor out PAN enabling/disabling into separate uaccess_*
+>     macros
+>   arm64: Factor out TTBR0_EL1 setting into a specific asm macro
+>   arm64: Introduce uaccess_{disable,enable} functionality based on
+>     TTBR0_EL1
+>   arm64: Disable TTBR0_EL1 during normal kernel execution
+>   arm64: Handle faults caused by inadvertent user access with PAN
+>     enabled
+>   arm64: xen: Enable user access before a privcmd hvc call
+>   arm64: Enable CONFIG_ARM64_TTBR0_PAN
+>
+>  arch/arm64/Kconfig                      |   8 +++
+>  arch/arm64/include/asm/assembler.h      | 106 +++++++++++++++++++++++++++++++-
+>  arch/arm64/include/asm/cpufeature.h     |   6 ++
+>  arch/arm64/include/asm/efi.h            |  14 +++++
+>  arch/arm64/include/asm/futex.h          |  14 ++---
+>  arch/arm64/include/asm/kernel-pgtable.h |   7 +++
+>  arch/arm64/include/asm/mmu_context.h    |   3 +-
+>  arch/arm64/include/asm/uaccess.h        |  57 ++++++++++++++---
+>  arch/arm64/include/uapi/asm/ptrace.h    |   2 +
+>  arch/arm64/kernel/armv8_deprecated.c    |  10 +--
+>  arch/arm64/kernel/cpufeature.c          |   1 +
+>  arch/arm64/kernel/entry.S               |  62 +++++++++++++++++++
+>  arch/arm64/kernel/head.S                |   6 +-
+>  arch/arm64/kernel/suspend.c             |  12 ++--
+>  arch/arm64/kernel/vmlinux.lds.S         |   5 ++
+>  arch/arm64/lib/clear_user.S             |   7 +--
+>  arch/arm64/lib/copy_from_user.S         |   7 +--
+>  arch/arm64/lib/copy_in_user.S           |   7 +--
+>  arch/arm64/lib/copy_to_user.S           |   7 +--
+>  arch/arm64/mm/context.c                 |  25 +++++++-
+>  arch/arm64/mm/fault.c                   |  21 ++++---
+>  arch/arm64/mm/proc.S                    |  16 +----
+>  arch/arm64/xen/hypercall.S              |  18 ++++++
+>  23 files changed, 347 insertions(+), 74 deletions(-)
 >
