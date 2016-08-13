@@ -1,80 +1,49 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 12 Aug 2016 22:05:41 -0700
-Subject: [PATCH net-next v2 05/12] drivers: net: xgene: Fix RSS indirection
- table fields
+Date: Fri, 12 Aug 2016 22:05:42 -0700
+Subject: [PATCH net-next v2 06/12] drivers: net: xgene: Change port init
+ sequence
 In-Reply-To: <1471064748-28033-1-git-send-email-isubramanian@apm.com>
 References: <1471064748-28033-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1471064748-28033-6-git-send-email-isubramanian@apm.com>
+Message-ID: <1471064748-28033-7-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes FPSel and NxtFPSel fields length to 5-bit value.
+This patch rearranges the port initialization sequence as recommended by
+hardware specification.  This patch also removes, mac_init() call from
+xgene_enet_link_state(), as it was not required.
 
-Signed-off-by: Quan Nguyen <qnguyen@apm.com>
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 Tested-by: Fushen Chen <fchen@apm.com>
 ---
- drivers/net/ethernet/apm/xgene/xgene_enet_cle.c | 17 ++++++++++++-----
- drivers/net/ethernet/apm/xgene/xgene_enet_cle.h | 10 +++++++---
- 2 files changed, 19 insertions(+), 8 deletions(-)
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_cle.c b/drivers/net/ethernet/apm/xgene/xgene_enet_cle.c
-index 472c0fb..23d72af 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_cle.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_cle.c
-@@ -32,12 +32,19 @@ static void xgene_cle_sband_to_hw(u8 frag, enum xgene_cle_prot_version ver,
- 		SET_VAL(SB_HDRLEN, len);
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
+index 9c6ad0d..d53c053 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
+@@ -216,12 +216,12 @@ static void xgene_xgmac_init(struct xgene_enet_pdata *pdata)
+ 	data |= CFG_RSIF_FPBUFF_TIMEOUT_EN;
+ 	xgene_enet_wr_csr(pdata, XG_RSIF_CONFIG_REG_ADDR, data);
+ 
+-	xgene_enet_wr_csr(pdata, XG_CFG_BYPASS_ADDR, RESUME_TX);
+-	xgene_enet_wr_csr(pdata, XGENET_RX_DV_GATE_REG_0_ADDR, 0);
+ 	xgene_enet_rd_csr(pdata, XG_ENET_SPARE_CFG_REG_ADDR, &data);
+ 	data |= BIT(12);
+ 	xgene_enet_wr_csr(pdata, XG_ENET_SPARE_CFG_REG_ADDR, data);
+ 	xgene_enet_wr_csr(pdata, XG_ENET_SPARE_CFG_REG_1_ADDR, 0x82);
++	xgene_enet_wr_csr(pdata, XGENET_RX_DV_GATE_REG_0_ADDR, 0);
++	xgene_enet_wr_csr(pdata, XG_CFG_BYPASS_ADDR, RESUME_TX);
  }
  
--static void xgene_cle_idt_to_hw(u32 dstqid, u32 fpsel,
-+static void xgene_cle_idt_to_hw(struct xgene_enet_pdata *pdata,
-+				u32 dstqid, u32 fpsel,
- 				u32 nfpsel, u32 *idt_reg)
- {
--	*idt_reg =  SET_VAL(IDT_DSTQID, dstqid) |
--		    SET_VAL(IDT_FPSEL, fpsel) |
--		    SET_VAL(IDT_NFPSEL, nfpsel);
-+	if (pdata->enet_id == XGENE_ENET1) {
-+		*idt_reg = SET_VAL(IDT_DSTQID, dstqid) |
-+			   SET_VAL(IDT_FPSEL1, fpsel)  |
-+			   SET_VAL(IDT_NFPSEL1, nfpsel);
-+	} else {
-+		*idt_reg = SET_VAL(IDT_DSTQID, dstqid) |
-+			   SET_VAL(IDT_FPSEL, fpsel)   |
-+			   SET_VAL(IDT_NFPSEL, nfpsel);
-+	}
- }
- 
- static void xgene_cle_dbptr_to_hw(struct xgene_enet_pdata *pdata,
-@@ -344,7 +351,7 @@ static int xgene_cle_set_rss_idt(struct xgene_enet_pdata *pdata)
- 		nfpsel = 0;
- 		idt_reg = 0;
- 
--		xgene_cle_idt_to_hw(dstqid, fpsel, nfpsel, &idt_reg);
-+		xgene_cle_idt_to_hw(pdata, dstqid, fpsel, nfpsel, &idt_reg);
- 		ret = xgene_cle_dram_wr(&pdata->cle, &idt_reg, 1, i,
- 					RSS_IDT, CLE_CMD_WR);
- 		if (ret)
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_cle.h b/drivers/net/ethernet/apm/xgene/xgene_enet_cle.h
-index 33c5f6b..9ac9f8e 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_cle.h
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_cle.h
-@@ -196,9 +196,13 @@ enum xgene_cle_ptree_dbptrs {
- #define IDT_DSTQID_POS		0
- #define IDT_DSTQID_LEN		12
- #define IDT_FPSEL_POS		12
--#define IDT_FPSEL_LEN		4
--#define IDT_NFPSEL_POS		16
--#define IDT_NFPSEL_LEN		4
-+#define IDT_FPSEL_LEN		5
-+#define IDT_NFPSEL_POS		17
-+#define IDT_NFPSEL_LEN		5
-+#define IDT_FPSEL1_POS		12
-+#define IDT_FPSEL1_LEN		4
-+#define IDT_NFPSEL1_POS		16
-+#define IDT_NFPSEL1_LEN		4
- 
- struct xgene_cle_ptree_branch {
- 	bool valid;
+ static void xgene_xgmac_rx_enable(struct xgene_enet_pdata *pdata)
+@@ -366,7 +366,6 @@ static void xgene_enet_link_state(struct work_struct *work)
+ 	if (link_status) {
+ 		if (!netif_carrier_ok(ndev)) {
+ 			netif_carrier_on(ndev);
+-			xgene_xgmac_init(pdata);
+ 			xgene_xgmac_rx_enable(pdata);
+ 			xgene_xgmac_tx_enable(pdata);
+ 			netdev_info(ndev, "Link is Up - 10Gbps\n");
 -- 
 1.9.1
