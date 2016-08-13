@@ -1,55 +1,33 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sat, 13 Aug 2016 18:01:47 +0200
-Subject: [PATCH RESEND] mmc: sunxi: Check the value returned by clk_round_rate
-Message-ID: <mailman.36.1471106459.1636.linux-arm-kernel@lists.infradead.org>
+Date: Sat, 13 Aug 2016 18:23:49 +0200
+Subject: [PATCH] clk: core: Force setting the phase delay when no change
+Message-ID: <mailman.37.1471106674.1636.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_round_rate() may return an error. Check it.
+The hardware phase delay may depend on some other settings as clock
+reparenting, so, it has to be set each time.
+Also, when the delay was the same as previously, an error was returned.
 
 Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
-This patch was initially sent in a patch series about the MMC new mode,
-but it may be applied independently.
----
- drivers/mmc/host/sunxi-mmc.c | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+ drivers/clk/clk.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 2ee4c21..ba647b7 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -656,7 +656,8 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
- static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 				  struct mmc_ios *ios)
- {
--	u32 rate, oclk_dly, rval, sclk_dly;
-+	long rate;
-+	u32 oclk_dly, rval, sclk_dly;
- 	u32 clock = ios->clock;
- 	int ret;
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 820a939..2e6b91e 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1908,10 +1908,6 @@ int clk_set_phase(struct clk *clk, int degrees)
  
-@@ -666,13 +667,18 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 		clock <<= 1;
+ 	clk_prepare_lock();
  
- 	rate = clk_round_rate(host->clk_mmc, clock);
--	dev_dbg(mmc_dev(host->mmc), "setting clk to %d, rounded %d\n",
-+	if (rate < 0) {
-+		dev_err(mmc_dev(host->mmc), "error rounding clk to %d: %ld\n",
-+			clock, rate);
-+		return rate;
-+	}
-+	dev_dbg(mmc_dev(host->mmc), "setting clk to %d, rounded %ld\n",
- 		clock, rate);
+-	/* bail early if nothing to do */
+-	if (degrees == clk->core->phase)
+-		goto out;
+-
+ 	trace_clk_set_phase(clk->core, degrees);
  
- 	/* setting clock rate */
- 	ret = clk_set_rate(host->clk_mmc, rate);
- 	if (ret) {
--		dev_err(mmc_dev(host->mmc), "error setting clk to %d: %d\n",
-+		dev_err(mmc_dev(host->mmc), "error setting clk to %ld: %d\n",
- 			rate, ret);
- 		return ret;
- 	}
+ 	if (clk->core->ops->set_phase)
 -- 
 2.9.2
