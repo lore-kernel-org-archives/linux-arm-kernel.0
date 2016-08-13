@@ -1,7 +1,7 @@
 From: moinejf@free.fr (Jean-Francois Moine)
 Date: Sat, 13 Aug 2016 18:01:47 +0200
 Subject: [PATCH RESEND] mmc: sunxi: Check the value returned by clk_round_rate
-Message-ID: <mailman.35.1471105355.1636.linux-arm-kernel@lists.infradead.org>
+Message-ID: <mailman.36.1471106459.1636.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
