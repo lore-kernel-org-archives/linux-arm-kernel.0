@@ -1,83 +1,80 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 12 Aug 2016 22:05:40 -0700
-Subject: [PATCH net-next v2 04/12] drivers: net: xgene: Fix error
- deconstruction path
+Date: Fri, 12 Aug 2016 22:05:41 -0700
+Subject: [PATCH net-next v2 05/12] drivers: net: xgene: Fix RSS indirection
+ table fields
 In-Reply-To: <1471064748-28033-1-git-send-email-isubramanian@apm.com>
 References: <1471064748-28033-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1471064748-28033-5-git-send-email-isubramanian@apm.com>
+Message-ID: <1471064748-28033-6-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since register_netdev() call in xgene_enet_probe() was moved down to
-the end, it doesn't properly handle errors that may occur, by
-deconstructing everything that was setup before the error occurred.
+This patch fixes FPSel and NxtFPSel fields length to 5-bit value.
 
+Signed-off-by: Quan Nguyen <qnguyen@apm.com>
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+Tested-by: Fushen Chen <fchen@apm.com>
 ---
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 27 +++++++++++++++++-------
- 1 file changed, 19 insertions(+), 8 deletions(-)
+ drivers/net/ethernet/apm/xgene/xgene_enet_cle.c | 17 ++++++++++++-----
+ drivers/net/ethernet/apm/xgene/xgene_enet_cle.h | 10 +++++++---
+ 2 files changed, 19 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-index 6b36e0f..a727da8 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-@@ -1641,8 +1641,8 @@ static int xgene_enet_probe(struct platform_device *pdev)
- 	}
- #endif
- 	if (!pdata->enet_id) {
--		free_netdev(ndev);
--		return -ENODEV;
-+		ret = -ENODEV;
-+		goto err;
- 	}
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_cle.c b/drivers/net/ethernet/apm/xgene/xgene_enet_cle.c
+index 472c0fb..23d72af 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_cle.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_cle.c
+@@ -32,12 +32,19 @@ static void xgene_cle_sband_to_hw(u8 frag, enum xgene_cle_prot_version ver,
+ 		SET_VAL(SB_HDRLEN, len);
+ }
  
- 	ret = xgene_enet_get_resources(pdata);
-@@ -1665,7 +1665,7 @@ static int xgene_enet_probe(struct platform_device *pdev)
+-static void xgene_cle_idt_to_hw(u32 dstqid, u32 fpsel,
++static void xgene_cle_idt_to_hw(struct xgene_enet_pdata *pdata,
++				u32 dstqid, u32 fpsel,
+ 				u32 nfpsel, u32 *idt_reg)
+ {
+-	*idt_reg =  SET_VAL(IDT_DSTQID, dstqid) |
+-		    SET_VAL(IDT_FPSEL, fpsel) |
+-		    SET_VAL(IDT_NFPSEL, nfpsel);
++	if (pdata->enet_id == XGENE_ENET1) {
++		*idt_reg = SET_VAL(IDT_DSTQID, dstqid) |
++			   SET_VAL(IDT_FPSEL1, fpsel)  |
++			   SET_VAL(IDT_NFPSEL1, nfpsel);
++	} else {
++		*idt_reg = SET_VAL(IDT_DSTQID, dstqid) |
++			   SET_VAL(IDT_FPSEL, fpsel)   |
++			   SET_VAL(IDT_NFPSEL, nfpsel);
++	}
+ }
  
- 	ret = xgene_enet_init_hw(pdata);
- 	if (ret)
--		goto err_netdev;
-+		goto err;
+ static void xgene_cle_dbptr_to_hw(struct xgene_enet_pdata *pdata,
+@@ -344,7 +351,7 @@ static int xgene_cle_set_rss_idt(struct xgene_enet_pdata *pdata)
+ 		nfpsel = 0;
+ 		idt_reg = 0;
  
- 	link_state = pdata->mac_ops->link_state;
- 	if (pdata->phy_mode == PHY_INTERFACE_MODE_XGMII) {
-@@ -1675,21 +1675,32 @@ static int xgene_enet_probe(struct platform_device *pdev)
- 			ret = xgene_enet_mdio_config(pdata);
- 		else
- 			INIT_DELAYED_WORK(&pdata->link_work, link_state);
-+
-+		if (ret)
-+			goto err1;
- 	}
--	if (ret)
--		goto err;
+-		xgene_cle_idt_to_hw(dstqid, fpsel, nfpsel, &idt_reg);
++		xgene_cle_idt_to_hw(pdata, dstqid, fpsel, nfpsel, &idt_reg);
+ 		ret = xgene_cle_dram_wr(&pdata->cle, &idt_reg, 1, i,
+ 					RSS_IDT, CLE_CMD_WR);
+ 		if (ret)
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_cle.h b/drivers/net/ethernet/apm/xgene/xgene_enet_cle.h
+index 33c5f6b..9ac9f8e 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_cle.h
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_cle.h
+@@ -196,9 +196,13 @@ enum xgene_cle_ptree_dbptrs {
+ #define IDT_DSTQID_POS		0
+ #define IDT_DSTQID_LEN		12
+ #define IDT_FPSEL_POS		12
+-#define IDT_FPSEL_LEN		4
+-#define IDT_NFPSEL_POS		16
+-#define IDT_NFPSEL_LEN		4
++#define IDT_FPSEL_LEN		5
++#define IDT_NFPSEL_POS		17
++#define IDT_NFPSEL_LEN		5
++#define IDT_FPSEL1_POS		12
++#define IDT_FPSEL1_LEN		4
++#define IDT_NFPSEL1_POS		16
++#define IDT_NFPSEL1_LEN		4
  
- 	xgene_enet_napi_add(pdata);
- 	ret = register_netdev(ndev);
- 	if (ret) {
- 		netdev_err(ndev, "Failed to register netdev\n");
--		goto err;
-+		goto err2;
- 	}
- 
- 	return 0;
- 
--err_netdev:
--	unregister_netdev(ndev);
-+err2:
-+	/*
-+	 * If necessary, free_netdev() will call netif_napi_del() and undo
-+	 * the effects of xgene_enet_napi_add()'s calls to netif_napi_add().
-+	 */
-+
-+	if (pdata->mdio_driver)
-+		xgene_enet_phy_disconnect(pdata);
-+	else if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII)
-+		xgene_enet_mdio_remove(pdata);
-+err1:
-+	xgene_enet_delete_desc_rings(pdata);
- err:
- 	free_netdev(ndev);
- 	return ret;
+ struct xgene_cle_ptree_branch {
+ 	bool valid;
 -- 
 1.9.1
