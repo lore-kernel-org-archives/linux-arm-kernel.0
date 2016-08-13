@@ -1,59 +1,64 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 12 Aug 2016 22:05:37 -0700
-Subject: [PATCH net-next v2 01/12] drivers: net: xgene: Fix compiler warnings
+Date: Fri, 12 Aug 2016 22:05:38 -0700
+Subject: [PATCH net-next v2 02/12] drivers: net: xgene: fix: Add
+ dma_unmap_single
 In-Reply-To: <1471064748-28033-1-git-send-email-isubramanian@apm.com>
 References: <1471064748-28033-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1471064748-28033-2-git-send-email-isubramanian@apm.com>
+Message-ID: <1471064748-28033-3-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixed compiler warnings reported with -Wmaybe-uninitialized W=1,
-
-      /drivers/net/ethernet/apm/xgene/xgene_enet_main.c: In function ?xgene_enet_rx_frame?:
-      ../drivers/net/ethernet/apm/xgene/xgene_enet_main.c:455:27: warning: variable ?pdata? set but not used [-Wunused-but-set-variable]
-      struct xgene_enet_pdata *pdata;
-      ^
-      ../drivers/net/ethernet/apm/xgene/xgene_enet_main.c: In function ?xgene_enet_remove?:
-      ../drivers/net/ethernet/apm/xgene/xgene_enet_main.c:1691:30: warning: variable ?mac_ops? set but not used [-Wunused-but-set-variable]
-      const struct xgene_mac_ops *mac_ops;
-				                                   ^
+In addition to xgene_enet_delete_bufpool() freeing skbs, their associated
+dma memory should also be unmapped.
 
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 ---
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 4 ----
- 1 file changed, 4 deletions(-)
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-index d1d6b5e..ceeb3f4 100644
+index ceeb3f4..c1fd33d 100644
 --- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
 +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-@@ -452,7 +452,6 @@ static int xgene_enet_rx_frame(struct xgene_enet_desc_ring *rx_ring,
- 			       struct xgene_enet_raw_desc *raw_desc)
+@@ -72,7 +72,6 @@ static int xgene_enet_refill_bufpool(struct xgene_enet_desc_ring *buf_pool,
+ 		skb = netdev_alloc_skb_ip_align(ndev, len);
+ 		if (unlikely(!skb))
+ 			return -ENOMEM;
+-		buf_pool->rx_skb[tail] = skb;
+ 
+ 		dma_addr = dma_map_single(dev, skb->data, len, DMA_FROM_DEVICE);
+ 		if (dma_mapping_error(dev, dma_addr)) {
+@@ -81,6 +80,8 @@ static int xgene_enet_refill_bufpool(struct xgene_enet_desc_ring *buf_pool,
+ 			return -EINVAL;
+ 		}
+ 
++		buf_pool->rx_skb[tail] = skb;
++
+ 		raw_desc->m1 = cpu_to_le64(SET_VAL(DATAADDR, dma_addr) |
+ 					   SET_VAL(BUFDATALEN, bufdatalen) |
+ 					   SET_BIT(COHERENT));
+@@ -102,12 +103,21 @@ static u8 xgene_enet_hdr_len(const void *data)
+ 
+ static void xgene_enet_delete_bufpool(struct xgene_enet_desc_ring *buf_pool)
  {
- 	struct net_device *ndev;
--	struct xgene_enet_pdata *pdata;
- 	struct device *dev;
- 	struct xgene_enet_desc_ring *buf_pool;
- 	u32 datalen, skb_index;
-@@ -461,7 +460,6 @@ static int xgene_enet_rx_frame(struct xgene_enet_desc_ring *rx_ring,
- 	int ret = 0;
++	struct device *dev = ndev_to_dev(buf_pool->ndev);
++	struct xgene_enet_raw_desc16 *raw_desc;
++	dma_addr_t dma_addr;
+ 	int i;
  
- 	ndev = rx_ring->ndev;
--	pdata = netdev_priv(ndev);
- 	dev = ndev_to_dev(rx_ring->ndev);
- 	buf_pool = rx_ring->buf_pool;
+ 	/* Free up the buffers held by hardware */
+ 	for (i = 0; i < buf_pool->slots; i++) {
+-		if (buf_pool->rx_skb[i])
++		if (buf_pool->rx_skb[i]) {
+ 			dev_kfree_skb_any(buf_pool->rx_skb[i]);
++
++			raw_desc = &buf_pool->raw_desc16[i];
++			dma_addr = GET_VAL(DATAADDR, le64_to_cpu(raw_desc->m1));
++			dma_unmap_single(dev, dma_addr, XGENE_ENET_MAX_MTU,
++					 DMA_FROM_DEVICE);
++		}
+ 	}
+ }
  
-@@ -1688,11 +1686,9 @@ err:
- static int xgene_enet_remove(struct platform_device *pdev)
- {
- 	struct xgene_enet_pdata *pdata;
--	const struct xgene_mac_ops *mac_ops;
- 	struct net_device *ndev;
- 
- 	pdata = platform_get_drvdata(pdev);
--	mac_ops = pdata->mac_ops;
- 	ndev = pdata->ndev;
- 
- 	rtnl_lock();
 -- 
 1.9.1
