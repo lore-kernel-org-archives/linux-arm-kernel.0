@@ -1,55 +1,36 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun, 14 Aug 2016 17:51:40 +0200
-Subject: [PATCH] mtd: nand: s3c2410: Register cpufreq notifier only on
- S3C24xx
-In-Reply-To: <1467031898-1410-1-git-send-email-k.kozlowski@samsung.com>
-References: <1467031898-1410-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20160814175140.254b1bec@bbrezillon>
+From: greg@kroah.com (Greg KH)
+Date: Sun, 14 Aug 2016 17:54:32 +0200
+Subject: [stable:PATCH 1/2] arm64: kernel: Save and restore addr_limit on
+ exception entry
+In-Reply-To: <1471025480-10394-1-git-send-email-james.morse@arm.com>
+References: <1471025480-10394-1-git-send-email-james.morse@arm.com>
+Message-ID: <20160814155432.GA27321@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Jun 2016 14:51:38 +0200
-Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
-
-> The driver registered for CPU frequency transitions to recalculate its
-> clock when ARM clock frequency changes (ratio between frequencies of
-> ARM's parent clock (fclk) and clock for peripherals remains fixed).
+On Fri, Aug 12, 2016 at 07:11:19PM +0100, James Morse wrote:
+> commit e19a6ee2460bdd0d0055a6029383422773f9999a upstream.
 > 
-> This is needed only on S3C24xx platform when cpufreq driver is enabled
-> so limit the ifdef to respective cpufreq Kconfig.
+> If we take an exception while at EL1, the exception handler inherits
+> the original context's addr_limit value. To be consistent always reset
+> addr_limit and PSTATE.UAO on (re-)entry to EL1. This prevents accidental
+> re-use of the original context's addr_limit.
 > 
-
-Applied.
-
-Thanks,
-
-Boris
-
-> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  drivers/mtd/nand/s3c2410.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> Based on a similar patch for arm from Russell King.
 > 
-> diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
-> index d9309cf0ce2e..8d440cc0f002 100644
-> --- a/drivers/mtd/nand/s3c2410.c
-> +++ b/drivers/mtd/nand/s3c2410.c
-> @@ -180,7 +180,7 @@ struct s3c2410_nand_info {
->  
->  	enum s3c_cpu_type		cpu_type;
->  
-> -#ifdef CONFIG_CPU_FREQ
-> +#ifdef CONFIG_ARM_S3C24XX_CPUFREQ
->  	struct notifier_block	freq_transition;
->  #endif
->  };
-> @@ -701,7 +701,7 @@ static void s3c2440_nand_write_buf(struct mtd_info *mtd, const u_char *buf,
->  
->  /* cpufreq driver support */
->  
-> -#ifdef CONFIG_CPU_FREQ
-> +#ifdef CONFIG_ARM_S3C24XX_CPUFREQ
->  
->  static int s3c2410_nand_cpufreq_transition(struct notifier_block *nb,
->  					  unsigned long val, void *data)
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> [ backport to stop perf misusing inherited addr_limit.
+>   Removed code interacting with UAO and the irqstack ]
+> Link: https://bugs.chromium.org/p/project-zero/issues/detail?id=822
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Cc: <stable@vger.kernel.org> #4.1
+
+Fails to apply to 4.4-stable, can you provide a backport for both of
+these to that tree if you want them there?
+
+thanks,
+
+greg k-h
