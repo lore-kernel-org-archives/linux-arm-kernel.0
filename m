@@ -1,107 +1,58 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 14 Aug 2016 20:28:01 +0200
-Subject: [PATCH 7/7] musb: sunxi: Add support for platform_set_mode
+Date: Sun, 14 Aug 2016 20:28:00 +0200
+Subject: [PATCH 6/7] musb: sunxi: Always register both host and udc when build
+ with dual-role support
 In-Reply-To: <1471199281-5494-1-git-send-email-hdegoede@redhat.com>
 References: <1471199281-5494-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1471199281-5494-8-git-send-email-hdegoede@redhat.com>
+Message-ID: <1471199281-5494-7-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows run-time dr_mode switching support via the "mode" musb
-sysfs attribute.
+On sunxi the handling of host- / peripheral-only mode is fully taken care
+of in the phy driver. So we can always safely let the musb-core register
+both the host and udc.
+
+Besides a nice cleanup, this is also a preparation patch for adding
+run-time dr_mode switching support via the "mode" musb sysfs attribute
+and the platform_set_mode() callback.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/usb/musb/sunxi.c | 42 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ drivers/usb/musb/sunxi.c | 22 ++--------------------
+ 1 file changed, 2 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-index 868db03..bfd5f23 100644
+index c6ee166..868db03 100644
 --- a/drivers/usb/musb/sunxi.c
 +++ b/drivers/usb/musb/sunxi.c
-@@ -74,6 +74,7 @@
- #define SUNXI_MUSB_FL_HAS_SRAM			5
- #define SUNXI_MUSB_FL_HAS_RESET			6
- #define SUNXI_MUSB_FL_NO_CONFIGDATA		7
-+#define SUNXI_MUSB_FL_PHY_MODE_PEND		8
- 
- /* Our read/write methods need access and do not get passed in a musb ref :| */
- static struct musb *sunxi_musb;
-@@ -87,6 +88,7 @@ struct sunxi_glue {
- 	struct phy		*phy;
- 	struct platform_device	*usb_phy;
- 	struct usb_phy		*xceiv;
-+	enum phy_mode		phy_mode;
- 	unsigned long		flags;
- 	struct work_struct	work;
- 	struct extcon_dev	*extcon;
-@@ -140,6 +142,9 @@ static void sunxi_musb_work(struct work_struct *work)
- 			clear_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
- 		}
+@@ -615,26 +615,8 @@ static int sunxi_musb_probe(struct platform_device *pdev)
  	}
-+
-+	if (test_and_clear_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags))
-+		phy_set_mode(glue->phy, glue->phy_mode);
- }
  
- static void sunxi_musb_set_vbus(struct musb *musb, int is_on)
-@@ -341,6 +346,41 @@ static void sunxi_musb_dma_controller_destroy(struct dma_controller *c)
- {
- }
+ 	memset(&pdata, 0, sizeof(pdata));
+-	switch (usb_get_dr_mode(&pdev->dev)) {
+-#if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_HOST
+-	case USB_DR_MODE_HOST:
+-		pdata.mode = MUSB_PORT_MODE_HOST;
+-		break;
+-#endif
+-#if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_GADGET
+-	case USB_DR_MODE_PERIPHERAL:
+-		pdata.mode = MUSB_PORT_MODE_GADGET;
+-		break;
+-#endif
+-#ifdef CONFIG_USB_MUSB_DUAL_ROLE
+-	case USB_DR_MODE_OTG:
+-		pdata.mode = MUSB_PORT_MODE_DUAL_ROLE;
+-		break;
+-#endif
+-	default:
+-		dev_err(&pdev->dev, "Invalid or missing 'dr_mode' property\n");
+-		return -EINVAL;
+-	}
++	/* devicetree dr_mode setting is handled by the phy driver */
++	pdata.mode		= MUSB_PORT_MODE_DUAL_ROLE;
+ 	pdata.platform_ops	= &sunxi_musb_ops;
+ 	pdata.config		= &sunxi_musb_hdrc_config;
  
-+static int sunxi_musb_set_mode(struct musb *musb, u8 mode)
-+{
-+	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
-+	enum phy_mode new_mode;
-+
-+	switch (mode) {
-+#if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_HOST
-+	case MUSB_HOST:		new_mode = PHY_MODE_USB_HOST; break;
-+#endif
-+#if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_GADGET
-+	case MUSB_PERIPHERAL:	new_mode = PHY_MODE_USB_DEVICE; break;
-+#endif
-+#ifdef CONFIG_USB_MUSB_DUAL_ROLE
-+	case MUSB_OTG:		new_mode = PHY_MODE_USB_OTG; break;
-+#endif
-+	default:
-+		dev_err(musb->controller->parent,
-+			"Error requested mode not supported by this kernel\n");
-+		return -EINVAL;
-+	}
-+
-+	if (glue->phy_mode == new_mode)
-+		return 0;
-+
-+	/*
-+	 * phy_set_mode may sleep, and we're called with a spinlock held,
-+	 * so let sunxi_musb_work deal with it.
-+	 */
-+	glue->phy_mode = new_mode;
-+	set_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags);
-+	schedule_work(&glue->work);
-+
-+	return 0;
-+}
-+
- /*
-  * sunxi musb register layout
-  * 0x00 - 0x17	fifo regs, 1 long per fifo
-@@ -568,6 +608,7 @@ static const struct musb_platform_ops sunxi_musb_ops = {
- 	.writew		= sunxi_musb_writew,
- 	.dma_init	= sunxi_musb_dma_controller_create,
- 	.dma_exit	= sunxi_musb_dma_controller_destroy,
-+	.set_mode	= sunxi_musb_set_mode,
- 	.set_vbus	= sunxi_musb_set_vbus,
- 	.pre_root_reset_end = sunxi_musb_pre_root_reset_end,
- 	.post_root_reset_end = sunxi_musb_post_root_reset_end,
-@@ -627,6 +668,7 @@ static int sunxi_musb_probe(struct platform_device *pdev)
- 	glue->dev = &pdev->dev;
- 	INIT_WORK(&glue->work, sunxi_musb_work);
- 	glue->host_nb.notifier_call = sunxi_musb_host_notifier;
-+	glue->phy_mode = PHY_MODE_USB_OTG;
- 
- 	if (of_device_is_compatible(np, "allwinner,sun4i-a10-musb"))
- 		set_bit(SUNXI_MUSB_FL_HAS_SRAM, &glue->flags);
 -- 
 2.7.4
