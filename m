@@ -1,58 +1,30 @@
-From: pratyush.anand@gmail.com (Pratyush Anand)
-Date: Sun, 14 Aug 2016 21:31:48 +0530
-Subject: [PATCH v2 1/2] PCI: designware: mv parameters for wait for link
- into pcie-designware.c
-In-Reply-To: <1470807079-366-2-git-send-email-jszhang@marvell.com>
-References: <1470807079-366-1-git-send-email-jszhang@marvell.com>
- <1470807079-366-2-git-send-email-jszhang@marvell.com>
-Message-ID: <CAHM4w1kDDK-HcAad5OT6+mG6J5ps1BJE2d=xK51oJcA-i3vEKQ@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Sun, 14 Aug 2016 12:32:49 -0500
+Subject: [PATCH RFC] Revert "of/irq: Mark initialised interrupt
+ controllers as populated"
+In-Reply-To: <E1bYVVh-0001eq-BI@rmk-PC.armlinux.org.uk>
+References: <E1bYVVh-0001eq-BI@rmk-PC.armlinux.org.uk>
+Message-ID: <CAL_JsqJNE7rGaL54HfmGEkaScZ7krf_iM55UrKw6mwWdLHv6Ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 11:01 AM, Jisheng Zhang <jszhang@marvell.com> wrote:
-> These parameters are only used in the core pcie-designware.c, let's
-> move them to the core driver.
+On Sat, Aug 13, 2016 at 4:45 AM, Russell King
+<rmk+kernel@armlinux.org.uk> wrote:
+> This reverts commit 15cc2ed6dcf91a8658e084be4e140147161819d7, which
+> causes a regression with iMX6 power domains.  iMX6 GPC contains both an
+> interrupt controller and power domains.  The iMX6 GPC code is setup to
+> register an interrupt controller using IRQCHIP_DECLARE(), but then to
+> register the power domains using the platform device.
 >
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-Acked-by: Pratyush Anand <pratyush.anand@gmail.com>
-
+> This commit prevents the platform device being created, thereby breaking
+> iMX6 power domain support.
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 > ---
->  drivers/pci/host/pcie-designware.c | 5 +++++
->  drivers/pci/host/pcie-designware.h | 5 -----
->  2 files changed, 5 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 12afce1..24a16dd 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -75,6 +75,11 @@
->  #define PCIE_PHY_DEBUG_R1              (PLR_OFFSET + 0x2c)
->  #define PCIE_PHY_DEBUG_R1_LINK_UP      0x00000010
->
-> +/* Parameters for the waiting for link up routine */
-> +#define LINK_WAIT_MAX_RETRIES          10
-> +#define LINK_WAIT_USLEEP_MIN           90000
-> +#define LINK_WAIT_USLEEP_MAX           100000
-> +
->  static struct pci_ops dw_pcie_ops;
->
->  int dw_pcie_cfg_read(void __iomem *addr, int size, u32 *val)
-> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-> index f437f9b..384e79b 100644
-> --- a/drivers/pci/host/pcie-designware.h
-> +++ b/drivers/pci/host/pcie-designware.h
-> @@ -22,11 +22,6 @@
->  #define MAX_MSI_IRQS                   32
->  #define MAX_MSI_CTRLS                  (MAX_MSI_IRQS / 32)
->
-> -/* Parameters for the waiting for link up routine */
-> -#define LINK_WAIT_MAX_RETRIES          10
-> -#define LINK_WAIT_USLEEP_MIN           90000
-> -#define LINK_WAIT_USLEEP_MAX           100000
-> -
->  struct pcie_port {
->         struct device           *dev;
->         u8                      root_bus_nr;
-> --
-> 2.8.1
->
+> Please argue amongst yourselves about how to fix this regression caused
+> by this commit...
+
+There's already a fix for this in my tree and -next. I will be sending
+to Linus soon.
+
+Rob
