@@ -1,24 +1,31 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 14 Aug 2016 17:46:35 -0300
-Subject: [PATCH 1/3] ARM: dts: skeleton: Fix build warning with W=1
-In-Reply-To: <69819507.278199.5842a41f-9d6d-4b55-baac-1529d6cae164.open-xchange@email.1und1.de>
-References: <1471203266-30414-1-git-send-email-festevam@gmail.com>
- <69819507.278199.5842a41f-9d6d-4b55-baac-1529d6cae164.open-xchange@email.1und1.de>
-Message-ID: <CAOMZO5BNpUSijVbZn1AoZfaUpwaNt0=aoS9nOHcuDVuF96NW7A@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 15 Aug 2016 00:17:20 +0200
+Subject: [PATCH] i2c: don't print error when adding adapter fails
+In-Reply-To: <1470742581-12971-1-git-send-email-wsa-dev@sang-engineering.com>
+References: <1470742581-12971-1-git-send-email-wsa-dev@sang-engineering.com>
+Message-ID: <20160814221719.GA10501@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On Tue, Aug 09, 2016 at 01:36:16PM +0200, Wolfram Sang wrote:
+> Since v4.8-rc1, the I2C core will print detailed information when adding an I2C
+> adapter fails. So, drivers can skip this now.
+> 
+> I am still undecided if I apply this as a single patch or break it out. But for
+> reviewing, avoiding the patch bomb is probably a good thing.
+> 
+> Should go via subsystem tree, I'd think.
+> 
+> Wolfram Sang (1):
+>   i2c: don't print error when adding adapter fails
+> 
 
-On Sun, Aug 14, 2016 at 5:24 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+Applied to for-next, thanks!
 
-> according to this thread [1] this patch shouldn't be applied yet. Patch 2 and 3
-> are okay.
-
-Ok, thanks. So patch 1/3 can be discarded then.
-
-> Btw: Do you have any comments about this patch series [2]?
-
-I tried to fix this sometime ago, but never had a chance to address
-the suggestions from Ulf. So better wait for the comments from the mmc
-folks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160815/1ec8f886/attachment.sig>
