@@ -1,44 +1,55 @@
-From: greg@kroah.com (Greg KH)
-Date: Sun, 14 Aug 2016 17:44:41 +0200
-Subject: [PATCH 2/2 (linux-stable-4.5.y)] stmmac: fix MDIO settings
-In-Reply-To: <1464009463-23654-3-git-send-email-peppe.cavallaro@st.com>
-References: <1464009463-23654-1-git-send-email-peppe.cavallaro@st.com>
- <1464009463-23654-3-git-send-email-peppe.cavallaro@st.com>
-Message-ID: <20160814154441.GJ20560@kroah.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sun, 14 Aug 2016 17:51:40 +0200
+Subject: [PATCH] mtd: nand: s3c2410: Register cpufreq notifier only on
+ S3C24xx
+In-Reply-To: <1467031898-1410-1-git-send-email-k.kozlowski@samsung.com>
+References: <1467031898-1410-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20160814175140.254b1bec@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2016 at 03:17:43PM +0200, Giuseppe Cavallaro wrote:
-> Initially the phy_bus_name was added to manipulate the
-> driver name but it was recently just used to manage the
-> fixed-link and then to take some decision at run-time.
-> So the patch uses the is_pseudo_fixed_link and removes
-> the phy_bus_name variable not necessary anymore.
+On Mon, 27 Jun 2016 14:51:38 +0200
+Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+
+> The driver registered for CPU frequency transitions to recalculate its
+> clock when ARM clock frequency changes (ratio between frequencies of
+> ARM's parent clock (fclk) and clock for peripherals remains fixed).
 > 
-> The driver can manage the mdio registration by using phy-handle,
-> dwmac-mdio and own parameter e.g. snps,phy-addr.
-> This patch takes care about all these possible configurations
-> and fixes the mdio registration in case of there is a real
-> transceiver or a switch (that needs to be managed by using
-> fixed-link).
+> This is needed only on S3C24xx platform when cpufreq driver is enabled
+> so limit the ifdef to respective cpufreq Kconfig.
 > 
-> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> Reviewed-by: Andreas F?rber <afaerber@suse.de>
-> Tested-by: Frank Sch?fer <fschaefer.oss@googlemail.com>
-> Cc: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-> Cc: Dinh Nguyen <dinh.linux@gmail.com>
-> Cc: David S. Miller <davem@davemloft.net>
-> Cc: Phil Reid <preid@electromag.com.au>
+
+Applied.
+
+Thanks,
+
+Boris
+
+> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
->  drivers/net/ethernet/stmicro/stmmac/stmmac_main.c  | 11 +--
->  drivers/net/ethernet/stmicro/stmmac/stmmac_mdio.c  | 19 +----
->  .../net/ethernet/stmicro/stmmac/stmmac_platform.c  | 84 +++++++++++++++++-----
->  3 files changed, 70 insertions(+), 44 deletions(-)
-
-<formletter>
-
-This is not the correct way to submit patches for inclusion in the
-stable kernel tree.  Please read Documentation/stable_kernel_rules.txt
-for how to do this properly.
-
-</formletter>
+>  drivers/mtd/nand/s3c2410.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
+> index d9309cf0ce2e..8d440cc0f002 100644
+> --- a/drivers/mtd/nand/s3c2410.c
+> +++ b/drivers/mtd/nand/s3c2410.c
+> @@ -180,7 +180,7 @@ struct s3c2410_nand_info {
+>  
+>  	enum s3c_cpu_type		cpu_type;
+>  
+> -#ifdef CONFIG_CPU_FREQ
+> +#ifdef CONFIG_ARM_S3C24XX_CPUFREQ
+>  	struct notifier_block	freq_transition;
+>  #endif
+>  };
+> @@ -701,7 +701,7 @@ static void s3c2440_nand_write_buf(struct mtd_info *mtd, const u_char *buf,
+>  
+>  /* cpufreq driver support */
+>  
+> -#ifdef CONFIG_CPU_FREQ
+> +#ifdef CONFIG_ARM_S3C24XX_CPUFREQ
+>  
+>  static int s3c2410_nand_cpufreq_transition(struct notifier_block *nb,
+>  					  unsigned long val, void *data)
