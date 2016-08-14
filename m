@@ -1,23 +1,45 @@
 From: ayaka@soulik.info (Randy Li)
-Date: Sun, 14 Aug 2016 19:27:22 +0800
-Subject: [PATCH 0/2] ARM: dts: rockchip: correct the regulators in firefly
- reload
-In-Reply-To: <522097f6-8b5c-ee6d-c1b1-a63840228a0e@rock-chips.com>
+Date: Sun, 14 Aug 2016 19:27:23 +0800
+Subject: [PATCH 1/2] ARM: dts: rockchip: remove excess sd properties for
+ firefly reload
+In-Reply-To: <1471174044-26003-1-git-send-email-ayaka@soulik.info>
 References: <522097f6-8b5c-ee6d-c1b1-a63840228a0e@rock-chips.com>
-Message-ID: <1471174044-26003-1-git-send-email-ayaka@soulik.info>
+ <1471174044-26003-1-git-send-email-ayaka@soulik.info>
+Message-ID: <1471174044-26003-2-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I double check the regulators settings in dts after the sdcard issue,
-I found I didn't make them match the hardware of firefly reload board.
+Because of a bug in hardware design, the sdcard at firefly
+rk3288 reload board can't switch the io voltage level to 1.8v.
 
-Randy Li (2):
-  ARM: dts: rockchip: remove excess sd properties for firefly reload
-  ARM: dts: rockchip: add missing regulators for firefly reload board
+Signed-off-by: Randy Li <ayaka@soulik.info>
+---
+ arch/arm/boot/dts/rk3288-firefly-reload.dts | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
- arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 29 +--------
- arch/arm/boot/dts/rk3288-firefly-reload.dts       | 71 +++++++++++++++++++----
- 2 files changed, 60 insertions(+), 40 deletions(-)
-
+diff --git a/arch/arm/boot/dts/rk3288-firefly-reload.dts b/arch/arm/boot/dts/rk3288-firefly-reload.dts
+index 43145d1..a2b1f14 100644
+--- a/arch/arm/boot/dts/rk3288-firefly-reload.dts
++++ b/arch/arm/boot/dts/rk3288-firefly-reload.dts
+@@ -202,18 +202,13 @@
+ 	bus-width = <4>;
+ 	cap-mmc-highspeed;
+ 	cap-sd-highspeed;
+-	sd-uhs-sdr12;
+-	sd-uhs-sdr25;
+-	sd-uhs-sdr50;
+-	sd-uhs-sdr104;
+-	sd-uhs-ddr50;
+ 	card-detect-delay = <200>;
+ 	disable-wp;
+ 	num-slots = <1>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&sdmmc_clk>, <&sdmmc_cmd>, <&sdmmc_cd>, <&sdmmc_bus4>;
+ 	vmmc-supply = <&vcc_sd>;
+-	vqmmc-supply = <&vccio_sd>;
++	vqmmc-supply = <&vcc_sd>;
+ 	status = "okay";
+ };
+ 
 -- 
 2.7.4
