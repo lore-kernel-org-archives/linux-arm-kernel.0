@@ -1,60 +1,58 @@
 From: pratyush.anand@gmail.com (Pratyush Anand)
-Date: Sun, 14 Aug 2016 21:30:04 +0530
-Subject: [PATCH v2 2/2] PCI: designware: let dw_pcie_link_up() beware of
- LTSSM training bit
-In-Reply-To: <1470807079-366-3-git-send-email-jszhang@marvell.com>
+Date: Sun, 14 Aug 2016 21:31:48 +0530
+Subject: [PATCH v2 1/2] PCI: designware: mv parameters for wait for link
+ into pcie-designware.c
+In-Reply-To: <1470807079-366-2-git-send-email-jszhang@marvell.com>
 References: <1470807079-366-1-git-send-email-jszhang@marvell.com>
- <1470807079-366-3-git-send-email-jszhang@marvell.com>
-Message-ID: <CAHM4w1kZ=c-hF8nwXE0h4SYcQD2QG3NvZ-R0gjyDEPmc+7E7aw@mail.gmail.com>
+ <1470807079-366-2-git-send-email-jszhang@marvell.com>
+Message-ID: <CAHM4w1kDDK-HcAad5OT6+mG6J5ps1BJE2d=xK51oJcA-i3vEKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Aug 10, 2016 at 11:01 AM, Jisheng Zhang <jszhang@marvell.com> wrote:
-> The link may be UP but still in link training. In this case, we can't
-> think the link is up and operating correctly. So we need to teach
-> dw_pcie_link_up() beware of the PCIE_PHY_DEBUG_R1_LINK_IN_TRAINING bit.
->
-
-I have no more access of designware PCIe specification now. Since Joao
-has acked it, so I would consider that
-PCIE_PHY_DEBUG_R1_LINK_IN_TRAINING bit exists in older core as well.
-If it is there then you have my Acked-by too.
-
-~Pratyush
-
-> This patch also rewrite PCIE_PHY_DEBUG_R1_LINK_UP definition so that
-> it's consistent with other MACROS.
+> These parameters are only used in the core pcie-designware.c, let's
+> move them to the core driver.
 >
 > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> Acked-by: Joao Pinto <jpinto@synopsys.com>
+Acked-by: Pratyush Anand <pratyush.anand@gmail.com>
+
 > ---
->  drivers/pci/host/pcie-designware.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
+>  drivers/pci/host/pcie-designware.c | 5 +++++
+>  drivers/pci/host/pcie-designware.h | 5 -----
+>  2 files changed, 5 insertions(+), 5 deletions(-)
 >
 > diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 24a16dd..6cc21bb 100644
+> index 12afce1..24a16dd 100644
 > --- a/drivers/pci/host/pcie-designware.c
 > +++ b/drivers/pci/host/pcie-designware.c
-> @@ -73,7 +73,8 @@
->  /* PCIe Port Logic registers */
->  #define PLR_OFFSET                     0x700
+> @@ -75,6 +75,11 @@
 >  #define PCIE_PHY_DEBUG_R1              (PLR_OFFSET + 0x2c)
-> -#define PCIE_PHY_DEBUG_R1_LINK_UP      0x00000010
-> +#define PCIE_PHY_DEBUG_R1_LINK_UP      (0x1 << 4)
-> +#define PCIE_PHY_DEBUG_R1_LINK_IN_TRAINING     (0x1 << 29)
+>  #define PCIE_PHY_DEBUG_R1_LINK_UP      0x00000010
 >
->  /* Parameters for the waiting for link up routine */
->  #define LINK_WAIT_MAX_RETRIES          10
-> @@ -417,7 +418,8 @@ int dw_pcie_link_up(struct pcie_port *pp)
->                 return pp->ops->link_up(pp);
+> +/* Parameters for the waiting for link up routine */
+> +#define LINK_WAIT_MAX_RETRIES          10
+> +#define LINK_WAIT_USLEEP_MIN           90000
+> +#define LINK_WAIT_USLEEP_MAX           100000
+> +
+>  static struct pci_ops dw_pcie_ops;
 >
->         val = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1);
-> -       return val & PCIE_PHY_DEBUG_R1_LINK_UP;
-> +       return ((val & PCIE_PHY_DEBUG_R1_LINK_UP) &&
-> +               (!(val & PCIE_PHY_DEBUG_R1_LINK_IN_TRAINING)));
->  }
+>  int dw_pcie_cfg_read(void __iomem *addr, int size, u32 *val)
+> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+> index f437f9b..384e79b 100644
+> --- a/drivers/pci/host/pcie-designware.h
+> +++ b/drivers/pci/host/pcie-designware.h
+> @@ -22,11 +22,6 @@
+>  #define MAX_MSI_IRQS                   32
+>  #define MAX_MSI_CTRLS                  (MAX_MSI_IRQS / 32)
 >
->  static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+> -/* Parameters for the waiting for link up routine */
+> -#define LINK_WAIT_MAX_RETRIES          10
+> -#define LINK_WAIT_USLEEP_MIN           90000
+> -#define LINK_WAIT_USLEEP_MAX           100000
+> -
+>  struct pcie_port {
+>         struct device           *dev;
+>         u8                      root_bus_nr;
 > --
 > 2.8.1
 >
