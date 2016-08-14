@@ -1,30 +1,50 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 14 Aug 2016 20:27:54 +0200
-Subject: [PATCH 0/7] musb: sunxi: Add support for run-time changing dr-mode
- through sysfs
-Message-ID: <1471199281-5494-1-git-send-email-hdegoede@redhat.com>
+Date: Sun, 14 Aug 2016 20:27:55 +0200
+Subject: [PATCH 1/7] phy-sun4i-usb: Use bool where appropriate
+In-Reply-To: <1471199281-5494-1-git-send-email-hdegoede@redhat.com>
+References: <1471199281-5494-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1471199281-5494-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+We're using bool as true/false type in most places in phy-sun4i-usb.c
+for consistency fixup the remaining uses of ints which are ever only
+0 or 1 to be bools too.
 
-Here is a patch series which implements run-time changing the dr-mode
-of sunxi musb controllers through the (already existing) musb "mode"
-sysfs attribute.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/phy/phy-sun4i-usb.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-This is useful on boards where there is no id pin, e.g. some tv-boxes
-use the musb controller to get an extra usb A port without needing
-a hub chip. Except for the missing id pin when using a usb A<->A cable
-these ports can do peripheral mode just fine. This series makes it
-possible to do e.g. this by doing echo "peripheral" > mode before
-plugging in the usb A<->A cable.
-
-This series has both sun4i-usb-phy driver and sunxi-musb-glue changes,
-both are necessary for the run-time changing to work, but they can be
-merged independently without breaking anything.
-
-Please review (and if no issues are found merge).
-
-Thanks & Regards,
-
-Hans
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index fcf4d95e..1cb84a8 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -445,7 +445,8 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ 	struct sun4i_usb_phy_data *data =
+ 		container_of(work, struct sun4i_usb_phy_data, detect.work);
+ 	struct phy *phy0 = data->phys[0].phy;
+-	int id_det, vbus_det, id_notify = 0, vbus_notify = 0;
++	bool id_notify = false, vbus_notify = false;
++	int id_det, vbus_det;
+ 
+ 	if (phy0 == NULL)
+ 		return;
+@@ -474,13 +475,13 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ 		}
+ 		sun4i_usb_phy0_set_id_detect(phy0, id_det);
+ 		data->id_det = id_det;
+-		id_notify = 1;
++		id_notify = true;
+ 	}
+ 
+ 	if (vbus_det != data->vbus_det) {
+ 		sun4i_usb_phy0_set_vbus_detect(phy0, vbus_det);
+ 		data->vbus_det = vbus_det;
+-		vbus_notify = 1;
++		vbus_notify = true;
+ 	}
+ 
+ 	mutex_unlock(&phy0->mutex);
+-- 
+2.7.4
