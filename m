@@ -1,31 +1,38 @@
-From: alexander.levin@verizon.com (Levin, Alexander)
-Date: Sun, 14 Aug 2016 11:27:33 -0400
-Subject: [E] [stable:PATCH 1/2] arm64: kernel: Save and restore
- addr_limit on exception entry
-In-Reply-To: <1471025480-10394-1-git-send-email-james.morse@arm.com>
-References: <1471025480-10394-1-git-send-email-james.morse@arm.com>
-Message-ID: <b1746053-fe21-0c45-5528-b1143a6df85f@verizon.com>
+From: greg@kroah.com (Greg KH)
+Date: Sun, 14 Aug 2016 17:44:34 +0200
+Subject: [PATCH 1/2 (linux-stable-4.5.y)] Revert "stmmac: Fix 'eth0: No
+ PHY found' regression"
+In-Reply-To: <1464009463-23654-2-git-send-email-peppe.cavallaro@st.com>
+References: <1464009463-23654-1-git-send-email-peppe.cavallaro@st.com>
+ <1464009463-23654-2-git-send-email-peppe.cavallaro@st.com>
+Message-ID: <20160814154434.GI20560@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2016 02:11 PM, James Morse wrote:
-> commit e19a6ee2460bdd0d0055a6029383422773f9999a upstream.
+On Mon, May 23, 2016 at 03:17:42PM +0200, Giuseppe Cavallaro wrote:
+> From: Giuseppe CAVALLARO <peppe.cavallaro@st.com>
 > 
-> If we take an exception while at EL1, the exception handler inherits
-> the original context's addr_limit value. To be consistent always reset
-> addr_limit and PSTATE.UAO on (re-)entry to EL1. This prevents accidental
-> re-use of the original context's addr_limit.
+> This reverts commit 88f8b1bb41c6208f81b6a480244533ded7b59493.
+> due to problems on GeekBox and Banana Pi M1 board when
+> connected to a real transceiver instead of a switch via
+> fixed-link.
 > 
-> Based on a similar patch for arm from Russell King.
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> [ backport to stop perf misusing inherited addr_limit.
->   Removed code interacting with UAO and the irqstack ]
-> Link: https://bugs.chromium.org/p/project-zero/issues/detail?id=822
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Cc: <stable@vger.kernel.org> #4.1
+> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> Cc: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> Cc: Andreas F?rber <afaerber@suse.de>
+> Cc: Frank Sch?fer <fschaefer.oss@googlemail.com>
+> Cc: Dinh Nguyen <dinh.linux@gmail.com>
+> Cc: David S. Miller <davem@davemloft.net>
+> Signed-off-by: David S. Miller <davem@davemloft.net>
+> ---
+>  drivers/net/ethernet/stmicro/stmmac/stmmac_mdio.c     | 11 ++++++++++-
+>  drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c |  9 +--------
+>  2 files changed, 11 insertions(+), 9 deletions(-)
 
-Added, thanks!
+<formletter>
+
+This is not the correct way to submit patches for inclusion in the
+stable kernel tree.  Please read Documentation/stable_kernel_rules.txt
+for how to do this properly.
+
+</formletter>
