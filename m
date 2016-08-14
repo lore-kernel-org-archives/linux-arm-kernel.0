@@ -1,99 +1,85 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 14 Aug 2016 20:27:57 +0200
-Subject: [PATCH 3/7] phy-sun4i-usb: Simplify missing dr_mode handling
+Date: Sun, 14 Aug 2016 20:27:56 +0200
+Subject: [PATCH 2/7] phy-sun4i-usb: Refactor forced session ending
 In-Reply-To: <1471199281-5494-1-git-send-email-hdegoede@redhat.com>
 References: <1471199281-5494-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1471199281-5494-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <1471199281-5494-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we cannot get dr_mode or no id gpio is specified simply assume
-peripheral mode, as this is always safe.
+The phy-sun4i-usb code supports forced ending a session on systems
+which lack Vbus detection, to allow switching between host and peripheral
+mode on such systems.
+
+Role switching via the musb driver "mode" sysfs attribute requires force
+ending the session too. This commit refactors the code to allow other
+parts of the phy-sun4i-usb code to request a forced session end.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/phy/phy-sun4i-usb.c | 43 ++++++++++++++-----------------------------
- 1 file changed, 14 insertions(+), 29 deletions(-)
+ drivers/phy/phy-sun4i-usb.c | 27 +++++++++++++--------------
+ 1 file changed, 13 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index 02cb65e..d0f6e30 100644
+index 1cb84a8..02cb65e 100644
 --- a/drivers/phy/phy-sun4i-usb.c
 +++ b/drivers/phy/phy-sun4i-usb.c
-@@ -124,7 +124,6 @@ struct sun4i_usb_phy_data {
- 		bool regulator_on;
- 		int index;
- 	} phys[MAX_PHYS];
--	int first_phy;
- 	/* phy0 / otg related variables */
- 	struct extcon_dev *extcon;
- 	bool phy0_init;
-@@ -325,10 +324,12 @@ static int sun4i_usb_phy_exit(struct phy *_phy)
- static int sun4i_usb_phy0_get_id_det(struct sun4i_usb_phy_data *data)
- {
- 	switch (data->dr_mode) {
--	case USB_DR_MODE_OTG:
--		return gpiod_get_value_cansleep(data->id_det_gpio);
- 	case USB_DR_MODE_HOST:
- 		return 0;
-+	case USB_DR_MODE_OTG:
-+		if (data->id_det_gpio)
-+			return gpiod_get_value_cansleep(data->id_det_gpio);
-+		/* Fallback to peripheral mode */
- 	case USB_DR_MODE_PERIPHERAL:
- 	default:
- 		return 1;
-@@ -539,8 +540,7 @@ static struct phy *sun4i_usb_phy_xlate(struct device *dev,
- {
- 	struct sun4i_usb_phy_data *data = dev_get_drvdata(dev);
+@@ -133,6 +133,7 @@ struct sun4i_usb_phy_data {
+ 	struct power_supply *vbus_power_supply;
+ 	struct notifier_block vbus_power_nb;
+ 	bool vbus_power_nb_registered;
++	bool force_session_end;
+ 	int id_det_irq;
+ 	int vbus_det_irq;
+ 	int id_det;
+@@ -445,7 +446,7 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ 	struct sun4i_usb_phy_data *data =
+ 		container_of(work, struct sun4i_usb_phy_data, detect.work);
+ 	struct phy *phy0 = data->phys[0].phy;
+-	bool id_notify = false, vbus_notify = false;
++	bool force_session_end, id_notify = false, vbus_notify = false;
+ 	int id_det, vbus_det;
  
--	if (args->args[0] < data->first_phy ||
--	    args->args[0] >= data->cfg->num_phys)
-+	if (args->args[0] >= data->cfg->num_phys)
- 		return ERR_PTR(-ENODEV);
- 
- 	return data->phys[args->args[0]].phy;
-@@ -615,33 +615,18 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 	if (phy0 == NULL)
+@@ -461,14 +462,17 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ 		return;
  	}
  
- 	data->dr_mode = of_usb_get_dr_mode_by_phy(np, 0);
--	switch (data->dr_mode) {
--	case USB_DR_MODE_OTG:
--		/* otg without id_det makes no sense, and is not supported */
--		if (!data->id_det_gpio) {
--			dev_err(dev, "usb0_id_det missing or invalid\n");
--			return -ENODEV;
--		}
--		/* fall through */
--	case USB_DR_MODE_HOST:
--	case USB_DR_MODE_PERIPHERAL:
--		data->extcon = devm_extcon_dev_allocate(dev,
--							sun4i_usb_phy0_cable);
--		if (IS_ERR(data->extcon))
--			return PTR_ERR(data->extcon);
- 
--		ret = devm_extcon_dev_register(dev, data->extcon);
--		if (ret) {
--			dev_err(dev, "failed to register extcon: %d\n", ret);
--			return ret;
--		}
--		break;
--	default:
--		dev_info(dev, "dr_mode unknown, not registering usb phy0\n");
--		data->first_phy = 1;
-+	data->extcon = devm_extcon_dev_allocate(dev, sun4i_usb_phy0_cable);
-+	if (IS_ERR(data->extcon))
-+		return PTR_ERR(data->extcon);
++	force_session_end = data->force_session_end;
++	data->force_session_end = false;
 +
-+	ret = devm_extcon_dev_register(dev, data->extcon);
-+	if (ret) {
-+		dev_err(dev, "failed to register extcon: %d\n", ret);
-+		return ret;
- 	}
- 
--	for (i = data->first_phy; i < data->cfg->num_phys; i++) {
-+	for (i = 0; i < data->cfg->num_phys; i++) {
- 		struct sun4i_usb_phy *phy = data->phys + i;
- 		char name[16];
- 
+ 	if (id_det != data->id_det) {
+-		/*
+-		 * When a host cable (id == 0) gets plugged in on systems
+-		 * without vbus detection report vbus low for long enough for
+-		 * the musb-ip to end the current device session.
+-		 */
++		/* id-change, force session end if we've no vbus detection */
+ 		if (data->dr_mode == USB_DR_MODE_OTG &&
+-		    !sun4i_usb_phy0_have_vbus_det(data) && id_det == 0) {
++		    !sun4i_usb_phy0_have_vbus_det(data))
++			force_session_end = true;
++
++		/* When entering host mode (id = 0) force end the session now */
++		if (force_session_end && id_det == 0) {
+ 			sun4i_usb_phy0_set_vbus_detect(phy0, 0);
+ 			msleep(200);
+ 			sun4i_usb_phy0_set_vbus_detect(phy0, 1);
+@@ -489,13 +493,8 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ 	if (id_notify) {
+ 		extcon_set_cable_state_(data->extcon, EXTCON_USB_HOST,
+ 					!id_det);
+-		/*
+-		 * When a host cable gets unplugged (id == 1) on systems
+-		 * without vbus detection report vbus low for long enough to
+-		 * the musb-ip to end the current host session.
+-		 */
+-		if (data->dr_mode == USB_DR_MODE_OTG &&
+-		    !sun4i_usb_phy0_have_vbus_det(data) && id_det == 1) {
++		/* When leaving host mode force end the session here */
++		if (force_session_end && id_det == 1) {
+ 			mutex_lock(&phy0->mutex);
+ 			sun4i_usb_phy0_set_vbus_detect(phy0, 0);
+ 			msleep(1000);
 -- 
 2.7.4
