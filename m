@@ -1,37 +1,39 @@
-From: Songjun.Wu@microchip.com (Wu, Songjun)
-Date: Mon, 15 Aug 2016 15:47:21 +0800
-Subject: [PATCH v9 0/2] [media] atmel-isc: add driver for Atmel ISC
-In-Reply-To: <676111f8-e179-b2cc-4792-cd4304995e31@xs4all.nl>
-References: <1470899202-13933-1-git-send-email-songjun.wu@microchip.com>
- <676111f8-e179-b2cc-4792-cd4304995e31@xs4all.nl>
-Message-ID: <160e313b-9a3e-2ca7-93cd-ef23eb412535@microchip.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 15 Aug 2016 10:53:30 +0300
+Subject: [GIT PULL] omap-gpmc fixes for v4.8-rc1
+Message-ID: <a4bd1d47-87b1-9ef9-d9d1-6c69be404b9e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd/Olof,
 
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
-On 8/15/2016 15:34, Hans Verkuil wrote:
-> On 08/11/2016 09:06 AM, Songjun Wu wrote:
->> The Image Sensor Controller driver includes two parts.
->> 1) Driver code to implement the ISC function.
->> 2) Device tree binding documentation, it describes how
->>    to add the ISC in device tree.
->
-> So close...
->
-> Running checkpatch gives me:
->
-> WARNING: added, moved or deleted file(s), does MAINTAINERS need updating?
-> #133:
-> new file mode 100644
->
-> Can you make a patch adding an entry to MAINTAINERS? No need to repost the other
-> two.
->
-Thank you.
-Nicolas or I will make a patch to add an entry to MAINTAINERS.
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
 
-> Regards,
->
-> 	Hans
->
+are available in the git repository at:
+
+  https://github.com/rogerq/linux.git tags/gpmc-omap-v4.8-rc1
+
+for you to fetch changes up to 23540d6e2f3193b946c4de43e3f9654fa6d23fe7:
+
+  memory: omap-gpmc: allow probe of child nodes to fail (2016-08-08 11:18:40 +0300)
+
+----------------------------------------------------------------
+OMAP-GPMC: fixes for v4.8-rc1
+
+* Allow other children of GPMC to probe even if any child fails.
+This fixes problem on Overo boards where networking device child
+doesn't probe due to broken NAND child.
+
+----------------------------------------------------------------
+Johan Hovold (1):
+      memory: omap-gpmc: allow probe of child nodes to fail
+
+ drivers/memory/omap-gpmc.c | 21 +++++++--------------
+ 1 file changed, 7 insertions(+), 14 deletions(-)
+
+--
+To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+the body of a message to majordomo at vger.kernel.org
+More majordomo info at  http://vger.kernel.org/majordomo-info.html
