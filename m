@@ -1,102 +1,95 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 15 Aug 2016 13:47:32 -0300
-Subject: [PATCH 1/3] ARM: dts: imx7s-warp: Add audio support
-Message-ID: <1471279654-16711-1-git-send-email-festevam@gmail.com>
+Date: Mon, 15 Aug 2016 13:47:33 -0300
+Subject: [PATCH 2/3] ARM: dts: imx7s-warp: Add Wifi support
+In-Reply-To: <1471279654-16711-1-git-send-email-festevam@gmail.com>
+References: <1471279654-16711-1-git-send-email-festevam@gmail.com>
+Message-ID: <1471279654-16711-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-warp7 has a sgtl5000 audio codec.
+Warp7 has a BCM43430 Wifi chip connected to the USDHC1 port.
 
 Add support for it.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx7s-warp.dts | 51 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
+ arch/arm/boot/dts/imx7s-warp.dts | 41 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx7s-warp.dts b/arch/arm/boot/dts/imx7s-warp.dts
-index ae23781..b9b45b1 100644
+index b9b45b1..cf730c1 100644
 --- a/arch/arm/boot/dts/imx7s-warp.dts
 +++ b/arch/arm/boot/dts/imx7s-warp.dts
-@@ -53,6 +53,27 @@
- 	memory {
+@@ -54,6 +54,18 @@
  		reg = <0x80000000 0x20000000>;
  	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "imx7-sgtl5000";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,bitclock-master = <&dailink_master>;
-+		simple-audio-card,frame-master = <&dailink_master>;
-+		simple-audio-card,cpu {
-+			sound-dai = <&sai1>;
-+		};
-+
-+		dailink_master: simple-audio-card,codec {
-+			sound-dai = <&codec>;
-+			clocks = <&clks IMX7D_AUDIO_MCLK_ROOT_CLK>;
-+		};
-+	};
-+};
-+
-+&clks {
-+	assigned-clocks = <&clks IMX7D_PLL_AUDIO_POST_DIV>;
-+	assigned-clock-rates = <884736000>;
- };
  
- &cpu0 {
-@@ -161,12 +182,32 @@
- 	pinctrl-0 = <&pinctrl_i2c4>;
++	reg_brcm: regulator-brcm {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio5 10 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_brcm_reg>;
++		regulator-name = "brcm_reg";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <200000>;
++	};
++
+ 	sound {
+ 		compatible = "simple-audio-card";
+ 		simple-audio-card,name = "imx7-sgtl5000";
+@@ -221,6 +233,17 @@
  	status = "okay";
- 
-+	codec: sgtl5000 at 0a {
-+		#sound-dai-cells = <0>;
-+		reg = <0x0a>;
-+		compatible = "fsl,sgtl5000";
-+		clocks = <&clks IMX7D_AUDIO_MCLK_ROOT_CLK>;
-+		VDDA-supply = <&vgen4_reg>;
-+		VDDIO-supply = <&vgen4_reg>;
-+		VDDD-supply = <&vgen2_reg>;
-+	};
-+
- 	mpl3115 at 60 {
- 		compatible = "fsl,mpl3115";
- 		reg = <0x60>;
- 	};
  };
  
-+&sai1 {
++&usdhc1 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_sai1>;
-+	assigned-clocks = <&clks IMX7D_SAI1_ROOT_SRC>,
-+			  <&clks IMX7D_SAI1_ROOT_CLK>;
-+	assigned-clock-parents = <&clks IMX7D_PLL_AUDIO_POST_DIV>;
-+	assigned-clock-rates = <0>, <36864000>;
++	pinctrl-0 = <&pinctrl_usdhc1>;
++	bus-width = <4>;
++	keep-power-in-suspend;
++	no-1-8-v;
++	non-removable;
++	vmmc-supply = <&reg_brcm>;
 +	status = "okay";
 +};
 +
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-@@ -208,6 +249,16 @@
- 		>;
- 	};
+ &usdhc3 {
+ 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ 	pinctrl-0 = <&pinctrl_usdhc3>;
+@@ -235,6 +258,12 @@
+ };
  
-+	pinctrl_sai1: sai1grp {
+ &iomuxc {
++	pinctrl_brcm_reg: brcmreggrp {
 +		fsl,pins = <
-+			MX7D_PAD_SAI1_RX_DATA__SAI1_RX_DATA0	0x1f
-+			MX7D_PAD_SAI1_TX_BCLK__SAI1_TX_BCLK	0x1f
-+			MX7D_PAD_SAI1_TX_SYNC__SAI1_TX_SYNC	0x1f
-+			MX7D_PAD_SAI1_TX_DATA__SAI1_TX_DATA0	0x30
-+			MX7D_PAD_SAI1_MCLK__SAI1_MCLK		0x1f
++			MX7D_PAD_SD2_WP__GPIO5_IO10	0x14 /* WL_REG_ON */
 +		>;
 +	};
 +
- 	pinctrl_uart1: uart1grp {
+ 	pinctrl_i2c1: i2c1grp {
  		fsl,pins = <
- 			MX7D_PAD_UART1_TX_DATA__UART1_DCE_TX	0x79
+ 			MX7D_PAD_I2C1_SDA__I2C1_SDA		0x4000007f
+@@ -266,6 +295,18 @@
+ 		>;
+ 	};
+ 
++	pinctrl_usdhc1: usdhc1grp {
++		fsl,pins = <
++			MX7D_PAD_SD1_CMD__SD1_CMD	0x59
++			MX7D_PAD_SD1_CLK__SD1_CLK	0x19
++			MX7D_PAD_SD1_DATA0__SD1_DATA0	0x59
++			MX7D_PAD_SD1_DATA1__SD1_DATA1	0x59
++			MX7D_PAD_SD1_DATA2__SD1_DATA2	0x59
++			MX7D_PAD_SD1_DATA3__SD1_DATA3	0x59
++			MX7D_PAD_SD2_RESET_B__GPIO5_IO11 0x14 /* WL_HOST_WAKE */
++		>;
++	};
++
+ 	pinctrl_usdhc3: usdhc3grp {
+ 		fsl,pins = <
+ 			MX7D_PAD_SD3_CMD__SD3_CMD		0x59
 -- 
 2.7.4
