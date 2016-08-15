@@ -1,41 +1,54 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 15 Aug 2016 19:55:04 +0200
-Subject: Build regressions/improvements in v4.8-rc2
-In-Reply-To: <1471283586-26886-1-git-send-email-geert@linux-m68k.org>
-References: <1471283586-26886-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <CAMuHMdU+CPs6nurGrw2Ogz74tQeRhuwq_0eEFByyCUeP18=ywg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 15 Aug 2016 20:56:05 +0300
+Subject: [PATCH 19/26] ARM: dts: r8a7794: add MSTP5 clocks
+In-Reply-To: <2a29f9d6fea82485941449c2328af5b2a4ea636f.1471251169.git.horms+renesas@verge.net.au>
+References: <cover.1471251169.git.horms+renesas@verge.net.au>
+ <2a29f9d6fea82485941449c2328af5b2a4ea636f.1471251169.git.horms+renesas@verge.net.au>
+Message-ID: <13739ec4-3e12-4b8d-9f69-14fbbe164986@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2016 at 7:53 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> JFYI, when comparing v4.8-rc2[1] to v4.8-rc1[3], the summaries are:
->   - build errors: +6/-3
+Hello.
 
-  + error: zynq-fpga.c: undefined reference to `clk_round_rate':  =>
-.text+0x3234c0), .text+0x350bd4), .text+0x17f780), .text+0x350d44),
-.text+0x34ad7c), .text+0x2b2588), .text+0x34ad64), .text+0x34ae3c)
-  + error: zynq-fpga.c: undefined reference to `clk_set_parent':  =>
-.text+0x143838)
-  + error: zynq-fpga.c: undefined reference to `clk_set_rate':  =>
-.text+0x350014), .text+0x34ffc4), .text+0x2b2598), .text+0x35430c),
-.text+0x13ed64), .text+0x352fb8), .text+0x34ada8), .text+0x3942ec),
-.text+0x350db4), .text+0x17f794), .text+0x149e4c), .text+0x34eeb0),
-.text+0x34f8d0), .text+0x323510), .text+0x76124), .text+0x148cf0),
-.text+0x354258)
+On 08/15/2016 11:55 AM, Simon Horman wrote:
 
-arm-randconfig
+> From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>
+> Add some MSTP5 clocks to the R8A7794 device tree.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/boot/dts/r8a7794.dtsi            | 9 +++++++++
+>  include/dt-bindings/clock/r8a7794-clock.h | 1 +
+>  2 files changed, 10 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+> index 5d1fded79633..1c2d3846d70e 100644
+> --- a/arch/arm/boot/dts/r8a7794.dtsi
+> +++ b/arch/arm/boot/dts/r8a7794.dtsi
+> @@ -1204,6 +1204,15 @@
+>  			clock-indices = <R8A7794_CLK_IRQC>;
+>  			clock-output-names = "irqc";
+>  		};
+> +		mstp5_clks: mstp5_clks at e6150144 {
+> +			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+> +			reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
+> +			clocks = <&hp_clk>, <&extal_clk>, <&p_clk>;
 
-> [1] http://kisskb.ellerman.id.au/kisskb/head/10769/ (all 262 configs)
-> [3] http://kisskb.ellerman.id.au/kisskb/head/10730/ (all 262 configs)
+    Argh! Looks like I forgot to remove <&extal_clk> when removing the thermal 
+clock... will send the patch.
 
-Gr{oetje,eeting}s,
+> +			#clock-cells = <1>;
+> +			clock-indices = <R8A7794_CLK_AUDIO_DMAC0
+> +					 R8A7794_CLK_PWM>;
+> +			clock-output-names = "audmac0", "pwm";
+> +		};
+>  		mstp7_clks: mstp7_clks at e615014c {
+>  			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+>  			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
+[...]
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+MBR, Sergei
