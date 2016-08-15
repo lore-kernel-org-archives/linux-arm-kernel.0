@@ -1,62 +1,243 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 15 Aug 2016 13:17:37 +0100
-Subject: [PATCH 4/7] ARM: dts: STiH407: Move non-removable property to board
- file
+Date: Mon, 15 Aug 2016 13:17:40 +0100
+Subject: [PATCH 7/7] ARM: dts: STi: Introduce B2260 board
 In-Reply-To: <20160815121740.29515-1-lee.jones@linaro.org>
 References: <20160815121740.29515-1-lee.jones@linaro.org>
-Message-ID: <20160815121740.29515-5-lee.jones@linaro.org>
+Message-ID: <20160815121740.29515-8-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-Due to 96board which uses mmc0 node for SD card, the non-removable
-property must be moved from STiH407-family to board file for B2120
-and B2199 boards.
+B2260 board is the STMicroelectronics 96Board
+based on STiH410 soc :
+  - 1GB DDR
+  - On-Board USB combo WiFi/Bluetooth RTL8723BU
+    with PCB soldered antenna
+  - Ethernet 1000-BaseT
+  - Sata
+  - HDMI
+  - 2 x USB2 type A
+  - micro USB2 type AB
+  - SD card slot
+  - High speed connector (SD/I2C/USB interfaces)
+  - Slow speed connector (UART/I2C/GPIO/SPI/PCM interfaces)
 
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih407-family.dtsi | 1 -
- arch/arm/boot/dts/stih418-b2199.dts   | 1 +
- arch/arm/boot/dts/stihxxx-b2120.dtsi  | 1 +
- 3 files changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/Makefile          |   1 +
+ arch/arm/boot/dts/stih410-b2260.dts | 190 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 191 insertions(+)
+ create mode 100644 arch/arm/boot/dts/stih410-b2260.dts
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index d294e824..59fea05 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -553,7 +553,6 @@
- 			clock-names = "mmc";
- 			clocks = <&clk_s_c0_flexgen CLK_MMC_0>;
- 			bus-width = <8>;
--			non-removable;
- 		};
- 
- 		mmc1: sdhci at 09080000 {
-diff --git a/arch/arm/boot/dts/stih418-b2199.dts b/arch/arm/boot/dts/stih418-b2199.dts
-index 772d2bb..7c45e75 100644
---- a/arch/arm/boot/dts/stih418-b2199.dts
-+++ b/arch/arm/boot/dts/stih418-b2199.dts
-@@ -86,6 +86,7 @@
- 			sd-uhs-sdr50;
- 			sd-uhs-sdr104;
- 			sd-uhs-ddr50;
-+			non-removable;
- 		};
- 
- 		miphy28lp_phy: miphy28lp at 9b22000 {
-diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-index 133375b..0b0dd02 100644
---- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
-+++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-@@ -65,6 +65,7 @@
- 		};
- 
- 		mmc0: sdhci at 09060000 {
-+			non-removable;
- 			status = "okay";
- 		};
- 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index faacd52..f23a5b3 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -686,6 +686,7 @@ dtb-$(CONFIG_ARCH_SPEAR6XX) += \
+ dtb-$(CONFIG_ARCH_STI) += \
+ 	stih407-b2120.dtb \
+ 	stih410-b2120.dtb \
++	stih410-b2260.dtb \
+ 	stih415-b2000.dtb \
+ 	stih415-b2020.dtb \
+ 	stih416-b2000.dtb \
+diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
+new file mode 100644
+index 0000000..94e064f
+--- /dev/null
++++ b/arch/arm/boot/dts/stih410-b2260.dts
+@@ -0,0 +1,190 @@
++/*
++ * Copyright (C) 2016 STMicroelectronics (R&D) Limited.
++ * Author: Patrice Chotard <patrice.chotard@st.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
++#include "stih410.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "STiH410 B2260";
++	compatible = "st,stih410-b2260", "st,stih410";
++
++	chosen {
++		bootargs = "console=ttyAS1,115200";
++		linux,stdout-path = &uart1;
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x40000000 0x40000000>;
++	};
++
++	aliases {
++		ttyAS1 = &uart1;
++		ethernet0 = &ethernet0;
++	};
++
++	soc {
++
++		leds {
++			compatible = "gpio-leds";
++			user_green_1 {
++				label = "User_green_1";
++				gpios = <&pio1 3 GPIO_ACTIVE_LOW>;
++				linux,default-trigger = "heartbeat";
++				default-state = "off";
++			};
++
++			user_green_2 {
++				label = "User_green_2";
++				gpios = <&pio4 1 GPIO_ACTIVE_LOW>;
++				default-state = "off";
++			};
++
++			user_green_3 {
++				label = "User_green_3";
++				gpios = <&pio2 1 GPIO_ACTIVE_LOW>;
++				default-state = "off";
++			};
++
++			user_green_4 {
++				label = "User_green_4";
++				gpios = <&pio2 5 GPIO_ACTIVE_LOW>;
++				default-state = "off";
++			};
++		};
++
++		/* Low speed expansion connector */
++		uart0: serial at 9830000 {
++			label = "LS-UART0";
++			status = "okay";
++		};
++
++		/* Low speed expansion connector */
++		uart1: serial at 9831000 {
++			label = "LS-UART1";
++			status = "okay";
++		};
++
++		/* Low speed expansion connector */
++		spi0: spi at 9844000 {
++			label = "LS-SPI0";
++			cs-gpio = <&pio30 3 0>;
++			status = "okay";
++		};
++
++		/* Low speed expansion connector */
++		i2c0: i2c at 9840000 {
++			label = "LS-I2C0";
++			status = "okay";
++		};
++
++		/* Low speed expansion connector */
++		i2c1: i2c at 9841000 {
++			label = "LS-I2C1";
++			status = "okay";
++		};
++
++		/* high speed expansion connector */
++		i2c2: i2c at 9842000 {
++			label = "HS-I2C2";
++			pinctrl-0 = <&pinctrl_i2c2_alt2_1>;
++			status = "okay";
++		};
++
++		/* high speed expansion connector */
++		i2c3: i2c at 9843000 {
++			label = "HS-I2C3";
++			pinctrl-0 = <&pinctrl_i2c3_alt3_0>;
++			status = "okay";
++		};
++
++		mmc0: sdhci at 09060000 {
++			pinctrl-0 = <&pinctrl_sd0>;
++			bus-width = <4>;
++			status = "okay";
++		};
++
++		/* high speed expansion connector */
++		mmc1: sdhci at 09080000 {
++			status = "okay";
++		};
++
++		pwm0: pwm at 9810000 {
++			status = "okay";
++		};
++
++		pwm1: pwm at 9510000 {
++			status = "okay";
++		};
++
++		usb2_picophy1: phy2 {
++			status = "okay";
++		};
++
++		usb2_picophy2: phy3 {
++			status = "okay";
++		};
++
++		ohci0: usb at 9a03c00 {
++			status = "okay";
++		};
++
++		ehci0: usb at 9a03e00 {
++			status = "okay";
++		};
++
++		ohci1: usb at 9a83c00 {
++			status = "okay";
++		};
++
++		ehci1: usb at 9a83e00 {
++			status = "okay";
++		};
++
++		ethernet0: dwmac at 9630000 {
++			phy-mode = "rgmii";
++			pinctrl-0 = <&pinctrl_rgmii1 &pinctrl_rgmii1_mdio_1>;
++
++			snps,phy-bus-name = "stmmac";
++			snps,phy-bus-id = <0>;
++			snps,phy-addr = <0>;
++			snps,reset-gpio = <&pio0 7 0>;
++			snps,reset-active-low;
++			snps,reset-delays-us = <0 10000 1000000>;
++
++			status = "okay";
++		};
++
++		/* SSC11 to HDMI */
++		hdmiddc: i2c at 9541000 {
++			/* HDMI V1.3a supports Standard mode only */
++			clock-frequency = <100000>;
++			st,i2c-min-scl-pulse-width-us = <0>;
++			st,i2c-min-sda-pulse-width-us = <5>;
++			status = "okay";
++		};
++
++		sti-display-subsystem {
++			sti_hdmi: sti-hdmi at 8d04000 {
++				status = "okay";
++			};
++		};
++
++		miphy28lp_phy: miphy28lp at 9b22000 {
++
++			phy_port1: port at 9b2a000 {
++				st,osc-force-ext;
++			};
++		};
++
++		sata1: sata at 9b28000 {
++			status = "okay";
++		};
++	};
++};
 -- 
 2.9.0
