@@ -1,5 +1,5 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 15 Aug 2016 11:06:49 +0100
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Aug 2016 11:08:38 +0100
 Subject: [kernel-hardening] [PATCH 0/7] arm64: Privileged Access Never
  using TTBR0_EL1 switching
 In-Reply-To: <CAKv+Gu99SNzKVccod_2At1vsmHfgO4fnqVYbVJ8Fjdd4k68RXg@mail.gmail.com>
@@ -8,7 +8,7 @@ References: <1471015666-23125-1-git-send-email-catalin.marinas@arm.com>
  <20160815094842.GB22320@e104818-lin.cambridge.arm.com>
  <20160815095813.GA1996@svinekod>
  <CAKv+Gu99SNzKVccod_2At1vsmHfgO4fnqVYbVJ8Fjdd4k68RXg@mail.gmail.com>
-Message-ID: <20160815100649.GB1996@svinekod>
+Message-ID: <20160815100838.GB13262@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -33,6 +33,7 @@ On Mon, Aug 15, 2016 at 12:02:33PM +0200, Ard Biesheuvel wrote:
 > > control only affects the behaviour on a TLB miss. Thus to use EPD0 we'd at
 > > least need TLB invalidation by ASID to remove previously-allocated entries from
 > > TLBs.
+> >
 > 
 > ... or update the ASID to the reserved ASID in TTBR0_EL1, but leave
 > the actual TTBR address alone.
@@ -40,12 +41,7 @@ On Mon, Aug 15, 2016 at 12:02:33PM +0200, Ard Biesheuvel wrote:
 > This would remove the need for a zero page, and for recording the
 > original TTBR address in a per-cpu variable.
 
-That's a good point, and a better approach.
+Hmm, how does that work? The ASID and EPDx are in different registers,
+so there's still a window where we could get speculative TLB fills.
 
-Unfortunately, we're still left with the issue that TCR_EL1.* can be cached in
-a TLB, as Catalin pointed out. Which at minimum would require a TLBI ASIDE1,
-and may require something stronger, given the precise rules for TLB-cached
-fields isn't clear.
-
-Thanks,
-Mark.
+Will
