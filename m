@@ -1,85 +1,39 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 15 Aug 2016 11:30:54 +0100
-Subject: [kernel-hardening] [PATCH 0/7] arm64: Privileged Access Never
- using TTBR0_EL1 switching
-In-Reply-To: <CAKv+Gu-nrAvdqy9Yb=vP1RysWY+gZqHdiMv6fdDKN4-gBPivDA@mail.gmail.com>
-References: <1471015666-23125-1-git-send-email-catalin.marinas@arm.com>
- <CAKv+Gu9hz_=GSRYgW3RueVhUA8F3HaM5DC_8Jkbx1JHF3x5mKg@mail.gmail.com>
- <20160815094842.GB22320@e104818-lin.cambridge.arm.com>
- <20160815095813.GA1996@svinekod>
- <CAKv+Gu99SNzKVccod_2At1vsmHfgO4fnqVYbVJ8Fjdd4k68RXg@mail.gmail.com>
- <20160815100649.GB1996@svinekod>
- <CAKv+Gu-nrAvdqy9Yb=vP1RysWY+gZqHdiMv6fdDKN4-gBPivDA@mail.gmail.com>
-Message-ID: <20160815103051.GD1996@svinekod>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 15 Aug 2016 11:44:06 +0100
+Subject: [PATCH] arm64: cpufeature: allow for version discrepancy in PMU
+ implementations
+In-Reply-To: <1471257732-29594-1-git-send-email-will.deacon@arm.com>
+References: <1471257732-29594-1-git-send-email-will.deacon@arm.com>
+Message-ID: <9e66d0db-a304-34c8-cec0-0f1329ec8dc7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2016 at 12:21:00PM +0200, Ard Biesheuvel wrote:
-> On 15 August 2016 at 12:06, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Mon, Aug 15, 2016 at 12:02:33PM +0200, Ard Biesheuvel wrote:
-> >> On 15 August 2016 at 11:58, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> > On Mon, Aug 15, 2016 at 10:48:42AM +0100, Catalin Marinas wrote:
-> >> >> On Sat, Aug 13, 2016 at 11:13:58AM +0200, Ard Biesheuvel wrote:
-> >> >> > On 12 August 2016 at 17:27, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> >> > > This is the first (public) attempt at emulating PAN by disabling
-> >> >> > > TTBR0_EL1 accesses on arm64.
-> >> >> >
-> >> >> > I take it using TCR_EL1.EPD0 is too expensive?
-> >> >>
-> >> >> It would require full TLB invalidation on entering/exiting the kernel
-> >> >> and again for any user access. That's because the architecture allows
-> >> >> this bit to be cached in the TLB so without TLBI we wouldn't have any
-> >> >> guarantee that the actual PAN was toggled. I'm not sure it's even clear
-> >> >> whether a TLBI by ASID or a local one would suffice (likely OK for the
-> >> >> latter).
-> >> >
-> >> > It's worth noting that even ignoring the TLB-caching of TCR_EL1.EPD0, the
-> >> > control only affects the behaviour on a TLB miss. Thus to use EPD0 we'd at
-> >> > least need TLB invalidation by ASID to remove previously-allocated entries from
-> >> > TLBs.
-> >>
-> >> ... or update the ASID to the reserved ASID in TTBR0_EL1, but leave
-> >> the actual TTBR address alone.
-> >>
-> >> This would remove the need for a zero page, and for recording the
-> >> original TTBR address in a per-cpu variable.
-> >
-> > That's a good point, and a better approach.
-> >
-> > Unfortunately, we're still left with the issue that TCR_EL1.* can be cached in
-> > a TLB, as Catalin pointed out. Which at minimum would require a TLBI ASIDE1,
-> > and may require something stronger, given the precise rules for TLB-cached
-> > fields isn't clear.
-> 
-> So how exactly would EPDn = 1 be cached in a TLB, given that the bit
-> specifically means that TTBRn_ELn is ignored on a TLB *miss*. Doesn't
-> that mean 'not covered by a TLB entry'? Or does it mean 'not covered
-> by a TLB entry describing a valid translation'?
+On 15/08/16 11:42, Will Deacon wrote:
+> Perf already supports multiple PMU instances for heterogeneous systems,
+> so there's no need to be strict in the cpufeature checking, particularly
+> as the PMU extension is optional in the architecture.
+>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/cpufeature.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 62272eac1352..a65a638965a4 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -172,7 +172,11 @@ static struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
+>  	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
+> -	S_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
+> +	/*
+> +	 * We can instantiate multiple PMU instances with different levels
+> +	 * of support.
+> +	 * */
+> +	S_ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
 
-The ARM ARM uses 'TLB' to mean any internal storage used by the translation,
-including internal registers. So it's not necessarily a TLB entry in the usual
-sense.
 
-Most of these make more sense if you consider that Stage-2 'TLBs' might cache
-this information for the purpose of walking Stage-1 entries. There are other
-potential reasons beyond that, though.
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-> I guess it indeed makes sense to get this clarified ...
-> 
-> As to Will's point, I suppose there is a window where a speculative
-> TLB fill could occur, so I suppose that means updating TTBR0_EL1.ASID
-> first, then TCR_EL1.EPD0, and finally perform the TLBI ASIDE1 on the
-> reserved ASID.
-
-I thought that too, but this could race with concurrent modification on another
-CPU. That other CPU would perform maintenance with the usual ASID, then perhaps
-modify/free entries.
-
-There would be a window where the CPU doing the EPD0 + reserved-ASID trick
-could have an erroneous view of the page tables, and walk garbage or allocate
-conflicting entries.
-
-Perhaps the ASID allocation logic could be modified to avoid that race, though.
-
-Thanks,
-Mark.
+Suzuki
