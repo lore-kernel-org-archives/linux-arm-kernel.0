@@ -1,45 +1,106 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 15 Aug 2016 10:17:54 +0100
-Subject: [PATCH v4 2/3] arm64: vdso: constify vm_special_mapping used for
- aarch32 vectors page
-In-Reply-To: <1471243546-3090-3-git-send-email-jszhang@marvell.com>
-References: <1471243546-3090-1-git-send-email-jszhang@marvell.com>
- <1471243546-3090-3-git-send-email-jszhang@marvell.com>
-Message-ID: <20160815091754.GC1426@svinekod>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Mon, 15 Aug 2016 17:13:10 +0800
+Subject: [PATCH v6 0/8] power: add power sequence library
+Message-ID: <1471252398-957-1-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2016 at 02:45:45PM +0800, Jisheng Zhang wrote:
-> The vm_special_mapping spec which is used for aarch32 vectors page is
-> never modified, so mark it as const.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Hi all,
 
-I see that this is never deliberately modified before being passed to
-_install_special_mapping, which takes it as a const pointer. So this looks good
-to me:
+This is a follow-up for my last power sequence framework patch set [1].
+According to Rob Herring and Ulf Hansson's comments[2], I use a generic
+power sequence library for parsing the power sequence elements on DT,
+and implement generic power sequence on library. The host driver
+can allocate power sequence instance, and calls pwrseq APIs accordingly.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+In future, if there are special power sequence requirements, the special
+power sequence library can be created.
 
-Mark.
+This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+two hot-plug devices to simulate this use case, the related binding
+change is updated at patch [1/6], The udoo board changes were tested
+using my last power sequence patch set.[3]
 
-> ---
->  arch/arm64/kernel/vdso.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-> index e320e8f..10ad8ab 100644
-> --- a/arch/arm64/kernel/vdso.c
-> +++ b/arch/arm64/kernel/vdso.c
-> @@ -88,7 +88,7 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
->  {
->  	struct mm_struct *mm = current->mm;
->  	unsigned long addr = AARCH32_VECTORS_BASE;
-> -	static struct vm_special_mapping spec = {
-> +	static const struct vm_special_mapping spec = {
->  		.name	= "[vectors]",
->  		.pages	= vectors_page,
->  
-> -- 
-> 2.8.1
-> 
+Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
+need to power on itself before it can be found by ULPI bus.
+
+[1] http://www.spinics.net/lists/linux-usb/msg142755.html
+[2] http://www.spinics.net/lists/linux-usb/msg143106.html
+[3] http://www.spinics.net/lists/linux-usb/msg142815.html
+
+Changes for v6:
+- Add Matthias Kaehlcke's Reviewed-by and Tested-by. (patch [2/6])
+- Change chipidea core of_node assignment for coming user. (patch [5/6])
+- Applies Joshua Clayton's three dts changes for two boards,
+  the USB device's reg has only #address-cells, but without #size-cells.
+
+Changes for v5:
+- Delete pwrseq_register/pwrseq_unregister, which is useless currently
+- Fix the linker error when the pwrseq user is compiled as module
+
+Changes for v4:
+- Create the patch on next-20160722 
+- Fix the of_node is not NULL after chipidea driver is unbinded [Patch 5/6]
+- Using more friendly wait method for reset gpio [Patch 2/6]
+- Support multiple input clocks [Patch 2/6]
+- Add Rob Herring's ack for DT changes
+- Add Joshua Clayton's Tested-by
+
+Changes for v3:
+- Delete "power-sequence" property at binding-doc, and change related code
+  at both library and user code.
+- Change binding-doc example node name with Rob's comments
+- of_get_named_gpio_flags only gets the gpio, but without setting gpio flags,
+  add additional code request gpio with proper gpio flags
+- Add Philipp Zabel's Ack and MAINTAINER's entry
+
+Changes for v2:
+- Delete "pwrseq" prefix and clock-names for properties at dt binding
+- Should use structure not but its pointer for kzalloc
+- Since chipidea core has no of_node, let core's of_node equals glue
+  layer's at core's probe
+
+Joshua Clayton (2):
+  ARM: dts: imx6qdl: Enable usb node children with <reg>
+  ARM: dts: imx6q-evi: Fix onboard hub reset line
+
+Peter Chen (6):
+  binding-doc: power: pwrseq-generic: add binding doc for generic power
+    sequence library
+  power: add power sequence library
+  binding-doc: usb: usb-device: add optional properties for power
+    sequence
+  usb: core: add power sequence handling for USB devices
+  usb: chipidea: let chipidea core device of_node equal's glue layer
+    device of_node
+  ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB property
+
+ .../bindings/power/pwrseq/pwrseq-generic.txt       |  48 ++++++
+ .../devicetree/bindings/usb/usb-device.txt         |  10 +-
+ MAINTAINERS                                        |   9 ++
+ arch/arm/boot/dts/imx6q-evi.dts                    |  25 +--
+ arch/arm/boot/dts/imx6qdl-udoo.dtsi                |  26 ++--
+ arch/arm/boot/dts/imx6qdl.dtsi                     |   6 +
+ drivers/power/Kconfig                              |   1 +
+ drivers/power/Makefile                             |   1 +
+ drivers/power/pwrseq/Kconfig                       |  20 +++
+ drivers/power/pwrseq/Makefile                      |   2 +
+ drivers/power/pwrseq/core.c                        |  62 ++++++++
+ drivers/power/pwrseq/pwrseq_generic.c              | 168 +++++++++++++++++++++
+ drivers/usb/chipidea/core.c                        |  27 +++-
+ drivers/usb/core/Makefile                          |   1 +
+ drivers/usb/core/hub.c                             |  12 +-
+ drivers/usb/core/hub.h                             |  12 ++
+ drivers/usb/core/pwrseq.c                          | 100 ++++++++++++
+ include/linux/power/pwrseq.h                       |  47 ++++++
+ 18 files changed, 536 insertions(+), 41 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+ create mode 100644 drivers/power/pwrseq/Kconfig
+ create mode 100644 drivers/power/pwrseq/Makefile
+ create mode 100644 drivers/power/pwrseq/core.c
+ create mode 100644 drivers/power/pwrseq/pwrseq_generic.c
+ create mode 100644 drivers/usb/core/pwrseq.c
+ create mode 100644 include/linux/power/pwrseq.h
+
+-- 
+1.9.1
