@@ -1,100 +1,97 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 15 Aug 2016 21:01:49 +0200
-Subject: [GIT PULL] delete the RealView boardfiles
-Message-ID: <CACRpkdar=aL6qXrmpmpYJH8NVN4JkN=DfZR3ShmJucNGU4owmg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 15 Aug 2016 21:04:58 +0200
+Subject: [kernel-hardening] [PATCH 0/7] arm64: Privileged Access Never
+ using TTBR0_EL1 switching
+In-Reply-To: <20160815161318.GH22320@e104818-lin.cambridge.arm.com>
+References: <20160815095813.GA1996@svinekod>
+ <CAKv+Gu99SNzKVccod_2At1vsmHfgO4fnqVYbVJ8Fjdd4k68RXg@mail.gmail.com>
+ <20160815100649.GB1996@svinekod>
+ <CAKv+Gu-nrAvdqy9Yb=vP1RysWY+gZqHdiMv6fdDKN4-gBPivDA@mail.gmail.com>
+ <20160815103000.GE13262@arm.com>
+ <CAKv+Gu_8d7Vf+TzQnqaofNj62L-=qkht4av-6mCYZoWkucz8RA@mail.gmail.com>
+ <20160815103721.GF13262@arm.com>
+ <CAKv+Gu-5Ckd0_ot-Le=7dL2Wn8E6198vEHPk0-E4VtRUw8c0BQ@mail.gmail.com>
+ <20160815105205.GD22320@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu87t-AnDKvtk699CpEfkEPgB=6DE-8EhBCMMnczemVQ4Q@mail.gmail.com>
+ <20160815161318.GH22320@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu_eEHnQ1zJojCUwK8E8dyfSGkJPSa8Up-yVPw70PLB4JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+On 15 August 2016 at 18:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Mon, Aug 15, 2016 at 12:56:58PM +0200, Ard Biesheuvel wrote:
+>> On 15 August 2016 at 12:52, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > On Mon, Aug 15, 2016 at 12:43:31PM +0200, Ard Biesheuvel wrote:
+>> >> But, how about we store the reserved ASID in TTBR1_EL1 instead, and
+>> >> switch TCR_EL1.A1 and TCR_EL1.EPD0 in a single write? That way, we can
+>> >> switch ASIDs and disable table walks atomically (I hope), and we
+>> >> wouldn't need to change TTBR0_EL1 at all.
+>> >
+>> > I did this before for AArch32 + LPAE (patches on the list sometime last
+>> > year I think). But the idea was nak'ed by the ARM architects. The
+>> > TCR_EL1.A1 can be cached somewhere in the TLB state machine, so you need
+>> > TLBI (IOW, toggling A1 does not guarantee an ASID switch).
+>>
+>> But how is TTBR0_EL1 any different? The ARM ARM equally mentions that
+>> any of its field can be cached in a TLB, so by that reasoning, setting
+>> a new ASID in TTBR0_EL1 would also require TLB maintenance.
+>
+> Not really because this register is also described as part of the
+> context switching operation, so that would be an exception to the
+> general rule of requiring TLB invalidation for cached registers.
+>
 
-this deletes the RealView boardfiles, good riddance. All is
-device tree now. 3788 deleted lines.
+Well, of course, requiring TLB maintenance to change the current ASID
+would be silly. But the ASID is obviously cached in each TLB entry
+that is generated while the ASID is active, which makes the sentence
+'Any of the fields in this register are permitted to be cached in a
+TLB.' a bit ambiguous, since it obviously does not mean that a stale
+ASID may be cached by the table walker.
 
-The missing piece was the CLCD patches that got merged
-by the fbdev maintainer last week.
+> If you keep reading the same paragraph, the ARM ARM becomes more
+> subjective ;) and you may come to the conclusion that the reserved ASID
+> (not TCR_EL1.A1 though) + TCR_EL1.EDP0 would do the trick but we need
+> clarification from the architects rather than my random interpretation:
+>
+> Section "D4.7.1 General TLB maintenance requirements" states:
+>
+>   Some System register field descriptions state that the effect of the
+>   field is permitted to be cached in a TLB. This means that all TLB
+>   entries that might be affected by a change of the field must be
+>   invalidated whenever that field is changed
+>
+> So the above kind of implies that only TLB *entries* that might be
+> affected by a change of a control bit need to be invalidated and only
+> the effect of such bit is cached (rather than the bit itself). The
+> effect of EDP0==1 is that there is no page table walk on a miss, so
+> there won't be any new entries cached in the TLB that would
+> reflect/cache the effect of EDP0==1. We still need to follow this by a
+> switch to the reserved ASID to make sure there are no other TLB entries
+> for TTBR0 (and we shouldn't care about the window between EDP0=1 and
+> ASID=reserved).
+>
 
-I touch oneliners in irqchips and MTD in the process but I
-seriously doubt that they mind.
+Indeed.
 
-Please pull this in for cleanups so we can get it rotating
-in linux-next. (The kautobuild seems happy.)
+> Anyway, the above wouldn't help the code much since we still need to
+> preserve/restore/switch the ASID of the current thread (that's unless we
+> temporarily store TTBR0_EL1.ASID into the TTBR1_EL1.ASID field).
 
-Yours,
-Linus Walleij
+That is actually not such a bad idea. We could assign both fields at
+context switch time, and simply copy it from TTBR1_EL1 to TTBR0_EL1
+before doing the user access.
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+> The
+> TCR_EL1.A1 trick would have been nice but explicitly rejected by the
+> architects (I guess it's not part of the context switching sequence, so
+> the hardware may not notice the A1 bit change).
+>
 
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+Yeah, that's unfortunate. But I think this feature is important, and
+combined with the hardened usercopy feature drastically reduces the
+attack surface of the kernel, so I expect it to quickly make its way
+into various 'stable' downstream trees. So I would really like to get
+to the bottom of this.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/realview-broomstick-sweep
-
-for you to fetch changes up to 8f2c00629e43b0f32785c3e89b61cca89058929a:
-
-  ARM: realview: imply device tree boot (2016-08-15 20:53:07 +0200)
-
-----------------------------------------------------------------
-This deletes the realview boardfiles, consolidates a bit
-around the Kconfig options and leaves the mach-realview
-directory nice and tidy, with all boards migrated over to
-Device Tree.
-
-----------------------------------------------------------------
-Linus Walleij (2):
-      ARM: realview: delete the RealView board files
-      ARM: realview: imply device tree boot
-
-Vladimir Murzin (1):
-      ARM: realview: no need to select SMP_ON_UP explicitly
-
- arch/arm/Kconfig                         |   3 +-
- arch/arm/mach-realview/Kconfig           |  72 +----
- arch/arm/mach-realview/Makefile          |  12 +-
- arch/arm/mach-realview/board-eb.h        |  94 ------
- arch/arm/mach-realview/board-pb1176.h    |  81 -----
- arch/arm/mach-realview/board-pb11mp.h    |  96 ------
- arch/arm/mach-realview/board-pba8.h      |  71 -----
- arch/arm/mach-realview/board-pbx.h       | 106 -------
- arch/arm/mach-realview/core.c            | 404 -------------------------
- arch/arm/mach-realview/core.h            |  58 ----
- arch/arm/mach-realview/hardware.h        |  40 ---
- arch/arm/mach-realview/hotplug.h         |   1 +
- arch/arm/mach-realview/irqs-eb.h         | 114 -------
- arch/arm/mach-realview/irqs-pb1176.h     |  77 -----
- arch/arm/mach-realview/irqs-pb11mp.h     |  97 ------
- arch/arm/mach-realview/irqs-pba8.h       |  71 -----
- arch/arm/mach-realview/irqs-pbx.h        |  87 ------
- arch/arm/mach-realview/platform.h        | 247 ----------------
- arch/arm/mach-realview/platsmp-dt.c      |   3 +-
- arch/arm/mach-realview/platsmp.c         |  86 ------
- arch/arm/mach-realview/realview_eb.c     | 492 -------------------------------
- arch/arm/mach-realview/realview_pb1176.c | 395 -------------------------
- arch/arm/mach-realview/realview_pb11mp.c | 385 ------------------------
- arch/arm/mach-realview/realview_pba8.c   | 307 -------------------
- arch/arm/mach-realview/realview_pbx.c    | 402 -------------------------
- drivers/irqchip/Makefile                 |   2 +-
- drivers/mtd/maps/Kconfig                 |   2 +-
- 27 files changed, 17 insertions(+), 3788 deletions(-)
- delete mode 100644 arch/arm/mach-realview/board-eb.h
- delete mode 100644 arch/arm/mach-realview/board-pb1176.h
- delete mode 100644 arch/arm/mach-realview/board-pb11mp.h
- delete mode 100644 arch/arm/mach-realview/board-pba8.h
- delete mode 100644 arch/arm/mach-realview/board-pbx.h
- delete mode 100644 arch/arm/mach-realview/core.c
- delete mode 100644 arch/arm/mach-realview/core.h
- delete mode 100644 arch/arm/mach-realview/hardware.h
- create mode 100644 arch/arm/mach-realview/hotplug.h
- delete mode 100644 arch/arm/mach-realview/irqs-eb.h
- delete mode 100644 arch/arm/mach-realview/irqs-pb1176.h
- delete mode 100644 arch/arm/mach-realview/irqs-pb11mp.h
- delete mode 100644 arch/arm/mach-realview/irqs-pba8.h
- delete mode 100644 arch/arm/mach-realview/irqs-pbx.h
- delete mode 100644 arch/arm/mach-realview/platform.h
- delete mode 100644 arch/arm/mach-realview/platsmp.c
- delete mode 100644 arch/arm/mach-realview/realview_eb.c
- delete mode 100644 arch/arm/mach-realview/realview_pb1176.c
- delete mode 100644 arch/arm/mach-realview/realview_pb11mp.c
- delete mode 100644 arch/arm/mach-realview/realview_pba8.c
- delete mode 100644 arch/arm/mach-realview/realview_pbx.c
+-- 
+Ard.
