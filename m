@@ -1,54 +1,35 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 15 Aug 2016 20:56:05 +0300
-Subject: [PATCH 19/26] ARM: dts: r8a7794: add MSTP5 clocks
-In-Reply-To: <2a29f9d6fea82485941449c2328af5b2a4ea636f.1471251169.git.horms+renesas@verge.net.au>
-References: <cover.1471251169.git.horms+renesas@verge.net.au>
- <2a29f9d6fea82485941449c2328af5b2a4ea636f.1471251169.git.horms+renesas@verge.net.au>
-Message-ID: <13739ec4-3e12-4b8d-9f69-14fbbe164986@cogentembedded.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 15 Aug 2016 19:59:30 +0200
+Subject: [PATCH] MAINTAINERS: Switch to kernel.org account for Krzysztof
+ Kozlowski
+In-Reply-To: <1471283467.4075.73.camel@perches.com>
+References: <1471281469-5847-1-git-send-email-krzk@kernel.org>
+ <1471282605.4075.70.camel@perches.com>
+ <20160815174612.GA8059@kozik-lap>
+ <1471283467.4075.73.camel@perches.com>
+Message-ID: <20160815175930.GA8804@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Mon, Aug 15, 2016 at 10:51:07AM -0700, Joe Perches wrote:
+> On Mon, 2016-08-15 at 19:46 +0200, Krzysztof Kozlowski wrote:
+> > On Mon, Aug 15, 2016 at 10:36:45AM -0700, Joe Perches wrote:
+> > > 
+> > > On Mon, 2016-08-15 at 19:17 +0200, Krzysztof Kozlowski wrote:
+> > > > 
+> > > > Change my email address to kernel.org account instead of Samsung one.
+> > > > Also switch Maxim MUIC charger drivers from supported to maintained
+> > > > mode.
+> > > You should probably add a .mailmap entry too
+> > > 
+> > > Krzysztof Kozlowski <krzk@kernel.org>?<k.kozlowski@samsung.com>
+> > I wasn't sure about this. When is mailmap used? For shortlog and
+> > "get_maintainers --git"?
+> 
+> git shortlog with option -e and always with get_maintainer.pl
 
-On 08/15/2016 11:55 AM, Simon Horman wrote:
+Indeed "shortlog -e" splits my humble person. I'll change also mailmap,
+thanks for hint!
 
-> From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->
-> Add some MSTP5 clocks to the R8A7794 device tree.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/boot/dts/r8a7794.dtsi            | 9 +++++++++
->  include/dt-bindings/clock/r8a7794-clock.h | 1 +
->  2 files changed, 10 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-> index 5d1fded79633..1c2d3846d70e 100644
-> --- a/arch/arm/boot/dts/r8a7794.dtsi
-> +++ b/arch/arm/boot/dts/r8a7794.dtsi
-> @@ -1204,6 +1204,15 @@
->  			clock-indices = <R8A7794_CLK_IRQC>;
->  			clock-output-names = "irqc";
->  		};
-> +		mstp5_clks: mstp5_clks at e6150144 {
-> +			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
-> +			reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
-> +			clocks = <&hp_clk>, <&extal_clk>, <&p_clk>;
-
-    Argh! Looks like I forgot to remove <&extal_clk> when removing the thermal 
-clock... will send the patch.
-
-> +			#clock-cells = <1>;
-> +			clock-indices = <R8A7794_CLK_AUDIO_DMAC0
-> +					 R8A7794_CLK_PWM>;
-> +			clock-output-names = "audmac0", "pwm";
-> +		};
->  		mstp7_clks: mstp7_clks at e615014c {
->  			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
->  			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
-[...]
-
-MBR, Sergei
+Best regards,
+Krzysztof
