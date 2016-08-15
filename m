@@ -1,99 +1,39 @@
-From: leoli@freescale.com (Li Yang)
-Date: Mon, 15 Aug 2016 13:02:56 -0500
-Subject: [PATCH v2 6/9] mtd: spi-nor: Support R/W for S25FS-S family flash
-In-Reply-To: <1461307192-866-6-git-send-email-B56489@freescale.com>
-References: <1461307192-866-1-git-send-email-B56489@freescale.com>
- <1461307192-866-6-git-send-email-B56489@freescale.com>
-Message-ID: <CADRPPNS91-y1BRa8sDUZb1PrrrxbfPgnfLd-AByAVKx1vrC7fw@mail.gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 15 Aug 2016 20:07:44 +0200
+Subject: [PATCH v2 4/5] clk: sunxi-ng: Add A31/A31s clocks
+In-Reply-To: <1471248795-17951-5-git-send-email-wens@csie.org>
+References: <1471248795-17951-1-git-send-email-wens@csie.org>
+ <1471248795-17951-5-git-send-email-wens@csie.org>
+Message-ID: <20160815200744.fc1ad630f927692eec1e5694@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 22, 2016 at 1:39 AM, Yunhui Cui <B56489@freescale.com> wrote:
-> From: Yunhui Cui <yunhui.cui@nxp.com>
->
-> With the physical sectors combination, S25FS-S family flash
-> requires some special operations for read/write functions.
->
-> Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
-> ---
->  drivers/mtd/spi-nor/spi-nor.c | 59 +++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 59 insertions(+)
->
-> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-> index 157841d..91ee920 100644
-> --- a/drivers/mtd/spi-nor/spi-nor.c
-> +++ b/drivers/mtd/spi-nor/spi-nor.c
-> @@ -39,6 +39,10 @@
->
->  #define SPI_NOR_MAX_ID_LEN     6
->  #define SPI_NOR_MAX_ADDR_WIDTH 4
-> +/* Added for S25FS-S family flash */
-> +#define SPINOR_CONFIG_REG3_OFFSET      0x800004
-> +#define CR3V_4KB_ERASE_UNABLE  0x8
-> +#define SPINOR_S25FS_FAMILY_ID 0x81
->
->  struct flash_info {
->         char            *name;
-> @@ -78,6 +82,7 @@ struct flash_info {
->  };
->
->  #define JEDEC_MFR(info)        ((info)->id[0])
-> +#define EXT_ID(info)   ((info)->id[5])
->
->  static const struct flash_info *spi_nor_match_id(const char *name);
->
-> @@ -881,6 +886,7 @@ static const struct flash_info spi_nor_ids[] = {
->          */
->         { "s25sl032p",  INFO(0x010215, 0x4d00,  64 * 1024,  64, SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
->         { "s25sl064p",  INFO(0x010216, 0x4d00,  64 * 1024, 128, SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
-> +       { "s25fs256s1", INFO6(0x010219, 0x4d0181, 64 * 1024, 512, 0)},
->         { "s25fl256s0", INFO(0x010219, 0x4d00, 256 * 1024, 128, 0) },
->         { "s25fl256s1", INFO(0x010219, 0x4d01,  64 * 1024, 512, SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
->         { "s25fl512s",  INFO(0x010220, 0x4d00, 256 * 1024, 256, SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
-> @@ -1018,6 +1024,53 @@ static const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
->         return ERR_PTR(-ENODEV);
->  }
->
+On Mon, 15 Aug 2016 16:13:14 +0800
+Chen-Yu Tsai <wens@csie.org> wrote:
+
 > +/*
-> + * The S25FS-S family physical sectors may be configured as a
-> + * hybrid combination of eight 4-kB parameter sectors
-> + * at the top or bottom of the address space with all
-> + * but one of the remaining sectors being uniform size.
-> + * The Parameter Sector Erase commands (20h or 21h) must
-> + * be used to erase the 4-kB parameter sectors individually.
-> + * The Sector (uniform sector) Erase commands (D8h or DCh)
-> + * must be used to erase any of the remaining
-> + * sectors, including the portion of highest or lowest address
-> + * sector that is not overlaid by the parameter sectors.
-> + * The uniform sector erase command has no effect on parameter sectors.
+> + * The Audio PLL is supposed to have 4 outputs: 3 fixed factors from
+> + * the base (2x, 4x and 8x), and one variable divider (the one true
+> + * pll audio).
+> + *
+> + * We don't have any need for the variable divider for now, so we just
+> + * hardcode it to match with the clock names
 > + */
-> +static int spansion_s25fs_disable_4kb_erase(struct spi_nor *nor)
-> +{
-> +       struct fsl_qspi *q;
-> +       u32 cr3v_addr  = SPINOR_CONFIG_REG3_OFFSET;
-> +       u8 cr3v = 0x0;
-> +       int ret = 0x0;
+> +#define SUN6I_A31_PLL_AUDIO_REG	0x008
 > +
-> +       q = nor->priv;
+> +static SUNXI_CCU_NM_WITH_GATE_LOCK(pll_audio_base_clk, "pll-audio-base",
+> +				   "osc24M", 0x008,
+> +				   8, 7,	/* N */
+> +				   0, 5,	/* M */
+> +				   BIT(31),	/* gate */
+> +				   BIT(28),	/* lock */
+> +				   0);
 > +
-> +       nor->cmd_buf[2] = cr3v_addr >> 16;
-> +       nor->cmd_buf[1] = cr3v_addr >> 8;
-> +       nor->cmd_buf[0] = cr3v_addr >> 0;
-> +
-> +       ret = nor->read_reg(nor, SPINOR_OP_SPANSION_RDAR, &cr3v, 1);
-> +       if (ret)
-> +               return ret;
-> +       if (cr3v & CR3V_4KB_ERASE_UNABLE)
-> +               return 0;
-> +       ret = nor->write_reg(nor, SPINOR_OP_WREN, NULL, 0);
-> +       if (ret)
-> +               return ret;
-> +       cr3v = CR3V_4KB_ERASE_UNABLE;
-> +       nor->program_opcode = SPINOR_OP_SPANSION_WRAR;
-> +       nor->write(nor, cr3v_addr, 1, NULL, &cr3v);
 
-The patch need to be re-spined due to the parameter change of write()
-in v4.8-rc.  Otherwise it can not pass build.
+FYI, as in many other SoCs (A83T/H3/..), the multipliers/dividers from
+the base clock (24MHz) do not give an exact rate for standard audio
+(44.1kHz and 48kHz). Sigma-Delta Modulation must be used.
 
-Regards,
-Leo
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
