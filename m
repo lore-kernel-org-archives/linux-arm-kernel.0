@@ -1,42 +1,57 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Mon, 15 Aug 2016 10:06:52 +0930
-Subject: [PATCH 02/12] pinctrl: Add core pinctrl support for Aspeed SoCs
-In-Reply-To: <1471049894.12231.41.camel@kernel.crashing.org>
-References: <1468994313-13538-1-git-send-email-andrew@aj.id.au>
- <1468994313-13538-3-git-send-email-andrew@aj.id.au>
- <CACRpkdZ0p+jNHBV1AqhVWQ2Q8RRrHVfsAz3XU3_+f6My22=Zxg@mail.gmail.com>
- <1470962022.27272.68.camel@aj.id.au>
- <CACRpkdaN=wR4amskqMapTJzaTTMJZe2EQWRnyLMQkq_zuhr2eA@mail.gmail.com>
- <1471049894.12231.41.camel@kernel.crashing.org>
-Message-ID: <1471221412.27272.76.camel@aj.id.au>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 15 Aug 2016 01:35:38 +0000
+Subject: [RFC PATCH] DT: kirkwood: Fix Openblock A6 external GPIO pins
+Message-ID: <20160815013538.8056-1-jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2016-08-13 at 10:58 +1000, Benjamin Herrenschmidt wrote:
-> On Fri, 2016-08-12 at 15:18 +0200, Linus Walleij wrote:
-> > 
-> > I would probably prefer that option (introduce another field)
-> > but you should make the overall decision, it's no strong opinion
-> > from my side.
-> > 
-> > > 
-> > > Would it be acceptable to document that requirement?
-> It might make it a bit less nasty (and easier to change later on
-> if necessary) to use some kind of:
-> 
-> 	bool ast_signal_is_gpio(...)
-> 
-> And stick the strcmp in there.
+By assigning the pin hog to the pinctrl node, we correctly configure the
+MPPs.  However, they are not available to userspace.
 
-Yep, I'll do so for v2.
+Fix this by assigning the hogs to the gpio node.
 
-Cheers,
+After this, the following works as expected:
 
-Andrew
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160815/3268bdca/attachment.sig>
+  # echo 28 >/sys/class/gpio/export
+  # echo low >/sys/class/gpio/gpio28/direction
+
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+---
+I'm submitting this as RFC because it's clear no one is using this, so I'm not
+sure how far we need to take this.  The dip switches should probably be under
+gpio-keys to make them input only.  Thoughts?
+
+thx,
+
+Jason.
+
+ arch/arm/boot/dts/kirkwood-openblocks_a6.dts | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+index 0db0e3edc88f..ddb17b1cdfe0 100644
+--- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
++++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+@@ -41,9 +41,6 @@
+ 		};
+ 
+ 		pinctrl: pin-controller at 10000 {
+-			pinctrl-0 = <&pmx_dip_switches &pmx_gpio_header>;
+-			pinctrl-names = "default";
+-
+ 			pmx_uart0: pmx-uart0 {
+ 				marvell,pins = "mpp10", "mpp11", "mpp15",
+ 					"mpp16";
+@@ -174,3 +171,10 @@
+ 		phy-handle = <&ethphy0>;
+ 	};
+ };
++
++&gpio0 {
++	status = "okay";
++
++	pinctrl-0 = <&pmx_dip_switches &pmx_gpio_header>;
++	pinctrl-names = "default";
++};
+-- 
+2.9.2
