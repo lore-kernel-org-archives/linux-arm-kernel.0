@@ -1,60 +1,27 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Aug 2016 13:39:34 +0100
-Subject: [PATCH v9 4/4] serial: pl011: add console matching function
-In-Reply-To: <20160811153152.755-5-aleksey.makarov@linaro.org>
-References: <20160811153152.755-1-aleksey.makarov@linaro.org>
- <20160811153152.755-5-aleksey.makarov@linaro.org>
-Message-ID: <20160815123934.GJ1041@n2100.armlinux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 15 Aug 2016 13:51:34 +0100
+Subject: Applied "regulator: qcom_smd: Fix voltage ranges for pm8x41" to
+ the regulator tree
+In-Reply-To: <20160813040038.GK26240@tuxbot>
+References: <20160711215009.4519-2-sboyd@codeaurora.org>
+ <E1bVdwK-0002kb-B3@debutante> <20160813040038.GK26240@tuxbot>
+Message-ID: <20160815125134.GJ9347@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2016 at 06:31:41PM +0300, Aleksey Makarov wrote:
-> +/**
-> + *	pl011_console_match - non-standard console matching
-> + *	@co:	  registering console
-> + *	@name:	  name from console command line
-> + *	@idx:	  index from console command line
-> + *	@options: ptr to option string from console command line
-> + *
-> + *	Only attempts to match console command lines of the form:
-> + *	    console=pl011,mmio|mmio32,<addr>[,<options>]
-> + *	    console=pl011,0x<addr>[,<options>]
-> + *	This form is used to register an initial earlycon boot console and
-> + *	replace it with the amba_console at pl011 driver init.
-> + *
-> + *	Performs console setup for a match (as required by interface)
-> + *	If no <options> are specified, then assume the h/w is already setup.
-> + *
-> + *	Returns 0 if console matches; otherwise non-zero to use default matching
-> + */
-> +static int __init pl011_console_match(struct console *co, char *name, int idx,
-> +				      char *options)
-> +{
-> +	char match[] = "pl011";	/* pl011-specific earlycon name */
+On Fri, Aug 12, 2016 at 09:00:38PM -0700, Bjorn Andersson wrote:
 
-This is inefficient - the compiler will probably store "pl011" in the
-rodata section, then allocate an array on the stack, and them memcpy()
-it onto the stack.  This is really a false optimisation.
+> I'm therefor asking you to include this patch in a -rc pull for v4.8.
+> I assume the pma8084 patch (#2 in this series) will give the same issue,
+> but don't have the setup to verify this.
 
-> +	unsigned char iotype;
-> +	unsigned long addr;
-> +	int i;
-> +
-> +	if (strncmp(name, match, 5) != 0)
-
-Just do:
-
-	if (strncmp(name, "pl011", 5) != 0)
-
-here, and let the compiler work it out - it'll probably place "pl011"
-in the rodata section, and use a pointer to it rather than messing around
-with the stack.
-
-What if "console=pl011x,..." is passed?  Should this be matched too?
-Maybe this should compare with "pl011," to ensure that the name is
-correctly terminated?
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+You can check to see if something is going to be sent as a fix by
+checking to see which branch it's applied on, if it's a fix/ branch then
+it'll go as a fix as here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160815/9459d4f9/attachment.sig>
