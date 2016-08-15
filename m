@@ -1,32 +1,33 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 15 Aug 2016 17:57:59 -0500
-Subject: [PATCH] pinctrl: meson: get rid of unneeded domain structures
-In-Reply-To: <1471110078-5946-1-git-send-email-b.galvani@gmail.com> (Beniamino
- Galvani's message of "Sat, 13 Aug 2016 19:41:18 +0200")
-References: <1471110078-5946-1-git-send-email-b.galvani@gmail.com>
-Message-ID: <m2a8gdabd4.fsf@baylibre.com>
+From: groeck@google.com (Guenter Roeck)
+Date: Mon, 15 Aug 2016 16:19:13 -0700
+Subject: Problem with atomic accesses in pstore on some ARM CPUs
+Message-ID: <CABXOdTfT7xMfiBvRuUS1hsVs=q5q2wY1x1Z8oCyyJNFckM0g0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Beniamino Galvani <b.galvani@gmail.com> writes:
+Hi,
 
-> The driver originally supported more domains (register ranges) per
-> pinctrl device, but since commit 9dab1868ec0d ("pinctrl: amlogic: Make
-> driver independent from two-domain configuration") each device gets
-> assigned a single domain and we instantiate multiple pinctrl devices
-> in the DT.
->
-> Therefore, now the 'meson_domain' and 'meson_domain_data' structures
-> don't have any reason to exist and can be removed to make the model
-> simpler to understand. This commit doesn't change behavior.
->
-> Tested on a Odroid-C2.
->
-> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+we are having a problem with atomic accesses in pstore on some ARM
+CPUs (specifically rk3288 and rk3399). With those chips, atomic
+accesses fail with both pgprot_noncached and pgprot_writecombine
+memory. Atomic accesses do work when selecting PAGE_KERNEL protection.
 
-Looks good and boot tested on meson-gxbb-p200:
+Debugging on rk3399 shows the following crash.
 
-Acked-by: Kevin Hilman <khilman@baylibre.com>
-Tested-by: Kevin Hilman <khilman@baylibre.com>
+[    0.912669] Bad mode in Error handler detected, code 0xbf000002 -- SError
+[    0.920140] CPU: 4 PID: 1 Comm: swapper/0 Not tainted 4.4.14 #389
+[    0.926838] Hardware name: Google Kevin (DT)
+[    0.931533] task: ffffffc0edfe0000 ti: ffffffc0edf7c000 task.ti:
+ffffffc0edf 7c000
+[    0.939780] PC is at __ll_sc___cmpxchg_case_mb_4+0x2c/0x5c
+[    0.945811] LR is at 0x1
 
-Kevin
+The "solution" for this problem in various Chrome OS releases is to
+disable atomic accesses in pstore entirely, which seems to be a bit
+brute-force. Question is what a proper upstream-acceptable solution
+might be. Introduce another memory type to select PAGE_KERNEL ? Is
+there some means to determine if atomic operations are supported with
+a given protection mask, maybe ? Anything else ?
+
+Thanks,
+Guenter
