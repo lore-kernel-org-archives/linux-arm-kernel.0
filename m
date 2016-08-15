@@ -1,134 +1,82 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 15 Aug 2016 10:55:42 +0200
-Subject: [PATCH 23/26] ARM: dts: silk: add sound support
+Date: Mon, 15 Aug 2016 10:55:27 +0200
+Subject: [PATCH 08/26] ARM: dts: r8a7792: add CAN clocks
 In-Reply-To: <cover.1471251169.git.horms+renesas@verge.net.au>
 References: <cover.1471251169.git.horms+renesas@verge.net.au>
-Message-ID: <feb13b95c3fc461bb01ef32cdb818f99d6a859db.1471251169.git.horms+renesas@verge.net.au>
+Message-ID: <47db051c22a03d41eac0d8193f3fe37b4f9768e9.1471251169.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Define the SILK board dependent part of the R8A7794 sound  device node.
-Add device node for Asahi Kasei AK4643 stereo codec to the I2C1 bus.
-Add the "simple-audio-card" device node to interconnect the SoC sound
-device  and the codec.
-
-This patch is based on the commit 493b4da7c10c ("ARM: dts: porter: add
-sound support").
+The R-Car CAN controllers can derive  the CAN  bus  clock not only from
+their peripheral  clock input (clkp1) but also from the other internal
+clock (clkp2) and the external clock fed on the CAN_CLK pin.  Describe
+those  clocks in  the R8A7792 device tree.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794-silk.dts | 70 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 70 insertions(+)
+ arch/arm/boot/dts/r8a7792.dtsi | 22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
-index cf24f45fff22..cf880ac06f4b 100644
---- a/arch/arm/boot/dts/r8a7794-silk.dts
-+++ b/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -10,6 +10,17 @@
-  * kind, whether express or implied.
-  */
- 
-+/*
-+ * SSI-AK4643
-+ *
-+ * SW1: 2-1: AK4643
-+ *      2-3: ADV7511
-+ *
-+ * This command is required before playback/capture:
-+ *
-+ *	amixer set "LINEOUT Mixer DACL" on
-+ */
-+
- /dts-v1/;
- #include "r8a7794.dtsi"
- #include <dt-bindings/gpio/gpio.h>
-@@ -119,6 +130,29 @@
- 		#clock-cells = <0>;
- 		clock-frequency = <74250000>;
- 	};
-+
-+	x9_clk: audio_clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <12288000>;
-+	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+
-+		simple-audio-card,format = "left_j";
-+		simple-audio-card,bitclock-master = <&soundcodec>;
-+		simple-audio-card,frame-master = <&soundcodec>;
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&rcar_sound>;
+diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
+index 37c9d95688cf..af8020bfc030 100644
+--- a/arch/arm/boot/dts/r8a7792.dtsi
++++ b/arch/arm/boot/dts/r8a7792.dtsi
+@@ -511,6 +511,13 @@
+ 			clock-div = <8>;
+ 			clock-mult = <1>;
+ 		};
++		rcan_clk: rcan {
++			compatible = "fixed-factor-clock";
++			clocks = <&pll1_div2_clk>;
++			#clock-cells = <0>;
++			clock-div = <49>;
++			clock-mult = <1>;
 +		};
-+
-+		soundcodec: simple-audio-card,codec {
-+			sound-dai = <&ak4643>;
-+			clocks = <&x9_clk>;
-+		};
-+	};
- };
  
- &extal_clk {
-@@ -193,6 +227,16 @@
- 		groups = "du1_rgb666", "du1_sync", "du1_disp", "du1_clk0_out";
- 		function = "du1";
- 	};
-+
-+	ssi_pins: sound {
-+		groups = "ssi0129_ctrl", "ssi0_data", "ssi1_data";
-+		function = "ssi";
-+	};
-+
-+	audio_clk_pins: audio_clk {
-+		groups = "audio_clkc";
-+		function = "audio_clk";
-+	};
- };
- 
- &scif2 {
-@@ -230,6 +274,12 @@
- 	status = "okay";
- 	clock-frequency = <400000>;
- 
-+	ak4643: codec at 12 {
-+		compatible = "asahi-kasei,ak4643";
-+		#sound-dai-cells = <0>;
-+		reg = <0x12>;
-+	};
-+
- 	composite-in at 20 {
- 		compatible = "adi,adv7180";
- 		reg = <0x20>;
-@@ -392,3 +442,23 @@
+ 		/* Gate clocks */
+ 		mstp1_clks: mstp1_clks at e6150134 {
+@@ -572,7 +579,8 @@
+ 			reg = <0 0xe6150994 0 4>, <0 0xe61509a4 0 4>;
+ 			clocks = <&cp_clk>, <&cp_clk>, <&cp_clk>, <&cp_clk>,
+ 				 <&cp_clk>, <&cp_clk>, <&cp_clk>, <&cp_clk>,
+-				 <&cp_clk>, <&cp_clk>, <&cp_clk>, <&cp_clk>;
++				 <&cp_clk>, <&cp_clk>, <&p_clk>, <&p_clk>,
++				 <&cp_clk>, <&cp_clk>;
+ 			#clock-cells = <1>;
+ 			clock-indices = <
+ 				R8A7792_CLK_GPIO7 R8A7792_CLK_GPIO6
+@@ -580,12 +588,14 @@
+ 				R8A7792_CLK_GPIO3 R8A7792_CLK_GPIO2
+ 				R8A7792_CLK_GPIO1 R8A7792_CLK_GPIO0
+ 				R8A7792_CLK_GPIO11 R8A7792_CLK_GPIO10
++				R8A7792_CLK_CAN1 R8A7792_CLK_CAN0
+ 				R8A7792_CLK_GPIO9 R8A7792_CLK_GPIO8
+ 			>;
+ 			clock-output-names =
+ 				"gpio7", "gpio6", "gpio5", "gpio4",
+ 				"gpio3", "gpio2", "gpio1", "gpio0",
+-				"gpio11", "gpio10", "gpio9", "gpio8";
++				"gpio11", "gpio10", "can1", "can0",
++				"gpio9", "gpio8";
  		};
  	};
- };
+ 
+@@ -604,4 +614,12 @@
+ 		/* This value must be overridden by the board. */
+ 		clock-frequency = <0>;
+ 	};
 +
-+&rcar_sound {
-+	pinctrl-0 = <&ssi_pins &audio_clk_pins>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+
-+	/* Single DAI */
-+	#sound-dai-cells = <0>;
-+
-+	rcar_sound,dai {
-+		dai0 {
-+			playback = <&ssi0>;
-+			capture  = <&ssi1>;
-+		};
++	/* External CAN clock */
++	can_clk: can {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		/* This value must be overridden by the board. */
++		clock-frequency = <0>;
 +	};
-+};
-+
-+&ssi1 {
-+	shared-pin;
-+};
+ };
 -- 
 2.7.0.rc3.207.g0ac5344
