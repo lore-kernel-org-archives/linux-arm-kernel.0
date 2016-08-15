@@ -1,44 +1,61 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 Aug 2016 17:39:29 +0100
-Subject: [PATCH 4/7] arm64: Disable TTBR0_EL1 during normal kernel
- execution
-In-Reply-To: <20160815111857.GA2060@svinekod>
-References: <1471015666-23125-1-git-send-email-catalin.marinas@arm.com>
- <1471015666-23125-5-git-send-email-catalin.marinas@arm.com>
- <20160815111857.GA2060@svinekod>
-Message-ID: <20160815163929.GI22320@e104818-lin.cambridge.arm.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Mon, 15 Aug 2016 18:40:57 +0200
+Subject: [PATCH 0/3] ARM64: meson: Meson8b and GXBB DWMAC glue driver
+In-Reply-To: <20160625165013.15917-1-martin.blumenstingl@googlemail.com>
+References: <20160625165013.15917-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20160815164100.27766-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2016 at 12:18:58PM +0100, Mark Rutland wrote:
-> On Fri, Aug 12, 2016 at 04:27:43PM +0100, Catalin Marinas wrote:
-> > diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
-> > index b5c3933ed441..9283e6b247f9 100644
-> > --- a/arch/arm64/include/uapi/asm/ptrace.h
-> > +++ b/arch/arm64/include/uapi/asm/ptrace.h
-> > @@ -52,6 +52,8 @@
-> >  #define PSR_Z_BIT	0x40000000
-> >  #define PSR_N_BIT	0x80000000
-> >  
-> > +#define _PSR_PAN_BIT	22
-> 
-> Given this is under uapi/, shouldn't we lose the leading underscore to align
-> with other PSR_* definitions?
-> 
-> Or should we not have this under uapi/?
+This adds a DWMAC glue driver for the PRG_ETHERNET registers found in
+Meson8b and GXBB SoCs. Based on the "old" meson6b-dwmac glue driver
+the register layout is completely different.
+Thus I introduced a separate driver.
 
-I moved it to the non-uapi ptrace.h.
+Changes compared to the RFC version:
+- switch from syscon / regmap to assigning the corresponding register
+  region directly to the driver (like meson6-dwmac does it)
+- dropped "fix_mac_speed" callback since the reference driver does not
+  implement it (I could not test if it is required due to lack of
+  hardware)
+- switch to common clock framework now that we know what bits 5:4
+  (mux clock), 6:5 (250MHz divider) and 10 (configurable 5 or 10
+  divider) are used for
+- Removed dts property "amlogic,mp2-clock" because it is now part of
+  the clocks which are registered by the glue driver
+- Removed dts properties "amlogic,enable-tx-phy-ref-clk" and
+  "amlogic,tx-delay" because it seems we can guess them based on the
+  phy-mode (the original Amlogic dts files only supply two different
+  values: one value for the internal RMII PHY and another one for the
+  external RGMII Gbit PHY).
+  If required we can extend the code in the future to make these
+  configurable.
+- This means that the only Meson8b / GXBB specific part of the binding
+  is the clkin0 (FCLK_DIV2) clock, as it's needed for the mux clock.
+  Everything else is auto-detected based on the phy-mode (which is
+  already mandatory in stmmac).
 
-> [...]
-> 
-> > +	mrs	lr, ttbr0_el1
-> > +	tst	lr, #0xffff << 48		// Check for the reserved ASID
-> 
-> Did we not have a regular register spare here? Not a problem, but using the lr
-> here stands out as unusual.
+I have successfully tested this on a Vega S95 Meta clone which comes
+with a "broken" bootloader (which programs the ethernet registers to
+"Fast Ethernet / RGMII" mode, while the board has a Realtek Gbit PHY).
+Before this series stmmac was detected, I got a network interface but
+no traffic was flowing.
 
-LR is a general purpose register, we just have an alias for it. I've
-replaced it with x21 so that it doesn't stand out.
+Due to lack of hardware I could not test this on a device which uses
+the internal RMII (Fast Ethernet) PHY.
+
+
+Martin Blumenstingl (3):
+  net: dt-bindings: Document the new Meson8b and GXBB DWMAC bindings
+  net: stmmac: add a glue driver for the Amlogic Meson 8b / GXBB DWMAC
+  ARM64: dts: meson-gxbb: use the new GXBB DWMAC glue driver
+
+ .../devicetree/bindings/net/meson-dwmac.txt        |  43 ++-
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |   7 +-
+ drivers/net/ethernet/stmicro/stmmac/Makefile       |   2 +-
+ .../net/ethernet/stmicro/stmmac/dwmac-meson8b.c    | 327 +++++++++++++++++++++
+ 4 files changed, 367 insertions(+), 12 deletions(-)
+ create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
 
 -- 
-Catalin
+2.9.3
