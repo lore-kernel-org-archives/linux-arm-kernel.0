@@ -1,113 +1,100 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Mon, 15 Aug 2016 20:40:08 +0200
-Subject: [PATCH] clk: gxbb: add MMC gate clocks, and expose for DT
-In-Reply-To: <20160802214011.19077-1-khilman@baylibre.com>
-References: <20160802214011.19077-1-khilman@baylibre.com>
-Message-ID: <CAFBinCDaow3au1an8yKbVV3qNkzpjXsFOD-cUdRT+KOm-FGVJg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 15 Aug 2016 21:01:49 +0200
+Subject: [GIT PULL] delete the RealView boardfiles
+Message-ID: <CACRpkdar=aL6qXrmpmpYJH8NVN4JkN=DfZR3ShmJucNGU4owmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 2, 2016 at 11:40 PM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Add the SD/eMMC gate clocks and expose them for use by DT.
->
-> While at it, also explose FCLK_DIV2 since this is one of the input
-> clocks to the mux internal to each of the SD/eMMC blocks.
->
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
-my Meson8b / GXBB DWMAC glue series needs this as well.
-This worked fine during my tests, so:
+Hi ARM SoC maintainers,
 
-Tested-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+this deletes the RealView boardfiles, good riddance. All is
+device tree now. 3788 deleted lines.
 
-> ---
-> Applies on top of current clk-s905 branch.
->
->  drivers/clk/meson/gxbb.c              | 9 +++++++++
->  drivers/clk/meson/gxbb.h              | 7 +++++--
->  include/dt-bindings/clock/gxbb-clkc.h | 4 ++++
->  3 files changed, 18 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
-> index 007b7157cf4b..4fc8e58feef9 100644
-> --- a/drivers/clk/meson/gxbb.c
-> +++ b/drivers/clk/meson/gxbb.c
-> @@ -581,6 +581,9 @@ static MESON_GATE(sdio, HHI_GCLK_MPEG0, 17);
->  static MESON_GATE(abuf, HHI_GCLK_MPEG0, 18);
->  static MESON_GATE(hiu_iface, HHI_GCLK_MPEG0, 19);
->  static MESON_GATE(assist_misc, HHI_GCLK_MPEG0, 23);
-> +static MESON_GATE(emmc_a, HHI_GCLK_MPEG0, 24);
-> +static MESON_GATE(emmc_b, HHI_GCLK_MPEG0, 25);
-> +static MESON_GATE(emmc_c, HHI_GCLK_MPEG0, 26);
->  static MESON_GATE(spi, HHI_GCLK_MPEG0, 30);
->
->  static MESON_GATE(i2s_spdif, HHI_GCLK_MPEG1, 2);
-> @@ -746,6 +749,9 @@ static struct clk_hw_onecell_data gxbb_hw_onecell_data = {
->                 [CLKID_AO_AHB_BUS]          = &gxbb_ao_ahb_bus.hw,
->                 [CLKID_AO_IFACE]            = &gxbb_ao_iface.hw,
->                 [CLKID_AO_I2C]              = &gxbb_ao_i2c.hw,
-> +               [CLKID_SD_EMMC_A]           = &gxbb_emmc_a.hw,
-> +               [CLKID_SD_EMMC_B]           = &gxbb_emmc_b.hw,
-> +               [CLKID_SD_EMMC_C]           = &gxbb_emmc_c.hw,
->         },
->         .num = NR_CLKS,
->  };
-> @@ -845,6 +851,9 @@ static struct clk_gate *gxbb_clk_gates[] = {
->         &gxbb_ao_ahb_bus,
->         &gxbb_ao_iface,
->         &gxbb_ao_i2c,
-> +       &gxbb_emmc_a,
-> +       &gxbb_emmc_b,
-> +       &gxbb_emmc_c,
->  };
->
->  static int gxbb_clkc_probe(struct platform_device *pdev)
-> diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
-> index a2adf3448b59..217df516de44 100644
-> --- a/drivers/clk/meson/gxbb.h
-> +++ b/drivers/clk/meson/gxbb.h
-> @@ -172,7 +172,7 @@
->  /* CLKID_CPUCLK */
->  #define CLKID_HDMI_PLL           2
->  #define CLKID_FIXED_PLL                  3
-> -#define CLKID_FCLK_DIV2                  4
-> +/* CLKID_FCLK_DIV2 */
->  #define CLKID_FCLK_DIV3                  5
->  #define CLKID_FCLK_DIV4                  6
->  #define CLKID_FCLK_DIV5                  7
-> @@ -262,8 +262,11 @@
->  #define CLKID_AO_AHB_BUS         91
->  #define CLKID_AO_IFACE           92
->  #define CLKID_AO_I2C             93
-> +/* CLKID_SD_EMMC_A */
-> +/* CLKID_SD_EMMC_B */
-> +/* CLKID_SD_EMMC_C */
->
-> -#define NR_CLKS                          94
-> +#define NR_CLKS                          97
->
->  /* include the CLKIDs that have been made part of the stable DT binding */
->  #include <dt-bindings/clock/gxbb-clkc.h>
-> diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
-> index f889d80246cb..7d418643cdcc 100644
-> --- a/include/dt-bindings/clock/gxbb-clkc.h
-> +++ b/include/dt-bindings/clock/gxbb-clkc.h
-> @@ -6,7 +6,11 @@
->  #define __GXBB_CLKC_H
->
->  #define CLKID_CPUCLK           1
-> +#define CLKID_FCLK_DIV2                4
->  #define CLKID_CLK81            12
->  #define CLKID_ETH              36
-> +#define CLKID_SD_EMMC_A                94
-> +#define CLKID_SD_EMMC_B                95
-> +#define CLKID_SD_EMMC_C                96
->
->  #endif /* __GXBB_CLKC_H */
-> --
-> 2.9.0
->
->
-> _______________________________________________
-> linux-amlogic mailing list
-> linux-amlogic at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+The missing piece was the CLCD patches that got merged
+by the fbdev maintainer last week.
+
+I touch oneliners in irqchips and MTD in the process but I
+seriously doubt that they mind.
+
+Please pull this in for cleanups so we can get it rotating
+in linux-next. (The kautobuild seems happy.)
+
+Yours,
+Linus Walleij
+
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+tags/realview-broomstick-sweep
+
+for you to fetch changes up to 8f2c00629e43b0f32785c3e89b61cca89058929a:
+
+  ARM: realview: imply device tree boot (2016-08-15 20:53:07 +0200)
+
+----------------------------------------------------------------
+This deletes the realview boardfiles, consolidates a bit
+around the Kconfig options and leaves the mach-realview
+directory nice and tidy, with all boards migrated over to
+Device Tree.
+
+----------------------------------------------------------------
+Linus Walleij (2):
+      ARM: realview: delete the RealView board files
+      ARM: realview: imply device tree boot
+
+Vladimir Murzin (1):
+      ARM: realview: no need to select SMP_ON_UP explicitly
+
+ arch/arm/Kconfig                         |   3 +-
+ arch/arm/mach-realview/Kconfig           |  72 +----
+ arch/arm/mach-realview/Makefile          |  12 +-
+ arch/arm/mach-realview/board-eb.h        |  94 ------
+ arch/arm/mach-realview/board-pb1176.h    |  81 -----
+ arch/arm/mach-realview/board-pb11mp.h    |  96 ------
+ arch/arm/mach-realview/board-pba8.h      |  71 -----
+ arch/arm/mach-realview/board-pbx.h       | 106 -------
+ arch/arm/mach-realview/core.c            | 404 -------------------------
+ arch/arm/mach-realview/core.h            |  58 ----
+ arch/arm/mach-realview/hardware.h        |  40 ---
+ arch/arm/mach-realview/hotplug.h         |   1 +
+ arch/arm/mach-realview/irqs-eb.h         | 114 -------
+ arch/arm/mach-realview/irqs-pb1176.h     |  77 -----
+ arch/arm/mach-realview/irqs-pb11mp.h     |  97 ------
+ arch/arm/mach-realview/irqs-pba8.h       |  71 -----
+ arch/arm/mach-realview/irqs-pbx.h        |  87 ------
+ arch/arm/mach-realview/platform.h        | 247 ----------------
+ arch/arm/mach-realview/platsmp-dt.c      |   3 +-
+ arch/arm/mach-realview/platsmp.c         |  86 ------
+ arch/arm/mach-realview/realview_eb.c     | 492 -------------------------------
+ arch/arm/mach-realview/realview_pb1176.c | 395 -------------------------
+ arch/arm/mach-realview/realview_pb11mp.c | 385 ------------------------
+ arch/arm/mach-realview/realview_pba8.c   | 307 -------------------
+ arch/arm/mach-realview/realview_pbx.c    | 402 -------------------------
+ drivers/irqchip/Makefile                 |   2 +-
+ drivers/mtd/maps/Kconfig                 |   2 +-
+ 27 files changed, 17 insertions(+), 3788 deletions(-)
+ delete mode 100644 arch/arm/mach-realview/board-eb.h
+ delete mode 100644 arch/arm/mach-realview/board-pb1176.h
+ delete mode 100644 arch/arm/mach-realview/board-pb11mp.h
+ delete mode 100644 arch/arm/mach-realview/board-pba8.h
+ delete mode 100644 arch/arm/mach-realview/board-pbx.h
+ delete mode 100644 arch/arm/mach-realview/core.c
+ delete mode 100644 arch/arm/mach-realview/core.h
+ delete mode 100644 arch/arm/mach-realview/hardware.h
+ create mode 100644 arch/arm/mach-realview/hotplug.h
+ delete mode 100644 arch/arm/mach-realview/irqs-eb.h
+ delete mode 100644 arch/arm/mach-realview/irqs-pb1176.h
+ delete mode 100644 arch/arm/mach-realview/irqs-pb11mp.h
+ delete mode 100644 arch/arm/mach-realview/irqs-pba8.h
+ delete mode 100644 arch/arm/mach-realview/irqs-pbx.h
+ delete mode 100644 arch/arm/mach-realview/platform.h
+ delete mode 100644 arch/arm/mach-realview/platsmp.c
+ delete mode 100644 arch/arm/mach-realview/realview_eb.c
+ delete mode 100644 arch/arm/mach-realview/realview_pb1176.c
+ delete mode 100644 arch/arm/mach-realview/realview_pb11mp.c
+ delete mode 100644 arch/arm/mach-realview/realview_pba8.c
+ delete mode 100644 arch/arm/mach-realview/realview_pbx.c
