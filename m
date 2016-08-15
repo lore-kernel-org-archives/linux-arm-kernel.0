@@ -1,29 +1,38 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 15 Aug 2016 20:34:51 +0900
-Subject: [PATCH] pinctrl: exynos: remove duplicate calls in irq handler
-In-Reply-To: <1471256227-6282-1-git-send-email-strongbox8@zoho.com>
-References: <1471256227-6282-1-git-send-email-strongbox8@zoho.com>
-Message-ID: <CA+Ln22HWHRROhzVQo4ptsKr5xNyMh=dnuCO7FEG1BsinpPg8MQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 15 Aug 2016 12:42:11 +0100
+Subject: ASoC: sun4i-codec: playback stall and I/O error with DAPM paths
+ all disabled
+In-Reply-To: <CAGb2v66X2BhEM4X+zQHUFB-wpHuBQ4xc8ztfYFuKADnY0b-gaQ@mail.gmail.com>
+References: <CAGb2v66X2BhEM4X+zQHUFB-wpHuBQ4xc8ztfYFuKADnY0b-gaQ@mail.gmail.com>
+Message-ID: <20160815114211.GI9347@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Aug 15, 2016 at 05:43:55PM +0800, wens Tsai wrote:
 
-2016-08-15 19:17 GMT+09:00 perr <strongbox8@zoho.com>:
-> Because chained_irq_enter() has already called chip->irq_mask() and
-> chip->irq_ack(), also chained_irq_exit() will call chip->irq_unmask(),
-> so it's not necessary to call chip->irq_*() here.
->
-> Signed-off-by: perr <strongbox8@zoho.com>
->
-> ---
->  drivers/pinctrl/samsung/pinctrl-exynos.c | 6 +-----
->  1 file changed, 1 insertion(+), 5 deletions(-)
->
+> What is unexpected is any attempt to play anything under this state makes
+> the playback software (in my case mpg321) stall, and later report an I/O
+> error. My guess is that the DAC is still disabled by DAPM, so it doesn't
+> send any DRQs, and thus the DMA engine is not consuming any data from
+> userspace.
 
-Indeed, nice finding. Thanks!
+This is normal for ASoC - like you say it'll be becasue the hardware
+isn't powered up.
 
-Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+> I think we should just enable the digital bits of the DAC/ADC all the
+> time. Or maybe transfer and then discard data if the DAC is off. Not
+> sure if this is doable though. I expect playback software to work, and
+> not block, regardless of the hardware status.
 
-Best regards,
-Tomasz
+Powering things up all the time will have a major effect on battery life
+for systems that care about that.  The expectation is that systems with
+this sort of hardware won't normally be offering end users direct
+control of the routing, it'll be something that's handled during system
+integration.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160815/63de4d34/attachment.sig>
