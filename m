@@ -1,82 +1,57 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 15 Aug 2016 10:55:27 +0200
-Subject: [PATCH 08/26] ARM: dts: r8a7792: add CAN clocks
+Date: Mon, 15 Aug 2016 10:55:28 +0200
+Subject: [PATCH 09/26] ARM: dts: r8a7792: add CAN support
 In-Reply-To: <cover.1471251169.git.horms+renesas@verge.net.au>
 References: <cover.1471251169.git.horms+renesas@verge.net.au>
-Message-ID: <47db051c22a03d41eac0d8193f3fe37b4f9768e9.1471251169.git.horms+renesas@verge.net.au>
+Message-ID: <f947c02a0f86dffa5258ef347c6b6980953a9679.1471251169.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-The R-Car CAN controllers can derive  the CAN  bus  clock not only from
-their peripheral  clock input (clkp1) but also from the other internal
-clock (clkp2) and the external clock fed on the CAN_CLK pin.  Describe
-those  clocks in  the R8A7792 device tree.
+Define the generic R8A7792 parts of the CAN0/1 device nodes.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7792.dtsi | 22 ++++++++++++++++++++--
- 1 file changed, 20 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7792.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
-index 37c9d95688cf..af8020bfc030 100644
+index af8020bfc030..1b96bf6393fb 100644
 --- a/arch/arm/boot/dts/r8a7792.dtsi
 +++ b/arch/arm/boot/dts/r8a7792.dtsi
-@@ -511,6 +511,13 @@
- 			clock-div = <8>;
- 			clock-mult = <1>;
+@@ -456,6 +456,30 @@
+ 			status = "disabled";
  		};
-+		rcan_clk: rcan {
-+			compatible = "fixed-factor-clock";
-+			clocks = <&pll1_div2_clk>;
-+			#clock-cells = <0>;
-+			clock-div = <49>;
-+			clock-mult = <1>;
+ 
++		can0: can at e6e80000 {
++			compatible = "renesas,can-r8a7792",
++				     "renesas,rcar-gen2-can";
++			reg = <0 0xe6e80000 0 0x1000>;
++			interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&mstp9_clks R8A7792_CLK_CAN0>,
++				 <&rcan_clk>, <&can_clk>;
++			clock-names = "clkp1", "clkp2", "can_clk";
++			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
++			status = "disabled";
 +		};
- 
- 		/* Gate clocks */
- 		mstp1_clks: mstp1_clks at e6150134 {
-@@ -572,7 +579,8 @@
- 			reg = <0 0xe6150994 0 4>, <0 0xe61509a4 0 4>;
- 			clocks = <&cp_clk>, <&cp_clk>, <&cp_clk>, <&cp_clk>,
- 				 <&cp_clk>, <&cp_clk>, <&cp_clk>, <&cp_clk>,
--				 <&cp_clk>, <&cp_clk>, <&cp_clk>, <&cp_clk>;
-+				 <&cp_clk>, <&cp_clk>, <&p_clk>, <&p_clk>,
-+				 <&cp_clk>, <&cp_clk>;
- 			#clock-cells = <1>;
- 			clock-indices = <
- 				R8A7792_CLK_GPIO7 R8A7792_CLK_GPIO6
-@@ -580,12 +588,14 @@
- 				R8A7792_CLK_GPIO3 R8A7792_CLK_GPIO2
- 				R8A7792_CLK_GPIO1 R8A7792_CLK_GPIO0
- 				R8A7792_CLK_GPIO11 R8A7792_CLK_GPIO10
-+				R8A7792_CLK_CAN1 R8A7792_CLK_CAN0
- 				R8A7792_CLK_GPIO9 R8A7792_CLK_GPIO8
- 			>;
- 			clock-output-names =
- 				"gpio7", "gpio6", "gpio5", "gpio4",
- 				"gpio3", "gpio2", "gpio1", "gpio0",
--				"gpio11", "gpio10", "gpio9", "gpio8";
-+				"gpio11", "gpio10", "can1", "can0",
-+				"gpio9", "gpio8";
- 		};
- 	};
- 
-@@ -604,4 +614,12 @@
- 		/* This value must be overridden by the board. */
- 		clock-frequency = <0>;
- 	};
 +
-+	/* External CAN clock */
-+	can_clk: can {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
- };
++		can1: can at e6e88000 {
++			compatible = "renesas,can-r8a7792",
++				     "renesas,rcar-gen2-can";
++			reg = <0 0xe6e88000 0 0x1000>;
++			interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&mstp9_clks R8A7792_CLK_CAN1>,
++				 <&rcan_clk>, <&can_clk>;
++			clock-names = "clkp1", "clkp2", "can_clk";
++			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
++			status = "disabled";
++		};
++
+ 		/* Special CPG clocks */
+ 		cpg_clocks: cpg_clocks at e6150000 {
+ 			compatible = "renesas,r8a7792-cpg-clocks",
 -- 
 2.7.0.rc3.207.g0ac5344
