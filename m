@@ -1,102 +1,33 @@
-From: Songjun.Wu@microchip.com (Wu, Songjun)
-Date: Mon, 15 Aug 2016 14:09:21 +0800
-Subject: [PATCH v9 0/2] [media] atmel-isc: add driver for Atmel ISC
-In-Reply-To: <c6593866-db70-b2a6-ee5a-32b6fecc3775@xs4all.nl>
-References: <1470899202-13933-1-git-send-email-songjun.wu@microchip.com>
- <c6593866-db70-b2a6-ee5a-32b6fecc3775@xs4all.nl>
-Message-ID: <c422fc89-8184-5416-4574-77d6234aa4be@microchip.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 15 Aug 2016 14:45:44 +0800
+Subject: [PATCH v4 1/3] arm64: vdso: add __init section marker to
+ alloc_vectors_page
+In-Reply-To: <1471243546-3090-1-git-send-email-jszhang@marvell.com>
+References: <1471243546-3090-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1471243546-3090-2-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+It is not needed after booting, this patch moves the alloc_vectors_page
+function to the __init section.
 
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ arch/arm64/kernel/vdso.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-On 8/12/2016 15:32, Hans Verkuil wrote:
-> One quick question:
->
-> On 08/11/2016 09:06 AM, Songjun Wu wrote:
->> The Image Sensor Controller driver includes two parts.
->> 1) Driver code to implement the ISC function.
->> 2) Device tree binding documentation, it describes how
->>    to add the ISC in device tree.
->>
->> Test result with v4l-utils.
->> # v4l2-compliance -f
->> v4l2-compliance SHA   : not available
->>
->> Driver Info:
->>         Driver name   : atmel_isc
->>         Card type     : Atmel Image Sensor Controller
->>         Bus info      : platform:atmel_isc f0008000.isc
->>         Driver version: 4.7.0
->>         Capabilities  : 0x84200001
->>                 Video Capture
->>                 Streaming
->>                 Extended Pix Format
->>                 Device Capabilities
->>         Device Caps   : 0x04200001
->>                 Video Capture
->>                 Streaming
->>                 Extended Pix Format
->>
->> Compliance test for device /dev/video0 (not using libv4l2):
->>
->> Required ioctls:
->>         test VIDIOC_QUERYCAP: OK
->>
->> Allow for multiple opens:
->>         test second video open: OK
->>         test VIDIOC_QUERYCAP: OK
->>         test VIDIOC_G/S_PRIORITY: OK
->>         test for unlimited opens: OK
->>
->> Debug ioctls:
->>         test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
->>         test VIDIOC_LOG_STATUS: OK (Not Supported)
->>
->> Input ioctls:
->>         test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
->>         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
->>         test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
->>         test VIDIOC_ENUMAUDIO: OK (Not Supported)
->>         test VIDIOC_G/S/ENUMINPUT: OK
->>         test VIDIOC_G/S_AUDIO: OK (Not Supported)
->>         Inputs: 1 Audio Inputs: 0 Tuners: 0
->>
->> Output ioctls:
->>         test VIDIOC_G/S_MODULATOR: OK (Not Supported)
->>         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
->>         test VIDIOC_ENUMAUDOUT: OK (Not Supported)
->>         test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
->>         test VIDIOC_G/S_AUDOUT: OK (Not Supported)
->>         Outputs: 0 Audio Outputs: 0 Modulators: 0
->>
->> Input/Output configuration ioctls:
->>         test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
->>         test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
->>         test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
->>         test VIDIOC_G/S_EDID: OK (Not Supported)
->>
->> Test input 0:
->>
->>         Control ioctls:
->>                 test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK (Not Supported)
->>                 test VIDIOC_QUERYCTRL: OK (Not Supported)
->>                 test VIDIOC_G/S_CTRL: OK (Not Supported)
->>                 test VIDIOC_G/S/TRY_EXT_CTRLS: OK (Not Supported)
->>                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK (Not Supported)
->>                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
->>                 Standard Controls: 0 Private Controls: 0
->
-> Can you confirm that the sensor subdevice you are using does not have any controls?
-> I ask since that is fairly unusual, so I want to make sure that controls are really
-> not supported in this setup.
->
-Sorry for the late reply.
-The subdevice I use supports controls, but I did not develop the v4l2 
-controls in the sensor driver.
-Should I add the v4l2 controls and test again?
-
-> Regards,
->
-> 	Hans
->
+diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+index 076312b..e320e8f 100644
+--- a/arch/arm64/kernel/vdso.c
++++ b/arch/arm64/kernel/vdso.c
+@@ -55,7 +55,7 @@ struct vdso_data *vdso_data = &vdso_data_store.data;
+  */
+ static struct page *vectors_page[1];
+ 
+-static int alloc_vectors_page(void)
++static int __init alloc_vectors_page(void)
+ {
+ 	extern char __kuser_helper_start[], __kuser_helper_end[];
+ 	extern char __aarch32_sigret_code_start[], __aarch32_sigret_code_end[];
+-- 
+2.8.1
