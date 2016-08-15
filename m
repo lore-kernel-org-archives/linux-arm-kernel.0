@@ -1,61 +1,50 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Mon, 15 Aug 2016 18:40:57 +0200
-Subject: [PATCH 0/3] ARM64: meson: Meson8b and GXBB DWMAC glue driver
-In-Reply-To: <20160625165013.15917-1-martin.blumenstingl@googlemail.com>
+Date: Mon, 15 Aug 2016 18:41:00 +0200
+Subject: [PATCH 3/3] ARM64: dts: meson-gxbb: use the new GXBB DWMAC glue driver
+In-Reply-To: <20160815164100.27766-1-martin.blumenstingl@googlemail.com>
 References: <20160625165013.15917-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20160815164100.27766-1-martin.blumenstingl@googlemail.com>
+ <20160815164100.27766-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20160815164100.27766-4-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a DWMAC glue driver for the PRG_ETHERNET registers found in
-Meson8b and GXBB SoCs. Based on the "old" meson6b-dwmac glue driver
-the register layout is completely different.
-Thus I introduced a separate driver.
+The Amlogic reference driver uses the "mc_val" devicetree property to
+configure the PRG_ETHERNET_ADDR0 register. Unfortunately it uses magic
+values for this configuration.
+According to the datasheet the PRG_ETHERNET_ADDR0 register is at address
+0xc8834108. However, the reference driver uses 0xc8834540 instead.
+According to my tests, the value from the reference driver is correct.
 
-Changes compared to the RFC version:
-- switch from syscon / regmap to assigning the corresponding register
-  region directly to the driver (like meson6-dwmac does it)
-- dropped "fix_mac_speed" callback since the reference driver does not
-  implement it (I could not test if it is required due to lack of
-  hardware)
-- switch to common clock framework now that we know what bits 5:4
-  (mux clock), 6:5 (250MHz divider) and 10 (configurable 5 or 10
-  divider) are used for
-- Removed dts property "amlogic,mp2-clock" because it is now part of
-  the clocks which are registered by the glue driver
-- Removed dts properties "amlogic,enable-tx-phy-ref-clk" and
-  "amlogic,tx-delay" because it seems we can guess them based on the
-  phy-mode (the original Amlogic dts files only supply two different
-  values: one value for the internal RMII PHY and another one for the
-  external RGMII Gbit PHY).
-  If required we can extend the code in the future to make these
-  configurable.
-- This means that the only Meson8b / GXBB specific part of the binding
-  is the clkin0 (FCLK_DIV2) clock, as it's needed for the mux clock.
-  Everything else is auto-detected based on the phy-mode (which is
-  already mandatory in stmmac).
+No changes are required to the board dts files because the only
+required configuration option is the phy-mode, which had to be
+configured correctly before as well.
 
-I have successfully tested this on a Vega S95 Meta clone which comes
-with a "broken" bootloader (which programs the ethernet registers to
-"Fast Ethernet / RGMII" mode, while the board has a Realtek Gbit PHY).
-Before this series stmmac was detected, I got a network interface but
-no traffic was flowing.
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-Due to lack of hardware I could not test this on a device which uses
-the internal RMII (Fast Ethernet) PHY.
-
-
-Martin Blumenstingl (3):
-  net: dt-bindings: Document the new Meson8b and GXBB DWMAC bindings
-  net: stmmac: add a glue driver for the Amlogic Meson 8b / GXBB DWMAC
-  ARM64: dts: meson-gxbb: use the new GXBB DWMAC glue driver
-
- .../devicetree/bindings/net/meson-dwmac.txt        |  43 ++-
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |   7 +-
- drivers/net/ethernet/stmicro/stmmac/Makefile       |   2 +-
- .../net/ethernet/stmicro/stmmac/dwmac-meson8b.c    | 327 +++++++++++++++++++++
- 4 files changed, 367 insertions(+), 12 deletions(-)
- create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
-
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 2c200f9..f8cf16e 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -367,13 +367,14 @@
+ 		};
+ 
+ 		ethmac: ethernet at c9410000 {
+-			compatible = "amlogic,meson6-dwmac", "snps,dwmac";
++			compatible = "amlogic,meson-gxbb-dwmac", "snps,dwmac";
+ 			reg = <0x0 0xc9410000 0x0 0x10000
+ 			       0x0 0xc8834540 0x0 0x4>;
+ 			interrupts = <0 8 1>;
+ 			interrupt-names = "macirq";
+-			clocks = <&clkc CLKID_ETH>;
+-			clock-names = "stmmaceth";
++			clocks = <&clkc CLKID_ETH>,
++				 <&clkc CLKID_FCLK_DIV2>;
++			clock-names = "stmmaceth", "clkin0";
+ 			phy-mode = "rgmii";
+ 			status = "disabled";
+ 		};
 -- 
 2.9.3
