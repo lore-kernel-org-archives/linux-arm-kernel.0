@@ -1,96 +1,233 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 15 Aug 2016 14:55:05 +0100
-Subject: [PATCH 1/2] remoteproc: core: Add rproc OF look-up functions
-In-Reply-To: <abae5c30-62ab-55c7-a144-cb8707832941@ti.com>
-References: <20160810204049.GV26240@tuxbot>
- <f9641050-0a3f-11de-fa69-e587034e0527@ti.com>
- <20160810211947.GW26240@tuxbot>
- <b1a01567-7a5d-20de-a2b5-b673b9ce67ec@ti.com>
- <20160811073122.GA1715@dell>
- <05d4c9c1-79ea-bde3-e5e5-d26e6b07c916@ti.com>
- <b1b2a510-e0cb-5d8f-9f44-48c9dd747d4d@ti.com>
- <06f795ef-e71c-2cda-5306-5b75e0f15125@ti.com>
- <20160812180751.GH26240@tuxbot>
- <abae5c30-62ab-55c7-a144-cb8707832941@ti.com>
-Message-ID: <20160815135505.GI25844@dell>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 15 Aug 2016 21:55:39 +0800
+Subject: [PATCH 2/2] pinctrl: sunxi: Add A64 R_PIO controller support
+In-Reply-To: <20160801145939.50583-2-icenowy@aosc.xyz>
+References: <20160801145939.50583-1-icenowy@aosc.xyz>
+ <20160801145939.50583-2-icenowy@aosc.xyz>
+Message-ID: <CAGb2v64nzOOwZFGzukXehv6Bx6nikHdnuGUkRMJWS8bjfMkeXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Aug 2016, Suman Anna wrote:
-> On 08/12/2016 01:07 PM, Bjorn Andersson wrote:
-> > On Fri 12 Aug 09:37 PDT 2016, Suman Anna wrote:
-> > 
-> >> Hi Bjorn,
-> >>
-> >>>> On 08/11/2016 02:31 AM, Lee Jones wrote:
-> >>>>> On Wed, 10 Aug 2016, Suman Anna wrote:
-> >>>>>
-> >>>>>> On 08/10/2016 04:19 PM, Bjorn Andersson wrote:
-> >>>>>>> On Wed 10 Aug 14:04 PDT 2016, Suman Anna wrote:
-> >>>>>>>
-> >>>>>>>> On 08/10/2016 03:40 PM, Bjorn Andersson wrote:
-> >>>>>>>>> On Wed 10 Aug 12:37 PDT 2016, Suman Anna wrote:
-> >>>>>>>>>
-> >>>>>>>>>> Hi Lee, Bjorn,
-> >>>>>>>>>>
-> >>>>>>>>>> On 08/10/2016 12:40 PM, Bjorn Andersson wrote:
-> >>>>>>>>>>> On Tue 19 Jul 08:49 PDT 2016, Lee Jones wrote:
-> >>>>>>>>>>>
-> >>>>>>>>>>>> - of_rproc_by_index(): look-up and obtain a reference to a rproc
-> >>>>>>>>>>>>                        using the DT phandle "rprocs" and a index.
-> >>>>>>>>>>>>
-> >>>>>>>>>>>> - of_rproc_by_name():  lookup and obtain a reference to a rproc
-> >>>>>>>>>>>>                        using the DT phandle "rprocs" and "rproc-names".
-> >>>>>>>>>>>>
-> >>>>>>>>>>>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> >>>>>>>>>>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >>>>>>>>>>>> ---
-> >>>>>>>>>>>
-> >>>>>>>>>>> I'm happy with this, so I whipped up a binding document describing our
-> >>>>>>>>>>> two new properties. Waiting for an opinion on that before I merge this.
-> >>
-> >> One last comment on this is the return code convention change on these
-> >> rproc_get APIs. I am fine in general with returning ERR_PTRs, but most
-> >> of the remoteproc code is using NULL checking for rproc. If you remember
-> >> the discussion back during the hwspinlock DT conversion [1], Ohad
-> >> preferred to return NULL, and that's why even the rproc_get_by_phandle
-> >> was returning NULL. We ought to make this consistent across the board if
-> >> we want to make this switch.
+Hi,
 
-IMHO it's always better to use the appropriate Linux error code in the
-event of a failure and if it's available.  Returning NULL doesn't
-actually tell us anything about the failure.  This will also come in
-handy when we start playing around with resource tables.  For
-instance, NULL will insinuate "no table supplied", which is valid and
-execution should continue.  Where as a positive IS_ERR() insinuates
-that something went wrong and execution should be cut short and an
-error value returned to the caller.
+On Mon, Aug 1, 2016 at 10:59 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+> The A64 has a R_PIO pin controller, similar to the one found on the H3 SoCs.
+> Add support for the pins controlled by the R_PIO controller.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+>  drivers/pinctrl/sunxi/Kconfig                |   5 +
+>  drivers/pinctrl/sunxi/Makefile               |   1 +
+>  drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c | 148 +++++++++++++++++++++++++++
+>  3 files changed, 154 insertions(+)
+>  create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c
+>
+> diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
+> index aaf075b..c4b476f 100644
+> --- a/drivers/pinctrl/sunxi/Kconfig
+> +++ b/drivers/pinctrl/sunxi/Kconfig
+> @@ -72,4 +72,9 @@ config PINCTRL_SUN50I_A64
+>         bool
+>         select PINCTRL_SUNXI
+>
+> +config PINCTRL_SUN50I_A64_R
+> +       bool
+> +       depends on RESET_CONTROLLER
+> +       select PINCTRL_SUNXI
+> +
+>  endif
+> diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
+> index 2d8b64e..d6eabdd 100644
+> --- a/drivers/pinctrl/sunxi/Makefile
+> +++ b/drivers/pinctrl/sunxi/Makefile
+> @@ -13,6 +13,7 @@ obj-$(CONFIG_PINCTRL_SUN8I_A23)               += pinctrl-sun8i-a23.o
+>  obj-$(CONFIG_PINCTRL_SUN8I_A23_R)      += pinctrl-sun8i-a23-r.o
+>  obj-$(CONFIG_PINCTRL_SUN8I_A33)                += pinctrl-sun8i-a33.o
+>  obj-$(CONFIG_PINCTRL_SUN50I_A64)       += pinctrl-sun50i-a64.o
+> +obj-$(CONFIG_PINCTRL_SUN50I_A64_R)     += pinctrl-sun50i-a64-r.o
+>  obj-$(CONFIG_PINCTRL_SUN8I_A83T)       += pinctrl-sun8i-a83t.o
+>  obj-$(CONFIG_PINCTRL_SUN8I_H3)         += pinctrl-sun8i-h3.o
+>  obj-$(CONFIG_PINCTRL_SUN8I_H3_R)       += pinctrl-sun8i-h3-r.o
+> diff --git a/drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c b/drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c
+> new file mode 100644
+> index 0000000..b836264
+> --- /dev/null
+> +++ b/drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c
+> @@ -0,0 +1,148 @@
+> +/*
+> + * Allwinner A64 SoCs special pins pinctrl driver.
+> + *
+> + * Based on pinctrl-sun8i-a23-r.c
+> + *
+> + * Copyright (C) 2016 Icenowy Zheng
+> + * Icenowy Zheng <icenowy@aosc.xyz>
+> + *
+> + * Copyright (C) 2014 Chen-Yu Tsai
+> + * Chen-Yu Tsai <wens@csie.org>
+> + *
+> + * Copyright (C) 2014 Boris Brezillon
+> + * Boris Brezillon <boris.brezillon@free-electrons.com>
+> + *
+> + * Copyright (C) 2014 Maxime Ripard
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
 
-> > I think it makes sense to return the actual error from these functions,
-> > if nothing else to keep it consistent with other frameworks.
-> > 
-> > The other case I see returning NULL is rproc_alloc(), which is think is
-> > analog to kmalloc(), so I think that's fine to keep.
-> > 
-> > Luckily wkup_m3 is the only consumer of this API in the kernel today, so
-> > we shouldn't have any issues wrt changing the return value here.
-> 
-> Yeah, not worried about the consumers, I am talking about the few
-> functions in remoteproc core code that do some checking like in
-> rproc_del(), __rproc_boot() or rproc_report_crash(). We would need to
-> modify these to use IS_ERR_OR_NULL instead of a NULL check atleast.
+Please sort the headers.
 
-I haven't looked at the code, but +1 in principle.
+> +#include <linux/pinctrl/pinctrl.h>
+> +#include <linux/reset.h>
+> +
+> +#include "pinctrl-sunxi.h"
+> +
+> +static const struct sunxi_desc_pin sun50i_a64_r_pins[] = {
+> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 0),
+> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
+> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
+> +                 SUNXI_FUNCTION(0x2, "s_rsb"),         /* SCK */
+> +                 SUNXI_FUNCTION(0x3, "s_twi"),         /* SCK */
 
-> >> [1] http://marc.info/?t=138965891200008
-> > 
-> > Regards,
-> > Bjorn
-> > 
-> 
+We use "i2c" instead of "twi".
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 0)),  /* PL_EINT0 */
+> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 1),
+> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
+> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
+> +                 SUNXI_FUNCTION(0x2, "s_rsb"),         /* SDA */
+> +                 SUNXI_FUNCTION(0x3, "s_twi"),         /* SDA */
+
+Same here.
+
+> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 1)),  /* PL_EINT1 */
+> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 2),
+> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
+> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
+> +                 SUNXI_FUNCTION(0x2, "s_uart"),        /* TX */
+> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 2)),  /* PL_EINT2 */
+> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 3),
+> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
+> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
+> +                 SUNXI_FUNCTION(0x2, "s_uart"),        /* RX */
+> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 3)),  /* PL_EINT3 */
+> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 4),
+> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
+> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
+> +                 SUNXI_FUNCTION(0x3, "s_jtag"),        /* MS */
+> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 4)),  /* PL_EINT4 */
+> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 5),
+> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
+> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
+> +                 SUNXI_FUNCTION(0x3, "s_jtag"),        /* CK */
+> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 5)),  /* PL_EINT5 */
+> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 6),
+> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
+> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
+> +                 SUNXI_FUNCTION(0x3, "s_jtag"),        /* DO */
+> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 6)),  /* PL_EINT6 */
+> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 7),
+> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
+> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
+> +                 SUNXI_FUNCTION(0x3, "s_jtag"),        /* DI */
+> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 7)),  /* PL_EINT7 */
+> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 8),
+> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
+> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
+> +                 SUNXI_FUNCTION(0x2, "s_twi"),         /* SCK */
+
+Ditto.
+
+> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 8)),  /* PL_EINT8 */
+> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 9),
+> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
+> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
+> +                 SUNXI_FUNCTION(0x2, "s_twi"),         /* SDA */
+
+Ditto.
+
+> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 9)),  /* PL_EINT9 */
+> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 10),
+> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
+> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
+> +                 SUNXI_FUNCTION(0x2, "s_pwm"),
+> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 10)), /* PL_EINT10 */
+> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 11),
+> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
+> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
+> +                 SUNXI_FUNCTION(0x2, "s_cir_rx"),
+> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 11)), /* PL_EINT11 */
+
+You missed PL12.
+
+> +};
+> +
+> +static const struct sunxi_pinctrl_desc sun50i_a64_r_pinctrl_data = {
+> +       .pins = sun50i_a64_r_pins,
+> +       .npins = ARRAY_SIZE(sun50i_a64_r_pins),
+> +       .pin_base = PL_BASE,
+> +       .irq_banks = 1,
+> +};
+> +
+> +static int sun50i_a64_r_pinctrl_probe(struct platform_device *pdev)
+> +{
+> +       struct reset_control *rstc;
+> +       int ret;
+> +
+> +       rstc = devm_reset_control_get(&pdev->dev, NULL);
+> +       if (IS_ERR(rstc)) {
+> +               dev_err(&pdev->dev, "Reset controller missing\n");
+> +               return PTR_ERR(rstc);
+> +       }
+> +
+> +       ret = reset_control_deassert(rstc);
+> +       if (ret)
+> +               return ret;
+> +
+> +       ret = sunxi_pinctrl_init(pdev,
+> +                                &sun50i_a64_r_pinctrl_data);
+> +
+> +       if (ret)
+> +               reset_control_assert(rstc);
+> +
+> +       return ret;
+> +}
+> +
+> +static const struct of_device_id sun50i_a64_r_pinctrl_match[] = {
+> +       { .compatible = "allwinner,sun50i-a64-r-pinctrl", },
+> +       {}
+> +};
+> +MODULE_DEVICE_TABLE(of, sun50i_a64_r_pinctrl_match);
+> +
+> +static struct platform_driver sun50i_a64_r_pinctrl_driver = {
+> +       .probe  = sun50i_a64_r_pinctrl_probe,
+> +       .driver = {
+> +               .name           = "sun50i-a64-r-pinctrl",
+> +               .of_match_table = sun50i_a64_r_pinctrl_match,
+> +       },
+> +};
+> +module_platform_driver(sun50i_a64_r_pinctrl_driver);
+> +
+> +MODULE_AUTHOR("Icenowy Zheng <icenowy@aosc.xyz>");
+> +MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
+> +MODULE_AUTHOR("Boris Brezillon <boris.brezillon@free-electrons.com");
+> +MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com");
+> +MODULE_DESCRIPTION("Allwinner A64 R_PIO pinctrl driver");
+> +MODULE_LICENSE("GPL");
+
+Since you have a bool Kconfig symbol, you can drop all the module related
+stuff. Just use builtin_platform_driver like the A64 main pinctrl driver
+does.
+
+Regards
+ChenYu
+
+> --
+> 2.9.0
+>
