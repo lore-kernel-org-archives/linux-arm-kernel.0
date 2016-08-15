@@ -1,47 +1,80 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Mon, 15 Aug 2016 11:37:16 +0800
-Subject: [PATCH 1/1] ARM: mach-imx: imx6ul: populates platform device at
- .init_machine
-Message-ID: <1471232236-12635-1-git-send-email-peter.chen@nxp.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 15 Aug 2016 12:52:14 +0800
+Subject: [PATCH v3 3/4] arm64: kaslr: Fix incorrect placement of
+ __initdata and __read_mostly
+In-Reply-To: <CAKv+Gu_ci37u6av9gjchBTVwoMCiqdnwtnDHxLT3cV3+kG0wUw@mail.gmail.com>
+References: <1470988871-2799-1-git-send-email-jszhang@marvell.com>
+ <1470988871-2799-4-git-send-email-jszhang@marvell.com>
+ <CAKv+Gu_ci37u6av9gjchBTVwoMCiqdnwtnDHxLT3cV3+kG0wUw@mail.gmail.com>
+Message-ID: <20160815125214.2727bf88@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At imx6ul_init_machine, it calls imx6ul_pm_init which needs to find
-platform device for ocram, but the default populate platform device is at
-of_platform_default_populate_init, which is located at arch_initcall_sync,
-and called later than arch_initcall (.init_machine is located at that).
-So below warning message will be showed during boots up:
+Hi Ard,
 
-	imx6q_suspend_init: failed to find ocram device!
-	imx6_pm_common_init: No DDR LPM support with suspend -19!
+On Fri, 12 Aug 2016 14:02:40 +0200 Ard Biesheuvel wrote:
 
-Due to lack of ocram device, the suspend mode "mem" which needs ocram to
-store suspend routine code is invalid.
+> Hi Jisheng,
+> 
+> On 12 August 2016 at 10:01, Jisheng Zhang <jszhang@marvell.com> wrote:
+> > __initdata and __read_mostly should be placed after the variable name
+> > for the variable to be placed in the intended section.
+> >  
+> 
+> Why?
 
-This commit populates platform device before imx6ul_pm_init like other
-imx6 platforms do, and the suspend mode "mem" can work successfully.
+include/linux/init.h says something as:
 
-Cc: Anson Huang <anson.huang@nxp.com>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: <stable@vger.kernel.org>
-Fixes: ee4a5f838c84 ("ARM: imx: add suspend/resume support for i.mx6ul")
+ * For initialized data:
+ * You should insert __initdata or __initconst between the variable name
+ * and equal sign followed by value, e.g.:
+ *
+ * static int init_variable __initdata = 0;
+ * static const char linux_logo[] __initconst = { 0x32, 0x36, ... };
 
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
----
- arch/arm/mach-imx/mach-imx6ul.c | 1 +
- 1 file changed, 1 insertion(+)
+and examples in gcc manual also put __attribute__ (...) after variable name.
 
-diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
-index 5d9bfab..6bb7d9c 100644
---- a/arch/arm/mach-imx/mach-imx6ul.c
-+++ b/arch/arm/mach-imx/mach-imx6ul.c
-@@ -64,6 +64,7 @@ static void __init imx6ul_init_machine(void)
- 	if (parent == NULL)
- 		pr_warn("failed to initialize soc device\n");
- 
-+	of_platform_default_populate(NULL, NULL, parent);
- 	imx6ul_enet_init();
- 	imx_anatop_init();
- 	imx6ul_pm_init();
--- 
-1.9.1
+https://gcc.gnu.org/onlinedocs/gcc/Common-Variable-Attributes.html#Common-Variable-Attributes
+
+Then I grep the source, found most lines (especially arch/arm64/*) put the
+__initdata and __read_mostly after the variable name.
+
+However, I built the code with three different gcc, the result looks identical
+no matter where these markers put. So the commit msg looks wrong, what about
+changes it as
+
+"put __initdata and __read_mostly after the variable name
+to keep the style consistent"?
+
+Thanks,
+Jisheng
+
+> 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >  arch/arm64/kernel/kaslr.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
+> > index b054691..8ebabc4 100644
+> > --- a/arch/arm64/kernel/kaslr.c
+> > +++ b/arch/arm64/kernel/kaslr.c
+> > @@ -20,8 +20,8 @@
+> >  #include <asm/pgtable.h>
+> >  #include <asm/sections.h>
+> >
+> > -u64 __read_mostly module_alloc_base;
+> > -u16 __initdata memstart_offset_seed;
+> > +u64 module_alloc_base __read_mostly;
+> > +u16 memstart_offset_seed __initdata;
+> >
+> >  static __init u64 get_kaslr_seed(void *fdt)
+> >  {
+> > --
+> > 2.8.1
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel  
