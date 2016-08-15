@@ -1,97 +1,113 @@
-From: dawei.chien@mediatek.com (dawei chien)
-Date: Mon, 15 Aug 2016 15:14:28 +0800
-Subject: [PATCH 3/3] arm: dts: thermal: add thermal/auxadc node.
-In-Reply-To: <fd3f0c2f-f0ad-dd0f-cf2b-eb658f72d735@gmail.com>
-References: <1467882386-40544-1-git-send-email-dawei.chien@mediatek.com>
- <1467882386-40544-4-git-send-email-dawei.chien@mediatek.com>
- <fd3f0c2f-f0ad-dd0f-cf2b-eb658f72d735@gmail.com>
-Message-ID: <1471245268.14287.14.camel@mtksdaap41>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 15 Aug 2016 09:15:23 +0200
+Subject: [PATCH v9 0/2] [media] atmel-isc: add driver for Atmel ISC
+In-Reply-To: <c422fc89-8184-5416-4574-77d6234aa4be@microchip.com>
+References: <1470899202-13933-1-git-send-email-songjun.wu@microchip.com>
+ <c6593866-db70-b2a6-ee5a-32b6fecc3775@xs4all.nl>
+ <c422fc89-8184-5416-4574-77d6234aa4be@microchip.com>
+Message-ID: <89ed4a10-30d7-87ca-8d9d-22ea2634e4af@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
-
-On Thu, 2016-08-11 at 17:51 +0200, Matthias Brugger wrote:
+On 08/15/2016 08:09 AM, Wu, Songjun wrote:
 > 
-> On 07/07/16 11:06, Dawei Chien wrote:
-> > This adds the thermal controller and auxadc nodes
-> > to the Mediatek MT2701 dtsi file.
-> >
-> > Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
-> > ---
-> > This patch depned on:
-> > https://patchwork.kernel.org/patch/9213545/
-> > ---
-> >  arch/arm/boot/dts/mt2701.dtsi |   43 +++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 43 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-> > index 2ac8b50..0834a23 100644
-> > --- a/arch/arm/boot/dts/mt2701.dtsi
-> > +++ b/arch/arm/boot/dts/mt2701.dtsi
-> > @@ -77,6 +77,36 @@
-> >  		#clock-cells = <0>;
-> >  	};
-> >
-> > +	thermal-zones {
-> > +		cpu_thermal: cpu_thermal {
-> > +			polling-delay-passive = <1000>; /* milliseconds */
-> > +			polling-delay = <1000>; /* milliseconds */
-> > +
-> > +			thermal-sensors = <&thermal 0>;
-> > +			sustainable-power = <1000>;
-> > +
-> > +			trips {
-> > +				threshold: trip-point at 0 {
-> > +					temperature = <68000>;
-> > +					hysteresis = <2000>;
-> > +					type = "passive";
-> > +				};
-> > +
-> > +				target: trip-point at 1 {
-> > +					temperature = <85000>;
-> > +					hysteresis = <2000>;
-> > +					type = "passive";
-> > +				};
-> > +
-> > +				cpu_crit: cpu_crit at 0 {
-> > +					temperature = <115000>;
-> > +					hysteresis = <2000>;
-> > +					type = "critical";
-> > +				};
-> > +			};
-> > +		};
-> > +	};
-> > +
-> >  	timer {
-> >  		compatible = "arm,armv7-timer";
-> >  		interrupt-parent = <&gic>;
-> > @@ -183,4 +213,17 @@
-> >  		clocks = <&uart_clk>;
-> >  		status = "disabled";
-> >  	};
-> > +
-> > +	thermal: thermal at 1100b000 {
-> > +		#thermal-sensor-cells = <0>;
-> > +		compatible = "mediatek,mt2701-thermal";
-> > +		reg = <0 0x1100b000 0 0x1000>;
-> > +		interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
-> > +		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
-> > +		clock-names = "therm", "auxadc";
-> > +		resets = <&pericfg 0x10>;
-> > +		reset-names = "therm";
-> > +		mediatek,auxadc = <&auxadc>;
-> > +		mediatek,apmixedsys = <&apmixedsys>;
-> > +	};
-> >  };
-> >
 > 
-> what about:
-> status = "disabled"; ?
+> On 8/12/2016 15:32, Hans Verkuil wrote:
+>> One quick question:
+>>
+>> On 08/11/2016 09:06 AM, Songjun Wu wrote:
+>>> The Image Sensor Controller driver includes two parts.
+>>> 1) Driver code to implement the ISC function.
+>>> 2) Device tree binding documentation, it describes how
+>>>    to add the ISC in device tree.
+>>>
+>>> Test result with v4l-utils.
+>>> # v4l2-compliance -f
+>>> v4l2-compliance SHA   : not available
+>>>
+>>> Driver Info:
+>>>         Driver name   : atmel_isc
+>>>         Card type     : Atmel Image Sensor Controller
+>>>         Bus info      : platform:atmel_isc f0008000.isc
+>>>         Driver version: 4.7.0
+>>>         Capabilities  : 0x84200001
+>>>                 Video Capture
+>>>                 Streaming
+>>>                 Extended Pix Format
+>>>                 Device Capabilities
+>>>         Device Caps   : 0x04200001
+>>>                 Video Capture
+>>>                 Streaming
+>>>                 Extended Pix Format
+>>>
+>>> Compliance test for device /dev/video0 (not using libv4l2):
+>>>
+>>> Required ioctls:
+>>>         test VIDIOC_QUERYCAP: OK
+>>>
+>>> Allow for multiple opens:
+>>>         test second video open: OK
+>>>         test VIDIOC_QUERYCAP: OK
+>>>         test VIDIOC_G/S_PRIORITY: OK
+>>>         test for unlimited opens: OK
+>>>
+>>> Debug ioctls:
+>>>         test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
+>>>         test VIDIOC_LOG_STATUS: OK (Not Supported)
+>>>
+>>> Input ioctls:
+>>>         test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
+>>>         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+>>>         test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
+>>>         test VIDIOC_ENUMAUDIO: OK (Not Supported)
+>>>         test VIDIOC_G/S/ENUMINPUT: OK
+>>>         test VIDIOC_G/S_AUDIO: OK (Not Supported)
+>>>         Inputs: 1 Audio Inputs: 0 Tuners: 0
+>>>
+>>> Output ioctls:
+>>>         test VIDIOC_G/S_MODULATOR: OK (Not Supported)
+>>>         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+>>>         test VIDIOC_ENUMAUDOUT: OK (Not Supported)
+>>>         test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
+>>>         test VIDIOC_G/S_AUDOUT: OK (Not Supported)
+>>>         Outputs: 0 Audio Outputs: 0 Modulators: 0
+>>>
+>>> Input/Output configuration ioctls:
+>>>         test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
+>>>         test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
+>>>         test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
+>>>         test VIDIOC_G/S_EDID: OK (Not Supported)
+>>>
+>>> Test input 0:
+>>>
+>>>         Control ioctls:
+>>>                 test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK (Not Supported)
+>>>                 test VIDIOC_QUERYCTRL: OK (Not Supported)
+>>>                 test VIDIOC_G/S_CTRL: OK (Not Supported)
+>>>                 test VIDIOC_G/S/TRY_EXT_CTRLS: OK (Not Supported)
+>>>                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK (Not Supported)
+>>>                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+>>>                 Standard Controls: 0 Private Controls: 0
+>>
+>> Can you confirm that the sensor subdevice you are using does not have any controls?
+>> I ask since that is fairly unusual, so I want to make sure that controls are really
+>> not supported in this setup.
+>>
+> Sorry for the late reply.
+> The subdevice I use supports controls, but I did not develop the v4l2 
+> controls in the sensor driver.
 
-Since thermal driver would protect our platform by shutdown method once
-SoC temperature over critical point, I prefer keep this rather than
-disabling, how do you think, thank you.
+So you mean the sensor hardware has controls, but the sensor driver doesn't implement
+them? Do I understand you correctly?
 
-BR,
-Dawei
+> Should I add the v4l2 controls and test again?
+
+If the sensor driver does not implement controls (i.e. has a struct v4l2_ctrl_handler),
+then everything is fine and the v4l2-compliance output is correct.
+
+Please confirm this. I just want to be 100% certain about this before I make the pull
+request.
+
+Thanks,
+
+	Hans
