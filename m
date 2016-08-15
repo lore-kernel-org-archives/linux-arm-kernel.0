@@ -1,37 +1,29 @@
-From: wens213@gmail.com (wens Tsai)
-Date: Mon, 15 Aug 2016 17:43:55 +0800
-Subject: ASoC: sun4i-codec: playback stall and I/O error with DAPM paths all
- disabled
-Message-ID: <CAGb2v66X2BhEM4X+zQHUFB-wpHuBQ4xc8ztfYFuKADnY0b-gaQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Aug 2016 10:46:50 +0100
+Subject: [PATCH] arm: remove traces of perf_ops_bp
+In-Reply-To: <1470934766-4009-1-git-send-email-mark.rutland@arm.com>
+References: <1470934766-4009-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20160815094649.GA13262@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+On Thu, Aug 11, 2016 at 05:59:26PM +0100, Mark Rutland wrote:
+> Even though perf_ops_bp was removed/renamed back in commit
+> b0a873ebbf87bf38 ("perf: Register PMU implementations"), as part of
+> v2.6.37, its definition still lives on in some arch headers.
+> 
+> This patch removes the vestigal definition from arm.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/include/asm/hw_breakpoint.h | 1 -
+>  1 file changed, 1 deletion(-)
 
-In the sun4i-codec driver, we control the DAC digital enable bits with a
-supply widget, which in turn supplies the DAC source widgets. DAPM will
-disable the supply if there are no usable playback paths. And it just so
-happens that the default value for various playback switches is the off
-setting.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Any user getting codec support for the first time has to enable a proper
-playback path before getting sound out of the hardware. This is expected.
+Please put this into the patch system -- I'll pick the other one up for
+arm64.
 
-What is unexpected is any attempt to play anything under this state makes
-the playback software (in my case mpg321) stall, and later report an I/O
-error. My guess is that the DAC is still disabled by DAPM, so it doesn't
-send any DRQs, and thus the DMA engine is not consuming any data from
-userspace.
-
-I think we should just enable the digital bits of the DAC/ADC all the
-time. Or maybe transfer and then discard data if the DAC is off. Not
-sure if this is doable though. I expect playback software to work, and
-not block, regardless of the hardware status.
-
-Any thoughts on this? sun4i-codec seems to be one of the rarer kinds of
-hardware where the DAC is directly tied to the system bus, without an I2S
-interface in between. And I don't see any DAI drivers using DAPM.
-
-
-Regards
-ChenYu
+Will
