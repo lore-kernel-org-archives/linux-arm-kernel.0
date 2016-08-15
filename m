@@ -1,15 +1,20 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 15 Aug 2016 21:29:18 +0800
-Subject: [PATCH v3 0/2] Add board support for TS-4900
-In-Reply-To: <1470755744-7837-1-git-send-email-lucile.quirion@savoirfairelinux.com>
-References: <1470755744-7837-1-git-send-email-lucile.quirion@savoirfairelinux.com>
-Message-ID: <20160815132917.GF500@tiger>
+Date: Mon, 15 Aug 2016 21:33:25 +0800
+Subject: [PATCH 1/2] ARM: dts: imx7s-warp: Add MPL3115 sensor support
+In-Reply-To: <1470768046-28416-1-git-send-email-breno.lima@nxp.com>
+References: <1470768046-28416-1-git-send-email-breno.lima@nxp.com>
+Message-ID: <20160815133325.GG500@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2016 at 11:15:42AM -0400, Lucile Quirion wrote:
-> Lucile Quirion (2):
->   of: documentation: add bindings documentation for TS-4900
->   ARM: dts: TS-4900: add basic device tree
+On Tue, Aug 09, 2016 at 03:40:45PM -0300, Breno Lima wrote:
+> Add support for MPL3115 NXP pressure sensor.
+> 
+> Tested by reading temperature and pressure:
+> 
+> $ cat /sys/bus/iio/devices/iio:device0/in_temp_raw
+> $ cat /sys/bus/iio/devices/iio:device0/in_pressure_raw
+> 
+> Signed-off-by: Breno Lima <breno.lima@nxp.com>
 
 Applied both, thanks.
