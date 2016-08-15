@@ -1,66 +1,73 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Mon, 15 Aug 2016 10:47:06 +0800
-Subject: [PATCH v9 01/10] clk: fix initial state of critical clock's
- parents
-In-Reply-To: <20160813003913.GA361@codeaurora.org>
+Date: Mon, 15 Aug 2016 11:00:34 +0800
+Subject: [PATCH v9 06/10] clk: mediatek: Add MT2701 clock support
+In-Reply-To: <20160813004438.GC361@codeaurora.org>
 References: <1466581229-2342-1-git-send-email-erin.lo@mediatek.com>
- <1466581229-2342-2-git-send-email-erin.lo@mediatek.com>
- <20160702012140.GB17071@codeaurora.org>
- <1467604308.26485.4.camel@mtksdaap41>
- <146802073038.73491.6675612765998057903@resonance>
- <1468225452.31247.7.camel@mtksdaap41> <1470203182.17063.3.camel@mtksdaap41>
- <1470721183.8551.6.camel@mtksdaap41> <20160810210922.GD2996@codeaurora.org>
- <1470989873.8551.10.camel@mtksdaap41> <20160813003913.GA361@codeaurora.org>
-Message-ID: <1471229226.8551.16.camel@mtksdaap41>
+ <1466581229-2342-7-git-send-email-erin.lo@mediatek.com>
+ <20160813004438.GC361@codeaurora.org>
+Message-ID: <1471230034.8551.22.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Stephen,
 
-On Fri, 2016-08-12 at 17:39 -0700, Stephen Boyd wrote:
-> On 08/12, James Liao wrote:
-> > On Wed, 2016-08-10 at 14:09 -0700, Stephen Boyd wrote:
-> > > (Including lists)
-> > > 
-> > > On 08/09, James Liao wrote:
-> > > > On Wed, 2016-08-03 at 13:46 +0800, James Liao wrote:
-> > > >>
-> > > >> Hi Mike,
-> > > >>
-> > > >> Do you have new patches to fix new clock parents? If not, I think we can
-> > > >> use my patch first. Is it okay?
-> > > >>
-> > > >
-> > > > Hi Stephen,
-> > > >
-> > > > Do you have comments for the bug fixing? I prefer to use my patch (clk:
-> > > > fix initial state of critical clock's parents). How do you think?
-> > > >
-> > > 
-> > > How about we recalc accuracies and rates in addition to the patch
-> > > from Mike? That will fix everything?
-> > 
-> > Hi Stephen,
-> > 
-> > It works!
-> > 
-> > I'll send a new series of MT2701 clock support in few days. Should I
-> > include this patch in my series? Or you'll merge it into clk-next
-> > directly?
-> > 
+On Fri, 2016-08-12 at 17:44 -0700, Stephen Boyd wrote:
+> On 06/22, Erin Lo wrote:
+> > diff --git a/drivers/clk/mediatek/clk-mt2701-bdp.c b/drivers/clk/mediatek/clk-mt2701-bdp.c
+> > new file mode 100644
+> > index 0000000..81f628c
+> > --- /dev/null
+> > +++ b/drivers/clk/mediatek/clk-mt2701-bdp.c
+> > @@ -0,0 +1,140 @@
+> > +/*
+> > + * Copyright (c) 2014 MediaTek Inc.
+> > + * Author: Shunli Wang <shunli.wang@mediatek.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#include <linux/clk.h>
 > 
-> Thanks. I can take that as a tested-by? I can merge it into
+> Is this include used? I would expect clk-provider.h instead.
 
-Yes, please feel free to add:
+Yes, it can be replaced with clk-provider.h. I'll change it in next
+patch series.
 
-Tested-by: James Liao <jamesjj.liao@mediatek.com>
+> > +#include <linux/platform_device.h>
+> > +
+> > +#include "clk-mtk.h"
+> > +#include "clk-gate.h"
+> > +
+> > +#include <dt-bindings/clock/mt2701-clk.h>
+> > +
+> [..]
+> > +
+> > +static void mtk_bdpsys_init(struct device_node *node)
+> > +{
+> > +	struct clk_onecell_data *clk_data;
+> > +	int r;
+> > +
+> > +	clk_data = mtk_alloc_clk_data(CLK_BDP_NR);
+> > +
+> > +	mtk_clk_register_gates(node, bdp_clks, ARRAY_SIZE(bdp_clks),
+> > +						clk_data);
+> > +
+> > +	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+> 
+> Is it possible to move to of_clk_add_hw_provider()? It can be
+> done later if that would mean changing all
+> mtk_clk_register_gates() users.
 
-> clk-next directly, but do we need to put the mt2701 patches on a
-> separate branch to merge into arm-soc? If so we'll need to put
-> this patch first to avoid bisection failures.
-
-I prefer to merge clk driver into mainline first. Patches that depend on
-mt2701 clks such as dtsi can base on next kernel release.
+I would like to keep current implementation due to test/integration
+effort. I prefer to apply clk_hw related APIs on new clk drivers instead
+of modify existing drivers.
 
 
 Best regards,
