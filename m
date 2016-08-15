@@ -1,75 +1,47 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Mon, 15 Aug 2016 11:00:34 +0800
-Subject: [PATCH v9 06/10] clk: mediatek: Add MT2701 clock support
-In-Reply-To: <20160813004438.GC361@codeaurora.org>
-References: <1466581229-2342-1-git-send-email-erin.lo@mediatek.com>
- <1466581229-2342-7-git-send-email-erin.lo@mediatek.com>
- <20160813004438.GC361@codeaurora.org>
-Message-ID: <1471230034.8551.22.camel@mtksdaap41>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Mon, 15 Aug 2016 11:37:16 +0800
+Subject: [PATCH 1/1] ARM: mach-imx: imx6ul: populates platform device at
+ .init_machine
+Message-ID: <1471232236-12635-1-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+At imx6ul_init_machine, it calls imx6ul_pm_init which needs to find
+platform device for ocram, but the default populate platform device is at
+of_platform_default_populate_init, which is located at arch_initcall_sync,
+and called later than arch_initcall (.init_machine is located at that).
+So below warning message will be showed during boots up:
 
-On Fri, 2016-08-12 at 17:44 -0700, Stephen Boyd wrote:
-> On 06/22, Erin Lo wrote:
-> > diff --git a/drivers/clk/mediatek/clk-mt2701-bdp.c b/drivers/clk/mediatek/clk-mt2701-bdp.c
-> > new file mode 100644
-> > index 0000000..81f628c
-> > --- /dev/null
-> > +++ b/drivers/clk/mediatek/clk-mt2701-bdp.c
-> > @@ -0,0 +1,140 @@
-> > +/*
-> > + * Copyright (c) 2014 MediaTek Inc.
-> > + * Author: Shunli Wang <shunli.wang@mediatek.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#include <linux/clk.h>
-> 
-> Is this include used? I would expect clk-provider.h instead.
+	imx6q_suspend_init: failed to find ocram device!
+	imx6_pm_common_init: No DDR LPM support with suspend -19!
 
-Yes, it can be replaced with clk-provider.h. I'll change it in next
-patch series.
+Due to lack of ocram device, the suspend mode "mem" which needs ocram to
+store suspend routine code is invalid.
 
-> > +#include <linux/platform_device.h>
-> > +
-> > +#include "clk-mtk.h"
-> > +#include "clk-gate.h"
-> > +
-> > +#include <dt-bindings/clock/mt2701-clk.h>
-> > +
-> [..]
-> > +
-> > +static void mtk_bdpsys_init(struct device_node *node)
-> > +{
-> > +	struct clk_onecell_data *clk_data;
-> > +	int r;
-> > +
-> > +	clk_data = mtk_alloc_clk_data(CLK_BDP_NR);
-> > +
-> > +	mtk_clk_register_gates(node, bdp_clks, ARRAY_SIZE(bdp_clks),
-> > +						clk_data);
-> > +
-> > +	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-> 
-> Is it possible to move to of_clk_add_hw_provider()? It can be
-> done later if that would mean changing all
-> mtk_clk_register_gates() users.
+This commit populates platform device before imx6ul_pm_init like other
+imx6 platforms do, and the suspend mode "mem" can work successfully.
 
-I would like to keep current implementation due to test/integration
-effort. I prefer to apply clk_hw related APIs on new clk drivers instead
-of modify existing drivers.
+Cc: Anson Huang <anson.huang@nxp.com>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: <stable@vger.kernel.org>
+Fixes: ee4a5f838c84 ("ARM: imx: add suspend/resume support for i.mx6ul")
 
+Signed-off-by: Peter Chen <peter.chen@nxp.com>
+---
+ arch/arm/mach-imx/mach-imx6ul.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Best regards,
-
-James
+diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
+index 5d9bfab..6bb7d9c 100644
+--- a/arch/arm/mach-imx/mach-imx6ul.c
++++ b/arch/arm/mach-imx/mach-imx6ul.c
+@@ -64,6 +64,7 @@ static void __init imx6ul_init_machine(void)
+ 	if (parent == NULL)
+ 		pr_warn("failed to initialize soc device\n");
+ 
++	of_platform_default_populate(NULL, NULL, parent);
+ 	imx6ul_enet_init();
+ 	imx_anatop_init();
+ 	imx6ul_pm_init();
+-- 
+1.9.1
