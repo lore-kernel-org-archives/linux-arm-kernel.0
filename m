@@ -1,39 +1,213 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 15 Aug 2016 10:53:30 +0300
-Subject: [GIT PULL] omap-gpmc fixes for v4.8-rc1
-Message-ID: <a4bd1d47-87b1-9ef9-d9d1-6c69be404b9e@ti.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 15 Aug 2016 10:30:52 +0200
+Subject: [PATCH v3 0/9] Add MT8173 Video Decoder Driver
+In-Reply-To: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
+References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <bdac7fe1-6425-2a3d-777f-86cfd1ee26e0@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd/Olof,
+Hi Tiffany,
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+This needs a v4: the DocBook format has been replaced by sphinx, and I also see that
+the vb2 queue_setup function is out-of-date (the allocation contexts no longer exist).
 
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+There were also a lot of comments about the MT21 format. I recommend splitting off the
+code adding MT21 into separate patches at the end of the patch series. That way if there
+are more comments it is easy to merge everything but those patches relating to MT21.
 
-are available in the git repository at:
+Can you also add the patches for the new V4L2_PIX_FMT_VP9 to this patch series? Those
+needs to be updated as well due to the move to sphinx.
 
-  https://github.com/rogerq/linux.git tags/gpmc-omap-v4.8-rc1
+Thanks!
 
-for you to fetch changes up to 23540d6e2f3193b946c4de43e3f9654fa6d23fe7:
+	Hans
 
-  memory: omap-gpmc: allow probe of child nodes to fail (2016-08-08 11:18:40 +0300)
-
-----------------------------------------------------------------
-OMAP-GPMC: fixes for v4.8-rc1
-
-* Allow other children of GPMC to probe even if any child fails.
-This fixes problem on Overo boards where networking device child
-doesn't probe due to broken NAND child.
-
-----------------------------------------------------------------
-Johan Hovold (1):
-      memory: omap-gpmc: allow probe of child nodes to fail
-
- drivers/memory/omap-gpmc.c | 21 +++++++--------------
- 1 file changed, 7 insertions(+), 14 deletions(-)
-
---
-To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-the body of a message to majordomo at vger.kernel.org
-More majordomo info at  http://vger.kernel.org/majordomo-info.html
+On 05/30/2016 02:29 PM, Tiffany Lin wrote:
+> ==============
+>  Introduction
+> ==============
+> 
+> The purpose of this series is to add the driver for video codec hw embedded in the Mediatek's MT8173 SoCs.
+> Mediatek Video Codec is able to handle video decoding of in a range of formats.
+> 
+> This patch series add Mediatek block format V4L2_PIX_FMT_MT21, the decoder driver will decoded bitstream to
+> V4L2_PIX_FMT_MT21 format.
+> 
+> This patch series rely on MTK VPU driver in patch series "Add MT8173 Video Encoder Driver and VPU Driver"[1]
+> and patch "CHROMIUM: v4l: Add V4L2_PIX_FMT_VP9 definition"[2] for VP9 support.
+> Mediatek Video Decoder driver rely on VPU driver to load, communicate with VPU.
+> 
+> Internally the driver uses videobuf2 framework and MTK IOMMU and MTK SMI both have been merged in v4.6-rc1.
+> 
+> [1]https://patchwork.linuxtv.org/patch/33734/
+> [2]https://chromium-review.googlesource.com/#/c/245241/
+> 
+> ==================
+>  Device interface
+> ==================
+> 
+> In principle the driver bases on v4l2 memory-to-memory framework:
+> it provides a single video node and each opened file handle gets its own private context with separate
+> buffer queues. Each context consist of 2 buffer queues: OUTPUT (for source buffers, i.e. bitstream)
+> and CAPTURE (for destination buffers, i.e. decoded video frames).
+> OUTPUT and CAPTURE buffer could be MMAP or DMABUF memory type.
+> VIDIOC_G_CTRL and VIDIOC_G_EXT_CTRLS return V4L2_CID_MIN_BUFFERS_FOR_CAPTURE only when dirver in MTK_STATE_HEADER
+> state, or it will return EAGAIN.
+> Driver do not support subscribe event for control 'User Controls' for now.
+> And it default support export DMABUF for other display drivers.
+> 
+> Change in v3:
+> 1. Refine vdec hw clock setting
+> 2. Refine vp9 codec driver
+> 3. Refine v4l2 codec driver
+> 
+> Change in v2:
+> 1. Add documentation for V4L2_PIX_FMT_MT21
+> 2. Remove DRM_FORMAT_MT21
+> 2. Refine code according to review comments
+> 
+> v4l2-compliance test output:
+> localhost Encode # ./v4l2-compliance -d /dev/video0
+> Driver Info:
+>         Driver name   : mtk-vcodec-dec
+>         Card type     : platform:mt8173
+>         Bus info      : platform:mt8173
+>         Driver version: 4.4.0
+>         Capabilities  : 0x84204000
+>                 Video Memory-to-Memory Multiplanar
+>                 Streaming
+>                 Extended Pix Format
+>                 Device Capabilities
+>         Device Caps   : 0x04204000
+>                 Video Memory-to-Memory Multiplanar
+>                 Streaming
+>                 Extended Pix Format
+> 
+> Compliance test for device /dev/video0 (not using libv4l2):
+> 
+> Required ioctls:
+>         test VIDIOC_QUERYCAP: OK
+> 
+> Allow for multiple opens:
+>         test second video open: OK
+>         test VIDIOC_QUERYCAP: OK
+>         test VIDIOC_G/S_PRIORITY: OK
+> 
+> Debug ioctls:
+>         test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
+>         test VIDIOC_LOG_STATUS: OK (Not Supported)
+> 
+> Input ioctls:
+>         test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
+>         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+>         test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
+>         test VIDIOC_ENUMAUDIO: OK (Not Supported)
+>         test VIDIOC_G/S/ENUMINPUT: OK (Not Supported)
+>         test VIDIOC_G/S_AUDIO: OK (Not Supported)
+>         Inputs: 0 Audio Inputs: 0 Tuners: 0
+> 
+> Output ioctls:
+>         test VIDIOC_G/S_MODULATOR: OK (Not Supported)
+>         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+>         test VIDIOC_ENUMAUDOUT: OK (Not Supported)
+>         test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
+>         test VIDIOC_G/S_AUDOUT: OK (Not Supported)
+>         Outputs: 0 Audio Outputs: 0 Modulators: 0
+> 
+> Input/Output configuration ioctls:
+>         test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
+>         test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
+>         test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
+>         test VIDIOC_G/S_EDID: OK (Not Supported)
+> 
+>         Control ioctls:
+>                 test VIDIOC_QUERYCTRL/MENU: OK
+>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(357): g_ctrl returned an error (11)
+>                 test VIDIOC_G/S_CTRL: FAIL
+>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(579): g_ext_ctrls returned an error (11)
+>                 test VIDIOC_G/S/TRY_EXT_CTRLS: FAIL
+>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(721): subscribe event for control 'User Controls' failed
+>                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: FAIL
+>                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+>                 Standard Controls: 2 Private Controls: 0
+> 
+>         Format ioctls:
+>                 test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+>                 test VIDIOC_G/S_PARM: OK (Not Supported)
+>                 test VIDIOC_G_FBUF: OK (Not Supported)
+>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-formats.cpp(405): expected EINVAL, but got 11 when getting format for buftype 9
+>                 test VIDIOC_G_FMT: FAIL
+>                 test VIDIOC_TRY_FMT: OK (Not Supported)
+>                 test VIDIOC_S_FMT: OK (Not Supported)
+>                 test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
+> 
+>         Codec ioctls:
+>                 test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
+>                 test VIDIOC_G_ENC_INDEX: OK (Not Supported)
+>                 test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
+> 
+>         Buffer ioctls:
+>                 test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
+>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(500): q.has_expbuf(node)
+>                 test VIDIOC_EXPBUF: FAIL
+> 
+> 
+> Total: 38, Succeeded: 33, Failed: 5, Warnings: 0
+> 
+> 
+> Andrew-CT Chen (1):
+>   VPU: mediatek: Add decode support
+> 
+> Tiffany Lin (8):
+>   v4l: add Mediatek compressed video block format
+>   DocBook/v4l: Add compressed video formats used on MT8173 codec driver
+>   dt-bindings: Add a binding for Mediatek Video Decoder
+>   vcodec: mediatek: Add Mediatek V4L2 Video Decoder Driver
+>   vcodec: mediatek: Add Mediatek H264 Video Decoder Driver
+>   vcodec: mediatek: Add Mediatek VP8 Video Decoder Driver
+>   vcodec: mediatek: Add Mediatek VP9 Video Decoder Driver
+>   arm64: dts: mediatek: Add Video Decoder for MT8173
+> 
+>  Documentation/DocBook/media/v4l/pixfmt.xml         |    6 +
+>  .../devicetree/bindings/media/mediatek-vcodec.txt  |   57 +-
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   44 +
+>  drivers/media/platform/mtk-vcodec/Makefile         |   15 +-
+>  drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c | 1348 ++++++++++++++++++++
+>  drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.h |   88 ++
+>  .../media/platform/mtk-vcodec/mtk_vcodec_dec_drv.c |  408 ++++++
+>  .../media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c  |  206 +++
+>  .../media/platform/mtk-vcodec/mtk_vcodec_dec_pm.h  |   28 +
+>  drivers/media/platform/mtk-vcodec/mtk_vcodec_drv.h |   88 +-
+>  .../media/platform/mtk-vcodec/mtk_vcodec_intr.c    |    4 +-
+>  .../media/platform/mtk-vcodec/mtk_vcodec_intr.h    |    2 +-
+>  .../media/platform/mtk-vcodec/mtk_vcodec_util.c    |   31 +-
+>  .../media/platform/mtk-vcodec/mtk_vcodec_util.h    |    7 +-
+>  .../media/platform/mtk-vcodec/vdec/vdec_h264_if.c  |  503 ++++++++
+>  .../media/platform/mtk-vcodec/vdec/vdec_vp8_if.c   |  630 +++++++++
+>  .../media/platform/mtk-vcodec/vdec/vdec_vp9_if.c   |  967 ++++++++++++++
+>  drivers/media/platform/mtk-vcodec/vdec_drv_base.h  |   56 +
+>  drivers/media/platform/mtk-vcodec/vdec_drv_if.c    |  117 ++
+>  drivers/media/platform/mtk-vcodec/vdec_drv_if.h    |  101 ++
+>  drivers/media/platform/mtk-vcodec/vdec_ipi_msg.h   |  103 ++
+>  drivers/media/platform/mtk-vcodec/vdec_vpu_if.c    |  168 +++
+>  drivers/media/platform/mtk-vcodec/vdec_vpu_if.h    |   96 ++
+>  drivers/media/platform/mtk-vpu/mtk_vpu.c           |   12 +
+>  drivers/media/platform/mtk-vpu/mtk_vpu.h           |   27 +
+>  include/uapi/linux/videodev2.h                     |    1 +
+>  26 files changed, 5090 insertions(+), 23 deletions(-)
+>  create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
+>  create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.h
+>  create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_drv.c
+>  create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c
+>  create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.h
+>  create mode 100644 drivers/media/platform/mtk-vcodec/vdec/vdec_h264_if.c
+>  create mode 100644 drivers/media/platform/mtk-vcodec/vdec/vdec_vp8_if.c
+>  create mode 100644 drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
+>  create mode 100644 drivers/media/platform/mtk-vcodec/vdec_drv_base.h
+>  create mode 100644 drivers/media/platform/mtk-vcodec/vdec_drv_if.c
+>  create mode 100644 drivers/media/platform/mtk-vcodec/vdec_drv_if.h
+>  create mode 100644 drivers/media/platform/mtk-vcodec/vdec_ipi_msg.h
+>  create mode 100644 drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
+>  create mode 100644 drivers/media/platform/mtk-vcodec/vdec_vpu_if.h
+> 
