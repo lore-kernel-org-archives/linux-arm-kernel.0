@@ -1,68 +1,60 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 15 Aug 2016 20:38:23 +0800
-Subject: [PATCH 3/3] ARM: dts: imx6sx-udoo-neo: Add SD
-In-Reply-To: <16912a4e-88c8-b11a-16bb-927ee6bf1775@suse.de>
-References: <1467691450-22975-1-git-send-email-afaerber@suse.de>
- <1467691450-22975-4-git-send-email-afaerber@suse.de>
- <20160808141248.GI4678@tiger>
- <16912a4e-88c8-b11a-16bb-927ee6bf1775@suse.de>
-Message-ID: <20160815123823.GC500@tiger>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Aug 2016 13:39:34 +0100
+Subject: [PATCH v9 4/4] serial: pl011: add console matching function
+In-Reply-To: <20160811153152.755-5-aleksey.makarov@linaro.org>
+References: <20160811153152.755-1-aleksey.makarov@linaro.org>
+ <20160811153152.755-5-aleksey.makarov@linaro.org>
+Message-ID: <20160815123934.GJ1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 08, 2016 at 05:00:41PM +0200, Andreas F?rber wrote:
-> Am 08.08.2016 um 16:12 schrieb Shawn Guo:
-> > On Tue, Jul 05, 2016 at 06:04:10AM +0200, Andreas F?rber wrote:
-> >> Enable the SDHC node and model the SDIO_PWR GPIO as a regulator.
-> >> Use the SD card as default trigger for the red LED.
-> >>
-> >> Cc: Ettore Chimenti <ettore.chimenti@udoo.org>
-> >> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> >> ---
-> >>  
-> >>
-> >>  arch/arm/boot/dts/imx6sx-udoo-neo.dtsi | 34 ++++++++++++++++++++++++++++++++++
-> >>  1 file changed, 34 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
-> >> index e074409644d8..85f5e8606dab 100644
-> >> --- a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
-> >> +++ b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
-> >> @@ -56,6 +56,7 @@
-> >>  			label = "udoo-neo:red:mmc";
-> >>  			gpios = <&gpio6 0 GPIO_ACTIVE_HIGH>;
-> >>  			default-state = "off";
-> >> +			linux,default-trigger = "mmc0";
-> >>  		};
-> >>  
-> >>  		orange {
-> >> @@ -64,6 +65,17 @@
-> >>  			default-state = "keep";
-> >>  		};
-> >>  	};
-> >> +
-> >> +	sdio_pwr_reg: sd-gpio-regulator {
-> >> +		compatible = "regulator-fixed";
-> >> +		gpio = <&gpio6 1 GPIO_ACTIVE_HIGH>;
-> >> +		enable-active-high;
-> >> +		regulator-name = "SDIO_PWR";
-> >> +		regulator-min-microvolt = <3300000>;
-> >> +		regulator-max-microvolt = <3300000>;
-> >> +		regulator-boot-on;
-> >> +		regulator-always-on;
-> >> +	};
-> > 
-> > Is it correct to model SDIO power control GPIO as a boot-on and
-> > always-on fixed regulator?  It will be powered-on even when SDIO driver
-> > is not enabled or loaded.
-> 
-> AFAIR the issue was that the driver does not use any -supply properties
-> where we could hook this regulator up for enabling. So modeling it as an
-> always-on regulator seemed like the only way to ensure it gets enabled
-> without relying on the bootloader?
+On Thu, Aug 11, 2016 at 06:31:41PM +0300, Aleksey Makarov wrote:
+> +/**
+> + *	pl011_console_match - non-standard console matching
+> + *	@co:	  registering console
+> + *	@name:	  name from console command line
+> + *	@idx:	  index from console command line
+> + *	@options: ptr to option string from console command line
+> + *
+> + *	Only attempts to match console command lines of the form:
+> + *	    console=pl011,mmio|mmio32,<addr>[,<options>]
+> + *	    console=pl011,0x<addr>[,<options>]
+> + *	This form is used to register an initial earlycon boot console and
+> + *	replace it with the amba_console at pl011 driver init.
+> + *
+> + *	Performs console setup for a match (as required by interface)
+> + *	If no <options> are specified, then assume the h/w is already setup.
+> + *
+> + *	Returns 0 if console matches; otherwise non-zero to use default matching
+> + */
+> +static int __init pl011_console_match(struct console *co, char *name, int idx,
+> +				      char *options)
+> +{
+> +	char match[] = "pl011";	/* pl011-specific earlycon name */
 
-If I understand it correctly, SDHCI driver calls
-mmc_regulator_get_supply() to handle vmmc and vqmmc supply.  Can
-vmmc-supply be used here?
+This is inefficient - the compiler will probably store "pl011" in the
+rodata section, then allocate an array on the stack, and them memcpy()
+it onto the stack.  This is really a false optimisation.
 
-Shawn
+> +	unsigned char iotype;
+> +	unsigned long addr;
+> +	int i;
+> +
+> +	if (strncmp(name, match, 5) != 0)
+
+Just do:
+
+	if (strncmp(name, "pl011", 5) != 0)
+
+here, and let the compiler work it out - it'll probably place "pl011"
+in the rodata section, and use a pointer to it rather than messing around
+with the stack.
+
+What if "console=pl011x,..." is passed?  Should this be matched too?
+Maybe this should compare with "pl011," to ensure that the name is
+correctly terminated?
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
