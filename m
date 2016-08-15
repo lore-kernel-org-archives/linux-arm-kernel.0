@@ -1,20 +1,17 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 15 Aug 2016 14:24:31 -0700
-Subject: [PATCH v3 5/6] dt-bindings: clock: add DT binding for the
- peripheral clocks on Armada 3700
-In-Reply-To: <1468935742-11218-6-git-send-email-gregory.clement@free-electrons.com>
-References: <1468935742-11218-1-git-send-email-gregory.clement@free-electrons.com>
- <1468935742-11218-6-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20160815212431.GE361@codeaurora.org>
+Date: Mon, 15 Aug 2016 14:29:58 -0700
+Subject: [PATCH -next] clk: gxbb: use builtin_platform_driver to simplify
+ the code
+In-Reply-To: <1470664520-9604-1-git-send-email-weiyj.lk@gmail.com>
+References: <1470664520-9604-1-git-send-email-weiyj.lk@gmail.com>
+Message-ID: <20160815212958.GF361@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/19, Gregory CLEMENT wrote:
-> This commit adds the DT binding documentation for the peripheral clocks
-> used in the Marvell Armada 3700 SoCs.
+On 08/08, Wei Yongjun wrote:
+> Use the builtin_platform_driver() macro to make the code simpler.
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Wei Yongjun <weiyj.lk@gmail.com>
 > ---
 
 Applied to clk-next
