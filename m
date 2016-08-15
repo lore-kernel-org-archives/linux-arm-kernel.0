@@ -1,40 +1,48 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 15 Aug 2016 00:34:37 +0200
-Subject: [PATCH] i2c: at91: fix support of the "alternative command"
- feature
-In-Reply-To: <20160803145826.11927-1-ludovic.desroches@atmel.com>
-References: <20160803145826.11927-1-ludovic.desroches@atmel.com>
-Message-ID: <20160814223437.GG10501@katana>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Sun, 14 Aug 2016 20:08:57 -0400
+Subject: [PATCH 1/3] clk: meson: Add GXBB AO Clock and Reset controller
+ driver
+In-Reply-To: <1470734008-18849-2-git-send-email-narmstrong@baylibre.com>
+References: <1470734008-18849-1-git-send-email-narmstrong@baylibre.com>
+ <1470734008-18849-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <CAP=VYLphcuq16vDueOOJ6anrW-ifYAK+1ijSjkGbxw48+m4xrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 03, 2016 at 04:58:26PM +0200, Ludovic Desroches wrote:
-> From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> 
-> The "alternative command" feature was introduced with sama5d2 SoCs.
-> 
-> Its purpose is to let the hardware i2c controller automatically send the
-> STOP condition on the i2c bus at the end of a data transfer.
-> Without this feature, the i2c driver has to write the 'STOP' bit into the
-> Control Register so the hardware i2c controller is triggered to send the
-> STOP condition on the bus.
-> 
-> Using the "alternative command" feature requires to set the transfer data
-> length into the 8bit DATAL field of the Alternative Command Register.
-> Hence only data transfers up to 255 bytes can take advantage of the
-> "alternative command" feature. For greater data transfer sizes, the driver
-> should use the previous implementation, when the "alternative command"
-> support was not implemented yet.
-> 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Tue, Aug 9, 2016 at 5:13 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+> Adds a Clock and Reset controller driver for the Always-On part
+> of the Amlogic Meson GXBB SoC.
+>
+> It exports paired Clocks and Resets lines that will be used by
+> peripherals in the Always-On subsystem.
 
-Applied to for-current, thanks!
+[...]
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160815/6738ffc1/attachment.sig>
+> +static const struct of_device_id gxbb_aoclkc_match_table[] = {
+> +       { .compatible = "amlogic,gxbb-aoclkc" },
+> +       { }
+> +};
+> +MODULE_DEVICE_TABLE(of, gxbb_aoclkc_match_table);
+> +
+> +static struct platform_driver gxbb_aoclkc_driver = {
+> +       .probe          = gxbb_aoclkc_probe,
+> +       .driver         = {
+> +               .name   = "gxbb-aoclkc",
+> +               .of_match_table = gxbb_aoclkc_match_table,
+> +       },
+> +};
+> +
+> +module_platform_driver(gxbb_aoclkc_driver);
+> +
+> +MODULE_DESCRIPTION("AmLogic Meson GXBB AO Clock Controller Driver");
+> +MODULE_LICENSE("Dual BSD/GPL");
+> +MODULE_ALIAS("platform:gxbb-aoclkc");
+> +MODULE_AUTHOR("Neil Armstrong <narmstrong@baylibre.com>");
+
+Since this driver is controlled by a bool Kconfig, you can dump the module.h
+include and all the MODULE_<xyz> tags above.
+
+Or, if there is a genuine use case for it to be modular, then make it tristate?
+
+Thanks,
+Paul.
