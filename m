@@ -1,228 +1,283 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Mon, 15 Aug 2016 15:03:41 +0800
-Subject: [PATCH v3 1/5] arm64: dts: hip05: kill hip05_hns.dtsi
+Date: Mon, 15 Aug 2016 15:03:43 +0800
+Subject: [PATCH v3 3/5] arm64: dts: hip06: Append hns node
 In-Reply-To: <1471244625-56331-1-git-send-email-wangkefeng.wang@huawei.com>
 References: <1467170878-24030-1-git-send-email-wangkefeng.wang@huawei.com>
  <1471244625-56331-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1471244625-56331-2-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1471244625-56331-4-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dsaf interrupt of hns connects to mbigen, but the mbigen(version 1)
-isn't upsteamed. Currently, hip05_hns.dtsi uses mbigen_dsa and it will
-never be built, so kill it for now, will add them back and merge them into
-hip05.dtsi once mbigen-v1 is accepted.
+There are four ports(2 GE, 2 XGE) in D03 board, append
+relevant nodes for them.
 
 Cc: Kejian Yan <yankejian@huawei.com>
 Cc: Yisen Zhuang <yisen.zhuang@huawei.com>
 Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- arch/arm64/boot/dts/hisilicon/hip05.dtsi     |   5 -
- arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi | 180 ---------------------------
- 2 files changed, 185 deletions(-)
- delete mode 100644 arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
+ arch/arm64/boot/dts/hisilicon/hip06-d03.dts |  16 +++
+ arch/arm64/boot/dts/hisilicon/hip06.dtsi    | 215 ++++++++++++++++++++++++++++
+ 2 files changed, 231 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-index bf322ed..4b472a3 100644
---- a/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-@@ -300,11 +300,6 @@
- 			clock-frequency = <200000000>;
- 		};
+diff --git a/arch/arm64/boot/dts/hisilicon/hip06-d03.dts b/arch/arm64/boot/dts/hisilicon/hip06-d03.dts
+index f3e5323..5562cf4 100644
+--- a/arch/arm64/boot/dts/hisilicon/hip06-d03.dts
++++ b/arch/arm64/boot/dts/hisilicon/hip06-d03.dts
+@@ -25,6 +25,22 @@
+ 	chosen { };
+ };
  
--		peri_c_subctrl: syscon at 80000000 {
--			compatible = "hisilicon,hip05-perisubc", "syscon";
--			reg = < 0x0 0x80000000 0x0 0x10000>;
--		};
--
- 		uart0: uart at 80300000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x0 0x80300000 0x0 0x10000>;
-diff --git a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi b/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
-deleted file mode 100644
-index b6a130c..0000000
---- a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
-+++ /dev/null
-@@ -1,180 +0,0 @@
--soc0: soc at 000000000 {
--	#address-cells = <2>;
--	#size-cells = <2>;
--	device_type = "soc";
--	compatible = "simple-bus";
--	ranges = <0x0 0x0 0x0 0x0 0x1 0x0>;
--	chip-id = <0>;
--
--	soc0_mdio0: mdio at 803c0000 {
--		#address-cells = <1>;
--		#size-cells = <0>;
--		compatible = "hisilicon,hns-mdio";
--		reg = <0x0 0x803c0000 0x0 0x10000>;
--		subctrl-vbase = <&peri_c_subctrl>;
--
--		soc0_phy0: ethernet-phy at 0 {
--			reg = <0x0>;
--			compatible = "ethernet-phy-ieee802.3-c22";
--		};
--		soc0_phy1: ethernet-phy at 1 {
--			reg = <0x1>;
--			compatible = "ethernet-phy-ieee802.3-c22";
--		};
--	};
--
--	dsaf0: dsa at c7000000 {
--		#address-cells = <1>;
--		#size-cells = <0>;
--		compatible = "hisilicon,hns-dsaf-v1";
--		mode = "6port-16rss";
--		interrupt-parent = <&mbigen_dsa>;
--
--		reg = <0x0 0xc5000000 0x0 0x890000
--		       0x0 0xc7000000 0x0 0x60000
--		       >;
--
--		reg-names = "ppe-base","dsaf-base";
--		subctrl-syscon = <&dsaf_subctrl>;
--		reset-field-offset = <0>;
--		interrupts = <
--			/* [14] ge fifo err 8 / xge 6**/
--			149 0x4 150 0x4 151 0x4 152 0x4
--			153 0x4 154 0x4  26 0x4 27 0x4
--			155 0x4 156 0x4 157 0x4 158 0x4 159 0x4 160 0x4
--			/* [12] rcb com 4*3**/
--			0x6 0x4 0x7 0x4 0x8 0x4 0x9 0x4
--			 16 0x4  17 0x4  18 0x4  19 0x4
--			 22 0x4  23 0x4  24 0x4  25 0x4
--			/* [8] ppe tnl 0-7***/
--			0x0 0x4 0x1 0x4 0x2 0x4 0x3 0x4
--			0x4 0x4 0x5 0x4 12 0x4 13 0x4
--			/* [21] dsaf event int 3+18**/
--			 128 0x4  129 0x4  130 0x4
--			0x83 0x4 0x84 0x4 0x85 0x4 0x86 0x4 0x87 0x4 0x88 0x4
--			0x89 0x4 0x8a 0x4 0x8b 0x4 0x8c 0x4 0x8d 0x4 0x8e 0x4
--			0x8f 0x4 0x90 0x4 0x91 0x4 0x92 0x4 0x93 0x4 0x94 0x4
--			/* [4] debug rcb 2*2*/
--			0xe 0x1 0xf 0x1 0x14 0x1 0x15 0x1
--			/* [256] sevice rcb 2*128*/
--			0x180 0x1 0x181 0x1 0x182 0x1 0x183 0x1
--			0x184 0x1 0x185 0x1 0x186 0x1 0x187 0x1
--			0x188 0x1 0x189 0x1 0x18a 0x1 0x18b 0x1
--			0x18c 0x1 0x18d 0x1 0x18e 0x1 0x18f 0x1
--			0x190 0x1 0x191 0x1 0x192 0x1 0x193 0x1
--			0x194 0x1 0x195 0x1 0x196 0x1 0x197 0x1
--			0x198 0x1 0x199 0x1 0x19a 0x1 0x19b 0x1
--			0x19c 0x1 0x19d 0x1 0x19e 0x1 0x19f 0x1
--			0x1a0 0x1 0x1a1 0x1 0x1a2 0x1 0x1a3 0x1
--			0x1a4 0x1 0x1a5 0x1 0x1a6 0x1 0x1a7 0x1
--			0x1a8 0x1 0x1a9 0x1 0x1aa 0x1 0x1ab 0x1
--			0x1ac 0x1 0x1ad 0x1 0x1ae 0x1 0x1af 0x1
--			0x1b0 0x1 0x1b1 0x1 0x1b2 0x1 0x1b3 0x1
--			0x1b4 0x1 0x1b5 0x1 0x1b6 0x1 0x1b7 0x1
--			0x1b8 0x1 0x1b9 0x1 0x1ba 0x1 0x1bb 0x1
--			0x1bc 0x1 0x1bd 0x1 0x1be 0x1 0x1bf 0x1
--			0x1c0 0x1 0x1c1 0x1 0x1c2 0x1 0x1c3 0x1
--			0x1c4 0x1 0x1c5 0x1 0x1c6 0x1 0x1c7 0x1
--			0x1c8 0x1 0x1c9 0x1 0x1ca 0x1 0x1cb 0x1
--			0x1cc 0x1 0x1cd 0x1 0x1ce 0x1 0x1cf 0x1
--			0x1d0 0x1 0x1d1 0x1 0x1d2 0x1 0x1d3 0x1
--			0x1d4 0x1 0x1d5 0x1 0x1d6 0x1 0x1d7 0x1
--			0x1d8 0x1 0x1d9 0x1 0x1da 0x1 0x1db 0x1
--			0x1dc 0x1 0x1dd 0x1 0x1de 0x1 0x1df 0x1
--			0x1e0 0x1 0x1e1 0x1 0x1e2 0x1 0x1e3 0x1
--			0x1e4 0x1 0x1e5 0x1 0x1e6 0x1 0x1e7 0x1
--			0x1e8 0x1 0x1e9 0x1 0x1ea 0x1 0x1eb 0x1
--			0x1ec 0x1 0x1ed 0x1 0x1ee 0x1 0x1ef 0x1
--			0x1f0 0x1 0x1f1 0x1 0x1f2 0x1 0x1f3 0x1
--			0x1f4 0x1 0x1f5 0x1 0x1f6 0x1 0x1f7 0x1
--			0x1f8 0x1 0x1f9 0x1 0x1fa 0x1 0x1fb 0x1
--			0x1fc 0x1 0x1fd 0x1 0x1fe 0x1 0x1ff 0x1
--			0x200 0x1 0x201 0x1 0x202 0x1 0x203 0x1
--			0x204 0x1 0x205 0x1 0x206 0x1 0x207 0x1
--			0x208 0x1 0x209 0x1 0x20a 0x1 0x20b 0x1
--			0x20c 0x1 0x20d 0x1 0x20e 0x1 0x20f 0x1
--			0x210 0x1 0x211 0x1 0x212 0x1 0x213 0x1
--			0x214 0x1 0x215 0x1 0x216 0x1 0x217 0x1
--			0x218 0x1 0x219 0x1 0x21a 0x1 0x21b 0x1
--			0x21c 0x1 0x21d 0x1 0x21e 0x1 0x21f 0x1
--			0x220 0x1 0x221 0x1 0x222 0x1 0x223 0x1
--			0x224 0x1 0x225 0x1 0x226 0x1 0x227 0x1
--			0x228 0x1 0x229 0x1 0x22a 0x1 0x22b 0x1
--			0x22c 0x1 0x22d 0x1 0x22e 0x1 0x22f 0x1
--			0x230 0x1 0x231 0x1 0x232 0x1 0x233 0x1
--			0x234 0x1 0x235 0x1 0x236 0x1 0x237 0x1
--			0x238 0x1 0x239 0x1 0x23a 0x1 0x23b 0x1
--			0x23c 0x1 0x23d 0x1 0x23e 0x1 0x23f 0x1
--			0x240 0x1 0x241 0x1 0x242 0x1 0x243 0x1
--			0x244 0x1 0x245 0x1 0x246 0x1 0x247 0x1
--			0x248 0x1 0x249 0x1 0x24a 0x1 0x24b 0x1
--			0x24c 0x1 0x24d 0x1 0x24e 0x1 0x24f 0x1
--			0x250 0x1 0x251 0x1 0x252 0x1 0x253 0x1
--			0x254 0x1 0x255 0x1 0x256 0x1 0x257 0x1
--			0x258 0x1 0x259 0x1 0x25a 0x1 0x25b 0x1
--			0x25c 0x1 0x25d 0x1 0x25e 0x1 0x25f 0x1
--			0x260 0x1 0x261 0x1 0x262 0x1 0x263 0x1
--			0x264 0x1 0x265 0x1 0x266 0x1 0x267 0x1
--			0x268 0x1 0x269 0x1 0x26a 0x1 0x26b 0x1
--			0x26c 0x1 0x26d 0x1 0x26e 0x1 0x26f 0x1
--			0x270 0x1 0x271 0x1 0x272 0x1 0x273 0x1
--			0x274 0x1 0x275 0x1 0x276 0x1 0x277 0x1
--			0x278 0x1 0x279 0x1 0x27a 0x1 0x27b 0x1
--			0x27c 0x1 0x27d 0x1 0x27e 0x1 0x27f 0x1>;
--		buf-size = <4096>;
--		desc-num = <1024>;
--		dma-coherent;
--
--		port at 0 {
--			reg = <0>;
--			serdes-syscon = <&serdes_ctrl0>;
--		};
--		port at 1 {
--			reg = <1>;
--			serdes-syscon = <&serdes_ctrl0>;
--		};
--		port at 4 {
--			reg = <4>;
--			phy-handle = <&soc0_phy0>;
--			serdes-syscon = <&serdes_ctrl1>;
--		};
--		port at 5 {
--			reg = <5>;
--			phy-handle = <&soc0_phy1>;
--			serdes-syscon = <&serdes_ctrl1>;
--		};
--	};
--
--	eth0: ethernet at 0{
--		compatible = "hisilicon,hns-nic-v1";
--		ae-handle = <&dsaf0>;
--		port-idx-in-ae = <0>;
--		local-mac-address = [00 00 00 01 00 58];
--		status = "disabled";
--		dma-coherent;
--	};
--	eth1: ethernet at 1{
--		compatible = "hisilicon,hns-nic-v1";
--		ae-handle = <&dsaf0>;
--		port-idx-in-ae = <1>;
--		local-mac-address = [00 00 00 01 00 59];
--		status = "disabled";
--		dma-coherent;
--	};
--	eth2: ethernet at 4{
--		compatible = "hisilicon,hns-nic-v1";
--		ae-handle = <&dsaf0>;
--		port-idx-in-ae = <4>;
--		local-mac-address = [00 00 00 01 00 5a];
--		status = "disabled";
--		dma-coherent;
--	};
--	eth3: ethernet at 5{
--		compatible = "hisilicon,hns-nic-v1";
--		ae-handle = <&dsaf0>;
--		port-idx-in-ae = <5>;
--		local-mac-address = [00 00 00 01 00 5b];
--		status = "disabled";
--		dma-coherent;
--	};
--};
++&eth0 {
++	status = "ok";
++};
++
++&eth1 {
++	status = "ok";
++};
++
++&eth2 {
++	status = "ok";
++};
++
++&eth3 {
++	status = "ok";
++};
++
+ &usb_ohci {
+ 	status = "ok";
+ };
+diff --git a/arch/arm64/boot/dts/hisilicon/hip06.dtsi b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
+index 5927bc4..ddbff81 100644
+--- a/arch/arm64/boot/dts/hisilicon/hip06.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
+@@ -279,6 +279,18 @@
+ 		};
+ 	};
+ 
++	mbigen_dsa at c0080000 {
++		compatible = "hisilicon,mbigen-v2";
++		reg = <0x0 0xc0080000 0x0 0x10000>;
++
++		mbigen_dsaf0: intc_dsaf0 {
++			msi-parent = <&its_dsa 0x40800>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			num-pins = <409>;
++		};
++	};
++
+ 	soc {
+ 		compatible = "simple-bus";
+ 		#address-cells = <2>;
+@@ -302,6 +314,209 @@
+ 			dma-coherent;
+ 			status = "disabled";
+ 		};
++
++		peri_c_subctrl: sub_ctrl_c at 60000000 {
++			compatible = "hisilicon,peri-subctrl","syscon";
++			reg = <0 0x60000000 0x0 0x10000>;
++		};
++
++		dsa_subctrl: dsa_subctrl at c0000000 {
++			compatible = "hisilicon,dsa-subctrl", "syscon";
++			reg = <0x0 0xc0000000 0x0 0x10000>;
++		};
++
++		serdes_ctrl: sds_ctrl at c2200000 {
++			compatible = "syscon";
++			reg = <0 0xc2200000 0x0 0x80000>;
++		};
++
++		mdio at 603c0000 {
++			compatible = "hisilicon,hns-mdio";
++			reg = <0x0 0x603c0000 0x0 0x1000>;
++			subctrl-vbase = <&peri_c_subctrl 0x338 0xa38 0x531c 0x5a1c>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			phy0: ethernet-phy at 0 {
++				compatible = "ethernet-phy-ieee802.3-c22";
++				reg = <0>;
++			};
++
++			phy1: ethernet-phy at 1 {
++				compatible = "ethernet-phy-ieee802.3-c22";
++				reg = <1>;
++			};
++		};
++
++		dsaf0: dsa at c7000000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "hisilicon,hns-dsaf-v2";
++			mode = "6port-16rss";
++			reg = <0x0 0xc5000000 0x0 0x890000
++			       0x0 0xc7000000 0x0 0x600000>;
++			reg-names = "ppe-base", "dsaf-base";
++			interrupt-parent = <&mbigen_dsaf0>;
++			subctrl-syscon = <&dsa_subctrl>;
++			reset-field-offset = <0>;
++			interrupts =
++			<576 1>, <577 1>, <578 1>, <579 1>, <580 1>,
++			<581 1>, <582 1>, <583 1>, <584 1>, <585 1>,
++			<586 1>, <587 1>, <588 1>, <589 1>, <590 1>,
++			<591 1>, <592 1>, <593 1>, <594 1>, <595 1>,
++			<596 1>, <597 1>, <598 1>, <599 1>, <600 1>,
++			<960 1>, <961 1>, <962 1>, <963 1>, <964 1>,
++			<965 1>, <966 1>, <967 1>, <968 1>, <969 1>,
++			<970 1>, <971 1>, <972 1>, <973 1>, <974 1>,
++			<975 1>, <976 1>, <977 1>, <978 1>, <979 1>,
++			<980 1>, <981 1>, <982 1>, <983 1>, <984 1>,
++			<985 1>, <986 1>, <987 1>, <988 1>, <989 1>,
++			<990 1>, <991 1>, <992 1>, <993 1>, <994 1>,
++			<995 1>, <996 1>, <997 1>, <998 1>, <999 1>,
++			<1000 1>, <1001 1>, <1002 1>, <1003 1>, <1004 1>,
++			<1005 1>, <1006 1>, <1007 1>, <1008 1>, <1009 1>,
++			<1010 1>, <1011 1>, <1012 1>, <1013 1>, <1014 1>,
++			<1015 1>, <1016 1>, <1017 1>, <1018 1>, <1019 1>,
++			<1020 1>, <1021 1>, <1022 1>, <1023 1>, <1024 1>,
++			<1025 1>, <1026 1>, <1027 1>, <1028 1>, <1029 1>,
++			<1030 1>, <1031 1>, <1032 1>, <1033 1>, <1034 1>,
++			<1035 1>, <1036 1>, <1037 1>, <1038 1>, <1039 1>,
++			<1040 1>, <1041 1>, <1042 1>, <1043 1>, <1044 1>,
++			<1045 1>, <1046 1>, <1047 1>, <1048 1>, <1049 1>,
++			<1050 1>, <1051 1>, <1052 1>, <1053 1>, <1054 1>,
++			<1055 1>, <1056 1>, <1057 1>, <1058 1>, <1059 1>,
++			<1060 1>, <1061 1>, <1062 1>, <1063 1>, <1064 1>,
++			<1065 1>, <1066 1>, <1067 1>, <1068 1>, <1069 1>,
++			<1070 1>, <1071 1>, <1072 1>, <1073 1>, <1074 1>,
++			<1075 1>, <1076 1>, <1077 1>, <1078 1>, <1079 1>,
++			<1080 1>, <1081 1>, <1082 1>, <1083 1>, <1084 1>,
++			<1085 1>, <1086 1>, <1087 1>, <1088 1>, <1089 1>,
++			<1090 1>, <1091 1>, <1092 1>, <1093 1>, <1094 1>,
++			<1095 1>, <1096 1>, <1097 1>, <1098 1>, <1099 1>,
++			<1100 1>, <1101 1>, <1102 1>, <1103 1>, <1104 1>,
++			<1105 1>, <1106 1>, <1107 1>, <1108 1>, <1109 1>,
++			<1110 1>, <1111 1>, <1112 1>, <1113 1>, <1114 1>,
++			<1115 1>, <1116 1>, <1117 1>, <1118 1>, <1119 1>,
++			<1120 1>, <1121 1>, <1122 1>, <1123 1>, <1124 1>,
++			<1125 1>, <1126 1>, <1127 1>, <1128 1>, <1129 1>,
++			<1130 1>, <1131 1>, <1132 1>, <1133 1>, <1134 1>,
++			<1135 1>, <1136 1>, <1137 1>, <1138 1>, <1139 1>,
++			<1140 1>, <1141 1>, <1142 1>, <1143 1>, <1144 1>,
++			<1145 1>, <1146 1>, <1147 1>, <1148 1>, <1149 1>,
++			<1150 1>, <1151 1>, <1152 1>, <1153 1>, <1154 1>,
++			<1155 1>, <1156 1>, <1157 1>, <1158 1>, <1159 1>,
++			<1160 1>, <1161 1>, <1162 1>, <1163 1>, <1164 1>,
++			<1165 1>, <1166 1>, <1167 1>, <1168 1>, <1169 1>,
++			<1170 1>, <1171 1>, <1172 1>, <1173 1>, <1174 1>,
++			<1175 1>, <1176 1>, <1177 1>, <1178 1>, <1179 1>,
++			<1180 1>, <1181 1>, <1182 1>, <1183 1>, <1184 1>,
++			<1185 1>, <1186 1>, <1187 1>, <1188 1>, <1189 1>,
++			<1190 1>, <1191 1>, <1192 1>, <1193 1>, <1194 1>,
++			<1195 1>, <1196 1>, <1197 1>, <1198 1>, <1199 1>,
++			<1200 1>, <1201 1>, <1202 1>, <1203 1>, <1204 1>,
++			<1205 1>, <1206 1>, <1207 1>, <1208 1>, <1209 1>,
++			<1210 1>, <1211 1>, <1212 1>, <1213 1>, <1214 1>,
++			<1215 1>, <1216 1>, <1217 1>, <1218 1>, <1219 1>,
++			<1220 1>, <1221 1>, <1222 1>, <1223 1>, <1224 1>,
++			<1225 1>, <1226 1>, <1227 1>, <1228 1>, <1229 1>,
++			<1230 1>, <1231 1>, <1232 1>, <1233 1>, <1234 1>,
++			<1235 1>, <1236 1>, <1237 1>, <1238 1>, <1239 1>,
++			<1240 1>, <1241 1>, <1242 1>, <1243 1>, <1244 1>,
++			<1245 1>, <1246 1>, <1247 1>, <1248 1>, <1249 1>,
++			<1250 1>, <1251 1>, <1252 1>, <1253 1>, <1254 1>,
++			<1255 1>, <1256 1>, <1257 1>, <1258 1>, <1259 1>,
++			<1260 1>, <1261 1>, <1262 1>, <1263 1>, <1264 1>,
++			<1265 1>, <1266 1>, <1267 1>, <1268 1>, <1269 1>,
++			<1270 1>, <1271 1>, <1272 1>, <1273 1>, <1274 1>,
++			<1275 1>, <1276 1>, <1277 1>, <1278 1>, <1279 1>,
++			<1280 1>, <1281 1>, <1282 1>, <1283 1>, <1284 1>,
++			<1285 1>, <1286 1>, <1287 1>, <1288 1>, <1289 1>,
++			<1290 1>, <1291 1>, <1292 1>, <1293 1>, <1294 1>,
++			<1295 1>, <1296 1>, <1297 1>, <1298 1>, <1299 1>,
++			<1300 1>, <1301 1>, <1302 1>, <1303 1>, <1304 1>,
++			<1305 1>, <1306 1>, <1307 1>, <1308 1>, <1309 1>,
++			<1310 1>, <1311 1>, <1312 1>, <1313 1>, <1314 1>,
++			<1315 1>, <1316 1>, <1317 1>, <1318 1>, <1319 1>,
++			<1320 1>, <1321 1>, <1322 1>, <1323 1>, <1324 1>,
++			<1325 1>, <1326 1>, <1327 1>, <1328 1>, <1329 1>,
++			<1330 1>, <1331 1>, <1332 1>, <1333 1>, <1334 1>,
++			<1335 1>, <1336 1>, <1337 1>, <1338 1>, <1339 1>,
++			<1340 1>, <1341 1>, <1342 1>, <1343 1>;
++
++			desc-num = <0x400>;
++			buf-size = <0x1000>;
++			dma-coherent;
++
++			port at 0 {
++				reg = <0>;
++				serdes-syscon = <&serdes_ctrl>;
++				port-rst-offset = <0>;
++				port-mode-offset = <0>;
++				media-type = "fiber";
++			};
++
++			port at 1 {
++				reg = <1>;
++				serdes-syscon= <&serdes_ctrl>;
++				port-rst-offset = <1>;
++				port-mode-offset = <1>;
++				media-type = "fiber";
++			};
++
++			port at 4 {
++				reg = <4>;
++				phy-handle = <&phy0>;
++				serdes-syscon= <&serdes_ctrl>;
++				port-rst-offset = <4>;
++				port-mode-offset = <2>;
++				media-type = "copper";
++			};
++
++			port at 5 {
++				reg = <5>;
++				phy-handle = <&phy1>;
++				serdes-syscon= <&serdes_ctrl>;
++				port-rst-offset = <5>;
++				port-mode-offset = <3>;
++				media-type = "copper";
++			};
++		};
++
++		eth0: ethernet at 4{
++			compatible = "hisilicon,hns-nic-v2";
++			ae-handle = <&dsaf0>;
++			port-idx-in-ae = <4>;
++			local-mac-address = [00 00 00 00 00 00];
++			status = "disabled";
++			dma-coherent;
++		};
++
++		eth1: ethernet at 5{
++			compatible = "hisilicon,hns-nic-v2";
++			ae-handle = <&dsaf0>;
++			port-idx-in-ae = <5>;
++			local-mac-address = [00 00 00 00 00 00];
++			status = "disabled";
++			dma-coherent;
++		};
++
++		eth2: ethernet at 0{
++			compatible = "hisilicon,hns-nic-v2";
++			ae-handle = <&dsaf0>;
++			port-idx-in-ae = <0>;
++			local-mac-address = [00 00 00 00 00 00];
++			status = "disabled";
++			dma-coherent;
++		};
++
++		eth3: ethernet at 1{
++			compatible = "hisilicon,hns-nic-v2";
++			ae-handle = <&dsaf0>;
++			port-idx-in-ae = <1>;
++			local-mac-address = [00 00 00 00 00 00];
++			status = "disabled";
++			dma-coherent;
++		};
+ 	};
+ 
+ };
 -- 
 1.7.12.4
