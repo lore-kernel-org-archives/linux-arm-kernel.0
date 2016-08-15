@@ -1,33 +1,20 @@
-From: groeck@google.com (Guenter Roeck)
-Date: Mon, 15 Aug 2016 16:19:13 -0700
-Subject: Problem with atomic accesses in pstore on some ARM CPUs
-Message-ID: <CABXOdTfT7xMfiBvRuUS1hsVs=q5q2wY1x1Z8oCyyJNFckM0g0A@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 15 Aug 2016 16:34:43 -0700 (PDT)
+Subject: [PATCH -next] net: phy: Fix return value check in
+ xgmiitorgmii_probe()
+In-Reply-To: <1471300497-15066-1-git-send-email-weiyj.lk@gmail.com>
+References: <1471300497-15066-1-git-send-email-weiyj.lk@gmail.com>
+Message-ID: <20160815.163443.1332884548426044511.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Wei Yongjun <weiyj.lk@gmail.com>
+Date: Mon, 15 Aug 2016 22:34:57 +0000
 
-we are having a problem with atomic accesses in pstore on some ARM
-CPUs (specifically rk3288 and rk3399). With those chips, atomic
-accesses fail with both pgprot_noncached and pgprot_writecombine
-memory. Atomic accesses do work when selecting PAGE_KERNEL protection.
+> In case of error, the function of_parse_phandle() returns NULL
+> pointer not ERR_PTR(). The IS_ERR() test in the return value check
+> should be replaced with NULL test.
+> 
+> Signed-off-by: Wei Yongjun <weiyj.lk@gmail.com>
 
-Debugging on rk3399 shows the following crash.
-
-[    0.912669] Bad mode in Error handler detected, code 0xbf000002 -- SError
-[    0.920140] CPU: 4 PID: 1 Comm: swapper/0 Not tainted 4.4.14 #389
-[    0.926838] Hardware name: Google Kevin (DT)
-[    0.931533] task: ffffffc0edfe0000 ti: ffffffc0edf7c000 task.ti:
-ffffffc0edf 7c000
-[    0.939780] PC is at __ll_sc___cmpxchg_case_mb_4+0x2c/0x5c
-[    0.945811] LR is at 0x1
-
-The "solution" for this problem in various Chrome OS releases is to
-disable atomic accesses in pstore entirely, which seems to be a bit
-brute-force. Question is what a proper upstream-acceptable solution
-might be. Introduce another memory type to select PAGE_KERNEL ? Is
-there some means to determine if atomic operations are supported with
-a given protection mask, maybe ? Anything else ?
-
-Thanks,
-Guenter
+Applied.
