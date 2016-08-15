@@ -1,108 +1,114 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 15 Aug 2016 12:17:37 -0600
-Subject: [PATCH RFC] perf tools: Adding event type for HW tracers
-Message-ID: <1471285057-8327-1-git-send-email-mathieu.poirier@linaro.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 15 Aug 2016 20:18:43 +0200
+Subject: [PATCH v2] MAINTAINERS: Switch to kernel.org account for Krzysztof
+ Kozlowski
+Message-ID: <1471285123-10085-1-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is now possible to use the kernel's perf filter framework to
-reduce the amount of trace collected by IntelPT and CoreSight tracers.
+Change my email address to kernel.org account instead of Samsung one.
+Also switch Maxim MUIC charger drivers from supported to maintained
+mode.
 
-To collect address filter specifics from the perf tool command line
-function parse_filter() is used, which in turn calls set_filter().  In
-the latter only events with a PERF_TYPE_TRACEPOINT attribute type are
-accepted.
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: linux-samsung-soc at vger.kernel.org
 
-Since IntelPT and CoreSight PMUs don't have a PERF_TYPE_TRACEPOINT
-type, filter specification from the command line fails.
-
-This patch adds a new PERF_TYPE_HW_TRACER PMU type.  From there
-set_filter() is enhanced to accept filter definition for tracepoint and
-HW tracer PMUs.
-
-CC: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- arch/x86/events/intel/pt.c                       |  2 +-
- drivers/hwtracing/coresight/coresight-etm-perf.c |  4 +++-
- include/uapi/linux/perf_event.h                  |  1 +
- tools/include/uapi/linux/perf_event.h            |  1 +
- tools/perf/util/parse-events.c                   | 10 ++++++++--
- 5 files changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/arch/x86/events/intel/pt.c b/arch/x86/events/intel/pt.c
-index 5178c5de0b19..f828eae05a0e 100644
---- a/arch/x86/events/intel/pt.c
-+++ b/arch/x86/events/intel/pt.c
-@@ -1419,7 +1419,7 @@ static __init int pt_init(void)
- 	pt_pmu.pmu.nr_addr_filters       =
- 		pt_cap_get(PT_CAP_num_address_ranges);
+Changes since v1:
+1. Update also mailmap after Joe Perches suggestion.
+
+Affected drivers/subsystems:
+1. arch/arm,
+2. mfd,
+3. power,
+4. regulator,
+5. clk,
+6. rtc,
+7. extcon,
+8. pinctrl,
+9. sound/soc,
+
+However if there are no objections, I can push it through my tree (to
+arm-soc folks).
+---
+ .mailmap    |  1 +
+ MAINTAINERS | 14 +++++++-------
+ 2 files changed, 8 insertions(+), 7 deletions(-)
+
+diff --git a/.mailmap b/.mailmap
+index 2a91c14c80bf..b18912c5121e 100644
+--- a/.mailmap
++++ b/.mailmap
+@@ -88,6 +88,7 @@ Kay Sievers <kay.sievers@vrfy.org>
+ Kenneth W Chen <kenneth.w.chen@intel.com>
+ Konstantin Khlebnikov <koct9i@gmail.com> <k.khlebnikov@samsung.com>
+ Koushik <raghavendra.koushik@neterion.com>
++Krzysztof Kozlowski <krzk@kernel.org> <k.kozlowski@samsung.com>
+ Krzysztof Kozlowski <krzk@kernel.org> <k.kozlowski.k@gmail.com>
+ Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+ Leonid I Ananiev <leonid.i.ananiev@intel.com>
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 45c98485c3f0..d437e0123bac 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1623,7 +1623,7 @@ N:	rockchip
  
--	ret = perf_pmu_register(&pt_pmu.pmu, "intel_pt", -1);
-+	ret = perf_pmu_register(&pt_pmu.pmu, "intel_pt", PERF_TYPE_HW_TRACER);
+ ARM/SAMSUNG EXYNOS ARM ARCHITECTURES
+ M:	Kukjin Kim <kgene@kernel.org>
+-M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
++M:	Krzysztof Kozlowski <krzk@kernel.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+ S:	Maintained
+@@ -7465,9 +7465,9 @@ F:	Documentation/devicetree/bindings/sound/max9860.txt
+ F:	sound/soc/codecs/max9860.*
  
- 	return ret;
- }
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index 7ae2a884ae5c..0b0bc81b58ba 100644
---- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -631,7 +631,9 @@ static int __init etm_perf_init(void)
- 	etm_pmu.addr_filters_validate	= etm_addr_filters_validate;
- 	etm_pmu.nr_addr_filters		= ETM_ADDR_CMP_MAX;
+ MAXIM MUIC CHARGER DRIVERS FOR EXYNOS BASED BOARDS
+-M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
++M:	Krzysztof Kozlowski <krzk@kernel.org>
+ L:	linux-pm at vger.kernel.org
+-S:	Supported
++S:	Maintained
+ F:	drivers/power/supply/max14577_charger.c
+ F:	drivers/power/supply/max77693_charger.c
  
--	ret = perf_pmu_register(&etm_pmu, CORESIGHT_ETM_PMU_NAME, -1);
-+	ret = perf_pmu_register(&etm_pmu,
-+				CORESIGHT_ETM_PMU_NAME,
-+				PERF_TYPE_HW_TRACER);
- 	if (ret == 0)
- 		etm_perf_up = true;
+@@ -7481,7 +7481,7 @@ F:	include/dt-bindings/*/*max77802.h
  
-diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
-index ce969677dab3..8b223d66694a 100644
---- a/include/uapi/linux/perf_event.h
-+++ b/include/uapi/linux/perf_event.h
-@@ -32,6 +32,7 @@ enum perf_type_id {
- 	PERF_TYPE_HW_CACHE			= 3,
- 	PERF_TYPE_RAW				= 4,
- 	PERF_TYPE_BREAKPOINT			= 5,
-+	PERF_TYPE_HW_TRACER			= 6,
+ MAXIM PMIC AND MUIC DRIVERS FOR EXYNOS BASED BOARDS
+ M:	Chanwoo Choi <cw00.choi@samsung.com>
+-M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
++M:	Krzysztof Kozlowski <krzk@kernel.org>
+ L:	linux-kernel at vger.kernel.org
+ S:	Supported
+ F:	drivers/*/max14577*.c
+@@ -9258,7 +9258,7 @@ F:	drivers/pinctrl/sh-pfc/
  
- 	PERF_TYPE_MAX,				/* non-ABI */
- };
-diff --git a/tools/include/uapi/linux/perf_event.h b/tools/include/uapi/linux/perf_event.h
-index ce969677dab3..8b223d66694a 100644
---- a/tools/include/uapi/linux/perf_event.h
-+++ b/tools/include/uapi/linux/perf_event.h
-@@ -32,6 +32,7 @@ enum perf_type_id {
- 	PERF_TYPE_HW_CACHE			= 3,
- 	PERF_TYPE_RAW				= 4,
- 	PERF_TYPE_BREAKPOINT			= 5,
-+	PERF_TYPE_HW_TRACER			= 6,
+ PIN CONTROLLER - SAMSUNG
+ M:	Tomasz Figa <tomasz.figa@gmail.com>
+-M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
++M:	Krzysztof Kozlowski <krzk@kernel.org>
+ M:	Sylwester Nawrocki <s.nawrocki@samsung.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+@@ -10189,7 +10189,7 @@ S:	Maintained
+ F:	drivers/platform/x86/samsung-laptop.c
  
- 	PERF_TYPE_MAX,				/* non-ABI */
- };
-diff --git a/tools/perf/util/parse-events.c b/tools/perf/util/parse-events.c
-index 2eb8b1ed4cc8..bb14cd63cba9 100644
---- a/tools/perf/util/parse-events.c
-+++ b/tools/perf/util/parse-events.c
-@@ -1761,9 +1761,15 @@ static int set_filter(struct perf_evsel *evsel, const void *arg)
- {
- 	const char *str = arg;
+ SAMSUNG AUDIO (ASoC) DRIVERS
+-M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
++M:	Krzysztof Kozlowski <krzk@kernel.org>
+ M:	Sangbeom Kim <sbkim73@samsung.com>
+ M:	Sylwester Nawrocki <s.nawrocki@samsung.com>
+ L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
+@@ -10204,7 +10204,7 @@ F:	drivers/video/fbdev/s3c-fb.c
  
--	if (evsel == NULL || evsel->attr.type != PERF_TYPE_TRACEPOINT) {
-+	if (evsel == NULL)
-+		return -1;
-+
-+	if (evsel->attr.type != PERF_TYPE_TRACEPOINT &&
-+	    evsel->attr.type != PERF_TYPE_HW_TRACER) {
- 		fprintf(stderr,
--			"--filter option should follow a -e tracepoint option\n");
-+			"--filter option should follow a -e tracepoint or HW tracer option\n");
-+		fprintf(stderr, "evsel->name: %s type: 0x%x\n",
-+			evsel->name, evsel->attr.type);
- 		return -1;
- 	}
- 
+ SAMSUNG MULTIFUNCTION PMIC DEVICE DRIVERS
+ M:	Sangbeom Kim <sbkim73@samsung.com>
+-M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
++M:	Krzysztof Kozlowski <krzk@kernel.org>
+ L:	linux-kernel at vger.kernel.org
+ L:	linux-samsung-soc at vger.kernel.org
+ S:	Supported
 -- 
 2.7.4
