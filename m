@@ -1,27 +1,50 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 15 Aug 2016 12:10:26 -0700
-Subject: [PATCH v1 03/14] clk: twl6040: Rename the driver and use
- consistent names in the code
-In-Reply-To: <20160530085522.30398-4-peter.ujfalusi@ti.com>
-References: <20160530085522.30398-1-peter.ujfalusi@ti.com>
- <20160530085522.30398-4-peter.ujfalusi@ti.com>
-Message-ID: <20160815191026.GY361@codeaurora.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 15 Aug 2016 21:21:26 +0200
+Subject: [PATCH v2 1/7] phy-sun4i-usb: Use bool where appropriate
+In-Reply-To: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
+References: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1471288892-21702-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30, Peter Ujfalusi wrote:
-> The driver is to provide the functional clock to OMAP4/5 McPDM. The clock
-> is named as pdmclk in the documentations so change the function names,
-> structure names and variables to align with this.
-> At the same time rename the driver from "twl6040-clk" to "twl6040-pdmclk".
-> This can be done w/o regression since the clock driver is not in use at
-> the moment, the MFD core driver is not even registering the device for it.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
+We're using bool as true/false type in most places in phy-sun4i-usb.c
+for consistency fixup the remaining uses of ints which are ever only
+0 or 1 to be bools too.
 
-Applied to clk-next
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/phy/phy-sun4i-usb.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index fcf4d95e..1cb84a8 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -445,7 +445,8 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ 	struct sun4i_usb_phy_data *data =
+ 		container_of(work, struct sun4i_usb_phy_data, detect.work);
+ 	struct phy *phy0 = data->phys[0].phy;
+-	int id_det, vbus_det, id_notify = 0, vbus_notify = 0;
++	bool id_notify = false, vbus_notify = false;
++	int id_det, vbus_det;
+ 
+ 	if (phy0 == NULL)
+ 		return;
+@@ -474,13 +475,13 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ 		}
+ 		sun4i_usb_phy0_set_id_detect(phy0, id_det);
+ 		data->id_det = id_det;
+-		id_notify = 1;
++		id_notify = true;
+ 	}
+ 
+ 	if (vbus_det != data->vbus_det) {
+ 		sun4i_usb_phy0_set_vbus_detect(phy0, vbus_det);
+ 		data->vbus_det = vbus_det;
+-		vbus_notify = 1;
++		vbus_notify = true;
+ 	}
+ 
+ 	mutex_unlock(&phy0->mutex);
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.7.4
