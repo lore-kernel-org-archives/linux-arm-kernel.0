@@ -1,87 +1,71 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 15 Aug 2016 10:08:57 -0600
-Subject: [PATCH v3 02/15] dt/bindings: Update binding for PM domain idle
- states
-In-Reply-To: <697d8ac2-34ee-db3e-940b-5ce3365c5aa1@arm.com>
-References: <1470351902-43103-1-git-send-email-lina.iyer@linaro.org>
- <1470351902-43103-3-git-send-email-lina.iyer@linaro.org>
- <99e35b6c-6698-6d27-f4d7-fa032796869e@arm.com>
- <20160810164034.GA1401@linaro.org>
- <5e59874c-bbb7-270a-199c-da1ff5932554@arm.com>
- <20160811211023.GC1401@linaro.org>
- <697d8ac2-34ee-db3e-940b-5ce3365c5aa1@arm.com>
-Message-ID: <20160815160857.GE1401@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 15 Aug 2016 17:13:18 +0100
+Subject: [kernel-hardening] [PATCH 0/7] arm64: Privileged Access Never
+ using TTBR0_EL1 switching
+In-Reply-To: <CAKv+Gu87t-AnDKvtk699CpEfkEPgB=6DE-8EhBCMMnczemVQ4Q@mail.gmail.com>
+References: <20160815095813.GA1996@svinekod>
+ <CAKv+Gu99SNzKVccod_2At1vsmHfgO4fnqVYbVJ8Fjdd4k68RXg@mail.gmail.com>
+ <20160815100649.GB1996@svinekod>
+ <CAKv+Gu-nrAvdqy9Yb=vP1RysWY+gZqHdiMv6fdDKN4-gBPivDA@mail.gmail.com>
+ <20160815103000.GE13262@arm.com>
+ <CAKv+Gu_8d7Vf+TzQnqaofNj62L-=qkht4av-6mCYZoWkucz8RA@mail.gmail.com>
+ <20160815103721.GF13262@arm.com>
+ <CAKv+Gu-5Ckd0_ot-Le=7dL2Wn8E6198vEHPk0-E4VtRUw8c0BQ@mail.gmail.com>
+ <20160815105205.GD22320@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu87t-AnDKvtk699CpEfkEPgB=6DE-8EhBCMMnczemVQ4Q@mail.gmail.com>
+Message-ID: <20160815161318.GH22320@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 12 2016 at 04:08 -0600, Sudeep Holla wrote:
->
->
->On 11/08/16 22:10, Lina Iyer wrote:
->>On Wed, Aug 10 2016 at 12:09 -0600, Sudeep Holla wrote:
->>>
->
->[...]
->
->>>cluster0
->>>    CLUSTER_RET(Retention)
->>>    CLUSTER_PG(Power Gate)
->>>    core0
->>>        CORE_RET
->>>        CORE_PG
->>>    core1
->>>        CORE_RET
->>>        CORE_PG
->>>
->>>cluster1
->>>    CLUSTER_RET
->>>    CLUSTER_PG
->>>    core0
->>>        CORE_RET
->>>        CORE_PG
->>>    core1
->>>        CORE_RET
->>>        CORE_PG
->>>
->>>Platform Co-ordinate supports the following states and we should be
->>>able to determine that from the binding:
->>>
->>>CORE_RET
->>>CORE_PG
->>>CORE_RET + CLUSTER_RET
->>
->>The problem that we have to sove here is knowing that CORE_RET +
->>CLUSTER_PG (hypothetically) an invalid combination. Kevin and
->>I debated it in the earlier RFC and we dont have a good way to solve
->>this generically for all devices.
->>
->
->Yes, I agree it's complex. But that needs to be solved IMO.
->
->I can think of 2 possible solutions:
->
->1. Index the states(which people have not liked, but as along as we
->   don't use it in the code as it for any other purpose, it should be
->   fine) and then have each state mentioning what parent state can be
->   entered at this child state(i.e. starting index and all states below
->   it)
->
-This is how QCOM solved it downstream.
+On Mon, Aug 15, 2016 at 12:56:58PM +0200, Ard Biesheuvel wrote:
+> On 15 August 2016 at 12:52, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Mon, Aug 15, 2016 at 12:43:31PM +0200, Ard Biesheuvel wrote:
+> >> But, how about we store the reserved ASID in TTBR1_EL1 instead, and
+> >> switch TCR_EL1.A1 and TCR_EL1.EPD0 in a single write? That way, we can
+> >> switch ASIDs and disable table walks atomically (I hope), and we
+> >> wouldn't need to change TTBR0_EL1 at all.
+> >
+> > I did this before for AArch32 + LPAE (patches on the list sometime last
+> > year I think). But the idea was nak'ed by the ARM architects. The
+> > TCR_EL1.A1 can be cached somewhere in the TLB state machine, so you need
+> > TLBI (IOW, toggling A1 does not guarantee an ASID switch).
+> 
+> But how is TTBR0_EL1 any different? The ARM ARM equally mentions that
+> any of its field can be cached in a TLB, so by that reasoning, setting
+> a new ASID in TTBR0_EL1 would also require TLB maintenance.
 
->2. Something similar to (1) but without index instead phandles.
->
+Not really because this register is also described as part of the
+context switching operation, so that would be an exception to the
+general rule of requiring TLB invalidation for cached registers.
 
-The problem is when you have non-CPU devices in the device tree and
-since they do not have a way to represent states like CPU, we did not
-have a clear path to that. Hence we punted that to later. Whatever we
-do, we should solve it for a generic PM domain, not just CPU domains.
+If you keep reading the same paragraph, the ARM ARM becomes more
+subjective ;) and you may come to the conclusion that the reserved ASID
+(not TCR_EL1.A1 though) + TCR_EL1.EDP0 would do the trick but we need
+clarification from the architects rather than my random interpretation:
 
-Thanks,
-Lina
+Section "D4.7.1 General TLB maintenance requirements" states:
 
->Again these are just thoughts, others may think of some better
->solution(s). Sorry I haven't followed all the previous threads in detail.
->
->-- 
->Regards,
->Sudeep
+  Some System register field descriptions state that the effect of the
+  field is permitted to be cached in a TLB. This means that all TLB
+  entries that might be affected by a change of the field must be
+  invalidated whenever that field is changed
+
+So the above kind of implies that only TLB *entries* that might be
+affected by a change of a control bit need to be invalidated and only
+the effect of such bit is cached (rather than the bit itself). The
+effect of EDP0==1 is that there is no page table walk on a miss, so
+there won't be any new entries cached in the TLB that would
+reflect/cache the effect of EDP0==1. We still need to follow this by a
+switch to the reserved ASID to make sure there are no other TLB entries
+for TTBR0 (and we shouldn't care about the window between EDP0=1 and
+ASID=reserved).
+
+Anyway, the above wouldn't help the code much since we still need to
+preserve/restore/switch the ASID of the current thread (that's unless we
+temporarily store TTBR0_EL1.ASID into the TTBR1_EL1.ASID field). The
+TCR_EL1.A1 trick would have been nice but explicitly rejected by the
+architects (I guess it's not part of the context switching sequence, so
+the hardware may not notice the A1 bit change).
+
+-- 
+Catalin
