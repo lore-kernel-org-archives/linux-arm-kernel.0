@@ -1,91 +1,65 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 16 Aug 2016 11:13:45 +0100
-Subject: [PATCH v24 5/9] arm64: kdump: add kdump support
-In-Reply-To: <20160811100310.GA29357@localhost.localdomain>
-References: <20160809015248.28414-2-takahiro.akashi@linaro.org>
- <20160809015615.28527-1-takahiro.akashi@linaro.org>
- <20160809015615.28527-3-takahiro.akashi@linaro.org>
- <57AB586D.3080900@arm.com> <20160810181827.GC24137@localhost.localdomain>
- <20160811100310.GA29357@localhost.localdomain>
-Message-ID: <57B2E759.201@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 15 Aug 2016 17:23:29 +0100
+Subject: [PATCH 2/3] arm64: dts: Add ZTE ZX296718 SoC dts and Makefile
+In-Reply-To: <1471335734-26893-2-git-send-email-jun.nie@linaro.org>
+References: <1471335734-26893-1-git-send-email-jun.nie@linaro.org>
+ <1471335734-26893-2-git-send-email-jun.nie@linaro.org>
+Message-ID: <20160815162328.GA31080@svinekod>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pratyush,
+Hi,
 
-On 11/08/16 11:03, Pratyush Anand wrote:
-> On 10/08/2016:11:48:27 PM, Pratyush Anand wrote:
->> On 10/08/2016:05:38:05 PM, James Morse wrote:
->>> =========================%<=========================
->>> diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
->>> index 2dc54d129be1..784d4c30b534 100644
->>> --- a/arch/arm64/kernel/crash_dump.c
->>> +++ b/arch/arm64/kernel/crash_dump.c
->>> @@ -37,6 +37,11 @@ ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
->>>         if (!csize)
->>>                 return 0;
->>>
->>> +       if (memblock_is_memory(pfn << PAGE_SHIFT) &&
->>> +           !memblock_is_map_memory(pfn << PAGE_SHIFT))
->>> +               /* skip this nomap memory region, reserved by firmware */
->>> +               return 0;
-> 
-> This should return 0 or -EINVAL? because, its caller does not care properly
-> about 0 return value (when csize is non-zero). So either we need to return
-> -EINVAL or we need to fix it's caller so that pread() would know that required
-> number of data were not read.
+On Tue, Aug 16, 2016 at 04:22:13PM +0800, Jun Nie wrote:
+> +		cpu0: cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53","arm,armv8";
+> +			reg = <0x0 0x0>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu1: cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53","arm,armv8";
+> +			reg = <0x0 0x1>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu2: cpu at 2 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53","arm,armv8";
+> +			reg = <0x0 0x2>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu3: cpu at 3 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53","arm,armv8";
+> +			reg = <0x0 0x3>;
+> +			enable-method = "psci";
+> +		};
 
-I blindly followed 'number of bytes copied' -> 0. It worked for me, but may not
-be correct.
+> +		pmu {
+> +			compatible = "arm,armv8-pmuv3";
+> +			interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_HIGH>;
+> +		};
 
-remap_oldmem_pfn_checked() looks like it substitutes the zero page in this (or
-at least a similar) case, maybe we should do the same for nomap pages.
+Please use "arm,cortex-a53-pmu" for the PMU compatible string.
 
+> +
+> +		psci {
+> +			compatible = "arm,psci-1.0";
+> +			method = "smc";
+> +			cpu_suspend = <0xC4000001>;
+> +			cpu_off = <0x84000002>;
+> +			cpu_on = <0xC4000003>;
+> +			migrate = <0xC4000005>;
+> +		};
 
-> 
->>> +
->>>         vaddr = ioremap_cache(__pfn_to_phys(pfn), PAGE_SIZE);
->>>         if (!vaddr)
->>>                 return -ENOMEM;
->>> =========================%<=========================
->>
->> In any case kernel must not panic, so I think we must have above hunk. However,
->> we also need to look into kexec-tools that why it is asking kernel to copy those
->> unneeded chunks.
->>
->> I will test tomorrow with above hunk.
-> 
-> After that hunk it did not crash but vmcore-dmesg fails with following message:
-> "No program header covering vaddr 0x401ff0found kexec bug?"
-> 
-> It happened because vmcore-dmesg is sending wrong offset to the pread(), and so
-> it did not crash after the above kernel hunk but it still read garbage wrong
-> log_buf virtual address pointer.
-> 
-> vmcore-dmesg is sending wrong offset because page_offset(vp_offset) calculation
-> is not perfect for my case, explained here [1].
-> 
-> So, if I correct page_offset(vp_offset) (as arm64_mem.page_offset = ehdr.e_entry
-> - "kernel Code Start PA" + phys_offset), then vmcore-dmesg and vmcore copy
-> worked fine, however if I use makedumpfile to copy(compressed) data from
-> /proc/vmcore then it still generates "synchronous external abort". I think, it
+Given you are PSCI 1.0 compliant, you don't need the function ID properties
+here. Please remove them.
 
-At a guess makedumpfile is mmap()ing /proc/vmcore so it can use multiple
-threads to read (then compress) the data. This bypasses the check added to
-copy_oldmem_page(). We probably need to provide a remap_oldmem_pfn_range() that
-checks whether the range contains nomap pages.
-
-I will try and send a fixup patch to do this later this week, (unless someone
-beats me to it!)
-
-
-> generated because it would have found garbage data in EFI memory region.
-
-If it was marked as belonging to efi in the efi memory map, the kernel shouldn't
-be touching it. If you add 'efi=debug' to your kernel cmdline you get a table of
-the addresses and properties.
-
+Otherwise this generally looks fine.
 
 Thanks,
-
-James
+Mark.
