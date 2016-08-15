@@ -1,44 +1,42 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Mon, 15 Aug 2016 15:03:40 +0800
-Subject: [PATCH v3 0/5] arm64: hisilicon: Hip0x dt/config update
-In-Reply-To: <1467170878-24030-1-git-send-email-wangkefeng.wang@huawei.com>
+Date: Mon, 15 Aug 2016 15:03:45 +0800
+Subject: [PATCH v3 5/5] arm64: defconfig: Enable Hisi SAS and HNS
+In-Reply-To: <1471244625-56331-1-git-send-email-wangkefeng.wang@huawei.com>
 References: <1467170878-24030-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1471244625-56331-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1471244625-56331-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1471244625-56331-6-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT update:
-1) Hip05
-- Kill unuesd hip05_hns.dtsi
-2) Hip06
-- Add SAS/HNS node
+Enable Hisi SAS and HNS config for D02/D03 board.
 
-CONFIG update:
-1) Enable SAS/HNS config
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ arch/arm64/configs/defconfig | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-Changes since v2:
-- Update phy-count of sas2, it should be 9
-- Update mdio node according to commit b15dc29264d0(net: hns: get reset registers from DT)
-
-Changes since v1:
-- Add dt binding document suggested by Wei xu and use better name.
-
-
-Kefeng Wang (5):
-  arm64: dts: hip05: kill hip05_hns.dtsi
-  dt-bindings: hisilicon: Add Hip05 and Hip06 system controller support
-  arm64: dts: hip06: Append hns node
-  arm64: dts: hip06: Append sas node
-  arm64: defconfig: Enable Hisi SAS and HNS
-
- .../bindings/arm/hisilicon/hisilicon.txt           |  39 ++-
- arch/arm64/boot/dts/hisilicon/hip05.dtsi           |   5 -
- arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi       | 180 ----------
- arch/arm64/boot/dts/hisilicon/hip06-d03.dts        |  28 ++
- arch/arm64/boot/dts/hisilicon/hip06.dtsi           | 365 +++++++++++++++++++++
- arch/arm64/configs/defconfig                       |   5 +-
- 6 files changed, 425 insertions(+), 197 deletions(-)
- delete mode 100644 arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index eadf485..10cab2f 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -139,7 +139,8 @@ CONFIG_VIRTIO_BLK=y
+ CONFIG_SRAM=y
+ # CONFIG_SCSI_PROC_FS is not set
+ CONFIG_BLK_DEV_SD=y
+-# CONFIG_SCSI_LOWLEVEL is not set
++CONFIG_SCSI_SAS_ATA=y
++CONFIG_SCSI_HISI_SAS=y
+ CONFIG_ATA=y
+ CONFIG_SATA_AHCI=y
+ CONFIG_SATA_AHCI_PLATFORM=y
+@@ -160,6 +161,8 @@ CONFIG_VIRTIO_NET=y
+ CONFIG_AMD_XGBE=y
+ CONFIG_NET_XGENE=y
+ CONFIG_MACB=y
++CONFIG_HNS_DSAF=y
++CONFIG_HNS_ENET=y
+ CONFIG_E1000E=y
+ CONFIG_IGB=y
+ CONFIG_IGBVF=y
 -- 
 1.7.12.4
