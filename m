@@ -1,57 +1,68 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 15 Aug 2016 01:35:38 +0000
-Subject: [RFC PATCH] DT: kirkwood: Fix Openblock A6 external GPIO pins
-Message-ID: <20160815013538.8056-1-jason@lakedaemon.net>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Mon, 15 Aug 2016 10:47:06 +0800
+Subject: [PATCH v9 01/10] clk: fix initial state of critical clock's
+ parents
+In-Reply-To: <20160813003913.GA361@codeaurora.org>
+References: <1466581229-2342-1-git-send-email-erin.lo@mediatek.com>
+ <1466581229-2342-2-git-send-email-erin.lo@mediatek.com>
+ <20160702012140.GB17071@codeaurora.org>
+ <1467604308.26485.4.camel@mtksdaap41>
+ <146802073038.73491.6675612765998057903@resonance>
+ <1468225452.31247.7.camel@mtksdaap41> <1470203182.17063.3.camel@mtksdaap41>
+ <1470721183.8551.6.camel@mtksdaap41> <20160810210922.GD2996@codeaurora.org>
+ <1470989873.8551.10.camel@mtksdaap41> <20160813003913.GA361@codeaurora.org>
+Message-ID: <1471229226.8551.16.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By assigning the pin hog to the pinctrl node, we correctly configure the
-MPPs.  However, they are not available to userspace.
+Hi Stephen,
 
-Fix this by assigning the hogs to the gpio node.
+On Fri, 2016-08-12 at 17:39 -0700, Stephen Boyd wrote:
+> On 08/12, James Liao wrote:
+> > On Wed, 2016-08-10 at 14:09 -0700, Stephen Boyd wrote:
+> > > (Including lists)
+> > > 
+> > > On 08/09, James Liao wrote:
+> > > > On Wed, 2016-08-03 at 13:46 +0800, James Liao wrote:
+> > > >>
+> > > >> Hi Mike,
+> > > >>
+> > > >> Do you have new patches to fix new clock parents? If not, I think we can
+> > > >> use my patch first. Is it okay?
+> > > >>
+> > > >
+> > > > Hi Stephen,
+> > > >
+> > > > Do you have comments for the bug fixing? I prefer to use my patch (clk:
+> > > > fix initial state of critical clock's parents). How do you think?
+> > > >
+> > > 
+> > > How about we recalc accuracies and rates in addition to the patch
+> > > from Mike? That will fix everything?
+> > 
+> > Hi Stephen,
+> > 
+> > It works!
+> > 
+> > I'll send a new series of MT2701 clock support in few days. Should I
+> > include this patch in my series? Or you'll merge it into clk-next
+> > directly?
+> > 
+> 
+> Thanks. I can take that as a tested-by? I can merge it into
 
-After this, the following works as expected:
+Yes, please feel free to add:
 
-  # echo 28 >/sys/class/gpio/export
-  # echo low >/sys/class/gpio/gpio28/direction
+Tested-by: James Liao <jamesjj.liao@mediatek.com>
 
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
----
-I'm submitting this as RFC because it's clear no one is using this, so I'm not
-sure how far we need to take this.  The dip switches should probably be under
-gpio-keys to make them input only.  Thoughts?
+> clk-next directly, but do we need to put the mt2701 patches on a
+> separate branch to merge into arm-soc? If so we'll need to put
+> this patch first to avoid bisection failures.
 
-thx,
+I prefer to merge clk driver into mainline first. Patches that depend on
+mt2701 clks such as dtsi can base on next kernel release.
 
-Jason.
 
- arch/arm/boot/dts/kirkwood-openblocks_a6.dts | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+Best regards,
 
-diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-index 0db0e3edc88f..ddb17b1cdfe0 100644
---- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-+++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-@@ -41,9 +41,6 @@
- 		};
- 
- 		pinctrl: pin-controller at 10000 {
--			pinctrl-0 = <&pmx_dip_switches &pmx_gpio_header>;
--			pinctrl-names = "default";
--
- 			pmx_uart0: pmx-uart0 {
- 				marvell,pins = "mpp10", "mpp11", "mpp15",
- 					"mpp16";
-@@ -174,3 +171,10 @@
- 		phy-handle = <&ethphy0>;
- 	};
- };
-+
-+&gpio0 {
-+	status = "okay";
-+
-+	pinctrl-0 = <&pmx_dip_switches &pmx_gpio_header>;
-+	pinctrl-names = "default";
-+};
--- 
-2.9.2
+James
