@@ -1,80 +1,101 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 Aug 2016 16:35:46 +0100
-Subject: [PATCH v7 14/15] arm64, acpi, numa: NUMA support based on SRAT
- and SLIT
-In-Reply-To: <1464129345-18985-15-git-send-email-ddaney.cavm@gmail.com>
-References: <1464129345-18985-1-git-send-email-ddaney.cavm@gmail.com>
- <1464129345-18985-15-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20160815153546.GF22320@e104818-lin.cambridge.arm.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Mon, 15 Aug 2016 16:36:28 +0100
+Subject: [PATCH v3 1/4] hwmon: iio_hwmon: delay probing with late_initcall
+In-Reply-To: <ed5c1761-bdc7-df9c-96c8-998e83c49c4c@free-electrons.com>
+References: <1469519027-11387-1-git-send-email-quentin.schulz@free-electrons.com>
+ <209942367.uny0GxrY2s@ws-stein>
+ <10d14cc4-26f1-8f2d-2997-3b2bc323c40e@free-electrons.com>
+ <5277864.qlyRKbC1Zy@ws-stein>
+ <ed5c1761-bdc7-df9c-96c8-998e83c49c4c@free-electrons.com>
+Message-ID: <bce453f4-a776-a534-34f2-c8fcd09a3420@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 24, 2016 at 03:35:44PM -0700, David Daney wrote:
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index aee323b..4b13ecd 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -113,4 +113,12 @@ static inline const char *acpi_get_enable_method(int cpu)
->  pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
->  #endif
->  
-> +#ifdef CONFIG_ACPI_NUMA
-> +int arm64_acpi_numa_init(void);
-> +int acpi_numa_get_nid(unsigned int cpu, u64 hwid);
-> +#else
-> +static inline int arm64_acpi_numa_init(void) { return -ENOSYS; }
-> +static inline int acpi_numa_get_nid(unsigned int cpu, u64 hwid) { return NUMA_NO_NODE; }
-> +#endif /* CONFIG_ACPI_NUMA */
-> +
->  #endif /*_ASM_ACPI_H*/
+On 26/07/16 10:33, Quentin Schulz wrote:
+> On 26/07/2016 11:05, Alexander Stein wrote:
+>> On Tuesday 26 July 2016 10:24:48, Quentin Schulz wrote:
+>>> On 26/07/2016 10:21, Alexander Stein wrote:
+>>>> On Tuesday 26 July 2016 09:43:44, Quentin Schulz wrote:
+>>>>> iio_channel_get_all returns -ENODEV when it cannot find either phandles
+>>>>> and
+>>>>> properties in the Device Tree or channels whose consumer_dev_name matches
+>>>>> iio_hwmon in iio_map_list. The iio_map_list is filled in by iio drivers
+>>>>> which might be probed after iio_hwmon.
+>>>>
+>>>> Would it work if iio_channel_get_all returning ENODEV is used for
+>>>> returning
+>>>> EPROBE_DEFER in iio_channel_get_all? Using late initcalls for
+>>>> driver/device
+>>>> dependencies seems not right for me at this place.
+>>>
+>>> Then what if the iio_channel_get_all is called outside of the probe of a
+>>> driver? We'll have to change the error code, things we are apparently
+>>> trying to avoid (see v2 patches' discussions).
+>>
+>> Maybe I didn't express my idea enough. I don't want to change the behavior of  
+>> iio_channel_get_all at all. Just the result evaluation of iio_channel_get_all 
+>> in iio_hwmon_probe. I have something link the patch below in mind.
+>>
+>> Best regards,
+>> Alexander
+>> ---
+>> diff --git a/drivers/hwmon/iio_hwmon.c b/drivers/hwmon/iio_hwmon.c
+>> index b550ba5..e32d150 100644
+>> --- a/drivers/hwmon/iio_hwmon.c
+>> +++ b/drivers/hwmon/iio_hwmon.c
+>> @@ -73,8 +73,12 @@ static int iio_hwmon_probe(struct platform_device *pdev)
+>>                 name = dev->of_node->name;
+>>  
+>>         channels = iio_channel_get_all(dev);
+>> -       if (IS_ERR(channels))
+>> -               return PTR_ERR(channels);
+>> +       if (IS_ERR(channels)) {
+>> +               if (PTR_ERR(channels) == -ENODEV)
+>> +                       return -EPROBE_DEFER;
+>> +               else
+>> +                       return PTR_ERR(channels);
+>> +       }
+>>  
+>>         st = devm_kzalloc(dev, sizeof(*st), GFP_KERNEL);
+>>         if (st == NULL) {
+> 
+> Indeed, I misunderstood what you told me.
+> 
+> Actually, the patch you proposed is part of my v1
+> (https://lkml.org/lkml/2016/6/28/203) and v2
+> (https://lkml.org/lkml/2016/7/15/215).
+> Jonathan and Guenter didn't really like the idea of changing the -ENODEV
+> in -EPROBE_DEFER.
+> 
+> What I thought you were proposing was to change the -ENODEV return code
+> inside iio_channel_get_all. This cannot be an option since the function
+> might be called outside of a probe (it is not yet, but might be in the
+> future?).
+If that did happen I'd be tempted to introduce a new function to be
+used outside of probe.  I definitely don't like rewriting in individual
+drivers.
 
-Apparently this doesn't always build since asm/acpi.h is conditionally
-included from linux/acpi.h only when CONFIG_ACPI is enabled. Disabling
-this option on arm64 leads to:
+The defer question is still rather open in my mind. Will address it in the
+other thread.
 
-arch/arm64/mm/numa.c: In function ?arm64_numa_init?:
-arch/arm64/mm/numa.c:395:24: error: ?arm64_acpi_numa_init? undeclared (first use in this function)
-   if (!acpi_disabled && !numa_init(arm64_acpi_numa_init))
+> 
+> Of what I understood, two possibilities are then possible (proposed
+> either by Guenter or Jonathan): either rework the iio framework to
+> register iio map array earlier or to use late_initcall instead of init
+> for the driver consuming the iio channels.
+Ultimately we probably need to rethink how the registration works
+(it was written before deferred probing came along and that has rather
+changed things for us!)
 
-I'll fix it in arch/arm64 by including asm/acpi.h directly as we do in a
-couple of other files:
+For now I'm not convinced that deferring is that painful even if we
+do have to try reprobing every time a new module gets probed..
 
-------------------8<------------------------------
->From 9a83bf400e0b4ef066b83eeaecdbca909b8491ea Mon Sep 17 00:00:00 2001
-From: Catalin Marinas <catalin.marinas@arm.com>
-Date: Mon, 15 Aug 2016 16:33:10 +0100
-Subject: [PATCH] arm64: Fix NUMA build error when !CONFIG_ACPI
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-
-Since asm/acpi.h is only included by linux/acpi.h when CONFIG_ACPI is
-enabled, disabling the latter leads to the following build error on
-arm64:
-
-arch/arm64/mm/numa.c: In function ?arm64_numa_init?:
-arch/arm64/mm/numa.c:395:24: error: ?arm64_acpi_numa_init? undeclared (first use in this function)
-   if (!acpi_disabled && !numa_init(arm64_acpi_numa_init))
-
-This patch include the asm/acpi.h explicitly in arch/arm64/mm/numa.c for
-the arm64_acpi_numa_init() definition.
-
-Fixes: d8b47fca8c23 ("arm64, ACPI, NUMA: NUMA support based on SRAT and SLIT")
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/mm/numa.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index c7fe3ec70774..5bb15eab6f00 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -23,6 +23,8 @@
- #include <linux/module.h>
- #include <linux/of.h>
- 
-+#include <asm/acpi.h>
-+
- struct pglist_data *node_data[MAX_NUMNODES] __read_mostly;
- EXPORT_SYMBOL(node_data);
- nodemask_t numa_nodes_parsed __initdata;
+Jonathan
+> 
+> Thanks,
+> Quentin
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
