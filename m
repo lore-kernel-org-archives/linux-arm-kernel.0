@@ -1,137 +1,145 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 15 Aug 2016 16:23:29 +0100
-Subject: [PATCH v4 04/15] drivers: acpi: iort: add support for IOMMU fwnode
- registration
+Date: Mon, 15 Aug 2016 16:23:32 +0100
+Subject: [PATCH v4 07/15] drivers: acpi: implement acpi_dma_configure
 In-Reply-To: <1471274620-20754-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1471274620-20754-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1471274620-20754-5-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1471274620-20754-8-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ACPI IORT table provide entries for IOMMU (aka SMMU in ARM world)
-components that allow creating the kernel data structures required to
-probe and initialize the IOMMU devices.
+On DT based systems, the of_dma_configure() API implements DMA
+configuration for a given device. On ACPI systems an API equivalent to
+of_dma_configure() is missing which implies that it is currently not
+possible to set-up DMA operations for devices through the ACPI generic
+kernel layer.
 
-This patch provides support in the IORT kernel code to register IOMMU
-components and their respective fwnode.
+This patch fills the gap by introducing acpi_dma_configure/deconfigure()
+calls that for now are just wrappers around arch_setup_dma_ops() and
+arch_teardown_dma_ops() and also updates ACPI and PCI core code to use
+the newly introduced acpi_dma_configure/acpi_dma_deconfigure functions.
+
+The DMA range size passed to arch_setup_dma_ops() is sized according
+to the device coherent_dma_mask (starting at address 0x0), mirroring the
+DT probing path behaviour when a dma-ranges property is not provided
+for the device being probed; this changes the current arch_setup_dma_ops()
+call parameters in the ACPI probing case, but since arch_setup_dma_ops()
+is a NOP on all architectures but ARM/ARM64 this patch does not change
+the current kernel behaviour on them.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Acked-by: Bjorn Helgaas <bhelgaas@google.com> [pci]
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
 Cc: Tomasz Nowicki <tn@semihalf.com>
+Cc: Joerg Roedel <joro@8bytes.org>
 Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
 ---
- drivers/acpi/arm64/iort.c | 65 +++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/iort.h      |  8 ++++++
- 2 files changed, 73 insertions(+)
+ drivers/acpi/glue.c     |  4 ++--
+ drivers/acpi/scan.c     | 24 ++++++++++++++++++++++++
+ drivers/pci/probe.c     |  3 +--
+ include/acpi/acpi_bus.h |  2 ++
+ include/linux/acpi.h    |  5 +++++
+ 5 files changed, 34 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index cad7d1d..01a5258 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -20,7 +20,9 @@
+diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
+index 5ea5dc2..f8d6564 100644
+--- a/drivers/acpi/glue.c
++++ b/drivers/acpi/glue.c
+@@ -227,8 +227,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
  
- #include <linux/iort.h>
- #include <linux/kernel.h>
-+#include <linux/list.h>
- #include <linux/pci.h>
-+#include <linux/slab.h>
+ 	attr = acpi_get_dma_attr(acpi_dev);
+ 	if (attr != DEV_DMA_NOT_SUPPORTED)
+-		arch_setup_dma_ops(dev, 0, 0, NULL,
+-				   attr == DEV_DMA_COHERENT);
++		acpi_dma_configure(dev, attr);
  
- struct iort_its_msi_chip {
- 	struct list_head	list;
-@@ -28,6 +30,69 @@ struct iort_its_msi_chip {
- 	u32			translation_id;
- };
+ 	acpi_physnode_link_name(physical_node_name, node_id);
+ 	retval = sysfs_create_link(&acpi_dev->dev.kobj, &dev->kobj,
+@@ -251,6 +250,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
+ 	return 0;
  
-+struct iort_fwnode {
-+	struct list_head list;
-+	struct acpi_iort_node *iort_node;
-+	struct fwnode_handle *fwnode;
-+};
-+static LIST_HEAD(iort_fwnode_list);
-+static DEFINE_SPINLOCK(iort_fwnode_lock);
-+
+  err:
++	acpi_dma_deconfigure(dev);
+ 	ACPI_COMPANION_SET(dev, NULL);
+ 	put_device(dev);
+ 	put_device(&acpi_dev->dev);
+diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+index ad9fc84..0bdc98e 100644
+--- a/drivers/acpi/scan.c
++++ b/drivers/acpi/scan.c
+@@ -1370,6 +1370,30 @@ enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
+ 		return DEV_DMA_NON_COHERENT;
+ }
+ 
 +/**
-+ * iort_set_fwnode() - Create iort_fwnode and use it to register
-+ *		       iommu data in the iort_fwnode_list
-+ *
-+ * @node: IORT table node associated with the IOMMU
-+ * @fwnode: fwnode associated with the IORT node
-+ *
-+ * Returns: 0 on success
-+ *          <0 on failure
++ * acpi_dma_configure - Set-up DMA configuration for the device.
++ * @dev: The pointer to the device
++ * @attr: device dma attributes
 + */
-+int iort_set_fwnode(struct acpi_iort_node *iort_node,
-+		    struct fwnode_handle *fwnode)
++void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
 +{
-+	struct iort_fwnode *np;
-+
-+	np = kzalloc(sizeof(struct iort_fwnode), GFP_ATOMIC);
-+
-+	if (WARN_ON(!np))
-+		return -ENOMEM;
-+
-+	INIT_LIST_HEAD(&np->list);
-+	np->iort_node = iort_node;
-+	np->fwnode = fwnode;
-+
-+	spin_lock(&iort_fwnode_lock);
-+	list_add_tail(&np->list, &iort_fwnode_list);
-+	spin_unlock(&iort_fwnode_lock);
-+
-+	return 0;
++	/*
++	 * Assume dma valid range starts at 0 and covers the whole
++	 * coherent_dma_mask.
++	 */
++	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, NULL,
++			   attr == DEV_DMA_COHERENT);
 +}
 +
 +/**
-+ * iort_get_fwnode() - Retrieve fwnode associated with an IORT node
-+ *
-+ * @node: IORT table node to be looked-up
-+ *
-+ * Returns: fwnode_handle pointer on success, NULL on failure
-+*/
-+struct fwnode_handle *iort_get_fwnode(struct acpi_iort_node *node)
++ * acpi_dma_deconfigure - Tear-down DMA configuration for the device.
++ * @dev: The pointer to the device
++ */
++void acpi_dma_deconfigure(struct device *dev)
 +{
-+	struct iort_fwnode *curr;
-+	struct fwnode_handle *fwnode = NULL;
-+
-+	spin_lock(&iort_fwnode_lock);
-+	list_for_each_entry(curr, &iort_fwnode_list, list) {
-+		if (curr->iort_node == node) {
-+			fwnode = curr->fwnode;
-+			break;
-+		}
-+	}
-+	spin_unlock(&iort_fwnode_lock);
-+
-+	return fwnode;
++	arch_teardown_dma_ops(dev);
 +}
 +
- typedef acpi_status (*iort_find_node_callback)
- 	(struct acpi_iort_node *node, void *context);
+ static void acpi_init_coherency(struct acpi_device *adev)
+ {
+ 	unsigned long long cca = 0;
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 93f280d..e96d482 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1734,8 +1734,7 @@ static void pci_dma_configure(struct pci_dev *dev)
+ 		if (attr == DEV_DMA_NOT_SUPPORTED)
+ 			dev_warn(&dev->dev, "DMA not supported.\n");
+ 		else
+-			arch_setup_dma_ops(&dev->dev, 0, 0, NULL,
+-					   attr == DEV_DMA_COHERENT);
++			acpi_dma_configure(&dev->dev, attr);
+ 	}
  
-diff --git a/include/linux/iort.h b/include/linux/iort.h
-index 9bb30c5..666a3de 100644
---- a/include/linux/iort.h
-+++ b/include/linux/iort.h
-@@ -30,12 +30,20 @@ struct fwnode_handle *iort_find_domain_token(int trans_id);
- void iort_table_detect(void);
- u32 iort_msi_map_rid(struct device *dev, u32 req_id);
- struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
-+int iort_set_fwnode(struct acpi_iort_node *iort_node,
-+		    struct fwnode_handle *fwnode);
-+struct fwnode_handle *iort_get_fwnode(struct acpi_iort_node *node);
- #else
- static inline void iort_table_detect(void) { }
- static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
- { return req_id; }
- static inline struct irq_domain *
- iort_get_device_domain(struct device *dev, u32 req_id) { return NULL; }
-+static inline int iort_set_fwnode(struct acpi_iort_node *iort_node,
-+				  struct fwnode_handle *fwnode)
-+{ return -ENODEV; }
-+static inline struct fwnode_handle *
-+iort_get_fwnode(struct acpi_iort_node *node) { return NULL; }
- #endif
+ 	pci_put_host_bridge_device(bridge);
+diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+index c1a524d..4242c31 100644
+--- a/include/acpi/acpi_bus.h
++++ b/include/acpi/acpi_bus.h
+@@ -573,6 +573,8 @@ struct acpi_pci_root {
  
- #define IORT_ACPI_DECLARE(name, table_id, fn)		\
+ bool acpi_dma_supported(struct acpi_device *adev);
+ enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev);
++void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr);
++void acpi_dma_deconfigure(struct device *dev);
+ 
+ struct acpi_device *acpi_find_child_device(struct acpi_device *parent,
+ 					   u64 address, bool check_children);
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 4d8452c..b347782 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -729,6 +729,11 @@ static inline enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
+ 	return DEV_DMA_NOT_SUPPORTED;
+ }
+ 
++static inline void acpi_dma_configure(struct device *dev,
++				      enum dev_dma_attr attr) { }
++
++static inline void acpi_dma_deconfigure(struct device *dev) { }
++
+ #define ACPI_PTR(_ptr)	(NULL)
+ 
+ static inline void acpi_device_set_enumerated(struct acpi_device *adev)
 -- 
 2.6.4
