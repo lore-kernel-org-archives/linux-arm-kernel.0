@@ -1,125 +1,65 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 15 Aug 2016 10:55:39 +0200
-Subject: [PATCH 20/26] ARM: dts: r8a7794: add MSTP10 clocks
+Date: Mon, 15 Aug 2016 10:55:40 +0200
+Subject: [PATCH 21/26] ARM: dts: r8a7794: add Audio-DMAC support
 In-Reply-To: <cover.1471251169.git.horms+renesas@verge.net.au>
 References: <cover.1471251169.git.horms+renesas@verge.net.au>
-Message-ID: <975fb77f874be95e50e653e90bcbcf09c08e66c2.1471251169.git.horms+renesas@verge.net.au>
+Message-ID: <298e4ee3d213a0764e8d4baa5336d4d1649a5bc5.1471251169.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Add MSTP10 clocks to the R8A7794 device tree.
+Describe Audio-DMAC in the R8A7794 device tree.
 
-This patch is based on the commit ee9141522dcf ("ARM: shmobile: r8a7791:
-add MSTP10 support on DTSI").
+This patch is loosely based on the commit 8994fff67761 ("ARM: shmobile:
+r8a7791: Add Audio DMAC devices to DT").
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794.dtsi            | 52 +++++++++++++++++++++++++++++++
- include/dt-bindings/clock/r8a7794-clock.h | 24 ++++++++++++++
- 2 files changed, 76 insertions(+)
+ arch/arm/boot/dts/r8a7794.dtsi | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 1c2d3846d70e..cba41c199fd8 100644
+index cba41c199fd8..668e1383dd09 100644
 --- a/arch/arm/boot/dts/r8a7794.dtsi
 +++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -1267,6 +1267,58 @@
- 				"gpio1", "gpio0", "rcan1", "rcan0", "qspi_mod",
- 				"i2c5", "i2c4", "i2c3", "i2c2", "i2c1", "i2c0";
- 		};
-+		mstp10_clks: mstp10_clks at e6150998 {
-+			compatible = "renesas,r8a7794-mstp-clocks",
-+				     "renesas,cpg-mstp-clocks";
-+			reg = <0 0xe6150998 0 4>, <0 0xe61509a8 0 4>;
-+			clocks = <&p_clk>,
-+				 <&mstp10_clks R8A7794_CLK_SSI_ALL>,
-+				 <&mstp10_clks R8A7794_CLK_SSI_ALL>,
-+				 <&mstp10_clks R8A7794_CLK_SSI_ALL>,
-+				 <&mstp10_clks R8A7794_CLK_SSI_ALL>,
-+				 <&mstp10_clks R8A7794_CLK_SSI_ALL>,
-+				 <&mstp10_clks R8A7794_CLK_SSI_ALL>,
-+				 <&mstp10_clks R8A7794_CLK_SSI_ALL>,
-+				 <&mstp10_clks R8A7794_CLK_SSI_ALL>,
-+				 <&mstp10_clks R8A7794_CLK_SSI_ALL>,
-+				 <&mstp10_clks R8A7794_CLK_SSI_ALL>,
-+				 <&p_clk>,
-+				 <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-+				 <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-+				 <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-+				 <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-+				 <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-+				 <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-+				 <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-+				 <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-+				 <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-+				 <&mstp10_clks R8A7794_CLK_SCU_ALL>;
-+			#clock-cells = <1>;
-+			clock-indices = <R8A7794_CLK_SSI_ALL
-+					 R8A7794_CLK_SSI9 R8A7794_CLK_SSI8
-+					 R8A7794_CLK_SSI7 R8A7794_CLK_SSI6
-+					 R8A7794_CLK_SSI5 R8A7794_CLK_SSI4
-+					 R8A7794_CLK_SSI3 R8A7794_CLK_SSI2
-+					 R8A7794_CLK_SSI1 R8A7794_CLK_SSI0
-+					 R8A7794_CLK_SCU_ALL
-+					 R8A7794_CLK_SCU_DVC1
-+					 R8A7794_CLK_SCU_DVC0
-+					 R8A7794_CLK_SCU_CTU1_MIX1
-+					 R8A7794_CLK_SCU_CTU0_MIX0
-+					 R8A7794_CLK_SCU_SRC6
-+					 R8A7794_CLK_SCU_SRC5
-+					 R8A7794_CLK_SCU_SRC4
-+					 R8A7794_CLK_SCU_SRC3
-+					 R8A7794_CLK_SCU_SRC2
-+					 R8A7794_CLK_SCU_SRC1>;
-+			clock-output-names = "ssi-all", "ssi9", "ssi8", "ssi7",
-+					     "ssi6", "ssi5", "ssi4", "ssi3",
-+					     "ssi2", "ssi1", "ssi0",
-+					     "scu-all", "scu-dvc1", "scu-dvc0",
-+					     "scu-ctu1-mix1", "scu-ctu0-mix0",
-+					     "scu-src6", "scu-src5", "scu-src4",
-+					     "scu-src3", "scu-src2", "scu-src1";
-+		};
- 		mstp11_clks: mstp11_clks at e615099c {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe615099c 0 4>, <0 0xe61509ac 0 4>;
-diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
-index f8279eca033e..9d02f5317c7c 100644
---- a/include/dt-bindings/clock/r8a7794-clock.h
-+++ b/include/dt-bindings/clock/r8a7794-clock.h
-@@ -108,6 +108,30 @@
- #define R8A7794_CLK_I2C1		30
- #define R8A7794_CLK_I2C0		31
+@@ -296,6 +296,34 @@
+ 		dma-channels = <15>;
+ 	};
  
-+/* MSTP10 */
-+#define R8A7794_CLK_SSI_ALL		5
-+#define R8A7794_CLK_SSI9		6
-+#define R8A7794_CLK_SSI8		7
-+#define R8A7794_CLK_SSI7		8
-+#define R8A7794_CLK_SSI6		9
-+#define R8A7794_CLK_SSI5		10
-+#define R8A7794_CLK_SSI4		11
-+#define R8A7794_CLK_SSI3		12
-+#define R8A7794_CLK_SSI2		13
-+#define R8A7794_CLK_SSI1		14
-+#define R8A7794_CLK_SSI0		15
-+#define R8A7794_CLK_SCU_ALL		17
-+#define R8A7794_CLK_SCU_DVC1		18
-+#define R8A7794_CLK_SCU_DVC0		19
-+#define R8A7794_CLK_SCU_CTU1_MIX1	20
-+#define R8A7794_CLK_SCU_CTU0_MIX0	21
-+#define R8A7794_CLK_SCU_SRC6		25
-+#define R8A7794_CLK_SCU_SRC5		26
-+#define R8A7794_CLK_SCU_SRC4		27
-+#define R8A7794_CLK_SCU_SRC3		28
-+#define R8A7794_CLK_SCU_SRC2		29
-+#define R8A7794_CLK_SCU_SRC1		30
++	audma0: dma-controller at ec700000 {
++		compatible = "renesas,dmac-r8a7794", "renesas,rcar-dmac";
++		reg = <0 0xec700000 0 0x10000>;
++		interrupts =	<GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH
++				 GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
++				 GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH
++				 GIC_SPI 322 IRQ_TYPE_LEVEL_HIGH
++				 GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH
++				 GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH
++				 GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH
++				 GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH
++				 GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH
++				 GIC_SPI 328 IRQ_TYPE_LEVEL_HIGH
++				 GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH
++				 GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH
++				 GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH
++				 GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "error",
++				  "ch0", "ch1", "ch2", "ch3", "ch4", "ch5",
++				  "ch6", "ch7", "ch8", "ch9", "ch10", "ch11",
++				  "ch12";
++		clocks = <&mstp5_clks R8A7794_CLK_AUDIO_DMAC0>;
++		clock-names = "fck";
++		power-domains = <&cpg_clocks>;
++		#dma-cells = <1>;
++		dma-channels = <13>;
++	};
 +
- /* MSTP11 */
- #define R8A7794_CLK_SCIFA3		6
- #define R8A7794_CLK_SCIFA4		7
+ 	scifa0: serial at e6c40000 {
+ 		compatible = "renesas,scifa-r8a7794",
+ 			     "renesas,rcar-gen2-scifa", "renesas,scifa";
 -- 
 2.7.0.rc3.207.g0ac5344
