@@ -1,278 +1,106 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 15 Aug 2016 10:28:26 -0400
-Subject: [PATCH V4 1/3] tracing: add a possibility of exporting function
- trace to other places instead of ring buffer only
-In-Reply-To: <1471261803-1186-2-git-send-email-zhang.chunyan@linaro.org>
-References: <1471261803-1186-1-git-send-email-zhang.chunyan@linaro.org>
- <1471261803-1186-2-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <20160815102826.667318b6@gandalf.local.home>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Mon, 15 Aug 2016 17:30:28 +0300
+Subject: [PATCH 01/19] compat ABI: use non-compat openat and
+ open_by_handle_at variants
+In-Reply-To: <mvmwplbkr8l.fsf@hawking.suse.de>
+References: <1466207668-10549-1-git-send-email-ynorov@caviumnetworks.com>
+ <1466207668-10549-2-git-send-email-ynorov@caviumnetworks.com>
+ <mvmwplbkr8l.fsf@hawking.suse.de>
+Message-ID: <20160815143028.GA7193@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Aug 2016 19:50:01 +0800
-Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
+On Mon, Jun 27, 2016 at 09:47:38AM +0200, Andreas Schwab wrote:
+> Yury Norov <ynorov@caviumnetworks.com> writes:
+> 
+> > The only difference is that non-compat version forces O_LARGEFILE,
+> > and it should be the default behaviour for all architectures, as
+> > we don't support 32-bit off_t. The only exception is tile32, that
+> > continues with compat version of syscalls.
+> >
+> > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > Acked-by: Chris Metcalf <cmetcalf@ezchip.com> [for tile]
+> > ---
+> >  arch/tile/kernel/compat.c | 3 +++
+> >  1 file changed, 3 insertions(+)
+> >
+> > diff --git a/arch/tile/kernel/compat.c b/arch/tile/kernel/compat.c
+> > index 4912084..489ae19 100644
+> > --- a/arch/tile/kernel/compat.c
+> > +++ b/arch/tile/kernel/compat.c
+> > @@ -94,6 +94,9 @@ COMPAT_SYSCALL_DEFINE5(llseek, unsigned int, fd, unsigned int, offset_high,
+> >  #define compat_sys_readahead sys32_readahead
+> >  #define sys_llseek compat_sys_llseek
+> >  
+> > +#define sys_openat		compat_sys_openat
+> > +#define sys_open_by_handle_at	compat_sys_open_by_handle_at
+> > +
+> >  /* Call the assembly trampolines where necessary. */
+> >  #define compat_sys_rt_sigreturn _compat_sys_rt_sigreturn
+> >  #define sys_clone _sys_clone
+> 
+> This is a no-op.  Did you mean to add this?  Without that the testsuite
+> of tar fails on ILP32.
 
-> +int register_trace_export(struct trace_export *export);
-> +int unregister_trace_export(struct trace_export *export);
-> +
-> +#endif	/* CONFIG_TRACING */
-> +
-> +#endif	/* _LINUX_TRACE_H */
-> diff --git a/kernel/trace/trace.c b/kernel/trace/trace.c
-> index dade4c9..0247ac2 100644
-> --- a/kernel/trace/trace.c
-> +++ b/kernel/trace/trace.c
-> @@ -40,6 +40,7 @@
->  #include <linux/poll.h>
->  #include <linux/nmi.h>
->  #include <linux/fs.h>
-> +#include <linux/trace.h>
->  #include <linux/sched/rt.h>
->  
->  #include "trace.h"
-> @@ -2128,6 +2129,127 @@ void trace_buffer_unlock_commit_regs(struct trace_array *tr,
->  	ftrace_trace_userstack(buffer, flags, pc);
->  }
->  
-> +static inline void
-> +trace_generic_commit(struct trace_array *tr,
-> +	       struct ring_buffer_event *event)
+The change you suggest below is what I originally sent at the end of
+December, but that chunk was lost after one of numerous rebases probably.
 
-Why is this marked inline? It is never called directly here.
+http://lkml.iu.edu/hypermail/linux/kernel/1512.3/00510.html
 
-> +{
-> +	struct trace_entry *entry;
-> +	struct trace_export *export = tr->export;
-> +	unsigned int size = 0;
-> +
-> +	entry = ring_buffer_event_data(event);
-> +
-> +	trace_entry_size(size, entry->type);
-> +	if (!size)
-> +		return;
-> +
-> +	if (export->write)
-> +		export->write((char *)entry, size);
-> +}
-> +
-> +static inline void
+IIRC, the only difference between this couple of syscalls and their
+compat versions is that non-compat syscalls set O_LARGEFILE depending
+on (BITS_PER_LONG != 32). Next patch of this series introduces
+ARCH_32BIT_OFF_T config option to force O_LARGEFILE for 64-bit arches,
+and all new 32-bit arches, as ARCH_32BIT_OFF_T is enabled for existing
+32-bit arches explicitly.
 
-Same here.
+O_LARGEFILE is controlled like this:
+        -#define force_o_largefile() (BITS_PER_LONG != 32)
+        +#define force_o_largefile() (!IS_ENABLED(CONFIG_ARCH_32BIT_OFF_T))
 
-> +trace_rb_commit(struct trace_array *tr,
-> +	       struct ring_buffer_event *event)
-> +{
-> +	__buffer_unlock_commit(tr->trace_buffer.buffer, event);
-> +}
-> +
-> +static DEFINE_MUTEX(trace_export_lock);
-> +
-> +static struct trace_export trace_export_rb __read_mostly = {
-> +	.name		= "rb",
-> +	.commit	= trace_rb_commit,
+So if I restore original patch, everything will work. But my question
+is: if ARCH_32BIT_OFF_T disables O_LARGEFILE for tile32 anyway, what
+for we redirect native syscall handlers to compat ones? They are
+looking identical...
 
-Make sure equal signs are lined up.
+If my understanding is correct, we can drop the change in
+arch/tile/kernel/compat.c and join this patch with next one in this
+series.
 
-> +	.next		= NULL,
-> +};
-> +static struct trace_export *trace_exports_list __read_mostly = &trace_export_rb;
+Chris, Arnd?
 
-trace_exports_list needs to be annotated as rcu, if you are going to
-dereference it via rcu_dereference. That was the kbuild warning you
-received.
-
-
-
-> +
-> +inline void
-> +trace_exports(struct trace_array *tr, struct ring_buffer_event *event)
-> +{
-> +	struct trace_export *export;
-> +
-> +	preempt_disable_notrace();
-> +
-> +	for (export = rcu_dereference_raw_notrace(trace_exports_list);
-> +	     export && export->commit;
-> +	     export = rcu_dereference_raw_notrace(export->next)) {
-> +		tr->export = export;
-> +		export->commit(tr, event);
-> +	}
-> +
-> +	preempt_enable_notrace();
-> +}
-
-I'm not too happy about the added overhead to normal function tracing
-(it will be noticeable), but I can fix that later.
-
-> +
-> +static void
-> +add_trace_export(struct trace_export **list, struct trace_export *export)
-> +{
-> +	export->next = *list;
-
-As export->next will most likely need to be marked __rcu as well, this
-may need an rcu_assign_pointer() too.
-
-> +	/*
-> +	 * We are entering export into the list but another
-> +	 * CPU might be walking that list. We need to make sure
-> +	 * the export->next pointer is valid before another CPU sees
-> +	 * the export pointer included into the list.
-> +	 */
-> +	rcu_assign_pointer(*list, export);
-> +
-> +}
-> +
-> +static int
-> +rm_trace_export(struct trace_export **list, struct trace_export *export)
-> +{
-> +	struct trace_export **p;
-> +
-> +	for (p = list; *p != &trace_export_rb; p = &(*p)->next)
-> +		if (*p == export)
-> +			break;
-> +
-> +	if (*p != export)
-> +		return -1;
-> +
-> +	*p = (*p)->next;
-
-I believe this requires an rcu_assign_pointer() as well.
-
-> +
-> +	return 0;
-> +}
-> +
-> +int register_trace_export(struct trace_export *export)
-> +{
-> +	if (!export->write) {
-> +		pr_warn("trace_export must have the write() call back.\n");
-
-Probably should be a "WARN_ON_ONCE()".
-
-> +		return -1;
-> +	}
-> +
-> +	if (!export->name) {
-> +		pr_warn("trace_export must have a name.\n");
-> +		return -1;
-> +	}
-
-If name isn't used don't add it till it is. That is, this patch should
-not have "name" in the structure. It's confusing, because I don't see a
-purpose for it.
-
-> +
-> +	mutex_lock(&trace_export_lock);
-> +
-> +	export->tr = trace_exports_list->tr;
-
-I don't see where tr is ever assigned.
-
-> +	export->commit = trace_generic_commit;
-
-Shouldn't the caller pass in the commit function too?
-
-> +
-> +	add_trace_export(&trace_exports_list, export);
-> +
-> +	mutex_unlock(&trace_export_lock);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(register_trace_export);
-> +
-> +int unregister_trace_export(struct trace_export *export)
-> +{
-> +	int ret;
-> +
-> +	mutex_lock(&trace_export_lock);
-> +
-> +	ret = rm_trace_export(&trace_exports_list, export);
-> +
-> +	mutex_unlock(&trace_export_lock);
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(unregister_trace_export);
-> +
->  void
->  trace_function(struct trace_array *tr,
->  	       unsigned long ip, unsigned long parent_ip, unsigned long flags,
-> @@ -2147,7 +2269,7 @@ trace_function(struct trace_array *tr,
->  	entry->parent_ip		= parent_ip;
->  
->  	if (!call_filter_check_discard(call, entry, buffer, event))
-
-How do you handle the discard? If the entry doesn't match the filter,
-it will try to discard the event. I don't see how the "trace_exports"
-handle that.
-
-
-> -		__buffer_unlock_commit(buffer, event);
-> +		trace_exports(tr, event);
->  }
->  
->  #ifdef CONFIG_STACKTRACE
-> diff --git a/kernel/trace/trace.h b/kernel/trace/trace.h
-> index f783df4..a40f07c 100644
-> --- a/kernel/trace/trace.h
-> +++ b/kernel/trace/trace.h
-> @@ -260,6 +260,7 @@ struct trace_array {
->  	/* function tracing enabled */
->  	int			function_enabled;
->  #endif
-> +	struct trace_export	*export;
->  };
->  
->  enum {
-> @@ -301,6 +302,13 @@ static inline struct trace_array *top_trace_array(void)
->  		break;					\
->  	}
->  
-> +#undef IF_SIZE
-> +#define IF_SIZE(size, var, etype, id)		\
-> +		if (var == id) {		\
-> +			size = (sizeof(etype));	\
-> +			break;			\
-> +		}
-> +
->  /* Will cause compile errors if type is not found. */
->  extern void __ftrace_bad_type(void);
->  
-> @@ -339,6 +347,29 @@ extern void __ftrace_bad_type(void);
->  	} while (0)
->  
->  /*
-> + * The trace_entry_size return the size of specific trace type
-> + *
-> + * IF_SIZE(size, var);
-> + *
-> + * Where "var" is just the given trace type.
-> + */
-> +#define trace_entry_size(size, var)					\
-> +	do {								\
-> +		IF_SIZE(size, var, struct ftrace_entry, TRACE_FN);	\
-> +		IF_SIZE(size, var, struct stack_entry, TRACE_STACK);	\
-> +		IF_SIZE(size, var, struct userstack_entry,		\
-> +			TRACE_USER_STACK);				\
-> +		IF_SIZE(size, var, struct print_entry, TRACE_PRINT);	\
-> +		IF_SIZE(size, var, struct bprint_entry, TRACE_BPRINT);	\
-> +		IF_SIZE(size, var, struct bputs_entry, TRACE_BPUTS);	\
-> +		IF_SIZE(size, var, struct trace_branch, TRACE_BRANCH);	\
-> +		IF_SIZE(size, var, struct ftrace_graph_ent_entry,	\
-> +			TRACE_GRAPH_ENT);				\
-> +		IF_SIZE(size, var, struct ftrace_graph_ret_entry,	\
-> +			TRACE_GRAPH_RET);				\
-
-I really really dislike this. This is a big if statement that all
-needs to go down one by one. Very inefficient!
-
--- Steve
-
-> +	} while (0)
-> +
-> +/*
->   * An option specific to a tracer. This is a boolean value.
->   * The bit is the bit index that sets its value on the
->   * flags value in struct tracer_flags.
+> 
+> diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
+> index a26415b..4dcc38d 100644
+> --- a/include/uapi/asm-generic/unistd.h
+> +++ b/include/uapi/asm-generic/unistd.h
+> @@ -178,7 +178,7 @@ __SYSCALL(__NR_fchownat, sys_fchownat)
+>  #define __NR_fchown 55
+>  __SYSCALL(__NR_fchown, sys_fchown)
+>  #define __NR_openat 56
+> -__SC_COMP(__NR_openat, sys_openat, compat_sys_openat)
+> +__SYSCALL(__NR_openat, sys_openat)
+>  #define __NR_close 57
+>  __SYSCALL(__NR_close, sys_close)
+>  #define __NR_vhangup 58
+> @@ -676,8 +676,7 @@ __SYSCALL(__NR_fanotify_mark, sys_fanotify_mark)
+>  #define __NR_name_to_handle_at         264
+>  __SYSCALL(__NR_name_to_handle_at, sys_name_to_handle_at)
+>  #define __NR_open_by_handle_at         265
+> -__SC_COMP(__NR_open_by_handle_at, sys_open_by_handle_at, \
+> -	  compat_sys_open_by_handle_at)
+> +__SYSCALL(__NR_open_by_handle_at, sys_open_by_handle_at)
+>  #define __NR_clock_adjtime 266
+>  __SC_COMP(__NR_clock_adjtime, sys_clock_adjtime, compat_sys_clock_adjtime)
+>  #define __NR_syncfs 267
+> -- 
+> 2.9.0
+> 
+> 
+> Andreas.
+> 
+> -- 
+> Andreas Schwab, SUSE Labs, schwab at suse.de
+> GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+> "And now for something completely different."
