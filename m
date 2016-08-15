@@ -1,23 +1,36 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 15 Aug 2016 15:48:36 -0700
-Subject: [PATCH] clk: gxbb: add MMC gate clocks, and expose for DT
-In-Reply-To: <20160802214011.19077-1-khilman@baylibre.com>
-References: <20160802214011.19077-1-khilman@baylibre.com>
-Message-ID: <20160815224836.GS361@codeaurora.org>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Mon, 15 Aug 2016 22:51:29 +0000
+Subject: [PATCH -next] net: thunderx: Remove unnecessary pci_set_drvdata()
+Message-ID: <1471301489-24888-1-git-send-email-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02, Kevin Hilman wrote:
-> Add the SD/eMMC gate clocks and expose them for use by DT.
-> 
-> While at it, also explose FCLK_DIV2 since this is one of the input
-> clocks to the mux internal to each of the SD/eMMC blocks.
-> 
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
-> ---
+The driver core clears the driver data to NULL after device_release
+or on probe failure. Thus, it is not needed to manually clear the
+device driver data to NULL.
 
-Applied to clk-meson-gxbb and merged into clk-next.
+Signed-off-by: Wei Yongjun <weiyj.lk@gmail.com>
+---
+ drivers/net/ethernet/cavium/thunder/thunder_xcv.c | 2 --
+ 1 file changed, 2 deletions(-)
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_xcv.c b/drivers/net/ethernet/cavium/thunder/thunder_xcv.c
+index 9210d04..67befed 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_xcv.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_xcv.c
+@@ -194,7 +194,6 @@ err_release_regions:
+ err_disable_device:
+ 	pci_disable_device(pdev);
+ err_kfree:
+-	pci_set_drvdata(pdev, NULL);
+ 	devm_kfree(dev, xcv);
+ 	xcv = NULL;
+ 	return err;
+@@ -211,7 +210,6 @@ static void xcv_remove(struct pci_dev *pdev)
+ 
+ 	pci_release_regions(pdev);
+ 	pci_disable_device(pdev);
+-	pci_set_drvdata(pdev, NULL);
+ }
+ 
+ static struct pci_driver xcv_driver = {
