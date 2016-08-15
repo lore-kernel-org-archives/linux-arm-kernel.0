@@ -1,56 +1,47 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 15 Aug 2016 10:55:25 +0200
-Subject: [PATCH 06/26] ARM: dts: r8a7792: add EtherAVB clocks
+Date: Mon, 15 Aug 2016 10:55:26 +0200
+Subject: [PATCH 07/26] ARM: dts: r8a7792: add EtherAVB support
 In-Reply-To: <cover.1471251169.git.horms+renesas@verge.net.au>
 References: <cover.1471251169.git.horms+renesas@verge.net.au>
-Message-ID: <08cafff67e8881e1622068924aaab3c3aa052b0b.1471251169.git.horms+renesas@verge.net.au>
+Message-ID: <b12dcdcc474977095ce72152b285be7f94d0efd3.1471251169.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Add the EtherAVB clock and its parent, HP clock to the R8A7792 device tree.
+Define the generic R8A7792 part of the EtherAVB device node.
+
+Based on the commit 89aac8af1a60 ("ARM: dts: r8a7794: add EtherAVB support").
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7792.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/r8a7792.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
-index d5ab9474297e..f97b034da35f 100644
+index f97b034da35f..37c9d95688cf 100644
 --- a/arch/arm/boot/dts/r8a7792.dtsi
 +++ b/arch/arm/boot/dts/r8a7792.dtsi
-@@ -471,6 +471,13 @@
- 			clock-div = <6>;
- 			clock-mult = <1>;
+@@ -444,6 +444,18 @@
+ 			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
  		};
-+		hp_clk: hp {
-+			compatible = "fixed-factor-clock";
-+			clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
-+			#clock-cells = <0>;
-+			clock-div = <12>;
-+			clock-mult = <1>;
+ 
++		avb: ethernet at e6800000 {
++			compatible = "renesas,etheravb-r8a7792",
++				     "renesas,etheravb-rcar-gen2";
++			reg = <0 0xe6800000 0 0x800>, <0 0xee0e8000 0 0x4000>;
++			interrupts = <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&mstp8_clks R8A7792_CLK_ETHERAVB>;
++			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
 +		};
- 		p_clk: p {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
-@@ -538,6 +545,15 @@
- 			clock-output-names = "hscif1", "hscif0", "scif3",
- 					     "scif2", "scif1", "scif0";
- 		};
-+		mstp8_clks: mstp8_clks at e6150990 {
-+			compatible = "renesas,r8a7792-mstp-clocks",
-+				     "renesas,cpg-mstp-clocks";
-+			reg = <0 0xe6150990 0 4>, <0 0xe61509a0 0 4>;
-+			clocks = <&hp_clk>;
-+			#clock-cells = <1>;
-+			clock-indices = <R8A7792_CLK_ETHERAVB>;
-+			clock-output-names = "etheravb";
-+		};
- 		mstp9_clks: mstp9_clks at e6150994 {
- 			compatible = "renesas,r8a7792-mstp-clocks",
- 				     "renesas,cpg-mstp-clocks";
++
+ 		/* Special CPG clocks */
+ 		cpg_clocks: cpg_clocks at e6150000 {
+ 			compatible = "renesas,r8a7792-cpg-clocks",
 -- 
 2.7.0.rc3.207.g0ac5344
