@@ -1,145 +1,148 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 15 Aug 2016 23:37:27 +0200
-Subject: [RFC PATCH v2 0/4] arm/arm64: vgic-new: Implement API for vGICv3
- live migration
-In-Reply-To: <CALicx6sQFPSqr6AsdUE8nuFOPDz+becwGDFgmTsyOR55HFV18w@mail.gmail.com>
-References: <1470740326-27751-1-git-send-email-vijay.kilari@gmail.com>
- <CAFEAcA-z+iM+=p0riWreJCewPPxw9wtHgg+_4MDtxV=ccwe-tg@mail.gmail.com>
- <CALicx6sdGgkf_neZ_F0OUu3cg36VBoWT581HAG=v2FecN6omJA@mail.gmail.com>
- <CAFEAcA-eAHaZio6xWtyDEDAGynXMEsAMBHMnPWx_B1DTQ+qGNQ@mail.gmail.com>
- <CALicx6sQFPSqr6AsdUE8nuFOPDz+becwGDFgmTsyOR55HFV18w@mail.gmail.com>
-Message-ID: <20160815213727.GA30152@cbox>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Mon, 15 Aug 2016 22:35:54 +0100
+Subject: [PATCH v3 1/4] hwmon: iio_hwmon: delay probing with late_initcall
+In-Reply-To: <20160815170730.GB32260@roeck-us.net>
+References: <1469519027-11387-1-git-send-email-quentin.schulz@free-electrons.com>
+ <5277864.qlyRKbC1Zy@ws-stein>
+ <ed5c1761-bdc7-df9c-96c8-998e83c49c4c@free-electrons.com>
+ <2324970.FJcTUYNoO2@ws-stein> <20160726160410.GE30628@roeck-us.net>
+ <aa387c9c-8330-fd2a-67c1-0aa0b9a90794@kernel.org>
+ <20160815170730.GB32260@roeck-us.net>
+Message-ID: <ECA41B39-BCC0-44D0-8B3D-838C48D713D0@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 12, 2016 at 01:08:12PM +0530, Vijay Kilari wrote:
-> On Thu, Aug 11, 2016 at 1:15 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
-> > On 11 August 2016 at 06:29, Vijay Kilari <vijay.kilari@gmail.com> wrote:
-> >> On Tue, Aug 9, 2016 at 5:22 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
-> >>> On 9 August 2016 at 11:58,  <vijay.kilari@gmail.com> wrote:
-> >>>> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
-> >>>>
-> >>>> This patchset adds API for saving and restoring
-> >>>> of VGICv3 registers to support live migration with new vgic feature.
-> >>>> This API definition is as per version of VGICv3 specification
-> >>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
-> >>>>
-> >>>> To test live migration with QEMU, use below patch series
-> >>>> https://lists.gnu.org/archive/html/qemu-devel/2016-08/msg01444.html
-> >>>>
-> >>>> The patch 3 & 4 are picked from the Pavel's previous implementation.
-> >>>> http://www.spinics.net/lists/kvm/msg122040.html
-> >>>>
-> >>>> v1 => v2:
-> >>>>  - The init sequence change patch is no more required.
-> >>>>    Fixed in patch 2 by using static vgic_io_dev regions structure instead
-> >>>>    of using dynamic allocation pointer.
-> >>>>  - Updated commit message of patch 4.
-> >>>>  - Dropped usage of union to manage 32-bit and 64-bit access in patch 1.
-> >>>>    Used local variable for 32-bit access.
-> >>>>  - Updated macro __ARM64_SYS_REG and ARM64_SYS_REG in
-> >>>>    arch/arm64/include/uapi/asm/kvm.h as per qemu requirements.
-> >>>
-> >>> I only scanned briefly through this patchset, but I didn't
-> >>> see any code implementing:
-> >>>  * KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO
-> >>
-> >> If irq->pending is updated by kernel based on irq->line_level when interrupt
-> >> is asserted by device or guest. Do we still need to extract
-> >> irq->line_level using
-> >> this ioctl and while writing back GIC{D|R}_ISPENDR with line_level
-> >> +(OR) GIC{D|R}_ISPENDR?
-> >
-> > The level and the pending status are different things;
-> > the API docs have an explanation of this. The API access
-> > to the ISPENDR registers should return only the pending
-> > latch status (which is not the same as what these registers
-> > return if you read them from the guest).
-> >
-> >>>  * the different behaviour for accesses to GICD_STATUSR, GICR_STATUSR,
-> >>
-> >> QEMU is saving and restoring this register, but kernel implementation
-> >> is missing. Kernel is silently returning zero. So could not catch. I
-> >> will fix it.
-> >>
-> >> However, Specification says as below for STATUSR.
-> >>
-> >> "    The GICD_STATUSR and GICR_STATUSR registers are architecturally
-> >> defined such
-> >>      that a write of a clear bit has no effect, whereas a write with a set bit
-> >>      clears that value.  To allow userspace to freely set the values
-> >> of these two
-> >>      registers, setting the attributes with the register offsets for these two
-> >>      registers simply sets the non-reserved bits to the value written."
-> >>
-> >> Question is during restore, the set bit will clear the value STATUSR.
-> >> So it will reset the STATUSR after migrating the VM.
-> >
-> > The text you quote above says that setting the attribute via
-> > the API "sets the non-reserved bits to the value written".
-> > This is the point -- it does not have the write-1-to-clear
-> > behaviour that a guest access to the register does.
-> >
-> >>>    GICD_ISPENDR, GICR_ISPENDR0, GICD_ICPENDR, and GICR_ICPENDR0, which
-> >>>    don't act the same via this API as for a guest access to the register
-> >>>
-> >>> Did I miss something?
-> >>
-> >> In kernel (as shown in below code snippet),
-> >>  GICD_ISPENDR, GICR_ISPENDR0, GICD_ICPENDR, and GICR_ICPENDR0
-> >> all register access using KVM_DEV_ARM_VGIC_GRP_{RE|DIST}_REGS ioctl
-> >> is accessing irq->pending state.
-> >>
-> >> unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
-> >>                                      gpa_t addr, unsigned int len)
-> >> {
-> >>         u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
-> >>         u32 value = 0;
-> >>         int i;
-> >>
-> >>         /* Loop over all IRQs affected by this read */
-> >>         for (i = 0; i < len * 8; i++) {
-> >>                 struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> >>
-> >>                 if (irq->pending)
-> >>                         value |= (1U << i);
-> >>         }
-> >>
-> >>   ...
-> >> }
-> >
-> > This is the code for handling a guest access to this register.
-> > The behaviour for access from userspace via this API has
-> > to be different, and therefore it must not use this code.
-> > The API doc specifies how it must differ.
-> 
-> API doc says,
-> 
-> "For a level triggered interrupt the value accessed
-> here is that of the latch which is set by ISPENDR and cleared by ICPENDR or
-> interrupt activation"
-> 
-> Kernel maintains only irq->pending for all interrupts.
-
-no, the kernel also maintains irq->soft_pending.
-
-> By going through the code, there is no separate variable that holds purely
-> ISPENDR value. With assumption that irq->pending is purely ISPENDR for
-> level triggerred
-
-it is not; irq->pending is always an OR of the line_level with the
-soft_pending field for level-triggered interrupts.
-
-You can read and understand the semantics of the soft_pending field by
-taking a look at vgic_mmio_write_spending and grepping for soft_pending
-in the kernel and vgic code in general.
 
 
-> interrupt, userspace access to ISPENDR for level triggerred interrupts
-> can be irq->pending & (~ICPENDR[irq_bit]) | irq->active?.
+On 15 August 2016 18:07:30 BST, Guenter Roeck <linux@roeck-us.net> wrote:
+>On Mon, Aug 15, 2016 at 04:40:21PM +0100, Jonathan Cameron wrote:
+>> On 26/07/16 17:04, Guenter Roeck wrote:
+>> > On Tue, Jul 26, 2016 at 12:00:33PM +0200, Alexander Stein wrote:
+>> >> On Tuesday 26 July 2016 11:33:59, Quentin Schulz wrote:
+>> >>> On 26/07/2016 11:05, Alexander Stein wrote:
+>> >>>> On Tuesday 26 July 2016 10:24:48, Quentin Schulz wrote:
+>> >>>>> On 26/07/2016 10:21, Alexander Stein wrote:
+>> >>>>>> On Tuesday 26 July 2016 09:43:44, Quentin Schulz wrote:
+>> >>>>>>> iio_channel_get_all returns -ENODEV when it cannot find
+>either phandles
+>> >>>>>>> and
+>> >>>>>>> properties in the Device Tree or channels whose
+>consumer_dev_name
+>> >>>>>>> matches
+>> >>>>>>> iio_hwmon in iio_map_list. The iio_map_list is filled in by
+>iio drivers
+>> >>>>>>> which might be probed after iio_hwmon.
+>> >>>>>>
+>> >>>>>> Would it work if iio_channel_get_all returning ENODEV is used
+>for
+>> >>>>>> returning
+>> >>>>>> EPROBE_DEFER in iio_channel_get_all? Using late initcalls for
+>> >>>>>> driver/device
+>> >>>>>> dependencies seems not right for me at this place.
+>> >>>>>
+>> >>>>> Then what if the iio_channel_get_all is called outside of the
+>probe of a
+>> >>>>> driver? We'll have to change the error code, things we are
+>apparently
+>> >>>>> trying to avoid (see v2 patches' discussions).
+>> >>>>
+>> >>>> Maybe I didn't express my idea enough. I don't want to change
+>the behavior
+>> >>>> of iio_channel_get_all at all. Just the result evaluation of
+>> >>>> iio_channel_get_all in iio_hwmon_probe. I have something link
+>the patch
+>> >>>> below in mind.
+>> >>>>
+>> >>>> Best regards,
+>> >>>> Alexander
+>> >>>> ---
+>> >>>> diff --git a/drivers/hwmon/iio_hwmon.c
+>b/drivers/hwmon/iio_hwmon.c
+>> >>>> index b550ba5..e32d150 100644
+>> >>>> --- a/drivers/hwmon/iio_hwmon.c
+>> >>>> +++ b/drivers/hwmon/iio_hwmon.c
+>> >>>> @@ -73,8 +73,12 @@ static int iio_hwmon_probe(struct
+>platform_device
+>> >>>> *pdev)
+>> >>>>
+>> >>>>                 name = dev->of_node->name;
+>> >>>>         
+>> >>>>         channels = iio_channel_get_all(dev);
+>> >>>>
+>> >>>> -       if (IS_ERR(channels))
+>> >>>> -               return PTR_ERR(channels);
+>> >>>> +       if (IS_ERR(channels)) {
+>> >>>> +               if (PTR_ERR(channels) == -ENODEV)
+>> >>>> +                       return -EPROBE_DEFER;
+>> >>>> +               else
+>> >>>> +                       return PTR_ERR(channels);
+>> >>>> +       }
+>> >>>>
+>> >>>>         st = devm_kzalloc(dev, sizeof(*st), GFP_KERNEL);
+>> >>>>         if (st == NULL) {
+>> >>>
+>> >>> Indeed, I misunderstood what you told me.
+>> >>>
+>> >>> Actually, the patch you proposed is part of my v1
+>> >>> (https://lkml.org/lkml/2016/6/28/203) and v2
+>> >>> (https://lkml.org/lkml/2016/7/15/215).
+>> >>> Jonathan and Guenter didn't really like the idea of changing the
+>-ENODEV
+>> >>> in -EPROBE_DEFER.
+>> >>
+>> >> Thanks for the links.
+>> >>
+>> >>> What I thought you were proposing was to change the -ENODEV
+>return code
+>> >>> inside iio_channel_get_all. This cannot be an option since the
+>function
+>> >>> might be called outside of a probe (it is not yet, but might be
+>in the
+>> >>> future?).
+>> >>
+>> >> AFAICS this is a helper function not knowing about device probing
+>itself. And 
+>> >> it should stay at that.
+>> >>
+>> >>> Of what I understood, two possibilities are then possible
+>(proposed
+>> >>> either by Guenter or Jonathan): either rework the iio framework
+>to
+>> >>> register iio map array earlier or to use late_initcall instead of
+>init
+>> >>> for the driver consuming the iio channels.
+>> >>
+>> >> Interestingly using this problem would not arise due to module
+>dependencies. 
+>> >> But using late_initcall would mean this needs to be done on any
+>driver using 
+>> >> iio channels? I would rather keep those consumers simple.
+>> >>
+>> > Me too, but that would imply a solution in iio. The change you
+>propose above
+>> > isn't exactly simple either, and would also be needed in each
+>consumer driver.
+>> > 
+>> > Just for the record, I dislike the late_initcall solution as well,
+>but I prefer
+>> > it over blindly converting ENODEV to EPROBE_DEFER.
+>> I'm falling on the other side on this one right now. Though I'd be
+>tempted
+>> to renaming the function to something like
+>iio_channel_get_all_or_defer
+>> to make it explicit that it can result in deferred probing.
+>> 
+>Would this new function return -EPROBE_DEFER instead of -ENODEV ?
+Yes. Though whether it really adds much over doing that in drivers isn't clear.
 
-I don't understand what the active state has to do with userspace
-reading the ISPENDR?
+Hmm. Needs more thought...
+>
+>Thanks,
+>Guenter
+>--
+>To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+>the body of a message to majordomo at vger.kernel.org
+>More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Hope this helps,
--Christoffer
+-- 
+Sent from my Android device with K-9 Mail. Please excuse my brevity.
