@@ -1,28 +1,87 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 15 Aug 2016 13:07:57 -0300
-Subject: [PATCH 3/3] ARM: dts: imx28: Fix build warnings with W=1
-In-Reply-To: <CAL_Jsq+u7c3Tj+AyuXhNhME8uZvJmX2a8EJmHow6Tkd1vv=7nA@mail.gmail.com>
-References: <1471203266-30414-1-git-send-email-festevam@gmail.com>
- <1471203266-30414-3-git-send-email-festevam@gmail.com>
- <CAL_Jsq+u7c3Tj+AyuXhNhME8uZvJmX2a8EJmHow6Tkd1vv=7nA@mail.gmail.com>
-Message-ID: <CAOMZO5CjBye7=a4AnYCJ1HDC42F6wW331XXNx+11tAdxX9Edmg@mail.gmail.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Mon, 15 Aug 2016 10:08:57 -0600
+Subject: [PATCH v3 02/15] dt/bindings: Update binding for PM domain idle
+ states
+In-Reply-To: <697d8ac2-34ee-db3e-940b-5ce3365c5aa1@arm.com>
+References: <1470351902-43103-1-git-send-email-lina.iyer@linaro.org>
+ <1470351902-43103-3-git-send-email-lina.iyer@linaro.org>
+ <99e35b6c-6698-6d27-f4d7-fa032796869e@arm.com>
+ <20160810164034.GA1401@linaro.org>
+ <5e59874c-bbb7-270a-199c-da1ff5932554@arm.com>
+ <20160811211023.GC1401@linaro.org>
+ <697d8ac2-34ee-db3e-940b-5ce3365c5aa1@arm.com>
+Message-ID: <20160815160857.GE1401@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2016 at 1:01 PM, Rob Herring <robh+dt@kernel.org> wrote:
-> On Sun, Aug 14, 2016 at 2:34 PM, Fabio Estevam <festevam@gmail.com> wrote:
->> From: Fabio Estevam <fabio.estevam@nxp.com>
->>
->> Fix the following build warnings with W=1:
->>
->> Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
->>
->> While at it, also pass the 'device_type' property as recommended by the
->> ePAPR specification.
+On Fri, Aug 12 2016 at 04:08 -0600, Sudeep Holla wrote:
 >
-> I'm surprised it worked without unless you were relying on
-> skeleton.dtsi. If that's the case, please remove the dependency on
-> skeleton.dtsi while at it.
+>
+>On 11/08/16 22:10, Lina Iyer wrote:
+>>On Wed, Aug 10 2016 at 12:09 -0600, Sudeep Holla wrote:
+>>>
+>
+>[...]
+>
+>>>cluster0
+>>>    CLUSTER_RET(Retention)
+>>>    CLUSTER_PG(Power Gate)
+>>>    core0
+>>>        CORE_RET
+>>>        CORE_PG
+>>>    core1
+>>>        CORE_RET
+>>>        CORE_PG
+>>>
+>>>cluster1
+>>>    CLUSTER_RET
+>>>    CLUSTER_PG
+>>>    core0
+>>>        CORE_RET
+>>>        CORE_PG
+>>>    core1
+>>>        CORE_RET
+>>>        CORE_PG
+>>>
+>>>Platform Co-ordinate supports the following states and we should be
+>>>able to determine that from the binding:
+>>>
+>>>CORE_RET
+>>>CORE_PG
+>>>CORE_RET + CLUSTER_RET
+>>
+>>The problem that we have to sove here is knowing that CORE_RET +
+>>CLUSTER_PG (hypothetically) an invalid combination. Kevin and
+>>I debated it in the earlier RFC and we dont have a good way to solve
+>>this generically for all devices.
+>>
+>
+>Yes, I agree it's complex. But that needs to be solved IMO.
+>
+>I can think of 2 possible solutions:
+>
+>1. Index the states(which people have not liked, but as along as we
+>   don't use it in the code as it for any other purpose, it should be
+>   fine) and then have each state mentioning what parent state can be
+>   entered at this child state(i.e. starting index and all states below
+>   it)
+>
+This is how QCOM solved it downstream.
 
-Yes, imx28.dtsi includes skeleton.dtsi. Will remove this dependency
-and submit a v2.
+>2. Something similar to (1) but without index instead phandles.
+>
+
+The problem is when you have non-CPU devices in the device tree and
+since they do not have a way to represent states like CPU, we did not
+have a clear path to that. Hence we punted that to later. Whatever we
+do, we should solve it for a generic PM domain, not just CPU domains.
+
+Thanks,
+Lina
+
+>Again these are just thoughts, others may think of some better
+>solution(s). Sorry I haven't followed all the previous threads in detail.
+>
+>-- 
+>Regards,
+>Sudeep
