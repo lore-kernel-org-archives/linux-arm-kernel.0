@@ -1,21 +1,23 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 15 Aug 2016 23:03:44 +0200
-Subject: [PATCH] ARM: kirkwood: ib62x0: fix size of u-boot environment
- partition
-In-Reply-To: <1471021970-21248-1-git-send-email-gmbnomis@gmail.com>
-References: <1471021970-21248-1-git-send-email-gmbnomis@gmail.com>
-Message-ID: <20160815210344.GI24664@lunn.ch>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 15 Aug 2016 14:09:41 -0700
+Subject: [PATCH v3 2/6] clk: mvebu: Add the xtal clock for Armada 3700 SoC
+In-Reply-To: <1468935742-11218-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1468935742-11218-1-git-send-email-gregory.clement@free-electrons.com>
+ <1468935742-11218-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20160815210941.GA361@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 12, 2016 at 07:12:50PM +0200, Simon Baatz wrote:
-> Commit 148c274ea644 ("ARM: kirkwood: ib62x0: add u-boot environment
-> partition") split the "u-boot" partition into "u-boot" and "u-boot
-> environment".  However, instead of the size of the environment, an offset
-> was given, resulting in overlapping partitions.
+On 07/19, Gregory CLEMENT wrote:
+> This clock is the parent of all the Armada 3700 clocks. It is a fixed
+> rate clock which depends on the gpio configuration read when resetting
+> the SoC.
 > 
-> Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Applied to clk-next
 
-    Andrew
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
