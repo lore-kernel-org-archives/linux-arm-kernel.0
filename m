@@ -1,66 +1,91 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 15 Aug 2016 14:10:14 -0700
-Subject: [PATCH v3 4/6] clk: mvebu Add the time base generator clocks for
- Armada 3700
-In-Reply-To: <1468935742-11218-5-git-send-email-gregory.clement@free-electrons.com>
-References: <1468935742-11218-1-git-send-email-gregory.clement@free-electrons.com>
- <1468935742-11218-5-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20160815211014.GC361@codeaurora.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 15 Aug 2016 23:15:31 +0200
+Subject: [PATCH v3] KVM: arm64: vgic-its: Make updates to propbaser/pendbaser
+ atomic
+Message-ID: <20160815211531.30350-1-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/19, Gregory CLEMENT wrote:
-> These clocks are children of the xtal clock and each one can be selected
-> as a source for the peripheral clocks.
-> 
-> According to the datasheet it should be possible to modify their rate,
-> but currently it is not supported.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
+There are two problems with the current implementation of the MMIO
+handlers for the propbaser and pendbaser:
 
-Applied to clk-next + the following squashed in
+First, the write to the value itself is not guaranteed to be an atomic
+64-bit write so two concurrent writes to the structure field could be
+intermixed.
 
-diff --git a/drivers/clk/mvebu/armada-37xx-tbg.c b/drivers/clk/mvebu/armada-37xx-tbg.c
-index 2063ba7d5cb1..aa80db11f543 100644
---- a/drivers/clk/mvebu/armada-37xx-tbg.c
-+++ b/drivers/clk/mvebu/armada-37xx-tbg.c
-@@ -46,14 +46,14 @@ struct tbg_def {
- 	u32 vcodiv_offset;
- };
+Second, because we do a read-modify-update operation without any
+synchronization, if we have two 32-bit accesses to separate parts of the
+register, we can loose one of them.
+
+By using the atomic cmpxchg64 we should cover both issues above.
+
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+Changes since v2:
+ - I misread the implementation and example uses of cmpxchg64 and
+   checked the return value for non-zero instead of comparing with the
+   old value.
+ - Dropped Andre's R-B
+
+Changes since v1:
+ - Use atomic cmpxchg64 instead of taking a lock
  
--const struct tbg_def tbg[NUM_TBG] = {
-+static const struct tbg_def tbg[NUM_TBG] = {
- 	{"TBG-A-P", TBG_A_REFDIV, TBG_A_FBDIV, TBG_CTRL8, TBG_A_VCODIV_DIFF},
- 	{"TBG-B-P", TBG_B_REFDIV, TBG_B_FBDIV, TBG_CTRL8, TBG_B_VCODIV_DIFF},
- 	{"TBG-A-S", TBG_A_REFDIV, TBG_A_FBDIV, TBG_CTRL1, TBG_A_VCODIV_SE},
- 	{"TBG-B-S", TBG_B_REFDIV, TBG_B_FBDIV, TBG_CTRL1, TBG_B_VCODIV_SE},
- };
- 
--unsigned int tbg_get_mult(void __iomem *reg, const struct tbg_def *ptbg)
-+static unsigned int tbg_get_mult(void __iomem *reg, const struct tbg_def *ptbg)
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 26 ++++++++++++++++----------
+ 1 file changed, 16 insertions(+), 10 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index ff668e0..90d8181 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -306,16 +306,19 @@ static void vgic_mmio_write_propbase(struct kvm_vcpu *vcpu,
  {
- 	u32 val;
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+-	u64 propbaser = dist->propbaser;
++	u64 old_propbaser, propbaser;
  
-@@ -62,7 +62,7 @@ unsigned int tbg_get_mult(void __iomem *reg, const struct tbg_def *ptbg)
- 	return ((val >> ptbg->fbdiv_offset) & TBG_DIV_MASK) << 2;
+ 	/* Storing a value with LPIs already enabled is undefined */
+ 	if (vgic_cpu->lpis_enabled)
+ 		return;
+ 
+-	propbaser = update_64bit_reg(propbaser, addr & 4, len, val);
+-	propbaser = vgic_sanitise_propbaser(propbaser);
+-
+-	dist->propbaser = propbaser;
++	do {
++		old_propbaser = dist->propbaser;
++		propbaser = old_propbaser;
++		propbaser = update_64bit_reg(propbaser, addr & 4, len, val);
++		propbaser = vgic_sanitise_propbaser(propbaser);
++	} while (cmpxchg64(&dist->propbaser, old_propbaser,
++			   propbaser) != old_propbaser);
  }
  
--unsigned int tbg_get_div(void __iomem *reg, const struct tbg_def *ptbg)
-+static unsigned int tbg_get_div(void __iomem *reg, const struct tbg_def *ptbg)
+ static unsigned long vgic_mmio_read_pendbase(struct kvm_vcpu *vcpu,
+@@ -331,16 +334,19 @@ static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
+ 				     unsigned long val)
  {
- 	u32 val;
- 	unsigned int div;
-@@ -99,7 +99,7 @@ static int armada_3700_tbg_clock_probe(struct platform_device *pdev)
- 	hw_tbg_data->num = NUM_TBG;
- 	platform_set_drvdata(pdev, hw_tbg_data);
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+-	u64 pendbaser = vgic_cpu->pendbaser;
++	u64 old_pendbaser, pendbaser;
  
--	parent = devm_clk_get(dev, 0);
-+	parent = devm_clk_get(dev, NULL);
- 	if (IS_ERR(parent)) {
- 		dev_err(dev, "Could get the clock parent\n");
- 		return -EINVAL;
-
+ 	/* Storing a value with LPIs already enabled is undefined */
+ 	if (vgic_cpu->lpis_enabled)
+ 		return;
+ 
+-	pendbaser = update_64bit_reg(pendbaser, addr & 4, len, val);
+-	pendbaser = vgic_sanitise_pendbaser(pendbaser);
+-
+-	vgic_cpu->pendbaser = pendbaser;
++	do {
++		old_pendbaser = vgic_cpu->pendbaser;
++		pendbaser = old_pendbaser;
++		pendbaser = update_64bit_reg(pendbaser, addr & 4, len, val);
++		pendbaser = vgic_sanitise_pendbaser(pendbaser);
++	} while (cmpxchg64(&vgic_cpu->pendbaser, old_pendbaser,
++			   pendbaser) != old_pendbaser);
+ }
+ 
+ /*
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.9.0
