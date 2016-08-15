@@ -1,56 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 15 Aug 2016 10:55:31 +0200
-Subject: [PATCH 12/26] ARM: dts: r8a7792: add SD clocks
+Date: Mon, 15 Aug 2016 10:55:30 +0200
+Subject: [PATCH 11/26] ARM: dts: r8a7794: Correct SDHI register size
 In-Reply-To: <cover.1471251169.git.horms+renesas@verge.net.au>
 References: <cover.1471251169.git.horms+renesas@verge.net.au>
-Message-ID: <fe683922cb436097ac5b1f65148fa0db3a6735a3.1471251169.git.horms+renesas@verge.net.au>
+Message-ID: <83701e00ded47e7f6390c6a123209426565046b7.1471251169.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+r8a7794 SDHI ch0 has SD_DMACR which is located in 0x324.
+This patch updates register size
 
-Describe the SDHI0 clock and its parent, SD clock in the R8A7792 device tree.
+Based on work for the r8a7790 by Kuninori Morimoto.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- arch/arm/boot/dts/r8a7792.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/r8a7794.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
-index 1b96bf6393fb..4148c5867c07 100644
---- a/arch/arm/boot/dts/r8a7792.dtsi
-+++ b/arch/arm/boot/dts/r8a7792.dtsi
-@@ -535,6 +535,13 @@
- 			clock-div = <8>;
- 			clock-mult = <1>;
- 		};
-+		sd_clk: sd {
-+			compatible = "fixed-factor-clock";
-+			clocks = <&pll1_div2_clk>;
-+			#clock-cells = <0>;
-+			clock-div = <8>;
-+			clock-mult = <1>;
-+		};
- 		rcan_clk: rcan {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&pll1_div2_clk>;
-@@ -564,6 +571,15 @@
- 			>;
- 			clock-output-names = "sys-dmac1", "sys-dmac0";
- 		};
-+		mstp3_clks: mstp3_clks at e615013c {
-+			compatible = "renesas,r8a7792-mstp-clocks",
-+				     "renesas,cpg-mstp-clocks";
-+			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
-+			clocks = <&sd_clk>;
-+			#clock-cells = <1>;
-+			renesas,clock-indices = <R8A7792_CLK_SDHI0>;
-+			clock-output-names = "sdhi0";
-+		};
- 		mstp4_clks: mstp4_clks at e6150140 {
- 			compatible = "renesas,r8a7792-mstp-clocks",
- 				     "renesas,cpg-mstp-clocks";
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 685f986cf962..55737bca4e63 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -697,7 +697,7 @@
+ 
+ 	sdhi0: sd at ee100000 {
+ 		compatible = "renesas,sdhi-r8a7794";
+-		reg = <0 0xee100000 0 0x200>;
++		reg = <0 0xee100000 0 0x328>;
+ 		interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7794_CLK_SDHI0>;
+ 		dmas = <&dmac0 0xcd>, <&dmac0 0xce>,
 -- 
 2.7.0.rc3.207.g0ac5344
