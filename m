@@ -1,45 +1,143 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Aug 2016 12:02:54 +0100
-Subject: [kernel-hardening] [PATCH 0/7] arm64: Privileged Access Never
- using TTBR0_EL1 switching
-In-Reply-To: <CAKv+Gu87t-AnDKvtk699CpEfkEPgB=6DE-8EhBCMMnczemVQ4Q@mail.gmail.com>
-References: <20160815095813.GA1996@svinekod>
- <CAKv+Gu99SNzKVccod_2At1vsmHfgO4fnqVYbVJ8Fjdd4k68RXg@mail.gmail.com>
- <20160815100649.GB1996@svinekod>
- <CAKv+Gu-nrAvdqy9Yb=vP1RysWY+gZqHdiMv6fdDKN4-gBPivDA@mail.gmail.com>
- <20160815103000.GE13262@arm.com>
- <CAKv+Gu_8d7Vf+TzQnqaofNj62L-=qkht4av-6mCYZoWkucz8RA@mail.gmail.com>
- <20160815103721.GF13262@arm.com>
- <CAKv+Gu-5Ckd0_ot-Le=7dL2Wn8E6198vEHPk0-E4VtRUw8c0BQ@mail.gmail.com>
- <20160815105205.GD22320@e104818-lin.cambridge.arm.com>
- <CAKv+Gu87t-AnDKvtk699CpEfkEPgB=6DE-8EhBCMMnczemVQ4Q@mail.gmail.com>
-Message-ID: <20160815110253.GH13262@arm.com>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Mon, 15 Aug 2016 14:17:25 +0300
+Subject: [PATCH v9 4/4] serial: pl011: add console matching function
+In-Reply-To: <20160811153152.755-5-aleksey.makarov@linaro.org>
+References: <20160811153152.755-1-aleksey.makarov@linaro.org>
+ <20160811153152.755-5-aleksey.makarov@linaro.org>
+Message-ID: <d1fc02d9-0be6-a5d0-08c9-88b368a7ee05@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2016 at 12:56:58PM +0200, Ard Biesheuvel wrote:
-> On 15 August 2016 at 12:52, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Mon, Aug 15, 2016 at 12:43:31PM +0200, Ard Biesheuvel wrote:
-> >> But, how about we store the reserved ASID in TTBR1_EL1 instead, and
-> >> switch TCR_EL1.A1 and TCR_EL1.EPD0 in a single write? That way, we can
-> >> switch ASIDs and disable table walks atomically (I hope), and we
-> >> wouldn't need to change TTBR0_EL1 at all.
-> >
-> > I did this before for AArch32 + LPAE (patches on the list sometime last
-> > year I think). But the idea was nak'ed by the ARM architects. The
-> > TCR_EL1.A1 can be cached somewhere in the TLB state machine, so you need
-> > TLBI (IOW, toggling A1 does not guarantee an ASID switch).
-> >
+
+On 08/11/2016 06:31 PM, Aleksey Makarov wrote:
+> This patch adds function pl011_console_match() that implements
+> method match of struct console.  It allows to match consoles against
+> data specified in a string, for example taken from command line or
+> compiled by ACPI SPCR table handler.
+
+Hi Greg,
+
+Can you review this new version of the patch and consider ACKing it please?
+
+It had your ACK for v7 but I had to make some changes:
+
+The patch by Christopher Covington [1] specifies that SBSA uart
+does 32-bit access to registers and this breaks the match function.
+In this series the function was changed to match with both mmio32 and
+mmio access. I removed Acked-by: Greg from this patch because of these
+changes.
+
+The difference between v7 and v9:
+
+@@ -2319,6 +2320,9 @@ static int __init pl011_console_match(struct
+console *co, char *name, int idx,
+        if (uart_parse_earlycon(options, &iotype, &addr, &options))
+                return -ENODEV;
+
++       if (iotype != UPIO_MEM && iotype != UPIO_MEM32)
++               return -ENODEV;
++
+        /* try to match the port specified on the command line */
+        for (i = 0; i < ARRAY_SIZE(amba_ports); i++) {
+                struct uart_port *port;
+@@ -2328,10 +2332,7 @@ static int __init pl011_console_match(struct
+console *co, char *name, int idx,
+
+                port = &amba_ports[i]->port;
+
+-               if (port->iotype != iotype)
+-                       continue;
+-               if ((iotype == UPIO_MEM || iotype == UPIO_MEM32) &&
+-                   (port->mapbase != addr))
++               if (port->mapbase != addr)
+                        continue;
+
+                co->index = i;
+
+
+[1]
+https://lkml.kernel.org/g/1457415800-8799-1-git-send-email-cov at codeaurora.org
+
+Thank you
+Aleksey Makarov
+
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+> ---
+>  drivers/tty/serial/amba-pl011.c | 56 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 56 insertions(+)
 > 
-> But how is TTBR0_EL1 any different? The ARM ARM equally mentions that
-> any of its field can be cached in a TLB, so by that reasoning, setting
-> a new ASID in TTBR0_EL1 would also require TLB maintenance.
-
-The underlying issue is that "cached in a TLB" doesn't distinguish between
-"cached in a TLB *entry*" and "cached by the logic used to form TLB entries"
-(i.e. the table walker).
-
-That's where we need to seek clarification from the architects, because
-existing microarchitectures do utilise both of these types of caching.
-
-Will
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 8a9e213..d6a51cb 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -2288,12 +2288,68 @@ static int __init pl011_console_setup(struct console *co, char *options)
+>  	return uart_set_options(&uap->port, co, baud, parity, bits, flow);
+>  }
+>  
+> +/**
+> + *	pl011_console_match - non-standard console matching
+> + *	@co:	  registering console
+> + *	@name:	  name from console command line
+> + *	@idx:	  index from console command line
+> + *	@options: ptr to option string from console command line
+> + *
+> + *	Only attempts to match console command lines of the form:
+> + *	    console=pl011,mmio|mmio32,<addr>[,<options>]
+> + *	    console=pl011,0x<addr>[,<options>]
+> + *	This form is used to register an initial earlycon boot console and
+> + *	replace it with the amba_console at pl011 driver init.
+> + *
+> + *	Performs console setup for a match (as required by interface)
+> + *	If no <options> are specified, then assume the h/w is already setup.
+> + *
+> + *	Returns 0 if console matches; otherwise non-zero to use default matching
+> + */
+> +static int __init pl011_console_match(struct console *co, char *name, int idx,
+> +				      char *options)
+> +{
+> +	char match[] = "pl011";	/* pl011-specific earlycon name */
+> +	unsigned char iotype;
+> +	unsigned long addr;
+> +	int i;
+> +
+> +	if (strncmp(name, match, 5) != 0)
+> +		return -ENODEV;
+> +
+> +	if (uart_parse_earlycon(options, &iotype, &addr, &options))
+> +		return -ENODEV;
+> +
+> +	if (iotype != UPIO_MEM && iotype != UPIO_MEM32)
+> +		return -ENODEV;
+> +
+> +	/* try to match the port specified on the command line */
+> +	for (i = 0; i < ARRAY_SIZE(amba_ports); i++) {
+> +		struct uart_port *port;
+> +
+> +		if (!amba_ports[i])
+> +			continue;
+> +
+> +		port = &amba_ports[i]->port;
+> +
+> +		if (port->mapbase != addr)
+> +			continue;
+> +
+> +		co->index = i;
+> +		port->cons = co;
+> +		return pl011_console_setup(co, options);
+> +	}
+> +
+> +	return -ENODEV;
+> +}
+> +
+>  static struct uart_driver amba_reg;
+>  static struct console amba_console = {
+>  	.name		= "ttyAMA",
+>  	.write		= pl011_console_write,
+>  	.device		= uart_console_device,
+>  	.setup		= pl011_console_setup,
+> +	.match		= pl011_console_match,
+>  	.flags		= CON_PRINTBUFFER,
+>  	.index		= -1,
+>  	.data		= &amba_reg,
+> 
