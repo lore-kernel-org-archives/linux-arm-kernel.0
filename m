@@ -1,35 +1,85 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 15 Aug 2016 19:59:30 +0200
-Subject: [PATCH] MAINTAINERS: Switch to kernel.org account for Krzysztof
- Kozlowski
-In-Reply-To: <1471283467.4075.73.camel@perches.com>
-References: <1471281469-5847-1-git-send-email-krzk@kernel.org>
- <1471282605.4075.70.camel@perches.com>
- <20160815174612.GA8059@kozik-lap>
- <1471283467.4075.73.camel@perches.com>
-Message-ID: <20160815175930.GA8804@kozik-lap>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Mon, 15 Aug 2016 11:00:16 -0700 (PDT)
+Subject: [PATCH 6/7] arm64: xen: Enable user access before a privcmd hvc
+ call
+In-Reply-To: <1f083bc9-f002-4b13-6638-c7448be0eaaa@arm.com>
+References: <1471015666-23125-1-git-send-email-catalin.marinas@arm.com>
+ <1471015666-23125-7-git-send-email-catalin.marinas@arm.com>
+ <1f083bc9-f002-4b13-6638-c7448be0eaaa@arm.com>
+Message-ID: <alpine.DEB.2.10.1608151058250.25028@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2016 at 10:51:07AM -0700, Joe Perches wrote:
-> On Mon, 2016-08-15 at 19:46 +0200, Krzysztof Kozlowski wrote:
-> > On Mon, Aug 15, 2016 at 10:36:45AM -0700, Joe Perches wrote:
-> > > 
-> > > On Mon, 2016-08-15 at 19:17 +0200, Krzysztof Kozlowski wrote:
-> > > > 
-> > > > Change my email address to kernel.org account instead of Samsung one.
-> > > > Also switch Maxim MUIC charger drivers from supported to maintained
-> > > > mode.
-> > > You should probably add a .mailmap entry too
-> > > 
-> > > Krzysztof Kozlowski <krzk@kernel.org>?<k.kozlowski@samsung.com>
-> > I wasn't sure about this. When is mailmap used? For shortlog and
-> > "get_maintainers --git"?
+On Mon, 15 Aug 2016, Julien Grall wrote:
+> Hi Catalin,
 > 
-> git shortlog with option -e and always with get_maintainer.pl
+> I have CCed Stefano who is maintaining the Xen ARM code in Linux.
+> 
+> On 12/08/2016 17:27, Catalin Marinas wrote:
+> > Privcmd calls are issued by the userspace. The kernel needs to enable
+> > access to TTBR0_EL1 as the hypervisor would issue stage 1 translations
+> > to user memory via AT instructions. Since AT instructions are not
+> > affected by the PAN bit (ARMv8.1), we only need the explicit
+> > uaccess_enable/disable if the TTBR0 PAN option is enabled.
+> > 
+> > Cc: Julien Grall <julien.grall@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: James Morse <james.morse@arm.com>
+> > Cc: Kees Cook <keescook@chromium.org>
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> Reviewed-by: Julien Grall <julien.grall@arm.com>
+> 
+> Regards,
+> 
+> > ---
+> >  arch/arm64/xen/hypercall.S | 18 ++++++++++++++++++
+> >  1 file changed, 18 insertions(+)
+> > 
+> > diff --git a/arch/arm64/xen/hypercall.S b/arch/arm64/xen/hypercall.S
+> > index 329c8027b0a9..4c509f4f4dcc 100644
+> > --- a/arch/arm64/xen/hypercall.S
+> > +++ b/arch/arm64/xen/hypercall.S
+> > @@ -91,6 +91,24 @@ ENTRY(privcmd_call)
+> >  	mov x2, x3
+> >  	mov x3, x4
+> >  	mov x4, x5
+> > +#ifdef CONFIG_ARM64_TTBR0_PAN
+> > +	/*
+> > +	 * Privcmd calls are issued by the userspace. The kernel needs to
+> > +	 * enable access to TTBR0_EL1 as the hypervisor would issue stage 1
+> > +	 * translations to user memory via AT instructions. Since AT
+> > +	 * instructions are not affected by the PAN bit (ARMv8.1), we only
+> > +	 * need the explicit uaccess_enable/disable if the TTBR0 PAN option is
+> > +	 * enabled.
 
-Indeed "shortlog -e" splits my humble person. I'll change also mailmap,
-thanks for hint!
+That's a pity but it is how it is.
 
-Best regards,
-Krzysztof
+Acked-by: Stefano Stabellini <sstabellini@kernel.org>
+
+Given that the patch is part of your PAN series, I expect that it is
+going to go via your tree.
+
+
+> > +	uaccess_enable x6, x7, x8
+> > +#endif
+> >  	hvc XEN_IMM
+> > +
+> > +#ifdef CONFIG_ARM64_TTBR0_PAN
+> > +	/*
+> > +	 * Disable userspace access from kernel once the hyp call completed.
+> > +	 */
+> > +	uaccess_disable x6
+> > +#endif
+> >  	ret
+> >  ENDPROC(privcmd_call);
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> 
+> -- 
+> Julien Grall
+> 
