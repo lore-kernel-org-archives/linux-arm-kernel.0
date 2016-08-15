@@ -1,105 +1,152 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 15 Aug 2016 12:38:44 -0500
-Subject: [PATCH] clk: gxbb: add MMC gate clocks, and expose for DT
-In-Reply-To: <20160802214011.19077-1-khilman@baylibre.com> (Kevin Hilman's
- message of "Tue, 2 Aug 2016 14:40:11 -0700")
-References: <20160802214011.19077-1-khilman@baylibre.com>
-Message-ID: <m2twem9bkr.fsf@baylibre.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Mon, 15 Aug 2016 18:41:49 +0100
+Subject: [PATCH v3 1/4] iio: adc: rockchip_saradc: reset saradc controller
+ before programming it
+In-Reply-To: <1469629447-544-1-git-send-email-wxt@rock-chips.com>
+References: <1469629447-544-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <5b6602f2-23f9-e5e5-8479-cddd365f7e71@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@baylibre.com> writes:
+On 27/07/16 15:24, Caesar Wang wrote:
+> SARADC controller needs to be reset before programming it, otherwise
+> it will not function properly.
+> 
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> Cc: Jonathan Cameron <jic23@kernel.org>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: linux-iio at vger.kernel.org
+> Cc: linux-rockchip at lists.infradead.org
+> Tested-by: Guenter Roeck <linux@roeck-us.net>
+> 
+Hi
 
-> Add the SD/eMMC gate clocks and expose them for use by DT.
->
-> While at it, also explose FCLK_DIV2 since this is one of the input
-> clocks to the mux internal to each of the SD/eMMC blocks.
->
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+Patch is fine (I'll fix up the wording issue) however...
 
-Gentle reminder ping.
+I'm not clear on the severity of the issue. Is this something
+we should be pushing for stable?
 
+Jonathan
 > ---
-> Applies on top of current clk-s905 branch.
->
->  drivers/clk/meson/gxbb.c              | 9 +++++++++
->  drivers/clk/meson/gxbb.h              | 7 +++++--
->  include/dt-bindings/clock/gxbb-clkc.h | 4 ++++
->  3 files changed, 18 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
-> index 007b7157cf4b..4fc8e58feef9 100644
-> --- a/drivers/clk/meson/gxbb.c
-> +++ b/drivers/clk/meson/gxbb.c
-> @@ -581,6 +581,9 @@ static MESON_GATE(sdio, HHI_GCLK_MPEG0, 17);
->  static MESON_GATE(abuf, HHI_GCLK_MPEG0, 18);
->  static MESON_GATE(hiu_iface, HHI_GCLK_MPEG0, 19);
->  static MESON_GATE(assist_misc, HHI_GCLK_MPEG0, 23);
-> +static MESON_GATE(emmc_a, HHI_GCLK_MPEG0, 24);
-> +static MESON_GATE(emmc_b, HHI_GCLK_MPEG0, 25);
-> +static MESON_GATE(emmc_c, HHI_GCLK_MPEG0, 26);
->  static MESON_GATE(spi, HHI_GCLK_MPEG0, 30);
+> 
+> Changes in v3:
+> - %s/devm_reset_control_get_optional()/devm_reset_control_get()
+> - add Guente's test tag.
+> 
+> Changes in v2:
+> - Make the reset as an optional property, since it should work
+> with old devicetrees as well.
+> 
+>  .../bindings/iio/adc/rockchip-saradc.txt           |  7 +++++
+>  drivers/iio/adc/Kconfig                            |  1 +
+>  drivers/iio/adc/rockchip_saradc.c                  | 30 ++++++++++++++++++++++
+>  3 files changed, 38 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+> index bf99e2f..205593f 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+> @@ -16,6 +16,11 @@ Required properties:
+>  - vref-supply: The regulator supply ADC reference voltage.
+>  - #io-channel-cells: Should be 1, see ../iio-bindings.txt
 >  
->  static MESON_GATE(i2s_spdif, HHI_GCLK_MPEG1, 2);
-> @@ -746,6 +749,9 @@ static struct clk_hw_onecell_data gxbb_hw_onecell_data = {
->  		[CLKID_AO_AHB_BUS]	    = &gxbb_ao_ahb_bus.hw,
->  		[CLKID_AO_IFACE]	    = &gxbb_ao_iface.hw,
->  		[CLKID_AO_I2C]		    = &gxbb_ao_i2c.hw,
-> +		[CLKID_SD_EMMC_A]	    = &gxbb_emmc_a.hw,
-> +		[CLKID_SD_EMMC_B]	    = &gxbb_emmc_b.hw,
-> +		[CLKID_SD_EMMC_C]	    = &gxbb_emmc_c.hw,
->  	},
->  	.num = NR_CLKS,
+> +Optional properties:
+> +- resets: Must contain an entry for each entry in reset-names if need support
+> +	  this option. See ../reset/reset.txt for details.
+> +- reset-names: Must include the name "saradc-apb".
+> +
+>  Example:
+>  	saradc: saradc at 2006c000 {
+>  		compatible = "rockchip,saradc";
+> @@ -23,6 +28,8 @@ Example:
+>  		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+>  		clocks = <&cru SCLK_SARADC>, <&cru PCLK_SARADC>;
+>  		clock-names = "saradc", "apb_pclk";
+> +		resets = <&cru SRST_SARADC>;
+> +		reset-names = "saradc-apb";
+>  		#io-channel-cells = <1>;
+>  		vref-supply = <&vcc18>;
+>  	};
+> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+> index 1de31bd..7675772 100644
+> --- a/drivers/iio/adc/Kconfig
+> +++ b/drivers/iio/adc/Kconfig
+> @@ -389,6 +389,7 @@ config QCOM_SPMI_VADC
+>  config ROCKCHIP_SARADC
+>  	tristate "Rockchip SARADC driver"
+>  	depends on ARCH_ROCKCHIP || (ARM && COMPILE_TEST)
+> +	depends on RESET_CONTROLLER
+>  	help
+>  	  Say yes here to build support for the SARADC found in SoCs from
+>  	  Rockchip.
+> diff --git a/drivers/iio/adc/rockchip_saradc.c b/drivers/iio/adc/rockchip_saradc.c
+> index f9ad6c2..85d7012 100644
+> --- a/drivers/iio/adc/rockchip_saradc.c
+> +++ b/drivers/iio/adc/rockchip_saradc.c
+> @@ -21,6 +21,8 @@
+>  #include <linux/of_device.h>
+>  #include <linux/clk.h>
+>  #include <linux/completion.h>
+> +#include <linux/delay.h>
+> +#include <linux/reset.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/iio/iio.h>
+>  
+> @@ -53,6 +55,7 @@ struct rockchip_saradc {
+>  	struct clk		*clk;
+>  	struct completion	completion;
+>  	struct regulator	*vref;
+> +	struct reset_control	*reset;
+>  	const struct rockchip_saradc_data *data;
+>  	u16			last_val;
 >  };
-> @@ -845,6 +851,9 @@ static struct clk_gate *gxbb_clk_gates[] = {
->  	&gxbb_ao_ahb_bus,
->  	&gxbb_ao_iface,
->  	&gxbb_ao_i2c,
-> +	&gxbb_emmc_a,
-> +	&gxbb_emmc_b,
-> +	&gxbb_emmc_c,
+> @@ -190,6 +193,16 @@ static const struct of_device_id rockchip_saradc_match[] = {
 >  };
+>  MODULE_DEVICE_TABLE(of, rockchip_saradc_match);
 >  
->  static int gxbb_clkc_probe(struct platform_device *pdev)
-> diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
-> index a2adf3448b59..217df516de44 100644
-> --- a/drivers/clk/meson/gxbb.h
-> +++ b/drivers/clk/meson/gxbb.h
-> @@ -172,7 +172,7 @@
->  /* CLKID_CPUCLK */
->  #define CLKID_HDMI_PLL		  2
->  #define CLKID_FIXED_PLL		  3
-> -#define CLKID_FCLK_DIV2		  4
-> +/* CLKID_FCLK_DIV2 */
->  #define CLKID_FCLK_DIV3		  5
->  #define CLKID_FCLK_DIV4		  6
->  #define CLKID_FCLK_DIV5		  7
-> @@ -262,8 +262,11 @@
->  #define CLKID_AO_AHB_BUS	  91
->  #define CLKID_AO_IFACE		  92
->  #define CLKID_AO_I2C		  93
-> +/* CLKID_SD_EMMC_A */
-> +/* CLKID_SD_EMMC_B */
-> +/* CLKID_SD_EMMC_C */
+> +/**
+> + * Reset SARADC Controller.
+> + */
+> +static void rockchip_saradc_reset_controller(struct reset_control *reset)
+> +{
+> +	reset_control_assert(reset);
+> +	usleep_range(10, 20);
+> +	reset_control_deassert(reset);
+> +}
+> +
+>  static int rockchip_saradc_probe(struct platform_device *pdev)
+>  {
+>  	struct rockchip_saradc *info = NULL;
+> @@ -218,6 +231,20 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
+>  	if (IS_ERR(info->regs))
+>  		return PTR_ERR(info->regs);
 >  
-> -#define NR_CLKS			  94
-> +#define NR_CLKS			  97
+> +	/*
+> +	 * The reset should be an optional property, as it should work
+> +	 * with old devicetrees as well
+> +	 */
+> +	info->reset = devm_reset_control_get(&pdev->dev, "saradc-apb");
+> +	if (IS_ERR(info->reset)) {
+> +		ret = PTR_ERR(info->reset);
+> +		if (ret != -ENOENT)
+> +			return ret;
+> +
+> +		dev_dbg(&pdev->dev, "no reset control found\n");
+> +		info->reset = NULL;
+> +	}
+> +
+>  	init_completion(&info->completion);
 >  
->  /* include the CLKIDs that have been made part of the stable DT binding */
->  #include <dt-bindings/clock/gxbb-clkc.h>
-> diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
-> index f889d80246cb..7d418643cdcc 100644
-> --- a/include/dt-bindings/clock/gxbb-clkc.h
-> +++ b/include/dt-bindings/clock/gxbb-clkc.h
-> @@ -6,7 +6,11 @@
->  #define __GXBB_CLKC_H
+>  	irq = platform_get_irq(pdev, 0);
+> @@ -252,6 +279,9 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
+>  		return PTR_ERR(info->vref);
+>  	}
 >  
->  #define CLKID_CPUCLK		1
-> +#define CLKID_FCLK_DIV2		4
->  #define CLKID_CLK81		12
->  #define CLKID_ETH		36
-> +#define CLKID_SD_EMMC_A		94
-> +#define CLKID_SD_EMMC_B		95
-> +#define CLKID_SD_EMMC_C		96
->  
->  #endif /* __GXBB_CLKC_H */
+> +	if (info->reset)
+> +		rockchip_saradc_reset_controller(info->reset);
+> +
+>  	/*
+>  	 * Use a default value for the converter clock.
+>  	 * This may become user-configurable in the future.
+> 
