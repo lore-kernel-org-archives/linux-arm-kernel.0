@@ -1,36 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Aug 2016 11:42:12 +0100
-Subject: [PATCH] arm64: cpufeature: allow for version discrepancy in PMU
- implementations
-Message-ID: <1471257732-29594-1-git-send-email-will.deacon@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 15 Aug 2016 12:43:31 +0200
+Subject: [kernel-hardening] [PATCH 0/7] arm64: Privileged Access Never
+ using TTBR0_EL1 switching
+In-Reply-To: <20160815103721.GF13262@arm.com>
+References: <1471015666-23125-1-git-send-email-catalin.marinas@arm.com>
+ <CAKv+Gu9hz_=GSRYgW3RueVhUA8F3HaM5DC_8Jkbx1JHF3x5mKg@mail.gmail.com>
+ <20160815094842.GB22320@e104818-lin.cambridge.arm.com>
+ <20160815095813.GA1996@svinekod>
+ <CAKv+Gu99SNzKVccod_2At1vsmHfgO4fnqVYbVJ8Fjdd4k68RXg@mail.gmail.com>
+ <20160815100649.GB1996@svinekod>
+ <CAKv+Gu-nrAvdqy9Yb=vP1RysWY+gZqHdiMv6fdDKN4-gBPivDA@mail.gmail.com>
+ <20160815103000.GE13262@arm.com>
+ <CAKv+Gu_8d7Vf+TzQnqaofNj62L-=qkht4av-6mCYZoWkucz8RA@mail.gmail.com>
+ <20160815103721.GF13262@arm.com>
+Message-ID: <CAKv+Gu-5Ckd0_ot-Le=7dL2Wn8E6198vEHPk0-E4VtRUw8c0BQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Perf already supports multiple PMU instances for heterogeneous systems,
-so there's no need to be strict in the cpufeature checking, particularly
-as the PMU extension is optional in the architecture.
+On 15 August 2016 at 12:37, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Aug 15, 2016 at 12:31:29PM +0200, Ard Biesheuvel wrote:
+>> On 15 August 2016 at 12:30, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Mon, Aug 15, 2016 at 12:21:00PM +0200, Ard Biesheuvel wrote:
+>> >> As to Will's point, I suppose there is a window where a speculative
+>> >> TLB fill could occur, so I suppose that means updating TTBR0_EL1.ASID
+>> >> first, then TCR_EL1.EPD0, and finally perform the TLBI ASIDE1 on the
+>> >> reserved ASID.
+>> >
+>> > But then what do you gain from the reserved ASID?
+>> >
+>>
+>> To prevent TLB hits against the ASID of the current (disabled)
+>> userland translation
+>
+> Right, but if the sequence you described ensures that, then why not just
+> set TCR_EL1.EPD0 and do TLBI ASIDE1 on the current ASID?
+>
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/cpufeature.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+... because then you wipe all the cached translations for current
+userland, which I suppose is best avoided. Wiping the reserved ASID
+only discards TLB entries that should not exist in the first place.
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 62272eac1352..a65a638965a4 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -172,7 +172,11 @@ static struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
--	S_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
-+	/*
-+	 * We can instantiate multiple PMU instances with different levels
-+	 * of support.
-+	 * */
-+	S_ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_TRACEVER_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_DEBUGVER_SHIFT, 4, 0x6),
- 	ARM64_FTR_END,
--- 
-2.1.4
+> I don't see the difference between a TLB entry formed from a speculative
+> fill using the reserved ASID and one formed using a non-reserved ASID --
+> the page table is the same.
+>
+
+No, but EPD0 does not disable translations, it disable translation
+table walks on TLB misses, so we need to switch ASIDs to prevent user
+space accesses via TLB hits.
+
+
+But, how about we store the reserved ASID in TTBR1_EL1 instead, and
+switch TCR_EL1.A1 and TCR_EL1.EPD0 in a single write? That way, we can
+switch ASIDs and disable table walks atomically (I hope), and we
+wouldn't need to change TTBR0_EL1 at all.
