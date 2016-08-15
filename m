@@ -1,28 +1,21 @@
-From: ccc94453@vip.cybercity.dk (Rask Ingemann Lambertsen)
-Date: Mon, 15 Aug 2016 22:55:53 +0200
-Subject: [PATCH v2] clocksource: sun4i: Clear interrupts after stopping
- timer in probe function
-In-Reply-To: <1471237024-16655-1-git-send-email-wens@csie.org>
-References: <1471237024-16655-1-git-send-email-wens@csie.org>
-Message-ID: <20160815205552.72dv76g3jktucpta@vip.cybercity.dk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 15 Aug 2016 23:03:44 +0200
+Subject: [PATCH] ARM: kirkwood: ib62x0: fix size of u-boot environment
+ partition
+In-Reply-To: <1471021970-21248-1-git-send-email-gmbnomis@gmail.com>
+References: <1471021970-21248-1-git-send-email-gmbnomis@gmail.com>
+Message-ID: <20160815210344.GI24664@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2016 at 12:57:04PM +0800, Chen-Yu Tsai wrote:
-> The bootloader (U-boot) sometimes uses this timer for various delays.
-> It uses it as a ongoing counter, and does comparisons on the current
-> counter value. The timer counter is never stopped.
+On Fri, Aug 12, 2016 at 07:12:50PM +0200, Simon Baatz wrote:
+> Commit 148c274ea644 ("ARM: kirkwood: ib62x0: add u-boot environment
+> partition") split the "u-boot" partition into "u-boot" and "u-boot
+> environment".  However, instead of the size of the environment, an offset
+> was given, resulting in overlapping partitions.
 > 
-> In some cases when the user interacts with the bootloader, or lets
-> it idle for some time before loading Linux, the timer may expire,
-> and an interrupt will be pending. This results in an unexpected
-> interrupt when the timer interrupt is enabled by the kernel, at
-> which point the event_handler isn't set yet. This results in a NULL
-> pointer dereference exception, panic, and no way to reboot.
+> Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
 
-Thanks for tracking down this bug. It bit me too once. Now I won't
-wonder if it was my fault. I do wonder if there are more interrupts
-which need their pending status cleared in the probe function.
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
--- 
-Rask Ingemann Lambertsen
+    Andrew
