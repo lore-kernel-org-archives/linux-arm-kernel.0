@@ -1,18 +1,15 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 15 Aug 2016 21:22:16 +0800
-Subject: [PATCH] ARM: no need to select SMP_ON_UP explicitly
-In-Reply-To: <57AB2466.9080404@arm.com>
-References: <1469199369-25746-1-git-send-email-vladimir.murzin@arm.com>
- <20160809084416.GS4678@tiger> <57AAE5D7.2080009@arm.com>
- <6326645.Nr2CxIomnL@wuerfel>
- <CACRpkdb1rJ0fVDFU6uJ3fscCG4ZGQXoC713uKLMcWiBc56Ht_Q@mail.gmail.com>
- <57AB2466.9080404@arm.com>
-Message-ID: <20160815132215.GE500@tiger>
+Date: Mon, 15 Aug 2016 21:29:18 +0800
+Subject: [PATCH v3 0/2] Add board support for TS-4900
+In-Reply-To: <1470755744-7837-1-git-send-email-lucile.quirion@savoirfairelinux.com>
+References: <1470755744-7837-1-git-send-email-lucile.quirion@savoirfairelinux.com>
+Message-ID: <20160815132917.GF500@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 01:56:06PM +0100, Vladimir Murzin wrote:
-> Shawn, since Linus picked up realview part only do you want me resubmit
-> remaining imx part?
+On Tue, Aug 09, 2016 at 11:15:42AM -0400, Lucile Quirion wrote:
+> Lucile Quirion (2):
+>   of: documentation: add bindings documentation for TS-4900
+>   ARM: dts: TS-4900: add basic device tree
 
-I just applied the IMX part, thanks.
+Applied both, thanks.
