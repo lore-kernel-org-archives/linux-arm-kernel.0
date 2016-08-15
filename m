@@ -1,48 +1,58 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 15 Aug 2016 12:57:04 +0800
-Subject: [PATCH v2] clocksource: sun4i: Clear interrupts after stopping timer
- in probe function
-Message-ID: <1471237024-16655-1-git-send-email-wens@csie.org>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 15 Aug 2016 13:57:41 +0800
+Subject: [PATCH v3 3/4] arm64: kaslr: Fix incorrect placement of
+ __initdata and __read_mostly
+In-Reply-To: <20160815125214.2727bf88@xhacker>
+References: <1470988871-2799-1-git-send-email-jszhang@marvell.com>
+ <1470988871-2799-4-git-send-email-jszhang@marvell.com>
+ <CAKv+Gu_ci37u6av9gjchBTVwoMCiqdnwtnDHxLT3cV3+kG0wUw@mail.gmail.com>
+ <20160815125214.2727bf88@xhacker>
+Message-ID: <20160815135741.35e60cd1@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bootloader (U-boot) sometimes uses this timer for various delays.
-It uses it as a ongoing counter, and does comparisons on the current
-counter value. The timer counter is never stopped.
+Hi Ard,
 
-In some cases when the user interacts with the bootloader, or lets
-it idle for some time before loading Linux, the timer may expire,
-and an interrupt will be pending. This results in an unexpected
-interrupt when the timer interrupt is enabled by the kernel, at
-which point the event_handler isn't set yet. This results in a NULL
-pointer dereference exception, panic, and no way to reboot.
+On Mon, 15 Aug 2016 12:52:14 +0800 Jisheng Zhang wrote:
 
-Clear any pending interrupts after we stop the timer in the probe
-function to avoid this.
+> Hi Ard,
+> 
+> On Fri, 12 Aug 2016 14:02:40 +0200 Ard Biesheuvel wrote:
+> 
+> > Hi Jisheng,
+> > 
+> > On 12 August 2016 at 10:01, Jisheng Zhang <jszhang@marvell.com> wrote:  
+> > > __initdata and __read_mostly should be placed after the variable name
+> > > for the variable to be placed in the intended section.
+> > >    
+> > 
+> > Why?  
+> 
+> include/linux/init.h says something as:
+> 
+>  * For initialized data:
+>  * You should insert __initdata or __initconst between the variable name
+>  * and equal sign followed by value, e.g.:
+>  *
+>  * static int init_variable __initdata = 0;
+>  * static const char linux_logo[] __initconst = { 0x32, 0x36, ... };
+> 
+> and examples in gcc manual also put __attribute__ (...) after variable name.
+> 
+> https://gcc.gnu.org/onlinedocs/gcc/Common-Variable-Attributes.html#Common-Variable-Attributes
+> 
+> Then I grep the source, found most lines (especially arch/arm64/*) put the
+> __initdata and __read_mostly after the variable name.
+> 
+> However, I built the code with three different gcc, the result looks identical
+> no matter where these markers put. So the commit msg looks wrong, what about
+> changes it as
+> 
+> "put __initdata and __read_mostly after the variable name
+> to keep the style consistent"?
 
-Cc: stable at vger.kernel.org
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
-Changes since v1:
+After some consideration, I want to drop this patch in newer version since
+it's not a bug, just "style"
 
-  - Add stable kernel to Cc.
----
- drivers/clocksource/sun4i_timer.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 97669ee4df2a..7ab69b36f744 100644
---- a/drivers/clocksource/sun4i_timer.c
-+++ b/drivers/clocksource/sun4i_timer.c
-@@ -208,6 +208,9 @@ static int __init sun4i_timer_init(struct device_node *node)
- 	/* Make sure timer is stopped before playing with interrupts */
- 	sun4i_clkevt_time_stop(0);
- 
-+	/* clear timer0 interrupt */
-+	writel(0x1, timer_base + TIMER_IRQ_ST_REG);
-+
- 	sun4i_clockevent.cpumask = cpu_possible_mask;
- 	sun4i_clockevent.irq = irq;
- 
--- 
-2.8.1
+Thanks for your reviewing,
+Jisheng
