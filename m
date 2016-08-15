@@ -1,26 +1,41 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 15 Aug 2016 10:51:07 -0700
-Subject: [PATCH] MAINTAINERS: Switch to kernel.org account for Krzysztof
- Kozlowski
-In-Reply-To: <20160815174612.GA8059@kozik-lap>
-References: <1471281469-5847-1-git-send-email-krzk@kernel.org>
- <1471282605.4075.70.camel@perches.com> <20160815174612.GA8059@kozik-lap>
-Message-ID: <1471283467.4075.73.camel@perches.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 15 Aug 2016 19:55:04 +0200
+Subject: Build regressions/improvements in v4.8-rc2
+In-Reply-To: <1471283586-26886-1-git-send-email-geert@linux-m68k.org>
+References: <1471283586-26886-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <CAMuHMdU+CPs6nurGrw2Ogz74tQeRhuwq_0eEFByyCUeP18=ywg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-08-15 at 19:46 +0200, Krzysztof Kozlowski wrote:
-> On Mon, Aug 15, 2016 at 10:36:45AM -0700, Joe Perches wrote:
-> > 
-> > On Mon, 2016-08-15 at 19:17 +0200, Krzysztof Kozlowski wrote:
-> > > 
-> > > Change my email address to kernel.org account instead of Samsung one.
-> > > Also switch Maxim MUIC charger drivers from supported to maintained
-> > > mode.
-> > You should probably add a .mailmap entry too
-> > 
-> > Krzysztof Kozlowski <krzk@kernel.org>?<k.kozlowski@samsung.com>
-> I wasn't sure about this. When is mailmap used? For shortlog and
-> "get_maintainers --git"?
+On Mon, Aug 15, 2016 at 7:53 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> JFYI, when comparing v4.8-rc2[1] to v4.8-rc1[3], the summaries are:
+>   - build errors: +6/-3
 
-git shortlog with option -e and always with get_maintainer.pl
+  + error: zynq-fpga.c: undefined reference to `clk_round_rate':  =>
+.text+0x3234c0), .text+0x350bd4), .text+0x17f780), .text+0x350d44),
+.text+0x34ad7c), .text+0x2b2588), .text+0x34ad64), .text+0x34ae3c)
+  + error: zynq-fpga.c: undefined reference to `clk_set_parent':  =>
+.text+0x143838)
+  + error: zynq-fpga.c: undefined reference to `clk_set_rate':  =>
+.text+0x350014), .text+0x34ffc4), .text+0x2b2598), .text+0x35430c),
+.text+0x13ed64), .text+0x352fb8), .text+0x34ada8), .text+0x3942ec),
+.text+0x350db4), .text+0x17f794), .text+0x149e4c), .text+0x34eeb0),
+.text+0x34f8d0), .text+0x323510), .text+0x76124), .text+0x148cf0),
+.text+0x354258)
+
+arm-randconfig
+
+> [1] http://kisskb.ellerman.id.au/kisskb/head/10769/ (all 262 configs)
+> [3] http://kisskb.ellerman.id.au/kisskb/head/10730/ (all 262 configs)
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
