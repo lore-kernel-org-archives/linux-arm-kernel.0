@@ -1,51 +1,32 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 Aug 2016 11:47:52 +0100
-Subject: [PATCH] arm64: Introduce execute-only page access permissions
-In-Reply-To: <CAGXu5jJTuJ+k948BU4rDGF=tHv54TR0JQVTbcVvzp=NtfQrL9Q@mail.gmail.com>
-References: <1470937490-7375-1-git-send-email-catalin.marinas@arm.com>
- <CAGXu5jJTuJ+k948BU4rDGF=tHv54TR0JQVTbcVvzp=NtfQrL9Q@mail.gmail.com>
-Message-ID: <20160815104751.GC22320@e104818-lin.cambridge.arm.com>
+Date: Mon, 15 Aug 2016 11:52:06 +0100
+Subject: [kernel-hardening] [PATCH 0/7] arm64: Privileged Access Never
+ using TTBR0_EL1 switching
+In-Reply-To: <CAKv+Gu-5Ckd0_ot-Le=7dL2Wn8E6198vEHPk0-E4VtRUw8c0BQ@mail.gmail.com>
+References: <CAKv+Gu9hz_=GSRYgW3RueVhUA8F3HaM5DC_8Jkbx1JHF3x5mKg@mail.gmail.com>
+ <20160815094842.GB22320@e104818-lin.cambridge.arm.com>
+ <20160815095813.GA1996@svinekod>
+ <CAKv+Gu99SNzKVccod_2At1vsmHfgO4fnqVYbVJ8Fjdd4k68RXg@mail.gmail.com>
+ <20160815100649.GB1996@svinekod>
+ <CAKv+Gu-nrAvdqy9Yb=vP1RysWY+gZqHdiMv6fdDKN4-gBPivDA@mail.gmail.com>
+ <20160815103000.GE13262@arm.com>
+ <CAKv+Gu_8d7Vf+TzQnqaofNj62L-=qkht4av-6mCYZoWkucz8RA@mail.gmail.com>
+ <20160815103721.GF13262@arm.com>
+ <CAKv+Gu-5Ckd0_ot-Le=7dL2Wn8E6198vEHPk0-E4VtRUw8c0BQ@mail.gmail.com>
+Message-ID: <20160815105205.GD22320@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 12, 2016 at 11:23:03AM -0700, Kees Cook wrote:
-> On Thu, Aug 11, 2016 at 10:44 AM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > The ARMv8 architecture allows execute-only user permissions by clearing
-> > the PTE_UXN and PTE_USER bits. However, the kernel running on a CPU
-> > implementation without User Access Override (ARMv8.2 onwards) can still
-> > access such page, so execute-only page permission does not protect
-> > against read(2)/write(2) etc. accesses. Systems requiring such
-> > protection must enable features like SECCOMP.
-> 
-> So, UAO CPUs will bypass this protection in userspace if using
-> read/write on a memory-mapped file?
+On Mon, Aug 15, 2016 at 12:43:31PM +0200, Ard Biesheuvel wrote:
+> But, how about we store the reserved ASID in TTBR1_EL1 instead, and
+> switch TCR_EL1.A1 and TCR_EL1.EPD0 in a single write? That way, we can
+> switch ASIDs and disable table walks atomically (I hope), and we
+> wouldn't need to change TTBR0_EL1 at all.
 
-It's the other way around. CPUs prior to ARMv8.2 (when UAO was
-introduced) or with the CONFIG_ARM64_UAO disabled can still access
-user execute-only memory regions while running in kernel mode via the
-copy_*_user, (get|put)_user etc. routines. So a way user can bypass this
-protection is by using such address as argument to read/write file
-operations.
-
-I don't think mmap() is an issue since such region is already mapped, so
-it would require mprotect(). As for the latter, it would most likely be
-restricted (probably together with read/write) SECCOMP.
-
-> I'm just trying to make sure I understand the bypass scenario. And is
-> this something that can be fixed? If we add exec-only, I feel like it
-> shouldn't have corner case surprises. :)
-
-I think we need better understanding of the usage scenarios for
-exec-only. IIUC (from those who first asked me for this feature), it is
-an additional protection on top of ASLR to prevent an untrusted entity
-from scanning the memory for ROP/JOP gadgets. An instrumented compiler
-would avoid generating the literal pool in the same section as the
-executable code, thus allowing the instructions to be mapped as
-executable-only. It's not clear to me how such untrusted code ends up
-scanning the memory, maybe relying on other pre-existent bugs (buffer
-under/overflows). I assume if such code is allowed to do system calls,
-all bets are off already.
+I did this before for AArch32 + LPAE (patches on the list sometime last
+year I think). But the idea was nak'ed by the ARM architects. The
+TCR_EL1.A1 can be cached somewhere in the TLB state machine, so you need
+TLBI (IOW, toggling A1 does not guarantee an ASID switch).
 
 -- 
 Catalin
