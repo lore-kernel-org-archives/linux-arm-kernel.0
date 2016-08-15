@@ -1,48 +1,42 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sun, 14 Aug 2016 20:08:57 -0400
-Subject: [PATCH 1/3] clk: meson: Add GXBB AO Clock and Reset controller
- driver
-In-Reply-To: <1470734008-18849-2-git-send-email-narmstrong@baylibre.com>
-References: <1470734008-18849-1-git-send-email-narmstrong@baylibre.com>
- <1470734008-18849-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <CAP=VYLphcuq16vDueOOJ6anrW-ifYAK+1ijSjkGbxw48+m4xrw@mail.gmail.com>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Mon, 15 Aug 2016 10:06:52 +0930
+Subject: [PATCH 02/12] pinctrl: Add core pinctrl support for Aspeed SoCs
+In-Reply-To: <1471049894.12231.41.camel@kernel.crashing.org>
+References: <1468994313-13538-1-git-send-email-andrew@aj.id.au>
+ <1468994313-13538-3-git-send-email-andrew@aj.id.au>
+ <CACRpkdZ0p+jNHBV1AqhVWQ2Q8RRrHVfsAz3XU3_+f6My22=Zxg@mail.gmail.com>
+ <1470962022.27272.68.camel@aj.id.au>
+ <CACRpkdaN=wR4amskqMapTJzaTTMJZe2EQWRnyLMQkq_zuhr2eA@mail.gmail.com>
+ <1471049894.12231.41.camel@kernel.crashing.org>
+Message-ID: <1471221412.27272.76.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 9, 2016 at 5:13 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
-> Adds a Clock and Reset controller driver for the Always-On part
-> of the Amlogic Meson GXBB SoC.
->
-> It exports paired Clocks and Resets lines that will be used by
-> peripherals in the Always-On subsystem.
+On Sat, 2016-08-13 at 10:58 +1000, Benjamin Herrenschmidt wrote:
+> On Fri, 2016-08-12 at 15:18 +0200, Linus Walleij wrote:
+> > 
+> > I would probably prefer that option (introduce another field)
+> > but you should make the overall decision, it's no strong opinion
+> > from my side.
+> > 
+> > > 
+> > > Would it be acceptable to document that requirement?
+> It might make it a bit less nasty (and easier to change later on
+> if necessary) to use some kind of:
+> 
+> 	bool ast_signal_is_gpio(...)
+> 
+> And stick the strcmp in there.
 
-[...]
+Yep, I'll do so for v2.
 
-> +static const struct of_device_id gxbb_aoclkc_match_table[] = {
-> +       { .compatible = "amlogic,gxbb-aoclkc" },
-> +       { }
-> +};
-> +MODULE_DEVICE_TABLE(of, gxbb_aoclkc_match_table);
-> +
-> +static struct platform_driver gxbb_aoclkc_driver = {
-> +       .probe          = gxbb_aoclkc_probe,
-> +       .driver         = {
-> +               .name   = "gxbb-aoclkc",
-> +               .of_match_table = gxbb_aoclkc_match_table,
-> +       },
-> +};
-> +
-> +module_platform_driver(gxbb_aoclkc_driver);
-> +
-> +MODULE_DESCRIPTION("AmLogic Meson GXBB AO Clock Controller Driver");
-> +MODULE_LICENSE("Dual BSD/GPL");
-> +MODULE_ALIAS("platform:gxbb-aoclkc");
-> +MODULE_AUTHOR("Neil Armstrong <narmstrong@baylibre.com>");
+Cheers,
 
-Since this driver is controlled by a bool Kconfig, you can dump the module.h
-include and all the MODULE_<xyz> tags above.
-
-Or, if there is a genuine use case for it to be modular, then make it tristate?
-
-Thanks,
-Paul.
+Andrew
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160815/3268bdca/attachment.sig>
