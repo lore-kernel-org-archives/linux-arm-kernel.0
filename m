@@ -1,21 +1,31 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 15 Aug 2016 20:16:26 +0800
-Subject: [PATCH v2] ARM: dts: imx: ventana: add RS485 txen gpio support
-In-Reply-To: <1470770329-25395-1-git-send-email-tharvey@gateworks.com>
-References: <1467207504-5218-1-git-send-email-tharvey@gateworks.com>
- <1470770329-25395-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <20160815121626.GB500@tiger>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 15 Aug 2016 13:17:33 +0100
+Subject: [PATCH 0/7] ARM: dts: STi: Make way for new Linaro 96Board: ST B2260
+Message-ID: <20160815121740.29515-1-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2016 at 12:18:49PM -0700, Tim Harvey wrote:
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> ---
-> v2:
->  - replace remove vendor specific property with generic property
->  - replace rts-gpio with rts-gpios to match devicetree binding documentation
->    (although both suffixes are supported)
-> 
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+This series paves the way for the new Linaro B2260 96Board, designed
+and built by ST-Microelectronics.
 
-Applied, thanks.
+Patrice Chotard (7):
+  ARM: dts: STiH407: Move pio20 node to fix kernel warning
+  ARM: dts: STiH410: Add thermal node
+  ARM: dts: STiH407-pinctrl: Add i2c2_alt2_1 node
+  ARM: dts: STiH407: Move non-removable property to board file
+  ARM: dts: STiH407-pinctrl: Add pinctrl_rgmii1_mdio_1 node
+  ARM: dts: STiH407-family: Add ports-implemented property in sata nodes
+  ARM: dts: STi: Introduce B2260 board
+
+ arch/arm/boot/dts/Makefile             |   1 +
+ arch/arm/boot/dts/stih407-family.dtsi  |   5 +-
+ arch/arm/boot/dts/stih407-pinctrl.dtsi |  32 ++++--
+ arch/arm/boot/dts/stih410-b2260.dts    | 190 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/stih410.dtsi         |   8 ++
+ arch/arm/boot/dts/stih418-b2199.dts    |   1 +
+ arch/arm/boot/dts/stihxxx-b2120.dtsi   |   1 +
+ 7 files changed, 228 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/boot/dts/stih410-b2260.dts
+
+-- 
+2.9.0
