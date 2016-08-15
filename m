@@ -1,29 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Aug 2016 10:46:50 +0100
-Subject: [PATCH] arm: remove traces of perf_ops_bp
-In-Reply-To: <1470934766-4009-1-git-send-email-mark.rutland@arm.com>
-References: <1470934766-4009-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160815094649.GA13262@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 15 Aug 2016 10:48:42 +0100
+Subject: [kernel-hardening] [PATCH 0/7] arm64: Privileged Access Never
+ using TTBR0_EL1 switching
+In-Reply-To: <CAKv+Gu9hz_=GSRYgW3RueVhUA8F3HaM5DC_8Jkbx1JHF3x5mKg@mail.gmail.com>
+References: <1471015666-23125-1-git-send-email-catalin.marinas@arm.com>
+ <CAKv+Gu9hz_=GSRYgW3RueVhUA8F3HaM5DC_8Jkbx1JHF3x5mKg@mail.gmail.com>
+Message-ID: <20160815094842.GB22320@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2016 at 05:59:26PM +0100, Mark Rutland wrote:
-> Even though perf_ops_bp was removed/renamed back in commit
-> b0a873ebbf87bf38 ("perf: Register PMU implementations"), as part of
-> v2.6.37, its definition still lives on in some arch headers.
+On Sat, Aug 13, 2016 at 11:13:58AM +0200, Ard Biesheuvel wrote:
+> On 12 August 2016 at 17:27, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > This is the first (public) attempt at emulating PAN by disabling
+> > TTBR0_EL1 accesses on arm64.
 > 
-> This patch removes the vestigal definition from arm.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/include/asm/hw_breakpoint.h | 1 -
->  1 file changed, 1 deletion(-)
+> I take it using TCR_EL1.EPD0 is too expensive?
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+It would require full TLB invalidation on entering/exiting the kernel
+and again for any user access. That's because the architecture allows
+this bit to be cached in the TLB so without TLBI we wouldn't have any
+guarantee that the actual PAN was toggled. I'm not sure it's even clear
+whether a TLBI by ASID or a local one would suffice (likely OK for the
+latter).
 
-Please put this into the patch system -- I'll pick the other one up for
-arm64.
+While I don't have numbers currently, it would be hard to test on the
+multitude of partner ARMv8 implementations, especially since that's not
+something people would expect to optimise the hardware for.
 
-Will
+-- 
+Catalin
