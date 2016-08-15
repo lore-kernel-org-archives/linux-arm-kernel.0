@@ -1,89 +1,32 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Mon, 15 Aug 2016 15:55:14 -0700
-Subject: [PATCH v7 14/15] arm64, acpi, numa: NUMA support based on SRAT
- and SLIT
-In-Reply-To: <20160815153546.GF22320@e104818-lin.cambridge.arm.com>
-References: <1464129345-18985-1-git-send-email-ddaney.cavm@gmail.com>
- <1464129345-18985-15-git-send-email-ddaney.cavm@gmail.com>
- <20160815153546.GF22320@e104818-lin.cambridge.arm.com>
-Message-ID: <57B24852.5090108@caviumnetworks.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 15 Aug 2016 17:57:59 -0500
+Subject: [PATCH] pinctrl: meson: get rid of unneeded domain structures
+In-Reply-To: <1471110078-5946-1-git-send-email-b.galvani@gmail.com> (Beniamino
+ Galvani's message of "Sat, 13 Aug 2016 19:41:18 +0200")
+References: <1471110078-5946-1-git-send-email-b.galvani@gmail.com>
+Message-ID: <m2a8gdabd4.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/15/2016 08:35 AM, Catalin Marinas wrote:
-> On Tue, May 24, 2016 at 03:35:44PM -0700, David Daney wrote:
->> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
->> index aee323b..4b13ecd 100644
->> --- a/arch/arm64/include/asm/acpi.h
->> +++ b/arch/arm64/include/asm/acpi.h
->> @@ -113,4 +113,12 @@ static inline const char *acpi_get_enable_method(int cpu)
->>   pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
->>   #endif
->>
->> +#ifdef CONFIG_ACPI_NUMA
->> +int arm64_acpi_numa_init(void);
->> +int acpi_numa_get_nid(unsigned int cpu, u64 hwid);
->> +#else
->> +static inline int arm64_acpi_numa_init(void) { return -ENOSYS; }
->> +static inline int acpi_numa_get_nid(unsigned int cpu, u64 hwid) { return NUMA_NO_NODE; }
->> +#endif /* CONFIG_ACPI_NUMA */
->> +
->>   #endif /*_ASM_ACPI_H*/
->
-> Apparently this doesn't always build since asm/acpi.h is conditionally
-> included from linux/acpi.h only when CONFIG_ACPI is enabled. Disabling
-> this option on arm64 leads to:
->
-> arch/arm64/mm/numa.c: In function ?arm64_numa_init?:
-> arch/arm64/mm/numa.c:395:24: error: ?arm64_acpi_numa_init? undeclared (first use in this function)
->     if (!acpi_disabled && !numa_init(arm64_acpi_numa_init))
->
-> I'll fix it in arch/arm64 by including asm/acpi.h directly as we do in a
-> couple of other files:
+Beniamino Galvani <b.galvani@gmail.com> writes:
 
-Sounds good.  Thanks for fixing it.
+> The driver originally supported more domains (register ranges) per
+> pinctrl device, but since commit 9dab1868ec0d ("pinctrl: amlogic: Make
+> driver independent from two-domain configuration") each device gets
+> assigned a single domain and we instantiate multiple pinctrl devices
+> in the DT.
+>
+> Therefore, now the 'meson_domain' and 'meson_domain_data' structures
+> don't have any reason to exist and can be removed to make the model
+> simpler to understand. This commit doesn't change behavior.
+>
+> Tested on a Odroid-C2.
+>
+> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
 
-David
+Looks good and boot tested on meson-gxbb-p200:
 
+Acked-by: Kevin Hilman <khilman@baylibre.com>
+Tested-by: Kevin Hilman <khilman@baylibre.com>
 
->
-> ------------------8<------------------------------
->  From 9a83bf400e0b4ef066b83eeaecdbca909b8491ea Mon Sep 17 00:00:00 2001
-> From: Catalin Marinas <catalin.marinas@arm.com>
-> Date: Mon, 15 Aug 2016 16:33:10 +0100
-> Subject: [PATCH] arm64: Fix NUMA build error when !CONFIG_ACPI
-> MIME-Version: 1.0
-> Content-Type: text/plain; charset=UTF-8
-> Content-Transfer-Encoding: 8bit
->
-> Since asm/acpi.h is only included by linux/acpi.h when CONFIG_ACPI is
-> enabled, disabling the latter leads to the following build error on
-> arm64:
->
-> arch/arm64/mm/numa.c: In function ?arm64_numa_init?:
-> arch/arm64/mm/numa.c:395:24: error: ?arm64_acpi_numa_init? undeclared (first use in this function)
->     if (!acpi_disabled && !numa_init(arm64_acpi_numa_init))
->
-> This patch include the asm/acpi.h explicitly in arch/arm64/mm/numa.c for
-> the arm64_acpi_numa_init() definition.
->
-> Fixes: d8b47fca8c23 ("arm64, ACPI, NUMA: NUMA support based on SRAT and SLIT")
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->   arch/arm64/mm/numa.c | 2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-> index c7fe3ec70774..5bb15eab6f00 100644
-> --- a/arch/arm64/mm/numa.c
-> +++ b/arch/arm64/mm/numa.c
-> @@ -23,6 +23,8 @@
->   #include <linux/module.h>
->   #include <linux/of.h>
->
-> +#include <asm/acpi.h>
-> +
->   struct pglist_data *node_data[MAX_NUMNODES] __read_mostly;
->   EXPORT_SYMBOL(node_data);
->   nodemask_t numa_nodes_parsed __initdata;
->
+Kevin
