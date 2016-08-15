@@ -1,143 +1,29 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 15 Aug 2016 14:17:25 +0300
-Subject: [PATCH v9 4/4] serial: pl011: add console matching function
-In-Reply-To: <20160811153152.755-5-aleksey.makarov@linaro.org>
-References: <20160811153152.755-1-aleksey.makarov@linaro.org>
- <20160811153152.755-5-aleksey.makarov@linaro.org>
-Message-ID: <d1fc02d9-0be6-a5d0-08c9-88b368a7ee05@linaro.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 15 Aug 2016 20:34:51 +0900
+Subject: [PATCH] pinctrl: exynos: remove duplicate calls in irq handler
+In-Reply-To: <1471256227-6282-1-git-send-email-strongbox8@zoho.com>
+References: <1471256227-6282-1-git-send-email-strongbox8@zoho.com>
+Message-ID: <CA+Ln22HWHRROhzVQo4ptsKr5xNyMh=dnuCO7FEG1BsinpPg8MQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On 08/11/2016 06:31 PM, Aleksey Makarov wrote:
-> This patch adds function pl011_console_match() that implements
-> method match of struct console.  It allows to match consoles against
-> data specified in a string, for example taken from command line or
-> compiled by ACPI SPCR table handler.
-
-Hi Greg,
-
-Can you review this new version of the patch and consider ACKing it please?
-
-It had your ACK for v7 but I had to make some changes:
-
-The patch by Christopher Covington [1] specifies that SBSA uart
-does 32-bit access to registers and this breaks the match function.
-In this series the function was changed to match with both mmio32 and
-mmio access. I removed Acked-by: Greg from this patch because of these
-changes.
-
-The difference between v7 and v9:
-
-@@ -2319,6 +2320,9 @@ static int __init pl011_console_match(struct
-console *co, char *name, int idx,
-        if (uart_parse_earlycon(options, &iotype, &addr, &options))
-                return -ENODEV;
-
-+       if (iotype != UPIO_MEM && iotype != UPIO_MEM32)
-+               return -ENODEV;
-+
-        /* try to match the port specified on the command line */
-        for (i = 0; i < ARRAY_SIZE(amba_ports); i++) {
-                struct uart_port *port;
-@@ -2328,10 +2332,7 @@ static int __init pl011_console_match(struct
-console *co, char *name, int idx,
-
-                port = &amba_ports[i]->port;
-
--               if (port->iotype != iotype)
--                       continue;
--               if ((iotype == UPIO_MEM || iotype == UPIO_MEM32) &&
--                   (port->mapbase != addr))
-+               if (port->mapbase != addr)
-                        continue;
-
-                co->index = i;
-
-
-[1]
-https://lkml.kernel.org/g/1457415800-8799-1-git-send-email-cov at codeaurora.org
-
-Thank you
-Aleksey Makarov
-
-> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+2016-08-15 19:17 GMT+09:00 perr <strongbox8@zoho.com>:
+> Because chained_irq_enter() has already called chip->irq_mask() and
+> chip->irq_ack(), also chained_irq_exit() will call chip->irq_unmask(),
+> so it's not necessary to call chip->irq_*() here.
+>
+> Signed-off-by: perr <strongbox8@zoho.com>
+>
 > ---
->  drivers/tty/serial/amba-pl011.c | 56 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 56 insertions(+)
-> 
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index 8a9e213..d6a51cb 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -2288,12 +2288,68 @@ static int __init pl011_console_setup(struct console *co, char *options)
->  	return uart_set_options(&uap->port, co, baud, parity, bits, flow);
->  }
->  
-> +/**
-> + *	pl011_console_match - non-standard console matching
-> + *	@co:	  registering console
-> + *	@name:	  name from console command line
-> + *	@idx:	  index from console command line
-> + *	@options: ptr to option string from console command line
-> + *
-> + *	Only attempts to match console command lines of the form:
-> + *	    console=pl011,mmio|mmio32,<addr>[,<options>]
-> + *	    console=pl011,0x<addr>[,<options>]
-> + *	This form is used to register an initial earlycon boot console and
-> + *	replace it with the amba_console at pl011 driver init.
-> + *
-> + *	Performs console setup for a match (as required by interface)
-> + *	If no <options> are specified, then assume the h/w is already setup.
-> + *
-> + *	Returns 0 if console matches; otherwise non-zero to use default matching
-> + */
-> +static int __init pl011_console_match(struct console *co, char *name, int idx,
-> +				      char *options)
-> +{
-> +	char match[] = "pl011";	/* pl011-specific earlycon name */
-> +	unsigned char iotype;
-> +	unsigned long addr;
-> +	int i;
-> +
-> +	if (strncmp(name, match, 5) != 0)
-> +		return -ENODEV;
-> +
-> +	if (uart_parse_earlycon(options, &iotype, &addr, &options))
-> +		return -ENODEV;
-> +
-> +	if (iotype != UPIO_MEM && iotype != UPIO_MEM32)
-> +		return -ENODEV;
-> +
-> +	/* try to match the port specified on the command line */
-> +	for (i = 0; i < ARRAY_SIZE(amba_ports); i++) {
-> +		struct uart_port *port;
-> +
-> +		if (!amba_ports[i])
-> +			continue;
-> +
-> +		port = &amba_ports[i]->port;
-> +
-> +		if (port->mapbase != addr)
-> +			continue;
-> +
-> +		co->index = i;
-> +		port->cons = co;
-> +		return pl011_console_setup(co, options);
-> +	}
-> +
-> +	return -ENODEV;
-> +}
-> +
->  static struct uart_driver amba_reg;
->  static struct console amba_console = {
->  	.name		= "ttyAMA",
->  	.write		= pl011_console_write,
->  	.device		= uart_console_device,
->  	.setup		= pl011_console_setup,
-> +	.match		= pl011_console_match,
->  	.flags		= CON_PRINTBUFFER,
->  	.index		= -1,
->  	.data		= &amba_reg,
-> 
+>  drivers/pinctrl/samsung/pinctrl-exynos.c | 6 +-----
+>  1 file changed, 1 insertion(+), 5 deletions(-)
+>
+
+Indeed, nice finding. Thanks!
+
+Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+
+Best regards,
+Tomasz
