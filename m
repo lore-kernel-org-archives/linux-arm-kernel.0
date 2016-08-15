@@ -1,27 +1,60 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 15 Aug 2016 18:26:26 +0530
-Subject: [PATCH 3/4] arm64: kprobes: WARN if attempting to step with
- PSTATE.D=1
-In-Reply-To: <20160812124656.GA23836@localhost.localdomain>
-References: <1468937260-23988-1-git-send-email-will.deacon@arm.com>
- <1468937260-23988-3-git-send-email-will.deacon@arm.com>
- <CAHB_Guonf6qc-yCr2oKDZgX+5q7qXJpSpLU3qafChrBkBqk7FA@mail.gmail.com>
- <20160809124832.GI27508@arm.com>
- <20160810080114.GB27500@localhost.localdomain>
- <20160810210401.e2bb53d1c9def874ba270f16@kernel.org>
- <20160812124656.GA23836@localhost.localdomain>
-Message-ID: <20160815125626.GA28649@localhost.localdomain>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 15 Aug 2016 21:03:22 +0800
+Subject: [PATCH V4 1/3] tracing: add a possibility of exporting function
+ trace to other places instead of ring buffer only
+In-Reply-To: <1471261803-1186-2-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <201608152102.m6KoaCgL%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08/2016:06:16:56 PM, Pratyush Anand wrote:
-> On 10/08/2016:09:04:01 PM, Masami Hiramatsu wrote:
-> > Could you also test it by using ftrace kprobe-trace interface and if you find
-> > any place where can cause infinit recursion, please put the function in blacklist.
-> 
-> OK, Will do.
+Hi Chunyan,
 
-Sorry, I do not think that we can test with kprobe over ftrace in arm64. It is
-yet to be supported.
+[auto build test WARNING on linus/master]
+[also build test WARNING on v4.8-rc2 next-20160815]
+[cannot apply to linux/master]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-~Pratyush
+url:    https://github.com/0day-ci/linux/commits/Chunyan-Zhang/tracing-add-a-possibility-of-exporting-function-trace-to-other-places-instead-of-ring-buffer-only/20160815-195631
+reproduce:
+        # apt-get install sparse
+        make ARCH=x86_64 allmodconfig
+        make C=1 CF=-D__CHECK_ENDIAN__
+
+
+sparse warnings: (new ones prefixed by >>)
+
+   include/linux/compiler.h:230:8: sparse: attribute 'no_sanitize_address': unknown attribute
+>> kernel/trace/trace.c:2173:23: sparse: incompatible types in comparison expression (different address spaces)
+   kernel/trace/trace.c:2175:23: sparse: incompatible types in comparison expression (different address spaces)
+
+vim +2173 kernel/trace/trace.c
+
+  2157	static DEFINE_MUTEX(trace_export_lock);
+  2158	
+  2159	static struct trace_export trace_export_rb __read_mostly = {
+  2160		.name		= "rb",
+  2161		.commit	= trace_rb_commit,
+  2162		.next		= NULL,
+  2163	};
+  2164	static struct trace_export *trace_exports_list __read_mostly = &trace_export_rb;
+  2165	
+  2166	inline void
+  2167	trace_exports(struct trace_array *tr, struct ring_buffer_event *event)
+  2168	{
+  2169		struct trace_export *export;
+  2170	
+  2171		preempt_disable_notrace();
+  2172	
+> 2173		for (export = rcu_dereference_raw_notrace(trace_exports_list);
+  2174		     export && export->commit;
+  2175		     export = rcu_dereference_raw_notrace(export->next)) {
+  2176			tr->export = export;
+  2177			export->commit(tr, event);
+  2178		}
+  2179	
+  2180		preempt_enable_notrace();
+  2181	}
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
