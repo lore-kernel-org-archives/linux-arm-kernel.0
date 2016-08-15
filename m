@@ -1,44 +1,41 @@
-From: tiffany.lin@mediatek.com (Tiffany Lin)
-Date: Mon, 15 Aug 2016 17:10:47 +0800
-Subject: [PATCH v3 0/9] Add MT8173 Video Decoder Driver
-In-Reply-To: <74aa2d31-97dd-d274-e07d-b4532c0f4fa5@xs4all.nl>
-References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
- <bdac7fe1-6425-2a3d-777f-86cfd1ee26e0@xs4all.nl>
- <1471251821.28498.7.camel@mtksdaap41>
- <74aa2d31-97dd-d274-e07d-b4532c0f4fa5@xs4all.nl>
-Message-ID: <1471252247.28498.8.camel@mtksdaap41>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 15 Aug 2016 10:13:59 +0100
+Subject: [PATCH v4 1/3] arm64: vdso: add __init section marker to
+ alloc_vectors_page
+In-Reply-To: <1471243546-3090-2-git-send-email-jszhang@marvell.com>
+References: <1471243546-3090-1-git-send-email-jszhang@marvell.com>
+ <1471243546-3090-2-git-send-email-jszhang@marvell.com>
+Message-ID: <20160815091359.GB1426@svinekod>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-
-On Mon, 2016-08-15 at 11:07 +0200, Hans Verkuil wrote:
-> On 08/15/2016 11:03 AM, Tiffany Lin wrote:
-> > Hi Hans,
-> > 
-> > I upstream v4 on 8/10, I don't know why this version is not shown in
-> > https://patchwork.kernel.org.
-> > But I could see it in other link.
-> > http://www.spinics.net/lists/arm-kernel/msg523095.html
-> > I refine DocBook and vb2 queue_setup function in v4.
-> > 
-> > For the MT21 format, if I put MT21 into separate patch, this patch
-> > series will build fail, I was confused how to fix this issue?
+On Mon, Aug 15, 2016 at 02:45:44PM +0800, Jisheng Zhang wrote:
+> It is not needed after booting, this patch moves the alloc_vectors_page
+> function to the __init section.
 > 
-> Just don't implement that pixelformat yet. I.e. everything else can be
-> implemented, just don't add MT21 to the list of pixelformats. Do that in
-> a separate patch at the end.
-> 
-> If that pixelformat isn't exposed, then nobody will use it either :-)
-> 
-Got it now.
-Thanks a lot.
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-best regards,
-Tiffany
+Mark
 
-> Regards,
+> ---
+>  arch/arm64/kernel/vdso.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> 	Hans
+> diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+> index 076312b..e320e8f 100644
+> --- a/arch/arm64/kernel/vdso.c
+> +++ b/arch/arm64/kernel/vdso.c
+> @@ -55,7 +55,7 @@ struct vdso_data *vdso_data = &vdso_data_store.data;
+>   */
+>  static struct page *vectors_page[1];
+>  
+> -static int alloc_vectors_page(void)
+> +static int __init alloc_vectors_page(void)
+>  {
+>  	extern char __kuser_helper_start[], __kuser_helper_end[];
+>  	extern char __aarch32_sigret_code_start[], __aarch32_sigret_code_end[];
+> -- 
+> 2.8.1
+> 
