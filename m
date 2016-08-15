@@ -1,15 +1,19 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 15 Aug 2016 22:17:36 +0800
-Subject: [PATCH 1/2] ARM: dts: imx7s: Add SAI nodes
-In-Reply-To: <1470844828-12848-1-git-send-email-fabio.estevam@nxp.com>
-References: <1470844828-12848-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <20160815141736.GI500@tiger>
+From: corbet@lwn.net (Jonathan Corbet)
+Date: Mon, 15 Aug 2016 08:25:40 -0600
+Subject: [PATCH] Documentation: kprobes: Document jprobes stack copying
+ limitations
+In-Reply-To: <1471033484-2709-1-git-send-email-dave.long@linaro.org>
+References: <1471033484-2709-1-git-send-email-dave.long@linaro.org>
+Message-ID: <20160815082540.2b7a889b@lwn.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 01:00:27PM -0300, Fabio Estevam wrote:
-> Add the three SAI ports nodes.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+On Fri, 12 Aug 2016 16:24:44 -0400
+David Long <dave.long@linaro.org> wrote:
 
-Applied both, thanks.
+> Some architectures (i.e.: sparc64 and arm64) make reasonable partial stack
+> duplication for jprobes problematic. Document this.
+
+Applied to the docs tree, thanks.
+
+jon
