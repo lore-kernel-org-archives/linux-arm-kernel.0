@@ -1,123 +1,49 @@
-From: Songjun.Wu@microchip.com (Wu, Songjun)
-Date: Mon, 15 Aug 2016 15:17:44 +0800
-Subject: [PATCH v9 0/2] [media] atmel-isc: add driver for Atmel ISC
-In-Reply-To: <89ed4a10-30d7-87ca-8d9d-22ea2634e4af@xs4all.nl>
-References: <1470899202-13933-1-git-send-email-songjun.wu@microchip.com>
- <c6593866-db70-b2a6-ee5a-32b6fecc3775@xs4all.nl>
- <c422fc89-8184-5416-4574-77d6234aa4be@microchip.com>
- <89ed4a10-30d7-87ca-8d9d-22ea2634e4af@xs4all.nl>
-Message-ID: <5374dc6b-c08d-7ba5-14bb-074075d62277@microchip.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 15 Aug 2016 09:28:25 +0200
+Subject: [PATCH] ARM: dts: imx6q-bx50v3: configure unused pca953x pins
+In-Reply-To: <a23f6081bea242bfba70b805f2a93494@taipei08.ADVANTECH.CORP>
+References: <1471023911-2763-1-git-send-email-akshay.bhat@timesys.com>
+ <20160815053033.ds27jg3c7vnx7ujw@pengutronix.de>
+ <a23f6081bea242bfba70b805f2a93494@taipei08.ADVANTECH.CORP>
+Message-ID: <20160815072825.hffvzlxpzlph6bk7@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
+Cc += linux-gpio
 
-On 8/15/2016 15:15, Hans Verkuil wrote:
-> On 08/15/2016 08:09 AM, Wu, Songjun wrote:
->>
->>
->> On 8/12/2016 15:32, Hans Verkuil wrote:
->>> One quick question:
->>>
->>> On 08/11/2016 09:06 AM, Songjun Wu wrote:
->>>> The Image Sensor Controller driver includes two parts.
->>>> 1) Driver code to implement the ISC function.
->>>> 2) Device tree binding documentation, it describes how
->>>>    to add the ISC in device tree.
->>>>
->>>> Test result with v4l-utils.
->>>> # v4l2-compliance -f
->>>> v4l2-compliance SHA   : not available
->>>>
->>>> Driver Info:
->>>>         Driver name   : atmel_isc
->>>>         Card type     : Atmel Image Sensor Controller
->>>>         Bus info      : platform:atmel_isc f0008000.isc
->>>>         Driver version: 4.7.0
->>>>         Capabilities  : 0x84200001
->>>>                 Video Capture
->>>>                 Streaming
->>>>                 Extended Pix Format
->>>>                 Device Capabilities
->>>>         Device Caps   : 0x04200001
->>>>                 Video Capture
->>>>                 Streaming
->>>>                 Extended Pix Format
->>>>
->>>> Compliance test for device /dev/video0 (not using libv4l2):
->>>>
->>>> Required ioctls:
->>>>         test VIDIOC_QUERYCAP: OK
->>>>
->>>> Allow for multiple opens:
->>>>         test second video open: OK
->>>>         test VIDIOC_QUERYCAP: OK
->>>>         test VIDIOC_G/S_PRIORITY: OK
->>>>         test for unlimited opens: OK
->>>>
->>>> Debug ioctls:
->>>>         test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
->>>>         test VIDIOC_LOG_STATUS: OK (Not Supported)
->>>>
->>>> Input ioctls:
->>>>         test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
->>>>         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
->>>>         test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
->>>>         test VIDIOC_ENUMAUDIO: OK (Not Supported)
->>>>         test VIDIOC_G/S/ENUMINPUT: OK
->>>>         test VIDIOC_G/S_AUDIO: OK (Not Supported)
->>>>         Inputs: 1 Audio Inputs: 0 Tuners: 0
->>>>
->>>> Output ioctls:
->>>>         test VIDIOC_G/S_MODULATOR: OK (Not Supported)
->>>>         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
->>>>         test VIDIOC_ENUMAUDOUT: OK (Not Supported)
->>>>         test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
->>>>         test VIDIOC_G/S_AUDOUT: OK (Not Supported)
->>>>         Outputs: 0 Audio Outputs: 0 Modulators: 0
->>>>
->>>> Input/Output configuration ioctls:
->>>>         test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
->>>>         test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
->>>>         test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
->>>>         test VIDIOC_G/S_EDID: OK (Not Supported)
->>>>
->>>> Test input 0:
->>>>
->>>>         Control ioctls:
->>>>                 test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK (Not Supported)
->>>>                 test VIDIOC_QUERYCTRL: OK (Not Supported)
->>>>                 test VIDIOC_G/S_CTRL: OK (Not Supported)
->>>>                 test VIDIOC_G/S/TRY_EXT_CTRLS: OK (Not Supported)
->>>>                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK (Not Supported)
->>>>                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
->>>>                 Standard Controls: 0 Private Controls: 0
->>>
->>> Can you confirm that the sensor subdevice you are using does not have any controls?
->>> I ask since that is fairly unusual, so I want to make sure that controls are really
->>> not supported in this setup.
->>>
->> Sorry for the late reply.
->> The subdevice I use supports controls, but I did not develop the v4l2
->> controls in the sensor driver.
->
-> So you mean the sensor hardware has controls, but the sensor driver doesn't implement
-> them? Do I understand you correctly?
->
-Yes, your understanding is correct.
+On Mon, Aug 15, 2016 at 06:18:07AM +0000, Ken.Lin wrote:
+> 1. As you can see in the datasheet(that I attached to this email), at
+> power on, P00 - P17 are configured as inputs (by chip default setting,
+> datasheet P.3) and an interrupt is generated by any rising or falling
+> edge of the port inputs in the input mode (datasheet P.10)
 
->> Should I add the v4l2 controls and test again?
->
-> If the sensor driver does not implement controls (i.e. has a struct v4l2_ctrl_handler),
-> then everything is fine and the v4l2-compliance output is correct.
->
-> Please confirm this. I just want to be 100% certain about this before I make the pull
-> request.
->
-I can confirm this. I use the sensor ov7740, and the driver is developed 
-by myself, I did not add the v4l2 controls into the sensor driver for now.
+ah, I see. All input pins generate an irq. The driver should handle this
+just fine however. So I hope you don't see an oops or messages about
+unhandled irqs, right?
 
-> Thanks,
->
-> 	Hans
->
+> 2. The unhandled interrupts ( return IRQ_NONE in pca953x_irq_handler)
+> in GPIO expander driver (drivers/gpio/gpio-pca953x.c) could happen
+> when unused GPIO pins in GPIO expander are not well configured.
+
+Hmm, maybe the driver should return IRQ_HANDLED in this case, too. After
+all the irq reason is known and it was expected that an irq happend,
+right?
+
+> 3. As a result, we tried to configure the unused (default floating
+> inputs) pca953x GPIO pins as GPO low to avoid the unexpected
+> interrupts (could be observed during the interference situation e.g.
+> putting fingers on the unused pin to make the signal level change)
+
+So changing these to outputs might still make sense to prevent these
+from floating or triggering unused irqs, but this should not make a
+semantical difference for your machine. (It might have more load and a
+bigger irq count, but apart from that everything should be the same.)
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
