@@ -1,210 +1,212 @@
 From: james.morse@arm.com (James Morse)
-Date: Mon, 15 Aug 2016 18:12:01 +0100
-Subject: [PATCH v4 2/3] arm64: vmlinux.ld: Add .mmuoff.{text,data} sections
+Date: Mon, 15 Aug 2016 18:12:00 +0100
+Subject: [PATCH v4 1/3] arm64: Create sections.h
 In-Reply-To: <1471281122-26295-1-git-send-email-james.morse@arm.com>
 References: <1471281122-26295-1-git-send-email-james.morse@arm.com>
-Message-ID: <1471281122-26295-3-git-send-email-james.morse@arm.com>
+Message-ID: <1471281122-26295-2-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resume from hibernate needs to clean any text executed by the kernel with
-the MMU off to the PoC. Collect these functions together into a new
-.mmuoff.text section. __boot_cpu_mode and secondary_holding_pen_release
-are data that is read or written with the MMU off. Add these to a new
-.mmuoff.data section.
+Each time new section markers are added, kernel/vmlinux.ld.S is updated,
+and new extern char __start_foo[] definitions are scattered through the
+tree.
 
-This covers booting of secondary cores and the cpu_suspend() path used
-by cpu-idle and suspend-to-ram.
-
-The bulk of head.S is not included, as the primary boot code is only ever
-executed once, the kernel never needs to ensure it is cleaned to a
-particular point in the cache.
+Create asm/include/sections.h to collect these definitions (and include
+the existing asm-generic version).
 
 Signed-off-by: James Morse <james.morse@arm.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
 ---
 Changes since v3:
- * Pad mmuoff.data section to CWG.
- * Specified the .mmuoff.data section for secondary_holding_pen_release in C
+ * Added irqentry_text start/end to sections.h
+ * Updated for kprobes idmap/hyp_idmap declarations.
 
- arch/arm64/include/asm/sections.h  |  2 ++
- arch/arm64/kernel/head.S           | 26 ++++++++++++++++++--------
- arch/arm64/kernel/sleep.S          |  2 ++
- arch/arm64/kernel/smp_spin_table.c |  3 ++-
- arch/arm64/kernel/vmlinux.lds.S    |  8 ++++++++
- arch/arm64/mm/proc.S               |  4 ++++
- 6 files changed, 36 insertions(+), 9 deletions(-)
+ arch/arm64/include/asm/Kbuild      |  1 -
+ arch/arm64/include/asm/sections.h  | 29 +++++++++++++++++++++++++++++
+ arch/arm64/include/asm/traps.h     |  6 +-----
+ arch/arm64/include/asm/virt.h      |  9 +--------
+ arch/arm64/kernel/alternative.c    |  7 +++----
+ arch/arm64/kernel/hibernate.c      |  6 ------
+ arch/arm64/kernel/probes/kprobes.c |  5 +----
+ 7 files changed, 35 insertions(+), 28 deletions(-)
+ create mode 100644 arch/arm64/include/asm/sections.h
 
+diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+index f43d2c44c765..2b3d2d24acba 100644
+--- a/arch/arm64/include/asm/Kbuild
++++ b/arch/arm64/include/asm/Kbuild
+@@ -32,7 +32,6 @@ generic-y += poll.h
+ generic-y += preempt.h
+ generic-y += resource.h
+ generic-y += rwsem.h
+-generic-y += sections.h
+ generic-y += segment.h
+ generic-y += sembuf.h
+ generic-y += serial.h
 diff --git a/arch/arm64/include/asm/sections.h b/arch/arm64/include/asm/sections.h
-index 237fcdd13445..fb824a71fbb2 100644
---- a/arch/arm64/include/asm/sections.h
+new file mode 100644
+index 000000000000..237fcdd13445
+--- /dev/null
 +++ b/arch/arm64/include/asm/sections.h
-@@ -25,5 +25,7 @@ extern char __hyp_idmap_text_start[], __hyp_idmap_text_end[];
- extern char __hyp_text_start[], __hyp_text_end[];
- extern char __idmap_text_start[], __idmap_text_end[];
- extern char __irqentry_text_start[], __irqentry_text_end[];
-+extern char __mmuoff_data_start[], __mmuoff_data_end[];
-+extern char __mmuoff_text_start[], __mmuoff_text_end[];
- 
- #endif /* __ASM_SECTIONS_H */
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index b77f58355da1..4230eeeeabf5 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -477,6 +477,7 @@ ENTRY(kimage_vaddr)
-  * Returns either BOOT_CPU_MODE_EL1 or BOOT_CPU_MODE_EL2 in x20 if
-  * booted in EL1 or EL2 respectively.
-  */
-+	.pushsection ".mmuoff.text", "ax"
- ENTRY(el2_setup)
- 	mrs	x0, CurrentEL
- 	cmp	x0, #CurrentEL_EL2
-@@ -621,17 +622,31 @@ set_cpu_boot_mode_flag:
- ENDPROC(set_cpu_boot_mode_flag)
- 
- /*
-+ * Values in this section are written with the MMU off, but read with the
-+ * MMU on. Writers will invalidate the corresponding address, discarding
-+ * a 'Cache Writeback Granule' (CWG) worth of data. Align these variables
-+ * to the architectural maximum of 2K.
-+ */
-+	.pushsection ".mmuoff.data", "aw"
-+	.align 11
+@@ -0,0 +1,29 @@
 +/*
-  * We need to find out the CPU boot mode long after boot, so we need to
-  * store it in a writable variable.
-  *
-  * This is not in .bss, because we set it sufficiently early that the boot-time
-  * zeroing of .bss would clobber it.
-  */
--	.pushsection	.data..cacheline_aligned
--	.align	L1_CACHE_SHIFT
- ENTRY(__boot_cpu_mode)
- 	.long	BOOT_CPU_MODE_EL2
- 	.long	BOOT_CPU_MODE_EL1
-+/*
-+ * The booting CPU updates the failed status @__early_cpu_boot_status,
-+ * with MMU turned off.
++ * Copyright (C) 2016 ARM Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+ENTRY(__early_cpu_boot_status)
-+	.long 	0
++#ifndef __ASM_SECTIONS_H
++#define __ASM_SECTIONS_H
 +
-+	.align 11
- 	.popsection
++#include <asm-generic/sections.h>
++
++extern char __alt_instructions[], __alt_instructions_end[];
++extern char __exception_text_start[], __exception_text_end[];
++extern char __hibernate_exit_text_start[], __hibernate_exit_text_end[];
++extern char __hyp_idmap_text_start[], __hyp_idmap_text_end[];
++extern char __hyp_text_start[], __hyp_text_end[];
++extern char __idmap_text_start[], __idmap_text_end[];
++extern char __irqentry_text_start[], __irqentry_text_end[];
++
++#endif /* __ASM_SECTIONS_H */
+diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
+index 9cd03f3e812f..02e9035b0685 100644
+--- a/arch/arm64/include/asm/traps.h
++++ b/arch/arm64/include/asm/traps.h
+@@ -19,6 +19,7 @@
+ #define __ASM_TRAP_H
  
- 	/*
-@@ -687,6 +702,7 @@ __secondary_switched:
- 	mov	x29, #0
- 	b	secondary_start_kernel
- ENDPROC(__secondary_switched)
-+	.popsection
+ #include <linux/list.h>
++#include <asm/sections.h>
  
- /*
-  * The booting CPU updates the failed status @__early_cpu_boot_status,
-@@ -706,12 +722,6 @@ ENDPROC(__secondary_switched)
- 	dc	ivac, \tmp1			// Invalidate potentially stale cache line
- 	.endm
+ struct pt_regs;
  
--	.pushsection	.data..cacheline_aligned
--	.align	L1_CACHE_SHIFT
--ENTRY(__early_cpu_boot_status)
--	.long 	0
--	.popsection
+@@ -39,9 +40,6 @@ void arm64_notify_segfault(struct pt_regs *regs, unsigned long addr);
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ static inline int __in_irqentry_text(unsigned long ptr)
+ {
+-	extern char __irqentry_text_start[];
+-	extern char __irqentry_text_end[];
 -
+ 	return ptr >= (unsigned long)&__irqentry_text_start &&
+ 	       ptr < (unsigned long)&__irqentry_text_end;
+ }
+@@ -54,8 +52,6 @@ static inline int __in_irqentry_text(unsigned long ptr)
+ 
+ static inline int in_exception_text(unsigned long ptr)
+ {
+-	extern char __exception_text_start[];
+-	extern char __exception_text_end[];
+ 	int in;
+ 
+ 	in = ptr >= (unsigned long)&__exception_text_start &&
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index 1788545f25bc..db5739413677 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -45,6 +45,7 @@
+ #ifndef __ASSEMBLY__
+ 
+ #include <asm/ptrace.h>
++#include <asm/sections.h>
+ 
  /*
-  * Enable the MMU.
-  *
-diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index 9a3aec97ac09..e66ce9b7bbde 100644
---- a/arch/arm64/kernel/sleep.S
-+++ b/arch/arm64/kernel/sleep.S
-@@ -97,6 +97,7 @@ ENTRY(__cpu_suspend_enter)
- ENDPROC(__cpu_suspend_enter)
- 	.ltorg
- 
-+	.pushsection ".mmuoff.text", "ax"
- ENTRY(cpu_resume)
- 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
- 	/* enable the MMU early - so we can access sleep_save_stash by va */
-@@ -106,6 +107,7 @@ ENTRY(cpu_resume)
- 	adrp	x26, swapper_pg_dir
- 	b	__cpu_setup
- ENDPROC(cpu_resume)
-+	.popsection
- 
- ENTRY(_cpu_resume)
- 	mrs	x1, mpidr_el1
-diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
-index 18a71bcd26ee..9db2471e1eed 100644
---- a/arch/arm64/kernel/smp_spin_table.c
-+++ b/arch/arm64/kernel/smp_spin_table.c
-@@ -29,7 +29,8 @@
- #include <asm/smp_plat.h>
- 
- extern void secondary_holding_pen(void);
--volatile unsigned long secondary_holding_pen_release = INVALID_HWID;
-+volatile unsigned long __section(".mmuoff.data")
-+secondary_holding_pen_release = INVALID_HWID;
- 
- static phys_addr_t cpu_release_addr[NR_CPUS];
- 
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 659963d40bb4..bbab3d886516 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -120,6 +120,9 @@ SECTIONS
- 			IRQENTRY_TEXT
- 			SOFTIRQENTRY_TEXT
- 			ENTRY_TEXT
-+			__mmuoff_text_start = .;
-+			*(.mmuoff.text)
-+			__mmuoff_text_end = .;
- 			TEXT_TEXT
- 			SCHED_TEXT
- 			LOCK_TEXT
-@@ -186,6 +189,11 @@ SECTIONS
- 	_sdata = .;
- 	RW_DATA_SECTION(L1_CACHE_BYTES, PAGE_SIZE, THREAD_SIZE)
- 	PECOFF_EDATA_PADDING
-+	.mmuoff.data : {
-+		__mmuoff_data_start = .;
-+		*(.mmuoff.data)
-+		__mmuoff_data_end = .;
-+	}
- 	_edata = .;
- 
- 	BSS_SECTION(0, 0, 0)
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 5bb61de23201..a709e95d68ff 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -83,6 +83,7 @@ ENDPROC(cpu_do_suspend)
-  *
-  * x0: Address of context pointer
-  */
-+	.pushsection ".mmuoff.text", "ax"
- ENTRY(cpu_do_resume)
- 	ldp	x2, x3, [x0]
- 	ldp	x4, x5, [x0, #16]
-@@ -111,6 +112,7 @@ ENTRY(cpu_do_resume)
- 	isb
- 	ret
- ENDPROC(cpu_do_resume)
-+	.popsection
+  * __boot_cpu_mode records what mode CPUs were booted in.
+@@ -87,14 +88,6 @@ extern void verify_cpu_run_el(void);
+ static inline void verify_cpu_run_el(void) {}
  #endif
  
- /*
-@@ -172,6 +174,7 @@ ENDPROC(idmap_cpu_replace_ttbr1)
-  *	Initialise the processor for turning the MMU on.  Return in x0 the
-  *	value of the SCTLR_EL1 register.
-  */
-+	.pushsection ".mmuoff.text", "ax"
- ENTRY(__cpu_setup)
- 	tlbi	vmalle1				// Invalidate local TLB
- 	dsb	nsh
-@@ -257,3 +260,4 @@ ENDPROC(__cpu_setup)
- crval:
- 	.word	0xfcffffff			// clear
- 	.word	0x34d5d91d			// set
-+	.popsection
+-/* The section containing the hypervisor idmap text */
+-extern char __hyp_idmap_text_start[];
+-extern char __hyp_idmap_text_end[];
+-
+-/* The section containing the hypervisor text */
+-extern char __hyp_text_start[];
+-extern char __hyp_text_end[];
+-
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif /* ! __ASM__VIRT_H */
+diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+index d2ee1b21a10d..4434dabde898 100644
+--- a/arch/arm64/kernel/alternative.c
++++ b/arch/arm64/kernel/alternative.c
+@@ -25,14 +25,13 @@
+ #include <asm/alternative.h>
+ #include <asm/cpufeature.h>
+ #include <asm/insn.h>
++#include <asm/sections.h>
+ #include <linux/stop_machine.h>
+ 
+ #define __ALT_PTR(a,f)		(u32 *)((void *)&(a)->f + (a)->f)
+ #define ALT_ORIG_PTR(a)		__ALT_PTR(a, orig_offset)
+ #define ALT_REPL_PTR(a)		__ALT_PTR(a, alt_offset)
+ 
+-extern struct alt_instr __alt_instructions[], __alt_instructions_end[];
+-
+ struct alt_region {
+ 	struct alt_instr *begin;
+ 	struct alt_instr *end;
+@@ -124,8 +123,8 @@ static int __apply_alternatives_multi_stop(void *unused)
+ {
+ 	static int patched = 0;
+ 	struct alt_region region = {
+-		.begin	= __alt_instructions,
+-		.end	= __alt_instructions_end,
++		.begin	= (struct alt_instr *)__alt_instructions,
++		.end	= (struct alt_instr *)__alt_instructions_end,
+ 	};
+ 
+ 	/* We always have a CPU 0 at this point (__init) */
+diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+index 65d81f965e74..b4082017c4cb 100644
+--- a/arch/arm64/kernel/hibernate.c
++++ b/arch/arm64/kernel/hibernate.c
+@@ -54,12 +54,6 @@ extern int in_suspend;
+ /* Do we need to reset el2? */
+ #define el2_reset_needed() (is_hyp_mode_available() && !is_kernel_in_hyp_mode())
+ 
+-/*
+- * Start/end of the hibernate exit code, this must be copied to a 'safe'
+- * location in memory, and executed from there.
+- */
+-extern char __hibernate_exit_text_start[], __hibernate_exit_text_end[];
+-
+ /* temporary el2 vectors in the __hibernate_exit_text section. */
+ extern char hibernate_el2_vectors[];
+ 
+diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+index c6b0f40620d8..2dc1b42afaaa 100644
+--- a/arch/arm64/kernel/probes/kprobes.c
++++ b/arch/arm64/kernel/probes/kprobes.c
+@@ -31,7 +31,7 @@
+ #include <asm/insn.h>
+ #include <asm/uaccess.h>
+ #include <asm/irq.h>
+-#include <asm-generic/sections.h>
++#include <asm/sections.h>
+ 
+ #include "decode-insn.h"
+ 
+@@ -543,9 +543,6 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+ 
+ bool arch_within_kprobe_blacklist(unsigned long addr)
+ {
+-	extern char __idmap_text_start[], __idmap_text_end[];
+-	extern char __hyp_idmap_text_start[], __hyp_idmap_text_end[];
+-
+ 	if ((addr >= (unsigned long)__kprobes_text_start &&
+ 	    addr < (unsigned long)__kprobes_text_end) ||
+ 	    (addr >= (unsigned long)__entry_text_start &&
 -- 
 2.8.0.rc3
