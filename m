@@ -1,40 +1,36 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Aug 2016 11:37:21 +0100
-Subject: [kernel-hardening] [PATCH 0/7] arm64: Privileged Access Never
- using TTBR0_EL1 switching
-In-Reply-To: <CAKv+Gu_8d7Vf+TzQnqaofNj62L-=qkht4av-6mCYZoWkucz8RA@mail.gmail.com>
-References: <1471015666-23125-1-git-send-email-catalin.marinas@arm.com>
- <CAKv+Gu9hz_=GSRYgW3RueVhUA8F3HaM5DC_8Jkbx1JHF3x5mKg@mail.gmail.com>
- <20160815094842.GB22320@e104818-lin.cambridge.arm.com>
- <20160815095813.GA1996@svinekod>
- <CAKv+Gu99SNzKVccod_2At1vsmHfgO4fnqVYbVJ8Fjdd4k68RXg@mail.gmail.com>
- <20160815100649.GB1996@svinekod>
- <CAKv+Gu-nrAvdqy9Yb=vP1RysWY+gZqHdiMv6fdDKN4-gBPivDA@mail.gmail.com>
- <20160815103000.GE13262@arm.com>
- <CAKv+Gu_8d7Vf+TzQnqaofNj62L-=qkht4av-6mCYZoWkucz8RA@mail.gmail.com>
-Message-ID: <20160815103721.GF13262@arm.com>
+Date: Mon, 15 Aug 2016 11:42:12 +0100
+Subject: [PATCH] arm64: cpufeature: allow for version discrepancy in PMU
+ implementations
+Message-ID: <1471257732-29594-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2016 at 12:31:29PM +0200, Ard Biesheuvel wrote:
-> On 15 August 2016 at 12:30, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Aug 15, 2016 at 12:21:00PM +0200, Ard Biesheuvel wrote:
-> >> As to Will's point, I suppose there is a window where a speculative
-> >> TLB fill could occur, so I suppose that means updating TTBR0_EL1.ASID
-> >> first, then TCR_EL1.EPD0, and finally perform the TLBI ASIDE1 on the
-> >> reserved ASID.
-> >
-> > But then what do you gain from the reserved ASID?
-> >
-> 
-> To prevent TLB hits against the ASID of the current (disabled)
-> userland translation
+Perf already supports multiple PMU instances for heterogeneous systems,
+so there's no need to be strict in the cpufeature checking, particularly
+as the PMU extension is optional in the architecture.
 
-Right, but if the sequence you described ensures that, then why not just
-set TCR_EL1.EPD0 and do TLBI ASIDE1 on the current ASID?
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/cpufeature.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-I don't see the difference between a TLB entry formed from a speculative
-fill using the reserved ASID and one formed using a non-reserved ASID --
-the page table is the same.
-
-Will
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 62272eac1352..a65a638965a4 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -172,7 +172,11 @@ static struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
+-	S_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
++	/*
++	 * We can instantiate multiple PMU instances with different levels
++	 * of support.
++	 * */
++	S_ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_TRACEVER_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_DEBUGVER_SHIFT, 4, 0x6),
+ 	ARM64_FTR_END,
+-- 
+2.1.4
