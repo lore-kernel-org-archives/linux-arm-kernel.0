@@ -1,39 +1,51 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 15 Aug 2016 11:44:06 +0100
-Subject: [PATCH] arm64: cpufeature: allow for version discrepancy in PMU
- implementations
-In-Reply-To: <1471257732-29594-1-git-send-email-will.deacon@arm.com>
-References: <1471257732-29594-1-git-send-email-will.deacon@arm.com>
-Message-ID: <9e66d0db-a304-34c8-cec0-0f1329ec8dc7@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 15 Aug 2016 11:47:52 +0100
+Subject: [PATCH] arm64: Introduce execute-only page access permissions
+In-Reply-To: <CAGXu5jJTuJ+k948BU4rDGF=tHv54TR0JQVTbcVvzp=NtfQrL9Q@mail.gmail.com>
+References: <1470937490-7375-1-git-send-email-catalin.marinas@arm.com>
+ <CAGXu5jJTuJ+k948BU4rDGF=tHv54TR0JQVTbcVvzp=NtfQrL9Q@mail.gmail.com>
+Message-ID: <20160815104751.GC22320@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/08/16 11:42, Will Deacon wrote:
-> Perf already supports multiple PMU instances for heterogeneous systems,
-> so there's no need to be strict in the cpufeature checking, particularly
-> as the PMU extension is optional in the architecture.
->
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/cpufeature.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 62272eac1352..a65a638965a4 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -172,7 +172,11 @@ static struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
->  	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
-> -	S_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
-> +	/*
-> +	 * We can instantiate multiple PMU instances with different levels
-> +	 * of support.
-> +	 * */
-> +	S_ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
+On Fri, Aug 12, 2016 at 11:23:03AM -0700, Kees Cook wrote:
+> On Thu, Aug 11, 2016 at 10:44 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > The ARMv8 architecture allows execute-only user permissions by clearing
+> > the PTE_UXN and PTE_USER bits. However, the kernel running on a CPU
+> > implementation without User Access Override (ARMv8.2 onwards) can still
+> > access such page, so execute-only page permission does not protect
+> > against read(2)/write(2) etc. accesses. Systems requiring such
+> > protection must enable features like SECCOMP.
+> 
+> So, UAO CPUs will bypass this protection in userspace if using
+> read/write on a memory-mapped file?
 
+It's the other way around. CPUs prior to ARMv8.2 (when UAO was
+introduced) or with the CONFIG_ARM64_UAO disabled can still access
+user execute-only memory regions while running in kernel mode via the
+copy_*_user, (get|put)_user etc. routines. So a way user can bypass this
+protection is by using such address as argument to read/write file
+operations.
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+I don't think mmap() is an issue since such region is already mapped, so
+it would require mprotect(). As for the latter, it would most likely be
+restricted (probably together with read/write) SECCOMP.
 
-Suzuki
+> I'm just trying to make sure I understand the bypass scenario. And is
+> this something that can be fixed? If we add exec-only, I feel like it
+> shouldn't have corner case surprises. :)
+
+I think we need better understanding of the usage scenarios for
+exec-only. IIUC (from those who first asked me for this feature), it is
+an additional protection on top of ASLR to prevent an untrusted entity
+from scanning the memory for ROP/JOP gadgets. An instrumented compiler
+would avoid generating the literal pool in the same section as the
+executable code, thus allowing the instructions to be mapped as
+executable-only. It's not clear to me how such untrusted code ends up
+scanning the memory, maybe relying on other pre-existent bugs (buffer
+under/overflows). I assume if such code is allowed to do system calls,
+all bets are off already.
+
+-- 
+Catalin
