@@ -1,25 +1,37 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Mon, 15 Aug 2016 11:01:22 -0500
-Subject: [PATCH 3/3] ARM: dts: imx28: Fix build warnings with W=1
-In-Reply-To: <1471203266-30414-3-git-send-email-festevam@gmail.com>
-References: <1471203266-30414-1-git-send-email-festevam@gmail.com>
- <1471203266-30414-3-git-send-email-festevam@gmail.com>
-Message-ID: <CAL_Jsq+u7c3Tj+AyuXhNhME8uZvJmX2a8EJmHow6Tkd1vv=7nA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 15 Aug 2016 09:02:20 -0700
+Subject: [PATCH 1/2] ARM: dts: am335x: Update elm phandle binding
+In-Reply-To: <9354c50f-f851-f473-a8af-0a84c951453e@ti.com>
+References: <1467711150-23356-1-git-send-email-t.remmet@phytec.de>
+ <20160713171407.GB136972@google.com>
+ <9354c50f-f851-f473-a8af-0a84c951453e@ti.com>
+Message-ID: <20160815160220.GP28140@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 14, 2016 at 2:34 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
->
-> Fix the following build warnings with W=1:
->
-> Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
->
-> While at it, also pass the 'device_type' property as recommended by the
-> ePAPR specification.
+* Roger Quadros <rogerq@ti.com> [160801 02:25]:
+> On 13/07/16 20:14, Brian Norris wrote:
+> > On Tue, Jul 05, 2016 at 11:32:29AM +0200, Teresa Remmet wrote:
+> >> The check for the "elm_id" binding had been removed.
+> >> This causes nand boot to fail on boards still using
+> >> the old binding. Update the bindings on those boards.
+> > 
+> > Acked-by: Brian Norris <computersforpeace@gmail.com>
+> > 
+> > We're fixing the backward compatibility issue anyway, but might as well
+> > "upgrade" the device tree.
+> > 
+> >> Signed-off-by: Teresa Remmet <t.remmet@phytec.de>
+> 
+> Acked-by: Roger Quadros <rogerq@ti.com>
+> 
+> Tony,
+> 
+> Please take this one via your OMAP DT tree. Thanks.
 
-I'm surprised it worked without unless you were relying on
-skeleton.dtsi. If that's the case, please remove the dependency on
-skeleton.dtsi while at it.
+Applying to omap-for-v4.8/fixes finally thanks. Sorry for
+the delay.
 
-Rob
+Regards,
+
+Tony
