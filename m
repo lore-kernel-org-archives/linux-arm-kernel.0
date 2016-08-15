@@ -1,36 +1,54 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 15 Aug 2016 10:55:30 +0200
-Subject: [PATCH 11/26] ARM: dts: r8a7794: Correct SDHI register size
+Date: Mon, 15 Aug 2016 10:55:33 +0200
+Subject: [PATCH 14/26] ARM: dts: r8a7792: add I2C clocks
 In-Reply-To: <cover.1471251169.git.horms+renesas@verge.net.au>
 References: <cover.1471251169.git.horms+renesas@verge.net.au>
-Message-ID: <83701e00ded47e7f6390c6a123209426565046b7.1471251169.git.horms+renesas@verge.net.au>
+Message-ID: <eedee25c2181ffd5463a994d456349dd39dc1b54.1471251169.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-r8a7794 SDHI ch0 has SD_DMACR which is located in 0x324.
-This patch updates register size
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Based on work for the r8a7790 by Kuninori Morimoto.
+Describe the I2C[0-5] clocks in the R8A7792 device tree.
 
-Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- arch/arm/boot/dts/r8a7794.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7792.dtsi | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 685f986cf962..55737bca4e63 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -697,7 +697,7 @@
+diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
+index 228860d9464a..353bc303b165 100644
+--- a/arch/arm/boot/dts/r8a7792.dtsi
++++ b/arch/arm/boot/dts/r8a7792.dtsi
+@@ -632,7 +632,8 @@
+ 			clocks = <&cp_clk>, <&cp_clk>, <&cp_clk>, <&cp_clk>,
+ 				 <&cp_clk>, <&cp_clk>, <&cp_clk>, <&cp_clk>,
+ 				 <&cp_clk>, <&cp_clk>, <&p_clk>, <&p_clk>,
+-				 <&cp_clk>, <&cp_clk>;
++				 <&cp_clk>, <&cp_clk>, <&hp_clk>, <&hp_clk>,
++				 <&hp_clk>, <&hp_clk>, <&hp_clk>, <&hp_clk>;
+ 			#clock-cells = <1>;
+ 			clock-indices = <
+ 				R8A7792_CLK_GPIO7 R8A7792_CLK_GPIO6
+@@ -642,12 +643,16 @@
+ 				R8A7792_CLK_GPIO11 R8A7792_CLK_GPIO10
+ 				R8A7792_CLK_CAN1 R8A7792_CLK_CAN0
+ 				R8A7792_CLK_GPIO9 R8A7792_CLK_GPIO8
++				R8A7792_CLK_I2C5 R8A7792_CLK_I2C4
++				R8A7792_CLK_I2C3 R8A7792_CLK_I2C2
++				R8A7792_CLK_I2C1 R8A7792_CLK_I2C0
+ 			>;
+ 			clock-output-names =
+ 				"gpio7", "gpio6", "gpio5", "gpio4",
+ 				"gpio3", "gpio2", "gpio1", "gpio0",
+ 				"gpio11", "gpio10", "can1", "can0",
+-				"gpio9", "gpio8";
++				"gpio9", "gpio8", "i2c5", "i2c4",
++				"i2c3",	"i2c2", "i2c1", "i2c0";
+ 		};
+ 	};
  
- 	sdhi0: sd at ee100000 {
- 		compatible = "renesas,sdhi-r8a7794";
--		reg = <0 0xee100000 0 0x200>;
-+		reg = <0 0xee100000 0 0x328>;
- 		interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7794_CLK_SDHI0>;
- 		dmas = <&dmac0 0xcd>, <&dmac0 0xce>,
 -- 
 2.7.0.rc3.207.g0ac5344
