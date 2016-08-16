@@ -1,278 +1,122 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 15 Aug 2016 17:50:50 +0100
-Subject: [PATCH v2] Added perf functionality to mmdc driver
-In-Reply-To: <20160815223035.5429-1-zhengyu.shen@nxp.com>
-References: <20160815223035.5429-1-zhengyu.shen@nxp.com>
-Message-ID: <20160815165050.GB31080@svinekod>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 16 Aug 2016 18:43:16 +0800
+Subject: [arm-platforms:kvm-arm64/vgic-v3-apr0 3/3]
+ arch/arm64/kvm/hyp/vgic-v3-sr.c:228:26: error: 'struct kvm_vcpu_arch' has no
+ member named 'v3_has_g0_interrupts'
+Message-ID: <201608161807.DZ1yT6D6%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/vgic-v3-apr0
+head:   26214414ebaa28da4f07a9af1a6b7d3a4835545e
+commit: 26214414ebaa28da4f07a9af1a6b7d3a4835545e [3/3] arm64: KVM: vgic-v3: Don't save ICH_AP0Rn when no Group0 interrupts are injected
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 26214414ebaa28da4f07a9af1a6b7d3a4835545e
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-On Mon, Aug 15, 2016 at 05:30:35PM -0500, Zhengyu Shen wrote:
-> MMDC is a multi-mode DDR controller that supports DDR3/DDR3L x16/x32/x64 and
-> LPDDR2 two channel x16/x32 memory types. MMDC is configurable, high performance,
-> and optimized. MMDC is present on i.MX6 Quad and i.MX6 QuadPlus devices, but
-> this driver only supports i.MX6 Quad at the moment. MMDC provides registers
-> for performance counters which read via this driver to help debug memory
-> throughput and similar issues.
-> 
-> $ perf stat -a -e mmdc/busy-cycles/,mmdc/read-accesses/,mmdc/read-bytes/,mmdc/total-cycles/,mmdc/write-accesses/,mmdc/write-bytes/ dd if=/dev/zero of=/dev/null bs=1M count=5000
-> Performance counter stats for 'dd if=/dev/zero of=/dev/null bs=1M count=5000':
-> 
->          898021787      mmdc/busy-cycles/
->           14819600      mmdc/read-accesses/
->             471.30 MB   mmdc/read-bytes/
->         2815419216      mmdc/total-cycles/
->           13367354      mmdc/write-accesses/
->             427.76 MB   mmdc/write-bytes/
-> 
->        5.334757334 seconds time elapsed
-> 
-> Signed-off-by: Zhengyu Shen <zhengyu.shen@nxp.com>
-> ---
-> change from v1 to v2:
-> 	Added cpumask and migration handling support to driver
-> 	Validated event during event_init
-> 	Added code to properly stop counters
-> 	Used perf_invalid_context instead of perf_sw_context
-> 	Added hrtimer to poll for overflow 
-> 	Added better description
-> 	Added support for multiple mmdcs
+All errors (new ones prefixed by >>):
 
-As I commented on v1 w.r.t. the above, I would appreciate being Cc'd on future
-versions of this patch.
+   In file included from arch/arm64/kvm/hyp/vgic-v3-sr.c:18:0:
+   arch/arm64/kvm/hyp/vgic-v3-sr.c: In function '__vgic_v3_save_state':
+>> arch/arm64/kvm/hyp/vgic-v3-sr.c:228:26: error: 'struct kvm_vcpu_arch' has no member named 'v3_has_g0_interrupts'
+      if (unlikely(vcpu->arch.v3_has_g0_interrupts))
+                             ^
+   include/linux/compiler.h:168:42: note: in definition of macro 'unlikely'
+    # define unlikely(x) __builtin_expect(!!(x), 0)
+                                             ^
+   arch/arm64/kvm/hyp/vgic-v3-sr.c: In function '__vgic_v3_restore_state':
+>> arch/arm64/kvm/hyp/vgic-v3-sr.c:288:19: error: 'struct vgic_v3_cpu_if' has no member named 'vgic_lrs'
+        g0 |= !(cpu_if->vgic_lrs[i] & ICH_LR_GROUP);
+                      ^
+   arch/arm64/kvm/hyp/vgic-v3-sr.c:310:13: error: 'struct kvm_vcpu_arch' has no member named 'v3_has_g0_interrupts'
+      vcpu->arch.v3_has_g0_interrupts = g0;
+                ^
 
-> +static u32 mmdc_read_counter(struct mmdc_pmu *pmu_mmdc, int cfg, u64 prev_val)
-> +{
-> +	u32 val;
-> +	void __iomem *mmdc_base, *reg;
-> +	mmdc_base = pmu_mmdc->mmdc_base;
-> +
-> +	switch (cfg)
-> +	{
-> +		case TOTAL_CYCLES:
-> +			reg = mmdc_base + MMDC_MADPSR0;
-> +			break;
-> +		case BUSY_CYCLES:
-> +			reg = mmdc_base + MMDC_MADPSR1;
-> +			break;
-> +		case READ_ACCESSES:
-> +			reg = mmdc_base + MMDC_MADPSR2;
-> +			break;
-> +		case WRITE_ACCESSES:
-> +			reg = mmdc_base + MMDC_MADPSR3;
-> +			break;
-> +		case READ_BYTES:
-> +			reg = mmdc_base + MMDC_MADPSR4;
-> +			break;
-> +		case WRITE_BYTES:
-> +			reg = mmdc_base + MMDC_MADPSR5;
-> +			break;
-> +		default:
-> +			return -1;
+vim +228 arch/arm64/kvm/hyp/vgic-v3-sr.c
 
-This is probably worth a WARN_ONCE, given this should never happen if things
-are working correctly.
+   222				else
+   223					cpu_if->vgic_lr[i] = __gic_v3_get_lr(i);
+   224	
+   225				__gic_v3_set_lr(0, i);
+   226			}
+   227	
+ > 228			if (unlikely(vcpu->arch.v3_has_g0_interrupts))
+   229				read_aprs(cpu_if->vgic_ap0r, 0, nr_pri_bits);
+   230	
+   231			read_aprs(cpu_if->vgic_ap1r, 1, nr_pri_bits);
+   232	
+   233			vcpu->arch.vgic_cpu.live_lrs = 0;
+   234		} else {
+   235			cpu_if->vgic_misr  = 0;
+   236			cpu_if->vgic_eisr  = 0;
+   237			cpu_if->vgic_elrsr = 0xffff;
+   238			cpu_if->vgic_ap0r[0] = 0;
+   239			cpu_if->vgic_ap0r[1] = 0;
+   240			cpu_if->vgic_ap0r[2] = 0;
+   241			cpu_if->vgic_ap0r[3] = 0;
+   242			cpu_if->vgic_ap1r[0] = 0;
+   243			cpu_if->vgic_ap1r[1] = 0;
+   244			cpu_if->vgic_ap1r[2] = 0;
+   245			cpu_if->vgic_ap1r[3] = 0;
+   246		}
+   247	
+   248		val = read_gicreg(ICC_SRE_EL2);
+   249		write_gicreg(val | ICC_SRE_EL2_ENABLE, ICC_SRE_EL2);
+   250	
+   251		if (!cpu_if->vgic_sre) {
+   252			/* Make sure ENABLE is set at EL2 before setting SRE at EL1 */
+   253			isb();
+   254			write_gicreg(1, ICC_SRE_EL1);
+   255		}
+   256	}
+   257	
+   258	void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+   259	{
+   260		struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+   261		u64 val;
+   262		u32 max_lr_idx, nr_pri_bits;
+   263		u16 live_lrs = 0;
+   264		bool g0 = false;
+   265		int i;
+   266	
+   267		/*
+   268		 * VFIQEn is RES1 if ICC_SRE_EL1.SRE is 1. This causes a
+   269		 * Group0 interrupt (as generated in GICv2 mode) to be
+   270		 * delivered as a FIQ to the guest, with potentially fatal
+   271		 * consequences. So we must make sure that ICC_SRE_EL1 has
+   272		 * been actually programmed with the value we want before
+   273		 * starting to mess with the rest of the GIC.
+   274		 */
+   275		if (!cpu_if->vgic_sre) {
+   276			write_gicreg(0, ICC_SRE_EL1);
+   277			isb();
+   278		}
+   279	
+   280		val = read_gicreg(ICH_VTR_EL2);
+   281		max_lr_idx = vtr_to_max_lr_idx(val);
+   282		nr_pri_bits = vtr_to_nr_pri_bits(val);
+   283	
+   284		for (i = 0; i <= max_lr_idx; i++) {
+   285			if (cpu_if->vgic_lr[i] & ICH_LR_STATE) {
+   286				live_lrs |= (1 << i);
+   287				if (cpu_if->vgic_sre)
+ > 288					g0 |= !(cpu_if->vgic_lrs[i] & ICH_LR_GROUP);
+   289			}
+   290		}
+   291	
 
-> +static int mmdc_cpu_notifier(struct notifier_block *nb,
-> +        unsigned long action, void *hcpu)
-> +{
-> +	struct mmdc_pmu *pmu_mmdc = container_of(nb, struct mmdc_pmu, cpu_nb);
-> +	unsigned int cpu = (long)hcpu; /* for (long) see kernel/cpu.c */
-> +	unsigned int target;
-> +
-> +	switch (action & ~CPU_TASKS_FROZEN) {
-> +		case CPU_DOWN_PREPARE:
-> +			if (!cpumask_test_and_clear_cpu(cpu, &pmu_mmdc->cpu))
-> +				break;
-> +			target = cpumask_any_but(cpu_online_mask, cpu);
-> +			if (target >= nr_cpu_ids)
-> +				break;
-> +			perf_pmu_migrate_context(&pmu_mmdc->pmu, cpu, target);
-> +			cpumask_set_cpu(target, &pmu_mmdc->cpu);
-> +		default:
-> +			break;
-> +    }
-> +
-> +	return NOTIFY_OK;
-> +}
-
-CPU notifiers are being ripped out of the kernel with the new hotplug state
-machine stuff. See [1] for examples.
-
-> +static int mmdc_event_init(struct perf_event *event)
-> +{
-> +	struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
-> +	if (event->attr.type != event->pmu->type)
-> +		return -ENOENT;
-> +
-> +	if (event->cpu < 0) {
-> +		dev_warn(pmu_mmdc->dev, "Can't provide per-task data!\n");
-> +		return -EOPNOTSUPP;
-> +	}
-> +
-> +	if (event->attr.exclude_user   ||
-> +			event->attr.exclude_kernel ||
-> +			event->attr.exclude_hv     ||
-> +			event->attr.exclude_idle   ||
-> +			event->attr.exclude_host)
-> +		return -EINVAL;
-
-Likewise for exclude_guest here.
-
-You also need to reject sampling events.
-
-You also need to sanity-check grouping.
-
-For the Nth time, I'm going to say that really, we should have the core check
-this (or expose helpers to do so). It's somewhat ridiculous that evry driver
-has to blacklist everything it doesn't support, rather than whitelisting the
-few things that it does.
-
-> +
-> +	mmdc_enable_profiling(event);
-
-This doesn't look right. Until we call add() we shouldn't have to poke HW.
-event_init should just verify the veent and set up datastructures as required.
-
-It would be better to count the number of active events and enable/disable the
-PMU as reuired in the add() and del() callbacks.
-
-> +	event->cpu = cpumask_first(&pmu_mmdc->cpu);
-> +	local64_set(&event->count, 0);
-> +
-> +	return 0;
-> +}
-> +
-> +static void mmdc_event_update(struct perf_event * event)
-> +{
-> +	struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
-> +	u32 val;
-> +	u64 prev_val;
-> +	prev_val = local64_read(&event->count);
-> +	val = mmdc_read_counter(pmu_mmdc, (int) event->attr.config, prev_val);
-> +	local64_add(val - (u32)(prev_val&0xFFFFFFFF) , &event->count);
-> +}
-
-Nit: please add spaces eithr side of the '&'.
-
-> +static void mmdc_event_start(struct perf_event *event, int flags)
-> +{
-> +	struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
-> +	void __iomem *mmdc_base, *reg;
-> +
-> +	local64_set(&event->count, 0);
-> +	mmdc_base = pmu_mmdc->mmdc_base;
-> +	reg = mmdc_base + MMDC_MADPCR0;
-> +	hrtimer_start(&pmu_mmdc->hrtimer, mmdc_timer_period(),
-> +			HRTIMER_MODE_REL_PINNED);
-
-Why is a hrtimer necessary? Is this just copy-pasted from CCN, or do you have
-similar HW issues?
-
-Is there no overflow interrupt?
-
-> +
-> +	writel_relaxed(DBG_RST, reg);
-> +	writel_relaxed(DBG_EN, reg);
-> +}
-> +
-> +static int mmdc_event_add(struct perf_event *event, int flags)
-> +{
-> +	struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
-> +	int cfg = (int)event->attr.config;
-> +	if (cfg >= 1 &&	cfg <= MMDC_NUM_COUNTERS)
-> +		pmu_mmdc->mmdc_events[cfg - 1] = event;
-
-Surely this should never happen, and we don't want to start such a broken
-event? SO this should be something like:
-
-	if (WARN_ONCE(cfg < 1 || cfg > MMDC_NUM_COUNTERS))
-		return;
-
-Also, why not use zero-based indices like everyone else?
-
-> +static void mmdc_event_stop(struct perf_event *event, int flags)
-> +{
-> +	struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
-> +	void __iomem *mmdc_base, *reg;
-> +	int cfg = (int)event->attr.config;
-> +
-> +	mmdc_base = pmu_mmdc->mmdc_base;
-> +	reg = mmdc_base + MMDC_MADPCR0;
-> +	if (cfg >= 1 &&	cfg <= MMDC_NUM_COUNTERS)
-
-Same comment as above here.
-
-> +	{
-> +		if (hrtimer_active(&pmu_mmdc->hrtimer))
-> +			hrtimer_cancel(&pmu_mmdc->hrtimer);
-
-What if I have multiple events? As soon as I stop one the hrtimer will be
-stopped for all of them. Note I fixed a similar bug in the CCN driver in [2].
-
-> +
-> +		writel_relaxed(PRF_FRZ, reg);
-
-Why relaxed?
-
-I see no barriers as one would expect to go with relaxed IO accessors, so I
-assume this is premature optimisation, and likely introducing bugs. Please use
-the non-relaxed accessors.
-
-> +static void mmdc_overflow_handler(struct mmdc_pmu *pmu_mmdc)
-> +{
-> +	int i;
-> +	u32 val;
-> +	u64 prev_val;
-> +
-> +	for (i = 0; i < MMDC_NUM_COUNTERS; i++)
-> +	{
-> +		struct perf_event *event = pmu_mmdc->mmdc_events[i];
-> +		if (event)
-> +		{
-> +			prev_val = local64_read(&event->count);
-> +			val = mmdc_read_counter(pmu_mmdc, i + 1, prev_val);
-> +			local64_add(val - (u32)(prev_val&0xFFFFFFFF) , &event->count);
-> +		}
-> +	}
-> +}
-
-Can't you call your update function for each event? This seems to be a copy of
-that logic.
-
-> @@ -61,7 +392,35 @@ static int imx_mmdc_probe(struct platform_device *pdev)
->  			__func__);
->  		return -EBUSY;
->  	}
-> +	pmu_mmdc = kzalloc(sizeof(*pmu_mmdc), GFP_KERNEL);
->  
-> +	if (!pmu_mmdc) {
-> +		pr_err("failed to allocate PMU device!\n");
-> +		return -ENOMEM;
-> +	}
-> +	mmdc_num = mmdc_pmu_init(pmu_mmdc, mmdc_base, &pdev->dev);
-> +	dev_info(pmu_mmdc->dev, "No access to interrupts, using timer.\n");
-
-You haven't even tried...
-
-> +	hrtimer_init(&pmu_mmdc->hrtimer, CLOCK_MONOTONIC,
-> +			HRTIMER_MODE_REL);
-> +	pmu_mmdc->hrtimer.function = mmdc_timer_handler;
-> +	register_cpu_notifier(&pmu_mmdc->cpu_nb);
-> +	if (mmdc_num == 0) {
-> +		name = "mmdc";
-> +	} else {
-> +		int len = snprintf(NULL, 0, "mmdc_%d", mmdc_num);
-> +		name = devm_kzalloc(&pdev->dev, len + 1, GFP_KERNEL);
-> +		snprintf(name, len + 1, "mmdc_%d", mmdc_num);
-> +	}
-
-Use devm_kasptrintf.
-
-Thanks,
-Mark.
-
-[1] https://lkml.org/lkml/2016/7/11/312
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/448369.html
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 30700 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160816/b7a5efde/attachment-0001.obj>
