@@ -1,122 +1,92 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 16 Aug 2016 18:50:42 +0200
-Subject: [PATCH v3] MAINTAINERS: Switch to kernel.org account for Krzysztof
- Kozlowski
-Message-ID: <1471366242-11432-1-git-send-email-krzk@kernel.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 16 Aug 2016 18:53:20 +0200
+Subject: [PATCH v6 3/3] net: phy: Add gmiitorgmii converter support
+In-Reply-To: <1470808208-32133-4-git-send-email-appanad@xilinx.com>
+References: <1470808208-32133-1-git-send-email-appanad@xilinx.com>
+ <1470808208-32133-4-git-send-email-appanad@xilinx.com>
+Message-ID: <20160816165320.GP14446@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change my email address to kernel.org account instead of Samsung one.
+> +static int xgmiitorgmii_read_status(struct phy_device *phydev)
+> +{
+> +	struct gmii2rgmii *priv = phydev->priv;
+> +	u16 val = 0;
+> +
+> +	priv->phy_drv->read_status(phydev);
 
-Add Bartlomiej Zolnierkiewicz as a co-maintainer of Maxim and Samsung
-PMIC drivers.  These are used on many of our boards along with Exynos
-SoCs and Samsung R&D Institute Poland can still take care of them.
+This can return an error, in which case phydev->speed should not be
+trusted.
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+I've not thought locking all the way through yet. I don't think you
+need a lock here, but i need to think about it.
 
----
+> +
+> +	val = mdiobus_read(phydev->mdio.bus, priv->addr, XILINX_GMII2RGMII_REG);
 
-Third revision for simple maintainers update. Nice! :)
+You should check for an error here.
 
-Changes since v2:
-1. Add Bartlomiej, leave MUIC charger drivers as "Supported".
+> +	val &= XILINX_GMII2RGMII_SPEED_MASK;
+> +
+> +	if (phydev->speed == SPEED_1000)
+> +		val |= BMCR_SPEED1000;
+> +	else if (phydev->speed == SPEED_100)
+> +		val |= BMCR_SPEED100;
+> +	else
+> +		val |= BMCR_SPEED10;
 
-Changes since v1:
-1. Update also mailmap after Joe Perches suggestion.
+What happens if for example the PHY is an aquantia and has negotiated
+SPEED_2500? Some Marvell PHYs can also do odd speeds, like 200Mbps.
+You probably want to return an error, rather than silently have things
+go wrong.
 
-Affected drivers/subsystems:
-1. arch/arm,
-2. mfd,
-3. power,
-4. regulator,
-5. clk,
-6. rtc,
-7. extcon,
-8. pinctrl,
-9. sound/soc,
+> +
+> +	mdiobus_write(phydev->mdio.bus, priv->addr, XILINX_GMII2RGMII_REG, val);
 
-However if there are no objections, I can push it through my tree (to
-arm-soc folks).
----
- .mailmap    |  1 +
- MAINTAINERS | 15 +++++++++------
- 2 files changed, 10 insertions(+), 6 deletions(-)
+This can also return an error.
 
-diff --git a/.mailmap b/.mailmap
-index 2a91c14c80bf..b18912c5121e 100644
---- a/.mailmap
-+++ b/.mailmap
-@@ -88,6 +88,7 @@ Kay Sievers <kay.sievers@vrfy.org>
- Kenneth W Chen <kenneth.w.chen@intel.com>
- Konstantin Khlebnikov <koct9i@gmail.com> <k.khlebnikov@samsung.com>
- Koushik <raghavendra.koushik@neterion.com>
-+Krzysztof Kozlowski <krzk@kernel.org> <k.kozlowski@samsung.com>
- Krzysztof Kozlowski <krzk@kernel.org> <k.kozlowski.k@gmail.com>
- Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
- Leonid I Ananiev <leonid.i.ananiev@intel.com>
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 45c98485c3f0..f77df673d097 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1623,7 +1623,7 @@ N:	rockchip
- 
- ARM/SAMSUNG EXYNOS ARM ARCHITECTURES
- M:	Kukjin Kim <kgene@kernel.org>
--M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
-+M:	Krzysztof Kozlowski <krzk@kernel.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
- S:	Maintained
-@@ -7465,7 +7465,8 @@ F:	Documentation/devicetree/bindings/sound/max9860.txt
- F:	sound/soc/codecs/max9860.*
- 
- MAXIM MUIC CHARGER DRIVERS FOR EXYNOS BASED BOARDS
--M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
-+M:	Krzysztof Kozlowski <krzk@kernel.org>
-+M:	Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
- L:	linux-pm at vger.kernel.org
- S:	Supported
- F:	drivers/power/supply/max14577_charger.c
-@@ -7481,7 +7482,8 @@ F:	include/dt-bindings/*/*max77802.h
- 
- MAXIM PMIC AND MUIC DRIVERS FOR EXYNOS BASED BOARDS
- M:	Chanwoo Choi <cw00.choi@samsung.com>
--M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
-+M:	Krzysztof Kozlowski <krzk@kernel.org>
-+M:	Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
- L:	linux-kernel at vger.kernel.org
- S:	Supported
- F:	drivers/*/max14577*.c
-@@ -9258,7 +9260,7 @@ F:	drivers/pinctrl/sh-pfc/
- 
- PIN CONTROLLER - SAMSUNG
- M:	Tomasz Figa <tomasz.figa@gmail.com>
--M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
-+M:	Krzysztof Kozlowski <krzk@kernel.org>
- M:	Sylwester Nawrocki <s.nawrocki@samsung.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
-@@ -10189,7 +10191,7 @@ S:	Maintained
- F:	drivers/platform/x86/samsung-laptop.c
- 
- SAMSUNG AUDIO (ASoC) DRIVERS
--M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
-+M:	Krzysztof Kozlowski <krzk@kernel.org>
- M:	Sangbeom Kim <sbkim73@samsung.com>
- M:	Sylwester Nawrocki <s.nawrocki@samsung.com>
- L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
-@@ -10204,7 +10206,8 @@ F:	drivers/video/fbdev/s3c-fb.c
- 
- SAMSUNG MULTIFUNCTION PMIC DEVICE DRIVERS
- M:	Sangbeom Kim <sbkim73@samsung.com>
--M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
-+M:	Krzysztof Kozlowski <krzk@kernel.org>
-+M:	Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
- L:	linux-kernel at vger.kernel.org
- L:	linux-samsung-soc at vger.kernel.org
- S:	Supported
--- 
-2.7.4
+> +	return 0;
+> +}
+> +
+> +int xgmiitorgmii_probe(struct mdio_device *mdiodev)
+> +{
+> +	struct device *dev = &mdiodev->dev;
+> +	struct device_node *np = dev->of_node, *phy_node;
+> +	struct gmii2rgmii *priv;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	phy_node = of_parse_phandle(np, "phy-handle", 0);
+> +	if (IS_ERR(phy_node)) {
+> +		dev_err(dev, "Couldn't parse phy-handle\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	priv->phy_dev = of_phy_find_device(phy_node);
+> +	if (!priv->phy_dev) {
+> +		dev_info(dev, "Couldn't find phydev\n");
+> +		return -EPROBE_DEFER;
+> +	}
+> +
+> +	priv->addr = mdiodev->addr;
+> +	priv->phy_drv = priv->phy_dev->drv;
+> +	memcpy(&priv->conv_phy_drv, priv->phy_dev->drv,
+> +	       sizeof(struct phy_driver));
+> +	priv->conv_phy_drv.read_status = xgmiitorgmii_read_status;
+> +	priv->phy_dev->priv = priv;
+> +	priv->phy_dev->drv = &priv->conv_phy_drv;
+
+So from this point onward, the phy driver depends on the memory
+allocated by this driver. If this driver goes away, freeing its
+memory, the next call to read_status() is going to have a problem.
+
+Also, i think this assignment should take the phy lock, just to be
+safe.
+
+There also needs to be some thought into what happens if the phy
+driver is unloaded. Should this driver take a reference on the phy
+driver to prevent that?
+
+       Andrew
