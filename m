@@ -1,84 +1,109 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 16 Aug 2016 16:48:02 +0300
-Subject: [PATCH v2 4/7] phy-sun4i-usb: Add support for phy_set_mode
-In-Reply-To: <1471288892-21702-5-git-send-email-hdegoede@redhat.com>
-References: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
- <1471288892-21702-5-git-send-email-hdegoede@redhat.com>
-Message-ID: <6058a676-1e2c-0301-6edd-eee64b515b51@cogentembedded.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 16 Aug 2016 15:50:18 +0200
+Subject: [PATCH v2 1/4] pwm: Add support for Meson PWM Controller
+In-Reply-To: <CAFBinCAXJ_POd9=UhL8vM6_sXXgVMgSZCwDKosLSzW2++ZmTQQ@mail.gmail.com>
+References: <1468142645-4360-1-git-send-email-narmstrong@baylibre.com>
+ <1468142645-4360-2-git-send-email-narmstrong@baylibre.com>
+ <CAFBinCAXJ_POd9=UhL8vM6_sXXgVMgSZCwDKosLSzW2++ZmTQQ@mail.gmail.com>
+Message-ID: <ad674bac-885b-e975-dd4c-d7ae11789d5a@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Martin,
 
-On 08/15/2016 10:21 PM, Hans de Goede wrote:
+On 08/15/2016 06:55 PM, Martin Blumenstingl wrote:
+> On Sun, Jul 10, 2016 at 11:24 AM, Neil Armstrong
 
-> Together with some musb sunxi glue changes this allows run-time dr_mode
-> switching support via the "mode" musb sysfs attribute.
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  drivers/phy/phy-sun4i-usb.c | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
->
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index fb2d4f3..d369081 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -427,6 +427,29 @@ static int sun4i_usb_phy_power_off(struct phy *_phy)
->  	return 0;
->  }
->
-> +static int sun4i_usb_phy_set_mode(struct phy *_phy, enum phy_mode mode)
-> +{
-> +	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
-> +	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
-> +
-> +	if (phy->index != 0)
-> +		return -EINVAL;
-> +
-> +	switch (mode) {
-> +	case PHY_MODE_USB_HOST:   data->dr_mode = USB_DR_MODE_HOST; break;
-> +	case PHY_MODE_USB_DEVICE: data->dr_mode = USB_DR_MODE_PERIPHERAL; break;
-> +	case PHY_MODE_USB_OTG:    data->dr_mode = USB_DR_MODE_OTG; break;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	dev_info(&_phy->dev, "Changing dr_mode to %d\n", (int)data->dr_mode);
-> +	data->force_session_end = true;
-> +	queue_delayed_work(system_wq, &data->detect, 0);
-> +
-> +	return 0;
-> +}
-> +
->  void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
->  {
->  	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
 [...]
 
-$ scripts/checkpatch.pl 
-~/patches/phy-sun4i-usb-Add-support-for-phy_set_mode.patch
-ERROR: trailing statements should be on next line
-#29: FILE: drivers/phy/phy-sun4i-usb.c:439:
-+	case PHY_MODE_USB_HOST:   data->dr_mode = USB_DR_MODE_HOST; break;
+>> +static int meson_pwm_calc(struct meson_pwm_chip *chip,
+>> +                              struct meson_pwm_channel *pwm_chan,
+>> +                              unsigned int id,
+>> +                              int duty_ns, unsigned int period_ns)
+>> +{
+>> +       unsigned int pwm_pre_div;
+>> +       unsigned int pwm_cnt;
+>> +       unsigned int pwm_duty_cnt;
+>> +       unsigned long fin_freq = -1;
+>> +       unsigned long fin_ns;
+>> +       unsigned int i = 0;
+>> +
+>> +       if (duty_ns > period_ns)
+>> +               return -EINVAL;
+>> +
+>> +       switch (id) {
+>> +       case PWM_A:
+>> +               fin_freq = clk_get_rate(chip->clk[0]);
+>> +               break;
+>> +       case PWM_B:
+>> +               fin_freq = clk_get_rate(chip->clk[1]);
+>> +               break;
+>> +       }
+>> +       if (fin_freq <= 0) {
+>> +               dev_err(chip->chip.dev, "invalid source clock frequency\n");
+>> +               return -EINVAL;
+>> +       }
+>> +       dev_dbg(chip->chip.dev, "fin_freq: %luHz\n", fin_freq);
+>> +       fin_ns = NSEC_PER_SEC / fin_freq;
+>> +
+>> +       /* Calc pre_div with the period */
+>> +       for (i = 0; i < MISC_CLK_DIV_MASK; i++) {
+>> +               pwm_pre_div = i;
+> according to the public (S905) datasheet the hardware wants "value
+> +1": "Selects the divider (N+1) for the PWM A clock"
+> so shouldn't this be pwm_pre_div = i + 1?
+> all your calculations below are already adding 1 to pwm_pre_div, but
+> pwm_pre_div is directly written to the hardware register in
+> meson_pwm_config()
 
-ERROR: trailing statements should be on next line
-#30: FILE: drivers/phy/phy-sun4i-usb.c:440:
-+	case PHY_MODE_USB_DEVICE: data->dr_mode = USB_DR_MODE_PERIPHERAL; break;
+You misread the datasheet, usually the phrase :
+"PWM_A_CLK_DIV: Selects the divider (N+1) for the PWM A clock"
 
-ERROR: trailing statements should be on next line
-#31: FILE: drivers/phy/phy-sun4i-usb.c:441:
-+	case PHY_MODE_USB_OTG:    data->dr_mode = USB_DR_MODE_OTG; break;
+Means, the divider that will be applied will be "N + 1", N is the value written in the register.
 
-total: 3 errors, 0 warnings, 36 lines checked
+This is why we start from 0 and for the following calculation, I add +1 :
+>> +               pwm_cnt = DIV_ROUND_CLOSEST(period_ns,
+>> +                               fin_ns * (pwm_pre_div + 1));
 
-NOTE: For some of the reported defects, checkpatch may be able to
-       mechanically convert to the typical style using --fix or --fix-inplace.
+This behavior was also present in the original vendor's driver.
 
-/home/headless/patches/phy-sun4i-usb-Add-support-for-phy_set_mode.patch has 
-style problems, please review.
+>> +               dev_dbg(chip->chip.dev, "fin_ns=%lu pre_div=%d cnt=%d\n",
+>> +                               fin_ns, pwm_pre_div, pwm_cnt);
+>> +               if (pwm_cnt <= 0xffff)
+>> +                       break;
+>> +       }
+>> +       if (i == MISC_CLK_DIV_MASK) {
+>> +               dev_err(chip->chip.dev, "Unable to get period pre_div");
+>> +               return -EINVAL;
+>> +       }
+>> +       dev_dbg(chip->chip.dev, "period_ns=%d pre_div=%d pwm_cnt=%d\n",
+>> +               period_ns, pwm_pre_div, pwm_cnt);
+>> +
+>> +       if (duty_ns == period_ns) {
+>> +               pwm_chan->pwm_pre_div = pwm_pre_div;
+>> +               pwm_chan->pwm_hi = pwm_cnt;
+>> +               pwm_chan->pwm_lo = 0;
+>> +       } else if (duty_ns == 0) {
+>> +               pwm_chan->pwm_pre_div = pwm_pre_div;
+>> +               pwm_chan->pwm_hi = 0;
+>> +               pwm_chan->pwm_lo = pwm_cnt;
+>> +       } else {
+>> +               /* Then check is we can have the duty with the same pre_div */
+>> +               pwm_duty_cnt = DIV_ROUND_CLOSEST(duty_ns,
+>> +                                       fin_ns * (pwm_pre_div + 1));
+>> +               if (pwm_cnt > 0xffff) {
+>> +                       dev_err(chip->chip.dev, "Unable to get duty period, differences are too high");
+>> +                       return -EINVAL;
+>> +               }
+>> +               dev_dbg(chip->chip.dev, "duty_ns=%d pre_div=%d pwm_cnt=%d\n",
+>> +                       duty_ns, pwm_pre_div, pwm_duty_cnt);
+>> +
+>> +               pwm_chan->pwm_pre_div = pwm_pre_div;
+>> +               pwm_chan->pwm_hi = pwm_duty_cnt;
+>> +               pwm_chan->pwm_lo = pwm_cnt - pwm_chan->pwm_hi;
+>> +       }
+>> +
+>> +       return 0;
+>> +}
 
-NOTE: If any of the errors are false positives, please report
-       them to the maintainer, see CHECKPATCH in MAINTAINERS.
-
-MBR, Sergei
+Neil
