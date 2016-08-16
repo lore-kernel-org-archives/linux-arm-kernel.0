@@ -1,55 +1,49 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 15 Aug 2016 17:17:06 -0700
-Subject: [PATCH 00/14] Split rpmsg into a framework
-Message-ID: <1471306640-29917-1-git-send-email-bjorn.andersson@linaro.org>
+Date: Mon, 15 Aug 2016 17:17:07 -0700
+Subject: [PATCH 01/14] rpmsg: Enable matching devices with drivers based on DT
+In-Reply-To: <1471306640-29917-1-git-send-email-bjorn.andersson@linaro.org>
+References: <1471306640-29917-1-git-send-email-bjorn.andersson@linaro.org>
+Message-ID: <1471306640-29917-2-git-send-email-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series splits the virtio rpmsg bus driver into a rpmsg bus and a virtio
-backend/wireformat.
+Make it possible to match rpmsg devices based on device tree node, in
+addition to the id table. In some of these cases the rpmsg driver would
+not have a id_table, so make this optional.
 
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+ drivers/rpmsg/virtio_rpmsg_bus.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-As we discussed the Qualcomm SMD implementation a couple of years back people
-suggested that I should make it "a rpmsg thingie". With the introduction of the
-Qualcomm 8996 platform, we must support a variant of the communication
-mechanism that share many of the characteristics of SMD, but are different
-enough that it can't be done in a single implementation. As such there is
-enough benefit to do the necessary work and being able to make SMD a "rpmsg
-thingie".
-
-On-top of this series I have patches to switch the current smd clients over to
-rpmsg (and by that drop the existing SMD implementation).
-
-All this allows me to implement the new backend and reuse all existing SMD
-drivers with the new mechanism.
-
-Bjorn Andersson (14):
-  rpmsg: Enable matching devices with drivers based on DT
-  rpmsg: Name rpmsg devices based on channel id
-  rpmsg: rpmsg_send() operations takes rpmsg_endpoint
-  rpmsg: Internalize rpmsg_send() implementations
-  rpmsg: Unify rpmsg device vs channel naming
-  rpmsg: Indirect all virtio related function calls
-  rpmsg: Split off generic tail of create_channel()
-  rpmsg: Split rpmsg core and virtio backend
-  rpmsg: Internalize rpmsg core ops
-  rpmsg: virtio: Internalize vrp pointer
-  rpmsg: Move virtio specifics from public header
-  rpmsg: Make rpmsg_create_ept() take channel_info struct
-  rpmsg: Allow callback to return errors
-  rpmsg: Introduce Qualcomm SMD backend
-
- drivers/rpmsg/Kconfig            |   14 +
- drivers/rpmsg/Makefile           |    4 +-
- drivers/rpmsg/qcom_smd.c         | 1448 ++++++++++++++++++++++++++++++++++++++
- drivers/rpmsg/rpmsg_core.c       |  525 ++++++++++++++
- drivers/rpmsg/rpmsg_internal.h   |   63 ++
- drivers/rpmsg/virtio_rpmsg_bus.c |  483 +++++--------
- include/linux/rpmsg.h            |  242 +------
- 7 files changed, 2268 insertions(+), 511 deletions(-)
- create mode 100644 drivers/rpmsg/qcom_smd.c
- create mode 100644 drivers/rpmsg/rpmsg_core.c
- create mode 100644 drivers/rpmsg/rpmsg_internal.h
-
+diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c b/drivers/rpmsg/virtio_rpmsg_bus.c
+index 4a4374cc6a59..495fa0a282d3 100644
+--- a/drivers/rpmsg/virtio_rpmsg_bus.c
++++ b/drivers/rpmsg/virtio_rpmsg_bus.c
+@@ -33,6 +33,7 @@
+ #include <linux/wait.h>
+ #include <linux/rpmsg.h>
+ #include <linux/mutex.h>
++#include <linux/of_device.h>
+ 
+ /**
+  * struct virtproc_info - virtual remote processor state
+@@ -175,11 +176,12 @@ static int rpmsg_dev_match(struct device *dev, struct device_driver *drv)
+ 	const struct rpmsg_device_id *ids = rpdrv->id_table;
+ 	unsigned int i;
+ 
+-	for (i = 0; ids[i].name[0]; i++)
+-		if (rpmsg_id_match(rpdev, &ids[i]))
+-			return 1;
++	if (ids)
++		for (i = 0; ids[i].name[0]; i++)
++			if (rpmsg_id_match(rpdev, &ids[i]))
++				return 1;
+ 
+-	return 0;
++	return of_driver_match_device(dev, drv);
+ }
+ 
+ static int rpmsg_uevent(struct device *dev, struct kobj_uevent_env *env)
 -- 
 2.5.0
