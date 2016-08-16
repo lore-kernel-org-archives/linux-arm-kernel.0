@@ -1,40 +1,42 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 16 Aug 2016 11:46:53 +0100
-Subject: [PATCH v2 2/7] arm64: KVM: Move vgic-v3 save/restore to
- virt/kvm/arm/hyp
-In-Reply-To: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
-References: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1471344418-19568-3-git-send-email-vladimir.murzin@arm.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 16 Aug 2016 18:56:47 +0800
+Subject: [PATCH v2 1/2] dt: bindings: add binding for Allwinner A64 R_PIO
+ pinctrl
+In-Reply-To: <CAGb2v65ca+HFq9Mr21E7QSN845O2H7BYKg5uAmRhECJe5dK6ag@mail.gmail.com>
+References: <20160816050709.7412-1-icenowy@aosc.xyz>
+ <CAGb2v65ca+HFq9Mr21E7QSN845O2H7BYKg5uAmRhECJe5dK6ag@mail.gmail.com>
+Message-ID: <1672001471345007@web4j.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So we can reuse the code under arch/arm
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm64/kvm/hyp/Makefile                       |    2 +-
- {arch/arm64/kvm => virt/kvm/arm}/hyp/vgic-v3-sr.c |    0
- 2 files changed, 1 insertion(+), 1 deletion(-)
- rename {arch/arm64/kvm => virt/kvm/arm}/hyp/vgic-v3-sr.c (100%)
 
-diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-index 0c85feb..aaf42ae 100644
---- a/arch/arm64/kvm/hyp/Makefile
-+++ b/arch/arm64/kvm/hyp/Makefile
-@@ -5,9 +5,9 @@
- KVM=../../../../virt/kvm
- 
- obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
-+obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/timer-sr.o
- 
--obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += entry.o
-diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-similarity index 100%
-rename from arch/arm64/kvm/hyp/vgic-v3-sr.c
-rename to virt/kvm/arm/hyp/vgic-v3-sr.c
--- 
-1.7.9.5
+16.08.2016, 17:14, "Chen-Yu Tsai" <wens@csie.org>:
+> On Tue, Aug 16, 2016 at 1:07 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>
+> Commit message please. :)
+I'm too silly to decide what should be written here...
+>
+> Something similar to the one in the pinctrl driver patch would do.
+>
+> ChenYu
+>
+>> ?---
+>> ??Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt | 1 +
+>> ??1 file changed, 1 insertion(+)
+>>
+>> ?diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+>> ?index 6961722..ee73f9f 100644
+>> ?--- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+>> ?+++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+>> ?@@ -23,6 +23,7 @@ Required properties:
+>> ????"allwinner,sun8i-h3-pinctrl"
+>> ????"allwinner,sun8i-h3-r-pinctrl"
+>> ????"allwinner,sun50i-a64-pinctrl"
+>> ?+ "allwinner,sun50i-a64-r-pinctrl"
+>>
+>> ??- reg: Should contain the register physical address and length for the
+>> ????pin controller.
+>> ?--
+>> ?2.9.2
