@@ -1,123 +1,66 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 16 Aug 2016 15:35:14 +0200
-Subject: [RFC 17/17] Revert
- "i2c: s3c2410: fix ABBA deadlock by keeping clock prepared"
-In-Reply-To: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
-References: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1471354514-24224-18-git-send-email-k.kozlowski@samsung.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue, 16 Aug 2016 15:40:32 +0200
+Subject: [PATCH v2] ARM: Add missing newline terminators to kernel messages
+Message-ID: <1471354832-18456-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 34e81ad5f0b60007c95995eb7803da7e00c6c611.
-
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Conflicts:
-	drivers/i2c/busses/i2c-s3c2410.c
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- drivers/i2c/busses/i2c-s3c2410.c | 23 ++++++-----------------
- 1 file changed, 6 insertions(+), 17 deletions(-)
+Before commit 874f9c7da9a4acbc ("printk: create pr_<level> functions"),
+pr_*() calls without a trailing newline characters would be printed with
+a newline character appended, both on the console and in the output of
+the dmesg command.
 
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index 38dc1cacfd8b..571250415617 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -771,16 +771,14 @@ static int s3c24xx_i2c_xfer(struct i2c_adapter *adap,
- 	int retry;
- 	int ret;
+After that commit, no new line character is appended, and the output of
+the next pr_*() call of the same type may be appended:
+
+    - Truncating RAM at 0x0000000040000000-0x00000000c0000000 to -0x0000000070000000
+    - Ignoring RAM at 0x0000000200000000-0x0000000240000000 (!CONFIG_HIGHMEM)
+    + Truncating RAM at 0x0000000040000000-0x00000000c0000000 to -0x0000000070000000Ignoring RAM at 0x0000000200000000-0x0000000240000000 (!CONFIG_HIGHMEM)
+
+and:
+
+    -No ATAGs?
+    -hw-breakpoint: found 5 (+1 reserved) breakpoint and 4 watchpoint registers.
+    +No ATAGs?hw-breakpoint: found 5 (+1 reserved) breakpoint and 4 watchpoint registers.
+
+While this commit has been reverted in commit a0cba2179ea4c182 ("Revert
+"printk: create pr_<level> functions""), it's still good practice to
+terminate kernel messages with newlines.
+
+v2:
+  - Rebased
+---
+ arch/arm/kernel/atags_proc.c | 2 +-
+ arch/arm/mm/mmu.c            | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/atags_proc.c b/arch/arm/kernel/atags_proc.c
+index 5a3379055f553167..d7af7b84a4ca32c5 100644
+--- a/arch/arm/kernel/atags_proc.c
++++ b/arch/arm/kernel/atags_proc.c
+@@ -41,7 +41,7 @@ static int __init init_atags_procfs(void)
+ 	size_t size;
  
--	ret = clk_enable(i2c->clk);
--	if (ret)
--		return ret;
-+	clk_prepare_enable(i2c->clk);
- 
- 	for (retry = 0; retry < adap->retries; retry++) {
- 
- 		ret = s3c24xx_i2c_doxfer(i2c, msgs, num);
- 
- 		if (ret != -EAGAIN) {
--			clk_disable(i2c->clk);
-+			clk_disable_unprepare(i2c->clk);
- 			return ret;
- 		}
- 
-@@ -789,7 +787,7 @@ static int s3c24xx_i2c_xfer(struct i2c_adapter *adap,
- 		udelay(100);
+ 	if (tag->hdr.tag != ATAG_CORE) {
+-		pr_info("No ATAGs?");
++		pr_info("No ATAGs?\n");
+ 		return -EINVAL;
  	}
  
--	clk_disable(i2c->clk);
-+	clk_disable_unprepare(i2c->clk);
- 	return -EREMOTEIO;
- }
- 
-@@ -1165,7 +1163,7 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
- 	}
- 
- 	ret = s3c24xx_i2c_init(i2c);
--	clk_disable(i2c->clk);
-+	clk_disable_unprepare(i2c->clk);
- 	if (ret != 0) {
- 		dev_err(&pdev->dev, "I2C controller init failed\n");
- 		clk_unprepare(i2c->clk);
-@@ -1180,7 +1178,6 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
- 		i2c->irq = ret = platform_get_irq(pdev, 0);
- 		if (ret <= 0) {
- 			dev_err(&pdev->dev, "cannot find IRQ\n");
--			clk_unprepare(i2c->clk);
- 			return ret;
- 		}
- 
-@@ -1188,7 +1185,6 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
- 				       0, dev_name(&pdev->dev), i2c);
- 		if (ret != 0) {
- 			dev_err(&pdev->dev, "cannot claim IRQ %d\n", i2c->irq);
--			clk_unprepare(i2c->clk);
- 			return ret;
- 		}
- 	}
-@@ -1196,7 +1192,6 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
- 	ret = s3c24xx_i2c_register_cpufreq(i2c);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "failed to register cpufreq notifier\n");
--		clk_unprepare(i2c->clk);
- 		return ret;
- 	}
- 
-@@ -1218,7 +1213,6 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "failed to add bus to i2c core\n");
- 		pm_runtime_disable(&pdev->dev);
- 		s3c24xx_i2c_deregister_cpufreq(i2c);
--		clk_unprepare(i2c->clk);
- 		return ret;
- 	}
- 
-@@ -1230,8 +1224,6 @@ static int s3c24xx_i2c_remove(struct platform_device *pdev)
- {
- 	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
- 
--	clk_unprepare(i2c->clk);
--
- 	pm_runtime_disable(&pdev->dev);
- 
- 	s3c24xx_i2c_deregister_cpufreq(i2c);
-@@ -1262,16 +1254,13 @@ static int s3c24xx_i2c_resume_noirq(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
--	int ret;
- 
- 	if (!IS_ERR(i2c->sysreg))
- 		regmap_write(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, i2c->sys_i2c_cfg);
- 
--	ret = clk_enable(i2c->clk);
--	if (ret)
--		return ret;
-+	clk_prepare_enable(i2c->clk);
- 	s3c24xx_i2c_init(i2c);
--	clk_disable(i2c->clk);
-+	clk_disable_unprepare(i2c->clk);
- 	i2c->suspended = 0;
- 
- 	return 0;
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 724d6be4b83225ee..7dbdad64a1ac5fd3 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1196,7 +1196,7 @@ void __init sanity_check_meminfo(void)
+ 				pr_notice("Truncating RAM at %pa-%pa",
+ 					  &block_start, &block_end);
+ 				block_end = vmalloc_limit;
+-				pr_cont(" to -%pa", &block_end);
++				pr_cont(" to -%pa\n", &block_end);
+ 				memblock_remove(vmalloc_limit, overlap_size);
+ 				should_use_highmem = true;
+ 			}
 -- 
 1.9.1
