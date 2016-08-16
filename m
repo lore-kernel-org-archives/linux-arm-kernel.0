@@ -1,216 +1,104 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 16 Aug 2016 10:49:31 +0100
-Subject: [PATCH 05/10] PM / Domains: Don't expose xlate and provider helper
- functions
+Date: Tue, 16 Aug 2016 10:49:32 +0100
+Subject: [PATCH 06/10] PM / Domains: Verify the PM domain is present when
+ adding a provider
 In-Reply-To: <1471340976-5379-1-git-send-email-jonathanh@nvidia.com>
 References: <1471340976-5379-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <1471340976-5379-6-git-send-email-jonathanh@nvidia.com>
+Message-ID: <1471340976-5379-7-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Functions __of_genpd_xlate_simple(), __of_genpd_xlate_onecell() and
-__of_genpd_add_provider() are not used outside of the core generic PM
-domain code. Therefore, reduce the number of APIs exposed by making
-these static. At the same time don't expose the typedef for
-genpd_xlate_t either and make this a local definition as well.
+When a PM domain provider is added, there is currently no way to tell if
+any PM domains associated with the provider are present. Naturally, the
+PM domain provider should not be registered if the PM domains have not
+been added. Nonetheless, verify that the PM domain(s) associated with a
+provider are present when registering the PM domain provider.
 
-The functions are renamed to follow the naming conventions for static
-functions in the generic PM domain core.
+This change adds a dependency on the function pm_genpd_present() when
+CONFIG_PM_GENERIC_DOMAINS_OF is enabled and so ensure this function is
+available when CONFIG_PM_GENERIC_DOMAINS_OF selected.
 
 Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 ---
- drivers/base/power/domain.c | 49 ++++++++++++++++++++++++++++++++++-----------
- include/linux/pm_domain.h   | 42 +++++++++++++-------------------------
- 2 files changed, 51 insertions(+), 40 deletions(-)
+ drivers/base/power/domain.c | 45 ++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 42 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 7b0aecef2e51..d09e45145a3d 100644
+index d09e45145a3d..50223ae0c9a7 100644
 --- a/drivers/base/power/domain.c
 +++ b/drivers/base/power/domain.c
-@@ -1329,6 +1329,10 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
- EXPORT_SYMBOL_GPL(pm_genpd_init);
+@@ -586,7 +586,7 @@ static int __init genpd_poweroff_unused(void)
+ }
+ late_initcall(genpd_poweroff_unused);
  
- #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
-+
-+typedef struct generic_pm_domain *(*genpd_xlate_t)(struct of_phandle_args *args,
-+						   void *data);
-+
- /*
-  * Device Tree based PM domain providers.
-  *
-@@ -1340,8 +1344,8 @@ EXPORT_SYMBOL_GPL(pm_genpd_init);
-  * maps a PM domain specifier retrieved from the device tree to a PM domain.
-  *
-  * Two simple mapping functions have been provided for convenience:
-- *  - __of_genpd_xlate_simple() for 1:1 device tree node to PM domain mapping.
-- *  - __of_genpd_xlate_onecell() for mapping of multiple PM domains per node by
-+ *  - genpd_xlate_simple() for 1:1 device tree node to PM domain mapping.
-+ *  - genpd_xlate_onecell() for mapping of multiple PM domains per node by
-  *    index.
-  */
- 
-@@ -1366,7 +1370,7 @@ static LIST_HEAD(of_genpd_providers);
- static DEFINE_MUTEX(of_genpd_mutex);
+-#ifdef CONFIG_PM_SLEEP
++#if defined(CONFIG_PM_SLEEP) || defined(CONFIG_PM_GENERIC_DOMAINS_OF)
  
  /**
-- * __of_genpd_xlate_simple() - Xlate function for direct node-domain mapping
-+ * genpd_xlate_simple() - Xlate function for direct node-domain mapping
-  * @genpdspec: OF phandle args to map into a PM domain
-  * @data: xlate function private data - pointer to struct generic_pm_domain
-  *
-@@ -1374,7 +1378,7 @@ static DEFINE_MUTEX(of_genpd_mutex);
-  * have their own device tree nodes. The private data of xlate function needs
-  * to be a valid pointer to struct generic_pm_domain.
-  */
--struct generic_pm_domain *__of_genpd_xlate_simple(
-+static struct generic_pm_domain *genpd_xlate_simple(
- 					struct of_phandle_args *genpdspec,
- 					void *data)
- {
-@@ -1382,10 +1386,9 @@ struct generic_pm_domain *__of_genpd_xlate_simple(
- 		return ERR_PTR(-EINVAL);
- 	return data;
+  * pm_genpd_present - Check if the given PM domain has been initialized.
+@@ -606,6 +606,10 @@ static bool pm_genpd_present(const struct generic_pm_domain *genpd)
+ 	return false;
  }
--EXPORT_SYMBOL_GPL(__of_genpd_xlate_simple);
  
- /**
-- * __of_genpd_xlate_onecell() - Xlate function using a single index.
-+ * genpd_xlate_onecell() - Xlate function using a single index.
-  * @genpdspec: OF phandle args to map into a PM domain
-  * @data: xlate function private data - pointer to struct genpd_onecell_data
-  *
-@@ -1394,7 +1397,7 @@ EXPORT_SYMBOL_GPL(__of_genpd_xlate_simple);
-  * A single cell is used as an index into an array of PM domains specified in
-  * the genpd_onecell_data struct when registering the provider.
-  */
--struct generic_pm_domain *__of_genpd_xlate_onecell(
-+static struct generic_pm_domain *genpd_xlate_onecell(
- 					struct of_phandle_args *genpdspec,
- 					void *data)
- {
-@@ -1414,16 +1417,15 @@ struct generic_pm_domain *__of_genpd_xlate_onecell(
- 
- 	return genpd_data->domains[idx];
- }
--EXPORT_SYMBOL_GPL(__of_genpd_xlate_onecell);
- 
- /**
-- * __of_genpd_add_provider() - Register a PM domain provider for a node
-+ * genpd_add_provider() - Register a PM domain provider for a node
-  * @np: Device node pointer associated with the PM domain provider.
-  * @xlate: Callback for decoding PM domain from phandle arguments.
-  * @data: Context pointer for @xlate callback.
-  */
--int __of_genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
--			void *data)
-+static int genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
-+			      void *data)
- {
- 	struct of_genpd_provider *cp;
- 
-@@ -1442,7 +1444,30 @@ int __of_genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
- 
- 	return 0;
- }
--EXPORT_SYMBOL_GPL(__of_genpd_add_provider);
++#endif
 +
-+/**
-+ * of_genpd_add_provider_simple() - Register a simple PM domain provider
-+ * @np: Device node pointer associated with the PM domain provider.
-+ * @genpd: Pointer to PM domain associated with the PM domain provider.
-+ */
-+int of_genpd_add_provider_simple(struct device_node *np,
-+				 struct generic_pm_domain *genpd)
-+{
-+	return genpd_add_provider(np, genpd_xlate_simple, genpd);
-+}
-+EXPORT_SYMBOL_GPL(of_genpd_add_provider_simple);
++#ifdef CONFIG_PM_SLEEP
 +
-+/**
-+ * of_genpd_add_provider_onecell() - Register a onecell PM domain provider
-+ * @np: Device node pointer associated with the PM domain provider.
-+ * @data: Pointer to the data associated with the PM domain provider.
-+ */
-+int of_genpd_add_provider_onecell(struct device_node *np,
-+				  struct genpd_onecell_data *data)
-+{
-+	return genpd_add_provider(np, genpd_xlate_onecell, data);
-+}
-+EXPORT_SYMBOL_GPL(of_genpd_add_provider_onecell);
- 
- /**
-  * of_genpd_del_provider() - Remove a previously registered PM domain provider
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index bd411e754f4a..f103869db443 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -187,19 +187,12 @@ struct genpd_onecell_data {
- 	unsigned int num_domains;
- };
- 
--typedef struct generic_pm_domain *(*genpd_xlate_t)(struct of_phandle_args *args,
--						void *data);
--
- #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
--int __of_genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
--			void *data);
-+int of_genpd_add_provider_simple(struct device_node *np,
-+				 struct generic_pm_domain *genpd);
-+int of_genpd_add_provider_onecell(struct device_node *np,
-+				  struct genpd_onecell_data *data);
- void of_genpd_del_provider(struct device_node *np);
--struct generic_pm_domain *__of_genpd_xlate_simple(
--					struct of_phandle_args *genpdspec,
--					void *data);
--struct generic_pm_domain *__of_genpd_xlate_onecell(
--					struct of_phandle_args *genpdspec,
--					void *data);
- extern int of_genpd_add_device(struct of_phandle_args *args,
- 			       struct device *dev);
- extern int of_genpd_add_subdomain(struct of_phandle_args *parent,
-@@ -207,15 +200,19 @@ extern int of_genpd_add_subdomain(struct of_phandle_args *parent,
- 
- int genpd_dev_pm_attach(struct device *dev);
- #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
--static inline int __of_genpd_add_provider(struct device_node *np,
--					genpd_xlate_t xlate, void *data)
-+static inline int of_genpd_add_provider_simple(struct device_node *np,
-+					struct generic_pm_domain *genpd)
+ static bool genpd_dev_active_wakeup(struct generic_pm_domain *genpd,
+ 				    struct device *dev)
  {
--	return 0;
-+	return -ENOTSUPP;
-+}
+@@ -1453,7 +1457,23 @@ static int genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
+ int of_genpd_add_provider_simple(struct device_node *np,
+ 				 struct generic_pm_domain *genpd)
+ {
+-	return genpd_add_provider(np, genpd_xlate_simple, genpd);
++	int ret;
 +
-+static inline int of_genpd_add_provider_onecell(struct device_node *np,
-+					struct genpd_onecell_data *data)
-+{
-+	return -ENOTSUPP;
++	if (!np || !genpd)
++		return -EINVAL;
++
++	mutex_lock(&gpd_list_lock);
++
++	if (!pm_genpd_present(genpd)) {
++		mutex_unlock(&gpd_list_lock);
++		return -EINVAL;
++	}
++
++	ret = genpd_add_provider(np, genpd_xlate_simple, genpd);
++
++	mutex_unlock(&gpd_list_lock);
++
++	return ret;
  }
--static inline void of_genpd_del_provider(struct device_node *np) {}
+ EXPORT_SYMBOL_GPL(of_genpd_add_provider_simple);
  
--#define __of_genpd_xlate_simple		NULL
--#define __of_genpd_xlate_onecell	NULL
-+static inline void of_genpd_del_provider(struct device_node *np) {}
- 
- static inline int of_genpd_add_device(struct of_phandle_args *args,
- 				      struct device *dev)
-@@ -235,17 +232,6 @@ static inline int genpd_dev_pm_attach(struct device *dev)
+@@ -1465,7 +1485,26 @@ EXPORT_SYMBOL_GPL(of_genpd_add_provider_simple);
+ int of_genpd_add_provider_onecell(struct device_node *np,
+ 				  struct genpd_onecell_data *data)
+ {
+-	return genpd_add_provider(np, genpd_xlate_onecell, data);
++	unsigned int i;
++	int ret;
++
++	if (!np || !data)
++		return -EINVAL;
++
++	mutex_lock(&gpd_list_lock);
++
++	for (i = 0; i < data->num_domains; i++) {
++		if (!pm_genpd_present(data->domains[i])) {
++			mutex_unlock(&gpd_list_lock);
++			return -EINVAL;
++		}
++	}
++
++	ret = genpd_add_provider(np, genpd_xlate_onecell, data);
++
++	mutex_unlock(&gpd_list_lock);
++
++	return ret;
  }
- #endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
+ EXPORT_SYMBOL_GPL(of_genpd_add_provider_onecell);
  
--static inline int of_genpd_add_provider_simple(struct device_node *np,
--					struct generic_pm_domain *genpd)
--{
--	return __of_genpd_add_provider(np, __of_genpd_xlate_simple, genpd);
--}
--static inline int of_genpd_add_provider_onecell(struct device_node *np,
--					struct genpd_onecell_data *data)
--{
--	return __of_genpd_add_provider(np, __of_genpd_xlate_onecell, data);
--}
--
- #ifdef CONFIG_PM
- extern int dev_pm_domain_attach(struct device *dev, bool power_on);
- extern void dev_pm_domain_detach(struct device *dev, bool power_off);
 -- 
 2.1.4
