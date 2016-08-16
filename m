@@ -1,99 +1,129 @@
-From: John.Youn@synopsys.com (John Youn)
-Date: Tue, 16 Aug 2016 12:30:00 -0700
-Subject: [PATCH V2 RFC 6/6] ARM: dts: bcm2835: Add Raspberry Pi Zero
-In-Reply-To: <1469559213-16160-7-git-send-email-stefan.wahren@i2se.com>
-References: <1469559213-16160-1-git-send-email-stefan.wahren@i2se.com>
- <1469559213-16160-7-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <722dafcb-2f67-88c7-69df-d442c56c058f@synopsys.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 16 Aug 2016 21:35:24 +0200
+Subject: [PATCH] input: touchscreen: silead: Add regulator support
+Message-ID: <1471376124-31169-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/26/2016 11:54 AM, Stefan Wahren wrote:
-> The Raspberry Pi Zero is a minified version of model A+. It's
-> notable there is no PWR LED and the ACT LED is inverted.
-> 
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> ---
->  arch/arm/boot/dts/Makefile             |    3 +-
->  arch/arm/boot/dts/bcm2835-rpi-zero.dts |   57 ++++++++++++++++++++++++++++++++
->  2 files changed, 59 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/bcm2835-rpi-zero.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index e38e7c9..cafa3b1 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -69,7 +69,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
->  	bcm2835-rpi-b-rev2.dtb \
->  	bcm2835-rpi-b-plus.dtb \
->  	bcm2835-rpi-a-plus.dtb \
-> -	bcm2836-rpi-2-b.dtb
-> +	bcm2836-rpi-2-b.dtb \
-> +	bcm2835-rpi-zero.dtb
->  dtb-$(CONFIG_ARCH_BCM_5301X) += \
->  	bcm4708-asus-rt-ac56u.dtb \
->  	bcm4708-asus-rt-ac68u.dtb \
-> diff --git a/arch/arm/boot/dts/bcm2835-rpi-zero.dts b/arch/arm/boot/dts/bcm2835-rpi-zero.dts
-> new file mode 100644
-> index 0000000..12bc82d
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/bcm2835-rpi-zero.dts
-> @@ -0,0 +1,57 @@
-> +/dts-v1/;
-> +#include "bcm2835.dtsi"
-> +#include "bcm2835-rpi.dtsi"
-> +
-> +/ {
-> +	compatible = "raspberrypi,model-zero", "brcm,bcm2835";
-> +	model = "Raspberry Pi Zero";
-> +
-> +	leds {
-> +		act {
-> +			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
-> +		};
-> +	};
-> +};
-> +
-> +
-> +&usb {
-> +	dr_mode = "host";
-> +	h-rx-fifo-size = <774>;
-> +	h-np-tx-fifo-size = <256>;
-> +	h-tx-fifo-size = <512>;
+On some tablets the touchscreen controller is powered by seperate
+regulators, add support for this.
 
-It seems like these last two are the same as the default values
-reported in the registers. So they should already be set that way
-without needing to specify them. If not, there may be some problem in
-the driver.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ .../bindings/input/touchscreen/silead_gsl1680.txt  |  2 +
+ drivers/input/touchscreen/silead.c                 | 51 ++++++++++++++++++++--
+ 2 files changed, 49 insertions(+), 4 deletions(-)
 
-> +/*
-> + * Settings for otg
-> + *
-> +	dr_mode = "otg";
-> +	h-rx-fifo-size = <774>;
-> +	h-np-tx-fifo-size = <32>;
-> +	h-tx-fifo-size = <0>;
-
-This seems odd. It should be non-zero for use when operating as host.
-
-> +	g-np-tx-fifo-size = <16>;
-> +	g-rx-fifo-size = <256>;
-> +	g-tx-fifo-size = <256 128 128 64 64 64 32>;
-> + *
-> + * Settings for peripheral
-> + *
-> +	dr_mode = "peripheral";
-> +	h-rx-fifo-size = <774>;
-> +	h-np-tx-fifo-size = <0>;
-> +	h-tx-fifo-size = <0>;
-
-You should be able to omit the host params if dr_mode == peripheral.
-
-> +	g-np-tx-fifo-size = <16>;
-> +	g-rx-fifo-size = <256>;
-> +	g-tx-fifo-size = <256 128 128 64 64 64 32>;
-> + */
-> +};
-
-Regards,
-John
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+index 37a9370..65eb4c7 100644
+--- a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
++++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+@@ -22,6 +22,8 @@ Optional properties:
+ - touchscreen-inverted-y  : See touchscreen.txt
+ - touchscreen-swapped-x-y : See touchscreen.txt
+ - silead,max-fingers	  : maximum number of fingers the touchscreen can detect
++- vddio-supply		  : regulator phandle for controller VDDIO
++- avdd-supply		  : regulator phandle for controller AVDD
+ 
+ Example:
+ 
+diff --git a/drivers/input/touchscreen/silead.c b/drivers/input/touchscreen/silead.c
+index 7379fe1..04992c5 100644
+--- a/drivers/input/touchscreen/silead.c
++++ b/drivers/input/touchscreen/silead.c
+@@ -29,6 +29,7 @@
+ #include <linux/input/touchscreen.h>
+ #include <linux/pm.h>
+ #include <linux/irq.h>
++#include <linux/regulator/consumer.h>
+ 
+ #include <asm/unaligned.h>
+ 
+@@ -72,6 +73,8 @@ enum silead_ts_power {
+ struct silead_ts_data {
+ 	struct i2c_client *client;
+ 	struct gpio_desc *gpio_power;
++	struct regulator *vddio;
++	struct regulator *avdd;
+ 	struct input_dev *input;
+ 	char fw_name[64];
+ 	struct touchscreen_properties prop;
+@@ -463,21 +466,52 @@ static int silead_ts_probe(struct i2c_client *client,
+ 	if (client->irq <= 0)
+ 		return -ENODEV;
+ 
++	data->vddio = devm_regulator_get_optional(dev, "vddio");
++	if (IS_ERR(data->vddio)) {
++		if (PTR_ERR(data->vddio) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++		data->vddio = NULL;
++	}
++
++	data->avdd = devm_regulator_get_optional(dev, "avdd");
++	if (IS_ERR(data->avdd)) {
++		if (PTR_ERR(data->avdd) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++		data->avdd = NULL;
++	}
++
++	/*
++	 * Enable regulators at probe and disable them at remove, we need
++	 * to keep the chip powered otherwise it forgets its firmware.
++	 */
++	if (data->vddio) {
++		error = regulator_enable(data->vddio);
++		if (error)
++			return error;
++	}
++
++	if (data->avdd) {
++		error = regulator_enable(data->avdd);
++		if (error)
++			goto disable_vddio;
++	}
++
+ 	/* Power GPIO pin */
+ 	data->gpio_power = gpiod_get_optional(dev, "power", GPIOD_OUT_LOW);
+ 	if (IS_ERR(data->gpio_power)) {
+ 		if (PTR_ERR(data->gpio_power) != -EPROBE_DEFER)
+ 			dev_err(dev, "Shutdown GPIO request failed\n");
+-		return PTR_ERR(data->gpio_power);
++		error = PTR_ERR(data->gpio_power);
++		goto disable_avdd;
+ 	}
+ 
+ 	error = silead_ts_setup(client);
+ 	if (error)
+-		return error;
++		goto disable_avdd;
+ 
+ 	error = silead_ts_request_input_dev(data);
+ 	if (error)
+-		return error;
++		goto disable_avdd;
+ 
+ 	error = devm_request_threaded_irq(dev, client->irq,
+ 					  NULL, silead_ts_threaded_irq_handler,
+@@ -485,10 +519,19 @@ static int silead_ts_probe(struct i2c_client *client,
+ 	if (error) {
+ 		if (error != -EPROBE_DEFER)
+ 			dev_err(dev, "IRQ request failed %d\n", error);
+-		return error;
++		goto disable_avdd;
+ 	}
+ 
+ 	return 0;
++
++disable_avdd:
++	if (data->avdd)
++		regulator_disable(data->avdd);
++disable_vddio:
++	if (data->vddio)
++		regulator_disable(data->vddio);
++
++	return error;
+ }
+ 
+ static int __maybe_unused silead_ts_suspend(struct device *dev)
+-- 
+2.7.4
