@@ -1,30 +1,26 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 16 Aug 2016 09:30:31 -0700
-Subject: [PATCH] mm, kasan: Update kasan docs to indicate arm64 support
-Message-ID: <1471365031-27115-1-git-send-email-labbott@redhat.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 16 Aug 2016 18:41:41 +0200
+Subject: [RFC 12/17] ASoC: samsung: Switch to new clock controller API
+In-Reply-To: <20160816141345.GT9347@sirena.org.uk>
+References: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
+ <1471354514-24224-13-git-send-email-k.kozlowski@samsung.com>
+ <20160816141345.GT9347@sirena.org.uk>
+Message-ID: <20160816164141.GB9249@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KASAN has been supported on arm64 since 39d114ddc682 ("arm64: add KASAN
-support"). Update the docs to indicate this.
+On Tue, Aug 16, 2016 at 03:13:45PM +0100, Mark Brown wrote:
+> On Tue, Aug 16, 2016 at 03:35:09PM +0200, Krzysztof Kozlowski wrote:
+> > Allocate a clock controller and use new clk_register_with_ctrl() API.
+> 
+> Acked-by: Mark Brown <broonie@kernel.org>
+> 
+> >  	i2s_unregister_clocks(i2s);
+> > +	clk_ctrl_unregister(i2s->clk_ctrl);
+> 
+> devm?
 
-Signed-off-by: Laura Abbott <labbott@redhat.com>
----
- Documentation/kasan.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Right, that would make sense. Thanks for pointing this out.
 
-diff --git a/Documentation/kasan.txt b/Documentation/kasan.txt
-index 7dd95b3..d167220 100644
---- a/Documentation/kasan.txt
-+++ b/Documentation/kasan.txt
-@@ -12,7 +12,7 @@ KASAN uses compile-time instrumentation for checking every memory access,
- therefore you will need a GCC version 4.9.2 or later. GCC 5.0 or later is
- required for detection of out-of-bounds accesses to stack or global variables.
- 
--Currently KASAN is supported only for x86_64 architecture.
-+Currently KASAN is supported only for x86_64 and arm64 architecture.
- 
- 1. Usage
- ========
--- 
-2.7.4
+Best regards,
+Krzysztof
