@@ -1,60 +1,38 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 16 Aug 2016 10:15:20 +0200
-Subject: [PATCH 2/7] Documentation: bindings: Add Exynos5433 PMU compatible
-In-Reply-To: <57B2C9EE.6000005@samsung.com>
-References: <1471328843-26653-1-git-send-email-cw00.choi@samsung.com>
- <1471328843-26653-3-git-send-email-cw00.choi@samsung.com>
- <CGME20160816074111epcas1p2ef832dad29a5b0a81fc5e783aed70ee4@epcas1p2.samsung.com>
- <488f925b-4c37-1759-04a8-11d992405527@samsung.com>
- <57B2C9EE.6000005@samsung.com>
-Message-ID: <a7cbc817-964b-e7a3-ccc8-7867f97166fb@samsung.com>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Tue, 16 Aug 2016 16:20:27 +0800
+Subject: [PATCH v12 2/4] CMDQ: Mediatek CMDQ driver
+In-Reply-To: <1470645093-13309-3-git-send-email-hs.liao@mediatek.com>
+References: <1470645093-13309-1-git-send-email-hs.liao@mediatek.com>
+ <1470645093-13309-3-git-send-email-hs.liao@mediatek.com>
+Message-ID: <1471335627.22752.4.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/16/2016 10:08 AM, Chanwoo Choi wrote:
-> Hi Krzysztof,
-> 
-> On 2016? 08? 16? 16:40, Krzysztof Kozlowski wrote:
->> On 08/16/2016 08:27 AM, Chanwoo Choi wrote:
->>> This patch adds the exynos5433 PMU compatible to support the access
->>> of PMU (Power Management Unit) block.
->>>
->>> Cc: Kukjin Kim <kgene@kernel.org>
->>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>> Cc: Rob Herring <robh+dt@kernel.org>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>> ---
->>>  Documentation/devicetree/bindings/arm/samsung/pmu.txt | 1 +
->>>  1 file changed, 1 insertion(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
->>> index 2d6356d8daf4..bf5fc59a6938 100644
->>> --- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
->>> +++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
->>> @@ -10,6 +10,7 @@ Properties:
->>>  		   - "samsung,exynos5260-pmu" - for Exynos5260 SoC.
->>>  		   - "samsung,exynos5410-pmu" - for Exynos5410 SoC,
->>>  		   - "samsung,exynos5420-pmu" - for Exynos5420 SoC.
->>> +		   - "samsung,exynos5433-pmu" - for Exynos5433 SoC.
->>>  		   - "samsung,exynos7-pmu" - for Exynos7 SoC.
->>>  		second value must be always "syscon".
->>
->> Is there any plan to add Exynos5433 support to
->> drivers/soc/samsung/exynos-pmu.c? If no... then exynos7-pmu might be
->> reused. If yes, then this makes sense.
-> 
-> Yes.
-> I'll support the suspend-to-ram for Exynos5433. But it is not right now.
-> because the current kernel support the suspend-to-ram for only 32-bit Exynos.
-> and the pm/suspend code are included in in arch/arm/mach-exynos/.
-> 
-> To support the suspend-to-ram for 64bit Exynos, I need a lot of time
-> to support the 64-bit suspend.
+Hi Matthias,
 
-OK, make sense.
+Sorry to disturb you.
+Do you have any further comment on CMDQ v12?
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Thanks.
+HS
 
-Best regards,
-Krzysztof
+On Mon, 2016-08-08 at 16:31 +0800, HS Liao wrote:
+> This patch is first version of Mediatek Command Queue(CMDQ) driver. The
+> CMDQ is used to help write registers with critical time limitation,
+> such as updating display configuration during the vblank. It controls
+> Global Command Engine (GCE) hardware to achieve this requirement.
+> Currently, CMDQ only supports display related hardwares, but we expect
+> it can be extended to other hardwares for future requirements.
+> 
+> Signed-off-by: HS Liao <hs.liao@mediatek.com>
+> Signed-off-by: CK Hu <ck.hu@mediatek.com>
+> ---
+>  drivers/soc/mediatek/Kconfig    |  11 +
+>  drivers/soc/mediatek/Makefile   |   1 +
+>  drivers/soc/mediatek/mtk-cmdq.c | 948 ++++++++++++++++++++++++++++++++++++++++
+>  include/soc/mediatek/cmdq.h     | 179 ++++++++
+>  4 files changed, 1139 insertions(+)
+>  create mode 100644 drivers/soc/mediatek/mtk-cmdq.c
+>  create mode 100644 include/soc/mediatek/cmdq.h
+> 
+[...]
