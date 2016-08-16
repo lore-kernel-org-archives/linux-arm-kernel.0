@@ -1,42 +1,27 @@
-From: wens213@gmail.com (wens Tsai)
-Date: Tue, 16 Aug 2016 12:45:39 +0800
-Subject: ASoC: sun4i-codec: playback stall and I/O error with DAPM paths
- all disabled
-In-Reply-To: <20160815114211.GI9347@sirena.org.uk>
-References: <CAGb2v66X2BhEM4X+zQHUFB-wpHuBQ4xc8ztfYFuKADnY0b-gaQ@mail.gmail.com>
- <20160815114211.GI9347@sirena.org.uk>
-Message-ID: <CAGb2v66diZMuxddK9jM5-RbOZGOF5EK_jgxxkWV-ad6WHCNd9Q@mail.gmail.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 16 Aug 2016 13:07:08 +0800
+Subject: [PATCH v2 1/2] dt: bindings: add binding for Allwinner A64 R_PIO
+ pinctrl
+Message-ID: <20160816050709.7412-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2016 at 7:42 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Mon, Aug 15, 2016 at 05:43:55PM +0800, wens Tsai wrote:
->
->> What is unexpected is any attempt to play anything under this state makes
->> the playback software (in my case mpg321) stall, and later report an I/O
->> error. My guess is that the DAC is still disabled by DAPM, so it doesn't
->> send any DRQs, and thus the DMA engine is not consuming any data from
->> userspace.
->
-> This is normal for ASoC - like you say it'll be becasue the hardware
-> isn't powered up.
->
->> I think we should just enable the digital bits of the DAC/ADC all the
->> time. Or maybe transfer and then discard data if the DAC is off. Not
->> sure if this is doable though. I expect playback software to work, and
->> not block, regardless of the hardware status.
->
-> Powering things up all the time will have a major effect on battery life
-> for systems that care about that.  The expectation is that systems with
-> this sort of hardware won't normally be offering end users direct
-> control of the routing, it'll be something that's handled during system
-> integration.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+ Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Ok. So I guess one solution would be to move the mute controls out of
-DAPM, and maybe change some other mux like paths into actual muxes, so
-there's at least one usable path at all times.
-
-IIRC there was a patch doing something like this. I'll look into it.
-
-Regards
-ChenYu
+diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+index 6961722..ee73f9f 100644
+--- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+@@ -23,6 +23,7 @@ Required properties:
+   "allwinner,sun8i-h3-pinctrl"
+   "allwinner,sun8i-h3-r-pinctrl"
+   "allwinner,sun50i-a64-pinctrl"
++  "allwinner,sun50i-a64-r-pinctrl"
+ 
+ - reg: Should contain the register physical address and length for the
+   pin controller.
+-- 
+2.9.2
