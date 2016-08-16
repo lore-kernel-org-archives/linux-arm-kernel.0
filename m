@@ -1,55 +1,56 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 16 Aug 2016 15:51:10 +0200
-Subject: [RFC 00/17] clk: Add per-controller locks to fix deadlocks
-In-Reply-To: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
-References: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <65703100-1e16-6c34-babe-40e630180688@samsung.com>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Tue, 16 Aug 2016 13:55:28 +0000
+Subject: [PATCH v4 0/3] ASoC/ARM: tegra: apalis t30/tk1/colibri t30:
+ sgtl5000 audio
+In-Reply-To: <1466298002-12576-1-git-send-email-marcel.ziswiler@toradex.com>
+References: <1466298002-12576-1-git-send-email-marcel.ziswiler@toradex.com>
+Message-ID: <1471355726.4197.6.camel@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/16/2016 03:34 PM, Krzysztof Kozlowski wrote:
-> Hi,
+On Sun, 2016-06-19 at 02:59 +0200, Marcel Ziswiler wrote:
+> This series adds/integrates Freescale SGTL5000 analogue audio codec
+> support.
 > 
-> RFC, please, do not apply, maybe except patch #1 which is harmless.
+> Changes in v4:
+> - simple-audio-card does still not allow for more advanced use cases
+> ? like Tegra SoCs
+> - further platform drivers have been accepted since my last attempt
+> ? (e.g. rt5677 one)
+> - relevance for one further board the new Toradex Apalis TK1
+> - drop unused sound/jack.h include
+> - in tegra_sgtl5000_driver_remove() pass return value of
+> ? snd_soc_unregister_card() on to caller
+> - no longer set owner property in platform_driver to THIS_MODULE
+> - re-based/resend
 > 
+> Changes in v3:
+> - revert to not using simple-audio-card being incompatible with tegra
+> - rebased to for-next
 > 
-> Introduction
-> ============
-> The patchset brings new entity: clock controller representing a hardware
-> block.  The clock controller comes with its own prepare lock which
-> is used then in many places.  The idea is to fix the deadlock mentioned
-> in commit 10ff4c5239a1 ("i2c: exynos5: Fix possible ABBA deadlock by keeping
-> I2C clock prepared") and commit 34e81ad5f0b6 ("i2c: s3c2410: fix ABBA deadlock
-> by keeping clock prepared").
+> Changes in v2:
+> - using simple-audio-card as suggested by Fabio
 > 
+> Marcel Ziswiler (3):
+> ? ASoC: tegra: add tegra sgtl5000 machine driver
+> ? ARM: tegra: apalis/colibri t30: integrate audio
+> ? ARM: tegra: enable sgtl5000 audio
+> 
+> ?.../bindings/sound/nvidia,tegra-audio-sgtl5000.txt |??42 ++++
+> ?arch/arm/boot/dts/tegra30-apalis.dtsi??????????????|??49 +++++
+> ?arch/arm/boot/dts/tegra30-colibri.dtsi?????????????|??49 +++++
+> ?arch/arm/configs/tegra_defconfig???????????????????|???1 +
+> ?sound/soc/tegra/Kconfig????????????????????????????|??11 ++
+> ?sound/soc/tegra/Makefile???????????????????????????|???2 +
+> ?sound/soc/tegra/tegra_sgtl5000.c???????????????????| 212
+> +++++++++++++++++++++
+> ?7 files changed, 366 insertions(+)
+> ?create mode 100644
+> Documentation/devicetree/bindings/sound/nvidia,tegra-audio-
+> sgtl5000.txt
+> ?create mode 100644 sound/soc/tegra/tegra_sgtl5000.c
 
-Damn, I forgot to describe the overall idea. :) It is mentioned in patch
-15 but probably not many will have enough of patience to reach it.
-
-The locking idea
-================
-Clock controllers representing different hardware blocks, will contain
-its own prepare lock which protects the clocks inside controller.  The
-hierarchy itself is protected by global lock.
-
-In prepare path, the global prepare lock is removed.  This is direct
-solution for the deadlock.
-
-Clock hierarchy imposes also hierarchy between controllers so when a
-prepare happens, also parents have to be locked.
-
-Following locking design was chosen:
-1. For prepare/unprepare paths: lock only clock controller and its
-   parents.
-2. For recalc rates paths: lock global lock, the controller and its
-   children.
-3. For reparent paths: lock entire tree up down (children and parents)
-   and the global lock as well.
-
-
-In each case of traversing the clock hierarchy, the locking of
-controllers is always from children to parents.
-
-
-Best regards,
-Krzysztof
+With Mark finally having pulled the first patch of this series (https:/
+/lkml.org/lkml/2016/8/15/297) I'm wondering whether the second and
+third patch are now being pulled via tegra tree? Or should I rather re-
+submit those as a new v5 patch set?
