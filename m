@@ -1,68 +1,24 @@
-From: sw0312.kim@samsung.com (Seung-Woo Kim)
-Date: Tue, 16 Aug 2016 23:22:01 +0900
-Subject: [PATCH v2] pwm: samsung: fix to use lowest div for large enough
- modulation bits
-In-Reply-To: <1470133006-4272-1-git-send-email-sw0312.kim@samsung.com>
-References: <1470133006-4272-1-git-send-email-sw0312.kim@samsung.com>
-Message-ID: <20160816142201.12672-1-sw0312.kim@samsung.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 16 Aug 2016 09:25:40 -0500
+Subject: [PATCH 1/3] net: dt-bindings: Document the new Meson8b and GXBB
+ DWMAC bindings
+In-Reply-To: <20160815164100.27766-2-martin.blumenstingl@googlemail.com>
+References: <20160625165013.15917-1-martin.blumenstingl@googlemail.com>
+ <20160815164100.27766-1-martin.blumenstingl@googlemail.com>
+ <20160815164100.27766-2-martin.blumenstingl@googlemail.com>
+Message-ID: <20160816142540.GA1332@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From pwm_samsung_calc_tin(), there is routine to find the lowest
-divider possible to generate lower frequency than requested one.
-But it is always possible to generate requested frequency with
-large enough modulation bits except s3c24xx, so this patch fixes
-to use lowest div for the case. This patch removes following UBSAN
-warning:
+On Mon, Aug 15, 2016 at 06:40:58PM +0200, Martin Blumenstingl wrote:
+> This patch adds the documentation for the DWMAC ethernet controller
+> found in Amlogic Meson 8b (S805) and GXBB (S905) SoCs.
+> The main difference between the Meson6 glue is that different registers
+> (with different layout) are used.
+> 
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  .../devicetree/bindings/net/meson-dwmac.txt        | 43 ++++++++++++++++++----
+>  1 file changed, 35 insertions(+), 8 deletions(-)
 
-   UBSAN: Undefined behaviour in drivers/pwm/pwm-samsung.c:197:13
-   shift exponent 32 is too large for 32-bit type 'long unsigned int'
-   [...]
-   [<c0670248>] (ubsan_epilogue) from [<c06707b4>] (__ubsan_handle_shift_out_of_bounds+0xd8/0x120)
-   [<c06707b4>] (__ubsan_handle_shift_out_of_bounds) from [<c0694b28>] (pwm_samsung_config+0x508/0x6a4)
-   [<c0694b28>] (pwm_samsung_config) from [<c069286c>] (pwm_apply_state+0x174/0x40c)
-   [<c069286c>] (pwm_apply_state) from [<c0b2e070>] (pwm_fan_probe+0xc8/0x488)
-   [<c0b2e070>] (pwm_fan_probe) from [<c07ba8b0>] (platform_drv_probe+0x70/0x150)
-   [...]
-
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
----
-Changes from v1
- * Remove too complex condition, instead, just checking simple variant->bits as Krzysztof's suggestion
- * Add comment from Tomasz
-
-The UBSAN warning from ARM is reported with the patch in following link:
-https://patchwork.kernel.org/patch/9189575/
----
- drivers/pwm/pwm-samsung.c | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/pwm/pwm-samsung.c b/drivers/pwm/pwm-samsung.c
-index ada2d32..f113cda 100644
---- a/drivers/pwm/pwm-samsung.c
-+++ b/drivers/pwm/pwm-samsung.c
-@@ -193,9 +193,18 @@ static unsigned long pwm_samsung_calc_tin(struct samsung_pwm_chip *chip,
- 	 * divider settings and choose the lowest divisor that can generate
- 	 * frequencies lower than requested.
- 	 */
--	for (div = variant->div_base; div < 4; ++div)
--		if ((rate >> (variant->bits + div)) < freq)
--			break;
-+	if (variant->bits < 32) {
-+		/* Only for s3c24xx */
-+		for (div = variant->div_base; div < 4; ++div)
-+			if ((rate >> (variant->bits + div)) < freq)
-+				break;
-+	} else {
-+		/*
-+		 * Other variants have enough counter bits to generate any
-+		 * requested rate, so no need to check higher divisors.
-+		 */
-+		div = variant->div_base;
-+	}
- 
- 	pwm_samsung_set_divisor(chip, chan, BIT(div));
- 
--- 
-2.9.2
+Acked-by: Rob Herring <robh@kernel.org>
