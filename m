@@ -1,89 +1,32 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 16 Aug 2016 13:50:38 +0800
-Subject: [PATCH 1/2] ARM: dts: imx7d: move CPU operating points to
- imx7d.dtsi
-In-Reply-To: <20160812001107.17016-1-stefan@agner.ch>
-References: <20160812001107.17016-1-stefan@agner.ch>
-Message-ID: <20160816055038.GL500@tiger>
+From: marcel@holtmann.org (Marcel Holtmann)
+Date: Tue, 16 Aug 2016 08:03:33 +0200
+Subject: [PATCH v2] Bluetooth: Add LED triggers for HCI frames tx and rx
+In-Reply-To: <1469939084-15603-1-git-send-email-guodong.xu@linaro.org>
+References: <1469939084-15603-1-git-send-email-guodong.xu@linaro.org>
+Message-ID: <1394C970-3726-4C42-A06D-0B3B3015D980@holtmann.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2016 at 05:11:06PM -0700, Stefan Agner wrote:
-> Only i.MX 7Dual SoC supports CPU frequencies of up to 1GHz. The i.MX
-> 7Solo can run with up to 800MHz and does so without making use of DVFS
-> usually. While the device tree clearly specified a too fast operating
-> point for i.MX 7Solo, the kernel did not used it in practise so far
-> because the CPUfreq driver does not get loaded on i.MX 7Solo devices
-> (since the fsl,imx7s compatible string is not in the list of devices
-> making use of the cpufreq-dt driver...).
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
-> Hi Shawn,
-> 
-> This is based on my earlier patchset:
-> ARM: dts: imx7d: move ARM platform peripherals inside soc
-> 
-> This are kind of fixes too, so if possible I would like to see them
-> in v4.8, what do you think?
+Hi Guodong,
 
-Patch "ARM: dts: imx7d: move ARM platform peripherals inside soc node"
-is not really a fix, and the diffstat looks too dramatic to be a -rc
-material, so I queued it as a -next patch, and any patch based on it
-will have to go through -next as well.
+> Two LED triggers are added into hci_dev: tx_led and rx_led. Upon ACL/SCO
+> packets available in tx or rx, the LEDs will blink.
+> 
+> For each hci registration, two triggers are added into LED subsystem:
+> [hdev->name]-tx and [hdev-name]-rx.
+> Refer to Documentation/leds/leds-class.txt for usage.
+> 
+> Verified on HiKey 96boards, which uses HiSilicon hi6220 SoC and TI
+> WL1835 WiFi/BT combo chip.
 
-Applied for -next, thanks.
+so I have no idea what to do with adding adding hci0-rx and hci0-tx triggers. Combined with hci0-power trigger these are already 3 triggers. And if you have 2 Bluetooth controllers in your system, then you have 6 triggers. If we then maybe add another trigger, then this number just goes up and up.
 
-Shawn
+As far as I can tell you can only assign a single trigger to a LED. So this means to even use these triggers, you need now 3 LEDs per Bluetooth controller. How is that useful for anybody in a real system? Maybe I am missing something here and somehow there is magic to combine triggers, but I have not found it yet. So please someone enlighten me on how this is suppose to be used with real devices.
 
-> 
-> --
-> Stefan
-> 
->  arch/arm/boot/dts/imx7d.dtsi | 8 ++++++++
->  arch/arm/boot/dts/imx7s.dtsi | 5 -----
->  2 files changed, 8 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-> index 3d77d95..d0b199c 100644
-> --- a/arch/arm/boot/dts/imx7d.dtsi
-> +++ b/arch/arm/boot/dts/imx7d.dtsi
-> @@ -45,6 +45,14 @@
->  
->  / {
->  	cpus {
-> +		cpu0: cpu at 0 {
-> +			operating-points = <
-> +				/* KHz	uV */
-> +				996000	1075000
-> +				792000	975000
-> +			>;
-> +		};
-> +
->  		cpu1: cpu at 1 {
->  			compatible = "arm,cortex-a7";
->  			device_type = "cpu";
-> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-> index c63591c..5132e2f 100644
-> --- a/arch/arm/boot/dts/imx7s.dtsi
-> +++ b/arch/arm/boot/dts/imx7s.dtsi
-> @@ -85,11 +85,6 @@
->  			compatible = "arm,cortex-a7";
->  			device_type = "cpu";
->  			reg = <0>;
-> -			operating-points = <
-> -				/* KHz	uV */
-> -				996000	1075000
-> -				792000	975000
-> -			>;
->  			clock-latency = <61036>; /* two CLK32 periods */
->  			clocks = <&clks IMX7D_CLK_ARM>;
->  		};
-> -- 
-> 2.9.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Recently I have added a simple bluetooth-power trigger that combines all Bluetooth controllers into a single trigger. If any of them is enabled, then you can control your LED. Which makes a lot more sense to me since you most likely have a single Bluetooth LED on your system. And you want it to show the correct state no matter what Bluetooth controller is in use. However I can see the case that someone might want to assign one specific Bluetooth controller to a LED status.
+
+So instead of adding many independent triggers to each controller, why not create one global bluetooth trigger and one individual bluetooth-hci0 trigger for each controller. And the combine power, tx, rx and whatever else we need to trigger the LED for?
+
+Regards
+
+Marcel
