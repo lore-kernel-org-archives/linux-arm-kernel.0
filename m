@@ -1,56 +1,243 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Tue, 16 Aug 2016 10:05:15 +0800
-Subject: [PATCH v2 1/1] ARM: mach-imx: imx6ul: populates platform device at
- .init_machine
-Message-ID: <1471313115-30099-1-git-send-email-peter.chen@nxp.com>
+From: lv.zheng@intel.com (Zheng, Lv)
+Date: Tue, 16 Aug 2016 02:15:44 +0000
+Subject: [PATCH V8 2/8] ACPI: Add new IORT functions to support MSI
+ domain handling
+In-Reply-To: <20160812164234.GB17734@red-moon>
+References: <1470909998-16710-1-git-send-email-tn@semihalf.com>
+ <1470909998-16710-3-git-send-email-tn@semihalf.com>
+ <20160812164234.GB17734@red-moon>
+Message-ID: <1AE640813FDE7649BE1B193DEA596E883BC0E3F2@SHSMSX101.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At imx6ul_init_machine, it calls imx6ul_pm_init which needs to find
-platform device for ocram, but the default populate platform device is at
-of_platform_default_populate_init, which is located at arch_initcall_sync,
-and called later than arch_initcall (.init_machine is located at that).
-So below warning message will be showed during boots up:
+Hi,
 
-	imx6q_suspend_init: failed to find ocram device!
-	imx6_pm_common_init: No DDR LPM support with suspend -19!
+> From: linux-acpi-owner at vger.kernel.org [mailto:linux-acpi-owner at vger.kernel.org] On Behalf Of Lorenzo
+> Pieralisi
+> Subject: Re: [PATCH V8 2/8] ACPI: Add new IORT functions to support MSI domain handling
+> 
+> On Thu, Aug 11, 2016 at 12:06:32PM +0200, Tomasz Nowicki wrote:
+> 
+> [...]
+> 
+> > +/**
+> > + * iort_register_domain_token() - register domain token and related ITS ID
+> > + * to the list from where we can get it back later on.
+> > + * @trans_id: ITS ID.
+> > + * @fw_node: Domain token.
+> > + *
+> > + * Returns: 0 on success, -ENOMEM if no memory when allocating list element
+> > + */
+> > +int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
+> > +{
+> > +	struct iort_its_msi_chip *its_msi_chip;
+> > +
+> > +	its_msi_chip = kzalloc(sizeof(*its_msi_chip), GFP_KERNEL);
+> 
+> I spotted this while reworking my ARM SMMU series, this may sleep
+> and that's no good given that we call it within the acpi_probe_lock.
+> 
+> Same goes for irq_domain_alloc_fwnode() (that we call in
+> gic_v2_acpi_init()), we have got to fix this usage, I will see with
+> Marc what's the best way to do it.
 
-Due to lack of ocram device, the suspend mode "mem" which needs ocram to
-store suspend routine code is invalid.
+If we can ensure that all table device probe entries are created during link stage or early stage.
+I think you can safely unlock probe lock before invoking acpi_table_parse() in __acpi_probe_device_table().
 
-This commit populates platform device before imx6ul_pm_init like other
-imx6 platforms do, and the suspend mode "mem" can work successfully.
+Thanks
+Lv
 
-Cc: Anson Huang <anson.huang@nxp.com>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Kefeng Wang <wangkefeng.wang@huawei.com>
-Cc: Rob Herring <robh@kernel.org>
-Cc: <stable@vger.kernel.org>
-Fixes: 850bea2335e4 ("arm: Remove unnecessary of_platform_populate
-	with default match table")
-
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-
-Changes for v2:
-- Add Fabio's Reviewed-by tag
-- Using the correct commit-id for "Fixes" tag
-
- arch/arm/mach-imx/mach-imx6ul.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
-index 5d9bfab..6bb7d9c 100644
---- a/arch/arm/mach-imx/mach-imx6ul.c
-+++ b/arch/arm/mach-imx/mach-imx6ul.c
-@@ -64,6 +64,7 @@ static void __init imx6ul_init_machine(void)
- 	if (parent == NULL)
- 		pr_warn("failed to initialize soc device\n");
- 
-+	of_platform_default_populate(NULL, NULL, parent);
- 	imx6ul_enet_init();
- 	imx_anatop_init();
- 	imx6ul_pm_init();
--- 
-1.9.1
+> 
+> Lorenzo
+> 
+> > +	if (!its_msi_chip)
+> > +		return -ENOMEM;
+> > +
+> > +	its_msi_chip->fw_node = fw_node;
+> > +	its_msi_chip->translation_id = trans_id;
+> > +
+> > +	spin_lock(&iort_msi_chip_lock);
+> > +	list_add(&its_msi_chip->list, &iort_msi_chip_list);
+> > +	spin_unlock(&iort_msi_chip_lock);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +/**
+> > + * iort_deregister_domain_token() - Deregister domain token based on ITS ID
+> > + * @trans_id: ITS ID.
+> > + *
+> > + * Returns: none.
+> > + */
+> > +void iort_deregister_domain_token(int trans_id)
+> > +{
+> > +	struct iort_its_msi_chip *its_msi_chip, *t;
+> > +
+> > +	spin_lock(&iort_msi_chip_lock);
+> > +	list_for_each_entry_safe(its_msi_chip, t, &iort_msi_chip_list, list) {
+> > +		if (its_msi_chip->translation_id == trans_id) {
+> > +			list_del(&its_msi_chip->list);
+> > +			kfree(its_msi_chip);
+> > +			break;
+> > +		}
+> > +	}
+> > +	spin_unlock(&iort_msi_chip_lock);
+> > +}
+> > +
+> > +/**
+> > + * iort_find_domain_token() - Find domain token based on given ITS ID
+> > + * @trans_id: ITS ID.
+> > + *
+> > + * Returns: domain token when find on the list, NULL otherwise
+> > + */
+> > +struct fwnode_handle *iort_find_domain_token(int trans_id)
+> > +{
+> > +	struct fwnode_handle *fw_node = NULL;
+> > +	struct iort_its_msi_chip *its_msi_chip;
+> > +
+> > +	spin_lock(&iort_msi_chip_lock);
+> > +	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
+> > +		if (its_msi_chip->translation_id == trans_id) {
+> > +			fw_node = its_msi_chip->fw_node;
+> > +			break;
+> > +		}
+> > +	}
+> > +	spin_unlock(&iort_msi_chip_lock);
+> > +
+> > +	return fw_node;
+> > +}
+> > +
+> >  static struct acpi_iort_node *
+> >  iort_scan_node(enum acpi_iort_node_type type,
+> >  	       iort_find_node_callback callback, void *context)
+> > @@ -206,6 +285,96 @@ iort_find_dev_node(struct device *dev)
+> >  			      iort_match_node_callback, &pbus->dev);
+> >  }
+> >
+> > +/**
+> > + * iort_msi_map_rid() - Map a MSI requester ID for a device
+> > + * @dev: The device for which the mapping is to be done.
+> > + * @req_id: The device requester ID.
+> > + *
+> > + * Returns: mapped MSI RID on success, input requester ID otherwise
+> > + */
+> > +u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+> > +{
+> > +	struct acpi_iort_node *node;
+> > +	u32 dev_id;
+> > +
+> > +	if (!iort_table)
+> > +		return req_id;
+> > +
+> > +	node = iort_find_dev_node(dev);
+> > +	if (!node) {
+> > +		dev_err(dev, "can't find related IORT node\n");
+> > +		return req_id;
+> > +	}
+> > +
+> > +	iort_node_map_rid(node, req_id, &dev_id, ACPI_IORT_NODE_ITS_GROUP);
+> > +	return dev_id;
+> > +}
+> > +
+> > +/**
+> > + * iort_dev_find_its_id() - Find the ITS identifier for a device
+> > + * @dev: The device.
+> > + * @idx: Index of the ITS identifier list.
+> > + * @its_id: ITS identifier.
+> > + *
+> > + * Returns: 0 on success, appropriate error value otherwise
+> > + */
+> > +static int
+> > +iort_dev_find_its_id(struct device *dev, u32 req_id, unsigned int idx,
+> > +		     int *its_id)
+> > +{
+> > +	struct acpi_iort_its_group *its;
+> > +	struct acpi_iort_node *node;
+> > +
+> > +	node = iort_find_dev_node(dev);
+> > +	if (!node) {
+> > +		dev_err(dev, "can't find related IORT node\n");
+> > +		return -ENXIO;
+> > +	}
+> > +
+> > +	node = iort_node_map_rid(node, req_id, NULL, ACPI_IORT_NODE_ITS_GROUP);
+> > +	if (!node) {
+> > +		dev_err(dev, "can't find related ITS node\n");
+> > +		return -ENXIO;
+> > +	}
+> > +
+> > +	/* Move to ITS specific data */
+> > +	its = (struct acpi_iort_its_group *)node->node_data;
+> > +	if (idx > its->its_count) {
+> > +		dev_err(dev, "requested ITS ID index [%d] is greater than available [%d]\n",
+> > +			idx, its->its_count);
+> > +		return -ENXIO;
+> > +	}
+> > +
+> > +	*its_id = its->identifiers[idx];
+> > +	return 0;
+> > +}
+> > +
+> > +/**
+> > + * iort_get_device_domain() - Find MSI domain related to a device
+> > + * @dev: The device.
+> > + * @req_id: Requester ID for the device.
+> > + *
+> > + * Returns: the MSI domain for this device, NULL otherwise
+> > + */
+> > +struct irq_domain *
+> > +iort_get_device_domain(struct device *dev, u32 req_id)
+> > +{
+> > +	static struct fwnode_handle *handle;
+> > +	int its_id;
+> > +
+> > +	if (!iort_table)
+> > +		return NULL;
+> > +
+> > +	if (iort_dev_find_its_id(dev, req_id, 0, &its_id))
+> > +		return NULL;
+> > +
+> > +	handle = iort_find_domain_token(its_id);
+> > +	if (!handle)
+> > +		return NULL;
+> > +
+> > +	return irq_find_matching_fwnode(handle, DOMAIN_BUS_PCI_MSI);
+> > +}
+> > +
+> >  void __init iort_table_detect(void)
+> >  {
+> >  	acpi_status status;
+> > diff --git a/include/linux/iort.h b/include/linux/iort.h
+> > index cde6809..d7daba1 100644
+> > --- a/include/linux/iort.h
+> > +++ b/include/linux/iort.h
+> > @@ -20,11 +20,22 @@
+> >  #define __IORT_H__
+> >
+> >  #include <linux/acpi.h>
+> > +#include <linux/fwnode.h>
+> > +#include <linux/irqdomain.h>
+> >
+> > +int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
+> > +void iort_deregister_domain_token(int trans_id);
+> > +struct fwnode_handle *iort_find_domain_token(int trans_id);
+> >  #ifdef CONFIG_IORT_TABLE
+> >  void iort_table_detect(void);
+> > +u32 iort_msi_map_rid(struct device *dev, u32 req_id);
+> > +struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
+> >  #else
+> >  static inline void iort_table_detect(void) { }
+> > +static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+> > +{ return req_id; }
+> > +static inline struct irq_domain *
+> > +iort_get_device_domain(struct device *dev, u32 req_id) { return NULL; }
+> >  #endif
+> >
+> >  #endif /* __IORT_H__ */
+> > --
+> > 1.9.1
+> >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
