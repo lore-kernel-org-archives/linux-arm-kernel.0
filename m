@@ -1,128 +1,91 @@
-From: sw0312.kim@samsung.com (Seung-Woo Kim)
-Date: Tue, 16 Aug 2016 18:54:57 +0900
-Subject: [PATCH] pwm: samsung: fix to use lowest div for large enough
- modulation bits
-In-Reply-To: <369cde8b-f761-4a0b-50b9-a3a01ba0b75d@samsung.com>
-References: <1470133006-4272-1-git-send-email-sw0312.kim@samsung.com>
- <CGME20160816073709epcas1p45d975f43e8f7e3fc17e30cf6f6573dfb@epcas1p4.samsung.com>
- <329cb013-4832-c443-d593-327531db7b40@samsung.com>
- <57B2CDF0.8020809@samsung.com>
- <CA+Ln22Ha6qrbXP87wqJdTTsTD8vXbxZejt7aRkoni0YKpFJvZQ@mail.gmail.com>
- <369cde8b-f761-4a0b-50b9-a3a01ba0b75d@samsung.com>
-Message-ID: <57B2E2F1.1020205@samsung.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 16 Aug 2016 11:13:45 +0100
+Subject: [PATCH v24 5/9] arm64: kdump: add kdump support
+In-Reply-To: <20160811100310.GA29357@localhost.localdomain>
+References: <20160809015248.28414-2-takahiro.akashi@linaro.org>
+ <20160809015615.28527-1-takahiro.akashi@linaro.org>
+ <20160809015615.28527-3-takahiro.akashi@linaro.org>
+ <57AB586D.3080900@arm.com> <20160810181827.GC24137@localhost.localdomain>
+ <20160811100310.GA29357@localhost.localdomain>
+Message-ID: <57B2E759.201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Hi Pratyush,
 
-On 2016? 08? 16? 18:10, Krzysztof Kozlowski wrote:
-> On 08/16/2016 11:00 AM, Tomasz Figa wrote:
->> 2016-08-16 17:25 GMT+09:00 Seung-Woo Kim <sw0312.kim@samsung.com>:
->>> Hi Krzysztof,
+On 11/08/16 11:03, Pratyush Anand wrote:
+> On 10/08/2016:11:48:27 PM, Pratyush Anand wrote:
+>> On 10/08/2016:05:38:05 PM, James Morse wrote:
+>>> =========================%<=========================
+>>> diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
+>>> index 2dc54d129be1..784d4c30b534 100644
+>>> --- a/arch/arm64/kernel/crash_dump.c
+>>> +++ b/arch/arm64/kernel/crash_dump.c
+>>> @@ -37,6 +37,11 @@ ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
+>>>         if (!csize)
+>>>                 return 0;
 >>>
->>> On 2016? 08? 16? 16:37, Krzysztof Kozlowski wrote:
->>>> On 08/02/2016 12:16 PM, Seung-Woo Kim wrote:
->>>>> >From pwm_samsung_calc_tin(), there is routine to find the lowest
->>>>> divider possible to generate lower frequency than requested one.
->>>>> But it is always possible to generate requested frequency with
->>>>> large enough modulation bits, so this patch fixes to use lowest
->>>>> div for the case. This patch removes following UBSAN warning:
->>>>>
->>>>>    UBSAN: Undefined behaviour in drivers/pwm/pwm-samsung.c:197:13
->>>>>    shift exponent 32 is too large for 32-bit type 'long unsigned int'
->>>>>    [...]
->>>>>    [<c0670248>] (ubsan_epilogue) from [<c06707b4>] (__ubsan_handle_shift_out_of_bounds+0xd8/0x120)
->>>>>    [<c06707b4>] (__ubsan_handle_shift_out_of_bounds) from [<c0694b28>] (pwm_samsung_config+0x508/0x6a4)
->>>>>    [<c0694b28>] (pwm_samsung_config) from [<c069286c>] (pwm_apply_state+0x174/0x40c)
->>>>>    [<c069286c>] (pwm_apply_state) from [<c0b2e070>] (pwm_fan_probe+0xc8/0x488)
->>>>>    [<c0b2e070>] (pwm_fan_probe) from [<c07ba8b0>] (platform_drv_probe+0x70/0x150)
->>>>>    [...]
->>>>>
->>>>> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
->>>>> ---
->>>>> The UBSAN warning from ARM is reported with the patch in following link:
->>>>> https://patchwork.kernel.org/patch/9189575/
->>>>> ---
->>>>>  drivers/pwm/pwm-samsung.c |   10 +++++++---
->>>>>  1 file changed, 7 insertions(+), 3 deletions(-)
->>>>>
->>>>> diff --git a/drivers/pwm/pwm-samsung.c b/drivers/pwm/pwm-samsung.c
->>>>> index ada2d32..ff0def6 100644
->>>>> --- a/drivers/pwm/pwm-samsung.c
->>>>> +++ b/drivers/pwm/pwm-samsung.c
->>>>> @@ -193,9 +193,13 @@ static unsigned long pwm_samsung_calc_tin(struct samsung_pwm_chip *chip,
->>>>>       * divider settings and choose the lowest divisor that can generate
->>>>>       * frequencies lower than requested.
->>>>>       */
->>>>> -    for (div = variant->div_base; div < 4; ++div)
->>>>> -            if ((rate >> (variant->bits + div)) < freq)
->>>>> -                    break;
->>>>> +    if (fls(rate) <= variant->bits) {
->>>>> +            div = variant->div_base;
->>>>> +    } else {
->>>>> +            for (div = variant->div_base; div < 4; ++div)
->>>>> +                    if ((rate >> (variant->bits + div)) < freq)
->>>>> +                            break;
->>>>> +    }
->>>>
->>>> I have trouble with understanding the idea behind initial code from
->>>> Tomasz (commit 11ad39ede24ee). The variant->bits for all SoC except
->>>> S3C24xx is 32. This means the shift:
->>>>       if ((rate >> (variant->bits + div)) < freq)
->>>> will be always by 32 or more... In practice this will choose always a
->>>> "div" of 0 because in first iteration of this loop, the shift will be by 32.
->>>
->>> I also confused that part, but I figured out that the bit is used to
->>> consider modulation bit to generate pwm signal from the input clock.
->>>
->>> Only the old s3c2440 has 16 bit modulation timer for pwm, and all later
->>> soc has 32 bit modulation timer. So 32 bit timer cases, with the lowest
->>> div, it can generate all frequencies which can be assigned with 32bit
->>> variable.
->>> But I uses fls() to consider 64bit case also even though there is no
->>> really that kind of clock.
+>>> +       if (memblock_is_memory(pfn << PAGE_SHIFT) &&
+>>> +           !memblock_is_map_memory(pfn << PAGE_SHIFT))
+>>> +               /* skip this nomap memory region, reserved by firmware */
+>>> +               return 0;
+> 
+> This should return 0 or -EINVAL? because, its caller does not care properly
+> about 0 return value (when csize is non-zero). So either we need to return
+> -EINVAL or we need to fix it's caller so that pread() would know that required
+> number of data were not read.
+
+I blindly followed 'number of bytes copied' -> 0. It worked for me, but may not
+be correct.
+
+remap_oldmem_pfn_checked() looks like it substitutes the zero page in this (or
+at least a similar) case, maybe we should do the same for nomap pages.
+
+
+> 
+>>> +
+>>>         vaddr = ioremap_cache(__pfn_to_phys(pfn), PAGE_SIZE);
+>>>         if (!vaddr)
+>>>                 return -ENOMEM;
+>>> =========================%<=========================
 >>
->> The code may look complicated (in fact I had to think a bit to recall
->> what exactly it was supposed to do), but I'm not sure how it could be
->> simplified. It's generally intended to handle variant->bits < 32 cases
->> only and is effectively a no-op when variant->bits >= 32.
+>> In any case kernel must not panic, so I think we must have above hunk. However,
+>> we also need to look into kexec-tools that why it is asking kernel to copy those
+>> unneeded chunks.
+>>
+>> I will test tomorrow with above hunk.
 > 
-> Right, a comment for this behavior would be very useful. No need to
-> waste time for re-thinking it later.
+> After that hunk it did not crash but vmcore-dmesg fails with following message:
+> "No program header covering vaddr 0x401ff0found kexec bug?"
 > 
->> I would suggest just making rate an u64 and be done with the warning.
->> IMHO adding this kind of special cases only complicates the (already
->> complicated) code unnecessarily.
+> It happened because vmcore-dmesg is sending wrong offset to the pread(), and so
+> it did not crash after the above kernel hunk but it still read garbage wrong
+> log_buf virtual address pointer.
 > 
-> u64 could solve the warning but then one would have to figure out
-> whether the casts are safe or not. Unsigned long is assigned to rate and
-> then returned.
+> vmcore-dmesg is sending wrong offset because page_offset(vp_offset) calculation
+> is not perfect for my case, explained here [1].
 > 
-> How about specific check (+comment) like:
-> if (variant->bits < 32) {
-> 	/* Only for s3c24xx */
-> 	// the for loop as it was
-> } else {
-> 	/* For other variants just choose lowest divider always */
-> 	div = variant->div_base;
-> }
-> 
-> For me this is quite obvious and error-prone (explicit check for value
-> to be used in shift).
+> So, if I correct page_offset(vp_offset) (as arm64_mem.page_offset = ehdr.e_entry
+> - "kernel Code Start PA" + phys_offset), then vmcore-dmesg and vmcore copy
+> worked fine, however if I use makedumpfile to copy(compressed) data from
+> /proc/vmcore then it still generates "synchronous external abort". I think, it
 
-Actually above was my internal first version and it also removes UBSAN
-warning. I will send as you suggested with Tomasz's comment.
+At a guess makedumpfile is mmap()ing /proc/vmcore so it can use multiple
+threads to read (then compress) the data. This bypasses the check added to
+copy_oldmem_page(). We probably need to provide a remap_oldmem_pfn_range() that
+checks whether the range contains nomap pages.
+
+I will try and send a fixup patch to do this later this week, (unless someone
+beats me to it!)
+
+
+> generated because it would have found garbage data in EFI memory region.
+
+If it was marked as belonging to efi in the efi memory map, the kernel shouldn't
+be touching it. If you add 'efi=debug' to your kernel cmdline you get a table of
+the addresses and properties.
+
 
 Thanks,
-- Seung-Woo Kim
 
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
-
--- 
-Seung-Woo Kim
-Samsung Software R&D Center
---
+James
