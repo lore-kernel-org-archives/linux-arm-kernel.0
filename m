@@ -1,141 +1,35 @@
-From: brendan.jackman@arm.com (Brendan Jackman)
-Date: Tue, 16 Aug 2016 09:41:27 +0100
-Subject: [PATCH v3 02/15] dt/bindings: Update binding for PM domain idle
- states
-In-Reply-To: <20160815224014.GF1401@linaro.org>
-References: <1470351902-43103-1-git-send-email-lina.iyer@linaro.org>
- <1470351902-43103-3-git-send-email-lina.iyer@linaro.org>
- <99e35b6c-6698-6d27-f4d7-fa032796869e@arm.com>
- <20160810164034.GA1401@linaro.org>
- <5e59874c-bbb7-270a-199c-da1ff5932554@arm.com>
- <20160811211023.GC1401@linaro.org>
- <697d8ac2-34ee-db3e-940b-5ce3365c5aa1@arm.com>
- <20160815160857.GE1401@linaro.org>
- <2033f384-7ea3-6713-4def-80bf4251fd67@arm.com>
- <20160815224014.GF1401@linaro.org>
-Message-ID: <20160816084127.GA24657@brendan-thinkstation>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 16 Aug 2016 10:41:45 +0200
+Subject: [PATCH 2/8] ARM: dts: sun8i: Add dt node for rtl8703as wifi chip
+ on ga10h
+In-Reply-To: <CAGb2v67=54_cW6Svt2ZNvtMXwOU7wvzj_V6MT0fGB9hAjX=8PA@mail.gmail.com>
+References: <1470685398-14568-1-git-send-email-hdegoede@redhat.com>
+ <1470685398-14568-2-git-send-email-hdegoede@redhat.com>
+ <CAGb2v67=54_cW6Svt2ZNvtMXwOU7wvzj_V6MT0fGB9hAjX=8PA@mail.gmail.com>
+Message-ID: <e8dbda57-a931-0f13-28b3-9cb63bb0f5c4@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lina,
+Hi,
 
-Agh, sorry, sent with the "IMPORTANT NOTICE" again, still getting used to
-mailing lists.. here's the message again without it.
-
-On Mon, Aug 15, 2016 at 04:40:14PM -0600, Lina Iyer wrote:
-> On Mon, Aug 15 2016 at 10:14 -0600, Sudeep Holla wrote:
-> >
-> >
-> >On 15/08/16 17:08, Lina Iyer wrote:
-> >>On Fri, Aug 12 2016 at 04:08 -0600, Sudeep Holla wrote:
-> >>>
-> >>>
-> >>>On 11/08/16 22:10, Lina Iyer wrote:
-> >>>>On Wed, Aug 10 2016 at 12:09 -0600, Sudeep Holla wrote:
-> >>>>>
-> >>>
-> >>>[...]
-> >>>
-> >>>>>cluster0
-> >>>>>  CLUSTER_RET(Retention)
-> >>>>>  CLUSTER_PG(Power Gate)
-> >>>>>  core0
-> >>>>>      CORE_RET
-> >>>>>      CORE_PG
-> >>>>>  core1
-> >>>>>      CORE_RET
-> >>>>>      CORE_PG
-> >>>>>
-> >>>>>cluster1
-> >>>>>  CLUSTER_RET
-> >>>>>  CLUSTER_PG
-> >>>>>  core0
-> >>>>>      CORE_RET
-> >>>>>      CORE_PG
-> >>>>>  core1
-> >>>>>      CORE_RET
-> >>>>>      CORE_PG
-> >>>>>
-> >>>>>Platform Co-ordinate supports the following states and we should be
-> >>>>>able to determine that from the binding:
-> >>>>>
-> >>>>>CORE_RET
-> >>>>>CORE_PG
-> >>>>>CORE_RET + CLUSTER_RET
-> >>>>
-> >>>>The problem that we have to sove here is knowing that CORE_RET +
-> >>>>CLUSTER_PG (hypothetically) an invalid combination. Kevin and
-> >>>>I debated it in the earlier RFC and we dont have a good way to solve
-> >>>>this generically for all devices.
-> >>>>
-> >>>
-> >>>Yes, I agree it's complex. But that needs to be solved IMO.
-> >>>
-> >>>I can think of 2 possible solutions:
-> >>>
-> >>>1. Index the states(which people have not liked, but as along as we
-> >>> don't use it in the code as it for any other purpose, it should be
-> >>> fine) and then have each state mentioning what parent state can be
-> >>> entered at this child state(i.e. starting index and all states below
-> >>> it)
-> >>>
-> >>This is how QCOM solved it downstream.
-> >>
-> >
-> >Yes even ACPI has indices to solve this.
-> >
-> >>>2. Something similar to (1) but without index instead phandles.
-> >>>
-> >>
-> >>The problem is when you have non-CPU devices in the device tree and
-> >>since they do not have a way to represent states like CPU, we did not
-> >>have a clear path to that. Hence we punted that to later. Whatever we
-> >>do, we should solve it for a generic PM domain, not just CPU domains.
-> >>
-> >
-> >Yes bindings defined here should be applicable for devices to, but only
-> >CPU's will have this hierarchy while the devices need not bother about
-> >hierarchy. However the parent power domain can ever the state which is
-> >least common denominator of all it's children power domain. That's my
-> >understanding. No?
-> >
-
-
-Are you saying that the parent can enter the shallowest idle state that all its
-children are in (I.e if all its children are in "retention" then it can enter
-"retention")? I don't know what the reality is on existing platforms but it
-doesn't sound like 100% safe assumption to make. Also I don't think you can
-necessarily correlate idle states at different domain levels - i.e. here we've
-matched up the idea of "retention" at core level with that of "retention" at
-cluster level. I may have misunderstood you there..
-
-> That is correct. But say if all the CPUs choose CORE_RET + CLUSTER_PG,
-> which is invalid and the firmware has to ignore it and does CORE_RET +
-> CLUSTER_RET instead, then Linux may have an inconsistent view of the
-> state selection.
+On 16-08-16 04:43, Chen-Yu Tsai wrote:
+> On Tue, Aug 9, 2016 at 3:43 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> The ga10h tablet has a rtl8703as wifi chip, add a dt node describing it.
+>>
+>> This enables usage of wifi on this tablet (together with the out of
+>> tree rtl8732bs driver).
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 >
-
-Perhaps a better starting point would be to go with the assumption that a parent
-PD can only enter any idle state once its children are in their deepest idle
-states.
-
-So in the example above we'd end up with
-
-CORE_RET
-CORE_PG
-CORE_PG + CLUSTER_RET
-CORE_PG + CLUSTER_PG
-
-(Missing out on CORE_RET + CLUSTER_RET, even though that's a valid combination
-from the hardware's perspective)
-
-Then a later addition to the bindings as discussed above could enable the
-possibility of those combinations to be expressed.
-
-> Thanks,
-> Lina
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 >
-> >--
-> >Regards,
-> >Sudeep
->
+> Does the chip or board support out of band interrupts?
+
+I believe so, but since the sunxi-mmc controller properly supports
+sdio-irq-s (without needing to poll) there is not to much to win there,
+so currently I've no plans to support this (this would require defining
+a dt binding + dts changes + driver changes).
+
+Regards,
+
+Hans
