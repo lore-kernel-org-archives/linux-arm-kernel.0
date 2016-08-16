@@ -1,75 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Aug 2016 08:47:40 -0700
-Subject: [GIT PULL] omap fixes for v4.8-rc cycle
-Message-ID: <20160816154740.bq3nuqz44tglcdxf@atomide.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 16 Aug 2016 17:51:44 +0200
+Subject: [PATCH 0/2] ARM: kernel: module PLT optimizations
+Message-ID: <1471362706-29859-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+As reported by Jongsung, the O(n^2) search in the PLT allocation code may
+disproportionately affect module load time for modules with a larger number
+of relocations.
 
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+Since the existing routines rather naively take branch instructions into
+account that are internal to the module, we can improve the situation
+significantly by checking the symbol section index first, and disregarding
+symbols that are defined in the same module.
 
-are available in the git repository at:
+Patch #1 merge the core and init PLTs, since the latter is virtually empty
+anyway.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.8/fixes-rc2
+Patch #2 implements the optimization to only take SHN_UNDEF symbols into
+account.
 
-for you to fetch changes up to 73912188a6663192063dc29362039997f4deb580:
+Ard Biesheuvel (2):
+  ARM: kernel: merge core and init PLTs
+  ARM: kernel: allocate PLT entries only for external symbols
 
-  Merge branch 'dts-fixes' into omap-for-v4.8/fixes (2016-08-15 09:16:45 -0700)
+ arch/arm/include/asm/module.h |   6 +-
+ arch/arm/kernel/module-plts.c | 100 ++++++++++----------
+ arch/arm/kernel/module.lds    |   3 +-
+ 3 files changed, 53 insertions(+), 56 deletions(-)
 
-----------------------------------------------------------------
-Fixes for omaps for v4.8-rc cycle, mostly a series of four fixes for
-am335x RTC zero offset for clkctrl register. Also few other fixes:
-
-- Add missing sysc information for DSI as at least n950 needs it for
-  the working display
-
-- Fix old elm-id properties that cause nand boot to not work
-
-- Fix overo gpmc nand cs0 range
-
-- FIx overo gpmc nand on boards with ethernet
-
-- Fix logicpd torpedo nand ready pin nand interrupt configuration
-
-----------------------------------------------------------------
-Adam Ford (2):
-      ARM: dts: logicpd-torpedo-som: Provide NAND ready pin
-      ARM: dts: logicpd-somlv: Fix NAND device nodes
-
-Dave Gerlach (4):
-      ARM: OMAP4+: hwmod: Add hwmod flag for HWMOD_OMAP4_ZERO_CLKCTRL_OFFSET
-      ARM: OMAP2+: AM33XX: Add HWMOD_OMAP4_ZERO_CLKCTRL_OFFSET flag to rtc hwmod
-      ARM: OMAP4+: Have _omap4_wait_target_* check for valid clkctrl_offs
-      ARM: OMAP4+: CM: Remove redundant checks for clkctrl_offs of zero
-
-Johan Hovold (2):
-      ARM: dts: overo: fix gpmc nand cs0 range
-      ARM: dts: overo: fix gpmc nand on boards with ethernet
-
-Sebastian Reichel (1):
-      ARM: OMAP3: hwmod data: Add sysc information for DSI
-
-Teresa Remmet (1):
-      ARM: dts: am335x: Update elm phandle binding
-
-Tony Lindgren (2):
-      Merge branch 'omap-for-v4.8/soc' into omap-for-v4.8/fixes
-      Merge branch 'dts-fixes' into omap-for-v4.8/fixes
-
- arch/arm/boot/dts/am335x-baltos.dtsi                    |  2 +-
- arch/arm/boot/dts/am335x-igep0033.dtsi                  |  2 +-
- arch/arm/boot/dts/am335x-phycore-som.dtsi               |  2 +-
- arch/arm/boot/dts/logicpd-som-lv.dtsi                   | 11 ++++++-----
- arch/arm/boot/dts/logicpd-torpedo-som.dtsi              |  1 +
- arch/arm/boot/dts/omap3-overo-base.dtsi                 |  4 +++-
- arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi    |  2 --
- arch/arm/boot/dts/omap3-overo-tobi-common.dtsi          |  2 --
- arch/arm/boot/dts/omap3-overo-tobiduo-common.dtsi       |  3 ---
- arch/arm/mach-omap2/cm33xx.c                            |  6 ------
- arch/arm/mach-omap2/cminst44xx.c                        |  6 ------
- arch/arm/mach-omap2/omap_hwmod.c                        |  8 ++++++++
- arch/arm/mach-omap2/omap_hwmod.h                        |  4 ++++
- arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |  2 ++
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c              | 12 ++++++++++++
- 15 files changed, 39 insertions(+), 28 deletions(-)
+-- 
+2.7.4
