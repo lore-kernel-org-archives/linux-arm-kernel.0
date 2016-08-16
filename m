@@ -1,105 +1,40 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 16 Aug 2016 12:50:58 +0200
-Subject: [PATCH 5/7] arm64: dts: exynos: Add dts files for Samsung
- Exynos5433 64bit SoC
-In-Reply-To: <1471329328-26842-1-git-send-email-cw00.choi@samsung.com>
-References: <1471328843-26653-1-git-send-email-cw00.choi@samsung.com>
- <1471329328-26842-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <d4ebd29f-98b7-6e56-42ee-923d55ca85ff@samsung.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 16 Aug 2016 11:46:53 +0100
+Subject: [PATCH v2 2/7] arm64: KVM: Move vgic-v3 save/restore to
+ virt/kvm/arm/hyp
+In-Reply-To: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
+References: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1471344418-19568-3-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+So we can reuse the code under arch/arm
 
-On 08/16/2016 08:35 AM, Chanwoo Choi wrote:
-> This patch adds new Exynos5433 dtsi to support 64-bit Exynos5433 SoC based on
-> Octa-core CPUs (quad Cortex-A57 and quad Cortex-A53). And Exynos5433 supports
-> PSCI (Power State Coordination Interface) v0.1.
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ arch/arm64/kvm/hyp/Makefile                       |    2 +-
+ {arch/arm64/kvm => virt/kvm/arm}/hyp/vgic-v3-sr.c |    0
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+ rename {arch/arm64/kvm => virt/kvm/arm}/hyp/vgic-v3-sr.c (100%)
 
-> ---
->  arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 1580 ++++++++++++++++++++
-
-> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi 
-> b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> new file mode 100644
-> index 000000000000..2a5b05744533
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> @@ -0,0 +1,1580 @@
-
-> +
-> +/ {
-> +	compatible = "samsung,exynos5433";
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-
-> +	soc: soc {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0x0 0x0 0x0 0x18000000>;
-
-> +		lpass: lpass at 11400000 {
-> +			compatible = "samsung,exynos5433-lpass";
-> +			reg = <0x11400000 0x100>;
-> +			samsung,pmu-syscon = <&pmu_system_controller>;
-> +			status = "disabled";
-> +		};
-> +
-> +		i2s0: i2s0 at 11440000 {
-> +			compatible = "samsung,exynos7-i2s";
-> +			reg = <0x11440000 0x100>;
-> +			dmas = <&adma 0 &adma 2>;
-> +			dma-names = "tx", "rx";
-> +			interrupts = <0 70 0>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			clocks = <&cmu_aud CLK_PCLK_AUD_I2S>,
-> +				 <&cmu_aud CLK_SCLK_AUD_I2S>,
-> +				 <&cmu_aud CLK_SCLK_I2S_BCLK>;
-> +			clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2s0_bus>;
-> +			status = "disabled";
-> +		};
-
-> +		serial_3: serial at 11460000 {
-> +			compatible = "samsung,exynos5433-uart";
-> +			reg = <0x11460000 0x100>;
-> +			interrupts = <0 67 0>;
-> +			clocks = <&cmu_aud CLK_PCLK_AUD_UART>,
-> +				<&cmu_aud CLK_SCLK_AUD_UART>;
-> +			clock-names = "uart", "clk_uart_baud0";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&uart_aud_bus>;
-> +			status = "disabled";
-> +		};
-> +
-
-> +		amba {
-> +			compatible = "arm,amba-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-
-> +			adma: adma at 11420000 {
-> +				compatible = "arm,pl330", "arm,primecell";
-> +				reg = <0x11420000 0x1000>;
-> +				interrupts = <0 73 0>;
-> +				clocks = <&cmu_aud CLK_ACLK_DMAC>;
-> +				clock-names = "apb_pclk";
-> +				#dma-cells = <1>;
-> +				#dma-channels = <8>;
-> +				#dma-requests = <32>;
-> +			};
-> +		};
-> +	};
-
-The latest Exynos5433 Audio Subsystem bindings look like this
-https://git.linuxtv.org/snawrocki/samsung.git/commit/?h=for-v4.9/mfd/exynos-lpass-v5&id=104cc6ad3ecc7c4c8ecf73663b93eb48b78f35aa
-i.e. adma at 11420000, i2s0 at 11440000, serial at 11460000 should be subnodes of
-the lpass at 11400000 node.
-
+diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+index 0c85feb..aaf42ae 100644
+--- a/arch/arm64/kvm/hyp/Makefile
++++ b/arch/arm64/kvm/hyp/Makefile
+@@ -5,9 +5,9 @@
+ KVM=../../../../virt/kvm
+ 
+ obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
++obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/timer-sr.o
+ 
+-obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += entry.o
+diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+similarity index 100%
+rename from arch/arm64/kvm/hyp/vgic-v3-sr.c
+rename to virt/kvm/arm/hyp/vgic-v3-sr.c
 -- 
-Thanks,
-Sylwester
+1.7.9.5
