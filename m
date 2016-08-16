@@ -1,109 +1,55 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 16 Aug 2016 15:50:18 +0200
-Subject: [PATCH v2 1/4] pwm: Add support for Meson PWM Controller
-In-Reply-To: <CAFBinCAXJ_POd9=UhL8vM6_sXXgVMgSZCwDKosLSzW2++ZmTQQ@mail.gmail.com>
-References: <1468142645-4360-1-git-send-email-narmstrong@baylibre.com>
- <1468142645-4360-2-git-send-email-narmstrong@baylibre.com>
- <CAFBinCAXJ_POd9=UhL8vM6_sXXgVMgSZCwDKosLSzW2++ZmTQQ@mail.gmail.com>
-Message-ID: <ad674bac-885b-e975-dd4c-d7ae11789d5a@baylibre.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 16 Aug 2016 15:51:10 +0200
+Subject: [RFC 00/17] clk: Add per-controller locks to fix deadlocks
+In-Reply-To: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
+References: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <65703100-1e16-6c34-babe-40e630180688@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+On 08/16/2016 03:34 PM, Krzysztof Kozlowski wrote:
+> Hi,
+> 
+> RFC, please, do not apply, maybe except patch #1 which is harmless.
+> 
+> 
+> Introduction
+> ============
+> The patchset brings new entity: clock controller representing a hardware
+> block.  The clock controller comes with its own prepare lock which
+> is used then in many places.  The idea is to fix the deadlock mentioned
+> in commit 10ff4c5239a1 ("i2c: exynos5: Fix possible ABBA deadlock by keeping
+> I2C clock prepared") and commit 34e81ad5f0b6 ("i2c: s3c2410: fix ABBA deadlock
+> by keeping clock prepared").
+> 
 
-On 08/15/2016 06:55 PM, Martin Blumenstingl wrote:
-> On Sun, Jul 10, 2016 at 11:24 AM, Neil Armstrong
+Damn, I forgot to describe the overall idea. :) It is mentioned in patch
+15 but probably not many will have enough of patience to reach it.
 
-[...]
+The locking idea
+================
+Clock controllers representing different hardware blocks, will contain
+its own prepare lock which protects the clocks inside controller.  The
+hierarchy itself is protected by global lock.
 
->> +static int meson_pwm_calc(struct meson_pwm_chip *chip,
->> +                              struct meson_pwm_channel *pwm_chan,
->> +                              unsigned int id,
->> +                              int duty_ns, unsigned int period_ns)
->> +{
->> +       unsigned int pwm_pre_div;
->> +       unsigned int pwm_cnt;
->> +       unsigned int pwm_duty_cnt;
->> +       unsigned long fin_freq = -1;
->> +       unsigned long fin_ns;
->> +       unsigned int i = 0;
->> +
->> +       if (duty_ns > period_ns)
->> +               return -EINVAL;
->> +
->> +       switch (id) {
->> +       case PWM_A:
->> +               fin_freq = clk_get_rate(chip->clk[0]);
->> +               break;
->> +       case PWM_B:
->> +               fin_freq = clk_get_rate(chip->clk[1]);
->> +               break;
->> +       }
->> +       if (fin_freq <= 0) {
->> +               dev_err(chip->chip.dev, "invalid source clock frequency\n");
->> +               return -EINVAL;
->> +       }
->> +       dev_dbg(chip->chip.dev, "fin_freq: %luHz\n", fin_freq);
->> +       fin_ns = NSEC_PER_SEC / fin_freq;
->> +
->> +       /* Calc pre_div with the period */
->> +       for (i = 0; i < MISC_CLK_DIV_MASK; i++) {
->> +               pwm_pre_div = i;
-> according to the public (S905) datasheet the hardware wants "value
-> +1": "Selects the divider (N+1) for the PWM A clock"
-> so shouldn't this be pwm_pre_div = i + 1?
-> all your calculations below are already adding 1 to pwm_pre_div, but
-> pwm_pre_div is directly written to the hardware register in
-> meson_pwm_config()
+In prepare path, the global prepare lock is removed.  This is direct
+solution for the deadlock.
 
-You misread the datasheet, usually the phrase :
-"PWM_A_CLK_DIV: Selects the divider (N+1) for the PWM A clock"
+Clock hierarchy imposes also hierarchy between controllers so when a
+prepare happens, also parents have to be locked.
 
-Means, the divider that will be applied will be "N + 1", N is the value written in the register.
+Following locking design was chosen:
+1. For prepare/unprepare paths: lock only clock controller and its
+   parents.
+2. For recalc rates paths: lock global lock, the controller and its
+   children.
+3. For reparent paths: lock entire tree up down (children and parents)
+   and the global lock as well.
 
-This is why we start from 0 and for the following calculation, I add +1 :
->> +               pwm_cnt = DIV_ROUND_CLOSEST(period_ns,
->> +                               fin_ns * (pwm_pre_div + 1));
 
-This behavior was also present in the original vendor's driver.
+In each case of traversing the clock hierarchy, the locking of
+controllers is always from children to parents.
 
->> +               dev_dbg(chip->chip.dev, "fin_ns=%lu pre_div=%d cnt=%d\n",
->> +                               fin_ns, pwm_pre_div, pwm_cnt);
->> +               if (pwm_cnt <= 0xffff)
->> +                       break;
->> +       }
->> +       if (i == MISC_CLK_DIV_MASK) {
->> +               dev_err(chip->chip.dev, "Unable to get period pre_div");
->> +               return -EINVAL;
->> +       }
->> +       dev_dbg(chip->chip.dev, "period_ns=%d pre_div=%d pwm_cnt=%d\n",
->> +               period_ns, pwm_pre_div, pwm_cnt);
->> +
->> +       if (duty_ns == period_ns) {
->> +               pwm_chan->pwm_pre_div = pwm_pre_div;
->> +               pwm_chan->pwm_hi = pwm_cnt;
->> +               pwm_chan->pwm_lo = 0;
->> +       } else if (duty_ns == 0) {
->> +               pwm_chan->pwm_pre_div = pwm_pre_div;
->> +               pwm_chan->pwm_hi = 0;
->> +               pwm_chan->pwm_lo = pwm_cnt;
->> +       } else {
->> +               /* Then check is we can have the duty with the same pre_div */
->> +               pwm_duty_cnt = DIV_ROUND_CLOSEST(duty_ns,
->> +                                       fin_ns * (pwm_pre_div + 1));
->> +               if (pwm_cnt > 0xffff) {
->> +                       dev_err(chip->chip.dev, "Unable to get duty period, differences are too high");
->> +                       return -EINVAL;
->> +               }
->> +               dev_dbg(chip->chip.dev, "duty_ns=%d pre_div=%d pwm_cnt=%d\n",
->> +                       duty_ns, pwm_pre_div, pwm_duty_cnt);
->> +
->> +               pwm_chan->pwm_pre_div = pwm_pre_div;
->> +               pwm_chan->pwm_hi = pwm_duty_cnt;
->> +               pwm_chan->pwm_lo = pwm_cnt - pwm_chan->pwm_hi;
->> +       }
->> +
->> +       return 0;
->> +}
 
-Neil
+Best regards,
+Krzysztof
