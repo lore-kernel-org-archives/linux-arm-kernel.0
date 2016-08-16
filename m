@@ -1,22 +1,31 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 16 Aug 2016 10:43:29 +0800
-Subject: [PATCH 2/8] ARM: dts: sun8i: Add dt node for rtl8703as wifi chip
- on ga10h
-In-Reply-To: <1470685398-14568-2-git-send-email-hdegoede@redhat.com>
-References: <1470685398-14568-1-git-send-email-hdegoede@redhat.com>
- <1470685398-14568-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGb2v67=54_cW6Svt2ZNvtMXwOU7wvzj_V6MT0fGB9hAjX=8PA@mail.gmail.com>
+From: finley.xiao@rock-chips.com (Finlye Xiao)
+Date: Tue, 16 Aug 2016 10:38:56 +0800
+Subject: [PATCH v1 0/3] PM / AVS: add Rockchip cpu avs
+Message-ID: <1471315139-28285-1-git-send-email-finley.xiao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 9, 2016 at 3:43 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> The ga10h tablet has a rtl8703as wifi chip, add a dt node describing it.
->
-> This enables usage of wifi on this tablet (together with the out of
-> tree rtl8732bs driver).
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+From: Finley Xiao <finley.xiao@rock-chips.com>
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Under the same frequency, the operating voltage tends to decrease with
+increasing leakage. so it is necessary to adjust opp's voltage according
+to leakage for power.
 
-Does the chip or board support out of band interrupts?
+Finley Xiao (3):
+  nvmem: rockchip-efuse: Change initcall to subsys
+  of: Add support for reading a s32 from a multi-value property.
+  PM / AVS: rockchip-cpu-avs: add driver handling Rockchip cpu avs
+
+ .../devicetree/bindings/power/rockchip-cpu-avs.txt |  37 +++
+ drivers/nvmem/rockchip-efuse.c                     |   9 +-
+ drivers/of/base.c                                  |  23 ++
+ drivers/power/avs/Kconfig                          |   8 +
+ drivers/power/avs/Makefile                         |   1 +
+ drivers/power/avs/rockchip-cpu-avs.c               | 314 +++++++++++++++++++++
+ include/linux/of.h                                 |  10 +
+ 7 files changed, 401 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/power/rockchip-cpu-avs.txt
+ create mode 100644 drivers/power/avs/rockchip-cpu-avs.c
+
+-- 
+1.9.1
