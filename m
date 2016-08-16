@@ -1,36 +1,32 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 16 Aug 2016 10:34:54 +0100
-Subject: [PATCH v4 03/17] ARM: dts: STiH416: Supply PWM Capture IRQs
+Date: Tue, 16 Aug 2016 10:34:56 +0100
+Subject: [PATCH v4 05/17] ARM: dts: STiH416: Define PWM Capture clock
 In-Reply-To: <20160816093508.28307-1-lee.jones@linaro.org>
 References: <20160816093508.28307-1-lee.jones@linaro.org>
-Message-ID: <20160816093508.28307-4-lee.jones@linaro.org>
+Message-ID: <20160816093508.28307-6-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih416.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/stih416.dtsi | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index 0afb4f7..2001d48 100644
+index 2001d48..bf15a32 100644
 --- a/arch/arm/boot/dts/stih416.dtsi
 +++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -475,6 +475,7 @@
- 			status		= "okay";
- 			#pwm-cells	= <2>;
- 			reg		= <0xfed10000 0x68>;
-+			interrupts      = <GIC_SPI 200 IRQ_TYPE_NONE>;
+@@ -483,8 +483,9 @@
+ 					&pinctrl_pwm0_chan2_default
+ 					&pinctrl_pwm0_chan3_default>;
  
- 			pinctrl-names	= "default";
- 			pinctrl-0 = 	<&pinctrl_pwm0_chan0_default
-@@ -493,6 +494,7 @@
- 			status		= "disabled";
- 			#pwm-cells	= <2>;
- 			reg		= <0xfe510000 0x68>;
-+			interrupts      = <GIC_SPI 202 IRQ_TYPE_NONE>;
+-			clock-names	= "pwm";
+-			clocks		= <&clk_sysin>;
++			clock-names	= "pwm", "capture";
++			clocks		= <&clk_sysin>, <&clk_s_a0_ls CLK_ICN_REG>;
++
+ 			st,pwm-num-chan = <4>;
+ 		};
  
- 			pinctrl-names	= "default";
- 			pinctrl-0	= <&pinctrl_pwm1_chan0_default
 -- 
 2.9.0
