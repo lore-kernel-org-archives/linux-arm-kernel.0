@@ -1,240 +1,299 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 16 Aug 2016 08:06:46 +0800
-Subject: [PATCH 2/2] pinctrl: sunxi: Add A64 R_PIO controller support
-In-Reply-To: <CAGb2v64nzOOwZFGzukXehv6Bx6nikHdnuGUkRMJWS8bjfMkeXQ@mail.gmail.com>
-References: <20160801145939.50583-1-icenowy@aosc.xyz>
- <20160801145939.50583-2-icenowy@aosc.xyz>
- <CAGb2v64nzOOwZFGzukXehv6Bx6nikHdnuGUkRMJWS8bjfMkeXQ@mail.gmail.com>
-Message-ID: <363591471306006@web8j.yandex.ru>
+From: bauerman@linux.vnet.ibm.com (Thiago Jung Bauermann)
+Date: Mon, 15 Aug 2016 21:13:20 -0300
+Subject: [PATCH v2 2/2] kexec: extend kexec_file_load system call
+In-Reply-To: <1606244.4vNzhVNUBR@hactar>
+References: <1606244.4vNzhVNUBR@hactar>
+Message-ID: <1471306400-9310-1-git-send-email-bauerman@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Here is a new version implementing your suggestions.
+I also changed it to kmalloc fdset instead of using the stack.
 
+What do you think?
 
-15.08.2016, 21:56, "Chen-Yu Tsai" <wens@csie.org>:
-> Hi,
->
-> On Mon, Aug 1, 2016 at 10:59 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
->> ?The A64 has a R_PIO pin controller, similar to the one found on the H3 SoCs.
->> ?Add support for the pins controlled by the R_PIO controller.
->>
->> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ?---
->> ??drivers/pinctrl/sunxi/Kconfig | 5 +
->> ??drivers/pinctrl/sunxi/Makefile | 1 +
->> ??drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c | 148 +++++++++++++++++++++++++++
->> ??3 files changed, 154 insertions(+)
->> ??create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c
->>
->> ?diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
->> ?index aaf075b..c4b476f 100644
->> ?--- a/drivers/pinctrl/sunxi/Kconfig
->> ?+++ b/drivers/pinctrl/sunxi/Kconfig
->> ?@@ -72,4 +72,9 @@ config PINCTRL_SUN50I_A64
->> ?????????bool
->> ?????????select PINCTRL_SUNXI
->>
->> ?+config PINCTRL_SUN50I_A64_R
->> ?+ bool
->> ?+ depends on RESET_CONTROLLER
->> ?+ select PINCTRL_SUNXI
->> ?+
->> ??endif
->> ?diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
->> ?index 2d8b64e..d6eabdd 100644
->> ?--- a/drivers/pinctrl/sunxi/Makefile
->> ?+++ b/drivers/pinctrl/sunxi/Makefile
->> ?@@ -13,6 +13,7 @@ obj-$(CONFIG_PINCTRL_SUN8I_A23) += pinctrl-sun8i-a23.o
->> ??obj-$(CONFIG_PINCTRL_SUN8I_A23_R) += pinctrl-sun8i-a23-r.o
->> ??obj-$(CONFIG_PINCTRL_SUN8I_A33) += pinctrl-sun8i-a33.o
->> ??obj-$(CONFIG_PINCTRL_SUN50I_A64) += pinctrl-sun50i-a64.o
->> ?+obj-$(CONFIG_PINCTRL_SUN50I_A64_R) += pinctrl-sun50i-a64-r.o
->> ??obj-$(CONFIG_PINCTRL_SUN8I_A83T) += pinctrl-sun8i-a83t.o
->> ??obj-$(CONFIG_PINCTRL_SUN8I_H3) += pinctrl-sun8i-h3.o
->> ??obj-$(CONFIG_PINCTRL_SUN8I_H3_R) += pinctrl-sun8i-h3-r.o
->> ?diff --git a/drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c b/drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c
->> ?new file mode 100644
->> ?index 0000000..b836264
->> ?--- /dev/null
->> ?+++ b/drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c
->> ?@@ -0,0 +1,148 @@
->> ?+/*
->> ?+ * Allwinner A64 SoCs special pins pinctrl driver.
->> ?+ *
->> ?+ * Based on pinctrl-sun8i-a23-r.c
->> ?+ *
->> ?+ * Copyright (C) 2016 Icenowy Zheng
->> ?+ * Icenowy Zheng <icenowy@aosc.xyz>
->> ?+ *
->> ?+ * Copyright (C) 2014 Chen-Yu Tsai
->> ?+ * Chen-Yu Tsai <wens@csie.org>
->> ?+ *
->> ?+ * Copyright (C) 2014 Boris Brezillon
->> ?+ * Boris Brezillon <boris.brezillon@free-electrons.com>
->> ?+ *
->> ?+ * Copyright (C) 2014 Maxime Ripard
->> ?+ * Maxime Ripard <maxime.ripard@free-electrons.com>
->> ?+ *
->> ?+ * This file is licensed under the terms of the GNU General Public
->> ?+ * License version 2. This program is licensed "as is" without any
->> ?+ * warranty of any kind, whether express or implied.
->> ?+ */
->> ?+
->> ?+#include <linux/module.h>
->> ?+#include <linux/platform_device.h>
->> ?+#include <linux/of.h>
->> ?+#include <linux/of_device.h>
->
-> Please sort the headers.
-This file is based on pinctrl-sun8i-a23-r.c and pinctrl-sun8i-h3-r.c, which
-both have #include in this sequence.
->
->> ?+#include <linux/pinctrl/pinctrl.h>
->> ?+#include <linux/reset.h>
->> ?+
->> ?+#include "pinctrl-sunxi.h"
->> ?+
->> ?+static const struct sunxi_desc_pin sun50i_a64_r_pins[] = {
->> ?+ SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 0),
->> ?+ SUNXI_FUNCTION(0x0, "gpio_in"),
->> ?+ SUNXI_FUNCTION(0x1, "gpio_out"),
->> ?+ SUNXI_FUNCTION(0x2, "s_rsb"), /* SCK */
->> ?+ SUNXI_FUNCTION(0x3, "s_twi"), /* SCK */
->
-> We use "i2c" instead of "twi".
-So as above, in A23 / H3 R_PIO driver, they're called as "s_twi" other than "s_i2c"
->
->> ?+ SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 0)), /* PL_EINT0 */
->> ?+ SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 1),
->> ?+ SUNXI_FUNCTION(0x0, "gpio_in"),
->> ?+ SUNXI_FUNCTION(0x1, "gpio_out"),
->> ?+ SUNXI_FUNCTION(0x2, "s_rsb"), /* SDA */
->> ?+ SUNXI_FUNCTION(0x3, "s_twi"), /* SDA */
->
-> Same here.
->
->> ?+ SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 1)), /* PL_EINT1 */
->> ?+ SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 2),
->> ?+ SUNXI_FUNCTION(0x0, "gpio_in"),
->> ?+ SUNXI_FUNCTION(0x1, "gpio_out"),
->> ?+ SUNXI_FUNCTION(0x2, "s_uart"), /* TX */
->> ?+ SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 2)), /* PL_EINT2 */
->> ?+ SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 3),
->> ?+ SUNXI_FUNCTION(0x0, "gpio_in"),
->> ?+ SUNXI_FUNCTION(0x1, "gpio_out"),
->> ?+ SUNXI_FUNCTION(0x2, "s_uart"), /* RX */
->> ?+ SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 3)), /* PL_EINT3 */
->> ?+ SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 4),
->> ?+ SUNXI_FUNCTION(0x0, "gpio_in"),
->> ?+ SUNXI_FUNCTION(0x1, "gpio_out"),
->> ?+ SUNXI_FUNCTION(0x3, "s_jtag"), /* MS */
->> ?+ SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 4)), /* PL_EINT4 */
->> ?+ SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 5),
->> ?+ SUNXI_FUNCTION(0x0, "gpio_in"),
->> ?+ SUNXI_FUNCTION(0x1, "gpio_out"),
->> ?+ SUNXI_FUNCTION(0x3, "s_jtag"), /* CK */
->> ?+ SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 5)), /* PL_EINT5 */
->> ?+ SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 6),
->> ?+ SUNXI_FUNCTION(0x0, "gpio_in"),
->> ?+ SUNXI_FUNCTION(0x1, "gpio_out"),
->> ?+ SUNXI_FUNCTION(0x3, "s_jtag"), /* DO */
->> ?+ SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 6)), /* PL_EINT6 */
->> ?+ SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 7),
->> ?+ SUNXI_FUNCTION(0x0, "gpio_in"),
->> ?+ SUNXI_FUNCTION(0x1, "gpio_out"),
->> ?+ SUNXI_FUNCTION(0x3, "s_jtag"), /* DI */
->> ?+ SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 7)), /* PL_EINT7 */
->> ?+ SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 8),
->> ?+ SUNXI_FUNCTION(0x0, "gpio_in"),
->> ?+ SUNXI_FUNCTION(0x1, "gpio_out"),
->> ?+ SUNXI_FUNCTION(0x2, "s_twi"), /* SCK */
->
-> Ditto.
->
->> ?+ SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 8)), /* PL_EINT8 */
->> ?+ SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 9),
->> ?+ SUNXI_FUNCTION(0x0, "gpio_in"),
->> ?+ SUNXI_FUNCTION(0x1, "gpio_out"),
->> ?+ SUNXI_FUNCTION(0x2, "s_twi"), /* SDA */
->
-> Ditto.
->
->> ?+ SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 9)), /* PL_EINT9 */
->> ?+ SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 10),
->> ?+ SUNXI_FUNCTION(0x0, "gpio_in"),
->> ?+ SUNXI_FUNCTION(0x1, "gpio_out"),
->> ?+ SUNXI_FUNCTION(0x2, "s_pwm"),
->> ?+ SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 10)), /* PL_EINT10 */
->> ?+ SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 11),
->> ?+ SUNXI_FUNCTION(0x0, "gpio_in"),
->> ?+ SUNXI_FUNCTION(0x1, "gpio_out"),
->> ?+ SUNXI_FUNCTION(0x2, "s_cir_rx"),
->> ?+ SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 11)), /* PL_EINT11 */
->
-> You missed PL12.
-Sorry... I forgot to add it...
->
->> ?+};
->> ?+
->> ?+static const struct sunxi_pinctrl_desc sun50i_a64_r_pinctrl_data = {
->> ?+ .pins = sun50i_a64_r_pins,
->> ?+ .npins = ARRAY_SIZE(sun50i_a64_r_pins),
->> ?+ .pin_base = PL_BASE,
->> ?+ .irq_banks = 1,
->> ?+};
->> ?+
->> ?+static int sun50i_a64_r_pinctrl_probe(struct platform_device *pdev)
->> ?+{
->> ?+ struct reset_control *rstc;
->> ?+ int ret;
->> ?+
->> ?+ rstc = devm_reset_control_get(&pdev->dev, NULL);
->> ?+ if (IS_ERR(rstc)) {
->> ?+ dev_err(&pdev->dev, "Reset controller missing\n");
->> ?+ return PTR_ERR(rstc);
->> ?+ }
->> ?+
->> ?+ ret = reset_control_deassert(rstc);
->> ?+ if (ret)
->> ?+ return ret;
->> ?+
->> ?+ ret = sunxi_pinctrl_init(pdev,
->> ?+ &sun50i_a64_r_pinctrl_data);
->> ?+
->> ?+ if (ret)
->> ?+ reset_control_assert(rstc);
->> ?+
->> ?+ return ret;
->> ?+}
->> ?+
->> ?+static const struct of_device_id sun50i_a64_r_pinctrl_match[] = {
->> ?+ { .compatible = "allwinner,sun50i-a64-r-pinctrl", },
->> ?+ {}
->> ?+};
->> ?+MODULE_DEVICE_TABLE(of, sun50i_a64_r_pinctrl_match);
->> ?+
->> ?+static struct platform_driver sun50i_a64_r_pinctrl_driver = {
->> ?+ .probe = sun50i_a64_r_pinctrl_probe,
->> ?+ .driver = {
->> ?+ .name = "sun50i-a64-r-pinctrl",
->> ?+ .of_match_table = sun50i_a64_r_pinctrl_match,
->> ?+ },
->> ?+};
->> ?+module_platform_driver(sun50i_a64_r_pinctrl_driver);
->> ?+
->> ?+MODULE_AUTHOR("Icenowy Zheng <icenowy@aosc.xyz>");
->> ?+MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
->> ?+MODULE_AUTHOR("Boris Brezillon <boris.brezillon@free-electrons.com");
->> ?+MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com");
->> ?+MODULE_DESCRIPTION("Allwinner A64 R_PIO pinctrl driver");
->> ?+MODULE_LICENSE("GPL");
->
-> Since you have a bool Kconfig symbol, you can drop all the module related
-> stuff. Just use builtin_platform_driver like the A64 main pinctrl driver
-> does.
->
-> Regards
-> ChenYu
->
->> ?--
->> ?2.9.0
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+
+Device tree blob must be passed to a second kernel on DTB-capable
+archs, like powerpc and arm64, but the current kernel interface
+lacks this support.
+
+This patch extends kexec_file_load system call by adding an extra
+argument to this syscall so that an arbitrary number of file descriptors
+can be handed out from user space to the kernel.
+
+	long sys_kexec_file_load(int kernel_fd, int initrd_fd,
+				 unsigned long cmdline_len,
+				 const char __user *cmdline_ptr,
+				 unsigned long flags,
+				 const struct kexec_fdset __user *ufdset);
+
+If KEXEC_FILE_EXTRA_FDS is set to the "flags" argument, the "ufdset"
+argument points to the following struct buffer:
+
+	struct kexec_fdset {
+		int nr_fds;
+		struct kexec_file_fd fds[0];
+	}
+
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com>
+---
+ include/linux/fs.h         |  1 +
+ include/linux/kexec.h      |  7 +++-
+ include/linux/syscalls.h   |  4 +-
+ include/uapi/linux/kexec.h | 22 +++++++++++
+ kernel/kexec_file.c        | 92 +++++++++++++++++++++++++++++++++++++++++++---
+ 5 files changed, 117 insertions(+), 9 deletions(-)
+
+diff --git a/include/linux/fs.h b/include/linux/fs.h
+index 3523bf62f328..2eb0674392d1 100644
+--- a/include/linux/fs.h
++++ b/include/linux/fs.h
+@@ -2656,6 +2656,7 @@ extern int do_pipe_flags(int *, int);
+ 	id(MODULE, kernel-module)		\
+ 	id(KEXEC_IMAGE, kexec-image)		\
+ 	id(KEXEC_INITRAMFS, kexec-initramfs)	\
++	id(KEXEC_PARTIAL_DTB, kexec-partial-dtb)\
+ 	id(POLICY, security-policy)		\
+ 	id(MAX_ID, )
+ 
+diff --git a/include/linux/kexec.h b/include/linux/kexec.h
+index 4f85d284ed0b..29202935055d 100644
+--- a/include/linux/kexec.h
++++ b/include/linux/kexec.h
+@@ -148,7 +148,10 @@ struct kexec_file_ops {
+ 	kexec_verify_sig_t *verify_sig;
+ #endif
+ };
+-#endif
++
++int __weak arch_kexec_verify_buffer(enum kexec_file_type type, const void *buf,
++				    unsigned long size);
++#endif /* CONFIG_KEXEC_FILE */
+ 
+ struct kimage {
+ 	kimage_entry_t head;
+@@ -280,7 +283,7 @@ extern int kexec_load_disabled;
+ 
+ /* List of defined/legal kexec file flags */
+ #define KEXEC_FILE_FLAGS	(KEXEC_FILE_UNLOAD | KEXEC_FILE_ON_CRASH | \
+-				 KEXEC_FILE_NO_INITRAMFS)
++				 KEXEC_FILE_NO_INITRAMFS | KEXEC_FILE_EXTRA_FDS)
+ 
+ #define VMCOREINFO_BYTES           (4096)
+ #define VMCOREINFO_NOTE_NAME       "VMCOREINFO"
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index d02239022bd0..fc072bdb74e3 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -66,6 +66,7 @@ struct perf_event_attr;
+ struct file_handle;
+ struct sigaltstack;
+ union bpf_attr;
++struct kexec_fdset;
+ 
+ #include <linux/types.h>
+ #include <linux/aio_abi.h>
+@@ -321,7 +322,8 @@ asmlinkage long sys_kexec_load(unsigned long entry, unsigned long nr_segments,
+ asmlinkage long sys_kexec_file_load(int kernel_fd, int initrd_fd,
+ 				    unsigned long cmdline_len,
+ 				    const char __user *cmdline_ptr,
+-				    unsigned long flags);
++				    unsigned long flags,
++				    const struct kexec_fdset __user *ufdset);
+ 
+ asmlinkage long sys_exit(int error_code);
+ asmlinkage long sys_exit_group(int error_code);
+diff --git a/include/uapi/linux/kexec.h b/include/uapi/linux/kexec.h
+index aae5ebf2022b..6279be79efba 100644
+--- a/include/uapi/linux/kexec.h
++++ b/include/uapi/linux/kexec.h
+@@ -23,6 +23,28 @@
+ #define KEXEC_FILE_UNLOAD	0x00000001
+ #define KEXEC_FILE_ON_CRASH	0x00000002
+ #define KEXEC_FILE_NO_INITRAMFS	0x00000004
++#define KEXEC_FILE_EXTRA_FDS	0x00000008
++
++enum kexec_file_type {
++	KEXEC_FILE_TYPE_KERNEL,
++	KEXEC_FILE_TYPE_INITRAMFS,
++
++	/*
++	 * Device Tree Blob containing just the nodes and properties that
++	 * the kexec_file_load caller wants to add or modify.
++	 */
++	KEXEC_FILE_TYPE_PARTIAL_DTB,
++};
++
++struct kexec_file_fd {
++	enum kexec_file_type type;
++	int fd;
++};
++
++struct kexec_fdset {
++	int nr_fds;
++	struct kexec_file_fd fds[0];
++};
+ 
+ /* These values match the ELF architecture values.
+  * Unless there is a good reason that should continue to be the case.
+diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+index 113af2f219b9..302427e5ee71 100644
+--- a/kernel/kexec_file.c
++++ b/kernel/kexec_file.c
+@@ -116,6 +116,22 @@ void kimage_file_post_load_cleanup(struct kimage *image)
+ 	image->image_loader_data = NULL;
+ }
+ 
++/**
++ * arch_kexec_verify_buffer() - check that the given kexec file is valid
++ *
++ * Device trees in particular can contain properties that may make the kernel
++ * execute code that it wasn't supposed to (e.g., use the wrong entry point
++ * when calling firmware functions). Because of this, the kernel needs to
++ * verify that it is safe to use the device tree blob passed from userspace.
++ *
++ * Return: 0 on success, negative errno on error.
++ */
++int __weak arch_kexec_verify_buffer(enum kexec_file_type type, const void *buf,
++				    unsigned long size)
++{
++	return -EINVAL;
++}
++
+ /*
+  * In file mode list of segments is prepared by kernel. Copy relevant
+  * data from user space, do error checking, prepare segment list
+@@ -123,11 +139,13 @@ void kimage_file_post_load_cleanup(struct kimage *image)
+ static int
+ kimage_file_prepare_segments(struct kimage *image, int kernel_fd, int initrd_fd,
+ 			     const char __user *cmdline_ptr,
+-			     unsigned long cmdline_len, unsigned flags)
++			     unsigned long cmdline_len, unsigned long flags,
++			     const struct kexec_fdset __user *ufdset)
+ {
+ 	int ret = 0;
+ 	void *ldata;
+ 	loff_t size;
++	struct kexec_fdset *fdset = NULL;
+ 
+ 	ret = kernel_read_file_from_fd(kernel_fd, &image->kernel_buf,
+ 				       &size, INT_MAX, READING_KEXEC_IMAGE);
+@@ -160,6 +178,64 @@ kimage_file_prepare_segments(struct kimage *image, int kernel_fd, int initrd_fd,
+ 		image->initrd_buf_len = size;
+ 	}
+ 
++	if (flags & KEXEC_FILE_EXTRA_FDS) {
++		int nr_fds, i;
++		size_t fdset_size;
++
++		ret = copy_from_user(&nr_fds, ufdset, sizeof(int));
++		if (ret) {
++			ret = -EFAULT;
++			goto out;
++		}
++
++		if (nr_fds < 0 || nr_fds > KEXEC_SEGMENT_MAX) {
++			ret = -E2BIG;
++			goto out;
++		}
++
++		fdset_size = sizeof(struct kexec_fdset)
++				+ nr_fds * sizeof(struct kexec_file_fd);
++
++		fdset = kmalloc(fdset_size, GFP_KERNEL);
++		if (fdset == NULL) {
++			ret = -ENOMEM;
++			goto out;
++		}
++
++		ret = copy_from_user(fdset, ufdset, fdset_size);
++		if (ret) {
++			ret = -EFAULT;
++			goto out;
++		}
++
++		if (nr_fds != fdset->nr_fds) {
++			ret = -EFAULT;
++			goto out;
++		}
++
++		for (i = 0; i < fdset->nr_fds; i++) {
++			if (fdset->fds[i].type == KEXEC_FILE_TYPE_PARTIAL_DTB) {
++				ret = kernel_read_file_from_fd(fdset->fds[i].fd,
++						&image->dtb_buf, &size, INT_MAX,
++						READING_KEXEC_PARTIAL_DTB);
++				if (ret)
++					goto out;
++				image->dtb_buf_len = size;
++
++				ret = arch_kexec_verify_buffer(KEXEC_FILE_TYPE_PARTIAL_DTB,
++							       image->dtb_buf,
++							       image->dtb_buf_len);
++				if (ret)
++					goto out;
++			} else {
++				pr_debug("unknown file type %d failed.\n",
++						fdset->fds[i].type);
++				ret = -EINVAL;
++				goto out;
++			}
++		}
++	}
++
+ 	if (cmdline_len) {
+ 		image->cmdline_buf = kzalloc(cmdline_len, GFP_KERNEL);
+ 		if (!image->cmdline_buf) {
+@@ -193,6 +269,8 @@ kimage_file_prepare_segments(struct kimage *image, int kernel_fd, int initrd_fd,
+ 
+ 	image->image_loader_data = ldata;
+ out:
++	kfree(fdset);
++
+ 	/* In case of error, free up all allocated memory in this function */
+ 	if (ret)
+ 		kimage_file_post_load_cleanup(image);
+@@ -202,7 +280,8 @@ out:
+ static int
+ kimage_file_alloc_init(struct kimage **rimage, int kernel_fd,
+ 		       int initrd_fd, const char __user *cmdline_ptr,
+-		       unsigned long cmdline_len, unsigned long flags)
++		       unsigned long cmdline_len, unsigned long flags,
++		       const struct kexec_fdset __user *ufdset)
+ {
+ 	int ret;
+ 	struct kimage *image;
+@@ -221,7 +300,8 @@ kimage_file_alloc_init(struct kimage **rimage, int kernel_fd,
+ 	}
+ 
+ 	ret = kimage_file_prepare_segments(image, kernel_fd, initrd_fd,
+-					   cmdline_ptr, cmdline_len, flags);
++					   cmdline_ptr, cmdline_len, flags,
++					   ufdset);
+ 	if (ret)
+ 		goto out_free_image;
+ 
+@@ -256,9 +336,9 @@ out_free_image:
+ 	return ret;
+ }
+ 
+-SYSCALL_DEFINE5(kexec_file_load, int, kernel_fd, int, initrd_fd,
++SYSCALL_DEFINE6(kexec_file_load, int, kernel_fd, int, initrd_fd,
+ 		unsigned long, cmdline_len, const char __user *, cmdline_ptr,
+-		unsigned long, flags)
++		unsigned long, flags, const struct kexec_fdset __user *, ufdset)
+ {
+ 	int ret = 0, i;
+ 	struct kimage **dest_image, *image;
+@@ -295,7 +375,7 @@ SYSCALL_DEFINE5(kexec_file_load, int, kernel_fd, int, initrd_fd,
+ 		kimage_free(xchg(&kexec_crash_image, NULL));
+ 
+ 	ret = kimage_file_alloc_init(&image, kernel_fd, initrd_fd, cmdline_ptr,
+-				     cmdline_len, flags);
++				     cmdline_len, flags, ufdset);
+ 	if (ret)
+ 		goto out;
+ 
+-- 
+1.9.1
