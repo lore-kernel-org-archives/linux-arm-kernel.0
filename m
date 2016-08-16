@@ -1,53 +1,88 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 15 Aug 2016 20:49:45 +0100
-Subject: [PATCH v2] Added perf functionality to mmdc driver
-In-Reply-To: <DB5PR04MB14309188D99C35809DDA377B9F130@DB5PR04MB1430.eurprd04.prod.outlook.com>
-References: <20160815223035.5429-1-zhengyu.shen@nxp.com>
- <20160815165050.GB31080@svinekod>
- <DB5PR04MB14309188D99C35809DDA377B9F130@DB5PR04MB1430.eurprd04.prod.outlook.com>
-Message-ID: <20160815194945.GB1120@svinekod>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 16 Aug 2016 15:52:12 +0100
+Subject: [PATCH 3/2+1] remoteproc: core: Move of_get_rproc() helper to header
+In-Reply-To: <20160816143824.4120-1-lee.jones@linaro.org>
+References: <20160816143824.4120-1-lee.jones@linaro.org>
+Message-ID: <20160816145212.GA4254@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 02:40:43PM +0000, Zhengyu Shen wrote:
-> > > 	Added cpumask and migration handling support to driver
-> > > 	Validated event during event_init
-> > > 	Added code to properly stop counters
-> > > 	Used perf_invalid_context instead of perf_sw_context
-> > > 	Added hrtimer to poll for overflow
-> > > 	Added better description
-> > > 	Added support for multiple mmdcs
-> > 
-> > As I commented on v1 w.r.t. the above, I would appreciate being Cc'd on
-> > future versions of this patch.
-> 
-> Sorry about that, I'll be sure to CC you in the future. 
-> 
-> > > +static void mmdc_event_start(struct perf_event *event, int flags) {
-> > > +	struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
-> > > +	void __iomem *mmdc_base, *reg;
-> > > +
-> > > +	local64_set(&event->count, 0);
-> > > +	mmdc_base = pmu_mmdc->mmdc_base;
-> > > +	reg = mmdc_base + MMDC_MADPCR0;
-> > > +	hrtimer_start(&pmu_mmdc->hrtimer, mmdc_timer_period(),
-> > > +			HRTIMER_MODE_REL_PINNED);
-> > 
-> > Why is a hrtimer necessary? Is this just copy-pasted from CCN, or do you
-> > have similar HW issues?
-> > 
-> > Is there no overflow interrupt?
-> 
-> When overflow occurs, a register bit is set to one. There is no overflow
-> interrupt which is why the timer is needed. 
+remoteproc: core: Move of_get_rproc() helper to header
 
-I see. Please have add comment in the driver explaining this, so that this is
-obvious.
+Since of_get_rproc() has been made a simple helper, we can move it
+to the remoteproc.h and make it a 'static inline'.
 
-Does the counter itself wrap and continue counting, or does it saturate?
+Suggested-by: Suman Anna <s-anna@ti.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-How have you tuned your polling period so as to avoid missing events in the
-case of an overflow?
-
-Thanks,
-Mark.
+diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+index 1c5d5d8..6966fb2 100644
+--- a/drivers/remoteproc/remoteproc_core.c
++++ b/drivers/remoteproc/remoteproc_core.c
+@@ -1267,25 +1267,6 @@ struct rproc *of_get_rproc_by_name(struct device_node *np, const char *name)
+ 	return of_get_rproc_by_index(np, index);
+ }
+ EXPORT_SYMBOL(of_get_rproc_by_name);
+-
+-/**
+- * of_get_rproc() - lookup and obtain a reference to an rproc
+- * @np: node to search for rproc
+- *
+- * Finds an rproc handle using the default remote processor's phandle,
+- * and then returns a handle to the rproc.
+- *
+- * This function increments the remote processor's refcount, so always
+- * use rproc_put() to decrement it back once rproc isn't needed anymore.
+- *
+- * Returns a pointer to the rproc struct on success or an appropriate error
+- * code otherwise.
+- */
+-struct rproc *of_get_rproc(struct device_node *np)
+-{
+-	return of_get_rproc_by_index(np, 0);
+-}
+-EXPORT_SYMBOL(of_get_rproc);
+ #endif
+ 
+ /**
+diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
+index 0e1adc9..ec1cffd 100644
+--- a/include/linux/remoteproc.h
++++ b/include/linux/remoteproc.h
+@@ -515,7 +515,6 @@ extern struct rproc *of_get_rproc_by_index(struct device_node *np,
+ 					   int index);
+ extern struct rproc *of_get_rproc_by_name(struct device_node *np,
+ 					  const char *name);
+-extern struct rproc *of_get_rproc(struct device_node *np);
+ #else
+ static inline
+ struct rproc *of_get_rproc_by_index(struct device_node *np, int index)
+@@ -527,11 +526,24 @@ struct rproc *of_get_rproc_by_name(struct device_node *np, const char *name)
+ {
+ 	return NULL;
+ }
+-static inline
+-struct rproc *of_get_rproc(struct device_node *np)
++#endif /* CONFIG_OF */
++
++/**
++ * of_get_rproc() - lookup and obtain a reference to an rproc
++ * @np: node to search for rproc
++ *
++ * Finds an rproc handle using the default remote processor's phandle,
++ * and then returns a handle to the rproc.
++ *
++ * This function increments the remote processor's refcount, so always
++ * use rproc_put() to decrement it back once rproc isn't needed anymore.
++ *
++ * Returns a pointer to the rproc struct on success or an appropriate error
++ * code otherwise.
++ */
++static inline struct rproc *of_get_rproc(struct device_node *np)
+ {
+-	return NULL;
++	return of_get_rproc_by_index(np, 0);
+ }
+-#endif /* CONFIG_OF */
+ 
+ #endif /* REMOTEPROC_H */
