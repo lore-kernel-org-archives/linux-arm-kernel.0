@@ -1,44 +1,84 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 16 Aug 2016 16:59:52 +0100
-Subject: [PATCH 1/2] drivers: acpi: fix typo in ACPI_DECLARE_PROBE_ENTRY macro
-Message-ID: <1471363193-16559-1-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Tue, 16 Aug 2016 16:59:53 +0100
+Subject: [PATCH 2/2] drivers: acpi: replace acpi_probe_lock spinlock with mutex
+In-Reply-To: <1471363193-16559-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1471363193-16559-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1471363193-16559-2-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the ACPI_DECLARE_PROBE_ENTRY macro was added in
-commit e647b532275b ("ACPI: Add early device probing infrastructure"),
-a stub macro adding an unused entry was added for the !CONFIG_ACPI
-Kconfig option case to make sure kernel code making use of the
-macro did not require to be guarded within CONFIG_ACPI in order to
-be compiled.
+Commit e647b532275b ("ACPI: Add early device probing infrastructure")
+introduced code that allows inserting driver specific
+struct acpi_probe_entry probe entries into acpi linker sections
+(one per-subsystem, eg irqchip, clocksource) that are then walked
+to retrieve the data and function hooks required to probe the
+respective kernel components.
 
-The stub macro was never used since all kernel code that defines
-ACPI_DECLARE_PROBE_ENTRY entries is currently guarded within
-CONFIG_ACPI; it contains a typo that should be nonetheless fixed.
+Probing for all entries in a section is triggered through
+the __acpi_probe_device_table() function, that in turn, according
+to the table id a given probe entry reports parses the table
+with the function retrieved from the respective section structures
+(ie struct acpi_probe_entry). Owing to the current ACPI table
+parsing implementation, the __acpi_probe_device_table() function
+has to share global variables with the acpi_match_madt() function, so
+in order to guarantee mutual exclusion locking is required
+between the two functions.
 
-Fix the typo in the stub (ie !CONFIG_ACPI) ACPI_DECLARE_PROBE_ENTRY()
-macro so that it can actually be used if needed.
+Current kernel code implements the locking through the acpi_probe_lock
+spinlock; this has the side effect of requiring all code called
+within the lock (ie struct acpi_probe_entry.probe_{table/subtbl} hooks)
+not to sleep.
+
+However, kernel subsystems that make use of the early probing
+infrastructure, are relying on kernel APIs that may sleep (eg
+irq_domain_alloc_fwnode(), among others) in the function calls
+pointed at by struct acpi_probe_entry.{probe_table/subtbl} entries
+(eg gic_v2_acpi_init()), which is a bug.
+
+Since __acpi_probe_device_table() is called from context
+that is allowed to sleep the acpi_probe_lock spinlock can be replaced
+with a mutex; this fixes the issue whilst still guaranteeing
+mutual exclusion.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Fixes: e647b532275b ("ACPI: Add early device probing infrastructure")
+Cc: Tomasz Nowicki <tn@semihalf.com>
 Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Marc Zyngier <Marc.Zyngier@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/acpi.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/acpi/scan.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 4d8452c..c5eaf2f 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -1056,7 +1056,7 @@ static inline struct fwnode_handle *acpi_get_next_subnode(struct device *dev,
- 	return NULL;
- }
+diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+index ad9fc84..e878fc7 100644
+--- a/drivers/acpi/scan.c
++++ b/drivers/acpi/scan.c
+@@ -2054,7 +2054,7 @@ int __init acpi_scan_init(void)
  
--#define ACPI_DECLARE_PROBE_ENTRY(table, name, table_id, subtable, validate, data, fn) \
-+#define ACPI_DECLARE_PROBE_ENTRY(table, name, table_id, subtable, valid, data, fn) \
- 	static const void * __acpi_table_##name[]			\
- 		__attribute__((unused))					\
- 		 = { (void *) table_id,					\
+ static struct acpi_probe_entry *ape;
+ static int acpi_probe_count;
+-static DEFINE_SPINLOCK(acpi_probe_lock);
++static DEFINE_MUTEX(acpi_probe_mutex);
+ 
+ static int __init acpi_match_madt(struct acpi_subtable_header *header,
+ 				  const unsigned long end)
+@@ -2073,7 +2073,7 @@ int __init __acpi_probe_device_table(struct acpi_probe_entry *ap_head, int nr)
+ 	if (acpi_disabled)
+ 		return 0;
+ 
+-	spin_lock(&acpi_probe_lock);
++	mutex_lock(&acpi_probe_mutex);
+ 	for (ape = ap_head; nr; ape++, nr--) {
+ 		if (ACPI_COMPARE_NAME(ACPI_SIG_MADT, ape->id)) {
+ 			acpi_probe_count = 0;
+@@ -2086,7 +2086,7 @@ int __init __acpi_probe_device_table(struct acpi_probe_entry *ap_head, int nr)
+ 				count++;
+ 		}
+ 	}
+-	spin_unlock(&acpi_probe_lock);
++	mutex_unlock(&acpi_probe_mutex);
+ 
+ 	return count;
+ }
 -- 
 2.6.4
