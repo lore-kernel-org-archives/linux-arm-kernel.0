@@ -1,78 +1,117 @@
 From: erin.lo@mediatek.com (Erin Lo)
-Date: Tue, 16 Aug 2016 15:30:29 +0800
-Subject: [PATCH v10 9/9] arm: dts: mt2701: Use real clock for UARTs
+Date: Tue, 16 Aug 2016 15:30:26 +0800
+Subject: [PATCH v10 6/9] reset: mediatek: Add MT2701 reset controller
+ dt-binding file
 In-Reply-To: <1471332629-15722-1-git-send-email-erin.lo@mediatek.com>
 References: <1471332629-15722-1-git-send-email-erin.lo@mediatek.com>
-Message-ID: <1471332629-15722-10-git-send-email-erin.lo@mediatek.com>
+Message-ID: <1471332629-15722-7-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We used to use a fixed rate clock for the UARTs. Now that we have clock
-support we can associate the correct clocks to the UARTs and drop the
-26MHz fixed rate UART clock.
+From: Shunli Wang <shunli.wang@mediatek.com>
 
-Change-Id: Icd44282b859a344b86eccdf4840e9ffb7cee7ec5
+Dt-binding file about reset controller is used to provide
+kinds of definition, which is referenced by dts file and
+IC-specified reset controller driver code.
+
+Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
+Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
 Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+Tested-by: John Crispin <blogic@openwrt.org>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- arch/arm/boot/dts/mt2701.dtsi | 18 ++++++++----------
- 1 file changed, 8 insertions(+), 10 deletions(-)
+ include/dt-bindings/reset/mt2701-resets.h | 83 +++++++++++++++++++++++++++++++
+ 1 file changed, 83 insertions(+)
+ create mode 100644 include/dt-bindings/reset/mt2701-resets.h
 
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index c9a8dbf..7eab6f4 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -73,12 +73,6 @@
- 		#clock-cells = <0>;
- 	};
- 
--	uart_clk: dummy26m {
--		compatible = "fixed-clock";
--		clock-frequency = <26000000>;
--		#clock-cells = <0>;
--	};
--
- 	clk26m: oscillator at 0 {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
-@@ -186,7 +180,8 @@
- 			     "mediatek,mt6577-uart";
- 		reg = <0 0x11002000 0 0x400>;
- 		interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
--		clocks = <&uart_clk>;
-+		clocks = <&pericfg CLK_PERI_UART0_SEL>, <&pericfg CLK_PERI_UART0>;
-+		clock-names = "baud", "bus";
- 		status = "disabled";
- 	};
- 
-@@ -195,7 +190,8 @@
- 			     "mediatek,mt6577-uart";
- 		reg = <0 0x11003000 0 0x400>;
- 		interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_LOW>;
--		clocks = <&uart_clk>;
-+		clocks = <&pericfg CLK_PERI_UART1_SEL>, <&pericfg CLK_PERI_UART1>;
-+		clock-names = "baud", "bus";
- 		status = "disabled";
- 	};
- 
-@@ -204,7 +200,8 @@
- 			     "mediatek,mt6577-uart";
- 		reg = <0 0x11004000 0 0x400>;
- 		interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_LOW>;
--		clocks = <&uart_clk>;
-+		clocks = <&pericfg CLK_PERI_UART2_SEL>, <&pericfg CLK_PERI_UART2>;
-+		clock-names = "baud", "bus";
- 		status = "disabled";
- 	};
- 
-@@ -213,7 +210,8 @@
- 			     "mediatek,mt6577-uart";
- 		reg = <0 0x11005000 0 0x400>;
- 		interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_LOW>;
--		clocks = <&uart_clk>;
-+		clocks = <&pericfg CLK_PERI_UART3_SEL>, <&pericfg CLK_PERI_UART3>;
-+		clock-names = "baud", "bus";
- 		status = "disabled";
- 	};
- };
+diff --git a/include/dt-bindings/reset/mt2701-resets.h b/include/dt-bindings/reset/mt2701-resets.h
+new file mode 100644
+index 0000000..aaf0305
+--- /dev/null
++++ b/include/dt-bindings/reset/mt2701-resets.h
+@@ -0,0 +1,83 @@
++/*
++ * Copyright (c) 2015 MediaTek, Shunli Wang <shunli.wang@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef _DT_BINDINGS_RESET_CONTROLLER_MT2701
++#define _DT_BINDINGS_RESET_CONTROLLER_MT2701
++
++/* INFRACFG resets */
++#define MT2701_INFRA_EMI_REG_RST		0
++#define MT2701_INFRA_DRAMC0_A0_RST		1
++#define MT2701_INFRA_FHCTL_RST			2
++#define MT2701_INFRA_APCIRQ_EINT_RST		3
++#define MT2701_INFRA_APXGPT_RST			4
++#define MT2701_INFRA_SCPSYS_RST			5
++#define MT2701_INFRA_KP_RST			6
++#define MT2701_INFRA_PMIC_WRAP_RST		7
++#define MT2701_INFRA_MIPI_RST			8
++#define MT2701_INFRA_IRRX_RST			9
++#define MT2701_INFRA_CEC_RST			10
++#define MT2701_INFRA_EMI_RST			32
++#define MT2701_INFRA_DRAMC0_RST			34
++#define MT2701_INFRA_TRNG_RST			37
++#define MT2701_INFRA_SYSIRQ_RST			38
++
++/*  PERICFG resets */
++#define MT2701_PERI_UART0_SW_RST		0
++#define MT2701_PERI_UART1_SW_RST		1
++#define MT2701_PERI_UART2_SW_RST		2
++#define MT2701_PERI_UART3_SW_RST		3
++#define MT2701_PERI_GCPU_SW_RST			5
++#define MT2701_PERI_BTIF_SW_RST			6
++#define MT2701_PERI_PWM_SW_RST			8
++#define MT2701_PERI_AUXADC_SW_RST		10
++#define MT2701_PERI_DMA_SW_RST			11
++#define MT2701_PERI_NFI_SW_RST			14
++#define MT2701_PERI_NLI_SW_RST			15
++#define MT2701_PERI_THERM_SW_RST		16
++#define MT2701_PERI_MSDC2_SW_RST		17
++#define MT2701_PERI_MSDC0_SW_RST		19
++#define MT2701_PERI_MSDC1_SW_RST		20
++#define MT2701_PERI_I2C0_SW_RST			22
++#define MT2701_PERI_I2C1_SW_RST			23
++#define MT2701_PERI_I2C2_SW_RST			24
++#define MT2701_PERI_I2C3_SW_RST			25
++#define MT2701_PERI_USB_SW_RST			28
++#define MT2701_PERI_ETH_SW_RST			29
++#define MT2701_PERI_SPI0_SW_RST			33
++
++/* TOPRGU resets */
++#define MT2701_TOPRGU_INFRA_RST			0
++#define MT2701_TOPRGU_MM_RST			1
++#define MT2701_TOPRGU_MFG_RST			2
++#define MT2701_TOPRGU_ETHDMA_RST		3
++#define MT2701_TOPRGU_VDEC_RST			4
++#define MT2701_TOPRGU_VENC_IMG_RST		5
++#define MT2701_TOPRGU_DDRPHY_RST		6
++#define MT2701_TOPRGU_MD_RST			7
++#define MT2701_TOPRGU_INFRA_AO_RST		8
++#define MT2701_TOPRGU_CONN_RST			9
++#define MT2701_TOPRGU_APMIXED_RST		10
++#define MT2701_TOPRGU_HIFSYS_RST		11
++#define MT2701_TOPRGU_CONN_MCU_RST		12
++#define MT2701_TOPRGU_BDP_DISP_RST		13
++
++/* HIFSYS resets */
++#define MT2701_HIFSYS_UHOST0_RST		3
++#define MT2701_HIFSYS_UHOST1_RST		4
++#define MT2701_HIFSYS_UPHY0_RST			21
++#define MT2701_HIFSYS_UPHY1_RST			22
++#define MT2701_HIFSYS_PCIE0_RST			24
++#define MT2701_HIFSYS_PCIE1_RST			25
++#define MT2701_HIFSYS_PCIE2_RST			26
++
++#endif  /* _DT_BINDINGS_RESET_CONTROLLER_MT2701 */
 -- 
 1.9.1
