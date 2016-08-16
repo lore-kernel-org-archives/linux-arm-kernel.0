@@ -1,81 +1,109 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 16 Aug 2016 15:20:17 +0800
-Subject: [PATCH v5 7/7] ARM: dts: sun9i: Switch to the AC100 RTC clock
- outputs for osc32k
-In-Reply-To: <CAGb2v66OhH=C5CqB56jN=T4c8TDgyuC=F0689d7=GBhy_rEonA@mail.gmail.com>
-References: <1467988422-17934-1-git-send-email-wens@csie.org>
- <1467988422-17934-8-git-send-email-wens@csie.org>
- <20160711065042.GC4589@lukather>
- <CAGb2v66OhH=C5CqB56jN=T4c8TDgyuC=F0689d7=GBhy_rEonA@mail.gmail.com>
-Message-ID: <CAGb2v66kLO2RnAyzasuqDbJXYZhcH0pBKraE3MUEJzb6hsEoTg@mail.gmail.com>
+From: erin.lo@mediatek.com (Erin Lo)
+Date: Tue, 16 Aug 2016 15:30:21 +0800
+Subject: [PATCH v10 1/9] clk: mediatek: remove __init from clk registration
+ functions
+In-Reply-To: <1471332629-15722-1-git-send-email-erin.lo@mediatek.com>
+References: <1471332629-15722-1-git-send-email-erin.lo@mediatek.com>
+Message-ID: <1471332629-15722-2-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2016 at 10:02 AM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Mon, Jul 11, 2016 at 2:50 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> Hi,
->>
->> On Fri, Jul 08, 2016 at 10:33:42PM +0800, Chen-Yu Tsai wrote:
->>> The 32.768 kHz clock inside the A80 SoC is fed from an external source,
->>> typically the AC100 RTC module.
->>>
->>> Make the osc32k placeholder a fixed-factor clock so board dts files can
->>> specify its source.
->>>
->>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>> ---
->>> Changes since v4: none
->>> Changes since v3: none
->>> Changes since v2: none
->>> Changes since v1: none
->>> ---
->>>  arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 5 +++++
->>>  arch/arm/boot/dts/sun9i-a80-optimus.dts     | 5 +++++
->>>  arch/arm/boot/dts/sun9i-a80.dtsi            | 9 +++------
->>>  3 files changed, 13 insertions(+), 6 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
->>> index cf2f4b72a841..04b014603659 100644
->>> --- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
->>> +++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
->>> @@ -103,6 +103,11 @@
->>>       allwinner,drive = <SUN4I_PINCTRL_40_MA>;
->>>  };
->>>
->>> +&osc32k {
->>> +     /* osc32k input is from AC100 */
->>> +     clocks = <&ac100_rtc 0>;
->>> +};
->>> +
->>
->> I'm guessing that an unresolved dependency when the driver has not
->> loaded yet, or is not even compiled ?
->>
->> How is it working then?
->
-> I assume the clk framework will leave it unresolved and unusable.
-> Also it seems that none of existing clks use it as a parent by
-> default. I will need to check the remaining unimplemented ones
-> though.
+From: James Liao <jamesjj.liao@mediatek.com>
 
-On the latest sunxi-next kernel, one clock is clocked from osc32k, which
-becomes an orphaned clock:
+Remove __init from functions that will be used by init functions
+that support probe deferral.
 
-   clock                         enable_cnt  prepare_cnt        rate
-accuracy   phase
-----------------------------------------------------------------------------------------
- osc24M                                   6            6    24000000
-       0 0
-    r_ir                                  1            1     8000000
-       0 0
- r_1wire                                  0            0           0
-       0 0
+Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+---
+ drivers/clk/mediatek/clk-gate.c |  2 +-
+ drivers/clk/mediatek/clk-mtk.c  | 12 ++++++------
+ drivers/clk/mediatek/clk-pll.c  |  2 +-
+ 3 files changed, 8 insertions(+), 8 deletions(-)
 
-r_ir is clocked from osc32k by default, but the clk_set_rate call in the
-IR driver seems to forces it to reparent to the working osc24M clock.
-
-So I think we're good here. Can you merge the 3 remaining dts patches?
-
-Thanks
-ChenYu
+diff --git a/drivers/clk/mediatek/clk-gate.c b/drivers/clk/mediatek/clk-gate.c
+index 2a76901..d8787bf 100644
+--- a/drivers/clk/mediatek/clk-gate.c
++++ b/drivers/clk/mediatek/clk-gate.c
+@@ -97,7 +97,7 @@ const struct clk_ops mtk_clk_gate_ops_setclr_inv = {
+ 	.disable	= mtk_cg_disable_inv,
+ };
+ 
+-struct clk * __init mtk_clk_register_gate(
++struct clk *mtk_clk_register_gate(
+ 		const char *name,
+ 		const char *parent_name,
+ 		struct regmap *regmap,
+diff --git a/drivers/clk/mediatek/clk-mtk.c b/drivers/clk/mediatek/clk-mtk.c
+index 5ada644..bb30f70 100644
+--- a/drivers/clk/mediatek/clk-mtk.c
++++ b/drivers/clk/mediatek/clk-mtk.c
+@@ -24,7 +24,7 @@
+ #include "clk-mtk.h"
+ #include "clk-gate.h"
+ 
+-struct clk_onecell_data * __init mtk_alloc_clk_data(unsigned int clk_num)
++struct clk_onecell_data *mtk_alloc_clk_data(unsigned int clk_num)
+ {
+ 	int i;
+ 	struct clk_onecell_data *clk_data;
+@@ -49,7 +49,7 @@ err_out:
+ 	return NULL;
+ }
+ 
+-void __init mtk_clk_register_fixed_clks(const struct mtk_fixed_clk *clks,
++void mtk_clk_register_fixed_clks(const struct mtk_fixed_clk *clks,
+ 		int num, struct clk_onecell_data *clk_data)
+ {
+ 	int i;
+@@ -72,7 +72,7 @@ void __init mtk_clk_register_fixed_clks(const struct mtk_fixed_clk *clks,
+ 	}
+ }
+ 
+-void __init mtk_clk_register_factors(const struct mtk_fixed_factor *clks,
++void mtk_clk_register_factors(const struct mtk_fixed_factor *clks,
+ 		int num, struct clk_onecell_data *clk_data)
+ {
+ 	int i;
+@@ -95,7 +95,7 @@ void __init mtk_clk_register_factors(const struct mtk_fixed_factor *clks,
+ 	}
+ }
+ 
+-int __init mtk_clk_register_gates(struct device_node *node,
++int mtk_clk_register_gates(struct device_node *node,
+ 		const struct mtk_gate *clks,
+ 		int num, struct clk_onecell_data *clk_data)
+ {
+@@ -135,7 +135,7 @@ int __init mtk_clk_register_gates(struct device_node *node,
+ 	return 0;
+ }
+ 
+-struct clk * __init mtk_clk_register_composite(const struct mtk_composite *mc,
++struct clk *mtk_clk_register_composite(const struct mtk_composite *mc,
+ 		void __iomem *base, spinlock_t *lock)
+ {
+ 	struct clk *clk;
+@@ -222,7 +222,7 @@ err_out:
+ 	return ERR_PTR(ret);
+ }
+ 
+-void __init mtk_clk_register_composites(const struct mtk_composite *mcs,
++void mtk_clk_register_composites(const struct mtk_composite *mcs,
+ 		int num, void __iomem *base, spinlock_t *lock,
+ 		struct clk_onecell_data *clk_data)
+ {
+diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
+index 966cab1..0c2deac 100644
+--- a/drivers/clk/mediatek/clk-pll.c
++++ b/drivers/clk/mediatek/clk-pll.c
+@@ -313,7 +313,7 @@ static struct clk *mtk_clk_register_pll(const struct mtk_pll_data *data,
+ 	return clk;
+ }
+ 
+-void __init mtk_clk_register_plls(struct device_node *node,
++void mtk_clk_register_plls(struct device_node *node,
+ 		const struct mtk_pll_data *plls, int num_plls, struct clk_onecell_data *clk_data)
+ {
+ 	void __iomem *base;
+-- 
+1.9.1
