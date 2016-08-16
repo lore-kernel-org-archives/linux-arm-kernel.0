@@ -1,61 +1,65 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue, 16 Aug 2016 13:06:03 -0700
-Subject: [PATCH 17/34] clk: maxgen: Migrate to clk_hw based OF and
- registration APIs
-In-Reply-To: <665a9824-b0c5-9eb3-d4b6-4821204d5db0@osg.samsung.com>
-References: <20160601231533.9354-1-stephen.boyd@linaro.org>
- <20160601231533.9354-18-stephen.boyd@linaro.org>
- <CABxcv=mWdwPrGRrP7ay=2FBxzoew6yBdfjZNvgFeDGACnQZdcQ@mail.gmail.com>
- <665a9824-b0c5-9eb3-d4b6-4821204d5db0@osg.samsung.com>
-Message-ID: <CAJOFmgzfvUza7DQeMsd0bD_e=+P5=WGT8kOkV7H5CCwVq4Z0RQ@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 16 Aug 2016 22:09:40 +0200 (CEST)
+Subject: [PATCH V2 RFC 1/6] usb: dwc2: core: Avoid nonsense error in
+ gadget mode
+In-Reply-To: <69b9522a-ca23-cc32-ec90-8d59f63e4e03@synopsys.com>
+References: <1469559213-16160-1-git-send-email-stefan.wahren@i2se.com>
+ <1469559213-16160-2-git-send-email-stefan.wahren@i2se.com>
+ <92280b0f-4dd3-bcf5-57ed-277a9f91653d@synopsys.com>
+ <2008594325.331112.5842a41f-9d6d-4b55-baac-1529d6cae164.open-xchange@email.1und1.de>
+ <69b9522a-ca23-cc32-ec90-8d59f63e4e03@synopsys.com>
+Message-ID: <167107178.290535.51598113-17aa-4db0-9dc0-6e58e3fafe07.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 7, 2016 at 11:55 AM, Javier Martinez Canillas
-<javier@osg.samsung.com> wrote:
-> On 06/07/2016 02:50 PM, Javier Martinez Canillas wrote:
->> Hello Stephen,
->>
->> On Wed, Jun 1, 2016 at 7:15 PM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
->>> Now that we have clk_hw based provider APIs to register clks, we
->>> can get rid of struct clk pointers while registering clks in
->>> these drivers, allowing us to move closer to a clear split of
->>> consumer and provider clk APIs.
->>>
->>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>
->> This email address doesn't exist anymore, you can use
->> javier at osg.samsung.com instead.
->>
->>> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
->>> ---
->>>
->>> See commit 58657d189a2f and it's children for details on this
->>> new registration API.
->>>
->>
->> I tried this patch on top of linux-next and my Peach Pi Chromebook
->> (that has a max77802 chip) failed to boot. Following is the relevant
->> parts from the boot log:
->>
->
-> It seems the mailer did a mess with the line wrapping so here's another attempt:
->
+Hi John,
 
-Thanks! Found the problem too.
+> John Youn <John.Youn@synopsys.com> hat am 16. August 2016 um 21:20
+> geschrieben:
+> 
+> 
+> On 8/16/2016 9:44 AM, Stefan Wahren wrote:
+> > Hi John,
+> > 
+> >> John Youn <John.Youn@synopsys.com> hat am 16. August 2016 um 03:30
+> ...
+> > [    2.476378] dwc2 20980000.usb: dwc2_set_parameters()
+> > [    2.476391] dwc2 20980000.usb: Setting dma_desc_fs_enable to 0
+> > [    2.476418] dwc2 20980000.usb: Setting external_id_pin_ctl to 0
+> > [    2.476429] dwc2 20980000.usb: Setting hibernation to 0
+> > [    2.476449] dwc2 20980000.usb: 0 invalid for host_rx_fifo_size. Check HW
+> > configuration.
+> > [    2.491704] dwc2 20980000.usb: Setting host_rx_fifo_size to 4096
+> > [    2.491727] dwc2 20980000.usb: 0 invalid for host_nperio_tx_fifo_size.
+> > Check
+> > HW configuration.
+> > [    2.507853] dwc2 20980000.usb: Setting host_nperio_tx_fifo_size to 0
+> > [    2.507875] dwc2 20980000.usb: 0 invalid for host_perio_tx_fifo_size.
+> > Check
+> > HW configuration.
+> > [    2.524246] dwc2 20980000.usb: Setting host_perio_tx_fifo_size to 0
+> 
+> Thanks for the logs.
+> 
+> It looks like if dr_mode == peripheral, dwc2 doesn't populate the
+> following host-only values from the reset values of the registers.
+> 
+> * hw_params->host_nperio_tx_fifo_size
+> * hw_params->host_perio_tx_fifo_size
+> 
+> Thus when it goes to set the core_params based on the hw_params you
+> get the error. As peripheral-only, they are never used so it's fine.
+> 
+> To get rid of the error we can skip setting the host-only parameters
+> if dr_mode == peripheral.
 
-----8<-----
-diff --git a/drivers/clk/clk-max-gen.c b/drivers/clk/clk-max-gen.c
-index 4bb53fcf8639..5e8bac190698 100644
---- a/drivers/clk/clk-max-gen.c
-+++ b/drivers/clk/clk-max-gen.c
-@@ -169,7 +169,7 @@ int max_gen_clk_probe(struct platform_device
-*pdev, struct regmap *regmap,
+sorry the subject is imprecise. According to the logs if dr_mode == otg we also
+get
 
-        if (dev->of_node) {
-                ret = of_clk_add_hw_provider(dev->of_node, of_clk_max_gen_get,
--                                            max_gen_clks);
-+                                            max_gen_data);
-                if (ret) {
-                        dev_err(dev, "failed to register OF clock provider\n");
-                        return ret;
+[    2.569573] dwc2 20980000.usb: 0 invalid for host_perio_tx_fifo_size. Check
+HW configuration.
+[    2.585354] dwc2 20980000.usb: Setting host_perio_tx_fifo_size to 0
+
+You already said in 6/6 that's faulty, but i only want to point it out.
+
+Stefan
