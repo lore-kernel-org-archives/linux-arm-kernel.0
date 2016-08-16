@@ -1,326 +1,74 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 16 Aug 2016 11:45:11 +0100
-Subject: [RFC PATCH 6/7] arm64: KVM: Handle trappable TLB instructions
-In-Reply-To: <1471344312-26685-1-git-send-email-punit.agrawal@arm.com>
-References: <1471344312-26685-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <1471344312-26685-7-git-send-email-punit.agrawal@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 16 Aug 2016 11:46:54 +0100
+Subject: [PATCH v2 3/7] KVM: arm: vgic-new: improve compatibility with 32-bit
+In-Reply-To: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
+References: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1471344418-19568-4-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARMv8 architecture allows trapping of TLB maintenane instructions
-from EL0/EL1 to higher exception levels. On encountering a trappable TLB
-instruction in a guest, an exception is taken to EL2.
+We have couple of 64-bit register defined in GICv3 architecture, so
+"unsigned long" kind of accessors wouldn't work for 32-bit. However,
+these registers can't be access as 64-bit in a one go if we run 32-bit
+host simply because KVM doesn't support multiple load/store on MMIO
+space.
 
-Add functionality to handle emulating the TLB instructions.
+It means that 32-bit guest access these registers in 32-bit chunks, so
+the only thing we need to do is to ensure that extract_bytes() always
+takes 64-bit data.
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+Since we are here fix couple of other width related issues by using
+ULL variants over UL.
+
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm64/include/asm/kvm_asm.h |   1 +
- arch/arm64/kvm/hyp/tlb.c         | 146 +++++++++++++++++++++++++++++++++++++++
- arch/arm64/kvm/sys_regs.c        |  81 ++++++++++++++++++++++
- arch/arm64/kvm/trace.h           |  16 +++++
- 4 files changed, 244 insertions(+)
+ virt/kvm/arm/vgic/vgic-mmio-v3.c |    6 +++---
+ virt/kvm/arm/vgic/vgic-mmio.h    |    2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index 7561f63..1ac1cc3 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -49,6 +49,7 @@ extern char __kvm_hyp_vector[];
- extern void __kvm_flush_vm_context(void);
- extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
- extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
-+extern void __kvm_emulate_tlb_invalidate(struct kvm *kvm, u32 sysreg, u64 regval);
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index ff668e0..cc20b60 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -23,7 +23,7 @@
+ #include "vgic-mmio.h"
  
- extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+ /* extract @num bytes at @offset bytes offset in data */
+-unsigned long extract_bytes(unsigned long data, unsigned int offset,
++unsigned long extract_bytes(u64 data, unsigned int offset,
+ 			    unsigned int num)
+ {
+ 	return (data >> (offset * 8)) & GENMASK_ULL(num * 8 - 1, 0);
+@@ -179,7 +179,7 @@ static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
+ 	int target_vcpu_id = vcpu->vcpu_id;
+ 	u64 value;
  
-diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
-index 4cda100..e0a0309 100644
---- a/arch/arm64/kvm/hyp/tlb.c
-+++ b/arch/arm64/kvm/hyp/tlb.c
-@@ -78,3 +78,149 @@ static void __hyp_text __tlb_flush_vm_context(void)
- }
+-	value = (mpidr & GENMASK(23, 0)) << 32;
++	value = (mpidr & GENMASK_ULL(23, 0)) << 32;
+ 	value |= ((target_vcpu_id & 0xffff) << 8);
+ 	if (target_vcpu_id == atomic_read(&vcpu->kvm->online_vcpus) - 1)
+ 		value |= GICR_TYPER_LAST;
+@@ -603,7 +603,7 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
+ 	bool broadcast;
  
- __alias(__tlb_flush_vm_context) void __kvm_flush_vm_context(void);
-+
-+/* Intentionally empty functions */
-+static void __hyp_text __switch_to_hyp_role_nvhe(void) { }
-+static void __hyp_text __switch_to_host_role_nvhe(void) { }
-+
-+static void __hyp_text __switch_to_hyp_role_vhe(void)
-+{
-+	u64 hcr = read_sysreg(hcr_el2);
-+
-+	hcr &= ~HCR_TGE;
-+	write_sysreg(hcr, hcr_el2);
-+}
-+
-+static void __hyp_text __switch_to_host_role_vhe(void)
-+{
-+	u64 hcr = read_sysreg(hcr_el2);
-+
-+	hcr |= HCR_TGE;
-+	write_sysreg(hcr, hcr_el2);
-+}
-+
-+static hyp_alternate_select(__switch_to_hyp_role,
-+			    __switch_to_hyp_role_nvhe,
-+			    __switch_to_hyp_role_vhe,
-+			    ARM64_HAS_VIRT_HOST_EXTN);
-+
-+static hyp_alternate_select(__switch_to_host_role,
-+			    __switch_to_host_role_nvhe,
-+			    __switch_to_host_role_vhe,
-+			    ARM64_HAS_VIRT_HOST_EXTN);
-+
-+static void __hyp_text __switch_to_guest_regime(struct kvm *kvm)
-+{
-+	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-+	__switch_to_hyp_role();
-+	isb();
-+}
-+
-+static void __hyp_text __switch_to_host_regime(void)
-+{
-+	__switch_to_host_role();
-+	write_sysreg(0, vttbr_el2);
-+}
-+
-+/*
-+ *  AArch32 TLB maintenance instructions trapping to EL2
-+ */
-+#define TLBIALLIS			sys_reg(0, 0, 8, 3, 0)
-+#define TLBIMVAIS			sys_reg(0, 0, 8, 3, 1)
-+#define TLBIASIDIS			sys_reg(0, 0, 8, 3, 2)
-+#define TLBIMVAAIS			sys_reg(0, 0, 8, 3, 3)
-+#define TLBIMVALIS			sys_reg(0, 0, 8, 3, 5)
-+#define TLBIMVAALIS			sys_reg(0, 0, 8, 3, 7)
-+#define ITLBIALL			sys_reg(0, 0, 8, 5, 0)
-+#define ITLBIMVA			sys_reg(0, 0, 8, 5, 1)
-+#define ITLBIASID			sys_reg(0, 0, 8, 5, 2)
-+#define DTLBIALL			sys_reg(0, 0, 8, 6, 0)
-+#define DTLBIMVA			sys_reg(0, 0, 8, 6, 1)
-+#define DTLBIASID			sys_reg(0, 0, 8, 6, 2)
-+#define TLBIALL				sys_reg(0, 0, 8, 7, 0)
-+#define TLBIMVA				sys_reg(0, 0, 8, 7, 1)
-+#define TLBIASID			sys_reg(0, 0, 8, 7, 2)
-+#define TLBIMVAA			sys_reg(0, 0, 8, 7, 3)
-+#define TLBIMVAL			sys_reg(0, 0, 8, 7, 5)
-+#define TLBIMVAAL			sys_reg(0, 0, 8, 7, 7)
-+
-+/*
-+ * ARMv8 ARM: Table C5-4 TLB maintenance instructions
-+ * (Ref: ARMv8 ARM C5.1 version: ARM DDI 0487A.j)
-+ */
-+#define TLBI_VMALLE1IS			sys_reg(1, 0, 8, 3, 0)
-+#define TLBI_VAE1IS			sys_reg(1, 0, 8, 3, 1)
-+#define TLBI_ASIDE1IS			sys_reg(1, 0, 8, 3, 2)
-+#define TLBI_VAAE1IS			sys_reg(1, 0, 8, 3, 3)
-+#define TLBI_VALE1IS			sys_reg(1, 0, 8, 3, 5)
-+#define TLBI_VAALE1IS			sys_reg(1, 0, 8, 3, 7)
-+#define TLBI_VMALLE1			sys_reg(1, 0, 8, 7, 0)
-+#define TLBI_VAE1			sys_reg(1, 0, 8, 7, 1)
-+#define TLBI_ASIDE1			sys_reg(1, 0, 8, 7, 2)
-+#define TLBI_VAAE1			sys_reg(1, 0, 8, 7, 3)
-+#define TLBI_VALE1			sys_reg(1, 0, 8, 7, 5)
-+#define TLBI_VAALE1			sys_reg(1, 0, 8, 7, 7)
-+
-+void __hyp_text
-+__kvm_emulate_tlb_invalidate(struct kvm *kvm, u32 sys_op, u64 regval)
-+{
-+	kvm = kern_hyp_va(kvm);
-+
-+	/*
-+	 * Switch to the guest before performing any TLB operations to
-+	 * target the appropriate VMID
-+	 */
-+	__switch_to_guest_regime(kvm);
-+
-+	/*
-+	 *  TLB maintenance operations broadcast to inner-shareable
-+	 *  domain when HCR_FB is set (default for KVM).
-+	 */
-+	switch (sys_op) {
-+	case TLBIALL:
-+	case TLBIALLIS:
-+	case ITLBIALL:
-+	case DTLBIALL:
-+	case TLBI_VMALLE1:
-+	case TLBI_VMALLE1IS:
-+		__tlbi(vmalle1is);
-+		break;
-+	case TLBIMVA:
-+	case TLBIMVAIS:
-+	case ITLBIMVA:
-+	case DTLBIMVA:
-+	case TLBI_VAE1:
-+	case TLBI_VAE1IS:
-+		__tlbi(vae1is, regval);
-+		break;
-+	case TLBIASID:
-+	case TLBIASIDIS:
-+	case ITLBIASID:
-+	case DTLBIASID:
-+	case TLBI_ASIDE1:
-+	case TLBI_ASIDE1IS:
-+		__tlbi(aside1is, regval);
-+		break;
-+	case TLBIMVAA:
-+	case TLBIMVAAIS:
-+	case TLBI_VAAE1:
-+	case TLBI_VAAE1IS:
-+		__tlbi(vaae1is, regval);
-+		break;
-+	case TLBIMVAL:
-+	case TLBIMVALIS:
-+	case TLBI_VALE1:
-+	case TLBI_VALE1IS:
-+		__tlbi(vale1is, regval);
-+		break;
-+	case TLBIMVAAL:
-+	case TLBIMVAALIS:
-+	case TLBI_VAALE1:
-+	case TLBI_VAALE1IS:
-+		__tlbi(vaale1is, regval);
-+		break;
-+	}
-+	isb();
-+
-+	__switch_to_host_regime();
-+}
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index b0b225c..ca0b80f 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -790,6 +790,18 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	return true;
- }
+ 	sgi = (reg & ICC_SGI1R_SGI_ID_MASK) >> ICC_SGI1R_SGI_ID_SHIFT;
+-	broadcast = reg & BIT(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
++	broadcast = reg & BIT_ULL(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
+ 	target_cpus = (reg & ICC_SGI1R_TARGET_LIST_MASK) >> ICC_SGI1R_TARGET_LIST_SHIFT;
+ 	mpidr = SGI_AFFINITY_LEVEL(reg, 3);
+ 	mpidr |= SGI_AFFINITY_LEVEL(reg, 2);
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index 0b3ecf9..80f92ce 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -96,7 +96,7 @@ unsigned long vgic_data_mmio_bus_to_host(const void *val, unsigned int len);
+ void vgic_data_host_to_mmio_bus(void *buf, unsigned int len,
+ 				unsigned long data);
  
-+static bool emulate_tlb_invalidate(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-+				  const struct sys_reg_desc *r)
-+{
-+	u32 opcode = sys_reg(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
-+
-+	kvm_call_hyp(__kvm_emulate_tlb_invalidate,
-+		     vcpu->kvm, opcode, p->regval);
-+	trace_kvm_tlb_invalidate(*vcpu_pc(vcpu), opcode);
-+
-+	return true;
-+}
-+
- /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
- #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
- 	/* DBGBVRn_EL1 */						\
-@@ -849,6 +861,35 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ Op0(0b01), Op1(0b000), CRn(0b0111), CRm(0b1110), Op2(0b010),
- 	  access_dcsw },
+-unsigned long extract_bytes(unsigned long data, unsigned int offset,
++unsigned long extract_bytes(u64 data, unsigned int offset,
+ 			    unsigned int num);
  
-+	/*
-+	 * ARMv8 ARM: Table C5-4 TLB maintenance instructions
-+	 * (Ref: ARMv8 ARM C5.1 version: ARM DDI 0487A.j)
-+	 */
-+	/* TLBI VMALLE1IS */
-+	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(0), emulate_tlb_invalidate },
-+	/* TLBI VAE1IS */
-+	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(1), emulate_tlb_invalidate },
-+	/* TLBI ASIDE1IS */
-+	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(2), emulate_tlb_invalidate },
-+	/* TLBI VAAE1IS */
-+	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(3), emulate_tlb_invalidate },
-+	/* TLBI VALE1IS */
-+	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(5), emulate_tlb_invalidate },
-+	/* TLBI VAALE1IS */
-+	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(7), emulate_tlb_invalidate },
-+	/* TLBI VMALLE1 */
-+	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(0), emulate_tlb_invalidate },
-+	/* TLBI VAE1 */
-+	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(1), emulate_tlb_invalidate },
-+	/* TLBI ASIDE1 */
-+	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(2), emulate_tlb_invalidate },
-+	/* TLBI VAAE1 */
-+	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(3), emulate_tlb_invalidate },
-+	/* TLBI VALE1 */
-+	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(5), emulate_tlb_invalidate },
-+	/* TLBI VAALE1 */
-+	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(7), emulate_tlb_invalidate },
-+
- 	DBG_BCR_BVR_WCR_WVR_EL1(0),
- 	DBG_BCR_BVR_WCR_WVR_EL1(1),
- 	/* MDCCINT_EL1 */
-@@ -1337,6 +1378,46 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	{ Op1( 0), CRn( 7), CRm(10), Op2( 2), access_dcsw },
- 	{ Op1( 0), CRn( 7), CRm(14), Op2( 2), access_dcsw },
- 
-+	/*
-+	 * TLB operations
-+	 */
-+	/* TLBIALLIS */
-+	{ Op1( 0), CRn( 8), CRm( 3), Op2( 0), emulate_tlb_invalidate},
-+	/* TLBIMVAIS */
-+	{ Op1( 0), CRn( 8), CRm( 3), Op2( 1), emulate_tlb_invalidate},
-+	/* TLBIASIDIS */
-+	{ Op1( 0), CRn( 8), CRm( 3), Op2( 2), emulate_tlb_invalidate},
-+	/* TLBIMVAAIS */
-+	{ Op1( 0), CRn( 8), CRm( 3), Op2( 3), emulate_tlb_invalidate},
-+	/* TLBIMVALIS */
-+	{ Op1( 0), CRn( 8), CRm( 3), Op2( 5), emulate_tlb_invalidate},
-+	/* TLBIMVAALIS */
-+	{ Op1( 0), CRn( 8), CRm( 3), Op2( 7), emulate_tlb_invalidate},
-+	/* ITLBIALL */
-+	{ Op1( 0), CRn( 8), CRm( 5), Op2( 0), emulate_tlb_invalidate},
-+	/* ITLBIMVA */
-+	{ Op1( 0), CRn( 8), CRm( 5), Op2( 1), emulate_tlb_invalidate},
-+	/* ITLBIASID */
-+	{ Op1( 0), CRn( 8), CRm( 5), Op2( 2), emulate_tlb_invalidate},
-+	/* DTLBIALL */
-+	{ Op1( 0), CRn( 8), CRm( 6), Op2( 0), emulate_tlb_invalidate},
-+	/* DTLBIMVA */
-+	{ Op1( 0), CRn( 8), CRm( 6), Op2( 1), emulate_tlb_invalidate},
-+	/* DTLBIASID */
-+	{ Op1( 0), CRn( 8), CRm( 6), Op2( 2), emulate_tlb_invalidate},
-+	/* TLBIALL */
-+	{ Op1( 0), CRn( 8), CRm( 7), Op2( 0), emulate_tlb_invalidate},
-+	/* TLBIMVA */
-+	{ Op1( 0), CRn( 8), CRm( 7), Op2( 1), emulate_tlb_invalidate},
-+	/* TLBIASID */
-+	{ Op1( 0), CRn( 8), CRm( 7), Op2( 2), emulate_tlb_invalidate},
-+	/* TLBIMVAA */
-+	{ Op1( 0), CRn( 8), CRm( 7), Op2( 3), emulate_tlb_invalidate},
-+	/* TLBIMVAL */
-+	{ Op1( 0), CRn( 8), CRm( 7), Op2( 5), emulate_tlb_invalidate},
-+	/* TLBIMVAAL */
-+	{ Op1( 0), CRn( 8), CRm( 7), Op2( 7), emulate_tlb_invalidate},
-+
- 	/* PMU */
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmcr },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), access_pmcnten },
-diff --git a/arch/arm64/kvm/trace.h b/arch/arm64/kvm/trace.h
-index 7fb0008..c4d577f 100644
---- a/arch/arm64/kvm/trace.h
-+++ b/arch/arm64/kvm/trace.h
-@@ -166,6 +166,22 @@ TRACE_EVENT(kvm_set_guest_debug,
- 	TP_printk("vcpu: %p, flags: 0x%08x", __entry->vcpu, __entry->guest_debug)
- );
- 
-+TRACE_EVENT(kvm_tlb_invalidate,
-+	TP_PROTO(unsigned long vcpu_pc, u32 opcode),
-+	TP_ARGS(vcpu_pc, opcode),
-+
-+	TP_STRUCT__entry(
-+		__field(unsigned long, vcpu_pc)
-+		__field(u32, opcode)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->vcpu_pc = vcpu_pc;
-+		__entry->opcode = opcode;
-+	),
-+
-+	TP_printk("vcpu_pc=0x%16lx opcode=%08x", __entry->vcpu_pc, __entry->opcode)
-+);
- 
- #endif /* _TRACE_ARM64_KVM_H */
- 
+ u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
 -- 
-2.8.1
+1.7.9.5
