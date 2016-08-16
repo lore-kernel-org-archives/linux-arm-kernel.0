@@ -1,41 +1,40 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 16 Aug 2016 13:52:48 +0100
-Subject: [PATCH 1/1] rpmsg: virtio_rpmsg_bus: Fix randomly placed
- semi-colon
-In-Reply-To: <20160720092935.5902-1-lee.jones@linaro.org>
-References: <20160720092935.5902-1-lee.jones@linaro.org>
-Message-ID: <20160816125248.GA2775@dell>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 16 Aug 2016 07:56:24 -0500
+Subject: [PATCH v2 1/2] devicetree: Add vendor prefix for Shenzhen
+ Sunchip Technology Co., Ltd
+In-Reply-To: <bae6ad6c04f7567b224e008ab27b32d2dac1d9c1.1471125083.git.ccc94453@vip.cybercity.dk>
+References: <20160812235312.GB10557@vip.cybercity.dk>
+ <bae6ad6c04f7567b224e008ab27b32d2dac1d9c1.1471125083.git.ccc94453@vip.cybercity.dk>
+Message-ID: <20160816125624.GA20716@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Jul 2016, Lee Jones wrote:
-
-> It should never have been there in the first place.
+On Thu, Aug 11, 2016 at 10:11:51PM +0200, Rask Ingemann Lambertsen wrote:
+> Shenzhen Sunchip Technology Co., Ltd produces TV boxes and TV dongles,
+> some of which are sold under other brands. Website:
+> <URL:http://www.sunchip-tech.com/>
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Rask Ingemann Lambertsen <ccc94453@vip.cybercity.dk>
 > ---
->  drivers/rpmsg/virtio_rpmsg_bus.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Changes in v2:
+> No patch changes, but added CC to the ARM kernel mailing list.
+> 
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 1992aa9..fbad2cea 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -256,6 +256,7 @@ ste	ST-Ericsson
+>  stericsson	ST-Ericsson
+>  syna	Synaptics Inc.
+>  synology	Synology, Inc.
+> +sunchip	Shenzhen Sunchip Technology Co., Ltd
+>  SUNW	Sun Microsystems, Inc
 
-I'm assuming this was missed.  Would you like me to send it again, or
-do you have the original patch still in your inbox?
+These are not in alphabetical order. Maybe someone thought uppercase 
+should be separate, but I don't. So please fix the ordering here moving 
+SUNW before syna.
 
-> diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c b/drivers/rpmsg/virtio_rpmsg_bus.c
-> index fe03b2a..9823178 100644
-> --- a/drivers/rpmsg/virtio_rpmsg_bus.c
-> +++ b/drivers/rpmsg/virtio_rpmsg_bus.c
-> @@ -865,7 +865,7 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
->  		msgs_received++;
->  
->  		msg = virtqueue_get_buf(rvq, &len);
-> -	};
-> +	}
->  
->  	dev_dbg(dev, "Received %u messages\n", msgs_received);
->  
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Rob
