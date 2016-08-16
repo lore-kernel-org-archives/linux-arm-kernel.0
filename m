@@ -1,32 +1,54 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 16 Aug 2016 23:47:23 +0200
-Subject: [PATCH] input: touchscreen: silead: Use devm_gpiod_get
-Message-ID: <1471384043-11717-1-git-send-email-hdegoede@redhat.com>
+From: John.Youn@synopsys.com (John Youn)
+Date: Tue, 16 Aug 2016 15:07:09 -0700
+Subject: [PATCH V2 RFC 6/6] ARM: dts: bcm2835: Add Raspberry Pi Zero
+In-Reply-To: <263309088.290419.51598113-17aa-4db0-9dc0-6e58e3fafe07.open-xchange@email.1und1.de>
+References: <1469559213-16160-1-git-send-email-stefan.wahren@i2se.com>
+ <1469559213-16160-7-git-send-email-stefan.wahren@i2se.com>
+ <722dafcb-2f67-88c7-69df-d442c56c058f@synopsys.com>
+ <263309088.290419.51598113-17aa-4db0-9dc0-6e58e3fafe07.open-xchange@email.1und1.de>
+Message-ID: <ac20c0e9-0cab-7e3f-4abf-75223538a816@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The silead code is using devm_foo for everything (and does not free
-any resources). Except that it is using gpiod_get instead of
-devm_gpiod_get (but is not freeing the gpio_desc), change this
-to use devm_gpiod_get so that the gpio will be properly released.
+On 8/16/2016 12:58 PM, Stefan Wahren wrote:
+> Hi John,
+> 
+>> John Youn <John.Youn@synopsys.com> hat am 16. August 2016 um 21:30
+>> geschrieben:
+>>
+>>
+>> On 7/26/2016 11:54 AM, Stefan Wahren wrote:
+>> ...
+>>> +/*
+>>> + * Settings for otg
+>>> + *
+>>> +	dr_mode = "otg";
+>>> +	h-rx-fifo-size = <774>;
+>>> +	h-np-tx-fifo-size = <32>;
+>>> +	h-tx-fifo-size = <0>;
+>>
+>> This seems odd. It should be non-zero for use when operating as host.
+>>
+> 
+> like in host mode i took the default values in otg mode for the last two here
+> (please refer to the logs). The BCM2835 datasheet isn't very helpful.
+> 
+> Do you have any suggestions for valid values or how to get them?
+> 
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/input/touchscreen/silead.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The same values used in host-only mode should work.
 
-diff --git a/drivers/input/touchscreen/silead.c b/drivers/input/touchscreen/silead.c
-index 04992c5..3b80f14 100644
---- a/drivers/input/touchscreen/silead.c
-+++ b/drivers/input/touchscreen/silead.c
-@@ -497,7 +497,7 @@ static int silead_ts_probe(struct i2c_client *client,
- 	}
- 
- 	/* Power GPIO pin */
--	data->gpio_power = gpiod_get_optional(dev, "power", GPIOD_OUT_LOW);
-+	data->gpio_power = devm_gpiod_get_optional(dev, "power", GPIOD_OUT_LOW);
- 	if (IS_ERR(data->gpio_power)) {
- 		if (PTR_ERR(data->gpio_power) != -EPROBE_DEFER)
- 			dev_err(dev, "Shutdown GPIO request failed\n");
--- 
-2.7.4
+It seems that the reset values for host-mode aren't being read
+correctly with dr_mode == otg. I suspect this is the core reset and
+force-mode delay problem.
+
+Can you try with this patch series to see if you get the proper
+values?
+
+http://marc.info/?l=linux-kernel&m=145921907525708
+
+This series fixes known issues, but it also breaks at least one
+platform and I haven't had time to look at it properly yet.
+
+Regards,
+John
