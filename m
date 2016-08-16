@@ -1,75 +1,176 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 16 Aug 2016 15:51:05 +0100
-Subject: [PATCH] kvm: arm: Enforce some NS-SVC initialisation
-In-Reply-To: <57B31643.1000600@arm.com>
-References: <5322cdb9cb397741d15b60c6693ad39dbf74b6d5.1469101945.git.robin.murphy@arm.com>
- <57B31643.1000600@arm.com>
-Message-ID: <46b4e0f6-eb62-1748-6fed-04340331efa1@arm.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 16 Aug 2016 09:54:35 -0500
+Subject: [PATCH] soc: ti: wkup_m3_ipc: switch to using remoteproc OF
+ infrastructure
+In-Reply-To: <20160812164335.GG26240@tuxbot>
+References: <20160812003529.519-1-s-anna@ti.com> <20160812110201.GD25844@dell>
+ <55d90506-eb1b-c8f9-02b5-8484b9a4babd@ti.com>
+ <20160812164335.GG26240@tuxbot>
+Message-ID: <CAL_Jsq+aOd-FqaKNtmDESw--pdxbWMuOzv+KXf-hhX+oU94CdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On 16/08/16 14:33, Marc Zyngier wrote:
-> On 21/07/16 13:01, Robin Murphy wrote:
->> Since the non-secure copies of banked registers lack architecturally
->> defined reset values, there is no actual guarantee when entering in Hyp
->> from secure-only firmware that the non-secure PL1 state will look the
->> way that kernel entry (in particular the decompressor stub) expects.
->> So far, we've been getting away with it thanks to implementation details
->> of ARMv7 cores and/or bootloader behaviour, but for the sake of forwards
->> compatibility let's try to ensure that we have a minimally sane state
->> before dropping down into it.
+On Fri, Aug 12, 2016 at 11:43 AM, Bjorn Andersson
+<bjorn.andersson@linaro.org> wrote:
+> On Fri 12 Aug 09:00 PDT 2016, Suman Anna wrote:
+>
+>> On 08/12/2016 06:02 AM, Lee Jones wrote:
+>> > On Thu, 11 Aug 2016, Suman Anna wrote:
+>> >
+>> >> The remoteproc framework has been enhanced recently to provide new
+>> >> OF API to retrieve a remoteproc handle by client drivers through a
+>> >> standard 'rprocs' property in client nodes. The wkup_m3_ipc driver
+>> >> has been using a custom 'ti,rproc' property until now, switch this
+>> >> to use this new OF infrastructure. The wkup_m3_ipc driver has been
+>> >> fixed up to provide backward compatibility for older DTBs by
+>> >> replacing the older property with the standard newer property.
+>> >>
+>> >> The wkup_m3_ipc binding has also been updated accordingly.
+>> >>
+>> >> Signed-off-by: Suman Anna <s-anna@ti.com>
+>> >> ---
+>> >> This patch is based on the discussion [1] for introducing new standard
+>> >> OF API in remoteproc core series [2] and the exporting of couple of
+>> >> functions in OF base code [3].
+>> >>
+>> >> With this in place, the remoteproc core need not be looking for the
+>> >> TI specific property anymore. I will submit the DTS changes once this
+>> >> makes it to mainline.
+>> >>
+>> >> regards
+>> >> Suman
+>> >>
+>> >> [1] https://patchwork.kernel.org/patch/9237767/
+>> >> [2] http://marc.info/?l=linux-kernel&m=146894341701010&w=2
+>> >> [3] https://patchwork.kernel.org/patch/9276181/
+>> >>
+>> >>  .../devicetree/bindings/soc/ti/wkup_m3_ipc.txt     |  9 ++++++--
+>> >>  drivers/soc/ti/wkup_m3_ipc.c                       | 26 +++++++++++++++++++++-
+>> >>  2 files changed, 32 insertions(+), 3 deletions(-)
+>> >>
+>> >> diff --git a/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt b/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
+>> >> index 401550487ed6..2ea7dd91acff 100644
+>> >> --- a/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
+>> >> +++ b/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
+>> >> @@ -23,12 +23,17 @@ Required properties:
+>> >>                    with the Wakeup M3 processor
+>> >>  - interrupts:             Contains the interrupt information for the wkup_m3
+>> >>                    interrupt that signals the MPU.
+>> >> -- ti,rproc:               phandle to the wkup_m3 rproc node so the IPC driver
+>> >> +- rprocs:         phandle to the wkup_m3 rproc node so the IPC driver
+>> >>                    can boot it.
+>> >>  - mboxes:         phandles used by IPC framework to get correct mbox
+>> >>                    channel for communication. Must point to appropriate
+>> >>                    mbox_wkupm3 child node.
+>> >>
+>> >> +Deprecated properties:
+>> >> +----------------------
+>> >> +- ti,rproc:               This property has been replaced with the "rprocs"
+>> >> +                  property.
+>> >> +
+>> >>  Example:
+>> >>  --------
+>> >>  /* AM33xx */
+>> >> @@ -48,7 +53,7 @@ Example:
+>> >>                            compatible = "ti,am3352-wkup-m3-ipc";
+>> >>                            reg = <0x1324 0x24>;
+>> >>                            interrupts = <78>;
+>> >> -                          ti,rproc = <&wkup_m3>;
+>> >> +                          rprocs = <&wkup_m3>;
+>> >>                            mboxes = <&mailbox &mbox_wkupm3>;
+>> >>                    };
+>> >>
+>> >> diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
+>> >> index 8823cc81ae45..86085f9bf6a8 100644
+>> >> --- a/drivers/soc/ti/wkup_m3_ipc.c
+>> >> +++ b/drivers/soc/ti/wkup_m3_ipc.c
+>> >> @@ -1,7 +1,7 @@
+>> >>  /*
+>> >>   * AMx3 Wkup M3 IPC driver
+>> >>   *
+>> >> - * Copyright (C) 2015 Texas Instruments, Inc.
+>> >> + * Copyright (C) 2015-2016 Texas Instruments, Inc.
+>> >>   *
+>> >>   * Dave Gerlach <d-gerlach@ti.com>
+>> >>   *
+>> >> @@ -390,6 +390,8 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
+>> >>    struct resource *res;
+>> >>    struct task_struct *task;
+>> >>    struct wkup_m3_ipc *m3_ipc;
+>> >> +  struct property *nprop, *oprop;
+>> >> +  const char nprop_name[] = "rprocs";
+>> >>
+>> >>    m3_ipc = devm_kzalloc(dev, sizeof(*m3_ipc), GFP_KERNEL);
+>> >>    if (!m3_ipc)
+>> >> @@ -415,6 +417,28 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
+>> >>            return ret;
+>> >>    }
+>> >>
+>> >> +  /* provide compatibility for older DTBs using ti,rproc property */
+>> >> +  nprop = of_find_property(dev->of_node, "rprocs", NULL);
+>> >> +  if (!nprop) {
+>> >> +          oprop = of_find_property(dev->of_node, "ti,rproc", NULL);
+>> >> +          if (!oprop) {
+>> >> +                  dev_err(&pdev->dev, "node is missing ti,rproc property\n");
+>> >> +                  return -ENODEV;
+>> >> +          }
+>> >> +
+>> >> +          nprop = kzalloc(sizeof(*nprop) + sizeof(nprop_name),
+>> >> +                          GFP_KERNEL);
+>> >> +          if (!nprop)
+>> >> +                  return -ENOMEM;
+>> >> +
+>> >> +          nprop->name = (char *)nprop + sizeof(*nprop);
+>> >> +          snprintf(nprop->name, sizeof(nprop_name), nprop_name);
+>> >> +          nprop->value = oprop->value;
+>> >> +          nprop->length = oprop->length;
+>> >> +          of_update_property(dev->of_node, nprop);
+>> >> +          of_remove_property(dev->of_node, oprop);
+>> >> +  }
+>> >> +
+>> >
+>> > +1 for getting the functionality out of core code.
+>> >
+>> > -100 for having to jump though all these hoops.
+>> >
+>> > If you are going to keep all of this, I would at least tuck it away in
+>> > a header file or something.
 >>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>  arch/arm/kernel/hyp-stub.S | 12 ++++++++++++
->>  1 file changed, 12 insertions(+)
+>> Hiding it somewhere else won't make much of a difference though. If this
+>> is such an eyesore, we still can do this cleanly without jumping through
+>> these hoops. I would say this is a direct result of the removal of the
+>> rproc_get_by_phandle API in Patch 2 of your OF remoteproc series [2].
+>> That API is still an agnostic API. We can just add the of_rproc_get()
+>> convenience helper in your Patch 1 and drop patch 2 completely with no
+>> references to ti,rproc in the core code in the first place. The other
+>> option, if we do want to remove that API is to add an additional
+>> property name argument (NULL to mean "rprocs") to
+>> of_rproc_get_by_index(), and it can be hidden away under of_rproc_get()
+>> API - which is what I am expecting most of the new client users would
+>> use anyway.
 >>
->> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
->> index 0b1e4a93d67e..7de3fe15ab21 100644
->> --- a/arch/arm/kernel/hyp-stub.S
->> +++ b/arch/arm/kernel/hyp-stub.S
->> @@ -142,6 +142,18 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
->>  	and	r7, #0x1f		@ Preserve HPMN
->>  	mcr	p15, 4, r7, c1, c1, 1	@ HDCR
->>  
->> +	@ Make sure NS-SVC is initialised appropriately
->> +	mrc	p15, 0, r7, c1, c0, 0	@ SCTLR
->> +	orr	r7, #(1 << 5)		@ CP15 barriers enabled
->> +	bic	r7, #(3 << 19)		@ WXN and UWXN disabled
-> 
-> I think that while you're doing this, you also may want to clear SED and
-> ITD so that a BE kernel has a chance to survive its first instruction
-> (assuming it it uses the decompressor...).
-
-Good point; I wrote this from the v7 perspective and neglected those,
-and I think I was actually trying to achieve something useful at the
-time which precluded cracking out the big-endian Thumb-2 kernel ;)
-
->From a quick correlation between ARM ARMs, those bits should be reliably
-safe to unconditionally clear on v7VE, so let's do it. I'll respin shortly.
-
->> +	mcr	p15, 0, r7, c1, c0, 0	@ SCTLR
->> +
->> +	mrc	p15, 0, r7, c0, c0, 0	@ MIDR
->> +	mcr	p15, 4, r7, c0, c0, 0	@ VPIDR
->> +
->> +	mrc	p15, 0, r7, c0, c0, 5	@ MPIDR
->> +	mcr	p15, 4, r7, c0, c0, 5	@ VMPIDR
->> +
->>  #if !defined(ZIMAGE) && defined(CONFIG_ARM_ARCH_TIMER)
->>  	@ make CNTP_* and CNTPCT accessible from PL1
->>  	mrc	p15, 0, r7, c0, c1, 1	@ ID_PFR1
+>> Once "rprocs" hits mainline, I will definitely switch over the
+>> wkup_m3_ipc nodes to use that standard property and can fix this driver
+>> independently.
 >>
-> 
-> Otherwise looks good.
+>
+> We're stuck with this problem all over the place, as the world continues
+> to evolve we will have issues with DT being static. This has been
+> discussed many times before and the suggested solution is always what
+> you implemented here - make the code deal with both versions, preferably
+> by patching.
+>
+> The fact that you had to export the of_ operations indicates that no-one
+> has tried this before and I'm happy you did. I'm however not happy about
+> the size of the chunk of code it takes to do this dance.
+>
+> I think for this to be practical we need to provide higher level
+> operations for DT modification - in this case a of_rename_property().
+>
+> @Rob, any comments on this?
 
-Cheers,
-Robin.
+I agree. Pantelis submitted some helpers in this area a while back
+(for the changeset API IIRC). I believe they were mostly fine, but
+needed some users.
 
-> 
-> Thanks,
-> 
-> 	M.
-> 
+Rob
