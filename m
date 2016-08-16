@@ -1,51 +1,56 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 15 Aug 2016 18:51:38 -0700
-Subject: [PATCH v3 3/3] ARM64: dts: amlogic: meson-gxbb: Add watchdog node
-In-Reply-To: <7hinv1ahqi.fsf@baylibre.com>
-References: <1468141867-4172-1-git-send-email-narmstrong@baylibre.com>
- <1468141867-4172-4-git-send-email-narmstrong@baylibre.com>
- <578271D3.4080704@roeck-us.net> <7hbn237aw7.fsf@baylibre.com>
- <m2bn19qsy3.fsf@baylibre.com>
- <CAOi56cUQaFKYu2jNP0AuLOSNnNramu+DNPc+PH7K0gHDZMf+zA@mail.gmail.com>
- <7hinv1ahqi.fsf@baylibre.com>
-Message-ID: <9cfa549e-1979-cb42-bfe1-1ef347dd3a9a@roeck-us.net>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Tue, 16 Aug 2016 10:05:15 +0800
+Subject: [PATCH v2 1/1] ARM: mach-imx: imx6ul: populates platform device at
+ .init_machine
+Message-ID: <1471313115-30099-1-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/15/2016 01:40 PM, Kevin Hilman wrote:
-> Kevin Hilman <khilman@baylibre.com> writes:
->
->> On Wed, Aug 3, 2016 at 5:27 PM, Kevin Hilman <khilman@baylibre.com> wrote:
->>> Hi Guenter,
->>>
->>> Kevin Hilman <khilman@baylibre.com> writes:
->>>
->>>> Guenter Roeck <linux@roeck-us.net> writes:
->>>>
->>>>> On 07/10/2016 02:11 AM, Neil Armstrong wrote:
->>>>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->>>>>
->>>>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
->>>>>
->>>>> Would this go in through one of the arm trees ?
->>>>
->>>> You can take the driver through the watchdog tree, but I'll take the DT
->>>> stuff through the amlogic tree (and submit via arm-soc).
->>>>
->>>> However, with your ack, and since this is a brand new driver, I could
->>>> take the driver as well.  Just let me know your preference.
->>>
->>> ping... do you have a prefernce here?
->>>
->>
->> Oops, just noticed Wim already picked these up.
->>
->
-> Strange, seems that Wim picked up patches 1 & 3, but this one was missed.  I'll
-> queue this for the arm-soc tree.
->
+At imx6ul_init_machine, it calls imx6ul_pm_init which needs to find
+platform device for ocram, but the default populate platform device is at
+of_platform_default_populate_init, which is located at arch_initcall_sync,
+and called later than arch_initcall (.init_machine is located at that).
+So below warning message will be showed during boots up:
 
-I got a number of requests from arm maintainers to not pick up devicetree changes
-for arch/arm, so for my part I usually leave those alone.
+	imx6q_suspend_init: failed to find ocram device!
+	imx6_pm_common_init: No DDR LPM support with suspend -19!
 
-Guenter
+Due to lack of ocram device, the suspend mode "mem" which needs ocram to
+store suspend routine code is invalid.
+
+This commit populates platform device before imx6ul_pm_init like other
+imx6 platforms do, and the suspend mode "mem" can work successfully.
+
+Cc: Anson Huang <anson.huang@nxp.com>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Kefeng Wang <wangkefeng.wang@huawei.com>
+Cc: Rob Herring <robh@kernel.org>
+Cc: <stable@vger.kernel.org>
+Fixes: 850bea2335e4 ("arm: Remove unnecessary of_platform_populate
+	with default match table")
+
+Signed-off-by: Peter Chen <peter.chen@nxp.com>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+
+Changes for v2:
+- Add Fabio's Reviewed-by tag
+- Using the correct commit-id for "Fixes" tag
+
+ arch/arm/mach-imx/mach-imx6ul.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
+index 5d9bfab..6bb7d9c 100644
+--- a/arch/arm/mach-imx/mach-imx6ul.c
++++ b/arch/arm/mach-imx/mach-imx6ul.c
+@@ -64,6 +64,7 @@ static void __init imx6ul_init_machine(void)
+ 	if (parent == NULL)
+ 		pr_warn("failed to initialize soc device\n");
+ 
++	of_platform_default_populate(NULL, NULL, parent);
+ 	imx6ul_enet_init();
+ 	imx_anatop_init();
+ 	imx6ul_pm_init();
+-- 
+1.9.1
