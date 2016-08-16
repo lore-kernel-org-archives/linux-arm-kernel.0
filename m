@@ -1,35 +1,195 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 16 Aug 2016 10:41:45 +0200
-Subject: [PATCH 2/8] ARM: dts: sun8i: Add dt node for rtl8703as wifi chip
- on ga10h
-In-Reply-To: <CAGb2v67=54_cW6Svt2ZNvtMXwOU7wvzj_V6MT0fGB9hAjX=8PA@mail.gmail.com>
-References: <1470685398-14568-1-git-send-email-hdegoede@redhat.com>
- <1470685398-14568-2-git-send-email-hdegoede@redhat.com>
- <CAGb2v67=54_cW6Svt2ZNvtMXwOU7wvzj_V6MT0fGB9hAjX=8PA@mail.gmail.com>
-Message-ID: <e8dbda57-a931-0f13-28b3-9cb63bb0f5c4@redhat.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 16 Aug 2016 10:46:02 +0200
+Subject: [PATCH 4/7] pinctrl: samsung: Add GPFx support of Exynos5433
+In-Reply-To: <1471328843-26653-5-git-send-email-cw00.choi@samsung.com>
+References: <1471328843-26653-1-git-send-email-cw00.choi@samsung.com>
+ <1471328843-26653-5-git-send-email-cw00.choi@samsung.com>
+Message-ID: <7a90ee6f-7a2e-e866-b2fa-6f0fff44d647@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 08/16/2016 08:27 AM, Chanwoo Choi wrote:
+> From: Joonyoung Shim <jy0922.shim@samsung.com>
+> 
+> This patch add the support of GPFx pin of Exynos5433 SoC. Exynos5433 has
+> different memory map of GPFx from previous Exynos SoC. Exynos GPIO has
+> following register to control gpio funciton. Usually, all registers of GPIO
+> are included in same domain.
+> - CON / DAT / PUD / DRV / CONPDN / PUDPDN
+> - EINT_CON/ EINT_FLTCON0, EINT_FLTCON1 / EINT_MASK / EINT_PEND
+> 
+> But, GPFx are included in two domain as following. So, this patch supports
+> the GPFx pin which handle the on separate two domains.
+> - ALIVE domain : CON / DAT / PUD / DRV / CONPDN / PUDPDN
+> - IMEM domain  : EINT_CON/ EINT_FLTCON0, EINT_FLTCON1 / EINT_MASK / EINT_PEND
+> 
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: linux-gpio at vger.kernel.org
+> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+>  .../bindings/pinctrl/samsung-pinctrl.txt           |  1 +
+>  drivers/pinctrl/samsung/pinctrl-exynos.c           |  5 +++
+>  drivers/pinctrl/samsung/pinctrl-exynos.h           | 11 ++++++
+>  drivers/pinctrl/samsung/pinctrl-samsung.c          | 43 ++++++++++++++++++----
+>  drivers/pinctrl/samsung/pinctrl-samsung.h          |  5 +++
+>  5 files changed, 57 insertions(+), 8 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+> index 6db16b90873a..807fba1f829f 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+> @@ -19,6 +19,7 @@ Required Properties:
+>    - "samsung,exynos5260-pinctrl": for Exynos5260 compatible pin-controller.
+>    - "samsung,exynos5410-pinctrl": for Exynos5410 compatible pin-controller.
+>    - "samsung,exynos5420-pinctrl": for Exynos5420 compatible pin-controller.
+> +  - "samsung,exynos5433-pinctrl": for Exynos5433 compatible pin-controller.
+>    - "samsung,exynos7-pinctrl": for Exynos7 compatible pin-controller.
+>  
+>  - reg: Base address of the pin controller hardware module and length of
+> diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
+> index 051b5bf701a8..4f95983e0cdd 100644
+> --- a/drivers/pinctrl/samsung/pinctrl-exynos.c
+> +++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
+> @@ -1350,6 +1350,11 @@ static const struct samsung_pin_bank_data exynos5433_pin_banks0[] = {
+>  	EXYNOS_PIN_BANK_EINTW(8, 0x020, "gpa1", 0x04),
+>  	EXYNOS_PIN_BANK_EINTW(8, 0x040, "gpa2", 0x08),
+>  	EXYNOS_PIN_BANK_EINTW(8, 0x060, "gpa3", 0x0c),
+> +	EXYNOS_PIN_BANK_EINTW_EXT(8, 0x020, "gpf1", 0x1004),
+> +	EXYNOS_PIN_BANK_EINTW_EXT(4, 0x040, "gpf2", 0x1008),
+> +	EXYNOS_PIN_BANK_EINTW_EXT(4, 0x060, "gpf3", 0x100c),
+> +	EXYNOS_PIN_BANK_EINTW_EXT(8, 0x080, "gpf4", 0x1010),
+> +	EXYNOS_PIN_BANK_EINTW_EXT(8, 0x0a0, "gpf5", 0x1014),
+>  };
+>  
+>  /* pin banks of exynos5433 pin-controller - AUD */
+> diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.h b/drivers/pinctrl/samsung/pinctrl-exynos.h
+> index 0f0f7cedb2dc..4b737b6c434d 100644
+> --- a/drivers/pinctrl/samsung/pinctrl-exynos.h
+> +++ b/drivers/pinctrl/samsung/pinctrl-exynos.h
+> @@ -79,6 +79,17 @@
+>  		.name		= id			\
+>  	}
+>  
+> +#define EXYNOS_PIN_BANK_EINTW_EXT(pins, reg, id, offs)	\
+> +	{						\
+> +		.type		= &bank_type_off,	\
+> +		.pctl_offset	= reg,			\
+> +		.nr_pins	= pins,			\
+> +		.eint_type	= EINT_TYPE_WKUP,	\
+> +		.eint_offset	= offs,			\
+> +		.eint_ext	= true,			\
+> +		.name		= id			\
+> +	}
+> +
+>  /**
+>   * struct exynos_weint_data: irq specific data for all the wakeup interrupts
+>   * generated by the external wakeup interrupt controller.
+> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+> index 513fe6b23248..57e22085c2db 100644
+> --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
+> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+> @@ -338,6 +338,7 @@ static void pin_to_reg_bank(struct samsung_pinctrl_drv_data *drvdata,
+>  			struct samsung_pin_bank **bank)
+>  {
+>  	struct samsung_pin_bank *b;
+> +	void __iomem *virt_base = drvdata->virt_base;
+>  
+>  	b = drvdata->pin_banks;
+>  
+> @@ -345,7 +346,10 @@ static void pin_to_reg_bank(struct samsung_pinctrl_drv_data *drvdata,
+>  			((b->pin_base + b->nr_pins - 1) < pin))
+>  		b++;
+>  
+> -	*reg = drvdata->virt_base + b->pctl_offset;
+> +	if (b->eint_ext)
+> +		virt_base = drvdata->ext_base;
+> +
+> +	*reg = virt_base + b->pctl_offset;
+>  	*offset = pin - b->pin_base;
+>  	if (bank)
+>  		*bank = b;
+> @@ -523,10 +527,12 @@ static void samsung_gpio_set_value(struct gpio_chip *gc,
+>  {
+>  	struct samsung_pin_bank *bank = gpiochip_get_data(gc);
+>  	const struct samsung_pin_bank_type *type = bank->type;
+> +	void __iomem *virt_base = bank->eint_ext ?
+> +		bank->drvdata->ext_base : bank->drvdata->virt_base;
 
-On 16-08-16 04:43, Chen-Yu Tsai wrote:
-> On Tue, Aug 9, 2016 at 3:43 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->> The ga10h tablet has a rtl8703as wifi chip, add a dt node describing it.
->>
->> This enables usage of wifi on this tablet (together with the out of
->> tree rtl8732bs driver).
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
->
-> Does the chip or board support out of band interrupts?
+I would prefer to avoid '?' operator because it makes the line difficult
+to read. However I wonder whether this check here and later is needed at
+all. It obfuscates the code so how about:
+1. In pinctrl-samsung always access virt_base as it was before.
+The virt_base in probe will be in domain of GPF_CON registers.
+2. Rename ext_base to eint_base
+3. Always assign eint_base in probe():
+	if (exynos5433)
+		eint_base = iomap()...
+	else
+		eint_base = virt_base;
+4. in pinctrl-exynos.c access the eint_base.
 
-I believe so, but since the sunxi-mmc controller properly supports
-sdio-irq-s (without needing to poll) there is not to much to win there,
-so currently I've no plans to support this (this would require defining
-a dt binding + dts changes + driver changes).
+No need of scattered if() through various calls and simpler flow.
 
-Regards,
+>  	void __iomem *reg;
+>  	u32 data;
+>  
+> -	reg = bank->drvdata->virt_base + bank->pctl_offset;
+> +	reg = virt_base + bank->pctl_offset;
+>  
+>  	data = readl(reg + type->reg_offset[PINCFG_TYPE_DAT]);
+>  	data &= ~(1 << offset);
+> @@ -553,8 +559,10 @@ static int samsung_gpio_get(struct gpio_chip *gc, unsigned offset)
+>  	u32 data;
+>  	struct samsung_pin_bank *bank = gpiochip_get_data(gc);
+>  	const struct samsung_pin_bank_type *type = bank->type;
+> +	void __iomem *virt_base = bank->eint_ext ?
+> +		bank->drvdata->ext_base : bank->drvdata->virt_base;
+>  
+> -	reg = bank->drvdata->virt_base + bank->pctl_offset;
+> +	reg = virt_base + bank->pctl_offset;
+>  
+>  	data = readl(reg + type->reg_offset[PINCFG_TYPE_DAT]);
+>  	data >>= offset;
+> @@ -574,6 +582,7 @@ static int samsung_gpio_set_direction(struct gpio_chip *gc,
+>  	const struct samsung_pin_bank_type *type;
+>  	struct samsung_pin_bank *bank;
+>  	struct samsung_pinctrl_drv_data *drvdata;
+> +	void __iomem *virt_base;
+>  	void __iomem *reg;
+>  	u32 data, mask, shift;
+>  
+> @@ -581,7 +590,8 @@ static int samsung_gpio_set_direction(struct gpio_chip *gc,
+>  	type = bank->type;
+>  	drvdata = bank->drvdata;
+>  
+> -	reg = drvdata->virt_base + bank->pctl_offset +
+> +	virt_base = bank->eint_ext ? drvdata->ext_base : drvdata->virt_base;
+> +	reg = virt_base + bank->pctl_offset +
+>  					type->reg_offset[PINCFG_TYPE_FUNC];
+>  
+>  	mask = (1 << type->fld_width[PINCFG_TYPE_FUNC]) - 1;
+> @@ -1007,6 +1017,7 @@ samsung_pinctrl_get_soc_data(struct samsung_pinctrl_drv_data *d,
+>  		bank->eint_type = bdata->eint_type;
+>  		bank->eint_mask = bdata->eint_mask;
+>  		bank->eint_offset = bdata->eint_offset;
+> +		bank->eint_ext = bdata->eint_ext;
+>  		bank->name = bdata->name;
+>  
+>  		spin_lock_init(&bank->slock);
+> @@ -1065,6 +1076,14 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
+>  	if (IS_ERR(drvdata->virt_base))
+>  		return PTR_ERR(drvdata->virt_base);
+>  
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 
-Hans
+Additional reg should be documented in bindings documentation.
+
+Best regards,
+Krzysztof
