@@ -1,42 +1,94 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Aug 2016 11:45:37 +0100
-Subject: Problem with atomic accesses in pstore on some ARM CPUs
-In-Reply-To: <8f0c9ced-cdc3-ab9b-caee-06fe85e6c1e7@arm.com>
-References: <CABXOdTfT7xMfiBvRuUS1hsVs=q5q2wY1x1Z8oCyyJNFckM0g0A@mail.gmail.com>
- <8f0c9ced-cdc3-ab9b-caee-06fe85e6c1e7@arm.com>
-Message-ID: <20160816104537.GB27088@arm.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 16 Aug 2016 11:45:05 +0100
+Subject: [RFC PATCH 0/7] Add support for monitoring guest TLB operations
+Message-ID: <1471344312-26685-1-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 11:32:04AM +0100, Robin Murphy wrote:
-> On 16/08/16 00:19, Guenter Roeck wrote:
-> > we are having a problem with atomic accesses in pstore on some ARM
-> > CPUs (specifically rk3288 and rk3399). With those chips, atomic
-> > accesses fail with both pgprot_noncached and pgprot_writecombine
-> > memory. Atomic accesses do work when selecting PAGE_KERNEL protection.
-> 
-> What's the pstore backed by? I'm guessing it's not normal DRAM.
+Hi,
 
-Regardless, pgprot_noncached and pgprot_writecombine map to Device-nGnRnE
-and Normal-non-cacheable respectively, and so it's IMP DEP whether or not
-exclusives will work there.
+ARMv8 supports trapping guest TLB maintenance operations to the
+hypervisor. This trapping mechanism can be used to monitor the use of
+guest TLB instructions.
 
-> > Debugging on rk3399 shows the following crash.
-> > 
-> > [    0.912669] Bad mode in Error handler detected, code 0xbf000002 -- SError
-> > [    0.920140] CPU: 4 PID: 1 Comm: swapper/0 Not tainted 4.4.14 #389
-> > [    0.926838] Hardware name: Google Kevin (DT)
-> > [    0.931533] task: ffffffc0edfe0000 ti: ffffffc0edf7c000 task.ti:
-> > ffffffc0edf 7c000
-> > [    0.939780] PC is at __ll_sc___cmpxchg_case_mb_4+0x2c/0x5c
-> > [    0.945811] LR is at 0x1
-> > 
-> > The "solution" for this problem in various Chrome OS releases is to
-> > disable atomic accesses in pstore entirely, which seems to be a bit
-> > brute-force. Question is what a proper upstream-acceptable solution
+As taking a trap for every TLB operation can have significant
+overhead, trapping should only be enabled -
 
-Why do you require atomics to the pstore? If you need to serialise updates
-from coherent observers (e.g. CPUs), is it acceptable to use a lock in
-normal memory instead?
+* on user request
+* for the VM of interest
 
-Will
+This patchset adds support to listen to perf trace event state change
+notifications. The notifications and associated context are then used
+to enable trapping of guest TLB operations when requested by the
+user. The trap handling generates trace events (kvm_tlb_invalidate)
+which can already be counted using existing perf trace
+functionality.
+
+Trapping of guest TLB operations is disabled when not being monitored
+(reducing profiling overhead).
+
+I would appreciate feedback on the approach to tie the control of TLB
+monitoring with perf trace events (Patch 1) especially if there are
+any suggestions on avoiding (or reducing) the overhead of "perf trace"
+notifications.
+
+I looked at using regfunc/unregfunc tracepoint hooks but they don't
+include the event context. But the bigger problem was that the
+callbacks are only called on the first instance of simultaneously
+executing perf stat invocations.
+
+The patchset is based on v4.8-rc2 and adds support for monitoring
+guest TLB operations on 64bit hosts. If the approach taken in the
+patches is acceptable, I'll add 32bit host support as well.
+
+With this patchset, 'perf' tool when attached to a VM process can be
+used to monitor the TLB operations. E.g., to monitor a VM with process
+id 4166 -
+
+# perf stat -e "kvm:kvm_tlb_invalidate" -p 4166
+
+Perform some operations in VM (running 'make -j 7' on the kernel
+sources in this instance). Breaking out of perf shows -
+
+Performance counter stats for process id '4166':
+
+         7,471,974      kvm:kvm_tlb_invalidate
+
+     374.235405282 seconds time elapsed
+
+All feedback welcome.
+
+Thanks,
+Punit
+
+Mark Rutland (2):
+  arm64: tlbflush.h: add __tlbi() macro
+  arm64/kvm: hyp: tlb: use __tlbi() helper
+
+Punit Agrawal (5):
+  perf/trace: Add notification for perf trace events
+  KVM: Track the pid of the VM process
+  KVM: arm/arm64: Register perf trace event notifier
+  arm64: KVM: Handle trappable TLB instructions
+  arm64: KVM: Enable selective trapping of TLB instructions
+
+ arch/arm/include/asm/kvm_host.h   |   3 +
+ arch/arm/kvm/arm.c                |   2 +
+ arch/arm64/include/asm/kvm_asm.h  |   1 +
+ arch/arm64/include/asm/kvm_host.h |   8 ++
+ arch/arm64/include/asm/tlbflush.h |  31 ++++++--
+ arch/arm64/kvm/Kconfig            |   4 +
+ arch/arm64/kvm/Makefile           |   1 +
+ arch/arm64/kvm/hyp/tlb.c          | 158 ++++++++++++++++++++++++++++++++++++--
+ arch/arm64/kvm/perf_trace.c       | 154 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/kvm/sys_regs.c         |  81 +++++++++++++++++++
+ arch/arm64/kvm/trace.h            |  16 ++++
+ include/linux/kvm_host.h          |   1 +
+ include/linux/trace_events.h      |   3 +
+ kernel/trace/trace_event_perf.c   |  24 ++++++
+ virt/kvm/kvm_main.c               |   2 +
+ 15 files changed, 475 insertions(+), 14 deletions(-)
+ create mode 100644 arch/arm64/kvm/perf_trace.c
+
+-- 
+2.8.1
