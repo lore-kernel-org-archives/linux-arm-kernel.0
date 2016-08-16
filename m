@@ -1,66 +1,38 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 16 Aug 2016 15:40:32 +0200
-Subject: [PATCH v2] ARM: Add missing newline terminators to kernel messages
-Message-ID: <1471354832-18456-1-git-send-email-geert+renesas@glider.be>
+Date: Tue, 16 Aug 2016 15:42:20 +0200
+Subject: [PATCH] ARM: debug-ll: Add support for r8a7992
+Message-ID: <1471354940-18696-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Enable low-level debugging support for R-Car V2H (r8a7792).
+V2H uses SCIF0 for the debug console, like most other R-Car Gen2 SoCs.
+
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
-Before commit 874f9c7da9a4acbc ("printk: create pr_<level> functions"),
-pr_*() calls without a trailing newline characters would be printed with
-a newline character appended, both on the console and in the output of
-the dmesg command.
+ arch/arm/Kconfig.debug | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-After that commit, no new line character is appended, and the output of
-the next pr_*() call of the same type may be appended:
-
-    - Truncating RAM at 0x0000000040000000-0x00000000c0000000 to -0x0000000070000000
-    - Ignoring RAM at 0x0000000200000000-0x0000000240000000 (!CONFIG_HIGHMEM)
-    + Truncating RAM at 0x0000000040000000-0x00000000c0000000 to -0x0000000070000000Ignoring RAM at 0x0000000200000000-0x0000000240000000 (!CONFIG_HIGHMEM)
-
-and:
-
-    -No ATAGs?
-    -hw-breakpoint: found 5 (+1 reserved) breakpoint and 4 watchpoint registers.
-    +No ATAGs?hw-breakpoint: found 5 (+1 reserved) breakpoint and 4 watchpoint registers.
-
-While this commit has been reverted in commit a0cba2179ea4c182 ("Revert
-"printk: create pr_<level> functions""), it's still good practice to
-terminate kernel messages with newlines.
-
-v2:
-  - Rebased
----
- arch/arm/kernel/atags_proc.c | 2 +-
- arch/arm/mm/mmu.c            | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/atags_proc.c b/arch/arm/kernel/atags_proc.c
-index 5a3379055f553167..d7af7b84a4ca32c5 100644
---- a/arch/arm/kernel/atags_proc.c
-+++ b/arch/arm/kernel/atags_proc.c
-@@ -41,7 +41,7 @@ static int __init init_atags_procfs(void)
- 	size_t size;
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index a9693b6987a6e41c..88440f63c31e434b 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -861,12 +861,12 @@ choice
+ 		  via SCIF2 on Renesas R-Car H1 (R8A7779).
  
- 	if (tag->hdr.tag != ATAG_CORE) {
--		pr_info("No ATAGs?");
-+		pr_info("No ATAGs?\n");
- 		return -EINVAL;
- 	}
+ 	config DEBUG_RCAR_GEN2_SCIF0
+-		bool "Kernel low-level debugging messages via SCIF0 on R8A7790/R8A7791/R8A7793"
+-		depends on ARCH_R8A7790 || ARCH_R8A7791 || ARCH_R8A7793
++		bool "Kernel low-level debugging messages via SCIF0 on R8A7790/R8A7791/R8A7792/R8A7793"
++		depends on ARCH_R8A7790 || ARCH_R8A7791 || ARCH_R8A7792 || ARCH_R8A7793
+ 		help
+ 		  Say Y here if you want kernel low-level debugging support
+-		  via SCIF0 on Renesas R-Car H2 (R8A7790), M2-W (R8A7791), or
+-		  M2-N (R8A7793).
++		  via SCIF0 on Renesas R-Car H2 (R8A7790), M2-W (R8A7791), V2H
++		  (R8A7792), or M2-N (R8A7793).
  
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 724d6be4b83225ee..7dbdad64a1ac5fd3 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1196,7 +1196,7 @@ void __init sanity_check_meminfo(void)
- 				pr_notice("Truncating RAM at %pa-%pa",
- 					  &block_start, &block_end);
- 				block_end = vmalloc_limit;
--				pr_cont(" to -%pa", &block_end);
-+				pr_cont(" to -%pa\n", &block_end);
- 				memblock_remove(vmalloc_limit, overlap_size);
- 				should_use_highmem = true;
- 			}
+ 	config DEBUG_RCAR_GEN2_SCIF2
+ 		bool "Kernel low-level debugging messages via SCIF2 on R8A7794"
 -- 
 1.9.1
