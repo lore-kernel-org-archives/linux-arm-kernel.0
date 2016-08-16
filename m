@@ -1,31 +1,37 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 16 Aug 2016 15:09:54 -0300
-Subject: [PATCH 1/1] irqchip: irq-gic: forward SGI to itself for cortex-a7
- single core
-In-Reply-To: <CAOMZO5Abm-cpm=R6+JLoA+5QDCkgF84Db3uLhNrpe4KM5btu1Q@mail.gmail.com>
-References: <20160808105026.GA12649@leverpostej>
- <HE1PR04MB1450C6BE844A31C95CEE3BE18B1B0@HE1PR04MB1450.eurprd04.prod.outlook.com>
- <20160808130754.GB12649@leverpostej> <20160808132847.GB17680@shlinux2>
- <20160808134842.GE12649@leverpostej> <20160808145916.0924e868@arm.com>
- <20160809034613.GB31105@shlinux2> <20160809063401.3117dc94@arm.com>
- <20160809055701.GC31105@shlinux2> <20160809075930.529f98ca@arm.com>
- <20160809071821.GD31105@shlinux2> <57A99A4A.6010301@arm.com>
- <CAOMZO5AB1u3+pL1kgxwF1zNH5MSxEd-BrT=3dzwUTxBd0R4Vsw@mail.gmail.com>
- <57B343E4.6090604@arm.com>
- <CAOMZO5Abm-cpm=R6+JLoA+5QDCkgF84Db3uLhNrpe4KM5btu1Q@mail.gmail.com>
-Message-ID: <CAOMZO5C+MVR1o6XF+vf_nh4NweDcuO-5Jwc3RYHOZ5=j5opxJg@mail.gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 17 Aug 2016 02:08:42 +0800
+Subject: [shawnguo:imx/dt 15/22] ERROR: Input tree has errors, aborting (use
+ -f to force output)
+Message-ID: <201608170226.eMaKynUU%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git imx/dt
+head:   aa4eab4468913b80fbed464abf1b94d64f0bb7cc
+commit: 7f876822566dc2dd9fde51940941676651eacaef [15/22] ARM: dts: imx7s: Add SAI nodes
+config: arm-multi_v7_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 7f876822566dc2dd9fde51940941676651eacaef
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-On Tue, Aug 16, 2016 at 2:03 PM, Fabio Estevam <festevam@gmail.com> wrote:
+Note: the shawnguo/imx/dt HEAD aa4eab4468913b80fbed464abf1b94d64f0bb7cc builds fine.
+      It only hurts bisectibility.
 
-> Tested the same kernel on a imx6ul-evk and 'reboot' and suspend/resume
-> work fine.
->
-> Looks like the issue I saw is imx6ul-pico board specific.
+All errors (new ones prefixed by >>):
 
-Yes, it was a PMIC problem. Will send a fix for it.
+>> ERROR: Input tree has errors, aborting (use -f to force output)
 
-Please submit your gic patch, thanks!
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 38534 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160817/7e8beacf/attachment-0001.obj>
