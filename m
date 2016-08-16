@@ -1,110 +1,111 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 16 Aug 2016 13:50:22 -0700
-Subject: Problem with atomic accesses in pstore on some ARM CPUs
-In-Reply-To: <CABXOdTfhXhq6pbqAqGQwHcsCXvyshS8JbDGQCBKxfd-2s=M-fw@mail.gmail.com>
-References: <CABXOdTfT7xMfiBvRuUS1hsVs=q5q2wY1x1Z8oCyyJNFckM0g0A@mail.gmail.com>
- <8f0c9ced-cdc3-ab9b-caee-06fe85e6c1e7@arm.com>
- <CABXOdTfg2T2tZrQOd2S5SjeySAMbfQX0weFuvRXBr2o8Of9nVQ@mail.gmail.com>
- <20160816132103.GD27088@arm.com>
- <CABXOdTfHX_ZB1CuM7hzU5LCZPYdHvBSatN9Nen=rb8r1rXhz-g@mail.gmail.com>
- <20160815221518.GD1120@svinekod>
- <CAMbhsRQiU-UyiCWqjaWNXbhDd0+=Tv_pWoeQkJKJaHC6y4=HwQ@mail.gmail.com>
- <CABXOdTfhXhq6pbqAqGQwHcsCXvyshS8JbDGQCBKxfd-2s=M-fw@mail.gmail.com>
-Message-ID: <CAGXu5jL7nX8aS64QH1Eqo=yvsy_+ad+xQnYVDG_ge-oomAOOxg@mail.gmail.com>
+From: cmetcalf@mellanox.com (Chris Metcalf)
+Date: Tue, 16 Aug 2016 17:19:30 -0400
+Subject: [PATCH v15 07/13] arm64: factor work_pending state machine to C
+In-Reply-To: <1471382376-5443-1-git-send-email-cmetcalf@mellanox.com>
+References: <1471382376-5443-1-git-send-email-cmetcalf@mellanox.com>
+Message-ID: <1471382376-5443-8-git-send-email-cmetcalf@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 1:26 PM, Guenter Roeck <groeck@google.com> wrote:
-> On Tue, Aug 16, 2016 at 10:35 AM, Colin Cross <ccross@android.com> wrote:
->> On Mon, Aug 15, 2016 at 3:15 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->>> On Tue, Aug 16, 2016 at 08:02:53AM -0700, Guenter Roeck wrote:
->>>> On Tue, Aug 16, 2016 at 6:21 AM, Will Deacon <will.deacon@arm.com> wrote:
->>>> > On Tue, Aug 16, 2016 at 06:14:53AM -0700, Guenter Roeck wrote:
->>>> >> On Tue, Aug 16, 2016 at 3:32 AM, Robin Murphy <robin.murphy@arm.com> wrote:
->>>> >> > On 16/08/16 00:19, Guenter Roeck wrote:
->>>> >> >> we are having a problem with atomic accesses in pstore on some ARM
->>>> >> >> CPUs (specifically rk3288 and rk3399). With those chips, atomic
->>>> >> >> accesses fail with both pgprot_noncached and pgprot_writecombine
->>>> >> >> memory. Atomic accesses do work when selecting PAGE_KERNEL protection.
->>>> >> >
->>>> >> > What's the pstore backed by? I'm guessing it's not normal DRAM.
->>>> >> >
->>>> >>
->>>> >> it is normal DRAM.
->>>> >
->>>> > In which case, why does it need to be mapped with weird attributes?
->>>> > Is there an alias in the linear map you can use?
->>>> >
->>>>
->>>> I don't really _want_ to do anything besides using pstore as-is, or,
->>>> in other words, to have the upstream kernel work with the affected
->>>> systems.
->>>>
->>>> The current pstore code runs the following code for memory with
->>>> pfn_valid() = true.
->>>>
->>>>         if (memtype)
->>>>                 prot = pgprot_noncached(PAGE_KERNEL);
->>>>         else
->>>>                 prot = pgprot_writecombine(PAGE_KERNEL);
->>>>         ...
->>>>         vaddr = vmap(pages, page_count, VM_MAP, prot);
->>>>
->>>> It then uses the memory pointed to by vaddr for atomic operations.
->>>
->>> This means that the generic ramoops / pstore code is making non-portable
->>> assumptions about memory types.
->>>
->>> So _something_ has to happen to that code.
->>>
->>>> In my case, both protection options don't work. Everything works fine
->>>> (or at least doesn't create an exception) if I use
->>>>         vaddr = vmap(pages, page_count, VM_MAP, PAGE_KERNEL);
->>>> instead.
->>>
->>> Architecturally, that will give you a memory type to which we can safely use
->>> atomics on.
->>>
->>> It would be nice to know why the ramoops/pstore code must use atomics, and
->>> exactly what it's trying to achieve (i.e. is this just for serialisation, or an
->>> attempt to ensure persistence).
->>>
->>> Depending on that, it may be possible to fix things more generically by using
->>> memremap by default, for example, and only allowing uncached mappings on those
->>> architectures which support them.
->>
->> persistent_ram uses atomic ops in uncached memory to store the start
->> and end positions in the ringbuffer so that the state of the
->> ringbuffer will be valid if the kernel crashes at any time.  This was
->> inherited from Android's ram_console implementation, and worked
->> through armv7.  It has been causing more and more problems recently,
->> see for example 027bc8b08242c59e19356b4b2c189f2d849ab660 (pstore-ram:
->> Allow optional mapping with pgprot_noncached) and
->> 7ae9cb81933515dc7db1aa3c47ef7653717e3090 (pstore-ram: Fix hangs by
->> using write-combine mappings).
->>
->> Maybe it should be replaced with a spinlock in normal ram protecting
->> writes to the uncached region.
->
-> The necessary functions already exist, and are used for memory mapped
-> with ioremap() / ioremap_wc(). They were introduced with commit
-> 0405a5cec3 ("pstore/ram: avoid atomic accesses for ioremapped
-> regions"), and the description in that patch sounds quite similar to
-> the current problem. Given that, would it be acceptable to remove
-> buffer_start_add_atomic() and buffer_size_add_atomic(), and always use
-> buffer_start_add_locked() and buffer_size_add_locked() instead ? Those
-> functions still use atomic_set() and atomic_read(), which works fine
-> in my tests. The only difference is that a spinlock in main memory is
-> used instead of atomic_cmpxchg().
+Currently ret_fast_syscall, work_pending, and ret_to_user form an ad-hoc
+state machine that can be difficult to reason about due to duplicated
+code and a large number of branch targets.
 
-I don't see much of a down side to this. ramoops isn't expected to be
-high-bandwidth so trading for a single global lock doesn't really
-bother me.
+This patch factors the common logic out into the existing
+do_notify_resume function, converting the code to C in the process,
+making the code more legible.
 
-(I've added other folks to CC that have touched this more recently...)
+This patch tries to closely mirror the existing behaviour while using
+the usual C control flow primitives. As local_irq_{disable,enable} may
+be instrumented, we balance exception entry (where we will almost most
+likely enable IRQs) with a call to trace_hardirqs_on just before the
+return to userspace.
 
--Kees
+Signed-off-by: Chris Metcalf <cmetcalf@mellanox.com>
+---
+ arch/arm64/kernel/entry.S  | 12 ++++--------
+ arch/arm64/kernel/signal.c | 36 ++++++++++++++++++++++++++----------
+ 2 files changed, 30 insertions(+), 18 deletions(-)
 
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 441420ca7d08..6a64182822e5 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -707,18 +707,13 @@ ret_fast_syscall_trace:
+  * Ok, we need to do extra processing, enter the slow path.
+  */
+ work_pending:
+-	tbnz	x1, #TIF_NEED_RESCHED, work_resched
+-	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
+ 	mov	x0, sp				// 'regs'
+-	enable_irq				// enable interrupts for do_notify_resume()
+ 	bl	do_notify_resume
+-	b	ret_to_user
+-work_resched:
+ #ifdef CONFIG_TRACE_IRQFLAGS
+-	bl	trace_hardirqs_off		// the IRQs are off here, inform the tracing code
++	bl	trace_hardirqs_on		// enabled while in userspace
+ #endif
+-	bl	schedule
+-
++	ldr	x1, [tsk, #TI_FLAGS]		// re-check for single-step
++	b	finish_ret_to_user
+ /*
+  * "slow" syscall return path.
+  */
+@@ -727,6 +722,7 @@ ret_to_user:
+ 	ldr	x1, [tsk, #TI_FLAGS]
+ 	and	x2, x1, #_TIF_WORK_MASK
+ 	cbnz	x2, work_pending
++finish_ret_to_user:
+ 	enable_step_tsk x1, x2
+ 	kernel_exit 0
+ ENDPROC(ret_to_user)
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index a8eafdbc7cb8..404dd67080b9 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -402,15 +402,31 @@ static void do_signal(struct pt_regs *regs)
+ asmlinkage void do_notify_resume(struct pt_regs *regs,
+ 				 unsigned int thread_flags)
+ {
+-	if (thread_flags & _TIF_SIGPENDING)
+-		do_signal(regs);
+-
+-	if (thread_flags & _TIF_NOTIFY_RESUME) {
+-		clear_thread_flag(TIF_NOTIFY_RESUME);
+-		tracehook_notify_resume(regs);
+-	}
+-
+-	if (thread_flags & _TIF_FOREIGN_FPSTATE)
+-		fpsimd_restore_current_state();
++	/*
++	 * The assembly code enters us with IRQs off, but it hasn't
++	 * informed the tracing code of that for efficiency reasons.
++	 * Update the trace code with the current status.
++	 */
++	trace_hardirqs_off();
++	do {
++		if (thread_flags & _TIF_NEED_RESCHED) {
++			schedule();
++		} else {
++			local_irq_enable();
++
++			if (thread_flags & _TIF_SIGPENDING)
++				do_signal(regs);
++
++			if (thread_flags & _TIF_NOTIFY_RESUME) {
++				clear_thread_flag(TIF_NOTIFY_RESUME);
++				tracehook_notify_resume(regs);
++			}
++
++			if (thread_flags & _TIF_FOREIGN_FPSTATE)
++				fpsimd_restore_current_state();
++		}
+ 
++		local_irq_disable();
++		thread_flags = READ_ONCE(current_thread_info()->flags);
++	} while (thread_flags & _TIF_WORK_MASK);
+ }
 -- 
-Kees Cook
-Nexus Security
+2.7.2
