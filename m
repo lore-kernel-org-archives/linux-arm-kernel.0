@@ -1,37 +1,41 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Wed, 17 Aug 2016 02:08:42 +0800
-Subject: [shawnguo:imx/dt 15/22] ERROR: Input tree has errors, aborting (use
- -f to force output)
-Message-ID: <201608170226.eMaKynUU%fengguang.wu@intel.com>
+From: ccc94453@vip.cybercity.dk (Rask Ingemann Lambertsen)
+Date: Tue, 16 Aug 2016 20:28:56 +0200
+Subject: [PATCH v2 1/2] devicetree: Add vendor prefix for Shenzhen
+ Sunchip Technology Co., Ltd
+In-Reply-To: <20160816125624.GA20716@rob-hp-laptop>
+References: <20160812235312.GB10557@vip.cybercity.dk>
+ <bae6ad6c04f7567b224e008ab27b32d2dac1d9c1.1471125083.git.ccc94453@vip.cybercity.dk>
+ <20160816125624.GA20716@rob-hp-laptop>
+Message-ID: <20160816182855.2hdupen4dcmczxiw@vip.cybercity.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git imx/dt
-head:   aa4eab4468913b80fbed464abf1b94d64f0bb7cc
-commit: 7f876822566dc2dd9fde51940941676651eacaef [15/22] ARM: dts: imx7s: Add SAI nodes
-config: arm-multi_v7_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 7f876822566dc2dd9fde51940941676651eacaef
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On Tue, Aug 16, 2016 at 07:56:24AM -0500, Rob Herring wrote:
+> On Thu, Aug 11, 2016 at 10:11:51PM +0200, Rask Ingemann Lambertsen wrote:
+> > 
+> > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > index 1992aa9..fbad2cea 100644
+> > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > @@ -256,6 +256,7 @@ ste	ST-Ericsson
+> >  stericsson	ST-Ericsson
+> >  syna	Synaptics Inc.
+> >  synology	Synology, Inc.
+> > +sunchip	Shenzhen Sunchip Technology Co., Ltd
+> >  SUNW	Sun Microsystems, Inc
+> 
+> These are not in alphabetical order. Maybe someone thought uppercase 
+> should be separate, but I don't. So please fix the ordering here moving 
+> SUNW before syna.
 
-Note: the shawnguo/imx/dt HEAD aa4eab4468913b80fbed464abf1b94d64f0bb7cc builds fine.
-      It only hurts bisectibility.
+I'm new to this, so I could use a bit of guidance here. Is it OK if I
+send a follow-up patch to fix the ordering or should I send a patch to
+fix the ordering first, before the sunchip prefix is added?
 
-All errors (new ones prefixed by >>):
+I never considered the possibility that the list wouldn't be in
+alphabetical order to begin with, so the brain power went into deciding
+if uppercase should be sorted separately.
 
->> ERROR: Input tree has errors, aborting (use -f to force output)
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 38534 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160817/7e8beacf/attachment-0001.obj>
+-- 
+Rask Ingemann Lambertsen
+Danish law requires addresses in e-mail to be logged and stored for a year
