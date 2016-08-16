@@ -1,101 +1,52 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 16 Aug 2016 10:46:30 -0700
-Subject: [PATCH] ARM: dts: msm8974: honami: Add touchscreen
-Message-ID: <1471369590-12978-1-git-send-email-bjorn.andersson@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 16 Aug 2016 18:49:18 +0100
+Subject: [PATCH v2] kvm: arm: Enforce some NS-SVC initialisation
+In-Reply-To: <5322cdb9cb397741d15b60c6693ad39dbf74b6d5.1469101945.git.robin.murphy@arm.com>
+References: <5322cdb9cb397741d15b60c6693ad39dbf74b6d5.1469101945.git.robin.murphy@arm.com>
+Message-ID: <6d030bee2db08c2fe1b7569e692e8f66800b1e4c.1471369569.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the i2c2 and rmi4 nodes to enable the Synaptics touchscreen found in
-the Honami.
+Since the non-secure copies of banked registers lack architecturally
+defined reset values, there is no actual guarantee when entering in Hyp
+from secure-only firmware that the Non-Secure PL1 state will look the
+way that kernel entry (in particular the decompressor stub) expects.
+So far, we've been getting away with it thanks to implementation details
+of ARMv7 cores and/or bootloader behaviour, but for the sake of forwards
+compatibility let's try to ensure that we have a minimally sane state
+before dropping down into it.
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- .../boot/dts/qcom-msm8974-sony-xperia-honami.dts   | 59 ++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-index 3fb4dada6b0d..0d414ef9d3d0 100644
---- a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-+++ b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-@@ -311,6 +311,45 @@
- 		pinctrl-0 = <&blsp1_uart2_pin_a>;
- 	};
+v2: Initialise SED/ITD to safe values as well.
+
+ arch/arm/kernel/hyp-stub.S | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index 0b1e4a93d67e..15d073ae5da2 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -142,6 +142,19 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
+ 	and	r7, #0x1f		@ Preserve HPMN
+ 	mcr	p15, 4, r7, c1, c1, 1	@ HDCR
  
-+	i2c at f9924000 {
-+		status = "ok";
++	@ Make sure NS-SVC is initialised appropriately
++	mrc	p15, 0, r7, c1, c0, 0	@ SCTLR
++	orr	r7, #(1 << 5)		@ CP15 barriers enabled
++	bic	r7, #(3 << 7)		@ Clear SED/ITD for v8 (RES0 for v7)
++	bic	r7, #(3 << 19)		@ WXN and UWXN disabled
++	mcr	p15, 0, r7, c1, c0, 0	@ SCTLR
 +
-+		clock-frequency = <355000>;
-+		qcom,src-freq = <50000000>;
++	mrc	p15, 0, r7, c0, c0, 0	@ MIDR
++	mcr	p15, 4, r7, c0, c0, 0	@ VPIDR
 +
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&i2c2_pins>;
++	mrc	p15, 0, r7, c0, c0, 5	@ MPIDR
++	mcr	p15, 4, r7, c0, c0, 5	@ VMPIDR
 +
-+		synaptics at 2c {
-+			compatible = "syna,rmi4-i2c";
-+			reg = <0x2c>;
-+
-+			interrupts-extended = <&msmgpio 61 IRQ_TYPE_EDGE_FALLING>;
-+
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			vdd-supply = <&pm8941_l22>;
-+			vio-supply = <&pm8941_lvs3>;
-+
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&ts_int_pin>;
-+
-+			syna,startup-delay-ms = <10>;
-+
-+			rmi4-f01 at 1 {
-+				reg = <0x1>;
-+				syna,nosleep-mode = <1>;
-+			};
-+
-+			rmi4-f11 at 11 {
-+				reg = <0x11>;
-+				touchscreen-inverted-x;
-+				syna,sensor-type = <1>;
-+			};
-+		};
-+	};
-+
- 	pinctrl at fd510000 {
- 		blsp1_uart2_pin_a: blsp1-uart2-pin-active {
- 			rx {
-@@ -330,6 +369,16 @@
- 			};
- 		};
- 
-+		i2c2_pins: i2c2 {
-+			mux {
-+				pins = "gpio6", "gpio7";
-+				function = "blsp_i2c2";
-+
-+				drive-strength = <2>;
-+				bias-disable;
-+			};
-+		};
-+
- 		sdhc1_pin_a: sdhc1-pin-active {
- 			clk {
- 				pins = "sdc1_clk";
-@@ -366,6 +415,16 @@
- 			};
- 		};
- 
-+		ts_int_pin: touch-int {
-+			pin {
-+				pins = "gpio61";
-+				function = "gpio";
-+
-+				drive-strength = <2>;
-+				bias-disable;
-+				input-enable;
-+			};
-+		};
- 	};
- 
- 	dma-controller at f9944000 {
+ #if !defined(ZIMAGE) && defined(CONFIG_ARM_ARCH_TIMER)
+ 	@ make CNTP_* and CNTPCT accessible from PL1
+ 	mrc	p15, 0, r7, c0, c1, 1	@ ID_PFR1
 -- 
-2.5.0
+2.8.1.dirty
