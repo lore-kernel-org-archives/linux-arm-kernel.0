@@ -1,61 +1,49 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 16 Aug 2016 12:25:16 +0200
-Subject: [PATCH v2] clocksource: sun4i: Clear interrupts after stopping
- timer in probe function
-In-Reply-To: <1471237024-16655-1-git-send-email-wens@csie.org>
-References: <1471237024-16655-1-git-send-email-wens@csie.org>
-Message-ID: <57B2EA0C.80006@linaro.org>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Tue, 16 Aug 2016 18:18:18 +0800
+Subject: [V2, 10/15] mmc: sdhci-esdhc-imx: enable hw auto retuning for
+ MAN_TUNING
+In-Reply-To: <20160815145941.GA23663@t450s.lan>
+References: <1468309584-3591-11-git-send-email-aisheng.dong@nxp.com>
+ <20160815145941.GA23663@t450s.lan>
+Message-ID: <20160816101818.GD9211@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/15/2016 06:57 AM, Chen-Yu Tsai wrote:
-> The bootloader (U-boot) sometimes uses this timer for various delays.
-> It uses it as a ongoing counter, and does comparisons on the current
-> counter value. The timer counter is never stopped.
+On Mon, Aug 15, 2016 at 04:59:41PM +0200, Gary Bisson wrote:
+> Dong Aisheng, All,
 > 
-> In some cases when the user interacts with the bootloader, or lets
-> it idle for some time before loading Linux, the timer may expire,
-> and an interrupt will be pending. This results in an unexpected
-> interrupt when the timer interrupt is enabled by the kernel, at
-> which point the event_handler isn't set yet. This results in a NULL
-> pointer dereference exception, panic, and no way to reboot.
+> On Tue, Jul 12, 2016 at 03:46:19PM +0800, Dong Aisheng wrote:
+> > Indicating hw auto retuning support for mx6qdl in the fake caps_1
+> > register and enable auto retuning in post_tuning process after
+> > tuning completes.
 > 
-> Clear any pending interrupts after we stop the timer in the probe
-> function to avoid this.
+> Have you tried this change with a SDIO3.0 device? I'm asking because a
+
+Tested with SD3.0 device.
+Not really for SDIO3.0 device since there's no SDIO3.0 device on my
+available MX6Q/DL boards.
+
+> similar change in latest NXP 4.1.15 kernel broke SDIO3.0 support.
+> With this tuning, the kernel would report:
+> mmc2: Got data interrupt 0x00000002 even though no data operation was in
+> progress.
 > 
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> Changes since v1:
+
+Can you provide the full enumeration log?
+
+> Doing a 'git bisect' and then reverting this patch fixed the issue.
+> Although I haven't tested that change on mainline kernel, I wanted you
+> to know about this observation before it gets merged.
 > 
->   - Add stable kernel to Cc.
-> ---
->  drivers/clocksource/sun4i_timer.c | 3 +++
->  1 file changed, 3 insertions(+)
+> As a FYI, the issue has been reported to NXP community:
+> https://community.nxp.com/thread/431316
 > 
-> diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-> index 97669ee4df2a..7ab69b36f744 100644
-> --- a/drivers/clocksource/sun4i_timer.c
-> +++ b/drivers/clocksource/sun4i_timer.c
-> @@ -208,6 +208,9 @@ static int __init sun4i_timer_init(struct device_node *node)
->  	/* Make sure timer is stopped before playing with interrupts */
->  	sun4i_clkevt_time_stop(0);
->  
-> +	/* clear timer0 interrupt */
-> +	writel(0x1, timer_base + TIMER_IRQ_ST_REG);
 
-Can you replace this call with a static inline function and reuse it
-also in 'sun4i_timer_interrupt' ?
+Thanks for nofity.
+I will check it on my side.
 
-Thanks.
+Regards
+Dong Aisheng
 
-  -- Daniel
-
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> Regards,
+> Gary
