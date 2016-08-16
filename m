@@ -1,127 +1,82 @@
 From: hl@rock-chips.com (Lin Huang)
-Date: Wed, 17 Aug 2016 06:36:27 +0800
-Subject: [PATCH v6 6/8] Documentation: bindings: add dt documentation for
- rk3399 dmc
+Date: Wed, 17 Aug 2016 06:36:24 +0800
+Subject: [PATCH v6 3/8] clk: rockchip: rk3399: add ddrc clock support
 In-Reply-To: <1471386989-9541-1-git-send-email-hl@rock-chips.com>
 References: <1471386989-9541-1-git-send-email-hl@rock-chips.com>
-Message-ID: <1471386989-9541-7-git-send-email-hl@rock-chips.com>
+Message-ID: <1471386989-9541-4-git-send-email-hl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the documentation for rockchip rk3399 dmc driver.
+add ddrc clock setting, so we can do ddr frequency
+scaling on rk3399 platform in future.
 
 Signed-off-by: Lin Huang <hl@rock-chips.com>
 ---
 Changes in v6:
--Add more detail in Documentation
+- None
 
 Changes in v5:
--None
+- fit for the ddr type
 
 Changes in v4:
--None
+- None
 
 Changes in v3:
--None
+- None
 
 Changes in v2:
--None 
+- remove clk_ddrc_dpll_src from critical clock list
 
 Changes in v1:
--None
- .../devicetree/bindings/devfreq/rk3399_dmc.txt     | 84 ++++++++++++++++++++++
- 1 file changed, 84 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
+- remove ddrc source CLK_IGNORE_UNUSED flag
+- move clk_ddrc and clk_ddrc_dpll_src to critical
 
-diff --git a/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt b/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
-new file mode 100644
-index 0000000..e73067c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
-@@ -0,0 +1,84 @@
-+* Rockchip rk3399 DMC(Dynamic Memory Controller) device
+ drivers/clk/rockchip/clk-rk3399.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+index e445cd6..01d4945 100644
+--- a/drivers/clk/rockchip/clk-rk3399.c
++++ b/drivers/clk/rockchip/clk-rk3399.c
+@@ -120,6 +120,10 @@ PNAME(mux_armclkb_p)				= { "clk_core_b_lpll_src",
+ 						    "clk_core_b_bpll_src",
+ 						    "clk_core_b_dpll_src",
+ 						    "clk_core_b_gpll_src" };
++PNAME(mux_ddrclk_p)				= { "clk_ddrc_lpll_src",
++						    "clk_ddrc_bpll_src",
++						    "clk_ddrc_dpll_src",
++						    "clk_ddrc_gpll_src" };
+ PNAME(mux_aclk_cci_p)				= { "cpll_aclk_cci_src",
+ 						    "gpll_aclk_cci_src",
+ 						    "npll_aclk_cci_src",
+@@ -1379,6 +1383,18 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+ 	COMPOSITE_NOMUX(0, "clk_test", "clk_test_pre", CLK_IGNORE_UNUSED,
+ 			RK3368_CLKSEL_CON(58), 0, 5, DFLAGS,
+ 			RK3368_CLKGATE_CON(13), 11, GFLAGS),
 +
-+Required properties:
-+- compatible: Must be "rockchip,rk3399-dmc".
-+- devfreq-events: Node to get ddr loading, Refer to
-+		  Documentation/devicetree/bindings/devfreq/rockchip-dif.txt
-+- interrupts: The interrupt number to the cpu. The interrupt specifier format
-+	      depends on the interrupt controller. it should be dcf interrupts,
-+	      when ddr dvfs finish, it will happen.
-+- clocks: Phandles for clock specified in "clock-names" property
-+- clock-names : The name of clock used by the DFI, must be "pclk_ddr_mon";
-+- operating-points-v2: Refer to Documentation/devicetree/bindings/power/opp.txt
-+		       for details.
-+- center-supply: Dmc supply node.
-+- status: Marks the node enabled/disabled.
++	/* ddrc */
++	GATE(0, "clk_ddrc_lpll_src", "lpll", 0, RK3399_CLKGATE_CON(3),
++	     0, GFLAGS),
++	GATE(0, "clk_ddrc_bpll_src", "bpll", 0, RK3399_CLKGATE_CON(3),
++	     1, GFLAGS),
++	GATE(0, "clk_ddrc_dpll_src", "dpll", 0, RK3399_CLKGATE_CON(3),
++	     2, GFLAGS),
++	GATE(0, "clk_ddrc_gpll_src", "gpll", 0, RK3399_CLKGATE_CON(3),
++	     3, GFLAGS),
++	COMPOSITE_DDRCLK(SCLK_DDRC, "clk_ddrc", mux_ddrclk_p, 0,
++		       RK3399_CLKSEL_CON(6), 4, 2, 0, 0, ROCKCHIP_DDRCLK_SIP),
+ };
+ 
+ static struct rockchip_clk_branch rk3399_clk_pmu_branches[] __initdata = {
+@@ -1493,6 +1509,9 @@ static const char *const rk3399_cru_critical_clocks[] __initconst = {
+ 	"gpll_aclk_perilp0_src",
+ 	"gpll_aclk_perihp_src",
+ 	"aclk_vio_noc",
 +
-+Optional properties:
-+- ddr_timing: ddr timing need to pass to arm trust firmware
-+- upthreshold: the upthreshold to simpleondeamnd policy
-+- downdifferential: The downdifferential to simpleondeamnd policy
-+
-+Example:
-+	ddr_timing: ddr_timing {
-+		compatible = "rockchip,ddr-timing";
-+		ddr3_speed_bin = <21>;
-+		pd_idle = <0>;
-+		sr_idle = <0>;
-+		sr_mc_gate_idle = <0>;
-+		srpd_lite_idle	= <0>;
-+		standby_idle = <0>;
-+		dram_dll_dis_freq = <300>;
-+		phy_dll_dis_freq = <125>;
-+
-+		ddr3_odt_dis_freq = <333>;
-+		ddr3_drv = <DDR3_DS_40ohm>;
-+		ddr3_odt = <DDR3_ODT_120ohm>;
-+		phy_ddr3_ca_drv = <PHY_DRV_ODT_40>;
-+		phy_ddr3_dq_drv = <PHY_DRV_ODT_40>;
-+		phy_ddr3_odt = <PHY_DRV_ODT_240>;
-+
-+		lpddr3_odt_dis_freq = <333>;
-+		lpddr3_drv = <LP3_DS_34ohm>;
-+		lpddr3_odt = <LP3_ODT_240ohm>;
-+		phy_lpddr3_ca_drv = <PHY_DRV_ODT_40>;
-+		phy_lpddr3_dq_drv = <PHY_DRV_ODT_40>;
-+		phy_lpddr3_odt = <PHY_DRV_ODT_240>;
-+
-+		lpddr4_odt_dis_freq = <333>;
-+		lpddr4_drv = <LP4_PDDS_60ohm>;
-+		lpddr4_dq_odt = <LP4_DQ_ODT_40ohm>;
-+		lpddr4_ca_odt = <LP4_CA_ODT_40ohm>;
-+		phy_lpddr4_ca_drv = <PHY_DRV_ODT_40>;
-+		phy_lpddr4_ck_cs_drv = <PHY_DRV_ODT_80>;
-+		phy_lpddr4_dq_drv = <PHY_DRV_ODT_80>;
-+		phy_lpddr4_odt = <PHY_DRV_ODT_60>;
-+	};
-+
-+	dmc_opp_table: dmc_opp_table {
-+		compatible = "operating-points-v2";
-+
-+		opp00 {
-+			opp-hz = /bits/ 64 <300000000>;
-+			opp-microvolt = <900000>;
-+		};
-+		opp01 {
-+			opp-hz = /bits/ 64 <666000000>;
-+			opp-microvolt = <900000>;
-+		};
-+	};
-+
-+	dmc: dmc {
-+		compatible = "rockchip,rk3399-dmc";
-+		devfreq-events = <&dfi>;
-+		interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_DDRCLK>;
-+		clock-names = "dmc_clk";
-+		ddr_timing = <&ddr_timing>;
-+		operating-points-v2 = <&dmc_opp_table>;
-+		center-supply = <&ppvar_centerlogic>;
-+		upthreshold = <15>;
-+		downdifferential = <10>;
-+		status = "disabled";
-+	};
-+
++	/* ddrc */
++	"clk_ddrc"
+ };
+ 
+ static const char *const rk3399_pmucru_critical_clocks[] __initconst = {
 -- 
 2.6.6
