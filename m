@@ -1,101 +1,76 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 16 Aug 2016 15:35:13 +0200
-Subject: [RFC 16/17] Revert
- "i2c: exynos5: Fix possible ABBA deadlock by keeping I2C clock prepared"
+Date: Tue, 16 Aug 2016 15:35:09 +0200
+Subject: [RFC 12/17] ASoC: samsung: Switch to new clock controller API
 In-Reply-To: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
 References: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1471354514-24224-17-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1471354514-24224-13-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 10ff4c5239a137abfc896ec73ef3d15a0f86a16a.
----
- drivers/i2c/busses/i2c-exynos5.c | 24 +++++-------------------
- 1 file changed, 5 insertions(+), 19 deletions(-)
+Allocate a clock controller and use new clk_register_with_ctrl() API.
 
-diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
-index c0e3ada02876..8710052eeb6b 100644
---- a/drivers/i2c/busses/i2c-exynos5.c
-+++ b/drivers/i2c/busses/i2c-exynos5.c
-@@ -671,9 +671,7 @@ static int exynos5_i2c_xfer(struct i2c_adapter *adap,
- 		return -EIO;
- 	}
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ sound/soc/samsung/i2s.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+index fa3ff03d97d5..1ec90daa4df4 100644
+--- a/sound/soc/samsung/i2s.c
++++ b/sound/soc/samsung/i2s.c
+@@ -104,6 +104,7 @@ struct i2s_dai {
+ 	/* Below fields are only valid if this is the primary FIFO */
+ 	struct clk *clk_table[3];
+ 	struct clk_onecell_data clk_data;
++	struct clk_ctrl *clk_ctrl;
+ };
  
--	ret = clk_enable(i2c->clk);
--	if (ret)
--		return ret;
-+	clk_prepare_enable(i2c->clk);
+ /* Lock for cross i/f checks */
+@@ -1148,6 +1149,7 @@ static void i2s_unregister_clock_provider(struct platform_device *pdev)
  
- 	for (i = 0; i < num; i++, msgs++) {
- 		stop = (i == num - 1);
-@@ -697,7 +695,7 @@ static int exynos5_i2c_xfer(struct i2c_adapter *adap,
- 	}
- 
-  out:
--	clk_disable(i2c->clk);
-+	clk_disable_unprepare(i2c->clk);
- 	return ret;
+ 	of_clk_del_provider(pdev->dev.of_node);
+ 	i2s_unregister_clocks(i2s);
++	clk_ctrl_unregister(i2s->clk_ctrl);
  }
  
-@@ -749,9 +747,7 @@ static int exynos5_i2c_probe(struct platform_device *pdev)
- 		return -ENOENT;
- 	}
+ static int i2s_register_clock_provider(struct platform_device *pdev)
+@@ -1164,6 +1166,10 @@ static int i2s_register_clock_provider(struct platform_device *pdev)
+ 	if (!of_find_property(dev->of_node, "#clock-cells", NULL))
+ 		return 0;
  
--	ret = clk_prepare_enable(i2c->clk);
--	if (ret)
--		return ret;
-+	clk_prepare_enable(i2c->clk);
++	i2s->clk_ctrl = clk_ctrl_register(dev);
++	if (IS_ERR(i2s->clk_ctrl))
++		return PTR_ERR(i2s->clk_ctrl);
++
+ 	/* Get the RCLKSRC mux clock parent clock names */
+ 	for (i = 0; i < ARRAY_SIZE(p_names); i++) {
+ 		rclksrc = clk_get(dev, clk_name[i]);
+@@ -1179,13 +1185,14 @@ static int i2s_register_clock_provider(struct platform_device *pdev)
+ 		writel(val | PSR_PSREN, i2s->addr + I2SPSR);
  
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	i2c->regs = devm_ioremap_resource(&pdev->dev, mem);
-@@ -803,10 +799,6 @@ static int exynos5_i2c_probe(struct platform_device *pdev)
+ 		i2s->clk_table[CLK_I2S_RCLK_SRC] = clk_register_mux(NULL,
++				i2s->clk_ctrl,
+ 				"i2s_rclksrc", p_names, ARRAY_SIZE(p_names),
+ 				CLK_SET_RATE_NO_REPARENT | CLK_SET_RATE_PARENT,
+ 				i2s->addr + I2SMOD, reg_info->rclksrc_off,
+ 				1, 0, i2s->lock);
  
- 	platform_set_drvdata(pdev, i2c);
+ 		i2s->clk_table[CLK_I2S_RCLK_PSR] = clk_register_divider(NULL,
+-				"i2s_presc", "i2s_rclksrc",
++				i2s->clk_ctrl, "i2s_presc", "i2s_rclksrc",
+ 				CLK_SET_RATE_PARENT,
+ 				i2s->addr + I2SPSR, 8, 6, 0, i2s->lock);
  
--	clk_disable(i2c->clk);
--
--	return 0;
--
-  err_clk:
- 	clk_disable_unprepare(i2c->clk);
- 	return ret;
-@@ -818,8 +810,6 @@ static int exynos5_i2c_remove(struct platform_device *pdev)
+@@ -1195,8 +1202,8 @@ static int i2s_register_clock_provider(struct platform_device *pdev)
+ 	of_property_read_string_index(dev->of_node,
+ 				"clock-output-names", 0, &clk_name[0]);
  
- 	i2c_del_adapter(&i2c->adap);
+-	i2s->clk_table[CLK_I2S_CDCLK] = clk_register_gate(NULL, clk_name[0],
+-				p_names[0], CLK_SET_RATE_PARENT,
++	i2s->clk_table[CLK_I2S_CDCLK] = clk_register_gate(NULL, i2s->clk_ctrl,
++				clk_name[0], p_names[0], CLK_SET_RATE_PARENT,
+ 				i2s->addr + I2SMOD, reg_info->cdclkcon_off,
+ 				CLK_GATE_SET_TO_DISABLE, i2s->lock);
  
--	clk_unprepare(i2c->clk);
--
- 	return 0;
- }
- 
-@@ -831,8 +821,6 @@ static int exynos5_i2c_suspend_noirq(struct device *dev)
- 
- 	i2c->suspended = 1;
- 
--	clk_unprepare(i2c->clk);
--
- 	return 0;
- }
- 
-@@ -842,9 +830,7 @@ static int exynos5_i2c_resume_noirq(struct device *dev)
- 	struct exynos5_i2c *i2c = platform_get_drvdata(pdev);
- 	int ret = 0;
- 
--	ret = clk_prepare_enable(i2c->clk);
--	if (ret)
--		return ret;
-+	clk_prepare_enable(i2c->clk);
- 
- 	ret = exynos5_hsi2c_clock_setup(i2c);
- 	if (ret) {
-@@ -853,7 +839,7 @@ static int exynos5_i2c_resume_noirq(struct device *dev)
- 	}
- 
- 	exynos5_i2c_init(i2c);
--	clk_disable(i2c->clk);
-+	clk_disable_unprepare(i2c->clk);
- 	i2c->suspended = 0;
- 
- 	return 0;
 -- 
 1.9.1
