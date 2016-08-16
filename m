@@ -1,52 +1,51 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 16 Aug 2016 18:49:18 +0100
-Subject: [PATCH v2] kvm: arm: Enforce some NS-SVC initialisation
-In-Reply-To: <5322cdb9cb397741d15b60c6693ad39dbf74b6d5.1469101945.git.robin.murphy@arm.com>
-References: <5322cdb9cb397741d15b60c6693ad39dbf74b6d5.1469101945.git.robin.murphy@arm.com>
-Message-ID: <6d030bee2db08c2fe1b7569e692e8f66800b1e4c.1471369569.git.robin.murphy@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 16 Aug 2016 19:50:23 +0200
+Subject: [PATCH v2] ARM: Add missing newline terminators to kernel messages
+In-Reply-To: <1471367313.4075.167.camel@perches.com>
+References: <1471354832-18456-1-git-send-email-geert+renesas@glider.be>
+ <1471367313.4075.167.camel@perches.com>
+Message-ID: <CAMuHMdWQae93bbrvxGBpwsw5JGCF85+KF4xZDyi=QTJaT9pWbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the non-secure copies of banked registers lack architecturally
-defined reset values, there is no actual guarantee when entering in Hyp
-from secure-only firmware that the Non-Secure PL1 state will look the
-way that kernel entry (in particular the decompressor stub) expects.
-So far, we've been getting away with it thanks to implementation details
-of ARMv7 cores and/or bootloader behaviour, but for the sake of forwards
-compatibility let's try to ensure that we have a minimally sane state
-before dropping down into it.
+Hi Joe,
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+On Tue, Aug 16, 2016 at 7:08 PM, Joe Perches <joe@perches.com> wrote:
+> On Tue, 2016-08-16 at 15:40 +0200, Geert Uytterhoeven wrote:
+>> Before commit 874f9c7da9a4acbc ("printk: create pr_<level> functions"),
+>> pr_*() calls without a trailing newline characters would be printed with
+>> a newline character appended, both on the console and in the output of
+>> the dmesg command.
+>
+> Hey Geert.
+>
+> This doesn't apply to -next as the pr_notice/pr_cont below is
+> properly changed to a single pr_notice.
 
-v2: Initialise SED/ITD to safe values as well.
+In which -next?
 
- arch/arm/kernel/hyp-stub.S | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Not in next-20160816, where the patch applies cleanly.
+Also not in arm/for-next.
 
-diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-index 0b1e4a93d67e..15d073ae5da2 100644
---- a/arch/arm/kernel/hyp-stub.S
-+++ b/arch/arm/kernel/hyp-stub.S
-@@ -142,6 +142,19 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
- 	and	r7, #0x1f		@ Preserve HPMN
- 	mcr	p15, 4, r7, c1, c1, 1	@ HDCR
- 
-+	@ Make sure NS-SVC is initialised appropriately
-+	mrc	p15, 0, r7, c1, c0, 0	@ SCTLR
-+	orr	r7, #(1 << 5)		@ CP15 barriers enabled
-+	bic	r7, #(3 << 7)		@ Clear SED/ITD for v8 (RES0 for v7)
-+	bic	r7, #(3 << 19)		@ WXN and UWXN disabled
-+	mcr	p15, 0, r7, c1, c0, 0	@ SCTLR
-+
-+	mrc	p15, 0, r7, c0, c0, 0	@ MIDR
-+	mcr	p15, 4, r7, c0, c0, 0	@ VPIDR
-+
-+	mrc	p15, 0, r7, c0, c0, 5	@ MPIDR
-+	mcr	p15, 4, r7, c0, c0, 5	@ VMPIDR
-+
- #if !defined(ZIMAGE) && defined(CONFIG_ARM_ARCH_TIMER)
- 	@ make CNTP_* and CNTPCT accessible from PL1
- 	mrc	p15, 0, r7, c0, c1, 1	@ ID_PFR1
--- 
-2.8.1.dirty
+>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+>
+> []
+>> @@ -1196,7 +1196,7 @@ void __init sanity_check_meminfo(void)
+>>                               pr_notice("Truncating RAM at %pa-%pa",
+>>                                         &block_start, &block_end);
+>>                               block_end = vmalloc_limit;
+>> -                             pr_cont(" to -%pa", &block_end);
+>> +                             pr_cont(" to -%pa\n", &block_end);
+>>                               memblock_remove(vmalloc_limit, overlap_size);
+>>                               should_use_highmem = true;
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
