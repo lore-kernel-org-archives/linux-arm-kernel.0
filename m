@@ -1,88 +1,75 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 16 Aug 2016 15:52:12 +0100
-Subject: [PATCH 3/2+1] remoteproc: core: Move of_get_rproc() helper to header
-In-Reply-To: <20160816143824.4120-1-lee.jones@linaro.org>
-References: <20160816143824.4120-1-lee.jones@linaro.org>
-Message-ID: <20160816145212.GA4254@dell>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 16 Aug 2016 15:51:05 +0100
+Subject: [PATCH] kvm: arm: Enforce some NS-SVC initialisation
+In-Reply-To: <57B31643.1000600@arm.com>
+References: <5322cdb9cb397741d15b60c6693ad39dbf74b6d5.1469101945.git.robin.murphy@arm.com>
+ <57B31643.1000600@arm.com>
+Message-ID: <46b4e0f6-eb62-1748-6fed-04340331efa1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-remoteproc: core: Move of_get_rproc() helper to header
+Hi Marc,
 
-Since of_get_rproc() has been made a simple helper, we can move it
-to the remoteproc.h and make it a 'static inline'.
+On 16/08/16 14:33, Marc Zyngier wrote:
+> On 21/07/16 13:01, Robin Murphy wrote:
+>> Since the non-secure copies of banked registers lack architecturally
+>> defined reset values, there is no actual guarantee when entering in Hyp
+>> from secure-only firmware that the non-secure PL1 state will look the
+>> way that kernel entry (in particular the decompressor stub) expects.
+>> So far, we've been getting away with it thanks to implementation details
+>> of ARMv7 cores and/or bootloader behaviour, but for the sake of forwards
+>> compatibility let's try to ensure that we have a minimally sane state
+>> before dropping down into it.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>  arch/arm/kernel/hyp-stub.S | 12 ++++++++++++
+>>  1 file changed, 12 insertions(+)
+>>
+>> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+>> index 0b1e4a93d67e..7de3fe15ab21 100644
+>> --- a/arch/arm/kernel/hyp-stub.S
+>> +++ b/arch/arm/kernel/hyp-stub.S
+>> @@ -142,6 +142,18 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
+>>  	and	r7, #0x1f		@ Preserve HPMN
+>>  	mcr	p15, 4, r7, c1, c1, 1	@ HDCR
+>>  
+>> +	@ Make sure NS-SVC is initialised appropriately
+>> +	mrc	p15, 0, r7, c1, c0, 0	@ SCTLR
+>> +	orr	r7, #(1 << 5)		@ CP15 barriers enabled
+>> +	bic	r7, #(3 << 19)		@ WXN and UWXN disabled
+> 
+> I think that while you're doing this, you also may want to clear SED and
+> ITD so that a BE kernel has a chance to survive its first instruction
+> (assuming it it uses the decompressor...).
 
-Suggested-by: Suman Anna <s-anna@ti.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Good point; I wrote this from the v7 perspective and neglected those,
+and I think I was actually trying to achieve something useful at the
+time which precluded cracking out the big-endian Thumb-2 kernel ;)
 
-diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-index 1c5d5d8..6966fb2 100644
---- a/drivers/remoteproc/remoteproc_core.c
-+++ b/drivers/remoteproc/remoteproc_core.c
-@@ -1267,25 +1267,6 @@ struct rproc *of_get_rproc_by_name(struct device_node *np, const char *name)
- 	return of_get_rproc_by_index(np, index);
- }
- EXPORT_SYMBOL(of_get_rproc_by_name);
--
--/**
-- * of_get_rproc() - lookup and obtain a reference to an rproc
-- * @np: node to search for rproc
-- *
-- * Finds an rproc handle using the default remote processor's phandle,
-- * and then returns a handle to the rproc.
-- *
-- * This function increments the remote processor's refcount, so always
-- * use rproc_put() to decrement it back once rproc isn't needed anymore.
-- *
-- * Returns a pointer to the rproc struct on success or an appropriate error
-- * code otherwise.
-- */
--struct rproc *of_get_rproc(struct device_node *np)
--{
--	return of_get_rproc_by_index(np, 0);
--}
--EXPORT_SYMBOL(of_get_rproc);
- #endif
- 
- /**
-diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
-index 0e1adc9..ec1cffd 100644
---- a/include/linux/remoteproc.h
-+++ b/include/linux/remoteproc.h
-@@ -515,7 +515,6 @@ extern struct rproc *of_get_rproc_by_index(struct device_node *np,
- 					   int index);
- extern struct rproc *of_get_rproc_by_name(struct device_node *np,
- 					  const char *name);
--extern struct rproc *of_get_rproc(struct device_node *np);
- #else
- static inline
- struct rproc *of_get_rproc_by_index(struct device_node *np, int index)
-@@ -527,11 +526,24 @@ struct rproc *of_get_rproc_by_name(struct device_node *np, const char *name)
- {
- 	return NULL;
- }
--static inline
--struct rproc *of_get_rproc(struct device_node *np)
-+#endif /* CONFIG_OF */
-+
-+/**
-+ * of_get_rproc() - lookup and obtain a reference to an rproc
-+ * @np: node to search for rproc
-+ *
-+ * Finds an rproc handle using the default remote processor's phandle,
-+ * and then returns a handle to the rproc.
-+ *
-+ * This function increments the remote processor's refcount, so always
-+ * use rproc_put() to decrement it back once rproc isn't needed anymore.
-+ *
-+ * Returns a pointer to the rproc struct on success or an appropriate error
-+ * code otherwise.
-+ */
-+static inline struct rproc *of_get_rproc(struct device_node *np)
- {
--	return NULL;
-+	return of_get_rproc_by_index(np, 0);
- }
--#endif /* CONFIG_OF */
- 
- #endif /* REMOTEPROC_H */
+>From a quick correlation between ARM ARMs, those bits should be reliably
+safe to unconditionally clear on v7VE, so let's do it. I'll respin shortly.
+
+>> +	mcr	p15, 0, r7, c1, c0, 0	@ SCTLR
+>> +
+>> +	mrc	p15, 0, r7, c0, c0, 0	@ MIDR
+>> +	mcr	p15, 4, r7, c0, c0, 0	@ VPIDR
+>> +
+>> +	mrc	p15, 0, r7, c0, c0, 5	@ MPIDR
+>> +	mcr	p15, 4, r7, c0, c0, 5	@ VMPIDR
+>> +
+>>  #if !defined(ZIMAGE) && defined(CONFIG_ARM_ARCH_TIMER)
+>>  	@ make CNTP_* and CNTPCT accessible from PL1
+>>  	mrc	p15, 0, r7, c0, c1, 1	@ ID_PFR1
+>>
+> 
+> Otherwise looks good.
+
+Cheers,
+Robin.
+
+> 
+> Thanks,
+> 
+> 	M.
+> 
