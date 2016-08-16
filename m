@@ -1,47 +1,41 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Tue, 16 Aug 2016 19:01:26 +0100
-Subject: [PATCH 0/4] boot-wrapper: arm64: Xen support
-In-Reply-To: <20160620150934.1729-1-andre.przywara@arm.com>
-References: <20160620150934.1729-1-andre.przywara@arm.com>
-Message-ID: <2db06642-e288-a158-0b0d-56ef43ece276@arm.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 16 Aug 2016 11:01:36 -0700
+Subject: [PATCH v2] ARM: Add missing newline terminators to kernel messages
+In-Reply-To: <CAMuHMdWQae93bbrvxGBpwsw5JGCF85+KF4xZDyi=QTJaT9pWbw@mail.gmail.com>
+References: <1471354832-18456-1-git-send-email-geert+renesas@glider.be>
+ <1471367313.4075.167.camel@perches.com>
+ <CAMuHMdWQae93bbrvxGBpwsw5JGCF85+KF4xZDyi=QTJaT9pWbw@mail.gmail.com>
+Message-ID: <1471370496.4075.170.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+On Tue, 2016-08-16 at 19:50 +0200, Geert Uytterhoeven wrote:
+> Hi Joe,
+> 
+> On Tue, Aug 16, 2016 at 7:08 PM, Joe Perches <joe@perches.com> wrote:
+> > 
+> > On Tue, 2016-08-16 at 15:40 +0200, Geert Uytterhoeven wrote:
+> > > 
+> > > Before commit 874f9c7da9a4acbc ("printk: create pr_<level>
+> > > functions"),
+> > > pr_*() calls without a trailing newline characters would be
+> > > printed with
+> > > a newline character appended, both on the console and in the
+> > > output of
+> > > the dmesg command.
+> > Hey Geert.
+> > 
+> > This doesn't apply to -next as the pr_notice/pr_cont below is
+> > properly changed to a single pr_notice.
+> In which -next?
+> 
+> Not in next-20160816, where the patch applies cleanly.
+> Also not in arm/for-next.
 
-Do you plan to send a new version of this series?
+My mistake, I was in the wrong directory.
+It doesn't apply to Linus' tree.
 
-Cheers,
+Still, it'd be slightly nicer to use a single
+pr_notice than the pr_notice/pr_cont.
 
-On 20/06/2016 16:09, Andre Przywara wrote:
-> These patches allow to include a Xen hypervisor binary into a boot-wrapper
-> ELF file, so that a Foundation Platform or a Fast Model can boot a Xen
-> system (including a Dom0 kernel).
-> This has been floating around for a while, I just updated the patches
-> to apply on the latest boot-wrapper tree. Also I increased Xen's load
-> address to accomodate for Dom0 kernels bigger than 16 MB.
-> For testing this just add: "--with-xen=/path/to/xen/xen/xen" to the
-> ./configure command line and feed the resulting xen-system.axf file to
-> the model.
->
-> Cheers,
-> Andre.
->
-> Christoffer Dall (3):
->   Support for building in a Xen binary
->   Xen: Support adding DT nodes
->   Explicitly clean linux-system.axf and xen-system.axf
->
-> Ian Campbell (1):
->   Xen: Select correct dom0 console
->
->  .gitignore    |  1 +
->  Makefile.am   | 38 +++++++++++++++++++++++++-------------
->  boot_common.c |  4 ++--
->  configure.ac  | 26 +++++++++++++++++++++++++-
->  model.lds.S   | 14 ++++++++++++++
->  5 files changed, 67 insertions(+), 16 deletions(-)
->
-
--- 
-Julien Grall
+cheers, Joe
