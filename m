@@ -1,61 +1,156 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 16 Aug 2016 14:33:55 +0100
-Subject: [PATCH] kvm: arm: Enforce some NS-SVC initialisation
-In-Reply-To: <5322cdb9cb397741d15b60c6693ad39dbf74b6d5.1469101945.git.robin.murphy@arm.com>
-References: <5322cdb9cb397741d15b60c6693ad39dbf74b6d5.1469101945.git.robin.murphy@arm.com>
-Message-ID: <57B31643.1000600@arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 16 Aug 2016 15:34:35 +0200
+Subject: [PATCH 1/3] clk: meson: Add GXBB AO Clock and Reset controller
+ driver
+In-Reply-To: <20160813012910.GT361@codeaurora.org>
+References: <1470734008-18849-1-git-send-email-narmstrong@baylibre.com>
+ <1470734008-18849-2-git-send-email-narmstrong@baylibre.com>
+ <20160813012910.GT361@codeaurora.org>
+Message-ID: <16163435-1310-043d-804f-3bb1fd33cff4@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/07/16 13:01, Robin Murphy wrote:
-> Since the non-secure copies of banked registers lack architecturally
-> defined reset values, there is no actual guarantee when entering in Hyp
-> from secure-only firmware that the non-secure PL1 state will look the
-> way that kernel entry (in particular the decompressor stub) expects.
-> So far, we've been getting away with it thanks to implementation details
-> of ARMv7 cores and/or bootloader behaviour, but for the sake of forwards
-> compatibility let's try to ensure that we have a minimally sane state
-> before dropping down into it.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  arch/arm/kernel/hyp-stub.S | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
-> 
-> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-> index 0b1e4a93d67e..7de3fe15ab21 100644
-> --- a/arch/arm/kernel/hyp-stub.S
-> +++ b/arch/arm/kernel/hyp-stub.S
-> @@ -142,6 +142,18 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
->  	and	r7, #0x1f		@ Preserve HPMN
->  	mcr	p15, 4, r7, c1, c1, 1	@ HDCR
->  
-> +	@ Make sure NS-SVC is initialised appropriately
-> +	mrc	p15, 0, r7, c1, c0, 0	@ SCTLR
-> +	orr	r7, #(1 << 5)		@ CP15 barriers enabled
-> +	bic	r7, #(3 << 19)		@ WXN and UWXN disabled
+Hi Stephen,
 
-I think that while you're doing this, you also may want to clear SED and
-ITD so that a BE kernel has a chance to survive its first instruction
-(assuming it it uses the decompressor...).
+On 08/13/2016 03:29 AM, Stephen Boyd wrote:
+> On 08/09, Neil Armstrong wrote:
+>> diff --git a/drivers/clk/meson/gxbb-aoclk.c b/drivers/clk/meson/gxbb-aoclk.c
+>> new file mode 100644
+>> index 0000000..56a9186
+>> --- /dev/null
+>> +++ b/drivers/clk/meson/gxbb-aoclk.c
+>> @@ -0,0 +1,203 @@
 
-> +	mcr	p15, 0, r7, c1, c0, 0	@ SCTLR
-> +
-> +	mrc	p15, 0, r7, c0, c0, 0	@ MIDR
-> +	mcr	p15, 4, r7, c0, c0, 0	@ VPIDR
-> +
-> +	mrc	p15, 0, r7, c0, c0, 5	@ MPIDR
-> +	mcr	p15, 4, r7, c0, c0, 5	@ VMPIDR
-> +
->  #if !defined(ZIMAGE) && defined(CONFIG_ARM_ARCH_TIMER)
->  	@ make CNTP_* and CNTPCT accessible from PL1
->  	mrc	p15, 0, r7, c0, c1, 1	@ ID_PFR1
+[...]
+
+>> + */
+>> +#include <linux/clk.h>
+> 
+> Is this include used?
+
+No !
+
+> 
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/reset-controller.h>
+>> +#include <linux/module.h>
+>> +#include <dt-bindings/clock/gxbb-aoclkc.h>
+>> +#include <dt-bindings/reset/gxbb-aoclkc.h>
+>> +
+>> +static DEFINE_SPINLOCK(clk_lock);
+> 
+> gxbb_clk_lock?
+
+Renamed into gxbb_aoclk_lock for sake of clarity
+
+> 
+>> +
+>> +struct gxbb_aoclk_reset_controller {
+>> +	struct reset_controller_dev reset;
+>> +	unsigned int *data;
+>> +	void __iomem *base;
+>> +};
+>> +
+
+[...]
+
+>> +
+>> +static struct clk_hw_onecell_data gxbb_aoclk_onecell_data = {
+> 
+> can this be const?
+
+It would be awesome, but it will be discarded by of_clk_add_hw_provider :
+
+drivers/clk/meson/gxbb-aoclk.c:176:4: warning: passing argument 3 of 'of_clk_add_hw_provider' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+    &gxbb_aoclk_onecell_data);
+
+In file included from drivers/clk/meson/gxbb-aoclk.c:55:0:
+./include/linux/clk-provider.h:788:5: note: expected 'void *' but argument is of type 'const struct clk_hw_onecell_data *'
+ int of_clk_add_hw_provider(struct device_node *np,
+
+> 
+>> +	.hws = {
+>> +		[CLKID_AO_REMOTE] = &remote_ao.hw,
+>> +		[CLKID_AO_I2C_MASTER] = &i2c_master_ao.hw,
+>> +		[CLKID_AO_I2C_SLAVE] = &i2c_slave_ao.hw,
+>> +		[CLKID_AO_UART1] = &uart1_ao.hw,
+>> +		[CLKID_AO_UART2] = &uart2_ao.hw,
+>> +		[CLKID_AO_IR_BLASTER] = &ir_blaster_ao.hw,
+>> +	},
+>> +	.num = ARRAY_SIZE(gxbb_aoclk_gate),
+>> +};
+>> +
+>> +static int gxbb_aoclkc_probe(struct platform_device *pdev)
+>> +{
+>> +	void __iomem *base;
+>> +	int ret, clkid;
+>> +	struct device *dev = &pdev->dev;
+>> +	struct gxbb_aoclk_reset_controller *rstc;
+>> +
+>> +	rstc = devm_kzalloc(dev, sizeof(rstc), GFP_KERNEL);
+>> +	if (!rstc)
+>> +		return -ENOMEM;
+>> +
+>> +	/*  Generic clocks */
+>> +	base = of_iomap(dev->of_node, 0);
+> 
+> use devm_ioremap_resource() please and platform APIs to get the
+> ioresource.
+
+Done.
+
+> 
+>> +	if (!base) {
+>> +		pr_err("%s: Unable to map clk base\n", __func__);
+> 
+> We don't need error prints here with devm_ioremap_resource().
+> 
+>> +		return -ENXIO;
+>> +	}
+>> +
+>> +	/* Reset Controller */
+>> +	rstc->base = base;
+>> +	rstc->data = gxbb_aoclk_reset;
+>> +	rstc->reset.ops = &gxbb_aoclk_reset_ops;
+>> +	rstc->reset.nr_resets = ARRAY_SIZE(gxbb_aoclk_reset);
+>> +	rstc->reset.of_node = dev->of_node;
+>> +	ret = devm_reset_controller_register(dev, &rstc->reset);
+>> +
+>> +	/*
+>> +	 * Populate base address and register all clks
+>> +	 */
+>> +	for (clkid = 0; clkid < gxbb_aoclk_onecell_data.num; clkid++) {
+>> +		gxbb_aoclk_gate[clkid]->reg = base;
+>> +
+>> +		ret = devm_clk_hw_register(dev,
+>> +					gxbb_aoclk_onecell_data.hws[clkid]);
+>> +		if (ret)
+>> +			goto iounmap;
+>> +	}
+>> +
+>> +	return of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
+>> +			&gxbb_aoclk_onecell_data);
+>> +
+>> +iounmap:
+>> +	iounmap(base);
+>> +	return ret;
+>> +}
+>> +
+>> +static const struct of_device_id gxbb_aoclkc_match_table[] = {
+>> +	{ .compatible = "amlogic,gxbb-aoclkc" },
+>> +	{ }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, gxbb_aoclkc_match_table);
+>> +
+>> +static struct platform_driver gxbb_aoclkc_driver = {
+>> +	.probe		= gxbb_aoclkc_probe,
+> 
+> No remove means leak of iomem mapping.
 > 
 
-Otherwise looks good.
+It will be non-modular, so no need of remove. The MODULE_* macros and module.h include will be removed like other clk drivers (gxbb and oxnas for instance).
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Neil
