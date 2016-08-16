@@ -1,243 +1,161 @@
-From: lv.zheng@intel.com (Zheng, Lv)
-Date: Tue, 16 Aug 2016 02:15:44 +0000
-Subject: [PATCH V8 2/8] ACPI: Add new IORT functions to support MSI
- domain handling
-In-Reply-To: <20160812164234.GB17734@red-moon>
-References: <1470909998-16710-1-git-send-email-tn@semihalf.com>
- <1470909998-16710-3-git-send-email-tn@semihalf.com>
- <20160812164234.GB17734@red-moon>
-Message-ID: <1AE640813FDE7649BE1B193DEA596E883BC0E3F2@SHSMSX101.ccr.corp.intel.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Tue, 16 Aug 2016 10:37:23 +0800
+Subject: [PATCH v2] Bluetooth: Add LED triggers for HCI frames tx and rx
+In-Reply-To: <1469939084-15603-1-git-send-email-guodong.xu@linaro.org>
+References: <1469939084-15603-1-git-send-email-guodong.xu@linaro.org>
+Message-ID: <CAFGCpxxXW0d=6GP1F4byEQBoR+YF-W6fX4bC6=13wKTt_NumkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Ping. :)  Would you give me some review opinions on this?
 
-> From: linux-acpi-owner at vger.kernel.org [mailto:linux-acpi-owner at vger.kernel.org] On Behalf Of Lorenzo
-> Pieralisi
-> Subject: Re: [PATCH V8 2/8] ACPI: Add new IORT functions to support MSI domain handling
-> 
-> On Thu, Aug 11, 2016 at 12:06:32PM +0200, Tomasz Nowicki wrote:
-> 
-> [...]
-> 
-> > +/**
-> > + * iort_register_domain_token() - register domain token and related ITS ID
-> > + * to the list from where we can get it back later on.
-> > + * @trans_id: ITS ID.
-> > + * @fw_node: Domain token.
-> > + *
-> > + * Returns: 0 on success, -ENOMEM if no memory when allocating list element
-> > + */
-> > +int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
-> > +{
-> > +	struct iort_its_msi_chip *its_msi_chip;
-> > +
-> > +	its_msi_chip = kzalloc(sizeof(*its_msi_chip), GFP_KERNEL);
-> 
-> I spotted this while reworking my ARM SMMU series, this may sleep
-> and that's no good given that we call it within the acpi_probe_lock.
-> 
-> Same goes for irq_domain_alloc_fwnode() (that we call in
-> gic_v2_acpi_init()), we have got to fix this usage, I will see with
-> Marc what's the best way to do it.
+In this revision, I chose to limit LED blinking to tx/rx traffic
+packets only. For other types of over-the-air packets, like scanning,
+it's not covered.
 
-If we can ensure that all table device probe entries are created during link stage or early stage.
-I think you can safely unlock probe lock before invoking acpi_table_parse() in __acpi_probe_device_table().
+Thank you.
 
-Thanks
-Lv
+-Guodong
 
-> 
-> Lorenzo
-> 
-> > +	if (!its_msi_chip)
-> > +		return -ENOMEM;
-> > +
-> > +	its_msi_chip->fw_node = fw_node;
-> > +	its_msi_chip->translation_id = trans_id;
-> > +
-> > +	spin_lock(&iort_msi_chip_lock);
-> > +	list_add(&its_msi_chip->list, &iort_msi_chip_list);
-> > +	spin_unlock(&iort_msi_chip_lock);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +/**
-> > + * iort_deregister_domain_token() - Deregister domain token based on ITS ID
-> > + * @trans_id: ITS ID.
-> > + *
-> > + * Returns: none.
-> > + */
-> > +void iort_deregister_domain_token(int trans_id)
-> > +{
-> > +	struct iort_its_msi_chip *its_msi_chip, *t;
-> > +
-> > +	spin_lock(&iort_msi_chip_lock);
-> > +	list_for_each_entry_safe(its_msi_chip, t, &iort_msi_chip_list, list) {
-> > +		if (its_msi_chip->translation_id == trans_id) {
-> > +			list_del(&its_msi_chip->list);
-> > +			kfree(its_msi_chip);
-> > +			break;
-> > +		}
-> > +	}
-> > +	spin_unlock(&iort_msi_chip_lock);
-> > +}
-> > +
-> > +/**
-> > + * iort_find_domain_token() - Find domain token based on given ITS ID
-> > + * @trans_id: ITS ID.
-> > + *
-> > + * Returns: domain token when find on the list, NULL otherwise
-> > + */
-> > +struct fwnode_handle *iort_find_domain_token(int trans_id)
-> > +{
-> > +	struct fwnode_handle *fw_node = NULL;
-> > +	struct iort_its_msi_chip *its_msi_chip;
-> > +
-> > +	spin_lock(&iort_msi_chip_lock);
-> > +	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
-> > +		if (its_msi_chip->translation_id == trans_id) {
-> > +			fw_node = its_msi_chip->fw_node;
-> > +			break;
-> > +		}
-> > +	}
-> > +	spin_unlock(&iort_msi_chip_lock);
-> > +
-> > +	return fw_node;
-> > +}
-> > +
-> >  static struct acpi_iort_node *
-> >  iort_scan_node(enum acpi_iort_node_type type,
-> >  	       iort_find_node_callback callback, void *context)
-> > @@ -206,6 +285,96 @@ iort_find_dev_node(struct device *dev)
-> >  			      iort_match_node_callback, &pbus->dev);
-> >  }
-> >
-> > +/**
-> > + * iort_msi_map_rid() - Map a MSI requester ID for a device
-> > + * @dev: The device for which the mapping is to be done.
-> > + * @req_id: The device requester ID.
-> > + *
-> > + * Returns: mapped MSI RID on success, input requester ID otherwise
-> > + */
-> > +u32 iort_msi_map_rid(struct device *dev, u32 req_id)
-> > +{
-> > +	struct acpi_iort_node *node;
-> > +	u32 dev_id;
-> > +
-> > +	if (!iort_table)
-> > +		return req_id;
-> > +
-> > +	node = iort_find_dev_node(dev);
-> > +	if (!node) {
-> > +		dev_err(dev, "can't find related IORT node\n");
-> > +		return req_id;
-> > +	}
-> > +
-> > +	iort_node_map_rid(node, req_id, &dev_id, ACPI_IORT_NODE_ITS_GROUP);
-> > +	return dev_id;
-> > +}
-> > +
-> > +/**
-> > + * iort_dev_find_its_id() - Find the ITS identifier for a device
-> > + * @dev: The device.
-> > + * @idx: Index of the ITS identifier list.
-> > + * @its_id: ITS identifier.
-> > + *
-> > + * Returns: 0 on success, appropriate error value otherwise
-> > + */
-> > +static int
-> > +iort_dev_find_its_id(struct device *dev, u32 req_id, unsigned int idx,
-> > +		     int *its_id)
-> > +{
-> > +	struct acpi_iort_its_group *its;
-> > +	struct acpi_iort_node *node;
-> > +
-> > +	node = iort_find_dev_node(dev);
-> > +	if (!node) {
-> > +		dev_err(dev, "can't find related IORT node\n");
-> > +		return -ENXIO;
-> > +	}
-> > +
-> > +	node = iort_node_map_rid(node, req_id, NULL, ACPI_IORT_NODE_ITS_GROUP);
-> > +	if (!node) {
-> > +		dev_err(dev, "can't find related ITS node\n");
-> > +		return -ENXIO;
-> > +	}
-> > +
-> > +	/* Move to ITS specific data */
-> > +	its = (struct acpi_iort_its_group *)node->node_data;
-> > +	if (idx > its->its_count) {
-> > +		dev_err(dev, "requested ITS ID index [%d] is greater than available [%d]\n",
-> > +			idx, its->its_count);
-> > +		return -ENXIO;
-> > +	}
-> > +
-> > +	*its_id = its->identifiers[idx];
-> > +	return 0;
-> > +}
-> > +
-> > +/**
-> > + * iort_get_device_domain() - Find MSI domain related to a device
-> > + * @dev: The device.
-> > + * @req_id: Requester ID for the device.
-> > + *
-> > + * Returns: the MSI domain for this device, NULL otherwise
-> > + */
-> > +struct irq_domain *
-> > +iort_get_device_domain(struct device *dev, u32 req_id)
-> > +{
-> > +	static struct fwnode_handle *handle;
-> > +	int its_id;
-> > +
-> > +	if (!iort_table)
-> > +		return NULL;
-> > +
-> > +	if (iort_dev_find_its_id(dev, req_id, 0, &its_id))
-> > +		return NULL;
-> > +
-> > +	handle = iort_find_domain_token(its_id);
-> > +	if (!handle)
-> > +		return NULL;
-> > +
-> > +	return irq_find_matching_fwnode(handle, DOMAIN_BUS_PCI_MSI);
-> > +}
-> > +
-> >  void __init iort_table_detect(void)
-> >  {
-> >  	acpi_status status;
-> > diff --git a/include/linux/iort.h b/include/linux/iort.h
-> > index cde6809..d7daba1 100644
-> > --- a/include/linux/iort.h
-> > +++ b/include/linux/iort.h
-> > @@ -20,11 +20,22 @@
-> >  #define __IORT_H__
-> >
-> >  #include <linux/acpi.h>
-> > +#include <linux/fwnode.h>
-> > +#include <linux/irqdomain.h>
-> >
-> > +int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
-> > +void iort_deregister_domain_token(int trans_id);
-> > +struct fwnode_handle *iort_find_domain_token(int trans_id);
-> >  #ifdef CONFIG_IORT_TABLE
-> >  void iort_table_detect(void);
-> > +u32 iort_msi_map_rid(struct device *dev, u32 req_id);
-> > +struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
-> >  #else
-> >  static inline void iort_table_detect(void) { }
-> > +static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
-> > +{ return req_id; }
-> > +static inline struct irq_domain *
-> > +iort_get_device_domain(struct device *dev, u32 req_id) { return NULL; }
-> >  #endif
-> >
-> >  #endif /* __IORT_H__ */
-> > --
-> > 1.9.1
-> >
+
+On 31 July 2016 at 12:24, Guodong Xu <guodong.xu@linaro.org> wrote:
+> Two LED triggers are added into hci_dev: tx_led and rx_led. Upon ACL/SCO
+> packets available in tx or rx, the LEDs will blink.
+>
+> For each hci registration, two triggers are added into LED subsystem:
+> [hdev->name]-tx and [hdev-name]-rx.
+> Refer to Documentation/leds/leds-class.txt for usage.
+>
+> Verified on HiKey 96boards, which uses HiSilicon hi6220 SoC and TI
+> WL1835 WiFi/BT combo chip.
+>
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+> ---
+>  include/net/bluetooth/hci_core.h |  1 +
+>  net/bluetooth/hci_core.c         |  6 ++++++
+>  net/bluetooth/leds.c             | 17 +++++++++++++++++
+>  net/bluetooth/leds.h             |  2 ++
+>  4 files changed, 26 insertions(+)
+>
+> diff --git a/include/net/bluetooth/hci_core.h b/include/net/bluetooth/hci_core.h
+> index dc71473..37b8dd9 100644
+> --- a/include/net/bluetooth/hci_core.h
+> +++ b/include/net/bluetooth/hci_core.h
+> @@ -398,6 +398,7 @@ struct hci_dev {
+>         bdaddr_t                rpa;
+>
+>         struct led_trigger      *power_led;
+> +       struct led_trigger      *tx_led, *rx_led;
+>
+>         int (*open)(struct hci_dev *hdev);
+>         int (*close)(struct hci_dev *hdev);
+> diff --git a/net/bluetooth/hci_core.c b/net/bluetooth/hci_core.c
+> index 45a9fc6..956dce1 100644
+> --- a/net/bluetooth/hci_core.c
+> +++ b/net/bluetooth/hci_core.c
+> @@ -3833,6 +3833,7 @@ static void hci_sched_acl(struct hci_dev *hdev)
+>         if (!hci_conn_num(hdev, AMP_LINK) && hdev->dev_type == HCI_AMP)
+>                 return;
+>
+> +       hci_leds_blink_oneshot(hdev->tx_led);
+>         switch (hdev->flow_ctl_mode) {
+>         case HCI_FLOW_CTL_MODE_PACKET_BASED:
+>                 hci_sched_acl_pkt(hdev);
+> @@ -3856,6 +3857,7 @@ static void hci_sched_sco(struct hci_dev *hdev)
+>         if (!hci_conn_num(hdev, SCO_LINK))
+>                 return;
+>
+> +       hci_leds_blink_oneshot(hdev->tx_led);
+>         while (hdev->sco_cnt && (conn = hci_low_sent(hdev, SCO_LINK, &quote))) {
+>                 while (quote-- && (skb = skb_dequeue(&conn->data_q))) {
+>                         BT_DBG("skb %p len %d", skb, skb->len);
+> @@ -3879,6 +3881,7 @@ static void hci_sched_esco(struct hci_dev *hdev)
+>         if (!hci_conn_num(hdev, ESCO_LINK))
+>                 return;
+>
+> +       hci_leds_blink_oneshot(hdev->tx_led);
+>         while (hdev->sco_cnt && (conn = hci_low_sent(hdev, ESCO_LINK,
+>                                                      &quote))) {
+>                 while (quote-- && (skb = skb_dequeue(&conn->data_q))) {
+> @@ -3911,6 +3914,7 @@ static void hci_sched_le(struct hci_dev *hdev)
+>                         hci_link_tx_to(hdev, LE_LINK);
+>         }
+>
+> +       hci_leds_blink_oneshot(hdev->tx_led);
+>         cnt = hdev->le_pkts ? hdev->le_cnt : hdev->acl_cnt;
+>         tmp = cnt;
+>         while (cnt && (chan = hci_chan_sent(hdev, LE_LINK, &quote))) {
+> @@ -3990,6 +3994,7 @@ static void hci_acldata_packet(struct hci_dev *hdev, struct sk_buff *skb)
+>
+>         if (conn) {
+>                 hci_conn_enter_active_mode(conn, BT_POWER_FORCE_ACTIVE_OFF);
+> +               hci_leds_blink_oneshot(hdev->rx_led);
+>
+>                 /* Send to upper protocol */
+>                 l2cap_recv_acldata(conn, skb, flags);
+> @@ -4022,6 +4027,7 @@ static void hci_scodata_packet(struct hci_dev *hdev, struct sk_buff *skb)
+>         hci_dev_unlock(hdev);
+>
+>         if (conn) {
+> +               hci_leds_blink_oneshot(hdev->rx_led);
+>                 /* Send to upper protocol */
+>                 sco_recv_scodata(conn, skb);
+>                 return;
+> diff --git a/net/bluetooth/leds.c b/net/bluetooth/leds.c
+> index 8319c84..ae10c5d 100644
+> --- a/net/bluetooth/leds.c
+> +++ b/net/bluetooth/leds.c
+> @@ -19,6 +19,8 @@ struct hci_basic_led_trigger {
+>  #define to_hci_basic_led_trigger(arg) container_of(arg, \
+>                         struct hci_basic_led_trigger, led_trigger)
+>
+> +#define BLUETOOTH_BLINK_DELAY  50 /* ms */
+> +
+>  void hci_leds_update_powered(struct hci_dev *hdev, bool enabled)
+>  {
+>         if (hdev->power_led)
+> @@ -37,6 +39,17 @@ static void power_activate(struct led_classdev *led_cdev)
+>         led_trigger_event(led_cdev->trigger, powered ? LED_FULL : LED_OFF);
+>  }
+>
+> +void hci_leds_blink_oneshot(struct led_trigger *trig)
+> +{
+> +       unsigned long led_delay = BLUETOOTH_BLINK_DELAY;
+> +
+> +       if (!trig)
+> +               return;
+> +
+> +       BT_DBG("led_trig %p", trig);
+> +       led_trigger_blink_oneshot(trig, &led_delay, &led_delay, 0);
+> +}
+> +
+>  static struct led_trigger *led_allocate_basic(struct hci_dev *hdev,
+>                         void (*activate)(struct led_classdev *led_cdev),
+>                         const char *name)
+> @@ -71,4 +84,8 @@ void hci_leds_init(struct hci_dev *hdev)
+>  {
+>         /* initialize power_led */
+>         hdev->power_led = led_allocate_basic(hdev, power_activate, "power");
+> +       /* initialize tx_led */
+> +       hdev->tx_led = led_allocate_basic(hdev, NULL, "tx");
+> +       /* initialize rx_led */
+> +       hdev->rx_led = led_allocate_basic(hdev, NULL, "rx");
+>  }
+> diff --git a/net/bluetooth/leds.h b/net/bluetooth/leds.h
+> index a9c4d6e..9b1cccd 100644
+> --- a/net/bluetooth/leds.h
+> +++ b/net/bluetooth/leds.h
+> @@ -9,8 +9,10 @@
+>  #if IS_ENABLED(CONFIG_BT_LEDS)
+>  void hci_leds_update_powered(struct hci_dev *hdev, bool enabled);
+>  void hci_leds_init(struct hci_dev *hdev);
+> +void hci_leds_blink_oneshot(struct led_trigger *trig);
+>  #else
+>  static inline void hci_leds_update_powered(struct hci_dev *hdev,
+>                                            bool enabled) {}
+>  static inline void hci_leds_init(struct hci_dev *hdev) {}
+> +static inline void hci_leds_blink_oneshot(struct led_trigger *trig) {}
+>  #endif
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 1.9.1
+>
