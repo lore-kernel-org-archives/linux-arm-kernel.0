@@ -1,86 +1,47 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 16 Aug 2016 15:19:57 -0700
-Subject: [PATCH] ARM: dts: add PM8058 LEDs to the APQ8060 Dragonboard
-In-Reply-To: <1471376759-9561-1-git-send-email-linus.walleij@linaro.org>
-References: <1471376759-9561-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20160816221957.GP26240@tuxbot>
+From: kbeldan@baylibre.com (Karl Beldan)
+Date: Tue, 16 Aug 2016 22:33:34 +0000
+Subject: [PATCH v3 0/4] Add DT support for NAND to LCDK via ti-aemif
+Message-ID: <20160816223338.20776-1-kbeldan@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 16 Aug 12:45 PDT 2016, Linus Walleij wrote:
+Hi,
 
-> This adds the PM8058 LEDs as used in the platform.
-> 
-> Cc: linux-arm-msm at vger.kernel.org
-> Cc: linux-leds at vger.kernel.org
-> Cc: Andy Gross <andy.gross@linaro.org>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
-> Cc: Jacek Anaszewski <j.anaszewski@samsung.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Here is another spin. I could get my hands on an EVM and test the
+changes on it as well. Doing so, I could also observe that 4bit ECC
+on 8bits NANDS is currently broken in mailine. Apparently there had
+already been some alerts on the mailing list some months ago.
 
-Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Rgds, 
+Karl
 
-Regards,
-Bjorn
+Changes from v1:
+ - s/cs2/cs3
+ - kept "ti,.." only nand properties (the adjustments made by
+   nand_davinci_probe are broken)
+ - replaced v1_1/4:
+     "memory: ti-aemif: Get a named clock rather than an unnamed one"
+   with v2_1/4:
+     "davinci: da8xx-dt: Add ti-aemif lookup for clock matching"
+ - Make the same improvements for the EVM as well as asked by Sekhar
 
-> ---
-> These DT bindings have been ACKed by Rob Herring and Bjorn Andersson
-> so I think the patch is safe to merge to the Qcom tree.
-> ---
->  arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 39 ++++++++++++++++++++++++++
->  1 file changed, 39 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-> index 0abc93e5bb00..b0800b988174 100644
-> --- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-> +++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-> @@ -239,6 +239,45 @@
->  						};
->  					};
->  				};
-> +
-> +				led at 48 {
-> +					/*
-> +					 * The keypad LED @0x48 is routed to
-> +					 * the sensor board where it is
-> +					 * connected to an infrared LED
-> +					 * SFH4650 (60mW, @850nm) next to the
-> +					 * ambient light and proximity sensor
-> +					 * Capella Microsystems CM3605.
-> +					 */
-> +					compatible = "qcom,pm8058-keypad-led";
-> +					reg = <0x48>;
-> +					label = "proximity0";
-> +					default-state = "off";
-> +				};
-> +				led at 131 {
-> +					compatible = "qcom,pm8058-led";
-> +					reg = <0x131>;
-> +					label = "pm8058:red";
-> +					default-state = "off";
-> +				};
-> +				led at 132 {
-> +					/*
-> +					 * This is actually green too on my
-> +					 * board, but documented as yellow.
-> +					 */
-> +					compatible = "qcom,pm8058-led";
-> +					reg = <0x132>;
-> +					label = "pm8058:yellow";
-> +					default-state = "off";
-> +					linux,default-trigger = "mmc0";
-> +				};
-> +				led at 133 {
-> +					compatible = "qcom,pm8058-led";
-> +					reg = <0x133>;
-> +					label = "pm8058:green";
-> +					default-state = "on";
-> +					linux,default-trigger = "heartbeat";
-> +				};
->  			};
->  		};
->  
-> -- 
-> 2.7.4
-> 
+Changes from v2:
+ - remove now useless pins of nand_cs3 in v3_3/4
+
+
+Karl Beldan (4):
+  ARM: davinci: da8xx-dt: Add ti-aemif lookup for clock matching
+  ARM: davinci_all_defconfig: Enable AEMIF as a module
+  ARM: dts: da850,da850-evm: Add an aemif node and use it for the NAND
+  ARM: dts: da850-lcdk: Add NAND to DT
+
+ arch/arm/boot/dts/da850-evm.dts        |  49 +++++++++++++--
+ arch/arm/boot/dts/da850-lcdk.dts       | 108 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/da850.dtsi           |  35 +++--------
+ arch/arm/configs/davinci_all_defconfig |   2 +
+ arch/arm/mach-davinci/da850.c          |   1 +
+ arch/arm/mach-davinci/da8xx-dt.c       |   1 +
+ 6 files changed, 164 insertions(+), 32 deletions(-)
+
+-- 
+2.9.2
