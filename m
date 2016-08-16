@@ -1,59 +1,89 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 16 Aug 2016 13:13:25 +0800
-Subject: [PATCH v1 3/3] PM / AVS: rockchip-cpu-avs: add driver handling
- Rockchip cpu avs
-In-Reply-To: <1471315139-28285-4-git-send-email-finley.xiao@rock-chips.com>
-Message-ID: <201608161305.FWFbm1Ww%fengguang.wu@intel.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 16 Aug 2016 13:50:38 +0800
+Subject: [PATCH 1/2] ARM: dts: imx7d: move CPU operating points to
+ imx7d.dtsi
+In-Reply-To: <20160812001107.17016-1-stefan@agner.ch>
+References: <20160812001107.17016-1-stefan@agner.ch>
+Message-ID: <20160816055038.GL500@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Finley,
+On Thu, Aug 11, 2016 at 05:11:06PM -0700, Stefan Agner wrote:
+> Only i.MX 7Dual SoC supports CPU frequencies of up to 1GHz. The i.MX
+> 7Solo can run with up to 800MHz and does so without making use of DVFS
+> usually. While the device tree clearly specified a too fast operating
+> point for i.MX 7Solo, the kernel did not used it in practise so far
+> because the CPUfreq driver does not get loaded on i.MX 7Solo devices
+> (since the fsl,imx7s compatible string is not in the list of devices
+> making use of the cpufreq-dt driver...).
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+> Hi Shawn,
+> 
+> This is based on my earlier patchset:
+> ARM: dts: imx7d: move ARM platform peripherals inside soc
+> 
+> This are kind of fixes too, so if possible I would like to see them
+> in v4.8, what do you think?
 
-[auto build test ERROR on battery/master]
-[also build test ERROR on v4.8-rc2 next-20160815]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Patch "ARM: dts: imx7d: move ARM platform peripherals inside soc node"
+is not really a fix, and the diffstat looks too dramatic to be a -rc
+material, so I queued it as a -next patch, and any patch based on it
+will have to go through -next as well.
 
-url:    https://github.com/0day-ci/linux/commits/Finlye-Xiao/PM-AVS-add-Rockchip-cpu-avs/20160816-105228
-base:   git://git.infradead.org/battery-2.6.git master
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Applied for -next, thanks.
 
-All error/warnings (new ones prefixed by >>):
+Shawn
 
-   drivers/power/avs/rockchip-cpu-avs.c: In function 'rockchip_cpu_avs_notifier':
->> drivers/power/avs/rockchip-cpu-avs.c:230:10: error: implicit declaration of function 'cpufreq_frequency_get_table' [-Werror=implicit-function-declaration]
-     table = cpufreq_frequency_get_table(policy->cpu);
-             ^
->> drivers/power/avs/rockchip-cpu-avs.c:230:8: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-     table = cpufreq_frequency_get_table(policy->cpu);
-           ^
-   cc1: some warnings being treated as errors
-
-vim +/cpufreq_frequency_get_table +230 drivers/power/avs/rockchip-cpu-avs.c
-
-   224		dev = get_cpu_device(policy->cpu);
-   225		if (!dev) {
-   226			pr_err("cpu%d Failed to get device\n", policy->cpu);
-   227			goto out;
-   228		}
-   229	
- > 230		table = cpufreq_frequency_get_table(policy->cpu);
-   231		if (!table) {
-   232			pr_err("cpu%d CPUFreq table not found\n", policy->cpu);
-   233			goto out;
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 58506 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160816/78d6ed26/attachment-0001.obj>
+> 
+> --
+> Stefan
+> 
+>  arch/arm/boot/dts/imx7d.dtsi | 8 ++++++++
+>  arch/arm/boot/dts/imx7s.dtsi | 5 -----
+>  2 files changed, 8 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+> index 3d77d95..d0b199c 100644
+> --- a/arch/arm/boot/dts/imx7d.dtsi
+> +++ b/arch/arm/boot/dts/imx7d.dtsi
+> @@ -45,6 +45,14 @@
+>  
+>  / {
+>  	cpus {
+> +		cpu0: cpu at 0 {
+> +			operating-points = <
+> +				/* KHz	uV */
+> +				996000	1075000
+> +				792000	975000
+> +			>;
+> +		};
+> +
+>  		cpu1: cpu at 1 {
+>  			compatible = "arm,cortex-a7";
+>  			device_type = "cpu";
+> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+> index c63591c..5132e2f 100644
+> --- a/arch/arm/boot/dts/imx7s.dtsi
+> +++ b/arch/arm/boot/dts/imx7s.dtsi
+> @@ -85,11 +85,6 @@
+>  			compatible = "arm,cortex-a7";
+>  			device_type = "cpu";
+>  			reg = <0>;
+> -			operating-points = <
+> -				/* KHz	uV */
+> -				996000	1075000
+> -				792000	975000
+> -			>;
+>  			clock-latency = <61036>; /* two CLK32 periods */
+>  			clocks = <&clks IMX7D_CLK_ARM>;
+>  		};
+> -- 
+> 2.9.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
