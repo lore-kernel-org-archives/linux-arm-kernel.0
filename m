@@ -1,65 +1,47 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Tue, 16 Aug 2016 14:02:57 +0000
-Subject: [PATCH] net: phy: Update copyright info
-In-Reply-To: <20160816133057.GG14446@lunn.ch>
-References: <1471328909-20104-1-git-send-email-appanad@xilinx.com>
- <20160816133057.GG14446@lunn.ch>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5E2C32@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 16 Aug 2016 15:03:01 +0100
+Subject: [PATCH] arm64: Document workaround for Cortex-A72 erratum #853709
+Message-ID: <1471356182-26034-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew
+We already have a workaround for Cortex-A57 erratum #852523,
+but Cortex-A72 r0p0 to r0p2 do suffer from the same issue
+(known as erratum #853709).
 
-> 
-> On Tue, Aug 16, 2016 at 11:58:29AM +0530, Kedareswara rao Appana wrote:
-> > For implementing this driver most of the inputs is provided by Andrew
-> > Lunn.
-> >
-> > Updating the driver with Andrew Copy right.
-> >
-> > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> 
-> O.K, so this is a start in correcting the damage.
-> 
-> The code still has major issues, like i think it will Opps after you unload the
-> module. The code was not ready for merging, which is why it did not get my
-> Signed-off-by, when i left for vacation...
-> 
-> So, for this, and only this patch:
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Let's document the fact that we already handle this.
 
-Thanks...
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ Documentation/arm64/silicon-errata.txt | 1 +
+ arch/arm64/kvm/hyp/switch.c            | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-Will test the driver as a module and will fix the Opps that you are taking will post the patch...
-
-Regards,
-Kedar.
-
-> 
->     Andrew
-> 
-> 
-> 
-> > ---
-> >  drivers/net/phy/xilinx_gmii2rgmii.c | 2 ++
-> >  1 file changed, 2 insertions(+)
-> >
-> > diff --git a/drivers/net/phy/xilinx_gmii2rgmii.c
-> > b/drivers/net/phy/xilinx_gmii2rgmii.c
-> > index cad6e19..e7a20ec 100644
-> > --- a/drivers/net/phy/xilinx_gmii2rgmii.c
-> > +++ b/drivers/net/phy/xilinx_gmii2rgmii.c
-> > @@ -1,7 +1,9 @@
-> >  /* Xilinx GMII2RGMII Converter driver
-> >   *
-> >   * Copyright (C) 2016 Xilinx, Inc.
-> > + * Copyright (C) 2016 Andrew Lunn <andrew@lunn.ch>
-> >   *
-> > + * Author: Andrew Lunn <andrew@lunn.ch>
-> >   * Author: Kedareswara rao Appana <appanad@xilinx.com>
-> >   *
-> >   * Description:
-> > --
-> > 2.1.2
-> >
+diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+index 4da60b4..ccc6032 100644
+--- a/Documentation/arm64/silicon-errata.txt
++++ b/Documentation/arm64/silicon-errata.txt
+@@ -53,6 +53,7 @@ stable kernels.
+ | ARM            | Cortex-A57      | #832075         | ARM64_ERRATUM_832075    |
+ | ARM            | Cortex-A57      | #852523         | N/A                     |
+ | ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220    |
++| ARM            | Cortex-A72      | #853709         | N/A                     |
+ | ARM            | MMU-500         | #841119,#826419 | N/A                     |
+ |                |                 |                 |                         |
+ | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375    |
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index ae7855f..5a84b45 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -256,7 +256,7 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+ 
+ 	/*
+ 	 * We must restore the 32-bit state before the sysregs, thanks
+-	 * to Cortex-A57 erratum #852523.
++	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
+ 	 */
+ 	__sysreg32_restore_state(vcpu);
+ 	__sysreg_restore_guest_state(guest_ctxt);
+-- 
+2.1.4
