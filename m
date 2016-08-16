@@ -1,153 +1,82 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 16 Aug 2016 19:51:49 +0200
-Subject: [PATCH 5/7] arm64: dts: exynos: Add dts files for Samsung
- Exynos5433 64bit SoC
-In-Reply-To: <57B30E2E.3090506@samsung.com>
-References: <1471328843-26653-1-git-send-email-cw00.choi@samsung.com>
- <1471329328-26842-1-git-send-email-cw00.choi@samsung.com>
- <CGME20160816102954epcas1p4480c2a31fc4bd51c396517a272c44b2c@epcas1p4.samsung.com>
- <6afa2f9c-147a-89d1-1806-b465c5a18c95@samsung.com>
- <57B30E2E.3090506@samsung.com>
-Message-ID: <20160816175149.GA14206@kozik-lap>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Tue, 16 Aug 2016 13:52:52 -0400
+Subject: [PATCH soc/next?] ARM: BCM53573: Initial support for Broadcom
+ BCM53573 SoCs
+In-Reply-To: <1470990396-23701-1-git-send-email-zajec5@gmail.com>
+References: <1470990396-23701-1-git-send-email-zajec5@gmail.com>
+Message-ID: <CAC3K-4qMynoE3kL+C3FJenD1WATpET29UAroVxLndZj1Hk1NZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 09:59:26PM +0900, Chanwoo Choi wrote:
-> >> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
-> >> new file mode 100644
-> >> index 000000000000..175121db367e
-> >> --- /dev/null
-> >> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
-> >> @@ -0,0 +1,306 @@
-> >> +/*
-> >> + * Device tree sources for Exynos5433 thermal zone
-> >> + *
-> >> + * Copyright (c) 2016 Chanwoo Choi <cw00.choi@samsung.com>
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * published by the Free Software Foundation.
-> >> + */
-> >> +
-> >> +#include <dt-bindings/thermal/thermal.h>
-> >> +
-> >> +/ {
-> >> +thermal-zones {
-> >> +	atlas0_thermal: atlas0-thermal {
-> >> +		thermal-sensors = <&tmu_atlas0>;
-> >> +		polling-delay-passive = <0>;
-> >> +		polling-delay = <0>;
-> >> +		trips {
-> >> +			atlas0_alert_0: atlas0-alert-0 {
-> >> +				temperature = <50000>;	/* millicelsius */
-> >> +				hysteresis = <1000>;	/* millicelsius */
-> >> +				type = "active";
-> >> +			};
-> >> +			atlas0_alert_1: atlas0-alert-1 {
-> >> +				temperature = <55000>;	/* millicelsius */
-> >> +				hysteresis = <1000>;	/* millicelsius */
-> >> +				type = "active";
-> >> +			};
-> >> +			atlas0_alert_2: atlas0-alert-2 {
-> >> +				temperature = <60000>;	/* millicelsius */
-> >> +				hysteresis = <1000>;	/* millicelsius */
-> >> +				type = "active";
-> >> +			};
-> >> +			atlas0_alert_3: atlas0-alert-3 {
-> >> +				temperature = <70000>;	/* millicelsius */
-> >> +				hysteresis = <1000>;	/* millicelsius */
-> >> +				type = "active";
-> >> +			};
-> >> +			atlas0_alert_4: atlas0-alert-4 {
-> >> +				temperature = <80000>;	/* millicelsius */
-> >> +				hysteresis = <1000>;	/* millicelsius */
-> >> +				type = "active";
-> >> +			};
-> >> +			atlas0_alert_5: atlas0-alert-5 {
-> >> +				temperature = <90000>;	/* millicelsius */
-> >> +				hysteresis = <1000>;	/* millicelsius */
-> >> +				type = "active";
-> >> +			};
-> >> +			atlas0_alert_6: atlas0-alert-6 {
-> >> +				temperature = <95000>;	/* millicelsius */
-> >> +				hysteresis = <1000>;	/* millicelsius */
-> >> +				type = "active";
-> >> +			};
-> > 
-> > No critical trip? I think it might be useful to shutdown the system in a
-> > user-friendly way.
-> 
-> When I use the critical trip, the following event occur[1].
-> But, I guess that this temperature is not correct temperature
-> because after completing the kernel booting, the temperature of big.LITTLE/G3D
-> are normal when checking the /sys/class/thermal/thermal_zoneX/temp right after booting.
-> - Maintain a uniform temperature(38 ~ 45 millicelsius) right after kernel booting.
-> 
-> I guess that the critical interrupt may occur before initializing the exynos tmu.
-> But, I don't spend the many time to check the exynos-tmu.c driver.
-> 
-> [1]
-> [  445.122122] thermal thermal_zone0: critical temperature reached(108 C),shutting down
-> [  445.122399] exynos-tmu 10060000.tmu: Temperature sensor ID: 0xa
-> [  445.122588] exynos-tmu 10060000.tmu: Calibration type is 2-point calibration
-> [  445.127942] reboot: Failed to start orderly shutdown: forcing the issue
-> [  445.134586] Emergency Sync complete
-> [    1.097954] reboot: Power down
+On Fri, Aug 12, 2016 at 4:26 AM, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
+>
+> BCM53573 series is a new family with embedded wireless. By marketing
+> people it's sometimes called Northstar but it uses different CPU and has
+> different architecture so we need a new symbol for it.
+> Fortunately it shares some peripherals with other iProc based SoCs so we
+> will be able to reuse some drivers/bindings.
+>
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> ---
+> Resending as linux-arm-kernel ML rejected my e-mail due to the wrong address:
+> bcm-kernel-feedback-list at broadcom.com>
+> ---
+>  MAINTAINERS               |  7 +++++++
+>  arch/arm/mach-bcm/Kconfig | 15 +++++++++++++++
+>  2 files changed, 22 insertions(+)
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 7304d2e..9e2db2e 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -2517,6 +2517,13 @@ F:       arch/arm/mach-bcm/bcm_5301x.c
+>  F:     arch/arm/boot/dts/bcm5301x.dtsi
+>  F:     arch/arm/boot/dts/bcm470*
+>
+> +BROADCOM BCM53573 ARM ARCHITECTURE
+> +M:     Rafa? Mi?ecki <rafal@milecki.pl>
+> +L:     linux-arm-kernel at lists.infradead.org
+> +S:     Maintained
+> +F:     arch/arm/boot/dts/bcm53573*
+> +F:     arch/arm/boot/dts/bcm47189*
+> +
+>  BROADCOM BCM63XX ARM ARCHITECTURE
+>  M:     Florian Fainelli <f.fainelli@gmail.com>
+>  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+> index 5832dba..9a6c3ae 100644
+> --- a/arch/arm/mach-bcm/Kconfig
+> +++ b/arch/arm/mach-bcm/Kconfig
+> @@ -76,6 +76,21 @@ config ARCH_BCM_5301X
+>           different SoC or with the older BCM47XX and BCM53XX based
+>           network SoC using a MIPS CPU, they are supported by arch/mips/bcm47xx
+>
+> +config ARCH_BCM_53573
+> +       bool "Broadcom BCM53573 SoC series support"
+> +       depends on ARCH_MULTI_V7
+> +       select ARCH_BCM_IPROC
+> +       select HAVE_ARM_ARCH_TIMER
+> +
+> +       help
+> +         BCM53573 series is set of SoCs using ARM Cortex-A7 CPUs with wireless
+> +         embedded in the chipset.
+> +         This SoC line is mostly used in home routers and is some cheaper
+> +         alternative for Northstar family.
+> +
+> +         The base chip is BCM53573 and there are some packaging modifications
+> +         like BCM47189 and BCM47452.
+> +
 
-I understand. Apparently the exynos-tmu driver needs some fixes for
-this race. Skipping critical then makes sense.
+This will put it under the "iProc" section.  I think we would want it
+under the "Other Architectures" section.
 
-> 
-> > 
-> >> +		};
-> >> +
-> >> +		cooling-maps {
-> >> +			map0 {
-> >> +				/* Set maximum frequency as 1800MHz  */
-> >> +				trip = <&atlas0_alert_0>;
-> >> +				cooling-device = <&cpu4 1 1>;
-> > 
-> > Out of curiosity: why choosing specific cooling level (so quite fast
-> > the device will slow down) instead of letting cooling framework to
-> > decide how much to cool? Any particular reason behind this?
-> 
-> This cooling level is just default value in cooling-maps.
-> This value is able to overwrite on dts file. 
-> 
-> And the thermal subsystem support the cpu cooling features
-> with 'cooling-maps'.
-> 
-> Also, when I tested the performance and stress test
-> with GLBenchmark, the temperature of big.LITTLE cores/G3D
-> reach easily the critical temperature with 8 online cores.
-> So, I add the cooling level aggressively to protect
-> the system fault of CPU and GPU and to maintain
-> the system state.
+Thanks,
+Jon
 
-I was asking why you do not let cooling framework decide which cooling
-level to use but instead you force a specific cooling level. Maybe code
-will be a better example. Why not use:
-			map0 {
-				/* Set maximum frequency as 1800MHz  */
-				trip = <&atlas0_alert_0>;
-				cooling-device = <&cpu4 0 1>;
-			}
-			map1 {
-				/* Set maximum frequency as 1700MHz  */
-				trip = <&atlas0_alert_1>;
-				cooling-device = <&cpu4 1 2>;
-			};
-
-For higher frequencies it makes even more sense:
-			map6 {
-				/* Set maximum frequency as 800MHz  */
-				trip = <&atlas0_alert_6>;
-				cooling-device = <&cpu4 7 11>;
-			};
-
-which allows the system to use suitable cooling level to maintain the
-balance between performance and temperature dissipance, instead of some
-fixed cooling level which might not be accurate to the system load.
-
-Best regards,
-Krzysztof
+>  comment "KONA architected SoCs"
+>
+>  config ARCH_BCM_MOBILE
+> --
+> 1.8.4.5
+>
