@@ -1,217 +1,78 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 16 Aug 2016 17:12:53 +0800
-Subject: [PATCH v2 2/2] pinctrl: sunxi: Add A64 R_PIO controller support
-In-Reply-To: <20160816050709.7412-2-icenowy@aosc.xyz>
-References: <20160816050709.7412-1-icenowy@aosc.xyz>
- <20160816050709.7412-2-icenowy@aosc.xyz>
-Message-ID: <CAGb2v64dP+0WKBdX+mNxjgb1PPH9N0rA+DCia+VM2eNdTZbiog@mail.gmail.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Tue, 16 Aug 2016 16:59:52 +0800
+Subject: [PATCH v5 1/7] power: act8945a_charger: Remove "battery_temperature"
+In-Reply-To: <1471337998-6467-1-git-send-email-wenyou.yang@atmel.com>
+References: <1471337998-6467-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1471337998-6467-2-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 1:07 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
-> The A64 has a R_PIO pin controller, similar to the one found on the H3 SoC.
-> Add support for the pins controlled by the R_PIO controller.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
-> Changes in v2:
-> - Changed the name of I2C functions from "s_twi" to "s_i2c"
-> - Rearranged the sequence of #include
-> - Changed the driver info part from module to a builtin driver
->
->  drivers/pinctrl/sunxi/Kconfig                |   5 +
->  drivers/pinctrl/sunxi/Makefile               |   1 +
->  drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c | 145 +++++++++++++++++++++++++++
->  3 files changed, 151 insertions(+)
->  create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c
->
-> diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
-> index aaf075b..c4b476f 100644
-> --- a/drivers/pinctrl/sunxi/Kconfig
-> +++ b/drivers/pinctrl/sunxi/Kconfig
-> @@ -72,4 +72,9 @@ config PINCTRL_SUN50I_A64
->         bool
->         select PINCTRL_SUNXI
->
-> +config PINCTRL_SUN50I_A64_R
-> +       bool
-> +       depends on RESET_CONTROLLER
-> +       select PINCTRL_SUNXI
-> +
->  endif
-> diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
-> index 2d8b64e..d6eabdd 100644
-> --- a/drivers/pinctrl/sunxi/Makefile
-> +++ b/drivers/pinctrl/sunxi/Makefile
-> @@ -13,6 +13,7 @@ obj-$(CONFIG_PINCTRL_SUN8I_A23)               += pinctrl-sun8i-a23.o
->  obj-$(CONFIG_PINCTRL_SUN8I_A23_R)      += pinctrl-sun8i-a23-r.o
->  obj-$(CONFIG_PINCTRL_SUN8I_A33)                += pinctrl-sun8i-a33.o
->  obj-$(CONFIG_PINCTRL_SUN50I_A64)       += pinctrl-sun50i-a64.o
-> +obj-$(CONFIG_PINCTRL_SUN50I_A64_R)     += pinctrl-sun50i-a64-r.o
->  obj-$(CONFIG_PINCTRL_SUN8I_A83T)       += pinctrl-sun8i-a83t.o
->  obj-$(CONFIG_PINCTRL_SUN8I_H3)         += pinctrl-sun8i-h3.o
->  obj-$(CONFIG_PINCTRL_SUN8I_H3_R)       += pinctrl-sun8i-h3-r.o
-> diff --git a/drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c b/drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c
-> new file mode 100644
-> index 0000000..440cfe9
-> --- /dev/null
-> +++ b/drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c
-> @@ -0,0 +1,145 @@
-> +/*
-> + * Allwinner A64 SoCs special pins pinctrl driver.
-> + *
-> + * Based on pinctrl-sun8i-a23-r.c
-> + *
-> + * Copyright (C) 2016 Icenowy Zheng
-> + * Icenowy Zheng <icenowy@aosc.xyz>
-> + *
-> + * Copyright (C) 2014 Chen-Yu Tsai
-> + * Chen-Yu Tsai <wens@csie.org>
-> + *
-> + * Copyright (C) 2014 Boris Brezillon
-> + * Boris Brezillon <boris.brezillon@free-electrons.com>
-> + *
-> + * Copyright (C) 2014 Maxime Ripard
-> + * Maxime Ripard <maxime.ripard@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/module.h>
+Remove "battery_temperature" member, it is redundant, it is the
+hardware's responsibility to handle TH pin properly.
+It is unnecessary to use the dt property to check if there is
+a battery temperature monitor or not.
 
-You can drop this one.
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
 
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/pinctrl/pinctrl.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reset.h>
-> +
-> +#include "pinctrl-sunxi.h"
-> +
-> +static const struct sunxi_desc_pin sun50i_a64_r_pins[] = {
-> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 0),
-> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
-> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
-> +                 SUNXI_FUNCTION(0x2, "s_rsb"),         /* SCK */
-> +                 SUNXI_FUNCTION(0x3, "s_i2c"),         /* SCK */
-> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 0)),  /* PL_EINT0 */
-> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 1),
-> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
-> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
-> +                 SUNXI_FUNCTION(0x2, "s_rsb"),         /* SDA */
-> +                 SUNXI_FUNCTION(0x3, "s_i2c"),         /* SDA */
-> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 1)),  /* PL_EINT1 */
-> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 2),
-> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
-> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
-> +                 SUNXI_FUNCTION(0x2, "s_uart"),        /* TX */
-> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 2)),  /* PL_EINT2 */
-> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 3),
-> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
-> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
-> +                 SUNXI_FUNCTION(0x2, "s_uart"),        /* RX */
-> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 3)),  /* PL_EINT3 */
-> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 4),
-> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
-> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
-> +                 SUNXI_FUNCTION(0x3, "s_jtag"),        /* MS */
-> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 4)),  /* PL_EINT4 */
-> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 5),
-> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
-> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
-> +                 SUNXI_FUNCTION(0x3, "s_jtag"),        /* CK */
-> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 5)),  /* PL_EINT5 */
-> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 6),
-> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
-> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
-> +                 SUNXI_FUNCTION(0x3, "s_jtag"),        /* DO */
-> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 6)),  /* PL_EINT6 */
-> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 7),
-> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
-> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
-> +                 SUNXI_FUNCTION(0x3, "s_jtag"),        /* DI */
-> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 7)),  /* PL_EINT7 */
-> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 8),
-> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
-> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
-> +                 SUNXI_FUNCTION(0x2, "s_i2c"),         /* SCK */
-> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 8)),  /* PL_EINT8 */
-> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 9),
-> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
-> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
-> +                 SUNXI_FUNCTION(0x2, "s_i2c"),         /* SDA */
-> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 9)),  /* PL_EINT9 */
-> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 10),
-> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
-> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
-> +                 SUNXI_FUNCTION(0x2, "s_pwm"),
-> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 10)), /* PL_EINT10 */
-> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 11),
-> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
-> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
-> +                 SUNXI_FUNCTION(0x2, "s_cir_rx"),
-> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 11)), /* PL_EINT11 */
-> +       SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 12),
-> +                 SUNXI_FUNCTION(0x0, "gpio_in"),
-> +                 SUNXI_FUNCTION(0x1, "gpio_out"),
-> +                 SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 12)), /* PL_EINT12 */
-> +};
-> +
-> +static const struct sunxi_pinctrl_desc sun50i_a64_r_pinctrl_data = {
-> +       .pins = sun50i_a64_r_pins,
-> +       .npins = ARRAY_SIZE(sun50i_a64_r_pins),
-> +       .pin_base = PL_BASE,
-> +       .irq_banks = 1,
-> +};
-> +
-> +static int sun50i_a64_r_pinctrl_probe(struct platform_device *pdev)
-> +{
-> +       struct reset_control *rstc;
-> +       int ret;
-> +
-> +       rstc = devm_reset_control_get(&pdev->dev, NULL);
-> +       if (IS_ERR(rstc)) {
-> +               dev_err(&pdev->dev, "Reset controller missing\n");
-> +               return PTR_ERR(rstc);
-> +       }
-> +
-> +       ret = reset_control_deassert(rstc);
-> +       if (ret)
-> +               return ret;
-> +
-> +       ret = sunxi_pinctrl_init(pdev,
-> +                                &sun50i_a64_r_pinctrl_data);
-> +
-> +       if (ret)
-> +               reset_control_assert(rstc);
-> +
-> +       return ret;
-> +}
-> +
-> +static const struct of_device_id sun50i_a64_r_pinctrl_match[] = {
-> +       { .compatible = "allwinner,sun50i-a64-r-pinctrl", },
-> +       {}
-> +};
-> +MODULE_DEVICE_TABLE(of, sun50i_a64_r_pinctrl_match);
+Changes in v5: None
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
 
-Nor do you need MODULE_DEVICE_TABLE.
+ drivers/power/supply/act8945a_charger.c | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
-Otherwise this looks good.
-
-ChenYu
-
-> +
-> +static struct platform_driver sun50i_a64_r_pinctrl_driver = {
-> +       .probe  = sun50i_a64_r_pinctrl_probe,
-> +       .driver = {
-> +               .name           = "sun50i-a64-r-pinctrl",
-> +               .of_match_table = sun50i_a64_r_pinctrl_match,
-> +       },
-> +};
-> +builtin_platform_driver(sun50i_a64_r_pinctrl_driver);
-> --
-> 2.9.2
->
+diff --git a/drivers/power/supply/act8945a_charger.c b/drivers/power/supply/act8945a_charger.c
+index b5c00e4..72d39ba 100644
+--- a/drivers/power/supply/act8945a_charger.c
++++ b/drivers/power/supply/act8945a_charger.c
+@@ -76,7 +76,6 @@ static const char *act8945a_charger_manufacturer = "Active-semi";
+ 
+ struct act8945a_charger {
+ 	struct regmap *regmap;
+-	bool battery_temperature;
+ };
+ 
+ static int act8945a_get_charger_state(struct regmap *regmap, int *val)
+@@ -138,8 +137,7 @@ static int act8945a_get_charge_type(struct regmap *regmap, int *val)
+ 	return 0;
+ }
+ 
+-static int act8945a_get_battery_health(struct act8945a_charger *charger,
+-				       struct regmap *regmap, int *val)
++static int act8945a_get_battery_health(struct regmap *regmap, int *val)
+ {
+ 	int ret;
+ 	unsigned int status;
+@@ -148,7 +146,7 @@ static int act8945a_get_battery_health(struct act8945a_charger *charger,
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	if (charger->battery_temperature && !(status & APCH_STATUS_TEMPDAT))
++	if (status & APCH_STATUS_TEMPDAT)
+ 		*val = POWER_SUPPLY_HEALTH_OVERHEAT;
+ 	else if (!(status & APCH_STATUS_INDAT))
+ 		*val = POWER_SUPPLY_HEALTH_OVERVOLTAGE;
+@@ -188,8 +186,7 @@ static int act8945a_charger_get_property(struct power_supply *psy,
+ 		val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
+ 		break;
+ 	case POWER_SUPPLY_PROP_HEALTH:
+-		ret = act8945a_get_battery_health(charger,
+-						  regmap, &val->intval);
++		ret = act8945a_get_battery_health(regmap, &val->intval);
+ 		break;
+ 	case POWER_SUPPLY_PROP_MODEL_NAME:
+ 		val->strval = act8945a_charger_model;
+@@ -235,9 +232,6 @@ static int act8945a_charger_config(struct device *dev,
+ 		return -EINVAL;
+ 	}
+ 
+-	charger->battery_temperature = of_property_read_bool(np,
+-				"active-semi,check-battery-temperature");
+-
+ 	chglev_pin = of_get_named_gpio_flags(np,
+ 				"active-semi,chglev-gpios", 0, &flags);
+ 
+-- 
+2.7.4
