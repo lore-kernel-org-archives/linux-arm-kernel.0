@@ -1,38 +1,84 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 16 Aug 2016 15:42:20 +0200
-Subject: [PATCH] ARM: debug-ll: Add support for r8a7992
-Message-ID: <1471354940-18696-1-git-send-email-geert+renesas@glider.be>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 16 Aug 2016 16:48:02 +0300
+Subject: [PATCH v2 4/7] phy-sun4i-usb: Add support for phy_set_mode
+In-Reply-To: <1471288892-21702-5-git-send-email-hdegoede@redhat.com>
+References: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
+ <1471288892-21702-5-git-send-email-hdegoede@redhat.com>
+Message-ID: <6058a676-1e2c-0301-6edd-eee64b515b51@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable low-level debugging support for R-Car V2H (r8a7792).
-V2H uses SCIF0 for the debug console, like most other R-Car Gen2 SoCs.
+Hello.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/Kconfig.debug | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+On 08/15/2016 10:21 PM, Hans de Goede wrote:
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index a9693b6987a6e41c..88440f63c31e434b 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -861,12 +861,12 @@ choice
- 		  via SCIF2 on Renesas R-Car H1 (R8A7779).
- 
- 	config DEBUG_RCAR_GEN2_SCIF0
--		bool "Kernel low-level debugging messages via SCIF0 on R8A7790/R8A7791/R8A7793"
--		depends on ARCH_R8A7790 || ARCH_R8A7791 || ARCH_R8A7793
-+		bool "Kernel low-level debugging messages via SCIF0 on R8A7790/R8A7791/R8A7792/R8A7793"
-+		depends on ARCH_R8A7790 || ARCH_R8A7791 || ARCH_R8A7792 || ARCH_R8A7793
- 		help
- 		  Say Y here if you want kernel low-level debugging support
--		  via SCIF0 on Renesas R-Car H2 (R8A7790), M2-W (R8A7791), or
--		  M2-N (R8A7793).
-+		  via SCIF0 on Renesas R-Car H2 (R8A7790), M2-W (R8A7791), V2H
-+		  (R8A7792), or M2-N (R8A7793).
- 
- 	config DEBUG_RCAR_GEN2_SCIF2
- 		bool "Kernel low-level debugging messages via SCIF2 on R8A7794"
--- 
-1.9.1
+> Together with some musb sunxi glue changes this allows run-time dr_mode
+> switching support via the "mode" musb sysfs attribute.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  drivers/phy/phy-sun4i-usb.c | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>
+> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+> index fb2d4f3..d369081 100644
+> --- a/drivers/phy/phy-sun4i-usb.c
+> +++ b/drivers/phy/phy-sun4i-usb.c
+> @@ -427,6 +427,29 @@ static int sun4i_usb_phy_power_off(struct phy *_phy)
+>  	return 0;
+>  }
+>
+> +static int sun4i_usb_phy_set_mode(struct phy *_phy, enum phy_mode mode)
+> +{
+> +	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+> +	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+> +
+> +	if (phy->index != 0)
+> +		return -EINVAL;
+> +
+> +	switch (mode) {
+> +	case PHY_MODE_USB_HOST:   data->dr_mode = USB_DR_MODE_HOST; break;
+> +	case PHY_MODE_USB_DEVICE: data->dr_mode = USB_DR_MODE_PERIPHERAL; break;
+> +	case PHY_MODE_USB_OTG:    data->dr_mode = USB_DR_MODE_OTG; break;
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +
+> +	dev_info(&_phy->dev, "Changing dr_mode to %d\n", (int)data->dr_mode);
+> +	data->force_session_end = true;
+> +	queue_delayed_work(system_wq, &data->detect, 0);
+> +
+> +	return 0;
+> +}
+> +
+>  void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
+>  {
+>  	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+[...]
+
+$ scripts/checkpatch.pl 
+~/patches/phy-sun4i-usb-Add-support-for-phy_set_mode.patch
+ERROR: trailing statements should be on next line
+#29: FILE: drivers/phy/phy-sun4i-usb.c:439:
++	case PHY_MODE_USB_HOST:   data->dr_mode = USB_DR_MODE_HOST; break;
+
+ERROR: trailing statements should be on next line
+#30: FILE: drivers/phy/phy-sun4i-usb.c:440:
++	case PHY_MODE_USB_DEVICE: data->dr_mode = USB_DR_MODE_PERIPHERAL; break;
+
+ERROR: trailing statements should be on next line
+#31: FILE: drivers/phy/phy-sun4i-usb.c:441:
++	case PHY_MODE_USB_OTG:    data->dr_mode = USB_DR_MODE_OTG; break;
+
+total: 3 errors, 0 warnings, 36 lines checked
+
+NOTE: For some of the reported defects, checkpatch may be able to
+       mechanically convert to the typical style using --fix or --fix-inplace.
+
+/home/headless/patches/phy-sun4i-usb-Add-support-for-phy_set_mode.patch has 
+style problems, please review.
+
+NOTE: If any of the errors are false positives, please report
+       them to the maintainer, see CHECKPATCH in MAINTAINERS.
+
+MBR, Sergei
