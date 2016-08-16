@@ -1,83 +1,122 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 16 Aug 2016 17:51:06 +0100
-Subject: [PATCH] KVM: arm64: ITS: avoid re-mapping LPIs
-Message-ID: <20160816165106.25057-1-andre.przywara@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 16 Aug 2016 18:50:42 +0200
+Subject: [PATCH v3] MAINTAINERS: Switch to kernel.org account for Krzysztof
+ Kozlowski
+Message-ID: <1471366242-11432-1-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a guest wants to map a device-ID/event-ID combination that is
-already mapped, we may end up in a situation where an LPI is never
-"put", thus never being freed.
-Since the GICv3 spec says that mapping an already mapped LPI is
-UNPREDICTABLE, lets just bail out early in this situation to avoid
-any potential leaks.
+Change my email address to kernel.org account instead of Samsung one.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Add Bartlomiej Zolnierkiewicz as a co-maintainer of Maxim and Samsung
+PMIC drivers.  These are used on many of our boards along with Exynos
+SoCs and Samsung R&D Institute Poland can still take care of them.
+
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+
 ---
- virt/kvm/arm/vgic/vgic-its.c | 27 +++++++++++++--------------
- 1 file changed, 13 insertions(+), 14 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 9533080..4660a7d 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -731,7 +731,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	u32 device_id = its_cmd_get_deviceid(its_cmd);
- 	u32 event_id = its_cmd_get_id(its_cmd);
- 	u32 coll_id = its_cmd_get_collection(its_cmd);
--	struct its_itte *itte, *new_itte = NULL;
-+	struct its_itte *itte;
- 	struct its_device *device;
- 	struct its_collection *collection, *new_coll = NULL;
- 	int lpi_nr;
-@@ -749,6 +749,10 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	    lpi_nr >= max_lpis_propbaser(kvm->arch.vgic.propbaser))
- 		return E_ITS_MAPTI_PHYSICALID_OOR;
+Third revision for simple maintainers update. Nice! :)
+
+Changes since v2:
+1. Add Bartlomiej, leave MUIC charger drivers as "Supported".
+
+Changes since v1:
+1. Update also mailmap after Joe Perches suggestion.
+
+Affected drivers/subsystems:
+1. arch/arm,
+2. mfd,
+3. power,
+4. regulator,
+5. clk,
+6. rtc,
+7. extcon,
+8. pinctrl,
+9. sound/soc,
+
+However if there are no objections, I can push it through my tree (to
+arm-soc folks).
+---
+ .mailmap    |  1 +
+ MAINTAINERS | 15 +++++++++------
+ 2 files changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/.mailmap b/.mailmap
+index 2a91c14c80bf..b18912c5121e 100644
+--- a/.mailmap
++++ b/.mailmap
+@@ -88,6 +88,7 @@ Kay Sievers <kay.sievers@vrfy.org>
+ Kenneth W Chen <kenneth.w.chen@intel.com>
+ Konstantin Khlebnikov <koct9i@gmail.com> <k.khlebnikov@samsung.com>
+ Koushik <raghavendra.koushik@neterion.com>
++Krzysztof Kozlowski <krzk@kernel.org> <k.kozlowski@samsung.com>
+ Krzysztof Kozlowski <krzk@kernel.org> <k.kozlowski.k@gmail.com>
+ Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+ Leonid I Ananiev <leonid.i.ananiev@intel.com>
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 45c98485c3f0..f77df673d097 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1623,7 +1623,7 @@ N:	rockchip
  
-+	/* If there is an existing mapping, behavior is UNPREDICTABLE. */
-+	if (find_itte(its, device_id, event_id))
-+		return 0;
-+
- 	collection = find_collection(its, coll_id);
- 	if (!collection) {
- 		int ret = vgic_its_alloc_collection(its, &collection, coll_id);
-@@ -757,20 +761,16 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 		new_coll = collection;
- 	}
+ ARM/SAMSUNG EXYNOS ARM ARCHITECTURES
+ M:	Kukjin Kim <kgene@kernel.org>
+-M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
++M:	Krzysztof Kozlowski <krzk@kernel.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+ S:	Maintained
+@@ -7465,7 +7465,8 @@ F:	Documentation/devicetree/bindings/sound/max9860.txt
+ F:	sound/soc/codecs/max9860.*
  
--	itte = find_itte(its, device_id, event_id);
-+	itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
- 	if (!itte) {
--		itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
--		if (!itte) {
--			if (new_coll)
--				vgic_its_free_collection(its, coll_id);
--			return -ENOMEM;
--		}
--
--		new_itte = itte;
--		itte->event_id	= event_id;
--		list_add_tail(&itte->itte_list, &device->itt_head);
-+		if (new_coll)
-+			vgic_its_free_collection(its, coll_id);
-+		return -ENOMEM;
- 	}
+ MAXIM MUIC CHARGER DRIVERS FOR EXYNOS BASED BOARDS
+-M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
++M:	Krzysztof Kozlowski <krzk@kernel.org>
++M:	Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+ L:	linux-pm at vger.kernel.org
+ S:	Supported
+ F:	drivers/power/supply/max14577_charger.c
+@@ -7481,7 +7482,8 @@ F:	include/dt-bindings/*/*max77802.h
  
-+	itte->event_id	= event_id;
-+	list_add_tail(&itte->itte_list, &device->itt_head);
-+
- 	itte->collection = collection;
- 	itte->lpi = lpi_nr;
+ MAXIM PMIC AND MUIC DRIVERS FOR EXYNOS BASED BOARDS
+ M:	Chanwoo Choi <cw00.choi@samsung.com>
+-M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
++M:	Krzysztof Kozlowski <krzk@kernel.org>
++M:	Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+ L:	linux-kernel at vger.kernel.org
+ S:	Supported
+ F:	drivers/*/max14577*.c
+@@ -9258,7 +9260,7 @@ F:	drivers/pinctrl/sh-pfc/
  
-@@ -778,8 +778,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	if (IS_ERR(irq)) {
- 		if (new_coll)
- 			vgic_its_free_collection(its, coll_id);
--		if (new_itte)
--			its_free_itte(kvm, new_itte);
-+		its_free_itte(kvm, itte);
- 		return PTR_ERR(irq);
- 	}
- 	itte->irq = irq;
+ PIN CONTROLLER - SAMSUNG
+ M:	Tomasz Figa <tomasz.figa@gmail.com>
+-M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
++M:	Krzysztof Kozlowski <krzk@kernel.org>
+ M:	Sylwester Nawrocki <s.nawrocki@samsung.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+@@ -10189,7 +10191,7 @@ S:	Maintained
+ F:	drivers/platform/x86/samsung-laptop.c
+ 
+ SAMSUNG AUDIO (ASoC) DRIVERS
+-M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
++M:	Krzysztof Kozlowski <krzk@kernel.org>
+ M:	Sangbeom Kim <sbkim73@samsung.com>
+ M:	Sylwester Nawrocki <s.nawrocki@samsung.com>
+ L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
+@@ -10204,7 +10206,8 @@ F:	drivers/video/fbdev/s3c-fb.c
+ 
+ SAMSUNG MULTIFUNCTION PMIC DEVICE DRIVERS
+ M:	Sangbeom Kim <sbkim73@samsung.com>
+-M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
++M:	Krzysztof Kozlowski <krzk@kernel.org>
++M:	Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+ L:	linux-kernel at vger.kernel.org
+ L:	linux-samsung-soc at vger.kernel.org
+ S:	Supported
 -- 
-2.9.0
+2.7.4
