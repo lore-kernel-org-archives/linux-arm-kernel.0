@@ -1,49 +1,49 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 15 Aug 2016 17:17:07 -0700
-Subject: [PATCH 01/14] rpmsg: Enable matching devices with drivers based on DT
+Date: Mon, 15 Aug 2016 17:17:08 -0700
+Subject: [PATCH 02/14] rpmsg: Name rpmsg devices based on channel id
 In-Reply-To: <1471306640-29917-1-git-send-email-bjorn.andersson@linaro.org>
 References: <1471306640-29917-1-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <1471306640-29917-2-git-send-email-bjorn.andersson@linaro.org>
+Message-ID: <1471306640-29917-3-git-send-email-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make it possible to match rpmsg devices based on device tree node, in
-addition to the id table. In some of these cases the rpmsg driver would
-not have a id_table, so make this optional.
+By basing rpmsg device names on channel id we end up with human readable
+device names in sysfs and debug logs.
 
 Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 ---
- drivers/rpmsg/virtio_rpmsg_bus.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ drivers/rpmsg/virtio_rpmsg_bus.c | 12 ++----------
+ 1 file changed, 2 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c b/drivers/rpmsg/virtio_rpmsg_bus.c
-index 4a4374cc6a59..495fa0a282d3 100644
+index 495fa0a282d3..c4bd89ea7681 100644
 --- a/drivers/rpmsg/virtio_rpmsg_bus.c
 +++ b/drivers/rpmsg/virtio_rpmsg_bus.c
-@@ -33,6 +33,7 @@
- #include <linux/wait.h>
- #include <linux/rpmsg.h>
- #include <linux/mutex.h>
-+#include <linux/of_device.h>
+@@ -136,14 +136,6 @@ rpmsg_show_attr(src, src, "0x%x\n");
+ rpmsg_show_attr(dst, dst, "0x%x\n");
+ rpmsg_show_attr(announce, announce ? "true" : "false", "%s\n");
  
- /**
-  * struct virtproc_info - virtual remote processor state
-@@ -175,11 +176,12 @@ static int rpmsg_dev_match(struct device *dev, struct device_driver *drv)
- 	const struct rpmsg_device_id *ids = rpdrv->id_table;
- 	unsigned int i;
+-/*
+- * Unique (and free running) index for rpmsg devices.
+- *
+- * Yeah, we're not recycling those numbers (yet?). will be easy
+- * to change if/when we want to.
+- */
+-static unsigned int rpmsg_dev_index;
+-
+ static ssize_t modalias_show(struct device *dev,
+ 			     struct device_attribute *attr, char *buf)
+ {
+@@ -531,8 +523,8 @@ static struct rpmsg_channel *rpmsg_create_channel(struct virtproc_info *vrp,
  
--	for (i = 0; ids[i].name[0]; i++)
--		if (rpmsg_id_match(rpdev, &ids[i]))
--			return 1;
-+	if (ids)
-+		for (i = 0; ids[i].name[0]; i++)
-+			if (rpmsg_id_match(rpdev, &ids[i]))
-+				return 1;
+ 	strncpy(rpdev->id.name, chinfo->name, RPMSG_NAME_SIZE);
  
--	return 0;
-+	return of_driver_match_device(dev, drv);
- }
+-	/* very simple device indexing plumbing which is enough for now */
+-	dev_set_name(&rpdev->dev, "rpmsg%d", rpmsg_dev_index++);
++	dev_set_name(&rpdev->dev, "%s:%s",
++		     dev_name(dev->parent), rpdev->id.name);
  
- static int rpmsg_uevent(struct device *dev, struct kobj_uevent_env *env)
+ 	rpdev->dev.parent = &vrp->vdev->dev;
+ 	rpdev->dev.bus = &rpmsg_bus;
 -- 
 2.5.0
