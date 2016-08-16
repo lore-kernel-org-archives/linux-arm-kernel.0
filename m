@@ -1,21 +1,48 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 16 Aug 2016 10:45:43 +0800
-Subject: [PATCH 3/8] ARM: dts: sun8i: reference-design-tablet: Add gsl1680
- touchscreen node
-In-Reply-To: <1470685398-14568-3-git-send-email-hdegoede@redhat.com>
+Date: Tue, 16 Aug 2016 10:47:36 +0800
+Subject: [PATCH 4/8] ARM: dts: sun8i: Add touchscreen node for
+ sun8i-a23-gt90h
+In-Reply-To: <1470685398-14568-4-git-send-email-hdegoede@redhat.com>
 References: <1470685398-14568-1-git-send-email-hdegoede@redhat.com>
- <1470685398-14568-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGb2v67jkZGAosSjO3vSaf0sTWvqVjmQXPB5LRR4Ah0_0-RM6w@mail.gmail.com>
+ <1470685398-14568-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGb2v66_WAO-hm5jyeE9=J=hi8=03LH26Qev+xv1CsphH53=eQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Aug 9, 2016 at 3:43 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Almost all sun8i tablets use a gsl1680 touchscreen controller, so add
-> a node describing it to reference-design-tablet.dtsi.
->
-> Almost all, but not all, so mark it as disabled by default (dts files
-> will also need to supply a firmware-name and resolution info).
+> The gt90h tablet has a gsl3675 touchscreen, add a dt node describing it.
 >
 > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
 Acked-by: Chen-Yu Tsai <wens@csie.org>
+
+> ---
+>  arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts b/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
+> index f27ebbb..da55b5a 100644
+> --- a/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
+> +++ b/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
+> @@ -53,6 +53,14 @@
+>         status = "okay";
+>  };
+>
+> +&gsl1680 {
+> +       compatible = "silead,gsl3675";
+
+The silead binding should be updated with all the other
+supported chips though. It currently only lists gsl1680.
+
+> +       touchscreen-fw-name = "silead/gsl3675-gt90h.fw";
+> +       touchscreen-size-x = <1792>;
+> +       touchscreen-size-y = <1024>;
+> +       status = "okay";
+> +};
+> +
+>  &lradc {
+>         button at 600 {
+>                 label = "Back";
+> --
+> 2.7.4
+>
