@@ -1,27 +1,28 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 16 Aug 2016 08:20:00 -0500
-Subject: [PATCH v2 0/4] pwm: Add Amlogic Meson SoC PWM Controller
-In-Reply-To: <CAOi56cVGRpSeAVwaATkx8Q2wz9hxocq6095opJQZucfDML2wSg@mail.gmail.com>
-References: <1468142645-4360-1-git-send-email-narmstrong@baylibre.com>
- <CAOi56cVGRpSeAVwaATkx8Q2wz9hxocq6095opJQZucfDML2wSg@mail.gmail.com>
-Message-ID: <CAOi56cWRwc28RcRopLpRiFLX-rft-KfgMZHwDGFG3f6tJ_8kYw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 16 Aug 2016 14:21:03 +0100
+Subject: Problem with atomic accesses in pstore on some ARM CPUs
+In-Reply-To: <CABXOdTfg2T2tZrQOd2S5SjeySAMbfQX0weFuvRXBr2o8Of9nVQ@mail.gmail.com>
+References: <CABXOdTfT7xMfiBvRuUS1hsVs=q5q2wY1x1Z8oCyyJNFckM0g0A@mail.gmail.com>
+ <8f0c9ced-cdc3-ab9b-caee-06fe85e6c1e7@arm.com>
+ <CABXOdTfg2T2tZrQOd2S5SjeySAMbfQX0weFuvRXBr2o8Of9nVQ@mail.gmail.com>
+Message-ID: <20160816132103.GD27088@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 3, 2016 at 7:25 PM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Hi Thierry,
->
-> On Sun, Jul 10, 2016 at 2:27 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
->> Add support for the PWM controller found in Amlogic Meson SoCs.
->> This controller provides a dual PWM output with 4 selectable clock source
->> and a two level divider to achieve a better PWM range.
->>
->> Currently Meson8b and GXBB SoCs are supported.
->>
->> Changes since v1 at http://lkml.kernel.org/r/1466173784-15625-1-git-send-email-narmstrong at baylibre.com :
->> - fix meson8b dtsi
->
-> Gentle reminder ping on this series.
->
+On Tue, Aug 16, 2016 at 06:14:53AM -0700, Guenter Roeck wrote:
+> On Tue, Aug 16, 2016 at 3:32 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+> > On 16/08/16 00:19, Guenter Roeck wrote:
+> >> we are having a problem with atomic accesses in pstore on some ARM
+> >> CPUs (specifically rk3288 and rk3399). With those chips, atomic
+> >> accesses fail with both pgprot_noncached and pgprot_writecombine
+> >> memory. Atomic accesses do work when selecting PAGE_KERNEL protection.
+> >
+> > What's the pstore backed by? I'm guessing it's not normal DRAM.
+> >
+> 
+> it is normal DRAM.
 
-One more... :)
+In which case, why does it need to be mapped with weird attributes?
+Is there an alias in the linear map you can use?
+
+Will
