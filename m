@@ -1,33 +1,17 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 16 Aug 2016 14:01:57 +0200
-Subject: [PATCH] MAINTAINERS: Switch to kernel.org account for Krzysztof
- Kozlowski
-In-Reply-To: <1686159.ibR5sQZ1NC@amdc1976>
-References: <1471281469-5847-1-git-send-email-krzk@kernel.org>
- <1686159.ibR5sQZ1NC@amdc1976>
-Message-ID: <7f5b8f5e-10cb-e175-50e9-df77f338fc19@kernel.org>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 16 Aug 2016 14:04:15 +0200
+Subject: [PATCH v2] Added perf functionality to mmdc driver
+In-Reply-To: <20160815165050.GB31080@svinekod>
+References: <20160815223035.5429-1-zhengyu.shen@nxp.com>
+ <20160815165050.GB31080@svinekod>
+Message-ID: <20160816120415.GJ30192@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/16/2016 12:36 PM, Bartlomiej Zolnierkiewicz wrote:
-> 
-> Hi,
-> 
-> On Monday, August 15, 2016 07:17:49 PM Krzysztof Kozlowski wrote:
->> Change my email address to kernel.org account instead of Samsung one.
->> Also switch Maxim MUIC charger drivers from supported to maintained
->> mode.
-> 
-> I would like to help with maintaining affected drivers/subsystems
-> from Samsung R&D Institute Poland's side (I can devote some of my
-> paid time for this) after your departure from the company.
-> 
-> Would it be possible to add me as co-maintainer to affected
-> drivers/subsystems (except pinctrl and sound/soc ones as they are
-> already covered by Sylwester Nawrocki)?
+On Mon, Aug 15, 2016 at 05:50:50PM +0100, Mark Rutland wrote:
+> For the Nth time, I'm going to say that really, we should have the core check
+> this (or expose helpers to do so). It's somewhat ridiculous that evry driver
+> has to blacklist everything it doesn't support, rather than whitelisting the
+> few things that it does.
 
-Awesome! I'll add you to the MUICs/PMICs and leave the "supported" state
-for Maxim chargers.
-
-Best regards,
-Krzysztof
+I'll look at patches ;-)
