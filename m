@@ -1,144 +1,139 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 16 Aug 2016 16:59:57 +0800
-Subject: [PATCH v5 6/7] power: act8945a_charger: Add max current property
-In-Reply-To: <1471337998-6467-1-git-send-email-wenyou.yang@atmel.com>
-References: <1471337998-6467-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1471337998-6467-7-git-send-email-wenyou.yang@atmel.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 16 Aug 2016 12:25:02 +0300
+Subject: [PATCH 5/8] drivers: platform: Configure dma operations at probe
+ time
+In-Reply-To: <1470696550-3416-6-git-send-email-sricharan@codeaurora.org>
+References: <1470696550-3416-1-git-send-email-sricharan@codeaurora.org>
+ <1470696550-3416-6-git-send-email-sricharan@codeaurora.org>
+Message-ID: <14864888.EhQqoi8buh@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the power supply's current max property,
-POWER_SUPPLY_PROP_CURRENT_MAX.
+Hi Sricharan,
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
+Thank you for the patch.
 
-Changes in v5: None
-Changes in v4:
- - Fix wrong gpio assignment for chglev_pin.
+On Tuesday 09 Aug 2016 04:19:07 Sricharan R wrote:
+> Configuring DMA ops at probe time will allow deferring device probe when
+> the IOMMU isn't available yet.
+> 
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> ---
+>  drivers/base/dd.c           | 11 +++++++++++
+>  drivers/base/dma-mapping.c  | 11 +++++++++++
+>  include/linux/dma-mapping.h |  3 +++
+>  3 files changed, 25 insertions(+)
+> 
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> index 16688f5..b9978af 100644
+> --- a/drivers/base/dd.c
+> +++ b/drivers/base/dd.c
+> @@ -19,6 +19,7 @@
+> 
+>  #include <linux/device.h>
+>  #include <linux/delay.h>
+> +#include <linux/dma-mapping.h>
+>  #include <linux/module.h>
+>  #include <linux/kthread.h>
+>  #include <linux/wait.h>
+> @@ -353,6 +354,10 @@ static int really_probe(struct device *dev, struct
+> device_driver *drv) if (ret)
+>  		goto pinctrl_bind_failed;
+> 
+> +	ret = dma_configure_ops(dev);
 
-Changes in v3: None
-Changes in v2: None
+Your patch doesn't remove the of_dma_configure_ops() from 
+of_platform_device_create_pdata(). Unless I'm mistaken, you will then end up 
+configuring the DMA ops twice, which at least on ARM will be a no-op the 
+second time:
 
- drivers/power/supply/act8945a_charger.c | 79 ++++++++++++++++++++++++++++++++-
- 1 file changed, 77 insertions(+), 2 deletions(-)
+(arch_setup_dma_ops)
 
-diff --git a/drivers/power/supply/act8945a_charger.c b/drivers/power/supply/act8945a_charger.c
-index 2321796..9bfbc87 100644
---- a/drivers/power/supply/act8945a_charger.c
-+++ b/drivers/power/supply/act8945a_charger.c
-@@ -84,6 +84,7 @@ struct act8945a_charger {
- 
- 	bool init_done;
- 	int lbo_pin;
-+	int chgin_level;
- };
- 
- static int act8945a_get_charger_state(struct regmap *regmap, int *val)
-@@ -267,12 +268,79 @@ static int act8945a_get_capacity_level(struct act8945a_charger *charger,
- 	return 0;
- }
- 
-+#define MAX_CURRENT_USB_HIGH	450000
-+#define MAX_CURRENT_USB_LOW	90000
-+#define MAX_CURRENT_USB_PRE	45000
-+/*
-+ * Riset(K) = 2336 * (1V/Ichg(mA)) - 0.205
-+ * Riset = 2.43K
-+ */
-+#define MAX_CURRENT_AC_HIGH		886527
-+#define MAX_CURRENT_AC_LOW		117305
-+#define MAX_CURRENT_AC_HIGH_PRE		88653
-+#define MAX_CURRENT_AC_LOW_PRE		11731
-+
-+static int act8945a_get_current_max(struct act8945a_charger *charger,
-+				    struct regmap *regmap, int *val)
-+{
-+	int ret;
-+	unsigned int status, state;
-+	unsigned int acin_state;
-+
-+	ret = regmap_read(regmap, ACT8945A_APCH_STATUS, &status);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = regmap_read(regmap, ACT8945A_APCH_STATE, &state);
-+	if (ret < 0)
-+		return ret;
-+
-+	acin_state = (state & APCH_STATE_ACINSTAT) >> 1;
-+
-+	state &= APCH_STATE_CSTATE;
-+	state >>= APCH_STATE_CSTATE_SHIFT;
-+
-+	switch (state) {
-+	case APCH_STATE_CSTATE_PRE:
-+		if (acin_state) {
-+			if (charger->chgin_level)
-+				*val = MAX_CURRENT_AC_HIGH_PRE;
-+			else
-+				*val = MAX_CURRENT_AC_LOW_PRE;
-+		} else {
-+			*val = MAX_CURRENT_USB_PRE;
-+		}
-+		break;
-+	case APCH_STATE_CSTATE_FAST:
-+		if (acin_state) {
-+			if (charger->chgin_level)
-+				*val = MAX_CURRENT_AC_HIGH;
-+			else
-+				*val = MAX_CURRENT_AC_LOW;
-+		} else {
-+			if (charger->chgin_level)
-+				*val = MAX_CURRENT_USB_HIGH;
-+			else
-+				*val = MAX_CURRENT_USB_LOW;
-+		}
-+		break;
-+	case APCH_STATE_CSTATE_EOC:
-+	case APCH_STATE_CSTATE_DISABLED:
-+	default:
-+		*val = 0;
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
- static enum power_supply_property act8945a_charger_props[] = {
- 	POWER_SUPPLY_PROP_STATUS,
- 	POWER_SUPPLY_PROP_CHARGE_TYPE,
- 	POWER_SUPPLY_PROP_TECHNOLOGY,
- 	POWER_SUPPLY_PROP_HEALTH,
- 	POWER_SUPPLY_PROP_CAPACITY_LEVEL,
-+	POWER_SUPPLY_PROP_CURRENT_MAX,
- 	POWER_SUPPLY_PROP_MODEL_NAME,
- 	POWER_SUPPLY_PROP_MANUFACTURER
- };
-@@ -302,6 +370,10 @@ static int act8945a_charger_get_property(struct power_supply *psy,
- 		ret = act8945a_get_capacity_level(charger,
- 						  regmap, &val->intval);
- 		break;
-+	case POWER_SUPPLY_PROP_CURRENT_MAX:
-+		ret = act8945a_get_current_max(charger,
-+					       regmap, &val->intval);
-+		break;
- 	case POWER_SUPPLY_PROP_MODEL_NAME:
- 		val->strval = act8945a_charger_model;
- 		break;
-@@ -434,8 +506,11 @@ static int act8945a_charger_config(struct device *dev,
- 				"active-semi,chglev-gpios", 0, &flags);
- 
- 	if (gpio_is_valid(chglev_pin)) {
--		gpio_set_value(chglev_pin,
--			       ((flags == OF_GPIO_ACTIVE_LOW) ? 0 : 1));
-+		if (!devm_gpio_request(dev, chglev_pin, "chglev-pin")) {
-+			charger->chgin_level =
-+					(flags == OF_GPIO_ACTIVE_LOW) ? 0 : 1;
-+			gpio_set_value(chglev_pin, charger->chgin_level);
-+		}
- 	}
- 
- 	if (of_property_read_u32(np,
+        /*
+         * Don't override the dma_ops if they have already been set. Ideally
+         * this should be the only location where dma_ops are set, remove this
+         * check when all other callers of set_dma_ops will have disappeared.
+         */
+        if (dev->archdata.dma_ops)
+                return;
+
+For the same reason I'm wondering whether you shouldn't also remove the 
+of_dma_configure_ops() call from of_amba_device_create() (I don't remember why 
+I left it there in my original patch series).
+
+> +	if (ret)
+> +		goto dma_failed;
+> +
+>  	if (driver_sysfs_add(dev)) {
+>  		printk(KERN_ERR "%s: driver_sysfs_add(%s) failed\n",
+>  			__func__, dev_name(dev));
+> @@ -394,7 +399,10 @@ static int really_probe(struct device *dev, struct
+> device_driver *drv) drv->bus->name, __func__, dev_name(dev), drv->name);
+>  	goto done;
+> 
+> +
+>  probe_failed:
+> +	dma_deconfigure(dev);
+> +dma_failed:
+>  	if (dev->bus)
+>  		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
+>  					     BUS_NOTIFY_DRIVER_NOT_BOUND, 
+dev);
+> @@ -780,6 +788,9 @@ static void __device_release_driver(struct device *dev)
+>  			dev->bus->remove(dev);
+>  		else if (drv->remove)
+>  			drv->remove(dev);
+> +
+> +		dma_deconfigure(dev);
+> +
+>  		devres_release_all(dev);
+>  		dev->driver = NULL;
+>  		dev_set_drvdata(dev, NULL);
+> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
+> index d799662..ccc1c6e 100644
+> --- a/drivers/base/dma-mapping.c
+> +++ b/drivers/base/dma-mapping.c
+> @@ -10,6 +10,7 @@
+>  #include <linux/dma-mapping.h>
+>  #include <linux/export.h>
+>  #include <linux/gfp.h>
+> +#include <linux/of_device.h>
+>  #include <linux/slab.h>
+>  #include <linux/vmalloc.h>
+> 
+> @@ -166,6 +167,16 @@ void dmam_free_noncoherent(struct device *dev, size_t
+> size, void *vaddr, }
+>  EXPORT_SYMBOL(dmam_free_noncoherent);
+> 
+> +int dma_configure_ops(struct device *dev)
+> +{
+> +	return of_dma_configure_ops(dev, dev->of_node);
+> +}
+> +
+> +void dma_deconfigure(struct device *dev)
+> +{
+> +	of_dma_deconfigure(dev);
+> +}
+> +
+>  #ifdef CONFIG_HAVE_GENERIC_DMA_COHERENT
+> 
+>  static void dmam_coherent_decl_release(struct device *dev, void *res)
+> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> index 71c1b21..a49aac9 100644
+> --- a/include/linux/dma-mapping.h
+> +++ b/include/linux/dma-mapping.h
+> @@ -613,6 +613,9 @@ dma_mark_declared_memory_occupied(struct device *dev,
+>  }
+>  #endif /* CONFIG_HAVE_GENERIC_DMA_COHERENT */
+> 
+> +int dma_configure_ops(struct device *dev);
+> +void dma_deconfigure(struct device *dev);
+> +
+>  /*
+>   * Managed DMA API
+>   */
+
 -- 
-2.7.4
+Regards,
+
+Laurent Pinchart
