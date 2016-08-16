@@ -1,53 +1,54 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 16 Aug 2016 11:03:00 +0800
-Subject: [PATCH 6/8] ARM: dts: sun8i: Add touchscreen node for
- sun8i-a23-polaroid-mid2407pxe03
-In-Reply-To: <1470685398-14568-6-git-send-email-hdegoede@redhat.com>
-References: <1470685398-14568-1-git-send-email-hdegoede@redhat.com>
- <1470685398-14568-6-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGb2v67bg9mLB0Ga9Ro+Lv=rYgb8DtHQiKXxwbE6L1CWyZcbOA@mail.gmail.com>
+Date: Tue, 16 Aug 2016 11:09:40 +0800
+Subject: [PATCH] ARM: sun5i: Fix typo in trip point temperature
+In-Reply-To: <6c422122-e83d-84e7-f330-0b747f06d51f@bonstra.fr.eu.org>
+References: <6c422122-e83d-84e7-f330-0b747f06d51f@bonstra.fr.eu.org>
+Message-ID: <CAGb2v66LpeEHveJFbkwHh1gW=qKUZ91=b4N5dNZt=o2Bx_5ieg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Aug 9, 2016 at 3:43 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Add a node enabling the gsl1680 touchscreen controller found on
-> sun8i-a23-polaroid-mid2407pxe03 tablets.
+On Sat, Jul 30, 2016 at 9:17 PM, Hugo Grostabussiat
+<bonstra@bonstra.fr.eu.org> wrote:
+> Set cpu_alert0 temperature to 85?C instead of 850?C.
 >
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+
+Please add:
+
+Fixes: 32a5d2d170cc ("ARM: dts: sun5i: Add cpu thermal zones to dtsi")
+
+And you should send it to the proper maintainers, lest it get missed.
+
+> Signed-off-by: Hugo Grostabussiat <bonstra@bonstra.fr.eu.org>
+
+Otherwise,
+
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+
 > ---
->  arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
+>  arch/arm/boot/dts/sun5i-a13.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts b/arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts
-> index e300442..cd64fd61 100644
-> --- a/arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts
-> +++ b/arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts
-> @@ -48,3 +48,20 @@
->         model = "Polaroid MID2407PXE03 tablet";
->         compatible = "polaroid,mid2407pxe03", "allwinner,sun8i-a23";
->  };
-> +
-> +&gsl1680 {
-> +       touchscreen-size-x = <960>;
-> +       touchscreen-size-y = <640>;
-> +       touchscreen-inverted-x;
-> +       touchscreen-inverted-y;
-> +       touchscreen-fw-name = "silead/gsl1680-polaroid-mid2407pxe03.fw";
-> +       status = "okay";
-> +};
-> +
-> +&reg_ldo_io1 {
-> +       regulator-always-on;
-> +       regulator-min-microvolt = <3300000>;
-> +       regulator-max-microvolt = <3300000>;
-> +       regulator-name = "vcc-touchscreen";
-> +       status = "okay";
-> +};
-
-This looks good, but it would be better if the touchscreen node
-took the regulator as a supply.
-
-Regards
-ChenYu
+> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi
+> b/arch/arm/boot/dts/sun5i-a13.dtsi
+> index 263d46d..2d78eee 100644
+> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+> @@ -84,7 +84,7 @@
+>                         trips {
+>                                 cpu_alert0: cpu_alert0 {
+>                                         /* milliCelsius */
+> -                                       temperature = <850000>;
+> +                                       temperature = <85000>;
+>                                         hysteresis = <2000>;
+>                                         type = "passive";
+>                                 };
+> --
+> 2.9.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
