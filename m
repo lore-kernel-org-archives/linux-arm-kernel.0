@@ -1,26 +1,50 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 16 Aug 2016 15:13:45 +0100
-Subject: [RFC 12/17] ASoC: samsung: Switch to new clock controller API
-In-Reply-To: <1471354514-24224-13-git-send-email-k.kozlowski@samsung.com>
-References: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
- <1471354514-24224-13-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20160816141345.GT9347@sirena.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 16 Aug 2016 14:14:47 +0000
+Subject: [PATCH 0/4] arm64: marvell: add support for the PIC and PMU
+In-Reply-To: <1470408921-447-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1470408921-447-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20160816141447.GQ3353@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 03:35:09PM +0200, Krzysztof Kozlowski wrote:
-> Allocate a clock controller and use new clk_register_with_ctrl() API.
+Hi Thomas,
 
-Acked-by: Mark Brown <broonie@kernel.org>
+On Fri, Aug 05, 2016 at 04:55:17PM +0200, Thomas Petazzoni wrote:
+> Hello,
+> 
+> This small patch series intends to add support for the PMU of the
+> Cortex-A72 cores found in the Marvell Armada 7K/8K SoCs.
+> 
+> However, the interrupt of the PMU is not directly connected to the
+> GIC, but goes through a secondary interrupt controller called the
+> PIC. Therefore, this series starts by adding a small driver for this
+> interrupt controller, before enabling the PIC and the PMU in the
+> Device Tree.
+> 
+> Thanks!
+> 
+> Thomas
+> 
+> Thomas Petazzoni (4):
+>   dt-bindings: interrupt-controller: add DT binding for Marvell 7K/8K
+>     PIC
+>   irqchip: irq-mvebu-pic: new driver for Marvell Armada 7K/8K PIC
+>   arm64: marvell: enable the Marvell PIC driver
+>   arm64: dts: marvell: describe the PIC and PMU on Armada 7K/8K
+> 
+>  .../interrupt-controller/marvell,armada-8k-pic.txt |  25 +++
+>  arch/arm64/Kconfig.platforms                       |   1 +
+>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |  14 ++
+>  drivers/irqchip/Kconfig                            |   3 +
+>  drivers/irqchip/Makefile                           |   1 +
+>  drivers/irqchip/irq-mvebu-pic.c                    | 195 +++++++++++++++++++++
+>  6 files changed, 239 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,armada-8k-pic.txt
+>  create mode 100644 drivers/irqchip/irq-mvebu-pic.c
 
->  	i2s_unregister_clocks(i2s);
-> +	clk_ctrl_unregister(i2s->clk_ctrl);
+Patches 1-3 applied to irqchip/mvebu64.  Patch 1 has Rob's Ack.  I
+assume you'll route the dtsi change through a separate branch.
 
-devm?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160816/31281df2/attachment.sig>
+thx,
+
+Jason.
