@@ -1,54 +1,59 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 16 Aug 2016 14:13:21 +0200
-Subject: [PATCH v2] efi: arm64: add debugfs node to dump UEFI runtime page
- tables
-Message-ID: <1471349601-31257-1-git-send-email-ard.biesheuvel@linaro.org>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Tue, 16 Aug 2016 17:58:51 +0530
+Subject: [PATCH 5/8] drivers: platform: Configure dma operations at probe
+ time
+In-Reply-To: <14864888.EhQqoi8buh@avalon>
+References: <1470696550-3416-1-git-send-email-sricharan@codeaurora.org>
+ <1470696550-3416-6-git-send-email-sricharan@codeaurora.org>
+ <14864888.EhQqoi8buh@avalon>
+Message-ID: <000701d1f7b9$c2c4e8b0$484eba10$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the debugfs node 'efi_page_tables' to allow the UEFI runtime
-page tables to be inspected. Note that ARM does not have 'asm/ptdump.h'
-[yet] so for now, this is arm64 only.
+Hi Laurent,
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v2: test for CONFIG_ARM64_PTDUMP rather than CONFIG_ARM64
-    add Mark's ack
+>Hi Sricharan,
+>
+>Thank you for the patch.
+>
+>On Tuesday 09 Aug 2016 04:19:07 Sricharan R wrote:
+>> Configuring DMA ops at probe time will allow deferring device probe when
+>> the IOMMU isn't available yet.
+>>
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ---
+>>  drivers/base/dd.c           | 11 +++++++++++
+>>  drivers/base/dma-mapping.c  | 11 +++++++++++
+>>  include/linux/dma-mapping.h |  3 +++
+>>  3 files changed, 25 insertions(+)
+>>
+>> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+>> index 16688f5..b9978af 100644
+>> --- a/drivers/base/dd.c
+>> +++ b/drivers/base/dd.c
+>> @@ -19,6 +19,7 @@
+>>
+>>  #include <linux/device.h>
+>>  #include <linux/delay.h>
+>> +#include <linux/dma-mapping.h>
+>>  #include <linux/module.h>
+>>  #include <linux/kthread.h>
+>>  #include <linux/wait.h>
+>> @@ -353,6 +354,10 @@ static int really_probe(struct device *dev, struct
+>> device_driver *drv) if (ret)
+>>  		goto pinctrl_bind_failed;
+>>
+>> +	ret = dma_configure_ops(dev);
+>
+>Your patch doesn't remove the of_dma_configure_ops() from
+>of_platform_device_create_pdata(). Unless I'm mistaken, you will then end up
+>configuring the DMA ops twice, which at least on ARM will be a no-op the
+>second time:
+    I did remove both of_dmaconfigure/deconfigure from other places, but
+    i did as a separate next patch [1]  (should have been squashed here).
+     I will squash for the next repost.
 
- drivers/firmware/efi/arm-runtime.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+[1] https://www.spinics.net/lists/arm-kernel/msg522510.html
 
-diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-index c394b81fe452..7ff61749acef 100644
---- a/drivers/firmware/efi/arm-runtime.c
-+++ b/drivers/firmware/efi/arm-runtime.c
-@@ -39,6 +39,26 @@ static struct mm_struct efi_mm = {
- 	.mmlist			= LIST_HEAD_INIT(efi_mm.mmlist),
- };
- 
-+#ifdef CONFIG_ARM64_PTDUMP
-+#include <asm/ptdump.h>
-+
-+static struct ptdump_info efi_ptdump_info = {
-+	.mm		= &efi_mm,
-+	.markers	= (struct addr_marker[]){
-+		{ 0,		"UEFI runtime start" },
-+		{ TASK_SIZE_64,	"UEFI runtime end" }
-+	},
-+	.base_addr	= 0,
-+};
-+
-+static int __init ptdump_init(void)
-+{
-+	return ptdump_register(&efi_ptdump_info, "efi_page_tables");
-+}
-+device_initcall(ptdump_init);
-+
-+#endif
-+
- static bool __init efi_virtmap_init(void)
- {
- 	efi_memory_desc_t *md;
--- 
-2.7.4
+Regards,
+ Sricharan
