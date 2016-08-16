@@ -1,60 +1,50 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 16 Aug 2016 15:35:00 +0200
-Subject: [RFC 03/17] clk: s2mps11: Switch to new clock controller API
+Date: Tue, 16 Aug 2016 15:34:58 +0200
+Subject: [RFC 01/17] clk: bcm2835: Rename clk_register to avoid name conflict
 In-Reply-To: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
 References: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1471354514-24224-4-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1471354514-24224-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allocate a clock controller and use new clk_register_with_ctrl() API.
+During clk_register_*() API refactoring, macros will be used for hiding
+and narrowing the scope of changes thus leading to a name conflict with
+clk_register found in bcm2835 clk driver.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/clk/clk-s2mps11.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ drivers/clk/bcm/clk-bcm2835.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clk/clk-s2mps11.c b/drivers/clk/clk-s2mps11.c
-index fbaa84a33c46..881f1e226867 100644
---- a/drivers/clk/clk-s2mps11.c
-+++ b/drivers/clk/clk-s2mps11.c
-@@ -41,6 +41,7 @@ struct s2mps11_clk {
- 	struct clk_hw hw;
- 	struct clk *clk;
- 	struct clk_lookup *lookup;
-+	struct clk_ctrl *clk_ctrl;
- 	u32 mask;
- 	unsigned int reg;
+diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+index 7a7970865c2d..b77a8efbfce7 100644
+--- a/drivers/clk/bcm/clk-bcm2835.c
++++ b/drivers/clk/bcm/clk-bcm2835.c
+@@ -1262,12 +1262,12 @@ static struct clk *bcm2835_register_gate(struct bcm2835_cprman *cprman,
+ typedef struct clk *(*bcm2835_clk_register)(struct bcm2835_cprman *cprman,
+ 					    const void *data);
+ struct bcm2835_clk_desc {
+-	bcm2835_clk_register clk_register;
++	bcm2835_clk_register bcm2835_clk_register;
+ 	const void *data;
  };
-@@ -176,6 +177,10 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
- 	if (IS_ERR(s2mps11_clks->clk_np))
- 		return PTR_ERR(s2mps11_clks->clk_np);
  
-+	s2mps11_clks->clk_ctrl = clk_ctrl_register(&pdev->dev);
-+	if (IS_ERR(s2mps11_clks->clk_ctrl))
-+		return PTR_ERR(s2mps11_clks->clk_ctrl); // FIXME: use devm-like
-+
- 	for (i = 0; i < S2MPS11_CLKS_NUM; i++) {
- 		if (i == S2MPS11_CLK_CP && hwid == S2MPS14X)
- 			continue; /* Skip clocks not present in some devices */
-@@ -184,7 +189,8 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
- 		s2mps11_clks[i].mask = 1 << i;
- 		s2mps11_clks[i].reg = s2mps11_reg;
+ /* assignment helper macros for different clock types */
+-#define _REGISTER(f, ...) { .clk_register = (bcm2835_clk_register)f, \
++#define _REGISTER(f, ...) { .bcm2835_clk_register = (bcm2835_clk_register)f, \
+ 			    .data = __VA_ARGS__ }
+ #define REGISTER_PLL(...)	_REGISTER(&bcm2835_register_pll,	\
+ 					  &(struct bcm2835_pll_data)	\
+@@ -1825,8 +1825,8 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
  
--		s2mps11_clks[i].clk = devm_clk_register(&pdev->dev,
-+		s2mps11_clks[i].clk = devm_clk_register_with_ctrl(&pdev->dev,
-+							s2mps11_clks->clk_ctrl,
- 							&s2mps11_clks[i].hw);
- 		if (IS_ERR(s2mps11_clks[i].clk)) {
- 			dev_err(&pdev->dev, "Fail to register : %s\n",
-@@ -233,6 +239,8 @@ static int s2mps11_clk_remove(struct platform_device *pdev)
- 		clkdev_drop(s2mps11_clks[i].lookup);
+ 	for (i = 0; i < asize; i++) {
+ 		desc = &clk_desc_array[i];
+-		if (desc->clk_register && desc->data)
+-			clks[i] = desc->clk_register(cprman, desc->data);
++		if (desc->bcm2835_clk_register && desc->data)
++			clks[i] = desc->bcm2835_clk_register(cprman, desc->data);
  	}
  
-+	clk_ctrl_unregister(s2mps11_clks->clk_ctrl);
-+
- 	return 0;
- }
- 
+ 	return of_clk_add_provider(dev->of_node, of_clk_src_onecell_get,
 -- 
 1.9.1
