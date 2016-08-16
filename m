@@ -1,31 +1,93 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 16 Aug 2016 10:08:33 -0700
-Subject: [PATCH v2] ARM: Add missing newline terminators to kernel messages
-In-Reply-To: <1471354832-18456-1-git-send-email-geert+renesas@glider.be>
-References: <1471354832-18456-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1471367313.4075.167.camel@perches.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 16 Aug 2016 19:26:58 +0200
+Subject: [PATCH] KVM: arm64: ITS: avoid re-mapping LPIs
+In-Reply-To: <20160816165106.25057-1-andre.przywara@arm.com>
+References: <20160816165106.25057-1-andre.przywara@arm.com>
+Message-ID: <20160816172658.GE14088@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-08-16 at 15:40 +0200, Geert Uytterhoeven wrote:
-> Before commit 874f9c7da9a4acbc ("printk: create pr_<level> functions"),
-> pr_*() calls without a trailing newline characters would be printed with
-> a newline character appended, both on the console and in the output of
-> the dmesg command.
+On Tue, Aug 16, 2016 at 05:51:06PM +0100, Andre Przywara wrote:
+> When a guest wants to map a device-ID/event-ID combination that is
+> already mapped, we may end up in a situation where an LPI is never
+> "put", thus never being freed.
+> Since the GICv3 spec says that mapping an already mapped LPI is
+> UNPREDICTABLE, lets just bail out early in this situation to avoid
+> any potential leaks.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-Hey Geert.
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-This doesn't apply to -next as the pr_notice/pr_cont below is
-properly changed to a single pr_notice.
+Thanks!
+-Christoffer
 
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-[]
-> @@ -1196,7 +1196,7 @@ void __init sanity_check_meminfo(void)
-> ?				pr_notice("Truncating RAM at %pa-%pa",
-> ?					??&block_start, &block_end);
-> ?				block_end = vmalloc_limit;
-> -				pr_cont(" to -%pa", &block_end);
-> +				pr_cont(" to -%pa\n", &block_end);
-> ?				memblock_remove(vmalloc_limit, overlap_size);
-> ?				should_use_highmem = true;
-> ?			}
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 27 +++++++++++++--------------
+>  1 file changed, 13 insertions(+), 14 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 9533080..4660a7d 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -731,7 +731,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>  	u32 device_id = its_cmd_get_deviceid(its_cmd);
+>  	u32 event_id = its_cmd_get_id(its_cmd);
+>  	u32 coll_id = its_cmd_get_collection(its_cmd);
+> -	struct its_itte *itte, *new_itte = NULL;
+> +	struct its_itte *itte;
+>  	struct its_device *device;
+>  	struct its_collection *collection, *new_coll = NULL;
+>  	int lpi_nr;
+> @@ -749,6 +749,10 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>  	    lpi_nr >= max_lpis_propbaser(kvm->arch.vgic.propbaser))
+>  		return E_ITS_MAPTI_PHYSICALID_OOR;
+>  
+> +	/* If there is an existing mapping, behavior is UNPREDICTABLE. */
+> +	if (find_itte(its, device_id, event_id))
+> +		return 0;
+> +
+>  	collection = find_collection(its, coll_id);
+>  	if (!collection) {
+>  		int ret = vgic_its_alloc_collection(its, &collection, coll_id);
+> @@ -757,20 +761,16 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>  		new_coll = collection;
+>  	}
+>  
+> -	itte = find_itte(its, device_id, event_id);
+> +	itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
+>  	if (!itte) {
+> -		itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
+> -		if (!itte) {
+> -			if (new_coll)
+> -				vgic_its_free_collection(its, coll_id);
+> -			return -ENOMEM;
+> -		}
+> -
+> -		new_itte = itte;
+> -		itte->event_id	= event_id;
+> -		list_add_tail(&itte->itte_list, &device->itt_head);
+> +		if (new_coll)
+> +			vgic_its_free_collection(its, coll_id);
+> +		return -ENOMEM;
+>  	}
+>  
+> +	itte->event_id	= event_id;
+> +	list_add_tail(&itte->itte_list, &device->itt_head);
+> +
+>  	itte->collection = collection;
+>  	itte->lpi = lpi_nr;
+>  
+> @@ -778,8 +778,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>  	if (IS_ERR(irq)) {
+>  		if (new_coll)
+>  			vgic_its_free_collection(its, coll_id);
+> -		if (new_itte)
+> -			its_free_itte(kvm, new_itte);
+> +		its_free_itte(kvm, itte);
+>  		return PTR_ERR(irq);
+>  	}
+>  	itte->irq = irq;
+> -- 
+> 2.9.0
+> 
