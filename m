@@ -1,32 +1,31 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 16 Aug 2016 14:03:45 -0300
-Subject: [PATCH 1/1] irqchip: irq-gic: forward SGI to itself for cortex-a7
- single core
-In-Reply-To: <57B343E4.6090604@arm.com>
-References: <20160808105026.GA12649@leverpostej>
- <HE1PR04MB1450C6BE844A31C95CEE3BE18B1B0@HE1PR04MB1450.eurprd04.prod.outlook.com>
- <20160808130754.GB12649@leverpostej> <20160808132847.GB17680@shlinux2>
- <20160808134842.GE12649@leverpostej> <20160808145916.0924e868@arm.com>
- <20160809034613.GB31105@shlinux2> <20160809063401.3117dc94@arm.com>
- <20160809055701.GC31105@shlinux2> <20160809075930.529f98ca@arm.com>
- <20160809071821.GD31105@shlinux2> <57A99A4A.6010301@arm.com>
- <CAOMZO5AB1u3+pL1kgxwF1zNH5MSxEd-BrT=3dzwUTxBd0R4Vsw@mail.gmail.com>
- <57B343E4.6090604@arm.com>
-Message-ID: <CAOMZO5Abm-cpm=R6+JLoA+5QDCkgF84Db3uLhNrpe4KM5btu1Q@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 16 Aug 2016 10:08:33 -0700
+Subject: [PATCH v2] ARM: Add missing newline terminators to kernel messages
+In-Reply-To: <1471354832-18456-1-git-send-email-geert+renesas@glider.be>
+References: <1471354832-18456-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1471367313.4075.167.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Tue, 2016-08-16 at 15:40 +0200, Geert Uytterhoeven wrote:
+> Before commit 874f9c7da9a4acbc ("printk: create pr_<level> functions"),
+> pr_*() calls without a trailing newline characters would be printed with
+> a newline character appended, both on the console and in the output of
+> the dmesg command.
 
-On Tue, Aug 16, 2016 at 1:48 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+Hey Geert.
 
-> Maybe because you now have a pending interrupt that you don't handle,
-> making your WFI exit immediately? Sorry, but without more information,
-> it is pretty hard to guess what's happening.
+This doesn't apply to -next as the pr_notice/pr_cont below is
+properly changed to a single pr_notice.
 
-Tested the same kernel on a imx6ul-evk and 'reboot' and suspend/resume
-work fine.
-
-Looks like the issue I saw is imx6ul-pico board specific.
-
-Thanks
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+[]
+> @@ -1196,7 +1196,7 @@ void __init sanity_check_meminfo(void)
+> ?				pr_notice("Truncating RAM at %pa-%pa",
+> ?					??&block_start, &block_end);
+> ?				block_end = vmalloc_limit;
+> -				pr_cont(" to -%pa", &block_end);
+> +				pr_cont(" to -%pa\n", &block_end);
+> ?				memblock_remove(vmalloc_limit, overlap_size);
+> ?				should_use_highmem = true;
+> ?			}
