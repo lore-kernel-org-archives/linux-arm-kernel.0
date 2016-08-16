@@ -1,50 +1,47 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 16 Aug 2016 15:34:58 +0200
-Subject: [RFC 01/17] clk: bcm2835: Rename clk_register to avoid name conflict
+Date: Tue, 16 Aug 2016 15:35:01 +0200
+Subject: [RFC 04/17] clk: samsung: Allocate a clock controller in context
 In-Reply-To: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
 References: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1471354514-24224-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1471354514-24224-5-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During clk_register_*() API refactoring, macros will be used for hiding
-and narrowing the scope of changes thus leading to a name conflict with
-clk_register found in bcm2835 clk driver.
+Allocate a clock controller and store it in context so it will be passed
+later for creating clocks.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/clk/bcm/clk-bcm2835.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/clk/samsung/clk.c | 4 ++++
+ drivers/clk/samsung/clk.h | 1 +
+ 2 files changed, 5 insertions(+)
 
-diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 7a7970865c2d..b77a8efbfce7 100644
---- a/drivers/clk/bcm/clk-bcm2835.c
-+++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -1262,12 +1262,12 @@ static struct clk *bcm2835_register_gate(struct bcm2835_cprman *cprman,
- typedef struct clk *(*bcm2835_clk_register)(struct bcm2835_cprman *cprman,
- 					    const void *data);
- struct bcm2835_clk_desc {
--	bcm2835_clk_register clk_register;
-+	bcm2835_clk_register bcm2835_clk_register;
- 	const void *data;
+diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
+index b7d87d6db9dc..fdeb35a48d3a 100644
+--- a/drivers/clk/samsung/clk.c
++++ b/drivers/clk/samsung/clk.c
+@@ -67,6 +67,10 @@ struct samsung_clk_provider *__init samsung_clk_init(struct device_node *np,
+ 	if (!ctx)
+ 		panic("could not allocate clock provider context.\n");
+ 
++	ctx->clk_ctrl = clk_ctrl_register(NULL);
++	if (!ctx->clk_ctrl)
++		panic("could not allocate clock provider controller.\n");
++
+ 	clk_table = kcalloc(nr_clks, sizeof(struct clk *), GFP_KERNEL);
+ 	if (!clk_table)
+ 		panic("could not allocate clock lookup table\n");
+diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
+index da3bdebabf1e..cb0ef6266b6d 100644
+--- a/drivers/clk/samsung/clk.h
++++ b/drivers/clk/samsung/clk.h
+@@ -28,6 +28,7 @@ struct samsung_clk_provider {
+ 	void __iomem *reg_base;
+ 	struct clk_onecell_data clk_data;
+ 	spinlock_t lock;
++	struct clk_ctrl *clk_ctrl;
  };
  
- /* assignment helper macros for different clock types */
--#define _REGISTER(f, ...) { .clk_register = (bcm2835_clk_register)f, \
-+#define _REGISTER(f, ...) { .bcm2835_clk_register = (bcm2835_clk_register)f, \
- 			    .data = __VA_ARGS__ }
- #define REGISTER_PLL(...)	_REGISTER(&bcm2835_register_pll,	\
- 					  &(struct bcm2835_pll_data)	\
-@@ -1825,8 +1825,8 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
- 
- 	for (i = 0; i < asize; i++) {
- 		desc = &clk_desc_array[i];
--		if (desc->clk_register && desc->data)
--			clks[i] = desc->clk_register(cprman, desc->data);
-+		if (desc->bcm2835_clk_register && desc->data)
-+			clks[i] = desc->bcm2835_clk_register(cprman, desc->data);
- 	}
- 
- 	return of_clk_add_provider(dev->of_node, of_clk_src_onecell_get,
+ /**
 -- 
 1.9.1
