@@ -1,102 +1,170 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 16 Aug 2016 23:36:32 +0900
-Subject: Why do we need reset_control_get_optional() ?
-In-Reply-To: <1470674376.2497.49.camel@pengutronix.de>
-References: <CAK7LNAQnitMMp5wMXXvVeS-UFF=Fo9m=M1hL=5f4=RF8JYCnGg@mail.gmail.com>
- <CAK7LNAQ0nCQymq+M+FTUXoK7yBj_5CJp9nqDjO3u5wcnckXtmw@mail.gmail.com>
- <1469703649.12835.34.camel@pengutronix.de> <1859714.7lR6dsl2IG@wuerfel>
- <1470674376.2497.49.camel@pengutronix.de>
-Message-ID: <CAK7LNAQdZu+C1XF1Y_KwvCQpoa1AUY0cyRcg=1PcHQaQxN79ng@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 16 Aug 2016 15:38:23 +0100
+Subject: [PATCH v2 1/2] remoteproc: core: Add rproc OF look-up functions
+Message-ID: <20160816143824.4120-1-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp, Arnd.
+- of_rproc_by_index(): look-up and obtain a reference to a rproc
+                       using the DT phandle "rprocs" and a index.
 
+- of_rproc_by_name():  lookup and obtain a reference to a rproc
+                       using the DT phandle "rprocs" and "rproc-names".
 
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
 
-2016-08-09 1:39 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
-> Am Freitag, den 05.08.2016, 17:50 +0200 schrieb Arnd Bergmann:
->> On Thursday, July 28, 2016 1:00:49 PM CEST Philipp Zabel wrote:
->> > Am Donnerstag, den 28.07.2016, 19:52 +0900 schrieb Masahiro Yamada:
->>
->> > > > In my experimental patch, I make the _optional functions
->> > > > return NULL if no "resets" property is provided but return
->> > > > an error if there are reset lines but the subsystem is
->> > > > disabled, i.e. an optional reset must be used if it's in the
->> > > > DT, but can be ignored otherwise.
->> > >
->> > > I do not like this idea.
->> > >
->> > > reset_control_get() (or variants) should not return NULL, it is ambiguous.
->> > > It should return ERR_PTR(-ENOENT) if no "resets" property.
->> > >
->> > > I only want two types for functions that return a pointer.
->> > >
->> > > [1] return a valid pointer on success, or return NULL on failure
->> > >     (for example, kmalloc())
->> > > [2] return a valid pointer on success, or return error pointer on failure
->> > >    (many of _register() functions)
->> > >
->> > > Mixing [1] and [2] will be a mess.
->>
->> Ah, right. I was thinking only of the case where the reset subsystem
->> is completely disabled here, so returning NULL could be considered
->> a valid return code that can in turn be passed into the other
->> functions.
->>
->> However, I agree that returning NULL as a valid result from
->> ..._get_optional() would be bad style, so let's drop my idea
->> there.
->>
->> > I too would prefer to keep that as-is. The reset_control_get_optional
->> > stub could return -ENOENT if there is no resets device tree property.
->>
->> Now I'm also confused about what we really need
->> reset_control_get_optional() for, and which error codes the callers
->> are supposed to check.
->>
->> This is the matrix I think you mean for _get_optional:
->>
-> [...]
->> CONFIG_RESET_CONTROLLER=n, dt entry present: -EOPNOTSUPP
->> CONFIG_RESET_CONTROLLER=n, dt entry missing: -ENOENT
->
-> ^^ I didn't consider this distiction.
->
->> Is this what you had in mind? If so, what is the value of the
->> added runtime warning for reset_control_get? Any caller of that
->> function would already check for errors, the only difference
->> I see is that callers of _optional can ignore -ENOENT.
->
-> My initial motivation was to make it as hard as possible to misconfigure
-> the kernel, which is why I initially didn't want stubs for the
-> non-optional variant. Of course that would cause build failures and/or
-> reduced compile test coverage, so we added the stubs and the warning to
-> make it obvious when a misconfigured kernel is running: on a kernel with
-> RESET_CONTROLLER=n drivers that use reset_control_get are expected to
-> build, but they are not expected to work. I suppose the same is the case
-> for _optional, if the dt entry is present, so maybe we should drop
-> reset_control_get_optional and add always a warning in case of
-> -EOPNOTSUPP.
-> I don't want all drivers to have to differentiate between -EOPNOTSUPP
-> and -ENOENT error codes, only current reset_control_get_optional users
-> have to do that.
+v1 => v2:
+ - s/ti,rprocs/ti,rproc
 
+drivers/remoteproc/remoteproc_core.c | 78 +++++++++++++++++++++++++++++++++++-
+ include/linux/remoteproc.h           | 25 +++++++++++-
+ 2 files changed, 101 insertions(+), 2 deletions(-)
 
-I've posted a patch to drop reset_control_get_optional;
-https://patchwork.kernel.org/patch/9284063/
-
-Could you check if it works?
-
-If we go this way, my patch
-289363fd99a17d6249ee1373541f1da43cbb22c5
-in your reset/next branch is completely useless.
-
-As the commits in the reset-subsystem do not appear
-even in linux-next until they are pulled into the ASOC tree,
-how about dropping 289363fd and turning around?
-
-
+diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+index fe0539e..fe362fb 100644
+--- a/drivers/remoteproc/remoteproc_core.c
++++ b/drivers/remoteproc/remoteproc_core.c
+@@ -41,6 +41,8 @@
+ #include <linux/virtio_ids.h>
+ #include <linux/virtio_ring.h>
+ #include <asm/byteorder.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
+ 
+ #include "remoteproc_internal.h"
+ 
+@@ -1191,6 +1193,81 @@ out:
+ }
+ EXPORT_SYMBOL(rproc_shutdown);
+ 
++#ifdef CONFIG_OF
++/**
++ * of_get_rproc_by_index() - lookup and obtain a reference to an rproc
++ * @np: node to search for rproc phandle
++ * @index: index into the phandle list
++ *
++ * This function increments the remote processor's refcount, so always
++ * use rproc_put() to decrement it back once rproc isn't needed anymore.
++ *
++ * Returns a pointer to the rproc struct on success or an appropriate error
++ * code otherwise.
++ */
++struct rproc *of_get_rproc_by_index(struct device_node *np, int index)
++{
++	struct rproc *rproc = NULL, *r;
++	struct device_node *rproc_np;
++
++	if (index < 0) {
++		pr_err("Invalid index: %d\n", index);
++		return ERR_PTR(-EINVAL);
++	}
++
++	rproc_np = of_parse_phandle(np, "rprocs", index);
++	if (!rproc_np) {
++		/* Unfortunately we have to support this,@least for now */
++		rproc_np = of_parse_phandle(np, "ti,rproc", index);
++		if (!rproc_np) {
++			pr_err("Failed to obtain phandle\n");
++			return ERR_PTR(-ENODEV);
++		}
++	}
++
++	mutex_lock(&rproc_list_mutex);
++	list_for_each_entry(r, &rproc_list, node) {
++		if (r->dev.parent && r->dev.parent->of_node == rproc_np) {
++			get_device(&r->dev);
++			rproc = r;
++			break;
++		}
++	}
++	mutex_unlock(&rproc_list_mutex);
++
++	of_node_put(rproc_np);
++
++	if (!rproc)
++		pr_err("Could not find rproc, deferring\n");
++
++	return rproc ?: ERR_PTR(-EPROBE_DEFER);
++}
++EXPORT_SYMBOL(of_get_rproc_by_index);
++
++/**
++ * of_get_rproc_by_name() - lookup and obtain a reference to an rproc
++ * @np: node to search for rproc
++ * @name: name of the remoteproc from device's point of view
++ *
++ * This function increments the remote processor's refcount, so always
++ * use rproc_put() to decrement it back once rproc isn't needed anymore.
++ *
++ * Returns a pointer to the rproc struct on success or an appropriate error
++ * code otherwise.
++ */
++struct rproc *of_get_rproc_by_name(struct device_node *np, const char *name)
++{
++	int index;
++
++	if (unlikely(!name))
++		return ERR_PTR(-EINVAL);
++
++	index = of_property_match_string(np, "rproc-names", name);
++
++	return of_get_rproc_by_index(np, index);
++}
++EXPORT_SYMBOL(of_get_rproc_by_name);
++
+ /**
+  * rproc_get_by_phandle() - find a remote processor by phandle
+  * @phandle: phandle to the rproc
+@@ -1203,7 +1280,6 @@ EXPORT_SYMBOL(rproc_shutdown);
+  *
+  * Returns the rproc handle on success, and NULL on failure.
+  */
+-#ifdef CONFIG_OF
+ struct rproc *rproc_get_by_phandle(phandle phandle)
+ {
+ 	struct rproc *rproc = NULL, *r;
+diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
+index 1c457a8..f130938 100644
+--- a/include/linux/remoteproc.h
++++ b/include/linux/remoteproc.h
+@@ -487,7 +487,6 @@ struct rproc_vdev {
+ 	u32 rsc_offset;
+ };
+ 
+-struct rproc *rproc_get_by_phandle(phandle phandle);
+ struct rproc *rproc_alloc(struct device *dev, const char *name,
+ 				const struct rproc_ops *ops,
+ 				const char *firmware, int len);
+@@ -511,4 +510,28 @@ static inline struct rproc *vdev_to_rproc(struct virtio_device *vdev)
+ 	return rvdev->rproc;
+ }
+ 
++#ifdef CONFIG_OF
++extern struct rproc *of_get_rproc_by_index(struct device_node *np,
++					   int index);
++extern struct rproc *of_get_rproc_by_name(struct device_node *np,
++					  const char *name);
++extern struct rproc *rproc_get_by_phandle(phandle phandle);
++#else
++static inline
++struct rproc *of_get_rproc_by_index(struct device_node *np, int index)
++{
++	return NULL;
++}
++static inline
++struct rproc *of_get_rproc_by_name(struct device_node *np, const char *name)
++{
++	return NULL;
++}
++static inline
++struct rproc *rproc_get_by_phandle(phandle phandle)
++{
++	return NULL;
++}
++#endif /* CONFIG_OF */
++
+ #endif /* REMOTEPROC_H */
 -- 
-Best Regards
-Masahiro Yamada
+2.9.0
