@@ -1,40 +1,19 @@
-From: strongbox8@zoho.com (perr perr)
-Date: Tue, 16 Aug 2016 14:49:54 +0800
-Subject: [RESEND][PATCH] pinctrl: exynos: remove duplicate calls in irq handler
-Message-ID: <156921d1559.dd4cb9f127644.6244938289269001596@zoho.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 16 Aug 2016 14:55:17 +0800
+Subject: [PATCH v2] Documentation: sunxi: Update Allwinner SoC
+ documentation
+In-Reply-To: <20160813100113.3756-1-icenowy@aosc.xyz>
+References: <20160813100113.3756-1-icenowy@aosc.xyz>
+Message-ID: <CAGb2v64cZegCkaQ521FSeSb__dWiFHcQrpDF2XAKCLra8H7LOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because chained_irq_enter() has already called chip->irq_mask() and 
-chip->irq_ack(), also chained_irq_exit() will call chip->irq_unmask(), 
-so it's not necessary to call chip->irq_*() here. 
- 
-Signed-off-by: Perr Zhang<strongbox8@zoho.com> 
- 
---- 
- drivers/pinctrl/samsung/pinctrl-exynos.c | 6 +----- 
- 1 file changed, 1 insertion(+), 5 deletions(-) 
- 
-diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c 
-index 051b5bf..d32fa2b 100644 
---- a/drivers/pinctrl/samsung/pinctrl-exynos.c 
-+++ b/drivers/pinctrl/samsung/pinctrl-exynos.c 
-@@ -428,14 +428,10 @@ static void exynos_irq_eint0_15(struct irq_desc *desc) 
-     int eint_irq; 
-  
-     chained_irq_enter(chip, desc); 
--    chip->irq_mask(&desc->irq_data); 
-- 
--    if (chip->irq_ack) 
--        chip->irq_ack(&desc->irq_data); 
-  
-     eint_irq = irq_linear_revmap(bank->irq_domain, eintd->irq); 
-     generic_handle_irq(eint_irq); 
--    chip->irq_unmask(&desc->irq_data); 
-+ 
-     chained_irq_exit(chip, desc); 
- } 
-  
---  
-1.9.3 
- 
+On Sat, Aug 13, 2016 at 6:01 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+> Now, the A83T and A64 SoC user manuals are available.
+> Update the documentation to add the links.
+>
+> An updated version of A83T datasheet is also included now.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+
+Acked-by: Chen-Yu Tsai <wens@csie.org>
