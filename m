@@ -1,146 +1,301 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 16 Aug 2016 15:38:24 +0100
-Subject: [PATCH v2 2/2] remoteproc: core: Rework obtaining a rproc from a DT
- phandle
-In-Reply-To: <20160816143824.4120-1-lee.jones@linaro.org>
-References: <20160816143824.4120-1-lee.jones@linaro.org>
-Message-ID: <20160816143824.4120-2-lee.jones@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 16 Aug 2016 16:39:51 +0200
+Subject: [PATCH] arm: module-plts: improve algorithm for counting PLTs
+In-Reply-To: <1471352117-19113-1-git-send-email-neidhard.kim@lge.com>
+References: <1471352117-19113-1-git-send-email-neidhard.kim@lge.com>
+Message-ID: <CAKv+Gu_x0KWbtgy6+arEPRQZ=G1Ma7dvX=p07K2UR4aZj=jnYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In this patch we;
- - Use a subsystem generic phandle to obtain an rproc
-   - We have to support TI's bespoke version for the time being
- - Convert wkup_m3_ipc driver to new API
- - Rename the call to be more like other, similar OF calls
- - Move feature-not-enabled inline stub to the headers
- - Strip out duplicate code by calling into of_get_rproc_by_index()
+(+ Dave)
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
+Hello Jongsung,
 
-v1 => v2:
- - Strip '_by_phandle' from function name
+On 16 August 2016 at 14:55, Jongsung Kim <neidhard.kim@lge.com> wrote:
+> Current count_plts() uses O(n^2) algorithm for counting distinct
+> PLTs. It's good and fast enough when handling relatively small
+> number of relocs. But the time for counting grows so fast by its
+> nature. A Cortex-A53 operating at 1GHz takes about 10 seconds to
+> count 4,819 distinct PLTs from 257,394 relocs. It can be serious
+> for embedded systems those usually want to boot fast.
+>
 
-drivers/remoteproc/remoteproc_core.c | 41 ++++++++----------------------------
- drivers/soc/ti/wkup_m3_ipc.c         | 14 +++---------
- include/linux/remoteproc.h           |  4 ++--
- 3 files changed, 14 insertions(+), 45 deletions(-)
+If I take the largest module I can find in my multi_v7_defconfig build, I get
 
-diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-index fe362fb..1c5d5d8 100644
---- a/drivers/remoteproc/remoteproc_core.c
-+++ b/drivers/remoteproc/remoteproc_core.c
-@@ -1269,47 +1269,24 @@ struct rproc *of_get_rproc_by_name(struct device_node *np, const char *name)
- EXPORT_SYMBOL(of_get_rproc_by_name);
- 
- /**
-- * rproc_get_by_phandle() - find a remote processor by phandle
-- * @phandle: phandle to the rproc
-+ * of_get_rproc() - lookup and obtain a reference to an rproc
-+ * @np: node to search for rproc
-  *
-- * Finds an rproc handle using the remote processor's phandle, and then
-- * return a handle to the rproc.
-+ * Finds an rproc handle using the default remote processor's phandle,
-+ * and then returns a handle to the rproc.
-  *
-  * This function increments the remote processor's refcount, so always
-  * use rproc_put() to decrement it back once rproc isn't needed anymore.
-  *
-- * Returns the rproc handle on success, and NULL on failure.
-+ * Returns a pointer to the rproc struct on success or an appropriate error
-+ * code otherwise.
-  */
--struct rproc *rproc_get_by_phandle(phandle phandle)
--{
--	struct rproc *rproc = NULL, *r;
--	struct device_node *np;
--
--	np = of_find_node_by_phandle(phandle);
--	if (!np)
--		return NULL;
--
--	mutex_lock(&rproc_list_mutex);
--	list_for_each_entry(r, &rproc_list, node) {
--		if (r->dev.parent && r->dev.parent->of_node == np) {
--			rproc = r;
--			get_device(&rproc->dev);
--			break;
--		}
--	}
--	mutex_unlock(&rproc_list_mutex);
--
--	of_node_put(np);
--
--	return rproc;
--}
--#else
--struct rproc *rproc_get_by_phandle(phandle phandle)
-+struct rproc *of_get_rproc(struct device_node *np)
- {
--	return NULL;
-+	return of_get_rproc_by_index(np, 0);
- }
-+EXPORT_SYMBOL(of_get_rproc);
- #endif
--EXPORT_SYMBOL(rproc_get_by_phandle);
- 
- /**
-  * rproc_add() - register a remote processor
-diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
-index 8823cc8..8518c16 100644
---- a/drivers/soc/ti/wkup_m3_ipc.c
-+++ b/drivers/soc/ti/wkup_m3_ipc.c
-@@ -385,7 +385,6 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	int irq, ret;
--	phandle rproc_phandle;
- 	struct rproc *m3_rproc;
- 	struct resource *res;
- 	struct task_struct *task;
-@@ -430,16 +429,9 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
- 		return PTR_ERR(m3_ipc->mbox);
- 	}
- 
--	if (of_property_read_u32(dev->of_node, "ti,rproc", &rproc_phandle)) {
--		dev_err(&pdev->dev, "could not get rproc phandle\n");
--		ret = -ENODEV;
--		goto err_free_mbox;
--	}
--
--	m3_rproc = rproc_get_by_phandle(rproc_phandle);
--	if (!m3_rproc) {
--		dev_err(&pdev->dev, "could not get rproc handle\n");
--		ret = -EPROBE_DEFER;
-+	m3_rproc = of_get_rproc(dev->of_node);
-+	if (IS_ERR(m3_rproc)) {
-+		ret = PTR_ERR(m3_rproc);
- 		goto err_free_mbox;
- 	}
- 
-diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
-index f130938..0e1adc9 100644
---- a/include/linux/remoteproc.h
-+++ b/include/linux/remoteproc.h
-@@ -515,7 +515,7 @@ extern struct rproc *of_get_rproc_by_index(struct device_node *np,
- 					   int index);
- extern struct rproc *of_get_rproc_by_name(struct device_node *np,
- 					  const char *name);
--extern struct rproc *rproc_get_by_phandle(phandle phandle);
-+extern struct rproc *of_get_rproc(struct device_node *np);
- #else
- static inline
- struct rproc *of_get_rproc_by_index(struct device_node *np, int index)
-@@ -528,7 +528,7 @@ struct rproc *of_get_rproc_by_name(struct device_node *np, const char *name)
- 	return NULL;
- }
- static inline
--struct rproc *rproc_get_by_phandle(phandle phandle)
-+struct rproc *of_get_rproc(struct device_node *np)
- {
- 	return NULL;
- }
--- 
-2.9.0
+$ readelf -r ./net/mac80211/mac80211.ko |wc -l
+7984
+$ readelf -r ./net/mac80211/mac80211.ko |grep -E JUMP\|CALL |wc -l
+3675
+
+Where does the figure 257,394 originate from?
+
+> This patch introduces faster O(n) algorithm for counting unique
+> PLTs using hash-table. The following table compares the time (in
+> usecs) for counting distinct PLTs from relocs (using Cortex-A53
+> @1GHz mentioned above):
+>
+>         --------------------------------------
+>           relocs    PLTs      O(n^2)     O(n)
+>         --------------------------------------
+>               15       1           1       27
+>               30       6           1       29
+>               60      14           5       31
+>              120      26          15       32
+>              240      47          51       36
+>              480      88         216       50
+>              960     125         560       67
+>            1,920     191       1,476      106
+>            3,840     253       5,731      179
+>            7,680     431      21,226      347
+>           15,360     637      88,211      698
+>           30,720   1,291     331,626    1,369
+>           61,440   1,902     803,964    2,917
+>          122,880   3,320   4,129,439    6,428
+>          245,760   4,646   8,837,064   13,024
+>         ======================================
+>
+> The time increases near-linearly, and the time to handling same
+> 257,394 relocs is reduced to < 20msec from 10 seconds. (< 0.2%)
+>
+> With very small number of PLTs, O(n^2) counting is still faster
+> than O(n) counting, because O(n) counting needs additional O(n)
+> memory space allocation. In these cases, however, the difference
+> looks very short and negligible.
+>
+> This patch does not replaces original O(n^2) counting algorithm
+> with introduced O(n) algorithm, to use it as fall-back algorithm
+> when required memory allocation fails.
+>
+
+I think there are other optimizations that are much simpler that we
+could look into first. For instance, PLT entries can only be used for
+call and jump relocations that refer to SHN_UNDEF symbols: this is a
+rather fundamental restriction, since the PLT itself must be in range
+for these call and jump instructions. If the module grows so big that
+PLT entries are required for jumps inside the same module, we can no
+longer guarantee that the PLT can be located close enough.
+
+I quickly tested this with the module above:
+Before:
+
+# insmod cfg80211.ko
+[   45.981587] Allocating 238 PLT entries for 3632 external
+jumps/calls (out of 3632 relocations)
+[   45.981967] Allocating 4 PLT entries for 10 external jumps/calls
+(out of 10 relocations)
+[   45.982386] Allocating 19 PLT entries for 37 external jumps/calls
+(out of 37 relocations)
+[   45.982895] Allocating 7 PLT entries for 11 external jumps/calls
+(out of 11 relocations)
+[   45.983409] Allocating 4 PLT entries for 16 external jumps/calls
+(out of 16 relocations)
+
+# insmod mac80211.ko
+[   52.028863] Allocating 545 PLT entries for 5762 external
+jumps/calls (out of 5762 relocations)
+[   52.029207] Allocating 8 PLT entries for 16 external jumps/calls
+(out of 16 relocations)
+[   52.029431] Allocating 4 PLT entries for 4 external jumps/calls
+(out of 4 relocations)
+[   52.029676] Allocating 39 PLT entries for 107 external jumps/calls
+(out of 107 relocations)
+
+(i.e., without the optimization, all jumps and calls are identified as
+potentially external)
+
+After:
+
+# insmod cfg80211.ko
+[   47.685451] Allocating 111 PLT entries for 2097 external
+jumps/calls (out of 3632 relocations)
+[   47.686016] Allocating 3 PLT entries for 5 external jumps/calls
+(out of 10 relocations)
+[   47.686440] Allocating 11 PLT entries for 11 external jumps/calls
+(out of 37 relocations)
+[   47.686837] Allocating 4 PLT entries for 4 external jumps/calls
+(out of 11 relocations)
+[   47.687098] Allocating 3 PLT entries for 13 external jumps/calls
+(out of 16 relocations)
+
+# insmod mac80211.ko
+[   50.410922] Allocating 231 PLT entries for 2857 external
+jumps/calls (out of 5762 relocations)
+[   50.411277] Allocating 2 PLT entries for 2 external jumps/calls
+(out of 16 relocations)
+[   50.411562] Allocating 1 PLT entries for 1 external jumps/calls
+(out of 4 relocations)
+[   50.411918] Allocating 20 PLT entries for 43 external jumps/calls
+(out of 107 relocations)
+
+Another thing to note is that the .init section hardly deserves its
+own PLT. In the example above the 3rd resp 2nd line refers to
+.init.text, and there is really no point in putting 11 resp 2 PLT
+entries (or 88 resp 16 bytes) into a separate section just so that we
+can release it again after init. So the next optimization is to simply
+merge them.
+
+I will send out the patches separately, please tell me what you think.
+
+Thanks,
+Ard.
+
+
+> Reported-by: Chanho Min <chanho.min@lge.com>
+> Suggested-by: Youngho Shin <youngho.shin@lge.com>
+> Signed-off-by: Jongsung Kim <neidhard.kim@lge.com>
+> Reviewed-by: Namhyung Kim <namhyung.kim@lge.com>
+> ---
+>  arch/arm/kernel/module-plts.c | 111 +++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 110 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/kernel/module-plts.c b/arch/arm/kernel/module-plts.c
+> index 0c7efc3..dae7459 100644
+> --- a/arch/arm/kernel/module-plts.c
+> +++ b/arch/arm/kernel/module-plts.c
+> @@ -9,6 +9,8 @@
+>  #include <linux/elf.h>
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+> +#include <linux/sched.h>
+> +#include <linux/vmalloc.h>
+>
+>  #include <asm/cache.h>
+>  #include <asm/opcodes.h>
+> @@ -25,11 +27,26 @@
+>                                                     (PLT_ENT_STRIDE - 8))
+>  #endif
+>
+> +#define PLT_HASH_SHIFT         10
+> +#define PLT_HASH_SIZE          (1 << PLT_HASH_SHIFT)
+> +#define PLT_HASH_MASK          (PLT_HASH_SIZE - 1)
+> +
+>  struct plt_entries {
+>         u32     ldr[PLT_ENT_COUNT];
+>         u32     lit[PLT_ENT_COUNT];
+>  };
+>
+> +struct plt_hash_entry {
+> +       struct plt_hash_entry *next;
+> +       Elf32_Rel const *plt;
+> +};
+> +
+> +struct plt_hash_table {
+> +       struct plt_hash_entry *table[PLT_HASH_SIZE];
+> +       size_t used;
+> +       struct plt_hash_entry entry[0];
+> +};
+> +
+>  static bool in_init(const struct module *mod, u32 addr)
+>  {
+>         return addr - (u32)mod->init_layout.base < mod->init_layout.size;
+> @@ -100,7 +117,7 @@ static int duplicate_rel(Elf32_Addr base, const Elf32_Rel *rel, int num,
+>  }
+>
+>  /* Count how many PLT entries we may need */
+> -static unsigned int count_plts(Elf32_Addr base, const Elf32_Rel *rel, int num)
+> +static unsigned int _count_plts(Elf32_Addr base, const Elf32_Rel *rel, int num)
+>  {
+>         unsigned int ret = 0;
+>         int i;
+> @@ -129,6 +146,98 @@ static unsigned int count_plts(Elf32_Addr base, const Elf32_Rel *rel, int num)
+>         return ret;
+>  }
+>
+> +static unsigned int hash_plt(Elf32_Rel const *plt, Elf32_Addr base, u32 mask)
+> +{
+> +       u32 const *loc = (u32 *)(base + plt->r_offset);
+> +       u32 hash = (plt->r_info >> 8) ^ (*loc & mask);
+> +       return hash & PLT_HASH_MASK;
+> +}
+> +
+> +static bool
+> +same_plts(Elf32_Rel const *a, Elf32_Rel const *b, Elf32_Addr base, u32 mask)
+> +{
+> +       u32 const *loc1;
+> +       u32 const *loc2;
+> +
+> +       if (a->r_info != b->r_info)
+> +               return false;
+> +
+> +       loc1 = (u32 *)(base + a->r_offset);
+> +       loc2 = (u32 *)(base + b->r_offset);
+> +
+> +       return ((*loc1 ^ *loc2) & mask) == 0;
+> +}
+> +
+> +static int hash_insert_plt(struct plt_hash_table *table, Elf32_Rel const *plt,
+> +                          Elf32_Addr base, u32 mask)
+> +{
+> +       unsigned int hash = hash_plt(plt, base, mask);
+> +       struct plt_hash_entry *entry;
+> +
+> +       for (entry = table->table[hash]; entry; entry = entry->next)
+> +               if (same_plts(entry->plt, plt, base, mask))
+> +                       return 0;
+> +
+> +       entry = &table->entry[table->used++];
+> +       entry->next = table->table[hash];
+> +       entry->plt = plt;
+> +       table->table[hash] = entry;
+> +
+> +       return 1;
+> +}
+> +
+> +static size_t count_plts(Elf32_Addr base, Elf32_Rel const *rel, int num)
+> +{
+> +       struct plt_hash_table *table;
+> +       size_t plts;
+> +       u32 mask;
+> +       int i;
+> +
+> +       /* count PLTs first to optimize memory usage */
+> +       for (plts = i = 0; i < num; i++) {
+> +               switch (ELF32_R_TYPE(rel[i].r_info)) {
+> +               case R_ARM_CALL:
+> +               case R_ARM_PC24:
+> +               case R_ARM_JUMP24:
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +               case R_ARM_THM_CALL:
+> +               case R_ARM_THM_JUMP24:
+> +#endif
+> +                       plts++;
+> +                       break;
+> +               }
+> +       }
+> +
+> +       table = vzalloc(sizeof(struct plt_hash_table) +
+> +                       sizeof(struct plt_hash_entry) * plts);
+> +       if (!table) {
+> +               /* fall-back to O(n^2) counting on memory shortage */
+> +               return _count_plts(base, rel, num);
+> +       }
+> +
+> +       for (plts = i = 0; i < num; i++) {
+> +               switch (ELF32_R_TYPE(rel[i].r_info)) {
+> +               case R_ARM_CALL:
+> +               case R_ARM_PC24:
+> +               case R_ARM_JUMP24:
+> +                       mask = __opcode_to_mem_arm(0x00ffffff);
+> +                       plts += hash_insert_plt(table, &rel[i], base, mask);
+> +                       break;
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +               case R_ARM_THM_CALL:
+> +               case R_ARM_THM_JUMP24:
+> +                       mask = __opcode_to_mem_thumb32(0x07ff2fff);
+> +                       plts += hash_insert_plt(table, &rel[i], base, mask);
+> +                       break;
+> +#endif
+> +               }
+> +       }
+> +
+> +       vfree(table);
+> +
+> +       return plts;
+> +}
+> +
+>  int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+>                               char *secstrings, struct module *mod)
+>  {
+> --
+> 2.7.4
+>
