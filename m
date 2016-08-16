@@ -1,31 +1,144 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 16 Aug 2016 18:19:22 +0900
-Subject: [PATCH] arm64: remove redundant "select HAVE_CLK"
-Message-ID: <1471339162-29585-1-git-send-email-yamada.masahiro@socionext.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Tue, 16 Aug 2016 16:59:57 +0800
+Subject: [PATCH v5 6/7] power: act8945a_charger: Add max current property
+In-Reply-To: <1471337998-6467-1-git-send-email-wenyou.yang@atmel.com>
+References: <1471337998-6467-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1471337998-6467-7-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HAVE_CLK is select'ed by CLKDEV_LOOKUP, which is select'ed by
-COMMON_CLK, which is select'ed by ARM64.  No sub-architecture
-need to select HAVE_CLK explicitly.
+Add the power supply's current max property,
+POWER_SUPPLY_PROP_CURRENT_MAX.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 ---
 
- arch/arm64/Kconfig.platforms | 1 -
- 1 file changed, 1 deletion(-)
+Changes in v5: None
+Changes in v4:
+ - Fix wrong gpio assignment for chglev_pin.
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index be5d824..4a4318b 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -159,7 +159,6 @@ config ARCH_TEGRA
- 	select CLKSRC_MMIO
- 	select CLKSRC_OF
- 	select GENERIC_CLOCKEVENTS
--	select HAVE_CLK
- 	select PINCTRL
- 	select RESET_CONTROLLER
- 	help
+Changes in v3: None
+Changes in v2: None
+
+ drivers/power/supply/act8945a_charger.c | 79 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 77 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/power/supply/act8945a_charger.c b/drivers/power/supply/act8945a_charger.c
+index 2321796..9bfbc87 100644
+--- a/drivers/power/supply/act8945a_charger.c
++++ b/drivers/power/supply/act8945a_charger.c
+@@ -84,6 +84,7 @@ struct act8945a_charger {
+ 
+ 	bool init_done;
+ 	int lbo_pin;
++	int chgin_level;
+ };
+ 
+ static int act8945a_get_charger_state(struct regmap *regmap, int *val)
+@@ -267,12 +268,79 @@ static int act8945a_get_capacity_level(struct act8945a_charger *charger,
+ 	return 0;
+ }
+ 
++#define MAX_CURRENT_USB_HIGH	450000
++#define MAX_CURRENT_USB_LOW	90000
++#define MAX_CURRENT_USB_PRE	45000
++/*
++ * Riset(K) = 2336 * (1V/Ichg(mA)) - 0.205
++ * Riset = 2.43K
++ */
++#define MAX_CURRENT_AC_HIGH		886527
++#define MAX_CURRENT_AC_LOW		117305
++#define MAX_CURRENT_AC_HIGH_PRE		88653
++#define MAX_CURRENT_AC_LOW_PRE		11731
++
++static int act8945a_get_current_max(struct act8945a_charger *charger,
++				    struct regmap *regmap, int *val)
++{
++	int ret;
++	unsigned int status, state;
++	unsigned int acin_state;
++
++	ret = regmap_read(regmap, ACT8945A_APCH_STATUS, &status);
++	if (ret < 0)
++		return ret;
++
++	ret = regmap_read(regmap, ACT8945A_APCH_STATE, &state);
++	if (ret < 0)
++		return ret;
++
++	acin_state = (state & APCH_STATE_ACINSTAT) >> 1;
++
++	state &= APCH_STATE_CSTATE;
++	state >>= APCH_STATE_CSTATE_SHIFT;
++
++	switch (state) {
++	case APCH_STATE_CSTATE_PRE:
++		if (acin_state) {
++			if (charger->chgin_level)
++				*val = MAX_CURRENT_AC_HIGH_PRE;
++			else
++				*val = MAX_CURRENT_AC_LOW_PRE;
++		} else {
++			*val = MAX_CURRENT_USB_PRE;
++		}
++		break;
++	case APCH_STATE_CSTATE_FAST:
++		if (acin_state) {
++			if (charger->chgin_level)
++				*val = MAX_CURRENT_AC_HIGH;
++			else
++				*val = MAX_CURRENT_AC_LOW;
++		} else {
++			if (charger->chgin_level)
++				*val = MAX_CURRENT_USB_HIGH;
++			else
++				*val = MAX_CURRENT_USB_LOW;
++		}
++		break;
++	case APCH_STATE_CSTATE_EOC:
++	case APCH_STATE_CSTATE_DISABLED:
++	default:
++		*val = 0;
++		break;
++	}
++
++	return 0;
++}
++
+ static enum power_supply_property act8945a_charger_props[] = {
+ 	POWER_SUPPLY_PROP_STATUS,
+ 	POWER_SUPPLY_PROP_CHARGE_TYPE,
+ 	POWER_SUPPLY_PROP_TECHNOLOGY,
+ 	POWER_SUPPLY_PROP_HEALTH,
+ 	POWER_SUPPLY_PROP_CAPACITY_LEVEL,
++	POWER_SUPPLY_PROP_CURRENT_MAX,
+ 	POWER_SUPPLY_PROP_MODEL_NAME,
+ 	POWER_SUPPLY_PROP_MANUFACTURER
+ };
+@@ -302,6 +370,10 @@ static int act8945a_charger_get_property(struct power_supply *psy,
+ 		ret = act8945a_get_capacity_level(charger,
+ 						  regmap, &val->intval);
+ 		break;
++	case POWER_SUPPLY_PROP_CURRENT_MAX:
++		ret = act8945a_get_current_max(charger,
++					       regmap, &val->intval);
++		break;
+ 	case POWER_SUPPLY_PROP_MODEL_NAME:
+ 		val->strval = act8945a_charger_model;
+ 		break;
+@@ -434,8 +506,11 @@ static int act8945a_charger_config(struct device *dev,
+ 				"active-semi,chglev-gpios", 0, &flags);
+ 
+ 	if (gpio_is_valid(chglev_pin)) {
+-		gpio_set_value(chglev_pin,
+-			       ((flags == OF_GPIO_ACTIVE_LOW) ? 0 : 1));
++		if (!devm_gpio_request(dev, chglev_pin, "chglev-pin")) {
++			charger->chgin_level =
++					(flags == OF_GPIO_ACTIVE_LOW) ? 0 : 1;
++			gpio_set_value(chglev_pin, charger->chgin_level);
++		}
+ 	}
+ 
+ 	if (of_property_read_u32(np,
 -- 
-1.9.1
+2.7.4
