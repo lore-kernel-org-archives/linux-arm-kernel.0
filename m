@@ -1,47 +1,38 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 16 Aug 2016 23:04:47 +0800
-Subject: [PATCH v2] regulator: axp20x: support AXP803/AXP813 variants
-In-Reply-To: <20160816150104.16a7bcf774135c8275828eda@free.fr>
-References: <E1bZY0w-0004lM-0a@bombadil.infradead.org>
- <248521471347017@web1g.yandex.ru>
- <20160816150104.16a7bcf774135c8275828eda@free.fr>
-Message-ID: <395001471359887@web15h.yandex.ru>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 16 Aug 2016 11:08:14 -0400
+Subject: [RESEND PATCH] ARM: multi_v7_defconfig: Build Atmel maXTouch driver
+ as a module
+Message-ID: <1471360094-27637-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The driver is for a trackpad device so is not needed for booting and
+makes more sense to have it as module to reduce the kernel image size.
 
+It was probably enabled as built-in because module autoload was not
+working when the I2C device was registered by OF but this got fixed
+in commit b7d21058b40b ("Input: atmel_mxt_ts - add maxtouch to I2C
+table for module autoload") so it's safe to enable as a module now.
 
-16.08.2016, 21:01, "Jean-Francois Moine" <moinejf@free.fr>:
-> On Tue, 16 Aug 2016 19:30:17 +0800
-> Icenowy Zheng <icenowy@aosc.xyz> wrote:
->
->> ?> The X-Powers AXP803 and AXP813 PMICs are close to the AXP809 with some
->> ?> more outputs.
->> ?AXP803 and AXP813 is quite different.
->> ?AXP803 have 6 DCDCs and 16 LDOs&Switch.
->> ?AXP813 have 7 DCDCs and 15 LDOs&Switch.
->> ?and AXP813 have an audio codec.
->>
->> ?AXP803 cannot be handled without extra code.
->>
->> ?(I'm trying to get RSB working in my semi-mainline A64 kernel)
->
-> Hi Icenowy,
->
-> Interesting.
-> I did not find the documentation about the AXP813, but looking at the
-> Banana PI M3 driver (which seems a bit buggy), I found it was very
-> close to the AXP803.
->
-> Which more code do you think is needed for the AXP803?
-I've not checked it.
->
-> Also, please, may you give me a pointer to the AXP813 documentation?
-I got it on BaiduPan.
-https://pan.baidu.com/share/link?shareid=120641733&uk=2121502978&fid=169295081716431
-Here's a link, you can download it if you can read Chinese...
-Or at least you can read it online.
->
-> --
-> Ken ar c'henta? | ** Breizh ha Linux atav! **
-> Jef | http://moinejf.free.fr/
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+---
+
+ arch/arm/configs/multi_v7_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 2c8665cd9dc5..5d4fb28fb34f 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -277,7 +277,7 @@ CONFIG_MOUSE_PS2_ELANTECH=y
+ CONFIG_MOUSE_CYAPA=m
+ CONFIG_MOUSE_ELAN_I2C=y
+ CONFIG_INPUT_TOUCHSCREEN=y
+-CONFIG_TOUCHSCREEN_ATMEL_MXT=y
++CONFIG_TOUCHSCREEN_ATMEL_MXT=m
+ CONFIG_TOUCHSCREEN_MMS114=m
+ CONFIG_TOUCHSCREEN_ST1232=m
+ CONFIG_TOUCHSCREEN_STMPE=y
+-- 
+2.5.5
