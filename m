@@ -1,62 +1,28 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 16 Aug 2016 10:34:51 +0100
-Subject: [PATCH v4 00/17] pwm: Add support for PWM Capture
-Message-ID: <20160816093508.28307-1-lee.jones@linaro.org>
+Date: Tue, 16 Aug 2016 10:34:52 +0100
+Subject: [PATCH v4 01/17] ARM: dts: STiH407: Supply PWM Capture IRQ
+In-Reply-To: <20160816093508.28307-1-lee.jones@linaro.org>
+References: <20160816093508.28307-1-lee.jones@linaro.org>
+Message-ID: <20160816093508.28307-2-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-set makes use of the new Capture API by supplying PWM
-Capture functionality into the already existing STi PWM driver.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/stih407-family.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-v3 => v4:
-- Keep DTB backward compatibilty
-
-v2 => v3:
-- Supply DT documentation changes
-- Submit DTS additions as part of this set
-- Default Capture and PWM-out number of channels to 0
-  - Do additional checking, to ensure at least one channel is requested
-  - Use global locking, instead of lock in device data
-
-v1 => v2:
-- API change
-- Use a struct to carry the result back to the caller
-- Use 'struct pwm' to store device specific data
-- Make timeout configurable
-- Don't use clear_bit(), instead use raw bit logic
-- Propagate return value of platform_get_irq()
-- Don't cast to (void *)
-- Move to subsystem terminology (channels => devices)
-- Remove channel select feature
-- Enable Capture IP during capture
-
-Lee Jones (17):
-  ARM: dts: STiH407: Supply PWM Capture IRQ
-  ARM: dts: STiH407: Declare PWM Capture data lines via Pinctrl
-  ARM: dts: STiH416: Supply PWM Capture IRQs
-  ARM: dts: STiH416: Declare PWM Capture data lines via Pinctrl
-  ARM: dts: STiH416: Define PWM Capture clock
-  ARM: dts: STiH416: Define the number of PWM Capture channels
-  pwm: sti: Rename channel => device
-  pwm: sti: Reorganise register names in preparation for new
-    functionality
-  pwm: sti: Only request clock rate when you need to
-  pwm: sti: Supply PWM Capture register addresses and bit locations
-  pwm: sti: Supply PWM Capture clock handling
-  pwm: sti: Initialise PWM Capture device data
-  pwm: sti: Add support for PWM Capture IRQs
-  pwm: sti: Add PWM Capture call-back
-  pwm: sti: It's now valid for number of PWM channels to be zero
-  pwm: sti: Take the opportunity to conduct a little house keeping
-  dt-bindings: pwm: sti: Update DT bindings with recent changes
-
- Documentation/devicetree/bindings/pwm/pwm-st.txt |   8 +-
- arch/arm/boot/dts/stih407-family.dtsi            |   1 +
- arch/arm/boot/dts/stih407-pinctrl.dtsi           |   3 +
- arch/arm/boot/dts/stih416-pinctrl.dtsi           |   5 +
- arch/arm/boot/dts/stih416.dtsi                   |   8 +-
- drivers/pwm/pwm-sti.c                            | 424 +++++++++++++++++++----
- 6 files changed, 373 insertions(+), 76 deletions(-)
-
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index 1566830..fd0793e 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -667,6 +667,7 @@
+ 			compatible	= "st,sti-pwm";
+ 			#pwm-cells	= <2>;
+ 			reg		= <0x9810000 0x68>;
++			interrupts      = <GIC_SPI 128 IRQ_TYPE_NONE>;
+ 			pinctrl-names	= "default";
+ 			pinctrl-0	= <&pinctrl_pwm0_chan0_default>;
+ 			clock-names	= "pwm";
 -- 
 2.9.0
