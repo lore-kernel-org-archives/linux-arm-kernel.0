@@ -1,139 +1,73 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 16 Aug 2016 12:25:02 +0300
-Subject: [PATCH 5/8] drivers: platform: Configure dma operations at probe
- time
-In-Reply-To: <1470696550-3416-6-git-send-email-sricharan@codeaurora.org>
-References: <1470696550-3416-1-git-send-email-sricharan@codeaurora.org>
- <1470696550-3416-6-git-send-email-sricharan@codeaurora.org>
-Message-ID: <14864888.EhQqoi8buh@avalon>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Tue, 16 Aug 2016 17:30:21 +0800
+Subject: [PATCH v2] Bluetooth: Add LED triggers for HCI frames tx and rx
+In-Reply-To: <1394C970-3726-4C42-A06D-0B3B3015D980@holtmann.org>
+References: <1469939084-15603-1-git-send-email-guodong.xu@linaro.org>
+ <1394C970-3726-4C42-A06D-0B3B3015D980@holtmann.org>
+Message-ID: <CAFGCpxz6j_7aOTX+uShdpyxmt71k61v=Abdw=7MfrRjvdygmTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan,
+Hi, Marcel
 
-Thank you for the patch.
+On 16 August 2016 at 14:03, Marcel Holtmann <marcel@holtmann.org> wrote:
+> Hi Guodong,
+>
+>> Two LED triggers are added into hci_dev: tx_led and rx_led. Upon ACL/SCO
+>> packets available in tx or rx, the LEDs will blink.
+>>
+>> For each hci registration, two triggers are added into LED subsystem:
+>> [hdev->name]-tx and [hdev-name]-rx.
+>> Refer to Documentation/leds/leds-class.txt for usage.
+>>
+>> Verified on HiKey 96boards, which uses HiSilicon hi6220 SoC and TI
+>> WL1835 WiFi/BT combo chip.
+>
+> so I have no idea what to do with adding adding hci0-rx and hci0-tx triggers. Combined with hci0-power trigger these are already 3 triggers. And if you have 2 Bluetooth controllers in your system, then you have 6 triggers.
+>
 
-On Tuesday 09 Aug 2016 04:19:07 Sricharan R wrote:
-> Configuring DMA ops at probe time will allow deferring device probe when
-> the IOMMU isn't available yet.
-> 
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
->  drivers/base/dd.c           | 11 +++++++++++
->  drivers/base/dma-mapping.c  | 11 +++++++++++
->  include/linux/dma-mapping.h |  3 +++
->  3 files changed, 25 insertions(+)
-> 
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index 16688f5..b9978af 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -19,6 +19,7 @@
-> 
->  #include <linux/device.h>
->  #include <linux/delay.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/module.h>
->  #include <linux/kthread.h>
->  #include <linux/wait.h>
-> @@ -353,6 +354,10 @@ static int really_probe(struct device *dev, struct
-> device_driver *drv) if (ret)
->  		goto pinctrl_bind_failed;
-> 
-> +	ret = dma_configure_ops(dev);
+True, 6 triggers. But, taking example for other subsytems, eg. cpu
+cores. On my board, I have "heartbeat cpu0 cpu1 cpu2 cpu3 cpu4 cpu5
+cpu6 cpu7". It doesn't have to mean you need all of them connected to
+some LED(s). Actually, in most of the case, I only need heartbeat.
 
-Your patch doesn't remove the of_dma_configure_ops() from 
-of_platform_device_create_pdata(). Unless I'm mistaken, you will then end up 
-configuring the DMA ops twice, which at least on ARM will be a no-op the 
-second time:
 
-(arch_setup_dma_ops)
 
-        /*
-         * Don't override the dma_ops if they have already been set. Ideally
-         * this should be the only location where dma_ops are set, remove this
-         * check when all other callers of set_dma_ops will have disappeared.
-         */
-        if (dev->archdata.dma_ops)
-                return;
+> If we then maybe add another trigger, then this number just goes up and up.
+>
+> As far as I can tell you can only assign a single trigger to a LED.
+>
 
-For the same reason I'm wondering whether you shouldn't also remove the 
-of_dma_configure_ops() call from of_amba_device_create() (I don't remember why 
-I left it there in my original patch series).
+That's true. And people got a choice of which feature he wants to visualize.
 
-> +	if (ret)
-> +		goto dma_failed;
-> +
->  	if (driver_sysfs_add(dev)) {
->  		printk(KERN_ERR "%s: driver_sysfs_add(%s) failed\n",
->  			__func__, dev_name(dev));
-> @@ -394,7 +399,10 @@ static int really_probe(struct device *dev, struct
-> device_driver *drv) drv->bus->name, __func__, dev_name(dev), drv->name);
->  	goto done;
-> 
-> +
->  probe_failed:
-> +	dma_deconfigure(dev);
-> +dma_failed:
->  	if (dev->bus)
->  		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
->  					     BUS_NOTIFY_DRIVER_NOT_BOUND, 
-dev);
-> @@ -780,6 +788,9 @@ static void __device_release_driver(struct device *dev)
->  			dev->bus->remove(dev);
->  		else if (drv->remove)
->  			drv->remove(dev);
-> +
-> +		dma_deconfigure(dev);
-> +
->  		devres_release_all(dev);
->  		dev->driver = NULL;
->  		dev_set_drvdata(dev, NULL);
-> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
-> index d799662..ccc1c6e 100644
-> --- a/drivers/base/dma-mapping.c
-> +++ b/drivers/base/dma-mapping.c
-> @@ -10,6 +10,7 @@
->  #include <linux/dma-mapping.h>
->  #include <linux/export.h>
->  #include <linux/gfp.h>
-> +#include <linux/of_device.h>
->  #include <linux/slab.h>
->  #include <linux/vmalloc.h>
-> 
-> @@ -166,6 +167,16 @@ void dmam_free_noncoherent(struct device *dev, size_t
-> size, void *vaddr, }
->  EXPORT_SYMBOL(dmam_free_noncoherent);
-> 
-> +int dma_configure_ops(struct device *dev)
-> +{
-> +	return of_dma_configure_ops(dev, dev->of_node);
-> +}
-> +
-> +void dma_deconfigure(struct device *dev)
-> +{
-> +	of_dma_deconfigure(dev);
-> +}
-> +
->  #ifdef CONFIG_HAVE_GENERIC_DMA_COHERENT
-> 
->  static void dmam_coherent_decl_release(struct device *dev, void *res)
-> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-> index 71c1b21..a49aac9 100644
-> --- a/include/linux/dma-mapping.h
-> +++ b/include/linux/dma-mapping.h
-> @@ -613,6 +613,9 @@ dma_mark_declared_memory_occupied(struct device *dev,
->  }
->  #endif /* CONFIG_HAVE_GENERIC_DMA_COHERENT */
-> 
-> +int dma_configure_ops(struct device *dev);
-> +void dma_deconfigure(struct device *dev);
-> +
->  /*
->   * Managed DMA API
->   */
+> So this means to even use these triggers, you need now 3 LEDs per Bluetooth controller. How is that useful for anybody in a real system? Maybe I am missing something here and somehow there is magic to combine triggers, but I have not found it yet. So please someone enlighten me on how this is suppose to be used with real devices.
+>
+> Recently I have added a simple bluetooth-power trigger that combines all Bluetooth controllers into a single trigger. If any of them is enabled, then you can control your LED. Which makes a lot more sense to me since you most likely have a single Bluetooth LED on your system. And you want it to show the correct state no matter what Bluetooth controller is in use. However I can see the case that someone might want to assign one specific Bluetooth controller to a LED status.
+>
+> So instead of adding many independent triggers to each controller, why not create one global bluetooth trigger and one individual bluetooth-hci0 trigger for each controller. And the combine power, tx, rx and whatever else we need to trigger the LED for?
+>
 
--- 
-Regards,
+When I starting this work, I referred to WiFi system. See
+CONFIG_MAC80211_LEDS. WiFi system implements these types of triggers "
+phy0rx phy0tx phy0assoc phy0radio" for each 'controller'.
 
-Laurent Pinchart
+Besides, there are also RFKILL which stands for WiFi/BT power status.
+RFKILL adds triggers for each module too. Eg. in the below example, I
+have one WiFi (phy0), one BT (hci0). Trigger rfkill1 equals to
+hci0-power.
+
+Ref: here are all LED triggers I found in my 96boards/HiKey:
+
+# cat trigger
+none kbd-scrollock kbd-numlock kbd-capslock kbd-kanalock kbd-shiftlock
+kbd-altgrlock kbd-ctrllock kbd-altlock kbd-shiftllock kbd-shiftrlock
+kbd-ctrlllock kbd-ctrlrlock mmc0 mmc1 heartbeat cpu0 cpu1 cpu2 cpu3
+cpu4 cpu5 cpu6 cpu7 mmc2 rfkill0 phy0rx phy0tx phy0assoc phy0radio
+hci0-power hci0-tx [hci0-rx] rfkill1
+
+-Guodong
+
+> Regards
+>
+> Marcel
+>
