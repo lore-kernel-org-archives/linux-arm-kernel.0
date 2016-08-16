@@ -1,75 +1,101 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 16 Aug 2016 15:35:07 +0200
-Subject: [RFC 10/17] clk: composite: Switch to new clock controller API
+Date: Tue, 16 Aug 2016 15:35:13 +0200
+Subject: [RFC 16/17] Revert
+ "i2c: exynos5: Fix possible ABBA deadlock by keeping I2C clock prepared"
 In-Reply-To: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
 References: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1471354514-24224-11-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1471354514-24224-17-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allocate a clock controller and use new clk_register_with_ctrl() API.
-
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+This reverts commit 10ff4c5239a137abfc896ec73ef3d15a0f86a16a.
 ---
- drivers/clk/clk-composite.c  | 8 +++++---
- include/linux/clk-provider.h | 6 ++++--
- 2 files changed, 9 insertions(+), 5 deletions(-)
+ drivers/i2c/busses/i2c-exynos5.c | 24 +++++-------------------
+ 1 file changed, 5 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-index 00269de2f390..8ad5c2c4a329 100644
---- a/drivers/clk/clk-composite.c
-+++ b/drivers/clk/clk-composite.c
-@@ -211,7 +211,8 @@ static void clk_composite_disable(struct clk_hw *hw)
- 	gate_ops->disable(gate_hw);
+diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
+index c0e3ada02876..8710052eeb6b 100644
+--- a/drivers/i2c/busses/i2c-exynos5.c
++++ b/drivers/i2c/busses/i2c-exynos5.c
+@@ -671,9 +671,7 @@ static int exynos5_i2c_xfer(struct i2c_adapter *adap,
+ 		return -EIO;
+ 	}
+ 
+-	ret = clk_enable(i2c->clk);
+-	if (ret)
+-		return ret;
++	clk_prepare_enable(i2c->clk);
+ 
+ 	for (i = 0; i < num; i++, msgs++) {
+ 		stop = (i == num - 1);
+@@ -697,7 +695,7 @@ static int exynos5_i2c_xfer(struct i2c_adapter *adap,
+ 	}
+ 
+  out:
+-	clk_disable(i2c->clk);
++	clk_disable_unprepare(i2c->clk);
+ 	return ret;
  }
  
--struct clk_hw *clk_hw_register_composite(struct device *dev, const char *name,
-+struct clk_hw *clk_hw_register_composite(struct device *dev, struct clk_ctrl *ctrl,
-+			const char *name,
- 			const char * const *parent_names, int num_parents,
- 			struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
- 			struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
-@@ -324,7 +325,8 @@ err:
- 	return hw;
+@@ -749,9 +747,7 @@ static int exynos5_i2c_probe(struct platform_device *pdev)
+ 		return -ENOENT;
+ 	}
+ 
+-	ret = clk_prepare_enable(i2c->clk);
+-	if (ret)
+-		return ret;
++	clk_prepare_enable(i2c->clk);
+ 
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	i2c->regs = devm_ioremap_resource(&pdev->dev, mem);
+@@ -803,10 +799,6 @@ static int exynos5_i2c_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, i2c);
+ 
+-	clk_disable(i2c->clk);
+-
+-	return 0;
+-
+  err_clk:
+ 	clk_disable_unprepare(i2c->clk);
+ 	return ret;
+@@ -818,8 +810,6 @@ static int exynos5_i2c_remove(struct platform_device *pdev)
+ 
+ 	i2c_del_adapter(&i2c->adap);
+ 
+-	clk_unprepare(i2c->clk);
+-
+ 	return 0;
  }
  
--struct clk *clk_register_composite(struct device *dev, const char *name,
-+struct clk *clk_register_composite(struct device *dev, struct clk_ctrl *ctrl,
-+			const char *name,
- 			const char * const *parent_names, int num_parents,
- 			struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
- 			struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
-@@ -333,7 +335,7 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
- {
- 	struct clk_hw *hw;
+@@ -831,8 +821,6 @@ static int exynos5_i2c_suspend_noirq(struct device *dev)
  
--	hw = clk_hw_register_composite(dev, name, parent_names, num_parents,
-+	hw = clk_hw_register_composite(dev, ctrl, name, parent_names, num_parents,
- 			mux_hw, mux_ops, rate_hw, rate_ops, gate_hw, gate_ops,
- 			flags);
- 	if (IS_ERR(hw))
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index cfb3aa3912c5..2bd0a8cb7a9c 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -663,14 +663,16 @@ struct clk_composite {
+ 	i2c->suspended = 1;
  
- #define to_clk_composite(_hw) container_of(_hw, struct clk_composite, hw)
+-	clk_unprepare(i2c->clk);
+-
+ 	return 0;
+ }
  
--struct clk *clk_register_composite(struct device *dev, const char *name,
-+struct clk *clk_register_composite(struct device *dev, struct clk_ctrl *ctrl,
-+		const char *name,
- 		const char * const *parent_names, int num_parents,
- 		struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
- 		struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
- 		struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
- 		unsigned long flags);
- void clk_unregister_composite(struct clk *clk);
--struct clk_hw *clk_hw_register_composite(struct device *dev, const char *name,
-+struct clk_hw *clk_hw_register_composite(struct device *dev,
-+		struct clk_ctrl *ctrl, const char *name,
- 		const char * const *parent_names, int num_parents,
- 		struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
- 		struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
+@@ -842,9 +830,7 @@ static int exynos5_i2c_resume_noirq(struct device *dev)
+ 	struct exynos5_i2c *i2c = platform_get_drvdata(pdev);
+ 	int ret = 0;
+ 
+-	ret = clk_prepare_enable(i2c->clk);
+-	if (ret)
+-		return ret;
++	clk_prepare_enable(i2c->clk);
+ 
+ 	ret = exynos5_hsi2c_clock_setup(i2c);
+ 	if (ret) {
+@@ -853,7 +839,7 @@ static int exynos5_i2c_resume_noirq(struct device *dev)
+ 	}
+ 
+ 	exynos5_i2c_init(i2c);
+-	clk_disable(i2c->clk);
++	clk_disable_unprepare(i2c->clk);
+ 	i2c->suspended = 0;
+ 
+ 	return 0;
 -- 
 1.9.1
