@@ -1,65 +1,41 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 16 Aug 2016 09:37:06 +0200
-Subject: [PATCH] pwm: samsung: fix to use lowest div for large enough
- modulation bits
-In-Reply-To: <1470133006-4272-1-git-send-email-sw0312.kim@samsung.com>
-References: <1470133006-4272-1-git-send-email-sw0312.kim@samsung.com>
-Message-ID: <329cb013-4832-c443-d593-327531db7b40@samsung.com>
+Date: Tue, 16 Aug 2016 09:40:38 +0200
+Subject: [PATCH 2/7] Documentation: bindings: Add Exynos5433 PMU compatible
+In-Reply-To: <1471328843-26653-3-git-send-email-cw00.choi@samsung.com>
+References: <1471328843-26653-1-git-send-email-cw00.choi@samsung.com>
+ <1471328843-26653-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <488f925b-4c37-1759-04a8-11d992405527@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/2016 12:16 PM, Seung-Woo Kim wrote:
->>From pwm_samsung_calc_tin(), there is routine to find the lowest
-> divider possible to generate lower frequency than requested one.
-> But it is always possible to generate requested frequency with
-> large enough modulation bits, so this patch fixes to use lowest
-> div for the case. This patch removes following UBSAN warning:
+On 08/16/2016 08:27 AM, Chanwoo Choi wrote:
+> This patch adds the exynos5433 PMU compatible to support the access
+> of PMU (Power Management Unit) block.
 > 
->    UBSAN: Undefined behaviour in drivers/pwm/pwm-samsung.c:197:13
->    shift exponent 32 is too large for 32-bit type 'long unsigned int'
->    [...]
->    [<c0670248>] (ubsan_epilogue) from [<c06707b4>] (__ubsan_handle_shift_out_of_bounds+0xd8/0x120)
->    [<c06707b4>] (__ubsan_handle_shift_out_of_bounds) from [<c0694b28>] (pwm_samsung_config+0x508/0x6a4)
->    [<c0694b28>] (pwm_samsung_config) from [<c069286c>] (pwm_apply_state+0x174/0x40c)
->    [<c069286c>] (pwm_apply_state) from [<c0b2e070>] (pwm_fan_probe+0xc8/0x488)
->    [<c0b2e070>] (pwm_fan_probe) from [<c07ba8b0>] (platform_drv_probe+0x70/0x150)
->    [...]
-> 
-> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 > ---
-> The UBSAN warning from ARM is reported with the patch in following link:
-> https://patchwork.kernel.org/patch/9189575/
-> ---
->  drivers/pwm/pwm-samsung.c |   10 +++++++---
->  1 file changed, 7 insertions(+), 3 deletions(-)
+>  Documentation/devicetree/bindings/arm/samsung/pmu.txt | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/drivers/pwm/pwm-samsung.c b/drivers/pwm/pwm-samsung.c
-> index ada2d32..ff0def6 100644
-> --- a/drivers/pwm/pwm-samsung.c
-> +++ b/drivers/pwm/pwm-samsung.c
-> @@ -193,9 +193,13 @@ static unsigned long pwm_samsung_calc_tin(struct samsung_pwm_chip *chip,
->  	 * divider settings and choose the lowest divisor that can generate
->  	 * frequencies lower than requested.
->  	 */
-> -	for (div = variant->div_base; div < 4; ++div)
-> -		if ((rate >> (variant->bits + div)) < freq)
-> -			break;
-> +	if (fls(rate) <= variant->bits) {
-> +		div = variant->div_base;
-> +	} else {
-> +		for (div = variant->div_base; div < 4; ++div)
-> +			if ((rate >> (variant->bits + div)) < freq)
-> +				break;
-> +	}
+> diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+> index 2d6356d8daf4..bf5fc59a6938 100644
+> --- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+> +++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+> @@ -10,6 +10,7 @@ Properties:
+>  		   - "samsung,exynos5260-pmu" - for Exynos5260 SoC.
+>  		   - "samsung,exynos5410-pmu" - for Exynos5410 SoC,
+>  		   - "samsung,exynos5420-pmu" - for Exynos5420 SoC.
+> +		   - "samsung,exynos5433-pmu" - for Exynos5433 SoC.
+>  		   - "samsung,exynos7-pmu" - for Exynos7 SoC.
+>  		second value must be always "syscon".
 
-I have trouble with understanding the idea behind initial code from
-Tomasz (commit 11ad39ede24ee). The variant->bits for all SoC except
-S3C24xx is 32. This means the shift:
-	if ((rate >> (variant->bits + div)) < freq)
-will be always by 32 or more... In practice this will choose always a
-"div" of 0 because in first iteration of this loop, the shift will be by 32.
-
-This looks weird and the fix does not really remove the weirdness out of it.
+Is there any plan to add Exynos5433 support to
+drivers/soc/samsung/exynos-pmu.c? If no... then exynos7-pmu might be
+reused. If yes, then this makes sense.
 
 Best regards,
 Krzysztof
