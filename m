@@ -1,92 +1,129 @@
-From: sw0312.kim@samsung.com (Seung-Woo Kim)
-Date: Tue, 16 Aug 2016 17:25:20 +0900
-Subject: [PATCH] pwm: samsung: fix to use lowest div for large enough
- modulation bits
-In-Reply-To: <329cb013-4832-c443-d593-327531db7b40@samsung.com>
-References: <1470133006-4272-1-git-send-email-sw0312.kim@samsung.com>
- <CGME20160816073709epcas1p45d975f43e8f7e3fc17e30cf6f6573dfb@epcas1p4.samsung.com>
- <329cb013-4832-c443-d593-327531db7b40@samsung.com>
-Message-ID: <57B2CDF0.8020809@samsung.com>
+From: brendan.jackman@arm.com (Brendan Jackman)
+Date: Tue, 16 Aug 2016 09:34:28 +0100
+Subject: [PATCH v3 02/15] dt/bindings: Update binding for PM domain idle
+ states
+In-Reply-To: <20160815224014.GF1401@linaro.org>
+References: <1470351902-43103-1-git-send-email-lina.iyer@linaro.org>
+ <1470351902-43103-3-git-send-email-lina.iyer@linaro.org>
+ <99e35b6c-6698-6d27-f4d7-fa032796869e@arm.com>
+ <20160810164034.GA1401@linaro.org>
+ <5e59874c-bbb7-270a-199c-da1ff5932554@arm.com>
+ <20160811211023.GC1401@linaro.org>
+ <697d8ac2-34ee-db3e-940b-5ce3365c5aa1@arm.com>
+ <20160815160857.GE1401@linaro.org>
+ <2033f384-7ea3-6713-4def-80bf4251fd67@arm.com>
+ <20160815224014.GF1401@linaro.org>
+Message-ID: <57B2D014.8000502@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
 
-On 2016? 08? 16? 16:37, Krzysztof Kozlowski wrote:
-> On 08/02/2016 12:16 PM, Seung-Woo Kim wrote:
->> >From pwm_samsung_calc_tin(), there is routine to find the lowest
->> divider possible to generate lower frequency than requested one.
->> But it is always possible to generate requested frequency with
->> large enough modulation bits, so this patch fixes to use lowest
->> div for the case. This patch removes following UBSAN warning:
+
+On 15/08/16 23:40, Lina Iyer wrote:
+> On Mon, Aug 15 2016 at 10:14 -0600, Sudeep Holla wrote:
 >>
->>    UBSAN: Undefined behaviour in drivers/pwm/pwm-samsung.c:197:13
->>    shift exponent 32 is too large for 32-bit type 'long unsigned int'
->>    [...]
->>    [<c0670248>] (ubsan_epilogue) from [<c06707b4>] (__ubsan_handle_shift_out_of_bounds+0xd8/0x120)
->>    [<c06707b4>] (__ubsan_handle_shift_out_of_bounds) from [<c0694b28>] (pwm_samsung_config+0x508/0x6a4)
->>    [<c0694b28>] (pwm_samsung_config) from [<c069286c>] (pwm_apply_state+0x174/0x40c)
->>    [<c069286c>] (pwm_apply_state) from [<c0b2e070>] (pwm_fan_probe+0xc8/0x488)
->>    [<c0b2e070>] (pwm_fan_probe) from [<c07ba8b0>] (platform_drv_probe+0x70/0x150)
->>    [...]
 >>
->> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
->> ---
->> The UBSAN warning from ARM is reported with the patch in following link:
->> https://patchwork.kernel.org/patch/9189575/
->> ---
->>  drivers/pwm/pwm-samsung.c |   10 +++++++---
->>  1 file changed, 7 insertions(+), 3 deletions(-)
+>> On 15/08/16 17:08, Lina Iyer wrote:
+>>> On Fri, Aug 12 2016 at 04:08 -0600, Sudeep Holla wrote:
+>>>>
+>>>>
+>>>> On 11/08/16 22:10, Lina Iyer wrote:
+>>>>> On Wed, Aug 10 2016 at 12:09 -0600, Sudeep Holla wrote:
+>>>>>>
+>>>>
+>>>> [...]
+>>>>
+>>>>>> cluster0
+>>>>>>   CLUSTER_RET(Retention)
+>>>>>>   CLUSTER_PG(Power Gate)
+>>>>>>   core0
+>>>>>>       CORE_RET
+>>>>>>       CORE_PG
+>>>>>>   core1
+>>>>>>       CORE_RET
+>>>>>>       CORE_PG
+>>>>>>
+>>>>>> cluster1
+>>>>>>   CLUSTER_RET
+>>>>>>   CLUSTER_PG
+>>>>>>   core0
+>>>>>>       CORE_RET
+>>>>>>       CORE_PG
+>>>>>>   core1
+>>>>>>       CORE_RET
+>>>>>>       CORE_PG
+>>>>>>
+>>>>>> Platform Co-ordinate supports the following states and we should be
+>>>>>> able to determine that from the binding:
+>>>>>>
+>>>>>> CORE_RET
+>>>>>> CORE_PG
+>>>>>> CORE_RET + CLUSTER_RET
+>>>>>
+>>>>> The problem that we have to sove here is knowing that CORE_RET +
+>>>>> CLUSTER_PG (hypothetically) an invalid combination. Kevin and
+>>>>> I debated it in the earlier RFC and we dont have a good way to solve
+>>>>> this generically for all devices.
+>>>>>
+>>>>
+>>>> Yes, I agree it's complex. But that needs to be solved IMO.
+>>>>
+>>>> I can think of 2 possible solutions:
+>>>>
+>>>> 1. Index the states(which people have not liked, but as along as we
+>>>>  don't use it in the code as it for any other purpose, it should be
+>>>>  fine) and then have each state mentioning what parent state can be
+>>>>  entered at this child state(i.e. starting index and all states below
+>>>>  it)
+>>>>
+>>> This is how QCOM solved it downstream.
+>>>
 >>
->> diff --git a/drivers/pwm/pwm-samsung.c b/drivers/pwm/pwm-samsung.c
->> index ada2d32..ff0def6 100644
->> --- a/drivers/pwm/pwm-samsung.c
->> +++ b/drivers/pwm/pwm-samsung.c
->> @@ -193,9 +193,13 @@ static unsigned long pwm_samsung_calc_tin(struct samsung_pwm_chip *chip,
->>  	 * divider settings and choose the lowest divisor that can generate
->>  	 * frequencies lower than requested.
->>  	 */
->> -	for (div = variant->div_base; div < 4; ++div)
->> -		if ((rate >> (variant->bits + div)) < freq)
->> -			break;
->> +	if (fls(rate) <= variant->bits) {
->> +		div = variant->div_base;
->> +	} else {
->> +		for (div = variant->div_base; div < 4; ++div)
->> +			if ((rate >> (variant->bits + div)) < freq)
->> +				break;
->> +	}
-> 
-> I have trouble with understanding the idea behind initial code from
-> Tomasz (commit 11ad39ede24ee). The variant->bits for all SoC except
-> S3C24xx is 32. This means the shift:
-> 	if ((rate >> (variant->bits + div)) < freq)
-> will be always by 32 or more... In practice this will choose always a
-> "div" of 0 because in first iteration of this loop, the shift will be by 32.
+>> Yes even ACPI has indices to solve this.
+>>
+>>>> 2. Something similar to (1) but without index instead phandles.
+>>>>
+>>>
+>>> The problem is when you have non-CPU devices in the device tree and
+>>> since they do not have a way to represent states like CPU, we did not
+>>> have a clear path to that. Hence we punted that to later. Whatever we
+>>> do, we should solve it for a generic PM domain, not just CPU domains.
+>>>
+>>
+>> Yes bindings defined here should be applicable for devices to, but only
+>> CPU's will have this hierarchy while the devices need not bother about
+>> hierarchy. However the parent power domain can ever the state which is
+>> least common denominator of all it's children power domain. That's my
+>> understanding. No ?
+>>
 
-I also confused that part, but I figured out that the bit is used to
-consider modulation bit to generate pwm signal from the input clock.
+Are you saying that the parent can enter the shallowest idle state that
+all its children are in (I.e if all its children are in "retention" then
+it can enter "retention")? I don't know what the reality is on existing
+platforms but it doesn't sound like 100% safe assumption to make. Also I
+don't think you can necessarily correlate idle states at different
+domain levels - i.e. here we've matched up the idea of "retention" at
+core level with that of "retention" at cluster level. I may have
+misunderstood you there..
 
-Only the old s3c2440 has 16 bit modulation timer for pwm, and all later
-soc has 32 bit modulation timer. So 32 bit timer cases, with the lowest
-div, it can generate all frequencies which can be assigned with 32bit
-variable.
-But I uses fls() to consider 64bit case also even though there is no
-really that kind of clock.
+> That is correct. But say if all the CPUs choose CORE_RET + CLUSTER_PG,
+> which is invalid and the firmware has to ignore it and does CORE_RET +
+> CLUSTER_RET instead, then Linux may have an inconsistent view of the
+> state selection.
+>
+Perhaps a better starting point would be to go with the assumption that
+a parent PD can only enter any idle state once its children are in their
+deepest idle states.
 
-Best Regards,
-- Seung-Woo Kim
+That is, we'd miss out on CORE_RET + CLUSTER_RET but have no invalid ones.
 
-> 
-> This looks weird and the fix does not really remove the weirdness out of it.
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
-> 
-
--- 
-Seung-Woo Kim
-Samsung Software R&D Center
---
+Then a later addition to the bindings as discussed above could enable
+the possibility of those combinations to be expressed.
+> Thanks,
+> Lina
+>
+>> --
+>> Regards,
+>> Sudeep
+>
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
