@@ -1,57 +1,146 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 16 Aug 2016 11:16:10 +0200
-Subject: [RESEND][PATCH] pinctrl: exynos: remove duplicate calls in irq
- handler
-In-Reply-To: <156921d1559.dd4cb9f127644.6244938289269001596@zoho.com>
-References: <156921d1559.dd4cb9f127644.6244938289269001596@zoho.com>
-Message-ID: <41a0d7c4-c199-0c1a-a861-10ba25337594@samsung.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Tue, 16 Aug 2016 16:59:56 +0800
+Subject: [PATCH v5 5/7] power: act8945a_charger: Add capacity level property
+In-Reply-To: <1471337998-6467-1-git-send-email-wenyou.yang@atmel.com>
+References: <1471337998-6467-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1471337998-6467-6-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/16/2016 08:49 AM, perr perr wrote:
-> Because chained_irq_enter() has already called chip->irq_mask() and 
-> chip->irq_ack(), also chained_irq_exit() will call chip->irq_unmask(), 
-> so it's not necessary to call chip->irq_*() here. 
->  
-> Signed-off-by: Perr Zhang<strongbox8@zoho.com> 
->  
-> --- 
->  drivers/pinctrl/samsung/pinctrl-exynos.c | 6 +----- 
->  1 file changed, 1 insertion(+), 5 deletions(-) 
+Add the power supply capacity level property, it corresponds to
+POWER_SUPPLY_CAPACITY_LEVEL_*.
 
-Hi,
+It also utilizes the precision voltage detector function module
+to catch the low battery voltage.
 
-Thanks for fixing Signed-off-by but now the commiter name does not match
-Signed-off-by. In the same time you skipped the tags you got already
-(Tomasz's ack and my reviewed-by).
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
 
-BR,
-Krzysztof
+Changes in v5: None
+Changes in v4:
+ - Change devname of devm_request_irq() from "lbo-detect" to
+   "act8945a, lbo-detect".
 
->  
-> diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c 
-> index 051b5bf..d32fa2b 100644 
-> --- a/drivers/pinctrl/samsung/pinctrl-exynos.c 
-> +++ b/drivers/pinctrl/samsung/pinctrl-exynos.c 
-> @@ -428,14 +428,10 @@ static void exynos_irq_eint0_15(struct irq_desc *desc) 
->      int eint_irq; 
->   
->      chained_irq_enter(chip, desc); 
-> -    chip->irq_mask(&desc->irq_data); 
-> - 
-> -    if (chip->irq_ack) 
-> -        chip->irq_ack(&desc->irq_data); 
->   
->      eint_irq = irq_linear_revmap(bank->irq_domain, eintd->irq); 
->      generic_handle_irq(eint_irq); 
-> -    chip->irq_unmask(&desc->irq_data); 
-> + 
->      chained_irq_exit(chip, desc); 
->  } 
->   
-> --  
-> 1.9.3 
->  
-> 
-> 
-> 
+Changes in v3: None
+Changes in v2: None
+
+ drivers/power/supply/act8945a_charger.c | 78 +++++++++++++++++++++++++++++++++
+ 1 file changed, 78 insertions(+)
+
+diff --git a/drivers/power/supply/act8945a_charger.c b/drivers/power/supply/act8945a_charger.c
+index a3d89be..2321796 100644
+--- a/drivers/power/supply/act8945a_charger.c
++++ b/drivers/power/supply/act8945a_charger.c
+@@ -83,6 +83,7 @@ struct act8945a_charger {
+ 	struct work_struct work;
+ 
+ 	bool init_done;
++	int lbo_pin;
+ };
+ 
+ static int act8945a_get_charger_state(struct regmap *regmap, int *val)
+@@ -208,11 +209,70 @@ static int act8945a_get_battery_health(struct regmap *regmap, int *val)
+ 	return 0;
+ }
+ 
++static int act8945a_get_capacity_level(struct act8945a_charger *charger,
++				       struct regmap *regmap, int *val)
++{
++	int ret;
++	unsigned int status, state, config;
++	int lbo_level = 1;
++
++	if (gpio_is_valid(charger->lbo_pin))
++		lbo_level = gpio_get_value(charger->lbo_pin);
++
++	ret = regmap_read(regmap, ACT8945A_APCH_STATUS, &status);
++	if (ret < 0)
++		return ret;
++
++	ret = regmap_read(regmap, ACT8945A_APCH_CFG, &config);
++	if (ret < 0)
++		return ret;
++
++	ret = regmap_read(regmap, ACT8945A_APCH_STATE, &state);
++	if (ret < 0)
++		return ret;
++
++	state &= APCH_STATE_CSTATE;
++	state >>= APCH_STATE_CSTATE_SHIFT;
++
++	switch (state) {
++	case APCH_STATE_CSTATE_PRE:
++		*val = POWER_SUPPLY_CAPACITY_LEVEL_LOW;
++		break;
++	case APCH_STATE_CSTATE_FAST:
++		if (lbo_level)
++			*val = POWER_SUPPLY_CAPACITY_LEVEL_HIGH;
++		else
++			*val = POWER_SUPPLY_CAPACITY_LEVEL_LOW;
++		break;
++	case APCH_STATE_CSTATE_EOC:
++		if (status & APCH_STATUS_CHGDAT)
++			*val = POWER_SUPPLY_CAPACITY_LEVEL_FULL;
++		else
++			*val = POWER_SUPPLY_CAPACITY_LEVEL_NORMAL;
++		break;
++	case APCH_STATE_CSTATE_DISABLED:
++	default:
++		if (config & APCH_CFG_SUSCHG) {
++			*val = POWER_SUPPLY_CAPACITY_LEVEL_UNKNOWN;
++		} else {
++			*val = POWER_SUPPLY_CAPACITY_LEVEL_NORMAL;
++			if (!(status & APCH_STATUS_INDAT)) {
++				if (!lbo_level)
++					*val = POWER_SUPPLY_CAPACITY_LEVEL_CRITICAL;
++			}
++		}
++		break;
++	}
++
++	return 0;
++}
++
+ static enum power_supply_property act8945a_charger_props[] = {
+ 	POWER_SUPPLY_PROP_STATUS,
+ 	POWER_SUPPLY_PROP_CHARGE_TYPE,
+ 	POWER_SUPPLY_PROP_TECHNOLOGY,
+ 	POWER_SUPPLY_PROP_HEALTH,
++	POWER_SUPPLY_PROP_CAPACITY_LEVEL,
+ 	POWER_SUPPLY_PROP_MODEL_NAME,
+ 	POWER_SUPPLY_PROP_MANUFACTURER
+ };
+@@ -238,6 +298,10 @@ static int act8945a_charger_get_property(struct power_supply *psy,
+ 	case POWER_SUPPLY_PROP_HEALTH:
+ 		ret = act8945a_get_battery_health(regmap, &val->intval);
+ 		break;
++	case POWER_SUPPLY_PROP_CAPACITY_LEVEL:
++		ret = act8945a_get_capacity_level(charger,
++						  regmap, &val->intval);
++		break;
+ 	case POWER_SUPPLY_PROP_MODEL_NAME:
+ 		val->strval = act8945a_charger_model;
+ 		break;
+@@ -352,6 +416,20 @@ static int act8945a_charger_config(struct device *dev,
+ 	if (tmp & APCH_CFG_SUSCHG)
+ 		value |= APCH_CFG_SUSCHG;
+ 
++	charger->lbo_pin = of_get_named_gpio(np, "active-semi,lbo-gpios", 0);
++	if (gpio_is_valid(charger->lbo_pin)) {
++		if (!devm_gpio_request(dev, charger->lbo_pin, "lbo-detect")) {
++			ret = devm_request_irq(dev,
++					       gpio_to_irq(charger->lbo_pin),
++					       act8945a_status_changed,
++					       IRQF_TRIGGER_FALLING |
++					       IRQF_TRIGGER_RISING,
++					       "act8945a, lbo-detect", charger);
++			if (ret)
++				dev_dbg(dev, "failed to request LBO pin IRQ\n");
++		}
++	}
++
+ 	chglev_pin = of_get_named_gpio_flags(np,
+ 				"active-semi,chglev-gpios", 0, &flags);
+ 
+-- 
+2.7.4
