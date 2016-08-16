@@ -1,78 +1,38 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 16 Aug 2016 16:59:52 +0800
-Subject: [PATCH v5 1/7] power: act8945a_charger: Remove "battery_temperature"
-In-Reply-To: <1471337998-6467-1-git-send-email-wenyou.yang@atmel.com>
-References: <1471337998-6467-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1471337998-6467-2-git-send-email-wenyou.yang@atmel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 16 Aug 2016 17:13:34 +0800
+Subject: [PATCH v2 1/2] dt: bindings: add binding for Allwinner A64 R_PIO
+ pinctrl
+In-Reply-To: <20160816050709.7412-1-icenowy@aosc.xyz>
+References: <20160816050709.7412-1-icenowy@aosc.xyz>
+Message-ID: <CAGb2v65ca+HFq9Mr21E7QSN845O2H7BYKg5uAmRhECJe5dK6ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove "battery_temperature" member, it is redundant, it is the
-hardware's responsibility to handle TH pin properly.
-It is unnecessary to use the dt property to check if there is
-a battery temperature monitor or not.
+On Tue, Aug 16, 2016 at 1:07 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
+Commit message please. :)
 
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+Something similar to the one in the pinctrl driver patch would do.
 
- drivers/power/supply/act8945a_charger.c | 12 +++---------
- 1 file changed, 3 insertions(+), 9 deletions(-)
+ChenYu
 
-diff --git a/drivers/power/supply/act8945a_charger.c b/drivers/power/supply/act8945a_charger.c
-index b5c00e4..72d39ba 100644
---- a/drivers/power/supply/act8945a_charger.c
-+++ b/drivers/power/supply/act8945a_charger.c
-@@ -76,7 +76,6 @@ static const char *act8945a_charger_manufacturer = "Active-semi";
- 
- struct act8945a_charger {
- 	struct regmap *regmap;
--	bool battery_temperature;
- };
- 
- static int act8945a_get_charger_state(struct regmap *regmap, int *val)
-@@ -138,8 +137,7 @@ static int act8945a_get_charge_type(struct regmap *regmap, int *val)
- 	return 0;
- }
- 
--static int act8945a_get_battery_health(struct act8945a_charger *charger,
--				       struct regmap *regmap, int *val)
-+static int act8945a_get_battery_health(struct regmap *regmap, int *val)
- {
- 	int ret;
- 	unsigned int status;
-@@ -148,7 +146,7 @@ static int act8945a_get_battery_health(struct act8945a_charger *charger,
- 	if (ret < 0)
- 		return ret;
- 
--	if (charger->battery_temperature && !(status & APCH_STATUS_TEMPDAT))
-+	if (status & APCH_STATUS_TEMPDAT)
- 		*val = POWER_SUPPLY_HEALTH_OVERHEAT;
- 	else if (!(status & APCH_STATUS_INDAT))
- 		*val = POWER_SUPPLY_HEALTH_OVERVOLTAGE;
-@@ -188,8 +186,7 @@ static int act8945a_charger_get_property(struct power_supply *psy,
- 		val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
- 		break;
- 	case POWER_SUPPLY_PROP_HEALTH:
--		ret = act8945a_get_battery_health(charger,
--						  regmap, &val->intval);
-+		ret = act8945a_get_battery_health(regmap, &val->intval);
- 		break;
- 	case POWER_SUPPLY_PROP_MODEL_NAME:
- 		val->strval = act8945a_charger_model;
-@@ -235,9 +232,6 @@ static int act8945a_charger_config(struct device *dev,
- 		return -EINVAL;
- 	}
- 
--	charger->battery_temperature = of_property_read_bool(np,
--				"active-semi,check-battery-temperature");
--
- 	chglev_pin = of_get_named_gpio_flags(np,
- 				"active-semi,chglev-gpios", 0, &flags);
- 
--- 
-2.7.4
+> ---
+>  Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+> index 6961722..ee73f9f 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+> @@ -23,6 +23,7 @@ Required properties:
+>    "allwinner,sun8i-h3-pinctrl"
+>    "allwinner,sun8i-h3-r-pinctrl"
+>    "allwinner,sun50i-a64-pinctrl"
+> +  "allwinner,sun50i-a64-r-pinctrl"
+>
+>  - reg: Should contain the register physical address and length for the
+>    pin controller.
+> --
+> 2.9.2
+>
