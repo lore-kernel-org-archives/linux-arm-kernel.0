@@ -1,55 +1,31 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 16 Aug 2016 20:06:35 +0200
-Subject: [PATCH v2] ARM: Add missing newline terminators to kernel messages
-In-Reply-To: <1471370496.4075.170.camel@perches.com>
-References: <1471354832-18456-1-git-send-email-geert+renesas@glider.be>
- <1471367313.4075.167.camel@perches.com>
- <CAMuHMdWQae93bbrvxGBpwsw5JGCF85+KF4xZDyi=QTJaT9pWbw@mail.gmail.com>
- <1471370496.4075.170.camel@perches.com>
-Message-ID: <CAMuHMdVD9A5TBhBnnjBd81bFC-Wsn-pQn2gj6q0TAJ1xs52ERQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 16 Aug 2016 15:09:54 -0300
+Subject: [PATCH 1/1] irqchip: irq-gic: forward SGI to itself for cortex-a7
+ single core
+In-Reply-To: <CAOMZO5Abm-cpm=R6+JLoA+5QDCkgF84Db3uLhNrpe4KM5btu1Q@mail.gmail.com>
+References: <20160808105026.GA12649@leverpostej>
+ <HE1PR04MB1450C6BE844A31C95CEE3BE18B1B0@HE1PR04MB1450.eurprd04.prod.outlook.com>
+ <20160808130754.GB12649@leverpostej> <20160808132847.GB17680@shlinux2>
+ <20160808134842.GE12649@leverpostej> <20160808145916.0924e868@arm.com>
+ <20160809034613.GB31105@shlinux2> <20160809063401.3117dc94@arm.com>
+ <20160809055701.GC31105@shlinux2> <20160809075930.529f98ca@arm.com>
+ <20160809071821.GD31105@shlinux2> <57A99A4A.6010301@arm.com>
+ <CAOMZO5AB1u3+pL1kgxwF1zNH5MSxEd-BrT=3dzwUTxBd0R4Vsw@mail.gmail.com>
+ <57B343E4.6090604@arm.com>
+ <CAOMZO5Abm-cpm=R6+JLoA+5QDCkgF84Db3uLhNrpe4KM5btu1Q@mail.gmail.com>
+Message-ID: <CAOMZO5C+MVR1o6XF+vf_nh4NweDcuO-5Jwc3RYHOZ5=j5opxJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joe,
+Hi Marc,
 
-On Tue, Aug 16, 2016 at 8:01 PM, Joe Perches <joe@perches.com> wrote:
-> On Tue, 2016-08-16 at 19:50 +0200, Geert Uytterhoeven wrote:
->> On Tue, Aug 16, 2016 at 7:08 PM, Joe Perches <joe@perches.com> wrote:
->> > On Tue, 2016-08-16 at 15:40 +0200, Geert Uytterhoeven wrote:
->> > > Before commit 874f9c7da9a4acbc ("printk: create pr_<level>
->> > > functions"),
->> > > pr_*() calls without a trailing newline characters would be
->> > > printed with
->> > > a newline character appended, both on the console and in the
->> > > output of
->> > > the dmesg command.
->> > Hey Geert.
->> >
->> > This doesn't apply to -next as the pr_notice/pr_cont below is
->> > properly changed to a single pr_notice.
->> In which -next?
->>
->> Not in next-20160816, where the patch applies cleanly.
->> Also not in arm/for-next.
+On Tue, Aug 16, 2016 at 2:03 PM, Fabio Estevam <festevam@gmail.com> wrote:
+
+> Tested the same kernel on a imx6ul-evk and 'reboot' and suspend/resume
+> work fine.
 >
-> My mistake, I was in the wrong directory.
-> It doesn't apply to Linus' tree.
+> Looks like the issue I saw is imx6ul-pico board specific.
 
-It's meant for the arm tree.
+Yes, it was a PMIC problem. Will send a fix for it.
 
-> Still, it'd be slightly nicer to use a single
-> pr_notice than the pr_notice/pr_cont.
-
-Indeed. The code was recently changed to split the message, hence
-my v2...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Please submit your gic patch, thanks!
