@@ -1,75 +1,77 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 16 Aug 2016 21:45:59 +0200
-Subject: [PATCH] ARM: dts: add PM8058 LEDs to the APQ8060 Dragonboard
-Message-ID: <1471376759-9561-1-git-send-email-linus.walleij@linaro.org>
+From: cmetcalf@mellanox.com (Chris Metcalf)
+Date: Tue, 16 Aug 2016 15:50:22 -0400
+Subject: [PATCH v8 2/4] nmi_backtrace: do a local dump_stack() instead of a
+ self-NMI
+In-Reply-To: <1471377024-2244-1-git-send-email-cmetcalf@mellanox.com>
+References: <1471377024-2244-1-git-send-email-cmetcalf@mellanox.com>
+Message-ID: <1471377024-2244-3-git-send-email-cmetcalf@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the PM8058 LEDs as used in the platform.
+Currently on arm there is code that checks whether it should call
+dump_stack() explicitly, to avoid trying to raise an NMI when the
+current context is not preemptible by the backtrace IPI.  Similarly,
+the forthcoming arch/tile support uses an IPI mechanism that does
+not support generating an NMI to self.
 
-Cc: linux-arm-msm at vger.kernel.org
-Cc: linux-leds at vger.kernel.org
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
-Cc: Jacek Anaszewski <j.anaszewski@samsung.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-These DT bindings have been ACKed by Rob Herring and Bjorn Andersson
-so I think the patch is safe to merge to the Qcom tree.
----
- arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 39 ++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+Accordingly, move the code that guards this case into the generic
+mechanism, and invoke it unconditionally whenever we want a
+backtrace of the current cpu.  It seems plausible that in all cases,
+dump_stack() will generate better information than generating a
+stack from the NMI handler.  The register state will be missing,
+but that state is likely not particularly helpful in any case.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-index 0abc93e5bb00..b0800b988174 100644
---- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-+++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-@@ -239,6 +239,45 @@
- 						};
- 					};
- 				};
-+
-+				led at 48 {
-+					/*
-+					 * The keypad LED @0x48 is routed to
-+					 * the sensor board where it is
-+					 * connected to an infrared LED
-+					 * SFH4650 (60mW, @850nm) next to the
-+					 * ambient light and proximity sensor
-+					 * Capella Microsystems CM3605.
-+					 */
-+					compatible = "qcom,pm8058-keypad-led";
-+					reg = <0x48>;
-+					label = "proximity0";
-+					default-state = "off";
-+				};
-+				led at 131 {
-+					compatible = "qcom,pm8058-led";
-+					reg = <0x131>;
-+					label = "pm8058:red";
-+					default-state = "off";
-+				};
-+				led at 132 {
-+					/*
-+					 * This is actually green too on my
-+					 * board, but documented as yellow.
-+					 */
-+					compatible = "qcom,pm8058-led";
-+					reg = <0x132>;
-+					label = "pm8058:yellow";
-+					default-state = "off";
-+					linux,default-trigger = "mmc0";
-+				};
-+				led at 133 {
-+					compatible = "qcom,pm8058-led";
-+					reg = <0x133>;
-+					label = "pm8058:green";
-+					default-state = "on";
-+					linux,default-trigger = "heartbeat";
-+				};
- 			};
- 		};
+Or, if we think it is helpful, we should be capturing and emitting
+the current register state in all cases when regs == NULL is passed
+to nmi_cpu_backtrace().
+
+Signed-off-by: Chris Metcalf <cmetcalf@mellanox.com>
+Acked-by: Aaron Tomlin <atomlin@redhat.com>
+Reviewed-by: Petr Mladek <pmladek@suse.com>
+---
+ arch/arm/kernel/smp.c | 9 ---------
+ lib/nmi_backtrace.c   | 9 +++++++++
+ 2 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 2a367b2de0e1..173ad30c20e0 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -748,15 +748,6 @@ core_initcall(register_cpufreq_notifier);
  
+ static void raise_nmi(cpumask_t *mask)
+ {
+-	/*
+-	 * Generate the backtrace directly if we are running in a calling
+-	 * context that is not preemptible by the backtrace IPI. Note
+-	 * that nmi_cpu_backtrace() automatically removes the current cpu
+-	 * from mask.
+-	 */
+-	if (cpumask_test_cpu(smp_processor_id(), mask) && irqs_disabled())
+-		nmi_cpu_backtrace(NULL);
+-
+ 	smp_cross_call(mask, IPI_CPU_BACKTRACE);
+ }
+ 
+diff --git a/lib/nmi_backtrace.c b/lib/nmi_backtrace.c
+index df347e355267..393a3cca1f47 100644
+--- a/lib/nmi_backtrace.c
++++ b/lib/nmi_backtrace.c
+@@ -49,6 +49,15 @@ void nmi_trigger_cpumask_backtrace(const cpumask_t *mask,
+ 	if (exclude_self)
+ 		cpumask_clear_cpu(this_cpu, to_cpumask(backtrace_mask));
+ 
++	/*
++	 * Don't try to send an NMI to this cpu; it may work on some
++	 * architectures, but on others it may not, and we'll get
++	 * information at least as useful just by doing a dump_stack() here.
++	 * Note that nmi_cpu_backtrace(NULL) will clear the cpu bit.
++	 */
++	if (cpumask_test_cpu(this_cpu, to_cpumask(backtrace_mask)))
++		nmi_cpu_backtrace(NULL);
++
+ 	if (!cpumask_empty(to_cpumask(backtrace_mask))) {
+ 		pr_info("Sending NMI from CPU %d to CPUs %*pbl:\n",
+ 			this_cpu, nr_cpumask_bits, to_cpumask(backtrace_mask));
 -- 
-2.7.4
+2.7.2
