@@ -1,54 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 16 Aug 2016 17:18:24 +0100
-Subject: [PATCH] arm64: Introduce execute-only page access permissions
-In-Reply-To: <CAGXu5jJTeta2OnL8KKHesG_HdeCvcXtaqjAir1cUvyfivaQeuQ@mail.gmail.com>
-References: <1470937490-7375-1-git-send-email-catalin.marinas@arm.com>
- <CAGXu5jJTuJ+k948BU4rDGF=tHv54TR0JQVTbcVvzp=NtfQrL9Q@mail.gmail.com>
- <20160815104751.GC22320@e104818-lin.cambridge.arm.com>
- <CAGXu5jJTeta2OnL8KKHesG_HdeCvcXtaqjAir1cUvyfivaQeuQ@mail.gmail.com>
-Message-ID: <20160816161824.GB7609@e104818-lin.cambridge.arm.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 16 Aug 2016 09:22:56 -0700
+Subject: [PATCH V2 RFC 1/6] usb: dwc2: core: Avoid nonsense error in
+ gadget mode
+In-Reply-To: <92280b0f-4dd3-bcf5-57ed-277a9f91653d@synopsys.com>
+References: <1469559213-16160-1-git-send-email-stefan.wahren@i2se.com>
+ <1469559213-16160-2-git-send-email-stefan.wahren@i2se.com>
+ <92280b0f-4dd3-bcf5-57ed-277a9f91653d@synopsys.com>
+Message-ID: <874m6kel9b.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2016 at 10:45:09AM -0700, Kees Cook wrote:
-> On Mon, Aug 15, 2016 at 3:47 AM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > On Fri, Aug 12, 2016 at 11:23:03AM -0700, Kees Cook wrote:
-> >> On Thu, Aug 11, 2016 at 10:44 AM, Catalin Marinas
-> >> <catalin.marinas@arm.com> wrote:
-> >> > The ARMv8 architecture allows execute-only user permissions by clearing
-> >> > the PTE_UXN and PTE_USER bits. However, the kernel running on a CPU
-> >> > implementation without User Access Override (ARMv8.2 onwards) can still
-> >> > access such page, so execute-only page permission does not protect
-> >> > against read(2)/write(2) etc. accesses. Systems requiring such
-> >> > protection must enable features like SECCOMP.
-> >>
-> >> So, UAO CPUs will bypass this protection in userspace if using
-> >> read/write on a memory-mapped file?
-> >
-> > It's the other way around. CPUs prior to ARMv8.2 (when UAO was
-> > introduced) or with the CONFIG_ARM64_UAO disabled can still access
-> > user execute-only memory regions while running in kernel mode via the
-> > copy_*_user, (get|put)_user etc. routines. So a way user can bypass this
-> > protection is by using such address as argument to read/write file
-> > operations.
-> 
-> Ah, okay. So exec-only for _userspace_ will always work, but exec-only
-> for _kernel_ will only work on ARMv8.2 with CONFIG_ARM64_UAO?
+John Youn <John.Youn@synopsys.com> writes:
 
-Yes (mostly). With UAO, we changed the user access routines in the
-kernel to use the LDTR/STTR instructions which always behave
-unprivileged even when executed in kernel mode (unless the UAO bit is
-set to override this restriction, needed for set_fs(KERNEL_DS)).
+> On 7/26/2016 11:54 AM, Stefan Wahren wrote:
+>> In gadget mode On bcm2835 platform the host tx fifo size could be zero.
+>> So add zero to range and avoid such nonsense errors:
+>> 
+>> dwc2 20980000.usb: 0 invalid for host_nperio_tx_fifo_size.
+>> dwc2 20980000.usb: Setting host_nperio_tx_fifo_size to 0
+>> dwc2 20980000.usb: 0 invalid for host_perio_tx_fifo_size.
+>> dwc2 20980000.usb: Setting host_perio_tx_fifo_size to 0
+>
+> Hi Stefan,
+>
+> Are those the power on reset values of GNPTXFSIZ and HPTXFSIZ?
+>
+> If these values can be 0, I think the patch is ok. But I'm not sure
+> about that. I can check with some hardware engineers to see under what
+> conditions this is possible.
 
-Even with UAO, we still have two cases where the kernel cannot perform
-unprivileged accesses (LDTR/STTR) since they don't have an exclusives
-equivalent (LDXR/STXR). These are in-user futex atomic ops and the SWP
-emulation for 32-bit binaries (armv8_deprecated.c). But these require
-write permission, so they would always fault even when running in the
-kernel. futex_atomic_cmpxchg_inatomic() is able to return the old value
-without a write (if it differs from "oldval") but it doesn't look like
-such value could leak to user space.
-
--- 
-Catalin
+FWIW, I don't see the firmware software doing any conditional setting of
+these registers.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160816/1c385e8e/attachment-0001.sig>
