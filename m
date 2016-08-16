@@ -1,99 +1,54 @@
-From: groeck@google.com (Guenter Roeck)
-Date: Tue, 16 Aug 2016 13:26:32 -0700
-Subject: Problem with atomic accesses in pstore on some ARM CPUs
-In-Reply-To: <CAMbhsRQiU-UyiCWqjaWNXbhDd0+=Tv_pWoeQkJKJaHC6y4=HwQ@mail.gmail.com>
-References: <CABXOdTfT7xMfiBvRuUS1hsVs=q5q2wY1x1Z8oCyyJNFckM0g0A@mail.gmail.com>
- <8f0c9ced-cdc3-ab9b-caee-06fe85e6c1e7@arm.com>
- <CABXOdTfg2T2tZrQOd2S5SjeySAMbfQX0weFuvRXBr2o8Of9nVQ@mail.gmail.com>
- <20160816132103.GD27088@arm.com>
- <CABXOdTfHX_ZB1CuM7hzU5LCZPYdHvBSatN9Nen=rb8r1rXhz-g@mail.gmail.com>
- <20160815221518.GD1120@svinekod>
- <CAMbhsRQiU-UyiCWqjaWNXbhDd0+=Tv_pWoeQkJKJaHC6y4=HwQ@mail.gmail.com>
-Message-ID: <CABXOdTfhXhq6pbqAqGQwHcsCXvyshS8JbDGQCBKxfd-2s=M-fw@mail.gmail.com>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Tue, 16 Aug 2016 13:30:36 -0700
+Subject: [PATCH] net: thunderx: Fix OOPs with ethtool --register-dump
+Message-ID: <1471379436-2932-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 10:35 AM, Colin Cross <ccross@android.com> wrote:
-> On Mon, Aug 15, 2016 at 3:15 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> On Tue, Aug 16, 2016 at 08:02:53AM -0700, Guenter Roeck wrote:
->>> On Tue, Aug 16, 2016 at 6:21 AM, Will Deacon <will.deacon@arm.com> wrote:
->>> > On Tue, Aug 16, 2016 at 06:14:53AM -0700, Guenter Roeck wrote:
->>> >> On Tue, Aug 16, 2016 at 3:32 AM, Robin Murphy <robin.murphy@arm.com> wrote:
->>> >> > On 16/08/16 00:19, Guenter Roeck wrote:
->>> >> >> we are having a problem with atomic accesses in pstore on some ARM
->>> >> >> CPUs (specifically rk3288 and rk3399). With those chips, atomic
->>> >> >> accesses fail with both pgprot_noncached and pgprot_writecombine
->>> >> >> memory. Atomic accesses do work when selecting PAGE_KERNEL protection.
->>> >> >
->>> >> > What's the pstore backed by? I'm guessing it's not normal DRAM.
->>> >> >
->>> >>
->>> >> it is normal DRAM.
->>> >
->>> > In which case, why does it need to be mapped with weird attributes?
->>> > Is there an alias in the linear map you can use?
->>> >
->>>
->>> I don't really _want_ to do anything besides using pstore as-is, or,
->>> in other words, to have the upstream kernel work with the affected
->>> systems.
->>>
->>> The current pstore code runs the following code for memory with
->>> pfn_valid() = true.
->>>
->>>         if (memtype)
->>>                 prot = pgprot_noncached(PAGE_KERNEL);
->>>         else
->>>                 prot = pgprot_writecombine(PAGE_KERNEL);
->>>         ...
->>>         vaddr = vmap(pages, page_count, VM_MAP, prot);
->>>
->>> It then uses the memory pointed to by vaddr for atomic operations.
->>
->> This means that the generic ramoops / pstore code is making non-portable
->> assumptions about memory types.
->>
->> So _something_ has to happen to that code.
->>
->>> In my case, both protection options don't work. Everything works fine
->>> (or at least doesn't create an exception) if I use
->>>         vaddr = vmap(pages, page_count, VM_MAP, PAGE_KERNEL);
->>> instead.
->>
->> Architecturally, that will give you a memory type to which we can safely use
->> atomics on.
->>
->> It would be nice to know why the ramoops/pstore code must use atomics, and
->> exactly what it's trying to achieve (i.e. is this just for serialisation, or an
->> attempt to ensure persistence).
->>
->> Depending on that, it may be possible to fix things more generically by using
->> memremap by default, for example, and only allowing uncached mappings on those
->> architectures which support them.
->
-> persistent_ram uses atomic ops in uncached memory to store the start
-> and end positions in the ringbuffer so that the state of the
-> ringbuffer will be valid if the kernel crashes at any time.  This was
-> inherited from Android's ram_console implementation, and worked
-> through armv7.  It has been causing more and more problems recently,
-> see for example 027bc8b08242c59e19356b4b2c189f2d849ab660 (pstore-ram:
-> Allow optional mapping with pgprot_noncached) and
-> 7ae9cb81933515dc7db1aa3c47ef7653717e3090 (pstore-ram: Fix hangs by
-> using write-combine mappings).
->
-> Maybe it should be replaced with a spinlock in normal ram protecting
-> writes to the uncached region.
+From: David Daney <david.daney@cavium.com>
 
-The necessary functions already exist, and are used for memory mapped
-with ioremap() / ioremap_wc(). They were introduced with commit
-0405a5cec3 ("pstore/ram: avoid atomic accesses for ioremapped
-regions"), and the description in that patch sounds quite similar to
-the current problem. Given that, would it be acceptable to remove
-buffer_start_add_atomic() and buffer_size_add_atomic(), and always use
-buffer_start_add_locked() and buffer_size_add_locked() instead ? Those
-functions still use atomic_set() and atomic_read(), which works fine
-in my tests. The only difference is that a spinlock in main memory is
-used instead of atomic_cmpxchg().
+The ethtool_ops .get_regs function attempts to read the nonexistent
+register NIC_QSET_SQ_0_7_CNM_CHG, which produces a "bus error" type
+OOPs.
 
-Thanks,
-Guenter
+Fix by not attempting to read, and removing the definition of,
+NIC_QSET_SQ_0_7_CNM_CHG.  A zero is written into the register dump to
+keep the layout unchanged.
+
+Signed-off-by: David Daney <david.daney@cavium.com>
+Cc: <stable@vger.kernel.org> # 4.4.x-
+---
+ drivers/net/ethernet/cavium/thunder/nic_reg.h       | 1 -
+ drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c | 5 ++++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/cavium/thunder/nic_reg.h b/drivers/net/ethernet/cavium/thunder/nic_reg.h
+index afb10e3..fab35a5 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic_reg.h
++++ b/drivers/net/ethernet/cavium/thunder/nic_reg.h
+@@ -170,7 +170,6 @@
+ #define   NIC_QSET_SQ_0_7_DOOR			(0x010838)
+ #define   NIC_QSET_SQ_0_7_STATUS		(0x010840)
+ #define   NIC_QSET_SQ_0_7_DEBUG			(0x010848)
+-#define   NIC_QSET_SQ_0_7_CNM_CHG		(0x010860)
+ #define   NIC_QSET_SQ_0_7_STAT_0_1		(0x010900)
+ 
+ #define   NIC_QSET_RBDR_0_1_CFG			(0x010C00)
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
+index d2d8ef2..ad4fddb 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
+@@ -382,7 +382,10 @@ static void nicvf_get_regs(struct net_device *dev,
+ 		p[i++] = nicvf_queue_reg_read(nic, NIC_QSET_SQ_0_7_DOOR, q);
+ 		p[i++] = nicvf_queue_reg_read(nic, NIC_QSET_SQ_0_7_STATUS, q);
+ 		p[i++] = nicvf_queue_reg_read(nic, NIC_QSET_SQ_0_7_DEBUG, q);
+-		p[i++] = nicvf_queue_reg_read(nic, NIC_QSET_SQ_0_7_CNM_CHG, q);
++		/* Padding, was NIC_QSET_SQ_0_7_CNM_CHG, which
++		 * produces bus errors when read
++		 */
++		p[i++] = 0;
+ 		p[i++] = nicvf_queue_reg_read(nic, NIC_QSET_SQ_0_7_STAT_0_1, q);
+ 		reg_offset = NIC_QSET_SQ_0_7_STAT_0_1 | (1 << 3);
+ 		p[i++] = nicvf_queue_reg_read(nic, reg_offset, q);
+-- 
+1.8.3.1
