@@ -1,73 +1,122 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Tue, 16 Aug 2016 17:30:21 +0800
-Subject: [PATCH v2] Bluetooth: Add LED triggers for HCI frames tx and rx
-In-Reply-To: <1394C970-3726-4C42-A06D-0B3B3015D980@holtmann.org>
-References: <1469939084-15603-1-git-send-email-guodong.xu@linaro.org>
- <1394C970-3726-4C42-A06D-0B3B3015D980@holtmann.org>
-Message-ID: <CAFGCpxz6j_7aOTX+uShdpyxmt71k61v=Abdw=7MfrRjvdygmTg@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 16 Aug 2016 18:32:20 +0900
+Subject: [PATCH] pwm: samsung: fix to use lowest div for large enough
+ modulation bits
+In-Reply-To: <369cde8b-f761-4a0b-50b9-a3a01ba0b75d@samsung.com>
+References: <1470133006-4272-1-git-send-email-sw0312.kim@samsung.com>
+ <CGME20160816073709epcas1p45d975f43e8f7e3fc17e30cf6f6573dfb@epcas1p4.samsung.com>
+ <329cb013-4832-c443-d593-327531db7b40@samsung.com>
+ <57B2CDF0.8020809@samsung.com>
+ <CA+Ln22Ha6qrbXP87wqJdTTsTD8vXbxZejt7aRkoni0YKpFJvZQ@mail.gmail.com>
+ <369cde8b-f761-4a0b-50b9-a3a01ba0b75d@samsung.com>
+Message-ID: <CA+Ln22EvJRHXLxGTNK8GQPWaBE5j_vOg+sXnKbTqYA4T8AGRug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Marcel
-
-On 16 August 2016 at 14:03, Marcel Holtmann <marcel@holtmann.org> wrote:
-> Hi Guodong,
->
->> Two LED triggers are added into hci_dev: tx_led and rx_led. Upon ACL/SCO
->> packets available in tx or rx, the LEDs will blink.
+2016-08-16 18:10 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+> On 08/16/2016 11:00 AM, Tomasz Figa wrote:
+>> 2016-08-16 17:25 GMT+09:00 Seung-Woo Kim <sw0312.kim@samsung.com>:
+>>> Hi Krzysztof,
+>>>
+>>> On 2016? 08? 16? 16:37, Krzysztof Kozlowski wrote:
+>>>> On 08/02/2016 12:16 PM, Seung-Woo Kim wrote:
+>>>>> >From pwm_samsung_calc_tin(), there is routine to find the lowest
+>>>>> divider possible to generate lower frequency than requested one.
+>>>>> But it is always possible to generate requested frequency with
+>>>>> large enough modulation bits, so this patch fixes to use lowest
+>>>>> div for the case. This patch removes following UBSAN warning:
+>>>>>
+>>>>>    UBSAN: Undefined behaviour in drivers/pwm/pwm-samsung.c:197:13
+>>>>>    shift exponent 32 is too large for 32-bit type 'long unsigned int'
+>>>>>    [...]
+>>>>>    [<c0670248>] (ubsan_epilogue) from [<c06707b4>] (__ubsan_handle_shift_out_of_bounds+0xd8/0x120)
+>>>>>    [<c06707b4>] (__ubsan_handle_shift_out_of_bounds) from [<c0694b28>] (pwm_samsung_config+0x508/0x6a4)
+>>>>>    [<c0694b28>] (pwm_samsung_config) from [<c069286c>] (pwm_apply_state+0x174/0x40c)
+>>>>>    [<c069286c>] (pwm_apply_state) from [<c0b2e070>] (pwm_fan_probe+0xc8/0x488)
+>>>>>    [<c0b2e070>] (pwm_fan_probe) from [<c07ba8b0>] (platform_drv_probe+0x70/0x150)
+>>>>>    [...]
+>>>>>
+>>>>> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
+>>>>> ---
+>>>>> The UBSAN warning from ARM is reported with the patch in following link:
+>>>>> https://patchwork.kernel.org/patch/9189575/
+>>>>> ---
+>>>>>  drivers/pwm/pwm-samsung.c |   10 +++++++---
+>>>>>  1 file changed, 7 insertions(+), 3 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/pwm/pwm-samsung.c b/drivers/pwm/pwm-samsung.c
+>>>>> index ada2d32..ff0def6 100644
+>>>>> --- a/drivers/pwm/pwm-samsung.c
+>>>>> +++ b/drivers/pwm/pwm-samsung.c
+>>>>> @@ -193,9 +193,13 @@ static unsigned long pwm_samsung_calc_tin(struct samsung_pwm_chip *chip,
+>>>>>       * divider settings and choose the lowest divisor that can generate
+>>>>>       * frequencies lower than requested.
+>>>>>       */
+>>>>> -    for (div = variant->div_base; div < 4; ++div)
+>>>>> -            if ((rate >> (variant->bits + div)) < freq)
+>>>>> -                    break;
+>>>>> +    if (fls(rate) <= variant->bits) {
+>>>>> +            div = variant->div_base;
+>>>>> +    } else {
+>>>>> +            for (div = variant->div_base; div < 4; ++div)
+>>>>> +                    if ((rate >> (variant->bits + div)) < freq)
+>>>>> +                            break;
+>>>>> +    }
+>>>>
+>>>> I have trouble with understanding the idea behind initial code from
+>>>> Tomasz (commit 11ad39ede24ee). The variant->bits for all SoC except
+>>>> S3C24xx is 32. This means the shift:
+>>>>       if ((rate >> (variant->bits + div)) < freq)
+>>>> will be always by 32 or more... In practice this will choose always a
+>>>> "div" of 0 because in first iteration of this loop, the shift will be by 32.
+>>>
+>>> I also confused that part, but I figured out that the bit is used to
+>>> consider modulation bit to generate pwm signal from the input clock.
+>>>
+>>> Only the old s3c2440 has 16 bit modulation timer for pwm, and all later
+>>> soc has 32 bit modulation timer. So 32 bit timer cases, with the lowest
+>>> div, it can generate all frequencies which can be assigned with 32bit
+>>> variable.
+>>> But I uses fls() to consider 64bit case also even though there is no
+>>> really that kind of clock.
 >>
->> For each hci registration, two triggers are added into LED subsystem:
->> [hdev->name]-tx and [hdev-name]-rx.
->> Refer to Documentation/leds/leds-class.txt for usage.
->>
->> Verified on HiKey 96boards, which uses HiSilicon hi6220 SoC and TI
->> WL1835 WiFi/BT combo chip.
+>> The code may look complicated (in fact I had to think a bit to recall
+>> what exactly it was supposed to do), but I'm not sure how it could be
+>> simplified. It's generally intended to handle variant->bits < 32 cases
+>> only and is effectively a no-op when variant->bits >= 32.
 >
-> so I have no idea what to do with adding adding hci0-rx and hci0-tx triggers. Combined with hci0-power trigger these are already 3 triggers. And if you have 2 Bluetooth controllers in your system, then you have 6 triggers.
+> Right, a comment for this behavior would be very useful. No need to
+> waste time for re-thinking it later.
 >
-
-True, 6 triggers. But, taking example for other subsytems, eg. cpu
-cores. On my board, I have "heartbeat cpu0 cpu1 cpu2 cpu3 cpu4 cpu5
-cpu6 cpu7". It doesn't have to mean you need all of them connected to
-some LED(s). Actually, in most of the case, I only need heartbeat.
-
-
-
-> If we then maybe add another trigger, then this number just goes up and up.
+>> I would suggest just making rate an u64 and be done with the warning.
+>> IMHO adding this kind of special cases only complicates the (already
+>> complicated) code unnecessarily.
 >
-> As far as I can tell you can only assign a single trigger to a LED.
+> u64 could solve the warning but then one would have to figure out
+> whether the casts are safe or not. Unsigned long is assigned to rate and
+> then returned.
 >
+> How about specific check (+comment) like:
+> if (variant->bits < 32) {
 
-That's true. And people got a choice of which feature he wants to visualize.
+Technically this still doesn't guarantee safe behavior, but in
+practice (24xx has bits == 16) should be fine, assuming that it stops
+UBSAN from grumbling.
 
-> So this means to even use these triggers, you need now 3 LEDs per Bluetooth controller. How is that useful for anybody in a real system? Maybe I am missing something here and somehow there is magic to combine triggers, but I have not found it yet. So please someone enlighten me on how this is suppose to be used with real devices.
+>         /* Only for s3c24xx */
+>         // the for loop as it was
+> } else {
+>         /* For other variants just choose lowest divider always */
+
+/*
+ * Other variants have enough counter bits to generate any requested rate,
+ * so no need to check higher divisors.
+ */
+
+>         div = variant->div_base;
+> }
 >
-> Recently I have added a simple bluetooth-power trigger that combines all Bluetooth controllers into a single trigger. If any of them is enabled, then you can control your LED. Which makes a lot more sense to me since you most likely have a single Bluetooth LED on your system. And you want it to show the correct state no matter what Bluetooth controller is in use. However I can see the case that someone might want to assign one specific Bluetooth controller to a LED status.
->
-> So instead of adding many independent triggers to each controller, why not create one global bluetooth trigger and one individual bluetooth-hci0 trigger for each controller. And the combine power, tx, rx and whatever else we need to trigger the LED for?
->
+> For me this is quite obvious and error-prone (explicit check for value
+> to be used in shift).
 
-When I starting this work, I referred to WiFi system. See
-CONFIG_MAC80211_LEDS. WiFi system implements these types of triggers "
-phy0rx phy0tx phy0assoc phy0radio" for each 'controller'.
-
-Besides, there are also RFKILL which stands for WiFi/BT power status.
-RFKILL adds triggers for each module too. Eg. in the below example, I
-have one WiFi (phy0), one BT (hci0). Trigger rfkill1 equals to
-hci0-power.
-
-Ref: here are all LED triggers I found in my 96boards/HiKey:
-
-# cat trigger
-none kbd-scrollock kbd-numlock kbd-capslock kbd-kanalock kbd-shiftlock
-kbd-altgrlock kbd-ctrllock kbd-altlock kbd-shiftllock kbd-shiftrlock
-kbd-ctrlllock kbd-ctrlrlock mmc0 mmc1 heartbeat cpu0 cpu1 cpu2 cpu3
-cpu4 cpu5 cpu6 cpu7 mmc2 rfkill0 phy0rx phy0tx phy0assoc phy0radio
-hci0-power hci0-tx [hci0-rx] rfkill1
-
--Guodong
-
-> Regards
->
-> Marcel
->
+I guess you meant error-proof. :) Sounds good to me.
