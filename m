@@ -1,33 +1,49 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 16 Aug 2016 11:56:14 +0200
-Subject: [PATCH v2] clocksource/drivers/time-armada-370-xp: Fix the clock
- reference
-In-Reply-To: <1470834867-25932-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1470834867-25932-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <57B2E33E.2030408@linaro.org>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 16 Aug 2016 10:49:29 +0100
+Subject: [PATCH 03/10] staging: board: Remove calls to
+ of_genpd_get_from_provider()
+In-Reply-To: <1471340976-5379-1-git-send-email-jonathanh@nvidia.com>
+References: <1471340976-5379-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <1471340976-5379-4-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2016 03:14 PM, Gregory CLEMENT wrote:
-> While converting the init function to return an error, the wrong clock
-> was get. This lead to wrong clock rate and slow down the kernel. For
-> example, before the patch a typical boot was around 15s after it was 1
-> minute slower.
-> 
-> Fixes: 12549e27c63c ("clocksource/drivers/time-armada-370-xp: Convert init function to return error")
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
+Update the staging/board PM domain code to use the
+of_genpd_add_subdomain() and remove any calls to
+of_genpd_get_from_provider().
 
-Applied.
+Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+---
+ drivers/staging/board/board.c | 9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
 
-Thanks Clement !
-
-  -- Daniel
-
+diff --git a/drivers/staging/board/board.c b/drivers/staging/board/board.c
+index 45807d8287d1..86dc41101610 100644
+--- a/drivers/staging/board/board.c
++++ b/drivers/staging/board/board.c
+@@ -140,7 +140,6 @@ static int board_staging_add_dev_domain(struct platform_device *pdev,
+ 					const char *domain)
+ {
+ 	struct of_phandle_args pd_args;
+-	struct generic_pm_domain *pd;
+ 	struct device_node *np;
+ 
+ 	np = of_find_node_by_path(domain);
+@@ -151,14 +150,8 @@ static int board_staging_add_dev_domain(struct platform_device *pdev,
+ 
+ 	pd_args.np = np;
+ 	pd_args.args_count = 0;
+-	pd = of_genpd_get_from_provider(&pd_args);
+-	if (IS_ERR(pd)) {
+-		pr_err("Cannot find genpd %s (%ld)\n", domain, PTR_ERR(pd));
+-		return PTR_ERR(pd);
+-	}
+-	pr_debug("Found genpd %s for device %s\n", pd->name, pdev->name);
+ 
+-	return pm_genpd_add_device(pd, &pdev->dev);
++	return of_genpd_add_device(&pd_args, &pdev->dev);
+ }
+ #else
+ static inline int board_staging_add_dev_domain(struct platform_device *pdev,
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.1.4
