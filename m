@@ -1,81 +1,101 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 17 Aug 2016 10:59:07 +0200
-Subject: [PATCH] KVM: arm64: ITS: avoid re-mapping LPIs
-In-Reply-To: <a291bbd7-d8b4-2841-669b-721985eab81b@arm.com>
-References: <20160816165106.25057-1-andre.przywara@arm.com>
- <20160816173038.GF14088@cbox>
- <a291bbd7-d8b4-2841-669b-721985eab81b@arm.com>
-Message-ID: <20160817085907.GC8808@cbox>
+From: yunhui.cui@nxp.com (Yunhui Cui)
+Date: Wed, 17 Aug 2016 08:57:22 +0000
+Subject: [PATCH v2 6/9] mtd: spi-nor: Support R/W for S25FS-S family flash
+In-Reply-To: <CAD6G_RQGMV5zxuC9dNa3TYa-Zxv4drDB7K1PpNdfzauBCeVmdA@mail.gmail.com>
+References: <1461307192-866-1-git-send-email-B56489@freescale.com>
+ <1461307192-866-6-git-send-email-B56489@freescale.com>
+ <CAD6G_RQGMV5zxuC9dNa3TYa-Zxv4drDB7K1PpNdfzauBCeVmdA@mail.gmail.com>
+Message-ID: <VI1PR0401MB26400B7243668C3BDF2C593194140@VI1PR0401MB2640.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2016 at 12:45:17AM +0100, Andr? Przywara wrote:
-> On 16/08/16 18:30, Christoffer Dall wrote:
-> > On Tue, Aug 16, 2016 at 05:51:06PM +0100, Andre Przywara wrote:
-> >> When a guest wants to map a device-ID/event-ID combination that is
-> >> already mapped, we may end up in a situation where an LPI is never
-> >> "put", thus never being freed.
-> >> Since the GICv3 spec says that mapping an already mapped LPI is
-> >> UNPREDICTABLE, lets just bail out early in this situation to avoid
-> >> any potential leaks.
-> >>
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >> ---
-> >>  virt/kvm/arm/vgic/vgic-its.c | 27 +++++++++++++--------------
-> >>  1 file changed, 13 insertions(+), 14 deletions(-)
-> >>
-> >> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> >> index 9533080..4660a7d 100644
-> >> --- a/virt/kvm/arm/vgic/vgic-its.c
-> >> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> >> @@ -731,7 +731,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
-> >>  	u32 device_id = its_cmd_get_deviceid(its_cmd);
-> >>  	u32 event_id = its_cmd_get_id(its_cmd);
-> >>  	u32 coll_id = its_cmd_get_collection(its_cmd);
-> >> -	struct its_itte *itte, *new_itte = NULL;
-> >> +	struct its_itte *itte;
-> >>  	struct its_device *device;
-> >>  	struct its_collection *collection, *new_coll = NULL;
-> >>  	int lpi_nr;
-> >> @@ -749,6 +749,10 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
-> >>  	    lpi_nr >= max_lpis_propbaser(kvm->arch.vgic.propbaser))
-> >>  		return E_ITS_MAPTI_PHYSICALID_OOR;
-> >>  
-> >> +	/* If there is an existing mapping, behavior is UNPREDICTABLE. */
-> >> +	if (find_itte(its, device_id, event_id))
-> >> +		return 0;
-> >> +
-> > 
-> > By the way, this made me think how these errors are handled, and unless
-> > I'm mistaken, the return value from vgic_its_handle_command() is simply
-> > discarded, so even when we return things like -ENOMEM, this is just
-> > ignored?  Is this really the intention?
-> 
-> Yes, at least at the moment. The spec does not specify how ITS errors
-> should be communicated (IMPLEMENTATION DEFINED), only that an error
-> condition itself can be signaled via an SError - for which atm we lack
-> any code to inject, if I am not mistaken.
-> Still I wanted to assign those error codes: IMHO it improves readability
-> and simplifies any later extension in that respect.
 
-It's fine to return error codes, but at the very least we should have a
-comment saying "We throw away all errors because we cannot handle them
-and this is always fine to do, because of X".
+
+On August 06, 2016 10:27 PM, Jagan Teki wrote:
+
+> On 22 April 2016 at 12:09, Yunhui Cui <B56489@freescale.com> wrote:
+> > From: Yunhui Cui <yunhui.cui@nxp.com>
+> >
+> > With the physical sectors combination, S25FS-S family flash requires
+> > some special operations for read/write functions.
+> >
+> > Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
+> > ---
+> >  drivers/mtd/spi-nor/spi-nor.c | 59
+> > +++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 59 insertions(+)
+> >
+> > diff --git a/drivers/mtd/spi-nor/spi-nor.c
+> > b/drivers/mtd/spi-nor/spi-nor.c index 157841d..91ee920 100644
+> > --- a/drivers/mtd/spi-nor/spi-nor.c
+> > +++ b/drivers/mtd/spi-nor/spi-nor.c
+> > @@ -39,6 +39,10 @@
+> >
+> >  #define SPI_NOR_MAX_ID_LEN     6
+> >  #define SPI_NOR_MAX_ADDR_WIDTH 4
+> > +/* Added for S25FS-S family flash */
+> > +#define SPINOR_CONFIG_REG3_OFFSET      0x800004
+> > +#define CR3V_4KB_ERASE_UNABLE  0x8
+> > +#define SPINOR_S25FS_FAMILY_ID 0x81
+> >
+> >  struct flash_info {
+> >         char            *name;
+> > @@ -78,6 +82,7 @@ struct flash_info {
+> >  };
+> >
+> >  #define JEDEC_MFR(info)        ((info)->id[0])
+> > +#define EXT_ID(info)   ((info)->id[5])
+> 
+> I don't think 5th only the ext and usually last 3 bytes are called as
+> ext_jedec if the id length is 6 bytes.
+
+[Yunhui] ok, I will update it in next version.
 
 > 
-> For the Linux errors (like -ENOMEM): Due to the asynchronous nature of
-> the ITS command handling and also the guest triggering the commands,
-> there is really no better way to report those OoM conditions, for
-> instance, so I treated them the same as "proper" ITS errors.
+> >
+> >  static const struct flash_info *spi_nor_match_id(const char *name);
+> >
+> > @@ -881,6 +886,7 @@ static const struct flash_info spi_nor_ids[] = {
+> >          */
+> >         { "s25sl032p",  INFO(0x010215, 0x4d00,  64 * 1024,  64,
+> SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+> >         { "s25sl064p",  INFO(0x010216, 0x4d00,  64 * 1024, 128,
+> > SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+> > +       { "s25fs256s1", INFO6(0x010219, 0x4d0181, 64 * 1024, 512, 0)},
+> >         { "s25fl256s0", INFO(0x010219, 0x4d00, 256 * 1024, 128, 0) },
+> >         { "s25fl256s1", INFO(0x010219, 0x4d01,  64 * 1024, 512,
+> SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+> >         { "s25fl512s",  INFO(0x010220, 0x4d00, 256 * 1024, 256,
+> > SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) }, @@ -1018,6 +1024,53 @@ static
+> const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
+> >         return ERR_PTR(-ENODEV);
+> >  }
+> >
+> > +/*
+> > + * The S25FS-S family physical sectors may be configured as a
+> > + * hybrid combination of eight 4-kB parameter sectors
+> > + * at the top or bottom of the address space with all
+> > + * but one of the remaining sectors being uniform size.
+> > + * The Parameter Sector Erase commands (20h or 21h) must
+> > + * be used to erase the 4-kB parameter sectors individually.
+> > + * The Sector (uniform sector) Erase commands (D8h or DCh)
+> > + * must be used to erase any of the remaining
+> > + * sectors, including the portion of highest or lowest address
+> > + * sector that is not overlaid by the parameter sectors.
+> > + * The uniform sector erase command has no effect on parameter sectors.
+> > + */
+> > +static int spansion_s25fs_disable_4kb_erase(struct spi_nor *nor) {
+> > +       struct fsl_qspi *q;
+> > +       u32 cr3v_addr  = SPINOR_CONFIG_REG3_OFFSET;
+> > +       u8 cr3v = 0x0;
+> > +       int ret = 0x0;
+> > +
+> > +       q = nor->priv;
+> 
+> Why this q?
 
-I feel like a -ENOMEM should be reported back to userspace so we can
-give up on our giant resource hogging VM instead of just grinding on.
+[Yunhui] ok, It seems that 'q' is useless in the function. I will update it in next version , thanks.
 
-Isn't this all done as part of a MMIO write, so you can return the error
-from that thing?
-
-If you were running this in a separate thread, it would be an entirely
-more difficult matter.
-
-Thanks,
--Christoffer
+> 
+> --
+> Jagan.
