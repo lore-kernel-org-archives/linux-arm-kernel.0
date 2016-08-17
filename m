@@ -1,27 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 17 Aug 2016 11:05:29 +0100
-Subject: [PATCH v2] kvm: arm: Enforce some NS-SVC initialisation
-In-Reply-To: <6d030bee2db08c2fe1b7569e692e8f66800b1e4c.1471369569.git.robin.murphy@arm.com>
-References: <5322cdb9cb397741d15b60c6693ad39dbf74b6d5.1469101945.git.robin.murphy@arm.com>
- <6d030bee2db08c2fe1b7569e692e8f66800b1e4c.1471369569.git.robin.murphy@arm.com>
-Message-ID: <57B436E9.5050607@arm.com>
+From: kbeldan@baylibre.com (Karl Beldan)
+Date: Wed, 17 Aug 2016 10:13:31 +0000
+Subject: [PATCH 2/2] ARM: davinci_all_defconfig: enable modules for sound
+ on LCDK
+In-Reply-To: <52f428a2-7818-5f3a-bb66-70e2eaa63e7a@ti.com>
+References: <20160810200853.24275-1-kbeldan@baylibre.com>
+ <20160810200853.24275-2-kbeldan@baylibre.com>
+ <52f428a2-7818-5f3a-bb66-70e2eaa63e7a@ti.com>
+Message-ID: <20160817101331.GA8009@gobelin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/08/16 18:49, Robin Murphy wrote:
-> Since the non-secure copies of banked registers lack architecturally
-> defined reset values, there is no actual guarantee when entering in Hyp
-> from secure-only firmware that the Non-Secure PL1 state will look the
-> way that kernel entry (in particular the decompressor stub) expects.
-> So far, we've been getting away with it thanks to implementation details
-> of ARMv7 cores and/or bootloader behaviour, but for the sake of forwards
-> compatibility let's try to ensure that we have a minimally sane state
-> before dropping down into it.
+On Wed, Aug 17, 2016 at 02:20:51PM +0530, Sekhar Nori wrote:
+> On Thursday 11 August 2016 01:38 AM, Karl Beldan wrote:
+> > This is the minimal set of additional modules required to support audio
+> > on the LCDK.
+> > 
+> > Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
 > 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> This patch does not apply because Kevin already added some missing audio
+> modules through commit "ARM: davinci_all_defconfig: enable DA850 audio
+> as modules"
+> 
+> Can you please rebase on master branch of my tree[1] and resend?
+> 
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+I checked out your tree.
+With Kevin's patch the needed modules get selected without needing 2/2.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+However I don't know why he used:
+ CONFIG_SND_DA850_SOC_EVM=m
+instead of: 
+ CONFIG_SND_DAVINCI_SOC_MCASP=m
+ CONFIG_SND_SOC_TLV320AIC3X=m
+The former seems to me to be pre-DT style config. I used the latter in
+2/2 and thought that's what we'd start switching to ? Unless it is for
+pre-DT compatibility ?
+
+ 
+Karl
