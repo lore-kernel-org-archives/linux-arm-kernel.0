@@ -1,68 +1,42 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 17 Aug 2016 21:38:53 +0200
-Subject: [PULL 06/12] KVM: arm64: check for ITS device on MSI injection
+Date: Wed, 17 Aug 2016 21:38:58 +0200
+Subject: [PULL 11/12] arm64: KVM: remove misleading comment on pmu status
 In-Reply-To: <20160817193859.15726-1-christoffer.dall@linaro.org>
 References: <20160817193859.15726-1-christoffer.dall@linaro.org>
-Message-ID: <20160817193859.15726-7-christoffer.dall@linaro.org>
+Message-ID: <20160817193859.15726-12-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@arm.com>
+From: Vladimir Murzin <vladimir.murzin@arm.com>
 
-When userspace provides the doorbell address for an MSI to be
-injected into the guest, we find a KVM device which feels responsible.
-Lets check that this device is really an emulated ITS before we make
-real use of the container_of-ed pointer.
+Comment about how PMU access is handled is not relavant since v4.6
+where proper PMU support was added in.
 
-  [ Moved NULL-pointer check to caller of static function
-    - Christoffer ]
-
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 21 +++++++++++++++++++--
- 1 file changed, 19 insertions(+), 2 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 1cf9f59..9533080 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -471,6 +471,21 @@ static int vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
- 	return 0;
- }
- 
-+static struct vgic_io_device *vgic_get_its_iodev(struct kvm_io_device *dev)
-+{
-+	struct vgic_io_device *iodev;
-+
-+	if (dev->ops != &kvm_io_gic_ops)
-+		return NULL;
-+
-+	iodev = container_of(dev, struct vgic_io_device, dev);
-+
-+	if (iodev->iodev_type != IODEV_ITS)
-+		return NULL;
-+
-+	return iodev;
-+}
-+
- /*
-  * Queries the KVM IO bus framework to get the ITS pointer from the given
-  * doorbell address.
-@@ -494,9 +509,11 @@ int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
- 
- 	kvm_io_dev = kvm_io_bus_get_dev(kvm, KVM_MMIO_BUS, address);
- 	if (!kvm_io_dev)
--		return -ENODEV;
-+		return -EINVAL;
- 
--	iodev = container_of(kvm_io_dev, struct vgic_io_device, dev);
-+	iodev = vgic_get_its_iodev(kvm_io_dev);
-+	if (!iodev)
-+		return -EINVAL;
- 
- 	mutex_lock(&iodev->its->its_lock);
- 	ret = vgic_its_trigger_msi(kvm, iodev->its, msi->devid, msi->data);
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index b0b225c..af5ea86 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -823,14 +823,6 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+  * Architected system registers.
+  * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
+  *
+- * We could trap ID_DFR0 and tell the guest we don't support performance
+- * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
+- * NAKed, so it will read the PMCR anyway.
+- *
+- * Therefore we tell the guest we have 0 counters.  Unfortunately, we
+- * must always support PMCCNTR (the cycle counter): we just RAZ/WI for
+- * all PM registers, which doesn't crash the guest kernel at least.
+- *
+  * Debug handling: We do trap most, if not all debug related system
+  * registers. The implementation is good enough to ensure that a guest
+  * can use these with minimal performance degradation. The drawback is
 -- 
 2.9.0
