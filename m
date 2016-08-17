@@ -1,118 +1,72 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 17 Aug 2016 21:11:28 +0200 (CEST)
-Subject: [PATCH V2 RFC 6/6] ARM: dts: bcm2835: Add Raspberry Pi Zero
-In-Reply-To: <ac20c0e9-0cab-7e3f-4abf-75223538a816@synopsys.com>
-References: <1469559213-16160-1-git-send-email-stefan.wahren@i2se.com>
- <1469559213-16160-7-git-send-email-stefan.wahren@i2se.com>
- <722dafcb-2f67-88c7-69df-d442c56c058f@synopsys.com>
- <263309088.290419.51598113-17aa-4db0-9dc0-6e58e3fafe07.open-xchange@email.1und1.de>
- <ac20c0e9-0cab-7e3f-4abf-75223538a816@synopsys.com>
-Message-ID: <1270178266.398560.152fe5dd-527b-4ad6-b2fd-e4b0af6bc2a9.open-xchange@email.1und1.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 17 Aug 2016 21:38:47 +0200
+Subject: [PULL 00/12] KVM/ARM Fixes for v4.8-rc3
+Message-ID: <20160817193859.15726-1-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Paolo and Radim,
 
-> John Youn <John.Youn@synopsys.com> hat am 17. August 2016 um 00:07
-> geschrieben:
-> 
-> 
-> On 8/16/2016 12:58 PM, Stefan Wahren wrote:
-> > Hi John,
-> > ...
-> > 
-> > like in host mode i took the default values in otg mode for the last two
-> > here
-> > (please refer to the logs). The BCM2835 datasheet isn't very helpful.
-> > 
-> > Do you have any suggestions for valid values or how to get them?
-> > 
-> 
-> The same values used in host-only mode should work.
-> 
-> It seems that the reset values for host-mode aren't being read
-> correctly with dr_mode == otg. I suspect this is the core reset and
-> force-mode delay problem.
-> 
-> Can you try with this patch series to see if you get the proper
-> values?
-> 
-> http://marc.info/?l=linux-kernel&m=145921907525708
-> 
-> This series fixes known issues, but it also breaks at least one
-> platform and I haven't had time to look at it properly yet.
+Here's a set of KVM/ARM fixes for v4.8-rc3 or as soon as you can make
+it.  They address:
+ - ITS init issues
+ - ITS error handling issues
+ - ITS IRQ leakage fix
+ - Plug a couple of ITS race conditions
+ - An erratum workaround for timers
+ - Some removal of misleading use of errors and comments
+ - A fix for GICv3 on 32-bit guests
 
-thanks. Yes, that seems to fix host fifo sizes for bcm2835. Here the log after
-applying patch 2 - 4 and removing all DT FIFO parameters (patch 1 has already
-been merged):
+Note that the patch previously submitted 'KVM: arm64: vgic-its: Grab
+kvm->lock when reading kvm->devices', was dropped from this series
+because we were already holding the kvm->lock in the call path to the
+ITS code.
 
-Linux raspberrypi 4.7.0-rc7-next-20160719+ #23 Wed Aug 17 18:15:24 UTC 2016
-armv6l
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
-[    2.290723] dwc2_lowlevel_hw_init()
-[    2.298123] dwc2_lowlevel_hw_enable()
-[    2.305451] dwc2_get_dr_mode()
-[    2.365040] dwc2_get_hwparams()
-[    2.371785] dwc2 20980000.usb: Core Release: 2.80a (snpsid=4f54280a)
-[    2.371801] dwc2 20980000.usb: hwcfg1=00000000
-[    2.371813] dwc2 20980000.usb: hwcfg2=228ddd50
-[    2.371823] dwc2 20980000.usb: hwcfg3=0ff000e8
-[    2.371833] dwc2 20980000.usb: hwcfg4=1ff00020
-[    2.371843] dwc2 20980000.usb: grxfsiz=00001000
-[    2.371853] dwc2 20980000.usb: Forcing mode to host
-[    2.371869] dwc2 20980000.usb: gnptxfsiz=01001000
-[    2.371880] dwc2 20980000.usb: hptxfsiz=02002000
-[    2.371890] dwc2 20980000.usb: Forcing mode to device
-[    2.423450] dwc2 20980000.usb: gnptxfsiz=00201000
-[    2.423468] dwc2 20980000.usb: Detected values from hardware:
-[    2.423480] dwc2 20980000.usb:   op_mode=0
-[    2.423490] dwc2 20980000.usb:   arch=2
-[    2.423500] dwc2 20980000.usb:   dma_desc_enable=0
-[    2.423511] dwc2 20980000.usb:   power_optimized=0
-[    2.423520] dwc2 20980000.usb:   i2c_enable=0
-[    2.423530] dwc2 20980000.usb:   hs_phy_type=1
-[    2.423540] dwc2 20980000.usb:   fs_phy_type=1
-[    2.423550] dwc2 20980000.usb:   utmi_phy_data_width=0
-[    2.423559] dwc2 20980000.usb:   num_dev_ep=7
-[    2.423570] dwc2 20980000.usb:   num_dev_perio_in_ep=0
-[    2.423579] dwc2 20980000.usb:   host_channels=8
-[    2.423590] dwc2 20980000.usb:   max_transfer_size=524287
-[    2.423601] dwc2 20980000.usb:   max_packet_count=1023
-[    2.423611] dwc2 20980000.usb:   nperio_tx_q_depth=0x4
-[    2.423621] dwc2 20980000.usb:   host_perio_tx_q_depth=0x4
-[    2.423631] dwc2 20980000.usb:   dev_token_q_depth=0x8
-[    2.423641] dwc2 20980000.usb:   enable_dynamic_fifo=1
-[    2.423651] dwc2 20980000.usb:   en_multiple_tx_fifo=1
-[    2.423661] dwc2 20980000.usb:   total_fifo_size=4080
-[    2.423671] dwc2 20980000.usb:   host_rx_fifo_size=4096
-[    2.423681] dwc2 20980000.usb:   host_nperio_tx_fifo_size=256
-[    2.423691] dwc2 20980000.usb:   host_perio_tx_fifo_size=512
-[    2.423699] dwc2 20980000.usb:
-[    2.423709] dwc2 20980000.usb: dwc2_set_parameters()
-[    2.423723] dwc2 20980000.usb: Setting dma_desc_fs_enable to 0
-[    2.423748] dwc2 20980000.usb: Setting external_id_pin_ctl to 0
-[    2.423760] dwc2 20980000.usb: Setting hibernation to 0
-[    2.423777] dwc2_force_dr_mode()
-[    2.430509] dwc2 20980000.usb: Clearing force mode bits
-[    2.499028] dwc2_gadget_init()
-[    2.505422] dwc2 20980000.usb: Specified GNPTXFDEP=1024 > 32
-[    2.514502] dwc2 20980000.usb: EPs: 8, dedicated fifos, 4080 entries in SPRAM
-[    2.542143] dwc2 20980000.usb: bound driver zero
-[    2.550164] dwc2_hcd_init()
-[    2.556602] dwc2 20980000.usb: DWC OTG Controller
-[    2.564878] dwc2 20980000.usb: new USB bus registered, assigned bus number 1
-[    2.575467] dwc2 20980000.usb: irq 33, io mem 0x00000000
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
 
-# cat /sys/kernel/debug/20980000.usb/fifo
-Non-periodic FIFOs:
-RXFIFO: Size 4096
-NPTXFIFO: Size 32, Start 0x00200000
+are available in the git repository at:
 
-Periodic TXFIFOs:
-        DPTXFIFO 1: Size 512, Start 0x00001020
-        DPTXFIFO 2: Size 512, Start 0x00001220
-        DPTXFIFO 3: Size 512, Start 0x00001420
-        DPTXFIFO 4: Size 512, Start 0x00001620
-        DPTXFIFO 5: Size 512, Start 0x00001820
-        DPTXFIFO 6: Size 768, Start 0x00001a20
-        DPTXFIFO 7: Size 768, Start 0x00001d20
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git kvm-arm-for-v4.8-rc3
+
+for you to fetch changes up to f7f6f2d94f0027242ddfd665289b107a873fde43:
+
+  arm64: KVM: report configured SRE value to 32-bit world (2016-08-17 12:46:23 +0200)
+
+Thanks,
+-Christoffer
+
+----------------------------------------------------------------
+Andre Przywara (4):
+      KVM: arm64: ITS: return 1 on successful MSI injection
+      KVM: arm64: ITS: move ITS registration into first VCPU run
+      KVM: arm64: check for ITS device on MSI injection
+      KVM: arm64: ITS: avoid re-mapping LPIs
+
+Christoffer Dall (4):
+      KVM: arm64: vgic-its: Handle errors from vgic_add_lpi
+      KVM: arm64: vgic-its: Plug race in vgic_put_irq
+      KVM: arm64: vgic-its: Make updates to propbaser/pendbaser atomic
+      KVM: arm/arm64: Change misleading use of is_error_pfn
+
+Marc Zyngier (2):
+      arm64: Document workaround for Cortex-A72 erratum #853709
+      KVM: arm/arm64: timer: Workaround misconfigured timer interrupt
+
+Vladimir Murzin (2):
+      arm64: KVM: remove misleading comment on pmu status
+      arm64: KVM: report configured SRE value to 32-bit world
+
+ Documentation/arm64/silicon-errata.txt |   1 +
+ arch/arm/kvm/mmu.c                     |   2 +-
+ arch/arm64/kvm/hyp/switch.c            |   2 +-
+ arch/arm64/kvm/sys_regs.c              |  10 +--
+ include/linux/irqchip/arm-gic-v3.h     |   1 +
+ virt/kvm/arm/arch_timer.c              |  11 ++-
+ virt/kvm/arm/vgic/vgic-its.c           | 158 ++++++++++++++++++++++++---------
+ virt/kvm/arm/vgic/vgic-mmio-v3.c       |  26 +++---
+ virt/kvm/arm/vgic/vgic-v3.c            |   8 ++
+ virt/kvm/arm/vgic/vgic.c               |  10 +--
+ virt/kvm/arm/vgic/vgic.h               |   6 ++
+ 11 files changed, 164 insertions(+), 71 deletions(-)
