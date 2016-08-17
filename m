@@ -1,146 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 17 Aug 2016 11:19:25 +0100
-Subject: [PATCH] arm64: head.S: get rid of x25 and x26 with 'global' scope
-In-Reply-To: <1471374152-23538-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1471374152-23538-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160817101924.GC30900@leverpostej>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 17 Aug 2016 12:21:41 +0200
+Subject: [PATCH] KVM: arm/arm64: timer: Workaround misconfigured timer
+ interrupt
+In-Reply-To: <1471356182-26034-2-git-send-email-marc.zyngier@arm.com>
+References: <1471356182-26034-1-git-send-email-marc.zyngier@arm.com>
+ <1471356182-26034-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160817102141.GD8808@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 09:02:32PM +0200, Ard Biesheuvel wrote:
-> Currently, x25 and x26 hold the physical addresses of idmap_pg_dir
-> and swapper_pg_dir, respectively, when running early boot code. But
-> having registers with 'global' scope in files that contain different
-> sections with different lifetimes, and that are called by different
-> CPUs at different times is a bit messy, especially since stashing the
-> values does not buy us anything in terms of code size or clarity.
+On Tue, Aug 16, 2016 at 03:03:02PM +0100, Marc Zyngier wrote:
+> Similarily to f005bd7e3b84 ("clocksource/arm_arch_timer: Force
+> per-CPU interrupt to be level-triggered"), make sure we can
+> survive an interrupt that has been misconfigured as edge-triggered
+> by forcing it to be level-triggered (active low is assumed, but
+> the GIC doesn't really care whether this is high or low).
 > 
-> So simply replace each reference to x25 or x26 with an adrp instruction
-> referring to idmap_pg_dir or swapper_pg_dir directly.
+> Hopefully, the amount of shouting in the kernel log will convince
+> the user to do something about their firmware.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-Nice! I agree that this makes things clearer, and as far as I can tell
-is correct, so FWIW:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Was this just for the sake of cleanup, or should we expect more head.S
-patches soon?
-
-Thanks,
-Mark.
-
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm64/kernel/sleep.S |  2 --
->  arch/arm64/kernel/head.S  | 28 +++++++++-----------
->  2 files changed, 13 insertions(+), 17 deletions(-)
+>  virt/kvm/arm/arch_timer.c | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-> index 9a3aec97ac09..a20a7576e77d 100644
-> --- a/arch/arm64/kernel/sleep.S
-> +++ b/arch/arm64/kernel/sleep.S
-> @@ -102,8 +102,6 @@ ENTRY(cpu_resume)
->  	/* enable the MMU early - so we can access sleep_save_stash by va */
->  	adr_l	lr, __enable_mmu	/* __cpu_setup will return here */
->  	ldr	x27, =_cpu_resume	/* __enable_mmu will branch here */
-> -	adrp	x25, idmap_pg_dir
-> -	adrp	x26, swapper_pg_dir
->  	b	__cpu_setup
->  ENDPROC(cpu_resume)
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 4fde8c7..77e6ccf 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -33,6 +33,7 @@
+>  static struct timecounter *timecounter;
+>  static struct workqueue_struct *wqueue;
+>  static unsigned int host_vtimer_irq;
+> +static u32 host_vtimer_irq_flags;
 >  
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index b77f58355da1..219676253dbc 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -214,7 +214,7 @@ ENTRY(stext)
->  	adrp	x24, __PHYS_OFFSET
->  	and	x23, x24, MIN_KIMG_ALIGN - 1	// KASLR offset, defaults to 0
->  	bl	set_cpu_boot_mode_flag
-> -	bl	__create_page_tables		// x25=TTBR0, x26=TTBR1
-> +	bl	__create_page_tables
->  	/*
->  	 * The following calls CPU setup code, see arch/arm64/mm/proc.S for
->  	 * details.
-> @@ -311,23 +311,21 @@ ENDPROC(preserve_boot_args)
->   *     been enabled
->   */
->  __create_page_tables:
-> -	adrp	x25, idmap_pg_dir
-> -	adrp	x26, swapper_pg_dir
->  	mov	x28, lr
+>  void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
+>  {
+> @@ -365,7 +366,7 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
 >  
->  	/*
->  	 * Invalidate the idmap and swapper page tables to avoid potential
->  	 * dirty cache lines being evicted.
->  	 */
-> -	mov	x0, x25
-> -	add	x1, x26, #SWAPPER_DIR_SIZE
-> +	adrp	x0, idmap_pg_dir
-> +	adrp	x1, swapper_pg_dir + SWAPPER_DIR_SIZE
->  	bl	__inval_cache_range
+>  static void kvm_timer_init_interrupt(void *info)
+>  {
+> -	enable_percpu_irq(host_vtimer_irq, 0);
+> +	enable_percpu_irq(host_vtimer_irq, host_vtimer_irq_flags);
+>  }
 >  
->  	/*
->  	 * Clear the idmap and swapper page tables.
->  	 */
-> -	mov	x0, x25
-> -	add	x6, x26, #SWAPPER_DIR_SIZE
-> +	adrp	x0, idmap_pg_dir
-> +	adrp	x6, swapper_pg_dir + SWAPPER_DIR_SIZE
->  1:	stp	xzr, xzr, [x0], #16
->  	stp	xzr, xzr, [x0], #16
->  	stp	xzr, xzr, [x0], #16
-> @@ -340,7 +338,7 @@ __create_page_tables:
->  	/*
->  	 * Create the identity mapping.
->  	 */
-> -	mov	x0, x25				// idmap_pg_dir
-> +	adrp	x0, idmap_pg_dir
->  	adrp	x3, __idmap_text_start		// __pa(__idmap_text_start)
+>  int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
+> @@ -432,6 +433,14 @@ int kvm_timer_hyp_init(void)
+>  	}
+>  	host_vtimer_irq = info->virtual_irq;
 >  
->  #ifndef CONFIG_ARM64_VA_BITS_48
-> @@ -390,7 +388,7 @@ __create_page_tables:
->  	/*
->  	 * Map the kernel image (starting with PHYS_OFFSET).
->  	 */
-> -	mov	x0, x26				// swapper_pg_dir
-> +	adrp	x0, swapper_pg_dir
->  	mov_q	x5, KIMAGE_VADDR + TEXT_OFFSET	// compile time __va(_text)
->  	add	x5, x5, x23			// add KASLR displacement
->  	create_pgd_entry x0, x5, x3, x6
-> @@ -405,8 +403,8 @@ __create_page_tables:
->  	 * accesses (MMU disabled), invalidate the idmap and swapper page
->  	 * tables again to remove any speculatively loaded cache lines.
->  	 */
-> -	mov	x0, x25
-> -	add	x1, x26, #SWAPPER_DIR_SIZE
-> +	adrp	x0, idmap_pg_dir
-> +	adrp	x1, swapper_pg_dir + SWAPPER_DIR_SIZE
->  	dmb	sy
->  	bl	__inval_cache_range
->  
-> @@ -666,8 +664,6 @@ secondary_startup:
->  	/*
->  	 * Common entry point for secondary CPUs.
->  	 */
-> -	adrp	x25, idmap_pg_dir
-> -	adrp	x26, swapper_pg_dir
->  	bl	__cpu_setup			// initialise processor
->  
->  	adr_l	x27, __secondary_switch		// address to jump to after enabling the MMU
-> @@ -731,8 +727,10 @@ ENTRY(__enable_mmu)
->  	cmp	x2, #ID_AA64MMFR0_TGRAN_SUPPORTED
->  	b.ne	__no_granule_support
->  	update_early_cpu_boot_status 0, x1, x2
-> -	msr	ttbr0_el1, x25			// load TTBR0
-> -	msr	ttbr1_el1, x26			// load TTBR1
-> +	adrp	x1, idmap_pg_dir
-> +	adrp	x2, swapper_pg_dir
-> +	msr	ttbr0_el1, x1			// load TTBR0
-> +	msr	ttbr1_el1, x2			// load TTBR1
->  	isb
->  	msr	sctlr_el1, x0
->  	isb
+> +	host_vtimer_irq_flags = irq_get_trigger_type(host_vtimer_irq);
+> +	if (host_vtimer_irq_flags != IRQF_TRIGGER_HIGH &&
+> +	    host_vtimer_irq_flags != IRQF_TRIGGER_LOW) {
+> +		kvm_err("Invalid trigger for IRQ%d, assuming level low\n",
+> +			host_vtimer_irq);
+> +		host_vtimer_irq_flags = IRQF_TRIGGER_LOW;
+> +	}
+> +
+>  	err = request_percpu_irq(host_vtimer_irq, kvm_arch_timer_handler,
+>  				 "kvm guest timer", kvm_get_running_vcpus());
+>  	if (err) {
 > -- 
-> 2.7.4
+> 2.1.4
 > 
+
+Looks good to me.  Applied.
+-Christoffer
