@@ -1,48 +1,38 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Wed, 17 Aug 2016 10:59:26 +0800
-Subject: [PATCH] dt-bindings: touchscreen: silead gsl1680: Document all
- compatibles
-In-Reply-To: <1471338091-3259-1-git-send-email-hdegoede@redhat.com>
-References: <1471338091-3259-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <46861471402766@web24j.yandex.ru>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 16 Aug 2016 23:00:36 -0400
+Subject: [PATCH 17/34] clk: maxgen: Migrate to clk_hw based OF and
+ registration APIs
+In-Reply-To: <CAJOFmgzfvUza7DQeMsd0bD_e=+P5=WGT8kOkV7H5CCwVq4Z0RQ@mail.gmail.com>
+References: <20160601231533.9354-1-stephen.boyd@linaro.org>
+ <20160601231533.9354-18-stephen.boyd@linaro.org>
+ <CABxcv=mWdwPrGRrP7ay=2FBxzoew6yBdfjZNvgFeDGACnQZdcQ@mail.gmail.com>
+ <665a9824-b0c5-9eb3-d4b6-4821204d5db0@osg.samsung.com>
+ <CAJOFmgzfvUza7DQeMsd0bD_e=+P5=WGT8kOkV7H5CCwVq4Z0RQ@mail.gmail.com>
+Message-ID: <4aacc9ef-16ff-07f2-11f7-91b056855725@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Stephen,
 
+On 08/16/2016 04:06 PM, Stephen Boyd wrote:
+> On Tue, Jun 7, 2016 at 11:55 AM, Javier Martinez Canillas
+>>>
+>>> I tried this patch on top of linux-next and my Peach Pi Chromebook
+>>> (that has a max77802 chip) failed to boot. Following is the relevant
+>>> parts from the boot log:
+>>>
+>>
+>> It seems the mailer did a mess with the line wrapping so here's another attempt:
+>>
+> 
+> Thanks! Found the problem too.
+> 
 
-16.08.2016, 17:06, "Hans de Goede" <hdegoede@redhat.com>:
-> The silead gsl1680 driver / binding supports a whole series of devices,
-> list the compatibles for all of them in the binding.
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> ?.../devicetree/bindings/input/touchscreen/silead_gsl1680.txt | 5 +++++
-> ?1 file changed, 5 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
-> index 1112e0d..37a9370 100644
-> --- a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
-> @@ -2,6 +2,11 @@
->
-> ?Required properties:
-> ?- compatible : "silead,gsl1680"
-> + or: "silead,gsl1688"
-> + or: "silead,gsl3670"
-> + or: "silead,gsl3675"
-> + or: "silead,gsl3692"
-> + or: "silead,mssl1680"
-I think ?mssl1680" is only a string which exists in ACPI tables.
-I have disassembled one of my tablet, which is said to have "MSSL1680" in it in
-ACPI table (a BayTrail tablet). What I got is a plain GSL1680.
-So it shouldn't exist in the compatible list.
-> ?- reg : I2C slave address of the chip (0x40)
-> ?- interrupt-parent : a phandle pointing to the interrupt controller
-> ?????????????????????????????serving the interrupt for this chip
-> --
-> 2.7.4
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Great! Thanks a lot for finding the issue.
+I tested v2 of your patch and it worked well indeed.
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
