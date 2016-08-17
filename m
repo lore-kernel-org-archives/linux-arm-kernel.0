@@ -1,56 +1,51 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 17 Aug 2016 06:41:12 -0700
-Subject: [PATCH v10 3/3] MAINTAINERS: atmel-isc: add entry for Atmel ISC
-In-Reply-To: <1471413929-26008-4-git-send-email-songjun.wu@microchip.com>
-References: <1471413929-26008-1-git-send-email-songjun.wu@microchip.com>
- <1471413929-26008-4-git-send-email-songjun.wu@microchip.com>
-Message-ID: <1400f664-09d5-98f6-e237-b5b1c5edae1d@atmel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 17 Aug 2016 15:47:03 +0200
+Subject: [PATCH/RTF 2/7] clk: renesas: r8a7796: Add SDIF clocks
+In-Reply-To: <1471433516-4478-3-git-send-email-horms+renesas@verge.net.au>
+References: <1471433516-4478-1-git-send-email-horms+renesas@verge.net.au>
+ <1471433516-4478-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWzCK9Btmbmd0ZHzC5TE-rc=c6QhcPB9Za9BzBaNvdoUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 16/08/2016 ? 23:05, Songjun Wu a ?crit :
-> Add the MAINTAINERS' entry for Microchip / Atmel Image Sensor Controller.
-> 
-> Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
+Hi Simon,
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
+On Wed, Aug 17, 2016 at 1:31 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> From: Ai Kyuse <ai.kyuse.uw@renesas.com>
+>
+> This patch adds SDIF clocks for R8A7796 SoC.
+>
+> Signed-off-by: Ai Kyuse <ai.kyuse.uw@renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > ---
-> 
-> Changes in v10: None
-> Changes in v9: None
-> Changes in v8: None
-> Changes in v7: None
-> Changes in v6: None
-> Changes in v5: None
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2: None
-> 
->  MAINTAINERS | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 20bb1d0..21a6f6f 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -7733,6 +7733,14 @@ T:	git git://git.monstr.eu/linux-2.6-microblaze.git
->  S:	Supported
->  F:	arch/microblaze/
->  
-> +MICROCHIP / ATMEL ISC DRIVER
-> +M:	Songjun Wu <songjun.wu@microchip.com>
-> +L:	linux-media at vger.kernel.org
-> +S:	Supported
-> +F:	drivers/media/platform/atmel/atmel-isc.c
-> +F:	drivers/media/platform/atmel/atmel-isc-regs.h
-> +F:	devicetree/bindings/media/atmel-isc.txt
-> +
->  MICROSOFT SURFACE PRO 3 BUTTON DRIVER
->  M:	Chen Yu <yu.c.chen@intel.com>
->  L:	platform-driver-x86 at vger.kernel.org
-> 
+>  drivers/clk/renesas/r8a7796-cpg-mssr.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+>
+> diff --git a/drivers/clk/renesas/r8a7796-cpg-mssr.c b/drivers/clk/renesas/r8a7796-cpg-mssr.c
+> index 999955c2b23e..4c390a8bc3e1 100644
+> --- a/drivers/clk/renesas/r8a7796-cpg-mssr.c
+> +++ b/drivers/clk/renesas/r8a7796-cpg-mssr.c
+> @@ -93,6 +93,11 @@ static const struct cpg_core_clk r8a7796_core_clks[] __initconst = {
+>         DEF_FIXED("s3d2",       R8A7796_CLK_S3D2,  CLK_S3,         2, 1),
+>         DEF_FIXED("s3d4",       R8A7796_CLK_S3D4,  CLK_S3,         4, 1),
+>
+> +       DEF_GEN3_SD("sd0",      R8A7796_CLK_SD0,   CLK_PLL1_DIV4, 0x0074),
+> +       DEF_GEN3_SD("sd1",      R8A7796_CLK_SD1,   CLK_PLL1_DIV4, 0x0078),
+> +       DEF_GEN3_SD("sd2",      R8A7796_CLK_SD2,   CLK_PLL1_DIV4, 0x0268),
+> +       DEF_GEN3_SD("sd3",      R8A7796_CLK_SD3,   CLK_PLL1_DIV4, 0x026c),
 
+While the definitions above give the right frequencies, they don't describe
+the correct topology. Please introduce an intermediate "SDSRC" clock, cfr.
+"clk: renesas: r8a7795: Fix SD clocks" for R-Car H3.
 
--- 
-Nicolas Ferre
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
