@@ -1,115 +1,86 @@
-From: John.Youn@synopsys.com (John Youn)
-Date: Wed, 17 Aug 2016 14:21:30 -0700
-Subject: [PATCH V2 RFC 6/6] ARM: dts: bcm2835: Add Raspberry Pi Zero
-In-Reply-To: <1270178266.398560.152fe5dd-527b-4ad6-b2fd-e4b0af6bc2a9.open-xchange@email.1und1.de>
-References: <1469559213-16160-1-git-send-email-stefan.wahren@i2se.com>
- <1469559213-16160-7-git-send-email-stefan.wahren@i2se.com>
- <722dafcb-2f67-88c7-69df-d442c56c058f@synopsys.com>
- <263309088.290419.51598113-17aa-4db0-9dc0-6e58e3fafe07.open-xchange@email.1und1.de>
- <ac20c0e9-0cab-7e3f-4abf-75223538a816@synopsys.com>
- <1270178266.398560.152fe5dd-527b-4ad6-b2fd-e4b0af6bc2a9.open-xchange@email.1und1.de>
-Message-ID: <badc3aa5-29ac-9b8c-2531-564c44b60030@synopsys.com>
+From: jacek.anaszewski@gmail.com (Jacek Anaszewski)
+Date: Wed, 17 Aug 2016 23:40:32 +0200
+Subject: [PATCH] ARM: dts: add PM8058 LEDs to the APQ8060 Dragonboard
+In-Reply-To: <1471376759-9561-1-git-send-email-linus.walleij@linaro.org>
+References: <1471376759-9561-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <57B4D9D0.8070000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/17/2016 12:11 PM, Stefan Wahren wrote:
-> Hi,
-> 
->> John Youn <John.Youn@synopsys.com> hat am 17. August 2016 um 00:07
->> geschrieben:
->>
->>
->> On 8/16/2016 12:58 PM, Stefan Wahren wrote:
->>> Hi John,
->>> ...
->>>
->>> like in host mode i took the default values in otg mode for the last two
->>> here
->>> (please refer to the logs). The BCM2835 datasheet isn't very helpful.
->>>
->>> Do you have any suggestions for valid values or how to get them?
->>>
->>
->> The same values used in host-only mode should work.
->>
->> It seems that the reset values for host-mode aren't being read
->> correctly with dr_mode == otg. I suspect this is the core reset and
->> force-mode delay problem.
->>
->> Can you try with this patch series to see if you get the proper
->> values?
->>
->> http://marc.info/?l=linux-kernel&m=145921907525708
->>
->> This series fixes known issues, but it also breaks at least one
->> platform and I haven't had time to look at it properly yet.
-> 
-> thanks. Yes, that seems to fix host fifo sizes for bcm2835. Here the log after
-> applying patch 2 - 4 and removing all DT FIFO parameters (patch 1 has already
-> been merged):
-> 
-> Linux raspberrypi 4.7.0-rc7-next-20160719+ #23 Wed Aug 17 18:15:24 UTC 2016
-> armv6l
-> 
-> [    2.290723] dwc2_lowlevel_hw_init()
-> [    2.298123] dwc2_lowlevel_hw_enable()
-> [    2.305451] dwc2_get_dr_mode()
-> [    2.365040] dwc2_get_hwparams()
-> [    2.371785] dwc2 20980000.usb: Core Release: 2.80a (snpsid=4f54280a)
-> [    2.371801] dwc2 20980000.usb: hwcfg1=00000000
-> [    2.371813] dwc2 20980000.usb: hwcfg2=228ddd50
-> [    2.371823] dwc2 20980000.usb: hwcfg3=0ff000e8
-> [    2.371833] dwc2 20980000.usb: hwcfg4=1ff00020
-> [    2.371843] dwc2 20980000.usb: grxfsiz=00001000
-> [    2.371853] dwc2 20980000.usb: Forcing mode to host
-> [    2.371869] dwc2 20980000.usb: gnptxfsiz=01001000
-> [    2.371880] dwc2 20980000.usb: hptxfsiz=02002000
-> [    2.371890] dwc2 20980000.usb: Forcing mode to device
-> [    2.423450] dwc2 20980000.usb: gnptxfsiz=00201000
-> [    2.423468] dwc2 20980000.usb: Detected values from hardware:
-> [    2.423480] dwc2 20980000.usb:   op_mode=0
-> [    2.423490] dwc2 20980000.usb:   arch=2
-> [    2.423500] dwc2 20980000.usb:   dma_desc_enable=0
-> [    2.423511] dwc2 20980000.usb:   power_optimized=0
-> [    2.423520] dwc2 20980000.usb:   i2c_enable=0
-> [    2.423530] dwc2 20980000.usb:   hs_phy_type=1
-> [    2.423540] dwc2 20980000.usb:   fs_phy_type=1
-> [    2.423550] dwc2 20980000.usb:   utmi_phy_data_width=0
-> [    2.423559] dwc2 20980000.usb:   num_dev_ep=7
-> [    2.423570] dwc2 20980000.usb:   num_dev_perio_in_ep=0
-> [    2.423579] dwc2 20980000.usb:   host_channels=8
-> [    2.423590] dwc2 20980000.usb:   max_transfer_size=524287
-> [    2.423601] dwc2 20980000.usb:   max_packet_count=1023
-> [    2.423611] dwc2 20980000.usb:   nperio_tx_q_depth=0x4
-> [    2.423621] dwc2 20980000.usb:   host_perio_tx_q_depth=0x4
-> [    2.423631] dwc2 20980000.usb:   dev_token_q_depth=0x8
-> [    2.423641] dwc2 20980000.usb:   enable_dynamic_fifo=1
-> [    2.423651] dwc2 20980000.usb:   en_multiple_tx_fifo=1
-> [    2.423661] dwc2 20980000.usb:   total_fifo_size=4080
-> [    2.423671] dwc2 20980000.usb:   host_rx_fifo_size=4096
-> [    2.423681] dwc2 20980000.usb:   host_nperio_tx_fifo_size=256
-> [    2.423691] dwc2 20980000.usb:   host_perio_tx_fifo_size=512
-> [    2.423699] dwc2 20980000.usb:
-> [    2.423709] dwc2 20980000.usb: dwc2_set_parameters()
-> [    2.423723] dwc2 20980000.usb: Setting dma_desc_fs_enable to 0
-> [    2.423748] dwc2 20980000.usb: Setting external_id_pin_ctl to 0
-> [    2.423760] dwc2 20980000.usb: Setting hibernation to 0
-> [    2.423777] dwc2_force_dr_mode()
-> [    2.430509] dwc2 20980000.usb: Clearing force mode bits
-> [    2.499028] dwc2_gadget_init()
-> [    2.505422] dwc2 20980000.usb: Specified GNPTXFDEP=1024 > 32
-> [    2.514502] dwc2 20980000.usb: EPs: 8, dedicated fifos, 4080 entries in SPRAM
-> [    2.542143] dwc2 20980000.usb: bound driver zero
-> [    2.550164] dwc2_hcd_init()
-> [    2.556602] dwc2 20980000.usb: DWC OTG Controller
-> [    2.564878] dwc2 20980000.usb: new USB bus registered, assigned bus number 1
-> [    2.575467] dwc2 20980000.usb: irq 33, io mem 0x00000000
-> 
+On 08/16/2016 09:45 PM, Linus Walleij wrote:
+> This adds the PM8058 LEDs as used in the platform.
+>
+> Cc: linux-arm-msm at vger.kernel.org
+> Cc: linux-leds at vger.kernel.org
+> Cc: Andy Gross <andy.gross@linaro.org>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Cc: Jacek Anaszewski <j.anaszewski@samsung.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> These DT bindings have been ACKed by Rob Herring and Bjorn Andersson
+> so I think the patch is safe to merge to the Qcom tree.
+> ---
+>   arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 39 ++++++++++++++++++++++++++
+>   1 file changed, 39 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+> index 0abc93e5bb00..b0800b988174 100644
+> --- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+> +++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+> @@ -239,6 +239,45 @@
+>   						};
+>   					};
+>   				};
+> +
+> +				led at 48 {
+> +					/*
+> +					 * The keypad LED @0x48 is routed to
+> +					 * the sensor board where it is
+> +					 * connected to an infrared LED
+> +					 * SFH4650 (60mW, @850nm) next to the
+> +					 * ambient light and proximity sensor
+> +					 * Capella Microsystems CM3605.
+> +					 */
+> +					compatible = "qcom,pm8058-keypad-led";
+> +					reg = <0x48>;
+> +					label = "proximity0";
 
-Ok, yeah, that seems better.
+In DT bindings documentation it was changed to "pm8050:white:keypad" to
+adhere to the LED class device naming convention. I assume that having
+it in this form is an omission here.
 
-Can you check if applying just patch 2 and 3 solves the issue? If so I
-think we can send those upstream.
+> +					default-state = "off";
+> +				};
+> +				led at 131 {
+> +					compatible = "qcom,pm8058-led";
+> +					reg = <0x131>;
+> +					label = "pm8058:red";
+> +					default-state = "off";
+> +				};
+> +				led at 132 {
+> +					/*
+> +					 * This is actually green too on my
+> +					 * board, but documented as yellow.
+> +					 */
+> +					compatible = "qcom,pm8058-led";
+> +					reg = <0x132>;
+> +					label = "pm8058:yellow";
+> +					default-state = "off";
+> +					linux,default-trigger = "mmc0";
+> +				};
+> +				led at 133 {
+> +					compatible = "qcom,pm8058-led";
+> +					reg = <0x133>;
+> +					label = "pm8058:green";
+> +					default-state = "on";
+> +					linux,default-trigger = "heartbeat";
+> +				};
+>   			};
+>   		};
+>
+>
 
-Regards,
-John
+-- 
+Best regards,
+Jacek Anaszewski
