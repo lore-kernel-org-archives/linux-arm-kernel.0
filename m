@@ -1,206 +1,45 @@
-From: sr@denx.de (Stefan Roese)
-Date: Wed, 17 Aug 2016 11:53:18 +0200
-Subject: [PATCH] dmaengine: mv_xor: Add support for IO (PCIe) src/dst areas
-Message-ID: <20160817095318.28034-1-sr@denx.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 17 Aug 2016 15:24:42 +0530
+Subject: [PATCH 1/2] ARM: dts: da850-lcdk: Audio support via simple-card
+In-Reply-To: <20160810200853.24275-1-kbeldan@baylibre.com>
+References: <20160810200853.24275-1-kbeldan@baylibre.com>
+Message-ID: <aeec6ee5-91e9-13fa-f7fa-09581ddb9b6a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To enable the access to a specific area, the MVEBU XOR controllers needs
-to have this area enabled / mapped via an address window. Right now,
-only the DRAM memory area is enabled via such memory windows. So
-using this driver to DMA to / from a e.g. PCIe memory region is
-currently not supported.
+On Thursday 11 August 2016 01:38 AM, Karl Beldan wrote:
+> The LCDK embeds a TLV320AIC3106 connected to the SoC McASP for analog
+> audio. This relies on the 'dummy' regulator as the codec is always on.
+> Quality is good with arecord -pipe- aplay on Line In/Line Out.
+> The MIC path doesn't seem to work yet.
 
-This patch now adds support for such PCIe / IO regions by checking
-if the src / dst address is located in an IO memory area in contrast
-to being located in DRAM. This is done by using the newly introduced
-MBus function mvebu_mbus_get_io_win_info(). If the src / dst address
-is located in such an IO area, a new address window is created in
-the XOR DMA controller. Enabling the controller to access this area.
+I tested the patch and I could not get the MIC to work as well. I
+suggest dropping the MIC path parts till that is debugged and root caused.
 
-Signed-off-by: Stefan Roese <sr@denx.de>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Marcin Wojtas <mw@semihalf.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Vinod Koul <vinod.koul@intel.com>
----
-RFC -> v1:
-- Use a cache for the already mapped areas for performance reasons, as
-  the MMIO registers don't need to get queried any more if the area is
-  already mapped now
+> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+> ---
+>  arch/arm/boot/dts/da850-lcdk.dts | 75 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 75 insertions(+)
 
- drivers/dma/mv_xor.c | 91 +++++++++++++++++++++++++++++++++++++++++++++++++++-
- drivers/dma/mv_xor.h |  7 ++++
- 2 files changed, 97 insertions(+), 1 deletion(-)
+> +&i2c0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c0_pins>;
+> +	clock-frequency = <100000>;
+> +	status = "okay";
+> +
+> +	tlv320aic3106: tlv320aic3106 at 18 {
+> +		#sound-dai-cells = <0>;
+> +		compatible = "ti,tlv320aic3106";
+> +		reg = <0x18>;
+> +		status = "okay";
+> +
+> +		ai3x-micbias-vg = <MICBIAS_2_5V>;
 
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index f4c9f98..0162750 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -470,12 +470,86 @@ static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
- 	return mv_chan->slots_allocated ? : -ENOMEM;
- }
- 
-+/*
-+ * Check if source or destination is an PCIe/IO address (non-SDRAM) and add
-+ * a new MBus window if necessary. Use a cache for these check so that
-+ * the MMIO mapped registers don't have to be accessed for this check
-+ * to speed up this process.
-+ */
-+static int mv_xor_add_io_win(struct mv_xor_chan *mv_chan, u32 addr)
-+{
-+	struct mv_xor_device *xordev = mv_chan->xordev;
-+	void __iomem *base = mv_chan->mmr_high_base;
-+	u32 win_enable;
-+	u32 size;
-+	u8 target, attr;
-+	int ret;
-+	int i;
-+
-+	/*
-+	 * Loop over the cached windows to check, if the requested area
-+	 * is already mapped. If this the case, nothing needs to be done
-+	 * and we can return.
-+	 */
-+	for (i = 0; i < WINDOW_COUNT; i++) {
-+		if (addr >= xordev->win_start[i] &&
-+		    addr <= xordev->win_end[i]) {
-+			/* Window is already mapped */
-+			return 0;
-+		}
-+	}
-+
-+	/*
-+	 * The window is not mapped, so we need to create the new mapping
-+	 */
-+
-+	/* If no IO window is found that addr has to be located in SDRAM */
-+	ret = mvebu_mbus_get_io_win_info(addr, &size, &target, &attr);
-+	if (ret < 0)
-+		return 0;
-+
-+	/*
-+	 * Mask the base addr 'addr' according to 'size' read back from the
-+	 * MBus window. Otherwise we might end up with an address located
-+	 * somewhere in the middle of this area here.
-+	 */
-+	size -= 1;
-+	addr &= ~size;
-+
-+	/*
-+	 * Reading one of both enabled register is enough, as they are always
-+	 * programmed to the identical values
-+	 */
-+	win_enable = readl(base + WINDOW_BAR_ENABLE(0));
-+
-+	/* Set 'i' to the first free window to write the new values to */
-+	i = ffs(~win_enable) - 1;
-+	if (i >= WINDOW_COUNT)
-+		return -ENOMEM;
-+
-+	writel((addr & 0xffff0000) | (attr << 8) | target,
-+	       base + WINDOW_BASE(i));
-+	writel(size & 0xffff0000, base + WINDOW_SIZE(i));
-+
-+	/* Fill the caching variables for later use */
-+	xordev->win_start[i] = addr;
-+	xordev->win_end[i] = addr + size;
-+
-+	win_enable |= (1 << i);
-+	win_enable |= 3 << (16 + (2 * i));
-+	writel(win_enable, base + WINDOW_BAR_ENABLE(0));
-+	writel(win_enable, base + WINDOW_BAR_ENABLE(1));
-+
-+	return 0;
-+}
-+
- static struct dma_async_tx_descriptor *
- mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
- 		    unsigned int src_cnt, size_t len, unsigned long flags)
- {
- 	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
- 	struct mv_xor_desc_slot *sw_desc;
-+	int ret;
- 
- 	if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
- 		return NULL;
-@@ -486,6 +560,11 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
- 		"%s src_cnt: %d len: %zu dest %pad flags: %ld\n",
- 		__func__, src_cnt, len, &dest, flags);
- 
-+	/* Check if a new window needs to get added for 'dest' */
-+	ret = mv_xor_add_io_win(mv_chan, dest);
-+	if (ret)
-+		return NULL;
-+
- 	sw_desc = mv_chan_alloc_slot(mv_chan);
- 	if (sw_desc) {
- 		sw_desc->type = DMA_XOR;
-@@ -493,8 +572,13 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
- 		mv_desc_init(sw_desc, dest, len, flags);
- 		if (mv_chan->op_in_desc == XOR_MODE_IN_DESC)
- 			mv_desc_set_mode(sw_desc);
--		while (src_cnt--)
-+		while (src_cnt--) {
-+			/* Check if a new window needs to get added for 'src' */
-+			ret = mv_xor_add_io_win(mv_chan, src[src_cnt]);
-+			if (ret)
-+				return NULL;
- 			mv_desc_set_src_addr(sw_desc, src_cnt, src[src_cnt]);
-+		}
- 	}
- 
- 	dev_dbg(mv_chan_to_devp(mv_chan),
-@@ -959,6 +1043,7 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
- 		mv_chan->op_in_desc = XOR_MODE_IN_DESC;
- 
- 	dma_dev = &mv_chan->dmadev;
-+	mv_chan->xordev = xordev;
- 
- 	/*
- 	 * These source and destination dummy buffers are used to implement
-@@ -1086,6 +1171,10 @@ mv_xor_conf_mbus_windows(struct mv_xor_device *xordev,
- 		       dram->mbus_dram_target_id, base + WINDOW_BASE(i));
- 		writel((cs->size - 1) & 0xffff0000, base + WINDOW_SIZE(i));
- 
-+		/* Fill the caching variables for later use */
-+		xordev->win_start[i] = cs->base;
-+		xordev->win_end[i] = cs->base + cs->size - 1;
-+
- 		win_enable |= (1 << i);
- 		win_enable |= 3 << (16 + (2 * i));
- 	}
-diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
-index bf56e08..88eeab2 100644
---- a/drivers/dma/mv_xor.h
-+++ b/drivers/dma/mv_xor.h
-@@ -80,12 +80,17 @@
- #define WINDOW_BAR_ENABLE(chan)	(0x40 + ((chan) << 2))
- #define WINDOW_OVERRIDE_CTRL(chan)	(0xA0 + ((chan) << 2))
- 
-+#define WINDOW_COUNT		8
-+
- struct mv_xor_device {
- 	void __iomem	     *xor_base;
- 	void __iomem	     *xor_high_base;
- 	struct clk	     *clk;
- 	struct mv_xor_chan   *channels[MV_XOR_MAX_CHANNELS];
- 	int		     xor_type;
-+
-+	u32                  win_start[WINDOW_COUNT];
-+	u32                  win_end[WINDOW_COUNT];
- };
- 
- /**
-@@ -127,6 +132,8 @@ struct mv_xor_chan {
- 	char			dummy_dst[MV_XOR_MIN_BYTE_COUNT];
- 	dma_addr_t		dummy_src_addr, dummy_dst_addr;
- 	u32                     saved_config_reg, saved_int_mask_reg;
-+
-+	struct mv_xor_device	*xordev;
- };
- 
- /**
--- 
-2.9.3
+It will be nice to add the codec regulators as well (and that in turn
+needs the PMIC to be populated). Although I wont insist on that since
+the regulators are optional properties.
+
+Rest of the patch looks good to me.
+
+Thanks,
+Sekhar
