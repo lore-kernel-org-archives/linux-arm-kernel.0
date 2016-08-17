@@ -1,30 +1,37 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 17 Aug 2016 17:43:16 +0200
-Subject: [PATCH/RTF 6/7] arm64: dts: r8a7796: add SDHI nodes
-In-Reply-To: <1471433516-4478-7-git-send-email-horms+renesas@verge.net.au>
-References: <1471433516-4478-1-git-send-email-horms+renesas@verge.net.au>
- <1471433516-4478-7-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdU-TOvnctzNUQL0F4LxRtF1eAwj++762ywRzx11Yq2Okw@mail.gmail.com>
+From: aryabinin@virtuozzo.com (Andrey Ryabinin)
+Date: Wed, 17 Aug 2016 18:48:14 +0300
+Subject: [PATCH] mm, kasan: Update kasan docs to indicate arm64 support
+In-Reply-To: <1471365031-27115-1-git-send-email-labbott@redhat.com>
+References: <1471365031-27115-1-git-send-email-labbott@redhat.com>
+Message-ID: <1e8f2aa7-78a6-f39a-640c-015cc279e2bc@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2016 at 1:31 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Add SDHI nodes to the DT of the r8a7796 SoC.
->
-> Based on the DT of the r8a7795 SoC.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Gr{oetje,eeting}s,
+On 08/16/2016 07:30 PM, Laura Abbott wrote:
+> KASAN has been supported on arm64 since 39d114ddc682 ("arm64: add KASAN
+> support"). Update the docs to indicate this.
+> 
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
 
-                        Geert
+Acked-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> ---
+>  Documentation/kasan.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/kasan.txt b/Documentation/kasan.txt
+> index 7dd95b3..d167220 100644
+> --- a/Documentation/kasan.txt
+> +++ b/Documentation/kasan.txt
+> @@ -12,7 +12,7 @@ KASAN uses compile-time instrumentation for checking every memory access,
+>  therefore you will need a GCC version 4.9.2 or later. GCC 5.0 or later is
+>  required for detection of out-of-bounds accesses to stack or global variables.
+>  
+> -Currently KASAN is supported only for x86_64 architecture.
+> +Currently KASAN is supported only for x86_64 and arm64 architecture.
+>  
+>  1. Usage
+>  ========
+> 
