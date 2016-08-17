@@ -1,26 +1,22 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 17 Aug 2016 16:46:10 +0200
-Subject: [PATCH] DT: kirkwood: Fix Openblock A6 external GPIO pins
-In-Reply-To: <20160815145104.14135-1-jason@lakedaemon.net>
-References: <20160815013538.8056-1-jason@lakedaemon.net>
- <20160815145104.14135-1-jason@lakedaemon.net>
-Message-ID: <20160817144610.GD3751@lunn.ch>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 17 Aug 2016 20:26:21 +0530
+Subject: [PATCH v3 2/4] ARM: davinci_all_defconfig: Enable AEMIF as a
+ module
+In-Reply-To: <20160816223338.20776-3-kbeldan@baylibre.com>
+References: <20160816223338.20776-1-kbeldan@baylibre.com>
+ <20160816223338.20776-3-kbeldan@baylibre.com>
+Message-ID: <b507c69d-4fdd-f1dd-e7ed-12ed3a589ca8@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2016 at 02:51:04PM +0000, Jason Cooper wrote:
-> By assigning the pin hog to the pinctrl node, we correctly configure the
-> MPPs.  However, they are not available to userspace.
+On Wednesday 17 August 2016 04:03 AM, Karl Beldan wrote:
+> This enables the use of the memory/ti-aemif.c driver.
+> ATM most davinci boards use the mach-davinci aemif code which gets in
+> the way of genericity and proper DT boot.
 > 
-> Fix this by assigning the hogs to the gpio node.
-> 
-> After this, the following works as expected:
-> 
->   # echo 28 >/sys/class/gpio/export
->   # echo low >/sys/class/gpio/gpio28/direction
-> 
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Applied to v4.9/defconfig.
 
-    Andrew
+Regards,
+Sekhar
