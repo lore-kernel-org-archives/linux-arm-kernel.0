@@ -1,39 +1,45 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 17 Aug 2016 17:17:14 +0100
-Subject: [PATCH] ARM: mm: pull asm/memory.h explicitly
-Message-ID: <1471450634-45566-1-git-send-email-vladimir.murzin@arm.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Wed, 17 Aug 2016 09:23:51 -0700
+Subject: [PATCH 1/1] ARM: keystone: defconfig: Fix USB configuration
+In-Reply-To: <1471430690-17143-2-git-send-email-rogerq@ti.com>
+References: <1471430690-17143-1-git-send-email-rogerq@ti.com>
+ <1471430690-17143-2-git-send-email-rogerq@ti.com>
+Message-ID: <ef561ff0-bf6d-5515-7d10-7c03aa69dd4c@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit d78114554939a (""ARM: 8512/1: proc-v7.S: Adjust stack address when
-XIP_KERNEL"") introduced a macro which lives under asm/memory.h.
-Unfortunately, for MMU-less systems (like R-class) it leads to build failure:
+Hi Arnd, Olof,
 
-arch/arm/mm/proc-v7.S: Assembler messages:
-arch/arm/mm/proc-v7.S:538: Error: unrecognised relocation suffix
-make[1]: *** [arch/arm/mm/proc-v7.o] Error 1
-make: *** [arch/arm/mm] Error 2
+Can you please pick-up the fix for 4.8-rcx ?
+Roger reported that USB ports are broken on Keystone2 boards
+since v4.8-rc1 because USB_HPY config option got dropped.
 
-since it is implicitly pulled via asm/pgtable.h for MMU capable systems only.
 
-To fix it include asm/memory.h explicitly.
+On 8/17/2016 3:44 AM, Roger Quadros wrote:
+> Simply enabling CONFIG_KEYSTONE_USB_PHY doesn't work anymore
+> as it depends on CONFIG_NOP_USB_XCEIV. We need to enable
+> that as well.
+>
+> This fixes USB on Keystone boards from v4.8-rc1 onwards.
+>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm/mm/proc-v7.S |    1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index d0b116c..8cb105b 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -16,6 +16,7 @@
- #include <asm/hwcap.h>
- #include <asm/pgtable-hwdef.h>
- #include <asm/pgtable.h>
-+#include <asm/memory.h>
- 
- #include "proc-macros.S"
- 
--- 
-1.7.9.5
+>  arch/arm/configs/keystone_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
+> index 71b42e6..78cd2f1 100644
+> --- a/arch/arm/configs/keystone_defconfig
+> +++ b/arch/arm/configs/keystone_defconfig
+> @@ -161,6 +161,7 @@ CONFIG_USB_MON=y
+>  CONFIG_USB_XHCI_HCD=y
+>  CONFIG_USB_STORAGE=y
+>  CONFIG_USB_DWC3=y
+> +CONFIG_NOP_USB_XCEIV=y
+>  CONFIG_KEYSTONE_USB_PHY=y
+>  CONFIG_NEW_LEDS=y
+>  CONFIG_LEDS_CLASS=y
+>
