@@ -1,37 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 17 Aug 2016 09:05:31 +0100
-Subject: [PATCH v15 07/13] arm64: factor work_pending state machine to C
-In-Reply-To: <1471382376-5443-8-git-send-email-cmetcalf@mellanox.com>
-References: <1471382376-5443-1-git-send-email-cmetcalf@mellanox.com>
- <1471382376-5443-8-git-send-email-cmetcalf@mellanox.com>
-Message-ID: <20160817080531.GA5601@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 17 Aug 2016 09:08:48 +0100
+Subject: [PATCH] ARM: irq_work: Do not attempt to IPI on non IPI-capable HW
+In-Reply-To: <VI1PR04MB1455E9F56D0EDA0558CC84508B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
+References: <1471361210-29914-1-git-send-email-marc.zyngier@arm.com>
+ <CAL411-pUUdxN_d76FaXYGtEd7Seewnrin=x2mFEbi1Z48zSRvg@mail.gmail.com>
+ <57B41523.6030202@arm.com>
+ <VI1PR04MB1455E9F56D0EDA0558CC84508B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
+Message-ID: <57B41B90.3050204@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
-
-On Tue, Aug 16, 2016 at 05:19:30PM -0400, Chris Metcalf wrote:
-> Currently ret_fast_syscall, work_pending, and ret_to_user form an ad-hoc
-> state machine that can be difficult to reason about due to duplicated
-> code and a large number of branch targets.
+On 17/08/16 08:58, Peter Chen wrote:
+>  
+>> On 17/08/16 04:15, Peter Chen wrote:
+>>> On Tue, Aug 16, 2016 at 11:26 PM, Marc Zyngier <marc.zyngier@arm.com>
+>> wrote:
+>>>> Not all of the ARM HW is IPI capable (i.e. most of the non-SMP
+>>>> systems). Unfortunately, some systems do advertise being SMP capable,
+>>>> even if they have a single core and do not define a cross call
+>>>> method.
+>>>
+>>> Could you example it? I find all current set_smp_cross_call is defined
+>>> under CONFIG_SMP.
+>>
+>> This doesn't mean that the system will be SMP at runtime (SMP_ON_UP).
+>>
+>  
+> I am puzzled that how you would like to check IPI capable, at runtime
+> or according to kernel configuration?
 > 
-> This patch factors the common logic out into the existing
-> do_notify_resume function, converting the code to C in the process,
-> making the code more legible.
+>>>>
+>>>>  static inline bool arch_irq_work_has_interrupt(void)  {
+>>>> -       return is_smp();
+>>>> +#ifdef CONFIG_SMP
+>>>
+>>> Why not using is_smp as condition, it is more strict.
+>>>
+>>> if (is_smp())
+>>>     return !!__smp_cross_call;
+>>> else
+>>>     return false;
+>>
+>> What's the gain? We're trying to check whether we can actually deliver
+>> an IPI. Why should we gate it by finding out whether we're smp_on_up or not?
+>>
 > 
-> This patch tries to closely mirror the existing behaviour while using
-> the usual C control flow primitives. As local_irq_{disable,enable} may
-> be instrumented, we balance exception entry (where we will almost most
-> likely enable IRQs) with a call to trace_hardirqs_on just before the
-> return to userspace.
-> 
-> Signed-off-by: Chris Metcalf <cmetcalf@mellanox.com>
-> ---
->  arch/arm64/kernel/entry.S  | 12 ++++--------
->  arch/arm64/kernel/signal.c | 36 ++++++++++++++++++++++++++----------
->  2 files changed, 30 insertions(+), 18 deletions(-)
+> If UP system with CONFIG_SMP enabled, the __smp_cross_call is not
+> NULL, but the IPI is not capable. Or am I missing something?
 
-I plan to queue this one in the arm64 tree for 4.9. Should hit -next
-sometime next week.
+Take an OMAP3 system. It is UP,  and doesn't have a GIC, so
+__smp_cross_call will be NULL. Yet, it boots with a generic
+multi-platform kernel, with SMP on.
 
-Will
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
