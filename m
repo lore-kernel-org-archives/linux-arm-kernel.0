@@ -1,32 +1,32 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 17 Aug 2016 17:31:15 +0200
-Subject: [PATCH/RTF 3/7] pinctrl: sh-pfc: r8a7796: Add SDHI pins, groups
- and functions
-In-Reply-To: <1471433516-4478-4-git-send-email-horms+renesas@verge.net.au>
-References: <1471433516-4478-1-git-send-email-horms+renesas@verge.net.au>
- <1471433516-4478-4-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdUNxV9Jyp3roPJnDA=1pQ6yrzwWz_jA5uo3=Zrw_9L7Vw@mail.gmail.com>
+From: zhengyu.shen@nxp.com (Zhengyu Shen)
+Date: Wed, 17 Aug 2016 15:31:19 +0000
+Subject: [PATCH v2] Added perf functionality to mmdc driver
+In-Reply-To: <1471395561-30389-1-git-send-email-Nitin.Chaudhary@zii.aero>
+References: <20160815223035.5429-1-zhengyu.shen@nxp.com>
+ <1471395561-30389-1-git-send-email-Nitin.Chaudhary@zii.aero>
+Message-ID: <DB5PR04MB1430018C7BFB14A65517162C9F140@DB5PR04MB1430.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2016 at 1:31 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
->
-> This patch adds SDHI pins, groups and functions to R8A7796 SoC.
->
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> The following series of patch resolve the kernel compilation errors with the
+> proposed perf functionality integration into MMDC driver by Zhengyu Shen.
+> These provide the working code which can be enhanced upon as per the
+> reviews from Mark and Peter but will make sure that code compiles without
+> errors and still retains working as was proposed by Zhengyu. I suggest further
+> improvements from review comments could be done on top of it from
+> further on with this being used as a base.
+> 
+> Nitin Chaudhary (2):
+>   Error: Fix mmdc compilation errors due to cpu notifier
+>   [i.MX6Q] Code cleanup & verification after fixing compilation error
+> 
+>  arch/arm/mach-imx/mmdc.c   | 95 ++++++++++++++++++++++++------------
+> ----------
+>  include/linux/cpuhotplug.h |  1 +
+>  2 files changed, 50 insertions(+), 46 deletions(-)
+> 
+> --
+> 2.7.4
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Hi, thanks for the help. Is it impossible for two pmus to be created? I wasn't sure
+about that, which is why I didn't have pmu_mmdc set to static.  
