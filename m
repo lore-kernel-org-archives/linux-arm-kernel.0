@@ -1,96 +1,88 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 17 Aug 2016 16:37:18 +0900
-Subject: [PATCH 7/7] arm64: dts: exynos: Add dts file for Exynos5433-based
- TM2E board
-In-Reply-To: <66f412cc-edc6-29f9-bc50-3f3d8eb69bf4@samsung.com>
-References: <1471328843-26653-1-git-send-email-cw00.choi@samsung.com>
- <1471329328-26842-3-git-send-email-cw00.choi@samsung.com>
- <CGME20160817064349epcas1p1d0b6da0e0e87788868bfcd63bfa92cf6@epcas1p1.samsung.com>
- <66f412cc-edc6-29f9-bc50-3f3d8eb69bf4@samsung.com>
-Message-ID: <57B4142E.30000@samsung.com>
+From: marcel@holtmann.org (Marcel Holtmann)
+Date: Wed, 17 Aug 2016 09:40:46 +0200
+Subject: [PATCH v2] Bluetooth: Add LED triggers for HCI frames tx and rx
+In-Reply-To: <CAFGCpxx7teWAGzw+-uy+nwoHgsS__8S-CdfGuNuycCUuWJRC+Q@mail.gmail.com>
+References: <1469939084-15603-1-git-send-email-guodong.xu@linaro.org>
+ <1394C970-3726-4C42-A06D-0B3B3015D980@holtmann.org>
+ <CAFGCpxz6j_7aOTX+uShdpyxmt71k61v=Abdw=7MfrRjvdygmTg@mail.gmail.com>
+ <30869CE7-FE5E-4CAF-86FC-D140E2C0963D@holtmann.org>
+ <CAFGCpxx7teWAGzw+-uy+nwoHgsS__8S-CdfGuNuycCUuWJRC+Q@mail.gmail.com>
+Message-ID: <7B1B501B-73E5-49E8-B147-25D9EEFC789D@holtmann.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi Guodong,
 
-On 2016? 08? 17? 15:43, Krzysztof Kozlowski wrote:
-> On 08/16/2016 08:35 AM, Chanwoo Choi wrote:
->> This patcha adds the Device Tree source for Exynos5433-based Samsung TM2E
+>>>>> Two LED triggers are added into hci_dev: tx_led and rx_led. Upon ACL/SCO
+>>>>> packets available in tx or rx, the LEDs will blink.
+>>>>> 
+>>>>> For each hci registration, two triggers are added into LED subsystem:
+>>>>> [hdev->name]-tx and [hdev-name]-rx.
+>>>>> Refer to Documentation/leds/leds-class.txt for usage.
+>>>>> 
+>>>>> Verified on HiKey 96boards, which uses HiSilicon hi6220 SoC and TI
+>>>>> WL1835 WiFi/BT combo chip.
+>>>> 
+>>>> so I have no idea what to do with adding adding hci0-rx and hci0-tx triggers. Combined with hci0-power trigger these are already 3 triggers. And if you have 2 Bluetooth controllers in your system, then you have 6 triggers.
+>>>> 
+>>> 
+>>> True, 6 triggers. But, taking example for other subsytems, eg. cpu
+>>> cores. On my board, I have "heartbeat cpu0 cpu1 cpu2 cpu3 cpu4 cpu5
+>>> cpu6 cpu7". It doesn't have to mean you need all of them connected to
+>>> some LED(s). Actually, in most of the case, I only need heartbeat.
+>>> 
+>>> 
+>>> 
+>>>> If we then maybe add another trigger, then this number just goes up and up.
+>>>> 
+>>>> As far as I can tell you can only assign a single trigger to a LED.
+>>>> 
+>>> 
+>>> That's true. And people got a choice of which feature he wants to visualize.
+>> 
+>> and as a result we keep adding senseless triggers to the kernel and bloating it up for no reason. Especially since it feels like 99% of the LED triggers are not used at all. This makes no sense to me.
+>> 
+>>>> So this means to even use these triggers, you need now 3 LEDs per Bluetooth controller. How is that useful for anybody in a real system? Maybe I am missing something here and somehow there is magic to combine triggers, but I have not found it yet. So please someone enlighten me on how this is suppose to be used with real devices.
+>>>> 
+>>>> Recently I have added a simple bluetooth-power trigger that combines all Bluetooth controllers into a single trigger. If any of them is enabled, then you can control your LED. Which makes a lot more sense to me since you most likely have a single Bluetooth LED on your system. And you want it to show the correct state no matter what Bluetooth controller is in use. However I can see the case that someone might want to assign one specific Bluetooth controller to a LED status.
+>>>> 
+>>>> So instead of adding many independent triggers to each controller, why not create one global bluetooth trigger and one individual bluetooth-hci0 trigger for each controller. And the combine power, tx, rx and whatever else we need to trigger the LED for?
+>>>> 
+>>> 
+>>> When I starting this work, I referred to WiFi system. See
+>>> CONFIG_MAC80211_LEDS. WiFi system implements these types of triggers "
+>>> phy0rx phy0tx phy0assoc phy0radio" for each 'controller'.
+>> 
+>> And I actually wonder who ever used these triggers. You need 4 LEDs to visualize the WiFi status. Which systems has 4 LEDs to spare to visualize this.
+>> 
+>>> Besides, there are also RFKILL which stands for WiFi/BT power status.
+>>> RFKILL adds triggers for each module too. Eg. in the below example, I
+>>> have one WiFi (phy0), one BT (hci0). Trigger rfkill1 equals to
+>>> hci0-power.
+>>> 
+>>> Ref: here are all LED triggers I found in my 96boards/HiKey:
+>>> 
+>>> # cat trigger
+>>> none kbd-scrollock kbd-numlock kbd-capslock kbd-kanalock kbd-shiftlock
+>>> kbd-altgrlock kbd-ctrllock kbd-altlock kbd-shiftllock kbd-shiftrlock
+>>> kbd-ctrlllock kbd-ctrlrlock mmc0 mmc1 heartbeat cpu0 cpu1 cpu2 cpu3
+>>> cpu4 cpu5 cpu6 cpu7 mmc2 rfkill0 phy0rx phy0tx phy0assoc phy0radio
+>>> hci0-power hci0-tx [hci0-rx] rfkill1
+>> 
+>> And how many LEDs do you have in the your system? I think you are making my point here.
+>> 
+>> So I think what we need to do is to not add to this madness and instead create one "bluetooth" LED trigger that combines power and TX/RX for all controllers. And then allow for individual "bluetooth-hci0" LED triggers so that you can bind a single Bluetooth controller to a single LED.
+>> 
+>> For me, if I can not combine hci0-power, hci0-tx and hci0-rx into a single LED,
 > 
-> s/patcha/patch/
+> By combining them into a single LED, do you mean such a use case?
+> - when hci0 is powered on, this LED starts on.
+> - then, when there is tx/rx traffic, this LED should blink (reversely
+> of course).
+> - when hci0 is powered off, this LED turns off.
 
-OK.
+yes, that is what I am thinking of.
 
-> 
->> board. TM2E board is the most similiar with TM2 board. The exynos5433-tm2e.dts
-> 
-> s/similiar/similar/
+Regards
 
-OK.
-
-> 
->> include the difference between TM2 and TM2E.
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
->> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
->> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
->> Signed-off-by: Inki Dae <inki.dae@samsung.com>
->> Signed-off-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
->> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
->> Signed-off-by: Jaewon Kim <jaewon02.kim@samsung.com>
->> Signed-off-by: Hyungwon Hwang <human.hwang@samsung.com>
->> Signed-off-by: Inha Song <ideal.song@samsung.com>
->> Signed-off-by: Ingi kim <ingi2.kim@samsung.com>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
->> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> ---
->>  .../bindings/arm/samsung/samsung-boards.txt        |  1 +
->>  arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     | 41 ++++++++++++++++++++++
->>  2 files changed, 42 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
->>
->> diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
->> index c704b4bf6137..c1bda8d3674c 100644
->> --- a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
->> +++ b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
->> @@ -16,6 +16,7 @@ Required root node properties:
->>  	- "samsung,smdk5410"	- for Exynos5410-based Samsung SMDK5410 eval board.
->>  	- "samsung,smdk5420"	- for Exynos5420-based Samsung SMDK5420 eval board.
->>  	- "samsung,tm2"		- for Exynos5333-based Samsung TM2 board.
->> +	- "samsung,tm2e"	- for Exynos5333-based Samsung TM2E board.
->>  	- "samsung,sd5v1"	- for Exynos5440-based Samsung board.
->>  	- "samsung,ssdk5440"	- for Exynos5440-based Samsung board.
->>  
->> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
->> new file mode 100644
->> index 000000000000..283b4fd19d5a
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
->> @@ -0,0 +1,41 @@
->> +/*
->> + * SAMSUNG Exynos5433 TM2E board device tree source
->> + *
->> + * Copyright (c) 2016 Samsung Electronics Co., Ltd.
->> + *
->> + * Device tree source file for Samsung's TM2E(TM2 EDGE) board which is based on
->> + * Samsung Exynos5433 SoC.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#include "exynos5433-tm2.dts"
->> +
-> 
-> Cool!
-> 
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Thanks for the review.
-
-Best regards,
-Chanwoo Choi
+Marcel
