@@ -1,60 +1,35 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 17 Aug 2016 15:05:17 +0300
-Subject: [PATCH 1/1] ARM: dma: fix dma_max_pfn()
-In-Reply-To: <1471435517-7840-1-git-send-email-rogerq@ti.com>
-References: <1471435517-7840-1-git-send-email-rogerq@ti.com>
-Message-ID: <1471435517-7840-2-git-send-email-rogerq@ti.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Wed, 17 Aug 2016 14:28:50 +0200
+Subject: [RFC2 nowrap: PATCH v7 00/18] ILP32 for ARM64
+In-Reply-To: <1471434403-25291-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1471434403-25291-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <175AE090-EDA7-4A8D-9044-3FFA74AC1903@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 6ce0d2001692 ("ARM: dma: Use dma_pfn_offset for dma address translation"),
-dma_to_pfn() already returns the PFN with the physical memory start offset
-so we don't need to add it again.
 
-This fixes USB mass storage lock-up problem on systems that can't do DMA
-over the entire physical memory range (e.g.) Keystone 2 systems with 4GB RAM
-can only do DMA over the first 2GB. [K2E-EVM].
+> On 17 Aug 2016, at 13:46, Yury Norov <ynorov@caviumnetworks.com> wrote:
+> 
+> This series enables aarch64 with ilp32 mode, and as supporting work,
+> introduces ARCH_32BIT_OFF_T configuration option that is enabled for
+> existing 32-bit architectures but disabled for new arches (so 64-bit
+> off_t is is used by new userspace).
+> 
+> This version is based on kernel v4.8-rc2.
+> It works with glibc-2.23, and tested with LTP.
+> 
+> This is RFC because there is still no solid understanding what type of registers
+> top-halves delousing we prefer. In this patchset, w0-w7 are cleared for each
+> syscall in assembler entry. The alternative approach is in introducing compat
+> wrappers which is little faster for natively routed syscalls (~2.6% for syscall
+> with no payload) but much more complicated.
 
-What happens there is that without this patch SCSI layer sets a wrong
-bounce buffer limit in scsi_calculate_bounce_limit() for the USB mass
-storage device. dma_max_pfn() evaluates to 0x8fffff and bounce_limit
-is set to 0x8fffff000 whereas maximum DMA'ble physical memory on Keystone 2
-is 0x87fffffff. This results in non DMA'ble pages being given to the
-USB controller and hence the lock-up.
+So you?re saying there are 2 options:
 
-NOTE: in the above case, USB-SCSI-device's dma_pfn_offset was showing as 0.
-This should have really been 0x780000 as on K2e, LOWMEM_START is 0x80000000
-and HIGHMEM_START is 0x800000000. DMA zone is 2GB so dma_max_pfn should be
-0x87ffff. The incorrect dma_pfn_offset for the USB storage device is because
-USB devices are not correctly inheriting the dma_pfn_offset from the
-USB host controller. This will be fixed by a separate patch.
+  1) easy to get right, slightly slower, same ABI to user space as 2
+  2) harder to get right, minor performance benefit
 
-Fixes: 6ce0d2001692 ("ARM: dma: Use dma_pfn_offset for dma address translation")
-Cc: stable at vger.kernel.org
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Reported-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/include/asm/dma-mapping.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+That?s an obvious pick, no? Mark it non-RFC and stay with the clearing in assembler entry. If anyone cares about those last few percent, they can still push the harder path upstream later if they want to, but at least we?ll have the ABI stable, so that you can start using and developing for ilp32 on aarch64.
 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index d009f79..bf02dbd 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -111,7 +111,7 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
- /* The ARM override for dma_max_pfn() */
- static inline unsigned long dma_max_pfn(struct device *dev)
- {
--	return PHYS_PFN_OFFSET + dma_to_pfn(dev, *dev->dma_mask);
-+	return dma_to_pfn(dev, *dev->dma_mask);
- }
- #define dma_max_pfn(dev) dma_max_pfn(dev)
- 
--- 
-2.7.4
+
+Alex
