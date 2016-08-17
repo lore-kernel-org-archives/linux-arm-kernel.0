@@ -1,31 +1,56 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 17 Aug 2016 15:40:42 +0200
-Subject: [PATCH/RTF 1/7] clk: renesas: r8a7796: Add GPIO clocks
-In-Reply-To: <1471433516-4478-2-git-send-email-horms+renesas@verge.net.au>
-References: <1471433516-4478-1-git-send-email-horms+renesas@verge.net.au>
- <1471433516-4478-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdW-Q=zXuRDgtYLLXk0C+gxe5ybiY9qv+xYNDZLXF6Zv3Q@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 17 Aug 2016 06:41:12 -0700
+Subject: [PATCH v10 3/3] MAINTAINERS: atmel-isc: add entry for Atmel ISC
+In-Reply-To: <1471413929-26008-4-git-send-email-songjun.wu@microchip.com>
+References: <1471413929-26008-1-git-send-email-songjun.wu@microchip.com>
+ <1471413929-26008-4-git-send-email-songjun.wu@microchip.com>
+Message-ID: <1400f664-09d5-98f6-e237-b5b1c5edae1d@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2016 at 1:31 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
->
-> Add GPIO clocks for the R8A7796 SoC.
->
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Le 16/08/2016 ? 23:05, Songjun Wu a ?crit :
+> Add the MAINTAINERS' entry for Microchip / Atmel Image Sensor Controller.
+> 
+> Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Gr{oetje,eeting}s,
+> ---
+> 
+> Changes in v10: None
+> Changes in v9: None
+> Changes in v8: None
+> Changes in v7: None
+> Changes in v6: None
+> Changes in v5: None
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  MAINTAINERS | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 20bb1d0..21a6f6f 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -7733,6 +7733,14 @@ T:	git git://git.monstr.eu/linux-2.6-microblaze.git
+>  S:	Supported
+>  F:	arch/microblaze/
+>  
+> +MICROCHIP / ATMEL ISC DRIVER
+> +M:	Songjun Wu <songjun.wu@microchip.com>
+> +L:	linux-media at vger.kernel.org
+> +S:	Supported
+> +F:	drivers/media/platform/atmel/atmel-isc.c
+> +F:	drivers/media/platform/atmel/atmel-isc-regs.h
+> +F:	devicetree/bindings/media/atmel-isc.txt
+> +
+>  MICROSOFT SURFACE PRO 3 BUTTON DRIVER
+>  M:	Chen Yu <yu.c.chen@intel.com>
+>  L:	platform-driver-x86 at vger.kernel.org
+> 
 
-                        Geert
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Nicolas Ferre
