@@ -1,38 +1,82 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Wed, 17 Aug 2016 08:28:06 +0000
-Subject: [PATCH] ARM: irq_work: Do not attempt to IPI on non IPI-capable HW
-In-Reply-To: <57B41B90.3050204@arm.com>
-References: <1471361210-29914-1-git-send-email-marc.zyngier@arm.com>
- <CAL411-pUUdxN_d76FaXYGtEd7Seewnrin=x2mFEbi1Z48zSRvg@mail.gmail.com>
- <57B41523.6030202@arm.com>
- <VI1PR04MB1455E9F56D0EDA0558CC84508B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
- <57B41B90.3050204@arm.com>
-Message-ID: <VI1PR04MB14558618D41FFF0BA4616BD08B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Wed, 17 Aug 2016 16:33:02 +0800
+Subject: [PATCH V8 5/8] irqchip/gicv3-its: Refactor ITS DT init code to
+ prepare for ACPI
+In-Reply-To: <1470909998-16710-6-git-send-email-tn@semihalf.com>
+References: <1470909998-16710-1-git-send-email-tn@semihalf.com>
+ <1470909998-16710-6-git-send-email-tn@semihalf.com>
+Message-ID: <57B4213E.3060201@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
->>>>
->>>> Why not using is_smp as condition, it is more strict.
->>>>
->>>> if (is_smp())
->>>>     return !!__smp_cross_call;
->>>> else
->>>>     return false;
->>>
->>> What's the gain? We're trying to check whether we can actually
->>> deliver an IPI. Why should we gate it by finding out whether we're smp_on_up or
->not?
->>>
->>
->> If UP system with CONFIG_SMP enabled, the __smp_cross_call is not
->> NULL, but the IPI is not capable. Or am I missing something?
+On 2016/8/11 18:06, Tomasz Nowicki wrote:
+> In order to add ACPI support we need to isolate ACPI&DT common code and
+> move DT logic to corresponding functions. To achieve this we are using
+> firmware agnostic handle which can be unpacked to either DT or ACPI node.
 >
->Take an OMAP3 system. It is UP,  and doesn't have a GIC, so __smp_cross_call will
->be NULL. Yet, it boots with a generic multi-platform kernel, with SMP on.
->
+> No functional changes other than a very minor one:
+> 1. Terminate its_init call with -ENODEV for non-DT case which allows
+> to remove hack from its-gic-v3.c.
+> 2. Fix ITS base register address type (from 'unsigned long' to 'phys_addr_t'),
+> as a bonus we get nice string formatting.
+> 3. Since there is only one of ITS parent domain convert it to static global
+> variable and drop the parameter from its_probe_one. Users can refer to it
+> in more convenient way then.
+[...]
+> -static int __init its_probe(struct device_node *node,
+> -			    struct irq_domain *parent)
+> +static int __init its_probe_one(struct resource *res,
+> +				struct fwnode_handle *handle, int numa_node)
+>  {
+> -	struct resource res;
+>  	struct its_node *its;
+>  	void __iomem *its_base;
+>  	u32 val;
+>  	u64 baser, tmp;
+>  	int err;
+>  
+> -	err = of_address_to_resource(node, 0, &res);
+> -	if (err) {
+> -		pr_warn("%s: no regs?\n", node->full_name);
+> -		return -ENXIO;
+> -	}
+> -
+> -	its_base = ioremap(res.start, resource_size(&res));
+> +	its_base = ioremap(res->start, resource_size(res));
+>  	if (!its_base) {
+> -		pr_warn("%s: unable to map registers\n", node->full_name);
+> +		pr_warn("ITS@%pa: Unable to map ITS registers\n", &res->start);
+>  		return -ENOMEM;
+>  	}
+>  
+>  	val = readl_relaxed(its_base + GITS_PIDR2) & GIC_PIDR2_ARCH_MASK;
+>  	if (val != 0x30 && val != 0x40) {
+> -		pr_warn("%s: no ITS detected, giving up\n", node->full_name);
+> +		pr_warn("ITS@%pa: No ITS detected, giving up\n", &res->start);
+>  		err = -ENODEV;
+>  		goto out_unmap;
+>  	}
+>  
+>  	err = its_force_quiescent(its_base);
+>  	if (err) {
+> -		pr_warn("%s: failed to quiesce, giving up\n",
+> -			node->full_name);
+> +		pr_warn("ITS@%pa: Failed to quiesce, giving up\n", &res->start);
+>  		goto out_unmap;
+>  	}
+>  
+> -	pr_info("ITS: %s\n", node->full_name);
+> +	pr_info("ITS@%pa\n", &res->start);
+                ^^
 
-Are there any UP platforms which have GIC? If there is, we may be in trouble with only
-depends on CONFIG_SMP.
+When I was testing this patch set I found message printed as below:
 
-Peter
+[    0.000000] ITS at 0x00000000c6000000
+[    0.000000] ITS at 0x00000000c6000000: allocated 524288 Devices @27dc400000 (flat, esz 8, psz 16K, shr 1)
+[    0.000000] ITS at 0x00000000c6000000: allocated 2048 Virtual CPUs @27dc820000 (flat, esz 8, psz 4K, shr 1)
+[    0.000000] ITS at 0x00000000c6000000: allocated 512 Interrupt Collections @27dc80f000 (flat, esz 8, psz 4K, shr 1)
+
+Seems this print is redundant, can we remove it?
+
+Thanks
+Hanjun
