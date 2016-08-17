@@ -1,88 +1,69 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Wed, 17 Aug 2016 09:40:46 +0200
-Subject: [PATCH v2] Bluetooth: Add LED triggers for HCI frames tx and rx
-In-Reply-To: <CAFGCpxx7teWAGzw+-uy+nwoHgsS__8S-CdfGuNuycCUuWJRC+Q@mail.gmail.com>
-References: <1469939084-15603-1-git-send-email-guodong.xu@linaro.org>
- <1394C970-3726-4C42-A06D-0B3B3015D980@holtmann.org>
- <CAFGCpxz6j_7aOTX+uShdpyxmt71k61v=Abdw=7MfrRjvdygmTg@mail.gmail.com>
- <30869CE7-FE5E-4CAF-86FC-D140E2C0963D@holtmann.org>
- <CAFGCpxx7teWAGzw+-uy+nwoHgsS__8S-CdfGuNuycCUuWJRC+Q@mail.gmail.com>
-Message-ID: <7B1B501B-73E5-49E8-B147-25D9EEFC789D@holtmann.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 17 Aug 2016 08:41:23 +0100
+Subject: [PATCH] ARM: irq_work: Do not attempt to IPI on non IPI-capable HW
+In-Reply-To: <CAL411-pUUdxN_d76FaXYGtEd7Seewnrin=x2mFEbi1Z48zSRvg@mail.gmail.com>
+References: <1471361210-29914-1-git-send-email-marc.zyngier@arm.com>
+ <CAL411-pUUdxN_d76FaXYGtEd7Seewnrin=x2mFEbi1Z48zSRvg@mail.gmail.com>
+Message-ID: <57B41523.6030202@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guodong,
-
->>>>> Two LED triggers are added into hci_dev: tx_led and rx_led. Upon ACL/SCO
->>>>> packets available in tx or rx, the LEDs will blink.
->>>>> 
->>>>> For each hci registration, two triggers are added into LED subsystem:
->>>>> [hdev->name]-tx and [hdev-name]-rx.
->>>>> Refer to Documentation/leds/leds-class.txt for usage.
->>>>> 
->>>>> Verified on HiKey 96boards, which uses HiSilicon hi6220 SoC and TI
->>>>> WL1835 WiFi/BT combo chip.
->>>> 
->>>> so I have no idea what to do with adding adding hci0-rx and hci0-tx triggers. Combined with hci0-power trigger these are already 3 triggers. And if you have 2 Bluetooth controllers in your system, then you have 6 triggers.
->>>> 
->>> 
->>> True, 6 triggers. But, taking example for other subsytems, eg. cpu
->>> cores. On my board, I have "heartbeat cpu0 cpu1 cpu2 cpu3 cpu4 cpu5
->>> cpu6 cpu7". It doesn't have to mean you need all of them connected to
->>> some LED(s). Actually, in most of the case, I only need heartbeat.
->>> 
->>> 
->>> 
->>>> If we then maybe add another trigger, then this number just goes up and up.
->>>> 
->>>> As far as I can tell you can only assign a single trigger to a LED.
->>>> 
->>> 
->>> That's true. And people got a choice of which feature he wants to visualize.
->> 
->> and as a result we keep adding senseless triggers to the kernel and bloating it up for no reason. Especially since it feels like 99% of the LED triggers are not used at all. This makes no sense to me.
->> 
->>>> So this means to even use these triggers, you need now 3 LEDs per Bluetooth controller. How is that useful for anybody in a real system? Maybe I am missing something here and somehow there is magic to combine triggers, but I have not found it yet. So please someone enlighten me on how this is suppose to be used with real devices.
->>>> 
->>>> Recently I have added a simple bluetooth-power trigger that combines all Bluetooth controllers into a single trigger. If any of them is enabled, then you can control your LED. Which makes a lot more sense to me since you most likely have a single Bluetooth LED on your system. And you want it to show the correct state no matter what Bluetooth controller is in use. However I can see the case that someone might want to assign one specific Bluetooth controller to a LED status.
->>>> 
->>>> So instead of adding many independent triggers to each controller, why not create one global bluetooth trigger and one individual bluetooth-hci0 trigger for each controller. And the combine power, tx, rx and whatever else we need to trigger the LED for?
->>>> 
->>> 
->>> When I starting this work, I referred to WiFi system. See
->>> CONFIG_MAC80211_LEDS. WiFi system implements these types of triggers "
->>> phy0rx phy0tx phy0assoc phy0radio" for each 'controller'.
->> 
->> And I actually wonder who ever used these triggers. You need 4 LEDs to visualize the WiFi status. Which systems has 4 LEDs to spare to visualize this.
->> 
->>> Besides, there are also RFKILL which stands for WiFi/BT power status.
->>> RFKILL adds triggers for each module too. Eg. in the below example, I
->>> have one WiFi (phy0), one BT (hci0). Trigger rfkill1 equals to
->>> hci0-power.
->>> 
->>> Ref: here are all LED triggers I found in my 96boards/HiKey:
->>> 
->>> # cat trigger
->>> none kbd-scrollock kbd-numlock kbd-capslock kbd-kanalock kbd-shiftlock
->>> kbd-altgrlock kbd-ctrllock kbd-altlock kbd-shiftllock kbd-shiftrlock
->>> kbd-ctrlllock kbd-ctrlrlock mmc0 mmc1 heartbeat cpu0 cpu1 cpu2 cpu3
->>> cpu4 cpu5 cpu6 cpu7 mmc2 rfkill0 phy0rx phy0tx phy0assoc phy0radio
->>> hci0-power hci0-tx [hci0-rx] rfkill1
->> 
->> And how many LEDs do you have in the your system? I think you are making my point here.
->> 
->> So I think what we need to do is to not add to this madness and instead create one "bluetooth" LED trigger that combines power and TX/RX for all controllers. And then allow for individual "bluetooth-hci0" LED triggers so that you can bind a single Bluetooth controller to a single LED.
->> 
->> For me, if I can not combine hci0-power, hci0-tx and hci0-rx into a single LED,
+On 17/08/16 04:15, Peter Chen wrote:
+> On Tue, Aug 16, 2016 at 11:26 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> Not all of the ARM HW is IPI capable (i.e. most of the non-SMP
+>> systems). Unfortunately, some systems do advertise being SMP
+>> capable, even if they have a single core and do not define
+>> a cross call method.
 > 
-> By combining them into a single LED, do you mean such a use case?
-> - when hci0 is powered on, this LED starts on.
-> - then, when there is tx/rx traffic, this LED should blink (reversely
-> of course).
-> - when hci0 is powered off, this LED turns off.
+> Could you example it? I find all current set_smp_cross_call is defined
+> under CONFIG_SMP.
 
-yes, that is what I am thinking of.
+This doesn't mean that the system will be SMP at runtime (SMP_ON_UP).
 
-Regards
+> Or you will change gic code to define set_smp_cross_call at runtime?
 
-Marcel
+No. Also, the GIC is not a universally adopted interrupt controller, as
+plenty of system don't have one.
+
+> 
+>> In this case, irq_work_queue dies
+>> as arch_irq_work_has_interrupt() fails to detect this
+>> particular case.
+>>
+>> Let's redefine arch_irq_work_has_interrupt() to actually check
+>> if we're IPI capable instead of simply being SMP. This sidesteps
+>> the issue entierely.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/include/asm/irq_work.h | 6 +++++-
+>>  arch/arm/include/asm/smp_plat.h | 2 ++
+>>  arch/arm/kernel/smp.c           | 2 +-
+>>  3 files changed, 8 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/irq_work.h b/arch/arm/include/asm/irq_work.h
+>> index 712d03e..3ba3583 100644
+>> --- a/arch/arm/include/asm/irq_work.h
+>> +++ b/arch/arm/include/asm/irq_work.h
+>> @@ -5,7 +5,11 @@
+>>
+>>  static inline bool arch_irq_work_has_interrupt(void)
+>>  {
+>> -       return is_smp();
+>> +#ifdef CONFIG_SMP
+> 
+> Why not using is_smp as condition, it is more strict.
+> 
+> if (is_smp())
+>     return !!__smp_cross_call;
+> else
+>     return false;
+
+What's the gain? We're trying to check whether we can actually deliver
+an IPI. Why should we gate it by finding out whether we're smp_on_up or not?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
