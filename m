@@ -1,68 +1,67 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 17 Aug 2016 12:21:41 +0200
-Subject: [PATCH] KVM: arm/arm64: timer: Workaround misconfigured timer
- interrupt
-In-Reply-To: <1471356182-26034-2-git-send-email-marc.zyngier@arm.com>
-References: <1471356182-26034-1-git-send-email-marc.zyngier@arm.com>
- <1471356182-26034-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160817102141.GD8808@cbox>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 17 Aug 2016 11:25:06 +0100
+Subject: [PATCH] ARM: dts: exynos: Use stdout non-deprecated property and
+ add serial options to Odroid XU/XU3/XU4
+In-Reply-To: <1471419298-10414-1-git-send-email-k.kozlowski@samsung.com>
+References: <1471419298-10414-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20160817102506.GD30900@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 03:03:02PM +0100, Marc Zyngier wrote:
-> Similarily to f005bd7e3b84 ("clocksource/arm_arch_timer: Force
-> per-CPU interrupt to be level-triggered"), make sure we can
-> survive an interrupt that has been misconfigured as edge-triggered
-> by forcing it to be level-triggered (active low is assumed, but
-> the GIC doesn't really care whether this is high or low).
+On Wed, Aug 17, 2016 at 09:34:58AM +0200, Krzysztof Kozlowski wrote:
+> The "linux,stdout-path" is deprecated.
 > 
-> Hopefully, the amount of shouting in the kernel log will convince
-> the user to do something about their firmware.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  virt/kvm/arm/arch_timer.c | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index 4fde8c7..77e6ccf 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -33,6 +33,7 @@
->  static struct timecounter *timecounter;
->  static struct workqueue_struct *wqueue;
->  static unsigned int host_vtimer_irq;
-> +static u32 host_vtimer_irq_flags;
->  
->  void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
->  {
-> @@ -365,7 +366,7 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
->  
->  static void kvm_timer_init_interrupt(void *info)
->  {
-> -	enable_percpu_irq(host_vtimer_irq, 0);
-> +	enable_percpu_irq(host_vtimer_irq, host_vtimer_irq_flags);
->  }
->  
->  int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
-> @@ -432,6 +433,14 @@ int kvm_timer_hyp_init(void)
->  	}
->  	host_vtimer_irq = info->virtual_irq;
->  
-> +	host_vtimer_irq_flags = irq_get_trigger_type(host_vtimer_irq);
-> +	if (host_vtimer_irq_flags != IRQF_TRIGGER_HIGH &&
-> +	    host_vtimer_irq_flags != IRQF_TRIGGER_LOW) {
-> +		kvm_err("Invalid trigger for IRQ%d, assuming level low\n",
-> +			host_vtimer_irq);
-> +		host_vtimer_irq_flags = IRQF_TRIGGER_LOW;
-> +	}
-> +
->  	err = request_percpu_irq(host_vtimer_irq, kvm_arch_timer_handler,
->  				 "kvm guest timer", kvm_get_running_vcpus());
->  	if (err) {
-> -- 
-> 2.1.4
-> 
+> Add serial options so the console can be properly configured when
+> bootloader does not pass "console" parameter to command line.  Without
+> options and lack of "console", the serial output dies during boot (just
+> after probing sound).
 
-Looks good to me.  Applied.
--Christoffer
+I'm confused. Is this just a cleanup (given "linux,stdout-path" is
+deprecated but still supported), or a bug fix?
+
+I guess that prior to this patch Linux might change the rate of the
+console, but otherwise it should work.
+
+Mark.
+
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5410-odroidxu.dts          | 2 +-
+>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5410-odroidxu.dts b/arch/arm/boot/dts/exynos5410-odroidxu.dts
+> index f6d135245a4b..a5ae76c1838f 100644
+> --- a/arch/arm/boot/dts/exynos5410-odroidxu.dts
+> +++ b/arch/arm/boot/dts/exynos5410-odroidxu.dts
+> @@ -26,7 +26,7 @@
+>  	};
+>  
+>  	chosen {
+> -		linux,stdout-path = &serial_2;
+> +		stdout-path = "serial2:115200n8";
+>  	};
+>  
+>  	emmc_pwrseq: pwrseq {
+> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> index d56253049ccb..d04490d40b07 100644
+> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> @@ -26,7 +26,7 @@
+>  	};
+>  
+>  	chosen {
+> -		linux,stdout-path = &serial_2;
+> +		stdout-path = "serial2:115200n8";
+>  	};
+>  
+>  	firmware at 02073000 {
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
