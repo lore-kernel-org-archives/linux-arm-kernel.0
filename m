@@ -1,62 +1,47 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 17 Aug 2016 13:31:41 +0200
-Subject: [PATCH v5 1/7] power: act8945a_charger: Remove
- "battery_temperature"
-In-Reply-To: <1471337998-6467-2-git-send-email-wenyou.yang@atmel.com>
-References: <1471337998-6467-1-git-send-email-wenyou.yang@atmel.com>
- <1471337998-6467-2-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20160817113141.cshwjvpuwcj2hk5k@earth>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 17 Aug 2016 13:31:49 +0200
+Subject: [PATCH/RTF 0/7] Add SDHI to r8a7796/salvator-x
+Message-ID: <1471433516-4478-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Aug 16, 2016 at 04:59:52PM +0800, Wenyou Yang wrote:
-> [...]
->
-> -static int act8945a_get_battery_health(struct act8945a_charger *charger,
-> -				       struct regmap *regmap, int *val)
-> +static int act8945a_get_battery_health(struct regmap *regmap, int *val)
->  {
->  	int ret;
->  	unsigned int status;
-> @@ -148,7 +146,7 @@ static int act8945a_get_battery_health(struct act8945a_charger *charger,
->  	if (ret < 0)
->  		return ret;
->  
-> -	if (charger->battery_temperature && !(status & APCH_STATUS_TEMPDAT))
-> +	if (status & APCH_STATUS_TEMPDAT)
+this patch set updates drivers, documentation and DT to
+enable SDHI0 & 3 on the r8a7796/salvator-x. This includes
+defining nodes for all available SDHI and GPIO devices.
 
-This incorrectly inverts the logic.
+I have boot-tested this which seems successful.
+However, I do not have physical access to an r8a7796/salvator-x board
+and the one that I have remote access to does not appear to have
+any SD cards present. I would be grateful of any testing anyone
+can provide.
 
->  		*val = POWER_SUPPLY_HEALTH_OVERHEAT;
->  	else if (!(status & APCH_STATUS_INDAT))
->  		*val = POWER_SUPPLY_HEALTH_OVERVOLTAGE;
-> @@ -188,8 +186,7 @@ static int act8945a_charger_get_property(struct power_supply *psy,
->  		val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
->  		break;
->  	case POWER_SUPPLY_PROP_HEALTH:
-> -		ret = act8945a_get_battery_health(charger,
-> -						  regmap, &val->intval);
-> +		ret = act8945a_get_battery_health(regmap, &val->intval);
->  		break;
->  	case POWER_SUPPLY_PROP_MODEL_NAME:
->  		val->strval = act8945a_charger_model;
-> @@ -235,9 +232,6 @@ static int act8945a_charger_config(struct device *dev,
->  		return -EINVAL;
->  	}
->  
-> -	charger->battery_temperature = of_property_read_bool(np,
-> -				"active-semi,check-battery-temperature");
-> -
->  	chglev_pin = of_get_named_gpio_flags(np,
->  				"active-semi,chglev-gpios", 0, &flags);
+Based on renesas-drivers-2016-08-09-v4.8-rc1
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160817/948749d5/attachment.sig>
+Provided for testing as the topic/r8a7796-sdhi branch in
+my renesas tree on kernel.org.
+
+Ai Kyuse (2):
+  clk: renesas: r8a7796: Add SDIF clocks
+  mmc: sh_mobile_sdhi: Add r8a7796 support
+
+Simon Horman (2):
+  arm64: dts: r8a7796: add SDHI nodes
+  arm64: dts: r8a7796: salvator-x: enable SDHI0 & 3
+
+Takeshi Kihara (3):
+  clk: renesas: r8a7796: Add GPIO clocks
+  pinctrl: sh-pfc: r8a7796: Add SDHI pins, groups and functions
+  arm64: dts: r8a7796: Add GPIO device nodes
+
+ Documentation/devicetree/bindings/mmc/tmio_mmc.txt |   1 +
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts |  84 +++++++
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 154 ++++++++++++
+ drivers/clk/renesas/r8a7796-cpg-mssr.c             |  17 ++
+ drivers/mmc/host/sh_mobile_sdhi.c                  |   1 +
+ drivers/pinctrl/sh-pfc/pfc-r8a7796.c               | 275 +++++++++++++++++++++
+ 6 files changed, 532 insertions(+)
+
+-- 
+2.7.0.rc3.207.g0ac5344
