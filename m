@@ -1,47 +1,57 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 17 Aug 2016 07:48:40 -0500
-Subject: [PATCH v2 1/2] devicetree: Add vendor prefix for Shenzhen Sunchip
- Technology Co., Ltd
-In-Reply-To: <20160816182855.2hdupen4dcmczxiw@vip.cybercity.dk>
-References: <20160812235312.GB10557@vip.cybercity.dk>
- <bae6ad6c04f7567b224e008ab27b32d2dac1d9c1.1471125083.git.ccc94453@vip.cybercity.dk>
- <20160816125624.GA20716@rob-hp-laptop>
- <20160816182855.2hdupen4dcmczxiw@vip.cybercity.dk>
-Message-ID: <CAL_Jsq+a04Btup8m=HkJ4ccmoCiYLT1B1habm76W21b9cTtmJA@mail.gmail.com>
+From: greg@kroah.com (Greg KH)
+Date: Wed, 17 Aug 2016 14:50:03 +0200
+Subject: [stable:PATCH 1/2] arm64: kernel: Save and restore addr_limit on
+ exception entry
+In-Reply-To: <57B1F1B7.2090003@arm.com>
+References: <1471025480-10394-1-git-send-email-james.morse@arm.com>
+ <20160814155432.GA27321@kroah.com> <57B1F1B7.2090003@arm.com>
+Message-ID: <20160817125003.GA8428@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 1:28 PM, Rask Ingemann Lambertsen
-<ccc94453@vip.cybercity.dk> wrote:
-> On Tue, Aug 16, 2016 at 07:56:24AM -0500, Rob Herring wrote:
->> On Thu, Aug 11, 2016 at 10:11:51PM +0200, Rask Ingemann Lambertsen wrote:
->> >
->> > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> > index 1992aa9..fbad2cea 100644
->> > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
->> > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> > @@ -256,6 +256,7 @@ ste     ST-Ericsson
->> >  stericsson ST-Ericsson
->> >  syna       Synaptics Inc.
->> >  synology   Synology, Inc.
->> > +sunchip    Shenzhen Sunchip Technology Co., Ltd
->> >  SUNW       Sun Microsystems, Inc
->>
->> These are not in alphabetical order. Maybe someone thought uppercase
->> should be separate, but I don't. So please fix the ordering here moving
->> SUNW before syna.
->
-> I'm new to this, so I could use a bit of guidance here. Is it OK if I
-> send a follow-up patch to fix the ordering or should I send a patch to
-> fix the ordering first, before the sunchip prefix is added?
+On Mon, Aug 15, 2016 at 05:45:43PM +0100, James Morse wrote:
+> Hi Greg,
+> 
+> On 14/08/16 16:54, Greg KH wrote:
+> > On Fri, Aug 12, 2016 at 07:11:19PM +0100, James Morse wrote:
+> >> commit e19a6ee2460bdd0d0055a6029383422773f9999a upstream.
+> >>
+> >> If we take an exception while at EL1, the exception handler inherits
+> >> the original context's addr_limit value. To be consistent always reset
+> >> addr_limit and PSTATE.UAO on (re-)entry to EL1. This prevents accidental
+> >> re-use of the original context's addr_limit.
+> >>
+> >> Based on a similar patch for arm from Russell King.
+> >>
+> >> Acked-by: Will Deacon <will.deacon@arm.com>
+> >> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> >> Signed-off-by: James Morse <james.morse@arm.com>
+> >> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> >> [ backport to stop perf misusing inherited addr_limit.
+> >>   Removed code interacting with UAO and the irqstack ]
+> >> Link: https://bugs.chromium.org/p/project-zero/issues/detail?id=822
+> >> Signed-off-by: James Morse <james.morse@arm.com>
+> >> Cc: <stable@vger.kernel.org> #4.1
+> > 
+> > Fails to apply to 4.4-stable, can you provide a backport for both of
+> > these to that tree if you want them there?
+> 
+> Sorry - that is what I was trying to do!
+> 
+> v4.4:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/448685.html
+> 
+> v4.1 (this one):
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/448684.html
+> 
+> 
+> Did I mess something up in the cc/sign-off area?
 
-For this, just doing it all in one patch is fine. If you want to do 2
-patches, then fix SUNW first then add sunchip.
+Ah, that was confusing.  You sent 2 patches, as a series, and didn't
+make it obvious what they were to be applied to.
 
-> I never considered the possibility that the list wouldn't be in
-> alphabetical order to begin with, so the brain power went into deciding
-> if uppercase should be sorted separately.
+Please make it so I can't miss it, otherwise I will :)
 
-Even if uppercase is sorted after lowercase, you've got it in the wrong place.
+now queued up.
 
-Rob
+greg k-h
