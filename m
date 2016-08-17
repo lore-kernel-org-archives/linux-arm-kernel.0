@@ -1,16 +1,14 @@
 From: songjun.wu@microchip.com (Songjun Wu)
-Date: Wed, 17 Aug 2016 14:05:28 +0800
-Subject: [PATCH v10 2/3] [media] atmel-isc: DT binding for Image Sensor
- Controller driver
+Date: Wed, 17 Aug 2016 14:05:29 +0800
+Subject: [PATCH v10 3/3] MAINTAINERS: atmel-isc: add entry for Atmel ISC
 In-Reply-To: <1471413929-26008-1-git-send-email-songjun.wu@microchip.com>
 References: <1471413929-26008-1-git-send-email-songjun.wu@microchip.com>
-Message-ID: <1471413929-26008-3-git-send-email-songjun.wu@microchip.com>
+Message-ID: <1471413929-26008-4-git-send-email-songjun.wu@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT binding documentation for ISC driver.
+Add the MAINTAINERS' entry for Microchip / Atmel Image Sensor Controller.
 
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
 ---
 
@@ -18,101 +16,33 @@ Changes in v10: None
 Changes in v9: None
 Changes in v8: None
 Changes in v7: None
-Changes in v6:
-- Add "iscck" and "gck" to clock-names.
+Changes in v6: None
+Changes in v5: None
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
 
-Changes in v5:
-- Add clock-output-names.
+ MAINTAINERS | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Changes in v4:
-- Remove the isc clock nodes.
-
-Changes in v3:
-- Remove the 'atmel,sensor-preferred'.
-- Modify the isc clock node according to the Rob's remarks.
-
-Changes in v2:
-- Remove the unit address of the endpoint.
-- Add the unit address to the clock node.
-- Avoid using underscores in node names.
-- Drop the "0x" in the unit address of the i2c node.
-- Modify the description of 'atmel,sensor-preferred'.
-- Add the description for the ISC internal clock.
-
- .../devicetree/bindings/media/atmel-isc.txt        | 65 ++++++++++++++++++++++
- 1 file changed, 65 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/atmel-isc.txt
-
-diff --git a/Documentation/devicetree/bindings/media/atmel-isc.txt b/Documentation/devicetree/bindings/media/atmel-isc.txt
-new file mode 100644
-index 0000000..bbe0e87c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/atmel-isc.txt
-@@ -0,0 +1,65 @@
-+Atmel Image Sensor Controller (ISC)
-+----------------------------------------------
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 20bb1d0..21a6f6f 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7733,6 +7733,14 @@ T:	git git://git.monstr.eu/linux-2.6-microblaze.git
+ S:	Supported
+ F:	arch/microblaze/
+ 
++MICROCHIP / ATMEL ISC DRIVER
++M:	Songjun Wu <songjun.wu@microchip.com>
++L:	linux-media at vger.kernel.org
++S:	Supported
++F:	drivers/media/platform/atmel/atmel-isc.c
++F:	drivers/media/platform/atmel/atmel-isc-regs.h
++F:	devicetree/bindings/media/atmel-isc.txt
 +
-+Required properties for ISC:
-+- compatible
-+	Must be "atmel,sama5d2-isc".
-+- reg
-+	Physical base address and length of the registers set for the device.
-+- interrupts
-+	Should contain IRQ line for the ISC.
-+- clocks
-+	List of clock specifiers, corresponding to entries in
-+	the clock-names property;
-+	Please refer to clock-bindings.txt.
-+- clock-names
-+	Required elements: "hclock", "iscck", "gck".
-+- #clock-cells
-+	Should be 0.
-+- clock-output-names
-+	Should be "isc-mck".
-+- pinctrl-names, pinctrl-0
-+	Please refer to pinctrl-bindings.txt.
-+
-+ISC supports a single port node with parallel bus. It should contain one
-+'port' child node with child 'endpoint' node. Please refer to the bindings
-+defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
-+
-+Example:
-+isc: isc at f0008000 {
-+	compatible = "atmel,sama5d2-isc";
-+	reg = <0xf0008000 0x4000>;
-+	interrupts = <46 IRQ_TYPE_LEVEL_HIGH 5>;
-+	clocks = <&isc_clk>, <&iscck>, <&isc_gclk>;
-+	clock-names = "hclock", "iscck", "gck";
-+	#clock-cells = <0>;
-+	clock-output-names = "isc-mck";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_isc_base &pinctrl_isc_data_8bit &pinctrl_isc_data_9_10 &pinctrl_isc_data_11_12>;
-+
-+	port {
-+		isc_0: endpoint {
-+			remote-endpoint = <&ov7740_0>;
-+			hsync-active = <1>;
-+			vsync-active = <0>;
-+			pclk-sample = <1>;
-+		};
-+	};
-+};
-+
-+i2c1: i2c at fc028000 {
-+	ov7740: camera at 21 {
-+		compatible = "ovti,ov7740";
-+		reg = <0x21>;
-+		clocks = <&isc>;
-+		clock-names = "xvclk";
-+		assigned-clocks = <&isc>;
-+		assigned-clock-rates = <24000000>;
-+
-+		port {
-+			ov7740_0: endpoint {
-+				remote-endpoint = <&isc_0>;
-+			};
-+		};
-+	};
-+};
+ MICROSOFT SURFACE PRO 3 BUTTON DRIVER
+ M:	Chen Yu <yu.c.chen@intel.com>
+ L:	platform-driver-x86 at vger.kernel.org
 -- 
 2.7.4
