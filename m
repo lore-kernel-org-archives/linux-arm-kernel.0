@@ -1,98 +1,115 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 17 Aug 2016 07:46:37 +0200
-Subject: [PATCH v2 2/2] KVM: arm/arm64: Rename vgic_attr_regs_access to
- vgic_attr_regs_access_v2
-In-Reply-To: <20160816173501.21521-3-christoffer.dall@linaro.org>
-References: <20160816173501.21521-1-christoffer.dall@linaro.org>
- <20160816173501.21521-3-christoffer.dall@linaro.org>
-Message-ID: <ca5b4328-5d9e-d3b7-a922-0d3409a7f3e7@redhat.com>
+From: kid.jin@hisilicon.com (Jinguojun)
+Date: Wed, 17 Aug 2016 14:11:26 +0800
+Subject: [PATCH V4]mmc: dw_mmc-k3: UHS-SD card for Hisilicon Hikey
+In-Reply-To: <1b724dde-863d-fa28-fa58-595c34c1bef2@samsung.com>
+References: <1470276973-41683-1-git-send-email-kid.jin@hisilicon.com>
+ <74c80b1c-5570-0ee0-4132-ff703d8d5eb4@hisilicon.com>
+ <CGME20160808091030epcas1p4e868c5412d08f0ed737e85714442e801@epcas1p4.samsung.com>
+ <06f63a26-251d-5ba8-f877-dae75aa8e362@rock-chips.com>
+ <1b724dde-863d-fa28-fa58-595c34c1bef2@samsung.com>
+Message-ID: <5d5551f4-e49c-d005-eb0b-9ca472a8d249@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi
 
-On 16/08/2016 19:35, Christoffer Dall wrote:
-> Just a rename so we can implement a v3-specific function later.
+On 2016/8/8 18:46, Jaehoon Chung wrote:
+> Hi,
 > 
-> We take the chance to get rid of the V2/V3 ops comments as well.
+> On 08/08/2016 06:10 PM, Shawn Lin wrote:
+>> Hi guy,
+>>
+>> On 2016/8/8 15:10, Jinguojun wrote:
+>>> Hi,maintainers
+>>>
+>>> Pls help to review code,this is the newest patch after your advise
 > 
-> No functional change.
+> Subject..
 > 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/vgic/vgic-kvm-device.c | 26 +++++++++++---------------
->  1 file changed, 11 insertions(+), 15 deletions(-)
+> s/UHS-SD/UHS-I/
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> index 19fa331..163b057 100644
-> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> @@ -294,17 +294,17 @@ static bool lock_all_vcpus(struct kvm *kvm)
->  	return true;
->  }
->  
-> -/** vgic_attr_regs_access: allows user space to read/write VGIC registers
-> - *
-> - * @dev: kvm device handle
-> - * @attr: kvm device attribute
-> - * @reg: address the value is read or written
-> - * @is_write: write flag
-> +/**
-> + * vgic_attr_regs_access_v2 - allows user space to access VGIC v2 state
->   *
-> + * @dev:      kvm device handle
-> + * @attr:     kvm device attribute
-> + * @reg:      address the value is read or written
-> + * @is_write: true if userspace is writing a register
->   */
-> -static int vgic_attr_regs_access(struct kvm_device *dev,
-> -				 struct kvm_device_attr *attr,
-> -				 u32 *reg, bool is_write)
-> +static int vgic_attr_regs_access_v2(struct kvm_device *dev,
-> +				    struct kvm_device_attr *attr,
-> +				    u32 *reg, bool is_write)
->  {
->  	struct vgic_reg_attr reg_attr;
->  	gpa_t addr;
-> @@ -347,8 +347,6 @@ out:
->  	return ret;
->  }
->  
-> -/* V2 ops */
-> -
->  static int vgic_v2_set_attr(struct kvm_device *dev,
->  			    struct kvm_device_attr *attr)
->  {
-> @@ -367,7 +365,7 @@ static int vgic_v2_set_attr(struct kvm_device *dev,
->  		if (get_user(reg, uaddr))
->  			return -EFAULT;
->  
-> -		return vgic_attr_regs_access(dev, attr, &reg, true);
-> +		return vgic_attr_regs_access_v2(dev, attr, &reg, true);
->  	}
->  	}
->  
-> @@ -389,7 +387,7 @@ static int vgic_v2_get_attr(struct kvm_device *dev,
->  		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
->  		u32 reg = 0;
->  
-> -		ret = vgic_attr_regs_access(dev, attr, &reg, false);
-> +		ret = vgic_attr_regs_access_v2(dev, attr, &reg, false);
->  		if (ret)
->  			return ret;
->  		return put_user(reg, uaddr);
-> @@ -433,8 +431,6 @@ struct kvm_device_ops kvm_arm_vgic_v2_ops = {
->  	.has_attr = vgic_v2_has_attr,
->  };
->  
-> -/* V3 ops */
-> -
->  #ifdef CONFIG_KVM_ARM_VGIC_V3
->  
->  static int vgic_v3_set_attr(struct kvm_device *dev,
+>>>
+>>
+>> Please give Jaehoon more time to review your patch before sending a
+>> ping or resending one(~2 weeks), as it's only four days(weekend
+>> included) since v4 was done....IMHO, it's quite bold...
+>>
+>>> Thx
+I apologize for my rudeness.
+>>> On 2016/8/4 10:16, Jin Guojun wrote:
+>>>> mmc: dw_mmc-k3: Hisilicon Hikey have no tuning function in
+>>>> dw_mmc-k3.c,so we must do the tuning function stub when we init UHS card.
+>>>>
+>>
+>> Hrmmm....  remove "mmc: dw_mmc-k3:" from the meat of commit msg?
+>>
+>> And you do nothing for dw_mci_hi6220_execute_tuning, why?
+>> Could you elaborate more..
+>>
+>>
+OK I'll remove the mmc: dw_mmc-k3:,Then Hikey can't support SDR104,so we only support SDR12 SDR25 SD50,and we do not need to do tuning for these modes.
+>>>> V1:add .prepare_command in dw_mmc.c
+>>>> V2:delete .prepare_command, add err = 0 in dw_mci_execute_tuning
+>>>> V3:delete err = 0 in dw_mci_execute_tuning,add .execute_tuning in
+>>>> dw_mmc-k3.c
+>>>> V4:add "linux-mmc at vger.kernel.org", patch version, Changelog, etc..
+>>
+>> The changelog is totally wrong, namely it should not be listed in the
+>> commit msg...
+>>
+OK I'll delete this part
+>>>>
+>>>> Signed-off-by: Jin Guojun <kid.jin@hisilicon.com>
+>>>> ---
+>>>>  drivers/mmc/host/dw_mmc-k3.c | 6 ++++++
+>>>>  1 file changed, 6 insertions(+)
+>>>>
+>>>> diff --git a/drivers/mmc/host/dw_mmc-k3.c b/drivers/mmc/host/dw_mmc-k3.c
+>>>> index 8e9d886..6247894 100644
+>>>> --- a/drivers/mmc/host/dw_mmc-k3.c
+>>>> +++ b/drivers/mmc/host/dw_mmc-k3.c
+>>>> @@ -131,11 +131,17 @@ static void dw_mci_hi6220_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+>>>>      host->bus_hz = clk_get_rate(host->biu_clk);
+>>>>  }
+>>>>
+>>>> +static int dw_mci_hi6220_execute_tuning(struct dw_mci_slot *slot, u32 opcode)
+>>>> +{
+>>>> +    return 0;
+>>>> +}
 > 
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-
-Thanks
-
-Eric
+> 
+> All of UHS-I cards didn't need to do tuning sequence on your SoC? it's strange.
+> 
+> I think we can fix more exactly in dw_mmc.c
+> As i know, some UHS cards don't need to send the tuning sequence.
+> (If i know wrong, let me know plz.)
+> 
+> But just skipping execute_tuning..I think it's not correct.
+> 
+> Best Regards,
+> Jaehoon Chung
+> 
+We cant support SDR104 currently.We only turn on SDR12 SDR25 SDR50.
+>>>> +
+>>>>  static const struct dw_mci_drv_data hi6220_data = {
+>>>>      .caps            = dw_mci_hi6220_caps,
+>>>>      .switch_voltage        = dw_mci_hi6220_switch_voltage,
+>>>>      .set_ios        = dw_mci_hi6220_set_ios,
+>>>>      .parse_dt        = dw_mci_hi6220_parse_dt,
+>>>> +    .execute_tuning        = dw_mci_hi6220_execute_tuning,
+>>>>  };
+>>>>
+>>>>  static const struct of_device_id dw_mci_k3_match[] = {
+>>>>
+>>>
+>>> -- 
+>>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>
+>>
+>>
+> 
+> 
+> .
+> 
