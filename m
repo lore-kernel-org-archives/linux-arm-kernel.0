@@ -1,115 +1,209 @@
-From: kid.jin@hisilicon.com (Jinguojun)
-Date: Wed, 17 Aug 2016 14:11:26 +0800
-Subject: [PATCH V4]mmc: dw_mmc-k3: UHS-SD card for Hisilicon Hikey
-In-Reply-To: <1b724dde-863d-fa28-fa58-595c34c1bef2@samsung.com>
-References: <1470276973-41683-1-git-send-email-kid.jin@hisilicon.com>
- <74c80b1c-5570-0ee0-4132-ff703d8d5eb4@hisilicon.com>
- <CGME20160808091030epcas1p4e868c5412d08f0ed737e85714442e801@epcas1p4.samsung.com>
- <06f63a26-251d-5ba8-f877-dae75aa8e362@rock-chips.com>
- <1b724dde-863d-fa28-fa58-595c34c1bef2@samsung.com>
-Message-ID: <5d5551f4-e49c-d005-eb0b-9ca472a8d249@hisilicon.com>
+From: songjun.wu@microchip.com (Songjun Wu)
+Date: Wed, 17 Aug 2016 14:05:26 +0800
+Subject: [PATCH v10 0/3] [media] atmel-isc: add driver for Atmel ISC
+Message-ID: <1471413929-26008-1-git-send-email-songjun.wu@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+The Image Sensor Controller driver includes three parts.
+1) Driver code to implement the ISC function.
+2) Device tree binding documentation, it describes how
+   to add the ISC in device tree.
+3) Add an entry to MAINTAINERS for Atmel ISC
 
-On 2016/8/8 18:46, Jaehoon Chung wrote:
-> Hi,
-> 
-> On 08/08/2016 06:10 PM, Shawn Lin wrote:
->> Hi guy,
->>
->> On 2016/8/8 15:10, Jinguojun wrote:
->>> Hi,maintainers
->>>
->>> Pls help to review code,this is the newest patch after your advise
-> 
-> Subject..
-> 
-> s/UHS-SD/UHS-I/
-> 
->>>
->>
->> Please give Jaehoon more time to review your patch before sending a
->> ping or resending one(~2 weeks), as it's only four days(weekend
->> included) since v4 was done....IMHO, it's quite bold...
->>
->>> Thx
-I apologize for my rudeness.
->>> On 2016/8/4 10:16, Jin Guojun wrote:
->>>> mmc: dw_mmc-k3: Hisilicon Hikey have no tuning function in
->>>> dw_mmc-k3.c,so we must do the tuning function stub when we init UHS card.
->>>>
->>
->> Hrmmm....  remove "mmc: dw_mmc-k3:" from the meat of commit msg?
->>
->> And you do nothing for dw_mci_hi6220_execute_tuning, why?
->> Could you elaborate more..
->>
->>
-OK I'll remove the mmc: dw_mmc-k3:,Then Hikey can't support SDR104,so we only support SDR12 SDR25 SD50,and we do not need to do tuning for these modes.
->>>> V1:add .prepare_command in dw_mmc.c
->>>> V2:delete .prepare_command, add err = 0 in dw_mci_execute_tuning
->>>> V3:delete err = 0 in dw_mci_execute_tuning,add .execute_tuning in
->>>> dw_mmc-k3.c
->>>> V4:add "linux-mmc at vger.kernel.org", patch version, Changelog, etc..
->>
->> The changelog is totally wrong, namely it should not be listed in the
->> commit msg...
->>
-OK I'll delete this part
->>>>
->>>> Signed-off-by: Jin Guojun <kid.jin@hisilicon.com>
->>>> ---
->>>>  drivers/mmc/host/dw_mmc-k3.c | 6 ++++++
->>>>  1 file changed, 6 insertions(+)
->>>>
->>>> diff --git a/drivers/mmc/host/dw_mmc-k3.c b/drivers/mmc/host/dw_mmc-k3.c
->>>> index 8e9d886..6247894 100644
->>>> --- a/drivers/mmc/host/dw_mmc-k3.c
->>>> +++ b/drivers/mmc/host/dw_mmc-k3.c
->>>> @@ -131,11 +131,17 @@ static void dw_mci_hi6220_set_ios(struct dw_mci *host, struct mmc_ios *ios)
->>>>      host->bus_hz = clk_get_rate(host->biu_clk);
->>>>  }
->>>>
->>>> +static int dw_mci_hi6220_execute_tuning(struct dw_mci_slot *slot, u32 opcode)
->>>> +{
->>>> +    return 0;
->>>> +}
-> 
-> 
-> All of UHS-I cards didn't need to do tuning sequence on your SoC? it's strange.
-> 
-> I think we can fix more exactly in dw_mmc.c
-> As i know, some UHS cards don't need to send the tuning sequence.
-> (If i know wrong, let me know plz.)
-> 
-> But just skipping execute_tuning..I think it's not correct.
-> 
-> Best Regards,
-> Jaehoon Chung
-> 
-We cant support SDR104 currently.We only turn on SDR12 SDR25 SDR50.
->>>> +
->>>>  static const struct dw_mci_drv_data hi6220_data = {
->>>>      .caps            = dw_mci_hi6220_caps,
->>>>      .switch_voltage        = dw_mci_hi6220_switch_voltage,
->>>>      .set_ios        = dw_mci_hi6220_set_ios,
->>>>      .parse_dt        = dw_mci_hi6220_parse_dt,
->>>> +    .execute_tuning        = dw_mci_hi6220_execute_tuning,
->>>>  };
->>>>
->>>>  static const struct of_device_id dw_mci_k3_match[] = {
->>>>
->>>
->>> -- 
->>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>
->>
->>
-> 
-> 
-> .
-> 
+Test result with v4l-utils.
+# v4l2-compliance -f
+v4l2-compliance SHA   : not available
+
+Driver Infoatmel_isc f0008000.isc: Format 0xffffffff not found
+atmel_isc f0008000.isc: Format 0xffffffff not found
+
+        Driver name   : atmel_isc
+        Card type     : Atmel Image Sensor Controller
+        Bus info      : platform:atmel_isc f0008000.isc
+        Driver version: 4.7.0
+        Capabilities  : 0x84200001
+                Video Capture
+                Streaming
+                Extended Pix Format
+                Device Capabilities
+        Device Caps   : 0x04200001
+                Video Capture
+                Streaming
+                Extended Pix Format
+
+Compliance test for device /dev/video0 (not using libv4l2):
+
+Required ioctls:
+        test VIDIOC_QUERYCAP: OK
+
+Allow for multiple opens:
+        test second video open: OK
+        test VIDIOC_QUERYCAP: OK
+        test VIDIOC_G/S_PRIORITY: OK
+        test for unlimited opens: OK
+
+Debug ioctls:
+        test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
+        test VIDIOC_LOG_STATUS: OK (Not Supported)
+
+Input ioctls:
+        test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
+        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+        test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
+        test VIDIOC_ENUMAUDIO: OK (Not Supported)
+        test VIDIOC_G/S/ENUMINPUT: OK
+        test VIDIOC_G/S_AUDIO: OK (Not Supported)
+        Inputs: 1 Audio Inputs: 0 Tuners: 0
+
+Output ioctls:
+        test VIDIOC_G/S_MODULATOR: OK (Not Supported)
+        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+        test VIDIOC_ENUMAUDOUT: OK (Not Supported)
+        test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
+        test VIDIOC_G/S_AUDOUT: OK (Not Supported)
+        Outputs: 0 Audio Outputs: 0 Modulators: 0
+
+Input/Output configuration ioctls:
+        test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
+        test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
+        test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
+        test VIDIOC_G/S_EDID: OK (Not Supported)
+
+Test input 0:
+
+        Control ioctls:
+                test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK (Not Supported)
+                test VIDIOC_QUERYCTRL: OK (Not Supported)
+                test VIDIOC_G/S_CTRL: OK (Not Supported)
+                test VIDIOC_G/S/TRY_EXT_CTRLS: OK (Not Supported)
+                test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK (Not Supported)
+                test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+                Standard Controls: 0 Private Controls: 0
+
+        Format ioctls:
+                test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+                test VIDIOC_G/S_PARM: OK
+                test VIDIOC_G_FBUF: OK (Not Supported)
+                test VIDIOC_G_FMT: OK
+                test VIDIOC_TRY_FMT: OK
+                test VIDIOC_S_FMT: OK
+                test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
+                test Cropping: OK (Not Supported)
+                test Composing: OK (Not Supported)
+                test Scaling: OK (Not Supported)
+
+        Codec ioctls:
+                test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
+                test VIDIOC_G_ENC_INDEX: OK (Not Supported)
+                test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
+
+        Buffer ioctls:
+                test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
+                test VIDIOC_EXPBUF: OK
+
+Test input 0:
+
+Stream using all formats:
+        test MMAP for Format BA81, Frame Size 640x480 at 60.00 Hz:
+                Stride 640, Field None: OK
+        test MMAP for Format YUYV, Frame Size 640x480 at 60.00 Hz:
+                Stride 1280, Field None: OK
+
+Total: 45, Succeeded: 45, Failed: 0, Warnings: 0
+
+Changes in v10:
+- If 's_power' api does not exist in the sensor driver,
+  the function 'isc_open' will return a value of 0.
+
+Changes in v9:
+- Set the default format in fuction 'isc_async_complete'.
+- Register the video device after everything is configured.
+
+Changes in v8:
+- Power on the sensor on the first open in function
+  'isc_open'.
+- Power off the sensor on the last release in function
+  'isc_release'.
+- Remove the switch of the pipeline.
+
+Changes in v7:
+- Add enum_framesizes and enum_frameintervals.
+- Call s_stream(0) when stream start fail.
+- Fill the device_caps field of struct video_device
+  with V4L2_CAP_STREAMING and V4L2_CAP_VIDEO_CAPTURE.
+- Initialize the dev of struct vb2_queue.
+- Set field to FIELD_NONE if the pix field is not supported.
+- Return the result directly when call g/s_parm of subdev.
+
+Changes in v6:
+- Add "iscck" and "gck" to clock-names.
+
+Changes in v5:
+- Modify the macro definition and the related code.
+- Add clock-output-names.
+
+Changes in v4:
+- Modify the isc clock code since the dt is changed.
+- Remove the isc clock nodes.
+
+Changes in v3:
+- Add pm runtime feature.
+- Modify the isc clock code since the dt is changed.
+- Remove the 'atmel,sensor-preferred'.
+- Modify the isc clock node according to the Rob's remarks.
+
+Changes in v2:
+- Add "depends on COMMON_CLK" and "VIDEO_V4L2_SUBDEV_API"
+  in Kconfig file.
+- Correct typos and coding style according to Laurent's remarks
+- Delete the loop while in 'isc_clk_enable' function.
+- Replace 'hsync_active', 'vsync_active' and 'pclk_sample'
+  with 'pfe_cfg0' in struct isc_subdev_entity.
+- Add the code to support VIDIOC_CREATE_BUFS in
+  'isc_queue_setup' function.
+- Invoke isc_config to configure register in
+  'isc_start_streaming' function.
+- Add the struct completion 'comp' to synchronize with
+  the frame end interrupt in 'isc_stop_streaming' function.
+- Check the return value of the clk_prepare_enable
+  in 'isc_open' function.
+- Set the default format in 'isc_open' function.
+- Add an exit condition in the loop while in 'isc_config'.
+- Delete the hardware setup operation in 'isc_set_format'.
+- Refuse format modification during streaming
+  in 'isc_s_fmt_vid_cap' function.
+- Invoke v4l2_subdev_alloc_pad_config to allocate and
+  initialize the pad config in 'isc_async_complete' function.
+- Remove the '.owner  = THIS_MODULE,' in atmel_isc_driver.
+- Replace the module_platform_driver_probe() with
+  module_platform_driver().
+- Remove the unit address of the endpoint.
+- Add the unit address to the clock node.
+- Avoid using underscores in node names.
+- Drop the "0x" in the unit address of the i2c node.
+- Modify the description of 'atmel,sensor-preferred'.
+- Add the description for the ISC internal clock.
+
+Songjun Wu (3):
+  [media] atmel-isc: add the Image Sensor Controller code
+  [media] atmel-isc: DT binding for Image Sensor Controller driver
+  MAINTAINERS: atmel-isc: add entry for Atmel ISC
+
+ .../devicetree/bindings/media/atmel-isc.txt        |   65 +
+ MAINTAINERS                                        |    8 +
+ drivers/media/platform/Kconfig                     |    1 +
+ drivers/media/platform/Makefile                    |    2 +
+ drivers/media/platform/atmel/Kconfig               |    9 +
+ drivers/media/platform/atmel/Makefile              |    1 +
+ drivers/media/platform/atmel/atmel-isc-regs.h      |  165 +++
+ drivers/media/platform/atmel/atmel-isc.c           | 1514 ++++++++++++++++++++
+ 8 files changed, 1765 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/atmel-isc.txt
+ create mode 100644 drivers/media/platform/atmel/Kconfig
+ create mode 100644 drivers/media/platform/atmel/Makefile
+ create mode 100644 drivers/media/platform/atmel/atmel-isc-regs.h
+ create mode 100644 drivers/media/platform/atmel/atmel-isc.c
+
+-- 
+2.7.4
