@@ -1,30 +1,47 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 17 Aug 2016 13:47:53 +0200
-Subject: [PATCH v5 5/7] power: act8945a_charger: Add capacity level
- property
-In-Reply-To: <1471337998-6467-6-git-send-email-wenyou.yang@atmel.com>
-References: <1471337998-6467-1-git-send-email-wenyou.yang@atmel.com>
- <1471337998-6467-6-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20160817114753.copygtkdmnohhybr@earth>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 17 Aug 2016 14:46:30 +0300
+Subject: [PATCH 05/18] arm64:uapi: set __BITS_PER_LONG correctly for ILP32 and
+ LP64
+In-Reply-To: <1471434403-25291-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1471434403-25291-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1471434403-25291-6-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Andrew Pinski <apinski@cavium.com>
 
-On Tue, Aug 16, 2016 at 04:59:56PM +0800, Wenyou Yang wrote:
-> Add the power supply capacity level property, it corresponds to
-> POWER_SUPPLY_CAPACITY_LEVEL_*.
-> 
-> It also utilizes the precision voltage detector function module
-> to catch the low battery voltage.
+Define __BITS_PER_LONG depending on the ABI used (i.e. check whether
+__ILP32__ or __LP64__ is defined).  This is necessary for glibc to
+determine the appropriate type definitions for the system call interface.
 
-Please use gpiod API instead of old gpio API.
+Signed-off-by: Andrew Pinski <apinski@cavium.com>
+Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+Reviewed-by: David Daney <ddaney@caviumnetworks.com>
+---
+ arch/arm64/include/uapi/asm/bitsperlong.h | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160817/ee1ffc59/attachment.sig>
+diff --git a/arch/arm64/include/uapi/asm/bitsperlong.h b/arch/arm64/include/uapi/asm/bitsperlong.h
+index fce9c29..4265243 100644
+--- a/arch/arm64/include/uapi/asm/bitsperlong.h
++++ b/arch/arm64/include/uapi/asm/bitsperlong.h
+@@ -16,7 +16,14 @@
+ #ifndef __ASM_BITSPERLONG_H
+ #define __ASM_BITSPERLONG_H
+ 
+-#define __BITS_PER_LONG 64
++#if defined(__LP64__)
++/* Assuming __LP64__ will be defined for native ELF64's and not for ILP32. */
++#  define __BITS_PER_LONG 64
++#elif defined(__ILP32__)
++#  define __BITS_PER_LONG 32
++#else
++#  error "Neither LP64 nor ILP32: unsupported ABI in asm/bitsperlong.h"
++#endif
+ 
+ #include <asm-generic/bitsperlong.h>
+ 
+-- 
+2.7.4
