@@ -1,83 +1,141 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 17 Aug 2016 21:38:51 +0200
-Subject: [PULL 04/12] KVM: arm64: vgic-its: Make updates to
- propbaser/pendbaser atomic
+Date: Wed, 17 Aug 2016 21:38:48 +0200
+Subject: [PULL 01/12] KVM: arm64: ITS: return 1 on successful MSI injection
 In-Reply-To: <20160817193859.15726-1-christoffer.dall@linaro.org>
 References: <20160817193859.15726-1-christoffer.dall@linaro.org>
-Message-ID: <20160817193859.15726-5-christoffer.dall@linaro.org>
+Message-ID: <20160817193859.15726-2-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two problems with the current implementation of the MMIO
-handlers for the propbaser and pendbaser:
+From: Andre Przywara <andre.przywara@arm.com>
 
-First, the write to the value itself is not guaranteed to be an atomic
-64-bit write so two concurrent writes to the structure field could be
-intermixed.
+According to the KVM API documentation a successful MSI injection
+should return a value > 0 on success.
+Return possible errors in vgic_its_trigger_msi() and report a
+successful injection back to userland, while also reporting the
+case where the MSI could not be delivered due to the guest not
+having the LPI mapped, for instance.
 
-Second, because we do a read-modify-update operation without any
-synchronization, if we have two 32-bit accesses to separate parts of the
-register, we can loose one of them.
-
-By using the atomic cmpxchg64 we should cover both issues above.
-
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-mmio-v3.c | 26 ++++++++++++++++----------
- 1 file changed, 16 insertions(+), 10 deletions(-)
+ include/linux/irqchip/arm-gic-v3.h |  1 +
+ virt/kvm/arm/vgic/vgic-its.c       | 56 +++++++++++++++++++++++++-------------
+ 2 files changed, 38 insertions(+), 19 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index ff668e0..90d8181 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -306,16 +306,19 @@ static void vgic_mmio_write_propbase(struct kvm_vcpu *vcpu,
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 56b0b7e..99ac022 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -337,6 +337,7 @@
+  */
+ #define E_ITS_MOVI_UNMAPPED_INTERRUPT		0x010107
+ #define E_ITS_MOVI_UNMAPPED_COLLECTION		0x010109
++#define E_ITS_INT_UNMAPPED_INTERRUPT		0x010307
+ #define E_ITS_CLEAR_UNMAPPED_INTERRUPT		0x010507
+ #define E_ITS_MAPD_DEVICE_OOR			0x010801
+ #define E_ITS_MAPC_PROCNUM_OOR			0x010902
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 07411cf..1bd8adb 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -441,39 +441,48 @@ static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
+  * Find the target VCPU and the LPI number for a given devid/eventid pair
+  * and make this IRQ pending, possibly injecting it.
+  * Must be called with the its_lock mutex held.
++ * Returns 0 on success, a positive error value for any ITS mapping
++ * related errors and negative error values for generic errors.
+  */
+-static void vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
+-				 u32 devid, u32 eventid)
++static int vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
++				u32 devid, u32 eventid)
  {
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
--	u64 propbaser = dist->propbaser;
-+	u64 old_propbaser, propbaser;
++	struct kvm_vcpu *vcpu;
+ 	struct its_itte *itte;
  
- 	/* Storing a value with LPIs already enabled is undefined */
- 	if (vgic_cpu->lpis_enabled)
- 		return;
+ 	if (!its->enabled)
+-		return;
++		return -EBUSY;
  
--	propbaser = update_64bit_reg(propbaser, addr & 4, len, val);
--	propbaser = vgic_sanitise_propbaser(propbaser);
+ 	itte = find_itte(its, devid, eventid);
+-	/* Triggering an unmapped IRQ gets silently dropped. */
+-	if (itte && its_is_collection_mapped(itte->collection)) {
+-		struct kvm_vcpu *vcpu;
 -
--	dist->propbaser = propbaser;
-+	do {
-+		old_propbaser = dist->propbaser;
-+		propbaser = old_propbaser;
-+		propbaser = update_64bit_reg(propbaser, addr & 4, len, val);
-+		propbaser = vgic_sanitise_propbaser(propbaser);
-+	} while (cmpxchg64(&dist->propbaser, old_propbaser,
-+			   propbaser) != old_propbaser);
+-		vcpu = kvm_get_vcpu(kvm, itte->collection->target_addr);
+-		if (vcpu && vcpu->arch.vgic_cpu.lpis_enabled) {
+-			spin_lock(&itte->irq->irq_lock);
+-			itte->irq->pending = true;
+-			vgic_queue_irq_unlock(kvm, itte->irq);
+-		}
+-	}
++	if (!itte || !its_is_collection_mapped(itte->collection))
++		return E_ITS_INT_UNMAPPED_INTERRUPT;
++
++	vcpu = kvm_get_vcpu(kvm, itte->collection->target_addr);
++	if (!vcpu)
++		return E_ITS_INT_UNMAPPED_INTERRUPT;
++
++	if (!vcpu->arch.vgic_cpu.lpis_enabled)
++		return -EBUSY;
++
++	spin_lock(&itte->irq->irq_lock);
++	itte->irq->pending = true;
++	vgic_queue_irq_unlock(kvm, itte->irq);
++
++	return 0;
  }
  
- static unsigned long vgic_mmio_read_pendbase(struct kvm_vcpu *vcpu,
-@@ -331,16 +334,19 @@ static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
- 				     unsigned long val)
+ /*
+  * Queries the KVM IO bus framework to get the ITS pointer from the given
+  * doorbell address.
+  * We then call vgic_its_trigger_msi() with the decoded data.
++ * According to the KVM_SIGNAL_MSI API description returns 1 on success.
+  */
+ int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
  {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
--	u64 pendbaser = vgic_cpu->pendbaser;
-+	u64 old_pendbaser, pendbaser;
+ 	u64 address;
+ 	struct kvm_io_device *kvm_io_dev;
+ 	struct vgic_io_device *iodev;
++	int ret;
  
- 	/* Storing a value with LPIs already enabled is undefined */
- 	if (vgic_cpu->lpis_enabled)
- 		return;
+ 	if (!vgic_has_its(kvm))
+ 		return -ENODEV;
+@@ -490,10 +499,21 @@ int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
+ 	iodev = container_of(kvm_io_dev, struct vgic_io_device, dev);
  
--	pendbaser = update_64bit_reg(pendbaser, addr & 4, len, val);
--	pendbaser = vgic_sanitise_pendbaser(pendbaser);
+ 	mutex_lock(&iodev->its->its_lock);
+-	vgic_its_trigger_msi(kvm, iodev->its, msi->devid, msi->data);
++	ret = vgic_its_trigger_msi(kvm, iodev->its, msi->devid, msi->data);
+ 	mutex_unlock(&iodev->its->its_lock);
+ 
+-	return 0;
++	if (ret < 0)
++		return ret;
++
++	/*
++	 * KVM_SIGNAL_MSI demands a return value > 0 for success and 0
++	 * if the guest has blocked the MSI. So we map any LPI mapping
++	 * related error to that.
++	 */
++	if (ret)
++		return 0;
++	else
++		return 1;
+ }
+ 
+ /* Requires the its_lock to be held. */
+@@ -981,9 +1001,7 @@ static int vgic_its_cmd_handle_int(struct kvm *kvm, struct vgic_its *its,
+ 	u32 msi_data = its_cmd_get_id(its_cmd);
+ 	u64 msi_devid = its_cmd_get_deviceid(its_cmd);
+ 
+-	vgic_its_trigger_msi(kvm, its, msi_devid, msi_data);
 -
--	vgic_cpu->pendbaser = pendbaser;
-+	do {
-+		old_pendbaser = vgic_cpu->pendbaser;
-+		pendbaser = old_pendbaser;
-+		pendbaser = update_64bit_reg(pendbaser, addr & 4, len, val);
-+		pendbaser = vgic_sanitise_pendbaser(pendbaser);
-+	} while (cmpxchg64(&vgic_cpu->pendbaser, old_pendbaser,
-+			   pendbaser) != old_pendbaser);
+-	return 0;
++	return vgic_its_trigger_msi(kvm, its, msi_devid, msi_data);
  }
  
  /*
