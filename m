@@ -1,70 +1,111 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 17 Aug 2016 13:50:27 +0100
-Subject: [PATCH v5 3/3] Revert "arm64: hibernate: Refuse to hibernate if the
- boot cpu is offline"
-In-Reply-To: <1471438227-8747-1-git-send-email-james.morse@arm.com>
-References: <1471438227-8747-1-git-send-email-james.morse@arm.com>
-Message-ID: <1471438227-8747-4-git-send-email-james.morse@arm.com>
+From: kbeldan@baylibre.com (Karl Beldan)
+Date: Wed, 17 Aug 2016 12:54:54 +0000
+Subject: [PATCH v2] ARM: dts: da850-lcdk: Audio support via simple-card
+Message-ID: <20160817125454.20717-1-kbeldan@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we use the MPIDR to resume on the same CPU that we hibernated on,
-we no longer need to refuse to hibernate if the boot cpu is offline. (Which
-we can't possibly know if kexec causes logical CPUs to be renumbered).
+The LCDK embeds a TLV320AIC3106 connected to the SoC McASP for analog
+audio. The power supply of the codec comes from the main PMIC
+(TPS650250) DCDCs which are always on per HW design and not
+controllable by SW, so SW wise the codec driver will rely on the 'dummy'
+regulator.
+Quality is good with arecord -pipe- aplay on Line In/Line Out.
 
-This reverts commit 1fe492ce6482b77807b25d29690a48c46456beee.
-
-Signed-off-by: James Morse <james.morse@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
 ---
-This patch should be merged via the same tree as patch 1.
+v2:
+ - Drop MIC paths parts as suggested by Sekhar.
 
- arch/arm64/kernel/hibernate.c | 26 --------------------------
- 1 file changed, 26 deletions(-)
+ arch/arm/boot/dts/da850-lcdk.dts | 68 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
 
-diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-index 9fcf2fcda876..2dcd7d29f568 100644
---- a/arch/arm64/kernel/hibernate.c
-+++ b/arch/arm64/kernel/hibernate.c
-@@ -18,7 +18,6 @@
- #include <linux/cpu.h>
- #include <linux/kvm_host.h>
- #include <linux/mm.h>
--#include <linux/notifier.h>
- #include <linux/pm.h>
- #include <linux/sched.h>
- #include <linux/suspend.h>
-@@ -524,31 +523,6 @@ out:
- 	return rc;
- }
+diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+index dbcca0b..7563260 100644
+--- a/arch/arm/boot/dts/da850-lcdk.dts
++++ b/arch/arm/boot/dts/da850-lcdk.dts
+@@ -23,10 +23,46 @@
+ 		device_type = "memory";
+ 		reg = <0xc0000000 0x08000000>;
+ 	};
++
++	sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "DA850/OMAP-L138 LCDK";
++		simple-audio-card,widgets =
++			"Line", "Line In",
++			"Line", "Line Out";
++		simple-audio-card,routing =
++			"LINE1L", "Line In",
++			"LINE1R", "Line In",
++			"Line Out", "LLOUT",
++			"Line Out", "RLOUT";
++		simple-audio-card,format = "dsp_b";
++		simple-audio-card,bitclock-master = <&link0_codec>;
++		simple-audio-card,frame-master = <&link0_codec>;
++		simple-audio-card,bitclock-inversion;
++
++		simple-audio-card,cpu {
++			sound-dai = <&mcasp0>;
++			system-clock-frequency = <24576000>;
++		};
++
++		link0_codec: simple-audio-card,codec {
++			sound-dai = <&tlv320aic3106>;
++			system-clock-frequency = <24576000>;
++		};
++	};
+ };
  
--static int check_boot_cpu_online_pm_callback(struct notifier_block *nb,
--					     unsigned long action, void *ptr)
--{
--	if (action == PM_HIBERNATION_PREPARE &&
--	     cpumask_first(cpu_online_mask) != 0) {
--		pr_warn("CPU0 is offline.\n");
--		return notifier_from_errno(-ENODEV);
--	}
--
--	return NOTIFY_OK;
--}
--
--static int __init check_boot_cpu_online_init(void)
--{
--	/*
--	 * Set this pm_notifier callback with a lower priority than
--	 * cpu_hotplug_pm_callback, so that cpu_hotplug_pm_callback will be
--	 * called earlier to disable cpu hotplug before the cpu online check.
--	 */
--	pm_notifier(check_boot_cpu_online_pm_callback, -INT_MAX);
--
--	return 0;
--}
--core_initcall(check_boot_cpu_online_init);
--
- int hibernate_resume_nonboot_cpu_disable(void)
- {
- 	if (sleep_cpu < 0) {
+ &pmx_core {
+ 	status = "okay";
++
++	mcasp0_pins: pinmux_mcasp0_pins {
++		pinctrl-single,bits = <
++			/* AHCLKX AFSX ACLKX */
++			0x00 0x00101010 0x00f0f0f0
++			/* ARX13 ARX14 */
++			0x04 0x00000110 0x00000ff0
++		>;
++	};
+ };
+ 
+ &serial2 {
+@@ -68,3 +104,35 @@
+ 	cd-gpios = <&gpio 64 GPIO_ACTIVE_HIGH>;
+ 	status = "okay";
+ };
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins>;
++	clock-frequency = <100000>;
++	status = "okay";
++
++	tlv320aic3106: tlv320aic3106 at 18 {
++		#sound-dai-cells = <0>;
++		compatible = "ti,tlv320aic3106";
++		reg = <0x18>;
++		status = "okay";
++	};
++};
++
++&mcasp0 {
++	#sound-dai-cells = <0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&mcasp0_pins>;
++	status = "okay";
++
++	op-mode = <0>;   /* DAVINCI_MCASP_IIS_MODE */
++	tdm-slots = <2>;
++	serial-dir = <   /* 0: INACTIVE, 1: TX, 2: RX */
++		0 0 0 0
++		0 0 0 0
++		0 0 0 0
++		0 1 2 0
++	>;
++	tx-num-evt = <32>;
++	rx-num-evt = <32>;
++};
 -- 
-2.8.0.rc3
+2.9.2
