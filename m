@@ -1,52 +1,89 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 17 Aug 2016 21:38:56 +0200
-Subject: [PULL 09/12] arm64: Document workaround for Cortex-A72 erratum #853709
+Date: Wed, 17 Aug 2016 21:38:54 +0200
+Subject: [PULL 07/12] KVM: arm64: ITS: avoid re-mapping LPIs
 In-Reply-To: <20160817193859.15726-1-christoffer.dall@linaro.org>
 References: <20160817193859.15726-1-christoffer.dall@linaro.org>
-Message-ID: <20160817193859.15726-10-christoffer.dall@linaro.org>
+Message-ID: <20160817193859.15726-8-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+From: Andre Przywara <andre.przywara@arm.com>
 
-We already have a workaround for Cortex-A57 erratum #852523,
-but Cortex-A72 r0p0 to r0p2 do suffer from the same issue
-(known as erratum #853709).
+When a guest wants to map a device-ID/event-ID combination that is
+already mapped, we may end up in a situation where an LPI is never
+"put", thus never being freed.
+Since the GICv3 spec says that mapping an already mapped LPI is
+UNPREDICTABLE, lets just bail out early in this situation to avoid
+any potential leaks.
 
-Let's document the fact that we already handle this.
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- Documentation/arm64/silicon-errata.txt | 1 +
- arch/arm64/kvm/hyp/switch.c            | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-its.c | 27 +++++++++++++--------------
+ 1 file changed, 13 insertions(+), 14 deletions(-)
 
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index 4da60b4..ccc6032 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -53,6 +53,7 @@ stable kernels.
- | ARM            | Cortex-A57      | #832075         | ARM64_ERRATUM_832075    |
- | ARM            | Cortex-A57      | #852523         | N/A                     |
- | ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220    |
-+| ARM            | Cortex-A72      | #853709         | N/A                     |
- | ARM            | MMU-500         | #841119,#826419 | N/A                     |
- |                |                 |                 |                         |
- | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375    |
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index ae7855f..5a84b45 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -256,7 +256,7 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 9533080..4660a7d 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -731,7 +731,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 	u32 device_id = its_cmd_get_deviceid(its_cmd);
+ 	u32 event_id = its_cmd_get_id(its_cmd);
+ 	u32 coll_id = its_cmd_get_collection(its_cmd);
+-	struct its_itte *itte, *new_itte = NULL;
++	struct its_itte *itte;
+ 	struct its_device *device;
+ 	struct its_collection *collection, *new_coll = NULL;
+ 	int lpi_nr;
+@@ -749,6 +749,10 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 	    lpi_nr >= max_lpis_propbaser(kvm->arch.vgic.propbaser))
+ 		return E_ITS_MAPTI_PHYSICALID_OOR;
  
- 	/*
- 	 * We must restore the 32-bit state before the sysregs, thanks
--	 * to Cortex-A57 erratum #852523.
-+	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
- 	 */
- 	__sysreg32_restore_state(vcpu);
- 	__sysreg_restore_guest_state(guest_ctxt);
++	/* If there is an existing mapping, behavior is UNPREDICTABLE. */
++	if (find_itte(its, device_id, event_id))
++		return 0;
++
+ 	collection = find_collection(its, coll_id);
+ 	if (!collection) {
+ 		int ret = vgic_its_alloc_collection(its, &collection, coll_id);
+@@ -757,20 +761,16 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 		new_coll = collection;
+ 	}
+ 
+-	itte = find_itte(its, device_id, event_id);
++	itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
+ 	if (!itte) {
+-		itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
+-		if (!itte) {
+-			if (new_coll)
+-				vgic_its_free_collection(its, coll_id);
+-			return -ENOMEM;
+-		}
+-
+-		new_itte = itte;
+-		itte->event_id	= event_id;
+-		list_add_tail(&itte->itte_list, &device->itt_head);
++		if (new_coll)
++			vgic_its_free_collection(its, coll_id);
++		return -ENOMEM;
+ 	}
+ 
++	itte->event_id	= event_id;
++	list_add_tail(&itte->itte_list, &device->itt_head);
++
+ 	itte->collection = collection;
+ 	itte->lpi = lpi_nr;
+ 
+@@ -778,8 +778,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 	if (IS_ERR(irq)) {
+ 		if (new_coll)
+ 			vgic_its_free_collection(its, coll_id);
+-		if (new_itte)
+-			its_free_itte(kvm, new_itte);
++		its_free_itte(kvm, itte);
+ 		return PTR_ERR(irq);
+ 	}
+ 	itte->irq = irq;
 -- 
 2.9.0
