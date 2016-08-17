@@ -1,144 +1,136 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 17 Aug 2016 13:31:54 +0200
-Subject: [PATCH/RTF 5/7] arm64: dts: r8a7796: Add GPIO device nodes
+Date: Wed, 17 Aug 2016 13:31:56 +0200
+Subject: [PATCH/RTF 7/7] arm64: dts: r8a7796: salvator-x: enable SDHI0 & 3
 In-Reply-To: <1471433516-4478-1-git-send-email-horms+renesas@verge.net.au>
 References: <1471433516-4478-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1471433516-4478-6-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1471433516-4478-8-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Enable the exposed SD card slots in the DT of the r8a7796/salvator-x.
 
-Add GPIO device nodes to the DT of the r8a7796 SoC.
+Based on work for the r8a7795/salvator-x by Ai Kyuse.
 
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Cc: Ai Kyuse <ai.kyuse.uw@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 112 +++++++++++++++++++++++++++++++
- 1 file changed, 112 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 84 ++++++++++++++++++++++
+ 1 file changed, 84 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index faea5a960abc..2741535f8b15 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -107,6 +107,118 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+index bb34b8d69c79..f06621f2ee4c 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+@@ -10,6 +10,7 @@
  
-+		gpio0: gpio at e6050000 {
-+			compatible = "renesas,gpio-r8a7796",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6050000 0 0x50>;
-+			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 0 16>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 912>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+		};
+ /dts-v1/;
+ #include "r8a7796.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	model = "Renesas Salvator-X board based on r8a7796";
+@@ -29,6 +30,55 @@
+ 		/* first 128MB is reserved for secure area. */
+ 		reg = <0x0 0x48000000 0x0 0x78000000>;
+ 	};
 +
-+		gpio1: gpio at e6051000 {
-+			compatible = "renesas,gpio-r8a7796",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6051000 0 0x50>;
-+			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 32 29>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 911>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+		};
++	vcc_sdhi0: regulator-vcc-sdhi0 {
++		compatible = "regulator-fixed";
 +
-+		gpio2: gpio at e6052000 {
-+			compatible = "renesas,gpio-r8a7796",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6052000 0 0x50>;
-+			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 64 15>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 910>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+		};
++		regulator-name = "SDHI0 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
 +
-+		gpio3: gpio at e6053000 {
-+			compatible = "renesas,gpio-r8a7796",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6053000 0 0x50>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 96 16>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 909>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+		};
++		gpio = <&gpio5 2 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
 +
-+		gpio4: gpio at e6054000 {
-+			compatible = "renesas,gpio-r8a7796",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6054000 0 0x50>;
-+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 128 18>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 908>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+		};
++	vccq_sdhi0: regulator-vccq-sdhi0 {
++		compatible = "regulator-gpio";
 +
-+		gpio5: gpio at e6055000 {
-+			compatible = "renesas,gpio-r8a7796",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6055000 0 0x50>;
-+			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 160 26>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 907>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+		};
++		regulator-name = "SDHI0 VccQ";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
 +
-+		gpio6: gpio at e6055400 {
-+			compatible = "renesas,gpio-r8a7796",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6055400 0 0x50>;
-+			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 192 32>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 906>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+		};
++		gpios = <&gpio5 1 GPIO_ACTIVE_HIGH>;
++		gpios-states = <1>;
++		states = <3300000 1
++			  1800000 0>;
++	};
 +
-+		gpio7: gpio at e6055800 {
-+			compatible = "renesas,gpio-r8a7796",
-+				     "renesas,gpio-rcar";
-+			reg = <0 0xe6055800 0 0x50>;
-+			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 224 4>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 905>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+		};
++	vcc_sdhi3: regulator-vcc-sdhi3 {
++		compatible = "regulator-fixed";
 +
- 		pfc: pfc at e6060000 {
- 			compatible = "renesas,pfc-r8a7796";
- 			reg = <0 0xe6060000 0 0x50c>;
++		regulator-name = "SDHI3 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpio = <&gpio3 15 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	vccq_sdhi3: regulator-vccq-sdhi3 {
++		compatible = "regulator-gpio";
++
++		regulator-name = "SDHI3 VccQ";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpios = <&gpio3 14 GPIO_ACTIVE_HIGH>;
++		gpios-states = <1>;
++		states = <3300000 1
++			  1800000 0>;
++	};
++
+ };
+ 
+ &pfc {
+@@ -36,12 +86,46 @@
+ 		groups = "scif2_data_a";
+ 		function = "scif2";
+ 	};
++
++	sdhi0_pins: sd0 {
++		groups = "sdhi0_data4", "sdhi0_ctrl";
++		function = "sdhi0";
++	};
++
++	sdhi3_pins: sd3 {
++		groups = "sdhi3_data4", "sdhi3_ctrl";
++		function = "sdhi3";
++	};
+ };
+ 
+ &extal_clk {
+ 	clock-frequency = <16666666>;
+ };
+ 
++&sdhi0 {
++	pinctrl-0 = <&sdhi0_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&vcc_sdhi0>;
++	vqmmc-supply = <&vccq_sdhi0>;
++	cd-gpios = <&gpio3 12 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&gpio3 13 GPIO_ACTIVE_HIGH>;
++	bus-width = <4>;
++	status = "okay";
++};
++
++&sdhi3 {
++	pinctrl-0 = <&sdhi3_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&vcc_sdhi3>;
++	vqmmc-supply = <&vccq_sdhi3>;
++	cd-gpios = <&gpio4 15 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&gpio4 16 GPIO_ACTIVE_HIGH>;
++	bus-width = <4>;
++	status = "okay";
++};
++
+ &scif2 {
+ 	pinctrl-0 = <&scif2_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.7.0.rc3.207.g0ac5344
