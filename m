@@ -1,71 +1,189 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Wed, 17 Aug 2016 17:58:44 +0200
-Subject: [RFC PATCH 0/7] Add support for monitoring guest TLB operations
-In-Reply-To: <1471344312-26685-1-git-send-email-punit.agrawal@arm.com>
-References: <1471344312-26685-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <ed9ce98d-67d2-f01b-6bb0-5c5c842129a5@redhat.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Wed, 17 Aug 2016 09:09:08 -0700
+Subject: [PATCH] mmc: sdhci-of-arasan: Don't power PHY w/ slow/no clock
+Message-ID: <1471450148-28307-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+>From empirical evidence (tested on Rockchip rk3399), it appears that the
+PHY intended to be used with the Arasan SDHCI 5.1 controller has trouble
+turning on when the card clock is slow or off.  Strangely these problems
+appear to show up consistently on some boards while other boares work
+fine, but on the boards where it shows up the problem reproduces 100% of
+the time and is quite consistent in its behavior.
 
+These problems can be fixed by always making sure that we power on the
+PHY (and turn on its DLL) when the card clock is faster than about 50
+MHz.  Once on, we need to make sure that we never power down the PHY /
+turn off its DLL until the clock is faster again.
 
-On 16/08/2016 12:45, Punit Agrawal wrote:
-> Hi,
-> 
-> ARMv8 supports trapping guest TLB maintenance operations to the
-> hypervisor. This trapping mechanism can be used to monitor the use of
-> guest TLB instructions.
-> 
-> As taking a trap for every TLB operation can have significant
-> overhead, trapping should only be enabled -
-> 
-> * on user request
-> * for the VM of interest
-> 
-> This patchset adds support to listen to perf trace event state change
-> notifications. The notifications and associated context are then used
-> to enable trapping of guest TLB operations when requested by the
-> user. The trap handling generates trace events (kvm_tlb_invalidate)
-> which can already be counted using existing perf trace
-> functionality.
-> 
-> Trapping of guest TLB operations is disabled when not being monitored
-> (reducing profiling overhead).
-> 
-> I would appreciate feedback on the approach to tie the control of TLB
-> monitoring with perf trace events (Patch 1) especially if there are
-> any suggestions on avoiding (or reducing) the overhead of "perf trace"
-> notifications.
-> 
-> I looked at using regfunc/unregfunc tracepoint hooks but they don't
-> include the event context. But the bigger problem was that the
-> callbacks are only called on the first instance of simultaneously
-> executing perf stat invocations.
-> 
-> The patchset is based on v4.8-rc2 and adds support for monitoring
-> guest TLB operations on 64bit hosts. If the approach taken in the
-> patches is acceptable, I'll add 32bit host support as well.
-> 
-> With this patchset, 'perf' tool when attached to a VM process can be
-> used to monitor the TLB operations. E.g., to monitor a VM with process
-> id 4166 -
-> 
-> # perf stat -e "kvm:kvm_tlb_invalidate" -p 4166
-> 
-> Perform some operations in VM (running 'make -j 7' on the kernel
-> sources in this instance). Breaking out of perf shows -
-> 
-> Performance counter stats for process id '4166':
-> 
->          7,471,974      kvm:kvm_tlb_invalidate
-> 
->      374.235405282 seconds time elapsed
-> 
-> All feedback welcome.
+We'll add logic for handling this into the sdhci-of-arasan driver.  Note
+that right now the only user of a PHY in the sdhci-of-arasan driver is
+arasan,sdhci-5.1.  It's presumed that all arasan,sdhci-5.1 PHY
+implementations need this workaround, so the logic is only contingent on
+having a PHY to control.  If future Arasan controllers don't have this
+problem we can add code to decide if we want this flow or not.
 
-Can you explain what this is used for?  In other words, why would this
-be used instead of just running perf in the guest?
+Also note that we check for slow clocks by checking for <= 400 kHz
+rather than checking for 50 MHz.  This keeps things the most consistent
+and also means we can power the PHY on@max speed (where the DLL will
+lock fastest).  Presumably anyone who intends to run with a card clock
+of < 50 MHz and > 400 Khz will be running on a device where this problem
+is fixed anyway.
 
-Thanks,
+I believe this brings some resolution to the problems reported before.
+See the commit 6fc09244d74d ("mmc: sdhci-of-arasan: Revert: Always power
+the PHY off/on when clock changes").
 
-Paolo
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+---
+Tested on chromeos kernel-4.4 with backports.
+
+ drivers/mmc/host/sdhci-of-arasan.c | 61 ++++++++++++++++++++++++++++----------
+ 1 file changed, 46 insertions(+), 15 deletions(-)
+
+diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+index e0f193f7e3e5..ec2fd00a913d 100644
+--- a/drivers/mmc/host/sdhci-of-arasan.c
++++ b/drivers/mmc/host/sdhci-of-arasan.c
+@@ -77,6 +77,7 @@ struct sdhci_arasan_soc_ctl_map {
+  * @host:		Pointer to the main SDHCI host structure.
+  * @clk_ahb:		Pointer to the AHB clock
+  * @phy:		Pointer to the generic phy
++ * @is_phy_on:		True if the PHY is on; false if not.
+  * @sdcardclk_hw:	Struct for the clock we might provide to a PHY.
+  * @sdcardclk:		Pointer to normal 'struct clock' for sdcardclk_hw.
+  * @soc_ctl_base:	Pointer to regmap for syscon for soc_ctl registers.
+@@ -86,6 +87,7 @@ struct sdhci_arasan_data {
+ 	struct sdhci_host *host;
+ 	struct clk	*clk_ahb;
+ 	struct phy	*phy;
++	bool		is_phy_on;
+ 
+ 	struct clk_hw	sdcardclk_hw;
+ 	struct clk      *sdcardclk;
+@@ -170,13 +172,47 @@ static void sdhci_arasan_set_clock(struct sdhci_host *host, unsigned int clock)
+ 	struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+ 	bool ctrl_phy = false;
+ 
+-	if (clock > MMC_HIGH_52_MAX_DTR && (!IS_ERR(sdhci_arasan->phy)))
+-		ctrl_phy = true;
++	if (!IS_ERR(sdhci_arasan->phy)) {
++		if (!sdhci_arasan->is_phy_on && clock <= 400000) {
++			/*
++			 * If PHY off, set clock to max speed and power PHY on.
++			 *
++			 * Although PHY docs apparently suggest power cycling
++			 * when changing the clock the PHY doesn't like to be
++			 * powered on while at low speeds like those used in ID
++			 * mode.  Even worse is powering the PHY on while the
++			 * clock is off.
++			 *
++			 * To workaround the PHY limitatoins, the best we can
++			 * do is to power it on@a faster speed and then slam
++			 * through low speeds without power cycling.
++			 */
++			sdhci_set_clock(host, host->max_clk);
++			spin_unlock_irq(&host->lock);
++			phy_power_on(sdhci_arasan->phy);
++			spin_lock_irq(&host->lock);
++			sdhci_arasan->is_phy_on = true;
++
++			/*
++			 * We'll now fall through to the below case with
++			 * ctrl_phy = false (so we won't turn off/on).  The
++			 * sdhci_set_clock() will set the real clock.
++			 */
++		} else if (clock > 400000) {
++			/*
++			 * At higher clock speeds the PHY is fine being power
++			 * cycled and docs say you _should_ power cycle when
++			 * changing clock speeds.
++			 */
++			ctrl_phy = true;
++		}
++	}
+ 
+-	if (ctrl_phy) {
++	if (ctrl_phy && sdhci_arasan->is_phy_on) {
+ 		spin_unlock_irq(&host->lock);
+ 		phy_power_off(sdhci_arasan->phy);
+ 		spin_lock_irq(&host->lock);
++		sdhci_arasan->is_phy_on = false;
+ 	}
+ 
+ 	sdhci_set_clock(host, clock);
+@@ -185,6 +221,7 @@ static void sdhci_arasan_set_clock(struct sdhci_host *host, unsigned int clock)
+ 		spin_unlock_irq(&host->lock);
+ 		phy_power_on(sdhci_arasan->phy);
+ 		spin_lock_irq(&host->lock);
++		sdhci_arasan->is_phy_on = true;
+ 	}
+ }
+ 
+@@ -239,13 +276,14 @@ static int sdhci_arasan_suspend(struct device *dev)
+ 	if (ret)
+ 		return ret;
+ 
+-	if (!IS_ERR(sdhci_arasan->phy)) {
++	if (!IS_ERR(sdhci_arasan->phy) && sdhci_arasan->is_phy_on) {
+ 		ret = phy_power_off(sdhci_arasan->phy);
+ 		if (ret) {
+ 			dev_err(dev, "Cannot power off phy.\n");
+ 			sdhci_resume_host(host);
+ 			return ret;
+ 		}
++		sdhci_arasan->is_phy_on = false;
+ 	}
+ 
+ 	clk_disable(pltfm_host->clk);
+@@ -281,12 +319,13 @@ static int sdhci_arasan_resume(struct device *dev)
+ 		return ret;
+ 	}
+ 
+-	if (!IS_ERR(sdhci_arasan->phy)) {
++	if (!IS_ERR(sdhci_arasan->phy) && host->mmc->actual_clock) {
+ 		ret = phy_power_on(sdhci_arasan->phy);
+ 		if (ret) {
+ 			dev_err(dev, "Cannot power on phy.\n");
+ 			return ret;
+ 		}
++		sdhci_arasan->is_phy_on = true;
+ 	}
+ 
+ 	return sdhci_resume_host(host);
+@@ -547,12 +586,6 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+ 			goto unreg_clk;
+ 		}
+ 
+-		ret = phy_power_on(sdhci_arasan->phy);
+-		if (ret < 0) {
+-			dev_err(&pdev->dev, "phy_power_on err.\n");
+-			goto err_phy_power;
+-		}
+-
+ 		host->mmc_host_ops.hs400_enhanced_strobe =
+ 					sdhci_arasan_hs400_enhanced_strobe;
+ 	}
+@@ -565,9 +598,6 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+ 
+ err_add_host:
+ 	if (!IS_ERR(sdhci_arasan->phy))
+-		phy_power_off(sdhci_arasan->phy);
+-err_phy_power:
+-	if (!IS_ERR(sdhci_arasan->phy))
+ 		phy_exit(sdhci_arasan->phy);
+ unreg_clk:
+ 	sdhci_arasan_unregister_sdclk(&pdev->dev);
+@@ -589,7 +619,8 @@ static int sdhci_arasan_remove(struct platform_device *pdev)
+ 	struct clk *clk_ahb = sdhci_arasan->clk_ahb;
+ 
+ 	if (!IS_ERR(sdhci_arasan->phy)) {
+-		phy_power_off(sdhci_arasan->phy);
++		if (sdhci_arasan->is_phy_on)
++			phy_power_off(sdhci_arasan->phy);
+ 		phy_exit(sdhci_arasan->phy);
+ 	}
+ 
+-- 
+2.8.0.rc3.226.g39d4020
