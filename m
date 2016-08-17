@@ -1,99 +1,344 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 17 Aug 2016 14:46:34 +0300
-Subject: [PATCH 09/18] arm64: introduce binfmt_elf32.c
+Date: Wed, 17 Aug 2016 14:46:39 +0300
+Subject: [PATCH 14/18] arm64: signal32: move ilp32 and aarch32 common code to
+ separated file
 In-Reply-To: <1471434403-25291-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1471434403-25291-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1471434403-25291-10-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1471434403-25291-15-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we support more than one compat formats, it looks more reasonable
-to not use fs/compat_binfmt.c. Custom binfmt_elf32.c allows to move aarch32
-specific definitions there and make code more maintainable and readable.
-
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
 ---
- arch/arm64/Kconfig               |  1 -
- arch/arm64/include/asm/hwcap.h   |  2 --
- arch/arm64/kernel/Makefile       |  2 +-
- arch/arm64/kernel/binfmt_elf32.c | 31 +++++++++++++++++++++++++++++++
- 4 files changed, 32 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm64/kernel/binfmt_elf32.c
+ arch/arm64/include/asm/signal32.h        |   3 +
+ arch/arm64/include/asm/signal32_common.h |  28 +++++++
+ arch/arm64/kernel/Makefile               |   2 +-
+ arch/arm64/kernel/signal32.c             | 107 ------------------------
+ arch/arm64/kernel/signal32_common.c      | 136 +++++++++++++++++++++++++++++++
+ 5 files changed, 168 insertions(+), 108 deletions(-)
+ create mode 100644 arch/arm64/include/asm/signal32_common.h
+ create mode 100644 arch/arm64/kernel/signal32_common.c
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 08ca1cb..3d46250 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -998,7 +998,6 @@ config AARCH32_EL0
- 	def_bool y
- 	depends on ARM64_4K_PAGES || EXPERT
- 	select COMPAT
--	select COMPAT_BINFMT_ELF
- 	select HAVE_UID16
- 	select OLD_SIGSUSPEND3
- 	select COMPAT_OLD_SIGACTION
-diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
-index 2c7fc5d..99dfd92 100644
---- a/arch/arm64/include/asm/hwcap.h
-+++ b/arch/arm64/include/asm/hwcap.h
-@@ -47,8 +47,6 @@
- #define ELF_HWCAP		(elf_hwcap)
+diff --git a/arch/arm64/include/asm/signal32.h b/arch/arm64/include/asm/signal32.h
+index e68fcce..1c4ede7 100644
+--- a/arch/arm64/include/asm/signal32.h
++++ b/arch/arm64/include/asm/signal32.h
+@@ -13,6 +13,9 @@
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
++
++#include <asm/signal32_common.h>
++
+ #ifndef __ASM_SIGNAL32_H
+ #define __ASM_SIGNAL32_H
  
- #ifdef CONFIG_AARCH32_EL0
--#define COMPAT_ELF_HWCAP	(compat_elf_hwcap)
--#define COMPAT_ELF_HWCAP2	(compat_elf_hwcap2)
- extern unsigned int compat_elf_hwcap, compat_elf_hwcap2;
- #endif
- 
+diff --git a/arch/arm64/include/asm/signal32_common.h b/arch/arm64/include/asm/signal32_common.h
+new file mode 100644
+index 0000000..e3e2d01
+--- /dev/null
++++ b/arch/arm64/include/asm/signal32_common.h
+@@ -0,0 +1,28 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_SIGNAL32_COMMON_H
++#define __ASM_SIGNAL32_COMMON_H
++
++#ifdef CONFIG_COMPAT
++
++int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from);
++int copy_siginfo_from_user32(siginfo_t *to, compat_siginfo_t __user *from);
++
++int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set);
++int get_sigset_t(sigset_t *set, const compat_sigset_t __user *uset);
++
++#endif /* CONFIG_COMPAT*/
++
++#endif /* __ASM_SIGNAL32_COMMON_H */
++
 diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 4ec5886..949187c 100644
+index 36257b7..20e8e66 100644
 --- a/arch/arm64/kernel/Makefile
 +++ b/arch/arm64/kernel/Makefile
-@@ -26,7 +26,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
- 	$(call if_changed,objcopy)
- 
+@@ -28,7 +28,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
  arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
--					   sys_compat.o entry32.o
-+					   sys_compat.o entry32.o binfmt_elf32.o
+ 					   sys_compat.o entry32.o binfmt_elf32.o
+ arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o sys_ilp32.o
+-arm64-obj-$(CONFIG_COMPAT)		+= entry32_common.o
++arm64-obj-$(CONFIG_COMPAT)		+= entry32_common.o signal32_common.o
  arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
  arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
  arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
-diff --git a/arch/arm64/kernel/binfmt_elf32.c b/arch/arm64/kernel/binfmt_elf32.c
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index b7063de..f2c1a38 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -103,113 +103,6 @@ struct compat_rt_sigframe {
+ 
+ #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
+ 
+-static inline int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set)
+-{
+-	compat_sigset_t	cset;
+-
+-	cset.sig[0] = set->sig[0] & 0xffffffffull;
+-	cset.sig[1] = set->sig[0] >> 32;
+-
+-	return copy_to_user(uset, &cset, sizeof(*uset));
+-}
+-
+-static inline int get_sigset_t(sigset_t *set,
+-			       const compat_sigset_t __user *uset)
+-{
+-	compat_sigset_t s32;
+-
+-	if (copy_from_user(&s32, uset, sizeof(*uset)))
+-		return -EFAULT;
+-
+-	set->sig[0] = s32.sig[0] | (((long)s32.sig[1]) << 32);
+-	return 0;
+-}
+-
+-int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
+-{
+-	int err;
+-
+-	if (!access_ok(VERIFY_WRITE, to, sizeof(*to)))
+-		return -EFAULT;
+-
+-	/* If you change siginfo_t structure, please be sure
+-	 * this code is fixed accordingly.
+-	 * It should never copy any pad contained in the structure
+-	 * to avoid security leaks, but must copy the generic
+-	 * 3 ints plus the relevant union member.
+-	 * This routine must convert siginfo from 64bit to 32bit as well
+-	 *@the same time.
+-	 */
+-	err = __put_user(from->si_signo, &to->si_signo);
+-	err |= __put_user(from->si_errno, &to->si_errno);
+-	err |= __put_user((short)from->si_code, &to->si_code);
+-	if (from->si_code < 0)
+-		err |= __copy_to_user(&to->_sifields._pad, &from->_sifields._pad,
+-				      SI_PAD_SIZE);
+-	else switch (from->si_code & __SI_MASK) {
+-	case __SI_KILL:
+-		err |= __put_user(from->si_pid, &to->si_pid);
+-		err |= __put_user(from->si_uid, &to->si_uid);
+-		break;
+-	case __SI_TIMER:
+-		 err |= __put_user(from->si_tid, &to->si_tid);
+-		 err |= __put_user(from->si_overrun, &to->si_overrun);
+-		 err |= __put_user(from->si_int, &to->si_int);
+-		break;
+-	case __SI_POLL:
+-		err |= __put_user(from->si_band, &to->si_band);
+-		err |= __put_user(from->si_fd, &to->si_fd);
+-		break;
+-	case __SI_FAULT:
+-		err |= __put_user((compat_uptr_t)(unsigned long)from->si_addr,
+-				  &to->si_addr);
+-#ifdef BUS_MCEERR_AO
+-		/*
+-		 * Other callers might not initialize the si_lsb field,
+-		 * so check explicitly for the right codes here.
+-		 */
+-		if (from->si_signo == SIGBUS &&
+-		    (from->si_code == BUS_MCEERR_AR || from->si_code == BUS_MCEERR_AO))
+-			err |= __put_user(from->si_addr_lsb, &to->si_addr_lsb);
+-#endif
+-		break;
+-	case __SI_CHLD:
+-		err |= __put_user(from->si_pid, &to->si_pid);
+-		err |= __put_user(from->si_uid, &to->si_uid);
+-		err |= __put_user(from->si_status, &to->si_status);
+-		err |= __put_user(from->si_utime, &to->si_utime);
+-		err |= __put_user(from->si_stime, &to->si_stime);
+-		break;
+-	case __SI_RT: /* This is not generated by the kernel as of now. */
+-	case __SI_MESGQ: /* But this is */
+-		err |= __put_user(from->si_pid, &to->si_pid);
+-		err |= __put_user(from->si_uid, &to->si_uid);
+-		err |= __put_user(from->si_int, &to->si_int);
+-		break;
+-	case __SI_SYS:
+-		err |= __put_user((compat_uptr_t)(unsigned long)
+-				from->si_call_addr, &to->si_call_addr);
+-		err |= __put_user(from->si_syscall, &to->si_syscall);
+-		err |= __put_user(from->si_arch, &to->si_arch);
+-		break;
+-	default: /* this is just in case for now ... */
+-		err |= __put_user(from->si_pid, &to->si_pid);
+-		err |= __put_user(from->si_uid, &to->si_uid);
+-		break;
+-	}
+-	return err;
+-}
+-
+-int copy_siginfo_from_user32(siginfo_t *to, compat_siginfo_t __user *from)
+-{
+-	if (copy_from_user(to, from, __ARCH_SI_PREAMBLE_SIZE) ||
+-	    copy_from_user(to->_sifields._pad,
+-			   from->_sifields._pad, SI_PAD_SIZE))
+-		return -EFAULT;
+-
+-	return 0;
+-}
+-
+ /*
+  * VFP save/restore code.
+  *
+diff --git a/arch/arm64/kernel/signal32_common.c b/arch/arm64/kernel/signal32_common.c
 new file mode 100644
-index 0000000..aec1c8a
+index 0000000..4a45aa6
 --- /dev/null
-+++ b/arch/arm64/kernel/binfmt_elf32.c
-@@ -0,0 +1,31 @@
++++ b/arch/arm64/kernel/signal32_common.c
+@@ -0,0 +1,136 @@
 +/*
-+ * Support for AArch32 Linux ELF binaries.
++ * Based on arch/arm/kernel/signal.c
++ *
++ * Copyright (C) 1995-2009 Russell King
++ * Copyright (C) 2012 ARM Ltd.
++ * Modified by Will Deacon <will.deacon@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+/* AArch32 EABI. */
-+#define EF_ARM_EABI_MASK		0xff000000
++#include <linux/compat.h>
++#include <linux/signal.h>
++#include <linux/ratelimit.h>
 +
-+#define compat_start_thread		compat_start_thread
-+#define COMPAT_SET_PERSONALITY(ex)		\
-+do {						\
-+	clear_thread_flag(TIF_32BIT_AARCH64);	\
-+	set_thread_flag(TIF_32BIT);		\
-+} while (0)
++#include <asm/esr.h>
++#include <asm/fpsimd.h>
++#include <asm/signal32_common.h>
++#include <asm/uaccess.h>
++#include <asm/unistd.h>
 +
-+#define COMPAT_ARCH_DLINFO
-+#define COMPAT_ELF_HWCAP		(compat_elf_hwcap)
-+#define COMPAT_ELF_HWCAP2		(compat_elf_hwcap2)
++int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set)
++{
++	compat_sigset_t	cset;
 +
-+#ifdef __AARCH64EB__
-+#define COMPAT_ELF_PLATFORM		("v8b")
-+#else
-+#define COMPAT_ELF_PLATFORM		("v8l")
++	cset.sig[0] = set->sig[0] & 0xffffffffull;
++	cset.sig[1] = set->sig[0] >> 32;
++
++	return copy_to_user(uset, &cset, sizeof(*uset));
++}
++
++int get_sigset_t(sigset_t *set, const compat_sigset_t __user *uset)
++{
++	compat_sigset_t s32;
++
++	if (copy_from_user(&s32, uset, sizeof(*uset)))
++		return -EFAULT;
++
++	set->sig[0] = s32.sig[0] | (((long)s32.sig[1]) << 32);
++	return 0;
++}
++
++int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
++{
++	int err;
++
++	if (!access_ok(VERIFY_WRITE, to, sizeof(*to)))
++		return -EFAULT;
++
++	/* If you change siginfo_t structure, please be sure
++	 * this code is fixed accordingly.
++	 * It should never copy any pad contained in the structure
++	 * to avoid security leaks, but must copy the generic
++	 * 3 ints plus the relevant union member.
++	 * This routine must convert siginfo from 64bit to 32bit as well
++	 *@the same time.
++	 */
++	err = __put_user(from->si_signo, &to->si_signo);
++	err |= __put_user(from->si_errno, &to->si_errno);
++	err |= __put_user((short)from->si_code, &to->si_code);
++	if (from->si_code < 0)
++		err |= __copy_to_user(&to->_sifields._pad, &from->_sifields._pad,
++				      SI_PAD_SIZE);
++	else switch (from->si_code & __SI_MASK) {
++	case __SI_KILL:
++		err |= __put_user(from->si_pid, &to->si_pid);
++		err |= __put_user(from->si_uid, &to->si_uid);
++		break;
++	case __SI_TIMER:
++		 err |= __put_user(from->si_tid, &to->si_tid);
++		 err |= __put_user(from->si_overrun, &to->si_overrun);
++		 err |= __put_user(from->si_int, &to->si_int);
++		break;
++	case __SI_POLL:
++		err |= __put_user(from->si_band, &to->si_band);
++		err |= __put_user(from->si_fd, &to->si_fd);
++		break;
++	case __SI_FAULT:
++		err |= __put_user((compat_uptr_t)(unsigned long)from->si_addr,
++				  &to->si_addr);
++#ifdef BUS_MCEERR_AO
++		/*
++		 * Other callers might not initialize the si_lsb field,
++		 * so check explicitly for the right codes here.
++		 */
++		if (from->si_signo == SIGBUS &&
++		    (from->si_code == BUS_MCEERR_AR || from->si_code == BUS_MCEERR_AO))
++			err |= __put_user(from->si_addr_lsb, &to->si_addr_lsb);
 +#endif
++		break;
++	case __SI_CHLD:
++		err |= __put_user(from->si_pid, &to->si_pid);
++		err |= __put_user(from->si_uid, &to->si_uid);
++		err |= __put_user(from->si_status, &to->si_status);
++		err |= __put_user(from->si_utime, &to->si_utime);
++		err |= __put_user(from->si_stime, &to->si_stime);
++		break;
++	case __SI_RT: /* This is not generated by the kernel as of now. */
++	case __SI_MESGQ: /* But this is */
++		err |= __put_user(from->si_pid, &to->si_pid);
++		err |= __put_user(from->si_uid, &to->si_uid);
++		err |= __put_user(from->si_int, &to->si_int);
++		break;
++	case __SI_SYS:
++		err |= __put_user((compat_uptr_t)(unsigned long)
++				from->si_call_addr, &to->si_call_addr);
++		err |= __put_user(from->si_syscall, &to->si_syscall);
++		err |= __put_user(from->si_arch, &to->si_arch);
++		break;
++	default: /* this is just in case for now ... */
++		err |= __put_user(from->si_pid, &to->si_pid);
++		err |= __put_user(from->si_uid, &to->si_uid);
++		break;
++	}
++	return err;
++}
 +
-+#define compat_arch_setup_additional_pages \
-+					aarch32_setup_vectors_page
-+struct linux_binprm;
-+extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
-+				      int uses_interp);
++int copy_siginfo_from_user32(siginfo_t *to, compat_siginfo_t __user *from)
++{
++	if (copy_from_user(to, from, __ARCH_SI_PREAMBLE_SIZE) ||
++	    copy_from_user(to->_sifields._pad,
++			   from->_sifields._pad, SI_PAD_SIZE))
++		return -EFAULT;
 +
-+#include "../../../fs/compat_binfmt_elf.c"
++	return 0;
++}
++
 -- 
 2.7.4
