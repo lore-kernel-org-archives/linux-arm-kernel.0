@@ -1,43 +1,65 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 17 Aug 2016 21:38:55 +0200
-Subject: [PULL 08/12] KVM: arm/arm64: Change misleading use of is_error_pfn
+Date: Wed, 17 Aug 2016 21:38:57 +0200
+Subject: [PULL 10/12] KVM: arm/arm64: timer: Workaround misconfigured timer
+ interrupt
 In-Reply-To: <20160817193859.15726-1-christoffer.dall@linaro.org>
 References: <20160817193859.15726-1-christoffer.dall@linaro.org>
-Message-ID: <20160817193859.15726-9-christoffer.dall@linaro.org>
+Message-ID: <20160817193859.15726-11-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When converting a gfn to a pfn, we call gfn_to_pfn_prot, which returns
-various kinds of error values.  It turns out that is_error_pfn() only
-returns true when the gfn was found in a memory slot and could somehow
-not be used, but it does not return true if the gfn does not belong to
-any memory slot.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Change use to is_error_noslot_pfn() which covers both cases.
+Similarily to f005bd7e3b84 ("clocksource/arm_arch_timer: Force
+per-CPU interrupt to be level-triggered"), make sure we can
+survive an interrupt that has been misconfigured as edge-triggered
+by forcing it to be level-triggered (active low is assumed, but
+the GIC doesn't really care whether this is high or low).
 
-Note: Since we already check for kvm_is_error_hva(hva) explicitly in the
-caller of this function while holding the kvm->srcu lock protecting the
-memory slots, this should never be a problem, but nevertheless this
-change is warranted as it shows the intention of the code.
+Hopefully, the amount of shouting in the kernel log will convince
+the user to do something about their firmware.
 
-Reported-by: James Hogan <james.hogan@imgtec.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/mmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ virt/kvm/arm/arch_timer.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index bda27b6..29d0b23 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1309,7 +1309,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	smp_rmb();
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 4fde8c7..77e6ccf 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -33,6 +33,7 @@
+ static struct timecounter *timecounter;
+ static struct workqueue_struct *wqueue;
+ static unsigned int host_vtimer_irq;
++static u32 host_vtimer_irq_flags;
  
- 	pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
--	if (is_error_pfn(pfn))
-+	if (is_error_noslot_pfn(pfn))
- 		return -EFAULT;
+ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
+ {
+@@ -365,7 +366,7 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
  
- 	if (kvm_is_device_pfn(pfn)) {
+ static void kvm_timer_init_interrupt(void *info)
+ {
+-	enable_percpu_irq(host_vtimer_irq, 0);
++	enable_percpu_irq(host_vtimer_irq, host_vtimer_irq_flags);
+ }
+ 
+ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
+@@ -432,6 +433,14 @@ int kvm_timer_hyp_init(void)
+ 	}
+ 	host_vtimer_irq = info->virtual_irq;
+ 
++	host_vtimer_irq_flags = irq_get_trigger_type(host_vtimer_irq);
++	if (host_vtimer_irq_flags != IRQF_TRIGGER_HIGH &&
++	    host_vtimer_irq_flags != IRQF_TRIGGER_LOW) {
++		kvm_err("Invalid trigger for IRQ%d, assuming level low\n",
++			host_vtimer_irq);
++		host_vtimer_irq_flags = IRQF_TRIGGER_LOW;
++	}
++
+ 	err = request_percpu_irq(host_vtimer_irq, kvm_arch_timer_handler,
+ 				 "kvm guest timer", kvm_get_running_vcpus());
+ 	if (err) {
 -- 
 2.9.0
