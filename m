@@ -1,44 +1,40 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 18 Aug 2016 16:15:59 -0500
-Subject: [PATCH v3 0/4] Add DT support for NAND to LCDK via ti-aemif
-In-Reply-To: <m2wpjeqa0o.fsf@baylibre.com> (Kevin Hilman's message of "Thu, 18
- Aug 2016 12:09:27 -0500")
-References: <20160816223338.20776-1-kbeldan@baylibre.com>
- <m2wpjeqa0o.fsf@baylibre.com>
-Message-ID: <m2vayxn5gw.fsf@baylibre.com>
+From: ccc94453@vip.cybercity.dk (Rask Ingemann Lambertsen)
+Date: Wed, 17 Aug 2016 23:32:22 +0200
+Subject: [PATCH v3 2/3] devicetree: Add vendor prefix for Shenzhen Sunchip
+ Technology Co., Ltd
+In-Reply-To: <54da74da3f60ede0bf8fb789ffee584703e81a29.1471553094.git.ccc94453@vip.cybercity.dk>
+References: <54da74da3f60ede0bf8fb789ffee584703e81a29.1471553094.git.ccc94453@vip.cybercity.dk>
+Message-ID: <8657d95d89daa3836d30ca390c49fb92eb263b16.1471553094.git.ccc94453@vip.cybercity.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@baylibre.com> writes:
+Shenzhen Sunchip Technology Co., Ltd produces TV boxes and TV dongles,
+some of which are sold under other brands. Website:
+<URL:http://www.sunchip-tech.com/>
 
-> Karl Beldan <kbeldan@baylibre.com> writes:
->
->> Here is another spin. I could get my hands on an EVM and test the
->> changes on it as well. Doing so, I could also observe that 4bit ECC
->> on 8bits NANDS is currently broken in mailine. Apparently there had
->> already been some alerts on the mailing list some months ago.
->
-> [...]
->
->> Karl Beldan (4):
->>   ARM: davinci: da8xx-dt: Add ti-aemif lookup for clock matching
->>   ARM: davinci_all_defconfig: Enable AEMIF as a module
->>   ARM: dts: da850,da850-evm: Add an aemif node and use it for the NAND
->>   ARM: dts: da850-lcdk: Add NAND to DT
->
-> Tested on DA850-LCDK with UBIFS.
->
-> Tested-by: Kevin Hilman <khilman@baylibre.com>
->
+Signed-off-by: Rask Ingemann Lambertsen <ccc94453@vip.cybercity.dk>
+---
 
-I forgot to mention that I had to enable:
+Changes in v3:
+None.
 
-CONFIG_UBIFS_FS=y
-CONFIG_MTD_UBI=y
+Changes in v2:
+No patch changes, but added CC to the ARM kernel mailing list.
 
-in order to test with ubifs. Care to send a patch adding these as
-modules to davinci_all_defconfig?
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks,
-
-Kevin
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 69398cf..2ec157c 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -254,6 +254,7 @@ starry	Starry Electronic Technology (ShenZhen) Co., LTD
+ startek	Startek
+ ste	ST-Ericsson
+ stericsson	ST-Ericsson
++sunchip	Shenzhen Sunchip Technology Co., Ltd
+ SUNW	Sun Microsystems, Inc
+ syna	Synaptics Inc.
+ synology	Synology, Inc.
+-- 
+2.8.1
