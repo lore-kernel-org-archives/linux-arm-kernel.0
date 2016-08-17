@@ -1,137 +1,152 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 17 Aug 2016 16:20:44 +0900
-Subject: [PATCH V4]mmc: dw_mmc-k3: UHS-SD card for Hisilicon Hikey
-In-Reply-To: <5d5551f4-e49c-d005-eb0b-9ca472a8d249@hisilicon.com>
-References: <1470276973-41683-1-git-send-email-kid.jin@hisilicon.com>
- <74c80b1c-5570-0ee0-4132-ff703d8d5eb4@hisilicon.com>
- <CGME20160808091030epcas1p4e868c5412d08f0ed737e85714442e801@epcas1p4.samsung.com>
- <06f63a26-251d-5ba8-f877-dae75aa8e362@rock-chips.com>
- <1b724dde-863d-fa28-fa58-595c34c1bef2@samsung.com>
- <5d5551f4-e49c-d005-eb0b-9ca472a8d249@hisilicon.com>
-Message-ID: <af90b627-e581-6722-8653-156341d3e8b7@samsung.com>
+From: fabien.lahoudere@collabora.co.uk (Fabien Lahoudere)
+Date: Wed, 17 Aug 2016 09:34:25 +0200
+Subject: [PATCH 1/1] Add PPD device tree
+In-Reply-To: <20160805133954.GC25152@leverpostej>
+References: <1470403887-15190-1-git-send-email-fabien.lahoudere@collabora.co.uk>
+ <20160805133954.GC25152@leverpostej>
+Message-ID: <f01a11ec-c5fe-8bde-ef3a-bdf240c5cc5b@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2016 03:11 PM, Jinguojun wrote:
-> Hi
-> 
-> On 2016/8/8 18:46, Jaehoon Chung wrote:
->> Hi,
->>
->> On 08/08/2016 06:10 PM, Shawn Lin wrote:
->>> Hi guy,
->>>
->>> On 2016/8/8 15:10, Jinguojun wrote:
->>>> Hi,maintainers
->>>>
->>>> Pls help to review code,this is the newest patch after your advise
->>
->> Subject..
->>
->> s/UHS-SD/UHS-I/
->>
->>>>
->>>
->>> Please give Jaehoon more time to review your patch before sending a
->>> ping or resending one(~2 weeks), as it's only four days(weekend
->>> included) since v4 was done....IMHO, it's quite bold...
->>>
->>>> Thx
-> I apologize for my rudeness.
+Hello,
 
-Don't mind. Feel free to tell me anytime! :)
+Thanks for your comments
 
->>>> On 2016/8/4 10:16, Jin Guojun wrote:
->>>>> mmc: dw_mmc-k3: Hisilicon Hikey have no tuning function in
->>>>> dw_mmc-k3.c,so we must do the tuning function stub when we init UHS card.
->>>>>
->>>
->>> Hrmmm....  remove "mmc: dw_mmc-k3:" from the meat of commit msg?
->>>
->>> And you do nothing for dw_mci_hi6220_execute_tuning, why?
->>> Could you elaborate more..
->>>
->>>
-> OK I'll remove the mmc: dw_mmc-k3:,Then Hikey can't support SDR104,so we only support SDR12 SDR25 SD50,and we do not need to do tuning for these modes.
->>>>> V1:add .prepare_command in dw_mmc.c
->>>>> V2:delete .prepare_command, add err = 0 in dw_mci_execute_tuning
->>>>> V3:delete err = 0 in dw_mci_execute_tuning,add .execute_tuning in
->>>>> dw_mmc-k3.c
->>>>> V4:add "linux-mmc at vger.kernel.org", patch version, Changelog, etc..
->>>
->>> The changelog is totally wrong, namely it should not be listed in the
->>> commit msg...
->>>
-> OK I'll delete this part
->>>>>
->>>>> Signed-off-by: Jin Guojun <kid.jin@hisilicon.com>
->>>>> ---
->>>>>  drivers/mmc/host/dw_mmc-k3.c | 6 ++++++
->>>>>  1 file changed, 6 insertions(+)
->>>>>
->>>>> diff --git a/drivers/mmc/host/dw_mmc-k3.c b/drivers/mmc/host/dw_mmc-k3.c
->>>>> index 8e9d886..6247894 100644
->>>>> --- a/drivers/mmc/host/dw_mmc-k3.c
->>>>> +++ b/drivers/mmc/host/dw_mmc-k3.c
->>>>> @@ -131,11 +131,17 @@ static void dw_mci_hi6220_set_ios(struct dw_mci *host, struct mmc_ios *ios)
->>>>>      host->bus_hz = clk_get_rate(host->biu_clk);
->>>>>  }
->>>>>
->>>>> +static int dw_mci_hi6220_execute_tuning(struct dw_mci_slot *slot, u32 opcode)
->>>>> +{
->>>>> +    return 0;
->>>>> +}
->>
->>
->> All of UHS-I cards didn't need to do tuning sequence on your SoC? it's strange.
->>
->> I think we can fix more exactly in dw_mmc.c
->> As i know, some UHS cards don't need to send the tuning sequence.
->> (If i know wrong, let me know plz.)
->>
->> But just skipping execute_tuning..I think it's not correct.
->>
->> Best Regards,
->> Jaehoon Chung
->>
-> We cant support SDR104 currently.We only turn on SDR12 SDR25 SDR50.
+On 05/08/2016 15:39, Mark Rutland wrote:
+> On Fri, Aug 05, 2016 at 03:31:25PM +0200, Fabien Lahoudere wrote:
+>> +/*
+>> + * Hardware uses CKO2 at 24MHz at several places. Set the parent clock of
+>> + * CKO2 to OSC.
+>> + */
+>> +#define CKO2_CONFIGURATION \
+>> +	clock-frequency = <24000000>; \
+>> +	clocks = <&clks IMX5_CLK_CKO2>; \
+>> +	assigned-clocks = <&clks IMX5_CLK_CKO2_SEL>, <&clks IMX5_CLK_OSC>; \
+>> +	assigned-clock-parents = <&clks IMX5_CLK_OSC>
+>
+> This makes the DT harder to read.
+>
+> Please place these explicitly where used.
+>
+>> +
+>> +/ {
+>> +	model = "Freescale i.MX53 CPUV0 PPD rev6";
+>> +	compatible = "fsl,imx53-ppd", "fsl,imx53";
+>> +
+>> +	aliases {
+>> +		spi0 = &cspi;
+>> +		spi1 = &ecspi1;
+>> +		spi2 = &ecspi2;
+>> +	};
+>> +
+>> +	chosen {
+>> +		stdout-path = &uart1;
+>> +	};
+>
+> It would be good if you could also define the rate, using an alias if
+> necessary.
+>
+>> +
+>> +	memory {
+>> +		reg = <0x70000000 0x20000000>,
+>> +		      <0xb0000000 0x20000000>;
+>> +	};
+>> +
+>> +	clocks {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +
+>> +		cko2_11M: sgtl_clock_cko2 {
+>> +			compatible = "fixed-clock";
+>> +			#clock-cells = <0>;
+>> +			clock-frequency = <11289600>;
+>> +		};
+>> +	};
+>
+> Get rid of the clocks node, and place the clock directly under the root
+> node.
+>
+>> +
+>> +	regulators {
+>> +		compatible = "simple-bus";
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +
+>> +		reg_sgtl5k: regulator at 0 {
+>> +			compatible = "regulator-fixed";
+>> +			reg = <0>;
+>> +			regulator-name = "reg-sgtl5k";
+>> +			regulator-min-microvolt = <3300000>;
+>> +			regulator-max-microvolt = <3300000>;
+>> +			regulator-always-on;
+>> +		};
+>
+> Likewise for these. Get rid of the regulators container node and place
+> these directly under the root node.
+>
+> Please don't make fake up reg and unit-address values. Just suffix the
+> node name, e.g. regulator-sgtl5k.
+>
 
-I will send the patch for execute_tuning in dwmmc.c within this week.
-After that, could you check that patch? I will add your email to CC. How about?
+Ok for all above.
 
-I think it's better than using the dummy function. :)
+>> +&ecspi1 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_ecspi1>;
+>> +	fsl,spi-num-chipselects = <4>;
+>> +	/* Fake this GPIO, this has special handling in userspace. */
+>
+> NAK. The DT should reflect reality, and should not be specific to a
+> given userspace.
+>
+>> +	cs-gpios = <&gpio5 1 GPIO_ACTIVE_LOW
+>> +		    &gpio4 10 GPIO_ACTIVE_LOW
+>> +		    &gpio4 11 GPIO_ACTIVE_LOW
+>> +		    &gpio4 12 GPIO_ACTIVE_LOW>;
+>> +	status = "okay";
+>> +
+>> +	spidev0: spi at 0 {
+>> +		compatible = "spidev";
+>> +		reg = <0>;
+>> +		spi-max-frequency = <1000000>;
+>> +		status = "okay";
+>> +	};
+>> +
+>> +	spidev1: spi at 1 {
+>> +		compatible = "spidev";
+>> +		reg = <1>;
+>> +		spi-max-frequency = <1000000>;
+>> +		status = "okay";
+>> +	};
+>> +
+>> +	spidev2: spi at 2 {
+>> +		compatible = "spidev";
+>> +		reg = <2>;
+>> +		spi-max-frequency = <1000000>;
+>> +		status = "okay";
+>> +	};
+>> +
+>> +	spidev3: spi at 3 {
+>> +		compatible = "spidev";
+>> +		reg = <3>;
+>> +		spi-max-frequency = <1000000>;
+>> +		status = "okay";
+>> +	};
+>> +};
+>
+> What are these SPI devices?
+>
+> Please fully describe them, with a complete compatible list.
+>
+> Thanks,
+> Mark.
+>
+I understand what you mean and I agree but spidev0 and spidev1 
+communicate with another micro with an OS (cortex M4) so it is ok if I 
+add 'compatible = "fsl,mk20fn1m0vmd12"' in the dts and in spidev.c ?
 
-Best Regards,
-Jaehoon Chung
+The 2 other devices are EXAR xra1403 (gpio controller).
 
->>>>> +
->>>>>  static const struct dw_mci_drv_data hi6220_data = {
->>>>>      .caps            = dw_mci_hi6220_caps,
->>>>>      .switch_voltage        = dw_mci_hi6220_switch_voltage,
->>>>>      .set_ios        = dw_mci_hi6220_set_ios,
->>>>>      .parse_dt        = dw_mci_hi6220_parse_dt,
->>>>> +    .execute_tuning        = dw_mci_hi6220_execute_tuning,
->>>>>  };
->>>>>
->>>>>  static const struct of_device_id dw_mci_k3_match[] = {
->>>>>
->>>>
->>>> -- 
->>>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
->>>> the body of a message to majordomo at vger.kernel.org
->>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>>
->>>
->>>
->>
->>
->> .
->>
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
-> 
+-- 
+Fabien Lahoudere
+Collabora Ltd.
