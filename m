@@ -1,48 +1,68 @@
-From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
-Date: Wed, 17 Aug 2016 14:54:59 +0200
-Subject: [RFC2 nowrap: PATCH v7 00/18] ILP32 for ARM64
-In-Reply-To: <20160817124822.GA25751@yury-N73SV>
-References: <1471434403-25291-1-git-send-email-ynorov@caviumnetworks.com>
- <175AE090-EDA7-4A8D-9044-3FFA74AC1903@suse.de>
- <20160817124822.GA25751@yury-N73SV>
-Message-ID: <DF24AFA0-5B5C-47E8-9B78-7C6C8711948E@theobroma-systems.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 17 Aug 2016 13:57:43 +0100
+Subject: [PATCH] ARM: irq_work: Do not attempt to IPI on non IPI-capable HW
+In-Reply-To: <VI1PR04MB14552BEF9184FF2AE23A51B58B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
+References: <1471361210-29914-1-git-send-email-marc.zyngier@arm.com>
+ <CAL411-pUUdxN_d76FaXYGtEd7Seewnrin=x2mFEbi1Z48zSRvg@mail.gmail.com>
+ <57B41523.6030202@arm.com>
+ <VI1PR04MB1455E9F56D0EDA0558CC84508B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
+ <57B41B90.3050204@arm.com>
+ <VI1PR04MB14558618D41FFF0BA4616BD08B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
+ <57B42C18.1090400@arm.com>
+ <VI1PR04MB14552BEF9184FF2AE23A51B58B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
+Message-ID: <57B45F47.7030801@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On 17 Aug 2016, at 14:48, Yury Norov <ynorov@caviumnetworks.com> wrote:
+On 17/08/16 12:27, Peter Chen wrote:
+>>
+>> On 17/08/16 09:28, Peter Chen wrote:
+>>>
+>>>>>>>
+>>>>>>> Why not using is_smp as condition, it is more strict.
+>>>>>>>
+>>>>>>> if (is_smp())
+>>>>>>>     return !!__smp_cross_call;
+>>>>>>> else
+>>>>>>>     return false;
+>>>>>>
+>>>>>> What's the gain? We're trying to check whether we can actually
+>>>>>> deliver an IPI. Why should we gate it by finding out whether we're
+>>>>>> smp_on_up or
+>>>> not?
+>>>>>>
+>>>>>
+>>>>> If UP system with CONFIG_SMP enabled, the __smp_cross_call is not
+>>>>> NULL, but the IPI is not capable. Or am I missing something?
+>>>>
+>>>> Take an OMAP3 system. It is UP,  and doesn't have a GIC, so
+>>>> __smp_cross_call will be NULL. Yet, it boots with a generic multi-platform kernel,
+>> with SMP on.
+>>>>
+>>>
+>>> Are there any UP platforms which have GIC? If there is, we may be in
+>>> trouble with only depends on CONFIG_SMP.
+>>
+>> Why would we be in trouble? Things will still work, as the irq work will be taken care
+>> of on the next timer interrupt. Again: the self IPI is only a latency optimization.
+>>
 > 
-> On Wed, Aug 17, 2016 at 02:28:50PM +0200, Alexander Graf wrote:
->> 
->>> On 17 Aug 2016, at 13:46, Yury Norov <ynorov@caviumnetworks.com> wrote:
->>> 
->>> This series enables aarch64 with ilp32 mode, and as supporting work,
->>> introduces ARCH_32BIT_OFF_T configuration option that is enabled for
->>> existing 32-bit architectures but disabled for new arches (so 64-bit
->>> off_t is is used by new userspace).
->>> 
->>> This version is based on kernel v4.8-rc2.
->>> It works with glibc-2.23, and tested with LTP.
->>> 
->>> This is RFC because there is still no solid understanding what type of registers
->>> top-halves delousing we prefer. In this patchset, w0-w7 are cleared for each
->>> syscall in assembler entry. The alternative approach is in introducing compat
->>> wrappers which is little faster for natively routed syscalls (~2.6% for syscall
->>> with no payload) but much more complicated.
->> 
->> So you?re saying there are 2 options:
->> 
->>  1) easy to get right, slightly slower, same ABI to user space as 2
->>  2) harder to get right, minor performance benefit
-> 
-> No, ABI is little different. If 1) we pass off_t in a pair to syscalls,
-> if 2) - in a single register. So if 1, we 'd take some wrappers from aarch32.
-> See patch 12 here.
+> From what I see, it is different with you. arch_irq_work_raise will be called if 
+> irq work is not lazy, and  If arch_irq_work_has_interrupt() is true,
+> the system will try to call IPI_IRQ_WORK through the GIC, but GIC has no
+> IPI capabilities, then the system is stuck, this is the same we have observed
+> at A7 single core platform.
 
->From our experience with ILP32, I?d prefer to have off_t (and similar) in a single register
-whenever possible (i.e. option #2).  It feels more natural to use the full 64bit registers 
-whenever possible, as ILP32 on ARMv8 should really be understood as a 64bit ABI with 
-a 32bit memory model.
+Look, we've been there before. For your platform to work with your
+configuration, you need the GIC patch that I already posted, and that
+has been tested by Fabio Estevam on the same A7 platform.
 
-Cheers,
-Philipp.
+The patch you are replying to handles a different case, which is the one
+where the HW is advertised as being SMP-capable, and yet do not have an
+IPI-capable interrupt controller.
+
+I can't make it clearer, sorry.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
