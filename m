@@ -1,45 +1,27 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 17 Aug 2016 11:04:25 +0100
-Subject: [PATCH v2] Added perf functionality to mmdc driver
-In-Reply-To: <DB5PR04MB1430F6105A94E0E95FF3C8FF9F130@DB5PR04MB1430.eurprd04.prod.outlook.com>
-References: <20160815223035.5429-1-zhengyu.shen@nxp.com>
- <20160815165050.GB31080@svinekod>
- <DB5PR04MB14309188D99C35809DDA377B9F130@DB5PR04MB1430.eurprd04.prod.outlook.com>
- <20160815194945.GB1120@svinekod>
- <DB5PR04MB1430F6105A94E0E95FF3C8FF9F130@DB5PR04MB1430.eurprd04.prod.outlook.com>
-Message-ID: <20160817100425.GB30900@leverpostej>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 17 Aug 2016 11:05:29 +0100
+Subject: [PATCH v2] kvm: arm: Enforce some NS-SVC initialisation
+In-Reply-To: <6d030bee2db08c2fe1b7569e692e8f66800b1e4c.1471369569.git.robin.murphy@arm.com>
+References: <5322cdb9cb397741d15b60c6693ad39dbf74b6d5.1469101945.git.robin.murphy@arm.com>
+ <6d030bee2db08c2fe1b7569e692e8f66800b1e4c.1471369569.git.robin.murphy@arm.com>
+Message-ID: <57B436E9.5050607@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 08:40:08PM +0000, Zhengyu Shen wrote:
-> > > > > +	hrtimer_start(&pmu_mmdc->hrtimer, mmdc_timer_period(),
-> > > > > +			HRTIMER_MODE_REL_PINNED);
-> > > >
-> > > > Why is a hrtimer necessary? Is this just copy-pasted from CCN, or do
-> > > > you have similar HW issues?
-> > > >
-> > > > Is there no overflow interrupt?
-> > >
-> > > When overflow occurs, a register bit is set to one. There is no
-> > > overflow interrupt which is why the timer is needed.
-> > 
-> > I see. Please have add comment in the driver explaining this, so that this is
-> > obvious.
-> > 
-> > Does the counter itself wrap and continue counting, or does it saturate?
-> > 
-> > How have you tuned your polling period so as to avoid missing events in the
-> > case of an overflow?
-> > 
-> > Thanks,
-> > Mark.
-> The counter wraps around once every ten seconds for total-cycles (which is the 
-> Fastest increasing counter). Polling is done every one second just to be safe.
+On 16/08/16 18:49, Robin Murphy wrote:
+> Since the non-secure copies of banked registers lack architecturally
+> defined reset values, there is no actual guarantee when entering in Hyp
+> from secure-only firmware that the Non-Secure PL1 state will look the
+> way that kernel entry (in particular the decompressor stub) expects.
+> So far, we've been getting away with it thanks to implementation details
+> of ARMv7 cores and/or bootloader behaviour, but for the sake of forwards
+> compatibility let's try to ensure that we have a minimally sane state
+> before dropping down into it.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-Ok. It would be worth noting this with a comment next to either the
-hrtimer handler or registration thereof.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-I assume that on overflow the counter wraps rather than saturating?
-
-Thanks,
-Mark.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
