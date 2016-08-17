@@ -1,53 +1,31 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 17 Aug 2016 11:26:42 -0300
-Subject: [PATCH] ARM: dts: imx6sx: document SION necessity of
- ENET1_REF_CLK1
-In-Reply-To: <1471425931.1934.18.camel@googlemail.com>
-References: <1458825865-7434-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1458825865-7434-7-git-send-email-u.kleine-koenig@pengutronix.de>
- <1470350663.26773.41.camel@googlemail.com>
- <20160805065845.GI17874@pengutronix.de>
- <1470398615.1936.22.camel@googlemail.com>
- <CAOMZO5BQQemrKFjejUxQpW+d=BGn_b+d_sbr9Untu8iO3dOVvw@mail.gmail.com>
- <1471120532.1923.4.camel@googlemail.com>
- <20160815052244.mwygjlo72e46w353@pengutronix.de>
- <1471425931.1934.18.camel@googlemail.com>
-Message-ID: <CAOMZO5CCwreYYgNd6uGnf9A0=KcMefYqHLFNWdMnweSTezxnWQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 17 Aug 2016 16:26:48 +0200
+Subject: [PATCH 0/4] arm64: marvell: add support for the PIC and PMU
+In-Reply-To: <20160816141447.GQ3353@io.lakedaemon.net>
+References: <1470408921-447-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160816141447.GQ3353@io.lakedaemon.net>
+Message-ID: <20160817162648.50eeeb83@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoph,
+Hello,
 
-On Wed, Aug 17, 2016 at 6:25 AM, Christoph Fritz
-<chf.fritz@googlemail.com> wrote:
+On Tue, 16 Aug 2016 14:14:47 +0000, Jason Cooper wrote:
 
-> +/*
-> + * SION bit is necessary for ENET1_REF_CLK1 (ENET2_REF_CLK2 untested) if it is
-> + * used as clock output of IMX6SX_CLK_ENET_REF (ENET1_TX_CLK) to e.g. supply a
-> + * PHY in RMII mode. This configuration is valid if:
-> + *  - bit 1 in field IMX6SX_GPR1_FEC_CLOCK_PAD_DIR_MASK is set
-> + *  - bit 1 in field IMX6SX_GPR1_FEC_CLOCK_MUX_SEL_MASK unset
+> Patches 1-3 applied to irqchip/mvebu64.  Patch 1 has Rob's Ack.
 
-So in your case the imx6sx_enet_clk_sel() does not do what you need:
+Great, thanks! Did you fix the driver for the minor nit that you
+pointed out, or do you want a follow-up to fix that?
 
-static void __init imx6sx_enet_clk_sel(void)
-{
-    struct regmap *gpr;
+> I assume you'll route the dtsi change through a separate branch.
 
-    gpr = syscon_regmap_lookup_by_compatible("fsl,imx6sx-iomuxc-gpr");
-    if (!IS_ERR(gpr)) {
-        regmap_update_bits(gpr, IOMUXC_GPR1,
-                   IMX6SX_GPR1_FEC_CLOCK_MUX_SEL_MASK, 0);
-        regmap_update_bits(gpr, IOMUXC_GPR1,
-                   IMX6SX_GPR1_FEC_CLOCK_PAD_DIR_MASK, 0);
-    } else {
-        pr_err("failed to find fsl,imx6sx-iomux-gpr regmap\n");
-    }
-}
+Yes, Gregory will take care of the .dtsi change, and pass it through
+mvebu and arm-soc.
 
-It seems that it is not a good idea to have imx6sx_enet_clk_sel() in
-common code as the GPR1 setting can change from board to board.
+Thanks!
 
-I think we need the fec driver to be in charge of configuring the GPR1 register.
-
-This is unrelated to your patch though :-)
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
