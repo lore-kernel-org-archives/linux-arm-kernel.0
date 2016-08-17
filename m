@@ -1,65 +1,44 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 17 Aug 2016 21:38:57 +0200
-Subject: [PULL 10/12] KVM: arm/arm64: timer: Workaround misconfigured timer
- interrupt
+Date: Wed, 17 Aug 2016 21:38:59 +0200
+Subject: [PULL 12/12] arm64: KVM: report configured SRE value to 32-bit world
 In-Reply-To: <20160817193859.15726-1-christoffer.dall@linaro.org>
 References: <20160817193859.15726-1-christoffer.dall@linaro.org>
-Message-ID: <20160817193859.15726-11-christoffer.dall@linaro.org>
+Message-ID: <20160817193859.15726-13-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+From: Vladimir Murzin <vladimir.murzin@arm.com>
 
-Similarily to f005bd7e3b84 ("clocksource/arm_arch_timer: Force
-per-CPU interrupt to be level-triggered"), make sure we can
-survive an interrupt that has been misconfigured as edge-triggered
-by forcing it to be level-triggered (active low is assumed, but
-the GIC doesn't really care whether this is high or low).
+After commit b34f2bc ("arm64: KVM: Make ICC_SRE_EL1 access return the
+configured SRE value") we report SRE value to 64-bit guest, but 32-bit
+one still handled as RAZ/WI what leads to funny promise we do not keep:
 
-Hopefully, the amount of shouting in the kernel log will convince
-the user to do something about their firmware.
+"GICv3: GIC: unable to set SRE (disabled at EL2), panic ahead"
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Instead, return the actual value of the ICC_SRE_EL1 register that the
+guest should see.
+
+ [ Tweaked commit message - Christoffer ]
+
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/arch_timer.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ arch/arm64/kvm/sys_regs.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 4fde8c7..77e6ccf 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -33,6 +33,7 @@
- static struct timecounter *timecounter;
- static struct workqueue_struct *wqueue;
- static unsigned int host_vtimer_irq;
-+static u32 host_vtimer_irq_flags;
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index af5ea86..e51367d 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -1352,7 +1352,7 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 	{ Op1( 0), CRn(10), CRm( 3), Op2( 1), access_vm_reg, NULL, c10_AMAIR1 },
  
- void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
- {
-@@ -365,7 +366,7 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
+ 	/* ICC_SRE */
+-	{ Op1( 0), CRn(12), CRm(12), Op2( 5), trap_raz_wi },
++	{ Op1( 0), CRn(12), CRm(12), Op2( 5), access_gic_sre },
  
- static void kvm_timer_init_interrupt(void *info)
- {
--	enable_percpu_irq(host_vtimer_irq, 0);
-+	enable_percpu_irq(host_vtimer_irq, host_vtimer_irq_flags);
- }
+ 	{ Op1( 0), CRn(13), CRm( 0), Op2( 1), access_vm_reg, NULL, c13_CID },
  
- int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
-@@ -432,6 +433,14 @@ int kvm_timer_hyp_init(void)
- 	}
- 	host_vtimer_irq = info->virtual_irq;
- 
-+	host_vtimer_irq_flags = irq_get_trigger_type(host_vtimer_irq);
-+	if (host_vtimer_irq_flags != IRQF_TRIGGER_HIGH &&
-+	    host_vtimer_irq_flags != IRQF_TRIGGER_LOW) {
-+		kvm_err("Invalid trigger for IRQ%d, assuming level low\n",
-+			host_vtimer_irq);
-+		host_vtimer_irq_flags = IRQF_TRIGGER_LOW;
-+	}
-+
- 	err = request_percpu_irq(host_vtimer_irq, kvm_arch_timer_handler,
- 				 "kvm guest timer", kvm_get_running_vcpus());
- 	if (err) {
 -- 
 2.9.0
