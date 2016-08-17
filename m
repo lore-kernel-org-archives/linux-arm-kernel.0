@@ -1,26 +1,59 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 17 Aug 2016 13:51:37 +0200
-Subject: [PATCH v5 6/7] power: act8945a_charger: Add max current property
-In-Reply-To: <1471337998-6467-7-git-send-email-wenyou.yang@atmel.com>
-References: <1471337998-6467-1-git-send-email-wenyou.yang@atmel.com>
- <1471337998-6467-7-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20160817115137.sldoet7dfxeusoxm@earth>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 17 Aug 2016 13:55:44 +0200
+Subject: [RFC PATCH v2 0/4] arm/arm64: vgic-new: Implement API for vGICv3
+ live migration
+In-Reply-To: <20160816173747.GH14088@cbox>
+References: <1470740326-27751-1-git-send-email-vijay.kilari@gmail.com>
+ <20160816173747.GH14088@cbox>
+Message-ID: <20160817115544.GB5909@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Aug 16, 2016 at 07:37:47PM +0200, Christoffer Dall wrote:
+> Hi Vijaya,
+> 
+> On Tue, Aug 09, 2016 at 04:28:42PM +0530, vijay.kilari at gmail.com wrote:
+> > From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> > 
+> > This patchset adds API for saving and restoring
+> > of VGICv3 registers to support live migration with new vgic feature.
+> > This API definition is as per version of VGICv3 specification
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
+> > 
+> > To test live migration with QEMU, use below patch series
+> > https://lists.gnu.org/archive/html/qemu-devel/2016-08/msg01444.html
+> > 
+> > The patch 3 & 4 are picked from the Pavel's previous implementation.
+> > http://www.spinics.net/lists/kvm/msg122040.html
+> > 
+> > v1 => v2:
+> >  - The init sequence change patch is no more required.
+> >    Fixed in patch 2 by using static vgic_io_dev regions structure instead
+> >    of using dynamic allocation pointer.
+> >  - Updated commit message of patch 4.
+> >  - Dropped usage of union to manage 32-bit and 64-bit access in patch 1.
+> >    Used local variable for 32-bit access.
+> >  - Updated macro __ARM64_SYS_REG and ARM64_SYS_REG in 
+> >    arch/arm64/include/uapi/asm/kvm.h as per qemu requirements.
+> > 
+> I think you should have enough to go on by now for a new revision.  You
+> can include the two patches I just sent with the series '[PATCH v2]
+> Rework vgic_attr_regs_access' in the beginning of your series and then
+> base your work on that, assuming nobody else screams about this.
+> 
+> If you use that approach, and you address the missing soft pending state
+> etc. that Peter pointed out, then we should be ready for a detailed
+> review.
+> 
+> Looking forward to the next version.
+> 
+FYI: I pushed the API doc and the refactoring patches to the 'queue'
+branch of the kvmarm tree:
 
-On Tue, Aug 16, 2016 at 04:59:57PM +0800, Wenyou Yang wrote:
-> Add the power supply's current max property,
-> POWER_SUPPLY_PROP_CURRENT_MAX.
+git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git
 
-Please also switch chgin_level to gpiod API.
+It would be good if you could base your patches on there for the next
+revision.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160817/e215d0f0/attachment-0001.sig>
+Thanks,
+-Christoffer
