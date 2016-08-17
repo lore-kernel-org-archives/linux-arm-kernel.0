@@ -1,315 +1,41 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Wed, 17 Aug 2016 20:48:07 +0800
-Subject: [PATCH V4 1/3] tracing: add a possibility of exporting function
- trace to other places instead of ring buffer only
-In-Reply-To: <20160815102826.667318b6@gandalf.local.home>
-References: <1471261803-1186-1-git-send-email-zhang.chunyan@linaro.org>
- <1471261803-1186-2-git-send-email-zhang.chunyan@linaro.org>
- <20160815102826.667318b6@gandalf.local.home>
-Message-ID: <CAG2=9p8qLfftFApsqDPeN9--0c8na7jwpjzrjcbYw4xv2PUcbw@mail.gmail.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 17 Aug 2016 15:48:22 +0300
+Subject: [RFC2 nowrap: PATCH v7 00/18] ILP32 for ARM64
+In-Reply-To: <175AE090-EDA7-4A8D-9044-3FFA74AC1903@suse.de>
+References: <1471434403-25291-1-git-send-email-ynorov@caviumnetworks.com>
+ <175AE090-EDA7-4A8D-9044-3FFA74AC1903@suse.de>
+Message-ID: <20160817124822.GA25751@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Steve,
+On Wed, Aug 17, 2016 at 02:28:50PM +0200, Alexander Graf wrote:
+> 
+> > On 17 Aug 2016, at 13:46, Yury Norov <ynorov@caviumnetworks.com> wrote:
+> > 
+> > This series enables aarch64 with ilp32 mode, and as supporting work,
+> > introduces ARCH_32BIT_OFF_T configuration option that is enabled for
+> > existing 32-bit architectures but disabled for new arches (so 64-bit
+> > off_t is is used by new userspace).
+> > 
+> > This version is based on kernel v4.8-rc2.
+> > It works with glibc-2.23, and tested with LTP.
+> > 
+> > This is RFC because there is still no solid understanding what type of registers
+> > top-halves delousing we prefer. In this patchset, w0-w7 are cleared for each
+> > syscall in assembler entry. The alternative approach is in introducing compat
+> > wrappers which is little faster for natively routed syscalls (~2.6% for syscall
+> > with no payload) but much more complicated.
+> 
+> So you?re saying there are 2 options:
+> 
+>   1) easy to get right, slightly slower, same ABI to user space as 2
+>   2) harder to get right, minor performance benefit
 
-Please correct me if I'm missing something in my following reply.
+No, ABI is little different. If 1) we pass off_t in a pair to syscalls,
+if 2) - in a single register. So if 1, we 'd take some wrappers from aarch32.
+See patch 12 here.
 
-On 15 August 2016 at 22:28, Steven Rostedt <rostedt@goodmis.org> wrote:
-> On Mon, 15 Aug 2016 19:50:01 +0800
-> Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
->
->> +int register_trace_export(struct trace_export *export);
->> +int unregister_trace_export(struct trace_export *export);
->> +
->> +#endif       /* CONFIG_TRACING */
->> +
->> +#endif       /* _LINUX_TRACE_H */
->> diff --git a/kernel/trace/trace.c b/kernel/trace/trace.c
->> index dade4c9..0247ac2 100644
->> --- a/kernel/trace/trace.c
->> +++ b/kernel/trace/trace.c
->> @@ -40,6 +40,7 @@
->>  #include <linux/poll.h>
->>  #include <linux/nmi.h>
->>  #include <linux/fs.h>
->> +#include <linux/trace.h>
->>  #include <linux/sched/rt.h>
->>
->>  #include "trace.h"
->> @@ -2128,6 +2129,127 @@ void trace_buffer_unlock_commit_regs(struct trace_array *tr,
->>       ftrace_trace_userstack(buffer, flags, pc);
->>  }
->>
->> +static inline void
->> +trace_generic_commit(struct trace_array *tr,
->> +            struct ring_buffer_event *event)
->
-> Why is this marked inline? It is never called directly here.
->
->> +{
->> +     struct trace_entry *entry;
->> +     struct trace_export *export = tr->export;
->> +     unsigned int size = 0;
->> +
->> +     entry = ring_buffer_event_data(event);
->> +
->> +     trace_entry_size(size, entry->type);
->> +     if (!size)
->> +             return;
->> +
->> +     if (export->write)
->> +             export->write((char *)entry, size);
->> +}
->> +
->> +static inline void
->
-> Same here.
->
->> +trace_rb_commit(struct trace_array *tr,
->> +            struct ring_buffer_event *event)
->> +{
->> +     __buffer_unlock_commit(tr->trace_buffer.buffer, event);
->> +}
->> +
->> +static DEFINE_MUTEX(trace_export_lock);
->> +
->> +static struct trace_export trace_export_rb __read_mostly = {
->> +     .name           = "rb",
->> +     .commit = trace_rb_commit,
->
-> Make sure equal signs are lined up.
->
->> +     .next           = NULL,
->> +};
->> +static struct trace_export *trace_exports_list __read_mostly = &trace_export_rb;
->
-> trace_exports_list needs to be annotated as rcu, if you are going to
-> dereference it via rcu_dereference. That was the kbuild warning you
-> received.
-
-Ok, will do.
-
-But I guess 'ftrace_ops_list' in ftrace.c [1] also should be annotated as rcu?
-
-[1] http://lxr.free-electrons.com/source/kernel/trace/ftrace.c#L460
-
->
->> +
->> +inline void
->> +trace_exports(struct trace_array *tr, struct ring_buffer_event *event)
->> +{
->> +     struct trace_export *export;
->> +
->> +     preempt_disable_notrace();
->> +
->> +     for (export = rcu_dereference_raw_notrace(trace_exports_list);
->> +          export && export->commit;
->> +          export = rcu_dereference_raw_notrace(export->next)) {
->> +             tr->export = export;
->> +             export->commit(tr, event);
->> +     }
->> +
->> +     preempt_enable_notrace();
->> +}
->
-> I'm not too happy about the added overhead to normal function tracing
-> (it will be noticeable), but I can fix that later.
-
-I think I will try to revise here in the next revision.
-
->
->> +
->> +static void
->> +add_trace_export(struct trace_export **list, struct trace_export *export)
->> +{
->> +     export->next = *list;
->
-> As export->next will most likely need to be marked __rcu as well, this
-> may need an rcu_assign_pointer() too.
->
->> +     /*
->> +      * We are entering export into the list but another
->> +      * CPU might be walking that list. We need to make sure
->> +      * the export->next pointer is valid before another CPU sees
->> +      * the export pointer included into the list.
->> +      */
->> +     rcu_assign_pointer(*list, export);
->> +
->> +}
->> +
->> +static int
->> +rm_trace_export(struct trace_export **list, struct trace_export *export)
->> +{
->> +     struct trace_export **p;
->> +
->> +     for (p = list; *p != &trace_export_rb; p = &(*p)->next)
->> +             if (*p == export)
->> +                     break;
->> +
->> +     if (*p != export)
->> +             return -1;
->> +
->> +     *p = (*p)->next;
->
-> I believe this requires an rcu_assign_pointer() as well.
->
->> +
->> +     return 0;
->> +}
->> +
->> +int register_trace_export(struct trace_export *export)
->> +{
->> +     if (!export->write) {
->> +             pr_warn("trace_export must have the write() call back.\n");
->
-> Probably should be a "WARN_ON_ONCE()".
-
-Yes, will revise.
-
->
->> +             return -1;
->> +     }
->> +
->> +     if (!export->name) {
->> +             pr_warn("trace_export must have a name.\n");
->> +             return -1;
->> +     }
->
-> If name isn't used don't add it till it is. That is, this patch should
-> not have "name" in the structure. It's confusing, because I don't see a
-> purpose for it.
-
-Ok will remove that.
-
->
->> +
->> +     mutex_lock(&trace_export_lock);
->> +
->> +     export->tr = trace_exports_list->tr;
->
-> I don't see where tr is ever assigned.
->
->> +     export->commit = trace_generic_commit;
->
-> Shouldn't the caller pass in the commit function too?
-
-The trace_export::write() callback is for caller, commit function
-mainly deal with traces, is it better to keep 'trace_generic_commit'
-in trace.c, i.e don't expose it to callers?
-
->
->> +
->> +     add_trace_export(&trace_exports_list, export);
->> +
->> +     mutex_unlock(&trace_export_lock);
->> +
->> +     return 0;
->> +}
->> +EXPORT_SYMBOL_GPL(register_trace_export);
->> +
->> +int unregister_trace_export(struct trace_export *export)
->> +{
->> +     int ret;
->> +
->> +     mutex_lock(&trace_export_lock);
->> +
->> +     ret = rm_trace_export(&trace_exports_list, export);
->> +
->> +     mutex_unlock(&trace_export_lock);
->> +
->> +     return ret;
->> +}
->> +EXPORT_SYMBOL_GPL(unregister_trace_export);
->> +
->>  void
->>  trace_function(struct trace_array *tr,
->>              unsigned long ip, unsigned long parent_ip, unsigned long flags,
->> @@ -2147,7 +2269,7 @@ trace_function(struct trace_array *tr,
->>       entry->parent_ip                = parent_ip;
->>
->>       if (!call_filter_check_discard(call, entry, buffer, event))
->
-> How do you handle the discard? If the entry doesn't match the filter,
-> it will try to discard the event. I don't see how the "trace_exports"
-> handle that.
-
-I directly used the entries which had already been filtered.
-Humm.. sorry, actually you lost me here.
-
->
->
->> -             __buffer_unlock_commit(buffer, event);
->> +             trace_exports(tr, event);
->>  }
->>
->>  #ifdef CONFIG_STACKTRACE
->> diff --git a/kernel/trace/trace.h b/kernel/trace/trace.h
->> index f783df4..a40f07c 100644
->> --- a/kernel/trace/trace.h
->> +++ b/kernel/trace/trace.h
->> @@ -260,6 +260,7 @@ struct trace_array {
->>       /* function tracing enabled */
->>       int                     function_enabled;
->>  #endif
->> +     struct trace_export     *export;
->>  };
->>
->>  enum {
->> @@ -301,6 +302,13 @@ static inline struct trace_array *top_trace_array(void)
->>               break;                                  \
->>       }
->>
->> +#undef IF_SIZE
->> +#define IF_SIZE(size, var, etype, id)                \
->> +             if (var == id) {                \
->> +                     size = (sizeof(etype)); \
->> +                     break;                  \
->> +             }
->> +
->>  /* Will cause compile errors if type is not found. */
->>  extern void __ftrace_bad_type(void);
->>
->> @@ -339,6 +347,29 @@ extern void __ftrace_bad_type(void);
->>       } while (0)
->>
->>  /*
->> + * The trace_entry_size return the size of specific trace type
->> + *
->> + * IF_SIZE(size, var);
->> + *
->> + * Where "var" is just the given trace type.
->> + */
->> +#define trace_entry_size(size, var)                                  \
->> +     do {                                                            \
->> +             IF_SIZE(size, var, struct ftrace_entry, TRACE_FN);      \
->> +             IF_SIZE(size, var, struct stack_entry, TRACE_STACK);    \
->> +             IF_SIZE(size, var, struct userstack_entry,              \
->> +                     TRACE_USER_STACK);                              \
->> +             IF_SIZE(size, var, struct print_entry, TRACE_PRINT);    \
->> +             IF_SIZE(size, var, struct bprint_entry, TRACE_BPRINT);  \
->> +             IF_SIZE(size, var, struct bputs_entry, TRACE_BPUTS);    \
->> +             IF_SIZE(size, var, struct trace_branch, TRACE_BRANCH);  \
->> +             IF_SIZE(size, var, struct ftrace_graph_ent_entry,       \
->> +                     TRACE_GRAPH_ENT);                               \
->> +             IF_SIZE(size, var, struct ftrace_graph_ret_entry,       \
->> +                     TRACE_GRAPH_RET);                               \
->
-> I really really dislike this. This is a big if statement that all
-> needs to go down one by one. Very inefficient!
-
-Ok, will change to other implementation.
-
-
-Thanks for your comments,
-Chunyan
-
->
-> -- Steve
->
->> +     } while (0)
->> +
->> +/*
->>   * An option specific to a tracer. This is a boolean value.
->>   * The bit is the bit index that sets its value on the
->>   * flags value in struct tracer_flags.
->
+> That?s an obvious pick, no? Mark it non-RFC and stay with the clearing in assembler entry. If anyone cares about those last few percent, they can still push the harder path upstream later if they want to, but at least we?ll have the ABI stable, so that you can start using and developing for ilp32 on aarch64.
+> 
+> 
+> Alex
