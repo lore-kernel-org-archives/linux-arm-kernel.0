@@ -1,48 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 17 Aug 2016 10:19:20 +0100
-Subject: [PATCH] ARM: irq_work: Do not attempt to IPI on non IPI-capable HW
-In-Reply-To: <VI1PR04MB14558618D41FFF0BA4616BD08B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
-References: <1471361210-29914-1-git-send-email-marc.zyngier@arm.com>
- <CAL411-pUUdxN_d76FaXYGtEd7Seewnrin=x2mFEbi1Z48zSRvg@mail.gmail.com>
- <57B41523.6030202@arm.com>
- <VI1PR04MB1455E9F56D0EDA0558CC84508B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
- <57B41B90.3050204@arm.com>
- <VI1PR04MB14558618D41FFF0BA4616BD08B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
-Message-ID: <57B42C18.1090400@arm.com>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Wed, 17 Aug 2016 11:25:31 +0200
+Subject: [PATCH] ARM: dts: imx6sx: document SION necessity of ENET1_REF_CLK1
+In-Reply-To: <20160815052244.mwygjlo72e46w353@pengutronix.de>
+References: <1458825865-7434-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1458825865-7434-7-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1470350663.26773.41.camel@googlemail.com>
+ <20160805065845.GI17874@pengutronix.de>
+ <1470398615.1936.22.camel@googlemail.com>
+ <CAOMZO5BQQemrKFjejUxQpW+d=BGn_b+d_sbr9Untu8iO3dOVvw@mail.gmail.com>
+ <1471120532.1923.4.camel@googlemail.com>
+ <20160815052244.mwygjlo72e46w353@pengutronix.de>
+Message-ID: <1471425931.1934.18.camel@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/08/16 09:28, Peter Chen wrote:
->  
->>>>>
->>>>> Why not using is_smp as condition, it is more strict.
->>>>>
->>>>> if (is_smp())
->>>>>     return !!__smp_cross_call;
->>>>> else
->>>>>     return false;
->>>>
->>>> What's the gain? We're trying to check whether we can actually
->>>> deliver an IPI. Why should we gate it by finding out whether we're smp_on_up or
->> not?
->>>>
->>>
->>> If UP system with CONFIG_SMP enabled, the __smp_cross_call is not
->>> NULL, but the IPI is not capable. Or am I missing something?
->>
->> Take an OMAP3 system. It is UP,  and doesn't have a GIC, so __smp_cross_call will
->> be NULL. Yet, it boots with a generic multi-platform kernel, with SMP on.
->>
-> 
-> Are there any UP platforms which have GIC? If there is, we may be in trouble with only
-> depends on CONFIG_SMP.
 
-Why would we be in trouble? Things will still work, as the irq work will
-be taken care of on the next timer interrupt. Again: the self IPI is
-only a latency optimization.
+Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+---
+ arch/arm/boot/dts/imx6sx-pinfunc.h | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-Thanks,
-
-	M.
+diff --git a/arch/arm/boot/dts/imx6sx-pinfunc.h b/arch/arm/boot/dts/imx6sx-pinfunc.h
+index bb9c6b7..42c4c80 100644
+--- a/arch/arm/boot/dts/imx6sx-pinfunc.h
++++ b/arch/arm/boot/dts/imx6sx-pinfunc.h
+@@ -308,6 +308,20 @@
+ #define MX6SX_PAD_ENET1_RX_CLK__VDEC_DEBUG_35                     0x008C 0x03D4 0x0000 0x8 0x0
+ #define MX6SX_PAD_ENET1_RX_CLK__PCIE_CTRL_DEBUG_29                0x008C 0x03D4 0x0000 0x9 0x0
+ #define MX6SX_PAD_ENET1_TX_CLK__ENET1_TX_CLK                      0x0090 0x03D8 0x0000 0x0 0x0
++/*
++ * SION bit is necessary for ENET1_REF_CLK1 (ENET2_REF_CLK2 untested) if it is
++ * used as clock output of IMX6SX_CLK_ENET_REF (ENET1_TX_CLK) to e.g. supply a
++ * PHY in RMII mode. This configuration is valid if:
++ *  - bit 1 in field IMX6SX_GPR1_FEC_CLOCK_PAD_DIR_MASK is set
++ *  - bit 1 in field IMX6SX_GPR1_FEC_CLOCK_MUX_SEL_MASK unset
++ * It seems to be a silicon bug that in this configuration ENET1_TX reference
++ * clock isn't provided automatically.  According to i.MX6SX reference manual
++ * (IOMUXC_GPR_GPR1 field descriptions: ENET1_CLK_SEL, Rev. 0 from 2/2015) it
++ * should be the case.
++ * So this might have unwanted side effects for other hardware units that are
++ * also connected to that pin and using respective function as input (e.g.
++ * UART1's DTR handling on MX6SX_PAD_ENET1_TX_CLK__UART1_DTR_B).
++ */
+ #define MX6SX_PAD_ENET1_TX_CLK__ENET1_REF_CLK1                    0x0090 0x03D8 0x0760 0x1 0x1
+ #define MX6SX_PAD_ENET1_TX_CLK__AUDMUX_AUD4_RXD                   0x0090 0x03D8 0x0644 0x2 0x1
+ #define MX6SX_PAD_ENET1_TX_CLK__UART1_DTR_B                       0x0090 0x03D8 0x0000 0x3 0x0
 -- 
-Jazz is not dead. It just smells funny...
+2.1.4
