@@ -1,109 +1,48 @@
-From: yunhui.cui@nxp.com (Yunhui Cui)
-Date: Wed, 17 Aug 2016 09:07:36 +0000
-Subject: [PATCH v2 6/9] mtd: spi-nor: Support R/W for S25FS-S family flash
-In-Reply-To: <CADRPPNS91-y1BRa8sDUZb1PrrrxbfPgnfLd-AByAVKx1vrC7fw@mail.gmail.com>
-References: <1461307192-866-1-git-send-email-B56489@freescale.com>
- <1461307192-866-6-git-send-email-B56489@freescale.com>
- <CADRPPNS91-y1BRa8sDUZb1PrrrxbfPgnfLd-AByAVKx1vrC7fw@mail.gmail.com>
-Message-ID: <VI1PR0401MB2640E76EADBBDE9003DE885694140@VI1PR0401MB2640.eurprd04.prod.outlook.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 17 Aug 2016 10:19:20 +0100
+Subject: [PATCH] ARM: irq_work: Do not attempt to IPI on non IPI-capable HW
+In-Reply-To: <VI1PR04MB14558618D41FFF0BA4616BD08B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
+References: <1471361210-29914-1-git-send-email-marc.zyngier@arm.com>
+ <CAL411-pUUdxN_d76FaXYGtEd7Seewnrin=x2mFEbi1Z48zSRvg@mail.gmail.com>
+ <57B41523.6030202@arm.com>
+ <VI1PR04MB1455E9F56D0EDA0558CC84508B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
+ <57B41B90.3050204@arm.com>
+ <VI1PR04MB14558618D41FFF0BA4616BD08B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
+Message-ID: <57B42C18.1090400@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On August 16, 2016 2:03 AM, Leo wrote:
-
-> On Fri, Apr 22, 2016 at 1:39 AM, Yunhui Cui <B56489@freescale.com> wrote:
-> > From: Yunhui Cui <yunhui.cui@nxp.com>
-> >
-> > With the physical sectors combination, S25FS-S family flash requires
-> > some special operations for read/write functions.
-> >
-> > Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
-> > ---
-> >  drivers/mtd/spi-nor/spi-nor.c | 59
-> > +++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 59 insertions(+)
-> >
-> > diff --git a/drivers/mtd/spi-nor/spi-nor.c
-> > b/drivers/mtd/spi-nor/spi-nor.c index 157841d..91ee920 100644
-> > --- a/drivers/mtd/spi-nor/spi-nor.c
-> > +++ b/drivers/mtd/spi-nor/spi-nor.c
-> > @@ -39,6 +39,10 @@
-> >
-> >  #define SPI_NOR_MAX_ID_LEN     6
-> >  #define SPI_NOR_MAX_ADDR_WIDTH 4
-> > +/* Added for S25FS-S family flash */
-> > +#define SPINOR_CONFIG_REG3_OFFSET      0x800004
-> > +#define CR3V_4KB_ERASE_UNABLE  0x8
-> > +#define SPINOR_S25FS_FAMILY_ID 0x81
-> >
-> >  struct flash_info {
-> >         char            *name;
-> > @@ -78,6 +82,7 @@ struct flash_info {
-> >  };
-> >
-> >  #define JEDEC_MFR(info)        ((info)->id[0])
-> > +#define EXT_ID(info)   ((info)->id[5])
-> >
-> >  static const struct flash_info *spi_nor_match_id(const char *name);
-> >
-> > @@ -881,6 +886,7 @@ static const struct flash_info spi_nor_ids[] = {
-> >          */
-> >         { "s25sl032p",  INFO(0x010215, 0x4d00,  64 * 1024,  64,
-> SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
-> >         { "s25sl064p",  INFO(0x010216, 0x4d00,  64 * 1024, 128,
-> > SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
-> > +       { "s25fs256s1", INFO6(0x010219, 0x4d0181, 64 * 1024, 512, 0)},
-> >         { "s25fl256s0", INFO(0x010219, 0x4d00, 256 * 1024, 128, 0) },
-> >         { "s25fl256s1", INFO(0x010219, 0x4d01,  64 * 1024, 512,
-> SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
-> >         { "s25fl512s",  INFO(0x010220, 0x4d00, 256 * 1024, 256,
-> > SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) }, @@ -1018,6 +1024,53 @@ static
-> const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
-> >         return ERR_PTR(-ENODEV);
-> >  }
-> >
-> > +/*
-> > + * The S25FS-S family physical sectors may be configured as a
-> > + * hybrid combination of eight 4-kB parameter sectors
-> > + * at the top or bottom of the address space with all
-> > + * but one of the remaining sectors being uniform size.
-> > + * The Parameter Sector Erase commands (20h or 21h) must
-> > + * be used to erase the 4-kB parameter sectors individually.
-> > + * The Sector (uniform sector) Erase commands (D8h or DCh)
-> > + * must be used to erase any of the remaining
-> > + * sectors, including the portion of highest or lowest address
-> > + * sector that is not overlaid by the parameter sectors.
-> > + * The uniform sector erase command has no effect on parameter sectors.
-> > + */
-> > +static int spansion_s25fs_disable_4kb_erase(struct spi_nor *nor) {
-> > +       struct fsl_qspi *q;
-> > +       u32 cr3v_addr  = SPINOR_CONFIG_REG3_OFFSET;
-> > +       u8 cr3v = 0x0;
-> > +       int ret = 0x0;
-> > +
-> > +       q = nor->priv;
-> > +
-> > +       nor->cmd_buf[2] = cr3v_addr >> 16;
-> > +       nor->cmd_buf[1] = cr3v_addr >> 8;
-> > +       nor->cmd_buf[0] = cr3v_addr >> 0;
-> > +
-> > +       ret = nor->read_reg(nor, SPINOR_OP_SPANSION_RDAR, &cr3v, 1);
-> > +       if (ret)
-> > +               return ret;
-> > +       if (cr3v & CR3V_4KB_ERASE_UNABLE)
-> > +               return 0;
-> > +       ret = nor->write_reg(nor, SPINOR_OP_WREN, NULL, 0);
-> > +       if (ret)
-> > +               return ret;
-> > +       cr3v = CR3V_4KB_ERASE_UNABLE;
-> > +       nor->program_opcode = SPINOR_OP_SPANSION_WRAR;
-> > +       nor->write(nor, cr3v_addr, 1, NULL, &cr3v);
+On 17/08/16 09:28, Peter Chen wrote:
+>  
+>>>>>
+>>>>> Why not using is_smp as condition, it is more strict.
+>>>>>
+>>>>> if (is_smp())
+>>>>>     return !!__smp_cross_call;
+>>>>> else
+>>>>>     return false;
+>>>>
+>>>> What's the gain? We're trying to check whether we can actually
+>>>> deliver an IPI. Why should we gate it by finding out whether we're smp_on_up or
+>> not?
+>>>>
+>>>
+>>> If UP system with CONFIG_SMP enabled, the __smp_cross_call is not
+>>> NULL, but the IPI is not capable. Or am I missing something?
+>>
+>> Take an OMAP3 system. It is UP,  and doesn't have a GIC, so __smp_cross_call will
+>> be NULL. Yet, it boots with a generic multi-platform kernel, with SMP on.
+>>
 > 
-> The patch need to be re-spined due to the parameter change of write() in
-> v4.8-rc.  Otherwise it can not pass build.
-> 
+> Are there any UP platforms which have GIC? If there is, we may be in trouble with only
+> depends on CONFIG_SMP.
 
-[Yunhui]Thanks for your reminder, I will check and update it .
+Why would we be in trouble? Things will still work, as the irq work will
+be taken care of on the next timer interrupt. Again: the self IPI is
+only a latency optimization.
 
-> Regards,
-> Leo
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
