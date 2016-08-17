@@ -1,244 +1,99 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 17 Aug 2016 14:46:38 +0300
-Subject: [PATCH 13/18] arm64: signal: share lp64 signal routines to ilp32
+Date: Wed, 17 Aug 2016 14:46:34 +0300
+Subject: [PATCH 09/18] arm64: introduce binfmt_elf32.c
 In-Reply-To: <1471434403-25291-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1471434403-25291-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1471434403-25291-14-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1471434403-25291-10-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After that, it will be possible to reuse it in ilp32.
+As we support more than one compat formats, it looks more reasonable
+to not use fs/compat_binfmt.c. Custom binfmt_elf32.c allows to move aarch32
+specific definitions there and make code more maintainable and readable.
 
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
 ---
- arch/arm64/include/asm/signal_common.h | 33 ++++++++++++
- arch/arm64/kernel/signal.c             | 93 +++++++++++++++++++++-------------
- 2 files changed, 92 insertions(+), 34 deletions(-)
- create mode 100644 arch/arm64/include/asm/signal_common.h
+ arch/arm64/Kconfig               |  1 -
+ arch/arm64/include/asm/hwcap.h   |  2 --
+ arch/arm64/kernel/Makefile       |  2 +-
+ arch/arm64/kernel/binfmt_elf32.c | 31 +++++++++++++++++++++++++++++++
+ 4 files changed, 32 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm64/kernel/binfmt_elf32.c
 
-diff --git a/arch/arm64/include/asm/signal_common.h b/arch/arm64/include/asm/signal_common.h
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 08ca1cb..3d46250 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -998,7 +998,6 @@ config AARCH32_EL0
+ 	def_bool y
+ 	depends on ARM64_4K_PAGES || EXPERT
+ 	select COMPAT
+-	select COMPAT_BINFMT_ELF
+ 	select HAVE_UID16
+ 	select OLD_SIGSUSPEND3
+ 	select COMPAT_OLD_SIGACTION
+diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
+index 2c7fc5d..99dfd92 100644
+--- a/arch/arm64/include/asm/hwcap.h
++++ b/arch/arm64/include/asm/hwcap.h
+@@ -47,8 +47,6 @@
+ #define ELF_HWCAP		(elf_hwcap)
+ 
+ #ifdef CONFIG_AARCH32_EL0
+-#define COMPAT_ELF_HWCAP	(compat_elf_hwcap)
+-#define COMPAT_ELF_HWCAP2	(compat_elf_hwcap2)
+ extern unsigned int compat_elf_hwcap, compat_elf_hwcap2;
+ #endif
+ 
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 4ec5886..949187c 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -26,7 +26,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
+ 	$(call if_changed,objcopy)
+ 
+ arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
+-					   sys_compat.o entry32.o
++					   sys_compat.o entry32.o binfmt_elf32.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+ arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
+diff --git a/arch/arm64/kernel/binfmt_elf32.c b/arch/arm64/kernel/binfmt_elf32.c
 new file mode 100644
-index 0000000..756ed2c
+index 0000000..aec1c8a
 --- /dev/null
-+++ b/arch/arm64/include/asm/signal_common.h
-@@ -0,0 +1,33 @@
++++ b/arch/arm64/kernel/binfmt_elf32.c
+@@ -0,0 +1,31 @@
 +/*
-+ * Copyright (C) 1995-2009 Russell King
-+ * Copyright (C) 2012 ARM Ltd.
-+ * Copyright (C) 2016 Cavium Networks.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ * Support for AArch32 Linux ELF binaries.
 + */
 +
-+#ifndef __ASM_SIGNAL_COMMON_H
-+#define __ASM_SIGNAL_COMMON_H
++/* AArch32 EABI. */
++#define EF_ARM_EABI_MASK		0xff000000
 +
-+#include <linux/uaccess.h>
-+#include <asm/ucontext.h>
-+#include <asm/fpsimd.h>
++#define compat_start_thread		compat_start_thread
++#define COMPAT_SET_PERSONALITY(ex)		\
++do {						\
++	clear_thread_flag(TIF_32BIT_AARCH64);	\
++	set_thread_flag(TIF_32BIT);		\
++} while (0)
 +
-+int preserve_fpsimd_context(struct fpsimd_context __user *ctx);
-+int restore_fpsimd_context(struct fpsimd_context __user *ctx);
-+int setup_sigcontext(struct sigcontext __user *uc_mcontext, struct pt_regs *regs);
-+int restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sf);
-+void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
-+			void __user *frame, off_t sigframe_off, int usig);
++#define COMPAT_ARCH_DLINFO
++#define COMPAT_ELF_HWCAP		(compat_elf_hwcap)
++#define COMPAT_ELF_HWCAP2		(compat_elf_hwcap2)
 +
-+#endif /* __ASM_SIGNAL_COMMON_H */
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index be02f65..5c73864 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -34,18 +34,26 @@
- #include <asm/fpsimd.h>
- #include <asm/signal32.h>
- #include <asm/vdso.h>
-+#include <asm/signal_common.h>
++#ifdef __AARCH64EB__
++#define COMPAT_ELF_PLATFORM		("v8b")
++#else
++#define COMPAT_ELF_PLATFORM		("v8l")
++#endif
 +
-+#define RT_SIGFRAME_FP_POS (offsetof(struct rt_sigframe, sig)	\
-+			+ offsetof(struct sigframe, fp))
++#define compat_arch_setup_additional_pages \
++					aarch32_setup_vectors_page
++struct linux_binprm;
++extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
++				      int uses_interp);
 +
-+struct sigframe {
-+	struct ucontext uc;
-+	u64 fp;
-+	u64 lr;
-+};
- 
- /*
-  * Do a signal return; undo the signal stack. These are aligned to 128-bit.
-  */
- struct rt_sigframe {
- 	struct siginfo info;
--	struct ucontext uc;
--	u64 fp;
--	u64 lr;
-+	struct sigframe sig;
- };
- 
--static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
-+int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
- {
- 	struct fpsimd_state *fpsimd = &current->thread.fpsimd_state;
- 	int err;
-@@ -65,7 +73,7 @@ static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
- 	return err ? -EFAULT : 0;
- }
- 
--static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
-+int restore_fpsimd_context(struct fpsimd_context __user *ctx)
- {
- 	struct fpsimd_state fpsimd;
- 	__u32 magic, size;
-@@ -93,22 +101,30 @@ static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
- }
- 
- static int restore_sigframe(struct pt_regs *regs,
--			    struct rt_sigframe __user *sf)
-+			    struct sigframe __user *sf)
- {
- 	sigset_t set;
--	int i, err;
--	void *aux = sf->uc.uc_mcontext.__reserved;
--
-+	int err;
- 	err = __copy_from_user(&set, &sf->uc.uc_sigmask, sizeof(set));
- 	if (err == 0)
- 		set_current_blocked(&set);
- 
-+	err |= restore_sigcontext(regs, &sf->uc.uc_mcontext);
-+	return err;
-+}
-+
-+
-+int restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *uc_mcontext)
-+{
-+	int i, err = 0;
-+	void *aux = uc_mcontext->__reserved;
-+
- 	for (i = 0; i < 31; i++)
--		__get_user_error(regs->regs[i], &sf->uc.uc_mcontext.regs[i],
-+		__get_user_error(regs->regs[i], &uc_mcontext->regs[i],
- 				 err);
--	__get_user_error(regs->sp, &sf->uc.uc_mcontext.sp, err);
--	__get_user_error(regs->pc, &sf->uc.uc_mcontext.pc, err);
--	__get_user_error(regs->pstate, &sf->uc.uc_mcontext.pstate, err);
-+	__get_user_error(regs->sp, &uc_mcontext->sp, err);
-+	__get_user_error(regs->pc, &uc_mcontext->pc, err);
-+	__get_user_error(regs->pstate, &uc_mcontext->pstate, err);
- 
- 	/*
- 	 * Avoid sys_rt_sigreturn() restarting.
-@@ -145,10 +161,10 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
- 	if (!access_ok(VERIFY_READ, frame, sizeof (*frame)))
- 		goto badframe;
- 
--	if (restore_sigframe(regs, frame))
-+	if (restore_sigframe(regs, &frame->sig))
- 		goto badframe;
- 
--	if (restore_altstack(&frame->uc.uc_stack))
-+	if (restore_altstack(&frame->sig.uc.uc_stack))
- 		goto badframe;
- 
- 	return regs->regs[0];
-@@ -162,27 +178,36 @@ badframe:
- 	return 0;
- }
- 
--static int setup_sigframe(struct rt_sigframe __user *sf,
-+static int setup_sigframe(struct sigframe __user *sf,
- 			  struct pt_regs *regs, sigset_t *set)
- {
--	int i, err = 0;
--	void *aux = sf->uc.uc_mcontext.__reserved;
--	struct _aarch64_ctx *end;
-+	int err = 0;
- 
- 	/* set up the stack frame for unwinding */
- 	__put_user_error(regs->regs[29], &sf->fp, err);
- 	__put_user_error(regs->regs[30], &sf->lr, err);
-+	err |= __copy_to_user(&sf->uc.uc_sigmask, set, sizeof(*set));
-+	err |= setup_sigcontext(&sf->uc.uc_mcontext, regs);
-+
-+	return err;
-+}
-+
-+int setup_sigcontext(struct sigcontext __user *uc_mcontext,
-+			struct pt_regs *regs)
-+{
-+	void *aux = uc_mcontext->__reserved;
-+	struct _aarch64_ctx *end;
-+	int i, err = 0;
- 
- 	for (i = 0; i < 31; i++)
--		__put_user_error(regs->regs[i], &sf->uc.uc_mcontext.regs[i],
-+		__put_user_error(regs->regs[i], &uc_mcontext->regs[i],
- 				 err);
--	__put_user_error(regs->sp, &sf->uc.uc_mcontext.sp, err);
--	__put_user_error(regs->pc, &sf->uc.uc_mcontext.pc, err);
--	__put_user_error(regs->pstate, &sf->uc.uc_mcontext.pstate, err);
- 
--	__put_user_error(current->thread.fault_address, &sf->uc.uc_mcontext.fault_address, err);
-+	__put_user_error(regs->sp, &uc_mcontext->sp, err);
-+	__put_user_error(regs->pc, &uc_mcontext->pc, err);
-+	__put_user_error(regs->pstate, &uc_mcontext->pstate, err);
- 
--	err |= __copy_to_user(&sf->uc.uc_sigmask, set, sizeof(*set));
-+	__put_user_error(current->thread.fault_address, &uc_mcontext->fault_address, err);
- 
- 	if (err == 0) {
- 		struct fpsimd_context *fpsimd_ctx =
-@@ -229,14 +254,14 @@ static struct rt_sigframe __user *get_sigframe(struct ksignal *ksig,
- 	return frame;
- }
- 
--static void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
--			 void __user *frame, int usig)
-+void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
-+			 void __user *frame, off_t fp_pos, int usig)
- {
- 	__sigrestore_t sigtramp;
- 
- 	regs->regs[0] = usig;
- 	regs->sp = (unsigned long)frame;
--	regs->regs[29] = regs->sp + offsetof(struct rt_sigframe, fp);
-+	regs->regs[29] = regs->sp + fp_pos;
- 	regs->pc = (unsigned long)ka->sa.sa_handler;
- 
- 	if (ka->sa.sa_flags & SA_RESTORER)
-@@ -257,17 +282,17 @@ static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
- 	if (!frame)
- 		return 1;
- 
--	__put_user_error(0, &frame->uc.uc_flags, err);
--	__put_user_error(NULL, &frame->uc.uc_link, err);
-+	__put_user_error(0, &frame->sig.uc.uc_flags, err);
-+	__put_user_error(NULL, &frame->sig.uc.uc_link, err);
- 
--	err |= __save_altstack(&frame->uc.uc_stack, regs->sp);
--	err |= setup_sigframe(frame, regs, set);
-+	err |= __save_altstack(&frame->sig.uc.uc_stack, regs->sp);
-+	err |= setup_sigframe(&frame->sig, regs, set);
- 	if (err == 0) {
--		setup_return(regs, &ksig->ka, frame, usig);
-+		setup_return(regs, &ksig->ka, frame, RT_SIGFRAME_FP_POS, usig);
- 		if (ksig->ka.sa.sa_flags & SA_SIGINFO) {
- 			err |= copy_siginfo_to_user(&frame->info, &ksig->info);
- 			regs->regs[1] = (unsigned long)&frame->info;
--			regs->regs[2] = (unsigned long)&frame->uc;
-+			regs->regs[2] = (unsigned long)&frame->sig.uc;
- 		}
- 	}
- 
++#include "../../../fs/compat_binfmt_elf.c"
 -- 
 2.7.4
