@@ -1,55 +1,96 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 17 Aug 2016 17:54:41 +0200
-Subject: [PATCH] arm64: kernel: avoid literal load of virtual address with MMU
- off
-Message-ID: <1471449281-10367-1-git-send-email-ard.biesheuvel@linaro.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 17 Aug 2016 10:58:32 -0500
+Subject: [PATCH V8 5/8] irqchip/gicv3-its: Refactor ITS DT init code to
+ prepare for ACPI
+In-Reply-To: <57B4213E.3060201@huawei.com>
+References: <1470909998-16710-1-git-send-email-tn@semihalf.com>
+ <1470909998-16710-6-git-send-email-tn@semihalf.com>
+ <57B4213E.3060201@huawei.com>
+Message-ID: <20160817155832.GA25421@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Literal loads of virtual addresses are subject to runtime relocation when
-CONFIG_RELOCATABLE=y, and given that the relocation routines run with the
-MMU and caches enabled, literal loads of relocated values performed with
-the MMU off are not guaranteed to return the latest value unless the
-memory covering the literal is cleaned to the PoC explicitly.
+On Wed, Aug 17, 2016 at 04:33:02PM +0800, Hanjun Guo wrote:
+> On 2016/8/11 18:06, Tomasz Nowicki wrote:
+> > In order to add ACPI support we need to isolate ACPI&DT common code and
+> > move DT logic to corresponding functions. To achieve this we are using
+> > firmware agnostic handle which can be unpacked to either DT or ACPI node.
+> >
+> > No functional changes other than a very minor one:
+> > 1. Terminate its_init call with -ENODEV for non-DT case which allows
+> > to remove hack from its-gic-v3.c.
+> > 2. Fix ITS base register address type (from 'unsigned long' to 'phys_addr_t'),
+> > as a bonus we get nice string formatting.
+> > 3. Since there is only one of ITS parent domain convert it to static global
+> > variable and drop the parameter from its_probe_one. Users can refer to it
+> > in more convenient way then.
+> [...]
+> > -static int __init its_probe(struct device_node *node,
+> > -			    struct irq_domain *parent)
+> > +static int __init its_probe_one(struct resource *res,
+> > +				struct fwnode_handle *handle, int numa_node)
+> >  {
+> > -	struct resource res;
+> >  	struct its_node *its;
+> >  	void __iomem *its_base;
+> >  	u32 val;
+> >  	u64 baser, tmp;
+> >  	int err;
+> >  
+> > -	err = of_address_to_resource(node, 0, &res);
+> > -	if (err) {
+> > -		pr_warn("%s: no regs?\n", node->full_name);
+> > -		return -ENXIO;
+> > -	}
+> > -
+> > -	its_base = ioremap(res.start, resource_size(&res));
+> > +	its_base = ioremap(res->start, resource_size(res));
+> >  	if (!its_base) {
+> > -		pr_warn("%s: unable to map registers\n", node->full_name);
+> > +		pr_warn("ITS@%pa: Unable to map ITS registers\n", &res->start);
+> >  		return -ENOMEM;
+> >  	}
+> >  
+> >  	val = readl_relaxed(its_base + GITS_PIDR2) & GIC_PIDR2_ARCH_MASK;
+> >  	if (val != 0x30 && val != 0x40) {
+> > -		pr_warn("%s: no ITS detected, giving up\n", node->full_name);
+> > +		pr_warn("ITS@%pa: No ITS detected, giving up\n", &res->start);
+> >  		err = -ENODEV;
+> >  		goto out_unmap;
+> >  	}
+> >  
+> >  	err = its_force_quiescent(its_base);
+> >  	if (err) {
+> > -		pr_warn("%s: failed to quiesce, giving up\n",
+> > -			node->full_name);
+> > +		pr_warn("ITS@%pa: Failed to quiesce, giving up\n", &res->start);
+> >  		goto out_unmap;
+> >  	}
+> >  
+> > -	pr_info("ITS: %s\n", node->full_name);
+> > +	pr_info("ITS@%pa\n", &res->start);
+>                 ^^
+> 
+> When I was testing this patch set I found message printed as below:
+> 
+> [    0.000000] ITS at 0x00000000c6000000
 
-So defer the literal load until after the MMU has been enabled, just like
-we do for primary_switch() and secondary_switch() in head.S.
+I think it'd be nicer to print the resource with %pR so we see the
+type and size in a way that matches other physical address usage.
 
-Fixes: 1e48ef7fcc37 ("arm64: add support for building vmlinux as a relocatable PIE binary")
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
+I don't know whether there is or should be a struct device associated
+with the ITS.  The its_probe_one() function looks similar to regular
+driver probe functions, so maybe there should be.
 
-This conflicts with the x25/x26 patch I sent yesterday, but this should
-probably go into stable, so I based it on v4.8-rc directly.
+If there were a struct device associated with the ITS, it'd be nicer
+to use dev_info() as well, of course.
 
- arch/arm64/kernel/sleep.S | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index 9a3aec97ac09..ccf79d849e0a 100644
---- a/arch/arm64/kernel/sleep.S
-+++ b/arch/arm64/kernel/sleep.S
-@@ -101,12 +101,20 @@ ENTRY(cpu_resume)
- 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
- 	/* enable the MMU early - so we can access sleep_save_stash by va */
- 	adr_l	lr, __enable_mmu	/* __cpu_setup will return here */
--	ldr	x27, =_cpu_resume	/* __enable_mmu will branch here */
-+	adr_l	x27, _resume_switched	/* __enable_mmu will branch here */
- 	adrp	x25, idmap_pg_dir
- 	adrp	x26, swapper_pg_dir
- 	b	__cpu_setup
- ENDPROC(cpu_resume)
- 
-+	.pushsection	".idmap.text", "ax"
-+_resume_switched:
-+	ldr	x8, =_cpu_resume
-+	br	x8
-+ENDPROC(_resume_switched)
-+	.ltorg
-+	.popsection
-+
- ENTRY(_cpu_resume)
- 	mrs	x1, mpidr_el1
- 	adrp	x8, mpidr_hash
--- 
-2.7.4
+> [    0.000000] ITS at 0x00000000c6000000: allocated 524288 Devices @27dc400000 (flat, esz 8, psz 16K, shr 1)
+> [    0.000000] ITS at 0x00000000c6000000: allocated 2048 Virtual CPUs @27dc820000 (flat, esz 8, psz 4K, shr 1)
+> [    0.000000] ITS at 0x00000000c6000000: allocated 512 Interrupt Collections @27dc80f000 (flat, esz 8, psz 4K, shr 1)
+> 
+> Seems this print is redundant, can we remove it?
+> 
+> Thanks
+> Hanjun
+> 
