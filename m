@@ -1,53 +1,49 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 17 Aug 2016 08:46:05 +0100
-Subject: [PATCH 1/1] rpmsg: virtio_rpmsg_bus: Fix randomly placed
- semi-colon
-In-Reply-To: <20160816162643.GO26240@tuxbot>
-References: <20160720092935.5902-1-lee.jones@linaro.org>
- <20160816125248.GA2775@dell> <20160816162643.GO26240@tuxbot>
-Message-ID: <20160817074605.GC4254@dell>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Wed, 17 Aug 2016 07:58:55 +0000
+Subject: [PATCH] ARM: irq_work: Do not attempt to IPI on non IPI-capable HW
+In-Reply-To: <57B41523.6030202@arm.com>
+References: <1471361210-29914-1-git-send-email-marc.zyngier@arm.com>
+ <CAL411-pUUdxN_d76FaXYGtEd7Seewnrin=x2mFEbi1Z48zSRvg@mail.gmail.com>
+ <57B41523.6030202@arm.com>
+Message-ID: <VI1PR04MB1455E9F56D0EDA0558CC84508B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 16 Aug 2016, Bjorn Andersson wrote:
+ 
+>On 17/08/16 04:15, Peter Chen wrote:
+>> On Tue, Aug 16, 2016 at 11:26 PM, Marc Zyngier <marc.zyngier@arm.com>
+>wrote:
+>>> Not all of the ARM HW is IPI capable (i.e. most of the non-SMP
+>>> systems). Unfortunately, some systems do advertise being SMP capable,
+>>> even if they have a single core and do not define a cross call
+>>> method.
+>>
+>> Could you example it? I find all current set_smp_cross_call is defined
+>> under CONFIG_SMP.
+>
+>This doesn't mean that the system will be SMP at runtime (SMP_ON_UP).
+>
+ 
+I am puzzled that how you would like to check IPI capable, at runtime
+or according to kernel configuration?
 
-> On Tue 16 Aug 05:52 PDT 2016, Lee Jones wrote:
-> 
-> > On Wed, 20 Jul 2016, Lee Jones wrote:
-> > 
-> > > It should never have been there in the first place.
-> > > 
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >  drivers/rpmsg/virtio_rpmsg_bus.c | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > I'm assuming this was missed.  Would you like me to send it again, or
-> > do you have the original patch still in your inbox?
-> > 
-> 
-> It was applied end of last week, but forgot to respond to your email,
-> sorry about that.
+>>>
+>>>  static inline bool arch_irq_work_has_interrupt(void)  {
+>>> -       return is_smp();
+>>> +#ifdef CONFIG_SMP
+>>
+>> Why not using is_smp as condition, it is more strict.
+>>
+>> if (is_smp())
+>>     return !!__smp_cross_call;
+>> else
+>>     return false;
+>
+>What's the gain? We're trying to check whether we can actually deliver
+>an IPI. Why should we gate it by finding out whether we're smp_on_up or not?
+>
 
-Ah, great, thanks.
+If UP system with CONFIG_SMP enabled, the __smp_cross_call is not
+NULL, but the IPI is not capable. Or am I missing something?
 
-> > > diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c b/drivers/rpmsg/virtio_rpmsg_bus.c
-> > > index fe03b2a..9823178 100644
-> > > --- a/drivers/rpmsg/virtio_rpmsg_bus.c
-> > > +++ b/drivers/rpmsg/virtio_rpmsg_bus.c
-> > > @@ -865,7 +865,7 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
-> > >  		msgs_received++;
-> > >  
-> > >  		msg = virtqueue_get_buf(rvq, &len);
-> > > -	};
-> > > +	}
-> > >  
-> > >  	dev_dbg(dev, "Received %u messages\n", msgs_received);
-> > >  
-> > 
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Peter
