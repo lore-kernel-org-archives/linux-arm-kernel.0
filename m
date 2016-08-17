@@ -1,45 +1,93 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 17 Aug 2016 15:24:42 +0530
-Subject: [PATCH 1/2] ARM: dts: da850-lcdk: Audio support via simple-card
-In-Reply-To: <20160810200853.24275-1-kbeldan@baylibre.com>
-References: <20160810200853.24275-1-kbeldan@baylibre.com>
-Message-ID: <aeec6ee5-91e9-13fa-f7fa-09581ddb9b6a@ti.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 17 Aug 2016 11:03:02 +0100
+Subject: [PATCH v4 2/3] arm64: hibernate: Resume when hibernate image
+ created on non-boot CPU
+In-Reply-To: <20160705174901.GK3565@e104818-lin.cambridge.arm.com>
+References: <1467643950-11034-1-git-send-email-james.morse@arm.com>
+ <1467643950-11034-3-git-send-email-james.morse@arm.com>
+ <20160705174901.GK3565@e104818-lin.cambridge.arm.com>
+Message-ID: <57B43656.30707@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 August 2016 01:38 AM, Karl Beldan wrote:
-> The LCDK embeds a TLV320AIC3106 connected to the SoC McASP for analog
-> audio. This relies on the 'dummy' regulator as the codec is always on.
-> Quality is good with arecord -pipe- aplay on Line In/Line Out.
-> The MIC path doesn't seem to work yet.
+Hi Catalin,
 
-I tested the patch and I could not get the MIC to work as well. I
-suggest dropping the MIC path parts till that is debugged and root caused.
+On 05/07/16 18:49, Catalin Marinas wrote:
+> On Mon, Jul 04, 2016 at 03:52:29PM +0100, James Morse wrote:
+>> diff --git a/arch/arm64/include/asm/suspend.h b/arch/arm64/include/asm/suspend.h
+>> index 024d623f662e..9b3e8d9bfc8c 100644
+>> --- a/arch/arm64/include/asm/suspend.h
+>> +++ b/arch/arm64/include/asm/suspend.h
+>> @@ -47,4 +47,8 @@ int swsusp_arch_resume(void);
+>>  int arch_hibernation_header_save(void *addr, unsigned int max_size);
+>>  int arch_hibernation_header_restore(void *addr);
+>>  
+>> +/* Used to resume on the CPU we hibernated on */
+>> +int _arch_hibernation_disable_cpus(bool suspend);
+>> +#define arch_hibernation_disable_cpus(x) _arch_hibernation_disable_cpus(x)
+> 
+> Nitpick: we normally tend to use the same name for the function an macro
+> but it's fine like this as well:
+> 
+> +int arch_hibernation_disable_cpus(bool suspend);
+> +#define arch_hibernation_disable_cpus arch_hibernation_disable_cpus
+> 
+> BTW, do you expect an architecture to define ARCH_HIBERNATION_CPU_HOOKS
+> but not arch_hibernation_disable_cpus? Or you'd expect more hooks in the
+> future?
 
-> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
-> ---
->  arch/arm/boot/dts/da850-lcdk.dts | 75 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 75 insertions(+)
+The macro and kconfig symbol are gone in the new version... they were both part
+of avoiding a weak symbol.
 
-> +&i2c0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c0_pins>;
-> +	clock-frequency = <100000>;
-> +	status = "okay";
-> +
-> +	tlv320aic3106: tlv320aic3106 at 18 {
-> +		#sound-dai-cells = <0>;
-> +		compatible = "ti,tlv320aic3106";
-> +		reg = <0x18>;
-> +		status = "okay";
-> +
-> +		ai3x-micbias-vg = <MICBIAS_2_5V>;
 
-It will be nice to add the codec regulators as well (and that in turn
-needs the PMIC to be populated). Although I wont insist on that since
-the regulators are optional properties.
+>> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+>> index 21ab5df9fa76..bae45abde7a2 100644
+>> --- a/arch/arm64/kernel/hibernate.c
+>> +++ b/arch/arm64/kernel/hibernate.c
 
-Rest of the patch looks good to me.
+>> @@ -66,6 +69,12 @@ extern char hibernate_el2_vectors[];
+>>  extern char __hyp_stub_vectors[];
+>>  
+>>  /*
+>> + * The logical cpu number we should resume on, initialised to a non-cpu
+>> + * number.
+>> + */
+>> +static int sleep_cpu = -EINVAL;
+>> +
+>> +/*
+>>   * Values that may not change over hibernate/resume. We put the build number
+>>   * and date in here so that we guarantee not to resume with a different
+>>   * kernel.
+>> @@ -87,6 +96,8 @@ static struct arch_hibernate_hdr {
+>>  	 * re-configure el2.
+>>  	 */
+>>  	phys_addr_t	__hyp_stub_vectors;
+>> +
+>> +	u64		sleep_cpu_mpidr;
+>>  } resume_hdr;
+>>  
+>>  static inline void arch_hdr_invariants(struct arch_hibernate_hdr_invariants *i)
+>> @@ -129,12 +140,18 @@ int arch_hibernation_header_save(void *addr, unsigned int max_size)
+>>  	else
+>>  		hdr->__hyp_stub_vectors = 0;
+>>  
+>> +	/* Save the mpidr of the cpu we called cpu_suspend() on... */
+>> +	hdr->sleep_cpu_mpidr = cpu_logical_map(sleep_cpu);
+>> +	pr_info("Hibernating on CPU %d [mpidr:0x%llx]\n", sleep_cpu,
+>> +		hdr->sleep_cpu_mpidr);
+> 
+> Do we have a guarantee that sleep_cpu != -EINVAL here?
 
-Thanks,
-Sekhar
+This depends on the order the core code calls these functions, I will add a
+check and return an error just in case it ever changes.
+
+
+> If the above is fine, feel free to add:
+> 
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+
+Thanks!
+
+
+
+James
