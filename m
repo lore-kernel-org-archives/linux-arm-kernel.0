@@ -1,96 +1,22 @@
-From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Wed, 17 Aug 2016 14:58:07 +0800
-Subject: [PATCH v4 2/3] drm/mediatek: enhance the HDMI driving current
-In-Reply-To: <1471417088-2993-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1471417088-2993-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1471417088-2993-3-git-send-email-bibby.hsieh@mediatek.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 17 Aug 2016 09:05:02 +0200
+Subject: [PATCH] ARM: dts: r8a7794: add VSP1 support
+In-Reply-To: <CAMuHMdV6D069J5-Z+qbUxTDrV=7kD_+wsEN_SvsZYoy3ONaDEg@mail.gmail.com>
+References: <1618499.8bcj8adpVO@wasted.cogentembedded.com>
+ <2191193.axSzE4vSGB@wasted.cogentembedded.com>
+ <CAMuHMdV6D069J5-Z+qbUxTDrV=7kD_+wsEN_SvsZYoy3ONaDEg@mail.gmail.com>
+Message-ID: <20160817070501.GE8673@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Junzhi Zhao <junzhi.zhao@mediatek.com>
+On Tue, Aug 16, 2016 at 10:07:05AM +0200, Geert Uytterhoeven wrote:
+> On Mon, Aug 15, 2016 at 11:52 PM, Sergei Shtylyov
+> <sergei.shtylyov@cogentembedded.com> wrote:
+> > Describe two instances (VSPS and VSPD0) of the VSP1 in the R8A7794 device
+> > tree.
+> >
+> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-In order to improve 4K resolution performance,
-we have to enhance the HDMI driving current
-when clock rate is greater than 165MHz.
-
-Signed-off-by: Junzhi Zhao <junzhi.zhao@mediatek.com>
-Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
----
- drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c |   42 +++++++++++++++++-------
- 1 file changed, 30 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c b/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c
-index 8a24754..51cb9cf 100644
---- a/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c
-+++ b/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c
-@@ -265,6 +265,9 @@ static int mtk_hdmi_pll_set_rate(struct clk_hw *hw, unsigned long rate,
- 	struct mtk_hdmi_phy *hdmi_phy = to_mtk_hdmi_phy(hw);
- 	unsigned int pre_div;
- 	unsigned int div;
-+	unsigned int pre_ibias;
-+	unsigned int hdmi_ibias;
-+	unsigned int imp_en;
- 
- 	dev_dbg(hdmi_phy->dev, "%s: %lu Hz, parent: %lu Hz\n", __func__,
- 		rate, parent_rate);
-@@ -298,18 +301,31 @@ static int mtk_hdmi_pll_set_rate(struct clk_hw *hw, unsigned long rate,
- 			  (0x1 << PLL_BR_SHIFT),
- 			  RG_HDMITX_PLL_BP | RG_HDMITX_PLL_BC |
- 			  RG_HDMITX_PLL_BR);
--	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON3, RG_HDMITX_PRD_IMP_EN);
-+	if (rate < 165000000) {
-+		mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON3,
-+					RG_HDMITX_PRD_IMP_EN);
-+		pre_ibias = 0x3;
-+		imp_en = 0x0;
-+		hdmi_ibias = hdmi_phy->ibias;
-+	} else {
-+		mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON3,
-+				      RG_HDMITX_PRD_IMP_EN);
-+		pre_ibias = 0x6;
-+		imp_en = 0xf;
-+		hdmi_ibias = hdmi_phy->ibias_up;
-+	}
- 	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON4,
--			  (0x3 << PRD_IBIAS_CLK_SHIFT) |
--			  (0x3 << PRD_IBIAS_D2_SHIFT) |
--			  (0x3 << PRD_IBIAS_D1_SHIFT) |
--			  (0x3 << PRD_IBIAS_D0_SHIFT),
-+			  (pre_ibias << PRD_IBIAS_CLK_SHIFT) |
-+			  (pre_ibias << PRD_IBIAS_D2_SHIFT) |
-+			  (pre_ibias << PRD_IBIAS_D1_SHIFT) |
-+			  (pre_ibias << PRD_IBIAS_D0_SHIFT),
- 			  RG_HDMITX_PRD_IBIAS_CLK |
- 			  RG_HDMITX_PRD_IBIAS_D2 |
- 			  RG_HDMITX_PRD_IBIAS_D1 |
- 			  RG_HDMITX_PRD_IBIAS_D0);
- 	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON3,
--			  (0x0 << DRV_IMP_EN_SHIFT), RG_HDMITX_DRV_IMP_EN);
-+			  (imp_en << DRV_IMP_EN_SHIFT),
-+			  RG_HDMITX_DRV_IMP_EN);
- 	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON6,
- 			  (hdmi_phy->drv_imp_clk << DRV_IMP_CLK_SHIFT) |
- 			  (hdmi_phy->drv_imp_d2 << DRV_IMP_D2_SHIFT) |
-@@ -318,12 +334,14 @@ static int mtk_hdmi_pll_set_rate(struct clk_hw *hw, unsigned long rate,
- 			  RG_HDMITX_DRV_IMP_CLK | RG_HDMITX_DRV_IMP_D2 |
- 			  RG_HDMITX_DRV_IMP_D1 | RG_HDMITX_DRV_IMP_D0);
- 	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON5,
--			  (hdmi_phy->ibias << DRV_IBIAS_CLK_SHIFT) |
--			  (hdmi_phy->ibias << DRV_IBIAS_D2_SHIFT) |
--			  (hdmi_phy->ibias << DRV_IBIAS_D1_SHIFT) |
--			  (hdmi_phy->ibias << DRV_IBIAS_D0_SHIFT),
--			  RG_HDMITX_DRV_IBIAS_CLK | RG_HDMITX_DRV_IBIAS_D2 |
--			  RG_HDMITX_DRV_IBIAS_D1 | RG_HDMITX_DRV_IBIAS_D0);
-+			  (hdmi_ibias << DRV_IBIAS_CLK_SHIFT) |
-+			  (hdmi_ibias << DRV_IBIAS_D2_SHIFT) |
-+			  (hdmi_ibias << DRV_IBIAS_D1_SHIFT) |
-+			  (hdmi_ibias << DRV_IBIAS_D0_SHIFT),
-+			  RG_HDMITX_DRV_IBIAS_CLK |
-+			  RG_HDMITX_DRV_IBIAS_D2 |
-+			  RG_HDMITX_DRV_IBIAS_D1 |
-+			  RG_HDMITX_DRV_IBIAS_D0);
- 	return 0;
- }
- 
--- 
-1.7.9.5
+Thanks, I have queued this up.
