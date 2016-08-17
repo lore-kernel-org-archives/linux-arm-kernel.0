@@ -1,66 +1,53 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Wed, 17 Aug 2016 00:45:17 +0100
-Subject: [PATCH] KVM: arm64: ITS: avoid re-mapping LPIs
-In-Reply-To: <20160816173038.GF14088@cbox>
-References: <20160816165106.25057-1-andre.przywara@arm.com>
- <20160816173038.GF14088@cbox>
-Message-ID: <a291bbd7-d8b4-2841-669b-721985eab81b@arm.com>
+From: groeck@google.com (Guenter Roeck)
+Date: Tue, 16 Aug 2016 17:26:40 -0700
+Subject: Problem with atomic accesses in pstore on some ARM CPUs
+In-Reply-To: <CAGXu5jL7nX8aS64QH1Eqo=yvsy_+ad+xQnYVDG_ge-oomAOOxg@mail.gmail.com>
+References: <CABXOdTfT7xMfiBvRuUS1hsVs=q5q2wY1x1Z8oCyyJNFckM0g0A@mail.gmail.com>
+ <8f0c9ced-cdc3-ab9b-caee-06fe85e6c1e7@arm.com>
+ <CABXOdTfg2T2tZrQOd2S5SjeySAMbfQX0weFuvRXBr2o8Of9nVQ@mail.gmail.com>
+ <20160816132103.GD27088@arm.com>
+ <CABXOdTfHX_ZB1CuM7hzU5LCZPYdHvBSatN9Nen=rb8r1rXhz-g@mail.gmail.com>
+ <20160815221518.GD1120@svinekod>
+ <CAMbhsRQiU-UyiCWqjaWNXbhDd0+=Tv_pWoeQkJKJaHC6y4=HwQ@mail.gmail.com>
+ <CABXOdTfhXhq6pbqAqGQwHcsCXvyshS8JbDGQCBKxfd-2s=M-fw@mail.gmail.com>
+ <CAGXu5jL7nX8aS64QH1Eqo=yvsy_+ad+xQnYVDG_ge-oomAOOxg@mail.gmail.com>
+Message-ID: <CABXOdTfVVA-rU96DZvVHCqKB2NxL=zFHMG6dzJk_9RhFsOBCvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/08/16 18:30, Christoffer Dall wrote:
-> On Tue, Aug 16, 2016 at 05:51:06PM +0100, Andre Przywara wrote:
->> When a guest wants to map a device-ID/event-ID combination that is
->> already mapped, we may end up in a situation where an LPI is never
->> "put", thus never being freed.
->> Since the GICv3 spec says that mapping an already mapped LPI is
->> UNPREDICTABLE, lets just bail out early in this situation to avoid
->> any potential leaks.
+On Tue, Aug 16, 2016 at 1:50 PM, Kees Cook <keescook@chromium.org> wrote:
+
+[ ... ]
+
+>>> persistent_ram uses atomic ops in uncached memory to store the start
+>>> and end positions in the ringbuffer so that the state of the
+>>> ringbuffer will be valid if the kernel crashes at any time.  This was
+>>> inherited from Android's ram_console implementation, and worked
+>>> through armv7.  It has been causing more and more problems recently,
+>>> see for example 027bc8b08242c59e19356b4b2c189f2d849ab660 (pstore-ram:
+>>> Allow optional mapping with pgprot_noncached) and
+>>> 7ae9cb81933515dc7db1aa3c47ef7653717e3090 (pstore-ram: Fix hangs by
+>>> using write-combine mappings).
+>>>
+>>> Maybe it should be replaced with a spinlock in normal ram protecting
+>>> writes to the uncached region.
 >>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  virt/kvm/arm/vgic/vgic-its.c | 27 +++++++++++++--------------
->>  1 file changed, 13 insertions(+), 14 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index 9533080..4660a7d 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -731,7 +731,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
->>  	u32 device_id = its_cmd_get_deviceid(its_cmd);
->>  	u32 event_id = its_cmd_get_id(its_cmd);
->>  	u32 coll_id = its_cmd_get_collection(its_cmd);
->> -	struct its_itte *itte, *new_itte = NULL;
->> +	struct its_itte *itte;
->>  	struct its_device *device;
->>  	struct its_collection *collection, *new_coll = NULL;
->>  	int lpi_nr;
->> @@ -749,6 +749,10 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
->>  	    lpi_nr >= max_lpis_propbaser(kvm->arch.vgic.propbaser))
->>  		return E_ITS_MAPTI_PHYSICALID_OOR;
->>  
->> +	/* If there is an existing mapping, behavior is UNPREDICTABLE. */
->> +	if (find_itte(its, device_id, event_id))
->> +		return 0;
->> +
-> 
-> By the way, this made me think how these errors are handled, and unless
-> I'm mistaken, the return value from vgic_its_handle_command() is simply
-> discarded, so even when we return things like -ENOMEM, this is just
-> ignored?  Is this really the intention?
+>> The necessary functions already exist, and are used for memory mapped
+>> with ioremap() / ioremap_wc(). They were introduced with commit
+>> 0405a5cec3 ("pstore/ram: avoid atomic accesses for ioremapped
+>> regions"), and the description in that patch sounds quite similar to
+>> the current problem. Given that, would it be acceptable to remove
+>> buffer_start_add_atomic() and buffer_size_add_atomic(), and always use
+>> buffer_start_add_locked() and buffer_size_add_locked() instead ? Those
+>> functions still use atomic_set() and atomic_read(), which works fine
+>> in my tests. The only difference is that a spinlock in main memory is
+>> used instead of atomic_cmpxchg().
+>
+> I don't see much of a down side to this. ramoops isn't expected to be
+> high-bandwidth so trading for a single global lock doesn't really
+> bother me.
+>
 
-Yes, at least at the moment. The spec does not specify how ITS errors
-should be communicated (IMPLEMENTATION DEFINED), only that an error
-condition itself can be signaled via an SError - for which atm we lack
-any code to inject, if I am not mistaken.
-Still I wanted to assign those error codes: IMHO it improves readability
-and simplifies any later extension in that respect.
+Sounds good. I'll submit a patch to address the problem as suggested above.
 
-For the Linux errors (like -ENOMEM): Due to the asynchronous nature of
-the ITS command handling and also the guest triggering the commands,
-there is really no better way to report those OoM conditions, for
-instance, so I treated them the same as "proper" ITS errors.
-
-Hope that helps.
-Cheers,
-Andre.
+Guenter
