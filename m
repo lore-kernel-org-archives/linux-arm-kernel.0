@@ -1,28 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 17 Aug 2016 18:11:34 +0100
-Subject: [PATCH] arm64: kernel: avoid literal load of virtual address
- with MMU off
-In-Reply-To: <1471449281-10367-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1471449281-10367-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160817171134.GF20762@e104818-lin.cambridge.arm.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Wed, 17 Aug 2016 10:11:40 -0700
+Subject: [PATCH v3 2/5] dt-bindings: sort Rockchip vop compatible by chip's
+ number
+In-Reply-To: <loom.20160602T085439-162@post.gmane.org>
+References: <loom.20160602T085439-162@post.gmane.org>
+Message-ID: <1471453900-1349-1-git-send-email-seanpaul@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2016 at 05:54:41PM +0200, Ard Biesheuvel wrote:
-> Literal loads of virtual addresses are subject to runtime relocation when
-> CONFIG_RELOCATABLE=y, and given that the relocation routines run with the
-> MMU and caches enabled, literal loads of relocated values performed with
-> the MMU off are not guaranteed to return the latest value unless the
-> memory covering the literal is cleaned to the PoC explicitly.
-> 
-> So defer the literal load until after the MMU has been enabled, just like
-> we do for primary_switch() and secondary_switch() in head.S.
+From: Mark Yao <mark.yao@rock-chips.com>
 
-I think for consistency with head.S the patch is fine but do we actually
-expect a literal pool value to be inconsistent between cache and PoC?
-Presumably, the first time the kernel image was loaded it had to be
-cleaned to PoC but after that we wouldn't expect modifications of the
-literal pool data.
+Reorder the compatible vop devices to be sorted by chip number
+in ascending order.
 
+Reviewed-by: Tomasz Figa <tfiga@chromium.org>
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+[seanpaul added commit description per tfiga's review]
+Signed-off-by: Sean Paul <seanpaul@chromium.org>
+---
+
+Changes in v3:
+	- Updated commit message (Tomasz Figa)
+
+ Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
+index 5489b59..196121f 100644
+--- a/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
++++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
+@@ -6,8 +6,8 @@ buffer to an external LCD interface.
+ 
+ Required properties:
+ - compatible: value should be one of the following
+-		"rockchip,rk3288-vop";
+ 		"rockchip,rk3036-vop";
++		"rockchip,rk3288-vop";
+ 
+ - interrupts: should contain a list of all VOP IP block interrupts in the
+ 		 order: VSYNC, LCD_SYSTEM. The interrupt specifier
 -- 
-Catalin
+2.8.0.rc3.226.g39d4020
