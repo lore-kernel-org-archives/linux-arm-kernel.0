@@ -1,111 +1,48 @@
-From: kbeldan@baylibre.com (Karl Beldan)
-Date: Wed, 17 Aug 2016 12:54:54 +0000
-Subject: [PATCH v2] ARM: dts: da850-lcdk: Audio support via simple-card
-Message-ID: <20160817125454.20717-1-kbeldan@baylibre.com>
+From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
+Date: Wed, 17 Aug 2016 14:54:59 +0200
+Subject: [RFC2 nowrap: PATCH v7 00/18] ILP32 for ARM64
+In-Reply-To: <20160817124822.GA25751@yury-N73SV>
+References: <1471434403-25291-1-git-send-email-ynorov@caviumnetworks.com>
+ <175AE090-EDA7-4A8D-9044-3FFA74AC1903@suse.de>
+ <20160817124822.GA25751@yury-N73SV>
+Message-ID: <DF24AFA0-5B5C-47E8-9B78-7C6C8711948E@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LCDK embeds a TLV320AIC3106 connected to the SoC McASP for analog
-audio. The power supply of the codec comes from the main PMIC
-(TPS650250) DCDCs which are always on per HW design and not
-controllable by SW, so SW wise the codec driver will rely on the 'dummy'
-regulator.
-Quality is good with arecord -pipe- aplay on Line In/Line Out.
 
-Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
----
-v2:
- - Drop MIC paths parts as suggested by Sekhar.
+> On 17 Aug 2016, at 14:48, Yury Norov <ynorov@caviumnetworks.com> wrote:
+> 
+> On Wed, Aug 17, 2016 at 02:28:50PM +0200, Alexander Graf wrote:
+>> 
+>>> On 17 Aug 2016, at 13:46, Yury Norov <ynorov@caviumnetworks.com> wrote:
+>>> 
+>>> This series enables aarch64 with ilp32 mode, and as supporting work,
+>>> introduces ARCH_32BIT_OFF_T configuration option that is enabled for
+>>> existing 32-bit architectures but disabled for new arches (so 64-bit
+>>> off_t is is used by new userspace).
+>>> 
+>>> This version is based on kernel v4.8-rc2.
+>>> It works with glibc-2.23, and tested with LTP.
+>>> 
+>>> This is RFC because there is still no solid understanding what type of registers
+>>> top-halves delousing we prefer. In this patchset, w0-w7 are cleared for each
+>>> syscall in assembler entry. The alternative approach is in introducing compat
+>>> wrappers which is little faster for natively routed syscalls (~2.6% for syscall
+>>> with no payload) but much more complicated.
+>> 
+>> So you?re saying there are 2 options:
+>> 
+>>  1) easy to get right, slightly slower, same ABI to user space as 2
+>>  2) harder to get right, minor performance benefit
+> 
+> No, ABI is little different. If 1) we pass off_t in a pair to syscalls,
+> if 2) - in a single register. So if 1, we 'd take some wrappers from aarch32.
+> See patch 12 here.
 
- arch/arm/boot/dts/da850-lcdk.dts | 68 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 68 insertions(+)
+>From our experience with ILP32, I?d prefer to have off_t (and similar) in a single register
+whenever possible (i.e. option #2).  It feels more natural to use the full 64bit registers 
+whenever possible, as ILP32 on ARMv8 should really be understood as a 64bit ABI with 
+a 32bit memory model.
 
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index dbcca0b..7563260 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -23,10 +23,46 @@
- 		device_type = "memory";
- 		reg = <0xc0000000 0x08000000>;
- 	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "DA850/OMAP-L138 LCDK";
-+		simple-audio-card,widgets =
-+			"Line", "Line In",
-+			"Line", "Line Out";
-+		simple-audio-card,routing =
-+			"LINE1L", "Line In",
-+			"LINE1R", "Line In",
-+			"Line Out", "LLOUT",
-+			"Line Out", "RLOUT";
-+		simple-audio-card,format = "dsp_b";
-+		simple-audio-card,bitclock-master = <&link0_codec>;
-+		simple-audio-card,frame-master = <&link0_codec>;
-+		simple-audio-card,bitclock-inversion;
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&mcasp0>;
-+			system-clock-frequency = <24576000>;
-+		};
-+
-+		link0_codec: simple-audio-card,codec {
-+			sound-dai = <&tlv320aic3106>;
-+			system-clock-frequency = <24576000>;
-+		};
-+	};
- };
- 
- &pmx_core {
- 	status = "okay";
-+
-+	mcasp0_pins: pinmux_mcasp0_pins {
-+		pinctrl-single,bits = <
-+			/* AHCLKX AFSX ACLKX */
-+			0x00 0x00101010 0x00f0f0f0
-+			/* ARX13 ARX14 */
-+			0x04 0x00000110 0x00000ff0
-+		>;
-+	};
- };
- 
- &serial2 {
-@@ -68,3 +104,35 @@
- 	cd-gpios = <&gpio 64 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- };
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins>;
-+	clock-frequency = <100000>;
-+	status = "okay";
-+
-+	tlv320aic3106: tlv320aic3106 at 18 {
-+		#sound-dai-cells = <0>;
-+		compatible = "ti,tlv320aic3106";
-+		reg = <0x18>;
-+		status = "okay";
-+	};
-+};
-+
-+&mcasp0 {
-+	#sound-dai-cells = <0>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mcasp0_pins>;
-+	status = "okay";
-+
-+	op-mode = <0>;   /* DAVINCI_MCASP_IIS_MODE */
-+	tdm-slots = <2>;
-+	serial-dir = <   /* 0: INACTIVE, 1: TX, 2: RX */
-+		0 0 0 0
-+		0 0 0 0
-+		0 0 0 0
-+		0 1 2 0
-+	>;
-+	tx-num-evt = <32>;
-+	rx-num-evt = <32>;
-+};
--- 
-2.9.2
+Cheers,
+Philipp.
