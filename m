@@ -1,53 +1,48 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 17 Aug 2016 12:36:21 +0200
-Subject: [PATCH] arm64: head.S: get rid of x25 and x26 with 'global' scope
-In-Reply-To: <20160817101924.GC30900@leverpostej>
-References: <1471374152-23538-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160817101924.GC30900@leverpostej>
-Message-ID: <CAKv+Gu9WPZ65K2Y7bum+-c3JJhSD0JzG3oYv2naMK-zPrDVo2w@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 17 Aug 2016 16:08:03 +0530
+Subject: [PATCH 2/2] ARM: davinci_all_defconfig: enable modules for sound
+ on LCDK
+In-Reply-To: <20160817101331.GA8009@gobelin>
+References: <20160810200853.24275-1-kbeldan@baylibre.com>
+ <20160810200853.24275-2-kbeldan@baylibre.com>
+ <52f428a2-7818-5f3a-bb66-70e2eaa63e7a@ti.com> <20160817101331.GA8009@gobelin>
+Message-ID: <388d5e63-ff82-ca88-c60a-24ad87700afd@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 August 2016 at 12:19, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Aug 16, 2016 at 09:02:32PM +0200, Ard Biesheuvel wrote:
->> Currently, x25 and x26 hold the physical addresses of idmap_pg_dir
->> and swapper_pg_dir, respectively, when running early boot code. But
->> having registers with 'global' scope in files that contain different
->> sections with different lifetimes, and that are called by different
->> CPUs at different times is a bit messy, especially since stashing the
->> values does not buy us anything in terms of code size or clarity.
+On Wednesday 17 August 2016 03:43 PM, Karl Beldan wrote:
+> On Wed, Aug 17, 2016 at 02:20:51PM +0530, Sekhar Nori wrote:
+>> On Thursday 11 August 2016 01:38 AM, Karl Beldan wrote:
+>>> This is the minimal set of additional modules required to support audio
+>>> on the LCDK.
+>>>
+>>> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
 >>
->> So simply replace each reference to x25 or x26 with an adrp instruction
->> referring to idmap_pg_dir or swapper_pg_dir directly.
+>> This patch does not apply because Kevin already added some missing audio
+>> modules through commit "ARM: davinci_all_defconfig: enable DA850 audio
+>> as modules"
 >>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> Nice! I agree that this makes things clearer, and as far as I can tell
-> is correct, so FWIW:
->
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
->
+>> Can you please rebase on master branch of my tree[1] and resend?
+>>
+> 
+> I checked out your tree.
+> With Kevin's patch the needed modules get selected without needing 2/2.
+> 
+> However I don't know why he used:
+>  CONFIG_SND_DA850_SOC_EVM=m
+> instead of: 
+>  CONFIG_SND_DAVINCI_SOC_MCASP=m
+>  CONFIG_SND_SOC_TLV320AIC3X=m
+> The former seems to me to be pre-DT style config. I used the latter in
+> 2/2 and thought that's what we'd start switching to ? Unless it is for
+> pre-DT compatibility ?
 
-Thanks.
+I don't think this is related to DT. As you said,
+CONFIG_SND_DA850_SOC_EVM selects CONFIG_SND_DAVINCI_SOC_MCASP and
+CONFIG_SND_SOC_TLV320AIC3X anyway.
 
-> Was this just for the sake of cleanup, or should we expect more head.S
-> patches soon?
->
+To be honest, I am okay either way. Copying Peter to see if he has any
+preference.
 
-Well, there are other things that I would like to improve, but this
-one was obvious, since x25/x26 were part of the effective prototype of
-__enable_mmu.
-
-In general, anything that makes these functions behave more like
-ordinary AAPCS-compliant routines would be an improvement, imo. For
-example, el2_setup() passing its return value in w20, and
-__enable_mmu() taking its second argument in x27. But in these cases,
-at least it is obvious (and documented), whereas the x25/x26 case was
-not obvious at all.
-
-Similarly, we have 'globals' in x21, x23 and x24 in head.S, but those
-are only used on the primary boot path, and not part of the prototype
-of any specific routine.
-
--- 
-Ard.
+Thanks,
+Sekhar
