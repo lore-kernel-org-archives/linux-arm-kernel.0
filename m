@@ -1,59 +1,79 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 17 Aug 2016 09:08:48 +0100
-Subject: [PATCH] ARM: irq_work: Do not attempt to IPI on non IPI-capable HW
-In-Reply-To: <VI1PR04MB1455E9F56D0EDA0558CC84508B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
-References: <1471361210-29914-1-git-send-email-marc.zyngier@arm.com>
- <CAL411-pUUdxN_d76FaXYGtEd7Seewnrin=x2mFEbi1Z48zSRvg@mail.gmail.com>
- <57B41523.6030202@arm.com>
- <VI1PR04MB1455E9F56D0EDA0558CC84508B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
-Message-ID: <57B41B90.3050204@arm.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Wed, 17 Aug 2016 16:11:03 +0800
+Subject: [PATCH 1/3] dt/bindings: arm-pl330: add description of
+ arm,pl330-periph-burst
+In-Reply-To: <1d42542f-c43c-5c4b-01b7-ba0ca085004a@rock-chips.com>
+References: <1470365602-32586-1-git-send-email-shawn.lin@rock-chips.com>
+ <1470365602-32586-2-git-send-email-shawn.lin@rock-chips.com>
+ <20160805033410.GJ9681@localhost>
+ <ea3572fa-4bff-87db-d5ad-f406809f8296@rock-chips.com>
+ <0df0ab4f-0032-6487-2c30-b1ccd7d9ae62@metafoo.de>
+ <1d42542f-c43c-5c4b-01b7-ba0ca085004a@rock-chips.com>
+Message-ID: <55e596a0-4176-4277-40cc-1d26763a8be0@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/08/16 08:58, Peter Chen wrote:
->  
->> On 17/08/16 04:15, Peter Chen wrote:
->>> On Tue, Aug 16, 2016 at 11:26 PM, Marc Zyngier <marc.zyngier@arm.com>
->> wrote:
->>>> Not all of the ARM HW is IPI capable (i.e. most of the non-SMP
->>>> systems). Unfortunately, some systems do advertise being SMP capable,
->>>> even if they have a single core and do not define a cross call
->>>> method.
+Hi, Vinod and Lars-Peter
+
+Ping.. Any better idea to share :)
+
+On 2016/8/9 17:12, Shawn Lin wrote:
+> Hi Lars-Peter,
+>
+> ? 2016/8/9 16:39, Lars-Peter Clausen ??:
+>> On 08/05/2016 09:25 AM, Shawn Lin wrote:
+>>> Hi Vinod,
 >>>
->>> Could you example it? I find all current set_smp_cross_call is defined
->>> under CONFIG_SMP.
->>
->> This doesn't mean that the system will be SMP at runtime (SMP_ON_UP).
->>
->  
-> I am puzzled that how you would like to check IPI capable, at runtime
-> or according to kernel configuration?
-> 
+>>> ? 2016/8/5 11:34, Vinod Koul ??:
+>>>> On Fri, Aug 05, 2016 at 10:53:20AM +0800, Shawn Lin wrote:
+>>>>> This patch adds the "arm,pl330-periph-burst" for arm-pl330 to
+>>>>> support busrt mode.
 >>>>
->>>>  static inline bool arch_irq_work_has_interrupt(void)  {
->>>> -       return is_smp();
->>>> +#ifdef CONFIG_SMP
+>>>> why should this be DT property. Only reason I can think of if some hw
+>>>> versions support this and some won't.
 >>>
->>> Why not using is_smp as condition, it is more strict.
->>>
->>> if (is_smp())
->>>     return !!__smp_cross_call;
->>> else
->>>     return false;
+>>> yes, if we want to support burst mode, both of the master(pl330) and
+>>> client(several peripherals) should implement it, otherwise it will
+>>> be broken when enabling.
 >>
->> What's the gain? We're trying to check whether we can actually deliver
->> an IPI. Why should we gate it by finding out whether we're smp_on_up or not?
+>> As you said, it is up to the consumer peripheral whether it supports
+>> BURST,
+>> SINGLE or both. So this is a per client property, but you specify this
+>> as a
+>> a global property on the producer side.
+>
+> Thanks for comment.
+>
+> yup, but what is the proper way to add it ? :)
+>
+>
+> a) If pl330 support BURST as well as all the peripherals, we could
+> enable it.
+>
+> b) If pl300 support BURST, but all the peripherals don't support it,
+> we could not enable it.
+>
+> c) If pl300 support BURST, but not all the peripherals support it,
+> we also could not enable it.
+>
+> the burst feature of peripheral IP may be vendor-specific, but the
+> common driver for this peripheral are used for many many vendors which
+> means we could not check all of this info. It's very likely to break
+> them... I couldn't figure out how many upstreamed peripheral drivers
+> who are using pl300 either.
+>
+> So this check should be done by all this vendors but we could make
+> sure we don't break them before they check a), b), c), right?
+>
+>
 >>
-> 
-> If UP system with CONFIG_SMP enabled, the __smp_cross_call is not
-> NULL, but the IPI is not capable. Or am I missing something?
+>>
+>>
+>>
+>
+>
 
-Take an OMAP3 system. It is UP,  and doesn't have a GIC, so
-__smp_cross_call will be NULL. Yet, it boots with a generic
-multi-platform kernel, with SMP on.
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Best Regards
+Shawn Lin
