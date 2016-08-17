@@ -1,113 +1,72 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 17 Aug 2016 22:31:17 +0800
-Subject: [V2,
- 10/15] mmc: sdhci-esdhc-imx: enable hw auto retuning for MAN_TUNING
-In-Reply-To: <20160816124444.GA31259@t450s.lan>
-References: <1468309584-3591-11-git-send-email-aisheng.dong@nxp.com>
- <20160815145941.GA23663@t450s.lan> <20160816101818.GD9211@shlinux2>
- <20160816124444.GA31259@t450s.lan>
-Message-ID: <CAA+hA=S=tpwykxqmV9MWJftrdM=RxR5QeLm+S=6Vx+zV3A2-vw@mail.gmail.com>
+From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
+Date: Wed, 17 Aug 2016 16:32:23 +0200
+Subject: [RFC2 nowrap: PATCH v7 00/18] ILP32 for ARM64
+In-Reply-To: <20160817142916.GC20762@e104818-lin.cambridge.arm.com>
+References: <1471434403-25291-1-git-send-email-ynorov@caviumnetworks.com>
+ <175AE090-EDA7-4A8D-9044-3FFA74AC1903@suse.de>
+ <20160817124822.GA25751@yury-N73SV>
+ <DF24AFA0-5B5C-47E8-9B78-7C6C8711948E@theobroma-systems.com>
+ <20160817142916.GC20762@e104818-lin.cambridge.arm.com>
+Message-ID: <B06DCD94-01BD-4494-BCE8-4C03C11BFDE2@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gary,
 
-On Tue, Aug 16, 2016 at 8:44 PM, Gary Bisson
-<gary.bisson@boundarydevices.com> wrote:
-> On Tue, Aug 16, 2016 at 06:18:18PM +0800, Dong Aisheng wrote:
->> On Mon, Aug 15, 2016 at 04:59:41PM +0200, Gary Bisson wrote:
->> > Dong Aisheng, All,
->> >
->> > On Tue, Jul 12, 2016 at 03:46:19PM +0800, Dong Aisheng wrote:
->> > > Indicating hw auto retuning support for mx6qdl in the fake caps_1
->> > > register and enable auto retuning in post_tuning process after
->> > > tuning completes.
->> >
->> > Have you tried this change with a SDIO3.0 device? I'm asking because a
->>
->> Tested with SD3.0 device.
->> Not really for SDIO3.0 device since there's no SDIO3.0 device on my
->> available MX6Q/DL boards.
->
-> Someone answered on the Community that it has been tested on i.MX7 SABRE
-> board but not on i.MX6 right?
->
+> On 17 Aug 2016, at 16:29, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> 
+> On Wed, Aug 17, 2016 at 02:54:59PM +0200, Dr. Philipp Tomsich wrote:
+>> On 17 Aug 2016, at 14:48, Yury Norov <ynorov@caviumnetworks.com> wrote:
+>>> On Wed, Aug 17, 2016 at 02:28:50PM +0200, Alexander Graf wrote:
+>>>> On 17 Aug 2016, at 13:46, Yury Norov <ynorov@caviumnetworks.com> wrote:
+>>>>> This series enables aarch64 with ilp32 mode, and as supporting work,
+>>>>> introduces ARCH_32BIT_OFF_T configuration option that is enabled for
+>>>>> existing 32-bit architectures but disabled for new arches (so 64-bit
+>>>>> off_t is is used by new userspace).
+>>>>> 
+>>>>> This version is based on kernel v4.8-rc2.
+>>>>> It works with glibc-2.23, and tested with LTP.
+>>>>> 
+>>>>> This is RFC because there is still no solid understanding what type of registers
+>>>>> top-halves delousing we prefer. In this patchset, w0-w7 are cleared for each
+>>>>> syscall in assembler entry. The alternative approach is in introducing compat
+>>>>> wrappers which is little faster for natively routed syscalls (~2.6% for syscall
+>>>>> with no payload) but much more complicated.
+>>>> 
+>>>> So you?re saying there are 2 options:
+>>>> 
+>>>> 1) easy to get right, slightly slower, same ABI to user space as 2
+>>>> 2) harder to get right, minor performance benefit
+>>> 
+>>> No, ABI is little different. If 1) we pass off_t in a pair to syscalls,
+>>> if 2) - in a single register. So if 1, we 'd take some wrappers from aarch32.
+>>> See patch 12 here.
+>> 
+>> From our experience with ILP32, I?d prefer to have off_t (and similar)
+>> in a single register whenever possible (i.e. option #2).  It feels
+>> more natural to use the full 64bit registers whenever possible, as
+>> ILP32 on ARMv8 should really be understood as a 64bit ABI with a 32bit
+>> memory model.
+> 
+> I think we are well past the point where we considered ILP32 a 64-bit
+> ABI. It would have been nice but we decided that breaking POSIX
+> compatibility is a bad idea, so we went back (again) to a 32-bit ABI for
+> ILP32. While there are 64-bit arguments that, at a first look, would
+> make sense to be passed in 64-bit registers, the kernel maintenance cost
+> is significant with changes to generic files.
+> 
+> Allowing 64-bit wide registers at the ILP32 syscall interface means that
+> the kernel would have to zero/sign-extend the upper half of the 32-bit
+> arguments for the cases where they are passed directly to a native
+> syscall that expects a 64-bit argument. This (a) adds a significant
+> number of wrappers to the generic code together additional annotations
+> to the generic unistd.h and (b) it adds a small overhead to the AArch32
+> (compat) ABI since it doesn't need such generic wrapping (the upper half
+> of 64-bit registers is guaranteed to be zero/preserved by the
+> architecture when coming from the AArch32 mode).
 
-Yes, we tested this feature with MX7 SDB board.
-However, MX7 is slightly a bit different from MX6 that it's using STD_TUNING
-rather than MAN_TUNING.
+Yes, I remember the discussions and just wanted to put option #2 in context again.
+Everything points to just going with the pair-of-registers and getting this merged 
+quickly then, I suppose.
 
-I just tried MAN_TUNING on MX7 which is the same as MX6, but i still
-couldn't see your issue.
-
-May try more and also on MX6 boards.
-
->> > similar change in latest NXP 4.1.15 kernel broke SDIO3.0 support.
->> > With this tuning, the kernel would report:
->> > mmc2: Got data interrupt 0x00000002 even though no data operation was in
->> > progress.
->> >
->>
->> Can you provide the full enumeration log?
->
-> Here is the mmc related part of dmesg:
-> # dmesg | grep mmc2
-> mmc2: SDHCI controller on 2194000.usdhc [2194000.usdhc] using ADMA
-> mmc2: queuing unknown CIS tuple 0x01 (3 bytes)
-> mmc2: queuing unknown CIS tuple 0x1a (5 bytes)
-> mmc2: queuing unknown CIS tuple 0x1b (8 bytes)
-> mmc2: queuing unknown CIS tuple 0x14 (0 bytes)
-> mmc2: queuing unknown CIS tuple 0x80 (1 bytes)
-> mmc2: queuing unknown CIS tuple 0x81 (1 bytes)
-> mmc2: queuing unknown CIS tuple 0x82 (1 bytes)
-> mmc2: new ultra high speed SDR104 SDIO card at address 0001
-> mmc2: queuing unknown CIS tuple 0x01 (3 bytes)
-> mmc2: queuing unknown CIS tuple 0x1a (5 bytes)
-> mmc2: queuing unknown CIS tuple 0x1b (8 bytes)
-> mmc2: queuing unknown CIS tuple 0x14 (0 bytes)
-> ar6k_wlan mmc2:0001:1: Direct firmware load for qsetup30.bin failed with
-> error -2
-> mmc2: Got data interrupt 0x00000002 even though no data operation was in
-> progress.
-> mmc2: Got data interrupt 0x00000002 even though no data operation was in
-> progress.
->
-> Without the MAN_TUN patch, everything is the same (as expected) but
-> without the last two errors. Note that when WiFi connection is up, this
-> warning keeps poping up every few seconds.
->
-
-Could you please enable CONFIG_MMC_DEBUG and send out the full
-card enumeration log?
-
->> > Doing a 'git bisect' and then reverting this patch fixed the issue.
->> > Although I haven't tested that change on mainline kernel, I wanted you
->> > to know about this observation before it gets merged.
->> >
->> > As a FYI, the issue has been reported to NXP community:
->> > https://community.nxp.com/thread/431316
->> >
->>
->> Thanks for nofity.
->> I will check it on my side.
->
-> Not sure you've seen my last post from today, but you can actually try
-> the device I'm using (QCA9377) on SABRE using the evaluation kit:
-> http://www.silexamerica.com/products/connectivity-solutions/embedded-wireless/sdio-radios/sx-sdcac/
->
-
-I do not have that WiFi card.
-But i have a Broadcom SDIO3.0 WiFi card, i will find way to run it on MX6 board.
-
-> Maybe there's a hw mod to do on SABRE in order to get SDIO3.0/1.8V vcc.
->
-
-Did your card work on 1.8v IO voltage?
-AFAIK usually the SDIO3.0 external WiFi card may not support 1.8v VIO and
-needs special HW rework.
-
-> Regards,
-> Gary
-
-Regards
-Dong Aisheng
+Cheers,
+Philipp.
