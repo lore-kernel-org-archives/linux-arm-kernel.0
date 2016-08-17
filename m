@@ -1,169 +1,129 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 17 Aug 2016 13:59:34 +0200
-Subject: [PATCH v2 1/3] ARM: kernel: merge core and init PLTs
+Date: Wed, 17 Aug 2016 13:59:35 +0200
+Subject: [PATCH v2 2/3] ARM: kernel: allocate PLT entries only for external
+ symbols
 In-Reply-To: <1471435176-13146-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1471435176-13146-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1471435176-13146-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1471435176-13146-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PLT code uses a separate .init.plt section to allocate PLT entries
-for jump and call instructions in __init code. However, even for fairly
-sizable modules like mac80211.ko, we only end up with a couple of PLT
-entries in the .init section, and so we can simplify the code
-significantly by emitting all PLT entries into the same section.
+When CONFIG_ARM_MODULE_PLTS is enabled, jump and call instructions in
+modules no longer need to be within 16 MB (8 MB for Thumb2) of their
+targets. If they are further away, a PLT entry will be generated on the
+fly for each of them, which extends the range to the entire 32-bit
+address space.
+
+However, since these PLT entries will become the branch targets of the
+original jump and call instructions, the PLT itself needs to be in
+range, or we end up in the same situation we started in. Since the PLT
+is in a separate section, this essentially means that all jumps and calls
+inside the same module must be resolvable without PLT entries.
+
+The PLT allocation code executes before the module itself is loaded in
+its final location, and so it has to use a worst-case estimate for
+which jumps and calls will require an entry in the PLT at relocation
+time. As an optimization, this code deduplicates entries pointing to
+the same symbol, using a O(n^2) algorithm. However, it does not take
+the above into account, i.e., that PLT entries will only be needed for
+jump and call relocations against symbols that are not defined in the
+module.
+
+So disregard relocations against symbols that are defined in the module
+itself.
+
+As an additional minor optimization, ignore input sections that lack
+the SHF_EXECINSTR flag. Since jump and call relocations operate on
+executable instructions only, there is no need to look in sections that
+do not contain executable code.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/include/asm/module.h |  6 +-
- arch/arm/kernel/module-plts.c | 68 +++++++-------------
- arch/arm/kernel/module.lds    |  3 +-
- 3 files changed, 25 insertions(+), 52 deletions(-)
+ arch/arm/kernel/module-plts.c | 32 +++++++++++++++++---
+ 1 file changed, 28 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/module.h b/arch/arm/include/asm/module.h
-index e358b7966c06..464748b9fd7d 100644
---- a/arch/arm/include/asm/module.h
-+++ b/arch/arm/include/asm/module.h
-@@ -23,10 +23,8 @@ struct mod_arch_specific {
- 	struct unwind_table *unwind[ARM_SEC_MAX];
- #endif
- #ifdef CONFIG_ARM_MODULE_PLTS
--	struct elf32_shdr   *core_plt;
--	struct elf32_shdr   *init_plt;
--	int		    core_plt_count;
--	int		    init_plt_count;
-+	struct elf32_shdr   *plt;
-+	int		    plt_count;
- #endif
- };
- 
 diff --git a/arch/arm/kernel/module-plts.c b/arch/arm/kernel/module-plts.c
-index 0c7efc3446c0..6832d1d6444e 100644
+index 6832d1d6444e..59d2fcaff7d2 100644
 --- a/arch/arm/kernel/module-plts.c
 +++ b/arch/arm/kernel/module-plts.c
-@@ -30,28 +30,16 @@ struct plt_entries {
- 	u32	lit[PLT_ENT_COUNT];
- };
+@@ -88,7 +88,8 @@ static int duplicate_rel(Elf32_Addr base, const Elf32_Rel *rel, int num,
+ }
  
--static bool in_init(const struct module *mod, u32 addr)
--{
--	return addr - (u32)mod->init_layout.base < mod->init_layout.size;
--}
--
- u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
+ /* Count how many PLT entries we may need */
+-static unsigned int count_plts(Elf32_Addr base, const Elf32_Rel *rel, int num)
++static unsigned int count_plts(const Elf32_Sym *syms, Elf32_Addr base,
++			       const Elf32_Rel *rel, int num)
  {
- 	struct plt_entries *plt, *plt_end;
--	int c, *count;
--
--	if (in_init(mod, loc)) {
--		plt = (void *)mod->arch.init_plt->sh_addr;
--		plt_end = (void *)plt + mod->arch.init_plt->sh_size;
--		count = &mod->arch.init_plt_count;
--	} else {
--		plt = (void *)mod->arch.core_plt->sh_addr;
--		plt_end = (void *)plt + mod->arch.core_plt->sh_size;
--		count = &mod->arch.core_plt_count;
--	}
-+	int c;
+ 	unsigned int ret = 0;
+ 	int i;
+@@ -97,7 +98,17 @@ static unsigned int count_plts(Elf32_Addr base, const Elf32_Rel *rel, int num)
+ 	 * Sure, this is order(n^2), but it's usually short, and not
+ 	 * time critical
+ 	 */
+-	for (i = 0; i < num; i++)
++	for (i = 0; i < num; i++) {
++		/*
++		 * We only have to consider branch targets that resolve
++		 * to undefined symbols. This is not simply a heuristic,
++		 * it is a fundamental limitation, since the PLT itself
++		 * is part of the module, and needs to be within range
++		 * as well, so modules can never grow beyond that limit.
++		 */
++		if (syms[ELF32_R_SYM(rel[i].r_info)].st_shndx != SHN_UNDEF)
++			continue;
 +
-+	plt = (void *)mod->arch.plt->sh_addr;
-+	plt_end = (void *)plt + mod->arch.plt->sh_size;
- 
- 	/* Look for an existing entry pointing to 'val' */
--	for (c = *count; plt < plt_end; c -= PLT_ENT_COUNT, plt++) {
-+	for (c = mod->arch.plt_count; plt < plt_end; c -= PLT_ENT_COUNT, plt++) {
- 		int i;
- 
- 		if (!c) {
-@@ -60,13 +48,13 @@ u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
- 				{ [0 ... PLT_ENT_COUNT - 1] = PLT_ENT_LDR, },
- 				{ val, }
- 			};
--			++*count;
-+			mod->arch.plt_count++;
- 			return (u32)plt->ldr;
+ 		switch (ELF32_R_TYPE(rel[i].r_info)) {
+ 		case R_ARM_CALL:
+ 		case R_ARM_PC24:
+@@ -114,6 +125,7 @@ static unsigned int count_plts(Elf32_Addr base, const Elf32_Rel *rel, int num)
+ 				ret++;
+ #endif
  		}
- 		for (i = 0; i < PLT_ENT_COUNT; i++) {
- 			if (!plt->lit[i]) {
- 				plt->lit[i] = val;
--				++*count;
-+				mod->arch.plt_count++;
- 			}
- 			if (plt->lit[i] == val)
- 				return (u32)&plt->ldr[i];
-@@ -132,21 +120,19 @@ static unsigned int count_plts(Elf32_Addr base, const Elf32_Rel *rel, int num)
- int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
- 			      char *secstrings, struct module *mod)
++	}
+ 	return ret;
+ }
+ 
+@@ -122,19 +134,27 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
  {
--	unsigned long core_plts = 0, init_plts = 0;
-+	unsigned long plts = 0;
+ 	unsigned long plts = 0;
  	Elf32_Shdr *s, *sechdrs_end = sechdrs + ehdr->e_shnum;
++	Elf32_Sym *syms = NULL;
  
  	/*
  	 * To store the PLTs, we expand the .text section for core module code
--	 * and the .init.text section for initialization code.
-+	 * and for initialization code.
+ 	 * and for initialization code.
  	 */
- 	for (s = sechdrs; s < sechdrs_end; ++s)
--		if (strcmp(".core.plt", secstrings + s->sh_name) == 0)
--			mod->arch.core_plt = s;
--		else if (strcmp(".init.plt", secstrings + s->sh_name) == 0)
--			mod->arch.init_plt = s;
-+		if (strcmp(".plt", secstrings + s->sh_name) == 0)
-+			mod->arch.plt = s;
+-	for (s = sechdrs; s < sechdrs_end; ++s)
++	for (s = sechdrs; s < sechdrs_end; ++s) {
+ 		if (strcmp(".plt", secstrings + s->sh_name) == 0)
+ 			mod->arch.plt = s;
++		else if (s->sh_type == SHT_SYMTAB)
++			syms = (Elf32_Sym *)s->sh_addr;
++	}
  
--	if (!mod->arch.core_plt || !mod->arch.init_plt) {
--		pr_err("%s: sections missing\n", mod->name);
-+	if (!mod->arch.plt) {
-+		pr_err("%s: module PLT section missing\n", mod->name);
+ 	if (!mod->arch.plt) {
+ 		pr_err("%s: module PLT section missing\n", mod->name);
  		return -ENOEXEC;
  	}
++	if (!syms) {
++		pr_err("%s: module symtab section missing\n", mod->name);
++		return -ENOEXEC;
++	}
  
-@@ -158,26 +144,16 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+ 	for (s = sechdrs + 1; s < sechdrs_end; ++s) {
+ 		const Elf32_Rel *rels = (void *)ehdr + s->sh_offset;
+@@ -144,7 +164,11 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
  		if (s->sh_type != SHT_REL)
  			continue;
  
--		if (strstr(secstrings + s->sh_name, ".init"))
--			init_plts += count_plts(dstsec->sh_addr, rels, numrels);
--		else
--			core_plts += count_plts(dstsec->sh_addr, rels, numrels);
-+		plts += count_plts(dstsec->sh_addr, rels, numrels);
+-		plts += count_plts(dstsec->sh_addr, rels, numrels);
++		/* ignore relocations that operate on non-exec sections */
++		if (!(dstsec->sh_flags & SHF_EXECINSTR))
++			continue;
++
++		plts += count_plts(syms, dstsec->sh_addr, rels, numrels);
  	}
  
--	mod->arch.core_plt->sh_type = SHT_NOBITS;
--	mod->arch.core_plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
--	mod->arch.core_plt->sh_addralign = L1_CACHE_BYTES;
--	mod->arch.core_plt->sh_size = round_up(core_plts * PLT_ENT_SIZE,
--					       sizeof(struct plt_entries));
--	mod->arch.core_plt_count = 0;
--
--	mod->arch.init_plt->sh_type = SHT_NOBITS;
--	mod->arch.init_plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
--	mod->arch.init_plt->sh_addralign = L1_CACHE_BYTES;
--	mod->arch.init_plt->sh_size = round_up(init_plts * PLT_ENT_SIZE,
--					       sizeof(struct plt_entries));
--	mod->arch.init_plt_count = 0;
--	pr_debug("%s: core.plt=%x, init.plt=%x\n", __func__,
--		 mod->arch.core_plt->sh_size, mod->arch.init_plt->sh_size);
-+	mod->arch.plt->sh_type = SHT_NOBITS;
-+	mod->arch.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-+	mod->arch.plt->sh_addralign = L1_CACHE_BYTES;
-+	mod->arch.plt->sh_size = round_up(plts * PLT_ENT_SIZE,
-+					  sizeof(struct plt_entries));
-+	mod->arch.plt_count = 0;
-+
-+	pr_debug("%s: plt=%x\n", __func__, mod->arch.plt->sh_size);
- 	return 0;
- }
-diff --git a/arch/arm/kernel/module.lds b/arch/arm/kernel/module.lds
-index 3682fa107918..05881e2b414c 100644
---- a/arch/arm/kernel/module.lds
-+++ b/arch/arm/kernel/module.lds
-@@ -1,4 +1,3 @@
- SECTIONS {
--        .core.plt : { BYTE(0) }
--        .init.plt : { BYTE(0) }
-+	.plt : { BYTE(0) }
- }
+ 	mod->arch.plt->sh_type = SHT_NOBITS;
 -- 
 2.7.4
