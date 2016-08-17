@@ -1,30 +1,58 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 17 Aug 2016 07:12:06 -0400
-Subject: [PATCH] arm64: Expose TASK_SIZE to userspace via auxv
-In-Reply-To: <20160817103006.GB20762@e104818-lin.cambridge.arm.com>
-References: <20160816183231.21179-1-cov@codeaurora.org>
- <20160817103006.GB20762@e104818-lin.cambridge.arm.com>
-Message-ID: <CED1E802-65C5-48B9-8165-46684BE81164@codeaurora.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 17 Aug 2016 13:16:36 +0200
+Subject: [PATCH v2] kvm: arm: Enforce some NS-SVC initialisation
+In-Reply-To: <6d030bee2db08c2fe1b7569e692e8f66800b1e4c.1471369569.git.robin.murphy@arm.com>
+References: <5322cdb9cb397741d15b60c6693ad39dbf74b6d5.1469101945.git.robin.murphy@arm.com>
+ <6d030bee2db08c2fe1b7569e692e8f66800b1e4c.1471369569.git.robin.murphy@arm.com>
+Message-ID: <20160817111636.GF8808@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Aug 16, 2016 at 06:49:18PM +0100, Robin Murphy wrote:
+> Since the non-secure copies of banked registers lack architecturally
+> defined reset values, there is no actual guarantee when entering in Hyp
+> from secure-only firmware that the Non-Secure PL1 state will look the
+> way that kernel entry (in particular the decompressor stub) expects.
+> So far, we've been getting away with it thanks to implementation details
+> of ARMv7 cores and/or bootloader behaviour, but for the sake of forwards
+> compatibility let's try to ensure that we have a minimally sane state
+> before dropping down into it.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-On August 17, 2016 6:30:06 AM EDT, Catalin Marinas <catalin.marinas@arm.com> wrote:
->On Tue, Aug 16, 2016 at 02:32:29PM -0400, Christopher Covington wrote:
->> Some userspace applications need to know the maximum virtual address
->they can
->> use (TASK_SIZE).
->
->Just curious, what are the cases needing TASK_SIZE in user space?
-
-Checkpoint/Restore In Userspace and the Mozilla Javascript Engine https://bugzilla.mozilla.org/show_bug.cgi?id=1143022 are the specific cases I've run into. I've heard LuaJIT might have a similar situation. In general I think making allocations from the top down is a shortcut for finding a large unused region of memory.
-
-Thanks,
-Cov
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
-
-Sent from my Snapdragon powered Android device with K-9 Mail. Please excuse my brevity.
+> ---
+> 
+> v2: Initialise SED/ITD to safe values as well.
+> 
+>  arch/arm/kernel/hyp-stub.S | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+> index 0b1e4a93d67e..15d073ae5da2 100644
+> --- a/arch/arm/kernel/hyp-stub.S
+> +++ b/arch/arm/kernel/hyp-stub.S
+> @@ -142,6 +142,19 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
+>  	and	r7, #0x1f		@ Preserve HPMN
+>  	mcr	p15, 4, r7, c1, c1, 1	@ HDCR
+>  
+> +	@ Make sure NS-SVC is initialised appropriately
+> +	mrc	p15, 0, r7, c1, c0, 0	@ SCTLR
+> +	orr	r7, #(1 << 5)		@ CP15 barriers enabled
+> +	bic	r7, #(3 << 7)		@ Clear SED/ITD for v8 (RES0 for v7)
+> +	bic	r7, #(3 << 19)		@ WXN and UWXN disabled
+> +	mcr	p15, 0, r7, c1, c0, 0	@ SCTLR
+> +
+> +	mrc	p15, 0, r7, c0, c0, 0	@ MIDR
+> +	mcr	p15, 4, r7, c0, c0, 0	@ VPIDR
+> +
+> +	mrc	p15, 0, r7, c0, c0, 5	@ MPIDR
+> +	mcr	p15, 4, r7, c0, c0, 5	@ VMPIDR
+> +
+>  #if !defined(ZIMAGE) && defined(CONFIG_ARM_ARCH_TIMER)
+>  	@ make CNTP_* and CNTPCT accessible from PL1
+>  	mrc	p15, 0, r7, c0, c1, 1	@ ID_PFR1
+> -- 
+> 2.8.1.dirty
+> 
