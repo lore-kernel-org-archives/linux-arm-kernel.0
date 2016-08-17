@@ -1,41 +1,47 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 17 Aug 2016 15:48:22 +0300
-Subject: [RFC2 nowrap: PATCH v7 00/18] ILP32 for ARM64
-In-Reply-To: <175AE090-EDA7-4A8D-9044-3FFA74AC1903@suse.de>
-References: <1471434403-25291-1-git-send-email-ynorov@caviumnetworks.com>
- <175AE090-EDA7-4A8D-9044-3FFA74AC1903@suse.de>
-Message-ID: <20160817124822.GA25751@yury-N73SV>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 17 Aug 2016 07:48:40 -0500
+Subject: [PATCH v2 1/2] devicetree: Add vendor prefix for Shenzhen Sunchip
+ Technology Co., Ltd
+In-Reply-To: <20160816182855.2hdupen4dcmczxiw@vip.cybercity.dk>
+References: <20160812235312.GB10557@vip.cybercity.dk>
+ <bae6ad6c04f7567b224e008ab27b32d2dac1d9c1.1471125083.git.ccc94453@vip.cybercity.dk>
+ <20160816125624.GA20716@rob-hp-laptop>
+ <20160816182855.2hdupen4dcmczxiw@vip.cybercity.dk>
+Message-ID: <CAL_Jsq+a04Btup8m=HkJ4ccmoCiYLT1B1habm76W21b9cTtmJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2016 at 02:28:50PM +0200, Alexander Graf wrote:
-> 
-> > On 17 Aug 2016, at 13:46, Yury Norov <ynorov@caviumnetworks.com> wrote:
-> > 
-> > This series enables aarch64 with ilp32 mode, and as supporting work,
-> > introduces ARCH_32BIT_OFF_T configuration option that is enabled for
-> > existing 32-bit architectures but disabled for new arches (so 64-bit
-> > off_t is is used by new userspace).
-> > 
-> > This version is based on kernel v4.8-rc2.
-> > It works with glibc-2.23, and tested with LTP.
-> > 
-> > This is RFC because there is still no solid understanding what type of registers
-> > top-halves delousing we prefer. In this patchset, w0-w7 are cleared for each
-> > syscall in assembler entry. The alternative approach is in introducing compat
-> > wrappers which is little faster for natively routed syscalls (~2.6% for syscall
-> > with no payload) but much more complicated.
-> 
-> So you?re saying there are 2 options:
-> 
->   1) easy to get right, slightly slower, same ABI to user space as 2
->   2) harder to get right, minor performance benefit
+On Tue, Aug 16, 2016 at 1:28 PM, Rask Ingemann Lambertsen
+<ccc94453@vip.cybercity.dk> wrote:
+> On Tue, Aug 16, 2016 at 07:56:24AM -0500, Rob Herring wrote:
+>> On Thu, Aug 11, 2016 at 10:11:51PM +0200, Rask Ingemann Lambertsen wrote:
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> > index 1992aa9..fbad2cea 100644
+>> > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> > @@ -256,6 +256,7 @@ ste     ST-Ericsson
+>> >  stericsson ST-Ericsson
+>> >  syna       Synaptics Inc.
+>> >  synology   Synology, Inc.
+>> > +sunchip    Shenzhen Sunchip Technology Co., Ltd
+>> >  SUNW       Sun Microsystems, Inc
+>>
+>> These are not in alphabetical order. Maybe someone thought uppercase
+>> should be separate, but I don't. So please fix the ordering here moving
+>> SUNW before syna.
+>
+> I'm new to this, so I could use a bit of guidance here. Is it OK if I
+> send a follow-up patch to fix the ordering or should I send a patch to
+> fix the ordering first, before the sunchip prefix is added?
 
-No, ABI is little different. If 1) we pass off_t in a pair to syscalls,
-if 2) - in a single register. So if 1, we 'd take some wrappers from aarch32.
-See patch 12 here.
+For this, just doing it all in one patch is fine. If you want to do 2
+patches, then fix SUNW first then add sunchip.
 
-> That?s an obvious pick, no? Mark it non-RFC and stay with the clearing in assembler entry. If anyone cares about those last few percent, they can still push the harder path upstream later if they want to, but at least we?ll have the ABI stable, so that you can start using and developing for ilp32 on aarch64.
-> 
-> 
-> Alex
+> I never considered the possibility that the list wouldn't be in
+> alphabetical order to begin with, so the brain power went into deciding
+> if uppercase should be sorted separately.
+
+Even if uppercase is sorted after lowercase, you've got it in the wrong place.
+
+Rob
