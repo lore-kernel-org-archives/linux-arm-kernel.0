@@ -1,67 +1,51 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Wed, 17 Aug 2016 14:58:06 +0800
-Subject: [PATCH v4 1/3] drm/mediatek: do mtk_hdmi_send_infoframe after HDMI
- clock enable
-In-Reply-To: <1471417088-2993-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1471417088-2993-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1471417088-2993-2-git-send-email-bibby.hsieh@mediatek.com>
+Date: Wed, 17 Aug 2016 14:58:05 +0800
+Subject: [PATCH v4 0/3] MT8173 HDMI 4K support
+Message-ID: <1471417088-2993-1-git-send-email-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Junzhi Zhao <junzhi.zhao@mediatek.com>
+This is MT8173 HDMI 4K support PATCH v4, based on 4.8-rc1.
 
-The mtk_hdmi_send_infoframe have to
-be run after PLL and PIXEL clock of HDMI enable.
-Make sure that HDMI inforframes can be sent
-successfully.
+In order to support HDMI 4K on MT8173,
+we have to make some modifications.
+1) Make sure that mtk_hdmi_send_infoframe is sent successfully.
+2) Enhance the HDMI driving current to improve performance.
+3) Make sure that pixel clock is 297MHz when resolution is 4K.
 
-Signed-off-by: Junzhi Zhao <junzhi.zhao@mediatek.com>
-Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
----
- drivers/gpu/drm/mediatek/mtk_hdmi.c |   17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
+Changes since v3:
+ - Rebase to 4.8-rc1.
+ - The valid range of tvdpll is 1G to 2G Hz, so, we Change the
+   if statement of mode->clock to fit that and add a comment.
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi.c b/drivers/gpu/drm/mediatek/mtk_hdmi.c
-index 334562d..875b045 100644
---- a/drivers/gpu/drm/mediatek/mtk_hdmi.c
-+++ b/drivers/gpu/drm/mediatek/mtk_hdmi.c
-@@ -1133,12 +1133,6 @@ static int mtk_hdmi_output_set_display_mode(struct mtk_hdmi *hdmi,
- 	phy_power_on(hdmi->phy);
- 	mtk_hdmi_aud_output_config(hdmi, mode);
- 
--	mtk_hdmi_setup_audio_infoframe(hdmi);
--	mtk_hdmi_setup_avi_infoframe(hdmi, mode);
--	mtk_hdmi_setup_spd_infoframe(hdmi, "mediatek", "On-chip HDMI");
--	if (mode->flags & DRM_MODE_FLAG_3D_MASK)
--		mtk_hdmi_setup_vendor_specific_infoframe(hdmi, mode);
--
- 	mtk_hdmi_hw_vid_black(hdmi, false);
- 	mtk_hdmi_hw_aud_unmute(hdmi);
- 	mtk_hdmi_hw_send_av_unmute(hdmi);
-@@ -1401,6 +1395,16 @@ static void mtk_hdmi_bridge_pre_enable(struct drm_bridge *bridge)
- 	hdmi->powered = true;
- }
- 
-+static void mtk_hdmi_send_infoframe(struct mtk_hdmi *hdmi,
-+				    struct drm_display_mode *mode)
-+{
-+	mtk_hdmi_setup_audio_infoframe(hdmi);
-+	mtk_hdmi_setup_avi_infoframe(hdmi, mode);
-+	mtk_hdmi_setup_spd_infoframe(hdmi, "mediatek", "On-chip HDMI");
-+	if (mode->flags & DRM_MODE_FLAG_3D_MASK)
-+		mtk_hdmi_setup_vendor_specific_infoframe(hdmi, mode);
-+}
-+
- static void mtk_hdmi_bridge_enable(struct drm_bridge *bridge)
- {
- 	struct mtk_hdmi *hdmi = hdmi_ctx_from_bridge(bridge);
-@@ -1409,6 +1413,7 @@ static void mtk_hdmi_bridge_enable(struct drm_bridge *bridge)
- 	clk_prepare_enable(hdmi->clk[MTK_HDMI_CLK_HDMI_PLL]);
- 	clk_prepare_enable(hdmi->clk[MTK_HDMI_CLK_HDMI_PIXEL]);
- 	phy_power_on(hdmi->phy);
-+	mtk_hdmi_send_infoframe(hdmi, &hdmi->mode);
- 
- 	hdmi->enabled = true;
- }
+Changes since v2:
+ - Remove the change about preparation for MT2701 support.
+
+Changes since v1:
+ - According to the suggestion from philipp, We use the new
+   dpi0_sel rate set method.
+ - calls clk_set_rate to set the dpi0_sel according to the
+   pixel clock.
+ - Remove the direct access to all the intermediate clock part.
+ - Remove the intermediate tvdpll_d* clocks in dts.
+ - According to suggestion from CK, we rename the clock parse
+   function and remove it from mtk_dpi_conf struct.
+ - Merges the hdmi Pll set rate for pixel clock greater than
+   165MHz and smaller parts.
+
+The PATCH depends on the following patch:
+https://patchwork.kernel.org/patch/9262575/
+(arm64: dts: mt8173: add mmsel clocks for 4K support)
+
+Junzhi Zhao (3):
+  drm/mediatek: do mtk_hdmi_send_infoframe after HDMI clock enable
+  drm/mediatek: enhance the HDMI driving current
+  drm/mediatek: fix the wrong pixel clock when resolution is 4K
+
+ drivers/gpu/drm/mediatek/mtk_dpi.c             |    9 +++--
+ drivers/gpu/drm/mediatek/mtk_hdmi.c            |   17 ++++++----
+ drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c |   42 +++++++++++++++++-------
+ 3 files changed, 48 insertions(+), 20 deletions(-)
+
 -- 
 1.7.9.5
