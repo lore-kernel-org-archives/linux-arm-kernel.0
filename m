@@ -1,53 +1,77 @@
-From: groeck@google.com (Guenter Roeck)
-Date: Tue, 16 Aug 2016 17:26:40 -0700
-Subject: Problem with atomic accesses in pstore on some ARM CPUs
-In-Reply-To: <CAGXu5jL7nX8aS64QH1Eqo=yvsy_+ad+xQnYVDG_ge-oomAOOxg@mail.gmail.com>
-References: <CABXOdTfT7xMfiBvRuUS1hsVs=q5q2wY1x1Z8oCyyJNFckM0g0A@mail.gmail.com>
- <8f0c9ced-cdc3-ab9b-caee-06fe85e6c1e7@arm.com>
- <CABXOdTfg2T2tZrQOd2S5SjeySAMbfQX0weFuvRXBr2o8Of9nVQ@mail.gmail.com>
- <20160816132103.GD27088@arm.com>
- <CABXOdTfHX_ZB1CuM7hzU5LCZPYdHvBSatN9Nen=rb8r1rXhz-g@mail.gmail.com>
- <20160815221518.GD1120@svinekod>
- <CAMbhsRQiU-UyiCWqjaWNXbhDd0+=Tv_pWoeQkJKJaHC6y4=HwQ@mail.gmail.com>
- <CABXOdTfhXhq6pbqAqGQwHcsCXvyshS8JbDGQCBKxfd-2s=M-fw@mail.gmail.com>
- <CAGXu5jL7nX8aS64QH1Eqo=yvsy_+ad+xQnYVDG_ge-oomAOOxg@mail.gmail.com>
-Message-ID: <CABXOdTfVVA-rU96DZvVHCqKB2NxL=zFHMG6dzJk_9RhFsOBCvA@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 17 Aug 2016 09:31:40 +0900
+Subject: [PATCH v6 4/8] Documentation: bindings: add dt documentation for
+ dfi controller
+In-Reply-To: <1471386989-9541-5-git-send-email-hl@rock-chips.com>
+References: <1471386989-9541-1-git-send-email-hl@rock-chips.com>
+ <CGME20160816223902epcas1p1c7f4bd3bfcc7081cc741392bf6a4afe3@epcas1p1.samsung.com>
+ <1471386989-9541-5-git-send-email-hl@rock-chips.com>
+Message-ID: <57B3B06C.1040109@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 1:50 PM, Kees Cook <keescook@chromium.org> wrote:
+Hi Lin,
 
-[ ... ]
+I add one minor comment.
 
->>> persistent_ram uses atomic ops in uncached memory to store the start
->>> and end positions in the ringbuffer so that the state of the
->>> ringbuffer will be valid if the kernel crashes at any time.  This was
->>> inherited from Android's ram_console implementation, and worked
->>> through armv7.  It has been causing more and more problems recently,
->>> see for example 027bc8b08242c59e19356b4b2c189f2d849ab660 (pstore-ram:
->>> Allow optional mapping with pgprot_noncached) and
->>> 7ae9cb81933515dc7db1aa3c47ef7653717e3090 (pstore-ram: Fix hangs by
->>> using write-combine mappings).
->>>
->>> Maybe it should be replaced with a spinlock in normal ram protecting
->>> writes to the uncached region.
->>
->> The necessary functions already exist, and are used for memory mapped
->> with ioremap() / ioremap_wc(). They were introduced with commit
->> 0405a5cec3 ("pstore/ram: avoid atomic accesses for ioremapped
->> regions"), and the description in that patch sounds quite similar to
->> the current problem. Given that, would it be acceptable to remove
->> buffer_start_add_atomic() and buffer_size_add_atomic(), and always use
->> buffer_start_add_locked() and buffer_size_add_locked() instead ? Those
->> functions still use atomic_set() and atomic_read(), which works fine
->> in my tests. The only difference is that a spinlock in main memory is
->> used instead of atomic_cmpxchg().
->
-> I don't see much of a down side to this. ramoops isn't expected to be
-> high-bandwidth so trading for a single global lock doesn't really
-> bother me.
->
+After fixing it, looks good to me.
+Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-Sounds good. I'll submit a patch to address the problem as suggested above.
+On 2016? 08? 17? 07:36, Lin Huang wrote:
+> This patch adds the documentation for rockchip dfi devfreq-event driver.
+> 
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> ---
+> Changes in v6:
+> -None
+> 
+> Changes in v5:
+> -None
+> 
+> Changes in v4:
+> -None
+> 
+> Changes in v3:
+> -None
+> 
+> Changes in v2:
+> -None 
+> 
+> Changes in v1:
+> -None
+> 
+>  .../bindings/devfreq/event/rockchip-dfi.txt          | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/devfreq/event/rockchip-dfi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/devfreq/event/rockchip-dfi.txt b/Documentation/devicetree/bindings/devfreq/event/rockchip-dfi.txt
+> new file mode 100644
+> index 0000000..bf42255
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/devfreq/event/rockchip-dfi.txt
+> @@ -0,0 +1,20 @@
+> +
+> +* Rockchip rk3399 DFI device
+> +
+> +Required properties:
+> +- compatible: Must be "rockchip,rk3399-dfi".
+> +- reg: physical base address of each DFI and length of memory mapped region
+> +- rockchip,pmu: phandle to the syscon managing the "pmu general register files"
+> +- clocks: phandles for clock specified in "clock-names" property
+> +- clock-names : the name of clock used by the DFI, must be "pclk_ddr_mon";
+> +
+> +Example:
+> +	dfi: dfi at 0xff630000 {
+> +		reg = <0x00 0xff630000 0x00 0x4000>;
+> +		compatible = "rockchip,rk3399-dfi";
+> +		rockchip,pmu = <&pmugrf>;
+> +		clocks = <&cru PCLK_DDR_MON>;
+> +		clock-names = "pclk_ddr_mon";
+> +		status = "disabled";
+> +	};
+> +
 
-Guenter
+Remove the blank line.
+
+Thanks,
+Chanwoo Choi
