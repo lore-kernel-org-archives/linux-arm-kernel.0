@@ -1,159 +1,68 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 17 Aug 2016 21:38:52 +0200
-Subject: [PULL 05/12] KVM: arm64: ITS: move ITS registration into first VCPU
- run
+Date: Wed, 17 Aug 2016 21:38:53 +0200
+Subject: [PULL 06/12] KVM: arm64: check for ITS device on MSI injection
 In-Reply-To: <20160817193859.15726-1-christoffer.dall@linaro.org>
 References: <20160817193859.15726-1-christoffer.dall@linaro.org>
-Message-ID: <20160817193859.15726-6-christoffer.dall@linaro.org>
+Message-ID: <20160817193859.15726-7-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andre Przywara <andre.przywara@arm.com>
 
-Currently we register an ITS device upon userland issuing the CTLR_INIT
-ioctl to mark initialization of the ITS as done.
-This deviates from the initialization sequence of the existing GIC
-devices and does not play well with the way QEMU handles things.
-To be more in line with what we are used to, register the ITS(es) just
-before the first VCPU is about to run, so in the map_resources() call.
-This involves iterating through the list of KVM devices and map each
-ITS that we find.
+When userspace provides the doorbell address for an MSI to be
+injected into the guest, we find a KVM device which feels responsible.
+Lets check that this device is really an emulated ITS before we make
+real use of the container_of-ed pointer.
+
+  [ Moved NULL-pointer check to caller of static function
+    - Christoffer ]
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Tested-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 43 +++++++++++++++++++++++++++++++++----------
- virt/kvm/arm/vgic/vgic-v3.c  |  8 ++++++++
- virt/kvm/arm/vgic/vgic.h     |  6 ++++++
- 3 files changed, 47 insertions(+), 10 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 21 +++++++++++++++++++--
+ 1 file changed, 19 insertions(+), 2 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index d06330a..1cf9f59 100644
+index 1cf9f59..9533080 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1319,13 +1319,13 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu)
- 		its_sync_lpi_pending_table(vcpu);
+@@ -471,6 +471,21 @@ static int vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
+ 	return 0;
  }
  
--static int vgic_its_init_its(struct kvm *kvm, struct vgic_its *its)
-+static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
- {
- 	struct vgic_io_device *iodev = &its->iodev;
- 	int ret;
- 
--	if (its->initialized)
--		return 0;
-+	if (!its->initialized)
-+		return -EBUSY;
- 
- 	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
- 		return -ENXIO;
-@@ -1342,9 +1342,6 @@ static int vgic_its_init_its(struct kvm *kvm, struct vgic_its *its)
- 				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
- 	mutex_unlock(&kvm->slots_lock);
- 
--	if (!ret)
--		its->initialized = true;
--
- 	return ret;
- }
- 
-@@ -1466,9 +1463,6 @@ static int vgic_its_set_attr(struct kvm_device *dev,
- 		if (type != KVM_VGIC_ITS_ADDR_TYPE)
- 			return -ENODEV;
- 
--		if (its->initialized)
--			return -EBUSY;
--
- 		if (copy_from_user(&addr, uaddr, sizeof(addr)))
- 			return -EFAULT;
- 
-@@ -1484,7 +1478,9 @@ static int vgic_its_set_attr(struct kvm_device *dev,
- 	case KVM_DEV_ARM_VGIC_GRP_CTRL:
- 		switch (attr->attr) {
- 		case KVM_DEV_ARM_VGIC_CTRL_INIT:
--			return vgic_its_init_its(dev->kvm, its);
-+			its->initialized = true;
-+
-+			return 0;
- 		}
- 		break;
- 	}
-@@ -1529,3 +1525,30 @@ int kvm_vgic_register_its_device(void)
- 	return kvm_register_device_ops(&kvm_arm_vgic_its_ops,
- 				       KVM_DEV_TYPE_ARM_VGIC_ITS);
- }
-+
-+/*
-+ * Registers all ITSes with the kvm_io_bus framework.
-+ * To follow the existing VGIC initialization sequence, this has to be
-+ * done as late as possible, just before the first VCPU runs.
-+ */
-+int vgic_register_its_iodevs(struct kvm *kvm)
++static struct vgic_io_device *vgic_get_its_iodev(struct kvm_io_device *dev)
 +{
-+	struct kvm_device *dev;
-+	int ret = 0;
++	struct vgic_io_device *iodev;
 +
-+	list_for_each_entry(dev, &kvm->devices, vm_node) {
-+		if (dev->ops != &kvm_arm_vgic_its_ops)
-+			continue;
++	if (dev->ops != &kvm_io_gic_ops)
++		return NULL;
 +
-+		ret = vgic_register_its_iodev(kvm, dev->private);
-+		if (ret)
-+			return ret;
-+		/*
-+		 * We don't need to care about tearing down previously
-+		 * registered ITSes, as the kvm_io_bus framework removes
-+		 * them for us if the VM gets destroyed.
-+		 */
-+	}
++	iodev = container_of(dev, struct vgic_io_device, dev);
 +
-+	return ret;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 0506543..9f0dae3 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -289,6 +289,14 @@ int vgic_v3_map_resources(struct kvm *kvm)
- 		goto out;
- 	}
- 
-+	if (vgic_has_its(kvm)) {
-+		ret = vgic_register_its_iodevs(kvm);
-+		if (ret) {
-+			kvm_err("Unable to register VGIC ITS MMIO regions\n");
-+			goto out;
-+		}
-+	}
++	if (iodev->iodev_type != IODEV_ITS)
++		return NULL;
 +
- 	dist->ready = true;
- 
- out:
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 1d8e21d..6c4625c 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -84,6 +84,7 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu);
- int vgic_v3_probe(const struct gic_kvm_info *info);
- int vgic_v3_map_resources(struct kvm *kvm);
- int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
-+int vgic_register_its_iodevs(struct kvm *kvm);
- bool vgic_has_its(struct kvm *kvm);
- int kvm_vgic_register_its_device(void);
- void vgic_enable_lpis(struct kvm_vcpu *vcpu);
-@@ -140,6 +141,11 @@ static inline int vgic_register_redist_iodevs(struct kvm *kvm,
- 	return -ENODEV;
- }
- 
-+static inline int vgic_register_its_iodevs(struct kvm *kvm)
-+{
-+	return -ENODEV;
++	return iodev;
 +}
 +
- static inline bool vgic_has_its(struct kvm *kvm)
- {
- 	return false;
+ /*
+  * Queries the KVM IO bus framework to get the ITS pointer from the given
+  * doorbell address.
+@@ -494,9 +509,11 @@ int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
+ 
+ 	kvm_io_dev = kvm_io_bus_get_dev(kvm, KVM_MMIO_BUS, address);
+ 	if (!kvm_io_dev)
+-		return -ENODEV;
++		return -EINVAL;
+ 
+-	iodev = container_of(kvm_io_dev, struct vgic_io_device, dev);
++	iodev = vgic_get_its_iodev(kvm_io_dev);
++	if (!iodev)
++		return -EINVAL;
+ 
+ 	mutex_lock(&iodev->its->its_lock);
+ 	ret = vgic_its_trigger_msi(kvm, iodev->its, msi->devid, msi->data);
 -- 
 2.9.0
