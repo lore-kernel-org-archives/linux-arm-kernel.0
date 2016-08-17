@@ -1,29 +1,54 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 17 Aug 2016 13:17:51 +0200
-Subject: [PATCH v2] kvm: arm: Enforce some NS-SVC initialisation
-In-Reply-To: <6d030bee2db08c2fe1b7569e692e8f66800b1e4c.1471369569.git.robin.murphy@arm.com>
-References: <5322cdb9cb397741d15b60c6693ad39dbf74b6d5.1469101945.git.robin.murphy@arm.com>
- <6d030bee2db08c2fe1b7569e692e8f66800b1e4c.1471369569.git.robin.murphy@arm.com>
-Message-ID: <20160817111751.GG8808@cbox>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Wed, 17 Aug 2016 11:27:20 +0000
+Subject: [PATCH] ARM: irq_work: Do not attempt to IPI on non IPI-capable HW
+In-Reply-To: <57B42C18.1090400@arm.com>
+References: <1471361210-29914-1-git-send-email-marc.zyngier@arm.com>
+ <CAL411-pUUdxN_d76FaXYGtEd7Seewnrin=x2mFEbi1Z48zSRvg@mail.gmail.com>
+ <57B41523.6030202@arm.com>
+ <VI1PR04MB1455E9F56D0EDA0558CC84508B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
+ <57B41B90.3050204@arm.com>
+ <VI1PR04MB14558618D41FFF0BA4616BD08B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
+ <57B42C18.1090400@arm.com>
+Message-ID: <VI1PR04MB14552BEF9184FF2AE23A51B58B140@VI1PR04MB1455.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+>
+>On 17/08/16 09:28, Peter Chen wrote:
+>>
+>>>>>>
+>>>>>> Why not using is_smp as condition, it is more strict.
+>>>>>>
+>>>>>> if (is_smp())
+>>>>>>     return !!__smp_cross_call;
+>>>>>> else
+>>>>>>     return false;
+>>>>>
+>>>>> What's the gain? We're trying to check whether we can actually
+>>>>> deliver an IPI. Why should we gate it by finding out whether we're
+>>>>> smp_on_up or
+>>> not?
+>>>>>
+>>>>
+>>>> If UP system with CONFIG_SMP enabled, the __smp_cross_call is not
+>>>> NULL, but the IPI is not capable. Or am I missing something?
+>>>
+>>> Take an OMAP3 system. It is UP,  and doesn't have a GIC, so
+>>> __smp_cross_call will be NULL. Yet, it boots with a generic multi-platform kernel,
+>with SMP on.
+>>>
+>>
+>> Are there any UP platforms which have GIC? If there is, we may be in
+>> trouble with only depends on CONFIG_SMP.
+>
+>Why would we be in trouble? Things will still work, as the irq work will be taken care
+>of on the next timer interrupt. Again: the self IPI is only a latency optimization.
+>
 
-On Tue, Aug 16, 2016 at 06:49:18PM +0100, Robin Murphy wrote:
-> Since the non-secure copies of banked registers lack architecturally
-> defined reset values, there is no actual guarantee when entering in Hyp
-> from secure-only firmware that the Non-Secure PL1 state will look the
-> way that kernel entry (in particular the decompressor stub) expects.
-> So far, we've been getting away with it thanks to implementation details
-> of ARMv7 cores and/or bootloader behaviour, but for the sake of forwards
-> compatibility let's try to ensure that we have a minimally sane state
-> before dropping down into it.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>From what I see, it is different with you. arch_irq_work_raise will be called if 
+irq work is not lazy, and  If arch_irq_work_has_interrupt() is true,
+the system will try to call IPI_IRQ_WORK through the GIC, but GIC has no
+IPI capabilities, then the system is stuck, this is the same we have observed
+at A7 single core platform.
 
-Can we have your acked-by on this patch to merge it via the KVM tree or
-do you prefer merging this one directly yourself?
-
-Thanks,
--Christoffer
+Peter
