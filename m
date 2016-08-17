@@ -1,49 +1,43 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Wed, 17 Aug 2016 10:16:42 -0700
-Subject: [PATCH v3 5/5] dt-bindings: add compatible strings for big/little
- rockchip vops
-In-Reply-To: <loom.20160602T092953-610@post.gmane.org>
-References: <loom.20160602T092953-610@post.gmane.org>
-Message-ID: <1471454202-1631-1-git-send-email-seanpaul@chromium.org>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 17 Aug 2016 18:20:14 +0100
+Subject: [RFC PATCH 0/7] Add support for monitoring guest TLB operations
+In-Reply-To: <a553745d-a527-b2ba-7cfa-f688786d5dc3@redhat.com> (Paolo
+ Bonzini's message of "Wed, 17 Aug 2016 19:02:32 +0200")
+References: <1471344312-26685-1-git-send-email-punit.agrawal@arm.com>
+ <ed9ce98d-67d2-f01b-6bb0-5c5c842129a5@redhat.com>
+ <87fuq3tjmv.fsf@e105922-lin.cambridge.arm.com>
+ <a553745d-a527-b2ba-7cfa-f688786d5dc3@redhat.com>
+Message-ID: <878tvvtir5.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Yao <mark.yao@rock-chips.com>
+Paolo Bonzini <pbonzini@redhat.com> writes:
 
-This patch documents the compatible strings for the big and little vop
-in rockchip's drm driver.
+> On 17/08/2016 19:01, Punit Agrawal wrote:
+>>> Can you explain what this is used for?  In other words, why would this
+>>> be used instead of just running perf in the guest?
+>> 
+>> As TLB maintenance operations are synchronised in hardware, they can
+>> impact performance beyond the guest. The operations generate traffic on
+>> the interconnect and depending on the implementation, they can also
+>> affect the remote TLB's translation bandwidth.
+>> 
+>> These patches are useful on systems where the host and guest are
+>> controlled by different users - the guest could be running arbitrary
+>> software. 
+>> 
+>> Having the ability to monitor the usage of guest TLB invalidations in
+>> the host can be useful to diagnose performance issues on such systems.
+>
+> Are there hardware performance counters for these operations?
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
+That would have been ideal! There are PMU events defined for TLB
+accesses and refills but unhelpfully none of them track maintenance
+operations.
 
-Reviewed-by: Tomasz Figa <tfiga@chromium.org>
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-[seanpaul removed superfluous description per tfiga's review]
-Signed-off-by: Sean Paul <seanpaul@chromium.org>
----
-
-Changes in v3:
-	- Updated subject (Sean Paul)
-	- Removed unnecessary description (Tomasz)
-
- Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
-index 196121f..9eb3f0a 100644
---- a/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
-+++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
-@@ -8,6 +8,8 @@ Required properties:
- - compatible: value should be one of the following
- 		"rockchip,rk3036-vop";
- 		"rockchip,rk3288-vop";
-+		"rockchip,rk3399-vop-big";
-+		"rockchip,rk3399-vop-lit";
- 
- - interrupts: should contain a list of all VOP IP block interrupts in the
- 		 order: VSYNC, LCD_SYSTEM. The interrupt specifier
--- 
-2.8.0.rc3.226.g39d4020
+>
+> Paolo
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
