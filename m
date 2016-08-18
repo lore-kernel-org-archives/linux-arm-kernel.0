@@ -1,83 +1,86 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 18 Aug 2016 12:11:01 +0200
-Subject: [PATCH 08/13] scpi: add a vendor_msg mechanism in case the mailbox
- message differs
-In-Reply-To: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
-References: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1471515066-3626-9-git-send-email-narmstrong@baylibre.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Thu, 18 Aug 2016 12:19:41 +0200
+Subject: [PULL 00/12] KVM/ARM Fixes for v4.8-rc3
+In-Reply-To: <20160817193859.15726-1-christoffer.dall@linaro.org>
+References: <20160817193859.15726-1-christoffer.dall@linaro.org>
+Message-ID: <3b5c3520-da99-e255-6961-2d2706f39c81@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case the mailbox message pointer must contain a specific structure.
-add a mechanism to override the pointer sent to the mailbox by a
-vendor specific data initialized by a vendor speficic function.
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/firmware/arm_scpi.c | 23 ++++++++++++++++++++++-
- 1 file changed, 22 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-index d3be4c5..275feef 100644
---- a/drivers/firmware/arm_scpi.c
-+++ b/drivers/firmware/arm_scpi.c
-@@ -189,6 +189,7 @@ struct scpi_xfer {
- 	unsigned int rx_len;
- 	struct list_head node;
- 	struct completion done;
-+	void *vendor_msg;
- };
- 
- struct scpi_chan {
-@@ -203,6 +204,7 @@ struct scpi_chan {
- 	struct mutex xfers_lock;
- 	u8 token;
- 	struct scpi_xfer *t;
-+	void *vendor_data;
- };
- 
- struct scpi_drvinfo {
-@@ -302,6 +304,8 @@ struct dev_pstate_set {
- 
- struct priv_scpi_ops {
- 	/* Internal Specific Ops */
-+	int (*init)(struct device *dev, struct scpi_chan *chan);
-+	int (*prepare)(struct scpi_chan *chan);
- 	void (*handle_remote_msg)(struct mbox_client *c, void *msg);
- 	void (*tx_prepare)(struct mbox_client *c, void *msg);
- 	/* Message Specific Ops */
-@@ -498,7 +502,18 @@ static int legacy_scpi_send_message(u8 cmd, void *tx_buf, unsigned int tx_len,
- 	init_completion(&msg->done);
- 	scpi_chan->t = msg;
- 
--	ret = mbox_send_message(scpi_chan->chan, &msg->cmd);
-+	/* Call the prepare hook to eventually set the vendor_msg */
-+	if (scpi_info->ops &&
-+	    scpi_info->ops->prepare) {
-+		ret = scpi_info->ops->prepare(scpi_chan);
-+		if (ret) {
-+			mutex_unlock(&scpi_chan->xfers_lock);
-+			return ret;
-+		}
-+	} else
-+		msg->vendor_msg = &msg->cmd;
-+
-+	ret = mbox_send_message(scpi_chan->chan, msg->vendor_msg);
- 	if (ret < 0)
- 		goto out;
- 
-@@ -1069,6 +1084,12 @@ static int scpi_probe(struct platform_device *pdev)
- 		}
- 		pchan->tx_payload = pchan->rx_payload + (size >> 1);
- 
-+		if (scpi_info->ops && scpi_info->ops->init) {
-+			ret = scpi_info->ops->init(dev, pchan);
-+			if (ret)
-+				goto err;
-+		}
-+
- 		cl->dev = dev;
- 		if (scpi_info->ops && scpi_info->ops->handle_remote_msg)
- 			cl->rx_callback = scpi_info->ops->handle_remote_msg;
--- 
-1.9.1
+On 17/08/2016 21:38, Christoffer Dall wrote:
+> Hi Paolo and Radim,
+> 
+> Here's a set of KVM/ARM fixes for v4.8-rc3 or as soon as you can make
+> it.  They address:
+>  - ITS init issues
+>  - ITS error handling issues
+>  - ITS IRQ leakage fix
+>  - Plug a couple of ITS race conditions
+>  - An erratum workaround for timers
+>  - Some removal of misleading use of errors and comments
+>  - A fix for GICv3 on 32-bit guests
+> 
+> Note that the patch previously submitted 'KVM: arm64: vgic-its: Grab
+> kvm->lock when reading kvm->devices', was dropped from this series
+> because we were already holding the kvm->lock in the call path to the
+> ITS code.
+> 
+> The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+> 
+>   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git kvm-arm-for-v4.8-rc3
+> 
+> for you to fetch changes up to f7f6f2d94f0027242ddfd665289b107a873fde43:
+> 
+>   arm64: KVM: report configured SRE value to 32-bit world (2016-08-17 12:46:23 +0200)
+> 
+> Thanks,
+> -Christoffer
+> 
+> ----------------------------------------------------------------
+> Andre Przywara (4):
+>       KVM: arm64: ITS: return 1 on successful MSI injection
+>       KVM: arm64: ITS: move ITS registration into first VCPU run
+>       KVM: arm64: check for ITS device on MSI injection
+>       KVM: arm64: ITS: avoid re-mapping LPIs
+> 
+> Christoffer Dall (4):
+>       KVM: arm64: vgic-its: Handle errors from vgic_add_lpi
+>       KVM: arm64: vgic-its: Plug race in vgic_put_irq
+>       KVM: arm64: vgic-its: Make updates to propbaser/pendbaser atomic
+>       KVM: arm/arm64: Change misleading use of is_error_pfn
+> 
+> Marc Zyngier (2):
+>       arm64: Document workaround for Cortex-A72 erratum #853709
+>       KVM: arm/arm64: timer: Workaround misconfigured timer interrupt
+> 
+> Vladimir Murzin (2):
+>       arm64: KVM: remove misleading comment on pmu status
+>       arm64: KVM: report configured SRE value to 32-bit world
+> 
+>  Documentation/arm64/silicon-errata.txt |   1 +
+>  arch/arm/kvm/mmu.c                     |   2 +-
+>  arch/arm64/kvm/hyp/switch.c            |   2 +-
+>  arch/arm64/kvm/sys_regs.c              |  10 +--
+>  include/linux/irqchip/arm-gic-v3.h     |   1 +
+>  virt/kvm/arm/arch_timer.c              |  11 ++-
+>  virt/kvm/arm/vgic/vgic-its.c           | 158 ++++++++++++++++++++++++---------
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c       |  26 +++---
+>  virt/kvm/arm/vgic/vgic-v3.c            |   8 ++
+>  virt/kvm/arm/vgic/vgic.c               |  10 +--
+>  virt/kvm/arm/vgic/vgic.h               |   6 ++
+>  11 files changed, 164 insertions(+), 71 deletions(-)
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+Pulled, thanks.
+
+Paolo
