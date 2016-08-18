@@ -1,61 +1,94 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Thu, 18 Aug 2016 15:48:23 +0800
-Subject: [PATCH v10 0/8] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <57B4B47E.5030100@codeaurora.org>
-References: <1469535565-20924-1-git-send-email-fu.wei@linaro.org>
- <0befd611-91a7-88e9-1686-82929c1745e8@semihalf.com>
- <510fa357-a729-4ce1-7c10-4cef06feb7b7@linaro.org>
- <CADyBb7tZDT2LMGnsWW_orR37dsfseijLEjzn59rLW9tbbxKVPQ@mail.gmail.com>
- <20160811105848.GA25680@red-moon> <57B4B47E.5030100@codeaurora.org>
-Message-ID: <CADyBb7ujY0kEFq5zrWfEdS1JA=G39rKAdZC4mf2jfw=Gm8GnpA@mail.gmail.com>
+From: B56489@freescale.com (Yunhui Cui)
+Date: Thu, 18 Aug 2016 15:37:56 +0800
+Subject: [PATCH v3 1/9] mtd:fsl-quadspi:use the property fields of SPI-NOR
+Message-ID: <1471505884-33996-1-git-send-email-B56489@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Timur,
+We can get the read/write/erase opcode from the spi nor framework
+directly. This patch uses the information stored in the SPI-NOR to
+remove the hardcode in the fsl_qspi_init_lut().
 
-On 18 August 2016 at 03:01, Timur Tabi <timur@codeaurora.org> wrote:
-> Lorenzo Pieralisi wrote:
->>
->> I do not think you need a v11 just to remove the drivers/acpi/arm64
->> directory creation, you need to get Daniel/Thomas review/ack on
->> the respective patches though, I do not see the point of churning
->> out another series just because drivers/acpi/arm64 is now created
->> in the IORT patch series. If v10 is ok you will rebase it on top of
->> Tomasz's series and mention the dependency in the respective pull
->> request.
->>
->> If there is need for a v11 following Daniel/Thomas review yes,
->> you can proceed as above.
->
->
-> What's the latest on this patchset?  I really want them in 4.9.  Is
-> everything queued up, or are still issues that need to be resolved.
+Signed-off-by: Yunhui Cui <B56489@freescale.com>
+Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
+---
+ drivers/mtd/spi-nor/fsl-quadspi.c | 40 ++++++++++++---------------------------
+ 1 file changed, 12 insertions(+), 28 deletions(-)
 
-we are trying to let Tomasz's series be merged first, then this patch set
-will be rebased on the top of it.
-
-If everyone is OK with this patchset, I guess  "in 4.9" is not a problem.
-
-I don't see any suggestion and comment for now, will keep my eyes on it.
-
->
-> Who will be merging these patches?
-
-I think the clocksource maintainer will take care of it, and  GTDT patch
-has got Rafael's ACK.
-
->
-> --
-> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-> Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-> Code Aurora Forum, a Linux Foundation Collaborative Project.
-
-
-
+diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
+index 5c82e4e..5ad6402 100644
+--- a/drivers/mtd/spi-nor/fsl-quadspi.c
++++ b/drivers/mtd/spi-nor/fsl-quadspi.c
+@@ -373,9 +373,13 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	void __iomem *base = q->iobase;
+ 	int rxfifo = q->devtype_data->rxfifo;
+ 	u32 lut_base;
+-	u8 cmd, addrlen, dummy;
+ 	int i;
+ 
++	struct spi_nor *nor = &q->nor[0];
++	u8 addrlen = (nor->addr_width == 3) ? ADDR24BIT : ADDR32BIT;
++	u8 read_op = nor->read_opcode;
++	u8 read_dm = nor->read_dummy;
++
+ 	fsl_qspi_unlock_lut(q);
+ 
+ 	/* Clear all the LUT table */
+@@ -385,20 +389,10 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	/* Quad Read */
+ 	lut_base = SEQID_QUAD_READ * 4;
+ 
+-	if (q->nor_size <= SZ_16M) {
+-		cmd = SPINOR_OP_READ_1_1_4;
+-		addrlen = ADDR24BIT;
+-		dummy = 8;
+-	} else {
+-		/* use the 4-byte address */
+-		cmd = SPINOR_OP_READ_1_1_4;
+-		addrlen = ADDR32BIT;
+-		dummy = 8;
+-	}
+-
+-	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
++	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
+ 			base + QUADSPI_LUT(lut_base));
+-	qspi_writel(q, LUT0(DUMMY, PAD1, dummy) | LUT1(FSL_READ, PAD4, rxfifo),
++	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
++		    LUT1(FSL_READ, PAD4, rxfifo),
+ 			base + QUADSPI_LUT(lut_base + 1));
+ 
+ 	/* Write enable */
+@@ -409,16 +403,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	/* Page Program */
+ 	lut_base = SEQID_PP * 4;
+ 
+-	if (q->nor_size <= SZ_16M) {
+-		cmd = SPINOR_OP_PP;
+-		addrlen = ADDR24BIT;
+-	} else {
+-		/* use the 4-byte address */
+-		cmd = SPINOR_OP_PP;
+-		addrlen = ADDR32BIT;
+-	}
+-
+-	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
++	qspi_writel(q, LUT0(CMD, PAD1, nor->program_opcode) |
++		    LUT1(ADDR, PAD1, addrlen),
+ 			base + QUADSPI_LUT(lut_base));
+ 	qspi_writel(q, LUT0(FSL_WRITE, PAD1, 0),
+ 			base + QUADSPI_LUT(lut_base + 1));
+@@ -432,10 +418,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	/* Erase a sector */
+ 	lut_base = SEQID_SE * 4;
+ 
+-	cmd = q->nor[0].erase_opcode;
+-	addrlen = q->nor_size <= SZ_16M ? ADDR24BIT : ADDR32BIT;
+-
+-	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
++	qspi_writel(q, LUT0(CMD, PAD1, nor->erase_opcode) |
++		    LUT1(ADDR, PAD1, addrlen),
+ 			base + QUADSPI_LUT(lut_base));
+ 
+ 	/* Erase the whole chip */
 -- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+2.1.0.27.g96db324
