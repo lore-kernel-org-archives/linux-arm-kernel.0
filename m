@@ -1,34 +1,55 @@
-From: sophian.yoma@gmail.com (yoma sophian)
-Date: Thu, 18 Aug 2016 10:07:59 +0800
-Subject: how to enable suspend to ram for arm-64 bits
-In-Reply-To: <06a4f0d7-9022-578d-99e0-ddcde31ed895@arm.com>
-References: <CADUS3onCMDThNK2ZwSSjGZhPE0M6cybjgCHJR2wVVeK09GC6ng@mail.gmail.com>
- <06a4f0d7-9022-578d-99e0-ddcde31ed895@arm.com>
-Message-ID: <CADUS3onUDk_=UpRoZy1m0hV1VGZYSf22ea8D10MpDbqJCfTkqw@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 17 Aug 2016 21:15:03 -0500
+Subject: [PATCH v3 0/4] Amlogic: Meson: Add reset controller
+In-Reply-To: <1464853333.3307.1.camel@pengutronix.de>
+References: <1464614838-28107-1-git-send-email-narmstrong@baylibre.com>
+ <1464853333.3307.1.camel@pengutronix.de>
+Message-ID: <CAOi56cV4uUkx+H4fKjFESOs_Kc0p0x5XfAQjtTNQJRjCQmAtGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Sudeep
+Hi Philipp,
 
-> Correct. What's the cpu enable method on your platform ? Is it PSCI ?
-No, the enable method is "spin-table"
+On Thu, Jun 2, 2016 at 2:42 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> Hi Neil,
+>
+> Am Montag, den 30.05.2016, 15:27 +0200 schrieb Neil Armstrong:
+>> Patchset to add and enable the reset controller driver on Meson SoCs platforms.
+>>
+>> This reset controller has up to 256 reset lines with reset pulse generation only,
+>> so the assert and deassert calls are not available.
+>>
+>> Depends on the patch :
+>>  - "reset: add devm_reset_controller_register API" [1]
+>>
+>> Changes since v2 at http://lkml.kernel.org/r/1464169758-26975-1-git-send-email-narmstrong at baylibre.com :
+>> - Get back __iomem in _reset() callback
+>> - Get rid of MODULE_ALIAS
+>>
+>> Changes since v1 at http://lkml.kernel.org/r/1463732875-23141-1-git-send-email-narmstrong at baylibre.com :
+>> - Remove _gxbb_ in names
+>> - Depends build on ARCH_MESON only
+>> - Add meson8b compatible and bindings
+>> - Re-indent dt-bindings headers
+>> - Switch to devm_ reset controller register
+>> - Remove platform "remove" callback
+>> - Update Dual BSD/GPL file headers
+>>
+>> Changes since the RFC at http://lkml.kernel.org/r/1463148012-25988-1-git-send-email-narmstrong at baylibre.com :
+>> - Fix register mapping and bit defines in bindings header
+>> - Remove assert and unassert calls
+>> - Fix missing __iomem
+>>
+>> [1] https://patchwork.kernel.org/patch/8988471/
+>>
+>> Neil Armstrong (4):
+>>   reset: Add support for the Amlogic Meson SoC Reset Controller
+>>   dt-bindings: reset: Add bindings for the Meson SoC Reset Controller
+>
+> I've applied these two patches to the reset/next branch.
+>
 
-> If yes, does you PSCI implementation support SYSTEM_SUSPEND ? If yes,
-> it should work. Check your PSCI implementation otherwise.
+I'm just noticing now that these didn't make it into v4.8-rc1.  Was
+there reason for that?
 
-if so, there are 2 things make me curious:
-a. I trace arch/arm64/kernel/psci.c even arch/arm64/*, but I sill
-cannot find where it create global suspend method table with
-suspend_set_ops.
-# grep -rnw 'suspend_set_ops' ../linux-4.1/arch/arm64/
-#
-except arch/xxx folder, there are
-../linux-4.1/drivers/macintosh/via-pmu.c:2276:    suspend_set_ops(&pmu_pm_ops);
-../linux-4.1/drivers/acpi/sleep.c:666:    suspend_set_ops(old_suspend_ordering ?
-Does that mean aarch64 register suspend_set_ops by apci flow when
-adopt PSCI implementation?
-
-b. in arm64, if some platform has its own suspend flow,  couldn't it
-adopts arm/match-xxx to register its own global suspend method?
-
-appreciate your kind help,
+Kevin
