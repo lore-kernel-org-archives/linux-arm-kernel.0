@@ -1,79 +1,88 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 18 Aug 2016 13:45:52 +0100
-Subject: [PATCH v2 0/8] ARM: V7M: Support caches
-Message-ID: <1471524360-31554-1-git-send-email-vladimir.murzin@arm.com>
+Date: Thu, 18 Aug 2016 13:45:59 +0100
+Subject: [PATCH v2 7/8] ARM: V7M: Indirect proc_info construction for V7M CPUs
+In-Reply-To: <1471524360-31554-1-git-send-email-vladimir.murzin@arm.com>
+References: <1471524360-31554-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1471524360-31554-8-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Jonathan Austin <jonathan.austin@arm.com>
 
-This patch set allows M-class cpus benefit of optional cache support.
-It originally was written by Jonny, I've been keeping it locally mainly
-rebasing over Linux versions.
+This patch copies the method used for V7A/R CPUs to specify differing
+processor info for different cores.
 
-The original idea behind patches was to reuse existing cache handling
-code from v7A/R with help of extra macros to factor out cache handling
-logic (v7M cache operations are provided via memory mapped interface
-rather than co-processor instructions).
-However, that idea was rejected and starting form this (v2) version
-V7M cache logic lives into file and macros to indirect memory-mapped
-operations stay there locally since they make it easier to follow the
-code.
+This patch differentiates Cortex-M3 and Cortex-M4 and leaves a fallback case
+for any other V7M processors.
 
-Along with the v7M cache support the first user (Cortex-M7) is
-introduced.
+Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ arch/arm/mm/proc-v7m.S |   46 +++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 35 insertions(+), 11 deletions(-)
 
-Patches were tested on MPS2 platform with Cortex-M3/M4/M7. The later
-one showed significant boot speed-up.
-
-Based on 4.8-rc2.
-
-Thanks!
-Vladimir
-
-Changelog:
-
-    v1 -> v2
-        - dropped generalisation of read_cpuid() (per Russell)
-	- M-class cache operations moved under it's own file and do not
-	  interfere with A/R code (per Russell)
-
-    RFC -> v1
-        - use linux/io.h instead of asm/io.h (per Russell)
-        - droped cast to void pointer in set_csselr; BASEADDR_V7M_SCB
-          is already defined with a help of IOMEM macro (per Russell)
-        - open-coded implantation of dccmvau and icimvau instead of
-          macros, since the latter would mark the wring instruction as
-          user-accessible (per Russell)
-        - dccimvac is updated  per Russell preference
-        - M_CLASS() macro is used instead of THUMB() where appropriate
-
-Jonathan Austin (6):
-  ARM: factor out CSSELR/CCSIDR operations that use cp15 directly
-  ARM: V7M: Add addresses for mem-mapped V7M cache operations
-  ARM: V7M: Add support for reading the CTR with read_cpuid_cachetype()
-  ARM: V7M: Wire up caches for V7M processors with cache support.
-  ARM: V7M: Indirect proc_info construction for V7M CPUs
-  ARM: V7M: Add support for the Cortex-M7 processor
-
-Vladimir Murzin (2):
-  ARM: V7M: fix notrace variant of save_and_disable_irqs
-  ARM: V7M: introduce cache operations
-
- arch/arm/include/asm/assembler.h  |    4 +
- arch/arm/include/asm/cachetype.h  |   39 ++++
- arch/arm/include/asm/cputype.h    |   15 +-
- arch/arm/include/asm/glue-cache.h |    4 -
- arch/arm/include/asm/v7m.h        |   22 ++
- arch/arm/kernel/head-nommu.S      |   16 +-
- arch/arm/kernel/setup.c           |   16 +-
- arch/arm/mm/Kconfig               |   10 +-
- arch/arm/mm/Makefile              |    2 +
- arch/arm/mm/cache-v7m.S           |  453 +++++++++++++++++++++++++++++++++++++
- arch/arm/mm/proc-macros.S         |   16 ++
- arch/arm/mm/proc-v7m.S            |  107 +++++++--
- 12 files changed, 668 insertions(+), 36 deletions(-)
- create mode 100644 arch/arm/mm/cache-v7m.S
-
+diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
+index 11f5816..796a983 100644
+--- a/arch/arm/mm/proc-v7m.S
++++ b/arch/arm/mm/proc-v7m.S
+@@ -132,6 +132,40 @@ ENDPROC(__v7m_setup)
+ 
+ 	.section ".proc.info.init", #alloc
+ 
++.macro __v7m_proc name, initfunc, cache_fns = nop_cache_fns, hwcaps = 0,  proc_fns = v7m_processor_functions
++	.long	0			/* proc_info_list.__cpu_mm_mmu_flags */
++	.long	0			/* proc_info_list.__cpu_io_mmu_flags */
++	initfn	\initfunc, \name
++	.long	cpu_arch_name
++	.long	cpu_elf_name
++	.long	HWCAP_HALF | HWCAP_THUMB | HWCAP_FAST_MULT | \hwcaps
++	.long	cpu_v7m_name
++	.long   \proc_fns
++	.long	0			/* proc_info_list.tlb */
++	.long	0			/* proc_info_list.user */
++	.long	\cache_fns
++.endm
++
++	/*
++	 * Match ARM Cortex-M4 processor.
++	 */
++	.type	__v7m_cm4_proc_info, #object
++__v7m_cm4_proc_info:
++	.long	0x410fc240		/* ARM Cortex-M4 0xC24 */
++	.long	0xff0ffff0		/* Mask off revision, patch release */
++	__v7m_proc __v7m_cm4_proc_info, __v7m_setup, hwcaps = HWCAP_EDSP
++	.size	__v7m_cm4_proc_info, . - __v7m_cm4_proc_info
++
++	/*
++	 * Match ARM Cortex-M3 processor.
++	 */
++	.type	__v7m_cm3_proc_info, #object
++__v7m_cm3_proc_info:
++	.long	0x410fc230		/* ARM Cortex-M3 0xC23 */
++	.long	0xff0ffff0		/* Mask off revision, patch release */
++	__v7m_proc __v7m_cm3_proc_info, __v7m_setup
++	.size	__v7m_cm3_proc_info, . - __v7m_cm3_proc_info
++
+ 	/*
+ 	 * Match any ARMv7-M processor core.
+ 	 */
+@@ -139,16 +173,6 @@ ENDPROC(__v7m_setup)
+ __v7m_proc_info:
+ 	.long	0x000f0000		@ Required ID value
+ 	.long	0x000f0000		@ Mask for ID
+-	.long   0			@ proc_info_list.__cpu_mm_mmu_flags
+-	.long   0			@ proc_info_list.__cpu_io_mmu_flags
+-	initfn	__v7m_setup, __v7m_proc_info	@ proc_info_list.__cpu_flush
+-	.long	cpu_arch_name
+-	.long	cpu_elf_name
+-	.long	HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT
+-	.long	cpu_v7m_name
+-	.long	v7m_processor_functions	@ proc_info_list.proc
+-	.long	0			@ proc_info_list.tlb
+-	.long	0			@ proc_info_list.user
+-	.long	nop_cache_fns		@ proc_info_list.cache
++	__v7m_proc __v7m_proc_info, __v7m_setup
+ 	.size	__v7m_proc_info, . - __v7m_proc_info
+ 
 -- 
 1.7.9.5
