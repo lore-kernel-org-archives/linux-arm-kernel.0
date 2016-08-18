@@ -1,48 +1,30 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 18 Aug 2016 17:29:58 +0100
-Subject: [GIT PULL] arm64 fixes for 4.8-rc3
-Message-ID: <20160818162955.GA592@e104818-lin.cambridge.arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 18 Aug 2016 18:47:08 +0200
+Subject: [PATCH 2/2] ARM: dts: rockchip: add missing regulators for
+ firefly reload board
+In-Reply-To: <1471453391-10267-3-git-send-email-ayaka@soulik.info>
+References: <19126716.OZv44ZHtAK@diego>
+ <1471453391-10267-1-git-send-email-ayaka@soulik.info>
+ <1471453391-10267-3-git-send-email-ayaka@soulik.info>
+Message-ID: <2277495.ctQ1BYPEEl@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Am Donnerstag, 18. August 2016, 01:03:11 schrieb Randy Li:
+> There are many regulators are missed in previous commit, this
+> commit complete most of them. It also fix some mistakes in the
+> regulator properties. The VDD_10(REG10) and VCC_18(REG11) had better
+> to keep in always-on state, as it is used as the USB PHY supply,
+> corretly we have no way to assign power supply to a USB PHY.
+> The VCCA_33(REG8) should be enabled or the GMAC won't work.
+> 
+> It also fix the wrong properties for audio in io-domains, the supply
+> connected to APIO4_VDD is different to firefly release version.
+> 
+> Signed-off-by: Randy Li <ayaka@soulik.info>
 
-Please pull the arm64 fixes below. Thank you.
+applied to my dts32 branch for 4.9
 
-The following changes since commit 694d0d0bb2030d2e36df73e2d23d5770511dbc8d:
 
-  Linux 4.8-rc2 (2016-08-14 19:11:36 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to a93a4d62324123dcda383bdb4ab89151bbc0e499:
-
-  arm64: Fix shift warning in arch/arm64/mm/dump.c (2016-08-18 12:38:11 +0100)
-
-----------------------------------------------------------------
-arm64 fixes:
-
-- Avoid a literal load with the MMU off on the CPU resume path
-  (potential inconsistency between cache and RAM)
-
-- Build error with CONFIG_ACPI=n fixed
-
-- Compiler warning in the arch/arm64/mm/dump.c code fixed
-
-----------------------------------------------------------------
-Ard Biesheuvel (1):
-      arm64: kernel: avoid literal load of virtual address with MMU off
-
-Catalin Marinas (2):
-      arm64: Fix NUMA build error when !CONFIG_ACPI
-      arm64: Fix shift warning in arch/arm64/mm/dump.c
-
- arch/arm64/kernel/sleep.S | 10 +++++++++-
- arch/arm64/mm/dump.c      |  6 +++---
- arch/arm64/mm/numa.c      |  2 ++
- 3 files changed, 14 insertions(+), 4 deletions(-)
-
--- 
-Catalin
+Thanks
+Heiko
