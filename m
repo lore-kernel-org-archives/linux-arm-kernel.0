@@ -1,34 +1,22 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 18 Aug 2016 15:32:29 +0100
-Subject: [PATCH] ARM: mm: pull asm/memory.h explicitly
-In-Reply-To: <20160818142246.GW1041@n2100.armlinux.org.uk>
-References: <1471450634-45566-1-git-send-email-vladimir.murzin@arm.com>
- <20160818142246.GW1041@n2100.armlinux.org.uk>
-Message-ID: <57B5C6FD.1090104@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 18 Aug 2016 16:44:13 +0200
+Subject: Merging code with arch condition into head.S
+In-Reply-To: <CACna6rwOXMEwJ=OjovpZgFHTAR3wrwAdQrgtxFzDYRPKypoSeg@mail.gmail.com>
+References: <CACna6rxhhD5kfa1oJzqp2dQxBhjaUzdTkNPMcm-+iNvQHD8yzA@mail.gmail.com>
+ <CAKv+Gu8dP8oAq-ykejskw+AzX-7_h_Ws6sFdXO+40MiGM14ccA@mail.gmail.com>
+ <CACna6rw1eTiqijo24SiGAYi_XeEGWb-C1L5diYUzpyA3o7e+qw@mail.gmail.com>
+ <20160818134722.GA13458@lunn.ch>
+ <CACna6rwOXMEwJ=OjovpZgFHTAR3wrwAdQrgtxFzDYRPKypoSeg@mail.gmail.com>
+Message-ID: <20160818144413.GB13458@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/08/16 15:22, Russell King - ARM Linux wrote:
-> On Wed, Aug 17, 2016 at 05:17:14PM +0100, Vladimir Murzin wrote:
->> Commit d78114554939a (""ARM: 8512/1: proc-v7.S: Adjust stack address when
->> XIP_KERNEL"") introduced a macro which lives under asm/memory.h.
->> Unfortunately, for MMU-less systems (like R-class) it leads to build failure:
->>
->> arch/arm/mm/proc-v7.S: Assembler messages:
->> arch/arm/mm/proc-v7.S:538: Error: unrecognised relocation suffix
->> make[1]: *** [arch/arm/mm/proc-v7.o] Error 1
->> make: *** [arch/arm/mm] Error 2
->>
->> since it is implicitly pulled via asm/pgtable.h for MMU capable systems only.
->>
->> To fix it include asm/memory.h explicitly.
->>
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> 
-> Looks fine, thanks.
-> 
+> I think I'll stick to the modified (out of tree) kernel for now, maybe
+> in a long term this intermediate loader could be a good idea. Did you
+> ever see solution like this? I never wrote my own loaders, so it'd
+> take me quite some time to learn required things.
 
-Should I drop it into patch system?
+Things might of moved on since then, but try Jason Cooper and the
+Impedance Matcher.
 
-Cheers
-Vladimir
+	  Andrew
