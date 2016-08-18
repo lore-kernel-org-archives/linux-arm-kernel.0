@@ -1,95 +1,43 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Thu, 18 Aug 2016 17:12:11 +0200
-Subject: [PATCH v8 4/4] nmi_backtrace: generate one-line reports for idle
- cpus
-In-Reply-To: <1471377024-2244-5-git-send-email-cmetcalf@mellanox.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 18 Aug 2016 16:46:05 +0100
+Subject: [PATCH v8 0/4] improvements to the nmi_backtrace code
+In-Reply-To: <1471377024-2244-1-git-send-email-cmetcalf@mellanox.com>
 References: <1471377024-2244-1-git-send-email-cmetcalf@mellanox.com>
- <1471377024-2244-5-git-send-email-cmetcalf@mellanox.com>
-Message-ID: <20160818151211.GN13300@pathway.suse.cz>
+Message-ID: <cae871a8-8d21-2cc0-6fed-0aed6b1159fa@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2016-08-16 15:50:24, Chris Metcalf wrote:
-> When doing an nmi backtrace of many cores, most of which are idle,
-> the output is a little overwhelming and very uninformative.  Suppress
-> messages for cpus that are idling when they are interrupted and just
-> emit one line, "NMI backtrace for N skipped: idling at pc 0xNNN".
-> 
-> We do this by grouping all the cpuidle code together into a new
-> .cpuidle.text section, and then checking the address of the
-> interrupted PC to see if it lies within that section.
-> 
-> This commit suitably tags x86 and tile idle routines, and only
-> adds in the minimal framework for other architectures.
-> 
-> diff --git a/arch/x86/include/asm/irqflags.h b/arch/x86/include/asm/irqflags.h
-> index b77f5edb03b0..4429f80aabcf 100644
-> --- a/arch/x86/include/asm/irqflags.h
-> +++ b/arch/x86/include/asm/irqflags.h
-> @@ -1,6 +1,7 @@
->  #ifndef _X86_IRQFLAGS_H_
->  #define _X86_IRQFLAGS_H_
->  
-> +#include <linux/compiler.h>
->  #include <asm/processor-flags.h>
->  
->  #ifndef __ASSEMBLY__
-> @@ -44,12 +45,12 @@ static inline void native_irq_enable(void)
->  	asm volatile("sti": : :"memory");
->  }
->  
-> -static inline void native_safe_halt(void)
-> +static __always_inline void native_safe_halt(void)
->  {
->  	asm volatile("sti; hlt": : :"memory");
->  }
+On 16/08/16 20:50, Chris Metcalf wrote:
+> This is a rebase of the series onto v4.8-rc2, plus some changes from
+> various reviewers.
+>
+> From the version 1 cover letter:
+>
+>   This patch series modifies the trigger_xxx_backtrace() NMI-based
+>   remote backtracing code to make it more flexible, and makes a few
+>   small improvements along the way.
+>
+>   The motivation comes from the task isolation code, where there are
+>   scenarios where we want to be able to diagnose a case where some cpu
+>   is about to interrupt a task-isolated cpu.  It can be helpful to
+>   see both where the interrupting cpu is, and also an approximation
+>   of where the cpu that is being interrupted is.  The nmi_backtrace
+>   framework allows us to discover the stack of the interrupted cpu.
+>
+> I've tested that the change works as desired on tile, and build-tested
+> x86, arm, mips, and sparc64.  For x86 I confirmed that the generic
+> cpuidle stuff as well as the architecture-specific routines are in the
+> new cpuidle section.  For arm, mips, and sparc I just build-tested it
+> and made sure the generic cpuidle routines were in the new cpuidle
+> section, but I didn't attempt to figure out which the
+> platform-specific idle routines might be.  That might be more usefully
+> done by someone with platform experience in follow-up patches.
 
-Ah, the __always_inline stuff did not helped here. It was
-not inlined:
+You can add runtime testing on arm to the list (I didn't try to exploit 
+the new one-line-for-idle feature but there were no regressions). All 
+patches:
 
-$> nm -n vmlinux | grep native_safe_halt
-ffffffff81050bc0 t native_safe_halt
-
-The reason seems to be that it is called via
-PVOP_VCALL0(pv_irq_ops.safe_halt);, see below
-in the disassembly.
-
-I guess that it is because I have
-CONFIG_PARAVIRT=y
+Tested-by: Daniel Thompson <daniel.thompson@linaro.org>
 
 
-void __cpuidle default_idle(void)
-{
-ffffffff819683f0:       e8 2b 2a 00 00          callq  ffffffff8196ae20 <__fentry__>
-ffffffff819683f5:       55                      push   %rbp
-ffffffff819683f6:       48 89 e5                mov    %rsp,%rbp
-ffffffff819683f9:       41 54                   push   %r12
-ffffffff819683fb:       53                      push   %rbx
-        trace_cpu_idle_rcuidle(1, smp_processor_id());
-ffffffff819683fc:       65 44 8b 25 0c 1d 6a    mov    %gs:0x7e6a1d0c(%rip),%r12d        # a110 <cpu_number>
-ffffffff81968403:       7e 
-ffffffff81968404:       0f 1f 44 00 00          nopl   0x0(%rax,%rax,1)
-        safe_halt();
-ffffffff81968409:       e8 a2 23 76 ff          callq  ffffffff810ca7b0 <trace_hardirqs_on>
-}
-#endif
-
-static inline void arch_safe_halt(void)
-{
-        PVOP_VCALL0(pv_irq_ops.safe_halt);
-ffffffff8196840e:       ff 14 25 80 a1 e2 81    callq  *0xffffffff81e2a180
-        trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
-ffffffff81968415:       65 44 8b 25 f3 1c 6a    mov    %gs:0x7e6a1cf3(%rip),%r12d        # a110 <cpu_number>
-ffffffff8196841c:       7e 
-ffffffff8196841d:       0f 1f 44 00 00          nopl   0x0(%rax,%rax,1)
-}
-ffffffff81968422:       5b                      pop    %rbx
-ffffffff81968423:       41 5c                   pop    %r12
-ffffffff81968425:       5d                      pop    %rbp
-ffffffff81968426:       c3                      retq   
-ffffffff81968427:       65 8b 05 e2 1c 6a 7e    mov    %gs:0x7e6a1ce2(%rip),%eax        # a110 <cpu_number>
-ffffffff8196842e:       89 c0                   mov    %eax,%eax
-
-
-Best Regards,
-Petr
+Daniel.
