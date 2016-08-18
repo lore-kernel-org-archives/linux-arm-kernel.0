@@ -1,47 +1,48 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Thu, 18 Aug 2016 10:01:30 -0500
-Subject: [PATCH] ARM: dts: socfpga: Add Macnica sodia board
-In-Reply-To: <32814CCC-93D0-4D39-8CE8-89F17D742583@gmail.com>
-References: <1469482208-5071-1-git-send-email-iwamatsu@nigauri.org>
- <57AE2951.3050404@opensource.altera.com>
- <32814CCC-93D0-4D39-8CE8-89F17D742583@gmail.com>
-Message-ID: <57B5CDCA.8020703@opensource.altera.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Aug 2016 16:11:13 +0100
+Subject: [PATCH v2 0/8] ARM: V7M: Support caches
+In-Reply-To: <57B5CCDE.10504@arm.com>
+References: <1471524360-31554-1-git-send-email-vladimir.murzin@arm.com>
+ <20160818145300.GA1041@n2100.armlinux.org.uk>
+ <57B5CCDE.10504@arm.com>
+Message-ID: <20160818151113.GB1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2016 03:26 PM, Florian Fainelli wrote:
-> On August 12, 2016 12:53:53 PM MST, Dinh Nguyen <dinguyen@opensource.altera.com> wrote:
->> On 07/25/2016 04:30 PM, Nobuhiro Iwamatsu wrote:
->>> Add support for board based on the Altera Cyclone V SoC.
->>> This board has the following functions:
->>>     - 1 GiB of DRAM
->>>     - 1 Gigabit ethernet
->>>     - 1 SD card slot
->>>     - 1 USB gadget port
->>>     - QSPI NOR Flash
->>>     - I2C EEPROMs and I2C RTC
->>>     - DVI output
->>>     - Audio port
->>>
->>> This commit supports without QSPI, DVI and Audio.
->>>
->>> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
->>> ---
->>>  arch/arm/boot/dts/Makefile                   |   1 +
->>>  arch/arm/boot/dts/socfpga_cyclone5_sodia.dts | 115
->> +++++++++++++++++++++++++++
->>>  2 files changed, 116 insertions(+)
->>>  create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
->>>
->>
->> Applied!
+On Thu, Aug 18, 2016 at 03:57:34PM +0100, Vladimir Murzin wrote:
+> On 18/08/16 15:53, Russell King - ARM Linux wrote:
+> > On Thu, Aug 18, 2016 at 01:45:52PM +0100, Vladimir Murzin wrote:
+> >> This patch set allows M-class cpus benefit of optional cache support.
+> >> It originally was written by Jonny, I've been keeping it locally mainly
+> >> rebasing over Linux versions.
+> >>
+> >> The original idea behind patches was to reuse existing cache handling
+> >> code from v7A/R with help of extra macros to factor out cache handling
+> >> logic (v7M cache operations are provided via memory mapped interface
+> >> rather than co-processor instructions).
+> >> However, that idea was rejected and starting form this (v2) version
+> >> V7M cache logic lives into file and macros to indirect memory-mapped
+> >> operations stay there locally since they make it easier to follow the
+> >> code.
+> >>
+> >> Along with the v7M cache support the first user (Cortex-M7) is
+> >> introduced.
+> >>
+> >> Patches were tested on MPS2 platform with Cortex-M3/M4/M7. The later
+> >> one showed significant boot speed-up.
+> > 
+> >>From a quick read through, the approach looks sane, and I think I'm
+> > now happy with these.
+> > 
 > 
-> This DTS still has Ethernet PHY properties (skew et al.) that are at the Ethernet MAC node level while they should be at the Ethetnet PHY node level, it is not like you tripped over that before..
+> Thanks!
 > 
+> Is it acceptable if patches hang on a list for awhile, so people (I'm
+> looking at Alex and  Szemz?) can test them?
 
-Thanks for catching this.
+Of course.
 
-Nobuhiro, can you please fixup the ethernet node?
-
-Thanks,
-Dinh
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
