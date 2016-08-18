@@ -1,122 +1,182 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 18 Aug 2016 13:27:41 +0200
-Subject: [PATCH 2/4] soc: qcom: add EBI2 driver
-In-Reply-To: <e073d8b7-a658-ec10-5f17-cfeeb5d46319@codeaurora.org>
-References: <1470691445-27571-1-git-send-email-linus.walleij@linaro.org>
- <1470691445-27571-3-git-send-email-linus.walleij@linaro.org>
- <e073d8b7-a658-ec10-5f17-cfeeb5d46319@codeaurora.org>
-Message-ID: <CACRpkdbXvJx4a=h_bJrVCX4izeBPh2SSCm1JZY8FUhekBJ=OEA@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 18 Aug 2016 12:39:49 +0100
+Subject: [PATCH v4 2/3] arm64: vmlinux.ld: Add .mmuoff.{text,
+ data} sections
+In-Reply-To: <CAKv+Gu-1jEPAFL7mUP6FqVzYrPQvVXfrB9RPuuR5AZFAWHBQQQ@mail.gmail.com>
+References: <1471281122-26295-1-git-send-email-james.morse@arm.com>
+ <1471281122-26295-3-git-send-email-james.morse@arm.com>
+ <CAKv+Gu-1jEPAFL7mUP6FqVzYrPQvVXfrB9RPuuR5AZFAWHBQQQ@mail.gmail.com>
+Message-ID: <57B59E85.8020304@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 9, 2016 at 1:33 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 08/08/2016 02:24 PM, Linus Walleij wrote:
+Hi Ard,
 
-> drivers/bus seems ok to me.
+On 17/08/16 18:50, Ard Biesheuvel wrote:
+> On 15 August 2016 at 19:12, James Morse <james.morse@arm.com> wrote:
+>> Resume from hibernate needs to clean any text executed by the kernel with
+>> the MMU off to the PoC. Collect these functions together into a new
+>> .mmuoff.text section. __boot_cpu_mode and secondary_holding_pen_release
+>> are data that is read or written with the MMU off. Add these to a new
+>> .mmuoff.data section.
+>>
+>> This covers booting of secondary cores and the cpu_suspend() path used
+>> by cpu-idle and suspend-to-ram.
+>>
+>> The bulk of head.S is not included, as the primary boot code is only ever
+>> executed once, the kernel never needs to ensure it is cleaned to a
+>> particular point in the cache.
 
-Moved to drivers/bus.
-
->> +config QCOM_EBI2
->> +     bool "Qualcomm External Bus Interface 2 (EBI2)"
->> +     default y if ARCH_MSM8X60
->
-> Please don't do any default. I've been trying to get rid of ARCH_MSM8X60
-> as a Kconfig symbol for some time.
-
-OK cut it, let's defconfig it in or something.
-
->> +/* Guessed bit placement CS2 and CS3 are certain */
->> +/* What about CS1A, CS1B, CS2A, CS2B? */
->> +#define EBI2_CS0_ENABLE BIT(2) /* GUESS */
->> +#define EBI2_CS1_ENABLE BIT(3) /* GUESS */
->> +#define EBI2_CS2_ENABLE BIT(4)
->> +#define EBI2_CS3_ENABLE BIT(5)
->> +#define EBI2_CS4_ENABLE BIT(6) /* GUESS */
->> +#define EBI2_CS5_ENABLE BIT(7) /* GUESS */
->> +#define EBI2_CSN_MASK BIT(2)|BIT(3)|BIT(4)|BIT(5)|BIT(6)|BIT(7)
->
-> CS0, CS1, CS4, CS5 are 2 bits wide.
-
-I guess that reads:
-CS0 bit 0,1
-CS1 bit 2,3
-CS2 bit 4
-CS3 bit 5
-CS4 bit 6,7
-CS5 bit 8,9
-
-And the register is 32bits wide. Augmenting the code like this.
-
->> +/*
->> + * FAST CSn CFG
->> + * Bits 31-28: ?
->> + * Bits 27-24: RD_HOLD: the length in cycles of the first segment of a read
->> + *             transfer. For a single read trandfer this will be the time
->> + *             from CS assertion to OE assertion.
->> + * Bits 18-24: ?
->> + * Bits 17-16: ADV_OE_RECOVERY, the number of cycles elapsed before an OE
->> + *             assertion, with respect to the cycle where ADV is asserted.
->> + *             2 means 2 cycles between ADV and OE. Values 0, 1, 2 or 3.
->> + * Bits 5:     ADDR_HOLD_ENA, The address is held for an extra cycle to meet
->> + *             hold time requirements with ADV assertion.
->> + *
->> + * The manual mentions "write precharge cycles" and "precharge cycles".
->> + * We have not been able to figure out which bit fields these correspond to
->> + * in the hardware, or what valid values exist. The current hypothesis is that
->> + * this is something just used on the FAST chip selects. There is also a "byte
->> + * device enable" flag somewhere for 8bit memories.
+>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+>> index b77f58355da1..4230eeeeabf5 100644
+>> --- a/arch/arm64/kernel/head.S
+>> +++ b/arch/arm64/kernel/head.S
+>> @@ -621,17 +622,31 @@ set_cpu_boot_mode_flag:
+>>  ENDPROC(set_cpu_boot_mode_flag)
+>>
+>>  /*
+>> + * Values in this section are written with the MMU off, but read with the
+>> + * MMU on. Writers will invalidate the corresponding address, discarding
+>> + * a 'Cache Writeback Granule' (CWG) worth of data. Align these variables
+>> + * to the architectural maximum of 2K.
 >> + */
->> +#define EBI2_XMEM_CS0_FAST_CFG 0x0028 /* GUESS */
->> +#define EBI2_XMEM_CS1_FAST_CFG 0x002C /* GUESS */
->> +#define EBI2_XMEM_CS2_FAST_CFG 0x0030 /* GUESS */
->> +#define EBI2_XMEM_CS3_FAST_CFG 0x0034
->> +#define EBI2_XMEM_CS4_FAST_CFG 0x0038 /* GUESS */
->> +#define EBI2_XMEM_CS5_FAST_CFG 0x003C /* GUESS */
->
-> Guesses are correct.
+>> +       .pushsection ".mmuoff.data", "aw"
+>> +       .align 11
+>> +/*
+>>   * We need to find out the CPU boot mode long after boot, so we need to
+>>   * store it in a writable variable.
+>>   *
+>>   * This is not in .bss, because we set it sufficiently early that the boot-time
+>>   * zeroing of .bss would clobber it.
+>>   */
+>> -       .pushsection    .data..cacheline_aligned
+>> -       .align  L1_CACHE_SHIFT
+>>  ENTRY(__boot_cpu_mode)
+>>         .long   BOOT_CPU_MODE_EL2
+>>         .long   BOOT_CPU_MODE_EL1
+>> +/*
+>> + * The booting CPU updates the failed status @__early_cpu_boot_status,
+>> + * with MMU turned off.
+>> + */
+>> +ENTRY(__early_cpu_boot_status)
+>> +       .long   0
+>> +
+>> +       .align 11
+> 
+> How is this supposed to work? Is secondary_holding_pen_release
+> expected to be covered by this region as well?
 
-Thanks, feel more secure. You don't happen to know about the
-uses of bits 31-28 or bits 18-24 in these registers?
+In this section, but not in the same CWG:
+__boot_cpu_mode and __early_cpu_boot_status are written with the mmu off, then
+the corresponding cache area is invalidated.
 
->> +     clk = devm_clk_get(dev, "ebi2x");
->> +     if (IS_ERR(clk)) {
->> +             dev_err(dev, "could not get EBI2X clk (%li)\n", PTR_ERR(clk));
->> +             return PTR_ERR(clk);
->
-> This could be noisy on probe defer...
+secondary_holding_pen_release works the other way round, it is written with the
+mmu on, then clean+invalidated, to be read with the mmu off.
 
-OK skipping it.
+I grouped them together in an older version, Mark pointed out that the
+maintenance of one could corrupt the other if they fall within a CWG of each
+other. [0]
 
->> +     ret = clk_prepare_enable(clk);
->> +     if (ret) {
->> +             dev_err(dev, "could not enable EBI2 clk\n");
->> +             return ret;
->
-> clk_disable_unprepare ebi2x clk? Or perhaps get both clks first and then
-> try to enable both in succession.
 
-OK will handle the errorpath better.
+> Wouldn't it be better to handle this alignment in the linker script?
 
->> +             dev_info(dev, "enabled CS%u\n", csindex);
->
-> dev_dbg?
+Its not just alignment of the section, but the alignment between mmuoff:read and
+mmuoff:write variables. Maybe it would be cleared if they were in separate sections?
 
-OK. Once everything works I will take a swep and dev_dbg()
-a bunch of stuff.
+(I should at least smother it with more comments)
 
->> +             if (slowcfg)
->> +                     writel_relaxed(slowcfg, ebi2_xmem + csd->slow_cfg);
->> +             if (fastcfg)
->> +                     writel_relaxed(fastcfg, ebi2_xmem + csd->fast_cfg);
->
-> The documentation just speaks of config0 and config1, but I guess if
-> slow and fast is meaningful to you then it's ok.
 
-That comes from the very similar hardware
-Cypress AN49576 Antioch Westbridge
-http://www.cypress.com/file/105771/download
-they call then "Fast_CSn_CFG0" and "Slow_CSn_CFG1"
-respectively.
+> (if you even need it, but see below)
+> 
+>>         .popsection
+>>
+>>         /*
+>> @@ -687,6 +702,7 @@ __secondary_switched:
+>>         mov     x29, #0
+>>         b       secondary_start_kernel
+>>  ENDPROC(__secondary_switched)
+>> +       .popsection
+>>
+>>  /*
+>>   * The booting CPU updates the failed status @__early_cpu_boot_status,
+>> @@ -706,12 +722,6 @@ ENDPROC(__secondary_switched)
+>>         dc      ivac, \tmp1                     // Invalidate potentially stale cache line
+>>         .endm
+>>
+>> -       .pushsection    .data..cacheline_aligned
+>> -       .align  L1_CACHE_SHIFT
+>> -ENTRY(__early_cpu_boot_status)
+>> -       .long   0
+>> -       .popsection
+>> -
+>>  /*
+>>   * Enable the MMU.
+>>   *
 
-Yours,
-Linus Walleij
+>> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+>> index 659963d40bb4..bbab3d886516 100644
+>> --- a/arch/arm64/kernel/vmlinux.lds.S
+>> +++ b/arch/arm64/kernel/vmlinux.lds.S
+>> @@ -120,6 +120,9 @@ SECTIONS
+>>                         IRQENTRY_TEXT
+>>                         SOFTIRQENTRY_TEXT
+>>                         ENTRY_TEXT
+>> +                       __mmuoff_text_start = .;
+>> +                       *(.mmuoff.text)
+>> +                       __mmuoff_text_end = .;
+>>                         TEXT_TEXT
+>>                         SCHED_TEXT
+>>                         LOCK_TEXT
+>> @@ -186,6 +189,11 @@ SECTIONS
+>>         _sdata = .;
+>>         RW_DATA_SECTION(L1_CACHE_BYTES, PAGE_SIZE, THREAD_SIZE)
+>>         PECOFF_EDATA_PADDING
+> 
+> This padding needs to be at the end, it is intended to make the size
+> of Image a multiple of 512.
+
+Ah, I didn't realise that, readelf says I broke this.
+I will move it to be before.
+
+(secondary_holding_pen_rel appears after head.S's align 11s, so the next symbol
+isn't 2KB aligned)
+
+
+> Alternatively, you could get rid of it
+> completely, I guess, if the end of .mmuoff.text is expected to be 2 KB
+> aligned (but I wonder if you need to)
+> 
+>> +       .mmuoff.data : {
+> 
+>  .mmuoff.data : ALIGN (SZ_2K) {
+> 
+>> +               __mmuoff_data_start = .;
+>> +               *(.mmuoff.data)
+> 
+> . = ALIGN(SZ_2K);
+> 
+> However, if the invalidation occurs before .bss is cleared (with the
+> caches on), perhaps there is no need to align the end of this section?
+
+We invalidate something in this section via secondary_entry() ->
+set_cpu_boot_mode_flag(), so this can happen any time.
+My understanding is that CWG is maximum amount of data that will be invalidated
+and at compile time we assume its worst case of 2KB. Aligning the end is to stop
+anything else being located in this worst case range.
+
+
+> 
+>> +               __mmuoff_data_end = .;
+>> +       }
+>>         _edata = .;
+>>
+>>         BSS_SECTION(0, 0, 0)
+
+
+Thanks,
+
+
+James
+
+
+[0] https://patchwork.kernel.org/patch/9203423/
