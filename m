@@ -1,84 +1,49 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 18 Aug 2016 12:11:02 +0200
-Subject: [PATCH 09/13] scpi: implement rockchip support via the vendor_msg
- mechanism
+Date: Thu, 18 Aug 2016 12:11:04 +0200
+Subject: [PATCH 11/13] dt-bindings: Add support for Amlogic GXBB SCPI Interface
 In-Reply-To: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
 References: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1471515066-3626-10-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1471515066-3626-12-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support the Rockchip legacy procotol, implement the vendor
-mailbox specific functions and add ops to the of_match table.
-
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/firmware/arm_scpi.c | 43 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+ Documentation/devicetree/bindings/arm/arm,scpi.txt | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-index 275feef..d73db7c 100644
---- a/drivers/firmware/arm_scpi.c
-+++ b/drivers/firmware/arm_scpi.c
-@@ -455,6 +455,37 @@ static int legacy_scpi_get_chan(u8 cmd)
- 	return 0;
- }
+diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+index faa4b44..04bc171 100644
+--- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
++++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+@@ -7,7 +7,7 @@ by Linux to initiate various system control and power operations.
  
-+/* Rockchip SoCs needs a special structure as a message */
-+
-+struct rockchip_scpi_xfer {
-+	u32 cmd;
-+	int rx_size;
-+};
-+
-+static int rockchip_init(struct device *dev, struct scpi_chan *chan)
-+{
-+	chan->vendor_data = devm_kmalloc(dev,
-+					 sizeof(struct rockchip_scpi_xfer),
-+					 GFP_KERNEL);
-+	if (!chan->vendor_data)
-+		return -ENOMEM;
-+
-+	return 0;
-+}
-+
-+static int rockchip_prepare(struct scpi_chan *chan)
-+{
-+	struct scpi_xfer *msg = chan->t;
-+	struct rockchip_scpi_xfer *xfer = chan->vendor_data;
-+
-+	xfer->cmd = msg->cmd;
-+	xfer->rx_size = msg->rx_len;
-+
-+	msg->vendor_msg = xfer;
-+
-+	return 0;
-+}
-+
- static struct scpi_xfer *get_scpi_xfer(struct scpi_chan *ch)
- {
- 	struct scpi_xfer *t;
-@@ -1026,9 +1057,21 @@ static const struct priv_scpi_ops scpi_legacy_ops = {
- 	.scpi_ops = &legacy_scpi_ops,
- };
+ Required properties:
  
-+static const struct priv_scpi_ops scpi_rockchip_ops = {
-+	.init = rockchip_init,
-+	.prepare = rockchip_prepare,
-+	.handle_remote_msg = legacy_scpi_handle_remote_msg,
-+	.tx_prepare = legacy_scpi_tx_prepare,
-+	.init_versions = legacy_scpi_init_versions,
-+	.dvfs_get_info = legacy_scpi_dvfs_get_info,
-+	.scpi_ops = &legacy_scpi_ops,
-+};
-+
- static const struct of_device_id scpi_of_match[] = {
- 	{.compatible = "arm,scpi"},
- 	{.compatible = "amlogic,meson-gxbb-scpi", .data = &scpi_legacy_ops},
-+	{.compatible = "rockchip,rk3368-scpi", .data = &scpi_rockchip_ops},
-+	{.compatible = "rockchip,rk3399-scpi", .data = &scpi_rockchip_ops},
- 	{},
- };
+-- compatible : should be "arm,scpi"
++- compatible : should be "arm,scpi" or "amlogic,meson-gxbb-scpi"
+ - mboxes: List of phandle and mailbox channel specifiers
+ 	  All the channels reserved by remote SCP firmware for use by
+ 	  SCPI message protocol should be specified in any order
+@@ -60,7 +60,8 @@ A small area of SRAM is reserved for SCPI communication between application
+ processors and SCP.
  
+ Required properties:
+-- compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno
++- compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno,
++		or "amlogic,meson-gxbb-sram" for Amlogic GXBB SoC.
+ 
+ The rest of the properties should follow the generic mmio-sram description
+ found in ../../sram/sram.txt
+@@ -70,7 +71,8 @@ Each sub-node represents the reserved area for SCPI.
+ Required sub-node properties:
+ - reg : The base offset and size of the reserved area with the SRAM
+ - compatible : should be "arm,juno-scp-shmem" for Non-secure SRAM based
+-	       shared memory on Juno platforms
++	       shared memory on Juno platforms or
++	       "amlogic,meson-gxbb-scp-shmem" for Amlogic GXBB SoC.
+ 
+ Sensor bindings for the sensors based on SCPI Message Protocol
+ --------------------------------------------------------------
 -- 
 1.9.1
