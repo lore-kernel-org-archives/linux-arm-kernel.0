@@ -1,40 +1,34 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 18 Aug 2016 08:41:18 +0800
-Subject: [GIT PULL] i.MX fixes for 4.8
-Message-ID: <20160818004118.GA20221@tiger>
+From: sophian.yoma@gmail.com (yoma sophian)
+Date: Thu, 18 Aug 2016 10:07:59 +0800
+Subject: how to enable suspend to ram for arm-64 bits
+In-Reply-To: <06a4f0d7-9022-578d-99e0-ddcde31ed895@arm.com>
+References: <CADUS3onCMDThNK2ZwSSjGZhPE0M6cybjgCHJR2wVVeK09GC6ng@mail.gmail.com>
+ <06a4f0d7-9022-578d-99e0-ddcde31ed895@arm.com>
+Message-ID: <CADUS3onUDk_=UpRoZy1m0hV1VGZYSf22ea8D10MpDbqJCfTkqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+hi Sudeep
 
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+> Correct. What's the cpu enable method on your platform ? Is it PSCI ?
+No, the enable method is "spin-table"
 
-are available in the git repository at:
+> If yes, does you PSCI implementation support SYSTEM_SUSPEND ? If yes,
+> it should work. Check your PSCI implementation otherwise.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.8
+if so, there are 2 things make me curious:
+a. I trace arch/arm64/kernel/psci.c even arch/arm64/*, but I sill
+cannot find where it create global suspend method table with
+suspend_set_ops.
+# grep -rnw 'suspend_set_ops' ../linux-4.1/arch/arm64/
+#
+except arch/xxx folder, there are
+../linux-4.1/drivers/macintosh/via-pmu.c:2276:    suspend_set_ops(&pmu_pm_ops);
+../linux-4.1/drivers/acpi/sleep.c:666:    suspend_set_ops(old_suspend_ordering ?
+Does that mean aarch64 register suspend_set_ops by apci flow when
+adopt PSCI implementation?
 
-for you to fetch changes up to cfee6b5874654fe4e7388bc3112d3afb76cd8b9e:
+b. in arm64, if some platform has its own suspend flow,  couldn't it
+adopts arm/match-xxx to register its own global suspend method?
 
-  ARM: imx6ul: populates platform device at .init_machine (2016-08-17 22:43:05 +0800)
-
-----------------------------------------------------------------
-The i.MX fixes for 4.8:
- - Fix typo in imx6sx-sabreauto board wakeup property
- - Fix i.MX6UL suspend-to-standby support by adding the
-   BM_CLPCR_BYP_MMDC_CH0_LPM_HS handling
- - Fix a i.MX6UL regression on suspend support, which is caused by
-   commit 850bea2335e4 ("arm: Remove unnecessary of_platform_populate
-   with default match table")
-
-----------------------------------------------------------------
-Andreas F?rber (1):
-      ARM: dts: imx6sx-sabreauto: Fix misspelled property
-
-Peter Chen (2):
-      ARM: imx6: add missing BM_CLPCR_BYP_MMDC_CH0_LPM_HS setting for imx6ul
-      ARM: imx6ul: populates platform device at .init_machine
-
- arch/arm/boot/dts/imx6sx-sabreauto.dts | 2 +-
- arch/arm/mach-imx/mach-imx6ul.c        | 1 +
- arch/arm/mach-imx/pm-imx6.c            | 2 +-
- 3 files changed, 3 insertions(+), 2 deletions(-)
+appreciate your kind help,
