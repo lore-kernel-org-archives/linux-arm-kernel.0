@@ -1,59 +1,35 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 17 Aug 2016 21:28:56 -0500
-Subject: [PATCH v3 0/4] Amlogic: Meson: Add reset controller
-In-Reply-To: <CAOi56cV4uUkx+H4fKjFESOs_Kc0p0x5XfAQjtTNQJRjCQmAtGg@mail.gmail.com>
-References: <1464614838-28107-1-git-send-email-narmstrong@baylibre.com>
- <1464853333.3307.1.camel@pengutronix.de>
- <CAOi56cV4uUkx+H4fKjFESOs_Kc0p0x5XfAQjtTNQJRjCQmAtGg@mail.gmail.com>
-Message-ID: <CAOi56cUcNSrvNdH6OCXWLJb+jW_jUFWyTMBnrN7nQ=jsRTE7bw@mail.gmail.com>
+From: dawei.chien@mediatek.com (Dawei Chien)
+Date: Thu, 18 Aug 2016 11:50:51 +0800
+Subject: [PATCH v2 1/3] dt-bindings: thermal: Add binding document for
+ Mediatek thermal controller
+In-Reply-To: <1471492253-7185-1-git-send-email-dawei.chien@mediatek.com>
+References: <1471492253-7185-1-git-send-email-dawei.chien@mediatek.com>
+Message-ID: <1471492253-7185-2-git-send-email-dawei.chien@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2016 at 9:15 PM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Hi Philipp,
->
-> On Thu, Jun 2, 2016 at 2:42 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
->> Hi Neil,
->>
->> Am Montag, den 30.05.2016, 15:27 +0200 schrieb Neil Armstrong:
->>> Patchset to add and enable the reset controller driver on Meson SoCs platforms.
->>>
->>> This reset controller has up to 256 reset lines with reset pulse generation only,
->>> so the assert and deassert calls are not available.
->>>
->>> Depends on the patch :
->>>  - "reset: add devm_reset_controller_register API" [1]
->>>
->>> Changes since v2 at http://lkml.kernel.org/r/1464169758-26975-1-git-send-email-narmstrong at baylibre.com :
->>> - Get back __iomem in _reset() callback
->>> - Get rid of MODULE_ALIAS
->>>
->>> Changes since v1 at http://lkml.kernel.org/r/1463732875-23141-1-git-send-email-narmstrong at baylibre.com :
->>> - Remove _gxbb_ in names
->>> - Depends build on ARCH_MESON only
->>> - Add meson8b compatible and bindings
->>> - Re-indent dt-bindings headers
->>> - Switch to devm_ reset controller register
->>> - Remove platform "remove" callback
->>> - Update Dual BSD/GPL file headers
->>>
->>> Changes since the RFC at http://lkml.kernel.org/r/1463148012-25988-1-git-send-email-narmstrong at baylibre.com :
->>> - Fix register mapping and bit defines in bindings header
->>> - Remove assert and unassert calls
->>> - Fix missing __iomem
->>>
->>> [1] https://patchwork.kernel.org/patch/8988471/
->>>
->>> Neil Armstrong (4):
->>>   reset: Add support for the Amlogic Meson SoC Reset Controller
->>>   dt-bindings: reset: Add bindings for the Meson SoC Reset Controller
->>
->> I've applied these two patches to the reset/next branch.
->>
->
-> I'm just noticing now that these didn't make it into v4.8-rc1.  Was
-> there reason for that?
+This adds the device tree binding documentation for the mediatek thermal
+controller found on Mediatek MT2701.
 
-Doh, nevermind, I'm blind (and was looking at the wrong tree.)   I see them now.
+Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
+---
+ .../bindings/thermal/mediatek-thermal.txt          |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Kevin
+diff --git a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+index 81f9a51..e2f494d 100644
+--- a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
++++ b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+@@ -8,7 +8,9 @@ apmixedsys register space via AHB bus accesses, so a phandle to the APMIXEDSYS
+ is also needed.
+ 
+ Required properties:
+-- compatible: "mediatek,mt8173-thermal"
++- compatible:
++  - "mediatek,mt8173-thermal" : For MT8173 family of SoCs
++  - "mediatek,mt2701-thermal" : For MT2701 family of SoCs
+ - reg: Address range of the thermal controller
+ - interrupts: IRQ for the thermal controller
+ - clocks, clock-names: Clocks needed for the thermal controller. required
+-- 
+1.7.9.5
