@@ -1,46 +1,28 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Thu, 18 Aug 2016 15:41:58 -0700
-Subject: [PATCH] irqchip/gicv3-its: Disable the ITS before initializing it.
-Message-ID: <1471560118-909-1-git-send-email-ddaney.cavm@gmail.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Thu, 18 Aug 2016 22:42:10 +0000
+Subject: [PATCH -next] crypto: fix missing unlock on error in sun4i_hash()
+Message-ID: <1471560130-5265-1-git-send-email-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Daney <david.daney@cavium.com>
+Add the missing unlock before return from function sun4i_hash()
+in the error handling case.
 
-When starting a kexec/kdump kernel, the GIC ITS will already have been
-enabled.  According to the ARM Generic Interrupt Controller
-Architecture Specification (GIC architecture Version 3.0 and version
-4.0), writing to GITS_BASER<n> or GITS_CBASER is "UNPREDICTABLE" when
-the ITS is enabled.  On Cavium Thunder systems, this prevents the ITS
-from being initializing in the kexec/kdump kernel, resulting in
-failure to register/enable interrupts for all devices.
-
-The fix is to disable the ITS if it is not already in the disabled
-state.  This allows the ITS to be properly initialized and then
-re-enabled in the kexec/kdump kernel.
-
-Signed-off-by: David Daney <david.daney@cavium.com>
+Fixes: 477d9b2e591b ("crypto: sun4i-ss - unify update/final function")
+Signed-off-by: Wei Yongjun <weiyj.lk@gmail.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 7ceaba8..36b9c28 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1545,7 +1545,12 @@ static int its_force_quiescent(void __iomem *base)
- 	u32 val;
- 
- 	val = readl_relaxed(base + GITS_CTLR);
--	if (val & GITS_CTLR_QUIESCENT)
-+	/*
-+	 * GIC architecture specification requires the ITS to be both
-+	 * disabled and quiescent for writes to GITS_BASER<n> or
-+	 * GITS_CBASER to not have UNPREDICTABLE results.
-+	 */
-+	if ((val & GITS_CTLR_QUIESCENT) && !(val & GITS_CTLR_ENABLE))
- 		return 0;
- 
- 	/* Disable the generation of all interrupts to this ITS */
--- 
-1.8.3.1
+diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
+index 2ee3b59..de66f47 100644
+--- a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
++++ b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
+@@ -245,6 +245,7 @@ int sun4i_hash(struct ahash_request *areq)
+ 		if (end > areq->nbytes || areq->nbytes - end > 63) {
+ 			dev_err(ss->dev, "ERROR: Bound error %u %u\n",
+ 				end, areq->nbytes);
++			spin_unlock(&ss->slock);
+ 			return -EINVAL;
+ 		}
+ 	} else {
