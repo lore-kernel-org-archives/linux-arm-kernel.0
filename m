@@ -1,289 +1,122 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 18 Aug 2016 12:14:20 +0100
-Subject: [PATCH V8 1/8] ACPI: I/O Remapping Table (IORT) initial support
-In-Reply-To: <20160818105549.GB20404@arm.com>
-References: <1470909998-16710-1-git-send-email-tn@semihalf.com>
- <1470909998-16710-2-git-send-email-tn@semihalf.com>
- <20160818105549.GB20404@arm.com>
-Message-ID: <20160818111419.GB8982@red-moon>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 18 Aug 2016 13:27:41 +0200
+Subject: [PATCH 2/4] soc: qcom: add EBI2 driver
+In-Reply-To: <e073d8b7-a658-ec10-5f17-cfeeb5d46319@codeaurora.org>
+References: <1470691445-27571-1-git-send-email-linus.walleij@linaro.org>
+ <1470691445-27571-3-git-send-email-linus.walleij@linaro.org>
+ <e073d8b7-a658-ec10-5f17-cfeeb5d46319@codeaurora.org>
+Message-ID: <CACRpkdbXvJx4a=h_bJrVCX4izeBPh2SSCm1JZY8FUhekBJ=OEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2016 at 06:55:50PM +0800, Dennis Chen wrote:
+On Tue, Aug 9, 2016 at 1:33 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 08/08/2016 02:24 PM, Linus Walleij wrote:
 
-[...]
+> drivers/bus seems ok to me.
 
-> > +static struct acpi_iort_node *
-> > +iort_scan_node(enum acpi_iort_node_type type,
-> > +	       iort_find_node_callback callback, void *context)
-> > +{
-> > +	struct acpi_iort_node *iort_node, *iort_end;
-> > +	struct acpi_table_iort *iort;
-> > +	int i;
-> > +
-> > +	/* Get the first IORT node */
-> > +	iort = (struct acpi_table_iort *)iort_table;
-> >
-> Here, the same as I comments on Lorenzo's patch. If IORT is missed in
-> the firmware, then iort_table will be NULL, result in kernel panic in
-> the codes followed.
+Moved to drivers/bus.
 
-The pointer is checked in the functions that are visible to
-other compilation units before calling this function:
+>> +config QCOM_EBI2
+>> +     bool "Qualcomm External Bus Interface 2 (EBI2)"
+>> +     default y if ARCH_MSM8X60
+>
+> Please don't do any default. I've been trying to get rid of ARCH_MSM8X60
+> as a Kconfig symbol for some time.
 
-iort_msi_map_rid()
-iort_get_device_domain()
+OK cut it, let's defconfig it in or something.
 
-I missed to check it when I added iort_node_match() and
-iort_iommu_configure() though, which makes me think that it is probably
-better to move the iort_table pointer check to iort_scan_node() so that
-it is done in one single place instead of adding it to all given
-external interfaces.
+>> +/* Guessed bit placement CS2 and CS3 are certain */
+>> +/* What about CS1A, CS1B, CS2A, CS2B? */
+>> +#define EBI2_CS0_ENABLE BIT(2) /* GUESS */
+>> +#define EBI2_CS1_ENABLE BIT(3) /* GUESS */
+>> +#define EBI2_CS2_ENABLE BIT(4)
+>> +#define EBI2_CS3_ENABLE BIT(5)
+>> +#define EBI2_CS4_ENABLE BIT(6) /* GUESS */
+>> +#define EBI2_CS5_ENABLE BIT(7) /* GUESS */
+>> +#define EBI2_CSN_MASK BIT(2)|BIT(3)|BIT(4)|BIT(5)|BIT(6)|BIT(7)
+>
+> CS0, CS1, CS4, CS5 are 2 bits wide.
 
-Lorenzo
+I guess that reads:
+CS0 bit 0,1
+CS1 bit 2,3
+CS2 bit 4
+CS3 bit 5
+CS4 bit 6,7
+CS5 bit 8,9
 
-> 
-> Thanks,
-> Dennis
-> > +	iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort,
-> > +				 iort->node_offset);
-> > +	iort_end = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
-> > +				iort_table->length);
-> > +
-> > +	for (i = 0; i < iort->node_count; i++) {
-> > +		if (WARN_TAINT(iort_node >= iort_end, TAINT_FIRMWARE_WORKAROUND,
-> > +			       "IORT node pointer overflows, bad table!\n"))
-> > +			return NULL;
-> > +
-> > +		if (iort_node->type == type) {
-> > +			if (ACPI_SUCCESS(callback(iort_node, context)))
-> > +				return iort_node;
-> > +		}
-> > +
-> > +		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
-> > +					 iort_node->length);
-> > +	}
-> > +
-> > +	return NULL;
-> > +}
-> > +
-> > +static acpi_status
-> > +iort_match_node_callback(struct acpi_iort_node *node, void *context)
-> > +{
-> > +	struct device *dev = context;
-> > +
-> > +	switch (node->type) {
-> > +	case ACPI_IORT_NODE_NAMED_COMPONENT: {
-> > +		struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
-> > +		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
-> > +		struct acpi_iort_named_component *ncomp;
-> > +
-> > +		if (!adev)
-> > +			break;
-> > +
-> > +		ncomp = (struct acpi_iort_named_component *)node->node_data;
-> > +
-> > +		if (ACPI_FAILURE(acpi_get_name(adev->handle,
-> > +					       ACPI_FULL_PATHNAME, &buffer))) {
-> > +			dev_warn(dev, "Can't get device full path name\n");
-> > +		} else {
-> > +			int match;
-> > +
-> > +			match = !strcmp(ncomp->device_name, buffer.pointer);
-> > +			acpi_os_free(buffer.pointer);
-> > +
-> > +			if (match)
-> > +				return AE_OK;
-> > +		}
-> > +
-> > +		break;
-> > +	}
-> > +	case ACPI_IORT_NODE_PCI_ROOT_COMPLEX: {
-> > +		struct acpi_iort_root_complex *pci_rc;
-> > +		struct pci_bus *bus;
-> > +
-> > +		bus = to_pci_bus(dev);
-> > +		pci_rc = (struct acpi_iort_root_complex *)node->node_data;
-> > +
-> > +		/*
-> > +		 * It is assumed that PCI segment numbers maps one-to-one
-> > +		 * with root complexes. Each segment number can represent only
-> > +		 * one root complex.
-> > +		 */
-> > +		if (pci_rc->pci_segment_number == pci_domain_nr(bus))
-> > +			return AE_OK;
-> > +
-> > +		break;
-> > +	}
-> > +	}
-> > +
-> > +	return AE_NOT_FOUND;
-> > +}
-> > +
-> > +static int
-> > +iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in, u32 *rid_out)
-> > +{
-> > +	/* Single mapping does not care for input id */
-> > +	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
-> > +		if (type == ACPI_IORT_NODE_NAMED_COMPONENT ||
-> > +		    type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
-> > +			*rid_out = map->output_base;
-> > +			return 0;
-> > +		}
-> > +
-> > +		pr_warn(FW_BUG "[map %p] SINGLE MAPPING flag not allowed for node type %d, skipping ID map\n",
-> > +			map, type);
-> > +		return -ENXIO;
-> > +	}
-> > +
-> > +	if (rid_in < map->input_base ||
-> > +	    (rid_in >= map->input_base + map->id_count))
-> > +		return -ENXIO;
-> > +
-> > +	*rid_out = map->output_base + (rid_in - map->input_base);
-> > +	return 0;
-> > +}
-> > +
-> > +static struct acpi_iort_node *
-> > +iort_node_map_rid(struct acpi_iort_node *node, u32 rid_in,
-> > +		  u32 *rid_out, u8 type)
-> > +{
-> > +	u32 rid = rid_in;
-> > +
-> > +	/* Parse the ID mapping tree to find specified node type */
-> > +	while (node) {
-> > +		struct acpi_iort_id_mapping *map;
-> > +		int i;
-> > +
-> > +		if (node->type == type) {
-> > +			if (rid_out)
-> > +				*rid_out = rid;
-> > +			return node;
-> > +		}
-> > +
-> > +		if (!node->mapping_offset || !node->mapping_count)
-> > +			goto fail_map;
-> > +
-> > +		map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
-> > +				   node->mapping_offset);
-> > +
-> > +		/* Firmware bug! */
-> > +		if (!map->output_reference) {
-> > +			pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
-> > +			       node, node->type);
-> > +			goto fail_map;
-> > +		}
-> > +
-> > +		/* Do the RID translation */
-> > +		for (i = 0; i < node->mapping_count; i++, map++) {
-> > +			if (!iort_id_map(map, node->type, rid, &rid))
-> > +				break;
-> > +		}
-> > +
-> > +		if (i == node->mapping_count)
-> > +			goto fail_map;
-> > +
-> > +		node = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
-> > +				    map->output_reference);
-> > +	}
-> > +
-> > +fail_map:
-> > +	/* Map input RID to output RID unchanged on mapping failure*/
-> > +	if (rid_out)
-> > +		*rid_out = rid_in;
-> > +
-> > +	return NULL;
-> > +}
-> > +
-> > +static struct acpi_iort_node *
-> > +iort_find_dev_node(struct device *dev)
-> > +{
-> > +	struct pci_bus *pbus;
-> > +
-> > +	if (!dev_is_pci(dev))
-> > +		return iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
-> > +				      iort_match_node_callback, dev);
-> > +
-> > +	/* Find a PCI root bus */
-> > +	pbus = to_pci_dev(dev)->bus;
-> > +	while (!pci_is_root_bus(pbus))
-> > +		pbus = pbus->parent;
-> > +
-> > +	return iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
-> > +			      iort_match_node_callback, &pbus->dev);
-> > +}
-> > +
-> > +void __init iort_table_detect(void)
-> > +{
-> > +	acpi_status status;
-> > +
-> > +	status = acpi_get_table(ACPI_SIG_IORT, 0, &iort_table);
-> > +	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
-> > +		const char *msg = acpi_format_exception(status);
-> > +		pr_err("Failed to get table, %s\n", msg);
-> > +	}
-> > +}
-> > diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
-> > index 85b7d07..55a84da 100644
-> > --- a/drivers/acpi/bus.c
-> > +++ b/drivers/acpi/bus.c
-> > @@ -36,6 +36,7 @@
-> >  #ifdef CONFIG_X86
-> >  #include <asm/mpspec.h>
-> >  #endif
-> > +#include <linux/iort.h>
-> >  #include <linux/pci.h>
-> >  #include <acpi/apei.h>
-> >  #include <linux/dmi.h>
-> > @@ -1186,6 +1187,7 @@ static int __init acpi_init(void)
-> >  	}
-> >  
-> >  	pci_mmcfg_late_init();
-> > +	iort_table_detect();
-> >  	acpi_scan_init();
-> >  	acpi_ec_init();
-> >  	acpi_debugfs_init();
-> > diff --git a/include/linux/iort.h b/include/linux/iort.h
-> > new file mode 100644
-> > index 0000000..cde6809
-> > --- /dev/null
-> > +++ b/include/linux/iort.h
-> > @@ -0,0 +1,30 @@
-> > +/*
-> > + * Copyright (C) 2016, Semihalf
-> > + *	Author: Tomasz Nowicki <tn@semihalf.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify it
-> > + * under the terms and conditions of the GNU General Public License,
-> > + * version 2, as published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope it will be useful, but WITHOUT
-> > + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> > + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> > + * more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License along with
-> > + * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-> > + * Place - Suite 330, Boston, MA 02111-1307 USA.
-> > + */
-> > +
-> > +#ifndef __IORT_H__
-> > +#define __IORT_H__
-> > +
-> > +#include <linux/acpi.h>
-> > +
-> > +#ifdef CONFIG_IORT_TABLE
-> > +void iort_table_detect(void);
-> > +#else
-> > +static inline void iort_table_detect(void) { }
-> > +#endif
-> > +
-> > +#endif /* __IORT_H__ */
-> > -- 
-> > 1.9.1
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > 
+And the register is 32bits wide. Augmenting the code like this.
+
+>> +/*
+>> + * FAST CSn CFG
+>> + * Bits 31-28: ?
+>> + * Bits 27-24: RD_HOLD: the length in cycles of the first segment of a read
+>> + *             transfer. For a single read trandfer this will be the time
+>> + *             from CS assertion to OE assertion.
+>> + * Bits 18-24: ?
+>> + * Bits 17-16: ADV_OE_RECOVERY, the number of cycles elapsed before an OE
+>> + *             assertion, with respect to the cycle where ADV is asserted.
+>> + *             2 means 2 cycles between ADV and OE. Values 0, 1, 2 or 3.
+>> + * Bits 5:     ADDR_HOLD_ENA, The address is held for an extra cycle to meet
+>> + *             hold time requirements with ADV assertion.
+>> + *
+>> + * The manual mentions "write precharge cycles" and "precharge cycles".
+>> + * We have not been able to figure out which bit fields these correspond to
+>> + * in the hardware, or what valid values exist. The current hypothesis is that
+>> + * this is something just used on the FAST chip selects. There is also a "byte
+>> + * device enable" flag somewhere for 8bit memories.
+>> + */
+>> +#define EBI2_XMEM_CS0_FAST_CFG 0x0028 /* GUESS */
+>> +#define EBI2_XMEM_CS1_FAST_CFG 0x002C /* GUESS */
+>> +#define EBI2_XMEM_CS2_FAST_CFG 0x0030 /* GUESS */
+>> +#define EBI2_XMEM_CS3_FAST_CFG 0x0034
+>> +#define EBI2_XMEM_CS4_FAST_CFG 0x0038 /* GUESS */
+>> +#define EBI2_XMEM_CS5_FAST_CFG 0x003C /* GUESS */
+>
+> Guesses are correct.
+
+Thanks, feel more secure. You don't happen to know about the
+uses of bits 31-28 or bits 18-24 in these registers?
+
+>> +     clk = devm_clk_get(dev, "ebi2x");
+>> +     if (IS_ERR(clk)) {
+>> +             dev_err(dev, "could not get EBI2X clk (%li)\n", PTR_ERR(clk));
+>> +             return PTR_ERR(clk);
+>
+> This could be noisy on probe defer...
+
+OK skipping it.
+
+>> +     ret = clk_prepare_enable(clk);
+>> +     if (ret) {
+>> +             dev_err(dev, "could not enable EBI2 clk\n");
+>> +             return ret;
+>
+> clk_disable_unprepare ebi2x clk? Or perhaps get both clks first and then
+> try to enable both in succession.
+
+OK will handle the errorpath better.
+
+>> +             dev_info(dev, "enabled CS%u\n", csindex);
+>
+> dev_dbg?
+
+OK. Once everything works I will take a swep and dev_dbg()
+a bunch of stuff.
+
+>> +             if (slowcfg)
+>> +                     writel_relaxed(slowcfg, ebi2_xmem + csd->slow_cfg);
+>> +             if (fastcfg)
+>> +                     writel_relaxed(fastcfg, ebi2_xmem + csd->fast_cfg);
+>
+> The documentation just speaks of config0 and config1, but I guess if
+> slow and fast is meaningful to you then it's ok.
+
+That comes from the very similar hardware
+Cypress AN49576 Antioch Westbridge
+http://www.cypress.com/file/105771/download
+they call then "Fast_CSn_CFG0" and "Slow_CSn_CFG1"
+respectively.
+
+Yours,
+Linus Walleij
