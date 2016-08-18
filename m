@@ -1,81 +1,58 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Thu, 18 Aug 2016 11:56:01 -0700
-Subject: [PATCH] soc: rockchip: power-domain: Don't (incorrectly) set rk3399
- up/down counts
-Message-ID: <1471546561-4459-1-git-send-email-dianders@chromium.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 18 Aug 2016 20:57:37 +0200 (CEST)
+Subject: [PATCH V2 RFC 0/6] ARM: dts: bcm2835: Add Raspberry Pi Zero
+In-Reply-To: <87lgzuj66o.fsf@eliezer.anholt.net>
+References: <1469559213-16160-1-git-send-email-stefan.wahren@i2se.com>
+ <87lgzuj66o.fsf@eliezer.anholt.net>
+Message-ID: <1091535069.365254.5a20a815-9153-4587-9aeb-f2a7fc5a4ff5.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On rk3288 it was important that powerdown and powerup counts for the
-CPU/GPU in the kernel because:
-* The power on default was crazy long.
-* We couldn't rely on the firmware to set this up because really this
-  wasn't the firmware's job--the kernel was the only one that really
-  cared about bringing up / down CPUs and the GPU and doing suspend /
-  resume (which involves bringing up / down CPUs).
+Hi Eric,
 
-On newer ARM systems (like rk3399) ARM Trusted Firmware is in charge of
-bringing up and down the CPUs and it really should be in charge of
-setting all these counts right.  After all ATF is in charge of suspend /
-resume and CPU up / down.  Let's get out of the way and let ATF do its
-job.
+> Eric Anholt <eric@anholt.net> hat am 18. August 2016 um 20:14 geschrieben:
+> 
+> 
+> Stefan Wahren <stefan.wahren@i2se.com> writes:
+> 
+> > This patch series is only a draft and not intended to be merged. Patches 1
+> > and 2
+> > aren't bcm2835 specific and should be helpful for other platforms. 
+> > The patches 2 - 4 are required for otg / gadget mode. The last patch
+> > based on the work of Lubomir Rintel [1] and Noralf Tr?nnes [2].
+> >
+> > Changes since V1:
+> > - rebase to current linux-next
+> > - add patches 1 - 4 for otg/gadget support
+> > - add patch 5 with model compatible
+> > - use polarity define for ACT LED
+> >
+> > [1] -
+> > http://lists.infradead.org/pipermail/linux-rpi-kernel/2016-February/003221.html
+> > [2] - https://github.com/raspberrypi/linux/pull/1239/
+> >
+> > Stefan Wahren (6):
+> >   usb: dwc2: core: Avoid nonsense error in gadget mode
+> >   usb: dwc2: Add DT properties to specify fifo size in host/otg mode
+> >   ARM: dts: bcm283x: Add missing usb clock
+> >   ARM: dts: bcm283x: Add generic USB PHY
+> >   DT: bindings: bcm: Add Raspberry Pi Zero
+> >   ARM: dts: bcm2835: Add Raspberry Pi Zero
+> 
+> Where are we at on these?  
 
-A few other motivations for doing this:
-* Depending on another configuration (PMU_24M_EN_CFG) these counts can
-  be either in 24M or 32k cycles.  Thus, though ATF isn't really so
-  involved in bringing up the GPU, ATF should probably manage the counts
-  for everything so it can also manage the 24M / 32k choice.
-* It turns out that (right now) 24M mode is broken on rk3399 and not
-  being used.  That means that the count the kernel was programming
-  in (24) was not 1 us (which it seems was intended) but was actually
-  .75 ms
-* On rk3399 there are actually 2 separate registers for setting CPU
-  up/down time plus 1 register for GPU up/down time.  The curent kernel
-  code actually was putting the register for the "little" cores in the
-  "CPU" slot and the register for the "big" cores in the "GPU" slot.  It
-  was never initting the GPU counts.
+I would like to split the series:
+part 1: Raspberry Pi Zero support (only USB host mode support)
+part 2: OTG / Peripheral support for BCM2835 (hope that i reach the point)
 
-Note: this change assumes that ATF will actually set these values at
-boot, as I'm proposing in <http://crosreview.com/372381>.
+> I've been holding off waiting for the USB
+> bits to get settled.  I can grab the bindings patch, but is there
+> anything else we could merge while you're working on USB?
 
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
----
- drivers/soc/rockchip/pm_domains.c | 16 +++++++---------
- 1 file changed, 7 insertions(+), 9 deletions(-)
+Maybe i missed something, but i didn't received any ACK from you about this
+series.
 
-diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-index 44842a205e4b..91c425d3e66c 100644
---- a/drivers/soc/rockchip/pm_domains.c
-+++ b/drivers/soc/rockchip/pm_domains.c
-@@ -583,10 +583,12 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
- 	 * Configure power up and down transition delays for CORE
- 	 * and GPU domains.
- 	 */
--	rockchip_configure_pd_cnt(pmu, pmu_info->core_pwrcnt_offset,
--				  pmu_info->core_power_transition_time);
--	rockchip_configure_pd_cnt(pmu, pmu_info->gpu_pwrcnt_offset,
--				  pmu_info->gpu_power_transition_time);
-+	if (pmu_info->core_power_transition_time)
-+		rockchip_configure_pd_cnt(pmu, pmu_info->core_pwrcnt_offset,
-+					pmu_info->core_power_transition_time);
-+	if (pmu_info->gpu_pwrcnt_offset)
-+		rockchip_configure_pd_cnt(pmu, pmu_info->gpu_pwrcnt_offset,
-+					pmu_info->gpu_power_transition_time);
- 
- 	error = -ENODEV;
- 
-@@ -708,11 +710,7 @@ static const struct rockchip_pmu_info rk3399_pmu = {
- 	.idle_offset = 0x64,
- 	.ack_offset = 0x68,
- 
--	.core_pwrcnt_offset = 0x9c,
--	.gpu_pwrcnt_offset = 0xa4,
--
--	.core_power_transition_time = 24,
--	.gpu_power_transition_time = 24,
-+	/* ARM Trusted Firmware manages power transition times */
- 
- 	.num_domains = ARRAY_SIZE(rk3399_pm_domains),
- 	.domain_info = rk3399_pm_domains,
--- 
-2.8.0.rc3.226.g39d4020
+In case everything is okay, you could also merge patch 3 since it's relevant to
+bcm283x and not RPi Zero specific.
+
+Stefan
