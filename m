@@ -1,73 +1,51 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 18 Aug 2016 13:39:59 -0700
-Subject: [PATCH v2] dt-bindings: touchscreen: silead gsl1680: Document
- all compatibles
-In-Reply-To: <CAL_JsqK2Lgic+-P-NvvnVO9COCy3k_yO3seOipYDd4d10QK2UA@mail.gmail.com>
-References: <1471424340-4201-1-git-send-email-hdegoede@redhat.com>
- <20160818193028.GA39271@dtor-ws>
- <CAL_JsqK2Lgic+-P-NvvnVO9COCy3k_yO3seOipYDd4d10QK2UA@mail.gmail.com>
-Message-ID: <20160818203959.GB39271@dtor-ws>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Thu, 18 Aug 2016 14:12:43 -0700
+Subject: [PATCH v3 5/5] dt-bindings: add compatible strings for big/little
+ rockchip vops
+In-Reply-To: <0001-<1471454202-1631-1-git-send-email-seanpaul@chromium.org>
+References: <0001-<1471454202-1631-1-git-send-email-seanpaul@chromium.org>
+Message-ID: <1471554763-22202-1-git-send-email-seanpaul@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2016 at 02:48:52PM -0500, Rob Herring wrote:
-> On Thu, Aug 18, 2016 at 2:30 PM, Dmitry Torokhov
-> <dmitry.torokhov@gmail.com> wrote:
-> > On Wed, Aug 17, 2016 at 10:59:00AM +0200, Hans de Goede wrote:
-> >> The silead gsl1680 driver / binding supports a whole series of devices,
-> >> list the compatibles for all of them in the binding.
-> >>
-> >> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >> ---
-> >> Changes in v2:
-> >> -Drop the "silead,mssl1680" compatible thing, the "mssl1680" name is an
-> >>  ACPI thing and does not belong in the dt bindings
-> >> ---
-> >>  .../devicetree/bindings/input/touchscreen/silead_gsl1680.txt          | 4 ++++
-> >>  1 file changed, 4 insertions(+)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
-> >> index b0eca54..ad7f41a 100644
-> >> --- a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
-> >> +++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
-> >> @@ -2,6 +2,10 @@
-> >>
-> >>  Required properties:
-> >>  - compatible           : "silead,gsl1680"
-> >> +                     or: "silead,gsl1688"
-> >> +                     or: "silead,gsl3670"
-> >> +                     or: "silead,gsl3675"
-> >> +                     or: "silead,gsl3692"
-> >
-> > Hmm, why do we need to document all compatible strings? We usually have
-> > only least common denominator in drievr, and device tree uses form:
-> >
-> >         compatible = "silead,<exact model>", "silead,gsl1680";
-> >
-> > Rob?
-> 
-> Because we require them in dts files even if the OS only uses the fallback.
+From: Mark Yao <mark.yao@rock-chips.com>
 
-So how exactly should it be documented? I mean if there were more than 1
-OS they might have been using different fallbacks. How do we decide
-which entry should be "true" fallback?
+This patch documents the compatible strings for the big and little vop
+in rockchip's drm driver.
 
-> 
-> >
-> > BTW, I do not see OF match table in the driver, did I manage to drop it?
-> 
-> If it is i2c, i2c has the quirk that it will match drv name to
-> compatible string with vendor prefix dropped.
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
 
-I think this is implementation quirk of I2C bus and I hope we'll fix it
-one of these days... Same with modalias dropping vendor prefix so we
-have to repeat OF data (sans vendor prefix) in I2C ID table if we want
-module auto-loading to work.
+Reviewed-by: Tomasz Figa <tfiga@chromium.org>
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+[seanpaul removed superfluous description per tfiga's review]
+Signed-off-by: Sean Paul <seanpaul@chromium.org>
+---
 
-> But that would imply one
-> of these is a fallback and the doc doesn't say that.
+Resending to add devicetree list
 
-Thanks.
+Changes in v3:
+	- Updated subject (Sean Paul)
+	- Removed unnecessary description (Tomasz)
 
+ Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
+index 196121f..9eb3f0a 100644
+--- a/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
++++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
+@@ -8,6 +8,8 @@ Required properties:
+ - compatible: value should be one of the following
+ 		"rockchip,rk3036-vop";
+ 		"rockchip,rk3288-vop";
++		"rockchip,rk3399-vop-big";
++		"rockchip,rk3399-vop-lit";
+ 
+ - interrupts: should contain a list of all VOP IP block interrupts in the
+ 		 order: VSYNC, LCD_SYSTEM. The interrupt specifier
 -- 
-Dmitry
+2.8.0.rc3.226.g39d4020
