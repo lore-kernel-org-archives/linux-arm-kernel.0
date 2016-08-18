@@ -1,40 +1,95 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Aug 2016 16:11:35 +0100
-Subject: [PATCH] ARM: mm: pull asm/memory.h explicitly
-In-Reply-To: <57B5C6FD.1090104@arm.com>
-References: <1471450634-45566-1-git-send-email-vladimir.murzin@arm.com>
- <20160818142246.GW1041@n2100.armlinux.org.uk>
- <57B5C6FD.1090104@arm.com>
-Message-ID: <20160818151135.GC1041@n2100.armlinux.org.uk>
+From: pmladek@suse.com (Petr Mladek)
+Date: Thu, 18 Aug 2016 17:12:11 +0200
+Subject: [PATCH v8 4/4] nmi_backtrace: generate one-line reports for idle
+ cpus
+In-Reply-To: <1471377024-2244-5-git-send-email-cmetcalf@mellanox.com>
+References: <1471377024-2244-1-git-send-email-cmetcalf@mellanox.com>
+ <1471377024-2244-5-git-send-email-cmetcalf@mellanox.com>
+Message-ID: <20160818151211.GN13300@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2016 at 03:32:29PM +0100, Vladimir Murzin wrote:
-> On 18/08/16 15:22, Russell King - ARM Linux wrote:
-> > On Wed, Aug 17, 2016 at 05:17:14PM +0100, Vladimir Murzin wrote:
-> >> Commit d78114554939a (""ARM: 8512/1: proc-v7.S: Adjust stack address when
-> >> XIP_KERNEL"") introduced a macro which lives under asm/memory.h.
-> >> Unfortunately, for MMU-less systems (like R-class) it leads to build failure:
-> >>
-> >> arch/arm/mm/proc-v7.S: Assembler messages:
-> >> arch/arm/mm/proc-v7.S:538: Error: unrecognised relocation suffix
-> >> make[1]: *** [arch/arm/mm/proc-v7.o] Error 1
-> >> make: *** [arch/arm/mm] Error 2
-> >>
-> >> since it is implicitly pulled via asm/pgtable.h for MMU capable systems only.
-> >>
-> >> To fix it include asm/memory.h explicitly.
-> >>
-> >> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> > 
-> > Looks fine, thanks.
-> > 
+On Tue 2016-08-16 15:50:24, Chris Metcalf wrote:
+> When doing an nmi backtrace of many cores, most of which are idle,
+> the output is a little overwhelming and very uninformative.  Suppress
+> messages for cpus that are idling when they are interrupted and just
+> emit one line, "NMI backtrace for N skipped: idling at pc 0xNNN".
 > 
-> Should I drop it into patch system?
+> We do this by grouping all the cpuidle code together into a new
+> .cpuidle.text section, and then checking the address of the
+> interrupted PC to see if it lies within that section.
+> 
+> This commit suitably tags x86 and tile idle routines, and only
+> adds in the minimal framework for other architectures.
+> 
+> diff --git a/arch/x86/include/asm/irqflags.h b/arch/x86/include/asm/irqflags.h
+> index b77f5edb03b0..4429f80aabcf 100644
+> --- a/arch/x86/include/asm/irqflags.h
+> +++ b/arch/x86/include/asm/irqflags.h
+> @@ -1,6 +1,7 @@
+>  #ifndef _X86_IRQFLAGS_H_
+>  #define _X86_IRQFLAGS_H_
+>  
+> +#include <linux/compiler.h>
+>  #include <asm/processor-flags.h>
+>  
+>  #ifndef __ASSEMBLY__
+> @@ -44,12 +45,12 @@ static inline void native_irq_enable(void)
+>  	asm volatile("sti": : :"memory");
+>  }
+>  
+> -static inline void native_safe_halt(void)
+> +static __always_inline void native_safe_halt(void)
+>  {
+>  	asm volatile("sti; hlt": : :"memory");
+>  }
 
-Yes please.
+Ah, the __always_inline stuff did not helped here. It was
+not inlined:
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+$> nm -n vmlinux | grep native_safe_halt
+ffffffff81050bc0 t native_safe_halt
+
+The reason seems to be that it is called via
+PVOP_VCALL0(pv_irq_ops.safe_halt);, see below
+in the disassembly.
+
+I guess that it is because I have
+CONFIG_PARAVIRT=y
+
+
+void __cpuidle default_idle(void)
+{
+ffffffff819683f0:       e8 2b 2a 00 00          callq  ffffffff8196ae20 <__fentry__>
+ffffffff819683f5:       55                      push   %rbp
+ffffffff819683f6:       48 89 e5                mov    %rsp,%rbp
+ffffffff819683f9:       41 54                   push   %r12
+ffffffff819683fb:       53                      push   %rbx
+        trace_cpu_idle_rcuidle(1, smp_processor_id());
+ffffffff819683fc:       65 44 8b 25 0c 1d 6a    mov    %gs:0x7e6a1d0c(%rip),%r12d        # a110 <cpu_number>
+ffffffff81968403:       7e 
+ffffffff81968404:       0f 1f 44 00 00          nopl   0x0(%rax,%rax,1)
+        safe_halt();
+ffffffff81968409:       e8 a2 23 76 ff          callq  ffffffff810ca7b0 <trace_hardirqs_on>
+}
+#endif
+
+static inline void arch_safe_halt(void)
+{
+        PVOP_VCALL0(pv_irq_ops.safe_halt);
+ffffffff8196840e:       ff 14 25 80 a1 e2 81    callq  *0xffffffff81e2a180
+        trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
+ffffffff81968415:       65 44 8b 25 f3 1c 6a    mov    %gs:0x7e6a1cf3(%rip),%r12d        # a110 <cpu_number>
+ffffffff8196841c:       7e 
+ffffffff8196841d:       0f 1f 44 00 00          nopl   0x0(%rax,%rax,1)
+}
+ffffffff81968422:       5b                      pop    %rbx
+ffffffff81968423:       41 5c                   pop    %r12
+ffffffff81968425:       5d                      pop    %rbp
+ffffffff81968426:       c3                      retq   
+ffffffff81968427:       65 8b 05 e2 1c 6a 7e    mov    %gs:0x7e6a1ce2(%rip),%eax        # a110 <cpu_number>
+ffffffff8196842e:       89 c0                   mov    %eax,%eax
+
+
+Best Regards,
+Petr
