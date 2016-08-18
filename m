@@ -1,38 +1,62 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 18 Aug 2016 15:10:01 +0100
-Subject: [PATCH] arm: KVM: Fix idmap overlap detection when the kernel is
- idmap'ed
-Message-ID: <1471529401-30323-1-git-send-email-marc.zyngier@arm.com>
+From: pmladek@suse.com (Petr Mladek)
+Date: Thu, 18 Aug 2016 16:12:42 +0200
+Subject: [PATCH v8 1/4] nmi_backtrace: add more trigger_*_cpu_backtrace()
+ methods
+In-Reply-To: <1471377024-2244-2-git-send-email-cmetcalf@mellanox.com>
+References: <1471377024-2244-1-git-send-email-cmetcalf@mellanox.com>
+ <1471377024-2244-2-git-send-email-cmetcalf@mellanox.com>
+Message-ID: <20160818141242.GK26194@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're trying hard to detect when the HYP idmap overlaps with the
-HYP va, as it makes the teardown of a cpu dangerous. But there is
-one case where an overlap is completely safe, which is when the
-whole of the kernel is idmap'ed, which is likely to happen on 32bit
-when RAM is at 0x8000000 and we're using a 2G/2G VA split.
+On Tue 2016-08-16 15:50:21, Chris Metcalf wrote:
+> Currently you can only request a backtrace of either all cpus, or
+> all cpus but yourself.  It can also be helpful to request a remote
+> backtrace of a single cpu, and since we want that, the logical
+> extension is to support a cpumask as the underlying primitive.
+> 
+> This change modifies the existing lib/nmi_backtrace.c code to take
+> a cpumask as its basic primitive, and modifies the linux/nmi.h code
+> to use the new "cpumask" method instead.
+> 
+> The mips code ignored the "include_self" boolean but with this change
+> it will now also dump a local backtrace if requested.
+> 
+> diff --git a/arch/mips/kernel/process.c b/arch/mips/kernel/process.c
+> index 7429ad09fbe3..fea1fa7726e3 100644
+> --- a/arch/mips/kernel/process.c
+> +++ b/arch/mips/kernel/process.c
+> @@ -569,9 +569,16 @@ static void arch_dump_stack(void *info)
+>  	dump_stack();
+>  }
+>  
+> -void arch_trigger_all_cpu_backtrace(bool include_self)
+> +void arch_trigger_cpumask_backtrace(const cpumask_t *mask, bool exclude_self)
+>  {
+> -	smp_call_function(arch_dump_stack, NULL, 1);
+> +	long this_cpu = get_cpu();
+> +
+> +	if (cpumask_test_cpu(this_cpu, mask) && !exclude_self)
+> +		dump_stack();
 
-In that case, we can proceed safely.
+The bit is not cleared in the mask. Therefore arch_dump_stack
+will get called for this CPU as well.
 
-Reported-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kvm/mmu.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+We could either use similar tricks as in lib/nmi_backtrace().
+I mean to copy the mask into a global variable and prevent
+parallel call with a backtrace_flag.
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index bda27b6..4e165ff 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1714,7 +1714,8 @@ int kvm_mmu_init(void)
- 		 kern_hyp_va(PAGE_OFFSET), kern_hyp_va(~0UL));
- 
- 	if (hyp_idmap_start >= kern_hyp_va(PAGE_OFFSET) &&
--	    hyp_idmap_start <  kern_hyp_va(~0UL)) {
-+	    hyp_idmap_start <  kern_hyp_va(~0UL) &&
-+	    hyp_idmap_start != __hyp_idmap_text_start) {
- 		/*
- 		 * The idmap page is intersecting with the VA space,
- 		 * it is not safe to continue further.
--- 
-2.1.4
+Or we could ignore the exclude_self flag as it was done
+before. It is a separate problem after all and it need
+not be solved in this patch(set).
+
+> +
+> +	smp_call_function_many(mask, arch_dump_stack, NULL, 1);
+> +
+> +	put_cpu();
+>  }
+
+Otherwise the patch patch looks good to me.
+
+Best Regards,
+Petr
