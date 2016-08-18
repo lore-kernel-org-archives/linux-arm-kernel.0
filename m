@@ -1,99 +1,51 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 18 Aug 2016 12:11:06 +0200
-Subject: [PATCH 13/13] ARM64: dts: meson-gxbb: Add SCPI with cpufreq & sensors
- Nodes
+Date: Thu, 18 Aug 2016 12:10:58 +0200
+Subject: [PATCH 05/13] scpi: move of_match table before probe functions
 In-Reply-To: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
 References: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1471515066-3626-14-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1471515066-3626-6-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Move the of_match table to prapre adding new compatible strings, with
+match data in order to be used by the probe function.
+
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 36 +++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ drivers/firmware/arm_scpi.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index 2748007..257845a 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -61,6 +61,7 @@
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0x0 0x0>;
- 			enable-method = "psci";
-+			clocks = <&scpi_dvfs 0>;
- 		};
+diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+index bb9965f..b0d911b 100644
+--- a/drivers/firmware/arm_scpi.c
++++ b/drivers/firmware/arm_scpi.c
+@@ -972,6 +972,13 @@ static int scpi_alloc_xfer_list(struct device *dev, struct scpi_chan *ch)
+ 	return 0;
+ }
  
- 		cpu1: cpu at 1 {
-@@ -68,6 +69,7 @@
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0x0 0x1>;
- 			enable-method = "psci";
-+			clocks = <&scpi_dvfs 0>;
- 		};
++static const struct of_device_id scpi_of_match[] = {
++	{.compatible = "arm,scpi"},
++	{},
++};
++
++MODULE_DEVICE_TABLE(of, scpi_of_match);
++
+ static int scpi_probe(struct platform_device *pdev)
+ {
+ 	int count, idx, ret;
+@@ -1069,13 +1076,6 @@ err:
+ 	return of_platform_populate(dev->of_node, NULL, NULL, dev);
+ }
  
- 		cpu2: cpu at 2 {
-@@ -75,6 +77,7 @@
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0x0 0x2>;
- 			enable-method = "psci";
-+			clocks = <&scpi_dvfs 0>;
- 		};
- 
- 		cpu3: cpu at 3 {
-@@ -82,6 +85,7 @@
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0x0 0x3>;
- 			enable-method = "psci";
-+			clocks = <&scpi_dvfs 0>;
- 		};
- 	};
- 
-@@ -99,6 +103,28 @@
- 		method = "smc";
- 	};
- 
-+	scpi {
-+		compatible = "amlogic,meson-gxbb-scpi";
-+		mboxes = <&mailbox 1 &mailbox 2>;
-+		shmem = <&cpu_scp_lpri &cpu_scp_hpri>;
-+
-+		clocks {
-+			compatible = "arm,scpi-clocks";
-+
-+			scpi_dvfs: scpi_clocks at 0 {
-+				compatible = "arm,scpi-dvfs-clocks";
-+				#clock-cells = <1>;
-+				clock-indices = <0>;
-+				clock-output-names = "vcpu";
-+			};
-+		};
-+
-+		scpi_sensors: sensors {
-+			compatible = "arm,scpi-sensors";
-+			#thermal-sensor-cells = <1>;
-+		};
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <GIC_PPI 13
-@@ -131,6 +157,16 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges = <0 0x0 0xc8000000 0x14000>;
-+
-+			cpu_scp_lpri: scp-shmem at 0 {
-+				compatible = "amlogic,meson-gxbb-scp-shmem";
-+				reg = <0x13000 0x400>;
-+			};
-+
-+			cpu_scp_hpri: scp-shmem at 200 {
-+				compatible = "amlogic,meson-gxbb-scp-shmem";
-+				reg = <0x13400 0x400>;
-+			};
- 		};
- 
- 		cbus: cbus at c1100000 {
+-static const struct of_device_id scpi_of_match[] = {
+-	{.compatible = "arm,scpi"},
+-	{},
+-};
+-
+-MODULE_DEVICE_TABLE(of, scpi_of_match);
+-
+ static struct platform_driver scpi_driver = {
+ 	.driver = {
+ 		.name = "scpi_protocol",
 -- 
 1.9.1
