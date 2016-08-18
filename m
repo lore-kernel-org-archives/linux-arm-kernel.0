@@ -1,88 +1,317 @@
-From: kbeldan@baylibre.com (Karl Beldan)
-Date: Thu, 18 Aug 2016 07:33:19 +0000
-Subject: [PATCH v3 1/4] ARM: davinci: da8xx-dt: Add ti-aemif lookup for
- clock matching
-In-Reply-To: <9e47844e-413b-4f85-5fbc-6b73cdd7fade@ti.com>
-References: <20160816223338.20776-1-kbeldan@baylibre.com>
- <20160816223338.20776-2-kbeldan@baylibre.com>
- <9e47844e-413b-4f85-5fbc-6b73cdd7fade@ti.com>
-Message-ID: <20160818073319.GA18481@gobelin>
+From: loic.pallardy@st.com (Loic PALLARDY)
+Date: Thu, 18 Aug 2016 07:36:09 +0000
+Subject: [PATCH 03/14] rpmsg: rpmsg_send() operations takes rpmsg_endpoint
+In-Reply-To: <1471306640-29917-4-git-send-email-bjorn.andersson@linaro.org>
+References: <1471306640-29917-1-git-send-email-bjorn.andersson@linaro.org>
+ <1471306640-29917-4-git-send-email-bjorn.andersson@linaro.org>
+Message-ID: <D0C04901035AEF47BB4C8387F4AA41F53C5CB2@SAFEX1NODE23.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2016 at 08:15:41PM +0530, Sekhar Nori wrote:
-> On Wednesday 17 August 2016 04:03 AM, Karl Beldan wrote:
-> > Many davinci boards (da830 and da850 families) don't have their clocks
-> > in DT yet and won't be successful in getting an unnamed aemif clock
+
+
+> -----Original Message-----
+> From: linux-remoteproc-owner at vger.kernel.org [mailto:linux-remoteproc-
+> owner at vger.kernel.org] On Behalf Of Bjorn Andersson
+> Sent: Tuesday, August 16, 2016 2:17 AM
+> To: Ohad Ben-Cohen <ohad@wizery.com>; Bjorn Andersson
+> <bjorn.andersson@linaro.org>
+> Cc: linux-remoteproc at vger.kernel.org; linux-arm-msm at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Subject: [PATCH 03/14] rpmsg: rpmsg_send() operations takes
+> rpmsg_endpoint
 > 
-> Actually none of DaVinci platforms have clocks in DT yet.
+> The rpmsg_send() operations has been taking a rpmsg_device, but this
+> forces users of secondary rpmsg_endpoints to use the rpmsg_sendto()
+> interface - by extracting source and destination from the given data
+> structures. If we instead pass the rpmsg_endpoint to these functions a
+> service can use rpmsg_sendto() to respond to messages, even on secondary
+> endpoints.
 > 
-
-Indeed, I haven't got used to the TI platforms, I mistook some omap SoCs
-for davinci ones.
-
-> > without explicitly registering them via clk_lookups, failing the
-> > ti-aemif memory driver probe.
+> In addition this would allow us to support operations on multiple
+> channels in future backends that does not support off-channel
+> operations.
 > 
-> I am happy with the patch itself. But I think the terminology used in
-> the commit message can be made more accurate. clk_get() does not look up
-> a clock by name. It looks up a clock by consumer device and a consumer
-> id (used for multiple clocks used by same consumer device). The AEMIF
-> clock in DaVinci has a name already. Its assigned in da850.c as "aemif".
-> But the clock name itself does not matter in clock lookup.
+Hi Bjorn,
+
+This patch is modifying rpmsg API by using rpmsg_endpoint as argument
+instead of rpmsg_device.
+But associated port of rpmsg_client_sample driver is missing in your patch series.
+
+Please find inline few comments.
+
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> ---
+>  drivers/rpmsg/virtio_rpmsg_bus.c |  4 +--
+>  include/linux/rpmsg.h            | 70 +++++++++++++++++++++++-----------------
+>  2 files changed, 42 insertions(+), 32 deletions(-)
 > 
+> diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c
+> b/drivers/rpmsg/virtio_rpmsg_bus.c
+> index c4bd89ea7681..1b63f4b7c2bd 100644
+> --- a/drivers/rpmsg/virtio_rpmsg_bus.c
+> +++ b/drivers/rpmsg/virtio_rpmsg_bus.c
+> @@ -382,7 +382,7 @@ static int rpmsg_dev_probe(struct device *dev)
+>  		nsm.addr = rpdev->src;
 
-I will be happy to send a more accurate comment, here is my case for the
-record and the feedback, although I try to keep my distance from
-comments of comments ;).
+Since endpoint is now used to indicate source, I'm wondering if it is possible
+to suppress src field from struct rpmsg_channel and rely only on endpoint addr?
+Else maybe confusing (which src addr used at the end: rpdev or ept?)
 
-Checking clk_get:
-
-struct clk *clk_get(struct device *dev, const char *con_id)
-{       
-	[...]
-	if (dev) {
-		struct clk *__of_clk_get_by_name(struct device_node *np,
-						 const char *dev_id,
-						 const char *name)
-		clk = __of_clk_get_by_name(dev->of_node, dev_id, con_id);
-		[...]
-	}
-	return clk_get_sys(dev_id, con_id);
-}
-
-In DT case the con_id _is_ the clock name, so the assertion "clk_get()
-does not look up a clock by name" would be false ?
-Also, numerous commits refer to *clk_get(*, NULL) as getting an unnamed
-clock, although it only really is accurate to the point in DT cases.
-
-> So, IMO, saying "won't be successful in getting an unnamed aemif clock"
-> is inaccurate.
+>  		nsm.flags = RPMSG_NS_CREATE;
 > 
-
-You are right, it is innacurate, because in that case it won't try
-getting such a clock, ie. by name. Instead it will resort to looking it
-up by dev_id / con_id, connecting back with your point.
-
-I will resend the series with this commit message reworded.
-
-Rgds, 
-Karl
-
-> > The current aemif lookup entry resolving to the same clock:
-> >     'CLK(NULL,               "aemif",        &aemif_clk)'
-> > remains, as it is currently used (davinci_nand is getting a named clock
-> > "aemif").
+> -		err = rpmsg_sendto(rpdev, &nsm, sizeof(nsm),
+> RPMSG_NS_ADDR);
+> +		err = rpmsg_sendto(rpdev->ept, &nsm, sizeof(nsm),
+> RPMSG_NS_ADDR);
+>  		if (err)
+>  			dev_err(dev, "failed to announce service %d\n", err);
+>  	}
+> @@ -407,7 +407,7 @@ static int rpmsg_dev_remove(struct device *dev)
+>  		nsm.addr = rpdev->src;
+>  		nsm.flags = RPMSG_NS_DESTROY;
 > 
-> So the existing look-up does not recognize the AEMIF as a device (NULL
-> device name) and is using a "global" consumer id to look-up
-> "device-less" clocks. As you noted, this entry should remain for non-DT
-> mode and for backward compatibility.
+> -		err = rpmsg_sendto(rpdev, &nsm, sizeof(nsm),
+> RPMSG_NS_ADDR);
+> +		err = rpmsg_sendto(rpdev->ept, &nsm, sizeof(nsm),
+> RPMSG_NS_ADDR);
+>  		if (err)
+>  			dev_err(dev, "failed to announce service %d\n", err);
+>  	}
+> diff --git a/include/linux/rpmsg.h b/include/linux/rpmsg.h
+> index 2b97c711a5e3..88e302c011e6 100644
+> --- a/include/linux/rpmsg.h
+> +++ b/include/linux/rpmsg.h
+> @@ -193,13 +193,14 @@ rpmsg_send_offchannel_raw(struct
+> rpmsg_channel *, u32, u32, void *, int, bool);
 > 
-> > This change will allow to switch from the mach-davinci aemif code to
-> > the ti-aemif memory driver.
-> > 
-> > Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+>  /**
+>   * rpmsg_send() - send a message across to the remote processor
+> - * @rpdev: the rpmsg channel
+> + * @ept: the rpmsg endpoint
+>   * @data: payload of message
+>   * @len: length of payload
+>   *
+> - * This function sends @data of length @len on the @rpdev channel.
+> - * The message will be sent to the remote processor which the @rpdev
+> - * channel belongs to, using @rpdev's source and destination addresses.
+> + * This function sends @data of length @len on the @ept endpoint.
+> + * The message will be sent to the remote processor which the @ept
+> + * endpoint belongs to, using @ept's address and its associated rpmsg
+> + * device destination addresses.
+>   * In case there are no TX buffers available, the function will block until
+>   * one becomes available, or a timeout of 15 seconds elapses. When the
+> latter
+>   * happens, -ERESTARTSYS is returned.
+> @@ -208,23 +209,24 @@ rpmsg_send_offchannel_raw(struct
+> rpmsg_channel *, u32, u32, void *, int, bool);
+>   *
+>   * Returns 0 on success and an appropriate error value on failure.
+>   */
+> -static inline int rpmsg_send(struct rpmsg_channel *rpdev, void *data, int
+> len)
+> +static inline int rpmsg_send(struct rpmsg_endpoint *ept, void *data, int
+> len)
+>  {
+> -	u32 src = rpdev->src, dst = rpdev->dst;
+> +	struct rpmsg_channel *rpdev = ept->rpdev;
+> +	u32 src = ept->addr, dst = rpdev->dst;
+As this function is part of rpmsg API, it will be good to verify pointers before use.
 > 
-> Thanks,
-> Sekhar
+>  	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, true);
+>  }
+> 
+>  /**
+>   * rpmsg_sendto() - send a message across to the remote processor, specify
+> dst
+> - * @rpdev: the rpmsg channel
+> + * @ept: the rpmsg endpoint
+>   * @data: payload of message
+>   * @len: length of payload
+>   * @dst: destination address
+>   *
+>   * This function sends @data of length @len to the remote @dst address.
+> - * The message will be sent to the remote processor which the @rpdev
+> - * channel belongs to, using @rpdev's source address.
+> + * The message will be sent to the remote processor which the @ept
+> + * endpoint belongs to, using @ept's address as source.
+>   * In case there are no TX buffers available, the function will block until
+>   * one becomes available, or a timeout of 15 seconds elapses. When the
+> latter
+>   * happens, -ERESTARTSYS is returned.
+> @@ -234,16 +236,17 @@ static inline int rpmsg_send(struct rpmsg_channel
+> *rpdev, void *data, int len)
+>   * Returns 0 on success and an appropriate error value on failure.
+>   */
+>  static inline
+> -int rpmsg_sendto(struct rpmsg_channel *rpdev, void *data, int len, u32 dst)
+> +int rpmsg_sendto(struct rpmsg_endpoint *ept, void *data, int len, u32 dst)
+>  {
+> -	u32 src = rpdev->src;
+> +	struct rpmsg_channel *rpdev = ept->rpdev;
+> +	u32 src = ept->addr;
+ditto
+
+> 
+>  	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, true);
+>  }
+> 
+>  /**
+>   * rpmsg_send_offchannel() - send a message using explicit src/dst
+> addresses
+> - * @rpdev: the rpmsg channel
+> + * @ept: the rpmsg endpoint
+>   * @src: source address
+>   * @dst: destination address
+>   * @data: payload of message
+> @@ -251,8 +254,8 @@ int rpmsg_sendto(struct rpmsg_channel *rpdev, void
+> *data, int len, u32 dst)
+>   *
+>   * This function sends @data of length @len to the remote @dst address,
+>   * and uses @src as the source address.
+> - * The message will be sent to the remote processor which the @rpdev
+> - * channel belongs to.
+> + * The message will be sent to the remote processor which the @ept
+> + * endpoint belongs to.
+>   * In case there are no TX buffers available, the function will block until
+>   * one becomes available, or a timeout of 15 seconds elapses. When the
+> latter
+>   * happens, -ERESTARTSYS is returned.
+> @@ -262,21 +265,24 @@ int rpmsg_sendto(struct rpmsg_channel *rpdev,
+> void *data, int len, u32 dst)
+>   * Returns 0 on success and an appropriate error value on failure.
+>   */
+>  static inline
+> -int rpmsg_send_offchannel(struct rpmsg_channel *rpdev, u32 src, u32 dst,
+> +int rpmsg_send_offchannel(struct rpmsg_endpoint *ept, u32 src, u32 dst,
+>  			  void *data, int len)
+>  {
+> +	struct rpmsg_channel *rpdev = ept->rpdev;
+ditto
+> +
+>  	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, true);
+>  }
+> 
+>  /**
+>   * rpmsg_send() - send a message across to the remote processor
+Function name and description not aligned with code.
+Should be rpmsg_trysend
+May be in another patch...
+
+> - * @rpdev: the rpmsg channel
+> + * @ept: the rpmsg endpoint
+>   * @data: payload of message
+>   * @len: length of payload
+>   *
+> - * This function sends @data of length @len on the @rpdev channel.
+> - * The message will be sent to the remote processor which the @rpdev
+> - * channel belongs to, using @rpdev's source and destination addresses.
+> + * This function sends @data of length @len on the @ept endpoint.
+> + * The message will be sent to the remote processor which the @ept
+> + * endpoint belongs to, using @ept's addres as source and its associated
+> + * rpdev's address as destination.
+>   * In case there are no TX buffers available, the function will immediately
+>   * return -ENOMEM without waiting until one becomes available.
+>   *
+> @@ -285,23 +291,24 @@ int rpmsg_send_offchannel(struct rpmsg_channel
+> *rpdev, u32 src, u32 dst,
+>   * Returns 0 on success and an appropriate error value on failure.
+>   */
+>  static inline
+> -int rpmsg_trysend(struct rpmsg_channel *rpdev, void *data, int len)
+> +int rpmsg_trysend(struct rpmsg_endpoint *ept, void *data, int len)
+>  {
+> -	u32 src = rpdev->src, dst = rpdev->dst;
+> +	struct rpmsg_channel *rpdev = ept->rpdev;
+> +	u32 src = ept->addr, dst = rpdev->dst;
+Pointer check before use
+> 
+>  	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, false);
+>  }
+> 
+>  /**
+>   * rpmsg_sendto() - send a message across to the remote processor, specify
+> dst
+Function name should be rpmsg_trysendto
+> - * @rpdev: the rpmsg channel
+> + * @ept: the rpmsg endpoint
+>   * @data: payload of message
+>   * @len: length of payload
+>   * @dst: destination address
+>   *
+>   * This function sends @data of length @len to the remote @dst address.
+> - * The message will be sent to the remote processor which the @rpdev
+> - * channel belongs to, using @rpdev's source address.
+> + * The message will be sent to the remote processor which the @ept
+> + * endpoint belongs to, using @ept's address as source.
+>   * In case there are no TX buffers available, the function will immediately
+>   * return -ENOMEM without waiting until one becomes available.
+>   *
+> @@ -310,16 +317,17 @@ int rpmsg_trysend(struct rpmsg_channel *rpdev,
+> void *data, int len)
+>   * Returns 0 on success and an appropriate error value on failure.
+>   */
+>  static inline
+> -int rpmsg_trysendto(struct rpmsg_channel *rpdev, void *data, int len, u32
+> dst)
+> +int rpmsg_trysendto(struct rpmsg_endpoint *ept, void *data, int len, u32
+> dst)
+>  {
+> -	u32 src = rpdev->src;
+> +	struct rpmsg_channel *rpdev = ept->rpdev;
+> +	u32 src = ept->addr;
+Check pointer before use
+> 
+>  	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, false);
+>  }
+> 
+>  /**
+>   * rpmsg_send_offchannel() - send a message using explicit src/dst
+> addresses
+Description for rpmsg_trysend_offchannel...
+
+> - * @rpdev: the rpmsg channel
+> + * @ept: the rpmsg endpoint
+>   * @src: source address
+>   * @dst: destination address
+>   * @data: payload of message
+> @@ -327,8 +335,8 @@ int rpmsg_trysendto(struct rpmsg_channel *rpdev,
+> void *data, int len, u32 dst)
+>   *
+>   * This function sends @data of length @len to the remote @dst address,
+>   * and uses @src as the source address.
+> - * The message will be sent to the remote processor which the @rpdev
+> - * channel belongs to.
+> + * The message will be sent to the remote processor which the @ept
+> + * endpoint belongs to.
+>   * In case there are no TX buffers available, the function will immediately
+>   * return -ENOMEM without waiting until one becomes available.
+>   *
+> @@ -337,9 +345,11 @@ int rpmsg_trysendto(struct rpmsg_channel *rpdev,
+> void *data, int len, u32 dst)
+>   * Returns 0 on success and an appropriate error value on failure.
+>   */
+>  static inline
+> -int rpmsg_trysend_offchannel(struct rpmsg_channel *rpdev, u32 src, u32
+> dst,
+> +int rpmsg_trysend_offchannel(struct rpmsg_endpoint *ept, u32 src, u32
+> dst,
+>  			     void *data, int len)
+>  {
+> +	struct rpmsg_channel *rpdev = ept->rpdev;
+> +
+Point check before use
+>  	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, false);
+>  }
+
+Regards,
+Loic 
+
+> 
+> --
+> 2.5.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-remoteproc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
