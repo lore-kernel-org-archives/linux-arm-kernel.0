@@ -1,113 +1,35 @@
-From: shaohui.xie@nxp.com (Shaohui Xie)
-Date: Thu, 18 Aug 2016 10:27:36 +0000
-Subject: [PATCH 1/5] arm64: dts: add QorIQ LS1046A SoC support
-In-Reply-To: <1984740.gmAYAJ1bIT@wuerfel>
-References: <1467972944-12293-1-git-send-email-shh.xie@gmail.com>
- <1467972944-12293-2-git-send-email-shh.xie@gmail.com>
- <1984740.gmAYAJ1bIT@wuerfel>
-Message-ID: <DB5PR0401MB21834BD67F0EA86B3A22E9D6E8150@DB5PR0401MB2183.eurprd04.prod.outlook.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Thu, 18 Aug 2016 12:35:26 +0200
+Subject: Merging code with arch condition into head.S
+Message-ID: <CACna6rxhhD5kfa1oJzqp2dQxBhjaUzdTkNPMcm-+iNvQHD8yzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+Hi,
 
-Thank you for reviewing!
+I'd like to ask for help with writing my arcm/arm/boot/compressed/head-foo.S.
 
-I'm seriously Sorry for the late response! I was on business travel on a project and had been very busy for a  long time.
+There is probably a bug in bootloader on *a lot* market-available
+devices that needs a very early fix executed during decompression. If
+we don't implement it, Broadcom Northstar devices hang in 25% of tries
+and BCM53573 devices don't boot at all.
 
-Please see inline.
+The problem is ARCH_BCM_5301X is used with ARCH_MULTI_V7, so we really
+shouldn't merge some extra code into head.S and execute it
+unconditionally. I'd like to ask if you can suggest some idea for a
+sane architecture check.
 
-Regards,
-Shaohui
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Friday, July 08, 2016 8:00 PM
-> To: shh.xie at gmail.com
-> Cc: devicetree at vger.kernel.org; robh+dt at kernel.org; mark.rutland at arm.com;
-> pawel.moll at arm.com; ijc+devicetree at hellion.org.uk; galak at codeaurora.org;
-> linux-arm-kernel at lists.infradead.org; catalin.marinas at arm.com;
-> will.deacon at arm.com; Mingkai Hu <mingkai.hu@nxp.com>; Mihai Emilian Bantea
-> <mihai.bantea@nxp.com>; Qianyu Gong <qianyu.gong@nxp.com>; Minghuan Lian
-> <minghuan.lian@nxp.com>; Zhiqiang Hou <zhiqiang.hou@nxp.com>; Shaohui Xie
-> <shaohui.xie@nxp.com>
-> Subject: Re: [PATCH 1/5] arm64: dts: add QorIQ LS1046A SoC support
-> 
-> On Friday, July 8, 2016 6:15:40 PM CEST shh.xie at gmail.com wrote:
-> > +
-> > +	memory at 80000000 {
-> > +		device_type = "memory";
-> > +		reg = <0x0 0x80000000 0 0x80000000>;
-> > +		      /* DRAM space 1, size: 2GiB DRAM */
-> > +	};
-> 
-> The memory size is usually in the .dts file, unless this is on-chip eDRAM.
-[S.H] The memory size will be fixup by U-boot, if it's not proper to have it in .dtsti,
-How about remove it?
+Ideally I'd read it from DT, but I don't think I can read machine
+"compatible" from ASM. As alternative I could try reading SoC chip ID
+from ChipCommon component which Broadcom always maps at 0x18000000.
+Would that be safe enough? Could reading from such offset do any harm
+on other devices?
 
-> > +		clockgen: clocking at 1ee1000 {
-> > +			compatible = "fsl,ls1046a-clockgen";
-> 
-> > +		scfg: scfg at 1570000 {
-> > +			compatible = "fsl,ls1046a-scfg", "syscon";
-> 
-> > +		dcfg: dcfg at 1ee0000 {
-> > +			compatible = "fsl,ls1046a-dcfg", "syscon";
-> 
-> None of the fsl,ls1046a-* devices seem to have any binding documentation.
-[S.H] Will update binding for fsl,ls1046-* devices in next version.
+Maybe you have some better ideas?
 
-> 
-> > +		wdog0: wdog at 2ad0000 {
-> 
-> watchdog at 2ad0000
-[S.H] Will fix it.
+I was looking for similar solutions in the kernel, but I found none.
+There are e.g. head-sa1100.S and head-sharpsl.S but they seem to be
+used on architectures that don't use ARCH_MULTI_V7.
 
-> 
-> > +		usb0: usb3 at 2f00000 {
-> 
-> usb at 2f00000
-[S.H] Will fix it.
-
-> 
-> > +		pcie at 3400000 {
-> > +			compatible = "fsl,ls1046a-pcie", "snps,dw-pcie";
-> > +			reg = <0x00 0x03400000 0x0 0x00100000   /* controller
-> registers */
-> > +			       0x40 0x00000000 0x0 0x00002000>; /* configuration
-> space */
-> > +			reg-names = "regs", "config";
-> > +			interrupts = <0 118 0x4>, /* controller interrupt */
-> > +				     <0 117 0x4>; /* PME interrupt */
-> > +			interrupt-names = "intr", "pme";
-> > +			#address-cells = <3>;
-> > +			#size-cells = <2>;
-> > +			device_type = "pci";
-> > +			num-lanes = <4>;
-> > +			bus-range = <0x0 0xff>;
-> > +			ranges = <0x81000000 0x0 0x00000000 0x40 0x00010000
-> 0x0 0x00010000   /* downstream I/O */
-> > +				  0x82000000 0x0 0x40000000 0x40 0x40000000
-> 0x0 0x40000000>; /*
-> > +non-prefetchable memory */
-> 
-> No prefetchable memory area?
-> 
-> > +			msi-parent = <&msi>;
-> 
-> You seem to have a gic-400, could you use that as the MSI sink instead?
-> 
-> > +			#interrupt-cells = <1>;
-> > +			interrupt-map-mask = <0 0 0 7>;
-> > +			interrupt-map = <0000 0 0 1 &gic 0 110 0x4>,
-> > +					<0000 0 0 2 &gic 0 110 0x4>,
-> > +					<0000 0 0 3 &gic 0 110 0x4>,
-> > +					<0000 0 0 4 &gic 0 110 0x4>;
-> > +		};
-> >
-> 
-> If the four interrupts are all the same, why do you have separate entries?
-[S.H] We are working on refining the MSI driver and the MSI node will also be changed, 
-so the MSI and PCIe node will be added together with the MSI driver updates.
-In the next version, I will drop the MSI node and PCIe node.
-
-Thank you!
+-- 
+Rafa?
