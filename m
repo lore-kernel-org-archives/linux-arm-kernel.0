@@ -1,43 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 18 Aug 2016 14:05:42 +0100
-Subject: [PATCH 4/4] iommu/arm-smmu: Don't BUG() if we find aborting STEs with
- disable_bypass
-In-Reply-To: <1471525542-14969-1-git-send-email-will.deacon@arm.com>
-References: <1471525542-14969-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1471525542-14969-5-git-send-email-will.deacon@arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 18 Aug 2016 15:07:39 +0200
+Subject: [PATCH v2 0/2] ARM: dts: Add support for the MDM9615
+Message-ID: <1471525661-2563-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The disable_bypass cmdline option changes the SMMUv3 driver to put down
-faulting stream table entries by default, as opposed to bypassing
-transactions from unconfigured devices.
+In order to support the Qualcomm MDM9615 in the Sierra Wireless WP8548
+Modules, add the MDM9615 DTSI and update its dt-bindings.
 
-In this mode of operation, it is entirely expected to see aborting
-entries in the stream table if and when we come to installing a valid
-translation, so don't trigger a BUG() as a result of misdiagnosing these
-entries as stream table corruption.
+This patchset depends on pinctrl [merged], clk [merged], pmic [1] and arm-soc [merged] patchsets.
 
-Tested-by: Robin Murphy <robin.murphy@arm.com>
-Reported-by: Robin Murphy <robin.murphy@arm.com>
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- drivers/iommu/arm-smmu-v3.c | 3 +++
- 1 file changed, 3 insertions(+)
+This patchset is part of a global SoC + Module + Board support for the
+Sierra Wireless mangOH Board support with the WP8548 module.
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 330623f8e344..641e88761319 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1034,6 +1034,9 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
- 		case STRTAB_STE_0_CFG_S2_TRANS:
- 			ste_live = true;
- 			break;
-+		case STRTAB_STE_0_CFG_ABORT:
-+			if (disable_bypass)
-+				break;
- 		default:
- 			BUG(); /* STE corruption */
- 		}
+[1] http://lkml.kernel.org/r/1470921406-18468-1-git-send-email-narmstrong at baylibre.com
+
+Changes since v1 at : http://lkml.kernel.org/r/1466159704-22774-1-git-send-email-narmstrong at baylibre.com
+ - Added cxo_board clock node
+ - Added secondary pm8921 compatibles
+ - Dropped corner regulator
+ - Dropped USB nodes
+
+Neil Armstrong (2):
+  ARM: dts: Add MDM9615 dtsi
+  dt-bindings: qcom: Add MDM9615 bindings
+
+ Documentation/devicetree/bindings/arm/qcom.txt |   1 +
+ arch/arm/boot/dts/qcom-mdm9615.dtsi            | 555 +++++++++++++++++++++++++
+ 2 files changed, 556 insertions(+)
+ create mode 100644 arch/arm/boot/dts/qcom-mdm9615.dtsi
+
 -- 
-2.1.4
+1.9.1
