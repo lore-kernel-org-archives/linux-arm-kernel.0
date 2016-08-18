@@ -1,56 +1,84 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 18 Aug 2016 14:48:52 -0500
-Subject: [PATCH v2] dt-bindings: touchscreen: silead gsl1680: Document all
- compatibles
-In-Reply-To: <20160818193028.GA39271@dtor-ws>
-References: <1471424340-4201-1-git-send-email-hdegoede@redhat.com>
- <20160818193028.GA39271@dtor-ws>
-Message-ID: <CAL_JsqK2Lgic+-P-NvvnVO9COCy3k_yO3seOipYDd4d10QK2UA@mail.gmail.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Thu, 18 Aug 2016 23:26:00 +0300
+Subject: [PATCHv6] support for AD5820 camera auto-focus coil
+In-Reply-To: <20160818104539.GA7427@amd>
+References: <20160524091746.GA14536@amd>
+ <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
+ <20160527205140.GA26767@amd> <20160805102611.GA13116@amd>
+ <20160808080955.GA3182@valkosipuli.retiisi.org.uk>
+ <20160808214132.GB2946@xo-6d-61-c0.localdomain>
+ <20160810120105.GP3182@valkosipuli.retiisi.org.uk>
+ <20160808232323.GC2946@xo-6d-61-c0.localdomain>
+ <20160811111633.GR3182@valkosipuli.retiisi.org.uk>
+ <20160818104539.GA7427@amd>
+Message-ID: <20160818202559.GF3182@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2016 at 2:30 PM, Dmitry Torokhov
-<dmitry.torokhov@gmail.com> wrote:
-> On Wed, Aug 17, 2016 at 10:59:00AM +0200, Hans de Goede wrote:
->> The silead gsl1680 driver / binding supports a whole series of devices,
->> list the compatibles for all of them in the binding.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->> Changes in v2:
->> -Drop the "silead,mssl1680" compatible thing, the "mssl1680" name is an
->>  ACPI thing and does not belong in the dt bindings
->> ---
->>  .../devicetree/bindings/input/touchscreen/silead_gsl1680.txt          | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
->> index b0eca54..ad7f41a 100644
->> --- a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
->> +++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
->> @@ -2,6 +2,10 @@
->>
->>  Required properties:
->>  - compatible           : "silead,gsl1680"
->> +                     or: "silead,gsl1688"
->> +                     or: "silead,gsl3670"
->> +                     or: "silead,gsl3675"
->> +                     or: "silead,gsl3692"
->
-> Hmm, why do we need to document all compatible strings? We usually have
-> only least common denominator in drievr, and device tree uses form:
->
->         compatible = "silead,<exact model>", "silead,gsl1680";
->
-> Rob?
+Hi Pavel,
 
-Because we require them in dts files even if the OS only uses the fallback.
+On Thu, Aug 18, 2016 at 12:45:39PM +0200, Pavel Machek wrote:
+> On Thu 2016-08-11 14:16:34, Sakari Ailus wrote:
+> > On Tue, Aug 09, 2016 at 01:23:23AM +0200, Pavel Machek wrote:
+> > > On Wed 2016-08-10 15:01:05, Sakari Ailus wrote:
+> > > > On Mon, Aug 08, 2016 at 11:41:32PM +0200, Pavel Machek wrote:
+> > > > > On Mon 2016-08-08 11:09:56, Sakari Ailus wrote:
+> > > > > > On Fri, Aug 05, 2016 at 12:26:11PM +0200, Pavel Machek wrote:
+> > > > > > > 
+> > > > > > > This adds support for AD5820 autofocus coil, found for example in
+> > > > > > > Nokia N900 smartphone.
+> > > > > > 
+> > > > > > Thanks, Pavel!
+> > > > > > 
+> > > > > > Let's use V4L2_CID_FOCUS_ABSOLUTE, as is in the patch. If we get something
+> > > > > > better in the future, we'll switch to that then.
+> > > > > > 
+> > > > > > I've applied this to ad5820 branch in my tree.
+> > > > > 
+> > > > > Thanks. If I understands things correctly, both DTS patch and this patch are
+> > > > > waiting in your tree, so we should be good to go for 4.9 (unless some unexpected
+> > > > > problems surface)?
+> > > > 
+> > > > Yeah. I just compiled it but haven't tested it. I presume it'll work. :-)
+> > > 
+> > > I'm testing it on n900. I guess simpler hardware with ad5820 would be better for the
+> > > test...
+> > > 
+> > > What hardware do you have?
+> > 
+> > N900. What else could it be? :-) :-)
+> 
+> Heh. Basically anything is easier to develop for than n900 :-(.
 
->
-> BTW, I do not see OF match table in the driver, did I manage to drop it?
+Is it?
 
-If it is i2c, i2c has the quirk that it will match drv name to
-compatible string with vendor prefix dropped. But that would imply one
-of these is a fallback and the doc doesn't say that.
+I actually find the old Nokia devices very practical. It's easy to boot your
+own kernel and things just work... until musb broke a bit recently. It
+requires reconnecting the usb cable again to function.
 
-Rob
+I have to admit I mostly use an N9.
+
+> 
+> Ok, for real testing, Ivaylo's camera patchset is useful, so that you
+> have picture to work with, plus your subdevs for omap3 patchset (which
+> needs a forward port).
+> 
+> I have patches against v4.7, if you are interested.
+
+They should be pretty close to mainline. The rebase should be very easy.
+
+Patches against media-tree master branch would always be better naturally.
+:-)
+
+> 
+> I guess subdevs for omap3 should be merged at this point. Do you have
+> any plans to do that, or should I take a look?
+
+What's still missing? I think I've yet to check the et8ek8 driver and the
+device tree description is missing. That's what comes to mind right now.
+
+-- 
+Kind regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
