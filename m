@@ -1,32 +1,36 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 18 Aug 2016 12:11:03 +0200
-Subject: [PATCH 10/13] scpi: grow MAX_DVFS_OPPS to 16 entries
+Date: Thu, 18 Aug 2016 12:11:05 +0200
+Subject: [PATCH 12/13] ARM64: dts: meson-gxbb: Add SRAM node
 In-Reply-To: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
 References: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1471515066-3626-11-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1471515066-3626-13-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since Amlogic SoCs reports more than 8 OPPs per domains, grow the structure
-size to 16.
-
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/firmware/arm_scpi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-index d73db7c..699bed7 100644
---- a/drivers/firmware/arm_scpi.c
-+++ b/drivers/firmware/arm_scpi.c
-@@ -74,7 +74,7 @@
- #define SCPI_SLOT		0
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index bdbf6e7..2748007 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -124,6 +124,15 @@
+ 		#size-cells = <2>;
+ 		ranges;
  
- #define MAX_DVFS_DOMAINS	8
--#define MAX_DVFS_OPPS		8
-+#define MAX_DVFS_OPPS		16
- #define DVFS_LATENCY(hdr)	(le32_to_cpu(hdr) >> 16)
- #define DVFS_OPP_COUNT(hdr)	((le32_to_cpu(hdr) >> 8) & 0xff)
- 
++		sram: sram at c8000000 {
++			compatible = "amlogic,meson-gxbb-sram", "mmio-sram";
++			reg = <0x0 0xc8000000 0x0 0x14000>;
++
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x0 0xc8000000 0x14000>;
++		};
++
+ 		cbus: cbus at c1100000 {
+ 			compatible = "simple-bus";
+ 			reg = <0x0 0xc1100000 0x0 0x100000>;
 -- 
 1.9.1
