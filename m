@@ -1,45 +1,95 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 18 Aug 2016 08:31:55 +0200
-Subject: [GIT PULL] ARM: exynos: Fixes for v4.8
-Message-ID: <1471501915-4746-1-git-send-email-k.kozlowski@samsung.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Thu, 18 Aug 2016 08:42:37 +0200
+Subject: [PATCH V8 5/8] irqchip/gicv3-its: Refactor ITS DT init code to
+ prepare for ACPI
+In-Reply-To: <20160817155832.GA25421@localhost>
+References: <1470909998-16710-1-git-send-email-tn@semihalf.com>
+ <1470909998-16710-6-git-send-email-tn@semihalf.com>
+ <57B4213E.3060201@huawei.com> <20160817155832.GA25421@localhost>
+Message-ID: <00af2bfa-0869-75e0-8a9a-4d7e0cafb687@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 17.08.2016 17:58, Bjorn Helgaas wrote:
+> On Wed, Aug 17, 2016 at 04:33:02PM +0800, Hanjun Guo wrote:
+>> On 2016/8/11 18:06, Tomasz Nowicki wrote:
+>>> In order to add ACPI support we need to isolate ACPI&DT common code and
+>>> move DT logic to corresponding functions. To achieve this we are using
+>>> firmware agnostic handle which can be unpacked to either DT or ACPI node.
+>>>
+>>> No functional changes other than a very minor one:
+>>> 1. Terminate its_init call with -ENODEV for non-DT case which allows
+>>> to remove hack from its-gic-v3.c.
+>>> 2. Fix ITS base register address type (from 'unsigned long' to 'phys_addr_t'),
+>>> as a bonus we get nice string formatting.
+>>> 3. Since there is only one of ITS parent domain convert it to static global
+>>> variable and drop the parameter from its_probe_one. Users can refer to it
+>>> in more convenient way then.
+>> [...]
+>>> -static int __init its_probe(struct device_node *node,
+>>> -			    struct irq_domain *parent)
+>>> +static int __init its_probe_one(struct resource *res,
+>>> +				struct fwnode_handle *handle, int numa_node)
+>>>  {
+>>> -	struct resource res;
+>>>  	struct its_node *its;
+>>>  	void __iomem *its_base;
+>>>  	u32 val;
+>>>  	u64 baser, tmp;
+>>>  	int err;
+>>>
+>>> -	err = of_address_to_resource(node, 0, &res);
+>>> -	if (err) {
+>>> -		pr_warn("%s: no regs?\n", node->full_name);
+>>> -		return -ENXIO;
+>>> -	}
+>>> -
+>>> -	its_base = ioremap(res.start, resource_size(&res));
+>>> +	its_base = ioremap(res->start, resource_size(res));
+>>>  	if (!its_base) {
+>>> -		pr_warn("%s: unable to map registers\n", node->full_name);
+>>> +		pr_warn("ITS@%pa: Unable to map ITS registers\n", &res->start);
+>>>  		return -ENOMEM;
+>>>  	}
+>>>
+>>>  	val = readl_relaxed(its_base + GITS_PIDR2) & GIC_PIDR2_ARCH_MASK;
+>>>  	if (val != 0x30 && val != 0x40) {
+>>> -		pr_warn("%s: no ITS detected, giving up\n", node->full_name);
+>>> +		pr_warn("ITS@%pa: No ITS detected, giving up\n", &res->start);
+>>>  		err = -ENODEV;
+>>>  		goto out_unmap;
+>>>  	}
+>>>
+>>>  	err = its_force_quiescent(its_base);
+>>>  	if (err) {
+>>> -		pr_warn("%s: failed to quiesce, giving up\n",
+>>> -			node->full_name);
+>>> +		pr_warn("ITS@%pa: Failed to quiesce, giving up\n", &res->start);
+>>>  		goto out_unmap;
+>>>  	}
+>>>
+>>> -	pr_info("ITS: %s\n", node->full_name);
+>>> +	pr_info("ITS@%pa\n", &res->start);
+>>                 ^^
+>>
+>> When I was testing this patch set I found message printed as below:
+>>
+>> [    0.000000] ITS at 0x00000000c6000000
+>
+> I think it'd be nicer to print the resource with %pR so we see the
+> type and size in a way that matches other physical address usage.
 
-A fix and a maintainers update for current release cycle (v4.8).
+The intention was to keep previous message layout but while we are here, 
+%pR usage for this one pr_info seems nice to me.
 
-Best regards,
-Krzysztof
+>
+> I don't know whether there is or should be a struct device associated
+> with the ITS.  The its_probe_one() function looks similar to regular
+> driver probe functions, so maybe there should be.
+>
+> If there were a struct device associated with the ITS, it'd be nicer
+> to use dev_info() as well, of course.
 
+Indeed dev_info() would be nice but there is no struct device for ITS.
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
-
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-fixes-4.8
-
-for you to fetch changes up to 326dce0734b63c3b82b6a88e5645eab8b54c6692:
-
-  MAINTAINERS: Switch to kernel.org account for Krzysztof Kozlowski (2016-08-17 17:54:56 +0200)
-
-----------------------------------------------------------------
-Fix for v4.8-rc1:
-1. Select proper eMMC HighSpeed mode on Odroid XU.  DTS was mixing
-   "samsung,exynos5250-dw-mshc" compatible (with HS200 as fastest mode)
-   with a property "mmc-hs400-1_8v" thus leading to failures during
-   probe.
-
-2. Update Krzysztof Kozlowski's email address in maintainers.
-
-----------------------------------------------------------------
-Krzysztof Kozlowski (2):
-      ARM: dts: exynos: Properly select eMMC HighSpeed mode on Odroid XU
-      MAINTAINERS: Switch to kernel.org account for Krzysztof Kozlowski
-
- .mailmap                                  |  1 +
- MAINTAINERS                               | 15 +++++++++------
- arch/arm/boot/dts/exynos5410-odroidxu.dts |  3 ---
- 3 files changed, 10 insertions(+), 9 deletions(-)
+Tomasz
