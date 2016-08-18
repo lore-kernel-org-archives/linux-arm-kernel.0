@@ -1,82 +1,29 @@
 From: dawei.chien@mediatek.com (Dawei Chien)
-Date: Thu, 18 Aug 2016 11:50:53 +0800
-Subject: [PATCH v2 3/3] arm: dts: thermal: add thermal/auxadc node.
-In-Reply-To: <1471492253-7185-1-git-send-email-dawei.chien@mediatek.com>
-References: <1471492253-7185-1-git-send-email-dawei.chien@mediatek.com>
-Message-ID: <1471492253-7185-4-git-send-email-dawei.chien@mediatek.com>
+Date: Thu, 18 Aug 2016 11:50:50 +0800
+Subject: [PATCH v2 0/3] Add Mediatek thermal driver for mt2701
+Message-ID: <1471492253-7185-1-git-send-email-dawei.chien@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the thermal controller and auxadc nodes
-to the Mediatek MT2701 dtsi file.
+This series support for mt2701 chip to mtk_thermal.c,
+and integrate both mt8173 and mt2701 on the same driver.
+MT8173 has four banks and five sensors, and MT2701 has
+only one bank and three sensors.
 
-Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
----
-This patch depned on:
-https://patchwork.kernel.org/patch/9249589/
----
- arch/arm/boot/dts/mt2701.dtsi |   44 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
+Change since V1:
+1. Restore macro name with MT8173 for nvmem calibration data
+since original macro name could be used for both MT2701/MT8173.
 
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index e9150a4..cee4724 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -87,6 +87,36 @@
- 		clock-output-names = "rtc32k";
- 	};
- 
-+	thermal-zones {
-+		cpu_thermal: cpu_thermal {
-+			polling-delay-passive = <1000>; /* milliseconds */
-+			polling-delay = <1000>; /* milliseconds */
-+
-+			thermal-sensors = <&thermal 0>;
-+			sustainable-power = <1000>;
-+
-+			trips {
-+				threshold: trip-point at 0 {
-+					temperature = <68000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+
-+				target: trip-point at 1 {
-+					temperature = <85000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+
-+				cpu_crit: cpu_crit at 0 {
-+					temperature = <115000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+		};
-+	};
-+
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupt-parent = <&gic>;
-@@ -222,4 +252,18 @@
- 		clock-names = "baud", "bus";
- 		status = "disabled";
- 	};
-+
-+	thermal: thermal at 1100b000 {
-+		#thermal-sensor-cells = <0>;
-+		compatible = "mediatek,mt2701-thermal";
-+		reg = <0 0x1100b000 0 0x1000>;
-+		interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
-+		clock-names = "therm", "auxadc";
-+		resets = <&pericfg 0x10>;
-+		reset-names = "therm";
-+		mediatek,auxadc = <&auxadc>;
-+		mediatek,apmixedsys = <&apmixedsys>;
-+	};
-+
- };
--- 
-1.7.9.5
+2. Add flexible array member to instead of normal array since
+thermal bank has different array size between MT2701 to MT8173.
+
+Dawei Chien (3):
+  dt-bindings: thermal: Add binding document for Mediatek thermal
+    controller
+  thermal: Add Mediatek thermal driver for mt2701.
+  arm: dts: thermal: add thermal/auxadc node.
+
+ .../bindings/thermal/mediatek-thermal.txt          |    4 +-
+ arch/arm/boot/dts/mt2701.dtsi                      |   44 ++++
+ drivers/thermal/mtk_thermal.c                      |  215 ++++++++++++++------
+ 3 files changed, 199 insertions(+), 64 deletions(-)
