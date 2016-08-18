@@ -1,90 +1,61 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Thu, 18 Aug 2016 15:48:03 +0800
-Subject: [PATCH V4 1/3] tracing: add a possibility of exporting function
- trace to other places instead of ring buffer only
-In-Reply-To: <201608152102.m6KoaCgL%fengguang.wu@intel.com>
-References: <1471261803-1186-2-git-send-email-zhang.chunyan@linaro.org>
- <201608152102.m6KoaCgL%fengguang.wu@intel.com>
-Message-ID: <CAG2=9p_ry_n-JEq8N60GLP55kKo-tnjNVQZBjVi04MQ3h_fDtA@mail.gmail.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Thu, 18 Aug 2016 15:48:23 +0800
+Subject: [PATCH v10 0/8] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <57B4B47E.5030100@codeaurora.org>
+References: <1469535565-20924-1-git-send-email-fu.wei@linaro.org>
+ <0befd611-91a7-88e9-1686-82929c1745e8@semihalf.com>
+ <510fa357-a729-4ce1-7c10-4cef06feb7b7@linaro.org>
+ <CADyBb7tZDT2LMGnsWW_orR37dsfseijLEjzn59rLW9tbbxKVPQ@mail.gmail.com>
+ <20160811105848.GA25680@red-moon> <57B4B47E.5030100@codeaurora.org>
+Message-ID: <CADyBb7ujY0kEFq5zrWfEdS1JA=G39rKAdZC4mf2jfw=Gm8GnpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fengguang,
+Hi Timur,
 
-On 15 August 2016 at 21:03, kbuild test robot <lkp@intel.com> wrote:
-> Hi Chunyan,
+On 18 August 2016 at 03:01, Timur Tabi <timur@codeaurora.org> wrote:
+> Lorenzo Pieralisi wrote:
+>>
+>> I do not think you need a v11 just to remove the drivers/acpi/arm64
+>> directory creation, you need to get Daniel/Thomas review/ack on
+>> the respective patches though, I do not see the point of churning
+>> out another series just because drivers/acpi/arm64 is now created
+>> in the IORT patch series. If v10 is ok you will rebase it on top of
+>> Tomasz's series and mention the dependency in the respective pull
+>> request.
+>>
+>> If there is need for a v11 following Daniel/Thomas review yes,
+>> you can proceed as above.
 >
-> [auto build test WARNING on linus/master]
-> [also build test WARNING on v4.8-rc2 next-20160815]
-> [cannot apply to linux/master]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 >
-> url:    https://github.com/0day-ci/linux/commits/Chunyan-Zhang/tracing-add-a-possibility-of-exporting-function-trace-to-other-places-instead-of-ring-buffer-only/20160815-195631
-> reproduce:
->         # apt-get install sparse
+> What's the latest on this patchset?  I really want them in 4.9.  Is
+> everything queued up, or are still issues that need to be resolved.
 
+we are trying to let Tomasz's series be merged first, then this patch set
+will be rebased on the top of it.
 
-It may be better to use the latest version of sparse, i.e.
+If everyone is OK with this patchset, I guess  "in 4.9" is not a problem.
 
-git clone git://git.kernel.org/pub/scm/devel/sparse/sparse.git
+I don't see any suggestion and comment for now, will keep my eyes on it.
 
-and then build the source code according to the direction on the page
-https://kernelnewbies.org/Sparse
-
-Otherwise, would get the errors like below if I install sparse using
-apt-get install.
-
--------------------------------------------------------
- CHECK   arch/x86/purgatory/purgatory.c
-No such file: asan-stack=1
-scripts/Makefile.build:289: recipe for target
-'arch/x86/purgatory/purgatory.o' failed
-make[1]: *** [arch/x86/purgatory/purgatory.o] Error 1
-arch/x86/Makefile:195: recipe for target 'archprepare' failed
-make: *** [archprepare] Error 2
--------------------------------------------------------
-
-
-Thanks,
-Chunyan
-
->         make ARCH=x86_64 allmodconfig
->         make C=1 CF=-D__CHECK_ENDIAN__
 >
-> sparse warnings: (new ones prefixed by >>)
+> Who will be merging these patches?
+
+I think the clocksource maintainer will take care of it, and  GTDT patch
+has got Rafael's ACK.
+
 >
->    include/linux/compiler.h:230:8: sparse: attribute 'no_sanitize_address': unknown attribute
->>> kernel/trace/trace.c:2173:23: sparse: incompatible types in comparison expression (different address spaces)
->    kernel/trace/trace.c:2175:23: sparse: incompatible types in comparison expression (different address spaces)
->
-> vim +2173 kernel/trace/trace.c
->
->   2157  static DEFINE_MUTEX(trace_export_lock);
->   2158
->   2159  static struct trace_export trace_export_rb __read_mostly = {
->   2160          .name           = "rb",
->   2161          .commit = trace_rb_commit,
->   2162          .next           = NULL,
->   2163  };
->   2164  static struct trace_export *trace_exports_list __read_mostly = &trace_export_rb;
->   2165
->   2166  inline void
->   2167  trace_exports(struct trace_array *tr, struct ring_buffer_event *event)
->   2168  {
->   2169          struct trace_export *export;
->   2170
->   2171          preempt_disable_notrace();
->   2172
->> 2173          for (export = rcu_dereference_raw_notrace(trace_exports_list);
->   2174               export && export->commit;
->   2175               export = rcu_dereference_raw_notrace(export->next)) {
->   2176                  tr->export = export;
->   2177                  export->commit(tr, event);
->   2178          }
->   2179
->   2180          preempt_enable_notrace();
->   2181  }
->
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> --
+> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+> Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+> Code Aurora Forum, a Linux Foundation Collaborative Project.
+
+
+
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
