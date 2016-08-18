@@ -1,51 +1,143 @@
-From: B56489@freescale.com (Yunhui Cui)
-Date: Thu, 18 Aug 2016 15:38:04 +0800
-Subject: [PATCH v3 9/9] mtd: fsl-quadspi: add multi flash chip R/W on ls2080a
-In-Reply-To: <1471505884-33996-1-git-send-email-B56489@freescale.com>
-References: <1471505884-33996-1-git-send-email-B56489@freescale.com>
-Message-ID: <1471505884-33996-9-git-send-email-B56489@freescale.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 18 Aug 2016 10:14:20 +0200
+Subject: [PATCH 1/4] soc: qcom: add an EBI2 device tree bindings
+In-Reply-To: <2988918.zNxvaGl6en@wuerfel>
+References: <1470691445-27571-1-git-send-email-linus.walleij@linaro.org>
+ <1470691445-27571-2-git-send-email-linus.walleij@linaro.org>
+ <2988918.zNxvaGl6en@wuerfel>
+Message-ID: <CACRpkdZ=HU6j3=Ye4dm=tFU=KmG54bq06KDfxPViWUouOA=jOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yunhui Cui <yunhui.cui@nxp.com>
+On Mon, Aug 8, 2016 at 11:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-There is a hardware feature that qspi_amba_base is added
-internally by SOC design on ls2080a. so memmap_phy need not
-be added in driver. If memmap_phy is added, the flash A1
-addr space is [0, memmap_phy] which far more than flash size.
-The AMBA memory will be divided into four parts and assign to
-every chipselect. Every channel will has two valid chipselects.
+> On Monday, August 8, 2016 11:24:02 PM CEST Linus Walleij wrote:
+>> +
+>> +Required subnode properties:
+>> +- chipselect: <N> where N is the chipselect configured in this node
+>> +- address-cells: should be <1>
+>> +- size-cells: should be <1>
+>> +- ranges: bool should be present
+>>
+>
+> I think this should use a proper ranges property that translates
+> the address space of the external bus into the parent bus.
+>
+> Just use #address-cells=<2> and make the first cell the cs number,
+> as the other similar drivers do, and get rid of the chipselect
+> property.
 
-Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
----
- drivers/mtd/spi-nor/fsl-quadspi.c | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+Rob Herring also wrote:
 
-diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
-index 193e81b..8c9746c 100644
---- a/drivers/mtd/spi-nor/fsl-quadspi.c
-+++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-@@ -736,11 +736,17 @@ static void fsl_qspi_set_map_addr(struct fsl_qspi *q)
- {
- 	int nor_size = q->nor_size;
- 	void __iomem *base = q->iobase;
-+	u32 mem_base;
- 
--	qspi_writel(q, nor_size + q->memmap_phy, base + QUADSPI_SFA1AD);
--	qspi_writel(q, nor_size * 2 + q->memmap_phy, base + QUADSPI_SFA2AD);
--	qspi_writel(q, nor_size * 3 + q->memmap_phy, base + QUADSPI_SFB1AD);
--	qspi_writel(q, nor_size * 4 + q->memmap_phy, base + QUADSPI_SFB2AD);
-+	if (has_added_amba_base_internal(q))
-+		mem_base = 0x0;
-+	else
-+		mem_base = q->memmap_phy;
-+
-+	qspi_writel(q, nor_size + mem_base, base + QUADSPI_SFA1AD);
-+	qspi_writel(q, nor_size * 2 + mem_base, base + QUADSPI_SFA2AD);
-+	qspi_writel(q, nor_size * 3 + mem_base, base + QUADSPI_SFB1AD);
-+	qspi_writel(q, nor_size * 4 + mem_base, base + QUADSPI_SFB2AD);
- }
- 
- /*
--- 
-2.1.0.27.g96db324
+>> +Required subnode properties:
+>> +- chipselect: <N> where N is the chipselect configured in this node
+>
+> Follow the other external buses that put the CS# in the reg property.
+
+Also the same comment from Mark Rutland on IRC.
+
+The following discussion is only about the CS-in-reg property problem.
+The ranges issue is not fixed but that is an orthogonal thing I'm working
+on.
+
+There is a problem. Look at this cut-down example where I just have
+the "qcom,xmem-recovery-cycles" set up for the CS2 chip select:
+
+ebi2 at 1a100000 {
+       compatible = "qcom,msm8660-ebi2";
+       #address-cells = <1>;
+       #size-cells = <1>;
+       (...)
+       cs2 at 1b800000 {
+               chipselect = <2>;
+               #address-cells = <1>;
+               #size-cells = <1>;
+               qcom,xmem-recovery-cycles = <5>;
+               foo-ebi2 at 1b800000 {
+                       compatible = "foo";
+                       reg = <0x1b800000 0x100>;
+                       (...)
+               };
+               bar-ebi2 at 1b800000 {
+                       compatible = "bar";
+                       reg = <0x1ba00000 0x100>;
+                       (...)
+               };
+       };
+};
+
+So two devices "foo" and "bar" on the EBI2 bus, in the old
+scheme.
+
+So I need to encode the CS in the first cell of the reg for
+foo-ebi2, and get rid of chipselect = <2> fine:
+
+ebi2 at 1a100000 {
+       compatible = "qcom,msm8660-ebi2";
+       #address-cells = <1>;
+       #size-cells = <1>;
+       (...)
+       cs2 at 1b800000 {
+               #address-cells = <2>;
+               #size-cells = <1>;
+               qcom,xmem-recovery-cycles = <5>;
+               foo-ebi2 at 1b800000 {
+                       compatible = "foo";
+                       reg = <2 0x1b800000 0x100>;
+                       (...)
+               };
+               bar-ebi2 at 1ba00000 {
+                       compatible = "bar";
+                       reg = <2 0x1ba00000 0x100>;
+                       (...)
+               };
+       };
+};
+
+This is not looking good at all. First: the configuration settings for
+the chipselect (i.e. all devices below it, both "foo" and "bar" are
+just floating in space. When parsing the tree how should you know
+what chipselect to set up the stuff on? Shall I check the child nodes
+first value in the reg property and then make a majority vote on what
+chipselect they apply to or what? That doesn't make sense.
+
+So I assume doing away with the chipselect node altogether would
+be prefered. But then: where do I put stuff like "qcom,xmem-recovery-cycles"
+that apply to the whole chipselect, not just a single subdevice on that
+chipselect? I certainly cannot encode it in the reg since it needs
+to be the same for all devices and it's not about addressing.
+
+The only thing I can reasonably come up with would be this:
+
+ebi2 at 1a100000 {
+       compatible = "qcom,msm8660-ebi2";
+       #address-cells = <2>;
+       #size-cells = <1>;
+       qcom,xmem-recovery-cycles = <0>, <0>, <5>, <0>, <0>, <0>;
+
+       (...)
+       foo-ebi2 at 1b800000 {
+              compatible = "foo";
+               reg = <2 0x1b800000 0x100>;
+               (...)
+       };
+       bar-ebi2 at 1ba00000 {
+               compatible = "bar";
+               reg = <2 0x1ba00000 0x100>;
+               (...)
+       };
+};
+
+So the chip select settings are shoehorned into an array in the top
+node that is then indexed to find the settings for cs0, cs1 etc.
+
+There will be 6 such arrays for the different per-cs settings.
+
+Is this what you want? I kind of thought the hierarchical model
+was nice since each device was below its chipselect node, but
+I understand that it breaks the pattern of other similar bus drivers.
+
+So are you fine with the array solution?
+
+Yours,
+Linus Walleij
