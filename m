@@ -1,134 +1,91 @@
 From: B56489@freescale.com (Yunhui Cui)
-Date: Thu, 18 Aug 2016 15:37:59 +0800
-Subject: [PATCH v3 4/9] mtd: spi-nor: fsl-quadspi: extend support for some
- special requerment.
+Date: Thu, 18 Aug 2016 15:38:00 +0800
+Subject: [PATCH v3 5/9] mtd: spi-nor: fsl-quadspi:Support qspi for ls2080a
 In-Reply-To: <1471505884-33996-1-git-send-email-B56489@freescale.com>
 References: <1471505884-33996-1-git-send-email-B56489@freescale.com>
-Message-ID: <1471505884-33996-4-git-send-email-B56489@freescale.com>
+Message-ID: <1471505884-33996-5-git-send-email-B56489@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yunhui Cui <yunhui.cui@nxp.com>
+There is a hardware feature that qspi_amba_base is added
+internally by SOC design on ls2080a. So as to software, the driver
+need support to the feature.
 
-Add extra info in LUT table to support some special requerments.
-Spansion S25FS-S family flash need some special operations.
-
+Signed-off-by: Yunhui Cui <B56489@freescale.com>
 Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
 ---
- drivers/mtd/spi-nor/fsl-quadspi.c | 44 +++++++++++++++++++++++++++++++++++++--
- include/linux/mtd/spi-nor.h       |  4 ++++
- 2 files changed, 46 insertions(+), 2 deletions(-)
+ drivers/mtd/spi-nor/fsl-quadspi.c | 24 ++++++++++++++++++++++--
+ 1 file changed, 22 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
-index b0a74b8..2521370 100644
+index 2521370..57eed3c 100644
 --- a/drivers/mtd/spi-nor/fsl-quadspi.c
 +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-@@ -205,6 +205,9 @@
- #define SEQID_RDCR		9
- #define SEQID_EN4B		10
- #define SEQID_BRWR		11
-+#define SEQID_RDAR		12
-+#define SEQID_WRAR		13
-+
+@@ -41,6 +41,8 @@
+ #define QUADSPI_QUIRK_TKT253890		(1 << 2)
+ /* Controller cannot wake up from wait mode, TKT245618 */
+ #define QUADSPI_QUIRK_TKT245618         (1 << 3)
++/* QSPI_AMBA_BASE is internally added by SOC design */
++#define QUADSPI_AMBA_BASE_INTERNAL	(0x10000)
  
- #define QUADSPI_MIN_IOMAP SZ_4M
+ /* The registers */
+ #define QUADSPI_MCR			0x00
+@@ -217,6 +219,7 @@ enum fsl_qspi_devtype {
+ 	FSL_QUADSPI_IMX7D,
+ 	FSL_QUADSPI_IMX6UL,
+ 	FSL_QUADSPI_LS1021A,
++	FSL_QUADSPI_LS2080A,
+ };
  
-@@ -470,6 +473,28 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- 	qspi_writel(q, LUT0(CMD, PAD1, SPINOR_OP_BRWR),
- 			base + QUADSPI_LUT(lut_base));
+ struct fsl_qspi_devtype_data {
+@@ -270,6 +273,14 @@ static struct fsl_qspi_devtype_data ls1021a_data = {
+ 	.driver_data = 0,
+ };
  
-+	/*
-+	 * Read any device register.
-+	 * Used for Spansion S25FS-S family flash only.
-+	 */
-+	lut_base = SEQID_RDAR * 4;
-+	qspi_writel(q, LUT0(CMD, PAD1, SPINOR_OP_SPANSION_RDAR) |
-+			LUT1(ADDR, PAD1, ADDR24BIT),
-+			base + QUADSPI_LUT(lut_base));
-+	qspi_writel(q, LUT0(DUMMY, PAD1, 8) | LUT1(FSL_READ, PAD1, 1),
-+			base + QUADSPI_LUT(lut_base + 1));
++static struct fsl_qspi_devtype_data ls2080a_data = {
++	.devtype = FSL_QUADSPI_LS2080A,
++	.rxfifo = 128,
++	.txfifo = 64,
++	.ahb_buf_size = 1024,
++	.driver_data = QUADSPI_AMBA_BASE_INTERNAL,
++};
 +
-+	/*
-+	 * Write any device register.
-+	 * Used for Spansion S25FS-S family flash only.
-+	 */
-+	lut_base = SEQID_WRAR * 4;
-+	qspi_writel(q, LUT0(CMD, PAD1, SPINOR_OP_SPANSION_WRAR) |
-+			LUT1(ADDR, PAD1, ADDR24BIT),
-+			base + QUADSPI_LUT(lut_base));
-+	qspi_writel(q, LUT0(FSL_WRITE, PAD1, 1),
-+			base + QUADSPI_LUT(lut_base + 1));
-+
- 	fsl_qspi_lock_lut(q);
+ #define FSL_QSPI_MAX_CHIP	4
+ struct fsl_qspi {
+ 	struct spi_nor nor[FSL_QSPI_MAX_CHIP];
+@@ -312,6 +323,11 @@ static inline int needs_wakeup_wait_mode(struct fsl_qspi *q)
+ 	return q->devtype_data->driver_data & QUADSPI_QUIRK_TKT245618;
  }
  
-@@ -477,9 +502,15 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
- {
- 	switch (cmd) {
-+	case SPINOR_OP_READ4_1_1_4:
- 	case SPINOR_OP_READ_1_1_4:
- 	case SPINOR_OP_READ_FAST:
-+	case SPINOR_OP_READ4_FAST:
- 		return SEQID_READ;
-+	case SPINOR_OP_SPANSION_RDAR:
-+		return SEQID_RDAR;
-+	case SPINOR_OP_SPANSION_WRAR:
-+		return SEQID_WRAR;
- 	case SPINOR_OP_WREN:
- 		return SEQID_WREN;
- 	case SPINOR_OP_WRDI:
-@@ -491,6 +522,7 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
- 	case SPINOR_OP_CHIP_ERASE:
- 		return SEQID_CHIP_ERASE;
- 	case SPINOR_OP_PP:
-+	case SPINOR_OP_PP_4B:
- 		return SEQID_PP;
- 	case SPINOR_OP_RDID:
- 		return SEQID_RDID;
-@@ -830,8 +862,12 @@ static int fsl_qspi_read_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len)
- {
- 	int ret;
- 	struct fsl_qspi *q = nor->priv;
-+	u32 to = 0;
++static inline int has_added_amba_base_internal(struct fsl_qspi *q)
++{
++	return q->devtype_data->driver_data & QUADSPI_AMBA_BASE_INTERNAL;
++}
 +
-+	if (opcode == SPINOR_OP_SPANSION_RDAR)
-+		memcpy(&to, nor->cmd_buf, 4);
+ /*
+  * R/W functions for big- or little-endian registers:
+  * The qSPI controller's endian is independent of the CPU core's endian.
+@@ -558,8 +574,11 @@ fsl_qspi_runcmd(struct fsl_qspi *q, u8 cmd, unsigned int addr, int len)
+ 	/* save the reg */
+ 	reg = qspi_readl(q, base + QUADSPI_MCR);
  
--	ret = fsl_qspi_runcmd(q, opcode, 0, len);
-+	ret = fsl_qspi_runcmd(q, opcode, to, len);
- 	if (ret)
- 		return ret;
- 
-@@ -843,9 +879,13 @@ static int fsl_qspi_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len)
- {
- 	struct fsl_qspi *q = nor->priv;
- 	int ret;
-+	u32 to = 0;
-+
-+	if (opcode == SPINOR_OP_SPANSION_WRAR)
-+		memcpy(&to, nor->cmd_buf, 4);
- 
- 	if (!buf) {
--		ret = fsl_qspi_runcmd(q, opcode, 0, 1);
-+		ret = fsl_qspi_runcmd(q, opcode, to, 1);
- 		if (ret)
- 			return ret;
- 
-diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
-index c425c7b..db3fe42 100644
---- a/include/linux/mtd/spi-nor.h
-+++ b/include/linux/mtd/spi-nor.h
-@@ -75,6 +75,10 @@
- /* Used for Spansion flashes only. */
- #define SPINOR_OP_BRWR		0x17	/* Bank register write */
- 
-+/* Used for Spansion S25FS-S family flash only. */
-+#define SPINOR_OP_SPANSION_RDAR	0x65	/* Read any device register */
-+#define SPINOR_OP_SPANSION_WRAR	0x71	/* Write any device register */
-+
- /* Used for Micron flashes only. */
- #define SPINOR_OP_RD_EVCR      0x65    /* Read EVCR register */
- #define SPINOR_OP_WD_EVCR      0x61    /* Write EVCR register */
+-	qspi_writel(q, q->memmap_phy + q->chip_base_addr + addr,
+-			base + QUADSPI_SFAR);
++	if (has_added_amba_base_internal(q))
++		qspi_writel(q, q->chip_base_addr + addr, base + QUADSPI_SFAR);
++	else
++		qspi_writel(q, q->memmap_phy + q->chip_base_addr + addr,
++			    base + QUADSPI_SFAR);
+ 	qspi_writel(q, QUADSPI_RBCT_WMRK_MASK | QUADSPI_RBCT_RXBRD_USEIPS,
+ 			base + QUADSPI_RBCT);
+ 	qspi_writel(q, reg | QUADSPI_MCR_CLR_RXF_MASK, base + QUADSPI_MCR);
+@@ -849,6 +868,7 @@ static const struct of_device_id fsl_qspi_dt_ids[] = {
+ 	{ .compatible = "fsl,imx7d-qspi", .data = (void *)&imx7d_data, },
+ 	{ .compatible = "fsl,imx6ul-qspi", .data = (void *)&imx6ul_data, },
+ 	{ .compatible = "fsl,ls1021a-qspi", .data = (void *)&ls1021a_data, },
++	{ .compatible = "fsl,ls2080a-qspi", .data = (void *)&ls2080a_data, },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, fsl_qspi_dt_ids);
 -- 
 2.1.0.27.g96db324
