@@ -1,57 +1,55 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 18 Aug 2016 14:10:24 +0100
-Subject: [RESEND] [PATCH 0/8] arm64: Work around for mismatched cache line size
-Message-ID: <1471525832-21209-1-git-send-email-suzuki.poulose@arm.com>
+Date: Thu, 18 Aug 2016 14:10:25 +0100
+Subject: [PATCH 1/8] arm64: Set the safe value for L1 icache policy
+In-Reply-To: <1471525832-21209-1-git-send-email-suzuki.poulose@arm.com>
+References: <1471525832-21209-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1471525832-21209-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds a work around for systems with mismatched {I,D}-cache
-line sizes. When a thread of execution gets migrated to a different CPU,
-the cache line size it had cached could be larger than that of the new
-CPU. This could cause data corruption issues. We work around this by
+Right now we use 0 as the safe value for CTR_EL0:L1Ip, which is
+not defined at the moment. The safer value for the L1Ip should be
+the weakest of the policies, which happens to be AIVIVT. While at it,
+fix the comment about safe_val.
 
- - Dynamically patching the kernel to use the smallest line size on the
-   system (from the CPU feature infrastructure)
- - Trapping the userspace access to CTR_EL0 (by clearing SCTLR_EL1.UCT) and
-   emulating it with the system wide safe value of CTR.
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/include/asm/cpufeature.h | 2 +-
+ arch/arm64/kernel/cpufeature.c      | 5 +++--
+ 2 files changed, 4 insertions(+), 3 deletions(-)
 
-The series also adds support for alternative code patching of adrp
-instructions by adjusting the PC-relative address offset to reflect
-the new PC.
-
-The series has been tested on Juno with a hack to forced enabling
-of the capability.
-
-Applies on aarch64: for-next/core. The tree is avaiable at :
-
-	git://linux-arm.org/linux-skp.git ctr-emulation
-
-Suzuki K Poulose (8):
-  arm64: Set the safe value for L1 icache policy
-  arm64: Use consistent naming for errata handling
-  arm64: Rearrange CPU errata workaround checks
-  arm64: insn: Add helpers for adrp offsets
-  arm64: alternative: Add support for patching adrp instructions
-  arm64: Introduce raw_{d,i}cache_line_size
-  arm64: Refactor sysinstr exception handling
-  arm64: Work around systems with mismatched cache line sizes
-
- arch/arm64/include/asm/assembler.h  | 45 +++++++++++++++++--
- arch/arm64/include/asm/cpufeature.h | 14 +++---
- arch/arm64/include/asm/esr.h        | 56 ++++++++++++++++++++++++
- arch/arm64/include/asm/insn.h       |  4 ++
- arch/arm64/include/asm/sysreg.h     |  1 +
- arch/arm64/kernel/alternative.c     | 13 ++++++
- arch/arm64/kernel/asm-offsets.c     |  2 +
- arch/arm64/kernel/cpu_errata.c      | 26 ++++++++++-
- arch/arm64/kernel/cpufeature.c      | 44 ++++++++++++++-----
- arch/arm64/kernel/cpuinfo.c         |  2 -
- arch/arm64/kernel/hibernate-asm.S   |  2 +-
- arch/arm64/kernel/insn.c            | 13 ++++++
- arch/arm64/kernel/relocate_kernel.S |  2 +-
- arch/arm64/kernel/smp.c             |  8 +++-
- arch/arm64/kernel/traps.c           | 87 ++++++++++++++++++++++++++-----------
- 15 files changed, 264 insertions(+), 55 deletions(-)
-
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 7099f26..f6f5e49 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -63,7 +63,7 @@ struct arm64_ftr_bits {
+ 	enum ftr_type	type;
+ 	u8		shift;
+ 	u8		width;
+-	s64		safe_val; /* safe value for discrete features */
++	s64		safe_val; /* safe value for FTR_EXACT features */
+ };
+ 
+ /*
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 62272ea..43f73e0 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -147,9 +147,10 @@ static struct arm64_ftr_bits ftr_ctr[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 1),	/* DminLine */
+ 	/*
+ 	 * Linux can handle differing I-cache policies. Userspace JITs will
+-	 * make use of *minLine
++	 * make use of *minLine.
++	 * If we have differing I-cache policies, report it as the weakest - AIVIVT.
+ 	 */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, 14, 2, 0),	/* L1Ip */
++	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, 14, 2, ICACHE_POLICY_AIVIVT),	/* L1Ip */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 10, 0),	/* RAZ */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* IminLine */
+ 	ARM64_FTR_END,
 -- 
 2.7.4
