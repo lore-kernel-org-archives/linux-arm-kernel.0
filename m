@@ -1,92 +1,289 @@
-From: kbeldan@baylibre.com (Karl Beldan)
-Date: Thu, 18 Aug 2016 11:08:14 +0000
-Subject: [PATCH v3 1/4] ARM: davinci: da8xx-dt: Add ti-aemif lookup for
- clock matching
-In-Reply-To: <20160818090437.GR1041@n2100.armlinux.org.uk>
-References: <20160816223338.20776-1-kbeldan@baylibre.com>
- <20160816223338.20776-2-kbeldan@baylibre.com>
- <9e47844e-413b-4f85-5fbc-6b73cdd7fade@ti.com>
- <20160818073319.GA18481@gobelin>
- <20160818090437.GR1041@n2100.armlinux.org.uk>
-Message-ID: <20160818110814.GA8395@gobelin>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 18 Aug 2016 12:14:20 +0100
+Subject: [PATCH V8 1/8] ACPI: I/O Remapping Table (IORT) initial support
+In-Reply-To: <20160818105549.GB20404@arm.com>
+References: <1470909998-16710-1-git-send-email-tn@semihalf.com>
+ <1470909998-16710-2-git-send-email-tn@semihalf.com>
+ <20160818105549.GB20404@arm.com>
+Message-ID: <20160818111419.GB8982@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2016 at 10:04:37AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Aug 18, 2016 at 07:33:19AM +0000, Karl Beldan wrote:
-> > Checking clk_get:
+On Thu, Aug 18, 2016 at 06:55:50PM +0800, Dennis Chen wrote:
+
+[...]
+
+> > +static struct acpi_iort_node *
+> > +iort_scan_node(enum acpi_iort_node_type type,
+> > +	       iort_find_node_callback callback, void *context)
+> > +{
+> > +	struct acpi_iort_node *iort_node, *iort_end;
+> > +	struct acpi_table_iort *iort;
+> > +	int i;
+> > +
+> > +	/* Get the first IORT node */
+> > +	iort = (struct acpi_table_iort *)iort_table;
+> >
+> Here, the same as I comments on Lorenzo's patch. If IORT is missed in
+> the firmware, then iort_table will be NULL, result in kernel panic in
+> the codes followed.
+
+The pointer is checked in the functions that are visible to
+other compilation units before calling this function:
+
+iort_msi_map_rid()
+iort_get_device_domain()
+
+I missed to check it when I added iort_node_match() and
+iort_iommu_configure() though, which makes me think that it is probably
+better to move the iort_table pointer check to iort_scan_node() so that
+it is done in one single place instead of adding it to all given
+external interfaces.
+
+Lorenzo
+
+> 
+> Thanks,
+> Dennis
+> > +	iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort,
+> > +				 iort->node_offset);
+> > +	iort_end = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
+> > +				iort_table->length);
+> > +
+> > +	for (i = 0; i < iort->node_count; i++) {
+> > +		if (WARN_TAINT(iort_node >= iort_end, TAINT_FIRMWARE_WORKAROUND,
+> > +			       "IORT node pointer overflows, bad table!\n"))
+> > +			return NULL;
+> > +
+> > +		if (iort_node->type == type) {
+> > +			if (ACPI_SUCCESS(callback(iort_node, context)))
+> > +				return iort_node;
+> > +		}
+> > +
+> > +		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
+> > +					 iort_node->length);
+> > +	}
+> > +
+> > +	return NULL;
+> > +}
+> > +
+> > +static acpi_status
+> > +iort_match_node_callback(struct acpi_iort_node *node, void *context)
+> > +{
+> > +	struct device *dev = context;
+> > +
+> > +	switch (node->type) {
+> > +	case ACPI_IORT_NODE_NAMED_COMPONENT: {
+> > +		struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+> > +		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
+> > +		struct acpi_iort_named_component *ncomp;
+> > +
+> > +		if (!adev)
+> > +			break;
+> > +
+> > +		ncomp = (struct acpi_iort_named_component *)node->node_data;
+> > +
+> > +		if (ACPI_FAILURE(acpi_get_name(adev->handle,
+> > +					       ACPI_FULL_PATHNAME, &buffer))) {
+> > +			dev_warn(dev, "Can't get device full path name\n");
+> > +		} else {
+> > +			int match;
+> > +
+> > +			match = !strcmp(ncomp->device_name, buffer.pointer);
+> > +			acpi_os_free(buffer.pointer);
+> > +
+> > +			if (match)
+> > +				return AE_OK;
+> > +		}
+> > +
+> > +		break;
+> > +	}
+> > +	case ACPI_IORT_NODE_PCI_ROOT_COMPLEX: {
+> > +		struct acpi_iort_root_complex *pci_rc;
+> > +		struct pci_bus *bus;
+> > +
+> > +		bus = to_pci_bus(dev);
+> > +		pci_rc = (struct acpi_iort_root_complex *)node->node_data;
+> > +
+> > +		/*
+> > +		 * It is assumed that PCI segment numbers maps one-to-one
+> > +		 * with root complexes. Each segment number can represent only
+> > +		 * one root complex.
+> > +		 */
+> > +		if (pci_rc->pci_segment_number == pci_domain_nr(bus))
+> > +			return AE_OK;
+> > +
+> > +		break;
+> > +	}
+> > +	}
+> > +
+> > +	return AE_NOT_FOUND;
+> > +}
+> > +
+> > +static int
+> > +iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in, u32 *rid_out)
+> > +{
+> > +	/* Single mapping does not care for input id */
+> > +	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
+> > +		if (type == ACPI_IORT_NODE_NAMED_COMPONENT ||
+> > +		    type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
+> > +			*rid_out = map->output_base;
+> > +			return 0;
+> > +		}
+> > +
+> > +		pr_warn(FW_BUG "[map %p] SINGLE MAPPING flag not allowed for node type %d, skipping ID map\n",
+> > +			map, type);
+> > +		return -ENXIO;
+> > +	}
+> > +
+> > +	if (rid_in < map->input_base ||
+> > +	    (rid_in >= map->input_base + map->id_count))
+> > +		return -ENXIO;
+> > +
+> > +	*rid_out = map->output_base + (rid_in - map->input_base);
+> > +	return 0;
+> > +}
+> > +
+> > +static struct acpi_iort_node *
+> > +iort_node_map_rid(struct acpi_iort_node *node, u32 rid_in,
+> > +		  u32 *rid_out, u8 type)
+> > +{
+> > +	u32 rid = rid_in;
+> > +
+> > +	/* Parse the ID mapping tree to find specified node type */
+> > +	while (node) {
+> > +		struct acpi_iort_id_mapping *map;
+> > +		int i;
+> > +
+> > +		if (node->type == type) {
+> > +			if (rid_out)
+> > +				*rid_out = rid;
+> > +			return node;
+> > +		}
+> > +
+> > +		if (!node->mapping_offset || !node->mapping_count)
+> > +			goto fail_map;
+> > +
+> > +		map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
+> > +				   node->mapping_offset);
+> > +
+> > +		/* Firmware bug! */
+> > +		if (!map->output_reference) {
+> > +			pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
+> > +			       node, node->type);
+> > +			goto fail_map;
+> > +		}
+> > +
+> > +		/* Do the RID translation */
+> > +		for (i = 0; i < node->mapping_count; i++, map++) {
+> > +			if (!iort_id_map(map, node->type, rid, &rid))
+> > +				break;
+> > +		}
+> > +
+> > +		if (i == node->mapping_count)
+> > +			goto fail_map;
+> > +
+> > +		node = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
+> > +				    map->output_reference);
+> > +	}
+> > +
+> > +fail_map:
+> > +	/* Map input RID to output RID unchanged on mapping failure*/
+> > +	if (rid_out)
+> > +		*rid_out = rid_in;
+> > +
+> > +	return NULL;
+> > +}
+> > +
+> > +static struct acpi_iort_node *
+> > +iort_find_dev_node(struct device *dev)
+> > +{
+> > +	struct pci_bus *pbus;
+> > +
+> > +	if (!dev_is_pci(dev))
+> > +		return iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+> > +				      iort_match_node_callback, dev);
+> > +
+> > +	/* Find a PCI root bus */
+> > +	pbus = to_pci_dev(dev)->bus;
+> > +	while (!pci_is_root_bus(pbus))
+> > +		pbus = pbus->parent;
+> > +
+> > +	return iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
+> > +			      iort_match_node_callback, &pbus->dev);
+> > +}
+> > +
+> > +void __init iort_table_detect(void)
+> > +{
+> > +	acpi_status status;
+> > +
+> > +	status = acpi_get_table(ACPI_SIG_IORT, 0, &iort_table);
+> > +	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
+> > +		const char *msg = acpi_format_exception(status);
+> > +		pr_err("Failed to get table, %s\n", msg);
+> > +	}
+> > +}
+> > diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
+> > index 85b7d07..55a84da 100644
+> > --- a/drivers/acpi/bus.c
+> > +++ b/drivers/acpi/bus.c
+> > @@ -36,6 +36,7 @@
+> >  #ifdef CONFIG_X86
+> >  #include <asm/mpspec.h>
+> >  #endif
+> > +#include <linux/iort.h>
+> >  #include <linux/pci.h>
+> >  #include <acpi/apei.h>
+> >  #include <linux/dmi.h>
+> > @@ -1186,6 +1187,7 @@ static int __init acpi_init(void)
+> >  	}
+> >  
+> >  	pci_mmcfg_late_init();
+> > +	iort_table_detect();
+> >  	acpi_scan_init();
+> >  	acpi_ec_init();
+> >  	acpi_debugfs_init();
+> > diff --git a/include/linux/iort.h b/include/linux/iort.h
+> > new file mode 100644
+> > index 0000000..cde6809
+> > --- /dev/null
+> > +++ b/include/linux/iort.h
+> > @@ -0,0 +1,30 @@
+> > +/*
+> > + * Copyright (C) 2016, Semihalf
+> > + *	Author: Tomasz Nowicki <tn@semihalf.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify it
+> > + * under the terms and conditions of the GNU General Public License,
+> > + * version 2, as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope it will be useful, but WITHOUT
+> > + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> > + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> > + * more details.
+> > + *
+> > + * You should have received a copy of the GNU General Public License along with
+> > + * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+> > + * Place - Suite 330, Boston, MA 02111-1307 USA.
+> > + */
+> > +
+> > +#ifndef __IORT_H__
+> > +#define __IORT_H__
+> > +
+> > +#include <linux/acpi.h>
+> > +
+> > +#ifdef CONFIG_IORT_TABLE
+> > +void iort_table_detect(void);
+> > +#else
+> > +static inline void iort_table_detect(void) { }
+> > +#endif
+> > +
+> > +#endif /* __IORT_H__ */
+> > -- 
+> > 1.9.1
 > > 
-> > struct clk *clk_get(struct device *dev, const char *con_id)
-> > {       
-> > 	[...]
-> > 	if (dev) {
-> > 		struct clk *__of_clk_get_by_name(struct device_node *np,
-> > 						 const char *dev_id,
-> > 						 const char *name)
-> > 		clk = __of_clk_get_by_name(dev->of_node, dev_id, con_id);
-> > 		[...]
-> > 	}
-> > 	return clk_get_sys(dev_id, con_id);
-> > }
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > > 
-> > In DT case the con_id _is_ the clock name, so the assertion "clk_get()
-> > does not look up a clock by name" would be false ?
-> 
-> Wrong.
-> 
-> 	clocks = <&provider 0>, <&provider 1>;
-> 	clock-names = "fck", "ick";
-> 
-> 	fck = clk_get(dev, "fck");
-> 
-> 	ick = clk_get(dev, "ick");
-> 
-> Works just the same.  The whole point of the string is to identify an
-> _individual_ _input_ _to_ _the_ _device_ and not a global clock name.
-> 
-
-I hope so.
-You are matching con_id with _a_ clock name, that's my point.
-
-Maybe my writing 'the clock name' instead of 'a clock name' made you
-deduce I was asserting in some way that the clock tree was addressed
-by some kind of a unique root namespace via the clock-names ?? It was
-not the case ('the' was contextual if that means anything).
-
-> Think what happens if you specify a clock name.  Where does that name
-> come from?  What if the clock is named differently on another SoC?
-> With that approach, we need to define a new set of APIs to allow a
-> device to determine the global clock name for the clock that it's
-> interested in - which is completely absurd when we've already got
-> that within clk_get().
-> 
-> The whole point of the clk API is to abstract those differences.  That's
-> why it takes a _connection_ _id_ and not a clock name.
-> 
-> I really can't understand why people keep getting this wrong in their
-> heads.  It makes no sense to me for this to take a global clock name.
-> 
-
-Nope, I am fine with that, it is a convenient scheme.
-
-> > Also, numerous commits refer to *clk_get(*, NULL) as getting an unnamed
-> > clock, although it only really is accurate to the point in DT cases.
-> 
-> Table-driven clkdev copes fine with that, and will try to locate an
-> appropriate table entry with a NULL connection ID, not matching any
-> non-NULL connection ID entry.
-> 
-
-Yes it does, my change relies on that and I was happy to be able to so.
-
-It is good to see the maintainers like Sekhar and you seizing the
-opportunity to throw light on such things.
- 
-Karl
-
-> In the DT case, it's always the first specified clock.
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
