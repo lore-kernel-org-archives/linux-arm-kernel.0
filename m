@@ -1,268 +1,53 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 18 Aug 2016 12:10:25 +0200
-Subject: [PATCH v2 1/3] mailbox: Add Platform Message-Handling-Unit variant
- driver
-In-Reply-To: <1471515027-3543-1-git-send-email-narmstrong@baylibre.com>
-References: <1471515027-3543-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1471515027-3543-2-git-send-email-narmstrong@baylibre.com>
+Date: Thu, 18 Aug 2016 12:10:53 +0200
+Subject: [PATCH 00/13] scpi: Add support for legacy SCPI protocol
+Message-ID: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Message-Handling-Unit driver for platform variants as mailbox controller.
-Actually, only the Amlogic Meson GXBB SoC MHU is supported.
+This patchset aims to support the legacy SCPI firmware implementation that was
+delivered as early technology preview for the JUNO platform.
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/mailbox/Kconfig        |  10 ++
- drivers/mailbox/Makefile       |   2 +
- drivers/mailbox/platform_mhu.c | 205 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 217 insertions(+)
- create mode 100644 drivers/mailbox/platform_mhu.c
+Finally a stable, maintained and public implementation for the SCPI protocol
+has been upstreamed part of the JUNO support and it is the recommended way
+of implementing SCP communication on ARMv8 platforms.
 
-diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
-index 97c3729..4cc93c6 100644
---- a/drivers/mailbox/Kconfig
-+++ b/drivers/mailbox/Kconfig
-@@ -15,6 +15,16 @@ config ARM_MHU
- 	  The controller has 3 mailbox channels, the last of which can be
- 	  used in Secure mode only.
- 
-+config PLATFORM_MHU
-+	tristate "Platform MHU Mailbox"
-+	depends on OF
-+	depends on HAS_IOMEM
-+	help
-+	  Say Y here if you want to build a platform specific variant MHU
-+	  controller driver.
-+	  The controller has a maximum of 3 mailbox channels, the last of
-+	  which can be used in Secure mode only.
-+
- config PL320_MBOX
- 	bool "ARM PL320 Mailbox"
- 	depends on ARM_AMBA
-diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
-index 66c38e3..ace6fed 100644
---- a/drivers/mailbox/Makefile
-+++ b/drivers/mailbox/Makefile
-@@ -6,6 +6,8 @@ obj-$(CONFIG_MAILBOX_TEST)	+= mailbox-test.o
- 
- obj-$(CONFIG_ARM_MHU)	+= arm_mhu.o
- 
-+obj-$(CONFIG_PLATFORM_MHU)	+= platform_mhu.o
-+
- obj-$(CONFIG_PL320_MBOX)	+= pl320-ipc.o
- 
- obj-$(CONFIG_OMAP2PLUS_MBOX)	+= omap-mailbox.o
-diff --git a/drivers/mailbox/platform_mhu.c b/drivers/mailbox/platform_mhu.c
-new file mode 100644
-index 0000000..e13201a
---- /dev/null
-+++ b/drivers/mailbox/platform_mhu.c
-@@ -0,0 +1,205 @@
-+/*
-+ * Copyright (C) 2016 BayLibre SAS.
-+ * Author: Neil Armstrong <narmstrong@baylibre.com>
-+ * Synchronised with arm_mhu.c from :
-+ * Copyright (C) 2013-2015 Fujitsu Semiconductor Ltd.
-+ * Copyright (C) 2015 Linaro Ltd.
-+ * Author: Jassi Brar <jaswinder.singh@linaro.org>
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation, version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/interrupt.h>
-+#include <linux/spinlock.h>
-+#include <linux/mutex.h>
-+#include <linux/delay.h>
-+#include <linux/slab.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/mailbox_controller.h>
-+
-+#define INTR_SET_OFS	0x0
-+#define INTR_STAT_OFS	0x4
-+#define INTR_CLR_OFS	0x8
-+
-+#define MHU_SEC_OFFSET	0x0
-+#define MHU_LP_OFFSET	0xc
-+#define MHU_HP_OFFSET	0x18
-+#define TX_REG_OFFSET	0x24
-+
-+#define MHU_CHANS	3
-+
-+struct platform_mhu_link {
-+	int irq;
-+	void __iomem *tx_reg;
-+	void __iomem *rx_reg;
-+};
-+
-+struct platform_mhu {
-+	void __iomem *base;
-+	struct platform_mhu_link mlink[MHU_CHANS];
-+	struct mbox_chan chan[MHU_CHANS];
-+	struct mbox_controller mbox;
-+};
-+
-+static irqreturn_t platform_mhu_rx_interrupt(int irq, void *p)
-+{
-+	struct mbox_chan *chan = p;
-+	struct platform_mhu_link *mlink = chan->con_priv;
-+	u32 val;
-+
-+	val = readl_relaxed(mlink->rx_reg + INTR_STAT_OFS);
-+	if (!val)
-+		return IRQ_NONE;
-+
-+	mbox_chan_received_data(chan, (void *)&val);
-+
-+	writel_relaxed(val, mlink->rx_reg + INTR_CLR_OFS);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static bool platform_mhu_last_tx_done(struct mbox_chan *chan)
-+{
-+	struct platform_mhu_link *mlink = chan->con_priv;
-+	u32 val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
-+
-+	return (val == 0);
-+}
-+
-+static int platform_mhu_send_data(struct mbox_chan *chan, void *data)
-+{
-+	struct platform_mhu_link *mlink = chan->con_priv;
-+	u32 *arg = data;
-+
-+	writel_relaxed(*arg, mlink->tx_reg + INTR_SET_OFS);
-+
-+	return 0;
-+}
-+
-+static int platform_mhu_startup(struct mbox_chan *chan)
-+{
-+	struct platform_mhu_link *mlink = chan->con_priv;
-+	u32 val;
-+	int ret;
-+
-+	val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
-+	writel_relaxed(val, mlink->tx_reg + INTR_CLR_OFS);
-+
-+	ret = request_irq(mlink->irq, platform_mhu_rx_interrupt,
-+			  IRQF_SHARED, "platform_mhu_link", chan);
-+	if (ret) {
-+		dev_err(chan->mbox->dev,
-+			"Unable to acquire IRQ %d\n", mlink->irq);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static void platform_mhu_shutdown(struct mbox_chan *chan)
-+{
-+	struct platform_mhu_link *mlink = chan->con_priv;
-+
-+	free_irq(mlink->irq, chan);
-+}
-+
-+static const struct mbox_chan_ops platform_mhu_ops = {
-+	.send_data = platform_mhu_send_data,
-+	.startup = platform_mhu_startup,
-+	.shutdown = platform_mhu_shutdown,
-+	.last_tx_done = platform_mhu_last_tx_done,
-+};
-+
-+static int platform_mhu_probe(struct platform_device *pdev)
-+{
-+	int i, err;
-+	struct platform_mhu *mhu;
-+	struct device *dev = &pdev->dev;
-+	struct resource *res;
-+	int platform_mhu_reg[MHU_CHANS] = {
-+		MHU_SEC_OFFSET, MHU_LP_OFFSET, MHU_HP_OFFSET
-+	};
-+
-+	/* Allocate memory for device */
-+	mhu = devm_kzalloc(dev, sizeof(*mhu), GFP_KERNEL);
-+	if (!mhu)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	mhu->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(mhu->base)) {
-+		dev_err(dev, "ioremap failed\n");
-+		return PTR_ERR(mhu->base);
-+	}
-+
-+	for (i = 0; i < MHU_CHANS; i++) {
-+		mhu->chan[i].con_priv = &mhu->mlink[i];
-+		mhu->mlink[i].irq = platform_get_irq(pdev, i);
-+		if (mhu->mlink[i].irq < 0) {
-+			dev_err(dev, "failed to get irq%d\n", i);
-+			return mhu->mlink[i].irq;
-+		}
-+		mhu->mlink[i].rx_reg = mhu->base + platform_mhu_reg[i];
-+		mhu->mlink[i].tx_reg = mhu->mlink[i].rx_reg + TX_REG_OFFSET;
-+	}
-+
-+	mhu->mbox.dev = dev;
-+	mhu->mbox.chans = &mhu->chan[0];
-+	mhu->mbox.num_chans = MHU_CHANS;
-+	mhu->mbox.ops = &platform_mhu_ops;
-+	mhu->mbox.txdone_irq = false;
-+	mhu->mbox.txdone_poll = true;
-+	mhu->mbox.txpoll_period = 1;
-+
-+	platform_set_drvdata(pdev, mhu);
-+
-+	err = mbox_controller_register(&mhu->mbox);
-+	if (err) {
-+		dev_err(dev, "Failed to register mailboxes %d\n", err);
-+		return err;
-+	}
-+
-+	dev_info(dev, "Platform MHU Mailbox registered\n");
-+	return 0;
-+}
-+
-+static int platform_mhu_remove(struct platform_device *pdev)
-+{
-+	struct platform_mhu *mhu = platform_get_drvdata(pdev);
-+
-+	mbox_controller_unregister(&mhu->mbox);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id platform_mhu_dt_ids[] = {
-+	{ .compatible = "amlogic,meson-gxbb-mhu", },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, platform_mhu_dt_ids);
-+
-+static struct platform_driver platform_mhu_driver = {
-+	.probe	= platform_mhu_probe,
-+	.remove	= platform_mhu_remove,
-+	.driver = {
-+		.name = "platform-mhu",
-+		.of_match_table	= platform_mhu_dt_ids,
-+	},
-+};
-+
-+module_platform_driver(platform_mhu_driver);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:platform-mhu");
-+MODULE_DESCRIPTION("Platform MHU Driver");
-+MODULE_AUTHOR("Neil Armstrong <narmstrong@baylibre.com>");
+The Amlogic GXBB platform is using this legacy protocol, as the RK3368 & RK3399
+platforms.
+
+This patchset add support for the legacy protocol in the arm_scpi.c file,
+avoiding code duplication.
+
+Last RFC discution tread can be found at : https://lkml.org/lkml/2016/8/9/210
+
+The first patch is here to provide vendor commands on the official SCPI protocol,
+it can be delayed to another patchset.
+
+Patches 8 & 9 are only here to demo how Rockchip support could be implemented, these
+patches should be delayed to a rockchip specific patchset.
+
+The last patch depends on the "Platform MHU" dtsi patch.
+
+Neil Armstrong (13):
+  scpi: Add vendor_send_message to enable access to vendor commands
+  scpi: Add alternative legacy structures and macros
+  scpi: Add legacy send, prepare and handle remote functions
+  scpi: Add legacy SCP functions calling legacy_scpi_send_message
+  scpi: move of_match table before probe functions
+  scpi: add priv_scpi_ops and fill legacy structure
+  scpi: ignore init_versions failure if reported not supported
+  scpi: add a vendor_msg mechanism in case the mailbox message differs
+  scpi: implement rockchip support via the vendor_msg mechanism
+  scpi: grow MAX_DVFS_OPPS to 16 entries
+  dt-bindings: Add support for Amlogic GXBB SCPI Interface
+  ARM64: dts: meson-gxbb: Add SRAM node
+  ARM64: dts: meson-gxbb: Add SCPI with cpufreq & sensors Nodes
+
+ Documentation/devicetree/bindings/arm/arm,scpi.txt |   8 +-
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  45 ++
+ drivers/firmware/arm_scpi.c                        | 455 ++++++++++++++++++++-
+ include/linux/scpi_protocol.h                      |   4 +
+ 4 files changed, 490 insertions(+), 22 deletions(-)
+
 -- 
 1.9.1
