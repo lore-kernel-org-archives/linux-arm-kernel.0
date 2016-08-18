@@ -1,35 +1,322 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 18 Aug 2016 15:11:19 +0200
-Subject: [PATCH v2 2/4] dt-bindings: arm: Add Sierra Wireless modules bindings
+Date: Thu, 18 Aug 2016 15:11:21 +0200
+Subject: [PATCH v2 4/4] ARM: dts: Add WP8548 based MangOH Green board DTS
 In-Reply-To: <1471525881-2797-1-git-send-email-narmstrong@baylibre.com>
 References: <1471525881-2797-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1471525881-2797-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1471525881-2797-5-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add support for the Sierra Wireless MangOH Green board with the
+Sierra Wireless WP8548 Module.
+
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- Documentation/devicetree/bindings/arm/swi.txt | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/swi.txt
+ arch/arm/boot/dts/Makefile                    |   3 +-
+ arch/arm/boot/dts/swi-wp8548-mangoh-green.dts | 281 ++++++++++++++++++++++++++
+ 2 files changed, 283 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/swi-wp8548-mangoh-green.dts
 
-diff --git a/Documentation/devicetree/bindings/arm/swi.txt b/Documentation/devicetree/bindings/arm/swi.txt
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index faacd52..49cb6fb 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -603,7 +603,8 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+ 	qcom-ipq8064-ap148.dtb \
+ 	qcom-msm8660-surf.dtb \
+ 	qcom-msm8960-cdp.dtb \
+-	qcom-msm8974-sony-xperia-honami.dtb
++	qcom-msm8974-sony-xperia-honami.dtb \
++	swi-wp8548-mangoh-green.dtb
+ dtb-$(CONFIG_ARCH_REALVIEW) += \
+ 	arm-realview-pb1176.dtb \
+ 	arm-realview-pb11mp.dtb \
+diff --git a/arch/arm/boot/dts/swi-wp8548-mangoh-green.dts b/arch/arm/boot/dts/swi-wp8548-mangoh-green.dts
 new file mode 100644
-index 0000000..7f36960
+index 0000000..8733583
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/swi.txt
-@@ -0,0 +1,12 @@
-+Sierra Wireless Modules device tree bindings
-+--------------------------------------------
++++ b/arch/arm/boot/dts/swi-wp8548-mangoh-green.dts
+@@ -0,0 +1,281 @@
++/*
++ * Device Tree Source for mangOH Green Board with WP8548 Module
++ *
++ * Copyright (C) 2016 BayLibre, SAS.
++ * Author : Neil Armstrong <narmstrong@baylibre.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+Supported Modules :
-+ - WP8548 : Includes MDM9615 and PM8018 in a module
++#include <dt-bindings/input/input.h>
 +
-+Sierra Wireless modules shall have the following properties :
-+  Required root node property
-+   - compatible: "swi,wp8548" for the WP8548 CF3 Module
++#include "swi-wp8548.dtsi"
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/gpio/gpio.h>
 +
-+Board compatible values:
-+  - "swi,mangoh-green-wp8548" for the mangOH green board with the WP8548 module
++/ {
++	model = "MangOH Green with WP8548 Module";
++	compatible = "swi,mangoh-green-wp8548", "swi,wp8548", "qcom,mdm9615";
++
++	aliases {
++		spi0 = &gsbi3_spi;
++		serial0 = &gsbi4_serial;
++		serial1 = &gsbi5_serial;
++		i2c0 = &gsbi5_i2c;
++		mmc0 = &sdcc1;
++	};
++
++	chosen {
++		stdout-path = "serial1:115200n8";
++	};
++};
++
++&msmgpio {
++	/* MangOH GPIO Mapping :
++	 * - 2 : GPIOEXP_INT2
++	 * - 7 : IOT1_GPIO2
++	 * - 8 : IOT0_GPIO4
++	 * - 13: IOT0_GPIO3
++	 * - 21: IOT1_GPIO4
++	 * - 22: IOT2_GPIO1
++	 * - 23: IOT2_GPIO2
++	 * - 24: IOT2_GPIO3
++	 * - 25: IOT1_GPIO1
++	 * - 32: IOT1_GPIO3
++	 * - 33: IOT0_GPIO2
++	 * - 42: IOT0_GPIO1 and SD Card Detect
++	 */
++
++	gpioext1_pins: gpioext1_pins {
++		pins {
++			pins = "gpio2";
++			function = "gpio";
++			input-enable;
++			bias-disable;
++		};
++	};
++
++	sdc_cd_pins: sdc_cd_pins {
++		pins {
++			pins = "gpio42";
++			function = "gpio";
++			drive-strength = <2>;
++			bias-pull-up;
++		};
++	};
++};
++
++&gsbi3_spi {
++	spi at 0 {
++		compatible = "swi,mangoh-iotport-spi", "spidev";
++		spi-max-frequency = <24000000>;
++		reg = <0>;
++	};
++};
++
++&gsbi5_i2c {
++	mux at 71 {
++		compatible = "nxp,pca9548";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x71>;
++
++		i2c_iot0: i2c at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0>;
++		};
++
++		i2c_iot1: i2c at 1 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <1>;
++		};
++
++		i2c_iot2: i2c at 2 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <2>;
++		};
++
++		i2c at 3 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <3>;
++
++			usbhub: hub at 8 {
++				compatible = "smsc,usb3503a";
++				reg = <0x8>;
++				connect-gpios = <&gpioext2 1 GPIO_ACTIVE_HIGH>;
++				intn-gpios = <&gpioext2 0 GPIO_ACTIVE_LOW>;
++				initial-mode = <1>;
++			};
++		};
++
++		i2c at 4 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <4>;
++
++			gpioext0: gpio at 3e {
++				/* GPIO Expander 0 Mapping :
++				 * - 0: ARDUINO_RESET_Level shift
++				 * - 1: BattChrgr_PG_N
++				 * - 2: BattGauge_GPIO
++				 * - 3: LED_ON (out active high)
++				 * - 4: ATmega_reset_GPIO
++				 * - 5: X
++				 * - 6: PCM_ANALOG_SELECT (out active high)
++				 * - 7: X
++				 * - 8: Board_rev_res1 (in)
++				 * - 9: Board_rev_res2 (in)
++				 * - 10: UART_EXP1_ENn (out active low / pull-down)
++				 * - 11: UART_EXP1_IN (out pull-down)
++				 * - 12: UART_EXP2_IN (out pull-down)
++				 * - 13: SDIO_SEL (out pull-down)
++				 * - 14: SPI_EXP1_ENn (out active low / pull-down)
++				 * - 15: SPI_EXP1_IN (out pull-down)
++				 */
++				#gpio-cells = <2>;
++				#interrupt-cells = <2>;
++				compatible = "semtech,sx1509q";
++				reg = <0x3e>;
++				interrupt-parent = <&gpioext1>;
++				interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
++
++				probe-reset;
++
++				gpio-controller;
++				interrupt-controller;
++			};
++		};
++
++		i2c at 5 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <5>;
++
++			gpioext1: gpio at 3f {
++				/* GPIO Expander 1 Mapping :
++				 * - 0: GPIOEXP_INT1
++				 * - 1: Battery detect
++				 * - 2: GPIO_SCF3_RESET
++				 * - 3: LED_CARD_DETECT_IOT0 (in)
++				 * - 4: LED_CARD_DETECT_IOT1 (in)
++				 * - 5: LED_CARD_DETECT_IOT2 (in)
++				 * - 6: UIM2_PWM_SELECT
++				 * - 7: UIM2_M2_S_SELECT
++				 * - 8: TP900
++				 * - 9: SENSOR_INT1 (in)
++				 * - 10: SENSOR_INT2 (in)
++				 * - 11: CARD_DETECT_IOT0 (in pull-up)
++				 * - 12: CARD_DETECT_IOT2 (in pull-up)
++				 * - 13: CARD_DETECT_IOT1 (in pull-up)
++				 * - 14: GPIOEXP_INT3 (in active low / pull-up)
++				 * - 15: BattChrgr_INT_N
++				 */
++				pinctrl-0 = <&gpioext1_pins>;
++				pinctrl-names = "default";
++
++				#gpio-cells = <2>;
++				#interrupt-cells = <2>;
++				compatible = "semtech,sx1509q";
++				reg = <0x3f>;
++				interrupt-parent = <&msmgpio>;
++				interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
++
++				probe-reset;
++
++				gpio-controller;
++				interrupt-controller;
++			};
++		};
++
++		i2c at 6 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <6>;
++
++			gpioext2: gpio at 70 {
++				/* GPIO Expander 2 Mapping :
++				 * - 0: USB_HUB_INTn
++				 * - 1: HUB_CONNECT
++				 * - 2: GPIO_IOT2_RESET (out active low / pull-up)
++				 * - 3: GPIO_IOT1_RESET (out active low / pull-up)
++				 * - 4: GPIO_IOT0_RESET (out active low / pull-up)
++				 * - 5: TP901
++				 * - 6: TP902
++				 * - 7: TP903
++				 * - 8: UART_EXP2_ENn (out active low / pull-down)
++				 * - 9: PCM_EXP1_ENn (out active low)
++				 * - 10: PCM_EXP1_SEL (out)
++				 * - 11: ARD_FTDI
++				 * - 12: TP904
++				 * - 13: TP905
++				 * - 14: TP906
++				 * - 15: RS232_Enable (out active high / pull-up)
++				 */
++				#gpio-cells = <2>;
++				#interrupt-cells = <2>;
++				compatible = "semtech,sx1509q";
++				reg = <0x70>;
++				interrupt-parent = <&gpioext1>;
++				interrupts = <14 IRQ_TYPE_EDGE_FALLING>;
++
++				probe-reset;
++
++				gpio-controller;
++				interrupt-controller;
++			};
++		};
++
++		i2c at 7 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <7>;
++		};
++	};
++};
++
++&sdcc1 {
++	pinctrl-0 = <&sdc_cd_pins>;
++	pinctrl-names = "default";
++	disable-wp;
++	cd-gpios = <&msmgpio 42 GPIO_ACTIVE_LOW>; /* Active low CD */
++};
 -- 
 1.9.1
