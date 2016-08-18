@@ -1,35 +1,83 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 18 Aug 2016 12:35:26 +0200
-Subject: Merging code with arch condition into head.S
-Message-ID: <CACna6rxhhD5kfa1oJzqp2dQxBhjaUzdTkNPMcm-+iNvQHD8yzA@mail.gmail.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Thu, 18 Aug 2016 11:42:05 +0100
+Subject: [PATCH v3 1/2] ARM: dts: Remove use of skeleton.dtsi from bcm283x.dtsi
+Message-ID: <1471516926-11466-1-git-send-email-ijc@hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This file is included from DTS files under arch/arm64 too (via
+broadcom/bcm2837-rpi-3-b.dts and broadcom/bcm2837.dtsi). There is a desire
+not to have skeleton.dtsi for ARM64. See commit 3ebee5a2e141 ("arm64: dts:
+kill skeleton.dtsi") for rationale for its removal.
 
-I'd like to ask for help with writing my arcm/arm/boot/compressed/head-foo.S.
+As well as the addition of #*-cells also requires adding the device_type to
+the rpi memory node explicitly.
 
-There is probably a bug in bootloader on *a lot* market-available
-devices that needs a very early fix executed during decompression. If
-we don't implement it, Broadcom Northstar devices hang in 25% of tries
-and BCM53573 devices don't boot at all.
+Note that this change results in the removal of an empty /aliases node from
+bcm2835-rpi-a.dtb and bcm2835-rpi-a-plus.dtb. I have no hardware to check
+if this is a problem or not.
 
-The problem is ARCH_BCM_5301X is used with ARCH_MULTI_V7, so we really
-shouldn't merge some extra code into head.S and execute it
-unconditionally. I'd like to ask if you can suggest some idea for a
-sane architecture check.
+It also results in some reordering of the nodes in the DTBs (the /aliases
+and /memory nodes come later). This isn't supposed to matter but, again,
+I've no hardware to check if it is true in this particular case.
 
-Ideally I'd read it from DT, but I don't think I can read machine
-"compatible" from ASM. As alternative I could try reading SoC chip ID
-from ChipCommon component which Broadcom always maps at 0x18000000.
-Would that be safe enough? Could reading from such offset do any harm
-on other devices?
+Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Frank Rowand <frowand.list@gmail.com>
+Cc: Eric Anholt <eric@anholt.net>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Lee Jones <lee@kernel.org>
+Cc: Gerd Hoffmann <kraxel@redhat.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-rpi-kernel at lists.infradead.org
+Cc: arm at kernel.org
+---
+v2: New patch to avoid needing to add skeleton.dtsi to arch/arm64
+v3: Collected tags
+---
+ arch/arm/boot/dts/bcm2835-rpi.dtsi | 1 +
+ arch/arm/boot/dts/bcm283x.dtsi     | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-Maybe you have some better ideas?
-
-I was looking for similar solutions in the kernel, but I found none.
-There are e.g. head-sa1100.S and head-sharpsl.S but they seem to be
-used on architectures that don't use ARCH_MULTI_V7.
-
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index caf2707..e9b47b2 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -2,6 +2,7 @@
+ 
+ / {
+ 	memory {
++		device_type = "memory";
+ 		reg = <0 0x10000000>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index b982522..445624a 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -2,7 +2,6 @@
+ #include <dt-bindings/clock/bcm2835.h>
+ #include <dt-bindings/clock/bcm2835-aux.h>
+ #include <dt-bindings/gpio/gpio.h>
+-#include "skeleton.dtsi"
+ 
+ /* This include file covers the common peripherals and configuration between
+  * bcm2835 and bcm2836 implementations, leaving the CPU configuration to
+@@ -13,6 +12,8 @@
+ 	compatible = "brcm,bcm2835";
+ 	model = "BCM2835";
+ 	interrupt-parent = <&intc>;
++	#address-cells = <1>;
++	#size-cells = <1>;
+ 
+ 	chosen {
+ 		bootargs = "earlyprintk console=ttyAMA0";
 -- 
-Rafa?
+2.8.1
