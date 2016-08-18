@@ -1,86 +1,70 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Thu, 18 Aug 2016 12:19:41 +0200
-Subject: [PULL 00/12] KVM/ARM Fixes for v4.8-rc3
-In-Reply-To: <20160817193859.15726-1-christoffer.dall@linaro.org>
-References: <20160817193859.15726-1-christoffer.dall@linaro.org>
-Message-ID: <3b5c3520-da99-e255-6961-2d2706f39c81@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 18 Aug 2016 11:21:13 +0100
+Subject: [PATCH v2 0/2] extend kexec_file_load system call
+In-Reply-To: <1470956638-3589-1-git-send-email-bauerman@linux.vnet.ibm.com>
+References: <1470956638-3589-1-git-send-email-bauerman@linux.vnet.ibm.com>
+Message-ID: <20160818102112.GB27045@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Aug 11, 2016 at 08:03:56PM -0300, Thiago Jung Bauermann wrote:
+> This patch series is from AKASHI Takahiro. I will use it in my next
+> version of the kexec_file_load implementation for powerpc, so I am
+> rebasing it on top of v4.8-rc1.
 
+[...]
 
-On 17/08/2016 21:38, Christoffer Dall wrote:
-> Hi Paolo and Radim,
+> Original cover letter:
 > 
-> Here's a set of KVM/ARM fixes for v4.8-rc3 or as soon as you can make
-> it.  They address:
->  - ITS init issues
->  - ITS error handling issues
->  - ITS IRQ leakage fix
->  - Plug a couple of ITS race conditions
->  - An erratum workaround for timers
->  - Some removal of misleading use of errors and comments
->  - A fix for GICv3 on 32-bit guests
+> Device tree blob must be passed to a second kernel on DTB-capable
+> archs, like powerpc and arm64, but the current kernel interface
+> lacks this support.
 > 
-> Note that the patch previously submitted 'KVM: arm64: vgic-its: Grab
-> kvm->lock when reading kvm->devices', was dropped from this series
-> because we were already holding the kvm->lock in the call path to the
-> ITS code.
+> This patch extends kexec_file_load system call by adding an extra
+> argument to this syscall so that an arbitrary number of file descriptors
+> can be handed out from user space to the kernel.
 > 
-> The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+> See the background [1].
 > 
->   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+> Please note that the new interface looks quite similar to the current
+> system call, but that it won't always mean that it provides the "binary
+> compatibility."
 > 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git kvm-arm-for-v4.8-rc3
-> 
-> for you to fetch changes up to f7f6f2d94f0027242ddfd665289b107a873fde43:
-> 
->   arm64: KVM: report configured SRE value to 32-bit world (2016-08-17 12:46:23 +0200)
-> 
-> Thanks,
-> -Christoffer
-> 
-> ----------------------------------------------------------------
-> Andre Przywara (4):
->       KVM: arm64: ITS: return 1 on successful MSI injection
->       KVM: arm64: ITS: move ITS registration into first VCPU run
->       KVM: arm64: check for ITS device on MSI injection
->       KVM: arm64: ITS: avoid re-mapping LPIs
-> 
-> Christoffer Dall (4):
->       KVM: arm64: vgic-its: Handle errors from vgic_add_lpi
->       KVM: arm64: vgic-its: Plug race in vgic_put_irq
->       KVM: arm64: vgic-its: Make updates to propbaser/pendbaser atomic
->       KVM: arm/arm64: Change misleading use of is_error_pfn
-> 
-> Marc Zyngier (2):
->       arm64: Document workaround for Cortex-A72 erratum #853709
->       KVM: arm/arm64: timer: Workaround misconfigured timer interrupt
-> 
-> Vladimir Murzin (2):
->       arm64: KVM: remove misleading comment on pmu status
->       arm64: KVM: report configured SRE value to 32-bit world
-> 
->  Documentation/arm64/silicon-errata.txt |   1 +
->  arch/arm/kvm/mmu.c                     |   2 +-
->  arch/arm64/kvm/hyp/switch.c            |   2 +-
->  arch/arm64/kvm/sys_regs.c              |  10 +--
->  include/linux/irqchip/arm-gic-v3.h     |   1 +
->  virt/kvm/arm/arch_timer.c              |  11 ++-
->  virt/kvm/arm/vgic/vgic-its.c           | 158 ++++++++++++++++++++++++---------
->  virt/kvm/arm/vgic/vgic-mmio-v3.c       |  26 +++---
->  virt/kvm/arm/vgic/vgic-v3.c            |   8 ++
->  virt/kvm/arm/vgic/vgic.c               |  10 +--
->  virt/kvm/arm/vgic/vgic.h               |   6 ++
->  11 files changed, 164 insertions(+), 71 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> [1] http://lists.infradead.org/pipermail/kexec/2016-June/016276.html
 
-Pulled, thanks.
+As with the original posting, I have a number of concerns, and I'm
+really not keen on this.
 
-Paolo
+* For typical usecases, I do not believe that this is necessary (at
+  least for arm64), and generally do not believe that it should be
+  necessary for a user to manipulate the DTB (much like the user need
+  not manipulate ACPI tables or other FW data structures).
+
+  Other than (potentially) the case of Linux as a flashed-in bootloader,
+  I don't see a compelling case for modifying the DTB that could not be
+  accomplished in-kernel. For that case, if truly necessary, I think
+  that we can get away with something simpler.
+
+* This series adds architecture-specific hooks, but doesn't define what
+  the architecture code is expected to do. For example, what is the
+  format of the partial DTB? Is it formatted as an overlay, or a regular
+  DTB that is expected to be merged somehow?
+
+  I'm afraid that the scope is unbound, and we'll see requests to
+  whitelist/blacklist arbitrary nodes or properties in arch code. This
+  goes against the original simple design of kexec_file_load. It also
+  implies that we're going to have varied architecture-specific
+  semantics, and that arch code might not consistently check all that it
+  should.
+  
+* Further, I believe that this offers a lot of scope for unintentionally
+  allowing certain modifications to the DTB that we do not want, and
+  avoiding that in general is very tricky. e.g. if we allow the
+  insertion or modification of nodes, how do we prevent phandle target
+  hijacking?
+
+I really don't think that this is a good idea. Please consider this a
+NAK from my end.
+
+Thanks,
+Mark.
