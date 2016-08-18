@@ -1,35 +1,84 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 18 Aug 2016 11:47:16 +0100
-Subject: [PATCH] arm: remove traces of perf_ops_bp
-In-Reply-To: <20160815094649.GA13262@arm.com>
-References: <1470934766-4009-1-git-send-email-mark.rutland@arm.com>
- <20160815094649.GA13262@arm.com>
-Message-ID: <20160818104716.GD27045@leverpostej>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 18 Aug 2016 12:11:02 +0200
+Subject: [PATCH 09/13] scpi: implement rockchip support via the vendor_msg
+ mechanism
+In-Reply-To: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
+References: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1471515066-3626-10-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2016 at 10:46:50AM +0100, Will Deacon wrote:
-> On Thu, Aug 11, 2016 at 05:59:26PM +0100, Mark Rutland wrote:
-> > Even though perf_ops_bp was removed/renamed back in commit
-> > b0a873ebbf87bf38 ("perf: Register PMU implementations"), as part of
-> > v2.6.37, its definition still lives on in some arch headers.
-> > 
-> > This patch removes the vestigal definition from arm.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Russell King <linux@armlinux.org.uk>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/include/asm/hw_breakpoint.h | 1 -
-> >  1 file changed, 1 deletion(-)
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> Please put this into the patch system -- I'll pick the other one up for
-> arm64.
+In order to support the Rockchip legacy procotol, implement the vendor
+mailbox specific functions and add ops to the of_match table.
 
-Cheers.
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ drivers/firmware/arm_scpi.c | 43 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-I've dropped this in the patch system as 8598/1.
-
-Mark.
+diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+index 275feef..d73db7c 100644
+--- a/drivers/firmware/arm_scpi.c
++++ b/drivers/firmware/arm_scpi.c
+@@ -455,6 +455,37 @@ static int legacy_scpi_get_chan(u8 cmd)
+ 	return 0;
+ }
+ 
++/* Rockchip SoCs needs a special structure as a message */
++
++struct rockchip_scpi_xfer {
++	u32 cmd;
++	int rx_size;
++};
++
++static int rockchip_init(struct device *dev, struct scpi_chan *chan)
++{
++	chan->vendor_data = devm_kmalloc(dev,
++					 sizeof(struct rockchip_scpi_xfer),
++					 GFP_KERNEL);
++	if (!chan->vendor_data)
++		return -ENOMEM;
++
++	return 0;
++}
++
++static int rockchip_prepare(struct scpi_chan *chan)
++{
++	struct scpi_xfer *msg = chan->t;
++	struct rockchip_scpi_xfer *xfer = chan->vendor_data;
++
++	xfer->cmd = msg->cmd;
++	xfer->rx_size = msg->rx_len;
++
++	msg->vendor_msg = xfer;
++
++	return 0;
++}
++
+ static struct scpi_xfer *get_scpi_xfer(struct scpi_chan *ch)
+ {
+ 	struct scpi_xfer *t;
+@@ -1026,9 +1057,21 @@ static const struct priv_scpi_ops scpi_legacy_ops = {
+ 	.scpi_ops = &legacy_scpi_ops,
+ };
+ 
++static const struct priv_scpi_ops scpi_rockchip_ops = {
++	.init = rockchip_init,
++	.prepare = rockchip_prepare,
++	.handle_remote_msg = legacy_scpi_handle_remote_msg,
++	.tx_prepare = legacy_scpi_tx_prepare,
++	.init_versions = legacy_scpi_init_versions,
++	.dvfs_get_info = legacy_scpi_dvfs_get_info,
++	.scpi_ops = &legacy_scpi_ops,
++};
++
+ static const struct of_device_id scpi_of_match[] = {
+ 	{.compatible = "arm,scpi"},
+ 	{.compatible = "amlogic,meson-gxbb-scpi", .data = &scpi_legacy_ops},
++	{.compatible = "rockchip,rk3368-scpi", .data = &scpi_rockchip_ops},
++	{.compatible = "rockchip,rk3399-scpi", .data = &scpi_rockchip_ops},
+ 	{},
+ };
+ 
+-- 
+1.9.1
