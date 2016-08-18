@@ -1,23 +1,60 @@
-From: clarence.lynch@koolcushions.com (FedEx International Economy)
-Date: Thu, 18 Aug 2016 21:54:37 +0000
-Subject: Shipment delivery problem #00598802
-Message-ID: <f19cbb04372c6ae60afd3353c323fef0@koolcushions.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 19 Aug 2016 00:03:01 +0200
+Subject: [PATCH] soc: rockchip: power-domain: Don't (incorrectly) set
+ rk3399 up/down counts
+In-Reply-To: <1471546561-4459-1-git-send-email-dianders@chromium.org>
+References: <1471546561-4459-1-git-send-email-dianders@chromium.org>
+Message-ID: <86565478.t9HNV2EDZM@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Customer,
+Hi Doug,
 
-This is to confirm that one or more of your parcels has been shipped.
-Shipment Label is attached to this email.
+Am Donnerstag, 18. August 2016, 11:56:01 CEST schrieb Douglas Anderson:
+> On rk3288 it was important that powerdown and powerup counts for the
+> CPU/GPU in the kernel because:
 
-Thanks and best regards,
-Clarence Lynch,
-FedEx Station Manager.
+somehow this sentence seems to miss some verb or so :-)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 00598802.zip
-Type: application/zip
-Size: 6253 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160818/442ccd7e/attachment.zip>
+> * The power on default was crazy long.
+> * We couldn't rely on the firmware to set this up because really this
+>   wasn't the firmware's job--the kernel was the only one that really
+>   cared about bringing up / down CPUs and the GPU and doing suspend /
+>   resume (which involves bringing up / down CPUs).
+> 
+> On newer ARM systems (like rk3399) ARM Trusted Firmware is in charge of
+> bringing up and down the CPUs and it really should be in charge of
+> setting all these counts right.  After all ATF is in charge of suspend /
+> resume and CPU up / down.  Let's get out of the way and let ATF do its
+> job.
+> 
+> A few other motivations for doing this:
+> * Depending on another configuration (PMU_24M_EN_CFG) these counts can
+>   be either in 24M or 32k cycles.  Thus, though ATF isn't really so
+>   involved in bringing up the GPU, ATF should probably manage the counts
+>   for everything so it can also manage the 24M / 32k choice.
+> * It turns out that (right now) 24M mode is broken on rk3399 and not
+>   being used.  That means that the count the kernel was programming
+>   in (24) was not 1 us (which it seems was intended) but was actually
+>   .75 ms
+> * On rk3399 there are actually 2 separate registers for setting CPU
+>   up/down time plus 1 register for GPU up/down time.  The curent kernel
+>   code actually was putting the register for the "little" cores in the
+>   "CPU" slot and the register for the "big" cores in the "GPU" slot.  It
+>   was never initting the GPU counts.
+> 
+> Note: this change assumes that ATF will actually set these values at
+> boot, as I'm proposing in <http://crosreview.com/372381>.
+
+I'd hope to see a link to an ATF github pull request here :-)
+But I guess that simply needs some more discussion on your side.
+
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+
+change itself looks good to me.
+
+So I guess we'll just need to wait for the counterpart to land in the ATF or 
+do you know if the poweron-defaults are somewhat sane?
+
+
+Heiko
