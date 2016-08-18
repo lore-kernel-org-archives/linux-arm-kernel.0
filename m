@@ -1,192 +1,23 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 18 Aug 2016 16:30:59 -0500
-Subject: [PATCH] soc: ti: wkup_m3_ipc: switch to using remoteproc OF
- infrastructure
-In-Reply-To: <CAL_Jsq+aOd-FqaKNtmDESw--pdxbWMuOzv+KXf-hhX+oU94CdQ@mail.gmail.com>
-References: <20160812003529.519-1-s-anna@ti.com> <20160812110201.GD25844@dell>
- <55d90506-eb1b-c8f9-02b5-8484b9a4babd@ti.com>
- <20160812164335.GG26240@tuxbot>
- <CAL_Jsq+aOd-FqaKNtmDESw--pdxbWMuOzv+KXf-hhX+oU94CdQ@mail.gmail.com>
-Message-ID: <dea62d2e-2935-ff91-967a-e8dee469543d@ti.com>
+From: clarence.lynch@koolcushions.com (FedEx International Economy)
+Date: Thu, 18 Aug 2016 21:54:37 +0000
+Subject: Shipment delivery problem #00598802
+Message-ID: <f19cbb04372c6ae60afd3353c323fef0@koolcushions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Dear Customer,
 
-On 08/16/2016 09:54 AM, Rob Herring wrote:
-> On Fri, Aug 12, 2016 at 11:43 AM, Bjorn Andersson
-> <bjorn.andersson@linaro.org> wrote:
->> On Fri 12 Aug 09:00 PDT 2016, Suman Anna wrote:
->>
->>> On 08/12/2016 06:02 AM, Lee Jones wrote:
->>>> On Thu, 11 Aug 2016, Suman Anna wrote:
->>>>
->>>>> The remoteproc framework has been enhanced recently to provide new
->>>>> OF API to retrieve a remoteproc handle by client drivers through a
->>>>> standard 'rprocs' property in client nodes. The wkup_m3_ipc driver
->>>>> has been using a custom 'ti,rproc' property until now, switch this
->>>>> to use this new OF infrastructure. The wkup_m3_ipc driver has been
->>>>> fixed up to provide backward compatibility for older DTBs by
->>>>> replacing the older property with the standard newer property.
->>>>>
->>>>> The wkup_m3_ipc binding has also been updated accordingly.
->>>>>
->>>>> Signed-off-by: Suman Anna <s-anna@ti.com>
->>>>> ---
->>>>> This patch is based on the discussion [1] for introducing new standard
->>>>> OF API in remoteproc core series [2] and the exporting of couple of
->>>>> functions in OF base code [3].
->>>>>
->>>>> With this in place, the remoteproc core need not be looking for the
->>>>> TI specific property anymore. I will submit the DTS changes once this
->>>>> makes it to mainline.
->>>>>
->>>>> regards
->>>>> Suman
->>>>>
->>>>> [1] https://patchwork.kernel.org/patch/9237767/
->>>>> [2] http://marc.info/?l=linux-kernel&m=146894341701010&w=2
->>>>> [3] https://patchwork.kernel.org/patch/9276181/
->>>>>
->>>>>  .../devicetree/bindings/soc/ti/wkup_m3_ipc.txt     |  9 ++++++--
->>>>>  drivers/soc/ti/wkup_m3_ipc.c                       | 26 +++++++++++++++++++++-
->>>>>  2 files changed, 32 insertions(+), 3 deletions(-)
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt b/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
->>>>> index 401550487ed6..2ea7dd91acff 100644
->>>>> --- a/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
->>>>> +++ b/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
->>>>> @@ -23,12 +23,17 @@ Required properties:
->>>>>                    with the Wakeup M3 processor
->>>>>  - interrupts:             Contains the interrupt information for the wkup_m3
->>>>>                    interrupt that signals the MPU.
->>>>> -- ti,rproc:               phandle to the wkup_m3 rproc node so the IPC driver
->>>>> +- rprocs:         phandle to the wkup_m3 rproc node so the IPC driver
->>>>>                    can boot it.
->>>>>  - mboxes:         phandles used by IPC framework to get correct mbox
->>>>>                    channel for communication. Must point to appropriate
->>>>>                    mbox_wkupm3 child node.
->>>>>
->>>>> +Deprecated properties:
->>>>> +----------------------
->>>>> +- ti,rproc:               This property has been replaced with the "rprocs"
->>>>> +                  property.
->>>>> +
->>>>>  Example:
->>>>>  --------
->>>>>  /* AM33xx */
->>>>> @@ -48,7 +53,7 @@ Example:
->>>>>                            compatible = "ti,am3352-wkup-m3-ipc";
->>>>>                            reg = <0x1324 0x24>;
->>>>>                            interrupts = <78>;
->>>>> -                          ti,rproc = <&wkup_m3>;
->>>>> +                          rprocs = <&wkup_m3>;
->>>>>                            mboxes = <&mailbox &mbox_wkupm3>;
->>>>>                    };
->>>>>
->>>>> diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
->>>>> index 8823cc81ae45..86085f9bf6a8 100644
->>>>> --- a/drivers/soc/ti/wkup_m3_ipc.c
->>>>> +++ b/drivers/soc/ti/wkup_m3_ipc.c
->>>>> @@ -1,7 +1,7 @@
->>>>>  /*
->>>>>   * AMx3 Wkup M3 IPC driver
->>>>>   *
->>>>> - * Copyright (C) 2015 Texas Instruments, Inc.
->>>>> + * Copyright (C) 2015-2016 Texas Instruments, Inc.
->>>>>   *
->>>>>   * Dave Gerlach <d-gerlach@ti.com>
->>>>>   *
->>>>> @@ -390,6 +390,8 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
->>>>>    struct resource *res;
->>>>>    struct task_struct *task;
->>>>>    struct wkup_m3_ipc *m3_ipc;
->>>>> +  struct property *nprop, *oprop;
->>>>> +  const char nprop_name[] = "rprocs";
->>>>>
->>>>>    m3_ipc = devm_kzalloc(dev, sizeof(*m3_ipc), GFP_KERNEL);
->>>>>    if (!m3_ipc)
->>>>> @@ -415,6 +417,28 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
->>>>>            return ret;
->>>>>    }
->>>>>
->>>>> +  /* provide compatibility for older DTBs using ti,rproc property */
->>>>> +  nprop = of_find_property(dev->of_node, "rprocs", NULL);
->>>>> +  if (!nprop) {
->>>>> +          oprop = of_find_property(dev->of_node, "ti,rproc", NULL);
->>>>> +          if (!oprop) {
->>>>> +                  dev_err(&pdev->dev, "node is missing ti,rproc property\n");
->>>>> +                  return -ENODEV;
->>>>> +          }
->>>>> +
->>>>> +          nprop = kzalloc(sizeof(*nprop) + sizeof(nprop_name),
->>>>> +                          GFP_KERNEL);
->>>>> +          if (!nprop)
->>>>> +                  return -ENOMEM;
->>>>> +
->>>>> +          nprop->name = (char *)nprop + sizeof(*nprop);
->>>>> +          snprintf(nprop->name, sizeof(nprop_name), nprop_name);
->>>>> +          nprop->value = oprop->value;
->>>>> +          nprop->length = oprop->length;
->>>>> +          of_update_property(dev->of_node, nprop);
->>>>> +          of_remove_property(dev->of_node, oprop);
->>>>> +  }
->>>>> +
->>>>
->>>> +1 for getting the functionality out of core code.
->>>>
->>>> -100 for having to jump though all these hoops.
->>>>
->>>> If you are going to keep all of this, I would at least tuck it away in
->>>> a header file or something.
->>>
->>> Hiding it somewhere else won't make much of a difference though. If this
->>> is such an eyesore, we still can do this cleanly without jumping through
->>> these hoops. I would say this is a direct result of the removal of the
->>> rproc_get_by_phandle API in Patch 2 of your OF remoteproc series [2].
->>> That API is still an agnostic API. We can just add the of_rproc_get()
->>> convenience helper in your Patch 1 and drop patch 2 completely with no
->>> references to ti,rproc in the core code in the first place. The other
->>> option, if we do want to remove that API is to add an additional
->>> property name argument (NULL to mean "rprocs") to
->>> of_rproc_get_by_index(), and it can be hidden away under of_rproc_get()
->>> API - which is what I am expecting most of the new client users would
->>> use anyway.
->>>
->>> Once "rprocs" hits mainline, I will definitely switch over the
->>> wkup_m3_ipc nodes to use that standard property and can fix this driver
->>> independently.
->>>
->>
->> We're stuck with this problem all over the place, as the world continues
->> to evolve we will have issues with DT being static. This has been
->> discussed many times before and the suggested solution is always what
->> you implemented here - make the code deal with both versions, preferably
->> by patching.
->>
->> The fact that you had to export the of_ operations indicates that no-one
->> has tried this before and I'm happy you did. I'm however not happy about
->> the size of the chunk of code it takes to do this dance.
->>
->> I think for this to be practical we need to provide higher level
->> operations for DT modification - in this case a of_rename_property().
->>
->> @Rob, any comments on this?
-> 
-> I agree. Pantelis submitted some helpers in this area a while back
-> (for the changeset API IIRC). I believe they were mostly fine, but
-> needed some users.
-> 
+This is to confirm that one or more of your parcels has been shipped.
+Shipment Label is attached to this email.
 
-Is this the series you are talking about?
-http://marc.info/?l=devicetree&m=146341689512653&w=2
+Thanks and best regards,
+Clarence Lynch,
+FedEx Station Manager.
 
-It looks like that series is effective only when OF_DYNAMIC is enabled.
-Probably a dumb question, but is this limited to DT Overlays? This
-particular usage is a one-time change (first-time module is insmod'd)
-mainly to provide compatibility for older DTBs, thereafter we wouldn't
-be required to make any changes. It is definitely not a bulk update and
-we don't want to unroll the changes even if we removed the module.
-
-regards
-Suman
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 00598802.zip
+Type: application/zip
+Size: 6253 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160818/442ccd7e/attachment.zip>
