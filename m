@@ -1,29 +1,71 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Aug 2016 15:22:46 +0100
-Subject: [PATCH] ARM: mm: pull asm/memory.h explicitly
-In-Reply-To: <1471450634-45566-1-git-send-email-vladimir.murzin@arm.com>
-References: <1471450634-45566-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20160818142246.GW1041@n2100.armlinux.org.uk>
+Date: Thu, 18 Aug 2016 15:24:59 +0100
+Subject: [PATCH 1/1] ARM: dma: fix dma_max_pfn()
+In-Reply-To: <1471435517-7840-2-git-send-email-rogerq@ti.com>
+References: <1471435517-7840-1-git-send-email-rogerq@ti.com>
+ <1471435517-7840-2-git-send-email-rogerq@ti.com>
+Message-ID: <20160818142459.GX1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2016 at 05:17:14PM +0100, Vladimir Murzin wrote:
-> Commit d78114554939a (""ARM: 8512/1: proc-v7.S: Adjust stack address when
-> XIP_KERNEL"") introduced a macro which lives under asm/memory.h.
-> Unfortunately, for MMU-less systems (like R-class) it leads to build failure:
+On Wed, Aug 17, 2016 at 03:05:17PM +0300, Roger Quadros wrote:
+> Since commit 6ce0d2001692 ("ARM: dma: Use dma_pfn_offset for dma address translation"),
+> dma_to_pfn() already returns the PFN with the physical memory start offset
+> so we don't need to add it again.
 > 
-> arch/arm/mm/proc-v7.S: Assembler messages:
-> arch/arm/mm/proc-v7.S:538: Error: unrecognised relocation suffix
-> make[1]: *** [arch/arm/mm/proc-v7.o] Error 1
-> make: *** [arch/arm/mm] Error 2
+> This fixes USB mass storage lock-up problem on systems that can't do DMA
+> over the entire physical memory range (e.g.) Keystone 2 systems with 4GB RAM
+> can only do DMA over the first 2GB. [K2E-EVM].
 > 
-> since it is implicitly pulled via asm/pgtable.h for MMU capable systems only.
+> What happens there is that without this patch SCSI layer sets a wrong
+> bounce buffer limit in scsi_calculate_bounce_limit() for the USB mass
+> storage device. dma_max_pfn() evaluates to 0x8fffff and bounce_limit
+> is set to 0x8fffff000 whereas maximum DMA'ble physical memory on Keystone 2
+> is 0x87fffffff. This results in non DMA'ble pages being given to the
+> USB controller and hence the lock-up.
 > 
-> To fix it include asm/memory.h explicitly.
-> 
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> NOTE: in the above case, USB-SCSI-device's dma_pfn_offset was showing as 0.
+> This should have really been 0x780000 as on K2e, LOWMEM_START is 0x80000000
+> and HIGHMEM_START is 0x800000000. DMA zone is 2GB so dma_max_pfn should be
+> 0x87ffff. The incorrect dma_pfn_offset for the USB storage device is because
+> USB devices are not correctly inheriting the dma_pfn_offset from the
+> USB host controller. This will be fixed by a separate patch.
 
-Looks fine, thanks.
+I'd like to hear from Santosh, as the author of the original change.
+The original commit doesn't mention which platform it was intended for
+or what the problem was, which would've been helpful.
+
+> 
+> Fixes: 6ce0d2001692 ("ARM: dma: Use dma_pfn_offset for dma address translation")
+> Cc: stable at vger.kernel.org
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Reported-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>  arch/arm/include/asm/dma-mapping.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index d009f79..bf02dbd 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -111,7 +111,7 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+>  /* The ARM override for dma_max_pfn() */
+>  static inline unsigned long dma_max_pfn(struct device *dev)
+>  {
+> -	return PHYS_PFN_OFFSET + dma_to_pfn(dev, *dev->dma_mask);
+> +	return dma_to_pfn(dev, *dev->dma_mask);
+>  }
+>  #define dma_max_pfn(dev) dma_max_pfn(dev)
+>  
+> -- 
+> 2.7.4
+> 
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
