@@ -1,145 +1,270 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 18 Aug 2016 20:02:17 +0200
-Subject: [PATCH v2 3/3] ARM: dts: sun6i: Add new dts file for tablets using
- the inet-q972 PCB
+Date: Thu, 18 Aug 2016 20:02:16 +0200
+Subject: [PATCH v2 2/3] ARM: dts: sun6i: Add sun6i-reference-design-tablet.dtsi
 In-Reply-To: <1471543337-6938-1-git-send-email-hdegoede@redhat.com>
 References: <1471543337-6938-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1471543337-6938-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <1471543337-6938-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a dts file for tablets using the generic inet-q972 PCB.
+Just like with a13/a23/a33 most a31 tablets are derived from the same
+reference design. Add a .dtsi file with all the common bits to avoid
+endless copy and pasting of these.
 
-Tablets with this PCB feature a mini-hdmi output, micro-usb usb-host,
-micro-usb usb-otg, 3.5mm headphone jack, a micro sd slot,
-(mini) power-barrel and an usb wifi module.
-
-This has been tested on a 9.7" 1024x768 qware qw tb9718-qhd tablet.
+The sun6i-reference-design-tablet.dtsi this commit adds is a copy
+of sun6i-a31s-colorfly-e708-q1.dts with a few tablet specific bits
+removed / left in sun6i-a31s-colorfly-e708-q1.dts.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/Makefile                 |   1 +
- arch/arm/boot/dts/sun6i-a31s-inet-q972.dts | 100 +++++++++++++++++++++++++++++
- 2 files changed, 101 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun6i-a31s-inet-q972.dts
+ arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts  | 147 +--------------------
+ ...8-q1.dts => sun6i-reference-design-tablet.dtsi} |  26 +---
+ 2 files changed, 2 insertions(+), 171 deletions(-)
+ copy arch/arm/boot/dts/{sun6i-a31s-colorfly-e708-q1.dts => sun6i-reference-design-tablet.dtsi} (90%)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 498ebfd..5d984c9 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -743,6 +743,7 @@ dtb-$(CONFIG_MACH_SUN6I) += \
- 	sun6i-a31-mele-a1000g-quad.dtb \
- 	sun6i-a31s-colorfly-e708-q1.dtb \
- 	sun6i-a31s-cs908.dtb \
-+	sun6i-a31s-inet-q972.dtb \
- 	sun6i-a31s-primo81.dtb \
- 	sun6i-a31s-sina31s.dtb \
- 	sun6i-a31s-sinovoip-bpi-m2.dtb \
-diff --git a/arch/arm/boot/dts/sun6i-a31s-inet-q972.dts b/arch/arm/boot/dts/sun6i-a31s-inet-q972.dts
-new file mode 100644
-index 0000000..e584e6b
---- /dev/null
-+++ b/arch/arm/boot/dts/sun6i-a31s-inet-q972.dts
-@@ -0,0 +1,100 @@
-+/*
-+ * Copyright 2016 Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun6i-a31s.dtsi"
+diff --git a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts b/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
+index 34d8710..882a4d8 100644
+--- a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
++++ b/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
+@@ -42,32 +42,11 @@
+ 
+ /dts-v1/;
+ #include "sun6i-a31s.dtsi"
+-#include "sunxi-common-regulators.dtsi"
+-
+-#include <dt-bindings/gpio/gpio.h>
+-#include <dt-bindings/input/input.h>
+-#include <dt-bindings/pinctrl/sun4i-a10.h>
 +#include "sun6i-reference-design-tablet.dtsi"
-+
-+/ {
-+	model = "iNet Q972 tablet";
-+	compatible = "inet-tek,inet-q972", "allwinner,sun6i-a31s";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+
-+	ft5406ee8: touchscreen at 38 {
-+		compatible = "edt,edt-ft5406";
-+		reg = <0x38>;
-+		interrupt-parent = <&pio>;
-+		interrupts = <0 3 IRQ_TYPE_LEVEL_HIGH>; /* PA3 */
-+		touchscreen-size-x = <768>;
-+		touchscreen-size-y = <1024>;
-+		touchscreen-swapped-x-y;
-+	};
-+};
-+
-+&lradc {
-+	vref-supply = <&reg_aldo3>;
-+	status = "okay";
-+
-+	button at 200 {
-+		label = "Volume Down";
-+		linux,code = <KEY_VOLUMEDOWN>;
-+		channel = <0>;
-+		voltage = <200000>;
-+	};
-+
-+	button at 900 {
-+		label = "Volume Up";
-+		linux,code = <KEY_VOLUMEUP>;
-+		channel = <0>;
-+		voltage = <900000>;
-+	};
-+
-+	button at 1200 {
-+		label = "Back";
-+		linux,code = <KEY_BACK>;
-+		channel = <0>;
-+		voltage = <1200000>;
-+	};
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
+ 
+ / {
+ 	model = "Colorfly E708 Q1 tablet";
+ 	compatible = "colorfly,e708-q1", "allwinner,sun6i-a31s";
+-
+-	aliases {
+-		serial0 = &uart0;
+-	};
+-
+-	chosen {
+-		stdout-path = "serial0:115200n8";
+-	};
+-};
+-
+-&cpu0 {
+-	cpu-supply = <&reg_dcdc3>;
+-};
+-
+-&ehci0 {
+-	/* rtl8188etv wifi is connected here */
+-	status = "okay";
+ };
+ 
+ &lradc {
+@@ -82,136 +61,12 @@
+ 	};
+ };
+ 
+-&mmc0 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_e708_q1>;
+-	vmmc-supply = <&reg_dcdc1>;
+-	bus-width = <4>;
+-	cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
+-	cd-inverted;
+-	status = "okay";
+-};
+-
+-&pio {
+-	mmc0_cd_pin_e708_q1: mmc0_cd_pin at 0 {
+-		allwinner,pins = "PA8";
+-		allwinner,function = "gpio_in";
+-		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+-	};
+-
+-	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+-		allwinner,pins = "PA15";
+-		allwinner,function = "gpio_in";
+-		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+-	};
+-};
+-
+-&p2wi {
+-	status = "okay";
+-
+-	axp22x: pmic at 68 {
+-		compatible = "x-powers,axp221";
+-		reg = <0x68>;
+-		interrupt-parent = <&nmi_intc>;
+-		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+-		drivevbus-supply = <&reg_vcc5v0>;
+-		x-powers,drive-vbus-en;
+-	};
+-};
+-
+-#include "axp22x.dtsi"
+-
+-&reg_aldo3 {
+-	regulator-always-on;
+-	regulator-min-microvolt = <2700000>;
+-	regulator-max-microvolt = <3300000>;
+-	regulator-name = "avcc";
+-};
+-
+-&reg_dc1sw {
+-	regulator-name = "vcc-lcd";
+-};
+-
+-&reg_dc5ldo {
+-	regulator-always-on;
+-	regulator-min-microvolt = <700000>;
+-	regulator-max-microvolt = <1320000>;
+-	regulator-name = "vdd-cpus"; /* This is an educated guess */
+-};
+-
+-&reg_dcdc1 {
+-	regulator-always-on;
+-	regulator-min-microvolt = <3000000>;
+-	regulator-max-microvolt = <3000000>;
+-	regulator-name = "vcc-3v0";
+-};
+-
+-&reg_dcdc2 {
+-	regulator-min-microvolt = <700000>;
+-	regulator-max-microvolt = <1320000>;
+-	regulator-name = "vdd-gpu";
+-};
+-
+-&reg_dcdc3 {
+-	regulator-always-on;
+-	regulator-min-microvolt = <700000>;
+-	regulator-max-microvolt = <1320000>;
+-	regulator-name = "vdd-cpu";
+-};
+-
+-&reg_dcdc4 {
+-	regulator-always-on;
+-	regulator-min-microvolt = <700000>;
+-	regulator-max-microvolt = <1320000>;
+-	regulator-name = "vdd-sys-dll";
+-};
+-
+-&reg_dcdc5 {
+-	regulator-always-on;
+-	regulator-min-microvolt = <1500000>;
+-	regulator-max-microvolt = <1500000>;
+-	regulator-name = "vcc-dram";
+-};
+-
+-&reg_dldo1 {
+-	regulator-min-microvolt = <3300000>;
+-	regulator-max-microvolt = <3300000>;
+-	regulator-name = "vcc-wifi";
+-};
+-
+ &reg_dldo2 {
+ 	regulator-min-microvolt = <1800000>;
+ 	regulator-max-microvolt = <1800000>;
+ 	regulator-name = "vcc-pg";
+ };
+ 
+-&reg_drivevbus {
+-	regulator-name = "usb0-vbus";
+-	status = "okay";
+-};
+-
+ &simplefb_lcd {
+-	vcc-lcd-supply = <&reg_dc1sw>;
+ 	vcc-pg-supply = <&reg_dldo2>;
+ };
+-
+-&usb_otg {
+-	dr_mode = "otg";
+-	status = "okay";
+-};
+-
+-&usb_power_supply {
+-	status = "okay";
+-};
+-
+-&usbphy {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&usb0_id_detect_pin>;
+-	usb0_id_det-gpio = <&pio 0 15 GPIO_ACTIVE_HIGH>; /* PA15 */
+-	usb0_vbus_power-supply = <&usb_power_supply>;
+-	usb0_vbus-supply = <&reg_drivevbus>;
+-	usb1_vbus-supply = <&reg_dldo1>;
+-	status = "okay";
+-};
+diff --git a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts b/arch/arm/boot/dts/sun6i-reference-design-tablet.dtsi
+similarity index 90%
+copy from arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
+copy to arch/arm/boot/dts/sun6i-reference-design-tablet.dtsi
+index 34d8710..0c43430 100644
+--- a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
++++ b/arch/arm/boot/dts/sun6i-reference-design-tablet.dtsi
+@@ -40,8 +40,6 @@
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+ 
+-/dts-v1/;
+-#include "sun6i-a31s.dtsi"
+ #include "sunxi-common-regulators.dtsi"
+ 
+ #include <dt-bindings/gpio/gpio.h>
+@@ -49,9 +47,6 @@
+ #include <dt-bindings/pinctrl/sun4i-a10.h>
+ 
+ / {
+-	model = "Colorfly E708 Q1 tablet";
+-	compatible = "colorfly,e708-q1", "allwinner,sun6i-a31s";
+-
+ 	aliases {
+ 		serial0 = &uart0;
+ 	};
+@@ -66,20 +61,8 @@
+ };
+ 
+ &ehci0 {
+-	/* rtl8188etv wifi is connected here */
+-	status = "okay";
+-};
+-
+-&lradc {
+-	vref-supply = <&reg_aldo3>;
++	/* Wifi is connected here */
+ 	status = "okay";
+-
+-	button at 1000 {
+-		label = "Home";
+-		linux,code = <KEY_HOMEPAGE>;
+-		channel = <0>;
+-		voltage = <1000000>;
+-	};
+ };
+ 
+ &mmc0 {
+@@ -181,12 +164,6 @@
+ 	regulator-name = "vcc-wifi";
+ };
+ 
+-&reg_dldo2 {
+-	regulator-min-microvolt = <1800000>;
+-	regulator-max-microvolt = <1800000>;
+-	regulator-name = "vcc-pg";
+-};
+-
+ &reg_drivevbus {
+ 	regulator-name = "usb0-vbus";
+ 	status = "okay";
+@@ -194,7 +171,6 @@
+ 
+ &simplefb_lcd {
+ 	vcc-lcd-supply = <&reg_dc1sw>;
+-	vcc-pg-supply = <&reg_dldo2>;
+ };
+ 
+ &usb_otg {
 -- 
 2.7.4
