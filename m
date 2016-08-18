@@ -1,63 +1,33 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Thu, 18 Aug 2016 15:44:31 +0900
-Subject: [PATCH] MAINTAINERS: add myself as Samsung SPI maintainer
-Message-ID: <20160818064431.8982-1-andi.shyti@samsung.com>
+From: yao.yuan@freescale.com (Yuan Yao)
+Date: Thu, 18 Aug 2016 14:38:43 +0800
+Subject: [PATCH v1 0/5] dma: Add QorIQ qDMA engine driver support
+Message-ID: <1471502328-28305-1-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a new entry for the Samsung SPI driver supported by the
-drivers/spi/spi-s3c* and remove it from its original place under
-"ARM/SAMSUNG EXYNOS ARM ARCHITECTURES".
+From: Yuan Yao <yao.yuan@nxp.com>
 
-The original maintainership inherited from the Samsung Exynos
-ARM Architecture is kept as it was (i.e. Kukjin and Krzysztof), I
-will help and co-maintain the driver.
+dma: Add QorIQ qDMA engine driver support
 
-CC: Krzysztof Kozlowski <krzk@kernel.org>
-CC: Kukjin Kim <kgene@kernel.org>
-CC: Mark Brown <broonie@kernel.org>
-CC: linux-samsung-soc at vger.kernel.org
-CC: linux-spi at vger.kernel.org
-Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
----
-Hi,
+Yuan Yao (5):
+  dma: Add QorIQ qDMA engine driver support
+  dma: Add device tree binding for QorIQ qDMA driver
+  MAINTAINERS: add maintainer entry for QorIQ QDMA driver
+  ARM: dts: ls1043a: add qDMA node
+  ARM: dts: ls1021a: add qDMA node
 
-this patch depends on Krzysztof's previous patch-set on the
-MAINTAINER file: https://lkml.org/lkml/2016/8/16/571
+ .../devicetree/bindings/dma/qoriq-qdma.txt         |  38 +
+ MAINTAINERS                                        |   7 +
+ arch/arm/boot/dts/ls1021a.dtsi                     |  10 +
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     |  10 +
+ drivers/dma/Kconfig                                |  12 +
+ drivers/dma/Makefile                               |   1 +
+ drivers/dma/qoriq-qdma.c                           | 900 +++++++++++++++++++++
+ drivers/dma/qoriq-qdma.h                           | 272 +++++++
+ 8 files changed, 1250 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/qoriq-qdma.txt
+ create mode 100644 drivers/dma/qoriq-qdma.c
+ create mode 100644 drivers/dma/qoriq-qdma.h
 
-Thanks,
-Andi
-
- MAINTAINERS | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index c9cd8d3..c305fa2 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1633,7 +1633,6 @@ F:	drivers/*/*s3c64xx*
- F:	drivers/*/*s5pv210*
- F:	drivers/memory/samsung/*
- F:	drivers/soc/samsung/*
--F:	drivers/spi/spi-s3c*
- F:	Documentation/arm/Samsung/
- F:	Documentation/devicetree/bindings/arm/samsung/
- F:	Documentation/devicetree/bindings/sram/samsung-sram.txt
-@@ -10240,6 +10239,15 @@ S:	Supported
- L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
- F:	drivers/clk/samsung/
- 
-+SAMSUNG SPI DRIVERS
-+M:	Kukjin Kim <kgene@kernel.org>
-+M:	Krzysztof Kozlowski <krzk@kernel.org>
-+M:	Andi Shyti <andi.shyti@samsung.com>
-+L:	linux-spi at vger.kernel.org
-+L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	drivers/spi/spi-s3c*
-+
- SAMSUNG SXGBE DRIVERS
- M:	Byungho An <bh74.an@samsung.com>
- M:	Girish K S <ks.giri@samsung.com>
 -- 
-2.8.1
+2.1.0.27.g96db324
