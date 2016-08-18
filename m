@@ -1,95 +1,63 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu, 18 Aug 2016 08:42:37 +0200
-Subject: [PATCH V8 5/8] irqchip/gicv3-its: Refactor ITS DT init code to
- prepare for ACPI
-In-Reply-To: <20160817155832.GA25421@localhost>
-References: <1470909998-16710-1-git-send-email-tn@semihalf.com>
- <1470909998-16710-6-git-send-email-tn@semihalf.com>
- <57B4213E.3060201@huawei.com> <20160817155832.GA25421@localhost>
-Message-ID: <00af2bfa-0869-75e0-8a9a-4d7e0cafb687@semihalf.com>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Thu, 18 Aug 2016 15:44:31 +0900
+Subject: [PATCH] MAINTAINERS: add myself as Samsung SPI maintainer
+Message-ID: <20160818064431.8982-1-andi.shyti@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.08.2016 17:58, Bjorn Helgaas wrote:
-> On Wed, Aug 17, 2016 at 04:33:02PM +0800, Hanjun Guo wrote:
->> On 2016/8/11 18:06, Tomasz Nowicki wrote:
->>> In order to add ACPI support we need to isolate ACPI&DT common code and
->>> move DT logic to corresponding functions. To achieve this we are using
->>> firmware agnostic handle which can be unpacked to either DT or ACPI node.
->>>
->>> No functional changes other than a very minor one:
->>> 1. Terminate its_init call with -ENODEV for non-DT case which allows
->>> to remove hack from its-gic-v3.c.
->>> 2. Fix ITS base register address type (from 'unsigned long' to 'phys_addr_t'),
->>> as a bonus we get nice string formatting.
->>> 3. Since there is only one of ITS parent domain convert it to static global
->>> variable and drop the parameter from its_probe_one. Users can refer to it
->>> in more convenient way then.
->> [...]
->>> -static int __init its_probe(struct device_node *node,
->>> -			    struct irq_domain *parent)
->>> +static int __init its_probe_one(struct resource *res,
->>> +				struct fwnode_handle *handle, int numa_node)
->>>  {
->>> -	struct resource res;
->>>  	struct its_node *its;
->>>  	void __iomem *its_base;
->>>  	u32 val;
->>>  	u64 baser, tmp;
->>>  	int err;
->>>
->>> -	err = of_address_to_resource(node, 0, &res);
->>> -	if (err) {
->>> -		pr_warn("%s: no regs?\n", node->full_name);
->>> -		return -ENXIO;
->>> -	}
->>> -
->>> -	its_base = ioremap(res.start, resource_size(&res));
->>> +	its_base = ioremap(res->start, resource_size(res));
->>>  	if (!its_base) {
->>> -		pr_warn("%s: unable to map registers\n", node->full_name);
->>> +		pr_warn("ITS@%pa: Unable to map ITS registers\n", &res->start);
->>>  		return -ENOMEM;
->>>  	}
->>>
->>>  	val = readl_relaxed(its_base + GITS_PIDR2) & GIC_PIDR2_ARCH_MASK;
->>>  	if (val != 0x30 && val != 0x40) {
->>> -		pr_warn("%s: no ITS detected, giving up\n", node->full_name);
->>> +		pr_warn("ITS@%pa: No ITS detected, giving up\n", &res->start);
->>>  		err = -ENODEV;
->>>  		goto out_unmap;
->>>  	}
->>>
->>>  	err = its_force_quiescent(its_base);
->>>  	if (err) {
->>> -		pr_warn("%s: failed to quiesce, giving up\n",
->>> -			node->full_name);
->>> +		pr_warn("ITS@%pa: Failed to quiesce, giving up\n", &res->start);
->>>  		goto out_unmap;
->>>  	}
->>>
->>> -	pr_info("ITS: %s\n", node->full_name);
->>> +	pr_info("ITS@%pa\n", &res->start);
->>                 ^^
->>
->> When I was testing this patch set I found message printed as below:
->>
->> [    0.000000] ITS at 0x00000000c6000000
->
-> I think it'd be nicer to print the resource with %pR so we see the
-> type and size in a way that matches other physical address usage.
+Create a new entry for the Samsung SPI driver supported by the
+drivers/spi/spi-s3c* and remove it from its original place under
+"ARM/SAMSUNG EXYNOS ARM ARCHITECTURES".
 
-The intention was to keep previous message layout but while we are here, 
-%pR usage for this one pr_info seems nice to me.
+The original maintainership inherited from the Samsung Exynos
+ARM Architecture is kept as it was (i.e. Kukjin and Krzysztof), I
+will help and co-maintain the driver.
 
->
-> I don't know whether there is or should be a struct device associated
-> with the ITS.  The its_probe_one() function looks similar to regular
-> driver probe functions, so maybe there should be.
->
-> If there were a struct device associated with the ITS, it'd be nicer
-> to use dev_info() as well, of course.
+CC: Krzysztof Kozlowski <krzk@kernel.org>
+CC: Kukjin Kim <kgene@kernel.org>
+CC: Mark Brown <broonie@kernel.org>
+CC: linux-samsung-soc at vger.kernel.org
+CC: linux-spi at vger.kernel.org
+Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+---
+Hi,
 
-Indeed dev_info() would be nice but there is no struct device for ITS.
+this patch depends on Krzysztof's previous patch-set on the
+MAINTAINER file: https://lkml.org/lkml/2016/8/16/571
 
-Tomasz
+Thanks,
+Andi
+
+ MAINTAINERS | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index c9cd8d3..c305fa2 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1633,7 +1633,6 @@ F:	drivers/*/*s3c64xx*
+ F:	drivers/*/*s5pv210*
+ F:	drivers/memory/samsung/*
+ F:	drivers/soc/samsung/*
+-F:	drivers/spi/spi-s3c*
+ F:	Documentation/arm/Samsung/
+ F:	Documentation/devicetree/bindings/arm/samsung/
+ F:	Documentation/devicetree/bindings/sram/samsung-sram.txt
+@@ -10240,6 +10239,15 @@ S:	Supported
+ L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+ F:	drivers/clk/samsung/
+ 
++SAMSUNG SPI DRIVERS
++M:	Kukjin Kim <kgene@kernel.org>
++M:	Krzysztof Kozlowski <krzk@kernel.org>
++M:	Andi Shyti <andi.shyti@samsung.com>
++L:	linux-spi at vger.kernel.org
++L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
++S:	Maintained
++F:	drivers/spi/spi-s3c*
++
+ SAMSUNG SXGBE DRIVERS
+ M:	Byungho An <bh74.an@samsung.com>
+ M:	Girish K S <ks.giri@samsung.com>
+-- 
+2.8.1
