@@ -1,42 +1,63 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Thu, 18 Aug 2016 18:02:40 +0800
-Subject: [PATCH v3 1/5] drm/rockchip: sort registers define by chip's
- number
-In-Reply-To: <20160818091141.GZ6232@phenom.ffwll.local>
-References: <loom.20160602T084340-509@post.gmane.org>
- <1471454452-2151-1-git-send-email-seanpaul@chromium.org>
- <57B57AFE.2030706@rock-chips.com> <20160818091141.GZ6232@phenom.ffwll.local>
-Message-ID: <57B587C0.5050007@rock-chips.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 18 Aug 2016 12:04:24 +0200
+Subject: [PATCH v3 0/4] ARM: kernel: module PLT optimizations
+In-Reply-To: <1471514563-28172-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1471514563-28172-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu-+VW4G0=gKJagJEbbhXKwxxoOM5UE1vro4GS8cjS2iyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?08?18? 17:11, Daniel Vetter wrote:
-> On Thu, Aug 18, 2016 at 05:08:14PM +0800, Mark yao wrote:
->> >Hi Sean
->> >
->> >Thanks for send v3 patch for rk3399 vop support.
->> >
->> >But sorry for that, I had changed my mind, those patches are deprecated,
->> >I have new rk3399 patch on my downstream kernel, I will upstream soon.
-> Wut? Imo merge Sean's patch here, and then rebase your downstream patches
-> on top of it. That you have a downstream tree which is out of sync with
-> upstream shouldn't be a reason to stall upstream development.
-> -Daniel
+On 18 August 2016 at 12:02, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> As reported by Jongsung, the O(n^2) search in the PLT allocation code may
+> disproportionately affect module load time for modules with a larger number
+> of relocations.
 >
-Yeah, Sorry for that.
+> Since the existing routines rather naively take branch instructions into
+> account that are internal to the module, we can improve the situation
+> significantly by checking the symbol section index first, and disregarding
+> symbols that are defined in the same module. Also, we can reduce the
+> algorithmic complexity to O(n log n) by sorting the reloc section before
+> processing it, and disregarding zero-addend relocations in the optimization.
+>
+> Patch #1 merge the core and init PLTs, since the latter is virtually empty
+> anyway.
+>
+> Patch #2 implements the optimization to only take SHN_UNDEF symbols into
+> account.
+>
+> Patch #3 sort the reloc section, so that the duplicate check can be done by
+> comparing an entry with the previous one. Since REL entries (as opposed to
+> RELA entries) do not contain the addend, simply disregard non-zero addends
+> in the optimization since those are rare anyway.
+>
+> Patch #4 replaces the brute force search for a matching existing entry in
+> the PLT generation routine with a simple check against the last entry that
+> was emitted. This is now sufficient since the relocation section is sorted,
+> and presented at relocation time in the same order.
+>
+> Note that this implementation is now mostly aligned with the arm64 version
+> (with the exception that the arm64 implementation stashes the address of the
+> PLT entry in the symtab instead of comparing the last emitted entry)
+>
+> v3:
+> - move the SHN_UNDEF check into the switch statement, so that we only
+>   dereference the symbol for relocations we care about (#2)
+> - compare the undecoded addend values bitwise when checking for zero addends,
+>   rather than fully decoding the offsets and doing an arithmetic comparison
+>   against '-8' (or '-4' for Thumb)
+> - added patch #4
+>
+> v2:
+> - added patch #3
+>
+> Ard Biesheuvel (4):
+>   ARM: kernel: merge core and init PLTs
+>   ARM: kernel: allocate PLT entries only for external symbols
+>   ARM: kernel: sort relocation sections before allocating PLTs
+>   arm64: kernel: avoid brute force search on PLT generation
+>
 
-In fact, on my downstream kernel, also have those patches, my new rk3399 
-patches are based on them,
-but the new rk3399 patches will cover the those patches,  Sean's patches 
-is old version.
-
-I just want to fast forward, don't want to send two version drivers to 
-upstream.
-but if you and Dave feel ok for that, I have no problem:-) .
-
-merged Sean's patches and then apply new version patches.
-
-Thanks.
+^^^ $SUBJECT fail: this should be ARM, of course
 
 -- 
-?ark Yao
+Ard.
