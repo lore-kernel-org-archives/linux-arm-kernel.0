@@ -1,116 +1,92 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 18 Aug 2016 17:54:57 +0530
-Subject: Support for configurable PCIe endpoint
-In-Reply-To: <VI1PR04MB14544C83482106ABF1067D5F8E140@VI1PR04MB1454.eurprd04.prod.outlook.com>
-References: <57A18927.9070003@ti.com>
- <7c696488-eb78-d6d9-dc70-49fa5b4e3317@synopsys.com> <57A31299.2040805@ti.com>
- <VI1PR04MB14544C83482106ABF1067D5F8E140@VI1PR04MB1454.eurprd04.prod.outlook.com>
-Message-ID: <57B5A919.6000809@ti.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 18 Aug 2016 15:25:35 +0300
+Subject: [PATCH RFC 1/3] DT: bindings: mmc: Add property for 3.3V only
+ support
+In-Reply-To: <468a6704-a9f0-1715-ff64-9e331a6a80b1@rock-chips.com>
+References: <1470488140-10104-1-git-send-email-stefan.wahren@i2se.com>
+ <1470488140-10104-2-git-send-email-stefan.wahren@i2se.com>
+ <20160810184451.GA13473@rob-hp-laptop>
+ <853617027.179290.63a6f478-ad48-40c8-82ca-760dd1afc040.open-xchange@email.1und1.de>
+ <CAL_JsqJ09hXYrp_pgAw9FXrBv+=grkm_zip6qB9XefujPECTxQ@mail.gmail.com>
+ <468a6704-a9f0-1715-ff64-9e331a6a80b1@rock-chips.com>
+Message-ID: <8f87c885-3c55-cac8-a9f5-e121ae031f90@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 11/08/16 03:48, Shawn Lin wrote:
+> + Adrian
+> 
+> Let's queue Adrian here who now maintains SDHCI stuff.
 
-On Wednesday 17 August 2016 03:19 PM, Mingkai Hu wrote:
+SDHCI drivers may not implement no-1-8-v in a consistent manner, but as far
+as I can see, the meaning is still clear: 1.8V will not be used for either
+supply or signaling.
+
+SDHCI is complicated because the SDHCI specification does not cover eMMC.
+>From the perspective of SDHCI, the only 1.8V modes are the UHS-I modes, so
+support for 1.8V signaling is the same as support for one of those modes
+(the spec even says as much).  But what happens is that the host controller
+can support those modes but the board can't supply 1.8V so the drivers
+remove capability for the modes.  Support for 1.8V supply has a capability
+bit which drivers can override if necessary but removable SD cards don't
+support 1.8V supply anyway, so the issue doesn't arise if the host
+controller is only used for uSD cards.
+
 > 
-> 
->> -----Original Message-----
->> From: Kishon Vijay Abraham I [mailto:kishon at ti.com]
->> Sent: Thursday, August 04, 2016 6:02 PM
->> To: Joao Pinto <Joao.Pinto@synopsys.com>; bhelgaas at google.com; linux-
->> pci at vger.kernel.org; arnd at arndb.de; Jingoo Han <jingoohan1@gmail.com>;
->> Pratyush Anand <pratyush.anand@gmail.com>
->> Cc: Ley Foon Tan <lftan@altera.com>; Rob Herring <robh@kernel.org>;
->> Tanmay Inamdar <tinamdar@apm.com>; Roy Zang <tie-
->> fei.zang at freescale.com>; Mingkai Hu <mingkai.hu@freescale.com>;
->> Minghuan Lian <minghuan.Lian@freescale.com>; Richard Zhu
->> <Richard.Zhu@freescale.com>; Lucas Stach <l.stach@pengutronix.de>;
->> Murali Karicheri <m-karicheri2@ti.com>; Thomas Petazzoni
->> <thomas.petazzoni@free-electrons.com>; Jason Cooper
->> <jason@lakedaemon.net>; Thierry Reding <thierry.reding@gmail.com>;
->> Simon Horman <horms@verge.net.au>; Zhou Wang
->> <wangzhou1@hisilicon.com>; Gabriele Paoloni
->> <gabriele.paoloni@huawei.com>; Stanimir Varbanov <svarbanov@mm-
->> sol.com>; David Daney <david.daney@cavium.com>; linux-
->> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
->> omap at vger.kernel.org; Carlos Palminha
->> <CARLOS.PALMINHA@synopsys.com>
->> Subject: Re: Support for configurable PCIe endpoint
+> On 2016/8/11 5:39, Rob Herring wrote:
+>> On Wed, Aug 10, 2016 at 3:27 PM, Stefan Wahren <stefan.wahren@i2se.com>
+>> wrote:
+>>> Hi,
+>>>
+>>>> Rob Herring <robh@kernel.org> hat am 10. August 2016 um 20:44 geschrieben:
+>>>>
+>>>>
+>>>> On Sat, Aug 06, 2016 at 12:55:38PM +0000, Stefan Wahren wrote:
+>>>>> Currently there is no proper way to define that a MMC host supports
+>>>>> only 3.3V. The property no-1-8-v is broken and has different meanings
+>>>>> for different sdhci variants. So add a new property for 3.3V only
+>>>>> support and mark no-1-8-v as deprecated.
+>>>>
+>>>> Why is it broken?
+>>>
+>>> i want to quote Ulf Hansson here [1]:
+>>>
+>>>   The problem with the "no-1-8-v" binding is that it's describing what
+>>>   the hardware *can't* do. It thus becomes easy to abuse it.
 >>
->> Hi,
+>> Sounds like a quirk which is perfectly normal for a property. I'd
+>> agree it should be what the h/w *can* do if h/w didn't have capability
+>> bit that does that.
 >>
->> On Wednesday 03 August 2016 07:09 PM, Joao Pinto wrote:
->>> Hi Kishon,
+>>>   I suggest we stop using it, we should mark it deprecated.
 >>>
->>> On 8/3/2016 7:03 AM, Kishon Vijay Abraham I wrote:
->>>> Hi,
->>>>
->>>> The PCIe controller present in TI's DRA7 SoC is capable of operating
->>>> either in Root Complex mode or Endpoint mode. (It uses Synopsys
->>>> Designware Core). I'd assume most of the PCIe controllers on other
->>>> platforms that use Designware core should also be capable to operate
->>>> in endpoint mode. But linux kernel right now supports only RC mode.
->>>>
->>>> PCIe endpoint support discussion came up briefly before [1] but it
->>>> was felt the practical use case will find firmware more suitable and
->>>> endpoint support in kernel can be used only for validation or demo.
->>>>
->>>> *) Modify platform driver to support EP mode (in my case pci-dra7xx.c).
->>>>
->>>> *) dt binding specific to EP mode should be created.
->>>>
->>>> Once I complete the implementation and start posting RFC patches, a
->>>> lot of these will become clear. But I want to check if this sounds
->>>> okay to you guys before starting the implementation.
->>>>
->>>> Let me know if you have some other ideas too.
->>>>
->>>> Cheers
->>>> Kishon
->>>>
->>>> [1] -> http://www.spinics.net/lists/linux-pci/msg26026.html
->>>>
+>>> [1] - http://www.spinics.net/lists/linux-mmc/msg34604.html
 >>>
->>> You are rising a topic that we are also addressing in Synopsys.
+>>>> How would I override a controller saying 1.8V is
+>>>> supported and it is not?
 >>>
->>> For the PCIe RC hardware validation we are currently using the
->>> standard pcie-designware and pcie-designware-plat drivers.
->>>
->>> For the Endpoint we have to use an internal software package. Its main
->>> purpose is to initialize the IP registers, eDMA channels and make data
->>> transfer to prove that the everything is working properly. This is
->>> done in 2 levels, a custom driver built and loaded and an application
->>> that makes some ioctl to the driver executing some interesting
->>> functions to check the Endpoint status and make some data exchange.
+>>> Sorry, i'm not sure that i understand your question. In case a board or a
+>>> MMC
+>>> controller doesn't support 1.8V, it usually supports only 3.3V which is the
+>>> intension of this patch.
 >>
->> hmm.. the platform I have doesn't have a DMA in PCIe IP
->> (http://www.ti.com/lit/ug/spruhz6g/spruhz6g.pdf). So in your testing does
->> the EP access RC memory? i.e the driver in the RC allocates memory from it's
->> DDR and gives it's DDR address to the EP. The EP then transfers data to this
->> address. (This is a typical use case with ethernet PCIe cards). IIUC that's not
->> simple with configurable EPs. I'd like to know more about your testing though.
+>> Some controllers have capability bits saying what voltages they
+>> support, right? And those bits can be wrong (unless firmware sets them
+>> I'd expect that is the common case) which as I read it is what
+>> "no-1-8-v" was for. So with the "mmc-ddr-*v" properties, what does not
+>> present mean and how do they relate to controller capability bits? I
+>> assume they would override the controller bits, but you can only
+>> override the capability bit not set case. I would think the property
+>> not present means use the capability bit, not that that voltage is not
+>> supported. I think you probably need tri-state properties here where
+>> value 1 means supported, 0 means not supported, and not present means
+>> use capability bit (or other method).
+>>
+>> Rob
+>> -- 
+>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >>
 > 
-> Hi Kishon,
 > 
-> This is a typical user case for EP to use DMA transfer data to/from RC memory.
-> In our case, we implement ring (like BD ring) or register in EP to communicate
-> The address allocated in RC memory, then EP can transfer data to/from RC memory.
-
-Initially I had some confusion w.r.t this because the address allocated in RC
-memory can also be an address in EP system. For example let's assume we connect
-two similar systems one configured as RC and the other configured as EP. The
-PCI driver in the RC allocates memory in it's DDR (say 0x80000000) and programs
-this address in the EP. Since it's a similar system, 0x80000000 will also be an
-address in the EPs DDR. This will result in EP transferring data to it's own
-DDR (at 0x80000000) instead of the same address in RC.
-
-But later realized instead of directly using the DDR address given by RC, this
-address should only be used to program the outbound window. That way the target
-of the outbound window can be an address given by the RC and source should be
-an address from the address space in the EP's system.
-
-Do you also use the RC memory address to program the outbound window?
-
-Thanks
-Kishon
