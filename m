@@ -1,68 +1,85 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 18 Aug 2016 21:31:54 +0300
-Subject: [PATCH] ARM: dts: blanche: add SDHI0 support
-In-Reply-To: <5383928.8UnDsUpmkz@wasted.cogentembedded.com>
-References: <5383928.8UnDsUpmkz@wasted.cogentembedded.com>
-Message-ID: <3029697.f9plKzFKet@wasted.cogentembedded.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 18 Aug 2016 11:39:12 -0700
+Subject: [PATCH V3 2/5] thermal: bcm2835: add thermal driver for bcm2835
+ soc
+In-Reply-To: <87mvn6qa2x.fsf@eliezer.anholt.net>
+References: <1463495753-967-1-git-send-email-kernel@martin.sperl.org>
+ <1463495753-967-3-git-send-email-kernel@martin.sperl.org>
+ <87mvn6qa2x.fsf@eliezer.anholt.net>
+Message-ID: <87r39lvs4v.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Blanche board dependent part of the SDHI0 (connected to the
-micro-SD slot) device node along with  the necessary voltage regulator.
+Eric Anholt <eric@anholt.net> writes:
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> kernel at martin.sperl.org writes:
+>
+>> From: Martin Sperl <kernel@martin.sperl.org>
+>>
+>> Add basic thermal driver for bcm2835 SOC.
+>>
+>> This driver currently relies on the firmware setting up the
+>> tsense HW block and does not set it up itself.
+>>
+>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+>>
+>> ChangeLog:
+>>  V1 -> V2: added specific settings depending on compatiblity
+>> 	   added trip point based on register
+>> 	   setting up ctrl-register if HW is not enabled by firmware
+>> 	     as per recommendation of Eric (untested)
+>> 	   check that clock frequency is in range
+>> 	     (1.9 - 5MHz - as per comment in clk-bcm2835.c)
+>> ---
+>
+>> diff --git a/drivers/thermal/bcm/Makefile b/drivers/thermal/bcm/Makefile
+>> new file mode 100644
+>> index 0000000..13456d2
+>> --- /dev/null
+>> +++ b/drivers/thermal/bcm/Makefile
+>> @@ -0,0 +1 @@
+>> +obj-$(CONFIG_BCM2835_THERMAL)		:= bcm2835_thermal.o
+>> diff --git a/drivers/thermal/bcm/bcm2835_thermal.c b/drivers/thermal/bcm/bcm2835_thermal.c
+>> new file mode 100644
+>> index 0000000..73138cb
+>> --- /dev/null
+>> +++ b/drivers/thermal/bcm/bcm2835_thermal.c
+>
+>> +static const struct of_device_id bcm2835_thermal_of_match_table[];
+>> +static int bcm2835_thermal_probe(struct platform_device *pdev)
+>> +{
+>
+>> +	/* enable clock and check rate */
+>> +	clk_prepare_enable(data->clk);
+>> +	rate = clk_get_rate(data->clk);
+>> +	if ((rate < 1920000) || (rate > 5000000)) {
+>> +		dev_warn(&pdev->dev,
+>> +			 "Clock %pCn is running at %pCr Hz, which is outside the recommended range of 1.9 to 5.0 MHz\n",
+>> +			 data->clk, data->clk);
+>> +	}
+>> +
+>> +	/* register it */
+>> +	tz = thermal_zone_device_register("bcm2835_thermal",
+>> +					  1, 0, data,
+>> +					  &bcm2835_thermal_ops,
+>> +					  NULL, 0, 0);
+>
+> I notice that the polling_delay is set to 0, but we're not using
+> interrupts to trigger the trip.  Is it valid to expose a trip without a
+> polling_delay or interrupts?  Should passive_delay be set as well?
+>
+> This is up to the thermal maintainers.  As far as I'm concerned, it's:
+>
+> Acked-by: Eric Anholt <eric@anholt.net>
+>
+> One it lands I'll pull the defconfig and DT bits.
 
----
-This patch is against the 'renesas-devel-20160817-v4.8-rc2' of Simon Horman's
-'renesas.git' repo plus the general purpose switches patch  posted yesterday.
-
- arch/arm/boot/dts/r8a7792-blanche.dts |   25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7792-blanche.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
-+++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
-@@ -103,6 +103,17 @@
- 			gpios = <&gpio11 2 GPIO_ACTIVE_LOW>;
- 		};
- 	};
-+
-+	vcc_sdhi0: regulator-vcc-sdhi0 {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "SDHI0 Vcc";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpio = <&gpio11 12 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
- };
- 
- &extal_clk {
-@@ -139,6 +150,11 @@
- 		groups = "can0_data", "can_clk";
- 		function = "can0";
- 	};
-+
-+	sdhi0_pins: sdhi0 {
-+		groups = "sdhi0_data4", "sdhi0_ctrl";
-+		function = "sdhi0";
-+	};
- };
- 
- &scif0 {
-@@ -161,3 +177,12 @@
- 
- 	status = "okay";
- };
-+
-+&sdhi0 {
-+	pinctrl-0 = <&sdhi0_pins>;
-+	pinctrl-names = "default";
-+
-+	vmmc-supply = <&vcc_sdhi0>;
-+	cd-gpios = <&gpio11 11 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
+Ping on this question to thermal maintainers.  I'd still love to see
+this driver land.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160818/6eb1e5f3/attachment.sig>
