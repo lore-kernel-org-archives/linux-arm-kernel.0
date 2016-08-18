@@ -1,57 +1,83 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 Aug 2016 07:02:34 -0700
-Subject: Problem with atomic accesses in pstore on some ARM CPUs
-In-Reply-To: <CABXOdTfVVA-rU96DZvVHCqKB2NxL=zFHMG6dzJk_9RhFsOBCvA@mail.gmail.com>
-References: <CABXOdTfT7xMfiBvRuUS1hsVs=q5q2wY1x1Z8oCyyJNFckM0g0A@mail.gmail.com>
- <8f0c9ced-cdc3-ab9b-caee-06fe85e6c1e7@arm.com>
- <CABXOdTfg2T2tZrQOd2S5SjeySAMbfQX0weFuvRXBr2o8Of9nVQ@mail.gmail.com>
- <20160816132103.GD27088@arm.com>
- <CABXOdTfHX_ZB1CuM7hzU5LCZPYdHvBSatN9Nen=rb8r1rXhz-g@mail.gmail.com>
- <20160815221518.GD1120@svinekod>
- <CAMbhsRQiU-UyiCWqjaWNXbhDd0+=Tv_pWoeQkJKJaHC6y4=HwQ@mail.gmail.com>
- <CABXOdTfhXhq6pbqAqGQwHcsCXvyshS8JbDGQCBKxfd-2s=M-fw@mail.gmail.com>
- <CAGXu5jL7nX8aS64QH1Eqo=yvsy_+ad+xQnYVDG_ge-oomAOOxg@mail.gmail.com>
- <CABXOdTfVVA-rU96DZvVHCqKB2NxL=zFHMG6dzJk_9RhFsOBCvA@mail.gmail.com>
-Message-ID: <20160818140234.2cq7toduxzl7sc6c@atomide.com>
+From: gmane@chmurka.net (Adam Wysocki)
+Date: Thu, 18 Aug 2016 14:05:26 +0000 (UTC)
+Subject: Linux 4.7 and Jornada 720 (SA-1100)
+Message-ID: <4Tcq736lIfmjNv8%gof@news.chmurka.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Guenter Roeck <groeck@google.com> [160816 17:27]:
-> On Tue, Aug 16, 2016 at 1:50 PM, Kees Cook <keescook@chromium.org> wrote:
-> 
-> [ ... ]
-> 
-> >>> persistent_ram uses atomic ops in uncached memory to store the start
-> >>> and end positions in the ringbuffer so that the state of the
-> >>> ringbuffer will be valid if the kernel crashes at any time.  This was
-> >>> inherited from Android's ram_console implementation, and worked
-> >>> through armv7.  It has been causing more and more problems recently,
-> >>> see for example 027bc8b08242c59e19356b4b2c189f2d849ab660 (pstore-ram:
-> >>> Allow optional mapping with pgprot_noncached) and
-> >>> 7ae9cb81933515dc7db1aa3c47ef7653717e3090 (pstore-ram: Fix hangs by
-> >>> using write-combine mappings).
-> >>>
-> >>> Maybe it should be replaced with a spinlock in normal ram protecting
-> >>> writes to the uncached region.
-> >>
-> >> The necessary functions already exist, and are used for memory mapped
-> >> with ioremap() / ioremap_wc(). They were introduced with commit
-> >> 0405a5cec3 ("pstore/ram: avoid atomic accesses for ioremapped
-> >> regions"), and the description in that patch sounds quite similar to
-> >> the current problem. Given that, would it be acceptable to remove
-> >> buffer_start_add_atomic() and buffer_size_add_atomic(), and always use
-> >> buffer_start_add_locked() and buffer_size_add_locked() instead ? Those
-> >> functions still use atomic_set() and atomic_read(), which works fine
-> >> in my tests. The only difference is that a spinlock in main memory is
-> >> used instead of atomic_cmpxchg().
-> >
-> > I don't see much of a down side to this. ramoops isn't expected to be
-> > high-bandwidth so trading for a single global lock doesn't really
-> > bother me.
-> >
-> 
-> Sounds good. I'll submit a patch to address the problem as suggested above.
+Hi,
 
-Yeah seems like it simplifies things quite a bit for us.
+I don't know if this is a proper group, but maybe someone will help?
 
-Tony
+I have a problem running Linux 4.7 on Jornada 720 handheld PC. This 
+antique has a StrongARM SA-1100 CPU (ARMv4-based) and Windows CE 3.0 
+stored in ROM. There is also an utility called jlinexec.exe (from 
+JLime project which is now nearly-dead) that is able to boot Linux 
+kernel on this machine.
+
+There is another, older kernel (from this JLime project) that already runs 
+there:
+
+gof at jornada7xx:~$ uname -a
+Linux jornada7xx 2.6.25-jlime #1 Wed Jul 16 15:52:07 CEST 2008 armv4l unknown 
+
+CPU is:
+
+gof at jornada7xx:~$ cat /proc/cpuinfo
+Processor       : StrongARM-1110 rev 8 (v4l)
+BogoMIPS        : 137.21
+Features        : swp half 26bit fastmult
+CPU implementer : 0x69
+CPU architecture: 4
+CPU variant     : 0x0
+CPU part        : 0xb11
+CPU revision    : 8
+
+Hardware        : HP Jornada 720
+Revision        : 0000
+Serial  : 0000000000000000 
+
+I wanted to compile new, fresh 4.7 with BX emulation patch applied:
+
+https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/commit/?h=arm/netwinder&id=6d833b52d0591b47ee65ef2808c459a99f1d37ec
+
+so I could run Debian userland compiled for "armel" architecture there 
+(these binaries don't use Thumb state, which this CPU lacks, but use BX 
+instruction, so they immediately fail with SIGILL). I did my compilation 
+with arm-linux-gnueabi cross-compiler and it compiled cleanly.
+
+However, when I try to run the kernel, the machine hangs. Only one 
+horizontal line is visible on the LCD (probably because CPU, normally 
+responsible for LCD refreshing, stops doing that) and that's all.
+
+I connected terminal to a serial port and tried playing with earlyprintk= 
+and console= settings (earlyprintk=serial,ttyS0,115200), but without luck. 
+The only thing I get on the serial port is the jlinexec.exe "logo":
+
+--------linexec--------
+
+I'm not even sure if early printk is available on this architecture...
+
+Kernel command line contains only ram=32 now and there's no initial 
+ramdisk (when I get to the point of booting it, I'll add root= and try to 
+mount rootfs).
+
+I also tried booting kernel ELF image with hpcboot.exe (a bootloader from 
+Jornada NetBSD port), but it failed to boot, too. Well, it's not supposed 
+to boot Linux anyway...
+
+Here's my first thread on debian-arm list:
+
+https://groups.google.com/forum/#!topic/linux.debian.ports.arm/lbvmPvA6_2k
+
+But as it became a kernel problem now, I think it's more appropriate to 
+ask here.
+
+My kernel .config is here: http://pastebin.com/QSsJybS8
+
+Anyone able to help troubleshoot that?
+
+Thank you!
+
+-- 
+http://www.chmurka.net/
