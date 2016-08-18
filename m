@@ -1,117 +1,51 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Thu, 18 Aug 2016 15:53:29 +0000
-Subject: [PATCH v6 3/3] net: phy: Add gmiitorgmii converter support
-In-Reply-To: <20160816165320.GP14446@lunn.ch>
-References: <1470808208-32133-1-git-send-email-appanad@xilinx.com>
- <1470808208-32133-4-git-send-email-appanad@xilinx.com>
- <20160816165320.GP14446@lunn.ch>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5E4426@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 18 Aug 2016 17:04:37 +0100
+Subject: [PATCH] mm, numa: boot cpu should bound to the node0 when
+ node_off enable
+In-Reply-To: <1471525766-12803-1-git-send-email-zhongjiang@huawei.com>
+References: <1471525766-12803-1-git-send-email-zhongjiang@huawei.com>
+Message-ID: <20160818160437.GA21343@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-	Thanks for the review...
-
+On Thu, Aug 18, 2016 at 09:09:26PM +0800, zhongjiang wrote:
+> At present, boot cpu will bound to a node from device tree when node_off enable.
+> if the node is not initialization, it will lead to a following problem.
 > 
-> > +static int xgmiitorgmii_read_status(struct phy_device *phydev) {
-> > +	struct gmii2rgmii *priv = phydev->priv;
-> > +	u16 val = 0;
-> > +
-> > +	priv->phy_drv->read_status(phydev);
+>  next_zones_zonelist+0x18/0x80
+>  __build_all_zonelists+0x1e0/0x288
+>  build_all_zonelists_init+0x10/0x1c
+>  build_all_zonelists+0x114/0x128
+>  start_kernel+0x1a0/0x414
+
+I think this "problem" is missing a lot of information. Is this supposed
+to be a kernel panic?
+
+> The patch fix it by fallback to node 0. therefore, the cpu will bound to the node
+> correctly.
 > 
-> This can return an error, in which case phydev->speed should not be trusted.
-
-Will fix...
-
+> Signed-off-by: zhongjiang <zhongjiang@huawei.com>
+> ---
+>  arch/arm64/mm/numa.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> I've not thought locking all the way through yet. I don't think you need a lock
-> here, but i need to think about it.
+> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+> index 4dcd7d6..1f8f5da 100644
+> --- a/arch/arm64/mm/numa.c
+> +++ b/arch/arm64/mm/numa.c
+> @@ -119,7 +119,7 @@ void numa_store_cpu_info(unsigned int cpu)
+>  void __init early_map_cpu_to_node(unsigned int cpu, int nid)
+>  {
+>  	/* fallback to node 0 */
+> -	if (nid < 0 || nid >= MAX_NUMNODES)
+> +	if (nid < 0 || nid >= MAX_NUMNODES || numa_off)
+>  		nid = 0;
+>  
+>  	cpu_to_node_map[cpu] = nid;
 
-Ok...
+The patch looks fine (slight inconsistence from the map_cpu_to_node()
+callers but I guess we don't want to expose numa_off outside this file).
+I would however like to see an Ack from Ganapat (cc'ed).
 
-> 
-> > +
-> > +	val = mdiobus_read(phydev->mdio.bus, priv->addr,
-> > +XILINX_GMII2RGMII_REG);
-> 
-> You should check for an error here.
-> 
-> > +	val &= XILINX_GMII2RGMII_SPEED_MASK;
-> > +
-> > +	if (phydev->speed == SPEED_1000)
-> > +		val |= BMCR_SPEED1000;
-> > +	else if (phydev->speed == SPEED_100)
-> > +		val |= BMCR_SPEED100;
-> > +	else
-> > +		val |= BMCR_SPEED10;
-> 
-> What happens if for example the PHY is an aquantia and has negotiated
-> SPEED_2500? Some Marvell PHYs can also do odd speeds, like 200Mbps.
-> You probably want to return an error, rather than silently have things go wrong.
-
-Will fix...
-
-> 
-> > +
-> > +	mdiobus_write(phydev->mdio.bus, priv->addr,
-> XILINX_GMII2RGMII_REG,
-> > +val);
-> 
-> This can also return an error.
-
-Will fix...
-
-> 
-> > +	return 0;
-> > +}
-> > +
-> > +int xgmiitorgmii_probe(struct mdio_device *mdiodev) {
-> > +	struct device *dev = &mdiodev->dev;
-> > +	struct device_node *np = dev->of_node, *phy_node;
-> > +	struct gmii2rgmii *priv;
-> > +
-> > +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> > +	if (!priv)
-> > +		return -ENOMEM;
-> > +
-> > +	phy_node = of_parse_phandle(np, "phy-handle", 0);
-> > +	if (IS_ERR(phy_node)) {
-> > +		dev_err(dev, "Couldn't parse phy-handle\n");
-> > +		return -ENODEV;
-> > +	}
-> > +
-> > +	priv->phy_dev = of_phy_find_device(phy_node);
-> > +	if (!priv->phy_dev) {
-> > +		dev_info(dev, "Couldn't find phydev\n");
-> > +		return -EPROBE_DEFER;
-> > +	}
-> > +
-> > +	priv->addr = mdiodev->addr;
-> > +	priv->phy_drv = priv->phy_dev->drv;
-> > +	memcpy(&priv->conv_phy_drv, priv->phy_dev->drv,
-> > +	       sizeof(struct phy_driver));
-> > +	priv->conv_phy_drv.read_status = xgmiitorgmii_read_status;
-> > +	priv->phy_dev->priv = priv;
-> > +	priv->phy_dev->drv = &priv->conv_phy_drv;
-> 
-> So from this point onward, the phy driver depends on the memory allocated by
-> this driver. If this driver goes away, freeing its memory, the next call to
-> read_status() is going to have a problem.
-> 
-> Also, i think this assignment should take the phy lock, just to be safe.
-
-Ok will fix....
-
-> 
-> There also needs to be some thought into what happens if the phy driver is
-> unloaded. Should this driver take a reference on the phy driver to prevent that?
-
-Ok will increment the reference count of the external phy device...
-
-
-Regards,
-Kedar.
-
-> 
->        Andrew
+-- 
+Catalin
