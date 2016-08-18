@@ -1,49 +1,35 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 18 Aug 2016 12:47:06 +0200
-Subject: Merging code with arch condition into head.S
-In-Reply-To: <CACna6rxhhD5kfa1oJzqp2dQxBhjaUzdTkNPMcm-+iNvQHD8yzA@mail.gmail.com>
-References: <CACna6rxhhD5kfa1oJzqp2dQxBhjaUzdTkNPMcm-+iNvQHD8yzA@mail.gmail.com>
-Message-ID: <CAKv+Gu8dP8oAq-ykejskw+AzX-7_h_Ws6sFdXO+40MiGM14ccA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 18 Aug 2016 11:47:16 +0100
+Subject: [PATCH] arm: remove traces of perf_ops_bp
+In-Reply-To: <20160815094649.GA13262@arm.com>
+References: <1470934766-4009-1-git-send-email-mark.rutland@arm.com>
+ <20160815094649.GA13262@arm.com>
+Message-ID: <20160818104716.GD27045@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 August 2016 at 12:35, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
-> Hi,
->
-> I'd like to ask for help with writing my arcm/arm/boot/compressed/head-foo.S.
->
-> There is probably a bug in bootloader on *a lot* market-available
-> devices that needs a very early fix executed during decompression. If
-> we don't implement it, Broadcom Northstar devices hang in 25% of tries
-> and BCM53573 devices don't boot at all.
->
+On Mon, Aug 15, 2016 at 10:46:50AM +0100, Will Deacon wrote:
+> On Thu, Aug 11, 2016 at 05:59:26PM +0100, Mark Rutland wrote:
+> > Even though perf_ops_bp was removed/renamed back in commit
+> > b0a873ebbf87bf38 ("perf: Register PMU implementations"), as part of
+> > v2.6.37, its definition still lives on in some arch headers.
+> > 
+> > This patch removes the vestigal definition from arm.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Russell King <linux@armlinux.org.uk>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm/include/asm/hw_breakpoint.h | 1 -
+> >  1 file changed, 1 deletion(-)
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> Please put this into the patch system -- I'll pick the other one up for
+> arm64.
 
-Could you elaborate on the nature of the fix?
+Cheers.
 
-> The problem is ARCH_BCM_5301X is used with ARCH_MULTI_V7, so we really
-> shouldn't merge some extra code into head.S and execute it
-> unconditionally. I'd like to ask if you can suggest some idea for a
-> sane architecture check.
->
-> Ideally I'd read it from DT, but I don't think I can read machine
-> "compatible" from ASM. As alternative I could try reading SoC chip ID
-> from ChipCommon component which Broadcom always maps at 0x18000000.
-> Would that be safe enough? Could reading from such offset do any harm
-> on other devices?
->
+I've dropped this in the patch system as 8598/1.
 
-Yes.
-
-> Maybe you have some better ideas?
->
-> I was looking for similar solutions in the kernel, but I found none.
-> There are e.g. head-sa1100.S and head-sharpsl.S but they seem to be
-> used on architectures that don't use ARCH_MULTI_V7.
->
-
-Generally, it is not the kernel's job to fix broken bootloaders,
-especially not in generic kernels. What kind of bootloader does this
-bug exist in?
-
--- 
-Ard.
+Mark.
