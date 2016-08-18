@@ -1,42 +1,38 @@
-From: yao.yuan@freescale.com (Yuan Yao)
-Date: Thu, 18 Aug 2016 14:38:48 +0800
-Subject: [PATCH v1 5/5] ARM: dts: ls1021a: add qDMA node
-In-Reply-To: <1471502328-28305-1-git-send-email-yao.yuan@freescale.com>
-References: <1471502328-28305-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <1471502328-28305-6-git-send-email-yao.yuan@freescale.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 18 Aug 2016 08:58:22 +0200
+Subject: [PATCH] MAINTAINERS: add myself as Samsung SPI maintainer
+In-Reply-To: <20160818064431.8982-1-andi.shyti@samsung.com>
+References: <20160818064431.8982-1-andi.shyti@samsung.com>
+Message-ID: <CAJKOXPe-=qLNSsm9AQHkcVYGSV=yMjsawMbBRbeo6h7sQuzHsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yuan Yao <yao.yuan@nxp.com>
+On Thu, Aug 18, 2016 at 8:44 AM, Andi Shyti <andi.shyti@samsung.com> wrote:
+> Create a new entry for the Samsung SPI driver supported by the
+> drivers/spi/spi-s3c* and remove it from its original place under
+> "ARM/SAMSUNG EXYNOS ARM ARCHITECTURES".
+>
+> The original maintainership inherited from the Samsung Exynos
+> ARM Architecture is kept as it was (i.e. Kukjin and Krzysztof), I
+> will help and co-maintain the driver.
+>
+> CC: Krzysztof Kozlowski <krzk@kernel.org>
+> CC: Kukjin Kim <kgene@kernel.org>
+> CC: Mark Brown <broonie@kernel.org>
+> CC: linux-samsung-soc at vger.kernel.org
+> CC: linux-spi at vger.kernel.org
+> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> ---
+> Hi,
+>
+> this patch depends on Krzysztof's previous patch-set on the
+> MAINTAINER file: https://lkml.org/lkml/2016/8/16/571
 
-Add the QDMA node for ls1021a platform to
-support QDMA driver.
+Thanks for taking care of SPI. From my side:
+Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
----
- arch/arm/boot/dts/ls1021a.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+I think there is no strict dependency on my patch (patches do not
+overlap) so it can safely go through SPI tree if accepted.
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 368e219..a1ca071 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -493,6 +493,16 @@
- 				 <&platform_clk 1>;
- 		};
- 
-+		qdma: qdma at 8390000 {
-+			compatible = "fsl,ls1021a-qdma";
-+			reg = <0x0 0x8398000 0x0 0x2000 /* Controller regs */
-+			       0x0 0x839a000 0x0 0x2000>; /* Block regs */
-+			interrupts = <GIC_SPI 185 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "qdma-error", "qdma-queue";
-+			big-endian;
-+		};
-+
- 		dcu: dcu at 2ce0000 {
- 			compatible = "fsl,ls1021a-dcu";
- 			reg = <0x0 0x2ce0000 0x0 0x10000>;
--- 
-2.1.0.27.g96db324
+Best regards,
+Krzysztof
