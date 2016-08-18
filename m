@@ -1,163 +1,225 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 18 Aug 2016 12:10:59 +0200
-Subject: [PATCH 06/13] scpi: add priv_scpi_ops and fill legacy structure
-In-Reply-To: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
-References: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1471515066-3626-7-git-send-email-narmstrong@baylibre.com>
+From: dennis.chen@arm.com (Dennis Chen)
+Date: Thu, 18 Aug 2016 18:50:07 +0800
+Subject: [PATCH v4 09/15] drivers: acpi: iort: add support for ARM SMMU
+ platform devices creation
+In-Reply-To: <1471274620-20754-10-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1471274620-20754-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1471274620-20754-10-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20160818105005.GA20404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to use the legacy functions variants, add a new priv_scpi_ops
-structure that will contain the internal alterne functions and then use these
-alternate call in the probe function.
+Hi Lorenzo,
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/firmware/arm_scpi.c | 68 ++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 64 insertions(+), 4 deletions(-)
+On Mon, Aug 15, 2016 at 04:23:34PM +0100, Lorenzo Pieralisi wrote:
+> In ARM ACPI systems, IOMMU components are specified through static
+> IORT table entries. In order to create platform devices for the
+> corresponding ARM SMMU components, IORT kernel code should be made
+> able to parse IORT table entries and create platform devices
+> dynamically.
+> 
+> This patch adds the generic IORT infrastructure required to create
+> platform devices for ARM SMMUs.
+> 
+> ARM SMMU versions have different resources requirement therefore this
+> patch also introduces an IORT specific structure (ie iort_iommu_config)
+> that contains hooks (to be defined when the corresponding ARM SMMU
+> driver support is added to the kernel) to be used to define the
+> platform devices names, init the IOMMUs, count their resources and
+> finally initialize them.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Tomasz Nowicki <tn@semihalf.com>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> ---
+>  drivers/acpi/arm64/iort.c | 153 ++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 153 insertions(+)
+> 
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index f6db3d8..4043071 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/kernel.h>
+>  #include <linux/list.h>
+>  #include <linux/pci.h>
+> +#include <linux/platform_device.h>
+>  #include <linux/slab.h>
+>  
+>  struct iort_its_msi_chip {
+> @@ -454,6 +455,157 @@ iort_get_device_domain(struct device *dev, u32 req_id)
+>  	return irq_find_matching_fwnode(handle, DOMAIN_BUS_PCI_MSI);
+>  }
+>  
+> +struct iort_iommu_config {
+> +	const char *name;
+> +	int (*iommu_init)(struct acpi_iort_node *node);
+> +	bool (*iommu_is_coherent)(struct acpi_iort_node *node);
+> +	int (*iommu_count_resources)(struct acpi_iort_node *node);
+> +	void (*iommu_init_resources)(struct resource *res,
+> +				     struct acpi_iort_node *node);
+> +};
+> +
+> +static const struct iort_iommu_config * __init
+> +iort_get_iommu_config(struct acpi_iort_node *node)
+> +{
+> +	return NULL;
+> +}
+> +
+> +/**
+> + * iort_add_smmu_platform_device() - Allocate a platform device for SMMU
+> + * @fwnode: IORT node associated fwnode handle
+> + * @node: Pointer to SMMU ACPI IORT node
+> + *
+> + * Returns: 0 on success, <0 failure
+> + */
+> +static int __init
+> +iort_add_smmu_platform_device(struct fwnode_handle *fwnode,
+> +			      struct acpi_iort_node *node)
+> +{
+> +	struct platform_device *pdev;
+> +	struct resource *r;
+> +	enum dev_dma_attr attr;
+> +	int ret, count;
+> +	const struct iort_iommu_config *ops =
+> +				iort_get_iommu_config(node);
+> +
+> +	if (!ops)
+> +		return -ENODEV;
+> +
+> +	pdev = platform_device_alloc(ops->name, PLATFORM_DEVID_AUTO);
+> +	if (!pdev)
+> +		return PTR_ERR(pdev);
+> +
+> +	count = ops->iommu_count_resources(node);
+> +
+> +	r = kcalloc(count, sizeof(*r), GFP_KERNEL);
+> +	if (!r) {
+> +		ret = -ENOMEM;
+> +		goto dev_put;
+> +	}
+> +
+> +	ops->iommu_init_resources(r, node);
+> +
+> +	ret = platform_device_add_resources(pdev, r, count);
+> +	/*
+> +	 * Resources are duplicated in platform_device_add_resources,
+> +	 * free their allocated memory
+> +	 */
+> +	kfree(r);
+> +
+> +	if (ret)
+> +		goto dev_put;
+> +
+> +	/*
+> +	 * Add a copy of IORT node pointer to platform_data to
+> +	 * be used to retrieve IORT data information.
+> +	 */
+> +	ret = platform_device_add_data(pdev, &node, sizeof(node));
+> +	if (ret)
+> +		goto dev_put;
+> +
+> +	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
+> +	if (!pdev->dev.dma_mask) {
+> +		ret = -ENOMEM;
+> +		goto dev_put;
+> +	}
+> +
+> +	pdev->dev.fwnode = fwnode;
+> +
+> +	/*
+> +	 * Set default dma mask value for the table walker,
+> +	 * to be overridden on probing with correct value.
+> +	 */
+> +	*pdev->dev.dma_mask = DMA_BIT_MASK(32);
+> +	pdev->dev.coherent_dma_mask = *pdev->dev.dma_mask;
+> +
+> +	attr = ops->iommu_is_coherent(node) ?
+> +			     DEV_DMA_COHERENT : DEV_DMA_NON_COHERENT;
+> +
+> +	/* Configure DMA for the page table walker */
+> +	acpi_dma_configure(&pdev->dev, attr);
+> +
+> +	ret = platform_device_add(pdev);
+> +	if (ret)
+> +		goto dma_deconfigure;
+> +
+> +	return 0;
+> +
+> +dma_deconfigure:
+> +	acpi_dma_deconfigure(&pdev->dev);
+> +	kfree(pdev->dev.dma_mask);
+> +
+> +dev_put:
+> +	platform_device_put(pdev);
+> +
+> +	return ret;
+> +}
+> +
+> +static void __init iort_smmu_init(void)
+> +{
+> +	struct acpi_iort_node *iort_node, *iort_end;
+> +	struct acpi_table_iort *iort;
+> +	struct fwnode_handle *fwnode;
+> +	int i, ret;
+> +
+> +	/*
+> +	 * table and iort will both point to the start of IORT table, but
+> +	 * have different struct types
+> +	 */
+> +	iort = (struct acpi_table_iort *)iort_table;
+>
+If the firmware of a platform happens to miss the IORT table, then iort_table here
+will be a NULL pointer, in this case 'NULL pointer dereference' kernel panic will occur, 
+if this is not an expected behavior then we can add a sanity check here to avoid this. 
+IORT missing is a fatal error? I don't think so.
 
-diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-index b0d911b..3fe39fe 100644
---- a/drivers/firmware/arm_scpi.c
-+++ b/drivers/firmware/arm_scpi.c
-@@ -213,6 +213,7 @@ struct scpi_drvinfo {
- 	struct scpi_ops *scpi_ops;
- 	struct scpi_chan *channels;
- 	struct scpi_dvfs_info *dvfs[MAX_DVFS_DOMAINS];
-+	const struct priv_scpi_ops *ops;
- };
- 
- /*
-@@ -299,6 +300,17 @@ struct dev_pstate_set {
- 	u8 pstate;
- } __packed;
- 
-+struct priv_scpi_ops {
-+	/* Internal Specific Ops */
-+	void (*handle_remote_msg)(struct mbox_client *c, void *msg);
-+	void (*tx_prepare)(struct mbox_client *c, void *msg);
-+	/* Message Specific Ops */
-+	int (*init_versions)(struct scpi_drvinfo *info);
-+	int (*dvfs_get_info)(u8 domain, struct dvfs_info *buf);
-+	/* System wide Ops */
-+	struct scpi_ops *scpi_ops;
-+};
-+
- static struct scpi_drvinfo *scpi_info;
- 
- static int scpi_linux_errmap[SCPI_ERR_MAX] = {
-@@ -695,9 +707,12 @@ static struct scpi_dvfs_info *scpi_dvfs_get_info(u8 domain)
- 	if (scpi_info->dvfs[domain])	/* data already populated */
- 		return scpi_info->dvfs[domain];
- 
--	ret = scpi_send_message(SCPI_CMD_GET_DVFS_INFO, &domain, sizeof(domain),
-+	if (scpi_info->ops && scpi_info->ops->dvfs_get_info)
-+		ret = scpi_info->ops->dvfs_get_info(domain, &buf);
-+	else
-+		ret = scpi_send_message(SCPI_CMD_GET_DVFS_INFO,
-+					&domain, sizeof(domain),
- 				&buf, sizeof(buf));
--
- 	if (ret)
- 		return ERR_PTR(ret);
- 
-@@ -855,6 +870,22 @@ static struct scpi_ops scpi_ops = {
- 	.vendor_send_message = scpi_ext_send_message,
- };
- 
-+static struct scpi_ops legacy_scpi_ops = {
-+	.get_version = scpi_get_version,
-+	.clk_get_range = NULL,
-+	.clk_get_val = legacy_scpi_clk_get_val,
-+	.clk_set_val = legacy_scpi_clk_set_val,
-+	.dvfs_get_idx = legacy_scpi_dvfs_get_idx,
-+	.dvfs_set_idx = legacy_scpi_dvfs_set_idx,
-+	.dvfs_get_info = scpi_dvfs_get_info,
-+	.sensor_get_capability = legacy_scpi_sensor_get_capability,
-+	.sensor_get_info = legacy_scpi_sensor_get_info,
-+	.sensor_get_value = legacy_scpi_sensor_get_value,
-+	.device_get_power_state = NULL,
-+	.device_set_power_state = NULL,
-+	.vendor_send_message = legacy_scpi_send_message,
-+};
-+
- struct scpi_ops *get_scpi_ops(void)
- {
- 	return scpi_info ? scpi_info->scpi_ops : NULL;
-@@ -972,8 +1003,17 @@ static int scpi_alloc_xfer_list(struct device *dev, struct scpi_chan *ch)
- 	return 0;
- }
- 
-+static const struct priv_scpi_ops scpi_legacy_ops = {
-+	.handle_remote_msg = legacy_scpi_handle_remote_msg,
-+	.tx_prepare = legacy_scpi_tx_prepare,
-+	.init_versions = legacy_scpi_init_versions,
-+	.dvfs_get_info = legacy_scpi_dvfs_get_info,
-+	.scpi_ops = &legacy_scpi_ops,
-+};
-+
- static const struct of_device_id scpi_of_match[] = {
- 	{.compatible = "arm,scpi"},
-+	{.compatible = "amlogic,meson-gxbb-scpi", .data = &scpi_legacy_ops},
- 	{},
- };
- 
-@@ -986,11 +1026,18 @@ static int scpi_probe(struct platform_device *pdev)
- 	struct scpi_chan *scpi_chan;
- 	struct device *dev = &pdev->dev;
- 	struct device_node *np = dev->of_node;
-+	const struct of_device_id *match;
-+
-+	match = of_match_device(scpi_of_match, &pdev->dev);
-+	if (!match)
-+		return -EINVAL;
- 
- 	scpi_info = devm_kzalloc(dev, sizeof(*scpi_info), GFP_KERNEL);
- 	if (!scpi_info)
- 		return -ENOMEM;
- 
-+	scpi_info->ops = match->data;
-+
- 	count = of_count_phandle_with_args(np, "mboxes", "#mbox-cells");
- 	if (count < 0) {
- 		dev_err(dev, "no mboxes property in '%s'\n", np->full_name);
-@@ -1023,7 +1070,13 @@ static int scpi_probe(struct platform_device *pdev)
- 		pchan->tx_payload = pchan->rx_payload + (size >> 1);
- 
- 		cl->dev = dev;
--		cl->rx_callback = scpi_handle_remote_msg;
-+		if (scpi_info->ops && scpi_info->ops->handle_remote_msg)
-+			cl->rx_callback = scpi_info->ops->handle_remote_msg;
-+		else
-+			cl->rx_callback = scpi_handle_remote_msg;
-+		if (scpi_info->ops && scpi_info->ops->tx_prepare)
-+			cl->tx_prepare = scpi_info->ops->tx_prepare;
-+		else
- 		cl->tx_prepare = scpi_tx_prepare;
- 		cl->tx_block = true;
- 		cl->tx_tout = 20;
-@@ -1054,6 +1107,9 @@ err:
- 	scpi_info->num_chans = count;
- 	platform_set_drvdata(pdev, scpi_info);
- 
-+	if (scpi_info->ops && scpi_info->ops->init_versions)
-+		ret = scpi_info->ops->init_versions(scpi_info);
-+	else
- 	ret = scpi_init_versions(scpi_info);
- 	if (ret) {
- 		dev_err(dev, "incorrect or no SCP firmware found\n");
-@@ -1067,7 +1123,11 @@ err:
- 		  FW_REV_MAJOR(scpi_info->firmware_version),
- 		  FW_REV_MINOR(scpi_info->firmware_version),
- 		  FW_REV_PATCH(scpi_info->firmware_version));
--	scpi_info->scpi_ops = &scpi_ops;
-+
-+	if (scpi_info->ops && scpi_info->ops->scpi_ops)
-+		scpi_info->scpi_ops = scpi_info->ops->scpi_ops;
-+	else
-+		scpi_info->scpi_ops = &scpi_ops;
- 
- 	ret = sysfs_create_groups(&dev->kobj, versions_groups);
- 	if (ret)
--- 
-1.9.1
+Thanks,
+Dennis
+> +
+> +	/* Get the first IORT node */
+> +	iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
+> +				 iort->node_offset);
+> +	iort_end = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
+> +				iort_table->length);
+> +
+> +	for (i = 0; i < iort->node_count; i++) {
+> +
+> +		if (iort_node >= iort_end) {
+> +			pr_err("iort node pointer overflows, bad table\n");
+> +			return;
+> +		}
+> +
+> +		if (iort_node->type == ACPI_IORT_NODE_SMMU ||
+> +		    iort_node->type == ACPI_IORT_NODE_SMMU_V3) {
+> +			fwnode = iort_get_fwnode(iort_node);
+> +
+> +			if (!fwnode)
+> +				continue;
+> +
+> +			ret = iort_add_smmu_platform_device(fwnode,
+> +							    iort_node);
+> +			if (ret) {
+> +				pr_err("Error in platform device creation\n");
+> +				return;
+> +			}
+> +		}
+> +
+> +		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
+> +					 iort_node->length);
+> +	}
+> +}
+> +
+>  void __init iort_table_detect(void)
+>  {
+>  	acpi_status status;
+> @@ -465,4 +617,5 @@ void __init iort_table_detect(void)
+>  	}
+>  
+>  	acpi_probe_device_table(iort);
+> +	iort_smmu_init();
+>  }
+> -- 
+> 2.6.4
+> 
