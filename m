@@ -1,26 +1,63 @@
-From: sophian.yoma@gmail.com (yoma sophian)
-Date: Thu, 18 Aug 2016 18:43:53 +0800
-Subject: how to enable suspend to ram for arm-64 bits
-In-Reply-To: <82ddd0e1-9ecc-5e54-e8ee-86f947fc0ecd@arm.com>
-References: <CADUS3onCMDThNK2ZwSSjGZhPE0M6cybjgCHJR2wVVeK09GC6ng@mail.gmail.com>
- <06a4f0d7-9022-578d-99e0-ddcde31ed895@arm.com>
- <CADUS3onUDk_=UpRoZy1m0hV1VGZYSf22ea8D10MpDbqJCfTkqw@mail.gmail.com>
- <82ddd0e1-9ecc-5e54-e8ee-86f947fc0ecd@arm.com>
-Message-ID: <CADUS3omw=WYhGF00S3DY8mkg_c-59WvD2AHYs4SQSzCYoHQraQ@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 18 Aug 2016 12:45:39 +0200
+Subject: [PATCHv6] support for AD5820 camera auto-focus coil
+In-Reply-To: <20160811111633.GR3182@valkosipuli.retiisi.org.uk>
+References: <20160524090433.GA1277@amd> <20160524091746.GA14536@amd>
+ <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
+ <20160527205140.GA26767@amd> <20160805102611.GA13116@amd>
+ <20160808080955.GA3182@valkosipuli.retiisi.org.uk>
+ <20160808214132.GB2946@xo-6d-61-c0.localdomain>
+ <20160810120105.GP3182@valkosipuli.retiisi.org.uk>
+ <20160808232323.GC2946@xo-6d-61-c0.localdomain>
+ <20160811111633.GR3182@valkosipuli.retiisi.org.uk>
+Message-ID: <20160818104539.GA7427@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Sudeep:
+On Thu 2016-08-11 14:16:34, Sakari Ailus wrote:
+> On Tue, Aug 09, 2016 at 01:23:23AM +0200, Pavel Machek wrote:
+> > On Wed 2016-08-10 15:01:05, Sakari Ailus wrote:
+> > > On Mon, Aug 08, 2016 at 11:41:32PM +0200, Pavel Machek wrote:
+> > > > On Mon 2016-08-08 11:09:56, Sakari Ailus wrote:
+> > > > > On Fri, Aug 05, 2016 at 12:26:11PM +0200, Pavel Machek wrote:
+> > > > > > 
+> > > > > > This adds support for AD5820 autofocus coil, found for example in
+> > > > > > Nokia N900 smartphone.
+> > > > > 
+> > > > > Thanks, Pavel!
+> > > > > 
+> > > > > Let's use V4L2_CID_FOCUS_ABSOLUTE, as is in the patch. If we get something
+> > > > > better in the future, we'll switch to that then.
+> > > > > 
+> > > > > I've applied this to ad5820 branch in my tree.
+> > > > 
+> > > > Thanks. If I understands things correctly, both DTS patch and this patch are
+> > > > waiting in your tree, so we should be good to go for 4.9 (unless some unexpected
+> > > > problems surface)?
+> > > 
+> > > Yeah. I just compiled it but haven't tested it. I presume it'll work. :-)
+> > 
+> > I'm testing it on n900. I guess simpler hardware with ad5820 would be better for the
+> > test...
+> > 
+> > What hardware do you have?
+> 
+> N900. What else could it be? :-) :-)
 
-2016-08-18 16:47 GMT+08:00 Sudeep Holla <sudeep.holla@arm.com>:
->
->> b. in arm64, if some platform has its own suspend flow,  couldn't it
->> adopts arm/match-xxx to register its own global suspend method?
->>
->
-> No, PSCI is highly recommended.
-Yes, I agree with you.
-But it may not mean the ONLY way for all armv8 platform that support
-suspend method is PSCI.
+Heh. Basically anything is easier to develop for than n900 :-(.
 
-Sincerely appreciate your kind help,
+Ok, for real testing, Ivaylo's camera patchset is useful, so that you
+have picture to work with, plus your subdevs for omap3 patchset (which
+needs a forward port).
+
+I have patches against v4.7, if you are interested.
+
+I guess subdevs for omap3 should be merged at this point. Do you have
+any plans to do that, or should I take a look?
+
+Best regards,
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
