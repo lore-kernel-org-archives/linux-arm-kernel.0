@@ -1,43 +1,208 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 18 Aug 2016 11:14:07 -0700
-Subject: [PATCH V2 RFC 0/6] ARM: dts: bcm2835: Add Raspberry Pi Zero
-In-Reply-To: <1469559213-16160-1-git-send-email-stefan.wahren@i2se.com>
-References: <1469559213-16160-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <87lgzuj66o.fsf@eliezer.anholt.net>
+From: geoff@infradead.org (Geoff Levand)
+Date: Thu, 18 Aug 2016 18:21:02 +0000
+Subject: [PATCH v4 1/3] kexec: Add common device tree routines
+In-Reply-To: <cover.1471543843.git.geoff@infradead.org>
+References: <cover.1471543843.git.geoff@infradead.org>
+Message-ID: <9ba9aa1e5325e0bd1014d4e234b5639cee63f282.1471543843.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+Common device tree routines that can be shared between all arches
+that have device tree support.
 
-> This patch series is only a draft and not intended to be merged. Patches 1 and 2
-> aren't bcm2835 specific and should be helpful for other platforms. 
-> The patches 2 - 4 are required for otg / gadget mode. The last patch
-> based on the work of Lubomir Rintel [1] and Noralf Tr?nnes [2].
->
-> Changes since V1:
-> - rebase to current linux-next
-> - add patches 1 - 4 for otg/gadget support
-> - add patch 5 with model compatible
-> - use polarity define for ACT LED
->
-> [1] - http://lists.infradead.org/pipermail/linux-rpi-kernel/2016-February/003221.html
-> [2] - https://github.com/raspberrypi/linux/pull/1239/
->
-> Stefan Wahren (6):
->   usb: dwc2: core: Avoid nonsense error in gadget mode
->   usb: dwc2: Add DT properties to specify fifo size in host/otg mode
->   ARM: dts: bcm283x: Add missing usb clock
->   ARM: dts: bcm283x: Add generic USB PHY
->   DT: bindings: bcm: Add Raspberry Pi Zero
->   ARM: dts: bcm2835: Add Raspberry Pi Zero
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+---
+ kexec/Makefile |   4 ++
+ kexec/dt-ops.c | 145 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ kexec/dt-ops.h |  13 ++++++
+ 3 files changed, 162 insertions(+)
+ create mode 100644 kexec/dt-ops.c
+ create mode 100644 kexec/dt-ops.h
 
-Where are we at on these?  I've been holding off waiting for the USB
-bits to get settled.  I can grab the bindings patch, but is there
-anything else we could merge while you're working on USB?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160818/2b308119/attachment.sig>
+diff --git a/kexec/Makefile b/kexec/Makefile
+index e2aee84..cc3f08b 100644
+--- a/kexec/Makefile
++++ b/kexec/Makefile
+@@ -73,6 +73,10 @@ dist				+= kexec/mem_regions.c kexec/mem_regions.h
+ $(ARCH)_MEM_REGIONS		=
+ KEXEC_SRCS			+= $($(ARCH)_MEM_REGIONS)
+ 
++dist				+= kexec/dt-ops.c kexec/dt-ops.h
++$(ARCH)_DT_OPS		=
++KEXEC_SRCS			+= $($(ARCH)_DT_OPS)
++
+ include $(srcdir)/kexec/arch/alpha/Makefile
+ include $(srcdir)/kexec/arch/arm/Makefile
+ include $(srcdir)/kexec/arch/i386/Makefile
+diff --git a/kexec/dt-ops.c b/kexec/dt-ops.c
+new file mode 100644
+index 0000000..915dbf5
+--- /dev/null
++++ b/kexec/dt-ops.c
+@@ -0,0 +1,145 @@
++#include <assert.h>
++#include <errno.h>
++#include <inttypes.h>
++#include <libfdt.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++#include "kexec.h"
++#include "dt-ops.h"
++
++static const char n_chosen[] = "/chosen";
++
++static const char p_bootargs[] = "bootargs";
++static const char p_initrd_start[] = "linux,initrd-start";
++static const char p_initrd_end[] = "linux,initrd-end";
++
++int dtb_set_initrd(char **dtb, off_t *dtb_size, off_t start, off_t end)
++{
++	int result;
++	uint64_t value;
++
++	dbgprintf("%s: start %jd, end %jd, size %jd (%jd KiB)\n",
++		__func__, (intmax_t)start, (intmax_t)end,
++		(intmax_t)(end - start),
++		(intmax_t)(end - start) / 1024);
++
++	value = cpu_to_fdt64(start);
++
++	result = dtb_set_property(dtb, dtb_size, n_chosen, p_initrd_start,
++		&value, sizeof(value));
++
++	if (result)
++		return result;
++
++	value = cpu_to_fdt64(end);
++
++	result = dtb_set_property(dtb, dtb_size, n_chosen, p_initrd_end,
++		&value, sizeof(value));
++
++	if (result) {
++		dtb_delete_property(*dtb, n_chosen, p_initrd_start);
++		return result;
++	}
++
++	return 0;
++}
++
++int dtb_set_bootargs(char **dtb, off_t *dtb_size, const char *command_line)
++{
++	return dtb_set_property(dtb, dtb_size, n_chosen, p_bootargs,
++		command_line, strlen(command_line) + 1);
++}
++
++int dtb_set_property(char **dtb, off_t *dtb_size, const char *node,
++	const char *prop, const void *value, int value_len)
++{
++	int result;
++	int nodeoffset;
++	void *new_dtb;
++	int new_size;
++
++	value_len = FDT_TAGALIGN(value_len);
++
++	new_size = FDT_TAGALIGN(*dtb_size + fdt_node_len(node)
++		+ fdt_prop_len(prop, value_len));
++
++	new_dtb = malloc(new_size);
++
++	if (!new_dtb) {
++		dbgprintf("%s: malloc failed\n", __func__);
++		return -ENOMEM;
++	}
++
++	result = fdt_open_into(*dtb, new_dtb, new_size);
++
++	if (result) {
++		dbgprintf("%s: fdt_open_into failed: %s\n", __func__,
++			fdt_strerror(result));
++		goto on_error;
++	}
++
++	nodeoffset = fdt_path_offset(new_dtb, node);
++	
++	if (nodeoffset == -FDT_ERR_NOTFOUND) {
++		result = fdt_add_subnode(new_dtb, nodeoffset, node);
++
++		if (result) {
++			dbgprintf("%s: fdt_add_subnode failed: %s\n", __func__,
++				fdt_strerror(result));
++			goto on_error;
++		}
++	} else if (nodeoffset < 0) {
++		dbgprintf("%s: fdt_path_offset failed: %s\n", __func__,
++			fdt_strerror(nodeoffset));
++		goto on_error;
++	}
++
++	result = fdt_setprop(new_dtb, nodeoffset, prop, value, value_len);
++
++	if (result) {
++		dbgprintf("%s: fdt_setprop failed: %s\n", __func__,
++			fdt_strerror(result));
++		goto on_error;
++	}
++
++	/*
++	 * Can't call free on dtb since dtb may have been mmaped by
++	 * slurp_file().
++	 */
++
++	result = fdt_pack(new_dtb);
++
++	if (result)
++		dbgprintf("%s: Unable to pack device tree: %s\n", __func__,
++			fdt_strerror(result));
++
++	*dtb = new_dtb;
++	*dtb_size = fdt_totalsize(*dtb);
++
++	return 0;
++
++on_error:
++	free(new_dtb);
++	return result;
++}
++
++int dtb_delete_property(char *dtb, const char *node, const char *prop)
++{
++	int result;
++	int nodeoffset = fdt_path_offset(dtb, node);
++
++	if (nodeoffset < 0) {
++		dbgprintf("%s: fdt_path_offset failed: %s\n", __func__,
++			fdt_strerror(nodeoffset));
++		return nodeoffset;
++	}
++
++	result = fdt_delprop(dtb, nodeoffset, prop);
++
++	if (result)
++		dbgprintf("%s: fdt_delprop failed: %s\n", __func__,
++			fdt_strerror(nodeoffset));
++
++	return result;
++}
+diff --git a/kexec/dt-ops.h b/kexec/dt-ops.h
+new file mode 100644
+index 0000000..e70d15d
+--- /dev/null
++++ b/kexec/dt-ops.h
+@@ -0,0 +1,13 @@
++#if !defined(KEXEC_DT_OPS_H)
++#define KEXEC_DT_OPS_H
++
++#include <sys/types.h>
++
++int dtb_set_initrd(char **dtb, off_t *dtb_size, off_t start, off_t end);
++int dtb_set_bootargs(char **dtb, off_t *dtb_size, const char *command_line);
++int dtb_set_property(char **dtb, off_t *dtb_size, const char *node,
++	const char *prop, const void *value, int value_len);
++
++int dtb_delete_property(char *dtb, const char *node, const char *prop);
++
++#endif
+-- 
+2.7.4
