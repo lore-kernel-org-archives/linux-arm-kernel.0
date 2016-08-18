@@ -1,85 +1,81 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 18 Aug 2016 11:39:12 -0700
-Subject: [PATCH V3 2/5] thermal: bcm2835: add thermal driver for bcm2835
- soc
-In-Reply-To: <87mvn6qa2x.fsf@eliezer.anholt.net>
-References: <1463495753-967-1-git-send-email-kernel@martin.sperl.org>
- <1463495753-967-3-git-send-email-kernel@martin.sperl.org>
- <87mvn6qa2x.fsf@eliezer.anholt.net>
-Message-ID: <87r39lvs4v.fsf@eliezer.anholt.net>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Thu, 18 Aug 2016 11:56:01 -0700
+Subject: [PATCH] soc: rockchip: power-domain: Don't (incorrectly) set rk3399
+ up/down counts
+Message-ID: <1471546561-4459-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric Anholt <eric@anholt.net> writes:
+On rk3288 it was important that powerdown and powerup counts for the
+CPU/GPU in the kernel because:
+* The power on default was crazy long.
+* We couldn't rely on the firmware to set this up because really this
+  wasn't the firmware's job--the kernel was the only one that really
+  cared about bringing up / down CPUs and the GPU and doing suspend /
+  resume (which involves bringing up / down CPUs).
 
-> kernel at martin.sperl.org writes:
->
->> From: Martin Sperl <kernel@martin.sperl.org>
->>
->> Add basic thermal driver for bcm2835 SOC.
->>
->> This driver currently relies on the firmware setting up the
->> tsense HW block and does not set it up itself.
->>
->> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
->>
->> ChangeLog:
->>  V1 -> V2: added specific settings depending on compatiblity
->> 	   added trip point based on register
->> 	   setting up ctrl-register if HW is not enabled by firmware
->> 	     as per recommendation of Eric (untested)
->> 	   check that clock frequency is in range
->> 	     (1.9 - 5MHz - as per comment in clk-bcm2835.c)
->> ---
->
->> diff --git a/drivers/thermal/bcm/Makefile b/drivers/thermal/bcm/Makefile
->> new file mode 100644
->> index 0000000..13456d2
->> --- /dev/null
->> +++ b/drivers/thermal/bcm/Makefile
->> @@ -0,0 +1 @@
->> +obj-$(CONFIG_BCM2835_THERMAL)		:= bcm2835_thermal.o
->> diff --git a/drivers/thermal/bcm/bcm2835_thermal.c b/drivers/thermal/bcm/bcm2835_thermal.c
->> new file mode 100644
->> index 0000000..73138cb
->> --- /dev/null
->> +++ b/drivers/thermal/bcm/bcm2835_thermal.c
->
->> +static const struct of_device_id bcm2835_thermal_of_match_table[];
->> +static int bcm2835_thermal_probe(struct platform_device *pdev)
->> +{
->
->> +	/* enable clock and check rate */
->> +	clk_prepare_enable(data->clk);
->> +	rate = clk_get_rate(data->clk);
->> +	if ((rate < 1920000) || (rate > 5000000)) {
->> +		dev_warn(&pdev->dev,
->> +			 "Clock %pCn is running at %pCr Hz, which is outside the recommended range of 1.9 to 5.0 MHz\n",
->> +			 data->clk, data->clk);
->> +	}
->> +
->> +	/* register it */
->> +	tz = thermal_zone_device_register("bcm2835_thermal",
->> +					  1, 0, data,
->> +					  &bcm2835_thermal_ops,
->> +					  NULL, 0, 0);
->
-> I notice that the polling_delay is set to 0, but we're not using
-> interrupts to trigger the trip.  Is it valid to expose a trip without a
-> polling_delay or interrupts?  Should passive_delay be set as well?
->
-> This is up to the thermal maintainers.  As far as I'm concerned, it's:
->
-> Acked-by: Eric Anholt <eric@anholt.net>
->
-> One it lands I'll pull the defconfig and DT bits.
+On newer ARM systems (like rk3399) ARM Trusted Firmware is in charge of
+bringing up and down the CPUs and it really should be in charge of
+setting all these counts right.  After all ATF is in charge of suspend /
+resume and CPU up / down.  Let's get out of the way and let ATF do its
+job.
 
-Ping on this question to thermal maintainers.  I'd still love to see
-this driver land.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160818/6eb1e5f3/attachment.sig>
+A few other motivations for doing this:
+* Depending on another configuration (PMU_24M_EN_CFG) these counts can
+  be either in 24M or 32k cycles.  Thus, though ATF isn't really so
+  involved in bringing up the GPU, ATF should probably manage the counts
+  for everything so it can also manage the 24M / 32k choice.
+* It turns out that (right now) 24M mode is broken on rk3399 and not
+  being used.  That means that the count the kernel was programming
+  in (24) was not 1 us (which it seems was intended) but was actually
+  .75 ms
+* On rk3399 there are actually 2 separate registers for setting CPU
+  up/down time plus 1 register for GPU up/down time.  The curent kernel
+  code actually was putting the register for the "little" cores in the
+  "CPU" slot and the register for the "big" cores in the "GPU" slot.  It
+  was never initting the GPU counts.
+
+Note: this change assumes that ATF will actually set these values at
+boot, as I'm proposing in <http://crosreview.com/372381>.
+
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+---
+ drivers/soc/rockchip/pm_domains.c | 16 +++++++---------
+ 1 file changed, 7 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
+index 44842a205e4b..91c425d3e66c 100644
+--- a/drivers/soc/rockchip/pm_domains.c
++++ b/drivers/soc/rockchip/pm_domains.c
+@@ -583,10 +583,12 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
+ 	 * Configure power up and down transition delays for CORE
+ 	 * and GPU domains.
+ 	 */
+-	rockchip_configure_pd_cnt(pmu, pmu_info->core_pwrcnt_offset,
+-				  pmu_info->core_power_transition_time);
+-	rockchip_configure_pd_cnt(pmu, pmu_info->gpu_pwrcnt_offset,
+-				  pmu_info->gpu_power_transition_time);
++	if (pmu_info->core_power_transition_time)
++		rockchip_configure_pd_cnt(pmu, pmu_info->core_pwrcnt_offset,
++					pmu_info->core_power_transition_time);
++	if (pmu_info->gpu_pwrcnt_offset)
++		rockchip_configure_pd_cnt(pmu, pmu_info->gpu_pwrcnt_offset,
++					pmu_info->gpu_power_transition_time);
+ 
+ 	error = -ENODEV;
+ 
+@@ -708,11 +710,7 @@ static const struct rockchip_pmu_info rk3399_pmu = {
+ 	.idle_offset = 0x64,
+ 	.ack_offset = 0x68,
+ 
+-	.core_pwrcnt_offset = 0x9c,
+-	.gpu_pwrcnt_offset = 0xa4,
+-
+-	.core_power_transition_time = 24,
+-	.gpu_power_transition_time = 24,
++	/* ARM Trusted Firmware manages power transition times */
+ 
+ 	.num_domains = ARRAY_SIZE(rk3399_pm_domains),
+ 	.domain_info = rk3399_pm_domains,
+-- 
+2.8.0.rc3.226.g39d4020
