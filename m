@@ -1,121 +1,83 @@
-From: felipe.balbi@linux.intel.com (Felipe Balbi)
-Date: Thu, 18 Aug 2016 13:17:59 +0300
-Subject: [PATCH v2 4/7] phy-sun4i-usb: Add support for phy_set_mode
-In-Reply-To: <bf40c95d-ae2e-8980-90c9-f68415b06461@redhat.com>
-References: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
- <1471288892-21702-5-git-send-email-hdegoede@redhat.com>
- <6058a676-1e2c-0301-6edd-eee64b515b51@cogentembedded.com>
- <93bda5ac-4548-9e92-742c-baba7ed52849@redhat.com>
- <877fbe5xuk.fsf@linux.intel.com>
- <bf40c95d-ae2e-8980-90c9-f68415b06461@redhat.com>
-Message-ID: <871t1m5qjs.fsf@linux.intel.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 18 Aug 2016 12:11:01 +0200
+Subject: [PATCH 08/13] scpi: add a vendor_msg mechanism in case the mailbox
+ message differs
+In-Reply-To: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
+References: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1471515066-3626-9-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In case the mailbox message pointer must contain a specific structure.
+add a mechanism to override the pointer sent to the mailbox by a
+vendor specific data initialized by a vendor speficic function.
 
-Hi,
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ drivers/firmware/arm_scpi.c | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
 
-Hans de Goede <hdegoede@redhat.com> writes:
-
-[...]
-
->>>>>  void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
->>>>>  {
->>>>>      struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
->>>> [...]
->>>>
->>>> $ scripts/checkpatch.pl ~/patches/phy-sun4i-usb-Add-support-for-phy_set_mode.patch
->>>> ERROR: trailing statements should be on next line
->>>> #29: FILE: drivers/phy/phy-sun4i-usb.c:439:
->>>> +    case PHY_MODE_USB_HOST:   data->dr_mode = USB_DR_MODE_HOST; break;
->>>>
->>>> ERROR: trailing statements should be on next line
->>>> #30: FILE: drivers/phy/phy-sun4i-usb.c:440:
->>>> +    case PHY_MODE_USB_DEVICE: data->dr_mode = USB_DR_MODE_PERIPHERAL; break;
->>>>
->>>> ERROR: trailing statements should be on next line
->>>> #31: FILE: drivers/phy/phy-sun4i-usb.c:441:
->>>> +    case PHY_MODE_USB_OTG:    data->dr_mode = USB_DR_MODE_OTG; break;
->>>
->>> This is normal codeing style for a switch-case assigning a single value per case,
->>> but checkpatch does not know this.
->>
->> I don't see that in CodingStyle
->
-> It is an exception to the rule as such it is not listed, but this
-> really is quite a normal thing to do in C code.
->
->> and it's quite ugly.
->
-> So this is ugly:
->
->      switch (mode) {
->      case PHY_MODE_USB_HOST:   data->dr_mode = USB_DR_MODE_HOST; break;
->      case PHY_MODE_USB_DEVICE: data->dr_mode = USB_DR_MODE_PERIPHERAL; break;
->      case PHY_MODE_USB_OTG:    data->dr_mode = USB_DR_MODE_OTG; break;
->      default:
->          return -EINVAL;
->      }
->
-> Where as this is not:
->
->      switch (mode) {
->      case PHY_MODE_USB_HOST:
->          data->dr_mode = USB_DR_MODE_HOST;
->          break;
->      case PHY_MODE_USB_DEVICE:
->          data->dr_mode = USB_DR_MODE_PERIPHERAL;
->          break;
->      case PHY_MODE_USB_OTG:
->          data->dr_mode = USB_DR_MODE_OTG;
->          break;
->      default:
->          return -EINVAL;
->      }
->
-> ???
->
-> IMHO the original version is much easier to read / makes it much
-> clearer what the code is doing.
->
-> But if you insist I can do a v3 changing the coding style to
-> the (IMHO) uglier version.
->
-> Also note that the real ugliness is that we've 3 different enums
-> for host / device / dual-role. For some reason the musb code has
-> 2 all of its own and then there is "enum phy_mode".
->
-> Anyways let me know if you want a v3 with check-patch warnings
-> fixed.
-
-I see it's somewhat common even in drivers/usb:
-
-$ git grep -ce "case \w+:.*break;" -- drivers/usb/ 
-drivers/usb/gadget/udc/net2272.c:4
-drivers/usb/host/ehci-hcd.c:3
-drivers/usb/host/isp116x.h:2
-drivers/usb/host/ohci-dbg.c:14
-drivers/usb/host/sl811-hcd.c:7
-drivers/usb/host/uhci-debug.c:8
-drivers/usb/image/microtek.c:64
-drivers/usb/mon/mon_text.c:6
-drivers/usb/musb/musb_gadget.c:2
-drivers/usb/serial/digi_acceleport.c:23
-drivers/usb/serial/ftdi_sio.c:10
-drivers/usb/serial/mct_u232.c:10
-drivers/usb/serial/spcp8x5.c:17
-drivers/usb/serial/whiteheat.c:4
-drivers/usb/storage/debug.c:86
-
-so I'm okay either way. Kishon has the final say here since he's
-drivers/phy/ maintainer.
-
+diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+index d3be4c5..275feef 100644
+--- a/drivers/firmware/arm_scpi.c
++++ b/drivers/firmware/arm_scpi.c
+@@ -189,6 +189,7 @@ struct scpi_xfer {
+ 	unsigned int rx_len;
+ 	struct list_head node;
+ 	struct completion done;
++	void *vendor_msg;
+ };
+ 
+ struct scpi_chan {
+@@ -203,6 +204,7 @@ struct scpi_chan {
+ 	struct mutex xfers_lock;
+ 	u8 token;
+ 	struct scpi_xfer *t;
++	void *vendor_data;
+ };
+ 
+ struct scpi_drvinfo {
+@@ -302,6 +304,8 @@ struct dev_pstate_set {
+ 
+ struct priv_scpi_ops {
+ 	/* Internal Specific Ops */
++	int (*init)(struct device *dev, struct scpi_chan *chan);
++	int (*prepare)(struct scpi_chan *chan);
+ 	void (*handle_remote_msg)(struct mbox_client *c, void *msg);
+ 	void (*tx_prepare)(struct mbox_client *c, void *msg);
+ 	/* Message Specific Ops */
+@@ -498,7 +502,18 @@ static int legacy_scpi_send_message(u8 cmd, void *tx_buf, unsigned int tx_len,
+ 	init_completion(&msg->done);
+ 	scpi_chan->t = msg;
+ 
+-	ret = mbox_send_message(scpi_chan->chan, &msg->cmd);
++	/* Call the prepare hook to eventually set the vendor_msg */
++	if (scpi_info->ops &&
++	    scpi_info->ops->prepare) {
++		ret = scpi_info->ops->prepare(scpi_chan);
++		if (ret) {
++			mutex_unlock(&scpi_chan->xfers_lock);
++			return ret;
++		}
++	} else
++		msg->vendor_msg = &msg->cmd;
++
++	ret = mbox_send_message(scpi_chan->chan, msg->vendor_msg);
+ 	if (ret < 0)
+ 		goto out;
+ 
+@@ -1069,6 +1084,12 @@ static int scpi_probe(struct platform_device *pdev)
+ 		}
+ 		pchan->tx_payload = pchan->rx_payload + (size >> 1);
+ 
++		if (scpi_info->ops && scpi_info->ops->init) {
++			ret = scpi_info->ops->init(dev, pchan);
++			if (ret)
++				goto err;
++		}
++
+ 		cl->dev = dev;
+ 		if (scpi_info->ops && scpi_info->ops->handle_remote_msg)
+ 			cl->rx_callback = scpi_info->ops->handle_remote_msg;
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160818/83f1464c/attachment.sig>
+1.9.1
