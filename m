@@ -1,35 +1,82 @@
 From: dawei.chien@mediatek.com (Dawei Chien)
-Date: Thu, 18 Aug 2016 11:50:51 +0800
-Subject: [PATCH v2 1/3] dt-bindings: thermal: Add binding document for
- Mediatek thermal controller
+Date: Thu, 18 Aug 2016 11:50:53 +0800
+Subject: [PATCH v2 3/3] arm: dts: thermal: add thermal/auxadc node.
 In-Reply-To: <1471492253-7185-1-git-send-email-dawei.chien@mediatek.com>
 References: <1471492253-7185-1-git-send-email-dawei.chien@mediatek.com>
-Message-ID: <1471492253-7185-2-git-send-email-dawei.chien@mediatek.com>
+Message-ID: <1471492253-7185-4-git-send-email-dawei.chien@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the device tree binding documentation for the mediatek thermal
-controller found on Mediatek MT2701.
+This adds the thermal controller and auxadc nodes
+to the Mediatek MT2701 dtsi file.
 
 Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
 ---
- .../bindings/thermal/mediatek-thermal.txt          |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+This patch depned on:
+https://patchwork.kernel.org/patch/9249589/
+---
+ arch/arm/boot/dts/mt2701.dtsi |   44 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-index 81f9a51..e2f494d 100644
---- a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-@@ -8,7 +8,9 @@ apmixedsys register space via AHB bus accesses, so a phandle to the APMIXEDSYS
- is also needed.
+diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+index e9150a4..cee4724 100644
+--- a/arch/arm/boot/dts/mt2701.dtsi
++++ b/arch/arm/boot/dts/mt2701.dtsi
+@@ -87,6 +87,36 @@
+ 		clock-output-names = "rtc32k";
+ 	};
  
- Required properties:
--- compatible: "mediatek,mt8173-thermal"
-+- compatible:
-+  - "mediatek,mt8173-thermal" : For MT8173 family of SoCs
-+  - "mediatek,mt2701-thermal" : For MT2701 family of SoCs
- - reg: Address range of the thermal controller
- - interrupts: IRQ for the thermal controller
- - clocks, clock-names: Clocks needed for the thermal controller. required
++	thermal-zones {
++		cpu_thermal: cpu_thermal {
++			polling-delay-passive = <1000>; /* milliseconds */
++			polling-delay = <1000>; /* milliseconds */
++
++			thermal-sensors = <&thermal 0>;
++			sustainable-power = <1000>;
++
++			trips {
++				threshold: trip-point at 0 {
++					temperature = <68000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				target: trip-point at 1 {
++					temperature = <85000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				cpu_crit: cpu_crit at 0 {
++					temperature = <115000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++		};
++	};
++
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+ 		interrupt-parent = <&gic>;
+@@ -222,4 +252,18 @@
+ 		clock-names = "baud", "bus";
+ 		status = "disabled";
+ 	};
++
++	thermal: thermal at 1100b000 {
++		#thermal-sensor-cells = <0>;
++		compatible = "mediatek,mt2701-thermal";
++		reg = <0 0x1100b000 0 0x1000>;
++		interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
++		clock-names = "therm", "auxadc";
++		resets = <&pericfg 0x10>;
++		reset-names = "therm";
++		mediatek,auxadc = <&auxadc>;
++		mediatek,apmixedsys = <&apmixedsys>;
++	};
++
+ };
 -- 
 1.7.9.5
