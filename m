@@ -1,123 +1,103 @@
 From: B56489@freescale.com (Yunhui Cui)
-Date: Thu, 18 Aug 2016 15:38:02 +0800
-Subject: [PATCH v3 7/9] mtd: fsl-quadspi: Solve Micron Spansion flash command
- conflict
+Date: Thu, 18 Aug 2016 15:38:03 +0800
+Subject: [PATCH v3 8/9] mtd: fsl-quadspi: disable AHB buffer prefetch
 In-Reply-To: <1471505884-33996-1-git-send-email-B56489@freescale.com>
 References: <1471505884-33996-1-git-send-email-B56489@freescale.com>
-Message-ID: <1471505884-33996-7-git-send-email-B56489@freescale.com>
+Message-ID: <1471505884-33996-8-git-send-email-B56489@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Yunhui Cui <yunhui.cui@nxp.com>
 
-Add some lut_tables to support quad mode for flash n25q128
-on the board ls1021a-twr and solve flash Spansion and Micron
-command conflict.
-In switch {}, The value of command SPINOR_OP_RD_EVCR and
-SPINOR_OP_SPANSION_RDAR is the same. They have to share
-the same seq_id: SEQID_RDAR_OR_RD_EVCR.
+A-009282: QuadSPI: QuadSPI data pre-fetch can result in incorrect data
+Affects: QuadSPI
+Description: With AHB buffer prefetch enabled, the QuadSPI may return
+incorrect data on the AHB
+interface. The buffer pre-fetch is enabled if the fetch size as
+configured either in the LUT or in
+the BUFxCR register is greater than 8 bytes.
+Impact: Only 64 bit read allowed.
+Workaround: Keep the read data size to 64 bits (8 Bytes), which disables
+the prefetch on the AHB buffer,
+and prevents this issue from occurring.
 
 Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
 ---
- drivers/mtd/spi-nor/fsl-quadspi.c | 47 ++++++++++++++++++++++++++++++---------
- 1 file changed, 36 insertions(+), 11 deletions(-)
+ drivers/mtd/spi-nor/fsl-quadspi.c | 33 ++++++++++++++++++++++++---------
+ 1 file changed, 24 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
-index 57eed3c..f9a7d4b 100644
+index f9a7d4b..193e81b 100644
 --- a/drivers/mtd/spi-nor/fsl-quadspi.c
 +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-@@ -207,9 +207,9 @@
- #define SEQID_RDCR		9
- #define SEQID_EN4B		10
- #define SEQID_BRWR		11
--#define SEQID_RDAR		12
-+#define SEQID_RDAR_OR_RD_EVCR	12
- #define SEQID_WRAR		13
--
-+#define SEQID_WD_EVCR           14
+@@ -41,6 +41,8 @@
+ #define QUADSPI_QUIRK_TKT253890		(1 << 2)
+ /* Controller cannot wake up from wait mode, TKT245618 */
+ #define QUADSPI_QUIRK_TKT245618         (1 << 3)
++/*Errata A-009282: disable the AHB buffer prefetch */
++#define QUADSPI_QUIRK_ADASZ_8BYTE_LIMIT (1 << 4)
+ /* QSPI_AMBA_BASE is internally added by SOC design */
+ #define QUADSPI_AMBA_BASE_INTERNAL	(0x10000)
  
- #define QUADSPI_MIN_IOMAP SZ_4M
+@@ -270,7 +272,7 @@ static struct fsl_qspi_devtype_data ls1021a_data = {
+ 	.rxfifo = 128,
+ 	.txfifo = 64,
+ 	.ahb_buf_size = 1024,
+-	.driver_data = 0,
++	.driver_data = QUADSPI_QUIRK_ADASZ_8BYTE_LIMIT,
+ };
  
-@@ -393,6 +393,7 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- 	int rxfifo = q->devtype_data->rxfifo;
- 	u32 lut_base;
- 	int i;
-+	const struct fsl_qspi_devtype_data *devtype_data = q->devtype_data;
+ static struct fsl_qspi_devtype_data ls2080a_data = {
+@@ -278,7 +280,8 @@ static struct fsl_qspi_devtype_data ls2080a_data = {
+ 	.rxfifo = 128,
+ 	.txfifo = 64,
+ 	.ahb_buf_size = 1024,
+-	.driver_data = QUADSPI_AMBA_BASE_INTERNAL,
++	.driver_data = QUADSPI_AMBA_BASE_INTERNAL
++		       | QUADSPI_QUIRK_ADASZ_8BYTE_LIMIT,
+ };
  
- 	struct spi_nor *nor = &q->nor[0];
- 	u8 addrlen = (nor->addr_width == 3) ? ADDR24BIT : ADDR32BIT;
-@@ -489,16 +490,26 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- 	qspi_writel(q, LUT0(CMD, PAD1, SPINOR_OP_BRWR),
- 			base + QUADSPI_LUT(lut_base));
- 
-+
- 	/*
--	 * Read any device register.
--	 * Used for Spansion S25FS-S family flash only.
-+	 * Flash Micron and Spansion command confilict
-+	 * use the same value 0x65. But it indicates different meaning.
- 	 */
--	lut_base = SEQID_RDAR * 4;
--	qspi_writel(q, LUT0(CMD, PAD1, SPINOR_OP_SPANSION_RDAR) |
--			LUT1(ADDR, PAD1, ADDR24BIT),
--			base + QUADSPI_LUT(lut_base));
--	qspi_writel(q, LUT0(DUMMY, PAD1, 8) | LUT1(FSL_READ, PAD1, 1),
--			base + QUADSPI_LUT(lut_base + 1));
-+	lut_base = SEQID_RDAR_OR_RD_EVCR * 4;
-+	if (devtype_data->devtype == FSL_QUADSPI_LS2080A) {
-+		/*
-+		* Read any device register.
-+		* Used for Spansion S25FS-S family flash only.
-+		*/
-+		qspi_writel(q, LUT0(CMD, PAD1, SPINOR_OP_SPANSION_RDAR) |
-+			    LUT1(ADDR, PAD1, ADDR24BIT),
-+			    base + QUADSPI_LUT(lut_base));
-+		qspi_writel(q, LUT0(DUMMY, PAD1, 8) | LUT1(FSL_READ, PAD1, 1),
-+			    base + QUADSPI_LUT(lut_base + 1));
-+	} else {
-+		qspi_writel(q, LUT0(CMD, PAD1, SPINOR_OP_RD_EVCR),
-+			    base + QUADSPI_LUT(lut_base));
-+	}
- 
- 	/*
- 	 * Write any device register.
-@@ -511,6 +522,11 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- 	qspi_writel(q, LUT0(FSL_WRITE, PAD1, 1),
- 			base + QUADSPI_LUT(lut_base + 1));
- 
-+	/* Write EVCR register */
-+	lut_base = SEQID_WD_EVCR * 4;
-+	qspi_writel(q, LUT0(CMD, PAD1, SPINOR_OP_WD_EVCR),
-+		    base + QUADSPI_LUT(lut_base));
-+
- 	fsl_qspi_lock_lut(q);
+ #define FSL_QSPI_MAX_CHIP	4
+@@ -328,6 +331,11 @@ static inline int has_added_amba_base_internal(struct fsl_qspi *q)
+ 	return q->devtype_data->driver_data & QUADSPI_AMBA_BASE_INTERNAL;
  }
  
-@@ -523,8 +539,15 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
- 	case SPINOR_OP_READ_FAST:
- 	case SPINOR_OP_READ4_FAST:
- 		return SEQID_READ;
-+	/*
-+	 * Spansion & Micron use the same command value 0x65
-+	 * Spansion: SPINOR_OP_SPANSION_RDAR, read any register.
-+	 * Micron: SPINOR_OP_RD_EVCR,
-+	 * read enhanced volatile configuration register.
-+	 * case SPINOR_OP_RD_EVCR:
-+	 */
- 	case SPINOR_OP_SPANSION_RDAR:
--		return SEQID_RDAR;
-+		return SEQID_RDAR_OR_RD_EVCR;
- 	case SPINOR_OP_SPANSION_WRAR:
- 		return SEQID_WRAR;
- 	case SPINOR_OP_WREN:
-@@ -550,6 +573,8 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
- 		return SEQID_EN4B;
- 	case SPINOR_OP_BRWR:
- 		return SEQID_BRWR;
-+	case SPINOR_OP_WD_EVCR:
-+		return SEQID_WD_EVCR;
- 	default:
- 		if (cmd == q->nor[0].erase_opcode)
- 			return SEQID_SE;
++static inline int needs_disable_ahb_prefetch(struct fsl_qspi *q)
++{
++	return q->devtype_data->driver_data & QUADSPI_QUIRK_ADASZ_8BYTE_LIMIT;
++}
++
+ /*
+  * R/W functions for big- or little-endian registers:
+  * The qSPI controller's endian is independent of the CPU core's endian.
+@@ -757,14 +765,21 @@ static void fsl_qspi_init_abh_read(struct fsl_qspi *q)
+ 	qspi_writel(q, QUADSPI_BUFXCR_INVALID_MSTRID, base + QUADSPI_BUF0CR);
+ 	qspi_writel(q, QUADSPI_BUFXCR_INVALID_MSTRID, base + QUADSPI_BUF1CR);
+ 	qspi_writel(q, QUADSPI_BUFXCR_INVALID_MSTRID, base + QUADSPI_BUF2CR);
+-	/*
+-	 * Set ADATSZ with the maximum AHB buffer size to improve the
+-	 * read performance.
+-	 */
+-	qspi_writel(q, QUADSPI_BUF3CR_ALLMST_MASK |
+-			((q->devtype_data->ahb_buf_size / 8)
+-			<< QUADSPI_BUF3CR_ADATSZ_SHIFT),
++
++	if (needs_disable_ahb_prefetch(q)) {
++		qspi_writel(q, QUADSPI_BUF3CR_ALLMST_MASK |
++			(1 << QUADSPI_BUF3CR_ADATSZ_SHIFT),
+ 			base + QUADSPI_BUF3CR);
++	} else {
++		/*
++		 * Set ADATSZ with the maximum AHB buffer size to improve the
++		 * read performance.
++		*/
++		qspi_writel(q, QUADSPI_BUF3CR_ALLMST_MASK |
++				((q->devtype_data->ahb_buf_size / 8)
++				<< QUADSPI_BUF3CR_ADATSZ_SHIFT),
++				base + QUADSPI_BUF3CR);
++	}
+ 
+ 	/* We only use the buffer3 */
+ 	qspi_writel(q, 0, base + QUADSPI_BUF0IND);
 -- 
 2.1.0.27.g96db324
