@@ -1,38 +1,33 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Aug 2016 15:53:00 +0100
-Subject: [PATCH v2 0/8] ARM: V7M: Support caches
-In-Reply-To: <1471524360-31554-1-git-send-email-vladimir.murzin@arm.com>
-References: <1471524360-31554-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20160818145300.GA1041@n2100.armlinux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 18 Aug 2016 10:55:33 -0400
+Subject: Merging code with arch condition into head.S
+In-Reply-To: <20160818144413.GB13458@lunn.ch>
+References: <CACna6rxhhD5kfa1oJzqp2dQxBhjaUzdTkNPMcm-+iNvQHD8yzA@mail.gmail.com>
+ <CAKv+Gu8dP8oAq-ykejskw+AzX-7_h_Ws6sFdXO+40MiGM14ccA@mail.gmail.com>
+ <CACna6rw1eTiqijo24SiGAYi_XeEGWb-C1L5diYUzpyA3o7e+qw@mail.gmail.com>
+ <20160818134722.GA13458@lunn.ch>
+ <CACna6rwOXMEwJ=OjovpZgFHTAR3wrwAdQrgtxFzDYRPKypoSeg@mail.gmail.com>
+ <20160818144413.GB13458@lunn.ch>
+Message-ID: <CDD72BA1-E050-4EF8-99E7-1B6FC5452F55@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2016 at 01:45:52PM +0100, Vladimir Murzin wrote:
-> This patch set allows M-class cpus benefit of optional cache support.
-> It originally was written by Jonny, I've been keeping it locally mainly
-> rebasing over Linux versions.
-> 
-> The original idea behind patches was to reuse existing cache handling
-> code from v7A/R with help of extra macros to factor out cache handling
-> logic (v7M cache operations are provided via memory mapped interface
-> rather than co-processor instructions).
-> However, that idea was rejected and starting form this (v2) version
-> V7M cache logic lives into file and macros to indirect memory-mapped
-> operations stay there locally since they make it easier to follow the
-> code.
-> 
-> Along with the v7M cache support the first user (Cortex-M7) is
-> introduced.
-> 
-> Patches were tested on MPS2 platform with Cortex-M3/M4/M7. The later
-> one showed significant boot speed-up.
+Hi!
 
->From a quick read through, the approach looks sane, and I think I'm
-now happy with these.
+On Aug 18, 2016, at 10:44, Andrew Lunn <andrew@lunn.ch> wrote:
 
-Thanks.
+>> I think I'll stick to the modified (out of tree) kernel for now, maybe
+>> in a long term this intermediate loader could be a good idea. Did you
+>> ever see solution like this? I never wrote my own loaders, so it'd
+>> take me quite some time to learn required things.
+> 
+> Things might of moved on since then, but try Jason Cooper and the
+> Impedance Matcher.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Search for pxa-impedance-matcher on github. I think under zonque?  That's Daniel Mack. He wrote it. It was Nico's suggestion, though. I just expanded it to some mvebu boards. 
+
+hth,
+
+Jason.
+
+Sorry for hacked up email, I'm on the road atm. 
