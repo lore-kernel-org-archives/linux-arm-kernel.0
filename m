@@ -1,45 +1,44 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Thu, 18 Aug 2016 14:15:18 -0700
-Subject: [PATCH v3 2/5] dt-bindings: sort Rockchip vop compatible by chip's
- number
-In-Reply-To: <loom.20160602T085439-162@post.gmane.org>
-References: <loom.20160602T085439-162@post.gmane.org>
-Message-ID: <1471554918-22353-1-git-send-email-seanpaul@chromium.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 18 Aug 2016 16:15:59 -0500
+Subject: [PATCH v3 0/4] Add DT support for NAND to LCDK via ti-aemif
+In-Reply-To: <m2wpjeqa0o.fsf@baylibre.com> (Kevin Hilman's message of "Thu, 18
+ Aug 2016 12:09:27 -0500")
+References: <20160816223338.20776-1-kbeldan@baylibre.com>
+ <m2wpjeqa0o.fsf@baylibre.com>
+Message-ID: <m2vayxn5gw.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Yao <mark.yao@rock-chips.com>
+Kevin Hilman <khilman@baylibre.com> writes:
 
-Reorder the compatible vop devices to be sorted by chip number
-in ascending order.
+> Karl Beldan <kbeldan@baylibre.com> writes:
+>
+>> Here is another spin. I could get my hands on an EVM and test the
+>> changes on it as well. Doing so, I could also observe that 4bit ECC
+>> on 8bits NANDS is currently broken in mailine. Apparently there had
+>> already been some alerts on the mailing list some months ago.
+>
+> [...]
+>
+>> Karl Beldan (4):
+>>   ARM: davinci: da8xx-dt: Add ti-aemif lookup for clock matching
+>>   ARM: davinci_all_defconfig: Enable AEMIF as a module
+>>   ARM: dts: da850,da850-evm: Add an aemif node and use it for the NAND
+>>   ARM: dts: da850-lcdk: Add NAND to DT
+>
+> Tested on DA850-LCDK with UBIFS.
+>
+> Tested-by: Kevin Hilman <khilman@baylibre.com>
+>
 
-Reviewed-by: Tomasz Figa <tfiga@chromium.org>
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-[seanpaul added commit description per tfiga's review]
-Signed-off-by: Sean Paul <seanpaul@chromium.org>
----
+I forgot to mention that I had to enable:
 
-Resending to add devicetree list
+CONFIG_UBIFS_FS=y
+CONFIG_MTD_UBI=y
 
-Changes in v3:
-	- Updated commit message (Tomasz Figa)
+in order to test with ubifs. Care to send a patch adding these as
+modules to davinci_all_defconfig?
 
- Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks,
 
-diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
-index 5489b59..196121f 100644
---- a/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
-+++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
-@@ -6,8 +6,8 @@ buffer to an external LCD interface.
- 
- Required properties:
- - compatible: value should be one of the following
--		"rockchip,rk3288-vop";
- 		"rockchip,rk3036-vop";
-+		"rockchip,rk3288-vop";
- 
- - interrupts: should contain a list of all VOP IP block interrupts in the
- 		 order: VSYNC, LCD_SYSTEM. The interrupt specifier
--- 
-2.8.0.rc3.226.g39d4020
+Kevin
