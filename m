@@ -1,88 +1,121 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 18 Aug 2016 11:17:48 +0100
-Subject: Applied "MAINTAINERS: add myself as Samsung SPI maintainer" to the
- spi tree
-In-Reply-To: <20160818072555.9208-1-andi.shyti@samsung.com>
-Message-ID: <E1baKOS-0002Br-90@debutante>
+From: felipe.balbi@linux.intel.com (Felipe Balbi)
+Date: Thu, 18 Aug 2016 13:17:59 +0300
+Subject: [PATCH v2 4/7] phy-sun4i-usb: Add support for phy_set_mode
+In-Reply-To: <bf40c95d-ae2e-8980-90c9-f68415b06461@redhat.com>
+References: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
+ <1471288892-21702-5-git-send-email-hdegoede@redhat.com>
+ <6058a676-1e2c-0301-6edd-eee64b515b51@cogentembedded.com>
+ <93bda5ac-4548-9e92-742c-baba7ed52849@redhat.com>
+ <877fbe5xuk.fsf@linux.intel.com>
+ <bf40c95d-ae2e-8980-90c9-f68415b06461@redhat.com>
+Message-ID: <871t1m5qjs.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
 
-   MAINTAINERS: add myself as Samsung SPI maintainer
+Hi,
 
-has been applied to the spi tree at
+Hans de Goede <hdegoede@redhat.com> writes:
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+[...]
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+>>>>>  void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
+>>>>>  {
+>>>>>      struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+>>>> [...]
+>>>>
+>>>> $ scripts/checkpatch.pl ~/patches/phy-sun4i-usb-Add-support-for-phy_set_mode.patch
+>>>> ERROR: trailing statements should be on next line
+>>>> #29: FILE: drivers/phy/phy-sun4i-usb.c:439:
+>>>> +    case PHY_MODE_USB_HOST:   data->dr_mode = USB_DR_MODE_HOST; break;
+>>>>
+>>>> ERROR: trailing statements should be on next line
+>>>> #30: FILE: drivers/phy/phy-sun4i-usb.c:440:
+>>>> +    case PHY_MODE_USB_DEVICE: data->dr_mode = USB_DR_MODE_PERIPHERAL; break;
+>>>>
+>>>> ERROR: trailing statements should be on next line
+>>>> #31: FILE: drivers/phy/phy-sun4i-usb.c:441:
+>>>> +    case PHY_MODE_USB_OTG:    data->dr_mode = USB_DR_MODE_OTG; break;
+>>>
+>>> This is normal codeing style for a switch-case assigning a single value per case,
+>>> but checkpatch does not know this.
+>>
+>> I don't see that in CodingStyle
+>
+> It is an exception to the rule as such it is not listed, but this
+> really is quite a normal thing to do in C code.
+>
+>> and it's quite ugly.
+>
+> So this is ugly:
+>
+>      switch (mode) {
+>      case PHY_MODE_USB_HOST:   data->dr_mode = USB_DR_MODE_HOST; break;
+>      case PHY_MODE_USB_DEVICE: data->dr_mode = USB_DR_MODE_PERIPHERAL; break;
+>      case PHY_MODE_USB_OTG:    data->dr_mode = USB_DR_MODE_OTG; break;
+>      default:
+>          return -EINVAL;
+>      }
+>
+> Where as this is not:
+>
+>      switch (mode) {
+>      case PHY_MODE_USB_HOST:
+>          data->dr_mode = USB_DR_MODE_HOST;
+>          break;
+>      case PHY_MODE_USB_DEVICE:
+>          data->dr_mode = USB_DR_MODE_PERIPHERAL;
+>          break;
+>      case PHY_MODE_USB_OTG:
+>          data->dr_mode = USB_DR_MODE_OTG;
+>          break;
+>      default:
+>          return -EINVAL;
+>      }
+>
+> ???
+>
+> IMHO the original version is much easier to read / makes it much
+> clearer what the code is doing.
+>
+> But if you insist I can do a v3 changing the coding style to
+> the (IMHO) uglier version.
+>
+> Also note that the real ugliness is that we've 3 different enums
+> for host / device / dual-role. For some reason the musb code has
+> 2 all of its own and then there is "enum phy_mode".
+>
+> Anyways let me know if you want a v3 with check-patch warnings
+> fixed.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+I see it's somewhat common even in drivers/usb:
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+$ git grep -ce "case \w+:.*break;" -- drivers/usb/ 
+drivers/usb/gadget/udc/net2272.c:4
+drivers/usb/host/ehci-hcd.c:3
+drivers/usb/host/isp116x.h:2
+drivers/usb/host/ohci-dbg.c:14
+drivers/usb/host/sl811-hcd.c:7
+drivers/usb/host/uhci-debug.c:8
+drivers/usb/image/microtek.c:64
+drivers/usb/mon/mon_text.c:6
+drivers/usb/musb/musb_gadget.c:2
+drivers/usb/serial/digi_acceleport.c:23
+drivers/usb/serial/ftdi_sio.c:10
+drivers/usb/serial/mct_u232.c:10
+drivers/usb/serial/spcp8x5.c:17
+drivers/usb/serial/whiteheat.c:4
+drivers/usb/storage/debug.c:86
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+so I'm okay either way. Kishon has the final say here since he's
+drivers/phy/ maintainer.
 
-Thanks,
-Mark
-
->From 2e365a703ea60de617287354ae63bf677e406feb Mon Sep 17 00:00:00 2001
-From: Andi Shyti <andi.shyti@samsung.com>
-Date: Thu, 18 Aug 2016 16:25:55 +0900
-Subject: [PATCH] MAINTAINERS: add myself as Samsung SPI maintainer
-
-Create a new entry for the Samsung SPI driver supported by the
-drivers/spi/spi-s3c* and remove it from its original place under
-"ARM/SAMSUNG EXYNOS ARM ARCHITECTURES".
-
-The original maintainership inherited from the Samsung Exynos
-ARM Architecture is kept as it was (i.e. Kukjin and Krzysztof), I
-will help and co-maintain the driver.
-
-Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- MAINTAINERS | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 20bb1d00098c..5051c2f46d47 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1633,7 +1633,6 @@ F:	drivers/*/*s3c64xx*
- F:	drivers/*/*s5pv210*
- F:	drivers/memory/samsung/*
- F:	drivers/soc/samsung/*
--F:	drivers/spi/spi-s3c*
- F:	Documentation/arm/Samsung/
- F:	Documentation/devicetree/bindings/arm/samsung/
- F:	Documentation/devicetree/bindings/sram/samsung-sram.txt
-@@ -10237,6 +10236,17 @@ S:	Supported
- L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
- F:	drivers/clk/samsung/
- 
-+SAMSUNG SPI DRIVERS
-+M:	Kukjin Kim <kgene@kernel.org>
-+M:	Krzysztof Kozlowski <krzk@kernel.org>
-+M:	Andi Shyti <andi.shyti@samsung.com>
-+L:	linux-spi at vger.kernel.org
-+L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	Documentation/devicetree/bindings/spi/spi-samsung.txt
-+F:	drivers/spi/spi-s3c*
-+F:	include/linux/platform_data/spi-s3c64xx.h
-+
- SAMSUNG SXGBE DRIVERS
- M:	Byungho An <bh74.an@samsung.com>
- M:	Girish K S <ks.giri@samsung.com>
 -- 
-2.8.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160818/83f1464c/attachment.sig>
