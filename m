@@ -1,26 +1,38 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 18 Aug 2016 21:00:47 +0300
-Subject: [PATCH 0/2] Add R8A7792 DU support
-In-Reply-To: <4031442.KeMCTMarLN@wasted.cogentembedded.com>
-References: <4031442.KeMCTMarLN@wasted.cogentembedded.com>
-Message-ID: <31faa5c3-d65f-0c1f-b62d-7f1882d19728@cogentembedded.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 18 Aug 2016 20:02:15 +0200
+Subject: [PATCH v2 1/3] ARM: dts: sun6i: colorfly-e708-q1: Remove unused
+ mma8452_int_e708_q1 node
+In-Reply-To: <1471543337-6938-1-git-send-email-hdegoede@redhat.com>
+References: <1471543337-6938-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1471543337-6938-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+The presence of the mma8452_int_e708_q1 node is a copy and paste
+error, remove it.
 
-On 08/05/2016 09:24 PM, Sergei Shtylyov wrote:
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts | 7 -------
+ 1 file changed, 7 deletions(-)
 
->    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
-> 'renesas-devel-20160725-v4.7-rc7' tag. We're adding the R8A7792 DU clocks and
-> device nodes. They have been tested on the Blanche board -- I'm not posting the
-> Blanche patch only because it also has some strange interaction with the
-> Ethernet chip, so that NFS root can't work anymore...
-
-    Looks like this effect is confined to only one Blanche board, so I'm going 
-to start posting the pending patches.
-
-> [1/2] ARM: dts: r8a7792: add DU clocks
-> [2/2] ARM: dts: r8a7792: add DU support
-
-WBR, Sergei
+diff --git a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts b/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
+index 9040bb9..34d8710 100644
+--- a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
++++ b/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
+@@ -93,13 +93,6 @@
+ };
+ 
+ &pio {
+-	mma8452_int_e708_q1: mma8452_int_pin at 0 {
+-		allwinner,pins = "PA9";
+-		allwinner,function = "gpio_in";
+-		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+-	};
+-
+ 	mmc0_cd_pin_e708_q1: mmc0_cd_pin at 0 {
+ 		allwinner,pins = "PA8";
+ 		allwinner,function = "gpio_in";
+-- 
+2.7.4
