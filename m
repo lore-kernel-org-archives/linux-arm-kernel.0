@@ -1,34 +1,43 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 19 Aug 2016 09:12:50 +0530
-Subject: [PATCH] dmaengine: qcom_hidma: release the descriptor before the
- callback
-In-Reply-To: <8c096fee-9749-a7df-7e04-25d21c0ea9ac@codeaurora.org>
-References: <20160804125525.GF9681@localhost>
- <71a15611-645f-7523-1c26-14b420aff667@codeaurora.org>
- <20160804144003.GV1041@n2100.armlinux.org.uk>
- <cff588a1-d85f-3d2c-ef61-1674d0d3ca92@codeaurora.org>
- <20160808090203.GY9681@localhost>
- <21475c6e-a5f8-5125-3998-f3995ce67c4d@codeaurora.org>
- <20160810172805.GH9681@localhost>
- <d09ebb5f-99ea-a4e9-da9c-693be89c7cd4@codeaurora.org>
- <20160819024853.GR9681@localhost>
- <8c096fee-9749-a7df-7e04-25d21c0ea9ac@codeaurora.org>
-Message-ID: <20160819034249.GS9681@localhost>
+From: yonglong.wu@mediatek.com (Yonglong Wu)
+Date: Fri, 19 Aug 2016 11:37:26 +0800
+Subject: [PATCH,v2] usb: hub: change CLEAR_FEATURE to SET_FEATURE
+Message-ID: <1471577846-15816-1-git-send-email-yonglong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2016 at 11:26:28PM -0400, Sinan Kaya wrote:
-> On 8/18/2016 10:48 PM, Vinod Koul wrote:
-> >> Keep a size limited list with error cookies and flush them in terminate all?
-> > I think so, terminate_all anyway cleans up the channel. Btw what is the
-> > behaviour on error? Do you terminate or somthing else?
-> > 
-> 
-> On error, I flush all outstanding transactions with an error code and I reset
-> the channel. After the reset, the DMA channel is functional again. The client
-> doesn't need to shutdown anything.
+From: Yonglong Wu <yonglong.wu@mediatek.com>
 
-You mean from the client context or driver?
+In USB20 specification, describes in chapter 9.4.5: The Remote Wakeup
+field can be modified by the SetFeature() and ClearFeature() requests
+using the DEVICE_REMOTE_WAKEUP feature selector.
 
+In USB30 specification, also describes in chapter 9.4.5: The Function
+Remote Wakeup field can be modified by the SetFeature() requests
+using the FUNCTION_SUSPEND feature selector. In chapter 9.4.9 Set
+Feature reference, it describes Function Remote Wake Enabled/Disabled
+at suspend options by SET_FEATURE.
+
+In USB30 specification only mentioned SetFeature(), so we need use
+SET_FEATURE replace CLEAR_FEATURE to disable USB30 function remote
+wakeup in suspend options.
+
+Signed-off-by: Yonglong Wu <yonglong.wu@mediatek.com>
+---
+ drivers/usb/core/hub.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
+index bee1351..a6f5095 100644
+--- a/drivers/usb/core/hub.c
++++ b/drivers/usb/core/hub.c
+@@ -3111,7 +3111,7 @@ static int usb_disable_remote_wakeup(struct usb_device *udev)
+ 				USB_CTRL_SET_TIMEOUT);
+ 	else
+ 		return usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
+-				USB_REQ_CLEAR_FEATURE, USB_RECIP_INTERFACE,
++				USB_REQ_SET_FEATURE, USB_RECIP_INTERFACE,
+ 				USB_INTRF_FUNC_SUSPEND,	0, NULL, 0,
+ 				USB_CTRL_SET_TIMEOUT);
+ }
 -- 
-~Vinod
+1.7.9.5
