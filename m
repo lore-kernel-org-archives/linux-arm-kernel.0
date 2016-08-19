@@ -1,7 +1,7 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 19 Aug 2016 17:29:30 +0100
-Subject: [PATCH 2/2] Input: jornada720_kbd - get rid of mach/irqs.h include
-Message-ID: <E1bamfi-0002YX-Ch@rmk-PC.armlinux.org.uk>
+Date: Fri, 19 Aug 2016 17:31:04 +0100
+Subject: [PATCH v2 2/2] Input: jornada720_kbd - get rid of mach/irqs.h include
+Message-ID: <E1bamhE-0004Vr-3x@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -36,7 +36,7 @@ index c0b1f5bafae4..2b96f7bc16bd 100644
  
  static struct platform_device jornada_ts_device = {
 diff --git a/drivers/input/keyboard/jornada720_kbd.c b/drivers/input/keyboard/jornada720_kbd.c
-index 4b2e9ff18ba1..484ee1ff33b8 100644
+index 4b2e9ff18ba1..6ac9fee1d8fa 100644
 --- a/drivers/input/keyboard/jornada720_kbd.c
 +++ b/drivers/input/keyboard/jornada720_kbd.c
 @@ -26,7 +26,6 @@
@@ -69,7 +69,7 @@ index 4b2e9ff18ba1..484ee1ff33b8 100644
  			       IRQF_TRIGGER_FALLING, "jornadakbd", pdev);
  	if (err) {
 -		printk(KERN_INFO "jornadakbd720_kbd: Unable to grab IRQ\n");
-+		dev_err(dev, "unable to grab IRQ%d: %d\n", irq, err);
++		dev_err(&pdev->dev, "unable to grab IRQ%d: %d\n", irq, err);
  		return err;
  	}
  
