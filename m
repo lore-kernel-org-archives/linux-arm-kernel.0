@@ -1,67 +1,42 @@
-From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
-Date: Fri, 19 Aug 2016 15:46:40 +0100
-Subject: [RFC 00/17] clk: Add per-controller locks to fix deadlocks
-In-Reply-To: <65703100-1e16-6c34-babe-40e630180688@samsung.com>
-References: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
- <65703100-1e16-6c34-babe-40e630180688@samsung.com>
-Message-ID: <20160819144640.GM21682@localhost.localdomain>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 19 Aug 2016 15:54:21 +0100
+Subject: [PATCH 5/5] arm64: KVM: vgic-v2: Enable GICV access from HYP if
+ access from guest is unsafe
+In-Reply-To: <CAFEAcA9Q9U02KkgkYYT1O6qTHyYmBMW6ARi_bQPRjDNS+O0w7Q@mail.gmail.com>
+References: <1471610295-1456-1-git-send-email-marc.zyngier@arm.com>
+ <1471610295-1456-6-git-send-email-marc.zyngier@arm.com>
+ <CAFEAcA99RScdr+E39Q+03L5DyDLiQgQo9x1DeP1gE2-nJ1yUig@mail.gmail.com>
+ <57B7042D.1020702@arm.com>
+ <CAFEAcA9Q9U02KkgkYYT1O6qTHyYmBMW6ARi_bQPRjDNS+O0w7Q@mail.gmail.com>
+Message-ID: <20160819155421.44355df9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 03:51:10PM +0200, Krzysztof Kozlowski wrote:
-> On 08/16/2016 03:34 PM, Krzysztof Kozlowski wrote:
-> > Hi,
-> > 
-> > RFC, please, do not apply, maybe except patch #1 which is harmless.
-> > 
-> > 
-> > Introduction
-> > ============
-> > The patchset brings new entity: clock controller representing a hardware
-> > block.  The clock controller comes with its own prepare lock which
-> > is used then in many places.  The idea is to fix the deadlock mentioned
-> > in commit 10ff4c5239a1 ("i2c: exynos5: Fix possible ABBA deadlock by keeping
-> > I2C clock prepared") and commit 34e81ad5f0b6 ("i2c: s3c2410: fix ABBA deadlock
-> > by keeping clock prepared").
-> > 
-> 
-> Damn, I forgot to describe the overall idea. :) It is mentioned in patch
-> 15 but probably not many will have enough of patience to reach it.
-> 
-> The locking idea
-> ================
-> Clock controllers representing different hardware blocks, will contain
-> its own prepare lock which protects the clocks inside controller.  The
-> hierarchy itself is protected by global lock.
-> 
-> In prepare path, the global prepare lock is removed.  This is direct
-> solution for the deadlock.
-> 
-> Clock hierarchy imposes also hierarchy between controllers so when a
-> prepare happens, also parents have to be locked.
-> 
-> Following locking design was chosen:
-> 1. For prepare/unprepare paths: lock only clock controller and its
->    parents.
-> 2. For recalc rates paths: lock global lock, the controller and its
->    children.
-> 3. For reparent paths: lock entire tree up down (children and parents)
->    and the global lock as well.
-> 
-> 
-> In each case of traversing the clock hierarchy, the locking of
-> controllers is always from children to parents.
-> 
-> 
-> Best regards,
-> Krzysztof
+On Fri, 19 Aug 2016 14:31:12 +0100
+Peter Maydell <peter.maydell@linaro.org> wrote:
 
-I have been playing with these patches on my Arndale board and
-they certainly do seem to resolve the interaction issues I have
-been SPI and the clocking framework, which is awesome and lets me
-sensibly add the clocking framework into our codec drivers. I will
-keep investigating and for what its worth have a little more
-detailed look through the code.
+> On 19 August 2016 at 14:05, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > On 19/08/16 13:53, Peter Maydell wrote:  
+> >> Is it worth specifically saying "performance will be worse", or do we
+> >> expect this to only happen on systems where the h/w can't permit direct
+> >> access (as opposed to those with bad dt info) ?  
+> >
+> > We cannot distinguish between the two, unfortunately. Even worse, ACPI
+> > only gives us a base address, and not the size of the region. So even if
+> > the HW was perfectly compliant with SBSA, we have to assume the worse case.  
+> 
+> Right, but if we expect this is mostly going to be "you just have
+> to live with it on this hardware" there's less point in printing
+> an alarming message, whereas if there's a significant subset of
+> "dt is just wrong" cases then the alarm might help in getting them
+> fixed, maybe...
+
+That'd require some more infrastructure from the kernel's GIC driver
+(which now provides the various base addresses), but I guess that we
+can have a look as well.
 
 Thanks,
-Charles
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
