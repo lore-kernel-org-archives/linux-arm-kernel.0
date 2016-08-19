@@ -1,53 +1,46 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 20 Aug 2016 01:19:48 +0300
-Subject: [PATCH 2/2] ARM: dts: r8a7792: add VSP1V support
-In-Reply-To: <1635089.v8k0jcJkvb@wasted.cogentembedded.com>
-References: <1635089.v8k0jcJkvb@wasted.cogentembedded.com>
-Message-ID: <1764210.GiXQZXIJDz@wasted.cogentembedded.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 19 Aug 2016 15:23:19 -0700
+Subject: [PATCH v4 1/6] pinctrl: amlogic: gxbb: add the IR remote pin
+In-Reply-To: <20160819215547.20063-2-martin.blumenstingl@googlemail.com>
+ (Martin Blumenstingl's message of "Fri, 19 Aug 2016 23:55:42 +0200")
+References: <20160628191802.21227-1-martin.blumenstingl@googlemail.com>
+ <20160819215547.20063-1-martin.blumenstingl@googlemail.com>
+ <20160819215547.20063-2-martin.blumenstingl@googlemail.com>
+Message-ID: <7h4m6g7608.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe  3 instances (VSPS, VSPD0, and VSPD1) of the VSP1V in the R8A7792
-device tree.
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> This adds the IR remote receiver to the AO domain devices.
 
----
- arch/arm/boot/dts/r8a7792.dtsi |   24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+nit Re: Subject: should specify IR remote *input* pin.
 
-Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7792.dtsi
-@@ -668,6 +668,30 @@
- 			status = "disabled";
- 		};
- 
-+		vsp1 at fe928000 {
-+			compatible = "renesas,vsp1";
-+			reg = <0 0xfe928000 0 0x8000>;
-+			interrupts = <GIC_SPI 267 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&mstp1_clks R8A7792_CLK_VSP1_SY>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		vsp1 at fe930000 {
-+			compatible = "renesas,vsp1";
-+			reg = <0 0xfe930000 0 0x8000>;
-+			interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&mstp1_clks R8A7792_CLK_VSP1DU0>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
-+		vsp1 at fe938000 {
-+			compatible = "renesas,vsp1";
-+			reg = <0 0xfe938000 0 0x8000>;
-+			interrupts = <GIC_SPI 247 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&mstp1_clks R8A7792_CLK_VSP1DU1>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+		};
-+
- 		/* Special CPG clocks */
- 		cpg_clocks: cpg_clocks at e6150000 {
- 			compatible = "renesas,r8a7792-cpg-clocks",
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  drivers/pinctrl/meson/pinctrl-meson-gxbb.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
+> index cb4d6ad..8fffb31 100644
+> --- a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
+> +++ b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
+> @@ -225,6 +225,8 @@ static const unsigned int i2c_sda_ao_pins[] = {PIN(GPIOAO_5, 0) };
+>  static const unsigned int i2c_slave_sck_ao_pins[] = {PIN(GPIOAO_4, 0) };
+>  static const unsigned int i2c_slave_sda_ao_pins[] = {PIN(GPIOAO_5, 0) };
+>  
+> +static const unsigned int ir_in_ao_pins[] = {PIN(GPIOAO_7, 0) };
+> +
+
+I'm trying to keep the names here so they match the datasheet, which
+calls this remote_input_ao.  Please update throughout the patch.
+
+Otherwise looks good to me.  Feel free to add
+
+Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+
+and Linus W can queue it up.
+
+Thanks,
+
+Kevin
