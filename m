@@ -1,118 +1,88 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 19 Aug 2016 17:28:56 +0100
-Subject: [PATCH] ARM: sa1100: move StrongARM CPU ID checks to cputype.h
-Message-ID: <E1bamfA-0002W7-Sb@rmk-PC.armlinux.org.uk>
+Date: Fri, 19 Aug 2016 17:29:25 +0100
+Subject: [PATCH 1/2] Input: jornada720_kbd - switch to devm_* APIs
+Message-ID: <E1bamfd-0002YO-8z@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the StrongARM CPU ID checks out of the platform's hardware.h
-file into asm/cputype.h
+Switch the jornada720_kbd driver to use the devm_* APIs.  This is in
+preparation to removing the mach/irqs.h include from this driver.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/include/asm/cputype.h               | 21 +++++++++++++++++++++
- arch/arm/mach-sa1100/include/mach/hardware.h | 18 ------------------
- drivers/cpufreq/sa1110-cpufreq.c             |  2 +-
- 3 files changed, 22 insertions(+), 19 deletions(-)
+ drivers/input/keyboard/jornada720_kbd.c | 38 ++++++++-------------------------
+ 1 file changed, 9 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index 1ee94c716a7f..d6a4902a75d7 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -60,6 +60,7 @@
- 	((mpidr >> (MPIDR_LEVEL_BITS * level)) & MPIDR_LEVEL_MASK)
+diff --git a/drivers/input/keyboard/jornada720_kbd.c b/drivers/input/keyboard/jornada720_kbd.c
+index 421d9c55b0e8..4b2e9ff18ba1 100644
+--- a/drivers/input/keyboard/jornada720_kbd.c
++++ b/drivers/input/keyboard/jornada720_kbd.c
+@@ -53,6 +53,7 @@ static unsigned short jornada_std_keymap[128] = {					/* ROW */
+ struct jornadakbd {
+ 	unsigned short keymap[ARRAY_SIZE(jornada_std_keymap)];
+ 	struct input_dev *input;
++	int irq;
+ };
  
- #define ARM_CPU_IMP_ARM			0x41
-+#define ARM_CPU_IMP_DEC			0x44
- #define ARM_CPU_IMP_INTEL		0x69
+ static irqreturn_t jornada720_kbd_interrupt(int irq, void *dev_id)
+@@ -99,12 +100,10 @@ static int jornada720_kbd_probe(struct platform_device *pdev)
+ 	struct input_dev *input_dev;
+ 	int i, err;
  
- /* ARM implemented processors */
-@@ -76,6 +77,17 @@
- #define ARM_CPU_PART_CORTEX_A15		0x4100c0f0
- #define ARM_CPU_PART_MASK		0xff00fff0
+-	jornadakbd = kzalloc(sizeof(struct jornadakbd), GFP_KERNEL);
+-	input_dev = input_allocate_device();
+-	if (!jornadakbd || !input_dev) {
+-		err = -ENOMEM;
+-		goto fail1;
+-	}
++	jornadakbd = devm_kzalloc(&pdev->dev, sizeof(*jornadakbd), GFP_KERNEL);
++	input_dev = devm_input_allocate_device(&pdev->dev);
++	if (!jornadakbd || !input_dev)
++		return -ENOMEM;
  
-+/* DEC implemented cores */
-+#define ARM_CPU_PART_SA1100		0x4400a110
-+
-+/* Intel implemented cores */
-+#define ARM_CPU_PART_SA1110		0x6900b110
-+#define ARM_CPU_REV_SA1110_A0		0
-+#define ARM_CPU_REV_SA1110_B0		4
-+#define ARM_CPU_REV_SA1110_B1		5
-+#define ARM_CPU_REV_SA1110_B2		6
-+#define ARM_CPU_REV_SA1110_B4		8
-+
- #define ARM_CPU_XSCALE_ARCH_MASK	0xe000
- #define ARM_CPU_XSCALE_ARCH_V1		0x2000
- #define ARM_CPU_XSCALE_ARCH_V2		0x4000
-@@ -173,6 +185,11 @@ static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
- 	return (read_cpuid_id() & 0xFF000000) >> 24;
+ 	platform_set_drvdata(pdev, jornadakbd);
+ 
+@@ -127,37 +126,18 @@ static int jornada720_kbd_probe(struct platform_device *pdev)
+ 
+ 	input_set_capability(input_dev, EV_MSC, MSC_SCAN);
+ 
+-	err = request_irq(IRQ_GPIO0,
+-			  jornada720_kbd_interrupt,
+-			  IRQF_TRIGGER_FALLING,
+-			  "jornadakbd", pdev);
++	err = devm_request_irq(&pdev->dev, IRQ_GPIO0, jornada720_kbd_interrupt,
++			       IRQF_TRIGGER_FALLING, "jornadakbd", pdev);
+ 	if (err) {
+ 		printk(KERN_INFO "jornadakbd720_kbd: Unable to grab IRQ\n");
+-		goto fail1;
++		return err;
+ 	}
+ 
+-	err = input_register_device(jornadakbd->input);
+-	if (err)
+-		goto fail2;
+-
+-	return 0;
+-
+- fail2:	/* IRQ, DEVICE, MEMORY */
+-	free_irq(IRQ_GPIO0, pdev);
+- fail1:	/* DEVICE, MEMORY */
+-	input_free_device(input_dev);
+-	kfree(jornadakbd);
+-	return err;
++	return input_register_device(jornadakbd->input);
+ };
+ 
+ static int jornada720_kbd_remove(struct platform_device *pdev)
+ {
+-	struct jornadakbd *jornadakbd = platform_get_drvdata(pdev);
+-
+-	free_irq(IRQ_GPIO0, pdev);
+-	input_unregister_device(jornadakbd->input);
+-	kfree(jornadakbd);
+-
+ 	return 0;
  }
  
-+static inline unsigned int __attribute_const__ read_cpuid_revision(void)
-+{
-+	return read_cpuid_id() & 0x0000000f;
-+}
-+
- /*
-  * The CPU part number is meaningless without referring to the CPU
-  * implementer: implementers are free to define their own part numbers
-@@ -208,6 +225,10 @@ static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
- 	return read_cpuid(CPUID_MPIDR);
- }
- 
-+/* StrongARM-11x0 CPUs */
-+#define cpu_is_sa1100() (read_cpuid_part() == ARM_CPU_PART_SA1100)
-+#define cpu_is_sa1110() (read_cpuid_part() == ARM_CPU_PART_SA1110)
-+
- /*
-  * Intel's XScale3 core supports some v6 features (supersections, L2)
-  * but advertises itself as v5 as it does not support the v6 ISA.  For
-diff --git a/arch/arm/mach-sa1100/include/mach/hardware.h b/arch/arm/mach-sa1100/include/mach/hardware.h
-index cbedd75a9d65..55c85ce7010d 100644
---- a/arch/arm/mach-sa1100/include/mach/hardware.h
-+++ b/arch/arm/mach-sa1100/include/mach/hardware.h
-@@ -36,28 +36,10 @@
- #define io_v2p( x )             \
-    ( (((x)&0x00ffffff) | (((x)&(0x30000000>>VIO_SHIFT))<<VIO_SHIFT)) + PIO_START )
- 
--#define CPU_SA1110_A0	(0)
--#define CPU_SA1110_B0	(4)
--#define CPU_SA1110_B1	(5)
--#define CPU_SA1110_B2	(6)
--#define CPU_SA1110_B4	(8)
--
--#define CPU_SA1100_ID	(0x4401a110)
--#define CPU_SA1100_MASK	(0xfffffff0)
--#define CPU_SA1110_ID	(0x6901b110)
--#define CPU_SA1110_MASK	(0xfffffff0)
--
- #define __MREG(x)	IOMEM(io_p2v(x))
- 
- #ifndef __ASSEMBLY__
- 
--#include <asm/cputype.h>
--
--#define CPU_REVISION	(read_cpuid_id() & 15)
--
--#define cpu_is_sa1100()	((read_cpuid_id() & CPU_SA1100_MASK) == CPU_SA1100_ID)
--#define cpu_is_sa1110()	((read_cpuid_id() & CPU_SA1110_MASK) == CPU_SA1110_ID)
--
- # define __REG(x)	(*((volatile unsigned long __iomem *)io_p2v(x)))
- # define __PREG(x)	(io_v2p((unsigned long)&(x)))
- 
-diff --git a/drivers/cpufreq/sa1110-cpufreq.c b/drivers/cpufreq/sa1110-cpufreq.c
-index b5befc211172..2bac9b6cfeea 100644
---- a/drivers/cpufreq/sa1110-cpufreq.c
-+++ b/drivers/cpufreq/sa1110-cpufreq.c
-@@ -159,7 +159,7 @@ sdram_calculate_timing(struct sdram_info *sd, u_int cpu_khz,
- 	 * half speed or use delayed read latching (errata 13).
- 	 */
- 	if ((ns_to_cycles(sdram->tck, sd_khz) > 1) ||
--	    (CPU_REVISION < CPU_SA1110_B2 && sd_khz < 62000))
-+	    (read_cpuid_revision() < ARM_CPU_REV_SA1110_B2 && sd_khz < 62000))
- 		sd_khz /= 2;
- 
- 	sd->mdcnfg = MDCNFG & 0x007f007f;
 -- 
 2.1.0
