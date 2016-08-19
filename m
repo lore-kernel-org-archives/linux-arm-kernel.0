@@ -1,41 +1,35 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 19 Aug 2016 23:55:44 +0200
-Subject: [PATCH v4 3/6] dt-bindings: media: meson-ir: Add Meson8b and GXBB
- compatible strings
+Date: Fri, 19 Aug 2016 23:55:43 +0200
+Subject: [PATCH v4 2/6] ARM64: dts: amlogic: add the pin for the IR remote
 In-Reply-To: <20160819215547.20063-1-martin.blumenstingl@googlemail.com>
 References: <20160628191802.21227-1-martin.blumenstingl@googlemail.com>
  <20160819215547.20063-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20160819215547.20063-4-martin.blumenstingl@googlemail.com>
+Message-ID: <20160819215547.20063-3-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Neil Armstrong <narmstrong@baylibre.com>
-
-New bindings are needed as the register layout on the newer platforms
-is slightly different compared to Meson6b.
-
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/media/meson-ir.txt | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/media/meson-ir.txt b/Documentation/devicetree/bindings/media/meson-ir.txt
-index 407848e..e7e3f3c 100644
---- a/Documentation/devicetree/bindings/media/meson-ir.txt
-+++ b/Documentation/devicetree/bindings/media/meson-ir.txt
-@@ -1,7 +1,10 @@
- * Amlogic Meson IR remote control receiver
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 4f42316..72df302 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -210,6 +210,13 @@
+ 						function = "uart_ao";
+ 					};
+ 				};
++
++				ir_in_ao_pins: ir_in_ao {
++					mux {
++						groups = "ir_in_ao";
++						function = "ir_in_ao";
++					};
++				};
+ 			};
  
- Required properties:
-- - compatible	: should be "amlogic,meson6-ir"
-+ - compatible	: depending on the platform this should be one of:
-+		  - "amlogic,meson6-ir"
-+		  - "amlogic,meson8b-ir"
-+		  - "amlogic,meson-gxbb-ir"
-  - reg		: physical base address and length of the device registers
-  - interrupts	: a single specifier for the interrupt from the device
- 
+ 			uart_AO: serial at 4c0 {
 -- 
 2.9.3
