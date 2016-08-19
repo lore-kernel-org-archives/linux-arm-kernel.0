@@ -1,36 +1,75 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 19 Aug 2016 14:34:48 +0100
-Subject: [PATCH] fixup! arm64: kdump: add kdump support
-In-Reply-To: <20160819080020.GA584@localhost.localdomain>
-References: <57B2E759.201@arm.com>
- <1471448011-20386-1-git-send-email-james.morse@arm.com>
- <20160819080020.GA584@localhost.localdomain>
-Message-ID: <57B70AF8.1000603@arm.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 19 Aug 2016 14:34:56 +0100
+Subject: [RFC PATCH 4/7] arm64: tlbflush.h: add __tlbi() macro
+In-Reply-To: <20160819132427.GD9893@arm.com> (Will Deacon's message of "Fri,
+ 19 Aug 2016 14:24:28 +0100")
+References: <1471344312-26685-1-git-send-email-punit.agrawal@arm.com>
+ <1471344312-26685-5-git-send-email-punit.agrawal@arm.com>
+ <20160819132427.GD9893@arm.com>
+Message-ID: <87r39kswzj.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/08/16 09:00, Pratyush Anand wrote:
-> On 17/08/2016:04:33:31 PM, James Morse wrote:
->> copy_oldmem_page() and mmap_vmcore() provide two ways for userspace to read
->> from /proc/vmcore. Neither of these check with memblock to see if the page
->> they are accessing is nomap. On Seattle this causes:
-> 
-> Thanks for the patch.It did resolve the kernel crash issue with makedumpfile,
-> however neither there was any data in vmcore-dmesg nor crash utility was able to
-> work the saved vmcore.
+Will Deacon <will.deacon@arm.com> writes:
 
-vmcore-dmesg doesn't work for me, but crash did once I'd rebuilt it from the
-most recent source.
+> On Tue, Aug 16, 2016 at 11:45:09AM +0100, Punit Agrawal wrote:
+>> From: Mark Rutland <mark.rutland@arm.com>
+>> 
+>> As with dsb() and isb(), add a __tbli() helper so that we can avoid
+>
+> Minor typo: s/__tbli/__tlbi/
 
-The most recent commit I have is:
-b349598bb755 ("Fix for the ARM64 "bt -R <symbol>" option if the only reference")
+Thanks for spotting. I've fixed this locally now.
 
-Are you using an older version?
+>
+>> distracting asm boilerplate every time we want a TLBI. As some TLBI
+>> operations take an argument while others do not, some pre-processor is
+>> used to handle these two cases with different assembly blocks.
+>> 
+>> The existing tlbflush.h code is moved over to use the helper.
+>> 
+>> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> [ rename helper to __tlbi, update commit log ]
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> ---
+>>  arch/arm64/include/asm/tlbflush.h | 31 +++++++++++++++++++++++--------
+>>  1 file changed, 23 insertions(+), 8 deletions(-)
+>> 
+>> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+>> index b460ae2..d57a0be 100644
+>> --- a/arch/arm64/include/asm/tlbflush.h
+>> +++ b/arch/arm64/include/asm/tlbflush.h
+>> @@ -25,6 +25,21 @@
+>>  #include <asm/cputype.h>
+>>  
+>>  /*
+>> + * Raw TLBI operations. Drivers and most kernel code should use the TLB
+>> + * management routines below in preference to these. Where necessary, these can
+>> + * be used to avoid asm() boilerplate.
+>> + *
+>> + * Can be used as __tlbi(op) or __tlbi(op, arg), depending on whether a
+>> + * particular TLBI op takes an argument or not. The macros below handle invoking
+>> + * the asm with or without the register argument as appropriate.
+>> + */
+>> +#define TLBI_0(op, arg)		asm ("tlbi " #op)
+>> +#define TLBI_1(op, arg)		asm ("tlbi " #op ", %0" : : "r" (arg))
+>> +#define TLBI_N(op, arg, n, ...)	TLBI_##n(op, arg)
+>
+> Should this be prefixed with underscores, too?
 
+As these were only used in the definition of __tlbi() I didn't
+prefix them. I'll add them for the next posting.
 
-Thanks,
+Thanks for taking a look.
 
-James
+Punit
 
-
-[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/447597.html
+>
+> Will
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
