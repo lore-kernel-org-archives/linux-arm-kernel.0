@@ -1,23 +1,31 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 19 Aug 2016 09:16:55 -0500
-Subject: [PATCH v4 2/4] dt-bindings: Add a binding for Mediatek MDP
-In-Reply-To: <1471606767-3218-3-git-send-email-minghsiu.tsai@mediatek.com>
-References: <1471606767-3218-1-git-send-email-minghsiu.tsai@mediatek.com>
- <1471606767-3218-3-git-send-email-minghsiu.tsai@mediatek.com>
-Message-ID: <20160819141655.GA18486@rob-hp-laptop>
+From: romain.perier@free-electrons.com (Romain Perier)
+Date: Fri, 19 Aug 2016 16:19:03 +0200
+Subject: [crypto] [marvell-cesa] Driver hangs on Armada 385 device
+In-Reply-To: <57B71301.4010005@free-electrons.com>
+References: <57b6f38c.23012e0a.374a0.56c6@mx.google.com>
+ <20160819141251.5dcc835d@free-electrons.com>
+ <20160819130846.GN1041@n2100.armlinux.org.uk>
+ <57B71301.4010005@free-electrons.com>
+Message-ID: <57B71557.5010903@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2016 at 07:39:25PM +0800, Minghsiu Tsai wrote:
-> Add a DT binding documentation of MDP for the MT8173 SoC
-> from Mediatek
-> 
-> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-> ---
->  .../devicetree/bindings/media/mediatek-mdp.txt     |  109 ++++++++++++++++++++
->  1 file changed, 109 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/mediatek-mdp.txt
+Le 19/08/2016 16:09, Romain Perier a ?crit :
+> I was, wondering, do you boot with a separated DTB or a legacy boot
+> (concatenated to the Image) ?
+>
+>
+> Could you test with uImage.armada-385-db-ap [1], that's a legacy Image.
+> Also, I have uploaded a minimalistic rootfs [2], if you want.
+>
+> 1. http://www.free-electrons.com/~romain/pub/cesa/uImage.armada-385-db-ap
+> 2. http://www.free-electrons.com/~romain/pub/cesa/rootfs.cpio.xz
 
-Please add acks when posting new versions.
+I have also uploaded the zImage and a separated DTB (the cesa directory 
+can be read from your browser)
 
-Rob
+Romain
+-- 
+Romain Perier, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
