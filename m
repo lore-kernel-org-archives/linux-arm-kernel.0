@@ -1,41 +1,52 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Fri, 19 Aug 2016 22:17:05 +0930
-Subject: [PATCH v2 7/7] aspeed-g5: Add gpio controller to devicetree
-In-Reply-To: <20160819124705.24633-1-andrew@aj.id.au>
-References: <20160819124705.24633-1-andrew@aj.id.au>
-Message-ID: <20160819124705.24633-8-andrew@aj.id.au>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Fri, 19 Aug 2016 18:18:10 +0530
+Subject: [PATCH 1/2] net: phy: Add error checks in the driver
+Message-ID: <1471610891-13353-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+This patch adds the necessary error checks in the driver.
+
+Reported-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 ---
+ drivers/net/phy/xilinx_gmii2rgmii.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
-Since v1:
-
-* Use aspeed,ast2500-gpio compatible string
-
- arch/arm/boot/dts/aspeed-g5.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index ae5871a11a70..318e1deafe30 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -280,6 +280,15 @@
- 				reg = <0x1e720000 0x9000>;	// 36K
- 			};
+diff --git a/drivers/net/phy/xilinx_gmii2rgmii.c b/drivers/net/phy/xilinx_gmii2rgmii.c
+index e7a20ec..7336fd0 100644
+--- a/drivers/net/phy/xilinx_gmii2rgmii.c
++++ b/drivers/net/phy/xilinx_gmii2rgmii.c
+@@ -39,11 +39,16 @@ struct gmii2rgmii {
+ static int xgmiitorgmii_read_status(struct phy_device *phydev)
+ {
+ 	struct gmii2rgmii *priv = phydev->priv;
+-	u16 val = 0;
++	int err, val = 0;
  
-+			gpio: gpio at 1e780000 {
-+				#gpio-cells = <2>;
-+				gpio-controller;
-+				compatible = "aspeed,ast2500-gpio";
-+				reg = <0x1e780000 0x1000>;
-+				interrupts = <20>;
-+				gpio-ranges = <&pinctrl 0 0 220>;
-+			};
+-	priv->phy_drv->read_status(phydev);
++	err = priv->phy_drv->read_status(phydev);
++	if (err < 0)
++		return err;
+ 
+ 	val = mdiobus_read(phydev->mdio.bus, priv->addr, XILINX_GMII2RGMII_REG);
++	if (val < 0)
++		return val;
 +
- 			timer: timer at 1e782000 {
- 				compatible = "aspeed,ast2400-timer";
- 				reg = <0x1e782000 0x90>;
+ 	val &= XILINX_GMII2RGMII_SPEED_MASK;
+ 
+ 	if (phydev->speed == SPEED_1000)
+@@ -53,7 +58,10 @@ static int xgmiitorgmii_read_status(struct phy_device *phydev)
+ 	else
+ 		val |= BMCR_SPEED10;
+ 
+-	mdiobus_write(phydev->mdio.bus, priv->addr, XILINX_GMII2RGMII_REG, val);
++	err = mdiobus_write(phydev->mdio.bus, priv->addr, XILINX_GMII2RGMII_REG,
++			    val);
++	if (err < 0)
++		return err;
+ 
+ 	return 0;
+ }
 -- 
-2.9.3
+2.1.2
