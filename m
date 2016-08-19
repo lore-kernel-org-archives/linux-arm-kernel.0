@@ -1,33 +1,38 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Aug 2016 17:46:29 +0100
-Subject: [PATCH] ARM: sa1100: clear reset status prior to reboot
-In-Reply-To: <1471625122.822734676@f202.i.mail.ru>
-References: <E1bamfG-0002WE-49@rmk-PC.armlinux.org.uk>
- <1471625122.822734676@f202.i.mail.ru>
-Message-ID: <20160819164629.GV1041@n2100.armlinux.org.uk>
+From: kbeldan@baylibre.com (Karl Beldan)
+Date: Fri, 19 Aug 2016 16:47:35 +0000
+Subject: [PATCH] ARM: davinci_all_defconfig: Enable some UBI modules
+Message-ID: <20160819164736.10199-1-kbeldan@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2016 at 07:45:22PM +0300, Alexander Shiyan wrote:
-> >???????, 19 ??????? 2016, 19:29 +03:00 ?? Russell King <rmk+kernel@armlinux.org.uk>:
-> >
-> >Clear the current reset status prior to rebooting the platform.  This
-> >adds the bit missing from 04fef228fb00 ("[ARM] pxa: introduce
-> >reset_status and clear_reset_status for driver's usage").
-> >
-> >Signed-off-by: Russell King < rmk+kernel@armlinux.org.uk >
-> >---
-> ...
-> >?static void assabet_lcd_backlight_power(int on)
-> >?{
-> >-if (on)
-> >+if (on && 0)
-> ...
-> It looks like you did not remove the debugging code.
+This enables UBI+UBIFS to handle the NAND MTDs, including the useful
+MTD_UBI_BLOCK.
 
-Well spotted, absolutely right.  Damn that 'git commit -a'
+Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+---
+ arch/arm/configs/davinci_all_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
+diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
+index cc94af9d..5e5dd6b 100644
+--- a/arch/arm/configs/davinci_all_defconfig
++++ b/arch/arm/configs/davinci_all_defconfig
+@@ -66,6 +66,8 @@ CONFIG_MTD_M25P80=m
+ CONFIG_MTD_NAND=m
+ CONFIG_MTD_NAND_DAVINCI=m
+ CONFIG_MTD_SPI_NOR=m
++CONFIG_MTD_UBI=m
++CONFIG_MTD_UBI_BLOCK=y
+ CONFIG_BLK_DEV_LOOP=m
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_COUNT=1
+@@ -188,6 +190,7 @@ CONFIG_MSDOS_FS=y
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=m
++CONFIG_UBIFS_FS=m
+ CONFIG_CRAMFS=y
+ CONFIG_MINIX_FS=m
+ CONFIG_NFS_FS=y
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.9.2
