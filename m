@@ -1,70 +1,113 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 19 Aug 2016 19:32:30 +0200
-Subject: [PATCH v3 09/12] arm64: dts: tegra: Add NVIDIA P3310 main board
- support
+Date: Fri, 19 Aug 2016 19:32:33 +0200
+Subject: [PATCH v3 12/12] reset: Add Tegra BPMP reset driver
 In-Reply-To: <20160819173233.13260-1-thierry.reding@gmail.com>
 References: <20160819173233.13260-1-thierry.reding@gmail.com>
-Message-ID: <20160819173233.13260-10-thierry.reding@gmail.com>
+Message-ID: <20160819173233.13260-13-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joseph Lo <josephl@nvidia.com>
+From: Thierry Reding <treding@nvidia.com>
 
-The NVIDIA P3310 is a processor module used in several reference designs
-that features a Tegra186 SoC, 8 GiB of LPDDR4 RAM, 32 GiB eMMC and other
-essentials such as ethernet, WiFi and a PMIC. It is typically connected
-to an I/O board (such as the P2597) that provides the connecters needed
-to hook it up to the outside world.
+This driver uses the services provided by the BPMP firmware driver to
+implement a reset driver based on the MRQ_RESET request.
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
-Changes in v3:
-- fix compatible string
+ drivers/reset/Makefile           |  1 +
+ drivers/reset/tegra/Makefile     |  1 +
+ drivers/reset/tegra/reset-bpmp.c | 63 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 65 insertions(+)
+ create mode 100644 drivers/reset/tegra/Makefile
+ create mode 100644 drivers/reset/tegra/reset-bpmp.c
 
- arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi | 34 ++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-
-diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index 5d65a93d3c43..523f2d705d24 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -6,6 +6,7 @@ obj-$(CONFIG_MACH_PISTACHIO) += reset-pistachio.o
+ obj-$(CONFIG_ARCH_MESON) += reset-meson.o
+ obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
+ obj-$(CONFIG_ARCH_STI) += sti/
++obj-$(CONFIG_ARCH_TEGRA) += tegra/
+ obj-$(CONFIG_ARCH_HISI) += hisilicon/
+ obj-$(CONFIG_ARCH_ZYNQ) += reset-zynq.o
+ obj-$(CONFIG_ATH79) += reset-ath79.o
+diff --git a/drivers/reset/tegra/Makefile b/drivers/reset/tegra/Makefile
 new file mode 100644
-index 000000000000..dc07ea618378
+index 000000000000..fd943b1ae029
 --- /dev/null
-+++ b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-@@ -0,0 +1,34 @@
-+#include "tegra186.dtsi"
++++ b/drivers/reset/tegra/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_ARCH_TEGRA_186_SOC)	+= reset-bpmp.o
+diff --git a/drivers/reset/tegra/reset-bpmp.c b/drivers/reset/tegra/reset-bpmp.c
+new file mode 100644
+index 000000000000..a06e45dc3f30
+--- /dev/null
++++ b/drivers/reset/tegra/reset-bpmp.c
+@@ -0,0 +1,63 @@
++#include <linux/reset-controller.h>
 +
-+/ {
-+	model = "NVIDIA Tegra186 P3310 main Board";
-+	compatible = "nvidia,p3310", "nvidia,tegra186";
++#include <soc/tegra/bpmp.h>
++#include <soc/tegra/bpmp-abi.h>
 +
-+	aliases {
-+		serial0 = &uarta;
-+	};
++static struct tegra_bpmp *to_tegra_bpmp(struct reset_controller_dev *rstc)
++{
++	return container_of(rstc, struct tegra_bpmp, rstc);
++}
 +
-+	chosen {
-+		bootargs = "earlycon console=ttyS0,115200n8";
-+		stdout-path = "serial0:115200n8";
-+	};
++static int tegra_bpmp_reset_common(struct reset_controller_dev *rstc,
++				   enum mrq_reset_commands command,
++				   unsigned int id)
++{
++	struct tegra_bpmp *bpmp = to_tegra_bpmp(rstc);
++	struct mrq_reset_request request;
++	struct tegra_bpmp_message msg;
 +
-+	memory {
-+		device_type = "memory";
-+		reg = <0x0 0x80000000 0x2 0x00000000>;
-+	};
++	memset(&request, 0, sizeof(request));
++	request.cmd = command;
++	request.reset_id = id;
 +
-+	serial at 03100000 {
-+		// HACK: before clk driver ready
-+		clock-frequency = <408000000>;
-+		status = "okay";
-+	};
++	memset(&msg, 0, sizeof(msg));
++	msg.mrq = MRQ_RESET;
++	msg.tx.data = &request;
++	msg.tx.size = sizeof(request);
 +
-+	hsp at 03c00000 {
-+		status = "okay";
-+	};
++	return tegra_bpmp_transfer(bpmp, &msg);
++}
 +
-+	bpmp {
-+		status = "okay";
-+	};
++static int tegra_bpmp_reset_module(struct reset_controller_dev *rstc,
++				   unsigned long id)
++{
++	return tegra_bpmp_reset_common(rstc, CMD_RESET_MODULE, id);
++}
++
++static int tegra_bpmp_reset_assert(struct reset_controller_dev *rstc,
++				   unsigned long id)
++{
++	return tegra_bpmp_reset_common(rstc, CMD_RESET_ASSERT, id);
++}
++
++static int tegra_bpmp_reset_deassert(struct reset_controller_dev *rstc,
++				     unsigned long id)
++{
++	return tegra_bpmp_reset_common(rstc, CMD_RESET_DEASSERT, id);
++}
++
++static const struct reset_control_ops tegra_bpmp_reset_ops = {
++	.reset = tegra_bpmp_reset_module,
++	.assert = tegra_bpmp_reset_assert,
++	.deassert = tegra_bpmp_reset_deassert,
 +};
++
++int tegra_bpmp_init_resets(struct tegra_bpmp *bpmp)
++{
++	bpmp->rstc.ops = &tegra_bpmp_reset_ops;
++	bpmp->rstc.owner = THIS_MODULE;
++	bpmp->rstc.of_node = bpmp->dev->of_node;
++	bpmp->rstc.nr_resets = bpmp->soc->num_resets;
++
++	return devm_reset_controller_register(bpmp->dev, &bpmp->rstc);
++}
 -- 
 2.9.0
