@@ -1,123 +1,285 @@
-From: nitinchaudhary1289@gmail.com (Nitin Chaudhary)
-Date: Thu, 18 Aug 2016 17:34:50 -0700
-Subject: [PATCH v2] Added perf functionality to mmdc driver
-In-Reply-To: <DB5PR04MB1430487C8BFA276E285493959F150@DB5PR04MB1430.eurprd04.prod.outlook.com>
-References: <20160815223035.5429-1-zhengyu.shen@nxp.com>
- <1471395561-30389-1-git-send-email-Nitin.Chaudhary@zii.aero>
- <DB5PR04MB1430018C7BFB14A65517162C9F140@DB5PR04MB1430.eurprd04.prod.outlook.com>
- <CAJOu_28674HsFLo45YnG1UT-Ocoz9oMuLh1uJ60UQ3ciW+YAPA@mail.gmail.com>
- <DB5PR04MB1430DE79735EE6106190CFD99F140@DB5PR04MB1430.eurprd04.prod.outlook.com>
- <CAJOu_289cZ8jXDcH3FB3hShyUyOUMrNJ+BCrcAevEtK+2D26xg@mail.gmail.com>
- <DB5PR04MB1430487C8BFA276E285493959F150@DB5PR04MB1430.eurprd04.prod.outlook.com>
-Message-ID: <CAJOu_28=a6xGXxjc_EbhqiwJSvM-wP4JO_AfGE563QhhGkcfmw@mail.gmail.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Fri, 19 Aug 2016 08:35:14 +0800
+Subject: [PATCH v2 2/3] ARM: dts: sun6i: Add
+ sun6i-reference-design-tablet.dtsi
+In-Reply-To: <1471543337-6938-3-git-send-email-hdegoede@redhat.com>
+References: <1471543337-6938-1-git-send-email-hdegoede@redhat.com>
+ <1471543337-6938-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <92631471566914@web15j.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhengyu,
 
-Thanks for your valuable inputs. I reworked on the patches and moved
-the busy loop to deferred workqueue and it works for my board now. I
-am publishing a new set of patches with the changes. It would be nice
-if you could provide your valuable review.
 
-On Thu, Aug 18, 2016 at 2:34 PM, Zhengyu Shen <zhengyu.shen@nxp.com> wrote:
-> I believe you are correct on the bit[4]. I'm not the original creator of the driver,
-> but from what I can tell, the MMDC should report that it is in power saving mode
-> very quickly, if not immediately after the bit is written. I tested the value of timeout
-> after a couple of a boots and it never goes under 1015 (0x3F7) for me.
+19.08.2016, 02:07, "Hans de Goede" <hdegoede@redhat.com>:
+> Just like with a13/a23/a33 most a31 tablets are derived from the same
+> reference design. Add a .dtsi file with all the common bits to avoid
+> endless copy and pasting of these.
 >
->> -----Original Message-----
->> From: Nitin Chaudhary [mailto:nitinchaudhary1289 at gmail.com]
->> Sent: Thursday, August 18, 2016 3:17 PM
->> To: Zhengyu Shen <zhengyu.shen@nxp.com>
->> Subject: Re: Re:[PATCH v2] Added perf functionality to mmdc driver
->>
->> Hi Zhengyu,
->>
->> Thanks for reply. I was wondering if the Power saving status bit
->> [MMDC0_MAPSR bit[4]] shows whether the MMDC is in power saving mode
->> or not? Also in the driver, exiting if we don't find MMDC in the power saving
->> mode immediately after enabling the automatic power saving mode within
->> the timeout period, is ok? Is it possible it will go into power saving mode after
->> enabling the automatic power saving mode once the DRAM access requests
->> calm down after the device has finished booting and went to a stable/idle
->> state?
->>
->> On Wed, Aug 17, 2016 at 11:09 AM, Zhengyu Shen
->> <zhengyu.shen@nxp.com> wrote:
->> >> Hi Zhengyu,
->> >>
->> >> There are two main reasons why I made pmu_mmdc to be static:
->> >> 1. Since i.MX6Q has only a single MMDC IP, at any time there should
->> >> be only 1 instance of the same.
->> >> 2. Now as the code plugs itself into the perf core, it is very
->> >> unlikely we need to allow access to this  data structure from outside
->> >> the driver code. If we need to do for some reasons in kernel in the
->> >> future then  we can expose some wrapper APIs to achieve that in a
->> safeway.
->> >
->> > I was told that there is a possibility of having more than one MMDC on
->> > a Board and thus pmu_mmdc must not be static. I'll have to verify this
->> > in more detail though.
->> >
->> >> Also, I have a few questions regarding MMDC initialization.
->> >> 1. Is there any specific hardware initialization reason that we do a
->> >> busy loop while trying to enable Automatic
->> >>     power saving mode. Is it possible to move it to deferred workqueue?
->> >> 2. I am having an issue with the MMDC driver running Linux Kernel
->> >> 4.8-rc2 and its unable to successfully
->> >>     probe due to timeout waiting for MMDC automatic wait getting
->> enabled.
->> >> The below is the log message
->> >>     along with the debug messages I added to dump the read values for
->> >> MDMIC and MAPSR reg in MMDC
->> >>    connected to singel channel DDR3.
->> >> [    0.133162] imx_mmdc_probe MMDC_MDMISC: 0x40001740
->> >> [    0.133178] imx_mmdc_probe MMDC_MAPSR: 0x00001046 << Before
->> >> [    0.133871] imx_mmdc_probe: failed to enable automatic power saving
->> >> [    0.133969] imx-mmdc 21b0000.mmdc: No access to interrupts, using
->> timer.
->> >>
->> >> The code snippet where the debug logs are printed is as below:
->> >> static int imx_mmdc_probe(struct platform_device *pdev) <snip>
->> >>         val = readl_relaxed(reg);
->> >>         ddr_type = (val & BM_MMDC_MDMISC_DDR_TYPE) >>
->> >>                  BP_MMDC_MDMISC_DDR_TYPE;
->> >>
->> >>         printk(KERN_CRIT "%s MMDC_MDMISC: 0x%08x\n", __func__, val);
->> >>         reg = mmdc_base + MMDC_MAPSR;
->> >>         /* Enable automatic power saving */
->> >>         val = readl_relaxed(reg);
->> >>         printk(KERN_CRIT "%s MMDC_MAPSR: 0x%08x\n", __func__, val);
->> >>         val &= ~(1 << BP_MMDC_MAPSR_PSD);
->> >>         writel_relaxed(val, reg);
->> >>
->> >>         /* Ensure it's successfully enabled */
->> >>         while (!(readl_relaxed(reg) & 1 << BP_MMDC_MAPSR_PSS) && --
->> >> timeout)
->> >>                 cpu_relax();
->> >> <snip>
->> >>
->> >> Any help on the before mentioned issue will be welcomed.
->> > I'll look into it. I can't reproduce the bug with the (slightly older) kernel
->> version I'm using.
->>
->>
->>
->> --
->> Thanks & Regards
->>
->> Nitin Chaudhary
->> MS, Electrical Engineering
->> University of Southern California
->> Intern, Zodiac In-flight Innovations
+> The sun6i-reference-design-tablet.dtsi this commit adds is a copy
+> of sun6i-a31s-colorfly-e708-q1.dts with a few tablet specific bits
+> removed / left in sun6i-a31s-colorfly-e708-q1.dts.
 
+Thanks! I will soon rebase my dt of Viewsonic Viewpad 133Q (a 13.3" A31s
+tablet) on the reference design.
 
-
--- 
-Thanks & Regards
-
-Nitin Chaudhary
-MS, Electrical Engineering
-University of Southern California
-Intern, Zodiac In-flight Innovations
+It makes it more tidy.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+> ?arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts | 147 +--------------------
+> ?...8-q1.dts => sun6i-reference-design-tablet.dtsi} | 26 +---
+> ?2 files changed, 2 insertions(+), 171 deletions(-)
+> ?copy arch/arm/boot/dts/{sun6i-a31s-colorfly-e708-q1.dts => sun6i-reference-design-tablet.dtsi} (90%)
+>
+> diff --git a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts b/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
+> index 34d8710..882a4d8 100644
+> --- a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
+> +++ b/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
+> @@ -42,32 +42,11 @@
+>
+> ?/dts-v1/;
+> ?#include "sun6i-a31s.dtsi"
+> -#include "sunxi-common-regulators.dtsi"
+> -
+> -#include <dt-bindings/gpio/gpio.h>
+> -#include <dt-bindings/input/input.h>
+> -#include <dt-bindings/pinctrl/sun4i-a10.h>
+> +#include "sun6i-reference-design-tablet.dtsi"
+>
+> ?/ {
+> ?????????model = "Colorfly E708 Q1 tablet";
+> ?????????compatible = "colorfly,e708-q1", "allwinner,sun6i-a31s";
+> -
+> - aliases {
+> - serial0 = &uart0;
+> - };
+> -
+> - chosen {
+> - stdout-path = "serial0:115200n8";
+> - };
+> -};
+> -
+> -&cpu0 {
+> - cpu-supply = <&reg_dcdc3>;
+> -};
+> -
+> -&ehci0 {
+> - /* rtl8188etv wifi is connected here */
+> - status = "okay";
+> ?};
+>
+> ?&lradc {
+> @@ -82,136 +61,12 @@
+> ?????????};
+> ?};
+>
+> -&mmc0 {
+> - pinctrl-names = "default";
+> - pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_e708_q1>;
+> - vmmc-supply = <&reg_dcdc1>;
+> - bus-width = <4>;
+> - cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
+> - cd-inverted;
+> - status = "okay";
+> -};
+> -
+> -&pio {
+> - mmc0_cd_pin_e708_q1: mmc0_cd_pin at 0 {
+> - allwinner,pins = "PA8";
+> - allwinner,function = "gpio_in";
+> - allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> - allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> - };
+> -
+> - usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+> - allwinner,pins = "PA15";
+> - allwinner,function = "gpio_in";
+> - allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> - allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> - };
+> -};
+> -
+> -&p2wi {
+> - status = "okay";
+> -
+> - axp22x: pmic at 68 {
+> - compatible = "x-powers,axp221";
+> - reg = <0x68>;
+> - interrupt-parent = <&nmi_intc>;
+> - interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> - drivevbus-supply = <&reg_vcc5v0>;
+> - x-powers,drive-vbus-en;
+> - };
+> -};
+> -
+> -#include "axp22x.dtsi"
+> -
+> -&reg_aldo3 {
+> - regulator-always-on;
+> - regulator-min-microvolt = <2700000>;
+> - regulator-max-microvolt = <3300000>;
+> - regulator-name = "avcc";
+> -};
+> -
+> -&reg_dc1sw {
+> - regulator-name = "vcc-lcd";
+> -};
+> -
+> -&reg_dc5ldo {
+> - regulator-always-on;
+> - regulator-min-microvolt = <700000>;
+> - regulator-max-microvolt = <1320000>;
+> - regulator-name = "vdd-cpus"; /* This is an educated guess */
+> -};
+> -
+> -&reg_dcdc1 {
+> - regulator-always-on;
+> - regulator-min-microvolt = <3000000>;
+> - regulator-max-microvolt = <3000000>;
+> - regulator-name = "vcc-3v0";
+> -};
+> -
+> -&reg_dcdc2 {
+> - regulator-min-microvolt = <700000>;
+> - regulator-max-microvolt = <1320000>;
+> - regulator-name = "vdd-gpu";
+> -};
+> -
+> -&reg_dcdc3 {
+> - regulator-always-on;
+> - regulator-min-microvolt = <700000>;
+> - regulator-max-microvolt = <1320000>;
+> - regulator-name = "vdd-cpu";
+> -};
+> -
+> -&reg_dcdc4 {
+> - regulator-always-on;
+> - regulator-min-microvolt = <700000>;
+> - regulator-max-microvolt = <1320000>;
+> - regulator-name = "vdd-sys-dll";
+> -};
+> -
+> -&reg_dcdc5 {
+> - regulator-always-on;
+> - regulator-min-microvolt = <1500000>;
+> - regulator-max-microvolt = <1500000>;
+> - regulator-name = "vcc-dram";
+> -};
+> -
+> -&reg_dldo1 {
+> - regulator-min-microvolt = <3300000>;
+> - regulator-max-microvolt = <3300000>;
+> - regulator-name = "vcc-wifi";
+> -};
+> -
+> ?&reg_dldo2 {
+> ?????????regulator-min-microvolt = <1800000>;
+> ?????????regulator-max-microvolt = <1800000>;
+> ?????????regulator-name = "vcc-pg";
+> ?};
+>
+> -&reg_drivevbus {
+> - regulator-name = "usb0-vbus";
+> - status = "okay";
+> -};
+> -
+> ?&simplefb_lcd {
+> - vcc-lcd-supply = <&reg_dc1sw>;
+> ?????????vcc-pg-supply = <&reg_dldo2>;
+> ?};
+> -
+> -&usb_otg {
+> - dr_mode = "otg";
+> - status = "okay";
+> -};
+> -
+> -&usb_power_supply {
+> - status = "okay";
+> -};
+> -
+> -&usbphy {
+> - pinctrl-names = "default";
+> - pinctrl-0 = <&usb0_id_detect_pin>;
+> - usb0_id_det-gpio = <&pio 0 15 GPIO_ACTIVE_HIGH>; /* PA15 */
+> - usb0_vbus_power-supply = <&usb_power_supply>;
+> - usb0_vbus-supply = <&reg_drivevbus>;
+> - usb1_vbus-supply = <&reg_dldo1>;
+> - status = "okay";
+> -};
+> diff --git a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts b/arch/arm/boot/dts/sun6i-reference-design-tablet.dtsi
+> similarity index 90%
+> copy from arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
+> copy to arch/arm/boot/dts/sun6i-reference-design-tablet.dtsi
+> index 34d8710..0c43430 100644
+> --- a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
+> +++ b/arch/arm/boot/dts/sun6i-reference-design-tablet.dtsi
+> @@ -40,8 +40,6 @@
+> ??* OTHER DEALINGS IN THE SOFTWARE.
+> ??*/
+>
+> -/dts-v1/;
+> -#include "sun6i-a31s.dtsi"
+> ?#include "sunxi-common-regulators.dtsi"
+>
+> ?#include <dt-bindings/gpio/gpio.h>
+> @@ -49,9 +47,6 @@
+> ?#include <dt-bindings/pinctrl/sun4i-a10.h>
+>
+> ?/ {
+> - model = "Colorfly E708 Q1 tablet";
+> - compatible = "colorfly,e708-q1", "allwinner,sun6i-a31s";
+> -
+> ?????????aliases {
+> ?????????????????serial0 = &uart0;
+> ?????????};
+> @@ -66,20 +61,8 @@
+> ?};
+>
+> ?&ehci0 {
+> - /* rtl8188etv wifi is connected here */
+> - status = "okay";
+> -};
+> -
+> -&lradc {
+> - vref-supply = <&reg_aldo3>;
+> + /* Wifi is connected here */
+> ?????????status = "okay";
+> -
+> - button at 1000 {
+> - label = "Home";
+> - linux,code = <KEY_HOMEPAGE>;
+> - channel = <0>;
+> - voltage = <1000000>;
+> - };
+> ?};
+>
+> ?&mmc0 {
+> @@ -181,12 +164,6 @@
+> ?????????regulator-name = "vcc-wifi";
+> ?};
+>
+> -&reg_dldo2 {
+> - regulator-min-microvolt = <1800000>;
+> - regulator-max-microvolt = <1800000>;
+> - regulator-name = "vcc-pg";
+> -};
+> -
+> ?&reg_drivevbus {
+> ?????????regulator-name = "usb0-vbus";
+> ?????????status = "okay";
+> @@ -194,7 +171,6 @@
+>
+> ?&simplefb_lcd {
+> ?????????vcc-lcd-supply = <&reg_dc1sw>;
+> - vcc-pg-supply = <&reg_dldo2>;
+> ?};
+>
+> ?&usb_otg {
+> --
+> 2.7.4
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
