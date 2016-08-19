@@ -1,46 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 19 Aug 2016 09:35:57 +0100
-Subject: [PATCH v4 17/17] dt-bindings: pwm: sti: Update DT bindings with
- recent changes
-In-Reply-To: <20160818192002.GA26225@rob-hp-laptop>
-References: <20160816093508.28307-1-lee.jones@linaro.org>
- <20160816093508.28307-18-lee.jones@linaro.org>
- <20160818192002.GA26225@rob-hp-laptop>
-Message-ID: <20160819083557.GK4254@dell>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 19 Aug 2016 15:42:25 +0800
+Subject: [PATCH v6 3/4] ARM: dts: sun9i: cubieboard4: Add device node for AC100
+In-Reply-To: <20160819074226.16636-1-wens@csie.org>
+References: <20160819074226.16636-1-wens@csie.org>
+Message-ID: <20160819074226.16636-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Aug 2016, Rob Herring wrote:
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+Changes since v5: none
+Changes since v4: none
 
-> On Tue, Aug 16, 2016 at 10:35:08AM +0100, Lee Jones wrote:
-> > We're renaming the 'st,pwm-num-chan' binding to 'st,pwm-num-devs' to
-> > be more inline with the naming conventions of the subsystem.  Where
-> > we used to treat each line as a channel, the PWM convention is to
-> > describe them as devices.
-> 
-> This is out of date now. Otherwise, the binding looks fine.
+Changes since v3:                           
 
-Yes, you are right.
+  - Moved 4M ADDA clk to codec side
 
-Perhaps if this is okay with Thierry, he can remove these few lines.
-If not, I don't mind re-sending on request.
+Changes since v2: none
+Changes since v1: none
+---
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-I'll leave it until I hear otherwise.
-
-> > The second documentation adaption entails adding support for PWM
-> > capture devices.  A new clock is required as well as an IRQ line.
-> > We're also adding a new property similar to the one described
-> > above, but for capture channels.  Typically, there will be less
-> > capture channels than PWM-out, since all channels have the latter
-> > capability, but only some have capture support.
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  Documentation/devicetree/bindings/pwm/pwm-st.txt | 8 +++++---
-> >  1 file changed, 5 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+index 1526b41c70f1..cf2f4b72a841 100644
+--- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
++++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+@@ -250,6 +250,30 @@
+ 			};
+ 		};
+ 	};
++
++	ac100: codec at e89 {
++		compatible = "x-powers,ac100";
++		reg = <0xe89>;
++
++		ac100_codec: codec {
++			compatible = "x-powers,ac100-codec";
++			interrupt-parent = <&r_pio>;
++			interrupts = <0 9 IRQ_TYPE_LEVEL_LOW>; /* PL9 */
++			#clock-cells = <0>;
++			clock-output-names = "4M_adda";
++		};
++
++		ac100_rtc: rtc {
++			compatible = "x-powers,ac100-rtc";
++			interrupt-parent = <&nmi_intc>;
++			interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++			clocks = <&ac100_codec>;
++			#clock-cells = <1>;
++			clock-output-names = "cko1_rtc",
++					     "cko2_rtc",
++					     "cko3_rtc";
++		};
++	};
+ };
+ 
+ #include "axp809.dtsi"
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.9.3
