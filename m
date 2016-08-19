@@ -1,38 +1,97 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Aug 2016 11:29:45 +0100
-Subject: Linux 4.7 and Jornada 720 (SA-1100)
-In-Reply-To: <4Tcq736lIfmjNv8%gof@news.chmurka.net>
-References: <4Tcq736lIfmjNv8%gof@news.chmurka.net>
-Message-ID: <20160819102945.GK1041@n2100.armlinux.org.uk>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 19 Aug 2016 12:30:49 +0200
+Subject: [PATCH v3 2/2] ARM64: zynqmp: Add PCIe node
+In-Reply-To: <5930f26f4b5dd129dce09f0a707817d5cf82fde9.1470750018.git.michal.simek@xilinx.com>
+References: <c26e914e5a65f22c2dc19dc2f90b4eb59d51828b.1470750018.git.michal.simek@xilinx.com>
+ <5930f26f4b5dd129dce09f0a707817d5cf82fde9.1470750018.git.michal.simek@xilinx.com>
+Message-ID: <a0012b9a-4c4f-f292-bb94-982fc53525bd@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2016 at 02:05:26PM +0000, Adam Wysocki wrote:
-> I don't know if this is a proper group, but maybe someone will help?
+On 9.8.2016 15:40, Michal Simek wrote:
+> Add PCIe node with prefetchable memory which goes beyond 4GB.
 > 
-> I have a problem running Linux 4.7 on Jornada 720 handheld PC. This 
-> antique has a StrongARM SA-1100 CPU (ARMv4-based) and Windows CE 3.0 
-> stored in ROM. There is also an utility called jlinexec.exe (from 
-> JLime project which is now nearly-dead) that is able to boot Linux 
-> kernel on this machine.
+> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+> Changes in v3:
+> - New patch to show usage of 2/2 on main amba bus
+> 
+> Changes in v2: None
+> 
+>  arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 39 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+> index d24014765111..fbdd6ab98988 100644
+> --- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+> +++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+> @@ -193,6 +193,45 @@
+>  			#size-cells = <0>;
+>  		};
+>  
+> +		pcie: pcie at fd0e0000 {
+> +			compatible = "xlnx,nwl-pcie-2.11";
+> +			status = "disabled";
+> +			#address-cells = <3>;
+> +			#size-cells = <2>;
+> +			#interrupt-cells = <1>;
+> +			msi-controller;
+> +			device_type = "pci";
+> +			interrupt-parent = <&gic>;
+> +			interrupts = <0 118 4>,
+> +				    <0 117 4>,
+> +				    <0 116 4>,
+> +				    <0 115 4>,	/* MSI_1 [63...32] */
+> +				    <0 114 4>;	/* MSI_0 [31...0] */
+> +			interrupt-names = "misc", "dummy", "intx",
+> +					  "msi1", "msi0";
+> +			msi-parent = <&pcie>;
+> +			reg = <0x0 0xfd0e0000 0x0 0x1000>,
+> +			      <0x0 0xfd480000 0x0 0x1000>,
+> +			      <0x80 0x00000000 0x0 0x1000000>;
+> +			reg-names = "breg", "pcireg", "cfg";
+> +			ranges = <0x02000000 0x00000000 0xe0000000 0x00000000
+> +				  0xe0000000 0x00000000 0x10000000
+> +				  /* non-prefetchable memory */
+> +				  0x43000000 0x00000006 0x00000000 0x00000006
+> +				  0x00000000 0x00000002 0x00000000>;
+> +				  /* prefetchable memory */
+> +			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+> +			interrupt-map = <0x0 0x0 0x0 0x1 &pcie_intc 0x1>,
+> +					<0x0 0x0 0x0 0x2 &pcie_intc 0x2>,
+> +					<0x0 0x0 0x0 0x3 &pcie_intc 0x3>,
+> +					<0x0 0x0 0x0 0x4 &pcie_intc 0x4>;
+> +			pcie_intc: legacy-interrupt-controller {
+> +				interrupt-controller;
+> +				#address-cells = <0>;
+> +				#interrupt-cells = <1>;
+> +			};
+> +		};
+> +
+>  		sata: ahci at fd0c0000 {
+>  			compatible = "ceva,ahci-1v84";
+>  			status = "disabled";
+> 
 
-I don't have any SA1100 devices, I only have a couple of SA1110 Assabets.
-I've just tested 4.8.0-rc2 there, and it boots, although cpufreq appears
-a little unhappy.
+Applied both.
 
-Make sure you have "console=ttySA0,38400n8" or similar to get serial
-console output - it needs to be a "ttySA" port, not "ttyS".
-
-Same probably goes for "earlyprintk=serial,ttyS0,115200", although I've
-no experience of earlyprintk myself.  However, if you're not even
-getting the "Uncompressing Linux... done, booting the kernel." line,
-that suggests the decompressor is not running, or is trying to access
-the wrong serial port.  The decompressor tries to find the first serial
-port out of serial 3, 1 and 2 which has been left enabled.
-
-Hope this helps.
+Thanks,
+Michal
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160819/c8c779a0/attachment-0001.sig>
