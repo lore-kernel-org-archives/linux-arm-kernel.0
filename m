@@ -1,39 +1,50 @@
 From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Sat, 20 Aug 2016 01:10:14 +0300
-Subject: [PATCH 2/3] gpio: mxc: lower level of gpio_mxc_init() initcall
+Date: Sat, 20 Aug 2016 01:10:13 +0300
+Subject: [PATCH 1/3] pinctrl: imx: accept gpio request/free from pinctrl
 In-Reply-To: <1471644615-10320-1-git-send-email-vladimir_zapolskiy@mentor.com>
 References: <1471644615-10320-1-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <1471644615-10320-3-git-send-email-vladimir_zapolskiy@mentor.com>
+Message-ID: <1471644615-10320-2-git-send-email-vladimir_zapolskiy@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Deepak Das <deepak_das@mentor.com>
+While only Freescale Vybrid SoC has settings of GPIO capabilities done
+by iomux controller, it is only a matter of GPIO controller driver
+implementation for the rest of Freescale/NXP SoCs from iMX series.
 
-gpio-mxc probe should be called after imx pinctrl driver to make
-sure that gpio-ranges are mapped to the corresponding pins of pin
-controller.
+As a practical example on GPIO request a pad function should be
+switched to GPIO, but because this requires updates to all particular
+iMX pinctrl drivers, for simplicity at the moment add only a proper
+connection between shared pinctrl-imx and pinctrl/pinmux core, namely
+.gpio_request_enable/.gpio_disable_free/.gpio_set_direction callbacks
+should return success to a caller. This change allows to progress by
+adding request/free callbacks into gpio-mxc.c driver.
 
-This commit changes the initcall level of gpio-mxc driver from
-postcore to device level.
-
-Signed-off-by: Deepak Das <deepak_das@mentor.com>
 Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
 ---
- drivers/gpio/gpio-mxc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pinctrl/freescale/pinctrl-imx.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-index 1b342a3842c8..1f0deb7d3380 100644
---- a/drivers/gpio/gpio-mxc.c
-+++ b/drivers/gpio/gpio-mxc.c
-@@ -510,7 +510,7 @@ static int __init gpio_mxc_init(void)
- {
- 	return platform_driver_register(&mxc_gpio_driver);
- }
--postcore_initcall(gpio_mxc_init);
-+device_initcall(gpio_mxc_init);
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
+index 56fd88013850..47613201269a 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx.c
++++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+@@ -315,7 +315,7 @@ static int imx_pmx_gpio_request_enable(struct pinctrl_dev *pctldev,
  
- MODULE_AUTHOR("Freescale Semiconductor, "
- 	      "Daniel Mack <danielncaiaq.de>, "
+ 	/* Currently implementation only for shared mux/conf register */
+ 	if (!(info->flags & SHARE_MUX_CONF_REG))
+-		return -EINVAL;
++		return 0;
+ 
+ 	pin_reg = &info->pin_regs[offset];
+ 	if (pin_reg->mux_reg == -1)
+@@ -380,7 +380,7 @@ static int imx_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
+ 	 * They are part of the shared mux/conf register.
+ 	 */
+ 	if (!(info->flags & SHARE_MUX_CONF_REG))
+-		return -EINVAL;
++		return 0;
+ 
+ 	pin_reg = &info->pin_regs[offset];
+ 	if (pin_reg->mux_reg == -1)
 -- 
 2.8.1
