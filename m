@@ -1,10 +1,8 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 19 Aug 2016 09:47:24 -0400
-Subject: [PATCH v2 2/2] ARM: multi_v7_defconfig: Don't attempt to enable
+Date: Fri, 19 Aug 2016 09:47:23 -0400
+Subject: [PATCH v2 1/2] ARM: exynos_defconfig: Don't attempt to enable
  schedutil governor as module
-In-Reply-To: <1471614444-10673-1-git-send-email-javier@osg.samsung.com>
-References: <1471614444-10673-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1471614444-10673-2-git-send-email-javier@osg.samsung.com>
+Message-ID: <1471614444-10673-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,21 +19,21 @@ Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 Changes in v2:
 - Include linux-samsung-soc ML to cc list. Suggested by Krzysztof Kozlowski.
 
- arch/arm/configs/multi_v7_defconfig | 2 +-
+ arch/arm/configs/exynos_defconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 0ccaa519f588..65b5b6172e83 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -136,7 +136,7 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 5476be3be686..4e484f406419 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -29,7 +29,7 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
  CONFIG_CPU_FREQ_GOV_POWERSAVE=m
  CONFIG_CPU_FREQ_GOV_USERSPACE=m
  CONFIG_CPU_FREQ_GOV_CONSERVATIVE=m
 -CONFIG_CPU_FREQ_GOV_SCHEDUTIL=m
 +CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
- CONFIG_ARM_IMX6Q_CPUFREQ=y
- CONFIG_QORIQ_CPUFREQ=y
+ CONFIG_CPUFREQ_DT=y
  CONFIG_CPU_IDLE=y
+ CONFIG_ARM_EXYNOS_CPUIDLE=y
 -- 
 2.5.5
