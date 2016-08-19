@@ -1,34 +1,86 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Sat, 20 Aug 2016 01:49:38 +0300
-Subject: [PATCH 2/7] ARM: dts: add gpio-ranges property to iMX6Q/D GPIO
- controllers
-In-Reply-To: <1471644388-10220-3-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1471644388-10220-1-git-send-email-vladimir_zapolskiy@mentor.com>
- <1471644388-10220-3-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <20361341-54d2-1e64-57aa-ce2370d05e9c@mentor.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 19 Aug 2016 17:51:54 -0500
+Subject: [PATCH 0/5] firmware: Add support for TI System Control Interface
+ (TI-SCI) protocol driver
+Message-ID: <20160819225159.10758-1-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2016 01:06 AM, Vladimir Zapolskiy wrote:
-> To establish a connection between GPIO controllers and pin multiplexor
-> controller add gpio-ranges properties to all GPIO controllers found
-> on iMX50 SoC. The change was done after human parsing of output from
+Hi,
 
-Looks like it is better to update copy-pasted commit messages to
-reflect not only imxXX-pinfunc.h file name but also a SoC name from
-above.
+Texas Instruments' Keystone generation System on Chips (SoC)
+starting with 66AK2G02[1], now include a dedicated SoC System Control
+entity called PMMC(Power Management Micro Controller) in line with
+ARM architecture recommendations. The function of this module is
+to integrate all system operations in a centralized location.
+Communication with the SoC System Control entity from various
+processing units like ARM/DSP occurs over Message Manager hardware
+block.
 
-I expect to get some review comments and fix it all together in v2,
-but if you prefer to see better commit messages earlier, please let me
-know and I'll resend the edited versions of the changes v1 2-7.
+This series adds the base support for TI System Control Interface
+(TI-SCI) protocol[2]. The protocol is built on top of Texas
+Instrument's Message Manager communication mechanism[3].
 
-Sorry for a typo.
+Overall architecture is very similar to SCPI[4] as follows:
++-------------+   +---------+     +------^-----+
+| TI SCI GENPD|   |TISCI Clk|     |TISCI reset |
++------+------+   +----+----+     +------+-----+
+       |               |                 |
+       |          +----v--------------+  |
+       +----------> TISCI Protocol(*) <--+
+                  +----+--------------+
+                       |
+                   +---v-----------+
+                   | MAILBOX  FWK  |
+                   +---+-----------+
+                       |
+                   +---v-----------+
+                   |  TI MSGMGR    |-> TISCI hardware block
+                   +---------------+
 
-> % gawk -n '{ sub(/.*__/, ""); if ($1 ~ "^GPIO") print $1, $2/4}' imx6q-pinfunc.h | sort -n
->
-> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> ---
+(*) This series.
 
---
-With best wishes,
-Vladimir
+NOTE: Given that this is fundamental to the Keystone generation of SoC
+starting with K2G, I have taken the liberty of adding Santosh, Tero
+and myself as maintainers to these driver. Do let me know if that is
+not appropriate.
+
+[1] http://www.ti.com/product/66ak2g02
+[2] http://processors.wiki.ti.com/index.php/TISCI
+[3] Documentation/devicetree/bindings/mailbox/ti,message-manager.txt
+[4] Documentation/devicetree/bindings/arm/arm,scpi.txt
+
+Baseline: v4.8-rc1
+boot log: http://pastebin.ubuntu.com/23071570/ (with additional SoC specific dts patches)
+Patches can also be found: https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.9/tisci-base-v1
+
+PS: We believe the churn is done in the protocol over the last 2 TI
+vendor kernel versions and minimal changes may be involved in the
+future. Obviously, a lot of folks (especially Russ Dill) have been
+involved in making this happen.. unfortunately, the list is a bit too
+long to elaborate here :(
+
+Nishanth Menon (5):
+  Documentation: Add support for TI System Control Interface (TI-SCI)
+    protocol
+  firmware: Add basic support for TI System Control Interface (TI-SCI)
+    protocol
+  firmware: ti_sci: Add support for Device control
+  firmware: ti_sci: Add support for Clock control
+  firmware: ti_sci: Add support for reboot core service
+
+ .../devicetree/bindings/arm/keystone/ti,sci.txt    |   66 +
+ MAINTAINERS                                        |   10 +
+ drivers/firmware/Kconfig                           |   15 +
+ drivers/firmware/Makefile                          |    1 +
+ drivers/firmware/ti_sci.c                          | 1993 ++++++++++++++++++++
+ drivers/firmware/ti_sci.h                          |  492 +++++
+ include/linux/soc/ti/ti_sci_protocol.h             |  249 +++
+ 7 files changed, 2826 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+ create mode 100644 drivers/firmware/ti_sci.c
+ create mode 100644 drivers/firmware/ti_sci.h
+ create mode 100644 include/linux/soc/ti/ti_sci_protocol.h
+
+-- 
+2.9.1.200.gb1ec08f
