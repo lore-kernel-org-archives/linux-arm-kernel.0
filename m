@@ -1,42 +1,64 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Aug 2016 17:45:47 +0100
-Subject: [PATCH v2 1/2] Input: jornada720_kbd - switch to devm_* APIs
-In-Reply-To: <20160819164447.GB20499@dtor-ws>
-References: <E1bamh9-0004Vi-0I@rmk-PC.armlinux.org.uk>
- <20160819164447.GB20499@dtor-ws>
-Message-ID: <20160819164547.GU1041@n2100.armlinux.org.uk>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 19 Aug 2016 17:46:11 +0100
+Subject: [PATCH 07/13] scpi: ignore init_versions failure if reported not
+ supported
+In-Reply-To: <1471515066-3626-8-git-send-email-narmstrong@baylibre.com>
+References: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
+ <1471515066-3626-8-git-send-email-narmstrong@baylibre.com>
+Message-ID: <74d35f80-8499-cadf-798c-9b296218305c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2016 at 09:44:47AM -0700, Dmitry Torokhov wrote:
-> On Fri, Aug 19, 2016 at 05:30:59PM +0100, Russell King wrote:
-> > Switch the jornada720_kbd driver to use the devm_* APIs.  This is in
-> > preparation to removing the mach/irqs.h include from this driver.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> > ---
-> >  drivers/input/keyboard/jornada720_kbd.c | 38 ++++++++-------------------------
-> >  1 file changed, 9 insertions(+), 29 deletions(-)
-> > 
-> > diff --git a/drivers/input/keyboard/jornada720_kbd.c b/drivers/input/keyboard/jornada720_kbd.c
-> > index 421d9c55b0e8..4b2e9ff18ba1 100644
-> > --- a/drivers/input/keyboard/jornada720_kbd.c
-> > +++ b/drivers/input/keyboard/jornada720_kbd.c
-> > @@ -53,6 +53,7 @@ static unsigned short jornada_std_keymap[128] = {					/* ROW */
-> >  struct jornadakbd {
-> >  	unsigned short keymap[ARRAY_SIZE(jornada_std_keymap)];
-> >  	struct input_dev *input;
-> > +	int irq;
-> 
-> I do not think you need this, not in this patch and the next one does
-> not seem to need this either?
-> 
-> Can I drop this chunk?
 
-Yes, that was accidentally left in while I was considering how to update
-the driver.  It can be safely dropped.  Thanks for spotting that.
+
+On 18/08/16 11:11, Neil Armstrong wrote:
+> In Amlogic GXBB Legacy SCPI, the LEGACY_SCPI_CMD_SCPI_CAPABILITIES report
+> as SCPI_ERR_SUPPORT, so do not fail if this command is not supported.
+>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  drivers/firmware/arm_scpi.c | 12 +++++++-----
+>  1 file changed, 7 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+> index 3fe39fe..d3be4c5 100644
+> --- a/drivers/firmware/arm_scpi.c
+> +++ b/drivers/firmware/arm_scpi.c
+> @@ -1111,12 +1111,13 @@ err:
+>  		ret = scpi_info->ops->init_versions(scpi_info);
+>  	else
+>  	ret = scpi_init_versions(scpi_info);
+> -	if (ret) {
+> +	if (ret && ret != -EOPNOTSUPP) {
+>  		dev_err(dev, "incorrect or no SCP firmware found\n");
+>  		scpi_remove(pdev);
+>  		return ret;
+>  	}
+>
+
+Why not deal it in init_versions itself.
+
+> +	if (ret != -EOPNOTSUPP) {
+>  	_dev_info(dev, "SCP Protocol %d.%d Firmware %d.%d.%d version\n",
+>  		  PROTOCOL_REV_MAJOR(scpi_info->protocol_version),
+>  		  PROTOCOL_REV_MINOR(scpi_info->protocol_version),
+
+Why not have default value like 0.0 ? Just add a comment. Since get
+version is exported out, IMO having default value makes more sense. What
+do you think ?
+
+> @@ -1124,15 +1125,16 @@ err:
+>  		  FW_REV_MINOR(scpi_info->firmware_version),
+>  		  FW_REV_PATCH(scpi_info->firmware_version));
+>
+> +		ret = sysfs_create_groups(&dev->kobj, versions_groups);
+> +		if (ret)
+> +			dev_err(dev, "unable to create sysfs version group\n");
+> +	}
+> +
+
+Again this can stay as is if we have default.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Sudeep
