@@ -1,67 +1,120 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Aug 2016 14:26:50 +0100
-Subject: Linux 4.7 and Jornada 720 (SA-1100)
-In-Reply-To: <7Tcq9hpfIfmjNv8%gof@news.chmurka.net>
-References: <4Tcq736lIfmjNv8%gof@news.chmurka.net>
- <20160819102945.GK1041@n2100.armlinux.org.uk>
- <7Tcq9hpfIfmjNv8%gof@news.chmurka.net>
-Message-ID: <20160819132650.GO1041@n2100.armlinux.org.uk>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 19 Aug 2016 18:57:05 +0530
+Subject: [PATCH v2 4/7] phy-sun4i-usb: Add support for phy_set_mode
+In-Reply-To: <871t1m5qjs.fsf@linux.intel.com>
+References: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
+ <1471288892-21702-5-git-send-email-hdegoede@redhat.com>
+ <6058a676-1e2c-0301-6edd-eee64b515b51@cogentembedded.com>
+ <93bda5ac-4548-9e92-742c-baba7ed52849@redhat.com>
+ <877fbe5xuk.fsf@linux.intel.com>
+ <bf40c95d-ae2e-8980-90c9-f68415b06461@redhat.com>
+ <871t1m5qjs.fsf@linux.intel.com>
+Message-ID: <57B70929.5080707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2016 at 01:11:13PM +0000, Adam Wysocki wrote:
-> Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
-> 
-> > Make sure you have "console=ttySA0,38400n8" or similar to get serial
-> > console output - it needs to be a "ttySA" port, not "ttyS".
-> 
-> Hmm... I changed to:
-> 
-> root=0x302 mem=32m console=ttySA0,115200n8
-> 
-> and success - it helped! The screen is still blank, but I least I have 
-> some messages on the serial port, finished with kernel panic because of 
-> failing to mount root. It looks like I didn't enable some drivers for 
-> the CF controller, but I look and it seems everything that should be 
-> enabled is enabled... maybe this kernel doesn't support CF on Jornada 
-> without a patch?
-> 
-> http://pastebin.com/J2ATKxQM
-> 
-> And I'm just wondering why the screen is blank while I definitely enabled 
-> the SA-1100 framebuffer support and console on framebuffer... I'm not sure 
-> if it should be blank when I specified console=ttySA0, but I don't think 
-> it should be blank without any console= setting...
+Hi,
 
-Looking at the board file, the jornada720 doesn't use sa11x0-fb at all.
-It uses an Epson s1d13xxx device.  The defconfig for jornada720 has:
-
-CONFIG_FB_S1D13XXX=y
-
-so if your configuration is derived from that, you should have the
-driver already enabled.
-
-> > Same probably goes for "earlyprintk=serial,ttyS0,115200", although I've
-> > no experience of earlyprintk myself.
+On Thursday 18 August 2016 03:47 PM, Felipe Balbi wrote:
 > 
-> It seems that earlyprintk is ignored anyway, maybe there's no support for 
-> it on this platform?
-
-No idea, sorry.  I use my printascii() hack in printk() when I need early
-or lowlevel debugging rather than early printk.
-
-> > However, if you're not even getting the "Uncompressing Linux... done, 
-> > booting the kernel." line, that suggests the decompressor is not running, 
-> > or is trying to access the wrong serial port.  The decompressor tries to 
-> > find the first serial port out of serial 3, 1 and 2 which has been left 
-> > enabled.
+> Hi,
 > 
-> In this order? Maybe it tries to send its messages to the built-in modem 
-> or IrDA port...
+> Hans de Goede <hdegoede@redhat.com> writes:
+> 
+> [...]
+> 
+>>>>>>  void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
+>>>>>>  {
+>>>>>>      struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+>>>>> [...]
+>>>>>
+>>>>> $ scripts/checkpatch.pl ~/patches/phy-sun4i-usb-Add-support-for-phy_set_mode.patch
+>>>>> ERROR: trailing statements should be on next line
+>>>>> #29: FILE: drivers/phy/phy-sun4i-usb.c:439:
+>>>>> +    case PHY_MODE_USB_HOST:   data->dr_mode = USB_DR_MODE_HOST; break;
+>>>>>
+>>>>> ERROR: trailing statements should be on next line
+>>>>> #30: FILE: drivers/phy/phy-sun4i-usb.c:440:
+>>>>> +    case PHY_MODE_USB_DEVICE: data->dr_mode = USB_DR_MODE_PERIPHERAL; break;
+>>>>>
+>>>>> ERROR: trailing statements should be on next line
+>>>>> #31: FILE: drivers/phy/phy-sun4i-usb.c:441:
+>>>>> +    case PHY_MODE_USB_OTG:    data->dr_mode = USB_DR_MODE_OTG; break;
+>>>>
+>>>> This is normal codeing style for a switch-case assigning a single value per case,
+>>>> but checkpatch does not know this.
+>>>
+>>> I don't see that in CodingStyle
+>>
+>> It is an exception to the rule as such it is not listed, but this
+>> really is quite a normal thing to do in C code.
+>>
+>>> and it's quite ugly.
+>>
+>> So this is ugly:
+>>
+>>      switch (mode) {
+>>      case PHY_MODE_USB_HOST:   data->dr_mode = USB_DR_MODE_HOST; break;
+>>      case PHY_MODE_USB_DEVICE: data->dr_mode = USB_DR_MODE_PERIPHERAL; break;
+>>      case PHY_MODE_USB_OTG:    data->dr_mode = USB_DR_MODE_OTG; break;
+>>      default:
+>>          return -EINVAL;
+>>      }
+>>
+>> Where as this is not:
+>>
+>>      switch (mode) {
+>>      case PHY_MODE_USB_HOST:
+>>          data->dr_mode = USB_DR_MODE_HOST;
+>>          break;
+>>      case PHY_MODE_USB_DEVICE:
+>>          data->dr_mode = USB_DR_MODE_PERIPHERAL;
+>>          break;
+>>      case PHY_MODE_USB_OTG:
+>>          data->dr_mode = USB_DR_MODE_OTG;
+>>          break;
+>>      default:
+>>          return -EINVAL;
+>>      }
+>>
+>> ???
+>>
+>> IMHO the original version is much easier to read / makes it much
+>> clearer what the code is doing.
+>>
+>> But if you insist I can do a v3 changing the coding style to
+>> the (IMHO) uglier version.
+>>
+>> Also note that the real ugliness is that we've 3 different enums
+>> for host / device / dual-role. For some reason the musb code has
+>> 2 all of its own and then there is "enum phy_mode".
+>>
+>> Anyways let me know if you want a v3 with check-patch warnings
+>> fixed.
+> 
+> I see it's somewhat common even in drivers/usb:
+> 
+> $ git grep -ce "case \w+:.*break;" -- drivers/usb/ 
+> drivers/usb/gadget/udc/net2272.c:4
+> drivers/usb/host/ehci-hcd.c:3
+> drivers/usb/host/isp116x.h:2
+> drivers/usb/host/ohci-dbg.c:14
+> drivers/usb/host/sl811-hcd.c:7
+> drivers/usb/host/uhci-debug.c:8
+> drivers/usb/image/microtek.c:64
+> drivers/usb/mon/mon_text.c:6
+> drivers/usb/musb/musb_gadget.c:2
+> drivers/usb/serial/digi_acceleport.c:23
+> drivers/usb/serial/ftdi_sio.c:10
+> drivers/usb/serial/mct_u232.c:10
+> drivers/usb/serial/spcp8x5.c:17
+> drivers/usb/serial/whiteheat.c:4
+> drivers/usb/storage/debug.c:86
+> 
+> so I'm okay either way. Kishon has the final say here since he's
+> drivers/phy/ maintainer.
 
-Yes, that order.
+hmm.. I'd prefer without checkpatch errors or warnings.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks
+Kishon
