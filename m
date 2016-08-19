@@ -1,60 +1,42 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 19 Aug 2016 12:16:12 -0700
-Subject: [PATCH v6 1/2] clk: uniphier: add core support code for UniPhier
- clock driver
-In-Reply-To: <CAK7LNAQg-LcK-vsWVU-b0WsF=Y_NBNR_cWqNDJKyMqp7Svdvqg@mail.gmail.com>
-References: <1470112223-24835-1-git-send-email-yamada.masahiro@socionext.com>
- <1470112223-24835-2-git-send-email-yamada.masahiro@socionext.com>
- <20160819002507.GS361@codeaurora.org>
- <CAK7LNAQg-LcK-vsWVU-b0WsF=Y_NBNR_cWqNDJKyMqp7Svdvqg@mail.gmail.com>
-Message-ID: <20160819191612.GU361@codeaurora.org>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 19 Aug 2016 15:31:08 -0400
+Subject: [RFC 00/17] clk: Add per-controller locks to fix deadlocks
+In-Reply-To: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
+References: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <8519a1cf-ec51-2914-e4aa-27b26b9233de@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20, Masahiro Yamada wrote:
-> 2016-08-19 9:25 GMT+09:00 Stephen Boyd <sboyd@codeaurora.org>:
-> >> +{
-> >> +     struct device *dev = &pdev->dev;
-> >> +     const struct of_device_id *match;
-> >> +     struct clk_hw_onecell_data *hw_data;
-> >> +     struct device_node *parent;
-> >> +     struct regmap *regmap;
-> >> +     const struct uniphier_clk_data *p;
-> >> +     int clk_num = 0;
-> >> +
-> >> +     match = of_match_node(uniphier_clk_match, dev->of_node);
-> >> +     if (!match)
-> >> +             return -ENODEV;
-> >
-> > We can use of_driver_match_device() to make this simpler.
-> 
-> 
-> I want to use the returned "match".
-> The of_driver_match_device() just checks if it matches or not,
-> so I do not think it can be the replacement.
-> 
-> I can use of_match_device() instead, if you like.
+Hello Krzysztof,
 
-Sorry I meant of_device_get_match_data().
-
+On 08/16/2016 09:34 AM, Krzysztof Kozlowski wrote:
+> Hi,
+> 
+> RFC, please, do not apply, maybe except patch #1 which is harmless.
 > 
 > 
+> Introduction
+> ============
+> The patchset brings new entity: clock controller representing a hardware
+> block.  The clock controller comes with its own prepare lock which
+> is used then in many places.  The idea is to fix the deadlock mentioned
+> in commit 10ff4c5239a1 ("i2c: exynos5: Fix possible ABBA deadlock by keeping
+> I2C clock prepared") and commit 34e81ad5f0b6 ("i2c: s3c2410: fix ABBA deadlock
+> by keeping clock prepared").
 > 
-> >> +
-> >> +     parent = of_get_parent(dev->of_node); /* parent should be syscon node */
-> >> +     regmap = syscon_node_to_regmap(parent);
-> >> +     of_node_put(parent);
-> >
-> > devm_get_regmap(dev->parent) should work then? Why do we need to
-> > use OF APIs?
-> 
-> "git grep devm_get_regmap" did not hit anything.
-> 
-> Where is it defined?
 > 
 
-Sorry I meant dev_get_regmap().
+I'm not familiar enough with the common clock framework to do a proper review
+of this patch-set, but I've tested both on an Exynos5800 Peach Pi Chromebook
+and an Exynos5422 Odroid XU4 board and I didn't find any clock regressions.
 
+Also, I confirmed that the possible deadlock in the Odroid XU4 that was fixed
+by reverted commit 10ff4c5239a1 doesn't happen anymore with your patches.
+
+Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
