@@ -1,42 +1,66 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 19 Aug 2016 10:00:44 +0200
-Subject: [PATCH 01/13] scpi: Add vendor_send_message to enable access to
- vendor commands
-In-Reply-To: <c5b2d698-de4c-012a-7e7b-63685b7e898c@arm.com>
-References: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
- <1471515066-3626-2-git-send-email-narmstrong@baylibre.com>
- <c5b2d698-de4c-012a-7e7b-63685b7e898c@arm.com>
-Message-ID: <9bf4a979-5325-fd70-1887-04c605d593d8@baylibre.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 19 Aug 2016 09:29:15 +0100
+Subject: [PATCH 2/2] arm64: dts: set UART1 clock frequency to 150MHz
+In-Reply-To: <85888839-f776-9f8a-0f06-8a1f69aab56d@linaro.org>
+References: <1467965467-28180-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <1467965467-28180-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <57836C8B.6020509@hisilicon.com>
+ <85888839-f776-9f8a-0f06-8a1f69aab56d@linaro.org>
+Message-ID: <57B6C35B.5010901@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/18/2016 05:53 PM, Sudeep Holla wrote:
-> 
-> 
-> On 18/08/16 11:10, Neil Armstrong wrote:
->> Adds an optional vendor_send_message to the scpi to enable sending
->> vendor platform specific commands to the SCP firmware.
+
+
+On 19/08/2016 07:57, Jorge Ramirez wrote:
+> On 07/11/2016 11:53 AM, Wei Xu wrote:
+>> Hi Jorge,
 >>
+>> On 08/07/2016 09:11, Jorge Ramirez-Ortiz wrote:
+>>> Enable support for higher baud rates (up to 3Mbps) in UART1 - required
+>>> for bluetooth transfers.
+>>>
+>>> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+>>> Tested-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+>> Fine to me.
+>> Thanks!
+>>
+>> Acked-by: Wei Xu <xuwei5@hisilicon.com>
+>>
+>> Best Regards,
+>> Wei
+>>
+>>> ---
+>>>   arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 2 ++
+>>>   1 file changed, 2 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+>>> index e92a30c..27be812 100644
+>>> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+>>> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+>>> @@ -55,6 +55,8 @@
+>>>           };
+>>>             uart1: uart at f7111000 {
+>>> +            assigned-clocks = <&sys_ctrl HI6220_UART1_SRC>;
+>>> +            assigned-clock-rates = <150000000>;
+>>>               status = "ok";
+>>>           };
+>>>  
+
+Hi Jorge,
+
+> Wei Xu,
 > 
-> I don't see any users of vendor_send_message in this series, so I prefer
-> it to be dropped and introduced when required.
+> I couldn't find the change upstream. has it been merged?
+
+No.
+I thought Mike will pick them.
+If nothing need to be change, I will pick up it.
+
+Best Regards,
+Wei
+
 > 
-> Also I had a different view on how to introduce this[1]. I would rather
-> wait until the requirement comes that enables us to make use of it.
-> Looks like you took parts of it and introduces vendor_send_message
-> allowing users to send any data which I don't like especially without
-> knowing how will it be (ab)used.
 > 
-
-Hi Sudeep,
-
-Indeed, I won't ask you to merge patches 1, 8 and 9, they need refactoring and
-a separate patchset.
-
-Vendor commands are not necessary for Amlogic, this is a nice to have since they
-have a "user" command that can be extended by a firmware loaded by u-boot.
-
-Could you review the following patches and I'll post a reduced v2 ASAP.
-
-Thanks,
-Neil
+> .
+> 
