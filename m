@@ -1,46 +1,32 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 19 Aug 2016 10:00:30 -0700
-Subject: [PATCH v2 1/2] Input: jornada720_kbd - switch to devm_* APIs
-In-Reply-To: <20160819164547.GU1041@n2100.armlinux.org.uk>
-References: <E1bamh9-0004Vi-0I@rmk-PC.armlinux.org.uk>
- <20160819164447.GB20499@dtor-ws>
- <20160819164547.GU1041@n2100.armlinux.org.uk>
-Message-ID: <20160819170030.GD20499@dtor-ws>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 19 Aug 2016 19:05:46 +0200
+Subject: [PATCH 6/7] arm64: dts: exynos: Add dts file for Exynos5433-based
+ TM2 board
+In-Reply-To: <1471329328-26842-2-git-send-email-cw00.choi@samsung.com>
+References: <1471328843-26653-1-git-send-email-cw00.choi@samsung.com>
+ <1471329328-26842-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <0aba7694-e5fc-47be-dce6-06f64fb3759d@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2016 at 05:45:47PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Aug 19, 2016 at 09:44:47AM -0700, Dmitry Torokhov wrote:
-> > On Fri, Aug 19, 2016 at 05:30:59PM +0100, Russell King wrote:
-> > > Switch the jornada720_kbd driver to use the devm_* APIs.  This is in
-> > > preparation to removing the mach/irqs.h include from this driver.
-> > > 
-> > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> > > ---
-> > >  drivers/input/keyboard/jornada720_kbd.c | 38 ++++++++-------------------------
-> > >  1 file changed, 9 insertions(+), 29 deletions(-)
-> > > 
-> > > diff --git a/drivers/input/keyboard/jornada720_kbd.c b/drivers/input/keyboard/jornada720_kbd.c
-> > > index 421d9c55b0e8..4b2e9ff18ba1 100644
-> > > --- a/drivers/input/keyboard/jornada720_kbd.c
-> > > +++ b/drivers/input/keyboard/jornada720_kbd.c
-> > > @@ -53,6 +53,7 @@ static unsigned short jornada_std_keymap[128] = {					/* ROW */
-> > >  struct jornadakbd {
-> > >  	unsigned short keymap[ARRAY_SIZE(jornada_std_keymap)];
-> > >  	struct input_dev *input;
-> > > +	int irq;
-> > 
-> > I do not think you need this, not in this patch and the next one does
-> > not seem to need this either?
-> > 
-> > Can I drop this chunk?
-> 
-> Yes, that was accidentally left in while I was considering how to update
-> the driver.  It can be safely dropped.  Thanks for spotting that.
+On 08/16/2016 08:35 AM, Chanwoo Choi wrote:
+> &spi_1 {
+> +	cs-gpios = <&gpd6 3 GPIO_ACTIVE_HIGH>;
+> +	status = "okay";
+> +
+> +	wm5110: wm5110-codec at 0 {
+> +		compatible = "wlf,wm5110";
+> +		reg = <0x0>;
+> +		spi-max-frequency = <20000000>;
+> +		interrupt-parent = <&gpa0>;
+> +		interrupts = <4 0 0>;
+> +		clocks = <&xxti>, <&s2mps13_osc 2>;
 
-Great. I'll also drop now empty jornada720_kbd_remove() and apply.
+The first clock needs to be CLKOUT, i.e.
 
-Thanks.
+	clocks = <&pmu_system_controller 0>, <&s2mps13_osc 2>;
+
 
 -- 
-Dmitry
+Thanks,
+Sylwester
