@@ -1,78 +1,166 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 19 Aug 2016 11:55:49 -0400
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Don't attempt to enable
- schedutil governor as module
-In-Reply-To: <20160819155140.GA12633@kozik-lap>
-References: <1471612328-6467-1-git-send-email-javier@osg.samsung.com>
- <1471612328-6467-2-git-send-email-javier@osg.samsung.com>
- <9c71ddbd-deb1-1e07-7421-53bb58359bad@kernel.org>
- <7dd6278d-bdc4-14e5-6b2e-062a59cd29d4@osg.samsung.com>
- <fe0ad949-ecd1-e0fe-3d9b-04a35b9dc172@osg.samsung.com>
- <20160819155140.GA12633@kozik-lap>
-Message-ID: <7d675cef-64b8-b143-6ce7-422dcfeefb6c@osg.samsung.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Fri, 19 Aug 2016 17:59:16 +0200
+Subject: [PATCH v6 5/7] power: act8945a_charger: Add capacity level
+ property
+In-Reply-To: <1471569215-6046-6-git-send-email-wenyou.yang@atmel.com>
+References: <1471569215-6046-1-git-send-email-wenyou.yang@atmel.com>
+ <1471569215-6046-6-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20160819155916.mzrgdgainol4c6nw@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Hi,
 
-On 08/19/2016 11:51 AM, Krzysztof Kozlowski wrote:
-> On Fri, Aug 19, 2016 at 09:52:47AM -0400, Javier Martinez Canillas wrote:
->> Hello Krzysztof,
->>
->> On 08/19/2016 09:46 AM, Javier Martinez Canillas wrote:
->>>
->>> On 08/19/2016 09:40 AM, Krzysztof Kozlowski wrote:
->>>> On 08/19/2016 03:12 PM, Javier Martinez Canillas wrote:
->>>>> The schedutil CPUFreq governor could be built as a module but the commit
->>>>> 58919e83c85c ("cpufreq / sched: Pass flags to cpufreq_update_util()")
->>>>> made it non-modular so attempting to enable as module leads to a warning:
->>>>>
->>>>> warning: symbol value 'm' invalid for CPU_FREQ_GOV_SCHEDUTIL
->>>>>
->>>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>>>>
->>>>> ---
->>>>>
->>>>>  arch/arm/configs/multi_v7_defconfig | 2 +-
->>>>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> Looks good.
->>>>
->>>> Applied... wait, no, these are not in samsung-soc list so they miss also
->>>> from patchwork. For reference:
->>>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>>
->>>
->>> Sigh, get_maintainers.pl suggested me an insanely large cc list so I added
->>> it manually... but I forgot linux-samsung-soc. I'll post v2.
->>>
->>
->> Damn... and now I forgot to include your collected tags in v2. I should not
->> post patches before having enough coffee, sorry about that.
->>
->> Please let me know if you don't mind or if you prefer a resend.
+On Fri, Aug 19, 2016 at 09:13:33AM +0800, Wenyou Yang wrote:
+> Add the power supply capacity level property, it corresponds to
+> POWER_SUPPLY_CAPACITY_LEVEL_*.
 > 
-> No problem, no need to resend.
->
-
-I resent some minutes ago figure getting your email. So feel free to ignore v3.
- 
-> Applied to separate branch (not tagged yet) in case someone would like
-> to base on top of it. Then please let me know, I'll add a tag.
+> It also utilizes the precision voltage detector function module
+> to catch the low battery voltage.
 > 
-> Mentioned commit is not yet in mainline and was applied recently, so I
-> remove the SHA from commit msg. The SHA might change and it's better not
-> to pollute the history in that case.
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> ---
 > 
-
-Ok, thanks for doing that.
-
-> Best regards,
-> Krzysztof
+> Changes in v6:
+>  - For 'lbo-gpios', use gpiod API instead of old gpio API to handle.
 > 
+> Changes in v5: None
+> Changes in v4:
+>  - Change devname of devm_request_irq() from "lbo-detect" to
+>    "act8945a, lbo-detect".
+> 
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  drivers/power/supply/act8945a_charger.c | 75 +++++++++++++++++++++++++++++++++
+>  1 file changed, 75 insertions(+)
+> 
+> diff --git a/drivers/power/supply/act8945a_charger.c b/drivers/power/supply/act8945a_charger.c
+> index 2ff2f8d..de7ad48 100644
+> --- a/drivers/power/supply/act8945a_charger.c
+> +++ b/drivers/power/supply/act8945a_charger.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/power_supply.h>
+>  #include <linux/regmap.h>
+> +#include <linux/gpio/consumer.h>
+>  
+>  static const char *act8945a_charger_model = "ACT8945A";
+>  static const char *act8945a_charger_manufacturer = "Active-semi";
+> @@ -83,6 +84,7 @@ struct act8945a_charger {
+>  	struct work_struct work;
+>  
+>  	bool init_done;
+> +	struct gpio_desc *lbo_gpio;
+>  };
+>  
+>  static int act8945a_get_charger_state(struct regmap *regmap, int *val)
+> @@ -208,11 +210,67 @@ static int act8945a_get_battery_health(struct regmap *regmap, int *val)
+>  	return 0;
+>  }
+>  
+> +static int act8945a_get_capacity_level(struct act8945a_charger *charger,
+> +				       struct regmap *regmap, int *val)
+> +{
+> +	int ret;
+> +	unsigned int status, state, config;
+> +	int lbo_level = gpiod_get_value(charger->lbo_gpio);
+> +
+> +	ret = regmap_read(regmap, ACT8945A_APCH_STATUS, &status);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = regmap_read(regmap, ACT8945A_APCH_CFG, &config);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = regmap_read(regmap, ACT8945A_APCH_STATE, &state);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	state &= APCH_STATE_CSTATE;
+> +	state >>= APCH_STATE_CSTATE_SHIFT;
+> +
+> +	switch (state) {
+> +	case APCH_STATE_CSTATE_PRE:
+> +		*val = POWER_SUPPLY_CAPACITY_LEVEL_LOW;
+> +		break;
+> +	case APCH_STATE_CSTATE_FAST:
+> +		if (lbo_level)
+> +			*val = POWER_SUPPLY_CAPACITY_LEVEL_HIGH;
+> +		else
+> +			*val = POWER_SUPPLY_CAPACITY_LEVEL_LOW;
+> +		break;
+> +	case APCH_STATE_CSTATE_EOC:
+> +		if (status & APCH_STATUS_CHGDAT)
+> +			*val = POWER_SUPPLY_CAPACITY_LEVEL_FULL;
+> +		else
+> +			*val = POWER_SUPPLY_CAPACITY_LEVEL_NORMAL;
+> +		break;
+> +	case APCH_STATE_CSTATE_DISABLED:
+> +	default:
+> +		if (config & APCH_CFG_SUSCHG) {
+> +			*val = POWER_SUPPLY_CAPACITY_LEVEL_UNKNOWN;
+> +		} else {
+> +			*val = POWER_SUPPLY_CAPACITY_LEVEL_NORMAL;
+> +			if (!(status & APCH_STATUS_INDAT)) {
+> +				if (!lbo_level)
+> +					*val = POWER_SUPPLY_CAPACITY_LEVEL_CRITICAL;
+> +			}
+> +		}
+> +		break;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static enum power_supply_property act8945a_charger_props[] = {
+>  	POWER_SUPPLY_PROP_STATUS,
+>  	POWER_SUPPLY_PROP_CHARGE_TYPE,
+>  	POWER_SUPPLY_PROP_TECHNOLOGY,
+>  	POWER_SUPPLY_PROP_HEALTH,
+> +	POWER_SUPPLY_PROP_CAPACITY_LEVEL,
+>  	POWER_SUPPLY_PROP_MODEL_NAME,
+>  	POWER_SUPPLY_PROP_MANUFACTURER
+>  };
+> @@ -238,6 +296,10 @@ static int act8945a_charger_get_property(struct power_supply *psy,
+>  	case POWER_SUPPLY_PROP_HEALTH:
+>  		ret = act8945a_get_battery_health(regmap, &val->intval);
+>  		break;
+> +	case POWER_SUPPLY_PROP_CAPACITY_LEVEL:
+> +		ret = act8945a_get_capacity_level(charger,
+> +						  regmap, &val->intval);
+> +		break;
+>  	case POWER_SUPPLY_PROP_MODEL_NAME:
+>  		val->strval = act8945a_charger_model;
+>  		break;
+> @@ -352,6 +414,19 @@ static int act8945a_charger_config(struct device *dev,
+>  	if (tmp & APCH_CFG_SUSCHG)
+>  		value |= APCH_CFG_SUSCHG;
+>  
+> +	charger->lbo_gpio = devm_gpiod_get(dev, "active-semi,lbo", GPIOD_IN);
+> +	if (IS_ERR(charger->lbo_gpio)) {
+> +		dev_err(dev, "unable to claim gpio \"lbo\"\n");
+> +		charger->lbo_gpio = NULL;
+> +	};
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+You need special handling for -EPROBE_DEFER.
+
+> +	ret = devm_request_irq(dev, gpiod_to_irq(charger->lbo_gpio),
+> +			       act8945a_status_changed,
+> +			       (IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING),
+> +			       "act8945a_lbo_detect", charger);
+> +	if (ret)
+> +		dev_dbg(dev, "failed to request \"lbo\" pin IRQ\n");
+
+Also everything in act8945a_charger_config is done with parent
+device as *dev. Thus all devm_*(dev, ...) calls are wrong.
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160819/d9ef1131/attachment-0001.sig>
