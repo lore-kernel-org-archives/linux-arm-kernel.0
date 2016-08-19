@@ -1,35 +1,84 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Fri, 19 Aug 2016 09:38:23 -0700
-Subject: [PATCH 1/1] ARM: dma: fix dma_max_pfn()
-In-Reply-To: <9c38663b-1867-213d-21ba-f1dec7edfb6a@ti.com>
-References: <1471435517-7840-1-git-send-email-rogerq@ti.com>
- <1471435517-7840-2-git-send-email-rogerq@ti.com>
- <20160818142459.GX1041@n2100.armlinux.org.uk>
- <8003b6ed-6071-9384-1b88-0b84604bdce8@oracle.com>
- <20160818230754.GE1041@n2100.armlinux.org.uk>
- <f8a05c02-df36-a0cf-6433-c67eb4a0f5b6@oracle.com>
- <9c38663b-1867-213d-21ba-f1dec7edfb6a@ti.com>
-Message-ID: <81dedbcc-14f6-f02f-2ce9-114d57c8d9d4@oracle.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 19 Aug 2016 09:39:40 -0700
+Subject: [PATCH] Input: jornada720_ts - get rid of mach/irqs.h include
+In-Reply-To: <E1bamhR-0004We-61@rmk-PC.armlinux.org.uk>
+References: <E1bamhR-0004We-61@rmk-PC.armlinux.org.uk>
+Message-ID: <20160819163940.GA20499@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Aug 19, 2016 at 05:31:17PM +0100, Russell King wrote:
+> Switch the jornada720 touchscreen driver to obtain its interrupt from
+> the platform device, rather than via a hard-coded interrupt number
+> obtained from the mach/irqs.h header.
+> 
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-On 8/19/2016 12:30 AM, Roger Quadros wrote:
-> Hi Santosh,
->
+Applied, thank you.
 
->>> So I'm 99.9% convinced that the proposed change is correct.
->>>
->> I will got with that then :-) and take my objection back. Just
->> saying that if there other breakages which I can't recollect now,
->> those drivers needs to be patched as well.
->>
-> I was able to boot the Keystone2 Edison EVM over NFS with the $subject patch.
-> Boot log is below. Do you see anything suspicious?
->
-Logs looks ok to me. Probably do some tests where DMA and bounce buffers 
-etc gets tested. Running it through your internal regression
-suit will be good idea as well if thats possible.
+> ---
+>  arch/arm/mach-sa1100/jornada720.c         |  6 ++++++
+>  drivers/input/touchscreen/jornada720_ts.c | 10 ++++++----
+>  2 files changed, 12 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-sa1100/jornada720.c b/arch/arm/mach-sa1100/jornada720.c
+> index 2b96f7bc16bd..010eaea04c69 100644
+> --- a/arch/arm/mach-sa1100/jornada720.c
+> +++ b/arch/arm/mach-sa1100/jornada720.c
+> @@ -228,9 +228,15 @@ static struct platform_device jornada_kbd_device = {
+>  	.resource	= jornada_kbd_resources,
+>  };
+>  
+> +static struct resource jornada_ts_resources[] = {
+> +	DEFINE_RES_IRQ(IRQ_GPIO9),
+> +};
+> +
+>  static struct platform_device jornada_ts_device = {
+>  	.name		= "jornada_ts",
+>  	.id		= -1,
+> +	.num_resources	= ARRAY_SIZE(jornada_ts_resources),
+> +	.resource	= jornada_ts_resources,
+>  };
+>  
+>  static struct platform_device *devices[] __initdata = {
+> diff --git a/drivers/input/touchscreen/jornada720_ts.c b/drivers/input/touchscreen/jornada720_ts.c
+> index ea3b6a5b83e6..7e196f8e5661 100644
+> --- a/drivers/input/touchscreen/jornada720_ts.c
+> +++ b/drivers/input/touchscreen/jornada720_ts.c
+> @@ -22,7 +22,6 @@
+>  
+>  #include <mach/hardware.h>
+>  #include <mach/jornada720.h>
+> -#include <mach/irqs.h>
+>  
+>  MODULE_AUTHOR("Kristoffer Ericson <kristoffer.ericson@gmail.com>");
+>  MODULE_DESCRIPTION("HP Jornada 710/720/728 touchscreen driver");
+> @@ -101,7 +100,11 @@ static int jornada720_ts_probe(struct platform_device *pdev)
+>  {
+>  	struct jornada_ts *jornada_ts;
+>  	struct input_dev *input_dev;
+> -	int error;
+> +	int error, irq;
+> +
+> +	irq = platform_get_irq(pdev, 0);
+> +	if (irq <= 0)
+> +		return irq < 0 ? irq : -EINVAL;
+>  
+>  	jornada_ts = devm_kzalloc(&pdev->dev, sizeof(*jornada_ts), GFP_KERNEL);
+>  	if (!jornada_ts)
+> @@ -125,8 +128,7 @@ static int jornada720_ts_probe(struct platform_device *pdev)
+>  	input_set_abs_params(input_dev, ABS_X, 270, 3900, 0, 0);
+>  	input_set_abs_params(input_dev, ABS_Y, 180, 3700, 0, 0);
+>  
+> -	error = devm_request_irq(&pdev->dev, IRQ_GPIO9,
+> -				 jornada720_ts_interrupt,
+> +	error = devm_request_irq(&pdev->dev, irq, jornada720_ts_interrupt,
+>  				 IRQF_TRIGGER_RISING,
+>  				 "HP7XX Touchscreen driver", pdev);
+>  	if (error) {
+> -- 
+> 2.1.0
+> 
 
-Regards,
-Santosh
+-- 
+Dmitry
