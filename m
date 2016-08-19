@@ -1,23 +1,64 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 19 Aug 2016 17:24:15 +0100
-Subject: [PATCH 05/13] scpi: move of_match table before probe functions
-In-Reply-To: <1471515066-3626-6-git-send-email-narmstrong@baylibre.com>
-References: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
- <1471515066-3626-6-git-send-email-narmstrong@baylibre.com>
-Message-ID: <def54975-8014-a326-6f82-8953740e520c@arm.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Fri, 19 Aug 2016 17:29:07 +0100
+Subject: [PATCH] ARM: document and update UNCACHEABLE_ADDR definitions
+Message-ID: <E1bamfL-0002WN-7u@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Document the UNCACHEABLE_ADDR definitions for footbridge and SA1100
+so that we know where they're located and/or what they're accessing.
+Change RiscPC to calculate the UNCACHEABLE_ADDR value from FLUSH_BASE
+as that's where we locate that.
 
+UNCACHEABLE_ADDR is used to perform an uncached access (ARMv4
+terminology) necessary to force a CPU clock-switch to the memory-
+speed clock, as required for entering WFI.
 
-On 18/08/16 11:10, Neil Armstrong wrote:
-> Move the of_match table to prapre adding new compatible strings, with
-> match data in order to be used by the probe function.
->
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/mach-footbridge/include/mach/hardware.h | 2 +-
+ arch/arm/mach-rpc/include/mach/hardware.h        | 2 +-
+ arch/arm/mach-sa1100/include/mach/hardware.h     | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-I understand the need of this change, but can be part of the patch
-introducing the need for this.
-
+diff --git a/arch/arm/mach-footbridge/include/mach/hardware.h b/arch/arm/mach-footbridge/include/mach/hardware.h
+index 02f6d7a706b1..20d5ad781fe2 100644
+--- a/arch/arm/mach-footbridge/include/mach/hardware.h
++++ b/arch/arm/mach-footbridge/include/mach/hardware.h
+@@ -59,7 +59,7 @@
+ #define XBUS_SWITCH_J17_11	((*XBUS_SWITCH) & (1 << 5))
+ #define XBUS_SWITCH_J17_9	((*XBUS_SWITCH) & (1 << 6))
+ 
+-#define UNCACHEABLE_ADDR	(ARMCSR_BASE + 0x108)
++#define UNCACHEABLE_ADDR	(ARMCSR_BASE + 0x108)	/* CSR_ROMBASEMASK */
+ 
+ 
+ /* PIC irq control */
+diff --git a/arch/arm/mach-rpc/include/mach/hardware.h b/arch/arm/mach-rpc/include/mach/hardware.h
+index 257166b21f3d..aa79fa47373a 100644
+--- a/arch/arm/mach-rpc/include/mach/hardware.h
++++ b/arch/arm/mach-rpc/include/mach/hardware.h
+@@ -40,7 +40,7 @@
+ #define SCREEN_END		0xdfc00000
+ #define SCREEN_BASE		0xdf800000
+ 
+-#define UNCACHEABLE_ADDR	0xdf010000
++#define UNCACHEABLE_ADDR	(FLUSH_BASE + 0x10000)
+ 
+ /*
+  * IO Addresses
+diff --git a/arch/arm/mach-sa1100/include/mach/hardware.h b/arch/arm/mach-sa1100/include/mach/hardware.h
+index 55c85ce7010d..d944fd7e464f 100644
+--- a/arch/arm/mach-sa1100/include/mach/hardware.h
++++ b/arch/arm/mach-sa1100/include/mach/hardware.h
+@@ -13,7 +13,7 @@
+ #define __ASM_ARCH_HARDWARE_H
+ 
+ 
+-#define UNCACHEABLE_ADDR	0xfa050000
++#define UNCACHEABLE_ADDR	0xfa050000	/* ICIP */
+ 
+ 
+ /*
 -- 
-Regards,
-Sudeep
+2.1.0
