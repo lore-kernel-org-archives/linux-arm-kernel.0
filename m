@@ -1,128 +1,81 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 19 Aug 2016 12:48:22 +0200
-Subject: [PATCH 5/7] arm64: dts: exynos: Add dts files for Samsung
- Exynos5433 64bit SoC
-In-Reply-To: <1471329328-26842-1-git-send-email-cw00.choi@samsung.com>
-References: <1471328843-26653-1-git-send-email-cw00.choi@samsung.com>
- <1471329328-26842-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <b4bb1d48-ce1f-0ddf-9e96-3e2ad29bc3fa@samsung.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 19 Aug 2016 12:00:32 +0100
+Subject: Kernel warning in cpufreq_add_dev()
+Message-ID: <20160819110032.GM1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+While checking the kernel on SA1110 Assabet, CPUFREQ issues a warning:
 
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 1 at /home/rmk/git/linux-rmk/drivers/cpufreq/cpufreq.c:1080 cpufreq_add_dev+0x140/0x62c
+Modules linked in:
+CPU: 0 PID: 1 Comm: swapper Not tainted 4.8.0-rc2+ #883
+Hardware name: Intel-Assabet
+Backtrace:
+[<c0212190>] (dump_backtrace) from [<c021249c>] (show_stack+0x18/0x1c)
+ r6:00000000 r5:c05e87c3 r4:00000000
+[<c0212484>] (show_stack) from [<c037260c>] (dump_stack+0x20/0x28)
+[<c03725ec>] (dump_stack) from [<c021f4cc>] (__warn+0xd0/0xfc)
+[<c021f3fc>] (__warn) from [<c021f520>] (warn_slowpath_null+0x28/0x30)
+ r10:00000000 r8:00000000 r7:00000000 r6:c064525c r5:00000000 r4:00000000
+[<c021f4f8>] (warn_slowpath_null) from [<c04343a8>] (cpufreq_add_dev+0x140/0x62c)
+[<c0434268>] (cpufreq_add_dev) from [<c03d83f4>] (bus_probe_device+0x5c/0x84)
+ r10:00000000 r8:00000000 r7:00000000 r6:c064525c r5:c0657d60 r4:c065a9f8
+[<c03d8398>] (bus_probe_device) from [<c03d677c>] (device_add+0x390/0x520)
+ r6:c0645264 r5:00000000 r4:c064525c
+[<c03d63ec>] (device_add) from [<c03d6a90>] (device_register+0x1c/0x20)
+ r10:c0639848 r8:c061e524 r7:00000001 r6:00000000 r5:c064525c r4:c064525c
+[<c03d6a74>] (device_register) from [<c03db5a0>] (register_cpu+0x88/0xac)
+ r4:c0645254
+[<c03db518>] (register_cpu) from [<c061e544>] (topology_init+0x20/0x2c)
+ r7:c0660b20 r6:c063f4a0 r5:c0639834 r4:00000000
+[<c061e524>] (topology_init) from [<c020974c>] (do_one_initcall+0xc0/0x178)
+ r4:00000004
+[<c020968c>] (do_one_initcall) from [<c061be70>] (kernel_init_freeable+0xfc/0x1c4)
+ r10:c0639848 r9:00000000 r8:00000088 r7:c0660b20 r6:c063f4a0 r5:c0639834
+ r4:00000004
+[<c061bd74>] (kernel_init_freeable) from [<c050d730>] (kernel_init+0x10/0xf4)
+ r10:00000000 r8:00000000 r7:00000000 r6:00000000 r5:c050d720 r4:00000000
+[<c050d720>] (kernel_init) from [<c020fcf0>] (ret_from_fork+0x14/0x24)
+ r4:00000000
+---[ end trace df94656649275917 ]---
 
-On 2016-08-16 08:35, Chanwoo Choi wrote:
-> This patch adds new Exynos5433 dtsi to support 64-bit Exynos5433 SoC based on
-> Octa-core CPUs (quad Cortex-A57 and quad Cortex-A53). And Exynos5433 supports
-> PSCI (Power State Coordination Interface) v0.1.
->
-> This patch includes following Device Tree node to support Exynos5433 SoC:
-> 1. Octa cores for big.LITTLE architecture
-> - Cortex-A53 LITTLE Quad-core
-> - Cortex-A57 big Quad-core
-> - Support PSCI v0.1
->
-> 2. Clock controller node
-> - CMU_TOP   : clocks for IMEM/FSYS/G3D/GSCL/HEVC/MSCL/G2D/MFC/PERIC/PERIS
-> - CMU_CPIF  : clocks for LLI (Low Latency Interface)
-> - CMU_MIF   : clocks for DRAM Memory Controller
-> - CMU_PERIC : clocks for UART/I2C/SPI/I2S/PCM/SPDIF/PWM/SLIMBUS
-> - CMU_PERIS : clocks for PMU/TMU/MCT/WDT/RTC/SECKEY/TZPC
-> - CMU_FSYS  : clocks for USB/UFS/SDMMC/TSI/PDMA
-> - CMU_G2D   : clocks for G2D/MDMA
-> - CMU_DISP  : clocks for DECON/HDMI/DSIM/MIXER
-> - CMU_AUD   : clocks for Cortex-A5/BUS/AUDIO
-> - CMU_BUS{0|1|2} : clocks for global data buses and global peripheral buses
-> - CMU_G3D   : clocks for 3D Graphics Engine
-> - CMU_GSCL  : clocks for GSCALER
-> - CMU_APOLLO: clocks for Cortex-A53 Quad-core processor.
-> - CMU_ATLAS : clocks for Cortex-A57 Quad-core processor,
->                CoreSight and L2 cache controller.
-> - CMU_MSCL  : clocks for M2M (Memory to Memory) scaler and JPEG IPs.
-> - CMU_MFC   : clocks for MFC (Multi-Format Codec) IP.
-> - CMU_HEVC  : clocks for HEVC(High Efficiency Video Codec) decoder IP.
-> - CMU_ISP   : clocks for FIMC-ISP/DRC/SCLC/DIS/3DNR IPs.
-> - CMU_CAM0  : clocks for MIPI_CSIS{0|1}/FIMC_LITE_{A|B|D}/FIMC_3AA{0|1} IPs.
-> - CMU_CAM1  : clocks for COrtex-A5/MIPI_CSIS2/FIMC_LITE_C/FIMC-FD IPs.
->
-> 3. pinctrl node for GPIO
-> - alive/aud/cpif/ese/finger/fsys/imem/nfc/peric/touch pad
->
-> 4. Timer
-> - ARM architecture timer (armv8-timer)
-> - MCT (Multi Core Timer) timer
->
-> 5. Interrupt controller (GIC-400)
->
-> 6. BUS devices
-> - HS-I2C (High-Speed I2C) device
-> - SPI (Serial Peripheral Interface) device
->
-> 7. Sound devices
-> - I2S bus
-> - LPASS (Low Power Audio Subsystem)
->
-> 8. Power management devices
-> - CPUFREQ for for Cortex-A53/A57
-> - TMU (Thermal Management Unit) for Cortex-A53/A57, G3D, ISP
->
-> 9. Display controller devices
-> - DECON (Display and enhancement controller) for panel output
-> - DSI (Display Serial Interface)
-> - MIC (Mobile Image Compressor)
-> - IOMMU for GSCL/DECON/TV/MFC/JPEG/FLITE/3AA/FIMC
+This is because of an incompatibility between the expectations of cpufreq
+and how register_cpu() works:
 
-I would prefer to instantiate only SYSMMU controllers for the devices that
-have been already added, so initially there will by only SYSMMUs for DECON.
-Other (GSCL, TV, MFC, JPEG, CAMERA ISP) can be added later together with
-respective master device nodes.
+int register_cpu(struct cpu *cpu, int num)
+{
+...
+        error = device_register(&cpu->dev);
+        if (!error)
+                per_cpu(cpu_sys_devices, num) = &cpu->dev;
 
-> 10. USB
-> - USB 3.0 DRD (Dual Role Device) controller
-> - USB 3.0 Host controller
->
-> 11. Storage devices
-> - MSHC (Mobile Stoarage Host Controller)
->
-> 12. Misc devices
-> - UART device
-> - ADC (Analog Digital Converter)
-> - PWM (Pulse Width Modulation)
-> - ADMA (Advanced DMA) and PDMA (Peripheral DMA)
->
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
-> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-> Signed-off-by: Inki Dae <inki.dae@samsung.com>
-> Signed-off-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
-> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
-> Signed-off-by: Jaewon Kim <jaewon02.kim@samsung.com>
-> Signed-off-by: Hyungwon Hwang <human.hwang@samsung.com>
-> Signed-off-by: Inha Song <ideal.song@samsung.com>
-> Signed-off-by: Ingi kim <ingi2.kim@samsung.com>
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
->   arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi |  794 ++++++++++
->   .../dts/exynos/exynos5433-tmu-g3d-sensor-conf.dtsi |   23 +
->   .../dts/exynos/exynos5433-tmu-sensor-conf.dtsi     |   22 +
->   arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi     |  306 ++++
->   arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 1580 ++++++++++++++++++++
->   5 files changed, 2725 insertions(+)
->   create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi
->   create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu-g3d-sensor-conf.dtsi
->   create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu-sensor-conf.dtsi
->   create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
->   create mode 100644 arch/arm64/boot/dts/exynos/exynos5433.dtsi
+When the device is registered via device_register(), any subsystems
+registered for the cpu_subsys will have their "add_dev" method called.
 
-(snipped)
+The cpufreq add_dev, via cpufreq_online() and cpufreq_policy_alloc(),
+tries to get the CPU device:
 
+static struct cpufreq_policy *cpufreq_policy_alloc(unsigned int cpu)
+{
+        struct device *dev = get_cpu_device(cpu);
+        if (WARN_ON(!dev))
+                return NULL;
 
-Best regards
+but this fails:
+
+struct device *get_cpu_device(unsigned cpu)
+{
+        if (cpu < nr_cpu_ids && cpu_possible(cpu))
+                return per_cpu(cpu_sys_devices, cpu);
+
+because the percpu data has not yet been written - it'll be written
+after a successful device registration.  So, using get_cpu_device()
+from within cpufreq_add_dev() is broken, and results in the above
+kernel warning.
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
+according to speedtest.net.
