@@ -1,67 +1,101 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 19 Aug 2016 18:56:50 -0500
-Subject: [PATCH 0/3] ARM: K2G: Add support for TI-SCI Generic PM Domains
-Message-ID: <20160819235653.26355-1-nm@ti.com>
+Date: Fri, 19 Aug 2016 18:56:51 -0500
+Subject: [PATCH 1/3] Documentation: dt: Add TI-SCI PM Domains
+In-Reply-To: <20160819235653.26355-1-nm@ti.com>
+References: <20160819235653.26355-1-nm@ti.com>
+Message-ID: <20160819235653.26355-2-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Texas Instruments' Keystone generation System on Chips (SoC)
-starting with 66AK2G02[1], now include a dedicated SoC System Control
-entity called PMMC(Power Management Micro Controller) in line with
-ARM architecture recommendations. The function of this module is
-to integrate all system operations in a centralized location.
-Communication with the SoC System Control entity from various
-processing units like ARM/DSP occurs over Message Manager hardware
-block.
+From: Dave Gerlach <d-gerlach@ti.com>
 
-This series adds the base support for device control using generic
-power domain framework over the TI System Control Interface (TI-SCI)
-protocol[2][3].
+Add a generic power domain implementation, TI SCI PM Domains, that
+will hook into the genpd framework and allow each PD, which will be
+created one per device, to be managed over the TI-SCI protocol.
 
-Overall architecture is very similar to SCPI[4] as follows:
-+----------------+  +---------+   +------------+
-| TI SCI GENPD(*)|  |TISCI Clk|   |TISCI reset |
-+------+---------+  +--+------+   +------+-----+
-       |               |                 |
-       |          +----v--------------+  |
-       +----------> TISCI Protocol    <--+
-                  +----+--------------+
-                       |
-                   +---v-----------+
-                   | MAILBOX  FWK  |
-                   +---+-----------+
-                       |
-                   +---v-----------+
-                   |  TI MSGMGR    |-> TISCI hardware block
-                   +---------------+
-
-(*) This series.
-
-Baseline: v4.8-rc1 + [3] (the dependency is due to MAINTAINERS update)
-Bootlog: http://pastebin.ubuntu.com/23071846/ (with the addition of couple of mach patches + dts)
-Integrated series is available:
-https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.9/tisci-genpd-v1
-
-Dave Gerlach (3):
-  Documentation: dt: Add TI-SCI PM Domains
-  dt-bindings: genpd: Add K2G device definitions
-  soc: ti: Add ti_sci_pm_domains driver
-
-[1] http://www.ti.com/product/66ak2g02
-[2] http://processors.wiki.ti.com/index.php/TISCI
-[3] https://lkml.org/lkml/2016/8/19/768
-
- .../devicetree/bindings/soc/ti/sci-pm-domain.txt   |  58 ++++++
- MAINTAINERS                                        |   3 +
- arch/arm/mach-keystone/Kconfig                     |   1 +
- drivers/soc/ti/Kconfig                             |  12 ++
- drivers/soc/ti/Makefile                            |   1 +
- drivers/soc/ti/ti_sci_pm_domains.c                 | 222 +++++++++++++++++++++
- include/dt-bindings/genpd/k2g.h                    |  90 +++++++++
- 7 files changed, 387 insertions(+)
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ .../devicetree/bindings/soc/ti/sci-pm-domain.txt   | 58 ++++++++++++++++++++++
+ MAINTAINERS                                        |  1 +
+ 2 files changed, 59 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
- create mode 100644 drivers/soc/ti/ti_sci_pm_domains.c
- create mode 100644 include/dt-bindings/genpd/k2g.h
 
+diff --git a/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
+new file mode 100644
+index 000000000000..059a5d71d692
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
+@@ -0,0 +1,58 @@
++Texas Instruments TI-SCI Generic Power Domain
++---------------------------------------------
++
++Some TI SoCs contain a system controller (like the PMMC, etc...) that are
++responsible for control the state of the IPs that are present. Communication
++between the host processor running an OS and the system controller happens
++through a protocol known as TI-SCI[1]. This pm domain implementation plugs into
++the generic pm domain framework and makes use of the TI SCI protocol power on
++and off each device when needed.
++
++[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
++
++PM Domains Nodes
++================
++The PM domains node represents the global PM domain managed by the PMMC,
++which in this case is one cell implementation as documented by the generic
++PM domain bindings in
++Documentation/devicetree/bindings/power/power_domain.txt.
++
++Required Properties:
++--------------------
++- compatible: should be "ti,sci-pm-domains"
++- #power-domain-cells: Must be 1 so that an offset can be provided in each
++		       device node.
++- ti,sci: Phandle to the TI SCI device to use for managing the devices
++
++Example:
++--------------------
++/* From arch/arm/boot/dts/k2g.dtsi */
++k2g_pds: k2g_pds {
++        compatible = "ti,sci-pm-domains";
++        #power-domain-cells = <1>;
++        ti,sci = <&pmmc>;
++};
++
++PM Domain Consumers
++===================
++Hardware blocks belonging to a PM domain should contain a "power-domains"
++property that is a phandle pointing to the corresponding PM domain node
++along with an index representing the device id to be passed for the PMMC
++for device control.
++
++See dt-bindings/genpd/k2g.h for the list of valid identifiers for k2g.
++
++Example:
++--------------------
++/* From arch/arm/boot/dts/k2g.dtsi */
++uart0: serial at 02530c00 {
++	compatible = "ns16550a";
++	current-speed = <115200>;
++	reg-shift = <2>;
++	reg-io-width = <4>;
++	reg = <0x02530c00 0x100>;
++	interrupts = <GIC_SPI 164 IRQ_TYPE_EDGE_RISING>;
++	clock-frequency = <200000000>;
++	status = "disabled";
++	power-domains = <&k2g_pds K2G_DEV_UART0>;
++};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 0c5e3d16f694..657fb6a10286 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -11573,6 +11573,7 @@ S:	Maintained
+ F:	Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+ F:	drivers/firmware/ti_sci*
+ F:	include/linux/soc/ti/ti_sci_protocol.h
++F:	Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
+ 
+ THANKO'S RAREMONO AM/FM/SW RADIO RECEIVER USB DRIVER
+ M:	Hans Verkuil <hverkuil@xs4all.nl>
 -- 
 2.9.1.200.gb1ec08f
