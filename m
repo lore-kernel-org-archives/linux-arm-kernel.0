@@ -1,39 +1,44 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Fri, 19 Aug 2016 22:16:58 +0930
-Subject: [PATCH v2 0/7] aspeed: Integrate pinctrl and gpio drivers
-Message-ID: <20160819124705.24633-1-andrew@aj.id.au>
+Date: Fri, 19 Aug 2016 22:16:59 +0930
+Subject: [PATCH v2 1/7] mach-aspeed: Select pinctrl drivers
+In-Reply-To: <20160819124705.24633-1-andrew@aj.id.au>
+References: <20160819124705.24633-1-andrew@aj.id.au>
+Message-ID: <20160819124705.24633-2-andrew@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+---
+ arch/arm/mach-aspeed/Kconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-This series contains the SoC-related patches of the Aspeed pinctrl and gpio
-drivers. The v2 has been split out from the original monolithic series found at:
-
-  https://lkml.org/lkml/2016/7/20/69 
-
-The combined series has been tested with both the AST2400 (g4) and AST2500 (g5)
-SoCs on OpenPOWER Palmetto and Aspeed AST2500 EVB machines respectively, and
-similarly in QEMU with the palmetto-bmc and ast2500-evb machines[1].
-
-Cheers,
-
-Andrew
-
-Andrew Jeffery (7):
-  mach-aspeed: Select pinctrl drivers
-  mach-aspeed: Select GPIO driver
-  aspeed-g4: Add syscon and pin controller nodes
-  palmetto: Request relevant mux functions in devicetree
-  aspeed-g4: Add gpio controller to devicetree
-  aspeed-g5: Add syscon and pin controller nodes
-  aspeed-g5: Add gpio controller to devicetree
-
- arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts |  14 +
- arch/arm/boot/dts/aspeed-g4.dtsi              | 429 ++++++++++++++++++++++++++
- arch/arm/boot/dts/aspeed-g5.dtsi              | 213 +++++++++++++
- arch/arm/mach-aspeed/Kconfig                  |   5 +
- 4 files changed, 661 insertions(+)
-
+diff --git a/arch/arm/mach-aspeed/Kconfig b/arch/arm/mach-aspeed/Kconfig
+index 5225fbcb250d..25a0ae01429e 100644
+--- a/arch/arm/mach-aspeed/Kconfig
++++ b/arch/arm/mach-aspeed/Kconfig
+@@ -5,6 +5,7 @@ menuconfig ARCH_ASPEED
+ 	select WATCHDOG
+ 	select ASPEED_WATCHDOG
+ 	select MOXART_TIMER
++	select PINCTRL
+ 	help
+ 	  Say Y here if you want to run your kernel on an ASpeed BMC SoC.
+ 
+@@ -14,6 +15,7 @@ config MACH_ASPEED_G4
+ 	bool "Aspeed SoC 4th Generation"
+ 	depends on ARCH_MULTI_V5
+ 	select CPU_ARM926T
++	select PINCTRL_ASPEED_G4
+ 	help
+ 	 Say yes if you intend to run on an Aspeed ast2400 or similar
+ 	 fourth generation BMCs, such as those used by OpenPower Power8
+@@ -23,6 +25,7 @@ config MACH_ASPEED_G5
+ 	bool "Aspeed SoC 5th Generation"
+ 	depends on ARCH_MULTI_V6
+ 	select CPU_V6
++	select PINCTRL_ASPEED_G5
+ 	help
+ 	 Say yes if you intend to run on an Aspeed ast2500 or similar
+ 	 fifth generation Aspeed BMCs.
 -- 
 2.9.3
