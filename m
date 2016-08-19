@@ -1,71 +1,84 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Fri, 19 Aug 2016 09:13:35 +0800
-Subject: [PATCH v6 7/7] doc: bindings: act8945a-charger: Update properties
-In-Reply-To: <1471569215-6046-1-git-send-email-wenyou.yang@atmel.com>
-References: <1471569215-6046-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1471569215-6046-8-git-send-email-wenyou.yang@atmel.com>
+From: Nitin.Chaudhary@zii.aero (Nitin Chaudhary)
+Date: Thu, 18 Aug 2016 18:17:38 -0700
+Subject: [PATCH 2/3] [i.MX6Q] Code cleanup & verification after fixing
+ compilation error
+In-Reply-To: <1471569459-1546-1-git-send-email-Nitin.Chaudhary@zii.aero>
+References: <DB5PR04MB1430487C8BFA276E285493959F150@DB5PR04MB1430.eurprd04.prod.outlook.com>
+ <1471569459-1546-1-git-send-email-Nitin.Chaudhary@zii.aero>
+Message-ID: <1471569459-1546-3-git-send-email-Nitin.Chaudhary@zii.aero>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due the driver improvements, update the properties,
- - Remove "active-semi,check-battery-temperature" property.
- - Add the properties, "active-semi,irq_gpio"
-   and "active-semi,lbo-gpios".
+Cleanup the code after fixing build error in Zhengyu Shen's perf mmdc
+integrated driver. The error occured due to migration of CPU Hotplug
+notifiers to a state machine based mechanism. Made the necessary cha-
+nges into the code and tested the same on an i.MX6QP FSL Board. The
+changes allow clean compilation and work fine as well. The results
+are as follows:
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Acked-by: Rob Herring <robh@kernel.org>
+root at RDU2:~ perf stat -a -e mmdc/busy-cycles/,mmdc/read-accesses/,mmdc/read-byte
+s/,mmdc/total-cycles/,mmdc/write-accesses/,mmdc/write-bytes/ dd if=/dev/zero of=
+/dev/null bs=1M count=5000
+5000+0 records in
+5000+0 records out
+5242880000 bytes (5.2 GB) copied, 5.4982 s, 954 MB/s
+
+ Performance counter stats for 'system wide':
+
+        1597891298      mmdc/busy-cycles/
+          28531959      mmdc/read-accesses/
+            910.77 MB   mmdc/read-bytes/
+        2917082184      mmdc/total-cycles/
+          27965222      mmdc/write-accesses/
+            894.91 MB   mmdc/write-bytes/
+
+       5.527407668 seconds time elapsed
+
+But still need to check why the automatic power saving mode is not getting
+enabled in my board. Any help/guidance on the same will be appreciated.
+
+Signed-off-by: Nitin Chaudhary <Nitin.Chaudhary@zii.aero>
 ---
+ arch/arm/mach-imx/mmdc.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
 
-Changes in v6: None
-Changes in v5:
- - Add Acked-by tag.
+diff --git a/arch/arm/mach-imx/mmdc.c b/arch/arm/mach-imx/mmdc.c
+index 95c222d..45790f5 100644
+--- a/arch/arm/mach-imx/mmdc.c
++++ b/arch/arm/mach-imx/mmdc.c
+@@ -204,9 +204,10 @@ static int mmdc_cpu_offline(unsigned int cpu)
 
-Changes in v4:
- - Update the doc/binding for using "interrupts" property.
-
-Changes in v3: None
-Changes in v2: None
-
- .../bindings/power/supply/act8945a-charger.txt           | 16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/power/supply/act8945a-charger.txt b/Documentation/devicetree/bindings/power/supply/act8945a-charger.txt
-index bea254c..f9866c4 100644
---- a/Documentation/devicetree/bindings/power/supply/act8945a-charger.txt
-+++ b/Documentation/devicetree/bindings/power/supply/act8945a-charger.txt
-@@ -4,10 +4,15 @@ Required properties:
-  - compatible: "active-semi,act8945a", please refer to ../mfd/act8945a.txt.
-  - active-semi,chglev-gpios: charge current level phandle with args
-    as described in ../gpio/gpio.txt.
-+ - active-semi,lbo-gpios: specify the low battery voltage detect phandle
-+   with args as as described in ../gpio/gpio.txt.
-+ - interrupts: <a b> where a is the interrupt number and b is a
-+   field that represents an encoding of the sense and level
-+   information for the interrupt.
-+ - interrupt-parent: the phandle for the interrupt controller that
-+   services interrupts for this device.
- 
- Optional properties:
-- - active-semi,check-battery-temperature: boolean to check the battery
--   temperature or not.
-  - active-semi,input-voltage-threshold-microvolt: unit: mV;
-    Specifies the charger's input over-voltage threshold value;
-    The value can be: 6600, 7000, 7500, 8000; default: 6600
-@@ -27,9 +32,14 @@ Example:
- 		status = "okay";
- 
- 		pinctrl-names = "default";
--		pinctrl-0 = <&pinctrl_charger_chglev>;
-+		pinctrl-0 = <&pinctrl_charger_chglev &pinctrl_charger_lbo &pinctrl_charger_irq>;
+        perf_pmu_migrate_context(&pmu_ptr->pmu, cpu, target);
+        cpumask_set_cpu(target, &pmu_ptr->cpu);
+-       /*
+-       if(pmu_ptr->irq)
+-               WARN_ON(irq_set_affinity_hint(pmu_ptr->irq, &pmu_ptr->cpu) != 0);
++       /*
++        * TODO: Need to check if we need it or not
++        * if(pmu_ptr->irq)
++        *       WARN_ON(irq_set_affinity_hint(pmu_ptr->irq, &pmu_ptr->cpu) != 0);
+        */
+        return 0;
+ }
+@@ -374,7 +375,12 @@ static int imx_mmdc_probe(struct platform_device *pdev)
+        if (unlikely(!timeout)) {
+                pr_warn("%s: failed to enable automatic power saving\n",
+                        __func__);
+-               //return -EBUSY;
 +
- 		active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
-+		active-semi,lbo-gpios = <&pioA 72 GPIO_ACTIVE_LOW>;
- 		active-semi,input-voltage-threshold-microvolt = <6600>;
- 		active-semi,precondition-timeout = <40>;
- 		active-semi,total-timeout = <3>;
-+		interrupt-parent = <&pioA>;
-+		interrupts = <45 GPIO_ACTIVE_LOW>;
-+
- 	};
--- 
++               /*
++                * TODO: Need to check why Automatic Power saving is not
++                * getting enabled successfully.
++                * return -EBUSY;
++                */
+        }
+        pmu_mmdc = kzalloc(sizeof(*pmu_mmdc), GFP_KERNEL);
+
+--
 2.7.4
+
+
+________________________________
+
+
+This email and any files transmitted with it are confidential & proprietary to Zodiac Inflight Innovations. This information is intended solely for the use of the individual or entity to which it is addressed. Access or transmittal of the information contained in this e-mail, in full or in part, to any other organization or persons is not authorized.
