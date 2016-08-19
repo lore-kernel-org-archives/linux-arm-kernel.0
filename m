@@ -1,154 +1,98 @@
 From: b-liu@ti.com (Bin Liu)
-Date: Fri, 19 Aug 2016 16:30:49 -0500
-Subject: [PATCH v2 7/7] musb: sunxi: Add support for platform_set_mode
-In-Reply-To: <1471288892-21702-8-git-send-email-hdegoede@redhat.com>
+Date: Fri, 19 Aug 2016 16:33:12 -0500
+Subject: [PATCH v2 6/7] phy-sun4i-usb: Add
+ "allwinner,usb0-usb-a-connector" dt property
+In-Reply-To: <1471288892-21702-7-git-send-email-hdegoede@redhat.com>
 References: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
- <1471288892-21702-8-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160819213049.GC1853@uda0271908>
+ <1471288892-21702-7-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160819213312.GD1853@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Mon, Aug 15, 2016 at 09:21:32PM +0200, Hans de Goede wrote:
-> This allows run-time dr_mode switching support via the "mode" musb
-> sysfs attribute.
+On Mon, Aug 15, 2016 at 09:21:31PM +0200, Hans de Goede wrote:
+> On some devices the musb otg controller can be used in both device and
+> host mode, but requires software mode switching since there is no id pin
+> connected. The usb0 phy code will default to device mode in this case.
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  drivers/usb/musb/sunxi.c | 52 ++++++++++++++++++++++++++++++++++++++++++++----
->  1 file changed, 48 insertions(+), 4 deletions(-)
+> On some systems usb0 is connected to a female USB-A port. It can still
+> be used in device mode when using software mode switching and a USB
+> A to A cable. To configure the controller to support both modes we must
+> set its "dr_mode" dt property to "otg" (*). For these setups the device
+> mode default is wrong, for a female USB-A port the default should be
+> host mode.
 > 
-> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-> index c6ee166..1fe7451 100644
-> --- a/drivers/usb/musb/sunxi.c
-> +++ b/drivers/usb/musb/sunxi.c
-> @@ -74,6 +74,7 @@
->  #define SUNXI_MUSB_FL_HAS_SRAM			5
->  #define SUNXI_MUSB_FL_HAS_RESET			6
->  #define SUNXI_MUSB_FL_NO_CONFIGDATA		7
-> +#define SUNXI_MUSB_FL_PHY_MODE_PEND		8
->  
->  /* Our read/write methods need access and do not get passed in a musb ref :| */
->  static struct musb *sunxi_musb;
-> @@ -87,6 +88,7 @@ struct sunxi_glue {
->  	struct phy		*phy;
->  	struct platform_device	*usb_phy;
->  	struct usb_phy		*xceiv;
-> +	enum phy_mode		phy_mode;
->  	unsigned long		flags;
->  	struct work_struct	work;
->  	struct extcon_dev	*extcon;
-> @@ -140,6 +142,9 @@ static void sunxi_musb_work(struct work_struct *work)
->  			clear_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
->  		}
->  	}
-> +
-> +	if (test_and_clear_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags))
-> +		phy_set_mode(glue->phy, glue->phy_mode);
->  }
->  
->  static void sunxi_musb_set_vbus(struct musb *musb, int is_on)
-> @@ -341,6 +346,41 @@ static void sunxi_musb_dma_controller_destroy(struct dma_controller *c)
->  {
->  }
->  
-> +static int sunxi_musb_set_mode(struct musb *musb, u8 mode)
-> +{
-> +	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
-> +	enum phy_mode new_mode;
-> +
-> +	switch (mode) {
-> +	case MUSB_HOST:		new_mode = PHY_MODE_USB_HOST; break;
-> +	case MUSB_PERIPHERAL:	new_mode = PHY_MODE_USB_DEVICE; break;
-> +	case MUSB_OTG:		new_mode = PHY_MODE_USB_OTG; break;
+> This commit adds support to the sun4i phy code for a new
+> "allwinner,usb0-usb-a-connector" dt property which can be used in dt
+> files to indicate this scenario and when present it changes the default
+> mode to host mode.
 
-Please fix the code style as commented in patch 4/7.
-
-> +	default:
-> +		dev_err(musb->controller->parent,
-> +			"Error requested mode not supported by this kernel\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (glue->phy_mode == new_mode)
-> +		return 0;
-> +
-> +	if (musb->port_mode != MUSB_PORT_MODE_DUAL_ROLE) {
-> +		dev_err(musb->controller->parent,
-> +			"Error changing modes is only supported in dual role mode\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	/*
-> +	 * phy_set_mode may sleep, and we're called with a spinlock held,
-> +	 * so let sunxi_musb_work deal with it.
-> +	 */
-> +	glue->phy_mode = new_mode;
-> +	set_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags);
-> +	schedule_work(&glue->work);
-
-When switching from host to peripheral mode, if an usb device is still
-plugged and enumerated, how do you handle the device disconnect?
+As I commented in patch 0/7, this dt prop is unneccesary.
 
 Regards,
 -Bin.
 
-> +
-> +	return 0;
-> +}
-> +
->  /*
->   * sunxi musb register layout
->   * 0x00 - 0x17	fifo regs, 1 long per fifo
-> @@ -568,6 +608,7 @@ static const struct musb_platform_ops sunxi_musb_ops = {
->  	.writew		= sunxi_musb_writew,
->  	.dma_init	= sunxi_musb_dma_controller_create,
->  	.dma_exit	= sunxi_musb_dma_controller_destroy,
-> +	.set_mode	= sunxi_musb_set_mode,
->  	.set_vbus	= sunxi_musb_set_vbus,
->  	.pre_root_reset_end = sunxi_musb_pre_root_reset_end,
->  	.post_root_reset_end = sunxi_musb_post_root_reset_end,
-> @@ -614,21 +655,28 @@ static int sunxi_musb_probe(struct platform_device *pdev)
->  		return -EINVAL;
->  	}
+> 
+> *) dr_mode = "host" is used when device mode is _never_ used. E.g.
+> a wifi module soldered onto the PCB is connected to the musb controller.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+> Changes in v2:
+> -New patch in v2 of this patchset
+> ---
+>  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 2 ++
+>  drivers/phy/phy-sun4i-usb.c                             | 9 ++++++++-
+>  2 files changed, 10 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> index 287150d..8646b53 100644
+> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> @@ -35,6 +35,8 @@ Optional properties:
+>  - usb0_vbus-supply : regulator phandle for controller usb0 vbus
+>  - usb1_vbus-supply : regulator phandle for controller usb1 vbus
+>  - usb2_vbus-supply : regulator phandle for controller usb2 vbus
+> +- allwinner,usb0-usb-a-connector: usb0 is connected to an USB-A connector,
+> +                     rather then an USB-B connector as one would expect (bool)
 >  
-> +	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
-> +	if (!glue)
-> +		return -ENOMEM;
-> +
->  	memset(&pdata, 0, sizeof(pdata));
->  	switch (usb_get_dr_mode(&pdev->dev)) {
->  #if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_HOST
+>  Example:
+>  	usbphy: phy at 0x01c13400 {
+> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+> index c17b099..82fb46a 100644
+> --- a/drivers/phy/phy-sun4i-usb.c
+> +++ b/drivers/phy/phy-sun4i-usb.c
+> @@ -137,6 +137,7 @@ struct sun4i_usb_phy_data {
+>  	int vbus_det_irq;
+>  	int id_det;
+>  	int vbus_det;
+> +	int id_det_default;
+>  	struct delayed_work detect;
+>  };
+>  
+> @@ -328,7 +329,7 @@ static int sun4i_usb_phy0_get_id_det(struct sun4i_usb_phy_data *data)
+>  		if (data->id_det_gpio)
+>  			return gpiod_get_value_cansleep(data->id_det_gpio);
+>  		else
+> -			return 1; /* Fallback to peripheral mode */
+> +			return data->id_det_default;
 >  	case USB_DR_MODE_HOST:
->  		pdata.mode = MUSB_PORT_MODE_HOST;
-> +		glue->phy_mode = PHY_MODE_USB_HOST;
->  		break;
->  #endif
->  #if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_GADGET
+>  		return 0;
 >  	case USB_DR_MODE_PERIPHERAL:
->  		pdata.mode = MUSB_PORT_MODE_GADGET;
-> +		glue->phy_mode = PHY_MODE_USB_DEVICE;
->  		break;
->  #endif
->  #ifdef CONFIG_USB_MUSB_DUAL_ROLE
->  	case USB_DR_MODE_OTG:
->  		pdata.mode = MUSB_PORT_MODE_DUAL_ROLE;
-> +		glue->phy_mode = PHY_MODE_USB_OTG;
->  		break;
->  #endif
->  	default:
-> @@ -638,10 +686,6 @@ static int sunxi_musb_probe(struct platform_device *pdev)
->  	pdata.platform_ops	= &sunxi_musb_ops;
->  	pdata.config		= &sunxi_musb_hdrc_config;
+> @@ -621,6 +622,12 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>  	if (IS_ERR(data->base))
+>  		return PTR_ERR(data->base);
 >  
-> -	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
-> -	if (!glue)
-> -		return -ENOMEM;
-> -
->  	glue->dev = &pdev->dev;
->  	INIT_WORK(&glue->work, sunxi_musb_work);
->  	glue->host_nb.notifier_call = sunxi_musb_host_notifier;
+> +	/* Set id-det default for when there is no id-det gpio */
+> +	if (of_property_read_bool(np, "allwinner,usb0-usb-a-connector"))
+> +		data->id_det_default = 0; /* Host (USB-A connector) */
+> +	else
+> +		data->id_det_default = 1; /* Device (USB-B connector) */
+> +
+>  	data->id_det_gpio = devm_gpiod_get_optional(dev, "usb0_id_det",
+>  						    GPIOD_IN);
+>  	if (IS_ERR(data->id_det_gpio))
 > -- 
 > 2.7.4
 > 
