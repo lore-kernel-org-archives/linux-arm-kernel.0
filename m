@@ -1,117 +1,93 @@
-From: Nitin.Chaudhary@zii.aero (Nitin Chaudhary)
-Date: Thu, 18 Aug 2016 18:41:00 -0700
-Subject: [PATCH 3/3] [PATCH][i.MX6Q]Removed MMDC Auto Power saving timeout
- error
-In-Reply-To: <1471570860-2087-1-git-send-email-Nitin.Chaudhary@zii.aero>
-References: <DB5PR04MB1430487C8BFA276E285493959F150@DB5PR04MB1430.eurprd04.prod.outlook.com>
- <1471570860-2087-1-git-send-email-Nitin.Chaudhary@zii.aero>
-Message-ID: <1471570860-2087-4-git-send-email-Nitin.Chaudhary@zii.aero>
+From: zhongjiang@huawei.com (zhong jiang)
+Date: Fri, 19 Aug 2016 09:41:56 +0800
+Subject: [PATCH] mm, numa: boot cpu should bound to the node0 when node_off
+ enable
+In-Reply-To: <CAFpQJXUYxPsTArMkv27r2u19v92APjjNF5W0bMNqQKGqNUin5g@mail.gmail.com>
+References: <1471525766-12803-1-git-send-email-zhongjiang@huawei.com>
+ <20160818160437.GA21343@e104818-lin.cambridge.arm.com>
+ <CAFpQJXUYxPsTArMkv27r2u19v92APjjNF5W0bMNqQKGqNUin5g@mail.gmail.com>
+Message-ID: <57B663E4.30706@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moved the busy loop to check MMDC0_MAPSR bit[4] for MMDC Automatic
-power saving mode enable to a deferred kernel workqueue ~5s after
-probe. Now the check passes successfully and no failure logs are
-seen. The power numbers are also lower on the board. The below are
-relevant dmesg outputs:
-
-root at RDU2:~ dmesg | grep -i mmdc
-[    0.132669] imx-mmdc 21b0000.mmdc: No access to interrupts, using timer.
-[    0.132775] imx-mmdc 21b0000.mmdc: imx_mmdc_probe success
-[    5.210514] is_mmdc_auto_powersave: MMDC auto power saving enabled MAPSR: 0x00001076
-
-Signed-off-by: Nitin Chaudhary <Nitin.Chaudhary@zii.aero>
----
- arch/arm/mach-imx/mmdc.c | 43 +++++++++++++++++++++++++++----------------
- 1 file changed, 27 insertions(+), 16 deletions(-)
-
-diff --git a/arch/arm/mach-imx/mmdc.c b/arch/arm/mach-imx/mmdc.c
-index 45790f5..9f27814 100644
---- a/arch/arm/mach-imx/mmdc.c
-+++ b/arch/arm/mach-imx/mmdc.c
-@@ -80,6 +80,7 @@ struct mmdc_pmu
-        struct hrtimer hrtimer;
-        unsigned int irq;
-        struct device *dev;
-+       struct delayed_work init_work;
-        struct perf_event *mmdc_events[MMDC_NUM_COUNTERS];
- };
-
-@@ -149,6 +150,27 @@ static const struct attribute_group * attr_groups[] = {
-        NULL,
- };
-
-+static void is_mmdc_auto_powersave(struct work_struct *work)
-+{
-+
-+       void __iomem *mmdc_base, *reg;
-+       int timeout = 0x400;
-+       mmdc_base = pmu_mmdc->mmdc_base;
-+       reg = mmdc_base + MMDC_MAPSR;
-+
-+       /* Ensure Automatic Power saving mode is successfully enabled */
-+       while (!(readl_relaxed(reg) & 1 << BP_MMDC_MAPSR_PSS) && --timeout)
-+               cpu_relax();
-+
-+       if (unlikely(!timeout)) {
-+               pr_warn("%s: failed to enable automatic power saving, recheck\n",
-+                       __func__);
-+       } else {
-+               pr_info("%s: MMDC auto power saving enabled MAPSR: 0x%08x\n",
-+                       __func__);
-+       }
-+}
-+
- static u32 mmdc_read_counter(int cfg, u64 prev_val)
- {
-        u32 val;
-@@ -348,7 +370,6 @@ static int imx_mmdc_probe(struct platform_device *pdev)
-        void __iomem *mmdc_base, *reg;
-        char * name;
-        u32 val;
--       int timeout = 0x800;
-        int mmdc_num;
-        int err;
-
-@@ -368,20 +389,6 @@ static int imx_mmdc_probe(struct platform_device *pdev)
-        val &= ~(1 << BP_MMDC_MAPSR_PSD);
-        writel_relaxed(val, reg);
-
--       /* Ensure it's successfully enabled */
--       while (!(readl_relaxed(reg) & 1 << BP_MMDC_MAPSR_PSS) && --timeout)
--               cpu_relax();
--
--       if (unlikely(!timeout)) {
--               pr_warn("%s: failed to enable automatic power saving\n",
--                       __func__);
--
--               /*
--                * TODO: Need to check why Automatic Power saving is not
--                * getting enabled successfully.
--                * return -EBUSY;
--                */
--       }
-        pmu_mmdc = kzalloc(sizeof(*pmu_mmdc), GFP_KERNEL);
-
-        if (!pmu_mmdc) {
-@@ -409,7 +416,11 @@ static int imx_mmdc_probe(struct platform_device *pdev)
-        }
-        platform_set_drvdata(pdev, pmu_mmdc);
-        perf_pmu_register(&(pmu_mmdc->pmu), name, -1);
--
-+
-+       /* Check if automatic Power saving mode was enabled */
-+       INIT_DELAYED_WORK(&pmu_mmdc->init_work, is_mmdc_auto_powersave);
-+       schedule_delayed_work(&pmu_mmdc->init_work, msecs_to_jiffies(5000));
-+
-        dev_info(pmu_mmdc->dev, "%s success\n",__func__);
-
-        return 0;
---
-2.7.4
-
-
-________________________________
-
-
-This email and any files transmitted with it are confidential & proprietary to Zodiac Inflight Innovations. This information is intended solely for the use of the individual or entity to which it is addressed. Access or transmittal of the information contained in this e-mail, in full or in part, to any other organization or persons is not authorized.
+On 2016/8/19 1:45, Ganapatrao Kulkarni wrote:
+> On Thu, Aug 18, 2016 at 9:34 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+>> On Thu, Aug 18, 2016 at 09:09:26PM +0800, zhongjiang wrote:
+>>> At present, boot cpu will bound to a node from device tree when node_off enable.
+>>> if the node is not initialization, it will lead to a following problem.
+>>>
+>>>  next_zones_zonelist+0x18/0x80
+>>>  __build_all_zonelists+0x1e0/0x288
+>>>  build_all_zonelists_init+0x10/0x1c
+>>>  build_all_zonelists+0x114/0x128
+>>>  start_kernel+0x1a0/0x414
+>> I think this "problem" is missing a lot of information. Is this supposed
+>> to be a kernel panic?
+yes, it will leads to kernel crash. the details is as follows.
+ 
+Unable to handle kernel paging request at virtual address 00001690
+pgd = ffff800001226000
+[00001690] *pgd=0000000000000000
+Internal error: Oops: 96000004 [#1] SMP
+ Modules linked in:
+CPU: 0 PID: 0 Comm: swapper Not tainted 4.1.27-vhulk3.6.5.aarch64 #1
+Hardware name: Hisilicon Hi1612 Development Board (DT)
+ task: ffff80000102b730 ti: ffff800001018000 task.ti: ffff800001018000
+PC is at next_zones_zonelist+0x18/0x80
+ LR is at __build_all_zonelists+0x1e0/0x288
+next_zones_zonelist+0x18/0x80
+ __build_all_zonelists+0x1e0/0x288
+build_all_zonelists_init+0x10/0x1c
+ build_all_zonelists+0x114/0x128
+ start_kernel+0x1a0/0x414
+>>> The patch fix it by fallback to node 0. therefore, the cpu will bound to the node
+>>> correctly.
+>>>
+>>> Signed-off-by: zhongjiang <zhongjiang@huawei.com>
+>>> ---
+>>>  arch/arm64/mm/numa.c | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+>>> index 4dcd7d6..1f8f5da 100644
+>>> --- a/arch/arm64/mm/numa.c
+>>> +++ b/arch/arm64/mm/numa.c
+>>> @@ -119,7 +119,7 @@ void numa_store_cpu_info(unsigned int cpu)
+>>>  void __init early_map_cpu_to_node(unsigned int cpu, int nid)
+>>>  {
+>>>       /* fallback to node 0 */
+>>> -     if (nid < 0 || nid >= MAX_NUMNODES)
+>>> +     if (nid < 0 || nid >= MAX_NUMNODES || numa_off)
+> i  did not understood how this line change fixes the issue that you
+> have mentioned (i too not understood fully the issue description)
+> this array used while mapping node id when secondary cores comes up
+> when numa_off is set the cpu_to_node_map[cpu] is not used and set to
+> node0 always( refer function numa_store_cpu_info)..
+> please provide more details to understand the issue you are facing.
+> /*
+>  *  Set the cpu to node and mem mapping
+>  */
+> void numa_store_cpu_info(unsigned int cpu)
+> {
+>         map_cpu_to_node(cpu, numa_off ? 0 : cpu_to_node_map[cpu]);
+> }
+>
+> thanks
+> Ganapat
+>>>               nid = 0;
+>>>
+>>>       cpu_to_node_map[cpu] = nid;
+>> The patch looks fine (slight inconsistence from the map_cpu_to_node()
+>> callers but I guess we don't want to expose numa_off outside this file).
+>> I would however like to see an Ack from Ganapat (cc'ed).
+>>
+>> --
+>> Catalin
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> .
+>
