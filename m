@@ -1,53 +1,116 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 19 Aug 2016 09:52:47 -0400
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Don't attempt to enable
- schedutil governor as module
-In-Reply-To: <7dd6278d-bdc4-14e5-6b2e-062a59cd29d4@osg.samsung.com>
-References: <1471612328-6467-1-git-send-email-javier@osg.samsung.com>
- <1471612328-6467-2-git-send-email-javier@osg.samsung.com>
- <9c71ddbd-deb1-1e07-7421-53bb58359bad@kernel.org>
- <7dd6278d-bdc4-14e5-6b2e-062a59cd29d4@osg.samsung.com>
-Message-ID: <fe0ad949-ecd1-e0fe-3d9b-04a35b9dc172@osg.samsung.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Fri, 19 Aug 2016 21:56:12 +0800
+Subject: [PATCH] ASoC: rockchip: Add support rt5514 dsp summy dailink
+Message-ID: <1471614973-10325-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+This patch can attach automaticlly rt5514 spi DAI with driver name "rt5514"
+in the snd_soc_find_dai process. Turn this feature on, we can enable the
+voice wake up via rt5514 dsp for RK3399 Gru Boards.
 
-On 08/19/2016 09:46 AM, Javier Martinez Canillas wrote:
-> 
-> On 08/19/2016 09:40 AM, Krzysztof Kozlowski wrote:
->> On 08/19/2016 03:12 PM, Javier Martinez Canillas wrote:
->>> The schedutil CPUFreq governor could be built as a module but the commit
->>> 58919e83c85c ("cpufreq / sched: Pass flags to cpufreq_update_util()")
->>> made it non-modular so attempting to enable as module leads to a warning:
->>>
->>> warning: symbol value 'm' invalid for CPU_FREQ_GOV_SCHEDUTIL
->>>
->>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>>
->>> ---
->>>
->>>  arch/arm/configs/multi_v7_defconfig | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> Looks good.
->>
->> Applied... wait, no, these are not in samsung-soc list so they miss also
->> from patchwork. For reference:
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>
-> 
-> Sigh, get_maintainers.pl suggested me an insanely large cc list so I added
-> it manually... but I forgot linux-samsung-soc. I'll post v2.
-> 
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+---
 
-Damn... and now I forgot to include your collected tags in v2. I should not
-post patches before having enough coffee, sorry about that.
+ sound/soc/rockchip/Kconfig            |    1 +
+ sound/soc/rockchip/rk3399_gru_sound.c |   39 ++++++++++++++++++++++++++++++++-
+ 2 files changed, 39 insertions(+), 1 deletion(-)
 
-Please let me know if you don't mind or if you prefer a resend.
-
-Best regards,
+diff --git a/sound/soc/rockchip/Kconfig b/sound/soc/rockchip/Kconfig
+index 6d39032..d82d763 100644
+--- a/sound/soc/rockchip/Kconfig
++++ b/sound/soc/rockchip/Kconfig
+@@ -49,6 +49,7 @@ config SND_SOC_RK3399_GRU_SOUND
+ 	select SND_SOC_MAX98357A
+ 	select SND_SOC_RT5514
+ 	select SND_SOC_DA7219
++	select SND_SOC_RT5514_SPI
+ 	help
+ 	  Say Y or M here if you want to add support multiple codecs for SoC
+ 	  audio on Rockchip RK3399 GRU boards.
+diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
+index 9933703..164b6da 100644
+--- a/sound/soc/rockchip/rk3399_gru_sound.c
++++ b/sound/soc/rockchip/rk3399_gru_sound.c
+@@ -230,8 +230,11 @@ enum {
+ 	DAILINK_MAX98357A,
+ 	DAILINK_RT5514,
+ 	DAILINK_DA7219,
++	DAILINK_RT5514_DSP,
+ };
+ 
++#define DAILINK_ENTITIES	(DAILINK_DA7219 + 1)
++
+ static struct snd_soc_dai_link rockchip_dailinks[] = {
+ 	[DAILINK_MAX98357A] = {
+ 		.name = "MAX98357A",
+@@ -261,6 +264,13 @@ static struct snd_soc_dai_link rockchip_dailinks[] = {
+ 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
+ 			SND_SOC_DAIFMT_CBS_CFS,
+ 	},
++	/* RT5514 DSP for voice wakeup via spi bus */
++	[DAILINK_RT5514_DSP] = {
++		.name = "RT5514 DSP",
++		.stream_name = "Wake on Voice",
++		.codec_name = "snd-soc-dummy",
++		.codec_dai_name = "snd-soc-dummy-dai",
++	},
+ };
+ 
+ static struct snd_soc_card rockchip_sound_card = {
+@@ -276,10 +286,17 @@ static struct snd_soc_card rockchip_sound_card = {
+ 	.num_controls = ARRAY_SIZE(rockchip_controls),
+ };
+ 
++static int rockchip_sound_match_stub(struct device *dev, void *data)
++{
++	return 1;
++}
++
+ static int rockchip_sound_probe(struct platform_device *pdev)
+ {
+ 	struct snd_soc_card *card = &rockchip_sound_card;
+ 	struct device_node *cpu_node;
++	struct device *dev;
++	struct device_driver *drv;
+ 	int i, ret;
+ 
+ 	cpu_node = of_parse_phandle(pdev->dev.of_node, "rockchip,cpu", 0);
+@@ -288,7 +305,7 @@ static int rockchip_sound_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	for (i = 0; i < card->num_links; i++) {
++	for (i = 0; i < DAILINK_ENTITIES; i++) {
+ 		rockchip_dailinks[i].platform_of_node = cpu_node;
+ 		rockchip_dailinks[i].cpu_of_node = cpu_node;
+ 
+@@ -301,6 +318,26 @@ static int rockchip_sound_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	/**
++	 * To acquire the spi driver of the rt5514 and set the dai-links names
++	 * for soc_bind_dai_link
++	 */
++	drv = driver_find("rt5514", &spi_bus_type);
++	if (!drv) {
++		dev_err(&pdev->dev, "Can not find the rt5514 driver at the spi bus\n");
++		return -EINVAL;
++	}
++
++	dev = driver_find_device(drv, NULL, NULL, rockchip_sound_match_stub);
++	if (!dev) {
++		dev_err(&pdev->dev, "Can not find the rt5514 device\n");
++		return -ENODEV;
++	}
++
++	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
++	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_dai_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
++	rockchip_dailinks[DAILINK_RT5514_DSP].platform_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
++
+ 	card->dev = &pdev->dev;
+ 	platform_set_drvdata(pdev, card);
+ 
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+1.7.9.5
