@@ -1,34 +1,19 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 19 Aug 2016 08:48:46 -0500
-Subject: [PATCH v2 1/4] dt-bindings: vendor-prefixes: Add Sierra Wireless
-In-Reply-To: <1471525881-2797-2-git-send-email-narmstrong@baylibre.com>
+Date: Fri, 19 Aug 2016 08:49:46 -0500
+Subject: [PATCH v2 2/4] dt-bindings: arm: Add Sierra Wireless modules
+ bindings
+In-Reply-To: <1471525881-2797-3-git-send-email-narmstrong@baylibre.com>
 References: <1471525881-2797-1-git-send-email-narmstrong@baylibre.com>
- <1471525881-2797-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20160819134846.GA2414@rob-hp-laptop>
+ <1471525881-2797-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20160819134946.GA4107@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2016 at 03:11:18PM +0200, Neil Armstrong wrote:
-> Add Sierra Wireless as swi vendor prefix.
-> 
+On Thu, Aug 18, 2016 at 03:11:19PM +0200, Neil Armstrong wrote:
 > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 > ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 1992aa9..5a8881f 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -254,6 +254,7 @@ starry	Starry Electronic Technology (ShenZhen) Co., LTD
->  startek	Startek
->  ste	ST-Ericsson
->  stericsson	ST-Ericsson
-> +swi	Sierra Wireless
+>  Documentation/devicetree/bindings/arm/swi.txt | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/swi.txt
 
-swir is the stock ticker. Can you use that?
-
-This is going to have some conflicts with some sorting fixes, so I plan 
-to pick up this patch separately.
-
-Rob
+Other than updating the vendor prefix, looks fine.
