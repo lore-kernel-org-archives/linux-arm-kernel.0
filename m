@@ -1,105 +1,68 @@
-From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Fri, 19 Aug 2016 18:18:11 +0530
-Subject: [PATCH 2/2] net: phy: Fix race conditions in the driver
-In-Reply-To: <1471610891-13353-1-git-send-email-appanad@xilinx.com>
-References: <1471610891-13353-1-git-send-email-appanad@xilinx.com>
-Message-ID: <1471610891-13353-2-git-send-email-appanad@xilinx.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 19 Aug 2016 13:53:48 +0100
+Subject: [PATCH 5/5] arm64: KVM: vgic-v2: Enable GICV access from HYP if
+ access from guest is unsafe
+In-Reply-To: <1471610295-1456-6-git-send-email-marc.zyngier@arm.com>
+References: <1471610295-1456-1-git-send-email-marc.zyngier@arm.com>
+ <1471610295-1456-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAFEAcA99RScdr+E39Q+03L5DyDLiQgQo9x1DeP1gE2-nJ1yUig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the below race conditions in the driver.
----> Fix Opps after unload the driver as a module
----> Use spin locks where relevant.
----> Take reference on the external phy to prevent issues
-when phy driver is unloaded.
+On 19 August 2016 at 13:38, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> So far, we've been disabling KVM on systems where the GICV region couldn't
+> be safely given to a guest. Now that we're able to handle this access
+> safely by emulating it in HYP, we can enable this feature when we detect
+> an unsafe configuration.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-v2.c | 69 +++++++++++++++++++++++++++------------------
+>  1 file changed, 42 insertions(+), 27 deletions(-)
+>
+> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+> index b8da901..d1dcfc76 100644
+> --- a/virt/kvm/arm/vgic/vgic-v2.c
+> +++ b/virt/kvm/arm/vgic/vgic-v2.c
+> @@ -278,12 +278,14 @@ int vgic_v2_map_resources(struct kvm *kvm)
+>                 goto out;
+>         }
+>
+> -       ret = kvm_phys_addr_ioremap(kvm, dist->vgic_cpu_base,
+> -                                   kvm_vgic_global_state.vcpu_base,
+> -                                   KVM_VGIC_V2_CPU_SIZE, true);
+> -       if (ret) {
+> -               kvm_err("Unable to remap VGIC CPU to VCPU\n");
+> -               goto out;
+> +       if (!static_branch_unlikely(&vgic_v2_cpuif_trap)) {
+> +               ret = kvm_phys_addr_ioremap(kvm, dist->vgic_cpu_base,
+> +                                           kvm_vgic_global_state.vcpu_base,
+> +                                           KVM_VGIC_V2_CPU_SIZE, true);
+> +               if (ret) {
+> +                       kvm_err("Unable to remap VGIC CPU to VCPU\n");
+> +                       goto out;
+> +               }
+>         }
+>
+>         dist->ready = true;
+> @@ -312,45 +314,51 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+>                 return -ENXIO;
+>         }
+>
+> -       if (!PAGE_ALIGNED(info->vcpu.start)) {
+> -               kvm_err("GICV physical address 0x%llx not page aligned\n",
+> -                       (unsigned long long)info->vcpu.start);
+> -               return -ENXIO;
+> -       }
+> +       if (!PAGE_ALIGNED(info->vcpu.start) ||
+> +           !PAGE_ALIGNED(resource_size(&info->vcpu))) {
+> +               kvm_info("GICV region size/alignement is unsafe, using trapping\n");
 
-Reported-by: Andrew Lunn <andrew@lunn.ch>
-Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
----
- drivers/net/phy/xilinx_gmii2rgmii.c | 32 +++++++++++++++++++++++++++++++-
- 1 file changed, 31 insertions(+), 1 deletion(-)
+"alignment".
 
-diff --git a/drivers/net/phy/xilinx_gmii2rgmii.c b/drivers/net/phy/xilinx_gmii2rgmii.c
-index 7336fd0..cdd9d95 100644
---- a/drivers/net/phy/xilinx_gmii2rgmii.c
-+++ b/drivers/net/phy/xilinx_gmii2rgmii.c
-@@ -34,6 +34,7 @@ struct gmii2rgmii {
- 	struct phy_driver *phy_drv;
- 	struct phy_driver conv_phy_drv;
- 	int addr;
-+	spinlock_t phy_lock;
- };
- 
- static int xgmiitorgmii_read_status(struct phy_device *phydev)
-@@ -55,7 +56,7 @@ static int xgmiitorgmii_read_status(struct phy_device *phydev)
- 		val |= BMCR_SPEED1000;
- 	else if (phydev->speed == SPEED_100)
- 		val |= BMCR_SPEED100;
--	else
-+	else if (phydev->speed == SPEED_10)
- 		val |= BMCR_SPEED10;
- 
- 	err = mdiobus_write(phydev->mdio.bus, priv->addr, XILINX_GMII2RGMII_REG,
-@@ -71,6 +72,8 @@ int xgmiitorgmii_probe(struct mdio_device *mdiodev)
- 	struct device *dev = &mdiodev->dev;
- 	struct device_node *np = dev->of_node, *phy_node;
- 	struct gmii2rgmii *priv;
-+	struct mii_bus *bus;
-+	unsigned long flags;
- 
- 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
- 	if (!priv)
-@@ -88,17 +91,43 @@ int xgmiitorgmii_probe(struct mdio_device *mdiodev)
- 		return -EPROBE_DEFER;
- 	}
- 
-+	spin_lock_init(&priv->phy_lock);
-+
-+	bus = priv->phy_dev->mdio.bus;
-+	if (!try_module_get(bus->owner)) {
-+		dev_err(dev, "failed to get the bus module\n");
-+		return -EIO;
-+	}
-+
-+	get_device(&priv->phy_dev->mdio.dev);
-+
- 	priv->addr = mdiodev->addr;
- 	priv->phy_drv = priv->phy_dev->drv;
- 	memcpy(&priv->conv_phy_drv, priv->phy_dev->drv,
- 	       sizeof(struct phy_driver));
- 	priv->conv_phy_drv.read_status = xgmiitorgmii_read_status;
- 	priv->phy_dev->priv = priv;
-+	spin_lock_irqsave(&priv->phy_lock, flags);
- 	priv->phy_dev->drv = &priv->conv_phy_drv;
-+	spin_unlock_irqrestore(&priv->phy_lock, flags);
-+
-+	dev_set_drvdata(dev, priv);
- 
- 	return 0;
- }
- 
-+static void xgmiitorgmii_remove(struct mdio_device *mdiodev)
-+{
-+	struct gmii2rgmii *priv = dev_get_drvdata(&mdiodev->dev);
-+	struct mii_bus *bus;
-+
-+	bus = priv->phy_dev->mdio.bus;
-+
-+	put_device(&priv->phy_dev->mdio.dev);
-+	module_put(bus->owner);
-+	phy_disconnect(priv->phy_dev);
-+}
-+
- static const struct of_device_id xgmiitorgmii_of_match[] = {
- 	{ .compatible = "xlnx,gmii-to-rgmii-1.0" },
- 	{},
-@@ -107,6 +136,7 @@ MODULE_DEVICE_TABLE(of, xgmiitorgmii_of_match);
- 
- static struct mdio_driver xgmiitorgmii_driver = {
- 	.probe	= xgmiitorgmii_probe,
-+	.remove	= xgmiitorgmii_remove,
- 	.mdiodrv.driver = {
- 		.name = "xgmiitorgmii",
- 		.of_match_table = xgmiitorgmii_of_match,
--- 
-2.1.2
+Is it worth specifically saying "performance will be worse", or do we
+expect this to only happen on systems where the h/w can't permit direct
+access (as opposed to those with bad dt info) ?
+
+thanks
+-- PMM
