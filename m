@@ -1,77 +1,67 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 19 Aug 2016 08:26:41 -0500
-Subject: [PATCH v24 9/9] Documentation: dt: chosen properties for arm64
- kdump
-In-Reply-To: <20160809015747.28591-1-takahiro.akashi@linaro.org>
-References: <20160809015248.28414-2-takahiro.akashi@linaro.org>
- <20160809015747.28591-1-takahiro.akashi@linaro.org>
-Message-ID: <20160819132641.GA12709@rob-hp-laptop>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 19 Aug 2016 14:26:50 +0100
+Subject: Linux 4.7 and Jornada 720 (SA-1100)
+In-Reply-To: <7Tcq9hpfIfmjNv8%gof@news.chmurka.net>
+References: <4Tcq736lIfmjNv8%gof@news.chmurka.net>
+ <20160819102945.GK1041@n2100.armlinux.org.uk>
+ <7Tcq9hpfIfmjNv8%gof@news.chmurka.net>
+Message-ID: <20160819132650.GO1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2016 at 10:57:47AM +0900, AKASHI Takahiro wrote:
-> From: James Morse <james.morse@arm.com>
+On Fri, Aug 19, 2016 at 01:11:13PM +0000, Adam Wysocki wrote:
+> Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
 > 
-> Add documentation for
-> 	linux,crashkernel-base and crashkernel-size,
-> 	linux,usable-memory-range, and
-> 	linux,elfcorehdr
-> used by arm64 kexec/kdump to decribe the kdump reserved area, and
-> the elfcorehdr's location within it.
+> > Make sure you have "console=ttySA0,38400n8" or similar to get serial
+> > console output - it needs to be a "ttySA" port, not "ttyS".
 > 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> [takahiro.akashi at linaro.org:
->     renamed "usable-memory" to "usable-memory-range",
->     added "linux,crashkernel-base" and "-size" ]
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  Documentation/devicetree/bindings/chosen.txt | 50 ++++++++++++++++++++++++++++
->  1 file changed, 50 insertions(+)
+> Hmm... I changed to:
 > 
-> diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
-> index 6ae9d82..236188a 100644
-> --- a/Documentation/devicetree/bindings/chosen.txt
-> +++ b/Documentation/devicetree/bindings/chosen.txt
-> @@ -52,3 +52,53 @@ This property is set (currently only on PowerPC, and only needed on
->  book3e) by some versions of kexec-tools to tell the new kernel that it
->  is being booted by kexec, as the booting environment may differ (e.g.
->  a different secondary CPU release mechanism)
-> +
-> +linux,crashkernel-base
-> +linux,crashkernel-size
-> +----------------------
-> +These properties (currently used on PowerPC and arm64) indicates
-> +the base address and the size, respectively, of the reserved memory
-> +range for crash dump kernel.
-> +e.g.
-> +
-> +/ {
-> +	chosen {
-> +		linux,crashkernel-base = <0x9 0xf0000000>;
-> +		linux,crashkernel-size = <0x0 0x10000000>;
-> +	};
-> +};
-> +
-> +linux,usable-memory-range
-> +-------------------------
-> +
-> +This property (currently used only on arm64) holds the memory range,
-> +the base address and the size, which can be used as system ram on
-> +the *current* kernel. Note that, if this property is present, any memory
-> +regions under "memory" nodes in DT blob or ones marked as "conventional
-> +memory" in EFI memory map should be ignored.
-> +e.g.
-> +
-> +/ {
-> +	chosen {
-> +		linux,usable-memory-range = <0x9 0xf0000000 0x0 0x10000000>;
-> +	};
-> +};
+> root=0x302 mem=32m console=ttySA0,115200n8
+> 
+> and success - it helped! The screen is still blank, but I least I have 
+> some messages on the serial port, finished with kernel panic because of 
+> failing to mount root. It looks like I didn't enable some drivers for 
+> the CF controller, but I look and it seems everything that should be 
+> enabled is enabled... maybe this kernel doesn't support CF on Jornada 
+> without a patch?
+> 
+> http://pastebin.com/J2ATKxQM
+> 
+> And I'm just wondering why the screen is blank while I definitely enabled 
+> the SA-1100 framebuffer support and console on framebuffer... I'm not sure 
+> if it should be blank when I specified console=ttySA0, but I don't think 
+> it should be blank without any console= setting...
 
-I've read the discussion on this. I think you should use the existing 
-linux,usable-memory property in the memory nodes. If UEFI systems don't 
-have memory nodes, then you can find an UEFI way to describe this. DT is 
-not the dumping ground for what doesn't fit in UEFI. How do x86 systems 
-work?
+Looking at the board file, the jornada720 doesn't use sa11x0-fb at all.
+It uses an Epson s1d13xxx device.  The defconfig for jornada720 has:
 
-Rob
+CONFIG_FB_S1D13XXX=y
+
+so if your configuration is derived from that, you should have the
+driver already enabled.
+
+> > Same probably goes for "earlyprintk=serial,ttyS0,115200", although I've
+> > no experience of earlyprintk myself.
+> 
+> It seems that earlyprintk is ignored anyway, maybe there's no support for 
+> it on this platform?
+
+No idea, sorry.  I use my printascii() hack in printk() when I need early
+or lowlevel debugging rather than early printk.
+
+> > However, if you're not even getting the "Uncompressing Linux... done, 
+> > booting the kernel." line, that suggests the decompressor is not running, 
+> > or is trying to access the wrong serial port.  The decompressor tries to 
+> > find the first serial port out of serial 3, 1 and 2 which has been left 
+> > enabled.
+> 
+> In this order? Maybe it tries to send its messages to the built-in modem 
+> or IrDA port...
+
+Yes, that order.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
