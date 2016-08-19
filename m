@@ -1,105 +1,83 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 19 Aug 2016 11:59:51 -0700
-Subject: [PATCH V3 2/5] thermal: bcm2835: add thermal driver for bcm2835
- soc
-In-Reply-To: <1471591694.2691.39.camel@intel.com>
-References: <1463495753-967-1-git-send-email-kernel@martin.sperl.org>
- <1463495753-967-3-git-send-email-kernel@martin.sperl.org>
- <87mvn6qa2x.fsf@eliezer.anholt.net> <87r39lvs4v.fsf@eliezer.anholt.net>
- <1471591694.2691.39.camel@intel.com>
-Message-ID: <87inuwd1p4.fsf@eliezer.anholt.net>
+From: jacek.anaszewski@gmail.com (Jacek Anaszewski)
+Date: Fri, 19 Aug 2016 21:13:01 +0200
+Subject: [PATCH v2] ARM: dts: add PM8058 LEDs to the APQ8060 Dragonboard
+In-Reply-To: <1471596407-4601-1-git-send-email-linus.walleij@linaro.org>
+References: <1471596407-4601-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <57B75A3D.4010305@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Zhang Rui <rui.zhang@intel.com> writes:
-
-> On ?, 2016-08-18 at 11:39 -0700, Eric Anholt wrote:
->> Eric Anholt <eric@anholt.net> writes:
->> 
->> > 
->> > kernel at martin.sperl.org writes:
->> > 
->> > > 
->> > > From: Martin Sperl <kernel@martin.sperl.org>
->> > > 
->> > > Add basic thermal driver for bcm2835 SOC.
->> > > 
->> > > This driver currently relies on the firmware setting up the
->> > > tsense HW block and does not set it up itself.
->> > > 
->> > > Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
->> > > 
->> > > ChangeLog:
->> > > ?V1 -> V2: added specific settings depending on compatiblity
->> > > 	???added trip point based on register
->> > > 	???setting up ctrl-register if HW is not enabled by firmware
->> > > 	?????as per recommendation of Eric (untested)
->> > > 	???check that clock frequency is in range
->> > > 	?????(1.9 - 5MHz - as per comment in clk-bcm2835.c)
->> > > ---
->> > > 
->> > > diff --git a/drivers/thermal/bcm/Makefile
->> > > b/drivers/thermal/bcm/Makefile
->> > > new file mode 100644
->> > > index 0000000..13456d2
->> > > --- /dev/null
->> > > +++ b/drivers/thermal/bcm/Makefile
->> > > @@ -0,0 +1 @@
->> > > +obj-$(CONFIG_BCM2835_THERMAL)		:=
->> > > bcm2835_thermal.o
->> > > diff --git a/drivers/thermal/bcm/bcm2835_thermal.c
->> > > b/drivers/thermal/bcm/bcm2835_thermal.c
->> > > new file mode 100644
->> > > index 0000000..73138cb
->> > > --- /dev/null
->> > > +++ b/drivers/thermal/bcm/bcm2835_thermal.c
->> > > 
->> > > +static const struct of_device_id
->> > > bcm2835_thermal_of_match_table[];
->> > > +static int bcm2835_thermal_probe(struct platform_device *pdev)
->> > > +{
->> > > 
->> > > +	/* enable clock and check rate */
->> > > +	clk_prepare_enable(data->clk);
->> > > +	rate = clk_get_rate(data->clk);
->> > > +	if ((rate < 1920000) || (rate > 5000000)) {
->> > > +		dev_warn(&pdev->dev,
->> > > +			?"Clock %pCn is running at %pCr Hz,
->> > > which is outside the recommended range of 1.9 to 5.0 MHz\n",
->> > > +			?data->clk, data->clk);
->> > > +	}
->> > > +
->> > > +	/* register it */
->> > > +	tz = thermal_zone_device_register("bcm2835_thermal",
->> > > +					??1, 0, data,
->> > > +					??&bcm2835_thermal_ops,
->> > > +					??NULL, 0, 0);
->> > I notice that the polling_delay is set to 0, but we're not using
->> > interrupts to trigger the trip.??Is it valid to expose a trip
->> > without a
->> > polling_delay or interrupts???Should passive_delay be set as well?
->> > 
->> > This is up to the thermal maintainers.??As far as I'm concerned,
->> > it's:
->> > 
->> > Acked-by: Eric Anholt <eric@anholt.net>
->> > 
->> > One it lands I'll pull the defconfig and DT bits.
->> Ping on this question to thermal maintainers.??I'd still love to see
->> this driver land.
+On 08/19/2016 10:46 AM, Linus Walleij wrote:
+> This adds the PM8058 LEDs as used in the platform.
 >
-> hmmm, how is this driver supposed to work?
-> With this patch set, I think the only benefit is that we can get the
-> temperature and trip point information via thermal sysfs interface, but
-> kernel thermal control is a no-op here, right?
+> Cc: linux-arm-msm at vger.kernel.org
+> Cc: linux-leds at vger.kernel.org
+> Cc: Andy Gross <andy.gross@linaro.org>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Jacek Anaszewski <j.anaszewski@samsung.com>
+> Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Rename the infrared LED to "pm8058:infrared:proximitysensor"
+> ---
+>   arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 39 ++++++++++++++++++++++++++
+>   1 file changed, 39 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+> index 0abc93e5bb00..6c0038398ef2 100644
+> --- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+> +++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+> @@ -239,6 +239,45 @@
+>   						};
+>   					};
+>   				};
+> +
+> +				led at 48 {
+> +					/*
+> +					 * The keypad LED @0x48 is routed to
+> +					 * the sensor board where it is
+> +					 * connected to an infrared LED
+> +					 * SFH4650 (60mW, @850nm) next to the
+> +					 * ambient light and proximity sensor
+> +					 * Capella Microsystems CM3605.
+> +					 */
+> +					compatible = "qcom,pm8058-keypad-led";
+> +					reg = <0x48>;
+> +					label = "pm8058:infrared:proximitysensor";
+> +					default-state = "off";
+> +				};
+> +				led at 131 {
+> +					compatible = "qcom,pm8058-led";
+> +					reg = <0x131>;
+> +					label = "pm8058:red";
+> +					default-state = "off";
+> +				};
+> +				led at 132 {
+> +					/*
+> +					 * This is actually green too on my
+> +					 * board, but documented as yellow.
+> +					 */
+> +					compatible = "qcom,pm8058-led";
+> +					reg = <0x132>;
+> +					label = "pm8058:yellow";
+> +					default-state = "off";
+> +					linux,default-trigger = "mmc0";
+> +				};
+> +				led at 133 {
+> +					compatible = "qcom,pm8058-led";
+> +					reg = <0x133>;
+> +					label = "pm8058:green";
+> +					default-state = "on";
+> +					linux,default-trigger = "heartbeat";
+> +				};
+>   			};
+>   		};
+>
+>
 
-Yeah.  It seems useful to be able to get the information.  Once we land
-this, I hope someone can add interrupt support so that there are actual
-trip points.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160819/166e10c1/attachment.sig>
+Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
+
+-- 
+Best regards,
+Jacek Anaszewski
