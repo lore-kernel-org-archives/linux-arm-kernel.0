@@ -1,47 +1,59 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 19 Aug 2016 11:33:50 +0100
-Subject: [PATCH] arm: l2x0: add PMU support
-In-Reply-To: <20160818190546.3c81388f8bd6d311bd28207c@arm.com>
-References: <1471451191-18090-1-git-send-email-mark.rutland@arm.com>
- <20160818190546.3c81388f8bd6d311bd28207c@arm.com>
-Message-ID: <20160819103349.GA25541@leverpostej>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 19 Aug 2016 11:39:15 +0100
+Subject: [PATCH 01/13] scpi: Add vendor_send_message to enable access to
+ vendor commands
+In-Reply-To: <9bf4a979-5325-fd70-1887-04c605d593d8@baylibre.com>
+References: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
+ <1471515066-3626-2-git-send-email-narmstrong@baylibre.com>
+ <c5b2d698-de4c-012a-7e7b-63685b7e898c@arm.com>
+ <9bf4a979-5325-fd70-1887-04c605d593d8@baylibre.com>
+Message-ID: <26c18a0c-ee62-3159-e10b-6b0e5c28fb56@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2016 at 07:05:46PM -0500, Kim Phillips wrote:
-> On Wed, 17 Aug 2016 17:26:31 +0100
-> Mark Rutland <mark.rutland@arm.com> wrote:
-> 
-> > The L2C-220 (AKA L220) and L2C-310 (AKA PL310) cache controllers feature
-> > a Performance Monitoring Unit (PMU), which can be useful for tuning
-> > and/or debugging. This hardware is always present and the relevant
-> > registers are accessible to non-secure accesses. Thus, no special
-> > firmware interface is necessary.
-> > 
-> > This patch adds support for the PMU, plugging into the usual perf
-> > infrastructure. The overflow interrupt is not always available (e.g. on
-> > RealView PBX A9 it is not wired up at all), and the hardware counters
-> > saturate, so the driver does not make use of this. Instead, the driver
-> > periodically polls and reset counters as required to avoid losing
-> > events due to saturation.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Kim Phillips <kim.phillips@arm.com>
-> > Cc: Pawel Moll <pawel.moll@arm.com>
-> > Cc: Russell King <linux@armlinux.org.uk>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> 
-> FWIW, I was able to test this successfully on a pandaboard.
 
-Great!
 
-I've taken that as a Tested-by for v2 of the series [1], on the
-assumption that you're happy with that.
+On 19/08/16 09:00, Neil Armstrong wrote:
+> On 08/18/2016 05:53 PM, Sudeep Holla wrote:
+>>
+>>
+>> On 18/08/16 11:10, Neil Armstrong wrote:
+>>> Adds an optional vendor_send_message to the scpi to enable sending
+>>> vendor platform specific commands to the SCP firmware.
+>>>
+>>
+>> I don't see any users of vendor_send_message in this series, so I prefer
+>> it to be dropped and introduced when required.
+>>
+>> Also I had a different view on how to introduce this[1]. I would rather
+>> wait until the requirement comes that enables us to make use of it.
+>> Looks like you took parts of it and introduces vendor_send_message
+>> allowing users to send any data which I don't like especially without
+>> knowing how will it be (ab)used.
+>>
+>
+> Hi Sudeep,
+>
+> Indeed, I won't ask you to merge patches 1, 8 and 9, they need refactoring and
+> a separate patchset.
+>
 
-Please give me a shout if that is not the case!
+Ah OK,then better if you put then at the end. Otherwise it makes it
+difficult to review.
 
-Thanks,
-Mark.
+> Vendor commands are not necessary for Amlogic, this is a nice to have
+> since they have a "user" command that can be extended by a firmware
+> loaded by u-boot.
+>
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/450024.html
+Good :)
+
+> Could you review the following patches and I'll post a reduced v2
+> ASAP.
+>
+
+Yes I was doing that yesterday, sorry got distracted. I will continue today.
+
+-- 
+Regards,
+Sudeep
