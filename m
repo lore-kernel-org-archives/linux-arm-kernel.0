@@ -1,82 +1,39 @@
-From: groeck@google.com (Guenter Roeck)
-Date: Fri, 19 Aug 2016 05:47:24 -0700
-Subject: Problem with atomic accesses in pstore on some ARM CPUs
-In-Reply-To: <20160819093537.GJ1041@n2100.armlinux.org.uk>
-References: <CABXOdTfT7xMfiBvRuUS1hsVs=q5q2wY1x1Z8oCyyJNFckM0g0A@mail.gmail.com>
- <8f0c9ced-cdc3-ab9b-caee-06fe85e6c1e7@arm.com>
- <CABXOdTfg2T2tZrQOd2S5SjeySAMbfQX0weFuvRXBr2o8Of9nVQ@mail.gmail.com>
- <20160816132103.GD27088@arm.com>
- <CABXOdTfHX_ZB1CuM7hzU5LCZPYdHvBSatN9Nen=rb8r1rXhz-g@mail.gmail.com>
- <20160815221518.GD1120@svinekod>
- <CAMbhsRQiU-UyiCWqjaWNXbhDd0+=Tv_pWoeQkJKJaHC6y4=HwQ@mail.gmail.com>
- <20160819093537.GJ1041@n2100.armlinux.org.uk>
-Message-ID: <CABXOdTe5MuJucjQ+Ac3F0bawkze_tq849uWcukW7mu+SA=ZL5w@mail.gmail.com>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Fri, 19 Aug 2016 22:16:58 +0930
+Subject: [PATCH v2 0/7] aspeed: Integrate pinctrl and gpio drivers
+Message-ID: <20160819124705.24633-1-andrew@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2016 at 2:35 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Tue, Aug 16, 2016 at 10:35:52AM -0700, Colin Cross wrote:
->> persistent_ram uses atomic ops in uncached memory to store the start
->> and end positions in the ringbuffer so that the state of the
->> ringbuffer will be valid if the kernel crashes at any time.  This was
->> inherited from Android's ram_console implementation, and worked
->> through armv7.
->
-> That statement is actually inaccurate.  It may have worked on _some_
-> ARMv7 implementations, but it's not architecturally compliant.
->
-> The exclusive access instructions are not portable to anything but
-> "normal memory":
->
->    It is IMPLEMENTATION DEFINED whether LDREX and STREX operations can
->    be performed to a memory region with the Device or Strongly-ordered
->    memory attribute. Unless the implementation documentation explicitly
->    states that LDREX and STREX operations to a memory region with the
->    Device or Strongly-ordered attribute are permitted, the effect of
->    such operations is UNPREDICTABLE.
->
-> pgprot_noncached() gives strongly-ordered memory, and so is unsuitable
-> to place semaphores in for all ARMv7 implementations.
->
-> Also:
->
-> +       if (memtype)
-> +               va = ioremap(start, size);
->
-> this returns *device* memory, which is also unsuitable for all ARMv7
-> implementations.
->
-> It seems that pstore is playing in areas of the architecture which are
-> implementation defined, so it's no surprise that folk are seeing
-> different behaviours with different implementations.
->
-> The code isn't architecturally wrong, it just isn't portable to all ARMv7
-> implementations.
->
-> So, saying that it works on some ARMv7 implementations is irrelevent.
->
-> Note that LDREX and STREX are used for all operations that require
-> atomicity - iow, atomics and locks.
->
-> pgprot_writecombine() and ioremap_wc() will return memory which is
-> suitable for these exclusive accesses - it maps to the architectures'
-> "normal memory, uncacheable".
->
+Hi all,
 
-Unfortunately, pgprot_writecombine() doesn't work in my case (for
-rk3288 and rk3399). It was also reported not to work on Tegra Logan by
-Nvidia. As mentioned earlier, PAGE_KERNEL works, at least for rk3288
-and rk3399.
+This series contains the SoC-related patches of the Aspeed pinctrl and gpio
+drivers. The v2 has been split out from the original monolithic series found at:
 
-Guenter
+  https://lkml.org/lkml/2016/7/20/69 
 
-> So, I suspect the OP should not be using mem_type=1 or using the
-> "unbuffered" DT attribute, but should leave it was the default
-> (mem_type=0).
->
->
-> --
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+The combined series has been tested with both the AST2400 (g4) and AST2500 (g5)
+SoCs on OpenPOWER Palmetto and Aspeed AST2500 EVB machines respectively, and
+similarly in QEMU with the palmetto-bmc and ast2500-evb machines[1].
+
+Cheers,
+
+Andrew
+
+Andrew Jeffery (7):
+  mach-aspeed: Select pinctrl drivers
+  mach-aspeed: Select GPIO driver
+  aspeed-g4: Add syscon and pin controller nodes
+  palmetto: Request relevant mux functions in devicetree
+  aspeed-g4: Add gpio controller to devicetree
+  aspeed-g5: Add syscon and pin controller nodes
+  aspeed-g5: Add gpio controller to devicetree
+
+ arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts |  14 +
+ arch/arm/boot/dts/aspeed-g4.dtsi              | 429 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/aspeed-g5.dtsi              | 213 +++++++++++++
+ arch/arm/mach-aspeed/Kconfig                  |   5 +
+ 4 files changed, 661 insertions(+)
+
+-- 
+2.9.3
