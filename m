@@ -1,84 +1,75 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Aug 2016 14:05:49 +0100
-Subject: [PATCH 5/5] arm64: KVM: vgic-v2: Enable GICV access from HYP if
- access from guest is unsafe
-In-Reply-To: <CAFEAcA99RScdr+E39Q+03L5DyDLiQgQo9x1DeP1gE2-nJ1yUig@mail.gmail.com>
-References: <1471610295-1456-1-git-send-email-marc.zyngier@arm.com>
- <1471610295-1456-6-git-send-email-marc.zyngier@arm.com>
- <CAFEAcA99RScdr+E39Q+03L5DyDLiQgQo9x1DeP1gE2-nJ1yUig@mail.gmail.com>
-Message-ID: <57B7042D.1020702@arm.com>
+From: romain.perier@free-electrons.com (Romain Perier)
+Date: Fri, 19 Aug 2016 15:07:44 +0200
+Subject: [crypto] [marvell-cesa] Driver hangs on Armada 385 device
+In-Reply-To: <20160819141251.5dcc835d@free-electrons.com>
+References: <57b6f38c.23012e0a.374a0.56c6@mx.google.com>
+ <20160819141251.5dcc835d@free-electrons.com>
+Message-ID: <57B704A0.4050603@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hello,
 
-On 19/08/16 13:53, Peter Maydell wrote:
-> On 19 August 2016 at 13:38, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> So far, we've been disabling KVM on systems where the GICV region couldn't
->> be safely given to a guest. Now that we're able to handle this access
->> safely by emulating it in HYP, we can enable this feature when we detect
->> an unsafe configuration.
+Le 19/08/2016 14:12, Thomas Petazzoni a ?crit :
+> Hello,
+>
+> I'm adding Romain Perier in Cc, since he is actively working on the
+> CESA driver.
+>
+> On Fri, 19 Aug 2016 14:54:50 +0300, radioconfusion at gmail.com wrote:
+>
+>>> On Tue, 05 Jul 2016 11:46:30 +0300, radioconfusion at gmail.com wrote:
 >>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  virt/kvm/arm/vgic/vgic-v2.c | 69 +++++++++++++++++++++++++++------------------
->>  1 file changed, 42 insertions(+), 27 deletions(-)
+>>> My Armada 385 -device hangs when using marvell-cesa -driver.
+>>> I'm using Linux 4.4.10 and armada-385-db-ap.dts.
+>>> I have also tried with the driver version of Linux 4.7-rc3.
+>>>
+>>> Please see https://bugzilla.kernel.org/show_bug.cgi?id=120111 for details.
 >>
->> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
->> index b8da901..d1dcfc76 100644
->> --- a/virt/kvm/arm/vgic/vgic-v2.c
->> +++ b/virt/kvm/arm/vgic/vgic-v2.c
->> @@ -278,12 +278,14 @@ int vgic_v2_map_resources(struct kvm *kvm)
->>                 goto out;
->>         }
+>> I just tested the marvell-cesa with Linux 4.8-rc2 and Armada 385.
+>> There is still the same hanging issue (originally described on
+>> https://bugzilla.kernel.org/show_bug.cgi?id=120111).
 >>
->> -       ret = kvm_phys_addr_ioremap(kvm, dist->vgic_cpu_base,
->> -                                   kvm_vgic_global_state.vcpu_base,
->> -                                   KVM_VGIC_V2_CPU_SIZE, true);
->> -       if (ret) {
->> -               kvm_err("Unable to remap VGIC CPU to VCPU\n");
->> -               goto out;
->> +       if (!static_branch_unlikely(&vgic_v2_cpuif_trap)) {
->> +               ret = kvm_phys_addr_ioremap(kvm, dist->vgic_cpu_base,
->> +                                           kvm_vgic_global_state.vcpu_base,
->> +                                           KVM_VGIC_V2_CPU_SIZE, true);
->> +               if (ret) {
->> +                       kvm_err("Unable to remap VGIC CPU to VCPU\n");
->> +                       goto out;
->> +               }
->>         }
+>> Please let me ask which model of Armada board has been verified to work with the
+>> marvell-cesa driver?
+>
+> The Armada 388 GP board.
+
+For now:
+The Armada 388-DB-GP
+The Armada 385-DB-AP
+The Armada 375-DB
+
+
+>
+>> I'm using a custom board based on 88F6820. Is this SoC
+>> model fully supported by the driver? Do you know if there is some necessary
+>> hardware initializations which must be done on u-boot? I'm using latest Marvell
+>> patch set (2015_T1.0p16) on u-boot.
 >>
->>         dist->ready = true;
->> @@ -312,45 +314,51 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
->>                 return -ENXIO;
->>         }
+>> My test case have been:
+>> # cryptsetup benchmark --cipher aes-cbc
 >>
->> -       if (!PAGE_ALIGNED(info->vcpu.start)) {
->> -               kvm_err("GICV physical address 0x%llx not page aligned\n",
->> -                       (unsigned long long)info->vcpu.start);
->> -               return -ENXIO;
->> -       }
->> +       if (!PAGE_ALIGNED(info->vcpu.start) ||
->> +           !PAGE_ALIGNED(resource_size(&info->vcpu))) {
->> +               kvm_info("GICV region size/alignement is unsafe, using trapping\n");
-> 
-> "alignment".
+>> and that always freezes the board.
+>
+> Romain, can you test the same scenario, and see if you can reproduce
+> the hang or not?
 
-Ah, thanks. There's always a bit of French being stuck somewhere... ;-)
+Sure,
 
-> 
-> Is it worth specifically saying "performance will be worse", or do we
-> expect this to only happen on systems where the h/w can't permit direct
-> access (as opposed to those with bad dt info) ?
 
-We cannot distinguish between the two, unfortunately. Even worse, ACPI
-only gives us a base address, and not the size of the region. So even if
-the HW was perfectly compliant with SBSA, we have to assume the worse case.
+I have did exactly the same tests with Linux 4.8-rc2 (using a rootfs 
+buildroot-2016.02 over nfs) on A388-db-gp and A385-db-ap, both work just 
+fine. I launched the benchmark several times.
 
-I guess that a slightly more alarming message is in order indeed.
+I am running uboot, Marvell version: 2015_T1.0p5
 
-Thanks,
 
-	M.
+See yourself: http://paste.ubuntu.com/23070118
+
+
+Romain
 -- 
-Jazz is not dead. It just smells funny...
+Romain Perier, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
