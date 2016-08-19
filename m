@@ -1,59 +1,41 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 19 Aug 2016 23:55:42 +0200
-Subject: [PATCH v4 1/6] pinctrl: amlogic: gxbb: add the IR remote pin
+Date: Fri, 19 Aug 2016 23:55:44 +0200
+Subject: [PATCH v4 3/6] dt-bindings: media: meson-ir: Add Meson8b and GXBB
+ compatible strings
 In-Reply-To: <20160819215547.20063-1-martin.blumenstingl@googlemail.com>
 References: <20160628191802.21227-1-martin.blumenstingl@googlemail.com>
  <20160819215547.20063-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20160819215547.20063-2-martin.blumenstingl@googlemail.com>
+Message-ID: <20160819215547.20063-4-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the IR remote receiver to the AO domain devices.
+From: Neil Armstrong <narmstrong@baylibre.com>
 
+New bindings are needed as the register layout on the newer platforms
+is slightly different compared to Meson6b.
+
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/pinctrl/meson/pinctrl-meson-gxbb.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ Documentation/devicetree/bindings/media/meson-ir.txt | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-index cb4d6ad..8fffb31 100644
---- a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-@@ -225,6 +225,8 @@ static const unsigned int i2c_sda_ao_pins[] = {PIN(GPIOAO_5, 0) };
- static const unsigned int i2c_slave_sck_ao_pins[] = {PIN(GPIOAO_4, 0) };
- static const unsigned int i2c_slave_sda_ao_pins[] = {PIN(GPIOAO_5, 0) };
+diff --git a/Documentation/devicetree/bindings/media/meson-ir.txt b/Documentation/devicetree/bindings/media/meson-ir.txt
+index 407848e..e7e3f3c 100644
+--- a/Documentation/devicetree/bindings/media/meson-ir.txt
++++ b/Documentation/devicetree/bindings/media/meson-ir.txt
+@@ -1,7 +1,10 @@
+ * Amlogic Meson IR remote control receiver
  
-+static const unsigned int ir_in_ao_pins[] = {PIN(GPIOAO_7, 0) };
-+
- static struct meson_pmx_group meson_gxbb_periphs_groups[] = {
- 	GPIO_GROUP(GPIOZ_0, EE_OFF),
- 	GPIO_GROUP(GPIOZ_1, EE_OFF),
-@@ -432,6 +434,7 @@ static struct meson_pmx_group meson_gxbb_aobus_groups[] = {
- 	GROUP(i2c_sda_ao,	0,	5),
- 	GROUP(i2c_slave_sck_ao, 0,	2),
- 	GROUP(i2c_slave_sda_ao, 0,	1),
-+	GROUP(ir_in_ao,		0,	0),
- };
+ Required properties:
+- - compatible	: should be "amlogic,meson6-ir"
++ - compatible	: depending on the platform this should be one of:
++		  - "amlogic,meson6-ir"
++		  - "amlogic,meson8b-ir"
++		  - "amlogic,meson-gxbb-ir"
+  - reg		: physical base address and length of the device registers
+  - interrupts	: a single specifier for the interrupt from the device
  
- static const char * const gpio_periphs_groups[] = {
-@@ -521,6 +524,10 @@ static const char * const i2c_slave_ao_groups[] = {
- 	"i2c_slave_sdk_ao", "i2c_slave_sda_ao",
- };
- 
-+static const char * const ir_in_ao_groups[] = {
-+	"ir_in_ao",
-+};
-+
- static struct meson_pmx_func meson_gxbb_periphs_functions[] = {
- 	FUNCTION(gpio_periphs),
- 	FUNCTION(emmc),
-@@ -537,6 +544,7 @@ static struct meson_pmx_func meson_gxbb_aobus_functions[] = {
- 	FUNCTION(uart_ao_b),
- 	FUNCTION(i2c_ao),
- 	FUNCTION(i2c_slave_ao),
-+	FUNCTION(ir_in_ao),
- };
- 
- static struct meson_bank meson_gxbb_periphs_banks[] = {
 -- 
 2.9.3
