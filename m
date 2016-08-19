@@ -1,33 +1,82 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 19 Aug 2016 07:45:00 -0500
-Subject: [PATCH v4 17/17] dt-bindings: pwm: sti: Update DT bindings with
- recent changes
-In-Reply-To: <20160819083557.GK4254@dell>
-References: <20160816093508.28307-1-lee.jones@linaro.org>
- <20160816093508.28307-18-lee.jones@linaro.org>
- <20160818192002.GA26225@rob-hp-laptop> <20160819083557.GK4254@dell>
-Message-ID: <CAL_JsqLOoU0gHiz7CEii3CXsGQS28u2+w5t7vxT1FStRaeObkw@mail.gmail.com>
+From: groeck@google.com (Guenter Roeck)
+Date: Fri, 19 Aug 2016 05:47:24 -0700
+Subject: Problem with atomic accesses in pstore on some ARM CPUs
+In-Reply-To: <20160819093537.GJ1041@n2100.armlinux.org.uk>
+References: <CABXOdTfT7xMfiBvRuUS1hsVs=q5q2wY1x1Z8oCyyJNFckM0g0A@mail.gmail.com>
+ <8f0c9ced-cdc3-ab9b-caee-06fe85e6c1e7@arm.com>
+ <CABXOdTfg2T2tZrQOd2S5SjeySAMbfQX0weFuvRXBr2o8Of9nVQ@mail.gmail.com>
+ <20160816132103.GD27088@arm.com>
+ <CABXOdTfHX_ZB1CuM7hzU5LCZPYdHvBSatN9Nen=rb8r1rXhz-g@mail.gmail.com>
+ <20160815221518.GD1120@svinekod>
+ <CAMbhsRQiU-UyiCWqjaWNXbhDd0+=Tv_pWoeQkJKJaHC6y4=HwQ@mail.gmail.com>
+ <20160819093537.GJ1041@n2100.armlinux.org.uk>
+Message-ID: <CABXOdTe5MuJucjQ+Ac3F0bawkze_tq849uWcukW7mu+SA=ZL5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2016 at 3:35 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Thu, 18 Aug 2016, Rob Herring wrote:
+On Fri, Aug 19, 2016 at 2:35 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Tue, Aug 16, 2016 at 10:35:52AM -0700, Colin Cross wrote:
+>> persistent_ram uses atomic ops in uncached memory to store the start
+>> and end positions in the ringbuffer so that the state of the
+>> ringbuffer will be valid if the kernel crashes at any time.  This was
+>> inherited from Android's ram_console implementation, and worked
+>> through armv7.
 >
->> On Tue, Aug 16, 2016 at 10:35:08AM +0100, Lee Jones wrote:
->> > We're renaming the 'st,pwm-num-chan' binding to 'st,pwm-num-devs' to
->> > be more inline with the naming conventions of the subsystem.  Where
->> > we used to treat each line as a channel, the PWM convention is to
->> > describe them as devices.
->>
->> This is out of date now. Otherwise, the binding looks fine.
+> That statement is actually inaccurate.  It may have worked on _some_
+> ARMv7 implementations, but it's not architecturally compliant.
 >
-> Yes, you are right.
+> The exclusive access instructions are not portable to anything but
+> "normal memory":
 >
-> Perhaps if this is okay with Thierry, he can remove these few lines.
-> If not, I don't mind re-sending on request.
+>    It is IMPLEMENTATION DEFINED whether LDREX and STREX operations can
+>    be performed to a memory region with the Device or Strongly-ordered
+>    memory attribute. Unless the implementation documentation explicitly
+>    states that LDREX and STREX operations to a memory region with the
+>    Device or Strongly-ordered attribute are permitted, the effect of
+>    such operations is UNPREDICTABLE.
 >
-> I'll leave it until I hear otherwise.
+> pgprot_noncached() gives strongly-ordered memory, and so is unsuitable
+> to place semaphores in for all ARMv7 implementations.
+>
+> Also:
+>
+> +       if (memtype)
+> +               va = ioremap(start, size);
+>
+> this returns *device* memory, which is also unsuitable for all ARMv7
+> implementations.
+>
+> It seems that pstore is playing in areas of the architecture which are
+> implementation defined, so it's no surprise that folk are seeing
+> different behaviours with different implementations.
+>
+> The code isn't architecturally wrong, it just isn't portable to all ARMv7
+> implementations.
+>
+> So, saying that it works on some ARMv7 implementations is irrelevent.
+>
+> Note that LDREX and STREX are used for all operations that require
+> atomicity - iow, atomics and locks.
+>
+> pgprot_writecombine() and ioremap_wc() will return memory which is
+> suitable for these exclusive accesses - it maps to the architectures'
+> "normal memory, uncacheable".
+>
 
-Fine with me.
+Unfortunately, pgprot_writecombine() doesn't work in my case (for
+rk3288 and rk3399). It was also reported not to work on Tegra Logan by
+Nvidia. As mentioned earlier, PAGE_KERNEL works, at least for rk3288
+and rk3399.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Guenter
+
+> So, I suspect the OP should not be using mem_type=1 or using the
+> "unbuffered" DT attribute, but should leave it was the default
+> (mem_type=0).
+>
+>
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
