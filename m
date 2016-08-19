@@ -1,62 +1,105 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 19 Aug 2016 13:10:32 -0500
-Subject: [PATCH v3 02/15] dt/bindings: Update binding for PM domain idle
- states
-In-Reply-To: <5e59874c-bbb7-270a-199c-da1ff5932554@arm.com> (Sudeep Holla's
- message of "Wed, 10 Aug 2016 19:09:21 +0100")
-References: <1470351902-43103-1-git-send-email-lina.iyer@linaro.org>
- <1470351902-43103-3-git-send-email-lina.iyer@linaro.org>
- <99e35b6c-6698-6d27-f4d7-fa032796869e@arm.com>
- <20160810164034.GA1401@linaro.org>
- <5e59874c-bbb7-270a-199c-da1ff5932554@arm.com>
-Message-ID: <m2fuq0k4tj.fsf@baylibre.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 19 Aug 2016 11:59:51 -0700
+Subject: [PATCH V3 2/5] thermal: bcm2835: add thermal driver for bcm2835
+ soc
+In-Reply-To: <1471591694.2691.39.camel@intel.com>
+References: <1463495753-967-1-git-send-email-kernel@martin.sperl.org>
+ <1463495753-967-3-git-send-email-kernel@martin.sperl.org>
+ <87mvn6qa2x.fsf@eliezer.anholt.net> <87r39lvs4v.fsf@eliezer.anholt.net>
+ <1471591694.2691.39.camel@intel.com>
+Message-ID: <87inuwd1p4.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sudeep Holla <sudeep.holla@arm.com> writes:
+Zhang Rui <rui.zhang@intel.com> writes:
 
-[...]
-
-> In general whatever binding we come up must not just address OS
-> coordinated mode. Also I was thinking to have better coverage in the
-> description by having a bit more complex system like:
+> On ?, 2016-08-18 at 11:39 -0700, Eric Anholt wrote:
+>> Eric Anholt <eric@anholt.net> writes:
+>> 
+>> > 
+>> > kernel at martin.sperl.org writes:
+>> > 
+>> > > 
+>> > > From: Martin Sperl <kernel@martin.sperl.org>
+>> > > 
+>> > > Add basic thermal driver for bcm2835 SOC.
+>> > > 
+>> > > This driver currently relies on the firmware setting up the
+>> > > tsense HW block and does not set it up itself.
+>> > > 
+>> > > Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+>> > > 
+>> > > ChangeLog:
+>> > > ?V1 -> V2: added specific settings depending on compatiblity
+>> > > 	???added trip point based on register
+>> > > 	???setting up ctrl-register if HW is not enabled by firmware
+>> > > 	?????as per recommendation of Eric (untested)
+>> > > 	???check that clock frequency is in range
+>> > > 	?????(1.9 - 5MHz - as per comment in clk-bcm2835.c)
+>> > > ---
+>> > > 
+>> > > diff --git a/drivers/thermal/bcm/Makefile
+>> > > b/drivers/thermal/bcm/Makefile
+>> > > new file mode 100644
+>> > > index 0000000..13456d2
+>> > > --- /dev/null
+>> > > +++ b/drivers/thermal/bcm/Makefile
+>> > > @@ -0,0 +1 @@
+>> > > +obj-$(CONFIG_BCM2835_THERMAL)		:=
+>> > > bcm2835_thermal.o
+>> > > diff --git a/drivers/thermal/bcm/bcm2835_thermal.c
+>> > > b/drivers/thermal/bcm/bcm2835_thermal.c
+>> > > new file mode 100644
+>> > > index 0000000..73138cb
+>> > > --- /dev/null
+>> > > +++ b/drivers/thermal/bcm/bcm2835_thermal.c
+>> > > 
+>> > > +static const struct of_device_id
+>> > > bcm2835_thermal_of_match_table[];
+>> > > +static int bcm2835_thermal_probe(struct platform_device *pdev)
+>> > > +{
+>> > > 
+>> > > +	/* enable clock and check rate */
+>> > > +	clk_prepare_enable(data->clk);
+>> > > +	rate = clk_get_rate(data->clk);
+>> > > +	if ((rate < 1920000) || (rate > 5000000)) {
+>> > > +		dev_warn(&pdev->dev,
+>> > > +			?"Clock %pCn is running at %pCr Hz,
+>> > > which is outside the recommended range of 1.9 to 5.0 MHz\n",
+>> > > +			?data->clk, data->clk);
+>> > > +	}
+>> > > +
+>> > > +	/* register it */
+>> > > +	tz = thermal_zone_device_register("bcm2835_thermal",
+>> > > +					??1, 0, data,
+>> > > +					??&bcm2835_thermal_ops,
+>> > > +					??NULL, 0, 0);
+>> > I notice that the polling_delay is set to 0, but we're not using
+>> > interrupts to trigger the trip.??Is it valid to expose a trip
+>> > without a
+>> > polling_delay or interrupts???Should passive_delay be set as well?
+>> > 
+>> > This is up to the thermal maintainers.??As far as I'm concerned,
+>> > it's:
+>> > 
+>> > Acked-by: Eric Anholt <eric@anholt.net>
+>> > 
+>> > One it lands I'll pull the defconfig and DT bits.
+>> Ping on this question to thermal maintainers.??I'd still love to see
+>> this driver land.
 >
-> cluster0
-> 	CLUSTER_RET(Retention)
-> 	CLUSTER_PG(Power Gate)
-> 	core0
-> 		CORE_RET
-> 		CORE_PG
-> 	core1
-> 		CORE_RET
-> 		CORE_PG
+> hmmm, how is this driver supposed to work?
+> With this patch set, I think the only benefit is that we can get the
+> temperature and trip point information via thermal sysfs interface, but
+> kernel thermal control is a no-op here, right?
 
-Also, remember that a power domain may contain more than just CPUs, so
-this will also need to handle things like:
-
-	device0..N
-        	DEV_CLK_GATE
-                DEV_RET
-                DEV_PG
-
-So, as (I think) Lina was trying to say, including CPU idle states
-inside domain idles states doesn't really scale well because it would
-also imply domain states would also include device idle states.
-
-IMO, the device-specific states belong in the device nodes, and that
-includes CPUs.
-
-It's up to the domain (genpd) governor to look at *all* devices in the
-domain, check their state and make a domain-wide decision.
-
-The tricky part remains, IMO, the mapping between device/CPU states and
-allowable domain states.
-
-As was suggested earlier, a good potential starting point would be that
-all devices/CPUs would need to be in their deepest state before the
-domain would make any decisions.  While that leaves soem power savings
-on the table, it maps well to how genpd works today with only on/off
-states and could be extended with more complicated governors down the
-road.
-
-Kevin
+Yeah.  It seems useful to be able to get the information.  Once we land
+this, I hope someone can add interrupt support so that there are actual
+trip points.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160819/166e10c1/attachment.sig>
