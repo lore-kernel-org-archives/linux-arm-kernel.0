@@ -1,25 +1,28 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 18 Aug 2016 21:16:55 -0700 (PDT)
-Subject: [PATCH] net: thunderx: Fix OOPs with ethtool --register-dump
-In-Reply-To: <1471375697-1878-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1471375697-1878-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20160818.211655.897588198741403986.davem@davemloft.net>
+From: ccc94453@vip.cybercity.dk (Rask Ingemann Lambertsen)
+Date: Fri, 19 Aug 2016 07:16:46 +0200
+Subject: [PATCH v3 1/3] devicetree: Sort vendor prefixes in alphabetical
+ order
+In-Reply-To: <20160818230237.GA22939@lunn.ch>
+References: <54da74da3f60ede0bf8fb789ffee584703e81a29.1471553094.git.ccc94453@vip.cybercity.dk>
+ <20160818230237.GA22939@lunn.ch>
+Message-ID: <20160819051645.2lcid73kdy2hwdwk@vip.cybercity.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Daney <ddaney.cavm@gmail.com>
-Date: Tue, 16 Aug 2016 12:28:17 -0700
+On Fri, Aug 19, 2016 at 01:02:37AM +0200, Andrew Lunn wrote:
+> > @@ -54,8 +54,8 @@ chipone		ChipOne
+> >  chipspark	ChipSPARK
+> >  chrp	Common Hardware Reference Platform
+> >  chunghwa	Chunghwa Picture Tubes Ltd.
+> > -ciaa	Computadora Industrial Abierta Argentina
+> >  cirrus	Cirrus Logic, Inc.
+> > +ciaa	Computadora Industrial Abierta Argentina
+> 
+> ciaa comes after cirrus?
 
-> From: David Daney <david.daney@cavium.com>
-> 
-> The ethtool_ops .get_regs function attempts to read the nonexistent
-> register NIC_QSET_SQ_0_7_CNM_CHG, which produces a "bus error" type
-> OOPs.
-> 
-> Fix by not attempting to read, and removing the definition of,
-> NIC_QSET_SQ_0_7_CNM_CHG.  A zero is written into the register dump to
-> keep the layout unchanged.
-> 
-> Signed-off-by: David Daney <david.daney@cavium.com>
+It does with LC_COLLATE=da_DK :-(
+I'm sorry about that. I'll post v4 this afternoon.
 
-Applied.
+-- 
+Rask Ingemann Lambertsen
+Danish law requires addresses in e-mail to be logged and stored for a year
