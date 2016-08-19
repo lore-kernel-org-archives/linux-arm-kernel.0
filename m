@@ -1,25 +1,36 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Fri, 19 Aug 2016 12:57:57 +0100
-Subject: [PATCH v2] efi: arm64: add debugfs node to dump UEFI runtime
- page tables
-In-Reply-To: <1471349601-31257-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1471349601-31257-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160819115757.GT30909@codeblueprint.co.uk>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 19 Aug 2016 20:00:33 +0800
+Subject: [PATCH] usb: chipidea: usb2: delete the redundant setting default DMA
+ mask code
+Message-ID: <20160819120033.556-1-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 16 Aug, at 02:13:21PM, Ard Biesheuvel wrote:
-> Register the debugfs node 'efi_page_tables' to allow the UEFI runtime
-> page tables to be inspected. Note that ARM does not have 'asm/ptdump.h'
-> [yet] so for now, this is arm64 only.
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> v2: test for CONFIG_ARM64_PTDUMP rather than CONFIG_ARM64
->     add Mark's ack
-> 
->  drivers/firmware/efi/arm-runtime.c | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
+Similar as commit 2b2fe36def08 ("usb: chipidea: imx: delete the
+redundant setting default DMA mask code"), the ci_hdrc_usb2 platform
+device is also created by device tree, the default DMA mask should be
+already set by of_dma_configure when the device are created. So delete
+the redundant code at driver.
 
-Thanks Ard. Queued up in 'next'.
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/usb/chipidea/ci_hdrc_usb2.c | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/drivers/usb/chipidea/ci_hdrc_usb2.c b/drivers/usb/chipidea/ci_hdrc_usb2.c
+index 4456d2c..d162cc0 100644
+--- a/drivers/usb/chipidea/ci_hdrc_usb2.c
++++ b/drivers/usb/chipidea/ci_hdrc_usb2.c
+@@ -74,10 +74,6 @@ static int ci_hdrc_usb2_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
+-	if (ret)
+-		goto clk_err;
+-
+ 	ci_pdata->name = dev_name(dev);
+ 
+ 	priv->ci_pdev = ci_hdrc_add_device(dev, pdev->resource,
+-- 
+2.9.3
