@@ -1,63 +1,62 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 20 Aug 2016 02:55:12 +0900
-Subject: [PATCH v6 2/2] clk: uniphier: add clock data for UniPhier SoCs
-In-Reply-To: <20160819002826.GT361@codeaurora.org>
-References: <1470112223-24835-1-git-send-email-yamada.masahiro@socionext.com>
- <1470112223-24835-3-git-send-email-yamada.masahiro@socionext.com>
- <20160819002826.GT361@codeaurora.org>
-Message-ID: <CAK7LNAROCdE4tomp6jg4p5Ep-koPjWSchNEXH01Qn0Wn3q-f2g@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 19 Aug 2016 13:10:32 -0500
+Subject: [PATCH v3 02/15] dt/bindings: Update binding for PM domain idle
+ states
+In-Reply-To: <5e59874c-bbb7-270a-199c-da1ff5932554@arm.com> (Sudeep Holla's
+ message of "Wed, 10 Aug 2016 19:09:21 +0100")
+References: <1470351902-43103-1-git-send-email-lina.iyer@linaro.org>
+ <1470351902-43103-3-git-send-email-lina.iyer@linaro.org>
+ <99e35b6c-6698-6d27-f4d7-fa032796869e@arm.com>
+ <20160810164034.GA1401@linaro.org>
+ <5e59874c-bbb7-270a-199c-da1ff5932554@arm.com>
+Message-ID: <m2fuq0k4tj.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Sudeep Holla <sudeep.holla@arm.com> writes:
 
+[...]
 
-2016-08-19 9:28 GMT+09:00 Stephen Boyd <sboyd@codeaurora.org>:
-
->> +
->> +
->> +System clock
->> +------------
->> +
->> +Required properties:
->> +- compatible: should be one of the following:
->> +    "socionext,uniphier-sld3-clock" - for PH1-sLD3 SoC.
->> +    "socionext,uniphier-ld4-clock"  - for PH1-LD4 SoC.
->> +    "socionext,uniphier-pro4-clock" - for PH1-Pro4 SoC.
->> +    "socionext,uniphier-sld8-clock" - for PH1-sLD8 SoC.
->> +    "socionext,uniphier-pro5-clock" - for PH1-Pro5 SoC.
->> +    "socionext,uniphier-pxs2-clock" - for ProXstream2/PH1-LD6b SoC.
->> +    "socionext,uniphier-ld11-clock" - for PH1-LD11 SoC.
->> +    "socionext,uniphier-ld20-clock" - for PH1-LD20 SoC.
->> +- #clock-cells: should be 1.
->> +
->> +Example:
->> +
->> +     sysctrl at 61840000 {
->> +             compatible = "socionext,uniphier-ld20-sysctrl",
->> +                          "simple-mfd", "syscon";
->> +             reg = <0x61840000 0x4000>;
->> +
->> +             clock {
->> +                     compatible = "socionext,uniphier-ld20-clock";
->> +                     #clock-cells = <1>;
->> +             };
->> +
->> +             other nodes ...
+> In general whatever binding we come up must not just address OS
+> coordinated mode. Also I was thinking to have better coverage in the
+> description by having a bit more complex system like:
 >
-> What are the other nodes? Is there a document for the rest of the
-> MFD?
+> cluster0
+> 	CLUSTER_RET(Retention)
+> 	CLUSTER_PG(Power Gate)
+> 	core0
+> 		CORE_RET
+> 		CORE_PG
+> 	core1
+> 		CORE_RET
+> 		CORE_PG
 
-At lease there are "clock" and "reset" in this MFD at this point.
-Perhaps, I may want to add more in the future.
+Also, remember that a power domain may contain more than just CPUs, so
+this will also need to handle things like:
 
-That's why I do not want to list all of the sibling nodes.
+	device0..N
+        	DEV_CLK_GATE
+                DEV_RET
+                DEV_PG
 
-The reset node is documented in its binding document,
-added by the following patch:
-https://patchwork.kernel.org/patch/9255101/
+So, as (I think) Lina was trying to say, including CPU idle states
+inside domain idles states doesn't really scale well because it would
+also imply domain states would also include device idle states.
 
+IMO, the device-specific states belong in the device nodes, and that
+includes CPUs.
 
--- 
-Best Regards
-Masahiro Yamada
+It's up to the domain (genpd) governor to look at *all* devices in the
+domain, check their state and make a domain-wide decision.
+
+The tricky part remains, IMO, the mapping between device/CPU states and
+allowable domain states.
+
+As was suggested earlier, a good potential starting point would be that
+all devices/CPUs would need to be in their deepest state before the
+domain would make any decisions.  While that leaves soem power savings
+on the table, it maps well to how genpd works today with only on/off
+states and could be extended with more complicated governors down the
+road.
+
+Kevin
