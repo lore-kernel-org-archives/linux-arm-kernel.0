@@ -1,285 +1,71 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Fri, 19 Aug 2016 08:35:14 +0800
-Subject: [PATCH v2 2/3] ARM: dts: sun6i: Add
- sun6i-reference-design-tablet.dtsi
-In-Reply-To: <1471543337-6938-3-git-send-email-hdegoede@redhat.com>
-References: <1471543337-6938-1-git-send-email-hdegoede@redhat.com>
- <1471543337-6938-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <92631471566914@web15j.yandex.ru>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 18 Aug 2016 17:37:56 -0700
+Subject: [PATCH V2 RFC 0/6] ARM: dts: bcm2835: Add Raspberry Pi Zero
+In-Reply-To: <1091535069.365254.5a20a815-9153-4587-9aeb-f2a7fc5a4ff5.open-xchange@email.1und1.de>
+References: <1469559213-16160-1-git-send-email-stefan.wahren@i2se.com>
+ <87lgzuj66o.fsf@eliezer.anholt.net>
+ <1091535069.365254.5a20a815-9153-4587-9aeb-f2a7fc5a4ff5.open-xchange@email.1und1.de>
+Message-ID: <87twehegpn.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
+> Hi Eric,
+>
+>> Eric Anholt <eric@anholt.net> hat am 18. August 2016 um 20:14 geschrieben:
+>> 
+>> 
+>> Stefan Wahren <stefan.wahren@i2se.com> writes:
+>> 
+>> > This patch series is only a draft and not intended to be merged. Patches 1
+>> > and 2
+>> > aren't bcm2835 specific and should be helpful for other platforms. 
+>> > The patches 2 - 4 are required for otg / gadget mode. The last patch
+>> > based on the work of Lubomir Rintel [1] and Noralf Tr?nnes [2].
+>> >
+>> > Changes since V1:
+>> > - rebase to current linux-next
+>> > - add patches 1 - 4 for otg/gadget support
+>> > - add patch 5 with model compatible
+>> > - use polarity define for ACT LED
+>> >
+>> > [1] -
+>> > http://lists.infradead.org/pipermail/linux-rpi-kernel/2016-February/003221.html
+>> > [2] - https://github.com/raspberrypi/linux/pull/1239/
+>> >
+>> > Stefan Wahren (6):
+>> >   usb: dwc2: core: Avoid nonsense error in gadget mode
+>> >   usb: dwc2: Add DT properties to specify fifo size in host/otg mode
+>> >   ARM: dts: bcm283x: Add missing usb clock
+>> >   ARM: dts: bcm283x: Add generic USB PHY
+>> >   DT: bindings: bcm: Add Raspberry Pi Zero
+>> >   ARM: dts: bcm2835: Add Raspberry Pi Zero
+>> 
+>> Where are we at on these?  
+>
+> I would like to split the series:
+> part 1: Raspberry Pi Zero support (only USB host mode support)
+> part 2: OTG / Peripheral support for BCM2835 (hope that i reach the point)
 
-19.08.2016, 02:07, "Hans de Goede" <hdegoede@redhat.com>:
-> Just like with a13/a23/a33 most a31 tablets are derived from the same
-> reference design. Add a .dtsi file with all the common bits to avoid
-> endless copy and pasting of these.
->
-> The sun6i-reference-design-tablet.dtsi this commit adds is a copy
-> of sun6i-a31s-colorfly-e708-q1.dts with a few tablet specific bits
-> removed / left in sun6i-a31s-colorfly-e708-q1.dts.
+That sounds great.
 
-Thanks! I will soon rebase my dt of Viewsonic Viewpad 133Q (a 13.3" A31s
-tablet) on the reference design.
+>> I've been holding off waiting for the USB
+>> bits to get settled.  I can grab the bindings patch, but is there
+>> anything else we could merge while you're working on USB?
+>
+> Maybe i missed something, but i didn't received any ACK from you about this
+> series.
+>
+> In case everything is okay, you could also merge patch 3 since it's relevant to
+> bcm283x and not RPi Zero specific.
 
-It makes it more tidy.
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> ?arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts | 147 +--------------------
-> ?...8-q1.dts => sun6i-reference-design-tablet.dtsi} | 26 +---
-> ?2 files changed, 2 insertions(+), 171 deletions(-)
-> ?copy arch/arm/boot/dts/{sun6i-a31s-colorfly-e708-q1.dts => sun6i-reference-design-tablet.dtsi} (90%)
->
-> diff --git a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts b/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
-> index 34d8710..882a4d8 100644
-> --- a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
-> +++ b/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
-> @@ -42,32 +42,11 @@
->
-> ?/dts-v1/;
-> ?#include "sun6i-a31s.dtsi"
-> -#include "sunxi-common-regulators.dtsi"
-> -
-> -#include <dt-bindings/gpio/gpio.h>
-> -#include <dt-bindings/input/input.h>
-> -#include <dt-bindings/pinctrl/sun4i-a10.h>
-> +#include "sun6i-reference-design-tablet.dtsi"
->
-> ?/ {
-> ?????????model = "Colorfly E708 Q1 tablet";
-> ?????????compatible = "colorfly,e708-q1", "allwinner,sun6i-a31s";
-> -
-> - aliases {
-> - serial0 = &uart0;
-> - };
-> -
-> - chosen {
-> - stdout-path = "serial0:115200n8";
-> - };
-> -};
-> -
-> -&cpu0 {
-> - cpu-supply = <&reg_dcdc3>;
-> -};
-> -
-> -&ehci0 {
-> - /* rtl8188etv wifi is connected here */
-> - status = "okay";
-> ?};
->
-> ?&lradc {
-> @@ -82,136 +61,12 @@
-> ?????????};
-> ?};
->
-> -&mmc0 {
-> - pinctrl-names = "default";
-> - pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_e708_q1>;
-> - vmmc-supply = <&reg_dcdc1>;
-> - bus-width = <4>;
-> - cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
-> - cd-inverted;
-> - status = "okay";
-> -};
-> -
-> -&pio {
-> - mmc0_cd_pin_e708_q1: mmc0_cd_pin at 0 {
-> - allwinner,pins = "PA8";
-> - allwinner,function = "gpio_in";
-> - allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> - allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-> - };
-> -
-> - usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-> - allwinner,pins = "PA15";
-> - allwinner,function = "gpio_in";
-> - allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> - allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-> - };
-> -};
-> -
-> -&p2wi {
-> - status = "okay";
-> -
-> - axp22x: pmic at 68 {
-> - compatible = "x-powers,axp221";
-> - reg = <0x68>;
-> - interrupt-parent = <&nmi_intc>;
-> - interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-> - drivevbus-supply = <&reg_vcc5v0>;
-> - x-powers,drive-vbus-en;
-> - };
-> -};
-> -
-> -#include "axp22x.dtsi"
-> -
-> -&reg_aldo3 {
-> - regulator-always-on;
-> - regulator-min-microvolt = <2700000>;
-> - regulator-max-microvolt = <3300000>;
-> - regulator-name = "avcc";
-> -};
-> -
-> -&reg_dc1sw {
-> - regulator-name = "vcc-lcd";
-> -};
-> -
-> -&reg_dc5ldo {
-> - regulator-always-on;
-> - regulator-min-microvolt = <700000>;
-> - regulator-max-microvolt = <1320000>;
-> - regulator-name = "vdd-cpus"; /* This is an educated guess */
-> -};
-> -
-> -&reg_dcdc1 {
-> - regulator-always-on;
-> - regulator-min-microvolt = <3000000>;
-> - regulator-max-microvolt = <3000000>;
-> - regulator-name = "vcc-3v0";
-> -};
-> -
-> -&reg_dcdc2 {
-> - regulator-min-microvolt = <700000>;
-> - regulator-max-microvolt = <1320000>;
-> - regulator-name = "vdd-gpu";
-> -};
-> -
-> -&reg_dcdc3 {
-> - regulator-always-on;
-> - regulator-min-microvolt = <700000>;
-> - regulator-max-microvolt = <1320000>;
-> - regulator-name = "vdd-cpu";
-> -};
-> -
-> -&reg_dcdc4 {
-> - regulator-always-on;
-> - regulator-min-microvolt = <700000>;
-> - regulator-max-microvolt = <1320000>;
-> - regulator-name = "vdd-sys-dll";
-> -};
-> -
-> -&reg_dcdc5 {
-> - regulator-always-on;
-> - regulator-min-microvolt = <1500000>;
-> - regulator-max-microvolt = <1500000>;
-> - regulator-name = "vcc-dram";
-> -};
-> -
-> -&reg_dldo1 {
-> - regulator-min-microvolt = <3300000>;
-> - regulator-max-microvolt = <3300000>;
-> - regulator-name = "vcc-wifi";
-> -};
-> -
-> ?&reg_dldo2 {
-> ?????????regulator-min-microvolt = <1800000>;
-> ?????????regulator-max-microvolt = <1800000>;
-> ?????????regulator-name = "vcc-pg";
-> ?};
->
-> -&reg_drivevbus {
-> - regulator-name = "usb0-vbus";
-> - status = "okay";
-> -};
-> -
-> ?&simplefb_lcd {
-> - vcc-lcd-supply = <&reg_dc1sw>;
-> ?????????vcc-pg-supply = <&reg_dldo2>;
-> ?};
-> -
-> -&usb_otg {
-> - dr_mode = "otg";
-> - status = "okay";
-> -};
-> -
-> -&usb_power_supply {
-> - status = "okay";
-> -};
-> -
-> -&usbphy {
-> - pinctrl-names = "default";
-> - pinctrl-0 = <&usb0_id_detect_pin>;
-> - usb0_id_det-gpio = <&pio 0 15 GPIO_ACTIVE_HIGH>; /* PA15 */
-> - usb0_vbus_power-supply = <&usb_power_supply>;
-> - usb0_vbus-supply = <&reg_drivevbus>;
-> - usb1_vbus-supply = <&reg_dldo1>;
-> - status = "okay";
-> -};
-> diff --git a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts b/arch/arm/boot/dts/sun6i-reference-design-tablet.dtsi
-> similarity index 90%
-> copy from arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
-> copy to arch/arm/boot/dts/sun6i-reference-design-tablet.dtsi
-> index 34d8710..0c43430 100644
-> --- a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
-> +++ b/arch/arm/boot/dts/sun6i-reference-design-tablet.dtsi
-> @@ -40,8 +40,6 @@
-> ??* OTHER DEALINGS IN THE SOFTWARE.
-> ??*/
->
-> -/dts-v1/;
-> -#include "sun6i-a31s.dtsi"
-> ?#include "sunxi-common-regulators.dtsi"
->
-> ?#include <dt-bindings/gpio/gpio.h>
-> @@ -49,9 +47,6 @@
-> ?#include <dt-bindings/pinctrl/sun4i-a10.h>
->
-> ?/ {
-> - model = "Colorfly E708 Q1 tablet";
-> - compatible = "colorfly,e708-q1", "allwinner,sun6i-a31s";
-> -
-> ?????????aliases {
-> ?????????????????serial0 = &uart0;
-> ?????????};
-> @@ -66,20 +61,8 @@
-> ?};
->
-> ?&ehci0 {
-> - /* rtl8188etv wifi is connected here */
-> - status = "okay";
-> -};
-> -
-> -&lradc {
-> - vref-supply = <&reg_aldo3>;
-> + /* Wifi is connected here */
-> ?????????status = "okay";
-> -
-> - button at 1000 {
-> - label = "Home";
-> - linux,code = <KEY_HOMEPAGE>;
-> - channel = <0>;
-> - voltage = <1000000>;
-> - };
-> ?};
->
-> ?&mmc0 {
-> @@ -181,12 +164,6 @@
-> ?????????regulator-name = "vcc-wifi";
-> ?};
->
-> -&reg_dldo2 {
-> - regulator-min-microvolt = <1800000>;
-> - regulator-max-microvolt = <1800000>;
-> - regulator-name = "vcc-pg";
-> -};
-> -
-> ?&reg_drivevbus {
-> ?????????regulator-name = "usb0-vbus";
-> ?????????status = "okay";
-> @@ -194,7 +171,6 @@
->
-> ?&simplefb_lcd {
-> ?????????vcc-lcd-supply = <&reg_dc1sw>;
-> - vcc-pg-supply = <&reg_dldo2>;
-> ?};
->
-> ?&usb_otg {
-> --
-> 2.7.4
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Didn't miss anything.  I hadn't acked yet since it looked like there
+were open questions for the USB folks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160818/72d6d925/attachment-0001.sig>
