@@ -1,101 +1,27 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 19 Aug 2016 09:44:47 -0700
-Subject: [PATCH v2 1/2] Input: jornada720_kbd - switch to devm_* APIs
-In-Reply-To: <E1bamh9-0004Vi-0I@rmk-PC.armlinux.org.uk>
-References: <E1bamh9-0004Vi-0I@rmk-PC.armlinux.org.uk>
-Message-ID: <20160819164447.GB20499@dtor-ws>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Fri, 19 Aug 2016 19:45:22 +0300
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNOiBzYTExMDA6IGNsZWFyIHJlc2V0IHN0YXR1cyBw?=
+ =?UTF-8?B?cmlvciB0byByZWJvb3Q=?=
+In-Reply-To: <E1bamfG-0002WE-49@rmk-PC.armlinux.org.uk>
+References: <E1bamfG-0002WE-49@rmk-PC.armlinux.org.uk>
+Message-ID: <1471625122.822734676@f202.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2016 at 05:30:59PM +0100, Russell King wrote:
-> Switch the jornada720_kbd driver to use the devm_* APIs.  This is in
-> preparation to removing the mach/irqs.h include from this driver.
-> 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  drivers/input/keyboard/jornada720_kbd.c | 38 ++++++++-------------------------
->  1 file changed, 9 insertions(+), 29 deletions(-)
-> 
-> diff --git a/drivers/input/keyboard/jornada720_kbd.c b/drivers/input/keyboard/jornada720_kbd.c
-> index 421d9c55b0e8..4b2e9ff18ba1 100644
-> --- a/drivers/input/keyboard/jornada720_kbd.c
-> +++ b/drivers/input/keyboard/jornada720_kbd.c
-> @@ -53,6 +53,7 @@ static unsigned short jornada_std_keymap[128] = {					/* ROW */
->  struct jornadakbd {
->  	unsigned short keymap[ARRAY_SIZE(jornada_std_keymap)];
->  	struct input_dev *input;
-> +	int irq;
+>???????, 19 ??????? 2016, 19:29 +03:00 ?? Russell King <rmk+kernel@armlinux.org.uk>:
+>
+>Clear the current reset status prior to rebooting the platform.  This
+>adds the bit missing from 04fef228fb00 ("[ARM] pxa: introduce
+>reset_status and clear_reset_status for driver's usage").
+>
+>Signed-off-by: Russell King < rmk+kernel@armlinux.org.uk >
+>---
+...
+>?static void assabet_lcd_backlight_power(int on)
+>?{
+>-if (on)
+>+if (on && 0)
+...
+It looks like you did not remove the debugging code.
 
-I do not think you need this, not in this patch and the next one does
-not seem to need this either?
-
-Can I drop this chunk?
-
->  };
->  
->  static irqreturn_t jornada720_kbd_interrupt(int irq, void *dev_id)
-> @@ -99,12 +100,10 @@ static int jornada720_kbd_probe(struct platform_device *pdev)
->  	struct input_dev *input_dev;
->  	int i, err;
->  
-> -	jornadakbd = kzalloc(sizeof(struct jornadakbd), GFP_KERNEL);
-> -	input_dev = input_allocate_device();
-> -	if (!jornadakbd || !input_dev) {
-> -		err = -ENOMEM;
-> -		goto fail1;
-> -	}
-> +	jornadakbd = devm_kzalloc(&pdev->dev, sizeof(*jornadakbd), GFP_KERNEL);
-> +	input_dev = devm_input_allocate_device(&pdev->dev);
-> +	if (!jornadakbd || !input_dev)
-> +		return -ENOMEM;
->  
->  	platform_set_drvdata(pdev, jornadakbd);
->  
-> @@ -127,37 +126,18 @@ static int jornada720_kbd_probe(struct platform_device *pdev)
->  
->  	input_set_capability(input_dev, EV_MSC, MSC_SCAN);
->  
-> -	err = request_irq(IRQ_GPIO0,
-> -			  jornada720_kbd_interrupt,
-> -			  IRQF_TRIGGER_FALLING,
-> -			  "jornadakbd", pdev);
-> +	err = devm_request_irq(&pdev->dev, IRQ_GPIO0, jornada720_kbd_interrupt,
-> +			       IRQF_TRIGGER_FALLING, "jornadakbd", pdev);
->  	if (err) {
->  		printk(KERN_INFO "jornadakbd720_kbd: Unable to grab IRQ\n");
-> -		goto fail1;
-> +		return err;
->  	}
->  
-> -	err = input_register_device(jornadakbd->input);
-> -	if (err)
-> -		goto fail2;
-> -
-> -	return 0;
-> -
-> - fail2:	/* IRQ, DEVICE, MEMORY */
-> -	free_irq(IRQ_GPIO0, pdev);
-> - fail1:	/* DEVICE, MEMORY */
-> -	input_free_device(input_dev);
-> -	kfree(jornadakbd);
-> -	return err;
-> +	return input_register_device(jornadakbd->input);
->  };
->  
->  static int jornada720_kbd_remove(struct platform_device *pdev)
->  {
-> -	struct jornadakbd *jornadakbd = platform_get_drvdata(pdev);
-> -
-> -	free_irq(IRQ_GPIO0, pdev);
-> -	input_unregister_device(jornadakbd->input);
-> -	kfree(jornadakbd);
-> -
->  	return 0;
->  }
->  
-> -- 
-> 2.1.0
-> 
-
--- 
-Dmitry
+---
