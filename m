@@ -1,77 +1,52 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Fri, 19 Aug 2016 21:09:24 +0800
-Subject: [PATCH 1/2] thermal: rockchip: enhance the tsadc's bandgap
- feature for rk3399
-In-Reply-To: <1469628643-29661-1-git-send-email-wxt@rock-chips.com>
-References: <1469628643-29661-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1471612164.2691.73.camel@intel.com>
+From: gmane@chmurka.net (Adam Wysocki)
+Date: Fri, 19 Aug 2016 13:11:13 +0000 (UTC)
+Subject: Linux 4.7 and Jornada 720 (SA-1100)
+References: <4Tcq736lIfmjNv8%gof@news.chmurka.net>
+ <20160819102945.GK1041@n2100.armlinux.org.uk>
+Message-ID: <7Tcq9hpfIfmjNv8%gof@news.chmurka.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?, 2016-07-27 at 22:10 +0800, Caesar Wang wrote:
-> From: Rocky Hao <rocky.hao@rock-chips.com>
-> 
-> Due to the voltage ripple, the sensing data of the tsadc is not
-> accurate.
-> And in this patch, the bandgap feature is enhanced to remove the
-> voltage
-> ripple, and then the tsadc can sense the temperature more precisely.
-> 
-> Obsolete codes are removed as well.
-> 
-> Signed-off-by: Rocky Hao <rocky.hao@rock-chips.com>
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> Cc: Eduardo Valentin <edubezval@gmail.com>
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: linux-pm at vger.kernel.org
+Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
 
-Both patches applied and queued for 4.9.
+> Make sure you have "console=ttySA0,38400n8" or similar to get serial
+> console output - it needs to be a "ttySA" port, not "ttyS".
 
-thanks,
-rui
-> ---
-> 
-> ?drivers/thermal/rockchip_thermal.c | 11 ++++++-----
-> ?1 file changed, 6 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/thermal/rockchip_thermal.c
-> b/drivers/thermal/rockchip_thermal.c
-> index db5ecc5..a90423d 100644
-> --- a/drivers/thermal/rockchip_thermal.c
-> +++ b/drivers/thermal/rockchip_thermal.c
-> @@ -222,10 +222,10 @@ struct rockchip_thermal_data {
-> ?#define GRF_TSADC_TESTBIT_L			0x0e648
-> ?#define GRF_TSADC_TESTBIT_H			0x0e64c
-> ?
-> -#define GRF_TSADC_TSEN_PD_ON			(0x30003 << 0)
-> -#define GRF_TSADC_TSEN_PD_OFF			(0x30000 << 0)
-> ?#define GRF_SARADC_TESTBIT_ON			(0x10001 << 2)
-> ?#define GRF_TSADC_TESTBIT_H_ON			(0x10001 << 2)
-> +#define GRF_TSADC_VCM_EN_L			(0x10001 << 7)
-> +#define GRF_TSADC_VCM_EN_H			(0x10001 << 7)
-> ?
-> ?/**
-> ? * struct tsadc_table - code to temperature conversion table
-> @@ -567,9 +567,10 @@ static void rk_tsadcv3_initialize(struct regmap
-> *grf, void __iomem *regs,
-> ?			???????regs + TSADCV2_HIGHT_TSHUT_DEBOUNCE);
-> ?
-> ?	} else {
-> -		regmap_write(grf, GRF_TSADC_TESTBIT_L,
-> GRF_TSADC_TSEN_PD_ON);
-> -		mdelay(10);
-> -		regmap_write(grf, GRF_TSADC_TESTBIT_L,
-> GRF_TSADC_TSEN_PD_OFF);
-> +		/* Enable the voltage common mode feature */
-> +		regmap_write(grf, GRF_TSADC_TESTBIT_L,
-> GRF_TSADC_VCM_EN_L);
-> +		regmap_write(grf, GRF_TSADC_TESTBIT_H,
-> GRF_TSADC_VCM_EN_H);
-> +
-> ?		usleep_range(15, 100); /* The spec note says at
-> least 15 us */
-> ?		regmap_write(grf, GRF_SARADC_TESTBIT,
-> GRF_SARADC_TESTBIT_ON);
-> ?		regmap_write(grf, GRF_TSADC_TESTBIT_H,
-> GRF_TSADC_TESTBIT_H_ON);
+Hmm... I changed to:
+
+root=0x302 mem=32m console=ttySA0,115200n8
+
+and success - it helped! The screen is still blank, but I least I have 
+some messages on the serial port, finished with kernel panic because of 
+failing to mount root. It looks like I didn't enable some drivers for 
+the CF controller, but I look and it seems everything that should be 
+enabled is enabled... maybe this kernel doesn't support CF on Jornada 
+without a patch?
+
+http://pastebin.com/J2ATKxQM
+
+And I'm just wondering why the screen is blank while I definitely enabled 
+the SA-1100 framebuffer support and console on framebuffer... I'm not sure 
+if it should be blank when I specified console=ttySA0, but I don't think 
+it should be blank without any console= setting...
+
+> Same probably goes for "earlyprintk=serial,ttyS0,115200", although I've
+> no experience of earlyprintk myself.
+
+It seems that earlyprintk is ignored anyway, maybe there's no support for 
+it on this platform?
+
+> However, if you're not even getting the "Uncompressing Linux... done, 
+> booting the kernel." line, that suggests the decompressor is not running, 
+> or is trying to access the wrong serial port.  The decompressor tries to 
+> find the first serial port out of serial 3, 1 and 2 which has been left 
+> enabled.
+
+In this order? Maybe it tries to send its messages to the built-in modem 
+or IrDA port...
+
+Anyway, now I know that kernel boots, so it's definitely helpful. I'll try 
+to find out what's wrong with this console and CF controller...
+
+-- 
+http://www.chmurka.net/
