@@ -1,52 +1,49 @@
 From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez)
-Date: Fri, 19 Aug 2016 08:52:35 +0200
-Subject: [PATCH] amba: Support clk parents and rates assigned in DT
-In-Reply-To: <20160711210852.31553-1-sboyd@codeaurora.org>
-References: <20160711210852.31553-1-sboyd@codeaurora.org>
-Message-ID: <453b7ea6-b6c9-ae42-6ac5-81faa1eb2b5d@linaro.org>
+Date: Fri, 19 Aug 2016 08:57:17 +0200
+Subject: [PATCH 2/2] arm64: dts: set UART1 clock frequency to 150MHz
+In-Reply-To: <57836C8B.6020509@hisilicon.com>
+References: <1467965467-28180-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <1467965467-28180-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <57836C8B.6020509@hisilicon.com>
+Message-ID: <85888839-f776-9f8a-0f06-8a1f69aab56d@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2016 11:08 PM, Stephen Boyd wrote:
-> Add the call to of_clk_set_defaults() into the amba probe path so
-> that devices on the amba bus can use the assigned rates and
-> parents feature of the common clock framework.
+On 07/11/2016 11:53 AM, Wei Xu wrote:
+> Hi Jorge,
 >
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: Jorge Ramirez Ortiz <jorge.ramirez-ortiz@linaro.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->   drivers/amba/bus.c | 5 +++++
->   1 file changed, 5 insertions(+)
+> On 08/07/2016 09:11, Jorge Ramirez-Ortiz wrote:
+>> Enable support for higher baud rates (up to 3Mbps) in UART1 - required
+>> for bluetooth transfers.
+>>
+>> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+>> Tested-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+> Fine to me.
+> Thanks!
 >
-> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-> index a5b5c87e2114..a56fa2a1e9aa 100644
-> --- a/drivers/amba/bus.c
-> +++ b/drivers/amba/bus.c
-> @@ -19,6 +19,7 @@
->   #include <linux/amba/bus.h>
->   #include <linux/sizes.h>
->   #include <linux/limits.h>
-> +#include <linux/clk/clk-conf.h>
->   
->   #include <asm/irq.h>
->   
-> @@ -237,6 +238,10 @@ static int amba_probe(struct device *dev)
->   	int ret;
->   
->   	do {
-> +		ret = of_clk_set_defaults(dev->of_node, false);
-> +		if (ret < 0)
-> +			break;
-> +
->   		ret = dev_pm_domain_attach(dev, true);
->   		if (ret == -EPROBE_DEFER)
->   			break;
+> Acked-by: Wei Xu <xuwei5@hisilicon.com>
+>
+> Best Regards,
+> Wei
+>
+>> ---
+>>   arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 2 ++
+>>   1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+>> index e92a30c..27be812 100644
+>> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+>> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+>> @@ -55,6 +55,8 @@
+>>   		};
+>>   
+>>   		uart1: uart at f7111000 {
+>> +			assigned-clocks = <&sys_ctrl HI6220_UART1_SRC>;
+>> +			assigned-clock-rates = <150000000>;
+>>   			status = "ok";
+>>   		};
+>>   
+>>
+Wei Xu,
 
-Stephen/Russell,
-
-what is the status of this patch? has it been merged?
-
-thanks
-
-Jorge
+I couldn't find the change upstream. has it been merged?
