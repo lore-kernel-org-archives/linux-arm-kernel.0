@@ -1,40 +1,90 @@
 From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Sat, 20 Aug 2016 01:06:21 +0300
-Subject: [PATCH 0/7] ARM: dts: imx: add gpio-ranges properties to some iMX
- GPIO controllers
-Message-ID: <1471644388-10220-1-git-send-email-vladimir_zapolskiy@mentor.com>
+Date: Sat, 20 Aug 2016 01:06:26 +0300
+Subject: [PATCH 5/7] ARM: dts: add gpio-ranges property to iMX6SX GPIO
+ controllers
+In-Reply-To: <1471644388-10220-1-git-send-email-vladimir_zapolskiy@mentor.com>
+References: <1471644388-10220-1-git-send-email-vladimir_zapolskiy@mentor.com>
+Message-ID: <1471644388-10220-6-git-send-email-vladimir_zapolskiy@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 To establish a connection between GPIO controllers and pin multiplexor
-controller(s) add gpio-ranges properties to all GPIO controllers found
-on a number of SoCs from Freescale/NXP series. The changes were done
-after human parsing of output from
+controller add gpio-ranges properties to all GPIO controllers found
+on iMX50 SoC. The change was done after human parsing of output from
 
-% gawk -n '{ sub(/.*__/, ""); if ($1 ~ "^GPIO") print $1, $2/4}' imxXX-pinfunc.h | sort -n
+% gawk -n '{ sub(/.*__/, ""); if ($1 ~ "^GPIO") print $1, $2/4}' imx6sx-pinfunc.h | sort -n
 
-Note that this means that potential errors in arch/arm/boot/dts/imx*-pinfunc.h
-descriptions may migrate to this change, please double check the values.
+Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+---
+ arch/arm/boot/dts/imx6sx.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-If needed similar changes may be done for the rest of iMX SoCs.
-
-Vladimir Zapolskiy (7):
-  ARM: dts: add gpio-ranges property to iMX50 GPIO controllers
-  ARM: dts: add gpio-ranges property to iMX6Q/D GPIO controllers
-  ARM: dts: add gpio-ranges property to iMX6DL/S GPIO controllers
-  ARM: dts: add gpio-ranges property to iMX6SL GPIO controllers
-  ARM: dts: add gpio-ranges property to iMX6SX GPIO controllers
-  ARM: dts: add gpio-ranges property to iMX6UL GPIO controllers
-  ARM: dts: add gpio-ranges property to iMX7D/S GPIO controllers
-
- arch/arm/boot/dts/imx50.dtsi  | 16 +++++++++++++
- arch/arm/boot/dts/imx6dl.dtsi | 53 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6q.dtsi  | 37 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6sl.dtsi | 52 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6sx.dtsi | 14 ++++++++++++
- arch/arm/boot/dts/imx6ul.dtsi | 11 +++++++++
- arch/arm/boot/dts/imx7s.dtsi  | 14 ++++++++++++
- 7 files changed, 197 insertions(+)
-
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index 2863c52be6f5..5ad851a75587 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -438,6 +438,8 @@
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
++
++				gpio-ranges = <&iomuxc 0 5 26>;
+ 			};
+ 
+ 			gpio2: gpio at 020a0000 {
+@@ -449,6 +451,8 @@
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
++
++				gpio-ranges = <&iomuxc 0 31 20>;
+ 			};
+ 
+ 			gpio3: gpio at 020a4000 {
+@@ -460,6 +464,8 @@
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
++
++				gpio-ranges = <&iomuxc 0 51 29>;
+ 			};
+ 
+ 			gpio4: gpio at 020a8000 {
+@@ -471,6 +477,8 @@
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
++
++				gpio-ranges = <&iomuxc 0 80 32>;
+ 			};
+ 
+ 			gpio5: gpio at 020ac000 {
+@@ -482,6 +490,8 @@
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
++
++				gpio-ranges = <&iomuxc 0 112 24>;
+ 			};
+ 
+ 			gpio6: gpio at 020b0000 {
+@@ -493,6 +503,8 @@
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
++
++				gpio-ranges = <&iomuxc 0 136 12>, <&iomuxc 12 158 11>;
+ 			};
+ 
+ 			gpio7: gpio at 020b4000 {
+@@ -504,6 +516,8 @@
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
++
++				gpio-ranges = <&iomuxc 0 148 10>, <&iomuxc 10 169 2>;
+ 			};
+ 
+ 			kpp: kpp at 020b8000 {
 -- 
 2.8.1
