@@ -1,117 +1,112 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 19 Aug 2016 17:39:55 +0100
-Subject: [PATCH 06/13] scpi: add priv_scpi_ops and fill legacy structure
-In-Reply-To: <1471515066-3626-7-git-send-email-narmstrong@baylibre.com>
-References: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
- <1471515066-3626-7-git-send-email-narmstrong@baylibre.com>
-Message-ID: <5c89a4e9-0100-0c67-1d6c-07651649172a@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 19 Aug 2016 17:40:56 +0100
+Subject: [PATCH] Input: jornada720_ts - get rid of mach/irqs.h include
+In-Reply-To: <E1bamhR-0004We-61@rmk-PC.armlinux.org.uk>
+References: <E1bamhR-0004We-61@rmk-PC.armlinux.org.uk>
+Message-ID: <20160819164056.GS1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Aug 19, 2016 at 05:31:17PM +0100, Russell King wrote:
+> Switch the jornada720 touchscreen driver to obtain its interrupt from
+> the platform device, rather than via a hard-coded interrupt number
+> obtained from the mach/irqs.h header.
+> 
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
+Looking deeper at this driver, this probably isn't an entirely correct
+way to go about this, because the interrupt handler does this:
 
-On 18/08/16 11:10, Neil Armstrong wrote:
-> In order to use the legacy functions variants, add a new priv_scpi_ops
-> structure that will contain the internal alterne functions and then use these
-> alternate call in the probe function.
->
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+        /* If GPIO_GPIO9 is set to high then report pen up */
+        if (GPLR & GPIO_GPIO(9)) {
+
+so we should be grabbing the GPIO via the gpio layer and testing
+the value there.
+
+_However_, having discovered this, along with the interrupt handler
+being registered with:
+
+        error = devm_request_irq(&pdev->dev, irq, jornada720_ts_interrupt,
+                                 IRQF_TRIGGER_RISING,
+                                 "HP7XX Touchscreen driver", pdev);
+
+this brings up the question: if the trigger is always a rising edge
+on GPIO 9, it is very unlikely that GPLR & GPIO_GPIO(9) will be
+false.  So how can this code have worked in the first place?
+
+I've checked the history, and I see nothing which changes this state
+of affairs back to 2.6.12-rc2.
+
 > ---
->  drivers/firmware/arm_scpi.c | 68 ++++++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 64 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-> index b0d911b..3fe39fe 100644
-> --- a/drivers/firmware/arm_scpi.c
-> +++ b/drivers/firmware/arm_scpi.c
-> @@ -213,6 +213,7 @@ struct scpi_drvinfo {
->  	struct scpi_ops *scpi_ops;
->  	struct scpi_chan *channels;
->  	struct scpi_dvfs_info *dvfs[MAX_DVFS_DOMAINS];
-> +	const struct priv_scpi_ops *ops;
+>  arch/arm/mach-sa1100/jornada720.c         |  6 ++++++
+>  drivers/input/touchscreen/jornada720_ts.c | 10 ++++++----
+>  2 files changed, 12 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-sa1100/jornada720.c b/arch/arm/mach-sa1100/jornada720.c
+> index 2b96f7bc16bd..010eaea04c69 100644
+> --- a/arch/arm/mach-sa1100/jornada720.c
+> +++ b/arch/arm/mach-sa1100/jornada720.c
+> @@ -228,9 +228,15 @@ static struct platform_device jornada_kbd_device = {
+>  	.resource	= jornada_kbd_resources,
 >  };
->
->  /*
-> @@ -299,6 +300,17 @@ struct dev_pstate_set {
->  	u8 pstate;
->  } __packed;
->
-> +struct priv_scpi_ops {
-> +	/* Internal Specific Ops */
-> +	void (*handle_remote_msg)(struct mbox_client *c, void *msg);
-> +	void (*tx_prepare)(struct mbox_client *c, void *msg);
-> +	/* Message Specific Ops */
-> +	int (*init_versions)(struct scpi_drvinfo *info);
-> +	int (*dvfs_get_info)(u8 domain, struct dvfs_info *buf);
-> +	/* System wide Ops */
-> +	struct scpi_ops *scpi_ops;
+>  
+> +static struct resource jornada_ts_resources[] = {
+> +	DEFINE_RES_IRQ(IRQ_GPIO9),
 > +};
 > +
-
-
-I fail to understand the need for this. Can you please explain the issue
-you would face without this ?
-
->  static struct scpi_drvinfo *scpi_info;
->
->  static int scpi_linux_errmap[SCPI_ERR_MAX] = {
-> @@ -695,9 +707,12 @@ static struct scpi_dvfs_info *scpi_dvfs_get_info(u8 domain)
->  	if (scpi_info->dvfs[domain])	/* data already populated */
->  		return scpi_info->dvfs[domain];
->
-> -	ret = scpi_send_message(SCPI_CMD_GET_DVFS_INFO, &domain, sizeof(domain),
-> +	if (scpi_info->ops && scpi_info->ops->dvfs_get_info)
-> +		ret = scpi_info->ops->dvfs_get_info(domain, &buf);
-> +	else
-> +		ret = scpi_send_message(SCPI_CMD_GET_DVFS_INFO,
-> +					&domain, sizeof(domain),
->  				&buf, sizeof(buf));
-> -
->  	if (ret)
->  		return ERR_PTR(ret);
->
-> @@ -855,6 +870,22 @@ static struct scpi_ops scpi_ops = {
->  	.vendor_send_message = scpi_ext_send_message,
+>  static struct platform_device jornada_ts_device = {
+>  	.name		= "jornada_ts",
+>  	.id		= -1,
+> +	.num_resources	= ARRAY_SIZE(jornada_ts_resources),
+> +	.resource	= jornada_ts_resources,
 >  };
->
-> +static struct scpi_ops legacy_scpi_ops = {
-> +	.get_version = scpi_get_version,
-> +	.clk_get_range = NULL,
-> +	.clk_get_val = legacy_scpi_clk_get_val,
-> +	.clk_set_val = legacy_scpi_clk_set_val,
-> +	.dvfs_get_idx = legacy_scpi_dvfs_get_idx,
-> +	.dvfs_set_idx = legacy_scpi_dvfs_set_idx,
-> +	.dvfs_get_info = scpi_dvfs_get_info,
-> +	.sensor_get_capability = legacy_scpi_sensor_get_capability,
-> +	.sensor_get_info = legacy_scpi_sensor_get_info,
-> +	.sensor_get_value = legacy_scpi_sensor_get_value,
-> +	.device_get_power_state = NULL,
-> +	.device_set_power_state = NULL,
-> +	.vendor_send_message = legacy_scpi_send_message,
-
-I think we need not have this at all if you follow the suggestion I had
-in the previous patch. Try and let's see how it would look.
-
-> +};
-> +
->  struct scpi_ops *get_scpi_ops(void)
+>  
+>  static struct platform_device *devices[] __initdata = {
+> diff --git a/drivers/input/touchscreen/jornada720_ts.c b/drivers/input/touchscreen/jornada720_ts.c
+> index ea3b6a5b83e6..7e196f8e5661 100644
+> --- a/drivers/input/touchscreen/jornada720_ts.c
+> +++ b/drivers/input/touchscreen/jornada720_ts.c
+> @@ -22,7 +22,6 @@
+>  
+>  #include <mach/hardware.h>
+>  #include <mach/jornada720.h>
+> -#include <mach/irqs.h>
+>  
+>  MODULE_AUTHOR("Kristoffer Ericson <kristoffer.ericson@gmail.com>");
+>  MODULE_DESCRIPTION("HP Jornada 710/720/728 touchscreen driver");
+> @@ -101,7 +100,11 @@ static int jornada720_ts_probe(struct platform_device *pdev)
 >  {
->  	return scpi_info ? scpi_info->scpi_ops : NULL;
-> @@ -972,8 +1003,17 @@ static int scpi_alloc_xfer_list(struct device *dev, struct scpi_chan *ch)
->  	return 0;
->  }
->
-> +static const struct priv_scpi_ops scpi_legacy_ops = {
-> +	.handle_remote_msg = legacy_scpi_handle_remote_msg,
-> +	.tx_prepare = legacy_scpi_tx_prepare,
-> +	.init_versions = legacy_scpi_init_versions,
-> +	.dvfs_get_info = legacy_scpi_dvfs_get_info,
-> +	.scpi_ops = &legacy_scpi_ops,
-> +};
+>  	struct jornada_ts *jornada_ts;
+>  	struct input_dev *input_dev;
+> -	int error;
+> +	int error, irq;
 > +
-
-Ditto, can go away.
+> +	irq = platform_get_irq(pdev, 0);
+> +	if (irq <= 0)
+> +		return irq < 0 ? irq : -EINVAL;
+>  
+>  	jornada_ts = devm_kzalloc(&pdev->dev, sizeof(*jornada_ts), GFP_KERNEL);
+>  	if (!jornada_ts)
+> @@ -125,8 +128,7 @@ static int jornada720_ts_probe(struct platform_device *pdev)
+>  	input_set_abs_params(input_dev, ABS_X, 270, 3900, 0, 0);
+>  	input_set_abs_params(input_dev, ABS_Y, 180, 3700, 0, 0);
+>  
+> -	error = devm_request_irq(&pdev->dev, IRQ_GPIO9,
+> -				 jornada720_ts_interrupt,
+> +	error = devm_request_irq(&pdev->dev, irq, jornada720_ts_interrupt,
+>  				 IRQF_TRIGGER_RISING,
+>  				 "HP7XX Touchscreen driver", pdev);
+>  	if (error) {
+> -- 
+> 2.1.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Regards,
-Sudeep
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
