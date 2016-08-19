@@ -1,28 +1,36 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Fri, 19 Aug 2016 23:42:04 +0800
-Subject: [PATCH 0/4] arm64: defconfig: enable various configs for HiKey
-Message-ID: <1471621328-21102-1-git-send-email-guodong.xu@linaro.org>
+Date: Fri, 19 Aug 2016 23:42:05 +0800
+Subject: [PATCH 1/4] arm64: defconfig: Enable HiSilicon kirin drm,
+ adv7533 for HiKey
+In-Reply-To: <1471621328-21102-1-git-send-email-guodong.xu@linaro.org>
+References: <1471621328-21102-1-git-send-email-guodong.xu@linaro.org>
+Message-ID: <1471621328-21102-2-git-send-email-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable various configs for HiKey, including:
-1. HiSilicon Kirin DRM
-2. ADV7533
-3. Powerkey
-4. Bluetooth
+Enable HiSilicon kirin drm driver for HiKey: CONFIG_DRM_HISI_KIRIN
+Enable adv7511/adv7533 for HiKey: CONFIG_DRM_I2C_ADV7511
 
-Also, set CMA heap size to 128MB.
+Build these components as modules.
 
-Guodong Xu (3):
-  arm64: defconfig: Enable HiSilicon kirin drm, adv7533 for HiKey
-  arm64: defconfig: enable CONFIG_INPUT_HISI_POWERKEY for HiKey
-  arm64: defconfig: enable bluetooth supports as modules
+Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+---
+ arch/arm64/configs/defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Xinliang Liu (1):
-  arm64: defconfig: Set cma heap size to 128MB
-
- arch/arm64/configs/defconfig | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 76bfaa7..e27f086 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -276,6 +276,8 @@ CONFIG_DRM=m
+ CONFIG_DRM_NOUVEAU=m
+ CONFIG_DRM_TEGRA=m
+ CONFIG_DRM_PANEL_SIMPLE=m
++CONFIG_DRM_I2C_ADV7511=m
++CONFIG_DRM_HISI_KIRIN=m
+ CONFIG_FB=y
+ CONFIG_FB_ARMCLCD=y
+ CONFIG_BACKLIGHT_GENERIC=m
 -- 
 1.9.1
