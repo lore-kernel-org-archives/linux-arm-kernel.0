@@ -1,52 +1,35 @@
-From: gmane@chmurka.net (Adam Wysocki)
-Date: Fri, 19 Aug 2016 13:11:13 +0000 (UTC)
-Subject: Linux 4.7 and Jornada 720 (SA-1100)
-References: <4Tcq736lIfmjNv8%gof@news.chmurka.net>
- <20160819102945.GK1041@n2100.armlinux.org.uk>
-Message-ID: <7Tcq9hpfIfmjNv8%gof@news.chmurka.net>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 19 Aug 2016 09:12:06 -0400
+Subject: [PATCH 1/2] ARM: exynos_defconfig: Don't attempt to enable schedutil
+ governor as module
+Message-ID: <1471612328-6467-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+The schedutil CPUFreq governor could be built as a module but the commit
+58919e83c85c ("cpufreq / sched: Pass flags to cpufreq_update_util()")
+made it non-modular so attempting to enable as module leads to a warning:
 
-> Make sure you have "console=ttySA0,38400n8" or similar to get serial
-> console output - it needs to be a "ttySA" port, not "ttyS".
+warning: symbol value 'm' invalid for CPU_FREQ_GOV_SCHEDUTIL
 
-Hmm... I changed to:
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
 
-root=0x302 mem=32m console=ttySA0,115200n8
+ arch/arm/configs/exynos_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-and success - it helped! The screen is still blank, but I least I have 
-some messages on the serial port, finished with kernel panic because of 
-failing to mount root. It looks like I didn't enable some drivers for 
-the CF controller, but I look and it seems everything that should be 
-enabled is enabled... maybe this kernel doesn't support CF on Jornada 
-without a patch?
-
-http://pastebin.com/J2ATKxQM
-
-And I'm just wondering why the screen is blank while I definitely enabled 
-the SA-1100 framebuffer support and console on framebuffer... I'm not sure 
-if it should be blank when I specified console=ttySA0, but I don't think 
-it should be blank without any console= setting...
-
-> Same probably goes for "earlyprintk=serial,ttyS0,115200", although I've
-> no experience of earlyprintk myself.
-
-It seems that earlyprintk is ignored anyway, maybe there's no support for 
-it on this platform?
-
-> However, if you're not even getting the "Uncompressing Linux... done, 
-> booting the kernel." line, that suggests the decompressor is not running, 
-> or is trying to access the wrong serial port.  The decompressor tries to 
-> find the first serial port out of serial 3, 1 and 2 which has been left 
-> enabled.
-
-In this order? Maybe it tries to send its messages to the built-in modem 
-or IrDA port...
-
-Anyway, now I know that kernel boots, so it's definitely helpful. I'll try 
-to find out what's wrong with this console and CF controller...
-
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 5476be3be686..4e484f406419 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -29,7 +29,7 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+ CONFIG_CPU_FREQ_GOV_POWERSAVE=m
+ CONFIG_CPU_FREQ_GOV_USERSPACE=m
+ CONFIG_CPU_FREQ_GOV_CONSERVATIVE=m
+-CONFIG_CPU_FREQ_GOV_SCHEDUTIL=m
++CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
+ CONFIG_CPUFREQ_DT=y
+ CONFIG_CPU_IDLE=y
+ CONFIG_ARM_EXYNOS_CPUIDLE=y
 -- 
-http://www.chmurka.net/
+2.5.5
