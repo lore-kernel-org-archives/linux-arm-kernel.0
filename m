@@ -1,75 +1,86 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 19 Aug 2016 16:21:09 -0500
-Subject: [PATCH] soc: ti: wkup_m3_ipc: switch to using remoteproc OF
- infrastructure
-In-Reply-To: <dea62d2e-2935-ff91-967a-e8dee469543d@ti.com>
-References: <20160812003529.519-1-s-anna@ti.com> <20160812110201.GD25844@dell>
- <55d90506-eb1b-c8f9-02b5-8484b9a4babd@ti.com>
- <20160812164335.GG26240@tuxbot>
- <CAL_Jsq+aOd-FqaKNtmDESw--pdxbWMuOzv+KXf-hhX+oU94CdQ@mail.gmail.com>
- <dea62d2e-2935-ff91-967a-e8dee469543d@ti.com>
-Message-ID: <CAL_JsqLDWkpiZx2PTa11T-ynW=meCwq=tiNK6C2-U4-q5qrYDw@mail.gmail.com>
+From: b-liu@ti.com (Bin Liu)
+Date: Fri, 19 Aug 2016 16:25:40 -0500
+Subject: [PATCH v2 0/7] musb: sunxi: Add support for run-time changing
+ dr-mode through sysfs
+In-Reply-To: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
+References: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160819212540.GB1853@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2016 at 4:30 PM, Suman Anna <s-anna@ti.com> wrote:
-> Hi Rob,
->
-> On 08/16/2016 09:54 AM, Rob Herring wrote:
->> On Fri, Aug 12, 2016 at 11:43 AM, Bjorn Andersson
->> <bjorn.andersson@linaro.org> wrote:
->>> On Fri 12 Aug 09:00 PDT 2016, Suman Anna wrote:
->>>
->>>> On 08/12/2016 06:02 AM, Lee Jones wrote:
->>>>> On Thu, 11 Aug 2016, Suman Anna wrote:
->>>>>
+Hi,
 
-[...]
+On Mon, Aug 15, 2016 at 09:21:25PM +0200, Hans de Goede wrote:
+> Hi All,
+> 
+> Here is a patch series which implements run-time changing the dr-mode
+> of sunxi musb controllers through the (already existing) musb "mode"
+> sysfs attribute.
+> 
+> This is useful on boards where there is no id pin, e.g. some tv-boxes
+> use the musb controller to get an extra usb A port without needing
+> a hub chip. Except for the missing id pin when using a usb A<->A cable
+> these ports can do peripheral mode just fine. This series makes it
+> possible to do e.g. this by doing echo "peripheral" > mode before
+> plugging in the usb A<->A cable.
 
->>>> Once "rprocs" hits mainline, I will definitely switch over the
->>>> wkup_m3_ipc nodes to use that standard property and can fix this driver
->>>> independently.
->>>>
->>>
->>> We're stuck with this problem all over the place, as the world continues
->>> to evolve we will have issues with DT being static. This has been
->>> discussed many times before and the suggested solution is always what
->>> you implemented here - make the code deal with both versions, preferably
->>> by patching.
->>>
->>> The fact that you had to export the of_ operations indicates that no-one
->>> has tried this before and I'm happy you did. I'm however not happy about
->>> the size of the chunk of code it takes to do this dance.
->>>
->>> I think for this to be practical we need to provide higher level
->>> operations for DT modification - in this case a of_rename_property().
->>>
->>> @Rob, any comments on this?
->>
->> I agree. Pantelis submitted some helpers in this area a while back
->> (for the changeset API IIRC). I believe they were mostly fine, but
->> needed some users.
->>
->
-> Is this the series you are talking about?
-> http://marc.info/?l=devicetree&m=146341689512653&w=2
->
-> It looks like that series is effective only when OF_DYNAMIC is enabled.
+Well, this is an illegal usecase. A-A cable is invalid by USB Spec.
+With type-A receptacle the controller should be in host-only mode,
+switching to peripheral mode should not be allowed.
 
-Yes, as changeset API allows adding/removing nodes. It's probably just
-a matter of time until OF_DYNAMIC is always enabled.
+> 
+> This series has both sun4i-usb-phy driver and sunxi-musb-glue changes,
+> both are necessary for the run-time changing to work, but they can be
+> merged independently without breaking anything.
+> 
+> Changed in v2:
+> 
+> After sleeping on it a night I realized that always passing port_mode =
+> DUAL_ROLE to the musb-core was wrong. There is a distintion between
+> the id-pin not working properly which we can work around with software
+> mode switching (and we want to register both the host and udc driver
+> in this case) vs cases where we really only want to register a host
+> (wifi module connected to musb soldered onto the PCB).
+> 
+> So v2 of this series drops the
+> "musb: sunxi: Always register both host and udc when build with dual-role support"
+> patch.
+> 
+> Instead systems which are dual-role capable, but lack an id-pin should use
+> dr_mode = "otg" in the dts file. There is one problem with this, some
+> systems are dual-role capable but use a female USB-A connector connected
+> to the musb controller. These should come up in host mode by default,
 
-> Probably a dumb question, but is this limited to DT Overlays?
+This is not a problem. With a type-A connector, the dual-role controller
+should work in host-only mode.
 
-No, changesets are the mechanism overlays use to apply changes.
+Role switching should only be allowed if an AB connector is used.
 
-> This
-> particular usage is a one-time change (first-time module is insmod'd)
-> mainly to provide compatibility for older DTBs, thereafter we wouldn't
-> be required to make any changes. It is definitely not a bulk update and
-> we don't want to unroll the changes even if we removed the module.
+Using the sysfs entry to switch roles for generic purpose is really a
+bad idea, it opens up ton of problems.
 
-If you only need property changes, then we could do similar helpers to
-make it easier for callers.
+For systems which lack of id-pin should use a discrete circuit (for
+example GPIO) to detect the id pin in the AB receptacle, then the USB
+driver will handle the role switching transparently.
 
-Rob
+> rather then peripheral mode which is the default for systems which lack an
+> id-pin. This patch set introduces:
+> 
+> "phy-sun4i-usb: Add "allwinner,usb0-usb-a-connector" dt property"
+> 
+> Which allows specifying the use of a female USB-A connector for the
+> musb controller in the phy dt node, the presence of this dt property
+> changes the default to host mode.
+
+This is unnecessary, if using a type-A connector, dr_mode should be
+"host" in DT.
+
+> 
+> Please review (and if no issues are found merge).
+> 
+> Thanks & Regards,
+> 
+> Hans
+
+Regards,
+-Bin.
