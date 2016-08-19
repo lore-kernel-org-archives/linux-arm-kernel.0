@@ -1,122 +1,54 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 19 Aug 2016 09:52:30 -0700
-Subject: [PATCH] Input: jornada720_ts - get rid of mach/irqs.h include
-In-Reply-To: <20160819164056.GS1041@n2100.armlinux.org.uk>
-References: <E1bamhR-0004We-61@rmk-PC.armlinux.org.uk>
- <20160819164056.GS1041@n2100.armlinux.org.uk>
-Message-ID: <20160819165230.GC20499@dtor-ws>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 19 Aug 2016 22:32:08 +0530
+Subject: [PATCH] dmaengine: qcom_hidma: release the descriptor before the
+ callback
+In-Reply-To: <37b059dcb67d1c83c2193acecef0ab96@codeaurora.org>
+References: <20160808090203.GY9681@localhost>
+ <21475c6e-a5f8-5125-3998-f3995ce67c4d@codeaurora.org>
+ <20160810172805.GH9681@localhost>
+ <d09ebb5f-99ea-a4e9-da9c-693be89c7cd4@codeaurora.org>
+ <20160819024853.GR9681@localhost>
+ <8c096fee-9749-a7df-7e04-25d21c0ea9ac@codeaurora.org>
+ <20160819034249.GS9681@localhost>
+ <3592cfe2-a563-7c26-9a9e-925051cc1934@codeaurora.org>
+ <20160819055252.GT9681@localhost>
+ <37b059dcb67d1c83c2193acecef0ab96@codeaurora.org>
+Message-ID: <20160819170208.GC9343@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2016 at 05:40:56PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Aug 19, 2016 at 05:31:17PM +0100, Russell King wrote:
-> > Switch the jornada720 touchscreen driver to obtain its interrupt from
-> > the platform device, rather than via a hard-coded interrupt number
-> > obtained from the mach/irqs.h header.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+On Fri, Aug 19, 2016 at 07:13:43AM -0400, okaya at codeaurora.org wrote:
+> On 2016-08-19 01:52, Vinod Koul wrote:
+> >On Thu, Aug 18, 2016 at 11:48:52PM -0400, Sinan Kaya wrote:
+> >>On 8/18/2016 11:42 PM, Vinod Koul wrote:
+> >>> On Thu, Aug 18, 2016 at 11:26:28PM -0400, Sinan Kaya wrote:
+> >>>> On 8/18/2016 10:48 PM, Vinod Koul wrote:
+> >>>>>> Keep a size limited list with error cookies and flush them in terminate all?
+> >>>>> I think so, terminate_all anyway cleans up the channel. Btw what is the
+> >>>>> behaviour on error? Do you terminate or somthing else?
+> >>>>>
+> >>>>
+> >>>> On error, I flush all outstanding transactions with an error code and I reset
+> >>>> the channel. After the reset, the DMA channel is functional again. The client
+> >>>> doesn't need to shutdown anything.
+> >>>
+> >>> You mean from the client context or driver?
+> >>>
+> >>
+> >>The client doesn't need to call device_free_chan_resources and
+> >>device_terminate_all
+> >>to be specific. Client can certainly call these if it needs to
+> >>but it is not
+> >>required to recover the channel.
+> >
+> >You didn't answer my question!
+> >
+> >On error you said you flush, so who does that?
 > 
-> Looking deeper at this driver, this probably isn't an entirely correct
-> way to go about this, because the interrupt handler does this:
-> 
->         /* If GPIO_GPIO9 is set to high then report pen up */
->         if (GPLR & GPIO_GPIO(9)) {
-> 
-> so we should be grabbing the GPIO via the gpio layer and testing
-> the value there.
-> 
-> _However_, having discovered this, along with the interrupt handler
-> being registered with:
-> 
->         error = devm_request_irq(&pdev->dev, irq, jornada720_ts_interrupt,
->                                  IRQF_TRIGGER_RISING,
->                                  "HP7XX Touchscreen driver", pdev);
-> 
-> this brings up the question: if the trigger is always a rising edge
-> on GPIO 9, it is very unlikely that GPLR & GPIO_GPIO(9) will be
-> false.  So how can this code have worked in the first place?
-> 
-> I've checked the history, and I see nothing which changes this state
-> of affairs back to 2.6.12-rc2.
+> This is done by the driver in interrupt context when an error
+> interrupt is received. All transactions are posted and hw is reset.
 
-That would be question for Kristoffer; I have never had this hardware...
-
-I'll hold off on this patch for now...
-
-> 
-> > ---
-> >  arch/arm/mach-sa1100/jornada720.c         |  6 ++++++
-> >  drivers/input/touchscreen/jornada720_ts.c | 10 ++++++----
-> >  2 files changed, 12 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-sa1100/jornada720.c b/arch/arm/mach-sa1100/jornada720.c
-> > index 2b96f7bc16bd..010eaea04c69 100644
-> > --- a/arch/arm/mach-sa1100/jornada720.c
-> > +++ b/arch/arm/mach-sa1100/jornada720.c
-> > @@ -228,9 +228,15 @@ static struct platform_device jornada_kbd_device = {
-> >  	.resource	= jornada_kbd_resources,
-> >  };
-> >  
-> > +static struct resource jornada_ts_resources[] = {
-> > +	DEFINE_RES_IRQ(IRQ_GPIO9),
-> > +};
-> > +
-> >  static struct platform_device jornada_ts_device = {
-> >  	.name		= "jornada_ts",
-> >  	.id		= -1,
-> > +	.num_resources	= ARRAY_SIZE(jornada_ts_resources),
-> > +	.resource	= jornada_ts_resources,
-> >  };
-> >  
-> >  static struct platform_device *devices[] __initdata = {
-> > diff --git a/drivers/input/touchscreen/jornada720_ts.c b/drivers/input/touchscreen/jornada720_ts.c
-> > index ea3b6a5b83e6..7e196f8e5661 100644
-> > --- a/drivers/input/touchscreen/jornada720_ts.c
-> > +++ b/drivers/input/touchscreen/jornada720_ts.c
-> > @@ -22,7 +22,6 @@
-> >  
-> >  #include <mach/hardware.h>
-> >  #include <mach/jornada720.h>
-> > -#include <mach/irqs.h>
-> >  
-> >  MODULE_AUTHOR("Kristoffer Ericson <kristoffer.ericson@gmail.com>");
-> >  MODULE_DESCRIPTION("HP Jornada 710/720/728 touchscreen driver");
-> > @@ -101,7 +100,11 @@ static int jornada720_ts_probe(struct platform_device *pdev)
-> >  {
-> >  	struct jornada_ts *jornada_ts;
-> >  	struct input_dev *input_dev;
-> > -	int error;
-> > +	int error, irq;
-> > +
-> > +	irq = platform_get_irq(pdev, 0);
-> > +	if (irq <= 0)
-> > +		return irq < 0 ? irq : -EINVAL;
-> >  
-> >  	jornada_ts = devm_kzalloc(&pdev->dev, sizeof(*jornada_ts), GFP_KERNEL);
-> >  	if (!jornada_ts)
-> > @@ -125,8 +128,7 @@ static int jornada720_ts_probe(struct platform_device *pdev)
-> >  	input_set_abs_params(input_dev, ABS_X, 270, 3900, 0, 0);
-> >  	input_set_abs_params(input_dev, ABS_Y, 180, 3700, 0, 0);
-> >  
-> > -	error = devm_request_irq(&pdev->dev, IRQ_GPIO9,
-> > -				 jornada720_ts_interrupt,
-> > +	error = devm_request_irq(&pdev->dev, irq, jornada720_ts_interrupt,
-> >  				 IRQF_TRIGGER_RISING,
-> >  				 "HP7XX Touchscreen driver", pdev);
-> >  	if (error) {
-> > -- 
-> > 2.1.0
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+Hmmm, waht about the txn which are pending? DO you clear them..?
 
 -- 
-Dmitry
+~Vinod
