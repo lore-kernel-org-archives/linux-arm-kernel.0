@@ -1,43 +1,31 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Aug 2016 14:28:45 +0100
-Subject: [crypto] [marvell-cesa] Driver hangs on Armada 385 device
-In-Reply-To: <20160819130846.GN1041@n2100.armlinux.org.uk>
-References: <57b6f38c.23012e0a.374a0.56c6@mx.google.com>
- <20160819141251.5dcc835d@free-electrons.com>
- <20160819130846.GN1041@n2100.armlinux.org.uk>
-Message-ID: <20160819132845.GP1041@n2100.armlinux.org.uk>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 19 Aug 2016 14:31:12 +0100
+Subject: [PATCH 5/5] arm64: KVM: vgic-v2: Enable GICV access from HYP if
+ access from guest is unsafe
+In-Reply-To: <57B7042D.1020702@arm.com>
+References: <1471610295-1456-1-git-send-email-marc.zyngier@arm.com>
+ <1471610295-1456-6-git-send-email-marc.zyngier@arm.com>
+ <CAFEAcA99RScdr+E39Q+03L5DyDLiQgQo9x1DeP1gE2-nJ1yUig@mail.gmail.com>
+ <57B7042D.1020702@arm.com>
+Message-ID: <CAFEAcA9Q9U02KkgkYYT1O6qTHyYmBMW6ARi_bQPRjDNS+O0w7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2016 at 02:08:46PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Aug 19, 2016 at 02:12:51PM +0200, Thomas Petazzoni wrote:
-> > Hello,
-> > 
-> > I'm adding Romain Perier in Cc, since he is actively working on the
-> > CESA driver.
-> 
-> 4.7 here on Clearfog (Armada 388):
-> 
-> # cryptsetup benchmark --cipher aes-cbc
-> # Tests are approximate using memory only (no storage IO).
-> #  Algorithm | Key |  Encryption |  Decryption
->      aes-cbc   256b    67.1 MiB/s    68.3 MiB/s
-> 
-> /proc/interrupts:
->            CPU0       CPU1
->  42:       2144          0     GIC-0  51 Level     f1090000.crypto
+On 19 August 2016 at 14:05, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 19/08/16 13:53, Peter Maydell wrote:
+>> Is it worth specifically saying "performance will be worse", or do we
+>> expect this to only happen on systems where the h/w can't permit direct
+>> access (as opposed to those with bad dt info) ?
+>
+> We cannot distinguish between the two, unfortunately. Even worse, ACPI
+> only gives us a base address, and not the size of the region. So even if
+> the HW was perfectly compliant with SBSA, we have to assume the worse case.
 
-With the coherency fix commit reverted (as mentioned in the bug report)
-I get:
+Right, but if we expect this is mostly going to be "you just have
+to live with it on this hardware" there's less point in printing
+an alarming message, whereas if there's a significant subset of
+"dt is just wrong" cases then the alarm might help in getting them
+fixed, maybe...
 
-# cryptsetup benchmark --cipher aes-cbc
-# Tests are approximate using memory only (no storage IO).
-#  Algorithm | Key |  Encryption |  Decryption
-     aes-cbc   256b    65.8 MiB/s    67.1 MiB/s
-
-so not that different from before.  Run more than 10 times without issue.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+thanks
+-- PMM
