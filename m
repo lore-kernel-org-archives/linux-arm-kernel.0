@@ -1,51 +1,61 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Fri, 19 Aug 2016 16:52:17 +0530
-Subject: [PATCH v24 5/9] arm64: kdump: add kdump support
-In-Reply-To: <20160819012651.GE20080@linaro.org>
-References: <20160809015248.28414-2-takahiro.akashi@linaro.org>
- <20160809015615.28527-1-takahiro.akashi@linaro.org>
- <20160809015615.28527-3-takahiro.akashi@linaro.org>
- <57AB586D.3080900@arm.com> <20160818071547.GC20080@linaro.org>
- <20160819012651.GE20080@linaro.org>
-Message-ID: <20160819112217.GB22221@localhost.localdomain>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Fri, 19 Aug 2016 19:29:56 +0800
+Subject: [PATCH v3] thermal: tango: add resume support
+In-Reply-To: <8406200.nXRkviT67W@wuerfel>
+References: <57726196.5060909@free.fr> <4062048.3qHsMMf8fO@wuerfel>
+ <5795E07F.6010506@free.fr> <8406200.nXRkviT67W@wuerfel>
+Message-ID: <1471606196.2691.58.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/08/2016:10:26:52 AM, AKASHI Takahiro wrote:
-> >From 740563e4a437f0d6ecf6e421c91433f9b8f19041 Mon Sep 17 00:00:00 2001
-> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Date: Fri, 19 Aug 2016 09:57:52 +0900
-> Subject: [PATCH] arm64: mark reserved memblock regions explicitly
+On ?, 2016-07-26 at 14:13 +0200, Arnd Bergmann wrote:
+> On Monday, July 25, 2016 11:48:47 AM CEST Mason wrote:
+> > 
+> > On 25/07/2016 10:52, Arnd Bergmann wrote:
+> > 
+> > > 
+> > > On Monday, July 25, 2016 10:18:22 AM CEST Mason wrote:
+> > > 
+> > > > 
+> > > > Moving the SIMPLE_DEV_PM_OPS macro outside the CONFIG_PM_SLEEP
+> > > > guard
+> > > > would unconditionally define a struct dev_pm_ops, which just
+> > > > wastes
+> > > > space when CONFIG_PM_SLEEP is undefined (if I'm not mistaken).
+> > > > 
+> > > > That's why I put SIMPLE_DEV_PM_OPS inside the CONFIG_PM_SLEEP
+> > > > guard.
+> > > If you want to avoid the extra few bytes, just use the trick I
+> > > suggested:
+> > > 
+> > > ??????.pm = IS_ENABLED(CONFIG_PM_SLEEP) ? &tango_thermal_pm :
+> > > NULL,
+> > This would achieve the same result as the solution I proposed
+> > in my v2 patch, right?
+> > 
+> > So you're saying you prefer the IS_ENABLED macro over using
+> > #ifdef ... #else define stuff as NULL #endif
+> > 
+> > Did I get that right?
+> Yes, but I'd also prefer not to hide the operations structure
+> at all and just rely on the __maybe_unused (ideally) or
+> #ifdef (not as good, but commonly used) to leave out the
+> functions.
 > 
-> ---
->  arch/arm64/kernel/setup.c | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
+IMO, the typical way is to use #ifdef for the pm callbacks, and leave
+SIMPLE_DEV_PM_OPS outside the #ifdef.
+For example,?drivers/ata/ahci_imx.c.
+
+thanks,
+rui
+> > 
+> > Eduardo, Zhang, what do thermal maintainers prefer?
+> > 
+> > > 
+> > > You should basically never have that #ifdef inside of the
+> > > platform_driver definition.
+> > Except when the fields don't exist, like the bug I introduced
+> > in struct smp_operations (which you fixed).
+> Right.
 > 
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index 38eda13..38589b5 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -205,10 +205,15 @@ static void __init request_standard_resources(void)
->  
->  	for_each_memblock(memory, region) {
->  		res = alloc_bootmem_low(sizeof(*res));
-> -		res->name  = "System RAM";
-> +		if (memblock_is_nomap(region)) {
-> +			res->name  = "reserved";
-> +			res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-> +		} else {
-> +			res->name  = "System RAM";
-> +			res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
-> +		}
->  		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
->  		res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
-> -		res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
->  
->  		request_resource(&iomem_resource, res);
-
-
-It will help kexec-tools to prevent copying  of any unnecessary data. I
-think, then you also need to change phys_offset calculation in kexec-tools. That
-should be start of either of first "reserved" or "System RAM" block.
-
-~Pratyush
+> 	Arnd
