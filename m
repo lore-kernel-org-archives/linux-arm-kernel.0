@@ -1,56 +1,127 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 19 Aug 2016 14:24:28 +0100
-Subject: [RFC PATCH 4/7] arm64: tlbflush.h: add __tlbi() macro
-In-Reply-To: <1471344312-26685-5-git-send-email-punit.agrawal@arm.com>
-References: <1471344312-26685-1-git-send-email-punit.agrawal@arm.com>
- <1471344312-26685-5-git-send-email-punit.agrawal@arm.com>
-Message-ID: <20160819132427.GD9893@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 19 Aug 2016 15:24:17 +0200
+Subject: [PATCH 2/2] net: phy: Fix race conditions in the driver
+In-Reply-To: <1471610891-13353-2-git-send-email-appanad@xilinx.com>
+References: <1471610891-13353-1-git-send-email-appanad@xilinx.com>
+ <1471610891-13353-2-git-send-email-appanad@xilinx.com>
+Message-ID: <20160819132417.GC7343@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 11:45:09AM +0100, Punit Agrawal wrote:
-> From: Mark Rutland <mark.rutland@arm.com>
-> 
-> As with dsb() and isb(), add a __tbli() helper so that we can avoid
+On Fri, Aug 19, 2016 at 06:18:11PM +0530, Kedareswara rao Appana wrote:
+> This patch fixes the below race conditions in the driver.
+> ---> Fix Opps after unload the driver as a module
+> ---> Use spin locks where relevant.
+> ---> Take reference on the external phy to prevent issues
+> when phy driver is unloaded.
 
-Minor typo: s/__tbli/__tlbi/
+Each one of these should be an individual patch.
 
-> distracting asm boilerplate every time we want a TLBI. As some TLBI
-> operations take an argument while others do not, some pre-processor is
-> used to handle these two cases with different assembly blocks.
 > 
-> The existing tlbflush.h code is moved over to use the helper.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> [ rename helper to __tlbi, update commit log ]
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Reported-by: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 > ---
->  arch/arm64/include/asm/tlbflush.h | 31 +++++++++++++++++++++++--------
->  1 file changed, 23 insertions(+), 8 deletions(-)
+>  drivers/net/phy/xilinx_gmii2rgmii.c | 32 +++++++++++++++++++++++++++++++-
+>  1 file changed, 31 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-> index b460ae2..d57a0be 100644
-> --- a/arch/arm64/include/asm/tlbflush.h
-> +++ b/arch/arm64/include/asm/tlbflush.h
-> @@ -25,6 +25,21 @@
->  #include <asm/cputype.h>
+> diff --git a/drivers/net/phy/xilinx_gmii2rgmii.c b/drivers/net/phy/xilinx_gmii2rgmii.c
+> index 7336fd0..cdd9d95 100644
+> --- a/drivers/net/phy/xilinx_gmii2rgmii.c
+> +++ b/drivers/net/phy/xilinx_gmii2rgmii.c
+> @@ -34,6 +34,7 @@ struct gmii2rgmii {
+>  	struct phy_driver *phy_drv;
+>  	struct phy_driver conv_phy_drv;
+>  	int addr;
+> +	spinlock_t phy_lock;
+
+The phy already have a lock.
+
+>  };
 >  
->  /*
-> + * Raw TLBI operations. Drivers and most kernel code should use the TLB
-> + * management routines below in preference to these. Where necessary, these can
-> + * be used to avoid asm() boilerplate.
-> + *
-> + * Can be used as __tlbi(op) or __tlbi(op, arg), depending on whether a
-> + * particular TLBI op takes an argument or not. The macros below handle invoking
-> + * the asm with or without the register argument as appropriate.
-> + */
-> +#define TLBI_0(op, arg)		asm ("tlbi " #op)
-> +#define TLBI_1(op, arg)		asm ("tlbi " #op ", %0" : : "r" (arg))
-> +#define TLBI_N(op, arg, n, ...)	TLBI_##n(op, arg)
+>  static int xgmiitorgmii_read_status(struct phy_device *phydev)
+> @@ -55,7 +56,7 @@ static int xgmiitorgmii_read_status(struct phy_device *phydev)
+>  		val |= BMCR_SPEED1000;
+>  	else if (phydev->speed == SPEED_100)
+>  		val |= BMCR_SPEED100;
+> -	else
+> +	else if (phydev->speed == SPEED_10)
+>  		val |= BMCR_SPEED10;
+  
+I said you want to return an error is the PHY is using a speed your
+converter cannot support. I don't see an error being raised here.
 
-Should this be prefixed with underscores, too?
+>  	err = mdiobus_write(phydev->mdio.bus, priv->addr, XILINX_GMII2RGMII_REG,
+> @@ -71,6 +72,8 @@ int xgmiitorgmii_probe(struct mdio_device *mdiodev)
+>  	struct device *dev = &mdiodev->dev;
+>  	struct device_node *np = dev->of_node, *phy_node;
+>  	struct gmii2rgmii *priv;
+> +	struct mii_bus *bus;
+> +	unsigned long flags;
+>  
+>  	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+>  	if (!priv)
+> @@ -88,17 +91,43 @@ int xgmiitorgmii_probe(struct mdio_device *mdiodev)
+>  		return -EPROBE_DEFER;
+>  	}
+>  
+> +	spin_lock_init(&priv->phy_lock);
+> +
+> +	bus = priv->phy_dev->mdio.bus;
+> +	if (!try_module_get(bus->owner)) {
+> +		dev_err(dev, "failed to get the bus module\n");
+> +		return -EIO;
+> +	}
 
-Will
+The comment at the top says you are taking a reference to the phy.
+Here you take a reference to the mdio bus driver???
+
+> +
+> +	get_device(&priv->phy_dev->mdio.dev);
+> +
+>  	priv->addr = mdiodev->addr;
+>  	priv->phy_drv = priv->phy_dev->drv;
+>  	memcpy(&priv->conv_phy_drv, priv->phy_dev->drv,
+>  	       sizeof(struct phy_driver));
+>  	priv->conv_phy_drv.read_status = xgmiitorgmii_read_status;
+>  	priv->phy_dev->priv = priv;
+> +	spin_lock_irqsave(&priv->phy_lock, flags);
+>  	priv->phy_dev->drv = &priv->conv_phy_drv;
+> +	spin_unlock_irqrestore(&priv->phy_lock, flags);
+
+And how is this spinlock protecting anything? 
+
+> +
+> +	dev_set_drvdata(dev, priv);
+>  
+>  	return 0;
+>  }
+>  
+> +static void xgmiitorgmii_remove(struct mdio_device *mdiodev)
+> +{
+> +	struct gmii2rgmii *priv = dev_get_drvdata(&mdiodev->dev);
+> +	struct mii_bus *bus;
+> +
+> +	bus = priv->phy_dev->mdio.bus;
+> +
+> +	put_device(&priv->phy_dev->mdio.dev);
+> +	module_put(bus->owner);
+> +	phy_disconnect(priv->phy_dev);
+
+Why are you disconnecting the phy?
+
+> +}
+> +
+>  static const struct of_device_id xgmiitorgmii_of_match[] = {
+>  	{ .compatible = "xlnx,gmii-to-rgmii-1.0" },
+>  	{},
+> @@ -107,6 +136,7 @@ MODULE_DEVICE_TABLE(of, xgmiitorgmii_of_match);
+>  
+>  static struct mdio_driver xgmiitorgmii_driver = {
+>  	.probe	= xgmiitorgmii_probe,
+> +	.remove	= xgmiitorgmii_remove,
+>  	.mdiodrv.driver = {
+>  		.name = "xgmiitorgmii",
+>  		.of_match_table = xgmiitorgmii_of_match,
+> -- 
+> 2.1.2
+> 
