@@ -1,36 +1,28 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 19 Aug 2016 20:00:33 +0800
-Subject: [PATCH] usb: chipidea: usb2: delete the redundant setting default DMA
- mask code
-Message-ID: <20160819120033.556-1-jszhang@marvell.com>
+Date: Fri, 19 Aug 2016 20:05:44 +0800
+Subject: [PATCH] usb: chipidea: delete an useless header file
+Message-ID: <20160819120544.651-1-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similar as commit 2b2fe36def08 ("usb: chipidea: imx: delete the
-redundant setting default DMA mask code"), the ci_hdrc_usb2 platform
-device is also created by device tree, the default DMA mask should be
-already set by of_dma_configure when the device are created. So delete
-the redundant code at driver.
+<linux/phy.h> is for net phy drivers, we don't need it.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- drivers/usb/chipidea/ci_hdrc_usb2.c | 4 ----
- 1 file changed, 4 deletions(-)
+ drivers/usb/chipidea/core.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/usb/chipidea/ci_hdrc_usb2.c b/drivers/usb/chipidea/ci_hdrc_usb2.c
-index 4456d2c..d162cc0 100644
---- a/drivers/usb/chipidea/ci_hdrc_usb2.c
-+++ b/drivers/usb/chipidea/ci_hdrc_usb2.c
-@@ -74,10 +74,6 @@ static int ci_hdrc_usb2_probe(struct platform_device *pdev)
- 		}
- 	}
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 69426e6..ae12595 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -62,7 +62,6 @@
+ #include <linux/usb/chipidea.h>
+ #include <linux/usb/of.h>
+ #include <linux/of.h>
+-#include <linux/phy.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/usb/ehci_def.h>
  
--	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
--	if (ret)
--		goto clk_err;
--
- 	ci_pdata->name = dev_name(dev);
- 
- 	priv->ci_pdev = ci_hdrc_add_device(dev, pdev->resource,
 -- 
 2.9.3
