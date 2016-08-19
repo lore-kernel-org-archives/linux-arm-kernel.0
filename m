@@ -1,20 +1,41 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 19 Aug 2016 19:40:35 +0530
-Subject: [PATCH v3 0/4] Add DT support for NAND to LCDK via ti-aemif
-In-Reply-To: <20160819134602.GA3056@gobelin>
-References: <20160816223338.20776-1-kbeldan@baylibre.com>
- <m2wpjeqa0o.fsf@baylibre.com> <m2vayxn5gw.fsf@baylibre.com>
- <20160819134602.GA3056@gobelin>
-Message-ID: <234aeb42-4373-a996-c782-1dac95838d07@ti.com>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Fri, 19 Aug 2016 15:15:19 +0100
+Subject: [PATCH v1 2/3] of: Add support for reading a s32 from a
+ multi-value property.
+In-Reply-To: <1471315139-28285-3-git-send-email-finley.xiao@rock-chips.com>
+References: <1471315139-28285-1-git-send-email-finley.xiao@rock-chips.com>
+ <1471315139-28285-3-git-send-email-finley.xiao@rock-chips.com>
+Message-ID: <1471616119.61594.465.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 August 2016 07:16 PM, Karl Beldan wrote:
+On Tue, 2016-08-16 at 10:38 +0800, Finlye Xiao wrote:
+> From: Finley Xiao <finley.xiao@rock-chips.com>
+> 
+> This patch adds an of_property_read_s32_index() function to allow
+> reading a single indexed s32 value from a property containing multiple
+> s32 values.
+> 
+> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
 
-> Sure, I'll add it to the series when resending.
+NAK.
 
-I just pushed an updated master branch on my tree with all the patches
-accepted so far. Can you please rebase against that branch while sending?
+Nobody should be using the old of_property_* functions any more anyway.
+You should be using the generic device_propery_* functions which work
+regardless of where the information comes from (actual DT vs. ACPI
+_DSD).
 
-Regards,
-Sekhar
+So no, don't *add* any more of these functions. Only add the generic
+version. And if your driver isn't using the generic property
+functions... fix it.
+
+-- 
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 5760 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160819/51563e57/attachment.bin>
