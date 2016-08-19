@@ -1,127 +1,77 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 19 Aug 2016 15:24:17 +0200
-Subject: [PATCH 2/2] net: phy: Fix race conditions in the driver
-In-Reply-To: <1471610891-13353-2-git-send-email-appanad@xilinx.com>
-References: <1471610891-13353-1-git-send-email-appanad@xilinx.com>
- <1471610891-13353-2-git-send-email-appanad@xilinx.com>
-Message-ID: <20160819132417.GC7343@lunn.ch>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 19 Aug 2016 08:26:41 -0500
+Subject: [PATCH v24 9/9] Documentation: dt: chosen properties for arm64
+ kdump
+In-Reply-To: <20160809015747.28591-1-takahiro.akashi@linaro.org>
+References: <20160809015248.28414-2-takahiro.akashi@linaro.org>
+ <20160809015747.28591-1-takahiro.akashi@linaro.org>
+Message-ID: <20160819132641.GA12709@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2016 at 06:18:11PM +0530, Kedareswara rao Appana wrote:
-> This patch fixes the below race conditions in the driver.
-> ---> Fix Opps after unload the driver as a module
-> ---> Use spin locks where relevant.
-> ---> Take reference on the external phy to prevent issues
-> when phy driver is unloaded.
-
-Each one of these should be an individual patch.
-
+On Tue, Aug 09, 2016 at 10:57:47AM +0900, AKASHI Takahiro wrote:
+> From: James Morse <james.morse@arm.com>
 > 
-> Reported-by: Andrew Lunn <andrew@lunn.ch>
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> Add documentation for
+> 	linux,crashkernel-base and crashkernel-size,
+> 	linux,usable-memory-range, and
+> 	linux,elfcorehdr
+> used by arm64 kexec/kdump to decribe the kdump reserved area, and
+> the elfcorehdr's location within it.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> [takahiro.akashi at linaro.org:
+>     renamed "usable-memory" to "usable-memory-range",
+>     added "linux,crashkernel-base" and "-size" ]
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 > ---
->  drivers/net/phy/xilinx_gmii2rgmii.c | 32 +++++++++++++++++++++++++++++++-
->  1 file changed, 31 insertions(+), 1 deletion(-)
+>  Documentation/devicetree/bindings/chosen.txt | 50 ++++++++++++++++++++++++++++
+>  1 file changed, 50 insertions(+)
 > 
-> diff --git a/drivers/net/phy/xilinx_gmii2rgmii.c b/drivers/net/phy/xilinx_gmii2rgmii.c
-> index 7336fd0..cdd9d95 100644
-> --- a/drivers/net/phy/xilinx_gmii2rgmii.c
-> +++ b/drivers/net/phy/xilinx_gmii2rgmii.c
-> @@ -34,6 +34,7 @@ struct gmii2rgmii {
->  	struct phy_driver *phy_drv;
->  	struct phy_driver conv_phy_drv;
->  	int addr;
-> +	spinlock_t phy_lock;
-
-The phy already have a lock.
-
->  };
->  
->  static int xgmiitorgmii_read_status(struct phy_device *phydev)
-> @@ -55,7 +56,7 @@ static int xgmiitorgmii_read_status(struct phy_device *phydev)
->  		val |= BMCR_SPEED1000;
->  	else if (phydev->speed == SPEED_100)
->  		val |= BMCR_SPEED100;
-> -	else
-> +	else if (phydev->speed == SPEED_10)
->  		val |= BMCR_SPEED10;
-  
-I said you want to return an error is the PHY is using a speed your
-converter cannot support. I don't see an error being raised here.
-
->  	err = mdiobus_write(phydev->mdio.bus, priv->addr, XILINX_GMII2RGMII_REG,
-> @@ -71,6 +72,8 @@ int xgmiitorgmii_probe(struct mdio_device *mdiodev)
->  	struct device *dev = &mdiodev->dev;
->  	struct device_node *np = dev->of_node, *phy_node;
->  	struct gmii2rgmii *priv;
-> +	struct mii_bus *bus;
-> +	unsigned long flags;
->  
->  	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
->  	if (!priv)
-> @@ -88,17 +91,43 @@ int xgmiitorgmii_probe(struct mdio_device *mdiodev)
->  		return -EPROBE_DEFER;
->  	}
->  
-> +	spin_lock_init(&priv->phy_lock);
+> diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
+> index 6ae9d82..236188a 100644
+> --- a/Documentation/devicetree/bindings/chosen.txt
+> +++ b/Documentation/devicetree/bindings/chosen.txt
+> @@ -52,3 +52,53 @@ This property is set (currently only on PowerPC, and only needed on
+>  book3e) by some versions of kexec-tools to tell the new kernel that it
+>  is being booted by kexec, as the booting environment may differ (e.g.
+>  a different secondary CPU release mechanism)
 > +
-> +	bus = priv->phy_dev->mdio.bus;
-> +	if (!try_module_get(bus->owner)) {
-> +		dev_err(dev, "failed to get the bus module\n");
-> +		return -EIO;
-> +	}
-
-The comment at the top says you are taking a reference to the phy.
-Here you take a reference to the mdio bus driver???
-
+> +linux,crashkernel-base
+> +linux,crashkernel-size
+> +----------------------
+> +These properties (currently used on PowerPC and arm64) indicates
+> +the base address and the size, respectively, of the reserved memory
+> +range for crash dump kernel.
+> +e.g.
 > +
-> +	get_device(&priv->phy_dev->mdio.dev);
+> +/ {
+> +	chosen {
+> +		linux,crashkernel-base = <0x9 0xf0000000>;
+> +		linux,crashkernel-size = <0x0 0x10000000>;
+> +	};
+> +};
 > +
->  	priv->addr = mdiodev->addr;
->  	priv->phy_drv = priv->phy_dev->drv;
->  	memcpy(&priv->conv_phy_drv, priv->phy_dev->drv,
->  	       sizeof(struct phy_driver));
->  	priv->conv_phy_drv.read_status = xgmiitorgmii_read_status;
->  	priv->phy_dev->priv = priv;
-> +	spin_lock_irqsave(&priv->phy_lock, flags);
->  	priv->phy_dev->drv = &priv->conv_phy_drv;
-> +	spin_unlock_irqrestore(&priv->phy_lock, flags);
+> +linux,usable-memory-range
+> +-------------------------
+> +
+> +This property (currently used only on arm64) holds the memory range,
+> +the base address and the size, which can be used as system ram on
+> +the *current* kernel. Note that, if this property is present, any memory
+> +regions under "memory" nodes in DT blob or ones marked as "conventional
+> +memory" in EFI memory map should be ignored.
+> +e.g.
+> +
+> +/ {
+> +	chosen {
+> +		linux,usable-memory-range = <0x9 0xf0000000 0x0 0x10000000>;
+> +	};
+> +};
 
-And how is this spinlock protecting anything? 
+I've read the discussion on this. I think you should use the existing 
+linux,usable-memory property in the memory nodes. If UEFI systems don't 
+have memory nodes, then you can find an UEFI way to describe this. DT is 
+not the dumping ground for what doesn't fit in UEFI. How do x86 systems 
+work?
 
-> +
-> +	dev_set_drvdata(dev, priv);
->  
->  	return 0;
->  }
->  
-> +static void xgmiitorgmii_remove(struct mdio_device *mdiodev)
-> +{
-> +	struct gmii2rgmii *priv = dev_get_drvdata(&mdiodev->dev);
-> +	struct mii_bus *bus;
-> +
-> +	bus = priv->phy_dev->mdio.bus;
-> +
-> +	put_device(&priv->phy_dev->mdio.dev);
-> +	module_put(bus->owner);
-> +	phy_disconnect(priv->phy_dev);
-
-Why are you disconnecting the phy?
-
-> +}
-> +
->  static const struct of_device_id xgmiitorgmii_of_match[] = {
->  	{ .compatible = "xlnx,gmii-to-rgmii-1.0" },
->  	{},
-> @@ -107,6 +136,7 @@ MODULE_DEVICE_TABLE(of, xgmiitorgmii_of_match);
->  
->  static struct mdio_driver xgmiitorgmii_driver = {
->  	.probe	= xgmiitorgmii_probe,
-> +	.remove	= xgmiitorgmii_remove,
->  	.mdiodrv.driver = {
->  		.name = "xgmiitorgmii",
->  		.of_match_table = xgmiitorgmii_of_match,
-> -- 
-> 2.1.2
-> 
+Rob
