@@ -1,85 +1,120 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 19 Aug 2016 19:32:21 +0200
-Subject: [PATCH v3 00/12] Initial Tegra186 support
-Message-ID: <20160819173233.13260-1-thierry.reding@gmail.com>
+Date: Fri, 19 Aug 2016 19:32:22 +0200
+Subject: [PATCH v3 01/12] dt-bindings: mailbox: Add Tegra HSP binding
+In-Reply-To: <20160819173233.13260-1-thierry.reding@gmail.com>
+References: <20160819173233.13260-1-thierry.reding@gmail.com>
+Message-ID: <20160819173233.13260-2-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+From: Joseph Lo <josephl@nvidia.com>
 
-Hi everyone,
+Add DT binding for the Hardware Synchronization Primitives (HSP). The
+HSP is designed for the processors to share resources and communicate
+with one another. A set of hardware synchronization primitives for
+interprocessor communication (IPC) is provided. IPC protocols can use
+use these hardware synchronization primitives when operating between
+processors in an AMP configuration.
 
-This is a set of patches to add initial support for Tegra186. It is
-based on Joseph's patches but I rewrote some of the drivers to be a
-little easier to comprehend and maintain (hopefully). I've also
-included clock and reset drivers as a proof of concept.
-
-Thierry
-
-Joseph Lo (7):
-  dt-bindings: mailbox: Add Tegra HSP binding
-  dt-bindings: firmware: Add bindings for Tegra BPMP
-  soc/tegra: Add Tegra186 support
-  arm64: defconfig: Enable Tegra186 SoC
-  arm64: dts: tegra: Add Tegra186 support
-  arm64: dts: tegra: Add NVIDIA P3310 main board support
-  arm64: dts: tegra: Add NVIDIA P2771 board support
-
-Thierry Reding (5):
-  mailbox: Add Tegra HSP driver
-  firmware: tegra: Add IVC library
-  firmware: tegra: Add BPMP support
-  clk: tegra: Add BPMP clock driver
-  reset: Add Tegra BPMP reset driver
-
- .../bindings/firmware/nvidia,tegra186-bpmp.txt     |   77 +
- .../bindings/mailbox/nvidia,tegra186-hsp.txt       |   52 +
- arch/arm64/boot/dts/nvidia/Makefile                |    1 +
- arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts |    8 +
- arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi     |   34 +
- arch/arm64/boot/dts/nvidia/tegra186.dtsi           |   86 ++
- arch/arm64/configs/defconfig                       |    1 +
- drivers/clk/tegra/Makefile                         |    1 +
- drivers/clk/tegra/clk-bpmp.c                       |  565 +++++++
- drivers/firmware/Kconfig                           |    1 +
- drivers/firmware/Makefile                          |    1 +
- drivers/firmware/tegra/Kconfig                     |   25 +
- drivers/firmware/tegra/Makefile                    |    2 +
- drivers/firmware/tegra/bpmp.c                      |  880 +++++++++++
- drivers/firmware/tegra/ivc.c                       |  683 +++++++++
- drivers/mailbox/Kconfig                            |    9 +
- drivers/mailbox/Makefile                           |    2 +
- drivers/mailbox/tegra-hsp.c                        |  561 +++++++
- drivers/reset/Makefile                             |    1 +
- drivers/reset/tegra/Makefile                       |    1 +
- drivers/reset/tegra/reset-bpmp.c                   |   63 +
- drivers/soc/tegra/Kconfig                          |   14 +
- include/dt-bindings/clock/tegra186-clock.h         |  940 ++++++++++++
- include/dt-bindings/mailbox/tegra186-hsp.h         |   24 +
- include/dt-bindings/reset/tegra186-reset.h         |  217 +++
- include/soc/tegra/bpmp-abi.h                       | 1601 ++++++++++++++++++++
- include/soc/tegra/bpmp.h                           |  122 ++
- include/soc/tegra/ivc.h                            |  109 ++
- 28 files changed, 6081 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+Acked-by: Stephen Warren <swarren@nvidia.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Jon Hunter <jonathanh@nvidia.com>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ .../bindings/mailbox/nvidia,tegra186-hsp.txt       | 52 ++++++++++++++++++++++
+ include/dt-bindings/mailbox/tegra186-hsp.h         | 24 ++++++++++
+ 2 files changed, 76 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra186.dtsi
- create mode 100644 drivers/clk/tegra/clk-bpmp.c
- create mode 100644 drivers/firmware/tegra/Kconfig
- create mode 100644 drivers/firmware/tegra/Makefile
- create mode 100644 drivers/firmware/tegra/bpmp.c
- create mode 100644 drivers/firmware/tegra/ivc.c
- create mode 100644 drivers/mailbox/tegra-hsp.c
- create mode 100644 drivers/reset/tegra/Makefile
- create mode 100644 drivers/reset/tegra/reset-bpmp.c
- create mode 100644 include/dt-bindings/clock/tegra186-clock.h
  create mode 100644 include/dt-bindings/mailbox/tegra186-hsp.h
- create mode 100644 include/dt-bindings/reset/tegra186-reset.h
- create mode 100644 include/soc/tegra/bpmp-abi.h
- create mode 100644 include/soc/tegra/bpmp.h
- create mode 100644 include/soc/tegra/ivc.h
 
+diff --git a/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt b/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
+new file mode 100644
+index 000000000000..b99d25fc2f26
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
+@@ -0,0 +1,52 @@
++NVIDIA Tegra Hardware Synchronization Primitives (HSP)
++
++The HSP modules are used for the processors to share resources and communicate
++together. It provides a set of hardware synchronization primitives for
++interprocessor communication. So the interprocessor communication (IPC)
++protocols can use hardware synchronization primitives, when operating between
++two processors not in an SMP relationship.
++
++The features that HSP supported are shared mailboxes, shared semaphores,
++arbitrated semaphores and doorbells.
++
++Required properties:
++- name : Should be hsp
++- compatible
++    Array of strings.
++    one of:
++    - "nvidia,tegra186-hsp"
++- reg : Offset and length of the register set for the device.
++- interrupt-names
++    Array of strings.
++    Contains a list of names for the interrupts described by the interrupt
++    property. May contain the following entries, in any order:
++    - "doorbell"
++    Users of this binding MUST look up entries in the interrupt property
++    by name, using this interrupt-names property to do so.
++- interrupts
++    Array of interrupt specifiers.
++    Must contain one entry per entry in the interrupt-names property,
++    in a matching order.
++- #mbox-cells : Should be 2.
++
++The mbox specifier of the "mboxes" property in the client node should
++contain two data. The first one should be the HSP type and the second
++one should be the ID that the client is going to use. Those information
++can be found in the following file.
++
++- <dt-bindings/mailbox/tegra186-hsp.h>.
++
++Example:
++
++hsp_top0: hsp at 3c00000 {
++	compatible = "nvidia,tegra186-hsp";
++	reg = <0x0 0x03c00000 0x0 0xa0000>;
++	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
++	interrupt-names = "doorbell";
++	#mbox-cells = <2>;
++};
++
++client {
++	...
++	mboxes = <&hsp_top0 TEGRA_HSP_MBOX_TYPE_DB TEGRA_HSP_DB_MASTER_XXX>;
++};
+diff --git a/include/dt-bindings/mailbox/tegra186-hsp.h b/include/dt-bindings/mailbox/tegra186-hsp.h
+new file mode 100644
+index 000000000000..f5d66e5f5f10
+--- /dev/null
++++ b/include/dt-bindings/mailbox/tegra186-hsp.h
+@@ -0,0 +1,24 @@
++/*
++ * This header provides constants for binding nvidia,tegra186-hsp.
++ */
++
++#ifndef _DT_BINDINGS_MAILBOX_TEGRA186_HSP_H
++#define _DT_BINDINGS_MAILBOX_TEGRA186_HSP_H
++
++/*
++ * These define the type of mailbox that is to be used (doorbell, shared
++ * mailbox, shared semaphore or arbitrated semaphore).
++ */
++#define TEGRA_HSP_MBOX_TYPE_DB 0x0
++#define TEGRA_HSP_MBOX_TYPE_SM 0x1
++#define TEGRA_HSP_MBOX_TYPE_SS 0x2
++#define TEGRA_HSP_MBOX_TYPE_AS 0x3
++
++/*
++ * These defines represent the bit associated with the given master ID in the
++ * doorbell registers.
++ */
++#define TEGRA_HSP_DB_MASTER_CCPLEX 17
++#define TEGRA_HSP_DB_MASTER_BPMP 19
++
++#endif
 -- 
 2.9.0
