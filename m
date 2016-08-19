@@ -1,31 +1,77 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Aug 2016 14:08:46 +0100
-Subject: [crypto] [marvell-cesa] Driver hangs on Armada 385 device
-In-Reply-To: <20160819141251.5dcc835d@free-electrons.com>
-References: <57b6f38c.23012e0a.374a0.56c6@mx.google.com>
- <20160819141251.5dcc835d@free-electrons.com>
-Message-ID: <20160819130846.GN1041@n2100.armlinux.org.uk>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Fri, 19 Aug 2016 21:09:24 +0800
+Subject: [PATCH 1/2] thermal: rockchip: enhance the tsadc's bandgap
+ feature for rk3399
+In-Reply-To: <1469628643-29661-1-git-send-email-wxt@rock-chips.com>
+References: <1469628643-29661-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1471612164.2691.73.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2016 at 02:12:51PM +0200, Thomas Petazzoni wrote:
-> Hello,
+On ?, 2016-07-27 at 22:10 +0800, Caesar Wang wrote:
+> From: Rocky Hao <rocky.hao@rock-chips.com>
 > 
-> I'm adding Romain Perier in Cc, since he is actively working on the
-> CESA driver.
+> Due to the voltage ripple, the sensing data of the tsadc is not
+> accurate.
+> And in this patch, the bandgap feature is enhanced to remove the
+> voltage
+> ripple, and then the tsadc can sense the temperature more precisely.
+> 
+> Obsolete codes are removed as well.
+> 
+> Signed-off-by: Rocky Hao <rocky.hao@rock-chips.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> Cc: Eduardo Valentin <edubezval@gmail.com>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: linux-pm at vger.kernel.org
 
-4.7 here on Clearfog (Armada 388):
+Both patches applied and queued for 4.9.
 
-# cryptsetup benchmark --cipher aes-cbc
-# Tests are approximate using memory only (no storage IO).
-#  Algorithm | Key |  Encryption |  Decryption
-     aes-cbc   256b    67.1 MiB/s    68.3 MiB/s
-
-/proc/interrupts:
-           CPU0       CPU1
- 42:       2144          0     GIC-0  51 Level     f1090000.crypto
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+thanks,
+rui
+> ---
+> 
+> ?drivers/thermal/rockchip_thermal.c | 11 ++++++-----
+> ?1 file changed, 6 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/thermal/rockchip_thermal.c
+> b/drivers/thermal/rockchip_thermal.c
+> index db5ecc5..a90423d 100644
+> --- a/drivers/thermal/rockchip_thermal.c
+> +++ b/drivers/thermal/rockchip_thermal.c
+> @@ -222,10 +222,10 @@ struct rockchip_thermal_data {
+> ?#define GRF_TSADC_TESTBIT_L			0x0e648
+> ?#define GRF_TSADC_TESTBIT_H			0x0e64c
+> ?
+> -#define GRF_TSADC_TSEN_PD_ON			(0x30003 << 0)
+> -#define GRF_TSADC_TSEN_PD_OFF			(0x30000 << 0)
+> ?#define GRF_SARADC_TESTBIT_ON			(0x10001 << 2)
+> ?#define GRF_TSADC_TESTBIT_H_ON			(0x10001 << 2)
+> +#define GRF_TSADC_VCM_EN_L			(0x10001 << 7)
+> +#define GRF_TSADC_VCM_EN_H			(0x10001 << 7)
+> ?
+> ?/**
+> ? * struct tsadc_table - code to temperature conversion table
+> @@ -567,9 +567,10 @@ static void rk_tsadcv3_initialize(struct regmap
+> *grf, void __iomem *regs,
+> ?			???????regs + TSADCV2_HIGHT_TSHUT_DEBOUNCE);
+> ?
+> ?	} else {
+> -		regmap_write(grf, GRF_TSADC_TESTBIT_L,
+> GRF_TSADC_TSEN_PD_ON);
+> -		mdelay(10);
+> -		regmap_write(grf, GRF_TSADC_TESTBIT_L,
+> GRF_TSADC_TSEN_PD_OFF);
+> +		/* Enable the voltage common mode feature */
+> +		regmap_write(grf, GRF_TSADC_TESTBIT_L,
+> GRF_TSADC_VCM_EN_L);
+> +		regmap_write(grf, GRF_TSADC_TESTBIT_H,
+> GRF_TSADC_VCM_EN_H);
+> +
+> ?		usleep_range(15, 100); /* The spec note says at
+> least 15 us */
+> ?		regmap_write(grf, GRF_SARADC_TESTBIT,
+> GRF_SARADC_TESTBIT_ON);
+> ?		regmap_write(grf, GRF_TSADC_TESTBIT_H,
+> GRF_TSADC_TESTBIT_H_ON);
