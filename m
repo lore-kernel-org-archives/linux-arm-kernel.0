@@ -1,71 +1,48 @@
-From: gmane@chmurka.net (Adam Wysocki)
-Date: Fri, 19 Aug 2016 14:33:34 +0000 (UTC)
-Subject: Linux 4.7 and Jornada 720 (SA-1100)
-References: <4Tcq736lIfmjNv8%gof@news.chmurka.net>
- <20160819102945.GK1041@n2100.armlinux.org.uk>
- <7Tcq9hpfIfmjNv8%gof@news.chmurka.net>
- <20160819132650.GO1041@n2100.armlinux.org.uk>
-Message-ID: <8Tcq9pmbIfmjNv8%gof@news.chmurka.net>
+From: romain.perier@free-electrons.com (Romain Perier)
+Date: Fri, 19 Aug 2016 16:39:24 +0200
+Subject: [crypto] [marvell-cesa] Driver hangs on Armada 385 device
+In-Reply-To: <20160819142145.GQ1041@n2100.armlinux.org.uk>
+References: <57b6f38c.23012e0a.374a0.56c6@mx.google.com>
+ <20160819141251.5dcc835d@free-electrons.com>
+ <20160819130846.GN1041@n2100.armlinux.org.uk>
+ <57B71301.4010005@free-electrons.com>
+ <20160819142145.GQ1041@n2100.armlinux.org.uk>
+Message-ID: <57B71A1C.3010607@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+Hello,
 
-> Looking at the board file, the jornada720 doesn't use sa11x0-fb at all.
-> It uses an Epson s1d13xxx device.  The defconfig for jornada720 has:
+Le 19/08/2016 16:21, Russell King - ARM Linux a ?crit :
+> On Fri, Aug 19, 2016 at 04:09:05PM +0200, Romain Perier wrote:
+>> I was, wondering, do you boot with a separated DTB or a legacy boot
+>> (concatenated to the Image) ?
+>>
+>>
+>> Could you test with uImage.armada-385-db-ap [1], that's a legacy Image.
+>> Also, I have uploaded a minimalistic rootfs [2], if you want.
+>>
+>> 1. http://www.free-electrons.com/~romain/pub/cesa/uImage.armada-385-db-ap
+>> 2. http://www.free-electrons.com/~romain/pub/cesa/rootfs.cpio.xz
+>
+> I assume you mean Thomas rather than myself, as I have only Clearfog
+> platforms, which are all Armada 388.
 
-Another bingo - enabling this:
+Yep, sorry. I meant, the person who has issues with cesa, i.e 
+radioconfusion at gmail.com :)
 
-> CONFIG_FB_S1D13XXX=y
+>
+> I don't use uImage anymore, except with versions of uboot that are
+> unable to support zImage booting.  Where zImage booting is supported,
+> I'm always using a separated DTB.  Doing otherwise is insane IMHO.
+>
 
-Solved the issue with console. Thanks!
+That's just, we have several ways to boot our Marvell devices, including 
+legacy or non legacy boots, uImage and zImage. Anyway,
+that's not the point of my previous email.
 
-> so if your configuration is derived from that, you should have the
-> driver already enabled.
-
-Where is this board file and defconfig for Jornada? I wasn't aware of 
-their existence, so I did my config from scratch. Maybe comparing my 
-config to defconfig will solve the issue with CF card, too...
-
->> It seems that earlyprintk is ignored anyway, maybe there's no support for 
->> it on this platform?
-> 
-> No idea, sorry.
-
-Well, now, as I have the console, it's not needed anymore :)
-
-> I use my printascii() hack in printk() when I need early or lowlevel 
-> debugging rather than early printk.
-
-Where does it print to? Serial port?
-
->> > However, if you're not even getting the "Uncompressing Linux... done, 
->> > booting the kernel." line, that suggests the decompressor is not running, 
->> > or is trying to access the wrong serial port.  The decompressor tries to 
->> > find the first serial port out of serial 3, 1 and 2 which has been left 
->> > enabled.
->> 
->> In this order? Maybe it tries to send its messages to the built-in modem 
->> or IrDA port...
-> 
-> Yes, that order.
-
->From SA-1100 developers manual it seems that:
-
-- serial 0 is the USB device controller
-- serial 1 is the SDLC/UART
-- serial 2 is the IrDA port
-- serial 3 is the UART (probably this one is routed externally)
-- serial 4 is the MCP / SSP (whatever it is)
-
-So it should use UART... strange that it doesn't do it. Or maybe it does, 
-but on different baudrate than 115200 (but I would probably get garbage 
-then)...
-
-Does it mean that if I enabled USB device and IrDA in the kernel, I would 
-have external serial port on ttySA2 instead of 0?
-
-Thanks again for your support.
-
+Romain
 -- 
-http://www.chmurka.net/
+Romain Perier, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
