@@ -1,255 +1,59 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 19 Aug 2016 10:26:52 +0900
-Subject: [PATCH v24 5/9] arm64: kdump: add kdump support
-In-Reply-To: <20160818071547.GC20080@linaro.org>
-References: <20160809015248.28414-2-takahiro.akashi@linaro.org>
- <20160809015615.28527-1-takahiro.akashi@linaro.org>
- <20160809015615.28527-3-takahiro.akashi@linaro.org>
- <57AB586D.3080900@arm.com> <20160818071547.GC20080@linaro.org>
-Message-ID: <20160819012651.GE20080@linaro.org>
+From: Nitin.Chaudhary@zii.aero (Nitin Chaudhary)
+Date: Thu, 18 Aug 2016 18:40:57 -0700
+Subject: [PATCH v3 0/3] Re:[PATCH v2] Added perf functionality to mmdc driver 
+In-Reply-To: <DB5PR04MB1430487C8BFA276E285493959F150@DB5PR04MB1430.eurprd04.prod.outlook.com>
+References: <DB5PR04MB1430487C8BFA276E285493959F150@DB5PR04MB1430.eurprd04.prod.outlook.com>
+Message-ID: <1471570860-2087-1-git-send-email-Nitin.Chaudhary@zii.aero>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-James,
+The following series of patch resolve the kernel compilation errors with the
+proposed perf functionality integration into MMDC driver by Zhengyu Shen and
+hence provide the working code which can be enhanced upon as per the reviews
+from Mark Rutland and Peter Zilstra. The code still retains the original working
+as was proposed by Zhengyu except a few minor changes to resolve probe failure
+in the latest version of kernel. These patchsets are second version of patches
+incorporating the inputs from Zhengyu. The below is description:
+ v2 - Migrated driver to use state machine based CPU notifier
+ v3 - Fixed the code for probe failure while polling on MMDC MAPSR bit 4
 
-On Thu, Aug 18, 2016 at 04:15:48PM +0900, AKASHI Takahiro wrote:
-> Hi James, Pratyush,
-> 
-> Thank you for your testing and reporting an issue.
-> I've been on vacation until yesterday.
-> 
-> On Wed, Aug 10, 2016 at 05:38:05PM +0100, James Morse wrote:
-> > Hi Akashi,
-> > 
-> > On 09/08/16 02:56, AKASHI Takahiro wrote:
-> > > On crash dump kernel, all the information about primary kernel's system
-> > > memory (core image) is available in elf core header.
-> > > The primary kernel will set aside this header with reserve_elfcorehdr()
-> > > at boot time and inform crash dump kernel of its location via a new
-> > > device-tree property, "linux,elfcorehdr".
-> > > 
-> > > Please note that all other architectures use traditional "elfcorehdr="
-> > > kernel parameter for this purpose.
-> > > 
-> > > Then crash dump kernel will access the primary kernel's memory with
-> > > copy_oldmem_page(), which reads one page by ioremap'ing it since it does
-> > > not reside in linear mapping on crash dump kernel.
-> > > 
-> > > We also need our own elfcorehdr_read() here since the header is placed
-> > > within crash dump kernel's usable memory.
-> > 
-> > On Seattle when I panic and boot the kdump kernel, I am unable to read the
-> > /proc/vmcore file. Instead I get:
-> > nanook at frikadeller:~$ sudo cp /proc/vmcore /
-> > [  174.393875] Unhandled fault: synchronous external abort (0x96000210) at
-> > 0xffffff80096b6000
-> > [  174.402158] Internal error: : 96000210 [#1] PREEMPT SMP
-> > [  174.407370] Modules linked in:
-> > [  174.410417] CPU: 6 PID: 2059 Comm: cp Tainted: G S      W I     4.8.0-rc1+ #4708
-> > [  174.417799] Hardware name: AMD Overdrive/Supercharger/Default string, BIOS
-> > ROD1002C 04/08/2016
-> > [  174.426396] task: ffffffc0fdec5780 task.stack: ffffffc0f34bc000
-> > [  174.432313] PC is at __arch_copy_to_user+0x180/0x280
-> > [  174.437274] LR is at copy_oldmem_page+0xac/0xf0
-> > [  174.441791] pc : [<ffffff800835e080>] lr : [<ffffff8008095b9c>] pstate: 20000145
-> > [  174.449173] sp : ffffffc0f34bfc90
-> > [  174.452474] x29: ffffffc0f34bfc90 x28: 0000000000000000
-> > [  174.457776] x27: 0000000008000000 x26: 000000000000d000
-> > [  174.463077] x25: 0000000000000001 x24: ffffff8008eb5000
-> > [  174.468378] x23: 0000000000000000 x22: ffffff80096b6000
-> > [  174.473679] x21: 0000000000000001 x20: 0000000030127000
-> > [  174.478979] x19: 0000000000001000 x18: 0000007ff7085d60
-> > [  174.484279] x17: 0000000000429358 x16: ffffff80081d9e88
-> > [  174.489579] x15: 0000007fae377590 x14: 0000000000000000
-> > [  174.494880] x13: 0000000000000000 x12: ffffff8008dd1000
-> > [  174.500180] x11: ffffff80096b6fff x10: ffffff80096b6fff
-> > [  174.505480] x9 : 0000000040000000 x8 : ffffff8008db6000
-> > [  174.510781] x7 : ffffff80096b7000 x6 : 0000000030127000
-> > [  174.516082] x5 : 0000000030128000 x4 : 0000000000000000
-> > [  174.521382] x3 : 00e8000000000713 x2 : 0000000000000f80
-> > [  174.526682] x1 : ffffff80096b6000 x0 : 0000000030127000
-> > [  174.531982]
-> > [  174.533461] Process cp (pid: 2059, stack limit = 0xffffffc0f34bc020)
-> > 
-> > [  174.848448] [<ffffff800835e080>] __arch_copy_to_user+0x180/0x280
-> > [  174.854448] [<ffffff8008245f34>] read_from_oldmem.part.4+0xb4/0xf4
-> > [  174.860615] [<ffffff8008246074>] read_vmcore+0x100/0x22c
-> > [  174.865919] [<ffffff8008239378>] proc_reg_read+0x64/0x90
-> > [  174.871223] [<ffffff80081d7da8>] __vfs_read+0x28/0x108
-> > [  174.876348] [<ffffff80081d8ae4>] vfs_read+0x84/0x144
-> > [  174.881301] [<ffffff80081d9ecc>] SyS_read+0x44/0xa0
-> > [  174.886167] [<ffffff8008082ef0>] el0_svc_naked+0x24/0x28
-> > [  174.891466] Code: 00000000 00000000 00000000 00000000 (a8c12027)
-> > [  174.897562] ---[ end trace 00801b2e35b0cd1f ]---
-> > 
-> > 
-> > The offending call is:
-> > > copy_oldmem_page(0x8000000, 0x00000000385f8000, 0x1000, 0, 1)
-> > 
-> > This is trying to access the bottom page of memory. From the efi memory map:
-> > > efi:   0x008000000000-0x008001e7ffff [Runtime Data       |RUN|  |WB|WT|WC|UC]*
-> > > efi:   0x008001e80000-0x008001ffffff [Conventional Memory|   |  |WB|WT|WC|UC]
-> > 
-> > This page is 'Runtime Data', and marked as nomap by both the original and kdump
-> > kernels, but copy_oldmem_page() doesn't know this.
-> > 
-> > In this case because we have already parsed the efi memory map again in the
-> > kdump kernel and re-marked these regions as nomap, the below hunk fixes the
-> > problem for me:
-> > =========================%<=========================
-> > diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
-> > index 2dc54d129be1..784d4c30b534 100644
-> > --- a/arch/arm64/kernel/crash_dump.c
-> > +++ b/arch/arm64/kernel/crash_dump.c
-> > @@ -37,6 +37,11 @@ ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
-> >         if (!csize)
-> >                 return 0;
-> > 
-> > +       if (memblock_is_memory(pfn << PAGE_SHIFT) &&
-> > +           !memblock_is_map_memory(pfn << PAGE_SHIFT))
-> > +               /* skip this nomap memory region, reserved by firmware */
-> > +               return 0;
-> > +
-> >         vaddr = ioremap_cache(__pfn_to_phys(pfn), PAGE_SIZE);
-> 
-> Here I'm wandering why my original code doesn't work.
-> If !memblock_is_map_memory(), ioremap_cache() would call __ioremap_caller()
-> and return a valid virtual address mapped in vmalloc area.
-> 
-> >         if (!vaddr)
-> >                 return -ENOMEM;
-> > =========================%<=========================
-> > 
-> > With this I can copy the vmcore file, and feed it to crash to read dmesg, task
-> > list etc...
-> > 
-> > This could be a deeper/wider issue, but I can't see any other users of
-> > memblock_mark_nomap().
-> > Do you think depending on this this 're-learning' is robust enough, or should
-> > the nomap ranges be described in the vmcoreinfo elf notes?
-> 
-> The current kexec-tools identifies all the memory regions from
-> /proc/iomem and there is no way for user space tools to distinguish
-> "EFI runtime data," or any other nomap memory, from normal "System RAM"
-> because all those resources are currently marked as "System RAM."
-> 
-> So I think that such regions should be marked as, say, "reserved,"
-> so that we can exclude those memories from a crush dump file.
+The following are results after running v3 version of the patches on an i.MX6Q
+board
 
-Can you try the following change?
-If it fixes your problem, I will post it as a patch.
+root at RDU2:/mnt/disk ./perf stat -a -e mmdc/busy-cycles/,mmdc/read-accesses/,mmdc
+/read-bytes/,mmdc/total-cycles/,mmdc/write-accesses/,mmdc/write-bytes/ dd if=/de
+v/zero of=/dev/null bs=1M count=5000
+5000+0 records in
+5000+0 records out
+5242880000 bytes (5.2 GB) copied, 4.63319 s, 1.1 GB/s
 
-Thanks,
--Takahiro AKASHI
+ Performance counter stats for 'system wide':
 
-===8<===
->From 740563e4a437f0d6ecf6e421c91433f9b8f19041 Mon Sep 17 00:00:00 2001
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Date: Fri, 19 Aug 2016 09:57:52 +0900
-Subject: [PATCH] arm64: mark reserved memblock regions explicitly
+         823347142      mmdc/busy-cycles/
+          12406525      mmdc/read-accesses/
+            404.43 MB   mmdc/read-bytes/
+        2460141184      mmdc/total-cycles/
+          11050765      mmdc/write-accesses/
+            353.64 MB   mmdc/write-bytes/
 
----
- arch/arm64/kernel/setup.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+       4.661893334 seconds time elapsed
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 38eda13..38589b5 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -205,10 +205,15 @@ static void __init request_standard_resources(void)
- 
- 	for_each_memblock(memory, region) {
- 		res = alloc_bootmem_low(sizeof(*res));
--		res->name  = "System RAM";
-+		if (memblock_is_nomap(region)) {
-+			res->name  = "reserved";
-+			res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-+		} else {
-+			res->name  = "System RAM";
-+			res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
-+		}
- 		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
- 		res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
--		res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
- 
- 		request_resource(&iomem_resource, res);
- 
--- 
-2.9.0
+Any review & comments are welcomed!
 
-===>8===
+Nitin Chaudhary (3):
+  Error: Fix mmdc compilation errors due to cpu notifier
+  [i.MX6Q] Code cleanup & verification after fixing compilation error
+  [i.MX6Q]Removed MMDC Auto Power saving timeout error
 
-> (I don't know whether this change may have a backward-compatibility
-> problem.)
-> 
-> -Takahiro AKASHI
-> 
-> > 
-> > Thanks,
-> > 
-> > James
-> > 
-> > 
-> > > diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
-> > > new file mode 100644
-> > > index 0000000..2dc54d1
-> > > --- /dev/null
-> > > +++ b/arch/arm64/kernel/crash_dump.c
-> > > @@ -0,0 +1,71 @@
-> > > +/*
-> > > + * Routines for doing kexec-based kdump
-> > > + *
-> > > + * Copyright (C) 2014 Linaro Limited
-> > > + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > > + *
-> > > + * This program is free software; you can redistribute it and/or modify
-> > > + * it under the terms of the GNU General Public License version 2 as
-> > > + * published by the Free Software Foundation.
-> > > + */
-> > > +
-> > > +#include <linux/crash_dump.h>
-> > > +#include <linux/errno.h>
-> > > +#include <linux/io.h>
-> > > +#include <linux/memblock.h>
-> > > +#include <linux/uaccess.h>
-> > > +#include <asm/memory.h>
-> > > +
-> > > +/**
-> > > + * copy_oldmem_page() - copy one page from old kernel memory
-> > > + * @pfn: page frame number to be copied
-> > > + * @buf: buffer where the copied page is placed
-> > > + * @csize: number of bytes to copy
-> > > + * @offset: offset in bytes into the page
-> > > + * @userbuf: if set, @buf is in a user address space
-> > > + *
-> > > + * This function copies one page from old kernel memory into buffer pointed by
-> > > + * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
-> > > + * copied or negative error in case of failure.
-> > > + */
-> > > +ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
-> > > +			 size_t csize, unsigned long offset,
-> > > +			 int userbuf)
-> > > +{
-> > > +	void *vaddr;
-> > > +
-> > > +	if (!csize)
-> > > +		return 0;
-> > > +
-> > > +	vaddr = ioremap_cache(__pfn_to_phys(pfn), PAGE_SIZE);
-> > > +	if (!vaddr)
-> > > +		return -ENOMEM;
-> > > +
-> > > +	if (userbuf) {
-> > > +		if (copy_to_user(buf, vaddr + offset, csize)) {
-> > > +			iounmap(vaddr);
-> > > +			return -EFAULT;
-> > > +		}
-> > > +	} else {
-> > > +		memcpy(buf, vaddr + offset, csize);
-> > > +	}
-> > > +
-> > > +	iounmap(vaddr);
-> > > +
-> > > +	return csize;
-> > > +}
-> > 
+ arch/arm/mach-imx/mmdc.c   | 122 +++++++++++++++++++++++++--------------------
+ include/linux/cpuhotplug.h |   1 +
+ 2 files changed, 69 insertions(+), 54 deletions(-)
+
+--
+2.7.4
+
+
+________________________________
+
+
+This email and any files transmitted with it are confidential & proprietary to Zodiac Inflight Innovations. This information is intended solely for the use of the individual or entity to which it is addressed. Access or transmittal of the information contained in this e-mail, in full or in part, to any other organization or persons is not authorized.
