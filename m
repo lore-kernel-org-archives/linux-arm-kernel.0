@@ -1,38 +1,21 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 19 Aug 2016 09:12:07 -0400
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Don't attempt to enable
- schedutil governor as module
-In-Reply-To: <1471612328-6467-1-git-send-email-javier@osg.samsung.com>
-References: <1471612328-6467-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1471612328-6467-2-git-send-email-javier@osg.samsung.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 19 Aug 2016 15:15:17 +0200
+Subject: [PATCH 1/2] net: phy: Add error checks in the driver
+In-Reply-To: <1471610891-13353-1-git-send-email-appanad@xilinx.com>
+References: <1471610891-13353-1-git-send-email-appanad@xilinx.com>
+Message-ID: <20160819131517.GB7343@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The schedutil CPUFreq governor could be built as a module but the commit
-58919e83c85c ("cpufreq / sched: Pass flags to cpufreq_update_util()")
-made it non-modular so attempting to enable as module leads to a warning:
+> -	mdiobus_write(phydev->mdio.bus, priv->addr, XILINX_GMII2RGMII_REG, val);
+> +	err = mdiobus_write(phydev->mdio.bus, priv->addr, XILINX_GMII2RGMII_REG,
+> +			    val);
+> +	if (err < 0)
+> +		return err;
+>  
+>  	return 0;
 
-warning: symbol value 'm' invalid for CPU_FREQ_GOV_SCHEDUTIL
+Do you need to assign err? Why not just
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
----
-
- arch/arm/configs/multi_v7_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 0ccaa519f588..65b5b6172e83 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -136,7 +136,7 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
- CONFIG_CPU_FREQ_GOV_POWERSAVE=m
- CONFIG_CPU_FREQ_GOV_USERSPACE=m
- CONFIG_CPU_FREQ_GOV_CONSERVATIVE=m
--CONFIG_CPU_FREQ_GOV_SCHEDUTIL=m
-+CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
- CONFIG_ARM_IMX6Q_CPUFREQ=y
- CONFIG_QORIQ_CPUFREQ=y
- CONFIG_CPU_IDLE=y
--- 
-2.5.5
+   return mdiobus_write(phydev->mdio.bus, priv->addr, XILINX_GMII2RGMII_REG,
+			val);
