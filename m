@@ -1,48 +1,67 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Fri, 19 Aug 2016 16:39:24 +0200
-Subject: [crypto] [marvell-cesa] Driver hangs on Armada 385 device
-In-Reply-To: <20160819142145.GQ1041@n2100.armlinux.org.uk>
-References: <57b6f38c.23012e0a.374a0.56c6@mx.google.com>
- <20160819141251.5dcc835d@free-electrons.com>
- <20160819130846.GN1041@n2100.armlinux.org.uk>
- <57B71301.4010005@free-electrons.com>
- <20160819142145.GQ1041@n2100.armlinux.org.uk>
-Message-ID: <57B71A1C.3010607@free-electrons.com>
+From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
+Date: Fri, 19 Aug 2016 15:46:40 +0100
+Subject: [RFC 00/17] clk: Add per-controller locks to fix deadlocks
+In-Reply-To: <65703100-1e16-6c34-babe-40e630180688@samsung.com>
+References: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
+ <65703100-1e16-6c34-babe-40e630180688@samsung.com>
+Message-ID: <20160819144640.GM21682@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Aug 16, 2016 at 03:51:10PM +0200, Krzysztof Kozlowski wrote:
+> On 08/16/2016 03:34 PM, Krzysztof Kozlowski wrote:
+> > Hi,
+> > 
+> > RFC, please, do not apply, maybe except patch #1 which is harmless.
+> > 
+> > 
+> > Introduction
+> > ============
+> > The patchset brings new entity: clock controller representing a hardware
+> > block.  The clock controller comes with its own prepare lock which
+> > is used then in many places.  The idea is to fix the deadlock mentioned
+> > in commit 10ff4c5239a1 ("i2c: exynos5: Fix possible ABBA deadlock by keeping
+> > I2C clock prepared") and commit 34e81ad5f0b6 ("i2c: s3c2410: fix ABBA deadlock
+> > by keeping clock prepared").
+> > 
+> 
+> Damn, I forgot to describe the overall idea. :) It is mentioned in patch
+> 15 but probably not many will have enough of patience to reach it.
+> 
+> The locking idea
+> ================
+> Clock controllers representing different hardware blocks, will contain
+> its own prepare lock which protects the clocks inside controller.  The
+> hierarchy itself is protected by global lock.
+> 
+> In prepare path, the global prepare lock is removed.  This is direct
+> solution for the deadlock.
+> 
+> Clock hierarchy imposes also hierarchy between controllers so when a
+> prepare happens, also parents have to be locked.
+> 
+> Following locking design was chosen:
+> 1. For prepare/unprepare paths: lock only clock controller and its
+>    parents.
+> 2. For recalc rates paths: lock global lock, the controller and its
+>    children.
+> 3. For reparent paths: lock entire tree up down (children and parents)
+>    and the global lock as well.
+> 
+> 
+> In each case of traversing the clock hierarchy, the locking of
+> controllers is always from children to parents.
+> 
+> 
+> Best regards,
+> Krzysztof
 
-Le 19/08/2016 16:21, Russell King - ARM Linux a ?crit :
-> On Fri, Aug 19, 2016 at 04:09:05PM +0200, Romain Perier wrote:
->> I was, wondering, do you boot with a separated DTB or a legacy boot
->> (concatenated to the Image) ?
->>
->>
->> Could you test with uImage.armada-385-db-ap [1], that's a legacy Image.
->> Also, I have uploaded a minimalistic rootfs [2], if you want.
->>
->> 1. http://www.free-electrons.com/~romain/pub/cesa/uImage.armada-385-db-ap
->> 2. http://www.free-electrons.com/~romain/pub/cesa/rootfs.cpio.xz
->
-> I assume you mean Thomas rather than myself, as I have only Clearfog
-> platforms, which are all Armada 388.
+I have been playing with these patches on my Arndale board and
+they certainly do seem to resolve the interaction issues I have
+been SPI and the clocking framework, which is awesome and lets me
+sensibly add the clocking framework into our codec drivers. I will
+keep investigating and for what its worth have a little more
+detailed look through the code.
 
-Yep, sorry. I meant, the person who has issues with cesa, i.e 
-radioconfusion at gmail.com :)
-
->
-> I don't use uImage anymore, except with versions of uboot that are
-> unable to support zImage booting.  Where zImage booting is supported,
-> I'm always using a separated DTB.  Doing otherwise is insane IMHO.
->
-
-That's just, we have several ways to boot our Marvell devices, including 
-legacy or non legacy boots, uImage and zImage. Anyway,
-that's not the point of my previous email.
-
-Romain
--- 
-Romain Perier, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks,
+Charles
