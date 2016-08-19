@@ -1,64 +1,75 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Aug 2016 09:43:13 +0100
-Subject: [PATCH] irqchip/gicv3-its: Disable the ITS before initializing it.
-In-Reply-To: <1471560118-909-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1471560118-909-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <57B6C6A1.1080109@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 19 Aug 2016 10:46:47 +0200
+Subject: [PATCH v2] ARM: dts: add PM8058 LEDs to the APQ8060 Dragonboard
+Message-ID: <1471596407-4601-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/08/16 23:41, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
-> 
-> When starting a kexec/kdump kernel, the GIC ITS will already have been
-> enabled.  According to the ARM Generic Interrupt Controller
-> Architecture Specification (GIC architecture Version 3.0 and version
-> 4.0), writing to GITS_BASER<n> or GITS_CBASER is "UNPREDICTABLE" when
-> the ITS is enabled.  On Cavium Thunder systems, this prevents the ITS
-> from being initializing in the kexec/kdump kernel, resulting in
-> failure to register/enable interrupts for all devices.
-> 
-> The fix is to disable the ITS if it is not already in the disabled
-> state.  This allows the ITS to be properly initialized and then
-> re-enabled in the kexec/kdump kernel.
-> 
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 7ceaba8..36b9c28 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1545,7 +1545,12 @@ static int its_force_quiescent(void __iomem *base)
->  	u32 val;
->  
->  	val = readl_relaxed(base + GITS_CTLR);
-> -	if (val & GITS_CTLR_QUIESCENT)
-> +	/*
-> +	 * GIC architecture specification requires the ITS to be both
-> +	 * disabled and quiescent for writes to GITS_BASER<n> or
-> +	 * GITS_CBASER to not have UNPREDICTABLE results.
-> +	 */
-> +	if ((val & GITS_CTLR_QUIESCENT) && !(val & GITS_CTLR_ENABLE))
->  		return 0;
->  
->  	/* Disable the generation of all interrupts to this ITS */
-> 
+This adds the PM8058 LEDs as used in the platform.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: linux-arm-msm at vger.kernel.org
+Cc: linux-leds at vger.kernel.org
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Jacek Anaszewski <j.anaszewski@samsung.com>
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Rename the infrared LED to "pm8058:infrared:proximitysensor"
+---
+ arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 39 ++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-I'll queue it for the next batch of fixes that I plan to send to tglx on
-Monday.
-
-Still, there is the question of how safe it is to do a kexec on a system
-that has an ITS that can modify memory behind our back, since we have no
-way to tell an irqchip to disable itself altogether (not a device and
-all that mess).
-
-Thanks,
-
-	M.
+diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+index 0abc93e5bb00..6c0038398ef2 100644
+--- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
++++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+@@ -239,6 +239,45 @@
+ 						};
+ 					};
+ 				};
++
++				led at 48 {
++					/*
++					 * The keypad LED @0x48 is routed to
++					 * the sensor board where it is
++					 * connected to an infrared LED
++					 * SFH4650 (60mW, @850nm) next to the
++					 * ambient light and proximity sensor
++					 * Capella Microsystems CM3605.
++					 */
++					compatible = "qcom,pm8058-keypad-led";
++					reg = <0x48>;
++					label = "pm8058:infrared:proximitysensor";
++					default-state = "off";
++				};
++				led at 131 {
++					compatible = "qcom,pm8058-led";
++					reg = <0x131>;
++					label = "pm8058:red";
++					default-state = "off";
++				};
++				led at 132 {
++					/*
++					 * This is actually green too on my
++					 * board, but documented as yellow.
++					 */
++					compatible = "qcom,pm8058-led";
++					reg = <0x132>;
++					label = "pm8058:yellow";
++					default-state = "off";
++					linux,default-trigger = "mmc0";
++				};
++				led at 133 {
++					compatible = "qcom,pm8058-led";
++					reg = <0x133>;
++					label = "pm8058:green";
++					default-state = "on";
++					linux,default-trigger = "heartbeat";
++				};
+ 			};
+ 		};
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
