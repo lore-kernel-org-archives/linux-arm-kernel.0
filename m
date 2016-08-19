@@ -1,24 +1,39 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 19 Aug 2016 17:47:48 +0100
-Subject: [PATCH 08/13] scpi: add a vendor_msg mechanism in case the
- mailbox message differs
-In-Reply-To: <1471515066-3626-9-git-send-email-narmstrong@baylibre.com>
-References: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
- <1471515066-3626-9-git-send-email-narmstrong@baylibre.com>
-Message-ID: <bd59fdb1-5f6d-ffba-0c6a-b5eb28397521@arm.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Fri, 19 Aug 2016 17:48:55 +0100
+Subject: [PATCH v2] ARM: sa1100: clear reset status prior to reboot
+Message-ID: <E1bamyV-0006Ls-Qb@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Clear the current reset status prior to rebooting the platform.  This
+adds the bit missing from 04fef228fb00 ("[ARM] pxa: introduce
+reset_status and clear_reset_status for driver's usage").
 
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/mach-sa1100/generic.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-On 18/08/16 11:11, Neil Armstrong wrote:
-> In case the mailbox message pointer must contain a specific structure.
-> add a mechanism to override the pointer sent to the mailbox by a
-> vendor specific data initialized by a vendor speficic function.
->
-
-As discussed, I won't look at this and next patch. You can drop from now.
-
+diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+index 2e2c35b8e0d4..3e09beddb6e8 100644
+--- a/arch/arm/mach-sa1100/generic.c
++++ b/arch/arm/mach-sa1100/generic.c
+@@ -34,6 +34,7 @@
+ 
+ #include <mach/hardware.h>
+ #include <mach/irqs.h>
++#include <mach/reset.h>
+ 
+ #include "generic.h"
+ #include <clocksource/pxa.h>
+@@ -95,6 +96,8 @@ static void sa1100_power_off(void)
+ 
+ void sa11x0_restart(enum reboot_mode mode, const char *cmd)
+ {
++	clear_reset_status(RESET_STATUS_ALL);
++
+ 	if (mode == REBOOT_SOFT) {
+ 		/* Jump into ROM at address 0 */
+ 		soft_restart(0);
 -- 
-Regards,
-Sudeep
+2.1.0
