@@ -1,45 +1,27 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 19 Aug 2016 11:43:13 -0400
-Subject: [PATCH v3 2/2] ARM: multi_v7_defconfig: Don't attempt to enable
- schedutil governor as module
-In-Reply-To: <1471621393-20382-1-git-send-email-javier@osg.samsung.com>
-References: <1471621393-20382-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1471621393-20382-2-git-send-email-javier@osg.samsung.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Fri, 19 Aug 2016 17:43:36 +0200
+Subject: [PATCH v6 1/7] power: act8945a_charger: Remove
+ "battery_temperature"
+In-Reply-To: <1471569215-6046-2-git-send-email-wenyou.yang@atmel.com>
+References: <1471569215-6046-1-git-send-email-wenyou.yang@atmel.com>
+ <1471569215-6046-2-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20160819154336.e6etmygoxnxnngd6@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The schedutil CPUFreq governor could be built as a module but the commit
-58919e83c85c ("cpufreq / sched: Pass flags to cpufreq_update_util()")
-made it non-modular so attempting to enable as module leads to a warning:
+Hi,
 
-warning: symbol value 'm' invalid for CPU_FREQ_GOV_SCHEDUTIL
+On Fri, Aug 19, 2016 at 09:13:29AM +0800, Wenyou Yang wrote:
+> -	if (charger->battery_temperature && !(status & APCH_STATUS_TEMPDAT))
+> +	if (status & APCH_STATUS_TEMPDAT)
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+This is still wrong. You removed the negation.
 
----
-
-Changes in v3:
-- Add Krzysztof Kozlowski's Reviewed-by tag.
-
-Changes in v2:
-- Include linux-samsung-soc ML to cc list. Suggested by Krzysztof Kozlowski.
-
- arch/arm/configs/multi_v7_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 0ccaa519f588..65b5b6172e83 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -136,7 +136,7 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
- CONFIG_CPU_FREQ_GOV_POWERSAVE=m
- CONFIG_CPU_FREQ_GOV_USERSPACE=m
- CONFIG_CPU_FREQ_GOV_CONSERVATIVE=m
--CONFIG_CPU_FREQ_GOV_SCHEDUTIL=m
-+CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
- CONFIG_ARM_IMX6Q_CPUFREQ=y
- CONFIG_QORIQ_CPUFREQ=y
- CONFIG_CPU_IDLE=y
--- 
-2.5.5
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160819/2e26b177/attachment.sig>
