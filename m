@@ -1,47 +1,97 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Aug 2016 13:38:10 +0100
-Subject: [PATCH 0/5] arm64: KVM: vgic-v2: Allow unsafe GICV accesses
-Message-ID: <1471610295-1456-1-git-send-email-marc.zyngier@arm.com>
+Date: Fri, 19 Aug 2016 13:38:14 +0100
+Subject: [PATCH 4/5] arm64: KVM: vgic-v2: Add GICV access from HYP
+In-Reply-To: <1471610295-1456-1-git-send-email-marc.zyngier@arm.com>
+References: <1471610295-1456-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1471610295-1456-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a number of cases, KVM cannot give access direct access to the
-GICv2 GICV region, either because GICV is not page aligned, or its
-size is not a multiple of the page size. This is especially visible
-with 16kB/64kB pages and the original GIC-400 layout where each region
-is only 4k aligned.
+Now that we have the necessary infrastructure to handle MMIO accesses
+in HYP, perform the GICV access on behalf of the guest. This requires
+checking that the access is strictly 32bit, properly aligned, and
+falls within the expected range.
 
-Instead of disabling KVM altogether (which is the current behaviour),
-there is some value in trapping each guest GICV access, performing the
-access as quickly as possible at EL2, and resuming the guest. This
-allows us to keep KVM enabled on this HW.
+When all condition are satisfied, we perform the access and tell
+the rest of the HYP code that the instruction has been correctly
+emulated.
 
-Implementation wise, this is done with a static key controlling the
-workaround being enabled, hence coming at zero cost (well, an extra
-nop on the exit hot path) for unaffected platforms. On the affected
-HW, I've measured a 10 to 15% overhead for a self-IPI test, which is
-pretty bad, but still much better than not having a GIC at all.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ include/kvm/arm_vgic.h        |  3 +++
+ virt/kvm/arm/hyp/vgic-v2-sr.c | 39 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 42 insertions(+)
 
-Tested on Juno.
-
-Marc Zyngier (5):
-  arm/arm64: KVM: Don't BUG_ON if IT bits are set in ARM mode
-  arm64: KVM: Allow kvm_skip_instr32 to be shared between kernel and HYP
-    code
-  arm64: KVM: vgic-v2: Add the GICV emulation infrastructure
-  arm64: KVM: vgic-v2: Add GICV access from HYP
-  arm64: KVM: vgic-v2: Enable GICV access from HYP if access from guest
-    is unsafe
-
- arch/arm/kvm/emulate.c               |  4 +-
- arch/arm64/include/asm/kvm_emulate.h | 49 +++++++++++++++++++++++++
- arch/arm64/include/asm/kvm_hyp.h     |  1 +
- arch/arm64/kvm/emulate.c             | 47 +-----------------------
- arch/arm64/kvm/hyp/switch.c          | 32 ++++++++++++++++
- include/kvm/arm_vgic.h               |  6 +++
- virt/kvm/arm/hyp/vgic-v2-sr.c        | 46 +++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-v2.c          | 71 ++++++++++++++++++++++--------------
- 8 files changed, 180 insertions(+), 76 deletions(-)
-
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 8eb1501..bb46c03 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -50,6 +50,9 @@ struct vgic_global {
+ 	/* Physical address of vgic virtual cpu interface */
+ 	phys_addr_t		vcpu_base;
+ 
++	/* GICV mapping */
++	void __iomem		*vcpu_base_va;
++
+ 	/* virtual control interface mapping */
+ 	void __iomem		*vctrl_base;
+ 
+diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
+index 3e2a62e..860fdc2 100644
+--- a/virt/kvm/arm/hyp/vgic-v2-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
+@@ -19,6 +19,7 @@
+ #include <linux/irqchip/arm-gic.h>
+ #include <linux/kvm_host.h>
+ 
++#include <asm/kvm_emulate.h>
+ #include <asm/kvm_hyp.h>
+ 
+ static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
+@@ -171,6 +172,44 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
+ #ifdef CONFIG_ARM64
+ bool __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ {
++	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
++	struct vgic_dist *vgic = &kvm->arch.vgic;
++	phys_addr_t fault_ipa;
++	void __iomem *addr;
++	int rd;
++
++	/* Reject anything but a 32bit access */
++	if (kvm_vcpu_dabt_get_as(vcpu) != sizeof(u32))
+ 		return false;
++
++	/* Not aligned? Don't bother */
++	fault_ipa = kvm_vcpu_get_hfar(vcpu) & GENMASK(11, 0);
++	if (fault_ipa & 3)
++		return false;
++
++	/* Build the full address */
++	fault_ipa |= kvm_vcpu_get_fault_ipa(vcpu);
++
++	/* If not for GICV, move on */
++	if (fault_ipa <  vgic->vgic_cpu_base ||
++	    fault_ipa >= (vgic->vgic_cpu_base + KVM_VGIC_V2_CPU_SIZE))
++		return false;
++
++	rd = kvm_vcpu_dabt_get_rd(vcpu);
++	addr  = kern_hyp_va((kern_hyp_va(&kvm_vgic_global_state))->vcpu_base_va);
++	addr += fault_ipa - vgic->vgic_cpu_base;
++
++	if (kvm_vcpu_dabt_iswrite(vcpu)) {
++		u32 data = vcpu_data_guest_to_host(vcpu,
++						   vcpu_get_reg(vcpu, rd),
++						   sizeof(u32));
++		writel_relaxed(data, addr);
++	} else {
++		u32 data = readl_relaxed(addr);
++		vcpu_set_reg(vcpu, rd, vcpu_data_host_to_guest(vcpu, data,
++							       sizeof(u32)));
++	}
++
++	return true;
+ }
+ #endif
 -- 
 2.1.4
