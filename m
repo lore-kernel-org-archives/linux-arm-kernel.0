@@ -1,27 +1,30 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Fri, 19 Aug 2016 16:09:05 +0200
-Subject: [crypto] [marvell-cesa] Driver hangs on Armada 385 device
-In-Reply-To: <20160819130846.GN1041@n2100.armlinux.org.uk>
-References: <57b6f38c.23012e0a.374a0.56c6@mx.google.com>
- <20160819141251.5dcc835d@free-electrons.com>
- <20160819130846.GN1041@n2100.armlinux.org.uk>
-Message-ID: <57B71301.4010005@free-electrons.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 19 Aug 2016 19:38:52 +0530
+Subject: [PATCH v2] ARM: dts: da850-lcdk: Audio support via simple-card
+In-Reply-To: <m2vayy6y6s.fsf@baylibre.com>
+References: <20160817125454.20717-1-kbeldan@baylibre.com>
+ <m2vayy6y6s.fsf@baylibre.com>
+Message-ID: <5d210466-def6-c19e-fce4-2b9730e13e2e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I was, wondering, do you boot with a separated DTB or a legacy boot 
-(concatenated to the Image) ?
+On Thursday 18 August 2016 06:17 PM, Kevin Hilman wrote:
+> Karl Beldan <kbeldan@baylibre.com> writes:
+> 
+>> The LCDK embeds a TLV320AIC3106 connected to the SoC McASP for analog
+>> audio. The power supply of the codec comes from the main PMIC
+>> (TPS650250) DCDCs which are always on per HW design and not
+>> controllable by SW, so SW wise the codec driver will rely on the 'dummy'
+>> regulator.
+>> Quality is good with arecord -pipe- aplay on Line In/Line Out.
+>>
+>> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+> 
+> Tested pass through: "arecord -f cd | aplay -" on DA850-LCDK.
+> 
+> Tested-by: Kevin Hilman <khilman@baylibre.com>
 
+Applied to v4.9/dts of my tree.
 
-Could you test with uImage.armada-385-db-ap [1], that's a legacy Image.
-Also, I have uploaded a minimalistic rootfs [2], if you want.
-
-1. http://www.free-electrons.com/~romain/pub/cesa/uImage.armada-385-db-ap
-2. http://www.free-electrons.com/~romain/pub/cesa/rootfs.cpio.xz
-
-Romain
-
--- 
-Romain Perier, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks,
+Sekhar
