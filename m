@@ -1,50 +1,70 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 19 Aug 2016 19:32:31 +0200
-Subject: [PATCH v3 10/12] arm64: dts: tegra: Add NVIDIA P2771 board support
+Date: Fri, 19 Aug 2016 19:32:30 +0200
+Subject: [PATCH v3 09/12] arm64: dts: tegra: Add NVIDIA P3310 main board
+ support
 In-Reply-To: <20160819173233.13260-1-thierry.reding@gmail.com>
 References: <20160819173233.13260-1-thierry.reding@gmail.com>
-Message-ID: <20160819173233.13260-11-thierry.reding@gmail.com>
+Message-ID: <20160819173233.13260-10-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Joseph Lo <josephl@nvidia.com>
 
-Add NVIDIA P2771 is composed of a P3310 processor module that connects
-to the P2597 I/O board. It comes with a 1200x1920 MIPI DSI panel
-connected via the P2597's display connector and has several connectors
-such as HDMI, USB 3.0, PCIe and ethernet.
+The NVIDIA P3310 is a processor module used in several reference designs
+that features a Tegra186 SoC, 8 GiB of LPDDR4 RAM, 32 GiB eMMC and other
+essentials such as ethernet, WiFi and a PMIC. It is typically connected
+to an I/O board (such as the P2597) that provides the connecters needed
+to hook it up to the outside world.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm64/boot/dts/nvidia/Makefile                | 1 +
- arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts | 8 ++++++++
- 2 files changed, 9 insertions(+)
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
+Changes in v3:
+- fix compatible string
 
-diff --git a/arch/arm64/boot/dts/nvidia/Makefile b/arch/arm64/boot/dts/nvidia/Makefile
-index 0f7cdf3e05c1..67234f3dc795 100644
---- a/arch/arm64/boot/dts/nvidia/Makefile
-+++ b/arch/arm64/boot/dts/nvidia/Makefile
-@@ -1,4 +1,5 @@
- dtb-$(CONFIG_ARCH_TEGRA_132_SOC) += tegra132-norrin.dtb
-+dtb-$(CONFIG_ARCH_TEGRA_186_SOC) += tegra186-p2771-0000.dtb
- dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2371-0000.dtb
- dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2371-2180.dtb
- dtb-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p2571.dtb
-diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
+ arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi | 34 ++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
+
+diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
 new file mode 100644
-index 000000000000..66b936389fa7
+index 000000000000..dc07ea618378
 --- /dev/null
-+++ b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
-@@ -0,0 +1,8 @@
-+/dts-v1/;
-+
-+#include "tegra186-p3310.dtsi"
++++ b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
+@@ -0,0 +1,34 @@
++#include "tegra186.dtsi"
 +
 +/ {
-+	model = "NVIDIA Tegra186 P2771-0000 Board";
-+	compatible = "nvidia,p2771-0000", "nvidia,tegra186";
++	model = "NVIDIA Tegra186 P3310 main Board";
++	compatible = "nvidia,p3310", "nvidia,tegra186";
++
++	aliases {
++		serial0 = &uarta;
++	};
++
++	chosen {
++		bootargs = "earlycon console=ttyS0,115200n8";
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x0 0x80000000 0x2 0x00000000>;
++	};
++
++	serial at 03100000 {
++		// HACK: before clk driver ready
++		clock-frequency = <408000000>;
++		status = "okay";
++	};
++
++	hsp at 03c00000 {
++		status = "okay";
++	};
++
++	bpmp {
++		status = "okay";
++	};
 +};
 -- 
 2.9.0
