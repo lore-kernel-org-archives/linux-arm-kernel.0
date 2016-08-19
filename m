@@ -1,29 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 19 Aug 2016 08:42:55 -0500
-Subject: [PATCH v3 1/3] devicetree: Sort vendor prefixes in alphabetical
- order
-In-Reply-To: <54da74da3f60ede0bf8fb789ffee584703e81a29.1471553094.git.ccc94453@vip.cybercity.dk>
-References: <54da74da3f60ede0bf8fb789ffee584703e81a29.1471553094.git.ccc94453@vip.cybercity.dk>
-Message-ID: <20160819134255.GA29943@rob-hp-laptop>
+Date: Fri, 19 Aug 2016 08:44:22 -0500
+Subject: [PATCH v2 1/3] dt-bindings: thermal: Add binding document for
+ Mediatek thermal controller
+In-Reply-To: <1471492253-7185-2-git-send-email-dawei.chien@mediatek.com>
+References: <1471492253-7185-1-git-send-email-dawei.chien@mediatek.com>
+ <1471492253-7185-2-git-send-email-dawei.chien@mediatek.com>
+Message-ID: <20160819134422.GA1118@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2016 at 11:13:34PM +0200, Rask Ingemann Lambertsen wrote:
-> Vendor prefixes should be listed in alphabetical order, which some of
-> them weren't, so this patch corrects that.
+On Thu, Aug 18, 2016 at 11:50:51AM +0800, Dawei Chien wrote:
+> This adds the device tree binding documentation for the mediatek thermal
+> controller found on Mediatek MT2701.
 > 
-> Signed-off-by: Rask Ingemann Lambertsen <ccc94453@vip.cybercity.dk>
+> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
 > ---
-> 
-> I used 'sort --ignore-case --key 1,1'.
-> 
-> Changes in v3:
-> This patch is new in v3.
-> 
->  .../devicetree/bindings/vendor-prefixes.txt        | 30 +++++++++++-----------
->  1 file changed, 15 insertions(+), 15 deletions(-)
+>  .../bindings/thermal/mediatek-thermal.txt          |    4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
 
-Oh, there's a lot more than I realized. I'd suggest that I take patches 
-1 and 2 thru my tree so I can manage any conflicts.
-
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
