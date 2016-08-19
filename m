@@ -1,77 +1,61 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 20 Aug 2016 02:46:29 +0900
-Subject: [PATCH v6 1/2] clk: uniphier: add core support code for UniPhier
- clock driver
-In-Reply-To: <20160819002507.GS361@codeaurora.org>
+Date: Sat, 20 Aug 2016 02:55:12 +0900
+Subject: [PATCH v6 2/2] clk: uniphier: add clock data for UniPhier SoCs
+In-Reply-To: <20160819002826.GT361@codeaurora.org>
 References: <1470112223-24835-1-git-send-email-yamada.masahiro@socionext.com>
- <1470112223-24835-2-git-send-email-yamada.masahiro@socionext.com>
- <20160819002507.GS361@codeaurora.org>
-Message-ID: <CAK7LNAQg-LcK-vsWVU-b0WsF=Y_NBNR_cWqNDJKyMqp7Svdvqg@mail.gmail.com>
+ <1470112223-24835-3-git-send-email-yamada.masahiro@socionext.com>
+ <20160819002826.GT361@codeaurora.org>
+Message-ID: <CAK7LNAROCdE4tomp6jg4p5Ep-koPjWSchNEXH01Qn0Wn3q-f2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Stephen,
 
 
-2016-08-19 9:25 GMT+09:00 Stephen Boyd <sboyd@codeaurora.org>:
->> +int uniphier_clk_probe(struct platform_device *pdev)
->
-> static?
-
-
-Thanks.
-Will fix in v7.
-
-
->> +{
->> +     struct device *dev = &pdev->dev;
->> +     const struct of_device_id *match;
->> +     struct clk_hw_onecell_data *hw_data;
->> +     struct device_node *parent;
->> +     struct regmap *regmap;
->> +     const struct uniphier_clk_data *p;
->> +     int clk_num = 0;
->> +
->> +     match = of_match_node(uniphier_clk_match, dev->of_node);
->> +     if (!match)
->> +             return -ENODEV;
->
-> We can use of_driver_match_device() to make this simpler.
-
-
-I want to use the returned "match".
-The of_driver_match_device() just checks if it matches or not,
-so I do not think it can be the replacement.
-
-I can use of_match_device() instead, if you like.
-
-
+2016-08-19 9:28 GMT+09:00 Stephen Boyd <sboyd@codeaurora.org>:
 
 >> +
->> +     parent = of_get_parent(dev->of_node); /* parent should be syscon node */
->> +     regmap = syscon_node_to_regmap(parent);
->> +     of_node_put(parent);
+>> +
+>> +System clock
+>> +------------
+>> +
+>> +Required properties:
+>> +- compatible: should be one of the following:
+>> +    "socionext,uniphier-sld3-clock" - for PH1-sLD3 SoC.
+>> +    "socionext,uniphier-ld4-clock"  - for PH1-LD4 SoC.
+>> +    "socionext,uniphier-pro4-clock" - for PH1-Pro4 SoC.
+>> +    "socionext,uniphier-sld8-clock" - for PH1-sLD8 SoC.
+>> +    "socionext,uniphier-pro5-clock" - for PH1-Pro5 SoC.
+>> +    "socionext,uniphier-pxs2-clock" - for ProXstream2/PH1-LD6b SoC.
+>> +    "socionext,uniphier-ld11-clock" - for PH1-LD11 SoC.
+>> +    "socionext,uniphier-ld20-clock" - for PH1-LD20 SoC.
+>> +- #clock-cells: should be 1.
+>> +
+>> +Example:
+>> +
+>> +     sysctrl at 61840000 {
+>> +             compatible = "socionext,uniphier-ld20-sysctrl",
+>> +                          "simple-mfd", "syscon";
+>> +             reg = <0x61840000 0x4000>;
+>> +
+>> +             clock {
+>> +                     compatible = "socionext,uniphier-ld20-clock";
+>> +                     #clock-cells = <1>;
+>> +             };
+>> +
+>> +             other nodes ...
 >
-> devm_get_regmap(dev->parent) should work then? Why do we need to
-> use OF APIs?
+> What are the other nodes? Is there a document for the rest of the
+> MFD?
 
-"git grep devm_get_regmap" did not hit anything.
+At lease there are "clock" and "reset" in this MFD at this point.
+Perhaps, I may want to add more in the future.
 
-Where is it defined?
+That's why I do not want to list all of the sibling nodes.
 
-
-
->> +     init.name = name;
->> +     init.ops = &clk_fixed_factor_ops;
->> +     init.flags = data->parent_name ? CLK_SET_RATE_PARENT : 0;
->> +     init.flags |= CLK_IS_BASIC;
->
-> Please don't use CLK_IS_BASIC unless you need it. So far we've
-> kept it to OMAP and I'm hoping to delete it.
-
-
-Will do in v7.
-
+The reset node is documented in its binding document,
+added by the following patch:
+https://patchwork.kernel.org/patch/9255101/
 
 
 -- 
