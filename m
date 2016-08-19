@@ -1,9 +1,9 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 19 Aug 2016 15:42:25 +0800
-Subject: [PATCH v6 3/4] ARM: dts: sun9i: cubieboard4: Add device node for AC100
+Date: Fri, 19 Aug 2016 15:42:24 +0800
+Subject: [PATCH v6 2/4] ARM: dts: sun9i: a80-optimus: Add device node for AC100
 In-Reply-To: <20160819074226.16636-1-wens@csie.org>
 References: <20160819074226.16636-1-wens@csie.org>
-Message-ID: <20160819074226.16636-4-wens@csie.org>
+Message-ID: <20160819074226.16636-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,21 +12,21 @@ Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 Changes since v5: none
 Changes since v4: none
 
-Changes since v3:                           
+Changes since v3:
 
   - Moved 4M ADDA clk to codec side
 
 Changes since v2: none
 Changes since v1: none
 ---
- arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 24 ++++++++++++++++++++++++
+ arch/arm/boot/dts/sun9i-a80-optimus.dts | 24 ++++++++++++++++++++++++
  1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
-index 1526b41c70f1..cf2f4b72a841 100644
---- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
-+++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
-@@ -250,6 +250,30 @@
+diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+index 7fd22e888602..e35c06c162a7 100644
+--- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
++++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+@@ -322,6 +322,30 @@
  			};
  		};
  	};
