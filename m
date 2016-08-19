@@ -1,61 +1,44 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 19 Aug 2016 15:42:24 +0800
-Subject: [PATCH v6 2/4] ARM: dts: sun9i: a80-optimus: Add device node for AC100
+Date: Fri, 19 Aug 2016 15:42:23 +0800
+Subject: [PATCH v6 1/4] rtc: ac100: support clock-output-names in device tree
+ binding
 In-Reply-To: <20160819074226.16636-1-wens@csie.org>
 References: <20160819074226.16636-1-wens@csie.org>
-Message-ID: <20160819074226.16636-3-wens@csie.org>
+Message-ID: <20160819074226.16636-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The ac100 device tree binding specifies the usage of clock-output-names
+to specify the names of its 3 clock outputs. This is needed for orphan
+clock resolution, when the ac100 is probed much later than any clocks
+that consume any of its outputs. This wasn't supported by the driver.
+
+Add support for this.
+
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
-Changes since v5: none
-Changes since v4: none
+Changes since v5:
 
-Changes since v3:
+  - New patch, based on mfd-rtc immutable branch given in
 
-  - Moved 4M ADDA clk to codec side
+     http://www.spinics.net/lists/devicetree/msg137991.html
 
-Changes since v2: none
-Changes since v1: none
 ---
- arch/arm/boot/dts/sun9i-a80-optimus.dts | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ drivers/rtc/rtc-ac100.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-index 7fd22e888602..e35c06c162a7 100644
---- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
-+++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-@@ -322,6 +322,30 @@
- 			};
+diff --git a/drivers/rtc/rtc-ac100.c b/drivers/rtc/rtc-ac100.c
+index 70b4fd0f6122..2d0bb02a25d9 100644
+--- a/drivers/rtc/rtc-ac100.c
++++ b/drivers/rtc/rtc-ac100.c
+@@ -327,6 +327,8 @@ static int ac100_rtc_register_clks(struct ac100_rtc_dev *chip)
+ 			.flags = 0,
  		};
- 	};
-+
-+	ac100: codec at e89 {
-+		compatible = "x-powers,ac100";
-+		reg = <0xe89>;
-+
-+		ac100_codec: codec {
-+			compatible = "x-powers,ac100-codec";
-+			interrupt-parent = <&r_pio>;
-+			interrupts = <0 9 IRQ_TYPE_LEVEL_LOW>; /* PL9 */
-+			#clock-cells = <0>;
-+			clock-output-names = "4M_adda";
-+		};
-+
-+		ac100_rtc: rtc {
-+			compatible = "x-powers,ac100-rtc";
-+			interrupt-parent = <&nmi_intc>;
-+			interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&ac100_codec>;
-+			#clock-cells = <1>;
-+			clock-output-names = "cko1_rtc",
-+					     "cko2_rtc",
-+					     "cko3_rtc";
-+		};
-+	};
- };
  
- #include "axp809.dtsi"
++		of_property_read_string_index(np, "clock-output-names",
++					      i, &init.name);
+ 		clk->regmap = chip->regmap;
+ 		clk->offset = AC100_CLKOUT_CTRL1 + i;
+ 		clk->hw.init = &init;
 -- 
 2.9.3
