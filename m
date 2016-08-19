@@ -1,80 +1,39 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Fri, 19 Aug 2016 17:05:22 -0500
-Subject: [PATCH v5] i2c: imx: make bus recovery through pinctrl optional
-Message-ID: <1471644322-22670-1-git-send-email-leoyang.li@nxp.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Sat, 20 Aug 2016 01:10:12 +0300
+Subject: [PATCH 0/3] gpio/pinctrl: imx: let IOMUX controller know about on-SoC
+ GPIOs
+Message-ID: <1471644615-10320-1-git-send-email-vladimir_zapolskiy@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 1c4b6c3bcf30 ("i2c: imx: implement bus recovery") the
-driver starts to use gpio/pinctrl to do i2c bus recovery.  But pinctrl
-is not always available for platforms with this controller such as ls1021a
-and ls1043a, and the device tree binding also mentioned this gpio based
-recovery mechanism as optional.  The patch makes it really optional that
-the probe function won't bailout but just disable the bus recovery function
-when pinctrl is not available.
+The change establishes a connection between on-SoC IOMUX controller(s)
+and GPIO controllers found on some SoC from Freescale/NXP iMX series,
+if a GPIO controller device node contains common gpio-ranges information.
 
-Signed-off-by: Li Yang <leoyang.li@nxp.com>
-Cc: Gao Pan <pandy.gao@nxp.com>
-Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
-v5:
-Revert the last minute change of recovery info initialization timing, it
-will cause problem if initialized after i2c_add_numbered_adapter()
+The change is backward compatible with respect to potentially not updated
+outdated DTB data without gpio-ranges propery, for such boards the only
+functional change is lowered initcall priority of GPIO controller driver,
+which in general anyway is exected to be used only after pinctrl/pinmux
+controller.
 
-v4:
-Remove the use of IS_ERR_OR_NULL
-Move the condition judgement to i2c_imx_init_recovery_info()
-Change the timing of recovery initialization to be after bus registration
+If this change is applied the next interesting applications may be done
+as a follow-up work, for example switching pad function to GPIO on gpiod
+request, converting iomux controller driver to strict type and so on.
 
-v3:
-Rebased to Wolfram's for-next branch
-Added acked-by from Linus Walleij
-Update to use new nxp email addresses due to company merge
+For actual values of gpio-ranges properties please reference series
+"ARM: dts: imx: add gpio-ranges properties to some iMX GPIO controllers"
+http://archive.arm.linux.org.uk/lurker/message/20160819.220621.86d845d1.en.html
 
- drivers/i2c/busses/i2c-imx.c | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+Deepak Das (1):
+  gpio: mxc: lower level of gpio_mxc_init() initcall
 
-diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-index 1844bc9..7ae7992 100644
---- a/drivers/i2c/busses/i2c-imx.c
-+++ b/drivers/i2c/busses/i2c-imx.c
-@@ -989,6 +989,15 @@ static void i2c_imx_init_recovery_info(struct imx_i2c_struct *i2c_imx,
- {
- 	struct i2c_bus_recovery_info *rinfo = &i2c_imx->rinfo;
- 
-+	/* if pinctrl is not supported on the system */
-+	if (IS_ERR(i2c_imx->pinctrl))
-+		i2c_imx->pinctrl = NULL;
-+
-+	if (!i2c_imx->pinctrl) {
-+		dev_info(&pdev->dev, "can't get pinctrl, bus recovery not supported\n");
-+		return;
-+	}
-+
- 	i2c_imx->pinctrl_pins_default = pinctrl_lookup_state(i2c_imx->pinctrl,
- 			PINCTRL_STATE_DEFAULT);
- 	i2c_imx->pinctrl_pins_gpio = pinctrl_lookup_state(i2c_imx->pinctrl,
-@@ -1081,8 +1090,11 @@ static int i2c_imx_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	/* optional bus recovery feature through pinctrl */
- 	i2c_imx->pinctrl = devm_pinctrl_get(&pdev->dev);
--	if (IS_ERR(i2c_imx->pinctrl)) {
-+	/* bailout on -ENOMEM or -EPROBE_DEFER, continue for other errors */
-+	if (PTR_ERR(i2c_imx->pinctrl) == -ENOMEM ||
-+			PTR_ERR(i2c_imx->pinctrl) == -EPROBE_DEFER) {
- 		ret = PTR_ERR(i2c_imx->pinctrl);
- 		goto clk_disable;
- 	}
-@@ -1125,6 +1137,7 @@ static int i2c_imx_probe(struct platform_device *pdev)
- 			i2c_imx, IMX_I2C_I2CR);
- 	imx_i2c_write_reg(i2c_imx->hwdata->i2sr_clr_opcode, i2c_imx, IMX_I2C_I2SR);
- 
-+	/* Init bus recovery info if supported */
- 	i2c_imx_init_recovery_info(i2c_imx, pdev);
- 
- 	/* Add I2C adapter */
+Vladimir Zapolskiy (2):
+  pinctrl: imx: accept gpio request/free from pinctrl
+  gpio: mxc: add generic gpio request/free callbacks to pinctrl
+
+ drivers/gpio/gpio-mxc.c                 | 7 ++++++-
+ drivers/pinctrl/freescale/pinctrl-imx.c | 4 ++--
+ 2 files changed, 8 insertions(+), 3 deletions(-)
+
 -- 
-1.9.0
+2.8.1
