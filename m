@@ -1,115 +1,153 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Fri, 19 Aug 2016 09:13:32 +0800
-Subject: [PATCH v6 4/7] power: act8945a_charger: Fix the power supply type
+Date: Fri, 19 Aug 2016 09:13:33 +0800
+Subject: [PATCH v6 5/7] power: act8945a_charger: Add capacity level property
 In-Reply-To: <1471569215-6046-1-git-send-email-wenyou.yang@atmel.com>
 References: <1471569215-6046-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1471569215-6046-5-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1471569215-6046-6-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The power supply type property is varying as the external power
-supply changes. It is not a constant.
+Add the power supply capacity level property, it corresponds to
+POWER_SUPPLY_CAPACITY_LEVEL_*.
+
+It also utilizes the precision voltage detector function module
+to catch the low battery voltage.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 ---
 
-Changes in v6: None
+Changes in v6:
+ - For 'lbo-gpios', use gpiod API instead of old gpio API to handle.
+
 Changes in v5: None
-Changes in v4: None
+Changes in v4:
+ - Change devname of devm_request_irq() from "lbo-detect" to
+   "act8945a, lbo-detect".
+
 Changes in v3: None
 Changes in v2: None
 
- drivers/power/supply/act8945a_charger.c | 48 ++++++++++++++++++++++++++-------
- 1 file changed, 39 insertions(+), 9 deletions(-)
+ drivers/power/supply/act8945a_charger.c | 75 +++++++++++++++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
 
 diff --git a/drivers/power/supply/act8945a_charger.c b/drivers/power/supply/act8945a_charger.c
-index e5bc237..2ff2f8d 100644
+index 2ff2f8d..de7ad48 100644
 --- a/drivers/power/supply/act8945a_charger.c
 +++ b/drivers/power/supply/act8945a_charger.c
-@@ -78,6 +78,7 @@ static const char *act8945a_charger_manufacturer = "Active-semi";
+@@ -18,6 +18,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/power_supply.h>
+ #include <linux/regmap.h>
++#include <linux/gpio/consumer.h>
  
- struct act8945a_charger {
- 	struct power_supply *psy;
-+	struct power_supply_desc desc;
- 	struct regmap *regmap;
+ static const char *act8945a_charger_model = "ACT8945A";
+ static const char *act8945a_charger_manufacturer = "Active-semi";
+@@ -83,6 +84,7 @@ struct act8945a_charger {
  	struct work_struct work;
  
-@@ -250,14 +251,6 @@ static int act8945a_charger_get_property(struct power_supply *psy,
- 	return ret;
- }
+ 	bool init_done;
++	struct gpio_desc *lbo_gpio;
+ };
  
--static const struct power_supply_desc act8945a_charger_desc = {
--	.name		= "act8945a-charger",
--	.type		= POWER_SUPPLY_TYPE_BATTERY,
--	.get_property	= act8945a_charger_get_property,
--	.properties	= act8945a_charger_props,
--	.num_properties	= ARRAY_SIZE(act8945a_charger_props),
--};
--
- static int act8945a_enable_interrupt(struct act8945a_charger *charger)
- {
- 	struct regmap *regmap = charger->regmap;
-@@ -281,11 +274,39 @@ static int act8945a_enable_interrupt(struct act8945a_charger *charger)
+ static int act8945a_get_charger_state(struct regmap *regmap, int *val)
+@@ -208,11 +210,67 @@ static int act8945a_get_battery_health(struct regmap *regmap, int *val)
  	return 0;
  }
  
-+static unsigned int act8945a_set_supply_type(struct act8945a_charger *charger,
-+					     unsigned int *type)
++static int act8945a_get_capacity_level(struct act8945a_charger *charger,
++				       struct regmap *regmap, int *val)
 +{
-+	unsigned int status, state;
 +	int ret;
++	unsigned int status, state, config;
++	int lbo_level = gpiod_get_value(charger->lbo_gpio);
 +
-+	ret = regmap_read(charger->regmap, ACT8945A_APCH_STATUS, &status);
++	ret = regmap_read(regmap, ACT8945A_APCH_STATUS, &status);
 +	if (ret < 0)
 +		return ret;
 +
-+	ret = regmap_read(charger->regmap, ACT8945A_APCH_STATE, &state);
++	ret = regmap_read(regmap, ACT8945A_APCH_CFG, &config);
 +	if (ret < 0)
 +		return ret;
 +
-+	if (status & APCH_STATUS_INDAT) {
-+		if (state & APCH_STATE_ACINSTAT)
-+			*type = POWER_SUPPLY_TYPE_MAINS;
++	ret = regmap_read(regmap, ACT8945A_APCH_STATE, &state);
++	if (ret < 0)
++		return ret;
++
++	state &= APCH_STATE_CSTATE;
++	state >>= APCH_STATE_CSTATE_SHIFT;
++
++	switch (state) {
++	case APCH_STATE_CSTATE_PRE:
++		*val = POWER_SUPPLY_CAPACITY_LEVEL_LOW;
++		break;
++	case APCH_STATE_CSTATE_FAST:
++		if (lbo_level)
++			*val = POWER_SUPPLY_CAPACITY_LEVEL_HIGH;
 +		else
-+			*type = POWER_SUPPLY_TYPE_USB;
-+	} else {
-+		*type = POWER_SUPPLY_TYPE_BATTERY;
++			*val = POWER_SUPPLY_CAPACITY_LEVEL_LOW;
++		break;
++	case APCH_STATE_CSTATE_EOC:
++		if (status & APCH_STATUS_CHGDAT)
++			*val = POWER_SUPPLY_CAPACITY_LEVEL_FULL;
++		else
++			*val = POWER_SUPPLY_CAPACITY_LEVEL_NORMAL;
++		break;
++	case APCH_STATE_CSTATE_DISABLED:
++	default:
++		if (config & APCH_CFG_SUSCHG) {
++			*val = POWER_SUPPLY_CAPACITY_LEVEL_UNKNOWN;
++		} else {
++			*val = POWER_SUPPLY_CAPACITY_LEVEL_NORMAL;
++			if (!(status & APCH_STATUS_INDAT)) {
++				if (!lbo_level)
++					*val = POWER_SUPPLY_CAPACITY_LEVEL_CRITICAL;
++			}
++		}
++		break;
 +	}
 +
 +	return 0;
 +}
 +
- static void act8945a_work(struct work_struct *work)
- {
- 	struct act8945a_charger *charger =
- 			container_of(work, struct act8945a_charger, work);
+ static enum power_supply_property act8945a_charger_props[] = {
+ 	POWER_SUPPLY_PROP_STATUS,
+ 	POWER_SUPPLY_PROP_CHARGE_TYPE,
+ 	POWER_SUPPLY_PROP_TECHNOLOGY,
+ 	POWER_SUPPLY_PROP_HEALTH,
++	POWER_SUPPLY_PROP_CAPACITY_LEVEL,
+ 	POWER_SUPPLY_PROP_MODEL_NAME,
+ 	POWER_SUPPLY_PROP_MANUFACTURER
+ };
+@@ -238,6 +296,10 @@ static int act8945a_charger_get_property(struct power_supply *psy,
+ 	case POWER_SUPPLY_PROP_HEALTH:
+ 		ret = act8945a_get_battery_health(regmap, &val->intval);
+ 		break;
++	case POWER_SUPPLY_PROP_CAPACITY_LEVEL:
++		ret = act8945a_get_capacity_level(charger,
++						  regmap, &val->intval);
++		break;
+ 	case POWER_SUPPLY_PROP_MODEL_NAME:
+ 		val->strval = act8945a_charger_model;
+ 		break;
+@@ -352,6 +414,19 @@ static int act8945a_charger_config(struct device *dev,
+ 	if (tmp & APCH_CFG_SUSCHG)
+ 		value |= APCH_CFG_SUSCHG;
  
-+	act8945a_set_supply_type(charger, &charger->desc.type);
++	charger->lbo_gpio = devm_gpiod_get(dev, "active-semi,lbo", GPIOD_IN);
++	if (IS_ERR(charger->lbo_gpio)) {
++		dev_err(dev, "unable to claim gpio \"lbo\"\n");
++		charger->lbo_gpio = NULL;
++	};
 +
- 	power_supply_changed(charger->psy);
- }
- 
-@@ -438,11 +459,20 @@ static int act8945a_charger_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	charger->desc.name = "act8945a-charger";
-+	charger->desc.get_property = act8945a_charger_get_property;
-+	charger->desc.properties = act8945a_charger_props;
-+	charger->desc.num_properties = ARRAY_SIZE(act8945a_charger_props);
-+
-+	ret = act8945a_set_supply_type(charger, &charger->desc.type);
++	ret = devm_request_irq(dev, gpiod_to_irq(charger->lbo_gpio),
++			       act8945a_status_changed,
++			       (IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING),
++			       "act8945a_lbo_detect", charger);
 +	if (ret)
-+		return -EINVAL;
++		dev_dbg(dev, "failed to request \"lbo\" pin IRQ\n");
 +
- 	psy_cfg.of_node	= pdev->dev.parent->of_node;
- 	psy_cfg.drv_data = charger;
+ 	chglev_pin = of_get_named_gpio_flags(np,
+ 				"active-semi,chglev-gpios", 0, &flags);
  
- 	charger->psy = devm_power_supply_register(&pdev->dev,
--						  &act8945a_charger_desc,
-+						  &charger->desc,
- 						  &psy_cfg);
- 	if (IS_ERR(charger->psy)) {
- 		dev_err(&pdev->dev, "failed to register power supply\n");
 -- 
 2.7.4
