@@ -1,32 +1,33 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 19 Aug 2016 20:37:45 +0800
-Subject: [PATCH v2] usb: chipidea: delete an useless header include
-Message-ID: <20160819123745.837-1-jszhang@marvell.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 19 Aug 2016 07:45:00 -0500
+Subject: [PATCH v4 17/17] dt-bindings: pwm: sti: Update DT bindings with
+ recent changes
+In-Reply-To: <20160819083557.GK4254@dell>
+References: <20160816093508.28307-1-lee.jones@linaro.org>
+ <20160816093508.28307-18-lee.jones@linaro.org>
+ <20160818192002.GA26225@rob-hp-laptop> <20160819083557.GK4254@dell>
+Message-ID: <CAL_JsqLOoU0gHiz7CEii3CXsGQS28u2+w5t7vxT1FStRaeObkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<linux/phy.h> is for net phy drivers, we don't need it.
+On Fri, Aug 19, 2016 at 3:35 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, 18 Aug 2016, Rob Herring wrote:
+>
+>> On Tue, Aug 16, 2016 at 10:35:08AM +0100, Lee Jones wrote:
+>> > We're renaming the 'st,pwm-num-chan' binding to 'st,pwm-num-devs' to
+>> > be more inline with the naming conventions of the subsystem.  Where
+>> > we used to treat each line as a channel, the PWM convention is to
+>> > describe them as devices.
+>>
+>> This is out of date now. Otherwise, the binding looks fine.
+>
+> Yes, you are right.
+>
+> Perhaps if this is okay with Thierry, he can remove these few lines.
+> If not, I don't mind re-sending on request.
+>
+> I'll leave it until I hear otherwise.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
+Fine with me.
 
-Since v1:
-  - fix commit subject. Thank Sergei for pointing it out.
-
- drivers/usb/chipidea/core.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 69426e6..ae12595 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -62,7 +62,6 @@
- #include <linux/usb/chipidea.h>
- #include <linux/usb/of.h>
- #include <linux/of.h>
--#include <linux/phy.h>
- #include <linux/regulator/consumer.h>
- #include <linux/usb/ehci_def.h>
- 
--- 
-2.9.3
+Acked-by: Rob Herring <robh@kernel.org>
