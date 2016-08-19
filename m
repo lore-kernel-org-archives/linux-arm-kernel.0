@@ -1,65 +1,24 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 19 Aug 2016 23:55:47 +0200
-Subject: [PATCH v4 6/6] ARM64: dts: meson-gxbb: Enable the the IR decoder on
- supported boards
-In-Reply-To: <20160819215547.20063-1-martin.blumenstingl@googlemail.com>
-References: <20160628191802.21227-1-martin.blumenstingl@googlemail.com>
- <20160819215547.20063-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20160819215547.20063-7-martin.blumenstingl@googlemail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 19 Aug 2016 15:03:06 -0700
+Subject: [PATCH v2 3/3] ARM64: dts: meson-gxbb: Add GXBB AO Clock and
+ Reset node
+In-Reply-To: <1471514928-3341-4-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Thu, 18 Aug 2016 12:08:48 +0200")
+References: <1471514928-3341-1-git-send-email-narmstrong@baylibre.com>
+ <1471514928-3341-4-git-send-email-narmstrong@baylibre.com>
+Message-ID: <7hk2fc76xx.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the Infrared Remote Controller on boards which have an Infrared
-receiver.
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts  | 6 ++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi     | 6 ++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi | 6 ++++++
- 3 files changed, 18 insertions(+)
+> Add the AO clock controller node for the AmLogic GXBB SoC.
+>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-index cba3ea1..9900b87 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-@@ -161,3 +161,9 @@
- 	vmmc-supply = <&vcc3v3>;
- 	vmmcq-sumpply = <&vcc1v8>;
- };
-+
-+&ir {
-+	status = "okay";
-+	pinctrl-0 = <&ir_in_ao_pins>;
-+	pinctrl-names = "default";
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-index e118754..dc007fe 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-@@ -143,3 +143,9 @@
- 	vmmc-supply = <&vcc_3v3>;
- 	vmmcq-sumpply = <&vddio_boot>;
- };
-+
-+&ir {
-+	status = "okay";
-+	pinctrl-0 = <&ir_in_ao_pins>;
-+	pinctrl-names = "default";
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-index 54bb7c7..45cd3ae 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-@@ -60,3 +60,9 @@
- 	pinctrl-names = "default";
- 
- };
-+
-+&ir {
-+	status = "okay";
-+	pinctrl-0 = <&ir_in_ao_pins>;
-+	pinctrl-names = "default";
-+};
--- 
-2.9.3
+Applying this to the amlogic tree, but will need to wait a cycle due to
+include dependencies on the bindings, which are going through the clock
+tree.
+
+Kevin
