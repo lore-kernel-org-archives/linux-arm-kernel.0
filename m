@@ -1,63 +1,62 @@
-From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
-Date: Sat, 20 Aug 2016 06:55:26 +0900
-Subject: [PATCH] ARM: dts: socfpga: Add Macnica sodia board
-In-Reply-To: <57B5CDCA.8020703@opensource.altera.com>
-References: <1469482208-5071-1-git-send-email-iwamatsu@nigauri.org>
- <57AE2951.3050404@opensource.altera.com>
- <32814CCC-93D0-4D39-8CE8-89F17D742583@gmail.com>
- <57B5CDCA.8020703@opensource.altera.com>
-Message-ID: <CABMQnVKYDwbiY7CEd_7m88a+fvxS6LkJLFnPPzjmQDAVEGvn+w@mail.gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Fri, 19 Aug 2016 23:55:41 +0200
+Subject: [PATCH v4 0/6] Add Meson 8b / GXBB support to the IR driver
+In-Reply-To: <20160628191802.21227-1-martin.blumenstingl@googlemail.com>
+References: <20160628191802.21227-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20160819215547.20063-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Newer Amlogic platforms (Meson 8b and GXBB) use a slightly different
+register layout for their Infrared Remoete Controller. The decoder mode
+is now configured in another register. Without the changes to the
+meson-ir driver we are simply getting incorrect "durations" reported
+from the hardware (because the hardware is not in time measurement aka
+software decode mode).
 
-2016-08-19 0:01 GMT+09:00 Dinh Nguyen <dinguyen@opensource.altera.com>:
-> On 08/12/2016 03:26 PM, Florian Fainelli wrote:
->> On August 12, 2016 12:53:53 PM MST, Dinh Nguyen <dinguyen@opensource.altera.com> wrote:
->>> On 07/25/2016 04:30 PM, Nobuhiro Iwamatsu wrote:
->>>> Add support for board based on the Altera Cyclone V SoC.
->>>> This board has the following functions:
->>>>     - 1 GiB of DRAM
->>>>     - 1 Gigabit ethernet
->>>>     - 1 SD card slot
->>>>     - 1 USB gadget port
->>>>     - QSPI NOR Flash
->>>>     - I2C EEPROMs and I2C RTC
->>>>     - DVI output
->>>>     - Audio port
->>>>
->>>> This commit supports without QSPI, DVI and Audio.
->>>>
->>>> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
->>>> ---
->>>>  arch/arm/boot/dts/Makefile                   |   1 +
->>>>  arch/arm/boot/dts/socfpga_cyclone5_sodia.dts | 115
->>> +++++++++++++++++++++++++++
->>>>  2 files changed, 116 insertions(+)
->>>>  create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
->>>>
->>>
->>> Applied!
->>
->> This DTS still has Ethernet PHY properties (skew et al.) that are at the Ethernet MAC node level while they should be at the Ethetnet PHY node level, it is not like you tripped over that before..
->>
->
-> Thanks for catching this.
->
-> Nobuhiro, can you please fixup the ethernet node?
->
+This problem was also noticed by some people trying to use this on an
+ODROID-C1 and ODROID-C2 - the workaround there (probably because the
+datasheets were not publicy available yet at that time) was to switch
+to ir_raw_event_store_edge (which leaves it up to the kernel to measure
+the duration of a pulse). See [0] and [1] for the corresponding
+patches.
 
-Okay, I will resend updated patch.
-Thanks for your reivew.
+Changes in v4:
+- added support for pinctrl configuration which makes it possible to
+  use the IR decoder when doing a cold-boot. Without these pinctrl
+  changes the IR decoder was only working when booting into stock
+  Android, then rebooting and booting the mainline kernel (with the
+  other patches from this series). Thanks to Kevin Hilman for spotting
+  this issue.
+- rebased dts changes to Kevin's v4.8/integ branch
 
-> Thanks,
-> Dinh
+As discussed on IRC (thanks Neil):
 
-Best regards,
-  Nobuhiro
+Tested-by: Neil Armstrong <narmstrong@baylibre.com>
+
+
+[0] https://github.com/erdoukki/linux-amlogic-1/commit/969b2e2242fb14a13cb651f9a1cf771b599c958b
+[1] http://forum.odroid.com/viewtopic.php?f=135&t=20504
+
+
+Martin Blumenstingl (3):
+  pinctrl: amlogic: gxbb: add the IR remote pin
+  ARM64: dts: amlogic: add the pin for the IR remote
+  ARM64: dts: meson-gxbb: Enable the the IR decoder on supported boards
+
+Neil Armstrong (3):
+  dt-bindings: media: meson-ir: Add Meson8b and GXBB compatible strings
+  media: rc: meson-ir: Add support for newer versions of the IR decoder
+  ARM64: dts: meson-gxbb: Add Infrared Remote Controller decoder
+
+ .../devicetree/bindings/media/meson-ir.txt         |  5 +++-
+ .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts |  6 +++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   |  6 +++++
+ .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      |  6 +++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 14 +++++++++++
+ drivers/media/rc/meson-ir.c                        | 29 ++++++++++++++++++----
+ drivers/pinctrl/meson/pinctrl-meson-gxbb.c         |  8 ++++++
+ 7 files changed, 68 insertions(+), 6 deletions(-)
 
 -- 
-Nobuhiro Iwamatsu
-   iwamatsu at {nigauri.org / debian.org}
-   GPG ID: 40AD1FA6
+2.9.3
