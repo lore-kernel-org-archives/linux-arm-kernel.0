@@ -1,37 +1,79 @@
-From: kbeldan@baylibre.com (Karl Beldan)
-Date: Fri, 19 Aug 2016 17:42:38 +0000
-Subject: [PATCH v3 0/4] Add DT support for NAND to LCDK via ti-aemif
-In-Reply-To: <234aeb42-4373-a996-c782-1dac95838d07@ti.com>
-References: <20160816223338.20776-1-kbeldan@baylibre.com>
- <m2wpjeqa0o.fsf@baylibre.com> <m2vayxn5gw.fsf@baylibre.com>
- <20160819134602.GA3056@gobelin>
- <234aeb42-4373-a996-c782-1dac95838d07@ti.com>
-Message-ID: <20160819174238.GA7526@gobelin>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 20 Aug 2016 02:46:29 +0900
+Subject: [PATCH v6 1/2] clk: uniphier: add core support code for UniPhier
+ clock driver
+In-Reply-To: <20160819002507.GS361@codeaurora.org>
+References: <1470112223-24835-1-git-send-email-yamada.masahiro@socionext.com>
+ <1470112223-24835-2-git-send-email-yamada.masahiro@socionext.com>
+ <20160819002507.GS361@codeaurora.org>
+Message-ID: <CAK7LNAQg-LcK-vsWVU-b0WsF=Y_NBNR_cWqNDJKyMqp7Svdvqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2016 at 07:40:35PM +0530, Sekhar Nori wrote:
-> On Friday 19 August 2016 07:16 PM, Karl Beldan wrote:
-> 
-> > Sure, I'll add it to the series when resending.
-> 
-> I just pushed an updated master branch on my tree with all the patches
-> accepted so far. Can you please rebase against that branch while sending?
-> 
+Hi Stephen,
 
-I rebased and sent
-  [1] [PATCH] ARM: davinci_all_defconfig: Enable some UBI modules
-  [2] [PATCH v2] ARM: davinci: da8xx-dt:
-                 Add ti-aemif lookup for clock matching
 
-Unfortunately while automating I messed up and sent both twice and [2] as
-a reply to [1] while I intended to send them separately and preferably
-[1] after [2].
+2016-08-19 9:25 GMT+09:00 Stephen Boyd <sboyd@codeaurora.org>:
+>> +int uniphier_clk_probe(struct platform_device *pdev)
+>
+> static?
 
-You've already applied patches 2/4 and 3/4 of the original series
-while 3/4 depends on [2] and 4/4 is on hold because of the ECC issue.
 
-Please tell me if you want to deal with these patches or prefer a resend.
+Thanks.
+Will fix in v7.
 
-Regards, 
-Karl
+
+>> +{
+>> +     struct device *dev = &pdev->dev;
+>> +     const struct of_device_id *match;
+>> +     struct clk_hw_onecell_data *hw_data;
+>> +     struct device_node *parent;
+>> +     struct regmap *regmap;
+>> +     const struct uniphier_clk_data *p;
+>> +     int clk_num = 0;
+>> +
+>> +     match = of_match_node(uniphier_clk_match, dev->of_node);
+>> +     if (!match)
+>> +             return -ENODEV;
+>
+> We can use of_driver_match_device() to make this simpler.
+
+
+I want to use the returned "match".
+The of_driver_match_device() just checks if it matches or not,
+so I do not think it can be the replacement.
+
+I can use of_match_device() instead, if you like.
+
+
+
+>> +
+>> +     parent = of_get_parent(dev->of_node); /* parent should be syscon node */
+>> +     regmap = syscon_node_to_regmap(parent);
+>> +     of_node_put(parent);
+>
+> devm_get_regmap(dev->parent) should work then? Why do we need to
+> use OF APIs?
+
+"git grep devm_get_regmap" did not hit anything.
+
+Where is it defined?
+
+
+
+>> +     init.name = name;
+>> +     init.ops = &clk_fixed_factor_ops;
+>> +     init.flags = data->parent_name ? CLK_SET_RATE_PARENT : 0;
+>> +     init.flags |= CLK_IS_BASIC;
+>
+> Please don't use CLK_IS_BASIC unless you need it. So far we've
+> kept it to OMAP and I'm hoping to delete it.
+
+
+Will do in v7.
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
