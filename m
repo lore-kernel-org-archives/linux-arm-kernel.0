@@ -1,32 +1,61 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 19 Aug 2016 19:05:46 +0200
-Subject: [PATCH 6/7] arm64: dts: exynos: Add dts file for Exynos5433-based
- TM2 board
-In-Reply-To: <1471329328-26842-2-git-send-email-cw00.choi@samsung.com>
-References: <1471328843-26653-1-git-send-email-cw00.choi@samsung.com>
- <1471329328-26842-2-git-send-email-cw00.choi@samsung.com>
-Message-ID: <0aba7694-e5fc-47be-dce6-06f64fb3759d@samsung.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 19 Aug 2016 13:21:34 -0400
+Subject: [PATCH] dmaengine: qcom_hidma: release the descriptor before the
+ callback
+In-Reply-To: <20160819170208.GC9343@localhost>
+References: <20160808090203.GY9681@localhost>
+ <21475c6e-a5f8-5125-3998-f3995ce67c4d@codeaurora.org>
+ <20160810172805.GH9681@localhost>
+ <d09ebb5f-99ea-a4e9-da9c-693be89c7cd4@codeaurora.org>
+ <20160819024853.GR9681@localhost>
+ <8c096fee-9749-a7df-7e04-25d21c0ea9ac@codeaurora.org>
+ <20160819034249.GS9681@localhost>
+ <3592cfe2-a563-7c26-9a9e-925051cc1934@codeaurora.org>
+ <20160819055252.GT9681@localhost>
+ <37b059dcb67d1c83c2193acecef0ab96@codeaurora.org>
+ <20160819170208.GC9343@localhost>
+Message-ID: <f11a2775-63b8-6933-ab15-20e3927f0db7@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/16/2016 08:35 AM, Chanwoo Choi wrote:
-> &spi_1 {
-> +	cs-gpios = <&gpd6 3 GPIO_ACTIVE_HIGH>;
-> +	status = "okay";
-> +
-> +	wm5110: wm5110-codec at 0 {
-> +		compatible = "wlf,wm5110";
-> +		reg = <0x0>;
-> +		spi-max-frequency = <20000000>;
-> +		interrupt-parent = <&gpa0>;
-> +		interrupts = <4 0 0>;
-> +		clocks = <&xxti>, <&s2mps13_osc 2>;
+On 8/19/2016 1:02 PM, Vinod Koul wrote:
+> On Fri, Aug 19, 2016 at 07:13:43AM -0400, okaya at codeaurora.org wrote:
+>> On 2016-08-19 01:52, Vinod Koul wrote:
+>>> On Thu, Aug 18, 2016 at 11:48:52PM -0400, Sinan Kaya wrote:
+>>>> On 8/18/2016 11:42 PM, Vinod Koul wrote:
+>>>>> On Thu, Aug 18, 2016 at 11:26:28PM -0400, Sinan Kaya wrote:
+>>>>>> On 8/18/2016 10:48 PM, Vinod Koul wrote:
+>>>>>>>> Keep a size limited list with error cookies and flush them in terminate all?
+>>>>>>> I think so, terminate_all anyway cleans up the channel. Btw what is the
+>>>>>>> behaviour on error? Do you terminate or somthing else?
+>>>>>>>
+>>>>>>
+>>>>>> On error, I flush all outstanding transactions with an error code and I reset
+>>>>>> the channel. After the reset, the DMA channel is functional again. The client
+>>>>>> doesn't need to shutdown anything.
+>>>>>
+>>>>> You mean from the client context or driver?
+>>>>>
+>>>>
+>>>> The client doesn't need to call device_free_chan_resources and
+>>>> device_terminate_all
+>>>> to be specific. Client can certainly call these if it needs to
+>>>> but it is not
+>>>> required to recover the channel.
+>>>
+>>> You didn't answer my question!
+>>>
+>>> On error you said you flush, so who does that?
+>>
+>> This is done by the driver in interrupt context when an error
+>> interrupt is received. All transactions are posted and hw is reset.
+> 
+> Hmmm, waht about the txn which are pending? DO you clear them..?
+> 
 
-The first clock needs to be CLKOUT, i.e.
-
-	clocks = <&pmu_system_controller 0>, <&s2mps13_osc 2>;
-
+Yes, I clear both pending and active transactions. 
 
 -- 
-Thanks,
-Sylwester
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
