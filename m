@@ -1,98 +1,81 @@
-From: b-liu@ti.com (Bin Liu)
-Date: Fri, 19 Aug 2016 16:33:12 -0500
-Subject: [PATCH v2 6/7] phy-sun4i-usb: Add
- "allwinner,usb0-usb-a-connector" dt property
-In-Reply-To: <1471288892-21702-7-git-send-email-hdegoede@redhat.com>
-References: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
- <1471288892-21702-7-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160819213312.GD1853@uda0271908>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 19 Aug 2016 16:35:21 -0500
+Subject: [PATCH] soc: ti: wkup_m3_ipc: switch to using remoteproc OF
+ infrastructure
+In-Reply-To: <CAL_JsqLDWkpiZx2PTa11T-ynW=meCwq=tiNK6C2-U4-q5qrYDw@mail.gmail.com>
+References: <20160812003529.519-1-s-anna@ti.com> <20160812110201.GD25844@dell>
+ <55d90506-eb1b-c8f9-02b5-8484b9a4babd@ti.com>
+ <20160812164335.GG26240@tuxbot>
+ <CAL_Jsq+aOd-FqaKNtmDESw--pdxbWMuOzv+KXf-hhX+oU94CdQ@mail.gmail.com>
+ <dea62d2e-2935-ff91-967a-e8dee469543d@ti.com>
+ <CAL_JsqLDWkpiZx2PTa11T-ynW=meCwq=tiNK6C2-U4-q5qrYDw@mail.gmail.com>
+Message-ID: <a18ac529-27d1-a98b-dcfa-82f5c03197fe@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 08/19/2016 04:21 PM, Rob Herring wrote:
+> On Thu, Aug 18, 2016 at 4:30 PM, Suman Anna <s-anna@ti.com> wrote:
+>> Hi Rob,
+>>
+>> On 08/16/2016 09:54 AM, Rob Herring wrote:
+>>> On Fri, Aug 12, 2016 at 11:43 AM, Bjorn Andersson
+>>> <bjorn.andersson@linaro.org> wrote:
+>>>> On Fri 12 Aug 09:00 PDT 2016, Suman Anna wrote:
+>>>>
+>>>>> On 08/12/2016 06:02 AM, Lee Jones wrote:
+>>>>>> On Thu, 11 Aug 2016, Suman Anna wrote:
+>>>>>>
+> 
+> [...]
+> 
+>>>>> Once "rprocs" hits mainline, I will definitely switch over the
+>>>>> wkup_m3_ipc nodes to use that standard property and can fix this driver
+>>>>> independently.
+>>>>>
+>>>>
+>>>> We're stuck with this problem all over the place, as the world continues
+>>>> to evolve we will have issues with DT being static. This has been
+>>>> discussed many times before and the suggested solution is always what
+>>>> you implemented here - make the code deal with both versions, preferably
+>>>> by patching.
+>>>>
+>>>> The fact that you had to export the of_ operations indicates that no-one
+>>>> has tried this before and I'm happy you did. I'm however not happy about
+>>>> the size of the chunk of code it takes to do this dance.
+>>>>
+>>>> I think for this to be practical we need to provide higher level
+>>>> operations for DT modification - in this case a of_rename_property().
+>>>>
+>>>> @Rob, any comments on this?
+>>>
+>>> I agree. Pantelis submitted some helpers in this area a while back
+>>> (for the changeset API IIRC). I believe they were mostly fine, but
+>>> needed some users.
+>>>
+>>
+>> Is this the series you are talking about?
+>> http://marc.info/?l=devicetree&m=146341689512653&w=2
+>>
+>> It looks like that series is effective only when OF_DYNAMIC is enabled.
+> 
+> Yes, as changeset API allows adding/removing nodes. It's probably just
+> a matter of time until OF_DYNAMIC is always enabled.
+> 
+>> Probably a dumb question, but is this limited to DT Overlays?
+> 
+> No, changesets are the mechanism overlays use to apply changes.
+> 
+>> This
+>> particular usage is a one-time change (first-time module is insmod'd)
+>> mainly to provide compatibility for older DTBs, thereafter we wouldn't
+>> be required to make any changes. It is definitely not a bulk update and
+>> we don't want to unroll the changes even if we removed the module.
+> 
+> If you only need property changes, then we could do similar helpers to
+> make it easier for callers.
 
-On Mon, Aug 15, 2016 at 09:21:31PM +0200, Hans de Goede wrote:
-> On some devices the musb otg controller can be used in both device and
-> host mode, but requires software mode switching since there is no id pin
-> connected. The usb0 phy code will default to device mode in this case.
-> 
-> On some systems usb0 is connected to a female USB-A port. It can still
-> be used in device mode when using software mode switching and a USB
-> A to A cable. To configure the controller to support both modes we must
-> set its "dr_mode" dt property to "otg" (*). For these setups the device
-> mode default is wrong, for a female USB-A port the default should be
-> host mode.
-> 
-> This commit adds support to the sun4i phy code for a new
-> "allwinner,usb0-usb-a-connector" dt property which can be used in dt
-> files to indicate this scenario and when present it changes the default
-> mode to host mode.
+So if you are ok with an of_rename_property() API, I can submit a patch
+for the same.
 
-As I commented in patch 0/7, this dt prop is unneccesary.
-
-Regards,
--Bin.
-
-> 
-> *) dr_mode = "host" is used when device mode is _never_ used. E.g.
-> a wifi module soldered onto the PCB is connected to the musb controller.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Changes in v2:
-> -New patch in v2 of this patchset
-> ---
->  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 2 ++
->  drivers/phy/phy-sun4i-usb.c                             | 9 ++++++++-
->  2 files changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> index 287150d..8646b53 100644
-> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> @@ -35,6 +35,8 @@ Optional properties:
->  - usb0_vbus-supply : regulator phandle for controller usb0 vbus
->  - usb1_vbus-supply : regulator phandle for controller usb1 vbus
->  - usb2_vbus-supply : regulator phandle for controller usb2 vbus
-> +- allwinner,usb0-usb-a-connector: usb0 is connected to an USB-A connector,
-> +                     rather then an USB-B connector as one would expect (bool)
->  
->  Example:
->  	usbphy: phy at 0x01c13400 {
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index c17b099..82fb46a 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -137,6 +137,7 @@ struct sun4i_usb_phy_data {
->  	int vbus_det_irq;
->  	int id_det;
->  	int vbus_det;
-> +	int id_det_default;
->  	struct delayed_work detect;
->  };
->  
-> @@ -328,7 +329,7 @@ static int sun4i_usb_phy0_get_id_det(struct sun4i_usb_phy_data *data)
->  		if (data->id_det_gpio)
->  			return gpiod_get_value_cansleep(data->id_det_gpio);
->  		else
-> -			return 1; /* Fallback to peripheral mode */
-> +			return data->id_det_default;
->  	case USB_DR_MODE_HOST:
->  		return 0;
->  	case USB_DR_MODE_PERIPHERAL:
-> @@ -621,6 +622,12 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->  	if (IS_ERR(data->base))
->  		return PTR_ERR(data->base);
->  
-> +	/* Set id-det default for when there is no id-det gpio */
-> +	if (of_property_read_bool(np, "allwinner,usb0-usb-a-connector"))
-> +		data->id_det_default = 0; /* Host (USB-A connector) */
-> +	else
-> +		data->id_det_default = 1; /* Device (USB-B connector) */
-> +
->  	data->id_det_gpio = devm_gpiod_get_optional(dev, "usb0_id_det",
->  						    GPIOD_IN);
->  	if (IS_ERR(data->id_det_gpio))
-> -- 
-> 2.7.4
-> 
+regards
+Suman
