@@ -1,36 +1,34 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Fri, 19 Aug 2016 23:42:05 +0800
-Subject: [PATCH 1/4] arm64: defconfig: Enable HiSilicon kirin drm,
- adv7533 for HiKey
+Date: Fri, 19 Aug 2016 23:42:06 +0800
+Subject: [PATCH 2/4] arm64: defconfig: Set cma heap size to 128MB
 In-Reply-To: <1471621328-21102-1-git-send-email-guodong.xu@linaro.org>
 References: <1471621328-21102-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <1471621328-21102-2-git-send-email-guodong.xu@linaro.org>
+Message-ID: <1471621328-21102-3-git-send-email-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable HiSilicon kirin drm driver for HiKey: CONFIG_DRM_HISI_KIRIN
-Enable adv7511/adv7533 for HiKey: CONFIG_DRM_I2C_ADV7511
+From: Xinliang Liu <xinliang.liu@linaro.org>
 
-Build these components as modules.
+For debian linux, cma heap is used to allocate graphic buffers.
+The default size is 16 MB which is not enought.
+So increase the size to 128 MB.
 
 Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
 ---
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 76bfaa7..e27f086 100644
+index e27f086..c94f2fa 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -276,6 +276,8 @@ CONFIG_DRM=m
- CONFIG_DRM_NOUVEAU=m
- CONFIG_DRM_TEGRA=m
- CONFIG_DRM_PANEL_SIMPLE=m
-+CONFIG_DRM_I2C_ADV7511=m
-+CONFIG_DRM_HISI_KIRIN=m
- CONFIG_FB=y
- CONFIG_FB_ARMCLCD=y
- CONFIG_BACKLIGHT_GENERIC=m
+@@ -130,6 +130,7 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_DMA_CMA=y
++CONFIG_CMA_SIZE_MBYTES=128
+ CONFIG_MTD=y
+ CONFIG_MTD_M25P80=y
+ CONFIG_MTD_SPI_NOR=y
 -- 
 1.9.1
