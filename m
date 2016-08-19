@@ -1,39 +1,71 @@
-From: Nitin.Chaudhary@zii.aero (Nitin Chaudhary)
-Date: Thu, 18 Aug 2016 18:17:36 -0700
-Subject: [PATCH v3 0/3]Re:Re:Re:[PATCH v2] Added perf functionality to mmdc
- driver
-In-Reply-To: <DB5PR04MB1430487C8BFA276E285493959F150@DB5PR04MB1430.eurprd04.prod.outlook.com>
-References: <DB5PR04MB1430487C8BFA276E285493959F150@DB5PR04MB1430.eurprd04.prod.outlook.com>
-Message-ID: <1471569459-1546-1-git-send-email-Nitin.Chaudhary@zii.aero>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Fri, 19 Aug 2016 09:13:35 +0800
+Subject: [PATCH v6 7/7] doc: bindings: act8945a-charger: Update properties
+In-Reply-To: <1471569215-6046-1-git-send-email-wenyou.yang@atmel.com>
+References: <1471569215-6046-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1471569215-6046-8-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following series of patch resolve the kernel compilation errors with the
-proposed perf functionality integration into MMDC driver by Zhengyu Shen and
-hence provide the working code which can be enhanced upon as per the reviews
-from Mark Rutland and Peter Zilstra. The code still retains the original working
-as was proposed by Zhengyu except a few minor changes to resolve probe failure
-in the latest version of kernel. These patchsets are second version of patches
-incorporating the inputs from Zhengyu. The below is description:
- v2 - Migrated driver to use state machine based CPU notifier
- v3 - Fixed the code for probe failure while polling on MMDC MAPSR bit 4
+Due the driver improvements, update the properties,
+ - Remove "active-semi,check-battery-temperature" property.
+ - Add the properties, "active-semi,irq_gpio"
+   and "active-semi,lbo-gpios".
 
-Any review & comments are welcomed!
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
 
-Nitin Chaudhary (3):
-  Error: Fix mmdc compilation errors due to cpu notifier
-  [i.MX6Q] Code cleanup & verification after fixing compilation error
-  [i.MX6Q]Removed MMDC Auto Power saving timeout error
+Changes in v6: None
+Changes in v5:
+ - Add Acked-by tag.
 
- arch/arm/mach-imx/mmdc.c   | 122 +++++++++++++++++++++++++--------------------
- include/linux/cpuhotplug.h |   1 +
- 2 files changed, 69 insertions(+), 54 deletions(-)
+Changes in v4:
+ - Update the doc/binding for using "interrupts" property.
 
---
+Changes in v3: None
+Changes in v2: None
+
+ .../bindings/power/supply/act8945a-charger.txt           | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/power/supply/act8945a-charger.txt b/Documentation/devicetree/bindings/power/supply/act8945a-charger.txt
+index bea254c..f9866c4 100644
+--- a/Documentation/devicetree/bindings/power/supply/act8945a-charger.txt
++++ b/Documentation/devicetree/bindings/power/supply/act8945a-charger.txt
+@@ -4,10 +4,15 @@ Required properties:
+  - compatible: "active-semi,act8945a", please refer to ../mfd/act8945a.txt.
+  - active-semi,chglev-gpios: charge current level phandle with args
+    as described in ../gpio/gpio.txt.
++ - active-semi,lbo-gpios: specify the low battery voltage detect phandle
++   with args as as described in ../gpio/gpio.txt.
++ - interrupts: <a b> where a is the interrupt number and b is a
++   field that represents an encoding of the sense and level
++   information for the interrupt.
++ - interrupt-parent: the phandle for the interrupt controller that
++   services interrupts for this device.
+ 
+ Optional properties:
+- - active-semi,check-battery-temperature: boolean to check the battery
+-   temperature or not.
+  - active-semi,input-voltage-threshold-microvolt: unit: mV;
+    Specifies the charger's input over-voltage threshold value;
+    The value can be: 6600, 7000, 7500, 8000; default: 6600
+@@ -27,9 +32,14 @@ Example:
+ 		status = "okay";
+ 
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_charger_chglev>;
++		pinctrl-0 = <&pinctrl_charger_chglev &pinctrl_charger_lbo &pinctrl_charger_irq>;
++
+ 		active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
++		active-semi,lbo-gpios = <&pioA 72 GPIO_ACTIVE_LOW>;
+ 		active-semi,input-voltage-threshold-microvolt = <6600>;
+ 		active-semi,precondition-timeout = <40>;
+ 		active-semi,total-timeout = <3>;
++		interrupt-parent = <&pioA>;
++		interrupts = <45 GPIO_ACTIVE_LOW>;
++
+ 	};
+-- 
 2.7.4
-
-
-________________________________
-
-
-This email and any files transmitted with it are confidential & proprietary to Zodiac Inflight Innovations. This information is intended solely for the use of the individual or entity to which it is addressed. Access or transmittal of the information contained in this e-mail, in full or in part, to any other organization or persons is not authorized.
