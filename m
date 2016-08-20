@@ -1,30 +1,32 @@
 From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Sat, 20 Aug 2016 15:26:55 +0000
-Subject: [PATCH -next] net: phy: Add missing of_node_put() in
- xgmiitorgmii_probe()
-Message-ID: <1471706815-27723-1-git-send-email-weiyj.lk@gmail.com>
+Date: Sat, 20 Aug 2016 15:30:16 +0000
+Subject: [PATCH -next] MMC: meson: remove redundant return value check of
+ platform_get_resource()
+Message-ID: <1471707016-28957-1-git-send-email-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This node pointer is returned by of_parse_phandle() with
-refcount incremented in this function. of_node_put() on it
-before exitting this function.
-
-This is detected by Coccinelle semantic patch.
+Remove unneeded error handling on the result of a call
+to platform_get_resource() when the value is passed to
+devm_ioremap_resource().
 
 Signed-off-by: Wei Yongjun <weiyj.lk@gmail.com>
 ---
- drivers/net/phy/xilinx_gmii2rgmii.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/mmc/host/meson-gxbb.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/drivers/net/phy/xilinx_gmii2rgmii.c b/drivers/net/phy/xilinx_gmii2rgmii.c
-index cad6e19..4f05e5e 100644
---- a/drivers/net/phy/xilinx_gmii2rgmii.c
-+++ b/drivers/net/phy/xilinx_gmii2rgmii.c
-@@ -75,6 +75,7 @@ int xgmiitorgmii_probe(struct mdio_device *mdiodev)
- 	priv->phy_dev = of_phy_find_device(phy_node);
- 	if (!priv->phy_dev) {
- 		dev_info(dev, "Couldn't find phydev\n");
-+		of_node_put(phy_node);
- 		return -EPROBE_DEFER;
+diff --git a/drivers/mmc/host/meson-gxbb.c b/drivers/mmc/host/meson-gxbb.c
+index 10eac41..96cd883 100644
+--- a/drivers/mmc/host/meson-gxbb.c
++++ b/drivers/mmc/host/meson-gxbb.c
+@@ -811,10 +811,6 @@ static int meson_mmc_probe(struct platform_device *pdev)
  	}
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!res) {
+-		ret = -ENODEV;
+-		goto free_host;
+-	}
+ 	host->regs = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(host->regs)) {
+ 		ret = PTR_ERR(host->regs);
