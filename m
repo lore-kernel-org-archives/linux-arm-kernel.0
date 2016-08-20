@@ -1,29 +1,63 @@
-From: john@metanate.com (John Keeping)
-Date: Sat, 20 Aug 2016 19:33:38 +0100
-Subject: [PATCH] Try to support analog audio codec at firefly reload
-In-Reply-To: <1471293727-26258-1-git-send-email-ayaka@soulik.info>
-References: <1471293727-26258-1-git-send-email-ayaka@soulik.info>
-Message-ID: <20160820183338.33pcyfbtmwjulogk@john.keeping.me.uk>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Sat, 20 Aug 2016 20:34:42 +0200
+Subject: [RESEND PATCH v2 3/4] ARM64: dts: meson-gxbb: Add Meson GXBB PWM
+ Controller nodes
+In-Reply-To: <1471718083-11516-1-git-send-email-narmstrong@baylibre.com>
+References: <1471718083-11516-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1471718083-11516-4-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 04:42:06AM +0800, Randy Li wrote:
->   This patch could enabled the es8328 codec at firefly reload board,
-> but it doesn't not really work. I disable the mute of channel 
-> Left mix and Right mix in alsamixer, I could hear the noise from
-> my headphone, but it never be a music. 
->   I just send this patch here to see whether somebody could figure
-> out what is wrong, I am really not familiar with sound.
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-Have you tried adding an mclk-fs setting to the simple-audio-card?  You
-probably want to set it to 256, which will allow 44.1kHz, 48kHz, 88.2kHz
-and 96kHz at the codec.  This will give more functionality than pinning
-the clock to a specific rate.
-
-For the Rock2 Square, I write a machine driver for the sound because the
-headphone GPIO setup cannot be made to work with simple-audio-card; I
-found the Firefly Reload schematic and it looks like the configuration
-hardware is very similar.  It's a bit of a mess but you can find it on
-Github [1] if you want to take a look.
-
-[1] https://github.com/johnkeeping/linux/tree/topic/audio
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index e502c24..e3f4d36 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -153,6 +153,27 @@
+ 				status = "disabled";
+ 			};
+ 
++			pwm_ab: pwm at 8550 {
++				compatible = "amlogic,meson-gxbb-pwm";
++				reg = <0x0 0x08550 0x0 0x10>;
++				#pwm-cells = <3>;
++				status = "disabled";
++			};
++
++			pwm_cd: pwm at 8650 {
++				compatible = "amlogic,meson-gxbb-pwm";
++				reg = <0x0 0x08650 0x0 0x10>;
++				#pwm-cells = <3>;
++				status = "disabled";
++			};
++
++			pwm_ef: pwm at 86c0 {
++				compatible = "amlogic,meson-gxbb-pwm";
++				reg = <0x0 0x086c0 0x0 0x10>;
++				#pwm-cells = <3>;
++				status = "disabled";
++			};
++
+ 			uart_C: serial at 8700 {
+ 				compatible = "amlogic,meson-uart";
+ 				reg = <0x0 0x8700 0x0 0x14>;
+@@ -212,6 +233,13 @@
+ 				clocks = <&xtal>;
+ 				status = "disabled";
+ 			};
++
++			pwm_ab_AO: pwm at 550 {
++				compatible = "amlogic,meson-gxbb-pwm";
++				reg = <0x0 0x0550 0x0 0x10>;
++				#pwm-cells = <3>;
++				status = "disabled";
++			};
+ 		};
+ 
+ 		periphs: periphs at c8834000 {
+-- 
+1.9.1
