@@ -1,124 +1,55 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sat, 20 Aug 2016 07:22:36 +0530
-Subject: [PATCH] ARM: sa1100: move StrongARM CPU ID checks to cputype.h
-In-Reply-To: <E1bamfA-0002W7-Sb@rmk-PC.armlinux.org.uk>
-References: <E1bamfA-0002W7-Sb@rmk-PC.armlinux.org.uk>
-Message-ID: <20160820015236.GC25143@ubuntu>
+From: cmetcalf@mellanox.com (Chris Metcalf)
+Date: Fri, 19 Aug 2016 21:54:31 -0400
+Subject: [PATCH v8 1/4] nmi_backtrace: add more trigger_*_cpu_backtrace()
+ methods
+In-Reply-To: <20160818141242.GK26194@pathway.suse.cz>
+References: <1471377024-2244-1-git-send-email-cmetcalf@mellanox.com>
+ <1471377024-2244-2-git-send-email-cmetcalf@mellanox.com>
+ <20160818141242.GK26194@pathway.suse.cz>
+Message-ID: <233b9270-2f35-b3c5-2520-bf513153f260@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19-08-16, 17:28, Russell King wrote:
-> Move the StrongARM CPU ID checks out of the platform's hardware.h
-> file into asm/cputype.h
-> 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  arch/arm/include/asm/cputype.h               | 21 +++++++++++++++++++++
->  arch/arm/mach-sa1100/include/mach/hardware.h | 18 ------------------
->  drivers/cpufreq/sa1110-cpufreq.c             |  2 +-
->  3 files changed, 22 insertions(+), 19 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-> index 1ee94c716a7f..d6a4902a75d7 100644
-> --- a/arch/arm/include/asm/cputype.h
-> +++ b/arch/arm/include/asm/cputype.h
-> @@ -60,6 +60,7 @@
->  	((mpidr >> (MPIDR_LEVEL_BITS * level)) & MPIDR_LEVEL_MASK)
->  
->  #define ARM_CPU_IMP_ARM			0x41
-> +#define ARM_CPU_IMP_DEC			0x44
->  #define ARM_CPU_IMP_INTEL		0x69
->  
->  /* ARM implemented processors */
-> @@ -76,6 +77,17 @@
->  #define ARM_CPU_PART_CORTEX_A15		0x4100c0f0
->  #define ARM_CPU_PART_MASK		0xff00fff0
->  
-> +/* DEC implemented cores */
-> +#define ARM_CPU_PART_SA1100		0x4400a110
-> +
-> +/* Intel implemented cores */
-> +#define ARM_CPU_PART_SA1110		0x6900b110
-> +#define ARM_CPU_REV_SA1110_A0		0
-> +#define ARM_CPU_REV_SA1110_B0		4
-> +#define ARM_CPU_REV_SA1110_B1		5
-> +#define ARM_CPU_REV_SA1110_B2		6
-> +#define ARM_CPU_REV_SA1110_B4		8
-> +
->  #define ARM_CPU_XSCALE_ARCH_MASK	0xe000
->  #define ARM_CPU_XSCALE_ARCH_V1		0x2000
->  #define ARM_CPU_XSCALE_ARCH_V2		0x4000
-> @@ -173,6 +185,11 @@ static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
->  	return (read_cpuid_id() & 0xFF000000) >> 24;
->  }
->  
-> +static inline unsigned int __attribute_const__ read_cpuid_revision(void)
-> +{
-> +	return read_cpuid_id() & 0x0000000f;
-> +}
-> +
->  /*
->   * The CPU part number is meaningless without referring to the CPU
->   * implementer: implementers are free to define their own part numbers
-> @@ -208,6 +225,10 @@ static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
->  	return read_cpuid(CPUID_MPIDR);
->  }
->  
-> +/* StrongARM-11x0 CPUs */
-> +#define cpu_is_sa1100() (read_cpuid_part() == ARM_CPU_PART_SA1100)
-> +#define cpu_is_sa1110() (read_cpuid_part() == ARM_CPU_PART_SA1110)
-> +
->  /*
->   * Intel's XScale3 core supports some v6 features (supersections, L2)
->   * but advertises itself as v5 as it does not support the v6 ISA.  For
-> diff --git a/arch/arm/mach-sa1100/include/mach/hardware.h b/arch/arm/mach-sa1100/include/mach/hardware.h
-> index cbedd75a9d65..55c85ce7010d 100644
-> --- a/arch/arm/mach-sa1100/include/mach/hardware.h
-> +++ b/arch/arm/mach-sa1100/include/mach/hardware.h
-> @@ -36,28 +36,10 @@
->  #define io_v2p( x )             \
->     ( (((x)&0x00ffffff) | (((x)&(0x30000000>>VIO_SHIFT))<<VIO_SHIFT)) + PIO_START )
->  
-> -#define CPU_SA1110_A0	(0)
-> -#define CPU_SA1110_B0	(4)
-> -#define CPU_SA1110_B1	(5)
-> -#define CPU_SA1110_B2	(6)
-> -#define CPU_SA1110_B4	(8)
-> -
-> -#define CPU_SA1100_ID	(0x4401a110)
-> -#define CPU_SA1100_MASK	(0xfffffff0)
-> -#define CPU_SA1110_ID	(0x6901b110)
-> -#define CPU_SA1110_MASK	(0xfffffff0)
-> -
->  #define __MREG(x)	IOMEM(io_p2v(x))
->  
->  #ifndef __ASSEMBLY__
->  
-> -#include <asm/cputype.h>
-> -
-> -#define CPU_REVISION	(read_cpuid_id() & 15)
-> -
-> -#define cpu_is_sa1100()	((read_cpuid_id() & CPU_SA1100_MASK) == CPU_SA1100_ID)
-> -#define cpu_is_sa1110()	((read_cpuid_id() & CPU_SA1110_MASK) == CPU_SA1110_ID)
-> -
->  # define __REG(x)	(*((volatile unsigned long __iomem *)io_p2v(x)))
->  # define __PREG(x)	(io_v2p((unsigned long)&(x)))
->  
-> diff --git a/drivers/cpufreq/sa1110-cpufreq.c b/drivers/cpufreq/sa1110-cpufreq.c
-> index b5befc211172..2bac9b6cfeea 100644
-> --- a/drivers/cpufreq/sa1110-cpufreq.c
-> +++ b/drivers/cpufreq/sa1110-cpufreq.c
-> @@ -159,7 +159,7 @@ sdram_calculate_timing(struct sdram_info *sd, u_int cpu_khz,
->  	 * half speed or use delayed read latching (errata 13).
->  	 */
->  	if ((ns_to_cycles(sdram->tck, sd_khz) > 1) ||
-> -	    (CPU_REVISION < CPU_SA1110_B2 && sd_khz < 62000))
-> +	    (read_cpuid_revision() < ARM_CPU_REV_SA1110_B2 && sd_khz < 62000))
->  		sd_khz /= 2;
->  
->  	sd->mdcnfg = MDCNFG & 0x007f007f;
+On 8/18/2016 10:12 AM, Petr Mladek wrote:
+> On Tue 2016-08-16 15:50:21, Chris Metcalf wrote:
+>> Currently you can only request a backtrace of either all cpus, or
+>> all cpus but yourself.  It can also be helpful to request a remote
+>> backtrace of a single cpu, and since we want that, the logical
+>> extension is to support a cpumask as the underlying primitive.
+>>
+>> This change modifies the existing lib/nmi_backtrace.c code to take
+>> a cpumask as its basic primitive, and modifies the linux/nmi.h code
+>> to use the new "cpumask" method instead.
+>>
+>> The mips code ignored the "include_self" boolean but with this change
+>> it will now also dump a local backtrace if requested.
+>>
+>> diff --git a/arch/mips/kernel/process.c b/arch/mips/kernel/process.c
+>> index 7429ad09fbe3..fea1fa7726e3 100644
+>> --- a/arch/mips/kernel/process.c
+>> +++ b/arch/mips/kernel/process.c
+>> @@ -569,9 +569,16 @@ static void arch_dump_stack(void *info)
+>>   	dump_stack();
+>>   }
+>>   
+>> -void arch_trigger_all_cpu_backtrace(bool include_self)
+>> +void arch_trigger_cpumask_backtrace(const cpumask_t *mask, bool exclude_self)
+>>   {
+>> -	smp_call_function(arch_dump_stack, NULL, 1);
+>> +	long this_cpu = get_cpu();
+>> +
+>> +	if (cpumask_test_cpu(this_cpu, mask) && !exclude_self)
+>> +		dump_stack();
+> The bit is not cleared in the mask. Therefore arch_dump_stack
+> will get called for this CPU as well.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Actually, and kind of confusingly, smp_call_function_many() never calls
+the current cpu, even if it is in the mask.  So this code is OK as-is.
+
+> Otherwise the patch patch looks good to me.
+
+Great, thanks!  Should I add your Reviewed-by?
 
 -- 
-viresh
+Chris Metcalf, Mellanox Technologies
+http://www.mellanox.com
