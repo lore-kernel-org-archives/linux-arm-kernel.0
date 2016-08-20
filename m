@@ -1,43 +1,29 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 20 Aug 2016 18:03:07 +0200
-Subject: [RFC 00/17] clk: Add per-controller locks to fix deadlocks
-In-Reply-To: <8519a1cf-ec51-2914-e4aa-27b26b9233de@osg.samsung.com>
-References: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
- <8519a1cf-ec51-2914-e4aa-27b26b9233de@osg.samsung.com>
-Message-ID: <20160820160307.GB6344@kozik-book>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sat, 20 Aug 2016 17:23:17 +0100
+Subject: [PATCH 0/2] add interworking support to Thumb2 kernel
+In-Reply-To: <1471679131-3570-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1471679131-3570-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160820162317.GX1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2016 at 03:31:08PM -0400, Javier Martinez Canillas wrote:
-> Hello Krzysztof,
-> 
-> On 08/16/2016 09:34 AM, Krzysztof Kozlowski wrote:
-> > Hi,
-> > 
-> > RFC, please, do not apply, maybe except patch #1 which is harmless.
-> > 
-> > 
-> > Introduction
-> > ============
-> > The patchset brings new entity: clock controller representing a hardware
-> > block.  The clock controller comes with its own prepare lock which
-> > is used then in many places.  The idea is to fix the deadlock mentioned
-> > in commit 10ff4c5239a1 ("i2c: exynos5: Fix possible ABBA deadlock by keeping
-> > I2C clock prepared") and commit 34e81ad5f0b6 ("i2c: s3c2410: fix ABBA deadlock
-> > by keeping clock prepared").
-> > 
-> > 
-> 
-> I'm not familiar enough with the common clock framework to do a proper review
-> of this patch-set, but I've tested both on an Exynos5800 Peach Pi Chromebook
-> and an Exynos5422 Odroid XU4 board and I didn't find any clock regressions.
-> 
-> Also, I confirmed that the possible deadlock in the Odroid XU4 that was fixed
-> by reverted commit 10ff4c5239a1 doesn't happen anymore with your patches.
-> 
-> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+On Sat, Aug 20, 2016 at 09:45:29AM +0200, Ard Biesheuvel wrote:
+> In the core kernel, interworking is supported since vmlinux is a static
+> binary, and the linker takes care of fixing up the bl instructions and
+> emitting veneers if necessary. For modules, however, all function objects
+> must currently be in the same mode, since the kernel's module loader does
+> not handle interworking switches at all.
 
-Thanks for testing, I appreciate that!
+I'm not sure what the usefulness of this is - you're effectively
+encouraging people to build modules with a different configuration
+from the main kernel, which is bad news.  Since it's the configuration
+which dictates whether the kernel (and modules) are built as ARM or
+as Thumb2, you'd have to use two different configurations, one for the
+main kernel and one for the modules.
 
-Best regards,
-Krzysztof
+That's really something we should not be encouraging.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
