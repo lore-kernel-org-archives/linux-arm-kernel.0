@@ -1,80 +1,65 @@
 From: robh+dt@kernel.org (Rob Herring)
-Date: Sat, 20 Aug 2016 15:18:45 -0500
-Subject: [PATCH RFC] Revert "of/irq: Mark initialised interrupt
- controllers as populated"
-In-Reply-To: <CABxcv=n9o7sU0zB3WZ2Sp8Aqd+fnv1KLp8UcAx2YSrKBVW+rhg@mail.gmail.com>
-References: <E1bYVVh-0001eq-BI@rmk-PC.armlinux.org.uk>
- <CAL_JsqJNE7rGaL54HfmGEkaScZ7krf_iM55UrKw6mwWdLHv6Ow@mail.gmail.com>
- <CABxcv=n9o7sU0zB3WZ2Sp8Aqd+fnv1KLp8UcAx2YSrKBVW+rhg@mail.gmail.com>
-Message-ID: <CAL_JsqKpLGscFaCT4x3NtQCOBgLK+-MQa_XDmpmkqyepdJVT4Q@mail.gmail.com>
+Date: Sat, 20 Aug 2016 15:25:48 -0500
+Subject: [PATCH v2] dt-bindings: touchscreen: silead gsl1680: Document all
+ compatibles
+In-Reply-To: <20160818203959.GB39271@dtor-ws>
+References: <1471424340-4201-1-git-send-email-hdegoede@redhat.com>
+ <20160818193028.GA39271@dtor-ws>
+ <CAL_JsqK2Lgic+-P-NvvnVO9COCy3k_yO3seOipYDd4d10QK2UA@mail.gmail.com>
+ <20160818203959.GB39271@dtor-ws>
+Message-ID: <CAL_Jsq+juNdPXf8m7Nffb49uGc8uzpei9YA--8yP0oxrVhKPnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 20, 2016 at 10:18 AM, Javier Martinez Canillas
-<javier@dowhile0.org> wrote:
-> Hello Rob,
->
-> On Sun, Aug 14, 2016 at 1:32 PM, Rob Herring <robh+dt@kernel.org> wrote:
->> On Sat, Aug 13, 2016 at 4:45 AM, Russell King
->> <rmk+kernel@armlinux.org.uk> wrote:
->>> This reverts commit 15cc2ed6dcf91a8658e084be4e140147161819d7, which
->>> causes a regression with iMX6 power domains.  iMX6 GPC contains both an
->>> interrupt controller and power domains.  The iMX6 GPC code is setup to
->>> register an interrupt controller using IRQCHIP_DECLARE(), but then to
->>> register the power domains using the platform device.
->>>
->>> This commit prevents the platform device being created, thereby breaking
->>> iMX6 power domain support.
->>>
->
-> That commit also broke Exynos platforms since several devices are not
-> created (GIC, Exynos combiner and PMU system controller for
-> Exynos5420/5422/5800).
->
->>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
->>> ---
->>> Please argue amongst yourselves about how to fix this regression caused
->>> by this commit...
+On Thu, Aug 18, 2016 at 3:39 PM, Dmitry Torokhov
+<dmitry.torokhov@gmail.com> wrote:
+> On Thu, Aug 18, 2016 at 02:48:52PM -0500, Rob Herring wrote:
+>> On Thu, Aug 18, 2016 at 2:30 PM, Dmitry Torokhov
+>> <dmitry.torokhov@gmail.com> wrote:
+>> > On Wed, Aug 17, 2016 at 10:59:00AM +0200, Hans de Goede wrote:
+>> >> The silead gsl1680 driver / binding supports a whole series of devices,
+>> >> list the compatibles for all of them in the binding.
+>> >>
+>> >> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> >> ---
+>> >> Changes in v2:
+>> >> -Drop the "silead,mssl1680" compatible thing, the "mssl1680" name is an
+>> >>  ACPI thing and does not belong in the dt bindings
+>> >> ---
+>> >>  .../devicetree/bindings/input/touchscreen/silead_gsl1680.txt          | 4 ++++
+>> >>  1 file changed, 4 insertions(+)
+>> >>
+>> >> diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+>> >> index b0eca54..ad7f41a 100644
+>> >> --- a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+>> >> +++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+>> >> @@ -2,6 +2,10 @@
+>> >>
+>> >>  Required properties:
+>> >>  - compatible           : "silead,gsl1680"
+>> >> +                     or: "silead,gsl1688"
+>> >> +                     or: "silead,gsl3670"
+>> >> +                     or: "silead,gsl3675"
+>> >> +                     or: "silead,gsl3692"
+>> >
+>> > Hmm, why do we need to document all compatible strings? We usually have
+>> > only least common denominator in drievr, and device tree uses form:
+>> >
+>> >         compatible = "silead,<exact model>", "silead,gsl1680";
+>> >
+>> > Rob?
 >>
->> There's already a fix for this in my tree and -next. I will be sending
->> to Linus soon.
->>
+>> Because we require them in dts files even if the OS only uses the fallback.
 >
-> I guess you mean patch "[1/2] of/irq: Mark interrupt controllers as
-> populated before initialisation" [0] ?
->
-> Even with that patch on top of v4.8-rc2, things don't work for me. I
-> needed to revert setting the OF_POPULATED flag in of_irq_init for
-> things to work:
->
-> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-> index a2e68f740eda..5f9adc6c06e7 100644
-> --- a/drivers/of/irq.c
-> +++ b/drivers/of/irq.c
-> @@ -544,7 +544,7 @@ void __init of_irq_init(const struct of_device_id *matches)
->
->                         list_del(&desc->list);
->
-> -                       of_node_set_flag(desc->dev, OF_POPULATED);
-> +                       //of_node_set_flag(desc->dev, OF_POPULATED);
->
->                         pr_debug("of_irq_init: init %s (%p), parent %p\n",
->                                  desc->dev->full_name,
->
-> I noticed that Philipp also sent a patch to clear that flag in
-> arch/arm/mach-imx/gpc.c [1]. I guess the same is needed in the drivers
-> for the devices that are not created for Exynos?
+> So how exactly should it be documented? I mean if there were more than 1
+> OS they might have been using different fallbacks. How do we decide
+> which entry should be "true" fallback?
 
-Yes, you need the same.
+It shouldn't matter which one an OS uses. There's typically only the
+specific one and then a generic or 1st compatible chip one.
 
-> If that's the case, then I think that's more safe to revert Jon's
-> commit for now since is too risky for the -rc cycle and more platforms
-> may be affected.
-
-I prefer not to and find the affected platforms. I've now grepped the
-tree to get all the IRQCHIP_DECLARE compatible strings and then
-grepped for other occurrences and didn't find any more. In theory, we
-could have matching happening with 2 different strings, but I'd guess
-that is unlikely.
+This is exactly why they need to be documented (and in a single place,
+looking at you u-boot), so there is no confusion as to what
+compatibles are allowed/valid for each platform.
 
 Rob
