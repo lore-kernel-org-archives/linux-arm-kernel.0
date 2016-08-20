@@ -1,46 +1,52 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat, 20 Aug 2016 11:35:36 +0200
-Subject: [PATCH v2 2/4] clk: gxbb: expose MPLL2 clock for use by DT
+Date: Sat, 20 Aug 2016 11:35:38 +0200
+Subject: [PATCH v2 4/4] ARM64: dts: meson-gxbb: use the new GXBB DWMAC glue
+ driver
 In-Reply-To: <20160820093538.9707-1-martin.blumenstingl@googlemail.com>
 References: <20160815164100.27766-1-martin.blumenstingl@googlemail.com>
  <20160820093538.9707-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20160820093538.9707-3-martin.blumenstingl@googlemail.com>
+Message-ID: <20160820093538.9707-5-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This exposes the MPLL2 clock as this is one of the input clocks of the
-ethernet controller's internal mux.
+The Amlogic reference driver uses the "mc_val" devicetree property to
+configure the PRG_ETHERNET_ADDR0 register. Unfortunately it uses magic
+values for this configuration.
+According to the datasheet the PRG_ETHERNET_ADDR0 register is at address
+0xc8834108. However, the reference driver uses 0xc8834540 instead.
+According to my tests, the value from the reference driver is correct.
+
+No changes are required to the board dts files because the only
+required configuration option is the phy-mode, which had to be
+configured correctly before as well.
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 ---
- drivers/clk/meson/gxbb.h              | 2 +-
- include/dt-bindings/clock/gxbb-clkc.h | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
-index 217df51..3606e875 100644
---- a/drivers/clk/meson/gxbb.h
-+++ b/drivers/clk/meson/gxbb.h
-@@ -183,7 +183,7 @@
- /* CLKID_CLK81 */
- #define CLKID_MPLL0		  13
- #define CLKID_MPLL1		  14
--#define CLKID_MPLL2		  15
-+/* CLKID_MPLL2 */
- #define CLKID_DDR		  16
- #define CLKID_DOS		  17
- #define CLKID_ISA		  18
-diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
-index 7d41864..244ea6e 100644
---- a/include/dt-bindings/clock/gxbb-clkc.h
-+++ b/include/dt-bindings/clock/gxbb-clkc.h
-@@ -8,6 +8,7 @@
- #define CLKID_CPUCLK		1
- #define CLKID_FCLK_DIV2		4
- #define CLKID_CLK81		12
-+#define CLKID_MPLL2		15
- #define CLKID_ETH		36
- #define CLKID_SD_EMMC_A		94
- #define CLKID_SD_EMMC_B		95
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 4f42316..ab817d3 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -373,13 +373,15 @@
+ 		};
+ 
+ 		ethmac: ethernet at c9410000 {
+-			compatible = "amlogic,meson6-dwmac", "snps,dwmac";
++			compatible = "amlogic,meson-gxbb-dwmac", "snps,dwmac";
+ 			reg = <0x0 0xc9410000 0x0 0x10000
+ 			       0x0 0xc8834540 0x0 0x4>;
+ 			interrupts = <0 8 1>;
+ 			interrupt-names = "macirq";
+-			clocks = <&clkc CLKID_ETH>;
+-			clock-names = "stmmaceth";
++			clocks = <&clkc CLKID_ETH>,
++				 <&clkc CLKID_FCLK_DIV2>,
++				 <&clkc CLKID_MPLL2>;
++			clock-names = "stmmaceth", "clkin0", "clkin1";
+ 			phy-mode = "rgmii";
+ 			status = "disabled";
+ 		};
 -- 
 2.9.3
