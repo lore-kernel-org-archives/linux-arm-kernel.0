@@ -1,93 +1,80 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Sat, 20 Aug 2016 23:04:51 +0300
-Subject: [PATCH v2 7/7] ARM: dts: add gpio-ranges property to iMX7D/S GPIO
- controllers
-In-Reply-To: <1471723491-15330-1-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1471723491-15330-1-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <1471723491-15330-8-git-send-email-vladimir_zapolskiy@mentor.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Sat, 20 Aug 2016 15:18:45 -0500
+Subject: [PATCH RFC] Revert "of/irq: Mark initialised interrupt
+ controllers as populated"
+In-Reply-To: <CABxcv=n9o7sU0zB3WZ2Sp8Aqd+fnv1KLp8UcAx2YSrKBVW+rhg@mail.gmail.com>
+References: <E1bYVVh-0001eq-BI@rmk-PC.armlinux.org.uk>
+ <CAL_JsqJNE7rGaL54HfmGEkaScZ7krf_iM55UrKw6mwWdLHv6Ow@mail.gmail.com>
+ <CABxcv=n9o7sU0zB3WZ2Sp8Aqd+fnv1KLp8UcAx2YSrKBVW+rhg@mail.gmail.com>
+Message-ID: <CAL_JsqKpLGscFaCT4x3NtQCOBgLK+-MQa_XDmpmkqyepdJVT4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To establish a connection between GPIO controllers and pin multiplexor
-controller add gpio-ranges properties to all GPIO controllers found
-on iMX7D/S SoC. The change was done after human parsing of output from
+On Sat, Aug 20, 2016 at 10:18 AM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> Hello Rob,
+>
+> On Sun, Aug 14, 2016 at 1:32 PM, Rob Herring <robh+dt@kernel.org> wrote:
+>> On Sat, Aug 13, 2016 at 4:45 AM, Russell King
+>> <rmk+kernel@armlinux.org.uk> wrote:
+>>> This reverts commit 15cc2ed6dcf91a8658e084be4e140147161819d7, which
+>>> causes a regression with iMX6 power domains.  iMX6 GPC contains both an
+>>> interrupt controller and power domains.  The iMX6 GPC code is setup to
+>>> register an interrupt controller using IRQCHIP_DECLARE(), but then to
+>>> register the power domains using the platform device.
+>>>
+>>> This commit prevents the platform device being created, thereby breaking
+>>> iMX6 power domain support.
+>>>
+>
+> That commit also broke Exynos platforms since several devices are not
+> created (GIC, Exynos combiner and PMU system controller for
+> Exynos5420/5422/5800).
+>
+>>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+>>> ---
+>>> Please argue amongst yourselves about how to fix this regression caused
+>>> by this commit...
+>>
+>> There's already a fix for this in my tree and -next. I will be sending
+>> to Linus soon.
+>>
+>
+> I guess you mean patch "[1/2] of/irq: Mark interrupt controllers as
+> populated before initialisation" [0] ?
+>
+> Even with that patch on top of v4.8-rc2, things don't work for me. I
+> needed to revert setting the OF_POPULATED flag in of_irq_init for
+> things to work:
+>
+> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+> index a2e68f740eda..5f9adc6c06e7 100644
+> --- a/drivers/of/irq.c
+> +++ b/drivers/of/irq.c
+> @@ -544,7 +544,7 @@ void __init of_irq_init(const struct of_device_id *matches)
+>
+>                         list_del(&desc->list);
+>
+> -                       of_node_set_flag(desc->dev, OF_POPULATED);
+> +                       //of_node_set_flag(desc->dev, OF_POPULATED);
+>
+>                         pr_debug("of_irq_init: init %s (%p), parent %p\n",
+>                                  desc->dev->full_name,
+>
+> I noticed that Philipp also sent a patch to clear that flag in
+> arch/arm/mach-imx/gpc.c [1]. I guess the same is needed in the drivers
+> for the devices that are not created for Exynos?
 
-% gawk -n '{ sub(/.*__/, ""); if ($1 ~ "^GPIO") print $1, $2/4}' imx7d-pinfunc.h | sort -n
+Yes, you need the same.
 
-Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
----
-Changes from v1 to v2:
-* in commit message body fixed SoC name to iMX7D/S
+> If that's the case, then I think that's more safe to revert Jon's
+> commit for now since is too risky for the -rc cycle and more platforms
+> may be affected.
 
- arch/arm/boot/dts/imx7s.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+I prefer not to and find the affected platforms. I've now grepped the
+tree to get all the IRQCHIP_DECLARE compatible strings and then
+grepped for other occurrences and didn't find any more. In theory, we
+could have matching happening with 2 different strings, but I'd guess
+that is unlikely.
 
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index 1e90bdbe3a6e..ed48ae44988e 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -325,6 +325,8 @@
- 				#gpio-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
-+
-+				gpio-ranges = <&iomuxc_lpsr 0 0 8>, <&iomuxc 8 5 8>;
- 			};
- 
- 			gpio2: gpio at 30210000 {
-@@ -336,6 +338,8 @@
- 				#gpio-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
-+
-+				gpio-ranges = <&iomuxc 0 13 32>;
- 			};
- 
- 			gpio3: gpio at 30220000 {
-@@ -347,6 +351,8 @@
- 				#gpio-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
-+
-+				gpio-ranges = <&iomuxc 0 45 29>;
- 			};
- 
- 			gpio4: gpio at 30230000 {
-@@ -358,6 +364,8 @@
- 				#gpio-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
-+
-+				gpio-ranges = <&iomuxc 0 74 24>;
- 			};
- 
- 			gpio5: gpio at 30240000 {
-@@ -369,6 +377,8 @@
- 				#gpio-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
-+
-+				gpio-ranges = <&iomuxc 0 98 18>;
- 			};
- 
- 			gpio6: gpio at 30250000 {
-@@ -380,6 +390,8 @@
- 				#gpio-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
-+
-+				gpio-ranges = <&iomuxc 0 116 23>;
- 			};
- 
- 			gpio7: gpio at 30260000 {
-@@ -391,6 +403,8 @@
- 				#gpio-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
-+
-+				gpio-ranges = <&iomuxc 0 139 16>;
- 			};
- 
- 			wdog1: wdog at 30280000 {
--- 
-2.8.1
+Rob
