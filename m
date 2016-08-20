@@ -1,40 +1,43 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Sat, 20 Aug 2016 00:51:14 -0500
-Subject: [PATCH 2/2] firmware: qcom: scm: Fix interrupted SCM calls
-In-Reply-To: <1471672274-19317-1-git-send-email-andy.gross@linaro.org>
-References: <1471672274-19317-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <1471672274-19317-3-git-send-email-andy.gross@linaro.org>
+Date: Sat, 20 Aug 2016 01:07:01 -0500
+Subject: [PATCH] ARM: cacheflush: Remove unused secure_flush_area API
+Message-ID: <1471673221-19181-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes an issue with the SCM64 calls.  Sometimes SCM calls can
-be interrupted and return early.  When this happens, the contents of
-register 6 will contain a session ID that is required when resuming the
-SCM call.
+This patch removes the unused secure_flush_area function.  The only
+consumer of this function has moved to using the streaming DMA APIs.
 
 Signed-off-by: Andy Gross <andy.gross@linaro.org>
 ---
- drivers/firmware/qcom_scm-64.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/cacheflush.h | 17 -----------------
+ 1 file changed, 17 deletions(-)
 
-diff --git a/drivers/firmware/qcom_scm-64.c b/drivers/firmware/qcom_scm-64.c
-index 4a0f5ea..1851294 100644
---- a/drivers/firmware/qcom_scm-64.c
-+++ b/drivers/firmware/qcom_scm-64.c
-@@ -131,10 +131,12 @@ static int qcom_scm_call(struct device *dev, u32 svc_id, u32 cmd_id,
- 					 qcom_smccc_convention,
- 					 ARM_SMCCC_OWNER_SIP, fn_id);
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index 9156fc3..bdd283b 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -501,21 +501,4 @@ static inline void set_kernel_text_ro(void) { }
+ void flush_uprobe_xol_access(struct page *page, unsigned long uaddr,
+ 			     void *kaddr, unsigned long len);
  
-+		res->a6 = 0;
-+
- 		do {
- 			arm_smccc_smc(cmd, desc->arginfo, desc->args[0],
--				      desc->args[1], desc->args[2], x5, 0, 0,
--				      res);
-+				      desc->args[1], desc->args[2], x5, res->a6,
-+				      0, res);
- 		} while (res->a0 == QCOM_SCM_INTERRUPTED);
- 
- 		mutex_unlock(&qcom_scm_lock);
+-/**
+- * secure_flush_area - ensure coherency across the secure boundary
+- * @addr: virtual address
+- * @size: size of region
+- *
+- * Ensure that the specified area of memory is coherent across the secure
+- * boundary from the non-secure side.  This is used when calling secure
+- * firmware where the secure firmware does not ensure coherency.
+- */
+-static inline void secure_flush_area(const void *addr, size_t size)
+-{
+-	phys_addr_t phys = __pa(addr);
+-
+-	__cpuc_flush_dcache_area((void *)addr, size);
+-	outer_flush_range(phys, phys + size);
+-}
+-
+ #endif
 -- 
 1.9.1
