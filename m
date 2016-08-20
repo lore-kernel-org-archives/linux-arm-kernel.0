@@ -1,30 +1,73 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Sat, 20 Aug 2016 00:51:12 -0500
-Subject: [PATCH 0/2] Qualcomm SMCCC Session ID Support
-Message-ID: <1471672274-19317-1-git-send-email-andy.gross@linaro.org>
+Date: Sat, 20 Aug 2016 00:51:13 -0500
+Subject: [PATCH 1/2] arm64: kernel: Add SMC Session ID to results
+In-Reply-To: <1471672274-19317-1-git-send-email-andy.gross@linaro.org>
+References: <1471672274-19317-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <1471672274-19317-2-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This set of patches fixes a problem with the recent adoption of the ARM
-SMCCC in the Qualcomm SCM firmware.  Qualcomm actually uses the optional
-Trusted OS Session ID parameter.  When SCM calls are interrupted, the
-session ID field is populated with a value that must be used when the
-SCM call is resumed.
+This patch adds the SMC Session ID to the results passed back from SMC
+calls.  The Qualcomm SMC implementation provides for interrupted SMC
+functions.  When this occurs, the SMC call will return a session ID that
+is required to be used when resuming the interrupted SMC call.
 
-The first patch extends the arm_smccc_res structure to contain the
-additional a6 result field and modifies the SMCCC ASM macro to store
-register 6 in the additional field.  The second patch modifies the
-Qualcomm SCM code to use the new result field.
-
-Andy Gross (2):
-  arm64: kernel: Add SMC Session ID to results
-  firmware: qcom: scm: Fix interrupted SCM calls
-
+Signed-off-by: Andy Gross <andy.gross@linaro.org>
+---
  arch/arm64/kernel/asm-offsets.c | 1 +
  arch/arm64/kernel/smccc-call.S  | 1 +
- drivers/firmware/qcom_scm-64.c  | 6 ++++--
  include/linux/arm-smccc.h       | 4 +++-
- 4 files changed, 9 insertions(+), 3 deletions(-)
+ 3 files changed, 5 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 05070b7..ff38c58 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -141,6 +141,7 @@ int main(void)
+ #endif
+   DEFINE(ARM_SMCCC_RES_X0_OFFS,	offsetof(struct arm_smccc_res, a0));
+   DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
++  DEFINE(ARM_SMCCC_RES_X6_OFFS,	offsetof(struct arm_smccc_res, a6));
+   BLANK();
+   DEFINE(HIBERN_PBE_ORIG,	offsetof(struct pbe, orig_address));
+   DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
+diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
+index ae0496f..278dc9a 100644
+--- a/arch/arm64/kernel/smccc-call.S
++++ b/arch/arm64/kernel/smccc-call.S
+@@ -20,6 +20,7 @@
+ 	ldr	x4, [sp]
+ 	stp	x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
+ 	stp	x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
++	str	x6, [x4, #ARM_SMCCC_RES_X6_OFFS]
+ 	ret
+ 	.cfi_endproc
+ 	.endm
+diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+index b5abfda..82d919f 100644
+--- a/include/linux/arm-smccc.h
++++ b/include/linux/arm-smccc.h
+@@ -63,18 +63,20 @@
+ /**
+  * struct arm_smccc_res - Result from SMC/HVC call
+  * @a0-a3 result values from registers 0 to 3
++ * @a6 Session ID register (optional)
+  */
+ struct arm_smccc_res {
+ 	unsigned long a0;
+ 	unsigned long a1;
+ 	unsigned long a2;
+ 	unsigned long a3;
++	unsigned long a6;
+ };
+ 
+ /**
+  * arm_smccc_smc() - make SMC calls
+  * @a0-a7: arguments passed in registers 0 to 7
+- * @res: result values from registers 0 to 3
++ * @res: result values from registers 0 to 3 and optional register 6
+  *
+  * This function is used to make SMC calls following SMC Calling Convention.
+  * The content of the supplied param are copied to registers 0 to 7 prior
 -- 
 1.9.1
