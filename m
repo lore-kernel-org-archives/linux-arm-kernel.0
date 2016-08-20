@@ -1,95 +1,78 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 19 Aug 2016 19:33:40 -0500
-Subject: [PATCH 1/3] Documentation: dt: Add TI SCI clock driver
-In-Reply-To: <20160820003342.13599-1-nm@ti.com>
-References: <20160820003342.13599-1-nm@ti.com>
-Message-ID: <20160820003342.13599-2-nm@ti.com>
+Date: Fri, 19 Aug 2016 19:33:39 -0500
+Subject: [PATCH 0/3] ARM: K2G: Add support for TI-SCI Clocks
+Message-ID: <20160820003342.13599-1-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tero Kristo <t-kristo@ti.com>
+Texas Instruments' Keystone generation System on Chips (SoC)
+starting with 66AK2G02[1], now include a dedicated SoC System Control
+entity called PMMC(Power Management Micro Controller) in line with
+ARM architecture recommendations. The function of this module is
+to integrate all system operations in a centralized location.
+Communication with the SoC System Control entity from various
+processing units like ARM/DSP occurs over Message Manager hardware
+block.
 
-Add a clock implementation, TI SCI clock, that will hook to the common
-clock framework, and allow each clock to be controlled via TI SCI
-protocol.
+This series adds the base support for clock control using generic
+power domain framework over the TI System Control Interface (TI-SCI)
+protocol[2][3][4].
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Tested-by: Dave Gerlach <d-gerlach@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- .../devicetree/bindings/clock/ti,sci-clk.txt       | 51 ++++++++++++++++++++++
- MAINTAINERS                                        |  1 +
- 2 files changed, 52 insertions(+)
+Overall architecture is very similar to SCPI[5] as follows:
++--------------+  +-------------+   +------------+
+| TI SCI GENPD |  |TISCI Clk(*) |   |TISCI reset |
++------+-------+  +----+--------+   +----+-------+
+       |               |                 |
+       |          +----v--------------+  |
+       +----------> TISCI Protocol    <--+
+                  +----+--------------+
+                       |
+                   +---v-----------+
+                   | MAILBOX  FWK  |
+                   +---+-----------+
+                       |
+                   +---v-----------+
+                   |  TI MSGMGR    |-> TISCI hardware block
+                   +---------------+
+
+(*) This series.
+
+Baseline: v4.8-rc1 + [3] + [4] (the dependency is due to MAINTAINERS update, API, data)
+Bootlog: http://pastebin.ubuntu.com/23071879/ (with the addition of couple of mach patches + dts)
+Integrated series is available:
+https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.9/tisci-clk-v1
+
+This is the last of the three major blocks to provide functionality for K2G SoC.
+TISCI reset series is a follow on series to enable DSP remoteproc and few other
+peripherals.
+
+NOTE: Tero is currently on vacation(till Aug 28) and the series
+is being send on his behalf to provide a complete baseline series
+for review. Obviously, all dependencies must be merged prior to
+this series being merged, but any additional feedback will be much
+appreciated.
+
+Tero Kristo (3):
+  Documentation: dt: Add TI SCI clock driver
+  dt-binding: clock: Add k2g clock definitions
+  clk: keystone: Add sci-clk driver support
+
+[1] http://www.ti.com/product/66ak2g02
+[2] http://processors.wiki.ti.com/index.php/TISCI
+[3] https://lkml.org/lkml/2016/8/19/768
+[4] https://lkml.org/lkml/2016/8/19/790
+[5] Documentation/devicetree/bindings/arm/arm,scpi.txt
+
+ .../devicetree/bindings/clock/ti,sci-clk.txt       |  51 ++
+ MAINTAINERS                                        |   3 +
+ drivers/clk/Kconfig                                |  13 +
+ drivers/clk/keystone/Makefile                      |   1 +
+ drivers/clk/keystone/sci-clk.c                     | 539 +++++++++++++++++++++
+ include/dt-bindings/clock/k2g.h                    | 234 +++++++++
+ 6 files changed, 841 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+ create mode 100644 drivers/clk/keystone/sci-clk.c
+ create mode 100644 include/dt-bindings/clock/k2g.h
 
-diff --git a/Documentation/devicetree/bindings/clock/ti,sci-clk.txt b/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
-new file mode 100644
-index 000000000000..231cb80a058e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
-@@ -0,0 +1,51 @@
-+Texas Instruments TI-SCI Clocks
-+===============================
-+
-+All clocks on Texas Instruments' SoCs that contain a System Controller,
-+are only controlled by this entity. Communication between a host processor
-+running an OS and the System Controller happens through a protocol known
-+as TI-SCI[1]. This clock implementation plugs into the common clock
-+framework and makes use of the TI-SCI protocol on clock API requests.
-+
-+[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-+
-+Required properties:
-+-------------------
-+- compatible: Must be "ti,sci-clk"
-+- #clock-cells: Shall be 2.
-+  In clock consumers, this cell represents the device ID and clock ID
-+  exposed by the PM firmware. The assignments can be found in the header
-+  files <dt-bindings/genpd/<soc>.h> (which covers the device IDs) and
-+  <dt-bindings/clock/<soc>.h> (which covers the clock IDs), where <soc>
-+  is the SoC involved, for example 'k2g'.
-+- ti,sci: Phandle to the TI SCI device to use for managing the clocks
-+
-+Optional properties:
-+-------------------
-+- ti,ssc-clocks: Array of phandle clocks that shall enable spread spectrum
-+		 clocking while enabled
-+- ti,allow-freq-change-clocks: Array of phandle clocks that shall allow
-+			       dynamic clock frequency changes by firmware
-+- ti,input-term-clocks: Array of phandle clocks that shall enable input
-+			termination
-+
-+Examples:
-+--------
-+
-+k2g_clks: k2g_clks {
-+	compatible = "ti,sci-clk";
-+	ti,sci = <&pmmc>;
-+	#clock-cells = <2>;
-+};
-+
-+dummy_node at 1234 {
-+	clocks = <&k2g_clks K2G_DEV_DUMMY K2G_DEV_DUMMY_FCK>;
-+};
-+
-+dummy_node2 at 2345 {
-+	clocks = <&k2g_clks K2G_DEV_DUMMY2 K2G_DEV_DUMMY_X1_CLK>;
-+};
-+
-+&k2g_clks {
-+	ti,ssc-clocks = <&k2g_clks K2G_DEV_DUMMY K2G_DEV_DUMMY_FCK>;
-+};
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 448f6801bd78..1837b98d96a9 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -11576,6 +11576,7 @@ F:	include/linux/soc/ti/ti_sci_protocol.h
- F:	Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
- F:	include/dt-bindings/genpd/k2g.h
- F:	drivers/soc/ti/ti_sci_pm_domains.c
-+F:	Documentation/devicetree/bindings/clock/ti,sci-clk.txt
- 
- THANKO'S RAREMONO AM/FM/SW RADIO RECEIVER USB DRIVER
- M:	Hans Verkuil <hverkuil@xs4all.nl>
 -- 
 2.9.1.200.gb1ec08f
