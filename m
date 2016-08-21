@@ -1,72 +1,131 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Sun, 21 Aug 2016 19:01:38 +0200
-Subject: [PATCH V2 soc/next?] ARM: BCM53573: Initial support for Broadcom
- BCM53573 SoCs
-In-Reply-To: <1470990396-23701-1-git-send-email-zajec5@gmail.com>
-References: <1470990396-23701-1-git-send-email-zajec5@gmail.com>
-Message-ID: <20160821170138.21259-1-zajec5@gmail.com>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Sun, 21 Aug 2016 19:21:42 +0200
+Subject: [PATCH V3 2/5] thermal: bcm2835: add thermal driver for bcm2835
+ soc
+In-Reply-To: <1471786649.2188.4.camel@intel.com>
+References: <1463495753-967-1-git-send-email-kernel@martin.sperl.org>
+ <1463495753-967-3-git-send-email-kernel@martin.sperl.org>
+ <87mvn6qa2x.fsf@eliezer.anholt.net> <87r39lvs4v.fsf@eliezer.anholt.net>
+ <1471591694.2691.39.camel@intel.com> <87inuwd1p4.fsf@eliezer.anholt.net>
+ <1471786649.2188.4.camel@intel.com>
+Message-ID: <46FE06A3-5A7D-41D7-827B-C7B35E42E2C5@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-BCM53573 series is a new family with embedded wireless. By marketing
-people it's sometimes called Northstar but it uses different CPU and has
-different architecture so we need a new symbol for it.
-Fortunately it shares some peripherals with other iProc based SoCs so we
-will be able to reuse some drivers/bindings.
+> On 21.08.2016, at 15:37, Zhang Rui <rui.zhang@intel.com> wrote:
+> 
+>> On ?, 2016-08-19 at 11:59 -0700, Eric Anholt wrote:
+>> Zhang Rui <rui.zhang@intel.com> writes:
+>> 
+>>> 
+>>>> On ?, 2016-08-18 at 11:39 -0700, Eric Anholt wrote:
+>>>> 
+>>>> Eric Anholt <eric@anholt.net> writes:
+>>>> 
+>>>>> 
+>>>>> 
+>>>>> kernel at martin.sperl.org writes:
+>>>>> 
+>>>>>> 
+>>>>>> 
+>>>>>> From: Martin Sperl <kernel@martin.sperl.org>
+>>>>>> 
+>>>>>> Add basic thermal driver for bcm2835 SOC.
+>>>>>> 
+>>>>>> This driver currently relies on the firmware setting up the
+>>>>>> tsense HW block and does not set it up itself.
+>>>>>> 
+>>>>>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+>>>>>> 
+>>>>>> ChangeLog:
+>>>>>>  V1 -> V2: added specific settings depending on compatiblity
+>>>>>>       added trip point based on register
+>>>>>>       setting up ctrl-register if HW is not enabled by
+>>>>>> firmware
+>>>>>>         as per recommendation of Eric (untested)
+>>>>>>       check that clock frequency is in range
+>>>>>>         (1.9 - 5MHz - as per comment in clk-bcm2835.c)
+>>>>>> ---
+>>>>>> 
+>>>>>> diff --git a/drivers/thermal/bcm/Makefile
+>>>>>> b/drivers/thermal/bcm/Makefile
+>>>>>> new file mode 100644
+>>>>>> index 0000000..13456d2
+>>>>>> --- /dev/null
+>>>>>> +++ b/drivers/thermal/bcm/Makefile
+>>>>>> @@ -0,0 +1 @@
+>>>>>> +obj-$(CONFIG_BCM2835_THERMAL)        :=
+>>>>>> bcm2835_thermal.o
+>>>>>> diff --git a/drivers/thermal/bcm/bcm2835_thermal.c
+>>>>>> b/drivers/thermal/bcm/bcm2835_thermal.c
+>>>>>> new file mode 100644
+>>>>>> index 0000000..73138cb
+>>>>>> --- /dev/null
+>>>>>> +++ b/drivers/thermal/bcm/bcm2835_thermal.c
+>>>>>> 
+>>>>>> +static const struct of_device_id
+>>>>>> bcm2835_thermal_of_match_table[];
+>>>>>> +static int bcm2835_thermal_probe(struct platform_device
+>>>>>> *pdev)
+>>>>>> +{
+>>>>>> 
+>>>>>> +    /* enable clock and check rate */
+>>>>>> +    clk_prepare_enable(data->clk);
+>>>>>> +    rate = clk_get_rate(data->clk);
+>>>>>> +    if ((rate < 1920000) || (rate > 5000000)) {
+>>>>>> +        dev_warn(&pdev->dev,
+>>>>>> +             "Clock %pCn is running at %pCr Hz,
+>>>>>> which is outside the recommended range of 1.9 to 5.0 MHz\n",
+>>>>>> +             data->clk, data->clk);
+>>>>>> +    }
+>>>>>> +
+>>>>>> +    /* register it */
+>>>>>> +    tz = thermal_zone_device_register("bcm2835_thermal",
+>>>>>> +                      1, 0, data,
+>>>>>> +                      &bcm2835_thermal_o
+>>>>>> ps,
+>>>>>> +                      NULL, 0, 0);
+>>>>> I notice that the polling_delay is set to 0, but we're not
+>>>>> using
+>>>>> interrupts to trigger the trip.  Is it valid to expose a trip
+>>>>> without a
+>>>>> polling_delay or interrupts?  Should passive_delay be set as
+>>>>> well?
+>>>>> 
+>>>>> This is up to the thermal maintainers.  As far as I'm
+>>>>> concerned,
+>>>>> it's:
+>>>>> 
+>>>>> Acked-by: Eric Anholt <eric@anholt.net>
+>>>>> 
+>>>>> One it lands I'll pull the defconfig and DT bits.
+>>>> Ping on this question to thermal maintainers.  I'd still love to
+>>>> see
+>>>> this driver land.
+>>> hmmm, how is this driver supposed to work?
+>>> With this patch set, I think the only benefit is that we can get
+>>> the
+>>> temperature and trip point information via thermal sysfs interface,
+>>> but
+>>> kernel thermal control is a no-op here, right?
+>> Yeah.  It seems useful to be able to get the information.  Once we
+>> land
+>> this, I hope someone can add interrupt support so that there are
+>> actual
+>> trip points.
+> 
+> sounds reasonable to me.
+> Another question, why you need a separate directory for a single
+> file, bcm2835_thermal.c?
 
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
----
-V2: Put new symbol under "Other Architectures"
----
- MAINTAINERS               |  7 +++++++
- arch/arm/mach-bcm/Kconfig | 15 +++++++++++++++
- 2 files changed, 22 insertions(+)
+Lots of other subsystems (clk, sound/soc, ...) are using vendor specific
+sub directories.
+In thermal there are already subdirectories for Samsung or st.
+So this was done in this case as well to support Broadcom immediately
+following this pattern.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7304d2e..9e2db2e 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2517,6 +2517,13 @@ F:	arch/arm/mach-bcm/bcm_5301x.c
- F:	arch/arm/boot/dts/bcm5301x.dtsi
- F:	arch/arm/boot/dts/bcm470*
- 
-+BROADCOM BCM53573 ARM ARCHITECTURE
-+M:	Rafa? Mi?ecki <rafal@milecki.pl>
-+L:	linux-arm-kernel at lists.infradead.org
-+S:	Maintained
-+F:	arch/arm/boot/dts/bcm53573*
-+F:	arch/arm/boot/dts/bcm47189*
-+
- BROADCOM BCM63XX ARM ARCHITECTURE
- M:	Florian Fainelli <f.fainelli@gmail.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 5832dba..6dfdc82 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -157,6 +157,21 @@ config ARCH_BCM2835
- 	  This enables support for the Broadcom BCM2835 and BCM2836 SoCs.
- 	  This SoC is used in the Raspberry Pi and Roku 2 devices.
- 
-+config ARCH_BCM_53573
-+	bool "Broadcom BCM53573 SoC series support"
-+	depends on ARCH_MULTI_V7
-+	select ARCH_BCM_IPROC
-+	select HAVE_ARM_ARCH_TIMER
-+
-+	help
-+	  BCM53573 series is set of SoCs using ARM Cortex-A7 CPUs with wireless
-+	  embedded in the chipset.
-+	  This SoC line is mostly used in home routers and is some cheaper
-+	  alternative for Northstar family.
-+
-+	  The base chip is BCM53573 and there are some packaging modifications
-+	  like BCM47189 and BCM47452.
-+
- config ARCH_BCM_63XX
- 	bool "Broadcom BCM63xx DSL SoC"
- 	depends on ARCH_MULTI_V7
--- 
-2.9.3
+You want a new version to keep it in thermal directly I can create a
+new version of the patch.
+
+Thanks, Martin
