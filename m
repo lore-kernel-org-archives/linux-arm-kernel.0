@@ -1,9 +1,9 @@
 From: ayaka@soulik.info (Randy Li)
-Date: Mon, 22 Aug 2016 04:04:53 +0800
-Subject: [PATCH 2/2] ARM: dts: add TOPEET itop elite based board
-In-Reply-To: <1471809893-31147-1-git-send-email-ayaka@soulik.info>
-References: <1471809893-31147-1-git-send-email-ayaka@soulik.info>
-Message-ID: <1471809893-31147-3-git-send-email-ayaka@soulik.info>
+Date: Mon, 22 Aug 2016 04:12:39 +0800
+Subject: [PATCH 2/2 v2] ARM: dts: add TOPEET itop elite based board
+In-Reply-To: <1471809893-31147-3-git-send-email-ayaka@soulik.info>
+References: <1471809893-31147-3-git-send-email-ayaka@soulik.info>
+Message-ID: <1471810359-6154-1-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,8 +20,7 @@ Signed-off-by: Randy Li <ayaka@soulik.info>
  .../bindings/arm/samsung/samsung-boards.txt        |   3 +
  arch/arm/boot/dts/Makefile                         |   1 +
  arch/arm/boot/dts/exynos4412-itop-elite.dts        | 148 +++++++++++++++++++++
- arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi    |   2 +-
- 4 files changed, 153 insertions(+), 1 deletion(-)
+ 3 files changed, 152 insertions(+)
  create mode 100644 arch/arm/boot/dts/exynos4412-itop-elite.dts
 
 diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
@@ -204,18 +203,5 @@ index 0000000..363908e
 +&adc {
 +	status = "okay";
 +};
-diff --git a/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi b/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
-index 0860ee6..040037b 100644
---- a/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
-+++ b/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
-@@ -394,7 +394,7 @@
- 		samsung,pins = "gpm2-4";
- 		samsung,pin-function = <1>;
- 		samsung,pin-pud = <0>;
--		samsung,pin-drv = <3>;
-+		samsung,pin-drv = <0>;
- 	};
- };
- 
 -- 
 2.7.4
