@@ -1,171 +1,59 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 21 Aug 2016 12:10:26 +0200
-Subject: [PATCH v2 7/7] musb: sunxi: Add support for platform_set_mode
-In-Reply-To: <20160819213049.GC1853@uda0271908>
-References: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
- <1471288892-21702-8-git-send-email-hdegoede@redhat.com>
- <20160819213049.GC1853@uda0271908>
-Message-ID: <2a55a1bf-7ebf-3ab4-b231-85eba20103f1@redhat.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sun, 21 Aug 2016 14:00:39 +0200
+Subject: [PATCH v2 3/4] net: stmmac: add a glue driver for the Amlogic
+ Meson 8b / GXBB DWMAC
+In-Reply-To: <CAGhQ9VyWs=sYg7PVrt5r-fM-2t--qAnHyvNXAZXwjkYn5P196g@mail.gmail.com>
+References: <20160815164100.27766-1-martin.blumenstingl@googlemail.com>
+ <20160820093538.9707-1-martin.blumenstingl@googlemail.com>
+ <20160820093538.9707-4-martin.blumenstingl@googlemail.com>
+ <CAGhQ9VyWs=sYg7PVrt5r-fM-2t--qAnHyvNXAZXwjkYn5P196g@mail.gmail.com>
+Message-ID: <CAFBinCCC4LQUkF17G-LNQWs_EuRiw44V7hep-zDsm-9MQ64VnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Joachim,
 
-On 19-08-16 23:30, Bin Liu wrote:
-> Hi,
+On Sat, Aug 20, 2016 at 11:29 PM, Joachim  Eastwood <manabian@gmail.com> wrote:
+>> +       platform_set_drvdata(pdev, dwmac);
 >
-> On Mon, Aug 15, 2016 at 09:21:32PM +0200, Hans de Goede wrote:
->> This allows run-time dr_mode switching support via the "mode" musb
->> sysfs attribute.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>  drivers/usb/musb/sunxi.c | 52 ++++++++++++++++++++++++++++++++++++++++++++----
->>  1 file changed, 48 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
->> index c6ee166..1fe7451 100644
->> --- a/drivers/usb/musb/sunxi.c
->> +++ b/drivers/usb/musb/sunxi.c
->> @@ -74,6 +74,7 @@
->>  #define SUNXI_MUSB_FL_HAS_SRAM			5
->>  #define SUNXI_MUSB_FL_HAS_RESET			6
->>  #define SUNXI_MUSB_FL_NO_CONFIGDATA		7
->> +#define SUNXI_MUSB_FL_PHY_MODE_PEND		8
->>
->>  /* Our read/write methods need access and do not get passed in a musb ref :| */
->>  static struct musb *sunxi_musb;
->> @@ -87,6 +88,7 @@ struct sunxi_glue {
->>  	struct phy		*phy;
->>  	struct platform_device	*usb_phy;
->>  	struct usb_phy		*xceiv;
->> +	enum phy_mode		phy_mode;
->>  	unsigned long		flags;
->>  	struct work_struct	work;
->>  	struct extcon_dev	*extcon;
->> @@ -140,6 +142,9 @@ static void sunxi_musb_work(struct work_struct *work)
->>  			clear_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
->>  		}
->>  	}
->> +
->> +	if (test_and_clear_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags))
->> +		phy_set_mode(glue->phy, glue->phy_mode);
->>  }
->>
->>  static void sunxi_musb_set_vbus(struct musb *musb, int is_on)
->> @@ -341,6 +346,41 @@ static void sunxi_musb_dma_controller_destroy(struct dma_controller *c)
->>  {
->>  }
->>
->> +static int sunxi_musb_set_mode(struct musb *musb, u8 mode)
->> +{
->> +	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
->> +	enum phy_mode new_mode;
->> +
->> +	switch (mode) {
->> +	case MUSB_HOST:		new_mode = PHY_MODE_USB_HOST; break;
->> +	case MUSB_PERIPHERAL:	new_mode = PHY_MODE_USB_DEVICE; break;
->> +	case MUSB_OTG:		new_mode = PHY_MODE_USB_OTG; break;
+> This will not work. The main stmmac driver already uses the driver_data field.
+> See: http://lxr.free-electrons.com/source/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c#L3218
 >
-> Please fix the code style as commented in patch 4/7.
-
-Ok I will send a new version with this fixed.
-
 >
->> +	default:
->> +		dev_err(musb->controller->parent,
->> +			"Error requested mode not supported by this kernel\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	if (glue->phy_mode == new_mode)
->> +		return 0;
->> +
->> +	if (musb->port_mode != MUSB_PORT_MODE_DUAL_ROLE) {
->> +		dev_err(musb->controller->parent,
->> +			"Error changing modes is only supported in dual role mode\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	/*
->> +	 * phy_set_mode may sleep, and we're called with a spinlock held,
->> +	 * so let sunxi_musb_work deal with it.
->> +	 */
->> +	glue->phy_mode = new_mode;
->> +	set_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags);
->> +	schedule_work(&glue->work);
+>> +       return stmmac_dvr_probe(&pdev->dev, plat_dat, &stmmac_res);
 >
-> When switching from host to peripheral mode, if an usb device is still
-> plugged and enumerated, how do you handle the device disconnect?
-
-The phy code will report vbus low for long enough for the musb to end
-the current session. It already does this for boards which do not
-have working vbus detection.
-
-Regards,
-
-Hans
-
-
+> So calling stmmac_dvr_probe here will overwrite the driver_data field.
 >
-> Regards,
-> -Bin.
 >
->> +
->> +	return 0;
 >> +}
 >> +
->>  /*
->>   * sunxi musb register layout
->>   * 0x00 - 0x17	fifo regs, 1 long per fifo
->> @@ -568,6 +608,7 @@ static const struct musb_platform_ops sunxi_musb_ops = {
->>  	.writew		= sunxi_musb_writew,
->>  	.dma_init	= sunxi_musb_dma_controller_create,
->>  	.dma_exit	= sunxi_musb_dma_controller_destroy,
->> +	.set_mode	= sunxi_musb_set_mode,
->>  	.set_vbus	= sunxi_musb_set_vbus,
->>  	.pre_root_reset_end = sunxi_musb_pre_root_reset_end,
->>  	.post_root_reset_end = sunxi_musb_post_root_reset_end,
->> @@ -614,21 +655,28 @@ static int sunxi_musb_probe(struct platform_device *pdev)
->>  		return -EINVAL;
->>  	}
->>
->> +	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
->> +	if (!glue)
->> +		return -ENOMEM;
+>> +static int meson8b_dwmac_remove(struct platform_device *pdev)
+>> +{
+>> +       struct meson8b_dwmac *dwmac = platform_get_drvdata(pdev);
 >> +
->>  	memset(&pdata, 0, sizeof(pdata));
->>  	switch (usb_get_dr_mode(&pdev->dev)) {
->>  #if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_HOST
->>  	case USB_DR_MODE_HOST:
->>  		pdata.mode = MUSB_PORT_MODE_HOST;
->> +		glue->phy_mode = PHY_MODE_USB_HOST;
->>  		break;
->>  #endif
->>  #if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_GADGET
->>  	case USB_DR_MODE_PERIPHERAL:
->>  		pdata.mode = MUSB_PORT_MODE_GADGET;
->> +		glue->phy_mode = PHY_MODE_USB_DEVICE;
->>  		break;
->>  #endif
->>  #ifdef CONFIG_USB_MUSB_DUAL_ROLE
->>  	case USB_DR_MODE_OTG:
->>  		pdata.mode = MUSB_PORT_MODE_DUAL_ROLE;
->> +		glue->phy_mode = PHY_MODE_USB_OTG;
->>  		break;
->>  #endif
->>  	default:
->> @@ -638,10 +686,6 @@ static int sunxi_musb_probe(struct platform_device *pdev)
->>  	pdata.platform_ops	= &sunxi_musb_ops;
->>  	pdata.config		= &sunxi_musb_hdrc_config;
->>
->> -	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
->> -	if (!glue)
->> -		return -ENOMEM;
->> -
->>  	glue->dev = &pdev->dev;
->>  	INIT_WORK(&glue->work, sunxi_musb_work);
->>  	glue->host_nb.notifier_call = sunxi_musb_host_notifier;
->> --
->> 2.7.4
->>
+>> +       clk_disable_unprepare(dwmac->m25_div_clk);
+>
+> Did you test this code? I am pretty sure it will blow up given that
+> driver_data is not set to what you expect.
+I guess I should've taken a closer look at my kernel config:
+CONFIG_DWMAC_MESON=y
+Thanks for spotting this issue!
+
+> To get your meson8b_dwmac struct you must retrieve it from plat_dat->bsp_priv.
+>
+>
+> I have some code for a helper to retrieve bsp_priv that I have meant
+> to sent to the ML for a while now.
+> See: https://github.com/manabian/linux-lpc/commit/c3e155a6e38b9634e4e61aa4eeb4602ede7e44a6
+>
+> Feel free to add it to your patch set if you want.
+>
+> Alternatively take a look at the remove function from dwmac-stm32 here:
+> https://patchwork.ozlabs.org/patch/619816/
+excellent, thanks!
+
+I will send a fixed version as soon as possible
+
+
+Regards,
+Martin
