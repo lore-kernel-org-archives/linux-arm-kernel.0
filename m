@@ -1,51 +1,55 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Sun, 21 Aug 2016 03:21:47 -0400
-Subject: [PATCH RFC] Revert "of/irq: Mark initialised interrupt
- controllers as populated"
-In-Reply-To: <CAL_JsqKpLGscFaCT4x3NtQCOBgLK+-MQa_XDmpmkqyepdJVT4Q@mail.gmail.com>
-References: <E1bYVVh-0001eq-BI@rmk-PC.armlinux.org.uk>
- <CAL_JsqJNE7rGaL54HfmGEkaScZ7krf_iM55UrKw6mwWdLHv6Ow@mail.gmail.com>
- <CABxcv=n9o7sU0zB3WZ2Sp8Aqd+fnv1KLp8UcAx2YSrKBVW+rhg@mail.gmail.com>
- <CAL_JsqKpLGscFaCT4x3NtQCOBgLK+-MQa_XDmpmkqyepdJVT4Q@mail.gmail.com>
-Message-ID: <CABxcv=nU4P-XfR6PcY_wrXTe09GyLADP5h==86G2v8GQmHLW4g@mail.gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Sun, 21 Aug 2016 03:27:45 -0400
+Subject: [PATCH] ARM: EXYNOS: Clear OF_POPULATED flag from PMU node in IRQ
+ init callback
+Message-ID: <1471764465-2524-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Rob,
+The Exynos PMU node is an interrupt, clock and PMU (Power Management Unit)
+controller, and these functionalities are supported by different drivers
+that matches the same compatible strings.
 
-On Sat, Aug 20, 2016 at 4:18 PM, Rob Herring <robh+dt@kernel.org> wrote:
-> On Sat, Aug 20, 2016 at 10:18 AM, Javier Martinez Canillas
-> <javier@dowhile0.org> wrote:
+Since commit 15cc2ed6dcf9 ("of/irq: Mark initialised interrupt controllers
+as populated") the OF core flags interrupt controllers registered with the
+IRQCHIP_DECLARE() macro as OF_POPULATED, so platform devices with the same
+compatible string as the interrupt controller will not be registered.
 
-[snip]
+This prevents the PMU platform device to be registered so the Exynos PMU
+driver is never probed. This breaks (among other things) Suspend-to-RAM.
 
->>
->> I noticed that Philipp also sent a patch to clear that flag in
->> arch/arm/mach-imx/gpc.c [1]. I guess the same is needed in the drivers
->> for the devices that are not created for Exynos?
->
-> Yes, you need the same.
->
+Fix this by clearing the OF_POPULATED flag in the PMU IRQ init callback,
+to allow the Exynos PMU platform driver to be probed. The patch is based
+on Philipp Zabel's "ARM: imx6: mark GPC node as not populated after irq
+init to probe pm domain driver".
 
-Great, thanks a lot for the confirmation.
+Fixes: 15cc2ed6dcf9 ("of/irq: Mark initialised interrupt controllers as populated")
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
->> If that's the case, then I think that's more safe to revert Jon's
->> commit for now since is too risky for the -rc cycle and more platforms
->> may be affected.
->
-> I prefer not to and find the affected platforms. I've now grepped the
+---
 
-Ok, at the end I found that the only problem was with the Exynos PMU
-driver since both IRQCHIP_DECLARE() and a platform driver is used for
-the interrupt and PMU (Power Management Unit) controller
-functionalities respectively. I'll post a patch for that.
+This was tested on an Exynos5800 Peach Pi Chromebook with v4.8-rc2 +
+Philipp's patch: https://patchwork.kernel.org/patch/9271361/
 
-> tree to get all the IRQCHIP_DECLARE compatible strings and then
-> grepped for other occurrences and didn't find any more. In theory, we
-> could have matching happening with 2 different strings, but I'd guess
-> that is unlikely.
->
-> Rob
+ arch/arm/mach-exynos/suspend.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Best regards,
-Javier
+diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+index 3750575c73c5..06332f626565 100644
+--- a/arch/arm/mach-exynos/suspend.c
++++ b/arch/arm/mach-exynos/suspend.c
+@@ -255,6 +255,12 @@ static int __init exynos_pmu_irq_init(struct device_node *node,
+ 		return -ENOMEM;
+ 	}
+ 
++	/*
++	 * Clear the OF_POPULATED flag set in of_irq_init so that
++	 * later the Exynos PMU platform device won't be skipped.
++	 */
++	of_node_clear_flag(node, OF_POPULATED);
++
+ 	return 0;
+ }
+ 
+-- 
+2.5.5
