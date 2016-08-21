@@ -1,83 +1,51 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Sun, 21 Aug 2016 09:51:25 +0300
-Subject: [linux-sunxi] [PATCH 0/9] mfd: axp20x: Add support for AXP809 PMIC
-In-Reply-To: <20160821021125.1521-1-wens@csie.org>
-References: <20160821021125.1521-1-wens@csie.org>
-Message-ID: <1471762285.581.1.camel@plaes.org>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Sun, 21 Aug 2016 03:21:47 -0400
+Subject: [PATCH RFC] Revert "of/irq: Mark initialised interrupt
+ controllers as populated"
+In-Reply-To: <CAL_JsqKpLGscFaCT4x3NtQCOBgLK+-MQa_XDmpmkqyepdJVT4Q@mail.gmail.com>
+References: <E1bYVVh-0001eq-BI@rmk-PC.armlinux.org.uk>
+ <CAL_JsqJNE7rGaL54HfmGEkaScZ7krf_iM55UrKw6mwWdLHv6Ow@mail.gmail.com>
+ <CABxcv=n9o7sU0zB3WZ2Sp8Aqd+fnv1KLp8UcAx2YSrKBVW+rhg@mail.gmail.com>
+ <CAL_JsqKpLGscFaCT4x3NtQCOBgLK+-MQa_XDmpmkqyepdJVT4Q@mail.gmail.com>
+Message-ID: <CABxcv=nU4P-XfR6PcY_wrXTe09GyLADP5h==86G2v8GQmHLW4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2016-08-21 at 10:11 +0800, Chen-Yu Tsai wrote:
-> Hi everyone,
-> 
-> This series adds support for X-Powers' AXP806 PMIC. This is the
-> secondary
-> PMIC accompanying Allwinner's A80 SoC. For now, only the regulators
-> are
-> supported. While the AXP806 supports standalone operation, no
-> hardware
-> exists, so this will not be supported.
+Hello Rob,
 
-Title says AXP809, but in text and in subsequent patches there's also
-806/809 confusion.
+On Sat, Aug 20, 2016 at 4:18 PM, Rob Herring <robh+dt@kernel.org> wrote:
+> On Sat, Aug 20, 2016 at 10:18 AM, Javier Martinez Canillas
+> <javier@dowhile0.org> wrote:
 
-> 
-> Patch 1 adds AXP806 to the axp20x bindings.
-> 
-> Patch 2 adds AXP806 support to the axp20x mfd driver.
-> 
-> Patch 3 fixes regulator output adjustment during regulator
-> registration
-> so it doesn't fail if the higher or lower bounds of its voltage
-> constraints
-> don't match up with the regulator's voltage granularity.
-> 
-> Patch 4 adds AXP806 support to the axp20x regulator driver.
-> 
-> Patch 5 adds the unused SW switch output of the AXP809 PMIC on the
-> A80
-> Optimus board. This was accidentally left out of the AXP809 series.
-> 
-> Patch 6 adds the unused SW switch output of the AXP809 PMIC on the
-> Cubieboard 4. This was accidentally left out of the AXP809 series.
-> 
-> Patch 7 enables AXP809 support on the A80 Optimus board.
-> 
-> Patch 8 enables AXP809 support on the Cubieboard 4.
-> 
-> Patch 9 disables EHCI1 on the A80 Optimus board.
-> 
-> 
-> Regards
-> ChenYu
-> 
-> Chen-Yu Tsai (9):
-> ? mfd: axp20x: Add bindings for AXP806 PMIC
-> ? mfd: axp20x: Add support for AXP806 PMIC
-> ? regulator: core: Try full range when adjusting regulators to
-> ????constraints
-> ? regulator: axp20x: support AXP806 variant
-> ? ARM: dts: sun9i: a80-optimus: Declare AXP809 SW regulator as unused
-> ? ARM: dts: sun9i: cubieboard4: Declare AXP809 SW regulator as unused
-> ? ARM: dts: sun9i: a80-optimus: Add AXP806 PMIC device node and
-> ????regulators
-> ? ARM: dts: sun9i: cubieboard4: Add AXP806 PMIC device node and
-> ????regulators
-> ? ARM: dts: sun9i: a80-optimus: Disable EHCI1
-> 
-> ?Documentation/devicetree/bindings/mfd/axp20x.txt |??28 +++++-
-> ?arch/arm/boot/dts/sun9i-a80-cubieboard4.dts??????| 116
-> +++++++++++++++++++++
-> ?arch/arm/boot/dts/sun9i-a80-optimus.dts??????????| 123
-> ++++++++++++++++++++++-
-> ?drivers/mfd/axp20x-rsb.c?????????????????????????|???1 +
-> ?drivers/mfd/axp20x.c?????????????????????????????|??72 +++++++++++++
-> ?drivers/regulator/axp20x-regulator.c?????????????| 117
-> +++++++++++++++++++--
-> ?drivers/regulator/core.c?????????????????????????|???8 +-
-> ?include/linux/mfd/axp20x.h???????????????????????|??60 +++++++++++
-> ?8 files changed, 508 insertions(+), 17 deletions(-)
-> 
-> --?
-> 2.9.3
-> 
+[snip]
+
+>>
+>> I noticed that Philipp also sent a patch to clear that flag in
+>> arch/arm/mach-imx/gpc.c [1]. I guess the same is needed in the drivers
+>> for the devices that are not created for Exynos?
+>
+> Yes, you need the same.
+>
+
+Great, thanks a lot for the confirmation.
+
+>> If that's the case, then I think that's more safe to revert Jon's
+>> commit for now since is too risky for the -rc cycle and more platforms
+>> may be affected.
+>
+> I prefer not to and find the affected platforms. I've now grepped the
+
+Ok, at the end I found that the only problem was with the Exynos PMU
+driver since both IRQCHIP_DECLARE() and a platform driver is used for
+the interrupt and PMU (Power Management Unit) controller
+functionalities respectively. I'll post a patch for that.
+
+> tree to get all the IRQCHIP_DECLARE compatible strings and then
+> grepped for other occurrences and didn't find any more. In theory, we
+> could have matching happening with 2 different strings, but I'd guess
+> that is unlikely.
+>
+> Rob
+
+Best regards,
+Javier
