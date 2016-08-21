@@ -1,10 +1,10 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 21 Aug 2016 10:11:23 +0800
-Subject: [PATCH 7/9] ARM: dts: sun9i: a80-optimus: Add AXP806 PMIC device node
+Date: Sun, 21 Aug 2016 10:11:24 +0800
+Subject: [PATCH 8/9] ARM: dts: sun9i: cubieboard4: Add AXP806 PMIC device node
  and regulators
 In-Reply-To: <20160821021125.1521-1-wens@csie.org>
 References: <20160821021125.1521-1-wens@csie.org>
-Message-ID: <20160821021125.1521-8-wens@csie.org>
+Message-ID: <20160821021125.1521-9-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,14 +14,14 @@ line is connected to NMI pin of the SoC.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun9i-a80-optimus.dts | 113 ++++++++++++++++++++++++++++++++
- 1 file changed, 113 insertions(+)
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 112 ++++++++++++++++++++++++++++
+ 1 file changed, 112 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-index caf0091e71ba..aeb4037c8768 100644
---- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
-+++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-@@ -332,6 +332,118 @@
+diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+index 910b29f0f0b5..e38ac4fec10c 100644
+--- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
++++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+@@ -260,6 +260,118 @@
  		};
  	};
  
@@ -140,13 +140,5 @@ index caf0091e71ba..aeb4037c8768 100644
  	ac100: codec at e89 {
  		compatible = "x-powers,ac100";
  		reg = <0xe89>;
-@@ -371,6 +483,7 @@
- };
- 
- &usbphy2 {
-+	phy-supply = <&reg_bldo4>;
- 	status = "okay";
- };
- 
 -- 
 2.9.3
