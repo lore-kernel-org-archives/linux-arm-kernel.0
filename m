@@ -1,43 +1,82 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 21 Aug 2016 15:10:01 +0000
-Subject: [PATCH V3 RFT 3/5] ARM64: dts: bcm283x: Use dtsi for USB host mode
-In-Reply-To: <1471792204-21908-1-git-send-email-stefan.wahren@i2se.com>
-References: <1471792204-21908-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1471792204-21908-4-git-send-email-stefan.wahren@i2se.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 21 Aug 2016 17:20:14 +0200
+Subject: [PATCH v3 5/7] phy-sun4i-usb: Warn when external vbus is detected
+In-Reply-To: <27711471789929@web21g.yandex.ru>
+References: <1471781799-10457-1-git-send-email-hdegoede@redhat.com>
+ <1471781799-10457-5-git-send-email-hdegoede@redhat.com>
+ <27711471789929@web21g.yandex.ru>
+Message-ID: <fabf206f-7f7a-4f00-dbdf-c3ad24211fef@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case dr_mode isn't passed via DT, the dwc2 driver defaults
-to OTG mode. But the Raspberry Pi 3 is designed only for host mode.
-So fix this issue by linking to the dtsi file which set the dr_mode
-to host.
+Hi,
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts   |    1 +
- .../boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi    |    1 +
- 2 files changed, 2 insertions(+)
- create mode 120000 arch/arm64/boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi
+On 21-08-16 16:32, Icenowy Zheng wrote:
+>
+>
+> 21.08.2016, 20:22, "Hans de Goede" <hdegoede@redhat.com>:
+>> Warn when external vbus is detected when we're trying to enable our
+>> own vbus.
+>
+> Will it lead to a dmesg flood if a not-well-connected USB OTG Charging Hub
+> is present?
 
-diff --git a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-index 7841b72..7625e57 100644
---- a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-+++ b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-@@ -2,6 +2,7 @@
- #include "bcm2837.dtsi"
- #include "bcm2835-rpi.dtsi"
- #include "bcm283x-rpi-smsc9514.dtsi"
-+#include "bcm283x-rpi-usb-host.dtsi"
- 
- / {
- 	compatible = "raspberrypi,3-model-b", "brcm,bcm2837";
-diff --git a/arch/arm64/boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi b/arch/arm64/boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi
-new file mode 120000
-index 0000000..cbeebe3
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi
-@@ -0,0 +1 @@
-+../../../../arm/boot/dts/bcm283x-rpi-usb-host.dtsi
-\ No newline at end of file
--- 
-1.7.9.5
+No, we only try to turn on Vbus once when switching to host-mode.
+
+When using a device which is actually providing power and has an
+id pin claiming it wants the port in host mode then this message
+will trigger once. I'm actually adding it exactly because of the
+USB OTG Charging Hub case. In this case you want to see this
+messages once, if you're not seeing it and the hub is sending
+power to the micro-usb port then something is wrong.
+
+Note in many cases these hubs will only send power when in
+charging mode and in this case the the id-pin is such
+that the micro-usb port will be in device mode and will
+never try to provide power. In this scenario you will not
+get the warning, not will Linux see the hub.
+
+Regards,
+
+Hans
+
+
+
+
+
+
+>
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>> Changes in v2:
+>> -No changes
+>> Changes in v3:
+>> -No changes
+>> ---
+>>  drivers/phy/phy-sun4i-usb.c | 4 +++-
+>>  1 file changed, 3 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+>> index af42f8d..03f030b 100644
+>> --- a/drivers/phy/phy-sun4i-usb.c
+>> +++ b/drivers/phy/phy-sun4i-usb.c
+>> @@ -390,8 +390,10 @@ static int sun4i_usb_phy_power_on(struct phy *_phy)
+>>
+>>          /* For phy0 only turn on Vbus if we don't have an ext. Vbus */
+>>          if (phy->index == 0 && sun4i_usb_phy0_have_vbus_det(data) &&
+>> - data->vbus_det)
+>> + data->vbus_det) {
+>> + dev_warn(&_phy->dev, "External vbus detected, not enabling our own vbus\n");
+>>                  return 0;
+>> + }
+>>
+>>          ret = regulator_enable(phy->vbus);
+>>          if (ret)
+>> --
+>> 2.7.4
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
