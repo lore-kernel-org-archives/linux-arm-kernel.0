@@ -1,144 +1,25 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 21 Aug 2016 10:11:24 +0800
-Subject: [PATCH 8/9] ARM: dts: sun9i: cubieboard4: Add AXP806 PMIC device node
- and regulators
-In-Reply-To: <20160821021125.1521-1-wens@csie.org>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Sun, 21 Aug 2016 14:15:24 +1000
+Subject: [linux-sunxi] [PATCH 2/9] mfd: axp20x: Add support for AXP806 PMIC
+In-Reply-To: <20160821021125.1521-3-wens@csie.org>
 References: <20160821021125.1521-1-wens@csie.org>
-Message-ID: <20160821021125.1521-9-wens@csie.org>
+ <20160821021125.1521-3-wens@csie.org>
+Message-ID: <CAGRGNgXpn5WJhu8fB0WhR=pGD7EKKyeA04vkBkNaL7SjPHLLHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP806 PMIC is the secondary PMIC. It provides various supply
-voltages for the SoC and other peripherals. The PMIC's interrupt
-line is connected to NMI pin of the SoC.
+Hi Chen-Yu,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 112 ++++++++++++++++++++++++++++
- 1 file changed, 112 insertions(+)
+On Sun, Aug 21, 2016 at 12:11 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> The X-Powers AXP809 is a new PMIC that is paired with Allwinner's A80
+> SoC, along with a master AXP809 PMIC.
 
-diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
-index 910b29f0f0b5..e38ac4fec10c 100644
---- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
-+++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
-@@ -260,6 +260,118 @@
- 		};
- 	};
- 
-+	axp806: pmic at 745 {
-+		compatible = "x-powers,axp806";
-+		reg = <0x745>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+		bldoin-supply = <&reg_dcdce>;
-+
-+		regulators {
-+			reg_s_aldo1: aldo1 {
-+				regulator-always-on;
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-name = "avcc";
-+			};
-+
-+			aldo2 {
-+				/*
-+				 * unused, but use a different name to
-+				 * avoid name clash with axp809's aldo's
-+				 */
-+				regulator-name = "s_aldo2";
-+			};
-+
-+			aldo3 {
-+				/*
-+				 * unused, but use a different name to
-+				 * avoid name clash with axp809's aldo's
-+				 */
-+				regulator-name = "s_aldo3";
-+			};
-+
-+			reg_bldo1: bldo1 {
-+				regulator-always-on;
-+				regulator-min-microvolt = <1620000>;
-+				regulator-max-microvolt = <1980000>;
-+				regulator-name = "vcc18-efuse-adc-display-csi";
-+			};
-+
-+			reg_bldo2: bldo2 {
-+				regulator-always-on;
-+				regulator-min-microvolt = <1620000>;
-+				regulator-max-microvolt = <1980000>;
-+				regulator-name =
-+					"vdd18-drampll-vcc18-pll-cpvdd";
-+			};
-+
-+			bldo3 {
-+				/* unused */
-+			};
-+
-+			reg_bldo4: bldo4 {
-+				regulator-min-microvolt = <1080000>;
-+				regulator-max-microvolt = <1320000>;
-+				regulator-name = "vcc12-hsic";
-+			};
-+
-+			reg_cldo1: cldo1 {
-+				/*
-+				 * This was 3V in the original design, but
-+				 * 3.3V is the recommended supply voltage
-+				 * for the Ethernet PHY.
-+				 */
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc-gmac-phy";
-+			};
-+
-+			reg_cldo2: cldo2 {
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-name = "afvcc-cam";
-+			};
-+
-+			reg_cldo3: cldo3 {
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-name = "vcc-io-wifi-codec-io2";
-+			};
-+
-+			reg_dcdca: dcdca {
-+				regulator-always-on;
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1100000>;
-+				regulator-name = "vdd-cpub";
-+			};
-+
-+			reg_dcdcd: dcdcd {
-+				regulator-always-on;
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1100000>;
-+				regulator-name = "vdd-vpu";
-+			};
-+
-+			reg_dcdce: dcdce {
-+				regulator-always-on;
-+				regulator-min-microvolt = <2100000>;
-+				regulator-max-microvolt = <2100000>;
-+				regulator-name = "vcc-bldo-codec-ldoin";
-+			};
-+
-+			sw {
-+				/*
-+				 * unused, but use a different name to
-+				 * avoid name clash with axp809's sw
-+				 */
-+				regulator-name = "s_sw";
-+			};
-+		};
-+	};
-+
- 	ac100: codec at e89 {
- 		compatible = "x-powers,ac100";
- 		reg = <0xe89>;
+The first "AXP809" should be "AXP806".
+
+Thanks,
+
 -- 
-2.9.3
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
