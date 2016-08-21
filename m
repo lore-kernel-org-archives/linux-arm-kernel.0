@@ -1,125 +1,171 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 21 Aug 2016 11:29:02 +0200
-Subject: [PATCH v2 0/7] musb: sunxi: Add support for run-time changing
- dr-mode through sysfs
-In-Reply-To: <20160819212540.GB1853@uda0271908>
+Date: Sun, 21 Aug 2016 12:10:26 +0200
+Subject: [PATCH v2 7/7] musb: sunxi: Add support for platform_set_mode
+In-Reply-To: <20160819213049.GC1853@uda0271908>
 References: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
- <20160819212540.GB1853@uda0271908>
-Message-ID: <f7109331-b1fd-f3f4-31fa-23f49d31ba05@redhat.com>
+ <1471288892-21702-8-git-send-email-hdegoede@redhat.com>
+ <20160819213049.GC1853@uda0271908>
+Message-ID: <2a55a1bf-7ebf-3ab4-b231-85eba20103f1@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 19-08-16 23:25, Bin Liu wrote:
+On 19-08-16 23:30, Bin Liu wrote:
 > Hi,
 >
-> On Mon, Aug 15, 2016 at 09:21:25PM +0200, Hans de Goede wrote:
->> Hi All,
->>
->> Here is a patch series which implements run-time changing the dr-mode
->> of sunxi musb controllers through the (already existing) musb "mode"
+> On Mon, Aug 15, 2016 at 09:21:32PM +0200, Hans de Goede wrote:
+>> This allows run-time dr_mode switching support via the "mode" musb
 >> sysfs attribute.
 >>
->> This is useful on boards where there is no id pin, e.g. some tv-boxes
->> use the musb controller to get an extra usb A port without needing
->> a hub chip. Except for the missing id pin when using a usb A<->A cable
->> these ports can do peripheral mode just fine. This series makes it
->> possible to do e.g. this by doing echo "peripheral" > mode before
->> plugging in the usb A<->A cable.
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>  drivers/usb/musb/sunxi.c | 52 ++++++++++++++++++++++++++++++++++++++++++++----
+>>  1 file changed, 48 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+>> index c6ee166..1fe7451 100644
+>> --- a/drivers/usb/musb/sunxi.c
+>> +++ b/drivers/usb/musb/sunxi.c
+>> @@ -74,6 +74,7 @@
+>>  #define SUNXI_MUSB_FL_HAS_SRAM			5
+>>  #define SUNXI_MUSB_FL_HAS_RESET			6
+>>  #define SUNXI_MUSB_FL_NO_CONFIGDATA		7
+>> +#define SUNXI_MUSB_FL_PHY_MODE_PEND		8
+>>
+>>  /* Our read/write methods need access and do not get passed in a musb ref :| */
+>>  static struct musb *sunxi_musb;
+>> @@ -87,6 +88,7 @@ struct sunxi_glue {
+>>  	struct phy		*phy;
+>>  	struct platform_device	*usb_phy;
+>>  	struct usb_phy		*xceiv;
+>> +	enum phy_mode		phy_mode;
+>>  	unsigned long		flags;
+>>  	struct work_struct	work;
+>>  	struct extcon_dev	*extcon;
+>> @@ -140,6 +142,9 @@ static void sunxi_musb_work(struct work_struct *work)
+>>  			clear_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
+>>  		}
+>>  	}
+>> +
+>> +	if (test_and_clear_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags))
+>> +		phy_set_mode(glue->phy, glue->phy_mode);
+>>  }
+>>
+>>  static void sunxi_musb_set_vbus(struct musb *musb, int is_on)
+>> @@ -341,6 +346,41 @@ static void sunxi_musb_dma_controller_destroy(struct dma_controller *c)
+>>  {
+>>  }
+>>
+>> +static int sunxi_musb_set_mode(struct musb *musb, u8 mode)
+>> +{
+>> +	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
+>> +	enum phy_mode new_mode;
+>> +
+>> +	switch (mode) {
+>> +	case MUSB_HOST:		new_mode = PHY_MODE_USB_HOST; break;
+>> +	case MUSB_PERIPHERAL:	new_mode = PHY_MODE_USB_DEVICE; break;
+>> +	case MUSB_OTG:		new_mode = PHY_MODE_USB_OTG; break;
 >
-> Well, this is an illegal usecase. A-A cable is invalid by USB Spec.
+> Please fix the code style as commented in patch 4/7.
 
-Yet they exist and there are USB devices (e.g. harddisk enclosures)
-which use a USB-A connector even though they are a device not
-a host. I own several such devices myself. I agree that this is
-wrong but these devices exist, typical case of reality trumping
-the spec.
+Ok I will send a new version with this fixed.
 
-> With type-A receptacle the controller should be in host-only mode,
-> switching to peripheral mode should not be allowed.
-
-Peripheral mode can still be quite useful, e.g. to do ethernet
-over USB (some of these devices lack wired ethernet).
-
-Also the manual of these devices typically instructs users to
-use an A<->A cable for firmware updates, since the bootROM in
-the SoC does not care anmd will happily put the device in
-Allwinner's custom DFU mode using the USB-A connector.
-
-Although I agree with this being not ideal, the fact is that
-an USB-A connector combined with a A<->A cable is electrically
-100% identical to a USB-B connector with its id-pin not connected
-(on the PCB side), which also happens see below.
-
->> This series has both sun4i-usb-phy driver and sunxi-musb-glue changes,
->> both are necessary for the run-time changing to work, but they can be
->> merged independently without breaking anything.
->>
->> Changed in v2:
->>
->> After sleeping on it a night I realized that always passing port_mode =
->> DUAL_ROLE to the musb-core was wrong. There is a distintion between
->> the id-pin not working properly which we can work around with software
->> mode switching (and we want to register both the host and udc driver
->> in this case) vs cases where we really only want to register a host
->> (wifi module connected to musb soldered onto the PCB).
->>
->> So v2 of this series drops the
->> "musb: sunxi: Always register both host and udc when build with dual-role support"
->> patch.
->>
->> Instead systems which are dual-role capable, but lack an id-pin should use
->> dr_mode = "otg" in the dts file. There is one problem with this, some
->> systems are dual-role capable but use a female USB-A connector connected
->> to the musb controller. These should come up in host mode by default,
 >
-> This is not a problem. With a type-A connector, the dual-role controller
-> should work in host-only mode.
- > Role switching should only be allowed if an AB connector is used.
-
-Yet people may want to use it in peripheral mode, I strongly believe
-that we should not be telling people what they can and cannot do
-with their hardware. That is policy and the kernel does not set
-such policy, that is up to userspace. OTOH the port should clearly
-default to host mode hence the new property.
-
-> Using the sysfs entry to switch roles for generic purpose is really a
-> bad idea, it opens up ton of problems.
-
-Yet the sysfs entry exists already, and the problems depend on how
-you hook it up. I'm merely using the sysfs entry as an id-pin
-for cases where there is no id pin hooked up. If you look at the
-patches you will see that all that is changed by writing the
-sysfs entry is the phy reporting a different id-pin value to
-the musb ip. Everything else is handled the same as for any normal
-otg mode port.
-
-> For systems which lack of id-pin should use a discrete circuit (for
-> example GPIO) to detect the id pin in the AB receptacle, then the USB
-> driver will handle the role switching transparently.
-
-You're again talking theory here in reality there is hardware where
-for whatever reasons the PCB uses a mini or micro usb receptacle,
-but they did not bother to _physically_ hook up the id pin.
-
-As said before reality trumps the Spec / theory.
-
->> rather then peripheral mode which is the default for systems which lack an
->> id-pin. This patch set introduces:
->>
->> "phy-sun4i-usb: Add "allwinner,usb0-usb-a-connector" dt property"
->>
->> Which allows specifying the use of a female USB-A connector for the
->> musb controller in the phy dt node, the presence of this dt property
->> changes the default to host mode.
+>> +	default:
+>> +		dev_err(musb->controller->parent,
+>> +			"Error requested mode not supported by this kernel\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	if (glue->phy_mode == new_mode)
+>> +		return 0;
+>> +
+>> +	if (musb->port_mode != MUSB_PORT_MODE_DUAL_ROLE) {
+>> +		dev_err(musb->controller->parent,
+>> +			"Error changing modes is only supported in dual role mode\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	/*
+>> +	 * phy_set_mode may sleep, and we're called with a spinlock held,
+>> +	 * so let sunxi_musb_work deal with it.
+>> +	 */
+>> +	glue->phy_mode = new_mode;
+>> +	set_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags);
+>> +	schedule_work(&glue->work);
 >
-> This is unnecessary, if using a type-A connector, dr_mode should be
-> "host" in DT.
+> When switching from host to peripheral mode, if an usb device is still
+> plugged and enumerated, how do you handle the device disconnect?
 
-Which means we're telling users what they can and cannot do with
-their hardware, which we should not be doing.
+The phy code will report vbus low for long enough for the musb to end
+the current session. It already does this for boards which do not
+have working vbus detection.
 
 Regards,
 
 Hans
+
+
+>
+> Regards,
+> -Bin.
+>
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>  /*
+>>   * sunxi musb register layout
+>>   * 0x00 - 0x17	fifo regs, 1 long per fifo
+>> @@ -568,6 +608,7 @@ static const struct musb_platform_ops sunxi_musb_ops = {
+>>  	.writew		= sunxi_musb_writew,
+>>  	.dma_init	= sunxi_musb_dma_controller_create,
+>>  	.dma_exit	= sunxi_musb_dma_controller_destroy,
+>> +	.set_mode	= sunxi_musb_set_mode,
+>>  	.set_vbus	= sunxi_musb_set_vbus,
+>>  	.pre_root_reset_end = sunxi_musb_pre_root_reset_end,
+>>  	.post_root_reset_end = sunxi_musb_post_root_reset_end,
+>> @@ -614,21 +655,28 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+>>  		return -EINVAL;
+>>  	}
+>>
+>> +	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
+>> +	if (!glue)
+>> +		return -ENOMEM;
+>> +
+>>  	memset(&pdata, 0, sizeof(pdata));
+>>  	switch (usb_get_dr_mode(&pdev->dev)) {
+>>  #if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_HOST
+>>  	case USB_DR_MODE_HOST:
+>>  		pdata.mode = MUSB_PORT_MODE_HOST;
+>> +		glue->phy_mode = PHY_MODE_USB_HOST;
+>>  		break;
+>>  #endif
+>>  #if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_GADGET
+>>  	case USB_DR_MODE_PERIPHERAL:
+>>  		pdata.mode = MUSB_PORT_MODE_GADGET;
+>> +		glue->phy_mode = PHY_MODE_USB_DEVICE;
+>>  		break;
+>>  #endif
+>>  #ifdef CONFIG_USB_MUSB_DUAL_ROLE
+>>  	case USB_DR_MODE_OTG:
+>>  		pdata.mode = MUSB_PORT_MODE_DUAL_ROLE;
+>> +		glue->phy_mode = PHY_MODE_USB_OTG;
+>>  		break;
+>>  #endif
+>>  	default:
+>> @@ -638,10 +686,6 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+>>  	pdata.platform_ops	= &sunxi_musb_ops;
+>>  	pdata.config		= &sunxi_musb_hdrc_config;
+>>
+>> -	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
+>> -	if (!glue)
+>> -		return -ENOMEM;
+>> -
+>>  	glue->dev = &pdev->dev;
+>>  	INIT_WORK(&glue->work, sunxi_musb_work);
+>>  	glue->host_nb.notifier_call = sunxi_musb_host_notifier;
+>> --
+>> 2.7.4
+>>
