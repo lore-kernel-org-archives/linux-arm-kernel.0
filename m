@@ -1,48 +1,72 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 21 Aug 2016 10:11:19 +0800
-Subject: [PATCH 3/9] regulator: core: Try full range when adjusting regulators
- to constraints
+Date: Sun, 21 Aug 2016 10:11:17 +0800
+Subject: [PATCH 1/9] mfd: axp20x: Add bindings for AXP806 PMIC
 In-Reply-To: <20160821021125.1521-1-wens@csie.org>
 References: <20160821021125.1521-1-wens@csie.org>
-Message-ID: <20160821021125.1521-4-wens@csie.org>
+Message-ID: <20160821021125.1521-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently when we try to bring regulator in bounds of its constraints,
-we pick either the minimum or maximum voltage as the target. This fails
-if the regulator range is not continuous, and the target voltage is not
-an exact value the regulator can achieve, i.e. the target is not aligned
-to the step of the regulator.
+This patch adds the basic and regulator bindings for the X-Powers AXP809
+PMIC.
 
-Instead pass the full range of the constraints, and have the regulator
-core work out a suitable voltage within.
-
-Fixes: ("regulator: core: Ensure we are at least in bounds for our
-	 constraints")
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/regulator/core.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 28 ++++++++++++++++++++++--
+ 1 file changed, 26 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index db320e8fa865..86f69c92ce7a 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -897,13 +897,9 @@ static int machine_constraints_voltage(struct regulator_dev *rdev,
- 		target_min = current_uV;
- 		target_max = current_uV;
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index 585a95546288..8f3ad9ab4637 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -10,7 +10,8 @@ axp809 (X-Powers)
  
--		if (current_uV < rdev->constraints->min_uV) {
-+		if (current_uV < rdev->constraints->min_uV ||
-+		    current_uV > rdev->constraints->max_uV) {
- 			target_min = rdev->constraints->min_uV;
--			target_max = rdev->constraints->min_uV;
--		}
+ Required properties:
+ - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
+-	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp809"
++	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp806",
++	      "x-powers,axp809"
+ - reg: The I2C slave address or RSB hardware address for the AXP chip
+ - interrupt-parent: The parent interrupt controller
+ - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
+@@ -47,7 +48,6 @@ Optional properties for DCDC regulators:
+ 			  probably makes sense for HiFi audio related
+ 			  applications that aren't battery constrained.
+ 
 -
--		if (current_uV > rdev->constraints->max_uV) {
--			target_min = rdev->constraints->max_uV;
- 			target_max = rdev->constraints->max_uV;
- 		}
+ AXP202/AXP209 regulators, type, and corresponding input supply names:
  
+ Regulator	  Type		  Supply Name		  Notes
+@@ -86,6 +86,30 @@ LDO_IO1		: LDO		: ips-supply		: GPIO 1
+ RTC_LDO		: LDO		: ips-supply		: always on
+ DRIVEVBUS	: Enable output	: drivevbus-supply	: external regulator
+ 
++AXP806 regulators, type, and corresponding input supply names:
++
++Regulator	  Type		  Supply Name		  Notes
++---------	  ----		  -----------		  -----
++DCDCA		: DC-DC buck	: vina-supply		: poly-phase capable
++DCDCB		: DC-DC buck	: vinb-supply		: poly-phase capable
++DCDCC		: DC-DC	buck	: vinc-supply		: poly-phase capable
++DCDCD		: DC-DC	buck	: vind-supply		: poly-phase capable
++DCDCE		: DC-DC	buck	: vine-supply		: poly-phase capable
++ALDO1		: LDO		: aldoin-supply		: shared supply
++ALDO2		: LDO		: aldoin-supply		: shared supply
++ALDO3		: LDO		: aldoin-supply		: shared supply
++BLDO1		: LDO		: bldoin-supply		: shared supply
++BLDO2		: LDO		: bldoin-supply		: shared supply
++BLDO3		: LDO		: bldoin-supply		: shared supply
++BLDO4		: LDO		: bldoin-supply		: shared supply
++CLDO1		: LDO		: cldoin-supply		: shared supply
++CLDO2		: LDO		: cldoin-supply		: shared supply
++CLDO3		: LDO		: cldoin-supply		: shared supply
++SW		: On/Off Switch : swin-supply
++
++Additionally, the AXP806 DC-DC regulators support poly-phase arrangements
++for higher output current. The possible groupings are: A+B, A+B+C, D+E.
++
+ AXP809 regulators, type, and corresponding input supply names:
+ 
+ Regulator	  Type		  Supply Name		  Notes
 -- 
 2.9.3
