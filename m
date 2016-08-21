@@ -1,50 +1,202 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 21 Aug 2016 19:58:40 +0100
-Subject: [PATCH v7 3/3] arm: dts: mt2701: Add auxadc node.
-In-Reply-To: <1471504297-26947-4-git-send-email-zhiyong.tao@mediatek.com>
-References: <1471504297-26947-1-git-send-email-zhiyong.tao@mediatek.com>
- <1471504297-26947-4-git-send-email-zhiyong.tao@mediatek.com>
-Message-ID: <c238236c-2445-7802-6f2e-2f4776778c36@kernel.org>
+Date: Sun, 21 Aug 2016 20:11:34 +0100
+Subject: [PATCH v3 1/4] iio: adc: rockchip_saradc: reset saradc controller
+ before programming it
+In-Reply-To: <57B20584.3090502@rock-chips.com>
+References: <1469629447-544-1-git-send-email-wxt@rock-chips.com>
+ <5b6602f2-23f9-e5e5-8479-cddd365f7e71@kernel.org>
+ <57B20584.3090502@rock-chips.com>
+Message-ID: <7e84e59d-48ee-3e17-feff-8e57ae7c2b4b@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/08/16 08:11, Zhiyong Tao wrote:
-> The commit adds auxadc nodes to the Mediatek MT2701 dtsi file.
+On 15/08/16 19:10, Caesar Wang wrote:
 > 
-> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
-> ---
-> This patch dependents on "Add clock support for Mediatek MT2701"[1].
-> Please accept this patch together with [1].
-> [1]http://lists.infradead.org/pipermail/linux-mediatek/2016-August/006620.html
-Guessing this is working it's way ultimately through arm-soc.  Patches
-1 and 2 are now heading through the iio / staging-iio route and should be
-merging in the next merge window if nothing odd happens.
+> On 2016?08?16? 01:41, Jonathan Cameron wrote:
+>> On 27/07/16 15:24, Caesar Wang wrote:
+>>> SARADC controller needs to be reset before programming it, otherwise
+>>> it will not function properly.
+>>>
+>>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>>> Cc: Jonathan Cameron <jic23@kernel.org>
+>>> Cc: Heiko Stuebner <heiko@sntech.de>
+>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>> Cc: linux-iio at vger.kernel.org
+>>> Cc: linux-rockchip at lists.infradead.org
+>>> Tested-by: Guenter Roeck <linux@roeck-us.net>
+>>>
+>> Hi
+>>
+>> Patch is fine (I'll fix up the wording issue) however...
+>>
+>> I'm not clear on the severity of the issue. Is this something
+>> we should be pushing for stable?
+> 
+> I think that should be pushing for stable, since the common isssue for the ADC is initially enabled on loader,
+> and only disabled after the first read.
+> 
+> cat /sys/class/hwmon/hwmon1/device/temp1_input
+> cat: /sys/class/hwmon/hwmon1/device/temp1_input: Connection timed out
+> 
+> The kernel log shows:
+> 
+> [ 32.209451] read channel() error: -110
+> ..
+> 
+> Also, for my experience. Some other reasons caused the adc (controller) glitch for the kernel side.
+Fine.  So now the only question is who is handling it. The
+fix is useless (I think) without the dts changes to support it.
+Normally we'd route the dts and driver changes separately as it
+should not matter, but here I think I'd prefer it if the whole
+thing went via rockchip -> arm-soc tree so it goes in together.
+
+Hence (with wording fixed)
+
+Acked-by: Jonathan Cameron <jic23@kernel.org>
+Cc: <Stable@vger.kernel.org> 
+(for the driver patch).
+
+If people want me to take it via IIO then I'll need acks for
+the dts changes with explicit agreement that they can be marked
+for stable. Would image Heiko, these would come from you.
 
 Thanks,
 
 Jonathan
-> ---
->  arch/arm/boot/dts/mt2701.dtsi |    9 +++++++++
->  1 file changed, 9 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-> index 7eab6f4..8e6a18c 100644
-> --- a/arch/arm/boot/dts/mt2701.dtsi
-> +++ b/arch/arm/boot/dts/mt2701.dtsi
-> @@ -175,6 +175,15 @@
->  		      <0 0x10216000 0 0x2000>;
->  	};
->  
-> +	auxadc: adc at 11001000 {
-> +		compatible = "mediatek,mt2701-auxadc";
-> +		reg = <0 0x11001000 0 0x1000>;
-> +		clocks = <&pericfg CLK_PERI_AUXADC>;
-> +		clock-names = "main";
-> +		#io-channel-cells = <1>;
-> +		status = "disabled";
-> +	};
-> +
->  	uart0: serial at 11002000 {
->  		compatible = "mediatek,mt2701-uart",
->  			     "mediatek,mt6577-uart";
+> -
+> Caesar
+> 
+>> Jonathan
+>>> ---
+>>>
+>>> Changes in v3:
+>>> - %s/devm_reset_control_get_optional()/devm_reset_control_get()
+>>> - add Guente's test tag.
+>>>
+>>> Changes in v2:
+>>> - Make the reset as an optional property, since it should work
+>>> with old devicetrees as well.
+>>>
+>>>  .../bindings/iio/adc/rockchip-saradc.txt           |  7 +++++
+>>>  drivers/iio/adc/Kconfig                            |  1 +
+>>>  drivers/iio/adc/rockchip_saradc.c                  | 30 ++++++++++++++++++++++
+>>>  3 files changed, 38 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+>>> index bf99e2f..205593f 100644
+>>> --- a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+>>> +++ b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+>>> @@ -16,6 +16,11 @@ Required properties:
+>>>  - vref-supply: The regulator supply ADC reference voltage.
+>>>  - #io-channel-cells: Should be 1, see ../iio-bindings.txt
+>>>  
+>>> +Optional properties:
+>>> +- resets: Must contain an entry for each entry in reset-names if need support
+>>> +	  this option. See ../reset/reset.txt for details.
+>>> +- reset-names: Must include the name "saradc-apb".
+>>> +
+>>>  Example:
+>>>  	saradc: saradc at 2006c000 {
+>>>  		compatible = "rockchip,saradc";
+>>> @@ -23,6 +28,8 @@ Example:
+>>>  		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+>>>  		clocks = <&cru SCLK_SARADC>, <&cru PCLK_SARADC>;
+>>>  		clock-names = "saradc", "apb_pclk";
+>>> +		resets = <&cru SRST_SARADC>;
+>>> +		reset-names = "saradc-apb";
+>>>  		#io-channel-cells = <1>;
+>>>  		vref-supply = <&vcc18>;
+>>>  	};
+>>> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+>>> index 1de31bd..7675772 100644
+>>> --- a/drivers/iio/adc/Kconfig
+>>> +++ b/drivers/iio/adc/Kconfig
+>>> @@ -389,6 +389,7 @@ config QCOM_SPMI_VADC
+>>>  config ROCKCHIP_SARADC
+>>>  	tristate "Rockchip SARADC driver"
+>>>  	depends on ARCH_ROCKCHIP || (ARM && COMPILE_TEST)
+>>> +	depends on RESET_CONTROLLER
+>>>  	help
+>>>  	  Say yes here to build support for the SARADC found in SoCs from
+>>>  	  Rockchip.
+>>> diff --git a/drivers/iio/adc/rockchip_saradc.c b/drivers/iio/adc/rockchip_saradc.c
+>>> index f9ad6c2..85d7012 100644
+>>> --- a/drivers/iio/adc/rockchip_saradc.c
+>>> +++ b/drivers/iio/adc/rockchip_saradc.c
+>>> @@ -21,6 +21,8 @@
+>>>  #include <linux/of_device.h>
+>>>  #include <linux/clk.h>
+>>>  #include <linux/completion.h>
+>>> +#include <linux/delay.h>
+>>> +#include <linux/reset.h>
+>>>  #include <linux/regulator/consumer.h>
+>>>  #include <linux/iio/iio.h>
+>>>  
+>>> @@ -53,6 +55,7 @@ struct rockchip_saradc {
+>>>  	struct clk		*clk;
+>>>  	struct completion	completion;
+>>>  	struct regulator	*vref;
+>>> +	struct reset_control	*reset;
+>>>  	const struct rockchip_saradc_data *data;
+>>>  	u16			last_val;
+>>>  };
+>>> @@ -190,6 +193,16 @@ static const struct of_device_id rockchip_saradc_match[] = {
+>>>  };
+>>>  MODULE_DEVICE_TABLE(of, rockchip_saradc_match);
+>>>  
+>>> +/**
+>>> + * Reset SARADC Controller.
+>>> + */
+>>> +static void rockchip_saradc_reset_controller(struct reset_control *reset)
+>>> +{
+>>> +	reset_control_assert(reset);
+>>> +	usleep_range(10, 20);
+>>> +	reset_control_deassert(reset);
+>>> +}
+>>> +
+>>>  static int rockchip_saradc_probe(struct platform_device *pdev)
+>>>  {
+>>>  	struct rockchip_saradc *info = NULL;
+>>> @@ -218,6 +231,20 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
+>>>  	if (IS_ERR(info->regs))
+>>>  		return PTR_ERR(info->regs);
+>>>  
+>>> +	/*
+>>> +	 * The reset should be an optional property, as it should work
+>>> +	 * with old devicetrees as well
+>>> +	 */
+>>> +	info->reset = devm_reset_control_get(&pdev->dev, "saradc-apb");
+>>> +	if (IS_ERR(info->reset)) {
+>>> +		ret = PTR_ERR(info->reset);
+>>> +		if (ret != -ENOENT)
+>>> +			return ret;
+>>> +
+>>> +		dev_dbg(&pdev->dev, "no reset control found\n");
+>>> +		info->reset = NULL;
+>>> +	}
+>>> +
+>>>  	init_completion(&info->completion);
+>>>  
+>>>  	irq = platform_get_irq(pdev, 0);
+>>> @@ -252,6 +279,9 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
+>>>  		return PTR_ERR(info->vref);
+>>>  	}
+>>>  
+>>> +	if (info->reset)
+>>> +		rockchip_saradc_reset_controller(info->reset);
+>>> +
+>>>  	/*
+>>>  	 * Use a default value for the converter clock.
+>>>  	 * This may become user-configurable in the future.
+>>>
+>>
+>> _______________________________________________
+>> Linux-rockchip mailing list
+>> Linux-rockchip at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+> 
+> 
+> -- 
+> caesar wang | software engineer | wxt at rock-chip.com 
 > 
