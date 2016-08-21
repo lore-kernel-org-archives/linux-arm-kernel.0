@@ -1,131 +1,69 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Sun, 21 Aug 2016 19:21:42 +0200
-Subject: [PATCH V3 2/5] thermal: bcm2835: add thermal driver for bcm2835
- soc
-In-Reply-To: <1471786649.2188.4.camel@intel.com>
-References: <1463495753-967-1-git-send-email-kernel@martin.sperl.org>
- <1463495753-967-3-git-send-email-kernel@martin.sperl.org>
- <87mvn6qa2x.fsf@eliezer.anholt.net> <87r39lvs4v.fsf@eliezer.anholt.net>
- <1471591694.2691.39.camel@intel.com> <87inuwd1p4.fsf@eliezer.anholt.net>
- <1471786649.2188.4.camel@intel.com>
-Message-ID: <46FE06A3-5A7D-41D7-827B-C7B35E42E2C5@martin.sperl.org>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 21 Aug 2016 19:54:00 +0100
+Subject: [PATCH v7 1/3] dt-bindings: auxadc: Add binding document for
+ Mediatek auxadc.
+In-Reply-To: <1471504297-26947-2-git-send-email-zhiyong.tao@mediatek.com>
+References: <1471504297-26947-1-git-send-email-zhiyong.tao@mediatek.com>
+ <1471504297-26947-2-git-send-email-zhiyong.tao@mediatek.com>
+Message-ID: <eb2d9448-5b6e-9ff7-5287-de35fb73d338@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On 21.08.2016, at 15:37, Zhang Rui <rui.zhang@intel.com> wrote:
+On 18/08/16 08:11, Zhiyong Tao wrote:
+> The commit adds the device tree binding documentation for the mediatek
+> auxadc found on Mediatek MT2701.
+> Thermal gets auxadc sample data by iio device.
+> So the commit changes auxadc device tree binding documentation from
+> /soc/mediatek/auxadc.txt to /iio/adc/mt6577_auxadc.txt.
 > 
->> On ?, 2016-08-19 at 11:59 -0700, Eric Anholt wrote:
->> Zhang Rui <rui.zhang@intel.com> writes:
->> 
->>> 
->>>> On ?, 2016-08-18 at 11:39 -0700, Eric Anholt wrote:
->>>> 
->>>> Eric Anholt <eric@anholt.net> writes:
->>>> 
->>>>> 
->>>>> 
->>>>> kernel at martin.sperl.org writes:
->>>>> 
->>>>>> 
->>>>>> 
->>>>>> From: Martin Sperl <kernel@martin.sperl.org>
->>>>>> 
->>>>>> Add basic thermal driver for bcm2835 SOC.
->>>>>> 
->>>>>> This driver currently relies on the firmware setting up the
->>>>>> tsense HW block and does not set it up itself.
->>>>>> 
->>>>>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
->>>>>> 
->>>>>> ChangeLog:
->>>>>>  V1 -> V2: added specific settings depending on compatiblity
->>>>>>       added trip point based on register
->>>>>>       setting up ctrl-register if HW is not enabled by
->>>>>> firmware
->>>>>>         as per recommendation of Eric (untested)
->>>>>>       check that clock frequency is in range
->>>>>>         (1.9 - 5MHz - as per comment in clk-bcm2835.c)
->>>>>> ---
->>>>>> 
->>>>>> diff --git a/drivers/thermal/bcm/Makefile
->>>>>> b/drivers/thermal/bcm/Makefile
->>>>>> new file mode 100644
->>>>>> index 0000000..13456d2
->>>>>> --- /dev/null
->>>>>> +++ b/drivers/thermal/bcm/Makefile
->>>>>> @@ -0,0 +1 @@
->>>>>> +obj-$(CONFIG_BCM2835_THERMAL)        :=
->>>>>> bcm2835_thermal.o
->>>>>> diff --git a/drivers/thermal/bcm/bcm2835_thermal.c
->>>>>> b/drivers/thermal/bcm/bcm2835_thermal.c
->>>>>> new file mode 100644
->>>>>> index 0000000..73138cb
->>>>>> --- /dev/null
->>>>>> +++ b/drivers/thermal/bcm/bcm2835_thermal.c
->>>>>> 
->>>>>> +static const struct of_device_id
->>>>>> bcm2835_thermal_of_match_table[];
->>>>>> +static int bcm2835_thermal_probe(struct platform_device
->>>>>> *pdev)
->>>>>> +{
->>>>>> 
->>>>>> +    /* enable clock and check rate */
->>>>>> +    clk_prepare_enable(data->clk);
->>>>>> +    rate = clk_get_rate(data->clk);
->>>>>> +    if ((rate < 1920000) || (rate > 5000000)) {
->>>>>> +        dev_warn(&pdev->dev,
->>>>>> +             "Clock %pCn is running at %pCr Hz,
->>>>>> which is outside the recommended range of 1.9 to 5.0 MHz\n",
->>>>>> +             data->clk, data->clk);
->>>>>> +    }
->>>>>> +
->>>>>> +    /* register it */
->>>>>> +    tz = thermal_zone_device_register("bcm2835_thermal",
->>>>>> +                      1, 0, data,
->>>>>> +                      &bcm2835_thermal_o
->>>>>> ps,
->>>>>> +                      NULL, 0, 0);
->>>>> I notice that the polling_delay is set to 0, but we're not
->>>>> using
->>>>> interrupts to trigger the trip.  Is it valid to expose a trip
->>>>> without a
->>>>> polling_delay or interrupts?  Should passive_delay be set as
->>>>> well?
->>>>> 
->>>>> This is up to the thermal maintainers.  As far as I'm
->>>>> concerned,
->>>>> it's:
->>>>> 
->>>>> Acked-by: Eric Anholt <eric@anholt.net>
->>>>> 
->>>>> One it lands I'll pull the defconfig and DT bits.
->>>> Ping on this question to thermal maintainers.  I'd still love to
->>>> see
->>>> this driver land.
->>> hmmm, how is this driver supposed to work?
->>> With this patch set, I think the only benefit is that we can get
->>> the
->>> temperature and trip point information via thermal sysfs interface,
->>> but
->>> kernel thermal control is a no-op here, right?
->> Yeah.  It seems useful to be able to get the information.  Once we
->> land
->> this, I hope someone can add interrupt support so that there are
->> actual
->> trip points.
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+Applied to the togreg branch of iio.git.
+
+Thanks,
+
+Jonathan
+> ---
+>  .../auxadc.txt => iio/adc/mt6577_auxadc.txt}       |   18 +++++++++++++-----
+>  1 file changed, 13 insertions(+), 5 deletions(-)
+>  rename Documentation/devicetree/bindings/{soc/mediatek/auxadc.txt => iio/adc/mt6577_auxadc.txt} (46%)
 > 
-> sounds reasonable to me.
-> Another question, why you need a separate directory for a single
-> file, bcm2835_thermal.c?
-
-Lots of other subsystems (clk, sound/soc, ...) are using vendor specific
-sub directories.
-In thermal there are already subdirectories for Samsung or st.
-So this was done in this case as well to support Broadcom immediately
-following this pattern.
-
-You want a new version to keep it in thermal directly I can create a
-new version of the patch.
-
-Thanks, Martin
+> diff --git a/Documentation/devicetree/bindings/soc/mediatek/auxadc.txt b/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
+> similarity index 46%
+> rename from Documentation/devicetree/bindings/soc/mediatek/auxadc.txt
+> rename to Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
+> index bdb7829..68c45cb 100644
+> --- a/Documentation/devicetree/bindings/soc/mediatek/auxadc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
+> @@ -1,4 +1,4 @@
+> -MediaTek AUXADC
+> +* Mediatek AUXADC - Analog to Digital Converter on Mediatek mobile soc (mt65xx/mt81xx/mt27xx)
+>  ===============
+>  
+>  The Auxiliary Analog/Digital Converter (AUXADC) is an ADC found
+> @@ -10,12 +10,20 @@ Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+>  for the Thermal Controller which holds a phandle to the AUXADC.
+>  
+>  Required properties:
+> -- compatible: Must be "mediatek,mt8173-auxadc"
+> -- reg: Address range of the AUXADC unit
+> +  - compatible: Should be one of:
+> +    - "mediatek,mt2701-auxadc": For MT2701 family of SoCs
+> +    - "mediatek,mt8173-auxadc": For MT8173 family of SoCs
+> +  - reg: Address range of the AUXADC unit.
+> +  - clocks: Should contain a clock specifier for each entry in clock-names
+> +  - clock-names: Should contain "main".
+> +  - #io-channel-cells: Should be 1, see ../iio-bindings.txt
+>  
+>  Example:
+>  
+> -auxadc: auxadc at 11001000 {
+> -	compatible = "mediatek,mt8173-auxadc";
+> +auxadc: adc at 11001000 {
+> +	compatible = "mediatek,mt2701-auxadc";
+>  	reg = <0 0x11001000 0 0x1000>;
+> +	clocks = <&pericfg CLK_PERI_AUXADC>;
+> +	clock-names = "main";
+> +	#io-channel-cells = <1>;
+>  };
+> 
