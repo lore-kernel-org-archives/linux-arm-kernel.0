@@ -1,55 +1,89 @@
-From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
-Date: Sun, 21 Aug 2016 23:20:25 +0200
-Subject: [PATCH] serial: vt8500_serial: Fix a parameter of find_first_zero_bit.
-Message-ID: <1471814425-18949-1-git-send-email-christophe.jaillet@wanadoo.fr>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Sun, 21 Aug 2016 15:11:52 -0700
+Subject: [PATCH v2] dt-bindings: touchscreen: silead gsl1680: Document all
+ compatibles
+In-Reply-To: <CAL_Jsq+juNdPXf8m7Nffb49uGc8uzpei9YA--8yP0oxrVhKPnw@mail.gmail.com>
+References: <1471424340-4201-1-git-send-email-hdegoede@redhat.com>
+ <20160818193028.GA39271@dtor-ws>
+ <CAL_JsqK2Lgic+-P-NvvnVO9COCy3k_yO3seOipYDd4d10QK2UA@mail.gmail.com>
+ <20160818203959.GB39271@dtor-ws>
+ <CAL_Jsq+juNdPXf8m7Nffb49uGc8uzpei9YA--8yP0oxrVhKPnw@mail.gmail.com>
+Message-ID: <5BB13372-9C05-4FEB-85BC-E16BAE98EB77@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 2nd parameter of 'find_first_zero_bit' is the number of bits to search.
-In this case, we are passing 'sizeof(vt8500_ports_in_use)'.
-'vt8500_ports_in_use' is an 'unsigned long'. So the sizeof is likely to
-return 4.
+On August 20, 2016 1:25:48 PM PDT, Rob Herring <robh+dt@kernel.org> wrote:
+>On Thu, Aug 18, 2016 at 3:39 PM, Dmitry Torokhov
+><dmitry.torokhov@gmail.com> wrote:
+>> On Thu, Aug 18, 2016 at 02:48:52PM -0500, Rob Herring wrote:
+>>> On Thu, Aug 18, 2016 at 2:30 PM, Dmitry Torokhov
+>>> <dmitry.torokhov@gmail.com> wrote:
+>>> > On Wed, Aug 17, 2016 at 10:59:00AM +0200, Hans de Goede wrote:
+>>> >> The silead gsl1680 driver / binding supports a whole series of
+>devices,
+>>> >> list the compatibles for all of them in the binding.
+>>> >>
+>>> >> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>> >> ---
+>>> >> Changes in v2:
+>>> >> -Drop the "silead,mssl1680" compatible thing, the "mssl1680" name
+>is an
+>>> >>  ACPI thing and does not belong in the dt bindings
+>>> >> ---
+>>> >>  .../devicetree/bindings/input/touchscreen/silead_gsl1680.txt    
+>     | 4 ++++
+>>> >>  1 file changed, 4 insertions(+)
+>>> >>
+>>> >> diff --git
+>a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+>b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+>>> >> index b0eca54..ad7f41a 100644
+>>> >> ---
+>a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+>>> >> +++
+>b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+>>> >> @@ -2,6 +2,10 @@
+>>> >>
+>>> >>  Required properties:
+>>> >>  - compatible           : "silead,gsl1680"
+>>> >> +                     or: "silead,gsl1688"
+>>> >> +                     or: "silead,gsl3670"
+>>> >> +                     or: "silead,gsl3675"
+>>> >> +                     or: "silead,gsl3692"
+>>> >
+>>> > Hmm, why do we need to document all compatible strings? We usually
+>have
+>>> > only least common denominator in drievr, and device tree uses
+>form:
+>>> >
+>>> >         compatible = "silead,<exact model>", "silead,gsl1680";
+>>> >
+>>> > Rob?
+>>>
+>>> Because we require them in dts files even if the OS only uses the
+>fallback.
+>>
+>> So how exactly should it be documented? I mean if there were more
+>than 1
+>> OS they might have been using different fallbacks. How do we decide
+>> which entry should be "true" fallback?
+>
+>It shouldn't matter which one an OS uses. There's typically only the
+>specific one and then a generic or 1st compatible chip one.
 
-A few lines below, we check if it is below VT8500_MAX_PORTS, which is 6.
+When you are saying "first compatible chip" do you mean first as it was created by the vendor or first that was added to a given os? Because we quite often have no idea what the first compatible chip in a series was and start with whatever the first submitter of a driver used in their product.
 
-It is likely that the number of bits in a long was expected here, so use
-BITS_PER_LONG instead.
+>
+>This is exactly why they need to be documented (and in a single place,
+>looking at you u-boot), so there is no confusion as to what
+>compatibles are allowed/valid for each platform.
+
+What do you mean when you say platform?
+
+We have uboot, core boot, Linux, free BSD, in whatever combinations. How do we make sure we all use the same fallback?
 
 
-It has been spotted by the following coccinelle script:
-@@
-expression ret, x;
+Thanks.
 
-@@
-*  ret = \(find_first_bit \| find_first_zero_bit\) (x, sizeof(...));
-
-Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
----
-Other options are possible:
-  - 'vt8500_ports_in_use' being a 'unsigned long', use ffz to reduce
-    code verbosity
-  - VT8500_MAX_PORTS, in order to be consistent with the test below
----
- drivers/tty/serial/vt8500_serial.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/tty/serial/vt8500_serial.c b/drivers/tty/serial/vt8500_serial.c
-index 23cfc5e16b45..935076c50cb1 100644
---- a/drivers/tty/serial/vt8500_serial.c
-+++ b/drivers/tty/serial/vt8500_serial.c
-@@ -664,7 +664,7 @@ static int vt8500_serial_probe(struct platform_device *pdev)
- 	if (port < 0) {
- 		/* calculate the port id */
- 		port = find_first_zero_bit(&vt8500_ports_in_use,
--					sizeof(vt8500_ports_in_use));
-+					   BITS_PER_LONG);
- 	}
- 
- 	if (port >= VT8500_MAX_PORTS)
 -- 
-2.7.4
-
-
----
-L'absence de virus dans ce courrier ?lectronique a ?t? v?rifi?e par le logiciel antivirus Avast.
-https://www.avast.com/antivirus
+Dmitry
