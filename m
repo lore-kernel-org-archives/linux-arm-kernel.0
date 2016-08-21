@@ -1,47 +1,32 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 21 Aug 2016 15:09:59 +0000
-Subject: [PATCH V3 1/5] ARM: dts: bcm283x: Add missing USB clock
+Date: Sun, 21 Aug 2016 15:10:02 +0000
+Subject: [PATCH V3 4/5] DT: bindings: bcm: Add Raspberry Pi Zero
 In-Reply-To: <1471792204-21908-1-git-send-email-stefan.wahren@i2se.com>
 References: <1471792204-21908-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1471792204-21908-2-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1471792204-21908-5-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the DWC2 binding an appropriate clock is required.
-This clock isn't handled by bcm2835 clock driver, so add a fixed
-clock to the bcm283x DT.
-
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-Acked-by: Stephen Warren <swarren@nvidia.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/boot/dts/bcm283x.dtsi |    9 +++++++++
- 1 file changed, 9 insertions(+)
+ .../devicetree/bindings/arm/bcm/brcm,bcm2835.txt   |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index 445624a..46d46d8 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -290,6 +290,8 @@
- 			interrupts = <1 9>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+			clocks = <&clk_usb>;
-+			clock-names = "otg";
- 		};
+diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
+index 6ffe087..9c97de2 100644
+--- a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
++++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
+@@ -38,6 +38,10 @@ Raspberry Pi Compute Module
+ Required root node properties:
+ compatible = "raspberrypi,compute-module", "brcm,bcm2835";
  
- 		v3d: v3d at 7ec00000 {
-@@ -317,5 +319,12 @@
- 			clock-frequency = <19200000>;
- 		};
- 
-+		clk_usb: clock at 4 {
-+			compatible = "fixed-clock";
-+			reg = <4>;
-+			#clock-cells = <0>;
-+			clock-output-names = "otg";
-+			clock-frequency = <480000000>;
-+		};
- 	};
- };
++Raspberry Pi Zero
++Required root node properties:
++compatible = "raspberrypi,model-zero", "brcm,bcm2835";
++
+ Generic BCM2835 board
+ Required root node properties:
+ compatible = "brcm,bcm2835";
 -- 
 1.7.9.5
