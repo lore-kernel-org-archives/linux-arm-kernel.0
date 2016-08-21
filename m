@@ -1,53 +1,109 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sun, 21 Aug 2016 22:32:09 +0800
-Subject: [PATCH v3 5/7] phy-sun4i-usb: Warn when external vbus is detected
-In-Reply-To: <1471781799-10457-5-git-send-email-hdegoede@redhat.com>
-References: <1471781799-10457-1-git-send-email-hdegoede@redhat.com>
- <1471781799-10457-5-git-send-email-hdegoede@redhat.com>
-Message-ID: <27711471789929@web21g.yandex.ru>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sun, 21 Aug 2016 15:10:00 +0000
+Subject: [PATCH V3 2/5] ARM: dts: bcm283x: Add dtsi for USB host mode
+In-Reply-To: <1471792204-21908-1-git-send-email-stefan.wahren@i2se.com>
+References: <1471792204-21908-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1471792204-21908-3-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In case dr_mode isn't passed via DT, the dwc2 defaults to OTG mode.
+But all Raspberry Pi boards here are designed only for host mode.
+So fix this issue by providing a dtsi file which set the dr_mode
+to host.
 
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ arch/arm/boot/dts/bcm2835-rpi-a-plus.dts    |    1 +
+ arch/arm/boot/dts/bcm2835-rpi-a.dts         |    1 +
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts    |    1 +
+ arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts    |    1 +
+ arch/arm/boot/dts/bcm2835-rpi-b.dts         |    1 +
+ arch/arm/boot/dts/bcm2836-rpi-2-b.dts       |    1 +
+ arch/arm/boot/dts/bcm283x-rpi-usb-host.dtsi |    3 +++
+ 7 files changed, 9 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm283x-rpi-usb-host.dtsi
 
-21.08.2016, 20:22, "Hans de Goede" <hdegoede@redhat.com>:
-> Warn when external vbus is detected when we're trying to enable our
-> own vbus.
-
-Will it lead to a dmesg flood if a not-well-connected USB OTG Charging Hub
-is present?
-
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Changes in v2:
-> -No changes
-> Changes in v3:
-> -No changes
-> ---
-> ?drivers/phy/phy-sun4i-usb.c | 4 +++-
-> ?1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index af42f8d..03f030b 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -390,8 +390,10 @@ static int sun4i_usb_phy_power_on(struct phy *_phy)
->
-> ?????????/* For phy0 only turn on Vbus if we don't have an ext. Vbus */
-> ?????????if (phy->index == 0 && sun4i_usb_phy0_have_vbus_det(data) &&
-> - data->vbus_det)
-> + data->vbus_det) {
-> + dev_warn(&_phy->dev, "External vbus detected, not enabling our own vbus\n");
-> ?????????????????return 0;
-> + }
->
-> ?????????ret = regulator_enable(phy->vbus);
-> ?????????if (ret)
-> --
-> 2.7.4
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
+index 35ff4e7..f7f9db3 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
+@@ -1,6 +1,7 @@
+ /dts-v1/;
+ #include "bcm2835.dtsi"
+ #include "bcm2835-rpi.dtsi"
++#include "bcm283x-rpi-usb-host.dtsi"
+ 
+ / {
+ 	compatible = "raspberrypi,model-a-plus", "brcm,bcm2835";
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-a.dts b/arch/arm/boot/dts/bcm2835-rpi-a.dts
+index 306a84e..8be102f 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-a.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-a.dts
+@@ -1,6 +1,7 @@
+ /dts-v1/;
+ #include "bcm2835.dtsi"
+ #include "bcm2835-rpi.dtsi"
++#include "bcm283x-rpi-usb-host.dtsi"
+ 
+ / {
+ 	compatible = "raspberrypi,model-a", "brcm,bcm2835";
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
+index d5fdb8e..35cde65 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
+@@ -2,6 +2,7 @@
+ #include "bcm2835.dtsi"
+ #include "bcm2835-rpi.dtsi"
+ #include "bcm283x-rpi-smsc9514.dtsi"
++#include "bcm283x-rpi-usb-host.dtsi"
+ 
+ / {
+ 	compatible = "raspberrypi,model-b-plus", "brcm,bcm2835";
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
+index bfc4bd9..84df85e 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
+@@ -2,6 +2,7 @@
+ #include "bcm2835.dtsi"
+ #include "bcm2835-rpi.dtsi"
+ #include "bcm283x-rpi-smsc9512.dtsi"
++#include "bcm283x-rpi-usb-host.dtsi"
+ 
+ / {
+ 	compatible = "raspberrypi,model-b-rev2", "brcm,bcm2835";
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+index 0371bb7..8e626a8 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+@@ -2,6 +2,7 @@
+ #include "bcm2835.dtsi"
+ #include "bcm2835-rpi.dtsi"
+ #include "bcm283x-rpi-smsc9512.dtsi"
++#include "bcm283x-rpi-usb-host.dtsi"
+ 
+ / {
+ 	compatible = "raspberrypi,model-b", "brcm,bcm2835";
+diff --git a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
+index 29e1cfe..39dccf6 100644
+--- a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
++++ b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
+@@ -2,6 +2,7 @@
+ #include "bcm2836.dtsi"
+ #include "bcm2835-rpi.dtsi"
+ #include "bcm283x-rpi-smsc9514.dtsi"
++#include "bcm283x-rpi-usb-host.dtsi"
+ 
+ / {
+ 	compatible = "raspberrypi,2-model-b", "brcm,bcm2836";
+diff --git a/arch/arm/boot/dts/bcm283x-rpi-usb-host.dtsi b/arch/arm/boot/dts/bcm283x-rpi-usb-host.dtsi
+new file mode 100644
+index 0000000..73f4ece
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm283x-rpi-usb-host.dtsi
+@@ -0,0 +1,3 @@
++&usb {
++	dr_mode = "host";
++};
+-- 
+1.7.9.5
