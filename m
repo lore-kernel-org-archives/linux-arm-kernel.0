@@ -1,130 +1,48 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Sun, 21 Aug 2016 09:00:58 +0800
-Subject: [PATCH 1/3] dt/bindings: arm-pl330: add description of
- arm,pl330-periph-burst
-In-Reply-To: <20160819024540.GQ9681@localhost>
-References: <1470365602-32586-1-git-send-email-shawn.lin@rock-chips.com>
- <1470365602-32586-2-git-send-email-shawn.lin@rock-chips.com>
- <20160805033410.GJ9681@localhost>
- <ea3572fa-4bff-87db-d5ad-f406809f8296@rock-chips.com>
- <0df0ab4f-0032-6487-2c30-b1ccd7d9ae62@metafoo.de>
- <1d42542f-c43c-5c4b-01b7-ba0ca085004a@rock-chips.com>
- <55e596a0-4176-4277-40cc-1d26763a8be0@rock-chips.com>
- <20160819024540.GQ9681@localhost>
-Message-ID: <d4574737-f7b7-2726-373c-31cc81274a32@rock-chips.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 21 Aug 2016 10:11:19 +0800
+Subject: [PATCH 3/9] regulator: core: Try full range when adjusting regulators
+ to constraints
+In-Reply-To: <20160821021125.1521-1-wens@csie.org>
+References: <20160821021125.1521-1-wens@csie.org>
+Message-ID: <20160821021125.1521-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Currently when we try to bring regulator in bounds of its constraints,
+we pick either the minimum or maximum voltage as the target. This fails
+if the regulator range is not continuous, and the target voltage is not
+an exact value the regulator can achieve, i.e. the target is not aligned
+to the step of the regulator.
 
-? 2016/8/19 10:45, Vinod Koul ??:
-> On Wed, Aug 17, 2016 at 04:11:03PM +0800, Shawn Lin wrote:
->> Hi, Vinod and Lars-Peter
->>
->> Ping.. Any better idea to share :)
->>
->> On 2016/8/9 17:12, Shawn Lin wrote:
->>> Hi Lars-Peter,
->>>
->>> ? 2016/8/9 16:39, Lars-Peter Clausen ??:
->>>> On 08/05/2016 09:25 AM, Shawn Lin wrote:
->>>>> Hi Vinod,
->>>>>
->>>>> ? 2016/8/5 11:34, Vinod Koul ??:
->>>>>> On Fri, Aug 05, 2016 at 10:53:20AM +0800, Shawn Lin wrote:
->>>>>>> This patch adds the "arm,pl330-periph-burst" for arm-pl330 to
->>>>>>> support busrt mode.
->>>>>>
->>>>>> why should this be DT property. Only reason I can think of if some hw
->>>>>> versions support this and some won't.
->>>>>
->>>>> yes, if we want to support burst mode, both of the master(pl330) and
->>>>> client(several peripherals) should implement it, otherwise it will
->>>>> be broken when enabling.
->>>>
->>>> As you said, it is up to the consumer peripheral whether it supports
->>>> BURST,
->>>> SINGLE or both. So this is a per client property, but you specify this
->>>> as a
->>>> a global property on the producer side.
->>>
->>> Thanks for comment.
->>>
->>> yup, but what is the proper way to add it ? :)
->>>
->>>
->>> a) If pl330 support BURST as well as all the peripherals, we could
->>> enable it.
->>>
->>> b) If pl300 support BURST, but all the peripherals don't support it,
->>> we could not enable it.
->>>
->>> c) If pl300 support BURST, but not all the peripherals support it,
->>> we also could not enable it.
->>>
->>> the burst feature of peripheral IP may be vendor-specific, but the
->>> common driver for this peripheral are used for many many vendors which
->>> means we could not check all of this info. It's very likely to break
->>> them... I couldn't figure out how many upstreamed peripheral drivers
->>> who are using pl300 either.
->>>
->>> So this check should be done by all this vendors but we could make
->>> sure we don't break them before they check a), b), c), right?
->
-> Since support for BURST needs to be from peripheral too, we should have
-> that as a property for peripheral not for controller.
->
-> The peripheral drivers can communicate the burst to be used to pl330
-> using src_maxburst/dst_maxburst in dma_slave_config. We can use this
-> value to indicate the DMA should be single (a value of 0) or burst with
-> "burst" value.
+Instead pass the full range of the constraints, and have the regulator
+core work out a suitable voltage within.
 
-Thanks for sharing this.
+Fixes: ("regulator: core: Ensure we are at least in bounds for our
+	 constraints")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/regulator/core.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-But this is really a difficult trade-off decision to add this new
-property for pl330 only.
-
-Burst mode was supported by Boojin Kim's patch by default(commit
-848e9776fee42 ("dmaengine: pl330: support burst mode for dev-to-mem and
-mem-to-dev transmit")).  But we found it will break SoCFPGA or
-Exynos4412 reported by Dinh Nguyen and Bartlomiej Zolnierkiewicz[0].
-So finally Caesar Wang contributed a patch, commit 0a18f9b268 ("
-dmaengine: pl330: fix to support the burst mode") to fix it, but what
-it actually did is to use single burst for any case, namely some kind
-of regression for Boojin Kim's improvement.
-
-So we can see these drivers which was broken by enabling burst mode
-had already set src_maxburst/dst_maxburst. It looks to me so unfortunate
-that the driver like 8250_dw.c was using so widely that we couldn't
-set scr/dst_maxburst as this is really vendor specific for whether it
-supports burst for 8250_dw or not..
-
-So it is quite painful that we probably will get dozens of regression
-reports when enabling burst mode by default. But without this, we have
-been suffering from low performance quite a long time due to this
-roadblock.
-
-Two possible paths to land this patch are:
-(1) Keep this property for pl330 only, so we have no chance to
-break others and we could make the platforms enjoy it if adding this
-property for their own dts.
-
-(2) Figuer out all the broken platfroms if enabling burst and fix them
-one by one for the src/dst_maxburst(maybe by enabling burst mode and
-get regression reports). If we could not solve any one of them, then we
-have to give up all the effort we do, and let this pain keep on
-stalling people's expectation of better performance.
-
-
-I would appreciate it if you could share your thought more, as I really 
-want more platforms benefit from it(at least don't break them)  :)
-
-
-[0] http://www.gossamer-threads.com/lists/linux/kernel/2374171
-
->
-
-
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index db320e8fa865..86f69c92ce7a 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -897,13 +897,9 @@ static int machine_constraints_voltage(struct regulator_dev *rdev,
+ 		target_min = current_uV;
+ 		target_max = current_uV;
+ 
+-		if (current_uV < rdev->constraints->min_uV) {
++		if (current_uV < rdev->constraints->min_uV ||
++		    current_uV > rdev->constraints->max_uV) {
+ 			target_min = rdev->constraints->min_uV;
+-			target_max = rdev->constraints->min_uV;
+-		}
+-
+-		if (current_uV > rdev->constraints->max_uV) {
+-			target_min = rdev->constraints->max_uV;
+ 			target_max = rdev->constraints->max_uV;
+ 		}
+ 
 -- 
-Best Regards
-Shawn Lin
+2.9.3
