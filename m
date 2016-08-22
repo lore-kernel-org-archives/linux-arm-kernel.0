@@ -1,160 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Aug 2016 15:53:26 +0100
-Subject: [PATCH 1/2] arm64: kernel: Add SMC Session ID to results
-In-Reply-To: <20160822140246.GA30923@hector.attlocal.net>
-References: <1471672274-19317-1-git-send-email-andy.gross@linaro.org>
- <1471672274-19317-2-git-send-email-andy.gross@linaro.org>
- <20160822134313.GJ14680@arm.com>
- <20160822140246.GA30923@hector.attlocal.net>
-Message-ID: <20160822145326.GK14680@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 22 Aug 2016 16:00:46 +0100
+Subject: how to enable suspend to ram for arm-64 bits
+In-Reply-To: <CADUS3on-Y63EgUUudhH1cbgihnMmHe_aXra0CG2WEQWRQTo+AA@mail.gmail.com>
+References: <CADUS3onCMDThNK2ZwSSjGZhPE0M6cybjgCHJR2wVVeK09GC6ng@mail.gmail.com>
+ <06a4f0d7-9022-578d-99e0-ddcde31ed895@arm.com>
+ <CADUS3onUDk_=UpRoZy1m0hV1VGZYSf22ea8D10MpDbqJCfTkqw@mail.gmail.com>
+ <82ddd0e1-9ecc-5e54-e8ee-86f947fc0ecd@arm.com>
+ <CADUS3omw=WYhGF00S3DY8mkg_c-59WvD2AHYs4SQSzCYoHQraQ@mail.gmail.com>
+ <62cbf1a0-268a-f9f5-09af-c155a8a77508@arm.com>
+ <CADUS3on-Y63EgUUudhH1cbgihnMmHe_aXra0CG2WEQWRQTo+AA@mail.gmail.com>
+Message-ID: <6fa7fdb7-7b8d-f955-75e6-75647a6d57a3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2016 at 09:02:46AM -0500, Andy Gross wrote:
-> On Mon, Aug 22, 2016 at 02:43:14PM +0100, Will Deacon wrote:
-> > On Sat, Aug 20, 2016 at 12:51:13AM -0500, Andy Gross wrote:
-> > > This patch adds the SMC Session ID to the results passed back from SMC
-> > > calls.  The Qualcomm SMC implementation provides for interrupted SMC
-> > > functions.  When this occurs, the SMC call will return a session ID that
-> > > is required to be used when resuming the interrupted SMC call.
-> > > 
-> > > Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> > > ---
-> > >  arch/arm64/kernel/asm-offsets.c | 1 +
-> > >  arch/arm64/kernel/smccc-call.S  | 1 +
-> > >  include/linux/arm-smccc.h       | 4 +++-
-> > >  3 files changed, 5 insertions(+), 1 deletion(-)
-> > 
-> > [...]
-> > 
-> > > diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-> > > index b5abfda..82d919f 100644
-> > > --- a/include/linux/arm-smccc.h
-> > > +++ b/include/linux/arm-smccc.h
-> > > @@ -63,18 +63,20 @@
-> > >  /**
-> > >   * struct arm_smccc_res - Result from SMC/HVC call
-> > >   * @a0-a3 result values from registers 0 to 3
-> > > + * @a6 Session ID register (optional)
-> > >   */
-> > >  struct arm_smccc_res {
-> > >  	unsigned long a0;
-> > >  	unsigned long a1;
-> > >  	unsigned long a2;
-> > >  	unsigned long a3;
-> > > +	unsigned long a6;
-> > >  };
-> > >  
-> > >  /**
-> > >   * arm_smccc_smc() - make SMC calls
-> > >   * @a0-a7: arguments passed in registers 0 to 7
-> > > - * @res: result values from registers 0 to 3
-> > > + * @res: result values from registers 0 to 3 and optional register 6
-> > 
-> > AFAICT from reading the SMCCC spec, parameter register 6 is "Unpredictable,
-> > Scratch registers" in return state, so I don't think this is correct.
-> > 
-> > What am I missing?
-> 
-> In the case of Qualcomm's implementation, they return a value in register 6 that
-> may or may not be used in subsequent calls.  If I want to leverage the arm_smccc
-> functions, then I need to extend them to include the optional return value.  The
-> downside to this is that everyone who uses this is exposed to it.
 
-Yes, I'm not keen on forcing this behaviour for everybody, as you never
-know what other firmware might do with unexpected a6 values. Could we
-perhaps quirk it, along the lines of the completely untested patch below?
 
-Will
+On 22/08/16 15:41, yoma sophian wrote:
+> hi Sudeep:
+>
+>>> Yes, I agree with you.
+>>> But it may not mean the ONLY way for all armv8 platform that support
+>>> suspend method is PSCI.
+>>
+>> I would say yes but if you have a real good reason not to adopt PSCI on
+>> your platform then you can try present that. It should be convincing
+>> enough to deviate from the standards :)
+>
+> Since we don't implement full features of PSCI on our platform, that
+> is why we wants to know whether there is registration of platform
+> suspend method.
+>
 
---->8
+For adding support for your platform in the mainline kernel, you need to
+support SYSTEM_SUSPEND in psci. There's no other way currently with the
+mainline.
 
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 05070b72fc28..1895e87d0240 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -141,6 +141,8 @@ int main(void)
- #endif
-   DEFINE(ARM_SMCCC_RES_X0_OFFS,	offsetof(struct arm_smccc_res, a0));
-   DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
-+  DEFINE(ARM_SMCCC_RES_QUIRK_ID_OFFS,		offsetof(struct arm_smccc_res, quirk.id));
-+  DEFINE(ARM_SMCCC_RES_QUIRK_STATE_OFFS,	offsetof(struct arm_smccc_res, quirk.state));
-   BLANK();
-   DEFINE(HIBERN_PBE_ORIG,	offsetof(struct pbe, orig_address));
-   DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
-diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
-index ae0496fa4235..3c6c976eaf5c 100644
---- a/arch/arm64/kernel/smccc-call.S
-+++ b/arch/arm64/kernel/smccc-call.S
-@@ -12,6 +12,7 @@
-  *
-  */
- #include <linux/linkage.h>
-+#include <linux/arm-smccc.h>
- #include <asm/asm-offsets.h>
- 
- 	.macro SMCCC instr
-@@ -20,7 +21,12 @@
- 	ldr	x4, [sp]
- 	stp	x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
- 	stp	x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
--	ret
-+	ldr	x9, [x4, #ARM_SMCCC_RES_QUIRK_ID_OFFS]
-+	cbz	x9, 1f /* ARM_SMCCC_QUIRK_NONE */
-+	cmp	x9, #ARM_SMCCC_QUIRK_QCOM_A6
-+	b.ne	1f
-+	str	x6, [x4, ARM_SMCCC_RES_QUIRK_STATE_OFFS]
-+1:	ret
- 	.cfi_endproc
- 	.endm
- 
-diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-index b5abfda80465..a3a6e291feb6 100644
---- a/include/linux/arm-smccc.h
-+++ b/include/linux/arm-smccc.h
-@@ -14,9 +14,6 @@
- #ifndef __LINUX_ARM_SMCCC_H
- #define __LINUX_ARM_SMCCC_H
- 
--#include <linux/linkage.h>
--#include <linux/types.h>
--
- /*
-  * This file provides common defines for ARM SMC Calling Convention as
-  * specified in
-@@ -60,6 +57,21 @@
- #define ARM_SMCCC_OWNER_TRUSTED_OS	50
- #define ARM_SMCCC_OWNER_TRUSTED_OS_END	63
- 
-+#define ARM_SMCCC_QUIRK_NONE	0
-+#define ARM_SMCCC_QUIRK_QCOM_A6	1 /* Save/restore register a6 */
-+
-+#ifndef __ASSEMBLY__
-+
-+#include <linux/linkage.h>
-+#include <linux/types.h>
-+
-+struct arm_smccc_quirk {
-+	int	id;
-+	union {
-+		unsigned long a6;
-+	} state;
-+};
-+
- /**
-  * struct arm_smccc_res - Result from SMC/HVC call
-  * @a0-a3 result values from registers 0 to 3
-@@ -69,6 +81,7 @@ struct arm_smccc_res {
- 	unsigned long a1;
- 	unsigned long a2;
- 	unsigned long a3;
-+	struct arm_smccc_quirk quirk;
- };
- 
- /**
-@@ -101,4 +114,5 @@ asmlinkage void arm_smccc_hvc(unsigned long a0, unsigned long a1,
- 			unsigned long a5, unsigned long a6, unsigned long a7,
- 			struct arm_smccc_res *res);
- 
-+#endif /* !__ASSEMBLY__ */
- #endif /*__LINUX_ARM_SMCCC_H*/
+> BTW, from the git log, it seems psci.c doesn't register system suspend
+> until Linux 4.4.
+
+Correct.
+
+> if so, before 4.4, how aarch64 support such as str, echo mem >
+> /sys/power/state , suspend flow?
+>
+
+You can back-port those patches, they are quite trivial if you need
+it on pre-v4.4 kernel.
+
+Moreover, how do you plan to support system system without PSCI ?
+How will you let the higher exception softwares know that you are
+entering system suspend. How will their context resumed back ?
+
+-- 
+Regards,
+Sudeep
