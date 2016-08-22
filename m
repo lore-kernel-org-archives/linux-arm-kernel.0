@@ -1,43 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 22 Aug 2016 16:10:32 +0200
-Subject: [PATCH 1/2] ARM64: dts: amlogic: gxbb: pinctrl: add pins for PWM
-In-Reply-To: <ee4431d1-2f78-b698-76ca-8a3afff8d0ee@baylibre.com>
-References: <1471870450-11109-1-git-send-email-narmstrong@baylibre.com>
- <1471870450-11109-2-git-send-email-narmstrong@baylibre.com>
- <CACRpkdZuRwvS_p9D3Sx0avr+1mtCjfGFUX3fXjRRmYS19TYvxg@mail.gmail.com>
- <ee4431d1-2f78-b698-76ca-8a3afff8d0ee@baylibre.com>
-Message-ID: <CACRpkdYnO-9hfDjtyLhDTQjkg1FGv+rRDVjt8GRmfs=V5V5ZdA@mail.gmail.com>
+From: kedare06@gmail.com (Kedari Appana)
+Date: Mon, 22 Aug 2016 19:40:41 +0530
+Subject: [PATCH -next v2] net: phy: Add missing of_node_put() in
+ xgmiitorgmii_probe()
+In-Reply-To: <1471819575-13389-1-git-send-email-weiyj.lk@gmail.com>
+References: <1471706815-27723-1-git-send-email-weiyj.lk@gmail.com>
+ <1471819575-13389-1-git-send-email-weiyj.lk@gmail.com>
+Message-ID: <CANdmM3POSz9GmoFEr7jRD23m2gR7K2pK3oU6E5wyTKcUpWO8LA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2016 at 4:04 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
-> On 08/22/2016 04:02 PM, Linus Walleij wrote:
->> On Mon, Aug 22, 2016 at 2:54 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
->>
->>> Add support for PWM pins, for EE and AO domains.
->>>
->>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->>
->> The $SUBJECT of this patch is titallyt wrong, it should be
->> just pinctrl: (something).
->>
->> Should I fix it up or would you like to resend?
->>
->> It looks nice otherwise.
->>
->> Yours,
->> Linus Walleij
->>
->
-> Hi Linus,
->
-> Yes, sorry I missed the subject.
->
-> If you can fixup, it would be great !
+Hi ,
 
-Hm I tried but the patch does not apply on my "devel" branch
-in pinctrl. I chicken out and ask you to rebase it, there are a few
-other patches to this driver in the devel branch.
 
-Yours,
-Linus Walleij
+On Mon, Aug 22, 2016 at 4:16 AM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
+> This node pointer is returned by of_parse_phandle() with
+> refcount incremented in this function. of_node_put() on it
+> before exitting this function.
+>
+> This is detected by Coccinelle semantic patch.
+>
+> Signed-off-by: Wei Yongjun <weiyj.lk@gmail.com>
+
+Reviewed-by: Kedareswara rao Appana <appanad@xilinx.com>
+
+Thanks,
+Kedar.
+
+> ---
+> v1 -> v2: release it unconditionally as Andrew and David's suggestion
+> ---
+>  drivers/net/phy/xilinx_gmii2rgmii.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/net/phy/xilinx_gmii2rgmii.c b/drivers/net/phy/xilinx_gmii2rgmii.c
+> index cad6e19..73b50f3 100644
+> --- a/drivers/net/phy/xilinx_gmii2rgmii.c
+> +++ b/drivers/net/phy/xilinx_gmii2rgmii.c
+> @@ -73,6 +73,7 @@ int xgmiitorgmii_probe(struct mdio_device *mdiodev)
+>         }
+>
+>         priv->phy_dev = of_phy_find_device(phy_node);
+> +       of_node_put(phy_node);
+>         if (!priv->phy_dev) {
+>                 dev_info(dev, "Couldn't find phydev\n");
+>                 return -EPROBE_DEFER;
+>
