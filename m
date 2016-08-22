@@ -1,37 +1,33 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 22 Aug 2016 16:04:03 +0200
-Subject: [PATCH 1/2] ARM64: dts: amlogic: gxbb: pinctrl: add pins for PWM
-In-Reply-To: <CACRpkdZuRwvS_p9D3Sx0avr+1mtCjfGFUX3fXjRRmYS19TYvxg@mail.gmail.com>
-References: <1471870450-11109-1-git-send-email-narmstrong@baylibre.com>
- <1471870450-11109-2-git-send-email-narmstrong@baylibre.com>
- <CACRpkdZuRwvS_p9D3Sx0avr+1mtCjfGFUX3fXjRRmYS19TYvxg@mail.gmail.com>
-Message-ID: <ee4431d1-2f78-b698-76ca-8a3afff8d0ee@baylibre.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 22 Aug 2016 16:04:48 +0200
+Subject: [PATCH] ASoC: sunxi: depend on ARCH_SUNXI
+In-Reply-To: <20160822121242.18827-1-pbrobinson@gmail.com>
+References: <20160822121242.18827-1-pbrobinson@gmail.com>
+Message-ID: <20160822140448.GP7104@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2016 04:02 PM, Linus Walleij wrote:
-> On Mon, Aug 22, 2016 at 2:54 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
-> 
->> Add support for PWM pins, for EE and AO domains.
->>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> 
-> The $SUBJECT of this patch is titallyt wrong, it should be
-> just pinctrl: (something).
-> 
-> Should I fix it up or would you like to resend?
-> 
-> It looks nice otherwise.
-> 
-> Yours,
-> Linus Walleij
-> 
+Hi,
 
-Hi Linus,
+On Mon, Aug 22, 2016 at 01:12:42PM +0100, Peter Robinson wrote:
+> Depend on ARCH_SUNXI or COMPILE_TEST as it doesn't make sense to enable
+> these if the appropriate SoC they're embedded in isn't enabled.
+> 
+> Signed-off-by: Peter Robinson <pbrobinson@gmail.com>
 
-Yes, sorry I missed the subject.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-If you can fixup, it would be great !
+Thanks!
+Maxime
 
-Thanks,
-Neil
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160822/e8aa6d30/attachment.sig>
