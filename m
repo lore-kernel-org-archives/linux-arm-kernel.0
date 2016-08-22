@@ -1,62 +1,43 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 22 Aug 2016 13:53:37 +0530
-Subject: [PATCH] usb: chipidea: support generic phy in PM code path
-In-Reply-To: <20160822161444.4ffb36d8@xhacker>
-References: <20160819121013.760-1-jszhang@marvell.com>
- <20160822053308.GA4362@shlinux2> <20160822143921.36b6f95a@xhacker>
- <20160822072907.GD4362@shlinux2> <20160822161444.4ffb36d8@xhacker>
-Message-ID: <57BAB689.2080208@ti.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Mon, 22 Aug 2016 08:26:47 +0000
+Subject: [PATCH] ARM: imx6: add missing BM_CLPCR_BYPASS_PMIC_READY setting
+ for imx6sx
+In-Reply-To: <1471881205-6389-1-git-send-email-Anson.Huang@nxp.com>
+References: <1471881205-6389-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <HE1PR04MB1450E23EC1E757E4ED10AC1E8BE80@HE1PR04MB1450.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+  
+>i.MX6SX has bypass PMIC ready function, as this function is normally NOT enabled
+>on the board design, so we need to bypass the PMIC ready pin check during DSM
+>mode resume flow, otherwise, the internal DSM resume logic will be waiting for this
+>signal to be ready forever and cause resume fail.
+>
+>Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+>---
+> arch/arm/mach-imx/pm-imx6.c | 2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
+>
+>diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c index
+>67bab74..fe708e2 100644
+>--- a/arch/arm/mach-imx/pm-imx6.c
+>+++ b/arch/arm/mach-imx/pm-imx6.c
+>@@ -310,7 +310,7 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
+> 		val |= 0x3 << BP_CLPCR_STBY_COUNT;
+> 		val |= BM_CLPCR_VSTBY;
+> 		val |= BM_CLPCR_SBYOS;
+>-		if (cpu_is_imx6sl())
+>+		if (cpu_is_imx6sl() || cpu_is_imx6sx())
+> 			val |= BM_CLPCR_BYPASS_PMIC_READY;
+> 		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
+> 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
+>--
 
-On Monday 22 August 2016 01:44 PM, Jisheng Zhang wrote:
-> + Kishon
-> 
-> Hi Peter, Kishon,
-> 
-> On Mon, 22 Aug 2016 15:29:07 +0800 Peter Chen wrote:
-> 
->> On Mon, Aug 22, 2016 at 02:39:21PM +0800, Jisheng Zhang wrote:
->>> Hi Peter,
->>>
->>> On Mon, 22 Aug 2016 13:33:08 +0800 Peter Chen wrote:
->>>   
->>>> On Fri, Aug 19, 2016 at 08:10:13PM +0800, Jisheng Zhang wrote:  
->>>>> Support generic phy in PM code path: call phy_power_off/phy_power_on
->>>>> in ci_controller_suspend/ci_controller_resume.
->>>>>
->>>>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
->>>>> ---
->>>>>  drivers/usb/chipidea/core.c | 4 +++-
->>>>>  1 file changed, 3 insertions(+), 1 deletion(-)
->>>>>
->>>>> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
->>>>> index ae12595..ef9fb0b 100644
->>>>> --- a/drivers/usb/chipidea/core.c
->>>>> +++ b/drivers/usb/chipidea/core.c
->>>>> @@ -1116,6 +1116,7 @@ static void ci_controller_suspend(struct ci_hdrc *ci)
->>>>>  		usleep_range(ci->platdata->phy_clkgate_delay_us,
->>>>>  			     ci->platdata->phy_clkgate_delay_us + 50);
->>>>>  	usb_phy_set_suspend(ci->usb_phy, 1);
->>>>> +	phy_power_off(ci->phy);    
->>>>
->>>> How could you support USB wakeup after PHY is powered off?  
->>>
->>> Per my understanding, the PHY's power off just power off data communication part
->>> but leaves the circuits involved in wakeup detection active.
->>>   
->>
->> Ok, I hope so.
-> 
-> If most parts of the phy can be powered off during runtime suspend to save
-> power, or phy HW support suspend mode, with usb phy, usb_phy_set_suspend() could
-> be used, but with the generic phy, it seems there's no corresponding API for
-> this purpose. I'm not sure whether using phy_power_off() is correct here. Is it
-> acceptable to extend the generic phy? such as, phy_suspend()/phy_resume()?
+With above changes, the suspend mode "mem" can work well.
+Tested-by: Peter Chen <peter.chen@nxp.com>
 
-phy_pm_runtime_put() could be used right?
+You can consider add below tag:
+Cc: <stable@vger.kernel.org> # 4.1+
 
-Thanks
-Kishon
+Peter
