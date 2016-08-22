@@ -1,232 +1,491 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 22 Aug 2016 09:57:41 +0800
-Subject: [PATCH v6] usb: ohci-at91: Forcibly suspend ports while USB suspend
-Message-ID: <1471831061-24110-1-git-send-email-wenyou.yang@atmel.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 22 Aug 2016 11:49:44 +0900
+Subject: [PATCH 1/2] clk: samsung: exynos5260: Move struct samsung_cmu_info to
+ init section
+In-Reply-To: <1471834185-20249-1-git-send-email-cw00.choi@samsung.com>
+References: <1471834185-20249-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1471834185-20249-2-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The usb controller does not manage correctly the suspend mode for
-the ehci. In echi mode, there is no way to suspend without any
-device connected to it. This is why this specific control is added
-to fix this issue. Since the suspend mode works in ohci mode, this
-specific control works by suspend the usb controller in ohci mode.
+This patch moves the all samsung_cmu_info struct to initconst section
+because they are used only in initconst section.
 
-This specific control is by setting the SUSPEND_A/B/C fields of
-SFR_OHCIICR(OHCI Interrupt Configuration Register) in the SFR
-while the OHCI USB suspend.
-
-This set operation must be done before the USB clock disabled,
-clear operation after the USB clock enabled.
-
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
+ drivers/clk/samsung/clk-exynos5260.c | 350 +++++++++++++++++------------------
+ 1 file changed, 175 insertions(+), 175 deletions(-)
 
-Changes in v6:
- - Set all the suspend bits for all the ports in the OHCIICR register
-   at once, instead of port by port.
- - Amend the commit log for clearer.
-
-Changes in v5:
- - Use the USB_PORT_FEAT_SUSPEND subcase of the SetPortFeature case
-   to take care it.
- - Update the commit log.
-
-Changes in v4:
- - To check whether the SFR node with "atmel,sama5d2-sfr" compatible
-   is present or not to decide if this feature is applied or not
-   when USB OHCI suspend/resume, instead of new compatible.
- - Drop the compatible "atmel,sama5d2-ohci".
- - Drop [PATCH 2/2] ARM: at91/dt: sama5d2: Use new compatible for
-   ohci node.
- - Drop include/soc/at91/at91_sfr.h, move the macro definitions to
-   atmel-sfr.h which already exists.
- - Change the defines to align the exists.
-
-Changes in v3:
- - Change the compatible description for more precise.
-
-Changes in v2:
- - Add compatible to support forcibly suspend the ports.
- - Add soc/at91/at91_sfr.h to accommodate the defines.
- - Add error checking for .sfr_regmap.
- - Remove unnecessary regmap_read() statement.
-
- drivers/usb/host/ohci-at91.c | 63 +++++++++++++++++++++++++++++++++++++++++++-
- include/soc/at91/atmel-sfr.h | 14 ++++++++++
- 2 files changed, 76 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index d177372..1a26ed9 100644
---- a/drivers/usb/host/ohci-at91.c
-+++ b/drivers/usb/host/ohci-at91.c
-@@ -21,8 +21,11 @@
- #include <linux/io.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/regmap.h>
- #include <linux/usb.h>
- #include <linux/usb/hcd.h>
-+#include <soc/at91/atmel-sfr.h>
- 
- #include "ohci.h"
- 
-@@ -51,6 +54,7 @@ struct ohci_at91_priv {
- 	struct clk *hclk;
- 	bool clocked;
- 	bool wakeup;		/* Saved wake-up state for resume */
-+	struct regmap *sfr_regmap;
+diff --git a/drivers/clk/samsung/clk-exynos5260.c b/drivers/clk/samsung/clk-exynos5260.c
+index a43642c36039..fd1d9bfc151b 100644
+--- a/drivers/clk/samsung/clk-exynos5260.c
++++ b/drivers/clk/samsung/clk-exynos5260.c
+@@ -131,21 +131,21 @@ static const struct samsung_gate_clock aud_gate_clks[] __initconst = {
+ 			EN_IP_AUD, 4, 0, 0),
  };
- /* interface and function clocks; sometimes also an AHB clock */
  
-@@ -134,6 +138,17 @@ static void at91_stop_hc(struct platform_device *pdev)
- 
- static void usb_hcd_at91_remove (struct usb_hcd *, struct platform_device *);
- 
-+struct regmap *at91_dt_syscon_sfr(void)
-+{
-+	struct regmap *regmap;
++static const struct samsung_cmu_info aud_cmu __initconst = {
++	.mux_clks	= aud_mux_clks,
++	.nr_mux_clks	= ARRAY_SIZE(aud_mux_clks),
++	.div_clks	= aud_div_clks,
++	.nr_div_clks	= ARRAY_SIZE(aud_div_clks),
++	.gate_clks	= aud_gate_clks,
++	.nr_gate_clks	= ARRAY_SIZE(aud_gate_clks),
++	.nr_clk_ids	= AUD_NR_CLK,
++	.clk_regs	= aud_clk_regs,
++	.nr_clk_regs	= ARRAY_SIZE(aud_clk_regs),
++};
 +
-+	regmap = syscon_regmap_lookup_by_compatible("atmel,sama5d2-sfr");
-+	if (IS_ERR(regmap))
-+		regmap = NULL;
-+
-+	return regmap;
-+}
-+
- /* configure so an HC device and id are always provided */
- /* always called with process context; sleeping is OK */
- 
-@@ -197,6 +212,10 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 		goto err;
- 	}
- 
-+	ohci_at91->sfr_regmap = at91_dt_syscon_sfr();
-+	if (!ohci_at91->sfr_regmap)
-+		dev_warn(dev, "failed to find sfr node\n");
-+
- 	board = hcd->self.controller->platform_data;
- 	ohci = hcd_to_ohci(hcd);
- 	ohci->num_ports = board->ports;
-@@ -282,6 +301,28 @@ static int ohci_at91_hub_status_data(struct usb_hcd *hcd, char *buf)
- 	return length;
- }
- 
-+static int ohci_at91_port_ctrl(struct regmap *regmap, u8 set)
-+{
-+	u32 regval;
-+	int ret;
-+
-+	if (!regmap)
-+		return 0;
-+
-+	ret = regmap_read(regmap, AT91_SFR_OHCIICR, &regval);
-+	if (ret)
-+		return ret;
-+
-+	if (set)
-+		regval |= AT91_OHCIICR_USB_SUSPEND;
-+	else
-+		regval &= ~AT91_OHCIICR_USB_SUSPEND;
-+
-+	regmap_write(regmap, AT91_SFR_OHCIICR, regval);
-+
-+	return 0;
-+}
-+
- /*
-  * Look at the control requests to the root hub and see if we need to override.
-  */
-@@ -289,6 +330,7 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
- 				 u16 wIndex, char *buf, u16 wLength)
+ static void __init exynos5260_clk_aud_init(struct device_node *np)
  {
- 	struct at91_usbh_data *pdata = dev_get_platdata(hcd->self.controller);
-+	struct ohci_at91_priv *ohci_at91 = hcd_to_ohci_at91_priv(hcd);
- 	struct usb_hub_descriptor *desc;
- 	int ret = -EINVAL;
- 	u32 *data = (u32 *)buf;
-@@ -301,7 +343,8 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
- 
- 	switch (typeReq) {
- 	case SetPortFeature:
--		if (wValue == USB_PORT_FEAT_POWER) {
-+		switch (wValue) {
-+		case USB_PORT_FEAT_POWER:
- 			dev_dbg(hcd->self.controller, "SetPortFeat: POWER\n");
- 			if (valid_port(wIndex)) {
- 				ohci_at91_usb_set_power(pdata, wIndex, 1);
-@@ -309,6 +352,11 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
- 			}
- 
- 			goto out;
-+
-+		case USB_PORT_FEAT_SUSPEND:
-+			dev_dbg(hcd->self.controller, "SetPortFeat: SUSPEND\n");
-+			ohci_at91_port_ctrl(ohci_at91->sfr_regmap, 1);
-+			break;
- 		}
- 		break;
- 
-@@ -342,6 +390,12 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
- 				ohci_at91_usb_set_power(pdata, wIndex, 0);
- 				return 0;
- 			}
-+			break;
-+
-+		case USB_PORT_FEAT_SUSPEND:
-+			dev_dbg(hcd->self.controller, "ClearPortFeature: SUSPEND\n");
-+			ohci_at91_port_ctrl(ohci_at91->sfr_regmap, 0);
-+			break;
- 		}
- 		break;
- 	}
-@@ -599,6 +653,9 @@ ohci_hcd_at91_drv_suspend(struct device *dev)
- 	if (ohci_at91->wakeup)
- 		enable_irq_wake(hcd->irq);
- 
-+	ohci_at91_hub_control(hcd, SetPortFeature,
-+			      USB_PORT_FEAT_SUSPEND, 1, NULL, 0);
-+
- 	ret = ohci_suspend(hcd, ohci_at91->wakeup);
- 	if (ret) {
- 		if (ohci_at91->wakeup)
-@@ -638,6 +695,10 @@ ohci_hcd_at91_drv_resume(struct device *dev)
- 	at91_start_clock(ohci_at91);
- 
- 	ohci_resume(hcd, false);
-+
-+	ohci_at91_hub_control(hcd, ClearPortFeature,
-+			      USB_PORT_FEAT_SUSPEND, 1, NULL, 0);
-+
- 	return 0;
+-	struct samsung_cmu_info cmu = { NULL };
+-
+-	cmu.mux_clks = aud_mux_clks;
+-	cmu.nr_mux_clks = ARRAY_SIZE(aud_mux_clks);
+-	cmu.div_clks = aud_div_clks;
+-	cmu.nr_div_clks = ARRAY_SIZE(aud_div_clks);
+-	cmu.gate_clks = aud_gate_clks;
+-	cmu.nr_gate_clks = ARRAY_SIZE(aud_gate_clks);
+-	cmu.nr_clk_ids = AUD_NR_CLK;
+-	cmu.clk_regs = aud_clk_regs;
+-	cmu.nr_clk_regs = ARRAY_SIZE(aud_clk_regs);
+-
+-	samsung_cmu_register_one(np, &cmu);
++	samsung_cmu_register_one(np, &aud_cmu);
  }
  
-diff --git a/include/soc/at91/atmel-sfr.h b/include/soc/at91/atmel-sfr.h
-index 2f9bb98..faf41a5 100644
---- a/include/soc/at91/atmel-sfr.h
-+++ b/include/soc/at91/atmel-sfr.h
-@@ -13,6 +13,20 @@
- #ifndef _LINUX_MFD_SYSCON_ATMEL_SFR_H
- #define _LINUX_MFD_SYSCON_ATMEL_SFR_H
+ CLK_OF_DECLARE(exynos5260_clk_aud, "samsung,exynos5260-clock-aud",
+@@ -321,21 +321,21 @@ static const struct samsung_gate_clock disp_gate_clks[] __initconst = {
+ 			EN_IP_DISP, 25, 0, 0),
+ };
  
-+#define AT91_SFR_DDRCFG		0x04	/* DDR Configuration Register */
-+/* 0x08 ~ 0x0c: Reserved */
-+#define AT91_SFR_OHCIICR	0x10	/* OHCI Interrupt Configuration Register */
-+#define AT91_SFR_OHCIISR	0x14	/* OHCI Interrupt Status Register */
- #define AT91_SFR_I2SCLKSEL	0x90	/* I2SC Register */
++static const struct samsung_cmu_info disp_cmu __initconst = {
++	.mux_clks	= disp_mux_clks,
++	.nr_mux_clks	= ARRAY_SIZE(disp_mux_clks),
++	.div_clks	= disp_div_clks,
++	.nr_div_clks	= ARRAY_SIZE(disp_div_clks),
++	.gate_clks	= disp_gate_clks,
++	.nr_gate_clks	= ARRAY_SIZE(disp_gate_clks),
++	.nr_clk_ids	= DISP_NR_CLK,
++	.clk_regs	= disp_clk_regs,
++	.nr_clk_regs	= ARRAY_SIZE(disp_clk_regs),
++};
++
+ static void __init exynos5260_clk_disp_init(struct device_node *np)
+ {
+-	struct samsung_cmu_info cmu = { NULL };
+-
+-	cmu.mux_clks = disp_mux_clks;
+-	cmu.nr_mux_clks = ARRAY_SIZE(disp_mux_clks);
+-	cmu.div_clks = disp_div_clks;
+-	cmu.nr_div_clks = ARRAY_SIZE(disp_div_clks);
+-	cmu.gate_clks = disp_gate_clks;
+-	cmu.nr_gate_clks = ARRAY_SIZE(disp_gate_clks);
+-	cmu.nr_clk_ids = DISP_NR_CLK;
+-	cmu.clk_regs = disp_clk_regs;
+-	cmu.nr_clk_regs = ARRAY_SIZE(disp_clk_regs);
+-
+-	samsung_cmu_register_one(np, &cmu);
++	samsung_cmu_register_one(np, &disp_cmu);
+ }
  
-+/* Field definitions */
-+#define AT91_OHCIICR_SUSPEND_A	BIT(8)
-+#define AT91_OHCIICR_SUSPEND_B	BIT(9)
-+#define AT91_OHCIICR_SUSPEND_C	BIT(10)
+ CLK_OF_DECLARE(exynos5260_clk_disp, "samsung,exynos5260-clock-disp",
+@@ -385,21 +385,21 @@ static const struct samsung_pll_clock egl_pll_clks[] __initconst = {
+ 		pll2550_24mhz_tbl),
+ };
+ 
++static const struct samsung_cmu_info egl_cmu __initconst = {
++	.pll_clks	= egl_pll_clks,
++	.nr_pll_clks	= ARRAY_SIZE(egl_pll_clks),
++	.mux_clks	= egl_mux_clks,
++	.nr_mux_clks	= ARRAY_SIZE(egl_mux_clks),
++	.div_clks	= egl_div_clks,
++	.nr_div_clks	= ARRAY_SIZE(egl_div_clks),
++	.nr_clk_ids	= EGL_NR_CLK,
++	.clk_regs	= egl_clk_regs,
++	.nr_clk_regs	= ARRAY_SIZE(egl_clk_regs),
++};
 +
-+#define AT91_OHCIICR_USB_SUSPEND	(AT91_OHCIICR_SUSPEND_A | \
-+					 AT91_OHCIICR_SUSPEND_B | \
-+					 AT91_OHCIICR_SUSPEND_C)
+ static void __init exynos5260_clk_egl_init(struct device_node *np)
+ {
+-	struct samsung_cmu_info cmu = { NULL };
+-
+-	cmu.pll_clks = egl_pll_clks;
+-	cmu.nr_pll_clks =  ARRAY_SIZE(egl_pll_clks);
+-	cmu.mux_clks = egl_mux_clks;
+-	cmu.nr_mux_clks = ARRAY_SIZE(egl_mux_clks);
+-	cmu.div_clks = egl_div_clks;
+-	cmu.nr_div_clks = ARRAY_SIZE(egl_div_clks);
+-	cmu.nr_clk_ids = EGL_NR_CLK;
+-	cmu.clk_regs = egl_clk_regs;
+-	cmu.nr_clk_regs = ARRAY_SIZE(egl_clk_regs);
+-
+-	samsung_cmu_register_one(np, &cmu);
++	samsung_cmu_register_one(np, &egl_cmu);
+ }
+ 
+ CLK_OF_DECLARE(exynos5260_clk_egl, "samsung,exynos5260-clock-egl",
+@@ -487,19 +487,19 @@ static const struct samsung_gate_clock fsys_gate_clks[] __initconst = {
+ 			EN_IP_FSYS_SECURE_SMMU_RTIC, 12, 0, 0),
+ };
+ 
++static const struct samsung_cmu_info fsys_cmu __initconst = {
++	.mux_clks	= fsys_mux_clks,
++	.nr_mux_clks	= ARRAY_SIZE(fsys_mux_clks),
++	.gate_clks	= fsys_gate_clks,
++	.nr_gate_clks	= ARRAY_SIZE(fsys_gate_clks),
++	.nr_clk_ids	= FSYS_NR_CLK,
++	.clk_regs	= fsys_clk_regs,
++	.nr_clk_regs	= ARRAY_SIZE(fsys_clk_regs),
++};
 +
+ static void __init exynos5260_clk_fsys_init(struct device_node *np)
+ {
+-	struct samsung_cmu_info cmu = { NULL };
+-
+-	cmu.mux_clks = fsys_mux_clks;
+-	cmu.nr_mux_clks = ARRAY_SIZE(fsys_mux_clks);
+-	cmu.gate_clks = fsys_gate_clks;
+-	cmu.nr_gate_clks = ARRAY_SIZE(fsys_gate_clks);
+-	cmu.nr_clk_ids = FSYS_NR_CLK;
+-	cmu.clk_regs = fsys_clk_regs;
+-	cmu.nr_clk_regs = ARRAY_SIZE(fsys_clk_regs);
+-
+-	samsung_cmu_register_one(np, &cmu);
++	samsung_cmu_register_one(np, &fsys_cmu);
+ }
+ 
+ CLK_OF_DECLARE(exynos5260_clk_fsys, "samsung,exynos5260-clock-fsys",
+@@ -576,21 +576,21 @@ static const struct samsung_gate_clock g2d_gate_clks[] __initconst = {
+ 			EN_IP_G2D_SECURE_SMMU_G2D, 15, 0, 0),
+ };
+ 
++static const struct samsung_cmu_info g2d_cmu __initconst = {
++	.mux_clks	= g2d_mux_clks,
++	.nr_mux_clks	= ARRAY_SIZE(g2d_mux_clks),
++	.div_clks	= g2d_div_clks,
++	.nr_div_clks	= ARRAY_SIZE(g2d_div_clks),
++	.gate_clks	= g2d_gate_clks,
++	.nr_gate_clks	= ARRAY_SIZE(g2d_gate_clks),
++	.nr_clk_ids	= G2D_NR_CLK,
++	.clk_regs	= g2d_clk_regs,
++	.nr_clk_regs	= ARRAY_SIZE(g2d_clk_regs),
++};
 +
- #endif /* _LINUX_MFD_SYSCON_ATMEL_SFR_H */
+ static void __init exynos5260_clk_g2d_init(struct device_node *np)
+ {
+-	struct samsung_cmu_info cmu = { NULL };
+-
+-	cmu.mux_clks = g2d_mux_clks;
+-	cmu.nr_mux_clks = ARRAY_SIZE(g2d_mux_clks);
+-	cmu.div_clks = g2d_div_clks;
+-	cmu.nr_div_clks = ARRAY_SIZE(g2d_div_clks);
+-	cmu.gate_clks = g2d_gate_clks;
+-	cmu.nr_gate_clks = ARRAY_SIZE(g2d_gate_clks);
+-	cmu.nr_clk_ids = G2D_NR_CLK;
+-	cmu.clk_regs = g2d_clk_regs;
+-	cmu.nr_clk_regs = ARRAY_SIZE(g2d_clk_regs);
+-
+-	samsung_cmu_register_one(np, &cmu);
++	samsung_cmu_register_one(np, &g2d_cmu);
+ }
+ 
+ CLK_OF_DECLARE(exynos5260_clk_g2d, "samsung,exynos5260-clock-g2d",
+@@ -637,23 +637,23 @@ static const struct samsung_pll_clock g3d_pll_clks[] __initconst = {
+ 		pll2550_24mhz_tbl),
+ };
+ 
++static const struct samsung_cmu_info g3d_cmu __initconst = {
++	.pll_clks	= g3d_pll_clks,
++	.nr_pll_clks	= ARRAY_SIZE(g3d_pll_clks),
++	.mux_clks	= g3d_mux_clks,
++	.nr_mux_clks	= ARRAY_SIZE(g3d_mux_clks),
++	.div_clks	= g3d_div_clks,
++	.nr_div_clks	= ARRAY_SIZE(g3d_div_clks),
++	.gate_clks	= g3d_gate_clks,
++	.nr_gate_clks	= ARRAY_SIZE(g3d_gate_clks),
++	.nr_clk_ids	= G3D_NR_CLK,
++	.clk_regs	= g3d_clk_regs,
++	.nr_clk_regs	= ARRAY_SIZE(g3d_clk_regs),
++};
++
+ static void __init exynos5260_clk_g3d_init(struct device_node *np)
+ {
+-	struct samsung_cmu_info cmu = { NULL };
+-
+-	cmu.pll_clks = g3d_pll_clks;
+-	cmu.nr_pll_clks =  ARRAY_SIZE(g3d_pll_clks);
+-	cmu.mux_clks = g3d_mux_clks;
+-	cmu.nr_mux_clks = ARRAY_SIZE(g3d_mux_clks);
+-	cmu.div_clks = g3d_div_clks;
+-	cmu.nr_div_clks = ARRAY_SIZE(g3d_div_clks);
+-	cmu.gate_clks = g3d_gate_clks;
+-	cmu.nr_gate_clks = ARRAY_SIZE(g3d_gate_clks);
+-	cmu.nr_clk_ids = G3D_NR_CLK;
+-	cmu.clk_regs = g3d_clk_regs;
+-	cmu.nr_clk_regs = ARRAY_SIZE(g3d_clk_regs);
+-
+-	samsung_cmu_register_one(np, &cmu);
++	samsung_cmu_register_one(np, &g3d_cmu);
+ }
+ 
+ CLK_OF_DECLARE(exynos5260_clk_g3d, "samsung,exynos5260-clock-g3d",
+@@ -772,21 +772,21 @@ static const struct samsung_gate_clock gscl_gate_clks[] __initconst = {
+ 			EN_IP_GSCL_SECURE_SMMU_MSCL1, 20, 0, 0),
+ };
+ 
++static const struct samsung_cmu_info gscl_cmu __initconst = {
++	.mux_clks	= gscl_mux_clks,
++	.nr_mux_clks	= ARRAY_SIZE(gscl_mux_clks),
++	.div_clks	= gscl_div_clks,
++	.nr_div_clks	= ARRAY_SIZE(gscl_div_clks),
++	.gate_clks	= gscl_gate_clks,
++	.nr_gate_clks	= ARRAY_SIZE(gscl_gate_clks),
++	.nr_clk_ids	= GSCL_NR_CLK,
++	.clk_regs	= gscl_clk_regs,
++	.nr_clk_regs	= ARRAY_SIZE(gscl_clk_regs),
++};
++
+ static void __init exynos5260_clk_gscl_init(struct device_node *np)
+ {
+-	struct samsung_cmu_info cmu = { NULL };
+-
+-	cmu.mux_clks = gscl_mux_clks;
+-	cmu.nr_mux_clks = ARRAY_SIZE(gscl_mux_clks);
+-	cmu.div_clks = gscl_div_clks;
+-	cmu.nr_div_clks = ARRAY_SIZE(gscl_div_clks);
+-	cmu.gate_clks = gscl_gate_clks;
+-	cmu.nr_gate_clks = ARRAY_SIZE(gscl_gate_clks);
+-	cmu.nr_clk_ids = GSCL_NR_CLK;
+-	cmu.clk_regs = gscl_clk_regs;
+-	cmu.nr_clk_regs = ARRAY_SIZE(gscl_clk_regs);
+-
+-	samsung_cmu_register_one(np, &cmu);
++	samsung_cmu_register_one(np, &gscl_cmu);
+ }
+ 
+ CLK_OF_DECLARE(exynos5260_clk_gscl, "samsung,exynos5260-clock-gscl",
+@@ -891,21 +891,21 @@ static const struct samsung_gate_clock isp_gate_clks[] __initconst = {
+ 			EN_SCLK_ISP, 9, CLK_SET_RATE_PARENT, 0),
+ };
+ 
++static const struct samsung_cmu_info isp_cmu __initconst = {
++	.mux_clks	= isp_mux_clks,
++	.nr_mux_clks	= ARRAY_SIZE(isp_mux_clks),
++	.div_clks	= isp_div_clks,
++	.nr_div_clks	= ARRAY_SIZE(isp_div_clks),
++	.gate_clks	= isp_gate_clks,
++	.nr_gate_clks	= ARRAY_SIZE(isp_gate_clks),
++	.nr_clk_ids	= ISP_NR_CLK,
++	.clk_regs	= isp_clk_regs,
++	.nr_clk_regs	= ARRAY_SIZE(isp_clk_regs),
++};
++
+ static void __init exynos5260_clk_isp_init(struct device_node *np)
+ {
+-	struct samsung_cmu_info cmu = { NULL };
+-
+-	cmu.mux_clks = isp_mux_clks;
+-	cmu.nr_mux_clks = ARRAY_SIZE(isp_mux_clks);
+-	cmu.div_clks = isp_div_clks;
+-	cmu.nr_div_clks = ARRAY_SIZE(isp_div_clks);
+-	cmu.gate_clks = isp_gate_clks;
+-	cmu.nr_gate_clks = ARRAY_SIZE(isp_gate_clks);
+-	cmu.nr_clk_ids = ISP_NR_CLK;
+-	cmu.clk_regs = isp_clk_regs;
+-	cmu.nr_clk_regs = ARRAY_SIZE(isp_clk_regs);
+-
+-	samsung_cmu_register_one(np, &cmu);
++	samsung_cmu_register_one(np, &isp_cmu);
+ }
+ 
+ CLK_OF_DECLARE(exynos5260_clk_isp, "samsung,exynos5260-clock-isp",
+@@ -955,21 +955,21 @@ static const struct samsung_pll_clock kfc_pll_clks[] __initconst = {
+ 		pll2550_24mhz_tbl),
+ };
+ 
++static const struct samsung_cmu_info kfc_cmu __initconst = {
++	.pll_clks	= kfc_pll_clks,
++	.nr_pll_clks	= ARRAY_SIZE(kfc_pll_clks),
++	.mux_clks	= kfc_mux_clks,
++	.nr_mux_clks	= ARRAY_SIZE(kfc_mux_clks),
++	.div_clks	= kfc_div_clks,
++	.nr_div_clks	= ARRAY_SIZE(kfc_div_clks),
++	.nr_clk_ids	= KFC_NR_CLK,
++	.clk_regs	= kfc_clk_regs,
++	.nr_clk_regs	= ARRAY_SIZE(kfc_clk_regs),
++};
++
+ static void __init exynos5260_clk_kfc_init(struct device_node *np)
+ {
+-	struct samsung_cmu_info cmu = { NULL };
+-
+-	cmu.pll_clks = kfc_pll_clks;
+-	cmu.nr_pll_clks =  ARRAY_SIZE(kfc_pll_clks);
+-	cmu.mux_clks = kfc_mux_clks;
+-	cmu.nr_mux_clks = ARRAY_SIZE(kfc_mux_clks);
+-	cmu.div_clks = kfc_div_clks;
+-	cmu.nr_div_clks = ARRAY_SIZE(kfc_div_clks);
+-	cmu.nr_clk_ids = KFC_NR_CLK;
+-	cmu.clk_regs = kfc_clk_regs;
+-	cmu.nr_clk_regs = ARRAY_SIZE(kfc_clk_regs);
+-
+-	samsung_cmu_register_one(np, &cmu);
++	samsung_cmu_register_one(np, &kfc_cmu);
+ }
+ 
+ CLK_OF_DECLARE(exynos5260_clk_kfc, "samsung,exynos5260-clock-kfc",
+@@ -1011,21 +1011,21 @@ static const struct samsung_gate_clock mfc_gate_clks[] __initconst = {
+ 			EN_IP_MFC_SECURE_SMMU2_MFC, 7, 0, 0),
+ };
+ 
++static const struct samsung_cmu_info mfc_cmu __initconst = {
++	.mux_clks	= mfc_mux_clks,
++	.nr_mux_clks	= ARRAY_SIZE(mfc_mux_clks),
++	.div_clks	= mfc_div_clks,
++	.nr_div_clks	= ARRAY_SIZE(mfc_div_clks),
++	.gate_clks	= mfc_gate_clks,
++	.nr_gate_clks	= ARRAY_SIZE(mfc_gate_clks),
++	.nr_clk_ids	= MFC_NR_CLK,
++	.clk_regs	= mfc_clk_regs,
++	.nr_clk_regs	= ARRAY_SIZE(mfc_clk_regs),
++};
++
+ static void __init exynos5260_clk_mfc_init(struct device_node *np)
+ {
+-	struct samsung_cmu_info cmu = { NULL };
+-
+-	cmu.mux_clks = mfc_mux_clks;
+-	cmu.nr_mux_clks = ARRAY_SIZE(mfc_mux_clks);
+-	cmu.div_clks = mfc_div_clks;
+-	cmu.nr_div_clks = ARRAY_SIZE(mfc_div_clks);
+-	cmu.gate_clks = mfc_gate_clks;
+-	cmu.nr_gate_clks = ARRAY_SIZE(mfc_gate_clks);
+-	cmu.nr_clk_ids = MFC_NR_CLK;
+-	cmu.clk_regs = mfc_clk_regs;
+-	cmu.nr_clk_regs = ARRAY_SIZE(mfc_clk_regs);
+-
+-	samsung_cmu_register_one(np, &cmu);
++	samsung_cmu_register_one(np, &mfc_cmu);
+ }
+ 
+ CLK_OF_DECLARE(exynos5260_clk_mfc, "samsung,exynos5260-clock-mfc",
+@@ -1158,23 +1158,23 @@ static const struct samsung_pll_clock mif_pll_clks[] __initconst = {
+ 		pll2550_24mhz_tbl),
+ };
+ 
++static const struct samsung_cmu_info mif_cmu __initconst = {
++	.pll_clks	= mif_pll_clks,
++	.nr_pll_clks	= ARRAY_SIZE(mif_pll_clks),
++	.mux_clks	= mif_mux_clks,
++	.nr_mux_clks	= ARRAY_SIZE(mif_mux_clks),
++	.div_clks	= mif_div_clks,
++	.nr_div_clks	= ARRAY_SIZE(mif_div_clks),
++	.gate_clks	= mif_gate_clks,
++	.nr_gate_clks	= ARRAY_SIZE(mif_gate_clks),
++	.nr_clk_ids	= MIF_NR_CLK,
++	.clk_regs	= mif_clk_regs,
++	.nr_clk_regs	= ARRAY_SIZE(mif_clk_regs),
++};
++
+ static void __init exynos5260_clk_mif_init(struct device_node *np)
+ {
+-	struct samsung_cmu_info cmu = { NULL };
+-
+-	cmu.pll_clks = mif_pll_clks;
+-	cmu.nr_pll_clks =  ARRAY_SIZE(mif_pll_clks);
+-	cmu.mux_clks = mif_mux_clks;
+-	cmu.nr_mux_clks = ARRAY_SIZE(mif_mux_clks);
+-	cmu.div_clks = mif_div_clks;
+-	cmu.nr_div_clks = ARRAY_SIZE(mif_div_clks);
+-	cmu.gate_clks = mif_gate_clks;
+-	cmu.nr_gate_clks = ARRAY_SIZE(mif_gate_clks);
+-	cmu.nr_clk_ids = MIF_NR_CLK;
+-	cmu.clk_regs = mif_clk_regs;
+-	cmu.nr_clk_regs = ARRAY_SIZE(mif_clk_regs);
+-
+-	samsung_cmu_register_one(np, &cmu);
++	samsung_cmu_register_one(np, &mif_cmu);
+ }
+ 
+ CLK_OF_DECLARE(exynos5260_clk_mif, "samsung,exynos5260-clock-mif",
+@@ -1366,21 +1366,21 @@ static const struct samsung_gate_clock peri_gate_clks[] __initconst = {
+ 		EN_IP_PERI_SECURE_TZPC, 20, 0, 0),
+ };
+ 
++static const struct samsung_cmu_info peri_cmu __initconst = {
++	.mux_clks	= peri_mux_clks,
++	.nr_mux_clks	= ARRAY_SIZE(peri_mux_clks),
++	.div_clks	= peri_div_clks,
++	.nr_div_clks	= ARRAY_SIZE(peri_div_clks),
++	.gate_clks	= peri_gate_clks,
++	.nr_gate_clks	= ARRAY_SIZE(peri_gate_clks),
++	.nr_clk_ids	= PERI_NR_CLK,
++	.clk_regs	= peri_clk_regs,
++	.nr_clk_regs	= ARRAY_SIZE(peri_clk_regs),
++};
++
+ static void __init exynos5260_clk_peri_init(struct device_node *np)
+ {
+-	struct samsung_cmu_info cmu = { NULL };
+-
+-	cmu.mux_clks = peri_mux_clks;
+-	cmu.nr_mux_clks = ARRAY_SIZE(peri_mux_clks);
+-	cmu.div_clks = peri_div_clks;
+-	cmu.nr_div_clks = ARRAY_SIZE(peri_div_clks);
+-	cmu.gate_clks = peri_gate_clks;
+-	cmu.nr_gate_clks = ARRAY_SIZE(peri_gate_clks);
+-	cmu.nr_clk_ids = PERI_NR_CLK;
+-	cmu.clk_regs = peri_clk_regs;
+-	cmu.nr_clk_regs = ARRAY_SIZE(peri_clk_regs);
+-
+-	samsung_cmu_register_one(np, &cmu);
++	samsung_cmu_register_one(np, &peri_cmu);
+ }
+ 
+ CLK_OF_DECLARE(exynos5260_clk_peri, "samsung,exynos5260-clock-peri",
+@@ -1818,25 +1818,25 @@ static const struct samsung_pll_clock top_pll_clks[] __initconst = {
+ 		pll2650_24mhz_tbl),
+ };
+ 
++static const struct samsung_cmu_info top_cmu __initconst = {
++	.pll_clks	= top_pll_clks,
++	.nr_pll_clks	= ARRAY_SIZE(top_pll_clks),
++	.mux_clks	= top_mux_clks,
++	.nr_mux_clks	= ARRAY_SIZE(top_mux_clks),
++	.div_clks	= top_div_clks,
++	.nr_div_clks	= ARRAY_SIZE(top_div_clks),
++	.gate_clks	= top_gate_clks,
++	.nr_gate_clks	= ARRAY_SIZE(top_gate_clks),
++	.fixed_clks	= fixed_rate_clks,
++	.nr_fixed_clks	= ARRAY_SIZE(fixed_rate_clks),
++	.nr_clk_ids	= TOP_NR_CLK,
++	.clk_regs	= top_clk_regs,
++	.nr_clk_regs	= ARRAY_SIZE(top_clk_regs),
++};
++
+ static void __init exynos5260_clk_top_init(struct device_node *np)
+ {
+-	struct samsung_cmu_info cmu = { NULL };
+-
+-	cmu.pll_clks = top_pll_clks;
+-	cmu.nr_pll_clks =  ARRAY_SIZE(top_pll_clks);
+-	cmu.mux_clks = top_mux_clks;
+-	cmu.nr_mux_clks = ARRAY_SIZE(top_mux_clks);
+-	cmu.div_clks = top_div_clks;
+-	cmu.nr_div_clks = ARRAY_SIZE(top_div_clks);
+-	cmu.gate_clks = top_gate_clks;
+-	cmu.nr_gate_clks = ARRAY_SIZE(top_gate_clks);
+-	cmu.fixed_clks = fixed_rate_clks;
+-	cmu.nr_fixed_clks = ARRAY_SIZE(fixed_rate_clks);
+-	cmu.nr_clk_ids = TOP_NR_CLK;
+-	cmu.clk_regs = top_clk_regs;
+-	cmu.nr_clk_regs = ARRAY_SIZE(top_clk_regs);
+-
+-	samsung_cmu_register_one(np, &cmu);
++	samsung_cmu_register_one(np, &top_cmu);
+ }
+ 
+ CLK_OF_DECLARE(exynos5260_clk_top, "samsung,exynos5260-clock-top",
 -- 
-2.7.4
+1.9.1
