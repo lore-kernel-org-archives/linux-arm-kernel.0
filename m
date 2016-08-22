@@ -1,38 +1,75 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 22 Aug 2016 19:03:49 +0200
-Subject: [PATCH v4 2/4] dt-bindings: Add a binding for Mediatek MDP
-In-Reply-To: <1471828082.30956.1.camel@mtksdaap41>
-References: <1471606767-3218-1-git-send-email-minghsiu.tsai@mediatek.com>
- <1471606767-3218-3-git-send-email-minghsiu.tsai@mediatek.com>
- <20160819141655.GA18486@rob-hp-laptop> <1471828082.30956.1.camel@mtksdaap41>
-Message-ID: <bc8dda62-8169-c2b4-bc05-7e23d5329c28@gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 22 Aug 2016 12:05:15 -0500
+Subject: [PATCH] pci: Add support for unbinding the generic PCI host
+ controller
+In-Reply-To: <57698276.6050606@siemens.com>
+References: <57698276.6050606@siemens.com>
+Message-ID: <20160822170515.GF18628@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jan,
 
+On Tue, Jun 21, 2016 at 08:07:50PM +0200, Jan Kiszka wrote:
+> Particularly useful when working in virtual environments where the
+> controller may come and go, but possibly not only there.
 
-On 22/08/16 03:08, Minghsiu Tsai wrote:
-> On Fri, 2016-08-19 at 09:16 -0500, Rob Herring wrote:
->> On Fri, Aug 19, 2016 at 07:39:25PM +0800, Minghsiu Tsai wrote:
->>> Add a DT binding documentation of MDP for the MT8173 SoC
->>> from Mediatek
->>>
->>> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
->>> ---
->>>  .../devicetree/bindings/media/mediatek-mdp.txt     |  109 ++++++++++++++++++++
->>>  1 file changed, 109 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/media/mediatek-mdp.txt
->>
->> Please add acks when posting new versions.
->>
->> Rob
->
-> Sorry for my mistake. I will add it in next version.
->
+I'm not sure where we're at with this.  Will had a few questions about
+the tear-down paths, and I couldn't tell what the resolution was.
 
-
-No need to provide a new version just because of this. If the driver 
-will be taken as is, I can fix up the ack when applying.
-
-Thanks,
-Matthias
+> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+> ---
+>  drivers/pci/ecam.h                  |  1 +
+>  drivers/pci/host/pci-host-common.c  | 13 +++++++++++++
+>  drivers/pci/host/pci-host-generic.c |  1 +
+>  3 files changed, 15 insertions(+)
+> 
+> diff --git a/drivers/pci/ecam.h b/drivers/pci/ecam.h
+> index 9878beb..5a5f607 100644
+> --- a/drivers/pci/ecam.h
+> +++ b/drivers/pci/ecam.h
+> @@ -63,5 +63,6 @@ extern struct pci_ecam_ops pci_generic_ecam_ops;
+>  /* for DT-based PCI controllers that support ECAM */
+>  int pci_host_common_probe(struct platform_device *pdev,
+>  			  struct pci_ecam_ops *ops);
+> +int pci_host_common_remove(struct platform_device *pdev);
+>  #endif
+>  #endif
+> diff --git a/drivers/pci/host/pci-host-common.c b/drivers/pci/host/pci-host-common.c
+> index 8cba7ab..c0ff4b1 100644
+> --- a/drivers/pci/host/pci-host-common.c
+> +++ b/drivers/pci/host/pci-host-common.c
+> @@ -164,6 +164,19 @@ int pci_host_common_probe(struct platform_device *pdev,
+>  	}
+>  
+>  	pci_bus_add_devices(bus);
+> +	platform_set_drvdata(pdev, bus);
+> +	return 0;
+> +}
+> +
+> +int pci_host_common_remove(struct platform_device *pdev)
+> +{
+> +	struct pci_bus *bus = platform_get_drvdata(pdev);
+> +
+> +	pci_lock_rescan_remove();
+> +	pci_stop_root_bus(bus);
+> +	pci_remove_root_bus(bus);
+> +	pci_unlock_rescan_remove();
+> +
+>  	return 0;
+>  }
+>  
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index 6eaceab..0a2e75b 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -65,6 +65,7 @@ static struct platform_driver gen_pci_driver = {
+>  		.of_match_table = gen_pci_of_match,
+>  	},
+>  	.probe = gen_pci_probe,
+> +	.remove = pci_host_common_remove,
+>  };
+>  module_platform_driver(gen_pci_driver);
+>  
+> -- 
+> 2.1.4
