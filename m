@@ -1,68 +1,61 @@
-From: mikko.rapeli@iki.fi (Mikko Rapeli)
-Date: Mon, 22 Aug 2016 20:33:11 +0200
-Subject: [PATCH v05 54/72] include/uapi/xen/privcmd.h: fix compilation in
- userspace
-In-Reply-To: <1471890809-4383-1-git-send-email-mikko.rapeli@iki.fi>
-References: <1471890809-4383-1-git-send-email-mikko.rapeli@iki.fi>
-Message-ID: <1471890809-4383-55-git-send-email-mikko.rapeli@iki.fi>
+From: ccc94453@vip.cybercity.dk (Rask Ingemann Lambertsen)
+Date: Mon, 22 Aug 2016 21:16:17 +0200
+Subject: [PATCH v2 0/7] musb: sunxi: Add support for run-time changing
+ dr-mode through sysfs
+In-Reply-To: <20160819212540.GB1853@uda0271908>
+References: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
+ <20160819212540.GB1853@uda0271908>
+Message-ID: <20160822191615.hqnswn6d4cosvbs5@vip.cybercity.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-xen/interface/xen.h is not exported from kernel headers so remove the
-dependency and provide needed defines for domid_t and xen_pfn_t if they
-are not already defined by some other e.g. Xen specific headers.
+On Fri, Aug 19, 2016 at 04:25:40PM -0500, Bin Liu wrote:
+> Hi,
+> 
+> On Mon, Aug 15, 2016 at 09:21:25PM +0200, Hans de Goede wrote:
+> > Hi All,
+> > 
+> > Here is a patch series which implements run-time changing the dr-mode
+> > of sunxi musb controllers through the (already existing) musb "mode"
+> > sysfs attribute.
+> > 
+> > This is useful on boards where there is no id pin, e.g. some tv-boxes
+> > use the musb controller to get an extra usb A port without needing
+> > a hub chip. Except for the missing id pin when using a usb A<->A cable
+> > these ports can do peripheral mode just fine. This series makes it
+> > possible to do e.g. this by doing echo "peripheral" > mode before
+> > plugging in the usb A<->A cable.
+> 
+> Well, this is an illegal usecase. A-A cable is invalid by USB Spec.
 
-Suggested by Andrew Cooper <andrew.cooper3@citrix.com> on lkml message
-<5569F9C9.8000607@citrix.com>.
+TV boxes with the Sunchip CX-A99 board inside are an example of such
+devices and they ship with a cable that has a type-A plug at both ends,
+precisely to allow you to connect the board to a USB host. It is standard
+practice to do so with that board [1][2] and I've had mine connected that
+way for the last few months while working on mainline kernel support.
 
-The ifdef for ARM is ugly but did not find better solutions for it.
+> With type-A receptacle the controller should be in host-only mode,
+> switching to peripheral mode should not be allowed.
+[...]
+> This is not a problem. With a type-A connector, the dual-role controller
+> should work in host-only mode.
+> 
+> Role switching should only be allowed if an AB connector is used.
 
-Fixes userspace compilation error:
+The Openmoko Neo 1973 and Neo Freerunner have just a Mini-B connector
+but the s3c24xx USB port is switchable between host mode and peripheral
+mode.[3] Should that also be disallowed then?
 
-xen/privcmd.h:38:31: fatal error: xen/interface/xen.h: No such file or directory
+> Using the sysfs entry to switch roles for generic purpose is really a
+> bad idea, it opens up ton of problems.
 
-Signed-off-by: Mikko Rapeli <mikko.rapeli@iki.fi>
-Cc: David Vrabel <david.vrabel@citrix.com>
----
- arch/arm/include/asm/xen/interface.h |  2 +-
- include/uapi/xen/privcmd.h           | 12 +++++++++++-
- 2 files changed, 12 insertions(+), 2 deletions(-)
+Openmoko kernels have since November 2008 had the funtionality to switch
+roles of the USB port using a sysfs attribute. Can you be more specific
+about the "ton of problems"? I have one of those devices as well as a
+CX-A99, so I'd like to know what I've overlooked.
 
-diff --git a/arch/arm/include/asm/xen/interface.h b/arch/arm/include/asm/xen/interface.h
-index 75d5968..6898ee1 100644
---- a/arch/arm/include/asm/xen/interface.h
-+++ b/arch/arm/include/asm/xen/interface.h
-@@ -38,7 +38,7 @@
-  * fine since it simply wouldn't be able to create any sure pfns in
-  * the first place.
-  */
--typedef uint64_t xen_pfn_t;
-+typedef __u64 xen_pfn_t;
- #define PRI_xen_pfn "llx"
- typedef uint64_t xen_ulong_t;
- #define PRI_xen_ulong "llx"
-diff --git a/include/uapi/xen/privcmd.h b/include/uapi/xen/privcmd.h
-index 7ddeeda..16c11f9 100644
---- a/include/uapi/xen/privcmd.h
-+++ b/include/uapi/xen/privcmd.h
-@@ -35,7 +35,17 @@
- 
- #include <linux/types.h>
- #include <linux/compiler.h>
--#include <xen/interface/xen.h>
-+
-+/* Defined by include/xen/interface/xen.h, but it is not part of Linux uapi */
-+#ifndef __XEN_PUBLIC_XEN_H__
-+typedef __u16 domid_t;
-+
-+#if (defined __ARMEL__ || defined __ARMEB__)
-+typedef __u64 xen_pfn_t;
-+#else
-+typedef unsigned long xen_pfn_t;
-+#endif /* (defined __ARMEL__ || defined __ARMEB__) */
-+#endif /* __XEN_PUBLIC_XEN_H__ */
- 
- struct privcmd_hypercall {
- 	__u64 op;
+[1] http://forum.tronsmart.com/forum/tronsmart-draco-aw80/211-instructions-for-firmware-updating-via-pc#642
+[2] https://linux-sunxi.org/FEL
+[3] http://wiki.openmoko.org/wiki/Specialized_USB_cables
 -- 
-2.8.1
+Rask Ingemann Lambertsen
