@@ -1,642 +1,152 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 22 Aug 2016 11:11:57 +0100
-Subject: [PATCH v3 11/12] clk: tegra: Add BPMP clock driver
-In-Reply-To: <20160819173233.13260-12-thierry.reding@gmail.com>
-References: <20160819173233.13260-1-thierry.reding@gmail.com>
- <20160819173233.13260-12-thierry.reding@gmail.com>
-Message-ID: <0d7080bc-9e82-75dd-7169-0a5b7429801e@nvidia.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 22 Aug 2016 11:12:06 +0100
+Subject: [RFC PATCH v3 6/7] arm64: irqflags: Use ICC sysregs to implement
+ IRQ masking
+In-Reply-To: <1471623195-7829-7-git-send-email-daniel.thompson@linaro.org>
+References: <1471623195-7829-1-git-send-email-daniel.thompson@linaro.org>
+ <1471623195-7829-7-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <57BACFF6.6060807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Daniel,
 
-On 19/08/16 18:32, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
+On 19/08/16 17:13, Daniel Thompson wrote:
+> Currently irqflags is implemented using the PSR's I bit. It is possible
+> to implement irqflags by using the co-processor interface to the GIC.
+> Using the co-processor interface makes it feasible to simulate NMIs
+> using GIC interrupt prioritization.
 > 
-> This driver uses the services provided by the BPMP firmware driver to
-> implement a clock driver based on the MRQ_CLK request. This part of the
-> BPMP ABI provides a means to enumerate and control clocks and should
-> allow the driver to work on any chip that supports this ABI.
+> This patch changes the irqflags macros to modify, save and restore
+> ICC_PMR_EL1. This has a substantial knock on effect for the rest of
+> the kernel. There are four reasons for this:
 > 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> 1. The state of the ICC_PMR_EL1_G_BIT becomes part of the CPU context
+
+What is this G bit? I can't spot anything like this in the GICv3 spec.
+
+>    and must be saved and restored during traps. To simplify the
+>    additional context management the ICC_PMR_EL1_G_BIT is converted
+>    into a fake (reserved) bit within the PSR (PSR_G_BIT). Naturally
+>    this approach will need to be changed if future ARM architecture
+>    extensions make use of this bit.
+> 
+> 2. The hardware automatically masks the I bit (at boot, during traps, etc).
+>    When the I bit is set by hardware we must add code to switch from I
+>    bit masking and PMR masking.
+> 
+> 3. Some instructions, noteably wfi, require that the PMR not be used
+>    for interrupt masking. Before calling these instructions we must
+>    switch from PMR masking to I bit masking.
+> 
+> 4. We use the alternatives system to all a single kernel to boot and
+>    switch between the different masking approaches.
+> 
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 > ---
->  drivers/clk/tegra/Makefile   |   1 +
->  drivers/clk/tegra/clk-bpmp.c | 565 +++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 566 insertions(+)
->  create mode 100644 drivers/clk/tegra/clk-bpmp.c
+>  arch/arm64/Kconfig                  |  15 +++++
+>  arch/arm64/include/asm/arch_gicv3.h |  51 +++++++++++++++++
+>  arch/arm64/include/asm/assembler.h  |  32 ++++++++++-
+>  arch/arm64/include/asm/irqflags.h   | 106 ++++++++++++++++++++++++++++++++++++
+>  arch/arm64/include/asm/ptrace.h     |  23 ++++++++
+>  arch/arm64/kernel/entry.S           |  77 ++++++++++++++++++++++----
+>  arch/arm64/kernel/head.S            |  35 ++++++++++++
+>  arch/arm64/kernel/smp.c             |   6 ++
+>  arch/arm64/mm/proc.S                |  23 ++++++++
+>  drivers/irqchip/irq-gic-v3.c        |   2 +
+>  include/linux/irqchip/arm-gic.h     |   2 +-
+>  11 files changed, 356 insertions(+), 16 deletions(-)
 > 
-> diff --git a/drivers/clk/tegra/Makefile b/drivers/clk/tegra/Makefile
-> index 33fd0938d79e..130df5685d21 100644
-> --- a/drivers/clk/tegra/Makefile
-> +++ b/drivers/clk/tegra/Makefile
-> @@ -22,3 +22,4 @@ obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= clk-tegra124-dfll-fcpu.o
->  obj-$(CONFIG_ARCH_TEGRA_132_SOC)	+= clk-tegra124.o
->  obj-y					+= cvb.o
->  obj-$(CONFIG_ARCH_TEGRA_210_SOC)	+= clk-tegra210.o
-> +obj-$(CONFIG_ARCH_TEGRA_186_SOC)	+= clk-bpmp.o
-> diff --git a/drivers/clk/tegra/clk-bpmp.c b/drivers/clk/tegra/clk-bpmp.c
-> new file mode 100644
-> index 000000000000..96cd6becf73e
-> --- /dev/null
-> +++ b/drivers/clk/tegra/clk-bpmp.c
-> @@ -0,0 +1,565 @@
-> +#define DEBUG
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index bc3f00f586f1..56846724d2af 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -718,6 +718,21 @@ config FORCE_MAX_ZONEORDER
+>  	  However for 4K, we choose a higher default value, 11 as opposed to 10, giving us
+>  	  4M allocations matching the default size used by generic code.
+>  
+> +config USE_ICC_SYSREGS_FOR_IRQFLAGS
+> +	bool "Use ICC system registers for IRQ masking"
+> +	select CONFIG_ARM_GIC_V3
+> +	help
+> +	  Using the ICC system registers for IRQ masking makes it possible
+> +	  to simulate NMI on ARM64 systems. This allows several interesting
+> +	  features (especially debug features) to be used on these systems.
+> +
+> +	  Say Y here to implement IRQ masking using ICC system
+> +	  registers. This will result in an unbootable kernel if these
 
-Do we want DEBUG by default?
+Is that a true statement? If so, this is not acceptable. We want a
+kernel that has this feature enabled to boot on anything, whether it has
+GICv3 or not. It should disable itself on a GICv2 system.
 
-> +#include <linux/clk-provider.h>
-> +#include <linux/device.h>
-> +#include <linux/seq_buf.h>
-> +#include <linux/slab.h>
+> +	  registers are not implemented or made inaccessible by the
+> +	  EL3 firmare or EL2 hypervisor (if present).
 > +
-> +#include <soc/tegra/bpmp.h>
-> +#include <soc/tegra/bpmp-abi.h>
+> +	  If unsure, say N
 > +
-> +#define TEGRA_BPMP_CLK_HAS_MUX		BIT(0)
-> +#define TEGRA_BPMP_CLK_HAS_SET_RATE	BIT(1)
-> +#define TEGRA_BPMP_CLK_IS_ROOT		BIT(2)
+>  menuconfig ARMV8_DEPRECATED
+>  	bool "Emulate deprecated/obsolete ARMv8 instructions"
+>  	depends on COMPAT
+> diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+> index fc2a0cb47b2c..a4ad69e2831b 100644
+> --- a/arch/arm64/include/asm/arch_gicv3.h
+> +++ b/arch/arm64/include/asm/arch_gicv3.h
+> @@ -80,6 +80,9 @@
+>  #include <linux/stringify.h>
+>  #include <asm/barrier.h>
+>  
+> +/* Our default, arbitrary priority value. Linux only uses one anyway. */
+> +#define DEFAULT_PMR_VALUE	0xf0
 > +
-> +struct tegra_bpmp_clk_info {
-> +	unsigned int id;
-> +	char name[MRQ_CLK_NAME_MAXLEN];
-> +	unsigned int parents[MRQ_CLK_MAX_PARENTS];
-> +	unsigned int num_parents;
-> +	unsigned long flags;
-> +};
-> +
-> +struct tegra_bpmp_clk {
-> +	struct clk_hw hw;
-> +
-> +	struct tegra_bpmp *bpmp;
-> +	unsigned int id;
-> +
-> +	unsigned int num_parents;
-> +	unsigned int *parents;
-> +};
-> +
-> +static inline struct tegra_bpmp_clk *to_tegra_bpmp_clk(struct clk_hw *hw)
-> +{
-> +	return container_of(hw, struct tegra_bpmp_clk, hw);
-> +}
-> +
-> +struct tegra_bpmp_clk_message {
-> +	unsigned int cmd;
-> +	unsigned int clk;
-> +
-> +	struct {
-> +		const void *data;
-> +		size_t size;
-> +	} tx;
-> +
-> +	struct {
-> +		void *data;
-> +		size_t size;
-> +	} rx;
-> +};
-> +
-> +static int
-> +__tegra_bpmp_clk_transfer_atomic(struct tegra_bpmp *bpmp,
-> +				 struct tegra_bpmp_message *msg)
-> +{
-> +	unsigned long flags;
-> +	int err;
-> +
-> +	local_irq_save(flags);
-> +	err = tegra_bpmp_transfer_atomic(bpmp, msg);
-> +	local_irq_restore(flags);
-> +
-> +	return err;
-> +}
-> +
-> +static int
-> +tegra_bpmp_clk_transfer_atomic(struct tegra_bpmp *bpmp,
-> +			       const struct tegra_bpmp_clk_message *clk)
-> +{
-> +	struct mrq_clk_request request;
-> +	struct tegra_bpmp_message msg;
-> +	void *req = (void *)&request;
-> +
-> +	memset(&request, 0, sizeof(request));
-> +	request.cmd_and_id = (clk->cmd << 24) | clk->clk;
-> +	memcpy(req + 4, clk->tx.data, clk->tx.size);
-> +
-> +	memset(&msg, 0, sizeof(msg));
-> +	msg.mrq = MRQ_CLK;
-> +	msg.tx.data = &request;
-> +	msg.tx.size = sizeof(request);
-> +	msg.rx.data = clk->rx.data;
-> +	msg.rx.size = clk->rx.size;
-> +
-> +	return __tegra_bpmp_clk_transfer_atomic(bpmp, &msg);;
-> +}
-> +
-> +static int tegra_bpmp_clk_transfer(struct tegra_bpmp *bpmp,
-> +				   const struct tegra_bpmp_clk_message *clk)
-> +{
-> +	struct mrq_clk_request request;
-> +	struct tegra_bpmp_message msg;
-> +	void *req = (void *)&request;
-> +	int err;
-> +
-> +	memset(&request, 0, sizeof(request));
-> +	request.cmd_and_id = (clk->cmd << 24) | clk->clk;
-> +	memcpy(req + 4, clk->tx.data, clk->tx.size);
-> +
-> +	memset(&msg, 0, sizeof(msg));
-> +	msg.mrq = MRQ_CLK;
-> +	msg.tx.data = &request;
-> +	msg.tx.size = sizeof(request);
-> +	msg.rx.data = clk->rx.data;
-> +	msg.rx.size = clk->rx.size;
-> +
-> +	err = tegra_bpmp_transfer(bpmp, &msg);
-> +	if (err != -EAGAIN)
-> +		return err;
-> +
-> +	return __tegra_bpmp_clk_transfer_atomic(bpmp, &msg);
-> +}
-> +
-> +static int tegra_bpmp_clk_enable(struct clk_hw *hw)
-> +{
-> +	struct tegra_bpmp_clk *clk = to_tegra_bpmp_clk(hw);
-> +	struct tegra_bpmp_clk_message msg;
-> +	int err;
-> +
-> +	dev_dbg(clk->bpmp->dev, "> %s(hw=%p)\n", __func__, hw);
-> +
-> +	memset(&msg, 0, sizeof(msg));
-> +	msg.cmd = CMD_CLK_ENABLE;
-> +	msg.clk = clk->id;
-> +
-> +	err = tegra_bpmp_clk_transfer(clk->bpmp, &msg);
-> +
-> +	dev_dbg(clk->bpmp->dev, "< %s() = %d\n", __func__, err);
-> +	return err;
-> +}
-> +
-> +static void tegra_bpmp_clk_disable(struct clk_hw *hw)
-> +{
-> +	struct tegra_bpmp_clk *clk = to_tegra_bpmp_clk(hw);
-> +	struct tegra_bpmp_clk_message msg;
-> +	int err;
-> +
-> +	memset(&msg, 0, sizeof(msg));
-> +	msg.cmd = CMD_CLK_DISABLE;
-> +	msg.clk = clk->id;
-> +
-> +	err = tegra_bpmp_clk_transfer(clk->bpmp, &msg);
-> +	if (err < 0)
-> +		dev_err(clk->bpmp->dev, "failed to disable clock %s: %d\n",
-> +			clk_hw_get_name(hw), err);
-> +}
-> +
-> +static int tegra_bpmp_clk_is_enabled(struct clk_hw *hw)
-> +{
-> +	struct tegra_bpmp_clk *clk = to_tegra_bpmp_clk(hw);
-> +	struct cmd_clk_is_enabled_response response;
-> +	struct tegra_bpmp_clk_message msg;
-> +	int err;
-> +
-> +	memset(&msg, 0, sizeof(msg));
-> +	msg.cmd = CMD_CLK_IS_ENABLED;
-> +	msg.clk = clk->id;
-> +	msg.rx.data = &response;
-> +	msg.rx.size = sizeof(response);
-> +
-> +	err = tegra_bpmp_clk_transfer_atomic(clk->bpmp, &msg);
-> +	if (err < 0)
-> +		return err;
-> +
-> +	return response.state;
-> +}
-> +
-> +static u8 tegra_bpmp_clk_get_parent(struct clk_hw *hw)
-> +{
-> +	struct tegra_bpmp_clk *clk = to_tegra_bpmp_clk(hw);
-> +	struct cmd_clk_get_parent_response response;
-> +	struct tegra_bpmp_clk_message msg;
-> +	unsigned int i;
-> +	int err;
-> +
-> +	memset(&msg, 0, sizeof(msg));
-> +	msg.cmd = CMD_CLK_GET_PARENT;
-> +	msg.clk = clk->id;
-> +	msg.rx.data = &response;
-> +	msg.rx.size = sizeof(&response);
-> +
-> +	err = tegra_bpmp_clk_transfer(clk->bpmp, &msg);
-> +	if (err < 0)
-> +		return err;
+>  /*
+>   * Low-level accessors
+>   *
+> @@ -102,9 +105,35 @@ static inline void gic_write_dir(u32 irq)
+>  static inline u64 gic_read_iar_common(void)
+>  {
+>  	u64 irqstat;
+> +	u64 __maybe_unused daif;
+> +	u64 __maybe_unused pmr;
+> +	u64 __maybe_unused default_pmr_value = DEFAULT_PMR_VALUE;
+>  
+> +#ifndef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+>  	asm volatile("mrs_s %0, " __stringify(ICC_IAR1_EL1) : "=r" (irqstat));
+>  	dsb(sy);
+> +#else
+> +	/*
+> +	 * The PMR may be configured to mask interrupts when this code is
+> +	 * called, thus in order to acknowledge interrupts we must set the
+> +	 * PMR to its default value before reading from the IAR.
+> +	 *
+> +	 * To do this without taking an interrupt we also ensure the I bit
+> +	 * is set whilst we are interfering with the value of the PMR.
+> +	 */
+> +	asm volatile(
+> +		"mrs	%1, daif\n\t"			     /* save I bit  */
+> +		"msr	daifset, #2\n\t"		     /* set I bit   */
+> +		"mrs_s  %2, " __stringify(ICC_PMR_EL1) "\n\t"/* save PMR    */
+> +		"msr_s	" __stringify(ICC_PMR_EL1) ",%3\n\t" /* set PMR     */
+> +		"mrs_s	%0, " __stringify(ICC_IAR1_EL1) "\n\t" /* ack int   */
+> +		"msr_s  " __stringify(ICC_PMR_EL1) ",%2\n\t" /* restore PMR */
+> +		"isb\n\t"
+> +		"msr	daif, %1"			     /* restore I   */
+> +		: "=r" (irqstat), "=&r" (daif), "=&r" (pmr)
+> +		: "r" (default_pmr_value));
 
-tegra_bpmp_clk_transfer returns an int, but this function returns a u8.
+I'm a bit puzzled by this. Why would you have to mess with PMR or DAIF
+at this stage? Why can't we just let the GIC priority mechanism do its
+thing? I'd expect the initial setting of PMR (indicating whether or not
+we have normal interrupts enabled or not) to be enough to perform the
+filtering.
 
-> +
-> +	for (i = 0; i < clk->num_parents; i++)
-> +		if (clk->parents[i] == response.parent_id)
-> +			return i;
-> +
-> +	return U8_MAX;
+You may get an NMI while you're already handling an interrupt, but
+that's fair game, and that's not something we should prevent.
 
-Is there any chance the U8_MAX == num_parents? Should we warn here
-somewhere?
+What am I missing?
 
-> +}
-> +
-> +static int tegra_bpmp_clk_set_parent(struct clk_hw *hw, u8 index)
-> +{
-> +	struct tegra_bpmp_clk *clk = to_tegra_bpmp_clk(hw);
-> +	struct cmd_clk_set_parent_response response;
-> +	struct cmd_clk_set_parent_request request;
-> +	struct tegra_bpmp_clk_message msg;
-> +	int err;
-> +
-> +	if (index >= clk->num_parents)
-> +		return -EINVAL;
-> +
-> +	memset(&request, 0, sizeof(request));
-> +	request.parent_id = clk->parents[index];
-> +
-> +	memset(&msg, 0, sizeof(msg));
-> +	msg.cmd = CMD_CLK_SET_PARENT;
-> +	msg.clk = clk->id;
-> +	msg.tx.data = &request;
-> +	msg.tx.size = sizeof(request);
-> +	msg.rx.data = &response;
-> +	msg.rx.size = sizeof(response);
-> +
-> +	err = tegra_bpmp_clk_transfer(clk->bpmp, &msg);
-> +	if (err < 0)
-> +		return err;
-> +
-> +	/* XXX check parent ID in response */
-> +
-> +	return 0;
-> +}
-> +
-> +static int tegra_bpmp_clk_set_rate(struct clk_hw *hw, unsigned long rate,
-> +				   unsigned long parent_rate)
-> +{
-> +	return 0;
-> +}
-> +
-> +static long tegra_bpmp_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-> +				      unsigned long *parent_rate)
-> +{
-> +	return 0;
-> +}
-> +
-> +static unsigned long tegra_bpmp_clk_recalc_rate(struct clk_hw *hw,
-> +						unsigned long parent_rate)
-> +{
-> +	return 0;
-> +}
-> +
-> +static const struct clk_ops tegra_bpmp_clk_gate_ops = {
-> +	.is_enabled = tegra_bpmp_clk_is_enabled,
-> +	.prepare = tegra_bpmp_clk_enable,
-> +	.unprepare = tegra_bpmp_clk_disable,
-> +};
-> +
-> +static const struct clk_ops tegra_bpmp_clk_mux_ops = {
-> +	.get_parent = tegra_bpmp_clk_get_parent,
-> +	.set_parent = tegra_bpmp_clk_set_parent,
-> +	.is_enabled = tegra_bpmp_clk_is_enabled,
-> +	.prepare = tegra_bpmp_clk_enable,
-> +	.unprepare = tegra_bpmp_clk_disable,
-> +};
-> +
-> +static const struct clk_ops tegra_bpmp_clk_rate_ops = {
-> +	.is_enabled = tegra_bpmp_clk_is_enabled,
-> +	.prepare = tegra_bpmp_clk_enable,
-> +	.unprepare = tegra_bpmp_clk_disable,
-> +	.set_rate = tegra_bpmp_clk_set_rate,
-> +	.round_rate = tegra_bpmp_clk_round_rate,
-> +	.recalc_rate = tegra_bpmp_clk_recalc_rate,
-> +};
-> +
-> +static const struct clk_ops tegra_bpmp_clk_mux_rate_ops = {
-> +	.get_parent = tegra_bpmp_clk_get_parent,
-> +	.set_parent = tegra_bpmp_clk_set_parent,
-> +	.is_enabled = tegra_bpmp_clk_is_enabled,
-> +	.prepare = tegra_bpmp_clk_enable,
-> +	.unprepare = tegra_bpmp_clk_disable,
-> +	.set_rate = tegra_bpmp_clk_set_rate,
-> +	.round_rate = tegra_bpmp_clk_round_rate,
-> +	.recalc_rate = tegra_bpmp_clk_recalc_rate,
-> +};
-> +
-> +static int tegra_bpmp_clk_get_max_id(struct tegra_bpmp *bpmp)
-> +{
-> +	struct cmd_clk_get_max_clk_id_response response;
-> +	struct tegra_bpmp_clk_message msg;
-> +	int err;
-> +
-> +	memset(&msg, 0, sizeof(msg));
-> +	msg.cmd = CMD_CLK_GET_MAX_CLK_ID;
-> +	msg.rx.data = &response;
-> +	msg.rx.size = sizeof(response);
-> +
-> +	err = tegra_bpmp_clk_transfer(bpmp, &msg);
-> +	if (err < 0)
-> +		return err;
-> +
-> +	return response.max_id;
+Thanks,
 
-response.max_id is a uint32
-> +}
-> +
-> +static int tegra_bpmp_clk_get_info(struct tegra_bpmp *bpmp, unsigned int id,
-> +				   struct tegra_bpmp_clk_info *info)
-> +{
-> +	struct cmd_clk_get_all_info_response response;
-> +	struct tegra_bpmp_clk_message msg;
-> +	unsigned int i;
-> +	int err;
-> +
-> +	memset(&msg, 0, sizeof(msg));
-> +	msg.cmd = CMD_CLK_GET_ALL_INFO;
-> +	msg.clk = id;
-> +	msg.rx.data = &response;
-> +	msg.rx.size = sizeof(response);
-> +
-> +	err = tegra_bpmp_clk_transfer(bpmp, &msg);
-> +	if (err < 0)
-> +		return err;
-> +
-> +	strlcpy(info->name, response.name, MRQ_CLK_NAME_MAXLEN);
-> +	info->num_parents = response.num_parents;
-> +
-> +	for (i = 0; i < info->num_parents; i++)
-> +		info->parents[i] = response.parents[i];
-> +
-> +	info->flags = response.flags;
-> +
-> +	return 0;
-> +}
-> +
-> +static int tegra_bpmp_probe_clocks(struct tegra_bpmp *bpmp,
-> +				   struct tegra_bpmp_clk_info **clocksp)
-> +{
-> +	struct tegra_bpmp_clk_info *clocks;
-> +	unsigned int max_id, id, count = 0;
-> +	int err;
-> +
-> +	err = tegra_bpmp_clk_get_max_id(bpmp);
-> +	if (err < 0)
-> +		return err;
-> +
-> +	max_id = err;
-> +
-> +	dev_dbg(bpmp->dev, "maximum clock ID: %u\n", max_id);
-> +
-> +	clocks = kcalloc(max_id + 1, sizeof(*clocks), GFP_KERNEL);
-> +	if (!clocks)
-> +		return -ENOMEM;
-> +
-> +	for (id = 0; id <= max_id; id++) {
-> +		struct tegra_bpmp_clk_info *info = &clocks[count];
-> +#if 0
-> +		const char *prefix = "";
-> +		struct seq_buf buf;
-> +		unsigned int i;
-> +		char flags[64];
-> +#endif
-> +
-> +		err = tegra_bpmp_clk_get_info(bpmp, id, info);
-> +		if (err < 0) {
-> +			dev_err(bpmp->dev, "failed to query clock %u: %d\n",
-> +				id, err);
-> +			continue;
-> +		}
-> +
-> +#if 0
-> +		seq_buf_init(&buf, flags, sizeof(flags));
-> +
-> +		if (info->flags)
-> +			seq_buf_printf(&buf, "(");
-> +
-> +		if (info->flags & TEGRA_BPMP_CLK_HAS_MUX) {
-> +			seq_buf_printf(&buf, "%smux", prefix);
-> +			prefix = ", ";
-> +		}
-> +
-> +		if ((info->flags & TEGRA_BPMP_CLK_HAS_SET_RATE) == 0) {
-> +			seq_buf_printf(&buf, "%sfixed", prefix);
-> +			prefix = ", ";
-> +		}
-> +
-> +		if (info->flags & TEGRA_BPMP_CLK_IS_ROOT) {
-> +			seq_buf_printf(&buf, "%sroot", prefix);
-> +			prefix = ", ";
-> +		}
-> +
-> +		if (info->flags)
-> +			seq_buf_printf(&buf, ")");
-> +
-> +		dev_dbg(bpmp->dev, "  %03u: %s\n", id, info->name);
-> +		dev_dbg(bpmp->dev, "    flags: %lx %s\n", info->flags, flags);
-> +		dev_dbg(bpmp->dev, "    parents: %u\n", info->num_parents);
-> +
-> +		for (i = 0; i < info->num_parents; i++)
-> +			dev_dbg(bpmp->dev, "      %03u\n", info->parents[i]);
-> +#endif
-> +
-> +		/* clock not exposed by BPMP */
-> +		if (info->name[0] == '\0')
-> +			continue;
-> +
-> +		info->id = id;
-> +		count++;
-> +	}
-> +
-> +	*clocksp = clocks;
-
-Nit we could just return the pointer.
-
-> +
-> +	return count;
-
-We return unsigned int here and not int. Why do we bother returning
-count and just store it directly in the bpmp->num_clocks here (see
-tegra_bpmp_register_clocks)?
-
-> +}
-> +
-> +static struct clk_hw *
-> +tegra_bpmp_clk_register(struct tegra_bpmp *bpmp,
-> +			const struct tegra_bpmp_clk_info *info,
-> +			const struct tegra_bpmp_clk_info *clocks,
-> +			unsigned int num_clocks)
-> +{
-> +	struct tegra_bpmp_clk *priv;
-> +	struct clk_init_data init;
-> +	const char **parents;
-> +	unsigned int i, j;
-> +	struct clk *clk;
-> +
-> +	dev_dbg(bpmp->dev, "registering clock %u (%s)\n", info->id, info->name);
-> +
-> +	priv = devm_kzalloc(bpmp->dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	priv->bpmp = bpmp;
-> +	priv->id = info->id;
-> +
-> +	priv->parents = devm_kcalloc(bpmp->dev, info->num_parents,
-> +				     sizeof(*priv->parents), GFP_KERNEL);
-> +	if (!priv->parents)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	priv->num_parents = info->num_parents;
-> +
-> +	/* hardware clock initialization */
-> +	priv->hw.init = &init;
-> +	init.name = info->name;
-> +
-> +	if (info->flags & TEGRA_BPMP_CLK_HAS_MUX) {
-> +		if (info->flags & TEGRA_BPMP_CLK_HAS_SET_RATE)
-> +			init.ops = &tegra_bpmp_clk_mux_rate_ops;
-> +		else
-> +			init.ops = &tegra_bpmp_clk_mux_ops;
-> +	} else {
-> +		if (info->flags & TEGRA_BPMP_CLK_HAS_SET_RATE)
-> +			init.ops = &tegra_bpmp_clk_rate_ops;
-> +		else
-> +			init.ops = &tegra_bpmp_clk_gate_ops;
-> +	}
-> +
-> +	init.num_parents = info->num_parents;
-> +
-> +	parents = kcalloc(info->num_parents, sizeof(*parents), GFP_KERNEL);
-> +	if (!parents)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	for (i = 0; i < info->num_parents; i++) {
-> +		/* keep a private copy of the ID to parent index map */
-> +		priv->parents[i] = info->parents[i];
-> +
-> +		for (j = 0; j < num_clocks; j++) {
-> +			const struct tegra_bpmp_clk_info *parent = &clocks[j];
-> +
-> +			if (parent->id == info->parents[i]) {
-> +				parents[i] = parent->name;
-> +				break;
-> +			}
-> +		}
-
-Is it necessary to loop through all the clocks again here? This function
-is called from tegra_bpmp_register_clocks() which is already looping
-through all the clocks. So for each clock we loop through all the clocks
-again.
-
-> +		if (!parents[i])
-> +			dev_err(bpmp->dev, "no parent %u found for %u\n",
-> +				info->parents[i], info->id);
-> +	}
-> +
-> +	init.parent_names = parents;
-> +
-> +	clk = clk_register(bpmp->dev, &priv->hw);
-
-IS_ERR?
-
-> +
-> +	kfree(parents);
-> +
-> +	return &priv->hw;
-> +}
-> +
-> +static int tegra_bpmp_register_clocks(struct tegra_bpmp *bpmp,
-> +				      struct tegra_bpmp_clk_info *clocks,
-> +				      unsigned int count)
-> +{
-> +	struct clk_hw *hw;
-> +	unsigned int i;
-> +
-> +	bpmp->num_clocks = count;
-> +
-> +	bpmp->clocks = devm_kcalloc(bpmp->dev, count, sizeof(hw), GFP_KERNEL);
-> +	if (!bpmp->clocks)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; i < count; i++) {
-> +		struct tegra_bpmp_clk_info *info = &clocks[i];
-> +
-> +		hw = tegra_bpmp_clk_register(bpmp, info, clocks, count);
-> +		if (IS_ERR(hw)) {
-> +			dev_err(bpmp->dev,
-> +				"failed to register clock %u (%s): %ld\n",
-> +				info->id, info->name, PTR_ERR(hw));
-> +			continue;
-> +		}
-> +
-> +		bpmp->clocks[i] = hw;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct clk_hw *tegra_bpmp_clk_of_xlate(struct of_phandle_args *clkspec,
-> +					      void *data)
-> +{
-> +	unsigned int id = clkspec->args[0], i;
-> +	struct tegra_bpmp *bpmp = data;
-> +	struct clk_hw *hw = NULL;
-> +
-> +	dev_dbg(bpmp->dev, "> %s(clkspec=%p, data=%p)\n", __func__, clkspec,
-> +		data);
-> +
-> +	for (i = 0; i < bpmp->num_clocks; i++) {
-> +		struct tegra_bpmp_clk *clk = to_tegra_bpmp_clk(bpmp->clocks[i]);
-> +
-> +		if (clk->id == id) {
-> +			hw = bpmp->clocks[i];
-> +			dev_dbg(bpmp->dev, "  found %u: %s\n", clk->id, clk_hw_get_name(hw));
-> +			break;
-> +		}
-> +	}
-> +
-> +	dev_dbg(bpmp->dev, "< %s() = %p\n", __func__, hw);
-> +
-> +	return hw;
-> +}
-> +
-> +int tegra_bpmp_init_clocks(struct tegra_bpmp *bpmp)
-> +{
-> +	struct tegra_bpmp_clk_info *clocks;
-> +	unsigned int count;
-> +	int err;
-> +
-> +	dev_dbg(bpmp->dev, "> %s(bpmp=%p)\n", __func__, bpmp);
-> +
-> +	err = tegra_bpmp_probe_clocks(bpmp, &clocks);
-> +	if (err < 0)
-> +		return err;
-> +
-> +	count = err;
-> +
-> +	dev_dbg(bpmp->dev, "%u clocks probed\n", count);
-> +
-> +	err = tegra_bpmp_register_clocks(bpmp, clocks, count);
-> +	if (err < 0) {
-> +		kfree(clocks);
-> +		return err;
-> +	}
-> +
-> +	kfree(clocks);
-> +
-> +	of_clk_add_hw_provider(bpmp->dev->of_node, tegra_bpmp_clk_of_xlate,
-> +			       bpmp);
-
-We should check the return code.
-
-> +	dev_dbg(bpmp->dev, "< %s()\n", __func__);
-> +	return 0;
-> +}
-> 
-
-Cheers
-Jon
-
+	M.
 -- 
-nvpublic
+Jazz is not dead. It just smells funny...
