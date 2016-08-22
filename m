@@ -1,57 +1,52 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Mon, 22 Aug 2016 16:30:38 -0400
-Subject: [PATCH v3 1/5] drm/rockchip: sort registers define by chip's
- number
-In-Reply-To: <57B587C0.5050007@rock-chips.com>
-References: <loom.20160602T084340-509@post.gmane.org>
- <1471454452-2151-1-git-send-email-seanpaul@chromium.org>
- <57B57AFE.2030706@rock-chips.com> <20160818091141.GZ6232@phenom.ffwll.local>
- <57B587C0.5050007@rock-chips.com>
-Message-ID: <CAOw6vbJdBwUdg5Qww-autFH=HvvaM-uac7-mN+Ja7PEDiPoPnw@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 22 Aug 2016 23:39:30 +0300
+Subject: [PATCH] ARM: dts: blanche: add support for general purpose LEDs
+In-Reply-To: <5383928.8UnDsUpmkz@wasted.cogentembedded.com>
+References: <5383928.8UnDsUpmkz@wasted.cogentembedded.com>
+Message-ID: <1529754.UBcqZ7GKj7@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2016 at 6:02 AM, Mark yao <mark.yao@rock-chips.com> wrote:
-> On 2016?08?18? 17:11, Daniel Vetter wrote:
->>
->> On Thu, Aug 18, 2016 at 05:08:14PM +0800, Mark yao wrote:
->>>
->>> >Hi Sean
->>> >
->>> >Thanks for send v3 patch for rk3399 vop support.
->>> >
->>> >But sorry for that, I had changed my mind, those patches are deprecated,
->>> >I have new rk3399 patch on my downstream kernel, I will upstream soon.
->>
->> Wut? Imo merge Sean's patch here, and then rebase your downstream patches
->> on top of it. That you have a downstream tree which is out of sync with
->> upstream shouldn't be a reason to stall upstream development.
->> -Daniel
->>
-> Yeah, Sorry for that.
->
-> In fact, on my downstream kernel, also have those patches, my new rk3399
-> patches are based on them,
-> but the new rk3399 patches will cover the those patches,  Sean's patches is
-> old version.
->
-> I just want to fast forward, don't want to send two version drivers to
-> upstream.
-> but if you and Dave feel ok for that, I have no problem:-) .
->
-> merged Sean's patches and then apply new version patches.
->
+Add support for the general purpose LEDs on the Blanche board.
 
-Ok, so can I get a review/ack for these revised patches then?
-Something is better than nothing, and there's a bunch of stuff that
-depends on these changes.
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Sean
+---
+This patch is against the 'renesas-devel-20160822-v4.8-rc3' of Simon Horman's
+'renesas.git' repo plus the SDHI0/DU patches posted earlier.
 
+ arch/arm/boot/dts/r8a7792-blanche.dts |   21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-> Thanks.
->
-> --
-> ?ark Yao
->
->
+Index: renesas/arch/arm/boot/dts/r8a7792-blanche.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
++++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
+@@ -159,6 +159,27 @@
+ 		};
+ 	};
+ 
++	leds {
++		compatible = "gpio-leds";
++
++		led17 {
++			gpios = <&gpio10 10 GPIO_ACTIVE_HIGH>;
++			label = "LED17";
++		};
++		led18 {
++			gpios = <&gpio10 11 GPIO_ACTIVE_HIGH>;
++			label = "LED18";
++		};
++		led19 {
++			gpios = <&gpio10 12 GPIO_ACTIVE_HIGH>;
++			label = "LED19";
++		};
++		led20 {
++			gpios = <&gpio10 23 GPIO_ACTIVE_HIGH>;
++			label = "LED20";
++		};
++	};
++
+ 	vcc_sdhi0: regulator-vcc-sdhi0 {
+ 		compatible = "regulator-fixed";
+ 
