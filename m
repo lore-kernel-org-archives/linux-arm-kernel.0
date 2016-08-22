@@ -1,38 +1,34 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 22 Aug 2016 12:51:41 -0600
-Subject: [PATCH v3 05/12] firmware: tegra: Add BPMP support
-In-Reply-To: <20160822125458.GC17367@ulmo.ba.sec>
-References: <20160819173233.13260-1-thierry.reding@gmail.com>
- <20160819173233.13260-6-thierry.reding@gmail.com>
- <94227d94-1d60-fda7-731b-26656633d585@nvidia.com>
- <20160822125458.GC17367@ulmo.ba.sec>
-Message-ID: <889ad898-873f-ecba-ef22-3492d731c75a@wwwdotorg.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 22 Aug 2016 20:55:52 +0200
+Subject: [PATCH 1/2] ARM: dts: sun6i: Add
+ sun6i-a31-reference-design-tablet.dtsi
+In-Reply-To: <20160822183915.GA7104@lukather>
+References: <1471533095-13432-1-git-send-email-hdegoede@redhat.com>
+ <20160822183915.GA7104@lukather>
+Message-ID: <c7d7dab8-ee30-8e71-c3b4-16ff1edfe134@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2016 06:54 AM, Thierry Reding wrote:
-> On Mon, Aug 22, 2016 at 10:26:50AM +0100, Jon Hunter wrote:
->>
->> On 19/08/16 18:32, Thierry Reding wrote:
->>> From: Thierry Reding <treding@nvidia.com>
->>>
->>> The Boot and Power Management Processor (BPMP) is a co-processor found
->>> on Tegra SoCs. It is designed to handle the early stages of the boot
->>> process and offload power management tasks (such as clocks, resets,
->>> powergates, ...) as well as system control services.
->>>
->>> Compared to the ARM SCPI, the services provided by BPMP are message-
->>> based rather than method-based. The BPMP firmware driver provides the
->>> services to transmit data to and receive data from the BPMP. Users can
->>> also register an MRQ, for which a service routine will be run when a
->>> corresponding event is received from the firmware.
->>
->> MRQ?
->
-> I think that means "Message ReQuest", which is sort of like an IRQ but
-> the user will receive a message (with potentially payload) instead. Do
-> you want me to spell that out in the commit message, or what would you
-> suggest?
+Hi,
 
-I believe MRQ refers to the ID/type/semantics of the message structure 
-itself, not so much the notification aspect of having received a message.
+On 22-08-16 20:39, Maxime Ripard wrote:
+> Hi,
+>
+> On Thu, Aug 18, 2016 at 05:11:34PM +0200, Hans de Goede wrote:
+>> Just like with a13/a23/a33 most a31 tablets are derived from the same
+>> reference design. Add a .dtsi file with all the common bits to avoid
+>> endless copy and pasting of these.
+>>
+>> The sun6i-a31-reference-design-tablet.dtsi this commit adds is a copy
+>> of sun6i-a31s-colorfly-e708-q1.dts with a few tablet specific bits
+>> removed / left in sun6i-a31s-colorfly-e708-q1.dts.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>
+> The patch looks ok, but doesn't apply.
+
+Right, I forgot an earlier patch in the series, which is why I send a v2.
+
+Regards,
+
+Hans
