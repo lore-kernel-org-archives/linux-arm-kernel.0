@@ -1,89 +1,40 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Mon, 22 Aug 2016 10:01:01 +0200
-Subject: [RFC PATCH v2 1/2] mm/hugetlb: Introduce ARCH_HAS_GIGANTIC_PAGE
-In-Reply-To: <1471834603-27053-2-git-send-email-xieyisheng1@huawei.com>
-References: <1471834603-27053-1-git-send-email-xieyisheng1@huawei.com>
- <1471834603-27053-2-git-send-email-xieyisheng1@huawei.com>
-Message-ID: <20160822080101.GE13596@dhcp22.suse.cz>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 22 Aug 2016 09:01:17 +0100
+Subject: [PATCH v2] arm: KVM: Fix idmap overlap detection when the kernel is
+ idmap'ed
+Message-ID: <1471852877-17197-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 22-08-16 10:56:42, Xie Yisheng wrote:
-> Avoid making ifdef get pretty unwieldy if many ARCHs support gigantic page.
-> No functional change with this patch.
-> 
-> Signed-off-by: Xie Yisheng <xieyisheng1@huawei.com>
-> ---
->  arch/s390/Kconfig | 1 +
->  arch/x86/Kconfig  | 1 +
->  fs/Kconfig        | 4 ++++
->  mm/hugetlb.c      | 2 +-
->  4 files changed, 7 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
-> index e751fe2..a8c8fa3 100644
-> --- a/arch/s390/Kconfig
-> +++ b/arch/s390/Kconfig
-> @@ -72,6 +72,7 @@ config S390
->  	select ARCH_HAS_DEVMEM_IS_ALLOWED
->  	select ARCH_HAS_ELF_RANDOMIZE
->  	select ARCH_HAS_GCOV_PROFILE_ALL
-> +	select ARCH_HAS_GIGANTIC_PAGE
->  	select ARCH_HAS_KCOV
->  	select ARCH_HAS_SG_CHAIN
->  	select ARCH_HAVE_NMI_SAFE_CMPXCHG
-> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> index c580d8c..5cf959c 100644
-> --- a/arch/x86/Kconfig
-> +++ b/arch/x86/Kconfig
-> @@ -29,6 +29,7 @@ config X86
->  	select ARCH_HAS_ELF_RANDOMIZE
->  	select ARCH_HAS_FAST_MULTIPLIER
->  	select ARCH_HAS_GCOV_PROFILE_ALL
-> +	select ARCH_HAS_GIGANTIC_PAGE		if X86_64
->  	select ARCH_HAS_KCOV			if X86_64
->  	select ARCH_HAS_PMEM_API		if X86_64
->  	select ARCH_HAS_MMIO_FLUSH
+We're trying hard to detect when the HYP idmap overlaps with the
+HYP va, as it makes the teardown of a cpu dangerous. But there is
+one case where an overlap is completely safe, which is when the
+whole of the kernel is idmap'ed, which is likely to happen on 32bit
+when RAM is at 0x8000000 and we're using a 2G/2G VA split.
 
-good
+In that case, we can proceed safely.
 
-> diff --git a/fs/Kconfig b/fs/Kconfig
-> index 2bc7ad7..b77ad0f 100644
-> --- a/fs/Kconfig
-> +++ b/fs/Kconfig
-> @@ -199,6 +199,10 @@ config HUGETLBFS
->  config HUGETLB_PAGE
->  	def_bool HUGETLBFS
->  
-> +config ARCH_HAS_GIGANTIC_PAGE
-> +	depends on HUGETLB_PAGE
-> +	bool
-> +
+Reported-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+v2: Fixed integer/pointer comparaison warning
 
-but is this really necessary? The code where we use
-ARCH_HAS_GIGANTIC_PAGE already depends on HUGETLB_PAGE.
+ arch/arm/kvm/mmu.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Other than that looks good to me and a nice simplification.
-
->  source "fs/configfs/Kconfig"
->  source "fs/efivarfs/Kconfig"
->  
-> diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-> index 87e11d8..8488dcc 100644
-> --- a/mm/hugetlb.c
-> +++ b/mm/hugetlb.c
-> @@ -1022,7 +1022,7 @@ static int hstate_next_node_to_free(struct hstate *h, nodemask_t *nodes_allowed)
->  		((node = hstate_next_node_to_free(hs, mask)) || 1);	\
->  		nr_nodes--)
->  
-> -#if (defined(CONFIG_X86_64) || defined(CONFIG_S390)) && \
-> +#if defined(CONFIG_ARCH_HAS_GIGANTIC_PAGE) && \
->  	((defined(CONFIG_MEMORY_ISOLATION) && defined(CONFIG_COMPACTION)) || \
->  	defined(CONFIG_CMA))
->  static void destroy_compound_gigantic_page(struct page *page,
-> -- 
-> 1.7.12.4
-
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index bda27b6..49149b9 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -1714,7 +1714,8 @@ int kvm_mmu_init(void)
+ 		 kern_hyp_va(PAGE_OFFSET), kern_hyp_va(~0UL));
+ 
+ 	if (hyp_idmap_start >= kern_hyp_va(PAGE_OFFSET) &&
+-	    hyp_idmap_start <  kern_hyp_va(~0UL)) {
++	    hyp_idmap_start <  kern_hyp_va(~0UL) &&
++	    hyp_idmap_start != (unsigned long)__hyp_idmap_text_start) {
+ 		/*
+ 		 * The idmap page is intersecting with the VA space,
+ 		 * it is not safe to continue further.
 -- 
-Michal Hocko
-SUSE Labs
+2.1.4
