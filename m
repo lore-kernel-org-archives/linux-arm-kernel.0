@@ -1,95 +1,68 @@
-From: anca.emanuel@gmail.com (Anca Emanuel)
-Date: Tue, 23 Aug 2016 00:47:26 +0300
-Subject: [PATCH V2 soc/next?] ARM: BCM53573: Initial support for Broadcom
- BCM53573 SoCs
-In-Reply-To: <CAC3K-4pY8ZEm6BvDHqU1KOWcGpZGajwP2re74HrOnNEYJ9JE4w@mail.gmail.com>
-References: <1470990396-23701-1-git-send-email-zajec5@gmail.com>
- <20160821170138.21259-1-zajec5@gmail.com>
- <CAC3K-4pY8ZEm6BvDHqU1KOWcGpZGajwP2re74HrOnNEYJ9JE4w@mail.gmail.com>
-Message-ID: <CAJL_dMv-XC_ZKkrMBATF=LaV2VBFE5kcT46YhUBWx=D3MCHDnQ@mail.gmail.com>
+From: John.Youn@synopsys.com (John Youn)
+Date: Mon, 22 Aug 2016 15:08:19 -0700
+Subject: [Bug] usb: dwc2: host function broken in OTG mode on bcm283x
+In-Reply-To: <183575717.19886.709cd5b7-97dd-4dda-9392-7c46ec5e192c.open-xchange@email.1und1.de>
+References: <907297251.436328.d9cd30e0-7476-4a28-8bab-dde17515cd9c.open-xchange@email.1und1.de>
+ <785fc063-9b72-84a9-db91-c2710c19cdf9@synopsys.com>
+ <183575717.19886.709cd5b7-97dd-4dda-9392-7c46ec5e192c.open-xchange@email.1und1.de>
+Message-ID: <37db5022-b98c-7f26-ca77-3ee9ba664edf@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-@Jon Mason: did you read this
-https://plus.google.com/+LinusTorvalds/posts/Cb5nY4yH6pd ?
-Your email was in the spam folder on my gmail account. I manually
-select this as not spam.
-Please read Linus Torvalds message on G+ above. And tell to others in
-the same situation.
+On 8/22/2016 1:47 PM, Stefan Wahren wrote:
+> Hi John,
+> 
+>> John Youn <John.Youn@synopsys.com> hat am 22. August 2016 um 22:06
+>> geschrieben:
+>>
+>>
+>> On 8/20/2016 6:03 AM, Stefan Wahren wrote:
+>>> Hi John,
+>>>
+>>>
+>>
+>> Hi Stefan,
+>>
+>> Why doesn't DT work? I think all the properties are there to set
+>> these.
+> 
+> it only works for the future releases, not for existing DT blobs. The DT is part
+> of the ABI.
+> 
+> Yes, i already send a patch to fix the DT [1], but it would be better to fix the
+> issue in deep.
 
-On Tue, Aug 23, 2016 at 12:24 AM, Jon Mason <jon.mason@broadcom.com> wrote:
-> On Sun, Aug 21, 2016 at 1:01 PM, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
->> From: Rafa? Mi?ecki <rafal@milecki.pl>
+I don't know much about DT issues. So I'm not sure what the issue is
+with this. The properties for the gadget fifo sizes already exist so
+there's no change to the ABI, correct?
+
+Also, the patch you linked doesn't seem to have settings for the FIFO
+sizes.
+
+> 
 >>
->> BCM53573 series is a new family with embedded wireless. By marketing
->> people it's sometimes called Northstar but it uses different CPU and has
->> different architecture so we need a new symbol for it.
->> Fortunately it shares some peripherals with other iProc based SoCs so we
->> will be able to reuse some drivers/bindings.
->>
->> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
->
-> Looks good to me!
->
-> Acked-by: Jon Mason <jon.mason@broadcom.com>
->
->
->> ---
->> V2: Put new symbol under "Other Architectures"
->> ---
->>  MAINTAINERS               |  7 +++++++
->>  arch/arm/mach-bcm/Kconfig | 15 +++++++++++++++
->>  2 files changed, 22 insertions(+)
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index 7304d2e..9e2db2e 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -2517,6 +2517,13 @@ F:       arch/arm/mach-bcm/bcm_5301x.c
->>  F:     arch/arm/boot/dts/bcm5301x.dtsi
->>  F:     arch/arm/boot/dts/bcm470*
->>
->> +BROADCOM BCM53573 ARM ARCHITECTURE
->> +M:     Rafa? Mi?ecki <rafal@milecki.pl>
->> +L:     linux-arm-kernel at lists.infradead.org
->> +S:     Maintained
->> +F:     arch/arm/boot/dts/bcm53573*
->> +F:     arch/arm/boot/dts/bcm47189*
->> +
->>  BROADCOM BCM63XX ARM ARCHITECTURE
->>  M:     Florian Fainelli <f.fainelli@gmail.com>
->>  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
->> index 5832dba..6dfdc82 100644
->> --- a/arch/arm/mach-bcm/Kconfig
->> +++ b/arch/arm/mach-bcm/Kconfig
->> @@ -157,6 +157,21 @@ config ARCH_BCM2835
->>           This enables support for the Broadcom BCM2835 and BCM2836 SoCs.
->>           This SoC is used in the Raspberry Pi and Roku 2 devices.
->>
->> +config ARCH_BCM_53573
->> +       bool "Broadcom BCM53573 SoC series support"
->> +       depends on ARCH_MULTI_V7
->> +       select ARCH_BCM_IPROC
->> +       select HAVE_ARM_ARCH_TIMER
->> +
->> +       help
->> +         BCM53573 series is set of SoCs using ARM Cortex-A7 CPUs with wireless
->> +         embedded in the chipset.
->> +         This SoC line is mostly used in home routers and is some cheaper
->> +         alternative for Northstar family.
->> +
->> +         The base chip is BCM53573 and there are some packaging modifications
->> +         like BCM47189 and BCM47452.
->> +
->>  config ARCH_BCM_63XX
->>         bool "Broadcom BCM63xx DSL SoC"
->>         depends on ARCH_MULTI_V7
->> --
->> 2.9.3
->>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> I hesitate to change the legacy/default settings in case it breaks any
+>> existing drivers that depend on them.
+> 
+> Platforms? I didn't expected that other drivers use these settings.
+
+Yes, I mean platforms.
+
+I believe these values were hard-coded since before the unified "dwc2"
+existed. So for sure there are platforms using these settings and to
+lower them will negatively impact those platforms. The DT properties
+were introduced to override these.
+
+I think it is best to override them in the broken platforms. Either
+that or fix it so that the defaults are more intelligently determined
+in a way that maximizes the fifo sizes and cannot fail, as opposed to
+some other arbitrary values.
+
+> 
+> Another option would be to add the gadget fifo sizes to platform data, but it's
+> not a nice solution.
+
+I agree, that wouldn't be good.
+
+Regards,
+John
