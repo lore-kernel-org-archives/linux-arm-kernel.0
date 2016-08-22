@@ -1,62 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Aug 2016 12:19:22 +0100
-Subject: [PATCH 5/8] arm64: alternative: Add support for patching adrp
- instructions
-In-Reply-To: <1471525832-21209-6-git-send-email-suzuki.poulose@arm.com>
-References: <1471525832-21209-1-git-send-email-suzuki.poulose@arm.com>
- <1471525832-21209-6-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160822111921.GC14680@arm.com>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Mon, 22 Aug 2016 19:33:46 +0800
+Subject: [RFC PATCH v2 2/2] arm64 Kconfig: Select gigantic page
+In-Reply-To: <20160822100045.GA26494@e104818-lin.cambridge.arm.com>
+References: <1471834603-27053-1-git-send-email-xieyisheng1@huawei.com>
+ <1471834603-27053-3-git-send-email-xieyisheng1@huawei.com>
+ <20160822080358.GF13596@dhcp22.suse.cz>
+ <20160822100045.GA26494@e104818-lin.cambridge.arm.com>
+Message-ID: <b5f1f756-4698-4c32-1c30-97b1ccf2b4a6@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2016 at 02:10:29PM +0100, Suzuki K Poulose wrote:
-> adrp uses PC-relative address offset to a page (of 4K size) of
-> a symbol. If it appears in an alternative code patched in, we
-> should adjust the offset to reflect the address where it will
-> be run from. This patch adds support for fixing the offset
-> for adrp instructions.
+
+
+On 2016/8/22 18:00, Catalin Marinas wrote:
+> On Mon, Aug 22, 2016 at 10:03:58AM +0200, Michal Hocko wrote:
+>> On Mon 22-08-16 10:56:43, Xie Yisheng wrote:
+>>> Arm64 supports gigantic page after
+>>> commit 084bd29810a5 ("ARM64: mm: HugeTLB support.")
+>>> however, it got broken by 
+>>> commit 944d9fec8d7a ("hugetlb: add support for gigantic page
+>>> allocation at runtime")
+>>>
+>>> This patch selects ARCH_HAS_GIGANTIC_PAGE to make this
+>>> function can be used again.
+>>
+>> I haven't double checked that the above commit really broke it but if
+>> that is the case then
+>>  
+>> Fixes: 944d9fec8d7a ("hugetlb: add support for gigantic page allocation at runtime")
+>>
+>> would be nice as well I guess. I do not think that marking it for stable
+>> is really necessary considering how long it's been broken and nobody has
+>> noticed...
 > 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Andre Przywara <andre.przywara@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/kernel/alternative.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
+> I'm not sure that commit broke it. The gigantic functionality introduced
+> by the above commit was under an #ifdef CONFIG_X86_64. Prior
+> to that we had a VM_BUG_ON(hstate_is_gigantic(h)).
 > 
-> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-> index d2ee1b2..71c6962 100644
-> --- a/arch/arm64/kernel/alternative.c
-> +++ b/arch/arm64/kernel/alternative.c
-> @@ -80,6 +80,19 @@ static u32 get_alt_insn(struct alt_instr *alt, u32 *insnptr, u32 *altinsnptr)
->  			offset = target - (unsigned long)insnptr;
->  			insn = aarch64_set_branch_offset(insn, offset);
->  		}
-> +	} else if (aarch64_insn_is_adrp(insn)) {
-> +		s32 orig_offset, new_offset;
-> +		unsigned long target;
-> +
-> +		/*
-> +		 * If we're replacing an adrp instruction, which uses PC-relative
-> +		 * immediate addressing, adjust the offset to reflect the new
-> +		 * PC. adrp operates on 4K aligned addresses.
-> +		 */
-> +		orig_offset  = aarch64_insn_adrp_get_offset(insn);
-> +		target = ((unsigned long)altinsnptr & ~0xfffUL) + orig_offset;
-> +		new_offset = target - ((unsigned long)insnptr & ~0xfffUL);
+Hi Catalin and Michal ,
+Thank you for your reply.
+Before that commit gigantic pages can only be allocated at boottime and
+can't be freed. That why we had VM_BUG_ON(hstate_is_gigantic(h)) in
+function update_and_free_page() Prior to that.
 
-The masking with ~0xfffUL might be nicer if you write it as
-align_down(ptr, SZ_4K);
+Anyway, it should not just add #ifdef CONFIG_X86_64 for arm64 already
+supported 1G hugepage before that commit. Right?
 
-> +		insn = aarch64_insn_adrp_set_offset(insn, new_offset);
->  	}
->  
->  	return insn;
+Please let me know if I miss something.
 
-I wonder if we shouldn't have a catch-all for any instructions performing
-PC-relative operations here, because silent corruption of the instruction
-stream is pretty horrible. What other instructions are there? ADR, LDR
-(literal), ... ?
-
-Will
+Thanks
+Xie Yisheng.
