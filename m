@@ -1,110 +1,90 @@
 From: erin.lo@mediatek.com (Erin Lo)
-Date: Mon, 22 Aug 2016 16:29:21 +0800
-Subject: [PATCH v12 0/4] Add clock support for Mediatek MT2701
-Message-ID: <1471854565-19810-1-git-send-email-erin.lo@mediatek.com>
+Date: Mon, 22 Aug 2016 16:29:23 +0800
+Subject: [PATCH v12 2/4] reset: mediatek: Add MT2701 reset driver
+In-Reply-To: <1471854565-19810-1-git-send-email-erin.lo@mediatek.com>
+References: <1471854565-19810-1-git-send-email-erin.lo@mediatek.com>
+Message-ID: <1471854565-19810-3-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is based on clk-next, add clock and reset controller support
-for Mediatek MT2701.
+From: Shunli Wang <shunli.wang@mediatek.com>
 
-Since some patches in v11 had been applied into clk-next, they were not
-included in v12 series.
+In infrasys and perifsys, there are many reset
+control bits for kinds of modules. These bits are
+used as actual reset controllers to be registered
+into kernel's generic reset controller framework.
 
-changes since v11:
-- Rebase to clk-next.
-- Return error code from probe() if clock registration fail.
+Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
+Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+Tested-by: John Crispin <blogic@openwrt.org>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ drivers/clk/mediatek/clk-mt2701-hif.c |  8 ++++++--
+ drivers/clk/mediatek/clk-mt2701.c     | 16 ++++++++++++----
+ 2 files changed, 18 insertions(+), 6 deletions(-)
 
-changes since v10:
-- Remove COMMON_CLK dependency from clk/mediatek/Kconfig.
-
-changes since v9:
-- Rebase to v4.8-rc1.
-- Drop a fix patch of parent clock initial state. It will be replaced by a new
-  patch from Mike/Stephen.
-- Replace clk.h with clk-provider.h.
-- Correct register settings of clocks.
-
-changes since v8:
-- Rebase to v4.7-rc1.
-- Include mt2701-resets.h in mt2701.dtsi.
-- Remove an unused property from apmixedsys DT node.
-
-changes since v7:
-- Rebase to clk-next.
-- Implement subsystem clocks in seperated files.
-- Replace critical clock enabling with CLK_IS_CRITICAL flag.
-- Reduce most clock registrations in CLK_OF_DECLARE().
-- Remove __init and __initconst from most init fucntions and data,
-  and replace driver registration with platform_driver_register().
-- Replace some common function or variable names with unique names.
-- Use real clock for UARTs.
-
-changes since v6:
-- Rebase to v4.6-rc1.
-- Register subsystem clocks in probe() instead of CLK_OF_DECLARE().
-- Add clocks that referred by subsystem clocks.
-- Fix clk_data size of apmixedsys.
-- Add config options for each subsystem clock provider.
-
-changes since v5:
-- Rebase to v4.5-rc1 and [1].
-- Enable critical clocks for MT2701
-- Refine dt-binding documents, add reset controller support for hifsys.
-
-changes since v4:
-- Rebase to v4.5-rc1.
-- Remove CLK_SET_RATE_PARENT from divider flags.
-- Add img_jpgdec_smi clock.
-- Move clk/mediatek/Kconfig into menu section in clk/Kconfig.
-
-changes since v3:
-- Change the parent of mm_mdp_bls_26m from clk26m to pwm_sel.
-
-changes since v2:
-- Fix ethsys definition.
-- Replace read-modify-write with regmap_update_bits() in clock operations.
-- Move mt2701-resets.h to include/dt-bindings/reset/.
-- Add hifsys reset patch from John Crispin.
-
-changes since v1:
-- Document MT2701 compatible strings.
-
-[1] https://patchwork.kernel.org/patch/8147901/
-
-Erin Lo (1):
-  arm: dts: mt2701: Use real clock for UARTs
-
-James Liao (1):
-  arm: dts: mt2701: Add clock controller device nodes
-
-Shunli Wang (2):
-  clk: mediatek: Add MT2701 clock support
-  reset: mediatek: Add MT2701 reset driver
-
- arch/arm/boot/dts/mt2701.dtsi          |   50 +-
- drivers/clk/mediatek/Kconfig           |   43 ++
- drivers/clk/mediatek/Makefile          |    7 +
- drivers/clk/mediatek/clk-gate.c        |   52 ++
- drivers/clk/mediatek/clk-gate.h        |    2 +
- drivers/clk/mediatek/clk-mt2701-bdp.c  |  141 +++++
- drivers/clk/mediatek/clk-mt2701-eth.c  |   83 +++
- drivers/clk/mediatek/clk-mt2701-hif.c  |   84 +++
- drivers/clk/mediatek/clk-mt2701-img.c  |   83 +++
- drivers/clk/mediatek/clk-mt2701-mm.c   |  126 ++++
- drivers/clk/mediatek/clk-mt2701-vdec.c |   94 +++
- drivers/clk/mediatek/clk-mt2701.c      | 1047 ++++++++++++++++++++++++++++++++
- drivers/clk/mediatek/clk-mtk.c         |   40 ++
- drivers/clk/mediatek/clk-mtk.h         |   41 +-
- drivers/clk/mediatek/clk-pll.c         |    1 +
- 15 files changed, 1884 insertions(+), 10 deletions(-)
- create mode 100644 drivers/clk/mediatek/clk-mt2701-bdp.c
- create mode 100644 drivers/clk/mediatek/clk-mt2701-eth.c
- create mode 100644 drivers/clk/mediatek/clk-mt2701-hif.c
- create mode 100644 drivers/clk/mediatek/clk-mt2701-img.c
- create mode 100644 drivers/clk/mediatek/clk-mt2701-mm.c
- create mode 100644 drivers/clk/mediatek/clk-mt2701-vdec.c
- create mode 100644 drivers/clk/mediatek/clk-mt2701.c
-
---
+diff --git a/drivers/clk/mediatek/clk-mt2701-hif.c b/drivers/clk/mediatek/clk-mt2701-hif.c
+index 18b4ab5..702fd74 100644
+--- a/drivers/clk/mediatek/clk-mt2701-hif.c
++++ b/drivers/clk/mediatek/clk-mt2701-hif.c
+@@ -52,11 +52,15 @@ static int mtk_hifsys_init(struct device_node *node)
+ 						clk_data);
+ 
+ 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+-	if (r)
++	if (r) {
+ 		pr_err("%s(): could not register clock provider: %d\n",
+ 			__func__, r);
++		return r;
++	}
++
++	mtk_register_reset_controller(node, 1, 0x34);
+ 
+-	return r;
++	return 0;
+ }
+ 
+ static const struct of_device_id of_match_clk_mt2701_hif[] = {
+diff --git a/drivers/clk/mediatek/clk-mt2701.c b/drivers/clk/mediatek/clk-mt2701.c
+index f6df578..c8cc583 100644
+--- a/drivers/clk/mediatek/clk-mt2701.c
++++ b/drivers/clk/mediatek/clk-mt2701.c
+@@ -790,11 +790,15 @@ static int mtk_infrasys_init(struct device_node *node)
+ 						infra_clk_data);
+ 
+ 	r = of_clk_add_provider(node, of_clk_src_onecell_get, infra_clk_data);
+-	if (r)
++	if (r) {
+ 		pr_err("%s(): could not register clock provider: %d\n",
+ 			__func__, r);
++		return r;
++	}
+ 
+-	return r;
++	mtk_register_reset_controller(node, 2, 0x30);
++
++	return 0;
+ }
+ 
+ static const struct mtk_gate_regs peri0_cg_regs = {
+@@ -912,11 +916,15 @@ static int mtk_pericfg_init(struct device_node *node)
+ 			&lock, clk_data);
+ 
+ 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+-	if (r)
++	if (r) {
+ 		pr_err("%s(): could not register clock provider: %d\n",
+ 			__func__, r);
++		return r;
++	}
+ 
+-	return r;
++	mtk_register_reset_controller(node, 2, 0x0);
++
++	return 0;
+ }
+ 
+ #define MT8590_PLL_FMAX		(2000 * MHZ)
+-- 
 1.9.1
