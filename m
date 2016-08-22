@@ -1,67 +1,79 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 22 Aug 2016 15:53:00 +0200
-Subject: [PATCH RESEND] mmc: sunxi: Check the value returned by
- clk_round_rate
-In-Reply-To: <57af4930.2866c20a.efdbe.7721SMTPIN_ADDED_MISSING@mx.google.com>
-References: <57af4930.2866c20a.efdbe.7721SMTPIN_ADDED_MISSING@mx.google.com>
-Message-ID: <CAPDyKFp0Wsf68jupHov_DxafXRhP9xyqyU-4Hiinm1MNMpyA8A@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 22 Aug 2016 15:53:07 +0200
+Subject: [PATCH] arm64: errata: Pass --fix-cortex-a53-843419 to ld if
+ workaround enabled
+In-Reply-To: <1471873737-7614-1-git-send-email-will.deacon@arm.com>
+References: <1471873737-7614-1-git-send-email-will.deacon@arm.com>
+Message-ID: <CAKv+Gu9Nbz27CkKoAi2-qtLGYYDOcWSZ_Y=4gCXLr8xVBqcDuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 August 2016 at 18:01, Jean-Francois Moine <moinejf@free.fr> wrote:
-> clk_round_rate() may return an error. Check it.
+On 22 August 2016 at 15:48, Will Deacon <will.deacon@arm.com> wrote:
+> Cortex-A53 erratum 843419 is worked around by the linker, although it is
+> a configure-time option to GCC as to whether ld is actually asked to
+> apply the workaround or not.
 >
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> This patch ensures that we pass --fix-cortex-a53-843419 to the linker
+> when both CONFIG_ARM64_ERRATUM_843419=y and the linker supports the
+> option.
+>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Please re-spins this as it doesn't apply cleanly due to recent new
-sunxi changes.
-
-Kind regards
-Uffe
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
 > ---
-> This patch was initially sent in a patch series about the MMC new mode,
-> but it may be applied independently.
-> ---
->  drivers/mmc/host/sunxi-mmc.c | 12 +++++++++---
->  1 file changed, 9 insertions(+), 3 deletions(-)
+>  arch/arm64/Kconfig  | 15 +++++----------
+>  arch/arm64/Makefile |  9 +++++++++
+>  2 files changed, 14 insertions(+), 10 deletions(-)
 >
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index 2ee4c21..ba647b7 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -656,7 +656,8 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
->  static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->                                   struct mmc_ios *ios)
->  {
-> -       u32 rate, oclk_dly, rval, sclk_dly;
-> +       long rate;
-> +       u32 oclk_dly, rval, sclk_dly;
->         u32 clock = ios->clock;
->         int ret;
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index bc3f00f586f1..e4b7d10e8e1c 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -415,18 +415,13 @@ config ARM64_ERRATUM_845719
 >
-> @@ -666,13 +667,18 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->                 clock <<= 1;
+>  config ARM64_ERRATUM_843419
+>         bool "Cortex-A53: 843419: A load or store might access an incorrect address"
+> -       depends on MODULES
+>         default y
+> -       select ARM64_MODULE_CMODEL_LARGE
+> +       select ARM64_MODULE_CMODEL_LARGE if MODULES
+>         help
+> -         This option builds kernel modules using the large memory model in
+> -         order to avoid the use of the ADRP instruction, which can cause
+> -         a subsequent memory access to use an incorrect address on Cortex-A53
+> -         parts up to r0p4.
+> -
+> -         Note that the kernel itself must be linked with a version of ld
+> -         which fixes potentially affected ADRP instructions through the
+> -         use of veneers.
+> +         This option links the kernel with '--fix-cortex-a53-843419' and
+> +         builds modules using the large memory model in order to avoid the use
+> +         of the ADRP instruction, which can cause a subsequent memory access
+> +         to use an incorrect address on Cortex-A53 parts up to r0p4.
 >
->         rate = clk_round_rate(host->clk_mmc, clock);
-> -       dev_dbg(mmc_dev(host->mmc), "setting clk to %d, rounded %d\n",
-> +       if (rate < 0) {
-> +               dev_err(mmc_dev(host->mmc), "error rounding clk to %d: %ld\n",
-> +                       clock, rate);
-> +               return rate;
-> +       }
-> +       dev_dbg(mmc_dev(host->mmc), "setting clk to %d, rounded %ld\n",
->                 clock, rate);
+>           If unsure, say Y.
 >
->         /* setting clock rate */
->         ret = clk_set_rate(host->clk_mmc, rate);
->         if (ret) {
-> -               dev_err(mmc_dev(host->mmc), "error setting clk to %d: %d\n",
-> +               dev_err(mmc_dev(host->mmc), "error setting clk to %ld: %d\n",
->                         rate, ret);
->                 return ret;
->         }
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index 5b54f8c021d8..c5ad4957e7ee 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -18,6 +18,15 @@ ifneq ($(CONFIG_RELOCATABLE),)
+>  LDFLAGS_vmlinux                += -pie -Bsymbolic
+>  endif
+>
+> +ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
+> +ld-843419-workaround := $(call ld-option, --fix-cortex-a53-843419)
+> +  ifeq ($(ld-843419-workaround),)
+> +$(warning ld does not support --fix-cortex-a53-843419; kernel may be susceptible to erratum)
+> +  else
+> +LDFLAGS_vmlinux        += --fix-cortex-a53-843419
+> +  endif
+> +endif
+> +
+>  KBUILD_DEFCONFIG := defconfig
+>
+>  # Check for binutils support for specific extensions
 > --
-> 2.9.2
+> 2.1.4
 >
