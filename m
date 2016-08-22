@@ -1,61 +1,124 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 22 Aug 2016 18:48:38 +0900
-Subject: [PATCH 4/5] clk: samsung: exynos5420: Fix the checkpatch warnings
+Date: Mon, 22 Aug 2016 18:48:39 +0900
+Subject: [PATCH 5/5] clk: samsung: exynos4: Fix the checkpatch warnings
 In-Reply-To: <1471859319-30681-1-git-send-email-cw00.choi@samsung.com>
 References: <1471859319-30681-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1471859319-30681-5-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1471859319-30681-6-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch fixes the following warnings by using checkpatch.pl script.
-- WARNING: void function return statements are not generally useful
-- ERROR: space prohibited before that ','
-- ERROR: Use of __initconst requires a separate use of const
+- Remove the space prohibited after that open parenthesis '('
+- Remove the unneeded blank line
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- drivers/clk/samsung/clk-exynos5420.c | 11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
+ drivers/clk/samsung/clk-exynos4.c | 51 +++++++++++++++++++--------------------
+ 1 file changed, 25 insertions(+), 26 deletions(-)
 
-diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index c99d05cd37b7..16b7d160fbdf 100644
---- a/drivers/clk/samsung/clk-exynos5420.c
-+++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -336,7 +336,6 @@ err_soc:
- 	kfree(exynos5x_save);
- 	pr_warn("%s: failed to allocate sleep save data, no sleep support!\n",
- 		__func__);
--	return;
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index faab9b31baf5..9809e6d8dadd 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -1267,13 +1267,13 @@ static const struct of_device_id ext_clk_match[] __initconst = {
+ static const struct samsung_pll_rate_table exynos4210_apll_rates[] __initconst = {
+ 	PLL_45XX_RATE(1200000000, 150,  3, 1, 28),
+ 	PLL_45XX_RATE(1000000000, 250,  6, 1, 28),
+-	PLL_45XX_RATE( 800000000, 200,  6, 1, 28),
+-	PLL_45XX_RATE( 666857142, 389, 14, 1, 13),
+-	PLL_45XX_RATE( 600000000, 100,  4, 1, 13),
+-	PLL_45XX_RATE( 533000000, 533, 24, 1,  5),
+-	PLL_45XX_RATE( 500000000, 250,  6, 2, 28),
+-	PLL_45XX_RATE( 400000000, 200,  6, 2, 28),
+-	PLL_45XX_RATE( 200000000, 200,  6, 3, 28),
++	PLL_45XX_RATE(800000000,  200,  6, 1, 28),
++	PLL_45XX_RATE(666857142,  389, 14, 1, 13),
++	PLL_45XX_RATE(600000000,  100,  4, 1, 13),
++	PLL_45XX_RATE(533000000,  533, 24, 1,  5),
++	PLL_45XX_RATE(500000000,  250,  6, 2, 28),
++	PLL_45XX_RATE(400000000,  200,  6, 2, 28),
++	PLL_45XX_RATE(200000000,  200,  6, 3, 28),
+ 	{ /* sentinel */ }
+ };
+ 
+@@ -1281,10 +1281,10 @@ static const struct samsung_pll_rate_table exynos4210_epll_rates[] __initconst =
+ 	PLL_4600_RATE(192000000, 48, 3, 1,     0, 0),
+ 	PLL_4600_RATE(180633605, 45, 3, 1, 10381, 0),
+ 	PLL_4600_RATE(180000000, 45, 3, 1,     0, 0),
+-	PLL_4600_RATE( 73727996, 73, 3, 3, 47710, 1),
+-	PLL_4600_RATE( 67737602, 90, 4, 3, 20762, 1),
+-	PLL_4600_RATE( 49151992, 49, 3, 3,  9961, 0),
+-	PLL_4600_RATE( 45158401, 45, 3, 3, 10381, 0),
++	PLL_4600_RATE(73727996,  73, 3, 3, 47710, 1),
++	PLL_4600_RATE(67737602,  90, 4, 3, 20762, 1),
++	PLL_4600_RATE(49151992,  49, 3, 3,  9961, 0),
++	PLL_4600_RATE(45158401,  45, 3, 3, 10381, 0),
+ 	{ /* sentinel */ }
+ };
+ 
+@@ -1293,7 +1293,7 @@ static const struct samsung_pll_rate_table exynos4210_vpll_rates[] __initconst =
+ 	PLL_4650_RATE(324000000, 53, 2, 1, 1024, 1,  1, 1),
+ 	PLL_4650_RATE(259617187, 63, 3, 1, 1950, 0, 20, 1),
+ 	PLL_4650_RATE(110000000, 53, 3, 2, 2048, 0, 17, 0),
+-	PLL_4650_RATE( 55360351, 53, 3, 3, 2417, 0, 17, 0),
++	PLL_4650_RATE(55360351,  53, 3, 3, 2417, 0, 17, 0),
+ 	{ /* sentinel */ }
+ };
+ 
+@@ -1304,14 +1304,14 @@ static const struct samsung_pll_rate_table exynos4x12_apll_rates[] __initconst =
+ 	PLL_35XX_RATE(1200000000, 200, 4, 0),
+ 	PLL_35XX_RATE(1100000000, 275, 6, 0),
+ 	PLL_35XX_RATE(1000000000, 125, 3, 0),
+-	PLL_35XX_RATE( 900000000, 150, 4, 0),
+-	PLL_35XX_RATE( 800000000, 100, 3, 0),
+-	PLL_35XX_RATE( 700000000, 175, 3, 1),
+-	PLL_35XX_RATE( 600000000, 200, 4, 1),
+-	PLL_35XX_RATE( 500000000, 125, 3, 1),
+-	PLL_35XX_RATE( 400000000, 100, 3, 1),
+-	PLL_35XX_RATE( 300000000, 200, 4, 2),
+-	PLL_35XX_RATE( 200000000, 100, 3, 2),
++	PLL_35XX_RATE(900000000,  150, 4, 0),
++	PLL_35XX_RATE(800000000,  100, 3, 0),
++	PLL_35XX_RATE(700000000,  175, 3, 1),
++	PLL_35XX_RATE(600000000,  200, 4, 1),
++	PLL_35XX_RATE(500000000,  125, 3, 1),
++	PLL_35XX_RATE(400000000,  100, 3, 1),
++	PLL_35XX_RATE(300000000,  200, 4, 2),
++	PLL_35XX_RATE(200000000,  100, 3, 2),
+ 	{ /* sentinel */ }
+ };
+ 
+@@ -1319,10 +1319,10 @@ static const struct samsung_pll_rate_table exynos4x12_epll_rates[] __initconst =
+ 	PLL_36XX_RATE(192000000, 48, 3, 1,     0),
+ 	PLL_36XX_RATE(180633605, 45, 3, 1, 10381),
+ 	PLL_36XX_RATE(180000000, 45, 3, 1,     0),
+-	PLL_36XX_RATE( 73727996, 73, 3, 3, 47710),
+-	PLL_36XX_RATE( 67737602, 90, 4, 3, 20762),
+-	PLL_36XX_RATE( 49151992, 49, 3, 3,  9961),
+-	PLL_36XX_RATE( 45158401, 45, 3, 3, 10381),
++	PLL_36XX_RATE(73727996,  73, 3, 3, 47710),
++	PLL_36XX_RATE(67737602,  90, 4, 3, 20762),
++	PLL_36XX_RATE(49151992,  49, 3, 3,  9961),
++	PLL_36XX_RATE(45158401,  45, 3, 3, 10381),
+ 	{ /* sentinel */ }
+ };
+ 
+@@ -1333,7 +1333,7 @@ static const struct samsung_pll_rate_table exynos4x12_vpll_rates[] __initconst =
+ 	PLL_36XX_RATE(266000000, 133, 3, 2,     0),
+ 	PLL_36XX_RATE(160000000, 160, 3, 3,     0),
+ 	PLL_36XX_RATE(106031250,  53, 3, 2,  1024),
+-	PLL_36XX_RATE( 53015625,  53, 3, 3,  1024),
++	PLL_36XX_RATE(53015625,   53, 3, 3,  1024),
+ 	{ /* sentinel */ }
+ };
+ 
+@@ -1559,7 +1559,6 @@ static void __init exynos4_clk_init(struct device_node *np,
+ 		_get_rate("div_core2"));
  }
- #else
- static void __init exynos5420_clk_sleep_init(void) {}
-@@ -345,8 +344,8 @@ static void __init exynos5420_clk_sleep_init(void) {}
- /* list of all parent clocks */
- PNAME(mout_mspll_cpu_p) = {"mout_sclk_cpll", "mout_sclk_dpll",
- 				"mout_sclk_mpll", "mout_sclk_spll"};
--PNAME(mout_cpu_p) = {"mout_apll" , "mout_mspll_cpu"};
--PNAME(mout_kfc_p) = {"mout_kpll" , "mout_mspll_kfc"};
-+PNAME(mout_cpu_p) = {"mout_apll", "mout_mspll_cpu"};
-+PNAME(mout_kfc_p) = {"mout_kpll", "mout_mspll_kfc"};
- PNAME(mout_apll_p) = {"fin_pll", "fout_apll"};
- PNAME(mout_bpll_p) = {"fin_pll", "fout_bpll"};
- PNAME(mout_cpll_p) = {"fin_pll", "fout_cpll"};
-@@ -503,14 +502,12 @@ static const struct samsung_fixed_rate_clock exynos5x_fixed_rate_clks[] __initco
- 	FRATE(0, "sclk_usbh20_scan_clk", NULL, 0, 480000000),
- };
  
--static const struct samsung_fixed_factor_clock
--		exynos5x_fixed_factor_clks[] __initconst = {
-+static const struct samsung_fixed_factor_clock exynos5x_fixed_factor_clks[] __initconst = {
- 	FFACTOR(0, "ff_hsic_12m", "fin_pll", 1, 2, 0),
- 	FFACTOR(0, "ff_sw_aclk66", "mout_sw_aclk66", 1, 2, 0),
- };
- 
--static const struct samsung_fixed_factor_clock
--		exynos5800_fixed_factor_clks[] __initconst = {
-+static const struct samsung_fixed_factor_clock exynos5800_fixed_factor_clks[] __initconst = {
- 	FFACTOR(0, "ff_dout_epll2", "mout_sclk_epll", 1, 2, 0),
- 	FFACTOR(0, "ff_dout_spll2", "mout_sclk_spll", 1, 2, 0),
- };
+-
+ static void __init exynos4210_clk_init(struct device_node *np)
+ {
+ 	exynos4_clk_init(np, EXYNOS4210);
 -- 
 1.9.1
