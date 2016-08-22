@@ -1,64 +1,67 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Aug 2016 07:54:50 +0200
-Subject: [PATCH -next] ASoC: sun4i-codec: Fix error return code in
- sun4i_codec_probe()
-In-Reply-To: <d48eceb4-c26d-3b3c-8577-1ba19a04b040@gmail.com>
-References: <1470836554-11569-1-git-send-email-weiyj.lk@gmail.com>
- <CAGb2v67cVXWtM=AzeFcftnajSs=+C6F12P_EvnXHB=oKsAm5Cw@mail.gmail.com>
- <d48eceb4-c26d-3b3c-8577-1ba19a04b040@gmail.com>
-Message-ID: <20160822055450.GA21741@lukather>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 22 Aug 2016 14:39:21 +0800
+Subject: [PATCH] usb: chipidea: support generic phy in PM code path
+In-Reply-To: <20160822053308.GA4362@shlinux2>
+References: <20160819121013.760-1-jszhang@marvell.com>
+ <20160822053308.GA4362@shlinux2>
+Message-ID: <20160822143921.36b6f95a@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Peter,
 
-On Thu, Aug 11, 2016 at 10:15:27PM +0800, Wei Yongjun wrote:
-> Hi
+On Mon, 22 Aug 2016 13:33:08 +0800 Peter Chen wrote:
+
+> On Fri, Aug 19, 2016 at 08:10:13PM +0800, Jisheng Zhang wrote:
+> > Support generic phy in PM code path: call phy_power_off/phy_power_on
+> > in ci_controller_suspend/ci_controller_resume.
+> > 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >  drivers/usb/chipidea/core.c | 4 +++-
+> >  1 file changed, 3 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> > index ae12595..ef9fb0b 100644
+> > --- a/drivers/usb/chipidea/core.c
+> > +++ b/drivers/usb/chipidea/core.c
+> > @@ -1116,6 +1116,7 @@ static void ci_controller_suspend(struct ci_hdrc *ci)
+> >  		usleep_range(ci->platdata->phy_clkgate_delay_us,
+> >  			     ci->platdata->phy_clkgate_delay_us + 50);
+> >  	usb_phy_set_suspend(ci->usb_phy, 1);
+> > +	phy_power_off(ci->phy);  
 > 
-> On 08/10/2016 10:04 PM, Chen-Yu Tsai wrote:
-> > On Wed, Aug 10, 2016 at 9:42 PM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
-> >> Fix to return error code -ENOMEM instead of 0 when create card
-> >> failed, as done elsewhere in this function.
-> >>
-> >> Fixes: 45fb6b6f2aa3 ("ASoC: sunxi: add support for the on-chip
-> >> codec on early Allwinner SoCs")
-> >> Signed-off-by: Wei Yongjun <weiyj.lk@gmail.com>
-> >> ---
-> >>  sound/soc/sunxi/sun4i-codec.c | 1 +
-> >>  1 file changed, 1 insertion(+)
-> >>
-> >> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-> >> index 0e19c50..e741659 100644
-> >> --- a/sound/soc/sunxi/sun4i-codec.c
-> >> +++ b/sound/soc/sunxi/sun4i-codec.c
-> >> @@ -846,6 +846,7 @@ static int sun4i_codec_probe(struct platform_device *pdev)
-> >>         card = sun4i_codec_create_card(&pdev->dev);
-> >>         if (!card) {
-> >>                 dev_err(&pdev->dev, "Failed to create our card\n");
-> >> +               ret = -ENOMEM;
-> >>                 goto err_unregister_codec;
-> >>         }
-> >>
-> > This works, though it might be better to fix the create_card function and
-> > any custom functions called in there to pass back a proper error value.
-> >
-> Since sun4i_codec_create_card() can only failed when kmalloc() return NULL, so
-> still need to change sun4i_codec_create_card()?
+> How could you support USB wakeup after PHY is powered off?
 
-Yes, please do. It's better to return whatever the function was
-returning. That was, if we add a new error code, we don't have to
-rework the code over and over again.
+Per my understanding, the PHY's power off just power off data communication part
+but leaves the circuits involved in wakeup detection active.
 
-Maxime
+Thanks,
+Jisheng
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160822/10d1397b/attachment.sig>
+> 
+> Peter
+> 
+> >  	ci->in_lpm = true;
+> >  	enable_irq(ci->irq);
+> >  }
+> > @@ -1132,9 +1133,10 @@ static int ci_controller_resume(struct device *dev)
+> >  	}
+> >  
+> >  	ci_hdrc_enter_lpm(ci, false);
+> > -	if (ci->usb_phy) {
+> > +	if (ci->usb_phy || ci->phy) {
+> >  		usb_phy_set_suspend(ci->usb_phy, 0);
+> >  		usb_phy_set_wakeup(ci->usb_phy, false);
+> > +		phy_power_on(ci->phy);
+> >  		hw_wait_phy_stable();
+> >  	}
+> >  
+> > -- 
+> > 2.9.3
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html  
+> 
