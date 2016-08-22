@@ -1,592 +1,718 @@
-From: hl@rock-chips.com (Lin Huang)
-Date: Mon, 22 Aug 2016 11:36:23 +0800
-Subject: [PATCH v7 7/8] PM / devfreq: rockchip: add devfreq driver for rk3399
- dmc
-In-Reply-To: <1471836984-6316-1-git-send-email-hl@rock-chips.com>
-References: <1471836984-6316-1-git-send-email-hl@rock-chips.com>
-Message-ID: <1471836984-6316-8-git-send-email-hl@rock-chips.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Mon, 22 Aug 2016 09:26:49 +0530
+Subject: [PATCH 3/5] firmware: ti_sci: Add support for Device control
+In-Reply-To: <20160819225159.10758-4-nm@ti.com>
+References: <20160819225159.10758-1-nm@ti.com>
+ <20160819225159.10758-4-nm@ti.com>
+Message-ID: <9a6a8663-a3f7-7875-253f-98232d56b860@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-base on dfi result, we do ddr frequency scaling, register
-dmc driver to devfreq framework, and use simple-ondemand
-policy.
 
-Signed-off-by: Lin Huang <hl@rock-chips.com>
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
----
-Changes in v7:
-- remove a blank line
 
-Changes in v6:
-- fix some nit suggest by Chanwoo Choi
+On Saturday 20 August 2016 04:21 AM, Nishanth Menon wrote:
+> Texas Instrument's System Control Interface (TI-SCI) Message Protocol
+> is used in Texas Instrument's System on Chip (SoC) such as those
+> in keystone family K2G SoC to communicate between various compute
+> processors with a central system controller entity.
+> 
+> TI-SCI message protocol provides support for management of various
+> hardware entitites within the SoC. Add support driver to allow
+> communication with system controller entity within the SoC using the
+> mailbox client.
+> 
+> We introduce the fundamental device management capability support to
+> the driver protocol as part of this change.
+> 
+> [d-gerlach at ti.com: Contributed device reset handling]
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+>  drivers/firmware/ti_sci.c              | 433 +++++++++++++++++++++++++++++++++
+>  drivers/firmware/ti_sci.h              |  98 ++++++++
+>  include/linux/soc/ti/ti_sci_protocol.h |  91 +++++++
+>  3 files changed, 622 insertions(+)
+> 
+> diff --git a/drivers/firmware/ti_sci.c b/drivers/firmware/ti_sci.c
+> index 4580c29dcb52..e0e286e76095 100644
+> --- a/drivers/firmware/ti_sci.c
+> +++ b/drivers/firmware/ti_sci.c
+> @@ -496,6 +496,437 @@ fail:
+>  }
+>  
+>  /**
+> + * tis_sci_is_response_ack() - Generic ACK/NACK message checkup
+> + * @r:	pointer to response buffer
+> + *
+> + * Return: true if the response was an ACK, else returns false.
+> + */
+> +static inline bool tis_sci_is_response_ack(void *r)
 
-Changes in v5:
-- improve dmc driver suggest by Chanwoo Choi
+May be just ti_sci_is_response_ack() to be consistent? or you wanted to
+keep it tis_sci* ?
 
-Changes in v4:
-- use arm_smccc_smc() function talk to bl31
-- delete rockchip_dmc.c file and config
-- delete dmc_notify
-- adjust probe order
+> +{
+> +	struct ti_sci_msg_hdr *hdr = r;
+> +
+> +	return hdr->flags & TI_SCI_FLAG_RESP_GENERIC_ACK ? true : false;
+> +}
+> +
+> +/**
+> + * ti_sci_set_device_state() - Set device state helper
+> + * @handle:	pointer to TI SCI handle
+> + * @id:		Device identifier
+> + * @flags:	flags to setup for the device
+> + * @state:	State to move the device to
+> + *
+> + * Return: 0 if all went well, else returns appropriate error value.
+> + */
+> +static int ti_sci_set_device_state(const struct ti_sci_handle *handle,
+> +				   u32 id, u32 flags, u8 state)
+> +{
+> +	struct ti_sci_info *info;
+> +	struct ti_sci_msg_req_set_device_state *req;
+> +	struct ti_sci_msg_hdr *resp;
+> +	struct ti_sci_xfer *xfer;
+> +	struct device *dev;
+> +	int ret = 0;
+> +
+> +	if (IS_ERR(handle))
+> +		return PTR_ERR(handle);
+> +	if (!handle)
+> +		return -EINVAL;
+> +
+> +	info = handle_to_ti_sci_info(handle);
+> +	dev = info->dev;
+> +
+> +	xfer = ti_sci_get_one_xfer(info, TI_SCI_MSG_SET_DEVICE_STATE,
+> +				   flags | TI_SCI_FLAG_REQ_ACK_ON_PROCESSED,
+> +				   sizeof(*req), sizeof(*resp));
+> +	if (IS_ERR(xfer)) {
+> +		ret = PTR_ERR(xfer);
+> +		dev_err(dev, "Message alloc failed(%d)\n", ret);
+> +		return ret;
+> +	}
+> +	req = (struct ti_sci_msg_req_set_device_state *)xfer->xfer_buf;
+> +	req->id = id;
+> +	req->state = state;
+> +
+> +	ret = ti_sci_do_xfer(info, xfer);
+> +	if (ret) {
+> +		dev_err(dev, "Mbox send fail %d\n", ret);
+> +		goto fail;
+> +	}
+> +
+> +	resp = (struct ti_sci_msg_hdr *)xfer->xfer_buf;
+> +
+> +	ret = tis_sci_is_response_ack(resp) ? 0 : -ENODEV;
+> +
+> +fail:
+> +	ti_sci_put_one_xfer(&info->minfo, xfer);
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+> + * ti_sci_get_device_state() - Get device state helper
+> + * @handle:	Handle to the device
+> + * @id:		Device Identifier
+> + * @clcnt:	Pointer to Context Loss Count
+> + * @resets:	pointer to resets
+> + * @p_state:	pointer to p_state
+> + * @c_state:	pointer to c_state
+> + *
+> + * Return: 0 if all went fine, else return appropriate error.
+> + */
+> +static int ti_sci_get_device_state(const struct ti_sci_handle *handle,
+> +				   u32 id,  u32 *clcnt,  u32 *resets,
+> +				    u8 *p_state,  u8 *c_state)
+> +{
+> +	struct ti_sci_info *info;
+> +	struct ti_sci_msg_req_get_device_state *req;
+> +	struct ti_sci_msg_resp_get_device_state *resp;
+> +	struct ti_sci_xfer *xfer;
+> +	struct device *dev;
+> +	int ret = 0;
+> +
+> +	if (IS_ERR(handle))
+> +		return PTR_ERR(handle);
+> +	if (!handle)
+> +		return -EINVAL;
+> +
+> +	if (!clcnt && !resets && !p_state && !c_state)
+> +		return -EINVAL;
+> +
+> +	info = handle_to_ti_sci_info(handle);
+> +	dev = info->dev;
+> +
+> +	/* Response is expected, so need of any flags */
+							^^ no*
 
-Changes in v3:
-- operate dram setting through sip call
-- imporve set rate flow
+Thanks and regards,
+Lokesh
 
-Changes in v2:
-- None
-
-Changes in v1:
-- move dfi controller to event
-- fix set voltage sequence when set rate fail
-- change Kconfig type from tristate to bool
-- move unuse EXPORT_SYMBOL_GPL()
-
- drivers/devfreq/Kconfig      |  11 +
- drivers/devfreq/Makefile     |   1 +
- drivers/devfreq/rk3399_dmc.c | 499 +++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 511 insertions(+)
- create mode 100644 drivers/devfreq/rk3399_dmc.c
-
-diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
-index a5be56e..e848121 100644
---- a/drivers/devfreq/Kconfig
-+++ b/drivers/devfreq/Kconfig
-@@ -100,6 +100,17 @@ config ARM_TEGRA_DEVFREQ
-          It reads ACTMON counters of memory controllers and adjusts the
-          operating frequencies and voltages with OPP support.
- 
-+config ARM_RK3399_DMC_DEVFREQ
-+	tristate "ARM RK3399 DMC DEVFREQ Driver"
-+	depends on ARCH_ROCKCHIP
-+	select DEVFREQ_EVENT_ROCKCHIP_DFI
-+	select DEVFREQ_GOV_SIMPLE_ONDEMAND
-+	select PM_OPP
-+	help
-+          This adds the DEVFREQ driver for the RK3399 DMC(Dynamic Memory Controller).
-+          It sets the frequency for the memory controller and reads the usage counts
-+          from hardware.
-+
- source "drivers/devfreq/event/Kconfig"
- 
- endif # PM_DEVFREQ
-diff --git a/drivers/devfreq/Makefile b/drivers/devfreq/Makefile
-index 09f11d9..fbff40a 100644
---- a/drivers/devfreq/Makefile
-+++ b/drivers/devfreq/Makefile
-@@ -8,6 +8,7 @@ obj-$(CONFIG_DEVFREQ_GOV_PASSIVE)	+= governor_passive.o
- 
- # DEVFREQ Drivers
- obj-$(CONFIG_ARM_EXYNOS_BUS_DEVFREQ)	+= exynos-bus.o
-+obj-$(CONFIG_ARM_RK3399_DMC_DEVFREQ)	+= rk3399_dmc.o
- obj-$(CONFIG_ARM_TEGRA_DEVFREQ)		+= tegra-devfreq.o
- 
- # DEVFREQ Event Drivers
-diff --git a/drivers/devfreq/rk3399_dmc.c b/drivers/devfreq/rk3399_dmc.c
-new file mode 100644
-index 0000000..b73a73c
---- /dev/null
-+++ b/drivers/devfreq/rk3399_dmc.c
-@@ -0,0 +1,499 @@
-+/*
-+ * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd.
-+ * Author: Lin Huang <hl@rock-chips.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ */
-+
-+#include <linux/arm-smccc.h>
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/devfreq.h>
-+#include <linux/devfreq-event.h>
-+#include <linux/interrupt.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_opp.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/rwsem.h>
-+#include <linux/suspend.h>
-+
-+#include <soc/rockchip/rockchip_sip.h>
-+
-+struct dram_timing {
-+	unsigned int ddr3_speed_bin;
-+	unsigned int pd_idle;
-+	unsigned int sr_idle;
-+	unsigned int sr_mc_gate_idle;
-+	unsigned int srpd_lite_idle;
-+	unsigned int standby_idle;
-+	unsigned int dram_dll_dis_freq;
-+	unsigned int phy_dll_dis_freq;
-+	unsigned int ddr3_odt_dis_freq;
-+	unsigned int ddr3_drv;
-+	unsigned int ddr3_odt;
-+	unsigned int phy_ddr3_ca_drv;
-+	unsigned int phy_ddr3_dq_drv;
-+	unsigned int phy_ddr3_odt;
-+	unsigned int lpddr3_odt_dis_freq;
-+	unsigned int lpddr3_drv;
-+	unsigned int lpddr3_odt;
-+	unsigned int phy_lpddr3_ca_drv;
-+	unsigned int phy_lpddr3_dq_drv;
-+	unsigned int phy_lpddr3_odt;
-+	unsigned int lpddr4_odt_dis_freq;
-+	unsigned int lpddr4_drv;
-+	unsigned int lpddr4_dq_odt;
-+	unsigned int lpddr4_ca_odt;
-+	unsigned int phy_lpddr4_ca_drv;
-+	unsigned int phy_lpddr4_ck_cs_drv;
-+	unsigned int phy_lpddr4_dq_drv;
-+	unsigned int phy_lpddr4_odt;
-+};
-+
-+struct rk3399_dmcfreq {
-+	struct device *dev;
-+	struct devfreq *devfreq;
-+	struct devfreq_simple_ondemand_data ondemand_data;
-+	struct clk *dmc_clk;
-+	struct devfreq_event_dev *edev;
-+	struct mutex lock;
-+	struct dram_timing *timing;
-+
-+	/*
-+	 * DDR Converser of Frequency (DCF) is used to implement DDR frequency
-+	 * conversion without the participation of CPU, we will implement and
-+	 * control it in arm trust firmware.
-+	 */
-+	wait_queue_head_t	wait_dcf_queue;
-+	int irq;
-+	int wait_dcf_flag;
-+	struct regulator *vdd_center;
-+	unsigned long rate, target_rate;
-+	unsigned long volt, target_volt;
-+	struct dev_pm_opp *curr_opp;
-+};
-+
-+static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
-+				 u32 flags)
-+{
-+	struct rk3399_dmcfreq *dmcfreq = dev_get_drvdata(dev);
-+	struct dev_pm_opp *opp;
-+	unsigned long old_clk_rate = dmcfreq->rate;
-+	unsigned long target_volt, target_rate;
-+	int err;
-+
-+	rcu_read_lock();
-+	opp = devfreq_recommended_opp(dev, freq, flags);
-+	if (IS_ERR(opp)) {
-+		rcu_read_unlock();
-+		return PTR_ERR(opp);
-+	}
-+
-+	target_rate = dev_pm_opp_get_freq(opp);
-+	target_volt = dev_pm_opp_get_voltage(opp);
-+
-+	dmcfreq->rate = dev_pm_opp_get_freq(dmcfreq->curr_opp);
-+	dmcfreq->volt = dev_pm_opp_get_voltage(dmcfreq->curr_opp);
-+
-+	rcu_read_unlock();
-+
-+	if (dmcfreq->rate == target_rate)
-+		return 0;
-+
-+	mutex_lock(&dmcfreq->lock);
-+
-+	/*
-+	 * If frequency scaling from low to high, adjust voltage first.
-+	 * If frequency scaling from high to low, adjust frequency first.
-+	 */
-+	if (old_clk_rate < target_rate) {
-+		err = regulator_set_voltage(dmcfreq->vdd_center, target_volt,
-+					    target_volt);
-+		if (err) {
-+			dev_err(dev, "Cannot to set voltage %lu uV\n",
-+				target_volt);
-+			goto out;
-+		}
-+	}
-+	dmcfreq->wait_dcf_flag = 1;
-+
-+	err = clk_set_rate(dmcfreq->dmc_clk, target_rate);
-+	if (err) {
-+		dev_err(dev, "Cannot to set frequency %lu (%d)\n",
-+			target_rate, err);
-+		regulator_set_voltage(dmcfreq->vdd_center, dmcfreq->volt,
-+				      dmcfreq->volt);
-+		goto out;
-+	}
-+
-+	/*
-+	 * Wait until bcf irq happen, it means freq scaling finish in
-+	 * arm trust firmware, use 100ms as timeout time.
-+	 */
-+	if (!wait_event_timeout(dmcfreq->wait_dcf_queue,
-+				!dmcfreq->wait_dcf_flag, HZ / 10))
-+		dev_warn(dev, "Timeout waiting for dcf interrupt\n");
-+
-+	/*
-+	 * Check the dpll rate,
-+	 * There only two result we will get,
-+	 * 1. Ddr frequency scaling fail, we still get the old rate.
-+	 * 2. Ddr frequency scaling sucessful, we get the rate we set.
-+	 */
-+	dmcfreq->rate = clk_get_rate(dmcfreq->dmc_clk);
-+
-+	/* If get the incorrect rate, set voltage to old value. */
-+	if (dmcfreq->rate != target_rate) {
-+		dev_err(dev, "Get wrong ddr frequency, Request frequency %lu,\
-+			Current frequency %lu\n", target_rate, dmcfreq->rate);
-+		regulator_set_voltage(dmcfreq->vdd_center, dmcfreq->volt,
-+				      dmcfreq->volt);
-+		goto out;
-+	} else if (old_clk_rate > target_rate)
-+		err = regulator_set_voltage(dmcfreq->vdd_center, target_volt,
-+					    target_volt);
-+	if (err)
-+		dev_err(dev, "Cannot to set vol %lu uV\n", target_volt);
-+
-+	dmcfreq->curr_opp = opp;
-+out:
-+	mutex_unlock(&dmcfreq->lock);
-+	return err;
-+}
-+
-+static int rk3399_dmcfreq_get_dev_status(struct device *dev,
-+					 struct devfreq_dev_status *stat)
-+{
-+	struct rk3399_dmcfreq *dmcfreq = dev_get_drvdata(dev);
-+	struct devfreq_event_data edata;
-+	int ret = 0;
-+
-+	ret = devfreq_event_get_event(dmcfreq->edev, &edata);
-+	if (ret < 0)
-+		return ret;
-+
-+	stat->current_frequency = dmcfreq->rate;
-+	stat->busy_time = edata.load_count;
-+	stat->total_time = edata.total_count;
-+
-+	return ret;
-+}
-+
-+static int rk3399_dmcfreq_get_cur_freq(struct device *dev, unsigned long *freq)
-+{
-+	struct rk3399_dmcfreq *dmcfreq = dev_get_drvdata(dev);
-+
-+	*freq = dmcfreq->rate;
-+
-+	return 0;
-+}
-+
-+static struct devfreq_dev_profile rk3399_devfreq_dmc_profile = {
-+	.polling_ms	= 200,
-+	.target		= rk3399_dmcfreq_target,
-+	.get_dev_status	= rk3399_dmcfreq_get_dev_status,
-+	.get_cur_freq	= rk3399_dmcfreq_get_cur_freq,
-+};
-+
-+static __maybe_unused int rk3399_dmcfreq_suspend(struct device *dev)
-+{
-+	struct rk3399_dmcfreq *dmcfreq = dev_get_drvdata(dev);
-+	int ret = 0;
-+
-+	ret = devfreq_event_disable_edev(dmcfreq->edev);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to disable the devfreq-event devices\n");
-+		return ret;
-+	}
-+
-+	ret = devfreq_suspend_device(dmcfreq->devfreq);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to suspend the devfreq devices\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static __maybe_unused int rk3399_dmcfreq_resume(struct device *dev)
-+{
-+	struct rk3399_dmcfreq *dmcfreq = dev_get_drvdata(dev);
-+	int ret = 0;
-+
-+	ret = devfreq_event_enable_edev(dmcfreq->edev);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to enable the devfreq-event devices\n");
-+		return ret;
-+	}
-+
-+	ret = devfreq_resume_device(dmcfreq->devfreq);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to resume the devfreq devices\n");
-+		return ret;
-+	}
-+	return ret;
-+}
-+
-+static SIMPLE_DEV_PM_OPS(rk3399_dmcfreq_pm, rk3399_dmcfreq_suspend,
-+			 rk3399_dmcfreq_resume);
-+
-+static irqreturn_t rk3399_dmc_irq(int irq, void *dev_id)
-+{
-+	struct rk3399_dmcfreq *dmcfreq = dev_id;
-+	struct arm_smccc_res res;
-+
-+	dmcfreq->wait_dcf_flag = 0;
-+	wake_up(&dmcfreq->wait_dcf_queue);
-+
-+	/* Clear the DCF interrupt */
-+	arm_smccc_smc(ROCKCHIP_SIP_DRAM_FREQ, 0, 0,
-+		      ROCKCHIP_SIP_CONFIG_DRAM_CLR_IRQ,
-+		      0, 0, 0, 0, &res);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct dram_timing *of_get_ddr_timings(struct device *dev,
-+					      struct device_node *np)
-+{
-+	struct dram_timing	*timing = NULL;
-+	struct device_node	*np_tim;
-+	int ret;
-+
-+	np_tim = of_parse_phandle(np, "ddr_timing", 0);
-+	if (np_tim) {
-+		timing = devm_kzalloc(dev, sizeof(*timing), GFP_KERNEL);
-+		if (!timing)
-+			goto err;
-+
-+		ret = of_property_read_u32(np_tim, "ddr3_speed_bin",
-+					   &timing->ddr3_speed_bin);
-+		ret |= of_property_read_u32(np_tim, "pd_idle",
-+					    &timing->pd_idle);
-+		ret |= of_property_read_u32(np_tim, "sr_idle",
-+					    &timing->sr_idle);
-+		ret |= of_property_read_u32(np_tim, "sr_mc_gate_idle",
-+					    &timing->sr_mc_gate_idle);
-+		ret |= of_property_read_u32(np_tim, "srpd_lite_idle",
-+					    &timing->srpd_lite_idle);
-+		ret |= of_property_read_u32(np_tim, "standby_idle",
-+					    &timing->standby_idle);
-+		ret |= of_property_read_u32(np_tim, "dram_dll_dis_freq",
-+					    &timing->dram_dll_dis_freq);
-+		ret |= of_property_read_u32(np_tim, "phy_dll_dis_freq",
-+					    &timing->phy_dll_dis_freq);
-+		ret |= of_property_read_u32(np_tim, "ddr3_odt_dis_freq",
-+					    &timing->ddr3_odt_dis_freq);
-+		ret |= of_property_read_u32(np_tim, "ddr3_drv",
-+					    &timing->ddr3_drv);
-+		ret |= of_property_read_u32(np_tim, "ddr3_odt",
-+					    &timing->ddr3_odt);
-+		ret |= of_property_read_u32(np_tim, "phy_ddr3_ca_drv",
-+					    &timing->phy_ddr3_ca_drv);
-+		ret |= of_property_read_u32(np_tim, "phy_ddr3_dq_drv",
-+					    &timing->phy_ddr3_dq_drv);
-+		ret |= of_property_read_u32(np_tim, "phy_ddr3_odt",
-+					    &timing->phy_ddr3_odt);
-+		ret |= of_property_read_u32(np_tim, "lpddr3_odt_dis_freq",
-+					    &timing->lpddr3_odt_dis_freq);
-+		ret |= of_property_read_u32(np_tim, "lpddr3_drv",
-+					    &timing->lpddr3_drv);
-+		ret |= of_property_read_u32(np_tim, "lpddr3_odt",
-+					    &timing->lpddr3_odt);
-+		ret |= of_property_read_u32(np_tim, "phy_lpddr3_ca_drv",
-+					    &timing->phy_lpddr3_ca_drv);
-+		ret |= of_property_read_u32(np_tim, "phy_lpddr3_dq_drv",
-+					    &timing->phy_lpddr3_dq_drv);
-+		ret |= of_property_read_u32(np_tim, "phy_lpddr3_odt",
-+					    &timing->phy_lpddr3_odt);
-+		ret |= of_property_read_u32(np_tim, "lpddr4_odt_dis_freq",
-+					    &timing->lpddr4_odt_dis_freq);
-+		ret |= of_property_read_u32(np_tim, "lpddr4_drv",
-+					    &timing->lpddr4_drv);
-+		ret |= of_property_read_u32(np_tim, "lpddr4_dq_odt",
-+					    &timing->lpddr4_dq_odt);
-+		ret |= of_property_read_u32(np_tim, "lpddr4_ca_odt",
-+					    &timing->lpddr4_ca_odt);
-+		ret |= of_property_read_u32(np_tim, "phy_lpddr4_ca_drv",
-+					    &timing->phy_lpddr4_ca_drv);
-+		ret |= of_property_read_u32(np_tim, "phy_lpddr4_ck_cs_drv",
-+					    &timing->phy_lpddr4_ck_cs_drv);
-+		ret |= of_property_read_u32(np_tim, "phy_lpddr4_dq_drv",
-+					    &timing->phy_lpddr4_dq_drv);
-+		ret |= of_property_read_u32(np_tim, "phy_lpddr4_odt",
-+					    &timing->phy_lpddr4_odt);
-+		if (ret) {
-+			devm_kfree(dev, timing);
-+			goto err;
-+		}
-+		of_node_put(np_tim);
-+		return timing;
-+	}
-+
-+err:
-+	if (timing) {
-+		devm_kfree(dev, timing);
-+		timing = NULL;
-+	}
-+	of_node_put(np_tim);
-+	return timing;
-+}
-+
-+static int rk3399_dmcfreq_probe(struct platform_device *pdev)
-+{
-+	struct arm_smccc_res res;
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = pdev->dev.of_node;
-+	struct rk3399_dmcfreq *data;
-+	int ret, irq, index, size;
-+	uint32_t *timing;
-+	struct dev_pm_opp *opp;
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
-+		dev_err(&pdev->dev, "Cannot get the dmc interrupt resource\n");
-+		return -EINVAL;
-+	}
-+	data = devm_kzalloc(dev, sizeof(struct rk3399_dmcfreq), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	mutex_init(&data->lock);
-+
-+	data->vdd_center = devm_regulator_get(dev, "center");
-+	if (IS_ERR(data->vdd_center)) {
-+		dev_err(dev, "Cannot get the regulator \"center\"\n");
-+		return PTR_ERR(data->vdd_center);
-+	}
-+
-+	data->dmc_clk = devm_clk_get(dev, "dmc_clk");
-+	if (IS_ERR(data->dmc_clk)) {
-+		dev_err(dev, "Cannot get the clk dmc_clk\n");
-+		return PTR_ERR(data->dmc_clk);
-+	};
-+
-+	data->irq = irq;
-+	ret = devm_request_irq(dev, irq, rk3399_dmc_irq, 0,
-+			       dev_name(dev), data);
-+	if (ret) {
-+		dev_err(dev, "Failed to request dmc irq: %d\n", ret);
-+		return ret;
-+	}
-+
-+	init_waitqueue_head(&data->wait_dcf_queue);
-+	data->wait_dcf_flag = 0;
-+
-+	data->edev = devfreq_event_get_edev_by_phandle(dev, 0);
-+	if (IS_ERR(data->edev))
-+		return -EPROBE_DEFER;
-+
-+	ret = devfreq_event_enable_edev(data->edev);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to enable devfreq-event devices\n");
-+		return ret;
-+	}
-+
-+	/*
-+	 * Get dram timing and pass it to arm trust firmware,
-+	 * the dram drvier in arm trust firmware will get these
-+	 * timing and to do dram initial.
-+	 */
-+	data->timing = of_get_ddr_timings(dev, np);
-+	if (data->timing) {
-+		timing = (uint32_t *)data->timing;
-+		size = sizeof(struct dram_timing) / 4;
-+		for (index = 0; index < size; index++) {
-+			arm_smccc_smc(ROCKCHIP_SIP_DRAM_FREQ, *timing++, index,
-+				      ROCKCHIP_SIP_CONFIG_DRAM_SET_PARAM,
-+				      0, 0, 0, 0, &res);
-+			if (res.a0) {
-+				dev_err(dev, "Failed to set dram param: %ld\n",
-+					res.a0);
-+				return -EINVAL;
-+			}
-+		}
-+	}
-+
-+	arm_smccc_smc(ROCKCHIP_SIP_DRAM_FREQ, 0, 0,
-+		      ROCKCHIP_SIP_CONFIG_DRAM_INIT,
-+		      0, 0, 0, 0, &res);
-+
-+	/*
-+	 * We add a devfreq driver to our parent since it has a device tree node
-+	 * with operating points.
-+	 */
-+	if (dev_pm_opp_of_add_table(dev)) {
-+		dev_err(dev, "Invalid operating-points in device tree.\n");
-+		rcu_read_unlock();
-+		return -EINVAL;
-+	}
-+
-+	of_property_read_u32(np, "upthreshold",
-+			     &data->ondemand_data.upthreshold);
-+	of_property_read_u32(np, "downdifferential",
-+			     &data->ondemand_data.downdifferential);
-+
-+	data->rate = clk_get_rate(data->dmc_clk);
-+
-+	rcu_read_lock();
-+	opp = devfreq_recommended_opp(dev, &data->rate, 0);
-+	if (IS_ERR(opp)) {
-+		rcu_read_unlock();
-+		return PTR_ERR(opp);
-+	}
-+	rcu_read_unlock();
-+	data->curr_opp = opp;
-+
-+	rk3399_devfreq_dmc_profile.initial_freq = data->rate;
-+
-+	data->devfreq = devfreq_add_device(dev,
-+					   &rk3399_devfreq_dmc_profile,
-+					   "simple_ondemand",
-+					   &data->ondemand_data);
-+	if (IS_ERR(data->devfreq))
-+		return PTR_ERR(data->devfreq);
-+	devm_devfreq_register_opp_notifier(dev, data->devfreq);
-+
-+	data->dev = dev;
-+	platform_set_drvdata(pdev, data);
-+
-+	return 0;
-+}
-+
-+static int rk3399_dmcfreq_remove(struct platform_device *pdev)
-+{
-+	struct rk3399_dmcfreq *dmcfreq = platform_get_drvdata(pdev);
-+
-+	regulator_put(dmcfreq->vdd_center);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id rk3399dmc_devfreq_of_match[] = {
-+	{ .compatible = "rockchip,rk3399-dmc" },
-+	{ },
-+};
-+
-+static struct platform_driver rk3399_dmcfreq_driver = {
-+	.probe	= rk3399_dmcfreq_probe,
-+	.remove	= rk3399_dmcfreq_remove,
-+	.driver = {
-+		.name	= "rk3399-dmc-freq",
-+		.pm	= &rk3399_dmcfreq_pm,
-+		.of_match_table = rk3399dmc_devfreq_of_match,
-+	},
-+};
-+module_platform_driver(rk3399_dmcfreq_driver);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Lin Huang <hl@rock-chips.com>");
-+MODULE_DESCRIPTION("RK3399 dmcfreq driver with devfreq framework");
--- 
-2.6.6
+> +	xfer = ti_sci_get_one_xfer(info, TI_SCI_MSG_GET_DEVICE_STATE,
+> +				   0, sizeof(*req), sizeof(*resp));
+> +	if (IS_ERR(xfer)) {
+> +		ret = PTR_ERR(xfer);
+> +		dev_err(dev, "Message alloc failed(%d)\n", ret);
+> +		return ret;
+> +	}
+> +	req = (struct ti_sci_msg_req_get_device_state *)xfer->xfer_buf;
+> +	req->id = id;
+> +
+> +	ret = ti_sci_do_xfer(info, xfer);
+> +	if (ret) {
+> +		dev_err(dev, "Mbox send fail %d\n", ret);
+> +		goto fail;
+> +	}
+> +
+> +	resp = (struct ti_sci_msg_resp_get_device_state *)xfer->xfer_buf;
+> +	if (!tis_sci_is_response_ack(resp)) {
+> +		ret = -ENODEV;
+> +		goto fail;
+> +	}
+> +
+> +	if (clcnt)
+> +		*clcnt = resp->context_loss_count;
+> +	if (resets)
+> +		*resets = resp->resets;
+> +	if (p_state)
+> +		*p_state = resp->programmed_state;
+> +	if (c_state)
+> +		*c_state = resp->current_state;
+> +fail:
+> +	ti_sci_put_one_xfer(&info->minfo, xfer);
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+> + * ti_sci_cmd_get_device() - command to request for device managed by TISCI
+> + * @handle:	Pointer to TISCI handle as retrieved by *ti_sci_get_handle
+> + * @id:		Device Identifier
+> + *
+> + * Request for the device - NOTE: the client MUST maintain integrity of
+> + * usage count by balancing get_device with put_device. No refcounting is
+> + * managed by driver for that purpose.
+> + *
+> + * NOTE: The request is for exclusive access for the processor.
+> + *
+> + * Return: 0 if all went fine, else return appropriate error.
+> + */
+> +static int ti_sci_cmd_get_device(const struct ti_sci_handle *handle, u32 id)
+> +{
+> +	return ti_sci_set_device_state(handle, id,
+> +				       MSG_FLAG_DEVICE_EXCLUSIVE,
+> +				       MSG_DEVICE_SW_STATE_ON);
+> +}
+> +
+> +/**
+> + * ti_sci_cmd_idle_device() - Command to idle a device managed by TISCI
+> + * @handle:	Pointer to TISCI handle as retrieved by *ti_sci_get_handle
+> + * @id:		Device Identifier
+> + *
+> + * Request for the device - NOTE: the client MUST maintain integrity of
+> + * usage count by balancing get_device with put_device. No refcounting is
+> + * managed by driver for that purpose.
+> + *
+> + * Return: 0 if all went fine, else return appropriate error.
+> + */
+> +static int ti_sci_cmd_idle_device(const struct ti_sci_handle *handle, u32 id)
+> +{
+> +	return ti_sci_set_device_state(handle, id,
+> +				       MSG_FLAG_DEVICE_EXCLUSIVE,
+> +				       MSG_DEVICE_SW_STATE_RETENTION);
+> +}
+> +
+> +/**
+> + * ti_sci_cmd_put_device() - command to release a device managed by TISCI
+> + * @handle:	Pointer to TISCI handle as retrieved by *ti_sci_get_handle
+> + * @id:		Device Identifier
+> + *
+> + * Request for the device - NOTE: the client MUST maintain integrity of
+> + * usage count by balancing get_device with put_device. No refcounting is
+> + * managed by driver for that purpose.
+> + *
+> + * Return: 0 if all went fine, else return appropriate error.
+> + */
+> +static int ti_sci_cmd_put_device(const struct ti_sci_handle *handle, u32 id)
+> +{
+> +	return ti_sci_set_device_state(handle, id,
+> +				       0, MSG_DEVICE_SW_STATE_AUTO_OFF);
+> +}
+> +
+> +/**
+> + * ti_sci_cmd_dev_is_valid() - Is the device valid
+> + * @handle:	Pointer to TISCI handle as retrieved by *ti_sci_get_handle
+> + * @id:		Device Identifier
+> + *
+> + * Return: 0 if all went fine and the device ID is valid, else return
+> + * appropriate error.
+> + */
+> +static int ti_sci_cmd_dev_is_valid(const struct ti_sci_handle *handle, u32 id)
+> +{
+> +	u8 unused;
+> +
+> +	/* check the device state which will also tell us if the ID is valid */
+> +	return ti_sci_get_device_state(handle, id, NULL, NULL, NULL, &unused);
+> +}
+> +
+> +/**
+> + * ti_sci_cmd_dev_get_clcnt() - Get context loss counter
+> + * @handle:	Pointer to TISCI handle
+> + * @id:		Device Identifier
+> + * @count:	Pointer to Context Loss counter to populate
+> + *
+> + * Return: 0 if all went fine, else return appropriate error.
+> + */
+> +static int ti_sci_cmd_dev_get_clcnt(const struct ti_sci_handle *handle, u32 id,
+> +				    u32 *count)
+> +{
+> +	return ti_sci_get_device_state(handle, id, count, NULL, NULL, NULL);
+> +}
+> +
+> +/**
+> + * ti_sci_cmd_dev_is_idle() - Check if the device is requested to be idle
+> + * @handle:	Pointer to TISCI handle
+> + * @id:		Device Identifier
+> + * @r_state:	true if requested to be idle
+> + *
+> + * Return: 0 if all went fine, else return appropriate error.
+> + */
+> +static int ti_sci_cmd_dev_is_idle(const struct ti_sci_handle *handle, u32 id,
+> +				  bool *r_state)
+> +{
+> +	int ret;
+> +	u8 state;
+> +
+> +	if (!r_state)
+> +		return -EINVAL;
+> +
+> +	ret = ti_sci_get_device_state(handle, id, NULL, NULL, &state, NULL);
+> +	if (ret)
+> +		return ret;
+> +
+> +	*r_state = (state == MSG_DEVICE_SW_STATE_RETENTION);
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+> + * ti_sci_cmd_dev_is_stop() - Check if the device is requested to be stopped
+> + * @handle:	Pointer to TISCI handle
+> + * @id:		Device Identifier
+> + * @r_state:	true if requested to be stopped
+> + * @curr_state:	true if currently stopped.
+> + *
+> + * Return: 0 if all went fine, else return appropriate error.
+> + */
+> +static int ti_sci_cmd_dev_is_stop(const struct ti_sci_handle *handle, u32 id,
+> +				  bool *r_state,  bool *curr_state)
+> +{
+> +	int ret;
+> +	u8 p_state, c_state;
+> +
+> +	if (!r_state && !curr_state)
+> +		return -EINVAL;
+> +
+> +	ret =
+> +	    ti_sci_get_device_state(handle, id, NULL, NULL, &p_state, &c_state);
+> +	if (ret)
+> +		return ret;
+> +
+> +	if (r_state)
+> +		*r_state = (p_state == MSG_DEVICE_SW_STATE_AUTO_OFF);
+> +	if (curr_state)
+> +		*curr_state = (c_state == MSG_DEVICE_HW_STATE_OFF);
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+> + * ti_sci_cmd_dev_is_on() - Check if the device is requested to be ON
+> + * @handle:	Pointer to TISCI handle
+> + * @id:		Device Identifier
+> + * @r_state:	true if requested to be ON
+> + * @curr_state:	true if currently ON and active
+> + *
+> + * Return: 0 if all went fine, else return appropriate error.
+> + */
+> +static int ti_sci_cmd_dev_is_on(const struct ti_sci_handle *handle, u32 id,
+> +				bool *r_state,  bool *curr_state)
+> +{
+> +	int ret;
+> +	u8 p_state, c_state;
+> +
+> +	if (!r_state && !curr_state)
+> +		return -EINVAL;
+> +
+> +	ret =
+> +	    ti_sci_get_device_state(handle, id, NULL, NULL, &p_state, &c_state);
+> +	if (ret)
+> +		return ret;
+> +
+> +	if (r_state)
+> +		*r_state = (p_state == MSG_DEVICE_SW_STATE_ON);
+> +	if (curr_state)
+> +		*curr_state = (c_state == MSG_DEVICE_HW_STATE_ON);
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+> + * ti_sci_cmd_dev_is_trans() - Check if the device is currently transitioning
+> + * @handle:	Pointer to TISCI handle
+> + * @id:		Device Identifier
+> + * @curr_state:	true if currently transitioning.
+> + *
+> + * Return: 0 if all went fine, else return appropriate error.
+> + */
+> +static int ti_sci_cmd_dev_is_trans(const struct ti_sci_handle *handle, u32 id,
+> +				   bool *curr_state)
+> +{
+> +	int ret;
+> +	u8 state;
+> +
+> +	if (!curr_state)
+> +		return -EINVAL;
+> +
+> +	ret = ti_sci_get_device_state(handle, id, NULL, NULL, NULL, &state);
+> +	if (ret)
+> +		return ret;
+> +
+> +	*curr_state = (state == MSG_DEVICE_HW_STATE_TRANS);
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+> + * ti_sci_cmd_set_device_resets() - command to set resets for device managed
+> + *				    by TISCI
+> + * @handle:	Pointer to TISCI handle as retrieved by *ti_sci_get_handle
+> + * @id:		Device Identifier
+> + * @reset_state: Device specific reset bit field
+> + *
+> + * Return: 0 if all went fine, else return appropriate error.
+> + */
+> +static int ti_sci_cmd_set_device_resets(const struct ti_sci_handle *handle,
+> +					u32 id, u32 reset_state)
+> +{
+> +	struct ti_sci_info *info;
+> +	struct ti_sci_msg_req_set_device_resets *req;
+> +	struct ti_sci_msg_hdr *resp;
+> +	struct ti_sci_xfer *xfer;
+> +	struct device *dev;
+> +	int ret = 0;
+> +
+> +	if (IS_ERR(handle))
+> +		return PTR_ERR(handle);
+> +	if (!handle)
+> +		return -EINVAL;
+> +
+> +	info = handle_to_ti_sci_info(handle);
+> +	dev = info->dev;
+> +
+> +	xfer = ti_sci_get_one_xfer(info, TI_SCI_MSG_SET_DEVICE_RESETS,
+> +				   TI_SCI_FLAG_REQ_ACK_ON_PROCESSED,
+> +				   sizeof(*req), sizeof(*resp));
+> +	if (IS_ERR(xfer)) {
+> +		ret = PTR_ERR(xfer);
+> +		dev_err(dev, "Message alloc failed(%d)\n", ret);
+> +		return ret;
+> +	}
+> +	req = (struct ti_sci_msg_req_set_device_resets *)xfer->xfer_buf;
+> +	req->id = id;
+> +	req->resets = reset_state;
+> +
+> +	ret = ti_sci_do_xfer(info, xfer);
+> +	if (ret) {
+> +		dev_err(dev, "Mbox send fail %d\n", ret);
+> +		goto fail;
+> +	}
+> +
+> +	resp = (struct ti_sci_msg_hdr *)xfer->xfer_buf;
+> +
+> +	ret = tis_sci_is_response_ack(resp) ? 0 : -ENODEV;
+> +
+> +fail:
+> +	ti_sci_put_one_xfer(&info->minfo, xfer);
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+> + * ti_sci_cmd_get_device_resets() - Get reset state for device managed
+> + *				    by TISCI
+> + * @handle:		Pointer to TISCI handle
+> + * @id:			Device Identifier
+> + * @reset_state:	Pointer to reset state to populate
+> + *
+> + * Return: 0 if all went fine, else return appropriate error.
+> + */
+> +static int ti_sci_cmd_get_device_resets(const struct ti_sci_handle *handle,
+> +					u32 id, u32 *reset_state)
+> +{
+> +	return ti_sci_get_device_state(handle, id, NULL, reset_state, NULL,
+> +				       NULL);
+> +}
+> +
+> +/*
+> + * ti_sci_setup_ops() - Setup the operations structures
+> + * @info:	pointer to TISCI pointer
+> + */
+> +static void ti_sci_setup_ops(struct ti_sci_info *info)
+> +{
+> +	struct ti_sci_ops *ops = &info->handle.ops;
+> +	struct ti_sci_dev_ops *dops = &ops->dev_ops;
+> +
+> +	dops->get_device = ti_sci_cmd_get_device;
+> +	dops->idle_device = ti_sci_cmd_idle_device;
+> +	dops->put_device = ti_sci_cmd_put_device;
+> +
+> +	dops->is_valid = ti_sci_cmd_dev_is_valid;
+> +	dops->get_context_loss_count = ti_sci_cmd_dev_get_clcnt;
+> +	dops->is_idle = ti_sci_cmd_dev_is_idle;
+> +	dops->is_stop = ti_sci_cmd_dev_is_stop;
+> +	dops->is_on = ti_sci_cmd_dev_is_on;
+> +	dops->is_transitioning = ti_sci_cmd_dev_is_trans;
+> +	dops->set_device_resets = ti_sci_cmd_set_device_resets;
+> +	dops->get_device_resets = ti_sci_cmd_get_device_resets;
+> +}
+> +
+> +/**
+>   * ti_sci_get_handle() - Get the TI SCI handle for a device
+>   * @dev:	Pointer to device for which we want SCI handle
+>   *
+> @@ -735,6 +1166,8 @@ static int ti_sci_probe(struct platform_device *pdev)
+>  		goto out;
+>  	}
+>  
+> +	ti_sci_setup_ops(info);
+> +
+>  	dev_info(dev, "ABI: %d.%d (firmware rev 0x%04x '%s')\n",
+>  		 info->handle.version.abi_major, info->handle.version.abi_minor,
+>  		 info->handle.version.firmware_revision,
+> diff --git a/drivers/firmware/ti_sci.h b/drivers/firmware/ti_sci.h
+> index e9dc53f26e0e..29ce0532a7ca 100644
+> --- a/drivers/firmware/ti_sci.h
+> +++ b/drivers/firmware/ti_sci.h
+> @@ -47,6 +47,11 @@
+>  #define TI_SCI_MSG_WAKE_REASON	0x0003
+>  #define TI_SCI_MSG_GOODBYE	0x0004
+>  
+> +/* Device requests */
+> +#define TI_SCI_MSG_SET_DEVICE_STATE	0x0200
+> +#define TI_SCI_MSG_GET_DEVICE_STATE	0x0201
+> +#define TI_SCI_MSG_SET_DEVICE_RESETS	0x0202
+> +
+>  /**
+>   * struct ti_sci_msg_hdr - Generic Message Header for All messages and responses
+>   * @type:	Type of messages: One of TI_SCI_MSG* values
+> @@ -90,4 +95,97 @@ struct ti_sci_msg_resp_version {
+>  	u8 abi_minor;
+>  } __packed;
+>  
+> +/**
+> + * struct ti_sci_msg_req_set_device_state - Set the desired state of the device
+> + * @hdr:		Generic header
+> + * @id:	Indicates which device to modify
+> + * @reserved: Reserved space in message, must be 0 for backward compatibility
+> + * @state: The desired state of the device.
+> + *
+> + * Certain flags can also be set to alter the device state:
+> + * + MSG_FLAG_DEVICE_WAKE_ENABLED - Configure the device to be a wake source.
+> + * The meaning of this flag will vary slightly from device to device and from
+> + * SoC to SoC but it generally allows the device to wake the SoC out of deep
+> + * suspend states.
+> + * + MSG_FLAG_DEVICE_RESET_ISO - Enable reset isolation for this device.
+> + * + MSG_FLAG_DEVICE_EXCLUSIVE - Claim this device exclusively. When passed
+> + * with STATE_RETENTION or STATE_ON, it will claim the device exclusively.
+> + * If another host already has this device set to STATE_RETENTION or STATE_ON,
+> + * the message will fail. Once successful, other hosts attempting to set
+> + * STATE_RETENTION or STATE_ON will fail.
+> + *
+> + * Request type is TI_SCI_MSG_SET_DEVICE_STATE, responded with a generic
+> + * ACK/NACK message.
+> + */
+> +struct ti_sci_msg_req_set_device_state {
+> +	/* Additional hdr->flags options */
+> +#define MSG_FLAG_DEVICE_WAKE_ENABLED	TI_SCI_MSG_FLAG(8)
+> +#define MSG_FLAG_DEVICE_RESET_ISO	TI_SCI_MSG_FLAG(9)
+> +#define MSG_FLAG_DEVICE_EXCLUSIVE	TI_SCI_MSG_FLAG(10)
+> +	struct ti_sci_msg_hdr hdr;
+> +	u32 id;
+> +	u32 reserved;
+> +
+> +#define MSG_DEVICE_SW_STATE_AUTO_OFF	0
+> +#define MSG_DEVICE_SW_STATE_RETENTION	1
+> +#define MSG_DEVICE_SW_STATE_ON		2
+> +	u8 state;
+> +} __packed;
+> +
+> +/**
+> + * struct ti_sci_msg_req_get_device_state - Request to get device.
+> + * @hdr:		Generic header
+> + * @id:		Device Identifier
+> + *
+> + * Request type is TI_SCI_MSG_GET_DEVICE_STATE, responded device state
+> + * information
+> + */
+> +struct ti_sci_msg_req_get_device_state {
+> +	struct ti_sci_msg_hdr hdr;
+> +	u32 id;
+> +} __packed;
+> +
+> +/**
+> + * struct ti_sci_msg_resp_get_device_state - Response to get device request.
+> + * @hdr:		Generic header
+> + * @context_loss_count: Indicates how many times the device has lost context. A
+> + *	driver can use this monotonic counter to determine if the device has
+> + *	lost context since the last time this message was exchanged.
+> + * @resets: Programmed state of the reset lines.
+> + * @programmed_state:	The state as programmed by set_device.
+> + *			- Uses the MSG_DEVICE_SW_* macros
+> + * @current_state:	The actual state of the hardware.
+> + *
+> + * Response to request TI_SCI_MSG_GET_DEVICE_STATE.
+> + */
+> +struct ti_sci_msg_resp_get_device_state {
+> +	struct ti_sci_msg_hdr hdr;
+> +	u32 context_loss_count;
+> +	u32 resets;
+> +	u8 programmed_state;
+> +#define MSG_DEVICE_HW_STATE_OFF		0
+> +#define MSG_DEVICE_HW_STATE_ON		1
+> +#define MSG_DEVICE_HW_STATE_TRANS	2
+> +	u8 current_state;
+> +} __packed;
+> +
+> +/**
+> + * struct ti_sci_msg_req_set_device_resets - Set the desired resets
+> + *				configuration of the device
+> + * @hdr:		Generic header
+> + * @id:	Indicates which device to modify
+> + * @resets: A bit field of resets for the device. The meaning, behavior,
+> + *	and usage of the reset flags are device specific. 0 for a bit
+> + *	indicates releasing the reset represented by that bit while 1
+> + *	indicates keeping it held.
+> + *
+> + * Request type is TI_SCI_MSG_SET_DEVICE_RESETS, responded with a generic
+> + * ACK/NACK message.
+> + */
+> +struct ti_sci_msg_req_set_device_resets {
+> +	struct ti_sci_msg_hdr hdr;
+> +	u32 id;
+> +	u32 resets;
+> +} __packed;
+> +
+>  #endif /* __TI_SCI_H */
+> diff --git a/include/linux/soc/ti/ti_sci_protocol.h b/include/linux/soc/ti/ti_sci_protocol.h
+> index e73483fd5327..87fa73851471 100644
+> --- a/include/linux/soc/ti/ti_sci_protocol.h
+> +++ b/include/linux/soc/ti/ti_sci_protocol.h
+> @@ -33,12 +33,103 @@ struct ti_sci_version_info {
+>  	char firmware_description[32];
+>  };
+>  
+> +struct ti_sci_handle;
+> +
+> +/**
+> + * struct ti_sci_dev_ops - Device control operations
+> + * @get_device: Command to request for device managed by TISCI
+> + *		Returns 0 for successful exclusive request, else returns
+> + *		corresponding error message.
+> + * @idle_device: Command to idle a device managed by TISCI
+> + *		Returns 0 for successful exclusive request, else returns
+> + *		corresponding error message.
+> + * @put_device:	Command to release a device managed by TISCI
+> + *		Returns 0 for successful release, else returns corresponding
+> + *		error message.
+> + * @is_valid:	Check if the device ID is a valid ID.
+> + *		Returns 0 if the ID is valid, else returns corresponding error.
+> + * @get_context_loss_count: Command to retrieve context loss counter - this
+> + *		increments every time the device looses context. Overflow
+> + *		is possible.
+> + *		- count: pointer to u32 which will retrieve counter
+> + *		Returns 0 for successful information request and count has
+> + *		proper data, else returns corresponding error message.
+> + * @is_idle:	Reports back about device idle state
+> + *		- req_state: Returns requested idle state
+> + *		Returns 0 for successful information request and req_state and
+> + *		current_state has proper data, else returns corresponding error
+> + *		message.
+> + * @is_stop:	Reports back about device stop state
+> + *		- req_state: Returns requested stop state
+> + *		- current_state: Returns current stop state
+> + *		Returns 0 for successful information request and req_state and
+> + *		current_state has proper data, else returns corresponding error
+> + *		message.
+> + * @is_on:	Reports back about device ON(or active) state
+> + *		- req_state: Returns requested ON state
+> + *		- current_state: Returns current ON state
+> + *		Returns 0 for successful information request and req_state and
+> + *		current_state has proper data, else returns corresponding error
+> + *		message.
+> + * @is_transitioning: Reports back if the device is in the middle of transition
+> + *		of state.
+> + *		-current_state: Returns 'true' if currently transitioning.
+> + * @set_device_resets: Command to configure resets for device managed by TISCI.
+> + *		-reset_state: Device specific reset bit field
+> + *		Returns 0 for successful request, else returns
+> + *		corresponding error message.
+> + * @get_device_resets: Command to read state of resets for device managed
+> + *		by TISCI.
+> + *		-reset_state: pointer to u32 which will retrieve resets
+> + *		Returns 0 for successful request, else returns
+> + *		corresponding error message.
+> + *
+> + * NOTE: for all these functions, the following parameters are generic in
+> + * nature:
+> + * -handle:	Pointer to TISCI handle as retrieved by *ti_sci_get_handle
+> + * -id:		Device Identifier
+> + *
+> + * Request for the device - NOTE: the client MUST maintain integrity of
+> + * usage count by balancing get_device with put_device. No refcounting is
+> + * managed by driver for that purpose.
+> + */
+> +struct ti_sci_dev_ops {
+> +	int (*get_device)(const struct ti_sci_handle *handle, u32 id);
+> +	int (*idle_device)(const struct ti_sci_handle *handle, u32 id);
+> +	int (*put_device)(const struct ti_sci_handle *handle, u32 id);
+> +	int (*is_valid)(const struct ti_sci_handle *handle, u32 id);
+> +	int (*get_context_loss_count)(const struct ti_sci_handle *handle,
+> +				      u32 id, u32 *count);
+> +	int (*is_idle)(const struct ti_sci_handle *handle, u32 id,
+> +		       bool *requested_state);
+> +	int (*is_stop)(const struct ti_sci_handle *handle, u32 id,
+> +		       bool *req_state, bool *current_state);
+> +	int (*is_on)(const struct ti_sci_handle *handle, u32 id,
+> +		     bool *req_state, bool *current_state);
+> +	int (*is_transitioning)(const struct ti_sci_handle *handle, u32 id,
+> +				bool *current_state);
+> +	int (*set_device_resets)(const struct ti_sci_handle *handle, u32 id,
+> +				 u32 reset_state);
+> +	int (*get_device_resets)(const struct ti_sci_handle *handle, u32 id,
+> +				 u32 *reset_state);
+> +};
+> +
+> +/**
+> + * struct ti_sci_ops - Function support for TI SCI
+> + * @dev_ops:	Device specific operations
+> + */
+> +struct ti_sci_ops {
+> +	struct ti_sci_dev_ops dev_ops;
+> +};
+> +
+>  /**
+>   * struct ti_sci_handle - Handle returned to TI SCI clients for usage.
+>   * @version:	structure containing version information
+> + * @ops:	operations that are made available to TI SCI clients
+>   */
+>  struct ti_sci_handle {
+>  	struct ti_sci_version_info version;
+> +	struct ti_sci_ops ops;
+>  };
+>  
+>  #if IS_ENABLED(CONFIG_TI_SCI_PROTOCOL)
+> 
