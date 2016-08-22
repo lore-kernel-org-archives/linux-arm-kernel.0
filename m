@@ -1,35 +1,81 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 22 Aug 2016 11:11:17 -0600
-Subject: [PATCH v3 08/12] arm64: dts: tegra: Add Tegra186 support
-In-Reply-To: <20160819173233.13260-9-thierry.reding@gmail.com>
-References: <20160819173233.13260-1-thierry.reding@gmail.com>
- <20160819173233.13260-9-thierry.reding@gmail.com>
-Message-ID: <c1e80c40-ccac-1424-6170-ab11a7845e83@wwwdotorg.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 22 Aug 2016 19:19:18 +0200
+Subject: [PATCH v3 1/4] iio: adc: rockchip_saradc: reset saradc controller
+ before programming it
+In-Reply-To: <b25cda21-0e24-de46-fb23-2142135eca03@kernel.org>
+References: <1469629447-544-1-git-send-email-wxt@rock-chips.com>
+ <7e84e59d-48ee-3e17-feff-8e57ae7c2b4b@kernel.org>
+ <b25cda21-0e24-de46-fb23-2142135eca03@kernel.org>
+Message-ID: <2324843.WCcsUObKgk@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/19/2016 11:32 AM, Thierry Reding wrote:
-> From: Joseph Lo <josephl@nvidia.com>
->
-> This adds the initial support of Tegra186 SoC. It provides enough to
-> enable the serial console and boot from an initial ramdisk.
+Am Sonntag, 21. August 2016, 21:01:19 CEST schrieb Jonathan Cameron:
+> Something in here got it blocked by the lists. I'm guessing it
+> was the characters my email client didn't like so trying again
+> with them dropped.
+> 
+> Jonathan
+> 
+> On 21/08/16 20:11, Jonathan Cameron wrote:
+> > On 15/08/16 19:10, Caesar Wang wrote:
+> >>> On 27/07/16 15:24, Caesar Wang wrote:
+> >>>> SARADC controller needs to be reset before programming it, otherwise
+> >>>> it will not function properly.
+> >>>> 
+> >>>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> >>>> Cc: Jonathan Cameron <jic23@kernel.org>
+> >>>> Cc: Heiko Stuebner <heiko@sntech.de>
+> >>>> Cc: Rob Herring <robh+dt@kernel.org>
+> >>>> Cc: linux-iio at vger.kernel.org
+> >>>> Cc: linux-rockchip at lists.infradead.org
+> >>>> Tested-by: Guenter Roeck <linux@roeck-us.net>
+> >>> 
+> >>> Hi
+> >>> 
+> >>> Patch is fine (I'll fix up the wording issue) however...
+> >>> 
+> >>> I'm not clear on the severity of the issue. Is this something
+> >>> we should be pushing for stable?
+> >> 
+> >> I think that should be pushing for stable, since the common isssue for
+> >> the ADC is initially enabled on loader, and only disabled after the
+> >> first read.
+> >> 
+> >> cat /sys/class/hwmon/hwmon1/device/temp1_input
+> >> cat: /sys/class/hwmon/hwmon1/device/temp1_input: Connection timed out
+> >> 
+> >> The kernel log shows:
+> >> 
+> >> [ 32.209451] read channel() error: -110
+> >> ..
+> >> 
+> >> Also, for my experience. Some other reasons caused the adc (controller)
+> >> glitch for the kernel side.> 
+> > Fine.  So now the only question is who is handling it. The
+> > fix is useless (I think) without the dts changes to support it.
+> > Normally we'd route the dts and driver changes separately as it
+> > should not matter, but here I think I'd prefer it if the whole
+> > thing went via rockchip -> arm-soc tree so it goes in together.
+> > 
+> > Hence (with wording fixed)
+> > 
+> > Acked-by: Jonathan Cameron <jic23@kernel.org>
+> > Cc: <Stable@vger.kernel.org>
+> > (for the driver patch).
+> > 
+> > If people want me to take it via IIO then I'll need acks for
+> > the dts changes with explicit agreement that they can be marked
+> > for stable. Would image Heiko, these would come from you.
 
-> diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+I don't know how the armsoc people feel about routing other subsystem changes 
+through armsoc, but I think small dts changes coming through driver trees is 
+the more common case, so personally I'd think patches 1,3 and 4 could go 
+through the iio tree.
 
-> +	uarta: serial at 03100000 {
-> +		compatible = "nvidia,tegra186-uart", "nvidia,tegra20-uart";
-> +		reg = <0x0 0x03100000 0x0 0x40>;
+Patch 2 of course isn't material for stable, as it adds new functionality, so 
+I'd pick that up directly, especially as we see numerous rk3399 changes, so 
+that would be prone to conflict.
 
-At least in the unit address, I think we want to suppress leading zeroes 
-(s/03100000/3100000/). I'd argue we should do the same in the reg values 
-too, although that makes no difference to the DTB itself. Same comment 
-for other nodes.
 
-> +	sysram at 30000000 {
-> +		compatible = "nvidia,tegra186-sysram", "mmio-ram";
-> +		reg = <0x0 0x30000000 0x0 0x4ffff>;
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges = <0 0x0 0x0 0x30000000 0x0 0x4ffff>;
-
-Shouldn't 0x4ffff be 0x50000 since it's length not max?
+Heiko
