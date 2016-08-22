@@ -1,56 +1,70 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 22 Aug 2016 15:56:17 +0800
-Subject: [PATCH v3 2/2] soc: qcom: add l2 cache perf events driver
-In-Reply-To: <1471374703-8109-3-git-send-email-nleeder@codeaurora.org>
-Message-ID: <201608221510.tt6ATDhN%fengguang.wu@intel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 22 Aug 2016 09:57:41 +0200
+Subject: [PATCH 5/5] ARM: sunxi: enable big-endian
+In-Reply-To: <20160802193115.850-6-michael.weiser@gmx.de>
+References: <20160802193115.850-1-michael.weiser@gmx.de>
+ <20160802193115.850-6-michael.weiser@gmx.de>
+Message-ID: <20160822075741.GC7104@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
+Hi Michael,
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.8-rc3 next-20160819]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-[Check https://git-scm.com/docs/git-format-patch for more information]
+On Tue, Aug 02, 2016 at 09:31:15PM +0200, Michael Weiser wrote:
+> With previous fixes to stmmac, sun4i-emac and sun4i-mmc at least the
+> Cubieboard2 incarnation of sunxi works correctly in big-endian mode.
+> Allow the selection of big-endian.
+> 
+> Tested using a Cubieboard Two-Card and the following
+> hardware-components:
+> - GMAC (stmmac)
+> - EMAC (sun4i-emac)
+> - SATA
+> - SPI
+> - UART
+> - security system
+> - touchscreen controller hwmon functionality
+> - pinctrl (custom interrupt for SPI ethernet controller)
+> - watchdog as reset controller
+> - onboard RTC
+> - DS1307 I2C RTC
+> - sound codec and with this indirectly the DMA engine
 
-url:    https://github.com/0day-ci/linux/commits/Neil-Leeder/qcom-add-l2-cache-perf-events-driver/20160817-031555
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Thanks for all the testing, it's really appreciated :)
 
-All errors (new ones prefixed by >>):
+> Signed-off-by: Michael Weiser <michael.weiser@gmx.de>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  arch/arm/mach-sunxi/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+> index 096ed21..cdeba4a 100644
+> --- a/arch/arm/mach-sunxi/Kconfig
+> +++ b/arch/arm/mach-sunxi/Kconfig
+> @@ -1,6 +1,7 @@
+>  menuconfig ARCH_SUNXI
+>  	bool "Allwinner SoCs"
+>  	depends on ARCH_MULTI_V7
+> +	select ARCH_SUPPORTS_BIG_ENDIAN
 
-   drivers/soc/qcom/perf_event_l2.c: In function 'l2_cache_pmu_probe':
->> drivers/soc/qcom/perf_event_l2.c:786:32: error: 'CPU_PRI_PERF' undeclared (first use in this function)
-     l2cache_pmu.cpu_nb.priority = CPU_PRI_PERF + 1;
-                                   ^
-   drivers/soc/qcom/perf_event_l2.c:786:32: note: each undeclared identifier is reported only once for each function it appears in
+However, you only tested it on the A20. I'd like to be conservative on
+this one and only enable it on tested platforms. In this case, that
+would mean to only select it for MACH_SUN7I.
 
-vim +/CPU_PRI_PERF +786 drivers/soc/qcom/perf_event_l2.c
+Thanks!
+Maxime
 
-   780		if (l2cache_pmu.num_pmus == 0) {
-   781			dev_err(&pdev->dev, "No hardware L2 PMUs found\n");
-   782			return -ENODEV;
-   783		}
-   784	
-   785		l2cache_pmu.cpu_nb.notifier_call = l2cache_pmu_cpu_notifier;
- > 786		l2cache_pmu.cpu_nb.priority = CPU_PRI_PERF + 1;
-   787		err = register_cpu_notifier(&l2cache_pmu.cpu_nb);
-   788		if (err)
-   789			return err;
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 51359 bytes
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160822/cfeeb936/attachment-0001.obj>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160822/38134afd/attachment.sig>
