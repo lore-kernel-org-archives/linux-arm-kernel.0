@@ -1,33 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 22 Aug 2016 14:08:14 +0200
-Subject: [RESEND][PATCH v2] pinctrl: exynos: remove duplicate calls in irq
- handler
-In-Reply-To: <15692f4c2b0.efa5c46c29252.3567074676558581477@zoho.com>
-References: <15692f4c2b0.efa5c46c29252.3567074676558581477@zoho.com>
-Message-ID: <CACRpkdbiBgzM2Z8tJRx7RxeZrjKWRSUFOKfQgEkgpWYKbCUf5w@mail.gmail.com>
+From: pbrobinson@gmail.com (Peter Robinson)
+Date: Mon, 22 Aug 2016 13:12:42 +0100
+Subject: [PATCH] ASoC: sunxi: depend on ARCH_SUNXI
+Message-ID: <20160822121242.18827-1-pbrobinson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 12:45 PM, perr perr <strongbox8@zoho.com> wrote:
+Depend on ARCH_SUNXI or COMPILE_TEST as it doesn't make sense to enable
+these if the appropriate SoC they're embedded in isn't enabled.
 
-> Because chained_irq_enter() has already called chip->irq_mask() and
-> chip->irq_ack(), also chained_irq_exit() will call chip->irq_unmask(),
-> so it's not necessary to call chip->irq_*() here.
->
-> Signed-off-by: Perr Zhang <strongbox8@zoho.com>
-> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Peter Robinson <pbrobinson@gmail.com>
+---
+ sound/soc/sunxi/Kconfig | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Patch did not apply because of whitespace-damage, I guess due
-to this:
-
-User-Agent: Zoho Mail
-X-Mailer: Zoho Mail
-
-No idea what that is :D
-
-But don't worry! I edited the patch by hand and now it is applied,
-check the result in linux-next.
-
-Yours,
-Linus Walleij
+diff --git a/sound/soc/sunxi/Kconfig b/sound/soc/sunxi/Kconfig
+index 2a954bd..a2b62dc5 100644
+--- a/sound/soc/sunxi/Kconfig
++++ b/sound/soc/sunxi/Kconfig
+@@ -2,6 +2,7 @@ menu "Allwinner SoC Audio support"
+ 
+ config SND_SUN4I_CODEC
+ 	tristate "Allwinner A10 Codec Support"
++	depends on ARCH_SUNXI || COMPILE_TEST
+ 	select SND_SOC_GENERIC_DMAENGINE_PCM
+ 	select REGMAP_MMIO
+ 	help
+@@ -10,6 +11,7 @@ config SND_SUN4I_CODEC
+ 
+ config SND_SUN4I_I2S
+ 	tristate "Allwinner A10 I2S Support"
++	depends on ARCH_SUNXI || COMPILE_TEST
+ 	select SND_SOC_GENERIC_DMAENGINE_PCM
+ 	select REGMAP_MMIO
+ 	help
+@@ -19,7 +21,7 @@ config SND_SUN4I_I2S
+ 
+ config SND_SUN4I_SPDIF
+ 	tristate "Allwinner A10 SPDIF Support"
+-	depends on OF
++	depends on OF && (ARCH_SUNXI || COMPILE_TEST)
+ 	select SND_SOC_GENERIC_DMAENGINE_PCM
+ 	select REGMAP_MMIO
+ 	help
+-- 
+2.9.3
