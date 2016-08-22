@@ -1,50 +1,160 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 22 Aug 2016 15:51:57 +0100
-Subject: [PATCH v1 2/3] of: Add support for reading a s32 from a
- multi-value property.
-In-Reply-To: <1471639654.4611.2.camel@infradead.org>
-References: <1471315139-28285-1-git-send-email-finley.xiao@rock-chips.com>
- <1471315139-28285-3-git-send-email-finley.xiao@rock-chips.com>
- <1471616119.61594.465.camel@infradead.org>
- <4975010.IL95Y3Sj1J@phil> <1471639654.4611.2.camel@infradead.org>
-Message-ID: <20160822145157.GD30850@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 22 Aug 2016 15:53:26 +0100
+Subject: [PATCH 1/2] arm64: kernel: Add SMC Session ID to results
+In-Reply-To: <20160822140246.GA30923@hector.attlocal.net>
+References: <1471672274-19317-1-git-send-email-andy.gross@linaro.org>
+ <1471672274-19317-2-git-send-email-andy.gross@linaro.org>
+ <20160822134313.GJ14680@arm.com>
+ <20160822140246.GA30923@hector.attlocal.net>
+Message-ID: <20160822145326.GK14680@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2016 at 09:47:34PM +0100, David Woodhouse wrote:
-> On Fri, 2016-08-19 at 22:41 +0200, Heiko Stuebner wrote:
+On Mon, Aug 22, 2016 at 09:02:46AM -0500, Andy Gross wrote:
+> On Mon, Aug 22, 2016 at 02:43:14PM +0100, Will Deacon wrote:
+> > On Sat, Aug 20, 2016 at 12:51:13AM -0500, Andy Gross wrote:
+> > > This patch adds the SMC Session ID to the results passed back from SMC
+> > > calls.  The Qualcomm SMC implementation provides for interrupted SMC
+> > > functions.  When this occurs, the SMC call will return a session ID that
+> > > is required to be used when resuming the interrupted SMC call.
+> > > 
+> > > Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> > > ---
+> > >  arch/arm64/kernel/asm-offsets.c | 1 +
+> > >  arch/arm64/kernel/smccc-call.S  | 1 +
+> > >  include/linux/arm-smccc.h       | 4 +++-
+> > >  3 files changed, 5 insertions(+), 1 deletion(-)
 > > 
-> > > So no, don't *add* any more of these functions. Only add the generic
-> > > version. And if your driver isn't using the generic property
-> > > functions... fix it.
+> > [...]
 > > 
-> > As far as I can see, all the device_property_* functions are grounded on their
-> > of_property_*, acpi_property_* etc counterparts and functions reading specific
-> > elements (the _index variants) are currently not available at all.
+> > > diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+> > > index b5abfda..82d919f 100644
+> > > --- a/include/linux/arm-smccc.h
+> > > +++ b/include/linux/arm-smccc.h
+> > > @@ -63,18 +63,20 @@
+> > >  /**
+> > >   * struct arm_smccc_res - Result from SMC/HVC call
+> > >   * @a0-a3 result values from registers 0 to 3
+> > > + * @a6 Session ID register (optional)
+> > >   */
+> > >  struct arm_smccc_res {
+> > >  	unsigned long a0;
+> > >  	unsigned long a1;
+> > >  	unsigned long a2;
+> > >  	unsigned long a3;
+> > > +	unsigned long a6;
+> > >  };
+> > >  
+> > >  /**
+> > >   * arm_smccc_smc() - make SMC calls
+> > >   * @a0-a7: arguments passed in registers 0 to 7
+> > > - * @res: result values from registers 0 to 3
+> > > + * @res: result values from registers 0 to 3 and optional register 6
 > > 
-> > drivers/base/property.c:
-> > #define OF_DEV_PROP_READ_ARRAY(node, propname, type, val, nval)?????????????????????????\
-> > ????????(val) ? of_property_read_##type##_array((node), (propname), (val), (nval))??????\
-> > ????????????? : of_property_count_elems_of_size((node), (propname), sizeof(type))
+> > AFAICT from reading the SMCCC spec, parameter register 6 is "Unpredictable,
+> > Scratch registers" in return state, so I don't think this is correct.
 > > 
-> > So even if you're using the device_property_* functions you'd still need
-> > a match in the underlying functions or am I missing something?
+> > What am I missing?
 > 
-> Yes, but the underlying function should never be used directly by
-> drivers. 
+> In the case of Qualcomm's implementation, they return a value in register 6 that
+> may or may not be used in subsequent calls.  If I want to leverage the arm_smccc
+> functions, then I need to extend them to include the optional return value.  The
+> downside to this is that everyone who uses this is exposed to it.
 
-There are properties which never make sense with ACPI, and there are
-drivers which shouldn't exist in the case of ACPI (due to clashes with
-core ACPI functionality). So using of_property_* for those, and not
-matching any ACPI tables is perfectly fine.
+Yes, I'm not keen on forcing this behaviour for everybody, as you never
+know what other firmware might do with unexpected a6 values. Could we
+perhaps quirk it, along the lines of the completely untested patch below?
 
-IMO, an of_property_read_s32_index() function is perfectly fine (as is
-an ACPI-specific variant, or a unified helper, if that's useful to some
-driver).
+Will
 
-There is no need to force drivers to superficially appear to support
-ACPI when they have not been designed with ACPI in mind, and are
-unlikely to function in an ACPI environment.
+--->8
 
-Thanks,
-Mark.
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 05070b72fc28..1895e87d0240 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -141,6 +141,8 @@ int main(void)
+ #endif
+   DEFINE(ARM_SMCCC_RES_X0_OFFS,	offsetof(struct arm_smccc_res, a0));
+   DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
++  DEFINE(ARM_SMCCC_RES_QUIRK_ID_OFFS,		offsetof(struct arm_smccc_res, quirk.id));
++  DEFINE(ARM_SMCCC_RES_QUIRK_STATE_OFFS,	offsetof(struct arm_smccc_res, quirk.state));
+   BLANK();
+   DEFINE(HIBERN_PBE_ORIG,	offsetof(struct pbe, orig_address));
+   DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
+diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
+index ae0496fa4235..3c6c976eaf5c 100644
+--- a/arch/arm64/kernel/smccc-call.S
++++ b/arch/arm64/kernel/smccc-call.S
+@@ -12,6 +12,7 @@
+  *
+  */
+ #include <linux/linkage.h>
++#include <linux/arm-smccc.h>
+ #include <asm/asm-offsets.h>
+ 
+ 	.macro SMCCC instr
+@@ -20,7 +21,12 @@
+ 	ldr	x4, [sp]
+ 	stp	x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
+ 	stp	x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
+-	ret
++	ldr	x9, [x4, #ARM_SMCCC_RES_QUIRK_ID_OFFS]
++	cbz	x9, 1f /* ARM_SMCCC_QUIRK_NONE */
++	cmp	x9, #ARM_SMCCC_QUIRK_QCOM_A6
++	b.ne	1f
++	str	x6, [x4, ARM_SMCCC_RES_QUIRK_STATE_OFFS]
++1:	ret
+ 	.cfi_endproc
+ 	.endm
+ 
+diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+index b5abfda80465..a3a6e291feb6 100644
+--- a/include/linux/arm-smccc.h
++++ b/include/linux/arm-smccc.h
+@@ -14,9 +14,6 @@
+ #ifndef __LINUX_ARM_SMCCC_H
+ #define __LINUX_ARM_SMCCC_H
+ 
+-#include <linux/linkage.h>
+-#include <linux/types.h>
+-
+ /*
+  * This file provides common defines for ARM SMC Calling Convention as
+  * specified in
+@@ -60,6 +57,21 @@
+ #define ARM_SMCCC_OWNER_TRUSTED_OS	50
+ #define ARM_SMCCC_OWNER_TRUSTED_OS_END	63
+ 
++#define ARM_SMCCC_QUIRK_NONE	0
++#define ARM_SMCCC_QUIRK_QCOM_A6	1 /* Save/restore register a6 */
++
++#ifndef __ASSEMBLY__
++
++#include <linux/linkage.h>
++#include <linux/types.h>
++
++struct arm_smccc_quirk {
++	int	id;
++	union {
++		unsigned long a6;
++	} state;
++};
++
+ /**
+  * struct arm_smccc_res - Result from SMC/HVC call
+  * @a0-a3 result values from registers 0 to 3
+@@ -69,6 +81,7 @@ struct arm_smccc_res {
+ 	unsigned long a1;
+ 	unsigned long a2;
+ 	unsigned long a3;
++	struct arm_smccc_quirk quirk;
+ };
+ 
+ /**
+@@ -101,4 +114,5 @@ asmlinkage void arm_smccc_hvc(unsigned long a0, unsigned long a1,
+ 			unsigned long a5, unsigned long a6, unsigned long a7,
+ 			struct arm_smccc_res *res);
+ 
++#endif /* !__ASSEMBLY__ */
+ #endif /*__LINUX_ARM_SMCCC_H*/
