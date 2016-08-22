@@ -1,24 +1,21 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Aug 2016 20:31:42 +0200
-Subject: [PATCH 3/8] ARM: dts: sun8i: reference-design-tablet: Add
- gsl1680 touchscreen node
-In-Reply-To: <1470685398-14568-3-git-send-email-hdegoede@redhat.com>
-References: <1470685398-14568-1-git-send-email-hdegoede@redhat.com>
- <1470685398-14568-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160822183142.GY7104@lukather>
+Date: Mon, 22 Aug 2016 20:36:11 +0200
+Subject: [RESEND][PATCH] ARM: sun5i: Fix typo in trip point temperature
+In-Reply-To: <d936e96e-7c2f-0607-0b04-3adfcdcadf98@bonstra.fr.eu.org>
+References: <d936e96e-7c2f-0607-0b04-3adfcdcadf98@bonstra.fr.eu.org>
+Message-ID: <20160822183611.GZ7104@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 08, 2016 at 09:43:13PM +0200, Hans de Goede wrote:
-> Almost all sun8i tablets use a gsl1680 touchscreen controller, so add
-> a node describing it to reference-design-tablet.dtsi.
+On Tue, Aug 16, 2016 at 08:34:07PM +0200, Hugo Grostabussiat wrote:
+> Set cpu_alert0 temperature to 85?C instead of 850?C.
 > 
-> Almost all, but not all, so mark it as disabled by default (dts files
-> will also need to supply a firmware-name and resolution info).
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Fixes: 32a5d2d170cc ("ARM: dts: sun5i: Add cpu thermal zones to dtsi")
+> Signed-off-by: Hugo Grostabussiat <bonstra@bonstra.fr.eu.org>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-Applied the first three patches, thanks!
+Thanks, applied.
+
 Maxime
 
 -- 
@@ -31,4 +28,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160822/dd6567ad/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160822/427bf95f/attachment.sig>
