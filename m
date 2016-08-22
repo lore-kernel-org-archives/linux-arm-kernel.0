@@ -1,72 +1,90 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 22 Aug 2016 11:38:03 +0530
-Subject: [PATCH] dmaengine: qcom_hidma: release the descriptor before the
- callback
-In-Reply-To: <f11a2775-63b8-6933-ab15-20e3927f0db7@codeaurora.org>
-References: <20160810172805.GH9681@localhost>
- <d09ebb5f-99ea-a4e9-da9c-693be89c7cd4@codeaurora.org>
- <20160819024853.GR9681@localhost>
- <8c096fee-9749-a7df-7e04-25d21c0ea9ac@codeaurora.org>
- <20160819034249.GS9681@localhost>
- <3592cfe2-a563-7c26-9a9e-925051cc1934@codeaurora.org>
- <20160819055252.GT9681@localhost>
- <37b059dcb67d1c83c2193acecef0ab96@codeaurora.org>
- <20160819170208.GC9343@localhost>
- <f11a2775-63b8-6933-ab15-20e3927f0db7@codeaurora.org>
-Message-ID: <20160822060803.GH2890@localhost>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Mon, 22 Aug 2016 11:45:13 +0530
+Subject: [RFC PATCH v2 0/4] arm/arm64: vgic-new: Implement API for vGICv3
+ live migration
+In-Reply-To: <CAFEAcA-eAHaZio6xWtyDEDAGynXMEsAMBHMnPWx_B1DTQ+qGNQ@mail.gmail.com>
+References: <1470740326-27751-1-git-send-email-vijay.kilari@gmail.com>
+ <CAFEAcA-z+iM+=p0riWreJCewPPxw9wtHgg+_4MDtxV=ccwe-tg@mail.gmail.com>
+ <CALicx6sdGgkf_neZ_F0OUu3cg36VBoWT581HAG=v2FecN6omJA@mail.gmail.com>
+ <CAFEAcA-eAHaZio6xWtyDEDAGynXMEsAMBHMnPWx_B1DTQ+qGNQ@mail.gmail.com>
+Message-ID: <CALicx6sB=t46OFpb9OTdCRHi5uNRL4Ztf9B705SRc32dp-Yr9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2016 at 01:21:34PM -0400, Sinan Kaya wrote:
-> On 8/19/2016 1:02 PM, Vinod Koul wrote:
-> > On Fri, Aug 19, 2016 at 07:13:43AM -0400, okaya at codeaurora.org wrote:
-> >> On 2016-08-19 01:52, Vinod Koul wrote:
-> >>> On Thu, Aug 18, 2016 at 11:48:52PM -0400, Sinan Kaya wrote:
-> >>>> On 8/18/2016 11:42 PM, Vinod Koul wrote:
-> >>>>> On Thu, Aug 18, 2016 at 11:26:28PM -0400, Sinan Kaya wrote:
-> >>>>>> On 8/18/2016 10:48 PM, Vinod Koul wrote:
-> >>>>>>>> Keep a size limited list with error cookies and flush them in terminate all?
-> >>>>>>> I think so, terminate_all anyway cleans up the channel. Btw what is the
-> >>>>>>> behaviour on error? Do you terminate or somthing else?
-> >>>>>>>
-> >>>>>>
-> >>>>>> On error, I flush all outstanding transactions with an error code and I reset
-> >>>>>> the channel. After the reset, the DMA channel is functional again. The client
-> >>>>>> doesn't need to shutdown anything.
-> >>>>>
-> >>>>> You mean from the client context or driver?
-> >>>>>
-> >>>>
-> >>>> The client doesn't need to call device_free_chan_resources and
-> >>>> device_terminate_all
-> >>>> to be specific. Client can certainly call these if it needs to
-> >>>> but it is not
-> >>>> required to recover the channel.
-> >>>
-> >>> You didn't answer my question!
-> >>>
-> >>> On error you said you flush, so who does that?
-> >>
-> >> This is done by the driver in interrupt context when an error
-> >> interrupt is received. All transactions are posted and hw is reset.
-> > 
-> > Hmmm, waht about the txn which are pending? DO you clear them..?
-> > 
-> 
-> Yes, I clear both pending and active transactions. 
+On Thu, Aug 11, 2016 at 1:15 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
+> On 11 August 2016 at 06:29, Vijay Kilari <vijay.kilari@gmail.com> wrote:
+>> On Tue, Aug 9, 2016 at 5:22 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
+>>> On 9 August 2016 at 11:58,  <vijay.kilari@gmail.com> wrote:
+>>>> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+>>>>
+>>>> This patchset adds API for saving and restoring
+>>>> of VGICv3 registers to support live migration with new vgic feature.
+>>>> This API definition is as per version of VGICv3 specification
+>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
+>>>>
+>>>> To test live migration with QEMU, use below patch series
+>>>> https://lists.gnu.org/archive/html/qemu-devel/2016-08/msg01444.html
+>>>>
+>>>> The patch 3 & 4 are picked from the Pavel's previous implementation.
+>>>> http://www.spinics.net/lists/kvm/msg122040.html
+>>>>
+>>>> v1 => v2:
+>>>>  - The init sequence change patch is no more required.
+>>>>    Fixed in patch 2 by using static vgic_io_dev regions structure instead
+>>>>    of using dynamic allocation pointer.
+>>>>  - Updated commit message of patch 4.
+>>>>  - Dropped usage of union to manage 32-bit and 64-bit access in patch 1.
+>>>>    Used local variable for 32-bit access.
+>>>>  - Updated macro __ARM64_SYS_REG and ARM64_SYS_REG in
+>>>>    arch/arm64/include/uapi/asm/kvm.h as per qemu requirements.
+>>>
+>>> I only scanned briefly through this patchset, but I didn't
+>>> see any code implementing:
+>>>  * KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO
+>>
+>> If irq->pending is updated by kernel based on irq->line_level when interrupt
+>> is asserted by device or guest. Do we still need to extract
+>> irq->line_level using
+>> this ioctl and while writing back GIC{D|R}_ISPENDR with line_level
+>> +(OR) GIC{D|R}_ISPENDR?
+>
+> The level and the pending status are different things;
+> the API docs have an explanation of this. The API access
+> to the ISPENDR registers should return only the pending
+> latch status (which is not the same as what these registers
+> return if you read them from the guest).
+>
 
-Okay, in that case your can consider below:
+OK. I have implemented separate api for ISPENDR userspace access to
+read soft_pending for level triggered interrupts. This needs kernel
+implementation
+to support separate api's for guest and userspace access.
 
-1. dmaengine asserts error interrupt
-2. Driver receives and mark's the txn as error
-3. Driver completes the txn and intimates the client. No further
-   submissions. Drop the locks before calling callback, as subsequent
-   processing by client maybe in callback thread.
-4. Client invokes status and you can return error
-5. On error, client calls terminate_all. You can reset channel, free all
-   descriptors in the active, pending and completed lists
-6. Client prepares new txn and so on..
+>>>  * the different behaviour for accesses to GICD_STATUSR, GICR_STATUSR,
+>>
+>> QEMU is saving and restoring this register, but kernel implementation
+>> is missing. Kernel is silently returning zero. So could not catch. I
+>> will fix it.
+>>
+>> However, Specification says as below for STATUSR.
+>>
+>> "    The GICD_STATUSR and GICR_STATUSR registers are architecturally
+>> defined such
+>>      that a write of a clear bit has no effect, whereas a write with a set bit
+>>      clears that value.  To allow userspace to freely set the values
+>> of these two
+>>      registers, setting the attributes with the register offsets for these two
+>>      registers simply sets the non-reserved bits to the value written."
+>>
+>> Question is during restore, the set bit will clear the value STATUSR.
+>> So it will reset the STATUSR after migrating the VM.
+>
+> The text you quote above says that setting the attribute via
+> the API "sets the non-reserved bits to the value written".
+> This is the point -- it does not have the write-1-to-clear
+> behaviour that a guest access to the register does.
+>
 
-Thanks
--- 
-~Vinod
+ In the current implementation of vgic in kernel I could not find
+any implement/support for GICD_STATUSR register value.
+Should I leave this as RAZ / WI for now?.
