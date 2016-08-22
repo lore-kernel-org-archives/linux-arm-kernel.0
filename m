@@ -1,90 +1,18 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Mon, 22 Aug 2016 11:45:13 +0530
-Subject: [RFC PATCH v2 0/4] arm/arm64: vgic-new: Implement API for vGICv3
- live migration
-In-Reply-To: <CAFEAcA-eAHaZio6xWtyDEDAGynXMEsAMBHMnPWx_B1DTQ+qGNQ@mail.gmail.com>
-References: <1470740326-27751-1-git-send-email-vijay.kilari@gmail.com>
- <CAFEAcA-z+iM+=p0riWreJCewPPxw9wtHgg+_4MDtxV=ccwe-tg@mail.gmail.com>
- <CALicx6sdGgkf_neZ_F0OUu3cg36VBoWT581HAG=v2FecN6omJA@mail.gmail.com>
- <CAFEAcA-eAHaZio6xWtyDEDAGynXMEsAMBHMnPWx_B1DTQ+qGNQ@mail.gmail.com>
-Message-ID: <CALicx6sB=t46OFpb9OTdCRHi5uNRL4Ztf9B705SRc32dp-Yr9Q@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 22 Aug 2016 11:53:19 +0530
+Subject: [PATCH -next] dmaengine: at_xdmac: fix to pass correct device
+ identity to free_irq()
+In-Reply-To: <1470799029-2613-1-git-send-email-weiyj.lk@gmail.com>
+References: <1470799029-2613-1-git-send-email-weiyj.lk@gmail.com>
+Message-ID: <20160822062318.GL2890@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2016 at 1:15 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
-> On 11 August 2016 at 06:29, Vijay Kilari <vijay.kilari@gmail.com> wrote:
->> On Tue, Aug 9, 2016 at 5:22 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
->>> On 9 August 2016 at 11:58,  <vijay.kilari@gmail.com> wrote:
->>>> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
->>>>
->>>> This patchset adds API for saving and restoring
->>>> of VGICv3 registers to support live migration with new vgic feature.
->>>> This API definition is as per version of VGICv3 specification
->>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
->>>>
->>>> To test live migration with QEMU, use below patch series
->>>> https://lists.gnu.org/archive/html/qemu-devel/2016-08/msg01444.html
->>>>
->>>> The patch 3 & 4 are picked from the Pavel's previous implementation.
->>>> http://www.spinics.net/lists/kvm/msg122040.html
->>>>
->>>> v1 => v2:
->>>>  - The init sequence change patch is no more required.
->>>>    Fixed in patch 2 by using static vgic_io_dev regions structure instead
->>>>    of using dynamic allocation pointer.
->>>>  - Updated commit message of patch 4.
->>>>  - Dropped usage of union to manage 32-bit and 64-bit access in patch 1.
->>>>    Used local variable for 32-bit access.
->>>>  - Updated macro __ARM64_SYS_REG and ARM64_SYS_REG in
->>>>    arch/arm64/include/uapi/asm/kvm.h as per qemu requirements.
->>>
->>> I only scanned briefly through this patchset, but I didn't
->>> see any code implementing:
->>>  * KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO
->>
->> If irq->pending is updated by kernel based on irq->line_level when interrupt
->> is asserted by device or guest. Do we still need to extract
->> irq->line_level using
->> this ioctl and while writing back GIC{D|R}_ISPENDR with line_level
->> +(OR) GIC{D|R}_ISPENDR?
->
-> The level and the pending status are different things;
-> the API docs have an explanation of this. The API access
-> to the ISPENDR registers should return only the pending
-> latch status (which is not the same as what these registers
-> return if you read them from the guest).
->
+On Wed, Aug 10, 2016 at 03:17:09AM +0000, Wei Yongjun wrote:
+> free_irq() expects the same device identity that was passed to
+> corresponding request_irq(), otherwise the IRQ is not freed.
 
-OK. I have implemented separate api for ISPENDR userspace access to
-read soft_pending for level triggered interrupts. This needs kernel
-implementation
-to support separate api's for guest and userspace access.
+Applied, thanks
 
->>>  * the different behaviour for accesses to GICD_STATUSR, GICR_STATUSR,
->>
->> QEMU is saving and restoring this register, but kernel implementation
->> is missing. Kernel is silently returning zero. So could not catch. I
->> will fix it.
->>
->> However, Specification says as below for STATUSR.
->>
->> "    The GICD_STATUSR and GICR_STATUSR registers are architecturally
->> defined such
->>      that a write of a clear bit has no effect, whereas a write with a set bit
->>      clears that value.  To allow userspace to freely set the values
->> of these two
->>      registers, setting the attributes with the register offsets for these two
->>      registers simply sets the non-reserved bits to the value written."
->>
->> Question is during restore, the set bit will clear the value STATUSR.
->> So it will reset the STATUSR after migrating the VM.
->
-> The text you quote above says that setting the attribute via
-> the API "sets the non-reserved bits to the value written".
-> This is the point -- it does not have the write-1-to-clear
-> behaviour that a guest access to the register does.
->
-
- In the current implementation of vgic in kernel I could not find
-any implement/support for GICD_STATUSR register value.
-Should I leave this as RAZ / WI for now?.
+-- 
+~Vinod
