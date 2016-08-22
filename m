@@ -1,171 +1,132 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Mon, 22 Aug 2016 10:16:40 -0500
-Subject: [PATCH 1/2] arm64: kernel: Add SMC Session ID to results
-In-Reply-To: <20160822145326.GK14680@arm.com>
-References: <1471672274-19317-1-git-send-email-andy.gross@linaro.org>
- <1471672274-19317-2-git-send-email-andy.gross@linaro.org>
- <20160822134313.GJ14680@arm.com>
- <20160822140246.GA30923@hector.attlocal.net>
- <20160822145326.GK14680@arm.com>
-Message-ID: <20160822151640.GC30923@hector.attlocal.net>
+From: b-liu@ti.com (Bin Liu)
+Date: Mon, 22 Aug 2016 10:24:21 -0500
+Subject: [PATCH v2 7/7] musb: sunxi: Add support for platform_set_mode
+In-Reply-To: <9699b62e-421a-ae8e-c25e-ef48beb84ce0@redhat.com>
+References: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
+ <1471288892-21702-8-git-send-email-hdegoede@redhat.com>
+ <20160819213049.GC1853@uda0271908>
+ <2a55a1bf-7ebf-3ab4-b231-85eba20103f1@redhat.com>
+ <20160822141158.GF1853@uda0271908>
+ <9699b62e-421a-ae8e-c25e-ef48beb84ce0@redhat.com>
+Message-ID: <20160822152421.GH1853@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2016 at 03:53:26PM +0100, Will Deacon wrote:
-> On Mon, Aug 22, 2016 at 09:02:46AM -0500, Andy Gross wrote:
-> > On Mon, Aug 22, 2016 at 02:43:14PM +0100, Will Deacon wrote:
-> > > On Sat, Aug 20, 2016 at 12:51:13AM -0500, Andy Gross wrote:
-> > > > This patch adds the SMC Session ID to the results passed back from SMC
-> > > > calls.  The Qualcomm SMC implementation provides for interrupted SMC
-> > > > functions.  When this occurs, the SMC call will return a session ID that
-> > > > is required to be used when resuming the interrupted SMC call.
-> > > > 
-> > > > Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> > > > ---
-> > > >  arch/arm64/kernel/asm-offsets.c | 1 +
-> > > >  arch/arm64/kernel/smccc-call.S  | 1 +
-> > > >  include/linux/arm-smccc.h       | 4 +++-
-> > > >  3 files changed, 5 insertions(+), 1 deletion(-)
-> > > 
-> > > [...]
-> > > 
-> > > > diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-> > > > index b5abfda..82d919f 100644
-> > > > --- a/include/linux/arm-smccc.h
-> > > > +++ b/include/linux/arm-smccc.h
-> > > > @@ -63,18 +63,20 @@
-> > > >  /**
-> > > >   * struct arm_smccc_res - Result from SMC/HVC call
-> > > >   * @a0-a3 result values from registers 0 to 3
-> > > > + * @a6 Session ID register (optional)
-> > > >   */
-> > > >  struct arm_smccc_res {
-> > > >  	unsigned long a0;
-> > > >  	unsigned long a1;
-> > > >  	unsigned long a2;
-> > > >  	unsigned long a3;
-> > > > +	unsigned long a6;
-> > > >  };
-> > > >  
-> > > >  /**
-> > > >   * arm_smccc_smc() - make SMC calls
-> > > >   * @a0-a7: arguments passed in registers 0 to 7
-> > > > - * @res: result values from registers 0 to 3
-> > > > + * @res: result values from registers 0 to 3 and optional register 6
-> > > 
-> > > AFAICT from reading the SMCCC spec, parameter register 6 is "Unpredictable,
-> > > Scratch registers" in return state, so I don't think this is correct.
-> > > 
-> > > What am I missing?
-> > 
-> > In the case of Qualcomm's implementation, they return a value in register 6 that
-> > may or may not be used in subsequent calls.  If I want to leverage the arm_smccc
-> > functions, then I need to extend them to include the optional return value.  The
-> > downside to this is that everyone who uses this is exposed to it.
+On Mon, Aug 22, 2016 at 05:08:56PM +0200, Hans de Goede wrote:
+> Hi,
 > 
-> Yes, I'm not keen on forcing this behaviour for everybody, as you never
-> know what other firmware might do with unexpected a6 values. Could we
-> perhaps quirk it, along the lines of the completely untested patch below?
-
-A quirk would work fine.  I'll try this out and get back to you.
-
-Thanks,
-
-Andy
-
-
-> --->8
+> On 22-08-16 16:11, Bin Liu wrote:
+> >Hi,
+> >
+> >On Sun, Aug 21, 2016 at 12:10:26PM +0200, Hans de Goede wrote:
+> >>Hi,
+> >>
+> >>On 19-08-16 23:30, Bin Liu wrote:
+> >>>Hi,
+> >>>
+> >>>On Mon, Aug 15, 2016 at 09:21:32PM +0200, Hans de Goede wrote:
+> >>>>This allows run-time dr_mode switching support via the "mode" musb
+> >>>>sysfs attribute.
+> >>>>
+> >>>>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>>>---
+> >>>>drivers/usb/musb/sunxi.c | 52 ++++++++++++++++++++++++++++++++++++++++++++----
+> >>>>1 file changed, 48 insertions(+), 4 deletions(-)
+> >>>>
+> >>>>diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+> >>>>index c6ee166..1fe7451 100644
+> >>>>--- a/drivers/usb/musb/sunxi.c
+> >>>>+++ b/drivers/usb/musb/sunxi.c
+> >>>>@@ -74,6 +74,7 @@
+> >>>>#define SUNXI_MUSB_FL_HAS_SRAM			5
+> >>>>#define SUNXI_MUSB_FL_HAS_RESET			6
+> >>>>#define SUNXI_MUSB_FL_NO_CONFIGDATA		7
+> >>>>+#define SUNXI_MUSB_FL_PHY_MODE_PEND		8
+> >>>>
+> >>>>/* Our read/write methods need access and do not get passed in a musb ref :| */
+> >>>>static struct musb *sunxi_musb;
+> >>>>@@ -87,6 +88,7 @@ struct sunxi_glue {
+> >>>>	struct phy		*phy;
+> >>>>	struct platform_device	*usb_phy;
+> >>>>	struct usb_phy		*xceiv;
+> >>>>+	enum phy_mode		phy_mode;
+> >>>>	unsigned long		flags;
+> >>>>	struct work_struct	work;
+> >>>>	struct extcon_dev	*extcon;
+> >>>>@@ -140,6 +142,9 @@ static void sunxi_musb_work(struct work_struct *work)
+> >>>>			clear_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
+> >>>>		}
+> >>>>	}
+> >>>>+
+> >>>>+	if (test_and_clear_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags))
+> >>>>+		phy_set_mode(glue->phy, glue->phy_mode);
+> >>>>}
+> >>>>
+> >>>>static void sunxi_musb_set_vbus(struct musb *musb, int is_on)
+> >>>>@@ -341,6 +346,41 @@ static void sunxi_musb_dma_controller_destroy(struct dma_controller *c)
+> >>>>{
+> >>>>}
+> >>>>
+> >>>>+static int sunxi_musb_set_mode(struct musb *musb, u8 mode)
+> >>>>+{
+> >>>>+	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
+> >>>>+	enum phy_mode new_mode;
+> >>>>+
+> >>>>+	switch (mode) {
+> >>>>+	case MUSB_HOST:		new_mode = PHY_MODE_USB_HOST; break;
+> >>>>+	case MUSB_PERIPHERAL:	new_mode = PHY_MODE_USB_DEVICE; break;
+> >>>>+	case MUSB_OTG:		new_mode = PHY_MODE_USB_OTG; break;
+> >>>
+> >>>Please fix the code style as commented in patch 4/7.
+> >>
+> >>Ok I will send a new version with this fixed.
+> >>
+> >>>
+> >>>>+	default:
+> >>>>+		dev_err(musb->controller->parent,
+> >>>>+			"Error requested mode not supported by this kernel\n");
+> >>>>+		return -EINVAL;
+> >>>>+	}
+> >>>>+
+> >>>>+	if (glue->phy_mode == new_mode)
+> >>>>+		return 0;
+> >>>>+
+> >>>>+	if (musb->port_mode != MUSB_PORT_MODE_DUAL_ROLE) {
+> >>>>+		dev_err(musb->controller->parent,
+> >>>>+			"Error changing modes is only supported in dual role mode\n");
+> >>>>+		return -EINVAL;
+> >>>>+	}
+> >>>>+
+> >>>>+	/*
+> >>>>+	 * phy_set_mode may sleep, and we're called with a spinlock held,
+> >>>>+	 * so let sunxi_musb_work deal with it.
+> >>>>+	 */
+> >>>>+	glue->phy_mode = new_mode;
+> >>>>+	set_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags);
+> >>>>+	schedule_work(&glue->work);
+> >>>
+> >>>When switching from host to peripheral mode, if an usb device is still
+> >>>plugged and enumerated, how do you handle the device disconnect?
+> >>
+> >>The phy code will report vbus low for long enough for the musb to end
+> >>the current session. It already does this for boards which do not
+> >>have working vbus detection.
+> >
+> >But you didn't disconnect DP/DM, right? then musb detects vbus is gone
+> >without receiving disconnect event, this is vbus error case, not a normal
+> >teardown.
 > 
-> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> index 05070b72fc28..1895e87d0240 100644
-> --- a/arch/arm64/kernel/asm-offsets.c
-> +++ b/arch/arm64/kernel/asm-offsets.c
-> @@ -141,6 +141,8 @@ int main(void)
->  #endif
->    DEFINE(ARM_SMCCC_RES_X0_OFFS,	offsetof(struct arm_smccc_res, a0));
->    DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
-> +  DEFINE(ARM_SMCCC_RES_QUIRK_ID_OFFS,		offsetof(struct arm_smccc_res, quirk.id));
-> +  DEFINE(ARM_SMCCC_RES_QUIRK_STATE_OFFS,	offsetof(struct arm_smccc_res, quirk.state));
->    BLANK();
->    DEFINE(HIBERN_PBE_ORIG,	offsetof(struct pbe, orig_address));
->    DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
-> diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
-> index ae0496fa4235..3c6c976eaf5c 100644
-> --- a/arch/arm64/kernel/smccc-call.S
-> +++ b/arch/arm64/kernel/smccc-call.S
-> @@ -12,6 +12,7 @@
->   *
->   */
->  #include <linux/linkage.h>
-> +#include <linux/arm-smccc.h>
->  #include <asm/asm-offsets.h>
->  
->  	.macro SMCCC instr
-> @@ -20,7 +21,12 @@
->  	ldr	x4, [sp]
->  	stp	x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
->  	stp	x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
-> -	ret
-> +	ldr	x9, [x4, #ARM_SMCCC_RES_QUIRK_ID_OFFS]
-> +	cbz	x9, 1f /* ARM_SMCCC_QUIRK_NONE */
-> +	cmp	x9, #ARM_SMCCC_QUIRK_QCOM_A6
-> +	b.ne	1f
-> +	str	x6, [x4, ARM_SMCCC_RES_QUIRK_STATE_OFFS]
-> +1:	ret
->  	.cfi_endproc
->  	.endm
->  
-> diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-> index b5abfda80465..a3a6e291feb6 100644
-> --- a/include/linux/arm-smccc.h
-> +++ b/include/linux/arm-smccc.h
-> @@ -14,9 +14,6 @@
->  #ifndef __LINUX_ARM_SMCCC_H
->  #define __LINUX_ARM_SMCCC_H
->  
-> -#include <linux/linkage.h>
-> -#include <linux/types.h>
-> -
->  /*
->   * This file provides common defines for ARM SMC Calling Convention as
->   * specified in
-> @@ -60,6 +57,21 @@
->  #define ARM_SMCCC_OWNER_TRUSTED_OS	50
->  #define ARM_SMCCC_OWNER_TRUSTED_OS_END	63
->  
-> +#define ARM_SMCCC_QUIRK_NONE	0
-> +#define ARM_SMCCC_QUIRK_QCOM_A6	1 /* Save/restore register a6 */
-> +
-> +#ifndef __ASSEMBLY__
-> +
-> +#include <linux/linkage.h>
-> +#include <linux/types.h>
-> +
-> +struct arm_smccc_quirk {
-> +	int	id;
-> +	union {
-> +		unsigned long a6;
-> +	} state;
-> +};
-> +
->  /**
->   * struct arm_smccc_res - Result from SMC/HVC call
->   * @a0-a3 result values from registers 0 to 3
-> @@ -69,6 +81,7 @@ struct arm_smccc_res {
->  	unsigned long a1;
->  	unsigned long a2;
->  	unsigned long a3;
-> +	struct arm_smccc_quirk quirk;
->  };
->  
->  /**
-> @@ -101,4 +114,5 @@ asmlinkage void arm_smccc_hvc(unsigned long a0, unsigned long a1,
->  			unsigned long a5, unsigned long a6, unsigned long a7,
->  			struct arm_smccc_res *res);
->  
-> +#endif /* !__ASSEMBLY__ */
->  #endif /*__LINUX_ARM_SMCCC_H*/
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Correct, there is no way to disconnect DP/DM and reporting Vbus low for
+> a while does the trick.
+
+Without physically disconnecting DP/DM, we still have a way to properly
+teardown the enumerated devices. Please check musb_softconnect_write()
+in musb_debugfs.c.
+
+Regards,
+-Bin.
+
+> 
+> Regards,
+> 
+> Hans
