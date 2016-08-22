@@ -1,39 +1,52 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 22 Aug 2016 15:10:46 +0100
-Subject: [PATCHv2] arm: l2x0: add PMU support
-In-Reply-To: <1471602346-26466-1-git-send-email-mark.rutland@arm.com>
-References: <1471602346-26466-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1471875046.5473.11.camel@arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 22 Aug 2016 16:11:37 +0200
+Subject: [PATCH 1/2] ARM64: dts: amlogic: gxbb: pinctrl: add pins for PWM
+In-Reply-To: <CACRpkdYnO-9hfDjtyLhDTQjkg1FGv+rRDVjt8GRmfs=V5V5ZdA@mail.gmail.com>
+References: <1471870450-11109-1-git-send-email-narmstrong@baylibre.com>
+ <1471870450-11109-2-git-send-email-narmstrong@baylibre.com>
+ <CACRpkdZuRwvS_p9D3Sx0avr+1mtCjfGFUX3fXjRRmYS19TYvxg@mail.gmail.com>
+ <ee4431d1-2f78-b698-76ca-8a3afff8d0ee@baylibre.com>
+ <CACRpkdYnO-9hfDjtyLhDTQjkg1FGv+rRDVjt8GRmfs=V5V5ZdA@mail.gmail.com>
+Message-ID: <585c50e0-8685-4c91-3360-990fe25cc7f0@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-08-19 at 11:25 +0100, Mark Rutland wrote:
-> The L2C-220 (AKA L220) and L2C-310 (AKA PL310) cache controllers
-> feature
-> a Performance Monitoring Unit (PMU), which can be useful for tuning
-> and/or debugging. This hardware is always present and the relevant
-> registers are accessible to non-secure accesses. Thus, no special
-> firmware interface is necessary.
+On 08/22/2016 04:10 PM, Linus Walleij wrote:
+> On Mon, Aug 22, 2016 at 4:04 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+>> On 08/22/2016 04:02 PM, Linus Walleij wrote:
+>>> On Mon, Aug 22, 2016 at 2:54 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+>>>
+>>>> Add support for PWM pins, for EE and AO domains.
+>>>>
+>>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>>>
+>>> The $SUBJECT of this patch is titallyt wrong, it should be
+>>> just pinctrl: (something).
+>>>
+>>> Should I fix it up or would you like to resend?
+>>>
+>>> It looks nice otherwise.
+>>>
+>>> Yours,
+>>> Linus Walleij
+>>>
+>>
+>> Hi Linus,
+>>
+>> Yes, sorry I missed the subject.
+>>
+>> If you can fixup, it would be great !
 > 
-> This patch adds support for the PMU, plugging into the usual perf
-> infrastructure. The overflow interrupt is not always available (e.g.
-> on
-> RealView PBX A9 it is not wired up at all), and the hardware counters
-> saturate, so the driver does not make use of this. Instead, the
-> driver
-> periodically polls and reset counters as required to avoid losing
-> events due to saturation.
+> Hm I tried but the patch does not apply on my "devel" branch
+> in pinctrl. I chicken out and ask you to rebase it, there are a few
+> other patches to this driver in the devel branch.
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Tested-by: Kim Phillips <kim.phillips@arm.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Will Deacon <will.deacon@arm.com>
+> Yours,
+> Linus Walleij
+> 
 
-For what it's worth, it's enthusiastically
+Ok no problem,
 
-Acked-by: Pawel Moll <pawel.moll@arm.com>
+I'll repost.
 
-Thanks!
-
-Pawel
+Neil
