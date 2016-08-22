@@ -1,143 +1,158 @@
-From: b-liu@ti.com (Bin Liu)
-Date: Mon, 22 Aug 2016 10:38:42 -0500
-Subject: [PATCH v2 7/7] musb: sunxi: Add support for platform_set_mode
-In-Reply-To: <fd1e9692-2c69-da16-0e6e-ac7fa50077ac@redhat.com>
-References: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
- <1471288892-21702-8-git-send-email-hdegoede@redhat.com>
- <20160819213049.GC1853@uda0271908>
- <2a55a1bf-7ebf-3ab4-b231-85eba20103f1@redhat.com>
- <20160822141158.GF1853@uda0271908>
- <9699b62e-421a-ae8e-c25e-ef48beb84ce0@redhat.com>
- <20160822152421.GH1853@uda0271908>
- <fd1e9692-2c69-da16-0e6e-ac7fa50077ac@redhat.com>
-Message-ID: <20160822153842.GI1853@uda0271908>
+From: kdasu.kdev@gmail.com (Kamal Dasu)
+Date: Mon, 22 Aug 2016 11:42:55 -0400
+Subject: [PATCH v2 1/2] mtd: brcmnand: iProc big endian and ONFI support
+In-Reply-To: <20160810162438.4c6cffd3@bbrezillon>
+References: <1469051631-7896-1-git-send-email-ray.jui@broadcom.com>
+ <1469051631-7896-2-git-send-email-ray.jui@broadcom.com>
+ <20160810162438.4c6cffd3@bbrezillon>
+Message-ID: <CAC=U0a27YcmxWCbfOmRje40_eeJ4mZm2bwWzrrviF4ooKBtoRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2016 at 05:32:57PM +0200, Hans de Goede wrote:
-> HI,
-> 
-> On 22-08-16 17:24, Bin Liu wrote:
-> >On Mon, Aug 22, 2016 at 05:08:56PM +0200, Hans de Goede wrote:
-> >>Hi,
-> >>
-> >>On 22-08-16 16:11, Bin Liu wrote:
-> >>>Hi,
-> >>>
-> >>>On Sun, Aug 21, 2016 at 12:10:26PM +0200, Hans de Goede wrote:
-> >>>>Hi,
-> >>>>
-> >>>>On 19-08-16 23:30, Bin Liu wrote:
-> >>>>>Hi,
-> >>>>>
-> >>>>>On Mon, Aug 15, 2016 at 09:21:32PM +0200, Hans de Goede wrote:
-> >>>>>>This allows run-time dr_mode switching support via the "mode" musb
-> >>>>>>sysfs attribute.
-> >>>>>>
-> >>>>>>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>>>>>---
-> >>>>>>drivers/usb/musb/sunxi.c | 52 ++++++++++++++++++++++++++++++++++++++++++++----
-> >>>>>>1 file changed, 48 insertions(+), 4 deletions(-)
-> >>>>>>
-> >>>>>>diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-> >>>>>>index c6ee166..1fe7451 100644
-> >>>>>>--- a/drivers/usb/musb/sunxi.c
-> >>>>>>+++ b/drivers/usb/musb/sunxi.c
-> >>>>>>@@ -74,6 +74,7 @@
-> >>>>>>#define SUNXI_MUSB_FL_HAS_SRAM			5
-> >>>>>>#define SUNXI_MUSB_FL_HAS_RESET			6
-> >>>>>>#define SUNXI_MUSB_FL_NO_CONFIGDATA		7
-> >>>>>>+#define SUNXI_MUSB_FL_PHY_MODE_PEND		8
-> >>>>>>
-> >>>>>>/* Our read/write methods need access and do not get passed in a musb ref :| */
-> >>>>>>static struct musb *sunxi_musb;
-> >>>>>>@@ -87,6 +88,7 @@ struct sunxi_glue {
-> >>>>>>	struct phy		*phy;
-> >>>>>>	struct platform_device	*usb_phy;
-> >>>>>>	struct usb_phy		*xceiv;
-> >>>>>>+	enum phy_mode		phy_mode;
-> >>>>>>	unsigned long		flags;
-> >>>>>>	struct work_struct	work;
-> >>>>>>	struct extcon_dev	*extcon;
-> >>>>>>@@ -140,6 +142,9 @@ static void sunxi_musb_work(struct work_struct *work)
-> >>>>>>			clear_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
-> >>>>>>		}
-> >>>>>>	}
-> >>>>>>+
-> >>>>>>+	if (test_and_clear_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags))
-> >>>>>>+		phy_set_mode(glue->phy, glue->phy_mode);
-> >>>>>>}
-> >>>>>>
-> >>>>>>static void sunxi_musb_set_vbus(struct musb *musb, int is_on)
-> >>>>>>@@ -341,6 +346,41 @@ static void sunxi_musb_dma_controller_destroy(struct dma_controller *c)
-> >>>>>>{
-> >>>>>>}
-> >>>>>>
-> >>>>>>+static int sunxi_musb_set_mode(struct musb *musb, u8 mode)
-> >>>>>>+{
-> >>>>>>+	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
-> >>>>>>+	enum phy_mode new_mode;
-> >>>>>>+
-> >>>>>>+	switch (mode) {
-> >>>>>>+	case MUSB_HOST:		new_mode = PHY_MODE_USB_HOST; break;
-> >>>>>>+	case MUSB_PERIPHERAL:	new_mode = PHY_MODE_USB_DEVICE; break;
-> >>>>>>+	case MUSB_OTG:		new_mode = PHY_MODE_USB_OTG; break;
-> >>>>>
-> >>>>>Please fix the code style as commented in patch 4/7.
-> >>>>
-> >>>>Ok I will send a new version with this fixed.
-> >>>>
-> >>>>>
-> >>>>>>+	default:
-> >>>>>>+		dev_err(musb->controller->parent,
-> >>>>>>+			"Error requested mode not supported by this kernel\n");
-> >>>>>>+		return -EINVAL;
-> >>>>>>+	}
-> >>>>>>+
-> >>>>>>+	if (glue->phy_mode == new_mode)
-> >>>>>>+		return 0;
-> >>>>>>+
-> >>>>>>+	if (musb->port_mode != MUSB_PORT_MODE_DUAL_ROLE) {
-> >>>>>>+		dev_err(musb->controller->parent,
-> >>>>>>+			"Error changing modes is only supported in dual role mode\n");
-> >>>>>>+		return -EINVAL;
-> >>>>>>+	}
-> >>>>>>+
-> >>>>>>+	/*
-> >>>>>>+	 * phy_set_mode may sleep, and we're called with a spinlock held,
-> >>>>>>+	 * so let sunxi_musb_work deal with it.
-> >>>>>>+	 */
-> >>>>>>+	glue->phy_mode = new_mode;
-> >>>>>>+	set_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags);
-> >>>>>>+	schedule_work(&glue->work);
-> >>>>>
-> >>>>>When switching from host to peripheral mode, if an usb device is still
-> >>>>>plugged and enumerated, how do you handle the device disconnect?
-> >>>>
-> >>>>The phy code will report vbus low for long enough for the musb to end
-> >>>>the current session. It already does this for boards which do not
-> >>>>have working vbus detection.
-> >>>
-> >>>But you didn't disconnect DP/DM, right? then musb detects vbus is gone
-> >>>without receiving disconnect event, this is vbus error case, not a normal
-> >>>teardown.
-> >>
-> >>Correct, there is no way to disconnect DP/DM and reporting Vbus low for
-> >>a while does the trick.
-> >
-> >Without physically disconnecting DP/DM, we still have a way to properly
-> >teardown the enumerated devices. Please check musb_softconnect_write()
-> >in musb_debugfs.c.
-> 
-> That is manipulating the session bit in the devctl reg, that does not
-> work to switch from device to host role or from host to device role,
-> at least not on allwinner's musb implementation. I've already tried that
-> before writing the code to report VBus low.
+On Wed, Aug 10, 2016 at 10:24 AM, Boris Brezillon
+<boris.brezillon@free-electrons.com> wrote:
+> On Wed, 20 Jul 2016 14:53:50 -0700
+> Ray Jui <ray.jui@broadcom.com> wrote:
+>
+>> This patch adds big endian and ONFI support for various iProc based
+>> SoCs that use the core brcmstb NAND controller
+>
+> Brian, Kamal, can you review this patch?
+>
+>>
+>> This patch was originally implemented by Prafulla Kota
+>> <prafulla.kota@broadcom.com> and fully tested on iProc based NS2 SVK
+>>
+>> Signed-off-by: Prafulla Kota <prafulla.kota@broadcom.com>
+>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
 
-I would think you have to call musb_root_disconnect() first to notify
-the core to teardown the enumerated devices.
+Acked-by: Kamal Dasu <kdasu.kdev@gmail.com>
 
-> 
-> Regards,
-> 
-> Hans
+>> ---
+>>  drivers/mtd/nand/brcmnand/brcmnand.c   | 12 ++++++------
+>>  drivers/mtd/nand/brcmnand/brcmnand.h   | 13 ++++++++-----
+>>  drivers/mtd/nand/brcmnand/iproc_nand.c | 18 ++++++++++++++----
+>>  3 files changed, 28 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
+>> index b76ad7c..12a1585 100644
+>> --- a/drivers/mtd/nand/brcmnand/brcmnand.c
+>> +++ b/drivers/mtd/nand/brcmnand/brcmnand.c
+>> @@ -1279,7 +1279,7 @@ static void brcmnand_cmdfunc(struct mtd_info *mtd, unsigned command,
+>>               u32 *flash_cache = (u32 *)ctrl->flash_cache;
+>>               int i;
+>>
+>> -             brcmnand_soc_data_bus_prepare(ctrl->soc);
+>> +             brcmnand_soc_data_bus_prepare(ctrl->soc, true);
+>>
+>>               /*
+>>                * Must cache the FLASH_CACHE now, since changes in
+>> @@ -1292,7 +1292,7 @@ static void brcmnand_cmdfunc(struct mtd_info *mtd, unsigned command,
+>>                        */
+>>                       flash_cache[i] = be32_to_cpu(brcmnand_read_fc(ctrl, i));
+>>
+>> -             brcmnand_soc_data_bus_unprepare(ctrl->soc);
+>> +             brcmnand_soc_data_bus_unprepare(ctrl->soc, true);
+>>
+>>               /* Cleanup from HW quirk: restore SECTOR_SIZE_1K */
+>>               if (host->hwcfg.sector_size_1k)
+>> @@ -1508,12 +1508,12 @@ static int brcmnand_read_by_pio(struct mtd_info *mtd, struct nand_chip *chip,
+>>               brcmnand_waitfunc(mtd, chip);
+>>
+>>               if (likely(buf)) {
+>> -                     brcmnand_soc_data_bus_prepare(ctrl->soc);
+>> +                     brcmnand_soc_data_bus_prepare(ctrl->soc, false);
+>>
+>>                       for (j = 0; j < FC_WORDS; j++, buf++)
+>>                               *buf = brcmnand_read_fc(ctrl, j);
+>>
+>> -                     brcmnand_soc_data_bus_unprepare(ctrl->soc);
+>> +                     brcmnand_soc_data_bus_unprepare(ctrl->soc, false);
+>>               }
+>>
+>>               if (oob)
+>> @@ -1678,12 +1678,12 @@ static int brcmnand_write(struct mtd_info *mtd, struct nand_chip *chip,
+>>               (void)brcmnand_read_reg(ctrl, BRCMNAND_CMD_ADDRESS);
+>>
+>>               if (buf) {
+>> -                     brcmnand_soc_data_bus_prepare(ctrl->soc);
+>> +                     brcmnand_soc_data_bus_prepare(ctrl->soc, false);
+>>
+>>                       for (j = 0; j < FC_WORDS; j++, buf++)
+>>                               brcmnand_write_fc(ctrl, j, *buf);
+>>
+>> -                     brcmnand_soc_data_bus_unprepare(ctrl->soc);
+>> +                     brcmnand_soc_data_bus_unprepare(ctrl->soc, false);
+>>               } else if (oob) {
+>>                       for (j = 0; j < FC_WORDS; j++)
+>>                               brcmnand_write_fc(ctrl, j, 0xffffffff);
+>> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.h b/drivers/mtd/nand/brcmnand/brcmnand.h
+>> index ef5eabb..5c44cd4 100644
+>> --- a/drivers/mtd/nand/brcmnand/brcmnand.h
+>> +++ b/drivers/mtd/nand/brcmnand/brcmnand.h
+>> @@ -23,19 +23,22 @@ struct dev_pm_ops;
+>>  struct brcmnand_soc {
+>>       bool (*ctlrdy_ack)(struct brcmnand_soc *soc);
+>>       void (*ctlrdy_set_enabled)(struct brcmnand_soc *soc, bool en);
+>> -     void (*prepare_data_bus)(struct brcmnand_soc *soc, bool prepare);
+>> +     void (*prepare_data_bus)(struct brcmnand_soc *soc, bool prepare,
+>> +                              bool is_param);
+>>  };
+>>
+>> -static inline void brcmnand_soc_data_bus_prepare(struct brcmnand_soc *soc)
+>> +static inline void brcmnand_soc_data_bus_prepare(struct brcmnand_soc *soc,
+>> +                                              bool is_param)
+>>  {
+>>       if (soc && soc->prepare_data_bus)
+>> -             soc->prepare_data_bus(soc, true);
+>> +             soc->prepare_data_bus(soc, true, is_param);
+>>  }
+>>
+>> -static inline void brcmnand_soc_data_bus_unprepare(struct brcmnand_soc *soc)
+>> +static inline void brcmnand_soc_data_bus_unprepare(struct brcmnand_soc *soc,
+>> +                                                bool is_param)
+>>  {
+>>       if (soc && soc->prepare_data_bus)
+>> -             soc->prepare_data_bus(soc, false);
+>> +             soc->prepare_data_bus(soc, false, is_param);
+>>  }
+>>
+>>  static inline u32 brcmnand_readl(void __iomem *addr)
+>> diff --git a/drivers/mtd/nand/brcmnand/iproc_nand.c b/drivers/mtd/nand/brcmnand/iproc_nand.c
+>> index 585596c..4c6ae11 100644
+>> --- a/drivers/mtd/nand/brcmnand/iproc_nand.c
+>> +++ b/drivers/mtd/nand/brcmnand/iproc_nand.c
+>> @@ -74,7 +74,8 @@ static void iproc_nand_intc_set(struct brcmnand_soc *soc, bool en)
+>>       spin_unlock_irqrestore(&priv->idm_lock, flags);
+>>  }
+>>
+>> -static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare)
+>> +static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare,
+>> +                               bool is_param)
+>>  {
+>>       struct iproc_nand_soc *priv =
+>>                       container_of(soc, struct iproc_nand_soc, soc);
+>> @@ -86,10 +87,19 @@ static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare)
+>>
+>>       val = brcmnand_readl(mmio);
+>>
+>> -     if (prepare)
+>> -             val |= IPROC_NAND_APB_LE_MODE;
+>> -     else
+>> +     /*
+>> +      * In the case of BE or when dealing with NAND data, alway configure
+>> +      * the APB bus to LE mode before accessing the FIFO and back to BE mode
+>> +      * after the access is done
+>> +      */
+>> +     if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN) || !is_param) {
+>> +             if (prepare)
+>> +                     val |= IPROC_NAND_APB_LE_MODE;
+>> +             else
+>> +                     val &= ~IPROC_NAND_APB_LE_MODE;
+>> +     } else { /* when in LE accessing the parameter page, keep APB in BE */
+>>               val &= ~IPROC_NAND_APB_LE_MODE;
+>> +     }
+>>
+>>       brcmnand_writel(val, mmio);
+>>
+>
