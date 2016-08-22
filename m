@@ -1,24 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Aug 2016 11:00:07 +0100
-Subject: [PATCH 6/8] arm64: Introduce raw_{d,i}cache_line_size
-In-Reply-To: <1471525832-21209-7-git-send-email-suzuki.poulose@arm.com>
-References: <1471525832-21209-1-git-send-email-suzuki.poulose@arm.com>
- <1471525832-21209-7-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160822100007.GB14680@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 22 Aug 2016 11:00:45 +0100
+Subject: [RFC PATCH v2 2/2] arm64 Kconfig: Select gigantic page
+In-Reply-To: <20160822080358.GF13596@dhcp22.suse.cz>
+References: <1471834603-27053-1-git-send-email-xieyisheng1@huawei.com>
+ <1471834603-27053-3-git-send-email-xieyisheng1@huawei.com>
+ <20160822080358.GF13596@dhcp22.suse.cz>
+Message-ID: <20160822100045.GA26494@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2016 at 02:10:30PM +0100, Suzuki K Poulose wrote:
-> On systems with mismatched i/d cache min line sizes, we need to use
-> the smallest size possible across all CPUs. This will be done by fetching
-> the system wide safe value from CPU feature infrastructure.
-> However the some special users(e.g kexec, hibernate) would need the line
-> size on the CPU (rather than the system wide), when the system wide
-> feature may not be accessible. Provide another helper which will fetch
-> cache line size on the current CPU.
+On Mon, Aug 22, 2016 at 10:03:58AM +0200, Michal Hocko wrote:
+> On Mon 22-08-16 10:56:43, Xie Yisheng wrote:
+> > Arm64 supports gigantic page after
+> > commit 084bd29810a5 ("ARM64: mm: HugeTLB support.")
+> > however, it got broken by 
+> > commit 944d9fec8d7a ("hugetlb: add support for gigantic page
+> > allocation at runtime")
+> > 
+> > This patch selects ARCH_HAS_GIGANTIC_PAGE to make this
+> > function can be used again.
+> 
+> I haven't double checked that the above commit really broke it but if
+> that is the case then
+>  
+> Fixes: 944d9fec8d7a ("hugetlb: add support for gigantic page allocation at runtime")
+> 
+> would be nice as well I guess. I do not think that marking it for stable
+> is really necessary considering how long it's been broken and nobody has
+> noticed...
 
-Why are these users "special"? Using a smaller line size shouldn't affect
-correctness, and I don't see kexec and hibernate as being performance
-critical in their cache maintenance.
+I'm not sure that commit broke it. The gigantic functionality introduced
+by the above commit was under an #ifdef CONFIG_X86_64. Prior
+to that we had a VM_BUG_ON(hstate_is_gigantic(h)).
 
-Will
+-- 
+Catalin
