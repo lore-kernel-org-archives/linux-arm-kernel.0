@@ -1,134 +1,95 @@
-From: ccc94453@vip.cybercity.dk (Rask Ingemann Lambertsen)
-Date: Mon, 22 Aug 2016 23:29:59 +0200
-Subject: [PATCH v4 3/3] ARM: dts: sun9i: Initial support for the Sunchip
- CX-A99 board
-In-Reply-To: <20160822185745.GC7104@lukather>
-References: <9f39145aa6a46a1e130c4b91bd120eabeb7c8929.1471637309.git.ccc94453@vip.cybercity.dk>
- <ce704da79c6263a4a5048af8f8e90f22e0849188.1471637309.git.ccc94453@vip.cybercity.dk>
- <20160822185745.GC7104@lukather>
-Message-ID: <20160822212959.yvr7abaclynxm5ta@vip.cybercity.dk>
+From: anca.emanuel@gmail.com (Anca Emanuel)
+Date: Tue, 23 Aug 2016 00:47:26 +0300
+Subject: [PATCH V2 soc/next?] ARM: BCM53573: Initial support for Broadcom
+ BCM53573 SoCs
+In-Reply-To: <CAC3K-4pY8ZEm6BvDHqU1KOWcGpZGajwP2re74HrOnNEYJ9JE4w@mail.gmail.com>
+References: <1470990396-23701-1-git-send-email-zajec5@gmail.com>
+ <20160821170138.21259-1-zajec5@gmail.com>
+ <CAC3K-4pY8ZEm6BvDHqU1KOWcGpZGajwP2re74HrOnNEYJ9JE4w@mail.gmail.com>
+Message-ID: <CAJL_dMv-XC_ZKkrMBATF=LaV2VBFE5kcT46YhUBWx=D3MCHDnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2016 at 08:57:45PM +0200, Maxime Ripard wrote:
-> Hi,
-> 
-> On Sat, Aug 13, 2016 at 12:03:57AM +0200, Rask Ingemann Lambertsen wrote:
-> > The Suncip CX-A99 board is found in at least four brands of TV boxes.
-> > It features an Allwinner A80 SOC, with either 2 GiB DDR3 DRAM and
-> > 16 GB eMMC or 4 GiB DDR3 DRAM and 32 GB eMMC, as well as several support
-> > chips for Ethernet, wireless networking, video output, SATA and power
-> > management. For details, see the linux-sunxi page about the board
-> > <URL:https://linux-sunxi.org/Sunchip_CX-A99>.
-> > 
-> > This patch only adds support for the SD and eMMC storage, real-time clock,
-> > USB 2.0 ports (and by extension the SATA port), the UART port and the LEDs.
-> > All of this relies on the boot loader to leave those parts powered up, as
-> > I'm still working on a driver for the AXP808 PMIC.
-> > 
-> > Signed-off-by: Rask Ingemann Lambertsen <ccc94453@vip.cybercity.dk>
-> 
-> It looks mostly good, but I have a couple of comments though, see below.
-> 
-> > ---
-> > 
-> > Although the vendor U-Boot lets you boot the kernel on one of the
-> > Cortex-A15 cores, the kernel gpio-regulator driver currently glitches
-> > the GPIO lines to the OZ80120 regulator such that the system crashes
-> > during startup. This part needs further work to be useful.
-> 
-> So it doesn't power the CPU through one of the AXP regulators?
-> Interesting design.
+@Jon Mason: did you read this
+https://plus.google.com/+LinusTorvalds/posts/Cb5nY4yH6pd ?
+Your email was in the spam folder on my gmail account. I manually
+select this as not spam.
+Please read Linus Torvalds message on G+ above. And tell to others in
+the same situation.
 
-The Cortex-A7 cores are powered by the dcdca regulator on the AXP 808 PMIC.
-Right now, I'm using the AXP 806 driver that Chen-Yu Tsai posted to drive
-the AXP 808 and so far, it looks good.
-
-[snip]
-> > +	leds {
-> > +		compatible = "gpio-leds";
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&led_pins_cx_a99>;
-> > +
-> > +		blue {
-> > +			gpios = <&pio 6 10 GPIO_ACTIVE_HIGH>;	/* PG10 */
-> > +			label = "cx-a99:blue:normal";
-> > +			default-state = "on";
-> > +		};
-> > +
-> > +		red {
-> > +			gpios = <&pio 6 11 GPIO_ACTIVE_HIGH>;	/* PG11 */
-> > +			label = "cx-a99:red:standby";
-> 
-> The last part of the label should be the function.
-
-I'm not sure what else to label them. They form a bi-colour LED emitting
-through the front of the device. The stock OS lights the blue LED when
-the device is powered on and lights the red LED when the device is
-suspended. There is no label on the front of the device telling what the
-colours mean. Documentation/devicetree/bindings/leds/common.txt and
-Documentation/devicetree/bindings/leds/leds-gpio.txt don't provide much in
-the way of examples. Suggestions are welcome.
-
-[snip]
-> > +
-> > +/* Each GPIO controls VBUS for a port on the GL850G hub connected to ehci0;
-> > + * PL7 for port 1, the USB connector closest to the 12 V power connector, and
-> > + * PL8 for port 2, the USB connector next to the (micro)SD card slot.
-> > + * Note: The regulators are not chained like this in reality, but
-> > + * regulator-fixed doesn't support a gpio list, and allwinner,sun9i-a80-usb-phy
-> > + * doesn't support more than one supply, so this will have to do (for now).
-> > + */
-> > +&reg_usb1_vbus {
-> > +	pinctrl-0 = <&usb1_vbus_r_pin_cx_a99>;
-> > +	gpio = <&r_pio 0 7 GPIO_ACTIVE_HIGH>;	/* PL7 */
-> > +	status = "okay";
-> > +};
-> > +
-> > +&reg_usb2_vbus {
-> > +	pinctrl-0 = <&usb2_vbus_r_pin_cx_a99>;
-> > +	gpio = <&r_pio 0 8 GPIO_ACTIVE_HIGH>;	/* PL8 */
-> 
-> I'd really prefer it to be modelled properly, and not attached to the
-> wrong device.
-> 
-> I have some work pending to allow multiple regulators in the same
-> property, but that won't be ready soon.
-> 
-> For the time being, I would suggest having two usb1 regulators
-> defined, each with their respective GPIOs, and one set to always on
-> (and keep that great comment).
-
-Will do if I don't come up with something better. I gave it a shot to
-describe the hub as a child of ehci0 with a child node for each of the
-two ports, but it didn't work.
-
-Also, using the phy-supply property for the vbus-supply is an ugly hack,
-in the first place, isn't it? Shouldn't it be more like this?
-
-&usbphy1 {
-	phy-supply = <&reg_vcc33_usbh>;
-};
-
-&ehci0 {
-	vcc-supply = <&reg_vdd09_usbh>;
-	phy = <&usbphy1>;
-
-	hub at 1 {
-		port at 1 {
-			vbus-supply = <&reg_usb1_vbus>;
-		}
-
-		port at 2 {
-			vbus-supply = <&reg_usb2_vbus>;
-		}
-	};
-};
-
-It would generally be great to be able to describe regulators that should
-be kept in sync, because the Wifi+BT module's Vbat pin is supplied by two
-regulators in parallel. IIRC, Hans de Goede ran into that as well on one
-of his boards.
-
--- 
-Rask Ingemann Lambertsen
+On Tue, Aug 23, 2016 at 12:24 AM, Jon Mason <jon.mason@broadcom.com> wrote:
+> On Sun, Aug 21, 2016 at 1:01 PM, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+>> From: Rafa? Mi?ecki <rafal@milecki.pl>
+>>
+>> BCM53573 series is a new family with embedded wireless. By marketing
+>> people it's sometimes called Northstar but it uses different CPU and has
+>> different architecture so we need a new symbol for it.
+>> Fortunately it shares some peripherals with other iProc based SoCs so we
+>> will be able to reuse some drivers/bindings.
+>>
+>> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+>
+> Looks good to me!
+>
+> Acked-by: Jon Mason <jon.mason@broadcom.com>
+>
+>
+>> ---
+>> V2: Put new symbol under "Other Architectures"
+>> ---
+>>  MAINTAINERS               |  7 +++++++
+>>  arch/arm/mach-bcm/Kconfig | 15 +++++++++++++++
+>>  2 files changed, 22 insertions(+)
+>>
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index 7304d2e..9e2db2e 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -2517,6 +2517,13 @@ F:       arch/arm/mach-bcm/bcm_5301x.c
+>>  F:     arch/arm/boot/dts/bcm5301x.dtsi
+>>  F:     arch/arm/boot/dts/bcm470*
+>>
+>> +BROADCOM BCM53573 ARM ARCHITECTURE
+>> +M:     Rafa? Mi?ecki <rafal@milecki.pl>
+>> +L:     linux-arm-kernel at lists.infradead.org
+>> +S:     Maintained
+>> +F:     arch/arm/boot/dts/bcm53573*
+>> +F:     arch/arm/boot/dts/bcm47189*
+>> +
+>>  BROADCOM BCM63XX ARM ARCHITECTURE
+>>  M:     Florian Fainelli <f.fainelli@gmail.com>
+>>  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+>> index 5832dba..6dfdc82 100644
+>> --- a/arch/arm/mach-bcm/Kconfig
+>> +++ b/arch/arm/mach-bcm/Kconfig
+>> @@ -157,6 +157,21 @@ config ARCH_BCM2835
+>>           This enables support for the Broadcom BCM2835 and BCM2836 SoCs.
+>>           This SoC is used in the Raspberry Pi and Roku 2 devices.
+>>
+>> +config ARCH_BCM_53573
+>> +       bool "Broadcom BCM53573 SoC series support"
+>> +       depends on ARCH_MULTI_V7
+>> +       select ARCH_BCM_IPROC
+>> +       select HAVE_ARM_ARCH_TIMER
+>> +
+>> +       help
+>> +         BCM53573 series is set of SoCs using ARM Cortex-A7 CPUs with wireless
+>> +         embedded in the chipset.
+>> +         This SoC line is mostly used in home routers and is some cheaper
+>> +         alternative for Northstar family.
+>> +
+>> +         The base chip is BCM53573 and there are some packaging modifications
+>> +         like BCM47189 and BCM47452.
+>> +
+>>  config ARCH_BCM_63XX
+>>         bool "Broadcom BCM63xx DSL SoC"
+>>         depends on ARCH_MULTI_V7
+>> --
+>> 2.9.3
+>>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
