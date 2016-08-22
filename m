@@ -1,152 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 22 Aug 2016 11:12:06 +0100
-Subject: [RFC PATCH v3 6/7] arm64: irqflags: Use ICC sysregs to implement
- IRQ masking
-In-Reply-To: <1471623195-7829-7-git-send-email-daniel.thompson@linaro.org>
-References: <1471623195-7829-1-git-send-email-daniel.thompson@linaro.org>
- <1471623195-7829-7-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <57BACFF6.6060807@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 22 Aug 2016 11:21:27 +0100
+Subject: [RFC PATCH v2 2/2] arm64 Kconfig: Select gigantic page
+In-Reply-To: <1471834603-27053-3-git-send-email-xieyisheng1@huawei.com>
+References: <1471834603-27053-1-git-send-email-xieyisheng1@huawei.com>
+ <1471834603-27053-3-git-send-email-xieyisheng1@huawei.com>
+Message-ID: <20160822102127.GB26494@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-On 19/08/16 17:13, Daniel Thompson wrote:
-> Currently irqflags is implemented using the PSR's I bit. It is possible
-> to implement irqflags by using the co-processor interface to the GIC.
-> Using the co-processor interface makes it feasible to simulate NMIs
-> using GIC interrupt prioritization.
+On Mon, Aug 22, 2016 at 10:56:43AM +0800, Xie Yisheng wrote:
+> Arm64 supports gigantic page after
+> commit 084bd29810a5 ("ARM64: mm: HugeTLB support.")
+> however, it got broken by 
+> commit 944d9fec8d7a ("hugetlb: add support for gigantic page
+> allocation at runtime")
 > 
-> This patch changes the irqflags macros to modify, save and restore
-> ICC_PMR_EL1. This has a substantial knock on effect for the rest of
-> the kernel. There are four reasons for this:
+> This patch selects ARCH_HAS_GIGANTIC_PAGE to make this
+> function can be used again.
 > 
-> 1. The state of the ICC_PMR_EL1_G_BIT becomes part of the CPU context
-
-What is this G bit? I can't spot anything like this in the GICv3 spec.
-
->    and must be saved and restored during traps. To simplify the
->    additional context management the ICC_PMR_EL1_G_BIT is converted
->    into a fake (reserved) bit within the PSR (PSR_G_BIT). Naturally
->    this approach will need to be changed if future ARM architecture
->    extensions make use of this bit.
-> 
-> 2. The hardware automatically masks the I bit (at boot, during traps, etc).
->    When the I bit is set by hardware we must add code to switch from I
->    bit masking and PMR masking.
-> 
-> 3. Some instructions, noteably wfi, require that the PMR not be used
->    for interrupt masking. Before calling these instructions we must
->    switch from PMR masking to I bit masking.
-> 
-> 4. We use the alternatives system to all a single kernel to boot and
->    switch between the different masking approaches.
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> Signed-off-by: Xie Yisheng <xieyisheng1@huawei.com>
 > ---
->  arch/arm64/Kconfig                  |  15 +++++
->  arch/arm64/include/asm/arch_gicv3.h |  51 +++++++++++++++++
->  arch/arm64/include/asm/assembler.h  |  32 ++++++++++-
->  arch/arm64/include/asm/irqflags.h   | 106 ++++++++++++++++++++++++++++++++++++
->  arch/arm64/include/asm/ptrace.h     |  23 ++++++++
->  arch/arm64/kernel/entry.S           |  77 ++++++++++++++++++++++----
->  arch/arm64/kernel/head.S            |  35 ++++++++++++
->  arch/arm64/kernel/smp.c             |   6 ++
->  arch/arm64/mm/proc.S                |  23 ++++++++
->  drivers/irqchip/irq-gic-v3.c        |   2 +
->  include/linux/irqchip/arm-gic.h     |   2 +-
->  11 files changed, 356 insertions(+), 16 deletions(-)
+>  arch/arm64/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
 > 
 > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index bc3f00f586f1..56846724d2af 100644
+> index bc3f00f..92217f6 100644
 > --- a/arch/arm64/Kconfig
 > +++ b/arch/arm64/Kconfig
-> @@ -718,6 +718,21 @@ config FORCE_MAX_ZONEORDER
->  	  However for 4K, we choose a higher default value, 11 as opposed to 10, giving us
->  	  4M allocations matching the default size used by generic code.
->  
-> +config USE_ICC_SYSREGS_FOR_IRQFLAGS
-> +	bool "Use ICC system registers for IRQ masking"
-> +	select CONFIG_ARM_GIC_V3
-> +	help
-> +	  Using the ICC system registers for IRQ masking makes it possible
-> +	  to simulate NMI on ARM64 systems. This allows several interesting
-> +	  features (especially debug features) to be used on these systems.
-> +
-> +	  Say Y here to implement IRQ masking using ICC system
-> +	  registers. This will result in an unbootable kernel if these
+> @@ -9,6 +9,7 @@ config ARM64
+>  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+>  	select ARCH_HAS_ELF_RANDOMIZE
+>  	select ARCH_HAS_GCOV_PROFILE_ALL
+> +	select ARCH_HAS_GIGANTIC_PAGE
 
-Is that a true statement? If so, this is not acceptable. We want a
-kernel that has this feature enabled to boot on anything, whether it has
-GICv3 or not. It should disable itself on a GICv2 system.
-
-> +	  registers are not implemented or made inaccessible by the
-> +	  EL3 firmare or EL2 hypervisor (if present).
-> +
-> +	  If unsure, say N
-> +
->  menuconfig ARMV8_DEPRECATED
->  	bool "Emulate deprecated/obsolete ARMv8 instructions"
->  	depends on COMPAT
-> diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-> index fc2a0cb47b2c..a4ad69e2831b 100644
-> --- a/arch/arm64/include/asm/arch_gicv3.h
-> +++ b/arch/arm64/include/asm/arch_gicv3.h
-> @@ -80,6 +80,9 @@
->  #include <linux/stringify.h>
->  #include <asm/barrier.h>
->  
-> +/* Our default, arbitrary priority value. Linux only uses one anyway. */
-> +#define DEFAULT_PMR_VALUE	0xf0
-> +
->  /*
->   * Low-level accessors
->   *
-> @@ -102,9 +105,35 @@ static inline void gic_write_dir(u32 irq)
->  static inline u64 gic_read_iar_common(void)
->  {
->  	u64 irqstat;
-> +	u64 __maybe_unused daif;
-> +	u64 __maybe_unused pmr;
-> +	u64 __maybe_unused default_pmr_value = DEFAULT_PMR_VALUE;
->  
-> +#ifndef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
->  	asm volatile("mrs_s %0, " __stringify(ICC_IAR1_EL1) : "=r" (irqstat));
->  	dsb(sy);
-> +#else
-> +	/*
-> +	 * The PMR may be configured to mask interrupts when this code is
-> +	 * called, thus in order to acknowledge interrupts we must set the
-> +	 * PMR to its default value before reading from the IAR.
-> +	 *
-> +	 * To do this without taking an interrupt we also ensure the I bit
-> +	 * is set whilst we are interfering with the value of the PMR.
-> +	 */
-> +	asm volatile(
-> +		"mrs	%1, daif\n\t"			     /* save I bit  */
-> +		"msr	daifset, #2\n\t"		     /* set I bit   */
-> +		"mrs_s  %2, " __stringify(ICC_PMR_EL1) "\n\t"/* save PMR    */
-> +		"msr_s	" __stringify(ICC_PMR_EL1) ",%3\n\t" /* set PMR     */
-> +		"mrs_s	%0, " __stringify(ICC_IAR1_EL1) "\n\t" /* ack int   */
-> +		"msr_s  " __stringify(ICC_PMR_EL1) ",%2\n\t" /* restore PMR */
-> +		"isb\n\t"
-> +		"msr	daif, %1"			     /* restore I   */
-> +		: "=r" (irqstat), "=&r" (daif), "=&r" (pmr)
-> +		: "r" (default_pmr_value));
-
-I'm a bit puzzled by this. Why would you have to mess with PMR or DAIF
-at this stage? Why can't we just let the GIC priority mechanism do its
-thing? I'd expect the initial setting of PMR (indicating whether or not
-we have normal interrupts enabled or not) to be enough to perform the
-filtering.
-
-You may get an NMI while you're already handling an interrupt, but
-that's fair game, and that's not something we should prevent.
-
-What am I missing?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
