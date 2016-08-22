@@ -1,56 +1,72 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 22 Aug 2016 14:47:30 +0100
-Subject: [PATCH v24 5/9] arm64: kdump: add kdump support
-In-Reply-To: <20160822012919.GI20080@linaro.org>
-References: <20160809015248.28414-2-takahiro.akashi@linaro.org>
- <20160809015615.28527-1-takahiro.akashi@linaro.org>
- <20160809015615.28527-3-takahiro.akashi@linaro.org>
- <57AB586D.3080900@arm.com> <20160818071547.GC20080@linaro.org>
- <20160819012651.GE20080@linaro.org>
- <20160819112217.GB22221@localhost.localdomain>
- <20160822012919.GI20080@linaro.org>
-Message-ID: <57BB0272.1000008@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 22 Aug 2016 14:48:57 +0100
+Subject: [PATCH] arm64: errata: Pass --fix-cortex-a53-843419 to ld if
+ workaround enabled
+Message-ID: <1471873737-7614-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/08/16 02:29, AKASHI Takahiro wrote:
-> On Fri, Aug 19, 2016 at 04:52:17PM +0530, Pratyush Anand wrote:
->> It will help kexec-tools to prevent copying  of any unnecessary data. I
->> think, then you also need to change phys_offset calculation in kexec-tools. That
->> should be start of either of first "reserved" or "System RAM" block.
-> 
-> Good point, but I'm not sure this is always true.
+Cortex-A53 erratum 843419 is worked around by the linker, although it is
+a configure-time option to GCC as to whether ld is actually asked to
+apply the workaround or not.
 
-> Is there any system whose ACPI memory is *not* part of DRAM
+This patch ensures that we pass --fix-cortex-a53-843419 to the linker
+when both CONFIG_ARM64_ERRATUM_843419=y and the linker supports the
+option.
 
->From the spec, it looks like this is allowed.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/Kconfig  | 15 +++++----------
+ arch/arm64/Makefile |  9 +++++++++
+ 2 files changed, 14 insertions(+), 10 deletions(-)
 
-What do you mean by 'DRAM'? Any ACPI region will be in the UEFI memory map, so
-the question is what is its type and memory attributes?
-The UEFI spec[0] says ACPI regions can have a type of EfiACPIReclaimMemory or
-EfiACPIMemoryNVS, the memory attributes aren't specified, so are chosen by the
-firmware.
-
-It is possible these regions have to be mapped non-cacheable, page 40 has a
-couple of:
-> If no information about the table location exists in the UEFI memory map or
-ACPI memory
-> descriptors, the table is assumed to be non-cached.
-
-reserve_regions() in drivers/firmware/efi/arm-init.c will add any entry in the
-memory map that has a 'WB' attribute to the memblock.memory list (via
-early_init_dt_add_memory_arch()), it will also mark as no-map regions that have
-this attribute and aren't in the is_reserve_region() list.
-
-If these ACPI regions have the 'WB' attribute, we add them as memory and mark
-them nomap. These show up as either a hole, or 'reserved' in /proc/iomem.
-If they don't have the 'WB' attribute, then then they are left out of memblock
-and aren't part of DRAM, I don't think these will show up in /proc/iomem at all.
-
-
-Thanks,
-
-James
-
-[0] '2.3.6 AArch64 Platforms' of version 2.6 of the UEFI spec at
-http://uefi.org/specifications
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index bc3f00f586f1..e4b7d10e8e1c 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -415,18 +415,13 @@ config ARM64_ERRATUM_845719
+ 
+ config ARM64_ERRATUM_843419
+ 	bool "Cortex-A53: 843419: A load or store might access an incorrect address"
+-	depends on MODULES
+ 	default y
+-	select ARM64_MODULE_CMODEL_LARGE
++	select ARM64_MODULE_CMODEL_LARGE if MODULES
+ 	help
+-	  This option builds kernel modules using the large memory model in
+-	  order to avoid the use of the ADRP instruction, which can cause
+-	  a subsequent memory access to use an incorrect address on Cortex-A53
+-	  parts up to r0p4.
+-
+-	  Note that the kernel itself must be linked with a version of ld
+-	  which fixes potentially affected ADRP instructions through the
+-	  use of veneers.
++	  This option links the kernel with '--fix-cortex-a53-843419' and
++	  builds modules using the large memory model in order to avoid the use
++	  of the ADRP instruction, which can cause a subsequent memory access
++	  to use an incorrect address on Cortex-A53 parts up to r0p4.
+ 
+ 	  If unsure, say Y.
+ 
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 5b54f8c021d8..c5ad4957e7ee 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -18,6 +18,15 @@ ifneq ($(CONFIG_RELOCATABLE),)
+ LDFLAGS_vmlinux		+= -pie -Bsymbolic
+ endif
+ 
++ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
++ld-843419-workaround := $(call ld-option, --fix-cortex-a53-843419)
++  ifeq ($(ld-843419-workaround),)
++$(warning ld does not support --fix-cortex-a53-843419; kernel may be susceptible to erratum)
++  else
++LDFLAGS_vmlinux	+= --fix-cortex-a53-843419
++  endif
++endif
++
+ KBUILD_DEFCONFIG := defconfig
+ 
+ # Check for binutils support for specific extensions
+-- 
+2.1.4
