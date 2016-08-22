@@ -1,75 +1,101 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 22 Aug 2016 12:05:15 -0500
-Subject: [PATCH] pci: Add support for unbinding the generic PCI host
- controller
-In-Reply-To: <57698276.6050606@siemens.com>
-References: <57698276.6050606@siemens.com>
-Message-ID: <20160822170515.GF18628@localhost>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 22 Aug 2016 19:09:56 +0200
+Subject: [PATCH 3/3] arm: dts: thermal: add thermal/auxadc node.
+In-Reply-To: <1471245268.14287.14.camel@mtksdaap41>
+References: <1467882386-40544-1-git-send-email-dawei.chien@mediatek.com>
+ <1467882386-40544-4-git-send-email-dawei.chien@mediatek.com>
+ <fd3f0c2f-f0ad-dd0f-cf2b-eb658f72d735@gmail.com>
+ <1471245268.14287.14.camel@mtksdaap41>
+Message-ID: <7a7684dc-aea5-15f8-04fb-494b2085a3fe@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jan,
 
-On Tue, Jun 21, 2016 at 08:07:50PM +0200, Jan Kiszka wrote:
-> Particularly useful when working in virtual environments where the
-> controller may come and go, but possibly not only there.
 
-I'm not sure where we're at with this.  Will had a few questions about
-the tear-down paths, and I couldn't tell what the resolution was.
+On 15/08/16 09:14, dawei chien wrote:
+> Hi Matthias,
+>
+> On Thu, 2016-08-11 at 17:51 +0200, Matthias Brugger wrote:
+>>
+>> On 07/07/16 11:06, Dawei Chien wrote:
+>>> This adds the thermal controller and auxadc nodes
+>>> to the Mediatek MT2701 dtsi file.
+>>>
+>>> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
+>>> ---
+>>> This patch depned on:
+>>> https://patchwork.kernel.org/patch/9213545/
+>>> ---
+>>>  arch/arm/boot/dts/mt2701.dtsi |   43 +++++++++++++++++++++++++++++++++++++++++
+>>>  1 file changed, 43 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+>>> index 2ac8b50..0834a23 100644
+>>> --- a/arch/arm/boot/dts/mt2701.dtsi
+>>> +++ b/arch/arm/boot/dts/mt2701.dtsi
+>>> @@ -77,6 +77,36 @@
+>>>  		#clock-cells = <0>;
+>>>  	};
+>>>
+>>> +	thermal-zones {
+>>> +		cpu_thermal: cpu_thermal {
+>>> +			polling-delay-passive = <1000>; /* milliseconds */
+>>> +			polling-delay = <1000>; /* milliseconds */
+>>> +
+>>> +			thermal-sensors = <&thermal 0>;
+>>> +			sustainable-power = <1000>;
+>>> +
+>>> +			trips {
+>>> +				threshold: trip-point at 0 {
+>>> +					temperature = <68000>;
+>>> +					hysteresis = <2000>;
+>>> +					type = "passive";
+>>> +				};
+>>> +
+>>> +				target: trip-point at 1 {
+>>> +					temperature = <85000>;
+>>> +					hysteresis = <2000>;
+>>> +					type = "passive";
+>>> +				};
+>>> +
+>>> +				cpu_crit: cpu_crit at 0 {
+>>> +					temperature = <115000>;
+>>> +					hysteresis = <2000>;
+>>> +					type = "critical";
+>>> +				};
+>>> +			};
+>>> +		};
+>>> +	};
+>>> +
+>>>  	timer {
+>>>  		compatible = "arm,armv7-timer";
+>>>  		interrupt-parent = <&gic>;
+>>> @@ -183,4 +213,17 @@
+>>>  		clocks = <&uart_clk>;
+>>>  		status = "disabled";
+>>>  	};
+>>> +
+>>> +	thermal: thermal at 1100b000 {
+>>> +		#thermal-sensor-cells = <0>;
+>>> +		compatible = "mediatek,mt2701-thermal";
+>>> +		reg = <0 0x1100b000 0 0x1000>;
+>>> +		interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
+>>> +		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
+>>> +		clock-names = "therm", "auxadc";
+>>> +		resets = <&pericfg 0x10>;
+>>> +		reset-names = "therm";
+>>> +		mediatek,auxadc = <&auxadc>;
+>>> +		mediatek,apmixedsys = <&apmixedsys>;
+>>> +	};
+>>>  };
+>>>
+>>
+>> what about:
+>> status = "disabled"; ?
+>
+> Since thermal driver would protect our platform by shutdown method once
+> SoC temperature over critical point, I prefer keep this rather than
+> disabling, how do you think, thank you.
+>
 
-> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
-> ---
->  drivers/pci/ecam.h                  |  1 +
->  drivers/pci/host/pci-host-common.c  | 13 +++++++++++++
->  drivers/pci/host/pci-host-generic.c |  1 +
->  3 files changed, 15 insertions(+)
-> 
-> diff --git a/drivers/pci/ecam.h b/drivers/pci/ecam.h
-> index 9878beb..5a5f607 100644
-> --- a/drivers/pci/ecam.h
-> +++ b/drivers/pci/ecam.h
-> @@ -63,5 +63,6 @@ extern struct pci_ecam_ops pci_generic_ecam_ops;
->  /* for DT-based PCI controllers that support ECAM */
->  int pci_host_common_probe(struct platform_device *pdev,
->  			  struct pci_ecam_ops *ops);
-> +int pci_host_common_remove(struct platform_device *pdev);
->  #endif
->  #endif
-> diff --git a/drivers/pci/host/pci-host-common.c b/drivers/pci/host/pci-host-common.c
-> index 8cba7ab..c0ff4b1 100644
-> --- a/drivers/pci/host/pci-host-common.c
-> +++ b/drivers/pci/host/pci-host-common.c
-> @@ -164,6 +164,19 @@ int pci_host_common_probe(struct platform_device *pdev,
->  	}
->  
->  	pci_bus_add_devices(bus);
-> +	platform_set_drvdata(pdev, bus);
-> +	return 0;
-> +}
-> +
-> +int pci_host_common_remove(struct platform_device *pdev)
-> +{
-> +	struct pci_bus *bus = platform_get_drvdata(pdev);
-> +
-> +	pci_lock_rescan_remove();
-> +	pci_stop_root_bus(bus);
-> +	pci_remove_root_bus(bus);
-> +	pci_unlock_rescan_remove();
-> +
->  	return 0;
->  }
->  
-> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> index 6eaceab..0a2e75b 100644
-> --- a/drivers/pci/host/pci-host-generic.c
-> +++ b/drivers/pci/host/pci-host-generic.c
-> @@ -65,6 +65,7 @@ static struct platform_driver gen_pci_driver = {
->  		.of_match_table = gen_pci_of_match,
->  	},
->  	.probe = gen_pci_probe,
-> +	.remove = pci_host_common_remove,
->  };
->  module_platform_driver(gen_pci_driver);
->  
-> -- 
-> 2.1.4
+Sounds reasonable. Thanks
