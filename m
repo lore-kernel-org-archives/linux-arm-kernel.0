@@ -1,42 +1,68 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 22 Aug 2016 13:11:27 -0600
-Subject: [PATCH v3 10/12] arm64: dts: tegra: Add NVIDIA P2771 board support
-In-Reply-To: <20160819173233.13260-11-thierry.reding@gmail.com>
-References: <20160819173233.13260-1-thierry.reding@gmail.com>
- <20160819173233.13260-11-thierry.reding@gmail.com>
-Message-ID: <67ca2714-8f12-d289-2b67-b31d6fb37fa8@wwwdotorg.org>
+From: mikko.rapeli@iki.fi (Mikko Rapeli)
+Date: Mon, 22 Aug 2016 20:33:11 +0200
+Subject: [PATCH v05 54/72] include/uapi/xen/privcmd.h: fix compilation in
+ userspace
+In-Reply-To: <1471890809-4383-1-git-send-email-mikko.rapeli@iki.fi>
+References: <1471890809-4383-1-git-send-email-mikko.rapeli@iki.fi>
+Message-ID: <1471890809-4383-55-git-send-email-mikko.rapeli@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/19/2016 11:32 AM, Thierry Reding wrote:
-> From: Joseph Lo <josephl@nvidia.com>
->
-> Add NVIDIA P2771 is composed of a P3310 processor module that connects
-> to the P2597 I/O board. It comes with a 1200x1920 MIPI DSI panel
-> connected via the P2597's display connector and has several connectors
-> such as HDMI, USB 3.0, PCIe and ethernet.
+xen/interface/xen.h is not exported from kernel headers so remove the
+dependency and provide needed defines for domid_t and xen_pfn_t if they
+are not already defined by some other e.g. Xen specific headers.
 
->  arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts | 8 ++++++++
+Suggested by Andrew Cooper <andrew.cooper3@citrix.com> on lkml message
+<5569F9C9.8000607@citrix.com>.
 
-The DT will be different for the different HW versions. So far, there 
-are at least 3 different versions with 3 combinations of 2 different HW 
-changes (PCIe lane layout, and SD card GPIO assignments). I suspect 
-we'll want this file to be tegra186-p2771-0000-NNN.dts where NNN is the 
-version number from the EEPROM (which is 000 for the first version, 300 
-for the version that introduces the first change, and 500 for the 
-version that introduces the second change).
+The ifdef for ARM is ugly but did not find better solutions for it.
 
-> diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
+Fixes userspace compilation error:
 
-> +#include "tegra186-p3310.dtsi"
-> +
-> +/ {
-> +	model = "NVIDIA Tegra186 P2771-0000 Board";
-> +	compatible = "nvidia,p2771-0000", "nvidia,tegra186";
+xen/privcmd.h:38:31: fatal error: xen/interface/xen.h: No such file or directory
 
-Do we need to propagate the "nvidia,p3310" entry from the included CVM 
-DT? It'd be nice if we could write:
+Signed-off-by: Mikko Rapeli <mikko.rapeli@iki.fi>
+Cc: David Vrabel <david.vrabel@citrix.com>
+---
+ arch/arm/include/asm/xen/interface.h |  2 +-
+ include/uapi/xen/privcmd.h           | 12 +++++++++++-
+ 2 files changed, 12 insertions(+), 2 deletions(-)
 
-/prepend/ compatible = "nvidia,p2771-0000";
-
-... and have that happen automatically.
+diff --git a/arch/arm/include/asm/xen/interface.h b/arch/arm/include/asm/xen/interface.h
+index 75d5968..6898ee1 100644
+--- a/arch/arm/include/asm/xen/interface.h
++++ b/arch/arm/include/asm/xen/interface.h
+@@ -38,7 +38,7 @@
+  * fine since it simply wouldn't be able to create any sure pfns in
+  * the first place.
+  */
+-typedef uint64_t xen_pfn_t;
++typedef __u64 xen_pfn_t;
+ #define PRI_xen_pfn "llx"
+ typedef uint64_t xen_ulong_t;
+ #define PRI_xen_ulong "llx"
+diff --git a/include/uapi/xen/privcmd.h b/include/uapi/xen/privcmd.h
+index 7ddeeda..16c11f9 100644
+--- a/include/uapi/xen/privcmd.h
++++ b/include/uapi/xen/privcmd.h
+@@ -35,7 +35,17 @@
+ 
+ #include <linux/types.h>
+ #include <linux/compiler.h>
+-#include <xen/interface/xen.h>
++
++/* Defined by include/xen/interface/xen.h, but it is not part of Linux uapi */
++#ifndef __XEN_PUBLIC_XEN_H__
++typedef __u16 domid_t;
++
++#if (defined __ARMEL__ || defined __ARMEB__)
++typedef __u64 xen_pfn_t;
++#else
++typedef unsigned long xen_pfn_t;
++#endif /* (defined __ARMEL__ || defined __ARMEB__) */
++#endif /* __XEN_PUBLIC_XEN_H__ */
+ 
+ struct privcmd_hypercall {
+ 	__u64 op;
+-- 
+2.8.1
