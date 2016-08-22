@@ -1,61 +1,50 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Mon, 22 Aug 2016 10:33:42 +0200
-Subject: [PATCH v8 1/4] nmi_backtrace: add more trigger_*_cpu_backtrace()
- methods
-In-Reply-To: <233b9270-2f35-b3c5-2520-bf513153f260@mellanox.com>
-References: <1471377024-2244-1-git-send-email-cmetcalf@mellanox.com>
- <1471377024-2244-2-git-send-email-cmetcalf@mellanox.com>
- <20160818141242.GK26194@pathway.suse.cz>
- <233b9270-2f35-b3c5-2520-bf513153f260@mellanox.com>
-Message-ID: <20160822083342.GA4866@pathway.suse.cz>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 22 Aug 2016 17:41:47 +0900
+Subject: [PATCH 1/2] dt-bindings: Add the clock id for CMU_CDREX (DRAM Express
+ Controller)
+In-Reply-To: <1471855308-12791-1-git-send-email-cw00.choi@samsung.com>
+References: <1471855308-12791-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1471855308-12791-2-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2016-08-19 21:54:31, Chris Metcalf wrote:
-> On 8/18/2016 10:12 AM, Petr Mladek wrote:
-> >On Tue 2016-08-16 15:50:21, Chris Metcalf wrote:
-> >>Currently you can only request a backtrace of either all cpus, or
-> >>all cpus but yourself.  It can also be helpful to request a remote
-> >>backtrace of a single cpu, and since we want that, the logical
-> >>extension is to support a cpumask as the underlying primitive.
-> >>
-> >>This change modifies the existing lib/nmi_backtrace.c code to take
-> >>a cpumask as its basic primitive, and modifies the linux/nmi.h code
-> >>to use the new "cpumask" method instead.
-> >>
-> >>The mips code ignored the "include_self" boolean but with this change
-> >>it will now also dump a local backtrace if requested.
-> >>
-> >>diff --git a/arch/mips/kernel/process.c b/arch/mips/kernel/process.c
-> >>index 7429ad09fbe3..fea1fa7726e3 100644
-> >>--- a/arch/mips/kernel/process.c
-> >>+++ b/arch/mips/kernel/process.c
-> >>@@ -569,9 +569,16 @@ static void arch_dump_stack(void *info)
-> >>  	dump_stack();
-> >>  }
-> >>-void arch_trigger_all_cpu_backtrace(bool include_self)
-> >>+void arch_trigger_cpumask_backtrace(const cpumask_t *mask, bool exclude_self)
-> >>  {
-> >>-	smp_call_function(arch_dump_stack, NULL, 1);
-> >>+	long this_cpu = get_cpu();
-> >>+
-> >>+	if (cpumask_test_cpu(this_cpu, mask) && !exclude_self)
-> >>+		dump_stack();
-> >The bit is not cleared in the mask. Therefore arch_dump_stack
-> >will get called for this CPU as well.
-> 
-> Actually, and kind of confusingly, smp_call_function_many() never calls
-> the current cpu, even if it is in the mask.  So this code is OK as-is.
+This patch adds the new clock id for CMU_CDRES (DRAM Express Controller)
+geneates the clocks for DRAM and NoC (Network on Chip) bus clock.
 
-I see it now.
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+---
+ include/dt-bindings/clock/exynos5420.h | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-> >Otherwise the patch patch looks good to me.
-> 
-> Great, thanks!  Should I add your Reviewed-by?
-
-Yup. This patch looks fine then:
-
-Reviewed-by: Petr Mladek <pmladek@suse.com>
-
-Best Regards,
-Petr
+diff --git a/include/dt-bindings/clock/exynos5420.h b/include/dt-bindings/clock/exynos5420.h
+index 17ab8394bec7..6fd21c291416 100644
+--- a/include/dt-bindings/clock/exynos5420.h
++++ b/include/dt-bindings/clock/exynos5420.h
+@@ -214,6 +214,9 @@
+ #define CLK_MOUT_SW_ACLK400     651
+ #define CLK_MOUT_USER_ACLK300_GSCL	652
+ #define CLK_MOUT_SW_ACLK300_GSCL	653
++#define CLK_MOUT_MCLK_CDREX	654
++#define CLK_MOUT_BPLL		655
++#define CLK_MOUT_MX_MSPLL_CCORE	656
+ 
+ /* divider clocks */
+ #define CLK_DOUT_PIXEL		768
+@@ -239,8 +242,14 @@
+ #define CLK_DOUT_ACLK300_DISP1	788
+ #define CLK_DOUT_ACLK300_GSCL	789
+ #define CLK_DOUT_ACLK400_DISP1	790
++#define CLK_DOUT_PCLK_CDREX	791
++#define CLK_DOUT_SCLK_CDREX	792
++#define CLK_DOUT_ACLK_CDREX1	793
++#define CLK_DOUT_CCLK_DREX0	794
++#define CLK_DOUT_CLK2X_PHY0	795
++#define CLK_DOUT_PCLK_CORE_MEM	796
+ 
+ /* must be greater than maximal clock id */
+-#define CLK_NR_CLKS		791
++#define CLK_NR_CLKS		797
+ 
+ #endif /* _DT_BINDINGS_CLOCK_EXYNOS_5420_H */
+-- 
+1.9.1
