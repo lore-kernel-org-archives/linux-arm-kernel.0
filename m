@@ -1,72 +1,90 @@
-From: vanessa.maegima@nxp.com (Vanessa Maegima)
-Date: Mon, 22 Aug 2016 14:22:06 -0300
-Subject: [PATCH] ARM: dts: imx7s-warp: Add Bluetooth support
-Message-ID: <1471886526-19251-1-git-send-email-vanessa.maegima@nxp.com>
+From: jan.kiszka@siemens.com (Jan Kiszka)
+Date: Mon, 22 Aug 2016 13:23:57 -0400
+Subject: [PATCH] pci: Add support for unbinding the generic PCI host
+ controller
+In-Reply-To: <20160822170515.GF18628@localhost>
+References: <57698276.6050606@siemens.com> <20160822170515.GF18628@localhost>
+Message-ID: <ca98db38-cfe3-eafd-cf04-2f927b1d2dea@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WaRP7 has a BCM4343 Bluetooth chip.
+On 2016-08-22 13:05, Bjorn Helgaas wrote:
+> Hi Jan,
+> 
+> On Tue, Jun 21, 2016 at 08:07:50PM +0200, Jan Kiszka wrote:
+>> Particularly useful when working in virtual environments where the
+>> controller may come and go, but possibly not only there.
+> 
+> I'm not sure where we're at with this.  Will had a few questions about
+> the tear-down paths, and I couldn't tell what the resolution was.
 
-Add support for it.
+Likely already the existing code leaks memory when rolling back on
+errors. That needs to be analysed and resolved. Then it will be simple
+to make unbinding leak-free as well.
 
-Signed-off-by: Vanessa Maegima <vanessa.maegima@nxp.com>
----
- arch/arm/boot/dts/imx7s-warp.dts | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+I'm not familiar enough with the functions involved and still need to
+find the required time to dig into this.
 
-diff --git a/arch/arm/boot/dts/imx7s-warp.dts b/arch/arm/boot/dts/imx7s-warp.dts
-index 92d9c85..6ce8953 100644
---- a/arch/arm/boot/dts/imx7s-warp.dts
-+++ b/arch/arm/boot/dts/imx7s-warp.dts
-@@ -66,6 +66,16 @@
- 		startup-delay-us = <200000>;
- 	};
- 
-+	reg_bt: bt-reg {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio5 17 GPIO_ACTIVE_HIGH>;
-+		regulator-name = "bt_reg";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+	};
-+
- 	sound {
- 		compatible = "simple-audio-card";
- 		simple-audio-card,name = "imx7-sgtl5000";
-@@ -228,6 +238,15 @@
- 	status = "okay";
- };
- 
-+&uart3  {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart3>;
-+	assigned-clocks = <&clks IMX7D_UART3_ROOT_SRC>;
-+	assigned-clock-parents = <&clks IMX7D_PLL_SYS_MAIN_240M_CLK>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
-+
- &usbotg1 {
- 	dr_mode = "peripheral";
- 	status = "okay";
-@@ -302,6 +321,16 @@
- 		>;
- 	};
- 
-+	pinctrl_uart3: uart3grp {
-+		fsl,pins = <
-+			MX7D_PAD_UART3_TX_DATA__UART3_DCE_TX 0x79
-+			MX7D_PAD_UART3_RX_DATA__UART3_DCE_RX 0x79
-+			MX7D_PAD_UART3_CTS_B__UART3_DCE_CTS 0x79
-+			MX7D_PAD_UART3_RTS_B__UART3_DCE_RTS 0x79
-+			MX7D_PAD_SD2_DATA3__GPIO5_IO17 0x14 /*BT_REG_ON*/
-+		>;
-+	};
-+
- 	pinctrl_usdhc1: usdhc1grp {
- 		fsl,pins = <
- 			MX7D_PAD_SD1_CMD__SD1_CMD	0x59
+Jan
+
+> 
+>> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+>> ---
+>>  drivers/pci/ecam.h                  |  1 +
+>>  drivers/pci/host/pci-host-common.c  | 13 +++++++++++++
+>>  drivers/pci/host/pci-host-generic.c |  1 +
+>>  3 files changed, 15 insertions(+)
+>>
+>> diff --git a/drivers/pci/ecam.h b/drivers/pci/ecam.h
+>> index 9878beb..5a5f607 100644
+>> --- a/drivers/pci/ecam.h
+>> +++ b/drivers/pci/ecam.h
+>> @@ -63,5 +63,6 @@ extern struct pci_ecam_ops pci_generic_ecam_ops;
+>>  /* for DT-based PCI controllers that support ECAM */
+>>  int pci_host_common_probe(struct platform_device *pdev,
+>>  			  struct pci_ecam_ops *ops);
+>> +int pci_host_common_remove(struct platform_device *pdev);
+>>  #endif
+>>  #endif
+>> diff --git a/drivers/pci/host/pci-host-common.c b/drivers/pci/host/pci-host-common.c
+>> index 8cba7ab..c0ff4b1 100644
+>> --- a/drivers/pci/host/pci-host-common.c
+>> +++ b/drivers/pci/host/pci-host-common.c
+>> @@ -164,6 +164,19 @@ int pci_host_common_probe(struct platform_device *pdev,
+>>  	}
+>>  
+>>  	pci_bus_add_devices(bus);
+>> +	platform_set_drvdata(pdev, bus);
+>> +	return 0;
+>> +}
+>> +
+>> +int pci_host_common_remove(struct platform_device *pdev)
+>> +{
+>> +	struct pci_bus *bus = platform_get_drvdata(pdev);
+>> +
+>> +	pci_lock_rescan_remove();
+>> +	pci_stop_root_bus(bus);
+>> +	pci_remove_root_bus(bus);
+>> +	pci_unlock_rescan_remove();
+>> +
+>>  	return 0;
+>>  }
+>>  
+>> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+>> index 6eaceab..0a2e75b 100644
+>> --- a/drivers/pci/host/pci-host-generic.c
+>> +++ b/drivers/pci/host/pci-host-generic.c
+>> @@ -65,6 +65,7 @@ static struct platform_driver gen_pci_driver = {
+>>  		.of_match_table = gen_pci_of_match,
+>>  	},
+>>  	.probe = gen_pci_probe,
+>> +	.remove = pci_host_common_remove,
+>>  };
+>>  module_platform_driver(gen_pci_driver);
+>>  
+>> -- 
+>> 2.1.4
+
 -- 
-2.7.4
+Siemens AG, Corporate Technology, CT RDA ITP SES-DE
+Corporate Competence Center Embedded Linux
