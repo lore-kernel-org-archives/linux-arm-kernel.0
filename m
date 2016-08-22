@@ -1,73 +1,97 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Mon, 22 Aug 2016 12:19:04 +0800
-Subject: [PATCH 1/1] arm64/hugetlb: clear PG_dcache_clean if the page is
- dirty when munmap
-In-Reply-To: <20160720091939.GA25890@e104818-lin.cambridge.arm.com>
-References: <1467893344-8352-1-git-send-email-thunder.leizhen@huawei.com>
- <20160707153741.GC27180@e104818-lin.cambridge.arm.com>
- <577F1FD9.1040205@huawei.com>
- <20160708135447.GB22099@e104818-lin.cambridge.arm.com>
- <577FC5AA.5010709@huawei.com>
- <20160708161347.GC22099@e104818-lin.cambridge.arm.com>
- <57839474.6030203@huawei.com>
- <20160712153535.GH22183@e104818-lin.cambridge.arm.com>
- <578EE603.9020206@huawei.com>
- <20160720091939.GA25890@e104818-lin.cambridge.arm.com>
-Message-ID: <57BA7D38.8030103@huawei.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 22 Aug 2016 13:28:34 +0900
+Subject: [PATCH v24 9/9] Documentation: dt: chosen properties for arm64
+ kdump
+In-Reply-To: <20160819132641.GA12709@rob-hp-laptop>
+References: <20160809015248.28414-2-takahiro.akashi@linaro.org>
+ <20160809015747.28591-1-takahiro.akashi@linaro.org>
+ <20160819132641.GA12709@rob-hp-laptop>
+Message-ID: <20160822042832.GJ20080@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Rob,
+[Cc: Mark]
 
-
-On 2016/7/20 17:19, Catalin Marinas wrote:
-> On Wed, Jul 20, 2016 at 10:46:27AM +0800, Leizhen (ThunderTown) wrote:
->>>>>> On 2016/7/8 21:54, Catalin Marinas wrote:
->>>>>>> ------------8<----------------
->>>>>>> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
->>>>>>> index dbd12ea8ce68..c753fa804165 100644
->>>>>>> --- a/arch/arm64/mm/flush.c
->>>>>>> +++ b/arch/arm64/mm/flush.c
->>>>>>> @@ -75,7 +75,8 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
->>>>>>>  	if (!page_mapping(page))
->>>>>>>  		return;
->>>>>>>  
->>>>>>> -	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
->>>>>>> +	if (!test_and_set_bit(PG_dcache_clean, &page->flags) ||
->>>>>>> +	    PageDirty(page))
->>>>>>>  		sync_icache_aliases(page_address(page),
->>>>>>>  				    PAGE_SIZE << compound_order(page));
->>>>>>>  	else if (icache_is_aivivt())
->>>>>>> ----------------8<---------------------
->>
->> Do you plan to send this patch? My colleagues told me that if our
->> patches are quite different, it should be Signed-off-by you.
+On Fri, Aug 19, 2016 at 08:26:41AM -0500, Rob Herring wrote:
+> On Tue, Aug 09, 2016 at 10:57:47AM +0900, AKASHI Takahiro wrote:
+> > From: James Morse <james.morse@arm.com>
+> > 
+> > Add documentation for
+> > 	linux,crashkernel-base and crashkernel-size,
+> > 	linux,usable-memory-range, and
+> > 	linux,elfcorehdr
+> > used by arm64 kexec/kdump to decribe the kdump reserved area, and
+> > the elfcorehdr's location within it.
+> > 
+> > Signed-off-by: James Morse <james.morse@arm.com>
+> > [takahiro.akashi at linaro.org:
+> >     renamed "usable-memory" to "usable-memory-range",
+> >     added "linux,crashkernel-base" and "-size" ]
+> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > ---
+> >  Documentation/devicetree/bindings/chosen.txt | 50 ++++++++++++++++++++++++++++
+> >  1 file changed, 50 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
+> > index 6ae9d82..236188a 100644
+> > --- a/Documentation/devicetree/bindings/chosen.txt
+> > +++ b/Documentation/devicetree/bindings/chosen.txt
+> > @@ -52,3 +52,53 @@ This property is set (currently only on PowerPC, and only needed on
+> >  book3e) by some versions of kexec-tools to tell the new kernel that it
+> >  is being booted by kexec, as the booting environment may differ (e.g.
+> >  a different secondary CPU release mechanism)
+> > +
+> > +linux,crashkernel-base
+> > +linux,crashkernel-size
+> > +----------------------
+> > +These properties (currently used on PowerPC and arm64) indicates
+> > +the base address and the size, respectively, of the reserved memory
+> > +range for crash dump kernel.
+> > +e.g.
+> > +
+> > +/ {
+> > +	chosen {
+> > +		linux,crashkernel-base = <0x9 0xf0000000>;
+> > +		linux,crashkernel-size = <0x0 0x10000000>;
+> > +	};
+> > +};
+> > +
+> > +linux,usable-memory-range
+> > +-------------------------
+> > +
+> > +This property (currently used only on arm64) holds the memory range,
+> > +the base address and the size, which can be used as system ram on
+> > +the *current* kernel. Note that, if this property is present, any memory
+> > +regions under "memory" nodes in DT blob or ones marked as "conventional
+> > +memory" in EFI memory map should be ignored.
+> > +e.g.
+> > +
+> > +/ {
+> > +	chosen {
+> > +		linux,usable-memory-range = <0x9 0xf0000000 0x0 0x10000000>;
+> > +	};
+> > +};
 > 
-> The reason I'm not sending it is that I don't fully understand how it
-> solves the problem for a shared file mmap(), not just hugetlbfs. As I
-> said in an earlier email: after an msync() in user space we
-> should flush the pages to disk via write_cache_pages(). This function
-Hi Catalin:
-   I'm so sorry for my fault. The previous small pages test result I actually ran on ramfs.
-Today, I ran the case on harddisk fs, it worked well without this patch.
+> I've read the discussion on this. I think you should use the existing 
+> linux,usable-memory property in the memory nodes. If UEFI systems don't 
+> have memory nodes, then you can find an UEFI way to describe this. DT is 
+> not the dumping ground for what doesn't fit in UEFI. How do x86 systems 
+> work?
 
-Summarized as follows:
-small pages on ramfs: need this patch
-small pages on harddisk fs: no need this patch
-hugetlbfs: need this patch
+Kdump for x86 passes the range of usable memory to crash dump kernel
+either via:
+(a) "memmap=nn at ss" command line parameter, or
+(b) faked BIOS e820 map (a sort of memory map table)
 
+(a) was rejected by Mark [1], and (b) is x86-specific.
 
+I believe that my approach is better because it works in the same way
+either on UEFI systems or DT-based systems.
 
-> calls clear_page_dirty_for_io() after which PageDirty() is no longer
-> true. I can't tell how a subsequent mmap() can see the written pages as
-> dirty.
-> 
->> I searched all Linux source code, __sync_icache_dcache is only called
->> by set_pte_at, and some check conditions(especially pte_exec) will
->> limit its impact.
->>
->> 	if (pte_user(pte) && pte_exec(pte) && !pte_special(pte))
->> 		__sync_icache_dcache(pte, addr);
-> 
-> Yes, and set_pte_at() would be called as a result of a page fault when
-> accessing the mmap'ed file.
-> 
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/400122.html
+
+Thanks,
+-Takahiro AKASHI
+
+> Rob
