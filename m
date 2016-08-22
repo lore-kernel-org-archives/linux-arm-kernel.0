@@ -1,35 +1,47 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Mon, 22 Aug 2016 23:53:25 +0800
-Subject: [PATCH] ARM: imx6: add missing BM_CLPCR_BYPASS_PMIC_READY setting for
- imx6sx
-Message-ID: <1471881205-6389-1-git-send-email-Anson.Huang@nxp.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 22 Aug 2016 10:10:23 +0200
+Subject: [PATCH] ARM: dts: blanche: add DU support
+In-Reply-To: <20160822074111.GE28034@verge.net.au>
+References: <5383928.8UnDsUpmkz@wasted.cogentembedded.com>
+ <1783132.r9t2y3QUUq@wasted.cogentembedded.com>
+ <20160822074111.GE28034@verge.net.au>
+Message-ID: <CAMuHMdXVw9SuagmZTD0nZOv-AC3ruWazfBbG5=cRrdHKQYcqgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6SX has bypass PMIC ready function, as this function
-is normally NOT enabled on the board design, so we need
-to bypass the PMIC ready pin check during DSM mode resume
-flow, otherwise, the internal DSM resume logic will be
-waiting for this signal to be ready forever and cause
-resume fail.
+Hi Simon,
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- arch/arm/mach-imx/pm-imx6.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Mon, Aug 22, 2016 at 9:41 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Aug 19, 2016 at 11:42:54PM +0300, Sergei Shtylyov wrote:
+>> Index: renesas/arch/arm/boot/dts/r8a7792-blanche.dts
+>> ===================================================================
+>> --- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
+>> +++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
+>
+> ...
+>
+>> @@ -186,3 +251,63 @@
+>>       cd-gpios = <&gpio11 11 GPIO_ACTIVE_LOW>;
+>>       status = "okay";
+>>  };
+>> +
+>> +&i2c1 {
+>> +     status = "okay";
+>> +     clock-frequency = <400000>;
+>
+> Is it intentional that there are no pinctrl properties here?
 
-diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-index 67bab74..fe708e2 100644
---- a/arch/arm/mach-imx/pm-imx6.c
-+++ b/arch/arm/mach-imx/pm-imx6.c
-@@ -310,7 +310,7 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
- 		val |= 0x3 << BP_CLPCR_STBY_COUNT;
- 		val |= BM_CLPCR_VSTBY;
- 		val |= BM_CLPCR_SBYOS;
--		if (cpu_is_imx6sl())
-+		if (cpu_is_imx6sl() || cpu_is_imx6sx())
- 			val |= BM_CLPCR_BYPASS_PMIC_READY;
- 		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
- 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
--- 
-1.9.1
+$ git grep -w I2C arch/arm/boot/dts/r8a7792.dtsi
+arch/arm/boot/dts/r8a7792.dtsi:         /* I2C doesn't need pinmux */
+$
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
