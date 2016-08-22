@@ -1,56 +1,55 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 22 Aug 2016 16:00:46 +0100
-Subject: how to enable suspend to ram for arm-64 bits
-In-Reply-To: <CADUS3on-Y63EgUUudhH1cbgihnMmHe_aXra0CG2WEQWRQTo+AA@mail.gmail.com>
-References: <CADUS3onCMDThNK2ZwSSjGZhPE0M6cybjgCHJR2wVVeK09GC6ng@mail.gmail.com>
- <06a4f0d7-9022-578d-99e0-ddcde31ed895@arm.com>
- <CADUS3onUDk_=UpRoZy1m0hV1VGZYSf22ea8D10MpDbqJCfTkqw@mail.gmail.com>
- <82ddd0e1-9ecc-5e54-e8ee-86f947fc0ecd@arm.com>
- <CADUS3omw=WYhGF00S3DY8mkg_c-59WvD2AHYs4SQSzCYoHQraQ@mail.gmail.com>
- <62cbf1a0-268a-f9f5-09af-c155a8a77508@arm.com>
- <CADUS3on-Y63EgUUudhH1cbgihnMmHe_aXra0CG2WEQWRQTo+AA@mail.gmail.com>
-Message-ID: <6fa7fdb7-7b8d-f955-75e6-75647a6d57a3@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 22 Aug 2016 17:00:58 +0200
+Subject: [PATCH v3 05/12] firmware: tegra: Add BPMP support
+In-Reply-To: <6bb4d32f-4f13-285e-430e-672f375a9a46@nvidia.com>
+References: <20160819173233.13260-1-thierry.reding@gmail.com>
+ <20160819173233.13260-6-thierry.reding@gmail.com>
+ <94227d94-1d60-fda7-731b-26656633d585@nvidia.com>
+ <20160822125458.GC17367@ulmo.ba.sec>
+ <6bb4d32f-4f13-285e-430e-672f375a9a46@nvidia.com>
+Message-ID: <20160822150058.GA21012@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Aug 22, 2016 at 03:24:28PM +0100, Jon Hunter wrote:
+> 
+> On 22/08/16 13:54, Thierry Reding wrote:
+> > * PGP Signed by an unknown key
+> > 
+> > On Mon, Aug 22, 2016 at 10:26:50AM +0100, Jon Hunter wrote:
+> >>
+> >> On 19/08/16 18:32, Thierry Reding wrote:
+> >>> From: Thierry Reding <treding@nvidia.com>
+> >>>
+> >>> The Boot and Power Management Processor (BPMP) is a co-processor found
+> >>> on Tegra SoCs. It is designed to handle the early stages of the boot
+> >>> process and offload power management tasks (such as clocks, resets,
+> >>> powergates, ...) as well as system control services.
+> >>>
+> >>> Compared to the ARM SCPI, the services provided by BPMP are message-
+> >>> based rather than method-based. The BPMP firmware driver provides the
+> >>> services to transmit data to and receive data from the BPMP. Users can
+> >>> also register an MRQ, for which a service routine will be run when a
+> >>> corresponding event is received from the firmware.
+> >>
+> >> MRQ?
+> > 
+> > I think that means "Message ReQuest", which is sort of like an IRQ but
+> > the user will receive a message (with potentially payload) instead. Do
+> > you want me to spell that out in the commit message, or what would you
+> > suggest?
+> 
+> I think that if we simply say 'Message ReQuest (MRQ)" it becomes clearer
+> what this is. Otherwise, google returns everything from 'most recent
+> quarter' to canadian rock bands :-)
 
+Okay, done.
 
-On 22/08/16 15:41, yoma sophian wrote:
-> hi Sudeep:
->
->>> Yes, I agree with you.
->>> But it may not mean the ONLY way for all armv8 platform that support
->>> suspend method is PSCI.
->>
->> I would say yes but if you have a real good reason not to adopt PSCI on
->> your platform then you can try present that. It should be convincing
->> enough to deviate from the standards :)
->
-> Since we don't implement full features of PSCI on our platform, that
-> is why we wants to know whether there is registration of platform
-> suspend method.
->
-
-For adding support for your platform in the mainline kernel, you need to
-support SYSTEM_SUSPEND in psci. There's no other way currently with the
-mainline.
-
-> BTW, from the git log, it seems psci.c doesn't register system suspend
-> until Linux 4.4.
-
-Correct.
-
-> if so, before 4.4, how aarch64 support such as str, echo mem >
-> /sys/power/state , suspend flow?
->
-
-You can back-port those patches, they are quite trivial if you need
-it on pre-v4.4 kernel.
-
-Moreover, how do you plan to support system system without PSCI ?
-How will you let the higher exception softwares know that you are
-entering system suspend. How will their context resumed back ?
-
--- 
-Regards,
-Sudeep
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160822/ecdf72bc/attachment.sig>
