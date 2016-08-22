@@ -1,175 +1,468 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Aug 2016 16:42:32 +0200
-Subject: [PATCH v3 05/12] firmware: tegra: Add BPMP support
-In-Reply-To: <20160822140211.GE17367@ulmo.ba.sec>
-References: <20160819173233.13260-1-thierry.reding@gmail.com>
- <2059006.oN1pE0IkCo@wuerfel> <20160822140211.GE17367@ulmo.ba.sec>
-Message-ID: <5669893.Rd6yQObxH6@wuerfel>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Mon, 22 Aug 2016 23:45:14 +0900
+Subject: [PATCH 1/2] ARM: dts: Add TOPEET itop core board SCP package
+ version
+In-Reply-To: <A0C9B5F5-6B75-43F3-9280-1D33E77DC3BC@soulik.info>
+References: <1471809893-31147-1-git-send-email-ayaka@soulik.info>
+ <1471809893-31147-2-git-send-email-ayaka@soulik.info>
+ <4767fc2a-95b7-ee0d-f51a-7a5d6ca89d8f@samsung.com>
+ <A0C9B5F5-6B75-43F3-9280-1D33E77DC3BC@soulik.info>
+Message-ID: <CAGTfZH07v_9bxKKx4gwLSb6+vLpZ+esW4D5sT4=RiHXa3SV-Vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, August 22, 2016 4:02:11 PM CEST Thierry Reding wrote:
-> On Mon, Aug 22, 2016 at 03:34:15PM +0200, Arnd Bergmann wrote:
-> > On Friday, August 19, 2016 7:32:26 PM CEST Thierry Reding wrote:
-> > > diff --git a/include/soc/tegra/bpmp-abi.h b/include/soc/tegra/bpmp-abi.h
-> > > new file mode 100644
-> > > index 000000000000..0aaef5960e29
-> > > --- /dev/null
-> > > +++ b/include/soc/tegra/bpmp-abi.h
-> > > +#ifndef _ABI_BPMP_ABI_H_
-> > > +#define _ABI_BPMP_ABI_H_
-> > > +
-> > > +#ifdef LK
-> > > +#include <stdint.h>
-> > > +#endif
-> > > +
-> > > +#ifndef __ABI_PACKED
-> > > +#define __ABI_PACKED __attribute__((packed))
-> > > +#endif
-> > > +
-> > > +#ifdef NO_GCC_EXTENSIONS
-> > > +#define EMPTY char empty;
-> > > +#define EMPTY_ARRAY 1
-> > > +#else
-> > > +#define EMPTY
-> > > +#define EMPTY_ARRAY 0
-> > > +#endif
-> > > +
-> > > +#ifndef __UNION_ANON
-> > > +#define __UNION_ANON
-> > > +#endif
-> > 
-> > Maybe keep these all out of the kernel?
-> 
-> This was discussed a little in an earlier posting. This header file is
-> maintained by the BPMP firmware team and using it verbatim means little
-> to no effort required to update it.
+Hi,
 
-The usual recommendation is to just use Linux coding style in shared
-files, and possibly add another header that provides the required
-definitions. Otherwise you end up with people randomly cleaning up
-the file later ;-)
+2016-08-22 17:28 GMT+09:00 Ayaka <ayaka@soulik.info>:
+>
+> Thank you
+> ??? iPad ??
+>
+>> Marek Szyprowski <m.szyprowski@samsung.com> ? 2016?8?22? ??2:50 ???
+>>
+>> Dear Randy,
+>>
+>>
+>>> On 2016-08-21 22:04, Randy Li wrote:
+>>> The TOPEET itop is a samsung exnynos 4412 core board, which have
+>>> two package versions. This patch add the support for SCP version.
+>>>
+>>> Currently supported are USB3503A HSIC, USB OTG, eMMC, RTC and PMIC.
+>>> The future features are in the based board. Also MFC and watchdog
+>>> have been enabled.
+>>>
+>>> Signed-off-by: Randy Li <ayaka@soulik.info>
+>>> ---
+>>>  arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi | 434 ++++++++++++++++++++++++
+>>>  1 file changed, 434 insertions(+)
+>>>  create mode 100644 arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi b/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
+>>> new file mode 100644
+>>> index 0000000..0860ee6
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
+>>> @@ -0,0 +1,434 @@
+>>> +/*
+>>> + * TOPEET's Exynos4412 based itop board device tree source
+>>> + *
+>>> + * Copyright (c) 2016 SUMOMO Computer Association
+>>> + *            https://www.sumomo.mobi
+>>> + *            Randy Li <ayaka@soulik.info>
+>>> + *
+>>> + * Device tree source file for TOPEET iTop Exynos 4412 SCP package core
+>>> + * board which is based on Samsung's Exynos4412 SoC.
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> +*/
+>>> +
+>>> +#include "exynos4412.dtsi"
+>>> +#include <dt-bindings/gpio/gpio.h>
+>>> +#include <dt-bindings/input/input.h>
+>>> +
+>>> +/ {
+>>> +    memory {
+>>> +        reg = <0x40000000 0x40000000>;
+>>> +    };
+>>> +
+>>> +    firmware at 0203F000 {
+>>> +        compatible = "samsung,secure-firmware";
+>>> +        reg = <0x0203F000 0x1000>;
+>>> +    };
+>>> +
+>>> +    display-timings {
+>>> +        native-mode = <&timing0>;
+>>> +        timing0: timing {
+>>> +            clock-frequency = <47500000>;
+>>> +            hactive = <1024>;
+>>> +            vactive = <600>;
+>>> +            hfront-porch = <64>;
+>>> +            hback-porch = <16>;
+>>> +            hsync-len = <48>;
+>>> +            vback-porch = <64>;
+>>> +            vfront-porch = <16>;
+>>> +            vsync-len = <3>;
+>>> +        };
+>>> +    };
+>>> +
+>>> +    fixed-rate-clocks {
+>>> +        xxti {
+>>> +            compatible = "samsung,clock-xxti";
+>>> +            clock-frequency = <0>;
+>>> +        };
+>>> +
+>>> +        xusbxti {
+>>> +            compatible = "samsung,clock-xusbxti";
+>>> +            clock-frequency = <24000000>;
+>>> +        };
+>>> +    };
+>>> +
+>>> +    usb-hub {
+>>> +        compatible = "smsc,usb3503a";
+>>> +        reset-gpios = <&gpm2 4 GPIO_ACTIVE_LOW>;
+>>> +        connect-gpios = <&gpm3 3 GPIO_ACTIVE_HIGH>;
+>>> +        intn-gpios = <&gpx2 3 GPIO_ACTIVE_HIGH>;
+>>> +        pinctrl-names = "default";
+>>> +        pinctrl-0 = <&hsic_reset>;
+>>> +    };
+>>> +};
+>>> +
+>>> +&cpu0 {
+>>> +    cpu0-supply = <&buck2_reg>;
+>>> +};
+>>> +
+>>> +&i2c_1 {
+>>> +    #address-cells = <1>;
+>>> +    #size-cells = <0>;
+>>> +    samsung,i2c-sda-delay = <100>;
+>>> +    samsung,i2c-max-bus-freq = <400000>;
+>>> +    pinctrl-0 = <&i2c1_bus>;
+>>> +    pinctrl-names = "default";
+>>> +    status = "okay";
+>>> +
+>>> +    s5m8767_pmic at 66 {
+>>> +        compatible = "samsung,s5m8767-pmic";
+>>> +        reg = <0x66>;
+>>> +
+>>> +        s5m8767,pmic-buck-default-dvs-idx = <3>;
+>>> +
+>>> +        s5m8767,pmic-buck-dvs-gpios = <&gpb 5 GPIO_ACTIVE_HIGH>,
+>>> +                         <&gpb 6 GPIO_ACTIVE_HIGH>,
+>>> +                         <&gpb 7 GPIO_ACTIVE_HIGH>;
+>>> +
+>>> +        s5m8767,pmic-buck-ds-gpios = <&gpm3 5 GPIO_ACTIVE_HIGH>,
+>>> +                        <&gpm3 6 GPIO_ACTIVE_HIGH>,
+>>> +                        <&gpm3 7 GPIO_ACTIVE_HIGH>;
+>>> +
+>>> +        /* VDD_ARM */
+>>> +        s5m8767,pmic-buck2-dvs-voltage = <1356250>, <1300000>,
+>>> +                         <1243750>, <1118750>,
+>>> +                         <1068750>, <1012500>,
+>>> +                         <956250>, <900000>;
+>>> +        /* VDD_INT */
+>>> +        s5m8767,pmic-buck3-dvs-voltage = <1000000>, <1000000>,
+>>> +                         <925000>, <925000>,
+>>> +                         <887500>, <887500>,
+>>> +                         <850000>, <850000>;
+>>> +        /* VDD_G3D */
+>>> +        s5m8767,pmic-buck4-dvs-voltage = <1081250>, <1081250>,
+>>> +                         <1025000>, <950000>,
+>>> +                         <918750>, <900000>,
+>>> +                         <875000>, <831250>;
+>>> +
+>>> +        regulators {
+>>> +            ldo1_reg: LDO1 {
+>>> +                regulator-name = "VDD_ALIVE";
+>>> +                regulator-min-microvolt = <1100000>;
+>>> +                regulator-max-microvolt = <1100000>;
+>>> +                regulator-always-on;
+>>> +                regulator-boot-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            /* SCP uses 1.5v, POP uses 1.2v */
+>>> +            ldo2_reg: LDO2 {
+>>> +                regulator-name = "VDDQ_M12";
+>>> +                regulator-min-microvolt = <1500000>;
+>>> +                regulator-max-microvolt = <1500000>;
+>>> +                regulator-always-on;
+>>> +                regulator-boot-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo3_reg: LDO3 {
+>>> +                regulator-name = "VDDIOAP_18";
+>>> +                regulator-min-microvolt = <1800000>;
+>>> +                regulator-max-microvolt = <1800000>;
+>>> +                regulator-always-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo4_reg: LDO4 {
+>>> +                regulator-name = "VDDQ_PRE";
+>>> +                regulator-min-microvolt = <1800000>;
+>>> +                regulator-max-microvolt = <1800000>;
+>>> +                regulator-always-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo6_reg: LDO6 {
+>>> +                regulator-name = "VDD10_MPLL";
+>>> +                regulator-min-microvolt = <1000000>;
+>>> +                regulator-max-microvolt = <1000000>;
+>>> +                regulator-always-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo7_reg: LDO7 {
+>>> +                regulator-name = "VDD10_XPLL";
+>>> +                regulator-min-microvolt = <1000000>;
+>>> +                regulator-max-microvolt = <1000000>;
+>>> +                regulator-always-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo8_reg: LDO8 {
+>>> +                regulator-name = "VDD10_MIPI";
+>>> +                regulator-min-microvolt = <1000000>;
+>>> +                regulator-max-microvolt = <1000000>;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo9_reg: LDO9 {
+>>> +                regulator-name = "VDD33_LCD";
+>>> +                regulator-min-microvolt = <3300000>;
+>>> +                regulator-max-microvolt = <3300000>;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo10_reg: LDO10 {
+>>> +                regulator-name = "VDD18_MIPI";
+>>> +                regulator-min-microvolt = <1800000>;
+>>> +                regulator-max-microvolt = <1800000>;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo11_reg: LDO11 {
+>>> +                regulator-name = "VDD18_ABB1";
+>>> +                regulator-min-microvolt = <1800000>;
+>>> +                regulator-max-microvolt = <1800000>;
+>>> +                regulator-always-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo12_reg: LDO12 {
+>>> +                regulator-name = "VDD33_UOTG";
+>>> +                regulator-min-microvolt = <3300000>;
+>>> +                regulator-max-microvolt = <3300000>;
+>>> +                regulator-always-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo13_reg: LDO13 {
+>>> +                regulator-name = "VDDIOPERI_18";
+>>> +                regulator-min-microvolt = <1800000>;
+>>> +                regulator-max-microvolt = <1800000>;
+>>> +                regulator-always-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo14_reg: LDO14 {
+>>> +                regulator-name = "VDD18_ABB02";
+>>> +                regulator-min-microvolt = <1800000>;
+>>> +                regulator-max-microvolt = <1800000>;
+>>> +                regulator-always-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo15_reg: LDO15 {
+>>> +                regulator-name = "VDD10_USH";
+>>> +                regulator-min-microvolt = <1000000>;
+>>> +                regulator-max-microvolt = <1000000>;
+>>> +                regulator-always-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo16_reg: LDO16 {
+>>> +                regulator-name = "VDD18_HSIC";
+>>> +                regulator-min-microvolt = <1800000>;
+>>> +                regulator-max-microvolt = <1800000>;
+>>> +                regulator-always-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo17_reg: LDO17 {
+>>> +                regulator-name = "VDDIOAP_MMC012_28";
+>>> +                regulator-min-microvolt = <2800000>;
+>>> +                regulator-max-microvolt = <2800000>;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            /* Used by HSIC */
+>>> +            ldo18_reg: LDO18 {
+>>> +                regulator-name = "VDDIOPERI_28";
+>>> +                regulator-min-microvolt = <3300000>;
+>>> +                regulator-max-microvolt = <3300000>;
+>>> +                regulator-always-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo20_reg: LDO20 {
+>>> +                regulator-name = "VDD28_CAM";
+>>> +                regulator-min-microvolt = <1800000>;
+>>> +                regulator-max-microvolt = <2800000>;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo21_reg: LDO21 {
+>>> +                regulator-name = "VDD28_AF";
+>>> +                regulator-min-microvolt = <1800000>;
+>>> +                regulator-max-microvolt = <2800000>;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo22_reg: LDO22 {
+>>> +                regulator-name = "VDDA28_2M";
+>>> +                regulator-min-microvolt = <2800000>;
+>>> +                regulator-max-microvolt = <2800000>;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo23_reg: LDO23 {
+>>> +                regulator-name = "VDD28_TF";
+>>> +                regulator-min-microvolt = <2800000>;
+>>> +                regulator-max-microvolt = <2800000>;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo24_reg: LDO24 {
+>>> +                regulator-name = "VDD33_A31";
+>>> +                regulator-min-microvolt = <3300000>;
+>>> +                regulator-max-microvolt = <3300000>;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo25_reg: LDO25 {
+>>> +                regulator-name = "VDD18_CAM";
+>>> +                regulator-min-microvolt = <1800000>;
+>>> +                regulator-max-microvolt = <1800000>;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo26_reg: LDO26 {
+>>> +                regulator-name = "VDD18_A31";
+>>> +                regulator-min-microvolt = <1800000>;
+>>> +                regulator-max-microvolt = <1800000>;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo27_reg: LDO27 {
+>>> +                regulator-name = "GPS_1V8";
+>>> +                regulator-min-microvolt = <1800000>;
+>>> +                regulator-max-microvolt = <1800000>;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            ldo28_reg: LDO28 {
+>>> +                regulator-name = "DVDD12";
+>>> +                regulator-min-microvolt = <1200000>;
+>>> +                regulator-max-microvolt = <1200000>;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            buck1_reg: BUCK1 {
+>>> +                regulator-name = "vdd_mif";
+>>> +                regulator-min-microvolt = <850000>;
+>>> +                regulator-max-microvolt    = <1100000>;
+>>> +                regulator-always-on;
+>>> +                regulator-boot-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            buck2_reg: BUCK2 {
+>>> +                regulator-name = "vdd_arm";
+>>> +                regulator-min-microvolt = <850000>;
+>>> +                regulator-max-microvolt    = <1456250>;
+>>> +                regulator-always-on;
+>>> +                regulator-boot-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            buck3_reg: BUCK3 {
+>>> +                regulator-name = "vdd_int";
+>>> +                regulator-min-microvolt = <875000>;
+>>> +                regulator-max-microvolt    = <1200000>;
+>>> +                regulator-always-on;
+>>> +                regulator-boot-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            buck4_reg: BUCK4 {
+>>> +                regulator-name = "vdd_g3d";
+>>> +                regulator-min-microvolt = <750000>;
+>>> +                regulator-max-microvolt    = <1500000>;
+>>> +                regulator-always-on;
+>>> +                regulator-boot-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            buck5_reg: BUCK5 {
+>>> +                regulator-name = "vdd_m12";
+>>> +                regulator-min-microvolt = <750000>;
+>>> +                regulator-max-microvolt    = <1500000>;
+>>> +                regulator-always-on;
+>>> +                regulator-boot-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            buck6_reg: BUCK6 {
+>>> +                regulator-name = "vdd12_5m";
+>>> +                regulator-min-microvolt = <750000>;
+>>> +                regulator-max-microvolt    = <1500000>;
+>>> +                regulator-always-on;
+>>> +                regulator-boot-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            buck7_reg: BUCK7 {
+>>> +                regulator-name = "pvdd_buck7";
+>>> +                regulator-min-microvolt = <750000>;
+>>> +                regulator-max-microvolt    = <2000000>;
+>>> +                regulator-boot-on;
+>>> +                regulator-always-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            buck8_reg: BUCK8 {
+>>> +                regulator-name = "pvdd_buck8";
+>>> +                regulator-min-microvolt = <750000>;
+>>> +                regulator-max-microvolt    = <1500000>;
+>>> +                regulator-boot-on;
+>>> +                regulator-always-on;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +
+>>> +            buck9_reg: BUCK9 {
+>>> +                regulator-name = "vddf28_emmc";
+>>> +                regulator-min-microvolt = <750000>;
+>>> +                regulator-max-microvolt    = <3000000>;
+>>> +                op_mode = <1>; /* Normal Mode */
+>>> +            };
+>>> +        };
+>>> +    };
+>>> +};
+>>> +
+>>> +&pinctrl_1 {
+>>> +    hsic_reset: hsic-reset {
+>>> +        samsung,pins = "gpm2-4";
+>>> +        samsung,pin-function = <1>;
+>>> +        samsung,pin-pud = <0>;
+>>> +        samsung,pin-drv = <3>;
+>>> +    };
+>>> +};
+>>> +
+>>> +&mfc {
+>>> +    samsung,mfc-r = <0x43000000 0x800000>;
+>>> +    samsung,mfc-l = <0x51000000 0x800000>;
+>>> +    status = "okay";
+>>> +};
+>>
+>> Since v4.8-rc1 MFC driver has been converted to generic reserved memory bindings,
+>> so samsung,mfc-* properties are obsoleted and no longer used. If you want to use
+>> MFC driver with reserved memory, please just add following line to your dts:
+>> #include "exynos-mfc-reserved-memory.dtsi"
+>>
+>> Please refer to dts of other boards for more examples.
+> I see, I would also enabled the bus_mfc and mfc entry.
+> I notice the new introduce Exynos bus. I need some time to add support it. I will send a new version later time(maybe you have to wait this weekend, sorry about that).
 
+What is meaning of "new introduce Exynos bus"?
+Could you explain it to me?
 
-> > > +struct mrq_request {
-> > > +	/** @brief MRQ number of the request */
-> > > +	uint32_t mrq;
-> > > +	/** @brief flags for the request */
-> > > +	uint32_t flags;
-> > > +} __ABI_PACKED;
-> > 
-> > Marking the structure as packed may result in byte-wise access, depending
-> > on compiler flags. Is that what you intended? The structure is fully
-> > packed already, so you won't avoid any padding here.
-> 
-> Agreed, the packing seems unnecessary in many places. However this is
-> defining an ABI that's used across multiple operating systems, so the
-> packing may still be required on some systems or toolchains to ensure
-> the exact same format in the transport.
+[snip]
 
-However, if __ABI_PACKED is defined to an empty string, it is different
-in some cases.
-
-Also, setting 'NO_GCC_EXTENSIONS' changes the structure layout of
-some of the structures, by adding an extra member. If the firmware
-has a compiler that is less than 10 years old, I'd suggest using C99
-syntax instead, which should avoid those differences and eliminate
-all gcc extensions.
-
-> > > +/**
-> > > + * @addtogroup Debugfs
-> > > + * @{
-> > > + *
-> > > + * The BPMP firmware implements a pseudo-filesystem called
-> > > + * debugfs. Any driver within the firmware may register with debugfs
-> > > + * to expose an arbitrary set of "files" in the filesystem. When
-> > > + * software on the CPU writes to a debugfs file, debugfs passes the
-> > > + * written data to a callback provided by the driver. When software on
-> > > + * the CPU reads a debugfs file, debugfs queries the driver for the
-> > > + * data to return to the CPU. The intention of the debugfs filesystem
-> > > + * is to provide information useful for debugging the system at
-> > > + * runtime.
-> > > + *
-> > > + * @note The files exposed via debugfs are not part of the
-> > > + * BPMP firmware's ABI. debugfs files may be added or removed in any
-> > > + * given version of the firmware. Typically the semantics of a debugfs
-> > > + * file are consistent from version to version but even that is not
-> > > + * guaranteed.
-> > > + *
-> > > + * @}
-> > > + */
-> > > +/** @ingroup Debugfs */
-> > > +enum mrq_debugfs_commands {
-> > > +	CMD_DEBUGFS_READ = 1,
-> > > +	CMD_DEBUGFS_WRITE = 2,
-> > > +	CMD_DEBUGFS_DUMPDIR = 3,
-> > > +	CMD_DEBUGFS_MAX
-> > > +};
-> > > +
-> > > +/**
-> > > + * @ingroup Debugfs
-> > > + * @brief parameters for CMD_DEBUGFS_READ/WRITE command
-> > > + */
-> > > +struct cmd_debugfs_fileop_request {
-> > > +	/** @brief physical address pointing at filename */
-> > > +	uint32_t fnameaddr;
-> > > +	/** @brief length in bytes of filename buffer */
-> > > +	uint32_t fnamelen;
-> > > +	/** @brief physical address pointing to data buffer */
-> > > +	uint32_t dataaddr;
-> > > +	/** @brief length in bytes of data buffer */
-> > > +	uint32_t datalen;
-> > > +} __ABI_PACKED;
-> > >
-> > 
-> > If the ABI is version specific, maybe add the firmware version name
-> > to the structure definition?
-> 
-> I don't think the ABI is version specific. Only the set and contents of
-> the files in the BPMP's debugfs may change per version. The messages
-> which are exchanged between the CPU and the BPMP remain the same.
-
-Ah, got it.
-
-> > > +struct cmd_clk_set_rate_request {
-> > > +	int32_t unused;
-> > > +	int64_t rate;
-> > > +} __ABI_PACKED;
-> > 
-> > This structure actually has a non-aligned struct member, but you
-> > can write that as
-> > 
-> > struct cmd_clk_set_rate_request {
-> > 	int32_t unused;
-> > 	int64_t rate;
-> > } __attribute__((packed, aligned(4)));
-> > 
-> > to still use a default four-byte alignment.
-> 
-> I thought the original would yield something like this in memory:
-> 
-> 	[unused]
-> 	[rate  ]
-> 	[rate  ]
-> 
-> because packing makes sure to avoid any padding introduced for natural
-> alignment. Isn't __attribute__((packd, aligned(4))) going to yield the
-> exact same layout?
-
-Yes, only the alignment of the structure itself is changed, not
-the contents. The main difference is that accessing 'rate' on
-a target machine without unaligned access will use two 32-bit
-loads rather than eight 8-bit loads.
-
-Also, embedding this structure in another one is different
-(in theory, I don't expect this to actually appear somewhere):
-
-struct example {
-	char a;
-	struct cmd_clk_set_rate_request b;
-};
-
-would currently be 13 bytes long, with the alignment I suggested you
-get three bytes of padding after 'a'.
-
-	Arnd
+-- 
+Regards,
+Chanwoo Choi
