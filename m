@@ -1,141 +1,72 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 22 Aug 2016 11:34:09 +0530
-Subject: [PATCH 1/3] dt/bindings: arm-pl330: add description of
- arm,pl330-periph-burst
-In-Reply-To: <d4574737-f7b7-2726-373c-31cc81274a32@rock-chips.com>
-References: <1470365602-32586-1-git-send-email-shawn.lin@rock-chips.com>
- <1470365602-32586-2-git-send-email-shawn.lin@rock-chips.com>
- <20160805033410.GJ9681@localhost>
- <ea3572fa-4bff-87db-d5ad-f406809f8296@rock-chips.com>
- <0df0ab4f-0032-6487-2c30-b1ccd7d9ae62@metafoo.de>
- <1d42542f-c43c-5c4b-01b7-ba0ca085004a@rock-chips.com>
- <55e596a0-4176-4277-40cc-1d26763a8be0@rock-chips.com>
- <20160819024540.GQ9681@localhost>
- <d4574737-f7b7-2726-373c-31cc81274a32@rock-chips.com>
-Message-ID: <20160822060409.GG2890@localhost>
+Date: Mon, 22 Aug 2016 11:38:03 +0530
+Subject: [PATCH] dmaengine: qcom_hidma: release the descriptor before the
+ callback
+In-Reply-To: <f11a2775-63b8-6933-ab15-20e3927f0db7@codeaurora.org>
+References: <20160810172805.GH9681@localhost>
+ <d09ebb5f-99ea-a4e9-da9c-693be89c7cd4@codeaurora.org>
+ <20160819024853.GR9681@localhost>
+ <8c096fee-9749-a7df-7e04-25d21c0ea9ac@codeaurora.org>
+ <20160819034249.GS9681@localhost>
+ <3592cfe2-a563-7c26-9a9e-925051cc1934@codeaurora.org>
+ <20160819055252.GT9681@localhost>
+ <37b059dcb67d1c83c2193acecef0ab96@codeaurora.org>
+ <20160819170208.GC9343@localhost>
+ <f11a2775-63b8-6933-ab15-20e3927f0db7@codeaurora.org>
+Message-ID: <20160822060803.GH2890@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 21, 2016 at 09:00:58AM +0800, Shawn Lin wrote:
-> Hi Vinod,
-> 
-> ? 2016/8/19 10:45, Vinod Koul ??:
-> >On Wed, Aug 17, 2016 at 04:11:03PM +0800, Shawn Lin wrote:
-> >>Hi, Vinod and Lars-Peter
-> >>
-> >>Ping.. Any better idea to share :)
-> >>
-> >>On 2016/8/9 17:12, Shawn Lin wrote:
-> >>>Hi Lars-Peter,
-> >>>
-> >>>? 2016/8/9 16:39, Lars-Peter Clausen ??:
-> >>>>On 08/05/2016 09:25 AM, Shawn Lin wrote:
-> >>>>>Hi Vinod,
-> >>>>>
-> >>>>>? 2016/8/5 11:34, Vinod Koul ??:
-> >>>>>>On Fri, Aug 05, 2016 at 10:53:20AM +0800, Shawn Lin wrote:
-> >>>>>>>This patch adds the "arm,pl330-periph-burst" for arm-pl330 to
-> >>>>>>>support busrt mode.
+On Fri, Aug 19, 2016 at 01:21:34PM -0400, Sinan Kaya wrote:
+> On 8/19/2016 1:02 PM, Vinod Koul wrote:
+> > On Fri, Aug 19, 2016 at 07:13:43AM -0400, okaya at codeaurora.org wrote:
+> >> On 2016-08-19 01:52, Vinod Koul wrote:
+> >>> On Thu, Aug 18, 2016 at 11:48:52PM -0400, Sinan Kaya wrote:
+> >>>> On 8/18/2016 11:42 PM, Vinod Koul wrote:
+> >>>>> On Thu, Aug 18, 2016 at 11:26:28PM -0400, Sinan Kaya wrote:
+> >>>>>> On 8/18/2016 10:48 PM, Vinod Koul wrote:
+> >>>>>>>> Keep a size limited list with error cookies and flush them in terminate all?
+> >>>>>>> I think so, terminate_all anyway cleans up the channel. Btw what is the
+> >>>>>>> behaviour on error? Do you terminate or somthing else?
+> >>>>>>>
 > >>>>>>
-> >>>>>>why should this be DT property. Only reason I can think of if some hw
-> >>>>>>versions support this and some won't.
+> >>>>>> On error, I flush all outstanding transactions with an error code and I reset
+> >>>>>> the channel. After the reset, the DMA channel is functional again. The client
+> >>>>>> doesn't need to shutdown anything.
 > >>>>>
-> >>>>>yes, if we want to support burst mode, both of the master(pl330) and
-> >>>>>client(several peripherals) should implement it, otherwise it will
-> >>>>>be broken when enabling.
+> >>>>> You mean from the client context or driver?
+> >>>>>
 > >>>>
-> >>>>As you said, it is up to the consumer peripheral whether it supports
-> >>>>BURST,
-> >>>>SINGLE or both. So this is a per client property, but you specify this
-> >>>>as a
-> >>>>a global property on the producer side.
+> >>>> The client doesn't need to call device_free_chan_resources and
+> >>>> device_terminate_all
+> >>>> to be specific. Client can certainly call these if it needs to
+> >>>> but it is not
+> >>>> required to recover the channel.
 > >>>
-> >>>Thanks for comment.
+> >>> You didn't answer my question!
 > >>>
-> >>>yup, but what is the proper way to add it ? :)
-> >>>
-> >>>
-> >>>a) If pl330 support BURST as well as all the peripherals, we could
-> >>>enable it.
-> >>>
-> >>>b) If pl300 support BURST, but all the peripherals don't support it,
-> >>>we could not enable it.
-> >>>
-> >>>c) If pl300 support BURST, but not all the peripherals support it,
-> >>>we also could not enable it.
-> >>>
-> >>>the burst feature of peripheral IP may be vendor-specific, but the
-> >>>common driver for this peripheral are used for many many vendors which
-> >>>means we could not check all of this info. It's very likely to break
-> >>>them... I couldn't figure out how many upstreamed peripheral drivers
-> >>>who are using pl300 either.
-> >>>
-> >>>So this check should be done by all this vendors but we could make
-> >>>sure we don't break them before they check a), b), c), right?
-> >
-> >Since support for BURST needs to be from peripheral too, we should have
-> >that as a property for peripheral not for controller.
-> >
-> >The peripheral drivers can communicate the burst to be used to pl330
-> >using src_maxburst/dst_maxburst in dma_slave_config. We can use this
-> >value to indicate the DMA should be single (a value of 0) or burst with
-> >"burst" value.
+> >>> On error you said you flush, so who does that?
+> >>
+> >> This is done by the driver in interrupt context when an error
+> >> interrupt is received. All transactions are posted and hw is reset.
+> > 
+> > Hmmm, waht about the txn which are pending? DO you clear them..?
+> > 
 > 
-> Thanks for sharing this.
-> 
-> But this is really a difficult trade-off decision to add this new
-> property for pl330 only.
-> 
-> Burst mode was supported by Boojin Kim's patch by default(commit
-> 848e9776fee42 ("dmaengine: pl330: support burst mode for dev-to-mem and
-> mem-to-dev transmit")).  But we found it will break SoCFPGA or
-> Exynos4412 reported by Dinh Nguyen and Bartlomiej Zolnierkiewicz[0].
-> So finally Caesar Wang contributed a patch, commit 0a18f9b268 ("
-> dmaengine: pl330: fix to support the burst mode") to fix it, but what
-> it actually did is to use single burst for any case, namely some kind
-> of regression for Boojin Kim's improvement.
-> 
-> So we can see these drivers which was broken by enabling burst mode
-> had already set src_maxburst/dst_maxburst. It looks to me so unfortunate
-> that the driver like 8250_dw.c was using so widely that we couldn't
-> set scr/dst_maxburst as this is really vendor specific for whether it
-> supports burst for 8250_dw or not..
-> 
-> So it is quite painful that we probably will get dozens of regression
-> reports when enabling burst mode by default. But without this, we have
-> been suffering from low performance quite a long time due to this
-> roadblock.
+> Yes, I clear both pending and active transactions. 
 
-well in that case I would suggest fixing client first. Make all users of
-pl330 not to use burst mode and then enable them one by one after testing
+Okay, in that case your can consider below:
 
-> 
-> Two possible paths to land this patch are:
-> (1) Keep this property for pl330 only, so we have no chance to
-> break others and we could make the platforms enjoy it if adding this
-> property for their own dts.
-> 
-> (2) Figuer out all the broken platfroms if enabling burst and fix them
-> one by one for the src/dst_maxburst(maybe by enabling burst mode and
-> get regression reports). If we could not solve any one of them, then we
-> have to give up all the effort we do, and let this pain keep on
-> stalling people's expectation of better performance.
-> 
-> 
-> I would appreciate it if you could share your thought more, as I
-> really want more platforms benefit from it(at least don't break
-> them)  :)
-> 
-> 
-> [0] http://www.gossamer-threads.com/lists/linux/kernel/2374171
-> 
-> >
-> 
-> 
-> -- 
-> Best Regards
-> Shawn Lin
-> 
+1. dmaengine asserts error interrupt
+2. Driver receives and mark's the txn as error
+3. Driver completes the txn and intimates the client. No further
+   submissions. Drop the locks before calling callback, as subsequent
+   processing by client maybe in callback thread.
+4. Client invokes status and you can return error
+5. On error, client calls terminate_all. You can reset channel, free all
+   descriptors in the active, pending and completed lists
+6. Client prepares new txn and so on..
 
+Thanks
 -- 
 ~Vinod
