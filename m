@@ -1,287 +1,131 @@
 From: hl@rock-chips.com (Lin Huang)
-Date: Mon, 22 Aug 2016 11:36:24 +0800
-Subject: [PATCH v7 8/8] drm/rockchip: Add dmc notifier in vop driver
+Date: Mon, 22 Aug 2016 11:36:22 +0800
+Subject: [PATCH v7 6/8] Documentation: bindings: add dt documentation for
+ rk3399 dmc
 In-Reply-To: <1471836984-6316-1-git-send-email-hl@rock-chips.com>
 References: <1471836984-6316-1-git-send-email-hl@rock-chips.com>
-Message-ID: <1471836984-6316-9-git-send-email-hl@rock-chips.com>
+Message-ID: <1471836984-6316-7-git-send-email-hl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-when in ddr frequency scaling process, vop can not do enable or
-disable operation, since in dcf we check vop clock to see whether
-vop work. If vop work, dcf do ddr frequency scaling when vop
-in vblank status, and we need to read vop register to check whether
-vop go into vblank status. If vop not work, dcf can do ddr frequency
-any time. So when do ddr frequency scaling, you disabled or enable
-vop, there may two bad thing happen: 1, the panel flicker(when vop from
-disable status change to enable). 2, kernel hang (when vop from enable
-status change to disable, dcf need to read vblank status, but if you disable
-vop clock, it can not get the status, it will lead soc dead) So we need
-register to devfreq notifier, and we can get the dmc status. Also, when
-there have two vop enabled, we need to disable dmc, since dcf only base
-on one vop vblank time, so the other panel will flicker when do ddr
-frequency scaling.
+This patch adds the documentation for rockchip rk3399 dmc driver.
 
 Signed-off-by: Lin Huang <hl@rock-chips.com>
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
 Changes in v7:
-- None
+-None
 
 Changes in v6:
-- fix a build error
+-Add more detail in Documentation
 
 Changes in v5:
-- improve some nits
+-None
 
 Changes in v4:
-- register notifier to devfreq_register_notifier
-- use DEVFREQ_PRECHANGE and DEVFREQ_POSTCHANGE to get dmc status
-- when two vop enable, disable dmc
-- when two vop back to one vop, enable dmc
+-None
 
 Changes in v3:
-- when do vop eanble/disable, dmc will wait until it finish
+-None
 
 Changes in v2:
-- None
+-None 
 
 Changes in v1:
-- use wait_event instead usleep
+-None
+ .../devicetree/bindings/devfreq/rk3399_dmc.txt     | 85 ++++++++++++++++++++++
+ 1 file changed, 85 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
 
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 127 ++++++++++++++++++++++++++--
- 1 file changed, 122 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index ec8ad00..a76e70c 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -12,6 +12,8 @@
-  * GNU General Public License for more details.
-  */
- 
-+#include <linux/devfreq.h>
-+#include <linux/devfreq-event.h>
- #include <drm/drm.h>
- #include <drm/drmP.h>
- #include <drm/drm_atomic.h>
-@@ -118,6 +120,13 @@ struct vop {
- 
- 	const struct vop_data *data;
- 
-+	struct devfreq *devfreq;
-+	struct devfreq_event_dev *devfreq_event_dev;
-+	struct notifier_block dmc_nb;
-+	int dmc_in_process;
-+	int vop_switch_status;
-+	wait_queue_head_t wait_dmc_queue;
-+	wait_queue_head_t wait_vop_switch_queue;
- 	uint32_t *regsbak;
- 	void __iomem *regs;
- 
-@@ -428,21 +437,59 @@ static void vop_dsp_hold_valid_irq_disable(struct vop *vop)
- 	spin_unlock_irqrestore(&vop->irq_lock, flags);
- }
- 
-+static int dmc_notify(struct notifier_block *nb, unsigned long event,
-+		      void *data)
-+{
-+	struct vop *vop = container_of(nb, struct vop, dmc_nb);
+diff --git a/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt b/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
+new file mode 100644
+index 0000000..b787abb
+--- /dev/null
++++ b/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
+@@ -0,0 +1,85 @@
++* Rockchip rk3399 DMC(Dynamic Memory Controller) device
 +
-+	if (event == DEVFREQ_PRECHANGE) {
-+		/*
-+		 * check if vop in enable or disable process,
-+		 * if yes, wait until it finishes, use 200ms as
-+		 * timeout.
-+		 */
-+		if (!wait_event_timeout(vop->wait_vop_switch_queue,
-+					!vop->vop_switch_status, HZ / 5))
-+			dev_warn(vop->dev,
-+				 "Timeout waiting for vop swtich status\n");
-+		vop->dmc_in_process = 1;
-+	} else if (event == DEVFREQ_POSTCHANGE) {
-+		vop->dmc_in_process = 0;
-+		wake_up(&vop->wait_dmc_queue);
-+	}
++Required properties:
++- compatible: Must be "rockchip,rk3399-dmc".
++- devfreq-events: Node to get DDR loading, Refer to
++		  Documentation/devicetree/bindings/devfreq/rockchip-dfi.txt
++- interrupts: The interrupt number to the CPU. The interrupt specifier format
++	      depends on the interrupt controller. It should be DCF interrupts,
++	      when DDR dvfs finish, it will happen.
++- clocks: Phandles for clock specified in "clock-names" property
++- clock-names : The name of clock used by the DFI, must be "pclk_ddr_mon";
++- operating-points-v2: Refer to Documentation/devicetree/bindings/power/opp.txt
++		       for details.
++- center-supply: DMC supply node.
++- status: Marks the node enabled/disabled.
 +
-+	return NOTIFY_OK;
-+}
++Optional properties:
++- ddr_timing:  DDR timing need to pass to arm trust firmware
++- upthreshold: The upthreshold to simpleondeamnd policy
++- downdifferential: The downdifferential to simpleondeamnd policy
 +
- static void vop_enable(struct drm_crtc *crtc)
- {
- 	struct vop *vop = to_vop(crtc);
-+	int num_enabled_crtc = 0;
- 	int ret;
- 
-+	if (vop->is_enabled)
-+		return;
++Example:
 +
-+	/*
-+	 * if in dmc scaling frequency process, wait until it finishes
-+	 * use 100ms as timeout time.
-+	 */
-+	if (!wait_event_timeout(vop->wait_dmc_queue,
-+				!vop->dmc_in_process, HZ / 5))
-+		dev_warn(vop->dev,
-+			 "Timeout waiting for dmc when vop enable\n");
++	ddr_timing: ddr_timing {
++		compatible = "rockchip,ddr-timing";
++		ddr3_speed_bin = <21>;
++		pd_idle = <0>;
++		sr_idle = <0>;
++		sr_mc_gate_idle = <0>;
++		srpd_lite_idle  = <0>;
++		standby_idle = <0>;
++		dram_dll_dis_freq = <300>;
++		phy_dll_dis_freq = <125>;
 +
-+	vop->vop_switch_status = 1;
- 	ret = pm_runtime_get_sync(vop->dev);
- 	if (ret < 0) {
- 		dev_err(vop->dev, "failed to get pm runtime: %d\n", ret);
--		return;
-+		goto err;
- 	}
- 
- 	ret = clk_enable(vop->hclk);
- 	if (ret < 0) {
- 		dev_err(vop->dev, "failed to enable hclk - %d\n", ret);
--		return;
-+		goto err;
- 	}
- 
- 	ret = clk_enable(vop->dclk);
-@@ -456,7 +503,6 @@ static void vop_enable(struct drm_crtc *crtc)
- 		dev_err(vop->dev, "failed to enable aclk - %d\n", ret);
- 		goto err_disable_dclk;
- 	}
--
- 	/*
- 	 * Slave iommu shares power, irq and clock with vop.  It was associated
- 	 * automatically with this master device via common driver code.
-@@ -485,6 +531,21 @@ static void vop_enable(struct drm_crtc *crtc)
- 
- 	drm_crtc_vblank_on(crtc);
- 
-+	vop->vop_switch_status = 0;
-+	wake_up(&vop->wait_vop_switch_queue);
++		ddr3_odt_dis_freq = <333>;
++		ddr3_drv = <DDR3_DS_40ohm>;
++		ddr3_odt = <DDR3_ODT_120ohm>;
++		phy_ddr3_ca_drv = <PHY_DRV_ODT_40>;
++		phy_ddr3_dq_drv = <PHY_DRV_ODT_40>;
++		phy_ddr3_odt = <PHY_DRV_ODT_240>;
 +
-+	/* check how many vop we use now */
-+	drm_for_each_crtc(crtc, vop->drm_dev) {
-+		if (crtc->state->enable)
-+			num_enabled_crtc++;
-+	}
++		lpddr3_odt_dis_freq = <333>;
++		lpddr3_drv = <LP3_DS_34ohm>;
++		lpddr3_odt = <LP3_ODT_240ohm>;
++		phy_lpddr3_ca_drv = <PHY_DRV_ODT_40>;
++		phy_lpddr3_dq_drv = <PHY_DRV_ODT_40>;
++		phy_lpddr3_odt = <PHY_DRV_ODT_240>;
 +
-+	/* if enable two vop, need to disable dmc */
-+	if ((num_enabled_crtc > 1) && vop->devfreq) {
-+		if (vop->devfreq_event_dev)
-+			devfreq_event_disable_edev(vop->devfreq_event_dev);
-+		devfreq_suspend_device(vop->devfreq);
-+	}
- 	return;
- 
- err_disable_aclk:
-@@ -493,16 +554,32 @@ err_disable_dclk:
- 	clk_disable(vop->dclk);
- err_disable_hclk:
- 	clk_disable(vop->hclk);
-+err:
-+	vop->vop_switch_status = 0;
-+	wake_up(&vop->wait_vop_switch_queue);
-+	return;
- }
- 
- static void vop_crtc_disable(struct drm_crtc *crtc)
- {
- 	struct vop *vop = to_vop(crtc);
-+	int num_enabled_crtc = 0;
- 	int i;
- 
- 	WARN_ON(vop->event);
- 
- 	/*
-+	 * if in dmc scaling frequency process, wait until it finish
-+	 * use 100ms as timeout time.
-+	 */
-+	if (!wait_event_timeout(vop->wait_dmc_queue,
-+				!vop->dmc_in_process, HZ / 5))
-+		dev_warn(vop->dev,
-+			 "Timeout waiting for dmc when vop disable\n");
++		lpddr4_odt_dis_freq = <333>;
++		lpddr4_drv = <LP4_PDDS_60ohm>;
++		lpddr4_dq_odt = <LP4_DQ_ODT_40ohm>;
++		lpddr4_ca_odt = <LP4_CA_ODT_40ohm>;
++		phy_lpddr4_ca_drv = <PHY_DRV_ODT_40>;
++		phy_lpddr4_ck_cs_drv = <PHY_DRV_ODT_80>;
++		phy_lpddr4_dq_drv = <PHY_DRV_ODT_80>;
++		phy_lpddr4_odt = <PHY_DRV_ODT_60>;
++	};
 +
-+	vop->vop_switch_status = 1;
++	dmc_opp_table: dmc_opp_table {
++		compatible = "operating-points-v2";
 +
-+	/*
- 	 * We need to make sure that all windows are disabled before we
- 	 * disable that crtc. Otherwise we might try to scan from a destroyed
- 	 * buffer later.
-@@ -515,7 +592,6 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
- 		VOP_WIN_SET(vop, win, enable, 0);
- 		spin_unlock(&vop->reg_lock);
- 	}
--
- 	drm_crtc_vblank_off(crtc);
- 
- 	/*
-@@ -546,7 +622,6 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
- 	 * vop standby complete, so iommu detach is safe.
- 	 */
- 	rockchip_drm_dma_detach_device(vop->drm_dev, vop->dev);
--
- 	clk_disable(vop->dclk);
- 	clk_disable(vop->aclk);
- 	clk_disable(vop->hclk);
-@@ -559,6 +634,25 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
- 
- 		crtc->state->event = NULL;
- 	}
++		opp00 {
++			opp-hz = /bits/ 64 <300000000>;
++			opp-microvolt = <900000>;
++		};
++		opp01 {
++			opp-hz = /bits/ 64 <666000000>;
++			opp-microvolt = <900000>;
++		};
++	};
 +
-+	vop->vop_switch_status = 0;
-+	wake_up(&vop->wait_vop_switch_queue);
++	dmc: dmc {
++		compatible = "rockchip,rk3399-dmc";
++		devfreq-events = <&dfi>;
++		interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru SCLK_DDRCLK>;
++		clock-names = "dmc_clk";
++		ddr_timing = <&ddr_timing>;
++		operating-points-v2 = <&dmc_opp_table>;
++		center-supply = <&ppvar_centerlogic>;
++		upthreshold = <15>;
++		downdifferential = <10>;
++		status = "disabled";
++	};
 +
-+	/* check how many vop use now */
-+	drm_for_each_crtc(crtc, vop->drm_dev) {
-+		if (crtc->state->enable)
-+			num_enabled_crtc++;
-+	}
-+
-+	/*
-+	 * if num_enabled_crtc = 1 now, it means 2 vop enabled
-+	 * change to 1 vop enabled  need to enable dmc again.
-+	 */
-+	if ((num_enabled_crtc == 1) && vop->devfreq) {
-+		if (vop->devfreq_event_dev)
-+			devfreq_event_enable_edev(vop->devfreq_event_dev);
-+		devfreq_resume_device(vop->devfreq);
-+	}
- }
- 
- static void vop_plane_destroy(struct drm_plane *plane)
-@@ -1410,6 +1504,8 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
- 	struct drm_device *drm_dev = data;
- 	struct vop *vop;
- 	struct resource *res;
-+	struct devfreq *devfreq;
-+	struct devfreq_event_dev *event_dev;
- 	size_t alloc_size;
- 	int ret, irq;
- 
-@@ -1471,6 +1567,27 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
- 		return ret;
- 
- 	pm_runtime_enable(&pdev->dev);
-+
-+	init_waitqueue_head(&vop->wait_vop_switch_queue);
-+	vop->vop_switch_status = 0;
-+	init_waitqueue_head(&vop->wait_dmc_queue);
-+	vop->dmc_in_process = 0;
-+
-+	devfreq = devfreq_get_devfreq_by_phandle(dev, 0);
-+	if (IS_ERR(devfreq))
-+		goto out;
-+
-+	vop->devfreq = devfreq;
-+	vop->dmc_nb.notifier_call = dmc_notify;
-+	devfreq_register_notifier(vop->devfreq, &vop->dmc_nb,
-+				  DEVFREQ_TRANSITION_NOTIFIER);
-+
-+	event_dev = devfreq_event_get_edev_by_phandle(vop->devfreq->dev.parent,
-+						      0);
-+	if (IS_ERR(event_dev))
-+		goto out;
-+	vop->devfreq_event_dev = event_dev;
-+out:
- 	return 0;
- }
- 
 -- 
 2.6.6
