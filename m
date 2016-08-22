@@ -1,27 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 22 Aug 2016 10:21:03 -0600
-Subject: [PATCH V3 0/5] ARM: dts: bcm2835: Add Raspberry Pi Zero
-In-Reply-To: <1471792204-21908-1-git-send-email-stefan.wahren@i2se.com>
-References: <1471792204-21908-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <47b64ef5-c75b-e60a-81b4-63f91464333b@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 22 Aug 2016 09:25:13 -0700
+Subject: Bunch of CRC errors in next with arm: move exports to definitions
+Message-ID: <20160822162512.mptzbiaozx2fz42l@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2016 09:09 AM, Stefan Wahren wrote:
-> This patch series add support for Raspberry Pi Zero with USB host mode. It's
-> based on the patch "ARM64: dts: bcm: Use a symlink to R-Pi dtsi files
-> from arch=arm" from Ian Campbell. Currently there is a bug [1] which needs
-> to fixed before because after applying these patch series the bug isn't
-> reproducible anymore but not fixed.
->
-> The patches 1-3 fixes the USB DT settings for bcm283x. Patch 3 is only compile
-> tested, so it would be nice if someone with a RPi 3 could test it.
-> The last patch based on the work of Lubomir Rintel [2] and Noralf Tr?nnes [3].
->
-> Note: Patch 3 can't be cherry-picked because it depends on Patch 2.
+Hi Al,
 
-All looks reasonable to me at a quick glance. I didn't validate any of 
-the GPIO values etc.
+Looks like starting with next-20160818 I'm now getting close to
+800 lines of WARNINGs on ARM with omap2plus_defconfig while doing
+make modules:
 
-The series,
-Acked-by: Stephen Warren <swarren@nvidia.com>
+Building modules, stage 2.
+  MODPOST 399 modules
+WARNING: "__memzero" [sound/usb/snd-usbmidi-lib.ko] has no CRC!
+WARNING: "memset" [sound/usb/snd-usbmidi-lib.ko] has no CRC!
+WARNING: "memcpy" [sound/usb/snd-usbmidi-lib.ko] has no CRC!
+WARNING: "_set_bit" [sound/usb/snd-usbmidi-lib.ko] has no CRC!
+WARNING: "_test_and_set_bit" [sound/usb/snd-usbmidi-lib.ko] has no CRC!
+WARNING: "_clear_bit" [sound/usb/snd-usbmidi-lib.ko] has no CRC!
+WARNING: "__aeabi_uidivmod" [sound/usb/snd-usb-audio.ko] has no CRC!
+WARNING: "_test_and_clear_bit" [sound/usb/snd-usb-audio.ko] has no CRC!
+WARNING: "arm_copy_to_user" [sound/usb/snd-usb-audio.ko] has no CRC!
+WARNING: "__aeabi_uidiv" [sound/usb/snd-usb-audio.ko] has no CRC!
+...
+WARNING: "memset" [crypto/drbg.ko] has no CRC!
+WARNING: "memcpy" [crypto/ctr.ko] has no CRC!
+WARNING: "memcpy" [crypto/cmac.ko] has no CRC!
+WARNING: "__memzero" [crypto/cmac.ko] has no CRC!
+WARNING: "memcpy" [crypto/ccm.ko] has no CRC!
+WARNING: "__memzero" [crypto/ccm.ko] has no CRC!
+
+Reverting commit 4dd1837d7589 ("arm: move exports to definitions")
+fixes it.
+
+Regards,
+
+Tony
