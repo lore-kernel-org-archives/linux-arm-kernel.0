@@ -1,87 +1,89 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 22 Aug 2016 15:38:29 +0200
-Subject: [PATCH resend] mmc: pwrseq-simple: Add an optional
- post-power-on-delay
-In-Reply-To: <1470596558-23195-2-git-send-email-hdegoede@redhat.com>
-References: <1470596558-23195-1-git-send-email-hdegoede@redhat.com>
- <1470596558-23195-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAPDyKFqg_kCOPht+UvndLznihxap2xGg6-KwA3JbuSnD4vPoYQ@mail.gmail.com>
+Date: Mon, 22 Aug 2016 15:38:42 +0200
+Subject: [PATCH 1/5] mmc: sunxi-mmc: change idma descriptor to __le32
+In-Reply-To: <20160802193115.850-2-michael.weiser@gmx.de>
+References: <20160802193115.850-1-michael.weiser@gmx.de>
+ <20160802193115.850-2-michael.weiser@gmx.de>
+Message-ID: <CAPDyKFrk4RGHHG-aHEJ5ZbQoL2W_tu=x1MPcxTjr2kpNvfH7KQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 August 2016 at 21:02, Hans de Goede <hdegoede@redhat.com> wrote:
-> Some devices need a while to boot their firmware after providing clks /
-> de-asserting resets before they are ready to receive sdio commands.
+On 2 August 2016 at 21:31, Michael Weiser <michael.weiser@gmx.de> wrote:
+> The sunxi-mmc driver does not take into account the processor may be big
+> endian when writing the DMA descriptors. This causes cards not to be
+> detected when running a big-endian kernel. Change the descriptors for
+> IDMA to use __le32 and ensure they are suitably swapped before writing.
+> Tested successfully on the Cubieboard2.
 >
-> This commits adds a post-power-on-delay-ms devicetree property to
-> mmc-pwrseq-simple for use with such devices.
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Signed-off-by: Michael Weiser <michael.weiser@gmx.de>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Thanks, applied for next!
+This doesn't apply as I have queued some other sunxi changes. Could
+you please re-spin a new version.
 
 Kind regards
 Uffe
 
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: linux-mmc at vger.kernel.org
 > ---
->  Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt | 2 ++
->  drivers/mmc/core/pwrseq_simple.c                            | 9 +++++++++
->  2 files changed, 11 insertions(+)
+>  drivers/mmc/host/sunxi-mmc.c | 27 +++++++++++++++------------
+>  1 file changed, 15 insertions(+), 12 deletions(-)
 >
-> diff --git a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
-> index ce0e767..e254368 100644
-> --- a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
-> +++ b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
-> @@ -16,6 +16,8 @@ Optional properties:
->    See ../clocks/clock-bindings.txt for details.
->  - clock-names : Must include the following entry:
->    "ext_clock" (External clock provided to the card).
-> +- post-power-on-delay-ms : Delay in ms after powering the card and
-> +       de-asserting the reset-gpios (if any)
->
->  Example:
->
-> diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
-> index 450d907..1304160 100644
-> --- a/drivers/mmc/core/pwrseq_simple.c
-> +++ b/drivers/mmc/core/pwrseq_simple.c
-> @@ -16,6 +16,8 @@
->  #include <linux/device.h>
->  #include <linux/err.h>
->  #include <linux/gpio/consumer.h>
-> +#include <linux/delay.h>
-> +#include <linux/property.h>
->
->  #include <linux/mmc/host.h>
->
-> @@ -24,6 +26,7 @@
->  struct mmc_pwrseq_simple {
->         struct mmc_pwrseq pwrseq;
->         bool clk_enabled;
-> +       u32 post_power_on_delay_ms;
->         struct clk *ext_clk;
->         struct gpio_descs *reset_gpios;
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index 2ee4c21..1e6df8a 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -223,10 +223,10 @@ struct sunxi_mmc_clk_delay {
 >  };
-> @@ -64,6 +67,9 @@ static void mmc_pwrseq_simple_post_power_on(struct mmc_host *host)
->         struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(host->pwrseq);
 >
->         mmc_pwrseq_simple_set_gpios_value(pwrseq, 0);
-> +
-> +       if (pwrseq->post_power_on_delay_ms)
-> +               msleep(pwrseq->post_power_on_delay_ms);
->  }
+>  struct sunxi_idma_des {
+> -       u32     config;
+> -       u32     buf_size;
+> -       u32     buf_addr_ptr1;
+> -       u32     buf_addr_ptr2;
+> +       __le32 config;
+> +       __le32 buf_size;
+> +       __le32 buf_addr_ptr1;
+> +       __le32 buf_addr_ptr2;
+>  };
 >
->  static void mmc_pwrseq_simple_power_off(struct mmc_host *host)
-> @@ -111,6 +117,9 @@ static int mmc_pwrseq_simple_probe(struct platform_device *pdev)
->                 return PTR_ERR(pwrseq->reset_gpios);
+>  struct sunxi_mmc_host {
+> @@ -325,22 +325,25 @@ static void sunxi_mmc_init_idma_des(struct sunxi_mmc_host *host,
+>         int i, max_len = (1 << host->idma_des_size_bits);
+>
+>         for (i = 0; i < data->sg_len; i++) {
+> -               pdes[i].config = SDXC_IDMAC_DES0_CH | SDXC_IDMAC_DES0_OWN |
+> -                                SDXC_IDMAC_DES0_DIC;
+> +               pdes[i].config = cpu_to_le32(SDXC_IDMAC_DES0_CH |
+> +                                            SDXC_IDMAC_DES0_OWN |
+> +                                            SDXC_IDMAC_DES0_DIC);
+>
+>                 if (data->sg[i].length == max_len)
+>                         pdes[i].buf_size = 0; /* 0 == max_len */
+>                 else
+> -                       pdes[i].buf_size = data->sg[i].length;
+> +                       pdes[i].buf_size = cpu_to_le32(data->sg[i].length);
+>
+>                 next_desc += sizeof(struct sunxi_idma_des);
+> -               pdes[i].buf_addr_ptr1 = sg_dma_address(&data->sg[i]);
+> -               pdes[i].buf_addr_ptr2 = (u32)next_desc;
+> +               pdes[i].buf_addr_ptr1 =
+> +                       cpu_to_le32(sg_dma_address(&data->sg[i]));
+> +               pdes[i].buf_addr_ptr2 = cpu_to_le32((u32)next_desc);
 >         }
 >
-> +       device_property_read_u32(dev, "post-power-on-delay-ms",
-> +                                &pwrseq->post_power_on_delay_ms);
-> +
->         pwrseq->pwrseq.dev = dev;
->         pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
->         pwrseq->pwrseq.owner = THIS_MODULE;
+> -       pdes[0].config |= SDXC_IDMAC_DES0_FD;
+> -       pdes[i - 1].config |= SDXC_IDMAC_DES0_LD | SDXC_IDMAC_DES0_ER;
+> -       pdes[i - 1].config &= ~SDXC_IDMAC_DES0_DIC;
+> +       pdes[0].config |= cpu_to_le32(SDXC_IDMAC_DES0_FD);
+> +       pdes[i - 1].config |= cpu_to_le32(SDXC_IDMAC_DES0_LD |
+> +                                         SDXC_IDMAC_DES0_ER);
+> +       pdes[i - 1].config &= cpu_to_le32(~SDXC_IDMAC_DES0_DIC);
+>         pdes[i - 1].buf_addr_ptr2 = 0;
+>
+>         /*
 > --
-> 2.7.4
+> 2.9.2
 >
