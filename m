@@ -1,114 +1,84 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 22 Aug 2016 12:16:00 +0530
-Subject: [PATCH] arm64: kprobe: Always clear pstate.D in breakpoint exception
- handler
-Message-ID: <1059f6762466c2cebf32aa40e4d7974731a68726.1471848065.git.panand@redhat.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 22 Aug 2016 15:55:24 +0900
+Subject: [PATCH] arm64: mark reserved memblock regions explicitly in iomem
+Message-ID: <20160822065524.8085-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whenever we are hitting a kprobe from a none-kprobe debug exception
-handler, we hit an infinite occurrences of "Unexpected kernel single-step
-exception at EL1"
+Kdump(kexec-tools) parses /proc/iomem to identify all the memory regions
+on the system. Since the current kernel names "nomap" regions, like UEFI
+runtime services code/data, as "System RAM," kexec-tools sets up elf core
+header to include them in a crash dump file (/proc/vmcore).
 
-PSTATE.D is debug exception mask bit. It is set whenever we enter into an
-exception mode. When it is set then Watchpoint, Breakpoint, and Software
-Step exceptions are masked. However, software Breakpoint Instruction
-exceptions can never be masked. Therefore, if we ever execute a BRK
-instruction, irrespective of D-bit setting, we will be receiving a
-corresponding  breakpoint exception.
-For example:
-- We are executing kprobe pre/post handler, and kprobe has been inserted in
-  one of the instruction of a function called by handler. So, it executes
-  BRK instruction and we land into the case of KPROBE_REENTER. (This case is
-  already handled by current code)
-- We are executing uprobe handler or any other BRK handler such as in
-  WARN_ON (BRK BUG_BRK_IMM), and we trace that path using kprobe.So, we
-  enter into kprobe breakpoint handler,from another BRK handler.(This case
-  is not being handled currently)
-In all such cases kprobe breakpoint exception will be raised when we were
-already in debug exception mode.
-SPSR's D bit (bit 9) shows the value of PSTATE.D immediately before the
-exception was taken.So, in above example cases we would find it set in
-kprobe breakpoint handler.
-Single step exception will always be followed by a kprobe breakpoint
-exception.However, it will only be raised gracefully if we clear D bit
-while returning from breakpoint exception. If D bit is set then, it results
-into undefined exception and when it's handler enables dbg then single step
-exception is generated, however it will never be handled(because address
-does not match and therefore treated as unexpected).
-This patch clears D-flag unconditionally in setup_singlestep, so that we
-can always get single step exception correctly after returning from
-breakpoint exception.
-Additionally, it also removes D-flag set statement for KPROBE_REENTER
-return path, because debug exception for KPROBE_REENTER will always take
-place in a debug exception state. So, D-flag will already be set in this
-case.
+Then crash dump kernel parses UEFI memory map again, re-marks those regions
+as "nomap" and does not create a memory mapping for them unlike the other
+areas of System RAM. In this case, copying /proc/vmcore through
+copy_oldmem_page() on crash dump kernel will end up with a kernel abort,
+as reported in [1].
 
-Signed-off-by: Pratyush Anand <panand@redhat.com>
+This patch names all the "nomap" regions explicitly as "reserved" so that
+we can exclude them from a crash dump file. acpi_os_ioremap() must also
+be modified because those regions have WB attributes [2].
+
+Apart from kdump, this change also matches x86's use of acpi (and
+/proc/iomem).
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/448186.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/450089.html
+
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/kernel/probes/kprobes.c | 29 +++++++++++++----------------
- 1 file changed, 13 insertions(+), 16 deletions(-)
+ arch/arm64/include/asm/acpi.h | 8 ++++++--
+ arch/arm64/kernel/setup.c     | 9 +++++++--
+ 2 files changed, 13 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-index e51f4ad97525..6e13361b9c01 100644
---- a/arch/arm64/kernel/probes/kprobes.c
-+++ b/arch/arm64/kernel/probes/kprobes.c
-@@ -166,13 +166,18 @@ static void __kprobes set_current_kprobe(struct kprobe *p)
- }
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index 5420cb0..e517088 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -12,7 +12,7 @@
+ #ifndef _ASM_ACPI_H
+ #define _ASM_ACPI_H
  
- /*
-- * The D-flag (Debug mask) is set (masked) upon debug exception entry.
-- * Kprobes needs to clear (unmask) D-flag -ONLY- in case of recursive
-- * probe i.e. when probe hit from kprobe handler context upon
-- * executing the pre/post handlers. In this case we return with
-- * D-flag clear so that single-stepping can be carried-out.
-- *
-- * Leave D-flag set in all other cases.
-+ * When PSTATE.D is set (masked), then software step exceptions can not be
-+ * generated.
-+ * SPSR's D bit shows the value of PSTATE.D immediately before the
-+ * exception was taken. PSTATE.D is set while entering into any exception
-+ * mode, however software clears it for any normal (none-debug-exception)
-+ * mode in the exception entry. Therefore, when we are entering into kprobe
-+ * breakpoint handler from any normal mode then SPSR.D bit is already
-+ * cleared, however it is set when we are entering from any debug exception
-+ * mode.
-+ * Since we always need to generate single step exception after a kprobe
-+ * breakpoint exception therefore we need to clear it unconditionally, when
-+ * we become sure that the current breakpoint exception is for kprobe.
-  */
- static void __kprobes
- spsr_set_debug_flag(struct pt_regs *regs, int mask)
-@@ -245,10 +250,7 @@ static void __kprobes setup_singlestep(struct kprobe *p,
+-#include <linux/mm.h>
++#include <linux/memblock.h>
+ #include <linux/psci.h>
  
- 		set_ss_context(kcb, slot);	/* mark pending ss */
+ #include <asm/cputype.h>
+@@ -32,7 +32,11 @@
+ static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+ 					    acpi_size size)
+ {
+-	if (!page_is_ram(phys >> PAGE_SHIFT))
++	/*
++	 * EFI's reserve_regions() call adds memory with the WB attribute
++	 * to memblock via early_init_dt_add_memory_arch().
++	 */
++	if (!memblock_is_memory(phys))
+ 		return ioremap(phys, size);
  
--		if (kcb->kprobe_status == KPROBE_REENTER)
--			spsr_set_debug_flag(regs, 0);
--		else
--			WARN_ON(regs->pstate & PSR_D_BIT);
-+		spsr_set_debug_flag(regs, 0);
+ 	return ioremap_cache(phys, size);
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 38eda13..38589b5 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -205,10 +205,15 @@ static void __init request_standard_resources(void)
  
- 		/* IRQs and single stepping do not mix well. */
- 		kprobes_save_local_irqflag(kcb, regs);
-@@ -333,8 +335,6 @@ int __kprobes kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr)
- 			BUG();
+ 	for_each_memblock(memory, region) {
+ 		res = alloc_bootmem_low(sizeof(*res));
+-		res->name  = "System RAM";
++		if (memblock_is_nomap(region)) {
++			res->name  = "reserved";
++			res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
++		} else {
++			res->name  = "System RAM";
++			res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
++		}
+ 		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
+ 		res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
+-		res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
  
- 		kernel_disable_single_step();
--		if (kcb->kprobe_status == KPROBE_REENTER)
--			spsr_set_debug_flag(regs, 1);
- 
- 		if (kcb->kprobe_status == KPROBE_REENTER)
- 			restore_previous_kprobe(kcb);
-@@ -457,9 +457,6 @@ kprobe_single_step_handler(struct pt_regs *regs, unsigned int esr)
- 		kprobes_restore_local_irqflag(kcb, regs);
- 		kernel_disable_single_step();
- 
--		if (kcb->kprobe_status == KPROBE_REENTER)
--			spsr_set_debug_flag(regs, 1);
--
- 		post_kprobe_handler(kcb, regs);
- 	}
+ 		request_resource(&iomem_resource, res);
  
 -- 
-2.5.5
+2.9.0
