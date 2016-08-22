@@ -1,30 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 22 Aug 2016 17:52:59 +0100
-Subject: [PATCH 4/9] regulator: axp20x: support AXP806 variant
-In-Reply-To: <20160821021125.1521-5-wens@csie.org>
-References: <20160821021125.1521-1-wens@csie.org>
- <20160821021125.1521-5-wens@csie.org>
-Message-ID: <20160822165259.GS22076@sirena.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 22 Aug 2016 10:53:15 -0600
+Subject: [PATCH v3 02/12] mailbox: Add Tegra HSP driver
+In-Reply-To: <20160819173233.13260-3-thierry.reding@gmail.com>
+References: <20160819173233.13260-1-thierry.reding@gmail.com>
+ <20160819173233.13260-3-thierry.reding@gmail.com>
+Message-ID: <c4e096fe-3f3c-b22a-75c0-9c8665ce896f@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 21, 2016 at 10:11:20AM +0800, Chen-Yu Tsai wrote:
+On 08/19/2016 11:32 AM, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+>
+> This driver exposes a mailbox interface for interprocessor communication
+> using the Hardware Synchronization Primitives (HSP) module's doorbell
+> mechanism. There are multiple HSP instances and they provide additional
+> features such as shared mailboxes, shared and arbitrated semaphores.
+>
+> A driver for a remote processor can use the mailbox client provided by
+> the HSP driver and build an IPC protocol on top of this synchronization
+> mechanism.
 
-> +	if (id == AXP806_DCDCB) {
-> +		return (((reg & GENMASK(7, 6)) == BIT(6)) ||
-> +			((reg & GENMASK(7, 6)) == BIT(7)));
-> +	} else if (id == AXP806_DCDCC) {
-> +		return ((reg & GENMASK(7, 6)) == BIT(7));
-> +	} else if (id == AXP806_DCDCE) {
-> +		return !!(reg & BIT(5));
-> +	}
+> +static int tegra_hsp_doorbell_startup(struct tegra_hsp_channel *channel)
+...
+> +	spin_lock_irqsave(&hsp->lock, flags);
+> +
+> +	value = tegra_hsp_channel_readl(&ccplex->channel, HSP_DB_ENABLE);
+> +	value |= BIT(db->master);
+> +	tegra_hsp_channel_writel(&ccplex->channel, value, HSP_DB_ENABLE);
+> +
+> +	spin_unlock_irqrestore(&hsp->lock, flags);
+> +
+> +	if (!tegra_hsp_doorbell_can_ring(db))
+> +		return -ENODEV;
 
-This looks like you're trying to write a switch statement, please do
-that.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160822/045c85a3/attachment.sig>
+Should the error-check happen before enabling the RX path? Otherwise, 
+presumably that HSP_DB_ENABLE bit should be cleared on failure.
+
+> +static int tegra_hsp_probe(struct platform_device *pdev)
+
+> +	dev_dbg(&pdev->dev, "regs: %pR (%p-%p)\n", res, hsp->regs, hsp->regs + resource_size(res) - 1);
+
+Line width?
