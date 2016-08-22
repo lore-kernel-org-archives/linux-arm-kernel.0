@@ -1,84 +1,67 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 22 Aug 2016 15:55:24 +0900
-Subject: [PATCH] arm64: mark reserved memblock regions explicitly in iomem
-Message-ID: <20160822065524.8085-1-takahiro.akashi@linaro.org>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Mon, 22 Aug 2016 14:49:10 +0800
+Subject: [PATCH v7 0/7] power: act8945a_charger: Improvements
+Message-ID: <1471848557-27278-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kdump(kexec-tools) parses /proc/iomem to identify all the memory regions
-on the system. Since the current kernel names "nomap" regions, like UEFI
-runtime services code/data, as "System RAM," kexec-tools sets up elf core
-header to include them in a crash dump file (/proc/vmcore).
+This patch series is to improve the implementation of act8945a-charger
+driver, such as improve the way to check the status, fix the power
+supply type property, add the status change update, and add more
+properties: capacity level property and max current property.
 
-Then crash dump kernel parses UEFI memory map again, re-marks those regions
-as "nomap" and does not create a memory mapping for them unlike the other
-areas of System RAM. In this case, copying /proc/vmcore through
-copy_oldmem_page() on crash dump kernel will end up with a kernel abort,
-as reported in [1].
+Changes in v7:
+ - Fix the missing negation sign.
+ - Add a prompt information if the charger suspended.
+ - Fix the wrong using devm_request_irq() with with parent
+   device as *dev.
+ - For "lbo-gpios", use gpiod_get() to fix devm_gpiod_get() wrong use
+   with parent device as *dev argument.
+ - Add the handle -EPROBE_DEFER returned from gpiod_get "lbo-gpios".
+ - Use dev_info() to print log if the lbo irq request failed.
+ - Remove unneeded semicolon.
+ - Add depends on GPIOLIB for use gpiod.
+ - For "chglev-gpios", use gpiod_get() to fix devm_gpiod_get() wrong use
+   with parent device as *dev argument.
+ - Add the handle -EPROBE_DEFER returned from gpiod_get "chglev_gpio".
+ - Remove unneeded semicolon.
 
-This patch names all the "nomap" regions explicitly as "reserved" so that
-we can exclude them from a crash dump file. acpi_os_ioremap() must also
-be modified because those regions have WB attributes [2].
+Changes in v6:
+ - Add .remove callback function.
+ - Fix the 'dev' argument of devm_request_irq() to pdev->dev.parent.
+ - For "lbo-gpios", use gpiod API instead of old gpio API to handle.
+ - For "chglev-gpios", use gpiod API instead of old gpio API to handle.
 
-Apart from kdump, this change also matches x86's use of acpi (and
-/proc/iomem).
+Changes in v5:
+ - Add Acked-by tag.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/448186.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/450089.html
+Changes in v4:
+ - Use "interrupts" property, instead of "active-semi,irq-gpios"
+   for irq.
+ - Change devname of devm_request_irq() from "lbo-detect" to
+   "act8945a, lbo-detect".
+ - Fix wrong gpio assignment for chglev_pin.
+ - Update the doc/binding for using "interrupts" property.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/include/asm/acpi.h | 8 ++++++--
- arch/arm64/kernel/setup.c     | 9 +++++++--
- 2 files changed, 13 insertions(+), 4 deletions(-)
+Changes in v3:
+ - Remove unneeded semicolon to fix semicolon.cocci warning.
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 5420cb0..e517088 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -12,7 +12,7 @@
- #ifndef _ASM_ACPI_H
- #define _ASM_ACPI_H
- 
--#include <linux/mm.h>
-+#include <linux/memblock.h>
- #include <linux/psci.h>
- 
- #include <asm/cputype.h>
-@@ -32,7 +32,11 @@
- static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
- 					    acpi_size size)
- {
--	if (!page_is_ram(phys >> PAGE_SHIFT))
-+	/*
-+	 * EFI's reserve_regions() call adds memory with the WB attribute
-+	 * to memblock via early_init_dt_add_memory_arch().
-+	 */
-+	if (!memblock_is_memory(phys))
- 		return ioremap(phys, size);
- 
- 	return ioremap_cache(phys, size);
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 38eda13..38589b5 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -205,10 +205,15 @@ static void __init request_standard_resources(void)
- 
- 	for_each_memblock(memory, region) {
- 		res = alloc_bootmem_low(sizeof(*res));
--		res->name  = "System RAM";
-+		if (memblock_is_nomap(region)) {
-+			res->name  = "reserved";
-+			res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-+		} else {
-+			res->name  = "System RAM";
-+			res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
-+		}
- 		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
- 		res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
--		res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
- 
- 		request_resource(&iomem_resource, res);
- 
+Changes in v2:
+ - Add missing ret declaration.
+
+Wenyou Yang (7):
+  power: act8945a_charger: Remove "battery_temperature"
+  power: act8945a_charger: Improve
+  power: act8945a_charger: Add status change update support
+  power: act8945a_charger: Fix the power supply type
+  power: act8945a_charger: Add capacity level property
+  power: act8945a_charger: Add max current property
+  doc: bindings: act8945a-charger: Update properties
+
+ .../bindings/power/supply/act8945a-charger.txt     |  16 +-
+ drivers/power/supply/Kconfig                       |   2 +-
+ drivers/power/supply/act8945a_charger.c            | 418 ++++++++++++++++++---
+ 3 files changed, 386 insertions(+), 50 deletions(-)
+
 -- 
-2.9.0
+2.7.4
