@@ -1,35 +1,27 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Sun, 21 Aug 2016 22:46:15 +0000
-Subject: [PATCH -next v2] net: phy: Add missing of_node_put() in
- xgmiitorgmii_probe()
-In-Reply-To: <1471706815-27723-1-git-send-email-weiyj.lk@gmail.com>
-References: <1471706815-27723-1-git-send-email-weiyj.lk@gmail.com>
-Message-ID: <1471819575-13389-1-git-send-email-weiyj.lk@gmail.com>
+From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
+Date: Mon, 22 Aug 2016 09:08:02 +0800
+Subject: [PATCH v4 2/4] dt-bindings: Add a binding for Mediatek MDP
+In-Reply-To: <20160819141655.GA18486@rob-hp-laptop>
+References: <1471606767-3218-1-git-send-email-minghsiu.tsai@mediatek.com>
+ <1471606767-3218-3-git-send-email-minghsiu.tsai@mediatek.com>
+ <20160819141655.GA18486@rob-hp-laptop>
+Message-ID: <1471828082.30956.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This node pointer is returned by of_parse_phandle() with
-refcount incremented in this function. of_node_put() on it
-before exitting this function.
+On Fri, 2016-08-19 at 09:16 -0500, Rob Herring wrote:
+> On Fri, Aug 19, 2016 at 07:39:25PM +0800, Minghsiu Tsai wrote:
+> > Add a DT binding documentation of MDP for the MT8173 SoC
+> > from Mediatek
+> > 
+> > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/media/mediatek-mdp.txt     |  109 ++++++++++++++++++++
+> >  1 file changed, 109 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/media/mediatek-mdp.txt
+> 
+> Please add acks when posting new versions.
+> 
+> Rob
 
-This is detected by Coccinelle semantic patch.
-
-Signed-off-by: Wei Yongjun <weiyj.lk@gmail.com>
----
-v1 -> v2: release it unconditionally as Andrew and David's suggestion
----
- drivers/net/phy/xilinx_gmii2rgmii.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/net/phy/xilinx_gmii2rgmii.c b/drivers/net/phy/xilinx_gmii2rgmii.c
-index cad6e19..73b50f3 100644
---- a/drivers/net/phy/xilinx_gmii2rgmii.c
-+++ b/drivers/net/phy/xilinx_gmii2rgmii.c
-@@ -73,6 +73,7 @@ int xgmiitorgmii_probe(struct mdio_device *mdiodev)
- 	}
- 
- 	priv->phy_dev = of_phy_find_device(phy_node);
-+	of_node_put(phy_node);
- 	if (!priv->phy_dev) {
- 		dev_info(dev, "Couldn't find phydev\n");
- 		return -EPROBE_DEFER;
+Sorry for my mistake. I will add it in next version.
