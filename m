@@ -1,46 +1,78 @@
-From: pbrobinson@gmail.com (Peter Robinson)
-Date: Mon, 22 Aug 2016 13:12:42 +0100
-Subject: [PATCH] ASoC: sunxi: depend on ARCH_SUNXI
-Message-ID: <20160822121242.18827-1-pbrobinson@gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 22 Aug 2016 14:16:52 +0200
+Subject: [RESEND PATCH v2 1/4] pwm: Add support for Meson PWM Controller
+In-Reply-To: <1471718083-11516-2-git-send-email-narmstrong@baylibre.com>
+References: <1471718083-11516-1-git-send-email-narmstrong@baylibre.com>
+ <1471718083-11516-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <ad2f719e-9236-96fd-3bea-ce20c487c67f@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Depend on ARCH_SUNXI or COMPILE_TEST as it doesn't make sense to enable
-these if the appropriate SoC they're embedded in isn't enabled.
+Hi Thierry,
 
-Signed-off-by: Peter Robinson <pbrobinson@gmail.com>
----
- sound/soc/sunxi/Kconfig | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+On 08/20/2016 08:34 PM, Neil Armstrong wrote:
+> Add support for the PWM controller found in the Amlogic SoCs.
+> This driver supports the Meson8b and GXBB SoCs.
+> 
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  drivers/pwm/Kconfig     |   9 +
+>  drivers/pwm/Makefile    |   1 +
+>  drivers/pwm/pwm-meson.c | 491 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 501 insertions(+)
+>  create mode 100644 drivers/pwm/pwm-meson.c
+> 
 
-diff --git a/sound/soc/sunxi/Kconfig b/sound/soc/sunxi/Kconfig
-index 2a954bd..a2b62dc5 100644
---- a/sound/soc/sunxi/Kconfig
-+++ b/sound/soc/sunxi/Kconfig
-@@ -2,6 +2,7 @@ menu "Allwinner SoC Audio support"
- 
- config SND_SUN4I_CODEC
- 	tristate "Allwinner A10 Codec Support"
-+	depends on ARCH_SUNXI || COMPILE_TEST
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	select REGMAP_MMIO
- 	help
-@@ -10,6 +11,7 @@ config SND_SUN4I_CODEC
- 
- config SND_SUN4I_I2S
- 	tristate "Allwinner A10 I2S Support"
-+	depends on ARCH_SUNXI || COMPILE_TEST
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	select REGMAP_MMIO
- 	help
-@@ -19,7 +21,7 @@ config SND_SUN4I_I2S
- 
- config SND_SUN4I_SPDIF
- 	tristate "Allwinner A10 SPDIF Support"
--	depends on OF
-+	depends on OF && (ARCH_SUNXI || COMPILE_TEST)
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	select REGMAP_MMIO
- 	help
--- 
-2.9.3
+[...]
+
+> diff --git a/drivers/pwm/pwm-meson.c b/drivers/pwm/pwm-meson.c
+> new file mode 100644
+> index 0000000..9e7ecf5
+> --- /dev/null
+> +++ b/drivers/pwm/pwm-meson.c
+
+[...]
+
+> +
+> +static const char * const pwm_parents[] = {
+> +	"xtal", "vid_pll", "fclk_div4", "fclk_div3", NULL
+> +};
+
+Aww, crap, it's "vid_pll" on meson8b and "hdmi_pll" for gxbb.
+I'll add it to DT mach data.
+
+> +static int meson_pwm_enable(struct pwm_chip *chip,
+> +				 struct pwm_device *pwm)
+> +{
+> +	struct meson_pwm_chip *pwm_data = to_meson_pwm_chip(chip);
+> +	unsigned int id = pwm->hwpwm;
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&pwm_data->lock, flags);
+> +	switch (id) {
+> +	case PWM_A:
+> +		writel(readl(pwm_data->base + REG_MISC_AB) | MISC_A_EN,
+> +			pwm_data->base + REG_MISC_AB);
+
+Found an issue here, the HW requires to re-write the clock counts register even if the value is correct.
+Let's got for a v3 !
+
+> +		break;
+> +
+> +	case PWM_B:
+> +		writel(readl(pwm_data->base + REG_MISC_AB) | MISC_B_EN,
+> +			pwm_data->base + REG_MISC_AB);
+> +		break;
+> +
+> +	default:
+> +		break;
+> +	}
+> +	spin_unlock_irqrestore(&pwm_data->lock, flags);
+> +
+> +	return 0;
+> +}
+
+Is it worth rewriting the driver using the apply callback ?
+I'll wish to have it for 4.9 if possible, do you think it's possible ?
+
+Neil
