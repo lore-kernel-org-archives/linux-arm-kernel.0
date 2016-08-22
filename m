@@ -1,170 +1,39 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 22 Aug 2016 12:09:54 -0400 (EDT)
-Subject: [PATCH v6 4/8] usb: core: add power sequence handling for USB
- devices
-In-Reply-To: <20160822065335.GC4362@shlinux2>
-Message-ID: <Pine.LNX.4.44L0.1608221156210.1543-100000@iolanthe.rowland.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 22 Aug 2016 18:09:36 +0200
+Subject: [PATCH] ARM: dts: kirkwood: Fix PCIe label on OpenRD
+Message-ID: <20160822160936.24873-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Aug 2016, Peter Chen wrote:
+While converting PCIe node on kirkwood by using label, the following
+commit eb13cf8345e9 ("ARM: dts: kirkwood: Fixup pcie DT warnings")
+introduced a regression on the OpenRD boards: the PCIe didn't work
+anymore. As reported by Aaro Koskinen, the display/framebuffer was
+lost. This commit adds the forgotten label.
 
-> On Mon, Aug 15, 2016 at 05:13:14PM +0800, Peter Chen wrote:
-> > Some hard-wired USB devices need to do power sequence to let the
-> > device work normally, the typical power sequence like: enable USB
-> > PHY clock, toggle reset pin, etc. But current Linux USB driver
-> > lacks of such code to do it, it may cause some hard-wired USB devices
-> > works abnormal or can't be recognized by controller at all.
-> > 
-> > In this patch, it calls power sequence library APIs to finish
-> > the power sequence events. At first, it calls pwrseq_alloc_generic
-> > to create a generic power sequence instance, then it will do power
-> > on sequence at hub's probe for all devices under this hub
-> > (includes root hub).
-> > 
-> > At hub_disconnect, it will do power off sequence which is at powered
-> > on list.
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> > Tested-by Joshua Clayton <stillcompiling@gmail.com>
-> 
-> Hi Alan,
-> 
-> The power sequence library code has been reviewed several rounds, would
-> you please help to review the change for USB part?
+Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+Fixes: eb13cf8345e9 ("ARM: dts: kirkwood: Fixup pcie DT warnings")
+Cc: stable at vger.kernel.org
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/boot/dts/kirkwood-openrd.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Some small problems...  See below.
-
-> > --- a/drivers/usb/core/Makefile
-> > +++ b/drivers/usb/core/Makefile
-> > @@ -9,5 +9,6 @@ usbcore-y += port.o of.o
-> >  
-> >  usbcore-$(CONFIG_PCI)		+= hcd-pci.o
-> >  usbcore-$(CONFIG_ACPI)		+= usb-acpi.o
-> > +usbcore-$(CONFIG_PWRSEQ_GENERIC) += pwrseq.o
-
-Please use a tab to align this with the lines above.
-
-> > --- /dev/null
-> > +++ b/drivers/usb/core/pwrseq.c
-> > @@ -0,0 +1,100 @@
-> > +/*
-> > + * pwrseq.c	USB device power sequence management
-> > + *
-> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> > + * Author: Peter Chen <peter.chen@nxp.com>
-> > + *
-> > + * This program is free software: you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2  of
-> > + * the License as published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License
-> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> > + */
-> > +
-> > +#include <linux/list.h>
-> > +#include <linux/of.h>
-> > +#include <linux/power/pwrseq.h>
-> > +#include <linux/slab.h>
-> > +#include <linux/usb.h>
-> > +#include <linux/usb/hcd.h>
-> > +
-> > +#include "hub.h"
-> > +
-> > +struct usb_pwrseq_node {
-> > +	struct pwrseq *pwrseq;
-> > +	struct list_head list;
-> > +};
-> > +
-> > +static int hub_of_pwrseq_on(struct device_node *np, struct usb_hub *hub)
-> > +{
-> > +	struct pwrseq *pwrseq;
-> > +	struct usb_pwrseq_node *pwrseq_node;
-> > +	int ret;
-> > +
-> > +	pwrseq = pwrseq_alloc_generic();
-> > +	if (IS_ERR(pwrseq))
-> > +		return PTR_ERR(pwrseq);
-> > +
-> > +	ret = pwrseq_get(np, pwrseq);
-> > +	if (ret)
-> > +		goto pwr_free;
-> > +
-> > +	ret = pwrseq_on(np, pwrseq);
-> > +	if (ret)
-> > +		goto pwr_put;
-> > +
-> > +	pwrseq_node = kzalloc(sizeof(*pwrseq_node), GFP_KERNEL);
-
-You need to check that the kzalloc succeeded.
-
-> > +	pwrseq_node->pwrseq = pwrseq;
-> > +	list_add(&pwrseq_node->list, &hub->pwrseq_on_list);
-> > +
-> > +	return 0;
-> > +
-> > +pwr_put:
-> > +	pwrseq_put(pwrseq);
-> > +pwr_free:
-> > +	pwrseq_free(pwrseq);
-> > +	return ret;
-> > +}
-
-This subroutine looks very generic.  The only place where it cares that
-it was called for a USB hub is the list_add(), and that could easily
-become generic also (make this function take &hub->pwrseq_on_list as
-its second argument, instead of hub).
-
-It looks like this routine really belongs in the power sequence 
-library.
-
-> > +
-> > +int hub_pwrseq_on(struct usb_hub *hub)
-> > +{
-
-The names of this routine and the subroutine above are too similar.  
-After all, both functions require OF support.
-
-> > +	struct device *parent;
-> > +	struct usb_device *hdev = hub->hdev;
-> > +	struct device_node *np;
-> > +	int ret;
-> > +
-> > +	if (hdev->parent)
-> > +		parent = &hdev->dev;
-> > +	else
-> > +		parent = bus_to_hcd(hdev->bus)->self.controller;
-> > +
-> > +	for_each_child_of_node(parent->of_node, np) {
-> > +		ret = hub_of_pwrseq_on(np, hub);
-> > +		if (ret)
-> > +			return ret;
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +void hub_pwrseq_off(struct usb_hub *hub)
-> > +{
-> > +	struct pwrseq *pwrseq;
-> > +	struct usb_pwrseq_node *pwrseq_node, *tmp_node;
-> > +
-> > +	list_for_each_entry_safe(pwrseq_node, tmp_node,
-> > +			&hub->pwrseq_on_list, list) {
-> > +		pwrseq = pwrseq_node->pwrseq;
-> > +		pwrseq_off(pwrseq);
-> > +		pwrseq_put(pwrseq);
-> > +		pwrseq_free(pwrseq);
-> > +		list_del(&pwrseq_node->list);
-> > +		kfree(pwrseq_node);
-> > +	}
-> > +}
-
-This routine also looks like it belongs in a library.
-
-Alan Stern
+diff --git a/arch/arm/boot/dts/kirkwood-openrd.dtsi b/arch/arm/boot/dts/kirkwood-openrd.dtsi
+index e4ecab112601..7175511a92da 100644
+--- a/arch/arm/boot/dts/kirkwood-openrd.dtsi
++++ b/arch/arm/boot/dts/kirkwood-openrd.dtsi
+@@ -116,6 +116,10 @@
+ 	};
+ };
+ 
++&pciec {
++	status = "okay";
++};
++
+ &pcie0 {
+ 	status = "okay";
+ };
+-- 
+2.9.3
