@@ -1,31 +1,33 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Aug 2016 20:40:06 +0200
-Subject: [PATCH v6 0/4] ARM: dts: sun9i: Enable X-Powers AC100 RTC
-In-Reply-To: <20160819074226.16636-1-wens@csie.org>
-References: <20160819074226.16636-1-wens@csie.org>
-Message-ID: <20160822184006.GB7104@lukather>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 22 Aug 2016 12:49:03 -0600
+Subject: [PATCH v3 04/12] firmware: tegra: Add IVC library
+In-Reply-To: <20160819173233.13260-5-thierry.reding@gmail.com>
+References: <20160819173233.13260-1-thierry.reding@gmail.com>
+ <20160819173233.13260-5-thierry.reding@gmail.com>
+Message-ID: <a11ba4fb-5be5-7b26-164d-63831d8891c7@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 08/19/2016 11:32 AM, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+>
+> The Inter-VM communication (IVC) is a communication protocol which is
+> designed for interprocessor communication (IPC) or the communication
+> between the hypervisor and the virtual machine with a guest OS.
+>
+> Message channels are used to communicate between processors. They are
+> backed by DRAM or SRAM, so care must be taken to maintain coherence of
+> data.
+>
+> The IVC library maintains memory-based descriptors for the transmission
+> and reception channels as well as the data coherence of the counter and
+> payload. Clients, such as the driver for the BPMP firmware, can use the
+> library to exchange messages with remote processors.
+>
+> Based on work by Peter Newman <pnewman@nvidia.com> and Joseph Lo
+> <josephl@nvidia.com>.
 
-On Fri, Aug 19, 2016 at 03:42:22PM +0800, Chen-Yu Tsai wrote:
-> Hi everyone,
-> 
-> This was "mfd: ac100: Add support for X-Powers AC100 audio codec / RTC
-> combo IC". The driver bits have all been merged.
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
 
-Applied the DT patches. Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160822/c4cad27b/attachment.sig>
+All the renaming/restructuring relative to the internal code made 
+comparing them a bit more difficult that I'd like...
