@@ -1,37 +1,48 @@
-From: xieyisheng1@huawei.com (Xie Yisheng)
-Date: Mon, 22 Aug 2016 10:56:41 +0800
-Subject: [RFC PATCH v2 0/2] arm64/hugetlb: enable gigantic page
-Message-ID: <1471834603-27053-1-git-send-email-xieyisheng1@huawei.com>
+From: hl@rock-chips.com (Lin Huang)
+Date: Mon, 22 Aug 2016 11:36:18 +0800
+Subject: [PATCH v7 2/8] clk: rockchip: rk3399: add SCLK_DDRCLK ID for ddrc
+In-Reply-To: <1471836984-6316-1-git-send-email-hl@rock-chips.com>
+References: <1471836984-6316-1-git-send-email-hl@rock-chips.com>
+Message-ID: <1471836984-6316-3-git-send-email-hl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arm64 supports different size of gigantic page which can be seen from:
-commit 084bd29810a5 ("ARM64: mm: HugeTLB support.")
-commit 66b3923a1a0f ("arm64: hugetlb: add support for PTE contiguous bit")
+Signed-off-by: Lin Huang <hl@rock-chips.com>
+---
+Changes in v7:
+-None
 
-So I tried to use this function by adding hugepagesz=1G in kernel
-parameters, with CONFIG_CMA=y. However, when I
-echo xx > \
-  /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages
-it failed with the following info:
--bash: echo: write error: Invalid argument
+Changes in v6:
+-None
 
-This is a v2 patchset which make gigantic page can be used on arm64,
-with CONFIG_CMA=y, or other related configs is enable.
+Changes in v5:
+-None
+Changes in v4:
+-None
 
-You can see the former discussions at:
-https://lkml.org/lkml/2016/8/18/310
+Changes in v3:
+-None
+
+Changes in v2:
+-None 
+
+Changes in v1:
+-None
+
+ include/dt-bindings/clock/rk3399-cru.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/dt-bindings/clock/rk3399-cru.h b/include/dt-bindings/clock/rk3399-cru.h
+index 50a44cf..ce5f3e9 100644
+--- a/include/dt-bindings/clock/rk3399-cru.h
++++ b/include/dt-bindings/clock/rk3399-cru.h
+@@ -131,6 +131,7 @@
+ #define SCLK_DPHY_RX0_CFG		165
+ #define SCLK_RMII_SRC			166
+ #define SCLK_PCIEPHY_REF100M		167
++#define SCLK_DDRC			168
  
-Xie Yisheng (2):
-  mm/hugetlb: Introduce ARCH_HAS_GIGANTIC_PAGE
-  arm64 Kconfig: Select gigantic page
-
- arch/arm64/Kconfig | 1 +
- arch/s390/Kconfig  | 1 +
- arch/x86/Kconfig   | 1 +
- fs/Kconfig         | 4 ++++
- mm/hugetlb.c       | 2 +-
- 5 files changed, 8 insertions(+), 1 deletion(-)
-
+ #define DCLK_VOP0			180
+ #define DCLK_VOP1			181
 -- 
-1.7.12.4
+2.6.6
