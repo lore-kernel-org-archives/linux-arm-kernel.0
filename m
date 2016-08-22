@@ -1,248 +1,137 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 22 Aug 2016 17:30:01 +0200
-Subject: [PATCH] mmc: Add mmc_force_detect_change_begin / _end functions
-In-Reply-To: <CAPDyKFoTj9=esqaUPiwxLkhCsO98cSDgzdD1phgbXLa7rf6jiw@mail.gmail.com>
-References: <1470488736-11083-1-git-send-email-hdegoede@redhat.com>
- <CAPDyKFoTj9=esqaUPiwxLkhCsO98cSDgzdD1phgbXLa7rf6jiw@mail.gmail.com>
-Message-ID: <831381a3-7cca-1264-29e2-bd40802a815f@redhat.com>
+Date: Mon, 22 Aug 2016 17:32:57 +0200
+Subject: [PATCH v2 7/7] musb: sunxi: Add support for platform_set_mode
+In-Reply-To: <20160822152421.GH1853@uda0271908>
+References: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
+ <1471288892-21702-8-git-send-email-hdegoede@redhat.com>
+ <20160819213049.GC1853@uda0271908>
+ <2a55a1bf-7ebf-3ab4-b231-85eba20103f1@redhat.com>
+ <20160822141158.GF1853@uda0271908>
+ <9699b62e-421a-ae8e-c25e-ef48beb84ce0@redhat.com>
+ <20160822152421.GH1853@uda0271908>
+Message-ID: <fd1e9692-2c69-da16-0e6e-ac7fa50077ac@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+HI,
 
-On 22-08-16 15:39, Ulf Hansson wrote:
-> On 6 August 2016 at 15:05, Hans de Goede <hdegoede@redhat.com> wrote:
->> Some sdio devices have a multiple stage bring-up process. Specifically
->> the esp8089 (for which an out of tree driver is available) loads firmware
->> on the first call to its sdio-drivers' probe function and then resets
->> the device causing it to reboot from its RAM with the new firmware.
+On 22-08-16 17:24, Bin Liu wrote:
+> On Mon, Aug 22, 2016 at 05:08:56PM +0200, Hans de Goede wrote:
+>> Hi,
 >>
->> When this sdio device reboots it comes back up in 1 bit 400 KHz mode
->> again, and we need to walk through the whole ios negatiation and sdio setup
->> again.
+>> On 22-08-16 16:11, Bin Liu wrote:
+>>> Hi,
+>>>
+>>> On Sun, Aug 21, 2016 at 12:10:26PM +0200, Hans de Goede wrote:
+>>>> Hi,
+>>>>
+>>>> On 19-08-16 23:30, Bin Liu wrote:
+>>>>> Hi,
+>>>>>
+>>>>> On Mon, Aug 15, 2016 at 09:21:32PM +0200, Hans de Goede wrote:
+>>>>>> This allows run-time dr_mode switching support via the "mode" musb
+>>>>>> sysfs attribute.
+>>>>>>
+>>>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>>>> ---
+>>>>>> drivers/usb/musb/sunxi.c | 52 ++++++++++++++++++++++++++++++++++++++++++++----
+>>>>>> 1 file changed, 48 insertions(+), 4 deletions(-)
+>>>>>>
+>>>>>> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+>>>>>> index c6ee166..1fe7451 100644
+>>>>>> --- a/drivers/usb/musb/sunxi.c
+>>>>>> +++ b/drivers/usb/musb/sunxi.c
+>>>>>> @@ -74,6 +74,7 @@
+>>>>>> #define SUNXI_MUSB_FL_HAS_SRAM			5
+>>>>>> #define SUNXI_MUSB_FL_HAS_RESET			6
+>>>>>> #define SUNXI_MUSB_FL_NO_CONFIGDATA		7
+>>>>>> +#define SUNXI_MUSB_FL_PHY_MODE_PEND		8
+>>>>>>
+>>>>>> /* Our read/write methods need access and do not get passed in a musb ref :| */
+>>>>>> static struct musb *sunxi_musb;
+>>>>>> @@ -87,6 +88,7 @@ struct sunxi_glue {
+>>>>>> 	struct phy		*phy;
+>>>>>> 	struct platform_device	*usb_phy;
+>>>>>> 	struct usb_phy		*xceiv;
+>>>>>> +	enum phy_mode		phy_mode;
+>>>>>> 	unsigned long		flags;
+>>>>>> 	struct work_struct	work;
+>>>>>> 	struct extcon_dev	*extcon;
+>>>>>> @@ -140,6 +142,9 @@ static void sunxi_musb_work(struct work_struct *work)
+>>>>>> 			clear_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
+>>>>>> 		}
+>>>>>> 	}
+>>>>>> +
+>>>>>> +	if (test_and_clear_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags))
+>>>>>> +		phy_set_mode(glue->phy, glue->phy_mode);
+>>>>>> }
+>>>>>>
+>>>>>> static void sunxi_musb_set_vbus(struct musb *musb, int is_on)
+>>>>>> @@ -341,6 +346,41 @@ static void sunxi_musb_dma_controller_destroy(struct dma_controller *c)
+>>>>>> {
+>>>>>> }
+>>>>>>
+>>>>>> +static int sunxi_musb_set_mode(struct musb *musb, u8 mode)
+>>>>>> +{
+>>>>>> +	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
+>>>>>> +	enum phy_mode new_mode;
+>>>>>> +
+>>>>>> +	switch (mode) {
+>>>>>> +	case MUSB_HOST:		new_mode = PHY_MODE_USB_HOST; break;
+>>>>>> +	case MUSB_PERIPHERAL:	new_mode = PHY_MODE_USB_DEVICE; break;
+>>>>>> +	case MUSB_OTG:		new_mode = PHY_MODE_USB_OTG; break;
+>>>>>
+>>>>> Please fix the code style as commented in patch 4/7.
+>>>>
+>>>> Ok I will send a new version with this fixed.
+>>>>
+>>>>>
+>>>>>> +	default:
+>>>>>> +		dev_err(musb->controller->parent,
+>>>>>> +			"Error requested mode not supported by this kernel\n");
+>>>>>> +		return -EINVAL;
+>>>>>> +	}
+>>>>>> +
+>>>>>> +	if (glue->phy_mode == new_mode)
+>>>>>> +		return 0;
+>>>>>> +
+>>>>>> +	if (musb->port_mode != MUSB_PORT_MODE_DUAL_ROLE) {
+>>>>>> +		dev_err(musb->controller->parent,
+>>>>>> +			"Error changing modes is only supported in dual role mode\n");
+>>>>>> +		return -EINVAL;
+>>>>>> +	}
+>>>>>> +
+>>>>>> +	/*
+>>>>>> +	 * phy_set_mode may sleep, and we're called with a spinlock held,
+>>>>>> +	 * so let sunxi_musb_work deal with it.
+>>>>>> +	 */
+>>>>>> +	glue->phy_mode = new_mode;
+>>>>>> +	set_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags);
+>>>>>> +	schedule_work(&glue->work);
+>>>>>
+>>>>> When switching from host to peripheral mode, if an usb device is still
+>>>>> plugged and enumerated, how do you handle the device disconnect?
+>>>>
+>>>> The phy code will report vbus low for long enough for the musb to end
+>>>> the current session. It already does this for boards which do not
+>>>> have working vbus detection.
+>>>
+>>> But you didn't disconnect DP/DM, right? then musb detects vbus is gone
+>>> without receiving disconnect event, this is vbus error case, not a normal
+>>> teardown.
 >>
->> There are 2 problems with this:
->>
->> 1) Typically these devices are soldered onto some (ARM) tablet / SBC
->> PCB and as such are described in devicetree as "non-removable", which
->> causes the mmc-core to scan them only once and not poll for the device
->> dropping of the bus. Normally this is the right thing todo but in the
->> eso8089 example we need the mmc-core to notice the module has disconnected
->> (since it is now in 1 bit mode again it will not talk to the host in 4 bit
->> mode). This can be worked around by using "broken-cd" in devicetree
->> instead of "non-removable", but that is not a proper fix since the device
->> really is non-removable.
->>
->> 2) When the mmc-core detects the device has disconnected it will poweroff
->> the device, causing the RAM loaded firmware to be lost. This can be worked
->> around in devicetree by using regulator-always-on (and avoiding the use of
->> mmc-pwrseq), but again that is more of a hack then a proper fix.
+>> Correct, there is no way to disconnect DP/DM and reporting Vbus low for
+>> a while does the trick.
 >
-> Agree, and thanks for the detailed description of the problem!
->
->>
->> This commmit fixes 1) by adding a mmc_force_detect_change function which
->> will cause scanning for device removal / insertion until a new device is
->> detected. 2) Is fixed by a keep_power flag to the mmc_force_detect_change
->> function which when set causes the mmc-core to keep the power to the device
->> on during the rescan.
->
-> Hmm, in the first scan-attempt there will be an SDIO card properly
-> detected, right!?
+> Without physically disconnecting DP/DM, we still have a way to properly
+> teardown the enumerated devices. Please check musb_softconnect_write()
+> in musb_debugfs.c.
 
-Correct.
-
-> The problem occurs when the SDIO func driver gets probed and when it
-> loads the new firmware
-
-Correct.
-
-> which may happen later or even not at all as
-> it also depends if the SDIO func driver has been registered.
-
-The driver never loading is not a scenario we need to care about here,
-because then the device does not need to be re-initialized :)
-
-> I am also thinking about the system PM suspend/resume case. In cases
-> where the SDIO card actually becomes powered off/on in suspend/resume.
-> In this case, I assume the SDIO card will be re-detected through
-> mmc_sdio_resume(), although the same sequence as during the SDIO func
-> driver ->probe() must be repeated (loading firmware etc).
-
-Right, ideally we would be able to put the device in a low power mode
-but keep it powered, but that may not always be possible.
-
-> To me it seems like we need a new SDIO func API, to re-initialize the
-> SDIO card without powering off it first. I guess in the end it will be
-> quite similar to what you propose, but my point is that I rather make
-> this a specific SDIO API instead of trying to hook it into the rescan
-> sequence.
-
-Ah yes that would be more elegant, so basically we would reset
-the ios to its defaults, call mmc_set_ios(host) and then
-call mmc_sdio_init_card() with the card as oldcard as if it
-is a resume ?
-
-This would also mean the driver's probe function does not end up
-getting called twice which certainly is better :)
-
-I'm not sure I'm familiar enough with the mmc subsys to come
-up with a good implementation of this though, nor when I'll have
-the time to look into this.
-
-Any chance you could make a RFC patch ? I can then test it on
-hardware which actually needs this and bug-fix the code until
-it actually works :)
+That is manipulating the session bit in the devctl reg, that does not
+work to switch from device to host role or from host to device role,
+at least not on allwinner's musb implementation. I've already tried that
+before writing the code to report VBus low.
 
 Regards,
 
 Hans
-
-
-
->> Cc: Icenowy Zheng <icenowy@aosc.xyz>
->> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
->> Cc: Chen-Yu Tsai <wens@csie.org>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>  drivers/mmc/core/core.c  | 47 ++++++++++++++++++++++++++++++++++++++++++-----
->>  include/linux/mmc/host.h |  4 ++++
->>  2 files changed, 46 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
->> index 8b4dfd4..d850cde 100644
->> --- a/drivers/mmc/core/core.c
->> +++ b/drivers/mmc/core/core.c
->> @@ -1716,8 +1716,11 @@ int mmc_select_drive_strength(struct mmc_card *card, unsigned int max_dtr,
->>   */
->>  void mmc_power_up(struct mmc_host *host, u32 ocr)
->>  {
->> -       if (host->ios.power_mode == MMC_POWER_ON)
->> +       if (host->ios.power_mode == MMC_POWER_ON) {
->> +               if (host->ios.clock == 0)
->> +                       goto set_clock;
->>                 return;
->> +       }
->>
->>         mmc_pwrseq_pre_power_on(host);
->>
->> @@ -1742,6 +1745,7 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
->>
->>         mmc_pwrseq_post_power_on(host);
->>
->> +set_clock:
->>         host->ios.clock = host->f_init;
->>
->>         host->ios.power_mode = MMC_POWER_ON;
->> @@ -1759,6 +1763,11 @@ void mmc_power_off(struct mmc_host *host)
->>         if (host->ios.power_mode == MMC_POWER_OFF)
->>                 return;
->>
->> +       if (host->rescan_keep_power) {
->> +               mmc_set_clock(host, 0);
->> +               return;
->> +       }
->> +
->>         mmc_pwrseq_power_off(host);
->>
->>         host->ios.clock = 0;
->> @@ -1907,6 +1916,27 @@ void mmc_detect_change(struct mmc_host *host, unsigned long delay)
->>  }
->>  EXPORT_SYMBOL(mmc_detect_change);
->>
->> +/**
->> + *     mmc_force_detect_change - force rescanning of a MMC socket even if
->> + *                               it is non-removable
->> + *     @host: host to rescan
->> + *     @delay: optional delay to wait before detection (jiffies)
->> + *     @keep_power: if set do not turn of vdd / call pwrseq_off during rescan
->> + *
->> + *     MMC drivers which need non-removable sdio devices to be rescanned
->> + *     (e.g. because the device reboots its fw after a firmware upload),
->> + *     can call this to force scanning the MMC socket for changes, even
->> + *     if it is non-removable.
->> + */
->> +void mmc_force_detect_change(struct mmc_host *host, unsigned long delay,
->> +                            bool keep_power)
->> +{
->> +       host->rescan_force = 1;
->> +       host->rescan_keep_power = keep_power;
->> +       _mmc_detect_change(host, delay, false);
->> +}
->> +EXPORT_SYMBOL(mmc_force_detect_change);
->> +
->>  void mmc_init_erase(struct mmc_card *card)
->>  {
->>         unsigned int sz;
->> @@ -2584,7 +2614,8 @@ void mmc_rescan(struct work_struct *work)
->>                 return;
->>
->>         /* If there is a non-removable card registered, only scan once */
->> -       if (!mmc_card_is_removable(host) && host->rescan_entered)
->> +       if (!mmc_card_is_removable(host) && host->rescan_entered &&
->> +           !host->rescan_force)
->>                 return;
->>         host->rescan_entered = 1;
->>
->> @@ -2601,7 +2632,8 @@ void mmc_rescan(struct work_struct *work)
->>          * if there is a _removable_ card registered, check whether it is
->>          * still present
->>          */
->> -       if (host->bus_ops && !host->bus_dead && mmc_card_is_removable(host))
->> +       if (host->bus_ops && !host->bus_dead &&
->> +           (mmc_card_is_removable(host) || host->rescan_force))
->>                 host->bus_ops->detect(host);
->>
->>         host->detect_change = 0;
->> @@ -2634,15 +2666,20 @@ void mmc_rescan(struct work_struct *work)
->>         }
->>
->>         for (i = 0; i < ARRAY_SIZE(freqs); i++) {
->> -               if (!mmc_rescan_try_freq(host, max(freqs[i], host->f_min)))
->> +               if (!mmc_rescan_try_freq(host, max(freqs[i], host->f_min))) {
->> +                       if (host->rescan_force) {
->> +                               host->rescan_force = 0;
->> +                               host->rescan_keep_power = 0;
->> +                       }
->>                         break;
->> +               }
->>                 if (freqs[i] <= host->f_min)
->>                         break;
->>         }
->>         mmc_release_host(host);
->>
->>   out:
->> -       if (host->caps & MMC_CAP_NEEDS_POLL)
->> +       if ((host->caps & MMC_CAP_NEEDS_POLL) || host->rescan_force)
->>                 mmc_schedule_delayed_work(&host->detect, HZ);
->>  }
->>
->> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
->> index 45cde8c..e9b3115 100644
->> --- a/include/linux/mmc/host.h
->> +++ b/include/linux/mmc/host.h
->> @@ -333,6 +333,8 @@ struct mmc_host {
->>
->>         int                     rescan_disable; /* disable card detection */
->>         int                     rescan_entered; /* used with nonremovable devices */
->> +       int                     rescan_force;   /* force rescan of (nonremovable) devices */
->> +       int                     rescan_keep_power; /* Do not power off card */
->>
->>         int                     need_retune;    /* re-tuning is needed */
->>         int                     hold_retune;    /* hold off re-tuning */
->> @@ -408,6 +410,8 @@ int mmc_power_save_host(struct mmc_host *host);
->>  int mmc_power_restore_host(struct mmc_host *host);
->>
->>  void mmc_detect_change(struct mmc_host *, unsigned long delay);
->> +void mmc_force_detect_change(struct mmc_host *host, unsigned long delay,
->> +                            bool keep_power);
->>  void mmc_request_done(struct mmc_host *, struct mmc_request *);
->>
->>  static inline void mmc_signal_sdio_irq(struct mmc_host *host)
->> --
->> 2.7.4
->>
->
-> Kind regards
-> Uffe
->
