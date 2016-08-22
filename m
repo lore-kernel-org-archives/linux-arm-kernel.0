@@ -1,47 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 22 Aug 2016 11:26:33 +0100
-Subject: [PATCH v2 2/2] arm64: dts: Fix broken architected timer interrupt
- trigger
-In-Reply-To: <1470045256-9032-3-git-send-email-marc.zyngier@arm.com>
-References: <1470045256-9032-1-git-send-email-marc.zyngier@arm.com>
- <1470045256-9032-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <57BAD359.30707@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 22 Aug 2016 13:34:12 +0300
+Subject: [PATCH] ARM: dts: blanche: add DU support
+In-Reply-To: <20160822074111.GE28034@verge.net.au>
+References: <5383928.8UnDsUpmkz@wasted.cogentembedded.com>
+ <1783132.r9t2y3QUUq@wasted.cogentembedded.com>
+ <20160822074111.GE28034@verge.net.au>
+Message-ID: <de79981f-9aff-5491-c97b-48542b860af2@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Hello.
 
-On 01/08/16 10:54, Marc Zyngier wrote:
-> The ARM architected timer specification mandates that the interrupt
-> associated with each timer is level triggered (which corresponds to
-> the "counter >= comparator" condition).
-> 
-> A number of DTs are being remarkably creative, declaring the interrupt
-> to be edge triggered. A quick look at the TRM for the corresponding ARM
-> CPUs clearly shows that this is wrong, and I've corrected those.
-> For non-ARM designs (and in the absence of a publicly available TRM),
-> I've made them active low as well, which can't be completely wrong
-> as the GIC cannot disinguish between level low and level high.
-> 
-> The respective maintainers are of course welcome to prove me wrong.
-> 
-> While I was at it, I took the liberty to fix a couple of related issue,
-> such as some spurious affinity bits on ThunderX, and their complete
-> absence on ls1043a (both of which seem to be related to copy-pasting
-> from other DTs).
-> 
-> Acked-by: Duc Dang <dhdang@apm.com>
-> Acked-by: Carlo Caione <carlo@endlessm.com>
-> Acked-by: Michal Simek <michal.simek@xilinx.com>
-> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Acked-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On 8/22/2016 10:41 AM, Simon Horman wrote:
 
-Any update on this patch? We have a workaround merged already, but it'd
-be good to have the DTS fixed as well.
+>> Define  the  Blanche board dependent part of the DU device node.
+>> Add the device nodes for the  Analog Devices ADV7511W  HDMI transmitter
+>> (connected to DU0) and ADV7123 video DAC (connected to DU1).  Add the
+>> necessary subnodes to interconnect DU, HDMI/VDAC devices, and HDMI/VGA
+>> connectors.
+>>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>
+>> ---
+>> This patch is against the 'renesas-devel-20160817-v4.8-rc2' of Simon Horman's
+>> 'renesas.git' repo plus the general purpose switches patch and the SDHI0 patch
+>> posted earlier.
+>>
+>>  arch/arm/boot/dts/r8a7792-blanche.dts |  125 ++++++++++++++++++++++++++++++++++
+>>  1 file changed, 125 insertions(+)
+>>
+>> Index: renesas/arch/arm/boot/dts/r8a7792-blanche.dts
+>> ===================================================================
+>> --- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
+>> +++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
+>
+> ...
+>
+>> @@ -186,3 +251,63 @@
+>>  	cd-gpios = <&gpio11 11 GPIO_ACTIVE_LOW>;
+>>  	status = "okay";
+>>  };
+>> +
+>> +&i2c1 {
+>> +	status = "okay";
+>> +	clock-frequency = <400000>;
+>
+> Is it intentional that there are no pinctrl properties here?
 
-Thanks,
+    Yes, as I commented in r8a7792.dtsi, all I2C pins are not multiplexed.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+MBR, Sergei
