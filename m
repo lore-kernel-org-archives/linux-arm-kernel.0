@@ -1,152 +1,77 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Mon, 22 Aug 2016 15:45:40 +0800
-Subject: [PATCH V3 2/5] thermal: bcm2835: add thermal driver for bcm2835
- soc
-In-Reply-To: <46FE06A3-5A7D-41D7-827B-C7B35E42E2C5@martin.sperl.org>
-References: <1463495753-967-1-git-send-email-kernel@martin.sperl.org>
- <1463495753-967-3-git-send-email-kernel@martin.sperl.org>
- <87mvn6qa2x.fsf@eliezer.anholt.net> <87r39lvs4v.fsf@eliezer.anholt.net>
- <1471591694.2691.39.camel@intel.com> <87inuwd1p4.fsf@eliezer.anholt.net>
- <1471786649.2188.4.camel@intel.com>
- <46FE06A3-5A7D-41D7-827B-C7B35E42E2C5@martin.sperl.org>
-Message-ID: <1471851940.2188.22.camel@intel.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Mon, 22 Aug 2016 15:47:39 +0800
+Subject: [PATCH v6 00/14] fix some type infos and bugs for arm64/of numa
+In-Reply-To: <1470908028-8596-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1470908028-8596-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <57BAAE1B.2070808@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?, 2016-08-21 at 19:21 +0200, Martin Sperl wrote:
-> > 
-> > On 21.08.2016, at 15:37, Zhang Rui <rui.zhang@intel.com> wrote:
-> > 
-> > > 
-> > > On ?, 2016-08-19 at 11:59 -0700, Eric Anholt wrote:
-> > > Zhang Rui <rui.zhang@intel.com> writes:
-> > > 
-> > > > 
-> > > > 
-> > > > > 
-> > > > > On ?, 2016-08-18 at 11:39 -0700, Eric Anholt wrote:
-> > > > > 
-> > > > > Eric Anholt <eric@anholt.net> writes:
-> > > > > 
-> > > > > > 
-> > > > > > 
-> > > > > > 
-> > > > > > kernel at martin.sperl.org writes:
-> > > > > > 
-> > > > > > > 
-> > > > > > > 
-> > > > > > > 
-> > > > > > > From: Martin Sperl <kernel@martin.sperl.org>
-> > > > > > > 
-> > > > > > > Add basic thermal driver for bcm2835 SOC.
-> > > > > > > 
-> > > > > > > This driver currently relies on the firmware setting up
-> > > > > > > the
-> > > > > > > tsense HW block and does not set it up itself.
-> > > > > > > 
-> > > > > > > Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
-> > > > > > > 
-> > > > > > > ChangeLog:
-> > > > > > > ?V1 -> V2: added specific settings depending on
-> > > > > > > compatiblity
-> > > > > > > ??????added trip point based on register
-> > > > > > > ??????setting up ctrl-register if HW is not enabled by
-> > > > > > > firmware
-> > > > > > > ????????as per recommendation of Eric (untested)
-> > > > > > > ??????check that clock frequency is in range
-> > > > > > > ????????(1.9 - 5MHz - as per comment in clk-bcm2835.c)
-> > > > > > > ---
-> > > > > > > 
-> > > > > > > diff --git a/drivers/thermal/bcm/Makefile
-> > > > > > > b/drivers/thermal/bcm/Makefile
-> > > > > > > new file mode 100644
-> > > > > > > index 0000000..13456d2
-> > > > > > > --- /dev/null
-> > > > > > > +++ b/drivers/thermal/bcm/Makefile
-> > > > > > > @@ -0,0 +1 @@
-> > > > > > > +obj-$(CONFIG_BCM2835_THERMAL)????????:=
-> > > > > > > bcm2835_thermal.o
-> > > > > > > diff --git a/drivers/thermal/bcm/bcm2835_thermal.c
-> > > > > > > b/drivers/thermal/bcm/bcm2835_thermal.c
-> > > > > > > new file mode 100644
-> > > > > > > index 0000000..73138cb
-> > > > > > > --- /dev/null
-> > > > > > > +++ b/drivers/thermal/bcm/bcm2835_thermal.c
-> > > > > > > 
-> > > > > > > +static const struct of_device_id
-> > > > > > > bcm2835_thermal_of_match_table[];
-> > > > > > > +static int bcm2835_thermal_probe(struct platform_device
-> > > > > > > *pdev)
-> > > > > > > +{
-> > > > > > > 
-> > > > > > > +????/* enable clock and check rate */
-> > > > > > > +????clk_prepare_enable(data->clk);
-> > > > > > > +????rate = clk_get_rate(data->clk);
-> > > > > > > +????if ((rate < 1920000) || (rate > 5000000)) {
-> > > > > > > +????????dev_warn(&pdev->dev,
-> > > > > > > +?????????????"Clock %pCn is running at %pCr Hz,
-> > > > > > > which is outside the recommended range of 1.9 to 5.0
-> > > > > > > MHz\n",
-> > > > > > > +?????????????data->clk, data->clk);
-> > > > > > > +????}
-> > > > > > > +
-> > > > > > > +????/* register it */
-> > > > > > > +????tz = thermal_zone_device_register("bcm2835_thermal",
-> > > > > > > +??????????????????????1, 0, data,
-> > > > > > > +??????????????????????&bcm2835_thermal_o
-> > > > > > > ps,
-> > > > > > > +??????????????????????NULL, 0, 0);
-> > > > > > I notice that the polling_delay is set to 0, but we're not
-> > > > > > using
-> > > > > > interrupts to trigger the trip.??Is it valid to expose a
-> > > > > > trip
-> > > > > > without a
-> > > > > > polling_delay or interrupts???Should passive_delay be set
-> > > > > > as
-> > > > > > well?
-> > > > > > 
-> > > > > > This is up to the thermal maintainers.??As far as I'm
-> > > > > > concerned,
-> > > > > > it's:
-> > > > > > 
-> > > > > > Acked-by: Eric Anholt <eric@anholt.net>
-> > > > > > 
-> > > > > > One it lands I'll pull the defconfig and DT bits.
-> > > > > Ping on this question to thermal maintainers.??I'd still love
-> > > > > to
-> > > > > see
-> > > > > this driver land.
-> > > > hmmm, how is this driver supposed to work?
-> > > > With this patch set, I think the only benefit is that we can
-> > > > get
-> > > > the
-> > > > temperature and trip point information via thermal sysfs
-> > > > interface,
-> > > > but
-> > > > kernel thermal control is a no-op here, right?
-> > > Yeah.??It seems useful to be able to get the information.??Once
-> > > we
-> > > land
-> > > this, I hope someone can add interrupt support so that there are
-> > > actual
-> > > trip points.
-> > sounds reasonable to me.
-> > Another question, why you need a separate directory for a single
-> > file, bcm2835_thermal.c?
-> Lots of other subsystems (clk, sound/soc, ...) are using vendor
-> specific
-> sub directories.
-> In thermal there are already subdirectories for Samsung or st.
-> So this was done in this case as well to support Broadcom immediately
-> following this pattern.
-> 
-> You want a new version to keep it in thermal directly I can create a
-> new version of the patch.
-> 
-If there are more broadcom patches coming, in your plan, it's okay to
-have its own subdirectory. Or else, it's better to create the
-subdirectory when it's actually needed.
+Hi everybody:
+   Is this patch series can be accepted or still need to be improved? It seems
+to have been a long time.
 
-thanks,
-rui
-> Thanks, Martin
+Thanks,
+   Zhen Lei
+
+
+On 2016/8/11 17:33, Zhen Lei wrote:
+> v5 -> v6:
+> Move memblk nid check from arch/arm64/mm/numa.c into drivers/of/of_numa.c,
+> because this check is arch independent.
+> 
+> This modification only related to patch 3, but impacted the contents of patch 7 and 8,
+> other patches have no change.
+> 
+> v4 -> v5:
+> This version has no code changes, just add "Acked-by: Rob Herring <robh@kernel.org>"
+> into patches 1, 2, 4, 6, 7, 13, 14. Because these patches rely on some acpi numa
+> patches, and the latter had not been upstreamed in 4.7, but upstreamed in 4.8-rc1,
+> so I resend my patches again.
+> 
+> v3 -> v4:
+> 1. Packed three patches of Kefeng Wang, patch6-8.
+> 2. Add 6 new patches(9-15) to enhance the numa on arm64.
+> 
+> v2 -> v3:
+> 1. Adjust patch2 and patch5 according to Matthias Brugger's advice, to make the
+>    patches looks more well. The final code have no change. 
+> 
+> v1 -> v2:
+> 1. Base on https://lkml.org/lkml/2016/5/24/679
+> 2. Rewrote of_numa_parse_memory_nodes according to Rob Herring's advice. So that it looks more clear.
+> 3. Rewrote patch 5 because some scenes were not considered before.
+> 
+> Kefeng Wang (3):
+>   of_numa: Use of_get_next_parent to simplify code
+>   of_numa: Use pr_fmt()
+>   arm64: numa: Use pr_fmt()
+> 
+> Zhen Lei (11):
+>   of/numa: remove a duplicated pr_debug information
+>   of/numa: fix a memory@ node can only contains one memory block
+>   arm64/numa: add nid check for memory block
+>   of/numa: remove a duplicated warning
+>   arm64/numa: avoid inconsistent information to be printed
+>   arm64/numa: support HAVE_SETUP_PER_CPU_AREA
+>   arm64/numa: define numa_distance as array to simplify code
+>   arm64/numa: support HAVE_MEMORYLESS_NODES
+>   arm64/numa: remove some useless code
+>   of/numa: remove the constraint on the distances of node pairs
+>   Documentation: remove the constraint on the distances of node pairs
+> 
+>  Documentation/devicetree/bindings/numa.txt |   1 -
+>  arch/arm64/Kconfig                         |  12 ++
+>  arch/arm64/include/asm/numa.h              |   1 -
+>  arch/arm64/kernel/smp.c                    |   1 +
+>  arch/arm64/mm/numa.c                       | 223 ++++++++++++++++-------------
+>  drivers/of/of_numa.c                       |  88 ++++++------
+>  6 files changed, 178 insertions(+), 148 deletions(-)
+> 
+> --
+> 2.5.0
+> 
+> 
+> 
+> .
+> 
