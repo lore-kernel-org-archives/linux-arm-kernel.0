@@ -1,215 +1,246 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 22 Aug 2016 15:40:39 +0200
-Subject: [PATCH v2] mmc: sdhci-of-arasan: Don't power PHY w/ slow/no clock
-In-Reply-To: <1471541198-8013-1-git-send-email-dianders@chromium.org>
-References: <1471541198-8013-1-git-send-email-dianders@chromium.org>
-Message-ID: <CAPDyKFqgXfAdwMovCa4Vx_dWFRiGJTdtLMbPLhzByis=ZMp64A@mail.gmail.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Mon, 22 Aug 2016 14:42:24 +0100
+Subject: [PATCH] iommu/arm-smmu: Fix event queues synchronization
+Message-ID: <20160822134224.18574-1-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 August 2016 at 19:26, Douglas Anderson <dianders@chromium.org> wrote:
-> From empirical evidence (tested on Rockchip rk3399), it appears that the
-> PHY intended to be used with the Arasan SDHCI 5.1 controller has trouble
-> turning on when the card clock is slow or off.  Strangely these problems
-> appear to show up consistently on some boards while other boards work
-> fine, but on the boards where it shows up the problem reproduces 100% of
-> the time and is quite consistent in its behavior.
->
-> These problems can be fixed by always making sure that we power on the
-> PHY (and turn on its DLL) when the card clock is faster than about 50
-> MHz.  Once on, we need to make sure that we never power down the PHY /
-> turn off its DLL until the clock is faster again.
->
-> We'll add logic for handling this into the sdhci-of-arasan driver.  Note
-> that right now the only user of a PHY in the sdhci-of-arasan driver is
-> arasan,sdhci-5.1.  It's presumed that all arasan,sdhci-5.1 PHY
-> implementations need this workaround, so the logic is only contingent on
-> having a PHY to control.  If future Arasan controllers don't have this
-> problem we can add code to decide if we want this flow or not.
->
-> Also note that we check for slow clocks by checking for <= 400 kHz
-> rather than checking for 50 MHz.  This keeps things the most consistent
-> and also means we can power the PHY on at max speed (where the DLL will
-> lock fastest).  Presumably anyone who intends to run with a card clock
-> of < 50 MHz and > 400 kHz will be running on a device where this problem
-> is fixed anyway.
->
-> I believe this brings some resolution to the problems reported before.
-> See the commit 6fc09244d74d ("mmc: sdhci-of-arasan: Revert: Always power
-> the PHY off/on when clock changes").
->
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
-> Acked-by: Adrian Hunter <adrian.hunter@intel.com>
-> Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
+SMMUv3 only sends interrupts for event queues (EVTQ and PRIQ) when they
+transition from empty to non-empty. At the moment, if the SMMU adds new
+items to a queue before the event thread finished consuming a previous
+batch, the driver ignores any new item. The queue is then stuck in
+non-empty state and all subsequent events will be lost.
 
-Thanks, applied for next!
+As an example, consider the following flow, where (P, C) is the SMMU view
+of producer/consumer indices, and (p, c) the driver view.
 
-Kind regards
-Uffe
+						P C | p c
+  1. SMMU appends a PPR to the PRI queue,	1 0 | 0 0
+          sends an MSI
+  2. PRIQ handler is called.			1 0 | 1 0
+  3. SMMU appends a PPR to the PRI queue.	2 0 | 1 0
+  4. PRIQ thread removes the first element.	2 1 | 1 1
 
-> ---
-> Tested on chromeos kernel-4.4 with backports.
->
-> Changes in v2:
-> - Fixed typos (Adrian)
-> - Add #define (Adrian)
-> - Add Shawn review / Adrian ack
->
->  drivers/mmc/host/sdhci-of-arasan.c | 63 +++++++++++++++++++++++++++++---------
->  1 file changed, 48 insertions(+), 15 deletions(-)
->
-> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> index e0f193f7e3e5..0b3a9cfed2df 100644
-> --- a/drivers/mmc/host/sdhci-of-arasan.c
-> +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> @@ -35,6 +35,8 @@
->  #define CLK_CTRL_TIMEOUT_MASK          (0xf << CLK_CTRL_TIMEOUT_SHIFT)
->  #define CLK_CTRL_TIMEOUT_MIN_EXP       13
->
-> +#define PHY_CLK_TOO_SLOW_HZ            400000
-> +
->  /*
->   * On some SoCs the syscon area has a feature where the upper 16-bits of
->   * each 32-bit register act as a write mask for the lower 16-bits.  This allows
-> @@ -77,6 +79,7 @@ struct sdhci_arasan_soc_ctl_map {
->   * @host:              Pointer to the main SDHCI host structure.
->   * @clk_ahb:           Pointer to the AHB clock
->   * @phy:               Pointer to the generic phy
-> + * @is_phy_on:         True if the PHY is on; false if not.
->   * @sdcardclk_hw:      Struct for the clock we might provide to a PHY.
->   * @sdcardclk:         Pointer to normal 'struct clock' for sdcardclk_hw.
->   * @soc_ctl_base:      Pointer to regmap for syscon for soc_ctl registers.
-> @@ -86,6 +89,7 @@ struct sdhci_arasan_data {
->         struct sdhci_host *host;
->         struct clk      *clk_ahb;
->         struct phy      *phy;
-> +       bool            is_phy_on;
->
->         struct clk_hw   sdcardclk_hw;
->         struct clk      *sdcardclk;
-> @@ -170,13 +174,47 @@ static void sdhci_arasan_set_clock(struct sdhci_host *host, unsigned int clock)
->         struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
->         bool ctrl_phy = false;
->
-> -       if (clock > MMC_HIGH_52_MAX_DTR && (!IS_ERR(sdhci_arasan->phy)))
-> -               ctrl_phy = true;
-> +       if (!IS_ERR(sdhci_arasan->phy)) {
-> +               if (!sdhci_arasan->is_phy_on && clock <= PHY_CLK_TOO_SLOW_HZ) {
-> +                       /*
-> +                        * If PHY off, set clock to max speed and power PHY on.
-> +                        *
-> +                        * Although PHY docs apparently suggest power cycling
-> +                        * when changing the clock the PHY doesn't like to be
-> +                        * powered on while at low speeds like those used in ID
-> +                        * mode.  Even worse is powering the PHY on while the
-> +                        * clock is off.
-> +                        *
-> +                        * To workaround the PHY limitations, the best we can
-> +                        * do is to power it on at a faster speed and then slam
-> +                        * through low speeds without power cycling.
-> +                        */
-> +                       sdhci_set_clock(host, host->max_clk);
-> +                       spin_unlock_irq(&host->lock);
-> +                       phy_power_on(sdhci_arasan->phy);
-> +                       spin_lock_irq(&host->lock);
-> +                       sdhci_arasan->is_phy_on = true;
-> +
-> +                       /*
-> +                        * We'll now fall through to the below case with
-> +                        * ctrl_phy = false (so we won't turn off/on).  The
-> +                        * sdhci_set_clock() will set the real clock.
-> +                        */
-> +               } else if (clock > PHY_CLK_TOO_SLOW_HZ) {
-> +                       /*
-> +                        * At higher clock speeds the PHY is fine being power
-> +                        * cycled and docs say you _should_ power cycle when
-> +                        * changing clock speeds.
-> +                        */
-> +                       ctrl_phy = true;
-> +               }
-> +       }
->
-> -       if (ctrl_phy) {
-> +       if (ctrl_phy && sdhci_arasan->is_phy_on) {
->                 spin_unlock_irq(&host->lock);
->                 phy_power_off(sdhci_arasan->phy);
->                 spin_lock_irq(&host->lock);
-> +               sdhci_arasan->is_phy_on = false;
->         }
->
->         sdhci_set_clock(host, clock);
-> @@ -185,6 +223,7 @@ static void sdhci_arasan_set_clock(struct sdhci_host *host, unsigned int clock)
->                 spin_unlock_irq(&host->lock);
->                 phy_power_on(sdhci_arasan->phy);
->                 spin_lock_irq(&host->lock);
-> +               sdhci_arasan->is_phy_on = true;
->         }
->  }
->
-> @@ -239,13 +278,14 @@ static int sdhci_arasan_suspend(struct device *dev)
->         if (ret)
->                 return ret;
->
-> -       if (!IS_ERR(sdhci_arasan->phy)) {
-> +       if (!IS_ERR(sdhci_arasan->phy) && sdhci_arasan->is_phy_on) {
->                 ret = phy_power_off(sdhci_arasan->phy);
->                 if (ret) {
->                         dev_err(dev, "Cannot power off phy.\n");
->                         sdhci_resume_host(host);
->                         return ret;
->                 }
-> +               sdhci_arasan->is_phy_on = false;
->         }
->
->         clk_disable(pltfm_host->clk);
-> @@ -281,12 +321,13 @@ static int sdhci_arasan_resume(struct device *dev)
->                 return ret;
->         }
->
-> -       if (!IS_ERR(sdhci_arasan->phy)) {
-> +       if (!IS_ERR(sdhci_arasan->phy) && host->mmc->actual_clock) {
->                 ret = phy_power_on(sdhci_arasan->phy);
->                 if (ret) {
->                         dev_err(dev, "Cannot power on phy.\n");
->                         return ret;
->                 }
-> +               sdhci_arasan->is_phy_on = true;
->         }
->
->         return sdhci_resume_host(host);
-> @@ -547,12 +588,6 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->                         goto unreg_clk;
->                 }
->
-> -               ret = phy_power_on(sdhci_arasan->phy);
-> -               if (ret < 0) {
-> -                       dev_err(&pdev->dev, "phy_power_on err.\n");
-> -                       goto err_phy_power;
-> -               }
-> -
->                 host->mmc_host_ops.hs400_enhanced_strobe =
->                                         sdhci_arasan_hs400_enhanced_strobe;
->         }
-> @@ -565,9 +600,6 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->
->  err_add_host:
->         if (!IS_ERR(sdhci_arasan->phy))
-> -               phy_power_off(sdhci_arasan->phy);
-> -err_phy_power:
-> -       if (!IS_ERR(sdhci_arasan->phy))
->                 phy_exit(sdhci_arasan->phy);
->  unreg_clk:
->         sdhci_arasan_unregister_sdclk(&pdev->dev);
-> @@ -589,7 +621,8 @@ static int sdhci_arasan_remove(struct platform_device *pdev)
->         struct clk *clk_ahb = sdhci_arasan->clk_ahb;
->
->         if (!IS_ERR(sdhci_arasan->phy)) {
-> -               phy_power_off(sdhci_arasan->phy);
-> +               if (sdhci_arasan->is_phy_on)
-> +                       phy_power_off(sdhci_arasan->phy);
->                 phy_exit(sdhci_arasan->phy);
->         }
->
-> --
-> 2.8.0.rc3.226.g39d4020
->
+  5. PRIQ thread believes that the queue is empty, goes into idle
+     indefinitely.
+
+To avoid this, always synchronize the producer index and drain the queue
+once before leaving an event handler. In order to prevent races on the
+local producer index, move all event queue handling into the threads.
+
+Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 150 +++++++++++++++++++-------------------------
+ 1 file changed, 66 insertions(+), 84 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 1cd526d..a9219e6 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1164,36 +1164,66 @@ static irqreturn_t arm_smmu_evtq_thread(int irq, void *dev)
+ 	struct arm_smmu_queue *q = &smmu->evtq.q;
+ 	u64 evt[EVTQ_ENT_DWORDS];
+ 
+-	while (!queue_remove_raw(q, evt)) {
+-		u8 id = evt[0] >> EVTQ_0_ID_SHIFT & EVTQ_0_ID_MASK;
++	do {
++		while (!queue_remove_raw(q, evt)) {
++			u8 id = evt[0] >> EVTQ_0_ID_SHIFT & EVTQ_0_ID_MASK;
+ 
+-		dev_info(smmu->dev, "event 0x%02x received:\n", id);
+-		for (i = 0; i < ARRAY_SIZE(evt); ++i)
+-			dev_info(smmu->dev, "\t0x%016llx\n",
+-				 (unsigned long long)evt[i]);
+-	}
++			dev_info(smmu->dev, "event 0x%02x received:\n", id);
++			for (i = 0; i < ARRAY_SIZE(evt); ++i)
++				dev_info(smmu->dev, "\t0x%016llx\n",
++					 (unsigned long long)evt[i]);
++
++		}
++
++		/*
++		 * Not much we can do on overflow, so scream and pretend we're
++		 * trying harder.
++		 */
++		if (queue_sync_prod(q) == -EOVERFLOW)
++			dev_err(smmu->dev, "EVTQ overflow detected -- events lost\n");
++	} while (!queue_empty(q));
+ 
+ 	/* Sync our overflow flag, as we believe we're up to speed */
+ 	q->cons = Q_OVF(q, q->prod) | Q_WRP(q, q->cons) | Q_IDX(q, q->cons);
+ 	return IRQ_HANDLED;
+ }
+ 
+-static irqreturn_t arm_smmu_evtq_handler(int irq, void *dev)
+-{
+-	irqreturn_t ret = IRQ_WAKE_THREAD;
+-	struct arm_smmu_device *smmu = dev;
+-	struct arm_smmu_queue *q = &smmu->evtq.q;
+-
+-	/*
+-	 * Not much we can do on overflow, so scream and pretend we're
+-	 * trying harder.
+-	 */
+-	if (queue_sync_prod(q) == -EOVERFLOW)
+-		dev_err(smmu->dev, "EVTQ overflow detected -- events lost\n");
+-	else if (queue_empty(q))
+-		ret = IRQ_NONE;
++static void arm_smmu_handle_ppr(struct arm_smmu_device *smmu, u64 *evt)
++{
++	u32 sid, ssid;
++	u16 grpid;
++	bool ssv, last;
++
++	sid = evt[0] >> PRIQ_0_SID_SHIFT & PRIQ_0_SID_MASK;
++	ssv = evt[0] & PRIQ_0_SSID_V;
++	ssid = ssv ? evt[0] >> PRIQ_0_SSID_SHIFT & PRIQ_0_SSID_MASK : 0;
++	last = evt[0] & PRIQ_0_PRG_LAST;
++	grpid = evt[1] >> PRIQ_1_PRG_IDX_SHIFT & PRIQ_1_PRG_IDX_MASK;
++
++	dev_info(smmu->dev, "unexpected PRI request received:\n");
++	dev_info(smmu->dev,
++		 "\tsid 0x%08x.0x%05x: [%u%s] %sprivileged %s%s%s access at iova 0x%016llx\n",
++		 sid, ssid, grpid, last ? "L" : "",
++		 evt[0] & PRIQ_0_PERM_PRIV ? "" : "un",
++		 evt[0] & PRIQ_0_PERM_READ ? "R" : "",
++		 evt[0] & PRIQ_0_PERM_WRITE ? "W" : "",
++		 evt[0] & PRIQ_0_PERM_EXEC ? "X" : "",
++		 evt[1] & PRIQ_1_ADDR_MASK << PRIQ_1_ADDR_SHIFT);
++
++	if (last) {
++		struct arm_smmu_cmdq_ent cmd = {
++			.opcode			= CMDQ_OP_PRI_RESP,
++			.substream_valid	= ssv,
++			.pri			= {
++				.sid	= sid,
++				.ssid	= ssid,
++				.grpid	= grpid,
++				.resp	= PRI_RESP_DENY,
++			},
++		};
+ 
+-	return ret;
++		arm_smmu_cmdq_issue_cmd(smmu, &cmd);
++	}
+ }
+ 
+ static irqreturn_t arm_smmu_priq_thread(int irq, void *dev)
+@@ -1202,63 +1232,19 @@ static irqreturn_t arm_smmu_priq_thread(int irq, void *dev)
+ 	struct arm_smmu_queue *q = &smmu->priq.q;
+ 	u64 evt[PRIQ_ENT_DWORDS];
+ 
+-	while (!queue_remove_raw(q, evt)) {
+-		u32 sid, ssid;
+-		u16 grpid;
+-		bool ssv, last;
+-
+-		sid = evt[0] >> PRIQ_0_SID_SHIFT & PRIQ_0_SID_MASK;
+-		ssv = evt[0] & PRIQ_0_SSID_V;
+-		ssid = ssv ? evt[0] >> PRIQ_0_SSID_SHIFT & PRIQ_0_SSID_MASK : 0;
+-		last = evt[0] & PRIQ_0_PRG_LAST;
+-		grpid = evt[1] >> PRIQ_1_PRG_IDX_SHIFT & PRIQ_1_PRG_IDX_MASK;
+-
+-		dev_info(smmu->dev, "unexpected PRI request received:\n");
+-		dev_info(smmu->dev,
+-			 "\tsid 0x%08x.0x%05x: [%u%s] %sprivileged %s%s%s access at iova 0x%016llx\n",
+-			 sid, ssid, grpid, last ? "L" : "",
+-			 evt[0] & PRIQ_0_PERM_PRIV ? "" : "un",
+-			 evt[0] & PRIQ_0_PERM_READ ? "R" : "",
+-			 evt[0] & PRIQ_0_PERM_WRITE ? "W" : "",
+-			 evt[0] & PRIQ_0_PERM_EXEC ? "X" : "",
+-			 evt[1] & PRIQ_1_ADDR_MASK << PRIQ_1_ADDR_SHIFT);
+-
+-		if (last) {
+-			struct arm_smmu_cmdq_ent cmd = {
+-				.opcode			= CMDQ_OP_PRI_RESP,
+-				.substream_valid	= ssv,
+-				.pri			= {
+-					.sid	= sid,
+-					.ssid	= ssid,
+-					.grpid	= grpid,
+-					.resp	= PRI_RESP_DENY,
+-				},
+-			};
++	do {
++		while (!queue_remove_raw(q, evt))
++			arm_smmu_handle_ppr(smmu, evt);
+ 
+-			arm_smmu_cmdq_issue_cmd(smmu, &cmd);
+-		}
+-	}
++		if (queue_sync_prod(q) == -EOVERFLOW)
++			dev_err(smmu->dev, "PRIQ overflow detected -- requests lost\n");
++	} while (!queue_empty(q));
+ 
+ 	/* Sync our overflow flag, as we believe we're up to speed */
+ 	q->cons = Q_OVF(q, q->prod) | Q_WRP(q, q->cons) | Q_IDX(q, q->cons);
+ 	return IRQ_HANDLED;
+ }
+ 
+-static irqreturn_t arm_smmu_priq_handler(int irq, void *dev)
+-{
+-	irqreturn_t ret = IRQ_WAKE_THREAD;
+-	struct arm_smmu_device *smmu = dev;
+-	struct arm_smmu_queue *q = &smmu->priq.q;
+-
+-	/* PRIQ overflow indicates a programming error */
+-	if (queue_sync_prod(q) == -EOVERFLOW)
+-		dev_err(smmu->dev, "PRIQ overflow detected -- requests lost\n");
+-	else if (queue_empty(q))
+-		ret = IRQ_NONE;
+-
+-	return ret;
+-}
+-
+ static irqreturn_t arm_smmu_cmdq_sync_handler(int irq, void *dev)
+ {
+ 	/* We don't actually use CMD_SYNC interrupts for anything */
+@@ -1291,15 +1277,11 @@ static irqreturn_t arm_smmu_gerror_handler(int irq, void *dev)
+ 	if (active & GERROR_MSI_GERROR_ABT_ERR)
+ 		dev_warn(smmu->dev, "GERROR MSI write aborted\n");
+ 
+-	if (active & GERROR_MSI_PRIQ_ABT_ERR) {
++	if (active & GERROR_MSI_PRIQ_ABT_ERR)
+ 		dev_warn(smmu->dev, "PRIQ MSI write aborted\n");
+-		arm_smmu_priq_handler(irq, smmu->dev);
+-	}
+ 
+-	if (active & GERROR_MSI_EVTQ_ABT_ERR) {
++	if (active & GERROR_MSI_EVTQ_ABT_ERR)
+ 		dev_warn(smmu->dev, "EVTQ MSI write aborted\n");
+-		arm_smmu_evtq_handler(irq, smmu->dev);
+-	}
+ 
+ 	if (active & GERROR_MSI_CMDQ_ABT_ERR) {
+ 		dev_warn(smmu->dev, "CMDQ MSI write aborted\n");
+@@ -2207,10 +2189,10 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
+ 	/* Request interrupt lines */
+ 	irq = smmu->evtq.q.irq;
+ 	if (irq) {
+-		ret = devm_request_threaded_irq(smmu->dev, irq,
+-						arm_smmu_evtq_handler,
++		ret = devm_request_threaded_irq(smmu->dev, irq, NULL,
+ 						arm_smmu_evtq_thread,
+-						0, "arm-smmu-v3-evtq", smmu);
++						IRQF_ONESHOT,
++						"arm-smmu-v3-evtq", smmu);
+ 		if (ret < 0)
+ 			dev_warn(smmu->dev, "failed to enable evtq irq\n");
+ 	}
+@@ -2235,10 +2217,10 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
+ 	if (smmu->features & ARM_SMMU_FEAT_PRI) {
+ 		irq = smmu->priq.q.irq;
+ 		if (irq) {
+-			ret = devm_request_threaded_irq(smmu->dev, irq,
+-							arm_smmu_priq_handler,
++			ret = devm_request_threaded_irq(smmu->dev, irq, NULL,
+ 							arm_smmu_priq_thread,
+-							0, "arm-smmu-v3-priq",
++							IRQF_ONESHOT,
++							"arm-smmu-v3-priq",
+ 							smmu);
+ 			if (ret < 0)
+ 				dev_warn(smmu->dev,
+-- 
+2.9.2
