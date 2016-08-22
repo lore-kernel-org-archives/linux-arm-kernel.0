@@ -1,64 +1,105 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Aug 2016 23:03:02 +0200
-Subject: Problem with atomic accesses in pstore on some ARM CPUs
-In-Reply-To: <20160815221518.GD1120@svinekod>
-References: <CABXOdTfT7xMfiBvRuUS1hsVs=q5q2wY1x1Z8oCyyJNFckM0g0A@mail.gmail.com>
- <CABXOdTfHX_ZB1CuM7hzU5LCZPYdHvBSatN9Nen=rb8r1rXhz-g@mail.gmail.com>
- <20160815221518.GD1120@svinekod>
-Message-ID: <11973430.JhDduGIT84@wuerfel>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 22 Aug 2016 14:11:47 -0700
+Subject: [PATCH] input: touchscreen: silead: Add regulator support
+In-Reply-To: <1471376124-31169-1-git-send-email-hdegoede@redhat.com>
+References: <1471376124-31169-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160822211147.GC12277@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, August 15, 2016 11:15:18 PM CEST Mark Rutland wrote:
-> On Tue, Aug 16, 2016 at 08:02:53AM -0700, Guenter Roeck wrote:
-> > On Tue, Aug 16, 2016 at 6:21 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > > On Tue, Aug 16, 2016 at 06:14:53AM -0700, Guenter Roeck wrote:
-> > >> On Tue, Aug 16, 2016 at 3:32 AM, Robin Murphy <robin.murphy@arm.com> wrote:
-> > >> > On 16/08/16 00:19, Guenter Roeck wrote:
-> > >> >> we are having a problem with atomic accesses in pstore on some ARM
-> > >> >> CPUs (specifically rk3288 and rk3399). With those chips, atomic
-> > >> >> accesses fail with both pgprot_noncached and pgprot_writecombine
-> > >> >> memory. Atomic accesses do work when selecting PAGE_KERNEL protection.
-> > >> >
-> > >> > What's the pstore backed by? I'm guessing it's not normal DRAM.
-> > >> >
-> > >>
-> > >> it is normal DRAM.
-> > >
-> > > In which case, why does it need to be mapped with weird attributes?
-> > > Is there an alias in the linear map you can use?
-> > >
-> > 
-> > I don't really _want_ to do anything besides using pstore as-is, or,
-> > in other words, to have the upstream kernel work with the affected
-> > systems.
-> > 
-> > The current pstore code runs the following code for memory with
-> > pfn_valid() = true.
-> > 
-> >         if (memtype)
-> >                 prot = pgprot_noncached(PAGE_KERNEL);
-> >         else
-> >                 prot = pgprot_writecombine(PAGE_KERNEL);
-> >         ...
-> >         vaddr = vmap(pages, page_count, VM_MAP, prot);
-> > 
-> > It then uses the memory pointed to by vaddr for atomic operations.
+Hi Hans,
+
+On Tue, Aug 16, 2016 at 09:35:24PM +0200, Hans de Goede wrote:
+> On some tablets the touchscreen controller is powered by seperate
+> regulators, add support for this.
 > 
-> This means that the generic ramoops / pstore code is making non-portable
-> assumptions about memory types.
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  .../bindings/input/touchscreen/silead_gsl1680.txt  |  2 +
+>  drivers/input/touchscreen/silead.c                 | 51 ++++++++++++++++++++--
+>  2 files changed, 49 insertions(+), 4 deletions(-)
 > 
-> So _something_ has to happen to that code.
+> diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+> index 37a9370..65eb4c7 100644
+> --- a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+> +++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+> @@ -22,6 +22,8 @@ Optional properties:
+>  - touchscreen-inverted-y  : See touchscreen.txt
+>  - touchscreen-swapped-x-y : See touchscreen.txt
+>  - silead,max-fingers	  : maximum number of fingers the touchscreen can detect
+> +- vddio-supply		  : regulator phandle for controller VDDIO
+> +- avdd-supply		  : regulator phandle for controller AVDD
+>  
+>  Example:
+>  
+> diff --git a/drivers/input/touchscreen/silead.c b/drivers/input/touchscreen/silead.c
+> index 7379fe1..04992c5 100644
+> --- a/drivers/input/touchscreen/silead.c
+> +++ b/drivers/input/touchscreen/silead.c
+> @@ -29,6 +29,7 @@
+>  #include <linux/input/touchscreen.h>
+>  #include <linux/pm.h>
+>  #include <linux/irq.h>
+> +#include <linux/regulator/consumer.h>
+>  
+>  #include <asm/unaligned.h>
+>  
+> @@ -72,6 +73,8 @@ enum silead_ts_power {
+>  struct silead_ts_data {
+>  	struct i2c_client *client;
+>  	struct gpio_desc *gpio_power;
+> +	struct regulator *vddio;
+> +	struct regulator *avdd;
+>  	struct input_dev *input;
+>  	char fw_name[64];
+>  	struct touchscreen_properties prop;
+> @@ -463,21 +466,52 @@ static int silead_ts_probe(struct i2c_client *client,
+>  	if (client->irq <= 0)
+>  		return -ENODEV;
+>  
+> +	data->vddio = devm_regulator_get_optional(dev, "vddio");
 
-If we have both a cacheable and a noncacheable mapping for the
-same DRAM area, things get even worse across many architectures.
+No need for devm_regulator_get_optional(), devm_regulator_get() will
+give you dummy regulator that you can enable/disable.
+regulator_get_optional() is only need if you have truly optional
+functionality in controller and you need to adjust behavior depending on
+presence of a regulator.
 
-IIRC PowerPC will trigger a checkstop if it encounters a valid
-cache line for a noncacheable mapping.
+> +	if (IS_ERR(data->vddio)) {
+> +		if (PTR_ERR(data->vddio) == -EPROBE_DEFER)
+> +			return -EPROBE_DEFER;
+> +		data->vddio = NULL;
+> +	}
+> +
+> +	data->avdd = devm_regulator_get_optional(dev, "avdd");
+> +	if (IS_ERR(data->avdd)) {
+> +		if (PTR_ERR(data->avdd) == -EPROBE_DEFER)
+> +			return -EPROBE_DEFER;
+> +		data->avdd = NULL;
+> +	}
+> +
+> +	/*
+> +	 * Enable regulators at probe and disable them at remove, we need
+> +	 * to keep the chip powered otherwise it forgets its firmware.
+> +	 */
+> +	if (data->vddio) {
+> +		error = regulator_enable(data->vddio);
+> +		if (error)
+> +			return error;
+> +	}
+> +
+> +	if (data->avdd) {
+> +		error = regulator_enable(data->avdd);
+> +		if (error)
+> +			goto disable_vddio;
+> +	}
 
-If there is only one mapping, this is not a problem, but we probably
-want to avoid having a write-back cache here, in case something
-serious goes wrong and all the cache is invalidated but the pstore
-is used for post-mortem analysis.
+Hmm, so you are enabling regulators and leave them on. That is not
+great. I'd rather we powered the device up during probe(), but then shut
+it off and waited for ->open() to be called. And power it down in
+->close(). You also need to handle it in suspend and resume.
 
-	Arnd
+Thanks.
+
+-- 
+Dmitry
