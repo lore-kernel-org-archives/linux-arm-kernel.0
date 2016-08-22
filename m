@@ -1,52 +1,32 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 22 Aug 2016 13:34:12 +0300
-Subject: [PATCH] ARM: dts: blanche: add DU support
-In-Reply-To: <20160822074111.GE28034@verge.net.au>
-References: <5383928.8UnDsUpmkz@wasted.cogentembedded.com>
- <1783132.r9t2y3QUUq@wasted.cogentembedded.com>
- <20160822074111.GE28034@verge.net.au>
-Message-ID: <de79981f-9aff-5491-c97b-48542b860af2@cogentembedded.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 22 Aug 2016 12:36:30 +0200
+Subject: [GIT PULL] iommu/arm-smmu: Fixes for 4.8
+In-Reply-To: <20160819160231.GH9893@arm.com>
+References: <20160819160231.GH9893@arm.com>
+Message-ID: <20160822103630.GK1437@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, Aug 19, 2016 at 05:02:31PM +0100, Will Deacon wrote:
+> The following changes since commit 694d0d0bb2030d2e36df73e2d23d5770511dbc8d:
+> 
+>   Linux 4.8-rc2 (2016-08-14 19:11:36 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/fixes
+> 
+> for you to fetch changes up to 5bc0a11664e17e9f9551983f5b660bd48b57483c:
+> 
+>   iommu/arm-smmu: Don't BUG() if we find aborting STEs with disable_bypass (2016-08-19 09:48:15 +0100)
+> 
+> ----------------------------------------------------------------
+> Robin Murphy (1):
+>       iommu/io-pgtable-arm-v7s: Fix attributes when splitting blocks
+> 
+> Will Deacon (3):
+>       iommu/arm-smmu: Fix CMDQ error handling
+>       iommu/arm-smmu: Disable stalling faults for all endpoints
+>       iommu/arm-smmu: Don't BUG() if we find aborting STEs with disable_bypass
 
-On 8/22/2016 10:41 AM, Simon Horman wrote:
-
->> Define  the  Blanche board dependent part of the DU device node.
->> Add the device nodes for the  Analog Devices ADV7511W  HDMI transmitter
->> (connected to DU0) and ADV7123 video DAC (connected to DU1).  Add the
->> necessary subnodes to interconnect DU, HDMI/VDAC devices, and HDMI/VGA
->> connectors.
->>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>
->> ---
->> This patch is against the 'renesas-devel-20160817-v4.8-rc2' of Simon Horman's
->> 'renesas.git' repo plus the general purpose switches patch and the SDHI0 patch
->> posted earlier.
->>
->>  arch/arm/boot/dts/r8a7792-blanche.dts |  125 ++++++++++++++++++++++++++++++++++
->>  1 file changed, 125 insertions(+)
->>
->> Index: renesas/arch/arm/boot/dts/r8a7792-blanche.dts
->> ===================================================================
->> --- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
->> +++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
->
-> ...
->
->> @@ -186,3 +251,63 @@
->>  	cd-gpios = <&gpio11 11 GPIO_ACTIVE_LOW>;
->>  	status = "okay";
->>  };
->> +
->> +&i2c1 {
->> +	status = "okay";
->> +	clock-frequency = <400000>;
->
-> Is it intentional that there are no pinctrl properties here?
-
-    Yes, as I commented in r8a7792.dtsi, all I2C pins are not multiplexed.
-
-MBR, Sergei
+Pulled, thanks Will.
