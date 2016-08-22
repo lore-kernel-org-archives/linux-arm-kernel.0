@@ -1,36 +1,113 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 22 Aug 2016 12:06:20 +0200
-Subject: [PATCH 0/5] clk: samsung: exynos: Fix the checkpatch warnings
-In-Reply-To: <1471859319-30681-1-git-send-email-cw00.choi@samsung.com>
-References: <1471859319-30681-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <432d1876-d561-6c4e-6808-b7761d128e94@samsung.com>
+From: po.liu@nxp.com (Po Liu)
+Date: Mon, 22 Aug 2016 10:09:18 +0000
+Subject: [PATCH v3 2/2] pci/aer: interrupt fixup in the quirk
+In-Reply-To: <20160729224154.GC13632@localhost>
+References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
+ <1465892645-32381-1-git-send-email-po.liu@nxp.com>
+ <1465892645-32381-2-git-send-email-po.liu@nxp.com>
+ <20160729224154.GC13632@localhost>
+Message-ID: <VI1PR0401MB170958461E597D1BC7D280FF92E80@VI1PR0401MB1709.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+Hi Bjorn,
 
-On 08/22/2016 11:48 AM, Chanwoo Choi wrote:
-> This patches just fix the checkpatch warnings for exynos5433/3250/5260/5420/4
-> series without the behavior changes.
-> 
-> Chanwoo Choi (5):
->   clk: samsung: exynos5433: Fix the checkpatch warnings
->   clk: samsung: exynos3250: Fix the checkpatch warnings
->   clk: samsung: exynos5260: Fix the checkpatch warnings
->   clk: samsung: exynos5420: Fix the checkpatch warnings
->   clk: samsung: exynos4: Fix the checkpatch warnings
-> 
->  drivers/clk/samsung/clk-exynos3250.c | 97 ++++++++++++++++++++----------------
->  drivers/clk/samsung/clk-exynos4.c    | 51 ++++++++++---------
->  drivers/clk/samsung/clk-exynos5260.c |  4 +-
->  drivers/clk/samsung/clk-exynos5420.c | 11 ++--
->  drivers/clk/samsung/clk-exynos5433.c |  6 ++-
->  5 files changed, 88 insertions(+), 81 deletions(-)
+Sorry for late reply.
 
-Sorry, but I have to NAK this whole series.  It's just an unnecessary
-churn and will cause problems when applying real development patches
-that are being worked on.
+I checked the updated kernel with Dongdong mentioned ACPI patch which was truly affected my quirk patch uploaded. So I suppose the quirk patch is not qualify to fix the bug.
 
--- 
-Thanks,
-Sylwester
+I were keep thinking what your "explicitly checking for a root port device" meaning. Do you mean I should upload again the first version patch which fix it in the portdrv_core.c ? I would upload again if yes. 
+
+Thanks!
+
+
+Best regards,
+Liu Po
+
+>  -----Original Message-----
+>  From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+>  Sent: Saturday, July 30, 2016 6:42 AM
+>  To: Po Liu
+>  Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Roy Zang; Arnd
+>  Bergmann; Marc Zyngier; Stuart Yoder; Yang-Leo Li; Minghuan Lian; Murali
+>  Karicheri; Bjorn Helgaas; Shawn Guo; Mingkai Hu
+>  Subject: Re: [PATCH v3 2/2] pci/aer: interrupt fixup in the quirk
+>  
+>  On Tue, Jun 14, 2016 at 04:24:05PM +0800, Po Liu wrote:
+>  > On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
+>  > When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
+>  > maybe there is interrupt line for aer pme etc. Search the interrupt
+>  > number in the fdt file. Then fixup the dev->irq with it.
+>  >
+>  > Signed-off-by: Po Liu <po.liu@nxp.com>
+>  
+>  I'm not sure where we're at with this.  Dongdong had some issue
+>  (possibly with a version of the quirk on a different platform?), and I
+>  think the suggestion of explicitly checking for a root port device was a
+>  good one.
+>  
+>  So please update and repost this for next cycle.
+>  
+>  > ---
+>  > changes for V3:
+>  > 	- Move to quirk;
+>  > 	- Only correct the irq in RC mode;
+>  >
+>  >  drivers/pci/quirks.c | 29 +++++++++++++++++++++++++++++
+>  >  1 file changed, 29 insertions(+)
+>  >
+>  > diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c index
+>  > ee72ebe..8b39cce 100644
+>  > --- a/drivers/pci/quirks.c
+>  > +++ b/drivers/pci/quirks.c
+>  > @@ -25,6 +25,7 @@
+>  >  #include <linux/sched.h>
+>  >  #include <linux/ktime.h>
+>  >  #include <linux/mm.h>
+>  > +#include <linux/of_irq.h>
+>  >  #include <asm/dma.h>	/* isa_dma_bridge_buggy */
+>  >  #include "pci.h"
+>  >
+>  > @@ -4419,3 +4420,31 @@ static void quirk_intel_qat_vf_cap(struct
+>  pci_dev *pdev)
+>  >  	}
+>  >  }
+>  >  DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443,
+>  > quirk_intel_qat_vf_cap);
+>  > +
+>  > +/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
+>  > + * but use standalone irq. Read the device tree for the aer
+>  > + * interrupt number.
+>  > + */
+>  > +static void quirk_aer_interrupt(struct pci_dev *dev) {
+>  > +	int ret;
+>  > +	u8 header_type;
+>  > +	struct device_node *np = NULL;
+>  > +
+>  > +	/* Only for the RC mode device */
+>  > +	pci_read_config_byte(dev, PCI_HEADER_TYPE, &header_type);
+>  > +	if ((header_type & 0x7F) != PCI_HEADER_TYPE_BRIDGE)
+>  > +		return;
+>  > +
+>  > +	if (dev->bus->dev.of_node)
+>  > +		np = dev->bus->dev.of_node;
+>  > +
+>  > +	if (IS_ENABLED(CONFIG_OF_IRQ) && np) {
+>  > +		ret = of_irq_get_byname(np, "aer");
+>  > +		if (ret > 0) {
+>  > +			dev->no_msi = 1;
+>  > +			dev->irq = ret;
+>  > +		}
+>  > +	}
+>  > +}
+>  > +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID,
+>  > +quirk_aer_interrupt);
+>  > --
+>  > 2.1.0.27.g96db324
+>  >
+>  >
+>  > _______________________________________________
+>  > linux-arm-kernel mailing list
+>  > linux-arm-kernel at lists.infradead.org
+>  > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
