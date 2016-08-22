@@ -1,114 +1,34 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 22 Aug 2016 16:41:00 +0200
-Subject: [RESEND PATCH 2/2] ARM64: dts: meson-gxbb: Add PWM pinctrl nodes
-In-Reply-To: <1471876860-5620-1-git-send-email-narmstrong@baylibre.com>
-References: <1471876860-5620-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1471876860-5620-3-git-send-email-narmstrong@baylibre.com>
+From: sophian.yoma@gmail.com (yoma sophian)
+Date: Mon, 22 Aug 2016 22:41:15 +0800
+Subject: how to enable suspend to ram for arm-64 bits
+In-Reply-To: <62cbf1a0-268a-f9f5-09af-c155a8a77508@arm.com>
+References: <CADUS3onCMDThNK2ZwSSjGZhPE0M6cybjgCHJR2wVVeK09GC6ng@mail.gmail.com>
+ <06a4f0d7-9022-578d-99e0-ddcde31ed895@arm.com>
+ <CADUS3onUDk_=UpRoZy1m0hV1VGZYSf22ea8D10MpDbqJCfTkqw@mail.gmail.com>
+ <82ddd0e1-9ecc-5e54-e8ee-86f947fc0ecd@arm.com>
+ <CADUS3omw=WYhGF00S3DY8mkg_c-59WvD2AHYs4SQSzCYoHQraQ@mail.gmail.com>
+ <62cbf1a0-268a-f9f5-09af-c155a8a77508@arm.com>
+Message-ID: <CADUS3on-Y63EgUUudhH1cbgihnMmHe_aXra0CG2WEQWRQTo+AA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT nodes for PWMs in EE and AO domains.
+hi Sudeep:
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 77 +++++++++++++++++++++++++++++
- 1 file changed, 77 insertions(+)
+>> Yes, I agree with you.
+>> But it may not mean the ONLY way for all armv8 platform that support
+>> suspend method is PSCI.
+>
+> I would say yes but if you have a real good reason not to adopt PSCI on
+> your platform then you can try present that. It should be convincing
+> enough to deviate from the standards :)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index e502c24..9aeb88a 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -203,6 +203,34 @@
- 						function = "uart_ao";
- 					};
- 				};
-+
-+				pwm_ao_a_3_pins: pwm_ao_a_3 {
-+					mux {
-+						groups = "pwm_ao_a_3";
-+						function = "pwm_ao_a_3";
-+					};
-+				};
-+
-+				pwm_ao_a_6_pins: pwm_ao_a_6 {
-+					mux {
-+						groups = "pwm_ao_a_6";
-+						function = "pwm_ao_a_6";
-+					};
-+				};
-+
-+				pwm_ao_a_12_pins: pwm_ao_a_12 {
-+					mux {
-+						groups = "pwm_ao_a_12";
-+						function = "pwm_ao_a_12";
-+					};
-+				};
-+
-+				pwm_ao_b_pins: pwm_ao_b {
-+					mux {
-+						groups = "pwm_ao_b";
-+						function = "pwm_ao_b";
-+					};
-+				};
- 			};
- 
- 			uart_AO: serial at 4c0 {
-@@ -306,6 +334,55 @@
- 						function = "eth";
- 					};
- 				};
-+
-+				pwm_a_x_pins: pwm_a_x {
-+					mux {
-+						groups = "pwm_a_x";
-+						function = "pwm_a_x";
-+					};
-+				};
-+
-+				pwm_a_y_pins: pwm_a_y {
-+					mux {
-+						groups = "pwm_a_y";
-+						function = "pwm_a_y";
-+					};
-+				};
-+
-+				pwm_b_pins: pwm_b {
-+					mux {
-+						groups = "pwm_b";
-+						function = "pwm_b";
-+					};
-+				};
-+
-+				pwm_d_pins: pwm_d {
-+					mux {
-+						groups = "pwm_d";
-+						function = "pwm_d";
-+					};
-+				};
-+
-+				pwm_e_pins: pwm_e {
-+					mux {
-+						groups = "pwm_e";
-+						function = "pwm_e";
-+					};
-+				};
-+
-+				pwm_f_x_pins: pwm_f_x {
-+					mux {
-+						groups = "pwm_f_x";
-+						function = "pwm_f_x";
-+					};
-+				};
-+
-+				pwm_f_y_pins: pwm_f_y {
-+					mux {
-+						groups = "pwm_f_y";
-+						function = "pwm_f_y";
-+					};
-+				};
- 			};
- 		};
- 
--- 
-1.9.1
+Since we don't implement full features of PSCI on our platform, that
+is why we wants to know whether there is registration of platform
+suspend method.
+
+BTW, from the git log, it seems psci.c doesn't register system suspend
+until Linux 4.4.
+if so, before 4.4, how aarch64 support such as str, echo mem >
+/sys/power/state , suspend flow?
+
+appreciate your kind explanation.
