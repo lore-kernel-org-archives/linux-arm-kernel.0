@@ -1,50 +1,46 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Aug 2016 21:03:57 +0200
-Subject: [PATCH 1/2] ARM: dts: sun6i: Add
- sun6i-a31-reference-design-tablet.dtsi
-In-Reply-To: <c7d7dab8-ee30-8e71-c3b4-16ff1edfe134@redhat.com>
-References: <1471533095-13432-1-git-send-email-hdegoede@redhat.com>
- <20160822183915.GA7104@lukather>
- <c7d7dab8-ee30-8e71-c3b4-16ff1edfe134@redhat.com>
-Message-ID: <20160822190357.GE7104@lukather>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 22 Aug 2016 13:07:23 -0600
+Subject: [PATCH v3 08/12] arm64: dts: tegra: Add Tegra186 support
+In-Reply-To: <20160819173233.13260-9-thierry.reding@gmail.com>
+References: <20160819173233.13260-1-thierry.reding@gmail.com>
+ <20160819173233.13260-9-thierry.reding@gmail.com>
+Message-ID: <7c96bc7a-e56e-c8b6-2d89-114eff4eb586@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2016 at 08:55:52PM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 22-08-16 20:39, Maxime Ripard wrote:
-> >Hi,
-> >
-> >On Thu, Aug 18, 2016 at 05:11:34PM +0200, Hans de Goede wrote:
-> >>Just like with a13/a23/a33 most a31 tablets are derived from the same
-> >>reference design. Add a .dtsi file with all the common bits to avoid
-> >>endless copy and pasting of these.
-> >>
-> >>The sun6i-a31-reference-design-tablet.dtsi this commit adds is a copy
-> >>of sun6i-a31s-colorfly-e708-q1.dts with a few tablet specific bits
-> >>removed / left in sun6i-a31s-colorfly-e708-q1.dts.
-> >>
-> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >
-> >The patch looks ok, but doesn't apply.
-> 
-> Right, I forgot an earlier patch in the series, which is why I send a v2.
+On 08/19/2016 11:32 AM, Thierry Reding wrote:
+> From: Joseph Lo <josephl@nvidia.com>
+>
+> This adds the initial support of Tegra186 SoC. It provides enough to
+> enable the serial console and boot from an initial ramdisk.
 
-Yeah, I just saw the v2 and applied it, -ETOOMANYMAILS.
+> diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
 
-Sorry for the noise :)
+> +	bpmp: bpmp {
+> +		compatible = "nvidia,tegra186-bpmp";
+> +		mboxes = <&hsp_top0 TEGRA_HSP_MBOX_TYPE_DB
+> +				    TEGRA_HSP_DB_MASTER_BPMP>;
+> +		shmem = <&cpu_bpmp_tx &cpu_bpmp_rx>;
+> +		#clock-cells = <1>;
+> +		#reset-cells = <1>;
+> +
+> +		bpmp_i2c: i2c {
+> +			compatible = "nvidia,tegra186-bpmp-i2c";
+> +			nvidia,bpmp = <&bpmp>;
+> +			nvidia,bpmp-bus-id = <5>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "disabled";
+> +		};
+> +	};
 
-Maxime
+Back on 7/20, Rob Herring wrote:
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160822/2fa793f7/attachment.sig>
+> Just 'i2c' here. With that:
+>
+> Acked-by: Rob Herring <robh@kernel.org>
+
+... but this series doesn't yet include the BPMP I2C bindings (they've 
+been ack'd so I assume they'll be applied right after this series is). 
+Is it better to leave out the I2C sub-node until after the bindings are 
+applied, or doesn't the order matter too?
