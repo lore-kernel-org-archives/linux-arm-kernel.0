@@ -1,42 +1,81 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 22 Aug 2016 14:12:00 -0700
-Subject: [PATCH] input: touchscreen: silead: Use devm_gpiod_get
-In-Reply-To: <1471384043-11717-1-git-send-email-hdegoede@redhat.com>
-References: <1471384043-11717-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160822211200.GD12277@dtor-ws>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Mon, 22 Aug 2016 17:24:42 -0400
+Subject: [PATCH V2 soc/next?] ARM: BCM53573: Initial support for Broadcom
+ BCM53573 SoCs
+In-Reply-To: <20160821170138.21259-1-zajec5@gmail.com>
+References: <1470990396-23701-1-git-send-email-zajec5@gmail.com>
+ <20160821170138.21259-1-zajec5@gmail.com>
+Message-ID: <CAC3K-4pY8ZEm6BvDHqU1KOWcGpZGajwP2re74HrOnNEYJ9JE4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 11:47:23PM +0200, Hans de Goede wrote:
-> The silead code is using devm_foo for everything (and does not free
-> any resources). Except that it is using gpiod_get instead of
-> devm_gpiod_get (but is not freeing the gpio_desc), change this
-> to use devm_gpiod_get so that the gpio will be properly released.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On Sun, Aug 21, 2016 at 1:01 PM, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
+>
+> BCM53573 series is a new family with embedded wireless. By marketing
+> people it's sometimes called Northstar but it uses different CPU and has
+> different architecture so we need a new symbol for it.
+> Fortunately it shares some peripherals with other iProc based SoCs so we
+> will be able to reuse some drivers/bindings.
+>
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 
-Applied, thank you.
+Looks good to me!
+
+Acked-by: Jon Mason <jon.mason@broadcom.com>
+
 
 > ---
->  drivers/input/touchscreen/silead.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/input/touchscreen/silead.c b/drivers/input/touchscreen/silead.c
-> index 04992c5..3b80f14 100644
-> --- a/drivers/input/touchscreen/silead.c
-> +++ b/drivers/input/touchscreen/silead.c
-> @@ -497,7 +497,7 @@ static int silead_ts_probe(struct i2c_client *client,
->  	}
->  
->  	/* Power GPIO pin */
-> -	data->gpio_power = gpiod_get_optional(dev, "power", GPIOD_OUT_LOW);
-> +	data->gpio_power = devm_gpiod_get_optional(dev, "power", GPIOD_OUT_LOW);
->  	if (IS_ERR(data->gpio_power)) {
->  		if (PTR_ERR(data->gpio_power) != -EPROBE_DEFER)
->  			dev_err(dev, "Shutdown GPIO request failed\n");
-> -- 
-> 2.7.4
-> 
-
--- 
-Dmitry
+> V2: Put new symbol under "Other Architectures"
+> ---
+>  MAINTAINERS               |  7 +++++++
+>  arch/arm/mach-bcm/Kconfig | 15 +++++++++++++++
+>  2 files changed, 22 insertions(+)
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 7304d2e..9e2db2e 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -2517,6 +2517,13 @@ F:       arch/arm/mach-bcm/bcm_5301x.c
+>  F:     arch/arm/boot/dts/bcm5301x.dtsi
+>  F:     arch/arm/boot/dts/bcm470*
+>
+> +BROADCOM BCM53573 ARM ARCHITECTURE
+> +M:     Rafa? Mi?ecki <rafal@milecki.pl>
+> +L:     linux-arm-kernel at lists.infradead.org
+> +S:     Maintained
+> +F:     arch/arm/boot/dts/bcm53573*
+> +F:     arch/arm/boot/dts/bcm47189*
+> +
+>  BROADCOM BCM63XX ARM ARCHITECTURE
+>  M:     Florian Fainelli <f.fainelli@gmail.com>
+>  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+> index 5832dba..6dfdc82 100644
+> --- a/arch/arm/mach-bcm/Kconfig
+> +++ b/arch/arm/mach-bcm/Kconfig
+> @@ -157,6 +157,21 @@ config ARCH_BCM2835
+>           This enables support for the Broadcom BCM2835 and BCM2836 SoCs.
+>           This SoC is used in the Raspberry Pi and Roku 2 devices.
+>
+> +config ARCH_BCM_53573
+> +       bool "Broadcom BCM53573 SoC series support"
+> +       depends on ARCH_MULTI_V7
+> +       select ARCH_BCM_IPROC
+> +       select HAVE_ARM_ARCH_TIMER
+> +
+> +       help
+> +         BCM53573 series is set of SoCs using ARM Cortex-A7 CPUs with wireless
+> +         embedded in the chipset.
+> +         This SoC line is mostly used in home routers and is some cheaper
+> +         alternative for Northstar family.
+> +
+> +         The base chip is BCM53573 and there are some packaging modifications
+> +         like BCM47189 and BCM47452.
+> +
+>  config ARCH_BCM_63XX
+>         bool "Broadcom BCM63xx DSL SoC"
+>         depends on ARCH_MULTI_V7
+> --
+> 2.9.3
+>
