@@ -1,52 +1,56 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 22 Aug 2016 23:39:30 +0300
-Subject: [PATCH] ARM: dts: blanche: add support for general purpose LEDs
-In-Reply-To: <5383928.8UnDsUpmkz@wasted.cogentembedded.com>
-References: <5383928.8UnDsUpmkz@wasted.cogentembedded.com>
-Message-ID: <1529754.UBcqZ7GKj7@wasted.cogentembedded.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 22 Aug 2016 22:47:01 +0200 (CEST)
+Subject: [Bug] usb: dwc2: host function broken in OTG mode on bcm283x
+In-Reply-To: <785fc063-9b72-84a9-db91-c2710c19cdf9@synopsys.com>
+References: <907297251.436328.d9cd30e0-7476-4a28-8bab-dde17515cd9c.open-xchange@email.1und1.de>
+ <785fc063-9b72-84a9-db91-c2710c19cdf9@synopsys.com>
+Message-ID: <183575717.19886.709cd5b7-97dd-4dda-9392-7c46ec5e192c.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the general purpose LEDs on the Blanche board.
+Hi John,
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> John Youn <John.Youn@synopsys.com> hat am 22. August 2016 um 22:06
+> geschrieben:
+> 
+> 
+> On 8/20/2016 6:03 AM, Stefan Wahren wrote:
+> > Hi John,
+> > 
+> > 
+> 
+> Hi Stefan,
+> 
+> Why doesn't DT work? I think all the properties are there to set
+> these.
 
----
-This patch is against the 'renesas-devel-20160822-v4.8-rc3' of Simon Horman's
-'renesas.git' repo plus the SDHI0/DU patches posted earlier.
+it only works for the future releases, not for existing DT blobs. The DT is part
+of the ABI.
 
- arch/arm/boot/dts/r8a7792-blanche.dts |   21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+Yes, i already send a patch to fix the DT [1], but it would be better to fix the
+issue in deep.
 
-Index: renesas/arch/arm/boot/dts/r8a7792-blanche.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
-+++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
-@@ -159,6 +159,27 @@
- 		};
- 	};
- 
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		led17 {
-+			gpios = <&gpio10 10 GPIO_ACTIVE_HIGH>;
-+			label = "LED17";
-+		};
-+		led18 {
-+			gpios = <&gpio10 11 GPIO_ACTIVE_HIGH>;
-+			label = "LED18";
-+		};
-+		led19 {
-+			gpios = <&gpio10 12 GPIO_ACTIVE_HIGH>;
-+			label = "LED19";
-+		};
-+		led20 {
-+			gpios = <&gpio10 23 GPIO_ACTIVE_HIGH>;
-+			label = "LED20";
-+		};
-+	};
-+
- 	vcc_sdhi0: regulator-vcc-sdhi0 {
- 		compatible = "regulator-fixed";
- 
+> 
+> I hesitate to change the legacy/default settings in case it breaks any
+> existing drivers that depend on them.
+
+Platforms? I didn't expected that other drivers use these settings.
+
+Another option would be to add the gadget fifo sizes to platform data, but it's
+not a nice solution.
+
+Regards
+Stefan
+
+[1] -
+http://lists.infradead.org/pipermail/linux-rpi-kernel/2016-August/004225.html
+
+> 
+> Regards,
+> John
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
