@@ -1,37 +1,36 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 22 Aug 2016 11:00:45 +0100
-Subject: [RFC PATCH v2 2/2] arm64 Kconfig: Select gigantic page
-In-Reply-To: <20160822080358.GF13596@dhcp22.suse.cz>
-References: <1471834603-27053-1-git-send-email-xieyisheng1@huawei.com>
- <1471834603-27053-3-git-send-email-xieyisheng1@huawei.com>
- <20160822080358.GF13596@dhcp22.suse.cz>
-Message-ID: <20160822100045.GA26494@e104818-lin.cambridge.arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 22 Aug 2016 12:06:20 +0200
+Subject: [PATCH 0/5] clk: samsung: exynos: Fix the checkpatch warnings
+In-Reply-To: <1471859319-30681-1-git-send-email-cw00.choi@samsung.com>
+References: <1471859319-30681-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <432d1876-d561-6c4e-6808-b7761d128e94@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2016 at 10:03:58AM +0200, Michal Hocko wrote:
-> On Mon 22-08-16 10:56:43, Xie Yisheng wrote:
-> > Arm64 supports gigantic page after
-> > commit 084bd29810a5 ("ARM64: mm: HugeTLB support.")
-> > however, it got broken by 
-> > commit 944d9fec8d7a ("hugetlb: add support for gigantic page
-> > allocation at runtime")
-> > 
-> > This patch selects ARCH_HAS_GIGANTIC_PAGE to make this
-> > function can be used again.
-> 
-> I haven't double checked that the above commit really broke it but if
-> that is the case then
->  
-> Fixes: 944d9fec8d7a ("hugetlb: add support for gigantic page allocation at runtime")
-> 
-> would be nice as well I guess. I do not think that marking it for stable
-> is really necessary considering how long it's been broken and nobody has
-> noticed...
+Hi Chanwoo,
 
-I'm not sure that commit broke it. The gigantic functionality introduced
-by the above commit was under an #ifdef CONFIG_X86_64. Prior
-to that we had a VM_BUG_ON(hstate_is_gigantic(h)).
+On 08/22/2016 11:48 AM, Chanwoo Choi wrote:
+> This patches just fix the checkpatch warnings for exynos5433/3250/5260/5420/4
+> series without the behavior changes.
+> 
+> Chanwoo Choi (5):
+>   clk: samsung: exynos5433: Fix the checkpatch warnings
+>   clk: samsung: exynos3250: Fix the checkpatch warnings
+>   clk: samsung: exynos5260: Fix the checkpatch warnings
+>   clk: samsung: exynos5420: Fix the checkpatch warnings
+>   clk: samsung: exynos4: Fix the checkpatch warnings
+> 
+>  drivers/clk/samsung/clk-exynos3250.c | 97 ++++++++++++++++++++----------------
+>  drivers/clk/samsung/clk-exynos4.c    | 51 ++++++++++---------
+>  drivers/clk/samsung/clk-exynos5260.c |  4 +-
+>  drivers/clk/samsung/clk-exynos5420.c | 11 ++--
+>  drivers/clk/samsung/clk-exynos5433.c |  6 ++-
+>  5 files changed, 88 insertions(+), 81 deletions(-)
+
+Sorry, but I have to NAK this whole series.  It's just an unnecessary
+churn and will cause problems when applying real development patches
+that are being worked on.
 
 -- 
-Catalin
+Thanks,
+Sylwester
