@@ -1,31 +1,49 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 22 Aug 2016 20:21:52 +0200
-Subject: [PATCH] mmc: Add mmc_force_detect_change_begin / _end functions
-In-Reply-To: <831381a3-7cca-1264-29e2-bd40802a815f@redhat.com>
-References: <1470488736-11083-1-git-send-email-hdegoede@redhat.com>
- <CAPDyKFoTj9=esqaUPiwxLkhCsO98cSDgzdD1phgbXLa7rf6jiw@mail.gmail.com>
- <831381a3-7cca-1264-29e2-bd40802a815f@redhat.com>
-Message-ID: <CAPDyKFptVEjy8EQeL0t3xoxLvttHEJdvmmcS4k=8cuJbZEKTxA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 22 Aug 2016 20:30:09 +0200
+Subject: [PATCH 4/8] ARM: dts: sun8i: Add touchscreen node for
+ sun8i-a23-gt90h
+In-Reply-To: <1470685398-14568-4-git-send-email-hdegoede@redhat.com>
+References: <1470685398-14568-1-git-send-email-hdegoede@redhat.com>
+ <1470685398-14568-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160822183009.GX7104@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+On Mon, Aug 08, 2016 at 09:43:14PM +0200, Hans de Goede wrote:
+> The gt90h tablet has a gsl3675 touchscreen, add a dt node describing it.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts b/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
+> index f27ebbb..da55b5a 100644
+> --- a/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
+> +++ b/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
+> @@ -53,6 +53,14 @@
+>  	status = "okay";
+>  };
+>  
+> +&gsl1680 {
+> +	compatible = "silead,gsl3675";
+> +	touchscreen-fw-name = "silead/gsl3675-gt90h.fw";
 
->
-> This would also mean the driver's probe function does not end up
-> getting called twice which certainly is better :)
->
-> I'm not sure I'm familiar enough with the mmc subsys to come
-> up with a good implementation of this though, nor when I'll have
-> the time to look into this.
->
-> Any chance you could make a RFC patch ? I can then test it on
-> hardware which actually needs this and bug-fix the code until
-> it actually works :)
+That's not documented anywhere, and looks really suspicious.
 
-Sure, I can do that! I keep you in the loop when I post it.
+Rob, is that even allowed?
 
-[...]
+Thanks,
+Maxime
 
-Kind regards
-Uffe
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160822/985c1496/attachment.sig>
