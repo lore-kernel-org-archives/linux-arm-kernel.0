@@ -1,62 +1,41 @@
-From: zhiyong.tao@mediatek.com (zhiyong tao)
-Date: Mon, 22 Aug 2016 14:22:08 +0800
-Subject: [PATCH v7 3/3] arm: dts: mt2701: Add auxadc node.
-In-Reply-To: <c238236c-2445-7802-6f2e-2f4776778c36@kernel.org>
-References: <1471504297-26947-1-git-send-email-zhiyong.tao@mediatek.com>
- <1471504297-26947-4-git-send-email-zhiyong.tao@mediatek.com>
- <c238236c-2445-7802-6f2e-2f4776778c36@kernel.org>
-Message-ID: <1471846928.16635.3.camel@mhfsdcap03>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 22 Aug 2016 08:28:56 +0200
+Subject: [linux-sunxi] [PATCH v2 0/3] clk: sunxi-ng: Add the A83T clocks
+In-Reply-To: <CAEzqOZuGbn0Qc62mLpPKuH+n8doVLQec5Lg-cvT2C5tqh1GFzg@mail.gmail.com>
+References: <cover.1465666788.git.moinejf@free.fr>
+ <CAEzqOZuGbn0Qc62mLpPKuH+n8doVLQec5Lg-cvT2C5tqh1GFzg@mail.gmail.com>
+Message-ID: <20160822082856.6ca0aa6705bbadb70edb2330@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2016-08-21 at 19:58 +0100, Jonathan Cameron wrote:
-> On 18/08/16 08:11, Zhiyong Tao wrote:
-> > The commit adds auxadc nodes to the Mediatek MT2701 dtsi file.
-> > 
-> > Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
-> > ---
-> > This patch dependents on "Add clock support for Mediatek MT2701"[1].
-> > Please accept this patch together with [1].
-> > [1]http://lists.infradead.org/pipermail/linux-mediatek/2016-August/006620.html
+On Mon, 22 Aug 2016 02:23:51 +0800
+Vishnu Patekar <vishnupatekar0510@gmail.com> wrote:
 
-Dear Jonathan,
-
-This patch dependents on "Add clock support for Mediatek MT2701"[1]. 
-We will refresh it again to Matthias when [1] is merged. 
-[1]http://lists.infradead.org/pipermail/linux-mediatek/2016-August/006620.html
-
-Thanks.
-
-> Guessing this is working it's way ultimately through arm-soc.  Patches
-> 1 and 2 are now heading through the iio / staging-iio route and should be
-> merging in the next merge window if nothing odd happens.
+> Thanks for followup patches for a83t modern clock.
 > 
-> Thanks,
-> 
-> Jonathan
-> > ---
-> >  arch/arm/boot/dts/mt2701.dtsi |    9 +++++++++
-> >  1 file changed, 9 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-> > index 7eab6f4..8e6a18c 100644
-> > --- a/arch/arm/boot/dts/mt2701.dtsi
-> > +++ b/arch/arm/boot/dts/mt2701.dtsi
-> > @@ -175,6 +175,15 @@
-> >  		      <0 0x10216000 0 0x2000>;
-> >  	};
-> >  
-> > +	auxadc: adc at 11001000 {
-> > +		compatible = "mediatek,mt2701-auxadc";
-> > +		reg = <0 0x11001000 0 0x1000>;
-> > +		clocks = <&pericfg CLK_PERI_AUXADC>;
-> > +		clock-names = "main";
-> > +		#io-channel-cells = <1>;
-> > +		status = "disabled";
-> > +	};
-> > +
-> >  	uart0: serial at 11002000 {
-> >  		compatible = "mediatek,mt2701-uart",
-> >  			     "mediatek,mt6577-uart";
-> > 
-> 
+> well, this patch series does not apply on sunxi/for-next.
+
+Hi Vishnu,
+
+This series is rather old!
+Well, at this time, I was thinking that the 'modern' clock (aka
+sunxi-ng) was a good thing, but, just after sending this series, I was
+blocked, mainly because of the 'new timing' of the MMC clocks.
+So, I rewrote and simplified the sunxi clock driver, and I submitted a
+'ccu' patch which was refused by Maxime and Mike.
+
+Actually, my 'ccu' driver is almost finished. The code is only 1200
+lines in one file. It contains optimized computation of the clock
+parameters, handles the H3 CPU frequency, the MMC 'new timing',
+sigma-delta modulation for the audio PLL, the PRCM clocks and more.
+The SoC specific tables (actually H3 and A83T) are about 10kB, but they
+are defined as templates in .init.rodata, so that only the tables of the
+current SoC remain in memory after system init.
+
+This driver works fine for my Allwinner's boards and I will never go
+back to the 'sunxi-ng' which is rather complex and lacks of flexibility.
+If you are interested, the source is available in my site (see below).
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
