@@ -1,35 +1,31 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Aug 2016 20:18:10 +0200
-Subject: [PATCH v2] ARM: dts: sun8i: Add dts file for the Orange Pi Lite
- SBC
-In-Reply-To: <1470579404-28081-1-git-send-email-hdegoede@redhat.com>
-References: <1470579404-28081-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160822181810.GV7104@lukather>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 22 Aug 2016 20:21:52 +0200
+Subject: [PATCH] mmc: Add mmc_force_detect_change_begin / _end functions
+In-Reply-To: <831381a3-7cca-1264-29e2-bd40802a815f@redhat.com>
+References: <1470488736-11083-1-git-send-email-hdegoede@redhat.com>
+ <CAPDyKFoTj9=esqaUPiwxLkhCsO98cSDgzdD1phgbXLa7rf6jiw@mail.gmail.com>
+ <831381a3-7cca-1264-29e2-bd40802a815f@redhat.com>
+Message-ID: <CAPDyKFptVEjy8EQeL0t3xoxLvttHEJdvmmcS4k=8cuJbZEKTxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 07, 2016 at 04:16:44PM +0200, Hans de Goede wrote:
-> The Orange Pi Lite SBC is a small H3 based SBC, with 512MB RAM,
-> micro-sd slot, HDMI out, 2 USB-A connectors, 1 micro-USB connector,
-> sdio attached rtl8189ftv wifi and an ir receiver.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Changes in v2:
-> -Fix the wifi ethernet alias to be ethernet0 as the comment says, rather
->  then ethernet1 (copy and paste error).
+[...]
 
-Applied, thanks!
-Maxime
+>
+> This would also mean the driver's probe function does not end up
+> getting called twice which certainly is better :)
+>
+> I'm not sure I'm familiar enough with the mmc subsys to come
+> up with a good implementation of this though, nor when I'll have
+> the time to look into this.
+>
+> Any chance you could make a RFC patch ? I can then test it on
+> hardware which actually needs this and bug-fix the code until
+> it actually works :)
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160822/87b30bc8/attachment.sig>
+Sure, I can do that! I keep you in the loop when I post it.
+
+[...]
+
+Kind regards
+Uffe
