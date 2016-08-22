@@ -1,37 +1,39 @@
 From: xieyisheng1@huawei.com (Xie Yisheng)
-Date: Mon, 22 Aug 2016 21:20:04 +0800
-Subject: [RFC PATCH v3 2/2] arm64 Kconfig: Select gigantic page
-In-Reply-To: <1471872004-59365-1-git-send-email-xieyisheng1@huawei.com>
-References: <1471872004-59365-1-git-send-email-xieyisheng1@huawei.com>
-Message-ID: <1471872004-59365-3-git-send-email-xieyisheng1@huawei.com>
+Date: Mon, 22 Aug 2016 21:20:02 +0800
+Subject: [RFC PATCH v3 0/2] arm64/hugetlb: enable gigantic page
+Message-ID: <1471872004-59365-1-git-send-email-xieyisheng1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arm64 supports gigantic page after
+Arm64 supports different size of gigantic page which can be seen from:
 commit 084bd29810a5 ("ARM64: mm: HugeTLB support.")
-however, it can only be allocated at boottime and can't be freed.
+commit 66b3923a1a0f ("arm64: hugetlb: add support for PTE contiguous bit")
 
-This patch selects ARCH_HAS_GIGANTIC_PAGE to make gigantic pages
-can be allocated and freed at runtime for arch arm64.
+So I tried to use this function by adding hugepagesz=1G in kernel
+parameters, with CONFIG_CMA=y. However, when I
+echo xx > \
+  /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages
+it failed with the following info:
+-bash: echo: write error: Invalid argument
 
-Acked-by: Michal Hocko <mhocko@suse.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Xie Yisheng <xieyisheng1@huawei.com>
----
+This is a v3 patchset which make gigantic page can be
+allocated and freed at runtime for arch arm64,
+with CONFIG_CMA=y or other related configs is enabled.
+
+You can see the former discussions at:
+https://lkml.org/lkml/2016/8/18/310
+https://lkml.org/lkml/2016/8/21/410
+ 
+Xie Yisheng (2):
+  mm/hugetlb: Introduce ARCH_HAS_GIGANTIC_PAGE
+  arm64 Kconfig: Select gigantic page
+
  arch/arm64/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/s390/Kconfig  | 1 +
+ arch/x86/Kconfig   | 1 +
+ fs/Kconfig         | 3 ++++
+ mm/hugetlb.c       | 2 +-
+ 5 files changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index bc3f00f..92217f6 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -9,6 +9,7 @@ config ARM64
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_HAS_ELF_RANDOMIZE
- 	select ARCH_HAS_GCOV_PROFILE_ALL
-+	select ARCH_HAS_GIGANTIC_PAGE
- 	select ARCH_HAS_KCOV
- 	select ARCH_HAS_SG_CHAIN
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
 -- 
 1.7.12.4
