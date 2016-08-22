@@ -1,84 +1,135 @@
-From: b-liu@ti.com (Bin Liu)
-Date: Mon, 22 Aug 2016 11:10:37 -0500
-Subject: [PATCH v2 7/7] musb: sunxi: Add support for platform_set_mode
-In-Reply-To: <2e1d2bb6-c3c4-17ab-79a6-8f9efa45a831@redhat.com>
-References: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
- <1471288892-21702-8-git-send-email-hdegoede@redhat.com>
- <20160819213049.GC1853@uda0271908>
- <2a55a1bf-7ebf-3ab4-b231-85eba20103f1@redhat.com>
- <20160822141158.GF1853@uda0271908>
- <9699b62e-421a-ae8e-c25e-ef48beb84ce0@redhat.com>
- <20160822152421.GH1853@uda0271908>
- <fd1e9692-2c69-da16-0e6e-ac7fa50077ac@redhat.com>
- <20160822153842.GI1853@uda0271908>
- <2e1d2bb6-c3c4-17ab-79a6-8f9efa45a831@redhat.com>
-Message-ID: <20160822161037.GK1853@uda0271908>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Mon, 22 Aug 2016 19:18:50 +0300
+Subject: [PATCH V5 4/9] perf/core: Adding PMU driver specific configuration
+In-Reply-To: <1470932464-726-5-git-send-email-mathieu.poirier@linaro.org>
+References: <1470932464-726-1-git-send-email-mathieu.poirier@linaro.org>
+ <1470932464-726-5-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <8760qsn5ed.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2016 at 05:55:50PM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 22-08-16 17:38, Bin Liu wrote:
-> >On Mon, Aug 22, 2016 at 05:32:57PM +0200, Hans de Goede wrote:
-> 
-> <snip>
-> 
-> >>>>>>>When switching from host to peripheral mode, if an usb device is still
-> >>>>>>>plugged and enumerated, how do you handle the device disconnect?
-> >>>>>>
-> >>>>>>The phy code will report vbus low for long enough for the musb to end
-> >>>>>>the current session. It already does this for boards which do not
-> >>>>>>have working vbus detection.
-> >>>>>
-> >>>>>But you didn't disconnect DP/DM, right? then musb detects vbus is gone
-> >>>>>without receiving disconnect event, this is vbus error case, not a normal
-> >>>>>teardown.
-> >>>>
-> >>>>Correct, there is no way to disconnect DP/DM and reporting Vbus low for
-> >>>>a while does the trick.
-> >>>
-> >>>Without physically disconnecting DP/DM, we still have a way to properly
-> >>>teardown the enumerated devices. Please check musb_softconnect_write()
-> >>>in musb_debugfs.c.
-> >>
-> >>That is manipulating the session bit in the devctl reg, that does not
-> >>work to switch from device to host role or from host to device role,
-> >>at least not on allwinner's musb implementation. I've already tried that
-> >>before writing the code to report VBus low.
-> >
-> >I would think you have to call musb_root_disconnect() first to notify
-> >the core to teardown the enumerated devices.
-> 
-> I tried that it does not help. It only affects the software state, the
-> hardware will still stay in host-mode if it does not see vbus low for
-> long enough).
+Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 
-I didn't mean to use musb_root_disconnect() to replace your
-implementation. I suggest to add this call before lowing vbus to let the
-core tearing down the numerated devices.
+> This patch somewhat mimics the work done on address filters to
+> add the infrastructure needed to pass PMU specific HW
+> configuration to the driver before a session starts.
 
-> 
-> Note this is on devices which lack vbus detection (again this is simply
-> physically not available on the PCB, just like some PCB's miss the
-> id-pin). Normally this never is an issue, because when a host cable gets
-> unplugged from a AB connector we see the id pin go high, disable the
-> boards driving of Vbus and then the phy's Vbus detect will report low to
-> the musb controller.
+Looks like a lot of work to do something that can be taken care of
+entirely in userspace. A few comments below.
 
-In this case, DP/DM get disconnected before vbus line, so
-musb_root_disconnect() gets called in handling the disconnect interrupt
-event. I think it is better simulate this in your usecase, which does
-not generate disconnect event.
+Btw, please don't forget to CC me on the kernel perf patches.
+
+> +static struct perf_drv_config *
+> +perf_drv_config_new(int cpu, struct list_head *drv_config_list)
+> +{
+> +	int node = cpu_to_node(cpu == -1 ? 0 : cpu);
+> +	struct perf_drv_config *drv_config;
+> +
+> +	drv_config = kzalloc_node(sizeof(*drv_config), GFP_KERNEL, node);
+> +	if (!drv_config)
+> +		return ERR_PTR(-ENOMEM);
+
+So it's the only error that this function may return.
+
+> +
+> +	INIT_LIST_HEAD(&drv_config->entry);
+> +	list_add_tail(&drv_config->entry, drv_config_list);
+> +
+> +	return drv_config;
+> +}
+> +
+> +static void free_drv_config_list(struct list_head *drv_config_list)
+> +{
+> +	struct perf_drv_config *drv_config, *itr;
+> +
+> +	list_for_each_entry_safe(drv_config, itr, drv_config_list, entry) {
+> +		list_del(&drv_config->entry);
+> +		kfree(drv_config->config);
+> +		kfree(drv_config->option);
+> +		kfree(drv_config);
+> +	}
+> +}
+> +
+> +/* How long does a configuration option really need to be?  */
+> +#define PERF_DRV_CONFIG_MAX	128
+
+Considering that you're already limiting the entire input buffer to
+PAGE_SIZE, this is redundant.
+
+> +
+>  /*
+> - * hrtimer based swevent callback
+> + * PMU specific driver configuration as specified from user space.
+> + * The data come in the form of an ascii string pushed down to the kernel
+> + * using an ioctl() call.
+> + *
+> + * Two format are accepted: a singleton and in pairs.  All of the following
+> + * are valid: cfg1, cfg2=config2, cfg3=anything_is_possible.
+
+What's the difference between 'config2' and 'anything_is_possible'?
+
+> + *
+> + * It is up to each PMU driver to make sure they can work with the
+> + * submitted configurables.
+>   */
+> +static int
+> +perf_event_parse_drv_config(struct perf_event *event, char *options,
+> +			    struct list_head *drv_config_list)
+> +{
+> +	char *token;
+> +	int ret;
+> +	struct perf_drv_config *drv_config;
+> +
+> +	/*
+> +	 * First split the @options string in nibbles.  Using the above
+> +	 * example "cfg1", "cfg2=option2" and "cfg3=anything_is_possible"
+
+"cfg2=config2", if you're referring to the comment at the top.
+
+> +	 * will be processed.
+> +	 */
+> +	while ((token = strsep(&options, ",")) != NULL) {
+> +		char *nibble, *config, *option;
+> +
+> +		if (!*token)
+> +			continue;
+
+So empty configs are valid?
+
+> +
+> +		/* Allocate a new driver config structure and queue it. */
+> +		drv_config = perf_drv_config_new(event->cpu, drv_config_list);
+> +		if (IS_ERR(drv_config)) {
+> +			ret = PTR_ERR(drv_config);
+
+We know it's ENOMEM, no need for ERR_PTR()->PTR_ERR().
+
+> +			goto fail;
+> +		}
+> +
+> +		/*
+> +		 * The nibbles are either a "config" or a "config=option"
+> +		 * pair.  First get the config part.  Since strsep() sets
+> +		 * @nibble to the next valid token, nibble will be equal to
+> +		 * the option part or NULL after the first call.
+> +		 */
+> +		nibble = token;
+> +		config = strsep(&nibble, "=");
+> +		option = nibble;
+
+So '@,=,=,=,=,=,=,=,=,' is a valid driver configuration, by the looks of
+it?
+
+> +
+> +		/* This shouldn't be happening */
+
+Indeed.
+
+> +		if (!config) {
+> +			ret = -EINVAL;
+> +			goto fail;
+> +		}
 
 Regards,
--Bin.
-
-> 
-> Anyways this is a solved problem, the reporting of Vbus low has been
-> working fine for both boards which lack vbus-detection as well as
-> for role-changing from sysfs.
-> 
-> Regards,
-> 
-> Hans
+--
+Alex
