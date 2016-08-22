@@ -1,31 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 22 Aug 2016 13:33:09 +0100
-Subject: [RFC PATCH v3 1/7] irqchip: gic-v3: Reset BPR during
- initialization
-In-Reply-To: <1471623195-7829-2-git-send-email-daniel.thompson@linaro.org>
-References: <1471623195-7829-1-git-send-email-daniel.thompson@linaro.org>
- <1471623195-7829-2-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <57BAF105.1080604@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 22 Aug 2016 13:33:10 +0100
+Subject: Tegra baseline test results for v4.8-rc3
+Message-ID: <ffea3b93-ca3c-f0c2-1700-860ad73f9373@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/08/16 17:13, Daniel Thompson wrote:
-> Currently, when running on FVP, CPU 0 boots up with its BPR changed from
-> the reset value. This renders it impossible to (preemptively) prioritize
-> interrupts on CPU 0.
-> 
-> This is harmless on normal systems since Linux typically does not
-> support preemptive interrupts. It does however cause problems in
-> systems with additional changes (such as patches for NMI simulation).
-> 
-> Many thanks to Andrew Thoelke for suggesting the BPR as having the
-> potential to harm preemption.
-> 
-> Suggested-by: Andrew Thoelke <andrew.thoelke@arm.com>
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Here are some basic Tegra test results for Linux v4.8-rc3.
+Logs and other details at:
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+    https://nvtb.github.io//linux/test_v4.8-rc3/20160821163103/
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.8-rc2 (694d0d0bb2030d2e36df73e2d23d5770511dbc8d)):
+   text     data      bss    total  kernel
+    +32     -512        0     -480  defconfig
+   +568     -512        0      +56  multi_v7_defconfig
+   +548     -512        0      +36  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.8-rc2 (694d0d0bb2030d2e36df73e2d23d5770511dbc8d))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+--
+nvpublic
