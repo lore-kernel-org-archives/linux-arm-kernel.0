@@ -1,101 +1,35 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 22 Aug 2016 19:09:56 +0200
-Subject: [PATCH 3/3] arm: dts: thermal: add thermal/auxadc node.
-In-Reply-To: <1471245268.14287.14.camel@mtksdaap41>
-References: <1467882386-40544-1-git-send-email-dawei.chien@mediatek.com>
- <1467882386-40544-4-git-send-email-dawei.chien@mediatek.com>
- <fd3f0c2f-f0ad-dd0f-cf2b-eb658f72d735@gmail.com>
- <1471245268.14287.14.camel@mtksdaap41>
-Message-ID: <7a7684dc-aea5-15f8-04fb-494b2085a3fe@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 22 Aug 2016 11:11:17 -0600
+Subject: [PATCH v3 08/12] arm64: dts: tegra: Add Tegra186 support
+In-Reply-To: <20160819173233.13260-9-thierry.reding@gmail.com>
+References: <20160819173233.13260-1-thierry.reding@gmail.com>
+ <20160819173233.13260-9-thierry.reding@gmail.com>
+Message-ID: <c1e80c40-ccac-1424-6170-ab11a7845e83@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 15/08/16 09:14, dawei chien wrote:
-> Hi Matthias,
+On 08/19/2016 11:32 AM, Thierry Reding wrote:
+> From: Joseph Lo <josephl@nvidia.com>
 >
-> On Thu, 2016-08-11 at 17:51 +0200, Matthias Brugger wrote:
->>
->> On 07/07/16 11:06, Dawei Chien wrote:
->>> This adds the thermal controller and auxadc nodes
->>> to the Mediatek MT2701 dtsi file.
->>>
->>> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
->>> ---
->>> This patch depned on:
->>> https://patchwork.kernel.org/patch/9213545/
->>> ---
->>>  arch/arm/boot/dts/mt2701.dtsi |   43 +++++++++++++++++++++++++++++++++++++++++
->>>  1 file changed, 43 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
->>> index 2ac8b50..0834a23 100644
->>> --- a/arch/arm/boot/dts/mt2701.dtsi
->>> +++ b/arch/arm/boot/dts/mt2701.dtsi
->>> @@ -77,6 +77,36 @@
->>>  		#clock-cells = <0>;
->>>  	};
->>>
->>> +	thermal-zones {
->>> +		cpu_thermal: cpu_thermal {
->>> +			polling-delay-passive = <1000>; /* milliseconds */
->>> +			polling-delay = <1000>; /* milliseconds */
->>> +
->>> +			thermal-sensors = <&thermal 0>;
->>> +			sustainable-power = <1000>;
->>> +
->>> +			trips {
->>> +				threshold: trip-point at 0 {
->>> +					temperature = <68000>;
->>> +					hysteresis = <2000>;
->>> +					type = "passive";
->>> +				};
->>> +
->>> +				target: trip-point at 1 {
->>> +					temperature = <85000>;
->>> +					hysteresis = <2000>;
->>> +					type = "passive";
->>> +				};
->>> +
->>> +				cpu_crit: cpu_crit at 0 {
->>> +					temperature = <115000>;
->>> +					hysteresis = <2000>;
->>> +					type = "critical";
->>> +				};
->>> +			};
->>> +		};
->>> +	};
->>> +
->>>  	timer {
->>>  		compatible = "arm,armv7-timer";
->>>  		interrupt-parent = <&gic>;
->>> @@ -183,4 +213,17 @@
->>>  		clocks = <&uart_clk>;
->>>  		status = "disabled";
->>>  	};
->>> +
->>> +	thermal: thermal at 1100b000 {
->>> +		#thermal-sensor-cells = <0>;
->>> +		compatible = "mediatek,mt2701-thermal";
->>> +		reg = <0 0x1100b000 0 0x1000>;
->>> +		interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
->>> +		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
->>> +		clock-names = "therm", "auxadc";
->>> +		resets = <&pericfg 0x10>;
->>> +		reset-names = "therm";
->>> +		mediatek,auxadc = <&auxadc>;
->>> +		mediatek,apmixedsys = <&apmixedsys>;
->>> +	};
->>>  };
->>>
->>
->> what about:
->> status = "disabled"; ?
->
-> Since thermal driver would protect our platform by shutdown method once
-> SoC temperature over critical point, I prefer keep this rather than
-> disabling, how do you think, thank you.
->
+> This adds the initial support of Tegra186 SoC. It provides enough to
+> enable the serial console and boot from an initial ramdisk.
 
-Sounds reasonable. Thanks
+> diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+
+> +	uarta: serial at 03100000 {
+> +		compatible = "nvidia,tegra186-uart", "nvidia,tegra20-uart";
+> +		reg = <0x0 0x03100000 0x0 0x40>;
+
+At least in the unit address, I think we want to suppress leading zeroes 
+(s/03100000/3100000/). I'd argue we should do the same in the reg values 
+too, although that makes no difference to the DTB itself. Same comment 
+for other nodes.
+
+> +	sysram at 30000000 {
+> +		compatible = "nvidia,tegra186-sysram", "mmio-ram";
+> +		reg = <0x0 0x30000000 0x0 0x4ffff>;
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		ranges = <0 0x0 0x0 0x30000000 0x0 0x4ffff>;
+
+Shouldn't 0x4ffff be 0x50000 since it's length not max?
