@@ -1,83 +1,56 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Mon, 22 Aug 2016 15:44:54 +0200
-Subject: [RFC PATCH v3 1/2] mm/hugetlb: Introduce ARCH_HAS_GIGANTIC_PAGE
-In-Reply-To: <1471872004-59365-2-git-send-email-xieyisheng1@huawei.com>
-References: <1471872004-59365-1-git-send-email-xieyisheng1@huawei.com>
- <1471872004-59365-2-git-send-email-xieyisheng1@huawei.com>
-Message-ID: <20160822134454.GN13596@dhcp22.suse.cz>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 22 Aug 2016 14:47:30 +0100
+Subject: [PATCH v24 5/9] arm64: kdump: add kdump support
+In-Reply-To: <20160822012919.GI20080@linaro.org>
+References: <20160809015248.28414-2-takahiro.akashi@linaro.org>
+ <20160809015615.28527-1-takahiro.akashi@linaro.org>
+ <20160809015615.28527-3-takahiro.akashi@linaro.org>
+ <57AB586D.3080900@arm.com> <20160818071547.GC20080@linaro.org>
+ <20160819012651.GE20080@linaro.org>
+ <20160819112217.GB22221@localhost.localdomain>
+ <20160822012919.GI20080@linaro.org>
+Message-ID: <57BB0272.1000008@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 22-08-16 21:20:03, Xie Yisheng wrote:
-> Avoid making ifdef get pretty unwieldy if many ARCHs support gigantic page.
-> No functional change with this patch.
+On 22/08/16 02:29, AKASHI Takahiro wrote:
+> On Fri, Aug 19, 2016 at 04:52:17PM +0530, Pratyush Anand wrote:
+>> It will help kexec-tools to prevent copying  of any unnecessary data. I
+>> think, then you also need to change phys_offset calculation in kexec-tools. That
+>> should be start of either of first "reserved" or "System RAM" block.
 > 
-> Signed-off-by: Xie Yisheng <xieyisheng1@huawei.com>
+> Good point, but I'm not sure this is always true.
 
-Acked-by: Michal Hocko <mhocko@suse.com>
+> Is there any system whose ACPI memory is *not* part of DRAM
 
-> ---
->  arch/s390/Kconfig | 1 +
->  arch/x86/Kconfig  | 1 +
->  fs/Kconfig        | 3 +++
->  mm/hugetlb.c      | 2 +-
->  4 files changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
-> index e751fe2..a8c8fa3 100644
-> --- a/arch/s390/Kconfig
-> +++ b/arch/s390/Kconfig
-> @@ -72,6 +72,7 @@ config S390
->  	select ARCH_HAS_DEVMEM_IS_ALLOWED
->  	select ARCH_HAS_ELF_RANDOMIZE
->  	select ARCH_HAS_GCOV_PROFILE_ALL
-> +	select ARCH_HAS_GIGANTIC_PAGE
->  	select ARCH_HAS_KCOV
->  	select ARCH_HAS_SG_CHAIN
->  	select ARCH_HAVE_NMI_SAFE_CMPXCHG
-> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> index c580d8c..2fdc300 100644
-> --- a/arch/x86/Kconfig
-> +++ b/arch/x86/Kconfig
-> @@ -29,6 +29,7 @@ config X86
->  	select ARCH_HAS_ELF_RANDOMIZE
->  	select ARCH_HAS_FAST_MULTIPLIER
->  	select ARCH_HAS_GCOV_PROFILE_ALL
-> +	select ARCH_HAS_GIGANTIC_PAGE		if X86_64
->  	select ARCH_HAS_KCOV			if X86_64
->  	select ARCH_HAS_PMEM_API		if X86_64
->  	select ARCH_HAS_MMIO_FLUSH
-> diff --git a/fs/Kconfig b/fs/Kconfig
-> index 2bc7ad7..b938205 100644
-> --- a/fs/Kconfig
-> +++ b/fs/Kconfig
-> @@ -199,6 +199,9 @@ config HUGETLBFS
->  config HUGETLB_PAGE
->  	def_bool HUGETLBFS
->  
-> +config ARCH_HAS_GIGANTIC_PAGE
-> +	bool
-> +
->  source "fs/configfs/Kconfig"
->  source "fs/efivarfs/Kconfig"
->  
-> diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-> index 87e11d8..8488dcc 100644
-> --- a/mm/hugetlb.c
-> +++ b/mm/hugetlb.c
-> @@ -1022,7 +1022,7 @@ static int hstate_next_node_to_free(struct hstate *h, nodemask_t *nodes_allowed)
->  		((node = hstate_next_node_to_free(hs, mask)) || 1);	\
->  		nr_nodes--)
->  
-> -#if (defined(CONFIG_X86_64) || defined(CONFIG_S390)) && \
-> +#if defined(CONFIG_ARCH_HAS_GIGANTIC_PAGE) && \
->  	((defined(CONFIG_MEMORY_ISOLATION) && defined(CONFIG_COMPACTION)) || \
->  	defined(CONFIG_CMA))
->  static void destroy_compound_gigantic_page(struct page *page,
-> -- 
-> 1.7.12.4
-> 
+>From the spec, it looks like this is allowed.
 
--- 
-Michal Hocko
-SUSE Labs
+What do you mean by 'DRAM'? Any ACPI region will be in the UEFI memory map, so
+the question is what is its type and memory attributes?
+The UEFI spec[0] says ACPI regions can have a type of EfiACPIReclaimMemory or
+EfiACPIMemoryNVS, the memory attributes aren't specified, so are chosen by the
+firmware.
+
+It is possible these regions have to be mapped non-cacheable, page 40 has a
+couple of:
+> If no information about the table location exists in the UEFI memory map or
+ACPI memory
+> descriptors, the table is assumed to be non-cached.
+
+reserve_regions() in drivers/firmware/efi/arm-init.c will add any entry in the
+memory map that has a 'WB' attribute to the memblock.memory list (via
+early_init_dt_add_memory_arch()), it will also mark as no-map regions that have
+this attribute and aren't in the is_reserve_region() list.
+
+If these ACPI regions have the 'WB' attribute, we add them as memory and mark
+them nomap. These show up as either a hole, or 'reserved' in /proc/iomem.
+If they don't have the 'WB' attribute, then then they are left out of memblock
+and aren't part of DRAM, I don't think these will show up in /proc/iomem at all.
+
+
+Thanks,
+
+James
+
+[0] '2.3.6 AArch64 Platforms' of version 2.6 of the UEFI spec at
+http://uefi.org/specifications
