@@ -1,14 +1,15 @@
 From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 22 Aug 2016 15:48:02 -0700
-Subject: [PATCH 1/4] arm64: dts: Add display subsystem DT nodes for
- hi6220-hikey
-Message-ID: <1471906085-16682-1-git-send-email-john.stultz@linaro.org>
+Date: Mon, 22 Aug 2016 15:48:03 -0700
+Subject: [PATCH 2/4] arm64: dts: Add HDMI node for hi6220-hikey
+In-Reply-To: <1471906085-16682-1-git-send-email-john.stultz@linaro.org>
+References: <1471906085-16682-1-git-send-email-john.stultz@linaro.org>
+Message-ID: <1471906085-16682-2-git-send-email-john.stultz@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Xinliang Liu <xinliang.liu@linaro.org>
 
-Add ade and dsi DT nodes for hikey board.
+Add adv7533 HDMI DT node for HiKey board.
 
 Cc: Guodong Xu <guodong.xu@linaro.org>
 Cc: Wei Xu <xuwei5@hisilicon.com>
@@ -21,97 +22,49 @@ Cc: devicetree at vger.kernel.org
 Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
 Signed-off-by: John Stultz <john.stultz@linaro.org>
 ---
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts |  8 ++++
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 55 ++++++++++++++++++++++++++
- 2 files changed, 63 insertions(+)
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 32 ++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-index 593c7e4..c2f014e 100644
+index c2f014e..8597e9b 100644
 --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
 +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-@@ -372,3 +372,11 @@
- &uart3 {
- 	label = "LS-UART1";
- };
-+
-+&ade {
-+	status = "ok";
-+};
-+
-+&dsi {
-+	status = "ok";
-+};
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 4f27041..d0b887a 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -262,6 +262,11 @@
- 			#clock-cells = <1>;
- 		};
+@@ -379,4 +379,36 @@
  
-+		medianoc_ade: medianoc_ade at f4520000 {
-+			compatible = "syscon";
-+			reg = <0x0 0xf4520000 0x0 0x4000>;
-+		};
+ &dsi {
+ 	status = "ok";
 +
- 		stub_clock: stub_clock {
- 			compatible = "hisilicon,hi6220-stub-clk";
- 			hisilicon,hi6220-clk-sram = <&sram>;
-@@ -850,5 +855,55 @@
- 				};
- 			};
- 		};
++	ports {
++		/* 1 for output port */
++		port at 1 {
++			reg = <1>;
 +
-+		ade: ade at f4100000 {
-+			compatible = "hisilicon,hi6220-ade";
-+			reg = <0x0 0xf4100000 0x0 0x7800>;
-+			reg-names = "ade_base";
-+			hisilicon,noc-syscon = <&medianoc_ade>;
-+			resets = <&media_ctrl MEDIA_ADE>;
-+			interrupts = <0 115 4>; /* ldi interrupt */
-+
-+			clocks = <&media_ctrl HI6220_ADE_CORE>,
-+				 <&media_ctrl HI6220_CODEC_JPEG>,
-+				 <&media_ctrl HI6220_ADE_PIX_SRC>;
-+			/*clock name*/
-+			clock-names  = "clk_ade_core",
-+				       "clk_codec_jpeg",
-+				       "clk_ade_pix";
-+
-+			assigned-clocks = <&media_ctrl HI6220_ADE_CORE>,
-+				<&media_ctrl HI6220_CODEC_JPEG>;
-+			assigned-clock-rates = <360000000>, <288000000>;
-+			dma-coherent;
-+			status = "disabled";
-+
-+			port {
-+				ade_out: endpoint {
-+					remote-endpoint = <&dsi_in>;
-+				};
++			dsi_out0: endpoint at 0 {
++				remote-endpoint = <&adv7533_in>;
 +			};
 +		};
++	};
++};
 +
-+		dsi: dsi at f4107800 {
-+			compatible = "hisilicon,hi6220-dsi";
-+			reg = <0x0 0xf4107800 0x0 0x100>;
-+			clocks = <&media_ctrl  HI6220_DSI_PCLK>;
-+			clock-names = "pclk";
-+			status = "disabled";
++&i2c2 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	status = "ok";
 +
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
++	adv7533: adv7533 at 39 {
++		compatible = "adi,adv7533";
++		reg = <0x39>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <1 2>;
++		pd-gpio = <&gpio0 4 0>;
++		adi,dsi-lanes = <4>;
 +
-+				/* 0 for input port */
-+				port at 0 {
-+					reg = <0>;
-+					dsi_in: endpoint {
-+						remote-endpoint = <&ade_out>;
-+					};
-+				};
++		port {
++			adv7533_in: endpoint {
++				remote-endpoint = <&dsi_out0>;
 +			};
 +		};
- 	};
++	};
  };
 -- 
 1.9.1
