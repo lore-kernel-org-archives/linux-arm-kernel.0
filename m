@@ -1,73 +1,84 @@
-From: xieyisheng1@huawei.com (Xie Yisheng)
-Date: Mon, 22 Aug 2016 21:20:03 +0800
-Subject: [RFC PATCH v3 1/2] mm/hugetlb: Introduce ARCH_HAS_GIGANTIC_PAGE
-In-Reply-To: <1471872004-59365-1-git-send-email-xieyisheng1@huawei.com>
-References: <1471872004-59365-1-git-send-email-xieyisheng1@huawei.com>
-Message-ID: <1471872004-59365-2-git-send-email-xieyisheng1@huawei.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 22 Aug 2016 09:27:04 -0400
+Subject: [PATCH] dmaengine: qcom_hidma: release the descriptor before the
+ callback
+In-Reply-To: <20160822060803.GH2890@localhost>
+References: <20160810172805.GH9681@localhost>
+ <d09ebb5f-99ea-a4e9-da9c-693be89c7cd4@codeaurora.org>
+ <20160819024853.GR9681@localhost>
+ <8c096fee-9749-a7df-7e04-25d21c0ea9ac@codeaurora.org>
+ <20160819034249.GS9681@localhost>
+ <3592cfe2-a563-7c26-9a9e-925051cc1934@codeaurora.org>
+ <20160819055252.GT9681@localhost>
+ <37b059dcb67d1c83c2193acecef0ab96@codeaurora.org>
+ <20160819170208.GC9343@localhost>
+ <f11a2775-63b8-6933-ab15-20e3927f0db7@codeaurora.org>
+ <20160822060803.GH2890@localhost>
+Message-ID: <6151fe21-3c48-e691-1c99-bafd3cc699e6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid making ifdef get pretty unwieldy if many ARCHs support gigantic page.
-No functional change with this patch.
+On 8/22/2016 2:08 AM, Vinod Koul wrote:
+> On Fri, Aug 19, 2016 at 01:21:34PM -0400, Sinan Kaya wrote:
+>> On 8/19/2016 1:02 PM, Vinod Koul wrote:
+>>> On Fri, Aug 19, 2016 at 07:13:43AM -0400, okaya at codeaurora.org wrote:
+>>>> On 2016-08-19 01:52, Vinod Koul wrote:
+>>>>> On Thu, Aug 18, 2016 at 11:48:52PM -0400, Sinan Kaya wrote:
+>>>>>> On 8/18/2016 11:42 PM, Vinod Koul wrote:
+>>>>>>> On Thu, Aug 18, 2016 at 11:26:28PM -0400, Sinan Kaya wrote:
+>>>>>>>> On 8/18/2016 10:48 PM, Vinod Koul wrote:
+>>>>>>>>>> Keep a size limited list with error cookies and flush them in terminate all?
+>>>>>>>>> I think so, terminate_all anyway cleans up the channel. Btw what is the
+>>>>>>>>> behaviour on error? Do you terminate or somthing else?
+>>>>>>>>>
+>>>>>>>>
+>>>>>>>> On error, I flush all outstanding transactions with an error code and I reset
+>>>>>>>> the channel. After the reset, the DMA channel is functional again. The client
+>>>>>>>> doesn't need to shutdown anything.
+>>>>>>>
+>>>>>>> You mean from the client context or driver?
+>>>>>>>
+>>>>>>
+>>>>>> The client doesn't need to call device_free_chan_resources and
+>>>>>> device_terminate_all
+>>>>>> to be specific. Client can certainly call these if it needs to
+>>>>>> but it is not
+>>>>>> required to recover the channel.
+>>>>>
+>>>>> You didn't answer my question!
+>>>>>
+>>>>> On error you said you flush, so who does that?
+>>>>
+>>>> This is done by the driver in interrupt context when an error
+>>>> interrupt is received. All transactions are posted and hw is reset.
+>>>
+>>> Hmmm, waht about the txn which are pending? DO you clear them..?
+>>>
+>>
+>> Yes, I clear both pending and active transactions. 
+> 
+> Okay, in that case your can consider below:
+> 
+> 1. dmaengine asserts error interrupt
+> 2. Driver receives and mark's the txn as error
+> 3. Driver completes the txn and intimates the client. No further
+>    submissions. Drop the locks before calling callback, as subsequent
+>    processing by client maybe in callback thread.
+> 4. Client invokes status and you can return error
+> 5. On error, client calls terminate_all. You can reset channel, free all
+>    descriptors in the active, pending and completed lists
+> 6. Client prepares new txn and so on..
 
-Signed-off-by: Xie Yisheng <xieyisheng1@huawei.com>
----
- arch/s390/Kconfig | 1 +
- arch/x86/Kconfig  | 1 +
- fs/Kconfig        | 3 +++
- mm/hugetlb.c      | 2 +-
- 4 files changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
-index e751fe2..a8c8fa3 100644
---- a/arch/s390/Kconfig
-+++ b/arch/s390/Kconfig
-@@ -72,6 +72,7 @@ config S390
- 	select ARCH_HAS_DEVMEM_IS_ALLOWED
- 	select ARCH_HAS_ELF_RANDOMIZE
- 	select ARCH_HAS_GCOV_PROFILE_ALL
-+	select ARCH_HAS_GIGANTIC_PAGE
- 	select ARCH_HAS_KCOV
- 	select ARCH_HAS_SG_CHAIN
- 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index c580d8c..2fdc300 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -29,6 +29,7 @@ config X86
- 	select ARCH_HAS_ELF_RANDOMIZE
- 	select ARCH_HAS_FAST_MULTIPLIER
- 	select ARCH_HAS_GCOV_PROFILE_ALL
-+	select ARCH_HAS_GIGANTIC_PAGE		if X86_64
- 	select ARCH_HAS_KCOV			if X86_64
- 	select ARCH_HAS_PMEM_API		if X86_64
- 	select ARCH_HAS_MMIO_FLUSH
-diff --git a/fs/Kconfig b/fs/Kconfig
-index 2bc7ad7..b938205 100644
---- a/fs/Kconfig
-+++ b/fs/Kconfig
-@@ -199,6 +199,9 @@ config HUGETLBFS
- config HUGETLB_PAGE
- 	def_bool HUGETLBFS
- 
-+config ARCH_HAS_GIGANTIC_PAGE
-+	bool
-+
- source "fs/configfs/Kconfig"
- source "fs/efivarfs/Kconfig"
- 
-diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-index 87e11d8..8488dcc 100644
---- a/mm/hugetlb.c
-+++ b/mm/hugetlb.c
-@@ -1022,7 +1022,7 @@ static int hstate_next_node_to_free(struct hstate *h, nodemask_t *nodes_allowed)
- 		((node = hstate_next_node_to_free(hs, mask)) || 1);	\
- 		nr_nodes--)
- 
--#if (defined(CONFIG_X86_64) || defined(CONFIG_S390)) && \
-+#if defined(CONFIG_ARCH_HAS_GIGANTIC_PAGE) && \
- 	((defined(CONFIG_MEMORY_ISOLATION) && defined(CONFIG_COMPACTION)) || \
- 	defined(CONFIG_CMA))
- static void destroy_compound_gigantic_page(struct page *page,
+Just to be clear, you are telling me not to accept any new transactions until
+terminate_all is called, right?
+
+> 
+> Thanks
+> 
+
+
 -- 
-1.7.12.4
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
