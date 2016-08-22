@@ -1,53 +1,62 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Mon, 22 Aug 2016 18:37:58 +0800
-Subject: [RFC PATCH v2 1/2] mm/hugetlb: Introduce ARCH_HAS_GIGANTIC_PAGE
-In-Reply-To: <20160822080101.GE13596@dhcp22.suse.cz>
-References: <1471834603-27053-1-git-send-email-xieyisheng1@huawei.com>
- <1471834603-27053-2-git-send-email-xieyisheng1@huawei.com>
- <20160822080101.GE13596@dhcp22.suse.cz>
-Message-ID: <32ed1cea-df4b-a170-2d6f-0a4e05ee8405@huawei.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 22 Aug 2016 12:19:22 +0100
+Subject: [PATCH 5/8] arm64: alternative: Add support for patching adrp
+ instructions
+In-Reply-To: <1471525832-21209-6-git-send-email-suzuki.poulose@arm.com>
+References: <1471525832-21209-1-git-send-email-suzuki.poulose@arm.com>
+ <1471525832-21209-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160822111921.GC14680@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2016/8/22 16:01, Michal Hocko wrote:
-> On Mon 22-08-16 10:56:42, Xie Yisheng wrote:
->>  
->> +config ARCH_HAS_GIGANTIC_PAGE
->> +	depends on HUGETLB_PAGE
->> +	bool
->> +
+On Thu, Aug 18, 2016 at 02:10:29PM +0100, Suzuki K Poulose wrote:
+> adrp uses PC-relative address offset to a page (of 4K size) of
+> a symbol. If it appears in an alternative code patched in, we
+> should adjust the offset to reflect the address where it will
+> be run from. This patch adds support for fixing the offset
+> for adrp instructions.
 > 
-> but is this really necessary? The code where we use
-> ARCH_HAS_GIGANTIC_PAGE already depends on HUGETLB_PAGE.
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Andre Przywara <andre.przywara@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/kernel/alternative.c | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
 > 
-Hi Michal,
-Thank you for your reply.
-That right, it's no need to depends on HUGETLB_PAGE here.
+> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+> index d2ee1b2..71c6962 100644
+> --- a/arch/arm64/kernel/alternative.c
+> +++ b/arch/arm64/kernel/alternative.c
+> @@ -80,6 +80,19 @@ static u32 get_alt_insn(struct alt_instr *alt, u32 *insnptr, u32 *altinsnptr)
+>  			offset = target - (unsigned long)insnptr;
+>  			insn = aarch64_set_branch_offset(insn, offset);
+>  		}
+> +	} else if (aarch64_insn_is_adrp(insn)) {
+> +		s32 orig_offset, new_offset;
+> +		unsigned long target;
+> +
+> +		/*
+> +		 * If we're replacing an adrp instruction, which uses PC-relative
+> +		 * immediate addressing, adjust the offset to reflect the new
+> +		 * PC. adrp operates on 4K aligned addresses.
+> +		 */
+> +		orig_offset  = aarch64_insn_adrp_get_offset(insn);
+> +		target = ((unsigned long)altinsnptr & ~0xfffUL) + orig_offset;
+> +		new_offset = target - ((unsigned long)insnptr & ~0xfffUL);
 
-I will send v3 soon.
+The masking with ~0xfffUL might be nicer if you write it as
+align_down(ptr, SZ_4K);
 
-Thanks
-Xie Yisheng
-> Other than that looks good to me and a nice simplification.
-> 
->>  source "fs/configfs/Kconfig"
->>  source "fs/efivarfs/Kconfig"
->>  
->> diff --git a/mm/hugetlb.c b/mm/hugetlb.c
->> index 87e11d8..8488dcc 100644
->> --- a/mm/hugetlb.c
->> +++ b/mm/hugetlb.c
->> @@ -1022,7 +1022,7 @@ static int hstate_next_node_to_free(struct hstate *h, nodemask_t *nodes_allowed)
->>  		((node = hstate_next_node_to_free(hs, mask)) || 1);	\
->>  		nr_nodes--)
->>  
->> -#if (defined(CONFIG_X86_64) || defined(CONFIG_S390)) && \
->> +#if defined(CONFIG_ARCH_HAS_GIGANTIC_PAGE) && \
->>  	((defined(CONFIG_MEMORY_ISOLATION) && defined(CONFIG_COMPACTION)) || \
->>  	defined(CONFIG_CMA))
->>  static void destroy_compound_gigantic_page(struct page *page,
->> -- 
->> 1.7.12.4
-> 
+> +		insn = aarch64_insn_adrp_set_offset(insn, new_offset);
+>  	}
+>  
+>  	return insn;
+
+I wonder if we shouldn't have a catch-all for any instructions performing
+PC-relative operations here, because silent corruption of the instruction
+stream is pretty horrible. What other instructions are there? ADR, LDR
+(literal), ... ?
+
+Will
