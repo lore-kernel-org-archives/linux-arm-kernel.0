@@ -1,33 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Aug 2016 13:55:22 +0200
-Subject: [PATCH v2 1/4] net: dt-bindings: Document the new Meson8b and
- GXBB DWMAC bindings
-In-Reply-To: <20160820093538.9707-2-martin.blumenstingl@googlemail.com>
-References: <20160815164100.27766-1-martin.blumenstingl@googlemail.com>
- <20160820093538.9707-1-martin.blumenstingl@googlemail.com>
- <20160820093538.9707-2-martin.blumenstingl@googlemail.com>
-Message-ID: <7308700.atIMKyMFZU@wuerfel>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 22 Aug 2016 21:02:48 +0900
+Subject: [PATCH 0/2] clk: samsung: exynos5420: Add clocks for CMU_CDREX
+ domain
+In-Reply-To: <1471855308-12791-1-git-send-email-cw00.choi@samsung.com>
+References: <CGME20160822084428epcas1p333bb92719d279a64e541ca70bdb7c0f3@epcas1p3.samsung.com>
+ <1471855308-12791-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <57BAE9E8.50703@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, August 20, 2016 11:35:35 AM CEST Martin Blumenstingl wrote:
-> +- reg: The first register range should be the one of the DWMAC
-> +       controller. The second range is is for the Amlogic specific
-> +       configuration (for example the PRG_ETHERNET register range
-> +       on Meson8b and newer)
->  
-...
+Dear all,
 
-> +Example for GXBB:
-> +       ethmac: ethernet at c9410000 {
-> +               compatible = "amlogic,meson-gxbb-dwmac", "snps,dwmac";
-> +               reg = <0x0 0xc9410000 0x0 0x10000>,
-> +                       <0x0 0xc8834540 0x0 0x8>;
+Please ignore this patches because the CMU_CDREX
+should support the 800MHz DRAM clock. But, following clk_summary
+show the 825MHz clock. So, I need to change the clock rate
+of fout_bpll or check it. After setting the DRAM clock
+as 800MHz, I'll send the patches again.
+
+Regards,
+Chanwoo Choi
+
+On 2016? 08? 22? 17:41, Chanwoo Choi wrote:
+> This patches add the clocks for CMU_CDREX (DRAM Express Controller)
+> that generates the clocks for DRAM and NoC (Network on Chip) bus clock.
 > 
-
-The address "0xc8834540" suggests that this is part of a larger register
-range that is used for various things, i.e. a "syscon" type of device.
-
-How about making this a syscon reference rather than a "reg" address?
-
-	Arnd
+> [Result for clk_summary on exynos5422-odroidxu3 board]
+>     fout_bpll                             0            0   825000000          0 0  
+>        mout_bpll                          0            0   825000000          0 0  
+>           mout_mclk_cdrex                 0            0   825000000          0 0  
+>              dout_pclk_core_mem           0            0   206250000          0 0  
+>              dout_sclk_cdrex              0            0   825000000          0 0  
+>                 dout_clk2x_phy0           0            0   825000000          0 0  
+>                    dout_aclk_cdrex1           0            0   412500000          0 0  
+>                       dout_pclk_cdrex           0            0   103125000          0 0  
+>                    dout_cclk_drex0           0            0   412500000          0 0  
+> 
+> Chanwoo Choi (2):
+>   dt-bindings: Add the clock id for CMU_CDREX (DRAM Express Controller)
+>   clk: samsung: exynos5420: Add clocks for CMU_CDREX domain
+> 
+>  drivers/clk/samsung/clk-exynos5420.c   | 35 ++++++++++++++++++++++++++++++++++
+>  include/dt-bindings/clock/exynos5420.h | 11 ++++++++++-
+>  2 files changed, 45 insertions(+), 1 deletion(-)
+> 
