@@ -1,31 +1,58 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 22 Aug 2016 17:41:46 +0900
-Subject: [PATCH 0/2] clk: samsung: exynos5420: Add clocks for CMU_CDREX domain
-Message-ID: <1471855308-12791-1-git-send-email-cw00.choi@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Aug 2016 10:42:28 +0200
+Subject: [PATCH] serial: vt8500_serial: Fix a parameter of
+ find_first_zero_bit.
+In-Reply-To: <1471814425-18949-1-git-send-email-christophe.jaillet@wanadoo.fr>
+References: <1471814425-18949-1-git-send-email-christophe.jaillet@wanadoo.fr>
+Message-ID: <2512469.eM8MYFl15l@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patches add the clocks for CMU_CDREX (DRAM Express Controller)
-that generates the clocks for DRAM and NoC (Network on Chip) bus clock.
+On Sunday, August 21, 2016 11:20:25 PM CEST Christophe JAILLET wrote:
+> The 2nd parameter of 'find_first_zero_bit' is the number of bits to search.
+> In this case, we are passing 'sizeof(vt8500_ports_in_use)'.
+> 'vt8500_ports_in_use' is an 'unsigned long'. So the sizeof is likely to
+> return 4.
+> 
+> A few lines below, we check if it is below VT8500_MAX_PORTS, which is 6.
+> 
+> It is likely that the number of bits in a long was expected here, so use
+> BITS_PER_LONG instead.
+> 
+> 
+> It has been spotted by the following coccinelle script:
+> @@
+> expression ret, x;
+> 
+> @@
+> *  ret = \(find_first_bit \| find_first_zero_bit\) (x, sizeof(...));
+> 
+> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+> ---
+> Other options are possible:
+>   - 'vt8500_ports_in_use' being a 'unsigned long', use ffz to reduce
+>     code verbosity
+>   - VT8500_MAX_PORTS, in order to be consistent with the test below
 
-[Result for clk_summary on exynos5422-odroidxu3 board]
-    fout_bpll                             0            0   825000000          0 0  
-       mout_bpll                          0            0   825000000          0 0  
-          mout_mclk_cdrex                 0            0   825000000          0 0  
-             dout_pclk_core_mem           0            0   206250000          0 0  
-             dout_sclk_cdrex              0            0   825000000          0 0  
-                dout_clk2x_phy0           0            0   825000000          0 0  
-                   dout_aclk_cdrex1           0            0   412500000          0 0  
-                      dout_pclk_cdrex           0            0   103125000          0 0  
-                   dout_cclk_drex0           0            0   412500000          0 0  
+Sorry, but I'm not following the logic here.
 
-Chanwoo Choi (2):
-  dt-bindings: Add the clock id for CMU_CDREX (DRAM Express Controller)
-  clk: samsung: exynos5420: Add clocks for CMU_CDREX domain
+> ---
+>  drivers/tty/serial/vt8500_serial.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/tty/serial/vt8500_serial.c b/drivers/tty/serial/vt8500_serial.c
+> index 23cfc5e16b45..935076c50cb1 100644
+> --- a/drivers/tty/serial/vt8500_serial.c
+> +++ b/drivers/tty/serial/vt8500_serial.c
+> @@ -664,7 +664,7 @@ static int vt8500_serial_probe(struct platform_device *pdev)
+>  	if (port < 0) {
+>  		/* calculate the port id */
+>  		port = find_first_zero_bit(&vt8500_ports_in_use,
+> -					sizeof(vt8500_ports_in_use));
+> +					   BITS_PER_LONG);
+>  	}
 
- drivers/clk/samsung/clk-exynos5420.c   | 35 ++++++++++++++++++++++++++++++++++
- include/dt-bindings/clock/exynos5420.h | 11 ++++++++++-
- 2 files changed, 45 insertions(+), 1 deletion(-)
+You argue that the two have the same meaning, which I see, but
+why is it better than the existing code?
 
--- 
-1.9.1
+	Arnd
