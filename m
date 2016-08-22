@@ -1,145 +1,221 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 22 Aug 2016 12:31:38 -0400 (EDT)
-Subject: [PATCH v6] usb: ohci-at91: Forcibly suspend ports while USB
- suspend
-In-Reply-To: <1471831061-24110-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <Pine.LNX.4.44L0.1608221224100.1543-100000@iolanthe.rowland.org>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 22 Aug 2016 18:34:14 +0200
+Subject: [PATCH] ARM: dts: exynos: Add entries for sound support on Odroid-XU
+ board
+Message-ID: <1471883654-2113-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Aug 2016, Wenyou Yang wrote:
+This patch adds device nodes for the AUDSS clock controller,
+peripheral DMA 0/1 controllers and the Audio Subsystem I2S controller.
+These entries are required for sound support on Odroid-XU board.
 
-> The usb controller does not manage correctly the suspend mode for
-> the ehci. In echi mode, there is no way to suspend without any
-> device connected to it. This is why this specific control is added
-> to fix this issue. Since the suspend mode works in ohci mode, this
-> specific control works by suspend the usb controller in ohci mode.
-> 
-> This specific control is by setting the SUSPEND_A/B/C fields of
-> SFR_OHCIICR(OHCI Interrupt Configuration Register) in the SFR
-> while the OHCI USB suspend.
-> 
-> This set operation must be done before the USB clock disabled,
-> clear operation after the USB clock enabled.
-> 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+This patch depends on a patch adding clock ID macro definitions.
+I'm going to provide a topic branch containing required changes.
+---
+ arch/arm/boot/dts/exynos5410-odroidxu.dts | 70 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5410-pinctrl.dtsi |  9 ++++
+ arch/arm/boot/dts/exynos5410.dtsi         | 59 ++++++++++++++++++++++++++
+ 3 files changed, 138 insertions(+)
 
-This is getting better...
-
-> @@ -282,6 +301,28 @@ static int ohci_at91_hub_status_data(struct usb_hcd *hcd, char *buf)
->  	return length;
->  }
->  
-> +static int ohci_at91_port_ctrl(struct regmap *regmap, u8 set)
-
-How about calling this routine ohci_at91_port_suspend instead of 
-_port_control?  After all, the only port feature that it affects is 
-the suspend feature.
-
-> +{
-> +	u32 regval;
-> +	int ret;
-> +
-> +	if (!regmap)
-> +		return 0;
-> +
-> +	ret = regmap_read(regmap, AT91_SFR_OHCIICR, &regval);
-> +	if (ret)
-> +		return ret;
-> +
-> +	if (set)
-> +		regval |= AT91_OHCIICR_USB_SUSPEND;
-> +	else
-> +		regval &= ~AT91_OHCIICR_USB_SUSPEND;
-> +
-> +	regmap_write(regmap, AT91_SFR_OHCIICR, regval);
-> +
-> +	return 0;
-> +}
-> +
->  /*
->   * Look at the control requests to the root hub and see if we need to override.
->   */
-> @@ -289,6 +330,7 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
->  				 u16 wIndex, char *buf, u16 wLength)
->  {
->  	struct at91_usbh_data *pdata = dev_get_platdata(hcd->self.controller);
-> +	struct ohci_at91_priv *ohci_at91 = hcd_to_ohci_at91_priv(hcd);
->  	struct usb_hub_descriptor *desc;
->  	int ret = -EINVAL;
->  	u32 *data = (u32 *)buf;
-> @@ -301,7 +343,8 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
->  
->  	switch (typeReq) {
->  	case SetPortFeature:
-> -		if (wValue == USB_PORT_FEAT_POWER) {
-> +		switch (wValue) {
-> +		case USB_PORT_FEAT_POWER:
->  			dev_dbg(hcd->self.controller, "SetPortFeat: POWER\n");
->  			if (valid_port(wIndex)) {
->  				ohci_at91_usb_set_power(pdata, wIndex, 1);
-> @@ -309,6 +352,11 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
->  			}
->  
->  			goto out;
-> +
-> +		case USB_PORT_FEAT_SUSPEND:
-> +			dev_dbg(hcd->self.controller, "SetPortFeat: SUSPEND\n");
-
-Don't you want to check valid_port(wIndex) here, like the 
-USB_PORT_FEAT_POWER case above?
-
-> +			ohci_at91_port_ctrl(ohci_at91->sfr_regmap, 1);
-> +			break;
->  		}
->  		break;
->  
-> @@ -342,6 +390,12 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
->  				ohci_at91_usb_set_power(pdata, wIndex, 0);
->  				return 0;
->  			}
-> +			break;
-> +
-> +		case USB_PORT_FEAT_SUSPEND:
-> +			dev_dbg(hcd->self.controller, "ClearPortFeature: SUSPEND\n");
-
-And here too?
-
-> +			ohci_at91_port_ctrl(ohci_at91->sfr_regmap, 0);
-> +			break;
->  		}
->  		break;
->  	}
-> @@ -599,6 +653,9 @@ ohci_hcd_at91_drv_suspend(struct device *dev)
->  	if (ohci_at91->wakeup)
->  		enable_irq_wake(hcd->irq);
->  
-> +	ohci_at91_hub_control(hcd, SetPortFeature,
-> +			      USB_PORT_FEAT_SUSPEND, 1, NULL, 0);
-> +
-
-You really shouldn't call ohci_at91_hub_control here.  Instead, you 
-can call ohci_at91_port_ctrl (or ohci_at91_port_suspend, if you 
-change the function's name).
-
->  	ret = ohci_suspend(hcd, ohci_at91->wakeup);
->  	if (ret) {
->  		if (ohci_at91->wakeup)
-> @@ -638,6 +695,10 @@ ohci_hcd_at91_drv_resume(struct device *dev)
->  	at91_start_clock(ohci_at91);
->  
->  	ohci_resume(hcd, false);
-> +
-> +	ohci_at91_hub_control(hcd, ClearPortFeature,
-> +			      USB_PORT_FEAT_SUSPEND, 1, NULL, 0);
-
-Same here.
-
-> +
->  	return 0;
->  }
-
-Alan Stern
+diff --git a/arch/arm/boot/dts/exynos5410-odroidxu.dts b/arch/arm/boot/dts/exynos5410-odroidxu.dts
+index d949931..91dd8e7 100644
+--- a/arch/arm/boot/dts/exynos5410-odroidxu.dts
++++ b/arch/arm/boot/dts/exynos5410-odroidxu.dts
+@@ -15,6 +15,7 @@
+ #include <dt-bindings/clock/maxim,max77802.h>
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/sound/samsung-i2s.h>
+ #include "exynos54xx-odroidxu-leds.dtsi"
+ 
+ / {
+@@ -56,6 +57,62 @@
+ 		compatible = "samsung,secure-firmware";
+ 		reg = <0x02073000 0x1000>;
+ 	};
++
++	sound: sound {
++		compatible = "simple-audio-card";
++
++		simple-audio-card,name = "Odroid-XU";
++		simple-audio-card,widgets =
++			"Headphone", "Headphone Jack",
++			"Speakers", "Speakers";
++		simple-audio-card,routing =
++			"Headphone Jack", "HPL",
++			"Headphone Jack", "HPR",
++			"Headphone Jack", "MICBIAS",
++			"IN1", "Headphone Jack",
++			"Speakers", "SPKL",
++			"Speakers", "SPKR";
++
++		simple-audio-card,format = "i2s";
++		simple-audio-card,bitclock-master = <&link0_codec>;
++		simple-audio-card,frame-master = <&link0_codec>;
++
++		assigned-clocks = <&clock_audss EXYNOS_MOUT_AUDSS>,
++				<&clock_audss EXYNOS_MOUT_I2S>,
++				<&clock_audss EXYNOS_DOUT_SRP>,
++				<&clock_audss EXYNOS_DOUT_AUD_BUS>;
++
++		assigned-clock-parents = <&clock CLK_FOUT_EPLL>,
++				<&clock_audss EXYNOS_MOUT_AUDSS>;
++
++		assigned-clock-rates =  <0>,
++					<0>,
++					<96000000>,
++					<19200000>;
++
++		simple-audio-card,cpu {
++			sound-dai = <&audi2s0 0>;
++			system-clock-frequency = <19200000>;
++		};
++
++		link0_codec: simple-audio-card,codec {
++			sound-dai = <&max98090>;
++			clocks = <&audi2s0 CLK_I2S_CDCLK>;
++		};
++	};
++};
++
++&audi2s0 {
++	status = "okay";
++};
++
++&clock {
++       clocks = <&fin_pll>;
++};
++
++&clock_audss {
++	assigned-clocks = <&clock CLK_FOUT_EPLL>;
++	assigned-clock-rates = <192000000>;
+ };
+ 
+ &cpu0_thermal {
+@@ -439,6 +496,19 @@
+ 	};
+ };
+ 
++&i2c_1 {
++	status = "okay";
++	max98090: max98090 at 10 {
++		compatible = "maxim,max98090";
++		reg = <0x10>;
++		interrupt-parent = <&gpj3>;
++		interrupts = <0 0>;
++		clocks = <&audi2s0 CLK_I2S_CDCLK>;
++		clock-names = "mclk";
++		#sound-dai-cells = <0>;
++	};
++};
++
+ &mmc_0 {
+ 	status = "okay";
+ 	mmc-pwrseq = <&emmc_pwrseq>;
+diff --git a/arch/arm/boot/dts/exynos5410-pinctrl.dtsi b/arch/arm/boot/dts/exynos5410-pinctrl.dtsi
+index b58a0f2..31f08a3 100644
+--- a/arch/arm/boot/dts/exynos5410-pinctrl.dtsi
++++ b/arch/arm/boot/dts/exynos5410-pinctrl.dtsi
+@@ -613,4 +613,13 @@
+ 		interrupt-controller;
+ 		#interrupt-cells = <2>;
+ 	};
++
++	audi2s0_bus: audi2s0-bus {
++		samsung,pins = "gpz-0", "gpz-1", "gpz-2", "gpz-3",
++				"gpz-4";
++		samsung,pin-function = <2>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
+ };
+diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+index 137f484..7a4cc0f 100644
+--- a/arch/arm/boot/dts/exynos5410.dtsi
++++ b/arch/arm/boot/dts/exynos5410.dtsi
+@@ -16,6 +16,7 @@
+ #include "exynos54xx.dtsi"
+ #include "exynos-syscon-restart.dtsi"
+ #include <dt-bindings/clock/exynos5410.h>
++#include <dt-bindings/clock/exynos-audss-clk.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ 
+ / {
+@@ -82,6 +83,14 @@
+ 			#clock-cells = <1>;
+ 		};
+ 
++		clock_audss: audss-clock-controller at 3810000 {
++			compatible = "samsung,exynos5410-audss-clock";
++			reg = <0x03810000 0x0C>;
++			#clock-cells = <1>;
++			clocks = <&fin_pll>, <&clock CLK_FOUT_EPLL>;
++			clock-names = "pll_ref", "pll_in";
++		};
++
+ 		tmu_cpu0: tmu at 10060000 {
+ 			compatible = "samsung,exynos5420-tmu";
+ 			reg = <0x10060000 0x100>;
+@@ -183,6 +192,56 @@
+ 			reg = <0x03860000 0x1000>;
+ 			interrupts = <0 47 0>;
+ 		};
++
++		amba {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			compatible = "simple-bus";
++			interrupt-parent = <&gic>;
++			ranges;
++
++			pdma0: pdma at 12680000 {
++				compatible = "arm,pl330", "arm,primecell";
++				reg = <0x121A0000 0x1000>;
++				interrupts = <0 34 0>;
++				clocks = <&clock CLK_PDMA0>;
++				clock-names = "apb_pclk";
++				#dma-cells = <1>;
++				#dma-channels = <8>;
++				#dma-requests = <32>;
++			};
++
++			pdma1: pdma at 12690000 {
++				compatible = "arm,pl330", "arm,primecell";
++				reg = <0x121B0000 0x1000>;
++				interrupts = <0 35 0>;
++				clocks = <&clock CLK_PDMA1>;
++				clock-names = "apb_pclk";
++				#dma-cells = <1>;
++				#dma-channels = <8>;
++				#dma-requests = <32>;
++			};
++		};
++
++		audi2s0: i2s at 03830000 {
++			compatible = "samsung,exynos5420-i2s";
++			reg = <0x03830000 0x100>;
++			dmas = <&pdma0 10
++				&pdma0 9
++				&pdma0 8>;
++			dma-names = "tx", "rx", "tx-sec";
++			clocks = <&clock_audss EXYNOS_I2S_BUS>,
++				<&clock_audss EXYNOS_I2S_BUS>,
++				<&clock_audss EXYNOS_SCLK_I2S>;
++			clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
++			#clock-cells = <1>;
++			clock-output-names = "i2s_cdclk0";
++			#sound-dai-cells = <1>;
++			samsung,idma-addr = <0x03000000>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&audi2s0_bus>;
++			status = "disabled";
++		};
+ 	};
+ 
+ 	thermal-zones {
+-- 
+1.9.1
