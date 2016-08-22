@@ -1,174 +1,152 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 22 Aug 2016 09:44:37 +0200
-Subject: [PATCH v2 1/2] mtd: brcmnand: iProc big endian and ONFI support
-In-Reply-To: <CAC=U0a2fA=aYbfDdhcdRPATFuPEWd8qmdajwdn4UAFn=R4rUsQ@mail.gmail.com>
-References: <1469051631-7896-1-git-send-email-ray.jui@broadcom.com>
- <1469051631-7896-2-git-send-email-ray.jui@broadcom.com>
- <20160810162438.4c6cffd3@bbrezillon>
- <CAC=U0a2fA=aYbfDdhcdRPATFuPEWd8qmdajwdn4UAFn=R4rUsQ@mail.gmail.com>
-Message-ID: <20160822094437.4e9fec83@bbrezillon>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Mon, 22 Aug 2016 15:45:40 +0800
+Subject: [PATCH V3 2/5] thermal: bcm2835: add thermal driver for bcm2835
+ soc
+In-Reply-To: <46FE06A3-5A7D-41D7-827B-C7B35E42E2C5@martin.sperl.org>
+References: <1463495753-967-1-git-send-email-kernel@martin.sperl.org>
+ <1463495753-967-3-git-send-email-kernel@martin.sperl.org>
+ <87mvn6qa2x.fsf@eliezer.anholt.net> <87r39lvs4v.fsf@eliezer.anholt.net>
+ <1471591694.2691.39.camel@intel.com> <87inuwd1p4.fsf@eliezer.anholt.net>
+ <1471786649.2188.4.camel@intel.com>
+ <46FE06A3-5A7D-41D7-827B-C7B35E42E2C5@martin.sperl.org>
+Message-ID: <1471851940.2188.22.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 19 Aug 2016 11:14:17 -0400
-Kamal Dasu <kdasu.kdev@gmail.com> wrote:
+On ?, 2016-08-21 at 19:21 +0200, Martin Sperl wrote:
+> > 
+> > On 21.08.2016, at 15:37, Zhang Rui <rui.zhang@intel.com> wrote:
+> > 
+> > > 
+> > > On ?, 2016-08-19 at 11:59 -0700, Eric Anholt wrote:
+> > > Zhang Rui <rui.zhang@intel.com> writes:
+> > > 
+> > > > 
+> > > > 
+> > > > > 
+> > > > > On ?, 2016-08-18 at 11:39 -0700, Eric Anholt wrote:
+> > > > > 
+> > > > > Eric Anholt <eric@anholt.net> writes:
+> > > > > 
+> > > > > > 
+> > > > > > 
+> > > > > > 
+> > > > > > kernel at martin.sperl.org writes:
+> > > > > > 
+> > > > > > > 
+> > > > > > > 
+> > > > > > > 
+> > > > > > > From: Martin Sperl <kernel@martin.sperl.org>
+> > > > > > > 
+> > > > > > > Add basic thermal driver for bcm2835 SOC.
+> > > > > > > 
+> > > > > > > This driver currently relies on the firmware setting up
+> > > > > > > the
+> > > > > > > tsense HW block and does not set it up itself.
+> > > > > > > 
+> > > > > > > Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+> > > > > > > 
+> > > > > > > ChangeLog:
+> > > > > > > ?V1 -> V2: added specific settings depending on
+> > > > > > > compatiblity
+> > > > > > > ??????added trip point based on register
+> > > > > > > ??????setting up ctrl-register if HW is not enabled by
+> > > > > > > firmware
+> > > > > > > ????????as per recommendation of Eric (untested)
+> > > > > > > ??????check that clock frequency is in range
+> > > > > > > ????????(1.9 - 5MHz - as per comment in clk-bcm2835.c)
+> > > > > > > ---
+> > > > > > > 
+> > > > > > > diff --git a/drivers/thermal/bcm/Makefile
+> > > > > > > b/drivers/thermal/bcm/Makefile
+> > > > > > > new file mode 100644
+> > > > > > > index 0000000..13456d2
+> > > > > > > --- /dev/null
+> > > > > > > +++ b/drivers/thermal/bcm/Makefile
+> > > > > > > @@ -0,0 +1 @@
+> > > > > > > +obj-$(CONFIG_BCM2835_THERMAL)????????:=
+> > > > > > > bcm2835_thermal.o
+> > > > > > > diff --git a/drivers/thermal/bcm/bcm2835_thermal.c
+> > > > > > > b/drivers/thermal/bcm/bcm2835_thermal.c
+> > > > > > > new file mode 100644
+> > > > > > > index 0000000..73138cb
+> > > > > > > --- /dev/null
+> > > > > > > +++ b/drivers/thermal/bcm/bcm2835_thermal.c
+> > > > > > > 
+> > > > > > > +static const struct of_device_id
+> > > > > > > bcm2835_thermal_of_match_table[];
+> > > > > > > +static int bcm2835_thermal_probe(struct platform_device
+> > > > > > > *pdev)
+> > > > > > > +{
+> > > > > > > 
+> > > > > > > +????/* enable clock and check rate */
+> > > > > > > +????clk_prepare_enable(data->clk);
+> > > > > > > +????rate = clk_get_rate(data->clk);
+> > > > > > > +????if ((rate < 1920000) || (rate > 5000000)) {
+> > > > > > > +????????dev_warn(&pdev->dev,
+> > > > > > > +?????????????"Clock %pCn is running at %pCr Hz,
+> > > > > > > which is outside the recommended range of 1.9 to 5.0
+> > > > > > > MHz\n",
+> > > > > > > +?????????????data->clk, data->clk);
+> > > > > > > +????}
+> > > > > > > +
+> > > > > > > +????/* register it */
+> > > > > > > +????tz = thermal_zone_device_register("bcm2835_thermal",
+> > > > > > > +??????????????????????1, 0, data,
+> > > > > > > +??????????????????????&bcm2835_thermal_o
+> > > > > > > ps,
+> > > > > > > +??????????????????????NULL, 0, 0);
+> > > > > > I notice that the polling_delay is set to 0, but we're not
+> > > > > > using
+> > > > > > interrupts to trigger the trip.??Is it valid to expose a
+> > > > > > trip
+> > > > > > without a
+> > > > > > polling_delay or interrupts???Should passive_delay be set
+> > > > > > as
+> > > > > > well?
+> > > > > > 
+> > > > > > This is up to the thermal maintainers.??As far as I'm
+> > > > > > concerned,
+> > > > > > it's:
+> > > > > > 
+> > > > > > Acked-by: Eric Anholt <eric@anholt.net>
+> > > > > > 
+> > > > > > One it lands I'll pull the defconfig and DT bits.
+> > > > > Ping on this question to thermal maintainers.??I'd still love
+> > > > > to
+> > > > > see
+> > > > > this driver land.
+> > > > hmmm, how is this driver supposed to work?
+> > > > With this patch set, I think the only benefit is that we can
+> > > > get
+> > > > the
+> > > > temperature and trip point information via thermal sysfs
+> > > > interface,
+> > > > but
+> > > > kernel thermal control is a no-op here, right?
+> > > Yeah.??It seems useful to be able to get the information.??Once
+> > > we
+> > > land
+> > > this, I hope someone can add interrupt support so that there are
+> > > actual
+> > > trip points.
+> > sounds reasonable to me.
+> > Another question, why you need a separate directory for a single
+> > file, bcm2835_thermal.c?
+> Lots of other subsystems (clk, sound/soc, ...) are using vendor
+> specific
+> sub directories.
+> In thermal there are already subdirectories for Samsung or st.
+> So this was done in this case as well to support Broadcom immediately
+> following this pattern.
+> 
+> You want a new version to keep it in thermal directly I can create a
+> new version of the patch.
+> 
+If there are more broadcom patches coming, in your plan, it's okay to
+have its own subdirectory. Or else, it's better to create the
+subdirectory when it's actually needed.
 
-> Boris
-> 
-> This change  looks good to me.
-
-Is this an Acked-by or a Reviewed-by? :)
-
-> 
-> 
-> On Wed, Aug 10, 2016 at 10:24 AM, Boris Brezillon
-> <boris.brezillon@free-electrons.com> wrote:
-> > On Wed, 20 Jul 2016 14:53:50 -0700
-> > Ray Jui <ray.jui@broadcom.com> wrote:
-> >  
-> >> This patch adds big endian and ONFI support for various iProc based
-> >> SoCs that use the core brcmstb NAND controller  
-> >
-> > Brian, Kamal, can you review this patch?
-> >  
-> >>
-> >> This patch was originally implemented by Prafulla Kota
-> >> <prafulla.kota@broadcom.com> and fully tested on iProc based NS2 SVK
-> >>
-> >> Signed-off-by: Prafulla Kota <prafulla.kota@broadcom.com>
-> >> Signed-off-by: Ray Jui <ray.jui@broadcom.com>  
-> 
-> Reviewed-by: Kamal Dasu <kdasu.kdev@gmail.com>
-> 
-> >> ---
-> >>  drivers/mtd/nand/brcmnand/brcmnand.c   | 12 ++++++------
-> >>  drivers/mtd/nand/brcmnand/brcmnand.h   | 13 ++++++++-----
-> >>  drivers/mtd/nand/brcmnand/iproc_nand.c | 18 ++++++++++++++----
-> >>  3 files changed, 28 insertions(+), 15 deletions(-)
-> >>
-> >> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
-> >> index b76ad7c..12a1585 100644
-> >> --- a/drivers/mtd/nand/brcmnand/brcmnand.c
-> >> +++ b/drivers/mtd/nand/brcmnand/brcmnand.c
-> >> @@ -1279,7 +1279,7 @@ static void brcmnand_cmdfunc(struct mtd_info *mtd, unsigned command,
-> >>               u32 *flash_cache = (u32 *)ctrl->flash_cache;
-> >>               int i;
-> >>
-> >> -             brcmnand_soc_data_bus_prepare(ctrl->soc);
-> >> +             brcmnand_soc_data_bus_prepare(ctrl->soc, true);
-> >>
-> >>               /*
-> >>                * Must cache the FLASH_CACHE now, since changes in
-> >> @@ -1292,7 +1292,7 @@ static void brcmnand_cmdfunc(struct mtd_info *mtd, unsigned command,
-> >>                        */
-> >>                       flash_cache[i] = be32_to_cpu(brcmnand_read_fc(ctrl, i));
-> >>
-> >> -             brcmnand_soc_data_bus_unprepare(ctrl->soc);
-> >> +             brcmnand_soc_data_bus_unprepare(ctrl->soc, true);
-> >>
-> >>               /* Cleanup from HW quirk: restore SECTOR_SIZE_1K */
-> >>               if (host->hwcfg.sector_size_1k)
-> >> @@ -1508,12 +1508,12 @@ static int brcmnand_read_by_pio(struct mtd_info *mtd, struct nand_chip *chip,
-> >>               brcmnand_waitfunc(mtd, chip);
-> >>
-> >>               if (likely(buf)) {
-> >> -                     brcmnand_soc_data_bus_prepare(ctrl->soc);
-> >> +                     brcmnand_soc_data_bus_prepare(ctrl->soc, false);
-> >>
-> >>                       for (j = 0; j < FC_WORDS; j++, buf++)
-> >>                               *buf = brcmnand_read_fc(ctrl, j);
-> >>
-> >> -                     brcmnand_soc_data_bus_unprepare(ctrl->soc);
-> >> +                     brcmnand_soc_data_bus_unprepare(ctrl->soc, false);
-> >>               }
-> >>
-> >>               if (oob)
-> >> @@ -1678,12 +1678,12 @@ static int brcmnand_write(struct mtd_info *mtd, struct nand_chip *chip,
-> >>               (void)brcmnand_read_reg(ctrl, BRCMNAND_CMD_ADDRESS);
-> >>
-> >>               if (buf) {
-> >> -                     brcmnand_soc_data_bus_prepare(ctrl->soc);
-> >> +                     brcmnand_soc_data_bus_prepare(ctrl->soc, false);
-> >>
-> >>                       for (j = 0; j < FC_WORDS; j++, buf++)
-> >>                               brcmnand_write_fc(ctrl, j, *buf);
-> >>
-> >> -                     brcmnand_soc_data_bus_unprepare(ctrl->soc);
-> >> +                     brcmnand_soc_data_bus_unprepare(ctrl->soc, false);
-> >>               } else if (oob) {
-> >>                       for (j = 0; j < FC_WORDS; j++)
-> >>                               brcmnand_write_fc(ctrl, j, 0xffffffff);
-> >> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.h b/drivers/mtd/nand/brcmnand/brcmnand.h
-> >> index ef5eabb..5c44cd4 100644
-> >> --- a/drivers/mtd/nand/brcmnand/brcmnand.h
-> >> +++ b/drivers/mtd/nand/brcmnand/brcmnand.h
-> >> @@ -23,19 +23,22 @@ struct dev_pm_ops;
-> >>  struct brcmnand_soc {
-> >>       bool (*ctlrdy_ack)(struct brcmnand_soc *soc);
-> >>       void (*ctlrdy_set_enabled)(struct brcmnand_soc *soc, bool en);
-> >> -     void (*prepare_data_bus)(struct brcmnand_soc *soc, bool prepare);
-> >> +     void (*prepare_data_bus)(struct brcmnand_soc *soc, bool prepare,
-> >> +                              bool is_param);
-> >>  };
-> >>
-> >> -static inline void brcmnand_soc_data_bus_prepare(struct brcmnand_soc *soc)
-> >> +static inline void brcmnand_soc_data_bus_prepare(struct brcmnand_soc *soc,
-> >> +                                              bool is_param)
-> >>  {
-> >>       if (soc && soc->prepare_data_bus)
-> >> -             soc->prepare_data_bus(soc, true);
-> >> +             soc->prepare_data_bus(soc, true, is_param);
-> >>  }
-> >>
-> >> -static inline void brcmnand_soc_data_bus_unprepare(struct brcmnand_soc *soc)
-> >> +static inline void brcmnand_soc_data_bus_unprepare(struct brcmnand_soc *soc,
-> >> +                                                bool is_param)
-> >>  {
-> >>       if (soc && soc->prepare_data_bus)
-> >> -             soc->prepare_data_bus(soc, false);
-> >> +             soc->prepare_data_bus(soc, false, is_param);
-> >>  }
-> >>
-> >>  static inline u32 brcmnand_readl(void __iomem *addr)
-> >> diff --git a/drivers/mtd/nand/brcmnand/iproc_nand.c b/drivers/mtd/nand/brcmnand/iproc_nand.c
-> >> index 585596c..4c6ae11 100644
-> >> --- a/drivers/mtd/nand/brcmnand/iproc_nand.c
-> >> +++ b/drivers/mtd/nand/brcmnand/iproc_nand.c
-> >> @@ -74,7 +74,8 @@ static void iproc_nand_intc_set(struct brcmnand_soc *soc, bool en)
-> >>       spin_unlock_irqrestore(&priv->idm_lock, flags);
-> >>  }
-> >>
-> >> -static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare)
-> >> +static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare,
-> >> +                               bool is_param)
-> >>  {
-> >>       struct iproc_nand_soc *priv =
-> >>                       container_of(soc, struct iproc_nand_soc, soc);
-> >> @@ -86,10 +87,19 @@ static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare)
-> >>
-> >>       val = brcmnand_readl(mmio);
-> >>
-> >> -     if (prepare)
-> >> -             val |= IPROC_NAND_APB_LE_MODE;
-> >> -     else
-> >> +     /*
-> >> +      * In the case of BE or when dealing with NAND data, alway configure
-> >> +      * the APB bus to LE mode before accessing the FIFO and back to BE mode
-> >> +      * after the access is done
-> >> +      */
-> >> +     if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN) || !is_param) {
-> >> +             if (prepare)
-> >> +                     val |= IPROC_NAND_APB_LE_MODE;
-> >> +             else
-> >> +                     val &= ~IPROC_NAND_APB_LE_MODE;
-> >> +     } else { /* when in LE accessing the parameter page, keep APB in BE */
-> >>               val &= ~IPROC_NAND_APB_LE_MODE;
-> >> +     }
-> >>
-> >>       brcmnand_writel(val, mmio);
-> >>  
-> >  
-> 
-> ______________________________________________________
-> Linux MTD discussion mailing list
-> http://lists.infradead.org/mailman/listinfo/linux-mtd/
+thanks,
+rui
+> Thanks, Martin
