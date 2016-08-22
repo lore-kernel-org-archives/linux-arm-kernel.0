@@ -1,55 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Aug 2016 14:43:14 +0100
-Subject: [PATCH 1/2] arm64: kernel: Add SMC Session ID to results
-In-Reply-To: <1471672274-19317-2-git-send-email-andy.gross@linaro.org>
-References: <1471672274-19317-1-git-send-email-andy.gross@linaro.org>
- <1471672274-19317-2-git-send-email-andy.gross@linaro.org>
-Message-ID: <20160822134313.GJ14680@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Aug 2016 15:43:23 +0200
+Subject: [PATCH v3 02/12] mailbox: Add Tegra HSP driver
+In-Reply-To: <20160819173233.13260-3-thierry.reding@gmail.com>
+References: <20160819173233.13260-1-thierry.reding@gmail.com>
+ <20160819173233.13260-3-thierry.reding@gmail.com>
+Message-ID: <13954058.6YHDe1jCOJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 20, 2016 at 12:51:13AM -0500, Andy Gross wrote:
-> This patch adds the SMC Session ID to the results passed back from SMC
-> calls.  The Qualcomm SMC implementation provides for interrupted SMC
-> functions.  When this occurs, the SMC call will return a session ID that
-> is required to be used when resuming the interrupted SMC call.
+On Friday, August 19, 2016 7:32:23 PM CEST Thierry Reding wrote:
+> +static int tegra_hsp_doorbell_send_data(struct tegra_hsp_channel *channel,
+> +                                       void *data)
+> +{
+> +       tegra_hsp_channel_writel(channel, 1, HSP_DB_TRIGGER);
+> +
+> +       return 0;
+> +}
 > 
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> ---
->  arch/arm64/kernel/asm-offsets.c | 1 +
->  arch/arm64/kernel/smccc-call.S  | 1 +
->  include/linux/arm-smccc.h       | 4 +++-
->  3 files changed, 5 insertions(+), 1 deletion(-)
 
-[...]
+It seems very odd that you don't write the data at all but just trigger
+the communication here. My interpretation is that you bypass
+the mailbox infrastructure for the actual message, and instead reimplement
+it on top of the mailbox infrastructure as part of the bpmp driver.
 
-> diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-> index b5abfda..82d919f 100644
-> --- a/include/linux/arm-smccc.h
-> +++ b/include/linux/arm-smccc.h
-> @@ -63,18 +63,20 @@
->  /**
->   * struct arm_smccc_res - Result from SMC/HVC call
->   * @a0-a3 result values from registers 0 to 3
-> + * @a6 Session ID register (optional)
->   */
->  struct arm_smccc_res {
->  	unsigned long a0;
->  	unsigned long a1;
->  	unsigned long a2;
->  	unsigned long a3;
-> +	unsigned long a6;
->  };
->  
->  /**
->   * arm_smccc_smc() - make SMC calls
->   * @a0-a7: arguments passed in registers 0 to 7
-> - * @res: result values from registers 0 to 3
-> + * @res: result values from registers 0 to 3 and optional register 6
+Why not expose the bpmp itself as the mailbox here?
 
-AFAICT from reading the SMCCC spec, parameter register 6 is "Unpredictable,
-Scratch registers" in return state, so I don't think this is correct.
-
-What am I missing?
-
-Will
+	Arnd
