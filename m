@@ -1,313 +1,77 @@
 From: hl@rock-chips.com (Lin Huang)
-Date: Mon, 22 Aug 2016 11:36:17 +0800
-Subject: [PATCH v7 1/8] clk: rockchip: add new clock-type for the ddrclk
+Date: Mon, 22 Aug 2016 11:36:21 +0800
+Subject: [PATCH v7 5/8] PM / devfreq: event: support rockchip dfi controller
 In-Reply-To: <1471836984-6316-1-git-send-email-hl@rock-chips.com>
 References: <1471836984-6316-1-git-send-email-hl@rock-chips.com>
-Message-ID: <1471836984-6316-2-git-send-email-hl@rock-chips.com>
+Message-ID: <1471836984-6316-6-git-send-email-hl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On new rockchip platform(rk3399 etc), there have dcf controller to
-do ddr frequency scaling, and this controller will implement in
-arm-trust-firmware. We add a special clock-type to handle that.
+on rk3399 platform, there is dfi conroller can monitor
+ddr load, base on this result, we can do ddr freqency
+scaling.
 
 Signed-off-by: Lin Huang <hl@rock-chips.com>
+Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
 Changes in v7:
-- add rockchip_ddrclk_sip_ops so we can distinguish other ddr clock operate
-- add ROCKCHIP_SIP_CONFIG_* in rockchip_sip.h give constants a specific name
- 
+-access need to *4 to get right DDR loading
+
 Changes in v6:
-- none
+-None
 
 Changes in v5:
-- delete unuse mux_flag
-- use div_flag to distinguish sip call and other operate
+-None
 
 Changes in v4:
-- use arm_smccc_smc() to set/read ddr rate
+-None
 
 Changes in v3:
-- use sip call to set/read ddr rate
+-None
 
 Changes in v2:
-- use GENMASK instead val_mask
-- use divider_recalc_rate() instead DIV_ROUND_UP_ULL
-- cleanup code
+-None 
 
 Changes in v1:
-- none
+-None
 
- drivers/clk/rockchip/Makefile       |   1 +
- drivers/clk/rockchip/clk-ddr.c      | 157 ++++++++++++++++++++++++++++++++++++
- drivers/clk/rockchip/clk.c          |   9 +++
- drivers/clk/rockchip/clk.h          |  35 ++++++++
- include/soc/rockchip/rockchip_sip.h |  27 +++++++
- 5 files changed, 229 insertions(+)
- create mode 100644 drivers/clk/rockchip/clk-ddr.c
- create mode 100644 include/soc/rockchip/rockchip_sip.h
+ drivers/devfreq/event/Kconfig        |   7 +
+ drivers/devfreq/event/Makefile       |   1 +
+ drivers/devfreq/event/rockchip-dfi.c | 256 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 264 insertions(+)
+ create mode 100644 drivers/devfreq/event/rockchip-dfi.c
 
-diff --git a/drivers/clk/rockchip/Makefile b/drivers/clk/rockchip/Makefile
-index f47a2fa..b5f2c8e 100644
---- a/drivers/clk/rockchip/Makefile
-+++ b/drivers/clk/rockchip/Makefile
-@@ -8,6 +8,7 @@ obj-y	+= clk-pll.o
- obj-y	+= clk-cpu.o
- obj-y	+= clk-inverter.o
- obj-y	+= clk-mmc-phase.o
-+obj-y	+= clk-ddr.o
- obj-$(CONFIG_RESET_CONTROLLER)	+= softrst.o
+diff --git a/drivers/devfreq/event/Kconfig b/drivers/devfreq/event/Kconfig
+index eb6f74a..20d82c2 100644
+--- a/drivers/devfreq/event/Kconfig
++++ b/drivers/devfreq/event/Kconfig
+@@ -30,4 +30,11 @@ config DEVFREQ_EVENT_EXYNOS_PPMU
+ 	  (Platform Performance Monitoring Unit) counters to estimate the
+ 	  utilization of each module.
  
- obj-y	+= clk-rk3036.o
-diff --git a/drivers/clk/rockchip/clk-ddr.c b/drivers/clk/rockchip/clk-ddr.c
++config DEVFREQ_EVENT_ROCKCHIP_DFI
++	tristate "ROCKCHIP DFI DEVFREQ event Driver"
++	depends on ARCH_ROCKCHIP
++	help
++	  This add the devfreq-event driver for Rockchip SoC. It provides DFI
++	  (DDR Monitor Module) driver to count ddr load.
++
+ endif # PM_DEVFREQ_EVENT
+diff --git a/drivers/devfreq/event/Makefile b/drivers/devfreq/event/Makefile
+index 3d6afd3..dda7090 100644
+--- a/drivers/devfreq/event/Makefile
++++ b/drivers/devfreq/event/Makefile
+@@ -2,3 +2,4 @@
+ 
+ obj-$(CONFIG_DEVFREQ_EVENT_EXYNOS_NOCP) += exynos-nocp.o
+ obj-$(CONFIG_DEVFREQ_EVENT_EXYNOS_PPMU) += exynos-ppmu.o
++obj-$(CONFIG_DEVFREQ_EVENT_ROCKCHIP_DFI) += rockchip-dfi.o
+diff --git a/drivers/devfreq/event/rockchip-dfi.c b/drivers/devfreq/event/rockchip-dfi.c
 new file mode 100644
-index 0000000..224e07e
+index 0000000..43fcc5a
 --- /dev/null
-+++ b/drivers/clk/rockchip/clk-ddr.c
-@@ -0,0 +1,157 @@
-+/*
-+ * Copyright (c) 2016 Rockchip Electronics Co. Ltd.
-+ * Author: Lin Huang <hl@rock-chips.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/arm-smccc.h>
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/slab.h>
-+#include <soc/rockchip/rockchip_sip.h>
-+
-+#include "clk.h"
-+
-+struct rockchip_ddrclk {
-+	struct clk_hw	hw;
-+	void __iomem	*reg_base;
-+	int		mux_offset;
-+	int		mux_shift;
-+	int		mux_width;
-+	int		div_shift;
-+	int		div_width;
-+	int		ddr_flag;
-+	spinlock_t	*lock;
-+};
-+
-+#define to_rockchip_ddrclk_hw(hw) container_of(hw, struct rockchip_ddrclk, hw)
-+
-+static int rockchip_ddrclk_sip_set_rate(struct clk_hw *hw, unsigned long drate,
-+					unsigned long prate)
-+{
-+	struct rockchip_ddrclk *ddrclk = to_rockchip_ddrclk_hw(hw);
-+	unsigned long flags;
-+	struct arm_smccc_res res;
-+
-+	spin_lock_irqsave(ddrclk->lock, flags);
-+	arm_smccc_smc(ROCKCHIP_SIP_DRAM_FREQ, drate, 0,
-+		      ROCKCHIP_SIP_CONFIG_DRAM_SET_RATE,
-+		      0, 0, 0, 0, &res);
-+	spin_unlock_irqrestore(ddrclk->lock, flags);
-+
-+	return res.a0;
-+}
-+
-+static unsigned long
-+rockchip_ddrclk_sip_recalc_rate(struct clk_hw *hw,
-+				unsigned long parent_rate)
-+{
-+	struct arm_smccc_res res;
-+
-+	arm_smccc_smc(ROCKCHIP_SIP_DRAM_FREQ, 0, 0,
-+		      ROCKCHIP_SIP_CONFIG_DRAM_GET_RATE,
-+		      0, 0, 0, 0, &res);
-+
-+	return res.a0;
-+}
-+
-+static long rockchip_ddrclk_sip_round_rate(struct clk_hw *hw,
-+					   unsigned long rate,
-+					   unsigned long *prate)
-+{
-+	struct arm_smccc_res res;
-+
-+	arm_smccc_smc(ROCKCHIP_SIP_DRAM_FREQ, rate, 0,
-+		      ROCKCHIP_SIP_CONFIG_DRAM_ROUND_RATE,
-+		      0, 0, 0, 0, &res);
-+
-+	return res.a0;
-+}
-+
-+static u8 rockchip_ddrclk_get_parent(struct clk_hw *hw)
-+{
-+	struct rockchip_ddrclk *ddrclk = to_rockchip_ddrclk_hw(hw);
-+	int num_parents = clk_hw_get_num_parents(hw);
-+	u32 val;
-+
-+	val = clk_readl(ddrclk->reg_base +
-+			ddrclk->mux_offset) >> ddrclk->mux_shift;
-+	val &= GENMASK(ddrclk->mux_width - 1, 0);
-+
-+	if (val >= num_parents)
-+		return -EINVAL;
-+
-+	return val;
-+}
-+
-+static const struct clk_ops rockchip_ddrclk_sip_ops = {
-+	.recalc_rate = rockchip_ddrclk_sip_recalc_rate,
-+	.set_rate = rockchip_ddrclk_sip_set_rate,
-+	.round_rate = rockchip_ddrclk_sip_round_rate,
-+	.get_parent = rockchip_ddrclk_get_parent,
-+};
-+
-+struct clk *rockchip_clk_register_ddrclk(const char *name, int flags,
-+					 const char *const *parent_names,
-+					 u8 num_parents, int mux_offset,
-+					 int mux_shift, int mux_width,
-+					 int div_shift, int div_width,
-+					 int ddr_flag, void __iomem *reg_base,
-+					 spinlock_t *lock)
-+{
-+	struct rockchip_ddrclk *ddrclk;
-+	struct clk_init_data init;
-+	struct clk *clk;
-+
-+	ddrclk = kzalloc(sizeof(*ddrclk), GFP_KERNEL);
-+	if (!ddrclk)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init.name = name;
-+	init.parent_names = parent_names;
-+	init.num_parents = num_parents;
-+
-+	init.flags = flags;
-+	init.flags |= CLK_SET_RATE_NO_REPARENT;
-+	init.flags |= CLK_GET_RATE_NOCACHE;
-+
-+	switch (ddr_flag) {
-+	case ROCKCHIP_DDRCLK_SIP:
-+		init.ops = &rockchip_ddrclk_sip_ops;
-+		break;
-+	default:
-+		pr_err("%s: unsupported ddrclk type %d\n", __func__, ddr_flag);
-+		kfree(ddrclk);
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	ddrclk->reg_base = reg_base;
-+	ddrclk->lock = lock;
-+	ddrclk->hw.init = &init;
-+	ddrclk->mux_offset = mux_offset;
-+	ddrclk->mux_shift = mux_shift;
-+	ddrclk->mux_width = mux_width;
-+	ddrclk->div_shift = div_shift;
-+	ddrclk->div_width = div_width;
-+	ddrclk->ddr_flag = ddr_flag;
-+
-+	clk = clk_register(NULL, &ddrclk->hw);
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: could not register ddrclk %s\n", __func__,	name);
-+		kfree(ddrclk);
-+		return NULL;
-+	}
-+
-+	return clk;
-+}
-diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
-index 1f1c74f..99baa5d 100644
---- a/drivers/clk/rockchip/clk.c
-+++ b/drivers/clk/rockchip/clk.c
-@@ -484,6 +484,15 @@ void __init rockchip_clk_register_branches(
- 				list->gate_offset, list->gate_shift,
- 				list->gate_flags, flags, &ctx->lock);
- 			break;
-+		case branch_ddrc:
-+			clk = rockchip_clk_register_ddrclk(
-+				list->name, list->flags,
-+				list->parent_names, list->num_parents,
-+				list->muxdiv_offset, list->mux_shift,
-+				list->mux_width, list->div_shift,
-+				list->div_width, list->div_flags,
-+				ctx->reg_base, &ctx->lock);
-+			break;
- 		}
- 
- 		/* none of the cases above matched */
-diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-index 3747de5..d6c58d0 100644
---- a/drivers/clk/rockchip/clk.h
-+++ b/drivers/clk/rockchip/clk.h
-@@ -281,6 +281,22 @@ struct clk *rockchip_clk_register_mmc(const char *name,
- 				const char *const *parent_names, u8 num_parents,
- 				void __iomem *reg, int shift);
- 
-+/*
-+ * for COMPOSITE_DDRCLK div_flag,
-+ * there may have serval ways to set ddr clock, use
-+ * this flag to distinguish them.
-+ * ROCKCHIP_DDRCLK_SIP: use SIP call to bl31 to change ddrclk rate.
-+ */
-+#define ROCKCHIP_DDRCLK_SIP		0x01
-+
-+struct clk *rockchip_clk_register_ddrclk(const char *name, int flags,
-+					 const char *const *parent_names,
-+					 u8 num_parents, int mux_offset,
-+					 int mux_shift, int mux_width,
-+					 int div_shift, int div_width,
-+					 int ddr_flags, void __iomem *reg_base,
-+					 spinlock_t *lock);
-+
- #define ROCKCHIP_INVERTER_HIWORD_MASK	BIT(0)
- 
- struct clk *rockchip_clk_register_inverter(const char *name,
-@@ -299,6 +315,7 @@ enum rockchip_clk_branch_type {
- 	branch_mmc,
- 	branch_inverter,
- 	branch_factor,
-+	branch_ddrc,
- };
- 
- struct rockchip_clk_branch {
-@@ -488,6 +505,24 @@ struct rockchip_clk_branch {
- 		.child		= ch,				\
- 	}
- 
-+#define COMPOSITE_DDRCLK(_id, cname, pnames, f, mo, ms, mw,	\
-+			 ds, dw, df)				\
-+	{							\
-+		.id		= _id,				\
-+		.branch_type	= branch_ddrc,			\
-+		.name		= cname,			\
-+		.parent_names	= pnames,			\
-+		.num_parents	= ARRAY_SIZE(pnames),		\
-+		.flags		= f,				\
-+		.muxdiv_offset  = mo,                           \
-+		.mux_shift      = ms,                           \
-+		.mux_width      = mw,                           \
-+		.div_shift      = ds,                           \
-+		.div_width      = dw,                           \
-+		.div_flags	= df,				\
-+		.gate_offset    = -1,                           \
-+	}
-+
- #define MUX(_id, cname, pnames, f, o, s, w, mf)			\
- 	{							\
- 		.id		= _id,				\
-diff --git a/include/soc/rockchip/rockchip_sip.h b/include/soc/rockchip/rockchip_sip.h
-new file mode 100644
-index 0000000..7e28092
---- /dev/null
-+++ b/include/soc/rockchip/rockchip_sip.h
-@@ -0,0 +1,27 @@
++++ b/drivers/devfreq/event/rockchip-dfi.c
+@@ -0,0 +1,256 @@
 +/*
 + * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
 + * Author: Lin Huang <hl@rock-chips.com>
@@ -321,19 +85,248 @@ index 0000000..7e28092
 + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
 + * more details.
 + */
-+#ifndef __SOC_ROCKCHIP_SIP_H
-+#define __SOC_ROCKCHIP_SIP_H
 +
-+#define ROCKCHIP_SIP_DRAM_FREQ			0x82000008
-+#define ROCKCHIP_SIP_CONFIG_DRAM_INIT		0x00
-+#define ROCKCHIP_SIP_CONFIG_DRAM_SET_RATE	0x01
-+#define ROCKCHIP_SIP_CONFIG_DRAM_ROUND_RATE	0x02
-+#define ROCKCHIP_SIP_CONFIG_DRAM_SET_AT_SR	0x03
-+#define ROCKCHIP_SIP_CONFIG_DRAM_GET_BW		0x04
-+#define ROCKCHIP_SIP_CONFIG_DRAM_GET_RATE	0x05
-+#define ROCKCHIP_SIP_CONFIG_DRAM_CLR_IRQ	0x06
-+#define ROCKCHIP_SIP_CONFIG_DRAM_SET_PARAM	0x07
++#include <linux/clk.h>
++#include <linux/devfreq-event.h>
++#include <linux/kernel.h>
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/slab.h>
++#include <linux/list.h>
++#include <linux/of.h>
 +
-+#endif
++#define RK3399_DMC_NUM_CH	2
++
++/* DDRMON_CTRL */
++#define DDRMON_CTRL	0x04
++#define CLR_DDRMON_CTRL	(0x1f0000 << 0)
++#define LPDDR4_EN	(0x10001 << 4)
++#define HARDWARE_EN	(0x10001 << 3)
++#define LPDDR3_EN	(0x10001 << 2)
++#define SOFTWARE_EN	(0x10001 << 1)
++#define SOFTWARE_DIS	(0x10000 << 1)
++#define TIME_CNT_EN	(0x10001 << 0)
++
++#define DDRMON_CH0_COUNT_NUM		0x28
++#define DDRMON_CH0_DFI_ACCESS_NUM	0x2c
++#define DDRMON_CH1_COUNT_NUM		0x3c
++#define DDRMON_CH1_DFI_ACCESS_NUM	0x40
++
++/* pmu grf */
++#define PMUGRF_OS_REG2	0x308
++#define DDRTYPE_SHIFT	13
++#define DDRTYPE_MASK	7
++
++enum {
++	DDR3 = 3,
++	LPDDR3 = 6,
++	LPDDR4 = 7,
++	UNUSED = 0xFF
++};
++
++struct dmc_usage {
++	u32 access;
++	u32 total;
++};
++
++/*
++ * The dfi controller can monitor DDR load. It has an upper and lower threshold
++ * for the operating points. Whenever the usage leaves these bounds an event is
++ * generated to indicate the DDR frequency should be changed.
++ */
++struct rockchip_dfi {
++	struct devfreq_event_dev *edev;
++	struct devfreq_event_desc *desc;
++	struct dmc_usage ch_usage[RK3399_DMC_NUM_CH];
++	struct device *dev;
++	void __iomem *regs;
++	struct regmap *regmap_pmu;
++	struct clk *clk;
++};
++
++static void rockchip_dfi_start_hardware_counter(struct devfreq_event_dev *edev)
++{
++	struct rockchip_dfi *info = devfreq_event_get_drvdata(edev);
++	void __iomem *dfi_regs = info->regs;
++	u32 val;
++	u32 ddr_type;
++
++	/* get ddr type */
++	regmap_read(info->regmap_pmu, PMUGRF_OS_REG2, &val);
++	ddr_type = (val >> DDRTYPE_SHIFT) & DDRTYPE_MASK;
++
++	/* clear DDRMON_CTRL setting */
++	writel_relaxed(CLR_DDRMON_CTRL, dfi_regs + DDRMON_CTRL);
++
++	/* set ddr type to dfi */
++	if (ddr_type == LPDDR3)
++		writel_relaxed(LPDDR3_EN, dfi_regs + DDRMON_CTRL);
++	else if (ddr_type == LPDDR4)
++		writel_relaxed(LPDDR4_EN, dfi_regs + DDRMON_CTRL);
++
++	/* enable count, use software mode */
++	writel_relaxed(SOFTWARE_EN, dfi_regs + DDRMON_CTRL);
++}
++
++static void rockchip_dfi_stop_hardware_counter(struct devfreq_event_dev *edev)
++{
++	struct rockchip_dfi *info = devfreq_event_get_drvdata(edev);
++	void __iomem *dfi_regs = info->regs;
++
++	writel_relaxed(SOFTWARE_DIS, dfi_regs + DDRMON_CTRL);
++}
++
++static int rockchip_dfi_get_busier_ch(struct devfreq_event_dev *edev)
++{
++	struct rockchip_dfi *info = devfreq_event_get_drvdata(edev);
++	u32 tmp, max = 0;
++	u32 i, busier_ch = 0;
++	void __iomem *dfi_regs = info->regs;
++
++	rockchip_dfi_stop_hardware_counter(edev);
++
++	/* Find out which channel is busier */
++	for (i = 0; i < RK3399_DMC_NUM_CH; i++) {
++		info->ch_usage[i].access = readl_relaxed(dfi_regs +
++				DDRMON_CH0_DFI_ACCESS_NUM + i * 20) * 4;
++		info->ch_usage[i].total = readl_relaxed(dfi_regs +
++				DDRMON_CH0_COUNT_NUM + i * 20);
++		tmp = info->ch_usage[i].access;
++		if (tmp > max) {
++			busier_ch = i;
++			max = tmp;
++		}
++	}
++	rockchip_dfi_start_hardware_counter(edev);
++
++	return busier_ch;
++}
++
++static int rockchip_dfi_disable(struct devfreq_event_dev *edev)
++{
++	struct rockchip_dfi *info = devfreq_event_get_drvdata(edev);
++
++	rockchip_dfi_stop_hardware_counter(edev);
++	clk_disable_unprepare(info->clk);
++
++	return 0;
++}
++
++static int rockchip_dfi_enable(struct devfreq_event_dev *edev)
++{
++	struct rockchip_dfi *info = devfreq_event_get_drvdata(edev);
++	int ret;
++
++	ret = clk_prepare_enable(info->clk);
++	if (ret) {
++		dev_err(&edev->dev, "failed to enable dfi clk: %d\n", ret);
++		return ret;
++	}
++
++	rockchip_dfi_start_hardware_counter(edev);
++	return 0;
++}
++
++static int rockchip_dfi_set_event(struct devfreq_event_dev *edev)
++{
++	return 0;
++}
++
++static int rockchip_dfi_get_event(struct devfreq_event_dev *edev,
++				  struct devfreq_event_data *edata)
++{
++	struct rockchip_dfi *info = devfreq_event_get_drvdata(edev);
++	int busier_ch;
++
++	busier_ch = rockchip_dfi_get_busier_ch(edev);
++
++	edata->load_count = info->ch_usage[busier_ch].access;
++	edata->total_count = info->ch_usage[busier_ch].total;
++
++	return 0;
++}
++
++static const struct devfreq_event_ops rockchip_dfi_ops = {
++	.disable = rockchip_dfi_disable,
++	.enable = rockchip_dfi_enable,
++	.get_event = rockchip_dfi_get_event,
++	.set_event = rockchip_dfi_set_event,
++};
++
++static const struct of_device_id rockchip_dfi_id_match[] = {
++	{ .compatible = "rockchip,rk3399-dfi" },
++	{ },
++};
++
++static int rockchip_dfi_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct rockchip_dfi *data;
++	struct resource *res;
++	struct devfreq_event_desc *desc;
++	struct device_node *np = pdev->dev.of_node, *node;
++
++	data = devm_kzalloc(dev, sizeof(struct rockchip_dfi), GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	data->regs = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(data->regs))
++		return PTR_ERR(data->regs);
++
++	data->clk = devm_clk_get(dev, "pclk_ddr_mon");
++	if (IS_ERR(data->clk)) {
++		dev_err(dev, "Cannot get the clk dmc_clk\n");
++		return PTR_ERR(data->clk);
++	};
++
++	/* try to find the optional reference to the pmu syscon */
++	node = of_parse_phandle(np, "rockchip,pmu", 0);
++	if (node) {
++		data->regmap_pmu = syscon_node_to_regmap(node);
++		if (IS_ERR(data->regmap_pmu))
++			return PTR_ERR(data->regmap_pmu);
++	}
++	data->dev = dev;
++
++	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
++	if (!desc)
++		return -ENOMEM;
++
++	desc->ops = &rockchip_dfi_ops;
++	desc->driver_data = data;
++	desc->name = np->name;
++	data->desc = desc;
++
++	data->edev = devm_devfreq_event_add_edev(&pdev->dev, desc);
++	if (IS_ERR(data->edev)) {
++		dev_err(&pdev->dev,
++			"failed to add devfreq-event device\n");
++		return PTR_ERR(data->edev);
++	}
++
++	platform_set_drvdata(pdev, data);
++
++	return 0;
++}
++
++static struct platform_driver rockchip_dfi_driver = {
++	.probe	= rockchip_dfi_probe,
++	.driver = {
++		.name	= "rockchip-dfi",
++		.of_match_table = rockchip_dfi_id_match,
++	},
++};
++module_platform_driver(rockchip_dfi_driver);
++
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("Lin Huang <hl@rock-chips.com>");
++MODULE_DESCRIPTION("Rockchip DFI driver");
 -- 
 2.6.6
