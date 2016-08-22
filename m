@@ -1,76 +1,48 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Mon, 22 Aug 2016 15:29:07 +0800
-Subject: [PATCH] usb: chipidea: support generic phy in PM code path
-In-Reply-To: <20160822143921.36b6f95a@xhacker>
-References: <20160819121013.760-1-jszhang@marvell.com>
- <20160822053308.GA4362@shlinux2> <20160822143921.36b6f95a@xhacker>
-Message-ID: <20160822072907.GD4362@shlinux2>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 22 Aug 2016 09:41:11 +0200
+Subject: [PATCH] ARM: dts: blanche: add DU support
+In-Reply-To: <1783132.r9t2y3QUUq@wasted.cogentembedded.com>
+References: <5383928.8UnDsUpmkz@wasted.cogentembedded.com>
+ <1783132.r9t2y3QUUq@wasted.cogentembedded.com>
+Message-ID: <20160822074111.GE28034@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2016 at 02:39:21PM +0800, Jisheng Zhang wrote:
-> Hi Peter,
-> 
-> On Mon, 22 Aug 2016 13:33:08 +0800 Peter Chen wrote:
-> 
-> > On Fri, Aug 19, 2016 at 08:10:13PM +0800, Jisheng Zhang wrote:
-> > > Support generic phy in PM code path: call phy_power_off/phy_power_on
-> > > in ci_controller_suspend/ci_controller_resume.
-> > > 
-> > > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > > ---
-> > >  drivers/usb/chipidea/core.c | 4 +++-
-> > >  1 file changed, 3 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> > > index ae12595..ef9fb0b 100644
-> > > --- a/drivers/usb/chipidea/core.c
-> > > +++ b/drivers/usb/chipidea/core.c
-> > > @@ -1116,6 +1116,7 @@ static void ci_controller_suspend(struct ci_hdrc *ci)
-> > >  		usleep_range(ci->platdata->phy_clkgate_delay_us,
-> > >  			     ci->platdata->phy_clkgate_delay_us + 50);
-> > >  	usb_phy_set_suspend(ci->usb_phy, 1);
-> > > +	phy_power_off(ci->phy);  
-> > 
-> > How could you support USB wakeup after PHY is powered off?
-> 
-> Per my understanding, the PHY's power off just power off data communication part
-> but leaves the circuits involved in wakeup detection active.
-> 
+Hi Sergei,
 
-Ok, I hope so.
-
-Peter
+On Fri, Aug 19, 2016 at 11:42:54PM +0300, Sergei Shtylyov wrote:
+> Define  the  Blanche board dependent part of the DU device node.
+> Add the device nodes for the  Analog Devices ADV7511W  HDMI transmitter
+> (connected to DU0) and ADV7123 video DAC (connected to DU1).  Add the
+> necessary subnodes to interconnect DU, HDMI/VDAC devices, and HDMI/VGA
+> connectors.
 > 
-> > 
-> > Peter
-> > 
-> > >  	ci->in_lpm = true;
-> > >  	enable_irq(ci->irq);
-> > >  }
-> > > @@ -1132,9 +1133,10 @@ static int ci_controller_resume(struct device *dev)
-> > >  	}
-> > >  
-> > >  	ci_hdrc_enter_lpm(ci, false);
-> > > -	if (ci->usb_phy) {
-> > > +	if (ci->usb_phy || ci->phy) {
-> > >  		usb_phy_set_suspend(ci->usb_phy, 0);
-> > >  		usb_phy_set_wakeup(ci->usb_phy, false);
-> > > +		phy_power_on(ci->phy);
-> > >  		hw_wait_phy_stable();
-> > >  	}
-> > >  
-> > > -- 
-> > > 2.9.3
-> > > 
-> > > --
-> > > To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> > > the body of a message to majordomo at vger.kernel.org
-> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html  
-> > 
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
+> ---
+> This patch is against the 'renesas-devel-20160817-v4.8-rc2' of Simon Horman's
+> 'renesas.git' repo plus the general purpose switches patch and the SDHI0 patch
+> posted earlier.
+> 
+>  arch/arm/boot/dts/r8a7792-blanche.dts |  125 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 125 insertions(+)
+> 
+> Index: renesas/arch/arm/boot/dts/r8a7792-blanche.dts
+> ===================================================================
+> --- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
+> +++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
 
--- 
+...
 
-Best Regards,
-Peter Chen
+> @@ -186,3 +251,63 @@
+>  	cd-gpios = <&gpio11 11 GPIO_ACTIVE_LOW>;
+>  	status = "okay";
+>  };
+> +
+> +&i2c1 {
+> +	status = "okay";
+> +	clock-frequency = <400000>;
+
+Is it intentional that there are no pinctrl properties here?
+
+...
