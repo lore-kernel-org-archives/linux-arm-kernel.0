@@ -1,65 +1,141 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Mon, 22 Aug 2016 13:48:04 +0800
-Subject: [arm-platforms:kvm-arm64/idmap-fixes 1/1]
- arch/arm/kvm/mmu.c:1718:22: warning: comparison between pointer and integer
-Message-ID: <201608221301.BMwHRZjX%fengguang.wu@intel.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 22 Aug 2016 11:34:09 +0530
+Subject: [PATCH 1/3] dt/bindings: arm-pl330: add description of
+ arm,pl330-periph-burst
+In-Reply-To: <d4574737-f7b7-2726-373c-31cc81274a32@rock-chips.com>
+References: <1470365602-32586-1-git-send-email-shawn.lin@rock-chips.com>
+ <1470365602-32586-2-git-send-email-shawn.lin@rock-chips.com>
+ <20160805033410.GJ9681@localhost>
+ <ea3572fa-4bff-87db-d5ad-f406809f8296@rock-chips.com>
+ <0df0ab4f-0032-6487-2c30-b1ccd7d9ae62@metafoo.de>
+ <1d42542f-c43c-5c4b-01b7-ba0ca085004a@rock-chips.com>
+ <55e596a0-4176-4277-40cc-1d26763a8be0@rock-chips.com>
+ <20160819024540.GQ9681@localhost>
+ <d4574737-f7b7-2726-373c-31cc81274a32@rock-chips.com>
+Message-ID: <20160822060409.GG2890@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/idmap-fixes
-head:   ac31b33e179d429278fe12020d3b0c4659457985
-commit: ac31b33e179d429278fe12020d3b0c4659457985 [1/1] arm: KVM: Fix idmap overlap detection when the kernel is idmap'ed
-config: arm-axm55xx_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout ac31b33e179d429278fe12020d3b0c4659457985
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On Sun, Aug 21, 2016 at 09:00:58AM +0800, Shawn Lin wrote:
+> Hi Vinod,
+> 
+> ? 2016/8/19 10:45, Vinod Koul ??:
+> >On Wed, Aug 17, 2016 at 04:11:03PM +0800, Shawn Lin wrote:
+> >>Hi, Vinod and Lars-Peter
+> >>
+> >>Ping.. Any better idea to share :)
+> >>
+> >>On 2016/8/9 17:12, Shawn Lin wrote:
+> >>>Hi Lars-Peter,
+> >>>
+> >>>? 2016/8/9 16:39, Lars-Peter Clausen ??:
+> >>>>On 08/05/2016 09:25 AM, Shawn Lin wrote:
+> >>>>>Hi Vinod,
+> >>>>>
+> >>>>>? 2016/8/5 11:34, Vinod Koul ??:
+> >>>>>>On Fri, Aug 05, 2016 at 10:53:20AM +0800, Shawn Lin wrote:
+> >>>>>>>This patch adds the "arm,pl330-periph-burst" for arm-pl330 to
+> >>>>>>>support busrt mode.
+> >>>>>>
+> >>>>>>why should this be DT property. Only reason I can think of if some hw
+> >>>>>>versions support this and some won't.
+> >>>>>
+> >>>>>yes, if we want to support burst mode, both of the master(pl330) and
+> >>>>>client(several peripherals) should implement it, otherwise it will
+> >>>>>be broken when enabling.
+> >>>>
+> >>>>As you said, it is up to the consumer peripheral whether it supports
+> >>>>BURST,
+> >>>>SINGLE or both. So this is a per client property, but you specify this
+> >>>>as a
+> >>>>a global property on the producer side.
+> >>>
+> >>>Thanks for comment.
+> >>>
+> >>>yup, but what is the proper way to add it ? :)
+> >>>
+> >>>
+> >>>a) If pl330 support BURST as well as all the peripherals, we could
+> >>>enable it.
+> >>>
+> >>>b) If pl300 support BURST, but all the peripherals don't support it,
+> >>>we could not enable it.
+> >>>
+> >>>c) If pl300 support BURST, but not all the peripherals support it,
+> >>>we also could not enable it.
+> >>>
+> >>>the burst feature of peripheral IP may be vendor-specific, but the
+> >>>common driver for this peripheral are used for many many vendors which
+> >>>means we could not check all of this info. It's very likely to break
+> >>>them... I couldn't figure out how many upstreamed peripheral drivers
+> >>>who are using pl300 either.
+> >>>
+> >>>So this check should be done by all this vendors but we could make
+> >>>sure we don't break them before they check a), b), c), right?
+> >
+> >Since support for BURST needs to be from peripheral too, we should have
+> >that as a property for peripheral not for controller.
+> >
+> >The peripheral drivers can communicate the burst to be used to pl330
+> >using src_maxburst/dst_maxburst in dma_slave_config. We can use this
+> >value to indicate the DMA should be single (a value of 0) or burst with
+> >"burst" value.
+> 
+> Thanks for sharing this.
+> 
+> But this is really a difficult trade-off decision to add this new
+> property for pl330 only.
+> 
+> Burst mode was supported by Boojin Kim's patch by default(commit
+> 848e9776fee42 ("dmaengine: pl330: support burst mode for dev-to-mem and
+> mem-to-dev transmit")).  But we found it will break SoCFPGA or
+> Exynos4412 reported by Dinh Nguyen and Bartlomiej Zolnierkiewicz[0].
+> So finally Caesar Wang contributed a patch, commit 0a18f9b268 ("
+> dmaengine: pl330: fix to support the burst mode") to fix it, but what
+> it actually did is to use single burst for any case, namely some kind
+> of regression for Boojin Kim's improvement.
+> 
+> So we can see these drivers which was broken by enabling burst mode
+> had already set src_maxburst/dst_maxburst. It looks to me so unfortunate
+> that the driver like 8250_dw.c was using so widely that we couldn't
+> set scr/dst_maxburst as this is really vendor specific for whether it
+> supports burst for 8250_dw or not..
+> 
+> So it is quite painful that we probably will get dozens of regression
+> reports when enabling burst mode by default. But without this, we have
+> been suffering from low performance quite a long time due to this
+> roadblock.
 
-All warnings (new ones prefixed by >>):
+well in that case I would suggest fixing client first. Make all users of
+pl330 not to use burst mode and then enable them one by one after testing
 
-   arch/arm/kvm/mmu.c: In function 'kvm_mmu_init':
->> arch/arm/kvm/mmu.c:1718:22: warning: comparison between pointer and integer
-         hyp_idmap_start != __hyp_idmap_text_start) {
-                         ^
+> 
+> Two possible paths to land this patch are:
+> (1) Keep this property for pl330 only, so we have no chance to
+> break others and we could make the platforms enjoy it if adding this
+> property for their own dts.
+> 
+> (2) Figuer out all the broken platfroms if enabling burst and fix them
+> one by one for the src/dst_maxburst(maybe by enabling burst mode and
+> get regression reports). If we could not solve any one of them, then we
+> have to give up all the effort we do, and let this pain keep on
+> stalling people's expectation of better performance.
+> 
+> 
+> I would appreciate it if you could share your thought more, as I
+> really want more platforms benefit from it(at least don't break
+> them)  :)
+> 
+> 
+> [0] http://www.gossamer-threads.com/lists/linux/kernel/2374171
+> 
+> >
+> 
+> 
+> -- 
+> Best Regards
+> Shawn Lin
+> 
 
-vim +1718 arch/arm/kvm/mmu.c
-
-  1702		hyp_idmap_start = kvm_virt_to_phys(__hyp_idmap_text_start);
-  1703		hyp_idmap_end = kvm_virt_to_phys(__hyp_idmap_text_end);
-  1704		hyp_idmap_vector = kvm_virt_to_phys(__kvm_hyp_init);
-  1705	
-  1706		/*
-  1707		 * We rely on the linker script to ensure at build time that the HYP
-  1708		 * init code does not cross a page boundary.
-  1709		 */
-  1710		BUG_ON((hyp_idmap_start ^ (hyp_idmap_end - 1)) & PAGE_MASK);
-  1711	
-  1712		kvm_info("IDMAP page: %lx\n", hyp_idmap_start);
-  1713		kvm_info("HYP VA range: %lx:%lx\n",
-  1714			 kern_hyp_va(PAGE_OFFSET), kern_hyp_va(~0UL));
-  1715	
-  1716		if (hyp_idmap_start >= kern_hyp_va(PAGE_OFFSET) &&
-  1717		    hyp_idmap_start <  kern_hyp_va(~0UL) &&
-> 1718		    hyp_idmap_start != __hyp_idmap_text_start) {
-  1719			/*
-  1720			 * The idmap page is intersecting with the VA space,
-  1721			 * it is not safe to continue further.
-  1722			 */
-  1723			kvm_err("IDMAP intersecting with HYP VA, unable to continue\n");
-  1724			err = -EINVAL;
-  1725			goto out;
-  1726		}
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 19201 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160822/32c39f57/attachment-0001.obj>
+-- 
+~Vinod
