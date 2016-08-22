@@ -1,138 +1,165 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Sun, 21 Aug 2016 21:23:17 -0700
-Subject: [v13 PATCH 4/5] Documentation: bindings: add dt documentation for cdn
- DP controller
+Date: Sun, 21 Aug 2016 21:23:14 -0700
+Subject: [v13 PATCH 1/5] Documentation: bindings: add dt doc for Rockchip USB
+ Type-C PHY
 In-Reply-To: <1471839798-14729-1-git-send-email-zyw@rock-chips.com>
 References: <1471839798-14729-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1471839798-14729-5-git-send-email-zyw@rock-chips.com>
+Message-ID: <1471839798-14729-2-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a binding that describes the cdn DP controller for
-rk3399.
+This patch adds a binding that describes the Rockchip USB Type-C PHY
+for rk3399
 
 Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+Reviewed-by: Tomasz Figa <tfiga@chromium.org>
+Reviewed-by: Kever Yang <kever.yang@rock-chips.com>
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 Acked-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Guenter Roeck <groeck@chromium.org>
 
 ---
 
-Changes in v13:
-- add dptx and apb reset
-
+Changes in v13: None
 Changes in v12: None
 Changes in v11:
-- refer dp phy
+- make a clearer emarcation between usb phy and dp phy
 
 Changes in v10:
-- add pclk_vio_grf clock
+- remove rockchip,uphy-dp-sel property
 
 Changes in v9:
-- modify the reference phy = <&tcphy0 0>, <&tcphy1 0>;
+- change #phy-cells to 1
 
 Changes in v8: None
 Changes in v7: None
 Changes in v6:
 - add assigned-clocks and assigned-clock-rates
-- add power-domains
 
 Changes in v5: None
 Changes in v4:
-- add a reset node
-- support 2 phys
+- add a #phy-cells node
 
 Changes in v3:
-- add SoC specific compatible string
-- remove reg = <1>;
+- use compatible: rockchip,rk3399-typec-phy
+- use dashes instead of underscores.
 
-Changes in v2: None
+Changes in v2:
+- add some registers description
+
 Changes in v1:
 - add extcon node description
-- add #sound-dai-cells description
+- move the registers in phy driver
+- remove the suffix of reset
 
- .../bindings/display/rockchip/cdn-dp-rockchip.txt  | 75 ++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
+ .../devicetree/bindings/phy/phy-rockchip-typec.txt | 101 +++++++++++++++++++++
+ 1 file changed, 101 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
 
-diff --git a/Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
+diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
 new file mode 100644
-index 0000000..9bd2c13
+index 0000000..6ea867e
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
-@@ -0,0 +1,75 @@
-+Rockchip RK3399 specific extensions to the cdn Display Port
-+================================
++++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+@@ -0,0 +1,101 @@
++* ROCKCHIP type-c PHY
++---------------------
 +
 +Required properties:
-+- compatible: must be "rockchip,rk3399-cdn-dp"
++ - compatible : must be "rockchip,rk3399-typec-phy"
++ - reg: Address and length of the usb phy control register set
++ - rockchip,grf : phandle to the syscon managing the "general
++   register files"
++ - clocks : phandle + clock specifier for the phy clocks
++ - clock-names : string, clock name, must be "tcpdcore", "tcpdphy-ref";
++ - assigned-clocks: main clock, should be <&cru SCLK_UPHY0_TCPDCORE> or
++		    <&cru SCLK_UPHY1_TCPDCORE>;
++ - assigned-clock-rates : the phy core clk frequency, shall be: 50000000
++ - resets : a list of phandle + reset specifier pairs
++ - reset-names : string reset name, must be:
++		 "uphy", "uphy-pipe", "uphy-tcphy"
++ - extcon : extcon specifier for the Power Delivery
 +
-+- reg: physical base address of the controller and length
++Note, there are 2 type-c phys for RK3399, and they are almost identical, except
++these registers(description below), every register node contains 3 sections:
++offset, enable bit, write mask bit.
++ - rockchip,typec-conn-dir : the register of type-c connector direction,
++   for type-c phy0, it must be <0xe580 0 16>;
++   for type-c phy1, it must be <0xe58c 0 16>;
++ - rockchip,usb3tousb2-en : the register of type-c force usb3 to usb2 enable
++   control.
++   for type-c phy0, it must be <0xe580 3 19>;
++   for type-c phy1, it must be <0xe58c 3 19>;
++ - rockchip,external-psm : the register of type-c phy external psm clock
++   selection.
++   for type-c phy0, it must be <0xe588 14 30>;
++   for type-c phy1, it must be <0xe594 14 30>;
++ - rockchip,pipe-status : the register of type-c phy pipe status.
++   for type-c phy0, it must be <0xe5c0 0 0>;
++   for type-c phy1, it must be <0xe5c0 16 16>;
 +
-+- clocks: from common clock binding: handle to dp clock.
++Required nodes : a sub-node is required for each port the phy provides.
++		 The sub-node name is used to identify dp or usb3 port,
++		 and shall be the following entries:
++	* "dp-port" : the name of DP port.
++	* "usb3-port" : the name of USB3 port.
 +
-+- clock-names: from common clock binding:
-+	       Required elements: "core-clk" "pclk" "spdif" "grf"
-+
-+- resets : a list of phandle + reset specifier pairs
-+- reset-names : string reset name, must be:
-+		"spdif", "dptx", "apb".
-+- power-domains : power-domain property defined with a phandle
-+		  to respective power domain.
-+- assigned-clocks: main clock, should be <&cru SCLK_DP_CORE>
-+- assigned-clock-rates : the DP core clk frequency, shall be: 100000000
-+
-+- rockchip,grf: this soc should set GRF regs, so need get grf here.
-+
-+- ports: contain a port nodes with endpoint definitions as defined in
-+	 Documentation/devicetree/bindings/media/video-interfaces.txt.
-+	 contained 2 endpoints, connecting to the output of vop.
-+
-+- phys: from general PHY binding: the phandle for the PHY device.
-+
-+- extcon: extcon specifier for the Power Delivery
-+
-+- #sound-dai-cells = it must be 1 if your system is using 2 DAIs: I2S, SPDIF
-+
-+-------------------------------------------------------------------------------
++Required properties (port (child) node):
++- #phy-cells : must be 0, See ./phy-bindings.txt for details.
 +
 +Example:
-+	cdn_dp: dp at fec00000 {
-+		compatible = "rockchip,rk3399-cdn-dp";
-+		reg = <0x0 0xfec00000 0x0 0x100000>;
-+		interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_DP_CORE>, <&cru PCLK_DP_CTRL>,
-+			 <&cru SCLK_SPDIF_REC_DPTX>, <&cru PCLK_VIO_GRF>;
-+		clock-names = "core-clk", "pclk", "spdif", "grf";
-+		assigned-clocks = <&cru SCLK_DP_CORE>;
-+		assigned-clock-rates = <100000000>;
-+		power-domains = <&power RK3399_PD_HDCP>;
-+		phys = <&tcphy0_dp>, <&tcphy1_dp>;
-+		resets = <&cru SRST_DPTX_SPDIF_REC>, <&cru SRST_P_UPHY0_DPTX>,
-+			 <&cru SRST_P_UPHY0_APB>;
-+		reset-names = "spdif", "dptx", "apb";
-+		extcon = <&fusb0>, <&fusb1>;
++	tcphy0: phy at ff7c0000 {
++		compatible = "rockchip,rk3399-typec-phy";
++		reg = <0x0 0xff7c0000 0x0 0x40000>;
 +		rockchip,grf = <&grf>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		#sound-dai-cells = <1>;
++		extcon = <&fusb0>;
++		clocks = <&cru SCLK_UPHY0_TCPDCORE>,
++			 <&cru SCLK_UPHY0_TCPDPHY_REF>;
++		clock-names = "tcpdcore", "tcpdphy-ref";
++		assigned-clocks = <&cru SCLK_UPHY0_TCPDCORE>;
++		assigned-clock-rates = <50000000>;
++		resets = <&cru SRST_UPHY0>,
++			 <&cru SRST_UPHY0_PIPE_L00>,
++			 <&cru SRST_P_UPHY0_TCPHY>;
++		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
++		rockchip,typec-conn-dir = <0xe580 0 16>;
++		rockchip,usb3tousb2-en = <0xe580 3 19>;
++		rockchip,external-psm = <0xe588 14 30>;
++		rockchip,pipe-status = <0xe5c0 0 0>;
 +
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++		tcphy0_dp: dp-port {
++			#phy-cells = <0>;
++		};
 +
-+			dp_in: port {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				dp_in_vopb: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&vopb_out_dp>;
-+				};
++		tcphy0_usb3: usb3-port {
++			#phy-cells = <0>;
++		};
++	};
 +
-+				dp_in_vopl: endpoint at 1 {
-+					reg = <1>;
-+					remote-endpoint = <&vopl_out_dp>;
-+				};
-+			};
++	tcphy1: phy at ff800000 {
++		compatible = "rockchip,rk3399-typec-phy";
++		reg = <0x0 0xff800000 0x0 0x40000>;
++		rockchip,grf = <&grf>;
++		extcon = <&fusb1>;
++		clocks = <&cru SCLK_UPHY1_TCPDCORE>,
++			 <&cru SCLK_UPHY1_TCPDPHY_REF>;
++		clock-names = "tcpdcore", "tcpdphy-ref";
++		assigned-clocks = <&cru SCLK_UPHY1_TCPDCORE>;
++		assigned-clock-rates = <50000000>;
++		resets = <&cru SRST_UPHY1>,
++			 <&cru SRST_UPHY1_PIPE_L00>,
++			 <&cru SRST_P_UPHY1_TCPHY>;
++		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
++		rockchip,typec-conn-dir = <0xe58c 0 16>;
++		rockchip,usb3tousb2-en = <0xe58c 3 19>;
++		rockchip,external-psm = <0xe594 14 30>;
++		rockchip,pipe-status = <0xe5c0 16 16>;
++
++		tcphy1_dp: dp-port {
++			#phy-cells = <0>;
++		};
++
++		tcphy1_usb3: usb3-port {
++			#phy-cells = <0>;
 +		};
 +	};
 -- 
