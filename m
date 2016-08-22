@@ -1,44 +1,30 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 22 Aug 2016 18:56:07 +0100
-Subject: [PATCH v5 2/3] arm64: vmlinux.ld: Add mmuoff text and data
- sections
-In-Reply-To: <1471887319-26702-3-git-send-email-james.morse@arm.com>
-References: <1471887319-26702-1-git-send-email-james.morse@arm.com>
- <1471887319-26702-3-git-send-email-james.morse@arm.com>
-Message-ID: <20160822175606.GH26494@e104818-lin.cambridge.arm.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 22 Aug 2016 10:57:13 -0700
+Subject: [PATCH V3 2/5] ARM: dts: bcm283x: Add dtsi for USB host mode
+In-Reply-To: <1471792204-21908-3-git-send-email-stefan.wahren@i2se.com>
+References: <1471792204-21908-1-git-send-email-stefan.wahren@i2se.com>
+ <1471792204-21908-3-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <87fupw4rgm.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2016 at 06:35:18PM +0100, James Morse wrote:
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index 659963d40bb4..97c3f36ce30b 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -120,6 +120,9 @@ SECTIONS
->  			IRQENTRY_TEXT
->  			SOFTIRQENTRY_TEXT
->  			ENTRY_TEXT
-> +			__mmuoff_text_start = .;
-> +			*(.mmuoff.text)
-> +			__mmuoff_text_end = .;
->  			TEXT_TEXT
->  			SCHED_TEXT
->  			LOCK_TEXT
-> @@ -185,6 +188,24 @@ SECTIONS
->  	_data = .;
->  	_sdata = .;
->  	RW_DATA_SECTION(L1_CACHE_BYTES, PAGE_SIZE, THREAD_SIZE)
-> +
-> +	/*
-> +	 * Data written with the MMU off but read with the MMU on requires
-> +	 * cache lines to be invalidated, discarding up to a Cache Writeback
-> +	 * Granule (CWG) of data from the cache. Keep the section that
-> +	 * requires this type of maintenance to be in its own Cache Writeback
-> +	 * Granule (CWG) area so the cache maintenance operations don't
-> +	 * don't interfere with adjacent data.
-> +	 */
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-Nitpick: you have "don't" twice in the comment above.
+> In case dr_mode isn't passed via DT, the dwc2 defaults to OTG mode.
+> But all Raspberry Pi boards here are designed only for host mode.
+> So fix this issue by providing a dtsi file which set the dr_mode
+> to host.
 
--- 
-Catalin
+Can you explain what change this should cause for these boards?  Is it
+just going to drop this message from dmesg:
+
+dwc2 3f980000.usb: Configuration mismatch. dr_mode forced to host
+
+or something else?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160822/7c8ce84d/attachment.sig>
