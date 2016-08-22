@@ -1,113 +1,642 @@
-From: po.liu@nxp.com (Po Liu)
-Date: Mon, 22 Aug 2016 10:09:18 +0000
-Subject: [PATCH v3 2/2] pci/aer: interrupt fixup in the quirk
-In-Reply-To: <20160729224154.GC13632@localhost>
-References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
- <1465892645-32381-1-git-send-email-po.liu@nxp.com>
- <1465892645-32381-2-git-send-email-po.liu@nxp.com>
- <20160729224154.GC13632@localhost>
-Message-ID: <VI1PR0401MB170958461E597D1BC7D280FF92E80@VI1PR0401MB1709.eurprd04.prod.outlook.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 22 Aug 2016 11:11:57 +0100
+Subject: [PATCH v3 11/12] clk: tegra: Add BPMP clock driver
+In-Reply-To: <20160819173233.13260-12-thierry.reding@gmail.com>
+References: <20160819173233.13260-1-thierry.reding@gmail.com>
+ <20160819173233.13260-12-thierry.reding@gmail.com>
+Message-ID: <0d7080bc-9e82-75dd-7169-0a5b7429801e@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
 
-Sorry for late reply.
+On 19/08/16 18:32, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+> 
+> This driver uses the services provided by the BPMP firmware driver to
+> implement a clock driver based on the MRQ_CLK request. This part of the
+> BPMP ABI provides a means to enumerate and control clocks and should
+> allow the driver to work on any chip that supports this ABI.
+> 
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
+>  drivers/clk/tegra/Makefile   |   1 +
+>  drivers/clk/tegra/clk-bpmp.c | 565 +++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 566 insertions(+)
+>  create mode 100644 drivers/clk/tegra/clk-bpmp.c
+> 
+> diff --git a/drivers/clk/tegra/Makefile b/drivers/clk/tegra/Makefile
+> index 33fd0938d79e..130df5685d21 100644
+> --- a/drivers/clk/tegra/Makefile
+> +++ b/drivers/clk/tegra/Makefile
+> @@ -22,3 +22,4 @@ obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= clk-tegra124-dfll-fcpu.o
+>  obj-$(CONFIG_ARCH_TEGRA_132_SOC)	+= clk-tegra124.o
+>  obj-y					+= cvb.o
+>  obj-$(CONFIG_ARCH_TEGRA_210_SOC)	+= clk-tegra210.o
+> +obj-$(CONFIG_ARCH_TEGRA_186_SOC)	+= clk-bpmp.o
+> diff --git a/drivers/clk/tegra/clk-bpmp.c b/drivers/clk/tegra/clk-bpmp.c
+> new file mode 100644
+> index 000000000000..96cd6becf73e
+> --- /dev/null
+> +++ b/drivers/clk/tegra/clk-bpmp.c
+> @@ -0,0 +1,565 @@
+> +#define DEBUG
 
-I checked the updated kernel with Dongdong mentioned ACPI patch which was truly affected my quirk patch uploaded. So I suppose the quirk patch is not qualify to fix the bug.
+Do we want DEBUG by default?
 
-I were keep thinking what your "explicitly checking for a root port device" meaning. Do you mean I should upload again the first version patch which fix it in the portdrv_core.c ? I would upload again if yes. 
+> +#include <linux/clk-provider.h>
+> +#include <linux/device.h>
+> +#include <linux/seq_buf.h>
+> +#include <linux/slab.h>
+> +
+> +#include <soc/tegra/bpmp.h>
+> +#include <soc/tegra/bpmp-abi.h>
+> +
+> +#define TEGRA_BPMP_CLK_HAS_MUX		BIT(0)
+> +#define TEGRA_BPMP_CLK_HAS_SET_RATE	BIT(1)
+> +#define TEGRA_BPMP_CLK_IS_ROOT		BIT(2)
+> +
+> +struct tegra_bpmp_clk_info {
+> +	unsigned int id;
+> +	char name[MRQ_CLK_NAME_MAXLEN];
+> +	unsigned int parents[MRQ_CLK_MAX_PARENTS];
+> +	unsigned int num_parents;
+> +	unsigned long flags;
+> +};
+> +
+> +struct tegra_bpmp_clk {
+> +	struct clk_hw hw;
+> +
+> +	struct tegra_bpmp *bpmp;
+> +	unsigned int id;
+> +
+> +	unsigned int num_parents;
+> +	unsigned int *parents;
+> +};
+> +
+> +static inline struct tegra_bpmp_clk *to_tegra_bpmp_clk(struct clk_hw *hw)
+> +{
+> +	return container_of(hw, struct tegra_bpmp_clk, hw);
+> +}
+> +
+> +struct tegra_bpmp_clk_message {
+> +	unsigned int cmd;
+> +	unsigned int clk;
+> +
+> +	struct {
+> +		const void *data;
+> +		size_t size;
+> +	} tx;
+> +
+> +	struct {
+> +		void *data;
+> +		size_t size;
+> +	} rx;
+> +};
+> +
+> +static int
+> +__tegra_bpmp_clk_transfer_atomic(struct tegra_bpmp *bpmp,
+> +				 struct tegra_bpmp_message *msg)
+> +{
+> +	unsigned long flags;
+> +	int err;
+> +
+> +	local_irq_save(flags);
+> +	err = tegra_bpmp_transfer_atomic(bpmp, msg);
+> +	local_irq_restore(flags);
+> +
+> +	return err;
+> +}
+> +
+> +static int
+> +tegra_bpmp_clk_transfer_atomic(struct tegra_bpmp *bpmp,
+> +			       const struct tegra_bpmp_clk_message *clk)
+> +{
+> +	struct mrq_clk_request request;
+> +	struct tegra_bpmp_message msg;
+> +	void *req = (void *)&request;
+> +
+> +	memset(&request, 0, sizeof(request));
+> +	request.cmd_and_id = (clk->cmd << 24) | clk->clk;
+> +	memcpy(req + 4, clk->tx.data, clk->tx.size);
+> +
+> +	memset(&msg, 0, sizeof(msg));
+> +	msg.mrq = MRQ_CLK;
+> +	msg.tx.data = &request;
+> +	msg.tx.size = sizeof(request);
+> +	msg.rx.data = clk->rx.data;
+> +	msg.rx.size = clk->rx.size;
+> +
+> +	return __tegra_bpmp_clk_transfer_atomic(bpmp, &msg);;
+> +}
+> +
+> +static int tegra_bpmp_clk_transfer(struct tegra_bpmp *bpmp,
+> +				   const struct tegra_bpmp_clk_message *clk)
+> +{
+> +	struct mrq_clk_request request;
+> +	struct tegra_bpmp_message msg;
+> +	void *req = (void *)&request;
+> +	int err;
+> +
+> +	memset(&request, 0, sizeof(request));
+> +	request.cmd_and_id = (clk->cmd << 24) | clk->clk;
+> +	memcpy(req + 4, clk->tx.data, clk->tx.size);
+> +
+> +	memset(&msg, 0, sizeof(msg));
+> +	msg.mrq = MRQ_CLK;
+> +	msg.tx.data = &request;
+> +	msg.tx.size = sizeof(request);
+> +	msg.rx.data = clk->rx.data;
+> +	msg.rx.size = clk->rx.size;
+> +
+> +	err = tegra_bpmp_transfer(bpmp, &msg);
+> +	if (err != -EAGAIN)
+> +		return err;
+> +
+> +	return __tegra_bpmp_clk_transfer_atomic(bpmp, &msg);
+> +}
+> +
+> +static int tegra_bpmp_clk_enable(struct clk_hw *hw)
+> +{
+> +	struct tegra_bpmp_clk *clk = to_tegra_bpmp_clk(hw);
+> +	struct tegra_bpmp_clk_message msg;
+> +	int err;
+> +
+> +	dev_dbg(clk->bpmp->dev, "> %s(hw=%p)\n", __func__, hw);
+> +
+> +	memset(&msg, 0, sizeof(msg));
+> +	msg.cmd = CMD_CLK_ENABLE;
+> +	msg.clk = clk->id;
+> +
+> +	err = tegra_bpmp_clk_transfer(clk->bpmp, &msg);
+> +
+> +	dev_dbg(clk->bpmp->dev, "< %s() = %d\n", __func__, err);
+> +	return err;
+> +}
+> +
+> +static void tegra_bpmp_clk_disable(struct clk_hw *hw)
+> +{
+> +	struct tegra_bpmp_clk *clk = to_tegra_bpmp_clk(hw);
+> +	struct tegra_bpmp_clk_message msg;
+> +	int err;
+> +
+> +	memset(&msg, 0, sizeof(msg));
+> +	msg.cmd = CMD_CLK_DISABLE;
+> +	msg.clk = clk->id;
+> +
+> +	err = tegra_bpmp_clk_transfer(clk->bpmp, &msg);
+> +	if (err < 0)
+> +		dev_err(clk->bpmp->dev, "failed to disable clock %s: %d\n",
+> +			clk_hw_get_name(hw), err);
+> +}
+> +
+> +static int tegra_bpmp_clk_is_enabled(struct clk_hw *hw)
+> +{
+> +	struct tegra_bpmp_clk *clk = to_tegra_bpmp_clk(hw);
+> +	struct cmd_clk_is_enabled_response response;
+> +	struct tegra_bpmp_clk_message msg;
+> +	int err;
+> +
+> +	memset(&msg, 0, sizeof(msg));
+> +	msg.cmd = CMD_CLK_IS_ENABLED;
+> +	msg.clk = clk->id;
+> +	msg.rx.data = &response;
+> +	msg.rx.size = sizeof(response);
+> +
+> +	err = tegra_bpmp_clk_transfer_atomic(clk->bpmp, &msg);
+> +	if (err < 0)
+> +		return err;
+> +
+> +	return response.state;
+> +}
+> +
+> +static u8 tegra_bpmp_clk_get_parent(struct clk_hw *hw)
+> +{
+> +	struct tegra_bpmp_clk *clk = to_tegra_bpmp_clk(hw);
+> +	struct cmd_clk_get_parent_response response;
+> +	struct tegra_bpmp_clk_message msg;
+> +	unsigned int i;
+> +	int err;
+> +
+> +	memset(&msg, 0, sizeof(msg));
+> +	msg.cmd = CMD_CLK_GET_PARENT;
+> +	msg.clk = clk->id;
+> +	msg.rx.data = &response;
+> +	msg.rx.size = sizeof(&response);
+> +
+> +	err = tegra_bpmp_clk_transfer(clk->bpmp, &msg);
+> +	if (err < 0)
+> +		return err;
 
-Thanks!
+tegra_bpmp_clk_transfer returns an int, but this function returns a u8.
 
+> +
+> +	for (i = 0; i < clk->num_parents; i++)
+> +		if (clk->parents[i] == response.parent_id)
+> +			return i;
+> +
+> +	return U8_MAX;
 
-Best regards,
-Liu Po
+Is there any chance the U8_MAX == num_parents? Should we warn here
+somewhere?
 
->  -----Original Message-----
->  From: Bjorn Helgaas [mailto:helgaas at kernel.org]
->  Sent: Saturday, July 30, 2016 6:42 AM
->  To: Po Liu
->  Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Roy Zang; Arnd
->  Bergmann; Marc Zyngier; Stuart Yoder; Yang-Leo Li; Minghuan Lian; Murali
->  Karicheri; Bjorn Helgaas; Shawn Guo; Mingkai Hu
->  Subject: Re: [PATCH v3 2/2] pci/aer: interrupt fixup in the quirk
->  
->  On Tue, Jun 14, 2016 at 04:24:05PM +0800, Po Liu wrote:
->  > On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
->  > When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
->  > maybe there is interrupt line for aer pme etc. Search the interrupt
->  > number in the fdt file. Then fixup the dev->irq with it.
->  >
->  > Signed-off-by: Po Liu <po.liu@nxp.com>
->  
->  I'm not sure where we're at with this.  Dongdong had some issue
->  (possibly with a version of the quirk on a different platform?), and I
->  think the suggestion of explicitly checking for a root port device was a
->  good one.
->  
->  So please update and repost this for next cycle.
->  
->  > ---
->  > changes for V3:
->  > 	- Move to quirk;
->  > 	- Only correct the irq in RC mode;
->  >
->  >  drivers/pci/quirks.c | 29 +++++++++++++++++++++++++++++
->  >  1 file changed, 29 insertions(+)
->  >
->  > diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c index
->  > ee72ebe..8b39cce 100644
->  > --- a/drivers/pci/quirks.c
->  > +++ b/drivers/pci/quirks.c
->  > @@ -25,6 +25,7 @@
->  >  #include <linux/sched.h>
->  >  #include <linux/ktime.h>
->  >  #include <linux/mm.h>
->  > +#include <linux/of_irq.h>
->  >  #include <asm/dma.h>	/* isa_dma_bridge_buggy */
->  >  #include "pci.h"
->  >
->  > @@ -4419,3 +4420,31 @@ static void quirk_intel_qat_vf_cap(struct
->  pci_dev *pdev)
->  >  	}
->  >  }
->  >  DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443,
->  > quirk_intel_qat_vf_cap);
->  > +
->  > +/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
->  > + * but use standalone irq. Read the device tree for the aer
->  > + * interrupt number.
->  > + */
->  > +static void quirk_aer_interrupt(struct pci_dev *dev) {
->  > +	int ret;
->  > +	u8 header_type;
->  > +	struct device_node *np = NULL;
->  > +
->  > +	/* Only for the RC mode device */
->  > +	pci_read_config_byte(dev, PCI_HEADER_TYPE, &header_type);
->  > +	if ((header_type & 0x7F) != PCI_HEADER_TYPE_BRIDGE)
->  > +		return;
->  > +
->  > +	if (dev->bus->dev.of_node)
->  > +		np = dev->bus->dev.of_node;
->  > +
->  > +	if (IS_ENABLED(CONFIG_OF_IRQ) && np) {
->  > +		ret = of_irq_get_byname(np, "aer");
->  > +		if (ret > 0) {
->  > +			dev->no_msi = 1;
->  > +			dev->irq = ret;
->  > +		}
->  > +	}
->  > +}
->  > +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID,
->  > +quirk_aer_interrupt);
->  > --
->  > 2.1.0.27.g96db324
->  >
->  >
->  > _______________________________________________
->  > linux-arm-kernel mailing list
->  > linux-arm-kernel at lists.infradead.org
->  > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +}
+> +
+> +static int tegra_bpmp_clk_set_parent(struct clk_hw *hw, u8 index)
+> +{
+> +	struct tegra_bpmp_clk *clk = to_tegra_bpmp_clk(hw);
+> +	struct cmd_clk_set_parent_response response;
+> +	struct cmd_clk_set_parent_request request;
+> +	struct tegra_bpmp_clk_message msg;
+> +	int err;
+> +
+> +	if (index >= clk->num_parents)
+> +		return -EINVAL;
+> +
+> +	memset(&request, 0, sizeof(request));
+> +	request.parent_id = clk->parents[index];
+> +
+> +	memset(&msg, 0, sizeof(msg));
+> +	msg.cmd = CMD_CLK_SET_PARENT;
+> +	msg.clk = clk->id;
+> +	msg.tx.data = &request;
+> +	msg.tx.size = sizeof(request);
+> +	msg.rx.data = &response;
+> +	msg.rx.size = sizeof(response);
+> +
+> +	err = tegra_bpmp_clk_transfer(clk->bpmp, &msg);
+> +	if (err < 0)
+> +		return err;
+> +
+> +	/* XXX check parent ID in response */
+> +
+> +	return 0;
+> +}
+> +
+> +static int tegra_bpmp_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+> +				   unsigned long parent_rate)
+> +{
+> +	return 0;
+> +}
+> +
+> +static long tegra_bpmp_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+> +				      unsigned long *parent_rate)
+> +{
+> +	return 0;
+> +}
+> +
+> +static unsigned long tegra_bpmp_clk_recalc_rate(struct clk_hw *hw,
+> +						unsigned long parent_rate)
+> +{
+> +	return 0;
+> +}
+> +
+> +static const struct clk_ops tegra_bpmp_clk_gate_ops = {
+> +	.is_enabled = tegra_bpmp_clk_is_enabled,
+> +	.prepare = tegra_bpmp_clk_enable,
+> +	.unprepare = tegra_bpmp_clk_disable,
+> +};
+> +
+> +static const struct clk_ops tegra_bpmp_clk_mux_ops = {
+> +	.get_parent = tegra_bpmp_clk_get_parent,
+> +	.set_parent = tegra_bpmp_clk_set_parent,
+> +	.is_enabled = tegra_bpmp_clk_is_enabled,
+> +	.prepare = tegra_bpmp_clk_enable,
+> +	.unprepare = tegra_bpmp_clk_disable,
+> +};
+> +
+> +static const struct clk_ops tegra_bpmp_clk_rate_ops = {
+> +	.is_enabled = tegra_bpmp_clk_is_enabled,
+> +	.prepare = tegra_bpmp_clk_enable,
+> +	.unprepare = tegra_bpmp_clk_disable,
+> +	.set_rate = tegra_bpmp_clk_set_rate,
+> +	.round_rate = tegra_bpmp_clk_round_rate,
+> +	.recalc_rate = tegra_bpmp_clk_recalc_rate,
+> +};
+> +
+> +static const struct clk_ops tegra_bpmp_clk_mux_rate_ops = {
+> +	.get_parent = tegra_bpmp_clk_get_parent,
+> +	.set_parent = tegra_bpmp_clk_set_parent,
+> +	.is_enabled = tegra_bpmp_clk_is_enabled,
+> +	.prepare = tegra_bpmp_clk_enable,
+> +	.unprepare = tegra_bpmp_clk_disable,
+> +	.set_rate = tegra_bpmp_clk_set_rate,
+> +	.round_rate = tegra_bpmp_clk_round_rate,
+> +	.recalc_rate = tegra_bpmp_clk_recalc_rate,
+> +};
+> +
+> +static int tegra_bpmp_clk_get_max_id(struct tegra_bpmp *bpmp)
+> +{
+> +	struct cmd_clk_get_max_clk_id_response response;
+> +	struct tegra_bpmp_clk_message msg;
+> +	int err;
+> +
+> +	memset(&msg, 0, sizeof(msg));
+> +	msg.cmd = CMD_CLK_GET_MAX_CLK_ID;
+> +	msg.rx.data = &response;
+> +	msg.rx.size = sizeof(response);
+> +
+> +	err = tegra_bpmp_clk_transfer(bpmp, &msg);
+> +	if (err < 0)
+> +		return err;
+> +
+> +	return response.max_id;
+
+response.max_id is a uint32
+> +}
+> +
+> +static int tegra_bpmp_clk_get_info(struct tegra_bpmp *bpmp, unsigned int id,
+> +				   struct tegra_bpmp_clk_info *info)
+> +{
+> +	struct cmd_clk_get_all_info_response response;
+> +	struct tegra_bpmp_clk_message msg;
+> +	unsigned int i;
+> +	int err;
+> +
+> +	memset(&msg, 0, sizeof(msg));
+> +	msg.cmd = CMD_CLK_GET_ALL_INFO;
+> +	msg.clk = id;
+> +	msg.rx.data = &response;
+> +	msg.rx.size = sizeof(response);
+> +
+> +	err = tegra_bpmp_clk_transfer(bpmp, &msg);
+> +	if (err < 0)
+> +		return err;
+> +
+> +	strlcpy(info->name, response.name, MRQ_CLK_NAME_MAXLEN);
+> +	info->num_parents = response.num_parents;
+> +
+> +	for (i = 0; i < info->num_parents; i++)
+> +		info->parents[i] = response.parents[i];
+> +
+> +	info->flags = response.flags;
+> +
+> +	return 0;
+> +}
+> +
+> +static int tegra_bpmp_probe_clocks(struct tegra_bpmp *bpmp,
+> +				   struct tegra_bpmp_clk_info **clocksp)
+> +{
+> +	struct tegra_bpmp_clk_info *clocks;
+> +	unsigned int max_id, id, count = 0;
+> +	int err;
+> +
+> +	err = tegra_bpmp_clk_get_max_id(bpmp);
+> +	if (err < 0)
+> +		return err;
+> +
+> +	max_id = err;
+> +
+> +	dev_dbg(bpmp->dev, "maximum clock ID: %u\n", max_id);
+> +
+> +	clocks = kcalloc(max_id + 1, sizeof(*clocks), GFP_KERNEL);
+> +	if (!clocks)
+> +		return -ENOMEM;
+> +
+> +	for (id = 0; id <= max_id; id++) {
+> +		struct tegra_bpmp_clk_info *info = &clocks[count];
+> +#if 0
+> +		const char *prefix = "";
+> +		struct seq_buf buf;
+> +		unsigned int i;
+> +		char flags[64];
+> +#endif
+> +
+> +		err = tegra_bpmp_clk_get_info(bpmp, id, info);
+> +		if (err < 0) {
+> +			dev_err(bpmp->dev, "failed to query clock %u: %d\n",
+> +				id, err);
+> +			continue;
+> +		}
+> +
+> +#if 0
+> +		seq_buf_init(&buf, flags, sizeof(flags));
+> +
+> +		if (info->flags)
+> +			seq_buf_printf(&buf, "(");
+> +
+> +		if (info->flags & TEGRA_BPMP_CLK_HAS_MUX) {
+> +			seq_buf_printf(&buf, "%smux", prefix);
+> +			prefix = ", ";
+> +		}
+> +
+> +		if ((info->flags & TEGRA_BPMP_CLK_HAS_SET_RATE) == 0) {
+> +			seq_buf_printf(&buf, "%sfixed", prefix);
+> +			prefix = ", ";
+> +		}
+> +
+> +		if (info->flags & TEGRA_BPMP_CLK_IS_ROOT) {
+> +			seq_buf_printf(&buf, "%sroot", prefix);
+> +			prefix = ", ";
+> +		}
+> +
+> +		if (info->flags)
+> +			seq_buf_printf(&buf, ")");
+> +
+> +		dev_dbg(bpmp->dev, "  %03u: %s\n", id, info->name);
+> +		dev_dbg(bpmp->dev, "    flags: %lx %s\n", info->flags, flags);
+> +		dev_dbg(bpmp->dev, "    parents: %u\n", info->num_parents);
+> +
+> +		for (i = 0; i < info->num_parents; i++)
+> +			dev_dbg(bpmp->dev, "      %03u\n", info->parents[i]);
+> +#endif
+> +
+> +		/* clock not exposed by BPMP */
+> +		if (info->name[0] == '\0')
+> +			continue;
+> +
+> +		info->id = id;
+> +		count++;
+> +	}
+> +
+> +	*clocksp = clocks;
+
+Nit we could just return the pointer.
+
+> +
+> +	return count;
+
+We return unsigned int here and not int. Why do we bother returning
+count and just store it directly in the bpmp->num_clocks here (see
+tegra_bpmp_register_clocks)?
+
+> +}
+> +
+> +static struct clk_hw *
+> +tegra_bpmp_clk_register(struct tegra_bpmp *bpmp,
+> +			const struct tegra_bpmp_clk_info *info,
+> +			const struct tegra_bpmp_clk_info *clocks,
+> +			unsigned int num_clocks)
+> +{
+> +	struct tegra_bpmp_clk *priv;
+> +	struct clk_init_data init;
+> +	const char **parents;
+> +	unsigned int i, j;
+> +	struct clk *clk;
+> +
+> +	dev_dbg(bpmp->dev, "registering clock %u (%s)\n", info->id, info->name);
+> +
+> +	priv = devm_kzalloc(bpmp->dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	priv->bpmp = bpmp;
+> +	priv->id = info->id;
+> +
+> +	priv->parents = devm_kcalloc(bpmp->dev, info->num_parents,
+> +				     sizeof(*priv->parents), GFP_KERNEL);
+> +	if (!priv->parents)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	priv->num_parents = info->num_parents;
+> +
+> +	/* hardware clock initialization */
+> +	priv->hw.init = &init;
+> +	init.name = info->name;
+> +
+> +	if (info->flags & TEGRA_BPMP_CLK_HAS_MUX) {
+> +		if (info->flags & TEGRA_BPMP_CLK_HAS_SET_RATE)
+> +			init.ops = &tegra_bpmp_clk_mux_rate_ops;
+> +		else
+> +			init.ops = &tegra_bpmp_clk_mux_ops;
+> +	} else {
+> +		if (info->flags & TEGRA_BPMP_CLK_HAS_SET_RATE)
+> +			init.ops = &tegra_bpmp_clk_rate_ops;
+> +		else
+> +			init.ops = &tegra_bpmp_clk_gate_ops;
+> +	}
+> +
+> +	init.num_parents = info->num_parents;
+> +
+> +	parents = kcalloc(info->num_parents, sizeof(*parents), GFP_KERNEL);
+> +	if (!parents)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	for (i = 0; i < info->num_parents; i++) {
+> +		/* keep a private copy of the ID to parent index map */
+> +		priv->parents[i] = info->parents[i];
+> +
+> +		for (j = 0; j < num_clocks; j++) {
+> +			const struct tegra_bpmp_clk_info *parent = &clocks[j];
+> +
+> +			if (parent->id == info->parents[i]) {
+> +				parents[i] = parent->name;
+> +				break;
+> +			}
+> +		}
+
+Is it necessary to loop through all the clocks again here? This function
+is called from tegra_bpmp_register_clocks() which is already looping
+through all the clocks. So for each clock we loop through all the clocks
+again.
+
+> +		if (!parents[i])
+> +			dev_err(bpmp->dev, "no parent %u found for %u\n",
+> +				info->parents[i], info->id);
+> +	}
+> +
+> +	init.parent_names = parents;
+> +
+> +	clk = clk_register(bpmp->dev, &priv->hw);
+
+IS_ERR?
+
+> +
+> +	kfree(parents);
+> +
+> +	return &priv->hw;
+> +}
+> +
+> +static int tegra_bpmp_register_clocks(struct tegra_bpmp *bpmp,
+> +				      struct tegra_bpmp_clk_info *clocks,
+> +				      unsigned int count)
+> +{
+> +	struct clk_hw *hw;
+> +	unsigned int i;
+> +
+> +	bpmp->num_clocks = count;
+> +
+> +	bpmp->clocks = devm_kcalloc(bpmp->dev, count, sizeof(hw), GFP_KERNEL);
+> +	if (!bpmp->clocks)
+> +		return -ENOMEM;
+> +
+> +	for (i = 0; i < count; i++) {
+> +		struct tegra_bpmp_clk_info *info = &clocks[i];
+> +
+> +		hw = tegra_bpmp_clk_register(bpmp, info, clocks, count);
+> +		if (IS_ERR(hw)) {
+> +			dev_err(bpmp->dev,
+> +				"failed to register clock %u (%s): %ld\n",
+> +				info->id, info->name, PTR_ERR(hw));
+> +			continue;
+> +		}
+> +
+> +		bpmp->clocks[i] = hw;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static struct clk_hw *tegra_bpmp_clk_of_xlate(struct of_phandle_args *clkspec,
+> +					      void *data)
+> +{
+> +	unsigned int id = clkspec->args[0], i;
+> +	struct tegra_bpmp *bpmp = data;
+> +	struct clk_hw *hw = NULL;
+> +
+> +	dev_dbg(bpmp->dev, "> %s(clkspec=%p, data=%p)\n", __func__, clkspec,
+> +		data);
+> +
+> +	for (i = 0; i < bpmp->num_clocks; i++) {
+> +		struct tegra_bpmp_clk *clk = to_tegra_bpmp_clk(bpmp->clocks[i]);
+> +
+> +		if (clk->id == id) {
+> +			hw = bpmp->clocks[i];
+> +			dev_dbg(bpmp->dev, "  found %u: %s\n", clk->id, clk_hw_get_name(hw));
+> +			break;
+> +		}
+> +	}
+> +
+> +	dev_dbg(bpmp->dev, "< %s() = %p\n", __func__, hw);
+> +
+> +	return hw;
+> +}
+> +
+> +int tegra_bpmp_init_clocks(struct tegra_bpmp *bpmp)
+> +{
+> +	struct tegra_bpmp_clk_info *clocks;
+> +	unsigned int count;
+> +	int err;
+> +
+> +	dev_dbg(bpmp->dev, "> %s(bpmp=%p)\n", __func__, bpmp);
+> +
+> +	err = tegra_bpmp_probe_clocks(bpmp, &clocks);
+> +	if (err < 0)
+> +		return err;
+> +
+> +	count = err;
+> +
+> +	dev_dbg(bpmp->dev, "%u clocks probed\n", count);
+> +
+> +	err = tegra_bpmp_register_clocks(bpmp, clocks, count);
+> +	if (err < 0) {
+> +		kfree(clocks);
+> +		return err;
+> +	}
+> +
+> +	kfree(clocks);
+> +
+> +	of_clk_add_hw_provider(bpmp->dev->of_node, tegra_bpmp_clk_of_xlate,
+> +			       bpmp);
+
+We should check the return code.
+
+> +	dev_dbg(bpmp->dev, "< %s()\n", __func__);
+> +	return 0;
+> +}
+> 
+
+Cheers
+Jon
+
+-- 
+nvpublic
