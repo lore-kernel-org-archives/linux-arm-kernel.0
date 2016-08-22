@@ -1,59 +1,285 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Mon, 22 Aug 2016 16:47:51 +0800
-Subject: [PATCH v3 1/2] Documentation: dt: Add new compatible to sunxi mmc
- driver bindings
-In-Reply-To: <20160822075847.GD7104@lukather>
-References: <20160801151351.51854-1-icenowy@aosc.xyz>
- <20160801151351.51854-2-icenowy@aosc.xyz> <20160822075847.GD7104@lukather>
-Message-ID: <370671471855671@web30j.yandex.ru>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 22 Aug 2016 16:50:35 +0800
+Subject: [PATCH v2 2/3] ARM: dts: sun6i: Add
+ sun6i-reference-design-tablet.dtsi
+In-Reply-To: <1471543337-6938-3-git-send-email-hdegoede@redhat.com>
+References: <1471543337-6938-1-git-send-email-hdegoede@redhat.com>
+ <1471543337-6938-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGb2v65DbNghtC_TuTLCx=z-mqGVU4_YPR_VCrUEpUdjz3QkOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-22.08.2016, 15:58, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> Hi Icenowy,
+On Fri, Aug 19, 2016 at 2:02 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Just like with a13/a23/a33 most a31 tablets are derived from the same
+> reference design. Add a .dtsi file with all the common bits to avoid
+> endless copy and pasting of these.
 >
-> On Mon, Aug 01, 2016 at 11:13:50PM +0800, Icenowy Zheng wrote:
->> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ?---
->> ?Changes in v2:
->> ?- Rebased on Hans de Goede's patchset.
->>
->> ??Documentation/devicetree/bindings/mmc/sunxi-mmc.txt | 1 +
->> ??1 file changed, 1 insertion(+)
->>
->> ?diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
->> ?index 904ff9f..55cdd80 100644
->> ?--- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
->> ?+++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
->> ?@@ -13,6 +13,7 @@ Required properties:
->> ?????* "allwinner,sun5i-a13-mmc"
->> ?????* "allwinner,sun7i-a20-mmc"
->> ?????* "allwinner,sun9i-a80-mmc"
->> ?+ * "allwinner,sun50i-a64-mmc"
->> ???- reg : mmc controller base registers
->> ???- clocks : a list with 4 phandle + clock specifier pairs
->> ???- clock-names : must contain "ahb", "mmc", "output" and "sample"
+> The sun6i-reference-design-tablet.dtsi this commit adds is a copy
+> of sun6i-a31s-colorfly-e708-q1.dts with a few tablet specific bits
+> removed / left in sun6i-a31s-colorfly-e708-q1.dts.
 >
-> You need to document that the output and sample clocks are not
-> mandatory in the A64 case.
-
-Oh, sorry.
-
-This series of patch is dropped now...
-
-At least I and Andre have no SD Card suitable for DDR mode...
-
-Maybe the patches can only be tested on eMMC.
-
-However, at least on Pine64, our SD Cards are working steaily.
-
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts  | 147 +--------------------
+>  ...8-q1.dts => sun6i-reference-design-tablet.dtsi} |  26 +---
+>  2 files changed, 2 insertions(+), 171 deletions(-)
+>  copy arch/arm/boot/dts/{sun6i-a31s-colorfly-e708-q1.dts => sun6i-reference-design-tablet.dtsi} (90%)
 >
-> Thanks!
-> Maxime
+> diff --git a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts b/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
+> index 34d8710..882a4d8 100644
+> --- a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
+> +++ b/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
+> @@ -42,32 +42,11 @@
 >
+>  /dts-v1/;
+>  #include "sun6i-a31s.dtsi"
+> -#include "sunxi-common-regulators.dtsi"
+> -
+> -#include <dt-bindings/gpio/gpio.h>
+> -#include <dt-bindings/input/input.h>
+> -#include <dt-bindings/pinctrl/sun4i-a10.h>
+> +#include "sun6i-reference-design-tablet.dtsi"
+>
+>  / {
+>         model = "Colorfly E708 Q1 tablet";
+>         compatible = "colorfly,e708-q1", "allwinner,sun6i-a31s";
+> -
+> -       aliases {
+> -               serial0 = &uart0;
+> -       };
+> -
+> -       chosen {
+> -               stdout-path = "serial0:115200n8";
+> -       };
+> -};
+> -
+> -&cpu0 {
+> -       cpu-supply = <&reg_dcdc3>;
+> -};
+> -
+> -&ehci0 {
+> -       /* rtl8188etv wifi is connected here */
+> -       status = "okay";
+>  };
+>
+>  &lradc {
+> @@ -82,136 +61,12 @@
+>         };
+>  };
+>
+> -&mmc0 {
+> -       pinctrl-names = "default";
+> -       pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_e708_q1>;
+> -       vmmc-supply = <&reg_dcdc1>;
+> -       bus-width = <4>;
+> -       cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
+> -       cd-inverted;
+> -       status = "okay";
+> -};
+> -
+> -&pio {
+> -       mmc0_cd_pin_e708_q1: mmc0_cd_pin at 0 {
+> -               allwinner,pins = "PA8";
+> -               allwinner,function = "gpio_in";
+> -               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> -               allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> -       };
+> -
+> -       usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+> -               allwinner,pins = "PA15";
+> -               allwinner,function = "gpio_in";
+> -               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> -               allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> -       };
+> -};
+> -
+> -&p2wi {
+> -       status = "okay";
+> -
+> -       axp22x: pmic at 68 {
+> -               compatible = "x-powers,axp221";
+> -               reg = <0x68>;
+> -               interrupt-parent = <&nmi_intc>;
+> -               interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> -               drivevbus-supply = <&reg_vcc5v0>;
+> -               x-powers,drive-vbus-en;
+> -       };
+> -};
+> -
+> -#include "axp22x.dtsi"
+> -
+> -&reg_aldo3 {
+> -       regulator-always-on;
+> -       regulator-min-microvolt = <2700000>;
+> -       regulator-max-microvolt = <3300000>;
+> -       regulator-name = "avcc";
+> -};
+> -
+> -&reg_dc1sw {
+> -       regulator-name = "vcc-lcd";
+> -};
+> -
+> -&reg_dc5ldo {
+> -       regulator-always-on;
+> -       regulator-min-microvolt = <700000>;
+> -       regulator-max-microvolt = <1320000>;
+> -       regulator-name = "vdd-cpus"; /* This is an educated guess */
+> -};
+> -
+> -&reg_dcdc1 {
+> -       regulator-always-on;
+> -       regulator-min-microvolt = <3000000>;
+> -       regulator-max-microvolt = <3000000>;
+> -       regulator-name = "vcc-3v0";
+> -};
+> -
+> -&reg_dcdc2 {
+> -       regulator-min-microvolt = <700000>;
+> -       regulator-max-microvolt = <1320000>;
+> -       regulator-name = "vdd-gpu";
+> -};
+> -
+> -&reg_dcdc3 {
+> -       regulator-always-on;
+> -       regulator-min-microvolt = <700000>;
+> -       regulator-max-microvolt = <1320000>;
+> -       regulator-name = "vdd-cpu";
+> -};
+> -
+> -&reg_dcdc4 {
+> -       regulator-always-on;
+> -       regulator-min-microvolt = <700000>;
+> -       regulator-max-microvolt = <1320000>;
+> -       regulator-name = "vdd-sys-dll";
+> -};
+> -
+> -&reg_dcdc5 {
+> -       regulator-always-on;
+> -       regulator-min-microvolt = <1500000>;
+> -       regulator-max-microvolt = <1500000>;
+> -       regulator-name = "vcc-dram";
+> -};
+> -
+> -&reg_dldo1 {
+> -       regulator-min-microvolt = <3300000>;
+> -       regulator-max-microvolt = <3300000>;
+> -       regulator-name = "vcc-wifi";
+> -};
+> -
+>  &reg_dldo2 {
+>         regulator-min-microvolt = <1800000>;
+>         regulator-max-microvolt = <1800000>;
+>         regulator-name = "vcc-pg";
+>  };
+>
+> -&reg_drivevbus {
+> -       regulator-name = "usb0-vbus";
+> -       status = "okay";
+> -};
+> -
+>  &simplefb_lcd {
+> -       vcc-lcd-supply = <&reg_dc1sw>;
+>         vcc-pg-supply = <&reg_dldo2>;
+>  };
+> -
+> -&usb_otg {
+> -       dr_mode = "otg";
+> -       status = "okay";
+> -};
+> -
+> -&usb_power_supply {
+> -       status = "okay";
+> -};
+> -
+> -&usbphy {
+> -       pinctrl-names = "default";
+> -       pinctrl-0 = <&usb0_id_detect_pin>;
+> -       usb0_id_det-gpio = <&pio 0 15 GPIO_ACTIVE_HIGH>; /* PA15 */
+> -       usb0_vbus_power-supply = <&usb_power_supply>;
+> -       usb0_vbus-supply = <&reg_drivevbus>;
+> -       usb1_vbus-supply = <&reg_dldo1>;
+> -       status = "okay";
+> -};
+> diff --git a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts b/arch/arm/boot/dts/sun6i-reference-design-tablet.dtsi
+> similarity index 90%
+> copy from arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
+> copy to arch/arm/boot/dts/sun6i-reference-design-tablet.dtsi
+> index 34d8710..0c43430 100644
+> --- a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
+> +++ b/arch/arm/boot/dts/sun6i-reference-design-tablet.dtsi
+> @@ -40,8 +40,6 @@
+>   *     OTHER DEALINGS IN THE SOFTWARE.
+>   */
+>
+> -/dts-v1/;
+> -#include "sun6i-a31s.dtsi"
+>  #include "sunxi-common-regulators.dtsi"
+>
+>  #include <dt-bindings/gpio/gpio.h>
+> @@ -49,9 +47,6 @@
+>  #include <dt-bindings/pinctrl/sun4i-a10.h>
+>
+>  / {
+> -       model = "Colorfly E708 Q1 tablet";
+> -       compatible = "colorfly,e708-q1", "allwinner,sun6i-a31s";
+> -
+>         aliases {
+>                 serial0 = &uart0;
+>         };
+> @@ -66,20 +61,8 @@
+>  };
+>
+>  &ehci0 {
+> -       /* rtl8188etv wifi is connected here */
+> -       status = "okay";
+> -};
+> -
+> -&lradc {
+
+Shouldn't LRADC be standard for tablets?
+Or are we looking at tablets with "soft" buttons?
+
+Otherwise,
+
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+
+
+> -       vref-supply = <&reg_aldo3>;
+> +       /* Wifi is connected here */
+>         status = "okay";
+> -
+> -       button at 1000 {
+> -               label = "Home";
+> -               linux,code = <KEY_HOMEPAGE>;
+> -               channel = <0>;
+> -               voltage = <1000000>;
+> -       };
+>  };
+>
+>  &mmc0 {
+> @@ -181,12 +164,6 @@
+>         regulator-name = "vcc-wifi";
+>  };
+>
+> -&reg_dldo2 {
+> -       regulator-min-microvolt = <1800000>;
+> -       regulator-max-microvolt = <1800000>;
+> -       regulator-name = "vcc-pg";
+> -};
+> -
+>  &reg_drivevbus {
+>         regulator-name = "usb0-vbus";
+>         status = "okay";
+> @@ -194,7 +171,6 @@
+>
+>  &simplefb_lcd {
+>         vcc-lcd-supply = <&reg_dc1sw>;
+> -       vcc-pg-supply = <&reg_dldo2>;
+>  };
+>
+>  &usb_otg {
 > --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+> 2.7.4
+>
