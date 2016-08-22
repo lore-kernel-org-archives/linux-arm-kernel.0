@@ -1,74 +1,37 @@
 From: xieyisheng1@huawei.com (Xie Yisheng)
-Date: Mon, 22 Aug 2016 10:56:42 +0800
-Subject: [RFC PATCH v2 1/2] mm/hugetlb: Introduce ARCH_HAS_GIGANTIC_PAGE
-In-Reply-To: <1471834603-27053-1-git-send-email-xieyisheng1@huawei.com>
-References: <1471834603-27053-1-git-send-email-xieyisheng1@huawei.com>
-Message-ID: <1471834603-27053-2-git-send-email-xieyisheng1@huawei.com>
+Date: Mon, 22 Aug 2016 10:56:41 +0800
+Subject: [RFC PATCH v2 0/2] arm64/hugetlb: enable gigantic page
+Message-ID: <1471834603-27053-1-git-send-email-xieyisheng1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid making ifdef get pretty unwieldy if many ARCHs support gigantic page.
-No functional change with this patch.
+Arm64 supports different size of gigantic page which can be seen from:
+commit 084bd29810a5 ("ARM64: mm: HugeTLB support.")
+commit 66b3923a1a0f ("arm64: hugetlb: add support for PTE contiguous bit")
 
-Signed-off-by: Xie Yisheng <xieyisheng1@huawei.com>
----
- arch/s390/Kconfig | 1 +
- arch/x86/Kconfig  | 1 +
- fs/Kconfig        | 4 ++++
- mm/hugetlb.c      | 2 +-
- 4 files changed, 7 insertions(+), 1 deletion(-)
+So I tried to use this function by adding hugepagesz=1G in kernel
+parameters, with CONFIG_CMA=y. However, when I
+echo xx > \
+  /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages
+it failed with the following info:
+-bash: echo: write error: Invalid argument
 
-diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
-index e751fe2..a8c8fa3 100644
---- a/arch/s390/Kconfig
-+++ b/arch/s390/Kconfig
-@@ -72,6 +72,7 @@ config S390
- 	select ARCH_HAS_DEVMEM_IS_ALLOWED
- 	select ARCH_HAS_ELF_RANDOMIZE
- 	select ARCH_HAS_GCOV_PROFILE_ALL
-+	select ARCH_HAS_GIGANTIC_PAGE
- 	select ARCH_HAS_KCOV
- 	select ARCH_HAS_SG_CHAIN
- 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index c580d8c..5cf959c 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -29,6 +29,7 @@ config X86
- 	select ARCH_HAS_ELF_RANDOMIZE
- 	select ARCH_HAS_FAST_MULTIPLIER
- 	select ARCH_HAS_GCOV_PROFILE_ALL
-+	select ARCH_HAS_GIGANTIC_PAGE		if X86_64
- 	select ARCH_HAS_KCOV			if X86_64
- 	select ARCH_HAS_PMEM_API		if X86_64
- 	select ARCH_HAS_MMIO_FLUSH
-diff --git a/fs/Kconfig b/fs/Kconfig
-index 2bc7ad7..b77ad0f 100644
---- a/fs/Kconfig
-+++ b/fs/Kconfig
-@@ -199,6 +199,10 @@ config HUGETLBFS
- config HUGETLB_PAGE
- 	def_bool HUGETLBFS
+This is a v2 patchset which make gigantic page can be used on arm64,
+with CONFIG_CMA=y, or other related configs is enable.
+
+You can see the former discussions at:
+https://lkml.org/lkml/2016/8/18/310
  
-+config ARCH_HAS_GIGANTIC_PAGE
-+	depends on HUGETLB_PAGE
-+	bool
-+
- source "fs/configfs/Kconfig"
- source "fs/efivarfs/Kconfig"
- 
-diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-index 87e11d8..8488dcc 100644
---- a/mm/hugetlb.c
-+++ b/mm/hugetlb.c
-@@ -1022,7 +1022,7 @@ static int hstate_next_node_to_free(struct hstate *h, nodemask_t *nodes_allowed)
- 		((node = hstate_next_node_to_free(hs, mask)) || 1);	\
- 		nr_nodes--)
- 
--#if (defined(CONFIG_X86_64) || defined(CONFIG_S390)) && \
-+#if defined(CONFIG_ARCH_HAS_GIGANTIC_PAGE) && \
- 	((defined(CONFIG_MEMORY_ISOLATION) && defined(CONFIG_COMPACTION)) || \
- 	defined(CONFIG_CMA))
- static void destroy_compound_gigantic_page(struct page *page,
+Xie Yisheng (2):
+  mm/hugetlb: Introduce ARCH_HAS_GIGANTIC_PAGE
+  arm64 Kconfig: Select gigantic page
+
+ arch/arm64/Kconfig | 1 +
+ arch/s390/Kconfig  | 1 +
+ arch/x86/Kconfig   | 1 +
+ fs/Kconfig         | 4 ++++
+ mm/hugetlb.c       | 2 +-
+ 5 files changed, 8 insertions(+), 1 deletion(-)
+
 -- 
 1.7.12.4
