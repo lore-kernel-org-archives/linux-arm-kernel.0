@@ -1,36 +1,117 @@
 From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 22 Aug 2016 15:45:30 -0700
-Subject: [RFC][PATCH] Kconfig: ARCH_HISI: Add PINCTRL to HISI platform
-Message-ID: <1471905930-12438-1-git-send-email-john.stultz@linaro.org>
+Date: Mon, 22 Aug 2016 15:48:02 -0700
+Subject: [PATCH 1/4] arm64: dts: Add display subsystem DT nodes for
+ hi6220-hikey
+Message-ID: <1471906085-16682-1-git-send-email-john.stultz@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Things won't work if PINCTRL isn't enabled,
-so make sure to explicitly set it rather
-then betting that we have some other platform
-configed in which selects it.
+From: Xinliang Liu <xinliang.liu@linaro.org>
 
-Cc: Arnd Bergmann <arnd@arndb.de>
+Add ade and dsi DT nodes for hikey board.
+
+Cc: Guodong Xu <guodong.xu@linaro.org>
 Cc: Wei Xu <xuwei5@hisilicon.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: linux-arm-kernel at lists.infradead.org
+Cc: devicetree at vger.kernel.org
+Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
 Signed-off-by: John Stultz <john.stultz@linaro.org>
 ---
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts |  8 ++++
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 55 ++++++++++++++++++++++++++
+ 2 files changed, 63 insertions(+)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index be5d824..f848946 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -67,6 +67,7 @@ config ARCH_HISI
- 	bool "Hisilicon SoC Family"
- 	select ARM_TIMER_SP804
- 	select HISILICON_IRQ_MBIGEN if PCI
-+	select PINCTRL
- 	help
- 	  This enables support for Hisilicon ARMv8 SoC family
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+index 593c7e4..c2f014e 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+@@ -372,3 +372,11 @@
+ &uart3 {
+ 	label = "LS-UART1";
+ };
++
++&ade {
++	status = "ok";
++};
++
++&dsi {
++	status = "ok";
++};
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index 4f27041..d0b887a 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -262,6 +262,11 @@
+ 			#clock-cells = <1>;
+ 		};
  
++		medianoc_ade: medianoc_ade at f4520000 {
++			compatible = "syscon";
++			reg = <0x0 0xf4520000 0x0 0x4000>;
++		};
++
+ 		stub_clock: stub_clock {
+ 			compatible = "hisilicon,hi6220-stub-clk";
+ 			hisilicon,hi6220-clk-sram = <&sram>;
+@@ -850,5 +855,55 @@
+ 				};
+ 			};
+ 		};
++
++		ade: ade at f4100000 {
++			compatible = "hisilicon,hi6220-ade";
++			reg = <0x0 0xf4100000 0x0 0x7800>;
++			reg-names = "ade_base";
++			hisilicon,noc-syscon = <&medianoc_ade>;
++			resets = <&media_ctrl MEDIA_ADE>;
++			interrupts = <0 115 4>; /* ldi interrupt */
++
++			clocks = <&media_ctrl HI6220_ADE_CORE>,
++				 <&media_ctrl HI6220_CODEC_JPEG>,
++				 <&media_ctrl HI6220_ADE_PIX_SRC>;
++			/*clock name*/
++			clock-names  = "clk_ade_core",
++				       "clk_codec_jpeg",
++				       "clk_ade_pix";
++
++			assigned-clocks = <&media_ctrl HI6220_ADE_CORE>,
++				<&media_ctrl HI6220_CODEC_JPEG>;
++			assigned-clock-rates = <360000000>, <288000000>;
++			dma-coherent;
++			status = "disabled";
++
++			port {
++				ade_out: endpoint {
++					remote-endpoint = <&dsi_in>;
++				};
++			};
++		};
++
++		dsi: dsi at f4107800 {
++			compatible = "hisilicon,hi6220-dsi";
++			reg = <0x0 0xf4107800 0x0 0x100>;
++			clocks = <&media_ctrl  HI6220_DSI_PCLK>;
++			clock-names = "pclk";
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				/* 0 for input port */
++				port at 0 {
++					reg = <0>;
++					dsi_in: endpoint {
++						remote-endpoint = <&ade_out>;
++					};
++				};
++			};
++		};
+ 	};
+ };
 -- 
 1.9.1
