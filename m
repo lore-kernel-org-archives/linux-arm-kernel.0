@@ -1,468 +1,64 @@
-From: cwchoi00@gmail.com (Chanwoo Choi)
-Date: Mon, 22 Aug 2016 23:45:14 +0900
-Subject: [PATCH 1/2] ARM: dts: Add TOPEET itop core board SCP package
- version
-In-Reply-To: <A0C9B5F5-6B75-43F3-9280-1D33E77DC3BC@soulik.info>
-References: <1471809893-31147-1-git-send-email-ayaka@soulik.info>
- <1471809893-31147-2-git-send-email-ayaka@soulik.info>
- <4767fc2a-95b7-ee0d-f51a-7a5d6ca89d8f@samsung.com>
- <A0C9B5F5-6B75-43F3-9280-1D33E77DC3BC@soulik.info>
-Message-ID: <CAGTfZH07v_9bxKKx4gwLSb6+vLpZ+esW4D5sT4=RiHXa3SV-Vg@mail.gmail.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Mon, 22 Aug 2016 09:02:46 -0500
+Subject: [PATCH 1/2] arm64: kernel: Add SMC Session ID to results
+In-Reply-To: <20160822134313.GJ14680@arm.com>
+References: <1471672274-19317-1-git-send-email-andy.gross@linaro.org>
+ <1471672274-19317-2-git-send-email-andy.gross@linaro.org>
+ <20160822134313.GJ14680@arm.com>
+Message-ID: <20160822140246.GA30923@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Aug 22, 2016 at 02:43:14PM +0100, Will Deacon wrote:
+> On Sat, Aug 20, 2016 at 12:51:13AM -0500, Andy Gross wrote:
+> > This patch adds the SMC Session ID to the results passed back from SMC
+> > calls.  The Qualcomm SMC implementation provides for interrupted SMC
+> > functions.  When this occurs, the SMC call will return a session ID that
+> > is required to be used when resuming the interrupted SMC call.
+> > 
+> > Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> > ---
+> >  arch/arm64/kernel/asm-offsets.c | 1 +
+> >  arch/arm64/kernel/smccc-call.S  | 1 +
+> >  include/linux/arm-smccc.h       | 4 +++-
+> >  3 files changed, 5 insertions(+), 1 deletion(-)
+> 
+> [...]
+> 
+> > diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+> > index b5abfda..82d919f 100644
+> > --- a/include/linux/arm-smccc.h
+> > +++ b/include/linux/arm-smccc.h
+> > @@ -63,18 +63,20 @@
+> >  /**
+> >   * struct arm_smccc_res - Result from SMC/HVC call
+> >   * @a0-a3 result values from registers 0 to 3
+> > + * @a6 Session ID register (optional)
+> >   */
+> >  struct arm_smccc_res {
+> >  	unsigned long a0;
+> >  	unsigned long a1;
+> >  	unsigned long a2;
+> >  	unsigned long a3;
+> > +	unsigned long a6;
+> >  };
+> >  
+> >  /**
+> >   * arm_smccc_smc() - make SMC calls
+> >   * @a0-a7: arguments passed in registers 0 to 7
+> > - * @res: result values from registers 0 to 3
+> > + * @res: result values from registers 0 to 3 and optional register 6
+> 
+> AFAICT from reading the SMCCC spec, parameter register 6 is "Unpredictable,
+> Scratch registers" in return state, so I don't think this is correct.
+> 
+> What am I missing?
 
-2016-08-22 17:28 GMT+09:00 Ayaka <ayaka@soulik.info>:
->
-> Thank you
-> ??? iPad ??
->
->> Marek Szyprowski <m.szyprowski@samsung.com> ? 2016?8?22? ??2:50 ???
->>
->> Dear Randy,
->>
->>
->>> On 2016-08-21 22:04, Randy Li wrote:
->>> The TOPEET itop is a samsung exnynos 4412 core board, which have
->>> two package versions. This patch add the support for SCP version.
->>>
->>> Currently supported are USB3503A HSIC, USB OTG, eMMC, RTC and PMIC.
->>> The future features are in the based board. Also MFC and watchdog
->>> have been enabled.
->>>
->>> Signed-off-by: Randy Li <ayaka@soulik.info>
->>> ---
->>>  arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi | 434 ++++++++++++++++++++++++
->>>  1 file changed, 434 insertions(+)
->>>  create mode 100644 arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
->>>
->>> diff --git a/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi b/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
->>> new file mode 100644
->>> index 0000000..0860ee6
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
->>> @@ -0,0 +1,434 @@
->>> +/*
->>> + * TOPEET's Exynos4412 based itop board device tree source
->>> + *
->>> + * Copyright (c) 2016 SUMOMO Computer Association
->>> + *            https://www.sumomo.mobi
->>> + *            Randy Li <ayaka@soulik.info>
->>> + *
->>> + * Device tree source file for TOPEET iTop Exynos 4412 SCP package core
->>> + * board which is based on Samsung's Exynos4412 SoC.
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> +*/
->>> +
->>> +#include "exynos4412.dtsi"
->>> +#include <dt-bindings/gpio/gpio.h>
->>> +#include <dt-bindings/input/input.h>
->>> +
->>> +/ {
->>> +    memory {
->>> +        reg = <0x40000000 0x40000000>;
->>> +    };
->>> +
->>> +    firmware at 0203F000 {
->>> +        compatible = "samsung,secure-firmware";
->>> +        reg = <0x0203F000 0x1000>;
->>> +    };
->>> +
->>> +    display-timings {
->>> +        native-mode = <&timing0>;
->>> +        timing0: timing {
->>> +            clock-frequency = <47500000>;
->>> +            hactive = <1024>;
->>> +            vactive = <600>;
->>> +            hfront-porch = <64>;
->>> +            hback-porch = <16>;
->>> +            hsync-len = <48>;
->>> +            vback-porch = <64>;
->>> +            vfront-porch = <16>;
->>> +            vsync-len = <3>;
->>> +        };
->>> +    };
->>> +
->>> +    fixed-rate-clocks {
->>> +        xxti {
->>> +            compatible = "samsung,clock-xxti";
->>> +            clock-frequency = <0>;
->>> +        };
->>> +
->>> +        xusbxti {
->>> +            compatible = "samsung,clock-xusbxti";
->>> +            clock-frequency = <24000000>;
->>> +        };
->>> +    };
->>> +
->>> +    usb-hub {
->>> +        compatible = "smsc,usb3503a";
->>> +        reset-gpios = <&gpm2 4 GPIO_ACTIVE_LOW>;
->>> +        connect-gpios = <&gpm3 3 GPIO_ACTIVE_HIGH>;
->>> +        intn-gpios = <&gpx2 3 GPIO_ACTIVE_HIGH>;
->>> +        pinctrl-names = "default";
->>> +        pinctrl-0 = <&hsic_reset>;
->>> +    };
->>> +};
->>> +
->>> +&cpu0 {
->>> +    cpu0-supply = <&buck2_reg>;
->>> +};
->>> +
->>> +&i2c_1 {
->>> +    #address-cells = <1>;
->>> +    #size-cells = <0>;
->>> +    samsung,i2c-sda-delay = <100>;
->>> +    samsung,i2c-max-bus-freq = <400000>;
->>> +    pinctrl-0 = <&i2c1_bus>;
->>> +    pinctrl-names = "default";
->>> +    status = "okay";
->>> +
->>> +    s5m8767_pmic at 66 {
->>> +        compatible = "samsung,s5m8767-pmic";
->>> +        reg = <0x66>;
->>> +
->>> +        s5m8767,pmic-buck-default-dvs-idx = <3>;
->>> +
->>> +        s5m8767,pmic-buck-dvs-gpios = <&gpb 5 GPIO_ACTIVE_HIGH>,
->>> +                         <&gpb 6 GPIO_ACTIVE_HIGH>,
->>> +                         <&gpb 7 GPIO_ACTIVE_HIGH>;
->>> +
->>> +        s5m8767,pmic-buck-ds-gpios = <&gpm3 5 GPIO_ACTIVE_HIGH>,
->>> +                        <&gpm3 6 GPIO_ACTIVE_HIGH>,
->>> +                        <&gpm3 7 GPIO_ACTIVE_HIGH>;
->>> +
->>> +        /* VDD_ARM */
->>> +        s5m8767,pmic-buck2-dvs-voltage = <1356250>, <1300000>,
->>> +                         <1243750>, <1118750>,
->>> +                         <1068750>, <1012500>,
->>> +                         <956250>, <900000>;
->>> +        /* VDD_INT */
->>> +        s5m8767,pmic-buck3-dvs-voltage = <1000000>, <1000000>,
->>> +                         <925000>, <925000>,
->>> +                         <887500>, <887500>,
->>> +                         <850000>, <850000>;
->>> +        /* VDD_G3D */
->>> +        s5m8767,pmic-buck4-dvs-voltage = <1081250>, <1081250>,
->>> +                         <1025000>, <950000>,
->>> +                         <918750>, <900000>,
->>> +                         <875000>, <831250>;
->>> +
->>> +        regulators {
->>> +            ldo1_reg: LDO1 {
->>> +                regulator-name = "VDD_ALIVE";
->>> +                regulator-min-microvolt = <1100000>;
->>> +                regulator-max-microvolt = <1100000>;
->>> +                regulator-always-on;
->>> +                regulator-boot-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            /* SCP uses 1.5v, POP uses 1.2v */
->>> +            ldo2_reg: LDO2 {
->>> +                regulator-name = "VDDQ_M12";
->>> +                regulator-min-microvolt = <1500000>;
->>> +                regulator-max-microvolt = <1500000>;
->>> +                regulator-always-on;
->>> +                regulator-boot-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo3_reg: LDO3 {
->>> +                regulator-name = "VDDIOAP_18";
->>> +                regulator-min-microvolt = <1800000>;
->>> +                regulator-max-microvolt = <1800000>;
->>> +                regulator-always-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo4_reg: LDO4 {
->>> +                regulator-name = "VDDQ_PRE";
->>> +                regulator-min-microvolt = <1800000>;
->>> +                regulator-max-microvolt = <1800000>;
->>> +                regulator-always-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo6_reg: LDO6 {
->>> +                regulator-name = "VDD10_MPLL";
->>> +                regulator-min-microvolt = <1000000>;
->>> +                regulator-max-microvolt = <1000000>;
->>> +                regulator-always-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo7_reg: LDO7 {
->>> +                regulator-name = "VDD10_XPLL";
->>> +                regulator-min-microvolt = <1000000>;
->>> +                regulator-max-microvolt = <1000000>;
->>> +                regulator-always-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo8_reg: LDO8 {
->>> +                regulator-name = "VDD10_MIPI";
->>> +                regulator-min-microvolt = <1000000>;
->>> +                regulator-max-microvolt = <1000000>;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo9_reg: LDO9 {
->>> +                regulator-name = "VDD33_LCD";
->>> +                regulator-min-microvolt = <3300000>;
->>> +                regulator-max-microvolt = <3300000>;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo10_reg: LDO10 {
->>> +                regulator-name = "VDD18_MIPI";
->>> +                regulator-min-microvolt = <1800000>;
->>> +                regulator-max-microvolt = <1800000>;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo11_reg: LDO11 {
->>> +                regulator-name = "VDD18_ABB1";
->>> +                regulator-min-microvolt = <1800000>;
->>> +                regulator-max-microvolt = <1800000>;
->>> +                regulator-always-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo12_reg: LDO12 {
->>> +                regulator-name = "VDD33_UOTG";
->>> +                regulator-min-microvolt = <3300000>;
->>> +                regulator-max-microvolt = <3300000>;
->>> +                regulator-always-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo13_reg: LDO13 {
->>> +                regulator-name = "VDDIOPERI_18";
->>> +                regulator-min-microvolt = <1800000>;
->>> +                regulator-max-microvolt = <1800000>;
->>> +                regulator-always-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo14_reg: LDO14 {
->>> +                regulator-name = "VDD18_ABB02";
->>> +                regulator-min-microvolt = <1800000>;
->>> +                regulator-max-microvolt = <1800000>;
->>> +                regulator-always-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo15_reg: LDO15 {
->>> +                regulator-name = "VDD10_USH";
->>> +                regulator-min-microvolt = <1000000>;
->>> +                regulator-max-microvolt = <1000000>;
->>> +                regulator-always-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo16_reg: LDO16 {
->>> +                regulator-name = "VDD18_HSIC";
->>> +                regulator-min-microvolt = <1800000>;
->>> +                regulator-max-microvolt = <1800000>;
->>> +                regulator-always-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo17_reg: LDO17 {
->>> +                regulator-name = "VDDIOAP_MMC012_28";
->>> +                regulator-min-microvolt = <2800000>;
->>> +                regulator-max-microvolt = <2800000>;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            /* Used by HSIC */
->>> +            ldo18_reg: LDO18 {
->>> +                regulator-name = "VDDIOPERI_28";
->>> +                regulator-min-microvolt = <3300000>;
->>> +                regulator-max-microvolt = <3300000>;
->>> +                regulator-always-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo20_reg: LDO20 {
->>> +                regulator-name = "VDD28_CAM";
->>> +                regulator-min-microvolt = <1800000>;
->>> +                regulator-max-microvolt = <2800000>;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo21_reg: LDO21 {
->>> +                regulator-name = "VDD28_AF";
->>> +                regulator-min-microvolt = <1800000>;
->>> +                regulator-max-microvolt = <2800000>;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo22_reg: LDO22 {
->>> +                regulator-name = "VDDA28_2M";
->>> +                regulator-min-microvolt = <2800000>;
->>> +                regulator-max-microvolt = <2800000>;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo23_reg: LDO23 {
->>> +                regulator-name = "VDD28_TF";
->>> +                regulator-min-microvolt = <2800000>;
->>> +                regulator-max-microvolt = <2800000>;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo24_reg: LDO24 {
->>> +                regulator-name = "VDD33_A31";
->>> +                regulator-min-microvolt = <3300000>;
->>> +                regulator-max-microvolt = <3300000>;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo25_reg: LDO25 {
->>> +                regulator-name = "VDD18_CAM";
->>> +                regulator-min-microvolt = <1800000>;
->>> +                regulator-max-microvolt = <1800000>;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo26_reg: LDO26 {
->>> +                regulator-name = "VDD18_A31";
->>> +                regulator-min-microvolt = <1800000>;
->>> +                regulator-max-microvolt = <1800000>;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo27_reg: LDO27 {
->>> +                regulator-name = "GPS_1V8";
->>> +                regulator-min-microvolt = <1800000>;
->>> +                regulator-max-microvolt = <1800000>;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            ldo28_reg: LDO28 {
->>> +                regulator-name = "DVDD12";
->>> +                regulator-min-microvolt = <1200000>;
->>> +                regulator-max-microvolt = <1200000>;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            buck1_reg: BUCK1 {
->>> +                regulator-name = "vdd_mif";
->>> +                regulator-min-microvolt = <850000>;
->>> +                regulator-max-microvolt    = <1100000>;
->>> +                regulator-always-on;
->>> +                regulator-boot-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            buck2_reg: BUCK2 {
->>> +                regulator-name = "vdd_arm";
->>> +                regulator-min-microvolt = <850000>;
->>> +                regulator-max-microvolt    = <1456250>;
->>> +                regulator-always-on;
->>> +                regulator-boot-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            buck3_reg: BUCK3 {
->>> +                regulator-name = "vdd_int";
->>> +                regulator-min-microvolt = <875000>;
->>> +                regulator-max-microvolt    = <1200000>;
->>> +                regulator-always-on;
->>> +                regulator-boot-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            buck4_reg: BUCK4 {
->>> +                regulator-name = "vdd_g3d";
->>> +                regulator-min-microvolt = <750000>;
->>> +                regulator-max-microvolt    = <1500000>;
->>> +                regulator-always-on;
->>> +                regulator-boot-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            buck5_reg: BUCK5 {
->>> +                regulator-name = "vdd_m12";
->>> +                regulator-min-microvolt = <750000>;
->>> +                regulator-max-microvolt    = <1500000>;
->>> +                regulator-always-on;
->>> +                regulator-boot-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            buck6_reg: BUCK6 {
->>> +                regulator-name = "vdd12_5m";
->>> +                regulator-min-microvolt = <750000>;
->>> +                regulator-max-microvolt    = <1500000>;
->>> +                regulator-always-on;
->>> +                regulator-boot-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            buck7_reg: BUCK7 {
->>> +                regulator-name = "pvdd_buck7";
->>> +                regulator-min-microvolt = <750000>;
->>> +                regulator-max-microvolt    = <2000000>;
->>> +                regulator-boot-on;
->>> +                regulator-always-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            buck8_reg: BUCK8 {
->>> +                regulator-name = "pvdd_buck8";
->>> +                regulator-min-microvolt = <750000>;
->>> +                regulator-max-microvolt    = <1500000>;
->>> +                regulator-boot-on;
->>> +                regulator-always-on;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +
->>> +            buck9_reg: BUCK9 {
->>> +                regulator-name = "vddf28_emmc";
->>> +                regulator-min-microvolt = <750000>;
->>> +                regulator-max-microvolt    = <3000000>;
->>> +                op_mode = <1>; /* Normal Mode */
->>> +            };
->>> +        };
->>> +    };
->>> +};
->>> +
->>> +&pinctrl_1 {
->>> +    hsic_reset: hsic-reset {
->>> +        samsung,pins = "gpm2-4";
->>> +        samsung,pin-function = <1>;
->>> +        samsung,pin-pud = <0>;
->>> +        samsung,pin-drv = <3>;
->>> +    };
->>> +};
->>> +
->>> +&mfc {
->>> +    samsung,mfc-r = <0x43000000 0x800000>;
->>> +    samsung,mfc-l = <0x51000000 0x800000>;
->>> +    status = "okay";
->>> +};
->>
->> Since v4.8-rc1 MFC driver has been converted to generic reserved memory bindings,
->> so samsung,mfc-* properties are obsoleted and no longer used. If you want to use
->> MFC driver with reserved memory, please just add following line to your dts:
->> #include "exynos-mfc-reserved-memory.dtsi"
->>
->> Please refer to dts of other boards for more examples.
-> I see, I would also enabled the bus_mfc and mfc entry.
-> I notice the new introduce Exynos bus. I need some time to add support it. I will send a new version later time(maybe you have to wait this weekend, sorry about that).
+In the case of Qualcomm's implementation, they return a value in register 6 that
+may or may not be used in subsequent calls.  If I want to leverage the arm_smccc
+functions, then I need to extend them to include the optional return value.  The
+downside to this is that everyone who uses this is exposed to it.
 
-What is meaning of "new introduce Exynos bus"?
-Could you explain it to me?
-
-[snip]
-
--- 
 Regards,
-Chanwoo Choi
+
+Andy
