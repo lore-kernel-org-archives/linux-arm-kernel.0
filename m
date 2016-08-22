@@ -1,45 +1,55 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Mon, 22 Aug 2016 14:04:49 +0200
-Subject: [PATCH v2 1/4] net: dt-bindings: Document the new Meson8b and
- GXBB DWMAC bindings
-In-Reply-To: <7308700.atIMKyMFZU@wuerfel>
-References: <20160815164100.27766-1-martin.blumenstingl@googlemail.com>
- <20160820093538.9707-1-martin.blumenstingl@googlemail.com>
- <20160820093538.9707-2-martin.blumenstingl@googlemail.com>
- <7308700.atIMKyMFZU@wuerfel>
-Message-ID: <CAFBinCA0HWHR3UbVX-_wU14W0-KOr-BAf5Nyn1ocZdnYxojn2Q@mail.gmail.com>
+From: groeck@google.com (Guenter Roeck)
+Date: Mon, 22 Aug 2016 05:07:00 -0700
+Subject: [v13 PATCH 2/5] phy: Add USB Type-C PHY driver for rk3399
+In-Reply-To: <57BA84F4.2000506@126.com>
+References: <1471839798-14729-1-git-send-email-zyw@rock-chips.com>
+ <1471839798-14729-3-git-send-email-zyw@rock-chips.com>
+ <CABXOdTcsOQH068bGthwQMmESf0DbNDz0i3UvPfDjjuHPj8mRUQ@mail.gmail.com>
+ <57BA84F4.2000506@126.com>
+Message-ID: <CABXOdTetf_rYLO0ObC=ChL7n6uJiQ43UYN3Lu_s4BX4E=kkzdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2016 at 1:55 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday, August 20, 2016 11:35:35 AM CEST Martin Blumenstingl wrote:
->> +- reg: The first register range should be the one of the DWMAC
->> +       controller. The second range is is for the Amlogic specific
->> +       configuration (for example the PRG_ETHERNET register range
->> +       on Meson8b and newer)
->>
-> ...
+Hi Chris,
+
+On Sun, Aug 21, 2016 at 9:52 PM, Chris <zywang33@126.com> wrote:
+> Hi Guenter
 >
->> +Example for GXBB:
->> +       ethmac: ethernet at c9410000 {
->> +               compatible = "amlogic,meson-gxbb-dwmac", "snps,dwmac";
->> +               reg = <0x0 0xc9410000 0x0 0x10000>,
->> +                       <0x0 0xc8834540 0x0 0x8>;
+[ ... ]
+
+>>> +static int rockchip_usb3_phy_power_on(struct phy *phy)
+>>> +{
+>>> +       struct rockchip_typec_phy *tcphy = phy_get_drvdata(phy);
+>>> +       struct rockchip_usb3phy_port_cfg *cfg = &tcphy->port_cfgs;
+>>> +       const struct usb3phy_reg *reg = &cfg->pipe_status;
+>>> +       int timeout, new_mode, ret = 0;
+>>> +       u32 val;
+>>> +
+>>> +       mutex_lock(&tcphy->lock);
+>>> +
+>>> +       new_mode = tcphy_get_mode(tcphy);
+>>> +       if (new_mode < 0) {
+>>> +               ret = new_mode;
+>>> +               goto unlock_ret;
+>>> +       }
+>>> +
+>>> +       /* DP-only mode; fall back to USB2 */
+>>> +       if (!(new_mode & (MODE_DFP_USB | MODE_UFP_USB)))
+>>> +               goto unlock_ret;
+>>> +
 >>
+>> The rest of the code (calling tcphy_phy_init(), waiting for pipe
+>> ready) is not needed in this case ?
 >
-> The address "0xc8834540" suggests that this is part of a larger register
-> range that is used for various things, i.e. a "syscon" type of device.
-You are right, these are part of the cbus range (which is already
-defined in meson-gxbb.dtsi)
+>
+> If there is only DP, the tcphy_phy_init will be called by DP controller, and
+> the pipe is for USB3, so do not need do anything, just return a "fake"
+> success here.
+> And the usb phy power off do nothing. Just make USB  controller happier.
+>
 
-> How about making this a syscon reference rather than a "reg" address?
-The first version of my patch ([0]) used
-syscon_regmap_lookup_by_phandle. Maybe I did it wrong (and I should
-have passed the cbus syscon-node instead of defining a new one just
-for the 2x32bit PRG_ETHERNET registers).
-I am perfectly fine with either way - however it seems that some other
-dwmac glue implementations are also using a second set of resources
-(that doesn't automatically make it "correct" though).
+Yes, you are right. It is a bit confusing (and I had overlooked) that
+MODE_DFP_USB is set for both USB2 and USB3 if DP isn't active, but if
+DP is active it is only set for USB3.
 
-
-Martin
+Guenter
