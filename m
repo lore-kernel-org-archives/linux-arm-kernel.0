@@ -1,52 +1,89 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Aug 2016 09:58:47 +0200
-Subject: [PATCH v3 1/2] Documentation: dt: Add new compatible to sunxi
- mmc driver bindings
-In-Reply-To: <20160801151351.51854-2-icenowy@aosc.xyz>
-References: <20160801151351.51854-1-icenowy@aosc.xyz>
- <20160801151351.51854-2-icenowy@aosc.xyz>
-Message-ID: <20160822075847.GD7104@lukather>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Mon, 22 Aug 2016 10:01:01 +0200
+Subject: [RFC PATCH v2 1/2] mm/hugetlb: Introduce ARCH_HAS_GIGANTIC_PAGE
+In-Reply-To: <1471834603-27053-2-git-send-email-xieyisheng1@huawei.com>
+References: <1471834603-27053-1-git-send-email-xieyisheng1@huawei.com>
+ <1471834603-27053-2-git-send-email-xieyisheng1@huawei.com>
+Message-ID: <20160822080101.GE13596@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Icenowy,
-
-On Mon, Aug 01, 2016 at 11:13:50PM +0800, Icenowy Zheng wrote:
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+On Mon 22-08-16 10:56:42, Xie Yisheng wrote:
+> Avoid making ifdef get pretty unwieldy if many ARCHs support gigantic page.
+> No functional change with this patch.
+> 
+> Signed-off-by: Xie Yisheng <xieyisheng1@huawei.com>
 > ---
-> Changes in v2:
-> - Rebased on Hans de Goede's patchset.
+>  arch/s390/Kconfig | 1 +
+>  arch/x86/Kconfig  | 1 +
+>  fs/Kconfig        | 4 ++++
+>  mm/hugetlb.c      | 2 +-
+>  4 files changed, 7 insertions(+), 1 deletion(-)
 > 
->  Documentation/devicetree/bindings/mmc/sunxi-mmc.txt | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> index 904ff9f..55cdd80 100644
-> --- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> @@ -13,6 +13,7 @@ Required properties:
->     * "allwinner,sun5i-a13-mmc"
->     * "allwinner,sun7i-a20-mmc"
->     * "allwinner,sun9i-a80-mmc"
-> +   * "allwinner,sun50i-a64-mmc"
->   - reg : mmc controller base registers
->   - clocks : a list with 4 phandle + clock specifier pairs
->   - clock-names : must contain "ahb", "mmc", "output" and "sample"
+> diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
+> index e751fe2..a8c8fa3 100644
+> --- a/arch/s390/Kconfig
+> +++ b/arch/s390/Kconfig
+> @@ -72,6 +72,7 @@ config S390
+>  	select ARCH_HAS_DEVMEM_IS_ALLOWED
+>  	select ARCH_HAS_ELF_RANDOMIZE
+>  	select ARCH_HAS_GCOV_PROFILE_ALL
+> +	select ARCH_HAS_GIGANTIC_PAGE
+>  	select ARCH_HAS_KCOV
+>  	select ARCH_HAS_SG_CHAIN
+>  	select ARCH_HAVE_NMI_SAFE_CMPXCHG
+> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> index c580d8c..5cf959c 100644
+> --- a/arch/x86/Kconfig
+> +++ b/arch/x86/Kconfig
+> @@ -29,6 +29,7 @@ config X86
+>  	select ARCH_HAS_ELF_RANDOMIZE
+>  	select ARCH_HAS_FAST_MULTIPLIER
+>  	select ARCH_HAS_GCOV_PROFILE_ALL
+> +	select ARCH_HAS_GIGANTIC_PAGE		if X86_64
+>  	select ARCH_HAS_KCOV			if X86_64
+>  	select ARCH_HAS_PMEM_API		if X86_64
+>  	select ARCH_HAS_MMIO_FLUSH
 
-You need to document that the output and sample clocks are not
-mandatory in the A64 case.
+good
 
-Thanks!
-Maxime
+> diff --git a/fs/Kconfig b/fs/Kconfig
+> index 2bc7ad7..b77ad0f 100644
+> --- a/fs/Kconfig
+> +++ b/fs/Kconfig
+> @@ -199,6 +199,10 @@ config HUGETLBFS
+>  config HUGETLB_PAGE
+>  	def_bool HUGETLBFS
+>  
+> +config ARCH_HAS_GIGANTIC_PAGE
+> +	depends on HUGETLB_PAGE
+> +	bool
+> +
+
+but is this really necessary? The code where we use
+ARCH_HAS_GIGANTIC_PAGE already depends on HUGETLB_PAGE.
+
+Other than that looks good to me and a nice simplification.
+
+>  source "fs/configfs/Kconfig"
+>  source "fs/efivarfs/Kconfig"
+>  
+> diff --git a/mm/hugetlb.c b/mm/hugetlb.c
+> index 87e11d8..8488dcc 100644
+> --- a/mm/hugetlb.c
+> +++ b/mm/hugetlb.c
+> @@ -1022,7 +1022,7 @@ static int hstate_next_node_to_free(struct hstate *h, nodemask_t *nodes_allowed)
+>  		((node = hstate_next_node_to_free(hs, mask)) || 1);	\
+>  		nr_nodes--)
+>  
+> -#if (defined(CONFIG_X86_64) || defined(CONFIG_S390)) && \
+> +#if defined(CONFIG_ARCH_HAS_GIGANTIC_PAGE) && \
+>  	((defined(CONFIG_MEMORY_ISOLATION) && defined(CONFIG_COMPACTION)) || \
+>  	defined(CONFIG_CMA))
+>  static void destroy_compound_gigantic_page(struct page *page,
+> -- 
+> 1.7.12.4
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160822/4158e8a6/attachment.sig>
+Michal Hocko
+SUSE Labs
