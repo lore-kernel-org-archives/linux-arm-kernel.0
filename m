@@ -1,31 +1,170 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Mon, 22 Aug 2016 16:08:21 +0000
-Subject: [PATCH -next] clk: meson: Fix invalid use of sizeof in
- gxbb_aoclkc_probe()
-Message-ID: <1471882101-22347-1-git-send-email-weiyj.lk@gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 22 Aug 2016 12:09:54 -0400 (EDT)
+Subject: [PATCH v6 4/8] usb: core: add power sequence handling for USB
+ devices
+In-Reply-To: <20160822065335.GC4362@shlinux2>
+Message-ID: <Pine.LNX.4.44L0.1608221156210.1543-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <weiyongjun1@huawei.com>
+On Mon, 22 Aug 2016, Peter Chen wrote:
 
-sizeof() when applied to a pointer typed expression gives the
-size of the pointer, not that of the pointed data.
+> On Mon, Aug 15, 2016 at 05:13:14PM +0800, Peter Chen wrote:
+> > Some hard-wired USB devices need to do power sequence to let the
+> > device work normally, the typical power sequence like: enable USB
+> > PHY clock, toggle reset pin, etc. But current Linux USB driver
+> > lacks of such code to do it, it may cause some hard-wired USB devices
+> > works abnormal or can't be recognized by controller at all.
+> > 
+> > In this patch, it calls power sequence library APIs to finish
+> > the power sequence events. At first, it calls pwrseq_alloc_generic
+> > to create a generic power sequence instance, then it will do power
+> > on sequence at hub's probe for all devices under this hub
+> > (includes root hub).
+> > 
+> > At hub_disconnect, it will do power off sequence which is at powered
+> > on list.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> > Tested-by Joshua Clayton <stillcompiling@gmail.com>
+> 
+> Hi Alan,
+> 
+> The power sequence library code has been reviewed several rounds, would
+> you please help to review the change for USB part?
 
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
----
- drivers/clk/meson/gxbb-aoclk.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Some small problems...  See below.
 
-diff --git a/drivers/clk/meson/gxbb-aoclk.c b/drivers/clk/meson/gxbb-aoclk.c
-index 61ef28a..b45c5fb 100644
---- a/drivers/clk/meson/gxbb-aoclk.c
-+++ b/drivers/clk/meson/gxbb-aoclk.c
-@@ -142,7 +142,7 @@ static int gxbb_aoclkc_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct gxbb_aoclk_reset_controller *rstc;
- 
--	rstc = devm_kzalloc(dev, sizeof(rstc), GFP_KERNEL);
-+	rstc = devm_kzalloc(dev, sizeof(*rstc), GFP_KERNEL);
- 	if (!rstc)
- 		return -ENOMEM;
- 
+> > --- a/drivers/usb/core/Makefile
+> > +++ b/drivers/usb/core/Makefile
+> > @@ -9,5 +9,6 @@ usbcore-y += port.o of.o
+> >  
+> >  usbcore-$(CONFIG_PCI)		+= hcd-pci.o
+> >  usbcore-$(CONFIG_ACPI)		+= usb-acpi.o
+> > +usbcore-$(CONFIG_PWRSEQ_GENERIC) += pwrseq.o
+
+Please use a tab to align this with the lines above.
+
+> > --- /dev/null
+> > +++ b/drivers/usb/core/pwrseq.c
+> > @@ -0,0 +1,100 @@
+> > +/*
+> > + * pwrseq.c	USB device power sequence management
+> > + *
+> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> > + * Author: Peter Chen <peter.chen@nxp.com>
+> > + *
+> > + * This program is free software: you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2  of
+> > + * the License as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + *
+> > + * You should have received a copy of the GNU General Public License
+> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> > + */
+> > +
+> > +#include <linux/list.h>
+> > +#include <linux/of.h>
+> > +#include <linux/power/pwrseq.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/usb.h>
+> > +#include <linux/usb/hcd.h>
+> > +
+> > +#include "hub.h"
+> > +
+> > +struct usb_pwrseq_node {
+> > +	struct pwrseq *pwrseq;
+> > +	struct list_head list;
+> > +};
+> > +
+> > +static int hub_of_pwrseq_on(struct device_node *np, struct usb_hub *hub)
+> > +{
+> > +	struct pwrseq *pwrseq;
+> > +	struct usb_pwrseq_node *pwrseq_node;
+> > +	int ret;
+> > +
+> > +	pwrseq = pwrseq_alloc_generic();
+> > +	if (IS_ERR(pwrseq))
+> > +		return PTR_ERR(pwrseq);
+> > +
+> > +	ret = pwrseq_get(np, pwrseq);
+> > +	if (ret)
+> > +		goto pwr_free;
+> > +
+> > +	ret = pwrseq_on(np, pwrseq);
+> > +	if (ret)
+> > +		goto pwr_put;
+> > +
+> > +	pwrseq_node = kzalloc(sizeof(*pwrseq_node), GFP_KERNEL);
+
+You need to check that the kzalloc succeeded.
+
+> > +	pwrseq_node->pwrseq = pwrseq;
+> > +	list_add(&pwrseq_node->list, &hub->pwrseq_on_list);
+> > +
+> > +	return 0;
+> > +
+> > +pwr_put:
+> > +	pwrseq_put(pwrseq);
+> > +pwr_free:
+> > +	pwrseq_free(pwrseq);
+> > +	return ret;
+> > +}
+
+This subroutine looks very generic.  The only place where it cares that
+it was called for a USB hub is the list_add(), and that could easily
+become generic also (make this function take &hub->pwrseq_on_list as
+its second argument, instead of hub).
+
+It looks like this routine really belongs in the power sequence 
+library.
+
+> > +
+> > +int hub_pwrseq_on(struct usb_hub *hub)
+> > +{
+
+The names of this routine and the subroutine above are too similar.  
+After all, both functions require OF support.
+
+> > +	struct device *parent;
+> > +	struct usb_device *hdev = hub->hdev;
+> > +	struct device_node *np;
+> > +	int ret;
+> > +
+> > +	if (hdev->parent)
+> > +		parent = &hdev->dev;
+> > +	else
+> > +		parent = bus_to_hcd(hdev->bus)->self.controller;
+> > +
+> > +	for_each_child_of_node(parent->of_node, np) {
+> > +		ret = hub_of_pwrseq_on(np, hub);
+> > +		if (ret)
+> > +			return ret;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +void hub_pwrseq_off(struct usb_hub *hub)
+> > +{
+> > +	struct pwrseq *pwrseq;
+> > +	struct usb_pwrseq_node *pwrseq_node, *tmp_node;
+> > +
+> > +	list_for_each_entry_safe(pwrseq_node, tmp_node,
+> > +			&hub->pwrseq_on_list, list) {
+> > +		pwrseq = pwrseq_node->pwrseq;
+> > +		pwrseq_off(pwrseq);
+> > +		pwrseq_put(pwrseq);
+> > +		pwrseq_free(pwrseq);
+> > +		list_del(&pwrseq_node->list);
+> > +		kfree(pwrseq_node);
+> > +	}
+> > +}
+
+This routine also looks like it belongs in a library.
+
+Alan Stern
