@@ -1,28 +1,21 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Aug 2016 20:39:15 +0200
-Subject: [PATCH 1/2] ARM: dts: sun6i: Add
- sun6i-a31-reference-design-tablet.dtsi
-In-Reply-To: <1471533095-13432-1-git-send-email-hdegoede@redhat.com>
-References: <1471533095-13432-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160822183915.GA7104@lukather>
+Date: Mon, 22 Aug 2016 20:40:06 +0200
+Subject: [PATCH v6 0/4] ARM: dts: sun9i: Enable X-Powers AC100 RTC
+In-Reply-To: <20160819074226.16636-1-wens@csie.org>
+References: <20160819074226.16636-1-wens@csie.org>
+Message-ID: <20160822184006.GB7104@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, Aug 18, 2016 at 05:11:34PM +0200, Hans de Goede wrote:
-> Just like with a13/a23/a33 most a31 tablets are derived from the same
-> reference design. Add a .dtsi file with all the common bits to avoid
-> endless copy and pasting of these.
+On Fri, Aug 19, 2016 at 03:42:22PM +0800, Chen-Yu Tsai wrote:
+> Hi everyone,
 > 
-> The sun6i-a31-reference-design-tablet.dtsi this commit adds is a copy
-> of sun6i-a31s-colorfly-e708-q1.dts with a few tablet specific bits
-> removed / left in sun6i-a31s-colorfly-e708-q1.dts.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> This was "mfd: ac100: Add support for X-Powers AC100 audio codec / RTC
+> combo IC". The driver bits have all been merged.
 
-The patch looks ok, but doesn't apply.
-
+Applied the DT patches. Thanks!
 Maxime
 
 -- 
@@ -35,4 +28,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160822/480249cf/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160822/c4cad27b/attachment.sig>
