@@ -1,158 +1,66 @@
-From: kdasu.kdev@gmail.com (Kamal Dasu)
-Date: Mon, 22 Aug 2016 11:42:55 -0400
-Subject: [PATCH v2 1/2] mtd: brcmnand: iProc big endian and ONFI support
-In-Reply-To: <20160810162438.4c6cffd3@bbrezillon>
-References: <1469051631-7896-1-git-send-email-ray.jui@broadcom.com>
- <1469051631-7896-2-git-send-email-ray.jui@broadcom.com>
- <20160810162438.4c6cffd3@bbrezillon>
-Message-ID: <CAC=U0a27YcmxWCbfOmRje40_eeJ4mZm2bwWzrrviF4ooKBtoRA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Aug 2016 17:43:38 +0200
+Subject: [PATCH v3 05/12] firmware: tegra: Add BPMP support
+In-Reply-To: <20160822153258.GB21012@ulmo.ba.sec>
+References: <20160819173233.13260-1-thierry.reding@gmail.com>
+ <5669893.Rd6yQObxH6@wuerfel> <20160822153258.GB21012@ulmo.ba.sec>
+Message-ID: <9945785.T0mojj3S7F@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 10:24 AM, Boris Brezillon
-<boris.brezillon@free-electrons.com> wrote:
-> On Wed, 20 Jul 2016 14:53:50 -0700
-> Ray Jui <ray.jui@broadcom.com> wrote:
+On Monday, August 22, 2016 5:32:58 PM CEST Thierry Reding wrote:
+> On Mon, Aug 22, 2016 at 04:42:32PM +0200, Arnd Bergmann wrote:
+> > On Monday, August 22, 2016 4:02:11 PM CEST Thierry Reding wrote:
+> > > > > +struct mrq_request {
+> > > > > +	/** @brief MRQ number of the request */
+> > > > > +	uint32_t mrq;
+> > > > > +	/** @brief flags for the request */
+> > > > > +	uint32_t flags;
+> > > > > +} __ABI_PACKED;
+> > > > 
+> > > > Marking the structure as packed may result in byte-wise access, depending
+> > > > on compiler flags. Is that what you intended? The structure is fully
+> > > > packed already, so you won't avoid any padding here.
+> > > 
+> > > Agreed, the packing seems unnecessary in many places. However this is
+> > > defining an ABI that's used across multiple operating systems, so the
+> > > packing may still be required on some systems or toolchains to ensure
+> > > the exact same format in the transport.
+> > 
+> > However, if __ABI_PACKED is defined to an empty string, it is different
+> > in some cases.
+> > 
+> > Also, setting 'NO_GCC_EXTENSIONS' changes the structure layout of
+> > some of the structures, by adding an extra member. If the firmware
+> > has a compiler that is less than 10 years old, I'd suggest using C99
+> > syntax instead, which should avoid those differences and eliminate
+> > all gcc extensions.
+> 
+> I think this isn't only about the firmware (which, as far as I can tell,
+> is always built with a non-ancient version of GCC). The same header file
+> is used in other operating systems and I have no idea about the
+> toolchain situation there.
+> 
+> As for the NO_GCC_EXTENSIONS I think that's only used to avoid empty
+> structures and zero-sized arrays, which I assume not all supported
+> toolchains can deal with.
 >
->> This patch adds big endian and ONFI support for various iProc based
->> SoCs that use the core brcmstb NAND controller
->
-> Brian, Kamal, can you review this patch?
->
->>
->> This patch was originally implemented by Prafulla Kota
->> <prafulla.kota@broadcom.com> and fully tested on iProc based NS2 SVK
->>
->> Signed-off-by: Prafulla Kota <prafulla.kota@broadcom.com>
->> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+> Sivaram, Timo: can you shed any light on the scope of operating systems
+> and toolchains that we need to support? Any ideas, short of manual
+> editing, that we can try to eliminate some of Arnd's concerns?
 
-Acked-by: Kamal Dasu <kdasu.kdev@gmail.com>
+Ok. To clarify, C99 supports this syntax:
 
->> ---
->>  drivers/mtd/nand/brcmnand/brcmnand.c   | 12 ++++++------
->>  drivers/mtd/nand/brcmnand/brcmnand.h   | 13 ++++++++-----
->>  drivers/mtd/nand/brcmnand/iproc_nand.c | 18 ++++++++++++++----
->>  3 files changed, 28 insertions(+), 15 deletions(-)
->>
->> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
->> index b76ad7c..12a1585 100644
->> --- a/drivers/mtd/nand/brcmnand/brcmnand.c
->> +++ b/drivers/mtd/nand/brcmnand/brcmnand.c
->> @@ -1279,7 +1279,7 @@ static void brcmnand_cmdfunc(struct mtd_info *mtd, unsigned command,
->>               u32 *flash_cache = (u32 *)ctrl->flash_cache;
->>               int i;
->>
->> -             brcmnand_soc_data_bus_prepare(ctrl->soc);
->> +             brcmnand_soc_data_bus_prepare(ctrl->soc, true);
->>
->>               /*
->>                * Must cache the FLASH_CACHE now, since changes in
->> @@ -1292,7 +1292,7 @@ static void brcmnand_cmdfunc(struct mtd_info *mtd, unsigned command,
->>                        */
->>                       flash_cache[i] = be32_to_cpu(brcmnand_read_fc(ctrl, i));
->>
->> -             brcmnand_soc_data_bus_unprepare(ctrl->soc);
->> +             brcmnand_soc_data_bus_unprepare(ctrl->soc, true);
->>
->>               /* Cleanup from HW quirk: restore SECTOR_SIZE_1K */
->>               if (host->hwcfg.sector_size_1k)
->> @@ -1508,12 +1508,12 @@ static int brcmnand_read_by_pio(struct mtd_info *mtd, struct nand_chip *chip,
->>               brcmnand_waitfunc(mtd, chip);
->>
->>               if (likely(buf)) {
->> -                     brcmnand_soc_data_bus_prepare(ctrl->soc);
->> +                     brcmnand_soc_data_bus_prepare(ctrl->soc, false);
->>
->>                       for (j = 0; j < FC_WORDS; j++, buf++)
->>                               *buf = brcmnand_read_fc(ctrl, j);
->>
->> -                     brcmnand_soc_data_bus_unprepare(ctrl->soc);
->> +                     brcmnand_soc_data_bus_unprepare(ctrl->soc, false);
->>               }
->>
->>               if (oob)
->> @@ -1678,12 +1678,12 @@ static int brcmnand_write(struct mtd_info *mtd, struct nand_chip *chip,
->>               (void)brcmnand_read_reg(ctrl, BRCMNAND_CMD_ADDRESS);
->>
->>               if (buf) {
->> -                     brcmnand_soc_data_bus_prepare(ctrl->soc);
->> +                     brcmnand_soc_data_bus_prepare(ctrl->soc, false);
->>
->>                       for (j = 0; j < FC_WORDS; j++, buf++)
->>                               brcmnand_write_fc(ctrl, j, *buf);
->>
->> -                     brcmnand_soc_data_bus_unprepare(ctrl->soc);
->> +                     brcmnand_soc_data_bus_unprepare(ctrl->soc, false);
->>               } else if (oob) {
->>                       for (j = 0; j < FC_WORDS; j++)
->>                               brcmnand_write_fc(ctrl, j, 0xffffffff);
->> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.h b/drivers/mtd/nand/brcmnand/brcmnand.h
->> index ef5eabb..5c44cd4 100644
->> --- a/drivers/mtd/nand/brcmnand/brcmnand.h
->> +++ b/drivers/mtd/nand/brcmnand/brcmnand.h
->> @@ -23,19 +23,22 @@ struct dev_pm_ops;
->>  struct brcmnand_soc {
->>       bool (*ctlrdy_ack)(struct brcmnand_soc *soc);
->>       void (*ctlrdy_set_enabled)(struct brcmnand_soc *soc, bool en);
->> -     void (*prepare_data_bus)(struct brcmnand_soc *soc, bool prepare);
->> +     void (*prepare_data_bus)(struct brcmnand_soc *soc, bool prepare,
->> +                              bool is_param);
->>  };
->>
->> -static inline void brcmnand_soc_data_bus_prepare(struct brcmnand_soc *soc)
->> +static inline void brcmnand_soc_data_bus_prepare(struct brcmnand_soc *soc,
->> +                                              bool is_param)
->>  {
->>       if (soc && soc->prepare_data_bus)
->> -             soc->prepare_data_bus(soc, true);
->> +             soc->prepare_data_bus(soc, true, is_param);
->>  }
->>
->> -static inline void brcmnand_soc_data_bus_unprepare(struct brcmnand_soc *soc)
->> +static inline void brcmnand_soc_data_bus_unprepare(struct brcmnand_soc *soc,
->> +                                                bool is_param)
->>  {
->>       if (soc && soc->prepare_data_bus)
->> -             soc->prepare_data_bus(soc, false);
->> +             soc->prepare_data_bus(soc, false, is_param);
->>  }
->>
->>  static inline u32 brcmnand_readl(void __iomem *addr)
->> diff --git a/drivers/mtd/nand/brcmnand/iproc_nand.c b/drivers/mtd/nand/brcmnand/iproc_nand.c
->> index 585596c..4c6ae11 100644
->> --- a/drivers/mtd/nand/brcmnand/iproc_nand.c
->> +++ b/drivers/mtd/nand/brcmnand/iproc_nand.c
->> @@ -74,7 +74,8 @@ static void iproc_nand_intc_set(struct brcmnand_soc *soc, bool en)
->>       spin_unlock_irqrestore(&priv->idm_lock, flags);
->>  }
->>
->> -static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare)
->> +static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare,
->> +                               bool is_param)
->>  {
->>       struct iproc_nand_soc *priv =
->>                       container_of(soc, struct iproc_nand_soc, soc);
->> @@ -86,10 +87,19 @@ static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare)
->>
->>       val = brcmnand_readl(mmio);
->>
->> -     if (prepare)
->> -             val |= IPROC_NAND_APB_LE_MODE;
->> -     else
->> +     /*
->> +      * In the case of BE or when dealing with NAND data, alway configure
->> +      * the APB bus to LE mode before accessing the FIFO and back to BE mode
->> +      * after the access is done
->> +      */
->> +     if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN) || !is_param) {
->> +             if (prepare)
->> +                     val |= IPROC_NAND_APB_LE_MODE;
->> +             else
->> +                     val &= ~IPROC_NAND_APB_LE_MODE;
->> +     } else { /* when in LE accessing the parameter page, keep APB in BE */
->>               val &= ~IPROC_NAND_APB_LE_MODE;
->> +     }
->>
->>       brcmnand_writel(val, mmio);
->>
->
+struct variable_length_struct {
+	int length;
+	char data[];
+};
+
+struct empty_struct {
+	char nothing[];
+};
+
+which could be used in place of the gcc specific syntax in
+portable code.
+
+	Arnd
