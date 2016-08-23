@@ -1,113 +1,78 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 23 Aug 2016 13:22:50 +0200
-Subject: [PATCH] ARM: dts: meson-gxbb: Add support for the Nexbox A95X Board
-Message-ID: <1471951370-29269-1-git-send-email-narmstrong@baylibre.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Tue, 23 Aug 2016 16:53:44 +0530
+Subject: [PATCH v24 5/9] arm64: kdump: add kdump support
+In-Reply-To: <20160823003815.GL20080@linaro.org>
+References: <20160809015248.28414-2-takahiro.akashi@linaro.org>
+ <20160809015615.28527-1-takahiro.akashi@linaro.org>
+ <20160809015615.28527-3-takahiro.akashi@linaro.org>
+ <57AB586D.3080900@arm.com> <20160818071547.GC20080@linaro.org>
+ <20160819012651.GE20080@linaro.org>
+ <20160819112217.GB22221@localhost.localdomain>
+ <20160822012919.GI20080@linaro.org> <57BB0272.1000008@arm.com>
+ <20160823003815.GL20080@linaro.org>
+Message-ID: <20160823112343.GC13501@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/Makefile               |  1 +
- .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    | 79 ++++++++++++++++++++++
- 2 files changed, 80 insertions(+)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+On 23/08/2016:09:38:16 AM, AKASHI Takahiro wrote:
+> On Mon, Aug 22, 2016 at 02:47:30PM +0100, James Morse wrote:
+> > On 22/08/16 02:29, AKASHI Takahiro wrote:
+> > > On Fri, Aug 19, 2016 at 04:52:17PM +0530, Pratyush Anand wrote:
+> > >> It will help kexec-tools to prevent copying  of any unnecessary data. I
+> > >> think, then you also need to change phys_offset calculation in kexec-tools. That
+> > >> should be start of either of first "reserved" or "System RAM" block.
+> > > 
+> > > Good point, but I'm not sure this is always true.
+> > 
+> > > Is there any system whose ACPI memory is *not* part of DRAM
+> > 
+> > From the spec, it looks like this is allowed.
+> > 
+> > What do you mean by 'DRAM'? Any ACPI region will be in the UEFI memory map, so
+> > the question is what is its type and memory attributes?
+> 
+> Yes.
+> 
+> > The UEFI spec[0] says ACPI regions can have a type of EfiACPIReclaimMemory or
+> > EfiACPIMemoryNVS, the memory attributes aren't specified, so are chosen by the
+> > firmware.
+> > 
+> > It is possible these regions have to be mapped non-cacheable, page 40 has a
+> > couple of:
+> > > If no information about the table location exists in the UEFI memory map or
+> > ACPI memory
+> > > descriptors, the table is assumed to be non-cached.
+> > 
+> > reserve_regions() in drivers/firmware/efi/arm-init.c will add any entry in the
+> > memory map that has a 'WB' attribute to the memblock.memory list (via
+> > early_init_dt_add_memory_arch()), it will also mark as no-map regions that have
+> > this attribute and aren't in the is_reserve_region() list.
+> > 
+> > If these ACPI regions have the 'WB' attribute, we add them as memory and mark
+> > them nomap. These show up as either a hole, or 'reserved' in /proc/iomem.
+> > If they don't have the 'WB' attribute, then then they are left out of memblock
+> > and aren't part of DRAM, I don't think these will show up in /proc/iomem at all.
+> 
+> Let's say,
+> 0x1000-0x1fff: reserved (SRAM for UEFI, WB)
+> 0x80000000-0xffffffff: System RAM (DRAM)
 
-diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-index 47ec703..2c50439 100644
---- a/arch/arm64/boot/dts/amlogic/Makefile
-+++ b/arch/arm64/boot/dts/amlogic/Makefile
-@@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-p201.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-pro.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-meta.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-telos.dtb
-+dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-nexbox-a95x.dtb
- 
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-new file mode 100644
-index 0000000..c418bd7
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-@@ -0,0 +1,79 @@
-+/*
-+ * Copyright (c) 2016 Andreas F?rber
-+ * Copyright (c) 2016 BayLibre, Inc.
-+ * Author: Neil Armstrong <narmstrong@kernel.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "meson-gxbb.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	compatible = "nexbox,a95x", "amlogic,meson-gxbb";
-+	model = "NEXBOX A95X";
-+	
-+	aliases {
-+		serial0 = &uart_AO;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x40000000>;
-+	};
-+};
-+
-+&uart_AO {
-+	status = "okay";
-+	pinctrl-0 = <&uart_ao_a_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&ethmac {
-+	status = "okay";
-+	pinctrl-0 = <&eth_pins>;
-+	pinctrl-names = "default";
-+};
-+
--- 
-1.9.1
+May be slightly more complicated:
+0x80000000-0x80001fff: System RAM (DRAM) for UEFI, WB
+0x80002000-0xffffffff: System RAM (DRAM)
+
+Kernel will have phys_offset 0x80000000, however kexec-tools will calculate it
+as 0x80002000.
+
+> 
+> If, as Pratyush suggested, "reserved" resources are added to phys_offset
+> calculation, the kernel linear mapping area starts at PAGE_OFFSET, but
+> there is no actual mapping around PAGE_OFFSET.
+> It won't hurt anything, but looks funny.
+> So we'd better not include "reserved" in phys_offset calculation anyway.
+>         -> Pratyush
+
+My only concern is that, then we will have different values of phys_offset in
+kernel and kexec-tools, which might lead to further confusion.
+
+~Pratyush
