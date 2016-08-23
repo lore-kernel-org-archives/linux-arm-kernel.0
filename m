@@ -1,84 +1,89 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 23 Aug 2016 11:57:20 -0700
-Subject: [PATCH v2 1/4] dt-binding: remoteproc: Introduce ADSP loader
- binding
-In-Reply-To: <20160823183121.GA13010@rob-hp-laptop>
-References: <1471931866-3107-1-git-send-email-bjorn.andersson@linaro.org>
- <20160823183121.GA13010@rob-hp-laptop>
-Message-ID: <20160823185720.GD15161@tuxbot>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 23 Aug 2016 20:15:17 +0100
+Subject: [PATCH v5 00/19] Generic DT bindings for PCI IOMMUs and ARM SMMU
+In-Reply-To: <cover.1471975357.git.robin.murphy@arm.com>
+References: <cover.1471975357.git.robin.murphy@arm.com>
+Message-ID: <3a9a9369-d8cd-66f4-9344-965c80894bb6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 23 Aug 11:31 PDT 2016, Rob Herring wrote:
+On 23/08/16 20:05, Robin Murphy wrote:
+> Hi all,
 
-> On Mon, Aug 22, 2016 at 10:57:43PM -0700, Bjorn Andersson wrote:
-> > This document defines the binding for a component that loads firmware
-> > and control the life cycle of the Qualcomm ADSP core.
-> > 
-> > Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> > ---
-> > 
-> > Changes since v1:
-> > - Added platform names to compatibility
-> > 
-> >  .../devicetree/bindings/remoteproc/qcom,adsp.txt   | 70 ++++++++++++++++++++++
-> >  1 file changed, 70 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/remoteproc/qcom,adsp.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/remoteproc/qcom,adsp.txt b/Documentation/devicetree/bindings/remoteproc/qcom,adsp.txt
-> > new file mode 100644
-> > index 000000000000..3820151ce3e9
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/remoteproc/qcom,adsp.txt
-> > @@ -0,0 +1,70 @@
-> > +Qualcomm ADSP Peripheral Image Loader
-> > +
-> > +This document defines the binding for a component that loads and boots firmware
-> > +on the Qualcomm ADSP core.
+Oh bums, looks like I managed to miss LAKML off the CC list. If anyone
+there is interested, it's over here:
+
+https://lists.linuxfoundation.org/pipermail/iommu/2016-August/018230.html
+
+Robin.
+
 > 
-> ADSP is for Audio DSP? So there is another driver for the audio 
-> functions? Why doesn't it do the firmware loading? I'm still confused 
-> why this binding is separate? If you had one common interface (a rproc) 
-> to load and boot various other blocks like ADSP and Venus, then this 
-> would make sense. Or does every accel block have some separate control 
-> uC associated with it?
+> At long last I've finished the big SMMUv2 rework, so here's everything
+> all together for a v5. As a quick breakdown:
 > 
-
-The ADSP is a general purpose CPU [1] mainly running services related to
-audio handling - including controlling audio paths, driving the audio
-blocks, audio effects, audio codec decoding.
-
-On some platforms it also sports services for sensor batch offloading
-(or whatever Google calls it) and video decoding for certain codecs.
-
-All these services show up in a semi-probable fashion on other buses;
-often on SMD, APR, QRTR.
-
-
-There are a few blocks that share mechanism with the remoteproc, that
-does not have a separate uC - with a destinct life cycle - I'm still
-investigating how to describe these, but most likely those cases will
-not show up in DT at all.
-
-On msm8916 you have the following additional uCs; RPM, Hexagon, Wireless
-and Venus; the RPM is always-on.
-
-On msm8960 we have the following uCs; RPM, Hexagon for audio, DSPS (ARM
-for sensor processing), two(?) Hexagons for modem, WCNSS (ARM core for
-wireless), Venus (seems to be another ARM core) and an optional ARM core
-for GPS if you don't have the modem Hexagons.
-
-So, we have between 4 and 8 extra uCs in these SoCs; most are controlled
-in a very similar fashion, but requires different resources and some
-tweaks to the steps of bringing them up, down and handling crashes.
-
-Downstream this is handled by having a "rproc" driver that's completely
-generic, DT provides lists of resources controlling each step and a
-callback mechanism is used to extend the rproc drivers with specific
-functionality - it took me months to figure out how to boot the WCNSS
-because the logic and resources are scattered throughout.
-
-[1] https://en.wikipedia.org/wiki/Qualcomm_Hexagon
-
-Regards,
-Bjorn
+> Patches 1-3 are the core PCI part, all acked and ready to go. No code
+> changes from v4.
+> 
+> Patch 4 is merely bugfixed from v4 for simplicity, as I've not yet
+> managed to take as close a look at Lorenzo's follow-on work as I'd like.
+> 
+> Patches 5-7 (SMMUv3) are mostly unchanged beyond a slight tweak to #5.
+> 
+> Patches 8-17 are the all-new SMMUv2 rework.
+> 
+> Patch 18 goes along with the fix already in 4.8-rc3 to help avoid 64-bit
+> DMA masks going wrong now that DMA ops will be enabled.
+> 
+> Finally, patch 19 addresses the previous problem of having to choose
+> between DMA ops or working MSIs. This is currently at the end as
+> moving it before #17 would require a further interim SMMUv2 patch, and
+> a 19-patch series is already quite enough...
+> 
+> I've pushed out a branch based on iommu/next to the usual place:
+> 
+> git://linux-arm.org/linux-rm iommu/generic-v5
+> 
+> Thanks,
+> Robin.
+> ---
+> 
+> Mark Rutland (1):
+>   Docs: dt: add PCI IOMMU map bindings
+> 
+> Robin Murphy (18):
+>   of/irq: Break out msi-map lookup (again)
+>   iommu/of: Handle iommu-map property for PCI
+>   iommu/of: Introduce iommu_fwspec
+>   iommu/arm-smmu: Implement of_xlate() for SMMUv3
+>   iommu/arm-smmu: Support non-PCI devices with SMMUv3
+>   iommu/arm-smmu: Set PRIVCFG in stage 1 STEs
+>   iommu/arm-smmu: Handle stream IDs more dynamically
+>   iommu/arm-smmu: Consolidate stream map entry state
+>   iommu/arm-smmu: Keep track of S2CR state
+>   iommu/arm-smmu: Refactor mmu-masters handling
+>   iommu/arm-smmu: Streamline SMMU data lookups
+>   iommu/arm-smmu: Add a stream map entry iterator
+>   iommu/arm-smmu: Intelligent SMR allocation
+>   iommu/arm-smmu: Convert to iommu_fwspec
+>   Docs: dt: document ARM SMMU generic binding usage
+>   iommu/arm-smmu: Wire up generic configuration support
+>   iommu/arm-smmu: Set domain geometry
+>   iommu/dma: Add support for mapping MSIs
+> 
+>  .../devicetree/bindings/iommu/arm,smmu.txt         |  63 +-
+>  .../devicetree/bindings/pci/pci-iommu.txt          | 171 ++++
+>  drivers/iommu/Kconfig                              |   2 +-
+>  drivers/iommu/arm-smmu-v3.c                        | 347 ++++----
+>  drivers/iommu/arm-smmu.c                           | 952 ++++++++++-----------
+>  drivers/iommu/dma-iommu.c                          | 141 ++-
+>  drivers/iommu/of_iommu.c                           |  95 +-
+>  drivers/irqchip/irq-gic-v2m.c                      |   3 +
+>  drivers/irqchip/irq-gic-v3-its.c                   |   3 +
+>  drivers/of/irq.c                                   |  78 +-
+>  drivers/of/of_pci.c                                | 102 +++
+>  include/linux/dma-iommu.h                          |   9 +
+>  include/linux/of_iommu.h                           |  15 +
+>  include/linux/of_pci.h                             |  10 +
+>  14 files changed, 1208 insertions(+), 783 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pci/pci-iommu.txt
+> 
