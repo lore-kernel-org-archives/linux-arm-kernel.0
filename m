@@ -1,58 +1,109 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 23 Aug 2016 15:10:44 -0500
-Subject: [PATCH 2/4] ARM: dts: exynos: Use 'hpd-gpios' instead of
- 'hpd-gpio'
-In-Reply-To: <1471943619-6102-3-git-send-email-woogyom.kim@gmail.com>
-References: <1471943619-6102-1-git-send-email-woogyom.kim@gmail.com>
- <1471943619-6102-3-git-send-email-woogyom.kim@gmail.com>
-Message-ID: <20160823201044.GA1734@rob-hp-laptop>
+From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
+Date: Tue, 23 Aug 2016 22:24:22 +0200
+Subject: [PATCH] serial: vt8500_serial: Fix a parameter of
+ find_first_zero_bit.
+In-Reply-To: <11520879.bzQ3JxDSyK@wuerfel>
+References: <1471814425-18949-1-git-send-email-christophe.jaillet@wanadoo.fr>
+ <2512469.eM8MYFl15l@wuerfel>
+ <57f44339-76c6-051f-b592-2648afaae336@wanadoo.fr>
+ <11520879.bzQ3JxDSyK@wuerfel>
+Message-ID: <79ef4c74-e268-c443-c51f-4fb4bfe5971e@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2016 at 06:13:37PM +0900, Milo Kim wrote:
-> This patch enables getting a HPD GPIO descriptor quickly.
-> The exynos-hdmi driver uses "hpd" for HDMI hot plug detection.
-> 
-> 	static int hdmi_resources_init(struct hdmi_context *hdata)
-> 	{
-> 		...
-> 		hdata->hpd_gpio = devm_gpiod_get(dev, "hpd", GPIOD_IN);
-> 		...
-> 	}
-> 
-> This calls 'of_find_gpio()' and it generates the GPIO consumer ID by referring
-> GPIO suffix. So 'hpd-gpios' is preferred on getting a GPIO descriptor.
-> 
-> However, if the device tree uses 'hpd-gpio', then the exynos-hdmi driver
-> always retries to get a GPIO descriptor because the first GPIO suffix is not
-> 'gpio' but 'gpios'. So you always see the debug message below.
-> 
-> 	of_get_named_gpiod_flags: can't parse 'hpd-gpios' property of node '/soc/hdmi at 14530000[0]'
-> 
-> Use the preferred property, 'hpd-gpios' instead of 'hpd-gpio'.
-> 
-> Cc: Inki Dae <inki.dae@samsung.com>
-> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
-> Cc: Seung-Woo Kim <sw0312.kim@samsung.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: dri-devel at lists.freedesktop.org
-> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
-> ---
->  Documentation/devicetree/bindings/display/exynos/exynos_hdmi.txt | 4 ++--
->  arch/arm/boot/dts/exynos4210-universal_c210.dts                  | 2 +-
->  arch/arm/boot/dts/exynos4412-odroid-common.dtsi                  | 2 +-
->  arch/arm/boot/dts/exynos5250-arndale.dts                         | 2 +-
->  arch/arm/boot/dts/exynos5250-smdk5250.dts                        | 2 +-
->  arch/arm/boot/dts/exynos5250-snow-common.dtsi                    | 2 +-
->  arch/arm/boot/dts/exynos5250-spring.dts                          | 2 +-
->  arch/arm/boot/dts/exynos5420-peach-pit.dts                       | 2 +-
->  arch/arm/boot/dts/exynos5420-smdk5420.dts                        | 2 +-
->  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi               | 2 +-
->  arch/arm/boot/dts/exynos5800-peach-pi.dts                        | 2 +-
->  11 files changed, 12 insertions(+), 12 deletions(-)
+Le 23/08/2016 ? 11:23, Arnd Bergmann a ?crit :
+> On Tuesday, August 23, 2016 6:20:28 AM CEST Christophe JAILLET wrote:
+>> Le 22/08/2016 ? 10:42, Arnd Bergmann a ?crit :
+>>> [...]
+>>> Sorry, but I'm not following the logic here.
+>>>
+>>> [...]
+>>> You argue that the two have the same meaning, which I see, but
+>>> why is it better than the existing code?
+>>>
+>>> 	Arnd
+>> Hi,
+>>
+>> sorry if my explanation was unclear.
+>>
+>> What I mean is that if "sizeof(unsigned long) = 4" (i.e. 32 bits systems
+>> ?) then:
+>>
+>> 	port = find_first_zero_bit(&vt8500_ports_in_use, sizeof(vt8500_ports_in_use));
+>> turns into:
+>>    	port = find_first_zero_bit(&vt8500_ports_in_use, 4);
+>>
+>> find_first_zero_bit "Returns the bit number of the first set bit.  If no bits are set, returns @size."
+>> So, in this case, it can return 1, 2, 3 or 4, if one of the 4 first bits is 0.
+>> And will also return 4, if none of the 4 first bits is 0.
+> Ah, got it.
+>
+>> Finally, what I meant by "Other options are possible:" is:
+>>     - 'vt8500_ports_in_use' being a 'unsigned long', use ffz to reduce code verbosity
+>> 	port = ffz(&vt8500_ports_in_use);
+>>       would also work, because it is equivalent to:
+>> 	port = find_first_zero_bit(&vt8500_ports_in_use, BITS_PER_LONG);
+>>
+>>     - VT8500_MAX_PORTS, in order to be consistent with the test below
+>> 	port = find_first_zero_bit(&vt8500_ports_in_use, VT8500_MAX_PORTS);
+>>       would also work and is maybe more logical in regard to the test "if (port >= VT8500_MAX_PORTS)"
+>>
+>>
+>>
+>> Now if "sizeof(unsigned long) = 8" (i.e. 64 bits systems ?), the actual code would work.
+>> But using "sizeof(long)" to mean "more than VT8500_MAX_PORTS" is odd.
+>> In other words, expressing a number of bits using something that gives a size in bytes is, IMHO, spurious.
+>>    
+>> All this is pure speculation.
+>>
+>> Hoping that it is clearer now ( and that my analysis is right :) )
+> I misread the code in the same way the original author wrote it wrong,
+> I guess it was meant to say
+>
+> 	port = find_first_zero_bit(&vt8500_ports_in_use, sizeof(vt8500_ports_in_use) * 8);
+I guess so.
 
-Acked-by: Rob Herring <robh@kernel.org>
+> to convert number of bytes into number of bits. Your patch is absolutely
+> correct, but being more specific about the kind of mistake that was made
+> is a good idea.
+>
+> Regarding which of the four alternatives to use, I'd probably use
+> your third one, checking against VT8500_MAX_PORTS. To make this code
+> absolutely foolproof, we can add this hunk too then:
+Agreed for VT8500_MAX_PORTS. This documents the code.
+
+Using DECLARE_BITMAP is also nice (even if I doubt that it will be 
+useful one day in this particular case)
+It would turn the vt8500_ports_in_use variable into a pointer. So some 
+more code modification would be required.
+
+Thk for your feedback and comments.
+
+I'll send a v2.
+
+
+CJ
+
+
+> diff --git a/drivers/tty/serial/vt8500_serial.c b/drivers/tty/serial/vt8500_serial.c
+> index 23cfc5e16b45..a68be66d2770 100644
+> --- a/drivers/tty/serial/vt8500_serial.c
+> +++ b/drivers/tty/serial/vt8500_serial.c
+> @@ -118,7 +118,7 @@ struct vt8500_port {
+>    * have been allocated as we can't use pdev->id in
+>    * devicetree
+>    */
+> -static unsigned long vt8500_ports_in_use;
+> +static DECLARE_BITMAP(vt8500_ports_in_use, VT8500_MAX_PORTS);
+>   
+>   static inline void vt8500_write(struct uart_port *port, unsigned int val,
+>   			     unsigned int off)
+>
+>
+>
+> 	Arnd
+
+
+---
+L'absence de virus dans ce courrier ?lectronique a ?t? v?rifi?e par le logiciel antivirus Avast.
+https://www.avast.com/antivirus
