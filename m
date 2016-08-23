@@ -1,34 +1,147 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Aug 2016 09:58:54 +0100
-Subject: [PATCH 2/2] ARM: sa1100: register clocks early
-In-Reply-To: <CALT56yPLMiQZaeSxmo3xz_+6c11BO-hWSEN2ex-ziJGZdZDY6w@mail.gmail.com>
-References: <E1baiKh-0004yg-OF@rmk-PC.armlinux.org.uk>
- <CALT56yPLMiQZaeSxmo3xz_+6c11BO-hWSEN2ex-ziJGZdZDY6w@mail.gmail.com>
-Message-ID: <20160823085854.GD1041@n2100.armlinux.org.uk>
+From: kid.jin@hisilicon.com (Jinguojun)
+Date: Tue, 23 Aug 2016 17:00:22 +0800
+Subject: [PATCH V4]mmc: dw_mmc-k3: UHS-SD card for Hisilicon Hikey
+In-Reply-To: <af90b627-e581-6722-8653-156341d3e8b7@samsung.com>
+References: <1470276973-41683-1-git-send-email-kid.jin@hisilicon.com>
+ <74c80b1c-5570-0ee0-4132-ff703d8d5eb4@hisilicon.com>
+ <CGME20160808091030epcas1p4e868c5412d08f0ed737e85714442e801@epcas1p4.samsung.com>
+ <06f63a26-251d-5ba8-f877-dae75aa8e362@rock-chips.com>
+ <1b724dde-863d-fa28-fa58-595c34c1bef2@samsung.com>
+ <5d5551f4-e49c-d005-eb0b-9ca472a8d249@hisilicon.com>
+ <af90b627-e581-6722-8653-156341d3e8b7@samsung.com>
+Message-ID: <49dcf25e-116e-b0d8-fbaf-4f23488433d3@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2016 at 04:47:08AM +0300, Dmitry Eremin-Solenikov wrote:
-> 2016-08-19 14:51 GMT+03:00 Russell King <rmk+kernel@armlinux.org.uk>:
-> > Since we switched to use pxa_timer, we need to provide the OSTIMER0
-> > clock.  However, as the clock is initialised early, we need to provide
-> > the clock early as well, so that pxa_timer can find it.  Adding the
-> > clock to the clkdev table at core_initcall() time is way too late.
+Hi
+
+On 2016/8/17 15:20, Jaehoon Chung wrote:
+> On 08/17/2016 03:11 PM, Jinguojun wrote:
+>> Hi
+>>
+>> On 2016/8/8 18:46, Jaehoon Chung wrote:
+>>> Hi,
+>>>
+>>> On 08/08/2016 06:10 PM, Shawn Lin wrote:
+>>>> Hi guy,
+>>>>
+>>>> On 2016/8/8 15:10, Jinguojun wrote:
+>>>>> Hi,maintainers
+>>>>>
+>>>>> Pls help to review code,this is the newest patch after your advise
+>>>
+>>> Subject..
+>>>
+>>> s/UHS-SD/UHS-I/
+>>>
+>>>>>
+>>>>
+>>>> Please give Jaehoon more time to review your patch before sending a
+>>>> ping or resending one(~2 weeks), as it's only four days(weekend
+>>>> included) since v4 was done....IMHO, it's quite bold...
+>>>>
+>>>>> Thx
+>> I apologize for my rudeness.
 > 
-> This worked for me before, so maybe the init order of other kernel parts
-> has changed. Anyway:
+> Don't mind. Feel free to tell me anytime! :)
 > 
-> Acked-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-
-It worked in so far as we fell back to the non-clock based code, so
-things continued to work.  However, a warning was printed at each
-boot.
-
-I don't think this ever worked.  Timers are setup very early in the
-boot process (going back to 0.99.x times), and core_initcall() has
-always been after that, after pid1 has been created.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>>>>> On 2016/8/4 10:16, Jin Guojun wrote:
+>>>>>> mmc: dw_mmc-k3: Hisilicon Hikey have no tuning function in
+>>>>>> dw_mmc-k3.c,so we must do the tuning function stub when we init UHS card.
+>>>>>>
+>>>>
+>>>> Hrmmm....  remove "mmc: dw_mmc-k3:" from the meat of commit msg?
+>>>>
+>>>> And you do nothing for dw_mci_hi6220_execute_tuning, why?
+>>>> Could you elaborate more..
+>>>>
+>>>>
+>> OK I'll remove the mmc: dw_mmc-k3:,Then Hikey can't support SDR104,so we only support SDR12 SDR25 SD50,and we do not need to do tuning for these modes.
+>>>>>> V1:add .prepare_command in dw_mmc.c
+>>>>>> V2:delete .prepare_command, add err = 0 in dw_mci_execute_tuning
+>>>>>> V3:delete err = 0 in dw_mci_execute_tuning,add .execute_tuning in
+>>>>>> dw_mmc-k3.c
+>>>>>> V4:add "linux-mmc at vger.kernel.org", patch version, Changelog, etc..
+>>>>
+>>>> The changelog is totally wrong, namely it should not be listed in the
+>>>> commit msg...
+>>>>
+>> OK I'll delete this part
+>>>>>>
+>>>>>> Signed-off-by: Jin Guojun <kid.jin@hisilicon.com>
+>>>>>> ---
+>>>>>>  drivers/mmc/host/dw_mmc-k3.c | 6 ++++++
+>>>>>>  1 file changed, 6 insertions(+)
+>>>>>>
+>>>>>> diff --git a/drivers/mmc/host/dw_mmc-k3.c b/drivers/mmc/host/dw_mmc-k3.c
+>>>>>> index 8e9d886..6247894 100644
+>>>>>> --- a/drivers/mmc/host/dw_mmc-k3.c
+>>>>>> +++ b/drivers/mmc/host/dw_mmc-k3.c
+>>>>>> @@ -131,11 +131,17 @@ static void dw_mci_hi6220_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+>>>>>>      host->bus_hz = clk_get_rate(host->biu_clk);
+>>>>>>  }
+>>>>>>
+>>>>>> +static int dw_mci_hi6220_execute_tuning(struct dw_mci_slot *slot, u32 opcode)
+>>>>>> +{
+>>>>>> +    return 0;
+>>>>>> +}
+>>>
+>>>
+>>> All of UHS-I cards didn't need to do tuning sequence on your SoC? it's strange.
+>>>
+>>> I think we can fix more exactly in dw_mmc.c
+>>> As i know, some UHS cards don't need to send the tuning sequence.
+>>> (If i know wrong, let me know plz.)
+>>>
+>>> But just skipping execute_tuning..I think it's not correct.
+>>>
+>>> Best Regards,
+>>> Jaehoon Chung
+>>>
+>> We cant support SDR104 currently.We only turn on SDR12 SDR25 SDR50.
+> 
+> I will send the patch for execute_tuning in dwmmc.c within this week.
+> After that, could you check that patch? I will add your email to CC. How about?
+> 
+> I think it's better than using the dummy function. :)
+> 
+> Best Regards,
+> Jaehoon Chung
+> 
+OK when you finish the patch,pls give me the modefy
+thx
+>>>>>> +
+>>>>>>  static const struct dw_mci_drv_data hi6220_data = {
+>>>>>>      .caps            = dw_mci_hi6220_caps,
+>>>>>>      .switch_voltage        = dw_mci_hi6220_switch_voltage,
+>>>>>>      .set_ios        = dw_mci_hi6220_set_ios,
+>>>>>>      .parse_dt        = dw_mci_hi6220_parse_dt,
+>>>>>> +    .execute_tuning        = dw_mci_hi6220_execute_tuning,
+>>>>>>  };
+>>>>>>
+>>>>>>  static const struct of_device_id dw_mci_k3_match[] = {
+>>>>>>
+>>>>>
+>>>>> -- 
+>>>>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>>>>> the body of a message to majordomo at vger.kernel.org
+>>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>>>
+>>>>
+>>>>
+>>>
+>>>
+>>> .
+>>>
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>>
+>>
+> 
+> 
+> .
+> 
