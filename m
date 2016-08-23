@@ -1,33 +1,72 @@
 From: kbeldan@baylibre.com (Karl Beldan)
-Date: Tue, 23 Aug 2016 12:57:00 +0000
-Subject: [PATCH 2/3] drm/tilcdc: Enable EOF interrupts for v1 LCDC
-In-Reply-To: <20160823125701.25700-1-kbeldan@baylibre.com>
-References: <20160823125701.25700-1-kbeldan@baylibre.com>
-Message-ID: <20160823125701.25700-3-kbeldan@baylibre.com>
+Date: Tue, 23 Aug 2016 12:56:58 +0000
+Subject: [PATCH 0/3] drm/tilcdc: Some fixes for LCDC rev1
+Message-ID: <20160823125701.25700-1-kbeldan@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This got accidentally dropped in the fixed commit and is required for
-the driver to properly work on the rev1 IP, such as found on the LCDK.
+Hi,
 
-Fixes: 2b2080d7e9ae ("drm/tilcdc: Get rid of complex ping-pong mechanism")
-Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
----
- drivers/gpu/drm/tilcdc/tilcdc_crtc.c | 2 ++
- 1 file changed, 2 insertions(+)
+I found some missing bits for rev1 of the LCDC and here are some of the
+changes I am using to use the DRM driver on an LCDCK (which has a rev1).
+1/3 seems required by rev1 of the IP and without it my the LCDC on my
+LCDK keeps can't sync, 2/3 is required by the driver logic, while 3/3
+is less of a requirement.
+Although 1,2/3 would have fitted drm-fixes I based them on drm-next as
+2/3 would conflict with the recent changes in drm-next.
 
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_crtc.c b/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
-index 89d6916..163f111 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
-@@ -98,6 +98,8 @@ static void tilcdc_crtc_enable_irqs(struct drm_device *dev)
- 	if (priv->rev == 1) {
- 		tilcdc_set(dev, LCDC_RASTER_CTRL_REG,
- 			LCDC_V1_UNDERFLOW_INT_ENA);
-+		tilcdc_set(dev, LCDC_DMA_CTRL_REG,
-+			LCDC_V1_END_OF_FRAME_INT_ENA);
- 	} else {
- 		tilcdc_write(dev, LCDC_INT_ENABLE_SET_REG,
- 			LCDC_V2_UNDERFLOW_INT_ENA |
+Another thing which is also an absolute requirement for the rev1 but 
+with which rev2 seems to cope fine is the palette loading (even if the DRM
+uses >= 16bpp formats), dixit the TRM:
+"12-, 16-, and 24-BPP modes do not need a palette; i.e., the pixel data is
+the desired RGB value. However, the first 32 bytes are still considered a
+palette. The first entry should be 4000h (bit 14 is 1) while the remaining
+entries must be filled with 0.".
+ATM I am using a local crude way of loading the palette to verify the
+missing bits to get the DRM driver properly working on the LCDK (as I
+haven't seen how things work in the DRM subsystem I can't post any proper
+change for that).
+
+The posted changes and the above mentioned palette loading missing bit 
+are specific to the DRM driver.
+
+However there are other shortcomings to the proper functioning of the 
+LCDC on some platforms (I am currently focusing on the LCDK but I guess 
+it should be true for all da850 based systems), which are not inherent to
+the DRM driver driver but which strongly relate to it:
+
+- The pixel clock rate setting (eg. currently the davinci clk can't cope
+properly with the DRM driver way of setting the clock and doesn't use
+the common clock framework)
+- The memory bandwidth/latency requirements for the LCDC are not met 
+with the default priority settings (apparently there is a fix in
+da850_lcd_hw_init of: http://arago-project.org/git/projects/linux-davinci.git?p=projects/linux-davinci.git;a=blob;f=arch/arm/mach-davinci/board-omapl138-lcdk.c;h=689b4f304011e09e262782cf8c4b96eba00ac28b;hb=HEAD).
+Of course this one affects both the DRM and framebuffer systems.
+
+Hence to test the LCDK my crude local changes include (ie. on top of the
+posted changes and some dts or sync_lost recovery bits):
+- palette loading
+- tweak of the pixel clock to cope with davinci clk
+- adjustment of the memory master priorities
+
+
+BTW, with the recent changes of tilcdc from drm-next, I see this warning
+when loading the module:
+"drm:drm_helper_disable_unused_functions [drm_kms_helper]] *ERROR* Called for atomic driver, this is not what you want."
+
+
+Regards, 
+Karl
+
+
+Karl Beldan (3):
+  drm/tilcdc: Adjust the FB_CEILING address
+  drm/tilcdc: Enable EOF interrupts for v1 LCDC
+  drm/tilcdc: Advertise the DRM_FORMATs according to the IP revision
+
+ drivers/gpu/drm/tilcdc/tilcdc_crtc.c  | 4 +++-
+ drivers/gpu/drm/tilcdc/tilcdc_plane.c | 7 ++++++-
+ 2 files changed, 9 insertions(+), 2 deletions(-)
+
 -- 
 2.9.2
