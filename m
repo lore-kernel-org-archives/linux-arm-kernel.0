@@ -1,225 +1,73 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 23 Aug 2016 13:14:02 -0500
-Subject: [PATCH 2/2] ARM: dts: add TOPEET itop elite based board
-In-Reply-To: <1471875489-11428-3-git-send-email-ayaka@soulik.info>
-References: <4767fc2a-95b7-ee0d-f51a-7a5d6ca89d8f@samsung.com>
- <1471875489-11428-1-git-send-email-ayaka@soulik.info>
- <1471875489-11428-3-git-send-email-ayaka@soulik.info>
-Message-ID: <20160823181402.GA6302@rob-hp-laptop>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 23 Aug 2016 20:26:00 +0200
+Subject: [PATCH v3 6/7] phy-sun4i-usb: Add
+ "allwinner,usb0-usb-a-connector" dt property
+In-Reply-To: <20160823180016.GA28538@rob-hp-laptop>
+References: <1471781799-10457-1-git-send-email-hdegoede@redhat.com>
+ <1471781799-10457-6-git-send-email-hdegoede@redhat.com>
+ <20160823180016.GA28538@rob-hp-laptop>
+Message-ID: <4792e77e-e72e-10db-5469-4a1e6e64e75c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2016 at 10:18:09PM +0800, Randy Li wrote:
-> The TOPEET itop exynos 4412 have three versions base board. The
-> Elite version is the cheap one without too much peripheral devices
-> on it.
-> 
-> Currently supported are serial console, wired networking(USB),
-> USB OTG in peripheral mode, USB host, SD storage, GPIO buttons,
-> PWM beeper, ADC and LEDs.
-> 
-> Signed-off-by: Randy Li <ayaka@soulik.info>
-> ---
->  .../bindings/arm/samsung/samsung-boards.txt        |   3 +
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/exynos4412-itop-elite.dts        | 147 +++++++++++++++++++++
->  3 files changed, 151 insertions(+)
->  create mode 100644 arch/arm/boot/dts/exynos4412-itop-elite.dts
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-> index 0ea7f14..c5913ba 100644
-> --- a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-> +++ b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-> @@ -22,6 +22,9 @@ Required root node properties:
->    * FriendlyARM
->  	- "friendlyarm,tiny4412"  - for Exynos4412-based FriendlyARM
->  				    TINY4412 board.
-> +  * Topee
+Hi,
 
-Topeet?
+On 08/23/2016 08:00 PM, Rob Herring wrote:
+> On Sun, Aug 21, 2016 at 02:16:38PM +0200, Hans de Goede wrote:
+>> On some devices the musb otg controller can be used in both device and
+>> host mode, but requires software mode switching since there is no id pin
+>> connected. The usb0 phy code will default to device mode in this case.
+>>
+>> On some systems usb0 is connected to a female USB-A port. It can still
+>> be used in device mode when using software mode switching and a USB
+>> A to A cable. To configure the controller to support both modes we must
+>> set its "dr_mode" dt property to "otg" (*). For these setups the device
+>> mode default is wrong, for a female USB-A port the default should be
+>> host mode.
+>>
+>> This commit adds support to the sun4i phy code for a new
+>> "allwinner,usb0-usb-a-connector" dt property which can be used in dt
+>> files to indicate this scenario and when present it changes the default
+>> mode to host mode.
+>>
+>> *) dr_mode = "host" is used when device mode is _never_ used. E.g.
+>> a wifi module soldered onto the PCB is connected to the musb controller.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>> Changes in v2:
+>> -New patch in v2 of this patchset
+>> Changes in v3:
+>> -No changes
+>> ---
+>>  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 2 ++
+>>  drivers/phy/phy-sun4i-usb.c                             | 9 ++++++++-
+>>  2 files changed, 10 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+>> index 287150d..8646b53 100644
+>> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+>> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+>> @@ -35,6 +35,8 @@ Optional properties:
+>>  - usb0_vbus-supply : regulator phandle for controller usb0 vbus
+>>  - usb1_vbus-supply : regulator phandle for controller usb1 vbus
+>>  - usb2_vbus-supply : regulator phandle for controller usb2 vbus
+>> +- allwinner,usb0-usb-a-connector: usb0 is connected to an USB-A connector,
+>> +                     rather then an USB-B connector as one would expect (bool)
+>
+> This seems like a pretty generic problem: a board has an A connector
+> wired to an OTG controller.  So I think we should have a generic
+> property.
 
-> +	- "topeet,itop4412-elite" - for Exynos4412-based Topeet
-> +                                    Elite base board.                             
->  
->    * Google
->  	- "google,pi"		- for Exynos5800-based Google Peach Pi
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 48e1d4e..8f47aa0 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -135,6 +135,7 @@ dtb-$(CONFIG_ARCH_EXYNOS4) += \
->  	exynos4412-origen.dtb \
->  	exynos4412-smdk4412.dtb \
->  	exynos4412-tiny4412.dtb \
-> +	exynos4412-itop-elite.dtb \
->  	exynos4412-trats2.dtb
->  dtb-$(CONFIG_ARCH_EXYNOS5) += \
->  	exynos5250-arndale.dtb \
-> diff --git a/arch/arm/boot/dts/exynos4412-itop-elite.dts b/arch/arm/boot/dts/exynos4412-itop-elite.dts
-> new file mode 100644
-> index 0000000..3e0863b
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/exynos4412-itop-elite.dts
-> @@ -0,0 +1,147 @@
-> +/*
-> + * TOPEET's Exynos4412 based itop board device tree source
-> + *
-> + * Copyright (c) 2016 SUMOMO Computer Association
-> + *			https://www.sumomo.mobi
-> + *			Randy Li <ayaka@soulik.info>
-> + *			
-> + * Device tree source file for TOPEET iTop Exynos 4412 core board 
-> + * which is based on Samsung's Exynos4412 SoC.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +/dts-v1/;
-> +#include "exynos4412-itop-scp-core.dtsi"
-> +
-> +/ {
-> +	model = "TOPEET iTop 4412 Elite board based on Exynos4412";
-> +	compatible = "topeet,itop4412-elite", "samsung,exynos4412", "samsung,exynos4";
-> +
-> +	chosen {
-> +		bootargs ="console=ttySAC2,115200";
+OK, any suggestions for a name ? And which bindings .txt file should
+this go in ?
 
-Don't need console set with...
+> The only part is here that is not is you have 3 USB buses for
+> the PHY. That probably should have been 3 child nodes for each PHY port.
 
-> +		stdout-path = &serial_2;
+Only one is an otg phy / bus though, so we can just use the generic
+property and apply it to bus0 / the otg-bus if present.
 
-this set.
+Regards,
 
-> +	};
-> +	
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		
-> +		led2 {
-> +			label = "red:system";
-> +			gpios = <&gpx1 0 GPIO_ACTIVE_HIGH>;
-> +			default-state = "off";
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +
-> +		led3 {
-> +			label = "red:user";
-> +			gpios = <&gpk1 1 GPIO_ACTIVE_HIGH>;
-> +			default-state = "off";
-> +		};
-> +	};
-> +
-> +	gpio-keys {
-> +		compatible = "gpio-keys";
-> +		
-> +		home {
-> +			lable = "GPIO Key Home";
-
-s/lable/label/
-
-> +			linux,code = <KEY_HOME>;
-> +			gpios = <&gpx1 1 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		back {
-> +			lable = "GPIO Key Back";
-
-ditto...
-
-> +			linux,code = <KEY_BACK>;
-> +			gpios = <&gpx1 2 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		sleep {
-> +			lable = "GPIO Key Sleep";
-> +			linux,code = <KEY_POWER>;
-> +			gpios = <&gpx3 3 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		vol_up {
-> +			lable = "GPIO Key Vol+";
-> +			linux,code = <KEY_UP>;
-> +			gpios = <&gpx2 1 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		vol_down {
-> +			lable = "GPIO Key Vol-";
-> +			linux,code = <KEY_DOWN>;
-> +			gpios = <&gpx2 0 GPIO_ACTIVE_LOW>;
-> +		};
-> +	};
-> +	
-> +	beep {
-> +		compatible = "pwm-beeper";
-> +		pwms = <&pwm>;
-> +		pinctrl-0 = <&pwm0_out>;
-> +		pinctrl-names = "default";
-> +	};
-> +};
-> +
-> +&pinctrl_1 {
-> +	ether-reset {
-> +		samsung,pins = "gpc0-1";
-> +		samsung,pin-function = <1>;
-> +		samsung,pin-pud = <0>;
-> +		samsung,pin-drv = <0>;
-> +	};
-> +};
-> +
-> +&sdhci_2 {
-> +	bus-width = <4>;
-> +	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus4>;
-> +	pinctrl-names = "default";
-> +	broken-cd;
-> +	cap-sd-highspeed;
-> +	vmmc-supply = <&ldo23_reg>;
-> +	vqmmc-supply = <&ldo17_reg>;
-> +	status = "okay";
-> +};
-> +
-> +&ehci {
-> +	status = "okay";
-> +	/* In order to reset USB ethernet */
-> +	samsung,vbus-gpio = <&gpc0 1 GPIO_ACTIVE_HIGH>;
-> +
-> +	port at 0 {
-> +		status = "okay";
-> +	};
-> +
-> +	port at 2 {
-> +		status = "okay";
-> +	};
-> +};
-> +
-> +&exynos_usbphy {
-> +	status = "okay";
-> +};
-> +
-> +&hsotg {
-> +	dr_mode = "peripheral";
-> +	status = "okay";
-> +};
-> +
-> +&serial_1 {
-> +	status = "okay";
-> +};
-> +
-> +&serial_2 {
-> +	status = "okay";
-> +};
-> +
-> +&pwm {
-> +	pinctrl-0 = <&pwm1_out>;
-> +	pinctrl-names = "default";
-> +	samsung,pwm-outputs = <1>;
-> +	status = "okay";
-> +};
-> +
-> +&adc {
-> +	status = "okay";
-> +};
-> -- 
-> 2.7.4
-> 
+Hans
