@@ -1,99 +1,30 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 23 Aug 2016 16:01:24 +0100
-Subject: [PATCH 07/13] scpi: ignore init_versions failure if reported not
- supported
-In-Reply-To: <895da5b6-baec-daf8-814b-76bd9ebcbbbc@baylibre.com>
-References: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
- <1471515066-3626-8-git-send-email-narmstrong@baylibre.com>
- <74d35f80-8499-cadf-798c-9b296218305c@arm.com>
- <86c4042a-a892-b5c4-cc75-c2139e80e226@baylibre.com>
- <5e627a97-88f6-c7cf-1d64-6439cb708aff@arm.com>
- <895da5b6-baec-daf8-814b-76bd9ebcbbbc@baylibre.com>
-Message-ID: <584cd7fc-c6dd-d380-0842-ca663fa298ab@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 23 Aug 2016 17:04:48 +0200
+Subject: [PATCH] dt-bindings: touchscreen: silead_gsl1680: Document
+ touchscreen-fw-name
+Message-ID: <1471964688-12188-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The driver has supported touchscreen-fw-name to specify the firmware to
+load since day 0, but this was omitted from the binding, document this.
 
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-On 23/08/16 15:55, Neil Armstrong wrote:
-> On 08/23/2016 04:54 PM, Sudeep Holla wrote:
->>
->>
->> On 23/08/16 09:23, Neil Armstrong wrote:
->>> On 08/19/2016 06:46 PM, Sudeep Holla wrote:
->>>>
->>>>
->>>> On 18/08/16 11:11, Neil Armstrong wrote:
->>>>> In Amlogic GXBB Legacy SCPI, the LEGACY_SCPI_CMD_SCPI_CAPABILITIES report
->>>>> as SCPI_ERR_SUPPORT, so do not fail if this command is not supported.
->>>>>
->>>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->>>>> ---
->>>>>  drivers/firmware/arm_scpi.c | 12 +++++++-----
->>>>>  1 file changed, 7 insertions(+), 5 deletions(-)
->>>>>
->>>>> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
->>>>> index 3fe39fe..d3be4c5 100644
->>>>> --- a/drivers/firmware/arm_scpi.c
->>>>> +++ b/drivers/firmware/arm_scpi.c
->>>>> @@ -1111,12 +1111,13 @@ err:
->>>>>          ret = scpi_info->ops->init_versions(scpi_info);
->>>>>      else
->>>>>      ret = scpi_init_versions(scpi_info);
->>>>> -    if (ret) {
->>>>> +    if (ret && ret != -EOPNOTSUPP) {
->>>>>          dev_err(dev, "incorrect or no SCP firmware found\n");
->>>>>          scpi_remove(pdev);
->>>>>          return ret;
->>>>>      }
->>>>>
->>>>
->>>> Why not deal it in init_versions itself.
->>>>
->>>>> +    if (ret != -EOPNOTSUPP) {
->>>>>      _dev_info(dev, "SCP Protocol %d.%d Firmware %d.%d.%d version\n",
->>>>>            PROTOCOL_REV_MAJOR(scpi_info->protocol_version),
->>>>>            PROTOCOL_REV_MINOR(scpi_info->protocol_version),
->>>>
->>>> Why not have default value like 0.0 ? Just add a comment. Since get
->>>> version is exported out, IMO having default value makes more sense. What
->>>> do you think ?
->>>>
->>>>> @@ -1124,15 +1125,16 @@ err:
->>>>>            FW_REV_MINOR(scpi_info->firmware_version),
->>>>>            FW_REV_PATCH(scpi_info->firmware_version));
->>>>>
->>>>> +        ret = sysfs_create_groups(&dev->kobj, versions_groups);
->>>>> +        if (ret)
->>>>> +            dev_err(dev, "unable to create sysfs version group\n");
->>>>> +    }
->>>>> +
->>>>
->>>> Again this can stay as is if we have default.
->>>>
->>>
->>> Printing version 0.0 firmware 0.0.0 is a nonsense for me...
->>>
->>
->> OK 0.0 was a wrong example. May be 0.1 ?
->>
->> Since the driver has already exposed, hypothetically user-space can use
->> that information, so IMO, we need to expose some static version for pre-v1.0
->>
->> I am surprised that capability is not supported as this was present even
->> in that legacy SCPI. Do you know what happens if you send that command ?
->> Have you done some experiments on that ?
->>
->
-> I've experimented and returns EOPNOTSUPP, Amlogic confirmed to us the command was not implemented.
->
-> This a clearly a corner-case.
->
-
-OK, thanks for the confirmation.
-Not exporting anything could be kind of breaking ABI as it was not made
-optional when introduced :( (you can blame me ;))
-
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+index ad7f41a..c9c1ddd 100644
+--- a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
++++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+@@ -17,6 +17,7 @@ Required properties:
+ - touchscreen-size-y	  : See touchscreen.txt
+ 
+ Optional properties:
++- touchscreen-fw-name	  : Filename (string) for device specific firmware
+ - touchscreen-inverted-x  : See touchscreen.txt
+ - touchscreen-inverted-y  : See touchscreen.txt
+ - touchscreen-swapped-x-y : See touchscreen.txt
 -- 
-Regards,
-Sudeep
+2.7.4
