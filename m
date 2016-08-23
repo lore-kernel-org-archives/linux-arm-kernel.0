@@ -1,37 +1,41 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 23 Aug 2016 11:38:41 +0100
-Subject: [PATCH 1/2] arm64: kernel: Add SMC Session ID to results
-In-Reply-To: <20160823003831.GN6502@codeaurora.org>
-References: <1471672274-19317-1-git-send-email-andy.gross@linaro.org>
- <1471672274-19317-2-git-send-email-andy.gross@linaro.org>
- <20160822134313.GJ14680@arm.com>
- <20160822140246.GA30923@hector.attlocal.net>
- <20160822145326.GK14680@arm.com>
- <20160823003831.GN6502@codeaurora.org>
-Message-ID: <20160823103841.GD8724@red-moon>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 23 Aug 2016 11:40:02 +0100
+Subject: [PATCH 3/9] regulator: core: Try full range when adjusting
+ regulators to constraints
+In-Reply-To: <CAGb2v67ZST-E++z5oobLRwCfHMZZR6HTss=MSqJLJArnQz3qMw@mail.gmail.com>
+References: <20160821021125.1521-1-wens@csie.org>
+ <20160821021125.1521-4-wens@csie.org>
+ <20160822162907.GO22076@sirena.org.uk>
+ <20160822175205.h76hurjaopnosymc@vip.cybercity.dk>
+ <20160822180932.GW22076@sirena.org.uk>
+ <CAGb2v67ZST-E++z5oobLRwCfHMZZR6HTss=MSqJLJArnQz3qMw@mail.gmail.com>
+Message-ID: <20160823104002.GX22076@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2016 at 05:38:31PM -0700, Stephen Boyd wrote:
+On Tue, Aug 23, 2016 at 12:17:23PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Aug 23, 2016 at 2:09 AM, Mark Brown <broonie@kernel.org> wrote:
 
-[...]
+> > Sure, but the constraints also say that you can do 1.32V which the
+> > system is not physically capable of delivering.  That's not a good sign
+> > for the constraints, it suggests that at least the capabilities of the
+> > regulator have not been taken into consideration when setting up the
+> > constraints.
 
-> This all comes about because the firmware generates a session id
-> for the SMC call and jams it in x6. The assembly on the
-> non-secure side is written with a tight loop around the smc
-> instruction so that when the return value indicates
-> "interrupted", x6 is kept intact and the non-secure OS can jump
-> back to the secure OS without register reloading. Perhaps
-> referring to x6 as result value is not correct because it's
-> really a session id that's irrelevant once the smc call
-> completes.
+> So to be clear, the constraints should be the intersection of the
+> recommended operating parameters of the consumer and the regulator's
+> output, with the voltage/current steps taken in to consideration.
 
-Sorry I missed this bit. The session id is _generated_ by secure
-firmware (probably only when the value passed in x6 == 0 (?))
-and actually returned to the caller so that subsequent (interrupted)
-calls can re-issue the same value, is that correct ?
-
-If that's the case the value in x6 is a result value from an SMCCC
-perspective and your current FW is not SMCCC compliant.
-
-Lorenzo
+The constraints are there to say what the *system* can deliver.  That
+includes the limitations of the consumers, the regulators and the
+physical design of the board.  Just as one shouldn't just throw in the
+maximum voltage range that the regulator can deliver one also shouldn't
+just use the maximum voltage range a consumer can support for similar
+reasons.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160823/346c4861/attachment.sig>
