@@ -1,180 +1,81 @@
-From: mirza.krak@gmail.com (Mirza Krak)
-Date: Tue, 23 Aug 2016 12:33:09 +0200
-Subject: [PATCH 3/6] dt/bindings: Add bindings for Tegra GMI controller
-In-Reply-To: <901be576-a810-c630-9b83-de922e945df0@nvidia.com>
-References: <1470512452-8322-1-git-send-email-mirza.krak@gmail.com>
- <1470512452-8322-4-git-send-email-mirza.krak@gmail.com>
- <901be576-a810-c630-9b83-de922e945df0@nvidia.com>
-Message-ID: <CALw8SCV9AyaAPKpRwRp72-dUz=cW2QZyywqjzS1noonTyGDYag@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 23 Aug 2016 12:34:05 +0200
+Subject: [PATCH] mtd: mxc_nand: Set timing for v2 controllers
+Message-ID: <1471948445-29936-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-08-08 16:44 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
->> +
->> +  gmi at 70090000 {
->> +    #address-cells = <1>;
->> +    #size-cells = <1>;
->
-> I think 0 for size makes sense. I know that caused you problems before,
-> but I am wondering if ...
->
->> +    ranges;
->
-> ... ranges is needed here? If we do have it, I am wondering if it should
-> be a single entry for the chip-select that is being used. For now we
-> could only support a ranges with one entry.
->
->         #address-cells = <1>;
->         #size-cells = <1>;
->         ranges = <4 0x48000000 0x00040000>;
->
->> +    nvidia,snor-mux-mode;
->> +    nvidia,snor-adv-inv;
->> +    nvidia,snor-cs-select = <4>;
->
-> I would have expected these under bus at X node as they are specific to the
-> GMI CS.
->
-> I would also expect that the actual chip-select number is encoded in the
-> reg property.
->
->> +
->> +    bus at 0,0 {
->
-> bus at 4
->
-> No mention of this bus node in the above documentation.
->
->> +      compatible = "simple-bus";
->> +      reg = <0 0>;
->
-> reg = <4>;
->
-> We should look up the chip-select from the reg property.
->
->> +      ranges;
->> +
->> +      #address-cells = <1>;
->> +      #size-cells = <1>;
->> +
->> +      can at 48000000 {
->> +        reg = <0x48000000 0x100>;
->> +        ...
->> +      };
->> +
->> +      can at 48040000 {
->> +        reg = <0x48040000 0x100>;
->> +        ...
->> +      };
->
-> If we use ranges we could have ...
->
->         can at 0 {
->                 reg = <0x0 0x100>;
->                 ...
->         };
->
->         can at 40000 {
->                 reg = <0x40000 0x100>;
->                 ...
->         };
->
+So far we relied on reset default or the bootloader to configure a
+suitable clk rate for the Nand controller. This works but we can
+optimize the timing for better performance. This sets the clk rate for
+v2 controllers (i.MX25/35) based on the timing mode read from the ONFI
+parameter page. This may also enable the symmetric mode (aks EDO mode)
+if necessary which reads one word per clock cycle.
+Tested on an i.MX25 with a Micron MT29F4G08ABBDAHC attached.
 
-Hi.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/mtd/nand/mxc_nand.c | 41 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
-Like we discussed I am now trying to implement this but without
-success and I am starting to think that it is not that simple unless I
-am missing something.
-
-Below tree
-
-gmi at 70009000 {
-     status = "okay";
-     #address-cells = <1>;
-     #size-cells = <1>;
-     ranges = <4 0x48000000 0x7ffffff>;
-
-     bus at 4 {
-          compatible = "simple-bus";
-          reg = <4 0>;
-          #address-cells = <1>;
-          #size-cells = <1>;
-         nvidia,snor-mux-mode;
-         nvidia,snor-adv-inv;
-
-        can at 0 {
-              compatible = "nxp,sja1000";
-              reg = <0 0x100>;
-              ....
-     };
-
-     can at 40000 {
-           compatible = "nxp,sja1000";
-           reg = <0x40000 0x100>;
-           ....
-    };
-};
-};
-
-results in:
-
-[    8.472509]    create child: /gmi at 70009000/bus at 4/can at 0
-[    8.472561] OF: ** translation for device /gmi at 70009000/bus at 4/can at 0 **
-[    8.472577] OF: bus is default (na=1, ns=1) on /gmi at 70009000/bus at 4
-[    8.472589] OF: translating address: 00000000
-[    8.472624] OF: parent bus is default (na=1, ns=1) on /gmi at 70009000
-[    8.472641] OF: no ranges; cannot translate
-[    8.472668] of_irq_parse_one: dev=/gmi at 70009000/bus at 4/can at 0, index=0
-[    8.472687]  intspec=13 intlen=2
-[    8.472726]  intsize=2 intlen=2
-[    8.472740] of_irq_parse_raw:  /gpio at 6000d000:0000000d,00000001
-[    8.493718] of_irq_parse_raw: ipar=/gpio at 6000d000, size=2
-[    8.493737]  -> addrsize=1
-[    8.493743]  -> got it !
-[    8.493755] of_irq_parse_one: dev=/gmi at 70009000/bus at 4/can at 0, index=1
-[    8.493771]  intspec=13 intlen=2
-[    8.493790]  intsize=2 intlen=2
-[    8.493800] of_irq_parse_one: dev=/gmi at 70009000/bus at 4/can at 0, index=0
-[    8.493805]  intspec=13 intlen=2
-[    8.493812]  intsize=2 intlen=2
-[    8.493824] of_irq_parse_raw:  /gpio at 6000d000:0000000d,00000001
-[    8.493829] of_irq_parse_raw: ipar=/gpio at 6000d000, size=2
-[    8.493834]  -> addrsize=1
-[    8.493837]  -> got it !
-[    8.493869] OF: ** translation for device /gmi at 70009000/bus at 4/can at 0 **
-[    8.493885] OF: bus is default (na=1, ns=1) on /gmi at 70009000/bus at 4
-[    8.493892] OF: translating address: 00000000
-[    8.493902] OF: parent bus is default (na=1, ns=1) on /gmi at 70009000
-[    8.493906] OF: no ranges; cannot translate
-[    8.493918] OF: ** translation for device /gmi at 70009000/bus at 4 **
-[    8.493924] OF: bus is default (na=1, ns=1) on /gmi at 70009000
-[    8.493930] OF: translating address: 00000004
-[    8.493938] OF: parent bus is default (na=1, ns=1) on /
-[    8.493944] OF: walking ranges...
-[    8.493952] OF: default map, cp=4, s=7ffffff, da=4
-[    8.493973] OF: parent translation for: 48000000
-[    8.493978] OF: with offset: 0
-[    8.493986] OF: one level translation: 48000000
-[    8.493989] OF: reached root node
-[    8.494011] of_dma_get_range: no dma-ranges found for
-node(/gmi at 70009000/bus at 4/can at 0)
-[    8.494037] platform 48000000.bus:can at 0: device is not dma coherent
-[    8.494048] platform 48000000.bus:can at 0: device is not behind an iommu
-[    8.495209] sja1000 probe entered
-[    8.495212] sja1000 probe entered1
-
-sja1000 probe fails because resource address is NULL.
-
-The result is the same for the second child device.
-
-I also attempted to add "ranges;" property to the bus child node,
-which results in the same error on can at 0, and can at 4000 is actually
-translated but it is not what I expect it to be (0x4803fff8).
-
-And I am not quite sure how to get around this in a simple way. I can
-not wrap my head around how the ranges property actually works really.
-
-Any suggestions would be really helpful.
-
-Best Regards
-Mirza
+diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+index 5173fad..725223c 100644
+--- a/drivers/mtd/nand/mxc_nand.c
++++ b/drivers/mtd/nand/mxc_nand.c
+@@ -1012,6 +1012,45 @@ static void preset_v1(struct mtd_info *mtd)
+ 	writew(0x4, NFC_V1_V2_WRPROT);
+ }
+ 
++static void mxc_nand_v2_set_timing(struct mtd_info *mtd, uint16_t *config1)
++{
++	struct nand_chip *nand_chip = mtd->priv;
++	struct mxc_nand_host *host = nand_chip->priv;
++	int mode, ret, tRC_min_ns;
++	unsigned long rate;
++	const struct nand_sdr_timings *timings;
++
++	mode = onfi_get_async_timing_mode(nand_chip);
++	if (mode == ONFI_TIMING_MODE_UNKNOWN)
++		return;
++
++	mode = fls(mode) - 1;
++	if (mode < 0)
++		mode = 0;
++
++	timings = onfi_async_timing_mode_to_sdr_timings(mode);
++	if (IS_ERR(timings))
++		return;
++
++	tRC_min_ns = timings->tRC_min / 1000;
++	rate = 1000000000 / tRC_min_ns;
++
++	if (clk_round_rate(host->clk, rate) > 33333333)
++		/*
++		 * If tRC is smaller than 30ns (that is, the rate is higher
++		 * than 33.333MHz) we have to use EDO timing.
++		 */
++		*config1 |= NFC_V2_CONFIG1_ONE_CYCLE;
++	else
++		/* Otherwise we have two clock cycles per access. */
++		rate *= 2;
++
++	ret = clk_set_rate(host->clk, rate);
++	if (ret)
++		/* Don't worry, continue with old rate */
++		dev_err(host->dev, "failed to set clk rate: %d\n", ret);
++}
++
+ static void preset_v2(struct mtd_info *mtd)
+ {
+ 	struct nand_chip *nand_chip = mtd_to_nand(mtd);
+@@ -1020,6 +1059,8 @@ static void preset_v2(struct mtd_info *mtd)
+ 
+ 	config1 |= NFC_V2_CONFIG1_FP_INT;
+ 
++	mxc_nand_v2_set_timing(mtd, &config1);
++
+ 	if (!host->devtype_data->irqpending_quirk)
+ 		config1 |= NFC_V1_V2_CONFIG1_INT_MSK;
+ 
+-- 
+2.8.1
