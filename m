@@ -1,84 +1,88 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 23 Aug 2016 10:39:01 +0100
-Subject: [PATCH 5/8] arm64: alternative: Add support for patching adrp
- instructions
-In-Reply-To: <20160822111921.GC14680@arm.com>
-References: <1471525832-21209-1-git-send-email-suzuki.poulose@arm.com>
- <1471525832-21209-6-git-send-email-suzuki.poulose@arm.com>
- <20160822111921.GC14680@arm.com>
-Message-ID: <74075792-8e10-2b6f-7df2-47c0f9e91fcf@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 23 Aug 2016 11:39:06 +0200
+Subject: [PATCH 4/8] ARM: dts: sun8i: Add touchscreen node for
+ sun8i-a23-gt90h
+In-Reply-To: <20160823092614.GF2598@lukather>
+References: <1470685398-14568-1-git-send-email-hdegoede@redhat.com>
+ <1470685398-14568-4-git-send-email-hdegoede@redhat.com>
+ <20160822183009.GX7104@lukather>
+ <cf0186a0-f4ea-173c-4f93-df8798941199@redhat.com>
+ <20160823092614.GF2598@lukather>
+Message-ID: <a8de228d-2ba9-e23e-0c0c-e9a78dbe6e6a@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/08/16 12:19, Will Deacon wrote:
-> On Thu, Aug 18, 2016 at 02:10:29PM +0100, Suzuki K Poulose wrote:
->> adrp uses PC-relative address offset to a page (of 4K size) of
->> a symbol. If it appears in an alternative code patched in, we
->> should adjust the offset to reflect the address where it will
->> be run from. This patch adds support for fixing the offset
->> for adrp instructions.
+Hi,
+
+On 23-08-16 11:26, Maxime Ripard wrote:
+> On Mon, Aug 22, 2016 at 09:03:57PM +0200, Hans de Goede wrote:
+>> Hi,
 >>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Andre Przywara <andre.przywara@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>  arch/arm64/kernel/alternative.c | 13 +++++++++++++
->>  1 file changed, 13 insertions(+)
+>> On 22-08-16 20:30, Maxime Ripard wrote:
+>>> On Mon, Aug 08, 2016 at 09:43:14PM +0200, Hans de Goede wrote:
+>>>> The gt90h tablet has a gsl3675 touchscreen, add a dt node describing it.
+>>>>
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>> ---
+>>>> arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts | 8 ++++++++
+>>>> 1 file changed, 8 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts b/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
+>>>> index f27ebbb..da55b5a 100644
+>>>> --- a/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
+>>>> +++ b/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
+>>>> @@ -53,6 +53,14 @@
+>>>> 	status = "okay";
+>>>> };
+>>>>
+>>>> +&gsl1680 {
+>>>> +	compatible = "silead,gsl3675";
+>>>> +	touchscreen-fw-name = "silead/gsl3675-gt90h.fw";
+>>>
+>>> That's not documented anywhere, and looks really suspicious.
 >>
->> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
->> index d2ee1b2..71c6962 100644
->> --- a/arch/arm64/kernel/alternative.c
->> +++ b/arch/arm64/kernel/alternative.c
->> @@ -80,6 +80,19 @@ static u32 get_alt_insn(struct alt_instr *alt, u32 *insnptr, u32 *altinsnptr)
->>  			offset = target - (unsigned long)insnptr;
->>  			insn = aarch64_set_branch_offset(insn, offset);
->>  		}
->> +	} else if (aarch64_insn_is_adrp(insn)) {
->> +		s32 orig_offset, new_offset;
->> +		unsigned long target;
->> +
->> +		/*
->> +		 * If we're replacing an adrp instruction, which uses PC-relative
->> +		 * immediate addressing, adjust the offset to reflect the new
->> +		 * PC. adrp operates on 4K aligned addresses.
->> +		 */
->> +		orig_offset  = aarch64_insn_adrp_get_offset(insn);
->> +		target = ((unsigned long)altinsnptr & ~0xfffUL) + orig_offset;
->> +		new_offset = target - ((unsigned long)insnptr & ~0xfffUL);
->
-> The masking with ~0xfffUL might be nicer if you write it as
-> align_down(ptr, SZ_4K);
-
-Right, that definitely looks better. Will change it.
-
->
->> +		insn = aarch64_insn_adrp_set_offset(insn, new_offset);
->>  	}
+>> Ugh, that should have been in:
 >>
->>  	return insn;
+>> Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+>>
+>> But somehow it is not (I believe it was there in earlier revisions of
+>> the patch), I'll send a patch to fix this.
+>>
+>> About it being suspicious, this is not really firmware it is a bunch
+>> of configuration data / lookup tables for the controller which tell
+>> it in which order the touchscreen horizontal / vertical sensor
+>> lines are connected to its sense pins, and what values to send
+>> for finger x% between line z and line z+1, which differs per
+>> tablet model, since not all tablets use the same digitizer.
 >
-> I wonder if we shouldn't have a catch-all for any instructions performing
-> PC-relative operations here, because silent corruption of the instruction
+> It's not really the firmware itself that I find suspicious, but more
+> the encoding of a path to a file in the DT,
 
-Correct, which is what happened initially when I didn't have the adrp handling ;-).
+It is not a path it is a filename. We could drop the "silead/" prefix
+and put that in the driver instead to really make it a filename.
 
-> stream is pretty horrible. What other instructions are there? ADR, LDR
-> (literal), ... ?
+> especially when you can
+> apparently derive it from other informations already found in the DT
+> (<vendor>/<compatible>-<board>.fw)
 
- From a quick look, all the instructions under "Load register (literal)" :
+That will not work, sometimes different boards use the same digitizer
+and thus the same firmware. Also in case of the q8 tablets, we need
+different firmware for different variants (this is to be dealt with
+by the q8-hardware-manager I'm working on), since although they
+all use the same digitizer they do not wire it up to the controllers
+pins the same in all models, so we need different firmware files
+corresponding to different wirings.
 
-i.e,
-LDR (literal) for GPR/FP_SIMD/32bit/64bit
-LDRSW (literal)
-PRFM (literal)
+TL;DR: There is no 1:1 mapping between board and the firmware filename.
 
-and Data processing instructions - immediate group with PC-relative addressing:
+Also note that this is not the first driver to introduce a firmware
+filename in a dts binding, a quick grep shows at least:
 
-ADR, ADRP
+Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt
 
-I will add a check to catch the unsupported instructions in the alternative code.
+Also does this, as well as several dt-bindings where board specific
+firmware gets embedded in the device tree itself.
 
-Thanks
-Suzuki
+Regards,
+
+Hans
