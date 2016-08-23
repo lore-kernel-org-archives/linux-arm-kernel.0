@@ -1,68 +1,47 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 23 Aug 2016 11:35:26 +0900
-Subject: [PATCH 1/2] clk: samsung: exynos5260: Move struct samsung_cmu_info
- to init section
-In-Reply-To: <20160823005512.GP6502@codeaurora.org>
-References: <1471834185-20249-1-git-send-email-cw00.choi@samsung.com>
- <1471834185-20249-2-git-send-email-cw00.choi@samsung.com>
- <CGME20160823005523epcas1p3993794ba487bb055cbf8a0b247fcb280@epcas1p3.samsung.com>
- <20160823005512.GP6502@codeaurora.org>
-Message-ID: <57BBB66E.2060807@samsung.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Tue, 23 Aug 2016 04:40:59 +0200
+Subject: [PATCH v7 5/7] power: act8945a_charger: Add capacity level
+ property
+In-Reply-To: <1471848557-27278-6-git-send-email-wenyou.yang@atmel.com>
+References: <1471848557-27278-1-git-send-email-wenyou.yang@atmel.com>
+ <1471848557-27278-6-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20160823024059.i7mvsef4t7flskcv@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi,
 
-On 2016? 08? 23? 09:55, Stephen Boyd wrote:
-> On 08/22, Chanwoo Choi wrote:
->> This patch moves the all samsung_cmu_info struct to initconst section
->> because they are used only in initconst section.
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> ---
->>  drivers/clk/samsung/clk-exynos5260.c | 350 +++++++++++++++++------------------
->>  1 file changed, 175 insertions(+), 175 deletions(-)
->>
->> diff --git a/drivers/clk/samsung/clk-exynos5260.c b/drivers/clk/samsung/clk-exynos5260.c
->> index a43642c36039..fd1d9bfc151b 100644
->> --- a/drivers/clk/samsung/clk-exynos5260.c
->> +++ b/drivers/clk/samsung/clk-exynos5260.c
->> @@ -131,21 +131,21 @@ static const struct samsung_gate_clock aud_gate_clks[] __initconst = {
->>  			EN_IP_AUD, 4, 0, 0),
->>  };
->>  
->> +static const struct samsung_cmu_info aud_cmu __initconst = {
->> +	.mux_clks	= aud_mux_clks,
->> +	.nr_mux_clks	= ARRAY_SIZE(aud_mux_clks),
->> +	.div_clks	= aud_div_clks,
->> +	.nr_div_clks	= ARRAY_SIZE(aud_div_clks),
->> +	.gate_clks	= aud_gate_clks,
->> +	.nr_gate_clks	= ARRAY_SIZE(aud_gate_clks),
->> +	.nr_clk_ids	= AUD_NR_CLK,
->> +	.clk_regs	= aud_clk_regs,
->> +	.nr_clk_regs	= ARRAY_SIZE(aud_clk_regs),
->> +};
->> +
->>  static void __init exynos5260_clk_aud_init(struct device_node *np)
->>  {
->> -	struct samsung_cmu_info cmu = { NULL };
->> -
-> 
-> I presume this was done this way to save some initdata space by
-> only allocating the array that's needed at runtime? I would
-> expect to see some more kernel image bloat from this change but
-> runtime memory usage would stay the same. Is there any real
-> benefit from this patch though?
-> 
+On Mon, Aug 22, 2016 at 02:49:15PM +0800, Wenyou Yang wrote:
+> [...]
+>
+> +	charger->lbo_gpio = gpiod_get(dev->parent, "active-semi,lbo", GPIOD_IN);
+> +	if (PTR_ERR(charger->lbo_gpio) == -EPROBE_DEFER) {
+> +		dev_info(dev, "probe retry requested for gpio \"lbo\"\n");
+> +	} else if (IS_ERR(charger->lbo_gpio)) {
+> +		dev_err(dev, "unable to claim gpio \"lbo\"\n");
+> +		charger->lbo_gpio = NULL;
+> +	}
+> +
+> +	ret = devm_request_irq(dev, gpiod_to_irq(charger->lbo_gpio),
+> +			       act8945a_status_changed,
+> +			       (IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING),
+> +			       "act8945a_lbo_detect", charger);
+> +	if (ret)
+> +		dev_info(dev, "failed to request gpio \"lbo\" IRQ\n");
 
-After this patch, 'struct samsung_cmu_info' size should be added
-to kernel image and then the size of deleted code should be removed
-from kernel image. I think that it is not bloating.
-(struct samsung_cmu_info includes the pointer and integer value.)
+that does not work, since you need to release the irq before
+releasing the gpio. So if the gpio is not requested via devm_
+than you can't request the irq via devm_ (actually you can by
+using devm_free_irq in remove(), but then you can also drop
+the devm_ alltogether).
 
-This patch make the code more simple and improve the readability.
-And, the samsung_cmu_register_on() requires the 'const' type
-argument for 'struct samsung_cmu_info'.
+> [...]
 
-Regards,
-Chanwoo Choi
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160823/034aade0/attachment.sig>
