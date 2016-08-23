@@ -1,93 +1,118 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Tue, 23 Aug 2016 16:53:27 +0800
-Subject: [PATCH V4 1/3] tracing: add a possibility of exporting function
- trace to other places instead of ring buffer only
-In-Reply-To: <20160818121258.2a62ce66@gandalf.local.home>
-References: <1471261803-1186-1-git-send-email-zhang.chunyan@linaro.org>
- <1471261803-1186-2-git-send-email-zhang.chunyan@linaro.org>
- <20160815102826.667318b6@gandalf.local.home>
- <CAG2=9p8qLfftFApsqDPeN9--0c8na7jwpjzrjcbYw4xv2PUcbw@mail.gmail.com>
- <20160817101119.0432655e@gandalf.local.home>
- <CAG2=9p9G+74k_rnY72LK=YVp0pLvOHBNxLDmYaQtGQUC4QRB4w@mail.gmail.com>
- <20160818121258.2a62ce66@gandalf.local.home>
-Message-ID: <CAG2=9p9fUKxoPb2t3nVwZYBnU3iGBOEXJ60grQ7bNFmXvArg1g@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 23 Aug 2016 10:55:34 +0200
+Subject: [PATCH v2 2/5] clk: sunxi-ng: mux: support fixed pre-dividers on
+ multiple parents
+In-Reply-To: <1471248795-17951-3-git-send-email-wens@csie.org>
+References: <1471248795-17951-1-git-send-email-wens@csie.org>
+ <1471248795-17951-3-git-send-email-wens@csie.org>
+Message-ID: <20160823085534.GC2598@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 August 2016 at 00:12, Steven Rostedt <rostedt@goodmis.org> wrote:
-> On Thu, 18 Aug 2016 17:22:11 +0800
-> Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
->
->
->> > Or is this just trying to hook into the tracing that is happening? That
->> > is, this isn't replacing writing into the ftrace ring buffer, but it is
->> > just adding a way to write to someplace in addition to the ftrace ring
->> > buffer. Where you still write to the ftrace ring buffer, but then you
->> > can add a hook to copy someplace else as well.
->>
->> Yes, this is what this patch is trying to implement.
->>
->> >
->> > I was looking at this as a way that you are adding a replacement, not
->> > only an addition to. If that's the case, I think there may be a easier
->> > way to do this.
->>
->> I want to know how it would be in the easier way you mentioned here.
->>
->> I was trying to add a ftrace_ops before, but with that way, I have to
->> deal with a lot of trace or ring buffer stuff including the sort of
->> discard things like you mentioned, which the existed ftrace code does.
->> And if I choose to implement a new ftrace_ops, I'm only able to get
->> the function trace support for STM and have to do many things which
->> would be overlap with the current ftrace subsystem.
->
-> Adding your own ftrace_ops is a way for replacing, not just adding a
-> hook into.
->
->>
->> So in order to reuse the existed code and architecture, I chose to add
->> a trace_export interface for Ftrace subsytem, and in this way I'm
->> using in this patch, I will get all supports of traces which are dealt
->> with trace_function();
->
-> Actually, a trace_export() should only be called if there's been
-> something added. And that should be done with a static_key_false()
-> branch (which is dynamically enabled, and does not use a comparison
-> branch).
->
-> That is, something like this instead:
->
->         if (!call_filter_check_discard(call, entry, buffer, event)) {
->                 if (static_key_false(&ftrace_trace_exports_enabled))
->                         ftrace_exports(tr, event);
->                 __buffer_unlock_commit(buffer, event);
->         }
->
+On Mon, Aug 15, 2016 at 04:13:12PM +0800, Chen-Yu Tsai wrote:
+> Some clocks on the A31 have fixed pre-dividers on multiple parents.
+> Add support for them.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> Changes since v1:
+> 
+>   - Add field for number of fixed pre-dividers.
+> ---
+>  drivers/clk/sunxi-ng/ccu-sun8i-h3.c |  9 +++++----
+>  drivers/clk/sunxi-ng/ccu_mux.c      |  6 ++++--
+>  drivers/clk/sunxi-ng/ccu_mux.h      | 11 +++++++----
+>  3 files changed, 16 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+> index 9af359544110..a01298881991 100644
+> --- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+> @@ -184,15 +184,16 @@ static SUNXI_CCU_MP_WITH_MUX(apb2_clk, "apb2", apb2_parents, 0x058,
+>  			     0);
+>  
+>  static const char * const ahb2_parents[] = { "ahb1" , "pll-periph0" };
+> +static const struct ccu_mux_fixed_prediv ahb2_fixed_predivs[] = {
+> +	{ .index = 1, .div = 2 },
+> +	{ },
+> +};
+>  static struct ccu_mux ahb2_clk = {
+>  	.mux		= {
+>  		.shift	= 0,
+>  		.width	= 1,
+>  
+> -		.fixed_prediv	= {
+> -			.index	= 1,
+> -			.div	= 2,
+> -		},
+> +		.fixed_predivs	= ahb2_fixed_predivs,
+>  	},
+>  
+>  	.common		= {
+> diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
+> index 68b32f168a74..7b17e0c26b01 100644
+> --- a/drivers/clk/sunxi-ng/ccu_mux.c
+> +++ b/drivers/clk/sunxi-ng/ccu_mux.c
+> @@ -20,6 +20,7 @@ void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
+>  {
+>  	u16 prediv = 1;
+>  	u32 reg;
+> +	int i;
+>  
+>  	if (!((common->features & CCU_FEATURE_FIXED_PREDIV) ||
+>  	      (common->features & CCU_FEATURE_VARIABLE_PREDIV)))
+> @@ -32,8 +33,9 @@ void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
+>  	}
+>  
+>  	if (common->features & CCU_FEATURE_FIXED_PREDIV)
+> -		if (parent_index == cm->fixed_prediv.index)
+> -			prediv = cm->fixed_prediv.div;
+> +		for (i = 0; i < cm->n_predivs; i++)
+> +			if (parent_index == cm->fixed_predivs[i].index)
+> +				prediv = cm->fixed_predivs[i].div;
+>  
+>  	if (common->features & CCU_FEATURE_VARIABLE_PREDIV)
+>  		if (parent_index == cm->variable_prediv.index) {
+> diff --git a/drivers/clk/sunxi-ng/ccu_mux.h b/drivers/clk/sunxi-ng/ccu_mux.h
+> index f0078de78712..5308b41da22a 100644
+> --- a/drivers/clk/sunxi-ng/ccu_mux.h
+> +++ b/drivers/clk/sunxi-ng/ccu_mux.h
+> @@ -5,15 +5,18 @@
+>  
+>  #include "ccu_common.h"
+>  
+> +struct ccu_mux_fixed_prediv {
+> +	u8	index;
+> +	u16	div;
+> +};
+> +
+>  struct ccu_mux_internal {
+>  	u8		shift;
+>  	u8		width;
+>  	const u8	*table;
+>  
+> -	struct {
+> -		u8	index;
+> -		u16	div;
+> -	} fixed_prediv;
+> +	const struct ccu_mux_fixed_prediv	*fixed_predivs;
+> +	u8		n_predivs;
 
-Thanks for the sample code, I got it, will do like this.
+I don't think you're using it anywhere (at least you don't define it
+in ahb2_clk, and the extra item in the array will introduce an
+off-by-one error.
 
-> Don't touch the current logic. Just have your code hook into the
-> ftrace_exports (note I use "ftrace_exports" and not trace_exports()
-> because it's the function tracer, which has stricter requirements than
-> events do. If you add a hook for tracepoints later, use trace_exports()
-> and have a different list for that).
->
->>
->> Another benefit of adding a trace_export is, if there will be other
->> subsystem would like to use the processed traces, it only needs to
->> register a trace_export and provides a .write() function call back or
->> together with a commit function, although from what I can see now
->> .write() is enough since my purpose was the processed traces I don't
->> need 'ring_buffer_event' so long as I had trace entries.
->
-> I'm saying if you don't mind the ring buffer being used along with
-> your own code (which seems to be what's happening), then just add a
-> call back to your code. Don't monkey with the current logic.
->
-> I think that will simplify things tremendously.
+Thanks!
+Maxime
 
-Thanks for your comments and detailed explanation,
-Chunyan
-
->
-> -- Steve
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160823/03796b5b/attachment.sig>
