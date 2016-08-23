@@ -1,80 +1,117 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 23 Aug 2016 13:32:02 +0200
-Subject: [PATCH 5/8] arm64: alternative: Add support for patching adrp
- instructions
-In-Reply-To: <3c727d40-0ea8-fb2d-7d51-3d47b96e96c4@arm.com>
-References: <1471525832-21209-1-git-send-email-suzuki.poulose@arm.com>
- <1471525832-21209-6-git-send-email-suzuki.poulose@arm.com>
- <CAKv+Gu8XAny8hun=O2Wahpz7p6pSb_tXdv8WHyD3HB52_wBsnQ@mail.gmail.com>
- <3c727d40-0ea8-fb2d-7d51-3d47b96e96c4@arm.com>
-Message-ID: <CAKv+Gu9cT9OEBFk0acFWZtYHw00LtdZLOEG15dcDuiEn=vLVTw@mail.gmail.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Tue, 23 Aug 2016 19:19:01 +0800
+Subject: [PATCH] mm, numa: boot cpu should bound to the node0 when
+ node_off enable
+In-Reply-To: <20160822142833.GE26494@e104818-lin.cambridge.arm.com>
+References: <1471525766-12803-1-git-send-email-zhongjiang@huawei.com>
+ <20160818160437.GA21343@e104818-lin.cambridge.arm.com>
+ <CAFpQJXUYxPsTArMkv27r2u19v92APjjNF5W0bMNqQKGqNUin5g@mail.gmail.com>
+ <57B667CA.5060905@huawei.com>
+ <CAFpQJXVzr0uvV00vtQkrAxzezW=QRpL9EKPL+4yqhmKE5GdXKA@mail.gmail.com>
+ <CAFpQJXXXAhQQxr9=SmW2-bHmAYQMyn93zFiYZiBqbjgyZg2oJw@mail.gmail.com>
+ <57B82533.9010507@huawei.com>
+ <20160822142833.GE26494@e104818-lin.cambridge.arm.com>
+Message-ID: <57BC3125.7090003@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 August 2016 at 11:16, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 22/08/16 12:45, Ard Biesheuvel wrote:
->>
->> On 18 August 2016 at 15:10, Suzuki K Poulose <suzuki.poulose@arm.com>
->> wrote:
->>>
->>> adrp uses PC-relative address offset to a page (of 4K size) of
->>> a symbol. If it appears in an alternative code patched in, we
->>> should adjust the offset to reflect the address where it will
->>> be run from. This patch adds support for fixing the offset
->>> for adrp instructions.
->>>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>> Cc: Andre Przywara <andre.przywara@arm.com>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>> ---
->>>  arch/arm64/kernel/alternative.c | 13 +++++++++++++
->>>  1 file changed, 13 insertions(+)
->>>
->>> diff --git a/arch/arm64/kernel/alternative.c
->>> b/arch/arm64/kernel/alternative.c
->>> index d2ee1b2..71c6962 100644
->>> --- a/arch/arm64/kernel/alternative.c
->>> +++ b/arch/arm64/kernel/alternative.c
->>> @@ -80,6 +80,19 @@ static u32 get_alt_insn(struct alt_instr *alt, u32
->>> *insnptr, u32 *altinsnptr)
->>>                         offset = target - (unsigned long)insnptr;
->>>                         insn = aarch64_set_branch_offset(insn, offset);
->>>                 }
->>> +       } else if (aarch64_insn_is_adrp(insn)) {
->>> +               s32 orig_offset, new_offset;
->>> +               unsigned long target;
->>> +
->>> +               /*
->>> +                * If we're replacing an adrp instruction, which uses
->>> PC-relative
->>> +                * immediate addressing, adjust the offset to reflect the
->>> new
->>> +                * PC. adrp operates on 4K aligned addresses.
->>> +                */
->>> +               orig_offset  = aarch64_insn_adrp_get_offset(insn);
->>> +               target = ((unsigned long)altinsnptr & ~0xfffUL) +
->>> orig_offset;
->>> +               new_offset = target - ((unsigned long)insnptr &
->>> ~0xfffUL);
->>> +               insn = aarch64_insn_adrp_set_offset(insn, new_offset);
->>
->>
->> Are orig_offset and new_offset guaranteed to be equal modulo 4 KB?
->> Otherwise, you will have to track down and patch the associated :lo12:
->> add/ldr instruction as well.
->
->
-> We are modifying the alternative instruction to accommodate for the new PC,
-> where this instruction will be executed from, while the referenced symbol
-> remains the same. Hence the associated :lo12: doesn't change. Does that
-> address your concern ? Or did I miss something ?
->
 
-Ah, of course. Yes, that should work fine, given that the symbol stays
-in place, and so its offset into the containing 4 KB page does not
-change either.
+On 2016/8/22 22:28, Catalin Marinas wrote:
+> On Sat, Aug 20, 2016 at 05:38:59PM +0800, zhong jiang wrote:
+>> On 2016/8/19 12:11, Ganapatrao Kulkarni wrote:
+>>> On Fri, Aug 19, 2016 at 9:30 AM, Ganapatrao Kulkarni
+>>> <gpkulkarni@gmail.com> wrote:
+>>>> On Fri, Aug 19, 2016 at 7:28 AM, zhong jiang <zhongjiang@huawei.com> wrote:
+>>>>> On 2016/8/19 1:45, Ganapatrao Kulkarni wrote:
+>>>>>> On Thu, Aug 18, 2016 at 9:34 PM, Catalin Marinas
+>>>>>> <catalin.marinas@arm.com> wrote:
+>>>>>>> On Thu, Aug 18, 2016 at 09:09:26PM +0800, zhongjiang wrote:
+>>>>>>>> At present, boot cpu will bound to a node from device tree when node_off enable.
+>>>>>>>> if the node is not initialization, it will lead to a following problem.
+> [...]
+>>>>>>>> --- a/arch/arm64/mm/numa.c
+>>>>>>>> +++ b/arch/arm64/mm/numa.c
+>>>>>>>> @@ -119,7 +119,7 @@ void numa_store_cpu_info(unsigned int cpu)
+>>>>>>>>  void __init early_map_cpu_to_node(unsigned int cpu, int nid)
+>>>>>>>>  {
+>>>>>>>>       /* fallback to node 0 */
+>>>>>>>> -     if (nid < 0 || nid >= MAX_NUMNODES)
+>>>>>>>> +     if (nid < 0 || nid >= MAX_NUMNODES || numa_off)
+>>>>>>
+>>>>>> i  did not understood how this line change fixes the issue that you
+>>>>>> have mentioned (i too not understood fully the issue description)
+>>>>>> this array used while mapping node id when secondary cores comes up
+>>>>>> when numa_off is set the cpu_to_node_map[cpu] is not used and set to
+>>>>>> node0 always( refer function numa_store_cpu_info)..
+>>>>>> please provide more details to understand the issue you are facing.
+>>>>>> /*
+>>>>>>  *  Set the cpu to node and mem mapping
+>>>>>>  */
+>>>>>> void numa_store_cpu_info(unsigned int cpu)
+>>>>>> {
+>>>>>>         map_cpu_to_node(cpu, numa_off ? 0 : cpu_to_node_map[cpu]);
+>>>>>> }
+>>>>>
+>>>>> The issue comes up when we test the kdump. it will leads to kernel crash.
+>>>>> when I debug the issue, I find boot cpu actually bound to the node1. while
+>>>>> node1 is not real existence when numa_off enable.
+>>>>
+>>>> boot cpu is default mapped to node0
+>>>> are you running with any other patches?
+He applied my patches, which I mentioned these days.
 
-Thanks,
-Ard.
+I chated with ZhongJiang, this problem is only exist for my patches, and no matter
+whether use kdump or not. Mainline doesn't have this problem.
+
+The details of this problem is(suppose numa_off is true), according to the code execution sequence :
+
+1. setup_arch-->bootmem_init-->arm64_numa_init
+When numa_off is true, all memory blocks will add into node 0.
+
+2. setup_arch-->of_smp_init_cpus
+I added early_map_cpu_to_node for boot cpu, so that the nid of cpu0 will change to the value read from dt node.
+With ZhongJiang's patch, it will correct the nid of cpu0 to zero when numa_off is true.
+
+3. build_all_zonelists
+Because numa is off, so that only the control block of node 0 had been initialized. So cpu0 with non-zero nid will lead the kernel crash.
+
+4. kernel_init_freeable-->smp_prepare_cpus-->smp_store_cpu_info
+Set the nid of cpu0 to zero, but it's too late.
+
+5. secondary_start_kernel-->smp_store_cpu_info
+Set the nid of other cpus to zero.
+
+I will update my patch series and resend it again.
+
+Best regards,
+     Town?Thunder
+     (My Chinese name Zhen Lei direct translation into English)
+
+>>>
+>>> if you added any patch to change this code
+>>>   /* init boot processor */
+>>>         cpu_to_node_map[0] = 0;
+>>>         map_cpu_to_node(0, 0);
+>>>
+>>> then adding code to take-care numa_off here might solve your issue.
+>>
+>>  but in of_smp_init_cpus, boot cpu will call early_map_cpu_to_node[] to get
+>>  the relation node. and the node is from devicetree.
+>>
+>>  you points to the code will be covered with another node. therefore, it is
+>>  possible that cpu_to_node[cpu] will leads to the incorrect results. therefore,
+>>  The crash will come up.
+> 
+> I think I get Ganapat's point. The cpu_to_node_map[0] may be incorrectly
+> set by early_map_cpu_to_node() when called from smp_init_cpus() ->
+> of_parse_and_init_cpus(). However, the cpu_to_node_map[] array is *only*
+> read by numa_store_cpu_info(). This latter function calls
+> map_cpu_to_node() and, if numa_off, will only ever pass 0 as the nid.
+> 
+> Given that the cpu_to_node_map[] array is static, I don't see how any
+> non-zero value could leak outside the arch/arm64/mm/numa.c file.
+> 
+> So please give more details of any additional patches you have on top of
+> mainline or whether you reproduced this issue with the vanilla kernel
+> (since you mentioned kdump, that's not in mainline yet).
+> 
