@@ -1,91 +1,53 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 22 Aug 2016 17:51:19 -0700
-Subject: [PATCH v2 1/2] ARM: dts: Add MDM9615 dtsi
-In-Reply-To: <884c47cb-6629-fab6-fba0-d189ea835adb@baylibre.com>
-References: <1471525661-2563-1-git-send-email-narmstrong@baylibre.com>
- <1471525661-2563-2-git-send-email-narmstrong@baylibre.com>
- <20160818180840.GE361@codeaurora.org>
- <884c47cb-6629-fab6-fba0-d189ea835adb@baylibre.com>
-Message-ID: <20160823005119.GO6502@codeaurora.org>
+Date: Mon, 22 Aug 2016 17:55:12 -0700
+Subject: [PATCH 1/2] clk: samsung: exynos5260: Move struct
+ samsung_cmu_info to init section
+In-Reply-To: <1471834185-20249-2-git-send-email-cw00.choi@samsung.com>
+References: <1471834185-20249-1-git-send-email-cw00.choi@samsung.com>
+ <1471834185-20249-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <20160823005512.GP6502@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20, Neil Armstrong wrote:
-> On 08/18/2016 08:08 PM, Stephen Boyd wrote:
-> > On 08/18, Neil Armstrong wrote:
-> > 
-> > 
-> >> +
-> >> +		gsbi2: gsbi at 16100000 {
-> >> +			compatible = "qcom,gsbi-v1.0.0";
-> >> +			cell-index = <2>;
-> >> +			reg = <0x16100000 0x100>;
-> >> +			clocks = <&gcc GSBI2_H_CLK>;
-> >> +			clock-names = "iface";
-> >> +			status = "disabled";
-> >> +			#address-cells = <1>;
-> >> +			#size-cells = <1>;
-> >> +			ranges;
-> >> +
-> >> +			gsbi2_i2c: i2c at 16180000 {
-> >> +				compatible = "qcom,i2c-qup-v1.1.1";
-> >> +				#address-cells = <1>;
-> >> +				#size-cells = <0>;
-> >> +				reg = <0x16180000 0x1000>;
-> >> +				interrupts = <GIC_SPI 149 IRQ_TYPE_NONE>;
-> > 
-> > There should be a trigger type... high perhaps?
+On 08/22, Chanwoo Choi wrote:
+> This patch moves the all samsung_cmu_info struct to initconst section
+> because they are used only in initconst section.
 > 
-> Well, I do not know, and other qcom dtsi has 0x0 or NONE here...
-
-We should fix those. The driver uses IRQF_TRIGGER_HIGH so it
-seems like we should put that here as well.
-
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos5260.c | 350 +++++++++++++++++------------------
+>  1 file changed, 175 insertions(+), 175 deletions(-)
 > 
-> > 
-> >> +
-> >> +				clocks = <&gcc GSBI2_QUP_CLK>, <&gcc GSBI2_H_CLK>;
-> >> +				clock-names = "core", "iface";
-> >> +				status = "disabled";
-> >> +			};
-> >> +		};
-> >> +
-> >> +
-> >> +		qcom,ssbi at 500000 {
-> >> +			compatible = "qcom,ssbi";
-> >> +			reg = <0x500000 0x1000>;
-> >> +			qcom,controller-type = "pmic-arbiter";
-> >> +
-> >> +			pmicintc: pmic at 0 {
-> >> +				compatible = "qcom,pm8018", "qcom,pm8921";
-> > 
-> > I know that DT specifies most specific compatible first, but when
-> > the generic compatible is part number specific as well it never
-> > feels right to me. I guess I'll have to get over this.
-> > 
-> >> +				interrupts = <GIC_PPI 226 IRQ_TYPE_NONE>;
-> >> +				#interrupt-cells = <2>;
-> >> +				interrupt-controller;
-> >> +				#address-cells = <1>;
-> >> +				#size-cells = <0>;
-> > 
-> > Can we have interrupt-parent = <&pmicintc> here instead of in
-> > every node?
-> 
-> No since the pmic node interrupt parent is the GIC.
+> diff --git a/drivers/clk/samsung/clk-exynos5260.c b/drivers/clk/samsung/clk-exynos5260.c
+> index a43642c36039..fd1d9bfc151b 100644
+> --- a/drivers/clk/samsung/clk-exynos5260.c
+> +++ b/drivers/clk/samsung/clk-exynos5260.c
+> @@ -131,21 +131,21 @@ static const struct samsung_gate_clock aud_gate_clks[] __initconst = {
+>  			EN_IP_AUD, 4, 0, 0),
+>  };
+>  
+> +static const struct samsung_cmu_info aud_cmu __initconst = {
+> +	.mux_clks	= aud_mux_clks,
+> +	.nr_mux_clks	= ARRAY_SIZE(aud_mux_clks),
+> +	.div_clks	= aud_div_clks,
+> +	.nr_div_clks	= ARRAY_SIZE(aud_div_clks),
+> +	.gate_clks	= aud_gate_clks,
+> +	.nr_gate_clks	= ARRAY_SIZE(aud_gate_clks),
+> +	.nr_clk_ids	= AUD_NR_CLK,
+> +	.clk_regs	= aud_clk_regs,
+> +	.nr_clk_regs	= ARRAY_SIZE(aud_clk_regs),
+> +};
+> +
+>  static void __init exynos5260_clk_aud_init(struct device_node *np)
+>  {
+> -	struct samsung_cmu_info cmu = { NULL };
+> -
 
-Ah ok. Silly me.
-
-> > 
-> >> +			compatible = "qcom,bam-v1.3.0";
-> >> +			reg = <0x12142000 0x8000>;
-> >> +			interrupts = <GIC_SPI 97 IRQ_TYPE_NONE>;
-> > 
-> > There should really be some flags.
-> 
-> Same as for the qup and uartdm, other qcom dtsi left 0x0 or NONE here...
-
-The driver uses IRQF_TRIGGER_HIGH here, so use that in dtsi?
+I presume this was done this way to save some initdata space by
+only allocating the array that's needed at runtime? I would
+expect to see some more kernel image bloat from this change but
+runtime memory usage would stay the same. Is there any real
+benefit from this patch though?
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
