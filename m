@@ -1,248 +1,74 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Tue, 23 Aug 2016 15:47:59 -0500
-Subject: [PATCH v7 8/9] arm64: pmu: Detect and enable multiple PMUs in an ACPI
- system
-In-Reply-To: <1471985280-2243-1-git-send-email-jeremy.linton@arm.com>
-References: <1471985280-2243-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1471985280-2243-9-git-send-email-jeremy.linton@arm.com>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Tue, 23 Aug 2016 14:06:20 -0700 (PDT)
+Subject: [PATCH v05 54/72] include/uapi/xen/privcmd.h: fix compilation
+ in userspace
+In-Reply-To: <20160823203811.GO5399@lakka.kapsi.fi>
+References: <1471890809-4383-1-git-send-email-mikko.rapeli@iki.fi>
+ <1471890809-4383-55-git-send-email-mikko.rapeli@iki.fi>
+ <20160823100201.GG1041@n2100.armlinux.org.uk>
+ <alpine.DEB.2.10.1608231100400.12392@sstabellini-ThinkPad-X260>
+ <20160823203811.GO5399@lakka.kapsi.fi>
+Message-ID: <alpine.DEB.2.10.1608231404210.12392@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Its possible that an ACPI system has multiple CPU types in it
-with differing PMU counters. Iterate the CPU's and make a determination
-about how many of each type exist in the system. Then take and create
-a PMU platform device for each type, and assign it the interrupts parsed
-from the MADT. Creating a platform device is necessary because the PMUs
-are not described as devices in the DSDT table.
+On Tue, 23 Aug 2016, Mikko Rapeli wrote:
+> On Tue, Aug 23, 2016 at 11:13:52AM -0700, Stefano Stabellini wrote:
+> > On Tue, 23 Aug 2016, Russell King - ARM Linux wrote:
+> > > On Mon, Aug 22, 2016 at 08:33:11PM +0200, Mikko Rapeli wrote:
+> > > > xen/interface/xen.h is not exported from kernel headers so remove the
+> > > > dependency and provide needed defines for domid_t and xen_pfn_t if they
+> > > > are not already defined by some other e.g. Xen specific headers.
+> > > 
+> > > I'm confused.  How did we end up with a 64-bit PFN number on ARM?  It's
+> > > insane - especially as the kernel uses "unsigned long" almost everywhere
+> > > for PFNs - we can't have physical addresses more than 44 bits (32 bit
+> > > pfn + 4k page size).
+> > 
+> > That's because xen_pfn_t is the type used to store pfns in structures
+> > passed to Xen via hypercalls. The Xen hypercall ABI is shared between
+> > ARM and ARM64. On x86_32 and x86_64 we have different sizes for pfn
+> > types in the hypercall ABI and it caused quite a bit of trouble in the
+> > past as it is possible to run 32bit domains on a 64bit hypervisor.
+> > Having a common type for pfns on ARM and ARM64 helped a lot in that
+> > respect.
+> > 
+> > 
+> > > > Suggested by Andrew Cooper <andrew.cooper3@citrix.com> on lkml message
+> > > > <5569F9C9.8000607@citrix.com>.
+> > > > 
+> > > > The ifdef for ARM is ugly but did not find better solutions for it.
+> > > 
+> > > #ifdef __arm__
+> > > 
+> > > maybe?  Even if not, the unsightly parens are not necessary.
+> > 
+> > Yes, I think it should be:
+> > 
+> > #if defined(__arm__) || defined(__aarch64__)
+> 
+> Thanks, I will send a new version with this change.
+>  
+> > > diff --git a/arch/arm/include/asm/xen/interface.h b/arch/arm/include/asm/xen/interface.h
+> > > index 75d5968..6898ee1 100644
+> > > --- a/arch/arm/include/asm/xen/interface.h
+> > > +++ b/arch/arm/include/asm/xen/interface.h
+> > > @@ -38,7 +38,7 @@
+> > >   * fine since it simply wouldn't be able to create any sure pfns in
+> > >   * the first place.
+> > >   */
+> > > -typedef uint64_t xen_pfn_t;
+> > > +typedef __u64 xen_pfn_t;
+> > >  #define PRI_xen_pfn "llx"
+> > >  typedef uint64_t xen_ulong_t;
+> > >  #define PRI_xen_ulong "llx"
+> > 
+> > Why this change?
+> 
+> I will double check but I think the other fix exposed then the common
+> "<stdint.h> definitions not available in userspace <linux/types.h>" and this
+> was needed to please the compiler. If so, I'll add this to commit message.
 
-This code is loosely based on earlier work by Mark Salter.
-
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
----
- drivers/perf/arm_pmu.c      |   7 +-
- drivers/perf/arm_pmu_acpi.c | 164 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 170 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index ee9e301..98a037a 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -1063,7 +1063,12 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 		if (!ret)
- 			ret = init_fn(pmu);
- 	} else if (probe_table) {
--		ret = probe_plat_pmu(pmu, probe_table, read_cpuid_id());
-+		if (acpi_disabled) {
-+			/* use the current cpu. */
-+			ret = probe_plat_pmu(pmu, probe_table,
-+					     read_cpuid_id());
-+		} else
-+			ret = probe_plat_pmu(pmu, probe_table, pdev->id);
- 	}
- 
- 	if (ret) {
-diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
-index e784714..c0d6888 100644
---- a/drivers/perf/arm_pmu_acpi.c
-+++ b/drivers/perf/arm_pmu_acpi.c
-@@ -2,13 +2,17 @@
-  * ARM ACPI PMU support
-  *
-  * Copyright (C) 2015 Red Hat Inc.
-+ * Copyright (C) 2016 ARM Ltd.
-  * Author: Mark Salter <msalter@redhat.com>
-+ *         Jeremy Linton <jeremy.linton@arm.com>
-  *
-  * This work is licensed under the terms of the GNU GPL, version 2.  See
-  * the COPYING file in the top-level directory.
-  *
-  */
- 
-+#define pr_fmt(fmt) "ACPI-PMU: " fmt
-+
- #include <asm/cpu.h>
- #include <linux/acpi.h>
- #include <linux/irq.h>
-@@ -23,6 +27,12 @@ struct pmu_irq {
- 	bool registered;
- };
- 
-+struct pmu_types {
-+	struct list_head list;
-+	int		 cpu_type;
-+	int		 cpu_count;
-+};
-+
- static struct pmu_irq pmu_irqs[NR_CPUS] __initdata;
- 
- /*
-@@ -39,13 +49,167 @@ void __init arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic)
- 		pmu_irqs[cpu].trigger = ACPI_LEVEL_SENSITIVE;
- }
- 
-+/* Count number and type of CPU cores in the system. */
-+static void __init arm_pmu_acpi_determine_cpu_types(struct list_head *pmus)
-+{
-+	int i;
-+	bool alloc_failure = false;
-+
-+	for_each_possible_cpu(i) {
-+		struct cpuinfo_arm64 *cinfo = per_cpu_ptr(&cpu_data, i);
-+		u32 partnum = MIDR_PARTNUM(cinfo->reg_midr);
-+		struct pmu_types *pmu;
-+
-+		list_for_each_entry(pmu, pmus, list) {
-+			if (pmu->cpu_type == partnum) {
-+				pmu->cpu_count++;
-+				break;
-+			}
-+		}
-+
-+		/* we didn't find the CPU type, add an entry to identify it */
-+		if ((&pmu->list == pmus) && (!alloc_failure)) {
-+			pmu = kzalloc(sizeof(struct pmu_types), GFP_KERNEL);
-+			if (!pmu) {
-+				pr_warn("Unable to allocate pmu_types\n");
-+				/*
-+				 * continue to count cpus for any pmu_types
-+				 * already allocated, but don't allocate any
-+				 * more pmu_types. This avoids undercounting.
-+				 */
-+				alloc_failure = true;
-+			} else {
-+				pmu->cpu_type = partnum;
-+				pmu->cpu_count++;
-+				list_add_tail(&pmu->list, pmus);
-+			}
-+		}
-+	}
-+}
-+
-+/*
-+ * Registers the group of PMU interfaces which correspond to the 'last_cpu_id'.
-+ * This group utilizes 'count' resources in the 'res'.
-+ */
-+static int __init arm_pmu_acpi_register_pmu(int count, struct resource *res,
-+					    int last_cpu_id)
-+{
-+	int i;
-+	int err = -ENOMEM;
-+	bool free_gsi = false;
-+	struct platform_device *pdev;
-+
-+	if (count) {
-+		pdev = platform_device_alloc(ARMV8_PMU_PDEV_NAME, last_cpu_id);
-+		if (pdev) {
-+			err = platform_device_add_resources(pdev, res, count);
-+			if (!err) {
-+				err = platform_device_add(pdev);
-+				if (err) {
-+					pr_warn("Unable to register PMU device\n");
-+					free_gsi = true;
-+				}
-+			} else {
-+				pr_warn("Unable to add resources to device\n");
-+				free_gsi = true;
-+				platform_device_put(pdev);
-+			}
-+		} else {
-+			pr_warn("Unable to allocate platform device\n");
-+			free_gsi = true;
-+		}
-+	}
-+
-+	/* unmark (and possibly unregister) registered GSIs */
-+	for_each_possible_cpu(i) {
-+		if (pmu_irqs[i].registered) {
-+			if (free_gsi)
-+				acpi_unregister_gsi(pmu_irqs[i].gsi);
-+			pmu_irqs[i].registered = false;
-+		}
-+	}
-+
-+	return err;
-+}
-+
-+/*
-+ * For the given cpu/pmu type, walk all known GSIs, register them, and add
-+ * them to the resource structure. Return the number of GSI's contained
-+ * in the res structure, and the id of the last CPU/PMU we added.
-+ */
-+static int __init arm_pmu_acpi_gsi_res(struct pmu_types *pmus,
-+				       struct resource *res, int *last_cpu_id)
-+{
-+	int i, count;
-+	int irq;
-+
-+	/* lets group all the PMU's from similar CPU's together */
-+	count = 0;
-+	for_each_possible_cpu(i) {
-+		struct cpuinfo_arm64 *cinfo = per_cpu_ptr(&cpu_data, i);
-+
-+		if (pmus->cpu_type == MIDR_PARTNUM(cinfo->reg_midr)) {
-+			if (pmu_irqs[i].gsi == 0)
-+				continue;
-+
-+			irq = acpi_register_gsi(NULL, pmu_irqs[i].gsi,
-+						pmu_irqs[i].trigger,
-+						ACPI_ACTIVE_HIGH);
-+
-+			res[count].start = res[count].end = irq;
-+			res[count].flags = IORESOURCE_IRQ;
-+
-+			if (pmu_irqs[i].trigger == ACPI_EDGE_SENSITIVE)
-+				res[count].flags |= IORESOURCE_IRQ_HIGHEDGE;
-+			else
-+				res[count].flags |= IORESOURCE_IRQ_HIGHLEVEL;
-+
-+			pmu_irqs[i].registered = true;
-+			count++;
-+			(*last_cpu_id) = cinfo->reg_midr;
-+		}
-+	}
-+	return count;
-+}
-+
- static int __init pmu_acpi_init(void)
- {
-+	struct resource	*res;
- 	int err = -ENOMEM;
-+	int count, cpu_id;
-+	struct pmu_types *pmu, *safe_temp;
-+	LIST_HEAD(pmus);
- 
- 	if (acpi_disabled)
- 		return 0;
- 
-+	arm_pmu_acpi_determine_cpu_types(&pmus);
-+
-+	list_for_each_entry_safe(pmu, safe_temp, &pmus, list) {
-+		res = kcalloc(pmu->cpu_count,
-+			      sizeof(struct resource), GFP_KERNEL);
-+
-+		/* for a given PMU type collect all the GSIs. */
-+		if (res) {
-+			count = arm_pmu_acpi_gsi_res(pmu, res,
-+						     &cpu_id);
-+			/*
-+			 * register this set of interrupts
-+			 * with a new PMU device
-+			 */
-+			err = arm_pmu_acpi_register_pmu(count, res, cpu_id);
-+			if (!err)
-+				pr_info("Registered %d devices for %X\n",
-+					count, pmu->cpu_type);
-+			kfree(res);
-+		} else
-+			pr_warn("PMU unable to allocate interrupt resource space\n");
-+
-+		list_del(&pmu->list);
-+		kfree(pmu);
-+	}
-+
- 	return err;
- }
-+
- arch_initcall(pmu_acpi_init);
--- 
-2.5.5
+That would be strange, because I don't think
+arch/arm/include/asm/xen/interface.h is exposed to userspace. If it
+was, we would need to replace the other definitions there too.
