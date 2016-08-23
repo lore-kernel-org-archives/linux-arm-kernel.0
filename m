@@ -1,73 +1,101 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 23 Aug 2016 05:03:29 +0200
-Subject: [PATCH v7 7/7] doc: bindings: act8945a-charger: Update properties
-In-Reply-To: <1471848557-27278-8-git-send-email-wenyou.yang@atmel.com>
-References: <1471848557-27278-1-git-send-email-wenyou.yang@atmel.com>
- <1471848557-27278-8-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20160823030329.zy6kgncj2ov5ypnj@earth>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Tue, 23 Aug 2016 11:10:21 +0800
+Subject: [PATCH v6 4/8] usb: core: add power sequence handling for USB
+ devices
+In-Reply-To: <Pine.LNX.4.44L0.1608221156210.1543-100000@iolanthe.rowland.org>
+References: <20160822065335.GC4362@shlinux2>
+ <Pine.LNX.4.44L0.1608221156210.1543-100000@iolanthe.rowland.org>
+Message-ID: <20160823031021.GB13986@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Aug 22, 2016 at 02:49:17PM +0800, Wenyou Yang wrote:
-> Due the driver improvements, update the properties,
->  - Remove "active-semi,check-battery-temperature" property.
->  - Add the properties, "active-semi,irq_gpio"
->    and "active-semi,lbo-gpios".
+On Mon, Aug 22, 2016 at 12:09:54PM -0400, Alan Stern wrote:
+> > > +
+> > > +static int hub_of_pwrseq_on(struct device_node *np, struct usb_hub *hub)
+> > > +{
+> > > +	struct pwrseq *pwrseq;
+> > > +	struct usb_pwrseq_node *pwrseq_node;
+> > > +	int ret;
+> > > +
+> > > +	pwrseq = pwrseq_alloc_generic();
+> > > +	if (IS_ERR(pwrseq))
+> > > +		return PTR_ERR(pwrseq);
+> > > +
+> > > +	ret = pwrseq_get(np, pwrseq);
+> > > +	if (ret)
+> > > +		goto pwr_free;
+> > > +
+> > > +	ret = pwrseq_on(np, pwrseq);
+> > > +	if (ret)
+> > > +		goto pwr_put;
+> > > +
+> > > +	pwrseq_node = kzalloc(sizeof(*pwrseq_node), GFP_KERNEL);
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> Acked-by: Rob Herring <robh@kernel.org>
+> You need to check that the kzalloc succeeded.
 
-I wonder if it's too late to slightly break the DT API by
-introducing a proper sub-device for the charger and having all those
-charger specific details described there. Not being able to use the
-devm_ functions because all properties are assigned to the parent
-device is not very nice.
+Ok.
 
-We could easily support reading timeouts and threshold information
-from the both (parent and sub-device) and just mark the parent
-binding deprecated. The only real API break would be
-"active-semi,chglev-gpios", which is currently broken anyways in the
-driver as far as I can see (I should have reviewed this more
-carefully previously).
+> 
+> > > +	pwrseq_node->pwrseq = pwrseq;
+> > > +	list_add(&pwrseq_node->list, &hub->pwrseq_on_list);
+> > > +
+> > > +	return 0;
+> > > +
+> > > +pwr_put:
+> > > +	pwrseq_put(pwrseq);
+> > > +pwr_free:
+> > > +	pwrseq_free(pwrseq);
+> > > +	return ret;
+> > > +}
+> 
+> This subroutine looks very generic.  The only place where it cares that
+> it was called for a USB hub is the list_add(), and that could easily
+> become generic also (make this function take &hub->pwrseq_on_list as
+> its second argument, instead of hub).
+> 
+> It looks like this routine really belongs in the power sequence 
+> library.
+> 
 
-In other words I suggest the following:
+I will export below two generic functions at pwrseq library:
 
-pmic at 5b {
-    compatible = "active-semi,act8945a";
-    reg = <0x5b>;
-    status = "okay";
+int generic_pwrseq_on(struct device_node *np, struct list_head *head)
+void generic_pwrseq_off(struct list_head *head)
 
-    /* the following 3 are deprecated, but still supported */
-    //active-semi,input-voltage-threshold-microvolt = <6600>;
-    //active-semi,precondition-timeout = <40>;
-    //active-semi,total-timeout = <3>;
+delete this file, and call above APIs at hub.c.
 
-    /* no longer supported, never worked properly */
-    //active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
+> > > +
+> > > +int hub_pwrseq_on(struct usb_hub *hub)
+> > > +{
+> 
+> The names of this routine and the subroutine above are too similar.  
+> After all, both functions require OF support.
+> 
 
-    /* this is new, mfd should register charger sub-dev independently
-     * of the subnode for backwards compatibility. Then optional
-     * gpios/irqs are not available. But those either never worked
-     * or did not exist before this update. */
-    charger {
-        active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
-        active-semi,lbo-gpios = <&pioA 72 GPIO_ACTIVE_LOW>;
-		interrupt-parent = <&pioA>;
-        interrupts = <45 GPIO_ACTIVE_LOW>
+I will add #ifdef CONFIG_OF for related code. And put the content at
+hub_pwrseq_on at hub_probe directly, how about below?
 
-        active-semi,input-voltage-threshold-microvolt = <6600>;
-        active-semi,precondition-timeout = <40>;
-        active-semi,total-timeout = <3>;
-    };
-};
+hub_probe() {
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160823/f270d174/attachment-0001.sig>
+	...
+
+	if (hub_configure(hub, endpoint) >= 0) {
+#ifdef CONFIG_OF
+		for_each_child_of_node(parent->of_node, np) {
+			ret = generic_pwrseq_on(np, hub);
+			if (ret)
+				return ret;
+		}
+#else
+		return 0;
+#endif
+	}
+
+	hub_disconnect(intf);
+	return ret;
+}
+
+-- 
+
+Best Regards,
+Peter Chen
