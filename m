@@ -1,44 +1,83 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 23 Aug 2016 08:51:35 -0600
-Subject: [PATCH V5 0/9] perf: Driver specific configuration for PMU
-In-Reply-To: <878tvon8b7.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1470932464-726-1-git-send-email-mathieu.poirier@linaro.org>
- <878tvon8b7.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <CANLsYkxQNB-ZU6obSKvJZMMmZQT5kMfuUuA1PpF8YYeZqujwbQ@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 23 Aug 2016 15:54:17 +0100
+Subject: [PATCH 07/13] scpi: ignore init_versions failure if reported not
+ supported
+In-Reply-To: <86c4042a-a892-b5c4-cc75-c2139e80e226@baylibre.com>
+References: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
+ <1471515066-3626-8-git-send-email-narmstrong@baylibre.com>
+ <74d35f80-8499-cadf-798c-9b296218305c@arm.com>
+ <86c4042a-a892-b5c4-cc75-c2139e80e226@baylibre.com>
+Message-ID: <5e627a97-88f6-c7cf-1d64-6439cb708aff@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 August 2016 at 09:15, Alexander Shishkin
-<alexander.shishkin@linux.intel.com> wrote:
-> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
->
->> As such something that used to be a two-step process:
+
+
+On 23/08/16 09:23, Neil Armstrong wrote:
+> On 08/19/2016 06:46 PM, Sudeep Holla wrote:
 >>
->> # echo 1 > /sys/bus/coresight/devices/20070000.etr/enable_sink
->> # perf record -e cs_etm//u --per-thread  uname
 >>
->> is integrated in a single command:
+>> On 18/08/16 11:11, Neil Armstrong wrote:
+>>> In Amlogic GXBB Legacy SCPI, the LEGACY_SCPI_CMD_SCPI_CAPABILITIES report
+>>> as SCPI_ERR_SUPPORT, so do not fail if this command is not supported.
+>>>
+>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>>> ---
+>>>  drivers/firmware/arm_scpi.c | 12 +++++++-----
+>>>  1 file changed, 7 insertions(+), 5 deletions(-)
+>>>
+>>> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+>>> index 3fe39fe..d3be4c5 100644
+>>> --- a/drivers/firmware/arm_scpi.c
+>>> +++ b/drivers/firmware/arm_scpi.c
+>>> @@ -1111,12 +1111,13 @@ err:
+>>>          ret = scpi_info->ops->init_versions(scpi_info);
+>>>      else
+>>>      ret = scpi_init_versions(scpi_info);
+>>> -    if (ret) {
+>>> +    if (ret && ret != -EOPNOTSUPP) {
+>>>          dev_err(dev, "incorrect or no SCP firmware found\n");
+>>>          scpi_remove(pdev);
+>>>          return ret;
+>>>      }
+>>>
 >>
->> # perf record -e cs_etm/@sink=20070000.etr/u --per-thread  uname
+>> Why not deal it in init_versions itself.
+>>
+>>> +    if (ret != -EOPNOTSUPP) {
+>>>      _dev_info(dev, "SCP Protocol %d.%d Firmware %d.%d.%d version\n",
+>>>            PROTOCOL_REV_MAJOR(scpi_info->protocol_version),
+>>>            PROTOCOL_REV_MINOR(scpi_info->protocol_version),
+>>
+>> Why not have default value like 0.0 ? Just add a comment. Since get
+>> version is exported out, IMO having default value makes more sense. What
+>> do you think ?
+>>
+>>> @@ -1124,15 +1125,16 @@ err:
+>>>            FW_REV_MINOR(scpi_info->firmware_version),
+>>>            FW_REV_PATCH(scpi_info->firmware_version));
+>>>
+>>> +        ret = sysfs_create_groups(&dev->kobj, versions_groups);
+>>> +        if (ret)
+>>> +            dev_err(dev, "unable to create sysfs version group\n");
+>>> +    }
+>>> +
+>>
+>> Again this can stay as is if we have default.
+>>
 >
-> Can't we simply teach perf record to write 1 to that sysfs attribute and
-> avoid parsing more ascii strings in the kernel? I suspect that would also
-> take way less code.
-
-That, in my opinion, would be a big hack.  Peter and Jiri, any thoughts on this?
-
+> Printing version 0.0 firmware 0.0.0 is a nonsense for me...
 >
-> Are there any other use cases for this besides specifying @sink for a
-> ETM?
 
-Not at this time but there is so many configuration option for the
-ETM/PTM tracers (that aren't filters) that I wanted the right
-infrastructure to be there should/when we need to expand.
+OK 0.0 was a wrong example. May be 0.1 ?
 
-Thanks for taking the time to review this set,
-Mathieu
+Since the driver has already exposed, hypothetically user-space can use
+that information, so IMO, we need to expose some static version for pre-v1.0
 
->
-> Regards,
-> --
-> Alex
+I am surprised that capability is not supported as this was present even
+in that legacy SCPI. Do you know what happens if you send that command ?
+Have you done some experiments on that ?
+
+-- 
+Regards,
+Sudeep
