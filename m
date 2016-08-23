@@ -1,58 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Aug 2016 12:09:52 +0200
-Subject: [PATCH v2 1/2] ARM: dts: Remove use of skeleton.dtsi from
- bcm283x.dtsi
-In-Reply-To: <20160818102349.GC27045@leverpostej>
-References: <1470233565-30154-1-git-send-email-ijc@hellion.org.uk>
- <1471504916.6295.32.camel@hellion.org.uk>
- <20160818102349.GC27045@leverpostej>
-Message-ID: <7746678.0mZLVD2k0J@wuerfel>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 23 Aug 2016 11:19:47 +0100
+Subject: [PATCH 7/8] arm64: Refactor sysinstr exception handling
+In-Reply-To: <20160822125343.GE14680@arm.com>
+References: <1471525832-21209-1-git-send-email-suzuki.poulose@arm.com>
+ <1471525832-21209-8-git-send-email-suzuki.poulose@arm.com>
+ <20160822125343.GE14680@arm.com>
+Message-ID: <50ca929f-7a79-1403-b0df-a99f84ddc319@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, August 18, 2016 11:23:49 AM CEST Mark Rutland wrote:
-> On Thu, Aug 18, 2016 at 08:21:56AM +0100, Ian Campbell wrote:
-> > On Tue, 2016-08-09 at 11:48 +0100, Ian Campbell wrote:
-> > > On Wed, 2016-08-03 at 15:48 +0100, Mark Rutland wrote:
-> > > > 
-> > > > > [...]Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
-> > > > 
-> > > > I also don't have the relevant hardware to test with, but this
-> > > looks
-> > > > generally like the right thing. So FWIW:
-> > > > 
-> > > > Acked-by: Mark Rutland <mark.rutland@arm.com>
-> > > 
-> > > Thanks (and Stefan too).
-> > > 
-> > > I think these things generally go via the arm-soc tree? Arnd & Olaf,
-> > > would it be possible to get this fix in for rc2 please (or in any event
-> > > for 4.8). Although it's an external tree I believe build breakage in
-> > > the split-out DT git repo is worth addressing.
-> > 
-> > This change doesn't appear to be in either v4.8-rc2, Linus' tree nor in
-> > the arm-soc tree that I can see. So, ping?
-> > 
-> > Or am I barking up the wrong tree pointing this patch towards arm-soc
-> > (via arm at k.o)?
-> 
-> That's the right place.
-> 
-> The best thing to do would be to resend the patch, with all tags
-> accumulated, with arm-soc, Arnd, and Olof in the To line (rather than
-> Cc'd), so it's clear they need to action it.
+On 22/08/16 13:53, Will Deacon wrote:
+> On Thu, Aug 18, 2016 at 02:10:31PM +0100, Suzuki K Poulose wrote:
+>> Right now we trap some of the user space data cache operations
+>> based on a few Errata (ARM 819472, 826319, 827319 and 824069).
+>> We need to trap userspace access to CTR_EL0, if we detect mismatched
+>> cache line size. Since both these traps share the EC, refactor
+>> the handler a little bit to make it a bit more reader friendly.
+>>
+>> Cc: Andre Przywara <andre.przywara@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>  arch/arm64/include/asm/esr.h | 48 +++++++++++++++++++++++++++++
+>>  arch/arm64/kernel/traps.c    | 73 ++++++++++++++++++++++++++++----------------
+>>  2 files changed, 95 insertions(+), 26 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+>> index f772e15..2a8f6c3 100644
+>> --- a/arch/arm64/include/asm/esr.h
+>> +++ b/arch/arm64/include/asm/esr.h
+>> @@ -109,6 +109,54 @@
+>>  	((ESR_ELx_EC_BRK64 << ESR_ELx_EC_SHIFT) | ESR_ELx_IL |	\
+>>  	 ((imm) & 0xffff))
+>>
+>> +/* ISS field definitions for System instruction traps */
+>
+> Can you add a similar comment for the ESR_ELx_* encodings that we already
+> have, please? Unfortunately, we've not namespaced things, so the
+> data/instruction abort encodings are described as e.g. ESR_ELx_ISV.
 
-I had skipped the new message as well while sorting through 5000
-messages after my vacation, but I've now put it into my TODO folder
-and will get to it eventually.
+Will do.
 
-We sometimes miss stuff that is meant for arm-soc when it comes
-from people that don't normally send us patches. If you want to
-be sure to catch the attention, stick a 'GIT PULL' into the subject
-or send a ping on IRC.
 
-The easiest way for us is when things get funnelled through the
-platform maintainers that handle all the other patches, but I
-can see how that may be annoying for a patch like this.
+>> +#define ESR_ELx_SYS64_ISS_Op0_SHIFT	20
+>> +#define ESR_ELx_SYS64_ISS_Op0_MASK	(UL(0x3) << ESR_ELx_SYS64_ISS_Op0_SHIFT)
+>
+> Inconsistent capitalisation in your macro naming (e.g. RT vs Op1). Maybe
+> just stick to uppercase for #defines?
 
-	Arnd
+Sure
+
+>> +
+>> +#define ESR_ELx_SYS64_ISS_U_CACHE_OP_MASK	(ESR_ELx_SYS64_ISS_Op0_MASK | \
+>> +						 ESR_ELx_SYS64_ISS_Op1_MASK | \
+>> +						 ESR_ELx_SYS64_ISS_Op2_MASK | \
+>> +						 ESR_ELx_SYS64_ISS_CRn_MASK | \
+>> +						 ESR_ELx_SYS64_ISS_DIR_MASK)
+>> +#define ESR_ELx_SYS64_ISS_U_CACHE_OP_VAL \
+>> +				(ESR_ELx_SYS64_ISS_SYS_VAL(1, 3, 1, 7, 0) | \
+>> +				 ESR_ELx_SYS64_ISS_DIR_WRITE)
+>
+> What is the _U_ for? Unified? User? If it's user, EL0 may be more
+> appropriate.
+
+Ok.
+  
+
+
+Thanks
+Suzuki
