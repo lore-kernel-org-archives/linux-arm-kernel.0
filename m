@@ -1,27 +1,91 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Aug 2016 10:19:33 +0100
-Subject: [PATCH 1/2] ARM: sa1100: fix 3.6864MHz clock
-In-Reply-To: <CALT56yNmjDuTO=zmQmUpKf3Ac4rNYZMEvMxBqmma=NB0H2YWwA@mail.gmail.com>
-References: <E1baiKc-0004ya-J6@rmk-PC.armlinux.org.uk>
- <CALT56yNmjDuTO=zmQmUpKf3Ac4rNYZMEvMxBqmma=NB0H2YWwA@mail.gmail.com>
-Message-ID: <20160823091933.GE1041@n2100.armlinux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Aug 2016 11:23:34 +0200
+Subject: [PATCH] serial: vt8500_serial: Fix a parameter of
+ find_first_zero_bit.
+In-Reply-To: <57f44339-76c6-051f-b592-2648afaae336@wanadoo.fr>
+References: <1471814425-18949-1-git-send-email-christophe.jaillet@wanadoo.fr>
+ <2512469.eM8MYFl15l@wuerfel>
+ <57f44339-76c6-051f-b592-2648afaae336@wanadoo.fr>
+Message-ID: <11520879.bzQ3JxDSyK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2016 at 04:46:20AM +0300, Dmitry Eremin-Solenikov wrote:
-> 2016-08-19 14:51 GMT+03:00 Russell King <rmk+kernel@armlinux.org.uk>:
-> > pxa_timer wants to be able to call clk_enable() etc on this clock,
-> > but our clk_enable() implementation expects non-NULL enable/disable
-> > operations.  Provide these dummy implementations.
+On Tuesday, August 23, 2016 6:20:28 AM CEST Christophe JAILLET wrote:
+> Le 22/08/2016 ? 10:42, Arnd Bergmann a ?crit :
+> > [...]
+> > Sorry, but I'm not following the logic here.
+> >
+> > [...]
+> > You argue that the two have the same meaning, which I see, but
+> > why is it better than the existing code?
+> >
+> > 	Arnd
 > 
-> Acked-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> Hi,
+> 
+> sorry if my explanation was unclear.
+> 
+> What I mean is that if "sizeof(unsigned long) = 4" (i.e. 32 bits systems 
+> ?) then:
+> 
+> 	port = find_first_zero_bit(&vt8500_ports_in_use, sizeof(vt8500_ports_in_use));
+> turns into:
+>   	port = find_first_zero_bit(&vt8500_ports_in_use, 4);
+> 
+> find_first_zero_bit "Returns the bit number of the first set bit.  If no bits are set, returns @size."
+> So, in this case, it can return 1, 2, 3 or 4, if one of the 4 first bits is 0.
+> And will also return 4, if none of the 4 first bits is 0.
 
-Thanks.  Both patches should be in linux-next tonight.
+Ah, got it.
 
-(btw, this oops is another reason why OSTIMER0 could never have been
-tested as working as intended - it's been working as not-intended.)
+> 
+> Finally, what I meant by "Other options are possible:" is:
+>    - 'vt8500_ports_in_use' being a 'unsigned long', use ffz to reduce code verbosity
+> 	port = ffz(&vt8500_ports_in_use);
+>      would also work, because it is equivalent to:
+> 	port = find_first_zero_bit(&vt8500_ports_in_use, BITS_PER_LONG);
+> 
+>    - VT8500_MAX_PORTS, in order to be consistent with the test below
+> 	port = find_first_zero_bit(&vt8500_ports_in_use, VT8500_MAX_PORTS);
+>      would also work and is maybe more logical in regard to the test "if (port >= VT8500_MAX_PORTS)"
+> 
+> 
+> 
+> Now if "sizeof(unsigned long) = 8" (i.e. 64 bits systems ?), the actual code would work.
+> But using "sizeof(long)" to mean "more than VT8500_MAX_PORTS" is odd.
+> In other words, expressing a number of bits using something that gives a size in bytes is, IMHO, spurious.
+>   
+> All this is pure speculation.
+> 
+> Hoping that it is clearer now ( and that my analysis is right :) )
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+I misread the code in the same way the original author wrote it wrong,
+I guess it was meant to say
+
+	port = find_first_zero_bit(&vt8500_ports_in_use, sizeof(vt8500_ports_in_use) * 8);
+
+to convert number of bytes into number of bits. Your patch is absolutely
+correct, but being more specific about the kind of mistake that was made
+is a good idea.
+
+Regarding which of the four alternatives to use, I'd probably use
+your third one, checking against VT8500_MAX_PORTS. To make this code
+absolutely foolproof, we can add this hunk too then:
+
+diff --git a/drivers/tty/serial/vt8500_serial.c b/drivers/tty/serial/vt8500_serial.c
+index 23cfc5e16b45..a68be66d2770 100644
+--- a/drivers/tty/serial/vt8500_serial.c
++++ b/drivers/tty/serial/vt8500_serial.c
+@@ -118,7 +118,7 @@ struct vt8500_port {
+  * have been allocated as we can't use pdev->id in
+  * devicetree
+  */
+-static unsigned long vt8500_ports_in_use;
++static DECLARE_BITMAP(vt8500_ports_in_use, VT8500_MAX_PORTS);
+ 
+ static inline void vt8500_write(struct uart_port *port, unsigned int val,
+ 			     unsigned int off)
+
+
+
+	Arnd
