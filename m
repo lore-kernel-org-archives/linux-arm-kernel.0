@@ -1,86 +1,57 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 23 Aug 2016 11:31:16 +0530
-Subject: [PATCH v2] ARM: EXYNOS: Remove unused DMC and CMU offset and its
- mapping
-Message-ID: <1471932076-16528-1-git-send-email-pankaj.dubey@samsung.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 23 Aug 2016 13:58:25 +0800
+Subject: [PATCH 1/2] pinctrl: sunxi: fix uart1 CTS/RTS pins at PG on A23/A33
+Message-ID: <20160823055826.20591-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently there is no user of DMC and CMU SFR offsets we can safely remove
-mapping of their SFR address space and cleanup related offset macros from
-mach-exynos
+PG8, PG9 is said to be the CTS/RTS pins for UART1 according to the A23/33
+datasheets. However, the function is wrongly named "uart2" in the pinctrl
+driver. This patch fixes this by modifying them to be named "uart1".
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
-Changes since v1:
- - Removed unused CMU register mapping and related SFR macros and updated
-   commit message accordingly
- 
- arch/arm/mach-exynos/exynos.c                | 15 ---------------
- arch/arm/mach-exynos/include/mach/map.h      |  5 -----
- arch/arm/plat-samsung/include/plat/map-s5p.h |  4 ----
- 3 files changed, 24 deletions(-)
+ drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c | 4 ++--
+ drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index acabf0b..757fc11 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -30,25 +30,10 @@
- 
- static struct map_desc exynos4_iodesc[] __initdata = {
- 	{
--		.virtual	= (unsigned long)S5P_VA_CMU,
--		.pfn		= __phys_to_pfn(EXYNOS4_PA_CMU),
--		.length		= SZ_128K,
--		.type		= MT_DEVICE,
--	}, {
- 		.virtual	= (unsigned long)S5P_VA_COREPERI_BASE,
- 		.pfn		= __phys_to_pfn(EXYNOS4_PA_COREPERI),
- 		.length		= SZ_8K,
- 		.type		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)S5P_VA_DMC0,
--		.pfn		= __phys_to_pfn(EXYNOS4_PA_DMC0),
--		.length		= SZ_64K,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)S5P_VA_DMC1,
--		.pfn		= __phys_to_pfn(EXYNOS4_PA_DMC1),
--		.length		= SZ_64K,
--		.type		= MT_DEVICE,
- 	},
- };
- 
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index c48ba4f..5fb0040 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -18,11 +18,6 @@
- 
- #define EXYNOS_PA_CHIPID		0x10000000
- 
--#define EXYNOS4_PA_CMU			0x10030000
--
--#define EXYNOS4_PA_DMC0			0x10400000
--#define EXYNOS4_PA_DMC1			0x10410000
--
- #define EXYNOS4_PA_COREPERI		0x10500000
- 
- #endif /* __ASM_ARCH_MAP_H */
-diff --git a/arch/arm/plat-samsung/include/plat/map-s5p.h b/arch/arm/plat-samsung/include/plat/map-s5p.h
-index b63aeeb..0fe2828 100644
---- a/arch/arm/plat-samsung/include/plat/map-s5p.h
-+++ b/arch/arm/plat-samsung/include/plat/map-s5p.h
-@@ -14,10 +14,6 @@
- #define __ASM_PLAT_MAP_S5P_H __FILE__
- 
- #define S5P_VA_CHIPID		S3C_ADDR(0x02000000)
--#define S5P_VA_CMU		S3C_ADDR(0x02100000)
--
--#define S5P_VA_DMC0		S3C_ADDR(0x02440000)
--#define S5P_VA_DMC1		S3C_ADDR(0x02480000)
- 
- #define S5P_VA_COREPERI_BASE	S3C_ADDR(0x02800000)
- #define S5P_VA_COREPERI(x)	(S5P_VA_COREPERI_BASE + (x))
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c
+index ce483b0..f9d661e 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c
+@@ -485,12 +485,12 @@ static const struct sunxi_desc_pin sun8i_a23_pins[] = {
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 8),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x2, "uart2"),		/* RTS */
++		  SUNXI_FUNCTION(0x2, "uart1"),		/* RTS */
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x4, 2, 8)),	/* PG_EINT8 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 9),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x2, "uart2"),		/* CTS */
++		  SUNXI_FUNCTION(0x2, "uart1"),		/* CTS */
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x4, 2, 9)),	/* PG_EINT9 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 10),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
+index 3040abe..3131cac 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
+@@ -407,12 +407,12 @@ static const struct sunxi_desc_pin sun8i_a33_pins[] = {
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 8),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x2, "uart2"),		/* RTS */
++		  SUNXI_FUNCTION(0x2, "uart1"),		/* RTS */
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x4, 1, 8)),	/* PG_EINT8 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 9),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x2, "uart2"),		/* CTS */
++		  SUNXI_FUNCTION(0x2, "uart1"),		/* CTS */
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x4, 1, 9)),	/* PG_EINT9 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 10),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
 -- 
-2.4.5
+2.9.3
