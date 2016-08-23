@@ -1,41 +1,30 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 23 Aug 2016 13:38:14 -0500
-Subject: [PATCH 2/5] firmware: Add basic support for TI System Control
- Interface (TI-SCI) protocol
-In-Reply-To: <5d03a04f-9184-10e4-43c9-8834e8a39545@ti.com>
+Date: Tue, 23 Aug 2016 13:45:05 -0500
+Subject: [PATCH 3/5] firmware: ti_sci: Add support for Device control
+In-Reply-To: <9a6a8663-a3f7-7875-253f-98232d56b860@ti.com>
 References: <20160819225159.10758-1-nm@ti.com>
- <20160819225159.10758-3-nm@ti.com>
- <5d03a04f-9184-10e4-43c9-8834e8a39545@ti.com>
-Message-ID: <CAGo_u6oAU-4Gab2H5S6mRET8AoUMc+wGHofnK3BaZQzR-340JA@mail.gmail.com>
+ <20160819225159.10758-4-nm@ti.com>
+ <9a6a8663-a3f7-7875-253f-98232d56b860@ti.com>
+Message-ID: <CAGo_u6p3Bm+zGDtxpOyT+DeGN8_XPWWE0zhCYuxsH47n41Z8jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 21, 2016 at 11:20 AM, Lokesh Vutla <lokeshvutla@ti.com> wrote:
-[...]
-
->> +
->> +static int ti_sci_remove(struct platform_device *pdev)
->> +{
->> +     struct ti_sci_info *info;
->> +     int ret = 0;
->> +
->> +     info = platform_get_drvdata(pdev);
->> +
->> +     mutex_lock(&ti_sci_list_mutex);
->> +     if (info->users)
->> +             ret = -EBUSY;
->> +     else
->> +             list_del(&info->node);
->> +     mutex_unlock(&ti_sci_list_mutex);
+On Sun, Aug 21, 2016 at 10:56 PM, Lokesh Vutla <lokeshvutla@ti.com> wrote:
+>>  /**
+>> + * tis_sci_is_response_ack() - Generic ACK/NACK message checkup
+>> + * @r:       pointer to response buffer
+>> + *
+>> + * Return: true if the response was an ACK, else returns false.
+>> + */
+>> +static inline bool tis_sci_is_response_ack(void *r)
 >
-> shouldn't the mbox channels be freed in remove?
->
-> mbox_free_channel(info->chan_tx);
-> mbox_free_channel(info->chan_rx);
+> May be just ti_sci_is_response_ack() to be consistent? or you wanted to
+> keep it tis_sci* ?
 
-Uggh.. yes.. my bad. thanks for catching this. will fix with a v2 next
-week if there are no further comments.
 
---
+Uggh.. Fat fingered that one.. thanks for catching.. fixed and will
+post a v2 next week if there is no further comments
+
+---
 Regards,
-NIshanth Menon
+Nishanth Menon
