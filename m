@@ -1,111 +1,91 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 23 Aug 2016 13:31:21 -0500
-Subject: [PATCH v2 1/4] dt-binding: remoteproc: Introduce ADSP loader
- binding
-In-Reply-To: <1471931866-3107-1-git-send-email-bjorn.andersson@linaro.org>
-References: <1471931866-3107-1-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <20160823183121.GA13010@rob-hp-laptop>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 23 Aug 2016 14:32:50 -0400
+Subject: [PATCH -next] ARM: pxa: remove duplicated include from spitz.c
+In-Reply-To: <87poozpfl0.fsf@belgarion.home>
+References: <1471965498-7824-1-git-send-email-weiyj.lk@gmail.com>
+ <87y43npi5l.fsf@belgarion.home>
+ <5b9111f3-1c9d-f551-af06-566adceaef38@gmail.com>
+ <87poozpfl0.fsf@belgarion.home>
+Message-ID: <20160823183249.GE6006@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2016 at 10:57:43PM -0700, Bjorn Andersson wrote:
-> This document defines the binding for a component that loads firmware
-> and control the life cycle of the Qualcomm ADSP core.
-> 
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> ---
-> 
-> Changes since v1:
-> - Added platform names to compatibility
-> 
->  .../devicetree/bindings/remoteproc/qcom,adsp.txt   | 70 ++++++++++++++++++++++
->  1 file changed, 70 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/remoteproc/qcom,adsp.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/remoteproc/qcom,adsp.txt b/Documentation/devicetree/bindings/remoteproc/qcom,adsp.txt
-> new file mode 100644
-> index 000000000000..3820151ce3e9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/remoteproc/qcom,adsp.txt
-> @@ -0,0 +1,70 @@
-> +Qualcomm ADSP Peripheral Image Loader
-> +
-> +This document defines the binding for a component that loads and boots firmware
-> +on the Qualcomm ADSP core.
+[Re: [PATCH -next] ARM: pxa: remove duplicated include from spitz.c] On 23/08/2016 (Tue 19:20) Robert Jarzmik wrote:
 
-ADSP is for Audio DSP? So there is another driver for the audio 
-functions? Why doesn't it do the firmware loading? I'm still confused 
-why this binding is separate? If you had one common interface (a rproc) 
-to load and boot various other blocks like ADSP and Venus, then this 
-would make sense. Or does every accel block have some separate control 
-uC associated with it?
-
-> +
-> +- compatible:
-> +	Usage: required
-> +	Value type: <string>
-> +	Definition: must be one of:
-> +		    "qcom,msm8974-adsp-pil"
-> +		    "qcom,msm8996-adsp-pil"
-> +
-> +- interrupts-extended:
-> +	Usage: required
-> +	Value type: <prop-encoded-array>
-> +	Definition: must list the watchdog, fatal IRQs ready, handover and
-> +		    stop-ack IRQs
-> +
-> +- interrupt-names:
-> +	Usage: required
-> +	Value type: <stringlist>
-> +	Definition: must be "wdog", "fatal", "ready", "handover", "stop-ack"
-> +
-> +- cx-supply:
-> +	Usage: required
-> +	Value type: <phandle>
-> +	Definition: reference to the regulator to be held on behalf of the
-> +		    booting of the Hexagon core
-> +
-> +- memory-region:
-> +	Usage: required
-> +	Value type: <phandle>
-> +	Definition: reference to the reserved-memory for the ADSP
-> +
-> +- qcom,smem-states:
-> +	Usage: required
-> +	Value type: <phandle>
-> +	Definition: reference to the smem state for requesting the ADSP to
-> +		    shut down
-> +
-> +- qcom,smem-state-names:
-> +	Usage: required
-> +	Value type: <stringlist>
-> +	Definition: must be "stop"
-> +
-> += EXAMPLE
-> +The following example describes the resources needed to boot control the
-> +ADSP, as it is found on MSM8974 boards.
-> +
-> +	adsp {
-> +		compatible = "qcom,adsp-pil";
-> +
-> +		interrupts-extended = <&intc 0 162 IRQ_TYPE_EDGE_RISING>,
-> +				      <&adsp_smp2p_in 0 IRQ_TYPE_EDGE_RISING>,
-> +				      <&adsp_smp2p_in 1 IRQ_TYPE_EDGE_RISING>,
-> +				      <&adsp_smp2p_in 2 IRQ_TYPE_EDGE_RISING>,
-> +				      <&adsp_smp2p_in 3 IRQ_TYPE_EDGE_RISING>;
-> +		interrupt-names = "wdog",
-> +				  "fatal",
-> +				  "ready",
-> +				  "handover",
-> +				  "stop-ack";
-> +
-> +		cx-supply = <&pm8841_s2>;
-> +
-> +		memory-region = <&adsp_region>;
-> +
-> +		qcom,smem-states = <&modem_smp2p_out 0>;
-> +		qcom,smem-state-names = "stop";
-> +	};
-> -- 
-> 2.5.0
+> Wei Yongjun <weiyj.lk@gmail.com> writes:
 > 
+> > Hi Robert,
+> > On 08/24/2016 12:24 AM, Robert Jarzmik wrote:
+> >> Wei Yongjun <weiyj.lk@gmail.com> writes:
+> >>
+> >>> Remove duplicated include.
+> >> How so duplicated ? Can you elaborate please ?
+> >>
+> >> Moreover, how do you do think symbol_get() can stay in spitz.c without having
+> >> this include ?
+> >
+> > file linux/module.h included twice as following:
+> >
+> > #include <linux/kernel.h>
+> > #include <linux/module.h>       /* symbol_get ; symbol_put */
+> > ...
+> > #include <linux/module.h>
+> >
+> > So I think we can remove the dup include.
+> 
+> Ah I see it now.
+> 
+> What you really mean is that you want to revert 12beb346710b ("Merge tag
+> 'pxa-fixes-v4.8' of https://github.com/rjarzmik/linux into randconfig-4.8"),
+> because :
+>  - I wasn't carefull enough at review time of
+>    https://github.com/rjarzmik/linux/commit/5351ca4e70f30e0175265fbf98691528b9a4e990
+>    https://github.com/rjarzmik/linux/commit/a3c747b96df66a7eb810fef45f3b9e65614712d9
+>  
+>  - and because Paul wasn't very carefull when we look at :
+>    73017a542fd2 ("arm: fix implicit module.h users by adding it to arch/arm as
+>    required.")
+> 
+> So all in all, I'd prefer a revert with Paul's ack please.
+
+So if possible, please drop the duplicate module.h w/o the comment
+vs. a revert.  Since it appeared as a pseudo merge and was not my
+original commit anyway, this shouldn't be a problem I hope...
+
+You can call it careless if you want, I won't be offended -- FWIW I was
+juggling several different streams; one to audit and remove apparently
+non-required inclusions of module.h and one to unwind the implicit gpio
+inclusion presence before trying to pave the way to fixing _that_ last
+minute for 4.8; it was mixing and testing the two simulatenously that
+led to the removal and re-addition; which when separating out the latter
+caused it to become a duplicate additon as reported above.
+
+Not an excuse; just one of those happenstance corner cases.  I'd since
+fixed the dup locally and added this to my automated testing:
+
+   make includecheck |sort > /tmp/pre-include.txt
+      <...apply all WIP patches>
+   make includecheck |sort > /tmp/post-include.txt
+   diff -u /tmp/pre-include.txt /tmp/post-include.txt > /tmp/inc-delta.txt
+   if [ -s /tmp/inc-delta.txt ]; then
+           echo redundant includes changed.
+           cat /tmp/inc-delta.txt
+   fi
+
+> And this time I'll go through my pxa/for-next tree, I was a fool to
+> put that in pxa/fixes.
+
+Well, you were not a fool - the fault is mine if it belongs to anyone.
+You made a sensible call based on what I wrote in the commit log.
+
+Fortunately it is 100% harmless and if you want to clean it up locally
+and do so ASAP, then no problem -- do it and consider it Ack'd.
+
+Thanks,
+Paul.
+--
+
+> 
+> Cheers.
+> 
+> -- Robert
