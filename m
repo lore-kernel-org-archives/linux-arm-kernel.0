@@ -1,59 +1,88 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 23 Aug 2016 13:00:16 -0500
-Subject: [PATCH v3 6/7] phy-sun4i-usb: Add
- "allwinner,usb0-usb-a-connector" dt property
-In-Reply-To: <1471781799-10457-6-git-send-email-hdegoede@redhat.com>
-References: <1471781799-10457-1-git-send-email-hdegoede@redhat.com>
- <1471781799-10457-6-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160823180016.GA28538@rob-hp-laptop>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Tue, 23 Aug 2016 19:08:11 +0100
+Subject: [PATCH v3 1/4] iio: adc: rockchip_saradc: reset saradc controller
+ before programming it
+In-Reply-To: <2324843.WCcsUObKgk@phil>
+References: <1469629447-544-1-git-send-email-wxt@rock-chips.com>
+ <7e84e59d-48ee-3e17-feff-8e57ae7c2b4b@kernel.org>
+ <b25cda21-0e24-de46-fb23-2142135eca03@kernel.org> <2324843.WCcsUObKgk@phil>
+Message-ID: <d1fe2625-cd8c-30ac-0f50-d52d7e8c6c05@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 21, 2016 at 02:16:38PM +0200, Hans de Goede wrote:
-> On some devices the musb otg controller can be used in both device and
-> host mode, but requires software mode switching since there is no id pin
-> connected. The usb0 phy code will default to device mode in this case.
+On 22/08/16 18:19, Heiko Stuebner wrote:
+> Am Sonntag, 21. August 2016, 21:01:19 CEST schrieb Jonathan Cameron:
+>> Something in here got it blocked by the lists. I'm guessing it
+>> was the characters my email client didn't like so trying again
+>> with them dropped.
+>>
+>> Jonathan
+>>
+>> On 21/08/16 20:11, Jonathan Cameron wrote:
+>>> On 15/08/16 19:10, Caesar Wang wrote:
+>>>>> On 27/07/16 15:24, Caesar Wang wrote:
+>>>>>> SARADC controller needs to be reset before programming it, otherwise
+>>>>>> it will not function properly.
+>>>>>>
+>>>>>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>>>>>> Cc: Jonathan Cameron <jic23@kernel.org>
+>>>>>> Cc: Heiko Stuebner <heiko@sntech.de>
+>>>>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>>>>> Cc: linux-iio at vger.kernel.org
+>>>>>> Cc: linux-rockchip at lists.infradead.org
+>>>>>> Tested-by: Guenter Roeck <linux@roeck-us.net>
+>>>>>
+>>>>> Hi
+>>>>>
+>>>>> Patch is fine (I'll fix up the wording issue) however...
+>>>>>
+>>>>> I'm not clear on the severity of the issue. Is this something
+>>>>> we should be pushing for stable?
+>>>>
+>>>> I think that should be pushing for stable, since the common isssue for
+>>>> the ADC is initially enabled on loader, and only disabled after the
+>>>> first read.
+>>>>
+>>>> cat /sys/class/hwmon/hwmon1/device/temp1_input
+>>>> cat: /sys/class/hwmon/hwmon1/device/temp1_input: Connection timed out
+>>>>
+>>>> The kernel log shows:
+>>>>
+>>>> [ 32.209451] read channel() error: -110
+>>>> ..
+>>>>
+>>>> Also, for my experience. Some other reasons caused the adc (controller)
+>>>> glitch for the kernel side.> 
+>>> Fine.  So now the only question is who is handling it. The
+>>> fix is useless (I think) without the dts changes to support it.
+>>> Normally we'd route the dts and driver changes separately as it
+>>> should not matter, but here I think I'd prefer it if the whole
+>>> thing went via rockchip -> arm-soc tree so it goes in together.
+>>>
+>>> Hence (with wording fixed)
+>>>
+>>> Acked-by: Jonathan Cameron <jic23@kernel.org>
+>>> Cc: <Stable@vger.kernel.org>
+>>> (for the driver patch).
+>>>
+>>> If people want me to take it via IIO then I'll need acks for
+>>> the dts changes with explicit agreement that they can be marked
+>>> for stable. Would image Heiko, these would come from you.
 > 
-> On some systems usb0 is connected to a female USB-A port. It can still
-> be used in device mode when using software mode switching and a USB
-> A to A cable. To configure the controller to support both modes we must
-> set its "dr_mode" dt property to "otg" (*). For these setups the device
-> mode default is wrong, for a female USB-A port the default should be
-> host mode.
+> I don't know how the armsoc people feel about routing other subsystem changes 
+> through armsoc, but I think small dts changes coming through driver trees is 
+> the more common case, so personally I'd think patches 1,3 and 4 could go 
+> through the iio tree.
 > 
-> This commit adds support to the sun4i phy code for a new
-> "allwinner,usb0-usb-a-connector" dt property which can be used in dt
-> files to indicate this scenario and when present it changes the default
-> mode to host mode.
-> 
-> *) dr_mode = "host" is used when device mode is _never_ used. E.g.
-> a wifi module soldered onto the PCB is connected to the musb controller.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Changes in v2:
-> -New patch in v2 of this patchset
-> Changes in v3:
-> -No changes
-> ---
->  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 2 ++
->  drivers/phy/phy-sun4i-usb.c                             | 9 ++++++++-
->  2 files changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> index 287150d..8646b53 100644
-> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> @@ -35,6 +35,8 @@ Optional properties:
->  - usb0_vbus-supply : regulator phandle for controller usb0 vbus
->  - usb1_vbus-supply : regulator phandle for controller usb1 vbus
->  - usb2_vbus-supply : regulator phandle for controller usb2 vbus
-> +- allwinner,usb0-usb-a-connector: usb0 is connected to an USB-A connector,
-> +                     rather then an USB-B connector as one would expect (bool)
+> Patch 2 of course isn't material for stable, as it adds new functionality, so 
+> I'd pick that up directly, especially as we see numerous rk3399 changes, so 
+> that would be prone to conflict.
+Absolutely.  This one applied to the fixes-togreg branch of iio.git
 
-This seems like a pretty generic problem: a board has an A connector 
-wired to an OTG controller. So I think we should have a generic 
-property. The only part is here that is not is you have 3 USB buses for 
-the PHY. That probably should have been 3 child nodes for each PHY port.
+Thanks,
 
-Rob
+Jonathan
+> 
+> 
+> Heiko
+> 
