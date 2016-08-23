@@ -1,41 +1,136 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 23 Aug 2016 09:49:43 +0200
-Subject: [PATCH/RFT v2 1/8] clk: renesas: r8a7796: Add GPIO clocks
+Date: Tue, 23 Aug 2016 09:49:50 +0200
+Subject: [PATCH/RFT v2 8/8] arm64: dts: r8a7796: salvator-x: enable SDHI0 & 3
 In-Reply-To: <1471938590-10650-1-git-send-email-horms+renesas@verge.net.au>
 References: <1471938590-10650-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1471938590-10650-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1471938590-10650-9-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Enable the exposed SD card slots in the DT of the r8a7796/salvator-x.
 
-Add GPIO clocks for the R8A7796 SoC.
+Based on work for the r8a7795/salvator-x by Ai Kyuse.
 
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- drivers/clk/renesas/r8a7796-cpg-mssr.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 84 ++++++++++++++++++++++
+ 1 file changed, 84 insertions(+)
 
-diff --git a/drivers/clk/renesas/r8a7796-cpg-mssr.c b/drivers/clk/renesas/r8a7796-cpg-mssr.c
-index c0dee762ed23..999955c2b23e 100644
---- a/drivers/clk/renesas/r8a7796-cpg-mssr.c
-+++ b/drivers/clk/renesas/r8a7796-cpg-mssr.c
-@@ -106,6 +106,14 @@ static const struct mssr_mod_clk r8a7796_mod_clks[] __initconst = {
- 	DEF_MOD("scif2",		 310,	R8A7796_CLK_S3D4),
- 	DEF_MOD("rwdt0",		 402,	R8A7796_CLK_R),
- 	DEF_MOD("intc-ap",		 408,	R8A7796_CLK_S3D1),
-+	DEF_MOD("gpio7",		 905,	R8A7796_CLK_S3D4),
-+	DEF_MOD("gpio6",		 906,	R8A7796_CLK_S3D4),
-+	DEF_MOD("gpio5",		 907,	R8A7796_CLK_S3D4),
-+	DEF_MOD("gpio4",		 908,	R8A7796_CLK_S3D4),
-+	DEF_MOD("gpio3",		 909,	R8A7796_CLK_S3D4),
-+	DEF_MOD("gpio2",		 910,	R8A7796_CLK_S3D4),
-+	DEF_MOD("gpio1",		 911,	R8A7796_CLK_S3D4),
-+	DEF_MOD("gpio0",		 912,	R8A7796_CLK_S3D4),
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+index bb34b8d69c79..f06621f2ee4c 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+@@ -10,6 +10,7 @@
+ 
+ /dts-v1/;
+ #include "r8a7796.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	model = "Renesas Salvator-X board based on r8a7796";
+@@ -29,6 +30,55 @@
+ 		/* first 128MB is reserved for secure area. */
+ 		reg = <0x0 0x48000000 0x0 0x78000000>;
+ 	};
++
++	vcc_sdhi0: regulator-vcc-sdhi0 {
++		compatible = "regulator-fixed";
++
++		regulator-name = "SDHI0 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpio = <&gpio5 2 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	vccq_sdhi0: regulator-vccq-sdhi0 {
++		compatible = "regulator-gpio";
++
++		regulator-name = "SDHI0 VccQ";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpios = <&gpio5 1 GPIO_ACTIVE_HIGH>;
++		gpios-states = <1>;
++		states = <3300000 1
++			  1800000 0>;
++	};
++
++	vcc_sdhi3: regulator-vcc-sdhi3 {
++		compatible = "regulator-fixed";
++
++		regulator-name = "SDHI3 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpio = <&gpio3 15 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	vccq_sdhi3: regulator-vccq-sdhi3 {
++		compatible = "regulator-gpio";
++
++		regulator-name = "SDHI3 VccQ";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpios = <&gpio3 14 GPIO_ACTIVE_HIGH>;
++		gpios-states = <1>;
++		states = <3300000 1
++			  1800000 0>;
++	};
++
  };
  
- static const unsigned int r8a7796_crit_mod_clks[] __initconst = {
+ &pfc {
+@@ -36,12 +86,46 @@
+ 		groups = "scif2_data_a";
+ 		function = "scif2";
+ 	};
++
++	sdhi0_pins: sd0 {
++		groups = "sdhi0_data4", "sdhi0_ctrl";
++		function = "sdhi0";
++	};
++
++	sdhi3_pins: sd3 {
++		groups = "sdhi3_data4", "sdhi3_ctrl";
++		function = "sdhi3";
++	};
+ };
+ 
+ &extal_clk {
+ 	clock-frequency = <16666666>;
+ };
+ 
++&sdhi0 {
++	pinctrl-0 = <&sdhi0_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&vcc_sdhi0>;
++	vqmmc-supply = <&vccq_sdhi0>;
++	cd-gpios = <&gpio3 12 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&gpio3 13 GPIO_ACTIVE_HIGH>;
++	bus-width = <4>;
++	status = "okay";
++};
++
++&sdhi3 {
++	pinctrl-0 = <&sdhi3_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&vcc_sdhi3>;
++	vqmmc-supply = <&vccq_sdhi3>;
++	cd-gpios = <&gpio4 15 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&gpio4 16 GPIO_ACTIVE_HIGH>;
++	bus-width = <4>;
++	status = "okay";
++};
++
+ &scif2 {
+ 	pinctrl-0 = <&scif2_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.7.0.rc3.207.g0ac5344
