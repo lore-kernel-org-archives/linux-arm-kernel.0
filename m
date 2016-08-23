@@ -1,29 +1,38 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue, 23 Aug 2016 08:26:47 +0200
-Subject: [PATCH 0/2] Armada 7k/8k CP110 system controller fixes
-Message-ID: <1471933609-8456-1-git-send-email-mw@semihalf.com>
+Date: Tue, 23 Aug 2016 08:26:48 +0200
+Subject: [PATCH 1/2] clk: mvebu: set flags in CP110 gate clock
+In-Reply-To: <1471933609-8456-1-git-send-email-mw@semihalf.com>
+References: <1471933609-8456-1-git-send-email-mw@semihalf.com>
+Message-ID: <1471933609-8456-2-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Armada CP110 system controller comprise its own routine responsble
+for registering gate clocks. Among others 'flags' field in
+struct clk_init_data was not set, using a random values, which
+may cause an unpredicted behavior.
 
-Newly added clock driver for Marvell Armada 7k/8k CP110 HW block occurred
-not to be working properly, especially when using two instances of CP110
-in Armada 8k. Below tiny patchset comprise fixes for that (prevent from
-using uninitialized 'flag' field and static global resources).
+This patch fixes the problem by setting CLK_IS_BASIC flag for
+all gated clocks of Armada 7k/8k SoCs family.
 
-Any feedback would be very welcome.
+Fixes: d3da3eaef7f4 ("clk: mvebu: new driver for Armada CP110 system ...")
 
-Best regards,
-Marcin
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+---
+ drivers/clk/mvebu/cp110-system-controller.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Marcin Wojtas (2):
-  clk: mvebu: set flags in CP110 gate clock
-  clk: mvebu: dynamically allocate resources in Armada CP110 system
-    controller
-
- drivers/clk/mvebu/cp110-system-controller.c | 30 ++++++++++++++++++++---------
- 1 file changed, 21 insertions(+), 9 deletions(-)
-
+diff --git a/drivers/clk/mvebu/cp110-system-controller.c b/drivers/clk/mvebu/cp110-system-controller.c
+index 7fa42d6..0835e1d 100644
+--- a/drivers/clk/mvebu/cp110-system-controller.c
++++ b/drivers/clk/mvebu/cp110-system-controller.c
+@@ -144,6 +144,7 @@ static struct clk *cp110_register_gate(const char *name,
+ 
+ 	init.name = name;
+ 	init.ops = &cp110_gate_ops;
++	init.flags = CLK_IS_BASIC;
+ 	init.parent_names = &parent_name;
+ 	init.num_parents = 1;
+ 
 -- 
 1.8.3.1
