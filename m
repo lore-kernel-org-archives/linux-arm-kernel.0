@@ -1,290 +1,83 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 23 Aug 2016 15:11:48 +0200
-Subject: [PATCH v5 2/3] arm64: vmlinux.ld: Add mmuoff text and data
- sections
-In-Reply-To: <1471887319-26702-3-git-send-email-james.morse@arm.com>
-References: <1471887319-26702-1-git-send-email-james.morse@arm.com>
- <1471887319-26702-3-git-send-email-james.morse@arm.com>
-Message-ID: <CAKv+Gu9x38UjUY6HA2KwZDZssqCAxYE+OiU96eq_ppnVTG=ERA@mail.gmail.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Tue, 23 Aug 2016 09:13:33 -0400
+Subject: [PATCH v3 1/5] drm/rockchip: sort registers define by chip's
+ number
+In-Reply-To: <57BB9B87.2040406@rock-chips.com>
+References: <loom.20160602T084340-509@post.gmane.org>
+ <1471454452-2151-1-git-send-email-seanpaul@chromium.org>
+ <57B57AFE.2030706@rock-chips.com> <20160818091141.GZ6232@phenom.ffwll.local>
+ <57B587C0.5050007@rock-chips.com>
+ <CAOw6vbJdBwUdg5Qww-autFH=HvvaM-uac7-mN+Ja7PEDiPoPnw@mail.gmail.com>
+ <57BB9B87.2040406@rock-chips.com>
+Message-ID: <CAOw6vbKnHZK4H_MHOE+iQ=a_YNJQen_F4PQ278B4N51OyxFc9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 August 2016 at 19:35, James Morse <james.morse@arm.com> wrote:
-> Resume from hibernate needs to clean any text executed by the kernel with
-> the MMU off to the PoC. Collect these functions together into a new
-> .mmuoff.text section.
+On Mon, Aug 22, 2016 at 8:40 PM, Mark yao <mark.yao@rock-chips.com> wrote:
+> On 2016?08?23? 04:30, Sean Paul wrote:
+>>
+>> On Thu, Aug 18, 2016 at 6:02 AM, Mark yao <mark.yao@rock-chips.com> wrote:
+>>>
+>>> On 2016?08?18? 17:11, Daniel Vetter wrote:
+>>>>
+>>>> On Thu, Aug 18, 2016 at 05:08:14PM +0800, Mark yao wrote:
+>>>>>>
+>>>>>> Hi Sean
+>>>>>>
+>>>>>> Thanks for send v3 patch for rk3399 vop support.
+>>>>>>
+>>>>>> But sorry for that, I had changed my mind, those patches are
+>>>>>> deprecated,
+>>>>>> I have new rk3399 patch on my downstream kernel, I will upstream soon.
+>>>>
+>>>> Wut? Imo merge Sean's patch here, and then rebase your downstream
+>>>> patches
+>>>> on top of it. That you have a downstream tree which is out of sync with
+>>>> upstream shouldn't be a reason to stall upstream development.
+>>>> -Daniel
+>>>>
+>>> Yeah, Sorry for that.
+>>>
+>>> In fact, on my downstream kernel, also have those patches, my new rk3399
+>>> patches are based on them,
+>>> but the new rk3399 patches will cover the those patches,  Sean's patches
+>>> is
+>>> old version.
+>>>
+>>> I just want to fast forward, don't want to send two version drivers to
+>>> upstream.
+>>> but if you and Dave feel ok for that, I have no problem:-) .
+>>>
+>>> merged Sean's patches and then apply new version patches.
+>>>
+>> Ok, so can I get a review/ack for these revised patches then?
+>> Something is better than nothing, and there's a bunch of stuff that
+>> depends on these changes.
+>>
+>> Sean
+>
+> Yes, But I miss your [PATCH v3 0/5] and [PATCH v3 4/5]. do you mean the lost
+> patches use v2 version?
 >
 
-Wouldn't it be much simpler to move all of this into the .idmap.text
-section? It is not that much code, and they intersect anyway (i.e.,
-some .idmap.text code is only called with the MMU off)
+Yes, v2 4/5 was reviewed as-is, so I just applied it.
 
-I am sitting on some related/conflicting patches that clean up head.S
-and sleep.S, and simplify the interactions between the MMU off code,
-__enable_mmu() and the idmap-to-KVA trampolines that we needed to add
-for relocatable kernels. For example, the resulting cpu_resume() looks
-like this
+Sean
 
-    .pushsection ".idmap.text", "ax"
-ENTRY(cpu_resume)
-    bl    el2_setup                // if in EL2 drop to EL1 cleanly
-    bl    __cpu_setup
-    /* enable the MMU early - so we can access sleep_save_stash by va */
-    bl    __enable_mmu
-    ldr   x8, =_cpu_resume
-    br    x8
-ENDPROC(cpu_resume)
-    .ltorg
-    .popsection
-
-with the separate trampoline removed. Likewise for primary and
-secondary boot paths.
-
-I was on the fence about whether to send out these patches, and even
-more so now that I realize they will conflict with yours (unless you
-merge the .mmuoff.text and .idmap.text sections :-))
-For reference, branch is here
-https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm64-headS-cleanup
-
-Some other comments below
-
-> Data is more complicated, secondary_holding_pen_release is written with
-> the MMU on, clean and invalidated, then read with the MMU off. In contrast
-> __boot_cpu_mode is written with the MMU off, the corresponding cache line
-> is invalidated, so when we read it with the MMU on we don't get stale data.
-> These cache maintenance operations conflict with each other if the values
-> are within a Cache Writeback Granule (CWG) of each other.
-> Collect the data into two sections .mmuoff.data.read and .mmuoff.data.write,
-> the linker script ensures mmuoff.data.write section is aligned to the
-> architectural maximum CWG of 2KB.
 >
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> ---
-> Changes since v4:
->  * Moved alignment rules out of assembly into the linker script.
->  * Split mmuoff.data into two sections one written with the mmu off, the other
->    read with the mmu off. CWG alignment only applies to mmuoff.data.write
->  * Fixed PE/COFF alignment breakage.
+>>
+>>
+>>> Thanks.
+>>>
+>>> --
+>>> ?ark Yao
+>>>
+>>>
+>>
+>>
 >
->  arch/arm64/include/asm/sections.h  |  2 ++
->  arch/arm64/kernel/head.S           | 24 ++++++++++++++++--------
->  arch/arm64/kernel/sleep.S          |  2 ++
->  arch/arm64/kernel/smp_spin_table.c |  3 ++-
->  arch/arm64/kernel/vmlinux.lds.S    | 21 +++++++++++++++++++++
->  arch/arm64/mm/proc.S               |  4 ++++
->  6 files changed, 47 insertions(+), 9 deletions(-)
 >
-> diff --git a/arch/arm64/include/asm/sections.h b/arch/arm64/include/asm/sections.h
-> index 237fcdd13445..fb824a71fbb2 100644
-> --- a/arch/arm64/include/asm/sections.h
-> +++ b/arch/arm64/include/asm/sections.h
-> @@ -25,5 +25,7 @@ extern char __hyp_idmap_text_start[], __hyp_idmap_text_end[];
->  extern char __hyp_text_start[], __hyp_text_end[];
->  extern char __idmap_text_start[], __idmap_text_end[];
->  extern char __irqentry_text_start[], __irqentry_text_end[];
-> +extern char __mmuoff_data_start[], __mmuoff_data_end[];
-> +extern char __mmuoff_text_start[], __mmuoff_text_end[];
->
->  #endif /* __ASM_SECTIONS_H */
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index b77f58355da1..9bee5394d76b 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -477,6 +477,7 @@ ENTRY(kimage_vaddr)
->   * Returns either BOOT_CPU_MODE_EL1 or BOOT_CPU_MODE_EL2 in x20 if
->   * booted in EL1 or EL2 respectively.
->   */
-> +       .pushsection ".mmuoff.text", "ax"
->  ENTRY(el2_setup)
->         mrs     x0, CurrentEL
->         cmp     x0, #CurrentEL_EL2
-> @@ -621,17 +622,29 @@ set_cpu_boot_mode_flag:
->  ENDPROC(set_cpu_boot_mode_flag)
->
->  /*
-> + * These values are written with the MMU off, but read with the MMU on.
-> + * Writers will invalidate the corresponding address, discarding up to a
-> + * 'Cache Writeback Granule' (CWG) worth of data. The linker script ensures
-> + * sufficient alignment that the CWG doesn't overlap another section.
-> + */
-> +       .pushsection ".mmuoff.data.write", "aw"
-> +/*
->   * We need to find out the CPU boot mode long after boot, so we need to
->   * store it in a writable variable.
->   *
->   * This is not in .bss, because we set it sufficiently early that the boot-time
->   * zeroing of .bss would clobber it.
->   */
-> -       .pushsection    .data..cacheline_aligned
-> -       .align  L1_CACHE_SHIFT
->  ENTRY(__boot_cpu_mode)
->         .long   BOOT_CPU_MODE_EL2
->         .long   BOOT_CPU_MODE_EL1
-> +/*
-> + * The booting CPU updates the failed status @__early_cpu_boot_status,
-> + * with MMU turned off.
-> + */
-> +ENTRY(__early_cpu_boot_status)
-> +       .long   0
-> +
->         .popsection
->
->         /*
-> @@ -687,6 +700,7 @@ __secondary_switched:
->         mov     x29, #0
->         b       secondary_start_kernel
->  ENDPROC(__secondary_switched)
-> +       .popsection
->
->  /*
->   * The booting CPU updates the failed status @__early_cpu_boot_status,
-> @@ -706,12 +720,6 @@ ENDPROC(__secondary_switched)
->         dc      ivac, \tmp1                     // Invalidate potentially stale cache line
->         .endm
->
-> -       .pushsection    .data..cacheline_aligned
-> -       .align  L1_CACHE_SHIFT
-> -ENTRY(__early_cpu_boot_status)
-> -       .long   0
-> -       .popsection
-> -
->  /*
->   * Enable the MMU.
->   *
-> diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-> index ccf79d849e0a..8c0a6957c7e8 100644
-> --- a/arch/arm64/kernel/sleep.S
-> +++ b/arch/arm64/kernel/sleep.S
-> @@ -97,6 +97,7 @@ ENTRY(__cpu_suspend_enter)
->  ENDPROC(__cpu_suspend_enter)
->         .ltorg
->
-> +       .pushsection ".mmuoff.text", "ax"
->  ENTRY(cpu_resume)
->         bl      el2_setup               // if in EL2 drop to EL1 cleanly
->         /* enable the MMU early - so we can access sleep_save_stash by va */
-> @@ -106,6 +107,7 @@ ENTRY(cpu_resume)
->         adrp    x26, swapper_pg_dir
->         b       __cpu_setup
->  ENDPROC(cpu_resume)
-> +       .popsection
->
->         .pushsection    ".idmap.text", "ax"
->  _resume_switched:
-> diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
-> index 18a71bcd26ee..9a00eee9acc8 100644
-> --- a/arch/arm64/kernel/smp_spin_table.c
-> +++ b/arch/arm64/kernel/smp_spin_table.c
-> @@ -29,7 +29,8 @@
->  #include <asm/smp_plat.h>
->
->  extern void secondary_holding_pen(void);
-> -volatile unsigned long secondary_holding_pen_release = INVALID_HWID;
-> +volatile unsigned long __section(".mmuoff.data.read")
-> +secondary_holding_pen_release = INVALID_HWID;
->
->  static phys_addr_t cpu_release_addr[NR_CPUS];
->
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index 659963d40bb4..97c3f36ce30b 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -120,6 +120,9 @@ SECTIONS
->                         IRQENTRY_TEXT
->                         SOFTIRQENTRY_TEXT
->                         ENTRY_TEXT
-> +                       __mmuoff_text_start = .;
-> +                       *(.mmuoff.text)
-> +                       __mmuoff_text_end = .;
-
-Could you add a define for this like we have for the other ones?
-
->                         TEXT_TEXT
->                         SCHED_TEXT
->                         LOCK_TEXT
-> @@ -185,6 +188,24 @@ SECTIONS
->         _data = .;
->         _sdata = .;
->         RW_DATA_SECTION(L1_CACHE_BYTES, PAGE_SIZE, THREAD_SIZE)
-> +
-> +       /*
-> +        * Data written with the MMU off but read with the MMU on requires
-> +        * cache lines to be invalidated, discarding up to a Cache Writeback
-> +        * Granule (CWG) of data from the cache. Keep the section that
-> +        * requires this type of maintenance to be in its own Cache Writeback
-> +        * Granule (CWG) area so the cache maintenance operations don't
-> +        * don't interfere with adjacent data.
-> +        */
-> +       .mmuoff.data.write : ALIGN(SZ_2K) {
-> +               __mmuoff_data_start = .;
-> +               *(.mmuoff.data.write)
-> +       }
-> +       .mmuoff.data.read : ALIGN(SZ_2K) {
-> +               *(.mmuoff.data.read)
-> +               __mmuoff_data_end = .;
-> +       }
-> +
-
-This looks fine now, with the caveat that empty sections are dropped
-completely by the linker (including their alignment), and so the start
-and end markers may assume unexpected values.
-
-For instance, if .mmuoff.data.read turns out empty in the build (and I
-am aware this is theoretical), the section will be dropped, and
-__mmuoff_data_end may assume a value that exceeds _edata. This is
-actually fine, as long as you put a
-
-. = ALIGN(SZ_2K);
-
-before BSS_SECTION() to ensure that the cache invalidation does not
-affect .bss in case .mmuoff.data.read does turn out empty (or
-alternatively, put the alignment inside the BSS_SECTION() invocation,
-as I did in my example before)
-
--- 
-Ard.
-
-
-
-
-
->         _edata = .;
->
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index 5bb61de23201..a709e95d68ff 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -83,6 +83,7 @@ ENDPROC(cpu_do_suspend)
->   *
->   * x0: Address of context pointer
->   */
-> +       .pushsection ".mmuoff.text", "ax"
->  ENTRY(cpu_do_resume)
->         ldp     x2, x3, [x0]
->         ldp     x4, x5, [x0, #16]
-> @@ -111,6 +112,7 @@ ENTRY(cpu_do_resume)
->         isb
->         ret
->  ENDPROC(cpu_do_resume)
-> +       .popsection
->  #endif
->
->  /*
-> @@ -172,6 +174,7 @@ ENDPROC(idmap_cpu_replace_ttbr1)
->   *     Initialise the processor for turning the MMU on.  Return in x0 the
->   *     value of the SCTLR_EL1 register.
->   */
-> +       .pushsection ".mmuoff.text", "ax"
->  ENTRY(__cpu_setup)
->         tlbi    vmalle1                         // Invalidate local TLB
->         dsb     nsh
-> @@ -257,3 +260,4 @@ ENDPROC(__cpu_setup)
->  crval:
->         .word   0xfcffffff                      // clear
->         .word   0x34d5d91d                      // set
-> +       .popsection
 > --
-> 2.8.0.rc3
+> ?ark Yao
+>
 >
