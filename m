@@ -1,107 +1,40 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 23 Aug 2016 13:58:26 +0800
-Subject: [PATCH 2/2] ARM: dts: sun8i: Add extra UART pinmux settings for A23/33
-In-Reply-To: <20160823055826.20591-1-icenowy@aosc.xyz>
-References: <20160823055826.20591-1-icenowy@aosc.xyz>
-Message-ID: <20160823055826.20591-2-icenowy@aosc.xyz>
+From: neidhard.kim@lge.com (Jongsung Kim)
+Date: Tue, 23 Aug 2016 15:06:06 +0900
+Subject: [PATCH v3 0/4] ARM: kernel: module PLT optimizations
+In-Reply-To: <1471514563-28172-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1471514563-28172-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <24dd6017-97ad-0051-9a4f-8a76e50076d9@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A23/33 have 4 UART controllers outside PRCM. However, the devicetree used
-to mentioned only UART0's pinmux settings. Some extra UART controllers have
-RTS/CTS, and is suitable for using as bluetooth UART controller.
+Hi Ard,
 
-Add the pinmux settings for the UART controller, to make use of the
-bluetooth function of some tablets.
+I did some rough performance tests for your patchset with my large ko.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- arch/arm/boot/dts/sun8i-a23-a33.dtsi | 56 ++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/sun8i-a23.dtsi     |  7 +++++
- 2 files changed, 63 insertions(+)
+On 2016? 08? 18? 19:02, Ard Biesheuvel wrote:
+> As reported by Jongsung, the O(n^2) search in the PLT allocation code may > disproportionately affect module load time for modules with a larger number > of relocations. > > Since the existing routines rather naively take branch instructions into > account that are internal to the module, we can improve the situation > significantly by checking the symbol section index first, and disregarding > symbols that are defined in the same module. Also, we can reduce the > algorithmic complexity to O(n log n) by sorting the reloc section before > processing it, and disregarding zero-addend relocations in the optimization. > > Patch #1 merge the core and init PLTs, since the latter is virtually empty > anyway. >
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-index 7e05e09..89ea479 100644
---- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-@@ -361,6 +361,62 @@
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
-+			uart1_pins_a: uart1 at 0 {
-+				allwinner,pins = "PD10", "PD11";
-+				allwinner,function = "uart1";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart1_pins_cts_rts_a: uart1-cts-rts at 1 {
-+				allwinner,pins = "PD12", "PD13";
-+				allwinner,function = "uart1";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart1_pins_b: uart1 at 1 {
-+				allwinner,pins = "PG6", "PG7";
-+				allwinner,function = "uart1";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart1_pins_cts_rts_b: uart1-cts-rts at 0 {
-+				allwinner,pins = "PG8", "PG9";
-+				allwinner,function = "uart1";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart2_pins_a: uart2 at 0 {
-+				allwinner,pins = "PB0", "PB1";
-+				allwinner,function = "uart2";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart2_pins_cts_rts_a: uart2-cts-rts at 1 {
-+				allwinner,pins = "PB2", "PB3";
-+				allwinner,function = "uart2";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart3_pins_a: uart3 at 0 {
-+				allwinner,pins = "PH6", "PH7";
-+				allwinner,function = "uart3";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart3_pins_cts_rts_a: uart3-cts-rts at 1 {
-+				allwinner,pins = "PH8", "PH9";
-+				allwinner,function = "uart3";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
- 			mmc0_pins_a: mmc0 at 0 {
- 				allwinner,pins = "PF0", "PF1", "PF2",
- 						 "PF3", "PF4", "PF5";
-diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
-index 92e6616..6b76580 100644
---- a/arch/arm/boot/dts/sun8i-a23.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23.dtsi
-@@ -123,4 +123,11 @@
- 	interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
- 		     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
- 		     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+
-+	uart3_pins_b: uart3 at 0 {
-+		allwinner,pins = "PD8", "PD9";
-+		allwinner,function = "uart3";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
- };
--- 
-2.9.3
+Patch #1 didn't make noticable difference in performance. Found 4,860 PLTs
+from 262,573 RELs in ~10secs.
+
+> Patch #2 implements the optimization to only take SHN_UNDEF symbols into > account. >
+
+After patch #2 applied, found 249 PLTs from 262,573 RELs in ~680msecs.
+
+> Patch #3 sort the reloc section, so that the duplicate check can be done by > comparing an entry with the previous one. Since REL entries (as opposed to > RELA entries) do not contain the addend, simply disregard non-zero addends > in the optimization since those are rare anyway. >
+
+After patch #3 applied, found 249 PLTs from 262,573 RELs in ~6msecs.
+
+> Patch #4 replaces the brute force search for a matching existing entry in > the PLT generation routine with a simple check against the last entry that > was emitted. This is now sufficient since the relocation section is sorted, > and presented at relocation time in the same order. >
+
+Finally with patch #4 applied, found 249 PLTs from 262,573 RELs in < 6msecs.
+
+> Note that this implementation is now mostly aligned with the arm64 version > (with the exception that the arm64 implementation stashes the address of the > PLT entry in the symtab instead of comparing the last emitted entry) >
+
+Time measured around calling count_plts() with preemption disabled. My O(n)
+implementation over patch #1 and #2 took over 10msecs to handle the same ko.
+I'd better to use your patchset. :-)
+
+Thank you for your works!
+
+JS
