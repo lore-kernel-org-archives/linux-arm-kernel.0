@@ -1,83 +1,85 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 23 Aug 2016 10:00:57 +0200
-Subject: [RESEND PATCH 1/2] pinctrl: meson-gxbb: add pins for PWM
-In-Reply-To: <1471876860-5620-2-git-send-email-narmstrong@baylibre.com>
-References: <1471876860-5620-1-git-send-email-narmstrong@baylibre.com>
- <1471876860-5620-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <45c22d0c-9cfd-b0a0-4499-6b306dfdcdd5@baylibre.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Aug 2016 08:59:50 +0100
+Subject: [PATCH RFC 4/5] drm/bridge: add dw-hdmi cec driver using Hans
+ Verkil's CEC code
+In-Reply-To: <dcd9587f-be60-0cb6-92bb-3226c51bddfb@xs4all.nl>
+References: <20160812141421.GB1041@n2100.armlinux.org.uk>
+ <E1bYDEs-0004rs-FP@rmk-PC.armlinux.org.uk>
+ <dcd9587f-be60-0cb6-92bb-3226c51bddfb@xs4all.nl>
+Message-ID: <20160823075950.GC1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2016 04:40 PM, Neil Armstrong wrote:
-> Add support for PWM pins, for EE and AO domains.
+On Tue, Aug 23, 2016 at 09:21:17AM +0200, Hans Verkuil wrote:
+> Hi Russell,
 > 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  drivers/pinctrl/meson/pinctrl-meson-gxbb.c | 78 ++++++++++++++++++++++++++++++
->  1 file changed, 78 insertions(+)
+> On 08/12/2016 04:15 PM, Russell King wrote:
+> > Add a CEC driver for the dw-hdmi hardware using Hans Verkil's CEC
+> > implementation.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > ---
+> >  drivers/gpu/drm/bridge/Kconfig            |   7 +
+> >  drivers/gpu/drm/bridge/Makefile           |   1 +
+> >  drivers/gpu/drm/bridge/dw-hdmi-cec.c      | 344 ++++++++++++++++++++++++++++++
+> >  drivers/gpu/drm/bridge/dw-hdmi.c          |  64 +++++-
+> >  include/linux/platform_data/dw_hdmi-cec.h |  16 ++
+> >  5 files changed, 421 insertions(+), 11 deletions(-)
+> >  create mode 100644 drivers/gpu/drm/bridge/dw-hdmi-cec.c
+> >  create mode 100644 include/linux/platform_data/dw_hdmi-cec.h
+> > 
 > 
-> diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-> index 7eeb053..1c6ffb3 100644
-> --- a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-> +++ b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-
-[...]
-
->  static const char * const gpio_aobus_groups[] = {
->  	"GPIOAO_0", "GPIOAO_1", "GPIOAO_2", "GPIOAO_3", "GPIOAO_4",
->  	"GPIOAO_5", "GPIOAO_6", "GPIOAO_7", "GPIOAO_8", "GPIOAO_9",
-> @@ -526,6 +578,21 @@ static const char * const i2c_slave_ao_groups[] = {
->  
->  static const char * const remote_input_ao_groups[] = {
->  	"remote_input_ao",
-> +
-
-Linus,
-
-Well, I missed my rebase, I'll post a v2 to fix that.
-
-Neil
-
-> +static const char * const pwm_ao_a_3_groups[] = {
-> +	"pwm_ao_a_3",
-> +};
-> +
-> +static const char * const pwm_ao_a_6_groups[] = {
-> +	"pwm_ao_a_6",
-> +};
-> +
-> +static const char * const pwm_ao_a_12_groups[] = {
-> +	"pwm_ao_a_12",
-> +};
-> +
-> +static const char * const pwm_ao_b_groups[] = {
-> +	"pwm_ao_b",
->  };
->  
->  static struct meson_pmx_func meson_gxbb_periphs_functions[] = {
-> @@ -536,6 +603,13 @@ static struct meson_pmx_func meson_gxbb_periphs_functions[] = {
->  	FUNCTION(uart_b),
->  	FUNCTION(uart_c),
->  	FUNCTION(eth),
-> +	FUNCTION(pwm_a_x),
-> +	FUNCTION(pwm_a_y),
-> +	FUNCTION(pwm_b),
-> +	FUNCTION(pwm_d),
-> +	FUNCTION(pwm_e),
-> +	FUNCTION(pwm_f_x),
-> +	FUNCTION(pwm_f_y),
->  };
->  
->  static struct meson_pmx_func meson_gxbb_aobus_functions[] = {
-> @@ -545,6 +619,10 @@ static struct meson_pmx_func meson_gxbb_aobus_functions[] = {
->  	FUNCTION(i2c_ao),
->  	FUNCTION(i2c_slave_ao),
->  	FUNCTION(remote_input_ao),
-> +	FUNCTION(pwm_ao_a_3),
-> +	FUNCTION(pwm_ao_a_6),
-> +	FUNCTION(pwm_ao_a_12),
-> +	FUNCTION(pwm_ao_b),
->  };
->  
->  static struct meson_bank meson_gxbb_periphs_banks[] = {
+> <snip>
 > 
+> > +static unsigned int parse_hdmi_addr(const struct edid *edid)
+> > +{
+> > +	if (!edid || edid->extensions == 0)
+> > +		return (u16)~0;
+> > +
+> > +	return cec_get_edid_phys_addr((u8 *)edid,
+> > +				EDID_LENGTH * (edid->extensions + 1), NULL);
+> > +}
+> > +
+> > +static int dw_hdmi_cec_notify(struct notifier_block *nb, unsigned long event,
+> > +			      void *data)
+> > +{
+> > +	struct dw_hdmi_cec *cec = container_of(nb, struct dw_hdmi_cec, nb);
+> > +	union hdmi_event *event_block = data;
+> > +	unsigned int phys;
+> > +
+> > +	dev_info(event_block->base.source, "event %lu\n", event);
+> > +
+> > +	if (event_block->base.source != cec->adap->devnode.parent)
+> > +		return NOTIFY_OK;
+> > +
+> > +	switch (event) {
+> > +	case HDMI_CONNECTED:
+> > +		break;
+> > +
+> > +	case HDMI_DISCONNECTED:
+> > +		cec_s_phys_addr(cec->adap, CEC_PHYS_ADDR_INVALID, false);
+> > +		break;
+> > +
+> > +	case HDMI_NEW_EDID:
+> > +		phys = parse_hdmi_addr(event_block->edid.edid);
+> > +		cec_s_phys_addr(cec->adap, phys, false);
+> > +		break;
+> > +	}
+> > +
+> > +	return NOTIFY_OK;
+> > +}
+> 
+> Wouldn't it make a lot of sense to integrate this into the cec framework?
+> 
+> All you need is to pass an hdmi_notifier_dev as argument to cec_allocate_adapter()
+> and you can integrate this.
+> 
+> If you are OK with that, then I can make patches for that.
+
+It's not just about CEC.  It's also used for passing information between
+the video and audio parts, so tying this into CEC is wrong.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
