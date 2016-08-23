@@ -1,51 +1,132 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Tue, 23 Aug 2016 07:36:17 -0500
+Date: Tue, 23 Aug 2016 07:39:20 -0500
 Subject: [PATCH 1/2] arm64: kernel: Add SMC Session ID to results
-In-Reply-To: <20160823103841.GD8724@red-moon>
+In-Reply-To: <20160822151640.GC30923@hector.attlocal.net>
 References: <1471672274-19317-1-git-send-email-andy.gross@linaro.org>
  <1471672274-19317-2-git-send-email-andy.gross@linaro.org>
  <20160822134313.GJ14680@arm.com>
  <20160822140246.GA30923@hector.attlocal.net>
  <20160822145326.GK14680@arm.com>
- <20160823003831.GN6502@codeaurora.org>
- <20160823103841.GD8724@red-moon>
-Message-ID: <20160823123617.GD30923@hector.attlocal.net>
+ <20160822151640.GC30923@hector.attlocal.net>
+Message-ID: <20160823123920.GE30923@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2016 at 11:38:41AM +0100, Lorenzo Pieralisi wrote:
-> On Mon, Aug 22, 2016 at 05:38:31PM -0700, Stephen Boyd wrote:
+On Mon, Aug 22, 2016 at 10:16:40AM -0500, Andy Gross wrote:
+> On Mon, Aug 22, 2016 at 03:53:26PM +0100, Will Deacon wrote:
+> > On Mon, Aug 22, 2016 at 09:02:46AM -0500, Andy Gross wrote:
+> > > On Mon, Aug 22, 2016 at 02:43:14PM +0100, Will Deacon wrote:
+> > > > On Sat, Aug 20, 2016 at 12:51:13AM -0500, Andy Gross wrote:
+
+<snip>
+
+> > > 
+> > > In the case of Qualcomm's implementation, they return a value in register 6 that
+> > > may or may not be used in subsequent calls.  If I want to leverage the arm_smccc
+> > > functions, then I need to extend them to include the optional return value.  The
+> > > downside to this is that everyone who uses this is exposed to it.
+> > 
+> > Yes, I'm not keen on forcing this behaviour for everybody, as you never
+> > know what other firmware might do with unexpected a6 values. Could we
+> > perhaps quirk it, along the lines of the completely untested patch below?
 > 
-> [...]
-> 
-> > This all comes about because the firmware generates a session id
-> > for the SMC call and jams it in x6. The assembly on the
-> > non-secure side is written with a tight loop around the smc
-> > instruction so that when the return value indicates
-> > "interrupted", x6 is kept intact and the non-secure OS can jump
-> > back to the secure OS without register reloading. Perhaps
-> > referring to x6 as result value is not correct because it's
-> > really a session id that's irrelevant once the smc call
-> > completes.
-> 
-> Sorry I missed this bit. The session id is _generated_ by secure
-> firmware (probably only when the value passed in x6 == 0 (?))
-> and actually returned to the caller so that subsequent (interrupted)
-> calls can re-issue the same value, is that correct ?
+> A quirk would work fine.  I'll try this out and get back to you.
 
-Yes, that is exactly what is going on.  You always pass in 0 for the first call.
-If the call is interrupted and needs to be re-executed, you will get a specific
-result in a0 that tells you to redo the call using x6 as your session ID.
+Update:  Aside from a minor change with either the id type or using w9 register
+for the id load, this works just fine.
 
-> 
-> If that's the case the value in x6 is a result value from an SMCCC
-> perspective and your current FW is not SMCCC compliant.
-
-Should we then write our own ASM snippet to do exactly what we want?  It'd be
-the same as the arm_smccc except with the extra str.  I'm ok with that, I was
-just hoping to leverage the existing smccc code.  The quirk also works well,
-except it costs everyone else 1 load and compare.
-
-Regards,
-
-Andy
+> > --->8
+> > 
+> > diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+> > index 05070b72fc28..1895e87d0240 100644
+> > --- a/arch/arm64/kernel/asm-offsets.c
+> > +++ b/arch/arm64/kernel/asm-offsets.c
+> > @@ -141,6 +141,8 @@ int main(void)
+> >  #endif
+> >    DEFINE(ARM_SMCCC_RES_X0_OFFS,	offsetof(struct arm_smccc_res, a0));
+> >    DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
+> > +  DEFINE(ARM_SMCCC_RES_QUIRK_ID_OFFS,		offsetof(struct arm_smccc_res, quirk.id));
+> > +  DEFINE(ARM_SMCCC_RES_QUIRK_STATE_OFFS,	offsetof(struct arm_smccc_res, quirk.state));
+> >    BLANK();
+> >    DEFINE(HIBERN_PBE_ORIG,	offsetof(struct pbe, orig_address));
+> >    DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
+> > diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
+> > index ae0496fa4235..3c6c976eaf5c 100644
+> > --- a/arch/arm64/kernel/smccc-call.S
+> > +++ b/arch/arm64/kernel/smccc-call.S
+> > @@ -12,6 +12,7 @@
+> >   *
+> >   */
+> >  #include <linux/linkage.h>
+> > +#include <linux/arm-smccc.h>
+> >  #include <asm/asm-offsets.h>
+> >  
+> >  	.macro SMCCC instr
+> > @@ -20,7 +21,12 @@
+> >  	ldr	x4, [sp]
+> >  	stp	x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
+> >  	stp	x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
+> > -	ret
+> > +	ldr	x9, [x4, #ARM_SMCCC_RES_QUIRK_ID_OFFS]
+> > +	cbz	x9, 1f /* ARM_SMCCC_QUIRK_NONE */
+> > +	cmp	x9, #ARM_SMCCC_QUIRK_QCOM_A6
+> > +	b.ne	1f
+> > +	str	x6, [x4, ARM_SMCCC_RES_QUIRK_STATE_OFFS]
+> > +1:	ret
+> >  	.cfi_endproc
+> >  	.endm
+> >  
+> > diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+> > index b5abfda80465..a3a6e291feb6 100644
+> > --- a/include/linux/arm-smccc.h
+> > +++ b/include/linux/arm-smccc.h
+> > @@ -14,9 +14,6 @@
+> >  #ifndef __LINUX_ARM_SMCCC_H
+> >  #define __LINUX_ARM_SMCCC_H
+> >  
+> > -#include <linux/linkage.h>
+> > -#include <linux/types.h>
+> > -
+> >  /*
+> >   * This file provides common defines for ARM SMC Calling Convention as
+> >   * specified in
+> > @@ -60,6 +57,21 @@
+> >  #define ARM_SMCCC_OWNER_TRUSTED_OS	50
+> >  #define ARM_SMCCC_OWNER_TRUSTED_OS_END	63
+> >  
+> > +#define ARM_SMCCC_QUIRK_NONE	0
+> > +#define ARM_SMCCC_QUIRK_QCOM_A6	1 /* Save/restore register a6 */
+> > +
+> > +#ifndef __ASSEMBLY__
+> > +
+> > +#include <linux/linkage.h>
+> > +#include <linux/types.h>
+> > +
+> > +struct arm_smccc_quirk {
+> > +	int	id;
+> > +	union {
+> > +		unsigned long a6;
+> > +	} state;
+> > +};
+> > +
+> >  /**
+> >   * struct arm_smccc_res - Result from SMC/HVC call
+> >   * @a0-a3 result values from registers 0 to 3
+> > @@ -69,6 +81,7 @@ struct arm_smccc_res {
+> >  	unsigned long a1;
+> >  	unsigned long a2;
+> >  	unsigned long a3;
+> > +	struct arm_smccc_quirk quirk;
+> >  };
+> >  
+> >  /**
+> > @@ -101,4 +114,5 @@ asmlinkage void arm_smccc_hvc(unsigned long a0, unsigned long a1,
+> >  			unsigned long a5, unsigned long a6, unsigned long a7,
+> >  			struct arm_smccc_res *res);
+> >  
+> > +#endif /* !__ASSEMBLY__ */
+> >  #endif /*__LINUX_ARM_SMCCC_H*/
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
