@@ -1,61 +1,65 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 22 Aug 2016 17:38:31 -0700
-Subject: [PATCH 1/2] arm64: kernel: Add SMC Session ID to results
-In-Reply-To: <20160822145326.GK14680@arm.com>
-References: <1471672274-19317-1-git-send-email-andy.gross@linaro.org>
- <1471672274-19317-2-git-send-email-andy.gross@linaro.org>
- <20160822134313.GJ14680@arm.com>
- <20160822140246.GA30923@hector.attlocal.net>
- <20160822145326.GK14680@arm.com>
-Message-ID: <20160823003831.GN6502@codeaurora.org>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Tue, 23 Aug 2016 08:40:39 +0800
+Subject: [PATCH v3 1/5] drm/rockchip: sort registers define by chip's
+ number
+In-Reply-To: <CAOw6vbJdBwUdg5Qww-autFH=HvvaM-uac7-mN+Ja7PEDiPoPnw@mail.gmail.com>
+References: <loom.20160602T084340-509@post.gmane.org>
+ <1471454452-2151-1-git-send-email-seanpaul@chromium.org>
+ <57B57AFE.2030706@rock-chips.com> <20160818091141.GZ6232@phenom.ffwll.local>
+ <57B587C0.5050007@rock-chips.com>
+ <CAOw6vbJdBwUdg5Qww-autFH=HvvaM-uac7-mN+Ja7PEDiPoPnw@mail.gmail.com>
+Message-ID: <57BB9B87.2040406@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22, Will Deacon wrote:
-> On Mon, Aug 22, 2016 at 09:02:46AM -0500, Andy Gross wrote:
-> > On Mon, Aug 22, 2016 at 02:43:14PM +0100, Will Deacon wrote:
-> > > On Sat, Aug 20, 2016 at 12:51:13AM -0500, Andy Gross wrote:
-> > > >  
-> > > >  /**
-> > > >   * arm_smccc_smc() - make SMC calls
-> > > >   * @a0-a7: arguments passed in registers 0 to 7
-> > > > - * @res: result values from registers 0 to 3
-> > > > + * @res: result values from registers 0 to 3 and optional register 6
-> > > 
-> > > AFAICT from reading the SMCCC spec, parameter register 6 is "Unpredictable,
-> > > Scratch registers" in return state, so I don't think this is correct.
-> > > 
-> > > What am I missing?
-> > 
-> > In the case of Qualcomm's implementation, they return a value in register 6 that
-> > may or may not be used in subsequent calls.  If I want to leverage the arm_smccc
-> > functions, then I need to extend them to include the optional return value.  The
-> > downside to this is that everyone who uses this is exposed to it.
-> 
-> Yes, I'm not keen on forcing this behaviour for everybody, as you never
-> know what other firmware might do with unexpected a6 values. Could we
-> perhaps quirk it, along the lines of the completely untested patch below?
-> 
+On 2016?08?23? 04:30, Sean Paul wrote:
+> On Thu, Aug 18, 2016 at 6:02 AM, Mark yao <mark.yao@rock-chips.com> wrote:
+>> On 2016?08?18? 17:11, Daniel Vetter wrote:
+>>> On Thu, Aug 18, 2016 at 05:08:14PM +0800, Mark yao wrote:
+>>>>> Hi Sean
+>>>>>
+>>>>> Thanks for send v3 patch for rk3399 vop support.
+>>>>>
+>>>>> But sorry for that, I had changed my mind, those patches are deprecated,
+>>>>> I have new rk3399 patch on my downstream kernel, I will upstream soon.
+>>> Wut? Imo merge Sean's patch here, and then rebase your downstream patches
+>>> on top of it. That you have a downstream tree which is out of sync with
+>>> upstream shouldn't be a reason to stall upstream development.
+>>> -Daniel
+>>>
+>> Yeah, Sorry for that.
+>>
+>> In fact, on my downstream kernel, also have those patches, my new rk3399
+>> patches are based on them,
+>> but the new rk3399 patches will cover the those patches,  Sean's patches is
+>> old version.
+>>
+>> I just want to fast forward, don't want to send two version drivers to
+>> upstream.
+>> but if you and Dave feel ok for that, I have no problem:-) .
+>>
+>> merged Sean's patches and then apply new version patches.
+>>
+> Ok, so can I get a review/ack for these revised patches then?
+> Something is better than nothing, and there's a bunch of stuff that
+> depends on these changes.
+>
+> Sean
+Yes, But I miss your [PATCH v3 0/5] and [PATCH v3 4/5]. do you mean the 
+lost patches use v2 version?
 
-How would the firmware know about the a6 values? It isn't passed
-to the firmware unless the caller of arm_smccc_smc() uses it. Is
-the concern that we would be exposing x6 as a return register for
-all users of arm_smccc_smc()? Presumably callers of
-arm_smccc_smc() would know if they want to use that extra
-register or not, so doing all the quirk stuff seems like more
-instructions over always saving away x6 on the return path, but
-maybe there's some reasoning I missed.
 
-This all comes about because the firmware generates a session id
-for the SMC call and jams it in x6. The assembly on the
-non-secure side is written with a tight loop around the smc
-instruction so that when the return value indicates
-"interrupted", x6 is kept intact and the non-secure OS can jump
-back to the secure OS without register reloading. Perhaps
-referring to x6 as result value is not correct because it's
-really a session id that's irrelevant once the smc call
-completes.
+>
+>
+>> Thanks.
+>>
+>> --
+>> ?ark Yao
+>>
+>>
+>
+>
+
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+?ark Yao
