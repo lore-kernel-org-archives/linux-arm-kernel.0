@@ -1,41 +1,92 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 23 Aug 2016 08:51:48 +0800
-Subject: [PATCH v7 3/3] arm: dts: mt2701: Add auxadc node.
-In-Reply-To: <1471504297-26947-4-git-send-email-zhiyong.tao@mediatek.com>
-Message-ID: <201608230822.aChhrMgR%fengguang.wu@intel.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 22 Aug 2016 17:51:19 -0700
+Subject: [PATCH v2 1/2] ARM: dts: Add MDM9615 dtsi
+In-Reply-To: <884c47cb-6629-fab6-fba0-d189ea835adb@baylibre.com>
+References: <1471525661-2563-1-git-send-email-narmstrong@baylibre.com>
+ <1471525661-2563-2-git-send-email-narmstrong@baylibre.com>
+ <20160818180840.GE361@codeaurora.org>
+ <884c47cb-6629-fab6-fba0-d189ea835adb@baylibre.com>
+Message-ID: <20160823005119.GO6502@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhiyong,
+On 08/20, Neil Armstrong wrote:
+> On 08/18/2016 08:08 PM, Stephen Boyd wrote:
+> > On 08/18, Neil Armstrong wrote:
+> > 
+> > 
+> >> +
+> >> +		gsbi2: gsbi at 16100000 {
+> >> +			compatible = "qcom,gsbi-v1.0.0";
+> >> +			cell-index = <2>;
+> >> +			reg = <0x16100000 0x100>;
+> >> +			clocks = <&gcc GSBI2_H_CLK>;
+> >> +			clock-names = "iface";
+> >> +			status = "disabled";
+> >> +			#address-cells = <1>;
+> >> +			#size-cells = <1>;
+> >> +			ranges;
+> >> +
+> >> +			gsbi2_i2c: i2c at 16180000 {
+> >> +				compatible = "qcom,i2c-qup-v1.1.1";
+> >> +				#address-cells = <1>;
+> >> +				#size-cells = <0>;
+> >> +				reg = <0x16180000 0x1000>;
+> >> +				interrupts = <GIC_SPI 149 IRQ_TYPE_NONE>;
+> > 
+> > There should be a trigger type... high perhaps?
+> 
+> Well, I do not know, and other qcom dtsi has 0x0 or NONE here...
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.8-rc3 next-20160822]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-[Check https://git-scm.com/docs/git-format-patch for more information]
+We should fix those. The driver uses IRQF_TRIGGER_HIGH so it
+seems like we should put that here as well.
 
-url:    https://github.com/0day-ci/linux/commits/Zhiyong-Tao/AUXADC-Mediatek-auxadc-driver/20160818-152251
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm-hisi_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+> 
+> > 
+> >> +
+> >> +				clocks = <&gcc GSBI2_QUP_CLK>, <&gcc GSBI2_H_CLK>;
+> >> +				clock-names = "core", "iface";
+> >> +				status = "disabled";
+> >> +			};
+> >> +		};
+> >> +
+> >> +
+> >> +		qcom,ssbi at 500000 {
+> >> +			compatible = "qcom,ssbi";
+> >> +			reg = <0x500000 0x1000>;
+> >> +			qcom,controller-type = "pmic-arbiter";
+> >> +
+> >> +			pmicintc: pmic at 0 {
+> >> +				compatible = "qcom,pm8018", "qcom,pm8921";
+> > 
+> > I know that DT specifies most specific compatible first, but when
+> > the generic compatible is part number specific as well it never
+> > feels right to me. I guess I'll have to get over this.
+> > 
+> >> +				interrupts = <GIC_PPI 226 IRQ_TYPE_NONE>;
+> >> +				#interrupt-cells = <2>;
+> >> +				interrupt-controller;
+> >> +				#address-cells = <1>;
+> >> +				#size-cells = <0>;
+> > 
+> > Can we have interrupt-parent = <&pmicintc> here instead of in
+> > every node?
+> 
+> No since the pmic node interrupt parent is the GIC.
 
-All errors (new ones prefixed by >>):
+Ah ok. Silly me.
 
->> Error: arch/arm/boot/dts/mt2701.dtsi:145.22-23 syntax error
-   FATAL ERROR: Unable to parse input tree
+> > 
+> >> +			compatible = "qcom,bam-v1.3.0";
+> >> +			reg = <0x12142000 0x8000>;
+> >> +			interrupts = <GIC_SPI 97 IRQ_TYPE_NONE>;
+> > 
+> > There should really be some flags.
+> 
+> Same as for the qup and uartdm, other qcom dtsi left 0x0 or NONE here...
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 17570 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160823/450e06a7/attachment-0001.obj>
+The driver uses IRQF_TRIGGER_HIGH here, so use that in dtsi?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
