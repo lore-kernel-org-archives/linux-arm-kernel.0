@@ -1,75 +1,91 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 23 Aug 2016 08:46:59 -0600
-Subject: [PATCH V5 9/9] coresight: etm-perf: incorporating sink definition
- from cmd line
-In-Reply-To: <8737lwn4en.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1470932464-726-1-git-send-email-mathieu.poirier@linaro.org>
- <1470932464-726-10-git-send-email-mathieu.poirier@linaro.org>
- <8737lwn4en.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <CANLsYkzpgcHJKco6gmNS0kaTmxS6C9hEDXDNQ60EkwJg1NEy6g@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 23 Aug 2016 15:47:02 +0100
+Subject: [PATCH 04/13] scpi: Add legacy SCP functions calling
+ legacy_scpi_send_message
+In-Reply-To: <53093fb5-22e2-3c17-3345-50c7e9df7089@baylibre.com>
+References: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
+ <1471515066-3626-5-git-send-email-narmstrong@baylibre.com>
+ <fe6919a2-a1dc-f056-9480-3248dc9315dc@arm.com>
+ <53093fb5-22e2-3c17-3345-50c7e9df7089@baylibre.com>
+Message-ID: <e31c0b43-a32f-bef9-c341-25783871f74f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 August 2016 at 10:40, Alexander Shishkin
-<alexander.shishkin@linux.intel.com> wrote:
-> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
->
->> +enum {
->> +     ETM_TOKEN_SINK_CPU,
->> +     ETM_TOKEN_SINK,
->> +     ETM_TOKEN_ERR,
->> +};
->> +
->> +static const match_table_t drv_cfg_tokens = {
->> +     {ETM_TOKEN_SINK_CPU, "sink=cpu%d:%s"},
->> +     {ETM_TOKEN_SINK, "sink=%s"},
->> +     {ETM_TOKEN_ERR, NULL},
->> +};
->
-> Wait, but we just parsed away the '=' and the whole thing is now a
-> linked list of { key, value }?
 
-You're correct.  From a parsing point of view it was better to
-reassemble the string and parse the whole thing again.  As suggested
-in my previous email if the parsing for "sink=xyz"  is done in the
-core we won't have to do this part.
 
+On 23/08/16 09:19, Neil Armstrong wrote:
+> On 08/19/2016 06:22 PM, Sudeep Holla wrote:
+>>
+>>
+>> On 18/08/16 11:10, Neil Armstrong wrote:
+>>> In order to support legacy SCP functions from kernel-wide driver, add legacy
+>>> functions using the legacy command enums and calling legacy_scpi_send_message.
+>>>
+>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>>> ---
+>>>  drivers/firmware/arm_scpi.c | 118 ++++++++++++++++++++++++++++++++++++++++++++
+>>>  1 file changed, 118 insertions(+)
+>>>
+>>> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+>>> index 50b1297..bb9965f 100644
+>>> --- a/drivers/firmware/arm_scpi.c
+>>> +++ b/drivers/firmware/arm_scpi.c
+>>> @@ -578,6 +578,8 @@ scpi_clk_get_range(u16 clk_id, unsigned long *min, unsigned long *max)
+>>>      return ret;
+>>>  }
+>>>
+>>> +/* scpi_clk_get_range not available for legacy */
+>>> +
+>>>  static unsigned long scpi_clk_get_val(u16 clk_id)
+>>>  {
+>>>      int ret;
+>>> @@ -589,6 +591,18 @@ static unsigned long scpi_clk_get_val(u16 clk_id)
+>>>      return ret ? ret : le32_to_cpu(clk.rate);
+>>>  }
+>>>
+>>> +static unsigned long legacy_scpi_clk_get_val(u16 clk_id)
+>>> +{
+>>> +    int ret;
+>>> +    struct clk_get_value clk;
+>>> +    __le16 le_clk_id = cpu_to_le16(clk_id);
+>>> +
+>>> +    ret = legacy_scpi_send_message(LEGACY_SCPI_CMD_GET_CLOCK_VALUE,
+>>> +                       &le_clk_id, sizeof(le_clk_id),
+>>> +                       &clk, sizeof(clk));
+>>> +    return ret ? ret : le32_to_cpu(clk.rate);
+>>> +}
+>>> +
+>>>  static int scpi_clk_set_val(u16 clk_id, unsigned long rate)
+>>>  {
+>>>      int stat;
+>>> @@ -601,6 +615,19 @@ static int scpi_clk_set_val(u16 clk_id, unsigned long rate)
+>>>                   &stat, sizeof(stat));
+>>>  }
+>>>
+>>> +static int legacy_scpi_clk_set_val(u16 clk_id, unsigned long rate)
+>>> +{
+>>> +    int stat;
+>>> +    struct legacy_clk_set_value clk = {
+>>> +        .id = cpu_to_le16(clk_id),
+>>> +        .rate = cpu_to_le32(rate)
+>>> +    };
+>>> +
+>>> +    return legacy_scpi_send_message(LEGACY_SCPI_CMD_SET_CLOCK_VALUE,
+>>> +                    &clk, sizeof(clk),
+>>> +                    &stat, sizeof(stat));
+>>
+>> Except this one which has a different structure format, why do we need
+>> to define legacy versions of other functions ? Can't we play with
+>> function pointer or have a boolean in drvinfo structure and use then in
+>> the existing functions as I had shown in one of the earlier emails.
+>>
 >
-> This also answers my question from the other email about the use cases
-> for sending in ascii strings. In my opinion, all this is completely
-> unnecessary.
+> The main problem is that the command indexes deviates starting at
+> SCPI_CMD_SET_CSS_PWR_STATE, I'll be pleased to know how to implement it.
 >
->> +static int
->> +etm_set_drv_configs(struct perf_event *event,
->> +                 struct list_head *drv_configs)
->> +{
->> +     char *config, *sink;
->> +     int len;
->> +     struct perf_drv_config *drv_config;
->> +     void *old_sink;
->> +
->> +     list_for_each_entry(drv_config, drv_configs, entry) {
->> +             /* ETM HW configuration needs a sink specification */
->> +             if (!drv_config->option)
->> +                     return -EINVAL;
->> +
->> +             len = strlen(drv_config->config) + strlen("=") +
->> +                   strlen(drv_config->option) + 1;
->> +
->> +             config = kmalloc(len, GFP_KERNEL);
->> +             if (!config)
->> +                     return -ENOMEM;
->> +
->> +             /* Reconstruct user configuration */
->> +             snprintf(config, len, "%s=%s",
->> +                      drv_config->config, drv_config->option);
->
-> Wait, what? We parse this *twice*?
->
-> There's basically a malloc+snprintf[which could have been
-> kasprintf()]+match_token just to see if drv_config::option starts with a
-> 'cpu%d:'?
->
-> Regards,
-> --
-> Alex
+
+Yes, I was thinking of some kind of mapping to new index using an array.
+
+-- 
+Regards,
+Sudeep
