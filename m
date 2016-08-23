@@ -1,34 +1,40 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Aug 2016 11:02:01 +0100
-Subject: [PATCH v05 54/72] include/uapi/xen/privcmd.h: fix compilation in
- userspace
-In-Reply-To: <1471890809-4383-55-git-send-email-mikko.rapeli@iki.fi>
-References: <1471890809-4383-1-git-send-email-mikko.rapeli@iki.fi>
- <1471890809-4383-55-git-send-email-mikko.rapeli@iki.fi>
-Message-ID: <20160823100201.GG1041@n2100.armlinux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Aug 2016 12:04:00 +0200
+Subject: [PATCH 1/5] arm64: dts: add QorIQ LS1046A SoC support
+In-Reply-To: <DB5PR0401MB21834BD67F0EA86B3A22E9D6E8150@DB5PR0401MB2183.eurprd04.prod.outlook.com>
+References: <1467972944-12293-1-git-send-email-shh.xie@gmail.com>
+ <1984740.gmAYAJ1bIT@wuerfel>
+ <DB5PR0401MB21834BD67F0EA86B3A22E9D6E8150@DB5PR0401MB2183.eurprd04.prod.outlook.com>
+Message-ID: <2061455.WN6nWWqTiZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2016 at 08:33:11PM +0200, Mikko Rapeli wrote:
-> xen/interface/xen.h is not exported from kernel headers so remove the
-> dependency and provide needed defines for domid_t and xen_pfn_t if they
-> are not already defined by some other e.g. Xen specific headers.
-
-I'm confused.  How did we end up with a 64-bit PFN number on ARM?  It's
-insane - especially as the kernel uses "unsigned long" almost everywhere
-for PFNs - we can't have physical addresses more than 44 bits (32 bit
-pfn + 4k page size).
-
-> Suggested by Andrew Cooper <andrew.cooper3@citrix.com> on lkml message
-> <5569F9C9.8000607@citrix.com>.
+On Thursday, August 18, 2016 10:27:36 AM CEST Shaohui Xie wrote:
+> Hello Arnd,
 > 
-> The ifdef for ARM is ugly but did not find better solutions for it.
+> Thank you for reviewing!
+> 
+> I'm seriously Sorry for the late response! I was on business travel on a project and had been very busy for a  long time.
 
-#ifdef __arm__
+No worries.
 
-maybe?  Even if not, the unsightly parens are not necessary.
+> > -----Original Message-----
+> > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > Sent: Friday, July 08, 2016 8:00 PM
+> > On Friday, July 8, 2016 6:15:40 PM CEST shh.xie at gmail.com wrote:
+> > > +
+> > > +   memory at 80000000 {
+> > > +           device_type = "memory";
+> > > +           reg = <0x0 0x80000000 0 0x80000000>;
+> > > +                 /* DRAM space 1, size: 2GiB DRAM */
+> > > +   };
+> > 
+> > The memory size is usually in the .dts file, unless this is on-chip eDRAM.
+> [S.H] The memory size will be fixup by U-boot, if it's not proper to have it in .dtsti,
+> How about remove it?
+> 
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Sounds fine to me. A lot of board specific files have a memory node
+regardless of the override, but I don't see a reason to require it.
+
+	Arnd
