@@ -1,30 +1,580 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 23 Aug 2016 13:30:50 +0200
-Subject: [PATCH v3 2/2] dt-bindings: qcom: Add MDM9615 bindings
+Date: Tue, 23 Aug 2016 13:30:49 +0200
+Subject: [PATCH v3 1/2] ARM: dts: Add MDM9615 dtsi
 In-Reply-To: <1471951850-29842-1-git-send-email-narmstrong@baylibre.com>
 References: <1471951850-29842-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1471951850-29842-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1471951850-29842-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-Acked-by: Rob Herring <robh@kernel.org>
+In order to support the Qualcomm MDM9615 SoC, add the SoC dtsi.
+
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- Documentation/devicetree/bindings/arm/qcom.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/qcom-mdm9615.dtsi | 555 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 555 insertions(+)
+ create mode 100644 arch/arm/boot/dts/qcom-mdm9615.dtsi
 
-diff --git a/Documentation/devicetree/bindings/arm/qcom.txt b/Documentation/devicetree/bindings/arm/qcom.txt
-index 3e24518..43abf4e 100644
---- a/Documentation/devicetree/bindings/arm/qcom.txt
-+++ b/Documentation/devicetree/bindings/arm/qcom.txt
-@@ -22,6 +22,7 @@ The 'SoC' element must be one of the following strings:
- 	msm8916
- 	msm8974
- 	msm8996
-+	mdm9615
- 
- The 'board' element must be one of the following strings:
- 
+diff --git a/arch/arm/boot/dts/qcom-mdm9615.dtsi b/arch/arm/boot/dts/qcom-mdm9615.dtsi
+new file mode 100644
+index 0000000..e30bfbd
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-mdm9615.dtsi
+@@ -0,0 +1,555 @@
++/*
++ * Device Tree Source for Qualcomm MDM9615 SoC
++ *
++ * Copyright (C) 2016 BayLibre, SAS.
++ * Author : Neil Armstrong <narmstrong@baylibre.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++/include/ "skeleton.dtsi"
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clock/qcom,gcc-mdm9615.h>
++#include <dt-bindings/reset/qcom,gcc-mdm9615.h>
++#include <dt-bindings/mfd/qcom-rpm.h>
++#include <dt-bindings/soc/qcom,gsbi.h>
++
++/ {
++	model = "Qualcomm MDM9615";
++	compatible = "qcom,mdm9615";
++	interrupt-parent = <&intc>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu0: cpu at 0 {
++			compatible = "arm,cortex-a5";
++			device_type = "cpu";
++			next-level-cache = <&L2>;
++		};
++	};
++
++	cpu-pmu {
++		compatible = "arm,cortex-a5-pmu";
++		interrupts = <GIC_SPI 10 0x304>;
++	};
++
++	clocks {
++		cxo_board {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <19200000>;
++		};
++	};
++
++	regulators {
++		vsdcc_fixed: vsdcc-regulator {
++			compatible = "regulator-fixed";
++			regulator-name = "SDCC Power";
++			regulator-min-microvolt = <2700000>;
++			regulator-max-microvolt = <2700000>;
++			regulator-always-on;
++		};
++	};
++
++	soc: soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		compatible = "simple-bus";
++
++		L2: l2-cache {
++			compatible = "arm,pl310-cache";
++			reg = <0x02040000 0x1000>;
++			arm,data-latency = <2 2 0>;
++			cache-unified;
++			cache-level = <2>;
++		};
++
++		intc: interrupt-controller at 2000000 {
++			compatible = "qcom,msm-qgic2";
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			reg = <0x02000000 0x1000>,
++			      <0x02002000 0x1000>;
++		};
++
++		timer at 200a000 {
++			compatible = "qcom,kpss-timer", "qcom,msm-timer";
++			interrupts = <GIC_PPI 1 0x101>,
++				     <GIC_PPI 2 0x101>,
++				     <GIC_PPI 3 0x101>;
++			reg = <0x0200a000 0x100>;
++			clock-frequency = <27000000>,
++					  <32768>;
++			cpu-offset = <0x80000>;
++		};
++
++		msmgpio: pinctrl at 800000 {
++			compatible = "qcom,mdm9615-pinctrl";
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			reg = <0x800000 0x4000>;
++		};
++
++		gcc: clock-controller at 900000 {
++			compatible = "qcom,gcc-mdm9615";
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++			reg = <0x900000 0x4000>;
++		};
++
++		lcc: clock-controller at 28000000 {
++			compatible = "qcom,lcc-mdm9615";
++			reg = <0x28000000 0x1000>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		l2cc: clock-controller at 2011000 {
++			compatible = "syscon";
++			reg = <0x02011000 0x1000>;
++		};
++
++		rng at 1a500000 {
++			compatible = "qcom,prng";
++			reg = <0x1a500000 0x200>;
++			clocks = <&gcc PRNG_CLK>;
++			clock-names = "core";
++			assigned-clocks = <&gcc PRNG_CLK>;
++			assigned-clock-rates = <32000000>;
++		};
++
++		gsbi2: gsbi at 16100000 {
++			compatible = "qcom,gsbi-v1.0.0";
++			cell-index = <2>;
++			reg = <0x16100000 0x100>;
++			clocks = <&gcc GSBI2_H_CLK>;
++			clock-names = "iface";
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			gsbi2_i2c: i2c at 16180000 {
++				compatible = "qcom,i2c-qup-v1.1.1";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0x16180000 0x1000>;
++				interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
++
++				clocks = <&gcc GSBI2_QUP_CLK>, <&gcc GSBI2_H_CLK>;
++				clock-names = "core", "iface";
++				status = "disabled";
++			};
++		};
++
++		gsbi3: gsbi at 16200000 {
++			compatible = "qcom,gsbi-v1.0.0";
++			cell-index = <3>;
++			reg = <0x16200000 0x100>;
++			clocks = <&gcc GSBI3_H_CLK>;
++			clock-names = "iface";
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			gsbi3_spi: spi at 16280000 {
++				compatible = "qcom,spi-qup-v1.1.1";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0x16280000 0x1000>;
++				interrupts = <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>;
++				spi-max-frequency = <24000000>;
++
++				clocks = <&gcc GSBI3_QUP_CLK>, <&gcc GSBI3_H_CLK>;
++				clock-names = "core", "iface";
++				status = "disabled";
++			};
++		};
++
++		gsbi4: gsbi at 16300000 {
++			compatible = "qcom,gsbi-v1.0.0";
++			cell-index = <4>;
++			reg = <0x16300000 0x100>;
++			clocks = <&gcc GSBI4_H_CLK>;
++			clock-names = "iface";
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			syscon-tcsr = <&tcsr>;
++
++			gsbi4_serial: serial at 16340000 {
++				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
++				reg = <0x16340000 0x1000>,
++				      <0x16300000 0x1000>;
++				interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&gcc GSBI4_UART_CLK>, <&gcc GSBI4_H_CLK>;
++				clock-names = "core", "iface";
++				status = "disabled";
++			};
++		};
++
++		gsbi5: gsbi at 16400000 {
++			compatible = "qcom,gsbi-v1.0.0";
++			cell-index = <5>;
++			reg = <0x16400000 0x100>;
++			clocks = <&gcc GSBI5_H_CLK>;
++			clock-names = "iface";
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			syscon-tcsr = <&tcsr>;
++
++			gsbi5_i2c: i2c at 16480000 {
++				compatible = "qcom,i2c-qup-v1.1.1";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0x16480000 0x1000>;
++				interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>;
++
++				/* QUP clock is not initialized, set rate */
++				assigned-clocks = <&gcc GSBI5_QUP_CLK>;
++				assigned-clock-rates = <24000000>;
++
++				clocks = <&gcc GSBI5_QUP_CLK>, <&gcc GSBI5_H_CLK>;
++				clock-names = "core", "iface";
++				status = "disabled";
++			};
++
++			gsbi5_serial: serial at 16440000 {
++				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
++				reg = <0x16440000 0x1000>,
++				      <0x16400000 0x1000>;
++				interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&gcc GSBI5_UART_CLK>, <&gcc GSBI5_H_CLK>;
++				clock-names = "core", "iface";
++				status = "disabled";
++			};
++		};
++
++		qcom,ssbi at 500000 {
++			compatible = "qcom,ssbi";
++			reg = <0x500000 0x1000>;
++			qcom,controller-type = "pmic-arbiter";
++
++			pmicintc: pmic at 0 {
++				compatible = "qcom,pm8018", "qcom,pm8921";
++				interrupts = <GIC_PPI 226 IRQ_TYPE_LEVEL_HIGH>;
++				#interrupt-cells = <2>;
++				interrupt-controller;
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				pwrkey at 1c {
++					compatible = "qcom,pm8018-pwrkey", "qcom,pm8921-pwrkey";
++					reg = <0x1c>;
++					interrupt-parent = <&pmicintc>;
++					interrupts = <50 IRQ_TYPE_NONE>,
++						     <51 IRQ_TYPE_NONE>;
++					debounce = <15625>;
++					pull-up;
++				};
++
++				pmicmpp: mpp at 50 {
++					compatible = "qcom,pm8018-mpp", "qcom,ssbi-mpp";
++					interrupt-parent = <&pmicintc>;
++					interrupts = <24 IRQ_TYPE_NONE>,
++						     <25 IRQ_TYPE_NONE>,
++						     <26 IRQ_TYPE_NONE>,
++						     <27 IRQ_TYPE_NONE>,
++						     <28 IRQ_TYPE_NONE>,
++						     <29 IRQ_TYPE_NONE>;
++					reg = <0x50>;
++					gpio-controller;
++					#gpio-cells = <2>;
++				};
++
++				rtc at 11d {
++					compatible = "qcom,pm8018-rtc", "qcom,pm8921-rtc";
++					interrupt-parent = <&pmicintc>;
++					interrupts = <39 IRQ_TYPE_NONE>;
++					reg = <0x11d>;
++					allow-set-time;
++				};
++
++				pmicgpio: gpio at 150 {
++					compatible = "qcom,pm8018-gpio", "qcom,ssbi-gpio";
++					interrupt-parent = <&pmicintc>;
++					interrupts = <24 IRQ_TYPE_NONE>,
++						     <25 IRQ_TYPE_NONE>,
++						     <26 IRQ_TYPE_NONE>,
++						     <27 IRQ_TYPE_NONE>,
++						     <28 IRQ_TYPE_NONE>,
++						     <29 IRQ_TYPE_NONE>;
++					gpio-controller;
++					#gpio-cells = <2>;
++				};
++			};
++		};
++
++		sdcc1bam: dma at 12182000{
++			compatible = "qcom,bam-v1.3.0";
++			reg = <0x12182000 0x8000>;
++			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&gcc SDC1_H_CLK>;
++			clock-names = "bam_clk";
++			#dma-cells = <1>;
++			qcom,ee = <0>;
++		};
++
++		sdcc2bam: dma at 12142000{
++			compatible = "qcom,bam-v1.3.0";
++			reg = <0x12142000 0x8000>;
++			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&gcc SDC2_H_CLK>;
++			clock-names = "bam_clk";
++			#dma-cells = <1>;
++			qcom,ee = <0>;
++		};
++
++		amba {
++			compatible = "arm,amba-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			sdcc1: sdcc at 12180000 {
++				status = "disabled";
++				compatible = "arm,pl18x", "arm,primecell";
++				arm,primecell-periphid = <0x00051180>;
++				reg = <0x12180000 0x2000>;
++				interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
++				interrupt-names	= "cmd_irq";
++				clocks = <&gcc SDC1_CLK>, <&gcc SDC1_H_CLK>;
++				clock-names = "mclk", "apb_pclk";
++				bus-width = <8>;
++				max-frequency = <48000000>;
++				cap-sd-highspeed;
++				cap-mmc-highspeed;
++				vmmc-supply = <&vsdcc_fixed>;
++				dmas = <&sdcc1bam 2>, <&sdcc1bam 1>;
++				dma-names = "tx", "rx";
++				assigned-clocks = <&gcc SDC1_CLK>;
++				assigned-clock-rates = <400000>;
++			};
++
++			sdcc2: sdcc at 12140000 {
++				compatible = "arm,pl18x", "arm,primecell";
++				arm,primecell-periphid = <0x00051180>;
++				status = "disabled";
++				reg = <0x12140000 0x2000>;
++				interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
++				interrupt-names	= "cmd_irq";
++				clocks = <&gcc SDC2_CLK>, <&gcc SDC2_H_CLK>;
++				clock-names = "mclk", "apb_pclk";
++				bus-width = <4>;
++				cap-sd-highspeed;
++				cap-mmc-highspeed;
++				max-frequency = <48000000>;
++				no-1-8-v;
++				vmmc-supply = <&vsdcc_fixed>;
++				dmas = <&sdcc2bam 2>, <&sdcc2bam 1>;
++				dma-names = "tx", "rx";
++				assigned-clocks = <&gcc SDC2_CLK>;
++				assigned-clock-rates = <400000>;
++			};
++		};
++
++		tcsr: syscon at 1a400000 {
++			compatible = "qcom,tcsr-mdm9615", "syscon";
++			reg = <0x1a400000 0x100>;
++		};
++
++		rpm: rpm at 108000 {
++			compatible = "qcom,rpm-mdm9615";
++			reg = <0x108000 0x1000>;
++
++			qcom,ipc = <&l2cc 0x8 2>;
++
++			interrupts = <0 19 0>, <0 21 0>, <0 22 0>;
++			interrupt-names	= "ack", "err", "wakeup";
++
++			regulators {
++				compatible = "qcom,rpm-pm8018-regulators";
++
++				vin_lvs1-supply = <&pm8018_s3>;
++
++				vdd_l7-supply = <&pm8018_s4>;
++				vdd_l8-supply = <&pm8018_s3>;
++				vdd_l9_l10_l11_l12-supply = <&pm8018_s5>;
++
++				/* Buck SMPS */
++				pm8018_s1: s1 {
++					regulator-min-microvolt = <500000>;
++					regulator-max-microvolt = <1150000>;
++					qcom,switch-mode-frequency = <1600000>;
++					bias-pull-down;
++				};
++
++				pm8018_s2: s2 {
++					regulator-min-microvolt = <1225000>;
++					regulator-max-microvolt = <1300000>;
++					qcom,switch-mode-frequency = <1600000>;
++					bias-pull-down;
++				};
++
++				pm8018_s3: s3 {
++					regulator-always-on;
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					qcom,switch-mode-frequency = <1600000>;
++					bias-pull-down;
++				};
++
++				pm8018_s4: s4 {
++					regulator-min-microvolt = <2100000>;
++					regulator-max-microvolt = <2200000>;
++					qcom,switch-mode-frequency = <1600000>;
++					bias-pull-down;
++				};
++
++				pm8018_s5: s5 {
++					regulator-always-on;
++					regulator-min-microvolt = <1350000>;
++					regulator-max-microvolt = <1350000>;
++					qcom,switch-mode-frequency = <1600000>;
++					bias-pull-down;
++				};
++
++				/* PMOS LDO */
++				pm8018_l2: l2 {
++					regulator-always-on;
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					bias-pull-down;
++				};
++
++				pm8018_l3: l3 {
++					regulator-always-on;
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					bias-pull-down;
++				};
++
++				pm8018_l4: l4 {
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++					bias-pull-down;
++				};
++
++				pm8018_l5: l5 {
++					regulator-min-microvolt = <2850000>;
++					regulator-max-microvolt = <2850000>;
++					bias-pull-down;
++				};
++
++				pm8018_l6: l6 {
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <2850000>;
++					bias-pull-down;
++				};
++
++				pm8018_l7: l7 {
++					regulator-min-microvolt = <1850000>;
++					regulator-max-microvolt = <1900000>;
++					bias-pull-down;
++				};
++
++				pm8018_l8: l8 {
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++					bias-pull-down;
++				};
++
++				pm8018_l9: l9 {
++					regulator-min-microvolt = <750000>;
++					regulator-max-microvolt = <1150000>;
++					bias-pull-down;
++				};
++
++				pm8018_l10: l10 {
++					regulator-min-microvolt = <1050000>;
++					regulator-max-microvolt = <1050000>;
++					bias-pull-down;
++				};
++
++				pm8018_l11: l11 {
++					regulator-min-microvolt = <1050000>;
++					regulator-max-microvolt = <1050000>;
++					bias-pull-down;
++				};
++
++				pm8018_l12: l12 {
++					regulator-min-microvolt = <1050000>;
++					regulator-max-microvolt = <1050000>;
++					bias-pull-down;
++				};
++
++				pm8018_l13: l13 {
++					regulator-min-microvolt = <1850000>;
++					regulator-max-microvolt = <2950000>;
++					bias-pull-down;
++				};
++
++				pm8018_l14: l14 {
++					regulator-min-microvolt = <2850000>;
++					regulator-max-microvolt = <2850000>;
++					bias-pull-down;
++				};
++
++				/* Low Voltage Switch */
++				pm8018_lvs1: lvs1 {
++					bias-pull-down;
++				};
++			};
++		};
++	};
++};
 -- 
 1.9.1
