@@ -1,49 +1,92 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 23 Aug 2016 12:17:23 +0800
-Subject: [PATCH 3/9] regulator: core: Try full range when adjusting
- regulators to constraints
-In-Reply-To: <20160822180932.GW22076@sirena.org.uk>
-References: <20160821021125.1521-1-wens@csie.org>
- <20160821021125.1521-4-wens@csie.org>
- <20160822162907.GO22076@sirena.org.uk>
- <20160822175205.h76hurjaopnosymc@vip.cybercity.dk>
- <20160822180932.GW22076@sirena.org.uk>
-Message-ID: <CAGb2v67ZST-E++z5oobLRwCfHMZZR6HTss=MSqJLJArnQz3qMw@mail.gmail.com>
+From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
+Date: Tue, 23 Aug 2016 06:20:28 +0200
+Subject: [PATCH] serial: vt8500_serial: Fix a parameter of
+ find_first_zero_bit.
+In-Reply-To: <2512469.eM8MYFl15l@wuerfel>
+References: <1471814425-18949-1-git-send-email-christophe.jaillet@wanadoo.fr>
+ <2512469.eM8MYFl15l@wuerfel>
+Message-ID: <57f44339-76c6-051f-b592-2648afaae336@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2016 at 2:09 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Mon, Aug 22, 2016 at 07:52:05PM +0200, Rask Ingemann Lambertsen wrote:
->> On Mon, Aug 22, 2016 at 05:29:07PM +0100, Mark Brown wrote:
+Le 22/08/2016 ? 10:42, Arnd Bergmann a ?crit :
+> [...]
+> Sorry, but I'm not following the logic here.
 >
->> > This seems like you have buggy constraints, constraints which allow
->> > voltages that can't physically be satisfied don't make obvious sense.
+> [...]
+> You argue that the two have the same meaning, which I see, but
+> why is it better than the existing code?
 >
->> No, it's for cases like this (see the cubietruck4 or a80-optimus dts
->> patches):
->
->>                       reg_bldo4: bldo4 {
->>                               regulator-min-microvolt = <1080000>;
->>                               regulator-max-microvolt = <1320000>;
->>                               regulator-name = "vcc12-hsic";
->>                       };
->
->> The regulator can do 1100000 uV, 1200000 uV and 1300000 uV, all of which
->> are within the constraints, so obviously the constraints can be satisfied,
->> yet the regulator core fails do so with a message like this:
->
-> Sure, but the constraints also say that you can do 1.32V which the
-> system is not physically capable of delivering.  That's not a good sign
-> for the constraints, it suggests that at least the capabilities of the
-> regulator have not been taken into consideration when setting up the
-> constraints.
+> 	Arnd
 
-So to be clear, the constraints should be the intersection of the
-recommended operating parameters of the consumer and the regulator's
-output, with the voltage/current steps taken in to consideration.
+Hi,
 
-In that case I'll drop this patch and fix up the constraints.
-And maybe send a patch to clarify the regulator bindings.
+sorry if my explanation was unclear.
 
-Thanks
-ChenYu
+What I mean is that if "sizeof(unsigned long) = 4" (i.e. 32 bits systems 
+?) then:
+
+	port = find_first_zero_bit(&vt8500_ports_in_use, sizeof(vt8500_ports_in_use));
+turns into:
+  	port = find_first_zero_bit(&vt8500_ports_in_use, 4);
+
+find_first_zero_bit "Returns the bit number of the first set bit.  If no bits are set, returns @size."
+So, in this case, it can return 1, 2, 3 or 4, if one of the 4 first bits is 0.
+And will also return 4, if none of the 4 first bits is 0.
+
+In no way, 5 or above can be returned.
+
+The code just after is:
+	if (port >= VT8500_MAX_PORTS)
+		return -ENODEV;
+It turns into:
+	if (port >= 6)
+		return -ENODEV;
+
+
+I see 2 problems there:
+	- First, according to this test, "port = 5" seems a legal value, but can never trigger.
+	- Second, if the first 3 bits are set, the find_first_zero_bit will return 4, whatever the value of the 4th bit.
+           This 4 can either mean "4th bit is clear" or "no clear bit found, so return @size (i.e. 4)"
+
+  
+Using:
+	port = find_first_zero_bit(&vt8500_ports_in_use, BITS_PER_LONG);
+Would solve the 2 issues.
+    - 4 would really mean, 4th bit is set.
+    - 5 becomes a possible value.
+    - 6 to 31 would mean: we found a clear bit "in the garbage after the VT8500_MAX_PORTS (i.e. 6) relevant bits".
+    - 32 would mean, all bits set.
+
+These answers look more in line with the "if (port >= VT8500_MAX_PORTS)" test.
+
+
+
+Finally, what I meant by "Other options are possible:" is:
+   - 'vt8500_ports_in_use' being a 'unsigned long', use ffz to reduce code verbosity
+	port = ffz(&vt8500_ports_in_use);
+     would also work, because it is equivalent to:
+	port = find_first_zero_bit(&vt8500_ports_in_use, BITS_PER_LONG);
+
+   - VT8500_MAX_PORTS, in order to be consistent with the test below
+	port = find_first_zero_bit(&vt8500_ports_in_use, VT8500_MAX_PORTS);
+     would also work and is maybe more logical in regard to the test "if (port >= VT8500_MAX_PORTS)"
+
+
+
+Now if "sizeof(unsigned long) = 8" (i.e. 64 bits systems ?), the actual code would work.
+But using "sizeof(long)" to mean "more than VT8500_MAX_PORTS" is odd.
+In other words, expressing a number of bits using something that gives a size in bytes is, IMHO, spurious.
+
+  
+All this is pure speculation.
+
+Hoping that it is clearer now ( and that my analysis is right :) )
+
+Best regard,
+CJ
+
+
+---
+L'absence de virus dans ce courrier ?lectronique a ?t? v?rifi?e par le logiciel antivirus Avast.
+https://www.avast.com/antivirus
