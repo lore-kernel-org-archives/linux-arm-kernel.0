@@ -1,81 +1,37 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 23 Aug 2016 12:34:05 +0200
-Subject: [PATCH] mtd: mxc_nand: Set timing for v2 controllers
-Message-ID: <1471948445-29936-1-git-send-email-s.hauer@pengutronix.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 23 Aug 2016 11:38:41 +0100
+Subject: [PATCH 1/2] arm64: kernel: Add SMC Session ID to results
+In-Reply-To: <20160823003831.GN6502@codeaurora.org>
+References: <1471672274-19317-1-git-send-email-andy.gross@linaro.org>
+ <1471672274-19317-2-git-send-email-andy.gross@linaro.org>
+ <20160822134313.GJ14680@arm.com>
+ <20160822140246.GA30923@hector.attlocal.net>
+ <20160822145326.GK14680@arm.com>
+ <20160823003831.GN6502@codeaurora.org>
+Message-ID: <20160823103841.GD8724@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far we relied on reset default or the bootloader to configure a
-suitable clk rate for the Nand controller. This works but we can
-optimize the timing for better performance. This sets the clk rate for
-v2 controllers (i.MX25/35) based on the timing mode read from the ONFI
-parameter page. This may also enable the symmetric mode (aks EDO mode)
-if necessary which reads one word per clock cycle.
-Tested on an i.MX25 with a Micron MT29F4G08ABBDAHC attached.
+On Mon, Aug 22, 2016 at 05:38:31PM -0700, Stephen Boyd wrote:
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/mtd/nand/mxc_nand.c | 41 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+[...]
 
-diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 5173fad..725223c 100644
---- a/drivers/mtd/nand/mxc_nand.c
-+++ b/drivers/mtd/nand/mxc_nand.c
-@@ -1012,6 +1012,45 @@ static void preset_v1(struct mtd_info *mtd)
- 	writew(0x4, NFC_V1_V2_WRPROT);
- }
- 
-+static void mxc_nand_v2_set_timing(struct mtd_info *mtd, uint16_t *config1)
-+{
-+	struct nand_chip *nand_chip = mtd->priv;
-+	struct mxc_nand_host *host = nand_chip->priv;
-+	int mode, ret, tRC_min_ns;
-+	unsigned long rate;
-+	const struct nand_sdr_timings *timings;
-+
-+	mode = onfi_get_async_timing_mode(nand_chip);
-+	if (mode == ONFI_TIMING_MODE_UNKNOWN)
-+		return;
-+
-+	mode = fls(mode) - 1;
-+	if (mode < 0)
-+		mode = 0;
-+
-+	timings = onfi_async_timing_mode_to_sdr_timings(mode);
-+	if (IS_ERR(timings))
-+		return;
-+
-+	tRC_min_ns = timings->tRC_min / 1000;
-+	rate = 1000000000 / tRC_min_ns;
-+
-+	if (clk_round_rate(host->clk, rate) > 33333333)
-+		/*
-+		 * If tRC is smaller than 30ns (that is, the rate is higher
-+		 * than 33.333MHz) we have to use EDO timing.
-+		 */
-+		*config1 |= NFC_V2_CONFIG1_ONE_CYCLE;
-+	else
-+		/* Otherwise we have two clock cycles per access. */
-+		rate *= 2;
-+
-+	ret = clk_set_rate(host->clk, rate);
-+	if (ret)
-+		/* Don't worry, continue with old rate */
-+		dev_err(host->dev, "failed to set clk rate: %d\n", ret);
-+}
-+
- static void preset_v2(struct mtd_info *mtd)
- {
- 	struct nand_chip *nand_chip = mtd_to_nand(mtd);
-@@ -1020,6 +1059,8 @@ static void preset_v2(struct mtd_info *mtd)
- 
- 	config1 |= NFC_V2_CONFIG1_FP_INT;
- 
-+	mxc_nand_v2_set_timing(mtd, &config1);
-+
- 	if (!host->devtype_data->irqpending_quirk)
- 		config1 |= NFC_V1_V2_CONFIG1_INT_MSK;
- 
--- 
-2.8.1
+> This all comes about because the firmware generates a session id
+> for the SMC call and jams it in x6. The assembly on the
+> non-secure side is written with a tight loop around the smc
+> instruction so that when the return value indicates
+> "interrupted", x6 is kept intact and the non-secure OS can jump
+> back to the secure OS without register reloading. Perhaps
+> referring to x6 as result value is not correct because it's
+> really a session id that's irrelevant once the smc call
+> completes.
+
+Sorry I missed this bit. The session id is _generated_ by secure
+firmware (probably only when the value passed in x6 == 0 (?))
+and actually returned to the caller so that subsequent (interrupted)
+calls can re-issue the same value, is that correct ?
+
+If that's the case the value in x6 is a result value from an SMCCC
+perspective and your current FW is not SMCCC compliant.
+
+Lorenzo
