@@ -1,48 +1,28 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 23 Aug 2016 11:37:20 -0400 (EDT)
-Subject: [PATCH v6 4/8] usb: core: add power sequence handling for USB
- devices
-In-Reply-To: <20160823031021.GB13986@shlinux2>
-Message-ID: <Pine.LNX.4.44L0.1608231130330.2093-100000@iolanthe.rowland.org>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Tue, 23 Aug 2016 23:41:25 +0800
+Subject: [PATCH -next] net: phy: xgmiitorgmii: Fix non static symbol
+ warning
+In-Reply-To: <20160823151619.GK20029@lunn.ch>
+References: <1471964765-32708-1-git-send-email-weiyj.lk@gmail.com>
+ <20160823151619.GK20029@lunn.ch>
+Message-ID: <874c4fd0-ac5d-9db0-3470-e092b9251cd7@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Aug 2016, Peter Chen wrote:
+Hi Andrew,
 
-> I will add #ifdef CONFIG_OF for related code. And put the content at
-> hub_pwrseq_on at hub_probe directly, how about below?
-> 
-> hub_probe() {
-> 
-> 	...
-> 
-> 	if (hub_configure(hub, endpoint) >= 0) {
-> #ifdef CONFIG_OF
-> 		for_each_child_of_node(parent->of_node, np) {
-> 			ret = generic_pwrseq_on(np, hub);
-> 			if (ret)
-> 				return ret;
-> 		}
-> #else
-> 		return 0;
-> #endif
-> 	}
+On 08/23/2016 11:16 PM, Andrew Lunn wrote:
+> On Tue, Aug 23, 2016 at 03:06:05PM +0000, Wei Yongjun wrote:
+>> From: Wei Yongjun <weiyongjun1@huawei.com>
+> Hi Wei
+>
+> No need for the additional From:
+>
+> git am will use the one in the mail header as the author of the patch,
+> and it is in the signed-off-by as well.
 
-Please make this a separate subroutine like you had before, but now in 
-hub.c:
+The mail address which I sent the patch is different with the
+signed-of-by one, so git send-email will not remove the From line.
 
-#ifdef CONFIG_OF
-static int hub_of_pwrseq_on(struct usb_hub *hub)
-{
-...
-}
-
-#else
-static inline int hub_of_pwrseq_on(struct usb_hub *hub)
-{
-	return 0;
-}
-#endif /* CONFIG_OF */
-
-
-Alan Stern
+Regards,
+Yongjun Wei 
