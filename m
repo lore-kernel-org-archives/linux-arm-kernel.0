@@ -1,81 +1,59 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 23 Aug 2016 12:51:20 -0500
-Subject: [PATCH 1/9] mfd: axp20x: Add bindings for AXP806 PMIC
-In-Reply-To: <20160821021125.1521-2-wens@csie.org>
-References: <20160821021125.1521-1-wens@csie.org>
- <20160821021125.1521-2-wens@csie.org>
-Message-ID: <20160823175120.GA26572@rob-hp-laptop>
+Date: Tue, 23 Aug 2016 13:00:16 -0500
+Subject: [PATCH v3 6/7] phy-sun4i-usb: Add
+ "allwinner,usb0-usb-a-connector" dt property
+In-Reply-To: <1471781799-10457-6-git-send-email-hdegoede@redhat.com>
+References: <1471781799-10457-1-git-send-email-hdegoede@redhat.com>
+ <1471781799-10457-6-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160823180016.GA28538@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 21, 2016 at 10:11:17AM +0800, Chen-Yu Tsai wrote:
-> This patch adds the basic and regulator bindings for the X-Powers AXP809
-> PMIC.
-
-Looks like you're adding the AXP806 to me.
-
+On Sun, Aug 21, 2016 at 02:16:38PM +0200, Hans de Goede wrote:
+> On some devices the musb otg controller can be used in both device and
+> host mode, but requires software mode switching since there is no id pin
+> connected. The usb0 phy code will default to device mode in this case.
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> On some systems usb0 is connected to a female USB-A port. It can still
+> be used in device mode when using software mode switching and a USB
+> A to A cable. To configure the controller to support both modes we must
+> set its "dr_mode" dt property to "otg" (*). For these setups the device
+> mode default is wrong, for a female USB-A port the default should be
+> host mode.
+> 
+> This commit adds support to the sun4i phy code for a new
+> "allwinner,usb0-usb-a-connector" dt property which can be used in dt
+> files to indicate this scenario and when present it changes the default
+> mode to host mode.
+> 
+> *) dr_mode = "host" is used when device mode is _never_ used. E.g.
+> a wifi module soldered onto the PCB is connected to the musb controller.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 > ---
->  Documentation/devicetree/bindings/mfd/axp20x.txt | 28 ++++++++++++++++++++++--
->  1 file changed, 26 insertions(+), 2 deletions(-)
+> Changes in v2:
+> -New patch in v2 of this patchset
+> Changes in v3:
+> -No changes
+> ---
+>  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 2 ++
+>  drivers/phy/phy-sun4i-usb.c                             | 9 ++++++++-
+>  2 files changed, 10 insertions(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> index 585a95546288..8f3ad9ab4637 100644
-> --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> @@ -10,7 +10,8 @@ axp809 (X-Powers)
->  
->  Required properties:
->  - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
-> -	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp809"
-> +	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp806",
-> +	      "x-powers,axp809"
+> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> index 287150d..8646b53 100644
+> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> @@ -35,6 +35,8 @@ Optional properties:
+>  - usb0_vbus-supply : regulator phandle for controller usb0 vbus
+>  - usb1_vbus-supply : regulator phandle for controller usb1 vbus
+>  - usb2_vbus-supply : regulator phandle for controller usb2 vbus
+> +- allwinner,usb0-usb-a-connector: usb0 is connected to an USB-A connector,
+> +                     rather then an USB-B connector as one would expect (bool)
 
-Reformat this to one valid combination per line.
+This seems like a pretty generic problem: a board has an A connector 
+wired to an OTG controller. So I think we should have a generic 
+property. The only part is here that is not is you have 3 USB buses for 
+the PHY. That probably should have been 3 child nodes for each PHY port.
 
->  - reg: The I2C slave address or RSB hardware address for the AXP chip
->  - interrupt-parent: The parent interrupt controller
->  - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
-> @@ -47,7 +48,6 @@ Optional properties for DCDC regulators:
->  			  probably makes sense for HiFi audio related
->  			  applications that aren't battery constrained.
->  
-> -
->  AXP202/AXP209 regulators, type, and corresponding input supply names:
->  
->  Regulator	  Type		  Supply Name		  Notes
-> @@ -86,6 +86,30 @@ LDO_IO1		: LDO		: ips-supply		: GPIO 1
->  RTC_LDO		: LDO		: ips-supply		: always on
->  DRIVEVBUS	: Enable output	: drivevbus-supply	: external regulator
->  
-> +AXP806 regulators, type, and corresponding input supply names:
-> +
-> +Regulator	  Type		  Supply Name		  Notes
-> +---------	  ----		  -----------		  -----
-> +DCDCA		: DC-DC buck	: vina-supply		: poly-phase capable
-> +DCDCB		: DC-DC buck	: vinb-supply		: poly-phase capable
-> +DCDCC		: DC-DC	buck	: vinc-supply		: poly-phase capable
-> +DCDCD		: DC-DC	buck	: vind-supply		: poly-phase capable
-> +DCDCE		: DC-DC	buck	: vine-supply		: poly-phase capable
-> +ALDO1		: LDO		: aldoin-supply		: shared supply
-> +ALDO2		: LDO		: aldoin-supply		: shared supply
-> +ALDO3		: LDO		: aldoin-supply		: shared supply
-> +BLDO1		: LDO		: bldoin-supply		: shared supply
-> +BLDO2		: LDO		: bldoin-supply		: shared supply
-> +BLDO3		: LDO		: bldoin-supply		: shared supply
-> +BLDO4		: LDO		: bldoin-supply		: shared supply
-> +CLDO1		: LDO		: cldoin-supply		: shared supply
-> +CLDO2		: LDO		: cldoin-supply		: shared supply
-> +CLDO3		: LDO		: cldoin-supply		: shared supply
-> +SW		: On/Off Switch : swin-supply
-> +
-> +Additionally, the AXP806 DC-DC regulators support poly-phase arrangements
-> +for higher output current. The possible groupings are: A+B, A+B+C, D+E.
-> +
->  AXP809 regulators, type, and corresponding input supply names:
->  
->  Regulator	  Type		  Supply Name		  Notes
-> -- 
-> 2.9.3
-> 
+Rob
