@@ -1,91 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Aug 2016 11:23:34 +0200
-Subject: [PATCH] serial: vt8500_serial: Fix a parameter of
- find_first_zero_bit.
-In-Reply-To: <57f44339-76c6-051f-b592-2648afaae336@wanadoo.fr>
-References: <1471814425-18949-1-git-send-email-christophe.jaillet@wanadoo.fr>
- <2512469.eM8MYFl15l@wuerfel>
- <57f44339-76c6-051f-b592-2648afaae336@wanadoo.fr>
-Message-ID: <11520879.bzQ3JxDSyK@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 23 Aug 2016 11:26:14 +0200
+Subject: [PATCH 4/8] ARM: dts: sun8i: Add touchscreen node for
+ sun8i-a23-gt90h
+In-Reply-To: <cf0186a0-f4ea-173c-4f93-df8798941199@redhat.com>
+References: <1470685398-14568-1-git-send-email-hdegoede@redhat.com>
+ <1470685398-14568-4-git-send-email-hdegoede@redhat.com>
+ <20160822183009.GX7104@lukather>
+ <cf0186a0-f4ea-173c-4f93-df8798941199@redhat.com>
+Message-ID: <20160823092614.GF2598@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, August 23, 2016 6:20:28 AM CEST Christophe JAILLET wrote:
-> Le 22/08/2016 ? 10:42, Arnd Bergmann a ?crit :
-> > [...]
-> > Sorry, but I'm not following the logic here.
-> >
-> > [...]
-> > You argue that the two have the same meaning, which I see, but
-> > why is it better than the existing code?
-> >
-> > 	Arnd
-> 
+On Mon, Aug 22, 2016 at 09:03:57PM +0200, Hans de Goede wrote:
 > Hi,
 > 
-> sorry if my explanation was unclear.
+> On 22-08-16 20:30, Maxime Ripard wrote:
+> >On Mon, Aug 08, 2016 at 09:43:14PM +0200, Hans de Goede wrote:
+> >>The gt90h tablet has a gsl3675 touchscreen, add a dt node describing it.
+> >>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>---
+> >> arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts | 8 ++++++++
+> >> 1 file changed, 8 insertions(+)
+> >>
+> >>diff --git a/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts b/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
+> >>index f27ebbb..da55b5a 100644
+> >>--- a/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
+> >>+++ b/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
+> >>@@ -53,6 +53,14 @@
+> >> 	status = "okay";
+> >> };
+> >>
+> >>+&gsl1680 {
+> >>+	compatible = "silead,gsl3675";
+> >>+	touchscreen-fw-name = "silead/gsl3675-gt90h.fw";
+> >
+> >That's not documented anywhere, and looks really suspicious.
 > 
-> What I mean is that if "sizeof(unsigned long) = 4" (i.e. 32 bits systems 
-> ?) then:
+> Ugh, that should have been in:
 > 
-> 	port = find_first_zero_bit(&vt8500_ports_in_use, sizeof(vt8500_ports_in_use));
-> turns into:
->   	port = find_first_zero_bit(&vt8500_ports_in_use, 4);
+> Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
 > 
-> find_first_zero_bit "Returns the bit number of the first set bit.  If no bits are set, returns @size."
-> So, in this case, it can return 1, 2, 3 or 4, if one of the 4 first bits is 0.
-> And will also return 4, if none of the 4 first bits is 0.
-
-Ah, got it.
-
+> But somehow it is not (I believe it was there in earlier revisions of
+> the patch), I'll send a patch to fix this.
 > 
-> Finally, what I meant by "Other options are possible:" is:
->    - 'vt8500_ports_in_use' being a 'unsigned long', use ffz to reduce code verbosity
-> 	port = ffz(&vt8500_ports_in_use);
->      would also work, because it is equivalent to:
-> 	port = find_first_zero_bit(&vt8500_ports_in_use, BITS_PER_LONG);
-> 
->    - VT8500_MAX_PORTS, in order to be consistent with the test below
-> 	port = find_first_zero_bit(&vt8500_ports_in_use, VT8500_MAX_PORTS);
->      would also work and is maybe more logical in regard to the test "if (port >= VT8500_MAX_PORTS)"
-> 
-> 
-> 
-> Now if "sizeof(unsigned long) = 8" (i.e. 64 bits systems ?), the actual code would work.
-> But using "sizeof(long)" to mean "more than VT8500_MAX_PORTS" is odd.
-> In other words, expressing a number of bits using something that gives a size in bytes is, IMHO, spurious.
->   
-> All this is pure speculation.
-> 
-> Hoping that it is clearer now ( and that my analysis is right :) )
+> About it being suspicious, this is not really firmware it is a bunch
+> of configuration data / lookup tables for the controller which tell
+> it in which order the touchscreen horizontal / vertical sensor
+> lines are connected to its sense pins, and what values to send
+> for finger x% between line z and line z+1, which differs per
+> tablet model, since not all tablets use the same digitizer.
 
-I misread the code in the same way the original author wrote it wrong,
-I guess it was meant to say
+It's not really the firmware itself that I find suspicious, but more
+the encoding of a path to a file in the DT, especially when you can
+apparently derive it from other informations already found in the DT
+(<vendor>/<compatible>-<board>.fw)
 
-	port = find_first_zero_bit(&vt8500_ports_in_use, sizeof(vt8500_ports_in_use) * 8);
+Thanks,
+Maxime
 
-to convert number of bytes into number of bits. Your patch is absolutely
-correct, but being more specific about the kind of mistake that was made
-is a good idea.
-
-Regarding which of the four alternatives to use, I'd probably use
-your third one, checking against VT8500_MAX_PORTS. To make this code
-absolutely foolproof, we can add this hunk too then:
-
-diff --git a/drivers/tty/serial/vt8500_serial.c b/drivers/tty/serial/vt8500_serial.c
-index 23cfc5e16b45..a68be66d2770 100644
---- a/drivers/tty/serial/vt8500_serial.c
-+++ b/drivers/tty/serial/vt8500_serial.c
-@@ -118,7 +118,7 @@ struct vt8500_port {
-  * have been allocated as we can't use pdev->id in
-  * devicetree
-  */
--static unsigned long vt8500_ports_in_use;
-+static DECLARE_BITMAP(vt8500_ports_in_use, VT8500_MAX_PORTS);
- 
- static inline void vt8500_write(struct uart_port *port, unsigned int val,
- 			     unsigned int off)
-
-
-
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160823/d2bd5ec5/attachment.sig>
