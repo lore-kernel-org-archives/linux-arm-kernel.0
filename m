@@ -1,47 +1,30 @@
-From: po.liu@nxp.com (Po Liu)
-Date: Tue, 23 Aug 2016 14:01:12 +0800
-Subject: [PATCH v1] arm64:pci: fix the IOV device enabled crash issue in
- designware
-Message-ID: <1471932072-6980-1-git-send-email-po.liu@nxp.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Tue, 23 Aug 2016 11:46:47 +0530
+Subject: [PATCH v2 0/2] AM335x-ICE: Add support for rotary switch
+Message-ID: <20160823061649.3394-1-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When echo a number to /sys/bus/pci/devices/xxx/sriov_numvfs to enable the
-VF devices. A crash log occurred. This found to be access the IOV devices
-config space failure issue.
+This series adds support for rotary-switch on AM335x-ICE that is
+connected to TI PCA9536 I2C GPIO expander.
+First patch adds new generic driver to read status of group of GPIO
+lines and report the value as an input event. The second patch adds DT
+entries for the same.
 
-The read/write config space from host would judge the pcie device plugin
-or not by:
+v1: https://lkml.org/lkml/2016/8/12/7
 
-if (bus->primary == pp->root_bus_nr && dev > 0)
-    return 0;
+Vignesh R (2):
+  input: misc: Add generic input driver to read encoded GPIO lines
+  ARM: dts: am335x-icev2: Add nodes for gpio-decoder
 
-Although all pcie devices for dev(coming from the device and function
-number) is zero. But the dev is not zero for VF. So remove the
-condition.
+ .../devicetree/bindings/input/gpio-decoder.txt     |  23 ++++
+ arch/arm/boot/dts/am335x-icev2.dts                 |   9 ++
+ drivers/input/misc/Kconfig                         |  12 ++
+ drivers/input/misc/Makefile                        |   1 +
+ drivers/input/misc/gpio_decoder.c                  | 130 +++++++++++++++++++++
+ 5 files changed, 175 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/gpio-decoder.txt
+ create mode 100644 drivers/input/misc/gpio_decoder.c
 
-Signed-off-by: Po Liu <po.liu@nxp.com>
----
- drivers/pci/host/pcie-designware.c | 7 -------
- 1 file changed, 7 deletions(-)
-
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 12afce1..dd20eb2 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -670,13 +670,6 @@ static int dw_pcie_valid_config(struct pcie_port *pp,
- 	if (bus->number == pp->root_bus_nr && dev > 0)
- 		return 0;
- 
--	/*
--	 * do not read more than one device on the bus directly attached
--	 * to RC's (Virtual Bridge's) DS side.
--	 */
--	if (bus->primary == pp->root_bus_nr && dev > 0)
--		return 0;
--
- 	return 1;
- }
- 
 -- 
-2.1.0.27.g96db324
+2.9.2
