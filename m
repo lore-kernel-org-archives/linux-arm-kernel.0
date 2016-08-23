@@ -1,9 +1,9 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 22 Aug 2016 22:57:45 -0700
-Subject: [PATCH v2 3/4] ARM: dts: msm8974: Add ADSP smp2p and smd nodes
+Date: Mon, 22 Aug 2016 22:57:46 -0700
+Subject: [PATCH v2 4/4] ARM: dts: msm8974: Add ADSP PIL node
 In-Reply-To: <1471931866-3107-1-git-send-email-bjorn.andersson@linaro.org>
 References: <1471931866-3107-1-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <1471931866-3107-3-git-send-email-bjorn.andersson@linaro.org>
+Message-ID: <1471931866-3107-4-git-send-email-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,58 +13,46 @@ Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 Changes since v1:
 - Added this patch
 
- arch/arm/boot/dts/qcom-msm8974.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ arch/arm/boot/dts/qcom-msm8974.dtsi | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index 561d4d136762..eac24cbe3c87 100644
+index eac24cbe3c87..4fa630cc7e4a 100644
 --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
 +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -168,6 +168,31 @@
- 		hwlocks = <&tcsr_mutex 3>;
+@@ -29,7 +29,7 @@
+ 			no-map;
+ 		};
+ 
+-		adsp at 0dc00000 {
++		adsp_region: adsp at 0dc00000 {
+ 			reg = <0x0dc00000 0x1900000>;
+ 			no-map;
+ 		};
+@@ -159,6 +159,24 @@
+ 		clock-frequency = <19200000>;
  	};
  
-+	smp2p-adsp {
-+		compatible = "qcom,smp2p";
-+		qcom,smem = <443>, <429>;
++	adsp-pil {
++		compatible = "qcom,msm8974-adsp-pil";
 +
-+		interrupt-parent = <&intc>;
-+		interrupts = <0 158 IRQ_TYPE_EDGE_RISING>;
++		interrupts-extended = <&intc 0 162 IRQ_TYPE_EDGE_RISING>,
++				      <&adsp_smp2p_in 0 IRQ_TYPE_EDGE_RISING>,
++				      <&adsp_smp2p_in 1 IRQ_TYPE_EDGE_RISING>,
++				      <&adsp_smp2p_in 2 IRQ_TYPE_EDGE_RISING>,
++				      <&adsp_smp2p_in 3 IRQ_TYPE_EDGE_RISING>;
++		interrupt-names = "wdog", "fatal", "ready", "handover", "stop-ack";
 +
-+		qcom,ipc = <&apcs 8 10>;
++		cx-supply = <&pm8841_s2>;
 +
-+		qcom,local-pid = <0>;
-+		qcom,remote-pid = <2>;
++		memory-region = <&adsp_region>;
 +
-+		adsp_smp2p_out: master-kernel {
-+			qcom,entry-name = "master-kernel";
-+			#qcom,smem-state-cells = <1>;
-+		};
-+
-+		adsp_smp2p_in: slave-kernel {
-+			qcom,entry-name = "slave-kernel";
-+
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
++		qcom,smem-states = <&adsp_smp2p_out 0>;
++		qcom,smem-state-names = "stop";
 +	};
 +
- 	smp2p-modem {
- 		compatible = "qcom,smp2p";
- 		qcom,smem = <435>, <428>;
-@@ -543,6 +568,13 @@
- 	smd {
- 		compatible = "qcom,smd";
- 
-+		adsp {
-+			interrupts = <0 156 IRQ_TYPE_EDGE_RISING>;
-+
-+			qcom,ipc = <&apcs 8 8>;
-+			qcom,smd-edge = <1>;
-+		};
-+
- 		modem {
- 			interrupts = <0 25 IRQ_TYPE_EDGE_RISING>;
+ 	smem {
+ 		compatible = "qcom,smem";
  
 -- 
 2.5.0
