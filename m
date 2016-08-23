@@ -1,190 +1,226 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 23 Aug 2016 00:48:11 -0400
-Subject: [PATCH V3 3/3] dmaengine: qcom_hidma: add error reporting for
- tx_status
-In-Reply-To: <1471927691-28827-1-git-send-email-okaya@codeaurora.org>
-References: <1471927691-28827-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1471927691-28827-4-git-send-email-okaya@codeaurora.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 23 Aug 2016 14:05:43 +0900
+Subject: [PATCH v6 6/8] Documentation: bindings: add dt documentation for
+ rk3399 dmc
+In-Reply-To: <57BA2834.6090409@rock-chips.com>
+References: <1471386989-9541-1-git-send-email-hl@rock-chips.com>
+ <CGME20160816223730epcas1p32cabad067157428ffee1a2f9c62d9798@epcas1p3.samsung.com>
+ <1471386989-9541-7-git-send-email-hl@rock-chips.com>
+ <57B3ED11.20003@samsung.com> <57BA2834.6090409@rock-chips.com>
+Message-ID: <57BBD9A7.7090603@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HIDMA driver is capable of error detection. However, the error was
-not being passed back to the client when tx_status API is called.
+Hi Lin,
 
-Changing the error handling behavior to follow this oder.
+On 2016? 08? 22? 07:16, hl wrote:
+> Hi Chanwoo Choi,
+> 
+> On 2016?08?17? 12:50, Chanwoo Choi wrote:
+>> Hi Lin,
+>>
+>> On 2016? 08? 17? 07:36, Lin Huang wrote:
+>>> This patch adds the documentation for rockchip rk3399 dmc driver.
+>>>
+>>> Signed-off-by: Lin Huang <hl@rock-chips.com>
+>>> ---
+>>> Changes in v6:
+>>> -Add more detail in Documentation
+>>>
+>>> Changes in v5:
+>>> -None
+>>>
+>>> Changes in v4:
+>>> -None
+>>>
+>>> Changes in v3:
+>>> -None
+>>>
+>>> Changes in v2:
+>>> -None
+>>>
+>>> Changes in v1:
+>>> -None
+>>>   .../devicetree/bindings/devfreq/rk3399_dmc.txt     | 84 ++++++++++++++++++++++
+>>>   1 file changed, 84 insertions(+)
+>>>   create mode 100644 Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt b/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
+>>> new file mode 100644
+>>> index 0000000..e73067c
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
+>>> @@ -0,0 +1,84 @@
+>>> +* Rockchip rk3399 DMC(Dynamic Memory Controller) device
+>>> +
+>>> +Required properties:
+>>> +- compatible: Must be "rockchip,rk3399-dmc".
+>>> +- devfreq-events: Node to get ddr loading, Refer to
+>>> +          Documentation/devicetree/bindings/devfreq/rockchip-dif.txt
+>>> +- interrupts: The interrupt number to the cpu. The interrupt specifier format
+>>> +          depends on the interrupt controller. it should be dcf interrupts,
+>>> +          when ddr dvfs finish, it will happen.
+>> If possible, you better to keep the indentation with other properties.
+>> s/it->It, dcf->DCF, ddr->DDR
+>>
+>>
+>>> +- clocks: Phandles for clock specified in "clock-names" property
+>>> +- clock-names : The name of clock used by the DFI, must be "pclk_ddr_mon";
+>>> +- operating-points-v2: Refer to Documentation/devicetree/bindings/power/opp.txt
+>>> +               for details.
+>> ditto.
+>>
+>>> +- center-supply: Dmc supply node.
+>> s/Dmc/DMC becaue DMC an abbreviation.
+>>
+>>> +- status: Marks the node enabled/disabled.
+>>> +
+>>> +Optional properties:
+>>> +- ddr_timing: ddr timing need to pass to arm trust firmware
+>>> +- upthreshold: the upthreshold to simpleondeamnd policy
+>>> +- downdifferential: The downdifferential to simpleondeamnd policy
+>>> +
+>>> +Example:
+>>> +    ddr_timing: ddr_timing {
+>>> +        compatible = "rockchip,ddr-timing";
+>> I can't find the 'rockchip,ddr-timing' driver on linux-next git repo (20160816).
+>> If ddr_timing includes the only properties for ddr_timing,
+>> I recommend you make the separate a .dtsi file including
+>> the ddr timing configuration. I add the reference and an example on below.
+>>
+>>> +        ddr3_speed_bin = <21>;
+>>> +        pd_idle = <0>;
+>>> +        sr_idle = <0>;
+>>> +        sr_mc_gate_idle = <0>;
+>>> +        srpd_lite_idle    = <0>;
+>>> +        standby_idle = <0>;
+>>> +        dram_dll_dis_freq = <300>;
+>>> +        phy_dll_dis_freq = <125>;
+>>> +
+>>> +        ddr3_odt_dis_freq = <333>;
+>>> +        ddr3_drv = <DDR3_DS_40ohm>;
+>>> +        ddr3_odt = <DDR3_ODT_120ohm>;
+>>> +        phy_ddr3_ca_drv = <PHY_DRV_ODT_40>;
+>>> +        phy_ddr3_dq_drv = <PHY_DRV_ODT_40>;
+>>> +        phy_ddr3_odt = <PHY_DRV_ODT_240>;
+>>> +
+>>> +        lpddr3_odt_dis_freq = <333>;
+>>> +        lpddr3_drv = <LP3_DS_34ohm>;
+>>> +        lpddr3_odt = <LP3_ODT_240ohm>;
+>>> +        phy_lpddr3_ca_drv = <PHY_DRV_ODT_40>;
+>>> +        phy_lpddr3_dq_drv = <PHY_DRV_ODT_40>;
+>>> +        phy_lpddr3_odt = <PHY_DRV_ODT_240>;
+>>> +
+>>> +        lpddr4_odt_dis_freq = <333>;
+>>> +        lpddr4_drv = <LP4_PDDS_60ohm>;
+>>> +        lpddr4_dq_odt = <LP4_DQ_ODT_40ohm>;
+>>> +        lpddr4_ca_odt = <LP4_CA_ODT_40ohm>;
+>>> +        phy_lpddr4_ca_drv = <PHY_DRV_ODT_40>;
+>>> +        phy_lpddr4_ck_cs_drv = <PHY_DRV_ODT_80>;
+>>> +        phy_lpddr4_dq_drv = <PHY_DRV_ODT_80>;
+>>> +        phy_lpddr4_odt = <PHY_DRV_ODT_60>;
+>>> +    };
+>>> +
+>>> +    dmc_opp_table: dmc_opp_table {
+>>> +        compatible = "operating-points-v2";
+>>> +
+>>> +        opp00 {
+>>> +            opp-hz = /bits/ 64 <300000000>;
+>>> +            opp-microvolt = <900000>;
+>>> +        };
+>>> +        opp01 {
+>>> +            opp-hz = /bits/ 64 <666000000>;
+>>> +            opp-microvolt = <900000>;
+>>> +        };
+>>> +    };
+>>> +
+>>> +    dmc: dmc {
+>>> +        compatible = "rockchip,rk3399-dmc";
+>>> +        devfreq-events = <&dfi>;
+>>> +        interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+>>> +        clocks = <&cru SCLK_DDRCLK>;
+>>> +        clock-names = "dmc_clk";
+>>> +        ddr_timing = <&ddr_timing>;
+>> You can use the following '#include' instead of 'ddr_timing'
+>> because the ddr_timing is not a device driver. Instead,
+>> the rk3399-dmc must need the ddr timing configuration.
+>>
+>>         #include "rk3399-dmc-timing-conf.dtsi"
+>>
+>> You can refer the similar usage case[1].
+>> The *.conf.dtsi is used on exynos3250 tmu dt node[2].
+>>
+>> [1] arch/arm/boot/dts/exynos4412-tmu-sensor-conf.dtsi
+>> [2] arch/arm/boot/dts/exynos3250.dtsi, 224 line.
+>>
+>>> +        operating-points-v2 = <&dmc_opp_table>;
+>>> +        center-supply = <&ppvar_centerlogic>;
+>>> +        upthreshold = <15>;
+>>> +        downdifferential = <10>;
+>>> +        status = "disabled";
+>>> +    };
+>>> +
+>>>
+>> For example,
+>> I think that you can add the following timing .dtsi file.
+>> - arch/arm/boot/dts/rk3399-dmc-timing-conf.dtsi
+>>
+>> /*
+>>   * Device tree sources for RK3399 DDR timing configuration
+>>   *
+>>   * Copyright (c) 2016 Lin Huang <hl@rock-chips.com>
+>>   *
+>>   * This program is free software; you can redistribute it and/or modify
+>>   * it under the terms of the GNU General Public License version 2 as
+>>   * published by the Free Software Foundation.
+>>   */
+>>
+>> rockchip,ddr3_speed_bin = <21>;
+>> rockchip,pd_idle = <0>;
+>> rockchip,sr_idle = <0>;
+>> rockchip,sr_mc_gate_idle = <0>;
+>> rockchip,srpd_lite_idle    = <0>;
+>> rockchip,standby_idle = <0>;
+>> rockchip,dram_dll_dis_freq = <300>;
+>> rockchip,phy_dll_dis_freq = <125>;
+>>
+>> rockchip,ddr3_odt_dis_freq = <333>;
+>> rockchip,ddr3_drv = <DDR3_DS_40ohm>;
+>> rockchip,ddr3_odt = <DDR3_ODT_120ohm>;
+>> rockchip,phy_ddr3_ca_drv = <PHY_DRV_ODT_40>;
+>> rockchip,phy_ddr3_dq_drv = <PHY_DRV_ODT_40>;
+>> rockchip,phy_ddr3_odt = <PHY_DRV_ODT_240>;
+>>
+>> rockchip,lpddr3_odt_dis_freq = <333>;
+>> rockchip,lpddr3_drv = <LP3_DS_34ohm>;
+>> rockchip,lpddr3_odt = <LP3_ODT_240ohm>;
+>> rockchip,phy_lpddr3_ca_drv = <PHY_DRV_ODT_40>;
+>> rockchip,phy_lpddr3_dq_drv = <PHY_DRV_ODT_40>;
+>> rockchip,phy_lpddr3_odt = <PHY_DRV_ODT_240>;
+>>
+>> rockchip,lpddr4_odt_dis_freq = <333>;
+>> rockchip,lpddr4_drv = <LP4_PDDS_60ohm>;
+>> rockchip,lpddr4_dq_odt = <LP4_DQ_ODT_40ohm>;
+>> rockchip,lpddr4_ca_odt = <LP4_CA_ODT_40ohm>;
+>> rockchip,phy_lpddr4_ca_drv = <PHY_DRV_ODT_40>;
+>> rockchip,phy_lpddr4_ck_cs_drv = <PHY_DRV_ODT_80>;
+>> rockchip,phy_lpddr4_dq_drv = <PHY_DRV_ODT_80>;
+>> rockchip,phy_lpddr4_odt = <PHY_DRV_ODT_60>;
+> Actually, i am doing like it on my downstream dtsi, but how to explain it in rk3399_dmc Documentation?
+> Creat a new ddr_timing Documentation? But it is not a driver, just a dtsi, that why i put it on rk3399_dmc.txt
+> now, do you have a better idea?
 
-1. dmaengine asserts error interrupt
-2. Driver receives and mark's the txn as error
-3. Driver completes the txn and intimates the client. No further
-   submissions. Drop the locks before calling callback, as subsequent
-   processing by client maybe in callback thread.
-4. Client invokes status and you can return error
-5. On error, client calls terminate_all. You can reset channel, free all
-   descriptors in the active, pending and completed lists
-6. Client prepares new txn and so on.
+I think that you don't need to add the new ddr_timing document.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/dma/qcom/hidma.c    | 30 +++++++++++++++++++++++++-----
- drivers/dma/qcom/hidma.h    |  1 +
- drivers/dma/qcom/hidma_ll.c | 32 +++++++-------------------------
- 3 files changed, 33 insertions(+), 30 deletions(-)
+The ddr_timing value are only used in the rk3399_dmc.c driver.
+So, the description of ddr_timing information should be
+included in rk3399_dmc.txt.
 
-diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
-index ea24863..e244e10 100644
---- a/drivers/dma/qcom/hidma.c
-+++ b/drivers/dma/qcom/hidma.c
-@@ -129,6 +129,7 @@ static void hidma_process_completed(struct hidma_chan *mchan)
- 		struct dmaengine_result result;
- 
- 		desc = &mdesc->desc;
-+		last_cookie = desc->cookie;
- 
- 		spin_lock_irqsave(&mchan->lock, irqflags);
- 		dma_cookie_complete(desc);
-@@ -137,15 +138,15 @@ static void hidma_process_completed(struct hidma_chan *mchan)
- 		llstat = hidma_ll_status(mdma->lldev, mdesc->tre_ch);
- 		dmaengine_desc_get_callback(desc, &cb);
- 
--		last_cookie = desc->cookie;
- 		dma_run_dependencies(desc);
- 
- 		spin_lock_irqsave(&mchan->lock, irqflags);
- 		list_move(&mdesc->node, &mchan->free);
- 
--		if (llstat == DMA_COMPLETE)
-+		if (llstat == DMA_COMPLETE) {
-+			mchan->last_success = last_cookie;
- 			result.result = DMA_TRANS_NOERROR;
--		else
-+		} else
- 			result.result = DMA_TRANS_ABORTED;
- 
- 		spin_unlock_irqrestore(&mchan->lock, irqflags);
-@@ -246,6 +247,19 @@ static void hidma_issue_pending(struct dma_chan *dmach)
- 		hidma_ll_start(dmadev->lldev);
- }
- 
-+static inline bool hidma_txn_is_success(dma_cookie_t cookie,
-+		dma_cookie_t last_success, dma_cookie_t last_used)
-+{
-+	if (last_success <= last_used) {
-+		if ((cookie <= last_success) || (cookie > last_used))
-+			return true;
-+	} else {
-+		if ((cookie <= last_success) && (cookie > last_used))
-+			return true;
-+	}
-+	return false;
-+}
-+
- static enum dma_status hidma_tx_status(struct dma_chan *dmach,
- 				       dma_cookie_t cookie,
- 				       struct dma_tx_state *txstate)
-@@ -254,8 +268,13 @@ static enum dma_status hidma_tx_status(struct dma_chan *dmach,
- 	enum dma_status ret;
- 
- 	ret = dma_cookie_status(dmach, cookie, txstate);
--	if (ret == DMA_COMPLETE)
--		return ret;
-+	if (ret == DMA_COMPLETE) {
-+		bool is_success;
-+
-+		is_success = hidma_txn_is_success(cookie, mchan->last_success,
-+						  dmach->cookie);
-+		return is_success ? ret : DMA_ERROR;
-+	}
- 
- 	if (mchan->paused && (ret == DMA_IN_PROGRESS)) {
- 		unsigned long flags;
-@@ -406,6 +425,7 @@ static int hidma_terminate_channel(struct dma_chan *chan)
- 	hidma_process_completed(mchan);
- 
- 	spin_lock_irqsave(&mchan->lock, irqflags);
-+	mchan->last_success = 0;
- 	list_splice_init(&mchan->active, &list);
- 	list_splice_init(&mchan->prepared, &list);
- 	list_splice_init(&mchan->completed, &list);
-diff --git a/drivers/dma/qcom/hidma.h b/drivers/dma/qcom/hidma.h
-index db413a5..f78aef0 100644
---- a/drivers/dma/qcom/hidma.h
-+++ b/drivers/dma/qcom/hidma.h
-@@ -89,6 +89,7 @@ struct hidma_chan {
- 	bool				allocated;
- 	char				dbg_name[16];
- 	u32				dma_sig;
-+	dma_cookie_t			last_success;
- 
- 	/*
- 	 * active descriptor on this channel
-diff --git a/drivers/dma/qcom/hidma_ll.c b/drivers/dma/qcom/hidma_ll.c
-index ad20dfb..3224f24 100644
---- a/drivers/dma/qcom/hidma_ll.c
-+++ b/drivers/dma/qcom/hidma_ll.c
-@@ -381,27 +381,6 @@ static int hidma_ll_reset(struct hidma_lldev *lldev)
- }
- 
- /*
-- * Abort all transactions and perform a reset.
-- */
--static void hidma_ll_abort(unsigned long arg)
--{
--	struct hidma_lldev *lldev = (struct hidma_lldev *)arg;
--	u8 err_code = HIDMA_EVRE_STATUS_ERROR;
--	u8 err_info = 0xFF;
--	int rc;
--
--	hidma_cleanup_pending_tre(lldev, err_info, err_code);
--
--	/* reset the channel for recovery */
--	rc = hidma_ll_setup(lldev);
--	if (rc) {
--		dev_err(lldev->dev, "channel reinitialize failed after error\n");
--		return;
--	}
--	writel(ENABLE_IRQS, lldev->evca + HIDMA_EVCA_IRQ_EN_REG);
--}
--
--/*
-  * The interrupt handler for HIDMA will try to consume as many pending
-  * EVRE from the event queue as possible. Each EVRE has an associated
-  * TRE that holds the user interface parameters. EVRE reports the
-@@ -454,13 +433,18 @@ irqreturn_t hidma_ll_inthandler(int chirq, void *arg)
- 
- 	while (cause) {
- 		if (cause & HIDMA_ERR_INT_MASK) {
--			dev_err(lldev->dev, "error 0x%x, resetting...\n",
-+			dev_err(lldev->dev, "error 0x%x, disabling...\n",
- 					cause);
- 
- 			/* Clear out pending interrupts */
- 			writel(cause, lldev->evca + HIDMA_EVCA_IRQ_CLR_REG);
- 
--			tasklet_schedule(&lldev->rst_task);
-+			/* No further submissions. */
-+			hidma_ll_disable(lldev);
-+
-+			/* Driver completes the txn and intimates the client.*/
-+			hidma_cleanup_pending_tre(lldev, 0xFF,
-+						  HIDMA_EVRE_STATUS_ERROR);
- 			goto out;
- 		}
- 
-@@ -808,7 +792,6 @@ struct hidma_lldev *hidma_ll_init(struct device *dev, u32 nr_tres,
- 		return NULL;
- 
- 	spin_lock_init(&lldev->lock);
--	tasklet_init(&lldev->rst_task, hidma_ll_abort, (unsigned long)lldev);
- 	tasklet_init(&lldev->task, hidma_ll_tre_complete, (unsigned long)lldev);
- 	lldev->initialized = 1;
- 	writel(ENABLE_IRQS, lldev->evca + HIDMA_EVCA_IRQ_EN_REG);
-@@ -831,7 +814,6 @@ int hidma_ll_uninit(struct hidma_lldev *lldev)
- 
- 	required_bytes = sizeof(struct hidma_tre) * lldev->nr_tres;
- 	tasklet_kill(&lldev->task);
--	tasklet_kill(&lldev->rst_task);
- 	memset(lldev->trepool, 0, required_bytes);
- 	lldev->trepool = NULL;
- 	lldev->pending_tre_count = 0;
+As I already mentioned, please refer the the similiar case[1][2].
+The exynos-thermal.txt[2] include the description of propertis[1].
+
+[1] arch/arm/boot/dts/exynos4412-tmu-sensor-conf.dtsi
+[2] Documentation/devicetree/bindings/tmu/exynos-thermal.txt
 -- 
-1.8.2.1
+Best Regards,
+Chanwoo Choi
