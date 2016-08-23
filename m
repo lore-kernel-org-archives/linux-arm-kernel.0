@@ -1,92 +1,97 @@
-From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
-Date: Tue, 23 Aug 2016 06:20:28 +0200
-Subject: [PATCH] serial: vt8500_serial: Fix a parameter of
- find_first_zero_bit.
-In-Reply-To: <2512469.eM8MYFl15l@wuerfel>
-References: <1471814425-18949-1-git-send-email-christophe.jaillet@wanadoo.fr>
- <2512469.eM8MYFl15l@wuerfel>
-Message-ID: <57f44339-76c6-051f-b592-2648afaae336@wanadoo.fr>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 23 Aug 2016 06:40:52 +0200 (CEST)
+Subject: [Bug] usb: dwc2: host function broken in OTG mode on bcm283x
+In-Reply-To: <37db5022-b98c-7f26-ca77-3ee9ba664edf@synopsys.com>
+References: <907297251.436328.d9cd30e0-7476-4a28-8bab-dde17515cd9c.open-xchange@email.1und1.de>
+ <785fc063-9b72-84a9-db91-c2710c19cdf9@synopsys.com>
+ <183575717.19886.709cd5b7-97dd-4dda-9392-7c46ec5e192c.open-xchange@email.1und1.de>
+ <37db5022-b98c-7f26-ca77-3ee9ba664edf@synopsys.com>
+Message-ID: <1408689388.21552.709cd5b7-97dd-4dda-9392-7c46ec5e192c.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 22/08/2016 ? 10:42, Arnd Bergmann a ?crit :
-> [...]
-> Sorry, but I'm not following the logic here.
->
-> [...]
-> You argue that the two have the same meaning, which I see, but
-> why is it better than the existing code?
->
-> 	Arnd
+Hi John,
 
-Hi,
+> John Youn <John.Youn@synopsys.com> hat am 23. August 2016 um 00:08
+> geschrieben:
+> 
+> 
+> On 8/22/2016 1:47 PM, Stefan Wahren wrote:
+> > Hi John,
+> > 
+> >> John Youn <John.Youn@synopsys.com> hat am 22. August 2016 um 22:06
+> >> geschrieben:
+> >>
+> >>
+> >> On 8/20/2016 6:03 AM, Stefan Wahren wrote:
+> >>> Hi John,
+> >>>
+> >>>
+> >>
+> >> Hi Stefan,
+> >>
+> >> Why doesn't DT work? I think all the properties are there to set
+> >> these.
+> > 
+> > it only works for the future releases, not for existing DT blobs. The DT is
+> > part
+> > of the ABI.
+> > 
+> > Yes, i already send a patch to fix the DT [1], but it would be better to fix
+> > the
+> > issue in deep.
+> 
+> I don't know much about DT issues. So I'm not sure what the issue is
+> with this.The properties for the gadget fifo sizes already exist so
+> there's no change to the ABI, correct?
 
-sorry if my explanation was unclear.
+It's correct the ABI doesn't change, but it also means that newer kernel must
+work with older DTB files. So the fix should be better in the driver and not in
+the DT sources.
 
-What I mean is that if "sizeof(unsigned long) = 4" (i.e. 32 bits systems 
-?) then:
+> 
+> Also, the patch you linked doesn't seem to have settings for the FIFO
+> sizes.
 
-	port = find_first_zero_bit(&vt8500_ports_in_use, sizeof(vt8500_ports_in_use));
-turns into:
-  	port = find_first_zero_bit(&vt8500_ports_in_use, 4);
+It wouldn't make sense to provide gadget fifo sizes for a host-only setup. The
+mentioned patch doesn't really fix this issue, that's why i mentioned that we
+should fix this issue first.
 
-find_first_zero_bit "Returns the bit number of the first set bit.  If no bits are set, returns @size."
-So, in this case, it can return 1, 2, 3 or 4, if one of the 4 first bits is 0.
-And will also return 4, if none of the 4 first bits is 0.
+> 
+> > 
+> >>
+> >> I hesitate to change the legacy/default settings in case it breaks any
+> >> existing drivers that depend on them.
+> > 
+> > Platforms? I didn't expected that other drivers use these settings.
+> 
+> Yes, I mean platforms.
+> 
+> I believe these values were hard-coded since before the unified "dwc2"
+> existed. So for sure there are platforms using these settings and to
+> lower them will negatively impact those platforms. The DT properties
+> were introduced to override these.
 
-In no way, 5 or above can be returned.
+Unfortunately the gadget fifo sizes should have been marked as required for OTG
+and gadget mode. But now it's too late. We only can improve DT binding here or
+at least add a warning during probe.
 
-The code just after is:
-	if (port >= VT8500_MAX_PORTS)
-		return -ENODEV;
-It turns into:
-	if (port >= 6)
-		return -ENODEV;
+> 
+> I think it is best to override them in the broken platforms. Either
+> that or fix it so that the defaults are more intelligently determined
+> in a way that maximizes the fifo sizes and cannot fail, as opposed to
+> some other arbitrary values.
+> 
 
+I don't have the knowledge for the second solution and i wouldn't prefer much
+more detection intelligence.
 
-I see 2 problems there:
-	- First, according to this test, "port = 5" seems a legal value, but can never trigger.
-	- Second, if the first 3 bits are set, the find_first_zero_bit will return 4, whatever the value of the 4th bit.
-           This 4 can either mean "4th bit is clear" or "no clear bit found, so return @size (i.e. 4)"
-
-  
-Using:
-	port = find_first_zero_bit(&vt8500_ports_in_use, BITS_PER_LONG);
-Would solve the 2 issues.
-    - 4 would really mean, 4th bit is set.
-    - 5 becomes a possible value.
-    - 6 to 31 would mean: we found a clear bit "in the garbage after the VT8500_MAX_PORTS (i.e. 6) relevant bits".
-    - 32 would mean, all bits set.
-
-These answers look more in line with the "if (port >= VT8500_MAX_PORTS)" test.
-
-
-
-Finally, what I meant by "Other options are possible:" is:
-   - 'vt8500_ports_in_use' being a 'unsigned long', use ffz to reduce code verbosity
-	port = ffz(&vt8500_ports_in_use);
-     would also work, because it is equivalent to:
-	port = find_first_zero_bit(&vt8500_ports_in_use, BITS_PER_LONG);
-
-   - VT8500_MAX_PORTS, in order to be consistent with the test below
-	port = find_first_zero_bit(&vt8500_ports_in_use, VT8500_MAX_PORTS);
-     would also work and is maybe more logical in regard to the test "if (port >= VT8500_MAX_PORTS)"
-
-
-
-Now if "sizeof(unsigned long) = 8" (i.e. 64 bits systems ?), the actual code would work.
-But using "sizeof(long)" to mean "more than VT8500_MAX_PORTS" is odd.
-In other words, expressing a number of bits using something that gives a size in bytes is, IMHO, spurious.
-
-  
-All this is pure speculation.
-
-Hoping that it is clearer now ( and that my analysis is right :) )
-
-Best regard,
-CJ
-
-
----
-L'absence de virus dans ce courrier ?lectronique a ?t? v?rifi?e par le logiciel antivirus Avast.
-https://www.avast.com/antivirus
+> > 
+> > Another option would be to add the gadget fifo sizes to platform data, but
+> > it's
+> > not a nice solution.
+> 
+> I agree, that wouldn't be good.
+> 
+> Regards,
+> John
