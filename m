@@ -1,44 +1,29 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 23 Aug 2016 11:46:49 +0530
-Subject: [PATCH v2 2/2] ARM: dts: am335x-icev2: Add nodes for gpio-decoder
-In-Reply-To: <20160823061649.3394-1-vigneshr@ti.com>
-References: <20160823061649.3394-1-vigneshr@ti.com>
-Message-ID: <20160823061649.3394-3-vigneshr@ti.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Tue, 23 Aug 2016 08:26:47 +0200
+Subject: [PATCH 0/2] Armada 7k/8k CP110 system controller fixes
+Message-ID: <1471933609-8456-1-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM335x ICE board has a rotary-switch connected to PCA9536 I2C GPIO
-expander. The position of the rotary-switch is reflected by status of
-GPIO lines. Add gpio-decoder node to read these GPIO line status via
-gpio-decoder driver and report it as an input event to the system.
+Hi,
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
+Newly added clock driver for Marvell Armada 7k/8k CP110 HW block occurred
+not to be working properly, especially when using two instances of CP110
+in Armada 8k. Below tiny patchset comprise fixes for that (prevent from
+using uninitialized 'flag' field and static global resources).
 
-v2: Update DT node name.
+Any feedback would be very welcome.
 
- arch/arm/boot/dts/am335x-icev2.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Best regards,
+Marcin
 
-diff --git a/arch/arm/boot/dts/am335x-icev2.dts b/arch/arm/boot/dts/am335x-icev2.dts
-index bc0190e4f10f..d3c53e5910c4 100644
---- a/arch/arm/boot/dts/am335x-icev2.dts
-+++ b/arch/arm/boot/dts/am335x-icev2.dts
-@@ -139,6 +139,15 @@
- 			default-state = "off";
- 		};
- 	};
-+	gpio-decoder {
-+		compatible = "gpio-decoder";
-+		gpios = <&pca9536 3 GPIO_ACTIVE_HIGH>,
-+			<&pca9536 2 GPIO_ACTIVE_HIGH>,
-+			<&pca9536 1 GPIO_ACTIVE_HIGH>,
-+			<&pca9536 0 GPIO_ACTIVE_HIGH>;
-+		linux,axis = <0>; /* ABS_X */
-+		decoder,max-value = <9>;
-+	};
- };
- 
- &am33xx_pinmux {
+Marcin Wojtas (2):
+  clk: mvebu: set flags in CP110 gate clock
+  clk: mvebu: dynamically allocate resources in Armada CP110 system
+    controller
+
+ drivers/clk/mvebu/cp110-system-controller.c | 30 ++++++++++++++++++++---------
+ 1 file changed, 21 insertions(+), 9 deletions(-)
+
 -- 
-2.9.2
+1.8.3.1
