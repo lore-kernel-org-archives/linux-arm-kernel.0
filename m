@@ -1,44 +1,33 @@
-From: kedare06@gmail.com (Kedari Appana)
-Date: Tue, 23 Aug 2016 22:10:34 +0530
-Subject: [PATCH -next] net: phy: xgmiitorgmii: Fix non static symbol
- warning
-In-Reply-To: <1471964765-32708-1-git-send-email-weiyj.lk@gmail.com>
-References: <1471964765-32708-1-git-send-email-weiyj.lk@gmail.com>
-Message-ID: <CANdmM3O1BEZpwE_b9m1a_rOtz_LQLN=FRxhk7bcDOkECOjDeSA@mail.gmail.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Wed, 24 Aug 2016 00:43:07 +0800
+Subject: [PATCH -next] ARM: pxa: remove duplicated include from spitz.c
+In-Reply-To: <87y43npi5l.fsf@belgarion.home>
+References: <1471965498-7824-1-git-send-email-weiyj.lk@gmail.com>
+ <87y43npi5l.fsf@belgarion.home>
+Message-ID: <5b9111f3-1c9d-f551-af06-566adceaef38@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI,
+Hi Robert,
+ 
 
-        Thanks for the patch..
+On 08/24/2016 12:24 AM, Robert Jarzmik wrote:
+> Wei Yongjun <weiyj.lk@gmail.com> writes:
+>
+>> Remove duplicated include.
+> How so duplicated ? Can you elaborate please ?
+>
+> Moreover, how do you do think symbol_get() can stay in spitz.c without having
+> this include ?
 
-On Tue, Aug 23, 2016 at 8:36 PM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
-> From: Wei Yongjun <weiyongjun1@huawei.com>
->
-> Fixes the following sparse warning:
->
-> drivers/net/phy/xilinx_gmii2rgmii.c:61:5: warning:
->  symbol 'xgmiitorgmii_probe' was not declared. Should it be static?
->
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+file linux/module.h included twice as following:
 
-Acked by: Kedareswara rao Appana <appanad@xilinx.com>
+#include <linux/kernel.h>
+#include <linux/module.h>       /* symbol_get ; symbol_put */
+...
+#include <linux/module.h>
 
-> ---
->  drivers/net/phy/xilinx_gmii2rgmii.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/net/phy/xilinx_gmii2rgmii.c b/drivers/net/phy/xilinx_gmii2rgmii.c
-> index e7a20ec..2e408b8 100644
-> --- a/drivers/net/phy/xilinx_gmii2rgmii.c
-> +++ b/drivers/net/phy/xilinx_gmii2rgmii.c
-> @@ -58,7 +58,7 @@ static int xgmiitorgmii_read_status(struct phy_device *phydev)
->         return 0;
->  }
->
-> -int xgmiitorgmii_probe(struct mdio_device *mdiodev)
-> +static int xgmiitorgmii_probe(struct mdio_device *mdiodev)
->  {
->         struct device *dev = &mdiodev->dev;
->         struct device_node *np = dev->of_node, *phy_node;
->
+So I think we can remove the dup include.
+
+Regards,
+Wei Yongjun
