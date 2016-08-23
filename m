@@ -1,56 +1,84 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 23 Aug 2016 17:38:27 -0500
-Subject: [PATCH 2/2] ARM: dts: add TOPEET itop elite based board
-In-Reply-To: <0192d6da-89ce-a158-1c15-48eebba7db3b@soulik.info>
-References: <4767fc2a-95b7-ee0d-f51a-7a5d6ca89d8f@samsung.com>
- <1471875489-11428-1-git-send-email-ayaka@soulik.info>
- <1471875489-11428-3-git-send-email-ayaka@soulik.info>
- <20160823181402.GA6302@rob-hp-laptop>
- <0192d6da-89ce-a158-1c15-48eebba7db3b@soulik.info>
-Message-ID: <CAL_JsqKY=VEZ+U11kY+XbMWuXhaFDr6GpnR3AXKd1U=9_=8fgA@mail.gmail.com>
+Date: Tue, 23 Aug 2016 18:06:26 -0500
+Subject: [PATCH v2 03/22] usb: ulpi: Support device discovery via device
+ properties
+In-Reply-To: <CAJOFmgwTPDwdL_cc7f5N09enZNhKwSkWAxdpF39vOBQLfEdVSg@mail.gmail.com>
+References: <20160707222114.1673-1-stephen.boyd@linaro.org>
+ <20160707222114.1673-4-stephen.boyd@linaro.org>
+ <20160718022355.GA8568@rob-hp-laptop>
+ <147043320014.26915.7483025835695600714@sboyd-linaro>
+ <CAJOFmgwTPDwdL_cc7f5N09enZNhKwSkWAxdpF39vOBQLfEdVSg@mail.gmail.com>
+Message-ID: <CAL_JsqKPgVEr8zuaO7f8NczuxdCqa9ceg+PnVpOBxiT=Lr79eA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2016 at 1:36 PM, ayaka <ayaka@soulik.info> wrote:
->
-> On 08/24/2016 02:14 AM, Rob Herring wrote:
->>
->> On Mon, Aug 22, 2016 at 10:18:09PM +0800, Randy Li wrote:
+On Tue, Aug 23, 2016 at 3:00 PM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
+> On Fri, Aug 5, 2016 at 2:40 PM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
+>> Quoting Rob Herring (2016-07-17 19:23:55)
+>>> On Thu, Jul 07, 2016 at 03:20:54PM -0700, Stephen Boyd wrote:
+>>> > +-------
+>>> > +
+>>> > +usb {
+>>> > +     compatible = "vendor,usb-controller";
+>>> > +
+>>> > +     ulpi {
+>>> > +             phy {
+>>> > +                     compatible = "vendor,phy";
+>>> > +                     ulpi-vendor = /bits/ 16 <0x1d6b>;
+>>> > +                     ulpi-product = /bits/ 16 <0x0002>;
+>>> > +             };
+>>> > +     };
 >>>
->>> The TOPEET itop exynos 4412 have three versions base board. The
->>> Elite version is the cheap one without too much peripheral devices
->>> on it.
+>>> I'm still having concerns about describing both phys and devices. If I
+>>> have a controller with 2 ports and 2 devices attached, I'd have
+>>> something like this under the USB controller:
 >>>
->>> Currently supported are serial console, wired networking(USB),
->>> USB OTG in peripheral mode, USB host, SD storage, GPIO buttons,
->>> PWM beeper, ADC and LEDs.
-
-[...]
-
->>> +/dts-v1/;
->>> +#include "exynos4412-itop-scp-core.dtsi"
->>> +
->>> +/ {
->>> +       model = "TOPEET iTop 4412 Elite board based on Exynos4412";
->>> +       compatible = "topeet,itop4412-elite", "samsung,exynos4412",
->>> "samsung,exynos4";
->>> +
->>> +       chosen {
->>> +               bootargs ="console=ttySAC2,115200";
+>>> ulpi {
+>>>         phy at 1 {
+>>>         };
+>>>         phy at 2 {
+>>>         };
+>>> };
 >>
->> Don't need console set with...
+>> My understanding is there would only be one status="ok" node on the ULPI
+>> bus for the single phy that a usb controller would have. At the least,
+>> the kernel's ULPI layer only seems to support one ULPI phy for a
+>> controller right now. So even if there are two ports, it doesn't mean
+>> there are two phys.
+>>
+>>>
+>>> dev at 1 {
+>>> ...
+>>> };
+>>>
+>>> dev at 2 {
+>>> ...
+>>> };
+>>>
+>>>
+>>> That doesn't seem the best, but I don't have a better suggestion. Maybe
+>>> the device nodes need to go under the phy nodes?
+>>>
+>>
+>> What if we moved the dev at 1 and dev at 2 to another sub node like "ports" or
+>> "usb-devices"? Legacy code can support having those devices directly
+>> underneath the usb controller, but future users would always need to put
+>> them in a different sub-node so that we can easily differentiate the
+>> different busses that a usb controller node may support?
+>>
+>> I'm not sure I see any need to relate the phy to the ports that are on
+>> the controller, but if that is needed then perhaps you're right and we
+>> should move the ports underneath the phy. USB core could be modified to
+>> go through the legacy path or through the phy, if it even exists, to
+>> find ports.
+>>
+>> Do we typically do this for other phy designs like sata or pci? The phy
+>> always seemed like a parallel thing to the logical bus that the phy is
+>> used for.
 >
-> But could I set something like rootfs here ?
-> As the bootloader(old u-boot) offered by the vendor is brick, it is
-> impossible to save any something in u-boot.
+> Rob does this sound ok to you?
 
-Yes, but then that is a user decision and shouldn't really be there
-either. In other words, ether the bootloader should set bootargs
-(which even a vendor u-boot should be able to do either directly or
-the zImage can take it from the ATAGS) or a user can edit the dts and
-carry that change.
-
-However, there are probably plenty of examples in the kernel that
-counter what I just said.
+Well, if there's only ever 1 phy under the controller, then as you had
+it is fine.
 
 Rob
