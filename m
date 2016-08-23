@@ -1,322 +1,42 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 23 Aug 2016 13:39:06 +0200
-Subject: [PATCH v3 4/4] ARM: dts: Add WP8548 based MangOH Green board DTS
-In-Reply-To: <1471952346-30676-1-git-send-email-narmstrong@baylibre.com>
-References: <1471952346-30676-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1471952346-30676-5-git-send-email-narmstrong@baylibre.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 23 Aug 2016 13:42:51 +0200
+Subject: [PATCH 2/2] ARM: dts: sun8i: Add extra UART pinmux settings for
+ A23/33
+In-Reply-To: <20160823055826.20591-2-icenowy@aosc.xyz>
+References: <20160823055826.20591-1-icenowy@aosc.xyz>
+ <20160823055826.20591-2-icenowy@aosc.xyz>
+Message-ID: <20160823114251.GL2598@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Sierra Wireless MangOH Green board with the
-Sierra Wireless WP8548 Module.
+Hi,
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm/boot/dts/Makefile                     |   3 +-
- arch/arm/boot/dts/swir-wp8548-mangoh-green.dts | 281 +++++++++++++++++++++++++
- 2 files changed, 283 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/swir-wp8548-mangoh-green.dts
+On Tue, Aug 23, 2016 at 01:58:26PM +0800, Icenowy Zheng wrote:
+> A23/33 have 4 UART controllers outside PRCM. However, the devicetree used
+> to mentioned only UART0's pinmux settings. Some extra UART controllers have
+> RTS/CTS, and is suitable for using as bluetooth UART controller.
+> 
+> Add the pinmux settings for the UART controller, to make use of the
+> bluetooth function of some tablets.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index faacd52..cef9538 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -603,7 +603,8 @@ dtb-$(CONFIG_ARCH_QCOM) += \
- 	qcom-ipq8064-ap148.dtb \
- 	qcom-msm8660-surf.dtb \
- 	qcom-msm8960-cdp.dtb \
--	qcom-msm8974-sony-xperia-honami.dtb
-+	qcom-msm8974-sony-xperia-honami.dtb \
-+	swir-wp8548-mangoh-green.dtb
- dtb-$(CONFIG_ARCH_REALVIEW) += \
- 	arm-realview-pb1176.dtb \
- 	arm-realview-pb11mp.dtb \
-diff --git a/arch/arm/boot/dts/swir-wp8548-mangoh-green.dts b/arch/arm/boot/dts/swir-wp8548-mangoh-green.dts
-new file mode 100644
-index 0000000..47b845b
---- /dev/null
-+++ b/arch/arm/boot/dts/swir-wp8548-mangoh-green.dts
-@@ -0,0 +1,281 @@
-+/*
-+ * Device Tree Source for mangOH Green Board with WP8548 Module
-+ *
-+ * Copyright (C) 2016 BayLibre, SAS.
-+ * Author : Neil Armstrong <narmstrong@baylibre.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include <dt-bindings/input/input.h>
-+
-+#include "swir-wp8548.dtsi"
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "MangOH Green with WP8548 Module";
-+	compatible = "swir,mangoh-green-wp8548", "swir,wp8548", "qcom,mdm9615";
-+
-+	aliases {
-+		spi0 = &gsbi3_spi;
-+		serial0 = &gsbi4_serial;
-+		serial1 = &gsbi5_serial;
-+		i2c0 = &gsbi5_i2c;
-+		mmc0 = &sdcc1;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial1:115200n8";
-+	};
-+};
-+
-+&msmgpio {
-+	/* MangOH GPIO Mapping :
-+	 * - 2 : GPIOEXP_INT2
-+	 * - 7 : IOT1_GPIO2
-+	 * - 8 : IOT0_GPIO4
-+	 * - 13: IOT0_GPIO3
-+	 * - 21: IOT1_GPIO4
-+	 * - 22: IOT2_GPIO1
-+	 * - 23: IOT2_GPIO2
-+	 * - 24: IOT2_GPIO3
-+	 * - 25: IOT1_GPIO1
-+	 * - 32: IOT1_GPIO3
-+	 * - 33: IOT0_GPIO2
-+	 * - 42: IOT0_GPIO1 and SD Card Detect
-+	 */
-+
-+	gpioext1_pins: gpioext1_pins {
-+		pins {
-+			pins = "gpio2";
-+			function = "gpio";
-+			input-enable;
-+			bias-disable;
-+		};
-+	};
-+
-+	sdc_cd_pins: sdc_cd_pins {
-+		pins {
-+			pins = "gpio42";
-+			function = "gpio";
-+			drive-strength = <2>;
-+			bias-pull-up;
-+		};
-+	};
-+};
-+
-+&gsbi3_spi {
-+	spi at 0 {
-+		compatible = "swir,mangoh-iotport-spi", "spidev";
-+		spi-max-frequency = <24000000>;
-+		reg = <0>;
-+	};
-+};
-+
-+&gsbi5_i2c {
-+	mux at 71 {
-+		compatible = "nxp,pca9548";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x71>;
-+
-+		i2c_iot0: i2c at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+		};
-+
-+		i2c_iot1: i2c at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+		};
-+
-+		i2c_iot2: i2c at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <2>;
-+		};
-+
-+		i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <3>;
-+
-+			usbhub: hub at 8 {
-+				compatible = "smsc,usb3503a";
-+				reg = <0x8>;
-+				connect-gpios = <&gpioext2 1 GPIO_ACTIVE_HIGH>;
-+				intn-gpios = <&gpioext2 0 GPIO_ACTIVE_LOW>;
-+				initial-mode = <1>;
-+			};
-+		};
-+
-+		i2c at 4 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <4>;
-+
-+			gpioext0: gpio at 3e {
-+				/* GPIO Expander 0 Mapping :
-+				 * - 0: ARDUINO_RESET_Level shift
-+				 * - 1: BattChrgr_PG_N
-+				 * - 2: BattGauge_GPIO
-+				 * - 3: LED_ON (out active high)
-+				 * - 4: ATmega_reset_GPIO
-+				 * - 5: X
-+				 * - 6: PCM_ANALOG_SELECT (out active high)
-+				 * - 7: X
-+				 * - 8: Board_rev_res1 (in)
-+				 * - 9: Board_rev_res2 (in)
-+				 * - 10: UART_EXP1_ENn (out active low / pull-down)
-+				 * - 11: UART_EXP1_IN (out pull-down)
-+				 * - 12: UART_EXP2_IN (out pull-down)
-+				 * - 13: SDIO_SEL (out pull-down)
-+				 * - 14: SPI_EXP1_ENn (out active low / pull-down)
-+				 * - 15: SPI_EXP1_IN (out pull-down)
-+				 */
-+				#gpio-cells = <2>;
-+				#interrupt-cells = <2>;
-+				compatible = "semtech,sx1509q";
-+				reg = <0x3e>;
-+				interrupt-parent = <&gpioext1>;
-+				interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
-+
-+				probe-reset;
-+
-+				gpio-controller;
-+				interrupt-controller;
-+			};
-+		};
-+
-+		i2c at 5 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <5>;
-+
-+			gpioext1: gpio at 3f {
-+				/* GPIO Expander 1 Mapping :
-+				 * - 0: GPIOEXP_INT1
-+				 * - 1: Battery detect
-+				 * - 2: GPIO_SCF3_RESET
-+				 * - 3: LED_CARD_DETECT_IOT0 (in)
-+				 * - 4: LED_CARD_DETECT_IOT1 (in)
-+				 * - 5: LED_CARD_DETECT_IOT2 (in)
-+				 * - 6: UIM2_PWM_SELECT
-+				 * - 7: UIM2_M2_S_SELECT
-+				 * - 8: TP900
-+				 * - 9: SENSOR_INT1 (in)
-+				 * - 10: SENSOR_INT2 (in)
-+				 * - 11: CARD_DETECT_IOT0 (in pull-up)
-+				 * - 12: CARD_DETECT_IOT2 (in pull-up)
-+				 * - 13: CARD_DETECT_IOT1 (in pull-up)
-+				 * - 14: GPIOEXP_INT3 (in active low / pull-up)
-+				 * - 15: BattChrgr_INT_N
-+				 */
-+				pinctrl-0 = <&gpioext1_pins>;
-+				pinctrl-names = "default";
-+
-+				#gpio-cells = <2>;
-+				#interrupt-cells = <2>;
-+				compatible = "semtech,sx1509q";
-+				reg = <0x3f>;
-+				interrupt-parent = <&msmgpio>;
-+				interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
-+
-+				probe-reset;
-+
-+				gpio-controller;
-+				interrupt-controller;
-+			};
-+		};
-+
-+		i2c at 6 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <6>;
-+
-+			gpioext2: gpio at 70 {
-+				/* GPIO Expander 2 Mapping :
-+				 * - 0: USB_HUB_INTn
-+				 * - 1: HUB_CONNECT
-+				 * - 2: GPIO_IOT2_RESET (out active low / pull-up)
-+				 * - 3: GPIO_IOT1_RESET (out active low / pull-up)
-+				 * - 4: GPIO_IOT0_RESET (out active low / pull-up)
-+				 * - 5: TP901
-+				 * - 6: TP902
-+				 * - 7: TP903
-+				 * - 8: UART_EXP2_ENn (out active low / pull-down)
-+				 * - 9: PCM_EXP1_ENn (out active low)
-+				 * - 10: PCM_EXP1_SEL (out)
-+				 * - 11: ARD_FTDI
-+				 * - 12: TP904
-+				 * - 13: TP905
-+				 * - 14: TP906
-+				 * - 15: RS232_Enable (out active high / pull-up)
-+				 */
-+				#gpio-cells = <2>;
-+				#interrupt-cells = <2>;
-+				compatible = "semtech,sx1509q";
-+				reg = <0x70>;
-+				interrupt-parent = <&gpioext1>;
-+				interrupts = <14 IRQ_TYPE_EDGE_FALLING>;
-+
-+				probe-reset;
-+
-+				gpio-controller;
-+				interrupt-controller;
-+			};
-+		};
-+
-+		i2c at 7 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <7>;
-+		};
-+	};
-+};
-+
-+&sdcc1 {
-+	pinctrl-0 = <&sdc_cd_pins>;
-+	pinctrl-names = "default";
-+	disable-wp;
-+	cd-gpios = <&msmgpio 42 GPIO_ACTIVE_LOW>; /* Active low CD */
-+};
+Our policy is that we avoid adding unused pinctrl nodes to not cripple
+the DT for no particular reason.
+
+So please add only the nodes you'll need in your tablet.
+
+Thanks!
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160823/6b013030/attachment.sig>
