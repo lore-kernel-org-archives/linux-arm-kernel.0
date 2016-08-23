@@ -1,31 +1,38 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 23 Aug 2016 10:44:01 +0200
-Subject: [PATCH v3 0/4] clocksource: timer-atmel-pit: driver fix and cleanups
-Message-ID: <1471941845-24813-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Tue, 23 Aug 2016 10:44:04 +0200
+Subject: [PATCH v3 3/4] clocksource: timer-atmel-pit: remove uselesss
+ WARN_ON_ONCE
+In-Reply-To: <1471941845-24813-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1471941845-24813-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1471941845-24813-4-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+IRQ handlers are running with IRQ disabled for a while, remove wrong
+comment and useless test.
 
-The first patch in the series is a fix that will be needed starting v4.9. The
-remaining patches are cleanups.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/clocksource/timer-atmel-pit.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-Changes in v3:
- - stop using panic
-
-Changes in v2:
- - Rebased on v4.8-rc1
- - Collected acks
-
-
-Alexandre Belloni (4):
-  clocksource: timer-atmel-pit: enable mck
-  clocksource: timer-atmel-pit: drop at91sam926x_pit_common_init
-  clocksource: timer-atmel-pit: remove uselesss WARN_ON_ONCE
-  clocksource: timer-atmel-pit: simplify IRQ handler
-
- drivers/clocksource/timer-atmel-pit.c | 93 +++++++++++++++--------------------
- 1 file changed, 41 insertions(+), 52 deletions(-)
-
+diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
+index 67240228fe8e..633a94429842 100644
+--- a/drivers/clocksource/timer-atmel-pit.c
++++ b/drivers/clocksource/timer-atmel-pit.c
+@@ -149,12 +149,6 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
+ {
+ 	struct pit_data *data = dev_id;
+ 
+-	/*
+-	 * irqs should be disabled here, but as the irq is shared they are only
+-	 * guaranteed to be off if the timer irq is registered first.
+-	 */
+-	WARN_ON_ONCE(!irqs_disabled());
+-
+ 	/* The PIT interrupt may be disabled, and is shared */
+ 	if (clockevent_state_periodic(&data->clkevt) &&
+ 	    (pit_read(data->base, AT91_PIT_SR) & AT91_PIT_PITS)) {
 -- 
 2.8.1
