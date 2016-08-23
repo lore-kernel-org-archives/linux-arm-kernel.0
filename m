@@ -1,217 +1,65 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 23 Aug 2016 14:33:04 +0100
-Subject: [PATCH v5 3/3] arm64: hibernate: Support DEBUG_PAGEALLOC
-In-Reply-To: <20160822185110.GI26494@e104818-lin.cambridge.arm.com>
-References: <1471887319-26702-1-git-send-email-james.morse@arm.com>
- <1471887319-26702-4-git-send-email-james.morse@arm.com>
- <20160822185110.GI26494@e104818-lin.cambridge.arm.com>
-Message-ID: <57BC5090.5010100@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 23 Aug 2016 14:44:57 +0100
+Subject: [PATCH v3 06/12] soc/tegra: Add Tegra186 support
+In-Reply-To: <20160819173233.13260-7-thierry.reding@gmail.com>
+References: <20160819173233.13260-1-thierry.reding@gmail.com>
+ <20160819173233.13260-7-thierry.reding@gmail.com>
+Message-ID: <3211799e-5f21-0294-1530-c76ca2b926dc@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin
 
-On 22/08/16 19:51, Catalin Marinas wrote:
-> On Mon, Aug 22, 2016 at 06:35:19PM +0100, James Morse wrote:
->> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
->> index b4082017c4cb..da4470de1807 100644
->> --- a/arch/arm64/kernel/hibernate.c
->> +++ b/arch/arm64/kernel/hibernate.c
->> @@ -235,6 +235,7 @@ out:
->>  	return rc;
->>  }
->>  
->> +#define dcache_clean_range(start, end)	__flush_dcache_area(start, (end - start))
->>  
->>  int swsusp_arch_suspend(void)
->>  {
->> @@ -252,8 +253,14 @@ int swsusp_arch_suspend(void)
->>  	if (__cpu_suspend_enter(&state)) {
->>  		ret = swsusp_save();
->>  	} else {
->> -		/* Clean kernel to PoC for secondary core startup */
->> -		__flush_dcache_area(LMADDR(KERNEL_START), KERNEL_END - KERNEL_START);
->> +		/* Clean kernel core startup/idle code to PoC*/
->> +		dcache_clean_range(__mmuoff_text_start, __mmuoff_text_end);
->> +		dcache_clean_range(__mmuoff_data_start, __mmuoff_data_end);
->> +		dcache_clean_range(__idmap_text_start, __idmap_text_end);
->> +
->> +		/* Clean kvm setup code to PoC? */
->> +		if (el2_reset_needed())
->> +			dcache_clean_range(__hyp_idmap_text_start, __hyp_idmap_text_end);
->>  
->>  		/*
->>  		 * Tell the hibernation core that we've just restored
->> @@ -269,6 +276,32 @@ int swsusp_arch_suspend(void)
->>  	return ret;
->>  }
->>  
->> +static void _copy_pte(pte_t *dst_pte, pte_t *src_pte, unsigned long addr)
->> +{
->> +	unsigned long pfn = virt_to_pfn(addr);
+On 19/08/16 18:32, Thierry Reding wrote:
+> From: Joseph Lo <josephl@nvidia.com>
 > 
-> I assume this is only called on the kernel linear mapping (according to
-> the copy_page_tables() use in swsusp_arch_resume). Otherwise
-> virt_to_pfn() would not work.
-
-Yes, hibernate only save/restores the linear map, on the assumption that
-contains everything.
-
-
-> Something I missed in the original hibernation support but it may look
-> better if you have something like:
+> The Tegra186 has a combination of Denver and Cortex-A57 CPU cores and
+> GPUs with Pascal architecture on it. It features with ADSP with
+> Cortex-A9 CPU for audio processing, hardware video encoder/decoder with
+> multi-format support, ISP for image capture processing and BPMP for the
+> power managements.
 > 
-> 	pte_t pte = *src_pte;
-
-Sure,
-
-
->> +
->> +	if (pte_valid(*src_pte)) {
->> +		/*
->> +		 * Resume will overwrite areas that may be marked
->> +		 * read only (code, rodata). Clear the RDONLY bit from
->> +		 * the temporary mappings we use during restore.
->> +		 */
->> +		set_pte(dst_pte, __pte(pte_val(*src_pte) & ~PTE_RDONLY));
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
+>  drivers/soc/tegra/Kconfig | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
 > 
-> and here:
+> diff --git a/drivers/soc/tegra/Kconfig b/drivers/soc/tegra/Kconfig
+> index 03089ad2fc65..88a71dfd466c 100644
+> --- a/drivers/soc/tegra/Kconfig
+> +++ b/drivers/soc/tegra/Kconfig
+> @@ -61,6 +61,20 @@ config ARCH_TEGRA_132_SOC
+>  	  but contains an NVIDIA Denver CPU complex in place of
+>  	  Tegra124's "4+1" Cortex-A15 CPU complex.
+>  
+> +config ARCH_TEGRA_186_SOC
+> +	bool "NVIDIA Tegra186 SoC"
+> +	select MAILBOX
+> +	select TEGRA_BPMP
+> +	select TEGRA_HSP_MBOX
+> +	select TEGRA_IVC
+> +	help
+> +	  Enable support for the NVIDIA Tegar186 SoC. The Tegra186 has a
+> +	  combination of Denver and Cortex-A57 CPU cores and GPUs with Pascal
+> +	  architecture on it. It features with ADSP with Cortex-A9 CPU for
+> +	  audio processing, hardware video encoder/decoder with multi-format
+> +	  support, ISP for image capture processing and BPMP for the power
+> +	  managements.
+> +
+>  config ARCH_TEGRA_210_SOC
+>  	bool "NVIDIA Tegra210 SoC"
+>  	select PINCTRL_TEGRA210
 > 
-> 		set_pte(dst_pte, pte_mkwrite(pte));
 
-pte_write() doesn't clear the PTE_RDONLY flag.
-Should it be changed?
+After this patch is applied, if I say Y to enable Tegra186 support then I get ...
 
+drivers/built-in.o: In function `tegra_bpmp_probe':
+/home/jonathanh/workdir/tegra/korg-linux-next.git/drivers/firmware/tegra/bpmp.c:820: undefined reference to `tegra_bpmp_init_clocks'
+/home/jonathanh/workdir/tegra/korg-linux-next.git/drivers/firmware/tegra/bpmp.c:824: undefined reference to `tegra_bpmp_init_resets'
 
->> +	} else if (debug_pagealloc_enabled()) {
->> +		/*
->> +		 * debug_pagealloc may have removed the PTE_VALID bit if
->> +		 * the page isn't in use by the resume kernel. It may have
->> +		 * been in use by the original kernel, in which case we need
->> +		 * to put it back in our copy to do the restore.
->> +		 *
->> +		 * Check for mappable memory that gives us a translation
->> +		 * like part of the linear map.
->> +		 */
->> +		if (pfn_valid(pfn) && pte_pfn(*src_pte) == pfn)
-> 
-> Is there a case where this condition is false?
+It seems that patches 11 and 12 should be applied before patch 5 of this series or am I overlooking something? 
 
-Hopefully not, but I tried to avoid marking whatever happens to be there as
-valid. This is as paranoid as I can make it: checking the pfn should be mapped,
-and that the output-address part of the record is correct.
+Jon
 
-If you're happy with the assumption that only valid records ever appear in the
-linear map page tables, (and that anything marked not-valid is a result of
-debug_pagealloc), then we can change this to !pte_none().
-
-
->> +			set_pte(dst_pte, __pte((pte_val(*src_pte) & ~PTE_RDONLY) | PTE_VALID));
-> 
-> With some more macros:
-> 
-> 			set_pte(dst_pte, pte_mkwrite(pte_mkpresent(pte)))
-> 
-> (pte_mkpresent() needs to be added)
-
->> +	}
->> +}
->> +
->>  static int copy_pte(pmd_t *dst_pmd, pmd_t *src_pmd, unsigned long start,
->>  		    unsigned long end)
->>  {
->> @@ -284,13 +317,7 @@ static int copy_pte(pmd_t *dst_pmd, pmd_t *src_pmd, unsigned long start,
->>  
->>  	src_pte = pte_offset_kernel(src_pmd, start);
->>  	do {
->> -		if (!pte_none(*src_pte))
-> 
-> You seem to no longer check for pte_none(). Is this not needed or
-> covered by the pte_pfn() != pfn check above?
-
-A bit of both:
-Previously this copied over any values it found. _copy_pte() now copies valid
-values, and if debug_pagealloc is turned on, tries to guess whether the
-non-valid values should be copied and marked valid.
-
-
-> 
->> -			/*
->> -			 * Resume will overwrite areas that may be marked
->> -			 * read only (code, rodata). Clear the RDONLY bit from
->> -			 * the temporary mappings we use during restore.
->> -			 */
->> -			set_pte(dst_pte, __pte(pte_val(*src_pte) & ~PTE_RDONLY));
->> +		_copy_pte(dst_pte, src_pte, addr);
->>  	} while (dst_pte++, src_pte++, addr += PAGE_SIZE, addr != end);
->>  
->>  	return 0;
->> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
->> index ca6d268e3313..b6c0da84258c 100644
->> --- a/arch/arm64/mm/pageattr.c
->> +++ b/arch/arm64/mm/pageattr.c
->> @@ -139,4 +139,42 @@ void __kernel_map_pages(struct page *page, int numpages, int enable)
->>  					__pgprot(0),
->>  					__pgprot(PTE_VALID));
->>  }
->> -#endif
->> +#ifdef CONFIG_HIBERNATION
->> +/*
->> + * When built with CONFIG_DEBUG_PAGEALLOC and CONFIG_HIBERNATION, this function
->> + * is used to determine if a linear map page has been marked as not-present by
->> + * CONFIG_DEBUG_PAGEALLOC. Walk the page table and check the PTE_VALID bit.
->> + * This is based on kern_addr_valid(), which almost does what we need.
->> + */
->> +bool kernel_page_present(struct page *page)
->> +{
->> +	pgd_t *pgd;
->> +	pud_t *pud;
->> +	pmd_t *pmd;
->> +	pte_t *pte;
->> +	unsigned long addr = (unsigned long)page_address(page);
->> +
->> +	pgd = pgd_offset_k(addr);
->> +	if (pgd_none(*pgd))
->> +		return false;
->> +
->> +	pud = pud_offset(pgd, addr);
->> +	if (pud_none(*pud))
->> +		return false;
->> +	if (pud_sect(*pud))
->> +		return true;
-> 
-> This wouldn't normally guarantee "present" but I don't think we ever
-> have a non-present section mapping for the kernel (we do for user
-> though). You may want to add a comment.
-
-Sure.
-
-Just in case I've totally miss-understood:
-> * Because this is only called on the kernel linar map we don't need to
-> * use p?d_present() to check for PROT_NONE regions, as these don't occur
-> * in the linear map.
-
-
->> +
->> +	pmd = pmd_offset(pud, addr);
->> +	if (pmd_none(*pmd))
->> +		return false;
->> +	if (pmd_sect(*pmd))
->> +		return true;
->> +
->> +	pte = pte_offset_kernel(pmd, addr);
->> +	if (pte_none(*pte))
->> +		return false;
->> +
->> +	return pte_valid(*pte);
-> 
-> You can return pte_valid() directly without the pte_none() check since
-> pte_none() implies !pte_valid().
-
-Oops, yes.
-
-
-Thanks for the comments!
-
-
-James
+-- 
+nvpublic
