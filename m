@@ -1,83 +1,59 @@
-From: zhongjiang@huawei.com (zhong jiang)
-Date: Tue, 23 Aug 2016 15:47:23 +0800
-Subject: [PATCH] mm, numa: boot cpu should bound to the node0 when node_off
- enable
-In-Reply-To: <20160822142833.GE26494@e104818-lin.cambridge.arm.com>
-References: <1471525766-12803-1-git-send-email-zhongjiang@huawei.com>
- <20160818160437.GA21343@e104818-lin.cambridge.arm.com>
- <CAFpQJXUYxPsTArMkv27r2u19v92APjjNF5W0bMNqQKGqNUin5g@mail.gmail.com>
- <57B667CA.5060905@huawei.com>
- <CAFpQJXVzr0uvV00vtQkrAxzezW=QRpL9EKPL+4yqhmKE5GdXKA@mail.gmail.com>
- <CAFpQJXXXAhQQxr9=SmW2-bHmAYQMyn93zFiYZiBqbjgyZg2oJw@mail.gmail.com>
- <57B82533.9010507@huawei.com>
- <20160822142833.GE26494@e104818-lin.cambridge.arm.com>
-Message-ID: <57BBFF8B.80801@huawei.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 23 Aug 2016 09:49:44 +0200
+Subject: [PATCH/RFT v2 2/8] clk: renesas: r8a7796: Add SDIF clocks
+In-Reply-To: <1471938590-10650-1-git-send-email-horms+renesas@verge.net.au>
+References: <1471938590-10650-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1471938590-10650-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/8/22 22:28, Catalin Marinas wrote:
-> On Sat, Aug 20, 2016 at 05:38:59PM +0800, zhong jiang wrote:
->> On 2016/8/19 12:11, Ganapatrao Kulkarni wrote:
->>> On Fri, Aug 19, 2016 at 9:30 AM, Ganapatrao Kulkarni
->>> <gpkulkarni@gmail.com> wrote:
->>>> On Fri, Aug 19, 2016 at 7:28 AM, zhong jiang <zhongjiang@huawei.com> wrote:
->>>>> On 2016/8/19 1:45, Ganapatrao Kulkarni wrote:
->>>>>> On Thu, Aug 18, 2016 at 9:34 PM, Catalin Marinas
->>>>>> <catalin.marinas@arm.com> wrote:
->>>>>>> On Thu, Aug 18, 2016 at 09:09:26PM +0800, zhongjiang wrote:
->>>>>>>> At present, boot cpu will bound to a node from device tree when node_off enable.
->>>>>>>> if the node is not initialization, it will lead to a following problem.
-> [...]
->>>>>>>> --- a/arch/arm64/mm/numa.c
->>>>>>>> +++ b/arch/arm64/mm/numa.c
->>>>>>>> @@ -119,7 +119,7 @@ void numa_store_cpu_info(unsigned int cpu)
->>>>>>>>  void __init early_map_cpu_to_node(unsigned int cpu, int nid)
->>>>>>>>  {
->>>>>>>>       /* fallback to node 0 */
->>>>>>>> -     if (nid < 0 || nid >= MAX_NUMNODES)
->>>>>>>> +     if (nid < 0 || nid >= MAX_NUMNODES || numa_off)
->>>>>> i  did not understood how this line change fixes the issue that you
->>>>>> have mentioned (i too not understood fully the issue description)
->>>>>> this array used while mapping node id when secondary cores comes up
->>>>>> when numa_off is set the cpu_to_node_map[cpu] is not used and set to
->>>>>> node0 always( refer function numa_store_cpu_info)..
->>>>>> please provide more details to understand the issue you are facing.
->>>>>> /*
->>>>>>  *  Set the cpu to node and mem mapping
->>>>>>  */
->>>>>> void numa_store_cpu_info(unsigned int cpu)
->>>>>> {
->>>>>>         map_cpu_to_node(cpu, numa_off ? 0 : cpu_to_node_map[cpu]);
->>>>>> }
->>>>> The issue comes up when we test the kdump. it will leads to kernel crash.
->>>>> when I debug the issue, I find boot cpu actually bound to the node1. while
->>>>> node1 is not real existence when numa_off enable.
->>>> boot cpu is default mapped to node0
->>>> are you running with any other patches?
->>> if you added any patch to change this code
->>>   /* init boot processor */
->>>         cpu_to_node_map[0] = 0;
->>>         map_cpu_to_node(0, 0);
->>>
->>> then adding code to take-care numa_off here might solve your issue.
->>  but in of_smp_init_cpus, boot cpu will call early_map_cpu_to_node[] to get
->>  the relation node. and the node is from devicetree.
->>
->>  you points to the code will be covered with another node. therefore, it is
->>  possible that cpu_to_node[cpu] will leads to the incorrect results. therefore,
->>  The crash will come up.
-> I think I get Ganapat's point. The cpu_to_node_map[0] may be incorrectly
-> set by early_map_cpu_to_node() when called from smp_init_cpus() ->
-> of_parse_and_init_cpus(). However, the cpu_to_node_map[] array is *only*
-> read by numa_store_cpu_info(). This latter function calls
-> map_cpu_to_node() and, if numa_off, will only ever pass 0 as the nid.
->
-> Given that the cpu_to_node_map[] array is static, I don't see how any
-> non-zero value could leak outside the arch/arm64/mm/numa.c file.
->
-> So please give more details of any additional patches you have on top of
-> mainline or whether you reproduced this issue with the vanilla kernel
-> (since you mentioned kdump, that's not in mainline yet).
->
-Thanks for Catalin and Ganapatral.
-I am sorry for that.  The mainline have solved.  The mainline changes is too much, I did not notice.
+This patch adds SDIF clocks for R8A7796 SoC.
+
+Based on work by Ai Kyuse and Yoshihiro Shimoda for the r8a7795 SoC.
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v2
+* Add and use SDSRC
+---
+ drivers/clk/renesas/r8a7796-cpg-mssr.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/drivers/clk/renesas/r8a7796-cpg-mssr.c b/drivers/clk/renesas/r8a7796-cpg-mssr.c
+index 999955c2b23e..891b353e8105 100644
+--- a/drivers/clk/renesas/r8a7796-cpg-mssr.c
++++ b/drivers/clk/renesas/r8a7796-cpg-mssr.c
+@@ -70,6 +70,7 @@ static const struct cpg_core_clk r8a7796_core_clks[] __initconst = {
+ 	DEF_FIXED(".s1",        CLK_S1,            CLK_PLL1_DIV2,  3, 1),
+ 	DEF_FIXED(".s2",        CLK_S2,            CLK_PLL1_DIV2,  4, 1),
+ 	DEF_FIXED(".s3",        CLK_S3,            CLK_PLL1_DIV2,  6, 1),
++	DEF_FIXED(".sdsrc",     CLK_SDSRC,         CLK_PLL1_DIV2,  2, 1),
+ 
+ 	/* Core Clock Outputs */
+ 	DEF_FIXED("ztr",        R8A7796_CLK_ZTR,   CLK_PLL1_DIV2,  6, 1),
+@@ -93,6 +94,11 @@ static const struct cpg_core_clk r8a7796_core_clks[] __initconst = {
+ 	DEF_FIXED("s3d2",       R8A7796_CLK_S3D2,  CLK_S3,         2, 1),
+ 	DEF_FIXED("s3d4",       R8A7796_CLK_S3D4,  CLK_S3,         4, 1),
+ 
++	DEF_GEN3_SD("sd0",      R8A7796_CLK_SD0,   CLK_SDSRC,    0x0074),
++	DEF_GEN3_SD("sd1",      R8A7796_CLK_SD1,   CLK_SDSRC,    0x0078),
++	DEF_GEN3_SD("sd2",      R8A7796_CLK_SD2,   CLK_SDSRC,    0x0268),
++	DEF_GEN3_SD("sd3",      R8A7796_CLK_SD3,   CLK_SDSRC,    0x026c),
++
+ 	DEF_FIXED("cl",         R8A7796_CLK_CL,    CLK_PLL1_DIV2, 48, 1),
+ 	DEF_FIXED("cp",         R8A7796_CLK_CP,    CLK_EXTAL,      2, 1),
+ 
+@@ -104,6 +110,10 @@ static const struct cpg_core_clk r8a7796_core_clks[] __initconst = {
+ 
+ static const struct mssr_mod_clk r8a7796_mod_clks[] __initconst = {
+ 	DEF_MOD("scif2",		 310,	R8A7796_CLK_S3D4),
++	DEF_MOD("sdif3",		 311,	R8A7796_CLK_SD3),
++	DEF_MOD("sdif2",		 312,	R8A7796_CLK_SD2),
++	DEF_MOD("sdif1",		 313,	R8A7796_CLK_SD1),
++	DEF_MOD("sdif0",		 314,	R8A7796_CLK_SD0),
+ 	DEF_MOD("rwdt0",		 402,	R8A7796_CLK_R),
+ 	DEF_MOD("intc-ap",		 408,	R8A7796_CLK_S3D1),
+ 	DEF_MOD("gpio7",		 905,	R8A7796_CLK_S3D4),
+-- 
+2.7.0.rc3.207.g0ac5344
