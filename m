@@ -1,30 +1,32 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 23 Aug 2016 17:04:48 +0200
-Subject: [PATCH] dt-bindings: touchscreen: silead_gsl1680: Document
- touchscreen-fw-name
-Message-ID: <1471964688-12188-1-git-send-email-hdegoede@redhat.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Tue, 23 Aug 2016 15:06:05 +0000
+Subject: [PATCH -next] net: phy: xgmiitorgmii: Fix non static symbol warning
+Message-ID: <1471964765-32708-1-git-send-email-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver has supported touchscreen-fw-name to specify the firmware to
-load since day 0, but this was omitted from the binding, document this.
+From: Wei Yongjun <weiyongjun1@huawei.com>
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Fixes the following sparse warning:
+
+drivers/net/phy/xilinx_gmii2rgmii.c:61:5: warning:
+ symbol 'xgmiitorgmii_probe' was not declared. Should it be static?
+
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 ---
- Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/net/phy/xilinx_gmii2rgmii.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
-index ad7f41a..c9c1ddd 100644
---- a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
-+++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
-@@ -17,6 +17,7 @@ Required properties:
- - touchscreen-size-y	  : See touchscreen.txt
+diff --git a/drivers/net/phy/xilinx_gmii2rgmii.c b/drivers/net/phy/xilinx_gmii2rgmii.c
+index e7a20ec..2e408b8 100644
+--- a/drivers/net/phy/xilinx_gmii2rgmii.c
++++ b/drivers/net/phy/xilinx_gmii2rgmii.c
+@@ -58,7 +58,7 @@ static int xgmiitorgmii_read_status(struct phy_device *phydev)
+ 	return 0;
+ }
  
- Optional properties:
-+- touchscreen-fw-name	  : Filename (string) for device specific firmware
- - touchscreen-inverted-x  : See touchscreen.txt
- - touchscreen-inverted-y  : See touchscreen.txt
- - touchscreen-swapped-x-y : See touchscreen.txt
--- 
-2.7.4
+-int xgmiitorgmii_probe(struct mdio_device *mdiodev)
++static int xgmiitorgmii_probe(struct mdio_device *mdiodev)
+ {
+ 	struct device *dev = &mdiodev->dev;
+ 	struct device_node *np = dev->of_node, *phy_node;
