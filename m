@@ -1,76 +1,58 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 23 Aug 2016 18:28:52 +0100
-Subject: [PATCH 1/1] arm64/hugetlb: clear PG_dcache_clean if the page is
- dirty when munmap
-In-Reply-To: <57BA7D38.8030103@huawei.com>
-References: <20160707153741.GC27180@e104818-lin.cambridge.arm.com>
- <577F1FD9.1040205@huawei.com>
- <20160708135447.GB22099@e104818-lin.cambridge.arm.com>
- <577FC5AA.5010709@huawei.com>
- <20160708161347.GC22099@e104818-lin.cambridge.arm.com>
- <57839474.6030203@huawei.com>
- <20160712153535.GH22183@e104818-lin.cambridge.arm.com>
- <578EE603.9020206@huawei.com>
- <20160720091939.GA25890@e104818-lin.cambridge.arm.com>
- <57BA7D38.8030103@huawei.com>
-Message-ID: <20160823172852.GB16213@e104818-lin.cambridge.arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 23 Aug 2016 18:35:30 +0100
+Subject: [PATCH v3 09/12] arm64: dts: tegra: Add NVIDIA P3310 main board
+ support
+In-Reply-To: <20160819173233.13260-10-thierry.reding@gmail.com>
+References: <20160819173233.13260-1-thierry.reding@gmail.com>
+ <20160819173233.13260-10-thierry.reding@gmail.com>
+Message-ID: <9c123f91-d7ae-7cf1-f669-412aa350a0ca@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2016 at 12:19:04PM +0800, Leizhen (ThunderTown) wrote:
-> On 2016/7/20 17:19, Catalin Marinas wrote:
-> > On Wed, Jul 20, 2016 at 10:46:27AM +0800, Leizhen (ThunderTown) wrote:
-> >>>>>> On 2016/7/8 21:54, Catalin Marinas wrote:
-> >>>>>>> ------------8<----------------
-> >>>>>>> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-> >>>>>>> index dbd12ea8ce68..c753fa804165 100644
-> >>>>>>> --- a/arch/arm64/mm/flush.c
-> >>>>>>> +++ b/arch/arm64/mm/flush.c
-> >>>>>>> @@ -75,7 +75,8 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
-> >>>>>>>  	if (!page_mapping(page))
-> >>>>>>>  		return;
-> >>>>>>>  
-> >>>>>>> -	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
-> >>>>>>> +	if (!test_and_set_bit(PG_dcache_clean, &page->flags) ||
-> >>>>>>> +	    PageDirty(page))
-> >>>>>>>  		sync_icache_aliases(page_address(page),
-> >>>>>>>  				    PAGE_SIZE << compound_order(page));
-> >>>>>>>  	else if (icache_is_aivivt())
-> >>>>>>> ----------------8<---------------------
-> >>
-> >> Do you plan to send this patch? My colleagues told me that if our
-> >> patches are quite different, it should be Signed-off-by you.
-> > 
-> > The reason I'm not sending it is that I don't fully understand how it
-> > solves the problem for a shared file mmap(), not just hugetlbfs. As I
-> > said in an earlier email: after an msync() in user space we
-> > should flush the pages to disk via write_cache_pages(). This function
-> Hi Catalin:
->    I'm so sorry for my fault. The previous small pages test result I actually ran on ramfs.
-> Today, I ran the case on harddisk fs, it worked well without this patch.
+
+On 19/08/16 18:32, Thierry Reding wrote:
+> From: Joseph Lo <josephl@nvidia.com>
 > 
-> Summarized as follows:
-> small pages on ramfs: need this patch
-> small pages on harddisk fs: no need this patch
-> hugetlbfs: need this patch
+> The NVIDIA P3310 is a processor module used in several reference designs
+> that features a Tegra186 SoC, 8 GiB of LPDDR4 RAM, 32 GiB eMMC and other
+> essentials such as ethernet, WiFi and a PMIC. It is typically connected
+> to an I/O board (such as the P2597) that provides the connecters needed
+> to hook it up to the outside world.
+> 
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
+> Changes in v3:
+> - fix compatible string
+> 
+>  arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi | 34 ++++++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
+> 
+> diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
+> new file mode 100644
+> index 000000000000..dc07ea618378
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
+> @@ -0,0 +1,34 @@
+> +#include "tegra186.dtsi"
+> +
+> +/ {
+> +	model = "NVIDIA Tegra186 P3310 main Board";
+> +	compatible = "nvidia,p3310", "nvidia,tegra186";
+> +
+> +	aliases {
+> +		serial0 = &uarta;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "earlycon console=ttyS0,115200n8";
 
-I would add:
+I don't think we need 'console' in the bootargs anymore because
+stdout-path is enough (even for early console).
 
-small pages over nfs: fails with or without this patch
-
-(tested on Juno, Cortex-A57; seems to be fixed if I remove the
-PG_dcache_clean test altogether but, well, we end up over-flushing)
-
-I assume that when using a hard drive, it goes through the block I/O
-layer and we may have a flush_dcache_page() called when the kernel is
-about to read a page that has been mapped in user space. This would
-clear the PG_dcache_clean bit and subsequent __sync_icache_dcache()
-would perform cache maintenance.
-
-Could you try on your system the test case without the msync() call? I'm
-not sure whether munmap() would trigger an immediate write-back, in
-which case we may see the issue even with the filesystem on a hard
-drive.
+Cheers
+Jon
 
 -- 
-Catalin
+nvpublic
