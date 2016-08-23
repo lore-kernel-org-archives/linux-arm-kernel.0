@@ -1,83 +1,23 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 23 Aug 2016 04:46:20 +0300
-Subject: [PATCH 1/2] ARM: sa1100: fix 3.6864MHz clock
-In-Reply-To: <E1baiKc-0004ya-J6@rmk-PC.armlinux.org.uk>
-References: <E1baiKc-0004ya-J6@rmk-PC.armlinux.org.uk>
-Message-ID: <CALT56yNmjDuTO=zmQmUpKf3Ac4rNYZMEvMxBqmma=NB0H2YWwA@mail.gmail.com>
+Date: Tue, 23 Aug 2016 04:47:08 +0300
+Subject: [PATCH 2/2] ARM: sa1100: register clocks early
+In-Reply-To: <E1baiKh-0004yg-OF@rmk-PC.armlinux.org.uk>
+References: <E1baiKh-0004yg-OF@rmk-PC.armlinux.org.uk>
+Message-ID: <CALT56yPLMiQZaeSxmo3xz_+6c11BO-hWSEN2ex-ziJGZdZDY6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 2016-08-19 14:51 GMT+03:00 Russell King <rmk+kernel@armlinux.org.uk>:
-> pxa_timer wants to be able to call clk_enable() etc on this clock,
-> but our clk_enable() implementation expects non-NULL enable/disable
-> operations.  Provide these dummy implementations.
+> Since we switched to use pxa_timer, we need to provide the OSTIMER0
+> clock.  However, as the clock is initialised early, we need to provide
+> the clock early as well, so that pxa_timer can find it.  Adding the
+> clock to the clkdev table at core_initcall() time is way too late.
+
+This worked for me before, so maybe the init order of other kernel parts
+has changed. Anyway:
 
 Acked-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 
-
->
-> Unable to handle kernel NULL pointer dereference at virtual address 00000000
-> pgd = c0204000
-> [00000000] *pgd=00000000
-> Internal error: Oops: 80000005 [#1] ARM
-> Modules linked in:
-> CPU: 0 PID: 0 Comm: swapper Not tainted 4.8.0-rc2+ #887
-> Hardware name: Intel-Assabet
-> task: c0644590 task.stack: c0640000
-> PC is at 0x0
-> LR is at clk_enable+0x40/0x58
-> pc : [<00000000>]    lr : [<c021b178>]    psr: 600000d3
-> sp : c0641f60  ip : c0641f4c  fp : c0641f74
-> r10: c1ffc7a0  r9 : 6901b118  r8 : 00000001
-> r7 : c0639a34  r6 : 0000001b  r5 : a00000d3  r4 : c0645d70
-> r3 : c0645d78  r2 : 00000001  r1 : c0641ef0  r0 : c0645d70
-> Flags: nZCv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment none
-> Control: c020717f  Table: c020717f  DAC: 00000053
-> Process swapper (pid: 0, stack limit = 0xc0640188)
-> Stack: (0xc0641f60 to 0xc0642000)
-> 1f60: 00384000 c08762e4 c0641f98 c0641f78 c063308c c021b144 00000000 00000000
-> 1f80: 00000000 c0660b20 ffffffff c0641fa8 c0641f9c c06220ec c0633058 c0641fb8
-> 1fa0: c0641fac c061f114 c06220dc c0641ff4 c0641fbc c061bb68 c061f0fc ffffffff
-> 1fc0: ffffffff 00000000 c061b6cc c0639a34 c0660cd4 c0642038 c0639a30 c0645434
-> 1fe0: c0204000 c06380f8 00000000 c0641ff8 c0208048 c061b954 00000000 00000000
-> Backtrace:
-> [<c021b138>] (clk_enable) from [<c063308c>] (pxa_timer_nodt_init+0x40/0x120)
->  r5:c08762e4 r4:00384000
-> [<c063304c>] (pxa_timer_nodt_init) from [<c06220ec>] (sa1100_timer_init+0x1c/0x20)
->  r6:ffffffff r5:c0660b20 r4:00000000
-> [<c06220d0>] (sa1100_timer_init) from [<c061f114>] (time_init+0x24/0x2c)
-> [<c061f0f0>] (time_init) from [<c061bb68>] (start_kernel+0x220/0x42c)
-> [<c061b948>] (start_kernel) from [<c0208048>] (0xc0208048)
->  r10:c06380f8 r8:c0204000 r7:c0645434 r6:c0639a30 r5:c0642038 r4:c0660cd4
-> Code: bad PC value
-> ---[ end trace 0000000000000000 ]---
-> Kernel panic - not syncing: Attempted to kill the idle task!
->
-> Fixes: ee3a4020f7c9 ("ARM: 8250/1: sa1100: provide OSTIMER0 clock for pxa_timer")
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
-> This change first, before patch 2, to avoid the above oops during
-> bisects.
->
->  arch/arm/mach-sa1100/clock.c | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/mach-sa1100/clock.c b/arch/arm/mach-sa1100/clock.c
-> index cbf53bb9c814..0bf3220988ef 100644
-> --- a/arch/arm/mach-sa1100/clock.c
-> +++ b/arch/arm/mach-sa1100/clock.c
-> @@ -125,6 +125,8 @@ static unsigned long clk_36864_get_rate(struct clk *clk)
->  }
->
->  static struct clkops clk_36864_ops = {
-> +       .enable         = clk_cpu_enable,
-> +       .disable        = clk_cpu_disable,
->         .get_rate       = clk_36864_get_rate,
->  };
->
-> --
-> 2.1.0
->
 
 
 
