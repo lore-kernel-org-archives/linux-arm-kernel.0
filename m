@@ -1,67 +1,68 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 23 Aug 2016 10:05:26 +0800
-Subject: [PATCH 4/8] ARM: dts: sun8i: Add touchscreen node for
- sun8i-a23-gt90h
-In-Reply-To: <cf0186a0-f4ea-173c-4f93-df8798941199@redhat.com>
-References: <1470685398-14568-1-git-send-email-hdegoede@redhat.com>
- <1470685398-14568-4-git-send-email-hdegoede@redhat.com>
- <20160822183009.GX7104@lukather>
- <cf0186a0-f4ea-173c-4f93-df8798941199@redhat.com>
-Message-ID: <106521471917926@web29g.yandex.ru>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 23 Aug 2016 11:35:26 +0900
+Subject: [PATCH 1/2] clk: samsung: exynos5260: Move struct samsung_cmu_info
+ to init section
+In-Reply-To: <20160823005512.GP6502@codeaurora.org>
+References: <1471834185-20249-1-git-send-email-cw00.choi@samsung.com>
+ <1471834185-20249-2-git-send-email-cw00.choi@samsung.com>
+ <CGME20160823005523epcas1p3993794ba487bb055cbf8a0b247fcb280@epcas1p3.samsung.com>
+ <20160823005512.GP6502@codeaurora.org>
+Message-ID: <57BBB66E.2060807@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Stephen,
 
-
-23.08.2016, 03:08, "Hans de Goede" <hdegoede@redhat.com>:
-> Hi,
->
-> On 22-08-16 20:30, Maxime Ripard wrote:
->> ?On Mon, Aug 08, 2016 at 09:43:14PM +0200, Hans de Goede wrote:
->>> ?The gt90h tablet has a gsl3675 touchscreen, add a dt node describing it.
->>>
->>> ?Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>> ?---
->>> ??arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts | 8 ++++++++
->>> ??1 file changed, 8 insertions(+)
->>>
->>> ?diff --git a/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts b/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
->>> ?index f27ebbb..da55b5a 100644
->>> ?--- a/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
->>> ?+++ b/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
->>> ?@@ -53,6 +53,14 @@
->>> ??????????status = "okay";
->>> ??};
->>>
->>> ?+&gsl1680 {
->>> ?+ compatible = "silead,gsl3675";
->>> ?+ touchscreen-fw-name = "silead/gsl3675-gt90h.fw";
+On 2016? 08? 23? 09:55, Stephen Boyd wrote:
+> On 08/22, Chanwoo Choi wrote:
+>> This patch moves the all samsung_cmu_info struct to initconst section
+>> because they are used only in initconst section.
 >>
->> ?That's not documented anywhere, and looks really suspicious.
->
-> Ugh, that should have been in:
->
-> Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
->
-> But somehow it is not (I believe it was there in earlier revisions of
-> the patch), I'll send a patch to fix this.
->
-> About it being suspicious, this is not really firmware it is a bunch
-> of configuration data / lookup tables for the controller which tell
-> it in which order the touchscreen horizontal / vertical sensor
-> lines are connected to its sense pins, and what values to send
-> for finger x% between line z and line z+1, which differs per
-> tablet model, since not all tablets use the same digitizer.
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> ---
+>>  drivers/clk/samsung/clk-exynos5260.c | 350 +++++++++++++++++------------------
+>>  1 file changed, 175 insertions(+), 175 deletions(-)
+>>
+>> diff --git a/drivers/clk/samsung/clk-exynos5260.c b/drivers/clk/samsung/clk-exynos5260.c
+>> index a43642c36039..fd1d9bfc151b 100644
+>> --- a/drivers/clk/samsung/clk-exynos5260.c
+>> +++ b/drivers/clk/samsung/clk-exynos5260.c
+>> @@ -131,21 +131,21 @@ static const struct samsung_gate_clock aud_gate_clks[] __initconst = {
+>>  			EN_IP_AUD, 4, 0, 0),
+>>  };
+>>  
+>> +static const struct samsung_cmu_info aud_cmu __initconst = {
+>> +	.mux_clks	= aud_mux_clks,
+>> +	.nr_mux_clks	= ARRAY_SIZE(aud_mux_clks),
+>> +	.div_clks	= aud_div_clks,
+>> +	.nr_div_clks	= ARRAY_SIZE(aud_div_clks),
+>> +	.gate_clks	= aud_gate_clks,
+>> +	.nr_gate_clks	= ARRAY_SIZE(aud_gate_clks),
+>> +	.nr_clk_ids	= AUD_NR_CLK,
+>> +	.clk_regs	= aud_clk_regs,
+>> +	.nr_clk_regs	= ARRAY_SIZE(aud_clk_regs),
+>> +};
+>> +
+>>  static void __init exynos5260_clk_aud_init(struct device_node *np)
+>>  {
+>> -	struct samsung_cmu_info cmu = { NULL };
+>> -
+> 
+> I presume this was done this way to save some initdata space by
+> only allocating the array that's needed at runtime? I would
+> expect to see some more kernel image bloat from this change but
+> runtime memory usage would stay the same. Is there any real
+> benefit from this patch though?
+> 
 
-I do think it's a mixture of executable MCU codes and data.
-The GSL1680 datasheet indicates that there's a 32-bit MCU in it.
+After this patch, 'struct samsung_cmu_info' size should be added
+to kernel image and then the size of deleted code should be removed
+from kernel image. I think that it is not bloating.
+(struct samsung_cmu_info includes the pointer and integer value.)
 
->
-> Regards,
->
-> Hans
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+This patch make the code more simple and improve the readability.
+And, the samsung_cmu_register_on() requires the 'const' type
+argument for 'struct samsung_cmu_info'.
+
+Regards,
+Chanwoo Choi
