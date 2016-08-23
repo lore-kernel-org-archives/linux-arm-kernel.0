@@ -1,83 +1,217 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Tue, 23 Aug 2016 09:13:33 -0400
-Subject: [PATCH v3 1/5] drm/rockchip: sort registers define by chip's
- number
-In-Reply-To: <57BB9B87.2040406@rock-chips.com>
-References: <loom.20160602T084340-509@post.gmane.org>
- <1471454452-2151-1-git-send-email-seanpaul@chromium.org>
- <57B57AFE.2030706@rock-chips.com> <20160818091141.GZ6232@phenom.ffwll.local>
- <57B587C0.5050007@rock-chips.com>
- <CAOw6vbJdBwUdg5Qww-autFH=HvvaM-uac7-mN+Ja7PEDiPoPnw@mail.gmail.com>
- <57BB9B87.2040406@rock-chips.com>
-Message-ID: <CAOw6vbKnHZK4H_MHOE+iQ=a_YNJQen_F4PQ278B4N51OyxFc9Q@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 23 Aug 2016 14:33:04 +0100
+Subject: [PATCH v5 3/3] arm64: hibernate: Support DEBUG_PAGEALLOC
+In-Reply-To: <20160822185110.GI26494@e104818-lin.cambridge.arm.com>
+References: <1471887319-26702-1-git-send-email-james.morse@arm.com>
+ <1471887319-26702-4-git-send-email-james.morse@arm.com>
+ <20160822185110.GI26494@e104818-lin.cambridge.arm.com>
+Message-ID: <57BC5090.5010100@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2016 at 8:40 PM, Mark yao <mark.yao@rock-chips.com> wrote:
-> On 2016?08?23? 04:30, Sean Paul wrote:
->>
->> On Thu, Aug 18, 2016 at 6:02 AM, Mark yao <mark.yao@rock-chips.com> wrote:
->>>
->>> On 2016?08?18? 17:11, Daniel Vetter wrote:
->>>>
->>>> On Thu, Aug 18, 2016 at 05:08:14PM +0800, Mark yao wrote:
->>>>>>
->>>>>> Hi Sean
->>>>>>
->>>>>> Thanks for send v3 patch for rk3399 vop support.
->>>>>>
->>>>>> But sorry for that, I had changed my mind, those patches are
->>>>>> deprecated,
->>>>>> I have new rk3399 patch on my downstream kernel, I will upstream soon.
->>>>
->>>> Wut? Imo merge Sean's patch here, and then rebase your downstream
->>>> patches
->>>> on top of it. That you have a downstream tree which is out of sync with
->>>> upstream shouldn't be a reason to stall upstream development.
->>>> -Daniel
->>>>
->>> Yeah, Sorry for that.
->>>
->>> In fact, on my downstream kernel, also have those patches, my new rk3399
->>> patches are based on them,
->>> but the new rk3399 patches will cover the those patches,  Sean's patches
->>> is
->>> old version.
->>>
->>> I just want to fast forward, don't want to send two version drivers to
->>> upstream.
->>> but if you and Dave feel ok for that, I have no problem:-) .
->>>
->>> merged Sean's patches and then apply new version patches.
->>>
->> Ok, so can I get a review/ack for these revised patches then?
->> Something is better than nothing, and there's a bunch of stuff that
->> depends on these changes.
->>
->> Sean
->
-> Yes, But I miss your [PATCH v3 0/5] and [PATCH v3 4/5]. do you mean the lost
-> patches use v2 version?
->
+Hi Catalin
 
-Yes, v2 4/5 was reviewed as-is, so I just applied it.
+On 22/08/16 19:51, Catalin Marinas wrote:
+> On Mon, Aug 22, 2016 at 06:35:19PM +0100, James Morse wrote:
+>> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+>> index b4082017c4cb..da4470de1807 100644
+>> --- a/arch/arm64/kernel/hibernate.c
+>> +++ b/arch/arm64/kernel/hibernate.c
+>> @@ -235,6 +235,7 @@ out:
+>>  	return rc;
+>>  }
+>>  
+>> +#define dcache_clean_range(start, end)	__flush_dcache_area(start, (end - start))
+>>  
+>>  int swsusp_arch_suspend(void)
+>>  {
+>> @@ -252,8 +253,14 @@ int swsusp_arch_suspend(void)
+>>  	if (__cpu_suspend_enter(&state)) {
+>>  		ret = swsusp_save();
+>>  	} else {
+>> -		/* Clean kernel to PoC for secondary core startup */
+>> -		__flush_dcache_area(LMADDR(KERNEL_START), KERNEL_END - KERNEL_START);
+>> +		/* Clean kernel core startup/idle code to PoC*/
+>> +		dcache_clean_range(__mmuoff_text_start, __mmuoff_text_end);
+>> +		dcache_clean_range(__mmuoff_data_start, __mmuoff_data_end);
+>> +		dcache_clean_range(__idmap_text_start, __idmap_text_end);
+>> +
+>> +		/* Clean kvm setup code to PoC? */
+>> +		if (el2_reset_needed())
+>> +			dcache_clean_range(__hyp_idmap_text_start, __hyp_idmap_text_end);
+>>  
+>>  		/*
+>>  		 * Tell the hibernation core that we've just restored
+>> @@ -269,6 +276,32 @@ int swsusp_arch_suspend(void)
+>>  	return ret;
+>>  }
+>>  
+>> +static void _copy_pte(pte_t *dst_pte, pte_t *src_pte, unsigned long addr)
+>> +{
+>> +	unsigned long pfn = virt_to_pfn(addr);
+> 
+> I assume this is only called on the kernel linear mapping (according to
+> the copy_page_tables() use in swsusp_arch_resume). Otherwise
+> virt_to_pfn() would not work.
 
-Sean
+Yes, hibernate only save/restores the linear map, on the assumption that
+contains everything.
 
->
->>
->>
->>> Thanks.
->>>
->>> --
->>> ?ark Yao
->>>
->>>
->>
->>
->
->
-> --
-> ?ark Yao
->
->
+
+> Something I missed in the original hibernation support but it may look
+> better if you have something like:
+> 
+> 	pte_t pte = *src_pte;
+
+Sure,
+
+
+>> +
+>> +	if (pte_valid(*src_pte)) {
+>> +		/*
+>> +		 * Resume will overwrite areas that may be marked
+>> +		 * read only (code, rodata). Clear the RDONLY bit from
+>> +		 * the temporary mappings we use during restore.
+>> +		 */
+>> +		set_pte(dst_pte, __pte(pte_val(*src_pte) & ~PTE_RDONLY));
+> 
+> and here:
+> 
+> 		set_pte(dst_pte, pte_mkwrite(pte));
+
+pte_write() doesn't clear the PTE_RDONLY flag.
+Should it be changed?
+
+
+>> +	} else if (debug_pagealloc_enabled()) {
+>> +		/*
+>> +		 * debug_pagealloc may have removed the PTE_VALID bit if
+>> +		 * the page isn't in use by the resume kernel. It may have
+>> +		 * been in use by the original kernel, in which case we need
+>> +		 * to put it back in our copy to do the restore.
+>> +		 *
+>> +		 * Check for mappable memory that gives us a translation
+>> +		 * like part of the linear map.
+>> +		 */
+>> +		if (pfn_valid(pfn) && pte_pfn(*src_pte) == pfn)
+> 
+> Is there a case where this condition is false?
+
+Hopefully not, but I tried to avoid marking whatever happens to be there as
+valid. This is as paranoid as I can make it: checking the pfn should be mapped,
+and that the output-address part of the record is correct.
+
+If you're happy with the assumption that only valid records ever appear in the
+linear map page tables, (and that anything marked not-valid is a result of
+debug_pagealloc), then we can change this to !pte_none().
+
+
+>> +			set_pte(dst_pte, __pte((pte_val(*src_pte) & ~PTE_RDONLY) | PTE_VALID));
+> 
+> With some more macros:
+> 
+> 			set_pte(dst_pte, pte_mkwrite(pte_mkpresent(pte)))
+> 
+> (pte_mkpresent() needs to be added)
+
+>> +	}
+>> +}
+>> +
+>>  static int copy_pte(pmd_t *dst_pmd, pmd_t *src_pmd, unsigned long start,
+>>  		    unsigned long end)
+>>  {
+>> @@ -284,13 +317,7 @@ static int copy_pte(pmd_t *dst_pmd, pmd_t *src_pmd, unsigned long start,
+>>  
+>>  	src_pte = pte_offset_kernel(src_pmd, start);
+>>  	do {
+>> -		if (!pte_none(*src_pte))
+> 
+> You seem to no longer check for pte_none(). Is this not needed or
+> covered by the pte_pfn() != pfn check above?
+
+A bit of both:
+Previously this copied over any values it found. _copy_pte() now copies valid
+values, and if debug_pagealloc is turned on, tries to guess whether the
+non-valid values should be copied and marked valid.
+
+
+> 
+>> -			/*
+>> -			 * Resume will overwrite areas that may be marked
+>> -			 * read only (code, rodata). Clear the RDONLY bit from
+>> -			 * the temporary mappings we use during restore.
+>> -			 */
+>> -			set_pte(dst_pte, __pte(pte_val(*src_pte) & ~PTE_RDONLY));
+>> +		_copy_pte(dst_pte, src_pte, addr);
+>>  	} while (dst_pte++, src_pte++, addr += PAGE_SIZE, addr != end);
+>>  
+>>  	return 0;
+>> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+>> index ca6d268e3313..b6c0da84258c 100644
+>> --- a/arch/arm64/mm/pageattr.c
+>> +++ b/arch/arm64/mm/pageattr.c
+>> @@ -139,4 +139,42 @@ void __kernel_map_pages(struct page *page, int numpages, int enable)
+>>  					__pgprot(0),
+>>  					__pgprot(PTE_VALID));
+>>  }
+>> -#endif
+>> +#ifdef CONFIG_HIBERNATION
+>> +/*
+>> + * When built with CONFIG_DEBUG_PAGEALLOC and CONFIG_HIBERNATION, this function
+>> + * is used to determine if a linear map page has been marked as not-present by
+>> + * CONFIG_DEBUG_PAGEALLOC. Walk the page table and check the PTE_VALID bit.
+>> + * This is based on kern_addr_valid(), which almost does what we need.
+>> + */
+>> +bool kernel_page_present(struct page *page)
+>> +{
+>> +	pgd_t *pgd;
+>> +	pud_t *pud;
+>> +	pmd_t *pmd;
+>> +	pte_t *pte;
+>> +	unsigned long addr = (unsigned long)page_address(page);
+>> +
+>> +	pgd = pgd_offset_k(addr);
+>> +	if (pgd_none(*pgd))
+>> +		return false;
+>> +
+>> +	pud = pud_offset(pgd, addr);
+>> +	if (pud_none(*pud))
+>> +		return false;
+>> +	if (pud_sect(*pud))
+>> +		return true;
+> 
+> This wouldn't normally guarantee "present" but I don't think we ever
+> have a non-present section mapping for the kernel (we do for user
+> though). You may want to add a comment.
+
+Sure.
+
+Just in case I've totally miss-understood:
+> * Because this is only called on the kernel linar map we don't need to
+> * use p?d_present() to check for PROT_NONE regions, as these don't occur
+> * in the linear map.
+
+
+>> +
+>> +	pmd = pmd_offset(pud, addr);
+>> +	if (pmd_none(*pmd))
+>> +		return false;
+>> +	if (pmd_sect(*pmd))
+>> +		return true;
+>> +
+>> +	pte = pte_offset_kernel(pmd, addr);
+>> +	if (pte_none(*pte))
+>> +		return false;
+>> +
+>> +	return pte_valid(*pte);
+> 
+> You can return pte_valid() directly without the pte_none() check since
+> pte_none() implies !pte_valid().
+
+Oops, yes.
+
+
+Thanks for the comments!
+
+
+James
