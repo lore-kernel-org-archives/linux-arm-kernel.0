@@ -1,114 +1,42 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 23 Aug 2016 14:49:38 +0100
-Subject: [PATCH v4 01/15] drivers: iommu: add FWNODE_IOMMU fwnode type
-In-Reply-To: <1471274620-20754-2-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1471274620-20754-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1471274620-20754-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20160823134938.GA9953@red-moon>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 23 Aug 2016 21:51:05 +0800
+Subject: [PATCH 2/2] ARM: dts: sun8i: Add extra UART pinmux settings for
+ A23/33
+In-Reply-To: <20160823114251.GL2598@lukather>
+References: <20160823055826.20591-1-icenowy@aosc.xyz>
+ <20160823055826.20591-2-icenowy@aosc.xyz> <20160823114251.GL2598@lukather>
+Message-ID: <69271471960265@web26h.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
 
-On Mon, Aug 15, 2016 at 04:23:26PM +0100, Lorenzo Pieralisi wrote:
-> On systems booting with a device tree, every struct device is
-> associated with a struct device_node, that represents its DT
-> representation. The device node can be used in generic kernel
-> contexts (eg IRQ translation, IOMMU streamid mapping), to
-> retrieve the properties associated with the device and carry
-> out kernel operation accordingly. Owing to the 1:1 relationship
-> between the device and its device_node, the device_node can also
-> be used as a look-up token for the device (eg looking up a device
-> through its device_node), to retrieve the device in kernel paths
-> where the device_node is available.
-> 
-> On systems booting with ACPI, the same abstraction provided by
-> the device_node is required to provide look-up functionality.
-> 
-> Therefore, mirroring the approach implemented in the IRQ domain
-> kernel layer, this patch adds an additional fwnode type FWNODE_IOMMU.
-> 
-> This patch also implements a glue kernel layer that allows to
-> allocate/free FWNODE_IOMMU fwnode_handle structures and associate
-> them with IOMMU devices.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> ---
->  include/linux/fwnode.h |  1 +
->  include/linux/iommu.h  | 25 +++++++++++++++++++++++++
->  2 files changed, 26 insertions(+)
-> 
-> diff --git a/include/linux/fwnode.h b/include/linux/fwnode.h
-> index 8516717..6e10050 100644
-> --- a/include/linux/fwnode.h
-> +++ b/include/linux/fwnode.h
-> @@ -19,6 +19,7 @@ enum fwnode_type {
->  	FWNODE_ACPI_DATA,
->  	FWNODE_PDATA,
->  	FWNODE_IRQCHIP,
-> +	FWNODE_IOMMU,
->  };
 
-Are you ok with this fwnode usage ? It is quite key to the rest
-of this series and I would need to know in order to make progress
-on it please.
+23.08.2016, 19:42, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> Hi,
+>
+> On Tue, Aug 23, 2016 at 01:58:26PM +0800, Icenowy Zheng wrote:
+>> ?A23/33 have 4 UART controllers outside PRCM. However, the devicetree used
+>> ?to mentioned only UART0's pinmux settings. Some extra UART controllers have
+>> ?RTS/CTS, and is suitable for using as bluetooth UART controller.
+>>
+>> ?Add the pinmux settings for the UART controller, to make use of the
+>> ?bluetooth function of some tablets.
+>>
+>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>
+> Our policy is that we avoid adding unused pinctrl nodes to not cripple
+> the DT for no particular reason.
+>
+> So please add only the nodes you'll need in your tablet.
 
-Platform devices created out of IORT tables are not ACPI devices
-(I could create fake ones as we do for FADT power button, I do not
-see any particular reason to prefer that approach over this one) and
-in order to identify the device through a fwnode_handle (that, as for
-IRQCHIP is nothing but a token used for look-up) that's what I came
-up with.
+Then... if what I needs is the PG group of uart1, should I name it as
+uart1_pins_a or uart1_pins_b?
 
-Any feedback on the rest of the series is very welcome and needed
-too, thanks.
-
-Lorenzo
-
->  struct fwnode_handle {
-> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> index a35fb8b..6f703cb 100644
-> --- a/include/linux/iommu.h
-> +++ b/include/linux/iommu.h
-> @@ -38,6 +38,7 @@ struct bus_type;
->  struct device;
->  struct iommu_domain;
->  struct notifier_block;
-> +struct fwnode_handle;
->  
->  /* iommu fault flags */
->  #define IOMMU_FAULT_READ	0x0
-> @@ -543,4 +544,28 @@ static inline void iommu_device_unlink(struct device *dev, struct device *link)
->  
->  #endif /* CONFIG_IOMMU_API */
->  
-> +/* IOMMU fwnode handling */
-> +static inline bool is_fwnode_iommu(struct fwnode_handle *fwnode)
-> +{
-> +	return fwnode && fwnode->type == FWNODE_IOMMU;
-> +}
-> +
-> +static inline struct fwnode_handle *iommu_alloc_fwnode(void)
-> +{
-> +	struct fwnode_handle *fwnode;
-> +
-> +	fwnode = kzalloc(sizeof(struct fwnode_handle), GFP_ATOMIC);
-> +	fwnode->type = FWNODE_IOMMU;
-> +
-> +	return fwnode;
-> +}
-> +
-> +static inline void iommu_free_fwnode(struct fwnode_handle *fwnode)
-> +{
-> +	if (WARN_ON(!is_fwnode_iommu(fwnode)))
-> +		return;
-> +
-> +	kfree(fwnode);
-> +}
-> +
->  #endif /* __LINUX_IOMMU_H */
-> -- 
-> 2.6.4
-> 
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
