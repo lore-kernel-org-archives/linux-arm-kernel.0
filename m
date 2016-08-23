@@ -1,75 +1,114 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 23 Aug 2016 14:49:00 +0100
-Subject: [PATCH v3 11/12] clk: tegra: Add BPMP clock driver
-In-Reply-To: <20160822132833.GD17367@ulmo.ba.sec>
-References: <20160819173233.13260-1-thierry.reding@gmail.com>
- <20160819173233.13260-12-thierry.reding@gmail.com>
- <0d7080bc-9e82-75dd-7169-0a5b7429801e@nvidia.com>
- <20160822132833.GD17367@ulmo.ba.sec>
-Message-ID: <d4caf8c4-f733-5a63-fa03-f6160963fadb@nvidia.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 23 Aug 2016 14:49:38 +0100
+Subject: [PATCH v4 01/15] drivers: iommu: add FWNODE_IOMMU fwnode type
+In-Reply-To: <1471274620-20754-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1471274620-20754-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1471274620-20754-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20160823134938.GA9953@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rafael,
 
-On 22/08/16 14:28, Thierry Reding wrote:
-> On Mon, Aug 22, 2016 at 11:11:57AM +0100, Jon Hunter wrote:
->>
->> On 19/08/16 18:32, Thierry Reding wrote:
->>> From: Thierry Reding <treding@nvidia.com>
->>>
->>> This driver uses the services provided by the BPMP firmware driver to
->>> implement a clock driver based on the MRQ_CLK request. This part of the
->>> BPMP ABI provides a means to enumerate and control clocks and should
->>> allow the driver to work on any chip that supports this ABI.
->>>
->>> Signed-off-by: Thierry Reding <treding@nvidia.com>
->>> ---
->>>  drivers/clk/tegra/Makefile   |   1 +
->>>  drivers/clk/tegra/clk-bpmp.c | 565 +++++++++++++++++++++++++++++++++++++++++++
->>>  2 files changed, 566 insertions(+)
->>>  create mode 100644 drivers/clk/tegra/clk-bpmp.c
-
-[snip]
-
->>> +int tegra_bpmp_init_clocks(struct tegra_bpmp *bpmp)
->>> +{
->>> +	struct tegra_bpmp_clk_info *clocks;
->>> +	unsigned int count;
->>> +	int err;
->>> +
->>> +	dev_dbg(bpmp->dev, "> %s(bpmp=%p)\n", __func__, bpmp);
->>> +
->>> +	err = tegra_bpmp_probe_clocks(bpmp, &clocks);
->>> +	if (err < 0)
->>> +		return err;
->>> +
->>> +	count = err;
->>> +
->>> +	dev_dbg(bpmp->dev, "%u clocks probed\n", count);
->>> +
->>> +	err = tegra_bpmp_register_clocks(bpmp, clocks, count);
->>> +	if (err < 0) {
->>> +		kfree(clocks);
->>> +		return err;
->>> +	}
->>> +
->>> +	kfree(clocks);
->>> +
->>> +	of_clk_add_hw_provider(bpmp->dev->of_node, tegra_bpmp_clk_of_xlate,
->>> +			       bpmp);
->>
->> We should check the return code.
+On Mon, Aug 15, 2016 at 04:23:26PM +0100, Lorenzo Pieralisi wrote:
+> On systems booting with a device tree, every struct device is
+> associated with a struct device_node, that represents its DT
+> representation. The device node can be used in generic kernel
+> contexts (eg IRQ translation, IOMMU streamid mapping), to
+> retrieve the properties associated with the device and carry
+> out kernel operation accordingly. Owing to the 1:1 relationship
+> between the device and its device_node, the device_node can also
+> be used as a look-up token for the device (eg looking up a device
+> through its device_node), to retrieve the device in kernel paths
+> where the device_node is available.
 > 
-> Yes, I suppose we should also make sure to remove all clocks if this
-> ever fails. I'll see how difficult it is to implement that.
+> On systems booting with ACPI, the same abstraction provided by
+> the device_node is required to provide look-up functionality.
+> 
+> Therefore, mirroring the approach implemented in the IRQ domain
+> kernel layer, this patch adds an additional fwnode type FWNODE_IOMMU.
+> 
+> This patch also implements a glue kernel layer that allows to
+> allocate/free FWNODE_IOMMU fwnode_handle structures and associate
+> them with IOMMU devices.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> ---
+>  include/linux/fwnode.h |  1 +
+>  include/linux/iommu.h  | 25 +++++++++++++++++++++++++
+>  2 files changed, 26 insertions(+)
+> 
+> diff --git a/include/linux/fwnode.h b/include/linux/fwnode.h
+> index 8516717..6e10050 100644
+> --- a/include/linux/fwnode.h
+> +++ b/include/linux/fwnode.h
+> @@ -19,6 +19,7 @@ enum fwnode_type {
+>  	FWNODE_ACPI_DATA,
+>  	FWNODE_PDATA,
+>  	FWNODE_IRQCHIP,
+> +	FWNODE_IOMMU,
+>  };
 
-In the unlikely event it fails, not much is going to work and so may be
-warning or printing an error is enough. It seems that we don't clean-up
-in the bpmp firmware driver (that calls this) and so not cleaning up
-here will not make much difference.
+Are you ok with this fwnode usage ? It is quite key to the rest
+of this series and I would need to know in order to make progress
+on it please.
 
-Cheers
-Jon
+Platform devices created out of IORT tables are not ACPI devices
+(I could create fake ones as we do for FADT power button, I do not
+see any particular reason to prefer that approach over this one) and
+in order to identify the device through a fwnode_handle (that, as for
+IRQCHIP is nothing but a token used for look-up) that's what I came
+up with.
 
--- 
-nvpublic
+Any feedback on the rest of the series is very welcome and needed
+too, thanks.
+
+Lorenzo
+
+>  struct fwnode_handle {
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> index a35fb8b..6f703cb 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -38,6 +38,7 @@ struct bus_type;
+>  struct device;
+>  struct iommu_domain;
+>  struct notifier_block;
+> +struct fwnode_handle;
+>  
+>  /* iommu fault flags */
+>  #define IOMMU_FAULT_READ	0x0
+> @@ -543,4 +544,28 @@ static inline void iommu_device_unlink(struct device *dev, struct device *link)
+>  
+>  #endif /* CONFIG_IOMMU_API */
+>  
+> +/* IOMMU fwnode handling */
+> +static inline bool is_fwnode_iommu(struct fwnode_handle *fwnode)
+> +{
+> +	return fwnode && fwnode->type == FWNODE_IOMMU;
+> +}
+> +
+> +static inline struct fwnode_handle *iommu_alloc_fwnode(void)
+> +{
+> +	struct fwnode_handle *fwnode;
+> +
+> +	fwnode = kzalloc(sizeof(struct fwnode_handle), GFP_ATOMIC);
+> +	fwnode->type = FWNODE_IOMMU;
+> +
+> +	return fwnode;
+> +}
+> +
+> +static inline void iommu_free_fwnode(struct fwnode_handle *fwnode)
+> +{
+> +	if (WARN_ON(!is_fwnode_iommu(fwnode)))
+> +		return;
+> +
+> +	kfree(fwnode);
+> +}
+> +
+>  #endif /* __LINUX_IOMMU_H */
+> -- 
+> 2.6.4
+> 
