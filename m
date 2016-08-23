@@ -1,93 +1,73 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 23 Aug 2016 11:58:47 +0900
-Subject: [PATCH 5/7] arm64: dts: exynos: Add dts files for Samsung
- Exynos5433 64bit SoC
-In-Reply-To: <b4bb1d48-ce1f-0ddf-9e96-3e2ad29bc3fa@samsung.com>
-References: <1471328843-26653-1-git-send-email-cw00.choi@samsung.com>
- <1471329328-26842-1-git-send-email-cw00.choi@samsung.com>
- <CGME20160819105049epcas1p424a9e752b59645c675d44d9802f9d775@epcas1p4.samsung.com>
- <b4bb1d48-ce1f-0ddf-9e96-3e2ad29bc3fa@samsung.com>
-Message-ID: <57BBBBE7.8080601@samsung.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Tue, 23 Aug 2016 05:03:29 +0200
+Subject: [PATCH v7 7/7] doc: bindings: act8945a-charger: Update properties
+In-Reply-To: <1471848557-27278-8-git-send-email-wenyou.yang@atmel.com>
+References: <1471848557-27278-1-git-send-email-wenyou.yang@atmel.com>
+ <1471848557-27278-8-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20160823030329.zy6kgncj2ov5ypnj@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hi,
 
-On 2016? 08? 19? 19:48, Marek Szyprowski wrote:
-> Hello,
+On Mon, Aug 22, 2016 at 02:49:17PM +0800, Wenyou Yang wrote:
+> Due the driver improvements, update the properties,
+>  - Remove "active-semi,check-battery-temperature" property.
+>  - Add the properties, "active-semi,irq_gpio"
+>    and "active-semi,lbo-gpios".
 > 
-> 
-> On 2016-08-16 08:35, Chanwoo Choi wrote:
->> This patch adds new Exynos5433 dtsi to support 64-bit Exynos5433 SoC based on
->> Octa-core CPUs (quad Cortex-A57 and quad Cortex-A53). And Exynos5433 supports
->> PSCI (Power State Coordination Interface) v0.1.
->>
->> This patch includes following Device Tree node to support Exynos5433 SoC:
->> 1. Octa cores for big.LITTLE architecture
->> - Cortex-A53 LITTLE Quad-core
->> - Cortex-A57 big Quad-core
->> - Support PSCI v0.1
->>
->> 2. Clock controller node
->> - CMU_TOP   : clocks for IMEM/FSYS/G3D/GSCL/HEVC/MSCL/G2D/MFC/PERIC/PERIS
->> - CMU_CPIF  : clocks for LLI (Low Latency Interface)
->> - CMU_MIF   : clocks for DRAM Memory Controller
->> - CMU_PERIC : clocks for UART/I2C/SPI/I2S/PCM/SPDIF/PWM/SLIMBUS
->> - CMU_PERIS : clocks for PMU/TMU/MCT/WDT/RTC/SECKEY/TZPC
->> - CMU_FSYS  : clocks for USB/UFS/SDMMC/TSI/PDMA
->> - CMU_G2D   : clocks for G2D/MDMA
->> - CMU_DISP  : clocks for DECON/HDMI/DSIM/MIXER
->> - CMU_AUD   : clocks for Cortex-A5/BUS/AUDIO
->> - CMU_BUS{0|1|2} : clocks for global data buses and global peripheral buses
->> - CMU_G3D   : clocks for 3D Graphics Engine
->> - CMU_GSCL  : clocks for GSCALER
->> - CMU_APOLLO: clocks for Cortex-A53 Quad-core processor.
->> - CMU_ATLAS : clocks for Cortex-A57 Quad-core processor,
->>                CoreSight and L2 cache controller.
->> - CMU_MSCL  : clocks for M2M (Memory to Memory) scaler and JPEG IPs.
->> - CMU_MFC   : clocks for MFC (Multi-Format Codec) IP.
->> - CMU_HEVC  : clocks for HEVC(High Efficiency Video Codec) decoder IP.
->> - CMU_ISP   : clocks for FIMC-ISP/DRC/SCLC/DIS/3DNR IPs.
->> - CMU_CAM0  : clocks for MIPI_CSIS{0|1}/FIMC_LITE_{A|B|D}/FIMC_3AA{0|1} IPs.
->> - CMU_CAM1  : clocks for COrtex-A5/MIPI_CSIS2/FIMC_LITE_C/FIMC-FD IPs.
->>
->> 3. pinctrl node for GPIO
->> - alive/aud/cpif/ese/finger/fsys/imem/nfc/peric/touch pad
->>
->> 4. Timer
->> - ARM architecture timer (armv8-timer)
->> - MCT (Multi Core Timer) timer
->>
->> 5. Interrupt controller (GIC-400)
->>
->> 6. BUS devices
->> - HS-I2C (High-Speed I2C) device
->> - SPI (Serial Peripheral Interface) device
->>
->> 7. Sound devices
->> - I2S bus
->> - LPASS (Low Power Audio Subsystem)
->>
->> 8. Power management devices
->> - CPUFREQ for for Cortex-A53/A57
->> - TMU (Thermal Management Unit) for Cortex-A53/A57, G3D, ISP
->>
->> 9. Display controller devices
->> - DECON (Display and enhancement controller) for panel output
->> - DSI (Display Serial Interface)
->> - MIC (Mobile Image Compressor)
->> - IOMMU for GSCL/DECON/TV/MFC/JPEG/FLITE/3AA/FIMC
-> 
-> I would prefer to instantiate only SYSMMU controllers for the devices that
-> have been already added, so initially there will by only SYSMMUs for DECON.
-> Other (GSCL, TV, MFC, JPEG, CAMERA ISP) can be added later together with
-> respective master device nodes.
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-OK. I'll remove all SYSMMU dt nodes from exynos5433.dtsi
-on next version.
+I wonder if it's too late to slightly break the DT API by
+introducing a proper sub-device for the charger and having all those
+charger specific details described there. Not being able to use the
+devm_ functions because all properties are assigned to the parent
+device is not very nice.
 
-[snip]
+We could easily support reading timeouts and threshold information
+from the both (parent and sub-device) and just mark the parent
+binding deprecated. The only real API break would be
+"active-semi,chglev-gpios", which is currently broken anyways in the
+driver as far as I can see (I should have reviewed this more
+carefully previously).
 
--- 
-Best Regards,
-Chanwoo Choi
+In other words I suggest the following:
+
+pmic at 5b {
+    compatible = "active-semi,act8945a";
+    reg = <0x5b>;
+    status = "okay";
+
+    /* the following 3 are deprecated, but still supported */
+    //active-semi,input-voltage-threshold-microvolt = <6600>;
+    //active-semi,precondition-timeout = <40>;
+    //active-semi,total-timeout = <3>;
+
+    /* no longer supported, never worked properly */
+    //active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
+
+    /* this is new, mfd should register charger sub-dev independently
+     * of the subnode for backwards compatibility. Then optional
+     * gpios/irqs are not available. But those either never worked
+     * or did not exist before this update. */
+    charger {
+        active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
+        active-semi,lbo-gpios = <&pioA 72 GPIO_ACTIVE_LOW>;
+		interrupt-parent = <&pioA>;
+        interrupts = <45 GPIO_ACTIVE_LOW>
+
+        active-semi,input-voltage-threshold-microvolt = <6600>;
+        active-semi,precondition-timeout = <40>;
+        active-semi,total-timeout = <3>;
+    };
+};
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160823/f270d174/attachment-0001.sig>
