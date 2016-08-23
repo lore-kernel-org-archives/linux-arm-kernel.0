@@ -1,75 +1,61 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 23 Aug 2016 09:38:16 +0900
-Subject: [PATCH v24 5/9] arm64: kdump: add kdump support
-In-Reply-To: <57BB0272.1000008@arm.com>
-References: <20160809015248.28414-2-takahiro.akashi@linaro.org>
- <20160809015615.28527-1-takahiro.akashi@linaro.org>
- <20160809015615.28527-3-takahiro.akashi@linaro.org>
- <57AB586D.3080900@arm.com> <20160818071547.GC20080@linaro.org>
- <20160819012651.GE20080@linaro.org>
- <20160819112217.GB22221@localhost.localdomain>
- <20160822012919.GI20080@linaro.org> <57BB0272.1000008@arm.com>
-Message-ID: <20160823003815.GL20080@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 22 Aug 2016 17:38:31 -0700
+Subject: [PATCH 1/2] arm64: kernel: Add SMC Session ID to results
+In-Reply-To: <20160822145326.GK14680@arm.com>
+References: <1471672274-19317-1-git-send-email-andy.gross@linaro.org>
+ <1471672274-19317-2-git-send-email-andy.gross@linaro.org>
+ <20160822134313.GJ14680@arm.com>
+ <20160822140246.GA30923@hector.attlocal.net>
+ <20160822145326.GK14680@arm.com>
+Message-ID: <20160823003831.GN6502@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2016 at 02:47:30PM +0100, James Morse wrote:
-> On 22/08/16 02:29, AKASHI Takahiro wrote:
-> > On Fri, Aug 19, 2016 at 04:52:17PM +0530, Pratyush Anand wrote:
-> >> It will help kexec-tools to prevent copying  of any unnecessary data. I
-> >> think, then you also need to change phys_offset calculation in kexec-tools. That
-> >> should be start of either of first "reserved" or "System RAM" block.
+On 08/22, Will Deacon wrote:
+> On Mon, Aug 22, 2016 at 09:02:46AM -0500, Andy Gross wrote:
+> > On Mon, Aug 22, 2016 at 02:43:14PM +0100, Will Deacon wrote:
+> > > On Sat, Aug 20, 2016 at 12:51:13AM -0500, Andy Gross wrote:
+> > > >  
+> > > >  /**
+> > > >   * arm_smccc_smc() - make SMC calls
+> > > >   * @a0-a7: arguments passed in registers 0 to 7
+> > > > - * @res: result values from registers 0 to 3
+> > > > + * @res: result values from registers 0 to 3 and optional register 6
+> > > 
+> > > AFAICT from reading the SMCCC spec, parameter register 6 is "Unpredictable,
+> > > Scratch registers" in return state, so I don't think this is correct.
+> > > 
+> > > What am I missing?
 > > 
-> > Good point, but I'm not sure this is always true.
+> > In the case of Qualcomm's implementation, they return a value in register 6 that
+> > may or may not be used in subsequent calls.  If I want to leverage the arm_smccc
+> > functions, then I need to extend them to include the optional return value.  The
+> > downside to this is that everyone who uses this is exposed to it.
 > 
-> > Is there any system whose ACPI memory is *not* part of DRAM
+> Yes, I'm not keen on forcing this behaviour for everybody, as you never
+> know what other firmware might do with unexpected a6 values. Could we
+> perhaps quirk it, along the lines of the completely untested patch below?
 > 
-> From the spec, it looks like this is allowed.
-> 
-> What do you mean by 'DRAM'? Any ACPI region will be in the UEFI memory map, so
-> the question is what is its type and memory attributes?
 
-Yes.
+How would the firmware know about the a6 values? It isn't passed
+to the firmware unless the caller of arm_smccc_smc() uses it. Is
+the concern that we would be exposing x6 as a return register for
+all users of arm_smccc_smc()? Presumably callers of
+arm_smccc_smc() would know if they want to use that extra
+register or not, so doing all the quirk stuff seems like more
+instructions over always saving away x6 on the return path, but
+maybe there's some reasoning I missed.
 
-> The UEFI spec[0] says ACPI regions can have a type of EfiACPIReclaimMemory or
-> EfiACPIMemoryNVS, the memory attributes aren't specified, so are chosen by the
-> firmware.
-> 
-> It is possible these regions have to be mapped non-cacheable, page 40 has a
-> couple of:
-> > If no information about the table location exists in the UEFI memory map or
-> ACPI memory
-> > descriptors, the table is assumed to be non-cached.
-> 
-> reserve_regions() in drivers/firmware/efi/arm-init.c will add any entry in the
-> memory map that has a 'WB' attribute to the memblock.memory list (via
-> early_init_dt_add_memory_arch()), it will also mark as no-map regions that have
-> this attribute and aren't in the is_reserve_region() list.
-> 
-> If these ACPI regions have the 'WB' attribute, we add them as memory and mark
-> them nomap. These show up as either a hole, or 'reserved' in /proc/iomem.
-> If they don't have the 'WB' attribute, then then they are left out of memblock
-> and aren't part of DRAM, I don't think these will show up in /proc/iomem at all.
+This all comes about because the firmware generates a session id
+for the SMC call and jams it in x6. The assembly on the
+non-secure side is written with a tight loop around the smc
+instruction so that when the return value indicates
+"interrupted", x6 is kept intact and the non-secure OS can jump
+back to the secure OS without register reloading. Perhaps
+referring to x6 as result value is not correct because it's
+really a session id that's irrelevant once the smc call
+completes.
 
-Let's say,
-0x1000-0x1fff: reserved (SRAM for UEFI, WB)
-0x80000000-0xffffffff: System RAM (DRAM)
-
-If, as Pratyush suggested, "reserved" resources are added to phys_offset
-calculation, the kernel linear mapping area starts at PAGE_OFFSET, but
-there is no actual mapping around PAGE_OFFSET.
-It won't hurt anything, but looks funny.
-So we'd better not include "reserved" in phys_offset calculation anyway.
-        -> Pratyush
-
-Thanks,
--Takahiro AKASHI
-
-> 
-> 
-> Thanks,
-> 
-> James
-> 
-> [0] '2.3.6 AArch64 Platforms' of version 2.6 of the UEFI spec at
-> http://uefi.org/specifications
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
