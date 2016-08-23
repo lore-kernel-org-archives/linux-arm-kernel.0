@@ -1,118 +1,34 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 23 Aug 2016 10:55:34 +0200
-Subject: [PATCH v2 2/5] clk: sunxi-ng: mux: support fixed pre-dividers on
- multiple parents
-In-Reply-To: <1471248795-17951-3-git-send-email-wens@csie.org>
-References: <1471248795-17951-1-git-send-email-wens@csie.org>
- <1471248795-17951-3-git-send-email-wens@csie.org>
-Message-ID: <20160823085534.GC2598@lukather>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Aug 2016 09:58:54 +0100
+Subject: [PATCH 2/2] ARM: sa1100: register clocks early
+In-Reply-To: <CALT56yPLMiQZaeSxmo3xz_+6c11BO-hWSEN2ex-ziJGZdZDY6w@mail.gmail.com>
+References: <E1baiKh-0004yg-OF@rmk-PC.armlinux.org.uk>
+ <CALT56yPLMiQZaeSxmo3xz_+6c11BO-hWSEN2ex-ziJGZdZDY6w@mail.gmail.com>
+Message-ID: <20160823085854.GD1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2016 at 04:13:12PM +0800, Chen-Yu Tsai wrote:
-> Some clocks on the A31 have fixed pre-dividers on multiple parents.
-> Add support for them.
+On Tue, Aug 23, 2016 at 04:47:08AM +0300, Dmitry Eremin-Solenikov wrote:
+> 2016-08-19 14:51 GMT+03:00 Russell King <rmk+kernel@armlinux.org.uk>:
+> > Since we switched to use pxa_timer, we need to provide the OSTIMER0
+> > clock.  However, as the clock is initialised early, we need to provide
+> > the clock early as well, so that pxa_timer can find it.  Adding the
+> > clock to the clkdev table at core_initcall() time is way too late.
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> Changes since v1:
+> This worked for me before, so maybe the init order of other kernel parts
+> has changed. Anyway:
 > 
->   - Add field for number of fixed pre-dividers.
-> ---
->  drivers/clk/sunxi-ng/ccu-sun8i-h3.c |  9 +++++----
->  drivers/clk/sunxi-ng/ccu_mux.c      |  6 ++++--
->  drivers/clk/sunxi-ng/ccu_mux.h      | 11 +++++++----
->  3 files changed, 16 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-> index 9af359544110..a01298881991 100644
-> --- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-> @@ -184,15 +184,16 @@ static SUNXI_CCU_MP_WITH_MUX(apb2_clk, "apb2", apb2_parents, 0x058,
->  			     0);
->  
->  static const char * const ahb2_parents[] = { "ahb1" , "pll-periph0" };
-> +static const struct ccu_mux_fixed_prediv ahb2_fixed_predivs[] = {
-> +	{ .index = 1, .div = 2 },
-> +	{ },
-> +};
->  static struct ccu_mux ahb2_clk = {
->  	.mux		= {
->  		.shift	= 0,
->  		.width	= 1,
->  
-> -		.fixed_prediv	= {
-> -			.index	= 1,
-> -			.div	= 2,
-> -		},
-> +		.fixed_predivs	= ahb2_fixed_predivs,
->  	},
->  
->  	.common		= {
-> diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
-> index 68b32f168a74..7b17e0c26b01 100644
-> --- a/drivers/clk/sunxi-ng/ccu_mux.c
-> +++ b/drivers/clk/sunxi-ng/ccu_mux.c
-> @@ -20,6 +20,7 @@ void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
->  {
->  	u16 prediv = 1;
->  	u32 reg;
-> +	int i;
->  
->  	if (!((common->features & CCU_FEATURE_FIXED_PREDIV) ||
->  	      (common->features & CCU_FEATURE_VARIABLE_PREDIV)))
-> @@ -32,8 +33,9 @@ void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
->  	}
->  
->  	if (common->features & CCU_FEATURE_FIXED_PREDIV)
-> -		if (parent_index == cm->fixed_prediv.index)
-> -			prediv = cm->fixed_prediv.div;
-> +		for (i = 0; i < cm->n_predivs; i++)
-> +			if (parent_index == cm->fixed_predivs[i].index)
-> +				prediv = cm->fixed_predivs[i].div;
->  
->  	if (common->features & CCU_FEATURE_VARIABLE_PREDIV)
->  		if (parent_index == cm->variable_prediv.index) {
-> diff --git a/drivers/clk/sunxi-ng/ccu_mux.h b/drivers/clk/sunxi-ng/ccu_mux.h
-> index f0078de78712..5308b41da22a 100644
-> --- a/drivers/clk/sunxi-ng/ccu_mux.h
-> +++ b/drivers/clk/sunxi-ng/ccu_mux.h
-> @@ -5,15 +5,18 @@
->  
->  #include "ccu_common.h"
->  
-> +struct ccu_mux_fixed_prediv {
-> +	u8	index;
-> +	u16	div;
-> +};
-> +
->  struct ccu_mux_internal {
->  	u8		shift;
->  	u8		width;
->  	const u8	*table;
->  
-> -	struct {
-> -		u8	index;
-> -		u16	div;
-> -	} fixed_prediv;
-> +	const struct ccu_mux_fixed_prediv	*fixed_predivs;
-> +	u8		n_predivs;
+> Acked-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 
-I don't think you're using it anywhere (at least you don't define it
-in ahb2_clk, and the extra item in the array will introduce an
-off-by-one error.
+It worked in so far as we fell back to the non-clock based code, so
+things continued to work.  However, a warning was printed at each
+boot.
 
-Thanks!
-Maxime
+I don't think this ever worked.  Timers are setup very early in the
+boot process (going back to 0.99.x times), and core_initcall() has
+always been after that, after pid1 has been created.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160823/03796b5b/attachment.sig>
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
