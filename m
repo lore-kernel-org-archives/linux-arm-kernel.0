@@ -1,44 +1,81 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 23 Aug 2016 12:48:41 -0500
-Subject: [PATCH 5/5] firmware: ti_sci: Add support for reboot core service
-In-Reply-To: <20160819225159.10758-6-nm@ti.com>
-References: <20160819225159.10758-1-nm@ti.com>
- <20160819225159.10758-6-nm@ti.com>
-Message-ID: <20160823174841.GA23677@rob-hp-laptop>
+Date: Tue, 23 Aug 2016 12:51:20 -0500
+Subject: [PATCH 1/9] mfd: axp20x: Add bindings for AXP806 PMIC
+In-Reply-To: <20160821021125.1521-2-wens@csie.org>
+References: <20160821021125.1521-1-wens@csie.org>
+ <20160821021125.1521-2-wens@csie.org>
+Message-ID: <20160823175120.GA26572@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2016 at 05:51:59PM -0500, Nishanth Menon wrote:
-> Since system controller now has control over SoC power management, it
-> needs to be explicitly requested to reboot the SoC. Add support for
-> it.
+On Sun, Aug 21, 2016 at 10:11:17AM +0800, Chen-Yu Tsai wrote:
+> This patch adds the basic and regulator bindings for the X-Powers AXP809
+> PMIC.
+
+Looks like you're adding the AXP806 to me.
+
 > 
-> In some systems however, SoC needs to toggle a GPIO or send event to an
-> external entity (like a PMIC) for a system reboot to take place. To
-> facilitate that, we allow for a DT property to determine if the reboot
-> handler will be registered and further, the service is also made
-> available to other drivers (such as PMIC driver) to sequence the
-> additional operation and trigger the SoC reboot as the last step.
-> 
-> Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  .../devicetree/bindings/arm/keystone/ti,sci.txt    |  1 +
->  drivers/firmware/ti_sci.c                          | 85 ++++++++++++++++++++++
->  drivers/firmware/ti_sci.h                          | 12 +++
->  include/linux/soc/ti/ti_sci_protocol.h             | 11 +++
->  4 files changed, 109 insertions(+)
+>  Documentation/devicetree/bindings/mfd/axp20x.txt | 28 ++++++++++++++++++++++--
+>  1 file changed, 26 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-> index 965d45e313b1..ed5b8fc185f1 100644
-> --- a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-> +++ b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-> @@ -38,6 +38,7 @@ Optional Properties:
->  - reg-names:
->  	debug_messages - Map the Debug message region
->  - reg:  register space corresponding to the debug_messages
-> +- ti,system-reboot-controller: If system reboot can be triggered by SoC reboot
+> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> index 585a95546288..8f3ad9ab4637 100644
+> --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
+> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> @@ -10,7 +10,8 @@ axp809 (X-Powers)
+>  
+>  Required properties:
+>  - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
+> -	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp809"
+> +	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp806",
+> +	      "x-powers,axp809"
 
-Don't define bindings incrementally. But all the binding in one patch.
+Reformat this to one valid combination per line.
 
-Rob
+>  - reg: The I2C slave address or RSB hardware address for the AXP chip
+>  - interrupt-parent: The parent interrupt controller
+>  - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
+> @@ -47,7 +48,6 @@ Optional properties for DCDC regulators:
+>  			  probably makes sense for HiFi audio related
+>  			  applications that aren't battery constrained.
+>  
+> -
+>  AXP202/AXP209 regulators, type, and corresponding input supply names:
+>  
+>  Regulator	  Type		  Supply Name		  Notes
+> @@ -86,6 +86,30 @@ LDO_IO1		: LDO		: ips-supply		: GPIO 1
+>  RTC_LDO		: LDO		: ips-supply		: always on
+>  DRIVEVBUS	: Enable output	: drivevbus-supply	: external regulator
+>  
+> +AXP806 regulators, type, and corresponding input supply names:
+> +
+> +Regulator	  Type		  Supply Name		  Notes
+> +---------	  ----		  -----------		  -----
+> +DCDCA		: DC-DC buck	: vina-supply		: poly-phase capable
+> +DCDCB		: DC-DC buck	: vinb-supply		: poly-phase capable
+> +DCDCC		: DC-DC	buck	: vinc-supply		: poly-phase capable
+> +DCDCD		: DC-DC	buck	: vind-supply		: poly-phase capable
+> +DCDCE		: DC-DC	buck	: vine-supply		: poly-phase capable
+> +ALDO1		: LDO		: aldoin-supply		: shared supply
+> +ALDO2		: LDO		: aldoin-supply		: shared supply
+> +ALDO3		: LDO		: aldoin-supply		: shared supply
+> +BLDO1		: LDO		: bldoin-supply		: shared supply
+> +BLDO2		: LDO		: bldoin-supply		: shared supply
+> +BLDO3		: LDO		: bldoin-supply		: shared supply
+> +BLDO4		: LDO		: bldoin-supply		: shared supply
+> +CLDO1		: LDO		: cldoin-supply		: shared supply
+> +CLDO2		: LDO		: cldoin-supply		: shared supply
+> +CLDO3		: LDO		: cldoin-supply		: shared supply
+> +SW		: On/Off Switch : swin-supply
+> +
+> +Additionally, the AXP806 DC-DC regulators support poly-phase arrangements
+> +for higher output current. The possible groupings are: A+B, A+B+C, D+E.
+> +
+>  AXP809 regulators, type, and corresponding input supply names:
+>  
+>  Regulator	  Type		  Supply Name		  Notes
+> -- 
+> 2.9.3
+> 
