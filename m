@@ -1,58 +1,44 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 23 Aug 2016 18:35:30 +0100
-Subject: [PATCH v3 09/12] arm64: dts: tegra: Add NVIDIA P3310 main board
- support
-In-Reply-To: <20160819173233.13260-10-thierry.reding@gmail.com>
-References: <20160819173233.13260-1-thierry.reding@gmail.com>
- <20160819173233.13260-10-thierry.reding@gmail.com>
-Message-ID: <9c123f91-d7ae-7cf1-f669-412aa350a0ca@nvidia.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 23 Aug 2016 12:48:41 -0500
+Subject: [PATCH 5/5] firmware: ti_sci: Add support for reboot core service
+In-Reply-To: <20160819225159.10758-6-nm@ti.com>
+References: <20160819225159.10758-1-nm@ti.com>
+ <20160819225159.10758-6-nm@ti.com>
+Message-ID: <20160823174841.GA23677@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 19/08/16 18:32, Thierry Reding wrote:
-> From: Joseph Lo <josephl@nvidia.com>
+On Fri, Aug 19, 2016 at 05:51:59PM -0500, Nishanth Menon wrote:
+> Since system controller now has control over SoC power management, it
+> needs to be explicitly requested to reboot the SoC. Add support for
+> it.
 > 
-> The NVIDIA P3310 is a processor module used in several reference designs
-> that features a Tegra186 SoC, 8 GiB of LPDDR4 RAM, 32 GiB eMMC and other
-> essentials such as ethernet, WiFi and a PMIC. It is typically connected
-> to an I/O board (such as the P2597) that provides the connecters needed
-> to hook it up to the outside world.
+> In some systems however, SoC needs to toggle a GPIO or send event to an
+> external entity (like a PMIC) for a system reboot to take place. To
+> facilitate that, we allow for a DT property to determine if the reboot
+> handler will be registered and further, the service is also made
+> available to other drivers (such as PMIC driver) to sequence the
+> additional operation and trigger the SoC reboot as the last step.
 > 
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 > ---
-> Changes in v3:
-> - fix compatible string
+>  .../devicetree/bindings/arm/keystone/ti,sci.txt    |  1 +
+>  drivers/firmware/ti_sci.c                          | 85 ++++++++++++++++++++++
+>  drivers/firmware/ti_sci.h                          | 12 +++
+>  include/linux/soc/ti/ti_sci_protocol.h             | 11 +++
+>  4 files changed, 109 insertions(+)
 > 
->  arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi | 34 ++++++++++++++++++++++++++
->  1 file changed, 34 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-> 
-> diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-> new file mode 100644
-> index 000000000000..dc07ea618378
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-> @@ -0,0 +1,34 @@
-> +#include "tegra186.dtsi"
-> +
-> +/ {
-> +	model = "NVIDIA Tegra186 P3310 main Board";
-> +	compatible = "nvidia,p3310", "nvidia,tegra186";
-> +
-> +	aliases {
-> +		serial0 = &uarta;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "earlycon console=ttyS0,115200n8";
+> diff --git a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+> index 965d45e313b1..ed5b8fc185f1 100644
+> --- a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+> +++ b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+> @@ -38,6 +38,7 @@ Optional Properties:
+>  - reg-names:
+>  	debug_messages - Map the Debug message region
+>  - reg:  register space corresponding to the debug_messages
+> +- ti,system-reboot-controller: If system reboot can be triggered by SoC reboot
 
-I don't think we need 'console' in the bootargs anymore because
-stdout-path is enough (even for early console).
+Don't define bindings incrementally. But all the binding in one patch.
 
-Cheers
-Jon
-
--- 
-nvpublic
+Rob
