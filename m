@@ -1,111 +1,93 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 23 Aug 2016 10:53:05 +0200
-Subject: [PATCH v2 1/5] clk: sunxi-ng: mux: Add support for mux tables
-In-Reply-To: <1471248795-17951-2-git-send-email-wens@csie.org>
-References: <1471248795-17951-1-git-send-email-wens@csie.org>
- <1471248795-17951-2-git-send-email-wens@csie.org>
-Message-ID: <20160823085305.GB2598@lukather>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Tue, 23 Aug 2016 16:53:27 +0800
+Subject: [PATCH V4 1/3] tracing: add a possibility of exporting function
+ trace to other places instead of ring buffer only
+In-Reply-To: <20160818121258.2a62ce66@gandalf.local.home>
+References: <1471261803-1186-1-git-send-email-zhang.chunyan@linaro.org>
+ <1471261803-1186-2-git-send-email-zhang.chunyan@linaro.org>
+ <20160815102826.667318b6@gandalf.local.home>
+ <CAG2=9p8qLfftFApsqDPeN9--0c8na7jwpjzrjcbYw4xv2PUcbw@mail.gmail.com>
+ <20160817101119.0432655e@gandalf.local.home>
+ <CAG2=9p9G+74k_rnY72LK=YVp0pLvOHBNxLDmYaQtGQUC4QRB4w@mail.gmail.com>
+ <20160818121258.2a62ce66@gandalf.local.home>
+Message-ID: <CAG2=9p9fUKxoPb2t3nVwZYBnU3iGBOEXJ60grQ7bNFmXvArg1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2016 at 04:13:11PM +0800, Chen-Yu Tsai wrote:
-> Some clock muxes have holes, i.e. invalid or unconnected inputs,
-> between parent mux values.
-> 
-> Add support for specifying a mux table to map clock parents to
-> mux values.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> Changes since v1: none
-> ---
->  drivers/clk/sunxi-ng/ccu_mux.c | 12 ++++++++++++
->  drivers/clk/sunxi-ng/ccu_mux.h | 12 ++++++++++--
->  2 files changed, 22 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
-> index 1329b9ab481e..68b32f168a74 100644
-> --- a/drivers/clk/sunxi-ng/ccu_mux.c
-> +++ b/drivers/clk/sunxi-ng/ccu_mux.c
-> @@ -107,6 +107,15 @@ u8 ccu_mux_helper_get_parent(struct ccu_common *common,
->  	parent = reg >> cm->shift;
->  	parent &= (1 << cm->width) - 1;
->  
-> +	if (cm->table) {
-> +		int num_parents = clk_hw_get_num_parents(&common->hw);
-> +		int i;
-> +
-> +		for (i = 0; i < num_parents; i++)
-> +			if (cm->table[i] == parent)
-> +				return i;
-> +	}
-> +
->  	return parent;
->  }
->  
-> @@ -117,6 +126,9 @@ int ccu_mux_helper_set_parent(struct ccu_common *common,
->  	unsigned long flags;
->  	u32 reg;
->  
-> +	if (cm->table)
-> +		index = cm->table[index];
-> +
->  	spin_lock_irqsave(common->lock, flags);
->  
->  	reg = readl(common->base + common->reg);
-> diff --git a/drivers/clk/sunxi-ng/ccu_mux.h b/drivers/clk/sunxi-ng/ccu_mux.h
-> index d35ce5e93840..f0078de78712 100644
-> --- a/drivers/clk/sunxi-ng/ccu_mux.h
-> +++ b/drivers/clk/sunxi-ng/ccu_mux.h
-> @@ -6,8 +6,9 @@
->  #include "ccu_common.h"
->  
->  struct ccu_mux_internal {
-> -	u8	shift;
-> -	u8	width;
-> +	u8		shift;
-> +	u8		width;
-> +	const u8	*table;
->  
->  	struct {
->  		u8	index;
-> @@ -21,6 +22,13 @@ struct ccu_mux_internal {
->  	} variable_prediv;
->  };
->  
-> +#define SUNXI_CLK_MUX_TABLE(_shift, _width, _table)	\
-> +	{						\
-> +		.shift	= _shift,			\
-> +		.width	= _width,			\
-> +		.table	= _table,			\
-> +	}
-> +
->  #define SUNXI_CLK_MUX(_shift, _width)	\
->  	{					\
->  		.shift	= _shift,		\
+On 19 August 2016 at 00:12, Steven Rostedt <rostedt@goodmis.org> wrote:
+> On Thu, 18 Aug 2016 17:22:11 +0800
+> Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
+>
+>
+>> > Or is this just trying to hook into the tracing that is happening? That
+>> > is, this isn't replacing writing into the ftrace ring buffer, but it is
+>> > just adding a way to write to someplace in addition to the ftrace ring
+>> > buffer. Where you still write to the ftrace ring buffer, but then you
+>> > can add a hook to copy someplace else as well.
+>>
+>> Yes, this is what this patch is trying to implement.
+>>
+>> >
+>> > I was looking at this as a way that you are adding a replacement, not
+>> > only an addition to. If that's the case, I think there may be a easier
+>> > way to do this.
+>>
+>> I want to know how it would be in the easier way you mentioned here.
+>>
+>> I was trying to add a ftrace_ops before, but with that way, I have to
+>> deal with a lot of trace or ring buffer stuff including the sort of
+>> discard things like you mentioned, which the existed ftrace code does.
+>> And if I choose to implement a new ftrace_ops, I'm only able to get
+>> the function trace support for STM and have to do many things which
+>> would be overlap with the current ftrace subsystem.
+>
+> Adding your own ftrace_ops is a way for replacing, not just adding a
+> hook into.
+>
+>>
+>> So in order to reuse the existed code and architecture, I chose to add
+>> a trace_export interface for Ftrace subsytem, and in this way I'm
+>> using in this patch, I will get all supports of traces which are dealt
+>> with trace_function();
+>
+> Actually, a trace_export() should only be called if there's been
+> something added. And that should be done with a static_key_false()
+> branch (which is dynamically enabled, and does not use a comparison
+> branch).
+>
+> That is, something like this instead:
+>
+>         if (!call_filter_check_discard(call, entry, buffer, event)) {
+>                 if (static_key_false(&ftrace_trace_exports_enabled))
+>                         ftrace_exports(tr, event);
+>                 __buffer_unlock_commit(buffer, event);
+>         }
+>
 
-I'd prefer if you also converted the SUNXI_CLK_MUX to use the MUX
-table version.
+Thanks for the sample code, I got it, will do like this.
 
-I've just merged the renaming patch for those macros to be consistent
-with the other internal structures macro, so that name will have to be
-adjusted..
+> Don't touch the current logic. Just have your code hook into the
+> ftrace_exports (note I use "ftrace_exports" and not trace_exports()
+> because it's the function tracer, which has stricter requirements than
+> events do. If you add a hook for tracepoints later, use trace_exports()
+> and have a different list for that).
+>
+>>
+>> Another benefit of adding a trace_export is, if there will be other
+>> subsystem would like to use the processed traces, it only needs to
+>> register a trace_export and provides a .write() function call back or
+>> together with a commit function, although from what I can see now
+>> .write() is enough since my purpose was the processed traces I don't
+>> need 'ring_buffer_event' so long as I had trace entries.
+>
+> I'm saying if you don't mind the ring buffer being used along with
+> your own code (which seems to be what's happening), then just add a
+> call back to your code. Don't monkey with the current logic.
+>
+> I think that will simplify things tremendously.
 
-Thanks,
-Maxime
+Thanks for your comments and detailed explanation,
+Chunyan
 
-> -- 
-> 2.8.1
-> 
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160823/c5ef3a3d/attachment.sig>
+>
+> -- Steve
