@@ -1,268 +1,110 @@
-From: hotran@apm.com (Hoan Tran)
-Date: Tue, 23 Aug 2016 08:52:40 -0700
-Subject: [PATCH 2/3] clk: xgene: Add PMD clock
-In-Reply-To: <1471967561-23634-1-git-send-email-hotran@apm.com>
-References: <1471967561-23634-1-git-send-email-hotran@apm.com>
-Message-ID: <1471967561-23634-3-git-send-email-hotran@apm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 23 Aug 2016 17:59:50 +0200
+Subject: [PATCH 4/8] ARM: dts: sun8i: Add touchscreen node for
+ sun8i-a23-gt90h
+In-Reply-To: <20160823151738.GM2598@lukather>
+References: <1470685398-14568-1-git-send-email-hdegoede@redhat.com>
+ <1470685398-14568-4-git-send-email-hdegoede@redhat.com>
+ <20160822183009.GX7104@lukather>
+ <cf0186a0-f4ea-173c-4f93-df8798941199@redhat.com>
+ <20160823092614.GF2598@lukather>
+ <a8de228d-2ba9-e23e-0c0c-e9a78dbe6e6a@redhat.com>
+ <20160823151738.GM2598@lukather>
+Message-ID: <8541f3c3-c83b-bd20-42cf-03fdfb3a33d9@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add X-Gene PMD clock support.
+Hi,
 
-PMD clock is implemented for a single register field.
-  Output rate = parent_rate * (denominator - scale) / denominator
-with
-  - denominator = bitmask of register field + 1
-  - scale = value of register field
+On 08/23/2016 05:17 PM, Maxime Ripard wrote:
+> On Tue, Aug 23, 2016 at 11:39:06AM +0200, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 23-08-16 11:26, Maxime Ripard wrote:
+>>> On Mon, Aug 22, 2016 at 09:03:57PM +0200, Hans de Goede wrote:
+>>>> Hi,
+>>>>
+>>>> On 22-08-16 20:30, Maxime Ripard wrote:
+>>>>> On Mon, Aug 08, 2016 at 09:43:14PM +0200, Hans de Goede wrote:
+>>>>>> The gt90h tablet has a gsl3675 touchscreen, add a dt node describing it.
+>>>>>>
+>>>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>>>> ---
+>>>>>> arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts | 8 ++++++++
+>>>>>> 1 file changed, 8 insertions(+)
+>>>>>>
+>>>>>> diff --git a/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts b/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
+>>>>>> index f27ebbb..da55b5a 100644
+>>>>>> --- a/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
+>>>>>> +++ b/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
+>>>>>> @@ -53,6 +53,14 @@
+>>>>>> 	status = "okay";
+>>>>>> };
+>>>>>>
+>>>>>> +&gsl1680 {
+>>>>>> +	compatible = "silead,gsl3675";
+>>>>>> +	touchscreen-fw-name = "silead/gsl3675-gt90h.fw";
+>>>>>
+>>>>> That's not documented anywhere, and looks really suspicious.
+>>>>
+>>>> Ugh, that should have been in:
+>>>>
+>>>> Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+>>>>
+>>>> But somehow it is not (I believe it was there in earlier revisions of
+>>>> the patch), I'll send a patch to fix this.
+>>>>
+>>>> About it being suspicious, this is not really firmware it is a bunch
+>>>> of configuration data / lookup tables for the controller which tell
+>>>> it in which order the touchscreen horizontal / vertical sensor
+>>>> lines are connected to its sense pins, and what values to send
+>>>> for finger x% between line z and line z+1, which differs per
+>>>> tablet model, since not all tablets use the same digitizer.
+>>>
+>>> It's not really the firmware itself that I find suspicious, but more
+>>> the encoding of a path to a file in the DT,
+>>
+>> It is not a path it is a filename. We could drop the "silead/" prefix
+>> and put that in the driver instead to really make it a filename.
+>>
+>>> especially when you can
+>>> apparently derive it from other informations already found in the DT
+>>> (<vendor>/<compatible>-<board>.fw)
+>>
+>> That will not work, sometimes different boards use the same digitizer
+>> and thus the same firmware. Also in case of the q8 tablets, we need
+>> different firmware for different variants (this is to be dealt with
+>> by the q8-hardware-manager I'm working on), since although they
+>> all use the same digitizer they do not wire it up to the controllers
+>> pins the same in all models, so we need different firmware files
+>> corresponding to different wirings.
+>>
+>> TL;DR: There is no 1:1 mapping between board and the firmware filename.
+>
+> The point still holds. It's exactly the same case than the broadcom
+> nvram filename discussion, and it raised the same issues.
 
-For example, for bitmask is 0x7, denominator will be 8 and scale
-will be computed and programmed accordingly.
+No it is not, in this case we also want to be able to specify
+different fw names on devices using the same base dts, here
+is a tablet for all the q8 tablets with gsl1680 I've:
 
-Signed-off-by: Hoan Tran <hotran@apm.com>
----
- drivers/clk/clk-xgene.c | 223 ++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 223 insertions(+)
+a13-94v-0:		a082 a23-tj-a23-q88-v4.0_20140815/GSL1680E_700_FW.fw	1024x600 inverted-x
+a13-tzx-713b-v2.1:	a082 a23-tj-a23-q88-v4.0_20140815/GSL1680E_700_FW.fw	1024x600
+a23-q8h-v3:		a082 a23-tj-a23-q88-v4.0_20140815/GSL1688_A70_FW.fw	 800x480 swapped-x-y
+a23-tj-a23-q88-v4.0:	a082 a23-tj-a23-q88-v4.0_20140815/GSL1680E_700_FW.fw	1024x600
+a23-tw-ao721-v41:	a082 a23-tj-a23-q88-v4.0_20140815/GSL1680E_700_FW.fw	1024x600 inverted-x
+a23-ippo-q8h-v1.2:	a082 a23-tj-a23-q88-v4.0_20140815/GSL1688_A70_FW.fw	 800x480 swapped-x-y
+a33-ippo-q8h-v1.2:	a082 a23-tj-a23-q88-v4.0_20140815/GSL1688_A70_FW.fw	 800x480 swapped-x-y
+a33-tzx-723q4:		b482 a33-Q8_V2.4_1118/GSL1680_FW_D702.fw		 960x640 inverted-x
+a33-q8-v2.4-1118:	b482 a33-Q8_V2.4_1118/GSL1680_FW_D702.fw		 960x640
+a33-q8h-v1.5:		b482 a33-q8h-v1.5/GSL1688_A70_FW.fw			 960x640
 
-diff --git a/drivers/clk/clk-xgene.c b/drivers/clk/clk-xgene.c
-index 3433132..66ce200 100644
---- a/drivers/clk/clk-xgene.c
-+++ b/drivers/clk/clk-xgene.c
-@@ -217,6 +217,228 @@ static void xgene_pcppllclk_init(struct device_node *np)
- 	xgene_pllclk_init(np, PLL_TYPE_PCP);
- }
- 
-+/**
-+ * struct xgene_clk_pmd - PMD clock
-+ *
-+ * @hw:		handle between common and hardware-specific interfaces
-+ * @reg:	register containing the fractional scale multiplier (scaler)
-+ * @shift:	shift to the unit bit field
-+ * @denom:	1/denominator unit
-+ * @lock:	register lock
-+ * Flags:
-+ * XGENE_CLK_PMD_SCALE_INVERTED - By default the scaler is the value read
-+ *	from the register plus one. For example,
-+ *		0 for (0 + 1) / denom,
-+ *		1 for (1 + 1) / denom and etc.
-+ *	If this flag is set, it is
-+ *		0 for (denom - 0) / denom,
-+ *		1 for (denom - 1) / denom and etc.
-+ *
-+ */
-+struct xgene_clk_pmd {
-+	struct clk_hw	hw;
-+	void __iomem	*reg;
-+	u8		shift;
-+	u32		mask;
-+	u64		denom;
-+	u32		flags;
-+	spinlock_t	*lock;
-+};
-+
-+#define to_xgene_clk_pmd(_hw) container_of(_hw, struct xgene_clk_pmd, hw)
-+
-+#define XGENE_CLK_PMD_SCALE_INVERTED	BIT(0)
-+
-+static unsigned long xgene_clk_pmd_recalc_rate(struct clk_hw *hw,
-+					       unsigned long parent_rate)
-+{
-+	struct xgene_clk_pmd *fd = to_xgene_clk_pmd(hw);
-+	unsigned long flags = 0;
-+	u64 ret, scale;
-+	u32 val;
-+
-+	if (fd->lock)
-+		spin_lock_irqsave(fd->lock, flags);
-+	else
-+		__acquire(fd->lock);
-+
-+	val = clk_readl(fd->reg);
-+
-+	if (fd->lock)
-+		spin_unlock_irqrestore(fd->lock, flags);
-+	else
-+		__release(fd->lock);
-+
-+	ret = (u64)parent_rate;
-+
-+	scale = (val & fd->mask) >> fd->shift;
-+	if (fd->flags & XGENE_CLK_PMD_SCALE_INVERTED)
-+		scale = fd->denom - scale;
-+	else
-+		scale++;
-+
-+	/* freq = parent_rate * scaler / denom */
-+	do_div(ret, fd->denom);
-+	ret *= scale;
-+	if (ret == 0)
-+		ret = (u64)parent_rate;
-+
-+	return ret;
-+}
-+
-+static long xgene_clk_pmd_round_rate(struct clk_hw *hw, unsigned long rate,
-+				     unsigned long *parent_rate)
-+{
-+	struct xgene_clk_pmd *fd = to_xgene_clk_pmd(hw);
-+	u64 ret, scale;
-+
-+	if (!rate || rate >= *parent_rate)
-+		return *parent_rate;
-+
-+	/* freq = parent_rate * scaler / denom */
-+	ret = rate * fd->denom;
-+	scale = DIV_ROUND_UP_ULL(ret, *parent_rate);
-+
-+	ret = (u64)*parent_rate * scale;
-+	do_div(ret, fd->denom);
-+
-+	return ret;
-+}
-+
-+static int xgene_clk_pmd_set_rate(struct clk_hw *hw, unsigned long rate,
-+				  unsigned long parent_rate)
-+{
-+	struct xgene_clk_pmd *fd = to_xgene_clk_pmd(hw);
-+	unsigned long flags = 0;
-+	u64 scale, ret;
-+	u32 val;
-+
-+	/*
-+	 * Compute the scaler:
-+	 *
-+	 * freq = parent_rate * scaler / denom, or
-+	 * scaler = freq * denom / parent_rate
-+	 */
-+	ret = rate * fd->denom;
-+	scale = DIV_ROUND_UP_ULL(ret, (u64)parent_rate);
-+
-+	/* Check if inverted */
-+	if (fd->flags & XGENE_CLK_PMD_SCALE_INVERTED)
-+		scale = fd->denom - scale;
-+	else
-+		scale--;
-+
-+	if (fd->lock)
-+		spin_lock_irqsave(fd->lock, flags);
-+	else
-+		__acquire(fd->lock);
-+
-+	val = clk_readl(fd->reg);
-+	val &= ~fd->mask;
-+	val |= (scale << fd->shift);
-+	clk_writel(val, fd->reg);
-+
-+	if (fd->lock)
-+		spin_unlock_irqrestore(fd->lock, flags);
-+	else
-+		__release(fd->lock);
-+
-+	return 0;
-+}
-+
-+static const struct clk_ops xgene_clk_pmd_ops = {
-+	.recalc_rate = xgene_clk_pmd_recalc_rate,
-+	.round_rate = xgene_clk_pmd_round_rate,
-+	.set_rate = xgene_clk_pmd_set_rate,
-+};
-+
-+static struct clk *
-+xgene_register_clk_pmd(struct device *dev,
-+		       const char *name, const char *parent_name,
-+		       unsigned long flags, void __iomem *reg, u8 shift,
-+		       u8 width, u64 denom, u32 clk_flags, spinlock_t *lock)
-+{
-+	struct xgene_clk_pmd *fd;
-+	struct clk_init_data init;
-+	struct clk *clk;
-+
-+	fd = kzalloc(sizeof(*fd), GFP_KERNEL);
-+	if (!fd)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init.name = name;
-+	init.ops = &xgene_clk_pmd_ops;
-+	init.flags = flags;
-+	init.parent_names = parent_name ? &parent_name : NULL;
-+	init.num_parents = parent_name ? 1 : 0;
-+
-+	fd->reg = reg;
-+	fd->shift = shift;
-+	fd->mask = (BIT(width) - 1) << shift;
-+	fd->denom = denom;
-+	fd->flags = clk_flags;
-+	fd->lock = lock;
-+	fd->hw.init = &init;
-+
-+	clk = clk_register(dev, &fd->hw);
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: could not register clk %s\n", __func__, name);
-+		kfree(fd);
-+		return NULL;
-+	}
-+
-+	return clk;
-+}
-+
-+static void xgene_pmdclk_init(struct device_node *np)
-+{
-+	const char *clk_name = np->full_name;
-+	void __iomem *csr_reg;
-+	struct resource res;
-+	struct clk *clk;
-+	u32 shift, width;
-+	u64 denom;
-+	u32 flags = 0;
-+	int rc;
-+
-+	/* Check if the entry is disabled */
-+	if (!of_device_is_available(np))
-+		return;
-+
-+	/* Parse the DTS register for resource */
-+	rc = of_address_to_resource(np, 0, &res);
-+	if (rc != 0) {
-+		pr_err("no DTS register for %s\n", np->full_name);
-+		return;
-+	}
-+	csr_reg = of_iomap(np, 0);
-+	if (!csr_reg) {
-+		pr_err("Unable to map resource for %s\n", np->full_name);
-+		return;
-+	}
-+	if (of_property_read_u32(np, "clock-shift", &shift))
-+		shift = 0;
-+	if (of_property_read_u32(np, "clock-width", &width))
-+		width = 32;
-+	of_property_read_string(np, "clock-output-names", &clk_name);
-+
-+	denom = BIT(width);
-+	flags |= XGENE_CLK_PMD_SCALE_INVERTED;
-+
-+	clk = xgene_register_clk_pmd(NULL, clk_name,
-+				     of_clk_get_parent_name(np, 0), 0,
-+				     csr_reg, shift, width, denom,
-+				     flags, &clk_lock);
-+	if (!IS_ERR(clk)) {
-+		of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+		clk_register_clkdev(clk, clk_name, NULL);
-+		pr_debug("Add %s clock\n", clk_name);
-+	} else {
-+		if (csr_reg)
-+			iounmap(csr_reg);
-+	}
-+}
-+
- /* IP Clock */
- struct xgene_dev_parameters {
- 	void __iomem *csr_reg;		/* CSR for IP clock */
-@@ -543,6 +765,7 @@ err:
- 
- CLK_OF_DECLARE(xgene_socpll_clock, "apm,xgene-socpll-clock", xgene_socpllclk_init);
- CLK_OF_DECLARE(xgene_pcppll_clock, "apm,xgene-pcppll-clock", xgene_pcppllclk_init);
-+CLK_OF_DECLARE(xgene_pmd_clock, "apm,xgene-pmd-clock", xgene_pmdclk_init);
- CLK_OF_DECLARE(xgene_socpll_v2_clock, "apm,xgene-socpll-v2-clock",
- 	       xgene_socpllclk_init);
- CLK_OF_DECLARE(xgene_pcppll_v2_clock, "apm,xgene-pcppll-v2-clock",
--- 
-1.9.1
+I'm working on a q8hardware-mgr (inspired by the beagle bone cape mgr)
+to automatically detect the touchscreen controller as well as the controller id
+(the 2nd column above), and it will need to set a filename for the firmware
+file based on this, deriving this from the machine compatible will
+simply not work here.
+
+Regards,
+
+Hans
