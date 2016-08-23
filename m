@@ -1,95 +1,66 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 23 Aug 2016 09:47:47 +0800
-Subject: [PATCH] arm64: errata: Pass --fix-cortex-a53-843419 to ld if
- workaround enabled
-In-Reply-To: <CAKv+Gu9Nbz27CkKoAi2-qtLGYYDOcWSZ_Y=4gCXLr8xVBqcDuQ@mail.gmail.com>
-References: <1471873737-7614-1-git-send-email-will.deacon@arm.com>
- <CAKv+Gu9Nbz27CkKoAi2-qtLGYYDOcWSZ_Y=4gCXLr8xVBqcDuQ@mail.gmail.com>
-Message-ID: <20160823094747.149be60a@xhacker>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 23 Aug 2016 10:05:26 +0800
+Subject: [PATCH 4/8] ARM: dts: sun8i: Add touchscreen node for
+ sun8i-a23-gt90h
+In-Reply-To: <cf0186a0-f4ea-173c-4f93-df8798941199@redhat.com>
+References: <1470685398-14568-1-git-send-email-hdegoede@redhat.com>
+ <1470685398-14568-4-git-send-email-hdegoede@redhat.com>
+ <20160822183009.GX7104@lukather>
+ <cf0186a0-f4ea-173c-4f93-df8798941199@redhat.com>
+Message-ID: <106521471917926@web29g.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Aug 2016 15:53:07 +0200 Ard Biesheuvel  wrote:
 
-> On 22 August 2016 at 15:48, Will Deacon wrote:
-> > Cortex-A53 erratum 843419 is worked around by the linker, although it is
-> > a configure-time option to GCC as to whether ld is actually asked to
-> > apply the workaround or not.
-> >
-> > This patch ensures that we pass --fix-cortex-a53-843419 to the linker
-> > when both CONFIG_ARM64_ERRATUM_843419=y and the linker supports the
-> > option.
-> >
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>  
-> 
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Thanks for this patch. I also suspected the errata isn't really work arounded
-before and queried this in June ;)
+23.08.2016, 03:08, "Hans de Goede" <hdegoede@redhat.com>:
+> Hi,
+>
+> On 22-08-16 20:30, Maxime Ripard wrote:
+>> ?On Mon, Aug 08, 2016 at 09:43:14PM +0200, Hans de Goede wrote:
+>>> ?The gt90h tablet has a gsl3675 touchscreen, add a dt node describing it.
+>>>
+>>> ?Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>> ?---
+>>> ??arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts | 8 ++++++++
+>>> ??1 file changed, 8 insertions(+)
+>>>
+>>> ?diff --git a/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts b/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
+>>> ?index f27ebbb..da55b5a 100644
+>>> ?--- a/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
+>>> ?+++ b/arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts
+>>> ?@@ -53,6 +53,14 @@
+>>> ??????????status = "okay";
+>>> ??};
+>>>
+>>> ?+&gsl1680 {
+>>> ?+ compatible = "silead,gsl3675";
+>>> ?+ touchscreen-fw-name = "silead/gsl3675-gt90h.fw";
+>>
+>> ?That's not documented anywhere, and looks really suspicious.
+>
+> Ugh, that should have been in:
+>
+> Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+>
+> But somehow it is not (I believe it was there in earlier revisions of
+> the patch), I'll send a patch to fix this.
+>
+> About it being suspicious, this is not really firmware it is a bunch
+> of configuration data / lookup tables for the controller which tell
+> it in which order the touchscreen horizontal / vertical sensor
+> lines are connected to its sense pins, and what values to send
+> for finger x% between line z and line z+1, which differs per
+> tablet model, since not all tablets use the same digitizer.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/434057.html
+I do think it's a mixture of executable MCU codes and data.
+The GSL1680 datasheet indicates that there's a 32-bit MCU in it.
 
-Thanks,
-Jisheng
-
-> 
-> > ---
-> >  arch/arm64/Kconfig  | 15 +++++----------
-> >  arch/arm64/Makefile |  9 +++++++++
-> >  2 files changed, 14 insertions(+), 10 deletions(-)
-> >
-> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > index bc3f00f586f1..e4b7d10e8e1c 100644
-> > --- a/arch/arm64/Kconfig
-> > +++ b/arch/arm64/Kconfig
-> > @@ -415,18 +415,13 @@ config ARM64_ERRATUM_845719
-> >
-> >  config ARM64_ERRATUM_843419
-> >         bool "Cortex-A53: 843419: A load or store might access an incorrect address"
-> > -       depends on MODULES
-> >         default y
-> > -       select ARM64_MODULE_CMODEL_LARGE
-> > +       select ARM64_MODULE_CMODEL_LARGE if MODULES
-> >         help
-> > -         This option builds kernel modules using the large memory model in
-> > -         order to avoid the use of the ADRP instruction, which can cause
-> > -         a subsequent memory access to use an incorrect address on Cortex-A53
-> > -         parts up to r0p4.
-> > -
-> > -         Note that the kernel itself must be linked with a version of ld
-> > -         which fixes potentially affected ADRP instructions through the
-> > -         use of veneers.
-> > +         This option links the kernel with '--fix-cortex-a53-843419' and
-> > +         builds modules using the large memory model in order to avoid the use
-> > +         of the ADRP instruction, which can cause a subsequent memory access
-> > +         to use an incorrect address on Cortex-A53 parts up to r0p4.
-> >
-> >           If unsure, say Y.
-> >
-> > diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> > index 5b54f8c021d8..c5ad4957e7ee 100644
-> > --- a/arch/arm64/Makefile
-> > +++ b/arch/arm64/Makefile
-> > @@ -18,6 +18,15 @@ ifneq ($(CONFIG_RELOCATABLE),)
-> >  LDFLAGS_vmlinux                += -pie -Bsymbolic
-> >  endif
-> >
-> > +ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
-> > +ld-843419-workaround := $(call ld-option, --fix-cortex-a53-843419)
-> > +  ifeq ($(ld-843419-workaround),)
-> > +$(warning ld does not support --fix-cortex-a53-843419; kernel may be susceptible to erratum)
-> > +  else
-> > +LDFLAGS_vmlinux        += --fix-cortex-a53-843419
-> > +  endif
-> > +endif
-> > +
-> >  KBUILD_DEFCONFIG := defconfig
-> >
-> >  # Check for binutils support for specific extensions
-> > --
-> > 2.1.4
-> >  
-> 
+>
+> Regards,
+>
+> Hans
+>
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
