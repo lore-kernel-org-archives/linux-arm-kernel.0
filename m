@@ -1,133 +1,126 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 23 Aug 2016 10:20:37 +0200
-Subject: [PATCH] input: touchscreen: silead: Add regulator support
-In-Reply-To: <20160822211147.GC12277@dtor-ws>
-References: <1471376124-31169-1-git-send-email-hdegoede@redhat.com>
- <20160822211147.GC12277@dtor-ws>
-Message-ID: <a30da422-5d8d-006f-8164-270956f7640e@redhat.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 23 Aug 2016 10:22:25 +0200
+Subject: [PATCH 06/13] scpi: add priv_scpi_ops and fill legacy structure
+In-Reply-To: <5c89a4e9-0100-0c67-1d6c-07651649172a@arm.com>
+References: <1471515066-3626-1-git-send-email-narmstrong@baylibre.com>
+ <1471515066-3626-7-git-send-email-narmstrong@baylibre.com>
+ <5c89a4e9-0100-0c67-1d6c-07651649172a@arm.com>
+Message-ID: <a0c9c4bc-cd83-c2e7-bfab-b8d24c886349@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI,
-
-On 22-08-16 23:11, Dmitry Torokhov wrote:
-> Hi Hans,
->
-> On Tue, Aug 16, 2016 at 09:35:24PM +0200, Hans de Goede wrote:
->> On some tablets the touchscreen controller is powered by seperate
->> regulators, add support for this.
+On 08/19/2016 06:39 PM, Sudeep Holla wrote:
+> 
+> 
+> On 18/08/16 11:10, Neil Armstrong wrote:
+>> In order to use the legacy functions variants, add a new priv_scpi_ops
+>> structure that will contain the internal alterne functions and then use these
+>> alternate call in the probe function.
 >>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 >> ---
->>  .../bindings/input/touchscreen/silead_gsl1680.txt  |  2 +
->>  drivers/input/touchscreen/silead.c                 | 51 ++++++++++++++++++++--
->>  2 files changed, 49 insertions(+), 4 deletions(-)
+>>  drivers/firmware/arm_scpi.c | 68 ++++++++++++++++++++++++++++++++++++++++++---
+>>  1 file changed, 64 insertions(+), 4 deletions(-)
 >>
->> diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
->> index 37a9370..65eb4c7 100644
->> --- a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
->> +++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
->> @@ -22,6 +22,8 @@ Optional properties:
->>  - touchscreen-inverted-y  : See touchscreen.txt
->>  - touchscreen-swapped-x-y : See touchscreen.txt
->>  - silead,max-fingers	  : maximum number of fingers the touchscreen can detect
->> +- vddio-supply		  : regulator phandle for controller VDDIO
->> +- avdd-supply		  : regulator phandle for controller AVDD
+>> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+>> index b0d911b..3fe39fe 100644
+>> --- a/drivers/firmware/arm_scpi.c
+>> +++ b/drivers/firmware/arm_scpi.c
+>> @@ -213,6 +213,7 @@ struct scpi_drvinfo {
+>>      struct scpi_ops *scpi_ops;
+>>      struct scpi_chan *channels;
+>>      struct scpi_dvfs_info *dvfs[MAX_DVFS_DOMAINS];
+>> +    const struct priv_scpi_ops *ops;
+>>  };
 >>
->>  Example:
+>>  /*
+>> @@ -299,6 +300,17 @@ struct dev_pstate_set {
+>>      u8 pstate;
+>>  } __packed;
 >>
->> diff --git a/drivers/input/touchscreen/silead.c b/drivers/input/touchscreen/silead.c
->> index 7379fe1..04992c5 100644
->> --- a/drivers/input/touchscreen/silead.c
->> +++ b/drivers/input/touchscreen/silead.c
->> @@ -29,6 +29,7 @@
->>  #include <linux/input/touchscreen.h>
->>  #include <linux/pm.h>
->>  #include <linux/irq.h>
->> +#include <linux/regulator/consumer.h>
->>
->>  #include <asm/unaligned.h>
->>
->> @@ -72,6 +73,8 @@ enum silead_ts_power {
->>  struct silead_ts_data {
->>  	struct i2c_client *client;
->>  	struct gpio_desc *gpio_power;
->> +	struct regulator *vddio;
->> +	struct regulator *avdd;
->>  	struct input_dev *input;
->>  	char fw_name[64];
->>  	struct touchscreen_properties prop;
->> @@ -463,21 +466,52 @@ static int silead_ts_probe(struct i2c_client *client,
->>  	if (client->irq <= 0)
->>  		return -ENODEV;
->>
->> +	data->vddio = devm_regulator_get_optional(dev, "vddio");
->
-> No need for devm_regulator_get_optional(), devm_regulator_get() will
-> give you dummy regulator that you can enable/disable.
-> regulator_get_optional() is only need if you have truly optional
-> functionality in controller and you need to adjust behavior depending on
-> presence of a regulator.
-
-I prefer using get_optional and not getting the dmesg output about
-using a dummy regulator, that tends to leads to users asking
-questions and dealing with not having the regulator is easy,
-but if you want me to drop the _optional bit and turn any
-errors into hard errors I can do that for v2.
-
->> +	if (IS_ERR(data->vddio)) {
->> +		if (PTR_ERR(data->vddio) == -EPROBE_DEFER)
->> +			return -EPROBE_DEFER;
->> +		data->vddio = NULL;
->> +	}
+>> +struct priv_scpi_ops {
+>> +    /* Internal Specific Ops */
+>> +    void (*handle_remote_msg)(struct mbox_client *c, void *msg);
+>> +    void (*tx_prepare)(struct mbox_client *c, void *msg);
+>> +    /* Message Specific Ops */
+>> +    int (*init_versions)(struct scpi_drvinfo *info);
+>> +    int (*dvfs_get_info)(u8 domain, struct dvfs_info *buf);
+>> +    /* System wide Ops */
+>> +    struct scpi_ops *scpi_ops;
+>> +};
 >> +
->> +	data->avdd = devm_regulator_get_optional(dev, "avdd");
->> +	if (IS_ERR(data->avdd)) {
->> +		if (PTR_ERR(data->avdd) == -EPROBE_DEFER)
->> +			return -EPROBE_DEFER;
->> +		data->avdd = NULL;
->> +	}
+> 
+> 
+> I fail to understand the need for this. Can you please explain the issue
+> you would face without this ?
+> 
+>>  static struct scpi_drvinfo *scpi_info;
+>>
+>>  static int scpi_linux_errmap[SCPI_ERR_MAX] = {
+>> @@ -695,9 +707,12 @@ static struct scpi_dvfs_info *scpi_dvfs_get_info(u8 domain)
+>>      if (scpi_info->dvfs[domain])    /* data already populated */
+>>          return scpi_info->dvfs[domain];
+>>
+>> -    ret = scpi_send_message(SCPI_CMD_GET_DVFS_INFO, &domain, sizeof(domain),
+>> +    if (scpi_info->ops && scpi_info->ops->dvfs_get_info)
+>> +        ret = scpi_info->ops->dvfs_get_info(domain, &buf);
+>> +    else
+>> +        ret = scpi_send_message(SCPI_CMD_GET_DVFS_INFO,
+>> +                    &domain, sizeof(domain),
+>>                  &buf, sizeof(buf));
+>> -
+>>      if (ret)
+>>          return ERR_PTR(ret);
+>>
+>> @@ -855,6 +870,22 @@ static struct scpi_ops scpi_ops = {
+>>      .vendor_send_message = scpi_ext_send_message,
+>>  };
+>>
+>> +static struct scpi_ops legacy_scpi_ops = {
+>> +    .get_version = scpi_get_version,
+>> +    .clk_get_range = NULL,
+>> +    .clk_get_val = legacy_scpi_clk_get_val,
+>> +    .clk_set_val = legacy_scpi_clk_set_val,
+>> +    .dvfs_get_idx = legacy_scpi_dvfs_get_idx,
+>> +    .dvfs_set_idx = legacy_scpi_dvfs_set_idx,
+>> +    .dvfs_get_info = scpi_dvfs_get_info,
+>> +    .sensor_get_capability = legacy_scpi_sensor_get_capability,
+>> +    .sensor_get_info = legacy_scpi_sensor_get_info,
+>> +    .sensor_get_value = legacy_scpi_sensor_get_value,
+>> +    .device_get_power_state = NULL,
+>> +    .device_set_power_state = NULL,
+>> +    .vendor_send_message = legacy_scpi_send_message,
+> 
+> I think we need not have this at all if you follow the suggestion I had
+> in the previous patch. Try and let's see how it would look.
+
+If you confirm you want the if/else as said in patch 4.
+
+But clk_get_range, device_get/set_power_state are not available in legacy,
+I think we should still have this alternate structure.
+
+>> +};
 >> +
->> +	/*
->> +	 * Enable regulators at probe and disable them at remove, we need
->> +	 * to keep the chip powered otherwise it forgets its firmware.
->> +	 */
->> +	if (data->vddio) {
->> +		error = regulator_enable(data->vddio);
->> +		if (error)
->> +			return error;
->> +	}
+>>  struct scpi_ops *get_scpi_ops(void)
+>>  {
+>>      return scpi_info ? scpi_info->scpi_ops : NULL;
+>> @@ -972,8 +1003,17 @@ static int scpi_alloc_xfer_list(struct device *dev, struct scpi_chan *ch)
+>>      return 0;
+>>  }
+>>
+>> +static const struct priv_scpi_ops scpi_legacy_ops = {
+>> +    .handle_remote_msg = legacy_scpi_handle_remote_msg,
+>> +    .tx_prepare = legacy_scpi_tx_prepare,
+>> +    .init_versions = legacy_scpi_init_versions,
+>> +    .dvfs_get_info = legacy_scpi_dvfs_get_info,
+>> +    .scpi_ops = &legacy_scpi_ops,
+>> +};
 >> +
->> +	if (data->avdd) {
->> +		error = regulator_enable(data->avdd);
->> +		if (error)
->> +			goto disable_vddio;
->> +	}
->
-> Hmm, so you are enabling regulators and leave them on. That is not
-> great. I'd rather we powered the device up during probe(), but then shut
-> it off and waited for ->open() to be called. And power it down in
-> ->close(). You also need to handle it in suspend and resume.
+> 
+> Ditto, can go away.
+> 
 
-The problem is the chip needs firmware (actually config data and
-lookup tables with info about the digitizer) and loading that takes
-aprox. 1 second so keeping the regulator on is better IMHO.
+Yes, in the if/else is_legacy variant this should go away.
 
-As for power usage the device also has an enable pin, which we already
-drive high on open / drive low on close (and suspend/resume), with this
-pin low the current usage of the device is very minimal.
-
-Actually of the 20 tablets I've with a gsl chip only 2 have taken the
-trouble to hook it up to a separate regulator. All the others just
-have it hooked to their default 3.3V rail. So re-loading the
-firmware on open / resume would penalize 18 of these with a 1 second
-delay, for a very minimal current saving on 2 of these.
-
-IMHO, esp. adding 1s delay to resume is not acceptable.
-
-So all in all I would like you to take this as is :) But if you still
-want a v2 let me know.
-
-Regards,
-
-Hans
+Thanks,
+Neil
