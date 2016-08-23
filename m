@@ -1,79 +1,53 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Tue, 23 Aug 2016 09:21:17 +0200
-Subject: [PATCH RFC 4/5] drm/bridge: add dw-hdmi cec driver using Hans
- Verkil's CEC code
-In-Reply-To: <E1bYDEs-0004rs-FP@rmk-PC.armlinux.org.uk>
-References: <20160812141421.GB1041@n2100.armlinux.org.uk>
- <E1bYDEs-0004rs-FP@rmk-PC.armlinux.org.uk>
-Message-ID: <dcd9587f-be60-0cb6-92bb-3226c51bddfb@xs4all.nl>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 23 Aug 2016 09:23:25 +0200
+Subject: [PATCH] ARM: dts: blanche: add SDHI0 support
+In-Reply-To: <220d0d62-8562-8d8a-54b2-fc6e1d616e02@cogentembedded.com>
+References: <5383928.8UnDsUpmkz@wasted.cogentembedded.com>
+ <3029697.f9plKzFKet@wasted.cogentembedded.com>
+ <20160822073305.GD28034@verge.net.au>
+ <220d0d62-8562-8d8a-54b2-fc6e1d616e02@cogentembedded.com>
+Message-ID: <20160823072325.GF14998@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On 08/12/2016 04:15 PM, Russell King wrote:
-> Add a CEC driver for the dw-hdmi hardware using Hans Verkil's CEC
-> implementation.
+On Mon, Aug 22, 2016 at 05:04:10PM +0300, Sergei Shtylyov wrote:
+> On 08/22/2016 10:33 AM, Simon Horman wrote:
 > 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  drivers/gpu/drm/bridge/Kconfig            |   7 +
->  drivers/gpu/drm/bridge/Makefile           |   1 +
->  drivers/gpu/drm/bridge/dw-hdmi-cec.c      | 344 ++++++++++++++++++++++++++++++
->  drivers/gpu/drm/bridge/dw-hdmi.c          |  64 +++++-
->  include/linux/platform_data/dw_hdmi-cec.h |  16 ++
->  5 files changed, 421 insertions(+), 11 deletions(-)
->  create mode 100644 drivers/gpu/drm/bridge/dw-hdmi-cec.c
->  create mode 100644 include/linux/platform_data/dw_hdmi-cec.h
+> >>Define the Blanche board dependent part of the SDHI0 (connected to the
+> >>micro-SD slot) device node along with  the necessary voltage regulator.
+> >>
+> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >>
+> >>---
+> >>This patch is against the 'renesas-devel-20160817-v4.8-rc2' of Simon Horman's
+> >>'renesas.git' repo plus the general purpose switches patch  posted yesterday.
+> >>
+> >> arch/arm/boot/dts/r8a7792-blanche.dts |   25 +++++++++++++++++++++++++
+> >> 1 file changed, 25 insertions(+)
+> >>
+> >>Index: renesas/arch/arm/boot/dts/r8a7792-blanche.dts
+> >>===================================================================
+> >>--- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
+> >>+++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
+> >>@@ -103,6 +103,17 @@
+> >> 			gpios = <&gpio11 2 GPIO_ACTIVE_LOW>;
+> >> 		};
+> >> 	};
+> >>+
+> >>+	vcc_sdhi0: regulator-vcc-sdhi0 {
+> >>+		compatible = "regulator-fixed";
+> >>+
+> >>+		regulator-name = "SDHI0 Vcc";
+> >>+		regulator-min-microvolt = <3300000>;
+> >>+		regulator-max-microvolt = <3300000>;
+> >>+
+> >>+		gpio = <&gpio11 12 GPIO_ACTIVE_HIGH>;
+> >>+		enable-active-high;
+> >>+	};
+> >> };
+> >
+> >Is it intentional that there is no vccq_sdhi0 ?
 > 
+>    Yes, it's fixed at 3.3V.
 
-<snip>
-
-> +static unsigned int parse_hdmi_addr(const struct edid *edid)
-> +{
-> +	if (!edid || edid->extensions == 0)
-> +		return (u16)~0;
-> +
-> +	return cec_get_edid_phys_addr((u8 *)edid,
-> +				EDID_LENGTH * (edid->extensions + 1), NULL);
-> +}
-> +
-> +static int dw_hdmi_cec_notify(struct notifier_block *nb, unsigned long event,
-> +			      void *data)
-> +{
-> +	struct dw_hdmi_cec *cec = container_of(nb, struct dw_hdmi_cec, nb);
-> +	union hdmi_event *event_block = data;
-> +	unsigned int phys;
-> +
-> +	dev_info(event_block->base.source, "event %lu\n", event);
-> +
-> +	if (event_block->base.source != cec->adap->devnode.parent)
-> +		return NOTIFY_OK;
-> +
-> +	switch (event) {
-> +	case HDMI_CONNECTED:
-> +		break;
-> +
-> +	case HDMI_DISCONNECTED:
-> +		cec_s_phys_addr(cec->adap, CEC_PHYS_ADDR_INVALID, false);
-> +		break;
-> +
-> +	case HDMI_NEW_EDID:
-> +		phys = parse_hdmi_addr(event_block->edid.edid);
-> +		cec_s_phys_addr(cec->adap, phys, false);
-> +		break;
-> +	}
-> +
-> +	return NOTIFY_OK;
-> +}
-
-Wouldn't it make a lot of sense to integrate this into the cec framework?
-
-All you need is to pass an hdmi_notifier_dev as argument to cec_allocate_adapter()
-and you can integrate this.
-
-If you are OK with that, then I can make patches for that.
-
-Regards,
-
-	Hans
+Thanks, I have queued this up.
