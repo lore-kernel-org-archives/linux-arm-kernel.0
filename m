@@ -1,144 +1,276 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 23 Aug 2016 14:27:13 +0900
-Subject: [PATCH v7 6/8] Documentation: bindings: add dt documentation for
- rk3399 dmc
-In-Reply-To: <1471836984-6316-7-git-send-email-hl@rock-chips.com>
-References: <1471836984-6316-1-git-send-email-hl@rock-chips.com>
- <CGME20160822033802epcas1p35730346fc5f2072f96faa0ffa03897d6@epcas1p3.samsung.com>
- <1471836984-6316-7-git-send-email-hl@rock-chips.com>
-Message-ID: <57BBDEB1.90000@samsung.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Tue, 23 Aug 2016 07:37:43 +0200
+Subject: [PATCH V2] ARM: BCM5301X: Add basic dts for BCM53573 based Tenda AC9
+In-Reply-To: <1469654305-1700-1-git-send-email-zajec5@gmail.com>
+References: <1469654305-1700-1-git-send-email-zajec5@gmail.com>
+Message-ID: <20160823053746.14521-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lin,
+BCM53573 seems to be low priced alternative for Northstar chipsts. It
+uses single core Cortex-A7 and doesn't have SDU or local (TWD) timer. It
+was also stripped out of independent SPI controller and 2 GMACs.
 
-I reply the on v6 patch[1].
-If you have another opinion, please let me know.
-If my suggestion is not reasonable, we need to discuss it.
+DTS for Tenda AC9 isn't completed yet. It misses e.g. switch entry (we
+still need some b53 fixes) and probably some clocks. It adds support for
+basic features however and can be improved later.
 
-[1] https://lkml.org/lkml/2016/8/23/28
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+---
+V2: Use ARCH_BCM_53573 instead of ARCH_BCM_5301X.
+---
+ arch/arm/boot/dts/Makefile               |   2 +
+ arch/arm/boot/dts/bcm47189-tenda-ac9.dts |  74 ++++++++++++++++
+ arch/arm/boot/dts/bcm53573.dtsi          | 147 +++++++++++++++++++++++++++++++
+ 3 files changed, 223 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm47189-tenda-ac9.dts
+ create mode 100644 arch/arm/boot/dts/bcm53573.dtsi
 
-Best Regards,
-Chanwoo Choi
-
-On 2016? 08? 22? 12:36, Lin Huang wrote:
-> This patch adds the documentation for rockchip rk3399 dmc driver.
-> 
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> ---
-> Changes in v7:
-> -None
-> 
-> Changes in v6:
-> -Add more detail in Documentation
-> 
-> Changes in v5:
-> -None
-> 
-> Changes in v4:
-> -None
-> 
-> Changes in v3:
-> -None
-> 
-> Changes in v2:
-> -None 
-> 
-> Changes in v1:
-> -None
->  .../devicetree/bindings/devfreq/rk3399_dmc.txt     | 85 ++++++++++++++++++++++
->  1 file changed, 85 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt b/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
-> new file mode 100644
-> index 0000000..b787abb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
-> @@ -0,0 +1,85 @@
-> +* Rockchip rk3399 DMC(Dynamic Memory Controller) device
-> +
-> +Required properties:
-> +- compatible: Must be "rockchip,rk3399-dmc".
-> +- devfreq-events: Node to get DDR loading, Refer to
-> +		  Documentation/devicetree/bindings/devfreq/rockchip-dfi.txt
-> +- interrupts: The interrupt number to the CPU. The interrupt specifier format
-> +	      depends on the interrupt controller. It should be DCF interrupts,
-> +	      when DDR dvfs finish, it will happen.
-> +- clocks: Phandles for clock specified in "clock-names" property
-> +- clock-names : The name of clock used by the DFI, must be "pclk_ddr_mon";
-> +- operating-points-v2: Refer to Documentation/devicetree/bindings/power/opp.txt
-> +		       for details.
-> +- center-supply: DMC supply node.
-> +- status: Marks the node enabled/disabled.
-> +
-> +Optional properties:
-> +- ddr_timing:  DDR timing need to pass to arm trust firmware
-> +- upthreshold: The upthreshold to simpleondeamnd policy
-> +- downdifferential: The downdifferential to simpleondeamnd policy
-> +
-> +Example:
-> +
-> +	ddr_timing: ddr_timing {
-> +		compatible = "rockchip,ddr-timing";
-> +		ddr3_speed_bin = <21>;
-> +		pd_idle = <0>;
-> +		sr_idle = <0>;
-> +		sr_mc_gate_idle = <0>;
-> +		srpd_lite_idle  = <0>;
-> +		standby_idle = <0>;
-> +		dram_dll_dis_freq = <300>;
-> +		phy_dll_dis_freq = <125>;
-> +
-> +		ddr3_odt_dis_freq = <333>;
-> +		ddr3_drv = <DDR3_DS_40ohm>;
-> +		ddr3_odt = <DDR3_ODT_120ohm>;
-> +		phy_ddr3_ca_drv = <PHY_DRV_ODT_40>;
-> +		phy_ddr3_dq_drv = <PHY_DRV_ODT_40>;
-> +		phy_ddr3_odt = <PHY_DRV_ODT_240>;
-> +
-> +		lpddr3_odt_dis_freq = <333>;
-> +		lpddr3_drv = <LP3_DS_34ohm>;
-> +		lpddr3_odt = <LP3_ODT_240ohm>;
-> +		phy_lpddr3_ca_drv = <PHY_DRV_ODT_40>;
-> +		phy_lpddr3_dq_drv = <PHY_DRV_ODT_40>;
-> +		phy_lpddr3_odt = <PHY_DRV_ODT_240>;
-> +
-> +		lpddr4_odt_dis_freq = <333>;
-> +		lpddr4_drv = <LP4_PDDS_60ohm>;
-> +		lpddr4_dq_odt = <LP4_DQ_ODT_40ohm>;
-> +		lpddr4_ca_odt = <LP4_CA_ODT_40ohm>;
-> +		phy_lpddr4_ca_drv = <PHY_DRV_ODT_40>;
-> +		phy_lpddr4_ck_cs_drv = <PHY_DRV_ODT_80>;
-> +		phy_lpddr4_dq_drv = <PHY_DRV_ODT_80>;
-> +		phy_lpddr4_odt = <PHY_DRV_ODT_60>;
-> +	};
-> +
-> +	dmc_opp_table: dmc_opp_table {
-> +		compatible = "operating-points-v2";
-> +
-> +		opp00 {
-> +			opp-hz = /bits/ 64 <300000000>;
-> +			opp-microvolt = <900000>;
-> +		};
-> +		opp01 {
-> +			opp-hz = /bits/ 64 <666000000>;
-> +			opp-microvolt = <900000>;
-> +		};
-> +	};
-> +
-> +	dmc: dmc {
-> +		compatible = "rockchip,rk3399-dmc";
-> +		devfreq-events = <&dfi>;
-> +		interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru SCLK_DDRCLK>;
-> +		clock-names = "dmc_clk";
-> +		ddr_timing = <&ddr_timing>;
-> +		operating-points-v2 = <&dmc_opp_table>;
-> +		center-supply = <&ppvar_centerlogic>;
-> +		upthreshold = <15>;
-> +		downdifferential = <10>;
-> +		status = "disabled";
-> +	};
-> +
-> 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 8e11aae..dd2c49e 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -90,6 +90,8 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm94709.dtb \
+ 	bcm953012er.dtb \
+ 	bcm953012k.dtb
++dtb-$(CONFIG_ARCH_BCM_53573) += \
++	bcm47189-tenda-ac9.dtb
+ dtb-$(CONFIG_ARCH_BCM_63XX) += \
+ 	bcm963138dvt.dtb
+ dtb-$(CONFIG_ARCH_BCM_CYGNUS) += \
+diff --git a/arch/arm/boot/dts/bcm47189-tenda-ac9.dts b/arch/arm/boot/dts/bcm47189-tenda-ac9.dts
+new file mode 100644
+index 0000000..4403ae8
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm47189-tenda-ac9.dts
+@@ -0,0 +1,74 @@
++/*
++ * Copyright (C) 2016 Rafa? Mi?ecki <rafal@milecki.pl>
++ *
++ * Licensed under the ISC license.
++ */
++
++/dts-v1/;
++
++#include "bcm53573.dtsi"
++
++/ {
++	compatible = "tenda,ac9", "brcm,bcm47189", "brcm,bcm53573";
++	model = "Tenda AC9";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 earlycon";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		usb {
++			label = "bcm53xx:blue:usb";
++			gpios = <&chipcommon 1 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		wps {
++			label = "bcm53xx:blue:wps";
++			gpios = <&chipcommon 10 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		5ghz {
++			label = "bcm53xx:blue:5ghz";
++			gpios = <&chipcommon 11 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		system {
++			label = "bcm53xx:blue:system";
++			gpios = <&chipcommon 15 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "timer";
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		rfkill {
++			label = "WiFi";
++			linux,code = <KEY_RFKILL>;
++			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
++		};
++
++		restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&chipcommon 7 GPIO_ACTIVE_LOW>;
++		};
++
++		wps {
++			label = "WPS";
++			linux,code = <KEY_WPS_BUTTON>;
++			gpios = <&chipcommon 9 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/bcm53573.dtsi b/arch/arm/boot/dts/bcm53573.dtsi
+new file mode 100644
+index 0000000..efa07de
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm53573.dtsi
+@@ -0,0 +1,147 @@
++/*
++ * Copyright (C) 2016 Rafa? Mi?ecki <rafal@milecki.pl>
++ *
++ * Licensed under the ISC license.
++ */
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include "skeleton.dtsi"
++
++/ {
++	interrupt-parent = <&gic>;
++
++	chosen {
++		stdout-path = &uart0;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x0>;
++		};
++	};
++
++	mpcore {
++		compatible = "simple-bus";
++		ranges = <0x00000000 0x18310000 0x00008000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		gic: interrupt-controller at 1000 {
++			compatible = "arm,cortex-a7-gic";
++			#interrupt-cells = <3>;
++			#address-cells = <0>;
++			interrupt-controller;
++			reg = <0x1000 0x1000>,
++			      <0x2000 0x0100>;
++		};
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		alp: oscillator {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <40000000>;
++		};
++	};
++
++	axi at 18000000 {
++		compatible = "brcm,bus-axi";
++		reg = <0x18000000 0x1000>;
++		ranges = <0x00000000 0x18000000 0x00100000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0x000fffff 0xffff>;
++		interrupt-map =
++			/* ChipCommon */
++			<0x00000000 0 &gic GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
++
++			/* IEEE 802.11 0 */
++			<0x00001000 0 &gic GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>,
++
++			/* PCIe Controller 0 */
++			<0x00002000 0 &gic GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
++			<0x00002000 1 &gic GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
++			<0x00002000 2 &gic GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
++			<0x00002000 3 &gic GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
++			<0x00002000 4 &gic GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
++			<0x00002000 5 &gic GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
++
++			/* USB 2.0 Controller */
++			<0x00004000 0 &gic GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
++
++			/* Ethernet Controller 0 */
++			<0x00005000 0 &gic GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>,
++
++			/* IEEE 802.11 1 */
++			<0x0000a000 0 &gic GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
++
++			/* Ethernet Controller 1 */
++			<0x0000b000 0 &gic GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
++
++		chipcommon: chipcommon at 0 {
++			compatible = "simple-bus";
++			reg = <0x00000000 0x1000>;
++			ranges;
++
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			uart0: serial at 0300 {
++				compatible = "ns16550a";
++				reg = <0x0300 0x100>;
++				interrupt-parent = <&gic>;
++				interrupts = <GIC_PPI 16 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&alp>;
++				status = "okay";
++			};
++		};
++
++		usb2: usb2 at 4000 {
++			reg = <0x4000 0x1000>;
++			ranges;
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			ehci: ehci at 4000 {
++				compatible = "generic-ehci";
++				reg = <0x4000 0x1000>;
++				interrupt-parent = <&gic>;
++				interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
++			};
++
++			ohci: ohci at d000 {
++				#usb-cells = <0>;
++
++				compatible = "generic-ohci";
++				reg = <0xd000 0x1000>;
++				interrupt-parent = <&gic>;
++				interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
++			};
++		};
++
++		gmac0: ethernet at 5000 {
++			reg = <0x5000 0x1000>;
++		};
++
++		gmac1: ethernet at b000 {
++			reg = <0xb000 0x1000>;
++		};
++	};
++};
+-- 
+2.9.3
