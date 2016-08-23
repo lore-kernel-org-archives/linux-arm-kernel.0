@@ -1,40 +1,69 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 23 Aug 2016 21:37:44 +0200
-Subject: [PATCH v4 1/7] arm64: sunxi: Kconfig: add essential pinctrl driver
-In-Reply-To: <20160808172149.30861-2-andre.przywara@arm.com>
-References: <20160808172149.30861-1-andre.przywara@arm.com>
- <20160808172149.30861-2-andre.przywara@arm.com>
-Message-ID: <20160823193744.GP2598@lukather>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 23 Aug 2016 13:47:19 -0600
+Subject: [PATCH V5 0/9] perf: Driver specific configuration for PMU
+In-Reply-To: <87y43nl8pt.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1470932464-726-1-git-send-email-mathieu.poirier@linaro.org>
+ <878tvon8b7.fsf@ashishki-desk.ger.corp.intel.com>
+ <CANLsYkxQNB-ZU6obSKvJZMMmZQT5kMfuUuA1PpF8YYeZqujwbQ@mail.gmail.com>
+ <87y43nl8pt.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <CANLsYkz0dAQLYtRpsQqD6gSrJ4t3bb+58y2MWrEtAD5e6DYfwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 08, 2016 at 06:21:43PM +0100, Andre Przywara wrote:
-> The pinctrl driver is essential for the Allwinner SoCs to work.
-> Add the driver's config symbol to the Kconfig entry to always compile
-> it in. We can't use the arm approach to make the _driver's_ Kconfig
-> symbol def_bool, because we lack the MACH_* symbols in arm64.
-> That line was in the original pinctrl driver patch, but got removed
-> to avoid the dependency on the Kconfig patch [1].
-> Also add the general PINCTRL symbol, which isn't selected automatically
-> for the same reason.
-> 
-> Reported-by: Jeroen Dekien <dekien@gmail.com>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> 
-> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/414086.html
+On 23 August 2016 at 11:02, Alexander Shishkin
+<alexander.shishkin@linux.intel.com> wrote:
+> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+>
+>> On 22 August 2016 at 09:15, Alexander Shishkin
+>> <alexander.shishkin@linux.intel.com> wrote:
+>>> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+>>>
+>>>> As such something that used to be a two-step process:
+>>>>
+>>>> # echo 1 > /sys/bus/coresight/devices/20070000.etr/enable_sink
+>>>> # perf record -e cs_etm//u --per-thread  uname
+>>>>
+>>>> is integrated in a single command:
+>>>>
+>>>> # perf record -e cs_etm/@sink=20070000.etr/u --per-thread  uname
+>>>
+>>> Can't we simply teach perf record to write 1 to that sysfs attribute and
+>>> avoid parsing more ascii strings in the kernel? I suspect that would also
+>>> take way less code.
+>>
+>> That, in my opinion, would be a big hack.  Peter and Jiri, any thoughts on this?
+>
+> Why would you say it's a hack? The whole tracer->sink configuration is
+> outside of scope of perf framework, there is absolutely no reason why
+> perf core should do this, especially, add this to perf ABI.
 
-Applied, thanks
+That is why the solution was made generic - sink configuration is
+simply using it.
 
-Maxime
+>
+> It would have somewhat made sense if you could configure different
+> events on the same pmu to send data to different sinks, but even that
+> won't work, because you simply cannot guarantee sink's availability if
+> you have to release it when your event gets scheduled out.
+>
+>>> Are there any other use cases for this besides specifying @sink for a
+>>> ETM?
+>>
+>> Not at this time but there is so many configuration option for the
+>> ETM/PTM tracers (that aren't filters) that I wanted the right
+>> infrastructure to be there should/when we need to expand.
+>
+> As I've asked before, what exactly is the need for expansion? That is,
+> something more than purely hypothetical that needs to be configured in
+> the tracer, on per event basis, *and* does not fit into the event
+> attribute. Note that the sink configuration also doesn't fit the bill.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160823/509e835d/attachment.sig>
+The first thing that comes to mind is counters and state machine,
+something that I simply don't see fitting into the event attributes.
+But those could also be set via sysFS - the end result is exactly the
+same.
+
+>
+> Regards,
+> --
+> Alex
