@@ -1,79 +1,61 @@
-From: woogyom.kim@gmail.com (Milo Kim)
-Date: Tue, 23 Aug 2016 18:13:39 +0900
-Subject: [PATCH 4/4] gpu: drm: exynos_hdmi: Use consolidated function on
- binding PHY DT property
-In-Reply-To: <1471943619-6102-1-git-send-email-woogyom.kim@gmail.com>
-References: <1471943619-6102-1-git-send-email-woogyom.kim@gmail.com>
-Message-ID: <1471943619-6102-5-git-send-email-woogyom.kim@gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 23 Aug 2016 10:16:55 +0100
+Subject: [PATCH 5/8] arm64: alternative: Add support for patching adrp
+ instructions
+In-Reply-To: <CAKv+Gu8XAny8hun=O2Wahpz7p6pSb_tXdv8WHyD3HB52_wBsnQ@mail.gmail.com>
+References: <1471525832-21209-1-git-send-email-suzuki.poulose@arm.com>
+ <1471525832-21209-6-git-send-email-suzuki.poulose@arm.com>
+ <CAKv+Gu8XAny8hun=O2Wahpz7p6pSb_tXdv8WHyD3HB52_wBsnQ@mail.gmail.com>
+Message-ID: <3c727d40-0ea8-fb2d-7d51-3d47b96e96c4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Handle legacy and raw 'phy' parsing in single function.
-And it also removes goto condition.
+On 22/08/16 12:45, Ard Biesheuvel wrote:
+> On 18 August 2016 at 15:10, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>> adrp uses PC-relative address offset to a page (of 4K size) of
+>> a symbol. If it appears in an alternative code patched in, we
+>> should adjust the offset to reflect the address where it will
+>> be run from. This patch adds support for fixing the offset
+>> for adrp instructions.
+>>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Andre Przywara <andre.przywara@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>  arch/arm64/kernel/alternative.c | 13 +++++++++++++
+>>  1 file changed, 13 insertions(+)
+>>
+>> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+>> index d2ee1b2..71c6962 100644
+>> --- a/arch/arm64/kernel/alternative.c
+>> +++ b/arch/arm64/kernel/alternative.c
+>> @@ -80,6 +80,19 @@ static u32 get_alt_insn(struct alt_instr *alt, u32 *insnptr, u32 *altinsnptr)
+>>                         offset = target - (unsigned long)insnptr;
+>>                         insn = aarch64_set_branch_offset(insn, offset);
+>>                 }
+>> +       } else if (aarch64_insn_is_adrp(insn)) {
+>> +               s32 orig_offset, new_offset;
+>> +               unsigned long target;
+>> +
+>> +               /*
+>> +                * If we're replacing an adrp instruction, which uses PC-relative
+>> +                * immediate addressing, adjust the offset to reflect the new
+>> +                * PC. adrp operates on 4K aligned addresses.
+>> +                */
+>> +               orig_offset  = aarch64_insn_adrp_get_offset(insn);
+>> +               target = ((unsigned long)altinsnptr & ~0xfffUL) + orig_offset;
+>> +               new_offset = target - ((unsigned long)insnptr & ~0xfffUL);
+>> +               insn = aarch64_insn_adrp_set_offset(insn, new_offset);
+>
+> Are orig_offset and new_offset guaranteed to be equal modulo 4 KB?
+> Otherwise, you will have to track down and patch the associated :lo12:
+> add/ldr instruction as well.
 
-Cc: Inki Dae <inki.dae@samsung.com>
-Cc: Joonyoung Shim <jy0922.shim@samsung.com>
-Cc: Seung-Woo Kim <sw0312.kim@samsung.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Cc: dri-devel at lists.freedesktop.org
-Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
----
- drivers/gpu/drm/exynos/exynos_hdmi.c | 23 ++++++++++++++---------
- 1 file changed, 14 insertions(+), 9 deletions(-)
+We are modifying the alternative instruction to accommodate for the new PC,
+where this instruction will be executed from, while the referenced symbol
+remains the same. Hence the associated :lo12: doesn't change. Does that
+address your concern ? Or did I miss something ?
 
-diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-index 6a636f2..bb2d6d4 100644
---- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-+++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-@@ -1778,11 +1778,22 @@ static struct device_node *hdmi_ddc_dt_binding(struct device *dev)
- 	return np;
- }
- 
--static struct device_node *hdmi_legacy_phy_dt_binding(struct device *dev)
-+static struct device_node *hdmi_phy_dt_binding(struct device *dev)
- {
- 	const char *compatible_str = "samsung,exynos4212-hdmiphy";
-+	struct device_node *np;
-+
-+	np = of_find_compatible_node(NULL, NULL, compatible_str);
-+	if (np)
-+		return np;
-+
-+	np = of_parse_phandle(dev->of_node, "phy", 0);
-+	if (!np)
-+		return NULL;
-+
-+	of_node_put(dev->of_node);
- 
--	return of_find_compatible_node(NULL, NULL, compatible_str);
-+	return np;
- }
- 
- static int hdmi_probe(struct platform_device *pdev)
-@@ -1829,19 +1840,13 @@ static int hdmi_probe(struct platform_device *pdev)
- 		return -EPROBE_DEFER;
- 	}
- 
--	phy_node = hdmi_legacy_phy_dt_binding(dev);
--	if (phy_node)
--		goto out_get_phy_port;
--
--	phy_node = of_parse_phandle(dev->of_node, "phy", 0);
-+	phy_node = hdmi_phy_dt_binding(dev);
- 	if (!phy_node) {
- 		DRM_ERROR("Failed to find hdmiphy node in device tree\n");
- 		ret = -ENODEV;
- 		goto err_ddc;
- 	}
--	of_node_put(dev->of_node);
- 
--out_get_phy_port:
- 	if (hdata->drv_data->is_apb_phy) {
- 		hdata->regs_hdmiphy = of_iomap(phy_node, 0);
- 		if (!hdata->regs_hdmiphy) {
--- 
-1.9.1
+Suzuki
