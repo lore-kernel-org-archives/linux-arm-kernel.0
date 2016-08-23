@@ -1,57 +1,107 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 23 Aug 2016 13:58:25 +0800
-Subject: [PATCH 1/2] pinctrl: sunxi: fix uart1 CTS/RTS pins at PG on A23/A33
-Message-ID: <20160823055826.20591-1-icenowy@aosc.xyz>
+Date: Tue, 23 Aug 2016 13:58:26 +0800
+Subject: [PATCH 2/2] ARM: dts: sun8i: Add extra UART pinmux settings for A23/33
+In-Reply-To: <20160823055826.20591-1-icenowy@aosc.xyz>
+References: <20160823055826.20591-1-icenowy@aosc.xyz>
+Message-ID: <20160823055826.20591-2-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PG8, PG9 is said to be the CTS/RTS pins for UART1 according to the A23/33
-datasheets. However, the function is wrongly named "uart2" in the pinctrl
-driver. This patch fixes this by modifying them to be named "uart1".
+A23/33 have 4 UART controllers outside PRCM. However, the devicetree used
+to mentioned only UART0's pinmux settings. Some extra UART controllers have
+RTS/CTS, and is suitable for using as bluetooth UART controller.
+
+Add the pinmux settings for the UART controller, to make use of the
+bluetooth function of some tablets.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
- drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c | 4 ++--
- drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi | 56 ++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun8i-a23.dtsi     |  7 +++++
+ 2 files changed, 63 insertions(+)
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c
-index ce483b0..f9d661e 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c
-@@ -485,12 +485,12 @@ static const struct sunxi_desc_pin sun8i_a23_pins[] = {
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 8),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
--		  SUNXI_FUNCTION(0x2, "uart2"),		/* RTS */
-+		  SUNXI_FUNCTION(0x2, "uart1"),		/* RTS */
- 		  SUNXI_FUNCTION_IRQ_BANK(0x4, 2, 8)),	/* PG_EINT8 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 9),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
--		  SUNXI_FUNCTION(0x2, "uart2"),		/* CTS */
-+		  SUNXI_FUNCTION(0x2, "uart1"),		/* CTS */
- 		  SUNXI_FUNCTION_IRQ_BANK(0x4, 2, 9)),	/* PG_EINT9 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 10),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
-index 3040abe..3131cac 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
-@@ -407,12 +407,12 @@ static const struct sunxi_desc_pin sun8i_a33_pins[] = {
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 8),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
--		  SUNXI_FUNCTION(0x2, "uart2"),		/* RTS */
-+		  SUNXI_FUNCTION(0x2, "uart1"),		/* RTS */
- 		  SUNXI_FUNCTION_IRQ_BANK(0x4, 1, 8)),	/* PG_EINT8 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 9),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
--		  SUNXI_FUNCTION(0x2, "uart2"),		/* CTS */
-+		  SUNXI_FUNCTION(0x2, "uart1"),		/* CTS */
- 		  SUNXI_FUNCTION_IRQ_BANK(0x4, 1, 9)),	/* PG_EINT9 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 10),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+index 7e05e09..89ea479 100644
+--- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+@@ -361,6 +361,62 @@
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
+ 
++			uart1_pins_a: uart1 at 0 {
++				allwinner,pins = "PD10", "PD11";
++				allwinner,function = "uart1";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			uart1_pins_cts_rts_a: uart1-cts-rts at 1 {
++				allwinner,pins = "PD12", "PD13";
++				allwinner,function = "uart1";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			uart1_pins_b: uart1 at 1 {
++				allwinner,pins = "PG6", "PG7";
++				allwinner,function = "uart1";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			uart1_pins_cts_rts_b: uart1-cts-rts at 0 {
++				allwinner,pins = "PG8", "PG9";
++				allwinner,function = "uart1";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			uart2_pins_a: uart2 at 0 {
++				allwinner,pins = "PB0", "PB1";
++				allwinner,function = "uart2";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			uart2_pins_cts_rts_a: uart2-cts-rts at 1 {
++				allwinner,pins = "PB2", "PB3";
++				allwinner,function = "uart2";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			uart3_pins_a: uart3 at 0 {
++				allwinner,pins = "PH6", "PH7";
++				allwinner,function = "uart3";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			uart3_pins_cts_rts_a: uart3-cts-rts at 1 {
++				allwinner,pins = "PH8", "PH9";
++				allwinner,function = "uart3";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
+ 			mmc0_pins_a: mmc0 at 0 {
+ 				allwinner,pins = "PF0", "PF1", "PF2",
+ 						 "PF3", "PF4", "PF5";
+diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+index 92e6616..6b76580 100644
+--- a/arch/arm/boot/dts/sun8i-a23.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+@@ -123,4 +123,11 @@
+ 	interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
+ 		     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
+ 		     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
++
++	uart3_pins_b: uart3 at 0 {
++		allwinner,pins = "PD8", "PD9";
++		allwinner,function = "uart3";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
+ };
 -- 
 2.9.3
