@@ -1,59 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 23 Aug 2016 09:49:44 +0200
-Subject: [PATCH/RFT v2 2/8] clk: renesas: r8a7796: Add SDIF clocks
-In-Reply-To: <1471938590-10650-1-git-send-email-horms+renesas@verge.net.au>
-References: <1471938590-10650-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1471938590-10650-3-git-send-email-horms+renesas@verge.net.au>
+Date: Tue, 23 Aug 2016 09:49:42 +0200
+Subject: [PATCH/RFT v2 0/8] Add SDHI to r8a7796/salvator-x
+Message-ID: <1471938590-10650-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds SDIF clocks for R8A7796 SoC.
+Hi,
 
-Based on work by Ai Kyuse and Yoshihiro Shimoda for the r8a7795 SoC.
+this patch set updates drivers, documentation and DT to
+enable SDHI0 & 3 on the r8a7796/salvator-x. This includes
+defining nodes for all available SDHI and GPIO devices.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v2
-* Add and use SDSRC
----
- drivers/clk/renesas/r8a7796-cpg-mssr.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+I have boot-tested this which seems successful.
+However, I do not have physical access to an r8a7796/salvator-x board
+and the one that I have remote access to does not appear to have
+any SD cards present. I would be grateful of any testing anyone
+can provide.
 
-diff --git a/drivers/clk/renesas/r8a7796-cpg-mssr.c b/drivers/clk/renesas/r8a7796-cpg-mssr.c
-index 999955c2b23e..891b353e8105 100644
---- a/drivers/clk/renesas/r8a7796-cpg-mssr.c
-+++ b/drivers/clk/renesas/r8a7796-cpg-mssr.c
-@@ -70,6 +70,7 @@ static const struct cpg_core_clk r8a7796_core_clks[] __initconst = {
- 	DEF_FIXED(".s1",        CLK_S1,            CLK_PLL1_DIV2,  3, 1),
- 	DEF_FIXED(".s2",        CLK_S2,            CLK_PLL1_DIV2,  4, 1),
- 	DEF_FIXED(".s3",        CLK_S3,            CLK_PLL1_DIV2,  6, 1),
-+	DEF_FIXED(".sdsrc",     CLK_SDSRC,         CLK_PLL1_DIV2,  2, 1),
- 
- 	/* Core Clock Outputs */
- 	DEF_FIXED("ztr",        R8A7796_CLK_ZTR,   CLK_PLL1_DIV2,  6, 1),
-@@ -93,6 +94,11 @@ static const struct cpg_core_clk r8a7796_core_clks[] __initconst = {
- 	DEF_FIXED("s3d2",       R8A7796_CLK_S3D2,  CLK_S3,         2, 1),
- 	DEF_FIXED("s3d4",       R8A7796_CLK_S3D4,  CLK_S3,         4, 1),
- 
-+	DEF_GEN3_SD("sd0",      R8A7796_CLK_SD0,   CLK_SDSRC,    0x0074),
-+	DEF_GEN3_SD("sd1",      R8A7796_CLK_SD1,   CLK_SDSRC,    0x0078),
-+	DEF_GEN3_SD("sd2",      R8A7796_CLK_SD2,   CLK_SDSRC,    0x0268),
-+	DEF_GEN3_SD("sd3",      R8A7796_CLK_SD3,   CLK_SDSRC,    0x026c),
-+
- 	DEF_FIXED("cl",         R8A7796_CLK_CL,    CLK_PLL1_DIV2, 48, 1),
- 	DEF_FIXED("cp",         R8A7796_CLK_CP,    CLK_EXTAL,      2, 1),
- 
-@@ -104,6 +110,10 @@ static const struct cpg_core_clk r8a7796_core_clks[] __initconst = {
- 
- static const struct mssr_mod_clk r8a7796_mod_clks[] __initconst = {
- 	DEF_MOD("scif2",		 310,	R8A7796_CLK_S3D4),
-+	DEF_MOD("sdif3",		 311,	R8A7796_CLK_SD3),
-+	DEF_MOD("sdif2",		 312,	R8A7796_CLK_SD2),
-+	DEF_MOD("sdif1",		 313,	R8A7796_CLK_SD1),
-+	DEF_MOD("sdif0",		 314,	R8A7796_CLK_SD0),
- 	DEF_MOD("rwdt0",		 402,	R8A7796_CLK_R),
- 	DEF_MOD("intc-ap",		 408,	R8A7796_CLK_S3D1),
- 	DEF_MOD("gpio7",		 905,	R8A7796_CLK_S3D4),
+Based on renesas-drivers-2016-08-09-v4.8-rc1
+
+Provided for testing as the topic/r8a7796-sdhi-v2 branch in
+my renesas tree on kernel.org.
+
+Changes since v1 noted in individual changelogs.
+Acks from v1 also added.
+
+Ai Kyuse (1):
+  mmc: sh_mobile_sdhi: Add r8a7796 support
+
+Simon Horman (4):
+  clk: renesas: r8a7796: Add SDIF clocks
+  gpio: rcar: Add r8a7796 (R-Car M3-W) support
+  arm64: dts: r8a7796: add SDHI nodes
+  arm64: dts: r8a7796: salvator-x: enable SDHI0 & 3
+
+Takeshi Kihara (3):
+  clk: renesas: r8a7796: Add GPIO clocks
+  pinctrl: sh-pfc: r8a7796: Add SDHI pins, groups and functions
+  arm64: dts: r8a7796: Add GPIO device nodes
+
+ .../devicetree/bindings/gpio/renesas,gpio-rcar.txt |   1 +
+ Documentation/devicetree/bindings/mmc/tmio_mmc.txt |   1 +
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts |  84 +++++++
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 154 ++++++++++++
+ drivers/clk/renesas/r8a7796-cpg-mssr.c             |  18 ++
+ drivers/gpio/gpio-rcar.c                           |   4 +
+ drivers/mmc/host/sh_mobile_sdhi.c                  |   1 +
+ drivers/pinctrl/sh-pfc/pfc-r8a7796.c               | 275 +++++++++++++++++++++
+ 8 files changed, 538 insertions(+)
+
 -- 
 2.7.0.rc3.207.g0ac5344
