@@ -1,77 +1,46 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue, 23 Aug 2016 13:00:00 -0700
-Subject: [PATCH v2 03/22] usb: ulpi: Support device discovery via device
- properties
-In-Reply-To: <147043320014.26915.7483025835695600714@sboyd-linaro>
-References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-4-stephen.boyd@linaro.org>
- <20160718022355.GA8568@rob-hp-laptop>
- <147043320014.26915.7483025835695600714@sboyd-linaro>
-Message-ID: <CAJOFmgwTPDwdL_cc7f5N09enZNhKwSkWAxdpF39vOBQLfEdVSg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 23 Aug 2016 22:00:19 +0200
+Subject: [PATCH v4 3/7] clk: sunxi: add generic multi-parent bus clock
+ gates driver
+In-Reply-To: <20160808172149.30861-4-andre.przywara@arm.com>
+References: <20160808172149.30861-1-andre.przywara@arm.com>
+ <20160808172149.30861-4-andre.przywara@arm.com>
+Message-ID: <20160823200019.GQ2598@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 5, 2016 at 2:40 PM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
-> Quoting Rob Herring (2016-07-17 19:23:55)
->> On Thu, Jul 07, 2016 at 03:20:54PM -0700, Stephen Boyd wrote:
->> > +-------
->> > +
->> > +usb {
->> > +     compatible = "vendor,usb-controller";
->> > +
->> > +     ulpi {
->> > +             phy {
->> > +                     compatible = "vendor,phy";
->> > +                     ulpi-vendor = /bits/ 16 <0x1d6b>;
->> > +                     ulpi-product = /bits/ 16 <0x0002>;
->> > +             };
->> > +     };
->>
->> I'm still having concerns about describing both phys and devices. If I
->> have a controller with 2 ports and 2 devices attached, I'd have
->> something like this under the USB controller:
->>
->> ulpi {
->>         phy at 1 {
->>         };
->>         phy at 2 {
->>         };
->> };
->
-> My understanding is there would only be one status="ok" node on the ULPI
-> bus for the single phy that a usb controller would have. At the least,
-> the kernel's ULPI layer only seems to support one ULPI phy for a
-> controller right now. So even if there are two ports, it doesn't mean
-> there are two phys.
->
->>
->> dev at 1 {
->> ...
->> };
->>
->> dev at 2 {
->> ...
->> };
->>
->>
->> That doesn't seem the best, but I don't have a better suggestion. Maybe
->> the device nodes need to go under the phy nodes?
->>
->
-> What if we moved the dev at 1 and dev at 2 to another sub node like "ports" or
-> "usb-devices"? Legacy code can support having those devices directly
-> underneath the usb controller, but future users would always need to put
-> them in a different sub-node so that we can easily differentiate the
-> different busses that a usb controller node may support?
->
-> I'm not sure I see any need to relate the phy to the ports that are on
-> the controller, but if that is needed then perhaps you're right and we
-> should move the ports underneath the phy. USB core could be modified to
-> go through the legacy path or through the phy, if it even exists, to
-> find ports.
->
-> Do we typically do this for other phy designs like sata or pci? The phy
-> always seemed like a parallel thing to the logical bus that the phy is
-> used for.
+On Mon, Aug 08, 2016 at 06:21:45PM +0100, Andre Przywara wrote:
+> The Allwinner H3 SoC introduced bus clock gates with potentially
+> different parents per clock gate register. The H3 driver chose to
+> hardcode the actual parent clock relation in the code.
+> Add a new driver (which has the potential to drive the H3 and also
+> the simple clock gates as well) which uses the power of DT to describe
+> this relationship in an elegant and flexible way.
+> Using one subnode for every parent clock we get away with a single
+> DT compatible match, which can be used as a fallback value in the
+> actual DTs without the need to add specific compatible strings to the
+> code.  This avoids adding a new driver or function for every new SoC.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Acked-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+>  drivers/clk/sunxi/Makefile          |   1 +
+>  drivers/clk/sunxi/clk-multi-gates.c | 105 ++++++++++++++++++++++++++++++++++++
 
-Rob does this sound ok to you?
+Aside from my initial objections (that I still have),
+drivers/clk/sunxi is in maintainance-only mode, we won't merge any new
+drivers there.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160823/16609d16/attachment.sig>
