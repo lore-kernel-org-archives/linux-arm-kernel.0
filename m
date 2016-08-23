@@ -1,147 +1,105 @@
-From: kid.jin@hisilicon.com (Jinguojun)
-Date: Tue, 23 Aug 2016 17:00:22 +0800
-Subject: [PATCH V4]mmc: dw_mmc-k3: UHS-SD card for Hisilicon Hikey
-In-Reply-To: <af90b627-e581-6722-8653-156341d3e8b7@samsung.com>
-References: <1470276973-41683-1-git-send-email-kid.jin@hisilicon.com>
- <74c80b1c-5570-0ee0-4132-ff703d8d5eb4@hisilicon.com>
- <CGME20160808091030epcas1p4e868c5412d08f0ed737e85714442e801@epcas1p4.samsung.com>
- <06f63a26-251d-5ba8-f877-dae75aa8e362@rock-chips.com>
- <1b724dde-863d-fa28-fa58-595c34c1bef2@samsung.com>
- <5d5551f4-e49c-d005-eb0b-9ca472a8d249@hisilicon.com>
- <af90b627-e581-6722-8653-156341d3e8b7@samsung.com>
-Message-ID: <49dcf25e-116e-b0d8-fbaf-4f23488433d3@hisilicon.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 23 Aug 2016 11:03:44 +0200
+Subject: [PATCH v1 3/3] PM / AVS: rockchip-cpu-avs: add driver handling
+ Rockchip cpu avs
+In-Reply-To: <c853c8fd-285a-603d-b294-750cdbf7f200@rock-chips.com>
+References: <1471315139-28285-1-git-send-email-finley.xiao@rock-chips.com>
+ <20160819133636.GA26913@rob-hp-laptop>
+ <c853c8fd-285a-603d-b294-750cdbf7f200@rock-chips.com>
+Message-ID: <3008348.gWNc8j0KGA@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Finley,
 
-On 2016/8/17 15:20, Jaehoon Chung wrote:
-> On 08/17/2016 03:11 PM, Jinguojun wrote:
->> Hi
->>
->> On 2016/8/8 18:46, Jaehoon Chung wrote:
->>> Hi,
->>>
->>> On 08/08/2016 06:10 PM, Shawn Lin wrote:
->>>> Hi guy,
->>>>
->>>> On 2016/8/8 15:10, Jinguojun wrote:
->>>>> Hi,maintainers
->>>>>
->>>>> Pls help to review code,this is the newest patch after your advise
->>>
->>> Subject..
->>>
->>> s/UHS-SD/UHS-I/
->>>
->>>>>
->>>>
->>>> Please give Jaehoon more time to review your patch before sending a
->>>> ping or resending one(~2 weeks), as it's only four days(weekend
->>>> included) since v4 was done....IMHO, it's quite bold...
->>>>
->>>>> Thx
->> I apologize for my rudeness.
+Am Dienstag, 23. August 2016, 12:10:27 schrieb Finley Xiao:
+> ? 2016/8/19 21:36, Rob Herring ??:
+> > On Tue, Aug 16, 2016 at 10:38:59AM +0800, Finlye Xiao wrote:
+> >> From: Finley Xiao <finley.xiao@rock-chips.com>
+> >> 
+> >> This patch supports adjusting opp's voltage according to leakage
+> >> 
+> >> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+> >> ---
+> >> 
+> >>   .../devicetree/bindings/power/rockchip-cpu-avs.txt |  37 +++
+> >>   drivers/power/avs/Kconfig                          |   8 +
+> >>   drivers/power/avs/Makefile                         |   1 +
+> >>   drivers/power/avs/rockchip-cpu-avs.c               | 314
+> >>   +++++++++++++++++++++ 4 files changed, 360 insertions(+)
+> >>   create mode 100644
+> >>   Documentation/devicetree/bindings/power/rockchip-cpu-avs.txt create
+> >>   mode 100644 drivers/power/avs/rockchip-cpu-avs.c
+> >> 
+> >> diff --git a/Documentation/devicetree/bindings/power/rockchip-cpu-avs.txt
+> >> b/Documentation/devicetree/bindings/power/rockchip-cpu-avs.txt new file
+> >> mode 100644
+> >> index 0000000..90f6b08
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/power/rockchip-cpu-avs.txt
+> >> @@ -0,0 +1,37 @@
+> >> +Rockchip cpu avs device tree bindings
+> >> +-------------------------------------
+> >> +
+> >> +Under the same frequency, the operating voltage tends to decrease with
+> >> +increasing leakage. so it is necessary to adjust opp's voltage according
+> >> +to leakage for power.
+> >> +
+> >> +
+> >> +Required properties:
+> >> +- compatible: Should be one of the following.
+> >> +  - "rockchip,rk3399-cpu-avs" - for RK3399 SoCs.
+> >> +- leakage-volt-<name>: Named leakage-volt property. At runtime, the
+> >> +  platform can find a cpu's cluster_id according to it's cpu_id and
+> >> match
+> >> +  leakage-volt-<name> property. The property is an array of 3-tuples
+> >> +  items, and each item consists of leakage and voltage like
+> >> +  <min-leakage-mA max-leakage-mA vol-uV>.
+> >> +	min-leakage: minimum leakage in mA.
+> >> +	max-leakage: maximum leakage in mA.
+> >> +	vol: voltage in microvolt.
+> > 
+> > How do you determine these values? When do they vary?
 > 
-> Don't mind. Feel free to tell me anytime! :)
+> How do you determine these values?
 > 
->>>>> On 2016/8/4 10:16, Jin Guojun wrote:
->>>>>> mmc: dw_mmc-k3: Hisilicon Hikey have no tuning function in
->>>>>> dw_mmc-k3.c,so we must do the tuning function stub when we init UHS card.
->>>>>>
->>>>
->>>> Hrmmm....  remove "mmc: dw_mmc-k3:" from the meat of commit msg?
->>>>
->>>> And you do nothing for dw_mci_hi6220_execute_tuning, why?
->>>> Could you elaborate more..
->>>>
->>>>
->> OK I'll remove the mmc: dw_mmc-k3:,Then Hikey can't support SDR104,so we only support SDR12 SDR25 SD50,and we do not need to do tuning for these modes.
->>>>>> V1:add .prepare_command in dw_mmc.c
->>>>>> V2:delete .prepare_command, add err = 0 in dw_mci_execute_tuning
->>>>>> V3:delete err = 0 in dw_mci_execute_tuning,add .execute_tuning in
->>>>>> dw_mmc-k3.c
->>>>>> V4:add "linux-mmc at vger.kernel.org", patch version, Changelog, etc..
->>>>
->>>> The changelog is totally wrong, namely it should not be listed in the
->>>> commit msg...
->>>>
->> OK I'll delete this part
->>>>>>
->>>>>> Signed-off-by: Jin Guojun <kid.jin@hisilicon.com>
->>>>>> ---
->>>>>>  drivers/mmc/host/dw_mmc-k3.c | 6 ++++++
->>>>>>  1 file changed, 6 insertions(+)
->>>>>>
->>>>>> diff --git a/drivers/mmc/host/dw_mmc-k3.c b/drivers/mmc/host/dw_mmc-k3.c
->>>>>> index 8e9d886..6247894 100644
->>>>>> --- a/drivers/mmc/host/dw_mmc-k3.c
->>>>>> +++ b/drivers/mmc/host/dw_mmc-k3.c
->>>>>> @@ -131,11 +131,17 @@ static void dw_mci_hi6220_set_ios(struct dw_mci *host, struct mmc_ios *ios)
->>>>>>      host->bus_hz = clk_get_rate(host->biu_clk);
->>>>>>  }
->>>>>>
->>>>>> +static int dw_mci_hi6220_execute_tuning(struct dw_mci_slot *slot, u32 opcode)
->>>>>> +{
->>>>>> +    return 0;
->>>>>> +}
->>>
->>>
->>> All of UHS-I cards didn't need to do tuning sequence on your SoC? it's strange.
->>>
->>> I think we can fix more exactly in dw_mmc.c
->>> As i know, some UHS cards don't need to send the tuning sequence.
->>> (If i know wrong, let me know plz.)
->>>
->>> But just skipping execute_tuning..I think it's not correct.
->>>
->>> Best Regards,
->>> Jaehoon Chung
->>>
->> We cant support SDR104 currently.We only turn on SDR12 SDR25 SDR50.
+> run antutu-benchmark
+> leakage     freq 	min_volt
+> 30mA 	    1608MHz 	1025mV
+> 40mA 	    1608MHz 	1000mV
+> 50mA 	    1608MHz 	975mV
 > 
-> I will send the patch for execute_tuning in dwmmc.c within this week.
-> After that, could you check that patch? I will add your email to CC. How about?
+>  From the table, we see the min_volt decrease with increasing leakage.
+> So we can set the default opp-microvolt 1025mV for 1608MHz,
+> and add an leakage_volt_cluster0 property as follows.
+> leakage_volt_cluster0 = <
+> 		/*  min(mA)   max(mA)    volt(uV)*/
+> 		    0         40        0
+> 		    41        50        (-25000)
+> 		    51        254       (-50000)
 > 
-> I think it's better than using the dummy function. :)
+> >;
 > 
-> Best Regards,
-> Jaehoon Chung
+> If the leakage is between 41mA and 50mA?the opp-microvolt will subtract
+> 25mV? If the leakage is between 41mA and 50mA?the opp-microvolt will
+> subtract 50mV?
 > 
-OK when you finish the patch,pls give me the modefy
-thx
->>>>>> +
->>>>>>  static const struct dw_mci_drv_data hi6220_data = {
->>>>>>      .caps            = dw_mci_hi6220_caps,
->>>>>>      .switch_voltage        = dw_mci_hi6220_switch_voltage,
->>>>>>      .set_ios        = dw_mci_hi6220_set_ios,
->>>>>>      .parse_dt        = dw_mci_hi6220_parse_dt,
->>>>>> +    .execute_tuning        = dw_mci_hi6220_execute_tuning,
->>>>>>  };
->>>>>>
->>>>>>  static const struct of_device_id dw_mci_k3_match[] = {
->>>>>>
->>>>>
->>>>> -- 
->>>>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
->>>>> the body of a message to majordomo at vger.kernel.org
->>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>>>
->>>>
->>>>
->>>
->>>
->>> .
->>>
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->>
->>
+> When do they vary?
 > 
+>  From the code,
+> cpufreq_online
+> --cpufreq_driver->init(policy);  /* add new opp table */
+> --blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
+> CPUFREQ_START, policy);
+> --cpufreq_init_policy
+> ----cpufreq_set_policy
+> --------__cpufreq_governor(policy, CPUFREQ_GOV_START);
 > 
-> .
-> 
+> The cpu's opp table is added in the init function(cpufreq_init)?and I will
+> register a cpufreq notifier, once the first cpu of cluster is onlined,
+> my notifer will be called, and if the event is CPUFREQ_START?it will modify
+> the opp-microvolt according to leakage_volt_cluster0.
+
+I think what Rob was asking with "when do they vary" is, are these leakage 
+values the same for each and every rk3399 soc or are they determined 
+separately for each board-type using the rk3399.
