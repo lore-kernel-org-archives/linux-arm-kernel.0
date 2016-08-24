@@ -1,48 +1,94 @@
-From: woogyom.kim@gmail.com (Milo Kim)
-Date: Wed, 24 Aug 2016 22:07:19 +0900
-Subject: [PATCH v3 5/5] gpu: drm: exynos_hdmi: Remove duplicate initialization
- of regulator bulk consumer
-In-Reply-To: <1472044039-16536-1-git-send-email-woogyom.kim@gmail.com>
-References: <1472044039-16536-1-git-send-email-woogyom.kim@gmail.com>
-Message-ID: <1472044039-16536-6-git-send-email-woogyom.kim@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 24 Aug 2016 18:43:16 +0530
+Subject: Kernel warning in cpufreq_add_dev()
+In-Reply-To: <2310664.2BksGViL4r@vostro.rjw.lan>
+References: <20160819110032.GM1041@n2100.armlinux.org.uk>
+ <1601399.OxUAWWKTJN@vostro.rjw.lan> <20160820014634.GA25143@ubuntu>
+ <2310664.2BksGViL4r@vostro.rjw.lan>
+Message-ID: <20160824131316.GI25143@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The helper, devm_regulator_bulk_get() initializes the consumer as NULL,
-so this code can be ignored.
+On 22-08-16, 19:32, Rafael J. Wysocki wrote:
+> But it will be called in that path during physical CPU hot-add, won't it?
 
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Cc: David Airlie <airlied@linux.ie>
-Cc: Inki Dae <inki.dae@samsung.com>
-Cc: Joonyoung Shim <jy0922.shim@samsung.com>
-Cc: Seung-Woo Kim <sw0312.kim@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Cc: dri-devel at lists.freedesktop.org
-Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
----
- drivers/gpu/drm/exynos/exynos_hdmi.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+What about something like this instead (completely untested) ?
 
-diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-index 249cb23..4e17877f 100644
---- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-+++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-@@ -1669,10 +1669,9 @@ static int hdmi_resources_init(struct hdmi_context *hdata)
- 	if (ret)
- 		return ret;
- 
--	for (i = 0; i < ARRAY_SIZE(supply); ++i) {
-+	for (i = 0; i < ARRAY_SIZE(supply); ++i)
- 		hdata->regul_bulk[i].supply = supply[i];
--		hdata->regul_bulk[i].consumer = NULL;
--	}
-+
- 	ret = devm_regulator_bulk_get(dev, ARRAY_SIZE(supply), hdata->regul_bulk);
- 	if (ret) {
- 		if (ret != -EPROBE_DEFER)
+@Russell: Can you please try this ??
+
 -- 
-1.9.1
+viresh
+
+-------------------------8<-------------------------
+
+diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+index 3dd4884c6f9e..a702d6246385 100644
+--- a/drivers/cpufreq/cpufreq.c
++++ b/drivers/cpufreq/cpufreq.c
+@@ -916,20 +916,11 @@ static struct kobj_type ktype_cpufreq = {
+ 	.release	= cpufreq_sysfs_release,
+ };
+ 
+-static int add_cpu_dev_symlink(struct cpufreq_policy *policy, int cpu)
++static int add_cpu_dev_symlink(struct cpufreq_policy *policy,
++			       struct device *dev)
+ {
+-	struct device *cpu_dev;
+-
+-	pr_debug("%s: Adding symlink for CPU: %u\n", __func__, cpu);
+-
+-	if (!policy)
+-		return 0;
+-
+-	cpu_dev = get_cpu_device(cpu);
+-	if (WARN_ON(!cpu_dev))
+-		return 0;
+-
+-	return sysfs_create_link(&cpu_dev->kobj, &policy->kobj, "cpufreq");
++	dev_dbg(dev, "%s: Adding symlink\n", __func__);
++	return sysfs_create_link(&dev->kobj, &policy->kobj, "cpufreq");
+ }
+ 
+ static void remove_cpu_dev_symlink(struct cpufreq_policy *policy, int cpu)
+@@ -948,12 +939,17 @@ static void remove_cpu_dev_symlink(struct cpufreq_policy *policy, int cpu)
+ /* Add/remove symlinks for all related CPUs */
+ static int cpufreq_add_dev_symlink(struct cpufreq_policy *policy)
+ {
++	struct device *cpu_dev;
+ 	unsigned int j;
+ 	int ret = 0;
+ 
+ 	/* Some related CPUs might not be present (physically hotplugged) */
+ 	for_each_cpu(j, policy->real_cpus) {
+-		ret = add_cpu_dev_symlink(policy, j);
++		cpu_dev = get_cpu_device(j);
++		if (WARN_ON(!cpu_dev))
++			continue;
++
++		ret = add_cpu_dev_symlink(policy, cpu_dev);
+ 		if (ret)
+ 			break;
+ 	}
+@@ -1073,13 +1069,9 @@ static void handle_update(struct work_struct *work)
+ 
+ static struct cpufreq_policy *cpufreq_policy_alloc(unsigned int cpu)
+ {
+-	struct device *dev = get_cpu_device(cpu);
+ 	struct cpufreq_policy *policy;
+ 	int ret;
+ 
+-	if (WARN_ON(!dev))
+-		return NULL;
+-
+ 	policy = kzalloc(sizeof(*policy), GFP_KERNEL);
+ 	if (!policy)
+ 		return NULL;
+@@ -1355,7 +1347,7 @@ static int cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
+ 	if (!policy || cpumask_test_and_set_cpu(cpu, policy->real_cpus))
+ 		return 0;
+ 
+-	return add_cpu_dev_symlink(policy, cpu);
++	return add_cpu_dev_symlink(policy, dev);
+ }
+ 
+ static void cpufreq_offline(unsigned int cpu)
