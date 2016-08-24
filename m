@@ -1,70 +1,67 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 24 Aug 2016 22:49:08 +0900
-Subject: [PATCH v2 4/7] pinctrl: samsung: Add GPF support for Exynos5433
+Date: Wed, 24 Aug 2016 22:49:05 +0900
+Subject: [PATCH v2 1/7] clocksource: exynos_mct: Add the support for ARM64
 In-Reply-To: <1472046551-703-1-git-send-email-cw00.choi@samsung.com>
 References: <1472046551-703-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1472046551-703-5-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1472046551-703-2-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joonyoung Shim <jy0922.shim@samsung.com>
+This patch adds the support for ARM 64bit. The delay_timer is only supported
+on ARM 32bit.
 
-This patch add the support of GPF[1-5] pin of Exynos5433 SoC. The GPFx need
-to support the multiple memory map because the registers of GPFx are located
-in the different domain.
-
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Kukjin Kim <kgene@kernel.org>
-Cc: linux-gpio at vger.kernel.org
-Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-[robh : Acked for binding documentation]
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt | 1 +
- drivers/pinctrl/samsung/pinctrl-exynos.c                      | 6 ++++++
- 2 files changed, 7 insertions(+)
+ drivers/clocksource/Kconfig      | 2 +-
+ drivers/clocksource/exynos_mct.c | 4 ++++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-index 37bc692445d4..499fb3484915 100644
---- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-@@ -19,6 +19,7 @@ Required Properties:
-   - "samsung,exynos5260-pinctrl": for Exynos5260 compatible pin-controller.
-   - "samsung,exynos5410-pinctrl": for Exynos5410 compatible pin-controller.
-   - "samsung,exynos5420-pinctrl": for Exynos5420 compatible pin-controller.
-+  - "samsung,exynos5433-pinctrl": for Exynos5433 compatible pin-controller.
-   - "samsung,exynos7-pinctrl": for Exynos7 compatible pin-controller.
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 567788664723..ec443c318c77 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -351,7 +351,7 @@ config CLKSRC_METAG_GENERIC
  
- - reg: Base address of the pin controller hardware module and length of
-diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
-index 12fa9d3f1113..b9605b8282be 100644
---- a/drivers/pinctrl/samsung/pinctrl-exynos.c
-+++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-@@ -1360,6 +1360,11 @@ static const struct samsung_pin_bank_data exynos5433_pin_banks0[] = {
- 	EXYNOS_PIN_BANK_EINTW(8, 0x020, "gpa1", 0x04),
- 	EXYNOS_PIN_BANK_EINTW(8, 0x040, "gpa2", 0x08),
- 	EXYNOS_PIN_BANK_EINTW(8, 0x060, "gpa3", 0x0c),
-+	EXYNOS_PIN_BANK_EINTW_EXT(8, 0x020, "gpf1", 0x1004, 1, 0),
-+	EXYNOS_PIN_BANK_EINTW_EXT(4, 0x040, "gpf2", 0x1008, 1, 0),
-+	EXYNOS_PIN_BANK_EINTW_EXT(4, 0x060, "gpf3", 0x100c, 1, 0),
-+	EXYNOS_PIN_BANK_EINTW_EXT(8, 0x080, "gpf4", 0x1010, 1, 0),
-+	EXYNOS_PIN_BANK_EINTW_EXT(8, 0x0a0, "gpf5", 0x1014, 1, 0),
- };
+ config CLKSRC_EXYNOS_MCT
+ 	bool "Exynos multi core timer driver" if COMPILE_TEST
+-	depends on ARM
++	depends on ARM || ARM64
+ 	help
+ 	  Support for Multi Core Timer controller on Exynos SoCs.
  
- /* pin banks of exynos5433 pin-controller - AUD */
-@@ -1441,6 +1446,7 @@ const struct samsung_pin_ctrl exynos5433_pin_ctrl[] = {
- 		.eint_wkup_init = exynos_eint_wkup_init,
- 		.suspend	= exynos_pinctrl_suspend,
- 		.resume		= exynos_pinctrl_resume,
-+		.nr_ext_resources = 1,
- 	}, {
- 		/* pin-controller instance 1 data */
- 		.pin_banks	= exynos5433_pin_banks1,
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 41840d02c331..8f3488b80896 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -223,6 +223,7 @@ static u64 notrace exynos4_read_sched_clock(void)
+ 	return exynos4_read_count_32();
+ }
+ 
++#if defined(CONFIG_ARM)
+ static struct delay_timer exynos4_delay_timer;
+ 
+ static cycles_t exynos4_read_current_timer(void)
+@@ -231,14 +232,17 @@ static cycles_t exynos4_read_current_timer(void)
+ 			 "cycles_t needs to move to 32-bit for ARM64 usage");
+ 	return exynos4_read_count_32();
+ }
++#endif
+ 
+ static int __init exynos4_clocksource_init(void)
+ {
+ 	exynos4_mct_frc_start();
+ 
++#if defined(CONFIG_ARM)
+ 	exynos4_delay_timer.read_current_timer = &exynos4_read_current_timer;
+ 	exynos4_delay_timer.freq = clk_rate;
+ 	register_current_timer_delay(&exynos4_delay_timer);
++#endif
+ 
+ 	if (clocksource_register_hz(&mct_frc, clk_rate))
+ 		panic("%s: can't register clocksource\n", mct_frc.name);
 -- 
 1.9.1
