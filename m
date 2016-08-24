@@ -1,163 +1,85 @@
-From: mirza.krak@gmail.com (Mirza Krak)
-Date: Wed, 24 Aug 2016 15:37:15 +0200
-Subject: [PATCH v2 3/6] dt/bindings: Add bindings for Tegra GMI controller
-In-Reply-To: <1472045838-22628-1-git-send-email-mirza.krak@gmail.com>
-References: <1472045838-22628-1-git-send-email-mirza.krak@gmail.com>
-Message-ID: <1472045838-22628-4-git-send-email-mirza.krak@gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 24 Aug 2016 22:49:04 +0900
+Subject: [PATCH v2 0/7] arm64: dts: Add the dts file for Exynos5433 and TM/TM2E
+ board
+Message-ID: <1472046551-703-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mirza Krak <mirza.krak@gmail.com>
+This patchset adds the Device Tree file for Samsung 64-bit Exynos5433 SoC
+and TM/TM2E board based on Exynos5433. The Exynos5433 has Octa-core CPUs
+(quad Cortex-A57 and quad Cortex-A53). The TM2 and TM2E are the Samsung board
+based on Exynos5433 SoC.
 
-Document the devicetree bindings for the Generic Memory Interface (GMI)
-bus driver found on Tegra SOCs.
+I sent the Exynos5433 patches[2]. But it was not merged because of sending
+the only SoC dtsi patch without board patches. So, I again send the Exynos5433
+SoC patches with TM2/TM2E board dts files.
 
-Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
----
-Changes in v2:
-- Updated examples and some information based on comments from Jon Hunter.
+When making the patches, I get the guide from Krzysztof (Exynos SoC maintainer).
+The maintainer requires that already developed and verified work should merge
+them as one patch. So, this patchset include only three patches for Exynos5433
+dtsi, TM2 dts and TM2E dts file.
 
- .../devicetree/bindings/bus/nvidia,tegra20-gmi.txt | 132 +++++++++++++++++++++
- 1 file changed, 132 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt
+I tested the display controller by using the modetest tool.
+But, Samsung s6e3ha2 panel driver has not yet posted. So, the TM2 dts file
+don't include the panel Device Tree node. I'll post the s6e3ha2 panel driver
+on separate patch with a dt patch.
 
-diff --git a/Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt b/Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt
-new file mode 100644
-index 0000000..8c1e15f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt
-@@ -0,0 +1,132 @@
-+Device tree bindings for NVIDIA Tegra Generic Memory Interface bus
-+
-+The Generic Memory Interface bus enables memory transfers between internal and
-+external memory. Can be used to attach various high speed devices such as
-+synchronous/asynchronous NOR, FPGA, UARTS and more.
-+
-+The actual devices are instantiated from the child nodes of a GMI node.
-+
-+Required properties:
-+ - compatible : Should contain one of the following:
-+        For Tegra20 must contain "nvidia,tegra20-gmi".
-+        For Tegra30 must contain "nvidia,tegra30-gmi".
-+ - reg: Should contain GMI controller registers location and length.
-+ - clocks: Must contain an entry for each entry in clock-names.
-+ - clock-names: Must include the following entries: "gmi"
-+ - resets : Must contain an entry for each entry in reset-names.
-+ - reset-names : Must include the following entries: "gmi"
-+ - #address-cells: The number of cells used to represent physical base
-+   addresses in the GMI address space. Should be 1.
-+ - #size-cells: The number of cells used to represent the size of an address
-+   range in the GMI address space. Should be 1.
-+ - ranges: Must be set up to reflect the memory layout with three integer values
-+   for each chip-select line in use (only one entry is supported, see below
-+   comments):
-+   <cs-number> <physical address of mapping> <size>
-+
-+Note that the GMI controller does not have any internal chip-select address
-+decoding, because of that chip-selects either need to be managed via software
-+or by employing external chip-select decoding logic.
-+
-+If external chip-select logic is used to support multiple devices it is assumed
-+that the devices use the same timing and so are probably the same type. It also
-+assumes that they can fit in the 256MB address range. In this case only one
-+child device is supported which represents the active chip-select line, see
-+examples for more insight.
-+
-+Required child cs node properties:
-+ - reg: First entry should contain the active chip-select number
-+
-+Optional child cs node properties:
-+
-+ - nvidia,snor-data-width-32bit: Use 32bit data-bus, default is 16bit.
-+ - nvidia,snor-mux-mode: Enable address/data MUX mode.
-+ - nvidia,snor-rdy-active-before-data: Assert RDY signal one cycle before data.
-+   If omitted it will be asserted with data.
-+ - nvidia,snor-rdy-inv: RDY signal is active high
-+ - nvidia,snor-adv-inv: ADV signal is active high
-+ - nvidia,snor-oe-inv: WE/OE signal is active high
-+ - nvidia,snor-cs-inv: CS signal is active high
-+
-+  Note that there is some special handling for the timing values.
-+  From Tegra TRM:
-+  Programming 0 means 1 clock cycle: actual cycle = programmed cycle + 1
-+
-+ - nvidia,snor-muxed-width: Number of cycles MUX address/data asserted on the
-+   bus. Valid values are 0-15, default is 1
-+ - nvidia,snor-hold-width: Number of cycles CE stays asserted after the
-+   de-assertion of WR_N (in case of SLAVE/MASTER Request) or OE_N
-+   (in case of MASTER Request). Valid values are 0-15, default is 1
-+ - nvidia,snor-adv-width: Number of cycles during which ADV stays asserted.
-+   Valid values are 0-15, default is 1.
-+ - nvidia,snor-ce-width: Number of cycles before CE is asserted.
-+   Valid values are 0-15, default is 4
-+ - nvidia,snor-we-width: Number of cycles during which WE stays asserted.
-+   Valid values are 0-15, default is 1
-+ - nvidia,snor-oe-width: Number of cycles during which OE stays asserted.
-+   Valid values are 0-255, default is 1
-+ - nvidia,snor-wait-width: Number of cycles before READY is asserted.
-+   Valid values are 0-255, default is 3
-+
-+Example with two SJA1000 CAN controllers connected to the GMI bus. We wrap the
-+controllers with a simple-bus node since they are all connected to the same
-+chip-select (CS4), in this example external address decoding is provided:
-+
-+gmi at 70090000 {
-+	compatible = "nvidia,tegra20-gmi";
-+	reg = <0x70009000 0x1000>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	clocks = <&tegra_car TEGRA20_CLK_NOR>;
-+	clock-names = "gmi";
-+	resets = <&tegra_car 42>;
-+	reset-names = "gmi";
-+	ranges = <4 0x48000000 0x7ffffff>;
-+
-+	status = "disabled";
-+
-+	bus at 4 {
-+		compatible = "simple-bus";
-+		reg = <4>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 4 0x40100>;
-+
-+		nvidia,snor-mux-mode;
-+		nvidia,snor-adv-inv;
-+
-+		can at 0 {
-+			reg = <0 0x100>;
-+			...
-+		};
-+
-+		can at 40000 {
-+			reg = <0x40000 0x100>;
-+			...
-+		};
-+	};
-+};
-+
-+Example with one SJA1000 CAN controller connected to the GMI bus
-+on CS4:
-+
-+gmi at 70090000 {
-+	compatible = "nvidia,tegra20-gmi";
-+	reg = <0x70009000 0x1000>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	clocks = <&tegra_car TEGRA20_CLK_NOR>;
-+	clock-names = "gmi";
-+	resets = <&tegra_car 42>;
-+	reset-names = "gmi";
-+	ranges = <4 0x48000000 0x7ffffff>;
-+
-+	status = "disabled";
-+
-+	can at 4 {
-+		reg = <4 0x100>;
-+		...
-+		nvidia,snor-mux-mode;
-+		nvidia,snor-adv-inv;
-+	};
-+};
---
-2.1.4
+Changes from v1:
+(https://lkml.org/lkml/2016/8/16/61)
+- Merge the cpufreq patch for exynos5433[3] on PM/cpufreq tree.
+- Add new patch to support the multiple IORESOURCE_MAP for samsung pinctrl driver.
+- Drop the SYSMMU Device-Tree node which will be posted by Marek Szyprowski.
+- Fix the code clean issue by Krzysztof Kozlowski and Rob Herring's comment.
+- Delete the unnecessary alias from exynos5433-tm2.dts.
+- Expand the range of cooling level of CPU device.
+- Update the binding method of 'Exynos5433 audio subsystem'
+
+Depends on:
+This patchset are based on v4.8-rc3[1] and TM2 sound patches[2].
+
+[1] v4.8-rc3
+[2] http://lkml.org/lkml/2015/3/17/843
+  : [PATCH v7 0/9] arm64: Add the support for new Exynos5433 SoC
+[3] https://lkml.org/lkml/2016/8/16/64
+  : [PATCH 3/7] cpufreq: dt: Add exynos5433 compatible to use generic cpufreq driver
+
+Chanwoo Choi (6):
+  clocksource: exynos_mct: Add the support for ARM64
+  Documentation: bindings: Add Exynos5433 PMU compatible
+  pinctrl: samsung: Add the support the multiple IORESOURCE_MEM for one pin-bank
+  arm64: dts: exynos: Add dts files for Samsung Exynos5433 64bit SoC
+  arm64: dts: exynos: Add dts file for Exynos5433-based TM2 board
+  arm64: dts: exynos: Add dts file for Exynos5433-based TM2E board
+
+Joonyoung Shim (1):
+  pinctrl: samsung: Add GPF support for Exynos5433
+
+ .../devicetree/bindings/arm/samsung/pmu.txt        |    1 +
+ .../bindings/arm/samsung/samsung-boards.txt        |    2 +
+ .../bindings/pinctrl/samsung-pinctrl.txt           |   18 +
+ arch/arm64/boot/dts/exynos/Makefile                |    5 +-
+ arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi |  792 ++++++++++++
+ arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      |  985 +++++++++++++++
+ arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     |   41 +
+ .../dts/exynos/exynos5433-tmu-g3d-sensor-conf.dtsi |   23 +
+ .../dts/exynos/exynos5433-tmu-sensor-conf.dtsi     |   22 +
+ arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi     |  306 +++++
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 1327 ++++++++++++++++++++
+ drivers/clocksource/Kconfig                        |    2 +-
+ drivers/clocksource/exynos_mct.c                   |    4 +
+ drivers/pinctrl/samsung/pinctrl-exynos.c           |   52 +-
+ drivers/pinctrl/samsung/pinctrl-exynos.h           |   47 +-
+ drivers/pinctrl/samsung/pinctrl-samsung.c          |   55 +-
+ drivers/pinctrl/samsung/pinctrl-samsung.h          |    7 +-
+ 17 files changed, 3646 insertions(+), 43 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu-g3d-sensor-conf.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu-sensor-conf.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433.dtsi
+
+-- 
+1.9.1
