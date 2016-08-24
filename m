@@ -1,109 +1,94 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Wed, 24 Aug 2016 16:53:35 +0800
-Subject: [PATCH v6 0/8] power: add power sequence library
-In-Reply-To: <b1848eb2-9298-9089-ee4d-5356998c6c08@linaro.org>
-References: <1471252398-957-1-git-send-email-peter.chen@nxp.com>
- <b1848eb2-9298-9089-ee4d-5356998c6c08@linaro.org>
-Message-ID: <20160824085335.GB27233@shlinux2>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Wed, 24 Aug 2016 17:00:50 +0800
+Subject: [PATCH 1/1] arm64/hugetlb: clear PG_dcache_clean if the page is
+ dirty when munmap
+In-Reply-To: <20160823172852.GB16213@e104818-lin.cambridge.arm.com>
+References: <20160707153741.GC27180@e104818-lin.cambridge.arm.com>
+ <577F1FD9.1040205@huawei.com>
+ <20160708135447.GB22099@e104818-lin.cambridge.arm.com>
+ <577FC5AA.5010709@huawei.com>
+ <20160708161347.GC22099@e104818-lin.cambridge.arm.com>
+ <57839474.6030203@huawei.com>
+ <20160712153535.GH22183@e104818-lin.cambridge.arm.com>
+ <578EE603.9020206@huawei.com>
+ <20160720091939.GA25890@e104818-lin.cambridge.arm.com>
+ <57BA7D38.8030103@huawei.com>
+ <20160823172852.GB16213@e104818-lin.cambridge.arm.com>
+Message-ID: <57BD6242.1080801@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2016 at 04:02:48PM +0530, Vaibhav Hiremath wrote:
-> 
-> 
-> On Monday 15 August 2016 02:43 PM, Peter Chen wrote:
-> >Hi all,
-> >
-> >This is a follow-up for my last power sequence framework patch set [1].
-> >According to Rob Herring and Ulf Hansson's comments[2], I use a generic
-> >power sequence library for parsing the power sequence elements on DT,
-> >and implement generic power sequence on library. The host driver
-> >can allocate power sequence instance, and calls pwrseq APIs accordingly.
-> >
-> >In future, if there are special power sequence requirements, the special
-> >power sequence library can be created.
-> >
-> >This patch set is tested on i.mx6 sabresx evk using a dts change, I use
-> >two hot-plug devices to simulate this use case, the related binding
-> >change is updated at patch [1/6], The udoo board changes were tested
-> >using my last power sequence patch set.[3]
-> >
-> >Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
-> >need to power on itself before it can be found by ULPI bus.
-> >
-> >[1] http://www.spinics.net/lists/linux-usb/msg142755.html
-> >[2] http://www.spinics.net/lists/linux-usb/msg143106.html
-> >[3] http://www.spinics.net/lists/linux-usb/msg142815.html
-> (Please ignore my response on V2)
-> 
-> Sorry being so late in the discussion...
-> 
-> If I am not missing anything, then I am afraid to say that the
-> generic library
-> implementation in this patch series is not going to solve many of
-> the custom
-> requirement of power on, off, etc...
-> I know you mentioned about adding another library when we come
-> across such platforms, but should we not keep provision (or easy
-> hooks/path)
-> to enable that ?
-> 
-> Let me bring in the use case I am dealing with,
-> 
-> 
->                               Host
->                                |
->                                V
->                            USB port
-> ------------------------------------------------------------
->                                |
->                                V
->                       USB HUB device (May need custom on/off seq)
->                                |
->                                V
->               =============================
->              |                             |
->              V                             V
->          Device-1                       Device-2
-> (Needs special power               (Needs special power
->  on/off sequence.                   on/off sequence.
->  Also may need custom               Also, may need custom
->  sequence for                       sequence for
->  suspend/resume)                    suspend/resume)
-> 
-> 
-> Note: Both Devices are connected to HUB via HSIC and may differ
->           in terms of functionality, features they support.
-> 
-> In the above case, both Device-1 and Device-2, need separate
-> power on/off sequence. So generic library currently we have in this
-> patch series is not going to satisfy the need here.
-> 
-> I looked at all 6 revisions of this patch-series, went through the
-> review comments, and looked at MMC power sequence code;
-> what I can say here is, we need something similar to
-> MMC power sequence here, where every device can have its own
-> power sequence (if needed).
-> 
-> I know Rob is not in favor of creating platform device for
-> this, and I understand his comment.
-> If not platform device, but atleast we need mechanism to
-> connect each device back to its of_node and its respective
-> driver/library fns. For example, the Devices may support different
-> boot modes, and platform driver needs to make sure that
-> the right sequence is followed for booting.
-> 
-> Peter, My apologies for taking you back again on this series.
-> I am OK, if you wish to address this in incremental addition,
-> but my point is, we know that the current generic way is not
-> enough for us, so I think we should try to fix it in initial phase only.
-> 
 
-Rob, it seems generic power sequence can't cover all cases.
-Without information from DT, we can't know which power sequence
-for which device.
 
--- 
+On 2016/8/24 1:28, Catalin Marinas wrote:
+> On Mon, Aug 22, 2016 at 12:19:04PM +0800, Leizhen (ThunderTown) wrote:
+>> On 2016/7/20 17:19, Catalin Marinas wrote:
+>>> On Wed, Jul 20, 2016 at 10:46:27AM +0800, Leizhen (ThunderTown) wrote:
+>>>>>>>> On 2016/7/8 21:54, Catalin Marinas wrote:
+>>>>>>>>> ------------8<----------------
+>>>>>>>>> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+>>>>>>>>> index dbd12ea8ce68..c753fa804165 100644
+>>>>>>>>> --- a/arch/arm64/mm/flush.c
+>>>>>>>>> +++ b/arch/arm64/mm/flush.c
+>>>>>>>>> @@ -75,7 +75,8 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
+>>>>>>>>>  	if (!page_mapping(page))
+>>>>>>>>>  		return;
+>>>>>>>>>  
+>>>>>>>>> -	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
+>>>>>>>>> +	if (!test_and_set_bit(PG_dcache_clean, &page->flags) ||
+>>>>>>>>> +	    PageDirty(page))
+>>>>>>>>>  		sync_icache_aliases(page_address(page),
+>>>>>>>>>  				    PAGE_SIZE << compound_order(page));
+>>>>>>>>>  	else if (icache_is_aivivt())
+>>>>>>>>> ----------------8<---------------------
+>>>>
+>>>> Do you plan to send this patch? My colleagues told me that if our
+>>>> patches are quite different, it should be Signed-off-by you.
+>>>
+>>> The reason I'm not sending it is that I don't fully understand how it
+>>> solves the problem for a shared file mmap(), not just hugetlbfs. As I
+>>> said in an earlier email: after an msync() in user space we
+>>> should flush the pages to disk via write_cache_pages(). This function
+>> Hi Catalin:
+>>    I'm so sorry for my fault. The previous small pages test result I actually ran on ramfs.
+>> Today, I ran the case on harddisk fs, it worked well without this patch.
+>>
+>> Summarized as follows:
+>> small pages on ramfs: need this patch
+>> small pages on harddisk fs: no need this patch
+>> hugetlbfs: need this patch
+> 
+> I would add:
+> 
+> small pages over nfs: fails with or without this patch
+> 
+> (tested on Juno, Cortex-A57; seems to be fixed if I remove the
+> PG_dcache_clean test altogether but, well, we end up over-flushing)
+> 
+> I assume that when using a hard drive, it goes through the block I/O
+> layer and we may have a flush_dcache_page() called when the kernel is
+> about to read a page that has been mapped in user space. This would
+> clear the PG_dcache_clean bit and subsequent __sync_icache_dcache()
+> would perform cache maintenance.
+> 
+> Could you try on your system the test case without the msync() call? I'm
+According to my test results: without msync, the test case may failed.
 
-Best Regards,
-Peter Chen
+10-175-112-211:~ # ./tst_small_page_no_msync
+Test is Failed: The result is 0x316b9, expect = 0x365a5
+10-175-112-211:~ # ./tst_small_page_no_msync
+Test is Failed: The result is 0x31023, expect = 0x31efa
+10-175-112-211:~ # ./tst_small_page_no_msync
+Test is Passed: The result is 0x31efa, expect = 0x31efa
+
+10-175-112-211:~ # ./tst_small_page
+Test is Passed: The result is 0x31eb7, expect = 0x31eb7
+10-175-112-211:~ # ./tst_small_page
+Test is Passed: The result is 0x3111f, expect = 0x3111f
+10-175-112-211:~ # ./tst_small_page
+Test is Passed: The result is 0x3111f, expect = 0x3111f
+
+> not sure whether munmap() would trigger an immediate write-back, in
+> which case we may see the issue even with the filesystem on a hard
+> drive.
+> 
