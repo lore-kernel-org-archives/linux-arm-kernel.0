@@ -1,47 +1,39 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Wed, 24 Aug 2016 15:44:44 +0800
-Subject: [PATCH v7 05/14] arm64/numa: avoid inconsistent information to be
- printed
+Date: Wed, 24 Aug 2016 15:44:43 +0800
+Subject: [PATCH v7 04/14] of/numa: remove a duplicated warning
 In-Reply-To: <1472024693-12912-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1472024693-12912-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1472024693-12912-6-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1472024693-12912-5-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-numa_init(of_numa_init) may returned error because of numa configuration
-error. So "No NUMA configuration found" is inaccurate. In fact, specific
-configuration error information should be immediately printed by the
-testing branch.
+This warning has been printed in of_numa_parse_cpu_nodes before.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm64/mm/numa.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/of/of_numa.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index 5bb15ea..d97c6e2 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -335,8 +335,10 @@ static int __init numa_init(int (*init_func)(void))
- 	if (ret < 0)
- 		return ret;
+diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
+index afaeb9c..8723f64 100644
+--- a/drivers/of/of_numa.c
++++ b/drivers/of/of_numa.c
+@@ -179,13 +179,8 @@ int of_node_to_nid(struct device_node *device)
+ 			np->name);
+ 	of_node_put(np);
 
--	if (nodes_empty(numa_nodes_parsed))
-+	if (nodes_empty(numa_nodes_parsed)) {
-+		pr_info("No NUMA configuration found\n");
- 		return -EINVAL;
-+	}
+-	if (!r) {
+-		if (nid >= MAX_NUMNODES)
+-			pr_warn("NUMA: Node id %u exceeds maximum value\n",
+-				nid);
+-		else
+-			return nid;
+-	}
++	if (!r)
++		return nid;
 
- 	ret = numa_register_nodes();
- 	if (ret < 0)
-@@ -367,8 +369,6 @@ static int __init dummy_numa_init(void)
-
- 	if (numa_off)
- 		pr_info("NUMA disabled\n"); /* Forced off on command line. */
--	else
--		pr_info("No NUMA configuration found\n");
- 	pr_info("NUMA: Faking a node@[mem %#018Lx-%#018Lx]\n",
- 	       0LLU, PFN_PHYS(max_pfn) - 1);
-
+ 	return NUMA_NO_NODE;
+ }
 --
 2.5.0
