@@ -1,158 +1,128 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Wed, 24 Aug 2016 15:44:49 +0800
-Subject: [PATCH v7 10/14] arm64/numa: define numa_distance as array to
- simplify code
+Date: Wed, 24 Aug 2016 15:44:50 +0800
+Subject: [PATCH v7 11/14] arm64/numa: support HAVE_MEMORYLESS_NODES
 In-Reply-To: <1472024693-12912-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1472024693-12912-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1472024693-12912-11-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1472024693-12912-12-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. MAX_NUMNODES is base on CONFIG_NODES_SHIFT, the default value of the
-   latter is very small now.
-2. Suppose the default value of MAX_NUMNODES is enlarged to 64, so the
-   size of numa_distance is 4K, it's still acceptable if run the Image
-   on other processors.
-3. It will make function __node_distance quicker than before.
+Some numa nodes may have no memory. For example:
+1. cpu0 on node0
+2. cpu1 on node1
+3. device0 access the momory from node0 and node1 take the same time.
+
+So, we can not simply classify device0 to node0 or node1, but we can
+define a node2 which distances to node0 and node1 are the same.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 ---
- arch/arm64/include/asm/numa.h |  1 -
- arch/arm64/mm/numa.c          | 74 +++----------------------------------------
- 2 files changed, 5 insertions(+), 70 deletions(-)
+ arch/arm64/Kconfig      |  4 ++++
+ arch/arm64/kernel/smp.c |  1 +
+ arch/arm64/mm/numa.c    | 43 +++++++++++++++++++++++++++++++++++++++++--
+ 3 files changed, 46 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
-index 600887e..9b6cc38 100644
---- a/arch/arm64/include/asm/numa.h
-+++ b/arch/arm64/include/asm/numa.h
-@@ -32,7 +32,6 @@ static inline const struct cpumask *cpumask_of_node(int node)
- void __init arm64_numa_init(void);
- int __init numa_add_memblk(int nodeid, u64 start, u64 end);
- void __init numa_set_distance(int from, int to, int distance);
--void __init numa_free_distance(void);
- void __init early_map_cpu_to_node(unsigned int cpu, int nid);
- void numa_store_cpu_info(unsigned int cpu);
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 2815af6..3a2b6ed 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -611,6 +611,10 @@ config NEED_PER_CPU_EMBED_FIRST_CHUNK
+ 	def_bool y
+ 	depends on NUMA
 
++config HAVE_MEMORYLESS_NODES
++	def_bool y
++	depends on NUMA
++
+ source kernel/Kconfig.preempt
+ source kernel/Kconfig.hz
+
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index d93d433..4879085 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -619,6 +619,7 @@ static void __init of_parse_and_init_cpus(void)
+ 			}
+
+ 			bootcpu_valid = true;
++			early_map_cpu_to_node(0, of_node_to_nid(dn));
+
+ 			/*
+ 			 * cpu_logical_map has already been
 diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index 5e44ad1..6853db7 100644
+index 6853db7..114180f 100644
 --- a/arch/arm64/mm/numa.c
 +++ b/arch/arm64/mm/numa.c
-@@ -33,8 +33,7 @@ EXPORT_SYMBOL(node_data);
- nodemask_t numa_nodes_parsed __initdata;
- static int cpu_to_node_map[NR_CPUS] = { [0 ... NR_CPUS-1] = NUMA_NO_NODE };
+@@ -129,6 +129,14 @@ void __init early_map_cpu_to_node(unsigned int cpu, int nid)
+ 		nid = 0;
 
--static int numa_distance_cnt;
--static u8 *numa_distance;
-+static u8 numa_distance[MAX_NUMNODES][MAX_NUMNODES];
- static bool numa_off;
-
- static __init int numa_parse_early_param(char *opt)
-@@ -243,59 +242,6 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
+ 	cpu_to_node_map[cpu] = nid;
++
++	/*
++	 * We should set the numa node of cpu0 as soon as possible, because it
++	 * has already been set up online before. cpu_to_node(0) will soon be
++	 * called.
++	 */
++	if (!cpu)
++		set_cpu_numa_node(cpu, nid);
  }
 
+ #ifdef CONFIG_HAVE_SETUP_PER_CPU_AREA
+@@ -211,6 +219,35 @@ int __init numa_add_memblk(int nid, u64 start, u64 end)
+ 	return ret;
+ }
+
++static u64 __init alloc_node_data_from_nearest_node(int nid, const size_t size)
++{
++	int i, best_nid, distance;
++	u64 pa;
++	DECLARE_BITMAP(nodes_map, MAX_NUMNODES);
++
++	bitmap_zero(nodes_map, MAX_NUMNODES);
++	bitmap_set(nodes_map, nid, 1);
++
++find_nearest_node:
++	best_nid = NUMA_NO_NODE;
++	distance = INT_MAX;
++
++	for_each_clear_bit(i, nodes_map, MAX_NUMNODES)
++		if (numa_distance[nid][i] < distance) {
++			best_nid = i;
++			distance = numa_distance[nid][i];
++		}
++
++	pa = memblock_alloc_nid(size, SMP_CACHE_BYTES, best_nid);
++	if (!pa) {
++		BUG_ON(best_nid == NUMA_NO_NODE);
++		bitmap_set(nodes_map, best_nid, 1);
++		goto find_nearest_node;
++	}
++
++	return pa;
++}
++
  /**
-- * numa_free_distance
-- *
-- * The current table is freed.
-- */
--void __init numa_free_distance(void)
--{
--	size_t size;
--
--	if (!numa_distance)
--		return;
--
--	size = numa_distance_cnt * numa_distance_cnt *
--		sizeof(numa_distance[0]);
--
--	memblock_free(__pa(numa_distance), size);
--	numa_distance_cnt = 0;
--	numa_distance = NULL;
--}
--
--/**
-- *
-- * Create a new NUMA distance table.
-- *
-- */
--static int __init numa_alloc_distance(void)
--{
--	size_t size;
--	u64 phys;
--	int i, j;
--
--	size = nr_node_ids * nr_node_ids * sizeof(numa_distance[0]);
--	phys = memblock_find_in_range(0, PFN_PHYS(max_pfn),
--				      size, PAGE_SIZE);
--	if (WARN_ON(!phys))
--		return -ENOMEM;
--
--	memblock_reserve(phys, size);
--
--	numa_distance = __va(phys);
--	numa_distance_cnt = nr_node_ids;
--
--	/* fill with the default distances */
--	for (i = 0; i < numa_distance_cnt; i++)
--		for (j = 0; j < numa_distance_cnt; j++)
--			numa_distance[i * numa_distance_cnt + j] = i == j ?
--				LOCAL_DISTANCE : REMOTE_DISTANCE;
--
--	pr_debug("Initialized distance table, cnt=%d\n", numa_distance_cnt);
--
--	return 0;
--}
--
--/**
-  * numa_set_distance - Set inter node NUMA distance from node to node.
-  * @from: the 'from' node to set distance
-  * @to: the 'to'  node to set distance
-@@ -310,12 +256,7 @@ static int __init numa_alloc_distance(void)
+  * Initialize NODE_DATA for a node on the local memory
   */
- void __init numa_set_distance(int from, int to, int distance)
- {
--	if (!numa_distance) {
--		pr_warn_once("Warning: distance table not allocated yet\n");
--		return;
--	}
--
--	if (from >= numa_distance_cnt || to >= numa_distance_cnt ||
-+	if (from >= MAX_NUMNODES || to >= MAX_NUMNODES ||
- 			from < 0 || to < 0) {
- 		pr_warn_once("Warning: node ids are out of bound, from=%d to=%d distance=%d\n",
- 			    from, to, distance);
-@@ -329,7 +270,7 @@ void __init numa_set_distance(int from, int to, int distance)
- 		return;
- 	}
+@@ -224,7 +261,9 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
+ 	pr_info("Initmem setup node %d [mem %#010Lx-%#010Lx]\n",
+ 		nid, start_pfn << PAGE_SHIFT, (end_pfn << PAGE_SHIFT) - 1);
 
--	numa_distance[from * numa_distance_cnt + to] = distance;
-+	numa_distance[from][to] = distance;
- }
+-	nd_pa = memblock_alloc_try_nid(nd_size, SMP_CACHE_BYTES, nid);
++	nd_pa = memblock_alloc_nid(nd_size, SMP_CACHE_BYTES, nid);
++	if (!nd_pa)
++		nd_pa = alloc_node_data_from_nearest_node(nid, nd_size);
+ 	nd = __va(nd_pa);
 
- /**
-@@ -337,9 +278,9 @@ void __init numa_set_distance(int from, int to, int distance)
-  */
- int __node_distance(int from, int to)
- {
--	if (from >= numa_distance_cnt || to >= numa_distance_cnt)
-+	if (from >= MAX_NUMNODES || to >= MAX_NUMNODES)
- 		return from == to ? LOCAL_DISTANCE : REMOTE_DISTANCE;
--	return numa_distance[from * numa_distance_cnt + to];
-+	return numa_distance[from][to];
- }
- EXPORT_SYMBOL(__node_distance);
+ 	/* report and initialize */
+@@ -234,7 +273,7 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
+ 	if (tnid != nid)
+ 		pr_info("    NODE_DATA(%d) on node %d\n", nid, tnid);
 
-@@ -379,11 +320,6 @@ static int __init numa_init(int (*init_func)(void))
- 	nodes_clear(numa_nodes_parsed);
- 	nodes_clear(node_possible_map);
- 	nodes_clear(node_online_map);
--	numa_free_distance();
--
--	ret = numa_alloc_distance();
--	if (ret < 0)
--		return ret;
-
- 	ret = init_func();
- 	if (ret < 0)
+-	node_data[nid] = nd;
++	NODE_DATA(nid) = nd;
+ 	memset(NODE_DATA(nid), 0, sizeof(pg_data_t));
+ 	NODE_DATA(nid)->node_id = nid;
+ 	NODE_DATA(nid)->node_start_pfn = start_pfn;
 --
 2.5.0
