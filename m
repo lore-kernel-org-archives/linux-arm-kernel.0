@@ -1,43 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 24 Aug 2016 21:46:54 +0100
-Subject: [PATCH v2 4/9] arm64: head.S: move KASLR processing out of
- __enable_mmu()
-In-Reply-To: <20160824203609.GA1642@remoulade>
-References: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
- <1472049366-10922-5-git-send-email-ard.biesheuvel@linaro.org>
- <20160824203609.GA1642@remoulade>
-Message-ID: <20160824204654.GA1775@remoulade>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 24 Aug 2016 15:50:59 -0500
+Subject: [PATCH v1] arm64:pci: fix the IOV device enabled crash issue in
+ designware
+In-Reply-To: <1471932072-6980-1-git-send-email-po.liu@nxp.com>
+References: <1471932072-6980-1-git-send-email-po.liu@nxp.com>
+Message-ID: <20160824205059.GG23914@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 09:36:10PM +0100, Mark Rutland wrote:
-> On Wed, Aug 24, 2016 at 04:36:01PM +0200, Ard Biesheuvel wrote:
-> > +__primary_switch:
-> > +#ifdef CONFIG_RANDOMIZE_BASE
-> > +	mov	x19, x0				// preserve new SCTLR_EL1 value
-> > +	mrs	x20, sctlr_el1			// preserve old SCTLR_EL1 value
-> > +#endif
-> > +
-> > +	adr	x27, 0f
-> > +	b	__enable_mmu
-> 
-> As we do elsewhere, it's probably worth a comment on the line with the ADR into
-> x27, mentioning that __enable_mmu will branch there.
-> 
-> ... or perhaps we should just have __enable_mmu return to the LR like a normal
-> AAPCS function, place the switch routines in the idmap, and use the idiomatic
-> sequence:
-> 
-> __thing_switch:
-> 	bl	__enable_mmu
-> 	ldr	xN, =__thing
-> 	blr	xN
+[+cc Jingoo, Pratyush, Michal, S?ren, Ley]
 
-... and now I see that this is what subsequent patches do ;)
+On Tue, Aug 23, 2016 at 02:01:12PM +0800, Po Liu wrote:
+> When echo a number to /sys/bus/pci/devices/xxx/sriov_numvfs to enable the
+> VF devices. A crash log occurred. This found to be access the IOV devices
+> config space failure issue.
 
-Is it possible to first AAPCS-ify __enable_mmu (with shuffling of callers as
-above) in one patch, prior to this? That would avoid introducing the unusual 0f
-label above, and the temporary x30 usage in a subsequent patch.
+What was the actual crash?  The mere fact that we made a config read fail
+should not cause a crash.  We might erroneously prevent access to VF
+devices, but it shouldn't crash.  So maybe there's another bug elsewhere
+that we should fix first.
 
-Thanks,
-Mark.
+> The read/write config space from host would judge the pcie device plugin
+> or not by:
+> 
+> if (bus->primary == pp->root_bus_nr && dev > 0)
+>     return 0;
+
+I'm guessing other drivers have the same issue, e.g.,
+altera_pcie_valid_config(), xilinx_pcie_valid_device().
+
+Can you look through them and fix them all at once?
+
+> Although all pcie devices for dev(coming from the device and function
+> number) is zero. But the dev is not zero for VF. So remove the
+> condition.
+> 
+> Signed-off-by: Po Liu <po.liu@nxp.com>
+> ---
+>  drivers/pci/host/pcie-designware.c | 7 -------
+>  1 file changed, 7 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index 12afce1..dd20eb2 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -670,13 +670,6 @@ static int dw_pcie_valid_config(struct pcie_port *pp,
+>  	if (bus->number == pp->root_bus_nr && dev > 0)
+>  		return 0;
+>  
+> -	/*
+> -	 * do not read more than one device on the bus directly attached
+> -	 * to RC's (Virtual Bridge's) DS side.
+> -	 */
+> -	if (bus->primary == pp->root_bus_nr && dev > 0)
+> -		return 0;
+> -
+>  	return 1;
+>  }
+>  
+> -- 
+> 2.1.0.27.g96db324
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
