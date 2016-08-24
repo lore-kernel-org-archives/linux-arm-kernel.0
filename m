@@ -1,52 +1,89 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 24 Aug 2016 08:41:53 +0200
-Subject: [PATCH v3 4/4] iio: adc: add support for Allwinner SoCs ADC
-In-Reply-To: <bccb6739-4804-8c71-a120-2cb8672fb57e@free-electrons.com>
-References: <1469519027-11387-1-git-send-email-quentin.schulz@free-electrons.com>
- <1469519027-11387-5-git-send-email-quentin.schulz@free-electrons.com>
- <20160729071230.GB6215@lukather>
- <bccb6739-4804-8c71-a120-2cb8672fb57e@free-electrons.com>
-Message-ID: <20160824064153.GC8103@lukather>
+From: chunfeng.yun@mediatek.com (chunfeng yun)
+Date: Wed, 24 Aug 2016 14:42:03 +0800
+Subject: [PATCH V5, 0/5] Add MediaTek USB3 DRD Driver
+In-Reply-To: <1470730998-9563-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1470730998-9563-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1472020923.27677.1.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2016 at 10:41:00AM +0200, Quentin Schulz wrote:
-> > However, I'm not sure this is even possible. Isn't the point of the
-> > runtime_pm precisely to not be called while you're using the device?
+Dear all,
+
+    Could you please help me to review the code? 
+
+    Thank you very much.
+
+     
+On Tue, 2016-08-09 at 16:23 +0800, Chunfeng Yun wrote:
+> These patches introduce the MediaTek USB3 dual-role controller
+> driver.
 > 
-> I agree on the principle but I am using runtime_pm functions (I am
-> mainly talking about the pm_runtime_put function) when probing or
-> removing the driver. Let's say we remove the mutex locks in runtime_pm
-> functions, what will happen if we are reading raw values from the ADC
-> when removing the ADC driver for example?
-
-Most likely, the first thing you will be doing in your remove is to
-unregister from the framework, so you won't be able to start any new
-conversion. So that case shouldn't happen.
-
-> >> +	/* Disable all hardware interrupts */
-> >> +	regmap_write(info->regmap, SUNXI_GPADC_TP_INT_FIFOC, 0);
-> > 
-> > This looks like the wrong place to do that. You'll disable the
-> > interrupts of all the devices of the MFD, which is probbaly not what
-> > you want to do (and if you do, you want to do it in the MFD driver).
+> The driver can be configured as Dual-Role Device (DRD),
+> Peripheral Only and Host Only (xHCI) modes. It works well
+> with Mass Storage, RNDIS and g_zero on FS/HS and SS. And it is
+> tested on MT8173 platform which only contains USB2.0 device IP,
+> and on MT6290 platform which contains USB3.0 device IP.
 > 
-> Yes but all subdrivers of the MFD are using IIO channels from the ADC
-> driver so anyway they would not work at all.
-
-I'm not sure what you mean by that.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160824/5c7f2069/attachment.sig>
+> Change in v5:
+> 1. modify some comments
+> 2. rename some unsuitable variables
+> 3. add reg-names property for host node
+> 4. add USB_MTU3_DEBUG to control debug messages
+> 
+> Change in v4:
+> 1. fix build errors on non-mediatek platforms
+> 2. provide manual dual-role switch via debugfs instead of sysfs
+> 
+> Change in v3:
+> 1. fix some typo error
+> 2. rename mtu3.txt to mt8173-mtu3.txt
+> 
+> Change in v2:
+> 1. modify binding docs according to suggestions
+> 2. modify some comments and remove some dummy blank lines
+> 3. fix memory leakage
+> 
+> 
+> Chunfeng Yun (5):
+>   dt-bindings: mt8173-xhci: support host side of dual-role mode
+>   dt-bindings: mt8173-mtu3: add devicetree bindings
+>   usb: xhci-mtk: make IPPC register optional
+>   usb: Add MediaTek USB3 DRD Driver
+>   arm64: dts: mediatek: add USB3 DRD driver
+> 
+>  .../devicetree/bindings/usb/mt8173-mtu3.txt        |   87 ++
+>  .../devicetree/bindings/usb/mt8173-xhci.txt        |   54 +-
+>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |   46 +-
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   29 +-
+>  drivers/usb/Kconfig                                |    2 +
+>  drivers/usb/Makefile                               |    1 +
+>  drivers/usb/host/xhci-mtk.c                        |   36 +-
+>  drivers/usb/mtu3/Kconfig                           |   54 ++
+>  drivers/usb/mtu3/Makefile                          |   19 +
+>  drivers/usb/mtu3/mtu3.h                            |  422 ++++++++++
+>  drivers/usb/mtu3/mtu3_core.c                       |  874 +++++++++++++++++++
+>  drivers/usb/mtu3/mtu3_dr.c                         |  375 +++++++++
+>  drivers/usb/mtu3/mtu3_dr.h                         |  108 +++
+>  drivers/usb/mtu3/mtu3_gadget.c                     |  731 ++++++++++++++++
+>  drivers/usb/mtu3/mtu3_gadget_ep0.c                 |  879 ++++++++++++++++++++
+>  drivers/usb/mtu3/mtu3_host.c                       |  294 +++++++
+>  drivers/usb/mtu3/mtu3_hw_regs.h                    |  473 +++++++++++
+>  drivers/usb/mtu3/mtu3_plat.c                       |  490 +++++++++++
+>  drivers/usb/mtu3/mtu3_qmu.c                        |  599 +++++++++++++
+>  drivers/usb/mtu3/mtu3_qmu.h                        |   43 +
+>  20 files changed, 5598 insertions(+), 18 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
+>  create mode 100644 drivers/usb/mtu3/Kconfig
+>  create mode 100644 drivers/usb/mtu3/Makefile
+>  create mode 100644 drivers/usb/mtu3/mtu3.h
+>  create mode 100644 drivers/usb/mtu3/mtu3_core.c
+>  create mode 100644 drivers/usb/mtu3/mtu3_dr.c
+>  create mode 100644 drivers/usb/mtu3/mtu3_dr.h
+>  create mode 100644 drivers/usb/mtu3/mtu3_gadget.c
+>  create mode 100644 drivers/usb/mtu3/mtu3_gadget_ep0.c
+>  create mode 100644 drivers/usb/mtu3/mtu3_host.c
+>  create mode 100644 drivers/usb/mtu3/mtu3_hw_regs.h
+>  create mode 100644 drivers/usb/mtu3/mtu3_plat.c
+>  create mode 100644 drivers/usb/mtu3/mtu3_qmu.c
+>  create mode 100644 drivers/usb/mtu3/mtu3_qmu.h
+> 
