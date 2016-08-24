@@ -1,34 +1,45 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 24 Aug 2016 14:43:14 +0200
-Subject: [PATCH] dmaengine: mv_xor: Add support for IO (PCIe) src/dst areas
-In-Reply-To: <b8c09619-22a5-a677-8841-9760c275a618@denx.de>
-References: <201608241240.aEXnCS9C%fengguang.wu@intel.com>
- <b8c09619-22a5-a677-8841-9760c275a618@denx.de>
-Message-ID: <20160824144314.18928e13@free-electrons.com>
+Date: Wed, 24 Aug 2016 14:38:55 +0200
+Subject: [crypto] [marvell-cesa] Driver hangs on Armada 385 device
+In-Reply-To: <57bd7c72.94052e0a.c451a.684f@mx.google.com>
+References: <57bd7c72.94052e0a.c451a.684f@mx.google.com>
+Message-ID: <20160824143855.72e43246@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Wed, 24 Aug 2016 10:23:02 +0200, Stefan Roese wrote:
+On Wed, 24 Aug 2016 13:52:33 +0300, radioconfusion at gmail.com wrote:
 
-> > All errors (new ones prefixed by >>):
-> > 
-> >    drivers/built-in.o: In function `set_param_ifnum':  
-> >>> ipmi_poweroff.c:(.text+0x10157c): undefined reference to `mvebu_mbus_get_io_win_info'  
-> >    drivers/built-in.o: In function `mv_xor_add_io_win':
-> >    mv_xor.c:(.text+0x11039e): undefined reference to `mvebu_mbus_get_io_win_info'  
+> I assume that you mean mem=1022M.
 > 
-> Does it really make sense to compile this driver for all archs?
-> Or should I send a v2 of this patch that removes COMPILE_TEST for
-> this driver from Kconfig so that its only compiled for the
-> target platforms?
+> Quick testing results:
+> mem=256M works
+> mem=384M not
+> mem=524160k not (512M-128k)
+> mem=524228k works (512M-60k)
+> mem=512M works
+> mem=524348k not (512M+60k)
+> mem=524416k not (512M+128k)
+> mem=768M works
+> mem=896M not
+> mem=960M not
+> mem=1022M not
+> mem=1023M not
+> mem=1048000k not
+> mem=1048448k not (1024M-128k)
+> mem=1048514k not
+> mem=1048516k works (1024M-60k)
+> mem=1048518k works
+> mem=1048520k works
+> mem=1024M works
 
-I'm not sure what's the exact policy, but I believe kernel maintainers
-like when the compilation coverage is as wide as possible. The MBus
-driver could provide some stub functions when not enabled? I don't know
-if it's worth it, since indeed mv_xor is only ever going to be used on
-ARM.
+The Mbus windows need to have a power of two size, and there are
+windows going from the device to the CPU for devices doing DMA. If the
+memory size is not a power of two, I'm not sure we're rounding up the
+window size to the next power of two. That might be the issue here.
+
+Best regards,
 
 Thomas
 -- 
