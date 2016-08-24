@@ -1,44 +1,157 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Aug 2016 16:56:50 +0100
-Subject: [PATCH 5/5] arm64: Add uprobe support
-In-Reply-To: <20160824154711.GA25531@redhat.com>
-References: <cover.1470114993.git.panand@redhat.com>
- <abaac6ebaa5dd63889803ec568663bc8c8c65b02.1470114993.git.panand@redhat.com>
- <20160809184943.GA17112@redhat.com>
- <20160824071308.GA24311@localhost.localdomain>
- <20160824154711.GA25531@redhat.com>
-Message-ID: <20160824155649.GG16944@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 24 Aug 2016 16:56:45 +0100
+Subject: [PATCH v2 3/6] dt/bindings: Add bindings for Tegra GMI controller
+In-Reply-To: <1472045838-22628-4-git-send-email-mirza.krak@gmail.com>
+References: <1472045838-22628-1-git-send-email-mirza.krak@gmail.com>
+ <1472045838-22628-4-git-send-email-mirza.krak@gmail.com>
+Message-ID: <de2fb909-829e-6c04-4f6a-442cbb9171c9@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 05:47:11PM +0200, Oleg Nesterov wrote:
-> On 08/24, Pratyush Anand wrote:
-> >
-> > > I don't think we want user_{enable,disable{_single_step in the long term,
-> > > please look at 9bd1190a11c9d2 "uprobes/x86: Do not (ab)use TIF_SINGLESTEP
-> > > /user_*_single_step() for single-stepping". it seems that ARM64 sets/clears
-> > > TIF_SINGLESTEP. You can also lool at saved_tf logic, probably ARM64 needs
-> > > the same.
-> >
-> > IIUC, then you mean that TIF_SINGLESTEP is a per task flag,
+
+On 24/08/16 14:37, Mirza Krak wrote:
+> From: Mirza Krak <mirza.krak@gmail.com>
 > 
-> Yes, and nobody but ptrace should use it, otherwise ptrace/uprobes can confuse
-> each other. And uprobes simply doesn't need to set/clear it.
-
-We're already using it for kprobes, hw_breakpoint and kgdb as well as
-ptrace, so I'd rather uprobes either followed existing practice, or we
-converted everybody off the current code.
-
-In what way do things get confused?
-
-> > while
-> > arch_uprobe_pre/post_xol() should enable/disable single stepping using a per
-> > uprobe_task,
+> Document the devicetree bindings for the Generic Memory Interface (GMI)
+> bus driver found on Tegra SOCs.
 > 
-> I can't really answer since I know nothing about arm. x86 just needs to set
-> X86_EFLAGS_TF, I guess arm needs to modify some register too?
+> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
+> ---
+> Changes in v2:
+> - Updated examples and some information based on comments from Jon Hunter.
+> 
+>  .../devicetree/bindings/bus/nvidia,tegra20-gmi.txt | 132 +++++++++++++++++++++
+>  1 file changed, 132 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt b/Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt
+> new file mode 100644
+> index 0000000..8c1e15f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt
+> @@ -0,0 +1,132 @@
+> +Device tree bindings for NVIDIA Tegra Generic Memory Interface bus
+> +
+> +The Generic Memory Interface bus enables memory transfers between internal and
+> +external memory. Can be used to attach various high speed devices such as
+> +synchronous/asynchronous NOR, FPGA, UARTS and more.
+> +
+> +The actual devices are instantiated from the child nodes of a GMI node.
+> +
+> +Required properties:
+> + - compatible : Should contain one of the following:
+> +        For Tegra20 must contain "nvidia,tegra20-gmi".
+> +        For Tegra30 must contain "nvidia,tegra30-gmi".
+> + - reg: Should contain GMI controller registers location and length.
+> + - clocks: Must contain an entry for each entry in clock-names.
+> + - clock-names: Must include the following entries: "gmi"
+> + - resets : Must contain an entry for each entry in reset-names.
+> + - reset-names : Must include the following entries: "gmi"
+> + - #address-cells: The number of cells used to represent physical base
+> +   addresses in the GMI address space. Should be 1.
+> + - #size-cells: The number of cells used to represent the size of an address
+> +   range in the GMI address space. Should be 1.
+> + - ranges: Must be set up to reflect the memory layout with three integer values
+> +   for each chip-select line in use (only one entry is supported, see below
+> +   comments):
+> +   <cs-number> <physical address of mapping> <size>
+> +
+> +Note that the GMI controller does not have any internal chip-select address
+> +decoding, because of that chip-selects either need to be managed via software
+> +or by employing external chip-select decoding logic.
+> +
+> +If external chip-select logic is used to support multiple devices it is assumed
+> +that the devices use the same timing and so are probably the same type. It also
+> +assumes that they can fit in the 256MB address range. In this case only one
+> +child device is supported which represents the active chip-select line, see
+> +examples for more insight.
+> +
+> +Required child cs node properties:
+> + - reg: First entry should contain the active chip-select number
+> +
+> +Optional child cs node properties:
+> +
+> + - nvidia,snor-data-width-32bit: Use 32bit data-bus, default is 16bit.
+> + - nvidia,snor-mux-mode: Enable address/data MUX mode.
+> + - nvidia,snor-rdy-active-before-data: Assert RDY signal one cycle before data.
+> +   If omitted it will be asserted with data.
+> + - nvidia,snor-rdy-inv: RDY signal is active high
+> + - nvidia,snor-adv-inv: ADV signal is active high
+> + - nvidia,snor-oe-inv: WE/OE signal is active high
+> + - nvidia,snor-cs-inv: CS signal is active high
+> +
+> +  Note that there is some special handling for the timing values.
+> +  From Tegra TRM:
+> +  Programming 0 means 1 clock cycle: actual cycle = programmed cycle + 1
+> +
+> + - nvidia,snor-muxed-width: Number of cycles MUX address/data asserted on the
+> +   bus. Valid values are 0-15, default is 1
+> + - nvidia,snor-hold-width: Number of cycles CE stays asserted after the
+> +   de-assertion of WR_N (in case of SLAVE/MASTER Request) or OE_N
+> +   (in case of MASTER Request). Valid values are 0-15, default is 1
+> + - nvidia,snor-adv-width: Number of cycles during which ADV stays asserted.
+> +   Valid values are 0-15, default is 1.
+> + - nvidia,snor-ce-width: Number of cycles before CE is asserted.
+> +   Valid values are 0-15, default is 4
+> + - nvidia,snor-we-width: Number of cycles during which WE stays asserted.
+> +   Valid values are 0-15, default is 1
+> + - nvidia,snor-oe-width: Number of cycles during which OE stays asserted.
+> +   Valid values are 0-255, default is 1
+> + - nvidia,snor-wait-width: Number of cycles before READY is asserted.
+> +   Valid values are 0-255, default is 3
+> +
+> +Example with two SJA1000 CAN controllers connected to the GMI bus. We wrap the
+> +controllers with a simple-bus node since they are all connected to the same
+> +chip-select (CS4), in this example external address decoding is provided:
+> +
+> +gmi at 70090000 {
+> +	compatible = "nvidia,tegra20-gmi";
+> +	reg = <0x70009000 0x1000>;
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	clocks = <&tegra_car TEGRA20_CLK_NOR>;
+> +	clock-names = "gmi";
+> +	resets = <&tegra_car 42>;
+> +	reset-names = "gmi";
+> +	ranges = <4 0x48000000 0x7ffffff>;
+> +
+> +	status = "disabled";
+> +
+> +	bus at 4 {
+> +		compatible = "simple-bus";
+> +		reg = <4>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges = <0 4 0x40100>;
 
-We have {user,kernel}_{enable,disable}_single_step for managing the various
-registers controlling the single-step state machine on arm64.
+Does this work? I tried to add an example like this and I got ...
 
-Will
+Warning (reg_format): "reg" property in /gmi at 70009000/bus at 4 has invalid
+length (4 bytes) (#address-cells == 1, #size-cells == 1)
+
+I am wondering if we should just following the arm,pl172 example and
+have ...
+
+	cs4 {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		nvidia,snor-cs = <4>;
+		nvidia,snor-mux-mode;
+		nvidia,snor-adv-inv;
+
+		can at 0 {
+			reg = <0 0x100>;
+			...
+		};
+
+		...
+	};
+
+Cheers
+Jon
+
+-- 
+nvpublic
