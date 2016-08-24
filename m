@@ -1,66 +1,41 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 24 Aug 2016 12:56:22 +0530
-Subject: [PATCH 0/5] ARM64: Uprobe support added
-In-Reply-To: <cover.1470114993.git.panand@redhat.com>
-References: <cover.1470114993.git.panand@redhat.com>
-Message-ID: <20160824072622.GB24311@localhost.localdomain>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Wed, 24 Aug 2016 10:31:34 +0300
+Subject: [PATCH v2 03/22] usb: ulpi: Support device discovery via device
+ properties
+In-Reply-To: <CAJOFmgz=BSq=mmo4-2p-BZLbb=qeE-2paUcgCv0_vx72PTYfWg@mail.gmail.com>
+References: <20160707222114.1673-1-stephen.boyd@linaro.org>
+ <20160707222114.1673-4-stephen.boyd@linaro.org>
+ <20160708090458.GB20485@shlinux2>
+ <147043245520.26915.14153612182716236022@sboyd-linaro>
+ <CAJOFmgz=BSq=mmo4-2p-BZLbb=qeE-2paUcgCv0_vx72PTYfWg@mail.gmail.com>
+Message-ID: <20160824073134.GB12117@kuha.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will/Catalin,
+On Tue, Aug 23, 2016 at 12:58:07PM -0700, Stephen Boyd wrote:
+> On Fri, Aug 5, 2016 at 2:27 PM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
+> > Quoting Peter Chen (2016-07-08 02:04:58)
+> >> On Thu, Jul 07, 2016 at 03:20:54PM -0700, Stephen Boyd wrote:
+> >> > @@ -39,6 +42,10 @@ static int ulpi_match(struct device *dev, struct device_driver *driver)
+> >> >       struct ulpi *ulpi = to_ulpi_dev(dev);
+> >> >       const struct ulpi_device_id *id;
+> >> >
+> >> > +     /* Some ULPI devices don't have a product id so rely on OF match */
+> >> > +     if (ulpi->id.product == 0)
+> >> > +             return of_driver_match_device(dev, driver);
+> >> > +
+> >>
+> >> How about using vendor id? It can't be 0, but pid may be 0.
+> >> See: http://www.linux-usb.org/usb.ids
+> >
+> > Heikki suggested a product id of 0 would mean we need to use DT
+> > matching. Should it be changed to vendor id instead?
+> 
+> Any comments here?
 
-Do you have any specific comment for this patch set?
+It makes sense. I don't have any problem with that.
 
-~Pratyush
+Thanks,
 
-[1] https://lkml.org/lkml/2016/8/22/69
-
-On 02/08/2016:11:00:04 AM, Pratyush Anand wrote:
-> ARM64 kprobe support is lying in torvalds/linux.git:master now. Therefore
-> sending my uprobe patches which were dependent on decode-insn code of kprobe
-> patches.
-> 
-> Unit tests for following have been done so far and they have been found
-> working.
->      1. Step-able instructions, like sub, ldr, add etc.
->      2. Simulation-able like ret, cbnz, cbz etc.
->      3. uretprobe
->      4. Reject-able instructions like sev, wfe etc.
->      5. trapped and abort xol path
->      6. probe at unaligned user address.
->      7. longjump test cases
->  
-> Currently it does not support aarch32 instruction probing.
-> 
-> RFC patches were sent long back, and all review comments for RFCs have been
-> incorporated. RFCs were here: https://lwn.net/Articles/648514/
-> 
-> Pratyush Anand (5):
->   arm64: kprobe: protect/rename few definitions to be reused by uprobe
->   arm64: kgdb_step_brk_fn: ignore other's exception
->   arm64: Handle TRAP_HWBRKPT for user mode as well
->   arm64: Handle TRAP_BRKPT for user mode as well
->   arm64: Add uprobe support
-> 
->  arch/arm64/Kconfig                      |   3 +
->  arch/arm64/include/asm/debug-monitors.h |   3 +
->  arch/arm64/include/asm/probes.h         |  23 ++--
->  arch/arm64/include/asm/ptrace.h         |   8 ++
->  arch/arm64/include/asm/thread_info.h    |   5 +-
->  arch/arm64/include/asm/uprobes.h        |  37 ++++++
->  arch/arm64/kernel/debug-monitors.c      |  40 +++---
->  arch/arm64/kernel/entry.S               |   6 +-
->  arch/arm64/kernel/kgdb.c                |   3 +
->  arch/arm64/kernel/probes/Makefile       |   2 +
->  arch/arm64/kernel/probes/decode-insn.c  |  31 ++---
->  arch/arm64/kernel/probes/decode-insn.h  |   8 +-
->  arch/arm64/kernel/probes/kprobes.c      |  36 ++---
->  arch/arm64/kernel/probes/uprobes.c      | 227 ++++++++++++++++++++++++++++++++
->  arch/arm64/kernel/signal.c              |   4 +-
->  arch/arm64/mm/flush.c                   |   6 +
->  16 files changed, 378 insertions(+), 64 deletions(-)
->  create mode 100644 arch/arm64/include/asm/uprobes.h
->  create mode 100644 arch/arm64/kernel/probes/uprobes.c
-> 
-> -- 
-> 2.5.5
+-- 
+heikki
