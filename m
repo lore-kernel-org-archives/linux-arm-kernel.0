@@ -1,76 +1,86 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 24 Aug 2016 16:36:05 +0200
-Subject: [PATCH v2 8/9] arm64: head.S: use ordinary stack frame for
- __primary_switched()
+Date: Wed, 24 Aug 2016 16:36:03 +0200
+Subject: [PATCH v2 6/9] arm64: call __enable_mmu as an ordinary function for
+ secondary/resume
 In-Reply-To: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1472049366-10922-9-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1472049366-10922-7-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of stashing the value of the link register in x28 before setting
-up the stack and calling into C code, create an ordinary PCS compatible
-stack frame so that we can push the return address onto the stack.
-
-Since exception handlers require a stack as well, assign the stach pointer
-register before installing the vector table.
-
-Note that this accounts for the difference between THREAD_START_SP and
-THREAD_SIZE, given that the stack pointer is always decremented before
-calling into any C code.
+This updates the secondary and cpu_resume call sites to simply call
+__enable_mmu as an ordinary function, with a bl instruction. This
+requires the callers to be covered by .idmap.text.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/head.S | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+ arch/arm64/kernel/head.S  | 14 ++++++--------
+ arch/arm64/kernel/sleep.S | 10 +++-------
+ 2 files changed, 9 insertions(+), 15 deletions(-)
 
 diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 27f51272de68..ad1dc61d67ac 100644
+index 3e08e51578d5..c112c153821e 100644
 --- a/arch/arm64/kernel/head.S
 +++ b/arch/arm64/kernel/head.S
-@@ -415,13 +415,18 @@ ENDPROC(__create_page_tables)
-  *
-  *   x0 = __PHYS_OFFSET
-  */
--	.set	initial_sp, init_thread_union + THREAD_START_SP
- __primary_switched:
--	mov	x28, lr				// preserve LR
-+	adrp	x4, init_thread_union
-+	add	sp, x4, #THREAD_SIZE
-+	msr	sp_el0, x4			// Save thread_info
-+
- 	adr_l	x8, vectors			// load VBAR_EL1 with virtual
- 	msr	vbar_el1, x8			// vector table address
- 	isb
+@@ -634,6 +634,7 @@ ENTRY(__boot_cpu_mode)
+ 	 * This provides a "holding pen" for platforms to hold all secondary
+ 	 * cores are held until we're ready for them to initialise.
+ 	 */
++	.pushsection	".idmap.text", "ax"
+ ENTRY(secondary_holding_pen)
+ 	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
+ 	bl	set_cpu_boot_mode_flag
+@@ -663,10 +664,12 @@ secondary_startup:
+ 	 * Common entry point for secondary CPUs.
+ 	 */
+ 	bl	__cpu_setup			// initialise processor
+-
+-	adr_l	lr, __secondary_switch		// address to jump to after enabling the MMU
+-	b	__enable_mmu
++	bl	__enable_mmu
++	ldr	x8, =__secondary_switched
++	br	x8
+ ENDPROC(secondary_startup)
++	.ltorg
++	.popsection
  
-+	stp	xzr, x30, [sp, #-16]!
-+	mov	x29, sp
-+
- 	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
+ __secondary_switched:
+ 	adr_l	x5, vectors
+@@ -812,8 +815,3 @@ __primary_switch:
+ 	ldr	x8, =__primary_switched
+ 	br	x8
+ ENDPROC(__primary_switch)
+-
+-__secondary_switch:
+-	ldr	x8, =__secondary_switched
+-	br	x8
+-ENDPROC(__secondary_switch)
+diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+index 4bce95cd656a..1d4aba6fcc7a 100644
+--- a/arch/arm64/kernel/sleep.S
++++ b/arch/arm64/kernel/sleep.S
+@@ -95,19 +95,15 @@ ENTRY(__cpu_suspend_enter)
+ 	ret
+ ENDPROC(__cpu_suspend_enter)
  
- 	ldr_l	x4, kimage_vaddr		// Save the offset between
-@@ -436,11 +441,6 @@ __primary_switched:
- 	bl	__pi_memset
- 	dsb	ishst				// Make zero page visible to PTW
++	.pushsection	".idmap.text", "ax"
+ ENTRY(cpu_resume)
+ 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
+ 	bl	__cpu_setup
+ 	/* enable the MMU early - so we can access sleep_save_stash by va */
+-	adr_l	lr, _resume_switched	/* __enable_mmu will branch here */
+-	b	__enable_mmu
+-ENDPROC(cpu_resume)
+-
+-	.pushsection	".idmap.text", "ax"
+-_resume_switched:
++	bl	__enable_mmu
+ 	ldr	x8, =_cpu_resume
+ 	br	x8
+-ENDPROC(_resume_switched)
++ENDPROC(cpu_resume)
+ 	.ltorg
+ 	.popsection
  
--	adr_l	sp, initial_sp, x4
--	mov	x4, sp
--	and	x4, x4, #~(THREAD_SIZE - 1)
--	msr	sp_el0, x4			// Save thread_info
--	mov	x29, #0
- #ifdef CONFIG_KASAN
- 	bl	kasan_early_init
- #endif
-@@ -452,8 +452,8 @@ __primary_switched:
- 	bl	kaslr_early_init		// parse FDT for KASLR options
- 	cbz	x0, 0f				// KASLR disabled? just proceed
- 	orr	x23, x23, x0			// record KASLR offset
--	ret	x28				// we must enable KASLR, return
--						// to __primary_switch()
-+	ldp	x29, x30, [sp], #16		// we must enable KASLR, return
-+	ret					// to __primary_switch()
- 0:
- #endif
- 	b	start_kernel
 -- 
 2.7.4
