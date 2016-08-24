@@ -1,86 +1,191 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 24 Aug 2016 11:24:07 -0700
-Subject: [PATCH 1/2] arm64: kernel: Add SMC Session ID to results
-In-Reply-To: <1471672274-19317-2-git-send-email-andy.gross@linaro.org>
-References: <1471672274-19317-1-git-send-email-andy.gross@linaro.org>
- <1471672274-19317-2-git-send-email-andy.gross@linaro.org>
-Message-ID: <20160824182407.GG15161@tuxbot>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 24 Aug 2016 20:24:16 +0200
+Subject: [PATCH v4 6/7] arm64: dts: add Pine64 support
+In-Reply-To: <20160808172149.30861-7-andre.przywara@arm.com>
+References: <20160808172149.30861-1-andre.przywara@arm.com>
+ <20160808172149.30861-7-andre.przywara@arm.com>
+Message-ID: <20160824182416.GO8103@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 19 Aug 22:51 PDT 2016, Andy Gross wrote:
+Hi,
 
-> This patch adds the SMC Session ID to the results passed back from SMC
-> calls.  The Qualcomm SMC implementation provides for interrupted SMC
-> functions.  When this occurs, the SMC call will return a session ID that
-> is required to be used when resuming the interrupted SMC call.
+On Mon, Aug 08, 2016 at 06:21:48PM +0100, Andre Przywara wrote:
+> The Pine64 is a cost-efficient development board based on the
+> Allwinner A64 SoC.
+> There are three models: the basic version with Fast Ethernet and
+> 512 MB of DRAM (Pine64) and two Pine64+ versions, which both
+> feature Gigabit Ethernet and additional connectors for touchscreens
+> and a camera. Or as my son put it: "Those are smaller and these are
+> missing." ;-)
+> The two Pine64+ models just differ in the amount of DRAM
+> (1GB vs. 2GB). Since U-Boot will figure out the right size for us and
+> patches the DT accordingly we just need to provide one DT for the
+> Pine64+.
 > 
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
-
-This fixes the spurious remoteproc firmware authentication failures I've
-seen lately.
-
-Tested-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-
-Regards,
-Bjorn
-
+> [Maxime: Removed the common DTSI and include directly the pine64 DTS]
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > ---
->  arch/arm64/kernel/asm-offsets.c | 1 +
->  arch/arm64/kernel/smccc-call.S  | 1 +
->  include/linux/arm-smccc.h       | 4 +++-
->  3 files changed, 5 insertions(+), 1 deletion(-)
+>  arch/arm64/boot/dts/Makefile                       |  1 +
+>  arch/arm64/boot/dts/allwinner/Makefile             |  5 ++
+>  .../boot/dts/allwinner/sun50i-a64-pine64-plus.dts  | 48 ++++++++++++++
+>  .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 74 ++++++++++++++++++++++
+>  4 files changed, 128 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/allwinner/Makefile
+>  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
+>  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
 > 
-> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> index 05070b7..ff38c58 100644
-> --- a/arch/arm64/kernel/asm-offsets.c
-> +++ b/arch/arm64/kernel/asm-offsets.c
-> @@ -141,6 +141,7 @@ int main(void)
->  #endif
->    DEFINE(ARM_SMCCC_RES_X0_OFFS,	offsetof(struct arm_smccc_res, a0));
->    DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
-> +  DEFINE(ARM_SMCCC_RES_X6_OFFS,	offsetof(struct arm_smccc_res, a6));
->    BLANK();
->    DEFINE(HIBERN_PBE_ORIG,	offsetof(struct pbe, orig_address));
->    DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
-> diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
-> index ae0496f..278dc9a 100644
-> --- a/arch/arm64/kernel/smccc-call.S
-> +++ b/arch/arm64/kernel/smccc-call.S
-> @@ -20,6 +20,7 @@
->  	ldr	x4, [sp]
->  	stp	x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
->  	stp	x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
-> +	str	x6, [x4, #ARM_SMCCC_RES_X6_OFFS]
->  	ret
->  	.cfi_endproc
->  	.endm
-> diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-> index b5abfda..82d919f 100644
-> --- a/include/linux/arm-smccc.h
-> +++ b/include/linux/arm-smccc.h
-> @@ -63,18 +63,20 @@
->  /**
->   * struct arm_smccc_res - Result from SMC/HVC call
->   * @a0-a3 result values from registers 0 to 3
-> + * @a6 Session ID register (optional)
->   */
->  struct arm_smccc_res {
->  	unsigned long a0;
->  	unsigned long a1;
->  	unsigned long a2;
->  	unsigned long a3;
-> +	unsigned long a6;
->  };
->  
->  /**
->   * arm_smccc_smc() - make SMC calls
->   * @a0-a7: arguments passed in registers 0 to 7
-> - * @res: result values from registers 0 to 3
-> + * @res: result values from registers 0 to 3 and optional register 6
->   *
->   * This function is used to make SMC calls following SMC Calling Convention.
->   * The content of the supplied param are copied to registers 0 to 7 prior
-> -- 
-> 1.9.1
-> 
+> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+> index 6e199c9..ddcbf5a 100644
+> --- a/arch/arm64/boot/dts/Makefile
+> +++ b/arch/arm64/boot/dts/Makefile
+> @@ -1,4 +1,5 @@
+>  dts-dirs += al
+> +dts-dirs += allwinner
+>  dts-dirs += altera
+>  dts-dirs += amd
+>  dts-dirs += amlogic
+> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+> new file mode 100644
+> index 0000000..1e29a5a
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/allwinner/Makefile
+> @@ -0,0 +1,5 @@
+> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
+> +
+> +always		:= $(dtb-y)
+> +subdir-y	:= $(dts-dirs)
+> +clean-files	:= *.dtb
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
+> new file mode 100644
+> index 0000000..e369e83
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
+> @@ -0,0 +1,48 @@
+> +/*
+> + * Copyright (c) 2016 ARM Ltd.
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +#include "sun50i-a64-pine64.dts"
+> +
+> +/ {
+> +	model = "Pine64+";
+> +	compatible = "pine64,pine64-plus", "allwinner,sun50i-a64";
+> +};
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> new file mode 100644
+> index 0000000..077a56f
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> @@ -0,0 +1,74 @@
+> +/*
+> + * Copyright (c) 2016 ARM Ltd.
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "sun50i-a64.dtsi"
+> +
+> +/ {
+> +	model = "Pine64";
+> +	compatible = "pine64,pine64", "allwinner,sun50i-a64";
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	memory {
+> +		reg = <0x40000000 0x20000000>;
+> +	};
+
+Isn't that wrong on some Pine64, and filled by U-Boot anyway?
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160824/e07be3b7/attachment.sig>
