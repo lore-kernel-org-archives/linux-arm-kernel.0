@@ -1,68 +1,37 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 24 Aug 2016 14:39:11 +0200
-Subject: [PATCH v3] pwm: sun4i: fix a possible NULL dereference
-In-Reply-To: <1472039038-4047-1-git-send-email-clabbe.montjoie@gmail.com>
-References: <1472039038-4047-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <20160824123911.GC3714@ulmo.ba.sec>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 24 Aug 2016 14:43:14 +0200
+Subject: [PATCH] dmaengine: mv_xor: Add support for IO (PCIe) src/dst areas
+In-Reply-To: <b8c09619-22a5-a677-8841-9760c275a618@denx.de>
+References: <201608241240.aEXnCS9C%fengguang.wu@intel.com>
+ <b8c09619-22a5-a677-8841-9760c275a618@denx.de>
+Message-ID: <20160824144314.18928e13@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 01:43:58PM +0200, LABBE Corentin wrote:
-> of_match_device could return NULL, and so cause a NULL pointer
-> dereference later.
-> 
-> For fixing this problem, we use of_device_get_match_data(), this will
-> simplify the code a little by using a standard function for
-> getting the match data.
-> 
-> Testing the return value of of_device_get_match_data is also necessary
-> for avoiding a second NULL deref on pwm->data.
-> 
-> Reported-by: coverity (CID 1324139)
-> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
-> ---
-> Changes since v2:
->  - Add a test on pwm->data for avoiding a second NULL deref.
-> Changes since v1:
->  - Use of_device_get_match_data()
-> 
->  drivers/pwm/pwm-sun4i.c | 7 +++----
->  1 file changed, 3 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
-> index 03a99a5..fb76c55 100644
-> --- a/drivers/pwm/pwm-sun4i.c
-> +++ b/drivers/pwm/pwm-sun4i.c
-> @@ -309,9 +309,6 @@ static int sun4i_pwm_probe(struct platform_device *pdev)
->  	struct resource *res;
->  	u32 val;
->  	int i, ret;
-> -	const struct of_device_id *match;
-> -
-> -	match = of_match_device(sun4i_pwm_dt_ids, &pdev->dev);
->  
->  	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
->  	if (!pwm)
-> @@ -326,7 +323,9 @@ static int sun4i_pwm_probe(struct platform_device *pdev)
->  	if (IS_ERR(pwm->clk))
->  		return PTR_ERR(pwm->clk);
->  
-> -	pwm->data = match->data;
-> +	pwm->data = of_device_get_match_data(&pdev->dev);
-> +	if (!pwm->data)
-> +		return -EINVAL;
+Hello,
 
-I don't see how this would ever be NULL. You'd have to add an entry to
-the table that has a NULL data field, which is very unlikely to happen.
-If you really want to check for this, which I think isn't necessary,
-please wrap this in a WARN_ON() or something to make more noise when
-this completely unexpected case happens.
+On Wed, 24 Aug 2016 10:23:02 +0200, Stefan Roese wrote:
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160824/ee7378e7/attachment.sig>
+> > All errors (new ones prefixed by >>):
+> > 
+> >    drivers/built-in.o: In function `set_param_ifnum':  
+> >>> ipmi_poweroff.c:(.text+0x10157c): undefined reference to `mvebu_mbus_get_io_win_info'  
+> >    drivers/built-in.o: In function `mv_xor_add_io_win':
+> >    mv_xor.c:(.text+0x11039e): undefined reference to `mvebu_mbus_get_io_win_info'  
+> 
+> Does it really make sense to compile this driver for all archs?
+> Or should I send a v2 of this patch that removes COMPILE_TEST for
+> this driver from Kconfig so that its only compiled for the
+> target platforms?
+
+I'm not sure what's the exact policy, but I believe kernel maintainers
+like when the compilation coverage is as wide as possible. The MBus
+driver could provide some stub functions when not enabled? I don't know
+if it's worth it, since indeed mv_xor is only ever going to be used on
+ARM.
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
