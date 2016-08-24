@@ -1,32 +1,48 @@
-From: radioconfusion@gmail.com (radioconfusion at gmail.com)
-Date: Wed, 24 Aug 2016 12:15:07 +0300
-Subject: [crypto] [marvell-cesa] Driver hangs on Armada 385 device
-Message-ID: <57bd659d.0f4d190a.e025.5da4@mx.google.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Wed, 24 Aug 2016 14:45:17 +0530
+Subject: [PATCH v3 0/2] AM335x-ICE: Add support for rotary switch
+In-Reply-To: <c5385d42-14e4-d5ca-370e-5b04e37d873d@zonque.org>
+References: <20160824075859.30979-1-vigneshr@ti.com>
+ <c5385d42-14e4-d5ca-370e-5b04e37d873d@zonque.org>
+Message-ID: <5294e820-4946-a196-549f-76a349b6606d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-On Fri, 19 Aug 2016 16:09, Roman Perier wrote:
-> Could you test with uImage.armada-385-db-ap [1], that's a legacy Image.
-> Also, I have uploaded a minimalistic rootfs [2], if you want.
->
-> 1. http://www.free-electrons.com/~romain/pub/cesa/uImage.armada-385-db-ap
-> 2. http://www.free-electrons.com/~romain/pub/cesa/rootfs.cpio.xz
+On Wednesday 24 August 2016 02:05 PM, Daniel Mack wrote:
+> Hi,
+> 
+> On 08/24/2016 09:58 AM, Vignesh R wrote:
+>> This series adds support for rotary-switch on AM335x-ICE that is
+>> connected to TI PCA9536 I2C GPIO expander.
+>> First patch adds new generic driver to read status of group of GPIO
+>> lines and report the value as an input event. The second patch adds DT
+>> entries for the same.
+>>
+>> v2: https://lkml.org/lkml/2016/8/23/111
+>> v1: https://lkml.org/lkml/2016/8/12/7
+> 
+> Is there a reason why the rotary-encoder driver cannot handle this?
+> Commit 7dde4e74744 ("Input: rotary-encoder - support more than 2 gpios
+> as input") added support for that mode AFAIU.
+> 
 
-Huge thanks to Roman, Thomas and Russell.
-The cesa works on your image and rootfs. Now it works on my system too.
+Rotary encoder driver handles incremental encoders only and does not
+support absolute encoders. The rotary switch on am335x-ice is different
+from the incremental encoders in the
+sense that GPIO line status directly reflect the position(number)
+pointed by the dial of the encoder. So, there is no need to count steps
+or know the direction of rotation as it does not matter.
 
-The problem caused by my mistake, I was using the following kernel parameter:
-mem=1048448k
-My device has 1 GiB of RAM and I tried to reserve 128 kiB of memory for ram
-oops. I guess this parameter caused overlapping or inaccessible area with cesa's
-addresses. Am I right?
-I tried to add memmap=0x20000$0x3ffe0000 without success.
+I did try to enhance rotary-encoder driver to support absolute
+encoder[1] but the comment there was to write new driver that simply
+translates gpio-encoded value into ABS* event. Indeed, the new driver
+looks more simple and can handle more such hardwares.
 
-Is this normal behaviour?
-If yes, what is the right way to reserve RAM without killing the cesa? Should I
-reserve memory at physical start point?
+[1] https://lkml.org/lkml/2016/5/19/98
 
-Best Regards,
-Jussi
+
+-- 
+Regards
+Vignesh
