@@ -1,112 +1,140 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Tue, 23 Aug 2016 22:17:03 -0700
-Subject: [v14 PATCH 3/5] arm64: dts: rockchip: add Type-C phy for RK3399
+Date: Tue, 23 Aug 2016 22:17:04 -0700
+Subject: [v14 PATCH 4/5] Documentation: bindings: add dt documentation for cdn
+ DP controller
 In-Reply-To: <1472015825-11365-1-git-send-email-zyw@rock-chips.com>
 References: <1472015825-11365-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1472015825-11365-4-git-send-email-zyw@rock-chips.com>
+Message-ID: <1472015825-11365-5-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are 2 Type-C phy on RK3399, they are almost same, except the
-address of register. They support USB3.0 Type-C and DisplayPort1.3
-Alt Mode on USB Type-C. Register a phy, supply it to USB3 controller
-and DP controller.
+This patch adds a binding that describes the cdn DP controller for
+rk3399.
 
 Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Guenter Roeck <groeck@chromium.org>
 
 ---
 
 Changes in v14: None
-Changes in v13: None
+Changes in v13:
+- add dptx and apb reset
+
 Changes in v12: None
 Changes in v11:
-- split the dp-phy and usb3-phy to 2 child-node
+- refer dp phy
 
 Changes in v10:
-- remove rockchip,uphy-dp-sel property
+- add pclk_vio_grf clock
 
 Changes in v9:
-- change #phy-cells to 1
+- modify the reference phy = <&tcphy0 0>, <&tcphy1 0>;
 
 Changes in v8: None
 Changes in v7: None
-Changes in v6: None
+Changes in v6:
+- add assigned-clocks and assigned-clock-rates
+- add power-domains
+
 Changes in v5: None
-Changes in v4: None
-Changes in v3: None
+Changes in v4:
+- add a reset node
+- support 2 phys
+
+Changes in v3:
+- add SoC specific compatible string
+- remove reg = <1>;
+
 Changes in v2: None
-Changes in v1: None
+Changes in v1:
+- add extcon node description
+- add #sound-dai-cells description
 
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 56 ++++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+ .../bindings/display/rockchip/cdn-dp-rockchip.txt  | 75 ++++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index a44eb67..23f7ae1 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1060,6 +1060,62 @@
- 		};
- 	};
- 
-+	tcphy0: phy at ff7c0000 {
-+		compatible = "rockchip,rk3399-typec-phy";
-+		reg = <0x0 0xff7c0000 0x0 0x40000>;
+diff --git a/Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
+new file mode 100644
+index 0000000..9bd2c13
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
+@@ -0,0 +1,75 @@
++Rockchip RK3399 specific extensions to the cdn Display Port
++================================
++
++Required properties:
++- compatible: must be "rockchip,rk3399-cdn-dp"
++
++- reg: physical base address of the controller and length
++
++- clocks: from common clock binding: handle to dp clock.
++
++- clock-names: from common clock binding:
++	       Required elements: "core-clk" "pclk" "spdif" "grf"
++
++- resets : a list of phandle + reset specifier pairs
++- reset-names : string reset name, must be:
++		"spdif", "dptx", "apb".
++- power-domains : power-domain property defined with a phandle
++		  to respective power domain.
++- assigned-clocks: main clock, should be <&cru SCLK_DP_CORE>
++- assigned-clock-rates : the DP core clk frequency, shall be: 100000000
++
++- rockchip,grf: this soc should set GRF regs, so need get grf here.
++
++- ports: contain a port nodes with endpoint definitions as defined in
++	 Documentation/devicetree/bindings/media/video-interfaces.txt.
++	 contained 2 endpoints, connecting to the output of vop.
++
++- phys: from general PHY binding: the phandle for the PHY device.
++
++- extcon: extcon specifier for the Power Delivery
++
++- #sound-dai-cells = it must be 1 if your system is using 2 DAIs: I2S, SPDIF
++
++-------------------------------------------------------------------------------
++
++Example:
++	cdn_dp: dp at fec00000 {
++		compatible = "rockchip,rk3399-cdn-dp";
++		reg = <0x0 0xfec00000 0x0 0x100000>;
++		interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru SCLK_DP_CORE>, <&cru PCLK_DP_CTRL>,
++			 <&cru SCLK_SPDIF_REC_DPTX>, <&cru PCLK_VIO_GRF>;
++		clock-names = "core-clk", "pclk", "spdif", "grf";
++		assigned-clocks = <&cru SCLK_DP_CORE>;
++		assigned-clock-rates = <100000000>;
++		power-domains = <&power RK3399_PD_HDCP>;
++		phys = <&tcphy0_dp>, <&tcphy1_dp>;
++		resets = <&cru SRST_DPTX_SPDIF_REC>, <&cru SRST_P_UPHY0_DPTX>,
++			 <&cru SRST_P_UPHY0_APB>;
++		reset-names = "spdif", "dptx", "apb";
++		extcon = <&fusb0>, <&fusb1>;
 +		rockchip,grf = <&grf>;
-+		clocks = <&cru SCLK_UPHY0_TCPDCORE>,
-+			 <&cru SCLK_UPHY0_TCPDPHY_REF>;
-+		clock-names = "tcpdcore", "tcpdphy-ref";
-+		assigned-clocks = <&cru SCLK_UPHY0_TCPDCORE>;
-+		assigned-clock-rates = <50000000>;
-+		resets = <&cru SRST_UPHY0>,
-+			 <&cru SRST_UPHY0_PIPE_L00>,
-+			 <&cru SRST_P_UPHY0_TCPHY>;
-+		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
-+		rockchip,typec-conn-dir = <0xe580 0 16>;
-+		rockchip,usb3tousb2-en = <0xe580 3 19>;
-+		rockchip,external-psm = <0xe588 14 30>;
-+		rockchip,pipe-status = <0xe5c0 0 0>;
-+		status = "disabled";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		#sound-dai-cells = <1>;
 +
-+		tcphy0_dp: dp-port {
-+			#phy-cells = <0>;
-+		};
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
 +
-+		tcphy0_usb3: usb3-port {
-+			#phy-cells = <0>;
++			dp_in: port {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				dp_in_vopb: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&vopb_out_dp>;
++				};
++
++				dp_in_vopl: endpoint at 1 {
++					reg = <1>;
++					remote-endpoint = <&vopl_out_dp>;
++				};
++			};
 +		};
 +	};
-+
-+	tcphy1: phy at ff800000 {
-+		compatible = "rockchip,rk3399-typec-phy";
-+		reg = <0x0 0xff800000 0x0 0x40000>;
-+		rockchip,grf = <&grf>;
-+		clocks = <&cru SCLK_UPHY1_TCPDCORE>,
-+			 <&cru SCLK_UPHY1_TCPDPHY_REF>;
-+		clock-names = "tcpdcore", "tcpdphy-ref";
-+		assigned-clocks = <&cru SCLK_UPHY1_TCPDCORE>;
-+		assigned-clock-rates = <50000000>;
-+		resets = <&cru SRST_UPHY1>,
-+			 <&cru SRST_UPHY1_PIPE_L00>,
-+			 <&cru SRST_P_UPHY1_TCPHY>;
-+		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
-+		rockchip,typec-conn-dir = <0xe58c 0 16>;
-+		rockchip,usb3tousb2-en = <0xe58c 3 19>;
-+		rockchip,external-psm = <0xe594 14 30>;
-+		rockchip,pipe-status = <0xe5c0 16 16>;
-+		status = "disabled";
-+
-+		tcphy1_dp: dp-port {
-+			#phy-cells = <0>;
-+		};
-+
-+		tcphy1_usb3: usb3-port {
-+			#phy-cells = <0>;
-+		};
-+	};
-+
- 	watchdog at ff840000 {
- 		compatible = "snps,dw-wdt";
- 		reg = <0x0 0xff840000 0x0 0x100>;
 -- 
 1.9.1
