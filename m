@@ -1,147 +1,128 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 24 Aug 2016 16:13:03 +0100
-Subject: [PATCH v3 04/12] firmware: tegra: Add IVC library
-In-Reply-To: <20160819173233.13260-5-thierry.reding@gmail.com>
-References: <20160819173233.13260-1-thierry.reding@gmail.com>
- <20160819173233.13260-5-thierry.reding@gmail.com>
-Message-ID: <85939406-a680-9d10-0a7e-1536ae841f84@nvidia.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Wed, 24 Aug 2016 16:14:57 +0100
+Subject: [PATCH 1/4] arm64: dts: Add display subsystem DT nodes for
+ hi6220-hikey
+In-Reply-To: <1471906085-16682-1-git-send-email-john.stultz@linaro.org>
+References: <1471906085-16682-1-git-send-email-john.stultz@linaro.org>
+Message-ID: <57BDB9F1.7020103@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi John,
 
-On 19/08/16 18:32, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
+On 22/08/2016 23:48, John Stultz wrote:
+> From: Xinliang Liu <xinliang.liu@linaro.org>
 > 
-> The Inter-VM communication (IVC) is a communication protocol which is
-> designed for interprocessor communication (IPC) or the communication
-> between the hypervisor and the virtual machine with a guest OS.
+> Add ade and dsi DT nodes for hikey board.
 > 
-> Message channels are used to communicate between processors. They are
-> backed by DRAM or SRAM, so care must be taken to maintain coherence of
-> data.
-> 
-> The IVC library maintains memory-based descriptors for the transmission
-> and reception channels as well as the data coherence of the counter and
-> payload. Clients, such as the driver for the BPMP firmware, can use the
-> library to exchange messages with remote processors.
-> 
-> Based on work by Peter Newman <pnewman@nvidia.com> and Joseph Lo
-> <josephl@nvidia.com>.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> Cc: Guodong Xu <guodong.xu@linaro.org>
+> Cc: Wei Xu <xuwei5@hisilicon.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+> Signed-off-by: John Stultz <john.stultz@linaro.org>
 > ---
-> Changes in v3:
-> - use a more object oriented design
+
+Series applied to the hisilicon soc tree.
+Thanks!
+
+Best Regards,
+Wei
+
+>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts |  8 ++++
+>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 55 ++++++++++++++++++++++++++
+>  2 files changed, 63 insertions(+)
 > 
->  drivers/firmware/Kconfig        |   1 +
->  drivers/firmware/Makefile       |   1 +
->  drivers/firmware/tegra/Kconfig  |  13 +
->  drivers/firmware/tegra/Makefile |   1 +
->  drivers/firmware/tegra/ivc.c    | 683 ++++++++++++++++++++++++++++++++++++++++
->  include/soc/tegra/ivc.h         | 109 +++++++
->  6 files changed, 808 insertions(+)
->  create mode 100644 drivers/firmware/tegra/Kconfig
->  create mode 100644 drivers/firmware/tegra/Makefile
->  create mode 100644 drivers/firmware/tegra/ivc.c
->  create mode 100644 include/soc/tegra/ivc.h
-
-[snip]
-
-> +static int check_ivc_params(unsigned long base1, unsigned long base2,
-> +			    unsigned int num_frames, size_t frame_size)
-> +{
-> +	BUG_ON(offsetof(struct tegra_ivc_header, tx.count) & (TEGRA_IVC_ALIGN - 1));
-> +	BUG_ON(offsetof(struct tegra_ivc_header, rx.count) & (TEGRA_IVC_ALIGN - 1));
-> +	BUG_ON(sizeof(struct tegra_ivc_header) & (TEGRA_IVC_ALIGN - 1));
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> index 593c7e4..c2f014e 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> @@ -372,3 +372,11 @@
+>  &uart3 {
+>  	label = "LS-UART1";
+>  };
 > +
-> +	if ((uint64_t)num_frames * (uint64_t)frame_size >= 0x100000000) {
-> +		pr_err("num_frames * frame_size overflows\n");
-> +		return -EINVAL;
-> +	}
-
-This generates the following sparse warning ...
-
-drivers/firmware/tegra/ivc.c:574:60: warning: constant 0x100000000 is so
-big it is long
-
-I think we need to append a UL.
-
+> +&ade {
+> +	status = "ok";
+> +};
 > +
-> +	/*
-> +	 * The headers must at least be aligned enough for counters
-> +	 * to be accessed atomically.
-> +	 */
-> +	if (base1 & (TEGRA_IVC_ALIGN - 1)) {
-> +		pr_err("IVC channel start not aligned: %lx\n", base1);
-> +		return -EINVAL;
-> +	}
+> +&dsi {
+> +	status = "ok";
+> +};
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> index 4f27041..d0b887a 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> @@ -262,6 +262,11 @@
+>  			#clock-cells = <1>;
+>  		};
+>  
+> +		medianoc_ade: medianoc_ade at f4520000 {
+> +			compatible = "syscon";
+> +			reg = <0x0 0xf4520000 0x0 0x4000>;
+> +		};
 > +
-> +	if (base2 & (TEGRA_IVC_ALIGN - 1)) {
-> +		pr_err("IVC channel start not aligned: %lx\n", base2);
-> +		return -EINVAL;
-> +	}
+>  		stub_clock: stub_clock {
+>  			compatible = "hisilicon,hi6220-stub-clk";
+>  			hisilicon,hi6220-clk-sram = <&sram>;
+> @@ -850,5 +855,55 @@
+>  				};
+>  			};
+>  		};
 > +
-> +	if (frame_size & (TEGRA_IVC_ALIGN - 1)) {
-> +		pr_err("frame size not adequately aligned: %zu\n", frame_size);
-> +		return -EINVAL;
-> +	}
+> +		ade: ade at f4100000 {
+> +			compatible = "hisilicon,hi6220-ade";
+> +			reg = <0x0 0xf4100000 0x0 0x7800>;
+> +			reg-names = "ade_base";
+> +			hisilicon,noc-syscon = <&medianoc_ade>;
+> +			resets = <&media_ctrl MEDIA_ADE>;
+> +			interrupts = <0 115 4>; /* ldi interrupt */
 > +
-> +	if (base1 < base2) {
-> +		if (base1 + frame_size * num_frames > base2) {
-> +			pr_err("queue regions overlap: %lx + %zx, %zx\n",
-> +			       base1, frame_size, frame_size * num_frames);
-> +			return -EINVAL;
-> +		}
-> +	} else {
-> +		if (base2 + frame_size * num_frames > base1) {
-> +			pr_err("queue regions overlap: %lx + %zx, %zx\n",
-> +			       base2, frame_size, frame_size * num_frames);
-> +			return -EINVAL;
-> +		}
-> +	}
+> +			clocks = <&media_ctrl HI6220_ADE_CORE>,
+> +				 <&media_ctrl HI6220_CODEC_JPEG>,
+> +				 <&media_ctrl HI6220_ADE_PIX_SRC>;
+> +			/*clock name*/
+> +			clock-names  = "clk_ade_core",
+> +				       "clk_codec_jpeg",
+> +				       "clk_ade_pix";
 > +
-> +	return 0;
-> +}
+> +			assigned-clocks = <&media_ctrl HI6220_ADE_CORE>,
+> +				<&media_ctrl HI6220_CODEC_JPEG>;
+> +			assigned-clock-rates = <360000000>, <288000000>;
+> +			dma-coherent;
+> +			status = "disabled";
 > +
-> +int tegra_ivc_init(struct tegra_ivc *ivc, struct device *peer,
-> +		   void __iomem *rx_virt, dma_addr_t rx_phys,
-> +		   void __iomem *tx_virt, dma_addr_t tx_phys,
-> +		   unsigned int num_frames, size_t frame_size,
-> +		   void (*notify)(struct tegra_ivc *ivc, void *data),
-> +		   void *data)
-> +{
-> +	size_t queue_size;
-> +	int err;
+> +			port {
+> +				ade_out: endpoint {
+> +					remote-endpoint = <&dsi_in>;
+> +				};
+> +			};
+> +		};
 > +
-> +	err = check_ivc_params((unsigned long)rx_virt, (unsigned long)tx_virt,
-> +			       num_frames, frame_size);
-> +	if (err < 0)
-> +		return err;
+> +		dsi: dsi at f4107800 {
+> +			compatible = "hisilicon,hi6220-dsi";
+> +			reg = <0x0 0xf4107800 0x0 0x100>;
+> +			clocks = <&media_ctrl  HI6220_DSI_PCLK>;
+> +			clock-names = "pclk";
+> +			status = "disabled";
 > +
-> +	BUG_ON(!ivc);
-> +	BUG_ON(!notify);
+> +			ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
 > +
-> +	queue_size = tegra_ivc_total_queue_size(num_frames * frame_size);
-> +
-> +	/*
-> +	 * All sizes that can be returned by communication functions should
-> +	 * fit in an int.
-> +	 */
-> +	if (frame_size > INT_MAX)
-> +		return -E2BIG;
-> +
-> +	ivc->rx.channel = (struct tegra_ivc_header *)rx_virt;
-> +	ivc->tx.channel = (struct tegra_ivc_header *)tx_virt;
-
-And these generate the sparse warnings ...
-
-drivers/firmware/tegra/ivc.c:642:28: warning: cast removes address space
-of expression
-drivers/firmware/tegra/ivc.c:643:28: warning: cast removes address space
-of expression
-
-Cheers
-Jon
-
--- 
-nvpublic
+> +				/* 0 for input port */
+> +				port at 0 {
+> +					reg = <0>;
+> +					dsi_in: endpoint {
+> +						remote-endpoint = <&ade_out>;
+> +					};
+> +				};
+> +			};
+> +		};
+>  	};
+>  };
+> 
