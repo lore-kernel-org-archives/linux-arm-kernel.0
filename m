@@ -1,54 +1,90 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 24 Aug 2016 22:41:35 +0200
-Subject: [PATCH] arm64: avoid TLB conflict with CONFIG_RANDOMIZE_BASE
-In-Reply-To: <1472058128-1216-1-git-send-email-mark.rutland@arm.com>
-References: <1472058128-1216-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAKv+Gu_TYRDibDcLr8uhB3nn-=HUFrgRgMxRgJBBqCCf5ObkxQ@mail.gmail.com>
+Date: Wed, 24 Aug 2016 22:44:34 +0200
+Subject: [PATCH v2 4/9] arm64: head.S: move KASLR processing out of
+ __enable_mmu()
+In-Reply-To: <20160824203609.GA1642@remoulade>
+References: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1472049366-10922-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20160824203609.GA1642@remoulade>
+Message-ID: <CAKv+Gu8ixdAtV4zDbH7zT_Tkj_BRQCa9B2rdtWgXKbMcGA29dQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 August 2016 at 19:02, Mark Rutland <mark.rutland@arm.com> wrote:
-> When CONFIG_RANDOMIZE_BASE is selected, we modify the page tables to remap the
-> kernel at a newly-chosen VA range. We do this with the MMU disabled, but do not
-> invalidate TLBs prior to re-enabling the MMU with the new tables. Thus the old
-> mappings entries may still live in TLBs, and we risk violating
-> Break-Before-Make requirements, leading to TLB conflicts and/or other issues.
+On 24 August 2016 at 22:36, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
 >
-> We invalidate TLBs when we uninsall the idmap in early setup code, but prior to
-> this we are subject to issues relating to the Break-Before-Make violation.
+> On Wed, Aug 24, 2016 at 04:36:01PM +0200, Ard Biesheuvel wrote:
+>> The KASLR processing in __enable_mmu() is only used by the primary boot
+>> path, and complements the processing that takes place in __primary_switch().
+>> Move the two parts together, to make the code easier to understand.
 >
-> Avoid these issues by invalidating the TLBs before the new mappings can be
-> used by the hardware.
+> As a heads-up, while reviewing this I spotted an existing issue [1]. I'd meant
+> to comment so when posting that patch, but in my hubris from making
+> git-send-email work I forgot to do so. :/
 >
-> Fixes: f80fb3a3d50843a4 ("arm64: add support for kernel ASLR")
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: stable at vger.kernel.org
+> [...]
+>
+>> @@ -770,11 +748,11 @@ __no_granule_support:
+>>  1:
+>>       wfe
+>>       wfi
+>> -     b 1b
+>> +     b       1b
+>>  ENDPROC(__no_granule_support)
+>
+> Unrelated change? Perhaps it's worth putting all the whitespace fixup in a
+> preparatory patch?
+>
+> [...]
+>
 
-Ah yes, brown paper bag time for me.
+I couldn't resist. It's the only occurrence in this series apart from #2
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> +__primary_switch:
+>> +#ifdef CONFIG_RANDOMIZE_BASE
+>> +     mov     x19, x0                         // preserve new SCTLR_EL1 value
+>> +     mrs     x20, sctlr_el1                  // preserve old SCTLR_EL1 value
+>> +#endif
+>> +
+>> +     adr     x27, 0f
+>> +     b       __enable_mmu
+>
+> As we do elsewhere, it's probably worth a comment on the line with the ADR into
+> x27, mentioning that __enable_mmu will branch there.
+>
+> ... or perhaps we should just have __enable_mmu return to the LR like a normal
+> AAPCS function, place the switch routines in the idmap, and use the idiomatic
+> sequence:
+>
+> __thing_switch:
+>         bl      __enable_mmu
+>         ldr     xN, =__thing
+>         blr     xN
+>
+> [...]
+>
 
-> ---
->  arch/arm64/kernel/head.S | 3 +++
->  1 file changed, 3 insertions(+)
+Yes, that is more or less the point of the two subsequent patches.
+
+>> +     /*
+>> +      * If we return here, we have a KASLR displacement in x23 which we need
+>> +      * to take into account by discarding the current kernel mapping and
+>> +      * creating a new one.
+>> +      */
+>> +     msr     sctlr_el1, x20                  // disable the MMU
+>> +     isb
+>> +     bl      __create_page_tables            // recreate kernel mapping
 >
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index b77f583..3e7b050 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -757,6 +757,9 @@ ENTRY(__enable_mmu)
->         isb
->         bl      __create_page_tables            // recreate kernel mapping
+> As per the issue I mentioned above [1], here we also need:
 >
-> +       tlbi    vmalle1                         // Remove any stale TLB entries
-> +       dsb     nsh
-> +
->         msr     sctlr_el1, x19                  // re-enable the MMU
->         isb
->         ic      iallu                           // flush instructions fetched
-> --
-> 2.7.4
+>         tlbi    vmalle1
+>         dsb     nsh
 >
+> ... in order to avoid TLB conflicts and other issues resulting from BBM
+> violations.
+>
+
+Indeed.
+
+Thanks,
+Ard.
