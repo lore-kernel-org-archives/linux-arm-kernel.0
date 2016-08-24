@@ -1,73 +1,66 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 24 Aug 2016 15:21:37 +0800
-Subject: [PATCH] arm64: KVM: Enable support for Cortex-A72
-Message-ID: <1472023297-2756-1-git-send-email-zhaoshenglong@huawei.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 24 Aug 2016 12:56:22 +0530
+Subject: [PATCH 0/5] ARM64: Uprobe support added
+In-Reply-To: <cover.1470114993.git.panand@redhat.com>
+References: <cover.1470114993.git.panand@redhat.com>
+Message-ID: <20160824072622.GB24311@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to allow KVM to run on Cortex-A72 physical cpus, enable KVM
-support for Cortex-A72.
+Hi Will/Catalin,
 
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
----
- arch/arm64/include/asm/cputype.h     | 1 +
- arch/arm64/include/uapi/asm/kvm.h    | 3 ++-
- arch/arm64/kvm/guest.c               | 2 ++
- arch/arm64/kvm/sys_regs_generic_v8.c | 2 ++
- 4 files changed, 7 insertions(+), 1 deletion(-)
+Do you have any specific comment for this patch set?
 
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index 9d9fd4b..cf1f638 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -76,6 +76,7 @@
- #define ARM_CPU_PART_FOUNDATION		0xD00
- #define ARM_CPU_PART_CORTEX_A57		0xD07
- #define ARM_CPU_PART_CORTEX_A53		0xD03
-+#define ARM_CPU_PART_CORTEX_A72		0xD08
- 
- #define APM_CPU_PART_POTENZA		0x000
- 
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index f209ea1..af8fbeb 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -65,8 +65,9 @@ struct kvm_regs {
- #define KVM_ARM_TARGET_CORTEX_A53	4
- /* Generic ARM v8 target */
- #define KVM_ARM_TARGET_GENERIC_V8	5
-+#define KVM_ARM_TARGET_CORTEX_A72	6
- 
--#define KVM_ARM_NUM_TARGETS		6
-+#define KVM_ARM_NUM_TARGETS		7
- 
- /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
- #define KVM_ARM_DEVICE_TYPE_SHIFT	0
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 32fad75..7eed92e 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -293,6 +293,8 @@ int __attribute_const__ kvm_target_cpu(void)
- 			return KVM_ARM_TARGET_CORTEX_A53;
- 		case ARM_CPU_PART_CORTEX_A57:
- 			return KVM_ARM_TARGET_CORTEX_A57;
-+		case ARM_CPU_PART_CORTEX_A72:
-+			return KVM_ARM_TARGET_CORTEX_A72;
- 		};
- 		break;
- 	case ARM_CPU_IMP_APM:
-diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
-index ed90578..cf823e1 100644
---- a/arch/arm64/kvm/sys_regs_generic_v8.c
-+++ b/arch/arm64/kvm/sys_regs_generic_v8.c
-@@ -92,6 +92,8 @@ static int __init sys_reg_genericv8_init(void)
- 					  &genericv8_target_table);
- 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A57,
- 					  &genericv8_target_table);
-+	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A72,
-+					  &genericv8_target_table);
- 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_XGENE_POTENZA,
- 					  &genericv8_target_table);
- 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_GENERIC_V8,
--- 
-2.0.4
+~Pratyush
+
+[1] https://lkml.org/lkml/2016/8/22/69
+
+On 02/08/2016:11:00:04 AM, Pratyush Anand wrote:
+> ARM64 kprobe support is lying in torvalds/linux.git:master now. Therefore
+> sending my uprobe patches which were dependent on decode-insn code of kprobe
+> patches.
+> 
+> Unit tests for following have been done so far and they have been found
+> working.
+>      1. Step-able instructions, like sub, ldr, add etc.
+>      2. Simulation-able like ret, cbnz, cbz etc.
+>      3. uretprobe
+>      4. Reject-able instructions like sev, wfe etc.
+>      5. trapped and abort xol path
+>      6. probe at unaligned user address.
+>      7. longjump test cases
+>  
+> Currently it does not support aarch32 instruction probing.
+> 
+> RFC patches were sent long back, and all review comments for RFCs have been
+> incorporated. RFCs were here: https://lwn.net/Articles/648514/
+> 
+> Pratyush Anand (5):
+>   arm64: kprobe: protect/rename few definitions to be reused by uprobe
+>   arm64: kgdb_step_brk_fn: ignore other's exception
+>   arm64: Handle TRAP_HWBRKPT for user mode as well
+>   arm64: Handle TRAP_BRKPT for user mode as well
+>   arm64: Add uprobe support
+> 
+>  arch/arm64/Kconfig                      |   3 +
+>  arch/arm64/include/asm/debug-monitors.h |   3 +
+>  arch/arm64/include/asm/probes.h         |  23 ++--
+>  arch/arm64/include/asm/ptrace.h         |   8 ++
+>  arch/arm64/include/asm/thread_info.h    |   5 +-
+>  arch/arm64/include/asm/uprobes.h        |  37 ++++++
+>  arch/arm64/kernel/debug-monitors.c      |  40 +++---
+>  arch/arm64/kernel/entry.S               |   6 +-
+>  arch/arm64/kernel/kgdb.c                |   3 +
+>  arch/arm64/kernel/probes/Makefile       |   2 +
+>  arch/arm64/kernel/probes/decode-insn.c  |  31 ++---
+>  arch/arm64/kernel/probes/decode-insn.h  |   8 +-
+>  arch/arm64/kernel/probes/kprobes.c      |  36 ++---
+>  arch/arm64/kernel/probes/uprobes.c      | 227 ++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/signal.c              |   4 +-
+>  arch/arm64/mm/flush.c                   |   6 +
+>  16 files changed, 378 insertions(+), 64 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/uprobes.h
+>  create mode 100644 arch/arm64/kernel/probes/uprobes.c
+> 
+> -- 
+> 2.5.5
