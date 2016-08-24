@@ -1,45 +1,66 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 24 Aug 2016 18:02:08 +0100
-Subject: [PATCH] arm64: avoid TLB conflict with CONFIG_RANDOMIZE_BASE
-Message-ID: <1472058128-1216-1-git-send-email-mark.rutland@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 24 Aug 2016 21:05:19 +0200
+Subject: [PATCH v3 1/5] ARM: dts: exynos: Enable HDMI for Arndale Octa
+ board
+In-Reply-To: <1472044039-16536-2-git-send-email-woogyom.kim@gmail.com>
+References: <1472044039-16536-1-git-send-email-woogyom.kim@gmail.com>
+ <1472044039-16536-2-git-send-email-woogyom.kim@gmail.com>
+Message-ID: <20160824190519.GA30097@kozik-book>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_RANDOMIZE_BASE is selected, we modify the page tables to remap the
-kernel at a newly-chosen VA range. We do this with the MMU disabled, but do not
-invalidate TLBs prior to re-enabling the MMU with the new tables. Thus the old
-mappings entries may still live in TLBs, and we risk violating
-Break-Before-Make requirements, leading to TLB conflicts and/or other issues.
+On Wed, Aug 24, 2016 at 10:07:15PM +0900, Milo Kim wrote:
+> * GPIO for HDMI hot plug detect
+>   GPX3_7 is used. The HPD awareness is done when the GPIO is active high and
+>   single ended.
+> 
+> * Enable HDMI block in Exynos5420
+>   HDMI VDD and PLL consume 1.0V LDO6 (PVDD_ANAIP_1V0) and HDMI oscillator
+>   requires 1.8V LDO7 (PVDD_ANAIP_1V8).
+> 
+> * Support HDMI display data channel
+>   I2C #2 is assigned for the HDMI DDC. It enables the EDID access.
+> 
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+> ---
+>  arch/arm/boot/dts/exynos5420-arndale-octa.dts | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+> index 39a3b81..2fb5708 100644
+> --- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+> +++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+> @@ -70,6 +70,19 @@
+>  	status = "disabled";
+>  };
+>
 
-We invalidate TLBs when we uninsall the idmap in early setup code, but prior to
-this we are subject to issues relating to the Break-Before-Make violation.
+First of all - it looks like these DTS patches do not depend on DRM
+part, do they?
 
-Avoid these issues by invalidating the TLBs before the new mappings can be
-used by the hardware.
+> +&hdmi {
+> +	hpd-gpios = <&gpx3 7 GPIO_OPEN_SOURCE>;
 
-Fixes: f80fb3a3d50843a4 ("arm64: add support for kernel ASLR")
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: stable at vger.kernel.org
----
- arch/arm64/kernel/head.S | 3 +++
- 1 file changed, 3 insertions(+)
+Are you sure it is open-source type?
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index b77f583..3e7b050 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -757,6 +757,9 @@ ENTRY(__enable_mmu)
- 	isb
- 	bl	__create_page_tables		// recreate kernel mapping
- 
-+	tlbi	vmalle1				// Remove any stale TLB entries
-+	dsb	nsh
-+
- 	msr	sctlr_el1, x19			// re-enable the MMU
- 	isb
- 	ic	iallu				// flush instructions fetched
--- 
-2.7.4
+> +	vdd_osc-supply = <&ldo7_reg>;
+> +	vdd_pll-supply = <&ldo6_reg>;
+> +	vdd-supply = <&ldo6_reg>;
+> +	ddc = <&i2c_2>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c_2 {
+> +	status = "okay";
+
+Hm, what is connected here? Please put it in alphabetical order (so
+after hsi2c_4).
+
+Best regards,
+Krzysztof
