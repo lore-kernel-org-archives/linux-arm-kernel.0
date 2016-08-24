@@ -1,39 +1,40 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Wed, 24 Aug 2016 10:23:06 +0800
-Subject: [PATCH 2/4] arm64: defconfig: Set cma heap size to 128MB
-In-Reply-To: <20160822090600.GB25947@ulmo.ba.sec>
-References: <1471621328-21102-1-git-send-email-guodong.xu@linaro.org>
- <1471621328-21102-3-git-send-email-guodong.xu@linaro.org>
- <20160822090600.GB25947@ulmo.ba.sec>
-Message-ID: <CAFGCpxyNubwm1kyjH2kSGGchSTuL7oqD4J=_frhXecrgvEVU=w@mail.gmail.com>
+From: woogyom.kim@gmail.com (Milo Kim)
+Date: Wed, 24 Aug 2016 11:25:20 +0900
+Subject: [PATCH v2 0/4] ARM: dts: exynos: Enable HDMI in Arndale Octa board
+Message-ID: <1472005524-3489-1-git-send-email-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 August 2016 at 17:06, Thierry Reding <treding@nvidia.com> wrote:
-> On Fri, Aug 19, 2016 at 11:42:06PM +0800, Guodong Xu wrote:
->> From: Xinliang Liu <xinliang.liu@linaro.org>
->>
->> For debian linux, cma heap is used to allocate graphic buffers.
->> The default size is 16 MB which is not enought.
->> So increase the size to 128 MB.
->>
->> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
->> ---
->>  arch/arm64/configs/defconfig | 1 +
->>  1 file changed, 1 insertion(+)
->
-> This is a bad idea. You're increasing this heap for all users of the
-> default configuration (which on 64-bit ARM is everyone, really). Many of
-> the devices don't require the CMA except maybe for the occasional very
-> small buffer. Most implement some form of IOMMU support that removes the
-> need for large amounts of contiguous physical memory.
->
-> I think it's a better idea to have some bootloader append a cma=128 to
-> the kernel command-line if necessary.
->
+This patch-set enables HDMI in Arndale Octa board and fixes HPD DT property.
+It also includes code refactoring on ddc and phy.
 
-I will remove this. Thanks.
+v2:
+  Include DRM and Exynos maintainers and resend the patch-set.
+  Add Rob's ack for the patch,
+	[PATCH 2/4] ARM: dts: exynos: Use 'hpd-gpios' instead of 'hpd-gpio'
 
--Guodong Xu
+Milo Kim (4):
+  ARM: dts: exynos: Enable HDMI for Arndale Octa board
+  ARM: dts: exynos: Use 'hpd-gpios' instead of 'hpd-gpio'
+  gpu: drm: exynos_hdmi: Use consolidated function on binding DDC DT
+    property
+  gpu: drm: exynos_hdmi: Use consolidated function on binding PHY DT
+    property
 
-> Thierry
+ .../bindings/display/exynos/exynos_hdmi.txt        |  4 +--
+ arch/arm/boot/dts/exynos4210-universal_c210.dts    |  2 +-
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi    |  2 +-
+ arch/arm/boot/dts/exynos5250-arndale.dts           |  2 +-
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |  2 +-
+ arch/arm/boot/dts/exynos5250-snow-common.dtsi      |  2 +-
+ arch/arm/boot/dts/exynos5250-spring.dts            |  2 +-
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts      | 17 +++++++++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts         |  2 +-
+ arch/arm/boot/dts/exynos5420-smdk5420.dts          |  2 +-
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  2 +-
+ arch/arm/boot/dts/exynos5800-peach-pi.dts          |  2 +-
+ drivers/gpu/drm/exynos/exynos_hdmi.c               | 41 ++++++++++++----------
+ 13 files changed, 52 insertions(+), 30 deletions(-)
+
+-- 
+1.9.1
