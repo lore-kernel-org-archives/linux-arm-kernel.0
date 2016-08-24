@@ -1,32 +1,88 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 24 Aug 2016 10:26:47 +0100
-Subject: [crypto] [marvell-cesa] Driver hangs on Armada 385 device
-In-Reply-To: <57bd659d.0f4d190a.e025.5da4@mx.google.com>
-References: <57bd659d.0f4d190a.e025.5da4@mx.google.com>
-Message-ID: <20160824092647.GH1041@n2100.armlinux.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 24 Aug 2016 11:31:56 +0200
+Subject: [PATCH 4/5] mmc: sunxi-mmc: change idma descriptor to __le32
+In-Reply-To: <20160822164219.14272-5-michael.weiser@gmx.de>
+References: <20160822164219.14272-1-michael.weiser@gmx.de>
+ <20160822164219.14272-5-michael.weiser@gmx.de>
+Message-ID: <CAPDyKFouYMjAajS68QRY6SvORQ1YZTf2dZsO_DtSJ+voKPWFdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 12:15:07PM +0300, radioconfusion at gmail.com wrote:
-> The problem caused by my mistake, I was using the following kernel parameter:
-> mem=1048448k
+On 22 August 2016 at 18:42, Michael Weiser <michael.weiser@gmx.de> wrote:
+> The sunxi-mmc driver does not take into account the processor may be big
+> endian when writing the DMA descriptors. This causes cards not to be
+> detected when running a big-endian kernel. Change the descriptors for
+> IDMA to use __le32 and ensure they are suitably swapped before writing.
+> Tested successfully on the Cubieboard2.
+>
+> Signed-off-by: Michael Weiser <michael.weiser@gmx.de>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: linux-mmc at vger.kernel.org
 
-Try mem=1046M - reducing it by 2MB.  If that works, try mem=1047M
-instead.  Yes, that's more than you want to reserve, but please
-check how the system behaves with these.
+Thanks, applied for next!
 
-> My device has 1 GiB of RAM and I tried to reserve 128 kiB of memory for ram
-> oops. I guess this parameter caused overlapping or inaccessible area with cesa's
-> addresses. Am I right?
-> I tried to add memmap=0x20000$0x3ffe0000 without success.
+Kind regards
+Uffe
 
-memmap= has no meaning on ARM.  It's an x86 thing, the ARM arch has
-never implemented it.  I've seen this come up a few times, and I don't
-know why people keep trying to use it (always with an "it doesn't seem
-to work" result.)  It's even documented as being an ACPI / x86 thing
-in Documentation/kernel-parameters.txt...
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> ---
+>  drivers/mmc/host/sunxi-mmc.c | 27 +++++++++++++++------------
+>  1 file changed, 15 insertions(+), 12 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index 2ec91ce..a1935a1 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -223,10 +223,10 @@ struct sunxi_mmc_clk_delay {
+>  };
+>
+>  struct sunxi_idma_des {
+> -       u32     config;
+> -       u32     buf_size;
+> -       u32     buf_addr_ptr1;
+> -       u32     buf_addr_ptr2;
+> +       __le32 config;
+> +       __le32 buf_size;
+> +       __le32 buf_addr_ptr1;
+> +       __le32 buf_addr_ptr2;
+>  };
+>
+>  struct sunxi_mmc_cfg {
+> @@ -329,22 +329,25 @@ static void sunxi_mmc_init_idma_des(struct sunxi_mmc_host *host,
+>         int i, max_len = (1 << host->cfg->idma_des_size_bits);
+>
+>         for (i = 0; i < data->sg_len; i++) {
+> -               pdes[i].config = SDXC_IDMAC_DES0_CH | SDXC_IDMAC_DES0_OWN |
+> -                                SDXC_IDMAC_DES0_DIC;
+> +               pdes[i].config = cpu_to_le32(SDXC_IDMAC_DES0_CH |
+> +                                            SDXC_IDMAC_DES0_OWN |
+> +                                            SDXC_IDMAC_DES0_DIC);
+>
+>                 if (data->sg[i].length == max_len)
+>                         pdes[i].buf_size = 0; /* 0 == max_len */
+>                 else
+> -                       pdes[i].buf_size = data->sg[i].length;
+> +                       pdes[i].buf_size = cpu_to_le32(data->sg[i].length);
+>
+>                 next_desc += sizeof(struct sunxi_idma_des);
+> -               pdes[i].buf_addr_ptr1 = sg_dma_address(&data->sg[i]);
+> -               pdes[i].buf_addr_ptr2 = (u32)next_desc;
+> +               pdes[i].buf_addr_ptr1 =
+> +                       cpu_to_le32(sg_dma_address(&data->sg[i]));
+> +               pdes[i].buf_addr_ptr2 = cpu_to_le32((u32)next_desc);
+>         }
+>
+> -       pdes[0].config |= SDXC_IDMAC_DES0_FD;
+> -       pdes[i - 1].config |= SDXC_IDMAC_DES0_LD | SDXC_IDMAC_DES0_ER;
+> -       pdes[i - 1].config &= ~SDXC_IDMAC_DES0_DIC;
+> +       pdes[0].config |= cpu_to_le32(SDXC_IDMAC_DES0_FD);
+> +       pdes[i - 1].config |= cpu_to_le32(SDXC_IDMAC_DES0_LD |
+> +                                         SDXC_IDMAC_DES0_ER);
+> +       pdes[i - 1].config &= cpu_to_le32(~SDXC_IDMAC_DES0_DIC);
+>         pdes[i - 1].buf_addr_ptr2 = 0;
+>
+>         /*
+> --
+> 2.9.2
+>
