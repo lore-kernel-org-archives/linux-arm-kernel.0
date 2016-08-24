@@ -1,30 +1,48 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 25 Aug 2016 00:25:03 +0200
-Subject: [PATCH] clk: rockchip: mark aclk_emmc_noc as a critical clock on
- rk3399
-In-Reply-To: <1472063379-717-1-git-send-email-dianders@chromium.org>
-References: <1472063379-717-1-git-send-email-dianders@chromium.org>
-Message-ID: <1770264.XeNEc6mIDD@diego>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Wed, 24 Aug 2016 16:07:25 -0700
+Subject: [PATCH v2 2/2] HWRNG: thunderx: Add Cavium HWRNG driver for
+ ThunderX SoC.
+In-Reply-To: <874d0bce-cf9b-8772-5af4-ec3844b3b255@gmail.com>
+References: <1471994835-2423-1-git-send-email-okhaliq@caviumnetworks.com>
+ <1471994835-2423-3-git-send-email-okhaliq@caviumnetworks.com>
+ <874d0bce-cf9b-8772-5af4-ec3844b3b255@gmail.com>
+Message-ID: <57BE28AD.5080607@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 24. August 2016, 11:29:39 schrieb Douglas Anderson:
-> From: Xing Zheng <zhengxing@rock-chips.com>
-> 
-> We don't have code to handle any of the noc clocks in rk3399 and they're
-> all just listed as critical clocks.  Let's do the same for
-> aclk_emmc_noc.
-> 
-> Without this clock being marked as critical we have problems around
-> suspend/resume after commit 20c389e656a8 ("clk: rockchip: fix incorrect
-> aclk_emmc source gate bits on rk3399").  Before that change we were
-> presumably not actually gating any of these clocks because we were
-> setting the wrong gate.
-> 
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+On 08/23/2016 10:46 PM, Corentin LABBE wrote:
+> Hello
+>
+>> +/* Read data from the RNG unit */
+>> +static int cavium_rng_read(struct hwrng *rng, void *dat, size_t max, bool wait)
+>> +{
+>> +	struct cavium_rng *p = container_of(rng, struct cavium_rng, ops);
+>> +	unsigned int size = max;
+>> +
+>> +	while (size >= 8) {
+>> +		*((u64 *)dat) = readq(p->result);
+>> +		size -= 8;
+>> +		dat += 8;
+>> +	}
+>
+> I think you could use readsq()
+> This will increase throughput
 
-applied to my clk-fixes branch
+If you look at the implementation of readsq(), you will see that it is a 
+similar loop.  Since the overhead is primarily I/O latency from the RNG 
+hardware, the throughput cannot really be changed with micro 
+optimizations to this simple loop.
 
-Thanks
-Heiko
+Also, on big-endian kernels, it appears that a loop of readq() and 
+readsq() will give different results as readq will byte swap the result 
+and readsq does not.  Since this is a RNG, the byte swapping is not 
+important, but it is a difference.
+
+Because of this, I think it should be acceptable to stick with the loop 
+we currently have.
+
+If the hwrng maintainers want to change the loop, to a readsq(), we 
+might investigate this more.
+
+Thanks,
+David Daney
