@@ -1,74 +1,88 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed, 24 Aug 2016 22:32:00 +0200
-Subject: [PATCH 03/10] reset: lpc18xx: add driver Kconfig option
-In-Reply-To: <1472045342-7434-3-git-send-email-p.zabel@pengutronix.de>
-References: <1472045342-7434-1-git-send-email-p.zabel@pengutronix.de>
- <1472045342-7434-3-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <CAGhQ9VzvU+1qzmmy9NeZmJxX7AS1ez6b4qJuq99J_drSpjJOUw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 24 Aug 2016 21:36:10 +0100
+Subject: [PATCH v2 4/9] arm64: head.S: move KASLR processing out of
+ __enable_mmu()
+In-Reply-To: <1472049366-10922-5-git-send-email-ard.biesheuvel@linaro.org>
+References: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1472049366-10922-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160824203609.GA1642@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+Hi,
 
-On 24 August 2016 at 15:28, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> Visible only if COMPILE_TEST is enabled, this allows to include the
-> driver in build tests.
->
-> Cc: Joachim Eastwood <manabian@gmail.com>
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
->  drivers/reset/Kconfig  | 7 +++++++
->  drivers/reset/Makefile | 2 +-
->  2 files changed, 8 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-> index 1194cbe..8e33de2 100644
-> --- a/drivers/reset/Kconfig
-> +++ b/drivers/reset/Kconfig
-> @@ -27,6 +27,13 @@ config RESET_BERLIN
->         help
->           This enables the reset controller driver for Marvell Berlin SoCs.
->
-> +config RESET_LPC18XX
-> +       bool "LPC18xx/43xx Reset Driver" if COMPILE_TEST
-> +       default ARCH_LPC18XX
-> +       help
-> +         This enables the LPC18xx/43 reset driver that supports the reset
-> +         controllers on AR71xx SoCs.
+On Wed, Aug 24, 2016 at 04:36:01PM +0200, Ard Biesheuvel wrote:
+> The KASLR processing in __enable_mmu() is only used by the primary boot
+> path, and complements the processing that takes place in __primary_switch().
+> Move the two parts together, to make the code easier to understand.
 
-Don't know where you got the "AR71xx SoCs" from. This reset controller
-is found on NXP LPC18xx/43xx SoCs.
+As a heads-up, while reviewing this I spotted an existing issue [1]. I'd meant
+to comment so when posting that patch, but in my hubris from making
+git-send-email work I forgot to do so. :/
 
-Other than that it looks fine to me.
+[...]
 
-Acked-by: Joachim Eastwood <manabian@gmail.com>
+> @@ -770,11 +748,11 @@ __no_granule_support:
+>  1:
+>  	wfe
+>  	wfi
+> -	b 1b
+> +	b	1b
+>  ENDPROC(__no_granule_support)
 
+Unrelated change? Perhaps it's worth putting all the whitespace fixup in a
+preparatory patch?
+
+[...]
+
+> +__primary_switch:
+> +#ifdef CONFIG_RANDOMIZE_BASE
+> +	mov	x19, x0				// preserve new SCTLR_EL1 value
+> +	mrs	x20, sctlr_el1			// preserve old SCTLR_EL1 value
+> +#endif
+> +
+> +	adr	x27, 0f
+> +	b	__enable_mmu
+
+As we do elsewhere, it's probably worth a comment on the line with the ADR into
+x27, mentioning that __enable_mmu will branch there.
+
+... or perhaps we should just have __enable_mmu return to the LR like a normal
+AAPCS function, place the switch routines in the idmap, and use the idiomatic
+sequence:
+
+__thing_switch:
+	bl	__enable_mmu
+	ldr	xN, =__thing
+	blr	xN
+
+[...]
+
+> +	/*
+> +	 * If we return here, we have a KASLR displacement in x23 which we need
+> +	 * to take into account by discarding the current kernel mapping and
+> +	 * creating a new one.
+> +	 */
+> +	msr	sctlr_el1, x20			// disable the MMU
+> +	isb
+> +	bl	__create_page_tables		// recreate kernel mapping
+
+As per the issue I mentioned above [1], here we also need:
+
+	tlbi	vmalle1
+	dsb	nsh
+
+... in order to avoid TLB conflicts and other issues resulting from BBM
+violations.
 
 > +
->  config RESET_OXNAS
->         bool
->
-> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-> index 34c0b23..25aa05a 100644
-> --- a/drivers/reset/Makefile
-> +++ b/drivers/reset/Makefile
-> @@ -1,5 +1,4 @@
->  obj-y += core.o
-> -obj-$(CONFIG_ARCH_LPC18XX) += reset-lpc18xx.o
->  obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
->  obj-$(CONFIG_MACH_PISTACHIO) += reset-pistachio.o
->  obj-$(CONFIG_ARCH_MESON) += reset-meson.o
-> @@ -10,6 +9,7 @@ obj-$(CONFIG_ARCH_HISI) += hisilicon/
->  obj-$(CONFIG_ARCH_ZYNQ) += reset-zynq.o
->  obj-$(CONFIG_RESET_ATH79) += reset-ath79.o
->  obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
-> +obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
->  obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
->  obj-$(CONFIG_TI_SYSCON_RESET) += reset-ti-syscon.o
->  obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
-> --
-> 2.8.1
+> +	msr	sctlr_el1, x19			// re-enable the MMU
+> +	isb
+> +	ic	iallu				// flush instructions fetched
+> +	dsb	nsh				// via old mapping
+> +	isb
 
+Thanks,
+Mark.
 
-regards,
-Joachim Eastwood
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/451294.html
