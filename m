@@ -1,88 +1,80 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue, 23 Aug 2016 18:06:31 -0700
-Subject: [PATCH v2 03/22] usb: ulpi: Support device discovery via device
- properties
-In-Reply-To: <CAL_JsqKPgVEr8zuaO7f8NczuxdCqa9ceg+PnVpOBxiT=Lr79eA@mail.gmail.com>
-References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-4-stephen.boyd@linaro.org>
- <20160718022355.GA8568@rob-hp-laptop>
- <147043320014.26915.7483025835695600714@sboyd-linaro>
- <CAJOFmgwTPDwdL_cc7f5N09enZNhKwSkWAxdpF39vOBQLfEdVSg@mail.gmail.com>
- <CAL_JsqKPgVEr8zuaO7f8NczuxdCqa9ceg+PnVpOBxiT=Lr79eA@mail.gmail.com>
-Message-ID: <CAJOFmgy5KLrjZ_8XBGH7V8M4gMdVWo0sCVhbTpv1CsCaxdujnQ@mail.gmail.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Wed, 24 Aug 2016 09:30:28 +0800
+Subject: [PATCH 1/1] arm64/hugetlb: clear PG_dcache_clean if the page is
+ dirty when munmap
+In-Reply-To: <20160823172852.GB16213@e104818-lin.cambridge.arm.com>
+References: <20160707153741.GC27180@e104818-lin.cambridge.arm.com>
+ <577F1FD9.1040205@huawei.com>
+ <20160708135447.GB22099@e104818-lin.cambridge.arm.com>
+ <577FC5AA.5010709@huawei.com>
+ <20160708161347.GC22099@e104818-lin.cambridge.arm.com>
+ <57839474.6030203@huawei.com>
+ <20160712153535.GH22183@e104818-lin.cambridge.arm.com>
+ <578EE603.9020206@huawei.com>
+ <20160720091939.GA25890@e104818-lin.cambridge.arm.com>
+ <57BA7D38.8030103@huawei.com>
+ <20160823172852.GB16213@e104818-lin.cambridge.arm.com>
+Message-ID: <57BCF8B4.9010109@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2016 at 4:06 PM, Rob Herring <robh@kernel.org> wrote:
-> On Tue, Aug 23, 2016 at 3:00 PM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
->> On Fri, Aug 5, 2016 at 2:40 PM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
->>> Quoting Rob Herring (2016-07-17 19:23:55)
->>>> On Thu, Jul 07, 2016 at 03:20:54PM -0700, Stephen Boyd wrote:
->>>> > +-------
->>>> > +
->>>> > +usb {
->>>> > +     compatible = "vendor,usb-controller";
->>>> > +
->>>> > +     ulpi {
->>>> > +             phy {
->>>> > +                     compatible = "vendor,phy";
->>>> > +                     ulpi-vendor = /bits/ 16 <0x1d6b>;
->>>> > +                     ulpi-product = /bits/ 16 <0x0002>;
->>>> > +             };
->>>> > +     };
->>>>
->>>> I'm still having concerns about describing both phys and devices. If I
->>>> have a controller with 2 ports and 2 devices attached, I'd have
->>>> something like this under the USB controller:
->>>>
->>>> ulpi {
->>>>         phy at 1 {
->>>>         };
->>>>         phy at 2 {
->>>>         };
->>>> };
->>>
->>> My understanding is there would only be one status="ok" node on the ULPI
->>> bus for the single phy that a usb controller would have. At the least,
->>> the kernel's ULPI layer only seems to support one ULPI phy for a
->>> controller right now. So even if there are two ports, it doesn't mean
->>> there are two phys.
->>>
->>>>
->>>> dev at 1 {
->>>> ...
->>>> };
->>>>
->>>> dev at 2 {
->>>> ...
->>>> };
->>>>
->>>>
->>>> That doesn't seem the best, but I don't have a better suggestion. Maybe
->>>> the device nodes need to go under the phy nodes?
->>>>
->>>
->>> What if we moved the dev at 1 and dev at 2 to another sub node like "ports" or
->>> "usb-devices"? Legacy code can support having those devices directly
->>> underneath the usb controller, but future users would always need to put
->>> them in a different sub-node so that we can easily differentiate the
->>> different busses that a usb controller node may support?
->>>
->>> I'm not sure I see any need to relate the phy to the ports that are on
->>> the controller, but if that is needed then perhaps you're right and we
->>> should move the ports underneath the phy. USB core could be modified to
->>> go through the legacy path or through the phy, if it even exists, to
->>> find ports.
->>>
->>> Do we typically do this for other phy designs like sata or pci? The phy
->>> always seemed like a parallel thing to the logical bus that the phy is
->>> used for.
->>
->> Rob does this sound ok to you?
->
-> Well, if there's only ever 1 phy under the controller, then as you had
-> it is fine.
->
 
-Ok. For ULPI I believe that's the case, but in general usb controllers
-can have more than one phy.
+
+On 2016/8/24 1:28, Catalin Marinas wrote:
+> On Mon, Aug 22, 2016 at 12:19:04PM +0800, Leizhen (ThunderTown) wrote:
+>> On 2016/7/20 17:19, Catalin Marinas wrote:
+>>> On Wed, Jul 20, 2016 at 10:46:27AM +0800, Leizhen (ThunderTown) wrote:
+>>>>>>>> On 2016/7/8 21:54, Catalin Marinas wrote:
+>>>>>>>>> ------------8<----------------
+>>>>>>>>> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+>>>>>>>>> index dbd12ea8ce68..c753fa804165 100644
+>>>>>>>>> --- a/arch/arm64/mm/flush.c
+>>>>>>>>> +++ b/arch/arm64/mm/flush.c
+>>>>>>>>> @@ -75,7 +75,8 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
+>>>>>>>>>  	if (!page_mapping(page))
+>>>>>>>>>  		return;
+>>>>>>>>>  
+>>>>>>>>> -	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
+>>>>>>>>> +	if (!test_and_set_bit(PG_dcache_clean, &page->flags) ||
+>>>>>>>>> +	    PageDirty(page))
+>>>>>>>>>  		sync_icache_aliases(page_address(page),
+>>>>>>>>>  				    PAGE_SIZE << compound_order(page));
+>>>>>>>>>  	else if (icache_is_aivivt())
+>>>>>>>>> ----------------8<---------------------
+>>>>
+>>>> Do you plan to send this patch? My colleagues told me that if our
+>>>> patches are quite different, it should be Signed-off-by you.
+>>>
+>>> The reason I'm not sending it is that I don't fully understand how it
+>>> solves the problem for a shared file mmap(), not just hugetlbfs. As I
+>>> said in an earlier email: after an msync() in user space we
+>>> should flush the pages to disk via write_cache_pages(). This function
+>> Hi Catalin:
+>>    I'm so sorry for my fault. The previous small pages test result I actually ran on ramfs.
+>> Today, I ran the case on harddisk fs, it worked well without this patch.
+>>
+>> Summarized as follows:
+>> small pages on ramfs: need this patch
+>> small pages on harddisk fs: no need this patch
+>> hugetlbfs: need this patch
+> 
+> I would add:
+> 
+> small pages over nfs: fails with or without this patch
+> 
+> (tested on Juno, Cortex-A57; seems to be fixed if I remove the
+> PG_dcache_clean test altogether but, well, we end up over-flushing)
+> 
+> I assume that when using a hard drive, it goes through the block I/O
+> layer and we may have a flush_dcache_page() called when the kernel is
+> about to read a page that has been mapped in user space. This would
+> clear the PG_dcache_clean bit and subsequent __sync_icache_dcache()
+> would perform cache maintenance.
+> 
+> Could you try on your system the test case without the msync() call? I'm
+> not sure whether munmap() would trigger an immediate write-back, in
+> which case we may see the issue even with the filesystem on a hard
+> drive.
+OK, no problem. I will do it today or tomorrow.
+
+> 
