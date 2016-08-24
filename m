@@ -1,37 +1,53 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 24 Aug 2016 17:12:22 +0200
-Subject: [PATCH v3] thermal: tango: add resume support
-In-Reply-To: <2198269.vtL6N6bMEV@wuerfel>
-References: <57726196.5060909@free.fr> <3377280.mzxhCYOnLL@wuerfel>
- <1472027140.2682.49.camel@intel.com> <2198269.vtL6N6bMEV@wuerfel>
-Message-ID: <57BDB956.8020709@free.fr>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Wed, 24 Aug 2016 16:12:12 +0100
+Subject: [PATCH v3 0/5] arm64: hisilicon: Hip0x dt/config update
+In-Reply-To: <1471244625-56331-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1467170878-24030-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1471244625-56331-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <57BDB94C.4080908@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/08/2016 10:32, Arnd Bergmann wrote:
+Hi Kefeng,
 
-> I think the ideal is to have only one set of conditionals in each
-> driver, so at least you don't get a mismatch between them.
+On 15/08/2016 08:03, Kefeng Wang wrote:
+> DT update:
+> 1) Hip05
+> - Kill unuesd hip05_hns.dtsi
+> 2) Hip06
+> - Add SAS/HNS node
 > 
-> SIMPLE_DEV_PM_OPS uses conditional evaluation (but does not
-> show the reference to the compiler). Annotating the functions as
-> __maybe_unused lets the compiler decide for itself if they should
-> be dropped or not, which means we use only the conditional inside
-> of SIMPLE_DEV_PM_OPS.
+> CONFIG update:
+> 1) Enable SAS/HNS config
+
+Series applied to the hisilicon soc tree.
+Thanks!
+
+Best Regards,
+Wei
+
 > 
-> Ideally, SIMPLE_DEV_PM_OPS itself should have used an IS_ENABLED()
-> check instead of the #ifdef, that would have made it possible to
-> just leave the function always defined with no __maybe_unused, but
-> still have it dropped from the object code without a warning
-> when there is no runtime reference.
-
-I'm not sure my trivial issue deserves this much discussion. I just
-want the patch to be upstream in some form.
-
-I'll submit one more patch, with SIMPLE_DEV_PM_OPS used unconditionally,
-and annotate the resume function with __maybe_unused.
-
-This will waste the space of the struct on systems where S3 is disabled,
-but it seems to be the preferred solution, IIUC.
-
-Regards.
+> Changes since v2:
+> - Update phy-count of sas2, it should be 9
+> - Update mdio node according to commit b15dc29264d0(net: hns: get reset registers from DT)
+> 
+> Changes since v1:
+> - Add dt binding document suggested by Wei xu and use better name.
+> 
+> 
+> Kefeng Wang (5):
+>   arm64: dts: hip05: kill hip05_hns.dtsi
+>   dt-bindings: hisilicon: Add Hip05 and Hip06 system controller support
+>   arm64: dts: hip06: Append hns node
+>   arm64: dts: hip06: Append sas node
+>   arm64: defconfig: Enable Hisi SAS and HNS
+> 
+>  .../bindings/arm/hisilicon/hisilicon.txt           |  39 ++-
+>  arch/arm64/boot/dts/hisilicon/hip05.dtsi           |   5 -
+>  arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi       | 180 ----------
+>  arch/arm64/boot/dts/hisilicon/hip06-d03.dts        |  28 ++
+>  arch/arm64/boot/dts/hisilicon/hip06.dtsi           | 365 +++++++++++++++++++++
+>  arch/arm64/configs/defconfig                       |   5 +-
+>  6 files changed, 425 insertions(+), 197 deletions(-)
+>  delete mode 100644 arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
+> 
