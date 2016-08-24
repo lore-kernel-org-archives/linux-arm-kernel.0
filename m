@@ -1,46 +1,29 @@
-From: radioconfusion@gmail.com (radioconfusion at gmail.com)
-Date: Wed, 24 Aug 2016 13:52:33 +0300
-Subject: [crypto] [marvell-cesa] Driver hangs on Armada 385 device
-Message-ID: <57bd7c72.94052e0a.c451a.684f@mx.google.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Wed, 24 Aug 2016 11:54:50 +0100
+Subject: [PATCH] arm64: KVM: Enable support for Cortex-A72
+In-Reply-To: <c02d842a-2576-92f5-8b25-8802cd9876d4@arm.com>
+References: <1472023297-2756-1-git-send-email-zhaoshenglong@huawei.com>
+ <ffda6889-5c31-1b56-942c-de65bbb1c16f@arm.com> <57BD679A.6060406@huawei.com>
+ <c02d842a-2576-92f5-8b25-8802cd9876d4@arm.com>
+Message-ID: <CAFEAcA_6=7ko_w=8MNC3nB2GTw2o=zZkCvZoLx5N0iO5Z65L_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 24 August 2016 at 11:19, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 24/08/16 10:23, Shannon Zhao wrote:
+>> Yes, this works for qemu with "-cpu host". But if it specifies the cpu
+>> type with "-cpu cortex-a72". It will fail without this patch.
+>
+>
+> Thats because you specify the expected target from the kernel in Qemu.
 
-On Wed, Aug 24, 2016 at 10:26:47PM +0100, Russell King - ARM Linux wrote:
-> > The problem caused by my mistake, I was using the following kernel parameter:
-> > mem=1048448k
+That's because if the user said "I really really want a cortex-A72 in
+the guest" then we need to tell the kernel "really must be an A72"
+(and the kernel can then fake it up in some hypothetical future world
+where we can simulate A72 on non-A72 h/w). If the user is happy
+with "whatever the kernel's best effort is" that's what -cpu host does.
+If there's no way to tell the kernel "must be an A72" we fail the command
+because we can't do what the user asked for.
 
-> Try mem=1046M - reducing it by 2MB.  If that works, try mem=1047M
-> instead.  Yes, that's more than you want to reserve, but please
-> check how the system behaves with these.
-
-I assume that you mean mem=1022M.
-
-Quick testing results:
-mem=256M works
-mem=384M not
-mem=524160k not (512M-128k)
-mem=524228k works (512M-60k)
-mem=512M works
-mem=524348k not (512M+60k)
-mem=524416k not (512M+128k)
-mem=768M works
-mem=896M not
-mem=960M not
-mem=1022M not
-mem=1023M not
-mem=1048000k not
-mem=1048448k not (1024M-128k)
-mem=1048514k not
-mem=1048516k works (1024M-60k)
-mem=1048518k works
-mem=1048520k works
-mem=1024M works
-
-So I can reserve 0-60 kiB or 256 MiB but nothing between.
-The device boots up with all listed values but cesa works with few
-values only.
-
-Best Regards
-Jussi
+thanks
+-- PMM
