@@ -1,10 +1,10 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 25 Aug 2016 02:43:07 +0900
-Subject: [PATCH 02/10] reset: berlin: add driver Kconfig option
-In-Reply-To: <1472045342-7434-2-git-send-email-p.zabel@pengutronix.de>
+Date: Thu, 25 Aug 2016 02:43:27 +0900
+Subject: [PATCH 03/10] reset: lpc18xx: add driver Kconfig option
+In-Reply-To: <1472045342-7434-3-git-send-email-p.zabel@pengutronix.de>
 References: <1472045342-7434-1-git-send-email-p.zabel@pengutronix.de>
- <1472045342-7434-2-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <CAK7LNAR9V-f=CnD_TATyPOQBD43QVQyD_oStAw-qkjxC+-9TZw@mail.gmail.com>
+ <1472045342-7434-3-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <CAK7LNAS6zSYXOOL88objmxAPDksn4Xj7A_i5A9GB05H0qTU=8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,8 +12,7 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > Visible only if COMPILE_TEST is enabled, this allows to include the
 > driver in build tests.
 >
-> Cc: Antoine Tenart <antoine.tenart@free-electrons.com>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Cc: Joachim Eastwood <manabian@gmail.com>
 > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 
 Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
