@@ -1,69 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 24 Aug 2016 22:06:04 +0200
-Subject: [PATCH 01/10] reset: ath79: add driver Kconfig option
-In-Reply-To: <CAK7LNAT4rZoQJaPLiA_Hg=PJ9AD4Z-oLVadq5WDgQ2etCYUFFA@mail.gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Wed, 24 Aug 2016 22:32:00 +0200
+Subject: [PATCH 03/10] reset: lpc18xx: add driver Kconfig option
+In-Reply-To: <1472045342-7434-3-git-send-email-p.zabel@pengutronix.de>
 References: <1472045342-7434-1-git-send-email-p.zabel@pengutronix.de>
- <20643424.8eBLZWavEG@wuerfel>
- <CAK7LNAT4rZoQJaPLiA_Hg=PJ9AD4Z-oLVadq5WDgQ2etCYUFFA@mail.gmail.com>
-Message-ID: <1779401.H3WQxbgf2J@wuerfel>
+ <1472045342-7434-3-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <CAGhQ9VzvU+1qzmmy9NeZmJxX7AS1ez6b4qJuq99J_drSpjJOUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, August 25, 2016 3:18:55 AM CEST Masahiro Yamada wrote:
-> Hi Arnd,
-> 
-> 
-> 2016-08-25 0:51 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-> > On Wednesday, August 24, 2016 3:28:53 PM CEST Philipp Zabel wrote:
-> >>  if RESET_CONTROLLER
-> >>
-> >> +config RESET_ATH79
-> >> +       bool "AR71xx Reset Driver" if COMPILE_TEST
-> >> +       default ATH79
-> >> +       help
-> >> +         This enables the ATH79 reset controller driver that supports the
-> >> +         AR71xx SoC reset controller.
-> >> +
-> >>
-> >
-> > Nice series!
-> >
-> > Just note that there is one possible problem with COMPILE_TEST
-> > when the platforms are enabled, as you can then disable a driver
-> > that is normally there, and that can in turn cause problems in
-> > rare cases, e.g. when the driver has a global function that is
-> > called from platform code. I don't know if any of the drivers
-> > do that, but if they do, you'd have to use
-> >
-> > config RESET_ATH79
-> >        bool "AR71xx Reset Driver" if COMPILE_TEST && !ATH79
-> >        default ATH79
-> >
-> > to ensure that it's impossible to disable the driver on platforms
-> > that require it.
-> 
-> Hmm,
-> Can we do this only when we really have to do so?
-> I think we should not care about such a rare case that may not happen.
-> 
-> Let's start with only "if COMPILE_TEST",
-> and take a look at it if a build error is detected.
-> 
-> Anyway, depending on platform code is a sign of weird implementation.
-> 
-> It might be better to find a potential issue rather than hide it.
-> 
-> 
-> 
+Hi Philipp,
 
-I just checked the object files in an allyesconfig build and found
-one instance:
+On 24 August 2016 at 15:28, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> Visible only if COMPILE_TEST is enabled, this allows to include the
+> driver in build tests.
+>
+> Cc: Joachim Eastwood <manabian@gmail.com>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+>  drivers/reset/Kconfig  | 7 +++++++
+>  drivers/reset/Makefile | 2 +-
+>  2 files changed, 8 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+> index 1194cbe..8e33de2 100644
+> --- a/drivers/reset/Kconfig
+> +++ b/drivers/reset/Kconfig
+> @@ -27,6 +27,13 @@ config RESET_BERLIN
+>         help
+>           This enables the reset controller driver for Marvell Berlin SoCs.
+>
+> +config RESET_LPC18XX
+> +       bool "LPC18xx/43xx Reset Driver" if COMPILE_TEST
+> +       default ARCH_LPC18XX
+> +       help
+> +         This enables the LPC18xx/43 reset driver that supports the reset
+> +         controllers on AR71xx SoCs.
 
-arch/arm/mach-sunxi/sunxi.c:extern void __init sun6i_reset_init(void);
-arch/arm/mach-sunxi/sunxi.c:            sun6i_reset_init();
-drivers/reset/reset-sunxi.c:void __init sun6i_reset_init(void)
+Don't know where you got the "AR71xx SoCs" from. This reset controller
+is found on NXP LPC18xx/43xx SoCs.
 
-We should definitely make sure this one is handled right, and maybe
-check the source code for other instances.
+Other than that it looks fine to me.
 
-	Arnd
+Acked-by: Joachim Eastwood <manabian@gmail.com>
+
+
+> +
+>  config RESET_OXNAS
+>         bool
+>
+> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+> index 34c0b23..25aa05a 100644
+> --- a/drivers/reset/Makefile
+> +++ b/drivers/reset/Makefile
+> @@ -1,5 +1,4 @@
+>  obj-y += core.o
+> -obj-$(CONFIG_ARCH_LPC18XX) += reset-lpc18xx.o
+>  obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
+>  obj-$(CONFIG_MACH_PISTACHIO) += reset-pistachio.o
+>  obj-$(CONFIG_ARCH_MESON) += reset-meson.o
+> @@ -10,6 +9,7 @@ obj-$(CONFIG_ARCH_HISI) += hisilicon/
+>  obj-$(CONFIG_ARCH_ZYNQ) += reset-zynq.o
+>  obj-$(CONFIG_RESET_ATH79) += reset-ath79.o
+>  obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
+> +obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
+>  obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
+>  obj-$(CONFIG_TI_SYSCON_RESET) += reset-ti-syscon.o
+>  obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
+> --
+> 2.8.1
+
+
+regards,
+Joachim Eastwood
