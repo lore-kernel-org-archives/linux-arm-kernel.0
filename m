@@ -1,33 +1,32 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 24 Aug 2016 17:23:38 +0800
-Subject: [PATCH] arm64: KVM: Enable support for Cortex-A72
-In-Reply-To: <ffda6889-5c31-1b56-942c-de65bbb1c16f@arm.com>
-References: <1472023297-2756-1-git-send-email-zhaoshenglong@huawei.com>
- <ffda6889-5c31-1b56-942c-de65bbb1c16f@arm.com>
-Message-ID: <57BD679A.6060406@huawei.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 24 Aug 2016 10:26:47 +0100
+Subject: [crypto] [marvell-cesa] Driver hangs on Armada 385 device
+In-Reply-To: <57bd659d.0f4d190a.e025.5da4@mx.google.com>
+References: <57bd659d.0f4d190a.e025.5da4@mx.google.com>
+Message-ID: <20160824092647.GH1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Aug 24, 2016 at 12:15:07PM +0300, radioconfusion at gmail.com wrote:
+> The problem caused by my mistake, I was using the following kernel parameter:
+> mem=1048448k
 
+Try mem=1046M - reducing it by 2MB.  If that works, try mem=1047M
+instead.  Yes, that's more than you want to reserve, but please
+check how the system behaves with these.
 
-On 2016/8/24 16:57, Suzuki K Poulose wrote:
-> On 24/08/16 08:21, Shannon Zhao wrote:
->> In order to allow KVM to run on Cortex-A72 physical cpus, enable KVM
->> support for Cortex-A72.
-> 
-> Do we really need this change ? Given that A72 is using the generic_v8
-> table,
-> it will automatically be supported via the GENERIC_V8 target. That was
-> added
-> just for this purpose. The pre-existing targets were preserved so that
-> we don't break the ABI for older user space.
-> 
-Yes, this works for qemu with "-cpu host". But if it specifies the cpu
-type with "-cpu cortex-a72". It will fail without this patch.
+> My device has 1 GiB of RAM and I tried to reserve 128 kiB of memory for ram
+> oops. I guess this parameter caused overlapping or inaccessible area with cesa's
+> addresses. Am I right?
+> I tried to add memmap=0x20000$0x3ffe0000 without success.
 
-The corresponding qemu patches could be found at [1].
-[1] https://lists.gnu.org/archive/html/qemu-devel/2016-08/msg03653.html
+memmap= has no meaning on ARM.  It's an x86 thing, the ARM arch has
+never implemented it.  I've seen this come up a few times, and I don't
+know why people keep trying to use it (always with an "it doesn't seem
+to work" result.)  It's even documented as being an ACPI / x86 thing
+in Documentation/kernel-parameters.txt...
 
-Thanks,
 -- 
-Shannon
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
