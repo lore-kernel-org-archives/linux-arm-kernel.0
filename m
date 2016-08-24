@@ -1,32 +1,44 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 24 Aug 2016 13:28:57 +0530
-Subject: [PATCH v3 0/2] AM335x-ICE: Add support for rotary switch
-Message-ID: <20160824075859.30979-1-vigneshr@ti.com>
+Date: Wed, 24 Aug 2016 13:28:59 +0530
+Subject: [PATCH v3 2/2] ARM: dts: am335x-icev2: Add nodes for gpio-decoder
+In-Reply-To: <20160824075859.30979-1-vigneshr@ti.com>
+References: <20160824075859.30979-1-vigneshr@ti.com>
+Message-ID: <20160824075859.30979-3-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for rotary-switch on AM335x-ICE that is
-connected to TI PCA9536 I2C GPIO expander.
-First patch adds new generic driver to read status of group of GPIO
-lines and report the value as an input event. The second patch adds DT
-entries for the same.
+AM335x ICE board has a rotary-switch connected to PCA9536 I2C GPIO
+expander. The position of the rotary-switch is reflected by status of
+GPIO lines. Add gpio-decoder node to read these GPIO line status via
+gpio-decoder driver and report it as an input event to the system.
 
-v2: https://lkml.org/lkml/2016/8/23/111
-v1: https://lkml.org/lkml/2016/8/12/7
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+---
 
+v3: s/decoder,max-value/decoder-max-value
 
-Vignesh R (2):
-  input: misc: Add generic input driver to read encoded GPIO lines
-  ARM: dts: am335x-icev2: Add nodes for gpio-decoder
+ arch/arm/boot/dts/am335x-icev2.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
- .../devicetree/bindings/input/gpio-decoder.txt     |  23 ++++
- arch/arm/boot/dts/am335x-icev2.dts                 |   9 ++
- drivers/input/misc/Kconfig                         |  12 ++
- drivers/input/misc/Makefile                        |   1 +
- drivers/input/misc/gpio_decoder.c                  | 134 +++++++++++++++++++++
- 5 files changed, 179 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/input/gpio-decoder.txt
- create mode 100644 drivers/input/misc/gpio_decoder.c
-
+diff --git a/arch/arm/boot/dts/am335x-icev2.dts b/arch/arm/boot/dts/am335x-icev2.dts
+index bc0190e4f10f..426022ee85c7 100644
+--- a/arch/arm/boot/dts/am335x-icev2.dts
++++ b/arch/arm/boot/dts/am335x-icev2.dts
+@@ -139,6 +139,15 @@
+ 			default-state = "off";
+ 		};
+ 	};
++	gpio-decoder {
++		compatible = "gpio-decoder";
++		gpios = <&pca9536 3 GPIO_ACTIVE_HIGH>,
++			<&pca9536 2 GPIO_ACTIVE_HIGH>,
++			<&pca9536 1 GPIO_ACTIVE_HIGH>,
++			<&pca9536 0 GPIO_ACTIVE_HIGH>;
++		linux,axis = <0>; /* ABS_X */
++		decoder-max-value = <9>;
++	};
+ };
+ 
+ &am33xx_pinmux {
 -- 
 2.9.2
