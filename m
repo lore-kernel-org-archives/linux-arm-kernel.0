@@ -1,34 +1,76 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Wed, 24 Aug 2016 15:44:42 +0800
-Subject: [PATCH v7 03/14] arm64/numa: add nid check for memory block
+Date: Wed, 24 Aug 2016 15:44:41 +0800
+Subject: [PATCH v7 02/14] of/numa: fix a memory@ node can only contains one
+ memory block
 In-Reply-To: <1472024693-12912-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1472024693-12912-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1472024693-12912-4-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1472024693-12912-3-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the same tactic to cpu and numa-distance nodes.
+For a normal memory@ devicetree node, its reg property can contains more
+memory blocks.
+
+Because we don't known how many memory blocks maybe contained, so we try
+from index=0, increase 1 until error returned(the end).
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/of/of_numa.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/of/of_numa.c | 29 ++++++++++-------------------
+ 1 file changed, 10 insertions(+), 19 deletions(-)
 
 diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
-index 7b3fbdc..afaeb9c 100644
+index fb71b4e..7b3fbdc 100644
 --- a/drivers/of/of_numa.c
 +++ b/drivers/of/of_numa.c
-@@ -75,6 +75,11 @@ static int __init of_numa_parse_memory_nodes(void)
+@@ -63,13 +63,9 @@ static int __init of_numa_parse_memory_nodes(void)
+ 	struct device_node *np = NULL;
+ 	struct resource rsrc;
+ 	u32 nid;
+-	int r = 0;
+-
+-	for (;;) {
+-		np = of_find_node_by_type(np, "memory");
+-		if (!np)
+-			break;
++	int i, r;
+
++	for_each_node_by_type(np, "memory") {
+ 		r = of_property_read_u32(np, "numa-node-id", &nid);
+ 		if (r == -EINVAL)
+ 			/*
+@@ -78,23 +74,18 @@ static int __init of_numa_parse_memory_nodes(void)
+ 			 * "numa-node-id" property
  			 */
  			continue;
+-		else if (r)
+-			/* some other error */
+-			break;
 
-+		if (nid >= MAX_NUMNODES) {
-+			pr_warn("NUMA: Node id %u exceeds maximum value\n", nid);
-+			return -EINVAL;
+-		r = of_address_to_resource(np, 0, &rsrc);
+-		if (r) {
+-			pr_err("NUMA: bad reg property in memory node\n");
+-			break;
+-		}
++		for (i = 0; !r && !of_address_to_resource(np, i, &rsrc); i++)
++			r = numa_add_memblk(nid, rsrc.start, rsrc.end + 1);
+
+-		r = numa_add_memblk(nid, rsrc.start, rsrc.end + 1);
+-		if (r)
+-			break;
++		if (!i || r) {
++			of_node_put(np);
++			pr_err("NUMA: bad property in memory node\n");
++			return r ? : -EINVAL;
 +		}
-+
- 		for (i = 0; !r && !of_address_to_resource(np, i, &rsrc); i++)
- 			r = numa_add_memblk(nid, rsrc.start, rsrc.end + 1);
+ 	}
+-	of_node_put(np);
 
+-	return r;
++	return 0;
+ }
+
+ static int __init of_numa_parse_distance_map_v1(struct device_node *map)
 --
 2.5.0
