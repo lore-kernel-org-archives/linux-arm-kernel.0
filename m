@@ -1,44 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 24 Aug 2016 09:21:26 +0200
-Subject: [PATCH v2] serial: vt8500_serial: Fix a parameter of
- find_first_zero_bit.
-In-Reply-To: <1472015218-31826-1-git-send-email-christophe.jaillet@wanadoo.fr>
-References: <1472015218-31826-1-git-send-email-christophe.jaillet@wanadoo.fr>
-Message-ID: <10942927.gm6yg0F9Sl@wuerfel>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Wed, 24 Aug 2016 15:21:37 +0800
+Subject: [PATCH] arm64: KVM: Enable support for Cortex-A72
+Message-ID: <1472023297-2756-1-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 24, 2016 7:06:58 AM CEST Christophe JAILLET wrote:
-> The 2nd parameter of 'find_first_zero_bit' is the number of bits to search.
-> In this case, we are passing 'sizeof(vt8500_ports_in_use)'.
-> 'vt8500_ports_in_use' is an 'unsigned long'. So the sizeof is likely to
-> return 4 on a 32 bits kernel.
-> 
-> A few lines below, we check if it is below VT8500_MAX_PORTS, which is 6.
-> 
-> It is likely that the number of bits in a long was expected here.
-> 
-> In order to fix it:
->    - use DECLARE_BITMAP when declaring the vt8500_ports_in_use
->    - use VT8500_MAX_PORTS as a maximum value when checking/setting bits in
->      this bitmap
->    - modify code now that 'vt8500_ports_in_use' has become a pointer
->      because of the use of DECLARE_BITMAP
-> 
-> 
-> It has been spotted by the following coccinelle script:
-> @@
-> expression ret, x;
-> 
-> @@
-> *  ret = \(find_first_bit \| find_first_zero_bit\) (x, sizeof(...));
-> 
-> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-> ---
-> v2: - use of VT8500_MAX_PORTS instead of BITS_PER_LONG to better self
->       document the code
->     - declare vt8500_ports_in_use with DECLARE_BITMAP in order to self
->       document even better and to be foolproof should VT8500_MAX_PORTS
->       be changed one day
+In order to allow KVM to run on Cortex-A72 physical cpus, enable KVM
+support for Cortex-A72.
 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+---
+ arch/arm64/include/asm/cputype.h     | 1 +
+ arch/arm64/include/uapi/asm/kvm.h    | 3 ++-
+ arch/arm64/kvm/guest.c               | 2 ++
+ arch/arm64/kvm/sys_regs_generic_v8.c | 2 ++
+ 4 files changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 9d9fd4b..cf1f638 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -76,6 +76,7 @@
+ #define ARM_CPU_PART_FOUNDATION		0xD00
+ #define ARM_CPU_PART_CORTEX_A57		0xD07
+ #define ARM_CPU_PART_CORTEX_A53		0xD03
++#define ARM_CPU_PART_CORTEX_A72		0xD08
+ 
+ #define APM_CPU_PART_POTENZA		0x000
+ 
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index f209ea1..af8fbeb 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -65,8 +65,9 @@ struct kvm_regs {
+ #define KVM_ARM_TARGET_CORTEX_A53	4
+ /* Generic ARM v8 target */
+ #define KVM_ARM_TARGET_GENERIC_V8	5
++#define KVM_ARM_TARGET_CORTEX_A72	6
+ 
+-#define KVM_ARM_NUM_TARGETS		6
++#define KVM_ARM_NUM_TARGETS		7
+ 
+ /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
+ #define KVM_ARM_DEVICE_TYPE_SHIFT	0
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 32fad75..7eed92e 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -293,6 +293,8 @@ int __attribute_const__ kvm_target_cpu(void)
+ 			return KVM_ARM_TARGET_CORTEX_A53;
+ 		case ARM_CPU_PART_CORTEX_A57:
+ 			return KVM_ARM_TARGET_CORTEX_A57;
++		case ARM_CPU_PART_CORTEX_A72:
++			return KVM_ARM_TARGET_CORTEX_A72;
+ 		};
+ 		break;
+ 	case ARM_CPU_IMP_APM:
+diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
+index ed90578..cf823e1 100644
+--- a/arch/arm64/kvm/sys_regs_generic_v8.c
++++ b/arch/arm64/kvm/sys_regs_generic_v8.c
+@@ -92,6 +92,8 @@ static int __init sys_reg_genericv8_init(void)
+ 					  &genericv8_target_table);
+ 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A57,
+ 					  &genericv8_target_table);
++	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A72,
++					  &genericv8_target_table);
+ 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_XGENE_POTENZA,
+ 					  &genericv8_target_table);
+ 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_GENERIC_V8,
+-- 
+2.0.4
