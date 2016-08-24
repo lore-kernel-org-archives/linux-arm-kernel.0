@@ -1,272 +1,154 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Thu, 25 Aug 2016 00:54:14 +0100
-Subject: [PATCH 00/13] arm64: Allwinner A64 support based on sunxi-ng
-In-Reply-To: <20160823193129.GO2598@lukather>
-References: <20160726203041.29366-1-maxime.ripard@free-electrons.com>
- <fb559224-561c-3476-1146-96f7aea427f0@arm.com>
- <20160823193129.GO2598@lukather>
-Message-ID: <822ff63c-117d-2250-c1ac-27cd1f787095@arm.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Thu, 25 Aug 2016 07:57:33 +0800
+Subject: [PATCH 1/2] ARM: dts: sun8i: Add dts file for inet-d978_rev2
+ tablets
+In-Reply-To: <20160824193235.GR8103@lukather>
+References: <20160823064451.25997-1-icenowy@aosc.xyz>
+ <20160823064451.25997-2-icenowy@aosc.xyz> <20160824193235.GR8103@lukather>
+Message-ID: <43601472083053@web23m.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
 
-thanks for your answer, much appreciated!
 
-On 23/08/16 20:31, Maxime Ripard wrote:
-> Hi Andre,
-> 
-> On Mon, Aug 01, 2016 at 02:43:06AM +0100, Andr? Przywara wrote:
->> Hi Maxime,
+25.08.2016, 03:32, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> Hi,
+>
+> On Tue, Aug 23, 2016 at 02:44:50PM +0800, Icenowy Zheng wrote:
+>> ?The inet-d978_rev2 is a pcb used in generic A33 based tablets. It features
+>> ?volume buttons, micro-usb otg, headphone connector and a power button.
 >>
->> On 26/07/16 21:30, Maxime Ripard wrote:
->>> Hi,
->>>
->>> Here is the previous A64 patches made by Andre [1], reworked to use
->>> the new sunxi-ng clock framework.
->>>
->>> This uses the current H3 clock code, as both are really similar. The
->>> first patches are just meant to rework slightly the H3 code, before
->>> introducing the A64-related patches.
->>>
->>> Some WiP stuff have been removed, such as the MMC part, but this serie
->>> already has a decent amount of devices supported: uart, i2c, rsb, etc.
+>> ?On the board a Realtek RTL8723BS SDIO Wi-Fi module are soldered, and there
+>> ?is also a accompanied board which has a Goodix GT9271 soldered.
 >>
->> Thanks very much for looking into this and compiling this series!
+>> ?As this board is desired to create tablets with a Home key dealed by
+>> ?GT9271, a LED is present at the front panel at the position of the
+>> ?Home key.
 >>
->> In general this looks good to me - apart from the sunxi-ng clock usage.
->> I think I have some small fixes to the DT (have to compare against my
->> latest local branch), I will comment on this later.
+>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> ?---
+>> ??arch/arm/boot/dts/Makefile | 1 +
+>> ??arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts | 87 ++++++++++++++++++++++++++
+>> ??2 files changed, 88 insertions(+)
+>> ??create mode 100644 arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
 >>
->> As I think I never officially expressed my concerns about the new sunxi
->> clock system, so I use that opportunity here ;-)
->>
->> As this became quite a long read, here a TL;DR:
->> - We consider using an SCPI based clock system for the A64, alongside
->> allwinner,simple-gates and fixed clocks. We try to avoid any Allwinner
->> specific clocks (apart from the simple-gates).
->> - ARM Trusted Firmware provides the SCPI implementation - for now, later
->> we may move this into a possible arisc firmware.
->> - We upstream some basic DT first, possibly omitting any controversial
->> clock parts at all.
->>
->> Let me know what you think!
->>
->>
->> Now the long part ....
->>
->> Basically I see those issues with the new clocks:
->> - sunxi-ng requires a complicated SoC specific source file in the
->> kernel. Although that makes the DT pretty easy (and avoids breaking it
->> the future), it ultimately requires an explicit code drop for every new
->> SoC, even if they share 95% of the clocks (as H3 and A64 do, for instance).
->> - This code file does not actually contain any code, instead it's just
->> data and looks like it should really be presented in DT - which brings
->> us back to something like the old sunxi clock scheme, which is
->> apparently not considered good enough. I still wonder if we could create
->> a generic sunxi-ng user, which explains the needed clocks in the DT
->> instead of in code. I admit that looks like quite some work.
->> - It makes it quite hard for any other DT user (*BSD, U-Boot) to use the
->> clocks, since they would have to copy quite verbatim the Linux
->> implementation choice. This is admittedly also true for the old clock
->> framework, but still unfortunate.
-> 
-> 3 - You never get a complete clock support for any SoC, requirining
->     for pretty much every driver to create from scratch a new clock
->     driver.
+>> ?diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> ?index faacd52..d1812a0 100644
+>> ?--- a/arch/arm/boot/dts/Makefile
+>> ?+++ b/arch/arm/boot/dts/Makefile
+>> ?@@ -782,6 +782,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+>> ??????????sun8i-a23-q8-tablet.dtb \
+>> ??????????sun8i-a33-et-q8-v1.6.dtb \
+>> ??????????sun8i-a33-ga10h-v1.1.dtb \
+>> ?+ sun8i-a33-inet-d978-rev2.dtb \
+>> ??????????sun8i-a33-ippo-q8h-v1.2.dtb \
+>> ??????????sun8i-a33-q8-tablet.dtb \
+>> ??????????sun8i-a33-sinlinx-sina33.dtb \
+>> ?diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+>> ?new file mode 100644
+>> ?index 0000000..78823d8
+>> ?--- /dev/null
+>> ?+++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+>> ?@@ -0,0 +1,87 @@
+>> ?+/*
+>> ?+ * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
+>
+> I guess you are the author too :)
+>
+>> ?+ *
+>> ?+ * This file is dual-licensed: you can use it either under the terms
+>> ?+ * of the GPL or the X11 license, at your option. Note that this dual
+>> ?+ * licensing only applies to this file, and not this project as a
+>> ?+ * whole.
+>> ?+ *
+>> ?+ * a) This file is free software; you can redistribute it and/or
+>> ?+ * modify it under the terms of the GNU General Public License as
+>> ?+ * published by the Free Software Foundation; either version 2 of the
+>> ?+ * License, or (at your option) any later version.
+>> ?+ *
+>> ?+ * This file is distributed in the hope that it will be useful,
+>> ?+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> ?+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+>> ?+ * GNU General Public License for more details.
+>> ?+ *
+>> ?+ * Or, alternatively,
+>> ?+ *
+>> ?+ * b) Permission is hereby granted, free of charge, to any person
+>> ?+ * obtaining a copy of this software and associated documentation
+>> ?+ * files (the "Software"), to deal in the Software without
+>> ?+ * restriction, including without limitation the rights to use,
+>> ?+ * copy, modify, merge, publish, distribute, sublicense, and/or
+>> ?+ * sell copies of the Software, and to permit persons to whom the
+>> ?+ * Software is furnished to do so, subject to the following
+>> ?+ * conditions:
+>> ?+ *
+>> ?+ * The above copyright notice and this permission notice shall be
+>> ?+ * included in all copies or substantial portions of the Software.
+>> ?+ *
+>> ?+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>> ?+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>> ?+ * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>> ?+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>> ?+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>> ?+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>> ?+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>> ?+ * OTHER DEALINGS IN THE SOFTWARE.
+>> ?+ */
+>> ?+
+>> ?+/dts-v1/;
+>> ?+#include "sun8i-a33.dtsi"
+>> ?+#include "sun8i-reference-design-tablet.dtsi"
+>> ?+
+>> ?+/ {
+>> ?+ model = "INet-D978 Rev 02";
+>> ?+ compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
+>> ?+
+>> ?+ leds {
+>> ?+ compatible = "gpio-leds";
+>> ?+ pinctrl-names = "default";
+>> ?+ pinctrl-0 = <&led_pin_d978>;
+>> ?+
+>> ?+ home {
+>> ?+ label = "d978:home";
+>
+> This is not the proper format for the led labels.
+>
+> It's supposed to be <board>:<color>:<function>
 
-I don't understand this. Are you referring to the old clock system? Or
-to the proposed SCPI approach? Or to sunxi-ng with DT descriptions?
+Thanks.
+So I'd use "d978:blue:home".
 
-And why would a *driver* care about a specific clock if it's using the
-common clock framework?
-Confused ...
+>
+>> ?+ gpios = <&r_pio 0 5 GPIO_ACTIVE_HIGH>; /* PL5 */
+>> ?+ };
+>> ?+ };
+>> ?+};
+>> ?+
+>> ?+&mmc1_pins_a {
+>> ?+ allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+>> ?+};
+>> ?+
+>> ?+&mmc1 {
+>> ?+ pinctrl-names = "default";
+>> ?+ pinctrl-0 = <&mmc1_pins_a>;
+>> ?+ vmmc-supply = <&reg_dldo1>;
+>> ?+ bus-width = <4>;
+>> ?+ non-removable;
+>> ?+ status = "okay";
+>> ?+
+>> ?+ rtl8723bs: sdio_wifi at 1 {
+>> ?+ reg = <1>;
+>> ?+ };
+>
+> Don't you need an alias to this node to have the MAC address set?
 
-> 4 - You require for all these clocks drivers some Ack from both the DT
->     and clocks maintainers, who both said they were fed up with this.
+It seems that rtl8723bs come with an eFUSE.
 
-Again which new clock drivers? The old sunxi-clks?
-For the SCPI version I propose we don't need any ACKs (apart from the
-new .dtsi, maybe), because the clocks are already there.
-
-> 5 - If you realise some day down the road that the parenting
->     relationship is not right, or that some clock is not doing what
->     you thought it was, you can't really fix it properly because of
->     the DT stability you wanted us to enforce.
-> 
->> So as mentioned several times before, I am looking into a more firmware
->> driven clock system using the SCPI[1] framework.
->> The idea is:
->> - The basic clocks (OSC24M, OSC32K, AHB1, APB1, APB2, PERIPH0) are
->> expressed as fixed clocks. If I am not mistaken, Allwinner recommends
->> certain frequencies for them anyway, so we just use that and set them up
->> before booting Linux, for instance in ATF.
->> - The gates clocks are expressed as before, but by defining a generic DT
->> compatible fallback name. I have no idea why every SoC enters its name
->> into the simple_gates.c source file, while just mentioning the
->> compatible string in the DT bindings and using the SoC specific name
->> together with a generic fallback like "allwinner,sunxi-simple-gates"
->> would suffice. This means that we don't need to touch simple-gates.c
->> anymore most of the time.
->> - Any clock that can (and has to) be programmed with a variable
->> frequency is expressed as an SCPI clock. This interface allows basically
->> querying and setting a frequency - not very powerful, but sufficient for
->> the clocks I checked. Firmware then takes the burden of programming the
->> respective clock register - which is not rocket science if we lock the
->> base clocks to a certain frequency.
->>
->> The advantage of this approach would be:
->> - The impact to Linux code is minimized. Normally there would be no need
->> to touch the kernel at all when we introduce a new SoC.
-> 
-> But you duplicate the clock framework entirely, both the core code and
-> the data you were complaining about, with all the issues that arise
-> from code duplication. You still have to create that big file you were
-> complaining about, with exactly the same constraints.
-
-We don't need to comply with some common clock framework in firmware, we
-just need to provide implementations for specific clocks. From a
-maintainer's point of view the CCF is nice, but its implementation is
-quite complicated and hard to understand for mere mortals. Also tweaking
-a particular clock is not easy, as it has to fit into the framework and
-we may miss the interfaces.
-
-See the MMC clock implementation for instance: it's just a simple
-divider clock. My implementation in ATF is probably bad and stupid, but
-at the end of the day I just have to provide a way to set a frequency of
-one single clock.
-I think we win a lot if we go away from possibly tuning the parent's
-clocks (AHB, PLL6 & friends), instead leaving them as fixed clocks - my
-understanding is that Allwinner recommends this anyway. Then the whole
-complex clock tree degrades into just a bunch of more or less
-independent clock registers.
-Also we can go with a much easier implementation, since we don't need to
-support all clocks in one image, but just the clocks for one particular
-SoC. This brings the complexity down, so we can get away with a much
-simpler implementation (compare U-Boot, though this isn't the best
-example, admittedly).
-
->> - Any other DT user can quite easily make use of the clock system
->> without adding tons of complicated Allwinner specific clock code. The
->> simple-gates driver is almost trivial to implement, and chances are SCPI
->> is already around anyway.
->> - If there are any peculiarities with a certain clock (implementation),
->> we can solve this in firmware. Fixes to code would immediately benefit
->> all users - existing kernels (from distributions), newer kernels and
->> other OSes.
-> 
-> But no-one would actually be able to use it, because no one upgrades
-> its firmware, including all the major distributions (Debian, Ubuntu,
-> Fedora, OpenWRT, Arch, Gento, you name it). So there's effectively no
-> way to fix a bug that was there.
-
-But currently distributions do upgrade U-Boot, don't they? ATF would be
-part of a FIT image, compiled alongside U-Boot and included in one image
-with the SPL and the U-Boot proper. In the Allwinner world with firmware
-on SD cards or in eMMC I don't see big issues.
-Also honestly I don't expect frequent updates. Yes: in the beginning we
-may have changes, but at some point we make a (tested) release and maybe
-publish updates every now and then. Either these updates fix bugs or
-provide new features, so there is some incentive for users to update. Or
-they don't care, in which case it may just work for them and they keep
-using the old version.
-
->> - Having SCPI gives us simple regulators and sensors (temperature,
->> power) for free (in terms of no Linux code required). It also allows for
->> DVFS support, though this may require more work on the firmware side.
-> 
-> And ignoring all the other features that the PMIC support, and the
-> board uses out there (GPIO, ADCs, Power supplies, battery charger, USB
-> VBUS monitoring)
-
-Replying to that in that other email ...
-
->> - This approach matches many of the more serious ARM64 machines out
->> there, which refrain from exposing all of their clock framework to Linux.
-> 
-> $ git grep -l scpi arch/arm64/boot/dts/**.dtsi
-> arch/arm64/boot/dts/arm/juno-base.dtsi
-> 
-> Are you saying that only Juno is a serious ARM64 machine?
-
-I wasn't referring to SCPI in particular (which is indeed used only by
-Juno at the moment), but about not exposing the actual internal clock
-layout to Linux. PCs certainly don't, but also AMD Seattle and ThunderX
-avoid this.
-
->> Also this opens the door to much easier support for new SoCs - up to a
->> point where any new chip would actually run out of the box on existing
->> distributions (thinking of LTS releases here). The pinctrl driver is a
->> nasty guy around here - but let's not make it worse and try to fix that
->> guy later ;-)
-> 
-> That's not true and you know it.
-> 
-> What you actually suggest is to implement a minimal set of clocks in
-> ATF (the opposite being, the entire set of clocks, which would of
-> course be untested, so it basically falls down in the exact same
-> category).
-> 
-> What this means is that, since we will obviously not support all the
-> clocks client from day one, any user will be *required* for a new
-> kernel release to operate as it's expected to upgrade the ATF.
-
-I don't see that these are related - unless you consider the DT part of
-the kernel - which it clearly isn't (although the current scheme of DT
-updates suggests this). Actually the firmware should provide the DT,
-just advertising all the clocks it implements.
-And as I don't expect implementing an isolated clock as an SCPI clock to
-be rocket science, I'd hope for the error rate to be minimal.
-So we may publish an early firmware version with support for certain
-devices only and later upgrade this. U-Boot gets also upgraded via the
-distributions at the moment. We could even introduce some firmware
-upgrade infrastructure (or use the Linux one) if we find us in dire need
-for.
-
-> Without any help from the distribution (s)he's running, because no one
-> has that kind of scenario in mind. And let's be honest, I don't see
-> Ubuntu changing the dependencies for the kernel for the Allwinner SoCs
-> alone (let alone the fact that it's pretty much impossible in a
-> generic way to know where and how the ATF is installed).
-
-Again how does this differ from U-Boot, which I consider firmware as
-well and which is handled by the distributions (although I don't like
-this approach very much, because it pushes hardware support to Linux
-vendors).
-
-> Apart from being a major pain for any user, upgrading the bootloader
-> is also a showstopper for most industries.
-> 
-> So, no, we won't do that. The A64 support is something we actually
-> want to use in real-life products, and our users to be happy with the
-> support they have.
-
-I can understand that we can just do what we did in the past: Spoon feed
-every new SoC as soon as we get our hands on some boards and explicitly
-add support for it in the Linux kernel.
-But I'd like to revisit this approach, as it actually takes quite some
-time for support to trickle in down the kernel road - especially if we
-look at major distributions (think LTS).
-If we can get closer to a state were new SoCs just require appropriate
-firmware and a DT - without any new kernel code - I see a big
-opportunity to get much quicker support for new SoCs - up to a point
-where the firmware is the only thing that's needed. Maybe some day the
-board vendors provide these firmware bits even, who knows?
-
-Another thing that strikes me: Currently we have strict per-SoC pinctrl
-drivers, which is unfortunate. But now we are adding new clock
-_descriptions_ for new SoCs as well, partly degrading the DT to a mere
-"board file selector". IIRC Linus complained about those numerous clock
-updates for ARM boards back then in his big ARM rant, I am just afraid
-that we go back to this state, bloating the kernel with SoC specific
-clock details - that it not necessarily needs to know about. In the end
-the kernel just wants to program this MMC clock to 52 MHz.
-
-> 
-> NAK.
-
-Cheers,
-Andre.
-
-P.S. I am cowardly leaving for a few days off after hitting the Send
-button, so don't expect immediate replies.
+>
+> Thanks,
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
