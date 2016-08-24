@@ -1,427 +1,102 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 24 Aug 2016 15:07:38 +0100
-Subject: [PATCH v3 02/15] dt/bindings: Update binding for PM domain idle
- states
-In-Reply-To: <m2fuq0k4tj.fsf@baylibre.com>
-References: <1470351902-43103-1-git-send-email-lina.iyer@linaro.org>
- <1470351902-43103-3-git-send-email-lina.iyer@linaro.org>
- <99e35b6c-6698-6d27-f4d7-fa032796869e@arm.com>
- <20160810164034.GA1401@linaro.org>
- <5e59874c-bbb7-270a-199c-da1ff5932554@arm.com> <m2fuq0k4tj.fsf@baylibre.com>
-Message-ID: <9b2ed5d3-c071-8828-5a22-1ab6f3753d74@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 24 Aug 2016 16:21:01 +0200
+Subject: [v.3] clocksource:clps711x-timer:- Unmap a region obtained by
+ remap.
+In-Reply-To: <1472047821-5539-1-git-send-email-arvind.yadav.cs@gmail.com>
+References: <1472047821-5539-1-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <57BDAD4D.7060602@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 08/24/2016 04:10 PM, Arvind Yadav wrote:
+> iounmap frees the mapping when timer id is not matching.
+> 
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+
+What is the difference with the V2 ?
+
+> ---
+>  drivers/clocksource/clps711x-timer.c | 41 +++++++++++++++++++-----------------
+>  1 file changed, 22 insertions(+), 19 deletions(-)
+> 
+> diff --git a/drivers/clocksource/clps711x-timer.c b/drivers/clocksource/clps711x-timer.c
+> index 24db6d6..784c000 100644
+> --- a/drivers/clocksource/clps711x-timer.c
+> +++ b/drivers/clocksource/clps711x-timer.c
+> @@ -33,14 +33,7 @@ static u64 notrace clps711x_sched_clock_read(void)
+>  
+>  static int __init _clps711x_clksrc_init(struct clk *clock, void __iomem *base)
+>  {
+> -	unsigned long rate;
+> -
+> -	if (!base)
+> -		return -ENOMEM;
+> -	if (IS_ERR(clock))
+> -		return PTR_ERR(clock);
+> -
+> -	rate = clk_get_rate(clock);
+> +	unsigned long rate = clk_get_rate(clock);
+>  
+>  	tcd = base;
+>  
+> @@ -67,13 +60,6 @@ static int __init _clps711x_clkevt_init(struct clk *clock, void __iomem *base,
+>  	struct clock_event_device *clkevt;
+>  	unsigned long rate;
+>  
+> -	if (!irq)
+> -		return -EINVAL;
+> -	if (!base)
+> -		return -ENOMEM;
+> -	if (IS_ERR(clock))
+> -		return PTR_ERR(clock);
+> -
+>  	clkevt = kzalloc(sizeof(*clkevt), GFP_KERNEL);
+>  	if (!clkevt)
+>  		return -ENOMEM;
+> @@ -106,16 +92,33 @@ void __init clps711x_clksrc_init(void __iomem *tc1_base, void __iomem *tc2_base,
+>  #ifdef CONFIG_CLKSRC_OF
+>  static int __init clps711x_timer_init(struct device_node *np)
+>  {
+> -	unsigned int irq = irq_of_parse_and_map(np, 0);
+> -	struct clk *clock = of_clk_get(np, 0);
+> -	void __iomem *base = of_iomap(np, 0);
+> +	unsigned int irq;
+> +	struct clk *clock;
+> +	void __iomem *base;
+> +	int ret;
+> +
+> +	clock = of_clk_get(np, 0);
+> +	if (IS_ERR(clock))
+> +		return PTR_ERR(clock);
+> +
+> +	base = of_iomap(np, 0);
+> +	if (!base)
+> +		return -ENOMEM;
+>  
+>  	switch (of_alias_get_id(np, "timer")) {
+>  	case CLPS711X_CLKSRC_CLOCKSOURCE:
+>  		return _clps711x_clksrc_init(clock, base);
+>  	case CLPS711X_CLKSRC_CLOCKEVENT:
+> -		return _clps711x_clkevt_init(clock, base, irq);
+> +		irq = irq_of_parse_and_map(np, 0);
+> +		if (!irq)
+> +			return -EINVAL;
+> +
+> +		ret = _clps711x_clkevt_init(clock, base, irq);
+> +		if (ret)
+> +			iounmap(base);
+> +		return ret;
+>  	default:
+> +		iounmap(base);
+>  		return -EINVAL;
+>  	}
+>  }
+> 
 
 
-On 19/08/16 19:10, Kevin Hilman wrote:
-> Sudeep Holla <sudeep.holla@arm.com> writes:
->
-> [...]
->
->> In general whatever binding we come up must not just address OS
->> coordinated mode. Also I was thinking to have better coverage in the
->> description by having a bit more complex system like:
->>
->> cluster0
->> 	CLUSTER_RET(Retention)
->> 	CLUSTER_PG(Power Gate)
->> 	core0
->> 		CORE_RET
->> 		CORE_PG
->> 	core1
->> 		CORE_RET
->> 		CORE_PG
->
-> Also, remember that a power domain may contain more than just CPUs, so
-> this will also need to handle things like:
->
-> 	device0..N
->         	DEV_CLK_GATE
->                 DEV_RET
->                 DEV_PG
->
-> So, as (I think) Lina was trying to say, including CPU idle states
-> inside domain idles states doesn't really scale well because it would
-> also imply domain states would also include device idle states.
->
-> IMO, the device-specific states belong in the device nodes, and that
-> includes CPUs.
->
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-OK, IIUC we don't have device idle states binding today, so we are not
-breaking anything there. Can you elaborate on the issue you see if we
-just have domain idle-states ? Is it because we currently create genpd
-domain for each entry ?
-
-If a CPU/Device can be enter idle-state(s) it means that it is in a
-power domain on its own, so I don't see any issue in such representation.
-
-> It's up to the domain (genpd) governor to look at *all* devices in the
-> domain, check their state and make a domain-wide decision.
->
-
-Lets not mix the current genpd implementation in the kernel into this
-discussion for simplicity. How is the implementation in the kernel today
-and what can be done is a separate topic.
-
-What this discussion should aim at is to present the idle states in the
-system in the device tree so that it address the issues we have
-currently and extensible in near future with any compatibility issues.
-
-> The tricky part remains, IMO, the mapping between device/CPU states and
-> allowable domain states.
->
-> As was suggested earlier, a good potential starting point would be that
-> all devices/CPUs would need to be in their deepest state before the
-> domain would make any decisions.  While that leaves soem power savings
-> on the table, it maps well to how genpd works today with only on/off
-> states and could be extended with more complicated governors down the
-> road.
->
-
-Agreed.
-
-Some example below for discussion, feel free to add more cases.
-
---
-Regards,
-Sudeep
-
-
---->8
-
-1. Dual cluster with 2 CPUs in each cluster with powerdown at both CPU and
-    cluster level
-
-   idle-states {
-     CPU_SLEEP_0: cpu-sleep-0 {
-       ...
-       entry-latency-us = <300>;
-       ...
-     };
-     CLUSTER_SLEEP_0: cluster-sleep-0 {
-       ...
-       entry-latency-us = <300>;
-       ...
-     };
-   };
-
-   cpu at 0 {
-     ...
-     /*
-      * implentation may ignore cpu-idle-states if power-domains
-      * has idle-states, DT's may have both for backward compatibility
-      */
-     cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
-     power-domains = <&CPU_0_1_PD>;
-     ...
-   };
-
-   cpu at 1 {
-     ...
-     cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
-     power-domains = <&CPU_0_1_PD>;
-     ...
-   };
-
-   cpu at 100 {
-     ...
-     cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
-     power-domains = <&CPU_1_0_PD>;
-     ...
-   };
-
-   cpu at 101 {
-     ...
-     cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
-     power-domains = <&CPU_1_1_PD>;
-     ...
-   };
-
-   power-domains {
-     CLUSTER_0_PD: cluster-0-pd {
-       #power-domain-cells = <0>;
-       domain-idle-states = <&CLUSTER_SLEEP_0>;
-     };
-     CPU_0_0_PD: cpu-0-0-pd at 0 {
-       #power-domain-cells = <0>;
-       domain-idle-states = <&CPU_SLEEP_0>;
-       power-domains = <&CLUSTER_0_PD>;
-     };
-     CPU_0_1_PD: cpu-0-1-pd at 1 {
-       #power-domain-cells = <0>;
-       domain-idle-states = <&CPU_SLEEP_0>;
-       power-domains = <&CLUSTER_0_PD>;
-     };
-     CLUSTER_1_PD: cluster-1-pd {
-       #power-domain-cells = <0>;
-       domain-idle-states = <&CLUSTER_SLEEP_0>;
-     };
-     CPU_1_0_PD: cpu-1-0-pd at 0 {
-       #power-domain-cells = <0>;
-       domain-idle-states = <&CPU_SLEEP_0>;
-       power-domains = <&CLUSTER_1_PD>;
-     };
-     CPU_1_1_PD: cpu-1-1-pd at 1 {
-       #power-domain-cells = <0>;
-       domain-idle-states = <&CPU_SLEEP_0>;
-       power-domains = <&CLUSTER_1_PD>;
-     };
-   };
-
-2. Dual cluster with 2 CPUs in each cluster with retention and powerdown 
-at both
-    CPU and cluster level
-
-   idle-states {
-     CPU_SLEEP_0: cpu-sleep-0 { /* Retention */
-       ...
-       entry-latency-us = <100>;
-       ...
-     };
-     CPU_SLEEP_1: cpu-sleep-1 { /* Power-down */
-       ...
-       entry-latency-us = <500>;
-       ...
-     };
-     CLUSTER_SLEEP_0: cluster-sleep-0 { /* Retention */
-       ...
-       entry-latency-us = <300>;
-       ...
-     };
-     CLUSTER_SLEEP_1: cluster-sleep-1 {/* Power-down */
-       ...
-       entry-latency-us = <1000>;
-       ...
-     };
-   };
-
-   cpu at 0 {
-     ...
-     power-domains = <&CPU_0_1_PD>;
-     ...
-   };
-
-   cpu at 1 {
-     ...
-     power-domains = <&CPU_0_1_PD>;
-     ...
-   };
-
-   cpu at 100 {
-     ...
-     power-domains = <&CPU_1_0_PD>;
-     ...
-   };
-
-   cpu at 101 {
-     ...
-     power-domains = <&CPU_1_1_PD>;
-     ...
-   };
-
-   power-domains {
-     /*
-      * Each cluster/core PD may point to different idle states,
-      * it's all same here in the example to keep it short and
-      * simple
-      */
-     CLUSTER_0_PD: cluster-0-pd {
-       #power-domain-cells = <0>;
-       domain-idle-states = <&CLUSTER_SLEEP_0 &CLUSTER_SLEEP_1>;
-     };
-     CPU_0_0_PD: cpu-0-0-pd at 0 {
-       #power-domain-cells = <0>;
-       domain-idle-states = <&CPU_SLEEP_0 &CPU_SLEEP_1>;
-       power-domains = <&CLUSTER_0_PD>;
-     };
-     CPU_0_1_PD: cpu-0-1-pd at 1 {
-       #power-domain-cells = <0>;
-       domain-idle-states = <&CPU_SLEEP_0 &CPU_SLEEP_1>;
-       power-domains = <&CLUSTER_0_PD>;
-     };
-     CLUSTER_1_PD: cluster-1-pd {
-       #power-domain-cells = <0>;
-       domain-idle-states = <&CLUSTER_SLEEP_0 &CLUSTER_SLEEP_1>;
-     };
-     CPU_1_0_PD: cpu-1-0-pd at 0 {
-       #power-domain-cells = <0>;
-       domain-idle-states = <&CPU_SLEEP_0 &CPU_SLEEP_1>;
-       power-domains = <&CLUSTER_1_PD>;
-     };
-     CPU_1_1_PD: cpu-1-1-pd at 1 {
-       #power-domain-cells = <0>;
-       domain-idle-states = <&CPU_SLEEP_0 &CPU_SLEEP_1>;
-       power-domains = <&CLUSTER_1_PD>;
-     };
-   };
-
-3. Dual cluster with 2 CPUs in each cluster with retention and powerdown at
-    just cluster level
-
-   idle-states {
-     CLUSTER_SLEEP_0: cluster-sleep-0 { /* Retention */
-       ...
-       entry-latency-us = <300>;
-       ...
-     };
-     CLUSTER_SLEEP_1: cluster-sleep-1 {/* Power-down */
-       ...
-       entry-latency-us = <1000>;
-       ...
-     };
-   };
-
-   cpu at 0 {
-     ...
-     power-domains = <&CLUSTER_0_PD>;
-     ...
-   };
-
-   cpu at 1 {
-     ...
-     power-domains = <&CLUSTER_0_PD>;
-     ...
-   };
-
-   cpu at 100 {
-     ...
-     power-domains = <&CLUSTER_1_PD>;
-     ...
-   };
-
-   cpu at 101 {
-     ...
-     power-domains = <&CLUSTER_1_PD>;
-     ...
-   };
-
-   power-domains {
-     CLUSTER_0_PD: cluster-0-pd {
-       #power-domain-cells = <0>;
-       domain-idle-states = <&CLUSTER_SLEEP_0 &CLUSTER_SLEEP_1>;
-     };
-     CLUSTER_1_PD: cluster-1-pd {
-       #power-domain-cells = <0>;
-       domain-idle-states = <&CLUSTER_SLEEP_0 &CLUSTER_SLEEP_1>;
-     };
-   };
-
-4. 4 devices sharing the power domain.
-
-   idle-states {
-     /*
-      * Device idle states may differ from CPU idle states in terms
-      * of the list of properties
-      */
-     DEVPD_SLEEP_0: devpd-sleep-0 { /* Retention */
-       ...
-       entry-latency-us = <300>;
-       ...
-     };
-     DEVPD_SLEEP_1: devpd-sleep-1 {/* Power-down */
-       ...
-       entry-latency-us = <1000>;
-       ...
-     };
-   };
-
-   dev at 0 {
-     ...
-     power-domains = <&DEV_PD_0>;
-     ...
-   };
-
-   dev at 1 {
-     ...
-     power-domains = <&DEV_PD_0>;
-     ...
-   };
-
-   dev at 2 {
-     ...
-     power-domains = <&DEV_PD_0>;
-     ...
-   };
-
-   dev at 3 {
-     ...
-     power-domains = <&DEV_PD_0>;
-     ...
-   };
-
-   power-domains {
-     DEV_PD_0: device-pd-0 {
-       #power-domain-cells = <0>;
-       domain-idle-states = <&DEVPD_SLEEP_0 &DEVPD_SLEEP_1>;
-     };
-   };
-
-5. 4 devices sharing the power domain + another device sharing the power
-    domain but has it's own sub-domain
-
-   idle-states {
-     DEVPD_0_SLEEP_0: devpd-sleep-0 { /* Retention */
-       ...
-       entry-latency-us = <300>;
-       ...
-     };
-     DEVPD_0_SLEEP_1: devpd-sleep-1 {/* Power-down */
-       ...
-       entry-latency-us = <1000>;
-       ...
-     };
-     DEVPD_1_SLEEP_0: devpd-sleep-0 { /* Retention */
-       ...
-       entry-latency-us = <300>;
-       ...
-     };
-     DEVPD_1_SLEEP_1: devpd-sleep-1 {/* Power-down */
-       ...
-       entry-latency-us = <1000>;
-       ...
-     };
-   };
-
-   dev at 0 {
-     ...
-     power-domains = <&DEV_PD_0>;
-     ...
-   };
-
-   dev at 1 {
-     ...
-     power-domains = <&DEV_PD_0>;
-     ...
-   };
-
-   dev at 2 {
-     ...
-     power-domains = <&DEV_PD_0>;
-     ...
-   };
-
-   dev at 3 {
-     ...
-     power-domains = <&DEV_PD_0>;
-     ...
-   };
-
-   dev at 4 {
-     ...
-     power-domains = <&DEV_PD_1>;
-     ...
-   };
-
-   power-domains {
-     DEV_PD_0: device-pd-0 {
-       #power-domain-cells = <0>;
-       domain-idle-states = <&DEVPD_0_SLEEP_0 &DEVPD_0_SLEEP_1>;
-     };
-     DEV_PD_1: device-pd-1 {
-       #power-domain-cells = <0>;
-       power-domains = <&DEV_PD_0>;
-       domain-idle-states = <&DEVPD_1_SLEEP_0 &DEVPD_1_SLEEP_1>;
-     };
-   };
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
