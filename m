@@ -1,44 +1,64 @@
-From: daniel@zonque.org (Daniel Mack)
-Date: Wed, 24 Aug 2016 13:01:44 +0200
-Subject: [PATCH v3 0/2] AM335x-ICE: Add support for rotary switch
-In-Reply-To: <5294e820-4946-a196-549f-76a349b6606d@ti.com>
-References: <20160824075859.30979-1-vigneshr@ti.com>
- <c5385d42-14e4-d5ca-370e-5b04e37d873d@zonque.org>
- <5294e820-4946-a196-549f-76a349b6606d@ti.com>
-Message-ID: <86711a29-8fb5-9804-8642-2f390081e677@zonque.org>
+From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
+Date: Wed, 24 Aug 2016 16:50:04 +0530
+Subject: [RFC PATCH v3 0/5] arm/arm64: vgic-new: Implement API for vGICv3 live
+ migration
+Message-ID: <1472037609-4164-1-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/24/2016 11:15 AM, Vignesh R wrote:
-> On Wednesday 24 August 2016 02:05 PM, Daniel Mack wrote:
->> On 08/24/2016 09:58 AM, Vignesh R wrote:
->>> This series adds support for rotary-switch on AM335x-ICE that is
->>> connected to TI PCA9536 I2C GPIO expander.
->>> First patch adds new generic driver to read status of group of GPIO
->>> lines and report the value as an input event. The second patch adds DT
->>> entries for the same.
->>>
->>> v2: https://lkml.org/lkml/2016/8/23/111
->>> v1: https://lkml.org/lkml/2016/8/12/7
->>
->> Is there a reason why the rotary-encoder driver cannot handle this?
->> Commit 7dde4e74744 ("Input: rotary-encoder - support more than 2 gpios
->> as input") added support for that mode AFAIU.
->>
-> 
-> Rotary encoder driver handles incremental encoders only and does not
-> support absolute encoders. The rotary switch on am335x-ice is different
-> from the incremental encoders in the
-> sense that GPIO line status directly reflect the position(number)
-> pointed by the dial of the encoder. So, there is no need to count steps
-> or know the direction of rotation as it does not matter.
-> 
-> I did try to enhance rotary-encoder driver to support absolute
-> encoder[1] but the comment there was to write new driver that simply
-> translates gpio-encoded value into ABS* event. Indeed, the new driver
-> looks more simple and can handle more such hardwares.
+From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
 
-Okay. Yes, that makes sense. Thanks for the explanation!
+This patchset adds API for saving and restoring
+of VGICv3 registers to support live migration with new vgic feature.
+This API definition is as per version of VGICv3 specification
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
 
+To test live migration with QEMU, use below patch series
+https://lists.gnu.org/archive/html/qemu-devel/2016-08/msg01444.html
 
-Daniel
+The patch 3 & 4 are picked from the Pavel's previous implementation.
+http://www.spinics.net/lists/kvm/msg122040.html
+
+v2 => v3:
+ - Implemented separate API for ISPENDR and ICPENDR to
+   read soft_pending instead of pending for level triggerred interrupts
+ - Implemented ioctl KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO to access line level
+ - Rebased on top of Christoffer's patch set
+   http://www.spinics.net/lists/kvm/msg136840.html
+
+ NOTE: GICD_STATUSR and GICR_STATUSR are implemented as RAZ/WI.
+
+v1 => v2:
+ - The init sequence change patch is no more required.
+   Fixed in patch 2 by using static vgic_io_dev regions structure instead
+   of using dynamic allocation pointer.
+ - Updated commit message of patch 4.
+ - Dropped usage of union to manage 32-bit and 64-bit access in patch 1.
+   Used local variable for 32-bit access.
+ - Updated macro __ARM64_SYS_REG and ARM64_SYS_REG in
+   arch/arm64/include/uapi/asm/kvm.h as per qemu requirements.
+
+Vijaya Kumar K (5):
+  arm/arm64: vgic-new: Implement support for userspace access
+  arm/arm64: vgic-new: Add distributor and redistributor access
+  arm/arm64: vgic-new: Introduce find_reg_by_id()
+  arm/arm64: vgic-new: Implement VGICv3 CPU interface access
+  arm/arm64: vgic-new: Implement KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
+
+ arch/arm64/include/uapi/asm/kvm.h   |  24 +++-
+ arch/arm64/kvm/Makefile             |   1 +
+ arch/arm64/kvm/sys_regs.c           |  22 ++--
+ arch/arm64/kvm/sys_regs.h           |   4 +
+ include/linux/irqchip/arm-gic-v3.h  |   4 +
+ virt/kvm/arm/vgic/vgic-kvm-device.c | 198 ++++++++++++++++++++++++++++++++-
+ virt/kvm/arm/vgic/vgic-mmio-v2.c    |   9 +-
+ virt/kvm/arm/vgic/vgic-mmio-v3.c    | 178 ++++++++++++++++++++++++++++--
+ virt/kvm/arm/vgic/vgic-mmio.c       | 123 +++++++++++++++++++--
+ virt/kvm/arm/vgic/vgic-mmio.h       |  31 ++++++
+ virt/kvm/arm/vgic/vgic-sys-reg-v3.c | 211 ++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h            |  17 +++
+ 12 files changed, 789 insertions(+), 33 deletions(-)
+ create mode 100644 virt/kvm/arm/vgic/vgic-sys-reg-v3.c
+
+-- 
+1.9.1
