@@ -1,28 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 24 Aug 2016 17:20:48 +0100
-Subject: [PATCH v2 3/9] arm64: kernel: use ordinary return/argument
- register for el2_setup()
-In-Reply-To: <1472049366-10922-4-git-send-email-ard.biesheuvel@linaro.org>
-References: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
- <1472049366-10922-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160824162047.GB30036@remoulade>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 24 Aug 2016 11:47:36 -0500
+Subject: [PATCH v2 1/2] PCI: quirk fixup for cavium invalid sriov link
+ value.
+In-Reply-To: <1471994835-2423-2-git-send-email-okhaliq@caviumnetworks.com>
+References: <1471994835-2423-1-git-send-email-okhaliq@caviumnetworks.com>
+ <1471994835-2423-2-git-send-email-okhaliq@caviumnetworks.com>
+Message-ID: <20160824164736.GA23914@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 04:36:00PM +0200, Ard Biesheuvel wrote:
-> The function el2_setup() passes its return value in register w20, and
-> in the two cases where the caller actually cares about this return value,
-> it is passed into set_cpu_boot_mode_flag() [almost] directly, which
-> expects its input in w20 as well.
+On Tue, Aug 23, 2016 at 04:27:14PM -0700, Omer Khaliq wrote:
+> From: Ananth Jasty <Ananth.Jasty@cavium.com>
 > 
-> So there is no reason to use a 'special' callee saved register here, but
-> we can simply follow the PCS for return value and first argument,
-> respectively.
+> Cavium cn88xx hardware presents an incorrect SR-IOV Function
+> Dependency Link, add a fixup quirk for the affected devices.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Acked-by: David Daney <david.daney@cavium.com>
+> Signed-off-by: Ananth Jasty <Ananth.Jasty@cavium.com>
+> Signed-off-by: Omer Khaliq <okhaliq@caviumnetworks.com>
 
-Make sense to me. FWIW:
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+If you update this patch for any reason, please update the subject
+like this:
 
-Mark.
+  -PCI: quirk fixup for cavium invalid sriov link value.
+  +PCI: Fix incorrect Cavium cn8xx SR-IOV Function Dependency Link
+
+This will make "git log --oneline drivers/pci/quirks.c" show more
+useful information and look more consistent.
+
+I assume somebody else will merge this patch along with your HWRNG
+driver.
+
+> ---
+>  drivers/pci/quirks.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+> index 37ff015..5980aae 100644
+> --- a/drivers/pci/quirks.c
+> +++ b/drivers/pci/quirks.c
+> @@ -834,6 +834,17 @@ static void quirk_amd_ioapic(struct pci_dev *dev)
+>  DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AMD,	PCI_DEVICE_ID_AMD_VIPER_7410,	quirk_amd_ioapic);
+>  #endif /* CONFIG_X86_IO_APIC */
+>  
+> +#ifdef CONFIG_ARM64
+> +
+> +static void quirk_cavium_sriov_rnm_link(struct pci_dev *dev)
+> +{
+> +	/* Fix for improper SRIOV configuration on Cavium cn88xx  RNM device */
+> +	if (dev->subsystem_device == 0xa118)
+> +		dev->sriov->link = dev->devfn;
+> +}
+> +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_CAVIUM, 0xa018, quirk_cavium_sriov_rnm_link);
+> +#endif
+> +
+>  /*
+>   * Some settings of MMRBC can lead to data corruption so block changes.
+>   * See AMD 8131 HyperTransport PCI-X Tunnel Revision Guide
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
