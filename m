@@ -1,42 +1,115 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 24 Aug 2016 11:19:06 +0100
-Subject: [PATCH] arm64: KVM: Enable support for Cortex-A72
-In-Reply-To: <57BD679A.6060406@huawei.com>
-References: <1472023297-2756-1-git-send-email-zhaoshenglong@huawei.com>
- <ffda6889-5c31-1b56-942c-de65bbb1c16f@arm.com> <57BD679A.6060406@huawei.com>
-Message-ID: <c02d842a-2576-92f5-8b25-8802cd9876d4@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 24 Aug 2016 11:25:29 +0100
+Subject: [PATCH v24 5/9] arm64: kdump: add kdump support
+In-Reply-To: <20160824080443.GA12902@dhcp-128-65.nay.redhat.com>
+References: <20160809015615.28527-1-takahiro.akashi@linaro.org>
+ <20160809015615.28527-3-takahiro.akashi@linaro.org>
+ <57AB586D.3080900@arm.com> <20160818071547.GC20080@linaro.org>
+ <20160819012651.GE20080@linaro.org>
+ <20160819112217.GB22221@localhost.localdomain>
+ <20160822012919.GI20080@linaro.org> <57BB0272.1000008@arm.com>
+ <20160823003815.GL20080@linaro.org>
+ <20160823112343.GC13501@localhost.localdomain>
+ <20160824080443.GA12902@dhcp-128-65.nay.redhat.com>
+Message-ID: <57BD7619.1040406@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/08/16 10:23, Shannon Zhao wrote:
->
->
-> On 2016/8/24 16:57, Suzuki K Poulose wrote:
->> On 24/08/16 08:21, Shannon Zhao wrote:
->>> In order to allow KVM to run on Cortex-A72 physical cpus, enable KVM
->>> support for Cortex-A72.
->>
->> Do we really need this change ? Given that A72 is using the generic_v8
->> table,
->> it will automatically be supported via the GENERIC_V8 target. That was
->> added
->> just for this purpose. The pre-existing targets were preserved so that
->> we don't break the ABI for older user space.
->>
-> Yes, this works for qemu with "-cpu host". But if it specifies the cpu
-> type with "-cpu cortex-a72". It will fail without this patch.
+Hi Dave,
 
-Thats because you specify the expected target from the kernel in Qemu.
+On 24/08/16 09:04, Dave Young wrote:
+> Looking the arm-init.c, I suspect it missed the some efi ranges as
+> reserved ranges like runtime code and runtime data etc. But I might be
+> wrong.
 
-I don't know what are the plans for Qemu. Are we going to add every single
-ARM CPU released to the target list both in Kernel and Qemu ? e.g, what about
-A35, A73 and others from the partners ?
+This had me confused for too... I think I get it, my understanding is:
 
-Suzuki
 
->
-> The corresponding qemu patches could be found at [1].
-> [1] https://lists.gnu.org/archive/html/qemu-devel/2016-08/msg03653.html
->
-> Thanks,
->
+> static __init int is_reserve_region(efi_memory_desc_t *md)
+> {
+>         switch (md->type) {
+>         case EFI_LOADER_CODE:
+>         case EFI_LOADER_DATA:
+>         case EFI_BOOT_SERVICES_CODE:
+>         case EFI_BOOT_SERVICES_DATA:
+>         case EFI_CONVENTIONAL_MEMORY:
+>         case EFI_PERSISTENT_MEMORY:
+>                 return 0;
+
+return false - this is the list of region-types to never reserve, regardless of
+memory attributes.
+
+
+>         default:
+>                 break;
+>         }
+>         return is_normal_ram(md);
+
+If its not in the 'never reserve' list above, then we check if the region is
+'normal' ram. If it is then it will end up in memblock.memory so we return true,
+causing it to be marked nomap too.
+
+reserve_regions() in that same file calls is_normal_ram() directly before adding
+all regions with the WB attribute to memblock.memory via
+early_init_dt_add_memory_arch().
+
+A runtime region with the WB attribute will be caught by is_reserve_region(),
+and is_normal_ram(), so it ends up in memblock.memory and memblock.nomap.
+
+
+> }
+> 
+> Let's see the x86 do_add_efi_mem_map, the default case set all other
+> types as reserved. Shouldn't this be same in all arches though there's
+> no e820 in arm(64)?
+
+> static void __init do_add_efi_memmap(void)
+> {
+> 
+> [snip]
+>                 switch (md->type) {
+>                 case EFI_LOADER_CODE:
+>                 case EFI_LOADER_DATA:
+>                 case EFI_BOOT_SERVICES_CODE:
+>                 case EFI_BOOT_SERVICES_DATA:
+>                 case EFI_CONVENTIONAL_MEMORY:
+>                         if (md->attribute & EFI_MEMORY_WB)
+>                                 e820_type = E820_RAM;
+
+In this case reserve_regions() will add the memory to memblock.memory because it
+has the WB attribute, and not reserve it.
+
+
+>                         else
+>                                 e820_type = E820_RESERVED;
+
+Without the WB attribute, these regions are in neither memblock.memory nor
+memblock.nomap.
+
+
+>                         break;
+> [snip]
+>                 default:
+>                         /*
+>                          * EFI_RESERVED_TYPE EFI_RUNTIME_SERVICES_CODE
+>                          * EFI_RUNTIME_SERVICES_DATA
+>                          * EFI_MEMORY_MAPPED_IO
+>                          * EFI_MEMORY_MAPPED_IO_PORT_SPACE EFI_PAL_CODE
+>                          */
+>                         e820_type = E820_RESERVED;
+>                         break;
+
+If any other regions has the WB attribute, it will be added to memblock.memory
+and memblock.nomap. If it doesn't, it will appear in neither.
+
+
+>                 }
+> [snip]
+> }
+
+Does this help at all?
+
+
+Thanks,
+
+James
