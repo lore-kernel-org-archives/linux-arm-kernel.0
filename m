@@ -1,46 +1,57 @@
 From: woogyom.kim@gmail.com (Milo Kim)
-Date: Wed, 24 Aug 2016 22:07:14 +0900
-Subject: [PATCH v3 0/5] ARM: dts: exynos: Enable HDMI in Arndale Octa board
-Message-ID: <1472044039-16536-1-git-send-email-woogyom.kim@gmail.com>
+Date: Wed, 24 Aug 2016 22:07:15 +0900
+Subject: [PATCH v3 1/5] ARM: dts: exynos: Enable HDMI for Arndale Octa board
+In-Reply-To: <1472044039-16536-1-git-send-email-woogyom.kim@gmail.com>
+References: <1472044039-16536-1-git-send-email-woogyom.kim@gmail.com>
+Message-ID: <1472044039-16536-2-git-send-email-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-set enables HDMI in Arndale Octa board and fixes HPD DT property.
-It also includes code refactoring on ddc and phy.
+* GPIO for HDMI hot plug detect
+  GPX3_7 is used. The HPD awareness is done when the GPIO is active high and
+  single ended.
 
-v3:
-  Add 'vdd-supply' property in dts.
-  Use generic 'ddc' property instead of legacy property.
-  Clean up DDC and PHY logic in _probe().
-  Remove duplicate code of regulator consumer initialization.
+* Enable HDMI block in Exynos5420
+  HDMI VDD and PLL consume 1.0V LDO6 (PVDD_ANAIP_1V0) and HDMI oscillator
+  requires 1.8V LDO7 (PVDD_ANAIP_1V8).
 
-v2:
-  Include DRM and Exynos maintainers and resend the patch-set.
-  Add Rob's ack for the patch,
-	[PATCH 2/4] ARM: dts: exynos: Use 'hpd-gpios' instead of 'hpd-gpio'
+* Support HDMI display data channel
+  I2C #2 is assigned for the HDMI DDC. It enables the EDID access.
 
-Milo Kim (5):
-  ARM: dts: exynos: Enable HDMI for Arndale Octa board
-  ARM: dts: exynos: Use 'hpd-gpios' instead of 'hpd-gpio'
-  gpu: drm: exynos_hdmi: Move DDC logic into single function
-  gpu: drm: exynos_hdmi: Move PHY logic into single function
-  gpu: drm: exynos_hdmi: Remove duplicate initialization of regulator
-    bulk consumer
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+---
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
- .../bindings/display/exynos/exynos_hdmi.txt        |   4 +-
- arch/arm/boot/dts/exynos4210-universal_c210.dts    |   2 +-
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi    |   2 +-
- arch/arm/boot/dts/exynos5250-arndale.dts           |   2 +-
- arch/arm/boot/dts/exynos5250-smdk5250.dts          |   2 +-
- arch/arm/boot/dts/exynos5250-snow-common.dtsi      |   2 +-
- arch/arm/boot/dts/exynos5250-spring.dts            |   2 +-
- arch/arm/boot/dts/exynos5420-arndale-octa.dts      |  13 +++
- arch/arm/boot/dts/exynos5420-peach-pit.dts         |   2 +-
- arch/arm/boot/dts/exynos5420-smdk5420.dts          |   2 +-
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |   2 +-
- arch/arm/boot/dts/exynos5800-peach-pi.dts          |   2 +-
- drivers/gpu/drm/exynos/exynos_hdmi.c               | 112 +++++++++++----------
- 13 files changed, 84 insertions(+), 65 deletions(-)
-
+diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+index 39a3b81..2fb5708 100644
+--- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
++++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+@@ -70,6 +70,19 @@
+ 	status = "disabled";
+ };
+ 
++&hdmi {
++	hpd-gpios = <&gpx3 7 GPIO_OPEN_SOURCE>;
++	vdd_osc-supply = <&ldo7_reg>;
++	vdd_pll-supply = <&ldo6_reg>;
++	vdd-supply = <&ldo6_reg>;
++	ddc = <&i2c_2>;
++	status = "okay";
++};
++
++&i2c_2 {
++	status = "okay";
++};
++
+ &hsi2c_4 {
+ 	status = "okay";
+ 
 -- 
 1.9.1
