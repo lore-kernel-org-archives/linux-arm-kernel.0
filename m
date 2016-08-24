@@ -1,19 +1,27 @@
-From: woogyom.kim@gmail.com (Milo Kim)
-Date: Wed, 24 Aug 2016 11:30:25 +0900
-Subject: [PATCH 0/4] ARM: dts: exynos: Enable HDMI in Arndale Octa board
-In-Reply-To: <CAJKOXPew=cTK6RkiT+OoPbUcU2SBHdOYTSPG-av3FiN2HYNV=g@mail.gmail.com>
-References: <1471943619-6102-1-git-send-email-woogyom.kim@gmail.com>
- <CAJKOXPew=cTK6RkiT+OoPbUcU2SBHdOYTSPG-av3FiN2HYNV=g@mail.gmail.com>
-Message-ID: <da2ff73c-b8ca-60dd-ff53-dff634e52dbc@gmail.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Wed, 24 Aug 2016 10:42:04 +0800
+Subject: [PATCH v2 0/3] arm64: defconfig: enable various configs for HiKey
+Message-ID: <1472006527-30620-1-git-send-email-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/24/2016 04:55 AM, Krzysztof Kozlowski wrote:
-> I saw DTS patches on linux-samsung-soc patchwork but still I would
-> appreciate if you send them to appropriate maintainers pointed by
-> get_maintainers.pl script. DTS stuff goes through samsung-soc tree.
+Enable various configs for HiKey, including:
+1. HiSilicon Kirin DRM
+2. ADV7533
+3. HiSi Powerkey
+4. Bluetooth
 
-Thanks for your tip. I've just sent out the v2.
+v2:
+ - Removed CMA size 128M change. Leave that in bootloader as suggested by
+   Thierry Reding <treding@nvidia.com>
 
-Best regards,
-Milo
+Guodong Xu (3):
+  arm64: defconfig: Enable HiSilicon kirin drm, adv7533 for HiKey
+  arm64: defconfig: enable CONFIG_INPUT_HISI_POWERKEY for HiKey
+  arm64: defconfig: enable bluetooth supports as modules
+
+ arch/arm64/configs/defconfig | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+-- 
+1.9.1
