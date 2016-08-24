@@ -1,86 +1,85 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 24 Aug 2016 16:36:03 +0200
-Subject: [PATCH v2 6/9] arm64: call __enable_mmu as an ordinary function for
- secondary/resume
+Date: Wed, 24 Aug 2016 16:36:04 +0200
+Subject: [PATCH v2 7/9] arm64: kernel: drop use of x24 from primary boot path
 In-Reply-To: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1472049366-10922-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1472049366-10922-8-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This updates the secondary and cpu_resume call sites to simply call
-__enable_mmu as an ordinary function, with a bl instruction. This
-requires the callers to be covered by .idmap.text.
+Keeping __PHYS_OFFSET in x24 is actually less clear than simply taking
+the value of __PHYS_OFFSET using an adrp instruction in the three places
+that we need it. So change that.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/head.S  | 14 ++++++--------
- arch/arm64/kernel/sleep.S | 10 +++-------
- 2 files changed, 9 insertions(+), 15 deletions(-)
+ arch/arm64/kernel/head.S | 20 ++++++++++++--------
+ 1 file changed, 12 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 3e08e51578d5..c112c153821e 100644
+index c112c153821e..27f51272de68 100644
 --- a/arch/arm64/kernel/head.S
 +++ b/arch/arm64/kernel/head.S
-@@ -634,6 +634,7 @@ ENTRY(__boot_cpu_mode)
- 	 * This provides a "holding pen" for platforms to hold all secondary
- 	 * cores are held until we're ready for them to initialise.
- 	 */
-+	.pushsection	".idmap.text", "ax"
- ENTRY(secondary_holding_pen)
+@@ -211,8 +211,8 @@ efi_header_end:
+ ENTRY(stext)
+ 	bl	preserve_boot_args
  	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
+-	adrp	x24, __PHYS_OFFSET
+-	and	x23, x24, MIN_KIMG_ALIGN - 1	// KASLR offset, defaults to 0
++	adrp	x23, __PHYS_OFFSET
++	and	x23, x23, MIN_KIMG_ALIGN - 1	// KASLR offset, defaults to 0
  	bl	set_cpu_boot_mode_flag
-@@ -663,10 +664,12 @@ secondary_startup:
- 	 * Common entry point for secondary CPUs.
- 	 */
- 	bl	__cpu_setup			// initialise processor
--
--	adr_l	lr, __secondary_switch		// address to jump to after enabling the MMU
--	b	__enable_mmu
-+	bl	__enable_mmu
-+	ldr	x8, =__secondary_switched
-+	br	x8
- ENDPROC(secondary_startup)
-+	.ltorg
-+	.popsection
+ 	bl	__create_page_tables
+ 	/*
+@@ -412,6 +412,8 @@ ENDPROC(__create_page_tables)
  
- __secondary_switched:
- 	adr_l	x5, vectors
-@@ -812,8 +815,3 @@ __primary_switch:
+ /*
+  * The following fragment of code is executed with the MMU enabled.
++ *
++ *   x0 = __PHYS_OFFSET
+  */
+ 	.set	initial_sp, init_thread_union + THREAD_START_SP
+ __primary_switched:
+@@ -420,6 +422,12 @@ __primary_switched:
+ 	msr	vbar_el1, x8			// vector table address
+ 	isb
+ 
++	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
++
++	ldr_l	x4, kimage_vaddr		// Save the offset between
++	sub	x4, x4, x0			// the kernel virtual and
++	str_l	x4, kimage_voffset, x5		// physical mappings
++
+ 	// Clear BSS
+ 	adr_l	x0, __bss_start
+ 	mov	x1, xzr
+@@ -432,12 +440,6 @@ __primary_switched:
+ 	mov	x4, sp
+ 	and	x4, x4, #~(THREAD_SIZE - 1)
+ 	msr	sp_el0, x4			// Save thread_info
+-	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
+-
+-	ldr_l	x4, kimage_vaddr		// Save the offset between
+-	sub	x4, x4, x24			// the kernel virtual and
+-	str_l	x4, kimage_voffset, x5		// physical mappings
+-
+ 	mov	x29, #0
+ #ifdef CONFIG_KASAN
+ 	bl	kasan_early_init
+@@ -792,6 +794,7 @@ __primary_switch:
+ 	bl	__relocate_kernel
+ #ifdef CONFIG_RANDOMIZE_BASE
  	ldr	x8, =__primary_switched
++	adrp	x0, __PHYS_OFFSET
+ 	blr	x8
+ 
+ 	/*
+@@ -813,5 +816,6 @@ __primary_switch:
+ #endif
+ #endif
+ 	ldr	x8, =__primary_switched
++	adrp	x0, __PHYS_OFFSET
  	br	x8
  ENDPROC(__primary_switch)
--
--__secondary_switch:
--	ldr	x8, =__secondary_switched
--	br	x8
--ENDPROC(__secondary_switch)
-diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index 4bce95cd656a..1d4aba6fcc7a 100644
---- a/arch/arm64/kernel/sleep.S
-+++ b/arch/arm64/kernel/sleep.S
-@@ -95,19 +95,15 @@ ENTRY(__cpu_suspend_enter)
- 	ret
- ENDPROC(__cpu_suspend_enter)
- 
-+	.pushsection	".idmap.text", "ax"
- ENTRY(cpu_resume)
- 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
- 	bl	__cpu_setup
- 	/* enable the MMU early - so we can access sleep_save_stash by va */
--	adr_l	lr, _resume_switched	/* __enable_mmu will branch here */
--	b	__enable_mmu
--ENDPROC(cpu_resume)
--
--	.pushsection	".idmap.text", "ax"
--_resume_switched:
-+	bl	__enable_mmu
- 	ldr	x8, =_cpu_resume
- 	br	x8
--ENDPROC(_resume_switched)
-+ENDPROC(cpu_resume)
- 	.ltorg
- 	.popsection
- 
 -- 
 2.7.4
