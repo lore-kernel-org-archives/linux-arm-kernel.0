@@ -1,11 +1,11 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Aug 2016 16:09:23 -0700
+Date: Wed, 24 Aug 2016 16:10:24 -0700
 Subject: [PATCH 08/34] clk: asm9260: Migrate to clk_hw based registration
  and OF APIs
 In-Reply-To: <20160601231533.9354-9-stephen.boyd@linaro.org>
 References: <20160601231533.9354-1-stephen.boyd@linaro.org>
  <20160601231533.9354-9-stephen.boyd@linaro.org>
-Message-ID: <20160824230923.GJ19826@codeaurora.org>
+Message-ID: <20160824231024.GK19826@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
