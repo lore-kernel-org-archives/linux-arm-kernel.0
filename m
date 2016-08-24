@@ -1,99 +1,57 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 24 Aug 2016 16:08:18 +0100
-Subject: [PATCH v4 6/8] iommu/arm-smmu: Implement of_xlate() for SMMUv3
-In-Reply-To: <1d570682-d815-657e-2119-b706e0034e2c@arm.com>
-References: <cover.1467388950.git.robin.murphy@arm.com>
- <925b054b1e96dc83c0b1dc9607785d0346187366.1467388950.git.robin.murphy@arm.com>
- <20160729144655.GA3359@e106794-lin.localdomain>
- <1d570682-d815-657e-2119-b706e0034e2c@arm.com>
-Message-ID: <09911a58-1566-9a32-c911-f61e690d354a@arm.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Wed, 24 Aug 2016 10:10:04 -0500
+Subject: [PATCH] arm64: dts: hikey: extend default cma size to 128MB
+In-Reply-To: <1472045710-15832-1-git-send-email-guodong.xu@linaro.org>
+References: <1472045710-15832-1-git-send-email-guodong.xu@linaro.org>
+Message-ID: <CAL_JsqJxE+fAbSsp=N7dvzvQiKwh3nM8-oSJH1OzV+KfW3w4jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/07/16 19:55, Robin Murphy wrote:
-> On 29/07/16 15:46, Jean-Philippe Brucker wrote:
->> Hi Robin,
->>
->> Very sorry about the delay, I forgot about this minor comment, below
->>
->> On Fri, Jul 01, 2016 at 05:50:15PM +0100, Robin Murphy wrote:
-[...]
->>> +		smmu = arm_smmu_get_by_node(fwspec->iommu_np);
->>> +		if (!smmu)
->>> +			return -ENODEV;
->>> +		master = kzalloc(sizeof(*master), GFP_KERNEL);
->>> +		if (!master)
->>> +			return -ENOMEM;
->>> +
->>> +		master->smmu = smmu;
->>> +		fwspec->iommu_priv = master;
->>
->> It's probably best to initialise master->ste.bypass = true here, to
->> reflect the initial state of STEs. Otherwise attach_dev always calls
->> detach_dev first for nothing.
-> 
-> I'm actually now thinking that that check in attach_dev() should be for
-> ste->valid, rather than ste->bypass. That matches the similar check in
-> remove_device(), and looking at old local branches I apparently did have
-> it that way at some point, and I now can't quite remember why it ended
-> up differently. I'll have a proper dig into it next week.
+On Wed, Aug 24, 2016 at 8:35 AM, Guodong Xu <guodong.xu@linaro.org> wrote:
+> To support display in Debian on HiKey, cma heap is used to allocate
+> graphic buffers. The default size of CMA is 16 MB which is not enought.
 
-[for a value of "next week" relative to "last week", at least...]
+s/enought/enough/
 
-Having now remembered, the reason it is this way is a subtle concession
-to the nasty PCI RID alias case. When you come to probe the second
-device behind a non-transparent bridge, the first device is already
-attached to the default domain so the underlying STE is no longer a
-bypass entry, but we've got no way of knowing that - we can't tell we're
-going to be in an alias group until we call iommu_group_get_for_dev(),
-and by the time that returns it's already too late, since the attach to
-the default domain (and thus the attempt to write a now-valid STE with
-the same data again) will have happened.
+>
+> Increase the default CMA size to 128 MB.
+>
+> cc: Rob Herring <rob.herring@linaro.org>
+> cc: Fathi Boudra <fathi.boudra@linaro.org>
+> cc: John Stultz <john.stultz@linaro.org>
+> cc: Xinliang Liu <xinliang.liu@linaro.org>
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+> ---
+>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> index 4a51058..abb3434 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> @@ -45,6 +45,20 @@
+>                       <0x00000000 0x22000000 0x00000000 0x1c000000>;
+>         };
+>
+> +       reserved-memory {
+> +               #address-cells = <2>;
+> +               #size-cells = <2>;
+> +               ranges;
+> +
+> +               /* global autoconfigured region for contiguous allocations */
+> +               linux,cma {
+> +                       compatible = "shared-dma-pool";
+> +                       reusable;
+> +                       size = <0x00000000 0x08000000>;
+> +                       linux,cma-default;
+> +               };
+> +       };
+> +
+>         pstore: pstore at 0x21f00000 {
 
-The least complicated ways around that that I can think of are 1)
-inspect the stream table itself on attach, 2) maintain a semi-redundant
-list within the group of exactly which ID is attached to which domain at
-any point in time, 3) treat the initial per-device state as undefined
-(!valid, !bypass) so that the initial domain attach is always a safe
-break-before-make on the stream table, or 4) disallow aliasing IDs
-entirely and just let the BUG() in write_strtab_ent() fire if a
-non-transparent bridge ever comes along.
+So what is upstream (as of 4.8) for ramoops also uses reserved-memory,
+so you should separately fix this.
 
-Discounting #4 as unreasonable, #3 is by far the least complicated, so
-I've kept this as it is for now. #2 might seem reasonable at a glance,
-but it wouldn't be useful for anything _except_ this specific situation,
-which in practice we'd expect to encounter rarely if ever.
+Acked-by: Rob Herring <robh@kernel.org>
 
-Robin.
-
->> Apart from that, this version works fine with my twisted setup. Note
->> that we might have to add a master->fwspec reference in the future, to
->> access those SIDs from various places. If I understood correctly, it
->> should be fine as those objects have the same lifetime after the
->> add_device call.
-> 
-> That sounds reasonable, although I can't think offhand where we might
-> have a master_data without having got it via the containing device
-> (unless we also add some other means of keeping track of them). Since
-> this series doesn't need any kind of reverse-lookup capabilities I'm
-> just keeping things as simple as possible for the time being.
-> 
-> Robin.
-> 
->>
->> Thanks,
->> Jean-Philippe
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Rob
