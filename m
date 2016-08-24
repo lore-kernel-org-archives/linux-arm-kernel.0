@@ -1,137 +1,81 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 24 Aug 2016 16:36:01 +0200
-Subject: [PATCH v2 4/9] arm64: head.S: move KASLR processing out of
- __enable_mmu()
+Date: Wed, 24 Aug 2016 16:35:59 +0200
+Subject: [PATCH v2 2/9] arm64: kernel: fix style issues in sleep.S
 In-Reply-To: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1472049366-10922-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1472049366-10922-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The KASLR processing in __enable_mmu() is only used by the primary boot
-path, and complements the processing that takes place in __primary_switch().
-Move the two parts together, to make the code easier to understand.
+This fixes a number of style issues in sleep.S. No functional changes are
+intended:
+- replace absolute literal references with relative references in
+  __cpu_suspend_enter(), which executes from its virtual address
+- replace explicit lr assignment plus branch with bl in cpu_resume(), which
+  aligns it with stext() and secondary_startup()
+- use adr_l for mpidr_hash reference, and fix the incorrect accompanying
+  comment
+- replace leading spaces with tabs, and add a bit of whitespace for
+  readability
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/head.S | 66 ++++++++++++--------
- 1 file changed, 39 insertions(+), 27 deletions(-)
+ arch/arm64/kernel/sleep.S | 19 +++++++++----------
+ 1 file changed, 9 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 2871271123e7..d390feb92730 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -222,9 +222,7 @@ ENTRY(stext)
- 	 * the TCR will have been set.
- 	 */
- 	bl	__cpu_setup			// initialise processor
--	adr_l	x27, __primary_switch		// address to jump to after
--						// MMU has been enabled
--	b	__enable_mmu
-+	b	__primary_switch
- ENDPROC(stext)
+diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+index 182129b60fdf..bbc63099223b 100644
+--- a/arch/arm64/kernel/sleep.S
++++ b/arch/arm64/kernel/sleep.S
+@@ -73,10 +73,9 @@ ENTRY(__cpu_suspend_enter)
+ 	str	x2, [x0, #SLEEP_STACK_DATA_SYSTEM_REGS + CPU_CTX_SP]
  
- /*
-@@ -453,7 +451,7 @@ __primary_switched:
- 	cbz	x0, 0f				// KASLR disabled? just proceed
- 	orr	x23, x23, x0			// record KASLR offset
- 	ret	x28				// we must enable KASLR, return
--						// to __enable_mmu()
-+						// to __primary_switch()
- 0:
- #endif
- 	b	start_kernel
-@@ -721,7 +719,6 @@ ENTRY(__early_cpu_boot_status)
-  */
- 	.section	".idmap.text", "ax"
- ENTRY(__enable_mmu)
--	mrs	x22, sctlr_el1			// preserve old SCTLR_EL1 value
- 	mrs	x1, ID_AA64MMFR0_EL1
- 	ubfx	x2, x1, #ID_AA64MMFR0_TGRAN_SHIFT, 4
- 	cmp	x2, #ID_AA64MMFR0_TGRAN_SUPPORTED
-@@ -742,25 +739,6 @@ ENTRY(__enable_mmu)
- 	ic	iallu
- 	dsb	nsh
- 	isb
--#ifdef CONFIG_RANDOMIZE_BASE
--	mov	x19, x0				// preserve new SCTLR_EL1 value
--	blr	x27
--
--	/*
--	 * If we return here, we have a KASLR displacement in x23 which we need
--	 * to take into account by discarding the current kernel mapping and
--	 * creating a new one.
--	 */
--	msr	sctlr_el1, x22			// disable the MMU
--	isb
--	bl	__create_page_tables		// recreate kernel mapping
--
--	msr	sctlr_el1, x19			// re-enable the MMU
--	isb
--	ic	iallu				// flush instructions fetched
--	dsb	nsh				// via old mapping
--	isb
--#endif
- 	br	x27
- ENDPROC(__enable_mmu)
- 
-@@ -770,11 +748,11 @@ __no_granule_support:
- 1:
- 	wfe
- 	wfi
--	b 1b
-+	b	1b
- ENDPROC(__no_granule_support)
- 
--__primary_switch:
- #ifdef CONFIG_RELOCATABLE
-+__relocate_kernel:
+ 	/* find the mpidr_hash */
+-	ldr	x1, =sleep_save_stash
+-	ldr	x1, [x1]
++	ldr_l	x1, sleep_save_stash
+ 	mrs	x7, mpidr_el1
+-	ldr	x9, =mpidr_hash
++	adr_l	x9, mpidr_hash
+ 	ldr	x10, [x9, #MPIDR_HASH_MASK]
  	/*
- 	 * Iterate over each entry in the relocation table, and apply the
- 	 * relocations in place.
-@@ -796,8 +774,42 @@ __primary_switch:
- 	add	x13, x13, x23			// relocate
- 	str	x13, [x11, x23]
- 	b	0b
-+1:	ret
-+ENDPROC(__relocate_kernel)
-+#endif
+ 	 * Following code relies on the struct mpidr_hash
+@@ -95,14 +94,13 @@ ENTRY(__cpu_suspend_enter)
+ 	mov	x0, #1
+ 	ret
+ ENDPROC(__cpu_suspend_enter)
+-	.ltorg
  
--1:
-+__primary_switch:
-+#ifdef CONFIG_RANDOMIZE_BASE
-+	mov	x19, x0				// preserve new SCTLR_EL1 value
-+	mrs	x20, sctlr_el1			// preserve old SCTLR_EL1 value
-+#endif
-+
-+	adr	x27, 0f
+ ENTRY(cpu_resume)
+ 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
++	bl	__cpu_setup
+ 	/* enable the MMU early - so we can access sleep_save_stash by va */
+-	adr_l	lr, __enable_mmu	/* __cpu_setup will return here */
+ 	adr_l	x27, _resume_switched	/* __enable_mmu will branch here */
+-	b	__cpu_setup
 +	b	__enable_mmu
-+0:
-+#ifdef CONFIG_RELOCATABLE
-+	bl	__relocate_kernel
-+#ifdef CONFIG_RANDOMIZE_BASE
-+	ldr	x8, =__primary_switched
-+	blr	x8
+ ENDPROC(cpu_resume)
+ 
+ 	.pushsection	".idmap.text", "ax"
+@@ -115,14 +113,15 @@ ENDPROC(_resume_switched)
+ 
+ ENTRY(_cpu_resume)
+ 	mrs	x1, mpidr_el1
+-	adrp	x8, mpidr_hash
+-	add x8, x8, #:lo12:mpidr_hash // x8 = struct mpidr_hash phys address
+-        /* retrieve mpidr_hash members to compute the hash */
++	adr_l	x8, mpidr_hash		// x8 = struct mpidr_hash virt address
 +
-+	/*
-+	 * If we return here, we have a KASLR displacement in x23 which we need
-+	 * to take into account by discarding the current kernel mapping and
-+	 * creating a new one.
-+	 */
-+	msr	sctlr_el1, x20			// disable the MMU
-+	isb
-+	bl	__create_page_tables		// recreate kernel mapping
++	/* retrieve mpidr_hash members to compute the hash */
+ 	ldr	x2, [x8, #MPIDR_HASH_MASK]
+ 	ldp	w3, w4, [x8, #MPIDR_HASH_SHIFTS]
+ 	ldp	w5, w6, [x8, #(MPIDR_HASH_SHIFTS + 8)]
+ 	compute_mpidr_hash x7, x3, x4, x5, x6, x1, x2
+-        /* x7 contains hash index, let's use it to grab context pointer */
 +
-+	msr	sctlr_el1, x19			// re-enable the MMU
-+	isb
-+	ic	iallu				// flush instructions fetched
-+	dsb	nsh				// via old mapping
-+	isb
-+
-+	bl	__relocate_kernel
-+#endif
- #endif
- 	ldr	x8, =__primary_switched
- 	br	x8
++	/* x7 contains hash index, let's use it to grab context pointer */
+ 	ldr_l	x0, sleep_save_stash
+ 	ldr	x0, [x0, x7, lsl #3]
+ 	add	x29, x0, #SLEEP_STACK_DATA_CALLEE_REGS
 -- 
 2.7.4
