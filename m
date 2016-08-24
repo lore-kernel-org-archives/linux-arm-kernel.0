@@ -1,36 +1,51 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 24 Aug 2016 21:13:00 +0200
-Subject: [PATCH v3 2/5] ARM: dts: exynos: Use 'hpd-gpios' instead of
- 'hpd-gpio'
-In-Reply-To: <1472044039-16536-3-git-send-email-woogyom.kim@gmail.com>
-References: <1472044039-16536-1-git-send-email-woogyom.kim@gmail.com>
- <1472044039-16536-3-git-send-email-woogyom.kim@gmail.com>
-Message-ID: <20160824191300.GA31869@kozik-book>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 24 Aug 2016 22:22:22 +0300
+Subject: [PATCH v2] ARM: dts: blanche: add support for general purpose LEDs
+In-Reply-To: <5383928.8UnDsUpmkz@wasted.cogentembedded.com>
+References: <5383928.8UnDsUpmkz@wasted.cogentembedded.com>
+Message-ID: <2604564.o6QQK9elnf@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 10:07:16PM +0900, Milo Kim wrote:
-> This patch enables getting a HPD GPIO descriptor quickly.
-> The exynos-hdmi driver uses "hpd" for HDMI hot plug detection.
-> 
-> 	static int hdmi_resources_init(struct hdmi_context *hdata)
-> 	{
-> 		...
-> 		hdata->hpd_gpio = devm_gpiod_get(dev, "hpd", GPIOD_IN);
-> 		...
-> 	}
-> 
-> This calls 'of_find_gpio()' and it generates the GPIO consumer ID by referring
-> GPIO suffix. So 'hpd-gpios' is preferred on getting a GPIO descriptor.
-> 
-> However, if the device tree uses 'hpd-gpio', then the exynos-hdmi driver
-> always retries to get a GPIO descriptor because the first GPIO suffix is not
-> 'gpio' but 'gpios'. So you always see the debug message below.
-> 
-> 	of_get_named_gpiod_flags: can't parse 'hpd-gpios' property of node '/soc/hdmi at 14530000[0]'
->
+Add support for the general purpose LEDs on the Blanche board.
 
-Thanks for fixing this, applied!
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-BR,
-Krzysztof
+---
+This patch is against the 'renesas-devel-20160824-v4.8-rc3' of Simon Horman's
+'renesas.git'.
+
+Changes in version 2:
+- removed the "label" props.
+
+ arch/arm/boot/dts/r8a7792-blanche.dts |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/r8a7792-blanche.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
++++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
+@@ -159,6 +159,23 @@
+ 		};
+ 	};
+ 
++	leds {
++		compatible = "gpio-leds";
++
++		led17 {
++			gpios = <&gpio10 10 GPIO_ACTIVE_HIGH>;
++		};
++		led18 {
++			gpios = <&gpio10 11 GPIO_ACTIVE_HIGH>;
++		};
++		led19 {
++			gpios = <&gpio10 12 GPIO_ACTIVE_HIGH>;
++		};
++		led20 {
++			gpios = <&gpio10 23 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
+ 	vcc_sdhi0: regulator-vcc-sdhi0 {
+ 		compatible = "regulator-fixed";
+ 
