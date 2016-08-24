@@ -1,94 +1,133 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Wed, 24 Aug 2016 17:00:50 +0800
-Subject: [PATCH 1/1] arm64/hugetlb: clear PG_dcache_clean if the page is
- dirty when munmap
-In-Reply-To: <20160823172852.GB16213@e104818-lin.cambridge.arm.com>
-References: <20160707153741.GC27180@e104818-lin.cambridge.arm.com>
- <577F1FD9.1040205@huawei.com>
- <20160708135447.GB22099@e104818-lin.cambridge.arm.com>
- <577FC5AA.5010709@huawei.com>
- <20160708161347.GC22099@e104818-lin.cambridge.arm.com>
- <57839474.6030203@huawei.com>
- <20160712153535.GH22183@e104818-lin.cambridge.arm.com>
- <578EE603.9020206@huawei.com>
- <20160720091939.GA25890@e104818-lin.cambridge.arm.com>
- <57BA7D38.8030103@huawei.com>
- <20160823172852.GB16213@e104818-lin.cambridge.arm.com>
-Message-ID: <57BD6242.1080801@huawei.com>
+From: npiggin@gmail.com (Nicholas Piggin)
+Date: Wed, 24 Aug 2016 19:05:30 +1000
+Subject: [PATCH] arm: add an option for erratum 657417
+In-Reply-To: <3214675.EzzC1Ail5Z@wuerfel>
+References: <1470989957-23671-1-git-send-email-npiggin@gmail.com>
+ <2466265.8og15RQ8jv@wuerfel>
+ <20160824140044.266d045d@roar.ozlabs.ibm.com>
+ <3214675.EzzC1Ail5Z@wuerfel>
+Message-ID: <20160824190530.5b67b356@roar.ozlabs.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 24 Aug 2016 09:41:39 +0200
+Arnd Bergmann <arnd@arndb.de> wrote:
+
+> On Wednesday, August 24, 2016 2:00:44 PM CEST Nicholas Piggin wrote:
+> > On Tue, 23 Aug 2016 14:01:29 +0200
+> > Arnd Bergmann <arnd@arndb.de> wrote:
+> >   
+> > > On Friday, August 12, 2016 6:19:17 PM CEST Nicholas Piggin wrote:  
+> > > > Erratum 657417 is worked around by the linker by inserting additional
+> > > > branch trampolines to avoid problematic branch target locations. This
+> > > > results in much higher linking time and presumably slower and larger
+> > > > generated code. The workaround also seems to only be required when
+> > > > linking thumb2 code, but the linker applies it for non-thumb2 code as
+> > > > well.
+> > > > 
+> > > > The workaround today is left to the linker to apply, which is overly
+> > > > conservative.
+> > > > 
+> > > > https://sourceware.org/ml/binutils/2009-05/msg00297.html
+> > > > 
+> > > > This patch adds an option which defaults to "y" in cases where we
+> > > > could possibly be running Cortex A8 and using Thumb2 instructions.
+> > > > In reality the workaround might not be required at all for the kernel
+> > > > if virtual instruction memory is linear in physical memory. However it
+> > > > is more conservative to keep the workaround, and it may be the case
+> > > > that the TLB lookup would be required in order to catch branches to
+> > > > unmapped or no-execute pages.
+> > > > 
+> > > > In an allyesconfig build, this workaround causes a large load on
+> > > > the linker's branch stub hash and slows down the final link by a
+> > > > factor of 5.
+> > > > 
+> > > > Signed-off-by: Nicholas Piggin <npiggin@gmail.com>
+> > > >     
+> > > 
+> > > Thanks a lot for finding this issue. I can confirm that your patch
+> > > helps noticeably in all configurations, reducing time for a relink
+> > > from 18 minutes to 9 minutes on my machine in the best case, but
+> > > the factor 10 slowdown of the final link with your thin archives
+> > > and gc-sections patches remains.
+> > > 
+> > > I suspect there is still something else going on besides the 657417
+> > > slowing things down, but it's also possible that I'm doing something
+> > > wrong here.  
+> > 
+> > Okay, I was only testing thin archives. gc-sections I didn't look at.
+> > With thin archives, one final arm allyesconfig link with this patch is
+> > not showing a regression. gc-sections must be causing something else
+> > ARM specific, because powerpc seems to link fast with gc-sections.  
+> 
+> Ok, I see. For completeness, here are my results with thin archives and
+> without gc-sections on ARM:
+
+This is about what I saw.
+
+> 
+> || no THUMB2, thin archives, no gc-sections, before: 144 seconds
+> 
+> 09:29:51   LINK    vmlinux
+> 09:29:51  AR      built-in.o
+> 09:29:52  LD      vmlinux.o
+> 09:30:12   MODPOST vmlinux.o
+> 09:30:14  GEN     .version
+> 09:30:14   CHK     include/generated/compile.h
+>   UPD     include/generated/compile.h
+> 09:30:14   CC      init/version.o
+> 09:30:15   AR      init/built-in.o
+> 09:30:43  KSYM    .tmp_kallsyms1.o
+> 09:31:28  KSYM    .tmp_kallsyms2.o
+> 09:31:40  LD      vmlinux
+> 09:32:13  SORTEX  vmlinux
+> 09:32:13  SYSMAP  System.map
+> 09:32:15   OBJCOPY arch/arm/boot/Image
+> 
+> || no THUMB2, thin archives, no gc-sections, after: 70 seconds
+> 
+> 09:33:54   LINK    vmlinux
+> 09:33:54  AR      built-in.o
+> 09:33:55  LD      vmlinux.o
+> 09:34:13   MODPOST vmlinux.o
+> 09:34:15  GEN     .version
+> 09:34:16   CHK     include/generated/compile.h
+>   UPD     include/generated/compile.h
+> 09:34:16   CC      init/version.o
+> 09:34:16   AR      init/built-in.o
+> 09:34:24  KSYM    .tmp_kallsyms1.o
+> 09:34:43  KSYM    .tmp_kallsyms2.o
+> 09:34:55  LD      vmlinux
+> 09:35:03  SORTEX  vmlinux
+> 09:35:03  SYSMAP  System.map
+> 09:35:04   OBJCOPY arch/arm/boot/Image
+> 
+> The final 'LD' step is much faster here as you also found, and now
+> the time for the complete link is mainly the initial 'LD vmlinux.o'
+> step, which did not get faster with your patch.
+
+The info here isn't very good because KSYM is printed after the link
+but before the kallsyms generation. We can kind of see what's happening
+if we take the time between the KSYM and the LD vmlinux as the time for
+kallsyms: 
+                           before    after
+KSYM                      ~12s      ~12s
+LD      vmlinux.o          20s       18s
+LD      .tmp_kallsyms1.o   28s        8s
+LD      .tmp_kallsyms2.o   33s        7s
+LD      vmlinux            33s        8s
+
+Probably the cortex a8 workaround does not get applied to vmlinux.o
+link (due to being incremental), so we don't see any speedup with the
+patch. It takes longer overall I guess because it keeps a lot of
+symbols in the output file (due to incremental).
 
 
-On 2016/8/24 1:28, Catalin Marinas wrote:
-> On Mon, Aug 22, 2016 at 12:19:04PM +0800, Leizhen (ThunderTown) wrote:
->> On 2016/7/20 17:19, Catalin Marinas wrote:
->>> On Wed, Jul 20, 2016 at 10:46:27AM +0800, Leizhen (ThunderTown) wrote:
->>>>>>>> On 2016/7/8 21:54, Catalin Marinas wrote:
->>>>>>>>> ------------8<----------------
->>>>>>>>> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
->>>>>>>>> index dbd12ea8ce68..c753fa804165 100644
->>>>>>>>> --- a/arch/arm64/mm/flush.c
->>>>>>>>> +++ b/arch/arm64/mm/flush.c
->>>>>>>>> @@ -75,7 +75,8 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
->>>>>>>>>  	if (!page_mapping(page))
->>>>>>>>>  		return;
->>>>>>>>>  
->>>>>>>>> -	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
->>>>>>>>> +	if (!test_and_set_bit(PG_dcache_clean, &page->flags) ||
->>>>>>>>> +	    PageDirty(page))
->>>>>>>>>  		sync_icache_aliases(page_address(page),
->>>>>>>>>  				    PAGE_SIZE << compound_order(page));
->>>>>>>>>  	else if (icache_is_aivivt())
->>>>>>>>> ----------------8<---------------------
->>>>
->>>> Do you plan to send this patch? My colleagues told me that if our
->>>> patches are quite different, it should be Signed-off-by you.
->>>
->>> The reason I'm not sending it is that I don't fully understand how it
->>> solves the problem for a shared file mmap(), not just hugetlbfs. As I
->>> said in an earlier email: after an msync() in user space we
->>> should flush the pages to disk via write_cache_pages(). This function
->> Hi Catalin:
->>    I'm so sorry for my fault. The previous small pages test result I actually ran on ramfs.
->> Today, I ran the case on harddisk fs, it worked well without this patch.
->>
->> Summarized as follows:
->> small pages on ramfs: need this patch
->> small pages on harddisk fs: no need this patch
->> hugetlbfs: need this patch
+> > Can you send your latest ARM patch to enable this and I'll have a look
+> > at it?  
 > 
-> I would add:
-> 
-> small pages over nfs: fails with or without this patch
-> 
-> (tested on Juno, Cortex-A57; seems to be fixed if I remove the
-> PG_dcache_clean test altogether but, well, we end up over-flushing)
-> 
-> I assume that when using a hard drive, it goes through the block I/O
-> layer and we may have a flush_dcache_page() called when the kernel is
-> about to read a page that has been mapped in user space. This would
-> clear the PG_dcache_clean bit and subsequent __sync_icache_dcache()
-> would perform cache maintenance.
-> 
-> Could you try on your system the test case without the msync() call? I'm
-According to my test results: without msync, the test case may failed.
+> See below. I have not updated the patch description yet, but included
+> the changes that Nico suggested. The test above used the same patch
+> but left out the 'select LD_DEAD_CODE_DATA_ELIMINATION' line.
 
-10-175-112-211:~ # ./tst_small_page_no_msync
-Test is Failed: The result is 0x316b9, expect = 0x365a5
-10-175-112-211:~ # ./tst_small_page_no_msync
-Test is Failed: The result is 0x31023, expect = 0x31efa
-10-175-112-211:~ # ./tst_small_page_no_msync
-Test is Passed: The result is 0x31efa, expect = 0x31efa
-
-10-175-112-211:~ # ./tst_small_page
-Test is Passed: The result is 0x31eb7, expect = 0x31eb7
-10-175-112-211:~ # ./tst_small_page
-Test is Passed: The result is 0x3111f, expect = 0x3111f
-10-175-112-211:~ # ./tst_small_page
-Test is Passed: The result is 0x3111f, expect = 0x3111f
-
-> not sure whether munmap() would trigger an immediate write-back, in
-> which case we may see the issue even with the filesystem on a hard
-> drive.
-> 
+Thanks, I'll take a look.
