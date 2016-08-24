@@ -1,47 +1,37 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Wed, 24 Aug 2016 16:09:29 +0100
-Subject: [RFC][PATCH] Kconfig: ARCH_HISI: Add PINCTRL to HISI platform
-In-Reply-To: <1471905930-12438-1-git-send-email-john.stultz@linaro.org>
-References: <1471905930-12438-1-git-send-email-john.stultz@linaro.org>
-Message-ID: <57BDB8A9.3050905@hisilicon.com>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 24 Aug 2016 17:12:22 +0200
+Subject: [PATCH v3] thermal: tango: add resume support
+In-Reply-To: <2198269.vtL6N6bMEV@wuerfel>
+References: <57726196.5060909@free.fr> <3377280.mzxhCYOnLL@wuerfel>
+ <1472027140.2682.49.camel@intel.com> <2198269.vtL6N6bMEV@wuerfel>
+Message-ID: <57BDB956.8020709@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John,
+On 24/08/2016 10:32, Arnd Bergmann wrote:
 
-On 22/08/2016 23:45, John Stultz wrote:
-> Things won't work if PINCTRL isn't enabled,
-> so make sure to explicitly set it rather
-> then betting that we have some other platform
-> configed in which selects it.
+> I think the ideal is to have only one set of conditionals in each
+> driver, so at least you don't get a mismatch between them.
 > 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Wei Xu <xuwei5@hisilicon.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: John Stultz <john.stultz@linaro.org>
-> ---
-
-Applied to hisi-defconfig-4.9 branch.
-Thanks!
-
-Best Regards,
-Wei
-
->  arch/arm64/Kconfig.platforms | 1 +
->  1 file changed, 1 insertion(+)
+> SIMPLE_DEV_PM_OPS uses conditional evaluation (but does not
+> show the reference to the compiler). Annotating the functions as
+> __maybe_unused lets the compiler decide for itself if they should
+> be dropped or not, which means we use only the conditional inside
+> of SIMPLE_DEV_PM_OPS.
 > 
-> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> index be5d824..f848946 100644
-> --- a/arch/arm64/Kconfig.platforms
-> +++ b/arch/arm64/Kconfig.platforms
-> @@ -67,6 +67,7 @@ config ARCH_HISI
->  	bool "Hisilicon SoC Family"
->  	select ARM_TIMER_SP804
->  	select HISILICON_IRQ_MBIGEN if PCI
-> +	select PINCTRL
->  	help
->  	  This enables support for Hisilicon ARMv8 SoC family
->  
-> 
+> Ideally, SIMPLE_DEV_PM_OPS itself should have used an IS_ENABLED()
+> check instead of the #ifdef, that would have made it possible to
+> just leave the function always defined with no __maybe_unused, but
+> still have it dropped from the object code without a warning
+> when there is no runtime reference.
+
+I'm not sure my trivial issue deserves this much discussion. I just
+want the patch to be upstream in some form.
+
+I'll submit one more patch, with SIMPLE_DEV_PM_OPS used unconditionally,
+and annotate the resume function with __maybe_unused.
+
+This will waste the space of the struct on systems where S3 is disabled,
+but it seems to be the preferred solution, IIUC.
+
+Regards.
