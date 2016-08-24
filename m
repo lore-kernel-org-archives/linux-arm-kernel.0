@@ -1,62 +1,47 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 24 Aug 2016 15:30:25 +0200
-Subject: [PATCH 04/10] reset: meson: add driver Kconfig option
-In-Reply-To: <1472045342-7434-4-git-send-email-p.zabel@pengutronix.de>
-References: <1472045342-7434-1-git-send-email-p.zabel@pengutronix.de>
- <1472045342-7434-4-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <736e8932-ccaf-2871-2633-a2960dcb6f3d@baylibre.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 24 Aug 2016 15:32:07 +0200
+Subject: [PATCH 2/2] reset: uniphier: use of_device_get_match_data() to
+ get matched data
+In-Reply-To: <CAK7LNASCtZNMdSO33z5K1jPac_DPTnt3aUaC+CCNrrUdm_hq9w@mail.gmail.com>
+References: <1472020830-16059-1-git-send-email-yamada.masahiro@socionext.com>
+ <1472020830-16059-3-git-send-email-yamada.masahiro@socionext.com>
+ <1472041622.5335.32.camel@pengutronix.de>
+ <CAK7LNASCtZNMdSO33z5K1jPac_DPTnt3aUaC+CCNrrUdm_hq9w@mail.gmail.com>
+Message-ID: <1472045527.5335.46.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/24/2016 03:28 PM, Philipp Zabel wrote:
-> Visible only if COMPILE_TEST is enabled, this allows to include the
-> driver in build tests.
+Am Mittwoch, den 24.08.2016, 21:29 +0900 schrieb Masahiro Yamada:
+[...]
+> >> @@ -285,6 +286,45 @@ static const struct reset_control_ops uniphier_reset_ops = {
+> >>       .status = uniphier_reset_status,
+> >>  };
+> >>
+> >> +static int uniphier_reset_probe(struct platform_device *pdev)
+> >> +{
+> >> +     struct device *dev = &pdev->dev;
+> >> +     struct uniphier_reset_priv *priv;
+> >> +     const struct uniphier_reset_data *p, *data;
+> >> +     struct regmap *regmap;
+> >> +     struct device_node *parent;
+> >> +     unsigned int nr_resets = 0;
+> >> +
+> >> +     data = of_device_get_match_data(dev);
+> >> +     WARN_ON(!data);
+> >
+> > I know right now this can't happen anyway, but you did return -EINVAL
+> > here before. Maybe use:
+> >
+> >         if (WARN_ON(!data))
+> >                 return -EINVAL;
+> >
+> > instead? I can fix it up if you agree.
 > 
-> Cc: Neil Armstrong <narmstrong@baylibre.com>
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
->  drivers/reset/Kconfig  | 6 ++++++
->  drivers/reset/Makefile | 2 +-
->  2 files changed, 7 insertions(+), 1 deletion(-)
+> I agree.
 > 
-> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-> index 8e33de2..fdf942d 100644
-> --- a/drivers/reset/Kconfig
-> +++ b/drivers/reset/Kconfig
-> @@ -34,6 +34,12 @@ config RESET_LPC18XX
->  	  This enables the LPC18xx/43 reset driver that supports the reset
->  	  controllers on AR71xx SoCs.
->  
-> +config RESET_MESON
-> +	bool "Meson Reset Driver" if COMPILE_TEST
-> +	default ARCH_MESON
-> +	help
-> +	  This enables the reset driver for Amlogic Meson SoCs.
-> +
->  config RESET_OXNAS
->  	bool
->  
-> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-> index 25aa05a..1408cba 100644
-> --- a/drivers/reset/Makefile
-> +++ b/drivers/reset/Makefile
-> @@ -1,7 +1,6 @@
->  obj-y += core.o
->  obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
->  obj-$(CONFIG_MACH_PISTACHIO) += reset-pistachio.o
-> -obj-$(CONFIG_ARCH_MESON) += reset-meson.o
->  obj-$(CONFIG_ARCH_STM32) += reset-stm32.o
->  obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
->  obj-$(CONFIG_ARCH_STI) += sti/
-> @@ -10,6 +9,7 @@ obj-$(CONFIG_ARCH_ZYNQ) += reset-zynq.o
->  obj-$(CONFIG_RESET_ATH79) += reset-ath79.o
->  obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
->  obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
-> +obj-$(CONFIG_RESET_MESON) += reset-meson.o
->  obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
->  obj-$(CONFIG_TI_SYSCON_RESET) += reset-ti-syscon.o
->  obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
-> 
+> Please fix it up.  Thanks!
 
+Ok, done.
 
-Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+regards
+Philipp
