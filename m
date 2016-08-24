@@ -1,36 +1,47 @@
 From: mirza.krak@gmail.com (Mirza Krak)
-Date: Wed, 24 Aug 2016 15:37:13 +0200
-Subject: [PATCH v2 1/6] clk: tegra: add TEGRA20_CLK_NOR to init table
+Date: Wed, 24 Aug 2016 15:37:16 +0200
+Subject: [PATCH v2 4/6] ARM: tegra: Add Tegra30 GMI support
 In-Reply-To: <1472045838-22628-1-git-send-email-mirza.krak@gmail.com>
 References: <1472045838-22628-1-git-send-email-mirza.krak@gmail.com>
-Message-ID: <1472045838-22628-2-git-send-email-mirza.krak@gmail.com>
+Message-ID: <1472045838-22628-5-git-send-email-mirza.krak@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mirza Krak <mirza.krak@gmail.com>
 
-Add TEGRA20_CLK_NOR to init tabel and set default rate to 92 MHz which
-is max rate.
+Add a device node for the GMI controller found on Tegra30.
 
 Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
 ---
 Changes in v2:
-- no changes
+- added address-cells, size-cells and ranges properties
 
- drivers/clk/tegra/clk-tegra20.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/tegra30.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
-index 837e5cb..13d3b5a 100644
---- a/drivers/clk/tegra/clk-tegra20.c
-+++ b/drivers/clk/tegra/clk-tegra20.c
-@@ -1047,6 +1047,7 @@ static struct tegra_clk_init_table init_table[] __initdata = {
- 	{ TEGRA20_CLK_SDMMC3, TEGRA20_CLK_PLL_P, 48000000, 0 },
- 	{ TEGRA20_CLK_SDMMC4, TEGRA20_CLK_PLL_P, 48000000, 0 },
- 	{ TEGRA20_CLK_SPI, TEGRA20_CLK_PLL_P, 20000000, 0 },
-+	{ TEGRA20_CLK_NOR, TEGRA20_CLK_PLL_P, 92000000, 0 },
- 	{ TEGRA20_CLK_SBC1, TEGRA20_CLK_PLL_P, 100000000, 0 },
- 	{ TEGRA20_CLK_SBC2, TEGRA20_CLK_PLL_P, 100000000, 0 },
- 	{ TEGRA20_CLK_SBC3, TEGRA20_CLK_PLL_P, 100000000, 0 },
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 5030065..1b26308 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -439,6 +439,19 @@
+ 		status = "disabled";
+ 	};
+
++	gmi at 70009000 {
++		compatible = "nvidia,tegra30-gmi";
++		reg = <0x70009000 0x1000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x48000000 0x7ffffff>;
++		clocks = <&tegra_car TEGRA30_CLK_NOR>;
++		clock-names = "gmi";
++		resets = <&tegra_car 42>;
++		reset-names = "gmi";
++		status = "disabled";
++	};
++
+ 	pwm: pwm at 7000a000 {
+ 		compatible = "nvidia,tegra30-pwm", "nvidia,tegra20-pwm";
+ 		reg = <0x7000a000 0x100>;
 --
 2.1.4
