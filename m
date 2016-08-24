@@ -1,40 +1,50 @@
-From: arvind.yadav.cs@gmail.com (arvind Yadav)
-Date: Wed, 24 Aug 2016 19:52:45 +0530
-Subject: [v.1] clk:clk-rockchip:-of_iomap failed to remap then abort clock
- initialization.
-In-Reply-To: <1528160.BtdbmuP27T@diego>
-References: <1471101978-1881-1-git-send-email-arvind.yadav.cs@gmail.com>
- <1528160.BtdbmuP27T@diego>
-Message-ID: <fa254e23-818c-0698-cbbc-68c983e83203@gmail.com>
+From: sf84@laposte.net (Sebastian Frias)
+Date: Wed, 24 Aug 2016 16:29:02 +0200
+Subject: ARM,SoC: About the use DT-defined properties by 3rd-party drivers
+Message-ID: <57BDAF2E.10502@laposte.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-yes, I am referring this code for clock control.
+Hi,
 
---Arvind
+Given a SoC and its SDK, 3rd party users of said SoC (customers of the SoC's
+manufacturer) may need/want to write kernel modules.
+Since the DT describes the HW, it would make sense to expose some HW properties
+through the DT, and have 3rd party users rely on them to write their drivers in
+a generic way.
+However, it seems that one is not allowed to upstream DT bindings and
+properties without a driver, is that right?
 
+If true, that hampers DT usage by out-of-tree drivers (or in this case,
+drivers that are not written yet) and limits the usage of DT properties as an
+API.
 
-On Tuesday 23 August 2016 09:45 PM, Heiko St?bner wrote:
-> Hi Arvind,
->
-> Am Samstag, 13. August 2016, 20:56:18 schrieb Arvind Yadav:
->> -check return of 'of_iomap'.if It's falied to remap then abort.
->>
->> -Unmap a region obtained by remap. iounmap frees the mapping when failed
->> to allocate the memory.
->>
->> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
->> ---
->>   drivers/clk/rockchip/clk-rockchip.c | 7 ++++++-
-> I've applied the patch, after rewording both patch subject and message [0].
->
-> That driver is deprecated for quite some time, see
-> Documenation/devicetree/bindings/clock/rockchip.txt - so I'm hoping this is
-> more of a random find and you're not actually using it?
->
->
-> Thanks
-> Heiko
->
-> [0] https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commit/?id=023a8280b8355a0aebe094299afec8d8b7b264cd
->
+We can understand that DT maintainers want to know what goes upstream,
+make sure that the bindings are documented, that there are no conflicts with
+other bindings or generic strings, etc.
+However, it is hard to see why there is not a "relaxed" upstreaming path
+for SoC-specific properties (i.e.: that do not affect DT API nor other
+SoCs).
+
+As an example, we would like to add some properties to /soc/ like:
+
+   soc {
+       compatible = "simple-bus";
+       ...
+       sigma-register-layout-version = <2>;
+       sigma-has-XYZ-capability;
+
+and so on.
+
+If this is really not possible, it forces the SoC manufacturer to expose
+those properties in a different way, thus wasting a (seemingly) perfectly
+fine way of doing so: the DT and its documentation.
+
+Thoughts?
+
+By the way, what about properties generated on-the-fly by the bootloader?
+
+Thanks in advance.
+Best regards,
+
+Sebastian
