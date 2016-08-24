@@ -1,57 +1,29 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 24 Aug 2016 17:38:19 +0900
-Subject: [PATCH 1/2] clk: samsung: exynos5260: Move struct samsung_cmu_info
- to init section
-In-Reply-To: <20160824044346.GR6502@codeaurora.org>
-References: <1471834185-20249-1-git-send-email-cw00.choi@samsung.com>
- <1471834185-20249-2-git-send-email-cw00.choi@samsung.com>
- <CGME20160823005523epcas1p3993794ba487bb055cbf8a0b247fcb280@epcas1p3.samsung.com>
- <20160823005512.GP6502@codeaurora.org> <57BBB66E.2060807@samsung.com>
- <84e40b9b-1e08-24e0-f1ef-60b38b760ae6@samsung.com>
- <20160824044346.GR6502@codeaurora.org>
-Message-ID: <57BD5CFB.5050500@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 24 Aug 2016 10:52:34 +0200
+Subject: [PATCH 0/4] EBI2 bus and ethernet on MSM8660/APQ8060
+Message-ID: <1472028758-29272-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016? 08? 24? 13:43, Stephen Boyd wrote:
-> On 08/23, Sylwester Nawrocki wrote:
->> On 08/23/2016 04:35 AM, Chanwoo Choi wrote:
->> I checked stripped object files and it seems with the patch there
->> is some saving of the kernel image size. Exactly 784 bytes, which
->> makes zImage smaller by 480 bytes.
->>
->> The patch increases .init.rodata section size by 780 bytes but 
->> decreases .init.text section size by 1564 bytes.  Looks like 
->> a static initializer is cheaper.
->>
->> $ ls -l  drivers/clk/samsung/clk-exynos5260.o
->>
->> < -rw-rw-r-- 1 snawrocki snawrocki 29100 Aug 23 11:35 drivers/clk/samsung/clk-exynos5260.o
->> ---
->>> -rw-rw-r-- 1 snawrocki snawrocki 28316 Aug 23 11:32 drivers/clk/samsung/clk-exynos5260.o
->>
->>
->> The section size differences are as below:
->> 15c15
->> <   3 .init.text    000006b8  00000000  00000000  00000034  2**2
->> ---
->>>   3 .init.text    0000009c  00000000  00000000  00000034  2**2
->> 25c25
->> <   8 .init.rodata  00003f6c  00000000  00000000  00002f20  2**2
->> ---
->>>   8 .init.rodata  00004278  00000000  00000000  00002904  2**2
->>
->> So the saving is rather insignificant but the patch doesn't make
->> things worse and I'd say it might be worth applying.
->>
-> 
-> Sounds good. This sort of information should be in the commit
-> text though. Talking about const doesn't make any sense to me.
+This is the second iteration of the EBI2+ethernet series for
+MSM8660/APQ8060. Things are working like a charm on the APQ8060
+Dragonboard and all review comments are addressed AFAICT.
 
-Do you mean that 'const' is initconst secion?
-If possible, could you explain the anything
-why you don't make sense about 'const'?
+Linus Walleij (4):
+  soc: qcom: add EBI2 device tree bindings
+  soc: qcom: add EBI2 driver
+  ARM: dts: add EBI2 to the Qualcomm MSM8660 DTSI
+  ARM: dts: add SMSC ethernet on the APQ8060 Dragonboard
+
+ .../devicetree/bindings/bus/qcom,ebi2.txt          | 136 +++++++
+ arch/arm/boot/dts/qcom-apq8060-dragonboard.dts     | 130 +++++++
+ arch/arm/boot/dts/qcom-msm8660.dtsi                |  17 +
+ drivers/bus/Kconfig                                |   7 +
+ drivers/bus/Makefile                               |   1 +
+ drivers/bus/qcom-ebi2.c                            | 404 +++++++++++++++++++++
+ 6 files changed, 695 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/bus/qcom,ebi2.txt
+ create mode 100644 drivers/bus/qcom-ebi2.c
 
 -- 
-Best Regards,
-Chanwoo Choi
+2.7.4
