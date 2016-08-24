@@ -1,136 +1,97 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 24 Aug 2016 17:59:32 +0200
-Subject: [PATCH v5 2/3] arm64: vmlinux.ld: Add mmuoff text and data
- sections
-In-Reply-To: <57BDC1F7.2010306@arm.com>
-References: <1471887319-26702-1-git-send-email-james.morse@arm.com>
- <1471887319-26702-3-git-send-email-james.morse@arm.com>
- <CAKv+Gu9x38UjUY6HA2KwZDZssqCAxYE+OiU96eq_ppnVTG=ERA@mail.gmail.com>
- <57BDC1F7.2010306@arm.com>
-Message-ID: <CAKv+Gu-kfVqbvz=Zk6aORb2O-qjYsicokORXCBxpvJVKdw7kNQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 24 Aug 2016 17:13:48 +0100
+Subject: [PATCH v2 2/9] arm64: kernel: fix style issues in sleep.S
+In-Reply-To: <1472049366-10922-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1472049366-10922-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160824161346.GA30036@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 August 2016 at 17:49, James Morse <james.morse@arm.com> wrote:
-> Hi Ard,
->
-> On 23/08/16 14:11, Ard Biesheuvel wrote:
->> On 22 August 2016 at 19:35, James Morse <james.morse@arm.com> wrote:
->>> Resume from hibernate needs to clean any text executed by the kernel with
->>> the MMU off to the PoC. Collect these functions together into a new
->>> .mmuoff.text section.
->>
->> Wouldn't it be much simpler to move all of this into the .idmap.text
->> section? It is not that much code, and they intersect anyway (i.e.,
->> some .idmap.text code is only called with the MMU off)
->
-> That's an idea, it changes the meaning of the things in that section slightly
-> but saves multiplying linker sections like this.
->
->
->>> Data is more complicated, secondary_holding_pen_release is written with
->>> the MMU on, clean and invalidated, then read with the MMU off. In contrast
->>> __boot_cpu_mode is written with the MMU off, the corresponding cache line
->>> is invalidated, so when we read it with the MMU on we don't get stale data.
->>> These cache maintenance operations conflict with each other if the values
->>> are within a Cache Writeback Granule (CWG) of each other.
->>> Collect the data into two sections .mmuoff.data.read and .mmuoff.data.write,
->>> the linker script ensures mmuoff.data.write section is aligned to the
->>> architectural maximum CWG of 2KB.
->
->>> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
->>> index 659963d40bb4..97c3f36ce30b 100644
->>> --- a/arch/arm64/kernel/vmlinux.lds.S
->>> +++ b/arch/arm64/kernel/vmlinux.lds.S
->>> @@ -120,6 +120,9 @@ SECTIONS
->>>                         IRQENTRY_TEXT
->>>                         SOFTIRQENTRY_TEXT
->>>                         ENTRY_TEXT
->>> +                       __mmuoff_text_start = .;
->>> +                       *(.mmuoff.text)
->>> +                       __mmuoff_text_end = .;
->>
->> Could you add a define for this like we have for the other ones?
->
-> I should have thought of that. If its merged with the idmap this disappears
-> completely.
->
->
->>
->>>                         TEXT_TEXT
->>>                         SCHED_TEXT
->>>                         LOCK_TEXT
->>> @@ -185,6 +188,24 @@ SECTIONS
->>>         _data = .;
->>>         _sdata = .;
->>>         RW_DATA_SECTION(L1_CACHE_BYTES, PAGE_SIZE, THREAD_SIZE)
->>> +
->>> +       /*
->>> +        * Data written with the MMU off but read with the MMU on requires
->>> +        * cache lines to be invalidated, discarding up to a Cache Writeback
->>> +        * Granule (CWG) of data from the cache. Keep the section that
->>> +        * requires this type of maintenance to be in its own Cache Writeback
->>> +        * Granule (CWG) area so the cache maintenance operations don't
->>> +        * don't interfere with adjacent data.
->>> +        */
->>> +       .mmuoff.data.write : ALIGN(SZ_2K) {
->>> +               __mmuoff_data_start = .;
->>> +               *(.mmuoff.data.write)
->>> +       }
->>> +       .mmuoff.data.read : ALIGN(SZ_2K) {
->>> +               *(.mmuoff.data.read)
->>> +               __mmuoff_data_end = .;
->>> +       }
->>> +
->>
->> This looks fine now, with the caveat that empty sections are dropped
->> completely by the linker (including their alignment), and so the start
->> and end markers may assume unexpected values.
->>
->> For instance, if .mmuoff.data.read turns out empty in the build (and I
->> am aware this is theoretical), the section will be dropped, and
->> __mmuoff_data_end may assume a value that exceeds _edata.
->
-> Really?
-> /me tries it.
-> ... okay that's weird ...
->
->
->> This is
->> actually fine, as long as you put a
->>
->> . = ALIGN(SZ_2K);
->>
->> before BSS_SECTION() to ensure that the cache invalidation does not
->> affect .bss in case .mmuoff.data.read does turn out empty
->
-> This can happen because the ALIGN() is attached to a different section, that
-> could be removed. Is this sufficient?:
->>???????.mmuoff.data.write : ALIGN(SZ_2K) {
->>??????? __mmuoff_data_start = .;
->>??????? *(.mmuoff.data.write)
->>???????}
->>???????. = ALIGN(SZ_2K);
->>???????.mmuoff.data.read : {
->>??????? *(.mmuoff.data.read)
->>??????? __mmuoff_data_end = .;
->>???????}
->
->
+On Wed, Aug 24, 2016 at 04:35:59PM +0200, Ard Biesheuvel wrote:
+> This fixes a number of style issues in sleep.S. No functional changes are
+> intended:
+> - replace absolute literal references with relative references in
+>   __cpu_suspend_enter(), which executes from its virtual address
+> - replace explicit lr assignment plus branch with bl in cpu_resume(), which
+>   aligns it with stext() and secondary_startup()
+> - use adr_l for mpidr_hash reference, and fix the incorrect accompanying
+>   comment
 
-I suppose that would work, the only difference being that the location
-pointer is advanced even if .mmuoff.data.write turns out empty. Of
-course, that does not matter at all given that that will never be the
-case anyway.
+It looks like the comment was true until commit cabe1c81ea5be983 ("arm64:
+Change cpu_resume() to enable mmu early then access sleep_sp by va"), which may
+be worth calling out here.
 
->> (or
->> alternatively, put the alignment inside the BSS_SECTION() invocation,
->> as I did in my example before)
->
-> What worries me about that is the alignment has nothing to do with the BSS. It's
-> not even anything to do with the 'PECOFF_EDATA_PADDING/_edata' that appears
-> before it.
->
+> - replace leading spaces with tabs, and add a bit of whitespace for
+>   readability
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-The linker simply tries not to emit padding in case the paddee ends up
-being dropped.
+Regardless of the above, this looks like a good improvement to me, for all
+points mentioned in the commit message. FWIW:
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
+> ---
+>  arch/arm64/kernel/sleep.S | 19 +++++++++----------
+>  1 file changed, 9 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+> index 182129b60fdf..bbc63099223b 100644
+> --- a/arch/arm64/kernel/sleep.S
+> +++ b/arch/arm64/kernel/sleep.S
+> @@ -73,10 +73,9 @@ ENTRY(__cpu_suspend_enter)
+>  	str	x2, [x0, #SLEEP_STACK_DATA_SYSTEM_REGS + CPU_CTX_SP]
+>  
+>  	/* find the mpidr_hash */
+> -	ldr	x1, =sleep_save_stash
+> -	ldr	x1, [x1]
+> +	ldr_l	x1, sleep_save_stash
+>  	mrs	x7, mpidr_el1
+> -	ldr	x9, =mpidr_hash
+> +	adr_l	x9, mpidr_hash
+>  	ldr	x10, [x9, #MPIDR_HASH_MASK]
+>  	/*
+>  	 * Following code relies on the struct mpidr_hash
+> @@ -95,14 +94,13 @@ ENTRY(__cpu_suspend_enter)
+>  	mov	x0, #1
+>  	ret
+>  ENDPROC(__cpu_suspend_enter)
+> -	.ltorg
+>  
+>  ENTRY(cpu_resume)
+>  	bl	el2_setup		// if in EL2 drop to EL1 cleanly
+> +	bl	__cpu_setup
+>  	/* enable the MMU early - so we can access sleep_save_stash by va */
+> -	adr_l	lr, __enable_mmu	/* __cpu_setup will return here */
+>  	adr_l	x27, _resume_switched	/* __enable_mmu will branch here */
+> -	b	__cpu_setup
+> +	b	__enable_mmu
+>  ENDPROC(cpu_resume)
+>  
+>  	.pushsection	".idmap.text", "ax"
+> @@ -115,14 +113,15 @@ ENDPROC(_resume_switched)
+>  
+>  ENTRY(_cpu_resume)
+>  	mrs	x1, mpidr_el1
+> -	adrp	x8, mpidr_hash
+> -	add x8, x8, #:lo12:mpidr_hash // x8 = struct mpidr_hash phys address
+> -        /* retrieve mpidr_hash members to compute the hash */
+> +	adr_l	x8, mpidr_hash		// x8 = struct mpidr_hash virt address
+> +
+> +	/* retrieve mpidr_hash members to compute the hash */
+>  	ldr	x2, [x8, #MPIDR_HASH_MASK]
+>  	ldp	w3, w4, [x8, #MPIDR_HASH_SHIFTS]
+>  	ldp	w5, w6, [x8, #(MPIDR_HASH_SHIFTS + 8)]
+>  	compute_mpidr_hash x7, x3, x4, x5, x6, x1, x2
+> -        /* x7 contains hash index, let's use it to grab context pointer */
+> +
+> +	/* x7 contains hash index, let's use it to grab context pointer */
+>  	ldr_l	x0, sleep_save_stash
+>  	ldr	x0, [x0, x7, lsl #3]
+>  	add	x29, x0, #SLEEP_STACK_DATA_CALLEE_REGS
+> -- 
+> 2.7.4
+> 
