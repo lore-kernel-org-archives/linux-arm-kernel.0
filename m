@@ -1,59 +1,44 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 24 Aug 2016 13:00:34 +0200
-Subject: [PATCH v13 0/4] Mediatek MT8173 CMDQ support
-In-Reply-To: <1472009252-1074-1-git-send-email-hs.liao@mediatek.com>
-References: <1472009252-1074-1-git-send-email-hs.liao@mediatek.com>
-Message-ID: <20b10079-3ae2-9da9-1149-0bceabac9837@gmail.com>
+From: daniel@zonque.org (Daniel Mack)
+Date: Wed, 24 Aug 2016 13:01:44 +0200
+Subject: [PATCH v3 0/2] AM335x-ICE: Add support for rotary switch
+In-Reply-To: <5294e820-4946-a196-549f-76a349b6606d@ti.com>
+References: <20160824075859.30979-1-vigneshr@ti.com>
+ <c5385d42-14e4-d5ca-370e-5b04e37d873d@zonque.org>
+ <5294e820-4946-a196-549f-76a349b6606d@ti.com>
+Message-ID: <86711a29-8fb5-9804-8642-2f390081e677@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 08/24/2016 11:15 AM, Vignesh R wrote:
+> On Wednesday 24 August 2016 02:05 PM, Daniel Mack wrote:
+>> On 08/24/2016 09:58 AM, Vignesh R wrote:
+>>> This series adds support for rotary-switch on AM335x-ICE that is
+>>> connected to TI PCA9536 I2C GPIO expander.
+>>> First patch adds new generic driver to read status of group of GPIO
+>>> lines and report the value as an input event. The second patch adds DT
+>>> entries for the same.
+>>>
+>>> v2: https://lkml.org/lkml/2016/8/23/111
+>>> v1: https://lkml.org/lkml/2016/8/12/7
+>>
+>> Is there a reason why the rotary-encoder driver cannot handle this?
+>> Commit 7dde4e74744 ("Input: rotary-encoder - support more than 2 gpios
+>> as input") added support for that mode AFAIU.
+>>
+> 
+> Rotary encoder driver handles incremental encoders only and does not
+> support absolute encoders. The rotary switch on am335x-ice is different
+> from the incremental encoders in the
+> sense that GPIO line status directly reflect the position(number)
+> pointed by the dial of the encoder. So, there is no need to count steps
+> or know the direction of rotation as it does not matter.
+> 
+> I did try to enhance rotary-encoder driver to support absolute
+> encoder[1] but the comment there was to write new driver that simply
+> translates gpio-encoded value into ABS* event. Indeed, the new driver
+> looks more simple and can handle more such hardwares.
+
+Okay. Yes, that makes sense. Thanks for the explanation!
 
 
-On 24/08/16 05:27, HS Liao wrote:
->
-> Hi,
->
-> This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
-> to help write registers with critical time limitation, such as
-> updating display configuration during the vblank. It controls Global
-> Command Engine (GCE) hardware to achieve this requirement.
->
-> These patches have a build dependency on top of v4.8-rc1.
->
-> Changes since v12:
->  - remove mediatek,gce from device tree
-
-Why? The binding got accepted by Rob.
-
->
-> Best regards,
-> HS Liao
->
-> HS Liao (4):
->   dt-bindings: soc: Add documentation for the MediaTek GCE unit
->   CMDQ: Mediatek CMDQ driver
->   arm64: dts: mt8173: Add GCE node
->   CMDQ: save more energy in idle
->
->  .../devicetree/bindings/soc/mediatek/gce.txt       |  44 +
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  10 +
->  drivers/soc/mediatek/Kconfig                       |  11 +
->  drivers/soc/mediatek/Makefile                      |   1 +
->  drivers/soc/mediatek/mtk-cmdq.c                    | 983 +++++++++++++++++++++
-
-The driver uses the mailbox framework, so it should live in the 
-drivers/mailbox folder.
-
-Please don't forget to add Jassi to the loop, as he is the maintainer of 
-this subsystem and the last instance to decide if/when the driver will 
-get accepted.
-
-Thanks,
-Matthias
-
->  include/soc/mediatek/cmdq.h                        | 180 ++++
->  6 files changed, 1229 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/gce.txt
->  create mode 100644 drivers/soc/mediatek/mtk-cmdq.c
->  create mode 100644 include/soc/mediatek/cmdq.h
->
+Daniel
