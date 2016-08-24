@@ -1,48 +1,36 @@
 From: mirza.krak@gmail.com (Mirza Krak)
-Date: Wed, 24 Aug 2016 15:37:17 +0200
-Subject: [PATCH v2 5/6] ARM: tegra: Add Tegra20 GMI support
+Date: Wed, 24 Aug 2016 15:37:13 +0200
+Subject: [PATCH v2 1/6] clk: tegra: add TEGRA20_CLK_NOR to init table
 In-Reply-To: <1472045838-22628-1-git-send-email-mirza.krak@gmail.com>
 References: <1472045838-22628-1-git-send-email-mirza.krak@gmail.com>
-Message-ID: <1472045838-22628-6-git-send-email-mirza.krak@gmail.com>
+Message-ID: <1472045838-22628-2-git-send-email-mirza.krak@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mirza Krak <mirza.krak@gmail.com>
 
-Add a device node for the GMI controller found on Tegra20.
+Add TEGRA20_CLK_NOR to init tabel and set default rate to 92 MHz which
+is max rate.
 
 Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
 ---
 Changes in v2:
-- added address-cells, size-cells and ranges properties
+- no changes
 
- arch/arm/boot/dts/tegra20.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ drivers/clk/tegra/clk-tegra20.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 2207c08..03eb029 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -376,6 +376,20 @@
- 		status = "disabled";
- 	};
-
-+
-+	gmi at 70009000 {
-+		compatible = "nvidia,tegra20-gmi";
-+		reg = <70009000 0x1000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0x48000000 0x7ffffff>;
-+		clocks = <&tegra_car TEGRA20_CLK_NOR>;
-+		clock-names = "gmi";
-+		resets = < &tegra_car 42>;
-+		reset-names = "gmi";
-+		status = "disabled";
-+	};
-+
- 	pwm: pwm at 7000a000 {
- 		compatible = "nvidia,tegra20-pwm";
- 		reg = <0x7000a000 0x100>;
+diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
+index 837e5cb..13d3b5a 100644
+--- a/drivers/clk/tegra/clk-tegra20.c
++++ b/drivers/clk/tegra/clk-tegra20.c
+@@ -1047,6 +1047,7 @@ static struct tegra_clk_init_table init_table[] __initdata = {
+ 	{ TEGRA20_CLK_SDMMC3, TEGRA20_CLK_PLL_P, 48000000, 0 },
+ 	{ TEGRA20_CLK_SDMMC4, TEGRA20_CLK_PLL_P, 48000000, 0 },
+ 	{ TEGRA20_CLK_SPI, TEGRA20_CLK_PLL_P, 20000000, 0 },
++	{ TEGRA20_CLK_NOR, TEGRA20_CLK_PLL_P, 92000000, 0 },
+ 	{ TEGRA20_CLK_SBC1, TEGRA20_CLK_PLL_P, 100000000, 0 },
+ 	{ TEGRA20_CLK_SBC2, TEGRA20_CLK_PLL_P, 100000000, 0 },
+ 	{ TEGRA20_CLK_SBC3, TEGRA20_CLK_PLL_P, 100000000, 0 },
 --
 2.1.4
