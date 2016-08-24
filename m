@@ -1,75 +1,52 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Wed, 24 Aug 2016 16:25:40 +0800
-Subject: [PATCH v3] thermal: tango: add resume support
-In-Reply-To: <3377280.mzxhCYOnLL@wuerfel>
-References: <57726196.5060909@free.fr> <8406200.nXRkviT67W@wuerfel>
- <1471606196.2691.58.camel@intel.com> <3377280.mzxhCYOnLL@wuerfel>
-Message-ID: <1472027140.2682.49.camel@intel.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Wed, 24 Aug 2016 10:28:34 +0200
+Subject: [PATCH 1/2] clk: mvebu: set flags in CP110 gate clock
+In-Reply-To: <20160823141603.GH20029@lunn.ch>
+References: <1471933609-8456-1-git-send-email-mw@semihalf.com>
+ <1471933609-8456-2-git-send-email-mw@semihalf.com>
+ <20160823141603.GH20029@lunn.ch>
+Message-ID: <CAPv3WKec7+xgy5gxc3e9SwVJ0T649odf+rXybje7SUkEu5gnhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?, 2016-08-22 at 23:00 +0200, Arnd Bergmann wrote:
-> On Friday, August 19, 2016 7:29:56 PM CEST Zhang Rui wrote:
-> > 
-> > On ?, 2016-07-26 at 14:13 +0200, Arnd Bergmann wrote:
-> > > 
-> > > On Monday, July 25, 2016 11:48:47 AM CEST Mason wrote:
-> > > > 
-> > > > 
-> > > > On 25/07/2016 10:52, Arnd Bergmann wrote:
-> > > > 
-> > > > > 
-> > > > > 
-> > > > > On Monday, July 25, 2016 10:18:22 AM CEST Mason wrote:
-> > > > > 
-> > > > > > 
-> > > > > > 
-> > > > > > Moving the SIMPLE_DEV_PM_OPS macro outside the
-> > > > > > CONFIG_PM_SLEEP
-> > > > > > guard
-> > > > > > would unconditionally define a struct dev_pm_ops, which
-> > > > > > just
-> > > > > > wastes
-> > > > > > space when CONFIG_PM_SLEEP is undefined (if I'm not
-> > > > > > mistaken).
-> > > > > > 
-> > > > > > That's why I put SIMPLE_DEV_PM_OPS inside the
-> > > > > > CONFIG_PM_SLEEP
-> > > > > > guard.
-> > > > > If you want to avoid the extra few bytes, just use the trick
-> > > > > I
-> > > > > suggested:
-> > > > > 
-> > > > > ??????.pm = IS_ENABLED(CONFIG_PM_SLEEP) ? &tango_thermal_pm :
-> > > > > NULL,
-> > > > This would achieve the same result as the solution I proposed
-> > > > in my v2 patch, right?
-> > > > 
-> > > > So you're saying you prefer the IS_ENABLED macro over using
-> > > > #ifdef ... #else define stuff as NULL #endif
-> > > > 
-> > > > Did I get that right?
-> > > Yes, but I'd also prefer not to hide the operations structure
-> > > at all and just rely on the __maybe_unused (ideally) or
-> > > #ifdef (not as good, but commonly used) to leave out the
-> > > functions.
-> > > 
-> > IMO, the typical way is to use #ifdef for the pm callbacks, and
-> > leave
-> > SIMPLE_DEV_PM_OPS outside the #ifdef.
-> > For example, drivers/ata/ahci_imx.c.
-> > 
-> Lots of drivers do it like that, the main downside I see is that a
-> lot of them also get it wrong and use incorrect #ifdef guards,
-> either checking the wrong Kconfig symbol,
+HI Andrew,
 
-This also happens when IS_ENABLED macro is used.
+2016-08-23 16:16 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
+> On Tue, Aug 23, 2016 at 08:26:48AM +0200, Marcin Wojtas wrote:
+>> Armada CP110 system controller comprise its own routine responsble
+>> for registering gate clocks. Among others 'flags' field in
+>> struct clk_init_data was not set, using a random values, which
+>> may cause an unpredicted behavior.
+>>
+>> This patch fixes the problem by setting CLK_IS_BASIC flag for
+>> all gated clocks of Armada 7k/8k SoCs family.
+>>
+>> Fixes: d3da3eaef7f4 ("clk: mvebu: new driver for Armada CP110 system ...")
+>>
+>> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+>> ---
+>>  drivers/clk/mvebu/cp110-system-controller.c | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/drivers/clk/mvebu/cp110-system-controller.c b/drivers/clk/mvebu/cp110-system-controller.c
+>> index 7fa42d6..0835e1d 100644
+>> --- a/drivers/clk/mvebu/cp110-system-controller.c
+>> +++ b/drivers/clk/mvebu/cp110-system-controller.c
+>> @@ -144,6 +144,7 @@ static struct clk *cp110_register_gate(const char *name,
+>>
+>>       init.name = name;
+>>       init.ops = &cp110_gate_ops;
+>> +     init.flags = CLK_IS_BASIC;
+>>       init.parent_names = &parent_name;
+>>       init.num_parents = 1;
+>
+> Hi Marcin
+>
+> How about adding a memset for init? That would also help if new fields
+> every get added to clk_init_data.
+>
 
->  or hiding the wrong
-> subset of functions.
-> 
-This also sounds a driver bug to me, and the driver should get fixed.
-For us, it's not a problem if we do it right here, right? :)
+Sure, it can be added.
 
-thanks,
-rui
+Best regards,
+Marcin
