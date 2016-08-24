@@ -1,219 +1,24 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 24 Aug 2016 18:27:29 +0100
-Subject: [PATCH v6 2/3] arm64: vmlinux.ld: Add mmuoff data sections and move
- mmuoff text into idmap
-In-Reply-To: <1472059650-591-1-git-send-email-james.morse@arm.com>
-References: <1472059650-591-1-git-send-email-james.morse@arm.com>
-Message-ID: <1472059650-591-3-git-send-email-james.morse@arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 24 Aug 2016 10:29:44 -0700
+Subject: [PATCH -next] clk: meson: Fix invalid use of sizeof in
+ gxbb_aoclkc_probe()
+In-Reply-To: <1471882101-22347-1-git-send-email-weiyj.lk@gmail.com>
+References: <1471882101-22347-1-git-send-email-weiyj.lk@gmail.com>
+Message-ID: <20160824172944.GA19826@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resume from hibernate needs to clean any text executed by the kernel with
-the MMU off to the PoC. Collect these functions together into the
-.idmap.text section as all this code is tightly coupled and also needs
-the same cleaning after resume.
+On 08/22, Wei Yongjun wrote:
+> From: Wei Yongjun <weiyongjun1@huawei.com>
+> 
+> sizeof() when applied to a pointer typed expression gives the
+> size of the pointer, not that of the pointed data.
+> 
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> ---
 
-Data is more complicated, secondary_holding_pen_release is written with
-the MMU on, clean and invalidated, then read with the MMU off. In contrast
-__boot_cpu_mode is written with the MMU off, the corresponding cache line
-is invalidated, so when we read it with the MMU on we don't get stale data.
-These cache maintenance operations conflict with each other if the values
-are within a Cache Writeback Granule (CWG) of each other.
-Collect the data into two sections .mmuoff.data.read and .mmuoff.data.write,
-the linker script ensures mmuoff.data.write section is aligned to the
-architectural maximum CWG of 2KB.
+Applied to clk-next
 
-Signed-off-by: James Morse <james.morse@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-
----
-Changes since v5:
- * Moved .mmuoff.text into .idmap.text,
- * Moved ALIGN() out of .mmuoff.data.read in case this section gets removed.
- * Removed stray "don't"
-
- arch/arm64/include/asm/sections.h  |  1 +
- arch/arm64/kernel/head.S           | 25 +++++++++++++++----------
- arch/arm64/kernel/sleep.S          |  2 +-
- arch/arm64/kernel/smp_spin_table.c |  3 ++-
- arch/arm64/kernel/vmlinux.lds.S    | 19 +++++++++++++++++++
- arch/arm64/mm/proc.S               |  4 ++++
- 6 files changed, 42 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm64/include/asm/sections.h b/arch/arm64/include/asm/sections.h
-index 237fcdd13445..4e7e7067afdb 100644
---- a/arch/arm64/include/asm/sections.h
-+++ b/arch/arm64/include/asm/sections.h
-@@ -25,5 +25,6 @@ extern char __hyp_idmap_text_start[], __hyp_idmap_text_end[];
- extern char __hyp_text_start[], __hyp_text_end[];
- extern char __idmap_text_start[], __idmap_text_end[];
- extern char __irqentry_text_start[], __irqentry_text_end[];
-+extern char __mmuoff_data_start[], __mmuoff_data_end[];
- 
- #endif /* __ASM_SECTIONS_H */
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index b77f58355da1..4413144f7ea4 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -465,7 +465,7 @@ ENDPROC(__primary_switched)
-  * end early head section, begin head code that is also used for
-  * hotplug and needs to have the same protections as the text region
-  */
--	.section ".text","ax"
-+	.section ".idmap.text","ax"
- 
- ENTRY(kimage_vaddr)
- 	.quad		_text - TEXT_OFFSET
-@@ -621,17 +621,29 @@ set_cpu_boot_mode_flag:
- ENDPROC(set_cpu_boot_mode_flag)
- 
- /*
-+ * These values are written with the MMU off, but read with the MMU on.
-+ * Writers will invalidate the corresponding address, discarding up to a
-+ * 'Cache Writeback Granule' (CWG) worth of data. The linker script ensures
-+ * sufficient alignment that the CWG doesn't overlap another section.
-+ */
-+	.pushsection ".mmuoff.data.write", "aw"
-+/*
-  * We need to find out the CPU boot mode long after boot, so we need to
-  * store it in a writable variable.
-  *
-  * This is not in .bss, because we set it sufficiently early that the boot-time
-  * zeroing of .bss would clobber it.
-  */
--	.pushsection	.data..cacheline_aligned
--	.align	L1_CACHE_SHIFT
- ENTRY(__boot_cpu_mode)
- 	.long	BOOT_CPU_MODE_EL2
- 	.long	BOOT_CPU_MODE_EL1
-+/*
-+ * The booting CPU updates the failed status @__early_cpu_boot_status,
-+ * with MMU turned off.
-+ */
-+ENTRY(__early_cpu_boot_status)
-+	.long 	0
-+
- 	.popsection
- 
- 	/*
-@@ -706,12 +718,6 @@ ENDPROC(__secondary_switched)
- 	dc	ivac, \tmp1			// Invalidate potentially stale cache line
- 	.endm
- 
--	.pushsection	.data..cacheline_aligned
--	.align	L1_CACHE_SHIFT
--ENTRY(__early_cpu_boot_status)
--	.long 	0
--	.popsection
--
- /*
-  * Enable the MMU.
-  *
-@@ -723,7 +729,6 @@ ENTRY(__early_cpu_boot_status)
-  * Checks if the selected granule size is supported by the CPU.
-  * If it isn't, park the CPU
-  */
--	.section	".idmap.text", "ax"
- ENTRY(__enable_mmu)
- 	mrs	x22, sctlr_el1			// preserve old SCTLR_EL1 value
- 	mrs	x1, ID_AA64MMFR0_EL1
-diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index ccf79d849e0a..679b0ad1e9cd 100644
---- a/arch/arm64/kernel/sleep.S
-+++ b/arch/arm64/kernel/sleep.S
-@@ -97,6 +97,7 @@ ENTRY(__cpu_suspend_enter)
- ENDPROC(__cpu_suspend_enter)
- 	.ltorg
- 
-+	.pushsection ".idmap.text", "ax"
- ENTRY(cpu_resume)
- 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
- 	/* enable the MMU early - so we can access sleep_save_stash by va */
-@@ -107,7 +108,6 @@ ENTRY(cpu_resume)
- 	b	__cpu_setup
- ENDPROC(cpu_resume)
- 
--	.pushsection	".idmap.text", "ax"
- _resume_switched:
- 	ldr	x8, =_cpu_resume
- 	br	x8
-diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
-index 18a71bcd26ee..9a00eee9acc8 100644
---- a/arch/arm64/kernel/smp_spin_table.c
-+++ b/arch/arm64/kernel/smp_spin_table.c
-@@ -29,7 +29,8 @@
- #include <asm/smp_plat.h>
- 
- extern void secondary_holding_pen(void);
--volatile unsigned long secondary_holding_pen_release = INVALID_HWID;
-+volatile unsigned long __section(".mmuoff.data.read")
-+secondary_holding_pen_release = INVALID_HWID;
- 
- static phys_addr_t cpu_release_addr[NR_CPUS];
- 
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 659963d40bb4..5ce9b2929e0d 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -185,6 +185,25 @@ SECTIONS
- 	_data = .;
- 	_sdata = .;
- 	RW_DATA_SECTION(L1_CACHE_BYTES, PAGE_SIZE, THREAD_SIZE)
-+
-+	/*
-+	 * Data written with the MMU off but read with the MMU on requires
-+	 * cache lines to be invalidated, discarding up to a Cache Writeback
-+	 * Granule (CWG) of data from the cache. Keep the section that
-+	 * requires this type of maintenance to be in its own Cache Writeback
-+	 * Granule (CWG) area so the cache maintenance operations don't
-+	 * interfere with adjacent data.
-+	 */
-+	.mmuoff.data.write : ALIGN(SZ_2K) {
-+		__mmuoff_data_start = .;
-+		*(.mmuoff.data.write)
-+	}
-+	. = ALIGN(SZ_2K);
-+	.mmuoff.data.read : {
-+		*(.mmuoff.data.read)
-+		__mmuoff_data_end = .;
-+	}
-+
- 	PECOFF_EDATA_PADDING
- 	_edata = .;
- 
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 5bb61de23201..5eb35964ab8e 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -83,6 +83,7 @@ ENDPROC(cpu_do_suspend)
-  *
-  * x0: Address of context pointer
-  */
-+	.pushsection ".idmap.text", "ax"
- ENTRY(cpu_do_resume)
- 	ldp	x2, x3, [x0]
- 	ldp	x4, x5, [x0, #16]
-@@ -111,6 +112,7 @@ ENTRY(cpu_do_resume)
- 	isb
- 	ret
- ENDPROC(cpu_do_resume)
-+	.popsection
- #endif
- 
- /*
-@@ -172,6 +174,7 @@ ENDPROC(idmap_cpu_replace_ttbr1)
-  *	Initialise the processor for turning the MMU on.  Return in x0 the
-  *	value of the SCTLR_EL1 register.
-  */
-+	.pushsection ".idmap.text", "ax"
- ENTRY(__cpu_setup)
- 	tlbi	vmalle1				// Invalidate local TLB
- 	dsb	nsh
-@@ -257,3 +260,4 @@ ENDPROC(__cpu_setup)
- crval:
- 	.word	0xfcffffff			// clear
- 	.word	0x34d5d91d			// set
-+	.popsection
 -- 
-2.8.0.rc3
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
