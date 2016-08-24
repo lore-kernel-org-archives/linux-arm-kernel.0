@@ -1,133 +1,98 @@
-From: npiggin@gmail.com (Nicholas Piggin)
-Date: Wed, 24 Aug 2016 19:05:30 +1000
-Subject: [PATCH] arm: add an option for erratum 657417
-In-Reply-To: <3214675.EzzC1Ail5Z@wuerfel>
-References: <1470989957-23671-1-git-send-email-npiggin@gmail.com>
- <2466265.8og15RQ8jv@wuerfel>
- <20160824140044.266d045d@roar.ozlabs.ibm.com>
- <3214675.EzzC1Ail5Z@wuerfel>
-Message-ID: <20160824190530.5b67b356@roar.ozlabs.ibm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 24 Aug 2016 11:08:55 +0200
+Subject: [PATCH] ARM: imx: add cpuidle support for i.mx6ul
+In-Reply-To: <1472055231-28434-1-git-send-email-Anson.Huang@nxp.com>
+References: <1472055231-28434-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1472029735.2780.3.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Aug 2016 09:41:39 +0200
-Arnd Bergmann <arnd@arndb.de> wrote:
-
-> On Wednesday, August 24, 2016 2:00:44 PM CEST Nicholas Piggin wrote:
-> > On Tue, 23 Aug 2016 14:01:29 +0200
-> > Arnd Bergmann <arnd@arndb.de> wrote:
-> >   
-> > > On Friday, August 12, 2016 6:19:17 PM CEST Nicholas Piggin wrote:  
-> > > > Erratum 657417 is worked around by the linker by inserting additional
-> > > > branch trampolines to avoid problematic branch target locations. This
-> > > > results in much higher linking time and presumably slower and larger
-> > > > generated code. The workaround also seems to only be required when
-> > > > linking thumb2 code, but the linker applies it for non-thumb2 code as
-> > > > well.
-> > > > 
-> > > > The workaround today is left to the linker to apply, which is overly
-> > > > conservative.
-> > > > 
-> > > > https://sourceware.org/ml/binutils/2009-05/msg00297.html
-> > > > 
-> > > > This patch adds an option which defaults to "y" in cases where we
-> > > > could possibly be running Cortex A8 and using Thumb2 instructions.
-> > > > In reality the workaround might not be required at all for the kernel
-> > > > if virtual instruction memory is linear in physical memory. However it
-> > > > is more conservative to keep the workaround, and it may be the case
-> > > > that the TLB lookup would be required in order to catch branches to
-> > > > unmapped or no-execute pages.
-> > > > 
-> > > > In an allyesconfig build, this workaround causes a large load on
-> > > > the linker's branch stub hash and slows down the final link by a
-> > > > factor of 5.
-> > > > 
-> > > > Signed-off-by: Nicholas Piggin <npiggin@gmail.com>
-> > > >     
-> > > 
-> > > Thanks a lot for finding this issue. I can confirm that your patch
-> > > helps noticeably in all configurations, reducing time for a relink
-> > > from 18 minutes to 9 minutes on my machine in the best case, but
-> > > the factor 10 slowdown of the final link with your thin archives
-> > > and gc-sections patches remains.
-> > > 
-> > > I suspect there is still something else going on besides the 657417
-> > > slowing things down, but it's also possible that I'm doing something
-> > > wrong here.  
-> > 
-> > Okay, I was only testing thin archives. gc-sections I didn't look at.
-> > With thin archives, one final arm allyesconfig link with this patch is
-> > not showing a regression. gc-sections must be causing something else
-> > ARM specific, because powerpc seems to link fast with gc-sections.  
+Am Donnerstag, den 25.08.2016, 00:13 +0800 schrieb Anson Huang:
+> This patch enables cpuidle driver for i.MX6UL, it
+> reuses i.MX6SX's cpuidle driver, 3 levels of cpuidle
+> supported:
 > 
-> Ok, I see. For completeness, here are my results with thin archives and
-> without gc-sections on ARM:
-
-This is about what I saw.
-
+> 1. ARM WFI;
+> 2. SOC in WAIT mode;
+> 3. SOC in WAIT mode + ARM power off.
 > 
-> || no THUMB2, thin archives, no gc-sections, before: 144 seconds
+> As i.MX6UL has cortex-A7 CORE with an internal L2
+> cache, so need to add L2 cache type check to decide
+> if to flush L2 when entering idle with ARM power off,
+> this is different from i.MX6SX which has PL310 external
+> L2 cache.
 > 
-> 09:29:51   LINK    vmlinux
-> 09:29:51  AR      built-in.o
-> 09:29:52  LD      vmlinux.o
-> 09:30:12   MODPOST vmlinux.o
-> 09:30:14  GEN     .version
-> 09:30:14   CHK     include/generated/compile.h
->   UPD     include/generated/compile.h
-> 09:30:14   CC      init/version.o
-> 09:30:15   AR      init/built-in.o
-> 09:30:43  KSYM    .tmp_kallsyms1.o
-> 09:31:28  KSYM    .tmp_kallsyms2.o
-> 09:31:40  LD      vmlinux
-> 09:32:13  SORTEX  vmlinux
-> 09:32:13  SYSMAP  System.map
-> 09:32:15   OBJCOPY arch/arm/boot/Image
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> ---
+>  arch/arm/mach-imx/cpuidle-imx6sx.c | 10 ++++++++++
+>  arch/arm/mach-imx/mach-imx6ul.c    |  3 +++
+>  2 files changed, 13 insertions(+)
 > 
-> || no THUMB2, thin archives, no gc-sections, after: 70 seconds
-> 
-> 09:33:54   LINK    vmlinux
-> 09:33:54  AR      built-in.o
-> 09:33:55  LD      vmlinux.o
-> 09:34:13   MODPOST vmlinux.o
-> 09:34:15  GEN     .version
-> 09:34:16   CHK     include/generated/compile.h
->   UPD     include/generated/compile.h
-> 09:34:16   CC      init/version.o
-> 09:34:16   AR      init/built-in.o
-> 09:34:24  KSYM    .tmp_kallsyms1.o
-> 09:34:43  KSYM    .tmp_kallsyms2.o
-> 09:34:55  LD      vmlinux
-> 09:35:03  SORTEX  vmlinux
-> 09:35:03  SYSMAP  System.map
-> 09:35:04   OBJCOPY arch/arm/boot/Image
-> 
-> The final 'LD' step is much faster here as you also found, and now
-> the time for the complete link is mainly the initial 'LD vmlinux.o'
-> step, which did not get faster with your patch.
+> diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c b/arch/arm/mach-imx/cpuidle-imx6sx.c
+> index 41cdce6..b4fcc8ae 100644
+> --- a/arch/arm/mach-imx/cpuidle-imx6sx.c
+> +++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
+> @@ -9,14 +9,21 @@
+>  #include <linux/cpuidle.h>
+>  #include <linux/cpu_pm.h>
+>  #include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <asm/cacheflush.h>
+>  #include <asm/cpuidle.h>
+>  #include <asm/suspend.h>
+>  
+>  #include "common.h"
+>  #include "cpuidle.h"
+>  
+> +static bool pl310_available;
+> +
+>  static int imx6sx_idle_finish(unsigned long val)
+>  {
+> +	/* check if need to flush internal L2 cache */
+> +	if (!pl310_available)
+> +		flush_cache_all();
 
-The info here isn't very good because KSYM is printed after the link
-but before the kallsyms generation. We can kind of see what's happening
-if we take the time between the KSYM and the LD vmlinux as the time for
-kallsyms: 
-                           before    after
-KSYM                      ~12s      ~12s
-LD      vmlinux.o          20s       18s
-LD      .tmp_kallsyms1.o   28s        8s
-LD      .tmp_kallsyms2.o   33s        7s
-LD      vmlinux            33s        8s
+I think this is only necessary when entering the deepest idle state with
+the ARM core powered off, right? It's a serious overhead for the shallow
+idle states.
 
-Probably the cortex a8 workaround does not get applied to vmlinux.o
-link (due to being incremental), so we don't see any speedup with the
-patch. It takes longer overall I guess because it keeps a lot of
-symbols in the output file (due to incremental).
+Also flush_cache_all() only flushes architected/inner caches, so it
+should do the right thing for this use-case even if the outer PL310
+cache is present. There is no need to make this conditional.
 
-
-> > Can you send your latest ARM patch to enable this and I'll have a look
-> > at it?  
-> 
-> See below. I have not updated the patch description yet, but included
-> the changes that Nico suggested. The test above used the same patch
-> but left out the 'select LD_DEAD_CODE_DATA_ELIMINATION' line.
-
-Thanks, I'll take a look.
+Regards,
+Lucas
+ 
+>  	cpu_do_idle();
+>  
+>  	return 0;
+> @@ -101,5 +108,8 @@ int __init imx6sx_cpuidle_init(void)
+>  	imx_gpc_set_arm_power_up_timing(2, 1);
+>  	imx_gpc_set_arm_power_down_timing(1, 1);
+>  
+> +	if (of_find_compatible_node(NULL, NULL, "arm,pl310-cache"))
+> +		pl310_available = true;
+> +
+>  	return cpuidle_register(&imx6sx_cpuidle_driver, NULL);
+>  }
+> diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
+> index c2cd61c..9c5e8f3 100644
+> --- a/arch/arm/mach-imx/mach-imx6ul.c
+> +++ b/arch/arm/mach-imx/mach-imx6ul.c
+> @@ -16,6 +16,7 @@
+>  #include <asm/mach/map.h>
+>  
+>  #include "common.h"
+> +#include "cpuidle.h"
+>  
+>  static void __init imx6ul_enet_clk_init(void)
+>  {
+> @@ -80,6 +81,8 @@ static void __init imx6ul_init_irq(void)
+>  
+>  static void __init imx6ul_init_late(void)
+>  {
+> +	imx6sx_cpuidle_init();
+> +
+>  	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
+>  		imx6_pm_opp_init();
+>  		platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
