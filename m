@@ -1,19 +1,109 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 24 Aug 2016 09:57:58 +0100
-Subject: [PATCH] arm64: KVM: Enable support for Cortex-A72
-In-Reply-To: <1472023297-2756-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1472023297-2756-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <ffda6889-5c31-1b56-942c-de65bbb1c16f@arm.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Wed, 24 Aug 2016 16:53:35 +0800
+Subject: [PATCH v6 0/8] power: add power sequence library
+In-Reply-To: <b1848eb2-9298-9089-ee4d-5356998c6c08@linaro.org>
+References: <1471252398-957-1-git-send-email-peter.chen@nxp.com>
+ <b1848eb2-9298-9089-ee4d-5356998c6c08@linaro.org>
+Message-ID: <20160824085335.GB27233@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/08/16 08:21, Shannon Zhao wrote:
-> In order to allow KVM to run on Cortex-A72 physical cpus, enable KVM
-> support for Cortex-A72.
+On Tue, Aug 23, 2016 at 04:02:48PM +0530, Vaibhav Hiremath wrote:
+> 
+> 
+> On Monday 15 August 2016 02:43 PM, Peter Chen wrote:
+> >Hi all,
+> >
+> >This is a follow-up for my last power sequence framework patch set [1].
+> >According to Rob Herring and Ulf Hansson's comments[2], I use a generic
+> >power sequence library for parsing the power sequence elements on DT,
+> >and implement generic power sequence on library. The host driver
+> >can allocate power sequence instance, and calls pwrseq APIs accordingly.
+> >
+> >In future, if there are special power sequence requirements, the special
+> >power sequence library can be created.
+> >
+> >This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+> >two hot-plug devices to simulate this use case, the related binding
+> >change is updated at patch [1/6], The udoo board changes were tested
+> >using my last power sequence patch set.[3]
+> >
+> >Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
+> >need to power on itself before it can be found by ULPI bus.
+> >
+> >[1] http://www.spinics.net/lists/linux-usb/msg142755.html
+> >[2] http://www.spinics.net/lists/linux-usb/msg143106.html
+> >[3] http://www.spinics.net/lists/linux-usb/msg142815.html
+> (Please ignore my response on V2)
+> 
+> Sorry being so late in the discussion...
+> 
+> If I am not missing anything, then I am afraid to say that the
+> generic library
+> implementation in this patch series is not going to solve many of
+> the custom
+> requirement of power on, off, etc...
+> I know you mentioned about adding another library when we come
+> across such platforms, but should we not keep provision (or easy
+> hooks/path)
+> to enable that ?
+> 
+> Let me bring in the use case I am dealing with,
+> 
+> 
+>                               Host
+>                                |
+>                                V
+>                            USB port
+> ------------------------------------------------------------
+>                                |
+>                                V
+>                       USB HUB device (May need custom on/off seq)
+>                                |
+>                                V
+>               =============================
+>              |                             |
+>              V                             V
+>          Device-1                       Device-2
+> (Needs special power               (Needs special power
+>  on/off sequence.                   on/off sequence.
+>  Also may need custom               Also, may need custom
+>  sequence for                       sequence for
+>  suspend/resume)                    suspend/resume)
+> 
+> 
+> Note: Both Devices are connected to HUB via HSIC and may differ
+>           in terms of functionality, features they support.
+> 
+> In the above case, both Device-1 and Device-2, need separate
+> power on/off sequence. So generic library currently we have in this
+> patch series is not going to satisfy the need here.
+> 
+> I looked at all 6 revisions of this patch-series, went through the
+> review comments, and looked at MMC power sequence code;
+> what I can say here is, we need something similar to
+> MMC power sequence here, where every device can have its own
+> power sequence (if needed).
+> 
+> I know Rob is not in favor of creating platform device for
+> this, and I understand his comment.
+> If not platform device, but atleast we need mechanism to
+> connect each device back to its of_node and its respective
+> driver/library fns. For example, the Devices may support different
+> boot modes, and platform driver needs to make sure that
+> the right sequence is followed for booting.
+> 
+> Peter, My apologies for taking you back again on this series.
+> I am OK, if you wish to address this in incremental addition,
+> but my point is, we know that the current generic way is not
+> enough for us, so I think we should try to fix it in initial phase only.
+> 
 
-Do we really need this change ? Given that A72 is using the generic_v8 table,
-it will automatically be supported via the GENERIC_V8 target. That was added
-just for this purpose. The pre-existing targets were preserved so that
-we don't break the ABI for older user space.
+Rob, it seems generic power sequence can't cover all cases.
+Without information from DT, we can't know which power sequence
+for which device.
 
-Suzuki
+-- 
+
+Best Regards,
+Peter Chen
