@@ -1,57 +1,57 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 24 Aug 2016 11:38:24 +0300
-Subject: [GIT PULL] omap-gpmc fixes for v4.8-rc1
-In-Reply-To: <a4bd1d47-87b1-9ef9-d9d1-6c69be404b9e@ti.com>
-References: <a4bd1d47-87b1-9ef9-d9d1-6c69be404b9e@ti.com>
-Message-ID: <68e0e835-4679-f950-0a2f-65e221e11ffb@ti.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 24 Aug 2016 17:38:19 +0900
+Subject: [PATCH 1/2] clk: samsung: exynos5260: Move struct samsung_cmu_info
+ to init section
+In-Reply-To: <20160824044346.GR6502@codeaurora.org>
+References: <1471834185-20249-1-git-send-email-cw00.choi@samsung.com>
+ <1471834185-20249-2-git-send-email-cw00.choi@samsung.com>
+ <CGME20160823005523epcas1p3993794ba487bb055cbf8a0b247fcb280@epcas1p3.samsung.com>
+ <20160823005512.GP6502@codeaurora.org> <57BBB66E.2060807@samsung.com>
+ <84e40b9b-1e08-24e0-f1ef-60b38b760ae6@samsung.com>
+ <20160824044346.GR6502@codeaurora.org>
+Message-ID: <57BD5CFB.5050500@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd/Olof,
+On 2016? 08? 24? 13:43, Stephen Boyd wrote:
+> On 08/23, Sylwester Nawrocki wrote:
+>> On 08/23/2016 04:35 AM, Chanwoo Choi wrote:
+>> I checked stripped object files and it seems with the patch there
+>> is some saving of the kernel image size. Exactly 784 bytes, which
+>> makes zImage smaller by 480 bytes.
+>>
+>> The patch increases .init.rodata section size by 780 bytes but 
+>> decreases .init.text section size by 1564 bytes.  Looks like 
+>> a static initializer is cheaper.
+>>
+>> $ ls -l  drivers/clk/samsung/clk-exynos5260.o
+>>
+>> < -rw-rw-r-- 1 snawrocki snawrocki 29100 Aug 23 11:35 drivers/clk/samsung/clk-exynos5260.o
+>> ---
+>>> -rw-rw-r-- 1 snawrocki snawrocki 28316 Aug 23 11:32 drivers/clk/samsung/clk-exynos5260.o
+>>
+>>
+>> The section size differences are as below:
+>> 15c15
+>> <   3 .init.text    000006b8  00000000  00000000  00000034  2**2
+>> ---
+>>>   3 .init.text    0000009c  00000000  00000000  00000034  2**2
+>> 25c25
+>> <   8 .init.rodata  00003f6c  00000000  00000000  00002f20  2**2
+>> ---
+>>>   8 .init.rodata  00004278  00000000  00000000  00002904  2**2
+>>
+>> So the saving is rather insignificant but the patch doesn't make
+>> things worse and I'd say it might be worth applying.
+>>
+> 
+> Sounds good. This sort of information should be in the commit
+> text though. Talking about const doesn't make any sense to me.
 
-On 15/08/16 10:53, Roger Quadros wrote:
-> Hi Arnd/Olof,
-> 
-> The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
-> 
->   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/rogerq/linux.git tags/gpmc-omap-v4.8-rc1
-> 
-> for you to fetch changes up to 23540d6e2f3193b946c4de43e3f9654fa6d23fe7:
-> 
->   memory: omap-gpmc: allow probe of child nodes to fail (2016-08-08 11:18:40 +0300)
-> 
-> ----------------------------------------------------------------
-> OMAP-GPMC: fixes for v4.8-rc1
-> 
-> * Allow other children of GPMC to probe even if any child fails.
-> This fixes problem on Overo boards where networking device child
-> doesn't probe due to broken NAND child.
-> 
-> ----------------------------------------------------------------
+Do you mean that 'const' is initconst secion?
+If possible, could you explain the anything
+why you don't make sense about 'const'?
 
-Gentle reminder to pick this for v4.8-rc. Thanks.
-
-cheers,
--roger
-
-
-> Johan Hovold (1):
->       memory: omap-gpmc: allow probe of child nodes to fail
-> 
->  drivers/memory/omap-gpmc.c | 21 +++++++--------------
->  1 file changed, 7 insertions(+), 14 deletions(-)
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+-- 
+Best Regards,
+Chanwoo Choi
