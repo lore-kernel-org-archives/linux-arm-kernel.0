@@ -1,22 +1,19 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 24 Aug 2016 10:55:38 +0200
-Subject: [PATCH 0/4] EBI2 bus and ethernet on MSM8660/APQ8060
-In-Reply-To: <1472028758-29272-1-git-send-email-linus.walleij@linaro.org>
-References: <1472028758-29272-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CACRpkdbbc8J1B3V4Mq-ko6TcNJHzovpsuszVr3YKCOR8tAu1Bg@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 24 Aug 2016 09:57:58 +0100
+Subject: [PATCH] arm64: KVM: Enable support for Cortex-A72
+In-Reply-To: <1472023297-2756-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1472023297-2756-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <ffda6889-5c31-1b56-942c-de65bbb1c16f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 10:52 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
+On 24/08/16 08:21, Shannon Zhao wrote:
+> In order to allow KVM to run on Cortex-A72 physical cpus, enable KVM
+> support for Cortex-A72.
 
-> Linus Walleij (4):
->   soc: qcom: add EBI2 device tree bindings
->   soc: qcom: add EBI2 driver
+Do we really need this change ? Given that A72 is using the generic_v8 table,
+it will automatically be supported via the GENERIC_V8 target. That was added
+just for this purpose. The pre-existing targets were preserved so that
+we don't break the ABI for older user space.
 
-Of course I forgot to update the subject to "bus: qcom: ..." on the
-first two patches. Always some glitch. Oh well, bear it in mind and
-review the rest and I'll respin a final v3 in due time.
-
-Yours,
-Linus Walleij
+Suzuki
