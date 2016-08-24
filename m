@@ -1,46 +1,42 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Wed, 24 Aug 2016 10:42:07 +0800
-Subject: [PATCH v2 3/3] arm64: defconfig: enable bluetooth supports as modules
-In-Reply-To: <1472006527-30620-1-git-send-email-guodong.xu@linaro.org>
-References: <1472006527-30620-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <1472006527-30620-4-git-send-email-guodong.xu@linaro.org>
+From: hs.liao@mediatek.com (HS Liao)
+Date: Wed, 24 Aug 2016 11:27:28 +0800
+Subject: [PATCH v13 0/4] Mediatek MT8173 CMDQ support
+Message-ID: <1472009252-1074-1-git-send-email-hs.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the following items for bluetooth mouse and speaker which base
-on HCIUART.
 
-a) CONFIG_BT_HCIUART
-b) CONFIG_BT_HCIUART_LL
-c) CONFIG_BT_HIDP
+Hi,
 
-Enable bluetooth LED support.
+This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
+to help write registers with critical time limitation, such as
+updating display configuration during the vblank. It controls Global
+Command Engine (GCE) hardware to achieve this requirement.
 
-d) CONFIG_BT_LEDS
+These patches have a build dependency on top of v4.8-rc1.
 
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
----
- arch/arm64/configs/defconfig | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Changes since v12:
+ - remove mediatek,gce from device tree
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index b4f714c..0c7551d 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -120,6 +120,14 @@ CONFIG_VLAN_8021Q=m
- CONFIG_VLAN_8021Q_GVRP=y
- CONFIG_VLAN_8021Q_MVRP=y
- CONFIG_BPF_JIT=y
-+CONFIG_BT=m
-+CONFIG_BT_HIDP=m
-+# CONFIG_BT_HS is not set
-+# CONFIG_BT_LE is not set
-+CONFIG_BT_LEDS=y
-+# CONFIG_BT_DEBUGFS is not set
-+CONFIG_BT_HCIUART=m
-+CONFIG_BT_HCIUART_LL=y
- CONFIG_CFG80211=m
- CONFIG_MAC80211=m
- CONFIG_MAC80211_LEDS=y
+Best regards,
+HS Liao
+
+HS Liao (4):
+  dt-bindings: soc: Add documentation for the MediaTek GCE unit
+  CMDQ: Mediatek CMDQ driver
+  arm64: dts: mt8173: Add GCE node
+  CMDQ: save more energy in idle
+
+ .../devicetree/bindings/soc/mediatek/gce.txt       |  44 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  10 +
+ drivers/soc/mediatek/Kconfig                       |  11 +
+ drivers/soc/mediatek/Makefile                      |   1 +
+ drivers/soc/mediatek/mtk-cmdq.c                    | 983 +++++++++++++++++++++
+ include/soc/mediatek/cmdq.h                        | 180 ++++
+ 6 files changed, 1229 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/gce.txt
+ create mode 100644 drivers/soc/mediatek/mtk-cmdq.c
+ create mode 100644 include/soc/mediatek/cmdq.h
+
 -- 
 1.9.1
