@@ -1,66 +1,92 @@
-From: ayaka@soulik.info (Ayaka)
-Date: Wed, 24 Aug 2016 16:29:07 +0800
-Subject: [PATCH 2/2] ARM: dts: add TOPEET itop elite based board
-In-Reply-To: <CAL_JsqKY=VEZ+U11kY+XbMWuXhaFDr6GpnR3AXKd1U=9_=8fgA@mail.gmail.com>
-References: <4767fc2a-95b7-ee0d-f51a-7a5d6ca89d8f@samsung.com>
- <1471875489-11428-1-git-send-email-ayaka@soulik.info>
- <1471875489-11428-3-git-send-email-ayaka@soulik.info>
- <20160823181402.GA6302@rob-hp-laptop>
- <0192d6da-89ce-a158-1c15-48eebba7db3b@soulik.info>
- <CAL_JsqKY=VEZ+U11kY+XbMWuXhaFDr6GpnR3AXKd1U=9_=8fgA@mail.gmail.com>
-Message-ID: <4FC4C5C4-C71B-4CC3-9A4F-E03404CF571A@soulik.info>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 Aug 2016 10:32:55 +0200
+Subject: [PATCH v3] thermal: tango: add resume support
+In-Reply-To: <1472027140.2682.49.camel@intel.com>
+References: <57726196.5060909@free.fr> <3377280.mzxhCYOnLL@wuerfel>
+ <1472027140.2682.49.camel@intel.com>
+Message-ID: <2198269.vtL6N6bMEV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wednesday, August 24, 2016 4:25:40 PM CEST Zhang Rui wrote:
+> On ?, 2016-08-22 at 23:00 +0200, Arnd Bergmann wrote:
+> > On Friday, August 19, 2016 7:29:56 PM CEST Zhang Rui wrote:
+> > > 
+> > > On ?, 2016-07-26 at 14:13 +0200, Arnd Bergmann wrote:
+> > > > 
+> > > > On Monday, July 25, 2016 11:48:47 AM CEST Mason wrote:
+> > > > > 
+> > > > > 
+> > > > > On 25/07/2016 10:52, Arnd Bergmann wrote:
+> > > > > 
+> > > > > > 
+> > > > > > 
+> > > > > > On Monday, July 25, 2016 10:18:22 AM CEST Mason wrote:
+> > > > > > 
+> > > > > > > 
+> > > > > > > 
+> > > > > > > Moving the SIMPLE_DEV_PM_OPS macro outside the
+> > > > > > > CONFIG_PM_SLEEP
+> > > > > > > guard
+> > > > > > > would unconditionally define a struct dev_pm_ops, which
+> > > > > > > just
+> > > > > > > wastes
+> > > > > > > space when CONFIG_PM_SLEEP is undefined (if I'm not
+> > > > > > > mistaken).
+> > > > > > > 
+> > > > > > > That's why I put SIMPLE_DEV_PM_OPS inside the
+> > > > > > > CONFIG_PM_SLEEP
+> > > > > > > guard.
+> > > > > > If you want to avoid the extra few bytes, just use the trick
+> > > > > > I
+> > > > > > suggested:
+> > > > > > 
+> > > > > >       .pm = IS_ENABLED(CONFIG_PM_SLEEP) ? &tango_thermal_pm :
+> > > > > > NULL,
+> > > > > This would achieve the same result as the solution I proposed
+> > > > > in my v2 patch, right?
+> > > > > 
+> > > > > So you're saying you prefer the IS_ENABLED macro over using
+> > > > > #ifdef ... #else define stuff as NULL #endif
+> > > > > 
+> > > > > Did I get that right?
+> > > > Yes, but I'd also prefer not to hide the operations structure
+> > > > at all and just rely on the __maybe_unused (ideally) or
+> > > > #ifdef (not as good, but commonly used) to leave out the
+> > > > functions.
+> > > > 
+> > > IMO, the typical way is to use #ifdef for the pm callbacks, and
+> > > leave
+> > > SIMPLE_DEV_PM_OPS outside the #ifdef.
+> > > For example, drivers/ata/ahci_imx.c.
+> > > 
+> > Lots of drivers do it like that, the main downside I see is that a
+> > lot of them also get it wrong and use incorrect #ifdef guards,
+> > either checking the wrong Kconfig symbol,
+> 
+> This also happens when IS_ENABLED macro is used.
 
+Right, but not with the __maybe_unused annotations.
 
-??? iPad ??
+> >  or hiding the wrong
+> > subset of functions.
+> > 
+> This also sounds a driver bug to me, and the driver should get fixed.
+> For us, it's not a problem if we do it right here, right? :)
 
-> Rob Herring <robh@kernel.org> ? 2016?8?24? ??6:38 ???
-> 
->> On Tue, Aug 23, 2016 at 1:36 PM, ayaka <ayaka@soulik.info> wrote:
->> 
->>> On 08/24/2016 02:14 AM, Rob Herring wrote:
->>> 
->>>> On Mon, Aug 22, 2016 at 10:18:09PM +0800, Randy Li wrote:
->>>> 
->>>> The TOPEET itop exynos 4412 have three versions base board. The
->>>> Elite version is the cheap one without too much peripheral devices
->>>> on it.
->>>> 
->>>> Currently supported are serial console, wired networking(USB),
->>>> USB OTG in peripheral mode, USB host, SD storage, GPIO buttons,
->>>> PWM beeper, ADC and LEDs.
-> 
-> [...]
-> 
->>>> +/dts-v1/;
->>>> +#include "exynos4412-itop-scp-core.dtsi"
->>>> +
->>>> +/ {
->>>> +       model = "TOPEET iTop 4412 Elite board based on Exynos4412";
->>>> +       compatible = "topeet,itop4412-elite", "samsung,exynos4412",
->>>> "samsung,exynos4";
->>>> +
->>>> +       chosen {
->>>> +               bootargs ="console=ttySAC2,115200";
->>> 
->>> Don't need console set with...
->> 
->> But could I set something like rootfs here ?
->> As the bootloader(old u-boot) offered by the vendor is brick, it is
->> impossible to save any something in u-boot.
-> 
-> Yes, but then that is a user decision and shouldn't really be there
-> either. In other words, ether the bootloader should set bootargs
-> (which even a vendor u-boot should be able to do either directly or
-> the zImage can take it from the ATAGS)
-Yes, but you have to break the auto boot every time. I want to write a new u-boot for it, but I meet some problem with JTAG, it won't come soon.
-> or a user can edit the dts and
-> carry that change.
-> 
-> However, there are probably plenty of examples in the kernel that
-> counter what I just said.
-I see than you. May I ask if I specific the rootfs bootargs of in dts, should you accept such patch?
-> 
-> Rob
+I think the ideal is to have only one set of conditionals in each
+driver, so at least you don't get a mismatch between them.
+
+SIMPLE_DEV_PM_OPS uses conditional evaluation (but does not
+show the reference to the compiler). Annotating the functions as
+__maybe_unused lets the compiler decide for itself if they should
+be dropped or not, which means we use only the conditional inside
+of SIMPLE_DEV_PM_OPS.
+
+Ideally, SIMPLE_DEV_PM_OPS itself should have used an IS_ENABLED()
+check instead of the #ifdef, that would have made it possible to
+just leave the function always defined with no __maybe_unused, but
+still have it dropped from the object code without a warning
+when there is no runtime reference.
+
+	Arnd
