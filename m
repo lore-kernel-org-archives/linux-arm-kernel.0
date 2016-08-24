@@ -1,40 +1,45 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Wed, 24 Aug 2016 11:29:39 -0700
-Subject: [PATCH] clk: rockchip: mark aclk_emmc_noc as a critical clock on
- rk3399
-Message-ID: <1472063379-717-1-git-send-email-dianders@chromium.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 24 Aug 2016 18:02:08 +0100
+Subject: [PATCH] arm64: avoid TLB conflict with CONFIG_RANDOMIZE_BASE
+Message-ID: <1472058128-1216-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xing Zheng <zhengxing@rock-chips.com>
+When CONFIG_RANDOMIZE_BASE is selected, we modify the page tables to remap the
+kernel at a newly-chosen VA range. We do this with the MMU disabled, but do not
+invalidate TLBs prior to re-enabling the MMU with the new tables. Thus the old
+mappings entries may still live in TLBs, and we risk violating
+Break-Before-Make requirements, leading to TLB conflicts and/or other issues.
 
-We don't have code to handle any of the noc clocks in rk3399 and they're
-all just listed as critical clocks.  Let's do the same for
-aclk_emmc_noc.
+We invalidate TLBs when we uninsall the idmap in early setup code, but prior to
+this we are subject to issues relating to the Break-Before-Make violation.
 
-Without this clock being marked as critical we have problems around
-suspend/resume after commit 20c389e656a8 ("clk: rockchip: fix incorrect
-aclk_emmc source gate bits on rk3399").  Before that change we were
-presumably not actually gating any of these clocks because we were
-setting the wrong gate.
+Avoid these issues by invalidating the TLBs before the new mappings can be
+used by the hardware.
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
+Fixes: f80fb3a3d50843a4 ("arm64: add support for kernel ASLR")
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: stable at vger.kernel.org
 ---
- drivers/clk/rockchip/clk-rk3399.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/kernel/head.S | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-index e445cd64952a..ede6c475b537 100644
---- a/drivers/clk/rockchip/clk-rk3399.c
-+++ b/drivers/clk/rockchip/clk-rk3399.c
-@@ -1489,6 +1489,7 @@ static const char *const rk3399_cru_critical_clocks[] __initconst = {
- 	"hclk_perilp1",
- 	"hclk_perilp1_noc",
- 	"aclk_dmac0_perilp",
-+	"aclk_emmc_noc",
- 	"gpll_hclk_perilp1_src",
- 	"gpll_aclk_perilp0_src",
- 	"gpll_aclk_perihp_src",
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index b77f583..3e7b050 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -757,6 +757,9 @@ ENTRY(__enable_mmu)
+ 	isb
+ 	bl	__create_page_tables		// recreate kernel mapping
+ 
++	tlbi	vmalle1				// Remove any stale TLB entries
++	dsb	nsh
++
+ 	msr	sctlr_el1, x19			// re-enable the MMU
+ 	isb
+ 	ic	iallu				// flush instructions fetched
 -- 
-2.8.0.rc3.226.g39d4020
+2.7.4
