@@ -1,36 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Aug 2016 10:50:49 -0700
-Subject: [PATCH v12 2/4] reset: mediatek: Add MT2701 reset driver
-In-Reply-To: <1471854565-19810-3-git-send-email-erin.lo@mediatek.com>
-References: <1471854565-19810-1-git-send-email-erin.lo@mediatek.com>
- <1471854565-19810-3-git-send-email-erin.lo@mediatek.com>
-Message-ID: <20160824175049.GC19826@codeaurora.org>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Wed, 24 Aug 2016 10:57:20 -0700
+Subject: [PATCH -next] sound: rockchip: fix build when SPI_MASTER is not
+ enabled
+Message-ID: <22fcb876-1a27-0ff4-3f18-5079281c247e@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22, Erin Lo wrote:
-> diff --git a/drivers/clk/mediatek/clk-mt2701-hif.c b/drivers/clk/mediatek/clk-mt2701-hif.c
-> index 18b4ab5..702fd74 100644
-> --- a/drivers/clk/mediatek/clk-mt2701-hif.c
-> +++ b/drivers/clk/mediatek/clk-mt2701-hif.c
-> @@ -52,11 +52,15 @@ static int mtk_hifsys_init(struct device_node *node)
->  						clk_data);
->  
->  	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-> -	if (r)
-> +	if (r) {
->  		pr_err("%s(): could not register clock provider: %d\n",
->  			__func__, r);
-> +		return r;
-> +	}
-> +
-> +	mtk_register_reset_controller(node, 1, 0x34);
+From: Randy Dunlap <rdunlap@infradead.org>
 
-The cleanup here isn't great. mtk_register_reset_controller()
-should really return an error so that we can properly cleanup if
-needed. Fixing that in a later patch would be a good idea.
+Fix multiple build errors in sound/soc/rockchip/ drivers by
+adding "depends on SPI_MASTER".
 
+Fixes these build errors:
+sound/built-in.o: In function `rt5514_spi_burst_read':
+(.text+0x6c26c): undefined reference to `spi_sync'
+sound/built-in.o: In function `rt5514_spi_burst_write':
+(.text+0x6c96e): undefined reference to `spi_sync'
+sound/built-in.o: In function `rockchip_sound_probe':
+rk3399_gru_sound.c:(.text+0x9f579): undefined reference to `spi_bus_type'
+sound/built-in.o: In function `rt5514_spi_driver_init':
+rt5514-spi.c:(.init.text+0x983): undefined reference to `__spi_register_driver'
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Signed-off-by: Randy Dunlap <rdunlap@infradead.org>
+Cc:	Heiko Stuebner <heiko@sntech.de>
+Cc:	linux-arm-kernel at lists.infradead.org
+Cc:	linux-rockchip at lists.infradead.org
+---
+ sound/soc/rockchip/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+--- linux-next-20160824.orig/sound/soc/rockchip/Kconfig
++++ linux-next-20160824/sound/soc/rockchip/Kconfig
+@@ -45,6 +45,7 @@ config SND_SOC_ROCKCHIP_RT5645
+ config SND_SOC_RK3399_GRU_SOUND
+ 	tristate "ASoC support multiple codecs for Rockchip RK3399 GRU boards"
+ 	depends on SND_SOC_ROCKCHIP && I2C && GPIOLIB && CLKDEV_LOOKUP
++	depends on SPI_MASTER
+ 	select SND_SOC_ROCKCHIP_I2S
+ 	select SND_SOC_MAX98357A
+ 	select SND_SOC_RT5514
