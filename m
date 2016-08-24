@@ -1,11 +1,11 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Aug 2016 16:10:24 -0700
-Subject: [PATCH 08/34] clk: asm9260: Migrate to clk_hw based registration
- and OF APIs
-In-Reply-To: <20160601231533.9354-9-stephen.boyd@linaro.org>
+Date: Wed, 24 Aug 2016 16:11:01 -0700
+Subject: [PATCH 09/34] clk: axi-clkgen: Migrate to clk_hw based OF and
+ registration APIs
+In-Reply-To: <20160601231533.9354-10-stephen.boyd@linaro.org>
 References: <20160601231533.9354-1-stephen.boyd@linaro.org>
- <20160601231533.9354-9-stephen.boyd@linaro.org>
-Message-ID: <20160824231024.GK19826@codeaurora.org>
+ <20160601231533.9354-10-stephen.boyd@linaro.org>
+Message-ID: <20160824231101.GL19826@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,7 +15,7 @@ On 06/01, Stephen Boyd wrote:
 > these drivers, allowing us to move closer to a clear split of
 > consumer and provider clk APIs.
 > 
-> Cc: Oleksij Rempel <linux@rempel-privat.de>
+> Cc: Lars-Peter Clausen <lars@metafoo.de>
 > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 > ---
 
