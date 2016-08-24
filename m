@@ -1,34 +1,99 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 24 Aug 2016 17:02:56 +0200
-Subject: [PATCH v05 60/72] arch/arm/include/uapi/asm/signal.h: use
- __kernel_size_t instead of size_t
-In-Reply-To: <1471890809-4383-61-git-send-email-mikko.rapeli@iki.fi>
-References: <1471890809-4383-1-git-send-email-mikko.rapeli@iki.fi>
- <1471890809-4383-61-git-send-email-mikko.rapeli@iki.fi>
-Message-ID: <1898059.B1P75dnZ5Q@wuerfel>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 24 Aug 2016 16:08:18 +0100
+Subject: [PATCH v4 6/8] iommu/arm-smmu: Implement of_xlate() for SMMUv3
+In-Reply-To: <1d570682-d815-657e-2119-b706e0034e2c@arm.com>
+References: <cover.1467388950.git.robin.murphy@arm.com>
+ <925b054b1e96dc83c0b1dc9607785d0346187366.1467388950.git.robin.murphy@arm.com>
+ <20160729144655.GA3359@e106794-lin.localdomain>
+ <1d570682-d815-657e-2119-b706e0034e2c@arm.com>
+Message-ID: <09911a58-1566-9a32-c911-f61e690d354a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, August 22, 2016 8:33:17 PM CEST Mikko Rapeli wrote:
-> diff --git a/arch/arm/include/uapi/asm/signal.h b/arch/arm/include/uapi/asm/signal.h
-> index 33073bd..859f2de 100644
-> --- a/arch/arm/include/uapi/asm/signal.h
-> +++ b/arch/arm/include/uapi/asm/signal.h
-> @@ -113,7 +113,7 @@ struct sigaction {
->  typedef struct sigaltstack {
->         void __user *ss_sp;
->         int ss_flags;
-> -       size_t ss_size;
-> +       __kernel_size_t ss_size;
->  } stack_t;
+On 29/07/16 19:55, Robin Murphy wrote:
+> On 29/07/16 15:46, Jean-Philippe Brucker wrote:
+>> Hi Robin,
+>>
+>> Very sorry about the delay, I forgot about this minor comment, below
+>>
+>> On Fri, Jul 01, 2016 at 05:50:15PM +0100, Robin Murphy wrote:
+[...]
+>>> +		smmu = arm_smmu_get_by_node(fwspec->iommu_np);
+>>> +		if (!smmu)
+>>> +			return -ENODEV;
+>>> +		master = kzalloc(sizeof(*master), GFP_KERNEL);
+>>> +		if (!master)
+>>> +			return -ENOMEM;
+>>> +
+>>> +		master->smmu = smmu;
+>>> +		fwspec->iommu_priv = master;
+>>
+>> It's probably best to initialise master->ste.bypass = true here, to
+>> reflect the initial state of STEs. Otherwise attach_dev always calls
+>> detach_dev first for nothing.
+> 
+> I'm actually now thinking that that check in attach_dev() should be for
+> ste->valid, rather than ste->bypass. That matches the similar check in
+> remove_device(), and looking at old local branches I apparently did have
+> it that way at some point, and I now can't quite remember why it ended
+> up differently. I'll have a proper dig into it next week.
 
-I was going to reply with an Ack, but on further consideration,
-I'm not sure if we can't do this in general: size_t may be either
-'unsigned int' or 'unsigned long' (depending on the architecture
-and toolchain), and if kernel and glibc disagree on this, we
-have a problem with any user space code that expects sigaltstack->ss_size
-to be the same type as size_t (as mandated by the man page).
+[for a value of "next week" relative to "last week", at least...]
 
-I wonder if there is another way to address this.
+Having now remembered, the reason it is this way is a subtle concession
+to the nasty PCI RID alias case. When you come to probe the second
+device behind a non-transparent bridge, the first device is already
+attached to the default domain so the underlying STE is no longer a
+bypass entry, but we've got no way of knowing that - we can't tell we're
+going to be in an alias group until we call iommu_group_get_for_dev(),
+and by the time that returns it's already too late, since the attach to
+the default domain (and thus the attempt to write a now-valid STE with
+the same data again) will have happened.
 
-	Arnd
+The least complicated ways around that that I can think of are 1)
+inspect the stream table itself on attach, 2) maintain a semi-redundant
+list within the group of exactly which ID is attached to which domain at
+any point in time, 3) treat the initial per-device state as undefined
+(!valid, !bypass) so that the initial domain attach is always a safe
+break-before-make on the stream table, or 4) disallow aliasing IDs
+entirely and just let the BUG() in write_strtab_ent() fire if a
+non-transparent bridge ever comes along.
+
+Discounting #4 as unreasonable, #3 is by far the least complicated, so
+I've kept this as it is for now. #2 might seem reasonable at a glance,
+but it wouldn't be useful for anything _except_ this specific situation,
+which in practice we'd expect to encounter rarely if ever.
+
+Robin.
+
+>> Apart from that, this version works fine with my twisted setup. Note
+>> that we might have to add a master->fwspec reference in the future, to
+>> access those SIDs from various places. If I understood correctly, it
+>> should be fine as those objects have the same lifetime after the
+>> add_device call.
+> 
+> That sounds reasonable, although I can't think offhand where we might
+> have a master_data without having got it via the containing device
+> (unless we also add some other means of keeping track of them). Since
+> this series doesn't need any kind of reverse-lookup capabilities I'm
+> just keeping things as simple as possible for the time being.
+> 
+> Robin.
+> 
+>>
+>> Thanks,
+>> Jean-Philippe
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
