@@ -1,151 +1,56 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Thu, 25 Aug 2016 07:57:33 +0800
-Subject: [PATCH 1/2] ARM: dts: sun8i: Add dts file for inet-d978_rev2
- tablets
-In-Reply-To: <20160824193235.GR8103@lukather>
+Date: Thu, 25 Aug 2016 07:58:27 +0800
+Subject: [PATCH 2/2] ARM: dts: sun8i: enable UART1 for iNet D978 Rev2 board
+In-Reply-To: <20160824193600.GS8103@lukather>
 References: <20160823064451.25997-1-icenowy@aosc.xyz>
- <20160823064451.25997-2-icenowy@aosc.xyz> <20160824193235.GR8103@lukather>
-Message-ID: <43601472083053@web23m.yandex.ru>
+ <20160823064451.25997-3-icenowy@aosc.xyz> <20160824193600.GS8103@lukather>
+Message-ID: <43951472083107@web23m.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-25.08.2016, 03:32, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+25.08.2016, 03:36, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
 > Hi,
 >
-> On Tue, Aug 23, 2016 at 02:44:50PM +0800, Icenowy Zheng wrote:
->> ?The inet-d978_rev2 is a pcb used in generic A33 based tablets. It features
->> ?volume buttons, micro-usb otg, headphone connector and a power button.
+> On Tue, Aug 23, 2016 at 02:44:51PM +0800, Icenowy Zheng wrote:
+>> ?UART1 is connected to the bluetooth part of RTL8723BS WiFi/BT combo card
+>> ?on iNet D978 Rev2 board.
 >>
->> ?On the board a Realtek RTL8723BS SDIO Wi-Fi module are soldered, and there
->> ?is also a accompanied board which has a Goodix GT9271 soldered.
->>
->> ?As this board is desired to create tablets with a Home key dealed by
->> ?GT9271, a LED is present at the front panel at the position of the
->> ?Home key.
+>> ?Enable the UART1 to make it possible to use the modified hciattach by
+>> ?Realtek to drive the BT part of RTL8723BS.
 >>
 >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>
+> I guess you could fold that patch into the previous one.
+>
 >> ?---
->> ??arch/arm/boot/dts/Makefile | 1 +
->> ??arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts | 87 ++++++++++++++++++++++++++
->> ??2 files changed, 88 insertions(+)
->> ??create mode 100644 arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+>> ??arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts | 11 +++++++++++
+>> ??1 file changed, 11 insertions(+)
 >>
->> ?diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> ?index faacd52..d1812a0 100644
->> ?--- a/arch/arm/boot/dts/Makefile
->> ?+++ b/arch/arm/boot/dts/Makefile
->> ?@@ -782,6 +782,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
->> ??????????sun8i-a23-q8-tablet.dtb \
->> ??????????sun8i-a33-et-q8-v1.6.dtb \
->> ??????????sun8i-a33-ga10h-v1.1.dtb \
->> ?+ sun8i-a33-inet-d978-rev2.dtb \
->> ??????????sun8i-a33-ippo-q8h-v1.2.dtb \
->> ??????????sun8i-a33-q8-tablet.dtb \
->> ??????????sun8i-a33-sinlinx-sina33.dtb \
 >> ?diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
->> ?new file mode 100644
->> ?index 0000000..78823d8
->> ?--- /dev/null
+>> ?index 78823d8..3ac22d4 100644
+>> ?--- a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
 >> ?+++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
->> ?@@ -0,0 +1,87 @@
->> ?+/*
->> ?+ * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
->
-> I guess you are the author too :)
->
->> ?+ *
->> ?+ * This file is dual-licensed: you can use it either under the terms
->> ?+ * of the GPL or the X11 license, at your option. Note that this dual
->> ?+ * licensing only applies to this file, and not this project as a
->> ?+ * whole.
->> ?+ *
->> ?+ * a) This file is free software; you can redistribute it and/or
->> ?+ * modify it under the terms of the GNU General Public License as
->> ?+ * published by the Free Software Foundation; either version 2 of the
->> ?+ * License, or (at your option) any later version.
->> ?+ *
->> ?+ * This file is distributed in the hope that it will be useful,
->> ?+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> ?+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
->> ?+ * GNU General Public License for more details.
->> ?+ *
->> ?+ * Or, alternatively,
->> ?+ *
->> ?+ * b) Permission is hereby granted, free of charge, to any person
->> ?+ * obtaining a copy of this software and associated documentation
->> ?+ * files (the "Software"), to deal in the Software without
->> ?+ * restriction, including without limitation the rights to use,
->> ?+ * copy, modify, merge, publish, distribute, sublicense, and/or
->> ?+ * sell copies of the Software, and to permit persons to whom the
->> ?+ * Software is furnished to do so, subject to the following
->> ?+ * conditions:
->> ?+ *
->> ?+ * The above copyright notice and this permission notice shall be
->> ?+ * included in all copies or substantial portions of the Software.
->> ?+ *
->> ?+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> ?+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> ?+ * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> ?+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> ?+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> ?+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> ?+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> ?+ * OTHER DEALINGS IN THE SOFTWARE.
->> ?+ */
->> ?+
->> ?+/dts-v1/;
->> ?+#include "sun8i-a33.dtsi"
->> ?+#include "sun8i-reference-design-tablet.dtsi"
->> ?+
->> ?+/ {
->> ?+ model = "INet-D978 Rev 02";
->> ?+ compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
->> ?+
->> ?+ leds {
->> ?+ compatible = "gpio-leds";
->> ?+ pinctrl-names = "default";
->> ?+ pinctrl-0 = <&led_pin_d978>;
->> ?+
->> ?+ home {
->> ?+ label = "d978:home";
->
-> This is not the proper format for the led labels.
->
-> It's supposed to be <board>:<color>:<function>
-
-Thanks.
-So I'd use "d978:blue:home".
-
->
->> ?+ gpios = <&r_pio 0 5 GPIO_ACTIVE_HIGH>; /* PL5 */
+>> ?@@ -48,6 +48,10 @@
+>> ??????????model = "INet-D978 Rev 02";
+>> ??????????compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
+>>
+>> ?+ aliases {
+>> ?+ serial1 = &uart1;
 >> ?+ };
->> ?+ };
->> ?+};
 >> ?+
->> ?+&mmc1_pins_a {
->> ?+ allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
->> ?+};
->> ?+
->> ?+&mmc1 {
->> ?+ pinctrl-names = "default";
->> ?+ pinctrl-0 = <&mmc1_pins_a>;
->> ?+ vmmc-supply = <&reg_dldo1>;
->> ?+ bus-width = <4>;
->> ?+ non-removable;
->> ?+ status = "okay";
->> ?+
->> ?+ rtl8723bs: sdio_wifi at 1 {
->> ?+ reg = <1>;
->> ?+ };
 >
-> Don't you need an alias to this node to have the MAC address set?
+> Is there any other UART in the system?
 
-It seems that rtl8723bs come with an eFUSE.
+serial0 is defined in sun8i-reference-design-tablet.dtsi, as r_uart.
 
 >
-> Thanks,
+> The alias is not supposed to be about the controller index, but the
+> index in the board, meaning that if you only have a single UART, that
+> would be serial0.
+>
+> Thanks!
 > Maxime
 >
 > --
