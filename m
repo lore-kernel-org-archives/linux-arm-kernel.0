@@ -1,57 +1,86 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 25 Aug 2016 03:18:55 +0900
-Subject: [PATCH 01/10] reset: ath79: add driver Kconfig option
-In-Reply-To: <20643424.8eBLZWavEG@wuerfel>
-References: <1472045342-7434-1-git-send-email-p.zabel@pengutronix.de>
- <20643424.8eBLZWavEG@wuerfel>
-Message-ID: <CAK7LNAT4rZoQJaPLiA_Hg=PJ9AD4Z-oLVadq5WDgQ2etCYUFFA@mail.gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 24 Aug 2016 11:24:07 -0700
+Subject: [PATCH 1/2] arm64: kernel: Add SMC Session ID to results
+In-Reply-To: <1471672274-19317-2-git-send-email-andy.gross@linaro.org>
+References: <1471672274-19317-1-git-send-email-andy.gross@linaro.org>
+ <1471672274-19317-2-git-send-email-andy.gross@linaro.org>
+Message-ID: <20160824182407.GG15161@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Fri 19 Aug 22:51 PDT 2016, Andy Gross wrote:
 
+> This patch adds the SMC Session ID to the results passed back from SMC
+> calls.  The Qualcomm SMC implementation provides for interrupted SMC
+> functions.  When this occurs, the SMC call will return a session ID that
+> is required to be used when resuming the interrupted SMC call.
+> 
+> Signed-off-by: Andy Gross <andy.gross@linaro.org>
 
-2016-08-25 0:51 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-> On Wednesday, August 24, 2016 3:28:53 PM CEST Philipp Zabel wrote:
->>  if RESET_CONTROLLER
->>
->> +config RESET_ATH79
->> +       bool "AR71xx Reset Driver" if COMPILE_TEST
->> +       default ATH79
->> +       help
->> +         This enables the ATH79 reset controller driver that supports the
->> +         AR71xx SoC reset controller.
->> +
->>
->
-> Nice series!
->
-> Just note that there is one possible problem with COMPILE_TEST
-> when the platforms are enabled, as you can then disable a driver
-> that is normally there, and that can in turn cause problems in
-> rare cases, e.g. when the driver has a global function that is
-> called from platform code. I don't know if any of the drivers
-> do that, but if they do, you'd have to use
->
-> config RESET_ATH79
->        bool "AR71xx Reset Driver" if COMPILE_TEST && !ATH79
->        default ATH79
->
-> to ensure that it's impossible to disable the driver on platforms
-> that require it.
+This fixes the spurious remoteproc firmware authentication failures I've
+seen lately.
 
-Hmm,
-Can we do this only when we really have to do so?
-I think we should not care about such a rare case that may not happen.
+Tested-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-Let's start with only "if COMPILE_TEST",
-and take a look at it if a build error is detected.
+Regards,
+Bjorn
 
-Anyway, depending on platform code is a sign of weird implementation.
-
-It might be better to find a potential issue rather than hide it.
-
-
--- 
-Best Regards
-Masahiro Yamada
+> ---
+>  arch/arm64/kernel/asm-offsets.c | 1 +
+>  arch/arm64/kernel/smccc-call.S  | 1 +
+>  include/linux/arm-smccc.h       | 4 +++-
+>  3 files changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+> index 05070b7..ff38c58 100644
+> --- a/arch/arm64/kernel/asm-offsets.c
+> +++ b/arch/arm64/kernel/asm-offsets.c
+> @@ -141,6 +141,7 @@ int main(void)
+>  #endif
+>    DEFINE(ARM_SMCCC_RES_X0_OFFS,	offsetof(struct arm_smccc_res, a0));
+>    DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
+> +  DEFINE(ARM_SMCCC_RES_X6_OFFS,	offsetof(struct arm_smccc_res, a6));
+>    BLANK();
+>    DEFINE(HIBERN_PBE_ORIG,	offsetof(struct pbe, orig_address));
+>    DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
+> diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
+> index ae0496f..278dc9a 100644
+> --- a/arch/arm64/kernel/smccc-call.S
+> +++ b/arch/arm64/kernel/smccc-call.S
+> @@ -20,6 +20,7 @@
+>  	ldr	x4, [sp]
+>  	stp	x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
+>  	stp	x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
+> +	str	x6, [x4, #ARM_SMCCC_RES_X6_OFFS]
+>  	ret
+>  	.cfi_endproc
+>  	.endm
+> diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+> index b5abfda..82d919f 100644
+> --- a/include/linux/arm-smccc.h
+> +++ b/include/linux/arm-smccc.h
+> @@ -63,18 +63,20 @@
+>  /**
+>   * struct arm_smccc_res - Result from SMC/HVC call
+>   * @a0-a3 result values from registers 0 to 3
+> + * @a6 Session ID register (optional)
+>   */
+>  struct arm_smccc_res {
+>  	unsigned long a0;
+>  	unsigned long a1;
+>  	unsigned long a2;
+>  	unsigned long a3;
+> +	unsigned long a6;
+>  };
+>  
+>  /**
+>   * arm_smccc_smc() - make SMC calls
+>   * @a0-a7: arguments passed in registers 0 to 7
+> - * @res: result values from registers 0 to 3
+> + * @res: result values from registers 0 to 3 and optional register 6
+>   *
+>   * This function is used to make SMC calls following SMC Calling Convention.
+>   * The content of the supplied param are copied to registers 0 to 7 prior
+> -- 
+> 1.9.1
+> 
