@@ -1,70 +1,104 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Wed, 24 Aug 2016 15:44:51 +0800
-Subject: [PATCH v7 12/14] arm64/numa: remove the limitation that cpu0 must
- bind to node0
+Date: Wed, 24 Aug 2016 15:44:46 +0800
+Subject: [PATCH v7 07/14] of_numa: Use pr_fmt()
 In-Reply-To: <1472024693-12912-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1472024693-12912-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1472024693-12912-13-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1472024693-12912-8-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. Currently only cpu0 set on cpu_possible_mask and percpu areas have not
-   been initialized.
-2. No reason to limit cpu0 must belongs to node0.
+From: Kefeng Wang <wangkefeng.wang@huawei.com>
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+Use pr_fmt to prefix kernel output.
+
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm64/mm/numa.c | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+ drivers/of/of_numa.c | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index 114180f..07a1978 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -94,7 +94,6 @@ void numa_clear_node(unsigned int cpu)
+diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
+index ed103e6..1234b4a 100644
+--- a/drivers/of/of_numa.c
++++ b/drivers/of/of_numa.c
+@@ -16,6 +16,8 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
   */
- static void __init setup_node_to_cpumask_map(void)
- {
--	unsigned int cpu;
- 	int node;
 
- 	/* setup nr_node_ids if not done yet */
-@@ -107,9 +106,6 @@ static void __init setup_node_to_cpumask_map(void)
- 		cpumask_clear(node_to_cpumask_map[node]);
++#define pr_fmt(fmt) "OF: NUMA: " fmt
++
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/nodemask.h>
+@@ -49,10 +51,9 @@ static void __init of_numa_parse_cpu_nodes(void)
+ 		if (r)
+ 			continue;
+
+-		pr_debug("NUMA: CPU on %u\n", nid);
++		pr_debug("CPU on %u\n", nid);
+ 		if (nid >= MAX_NUMNODES)
+-			pr_warn("NUMA: Node id %u exceeds maximum value\n",
+-				nid);
++			pr_warn("Node id %u exceeds maximum value\n", nid);
+ 		else
+ 			node_set(nid, numa_nodes_parsed);
+ 	}
+@@ -76,7 +77,7 @@ static int __init of_numa_parse_memory_nodes(void)
+ 			continue;
+
+ 		if (nid >= MAX_NUMNODES) {
+-			pr_warn("NUMA: Node id %u exceeds maximum value\n", nid);
++			pr_warn("Node id %u exceeds maximum value\n", nid);
+ 			return -EINVAL;
+ 		}
+
+@@ -85,7 +86,7 @@ static int __init of_numa_parse_memory_nodes(void)
+
+ 		if (!i || r) {
+ 			of_node_put(np);
+-			pr_err("NUMA: bad property in memory node\n");
++			pr_err("bad property in memory node\n");
+ 			return r ? : -EINVAL;
+ 		}
+ 	}
+@@ -99,17 +100,17 @@ static int __init of_numa_parse_distance_map_v1(struct device_node *map)
+ 	int entry_count;
+ 	int i;
+
+-	pr_info("NUMA: parsing numa-distance-map-v1\n");
++	pr_info("parsing numa-distance-map-v1\n");
+
+ 	matrix = of_get_property(map, "distance-matrix", NULL);
+ 	if (!matrix) {
+-		pr_err("NUMA: No distance-matrix property in distance-map\n");
++		pr_err("No distance-matrix property in distance-map\n");
+ 		return -EINVAL;
  	}
 
--	for_each_possible_cpu(cpu)
--		set_cpu_numa_node(cpu, NUMA_NO_NODE);
--
- 	/* cpumask_of_node() will now work */
- 	pr_debug("Node to cpumask map for %d nodes\n", nr_node_ids);
- }
-@@ -119,13 +115,13 @@ static void __init setup_node_to_cpumask_map(void)
-  */
- void numa_store_cpu_info(unsigned int cpu)
- {
--	map_cpu_to_node(cpu, numa_off ? 0 : cpu_to_node_map[cpu]);
-+	map_cpu_to_node(cpu, cpu_to_node_map[cpu]);
- }
+ 	entry_count = of_property_count_u32_elems(map, "distance-matrix");
+ 	if (entry_count <= 0) {
+-		pr_err("NUMA: Invalid distance-matrix\n");
++		pr_err("Invalid distance-matrix\n");
+ 		return -EINVAL;
+ 	}
 
- void __init early_map_cpu_to_node(unsigned int cpu, int nid)
- {
- 	/* fallback to node 0 */
--	if (nid < 0 || nid >= MAX_NUMNODES)
-+	if (nid < 0 || nid >= MAX_NUMNODES || numa_off)
- 		nid = 0;
+@@ -124,7 +125,7 @@ static int __init of_numa_parse_distance_map_v1(struct device_node *map)
+ 		matrix++;
 
- 	cpu_to_node_map[cpu] = nid;
-@@ -375,10 +371,6 @@ static int __init numa_init(int (*init_func)(void))
+ 		numa_set_distance(nodea, nodeb, distance);
+-		pr_debug("NUMA:  distance[node%d -> node%d] = %d\n",
++		pr_debug("distance[node%d -> node%d] = %d\n",
+ 			 nodea, nodeb, distance);
 
- 	setup_node_to_cpumask_map();
-
--	/* init boot processor */
--	cpu_to_node_map[0] = 0;
--	map_cpu_to_node(0, 0);
--
- 	return 0;
- }
+ 		/* Set default distance of node B->A same as A->B */
+@@ -171,7 +172,7 @@ int of_node_to_nid(struct device_node *device)
+ 		np = of_get_next_parent(np);
+ 	}
+ 	if (np && r)
+-		pr_warn("NUMA: Invalid \"numa-node-id\" property in node %s\n",
++		pr_warn("Invalid \"numa-node-id\" property in node %s\n",
+ 			np->name);
+ 	of_node_put(np);
 
 --
 2.5.0
