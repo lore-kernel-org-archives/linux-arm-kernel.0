@@ -1,38 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 24 Aug 2016 17:51:06 +0200
-Subject: [PATCH 01/10] reset: ath79: add driver Kconfig option
-In-Reply-To: <1472045342-7434-1-git-send-email-p.zabel@pengutronix.de>
-References: <1472045342-7434-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20643424.8eBLZWavEG@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Aug 2016 16:56:50 +0100
+Subject: [PATCH 5/5] arm64: Add uprobe support
+In-Reply-To: <20160824154711.GA25531@redhat.com>
+References: <cover.1470114993.git.panand@redhat.com>
+ <abaac6ebaa5dd63889803ec568663bc8c8c65b02.1470114993.git.panand@redhat.com>
+ <20160809184943.GA17112@redhat.com>
+ <20160824071308.GA24311@localhost.localdomain>
+ <20160824154711.GA25531@redhat.com>
+Message-ID: <20160824155649.GG16944@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 24, 2016 3:28:53 PM CEST Philipp Zabel wrote:
->  if RESET_CONTROLLER
->  
-> +config RESET_ATH79
-> +       bool "AR71xx Reset Driver" if COMPILE_TEST
-> +       default ATH79
-> +       help
-> +         This enables the ATH79 reset controller driver that supports the
-> +         AR71xx SoC reset controller.
-> +
+On Wed, Aug 24, 2016 at 05:47:11PM +0200, Oleg Nesterov wrote:
+> On 08/24, Pratyush Anand wrote:
+> >
+> > > I don't think we want user_{enable,disable{_single_step in the long term,
+> > > please look at 9bd1190a11c9d2 "uprobes/x86: Do not (ab)use TIF_SINGLESTEP
+> > > /user_*_single_step() for single-stepping". it seems that ARM64 sets/clears
+> > > TIF_SINGLESTEP. You can also lool at saved_tf logic, probably ARM64 needs
+> > > the same.
+> >
+> > IIUC, then you mean that TIF_SINGLESTEP is a per task flag,
 > 
+> Yes, and nobody but ptrace should use it, otherwise ptrace/uprobes can confuse
+> each other. And uprobes simply doesn't need to set/clear it.
 
-Nice series!
+We're already using it for kprobes, hw_breakpoint and kgdb as well as
+ptrace, so I'd rather uprobes either followed existing practice, or we
+converted everybody off the current code.
 
-Just note that there is one possible problem with COMPILE_TEST
-when the platforms are enabled, as you can then disable a driver
-that is normally there, and that can in turn cause problems in
-rare cases, e.g. when the driver has a global function that is
-called from platform code. I don't know if any of the drivers
-do that, but if they do, you'd have to use
+In what way do things get confused?
 
-config RESET_ATH79
-       bool "AR71xx Reset Driver" if COMPILE_TEST && !ATH79
-       default ATH79
+> > while
+> > arch_uprobe_pre/post_xol() should enable/disable single stepping using a per
+> > uprobe_task,
+> 
+> I can't really answer since I know nothing about arm. x86 just needs to set
+> X86_EFLAGS_TF, I guess arm needs to modify some register too?
 
-to ensure that it's impossible to disable the driver on platforms
-that require it.
+We have {user,kernel}_{enable,disable}_single_step for managing the various
+registers controlling the single-step state machine on arm64.
 
-	Arnd
+Will
