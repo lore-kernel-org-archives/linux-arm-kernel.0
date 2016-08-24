@@ -1,50 +1,106 @@
-From: sf84@laposte.net (Sebastian Frias)
-Date: Wed, 24 Aug 2016 16:29:02 +0200
-Subject: ARM,SoC: About the use DT-defined properties by 3rd-party drivers
-Message-ID: <57BDAF2E.10502@laposte.net>
+From: arvind.yadav.cs@gmail.com (arvind Yadav)
+Date: Wed, 24 Aug 2016 20:05:54 +0530
+Subject: [v.3] clocksource:clps711x-timer:- Unmap a region obtained by
+ remap.
+In-Reply-To: <57BDAD4D.7060602@linaro.org>
+References: <1472047821-5539-1-git-send-email-arvind.yadav.cs@gmail.com>
+ <57BDAD4D.7060602@linaro.org>
+Message-ID: <2af1fb67-5e3e-24aa-8915-ff530375a65a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This clocksource(_clps711x_clksrc_init) initialization is not depend on irq.
 
-Given a SoC and its SDK, 3rd party users of said SoC (customers of the SoC's
-manufacturer) may need/want to write kernel modules.
-Since the DT describes the HW, it would make sense to expose some HW properties
-through the DT, and have 3rd party users rely on them to write their drivers in
-a generic way.
-However, it seems that one is not allowed to upstream DT bindings and
-properties without a driver, is that right?
+We should check irq only for clockevent(_clps711x_clkevt_init) 
+initialization.
 
-If true, that hampers DT usage by out-of-tree drivers (or in this case,
-drivers that are not written yet) and limits the usage of DT properties as an
-API.
+In V2, I was checking irq for both the initialization.
 
-We can understand that DT maintainers want to know what goes upstream,
-make sure that the bindings are documented, that there are no conflicts with
-other bindings or generic strings, etc.
-However, it is hard to see why there is not a "relaxed" upstreaming path
-for SoC-specific properties (i.e.: that do not affect DT API nor other
-SoCs).
+--Arvind Y
 
-As an example, we would like to add some properties to /soc/ like:
 
-   soc {
-       compatible = "simple-bus";
-       ...
-       sigma-register-layout-version = <2>;
-       sigma-has-XYZ-capability;
-
-and so on.
-
-If this is really not possible, it forces the SoC manufacturer to expose
-those properties in a different way, thus wasting a (seemingly) perfectly
-fine way of doing so: the DT and its documentation.
-
-Thoughts?
-
-By the way, what about properties generated on-the-fly by the bootloader?
-
-Thanks in advance.
-Best regards,
-
-Sebastian
+On Wednesday 24 August 2016 07:51 PM, Daniel Lezcano wrote:
+> On 08/24/2016 04:10 PM, Arvind Yadav wrote:
+>> iounmap frees the mapping when timer id is not matching.
+>>
+>> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> What is the difference with the V2 ?
+>
+>> ---
+>>   drivers/clocksource/clps711x-timer.c | 41 +++++++++++++++++++-----------------
+>>   1 file changed, 22 insertions(+), 19 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/clps711x-timer.c b/drivers/clocksource/clps711x-timer.c
+>> index 24db6d6..784c000 100644
+>> --- a/drivers/clocksource/clps711x-timer.c
+>> +++ b/drivers/clocksource/clps711x-timer.c
+>> @@ -33,14 +33,7 @@ static u64 notrace clps711x_sched_clock_read(void)
+>>   
+>>   static int __init _clps711x_clksrc_init(struct clk *clock, void __iomem *base)
+>>   {
+>> -	unsigned long rate;
+>> -
+>> -	if (!base)
+>> -		return -ENOMEM;
+>> -	if (IS_ERR(clock))
+>> -		return PTR_ERR(clock);
+>> -
+>> -	rate = clk_get_rate(clock);
+>> +	unsigned long rate = clk_get_rate(clock);
+>>   
+>>   	tcd = base;
+>>   
+>> @@ -67,13 +60,6 @@ static int __init _clps711x_clkevt_init(struct clk *clock, void __iomem *base,
+>>   	struct clock_event_device *clkevt;
+>>   	unsigned long rate;
+>>   
+>> -	if (!irq)
+>> -		return -EINVAL;
+>> -	if (!base)
+>> -		return -ENOMEM;
+>> -	if (IS_ERR(clock))
+>> -		return PTR_ERR(clock);
+>> -
+>>   	clkevt = kzalloc(sizeof(*clkevt), GFP_KERNEL);
+>>   	if (!clkevt)
+>>   		return -ENOMEM;
+>> @@ -106,16 +92,33 @@ void __init clps711x_clksrc_init(void __iomem *tc1_base, void __iomem *tc2_base,
+>>   #ifdef CONFIG_CLKSRC_OF
+>>   static int __init clps711x_timer_init(struct device_node *np)
+>>   {
+>> -	unsigned int irq = irq_of_parse_and_map(np, 0);
+>> -	struct clk *clock = of_clk_get(np, 0);
+>> -	void __iomem *base = of_iomap(np, 0);
+>> +	unsigned int irq;
+>> +	struct clk *clock;
+>> +	void __iomem *base;
+>> +	int ret;
+>> +
+>> +	clock = of_clk_get(np, 0);
+>> +	if (IS_ERR(clock))
+>> +		return PTR_ERR(clock);
+>> +
+>> +	base = of_iomap(np, 0);
+>> +	if (!base)
+>> +		return -ENOMEM;
+>>   
+>>   	switch (of_alias_get_id(np, "timer")) {
+>>   	case CLPS711X_CLKSRC_CLOCKSOURCE:
+>>   		return _clps711x_clksrc_init(clock, base);
+>>   	case CLPS711X_CLKSRC_CLOCKEVENT:
+>> -		return _clps711x_clkevt_init(clock, base, irq);
+>> +		irq = irq_of_parse_and_map(np, 0);
+>> +		if (!irq)
+>> +			return -EINVAL;
+>> +
+>> +		ret = _clps711x_clkevt_init(clock, base, irq);
+>> +		if (ret)
+>> +			iounmap(base);
+>> +		return ret;
+>>   	default:
+>> +		iounmap(base);
+>>   		return -EINVAL;
+>>   	}
+>>   }
+>>
+>
