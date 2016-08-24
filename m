@@ -1,29 +1,46 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Wed, 24 Aug 2016 10:42:06 +0800
-Subject: [PATCH v2 2/3] arm64: defconfig: enable CONFIG_INPUT_HISI_POWERKEY
- for HiKey
+Date: Wed, 24 Aug 2016 10:42:07 +0800
+Subject: [PATCH v2 3/3] arm64: defconfig: enable bluetooth supports as modules
 In-Reply-To: <1472006527-30620-1-git-send-email-guodong.xu@linaro.org>
 References: <1472006527-30620-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <1472006527-30620-3-git-send-email-guodong.xu@linaro.org>
+Message-ID: <1472006527-30620-4-git-send-email-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Enable the following items for bluetooth mouse and speaker which base
+on HCIUART.
+
+a) CONFIG_BT_HCIUART
+b) CONFIG_BT_HCIUART_LL
+c) CONFIG_BT_HIDP
+
+Enable bluetooth LED support.
+
+d) CONFIG_BT_LEDS
+
 Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/configs/defconfig | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index e27f086..b4f714c 100644
+index b4f714c..0c7551d 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -186,6 +186,7 @@ CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_PM8941_PWRKEY=y
-+CONFIG_INPUT_HISI_POWERKEY=y
- # CONFIG_SERIO_SERPORT is not set
- CONFIG_SERIO_AMBAKMI=y
- CONFIG_LEGACY_PTY_COUNT=16
+@@ -120,6 +120,14 @@ CONFIG_VLAN_8021Q=m
+ CONFIG_VLAN_8021Q_GVRP=y
+ CONFIG_VLAN_8021Q_MVRP=y
+ CONFIG_BPF_JIT=y
++CONFIG_BT=m
++CONFIG_BT_HIDP=m
++# CONFIG_BT_HS is not set
++# CONFIG_BT_LE is not set
++CONFIG_BT_LEDS=y
++# CONFIG_BT_DEBUGFS is not set
++CONFIG_BT_HCIUART=m
++CONFIG_BT_HCIUART_LL=y
+ CONFIG_CFG80211=m
+ CONFIG_MAC80211=m
+ CONFIG_MAC80211_LEDS=y
 -- 
 1.9.1
