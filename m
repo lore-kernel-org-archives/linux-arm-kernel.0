@@ -1,9 +1,9 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 24 Aug 2016 16:30:05 +0530
-Subject: [GIT PULL 2/3] DaVinci dts updates for v4.9
+Date: Wed, 24 Aug 2016 16:30:06 +0530
+Subject: [GIT PULL 3/3] DaVinci defconfig updates for v4.9
 In-Reply-To: <20160824110006.1866-1-nsekhar@ti.com>
 References: <20160824110006.1866-1-nsekhar@ti.com>
-Message-ID: <20160824110006.1866-2-nsekhar@ti.com>
+Message-ID: <20160824110006.1866-3-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,35 +13,27 @@ The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.9/dts
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.9/defconfig
 
-for you to fetch changes up to 9d05b389846312751108b16f3f8fccd51fa92715:
+for you to fetch changes up to c6144fb8ec5328110ca7bf4682167a95590fd7ec:
 
-  ARM: dts: da850-lcdk: Audio support via simple-card (2016-08-19 17:51:27 +0530)
-
-----------------------------------------------------------------
-DaVinci DA850 device-tree enhancements include:
-
-- Support for new board OMAP-L138 LCDK
-- Add AEMIF node on DA850 EVM and use it for NAND
-- Audio support for LCDK
-- Cleanups for PWM and UART
+  ARM: davinci_all_defconfig: Enable some UBI modules (2016-08-23 16:22:19 +0530)
 
 ----------------------------------------------------------------
-Cooper Jr., Franklin (1):
-      ARM: dts: da850: Add new ECAP and EPWM bindings
+DaVinci defconfig updates include cleanup using
+savedefconfig and enabling various commonly used
+drivers as modules.
 
+----------------------------------------------------------------
 Karl Beldan (4):
-      ARM: dts: da850: Add missing pin muxing for the UARTs
-      ARM: dts: da850: Add basic DTS for the LCDK
-      ARM: dts: da850,da850-evm: Add an aemif node and use it for the NAND
-      ARM: dts: da850-lcdk: Audio support via simple-card
+      ARM: davinci_all_defconfig: enable RTC driver as module
+      ARM: davinci_all_defconfig: enable SMSC ethernet PHY
+      ARM: davinci_all_defconfig: Enable AEMIF as a module
+      ARM: davinci_all_defconfig: Enable some UBI modules
 
- Documentation/devicetree/bindings/arm/davinci.txt |   4 +
- arch/arm/boot/dts/Makefile                        |   1 +
- arch/arm/boot/dts/da850-evm.dts                   |  49 +++++++-
- arch/arm/boot/dts/da850-lcdk.dts                  | 138 ++++++++++++++++++++++
- arch/arm/boot/dts/da850.dtsi                      |  80 ++++++++-----
- arch/arm/mach-davinci/da8xx-dt.c                  |   1 +
- 6 files changed, 239 insertions(+), 34 deletions(-)
- create mode 100644 arch/arm/boot/dts/da850-lcdk.dts
+Kevin Hilman (2):
+      ARM: davinci_all_defconfig: cleanup with savedefconfig
+      ARM: davinci_all_defconfig: enable DA850 audio as modules
+
+ arch/arm/configs/davinci_all_defconfig | 66 +++++++++++++---------------------
+ 1 file changed, 25 insertions(+), 41 deletions(-)
