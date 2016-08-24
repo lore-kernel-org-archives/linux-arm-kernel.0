@@ -1,15 +1,16 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 24 Aug 2016 15:29:00 +0200
-Subject: [PATCH 08/10] reset: sunxi: add driver Kconfig option
+Date: Wed, 24 Aug 2016 15:28:58 +0200
+Subject: [PATCH 06/10] reset: socfpga: add driver Kconfig option
 In-Reply-To: <1472045342-7434-1-git-send-email-p.zabel@pengutronix.de>
 References: <1472045342-7434-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1472045342-7434-8-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1472045342-7434-6-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Visible only if COMPILE_TEST is enabled, this allows to include the
 driver in build tests.
 
+Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
  drivers/reset/Kconfig  | 6 ++++++
@@ -17,37 +18,37 @@ Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
  2 files changed, 7 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-index 3a54a66..17030e2 100644
+index 6ac631e..354e281 100644
 --- a/drivers/reset/Kconfig
 +++ b/drivers/reset/Kconfig
-@@ -61,6 +61,12 @@ config RESET_STM32
+@@ -49,6 +49,12 @@ config RESET_PISTACHIO
  	help
- 	  This enables the RCC reset controller driver for STM32 MCUs.
+ 	  This enables the reset driver for ImgTec Pistachio SoCs.
  
-+config RESET_SUNXI
-+	bool "Allwinner SoCs Reset Driver" if COMPILE_TEST
-+	default ARCH_SUNXI
++config RESET_SOCFPGA
++	bool "SoC FPGA Reset Driver" if COMPILE_TEST
++	default ARCH_SOCFPGA
 +	help
-+	  This enables the reset driver for Allwinner SoCs.
++	  This enables the reset driver for Altera SoC FPGAs.
 +
  config TI_SYSCON_RESET
  	tristate "TI SYSCON Reset Driver"
  	depends on HAS_IOMEM
 diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index 6276f82..4a163c7 100644
+index c796a14..61e4c64 100644
 --- a/drivers/reset/Makefile
 +++ b/drivers/reset/Makefile
 @@ -1,5 +1,4 @@
  obj-y += core.o
--obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
+-obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
+ obj-$(CONFIG_ARCH_STM32) += reset-stm32.o
+ obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
  obj-$(CONFIG_ARCH_STI) += sti/
- obj-$(CONFIG_ARCH_HISI) += hisilicon/
- obj-$(CONFIG_ARCH_ZYNQ) += reset-zynq.o
-@@ -11,5 +10,6 @@ obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
+@@ -11,5 +10,6 @@ obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
+ obj-$(CONFIG_RESET_MESON) += reset-meson.o
+ obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
  obj-$(CONFIG_RESET_PISTACHIO) += reset-pistachio.o
- obj-$(CONFIG_RESET_SOCFPGA) += reset-socfpga.o
- obj-$(CONFIG_RESET_STM32) += reset-stm32.o
-+obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
++obj-$(CONFIG_RESET_SOCFPGA) += reset-socfpga.o
  obj-$(CONFIG_TI_SYSCON_RESET) += reset-ti-syscon.o
  obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
 -- 
