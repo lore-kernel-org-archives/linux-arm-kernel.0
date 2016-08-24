@@ -1,126 +1,69 @@
-From: mirza.krak@gmail.com (Mirza Krak)
-Date: Wed, 24 Aug 2016 21:54:47 +0200
-Subject: [PATCH v2 3/6] dt/bindings: Add bindings for Tegra GMI controller
-In-Reply-To: <de2fb909-829e-6c04-4f6a-442cbb9171c9@nvidia.com>
-References: <1472045838-22628-1-git-send-email-mirza.krak@gmail.com>
- <1472045838-22628-4-git-send-email-mirza.krak@gmail.com>
- <de2fb909-829e-6c04-4f6a-442cbb9171c9@nvidia.com>
-Message-ID: <CALw8SCVcPymDZ8NyUbeanRF0TCT1TZzL6iRDticYA42FWrEWqw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 Aug 2016 22:06:04 +0200
+Subject: [PATCH 01/10] reset: ath79: add driver Kconfig option
+In-Reply-To: <CAK7LNAT4rZoQJaPLiA_Hg=PJ9AD4Z-oLVadq5WDgQ2etCYUFFA@mail.gmail.com>
+References: <1472045342-7434-1-git-send-email-p.zabel@pengutronix.de>
+ <20643424.8eBLZWavEG@wuerfel>
+ <CAK7LNAT4rZoQJaPLiA_Hg=PJ9AD4Z-oLVadq5WDgQ2etCYUFFA@mail.gmail.com>
+Message-ID: <1779401.H3WQxbgf2J@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-08-24 17:56 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
-+
->> +Example with two SJA1000 CAN controllers connected to the GMI bus. We wrap the
->> +controllers with a simple-bus node since they are all connected to the same
->> +chip-select (CS4), in this example external address decoding is provided:
->> +
->> +gmi at 70090000 {
->> +     compatible = "nvidia,tegra20-gmi";
->> +     reg = <0x70009000 0x1000>;
->> +     #address-cells = <1>;
->> +     #size-cells = <1>;
->> +     clocks = <&tegra_car TEGRA20_CLK_NOR>;
->> +     clock-names = "gmi";
->> +     resets = <&tegra_car 42>;
->> +     reset-names = "gmi";
->> +     ranges = <4 0x48000000 0x7ffffff>;
->> +
->> +     status = "disabled";
->> +
->> +     bus at 4 {
->> +             compatible = "simple-bus";
->> +             reg = <4>;
->> +             #address-cells = <1>;
->> +             #size-cells = <1>;
->> +             ranges = <0 4 0x40100>;
->
-> Does this work? I tried to add an example like this and I got ...
->
-> Warning (reg_format): "reg" property in /gmi at 70009000/bus at 4 has invalid
-> length (4 bytes) (#address-cells == 1, #size-cells == 1)
+On Thursday, August 25, 2016 3:18:55 AM CEST Masahiro Yamada wrote:
+> Hi Arnd,
+> 
+> 
+> 2016-08-25 0:51 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> > On Wednesday, August 24, 2016 3:28:53 PM CEST Philipp Zabel wrote:
+> >>  if RESET_CONTROLLER
+> >>
+> >> +config RESET_ATH79
+> >> +       bool "AR71xx Reset Driver" if COMPILE_TEST
+> >> +       default ATH79
+> >> +       help
+> >> +         This enables the ATH79 reset controller driver that supports the
+> >> +         AR71xx SoC reset controller.
+> >> +
+> >>
+> >
+> > Nice series!
+> >
+> > Just note that there is one possible problem with COMPILE_TEST
+> > when the platforms are enabled, as you can then disable a driver
+> > that is normally there, and that can in turn cause problems in
+> > rare cases, e.g. when the driver has a global function that is
+> > called from platform code. I don't know if any of the drivers
+> > do that, but if they do, you'd have to use
+> >
+> > config RESET_ATH79
+> >        bool "AR71xx Reset Driver" if COMPILE_TEST && !ATH79
+> >        default ATH79
+> >
+> > to ensure that it's impossible to disable the driver on platforms
+> > that require it.
+> 
+> Hmm,
+> Can we do this only when we really have to do so?
+> I think we should not care about such a rare case that may not happen.
+> 
+> Let's start with only "if COMPILE_TEST",
+> and take a look at it if a build error is detected.
+> 
+> Anyway, depending on platform code is a sign of weird implementation.
+> 
+> It might be better to find a potential issue rather than hide it.
+> 
+> 
+> 
 
-Shoot, to get rid of the warning it should be
+I just checked the object files in an allyesconfig build and found
+one instance:
 
-reg = <4 0 >;
+arch/arm/mach-sunxi/sunxi.c:extern void __init sun6i_reset_init(void);
+arch/arm/mach-sunxi/sunxi.c:            sun6i_reset_init();
+drivers/reset/reset-sunxi.c:void __init sun6i_reset_init(void)
 
-But it works either way.
+We should definitely make sure this one is handled right, and maybe
+check the source code for other instances.
 
->
-> I am wondering if we should just following the arm,pl172 example and
-> have ...
->
->         cs4 {
->                 compatible = "simple-bus";
->                 #address-cells = <1>;
->                 #size-cells = <1>;
->                 ranges;
->
->                 nvidia,snor-cs = <4>;
->                 nvidia,snor-mux-mode;
->                 nvidia,snor-adv-inv;
->
->                 can at 0 {
->                         reg = <0 0x100>;
->                         ...
->                 };
->
->                 ...
->         };
->
-
-That means to go back to V1 really (almost :)). Which I do not mind.
-Will give it a test run.
-
-But I am a little hesitant if will be any better/cleaner. In your example above:
-
-can at 0 {
-         reg = <0 0x100>;
-         ...
-};
-
-Would this really translate correctly? In the pl172 example they have
-multiple ranges and address with "flash at 0,0" which a range defined in
-parent node. "can at 0" does not have valid match in parent node in our
-example. So I probably need add some more logic for it to properly
-translate.
-
-I have an idea which is following:
-
-gmi at 70090000 {
-         status = "okay";
-         #address-cells = <2>;
-         #size-cells = <1>;
-         ranges = <4 0 0x48000000 0x00040000>;
-
-         cs4 {
-                 compatible = "simple-bus";
-                 #address-cells = <2>;
-                 #size-cells = <1>;
-                 ranges;
-
-                 nvidia,snor-cs = <4>;
-                 nvidia,snor-mux-mode;
-                 nvidia,snor-adv-inv;
-
-                 can at 0 {
-                         compatible = "nxp,sja1000";
-                         reg = <4 0 0x100>;
-                         ...
-                 };
-
-
-                 can at 40000 {
-                         compatible = "nxp,sja1000";
-                         reg = <4 0x40000 0x100>;
-                         ...
-                 };
-         };
-};
-
-Do not know if above will work at all (not able to test at current
-location), anyway I will play around with it some more and get back to
-you.
-
-Best Regards
-Mirza
+	Arnd
