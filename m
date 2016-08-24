@@ -1,34 +1,32 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 24 Aug 2016 08:15:52 +0200
-Subject: [PATCH] clk: core: Force setting the phase delay when no change
-In-Reply-To: <20160813164412.2671726A@mail.free-electrons.com>
-References: <20160813164412.2671726A@mail.free-electrons.com>
-Message-ID: <20160824061552.GA8103@lukather>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 24 Aug 2016 15:40:29 +0900
+Subject: [PATCH 1/2] reset: uniphier: add static qualifier to probe function
+In-Reply-To: <1472020830-16059-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1472020830-16059-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1472020830-16059-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+I missed this in the initial commit.
 
-On Sat, Aug 13, 2016 at 06:23:49PM +0200, Jean-Francois Moine wrote:
-> The hardware phase delay may depend on some other settings as clock
-> reparenting, so, it has to be set each time.
-> Also, when the delay was the same as previously, an error was returned.
-> 
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Please send it to the proper maintainers.
+ drivers/reset/reset-uniphier.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-Maxime
-
+diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
+index 9de071f..41c62af 100644
+--- a/drivers/reset/reset-uniphier.c
++++ b/drivers/reset/reset-uniphier.c
+@@ -385,7 +385,7 @@ static const struct of_device_id uniphier_reset_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, uniphier_reset_match);
+ 
+-int uniphier_reset_probe(struct platform_device *pdev)
++static int uniphier_reset_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	const struct of_device_id *match;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160824/11a29fd7/attachment.sig>
+1.9.1
