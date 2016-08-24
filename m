@@ -1,27 +1,44 @@
-From: woogyom.kim@gmail.com (Milo Kim)
-Date: Wed, 24 Aug 2016 16:21:28 +0900
-Subject: [PATCH v2 3/4] gpu: drm: exynos_hdmi: Use consolidated function
- on binding DDC DT property
-In-Reply-To: <a6d2e6cc-d491-fdd4-8c76-5425ec42ba80@samsung.com>
-References: <1472005524-3489-1-git-send-email-woogyom.kim@gmail.com>
- <1472005524-3489-4-git-send-email-woogyom.kim@gmail.com>
- <a6d2e6cc-d491-fdd4-8c76-5425ec42ba80@samsung.com>
-Message-ID: <9d5bf0cd-44f1-2028-7831-6828e43984d1@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 Aug 2016 09:21:26 +0200
+Subject: [PATCH v2] serial: vt8500_serial: Fix a parameter of
+ find_first_zero_bit.
+In-Reply-To: <1472015218-31826-1-git-send-email-christophe.jaillet@wanadoo.fr>
+References: <1472015218-31826-1-git-send-email-christophe.jaillet@wanadoo.fr>
+Message-ID: <10942927.gm6yg0F9Sl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrzej,
+On Wednesday, August 24, 2016 7:06:58 AM CEST Christophe JAILLET wrote:
+> The 2nd parameter of 'find_first_zero_bit' is the number of bits to search.
+> In this case, we are passing 'sizeof(vt8500_ports_in_use)'.
+> 'vt8500_ports_in_use' is an 'unsigned long'. So the sizeof is likely to
+> return 4 on a 32 bits kernel.
+> 
+> A few lines below, we check if it is below VT8500_MAX_PORTS, which is 6.
+> 
+> It is likely that the number of bits in a long was expected here.
+> 
+> In order to fix it:
+>    - use DECLARE_BITMAP when declaring the vt8500_ports_in_use
+>    - use VT8500_MAX_PORTS as a maximum value when checking/setting bits in
+>      this bitmap
+>    - modify code now that 'vt8500_ports_in_use' has become a pointer
+>      because of the use of DECLARE_BITMAP
+> 
+> 
+> It has been spotted by the following coccinelle script:
+> @@
+> expression ret, x;
+> 
+> @@
+> *  ret = \(find_first_bit \| find_first_zero_bit\) (x, sizeof(...));
+> 
+> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+> ---
+> v2: - use of VT8500_MAX_PORTS instead of BITS_PER_LONG to better self
+>       document the code
+>     - declare vt8500_ports_in_use with DECLARE_BITMAP in order to self
+>       document even better and to be foolproof should VT8500_MAX_PORTS
+>       be changed one day
 
-On 08/24/2016 02:55 PM, Andrzej Hajda wrote:
-> This is mistake introduced  by other patch, of_node_put should be called on
-> np, after calling of_find_i2c_adapter_by_node. You can fix it in your
-> patch as well.
-> I think you can move of_find_i2c_adapter_by_node also to this function and
-> rename it to sth like hdmi_get_ddc_adapter, this way you will enclose
-> whole logic
-> of getting resource into one function.
-
-Agree, let me prepare next patch-set. Thanks!
-
-Best regards,
-Milo
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
