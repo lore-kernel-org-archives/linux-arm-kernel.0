@@ -1,117 +1,100 @@
-From: oliver@schinagl.nl (Olliver Schinagl)
-Date: Thu, 25 Aug 2016 19:50:11 +0200
-Subject: [PATCH 2/2] pwm: sunxi: Yield some time to the pwm-block to become
- ready
-In-Reply-To: <1472147411-30424-1-git-send-email-oliver@schinagl.nl>
-References: <1472147411-30424-1-git-send-email-oliver@schinagl.nl>
-Message-ID: <1472147411-30424-3-git-send-email-oliver@schinagl.nl>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 25 Aug 2016 19:59:46 +0200
+Subject: [PATCH v2 7/7] musb: sunxi: Add support for platform_set_mode
+In-Reply-To: <20160822161037.GK1853@uda0271908>
+References: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
+ <1471288892-21702-8-git-send-email-hdegoede@redhat.com>
+ <20160819213049.GC1853@uda0271908>
+ <2a55a1bf-7ebf-3ab4-b231-85eba20103f1@redhat.com>
+ <20160822141158.GF1853@uda0271908>
+ <9699b62e-421a-ae8e-c25e-ef48beb84ce0@redhat.com>
+ <20160822152421.GH1853@uda0271908>
+ <fd1e9692-2c69-da16-0e6e-ac7fa50077ac@redhat.com>
+ <20160822153842.GI1853@uda0271908>
+ <2e1d2bb6-c3c4-17ab-79a6-8f9efa45a831@redhat.com>
+ <20160822161037.GK1853@uda0271908>
+Message-ID: <00986b3a-1a2a-1c67-f8bd-3a4c916cfbba@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Olliver Schinagl <o.schinagl@ultimaker.com>
+Hi,
 
-The pwm-block of some of the sunxi chips feature a 'ready' flag to
-indicate the software that it is ready for new commands.
+On 22-08-16 18:10, Bin Liu wrote:
+> On Mon, Aug 22, 2016 at 05:55:50PM +0200, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 22-08-16 17:38, Bin Liu wrote:
+>>> On Mon, Aug 22, 2016 at 05:32:57PM +0200, Hans de Goede wrote:
+>>
+>> <snip>
+>>
+>>>>>>>>> When switching from host to peripheral mode, if an usb device is still
+>>>>>>>>> plugged and enumerated, how do you handle the device disconnect?
+>>>>>>>>
+>>>>>>>> The phy code will report vbus low for long enough for the musb to end
+>>>>>>>> the current session. It already does this for boards which do not
+>>>>>>>> have working vbus detection.
+>>>>>>>
+>>>>>>> But you didn't disconnect DP/DM, right? then musb detects vbus is gone
+>>>>>>> without receiving disconnect event, this is vbus error case, not a normal
+>>>>>>> teardown.
+>>>>>>
+>>>>>> Correct, there is no way to disconnect DP/DM and reporting Vbus low for
+>>>>>> a while does the trick.
+>>>>>
+>>>>> Without physically disconnecting DP/DM, we still have a way to properly
+>>>>> teardown the enumerated devices. Please check musb_softconnect_write()
+>>>>> in musb_debugfs.c.
+>>>>
+>>>> That is manipulating the session bit in the devctl reg, that does not
+>>>> work to switch from device to host role or from host to device role,
+>>>> at least not on allwinner's musb implementation. I've already tried that
+>>>> before writing the code to report VBus low.
+>>>
+>>> I would think you have to call musb_root_disconnect() first to notify
+>>> the core to teardown the enumerated devices.
+>>
+>> I tried that it does not help. It only affects the software state, the
+>> hardware will still stay in host-mode if it does not see vbus low for
+>> long enough).
+>
+> I didn't mean to use musb_root_disconnect() to replace your
+> implementation. I suggest to add this call before lowing vbus to let the
+> core tearing down the numerated devices.
+>
+>>
+>> Note this is on devices which lack vbus detection (again this is simply
+>> physically not available on the PCB, just like some PCB's miss the
+>> id-pin). Normally this never is an issue, because when a host cable gets
+>> unplugged from a AB connector we see the id pin go high, disable the
+>> boards driving of Vbus and then the phy's Vbus detect will report low to
+>> the musb controller.
+>
+> In this case, DP/DM get disconnected before vbus line, so
+> musb_root_disconnect() gets called in handling the disconnect interrupt
+> event. I think it is better simulate this in your usecase, which does
+> not generate disconnect event.
 
-Right now, when we call pwm_config and set the period, we write the
-values to the registers, and turn off the clock to the IP. Because of
-this, the hardware does not have time to configure the hardware and set
-the 'ready' flag.
+Ah right, I ran some tests and indeed the hcd does not see a disconnect
+on role-change unless musb_root_disconnect() gets called, I'll send a v4
+fixing this.
 
-By running the clock just before making new changes and before checking
-if the hardware is ready, the hardware has time to reconfigure itself
-and set the clear the flag appropriately.
+Thank you for catching this.
 
-Signed-off-by: Olliver Schinagl <o.schinagl@ultimaker.com>
----
- drivers/pwm/pwm-sun4i.c | 43 +++++++++++++++++++++++++------------------
- 1 file changed, 25 insertions(+), 18 deletions(-)
+Regards,
 
-diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
-index 5e97c8a..dd198c3 100644
---- a/drivers/pwm/pwm-sun4i.c
-+++ b/drivers/pwm/pwm-sun4i.c
-@@ -105,6 +105,22 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	u64 clk_rate, div = 0;
- 	unsigned int prescaler = 0;
- 	int err;
-+	int ret = 0;
-+
-+	/* Let the PWM hardware run before making any changes. We do this to
-+	 * allow the hardware to have some time to clear the 'ready' flag.
-+	 */
-+	err = clk_prepare_enable(sun4i_pwm->clk);
-+	if (err) {
-+		dev_err(chip->dev, "failed to enable PWM clock\n");
-+		return err;
-+	}
-+	spin_lock(&sun4i_pwm->ctrl_lock);
-+	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
-+	clk_gate = val & BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-+	val |= BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-+	sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
-+	spin_unlock(&sun4i_pwm->ctrl_lock);
- 
- 	clk_rate = clk_get_rate(sun4i_pwm->clk);
- 
-@@ -137,7 +153,9 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 
- 		if (div - 1 > PWM_PRD_MASK) {
- 			dev_err(chip->dev, "period exceeds the maximum value\n");
--			return -EINVAL;
-+			ret = -EINVAL;
-+			spin_lock(&sun4i_pwm->ctrl_lock);
-+			goto out;
- 		}
- 	}
- 
-@@ -146,26 +164,14 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	do_div(div, period_ns);
- 	dty = div;
- 
--	err = clk_prepare_enable(sun4i_pwm->clk);
--	if (err) {
--		dev_err(chip->dev, "failed to enable PWM clock\n");
--		return err;
--	}
--
- 	spin_lock(&sun4i_pwm->ctrl_lock);
- 	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
--
- 	if (sun4i_pwm->data->has_rdy && (val & PWM_RDY(pwm->hwpwm))) {
--		spin_unlock(&sun4i_pwm->ctrl_lock);
--		clk_disable_unprepare(sun4i_pwm->clk);
--		return -EBUSY;
--	}
--
--	clk_gate = val & BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
--	if (clk_gate) {
--		val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
--		sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
-+		ret = -EBUSY;
-+		goto out;
- 	}
-+	val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-+	sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
- 
- 	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
- 	val &= ~BIT_CH(PWM_PRESCAL_MASK, pwm->hwpwm);
-@@ -175,6 +181,7 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	val = (dty & PWM_DTY_MASK) | PWM_PRD(prd);
- 	sun4i_pwm_writel(sun4i_pwm, val, PWM_CH_PRD(pwm->hwpwm));
- 
-+out:
- 	if (clk_gate) {
- 		val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
- 		val |= clk_gate;
-@@ -184,7 +191,7 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	spin_unlock(&sun4i_pwm->ctrl_lock);
- 	clk_disable_unprepare(sun4i_pwm->clk);
- 
--	return 0;
-+	return ret;
- }
- 
- static int sun4i_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
--- 
-2.8.1
+Hans
+
+
+>
+> Regards,
+> -Bin.
+>
+>>
+>> Anyways this is a solved problem, the reporting of Vbus low has been
+>> working fine for both boards which lack vbus-detection as well as
+>> for role-changing from sysfs.
+>>
+>> Regards,
+>>
+>> Hans
