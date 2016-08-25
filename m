@@ -1,63 +1,78 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 25 Aug 2016 19:12:57 +0530
-Subject: [PATCH v13 0/4] Mediatek MT8173 CMDQ support
-In-Reply-To: <1472132247.26044.23.camel@mtksdaap41>
-References: <1472009252-1074-1-git-send-email-hs.liao@mediatek.com>
- <20b10079-3ae2-9da9-1149-0bceabac9837@gmail.com>
- <1472132247.26044.23.camel@mtksdaap41>
-Message-ID: <CABb+yY2-cug=iwjTJEx_NQ9gj+8SZ1uHoD5hVGQDkQ7t5P=vSA@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 25 Aug 2016 14:45:58 +0100
+Subject: [PATCH v2 0/7] scpi: Add support for legacy SCPI protocol
+In-Reply-To: <f6c7249f-f103-fd91-2c89-a30c191427aa@baylibre.com>
+References: <1471952816-30877-1-git-send-email-narmstrong@baylibre.com>
+ <f6c7249f-f103-fd91-2c89-a30c191427aa@baylibre.com>
+Message-ID: <73cce388-219d-2daa-811a-059c3d84c2e4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2016 at 7:07 PM, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
-> Hi Matthias,
->
-> On Wed, 2016-08-24 at 13:00 +0200, Matthias Brugger wrote:
->> On 24/08/16 05:27, HS Liao wrote:
-> [...]
->> > Changes since v12:
->> >  - remove mediatek,gce from device tree
+
+
+On 25/08/16 14:18, Neil Armstrong wrote:
+> On 08/23/2016 01:46 PM, Neil Armstrong wrote:
+>> This patchset aims to support the legacy SCPI firmware implementation that was
+>> delivered as early technology preview for the JUNO platform.
 >>
->> Why? The binding got accepted by Rob.
->
-> We can get cmdq dev from mailbox controller,
-> so we don't need mediatek,gce anymore.
->
->> >
->> > Best regards,
->> > HS Liao
->> >
->> > HS Liao (4):
->> >   dt-bindings: soc: Add documentation for the MediaTek GCE unit
->> >   CMDQ: Mediatek CMDQ driver
->> >   arm64: dts: mt8173: Add GCE node
->> >   CMDQ: save more energy in idle
->> >
->> >  .../devicetree/bindings/soc/mediatek/gce.txt       |  44 +
->> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  10 +
->> >  drivers/soc/mediatek/Kconfig                       |  11 +
->> >  drivers/soc/mediatek/Makefile                      |   1 +
->> >  drivers/soc/mediatek/mtk-cmdq.c                    | 983 +++++++++++++++++++++
+>> Finally a stable, maintained and public implementation for the SCPI protocol
+>> has been upstreamed part of the JUNO support and it is the recommended way
+>> of implementing SCP communication on ARMv8 platforms.
 >>
->> The driver uses the mailbox framework, so it should live in the
->> drivers/mailbox folder.
+>> The Amlogic GXBB platform is using this legacy protocol, as the RK3368 & RK3399
+>> platforms. This patchset will only add support for Amlogic GXBB SoC.
+>>
+>> This patchset add support for the legacy protocol in the arm_scpi.c file,
+>> avoiding code duplication.
+>>
+>> Last RFC discution tread can be found at : https://lkml.org/lkml/2016/8/9/210
+>>
+>> The last patch depends on the "Platform MHU" dtsi patch.
+>>
+>> Changes since v1 at : http://lkml.kernel.org/r/1471515066-3626-1-git-send-email-narmstrong at baylibre.com
+>>  - Dropped vendor_send_message and rockchip vendor mechanism patches
+>>  - Merged alternate functions into main functions using is_legacy boolean
+>>  - Added DT match table to set is_legacy to true
+>>  - Kept alternate scpi_ops structure for legacy
+>>
+>> Neil Armstrong (7):
+>>   scpi: Add alternative legacy structures, functions and macros
+>>   scpi: Use legacy variants command index calling scpi_send_message
+>>   scpi: Add support for Legacy match table for Amlogic GXBB SoC
+>>   scpi: grow MAX_DVFS_OPPS to 16 entries
+>>   dt-bindings: Add support for Amlogic GXBB SCPI Interface
+>>   ARM64: dts: meson-gxbb: Add SRAM node
+>>   ARM64: dts: meson-gxbb: Add SCPI with cpufreq & sensors Nodes
+>>
+>>  Documentation/devicetree/bindings/arm/arm,scpi.txt |   8 +-
+>>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  45 ++++
+>>  drivers/firmware/arm_scpi.c                        | 279 +++++++++++++++++++--
+>>  3 files changed, 302 insertions(+), 30 deletions(-)
+>>
 >
-> As you know, the maximum number of gce threads is 16.
-> However, we plan to support more clients in the future,
-> and they may need to use more than 16 gce threads.
+> Hi Sudeep,
 >
-> For this issue, our plan is to let multiple clients share the same gce
-> thread; i.e. we will acquire gce thread for client dynamically by
-> internal policy in cmdq driver.
-> Unfortunately. mailbox channel has exclusive feature.
-> Quote from comment of mbox_request_channel().
-> "The channel is exclusively allocated and can't be used by another
-> client before the owner calls mbox_free_channel."
-> Therefore, we plan to remove mailbox framework from cmdq driver in the
-> future.
+> Sorry but I posted this V2 before you had time to look at my
+> previous  v1 replies...
 >
-Platforms that need shared access to a channel, implement a 'server'
-driver that serialise (which is needed still) the access to common
-channel. If you think you don't need mutual exclusion and don't care
-about replies, simply share the mailbox handle among different
-clients.
+
+That's fine.
+
+> In this series, I merged the scpi_send_message, but I must still
+> evaluate how it's possible  to use the list to queue commands.
+>
+
+Ah OK.
+
+> Here I used if(is_legacy) to stop duplicating functions, is this ok
+> for you ?
+>
+
+I am still thinking if it can be abstracted well, some kind of mapping
+but haven't thought too much about that yet. Also I was thinking about
+bitmap for high priority commands. I remember doing something before but
+seem to have lost that copy. I will try to dig it out..
+
+-- 
+Regards,
+Sudeep
