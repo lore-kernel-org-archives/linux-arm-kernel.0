@@ -1,11 +1,11 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Aug 2016 17:30:31 -0700
-Subject: [PATCH 26/34] clk: scpi: Migrate to clk_hw based OF and
- registration APIs
-In-Reply-To: <20160601231533.9354-27-stephen.boyd@linaro.org>
+Date: Wed, 24 Aug 2016 17:34:23 -0700
+Subject: [PATCH 31/34] clk: twl6040: Migrate to clk_hw based registration
+ APIs
+In-Reply-To: <20160601231533.9354-32-stephen.boyd@linaro.org>
 References: <20160601231533.9354-1-stephen.boyd@linaro.org>
- <20160601231533.9354-27-stephen.boyd@linaro.org>
-Message-ID: <20160825003031.GD19826@codeaurora.org>
+ <20160601231533.9354-32-stephen.boyd@linaro.org>
+Message-ID: <20160825003423.GF19826@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,7 +15,7 @@ On 06/01, Stephen Boyd wrote:
 > these drivers, allowing us to move closer to a clear split of
 > consumer and provider clk APIs.
 > 
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
 > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 > ---
 
