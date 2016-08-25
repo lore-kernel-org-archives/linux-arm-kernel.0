@@ -1,126 +1,179 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 25 Aug 2016 15:47:56 +0200
-Subject: [PATCH] tty/serial: atmel: add fractional baud rate support
-Message-ID: <20160825134756.6261-1-ludovic.desroches@atmel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 25 Aug 2016 14:54:01 +0100
+Subject: [RFC PATCH v3 6/7] arm64: irqflags: Use ICC sysregs to
+ implement IRQ masking
+In-Reply-To: <684c3744-6a36-be04-03aa-2b1fad692944@linaro.org>
+References: <1471623195-7829-1-git-send-email-daniel.thompson@linaro.org>
+ <1471623195-7829-7-git-send-email-daniel.thompson@linaro.org>
+ <57BACFF6.6060807@arm.com>
+ <5eb08d32-1223-55f9-24ac-c1909f62aea9@linaro.org>
+ <57BB14FB.3090903@arm.com>
+ <684c3744-6a36-be04-03aa-2b1fad692944@linaro.org>
+Message-ID: <20160825145401.0576b262@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USART device provides a fractional baud rate generator to get a more
-accurate baud rate. It can be used only when the USART is configured in
-'normal mode' and this feature is not available on AT91RM9200 SoC.
+On Thu, 25 Aug 2016 14:23:42 +0100
+Daniel Thompson <daniel.thompson@linaro.org> wrote:
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/tty/serial/atmel_serial.c | 41 +++++++++++++++++++++++++++++++--------
- include/linux/atmel_serial.h      |  1 +
- 2 files changed, 34 insertions(+), 8 deletions(-)
+> On 22/08/16 16:06, Marc Zyngier wrote:
+> >>>> diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+> >>>> index fc2a0cb47b2c..a4ad69e2831b 100644
+> >>>> --- a/arch/arm64/include/asm/arch_gicv3.h
+> >>>> +++ b/arch/arm64/include/asm/arch_gicv3.h
+> >>>> @@ -80,6 +80,9 @@
+> >>>>  #include <linux/stringify.h>
+> >>>>  #include <asm/barrier.h>
+> >>>>
+> >>>> +/* Our default, arbitrary priority value. Linux only uses one anyway. */
+> >>>> +#define DEFAULT_PMR_VALUE	0xf0
+> >>>> +
+> >>>>  /*
+> >>>>   * Low-level accessors
+> >>>>   *
+> >>>> @@ -102,9 +105,35 @@ static inline void gic_write_dir(u32 irq)
+> >>>>  static inline u64 gic_read_iar_common(void)
+> >>>>  {
+> >>>>  	u64 irqstat;
+> >>>> +	u64 __maybe_unused daif;
+> >>>> +	u64 __maybe_unused pmr;
+> >>>> +	u64 __maybe_unused default_pmr_value = DEFAULT_PMR_VALUE;
+> >>>>
+> >>>> +#ifndef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+> >>>>  	asm volatile("mrs_s %0, " __stringify(ICC_IAR1_EL1) : "=r" (irqstat));
+> >>>>  	dsb(sy);
+> >>>> +#else
+> >>>> +	/*
+> >>>> +	 * The PMR may be configured to mask interrupts when this code is
+> >>>> +	 * called, thus in order to acknowledge interrupts we must set the
+> >>>> +	 * PMR to its default value before reading from the IAR.
+> >>>> +	 *
+> >>>> +	 * To do this without taking an interrupt we also ensure the I bit
+> >>>> +	 * is set whilst we are interfering with the value of the PMR.
+> >>>> +	 */
+> >>>> +	asm volatile(
+> >>>> +		"mrs	%1, daif\n\t"			     /* save I bit  */
+> >>>> +		"msr	daifset, #2\n\t"		     /* set I bit   */
+> >>>> +		"mrs_s  %2, " __stringify(ICC_PMR_EL1) "\n\t"/* save PMR    */
+> >>>> +		"msr_s	" __stringify(ICC_PMR_EL1) ",%3\n\t" /* set PMR     */
+> >>>> +		"mrs_s	%0, " __stringify(ICC_IAR1_EL1) "\n\t" /* ack int   */
+> >>>> +		"msr_s  " __stringify(ICC_PMR_EL1) ",%2\n\t" /* restore PMR */
+> >>>> +		"isb\n\t"
+> >>>> +		"msr	daif, %1"			     /* restore I   */
+> >>>> +		: "=r" (irqstat), "=&r" (daif), "=&r" (pmr)
+> >>>> +		: "r" (default_pmr_value));  
+> >>>
+> >>> I'm a bit puzzled by this. Why would you have to mess with PMR or DAIF
+> >>> at this stage? Why can't we just let the GIC priority mechanism do its
+> >>> thing? I'd expect the initial setting of PMR (indicating whether or not
+> >>> we have normal interrupts enabled or not) to be enough to perform the
+> >>> filtering.
+> >>>
+> >>> You may get an NMI while you're already handling an interrupt, but
+> >>> that's fair game, and that's not something we should prevent.
+> >>>
+> >>> What am I missing?  
+> >>
+> >> This code *always* executes with interrupts masked at the PMR and, when
+> >> interrupts are masked in this way, they cannot be acknowledged.
+> >>
+> >> So to acknowledge the interrupt we must first modify the PMR to unmask
+> >> it. If we did that without first ensuring the I-bit is masked we would
+> >> end up constantly re-trapping.  
+> >
+> > Right, I see your problem now. I guess that I had a slightly different
+> > view of how to implement it. My own take is that we'd be better off
+> > leaving the I bit alone until we reach the point where we've accessed
+> > the IAR register (hence making the interrupt active and this particular
+> > priority unable to fire:
+> >
+> > 	irqstat = read_iar();
+> > 	clear_i_bit();
+> >
+> > At that stage, the only interrupt that can fire is an NMI (or nothing at
+> > all if we're already handling one). The I bit must also be set again on
+> > priority drop (before writing to the EOI register).  
+> 
+> Relying on intack to raise the priority does sound a lot simpler.
+> 
+> The forceful mask of PMR inside kernel_entry was so we model, as closely 
+> as possible. the way the I-bit is set by hardware when we take a trap.
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 2eaa18d..1759239 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -166,6 +166,7 @@ struct atmel_uart_port {
- 	u32			rts_low;
- 	bool			ms_irq_enabled;
- 	u32			rtor;	/* address of receiver timeout register if it exists */
-+	bool			has_frac_baudrate;
- 	bool			has_hw_timer;
- 	struct timer_list	uart_timer;
- 
-@@ -1745,6 +1746,11 @@ static void atmel_get_ip_name(struct uart_port *port)
- 	dbgu_uart = 0x44424755;	/* DBGU */
- 	new_uart = 0x55415254;	/* UART */
- 
-+	/*
-+	 * Only USART devices from at91sam9260 SOC implement fractional
-+	 * baudrate.
-+	 */
-+	atmel_port->has_frac_baudrate = false;
- 	atmel_port->has_hw_timer = false;
- 
- 	if (name == new_uart) {
-@@ -1753,6 +1759,7 @@ static void atmel_get_ip_name(struct uart_port *port)
- 		atmel_port->rtor = ATMEL_UA_RTOR;
- 	} else if (name == usart) {
- 		dev_dbg(port->dev, "Usart\n");
-+		atmel_port->has_frac_baudrate = true;
- 		atmel_port->has_hw_timer = true;
- 		atmel_port->rtor = ATMEL_US_RTOR;
- 	} else if (name == dbgu_uart) {
-@@ -1764,6 +1771,7 @@ static void atmel_get_ip_name(struct uart_port *port)
- 		case 0x302:
- 		case 0x10213:
- 			dev_dbg(port->dev, "This version is usart\n");
-+			atmel_port->has_frac_baudrate = true;
- 			atmel_port->has_hw_timer = true;
- 			atmel_port->rtor = ATMEL_US_RTOR;
- 			break;
-@@ -2025,8 +2033,9 @@ static void atmel_serial_pm(struct uart_port *port, unsigned int state,
- static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
- 			      struct ktermios *old)
- {
-+	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
- 	unsigned long flags;
--	unsigned int old_mode, mode, imr, quot, baud;
-+	unsigned int old_mode, mode, imr, quot, baud, div, cd, fp = 0;
- 
- 	/* save the current mode register */
- 	mode = old_mode = atmel_uart_readl(port, ATMEL_US_MR);
-@@ -2036,12 +2045,6 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
- 		  ATMEL_US_PAR | ATMEL_US_USMODE);
- 
- 	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk / 16);
--	quot = uart_get_divisor(port, baud);
--
--	if (quot > 65535) {	/* BRGR is 16-bit, so switch to slower clock */
--		quot /= 8;
--		mode |= ATMEL_US_USCLKS_MCK_DIV8;
--	}
- 
- 	/* byte size */
- 	switch (termios->c_cflag & CSIZE) {
-@@ -2160,7 +2163,29 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
- 		atmel_uart_writel(port, ATMEL_US_CR, rts_state);
- 	}
- 
--	/* set the baud rate */
-+	/*
-+	 * Set the baud rate:
-+	 * Fractional baudrate allows to setup output frequency more
-+	 * accurately. This feature is enabled only when using normal mode.
-+	 * baudrate = selected clock / (8 * (2 - OVER) * (CD + FP / 8))
-+	 * Currently, OVER is always set to 0 so we get
-+	 * baudrate = selected clock (16 * (CD + FP / 8))
-+	 */
-+	if (atmel_port->has_frac_baudrate &&
-+	    (mode & ATMEL_US_USMODE) == ATMEL_US_USMODE_NORMAL) {
-+		div = DIV_ROUND_CLOSEST(port->uartclk, baud);
-+		cd = div / 16;
-+		fp = DIV_ROUND_CLOSEST(div % 16, 2);
-+	} else {
-+		cd = uart_get_divisor(port, baud);
-+	}
-+
-+	if (cd > 65535) {	/* BRGR is 16-bit, so switch to slower clock */
-+		cd /= 8;
-+		mode |= ATMEL_US_USCLKS_MCK_DIV8;
-+	}
-+	quot = cd | fp << ATMEL_US_FP_OFFSET;
-+
- 	atmel_uart_writel(port, ATMEL_US_BRGR, quot);
- 	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
- 	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN | ATMEL_US_RXEN);
-diff --git a/include/linux/atmel_serial.h b/include/linux/atmel_serial.h
-index 5a4d664..f8e452a 100644
---- a/include/linux/atmel_serial.h
-+++ b/include/linux/atmel_serial.h
-@@ -118,6 +118,7 @@
- 
- #define ATMEL_US_BRGR		0x20	/* Baud Rate Generator Register */
- #define	ATMEL_US_CD		GENMASK(15, 0)	/* Clock Divider */
-+#define ATMEL_US_FP_OFFSET	16	/* Fractional Part */
- 
- #define ATMEL_US_RTOR		0x24	/* Receiver Time-out Register for USART */
- #define ATMEL_UA_RTOR		0x28	/* Receiver Time-out Register for UART */
+I think we shouldn't confuse two things:
+- an explicit call to local_irq_disable() which should translate in an
+  increase of the priority to only allow NMIs,
+- an exception taken by the CPU, which should mask interrupts
+  completely until you're in a situation where you can safely clear the
+  I bit.
+
+> However the update of the PMR can easily be shifted into the enable_nmi 
+> macro leaving the interrupt controller (which cannot enable_nmi before 
+> calling the handler) to look after itself.
+> 
+> 
+> > This will save you most, if not all, of the faffing with PMR (which
+> > requires an ISB/DSB pair on each update to be guaranteed to have an
+> > effect, and is a good way to kill your performance).  
+> 
+> Removing the code is a good thing although I thought the PMR was 
+> self-synchronizing (the code used to have barriers all over the shop 
+> until Dave Martin pointed that out).
+
+The architecture document seems to suggest otherwise (8.1.6,
+Observability of the effects of accesses to the GIC registers),
+explicitly calling out that:
+
+"- Architectural execution of a DSB instruction guarantees that
+	- The last value written to ICC_PMR_EL1 or GICC_PMR is observed
+	  by the associated Redistributor.
+[...]
+-- Note --
+An ISB or other context synchronization operation must precede the DSB
+to ensure visibility of System register writes.
+----------"
+
+> > Of course, the drawback is that we still cover a large section of code
+> > using the I bit, but that'd be a good start.  
+> 
+> To be honest I think that is forced on us anyway. We cannot know if the 
+> IRQ trap is a pseudo-NMI or an IRQ until we read the intack register.
+
+Exactly. This is the only way you can be sure of what you're actually
+dealing with (anything else is inherently racy).
+
+> >> Note, we could probably avoid saving the DAIF bits and PMR since they
+> >> both have a known state at this stage in gic_handle_irq(). However it
+> >> would be such a nasty potential side-effect I think I'd have to refactor
+> >> things a bit so the mask/unmask dance doesn't happen in the register
+> >> access functions.  
+> >
+> > Yeah, there is clearly some redundancy here. And to be completely
+> > honest, I think you should try to split this series in two parts:
+> > - one that implements interrupt masking using PMR
+> > - one that takes care of NMIs and possibly backtracing
+> >
+> > At the moment, things are a bit mixed and it is hard to pinpoint what is
+> > really required for what.  
+> 
+> Well... the patches are already teased out just as you say but the 
+> ordering *is* a bit weird now you mention it (patches 3, 4, 5 & 6 do the 
+> interrupt masking, whilst 1, 2 and 7 do the NMI).
+> 
+> Do you think its acceptable to reorder the patch set and put a clear 
+> description of the covering letter describing when the code related to 
+> NMI starts? I find it hard to see the point of PMR masking without 
+> example code to drive it.
+
+I see it under a slightly different light. PMR usage as a replacement
+for the I bit shouldn't introduce any change in behaviour, and I'm
+eager to get that part right before we start introducing more features.
+
+Of course, we should keep the NMI/backtracing goal in mind, but I'd
+rather take one step at a time and plug the PMR infrastructure in place
+first.
+
+Thanks,
+
+	M.
 -- 
-2.9.0
+Jazz is not dead. It just smells funny.
