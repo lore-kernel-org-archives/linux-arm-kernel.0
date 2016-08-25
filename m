@@ -1,80 +1,59 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 25 Aug 2016 09:51:11 +0200
-Subject: [PATCH 09/10] reset: zynq: add driver Kconfig option
-In-Reply-To: <CAK7LNASfDx_DkedVs0Y8FKrD2DJEG9cqty6kbLTy_YYusEg1iw@mail.gmail.com>
-References: <1472045342-7434-1-git-send-email-p.zabel@pengutronix.de>
- <1472045342-7434-9-git-send-email-p.zabel@pengutronix.de>
- <CAK7LNATr0WDx0aMXEJMxrDY6WxBtqis-DkZiOjGnrjM8zqYi-A@mail.gmail.com>
- <CAK7LNASJ0gQ-_4H3+=deNAXYVSWkek4sH2uUrTkyxGH5R7i1Xw@mail.gmail.com>
- <1472109786.3032.21.camel@pengutronix.de>
- <CAK7LNASfDx_DkedVs0Y8FKrD2DJEG9cqty6kbLTy_YYusEg1iw@mail.gmail.com>
-Message-ID: <1472111471.3032.29.camel@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 25 Aug 2016 10:03:34 +0200
+Subject: [PATCH 2/2] ARM: dts: sun8i: enable UART1 for iNet D978 Rev2 board
+In-Reply-To: <97321472108244@web8m.yandex.ru>
+References: <20160823064451.25997-1-icenowy@aosc.xyz>
+ <20160823064451.25997-3-icenowy@aosc.xyz>
+ <20160824193600.GS8103@lukather> <43951472083107@web23m.yandex.ru>
+ <CAGb2v66tFENk8QBw7D1+bwFN-zWaE2SGDrNyc-zdbJSRzENk4Q@mail.gmail.com>
+ <97321472108244@web8m.yandex.ru>
+Message-ID: <20160825080334.GD7776@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 25.08.2016, 16:31 +0900 schrieb Masahiro Yamada:
-> 2016-08-25 16:23 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
-> > Am Donnerstag, den 25.08.2016, 10:08 +0900 schrieb Masahiro Yamada:
-> >> 2016-08-25 2:48 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> >> > 2016-08-24 22:29 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
-> >> >> Visible only if COMPILE_TEST is enabled, this allows to include the
-> >> >> driver in build tests.
-> >> >>
-> >> >> Cc: Moritz Fischer <moritz.fischer@ettus.com>
-> >> >> Cc: Michal Simek <michal.simek@xilinx.com>
-> >> >> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> >> >> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> >> >> ---
-> >> >>  drivers/reset/Kconfig  | 6 ++++++
-> >> >>  drivers/reset/Makefile | 2 +-
-> >> >>  2 files changed, 7 insertions(+), 1 deletion(-)
-> >> >>
-> >> >> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-> >> >> index 17030e2..86b49a2 100644
-> >> >> --- a/drivers/reset/Kconfig
-> >> >> +++ b/drivers/reset/Kconfig
-> >> >> @@ -67,6 +67,12 @@ config RESET_SUNXI
-> >> >>         help
-> >> >>           This enables the reset driver for Allwinner SoCs.
-> >> >>
-> >> >> +config RESET_ZYNQ
-> >> >> +       bool "ZYNQ Reset Driver" if COMPILE_TEST
-> >> >> +       default ARCH_ZYNQ
-> >> >> +       help
-> >> >> +         This enables the reset driver for Xilinx Zynq FPGAs.
-> >> >> +
-> >> >
-> >> > Please move this below RESET_UNIPHIER
-> >> > as I assume you are sorting Kconfig entries alphabetically.
+Hi,
+
+On Thu, Aug 25, 2016 at 02:57:24PM +0800, Icenowy Zheng wrote:
+> >>>> ??diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+> >>>> ??index 78823d8..3ac22d4 100644
+> >>>> ??--- a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+> >>>> ??+++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+> >>>> ??@@ -48,6 +48,10 @@
+> >>>> ???????????model = "INet-D978 Rev 02";
+> >>>> ???????????compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
+> >>>>
+> >>>> ??+ aliases {
+> >>>> ??+ serial1 = &uart1;
+> >>>> ??+ };
+> >>>> ??+
+> >>>
+> >>> ?Is there any other UART in the system?
+> >>
+> >> ?serial0 is defined in sun8i-reference-design-tablet.dtsi, as r_uart.
 > >
-> > Yes, that was my intention.
-> >
-> >> > Otherwise,
-> >> >
-> >> > Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> >> >
-> >>
-> >>
-> >>
-> >>
-> >> >> +         This enables the reset driver for Xilinx Zynq FPGAs.
-> >>
-> >>
-> >> One more thing, I thought this statement is not precise
-> >> because Zynq is not only an FPGA,
-> >> but ARM SoC + FPGA.
-> >>
-> >> Please consider to reword
-> >>
-> >> "This enables the reset driver for Xilinx Zynq SoC"
-> >
-> > I'll change it to SoCs, thanks.
+> > If your board does not have r_uart pads, then the right thing to do
+> > would be to disable it. You can then have uart1 as serial0.
 > 
-> Maybe singular?   As far as I know, Zynq-7000 is the only SoC
-> of the Zynq family.
-> I am not sure if Xilinx has plan to add more lineups to 32bit SoCs.
+> I don't know it. The RX/TX is wired on PF2/PF4 on the board (UART0 muxed with
+> MMC)
 
-Zynq-7000 is a family, so plural should be okay.
+Then you don't support it and you need to disable it.
 
-regards
-Philipp
+> But many codes will require a ttyS0 as console... So I think the
+> bluetooth should be located at ttyS1...
+
+Most of them would use /dev/console anyway. What do you have in mind?
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160825/e59cd5f4/attachment.sig>
