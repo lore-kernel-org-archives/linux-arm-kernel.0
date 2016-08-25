@@ -1,30 +1,81 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 25 Aug 2016 17:23:47 +0200
-Subject: [PATCH 1/2] sdhci-of-arasan: Add quirk and device tree parameter
- to fake CD bit
-In-Reply-To: <20160825151047.GO16583@xsjsorenbubuntu>
-References: <1472080984-17373-1-git-send-email-zach.brown@ni.com>
- <20160825151047.GO16583@xsjsorenbubuntu>
-Message-ID: <d5dd97b1-f58f-2e45-5c95-17a77a46b30c@metafoo.de>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 25 Aug 2016 11:24:50 -0400
+Subject: [PATCH] arm64: Introduce execute-only page access permissions
+In-Reply-To: <20160825103042.GA12599@arm.com>
+References: <1470937490-7375-1-git-send-email-catalin.marinas@arm.com>
+ <CAGXu5jJTuJ+k948BU4rDGF=tHv54TR0JQVTbcVvzp=NtfQrL9Q@mail.gmail.com>
+ <20160815104751.GC22320@e104818-lin.cambridge.arm.com>
+ <CAGXu5jJTeta2OnL8KKHesG_HdeCvcXtaqjAir1cUvyfivaQeuQ@mail.gmail.com>
+ <20160816161824.GB7609@e104818-lin.cambridge.arm.com>
+ <20160825103042.GA12599@arm.com>
+Message-ID: <CAGXu5jKA-OByV9R4HFV1WSMQc+vfrCs-Rkb9SCYn9kA7tbB=Fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25/2016 05:10 PM, S?ren Brinkmann wrote:
-> On Wed, 2016-08-24 at 18:23:03 -0500, Zach Brown wrote:
->> The sdhci controller on xilinx zynq devices will not function unless
->> the cd bit is provided. http://www.xilinx.com/support/answers/61064.html
->> In cases where it is impossible to provide the cd bit in hardware,
->> setting the controller to test mode and then setting inserted to true
->> will get the controller to function with out the cd bit.
+On Thu, Aug 25, 2016 at 6:30 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Aug 16, 2016 at 05:18:24PM +0100, Catalin Marinas wrote:
+>> On Mon, Aug 15, 2016 at 10:45:09AM -0700, Kees Cook wrote:
+>> > On Mon, Aug 15, 2016 at 3:47 AM, Catalin Marinas
+>> > <catalin.marinas@arm.com> wrote:
+>> > > On Fri, Aug 12, 2016 at 11:23:03AM -0700, Kees Cook wrote:
+>> > >> On Thu, Aug 11, 2016 at 10:44 AM, Catalin Marinas
+>> > >> <catalin.marinas@arm.com> wrote:
+>> > >> > The ARMv8 architecture allows execute-only user permissions by clearing
+>> > >> > the PTE_UXN and PTE_USER bits. However, the kernel running on a CPU
+>> > >> > implementation without User Access Override (ARMv8.2 onwards) can still
+>> > >> > access such page, so execute-only page permission does not protect
+>> > >> > against read(2)/write(2) etc. accesses. Systems requiring such
+>> > >> > protection must enable features like SECCOMP.
+>> > >>
+>> > >> So, UAO CPUs will bypass this protection in userspace if using
+>> > >> read/write on a memory-mapped file?
+>> > >
+>> > > It's the other way around. CPUs prior to ARMv8.2 (when UAO was
+>> > > introduced) or with the CONFIG_ARM64_UAO disabled can still access
+>> > > user execute-only memory regions while running in kernel mode via the
+>> > > copy_*_user, (get|put)_user etc. routines. So a way user can bypass this
+>> > > protection is by using such address as argument to read/write file
+>> > > operations.
+>> >
+>> > Ah, okay. So exec-only for _userspace_ will always work, but exec-only
+>> > for _kernel_ will only work on ARMv8.2 with CONFIG_ARM64_UAO?
 >>
->> The device property "fake-cd" will let the arasan driver know it needs
->> to fake the cd bit for the controller inorder for the controller to
->> function with a SD card that does not provide the CD bit.
-> 
-> I thought the CD is, if not pinned out, tied off to some valid logic
-> level. Isn't it enough to specify cd-inverted if needed to make it work
-> in those cases?
+>> Yes (mostly). With UAO, we changed the user access routines in the
+>> kernel to use the LDTR/STTR instructions which always behave
+>> unprivileged even when executed in kernel mode (unless the UAO bit is
+>> set to override this restriction, needed for set_fs(KERNEL_DS)).
+>>
+>> Even with UAO, we still have two cases where the kernel cannot perform
+>> unprivileged accesses (LDTR/STTR) since they don't have an exclusives
+>> equivalent (LDXR/STXR). These are in-user futex atomic ops and the SWP
+>> emulation for 32-bit binaries (armv8_deprecated.c). But these require
+>> write permission, so they would always fault even when running in the
+>> kernel. futex_atomic_cmpxchg_inatomic() is able to return the old value
+>> without a write (if it differs from "oldval") but it doesn't look like
+>> such value could leak to user space.
+>
+> If this was an issue, couldn't we add a dummy LDTR before the LDXR, and
+> have the fixup handler return -EFAULT?
+>
+> Either way, this series looks technically fine to me:
+>
+> Reviewed-by: Will Deacon <will.deacon@arm.com>
+>
+> but it would be good for some security-focussed person (Hi, Kees!) to
+> comment on whether or not this is useful, given the caveats you've
+> described. If it is, I can queue it for 4.9.
 
-It is always brought out to some pin, that is the problem on the Zynq. This
-means you'd have to set at least one pin aside as dummy CD or WP pin. Which
-is not always possible when you are tight on available pins.
+Hi!
+
+It is a good building block for frustrating ROP attacks or other
+things that rely on memory content exposure. It's still unclear to me
+how much traction it'll get until the devices that support it are
+widely in the hands of people, but I'd rather have the infrastructure
+available than not. :)
+
+-Kees
+
+
+-- 
+Kees Cook
+Nexus Security
