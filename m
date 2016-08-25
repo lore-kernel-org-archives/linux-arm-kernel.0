@@ -1,56 +1,95 @@
-From: oliver@schinagl.nl (Olliver Schinagl)
-Date: Thu, 25 Aug 2016 18:47:09 +0200
-Subject: [PATCHv2] pwm: lpc-18xx: use pwm_set_chip_data
-Message-ID: <1472143629-29890-1-git-send-email-oliver@schinagl.nl>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 25 Aug 2016 18:55:19 +0200
+Subject: [PATCH] arm64: always enable DEBUG_RODATA and remove the Kconfig
+ option
+In-Reply-To: <1472142204-14258-1-git-send-email-mark.rutland@arm.com>
+References: <1472142204-14258-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAKv+Gu8s5_NNkU_JjEdGqhWzxqkCn2b+h3RDkp3h3WKvYph8Lg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The lpc18xx driver currently manipulates the pwm_device struct directly
-rather then using the pwm_set_chip_data. While the current method may
-save a clock cycle or two, it is more obvious that data is set to
-the local chip data pointer.
+On 25 August 2016 at 18:23, Mark Rutland <mark.rutland@arm.com> wrote:
+> Follow the example set by x86 in commit 9ccaf77cf05915f5 ("x86/mm:
+> Always enable CONFIG_DEBUG_RODATA and remove the Kconfig option"), and
+> make these protections a fundamental security feature rather than an
+> opt-in. This also results in a minor code simplification.
+>
+> For those rare cases when users wish to disable this protection (e.g.
+> for debugging), this can be done by passing 'rodata=off' on the command
+> line.
+>
+> As DEBUG_RODATA_ALIGN is only intended to address a performance/memory
+> tradeoff, and does not affect correctness, this is left user-selectable.
+> DEBUG_MODULE_RONX is also left user-selectable until the core code
+> provides a boot-time option to disable the protection for debugging
+> use-cases.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 
-Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
----
-Hi,
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-This is a resend of a patch-series I sent last year. There was no technical
-related feedback and so I am re-sending the patch as is. I did rebase it to
-Linus's current master.
+About time!
 
-Changes since v1:
-	- removed wrongfully added sun4i patch
-	- split patch series into a single patch
-	- added author
 
- drivers/pwm/pwm-lpc18xx-sct.c | 11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/pwm/pwm-lpc18xx-sct.c b/drivers/pwm/pwm-lpc18xx-sct.c
-index 19dc64c..a630fc5 100644
---- a/drivers/pwm/pwm-lpc18xx-sct.c
-+++ b/drivers/pwm/pwm-lpc18xx-sct.c
-@@ -413,14 +413,17 @@ static int lpc18xx_pwm_probe(struct platform_device *pdev)
- 	}
- 
- 	for (i = 0; i < lpc18xx_pwm->chip.npwm; i++) {
-+		struct lpc18xx_pwm_data *lpc18xx_data;
-+
- 		pwm = &lpc18xx_pwm->chip.pwms[i];
--		pwm->chip_data = devm_kzalloc(lpc18xx_pwm->dev,
--					      sizeof(struct lpc18xx_pwm_data),
--					      GFP_KERNEL);
--		if (!pwm->chip_data) {
-+		lpc18xx_data = devm_kzalloc(lpc18xx_pwm->dev,
-+					    sizeof(struct lpc18xx_pwm_data),
-+					    GFP_KERNEL);
-+		if (!lpc18xx_data) {
- 			ret = -ENOMEM;
- 			goto remove_pwmchip;
- 		}
-+		pwm_set_chip_data(pwm, lpc18xx_data);
- 	}
- 
- 	platform_set_drvdata(pdev, lpc18xx_pwm);
--- 
-2.8.1
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Laura Abbott <labbott@redhat.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/Kconfig       |  3 +++
+>  arch/arm64/Kconfig.debug | 10 ----------
+>  arch/arm64/kernel/insn.c |  2 +-
+>  3 files changed, 4 insertions(+), 11 deletions(-)
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index bc3f00f..43d6134 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -122,6 +122,9 @@ config ARCH_PHYS_ADDR_T_64BIT
+>  config MMU
+>         def_bool y
+>
+> +config DEBUG_RODATA
+> +       def_bool y
+> +
+>  config ARM64_PAGE_SHIFT
+>         int
+>         default 16 if ARM64_64K_PAGES
+> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+> index 0cc758c..b661fe7 100644
+> --- a/arch/arm64/Kconfig.debug
+> +++ b/arch/arm64/Kconfig.debug
+> @@ -49,16 +49,6 @@ config DEBUG_SET_MODULE_RONX
+>
+>           If in doubt, say Y.
+>
+> -config DEBUG_RODATA
+> -       bool "Make kernel text and rodata read-only"
+> -       default y
+> -       help
+> -         If this is set, kernel text and rodata will be made read-only. This
+> -         is to help catch accidental or malicious attempts to change the
+> -         kernel's executable code.
+> -
+> -         If in doubt, say Y.
+> -
+>  config DEBUG_ALIGN_RODATA
+>         depends on DEBUG_RODATA
+>         bool "Align linker sections up to SECTION_SIZE"
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index 63f9432..178488f 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -96,7 +96,7 @@ static void __kprobes *patch_map(void *addr, int fixmap)
+>
+>         if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
+>                 page = vmalloc_to_page(addr);
+> -       else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
+> +       else if (!module)
+>                 page = pfn_to_page(PHYS_PFN(__pa(addr)));
+>         else
+>                 return addr;
+> --
+> 2.7.4
+>
