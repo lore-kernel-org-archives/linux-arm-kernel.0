@@ -1,51 +1,85 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 25 Aug 2016 14:59:51 +0100
-Subject: [PATCH v2 4/9] arm64: head.S: move KASLR processing out of
- __enable_mmu()
-In-Reply-To: <20160824204654.GA1775@remoulade>
-References: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
- <1472049366-10922-5-git-send-email-ard.biesheuvel@linaro.org>
- <20160824203609.GA1642@remoulade> <20160824204654.GA1775@remoulade>
-Message-ID: <CAKv+Gu-N+-Qykg30UDaisgA+J1e0p-+GGuE9diz1=Hoh_yPPtw@mail.gmail.com>
+Date: Thu, 25 Aug 2016 15:07:32 +0100
+Subject: [PATCH] efi: arm64: treat regions with WT/WC set but WB cleared
+ as memory
+In-Reply-To: <20160825115325.GG31760@bivouac.eciton.net>
+References: <1472052256-26365-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160825115325.GG31760@bivouac.eciton.net>
+Message-ID: <CAKv+Gu89ofCBv+_-vy979c67Bhrt7soFNyHEYwe4r3=x8_gwgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 August 2016 at 21:46, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Aug 24, 2016 at 09:36:10PM +0100, Mark Rutland wrote:
->> On Wed, Aug 24, 2016 at 04:36:01PM +0200, Ard Biesheuvel wrote:
->> > +__primary_switch:
->> > +#ifdef CONFIG_RANDOMIZE_BASE
->> > +   mov     x19, x0                         // preserve new SCTLR_EL1 value
->> > +   mrs     x20, sctlr_el1                  // preserve old SCTLR_EL1 value
->> > +#endif
->> > +
->> > +   adr     x27, 0f
->> > +   b       __enable_mmu
+On 25 August 2016 at 12:53, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> On Wed, Aug 24, 2016 at 05:24:16PM +0200, Ard Biesheuvel wrote:
+>> Currently, memory regions are only recorded in the memblock memory table
+>> if they have the EFI_MEMORY_WB memory type attribute set. In case the
+>> region is of a reserved type, it is also marked as MEMBLOCK_NOMAP, which
+>> will leave it out of the linear mapping.
 >>
->> As we do elsewhere, it's probably worth a comment on the line with the ADR into
->> x27, mentioning that __enable_mmu will branch there.
+>> However, memory regions may legally have the EFI_MEMORY_WT or EFI_MEMORY_WC
+>> attributes set, and the EFI_MEMORY_WB cleared, in which case the region in
+>> question is obviously backed by normal memory, but is not recorded in the
+>> memblock memory table at all. Since it would be useful to be able to
+>> identify any UEFI reported memory region using memblock_is_memory(), it
+>> makes sense to add all memory to the memblock memory table, and simply mark
+>> it as MEMBLOCK_NOMAP if it lacks the EFI_MEMORY_WB attribute.
 >>
->> ... or perhaps we should just have __enable_mmu return to the LR like a normal
->> AAPCS function, place the switch routines in the idmap, and use the idiomatic
->> sequence:
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
 >>
->> __thing_switch:
->>       bl      __enable_mmu
->>       ldr     xN, =__thing
->>       blr     xN
+>> Note that this will also result in regions with EFI_MEMORY_WB cleared to
+>> be listed in /proc/iomem as 'System RAM', which may be incorrect. However,
+>> we already display this incorrect behavior for runtime services code/data
+>> regions, so this should be fixed in a separate patch, of which an example
+>> has been proposed here:
+>> https://www.spinics.net/lists/arm-kernel/msg525369.html
+>>
+>>  drivers/firmware/efi/arm-init.c | 10 ++++++++--
+>>  1 file changed, 8 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+>> index c49d50e68aee..678672d332f8 100644
+>> --- a/drivers/firmware/efi/arm-init.c
+>> +++ b/drivers/firmware/efi/arm-init.c
+>> @@ -28,7 +28,7 @@ u64 efi_system_table;
+>>
+>>  static int __init is_normal_ram(efi_memory_desc_t *md)
+>>  {
+>> -     if (md->attribute & EFI_MEMORY_WB)
+>> +     if (md->attribute & (EFI_MEMORY_WB|EFI_MEMORY_WT|EFI_MEMORY_WC))
 >
-> ... and now I see that this is what subsequent patches do ;)
+> The code change makes a lot of sense, but this makes the call sites a
+> bit confusing. It would make sense to rename this function.
 >
-> Is it possible to first AAPCS-ify __enable_mmu (with shuffling of callers as
-> above) in one patch, prior to this?
+> Would supports_unaligned() be too silly? That's basically what the
+> above makes it mean.
+>
 
-Yes, but that would result in an __enable_mmu() that needs to stash
-the link register value, and essentially returns twice in the KASLR
-case. As an intermediate step working towards the result after the
-series, I think the adr + label above is the lesser evil
+How about is_memory() ?
 
-> That would avoid introducing the unusual 0f
-> label above, and the temporary x30 usage in a subsequent patch.
+And we could invert is_reserve_region, and call it is_usable_memory() ...
+
+
+> /
+>     Leif
 >
-> Thanks,
-> Mark.
+>>               return 1;
+>>       return 0;
+>>  }
+>> @@ -163,7 +163,13 @@ static __init int is_reserve_region(efi_memory_desc_t *md)
+>>       case EFI_BOOT_SERVICES_DATA:
+>>       case EFI_CONVENTIONAL_MEMORY:
+>>       case EFI_PERSISTENT_MEMORY:
+>> -             return 0;
+>> +             /*
+>> +              * According to the spec, these regions are no longer reserved
+>> +              * after calling ExitBootServices(). However, we can only use
+>> +              * them as System RAM if they can be mapped writeback cacheable.
+>> +              * Otherwise, treat them as reserved.
+>> +              */
+>> +             return (md->type & EFI_MEMORY_WB) == 0;
+>>       default:
+>>               break;
+>>       }
+>> --
+>> 2.7.4
