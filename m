@@ -1,123 +1,25 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Aug 2016 17:16:13 -0700
-Subject: [PATCH 2/2] clk: mvebu: dynamically allocate resources in Armada
- CP110 system controller
-In-Reply-To: <1471933609-8456-3-git-send-email-mw@semihalf.com>
-References: <1471933609-8456-1-git-send-email-mw@semihalf.com>
- <1471933609-8456-3-git-send-email-mw@semihalf.com>
-Message-ID: <20160825001613.GQ19826@codeaurora.org>
+Date: Wed, 24 Aug 2016 17:19:06 -0700
+Subject: [PATCH 12/34] clk: cdce925: Migrate to clk_hw based OF and
+ provider APIs
+In-Reply-To: <20160601231533.9354-13-stephen.boyd@linaro.org>
+References: <20160601231533.9354-1-stephen.boyd@linaro.org>
+ <20160601231533.9354-13-stephen.boyd@linaro.org>
+Message-ID: <20160825001906.GR19826@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23, Marcin Wojtas wrote:
-> Original commit, which added support for Armada CP110 system controller
-> used global variables for storing all clock information. It worked
-> fine for Armada 7k SoC, with single CP110 block. After dual-CP110 Armada 8k
-> was introduced, the data got overwritten and corrupted.
+On 06/01, Stephen Boyd wrote:
+> Now that we have clk_hw based provider APIs to register clks, we
+> can get rid of struct clk pointers while registering clks in
+> these drivers, allowing us to move closer to a clear split of
+> consumer and provider clk APIs.
 > 
-> This patch fixes the issue by allocating resources dynamically in the
-> driver probe and storing it as platform drvdata.
-> 
-> Fixes: d3da3eaef7f4 ("clk: mvebu: new driver for Armada CP110 system ...")
-> 
-
-Please drop the space between fixes tag and the signoff.
-
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+> Cc: Mike Looijmans <mike.looijmans@topic.nl>
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 > ---
->  drivers/clk/mvebu/cp110-system-controller.c | 29 ++++++++++++++++++++---------
->  1 file changed, 20 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/clk/mvebu/cp110-system-controller.c b/drivers/clk/mvebu/cp110-system-controller.c
-> index 0835e1d..2bd87d2 100644
-> --- a/drivers/clk/mvebu/cp110-system-controller.c
-> +++ b/drivers/clk/mvebu/cp110-system-controller.c
-> @@ -81,13 +81,6 @@ enum {
->  #define CP110_GATE_EIP150		25
->  #define CP110_GATE_EIP197		26
->  
-> -static struct clk *cp110_clks[CP110_CLK_NUM];
-> -
-> -static struct clk_onecell_data cp110_clk_data = {
-> -	.clks = cp110_clks,
-> -	.clk_num = CP110_CLK_NUM,
-> -};
-> -
->  struct cp110_gate_clk {
->  	struct clk_hw hw;
->  	struct regmap *regmap;
-> @@ -195,7 +188,8 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
->  	struct regmap *regmap;
->  	struct device_node *np = pdev->dev.of_node;
->  	const char *ppv2_name, *apll_name, *core_name, *eip_name, *nand_name;
-> -	struct clk *clk;
-> +	struct clk_onecell_data *cp110_clk_data;
-> +	struct clk *clk, **cp110_clks;
->  	u32 nand_clk_ctrl;
->  	int i, ret;
->  
-> @@ -208,6 +202,20 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
->  	if (ret)
->  		return ret;
->  
-> +	cp110_clks = devm_kcalloc(&pdev->dev, sizeof(struct clk *),
-> +				  CP110_CLK_NUM, GFP_KERNEL);
-> +	if (IS_ERR(cp110_clks))
 
-Doesn't that return NULL on error?
-
-> +		return PTR_ERR(cp110_clks);
-> +
-> +	cp110_clk_data = devm_kzalloc(&pdev->dev,
-> +				      sizeof(struct clk_onecell_data),
-
-sizeof(*cp110_clk_data) please
-
-> +				      GFP_KERNEL);
-> +	if (IS_ERR(cp110_clk_data))
-
-Doesn't that return NULL on error?
-
-> +		return PTR_ERR(cp110_clk_data);
-> +
-> +	cp110_clk_data->clks = cp110_clks;
-> +	cp110_clk_data->clk_num = CP110_CLK_NUM;
-> +
->  	/* Register the APLL which is the root of the clk tree */
->  	of_property_read_string_index(np, "core-clock-output-names",
->  				      CP110_CORE_APLL, &apll_name);
-> @@ -335,10 +343,12 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
->  		cp110_clks[CP110_MAX_CORE_CLOCKS + i] = clk;
->  	}
->  
-> -	ret = of_clk_add_provider(np, cp110_of_clk_get, &cp110_clk_data);
-> +	ret = of_clk_add_provider(np, cp110_of_clk_get, cp110_clk_data);
-
-It would be nice if this could be converted to
-of_clk_add_hw_provider().
-
->  	if (ret)
->  		goto fail_clk_add;
->  
-> +	platform_set_drvdata(pdev, cp110_clks);
-> +
->  	return 0;
->  
->  fail_clk_add:
-> @@ -365,6 +375,7 @@ fail0:
->  
->  static int cp110_syscon_clk_remove(struct platform_device *pdev)
->  {
-> +	struct clk **cp110_clks = platform_get_drvdata(pdev);
-
-Is this variable unused now?
-
->  	int i;
->  
->  	of_clk_del_provider(pdev->dev.of_node);
-> -- 
-> 1.8.3.1
-> 
+Applied to clk-next
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
