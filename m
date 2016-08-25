@@ -1,88 +1,253 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 25 Aug 2016 15:19:13 -0600
-Subject: [PATCH 23/28] coresight: etm4x: split default and filter configuration
+Date: Thu, 25 Aug 2016 15:19:12 -0600
+Subject: [PATCH 22/28] coresight: etm-perf: configuring filters from perf core
 In-Reply-To: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1472159958-5981-24-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1472159958-5981-23-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Splitting the steps involved in the configuration of a tracer.
-The first part is generic and can be reused for both sysFS and
-Perf methods.
-
-The second part pertains to the configuration of filters
-themselves where the source of the information used to
-configure the filters will vary depending on the access
-methods.
+This patch implements the required API needed to access
+and retrieve range and start/stop filters from the perf core.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm4x.c | 36 ++++++++++++++++-----------
- 1 file changed, 22 insertions(+), 14 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 149 ++++++++++++++++++++---
+ drivers/hwtracing/coresight/coresight-etm-perf.h |  34 ++++++
+ 2 files changed, 168 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index b9e26d4f6b84..f890d1de39e3 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -562,21 +562,8 @@ static void etm4_init_arch_data(void *info)
- 	CS_LOCK(drvdata->base);
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+index e4754e8e6906..98eb207684fa 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.c
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+@@ -27,6 +27,7 @@
+ #include <linux/types.h>
+ #include <linux/workqueue.h>
+ 
++#include "coresight-etm-perf.h"
+ #include "coresight-priv.h"
+ 
+ static struct pmu etm_pmu;
+@@ -71,14 +72,48 @@ static const struct attribute_group *etm_pmu_attr_groups[] = {
+ 
+ static void etm_event_read(struct perf_event *event) {}
+ 
+-static int etm_event_init(struct perf_event *event)
++static int etm_addr_filters_alloc(struct perf_event *event)
+ {
+-	if (event->attr.type != etm_pmu.type)
+-		return -ENOENT;
++	struct etm_filters *filters;
++	int node = event->cpu == -1 ? -1 : cpu_to_node(event->cpu);
++
++	filters = kzalloc_node(sizeof(struct etm_filters), GFP_KERNEL, node);
++	if (!filters)
++		return -ENOMEM;
++
++	if (event->parent)
++		memcpy(filters, event->parent->hw.addr_filters,
++		       sizeof(*filters));
++
++	event->hw.addr_filters = filters;
+ 
+ 	return 0;
  }
  
--static void etm4_set_default(struct etmv4_config *config)
-+static void etm4_set_default_config(struct etmv4_config *config)
- {
--	if (WARN_ON_ONCE(!config))
--		return;
--
--	/*
--	 * Make default initialisation trace everything
--	 *
--	 * Select the "always true" resource selector on the
--	 * "Enablign Event" line and configure address range comparator
--	 * '0' to trace all the possible address range.  From there
--	 * configure the "include/exclude" engine to include address
--	 * range comparator '0'.
--	 */
--
- 	/* disable all events tracing */
- 	config->eventctrl0 = 0x0;
- 	config->eventctrl1 = 0x0;
-@@ -592,7 +579,10 @@ static void etm4_set_default(struct etmv4_config *config)
- 
- 	/* TRCVICTLR::EVENT = 0x01, select the always on logic */
- 	config->vinst_ctrl |= BIT(0);
-+}
- 
-+static void etm4_set_default_filter(struct etmv4_config *config)
++static void etm_event_destroy(struct perf_event *event)
 +{
- 	/*
- 	 * TRCVICTLR::SSSTATUS == 1, the start-stop logic is
- 	 * in the started state
-@@ -638,6 +628,24 @@ static void etm4_set_default(struct etmv4_config *config)
- 	config->vissctlr = 0x0;
++	kfree(event->hw.addr_filters);
++	event->hw.addr_filters = NULL;
++}
++
++static int etm_event_init(struct perf_event *event)
++{
++	int ret = 0;
++
++	if (event->attr.type != etm_pmu.type) {
++		ret = -ENOENT;
++		goto out;
++	}
++
++	ret = etm_addr_filters_alloc(event);
++	if (ret)
++		goto out;
++
++	event->destroy = etm_event_destroy;
++out:
++	return ret;
++}
++
+ static void free_event_data(struct work_struct *work)
+ {
+ 	int cpu;
+@@ -342,6 +377,87 @@ static void etm_event_del(struct perf_event *event, int mode)
+ 	etm_event_stop(event, PERF_EF_UPDATE);
  }
  
-+static void etm4_set_default(struct etmv4_config *config)
++static int etm_addr_filters_validate(struct list_head *filters)
 +{
-+	if (WARN_ON_ONCE(!config))
-+		return;
++	bool range = false, address = false;
++	int index = 0;
++	struct perf_addr_filter *filter;
 +
-+	/*
-+	 * Make default initialisation trace everything
-+	 *
-+	 * Select the "always true" resource selector on the
-+	 * "Enablign Event" line and configure address range comparator
-+	 * '0' to trace all the possible address range.  From there
-+	 * configure the "include/exclude" engine to include address
-+	 * range comparator '0'.
-+	 */
-+	etm4_set_default_config(config);
-+	etm4_set_default_filter(config);
++	list_for_each_entry(filter, filters, entry) {
++		/*
++		 * No need to go further if there's no more
++		 * room for filters.
++		 */
++		if (++index > ETM_ADDR_CMP_MAX)
++			return -EOPNOTSUPP;
++
++		/*
++		 * As taken from the struct perf_addr_filter documentation:
++		 *	@range:	1: range, 0: address
++		 *
++		 * At this time we don't allow range and start/stop filtering
++		 * to cohabitate, they have to be mutually exclusive.
++		 */
++		if ((filter->range == 1) && address)
++			return -EOPNOTSUPP;
++
++		if ((filter->range == 0) && range)
++			return -EOPNOTSUPP;
++
++		/*
++		 * For range filtering, the second address in the address
++		 * range comparator needs to be higher than the first.
++		 * Invalid otherwise.
++		 */
++		if (filter->range && filter->size == 0)
++			return -EINVAL;
++
++		/*
++		 * Everything checks out with this filter, record what we've
++		 * received before moving on to the next one.
++		 */
++		if (filter->range)
++			range = true;
++		else
++			address = true;
++	}
++
++	return 0;
 +}
 +
- void etm4_config_trace_mode(struct etmv4_config *config)
++static void etm_addr_filters_sync(struct perf_event *event)
++{
++	struct perf_addr_filters_head *head = perf_event_addr_filters(event);
++	unsigned long start, stop, *offs = event->addr_filters_offs;
++	struct etm_filters *filters = event->hw.addr_filters;
++	struct etm_filter *etm_filter;
++	struct perf_addr_filter *filter;
++	int i = 0;
++
++	list_for_each_entry(filter, &head->list, entry) {
++		start = filter->offset + offs[i];
++		stop = start + filter->size;
++		etm_filter = &filters->etm_filter[i];
++
++		if (filter->range == 1) {
++			etm_filter->start_addr = start;
++			etm_filter->stop_addr = stop;
++			etm_filter->type = ETM_ADDR_TYPE_RANGE;
++		} else {
++			if (filter->filter == 1) {
++				etm_filter->start_addr = start;
++				etm_filter->type = ETM_ADDR_TYPE_START;
++			} else {
++				etm_filter->stop_addr = stop;
++				etm_filter->type = ETM_ADDR_TYPE_STOP;
++			}
++		}
++		i++;
++	}
++
++	filters->nr_filters = i;
++}
++
+ int etm_perf_symlink(struct coresight_device *csdev, bool link)
  {
- 	u32 addr_acc, mode;
+ 	char entry[sizeof("cpu9999999")];
+@@ -371,18 +487,21 @@ static int __init etm_perf_init(void)
+ {
+ 	int ret;
+ 
+-	etm_pmu.capabilities	= PERF_PMU_CAP_EXCLUSIVE;
+-
+-	etm_pmu.attr_groups	= etm_pmu_attr_groups;
+-	etm_pmu.task_ctx_nr	= perf_sw_context;
+-	etm_pmu.read		= etm_event_read;
+-	etm_pmu.event_init	= etm_event_init;
+-	etm_pmu.setup_aux	= etm_setup_aux;
+-	etm_pmu.free_aux	= etm_free_aux;
+-	etm_pmu.start		= etm_event_start;
+-	etm_pmu.stop		= etm_event_stop;
+-	etm_pmu.add		= etm_event_add;
+-	etm_pmu.del		= etm_event_del;
++	etm_pmu.capabilities		= PERF_PMU_CAP_EXCLUSIVE;
++
++	etm_pmu.attr_groups		= etm_pmu_attr_groups;
++	etm_pmu.task_ctx_nr		= perf_sw_context;
++	etm_pmu.read			= etm_event_read;
++	etm_pmu.event_init		= etm_event_init;
++	etm_pmu.setup_aux		= etm_setup_aux;
++	etm_pmu.free_aux		= etm_free_aux;
++	etm_pmu.start			= etm_event_start;
++	etm_pmu.stop			= etm_event_stop;
++	etm_pmu.add			= etm_event_add;
++	etm_pmu.del			= etm_event_del;
++	etm_pmu.addr_filters_sync	= etm_addr_filters_sync;
++	etm_pmu.addr_filters_validate	= etm_addr_filters_validate;
++	etm_pmu.nr_addr_filters		= ETM_ADDR_CMP_MAX;
+ 
+ 	ret = perf_pmu_register(&etm_pmu, CORESIGHT_ETM_PMU_NAME, -1);
+ 	if (ret == 0)
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.h b/drivers/hwtracing/coresight/coresight-etm-perf.h
+index 87f5a134eb6f..3ffc9feb2d64 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.h
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.h
+@@ -18,8 +18,42 @@
+ #ifndef _CORESIGHT_ETM_PERF_H
+ #define _CORESIGHT_ETM_PERF_H
+ 
++#include "coresight-priv.h"
++
+ struct coresight_device;
+ 
++/*
++ * In both ETMv3 and v4 the maximum number of address comparator implentable
++ * is 8.  The actual number is implementation specific and will be checked
++ * when filters are applied.
++ */
++#define ETM_ADDR_CMP_MAX	8
++
++/**
++ * struct etm_filter - single instruction range or start/stop configuration.
++ * @start_addr:	The address to start tracing on.
++ * @stop_addr:	The address to stop tracing on.
++ * @type:	Is this a range or start/stop filter.
++ */
++struct etm_filter {
++	unsigned long start_addr;
++	unsigned long stop_addr;
++	enum etm_addr_type type;
++};
++
++/**
++ * struct etm_filters - set of filters for a session
++ * @etm_filter:	All the filters for this session.
++ * @nr_filters:	Number of filters
++ * @ssstatus:	Status of the start/stop logic.
++ */
++struct etm_filters {
++	struct etm_filter	etm_filter[ETM_ADDR_CMP_MAX];
++	unsigned int		nr_filters;
++	bool			ssstatus;
++};
++
++
+ #ifdef CONFIG_CORESIGHT
+ int etm_perf_symlink(struct coresight_device *csdev, bool link);
+ 
 -- 
 2.7.4
