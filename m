@@ -1,32 +1,89 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 25 Aug 2016 16:30:25 +0100
-Subject: [PATCH v6 2/3] arm64: vmlinux.ld: Add mmuoff data sections and
- move mmuoff text into idmap
-In-Reply-To: <1472059650-591-3-git-send-email-james.morse@arm.com>
-References: <1472059650-591-1-git-send-email-james.morse@arm.com>
- <1472059650-591-3-git-send-email-james.morse@arm.com>
-Message-ID: <20160825153024.GI20748@e104818-lin.cambridge.arm.com>
+From: chris.brandt@renesas.com (Chris Brandt)
+Date: Thu, 25 Aug 2016 11:31:15 -0400
+Subject: [PATCH] ARM: dts: rskrza1: initial device tree
+Message-ID: <20160825153115.15291-1-chris.brandt@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 06:27:29PM +0100, James Morse wrote:
-> Resume from hibernate needs to clean any text executed by the kernel with
-> the MMU off to the PoC. Collect these functions together into the
-> .idmap.text section as all this code is tightly coupled and also needs
-> the same cleaning after resume.
-> 
-> Data is more complicated, secondary_holding_pen_release is written with
-> the MMU on, clean and invalidated, then read with the MMU off. In contrast
-> __boot_cpu_mode is written with the MMU off, the corresponding cache line
-> is invalidated, so when we read it with the MMU on we don't get stale data.
-> These cache maintenance operations conflict with each other if the values
-> are within a Cache Writeback Granule (CWG) of each other.
-> Collect the data into two sections .mmuoff.data.read and .mmuoff.data.write,
-> the linker script ensures mmuoff.data.write section is aligned to the
-> architectural maximum CWG of 2KB.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
+Add the initial device tree for the RZ/A1 based development board (RSK).
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+---
+ arch/arm/boot/dts/Makefile             |  1 +
+ arch/arm/boot/dts/r7s72100-rskrza1.dts | 53 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 54 insertions(+)
+ create mode 100644 arch/arm/boot/dts/r7s72100-rskrza1.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index faacd52..c1c4d912 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -651,6 +651,7 @@ dtb-$(CONFIG_ARCH_S5PV210) += \
+ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
+ 	emev2-kzm9d.dtb \
+ 	r7s72100-genmai.dtb \
++	r7s72100-rskrza1.dtb \
+ 	r8a73a4-ape6evm.dtb \
+ 	r8a7740-armadillo800eva.dtb \
+ 	r8a7778-bockw.dtb \
+diff --git a/arch/arm/boot/dts/r7s72100-rskrza1.dts b/arch/arm/boot/dts/r7s72100-rskrza1.dts
+new file mode 100644
+index 0000000..df9b979e
+--- /dev/null
++++ b/arch/arm/boot/dts/r7s72100-rskrza1.dts
+@@ -0,0 +1,53 @@
++/*
++ * Device Tree Source for the RZ/A1H RSK board
++ *
++ * Copyright (C) 2016 Renesas Electronics
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/dts-v1/;
++#include "r7s72100.dtsi"
++
++/ {
++	model = "RSKRZA1";
++	compatible = "renesas,rskrza1", "renesas,r7s72100";
++
++	aliases {
++		serial0 = &scif2;
++	};
++
++	chosen {
++		bootargs = "ignore_loglevel";
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory at 8000000 {
++		device_type = "memory";
++		reg = <0x08000000 0x02000000>;
++	};
++
++	lbsc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++	};
++};
++
++&extal_clk {
++	clock-frequency = <13330000>;
++};
++
++&usb_x1_clk {
++	clock-frequency = <48000000>;
++};
++
++&mtu2 {
++	status = "okay";
++};
++
++&scif2 {
++	status = "okay";
++};
++
+-- 
+2.9.2
