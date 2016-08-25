@@ -1,67 +1,197 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Thu, 25 Aug 2016 10:02:31 +0800
-Subject: [PATCH] arm64: dts: hikey: extend default cma size to 128MB
-In-Reply-To: <CAL_JsqJxE+fAbSsp=N7dvzvQiKwh3nM8-oSJH1OzV+KfW3w4jw@mail.gmail.com>
-References: <1472045710-15832-1-git-send-email-guodong.xu@linaro.org>
- <CAL_JsqJxE+fAbSsp=N7dvzvQiKwh3nM8-oSJH1OzV+KfW3w4jw@mail.gmail.com>
-Message-ID: <CAFGCpxwQLhADWH9aZufgX8YhPF2T-63ZPv1GB6gK8w1dzTzN4w@mail.gmail.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Thu, 25 Aug 2016 09:53:25 +0800
+Subject: [PATCH] ARM: imx6: add opp table when cpufreq is enabled
+In-Reply-To: <1471964171-27480-1-git-send-email-Anson.Huang@nxp.com>
+References: <1471964171-27480-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20160825015325.GA17005@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 August 2016 at 23:10, Rob Herring <robh+dt@kernel.org> wrote:
-> On Wed, Aug 24, 2016 at 8:35 AM, Guodong Xu <guodong.xu@linaro.org> wrote:
->> To support display in Debian on HiKey, cma heap is used to allocate
->> graphic buffers. The default size of CMA is 16 MB which is not enought.
->
-> s/enought/enough/
->
->>
->> Increase the default CMA size to 128 MB.
->>
->> cc: Rob Herring <rob.herring@linaro.org>
->> cc: Fathi Boudra <fathi.boudra@linaro.org>
->> cc: John Stultz <john.stultz@linaro.org>
->> cc: Xinliang Liu <xinliang.liu@linaro.org>
->> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
->> ---
->>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 14 ++++++++++++++
->>  1 file changed, 14 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
->> index 4a51058..abb3434 100644
->> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
->> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
->> @@ -45,6 +45,20 @@
->>                       <0x00000000 0x22000000 0x00000000 0x1c000000>;
->>         };
->>
->> +       reserved-memory {
->> +               #address-cells = <2>;
->> +               #size-cells = <2>;
->> +               ranges;
->> +
->> +               /* global autoconfigured region for contiguous allocations */
->> +               linux,cma {
->> +                       compatible = "shared-dma-pool";
->> +                       reusable;
->> +                       size = <0x00000000 0x08000000>;
->> +                       linux,cma-default;
->> +               };
->> +       };
->> +
->>         pstore: pstore at 0x21f00000 {
->
-> So what is upstream (as of 4.8) for ramoops also uses reserved-memory,
-> so you should separately fix this.
->
+On Tue, Aug 23, 2016 at 10:56:11PM +0800, Anson Huang wrote:
+> On those i.MX6 platforms which have no speed grading
+> check, opp table will NOT be created in platform code,
+> so cpufreq driver will have below error message:
+> 
+> cpu cpu0: dev_pm_opp_get_opp_count: OPP table not found (-19)
+> 
+> As cpufreq driver expects opp table is supplied by
+> platform, so it is better to add opp table if cpufreq
+> is enabled.
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> ---
+>  arch/arm/mach-imx/common.h      |  1 +
+>  arch/arm/mach-imx/mach-imx6q.c  | 31 ++++---------------------------
+>  arch/arm/mach-imx/mach-imx6sl.c |  4 +++-
+>  arch/arm/mach-imx/mach-imx6sx.c |  4 +++-
+>  arch/arm/mach-imx/mach-imx6ul.c |  4 +++-
+>  arch/arm/mach-imx/pm-imx6.c     | 25 +++++++++++++++++++++++++
+>  6 files changed, 39 insertions(+), 30 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+> index bcca481..b757811 100644
+> --- a/arch/arm/mach-imx/common.h
+> +++ b/arch/arm/mach-imx/common.h
+> @@ -124,6 +124,7 @@ static inline void imx6_suspend(void __iomem *ocram_vbase) {}
+>  #endif
+>  
+>  void imx6_pm_ccm_init(const char *ccm_compat);
+> +void imx6_pm_opp_init(void);
+>  void imx6q_pm_init(void);
+>  void imx6dl_pm_init(void);
+>  void imx6sl_pm_init(void);
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index 97fd251..09d295b 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -338,32 +338,6 @@ put_node:
+>  	of_node_put(np);
+>  }
+>  
+> -static void __init imx6q_opp_init(void)
+> -{
+> -	struct device_node *np;
+> -	struct device *cpu_dev = get_cpu_device(0);
+> -
+> -	if (!cpu_dev) {
+> -		pr_warn("failed to get cpu0 device\n");
+> -		return;
+> -	}
+> -	np = of_node_get(cpu_dev->of_node);
+> -	if (!np) {
+> -		pr_warn("failed to find cpu0 node\n");
+> -		return;
+> -	}
+> -
+> -	if (dev_pm_opp_of_add_table(cpu_dev)) {
+> -		pr_warn("failed to init OPP table\n");
+> -		goto put_node;
+> -	}
+> -
+> -	imx6q_opp_check_speed_grading(cpu_dev);
+> -
+> -put_node:
+> -	of_node_put(np);
+> -}
+> -
+>  static struct platform_device imx6q_cpufreq_pdev = {
+>  	.name = "imx6q-cpufreq",
+>  };
+> @@ -378,7 +352,10 @@ static void __init imx6q_init_late(void)
+>  		imx6q_cpuidle_init();
+>  
+>  	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
+> -		imx6q_opp_init();
+> +		struct device *cpu_dev = get_cpu_device(0);
+> +
+> +		imx6_pm_opp_init();
+> +		imx6q_opp_check_speed_grading(cpu_dev);
+>  		platform_device_register(&imx6q_cpufreq_pdev);
+>  	}
+>  }
+> diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
+> index 0408490..009bfa8 100644
+> --- a/arch/arm/mach-imx/mach-imx6sl.c
+> +++ b/arch/arm/mach-imx/mach-imx6sl.c
+> @@ -38,8 +38,10 @@ static void __init imx6sl_fec_init(void)
+>  static void __init imx6sl_init_late(void)
+>  {
+>  	/* imx6sl reuses imx6q cpufreq driver */
+> -	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
+> +	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
+> +		imx6_pm_opp_init();
+>  		platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
+> +	}
+>  
+>  	imx6sl_cpuidle_init();
+>  }
+> diff --git a/arch/arm/mach-imx/mach-imx6sx.c b/arch/arm/mach-imx/mach-imx6sx.c
+> index 7f52d9b..2c5b78b 100644
+> --- a/arch/arm/mach-imx/mach-imx6sx.c
+> +++ b/arch/arm/mach-imx/mach-imx6sx.c
+> @@ -93,8 +93,10 @@ static void __init imx6sx_init_late(void)
+>  {
+>  	imx6sx_cpuidle_init();
+>  
+> -	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
+> +	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
+> +		imx6_pm_opp_init();
+>  		platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
+> +	}
+>  }
+>  
+>  static const char * const imx6sx_dt_compat[] __initconst = {
+> diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
+> index 6bb7d9c..c2cd61c 100644
+> --- a/arch/arm/mach-imx/mach-imx6ul.c
+> +++ b/arch/arm/mach-imx/mach-imx6ul.c
+> @@ -80,8 +80,10 @@ static void __init imx6ul_init_irq(void)
+>  
+>  static void __init imx6ul_init_late(void)
+>  {
+> -	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
+> +	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
+> +		imx6_pm_opp_init();
+>  		platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
+> +	}
+>  }
+>  
+>  static const char * const imx6ul_dt_compat[] __initconst = {
+> diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+> index fe708e2..9a6f34c 100644
+> --- a/arch/arm/mach-imx/pm-imx6.c
+> +++ b/arch/arm/mach-imx/pm-imx6.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/pm_opp.h>
+>  #include <linux/regmap.h>
+>  #include <linux/suspend.h>
+>  #include <asm/cacheflush.h>
+> @@ -620,6 +621,30 @@ void __init imx6_pm_ccm_init(const char *ccm_compat)
+>  	writel_relaxed(val, ccm_base + CLPCR);
+>  }
+>  
+> +void __init imx6_pm_opp_init(void)
+> +{
+> +	struct device_node *np;
+> +	struct device *cpu_dev = get_cpu_device(0);
+> +
+> +	if (!cpu_dev) {
+> +		pr_warn("failed to get cpu0 device\n");
+> +		return;
+> +	}
+> +	np = of_node_get(cpu_dev->of_node);
+> +	if (!np) {
+> +		pr_warn("failed to find cpu0 node\n");
+> +		return;
+> +	}
+> +
+> +	if (dev_pm_opp_of_add_table(cpu_dev)) {
+> +		pr_warn("failed to init OPP table\n");
+> +		goto put_node;
+> +	}
+> +
+> +put_node:
+> +	of_node_put(np);
+> +}
+> +
+>  void __init imx6q_pm_init(void)
+>  {
+>  	imx6_pm_common_init(&imx6q_pm_data);
+> -- 
+> 1.9.1
+> 
 
-Got it. I will fix and resend.
 
-> Acked-by: Rob Herring <robh@kernel.org>
->
+After applying this patch, the error message is gone,
+and cpufreq works well at my imx6sx and imx6ul boards.
 
-Thanks.
--Guodong
+Reviewed-by: Peter Chen <peter.chen@nxp.com>
+Tested-by: Peter Chen <peter.chen@nxp.com>
 
+-- 
 
-> Rob
+Best Regards,
+Peter Chen
