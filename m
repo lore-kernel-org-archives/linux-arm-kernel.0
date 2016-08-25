@@ -1,98 +1,77 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 25 Aug 2016 14:21:56 +0800
-Subject: [PATCH v3 2/6] clk: sunxi-ng: mux: Add support for mux tables
-In-Reply-To: <20160825062200.17206-1-wens@csie.org>
-References: <20160825062200.17206-1-wens@csie.org>
-Message-ID: <20160825062200.17206-3-wens@csie.org>
+Date: Thu, 25 Aug 2016 14:21:54 +0800
+Subject: [PATCH v3 0/6] clk: sunxi-ng: Support A31/A31s CCU
+Message-ID: <20160825062200.17206-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clock muxes have holes, i.e. invalid or unconnected inputs,
-between parent mux values.
+Hi everyone,
 
-Add support for specifying a mux table to map clock parents to
-mux values.
+This is v3 of the sunxi-ng clk driver for A31/A31s CCU, consisting of
+the remaining patches that haven't been merged, with some minor changes
+addressing review comments. Changelog is inline in each patch.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
-Changes since v2:
+This series adds support for the A31/A31s CCU (clock control unit) with
+the new sunxi-ng binding/driver. This is a near complete driver, with a
+few features unimplemented or might need reworking:
 
-  - Update macro names as changed in commit ad4578dc4cfa ("clk: sunxi-ng:
-    mux: Rename mux macro to be consistent")
-  - Use _SUNXI_CLK_MUX_TABLE to expand _SUNXI_CLK_MUX
+  - The HDMI mode of the PLL-MIPI clock is unsupported.
 
-Changes since v1: none
----
- drivers/clk/sunxi-ng/ccu_mux.c | 12 ++++++++++++
- drivers/clk/sunxi-ng/ccu_mux.h | 17 +++++++++++------
- 2 files changed, 23 insertions(+), 6 deletions(-)
+  - The EMAC clock is unimplemented. In the past we modelled this as a
+    clock. Unforunately that doesn't work very well. While it is sort
+    of a clock control, with clock inverters and delay chains, it also
+    controls the interface mode of the EMAC. On later SoCs this register
+    is moved out of the CCU, into the system control register range.
+    Other platforms consider this a part of the ethernet controller glue
+    logic, and map and use it directly as part of the controller bindings.
+    I would like to do the same.
 
-diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
-index 1329b9ab481e..68b32f168a74 100644
---- a/drivers/clk/sunxi-ng/ccu_mux.c
-+++ b/drivers/clk/sunxi-ng/ccu_mux.c
-@@ -107,6 +107,15 @@ u8 ccu_mux_helper_get_parent(struct ccu_common *common,
- 	parent = reg >> cm->shift;
- 	parent &= (1 << cm->width) - 1;
- 
-+	if (cm->table) {
-+		int num_parents = clk_hw_get_num_parents(&common->hw);
-+		int i;
-+
-+		for (i = 0; i < num_parents; i++)
-+			if (cm->table[i] == parent)
-+				return i;
-+	}
-+
- 	return parent;
- }
- 
-@@ -117,6 +126,9 @@ int ccu_mux_helper_set_parent(struct ccu_common *common,
- 	unsigned long flags;
- 	u32 reg;
- 
-+	if (cm->table)
-+		index = cm->table[index];
-+
- 	spin_lock_irqsave(common->lock, flags);
- 
- 	reg = readl(common->base + common->reg);
-diff --git a/drivers/clk/sunxi-ng/ccu_mux.h b/drivers/clk/sunxi-ng/ccu_mux.h
-index 83737c2facd4..b1e085612e5e 100644
---- a/drivers/clk/sunxi-ng/ccu_mux.h
-+++ b/drivers/clk/sunxi-ng/ccu_mux.h
-@@ -6,8 +6,9 @@
- #include "ccu_common.h"
- 
- struct ccu_mux_internal {
--	u8	shift;
--	u8	width;
-+	u8		shift;
-+	u8		width;
-+	const u8	*table;
- 
- 	struct {
- 		u8	index;
-@@ -21,12 +22,16 @@ struct ccu_mux_internal {
- 	} variable_prediv;
- };
- 
--#define _SUNXI_CCU_MUX(_shift, _width)		\
--	{					\
--		.shift	= _shift,		\
--		.width	= _width,		\
-+#define _SUNXI_CCU_MUX_TABLE(_shift, _width, _table)	\
-+	{						\
-+		.shift	= _shift,			\
-+		.width	= _width,			\
-+		.table	= _table,			\
- 	}
- 
-+#define _SUNXI_CCU_MUX(_shift, _width) \
-+	_SUNXI_CCU_MUX_TABLE(_shift, _width, NULL)
-+
- struct ccu_mux {
- 	u16			reg;
- 	u32			enable;
+  - The A31 has 2 SDRAM clocks and 2 MBUS clocks. As such we can't have
+    them all as the DRAM gate clocks' parent. Instead I'm using the MDFS
+    clock as their parent. It is unclear what MDFS actually is, but the
+    close proximity of the registers to the DRAM bits, and hints about
+    this tied to DRAM DVFS suggest this is a common memory bus. If we're
+    wrong we can always fix this as the relationship is part of the driver,
+    not the binding. Also, all 5 clocks are marked as critical.
+
+Various changes were made to the common (to sunxi-ng) clock types to make
+them compatible with the A31/A31s' CCU's design.
+
+Also new is support for clk notifiers for mux clocks. This is needed for
+the cpu clock, which should be muxed to the stable main oscillator when
+the PLL-CPU clock rate is changed, to avoid any instabilities in the PLL
+which result in the CPU crashing. This is similar to what the meson
+platform does.
+
+
+Regards
+ChenYu
+
+Chen-Yu Tsai (6):
+  clk: sunxi-ng: nkm: Correct mux clock macro name
+  clk: sunxi-ng: mux: Add support for mux tables
+  clk: sunxi-ng: mux: support fixed pre-dividers on multiple parents
+  clk: sunxi-ng: mux: Add clk notifier functions
+  clk: sunxi-ng: Add A31/A31s clocks
+  ARM: dts: sun6i: switch A31/A31s to new CCU clock bindings
+
+ .../devicetree/bindings/clock/sunxi-ccu.txt        |    3 +-
+ arch/arm/boot/dts/sun6i-a31.dtsi                   |  424 ++-----
+ drivers/clk/sunxi-ng/Kconfig                       |   10 +
+ drivers/clk/sunxi-ng/Makefile                      |    1 +
+ drivers/clk/sunxi-ng/ccu-sun6i-a31.c               | 1235 ++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun6i-a31.h               |   72 ++
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c                |   10 +-
+ drivers/clk/sunxi-ng/ccu_mux.c                     |   54 +-
+ drivers/clk/sunxi-ng/ccu_mux.h                     |   42 +-
+ drivers/clk/sunxi-ng/ccu_nkm.h                     |    2 +-
+ include/dt-bindings/clock/sun6i-a31-ccu.h          |  187 +++
+ include/dt-bindings/reset/sun6i-a31-ccu.h          |  106 ++
+ 12 files changed, 1800 insertions(+), 346 deletions(-)
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun6i-a31.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun6i-a31.h
+ create mode 100644 include/dt-bindings/clock/sun6i-a31-ccu.h
+ create mode 100644 include/dt-bindings/reset/sun6i-a31-ccu.h
+
 -- 
 2.9.3
