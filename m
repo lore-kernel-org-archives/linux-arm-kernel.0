@@ -1,92 +1,73 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Thu, 25 Aug 2016 15:40:26 +0800
-Subject: [PATCH v8 10/11] doc: bindings: power: act8945a-charger: Update
- properties.
+Date: Thu, 25 Aug 2016 15:45:04 +0800
+Subject: [PATCH v8 11/11] ARM: at91/dt: sama5d2_xplained: Add act8945a-charger
+ node.
 In-Reply-To: <1472109599-21915-1-git-send-email-wenyou.yang@atmel.com>
 References: <1472109599-21915-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1472110826-22328-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1472111104-22477-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due the driver improvements, update the properties,
- - Remove "active-semi,check-battery-temperature" property.
- - Add the properties, "active-semi,irq_gpio"
-   and "active-semi,lbo-gpios".
- - As act8945a-charger is regarded as a sub-device, update
-   the compatible and examples.
+Add act8945a-charger as a sub-device node.
+Use the "interrupts" property, instead of the "active-semi,irq_gpios"
+to denote the act8945a chager's irq.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
 
 Changes in v8:
- - Since the act8945a-charger is regarded as a sub-device, update
-   the compatible decription and examples.
+ - Add 4 new patches: 1/11, 2/11, 9/11, and 11/11.
 
 Changes in v7: None
 Changes in v6: None
-Changes in v5:
- - Add Acked-by tag.
-
-Changes in v4:
- - Update the doc/binding for using "interrupts" property.
-
+Changes in v5: None
+Changes in v4: None
 Changes in v3: None
 Changes in v2: None
 
- .../bindings/power/supply/act8945a-charger.txt     | 31 +++++++++++++++-------
- 1 file changed, 22 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 23 +++++++++++++++--------
+ 1 file changed, 15 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/power/supply/act8945a-charger.txt b/Documentation/devicetree/bindings/power/supply/act8945a-charger.txt
-index bea254c..de78d76 100644
---- a/Documentation/devicetree/bindings/power/supply/act8945a-charger.txt
-+++ b/Documentation/devicetree/bindings/power/supply/act8945a-charger.txt
-@@ -1,13 +1,18 @@
- Device-Tree bindings for charger of Active-semi ACT8945A Multi-Function Device
+diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+index 0b9a59d..87eff10 100644
+--- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+@@ -162,14 +162,6 @@
+ 					compatible = "active-semi,act8945a";
+ 					reg = <0x5b>;
+ 					active-semi,vsel-high;
+-					active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
+-					active-semi,lbo-gpios = <&pioA 72 GPIO_ACTIVE_LOW>;
+-					active-semi,irq_gpios = <&pioA 45 GPIO_ACTIVE_LOW>;
+-					active-semi,input-voltage-threshold-microvolt = <6600>;
+-					active-semi,precondition-timeout = <40>;
+-					active-semi,total-timeout = <3>;
+-					pinctrl-names = "default";
+-					pinctrl-0 = <&pinctrl_charger_chglev &pinctrl_charger_lbo &pinctrl_charger_irq>;
+ 					status = "okay";
  
- Required properties:
-- - compatible: "active-semi,act8945a", please refer to ../mfd/act8945a.txt.
-+ - compatible: "active-semi,act8945a-charger".
-  - active-semi,chglev-gpios: charge current level phandle with args
-    as described in ../gpio/gpio.txt.
-+ - active-semi,lbo-gpios: specify the low battery voltage detect phandle
-+   with args as as described in ../gpio/gpio.txt.
-+ - interrupts: <a b> where a is the interrupt number and b is a
-+   field that represents an encoding of the sense and level
-+   information for the interrupt.
-+ - interrupt-parent: the phandle for the interrupt controller that
-+   services interrupts for this device.
- 
- Optional properties:
-- - active-semi,check-battery-temperature: boolean to check the battery
--   temperature or not.
-  - active-semi,input-voltage-threshold-microvolt: unit: mV;
-    Specifies the charger's input over-voltage threshold value;
-    The value can be: 6600, 7000, 7500, 8000; default: 6600
-@@ -26,10 +31,18 @@ Example:
- 		reg = <0x5b>;
- 		status = "okay";
- 
--		pinctrl-names = "default";
--		pinctrl-0 = <&pinctrl_charger_chglev>;
--		active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
--		active-semi,input-voltage-threshold-microvolt = <6600>;
--		active-semi,precondition-timeout = <40>;
--		active-semi,total-timeout = <3>;
-+		charger {
-+			compatible = "active-semi,act8945a-charger";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_charger_chglev &pinctrl_charger_lbo &pinctrl_charger_irq>;
-+			interrupt-parent = <&pioA>;
-+			interrupts = <45 GPIO_ACTIVE_LOW>;
+ 					regulators {
+@@ -222,6 +214,21 @@
+ 							regulator-always-on;
+ 						};
+ 					};
 +
-+			active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
-+			active-semi,lbo-gpios = <&pioA 72 GPIO_ACTIVE_LOW>;
-+			active-semi,input-voltage-threshold-microvolt = <6600>;
-+			active-semi,precondition-timeout = <40>;
-+			active-semi,total-timeout = <3>;
-+			status = "okay";
-+		};
- 	};
++					charger {
++						compatible = "active-semi,act8945a-charger";
++						pinctrl-names = "default";
++						pinctrl-0 = <&pinctrl_charger_chglev &pinctrl_charger_lbo &pinctrl_charger_irq>;
++						interrupt-parent = <&pioA>;
++						interrupts = <45 GPIO_ACTIVE_LOW>;
++
++						active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
++						active-semi,lbo-gpios = <&pioA 72 GPIO_ACTIVE_LOW>;
++						active-semi,input-voltage-threshold-microvolt = <6600>;
++						active-semi,precondition-timeout = <40>;
++						active-semi,total-timeout = <3>;
++						status = "okay";
++					};
+ 				};
+ 			};
+ 
 -- 
 2.7.4
