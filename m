@@ -1,45 +1,58 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 25 Aug 2016 17:28:58 +0800
-Subject: [PATCH v2 6/7] arm64: dts: exynos: Add dts file for
- Exynos5433-based TM2 board
-In-Reply-To: <1472046551-703-7-git-send-email-cw00.choi@samsung.com>
-Message-ID: <201608251736.gveyTsas%fengguang.wu@intel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 25 Aug 2016 10:30:54 +0100
+Subject: [PATCH 1/1] arm64/hugetlb: clear PG_dcache_clean if the page is
+ dirty when munmap
+In-Reply-To: <57BE4D02.1040906@huawei.com>
+References: <20160708161347.GC22099@e104818-lin.cambridge.arm.com>
+ <57839474.6030203@huawei.com>
+ <20160712153535.GH22183@e104818-lin.cambridge.arm.com>
+ <578EE603.9020206@huawei.com>
+ <20160720091939.GA25890@e104818-lin.cambridge.arm.com>
+ <57BA7D38.8030103@huawei.com>
+ <20160823172852.GB16213@e104818-lin.cambridge.arm.com>
+ <57BD6242.1080801@huawei.com>
+ <20160824103044.GA11504@e104818-lin.cambridge.arm.com>
+ <57BE4D02.1040906@huawei.com>
+Message-ID: <20160825093054.GB20748@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+On Thu, Aug 25, 2016 at 09:42:26AM +0800, Leizhen (ThunderTown) wrote:
+> On 2016/8/24 18:30, Catalin Marinas wrote:
+> >>>>>>>>>> On 2016/7/8 21:54, Catalin Marinas wrote:
+> >>>>>>>>>>> ------------8<----------------
+> >>>>>>>>>>> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+> >>>>>>>>>>> index dbd12ea8ce68..c753fa804165 100644
+> >>>>>>>>>>> --- a/arch/arm64/mm/flush.c
+> >>>>>>>>>>> +++ b/arch/arm64/mm/flush.c
+> >>>>>>>>>>> @@ -75,7 +75,8 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
+> >>>>>>>>>>>  	if (!page_mapping(page))
+> >>>>>>>>>>>  		return;
+> >>>>>>>>>>>  
+> >>>>>>>>>>> -	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
+> >>>>>>>>>>> +	if (!test_and_set_bit(PG_dcache_clean, &page->flags) ||
+> >>>>>>>>>>> +	    PageDirty(page))
+> >>>>>>>>>>>  		sync_icache_aliases(page_address(page),
+> >>>>>>>>>>>  				    PAGE_SIZE << compound_order(page));
+> >>>>>>>>>>>  	else if (icache_is_aivivt())
+> >>>>>>>>>>> ----------------8<---------------------
+[...]
+> > While we indeed see failures on multiple filesystem types, I wonder
+> > whether this test case is actually expected to work. If I modify the
+> > test to pass O_TRUNC to open(), I can no longer see failures. So any
+> > standard tool that copies/creates executable files (gcc, dpkg, cp, rsync
+> > etc.) wouldn't encounter such issues since they truncate the original
+> > file and old page cache pages would be removed.
+> > 
+> > Do you have a real use-case where a task mmap's an executable file,
+> > modifies it in place and expects another task to see the new
+> > instructions without user-space cache maintenance?
+> 
+> No, it's just a test case created by testers.
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.8-rc3 next-20160824]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-[Check https://git-scm.com/docs/git-format-patch for more information]
+In this case I propose we ignore this patch and you adjust the test to
+use O_TRUNC, at least until we find a real scenario where this would
+matter.
 
-url:    https://github.com/0day-ci/linux/commits/Chanwoo-Choi/arm64-dts-Add-the-dts-file-for-Exynos5433-and-TM-TM2E-board/20160824-215757
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
-
-Note: the linux-review/Chanwoo-Choi/arm64-dts-Add-the-dts-file-for-Exynos5433-and-TM-TM2E-board/20160824-215757 HEAD 46d1185173dccb3ecf3c7b36a713e8eee1d39cfe builds fine.
-      It only hurts bisectibility.
-
-All errors (new ones prefixed by >>):
-
->> make[3]: *** No rule to make target 'arch/arm64/boot/dts/exynos/exynos5433-tm2e.dtb', needed by '__build'.
-   make[3]: Target '__build' not remade because of errors.
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 31013 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160825/22fa44e0/attachment-0001.obj>
+-- 
+Catalin
