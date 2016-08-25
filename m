@@ -1,58 +1,58 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 25 Aug 2016 10:30:54 +0100
-Subject: [PATCH 1/1] arm64/hugetlb: clear PG_dcache_clean if the page is
- dirty when munmap
-In-Reply-To: <57BE4D02.1040906@huawei.com>
-References: <20160708161347.GC22099@e104818-lin.cambridge.arm.com>
- <57839474.6030203@huawei.com>
- <20160712153535.GH22183@e104818-lin.cambridge.arm.com>
- <578EE603.9020206@huawei.com>
- <20160720091939.GA25890@e104818-lin.cambridge.arm.com>
- <57BA7D38.8030103@huawei.com>
- <20160823172852.GB16213@e104818-lin.cambridge.arm.com>
- <57BD6242.1080801@huawei.com>
- <20160824103044.GA11504@e104818-lin.cambridge.arm.com>
- <57BE4D02.1040906@huawei.com>
-Message-ID: <20160825093054.GB20748@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 25 Aug 2016 10:52:33 +0100
+Subject: [PATCH] arm64: avoid TLB conflict with CONFIG_RANDOMIZE_BASE
+In-Reply-To: <1472058128-1216-1-git-send-email-mark.rutland@arm.com>
+References: <1472058128-1216-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20160825095233.GD6630@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2016 at 09:42:26AM +0800, Leizhen (ThunderTown) wrote:
-> On 2016/8/24 18:30, Catalin Marinas wrote:
-> >>>>>>>>>> On 2016/7/8 21:54, Catalin Marinas wrote:
-> >>>>>>>>>>> ------------8<----------------
-> >>>>>>>>>>> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-> >>>>>>>>>>> index dbd12ea8ce68..c753fa804165 100644
-> >>>>>>>>>>> --- a/arch/arm64/mm/flush.c
-> >>>>>>>>>>> +++ b/arch/arm64/mm/flush.c
-> >>>>>>>>>>> @@ -75,7 +75,8 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
-> >>>>>>>>>>>  	if (!page_mapping(page))
-> >>>>>>>>>>>  		return;
-> >>>>>>>>>>>  
-> >>>>>>>>>>> -	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
-> >>>>>>>>>>> +	if (!test_and_set_bit(PG_dcache_clean, &page->flags) ||
-> >>>>>>>>>>> +	    PageDirty(page))
-> >>>>>>>>>>>  		sync_icache_aliases(page_address(page),
-> >>>>>>>>>>>  				    PAGE_SIZE << compound_order(page));
-> >>>>>>>>>>>  	else if (icache_is_aivivt())
-> >>>>>>>>>>> ----------------8<---------------------
-[...]
-> > While we indeed see failures on multiple filesystem types, I wonder
-> > whether this test case is actually expected to work. If I modify the
-> > test to pass O_TRUNC to open(), I can no longer see failures. So any
-> > standard tool that copies/creates executable files (gcc, dpkg, cp, rsync
-> > etc.) wouldn't encounter such issues since they truncate the original
-> > file and old page cache pages would be removed.
-> > 
-> > Do you have a real use-case where a task mmap's an executable file,
-> > modifies it in place and expects another task to see the new
-> > instructions without user-space cache maintenance?
+On Wed, Aug 24, 2016 at 06:02:08PM +0100, Mark Rutland wrote:
+> When CONFIG_RANDOMIZE_BASE is selected, we modify the page tables to remap the
+> kernel at a newly-chosen VA range. We do this with the MMU disabled, but do not
+> invalidate TLBs prior to re-enabling the MMU with the new tables. Thus the old
+> mappings entries may still live in TLBs, and we risk violating
+> Break-Before-Make requirements, leading to TLB conflicts and/or other issues.
 > 
-> No, it's just a test case created by testers.
+> We invalidate TLBs when we uninsall the idmap in early setup code, but prior to
+> this we are subject to issues relating to the Break-Before-Make violation.
+> 
+> Avoid these issues by invalidating the TLBs before the new mappings can be
+> used by the hardware.
+> 
+> Fixes: f80fb3a3d50843a4 ("arm64: add support for kernel ASLR")
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: stable at vger.kernel.org
+> ---
+>  arch/arm64/kernel/head.S | 3 +++
+>  1 file changed, 3 insertions(+)
 
-In this case I propose we ignore this patch and you adjust the test to
-use O_TRUNC, at least until we find a real scenario where this would
-matter.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
--- 
-Catalin
+Although I do wonder whether it would be cleaner to do the local TLBI
+in __create_page_tables after zeroing swapper, and then moving the TLBI
+out of __cpu_setup and onto the secondary boot path. I suppose it doesn't
+really matter...
+
+Will
+
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index b77f583..3e7b050 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -757,6 +757,9 @@ ENTRY(__enable_mmu)
+>  	isb
+>  	bl	__create_page_tables		// recreate kernel mapping
+>  
+> +	tlbi	vmalle1				// Remove any stale TLB entries
+> +	dsb	nsh
+> +
+>  	msr	sctlr_el1, x19			// re-enable the MMU
+>  	isb
+>  	ic	iallu				// flush instructions fetched
+> -- 
+> 2.7.4
+> 
