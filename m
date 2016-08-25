@@ -1,62 +1,32 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 25 Aug 2016 13:46:10 -0400 (EDT)
-Subject: [PATCH] arm: sys_oabi-compat: Use kmalloc_array() in two functions
-In-Reply-To: <5deba521-2dd4-cd2e-23d7-226a1a7728c3@users.sourceforge.net>
-References: <5deba521-2dd4-cd2e-23d7-226a1a7728c3@users.sourceforge.net>
-Message-ID: <alpine.LFD.2.20.1608251334360.17623@knanqh.ubzr>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 25 Aug 2016 13:48:32 -0400 (EDT)
+Subject: [PATCH v2 1/2] smc91x: always use 8-bit access if necessary
+In-Reply-To: <3107598.uul2xx8LJA@wuerfel>
+References: <20160825144633.1850889-1-arnd@arndb.de>
+ <3107598.uul2xx8LJA@wuerfel>
+Message-ID: <alpine.LFD.2.20.1608251347170.17623@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Aug 2016, SF Markus Elfring wrote:
+On Thu, 25 Aug 2016, Arnd Bergmann wrote:
 
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Thu, 25 Aug 2016 17:45:23 +0200
+> As Russell King found out the hard way, a change I did to fix multiplatform
+> builds with this driver broke the old Assabet/Neponset platform: It turns
+> out that while the driver is runtime configurable in principle, the
+> runtime configuration does not cover the specific case of machines that
+> can not do any 16-bit I/O on the smc91x registers.
 > 
-> Multiplications for the size determination of memory allocations
-> indicated that array data structures should be processed.
-> Thus use the corresponding function "kmalloc_array".
+> The driver currently provides helpers to access 16-bit registers for
+> architectures that are known at compile-time to only have 8-bit I/O,
+> but my patch changed it to a runtime flag that never gets consulted
+> most register accesses.
 > 
-> This issue was detected by using the Coccinelle software.
-> 
-> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+> This introduces new SMC_out16()/SMC_in16 helpers (if anyone can suggest
+> a better name, I'm glad to modify this) that behaves like SMC_outw()/SMC_inw()
+> most of the time, but uses a pair of 8-bit accesses on platforms that
+> have no support for wider register accesses.
 
-The use of kmalloc_array() introduces a duplicate of the size capping 
-check that already exists in the code.  However it seems that gcc is 
-smart enough to figure that out and doesn't emit it twice.
+Why don't you fold this directly into SMC_outw() instead?
 
-Note that I'm not implying that the existing check should be removed if 
-this patch is applied though. Having it there makes the code clearer. 
-But if this patch makes a Coccinelle script happier then ...
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-> ---
->  arch/arm/kernel/sys_oabi-compat.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/sys_oabi-compat.c b/arch/arm/kernel/sys_oabi-compat.c
-> index 5f221ac..e624db9 100644
-> --- a/arch/arm/kernel/sys_oabi-compat.c
-> +++ b/arch/arm/kernel/sys_oabi-compat.c
-> @@ -285,7 +285,7 @@ asmlinkage long sys_oabi_epoll_wait(int epfd,
->  		return -EINVAL;
->  	if (!access_ok(VERIFY_WRITE, events, sizeof(*events) * maxevents))
->  		return -EFAULT;
-> -	kbuf = kmalloc(sizeof(*kbuf) * maxevents, GFP_KERNEL);
-> +	kbuf = kmalloc_array(maxevents, sizeof(*kbuf), GFP_KERNEL);
->  	if (!kbuf)
->  		return -ENOMEM;
->  	fs = get_fs();
-> @@ -323,7 +323,7 @@ asmlinkage long sys_oabi_semtimedop(int semid,
->  		return -EINVAL;
->  	if (!access_ok(VERIFY_READ, tsops, sizeof(*tsops) * nsops))
->  		return -EFAULT;
-> -	sops = kmalloc(sizeof(*sops) * nsops, GFP_KERNEL);
-> +	sops = kmalloc_array(nsops, sizeof(*sops), GFP_KERNEL);
->  	if (!sops)
->  		return -ENOMEM;
->  	err = 0;
-> -- 
-> 2.9.3
-> 
-> 
+Nicolas
