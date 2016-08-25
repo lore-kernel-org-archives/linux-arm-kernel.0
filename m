@@ -1,126 +1,108 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Thu, 25 Aug 2016 09:04:26 +0800
-Subject: [PATCH v24 5/9] arm64: kdump: add kdump support
-In-Reply-To: <57BD7619.1040406@arm.com>
-References: <57AB586D.3080900@arm.com> <20160818071547.GC20080@linaro.org>
- <20160819012651.GE20080@linaro.org>
- <20160819112217.GB22221@localhost.localdomain>
- <20160822012919.GI20080@linaro.org> <57BB0272.1000008@arm.com>
- <20160823003815.GL20080@linaro.org>
- <20160823112343.GC13501@localhost.localdomain>
- <20160824080443.GA12902@dhcp-128-65.nay.redhat.com>
- <57BD7619.1040406@arm.com>
-Message-ID: <20160825010426.GA11824@dhcp-128-65.nay.redhat.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Thu, 25 Aug 2016 09:08:48 +0800
+Subject: [PATCH 2/2] sdhci-of-arasan: Add quirk and device tree parameter
+ to fake CD bit
+In-Reply-To: <1472080984-17373-2-git-send-email-zach.brown@ni.com>
+References: <1472080984-17373-1-git-send-email-zach.brown@ni.com>
+ <1472080984-17373-2-git-send-email-zach.brown@ni.com>
+Message-ID: <54440de0-6e66-1f8e-c067-9aeb79733739@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/24/16 at 11:25am, James Morse wrote:
-> Hi Dave,
-> 
-> On 24/08/16 09:04, Dave Young wrote:
-> > Looking the arm-init.c, I suspect it missed the some efi ranges as
-> > reserved ranges like runtime code and runtime data etc. But I might be
-> > wrong.
-> 
-> This had me confused for too... I think I get it, my understanding is:
-> 
-James, thanks for your clarification. 
-> 
-> > static __init int is_reserve_region(efi_memory_desc_t *md)
-> > {
-> >         switch (md->type) {
-> >         case EFI_LOADER_CODE:
-> >         case EFI_LOADER_DATA:
-> >         case EFI_BOOT_SERVICES_CODE:
-> >         case EFI_BOOT_SERVICES_DATA:
-> >         case EFI_CONVENTIONAL_MEMORY:
-> >         case EFI_PERSISTENT_MEMORY:
-> >                 return 0;
-> 
-> return false - this is the list of region-types to never reserve, regardless of
-> memory attributes.
-> 
-> 
-> >         default:
-> >                 break;
-> >         }
-> >         return is_normal_ram(md);
-> 
-> If its not in the 'never reserve' list above, then we check if the region is
-> 'normal' ram. If it is then it will end up in memblock.memory so we return true,
-> causing it to be marked nomap too.
-> 
-> reserve_regions() in that same file calls is_normal_ram() directly before adding
-> all regions with the WB attribute to memblock.memory via
-> early_init_dt_add_memory_arch().
-> 
-> A runtime region with the WB attribute will be caught by is_reserve_region(),
-> and is_normal_ram(), so it ends up in memblock.memory and memblock.nomap.
+? 2016/8/25 7:23, Zach Brown ??:
+> The sdhci controller on xilinx zynq devices will not function unless
+> the cd bit is provided. http://www.xilinx.com/support/answers/61064.html
+> In cases where it is impossible to provide the cd bit in hardware,
+> setting the controller to test mode and then setting inserted to true
+> will get the controller to function with out the cd bit.
+>
+> The device property "fake-cd" will let the arasan driver know it needs
+> to fake the cd bit for the controller inorder for the controller to
+> function with a SD card that does not provide the CD bit.
+>
+> Signed-off-by: Zach Brown <zach.brown@ni.com>
+> ---
+>  drivers/mmc/host/sdhci-of-arasan.c | 23 ++++++++++++++++++++++-
+>  drivers/mmc/host/sdhci.h           |  4 ++++
+>  2 files changed, 26 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+> index e0f193f..a74bcf5 100644
+> --- a/drivers/mmc/host/sdhci-of-arasan.c
+> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/phy/phy.h>
+>  #include <linux/regmap.h>
+>  #include "sdhci-pltfm.h"
+> +#include <linux/of.h>
+>
+>  #define SDHCI_ARASAN_CLK_CTRL_OFFSET	0x2c
+>  #define SDHCI_ARASAN_VENDOR_REGISTER	0x78
+> @@ -203,12 +204,26 @@ static void sdhci_arasan_hs400_enhanced_strobe(struct mmc_host *mmc,
+>  	writel(vendor, host->ioaddr + SDHCI_ARASAN_VENDOR_REGISTER);
+>  }
+>
+> +void sdhci_arasan_reset(struct sdhci_host *host, u8 mask)
+> +{
+> +	u8 ctrl;
+> +
+> +	sdhci_reset(host, mask);
+> +
+> +	if (host->quirks2 & SDHCI_QUIRK2_NEED_FAKE_CD) {
+> +		ctrl = sdhci_readl(host, SDHCI_HOST_CONTROL);
+> +		ctrl |= SDHCI_CTRL_CD_TEST_INSERTED |
+> +		SDHCI_CTRL_CD_TEST_ENABLE;
+> +		sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
+> +	}
+> +}
+> +
+>  static struct sdhci_ops sdhci_arasan_ops = {
+>  	.set_clock = sdhci_arasan_set_clock,
+>  	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
+>  	.get_timeout_clock = sdhci_arasan_get_timeout_clock,
+>  	.set_bus_width = sdhci_set_bus_width,
+> -	.reset = sdhci_reset,
+> +	.reset = sdhci_arasan_reset,
+>  	.set_uhs_signaling = sdhci_set_uhs_signaling,
+>  };
+>
+> @@ -516,6 +531,12 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>  	}
+>
+>  	sdhci_get_of_property(pdev);
+> +
+> +	if (of_get_property(pdev->dev.of_node, "fake-cd", NULL))
+> +		host->quirks2 |= SDHCI_QUIRK2_NEED_FAKE_CD;
 
-Hmm, It is not straitforward like the do_add_efi_memmap. I got it.
 
-BTW, I believe there is same problem in arm as well as arm64, it also
-need mark the runtime ranges as "reserved" /proc/iomem. 
+Why don't you use MMC_CAP_NEEDS_POLL, could you use broken-cd?
 
-> 
-> 
-> > }
-> > 
-> > Let's see the x86 do_add_efi_mem_map, the default case set all other
-> > types as reserved. Shouldn't this be same in all arches though there's
-> > no e820 in arm(64)?
-> 
-> > static void __init do_add_efi_memmap(void)
-> > {
-> > 
-> > [snip]
-> >                 switch (md->type) {
-> >                 case EFI_LOADER_CODE:
-> >                 case EFI_LOADER_DATA:
-> >                 case EFI_BOOT_SERVICES_CODE:
-> >                 case EFI_BOOT_SERVICES_DATA:
-> >                 case EFI_CONVENTIONAL_MEMORY:
-> >                         if (md->attribute & EFI_MEMORY_WB)
-> >                                 e820_type = E820_RAM;
-> 
-> In this case reserve_regions() will add the memory to memblock.memory because it
-> has the WB attribute, and not reserve it.
-> 
-> 
-> >                         else
-> >                                 e820_type = E820_RESERVED;
-> 
-> Without the WB attribute, these regions are in neither memblock.memory nor
-> memblock.nomap.
-> 
-> 
-> >                         break;
-> > [snip]
-> >                 default:
-> >                         /*
-> >                          * EFI_RESERVED_TYPE EFI_RUNTIME_SERVICES_CODE
-> >                          * EFI_RUNTIME_SERVICES_DATA
-> >                          * EFI_MEMORY_MAPPED_IO
-> >                          * EFI_MEMORY_MAPPED_IO_PORT_SPACE EFI_PAL_CODE
-> >                          */
-> >                         e820_type = E820_RESERVED;
-> >                         break;
-> 
-> If any other regions has the WB attribute, it will be added to memblock.memory
-> and memblock.nomap. If it doesn't, it will appear in neither.
-> 
-> 
-> >                 }
-> > [snip]
-> > }
-> 
-> Does this help at all?
-> 
-
-Yes, thanks a lot!
-Dave
-
-> 
-> Thanks,
-> 
-> James
+> +
+> +	pltfm_host = sdhci_priv(host);
+> +	pltfm_host->priv = sdhci_arasan;
+>  	pltfm_host->clk = clk_xin;
+>
+>  	sdhci_arasan_update_baseclkfreq(host);
+> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+> index 0411c9f..ff3c8ba 100644
+> --- a/drivers/mmc/host/sdhci.h
+> +++ b/drivers/mmc/host/sdhci.h
+> @@ -84,6 +84,8 @@
+>  #define   SDHCI_CTRL_ADMA32	0x10
+>  #define   SDHCI_CTRL_ADMA64	0x18
+>  #define   SDHCI_CTRL_8BITBUS	0x20
+> +#define  SDHCI_CTRL_CD_TEST_INSERTED   0x40
+> +#define  SDHCI_CTRL_CD_TEST_ENABLE     0x80
+>
+>  #define SDHCI_POWER_CONTROL	0x29
+>  #define  SDHCI_POWER_ON		0x01
+> @@ -422,6 +424,8 @@ struct sdhci_host {
+>  #define SDHCI_QUIRK2_ACMD23_BROKEN			(1<<14)
+>  /* Broken Clock divider zero in controller */
+>  #define SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN		(1<<15)
+> +/* Controller needs the cd bit faked */
+> +#define SDHCI_QUIRK2_NEED_FAKE_CD (1<<16)
+>
+>  	int irq;		/* Device IRQ */
+>  	void __iomem *ioaddr;	/* Mapped address */
+>
