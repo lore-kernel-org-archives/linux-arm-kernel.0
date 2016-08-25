@@ -1,151 +1,110 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Thu, 25 Aug 2016 11:05:29 +0800
-Subject: [RESEND PATCH, v5 5/5] arm64: dts: mediatek: add USB3 DRD driver
+Date: Thu, 25 Aug 2016 11:05:25 +0800
+Subject: [RESEND PATCH,
+ v5 1/5] dt-bindings: mt8173-xhci: support host side of dual-role mode
 In-Reply-To: <1472094329-18466-1-git-send-email-chunfeng.yun@mediatek.com>
 References: <1472094329-18466-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1472094329-18466-6-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1472094329-18466-2-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-USB3 DRD driver is added for MT8173-EVB, and xHCI driver
-becomes its subnode
+Some resources, such as IPPC register etc, shared with device
+driver are moved into common glue layer when xHCI driver is the
+host side of dual-role mode and they should be changed as optional
+properties if they are required ones before. For clarity, add
+a new part of binding to support host side of dual-role mode.
+
+Additionally add optional properties of pinctrl for host only mode
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts |   46 +++++++++++++++++++++++++--
- arch/arm64/boot/dts/mediatek/mt8173.dtsi    |   29 +++++++++++++----
- 2 files changed, 66 insertions(+), 9 deletions(-)
+ .../devicetree/bindings/usb/mt8173-xhci.txt        |   54 +++++++++++++++++++-
+ 1 file changed, 52 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-index 7453a47..682dfd7 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-+++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-@@ -34,6 +34,11 @@
+diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+index b3a7ffa..2a930bd 100644
+--- a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
++++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+@@ -2,10 +2,18 @@ MT8173 xHCI
  
- 	chosen { };
+ The device node for Mediatek SOC USB3.0 host controller
  
-+	extcon_usb: extcon_iddig {
-+		compatible = "linux,extcon-usb-gpio";
-+		id-gpio = <&pio 16 GPIO_ACTIVE_HIGH>;
-+	};
++There are two scenarios: the first one only supports xHCI driver;
++the second one supports dual-role mode, and the host is based on xHCI
++driver. Take account of backward compatibility, we divide bindings
++into two parts.
 +
- 	usb_p1_vbus: regulator at 0 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "usb_vbus";
-@@ -42,6 +47,16 @@
- 		gpio = <&pio 130 GPIO_ACTIVE_HIGH>;
- 		enable-active-high;
- 	};
++1st: only supports xHCI driver
++------------------------------------------------------------------------
 +
-+	usb_p0_vbus: regulator at 1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&pio 9 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
+ Required properties:
+  - compatible : should contain "mediatek,mt8173-xhci"
+- - reg : specifies physical base address and size of the registers,
+-	the first one for MAC, the second for IPPC
++ - reg : specifies physical base address and size of the registers
++ - reg-names: should be "mac" for xHCI MAC and "ippc" for IP port control
+  - interrupts : interrupt used by the controller
+  - power-domains : a phandle to USB power domain node to control USB's
+ 	mtcmos
+@@ -27,12 +35,16 @@ Optional properties:
+ 	control register, it depends on "mediatek,wakeup-src".
+  - vbus-supply : reference to the VBUS regulator;
+  - usb3-lpm-capable : supports USB3.0 LPM
++ - pinctrl-names : a pinctrl state named "default" must be defined
++ - pinctrl-0 : pin control group
++	See: Documentation/devicetree/bindings/pinctrl/pinctrl-binding.txt
+ 
+ Example:
+ usb30: usb at 11270000 {
+ 	compatible = "mediatek,mt8173-xhci";
+ 	reg = <0 0x11270000 0 0x1000>,
+ 	      <0 0x11280700 0 0x0100>;
++	reg-names = "mac", "ippc";
+ 	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
+ 	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
+ 	clocks = <&topckgen CLK_TOP_USB30_SEL>,
+@@ -49,3 +61,41 @@ usb30: usb at 11270000 {
+ 	mediatek,syscon-wakeup = <&pericfg>;
+ 	mediatek,wakeup-src = <1>;
  };
- 
- &i2c1 {
-@@ -205,6 +220,20 @@
- 			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
- 		};
- 	};
 +
-+	usb_id_pins_float: usb_iddig_pull_up {
-+		pins_iddig {
-+			pinmux = <MT8173_PIN_16_IDDIG__FUNC_IDDIG>;
-+			bias-pull-up;
-+		};
-+	};
++2nd: dual-role mode with xHCI driver
++------------------------------------------------------------------------
 +
-+	usb_id_pins_ground: usb_iddig_pull_down {
-+		pins_iddig {
-+			pinmux = <MT8173_PIN_16_IDDIG__FUNC_IDDIG>;
-+			bias-pull-down;
-+		};
-+	};
- };
- 
- &pwm0 {
-@@ -431,12 +460,25 @@
- 	status = "okay";
- };
- 
-+&ssusb {
++In the case, xhci is added as subnode to mtu3. An example and the DT binding
++details of mtu3 can be found in:
++Documentation/devicetree/bindings/usb/mtu3.txt
++
++Required properties:
++ - compatible : should contain "mediatek,mt8173-xhci"
++ - reg : specifies physical base address and size of the registers
++ - reg-names: should be "mac" for xHCI MAC
++ - interrupts : interrupt used by the host controller
++ - power-domains : a phandle to USB power domain node to control USB's
++	mtcmos
++ - vusb33-supply : regulator of USB avdd3.3v
++
++ - clocks : a list of phandle + clock-specifier pairs, one for each
++	entry in clock-names
++ - clock-names : must be
++	"sys_ck": for clock of xHCI MAC
++
++Optional properties:
++ - vbus-supply : reference to the VBUS regulator;
++ - usb3-lpm-capable : supports USB3.0 LPM
++
++Example:
++usb30: usb at 11270000 {
++	compatible = "mediatek,mt8173-xhci";
++	reg = <0 0x11270000 0 0x1000>;
++	reg-names = "mac";
++	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
++	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
++	clocks = <&topckgen CLK_TOP_USB30_SEL>;
++	clock-names = "sys_ck";
 +	vusb33-supply = <&mt6397_vusb_reg>;
-+	vbus-supply = <&usb_p0_vbus>;
-+	extcon = <&extcon_usb>;
-+	dr_mode = "otg";
-+	mediatek,enable-wakeup;
-+	pinctrl-names = "default", "id_float", "id_ground";
-+	pinctrl-0 = <&usb_id_pins_float>;
-+	pinctrl-1 = <&usb_id_pins_float>;
-+	pinctrl-2 = <&usb_id_pins_ground>;
-+	status = "okay";
++	usb3-lpm-capable;
 +};
-+
- &uart0 {
- 	status = "okay";
- };
- 
--&usb30 {
-+&usb_host {
- 	vusb33-supply = <&mt6397_vusb_reg>;
- 	vbus-supply = <&usb_p1_vbus>;
--	mediatek,wakeup-src = <1>;
-+	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 10f638f..925948a 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -668,11 +668,14 @@
- 			status = "disabled";
- 		};
- 
--		usb30: usb at 11270000 {
--			compatible = "mediatek,mt8173-xhci";
--			reg = <0 0x11270000 0 0x1000>,
-+		ssusb: usb at 11271000 {
-+			compatible = "mediatek,mt8173-mtu3";
-+			reg = <0 0x11271000 0 0x3000>,
- 			      <0 0x11280700 0 0x0100>;
--			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-+			reg-names = "mac", "ippc";
-+			interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_LOW>;
-+			phys = <&phy_port0 PHY_TYPE_USB3>,
-+			       <&phy_port1 PHY_TYPE_USB2>;
- 			power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
- 			clocks = <&topckgen CLK_TOP_USB30_SEL>,
- 				 <&pericfg CLK_PERI_USB0>,
-@@ -680,10 +683,22 @@
- 			clock-names = "sys_ck",
- 				      "wakeup_deb_p0",
- 				      "wakeup_deb_p1";
--			phys = <&phy_port0 PHY_TYPE_USB3>,
--			       <&phy_port1 PHY_TYPE_USB2>;
- 			mediatek,syscon-wakeup = <&pericfg>;
--			status = "okay";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges;
-+			status = "disabled";
-+
-+			usb_host: xhci at 11270000 {
-+				compatible = "mediatek,mt8173-xhci";
-+				reg = <0 0x11270000 0 0x1000>;
-+				reg-names = "mac";
-+				interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-+				clocks = <&topckgen CLK_TOP_USB30_SEL>;
-+				clock-names = "sys_ck";
-+				status = "disabled";
-+			};
- 		};
- 
- 		u3phy: usb-phy at 11290000 {
 -- 
 1.7.9.5
