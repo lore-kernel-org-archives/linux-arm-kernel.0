@@ -1,76 +1,34 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Thu, 25 Aug 2016 14:57:24 +0800
-Subject: [PATCH 2/2] ARM: dts: sun8i: enable UART1 for iNet D978 Rev2 board
-In-Reply-To: <CAGb2v66tFENk8QBw7D1+bwFN-zWaE2SGDrNyc-zdbJSRzENk4Q@mail.gmail.com>
-References: <20160823064451.25997-1-icenowy@aosc.xyz>
- <20160823064451.25997-3-icenowy@aosc.xyz>
- <20160824193600.GS8103@lukather> <43951472083107@web23m.yandex.ru>
- <CAGb2v66tFENk8QBw7D1+bwFN-zWaE2SGDrNyc-zdbJSRzENk4Q@mail.gmail.com>
-Message-ID: <97321472108244@web8m.yandex.ru>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 25 Aug 2016 15:57:15 +0900
+Subject: [PATCH v2 0/3] clk: samsung: exynos5420: Add clocks for CMU_CDREX
+ domain
+Message-ID: <1472108238-24309-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patches add the clocks for CMU_CDREX (DRAM Express Controller)
+that generates the clocks for DRAM and NoC (Network on Chip) bus clock.
 
+[clk_summary on exynos5422-odroidxu3 board]
+fout_bpll                             0            0   800000000          0 0
+    mout_bpll                          0            0   800000000          0 0
+       mout_mclk_cdrex                 0            0   800000000          0 0
+          dout_pclk_core_mem           0            0   200000000          0 0
+          dout_sclk_cdrex              0            0   800000000          0 0
 
-25.08.2016, 12:41, "Chen-Yu Tsai" <wens@csie.org>:
-> On Thu, Aug 25, 2016 at 7:58 AM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
->> ?25.08.2016, 03:36, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
->>> ?Hi,
->>>
->>> ?On Tue, Aug 23, 2016 at 02:44:51PM +0800, Icenowy Zheng wrote:
->>>> ??UART1 is connected to the bluetooth part of RTL8723BS WiFi/BT combo card
->>>> ??on iNet D978 Rev2 board.
->>>>
->>>> ??Enable the UART1 to make it possible to use the modified hciattach by
->>>> ??Realtek to drive the BT part of RTL8723BS.
->>>>
->>>> ??Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->>>
->>> ?I guess you could fold that patch into the previous one.
->>>
->>>> ??---
->>>> ???arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts | 11 +++++++++++
->>>> ???1 file changed, 11 insertions(+)
->>>>
->>>> ??diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
->>>> ??index 78823d8..3ac22d4 100644
->>>> ??--- a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
->>>> ??+++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
->>>> ??@@ -48,6 +48,10 @@
->>>> ???????????model = "INet-D978 Rev 02";
->>>> ???????????compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
->>>>
->>>> ??+ aliases {
->>>> ??+ serial1 = &uart1;
->>>> ??+ };
->>>> ??+
->>>
->>> ?Is there any other UART in the system?
->>
->> ?serial0 is defined in sun8i-reference-design-tablet.dtsi, as r_uart.
->
-> If your board does not have r_uart pads, then the right thing to do
-> would be to disable it. You can then have uart1 as serial0.
+Changes from v1:
+- Use the BPLL for DRAM clock to generate the 800MHz
+- Add patch3 to assign the clock rate for DRAM clock
 
-I don't know it. The RX/TX is wired on PF2/PF4 on the board (UART0 muxed with
-MMC)
+Chanwoo Choi (3):
+  dt-bindings: Add the clock id for CMU_CDREX (DRAM Express Controller)
+  clk: samsung: exynos5420: Add clocks for CMU_CDREX domain
+  ARM: dts: Set the clock rate for DREX block 800Mhz on exynos5422-odroidxu3
 
-But many codes will require a ttyS0 as console... So I think the bluetooth should be
-located at ttyS1...
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  5 +++
+ drivers/clk/samsung/clk-exynos5420.c               | 37 ++++++++++++++++++++++
+ include/dt-bindings/clock/exynos5420.h             | 11 ++++++-
+ 3 files changed, 52 insertions(+), 1 deletion(-)
 
->
-> AFAIK Linux requires a console, but that console can be simplefb.
->
-> ChenYu
->
->>> ?The alias is not supposed to be about the controller index, but the
->>> ?index in the board, meaning that if you only have a single UART, that
->>> ?would be serial0.
->>>
->>> ?Thanks!
->>> ?Maxime
->>>
->>> ?--
->>> ?Maxime Ripard, Free Electrons
->>> ?Embedded Linux and Kernel engineering
->>> ?http://free-electrons.com
+-- 
+1.9.1
