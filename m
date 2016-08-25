@@ -1,49 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 25 Aug 2016 19:10:00 +0100
-Subject: [PATCH 1/2] sdhci-of-arasan: Add quirk and device tree parameter
- to fake CD bit
-In-Reply-To: <20160825171539.GA13571@zach-desktop>
-References: <1472080984-17373-1-git-send-email-zach.brown@ni.com>
- <20160825105640.GA5439@remoulade>
- <20160825171539.GA13571@zach-desktop>
-Message-ID: <20160825180959.GA14705@remoulade>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 25 Aug 2016 14:16:11 -0400
+Subject: [PATCH] arm64: always enable DEBUG_RODATA and remove the Kconfig
+ option
+In-Reply-To: <1472142204-14258-1-git-send-email-mark.rutland@arm.com>
+References: <1472142204-14258-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAGXu5jJCppekxa4KpWUj7yr5wFcZ-0YeA3gbYaqnNEdKeE7iJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2016 at 12:15:44PM -0500, Zach Brown wrote:
-> On Thu, Aug 25, 2016 at 11:56:55AM +0100, Mark Rutland wrote:
-> > On Wed, Aug 24, 2016 at 06:23:03PM -0500, Zach Brown wrote:
-> > > +- fake-cd: On Zynq Devices the SDHCI Controller will not work without the cd
-> > > +  bit. When this option is set the driver will put the controller in test mode
-> > > +  and fake the cd bit so it will function.
-> > 
-> > As Lars noted, the DT should describe the HW, and the policy of how to deal
-> > with that should be left to the kernel. So from a DT perspective the above is
-> > not correct.
-> > 
-> > If I understand the linked documentation, this is slightly different to typical
-> > uses of broken-cd in that in the absence of a card detect signal the HW will
-> > not be able to access the SD card at all, even if requested to. Is that correct?
-> > 
-> > If so, perhaps a better option is to have the combination of broken-cd and the
-> > compatible string for this IP block imply that the test mode workaround is
-> > required. Obviously that requires a fixup to the usual broken-cd binding to
-> > remove the implication that polling alone must be used.
-> > 
-> > Thanks,
-> > Mark.
-> 
-> In cases where the card is non-removable then polling doesn't make sense.
+On Thu, Aug 25, 2016 at 12:23 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Follow the example set by x86 in commit 9ccaf77cf05915f5 ("x86/mm:
+> Always enable CONFIG_DEBUG_RODATA and remove the Kconfig option"), and
+> make these protections a fundamental security feature rather than an
+> opt-in. This also results in a minor code simplification.
+>
+> For those rare cases when users wish to disable this protection (e.g.
+> for debugging), this can be done by passing 'rodata=off' on the command
+> line.
+>
+> As DEBUG_RODATA_ALIGN is only intended to address a performance/memory
+> tradeoff, and does not affect correctness, this is left user-selectable.
+> DEBUG_MODULE_RONX is also left user-selectable until the core code
+> provides a boot-time option to disable the protection for debugging
+> use-cases.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Laura Abbott <labbott@redhat.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-We have the non-removable property to describe that, so we can also look at that.
+Awesome!
 
-> So it doesn't make sense to tie the test mode workaround into the broken-cd
-> property, even though I agree the nature of the defect fits under the notion
-> of the CD being broken.
+Acked-by: Kees Cook <keescook@chromium.org>
 
-Maybe not solely on broken-cd, but I think that we dont necessarily need a new
-DT property. As above, broken-cd, non-removable, and the compatible string may
-together give the kernel enough information to choose the right thing to do.
+-Kees
 
-Thanks,
-Mark.
+-- 
+Kees Cook
+Nexus Security
