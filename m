@@ -1,10 +1,8 @@
 From: zach.brown@ni.com (Zach Brown)
-Date: Thu, 25 Aug 2016 18:01:51 -0500
-Subject: [PATCH v2 2/2] sdhci-of-arasan: Set controller to test mode when Card
- Detection is broken.
-In-Reply-To: <1472166111-28872-1-git-send-email-zach.brown@ni.com>
-References: <1472166111-28872-1-git-send-email-zach.brown@ni.com>
-Message-ID: <1472166111-28872-2-git-send-email-zach.brown@ni.com>
+Date: Thu, 25 Aug 2016 18:01:50 -0500
+Subject: [PATCH v2 1/2] sdhci-of-arasan: Modify arasan sdhci documentation
+ about broken-cd and non-removable properties.
+Message-ID: <1472166111-28872-1-git-send-email-zach.brown@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,68 +12,51 @@ In cases where it is impossible to provide the CD bit in hardware,
 setting the controller to test mode and then setting inserted to true
 will get the controller to function without the CD bit.
 
-When the device has the property broken-cd the driver changes the
-controller to test mode and sets test inserted to true to make the
-controller function.
+Additionally in some situations it will make sense to use the
+"broken-cd" and "non-removable" property together.
+i.e the sd device is non-removable so polling doesn't make sense, but
+the CD is broken and the controller will need to be in test mode to
+function.
+
+This patch modifies the documentation to reflect those differences
+from the standard behaviours.
 
 Signed-off-by: Zach Brown <zach.brown@ni.com>
 ---
- drivers/mmc/host/sdhci-of-arasan.c | 17 ++++++++++++++++-
- drivers/mmc/host/sdhci.h           |  2 ++
- 2 files changed, 18 insertions(+), 1 deletion(-)
+v2:
+  * improved commit messages
+  * removed fake-cd device property
+  * removed fake-cd quirk
+  * use broken-cd device property
+  * documented new usage of broken-cd
 
-diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-index e0f193f..3798a3b 100644
---- a/drivers/mmc/host/sdhci-of-arasan.c
-+++ b/drivers/mmc/host/sdhci-of-arasan.c
-@@ -26,6 +26,7 @@
- #include <linux/phy/phy.h>
- #include <linux/regmap.h>
- #include "sdhci-pltfm.h"
-+#include <linux/of.h>
+ Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+index 3404afa..b41c448 100644
+--- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
++++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+@@ -37,6 +37,14 @@ Optional Properties:
+     in place we will export a clock representing the Card Clock.  This clock
+     is expected to be consumed by our PHY.  You must also specify
  
- #define SDHCI_ARASAN_CLK_CTRL_OFFSET	0x2c
- #define SDHCI_ARASAN_VENDOR_REGISTER	0x78
-@@ -203,12 +204,26 @@ static void sdhci_arasan_hs400_enhanced_strobe(struct mmc_host *mmc,
- 	writel(vendor, host->ioaddr + SDHCI_ARASAN_VENDOR_REGISTER);
- }
- 
-+void sdhci_arasan_reset(struct sdhci_host *host, u8 mask)
-+{
-+	u8 ctrl;
++Card detection:
++The arasan controller does not work
++when the CD bit is not supplied unless in test mode.
++- broken-cd: The CD bit is not supplied and the controller will
++  need to be set to test mode to function.
++- non-removable: like normal, except it can now be partnered with
++  broken-cd, which will turn off polling, but keep test mode on.
 +
-+	sdhci_reset(host, mask);
-+
-+	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION) {
-+		ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
-+		ctrl |= SDHCI_CTRL_CDTEST_INS |
-+			SDHCI_CTRL_CDTEST_EN;
-+		sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
-+	}
-+}
-+
- static struct sdhci_ops sdhci_arasan_ops = {
- 	.set_clock = sdhci_arasan_set_clock,
- 	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
- 	.get_timeout_clock = sdhci_arasan_get_timeout_clock,
- 	.set_bus_width = sdhci_set_bus_width,
--	.reset = sdhci_reset,
-+	.reset = sdhci_arasan_reset,
- 	.set_uhs_signaling = sdhci_set_uhs_signaling,
- };
- 
-diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-index 0411c9f..8d92d6e9 100644
---- a/drivers/mmc/host/sdhci.h
-+++ b/drivers/mmc/host/sdhci.h
-@@ -84,6 +84,8 @@
- #define   SDHCI_CTRL_ADMA32	0x10
- #define   SDHCI_CTRL_ADMA64	0x18
- #define   SDHCI_CTRL_8BITBUS	0x20
-+#define  SDHCI_CTRL_CDTEST_INS   0x40
-+#define  SDHCI_CTRL_CDTEST_EN     0x80
- 
- #define SDHCI_POWER_CONTROL	0x29
- #define  SDHCI_POWER_ON		0x01
+ Example:
+ 	sdhci at e0100000 {
+ 		compatible = "arasan,sdhci-8.9a";
+@@ -72,4 +80,4 @@ Example:
+ 		phy-names = "phy_arasan";
+ 		#clock-cells = <0>;
+ 		status = "disabled";
+-	};
++	} ;
 -- 
 2.7.4
