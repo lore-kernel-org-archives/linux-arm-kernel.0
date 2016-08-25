@@ -1,108 +1,71 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Thu, 25 Aug 2016 09:08:48 +0800
-Subject: [PATCH 2/2] sdhci-of-arasan: Add quirk and device tree parameter
- to fake CD bit
-In-Reply-To: <1472080984-17373-2-git-send-email-zach.brown@ni.com>
-References: <1472080984-17373-1-git-send-email-zach.brown@ni.com>
- <1472080984-17373-2-git-send-email-zach.brown@ni.com>
-Message-ID: <54440de0-6e66-1f8e-c067-9aeb79733739@rock-chips.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 25 Aug 2016 10:08:46 +0900
+Subject: [PATCH 09/10] reset: zynq: add driver Kconfig option
+In-Reply-To: <CAK7LNATr0WDx0aMXEJMxrDY6WxBtqis-DkZiOjGnrjM8zqYi-A@mail.gmail.com>
+References: <1472045342-7434-1-git-send-email-p.zabel@pengutronix.de>
+ <1472045342-7434-9-git-send-email-p.zabel@pengutronix.de>
+ <CAK7LNATr0WDx0aMXEJMxrDY6WxBtqis-DkZiOjGnrjM8zqYi-A@mail.gmail.com>
+Message-ID: <CAK7LNASJ0gQ-_4H3+=deNAXYVSWkek4sH2uUrTkyxGH5R7i1Xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/8/25 7:23, Zach Brown ??:
-> The sdhci controller on xilinx zynq devices will not function unless
-> the cd bit is provided. http://www.xilinx.com/support/answers/61064.html
-> In cases where it is impossible to provide the cd bit in hardware,
-> setting the controller to test mode and then setting inserted to true
-> will get the controller to function with out the cd bit.
+2016-08-25 2:48 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> 2016-08-24 22:29 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
+>> Visible only if COMPILE_TEST is enabled, this allows to include the
+>> driver in build tests.
+>>
+>> Cc: Moritz Fischer <moritz.fischer@ettus.com>
+>> Cc: Michal Simek <michal.simek@xilinx.com>
+>> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+>> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+>> ---
+>>  drivers/reset/Kconfig  | 6 ++++++
+>>  drivers/reset/Makefile | 2 +-
+>>  2 files changed, 7 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+>> index 17030e2..86b49a2 100644
+>> --- a/drivers/reset/Kconfig
+>> +++ b/drivers/reset/Kconfig
+>> @@ -67,6 +67,12 @@ config RESET_SUNXI
+>>         help
+>>           This enables the reset driver for Allwinner SoCs.
+>>
+>> +config RESET_ZYNQ
+>> +       bool "ZYNQ Reset Driver" if COMPILE_TEST
+>> +       default ARCH_ZYNQ
+>> +       help
+>> +         This enables the reset driver for Xilinx Zynq FPGAs.
+>> +
 >
-> The device property "fake-cd" will let the arasan driver know it needs
-> to fake the cd bit for the controller inorder for the controller to
-> function with a SD card that does not provide the CD bit.
+> Please move this below RESET_UNIPHIER
+> as I assume you are sorting Kconfig entries alphabetically.
 >
-> Signed-off-by: Zach Brown <zach.brown@ni.com>
-> ---
->  drivers/mmc/host/sdhci-of-arasan.c | 23 ++++++++++++++++++++++-
->  drivers/mmc/host/sdhci.h           |  4 ++++
->  2 files changed, 26 insertions(+), 1 deletion(-)
 >
-> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> index e0f193f..a74bcf5 100644
-> --- a/drivers/mmc/host/sdhci-of-arasan.c
-> +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> @@ -26,6 +26,7 @@
->  #include <linux/phy/phy.h>
->  #include <linux/regmap.h>
->  #include "sdhci-pltfm.h"
-> +#include <linux/of.h>
+> Otherwise,
 >
->  #define SDHCI_ARASAN_CLK_CTRL_OFFSET	0x2c
->  #define SDHCI_ARASAN_VENDOR_REGISTER	0x78
-> @@ -203,12 +204,26 @@ static void sdhci_arasan_hs400_enhanced_strobe(struct mmc_host *mmc,
->  	writel(vendor, host->ioaddr + SDHCI_ARASAN_VENDOR_REGISTER);
->  }
+> Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 >
-> +void sdhci_arasan_reset(struct sdhci_host *host, u8 mask)
-> +{
-> +	u8 ctrl;
-> +
-> +	sdhci_reset(host, mask);
-> +
-> +	if (host->quirks2 & SDHCI_QUIRK2_NEED_FAKE_CD) {
-> +		ctrl = sdhci_readl(host, SDHCI_HOST_CONTROL);
-> +		ctrl |= SDHCI_CTRL_CD_TEST_INSERTED |
-> +		SDHCI_CTRL_CD_TEST_ENABLE;
-> +		sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
-> +	}
-> +}
-> +
->  static struct sdhci_ops sdhci_arasan_ops = {
->  	.set_clock = sdhci_arasan_set_clock,
->  	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
->  	.get_timeout_clock = sdhci_arasan_get_timeout_clock,
->  	.set_bus_width = sdhci_set_bus_width,
-> -	.reset = sdhci_reset,
-> +	.reset = sdhci_arasan_reset,
->  	.set_uhs_signaling = sdhci_set_uhs_signaling,
->  };
->
-> @@ -516,6 +531,12 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->  	}
->
->  	sdhci_get_of_property(pdev);
-> +
-> +	if (of_get_property(pdev->dev.of_node, "fake-cd", NULL))
-> +		host->quirks2 |= SDHCI_QUIRK2_NEED_FAKE_CD;
 
 
-Why don't you use MMC_CAP_NEEDS_POLL, could you use broken-cd?
 
-> +
-> +	pltfm_host = sdhci_priv(host);
-> +	pltfm_host->priv = sdhci_arasan;
->  	pltfm_host->clk = clk_xin;
->
->  	sdhci_arasan_update_baseclkfreq(host);
-> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> index 0411c9f..ff3c8ba 100644
-> --- a/drivers/mmc/host/sdhci.h
-> +++ b/drivers/mmc/host/sdhci.h
-> @@ -84,6 +84,8 @@
->  #define   SDHCI_CTRL_ADMA32	0x10
->  #define   SDHCI_CTRL_ADMA64	0x18
->  #define   SDHCI_CTRL_8BITBUS	0x20
-> +#define  SDHCI_CTRL_CD_TEST_INSERTED   0x40
-> +#define  SDHCI_CTRL_CD_TEST_ENABLE     0x80
->
->  #define SDHCI_POWER_CONTROL	0x29
->  #define  SDHCI_POWER_ON		0x01
-> @@ -422,6 +424,8 @@ struct sdhci_host {
->  #define SDHCI_QUIRK2_ACMD23_BROKEN			(1<<14)
->  /* Broken Clock divider zero in controller */
->  #define SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN		(1<<15)
-> +/* Controller needs the cd bit faked */
-> +#define SDHCI_QUIRK2_NEED_FAKE_CD (1<<16)
->
->  	int irq;		/* Device IRQ */
->  	void __iomem *ioaddr;	/* Mapped address */
->
+
+>> +         This enables the reset driver for Xilinx Zynq FPGAs.
+
+
+One more thing, I thought this statement is not precise
+because Zynq is not only an FPGA,
+but ARM SoC + FPGA.
+
+Please consider to reword
+
+"This enables the reset driver for Xilinx Zynq SoC"
+
+
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
