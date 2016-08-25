@@ -1,265 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Aug 2016 17:39:00 +0200
-Subject: [PATCH v2 1/2] smc91x: always use 8-bit access if necessary
-In-Reply-To: <20160825144633.1850889-1-arnd@arndb.de>
-References: <20160825144633.1850889-1-arnd@arndb.de>
-Message-ID: <3107598.uul2xx8LJA@wuerfel>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Thu, 25 Aug 2016 17:50:16 +0200
+Subject: [PATCH 1/2] sdhci-of-arasan: Add quirk and device tree parameter
+ to fake CD bit
+In-Reply-To: <20160825152944.GP16583@xsjsorenbubuntu>
+References: <1472080984-17373-1-git-send-email-zach.brown@ni.com>
+ <20160825151047.GO16583@xsjsorenbubuntu>
+ <d5dd97b1-f58f-2e45-5c95-17a77a46b30c@metafoo.de>
+ <20160825152944.GP16583@xsjsorenbubuntu>
+Message-ID: <e703a068-810f-77fe-d702-138911669147@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As Russell King found out the hard way, a change I did to fix multiplatform
-builds with this driver broke the old Assabet/Neponset platform: It turns
-out that while the driver is runtime configurable in principle, the
-runtime configuration does not cover the specific case of machines that
-can not do any 16-bit I/O on the smc91x registers.
+On 08/25/2016 05:29 PM, S?ren Brinkmann wrote:
+> On Thu, 2016-08-25 at 17:23:47 +0200, Lars-Peter Clausen wrote:
+>> On 08/25/2016 05:10 PM, S?ren Brinkmann wrote:
+>>> On Wed, 2016-08-24 at 18:23:03 -0500, Zach Brown wrote:
+>>>> The sdhci controller on xilinx zynq devices will not function unless
+>>>> the cd bit is provided. http://www.xilinx.com/support/answers/61064.html
+>>>> In cases where it is impossible to provide the cd bit in hardware,
+>>>> setting the controller to test mode and then setting inserted to true
+>>>> will get the controller to function with out the cd bit.
+>>>>
+>>>> The device property "fake-cd" will let the arasan driver know it needs
+>>>> to fake the cd bit for the controller inorder for the controller to
+>>>> function with a SD card that does not provide the CD bit.
+>>>
+>>> I thought the CD is, if not pinned out, tied off to some valid logic
+>>> level. Isn't it enough to specify cd-inverted if needed to make it work
+>>> in those cases?
+>>
+>> It is always brought out to some pin, that is the problem on the Zynq. This
+>> means you'd have to set at least one pin aside as dummy CD or WP pin. Which
+>> is not always possible when you are tight on available pins.
+> 
+> I have to admit that I haven't looked at Vivado for quite a while. Is it
+> possible to select EMIO for those pins? If those are not routed anything
+> they should be tied to some logic level, I believe.
+> If they are always forced to be on a physical pin, do you let that pin
+> just float? Otherwise, the logic level should also be defined, give and
+> take a logic inversion.
 
-The driver currently provides helpers to access 16-bit registers for
-architectures that are known at compile-time to only have 8-bit I/O,
-but my patch changed it to a runtime flag that never gets consulted
-most register accesses.
+Yes, it is possible to source them from EMIO. We had the same issue with WP
+on one of our boards and the routing to EMIO approach was one of the
+solutions I considered. But I could not find documentation on whether and
+how the pins are tied when the FPGA is not configured or what happens during
+reconfiguration, is there a chance of glitches.
 
-This introduces new SMC_out16()/SMC_in16 helpers (if anyone can suggest
-a better name, I'm glad to modify this) that behaves like SMC_outw()/SMC_inw()
-most of the time, but uses a pair of 8-bit accesses on platforms that
-have no support for wider register accesses.
+So I went with the software solution of specifying disable-wp for the slot
+instead.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Reported-by: Russell King <linux@armlinux.org.uk>
-Fixes: b70661c70830d ("net: smc91x: use run-time configuration on all ARM machines")
----
-Having bad luck streak with this patch, the version I sent
-had a couple of mistakes from the last rebase before sending
-it out, this version should actually apply and build.
-
-diff --git a/drivers/net/ethernet/smsc/smc91x.h b/drivers/net/ethernet/smsc/smc91x.h
-index 1a55c7976df0..497411ed6de2 100644
---- a/drivers/net/ethernet/smsc/smc91x.h
-+++ b/drivers/net/ethernet/smsc/smc91x.h
-@@ -414,30 +414,32 @@ smc_pxa_dma_insw(void __iomem *ioaddr, struct smc_local *lp, int reg, int dma,
- #define SMC_outsl(a, r, p, l)		BUG()
- #endif
- 
--#if ! SMC_CAN_USE_16BIT
--
- /*
-- * Any 16-bit access is performed with two 8-bit accesses if the hardware
-- * can't do it directly. Most registers are 16-bit so those are mandatory.
-+ * Any 16-bit register access is performed with two 8-bit accesses if the
-+ * hardware can't do it directly.
-  */
--#define SMC_outw(x, ioaddr, reg)					\
--	do {								\
--		unsigned int __val16 = (x);				\
--		SMC_outb( __val16, ioaddr, reg );			\
--		SMC_outb( __val16 >> 8, ioaddr, reg + (1 << SMC_IO_SHIFT));\
--	} while (0)
--#define SMC_inw(ioaddr, reg)						\
--	({								\
--		unsigned int __val16;					\
--		__val16 =  SMC_inb( ioaddr, reg );			\
-+#define SMC_out16(x, ioaddr, reg)					     \
-+do {									     \
-+	if (SMC_CAN_USE_8BIT && !SMC_16BIT(lp)) {			     \
-+		unsigned int __val16 = (x);				     \
-+		SMC_outb(__val16, ioaddr, reg );			     \
-+		SMC_outb(__val16 >> 8, ioaddr, reg + (1 << SMC_IO_SHIFT));   \
-+	} else {							     \
-+		SMC_outw(x, ioaddr, reg);				     \
-+	}								     \
-+} while (0)
-+
-+#define SMC_in16(ioaddr, reg)						     \
-+({									     \
-+	unsigned int __val16;					   	     \
-+	if (SMC_CAN_USE_8BIT && !SMC_16BIT(lp)) {			     \
-+		__val16 =  SMC_inb( ioaddr, reg );			     \
- 		__val16 |= SMC_inb( ioaddr, reg + (1 << SMC_IO_SHIFT)) << 8; \
--		__val16;						\
--	})
--
--#define SMC_insw(a, r, p, l)		BUG()
--#define SMC_outsw(a, r, p, l)		BUG()
--
--#endif
-+	} else {							     \
-+		__val16 = SMC_inw(ioaddr, reg);				     \
-+	}								     \
-+	__val16;							     \
-+})
- 
- #if !defined(SMC_insw) || !defined(SMC_outsw)
- #define SMC_insw(a, r, p, l)		BUG()
-@@ -927,113 +929,113 @@ static const char * chip_ids[ 16 ] =  {
- 			SMC_outw((x) << 8, ioaddr, INT_REG(lp));	\
- 	} while (0)
- 
--#define SMC_CURRENT_BANK(lp)	SMC_inw(ioaddr, BANK_SELECT)
-+#define SMC_CURRENT_BANK(lp)	SMC_in16(ioaddr, BANK_SELECT)
- 
- #define SMC_SELECT_BANK(lp, x)					\
- 	do {								\
- 		if (SMC_MUST_ALIGN_WRITE(lp))				\
- 			SMC_outl((x)<<16, ioaddr, 12<<SMC_IO_SHIFT);	\
- 		else							\
--			SMC_outw(x, ioaddr, BANK_SELECT);		\
-+			SMC_out16(x, ioaddr, BANK_SELECT);		\
- 	} while (0)
- 
--#define SMC_GET_BASE(lp)		SMC_inw(ioaddr, BASE_REG(lp))
-+#define SMC_GET_BASE(lp)	SMC_in16(ioaddr, BASE_REG(lp))
- 
--#define SMC_SET_BASE(lp, x)		SMC_outw(x, ioaddr, BASE_REG(lp))
-+#define SMC_SET_BASE(lp, x)	SMC_out16(x, ioaddr, BASE_REG(lp))
- 
--#define SMC_GET_CONFIG(lp)	SMC_inw(ioaddr, CONFIG_REG(lp))
-+#define SMC_GET_CONFIG(lp)	SMC_in16(ioaddr, CONFIG_REG(lp))
- 
--#define SMC_SET_CONFIG(lp, x)	SMC_outw(x, ioaddr, CONFIG_REG(lp))
-+#define SMC_SET_CONFIG(lp, x)	SMC_out16(x, ioaddr, CONFIG_REG(lp))
- 
--#define SMC_GET_COUNTER(lp)	SMC_inw(ioaddr, COUNTER_REG(lp))
-+#define SMC_GET_COUNTER(lp)	SMC_in16(ioaddr, COUNTER_REG(lp))
- 
--#define SMC_GET_CTL(lp)		SMC_inw(ioaddr, CTL_REG(lp))
-+#define SMC_GET_CTL(lp)		SMC_in16(ioaddr, CTL_REG(lp))
- 
--#define SMC_SET_CTL(lp, x)		SMC_outw(x, ioaddr, CTL_REG(lp))
-+#define SMC_SET_CTL(lp, x)	SMC_out16(x, ioaddr, CTL_REG(lp))
- 
--#define SMC_GET_MII(lp)		SMC_inw(ioaddr, MII_REG(lp))
-+#define SMC_GET_MII(lp)		SMC_in16(ioaddr, MII_REG(lp))
- 
--#define SMC_GET_GP(lp)		SMC_inw(ioaddr, GP_REG(lp))
-+#define SMC_GET_GP(lp)		SMC_in16(ioaddr, GP_REG(lp))
- 
- #define SMC_SET_GP(lp, x)						\
- 	do {								\
- 		if (SMC_MUST_ALIGN_WRITE(lp))				\
- 			SMC_outl((x)<<16, ioaddr, SMC_REG(lp, 8, 1));	\
- 		else							\
--			SMC_outw(x, ioaddr, GP_REG(lp));		\
-+			SMC_out16(x, ioaddr, GP_REG(lp));		\
- 	} while (0)
- 
--#define SMC_SET_MII(lp, x)		SMC_outw(x, ioaddr, MII_REG(lp))
-+#define SMC_SET_MII(lp, x)	SMC_out16(x, ioaddr, MII_REG(lp))
- 
--#define SMC_GET_MIR(lp)		SMC_inw(ioaddr, MIR_REG(lp))
-+#define SMC_GET_MIR(lp)		SMC_in16(ioaddr, MIR_REG(lp))
- 
--#define SMC_SET_MIR(lp, x)		SMC_outw(x, ioaddr, MIR_REG(lp))
-+#define SMC_SET_MIR(lp, x)	SMC_out16(x, ioaddr, MIR_REG(lp))
- 
--#define SMC_GET_MMU_CMD(lp)	SMC_inw(ioaddr, MMU_CMD_REG(lp))
-+#define SMC_GET_MMU_CMD(lp)	SMC_in16(ioaddr, MMU_CMD_REG(lp))
- 
--#define SMC_SET_MMU_CMD(lp, x)	SMC_outw(x, ioaddr, MMU_CMD_REG(lp))
-+#define SMC_SET_MMU_CMD(lp, x)	SMC_out16(x, ioaddr, MMU_CMD_REG(lp))
- 
--#define SMC_GET_FIFO(lp)		SMC_inw(ioaddr, FIFO_REG(lp))
-+#define SMC_GET_FIFO(lp)	SMC_in16(ioaddr, FIFO_REG(lp))
- 
--#define SMC_GET_PTR(lp)		SMC_inw(ioaddr, PTR_REG(lp))
-+#define SMC_GET_PTR(lp)		SMC_in16(ioaddr, PTR_REG(lp))
- 
- #define SMC_SET_PTR(lp, x)						\
- 	do {								\
- 		if (SMC_MUST_ALIGN_WRITE(lp))				\
- 			SMC_outl((x)<<16, ioaddr, SMC_REG(lp, 4, 2));	\
- 		else							\
--			SMC_outw(x, ioaddr, PTR_REG(lp));		\
-+			SMC_out16(x, ioaddr, PTR_REG(lp));		\
- 	} while (0)
- 
--#define SMC_GET_EPH_STATUS(lp)	SMC_inw(ioaddr, EPH_STATUS_REG(lp))
-+#define SMC_GET_EPH_STATUS(lp)	SMC_in16(ioaddr, EPH_STATUS_REG(lp))
- 
--#define SMC_GET_RCR(lp)		SMC_inw(ioaddr, RCR_REG(lp))
-+#define SMC_GET_RCR(lp)		SMC_in16(ioaddr, RCR_REG(lp))
- 
--#define SMC_SET_RCR(lp, x)		SMC_outw(x, ioaddr, RCR_REG(lp))
-+#define SMC_SET_RCR(lp, x)	SMC_out16(x, ioaddr, RCR_REG(lp))
- 
--#define SMC_GET_REV(lp)		SMC_inw(ioaddr, REV_REG(lp))
-+#define SMC_GET_REV(lp)		SMC_in16(ioaddr, REV_REG(lp))
- 
--#define SMC_GET_RPC(lp)		SMC_inw(ioaddr, RPC_REG(lp))
-+#define SMC_GET_RPC(lp)		SMC_in16(ioaddr, RPC_REG(lp))
- 
- #define SMC_SET_RPC(lp, x)						\
- 	do {								\
- 		if (SMC_MUST_ALIGN_WRITE(lp))				\
- 			SMC_outl((x)<<16, ioaddr, SMC_REG(lp, 8, 0));	\
- 		else							\
--			SMC_outw(x, ioaddr, RPC_REG(lp));		\
-+			SMC_out16(x, ioaddr, RPC_REG(lp));		\
- 	} while (0)
- 
--#define SMC_GET_TCR(lp)		SMC_inw(ioaddr, TCR_REG(lp))
-+#define SMC_GET_TCR(lp)		SMC_in16(ioaddr, TCR_REG(lp))
- 
--#define SMC_SET_TCR(lp, x)		SMC_outw(x, ioaddr, TCR_REG(lp))
-+#define SMC_SET_TCR(lp, x)	SMC_out16(x, ioaddr, TCR_REG(lp))
- 
- #ifndef SMC_GET_MAC_ADDR
- #define SMC_GET_MAC_ADDR(lp, addr)					\
- 	do {								\
- 		unsigned int __v;					\
--		__v = SMC_inw(ioaddr, ADDR0_REG(lp));			\
-+		__v = SMC_in16(ioaddr, ADDR0_REG(lp));			\
- 		addr[0] = __v; addr[1] = __v >> 8;			\
--		__v = SMC_inw(ioaddr, ADDR1_REG(lp));			\
-+		__v = SMC_in16(ioaddr, ADDR1_REG(lp));			\
- 		addr[2] = __v; addr[3] = __v >> 8;			\
--		__v = SMC_inw(ioaddr, ADDR2_REG(lp));			\
-+		__v = SMC_in16(ioaddr, ADDR2_REG(lp));			\
- 		addr[4] = __v; addr[5] = __v >> 8;			\
- 	} while (0)
- #endif
- 
- #define SMC_SET_MAC_ADDR(lp, addr)					\
- 	do {								\
--		SMC_outw(addr[0]|(addr[1] << 8), ioaddr, ADDR0_REG(lp)); \
--		SMC_outw(addr[2]|(addr[3] << 8), ioaddr, ADDR1_REG(lp)); \
--		SMC_outw(addr[4]|(addr[5] << 8), ioaddr, ADDR2_REG(lp)); \
-+		SMC_out16(addr[0]|(addr[1] << 8), ioaddr, ADDR0_REG(lp)); \
-+		SMC_out16(addr[2]|(addr[3] << 8), ioaddr, ADDR1_REG(lp)); \
-+		SMC_out16(addr[4]|(addr[5] << 8), ioaddr, ADDR2_REG(lp)); \
- 	} while (0)
- 
- #define SMC_SET_MCAST(lp, x)						\
- 	do {								\
- 		const unsigned char *mt = (x);				\
--		SMC_outw(mt[0] | (mt[1] << 8), ioaddr, MCAST_REG1(lp)); \
--		SMC_outw(mt[2] | (mt[3] << 8), ioaddr, MCAST_REG2(lp)); \
--		SMC_outw(mt[4] | (mt[5] << 8), ioaddr, MCAST_REG3(lp)); \
--		SMC_outw(mt[6] | (mt[7] << 8), ioaddr, MCAST_REG4(lp)); \
-+		SMC_out16(mt[0] | (mt[1] << 8), ioaddr, MCAST_REG1(lp)); \
-+		SMC_out16(mt[2] | (mt[3] << 8), ioaddr, MCAST_REG2(lp)); \
-+		SMC_out16(mt[4] | (mt[5] << 8), ioaddr, MCAST_REG3(lp)); \
-+		SMC_out16(mt[6] | (mt[7] << 8), ioaddr, MCAST_REG4(lp)); \
- 	} while (0)
- 
- #define SMC_PUT_PKT_HDR(lp, status, length)				\
-@@ -1042,8 +1044,8 @@ static const char * chip_ids[ 16 ] =  {
- 			SMC_outl((status) | (length)<<16, ioaddr,	\
- 				 DATA_REG(lp));			\
- 		else {							\
--			SMC_outw(status, ioaddr, DATA_REG(lp));	\
--			SMC_outw(length, ioaddr, DATA_REG(lp));	\
-+			SMC_out16(status, ioaddr, DATA_REG(lp));	\
-+			SMC_out16(length, ioaddr, DATA_REG(lp));	\
- 		}							\
- 	} while (0)
- 
-@@ -1054,8 +1056,8 @@ static const char * chip_ids[ 16 ] =  {
- 			(status) = __val & 0xffff;			\
- 			(length) = __val >> 16;				\
- 		} else {						\
--			(status) = SMC_inw(ioaddr, DATA_REG(lp));	\
--			(length) = SMC_inw(ioaddr, DATA_REG(lp));	\
-+			(status) = SMC_in16(ioaddr, DATA_REG(lp));	\
-+			(length) = SMC_in16(ioaddr, DATA_REG(lp));	\
- 		}							\
- 	} while (0)
- 
+But even if using EMIO works I think correctly describing the hardware,
+which is that there is no external WP or CD pin connected, is the better
+approach rather than playing around with invert flags, which has a different
+semantical meaning. Software can than work with that information and take
+the approach it is best to handle the situation. And this approach might
+change if we find better ways to handle it, whereas the hardware description
+stays static.
