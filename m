@@ -1,72 +1,93 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 25 Aug 2016 16:27:47 +0100
-Subject: [PATCH] arm64: mark reserved memblock regions explicitly in iomem
-In-Reply-To: <20160822065524.8085-1-takahiro.akashi@linaro.org>
-References: <20160822065524.8085-1-takahiro.akashi@linaro.org>
-Message-ID: <57BF0E73.7060801@arm.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Thu, 25 Aug 2016 23:29:41 +0800
+Subject: [PATCH 2/2] ARM: dts: sun8i: enable UART1 for iNet D978 Rev2 board
+In-Reply-To: <235ab6d3-7b9c-631e-80e1-c8e2de868eb0@redhat.com>
+References: <20160823064451.25997-1-icenowy@aosc.xyz>
+ <20160823064451.25997-3-icenowy@aosc.xyz> <20160824193600.GS8103@lukather>
+ <43951472083107@web23m.yandex.ru>
+ <CAGb2v66tFENk8QBw7D1+bwFN-zWaE2SGDrNyc-zdbJSRzENk4Q@mail.gmail.com>
+ <97321472108244@web8m.yandex.ru> <20160825080334.GD7776@lukather>
+ <116041472134355@web12g.yandex.ru>
+ <6580ba1b-f542-58d4-9f0a-fdd8e9b86092@redhat.com>
+ <438381472136802@web24g.yandex.ru>
+ <235ab6d3-7b9c-631e-80e1-c8e2de868eb0@redhat.com>
+Message-ID: <544431472138981@web24g.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
-
-On 22/08/16 07:55, AKASHI Takahiro wrote:
-> Kdump(kexec-tools) parses /proc/iomem to identify all the memory regions
-> on the system. Since the current kernel names "nomap" regions, like UEFI
-> runtime services code/data, as "System RAM," kexec-tools sets up elf core
-> header to include them in a crash dump file (/proc/vmcore).
-> 
-> Then crash dump kernel parses UEFI memory map again, re-marks those regions
-> as "nomap" and does not create a memory mapping for them unlike the other
-> areas of System RAM. In this case, copying /proc/vmcore through
-> copy_oldmem_page() on crash dump kernel will end up with a kernel abort,
-> as reported in [1].
-> 
-> This patch names all the "nomap" regions explicitly as "reserved" so that
-> we can exclude them from a crash dump file. acpi_os_ioremap() must also
-> be modified because those regions have WB attributes [2].
-> 
-> Apart from kdump, this change also matches x86's use of acpi (and
-> /proc/iomem).
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/448186.html
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/450089.html
 
 
-Tested on Seattle on v4.8-rc3, /proc/iomem Before:
-8000000000-8001e7ffff : System RAM
-8001e80000-83ff186fff : System RAM
-  8002080000-8002baffff : Kernel code
-  8002ca0000-8002db1fff : Kernel data
-83ff187000-83ff1c4fff : System RAM
-83ff1c5000-83ff224fff : System RAM
-83ff225000-83ffe42fff : System RAM
-83ffe43000-83ffffffff : System RAM
+25.08.2016, 23:13, "Hans de Goede" <hdegoede@redhat.com>:
+> HI,
+>
+> On 25-08-16 16:53, Icenowy Zheng wrote:
+>> ?25.08.2016, 22:18, "Hans de Goede" <hdegoede@redhat.com>:
+>>> ?Hi,
+>>>
+>>> ?On 25-08-16 16:12, Icenowy Zheng wrote:
+>>>> ??25.08.2016, 16:03, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>>>>> ??Hi,
+>>>>>
+>>>>> ??On Thu, Aug 25, 2016 at 02:57:24PM +0800, Icenowy Zheng wrote:
+>>>>>> ???>>>> diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+>>>>>> ???>>>> index 78823d8..3ac22d4 100644
+>>>>>> ???>>>> --- a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+>>>>>> ???>>>> +++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+>>>>>> ???>>>> @@ -48,6 +48,10 @@
+>>>>>> ???>>>> model = "INet-D978 Rev 02";
+>>>>>> ???>>>> compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
+>>>>>> ???>>>>
+>>>>>> ???>>>> + aliases {
+>>>>>> ???>>>> + serial1 = &uart1;
+>>>>>> ???>>>> + };
+>>>>>> ???>>>> +
+>>>>>> ???>>>
+>>>>>> ???>>> Is there any other UART in the system?
+>>>>>> ???>>
+>>>>>> ???>> serial0 is defined in sun8i-reference-design-tablet.dtsi, as r_uart.
+>>>>>> ???>
+>>>>>> ???> If your board does not have r_uart pads, then the right thing to do
+>>>>>> ???> would be to disable it. You can then have uart1 as serial0.
+>>>>>>
+>>>>>> ???I don't know it. The RX/TX is wired on PF2/PF4 on the board (UART0 muxed with
+>>>>>> ???MMC)
+>>>>>
+>>>>> ??Then you don't support it and you need to disable it.
+>>>>>
+>>>>>> ???But many codes will require a ttyS0 as console... So I think the
+>>>>>> ???bluetooth should be located at ttyS1...
+>>>>>
+>>>>> ??Most of them would use /dev/console anyway. What do you have in mind?
+>>>>
+>>>> ??As a general configuration, /dev/ttyS0 will be indicated as the default console=
+>>>> ??value... (Otherwise more boards will fail)
+>>>>
+>>>> ??Or maybe we can specify uart0 as serial0, and leave it as disabled? (Thus if the
+>>>> ??debug port is needed, we can easily apply a overlay with &mmc0 status as disabled,
+>>>> ??and &uart0 status as okay)
+>>>>
+>>>> ??On all my A33 boards, the official boot0, u-boot all uses uart0 as debugging port.
+>>>
+>>> ?If no uart is available (and being muxed with the mmc counts as not being available)
+>>> ?then you should not have any serial alias in the dts.
+>>>
+>>> ?In u-boot you need to use:
+>>>
+>>> ?# CONFIG_REQUIRE_SERIAL_CONSOLE is not set
+>>>
+>>> ?In the defconfig in this case, otherwise u-boot is going to be unhappy about
+>>> ?not having a serial console.
+>>
+>> ?It's not the problem.
+>>
+>> ?Can I have no ttyS0 and just make bluetooth ttyS1?
+>
+> Ah, yes having a serial1 alias should do that I believe and I agree that it
+> is probably better to not use ttyS0 for the bluetooth uart.
 
-/proc/iomem After:
-8000000000-8001e7ffff : reserved
-8001e80000-83ff186fff : System RAM
-  8002080000-8002baffff : Kernel code
-  8002ca0000-8002db1fff : Kernel data
-83ff187000-83ff1c4fff : reserved
-83ff1c5000-83ff224fff : System RAM
-83ff225000-83ffe42fff : reserved
-83ffe43000-83ffffffff : System RAM
+Yes, I will refer to sun5i-a13-utoo-p66.dts for it.
 
-Which matches the output from 'efi=debug'.
-
-I can also kdump with v24 of your series, and copy the vmcore file with
-read()/mmap() and dig through it with crash.
-
-Tested-by: James Morse <james.morse@arm.com>
-Reviewed-by: James Morse <james.morse@arm.com>
-
-
-The only side-effect of this I could find is we now allow access to the UEFI
-areas when built with CONFIG_STRICT_DEVMEM, which is what the help text says
-should happen, so it was broken before.
-
-
-
-Thanks,
-
-James
+>
+> Regards,
+>
+> Hans
