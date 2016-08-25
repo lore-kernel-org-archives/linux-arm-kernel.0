@@ -1,27 +1,33 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 25 Aug 2016 09:51:12 +0200
-Subject: [PATCH 01/10] reset: ath79: add driver Kconfig option
-In-Reply-To: <CAK7LNAQYxQv0e0OSvRfH-wNYYaSCy9D_anqwNTDFa5Nhcv7PfQ@mail.gmail.com>
-References: <1472045342-7434-1-git-send-email-p.zabel@pengutronix.de>
- <20643424.8eBLZWavEG@wuerfel>
- <CAK7LNAT4rZoQJaPLiA_Hg=PJ9AD4Z-oLVadq5WDgQ2etCYUFFA@mail.gmail.com>
- <1779401.H3WQxbgf2J@wuerfel> <1472109754.3032.18.camel@pengutronix.de>
- <CAK7LNAQYxQv0e0OSvRfH-wNYYaSCy9D_anqwNTDFa5Nhcv7PfQ@mail.gmail.com>
-Message-ID: <1472111472.3032.30.camel@pengutronix.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 25 Aug 2016 09:52:47 +0200
+Subject: [PATCH v3] clk: let clk_disable() return immediately if clk is
+ NULL
+In-Reply-To: <1472059613-30551-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1472059613-30551-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAMuHMdUC9d4KNPTDY51DCptmMFQ1F2jLmRDO9WLt=WZA09qRew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 25.08.2016, 16:27 +0900 schrieb Masahiro Yamada:
-> 2016-08-25 16:22 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
-> > And the hi6220
-> > driver, which doesn't have a user yet.
-> 
-> It does.
-> 
-> See arch/arm64/configs/defconfig
+On Wed, Aug 24, 2016 at 7:26 PM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> Many of clk_disable() implementations just return for NULL pointer,
+> but this check is missing from some.  Let's make it tree-wide
+> consistent.  It will allow clock consumers to call clk_disable()
+> without NULL pointer check.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Acked-by: Greg Ungerer <gerg@uclinux.org>
+> Acked-by: Wan Zongshun <mcuos.com@gmail.com>
 
-My mistake, I missed that hi6220_reset_init is a postcore_initcall, so
-there is no compile time dependency on the reset driver.
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-regards
-Philipp
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
