@@ -1,11 +1,11 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Aug 2016 17:30:29 -0700
-Subject: [PATCH 27/34] clk: si514: Migrate to clk_hw based OF and
+Date: Wed, 24 Aug 2016 17:30:34 -0700
+Subject: [PATCH 24/34] clk: rk808: Migrate to clk_hw based OF and
  registration APIs
-In-Reply-To: <20160601231533.9354-28-stephen.boyd@linaro.org>
+In-Reply-To: <20160601231533.9354-25-stephen.boyd@linaro.org>
 References: <20160601231533.9354-1-stephen.boyd@linaro.org>
- <20160601231533.9354-28-stephen.boyd@linaro.org>
-Message-ID: <20160825003029.GC19826@codeaurora.org>
+ <20160601231533.9354-25-stephen.boyd@linaro.org>
+Message-ID: <20160825003034.GE19826@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,10 +15,7 @@ On 06/01, Stephen Boyd wrote:
 > these drivers, allowing us to move closer to a clear split of
 > consumer and provider clk APIs.
 > 
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Guenter Roeck <linux@roeck-us.net>
-> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> Cc: Mike Looijmans <mike.looijmans@topic.nl>
+> Cc: Chris Zhong <zyw@rock-chips.com>
 > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 > ---
 
