@@ -1,92 +1,57 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Thu, 25 Aug 2016 11:20:26 -0700
-Subject: [PATCH] arm64: always enable DEBUG_RODATA and remove the Kconfig
- option
-In-Reply-To: <1472142204-14258-1-git-send-email-mark.rutland@arm.com>
-References: <1472142204-14258-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <789f1679-d6fb-2229-9950-bb2c63a9fa62@redhat.com>
+From: zach.brown@ni.com (Zach Brown)
+Date: Thu, 25 Aug 2016 13:26:22 -0500
+Subject: [PATCH 1/2] sdhci-of-arasan: Add quirk and device tree parameter
+ to fake CD bit
+In-Reply-To: <20160825180959.GA14705@remoulade>
+References: <1472080984-17373-1-git-send-email-zach.brown@ni.com>
+ <20160825105640.GA5439@remoulade>
+ <20160825171539.GA13571@zach-desktop>
+ <20160825180959.GA14705@remoulade>
+Message-ID: <20160825182621.GA14817@zach-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25/2016 09:23 AM, Mark Rutland wrote:
-> Follow the example set by x86 in commit 9ccaf77cf05915f5 ("x86/mm:
-> Always enable CONFIG_DEBUG_RODATA and remove the Kconfig option"), and
-> make these protections a fundamental security feature rather than an
-> opt-in. This also results in a minor code simplification.
->
-> For those rare cases when users wish to disable this protection (e.g.
-> for debugging), this can be done by passing 'rodata=off' on the command
-> line.
->
-> As DEBUG_RODATA_ALIGN is only intended to address a performance/memory
-> tradeoff, and does not affect correctness, this is left user-selectable.
-> DEBUG_MODULE_RONX is also left user-selectable until the core code
-> provides a boot-time option to disable the protection for debugging
-> use-cases.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Laura Abbott <labbott@redhat.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+On Thu, Aug 25, 2016 at 07:10:00PM +0100, Mark Rutland wrote:
+> On Thu, Aug 25, 2016 at 12:15:44PM -0500, Zach Brown wrote:
+> > On Thu, Aug 25, 2016 at 11:56:55AM +0100, Mark Rutland wrote:
+> > > On Wed, Aug 24, 2016 at 06:23:03PM -0500, Zach Brown wrote:
+> > > > +- fake-cd: On Zynq Devices the SDHCI Controller will not work without the cd
+> > > > +  bit. When this option is set the driver will put the controller in test mode
+> > > > +  and fake the cd bit so it will function.
+> > > 
+> > > As Lars noted, the DT should describe the HW, and the policy of how to deal
+> > > with that should be left to the kernel. So from a DT perspective the above is
+> > > not correct.
+> > > 
+> > > If I understand the linked documentation, this is slightly different to typical
+> > > uses of broken-cd in that in the absence of a card detect signal the HW will
+> > > not be able to access the SD card at all, even if requested to. Is that correct?
+> > > 
+> > > If so, perhaps a better option is to have the combination of broken-cd and the
+> > > compatible string for this IP block imply that the test mode workaround is
+> > > required. Obviously that requires a fixup to the usual broken-cd binding to
+> > > remove the implication that polling alone must be used.
+> > > 
+> > > Thanks,
+> > > Mark.
+> > 
+> > In cases where the card is non-removable then polling doesn't make sense.
+> 
+> We have the non-removable property to describe that, so we can also look at that.
+> 
+> > So it doesn't make sense to tie the test mode workaround into the broken-cd
+> > property, even though I agree the nature of the defect fits under the notion
+> > of the CD being broken.
+> 
+> Maybe not solely on broken-cd, but I think that we dont necessarily need a new
+> DT property. As above, broken-cd, non-removable, and the compatible string may
+> together give the kernel enough information to choose the right thing to do.
+> 
+> Thanks,
+> Mark.
 
-Excellent!
-
-Acked-by: Laura Abbott <labbott@redhat.com>
-
-> ---
->  arch/arm64/Kconfig       |  3 +++
->  arch/arm64/Kconfig.debug | 10 ----------
->  arch/arm64/kernel/insn.c |  2 +-
->  3 files changed, 4 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index bc3f00f..43d6134 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -122,6 +122,9 @@ config ARCH_PHYS_ADDR_T_64BIT
->  config MMU
->  	def_bool y
->
-> +config DEBUG_RODATA
-> +	def_bool y
-> +
->  config ARM64_PAGE_SHIFT
->  	int
->  	default 16 if ARM64_64K_PAGES
-> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-> index 0cc758c..b661fe7 100644
-> --- a/arch/arm64/Kconfig.debug
-> +++ b/arch/arm64/Kconfig.debug
-> @@ -49,16 +49,6 @@ config DEBUG_SET_MODULE_RONX
->
->  	  If in doubt, say Y.
->
-> -config DEBUG_RODATA
-> -	bool "Make kernel text and rodata read-only"
-> -	default y
-> -	help
-> -	  If this is set, kernel text and rodata will be made read-only. This
-> -	  is to help catch accidental or malicious attempts to change the
-> -	  kernel's executable code.
-> -
-> -	  If in doubt, say Y.
-> -
->  config DEBUG_ALIGN_RODATA
->  	depends on DEBUG_RODATA
->  	bool "Align linker sections up to SECTION_SIZE"
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index 63f9432..178488f 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -96,7 +96,7 @@ static void __kprobes *patch_map(void *addr, int fixmap)
->
->  	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
->  		page = vmalloc_to_page(addr);
-> -	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
-> +	else if (!module)
->  		page = pfn_to_page(PHYS_PFN(__pa(addr)));
->  	else
->  		return addr;
->
+I'm not sure if I understand your suggestion completely. Are you suggesting
+setting both the broken-cd and non-removable properties? That would make sense,
+but my understanding was that the two properities are not meant to co-exist. In
+/Documentation/devicetree/bindings/mmc/mmc.txt it states that only one should
+be supplied. Don't the two properties conflict with each other?
