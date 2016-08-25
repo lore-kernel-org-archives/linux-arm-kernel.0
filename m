@@ -1,11 +1,11 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Aug 2016 17:22:53 -0700
-Subject: [PATCH 15/34] clk: efm32gg: Migrate to clk_hw based OF and
+Date: Wed, 24 Aug 2016 17:25:38 -0700
+Subject: [PATCH 21/34] clk: nspire: Migrate to clk_hw based OF and
  registration APIs
-In-Reply-To: <20160601231533.9354-16-stephen.boyd@linaro.org>
+In-Reply-To: <20160601231533.9354-22-stephen.boyd@linaro.org>
 References: <20160601231533.9354-1-stephen.boyd@linaro.org>
- <20160601231533.9354-16-stephen.boyd@linaro.org>
-Message-ID: <20160825002253.GU19826@codeaurora.org>
+ <20160601231533.9354-22-stephen.boyd@linaro.org>
+Message-ID: <20160825002538.GX19826@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,7 +15,7 @@ On 06/01, Stephen Boyd wrote:
 > these drivers, allowing us to move closer to a clear split of
 > consumer and provider clk APIs.
 > 
-> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Daniel Tang <dt.tangr@gmail.com>
 > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 > ---
 
