@@ -1,26 +1,14 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 25 Aug 2016 17:11:43 -0700
-Subject: [GIT PULL] SCPI/Vexpress fixes for v4.8-rc
-In-Reply-To: <f232ba19-e359-3ef4-cce5-e76b0f35d078@arm.com>
-References: <f232ba19-e359-3ef4-cce5-e76b0f35d078@arm.com>
-Message-ID: <20160826001143.GD6209@localhost>
+Date: Thu, 25 Aug 2016 16:54:41 -0700
+Subject: [GIT PULL] omap-gpmc fixes for v4.8-rc1
+In-Reply-To: <a4bd1d47-87b1-9ef9-d9d1-6c69be404b9e@ti.com>
+References: <a4bd1d47-87b1-9ef9-d9d1-6c69be404b9e@ti.com>
+Message-ID: <20160825235441.GB6209@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
-
-On Tue, Aug 16, 2016 at 12:01:00PM +0100, Sudeep Holla wrote:
-> 
-> Hi ARM-SoC guys,
-> 
-> I have couple of missing of_node_put fixes in vexpress/scpi drivers.
-> I am not sure if these are considered as more cleanup patches rather
-> than fixes as OF reference counting is not something religiously checked
-> always. Let me know, I will move these to v4.9 queue otherwise.
-> 
-> -- 
-> Regards,
-> Sudeep
+On Mon, Aug 15, 2016 at 10:53:30AM +0300, Roger Quadros wrote:
+> Hi Arnd/Olof,
 > 
 > The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 > 
@@ -28,25 +16,20 @@ On Tue, Aug 16, 2016 at 12:01:00PM +0100, Sudeep Holla wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
-> tags/vexpress-fixes-4.8-rc
+>   https://github.com/rogerq/linux.git tags/gpmc-omap-v4.8-rc1
 > 
-> for you to fetch changes up to b079bd555f6060cd6b435a1eb58ec3b8d255ebd0:
+> for you to fetch changes up to 23540d6e2f3193b946c4de43e3f9654fa6d23fe7:
 > 
->   firmware: arm_scpi: add missing of_node_put after calling of_parse_phandle
-> (2016-08-08 14:31:09 +0100)
+>   memory: omap-gpmc: allow probe of child nodes to fail (2016-08-08 11:18:40 +0300)
 > 
 > ----------------------------------------------------------------
-> SCPI/Vexpress fixes for v4.8-rc
+> OMAP-GPMC: fixes for v4.8-rc1
 > 
-> Couple of minor fixes to add missing of_node_put after calling
-> of_parse_phandle in SCPI and vexpress-config bus drivers(Peter Chen)
+> * Allow other children of GPMC to probe even if any child fails.
+> This fixes problem on Overo boards where networking device child
+> doesn't probe due to broken NAND child.
 
-This tag is signed with a key that I can't find any track of anywhere. The
-32-bit ID is 317EE298. but the key you have on the servers is
-0x39CFD4755FE2D5B4. What's going on?
+Merged, thanks.
 
-After looking at the contents, it's harmless enough so I've stilled merged
-it but please sort out your keys.
 
 -Olof
