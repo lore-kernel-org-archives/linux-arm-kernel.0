@@ -1,67 +1,123 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 25 Aug 2016 23:43:10 +0900
-Subject: [PATCH 1/2] clk: samsung: exynos5260: Move struct
- samsung_cmu_info to init section
-In-Reply-To: <57BE9E16.7090309@samsung.com>
-References: <1471834185-20249-1-git-send-email-cw00.choi@samsung.com>
- <1471834185-20249-2-git-send-email-cw00.choi@samsung.com>
- <CGME20160823005523epcas1p3993794ba487bb055cbf8a0b247fcb280@epcas1p3.samsung.com>
- <20160823005512.GP6502@codeaurora.org> <57BBB66E.2060807@samsung.com>
- <84e40b9b-1e08-24e0-f1ef-60b38b760ae6@samsung.com>
- <20160824044346.GR6502@codeaurora.org>
- <57BD5CFB.5050500@samsung.com> <20160825001109.GO19826@codeaurora.org>
- <57BE9E16.7090309@samsung.com>
-Message-ID: <CA+Ln22E7ZeFTuzmAT-S9xDWq5kE1_XhkDp8fp7=odrudgaivYQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Aug 2016 16:43:04 +0200
+Subject: [PATCH] smc91x: remove ARM hack for unaligned 16-bit writes
+Message-ID: <20160825144314.1850730-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-08-25 16:28 GMT+09:00 Chanwoo Choi <cw00.choi@samsung.com>:
-> Hi Stephen,
->
-> On 2016? 08? 25? 09:11, Stephen Boyd wrote:
->> On 08/24, Chanwoo Choi wrote:
->>> On 2016? 08? 24? 13:43, Stephen Boyd wrote:
->>>> On 08/23, Sylwester Nawrocki wrote:
->>>>> So the saving is rather insignificant but the patch doesn't make
->>>>> things worse and I'd say it might be worth applying.
->>>>>
->>>>
->>>> Sounds good. This sort of information should be in the commit
->>>> text though. Talking about const doesn't make any sense to me.
->>>
->>> Do you mean that 'const' is initconst secion?
->>
->> No. Marking it as initconst in the patch is correct.
->
-> OK.
->
->>
->>> If possible, could you explain the anything
->>> why you don't make sense about 'const'?
->>>
->>
->> I'm just saying that the reasoning to move it from the text
->> section to the data section shouldn't be because of const. There
->> should be better reasons to do this, like size benefits.
->>
->
-> As I already said, the samsung_cmu_register_on() requires
-> the 'const' type argument for 'struct samsung_cmu_info'.
+The ARM specific I/O operations are almost the same as the generic
+ones, with the exception of the SMC_outw macro that works around
+a problem of some platforms that cannot write to 16-bit registers
+at an address that is not 32-bit aligned.
 
-If a function takes a const pointer as an argument, then it's
-perfectly valid to give a non-const pointer. Casting from non-cost
-into const is valid, other way around not.
+By inspection, I found that this is handled already in the
+register abstractions for almost all cases, the exceptions being
+SMC_SET_MAC_ADDR() and SMC_SET_MCAST(). I assume that all
+platforms that require the hack for the other registers also
+need it here, so the ones listed explictly here are the only
+ones that work correctly, while the other ones either don't
+need the hack at all, or they will set an incorrect MAC
+address (which can often go unnoticed).
 
->
-> So, I defined the instance on the out of the exynos5260_clk_aud_init() as following:
->         static const struct samsung_cmu_info aud_cmu __initconst = {
->
-> How can i add the 'const' keyword and '__initsecion' to the
-> "struct samsung_cmu_info aud_cmu" in the "static void __init
-> exynos5260_clk_aud_init(struct device_node *np)"?
+This changes the two macros that set the unaligned registers
+to use 32-bit writes if possible, which should do the right
+thing in all combinations. The ARM specific SMC_outw gets removed
+as a consequence.
 
-Stephen meant that there must be some benefit from a change to make it
-worth being included into the kernel.
+The only difference between the ARM behavior and the default is
+the selection of the LED settings. The fact that we have different
+defaults based on the CPU architectures here is a bit suspicious,
+but probably harmless, and I have no plan of touching that.
 
-Best regards,
-Tomasz
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/net/ethernet/smsc/smc91x.h | 50 +++++++++++++++++++++++---------------
+ 1 file changed, 30 insertions(+), 20 deletions(-)
+
+While this patch fixes one bug on Neponset, it probably doesn't address
+the one that Russell ran into first, so this is for review only for now,
+until the remaining problem(s) have been worked out.
+
+
+diff --git a/drivers/net/ethernet/smsc/smc91x.h b/drivers/net/ethernet/smsc/smc91x.h
+index 22333477d0b5..908473d9ede0 100644
+--- a/drivers/net/ethernet/smsc/smc91x.h
++++ b/drivers/net/ethernet/smsc/smc91x.h
+@@ -58,6 +58,7 @@
+ #define SMC_inw(a, r)		readw((a) + (r))
+ #define SMC_inl(a, r)		readl((a) + (r))
+ #define SMC_outb(v, a, r)	writeb(v, (a) + (r))
++#define SMC_outw(v, a, r)	writew(v, (a) + (r))
+ #define SMC_outl(v, a, r)	writel(v, (a) + (r))
+ #define SMC_insw(a, r, p, l)	readsw((a) + (r), p, l)
+ #define SMC_outsw(a, r, p, l)	writesw((a) + (r), p, l)
+@@ -65,19 +66,6 @@
+ #define SMC_outsl(a, r, p, l)	writesl((a) + (r), p, l)
+ #define SMC_IRQ_FLAGS		(-1)	/* from resource */
+ 
+-/* We actually can't write halfwords properly if not word aligned */
+-static inline void SMC_outw(u16 val, void __iomem *ioaddr, int reg)
+-{
+-	if ((machine_is_mainstone() || machine_is_stargate2() ||
+-	     machine_is_pxa_idp()) && reg & 2) {
+-		unsigned int v = val << 16;
+-		v |= readl(ioaddr + (reg & ~2)) & 0xffff;
+-		writel(v, ioaddr + (reg & ~2));
+-	} else {
+-		writew(val, ioaddr + reg);
+-	}
+-}
+-
+ #elif	defined(CONFIG_SH_SH4202_MICRODEV)
+ 
+ #define SMC_CAN_USE_8BIT	0
+@@ -1029,18 +1017,40 @@ static const char * chip_ids[ 16 ] =  {
+ 
+ #define SMC_SET_MAC_ADDR(lp, addr)					\
+ 	do {								\
+-		SMC_out16(addr[0]|(addr[1] << 8), ioaddr, ADDR0_REG(lp)); \
+-		SMC_out16(addr[2]|(addr[3] << 8), ioaddr, ADDR1_REG(lp)); \
+-		SMC_out16(addr[4]|(addr[5] << 8), ioaddr, ADDR2_REG(lp)); \
++		if (SMC_32BIT(lp)) {					\
++			SMC_outl((addr[0]      )|(addr[1] <<  8) |	\
++				 (addr[2] << 16)|(addr[3] << 24),	\
++				 ioaddr, ADDR0_REG(lp));		\
++		} else {						\
++			SMC_out16(addr[0]|(addr[1] << 8), ioaddr,	\
++				  ADDR0_REG(lp));			\
++			SMC_out16(addr[2]|(addr[3] << 8), ioaddr,	\
++				  ADDR1_REG(lp));			\
++		}							\
++		SMC_out16(addr[4]|(addr[5] << 8), ioaddr,		\
++			  ADDR2_REG(lp)); \
+ 	} while (0)
+ 
+ #define SMC_SET_MCAST(lp, x)						\
+ 	do {								\
+ 		const unsigned char *mt = (x);				\
+-		SMC_out16(mt[0] | (mt[1] << 8), ioaddr, MCAST_REG1(lp)); \
+-		SMC_out16(mt[2] | (mt[3] << 8), ioaddr, MCAST_REG2(lp)); \
+-		SMC_out16(mt[4] | (mt[5] << 8), ioaddr, MCAST_REG3(lp)); \
+-		SMC_out16(mt[6] | (mt[7] << 8), ioaddr, MCAST_REG4(lp)); \
++		if (SMC_32BIT(lp)) {					\
++			SMC_outl((mt[0]      ) | (mt[1] <<  8) |	\
++				 (mt[2] << 16) | (mt[3] << 24),		\
++				 ioaddr, MCAST_REG1(lp));		\
++			SMC_outl((mt[4]      ) | (mt[5] <<  8) |	\
++				 (mt[6] << 16) | (mt[7] << 24),		\
++				 ioaddr, MCAST_REG3(lp));		\
++		} else {						\
++			SMC_out16(mt[0] | (mt[1] << 8),			\
++				  ioaddr, MCAST_REG1(lp));		\
++			SMC_out16(mt[2] | (mt[3] << 8),			\
++				  ioaddr, MCAST_REG2(lp));		\
++			SMC_out16(mt[4] | (mt[5] << 8),			\
++				  ioaddr, MCAST_REG3(lp));		\
++			SMC_out16(mt[6] | (mt[7] << 8),			\
++				  ioaddr, MCAST_REG4(lp));		\
++		}							\
+ 	} while (0)
+ 
+ #define SMC_PUT_PKT_HDR(lp, status, length)				\
+-- 
+2.9.0
