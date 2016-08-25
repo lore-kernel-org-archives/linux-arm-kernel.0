@@ -1,59 +1,142 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 25 Aug 2016 15:18:31 +0200
-Subject: [PATCH v2 0/7] scpi: Add support for legacy SCPI protocol
-In-Reply-To: <1471952816-30877-1-git-send-email-narmstrong@baylibre.com>
-References: <1471952816-30877-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <f6c7249f-f103-fd91-2c89-a30c191427aa@baylibre.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 25 Aug 2016 14:23:42 +0100
+Subject: [RFC PATCH v3 6/7] arm64: irqflags: Use ICC sysregs to implement
+ IRQ masking
+In-Reply-To: <57BB14FB.3090903@arm.com>
+References: <1471623195-7829-1-git-send-email-daniel.thompson@linaro.org>
+ <1471623195-7829-7-git-send-email-daniel.thompson@linaro.org>
+ <57BACFF6.6060807@arm.com> <5eb08d32-1223-55f9-24ac-c1909f62aea9@linaro.org>
+ <57BB14FB.3090903@arm.com>
+Message-ID: <684c3744-6a36-be04-03aa-2b1fad692944@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2016 01:46 PM, Neil Armstrong wrote:
-> This patchset aims to support the legacy SCPI firmware implementation that was
-> delivered as early technology preview for the JUNO platform.
-> 
-> Finally a stable, maintained and public implementation for the SCPI protocol
-> has been upstreamed part of the JUNO support and it is the recommended way
-> of implementing SCP communication on ARMv8 platforms.
-> 
-> The Amlogic GXBB platform is using this legacy protocol, as the RK3368 & RK3399
-> platforms. This patchset will only add support for Amlogic GXBB SoC.
-> 
-> This patchset add support for the legacy protocol in the arm_scpi.c file,
-> avoiding code duplication.
-> 
-> Last RFC discution tread can be found at : https://lkml.org/lkml/2016/8/9/210
-> 
-> The last patch depends on the "Platform MHU" dtsi patch.
-> 
-> Changes since v1 at : http://lkml.kernel.org/r/1471515066-3626-1-git-send-email-narmstrong at baylibre.com
->  - Dropped vendor_send_message and rockchip vendor mechanism patches
->  - Merged alternate functions into main functions using is_legacy boolean
->  - Added DT match table to set is_legacy to true
->  - Kept alternate scpi_ops structure for legacy
-> 
-> Neil Armstrong (7):
->   scpi: Add alternative legacy structures, functions and macros
->   scpi: Use legacy variants command index calling scpi_send_message
->   scpi: Add support for Legacy match table for Amlogic GXBB SoC
->   scpi: grow MAX_DVFS_OPPS to 16 entries
->   dt-bindings: Add support for Amlogic GXBB SCPI Interface
->   ARM64: dts: meson-gxbb: Add SRAM node
->   ARM64: dts: meson-gxbb: Add SCPI with cpufreq & sensors Nodes
-> 
->  Documentation/devicetree/bindings/arm/arm,scpi.txt |   8 +-
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  45 ++++
->  drivers/firmware/arm_scpi.c                        | 279 +++++++++++++++++++--
->  3 files changed, 302 insertions(+), 30 deletions(-)
-> 
+On 22/08/16 16:06, Marc Zyngier wrote:
+>>>> diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+>>>> index fc2a0cb47b2c..a4ad69e2831b 100644
+>>>> --- a/arch/arm64/include/asm/arch_gicv3.h
+>>>> +++ b/arch/arm64/include/asm/arch_gicv3.h
+>>>> @@ -80,6 +80,9 @@
+>>>>  #include <linux/stringify.h>
+>>>>  #include <asm/barrier.h>
+>>>>
+>>>> +/* Our default, arbitrary priority value. Linux only uses one anyway. */
+>>>> +#define DEFAULT_PMR_VALUE	0xf0
+>>>> +
+>>>>  /*
+>>>>   * Low-level accessors
+>>>>   *
+>>>> @@ -102,9 +105,35 @@ static inline void gic_write_dir(u32 irq)
+>>>>  static inline u64 gic_read_iar_common(void)
+>>>>  {
+>>>>  	u64 irqstat;
+>>>> +	u64 __maybe_unused daif;
+>>>> +	u64 __maybe_unused pmr;
+>>>> +	u64 __maybe_unused default_pmr_value = DEFAULT_PMR_VALUE;
+>>>>
+>>>> +#ifndef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+>>>>  	asm volatile("mrs_s %0, " __stringify(ICC_IAR1_EL1) : "=r" (irqstat));
+>>>>  	dsb(sy);
+>>>> +#else
+>>>> +	/*
+>>>> +	 * The PMR may be configured to mask interrupts when this code is
+>>>> +	 * called, thus in order to acknowledge interrupts we must set the
+>>>> +	 * PMR to its default value before reading from the IAR.
+>>>> +	 *
+>>>> +	 * To do this without taking an interrupt we also ensure the I bit
+>>>> +	 * is set whilst we are interfering with the value of the PMR.
+>>>> +	 */
+>>>> +	asm volatile(
+>>>> +		"mrs	%1, daif\n\t"			     /* save I bit  */
+>>>> +		"msr	daifset, #2\n\t"		     /* set I bit   */
+>>>> +		"mrs_s  %2, " __stringify(ICC_PMR_EL1) "\n\t"/* save PMR    */
+>>>> +		"msr_s	" __stringify(ICC_PMR_EL1) ",%3\n\t" /* set PMR     */
+>>>> +		"mrs_s	%0, " __stringify(ICC_IAR1_EL1) "\n\t" /* ack int   */
+>>>> +		"msr_s  " __stringify(ICC_PMR_EL1) ",%2\n\t" /* restore PMR */
+>>>> +		"isb\n\t"
+>>>> +		"msr	daif, %1"			     /* restore I   */
+>>>> +		: "=r" (irqstat), "=&r" (daif), "=&r" (pmr)
+>>>> +		: "r" (default_pmr_value));
+>>>
+>>> I'm a bit puzzled by this. Why would you have to mess with PMR or DAIF
+>>> at this stage? Why can't we just let the GIC priority mechanism do its
+>>> thing? I'd expect the initial setting of PMR (indicating whether or not
+>>> we have normal interrupts enabled or not) to be enough to perform the
+>>> filtering.
+>>>
+>>> You may get an NMI while you're already handling an interrupt, but
+>>> that's fair game, and that's not something we should prevent.
+>>>
+>>> What am I missing?
+>>
+>> This code *always* executes with interrupts masked at the PMR and, when
+>> interrupts are masked in this way, they cannot be acknowledged.
+>>
+>> So to acknowledge the interrupt we must first modify the PMR to unmask
+>> it. If we did that without first ensuring the I-bit is masked we would
+>> end up constantly re-trapping.
+>
+> Right, I see your problem now. I guess that I had a slightly different
+> view of how to implement it. My own take is that we'd be better off
+> leaving the I bit alone until we reach the point where we've accessed
+> the IAR register (hence making the interrupt active and this particular
+> priority unable to fire:
+>
+> 	irqstat = read_iar();
+> 	clear_i_bit();
+>
+> At that stage, the only interrupt that can fire is an NMI (or nothing at
+> all if we're already handling one). The I bit must also be set again on
+> priority drop (before writing to the EOI register).
 
-Hi Sudeep,
+Relying on intack to raise the priority does sound a lot simpler.
 
-Sorry but I posted this V2 before you had time to look at my previous v1 replies...
+The forceful mask of PMR inside kernel_entry was so we model, as closely 
+as possible. the way the I-bit is set by hardware when we take a trap.
 
-In this serie, I merged the scpi_send_message, but I must still evaluate how it's possible
-to use the list to queue commands.
+However the update of the PMR can easily be shifted into the enable_nmi 
+macro leaving the interrupt controller (which cannot enable_nmi before 
+calling the handler) to look after itself.
 
-Here I used if(is_legacy) to stop duplicating functions, is this ok for you ?
 
-Thanks,
-Neil
+> This will save you most, if not all, of the faffing with PMR (which
+> requires an ISB/DSB pair on each update to be guaranteed to have an
+> effect, and is a good way to kill your performance).
+
+Removing the code is a good thing although I thought the PMR was 
+self-synchronizing (the code used to have barriers all over the shop 
+until Dave Martin pointed that out).
+
+
+> Of course, the drawback is that we still cover a large section of code
+> using the I bit, but that'd be a good start.
+
+To be honest I think that is forced on us anyway. We cannot know if the 
+IRQ trap is a pseudo-NMI or an IRQ until we read the intack register.
+
+
+>> Note, we could probably avoid saving the DAIF bits and PMR since they
+>> both have a known state at this stage in gic_handle_irq(). However it
+>> would be such a nasty potential side-effect I think I'd have to refactor
+>> things a bit so the mask/unmask dance doesn't happen in the register
+>> access functions.
+>
+> Yeah, there is clearly some redundancy here. And to be completely
+> honest, I think you should try to split this series in two parts:
+> - one that implements interrupt masking using PMR
+> - one that takes care of NMIs and possibly backtracing
+>
+> At the moment, things are a bit mixed and it is hard to pinpoint what is
+> really required for what.
+
+Well... the patches are already teased out just as you say but the 
+ordering *is* a bit weird now you mention it (patches 3, 4, 5 & 6 do the 
+interrupt masking, whilst 1, 2 and 7 do the NMI).
+
+Do you think its acceptable to reorder the patch set and put a clear 
+description of the covering letter describing when the code related to 
+NMI starts? I find it hard to see the point of PMR masking without 
+example code to drive it.
+
+
+Daniel.
