@@ -1,55 +1,113 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Thu, 25 Aug 2016 11:00:41 +0800
-Subject: [PATCH v2 2/2] arm64: dts: hi6220: add resets property into dwmmc
- nodes
-In-Reply-To: <1472094041-5357-1-git-send-email-guodong.xu@linaro.org>
-References: <1472094041-5357-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <1472094041-5357-2-git-send-email-guodong.xu@linaro.org>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Thu, 25 Aug 2016 11:05:27 +0800
+Subject: [RESEND PATCH, v5 3/5] usb: xhci-mtk: make IPPC register optional
+In-Reply-To: <1472094329-18466-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1472094329-18466-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1472094329-18466-4-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add resets property into dwmmc_0, dwmmc_1 and dwmmc_2 for hi6220
+Make IPPC register optional to support host side of dual-role mode,
+due to it is moved into common glue layer for simplification.
 
-Code and documentation to this property were confirmed by maintainers.
-See:
-[1] https://patchwork.kernel.org/patch/9276607/
-[2] https://patchwork.kernel.org/patch/8487151/
-[3] https://lkml.org/lkml/2016/8/12/91
-
-cc: Jaehoon Chung <jh80.chung@samsung.com>
-cc: Rob Herring <robh+dt@kernel.org>
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/usb/host/xhci-mtk.c |   36 +++++++++++++++++++++++++++++-------
+ 1 file changed, 29 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index d0b887a..63608e9 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -771,6 +771,7 @@
- 			interrupts = <0x0 0x48 0x4>;
- 			clocks = <&sys_ctrl 2>, <&sys_ctrl 1>;
- 			clock-names = "ciu", "biu";
-+			resets = <&sys_ctrl PERIPH_RSTDIS0_MMC0>;
- 			bus-width = <0x8>;
- 			vmmc-supply = <&ldo19>;
- 			pinctrl-names = "default";
-@@ -790,6 +791,7 @@
- 			#size-cells = <0x0>;
- 			clocks = <&sys_ctrl 4>, <&sys_ctrl 3>;
- 			clock-names = "ciu", "biu";
-+			resets = <&sys_ctrl PERIPH_RSTDIS0_MMC1>;
- 			vqmmc-supply = <&ldo7>;
- 			vmmc-supply = <&ldo10>;
- 			bus-width = <0x4>;
-@@ -807,6 +809,7 @@
- 			interrupts = <0x0 0x4a 0x4>;
- 			clocks = <&sys_ctrl HI6220_MMC2_CIUCLK>, <&sys_ctrl HI6220_MMC2_CLK>;
- 			clock-names = "ciu", "biu";
-+			resets = <&sys_ctrl PERIPH_RSTDIS0_MMC2>;
- 			bus-width = <0x4>;
- 			broken-cd;
- 			pinctrl-names = "default", "idle";
+diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+index 79959f1..4bf99b9 100644
+--- a/drivers/usb/host/xhci-mtk.c
++++ b/drivers/usb/host/xhci-mtk.c
+@@ -94,6 +94,9 @@ static int xhci_mtk_host_enable(struct xhci_hcd_mtk *mtk)
+ 	int ret;
+ 	int i;
+ 
++	if (ippc == NULL)
++		return 0;
++
+ 	/* power on host ip */
+ 	value = readl(&ippc->ip_pw_ctr1);
+ 	value &= ~CTRL1_IP_HOST_PDN;
+@@ -139,6 +142,9 @@ static int xhci_mtk_host_disable(struct xhci_hcd_mtk *mtk)
+ 	int ret;
+ 	int i;
+ 
++	if (ippc == NULL)
++		return 0;
++
+ 	/* power down all u3 ports */
+ 	for (i = 0; i < mtk->num_u3_ports; i++) {
+ 		value = readl(&ippc->u3_ctrl_p[i]);
+@@ -173,6 +179,9 @@ static int xhci_mtk_ssusb_config(struct xhci_hcd_mtk *mtk)
+ 	struct mu3c_ippc_regs __iomem *ippc = mtk->ippc_regs;
+ 	u32 value;
+ 
++	if (ippc == NULL)
++		return 0;
++
+ 	/* reset whole ip */
+ 	value = readl(&ippc->ip_pw_ctr0);
+ 	value |= CTRL0_IP_SW_RST;
+@@ -475,6 +484,7 @@ static void xhci_mtk_quirks(struct device *dev, struct xhci_hcd *xhci)
+ /* called during probe() after chip reset completes */
+ static int xhci_mtk_setup(struct usb_hcd *hcd)
+ {
++	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+ 	struct xhci_hcd_mtk *mtk = hcd_to_mtk(hcd);
+ 	int ret;
+ 
+@@ -482,12 +492,21 @@ static int xhci_mtk_setup(struct usb_hcd *hcd)
+ 		ret = xhci_mtk_ssusb_config(mtk);
+ 		if (ret)
+ 			return ret;
++	}
++
++	ret = xhci_gen_setup(hcd, xhci_mtk_quirks);
++	if (ret)
++		return ret;
++
++	if (usb_hcd_is_primary_hcd(hcd)) {
++		mtk->num_u3_ports = xhci->num_usb3_ports;
++		mtk->num_u2_ports = xhci->num_usb2_ports;
+ 		ret = xhci_mtk_sch_init(mtk);
+ 		if (ret)
+ 			return ret;
+ 	}
+ 
+-	return xhci_gen_setup(hcd, xhci_mtk_quirks);
++	return ret;
+ }
+ 
+ static int xhci_mtk_probe(struct platform_device *pdev)
+@@ -586,7 +605,7 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+ 	mtk->hcd = platform_get_drvdata(pdev);
+ 	platform_set_drvdata(pdev, mtk);
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mac");
+ 	hcd->regs = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(hcd->regs)) {
+ 		ret = PTR_ERR(hcd->regs);
+@@ -595,11 +614,14 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+ 	hcd->rsrc_start = res->start;
+ 	hcd->rsrc_len = resource_size(res);
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+-	mtk->ippc_regs = devm_ioremap_resource(dev, res);
+-	if (IS_ERR(mtk->ippc_regs)) {
+-		ret = PTR_ERR(mtk->ippc_regs);
+-		goto put_usb2_hcd;
++	mtk->ippc_regs = NULL;
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ippc");
++	if (res) {	/* ippc register is optional */
++		mtk->ippc_regs = devm_ioremap_resource(dev, res);
++		if (IS_ERR(mtk->ippc_regs)) {
++			ret = PTR_ERR(mtk->ippc_regs);
++			goto put_usb2_hcd;
++		}
+ 	}
+ 
+ 	for (phy_num = 0; phy_num < mtk->num_phys; phy_num++) {
 -- 
-1.9.1
+1.7.9.5
