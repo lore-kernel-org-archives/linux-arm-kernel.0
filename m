@@ -1,100 +1,132 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 25 Aug 2016 19:59:46 +0200
-Subject: [PATCH v2 7/7] musb: sunxi: Add support for platform_set_mode
-In-Reply-To: <20160822161037.GK1853@uda0271908>
-References: <1471288892-21702-1-git-send-email-hdegoede@redhat.com>
- <1471288892-21702-8-git-send-email-hdegoede@redhat.com>
- <20160819213049.GC1853@uda0271908>
- <2a55a1bf-7ebf-3ab4-b231-85eba20103f1@redhat.com>
- <20160822141158.GF1853@uda0271908>
- <9699b62e-421a-ae8e-c25e-ef48beb84ce0@redhat.com>
- <20160822152421.GH1853@uda0271908>
- <fd1e9692-2c69-da16-0e6e-ac7fa50077ac@redhat.com>
- <20160822153842.GI1853@uda0271908>
- <2e1d2bb6-c3c4-17ab-79a6-8f9efa45a831@redhat.com>
- <20160822161037.GK1853@uda0271908>
-Message-ID: <00986b3a-1a2a-1c67-f8bd-3a4c916cfbba@redhat.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 25 Aug 2016 13:59:53 -0400 (EDT)
+Subject: [PATCH 2/2] smc91x: remove ARM hack for unaligned 16-bit
+ writes
+In-Reply-To: <cvvmbcA3dSJWccvvnbQPVX@videotron.ca>
+References: <20160825144633.1850889-1-arnd@arndb.de>
+ <cvvmbcA3dSJWccvvnbQPVX@videotron.ca>
+Message-ID: <alpine.LFD.2.20.1608251350350.17623@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 25 Aug 2016, Arnd Bergmann wrote:
 
-On 22-08-16 18:10, Bin Liu wrote:
-> On Mon, Aug 22, 2016 at 05:55:50PM +0200, Hans de Goede wrote:
->> Hi,
->>
->> On 22-08-16 17:38, Bin Liu wrote:
->>> On Mon, Aug 22, 2016 at 05:32:57PM +0200, Hans de Goede wrote:
->>
->> <snip>
->>
->>>>>>>>> When switching from host to peripheral mode, if an usb device is still
->>>>>>>>> plugged and enumerated, how do you handle the device disconnect?
->>>>>>>>
->>>>>>>> The phy code will report vbus low for long enough for the musb to end
->>>>>>>> the current session. It already does this for boards which do not
->>>>>>>> have working vbus detection.
->>>>>>>
->>>>>>> But you didn't disconnect DP/DM, right? then musb detects vbus is gone
->>>>>>> without receiving disconnect event, this is vbus error case, not a normal
->>>>>>> teardown.
->>>>>>
->>>>>> Correct, there is no way to disconnect DP/DM and reporting Vbus low for
->>>>>> a while does the trick.
->>>>>
->>>>> Without physically disconnecting DP/DM, we still have a way to properly
->>>>> teardown the enumerated devices. Please check musb_softconnect_write()
->>>>> in musb_debugfs.c.
->>>>
->>>> That is manipulating the session bit in the devctl reg, that does not
->>>> work to switch from device to host role or from host to device role,
->>>> at least not on allwinner's musb implementation. I've already tried that
->>>> before writing the code to report VBus low.
->>>
->>> I would think you have to call musb_root_disconnect() first to notify
->>> the core to teardown the enumerated devices.
->>
->> I tried that it does not help. It only affects the software state, the
->> hardware will still stay in host-mode if it does not see vbus low for
->> long enough).
->
-> I didn't mean to use musb_root_disconnect() to replace your
-> implementation. I suggest to add this call before lowing vbus to let the
-> core tearing down the numerated devices.
->
->>
->> Note this is on devices which lack vbus detection (again this is simply
->> physically not available on the PCB, just like some PCB's miss the
->> id-pin). Normally this never is an issue, because when a host cable gets
->> unplugged from a AB connector we see the id pin go high, disable the
->> boards driving of Vbus and then the phy's Vbus detect will report low to
->> the musb controller.
->
-> In this case, DP/DM get disconnected before vbus line, so
-> musb_root_disconnect() gets called in handling the disconnect interrupt
-> event. I think it is better simulate this in your usecase, which does
-> not generate disconnect event.
+> The ARM specific I/O operations are almost the same as the generic
+> ones, with the exception of the SMC_outw macro that works around
+> a problem of some platforms that cannot write to 16-bit registers
+> at an address that is not 32-bit aligned.
+> 
+> By inspection, I found that this is handled already in the
+> register abstractions for almost all cases, the exceptions being
+> SMC_SET_MAC_ADDR() and SMC_SET_MCAST(). I assume that all
+> platforms that require the hack for the other registers also
+> need it here, so the ones listed explictly here are the only
+> ones that work correctly, while the other ones either don't
+> need the hack at all, or they will set an incorrect MAC
+> address (which can often go unnoticed).
 
-Ah right, I ran some tests and indeed the hcd does not see a disconnect
-on role-change unless musb_root_disconnect() gets called, I'll send a v4
-fixing this.
+Probably that all PXA based platforms that use the SMC91x with 32-bit 
+accesses need this.  The others simply wired only 16 data lines, or 
+only 8 like the Neponset.
 
-Thank you for catching this.
+However I no longer have the concerned hardware and can't test it.
 
-Regards,
-
-Hans
-
-
->
-> Regards,
-> -Bin.
->
->>
->> Anyways this is a solved problem, the reporting of Vbus low has been
->> working fine for both boards which lack vbus-detection as well as
->> for role-changing from sysfs.
->>
->> Regards,
->>
->> Hans
+> This changes the two macros that set the unaligned registers
+> to use 32-bit writes if possible, which should do the right
+> thing in all combinations. The ARM specific SMC_outw gets removed
+> as a consequence.
+> 
+> The only difference between the ARM behavior and the default is
+> the selection of the LED settings. The fact that we have different
+> defaults based on the CPU architectures here is a bit suspicious,
+> but probably harmless, and I have no plan of touching that.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/net/ethernet/smsc/smc91x.h | 50 +++++++++++++++++++++++---------------
+>  1 file changed, 30 insertions(+), 20 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/smsc/smc91x.h b/drivers/net/ethernet/smsc/smc91x.h
+> index 22333477d0b5..908473d9ede0 100644
+> --- a/drivers/net/ethernet/smsc/smc91x.h
+> +++ b/drivers/net/ethernet/smsc/smc91x.h
+> @@ -58,6 +58,7 @@
+>  #define SMC_inw(a, r)		readw((a) + (r))
+>  #define SMC_inl(a, r)		readl((a) + (r))
+>  #define SMC_outb(v, a, r)	writeb(v, (a) + (r))
+> +#define SMC_outw(v, a, r)	writew(v, (a) + (r))
+>  #define SMC_outl(v, a, r)	writel(v, (a) + (r))
+>  #define SMC_insw(a, r, p, l)	readsw((a) + (r), p, l)
+>  #define SMC_outsw(a, r, p, l)	writesw((a) + (r), p, l)
+> @@ -65,19 +66,6 @@
+>  #define SMC_outsl(a, r, p, l)	writesl((a) + (r), p, l)
+>  #define SMC_IRQ_FLAGS		(-1)	/* from resource */
+>  
+> -/* We actually can't write halfwords properly if not word aligned */
+> -static inline void SMC_outw(u16 val, void __iomem *ioaddr, int reg)
+> -{
+> -	if ((machine_is_mainstone() || machine_is_stargate2() ||
+> -	     machine_is_pxa_idp()) && reg & 2) {
+> -		unsigned int v = val << 16;
+> -		v |= readl(ioaddr + (reg & ~2)) & 0xffff;
+> -		writel(v, ioaddr + (reg & ~2));
+> -	} else {
+> -		writew(val, ioaddr + reg);
+> -	}
+> -}
+> -
+>  #elif	defined(CONFIG_SH_SH4202_MICRODEV)
+>  
+>  #define SMC_CAN_USE_8BIT	0
+> @@ -1029,18 +1017,40 @@ static const char * chip_ids[ 16 ] =  {
+>  
+>  #define SMC_SET_MAC_ADDR(lp, addr)					\
+>  	do {								\
+> -		SMC_out16(addr[0]|(addr[1] << 8), ioaddr, ADDR0_REG(lp)); \
+> -		SMC_out16(addr[2]|(addr[3] << 8), ioaddr, ADDR1_REG(lp)); \
+> -		SMC_out16(addr[4]|(addr[5] << 8), ioaddr, ADDR2_REG(lp)); \
+> +		if (SMC_32BIT(lp)) {					\
+> +			SMC_outl((addr[0]      )|(addr[1] <<  8) |	\
+> +				 (addr[2] << 16)|(addr[3] << 24),	\
+> +				 ioaddr, ADDR0_REG(lp));		\
+> +		} else {						\
+> +			SMC_out16(addr[0]|(addr[1] << 8), ioaddr,	\
+> +				  ADDR0_REG(lp));			\
+> +			SMC_out16(addr[2]|(addr[3] << 8), ioaddr,	\
+> +				  ADDR1_REG(lp));			\
+> +		}							\
+> +		SMC_out16(addr[4]|(addr[5] << 8), ioaddr,		\
+> +			  ADDR2_REG(lp)); \
+>  	} while (0)
+>  
+>  #define SMC_SET_MCAST(lp, x)						\
+>  	do {								\
+>  		const unsigned char *mt = (x);				\
+> -		SMC_out16(mt[0] | (mt[1] << 8), ioaddr, MCAST_REG1(lp)); \
+> -		SMC_out16(mt[2] | (mt[3] << 8), ioaddr, MCAST_REG2(lp)); \
+> -		SMC_out16(mt[4] | (mt[5] << 8), ioaddr, MCAST_REG3(lp)); \
+> -		SMC_out16(mt[6] | (mt[7] << 8), ioaddr, MCAST_REG4(lp)); \
+> +		if (SMC_32BIT(lp)) {					\
+> +			SMC_outl((mt[0]      ) | (mt[1] <<  8) |	\
+> +				 (mt[2] << 16) | (mt[3] << 24),		\
+> +				 ioaddr, MCAST_REG1(lp));		\
+> +			SMC_outl((mt[4]      ) | (mt[5] <<  8) |	\
+> +				 (mt[6] << 16) | (mt[7] << 24),		\
+> +				 ioaddr, MCAST_REG3(lp));		\
+> +		} else {						\
+> +			SMC_out16(mt[0] | (mt[1] << 8),			\
+> +				  ioaddr, MCAST_REG1(lp));		\
+> +			SMC_out16(mt[2] | (mt[3] << 8),			\
+> +				  ioaddr, MCAST_REG2(lp));		\
+> +			SMC_out16(mt[4] | (mt[5] << 8),			\
+> +				  ioaddr, MCAST_REG3(lp));		\
+> +			SMC_out16(mt[6] | (mt[7] << 8),			\
+> +				  ioaddr, MCAST_REG4(lp));		\
+> +		}							\
+>  	} while (0)
+>  
+>  #define SMC_PUT_PKT_HDR(lp, status, length)				\
+> -- 
+> 2.9.0
+> 
+> 
