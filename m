@@ -1,9 +1,9 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 25 Aug 2016 10:52:33 +0100
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 25 Aug 2016 11:14:19 +0100
 Subject: [PATCH] arm64: avoid TLB conflict with CONFIG_RANDOMIZE_BASE
 In-Reply-To: <1472058128-1216-1-git-send-email-mark.rutland@arm.com>
 References: <1472058128-1216-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160825095233.GD6630@arm.com>
+Message-ID: <20160825101419.GC20748@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,33 +26,8 @@ On Wed, Aug 24, 2016 at 06:02:08PM +0100, Mark Rutland wrote:
 > Cc: Catalin Marinas <catalin.marinas@arm.com>
 > Cc: Will Deacon <will.deacon@arm.com>
 > Cc: stable at vger.kernel.org
-> ---
->  arch/arm64/kernel/head.S | 3 +++
->  1 file changed, 3 insertions(+)
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Applied to arm64 fixes/core.
 
-Although I do wonder whether it would be cleaner to do the local TLBI
-in __create_page_tables after zeroing swapper, and then moving the TLBI
-out of __cpu_setup and onto the secondary boot path. I suppose it doesn't
-really matter...
-
-Will
-
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index b77f583..3e7b050 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -757,6 +757,9 @@ ENTRY(__enable_mmu)
->  	isb
->  	bl	__create_page_tables		// recreate kernel mapping
->  
-> +	tlbi	vmalle1				// Remove any stale TLB entries
-> +	dsb	nsh
-> +
->  	msr	sctlr_el1, x19			// re-enable the MMU
->  	isb
->  	ic	iallu				// flush instructions fetched
-> -- 
-> 2.7.4
-> 
+-- 
+Catalin
