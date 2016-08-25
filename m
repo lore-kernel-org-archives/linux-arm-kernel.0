@@ -1,27 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 25 Aug 2016 09:59:35 +0100
-Subject: [PATCH v8 00/11] power: act8945a_charger: Improvements
-In-Reply-To: <1472109599-21915-1-git-send-email-wenyou.yang@atmel.com>
-References: <1472109599-21915-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20160825085935.GH22076@sirena.org.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 25 Aug 2016 11:11:31 +0200
+Subject: [PATCH v3] clocksource: sun4i: Clear interrupts after stopping
+ timer in probe function
+In-Reply-To: <20160825062659.17433-1-wens@csie.org>
+References: <20160825062659.17433-1-wens@csie.org>
+Message-ID: <57BEB643.7030404@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2016 at 03:19:48PM +0800, Wenyou Yang wrote:
-> This patch series is to improve the implementation of act8945a-charger
-> driver, such as regard the act8945-charger as a sub-device, improve
-> the way to check the status, fix the power supply type property,
-> add the status change update, and add more properties: capacity level
-> property and max current property.
+On 08/25/2016 08:26 AM, Chen-Yu Tsai wrote:
+> The bootloader (U-boot) sometimes uses this timer for various delays.
+> It uses it as a ongoing counter, and does comparisons on the current
+> counter value. The timer counter is never stopped.
+> 
+> In some cases when the user interacts with the bootloader, or lets
+> it idle for some time before loading Linux, the timer may expire,
+> and an interrupt will be pending. This results in an unexpected
+> interrupt when the timer interrupt is enabled by the kernel, at
+> which point the event_handler isn't set yet. This results in a NULL
+> pointer dereference exception, panic, and no way to reboot.
+> 
+> Clear any pending interrupts after we stop the timer in the probe
+> function to avoid this.
+> 
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
 
-I don't know why you're copying me on this series but can you please
-either stop or let me know what you're looking for me to do with it?
-It's quite large, is getting resent regularly with frequent replies and
-I'm never quite sure why it's there.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160825/1f9b1bb4/attachment.sig>
+Applied.
+
+Thanks !
+
+  -- Daniel
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
