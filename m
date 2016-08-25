@@ -1,49 +1,34 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 25 Aug 2016 10:03:34 +0200
-Subject: [PATCH 2/2] ARM: dts: sun8i: enable UART1 for iNet D978 Rev2 board
-In-Reply-To: <97321472108244@web8m.yandex.ru>
-References: <20160823064451.25997-1-icenowy@aosc.xyz>
- <20160823064451.25997-3-icenowy@aosc.xyz>
- <20160824193600.GS8103@lukather> <43951472083107@web23m.yandex.ru>
- <CAGb2v66tFENk8QBw7D1+bwFN-zWaE2SGDrNyc-zdbJSRzENk4Q@mail.gmail.com>
- <97321472108244@web8m.yandex.ru>
-Message-ID: <20160825080334.GD7776@lukather>
+Date: Thu, 25 Aug 2016 10:04:09 +0200
+Subject: [PATCH v3] clocksource: sun4i: Clear interrupts after stopping
+ timer in probe function
+In-Reply-To: <20160825062659.17433-1-wens@csie.org>
+References: <20160825062659.17433-1-wens@csie.org>
+Message-ID: <20160825080409.GE7776@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Aug 25, 2016 at 02:57:24PM +0800, Icenowy Zheng wrote:
-> >>>> ??diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
-> >>>> ??index 78823d8..3ac22d4 100644
-> >>>> ??--- a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
-> >>>> ??+++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
-> >>>> ??@@ -48,6 +48,10 @@
-> >>>> ???????????model = "INet-D978 Rev 02";
-> >>>> ???????????compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
-> >>>>
-> >>>> ??+ aliases {
-> >>>> ??+ serial1 = &uart1;
-> >>>> ??+ };
-> >>>> ??+
-> >>>
-> >>> ?Is there any other UART in the system?
-> >>
-> >> ?serial0 is defined in sun8i-reference-design-tablet.dtsi, as r_uart.
-> >
-> > If your board does not have r_uart pads, then the right thing to do
-> > would be to disable it. You can then have uart1 as serial0.
+On Thu, Aug 25, 2016 at 02:26:59PM +0800, Chen-Yu Tsai wrote:
+> The bootloader (U-boot) sometimes uses this timer for various delays.
+> It uses it as a ongoing counter, and does comparisons on the current
+> counter value. The timer counter is never stopped.
 > 
-> I don't know it. The RX/TX is wired on PF2/PF4 on the board (UART0 muxed with
-> MMC)
+> In some cases when the user interacts with the bootloader, or lets
+> it idle for some time before loading Linux, the timer may expire,
+> and an interrupt will be pending. This results in an unexpected
+> interrupt when the timer interrupt is enabled by the kernel, at
+> which point the event_handler isn't set yet. This results in a NULL
+> pointer dereference exception, panic, and no way to reboot.
+> 
+> Clear any pending interrupts after we stop the timer in the probe
+> function to avoid this.
+> 
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Then you don't support it and you need to disable it.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-> But many codes will require a ttyS0 as console... So I think the
-> bluetooth should be located at ttyS1...
-
-Most of them would use /dev/console anyway. What do you have in mind?
-
+Thanks!
 Maxime
 
 -- 
@@ -56,4 +41,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160825/e59cd5f4/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160825/c0fae385/attachment.sig>
