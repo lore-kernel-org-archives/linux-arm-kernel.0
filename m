@@ -1,106 +1,89 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 25 Aug 2016 14:21:57 +0800
-Subject: [PATCH v3 3/6] clk: sunxi-ng: mux: support fixed pre-dividers on
- multiple parents
-In-Reply-To: <20160825062200.17206-1-wens@csie.org>
-References: <20160825062200.17206-1-wens@csie.org>
-Message-ID: <20160825062200.17206-4-wens@csie.org>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Thu, 25 Aug 2016 15:19:48 +0800
+Subject: [PATCH v8 00/11] power: act8945a_charger: Improvements
+Message-ID: <1472109599-21915-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clocks on the A31 have fixed pre-dividers on multiple parents.
-Add support for them.
+This patch series is to improve the implementation of act8945a-charger
+driver, such as regard the act8945-charger as a sub-device, improve
+the way to check the status, fix the power supply type property,
+add the status change update, and add more properties: capacity level
+property and max current property.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
-Changes since v2:
+Changes in v8:
+ - Achieve "interrupts" property from its own node directly.
+ - As the act8945a_charger is regarded as a sub-device, all
+   properties can be achieved from its own device node,
+   use devm_gpiod_get() properly as well to get "lbo-gpios".
+ - Add missing return -EPROBE_DEFER  for "lbo-gpios".
+ - As the act8945a_charger is regarded as a sub-device, all
+   properties can be achieved from its own device node,
+   use devm_gpiod_get() properly as well to get "chglev-gpios".
+ - Add missing return -EPROBE_DEFER  for "chglev-gpios".
+ - Since the act8945a-charger is regarded as a sub-device, update
+   the compatible decription and examples.
+ - Add 4 new patches: 1/11, 2/11, 9/11, and 11/11.
 
-  - Fixed up H3 changes for number of fixed pre-dividers.
+Changes in v7:
+ - Fix the missing negation sign.
+ - Add a prompt information if the charger suspended.
+ - Fix the wrong using devm_request_irq() with with parent
+   device as *dev.
+ - For "lbo-gpios", use gpiod_get() to fix devm_gpiod_get() wrong use
+   with parent device as *dev argument.
+ - Add the handle -EPROBE_DEFER returned from gpiod_get "lbo-gpios".
+ - Use dev_info() to print log if the lbo irq request failed.
+ - Remove unneeded semicolon.
+ - Add depends on GPIOLIB for use gpiod.
+ - For "chglev-gpios", use gpiod_get() to fix devm_gpiod_get() wrong use
+   with parent device as *dev argument.
+ - Add the handle -EPROBE_DEFER returned from gpiod_get "chglev-gpio".
+ - Remove unneeded semicolon.
 
-Changes since v1:
+Changes in v6:
+ - Add .remove callback function.
+ - Fix the 'dev' argument of devm_request_irq() to pdev->dev.parent.
+ - For "lbo-gpios", use gpiod API instead of old gpio API to handle.
+ - For "chglev-gpios", use gpiod API instead of old gpio API to handle.
 
-  - Add field for number of fixed pre-dividers.
----
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 10 +++++-----
- drivers/clk/sunxi-ng/ccu_mux.c      |  6 ++++--
- drivers/clk/sunxi-ng/ccu_mux.h      | 11 +++++++----
- 3 files changed, 16 insertions(+), 11 deletions(-)
+Changes in v5:
+ - Add Acked-by tag.
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-index 9af359544110..4fa9374c2959 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-@@ -184,15 +184,15 @@ static SUNXI_CCU_MP_WITH_MUX(apb2_clk, "apb2", apb2_parents, 0x058,
- 			     0);
- 
- static const char * const ahb2_parents[] = { "ahb1" , "pll-periph0" };
-+static const struct ccu_mux_fixed_prediv ahb2_fixed_predivs[] = {
-+	{ .index = 1, .div = 2 },
-+};
- static struct ccu_mux ahb2_clk = {
- 	.mux		= {
- 		.shift	= 0,
- 		.width	= 1,
--
--		.fixed_prediv	= {
--			.index	= 1,
--			.div	= 2,
--		},
-+		.fixed_predivs	= ahb2_fixed_predivs,
-+		.n_predivs	= ARRAY_SIZE(ahb2_fixed_predivs),
- 	},
- 
- 	.common		= {
-diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
-index 68b32f168a74..7b17e0c26b01 100644
---- a/drivers/clk/sunxi-ng/ccu_mux.c
-+++ b/drivers/clk/sunxi-ng/ccu_mux.c
-@@ -20,6 +20,7 @@ void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
- {
- 	u16 prediv = 1;
- 	u32 reg;
-+	int i;
- 
- 	if (!((common->features & CCU_FEATURE_FIXED_PREDIV) ||
- 	      (common->features & CCU_FEATURE_VARIABLE_PREDIV)))
-@@ -32,8 +33,9 @@ void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
- 	}
- 
- 	if (common->features & CCU_FEATURE_FIXED_PREDIV)
--		if (parent_index == cm->fixed_prediv.index)
--			prediv = cm->fixed_prediv.div;
-+		for (i = 0; i < cm->n_predivs; i++)
-+			if (parent_index == cm->fixed_predivs[i].index)
-+				prediv = cm->fixed_predivs[i].div;
- 
- 	if (common->features & CCU_FEATURE_VARIABLE_PREDIV)
- 		if (parent_index == cm->variable_prediv.index) {
-diff --git a/drivers/clk/sunxi-ng/ccu_mux.h b/drivers/clk/sunxi-ng/ccu_mux.h
-index b1e085612e5e..8eab1733eeac 100644
---- a/drivers/clk/sunxi-ng/ccu_mux.h
-+++ b/drivers/clk/sunxi-ng/ccu_mux.h
-@@ -5,15 +5,18 @@
- 
- #include "ccu_common.h"
- 
-+struct ccu_mux_fixed_prediv {
-+	u8	index;
-+	u16	div;
-+};
-+
- struct ccu_mux_internal {
- 	u8		shift;
- 	u8		width;
- 	const u8	*table;
- 
--	struct {
--		u8	index;
--		u16	div;
--	} fixed_prediv;
-+	const struct ccu_mux_fixed_prediv	*fixed_predivs;
-+	u8		n_predivs;
- 
- 	struct {
- 		u8	index;
+Changes in v4:
+ - Use "interrupts" property, instead of "active-semi,irq-gpios"
+   for irq.
+ - Change devname of devm_request_irq() from "lbo-detect" to
+   "act8945a, lbo-detect".
+ - Fix wrong gpio assignment for chglev_pin.
+ - Update the doc/binding for using "interrupts" property.
+
+Changes in v3:
+ - Remove unneeded semicolon to fix semicolon.cocci warning.
+
+Changes in v2:
+ - Add missing ret declaration.
+
+Wenyou Yang (11):
+  mfd: act8945a: Add .of_compatible for act8945a-charger
+  power: act8945a_charger: Achieve properties from its node
+  power: act8945a_charger: Remove "battery_temperature"
+  power: act8945a_charger: Improve
+  power: act8945a_charger: Add status change update support
+  power: act8945a_charger: Fix the power supply type
+  power: act8945a_charger: Add capacity level property
+  power: act8945a_charger: Add max current property
+  doc: bindings: mfd: act8945a: Update the example
+  doc: bindings: power: act8945a-charger: Update properties.
+  ARM: at91/dt: sama5d2_xplained: Add act8945a-charger node.
+
+ Documentation/devicetree/bindings/mfd/act8945a.txt |  22 +-
+ .../bindings/power/supply/act8945a-charger.txt     |  31 +-
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts        |  23 +-
+ drivers/mfd/act8945a.c                             |   1 +
+ drivers/power/supply/Kconfig                       |   2 +-
+ drivers/power/supply/act8945a_charger.c            | 401 ++++++++++++++++++---
+ 6 files changed, 409 insertions(+), 71 deletions(-)
+
 -- 
-2.9.3
+2.7.4
