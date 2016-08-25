@@ -1,48 +1,102 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 25 Aug 2016 15:19:02 -0600
-Subject: [PATCH 12/28] coresight: add PM runtime calls to
- coresight_simple_func()
+Date: Thu, 25 Aug 2016 15:19:14 -0600
+Subject: [PATCH 24/28] coresight: etm4x: cleaning up default filter
+ configuration
 In-Reply-To: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1472159958-5981-13-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1472159958-5981-25-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is mandatory to enable a coresight block's power domain before
-trying to access management registers.  Otherwise the transaction
-simply stalls, leading to a system hang.
+The default filter configuration was hard to read and included
+some redundancy.  This patch attempts to stream line configuration
+and improve readability.
+
+No change of functionality is included.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-priv.h | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm4x.c | 53 ++++++++++++++-------------
+ 1 file changed, 27 insertions(+), 26 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index ad975c58080d..decfd52b5dc3 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -16,6 +16,7 @@
- #include <linux/bitops.h>
- #include <linux/io.h>
- #include <linux/coresight.h>
-+#include <linux/pm_runtime.h>
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index f890d1de39e3..04462fffe8e4 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -583,39 +583,34 @@ static void etm4_set_default_config(struct etmv4_config *config)
  
- /*
-  * Coresight management registers (0xf00-0xfcc)
-@@ -42,8 +43,11 @@ static ssize_t name##_show(struct device *_dev,				\
- 			   struct device_attribute *attr, char *buf)	\
- {									\
- 	type *drvdata = dev_get_drvdata(_dev->parent);			\
--	return scnprintf(buf, PAGE_SIZE, "0x%x\n",			\
--			 readl_relaxed(drvdata->base + offset));	\
-+	u32 val;							\
-+	pm_runtime_get_sync(_dev->parent);				\
-+	val = readl_relaxed(drvdata->base + offset);			\
-+	pm_runtime_put_sync(_dev->parent);				\
-+	return scnprintf(buf, PAGE_SIZE, "0x%x\n", val);		\
- }									\
- static DEVICE_ATTR_RO(name)
+ static void etm4_set_default_filter(struct etmv4_config *config)
+ {
+-	/*
+-	 * TRCVICTLR::SSSTATUS == 1, the start-stop logic is
+-	 * in the started state
+-	 */
+-	config->vinst_ctrl |= BIT(9);
++	u64 start, stop, access_type = 0;
+ 
+ 	/*
+ 	 * Configure address range comparator '0' to encompass all
+ 	 * possible addresses.
+ 	 */
++	start = 0x0;
++	stop = ~0x0;
+ 
+-	/* First half of default address comparator: start at address 0 */
+-	config->addr_val[ETM_DEFAULT_ADDR_COMP] = 0x0;
+-	/* trace instruction addresses */
+-	config->addr_acc[ETM_DEFAULT_ADDR_COMP] &= ~(BIT(0) | BIT(1));
+-	/* EXLEVEL_NS, bits[12:15], only trace application and kernel space */
+-	config->addr_acc[ETM_DEFAULT_ADDR_COMP] |= ETM_EXLEVEL_NS_HYP;
+-	/* EXLEVEL_S, bits[11:8], don't trace anything in secure state */
+-	config->addr_acc[ETM_DEFAULT_ADDR_COMP] |= (ETM_EXLEVEL_S_APP |
+-						    ETM_EXLEVEL_S_OS |
+-						    ETM_EXLEVEL_S_HYP);
+-	config->addr_type[ETM_DEFAULT_ADDR_COMP] = ETM_ADDR_TYPE_RANGE;
++	/* EXLEVEL_NS, bits[12:15], always stay away from hypervisor mode. */
++	access_type = ETM_EXLEVEL_NS_HYP;
+ 
+ 	/*
+-	 * Second half of default address comparator: go all
+-	 * the way to the top.
+-	*/
+-	config->addr_val[ETM_DEFAULT_ADDR_COMP + 1] = ~0x0;
+-	/* trace instruction addresses */
+-	config->addr_acc[ETM_DEFAULT_ADDR_COMP + 1] &= ~(BIT(0) | BIT(1));
+-	/* Address comparator type must be equal for both halves */
+-	config->addr_acc[ETM_DEFAULT_ADDR_COMP + 1] =
+-					config->addr_acc[ETM_DEFAULT_ADDR_COMP];
++	 * EXLEVEL_S, bits[11:8], don't trace anything happening
++	 * in secure state.
++	 */
++	access_type |= (ETM_EXLEVEL_S_APP	|
++			ETM_EXLEVEL_S_OS	|
++			ETM_EXLEVEL_S_HYP);
++
++	/* First half of default address comparator */
++	config->addr_val[ETM_DEFAULT_ADDR_COMP] = start;
++	config->addr_acc[ETM_DEFAULT_ADDR_COMP] = access_type;
++	config->addr_type[ETM_DEFAULT_ADDR_COMP] = ETM_ADDR_TYPE_RANGE;
++
++	/* Second half of default address comparator */
++	config->addr_val[ETM_DEFAULT_ADDR_COMP + 1] = stop;
++	config->addr_acc[ETM_DEFAULT_ADDR_COMP + 1] = access_type;
+ 	config->addr_type[ETM_DEFAULT_ADDR_COMP + 1] = ETM_ADDR_TYPE_RANGE;
+ 
+ 	/*
+@@ -624,7 +619,13 @@ static void etm4_set_default_filter(struct etmv4_config *config)
+ 	 */
+ 	config->viiectlr = BIT(0);
+ 
+-	/* no start-stop filtering for ViewInst */
++	/*
++	 * TRCVICTLR::SSSTATUS == 1, the start-stop logic is
++	 * in the started state
++	 */
++	config->vinst_ctrl |= BIT(9);
++
++	/* No start-stop filtering for ViewInst */
+ 	config->vissctlr = 0x0;
+ }
  
 -- 
 2.7.4
