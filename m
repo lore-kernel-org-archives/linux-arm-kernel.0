@@ -1,31 +1,28 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 25 Aug 2016 12:00:08 +0100
-Subject: [PATCH] arm64: ni_syscall should be similar to other archs
-In-Reply-To: <B7B4BB465792624BAF51F33077E990659D7C134D@ALA-MBB.corp.ad.wrs.com>
-References: <1456325699-25849-1-git-send-email-per.hallsmark@windriver.com>
- <20160418095808.GB18257@e104818-lin.cambridge.arm.com>
- <B7B4BB465792624BAF51F33077E990659D7C134D@ALA-MBB.corp.ad.wrs.com>
-Message-ID: <20160825110008.GD20748@e104818-lin.cambridge.arm.com>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Thu, 25 Aug 2016 13:04:56 +0200
+Subject: [PATCH v4 1/4] arm64: arch_timer: Add device tree binding for
+ A-008585 erratum
+In-Reply-To: <1467877572-10817-1-git-send-email-oss@buserror.net>
+References: <1467877572-10817-1-git-send-email-oss@buserror.net>
+Message-ID: <e69db8b1-5fe2-ed0a-b073-de3efdd854d2@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2016 at 01:58:08PM +0000, Hallsmark, Per wrote:
-> Catalin Marinas wrote:
-> > On Wed, Feb 24, 2016 at 03:54:59PM +0100, per.hallsmark at windriver.com wrote:
-> > > From: Per Hallsmark <per.hallsmark@windriver.com>
-> > >
-> > > Today arm64 have it's own variant when a userspace app is doing a
-> > > non-implemented syscall in that it dumps on console process name,
-> > > registers and such. This makes a different behaviour on arm64 than
-> > > on all other archs.
-> > 
-> > Are you hitting a real issue with this? Test apps doing random syscalls?
-> 
-> The issue was found on a real case, running lttng that tries to make use
-> of sys_brk before falling back to internal variant. On arm64 this generates
-> an "ugly" dump on console which dont happen on arm, x86 etc.
+Hi all,
 
-Why would a sys_brk() end up on the do_ni_syscall() path?
+On 07/07/16 09:46, Scott Wood wrote:
+> This erratum describes a bug in logic outside the core, so MIDR can't be
+> used to identify its presence, and reading an SoC-specific revision
+> register from common arch timer code would be awkward.  So, describe it
+> in the device tree.
+>
+> Signed-off-by: Scott Wood <oss@buserror.net>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
 
--- 
-Catalin
+As of today I wasn't able to find this series in linux-next. Was this 
+series somehow forgotten? Scott maybe you can resend the patches adding 
+the clocksource maintainer.
+
+Regards,
+Matthias
