@@ -1,138 +1,176 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 25 Aug 2016 15:19:18 -0600
-Subject: [PATCH 28/28] coresight: etm4x: adding configurable start/stop
- filtering
-In-Reply-To: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1472159958-5981-29-git-send-email-mathieu.poirier@linaro.org>
+From: johnyoun@synopsys.com (John Youn)
+Date: Thu, 25 Aug 2016 14:26:39 -0700
+Subject: [RFT PATCH v3 2/3] usb: dwc2: Add delay to core soft reset
+In-Reply-To: <cover.1472160194.git.johnyoun@synopsys.com>
+References: <cover.1472160194.git.johnyoun@synopsys.com>
+Message-ID: <cdb2be23c118f50b5f4e95d028314b12d07f386e.1472160194.git.johnyoun@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With this patch we add start/stop filtering as specified on
-the perf cmd line.  When the IP matches the start address
-trace generation gets triggered.  The stop condition is
-achieved when the IP matches the stop address.
+Add a delay to the core soft reset function to account for the IDDIG
+debounce filter.
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+If the current mode is host, either due to the force mode bit being
+set (which persists after core reset) or the connector id pin, a core
+soft reset will temporarily reset the mode to device and a delay from
+the IDDIG debounce filter will occur before going back to host mode.
+
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+Signed-off-by: John Youn <johnyoun@synopsys.com>
 ---
- drivers/hwtracing/coresight/coresight-etm4x.c | 71 +++++++++++++++++++++++++++
- 1 file changed, 71 insertions(+)
+ drivers/usb/dwc2/core.c | 97 +++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/usb/dwc2/core.h |  1 +
+ drivers/usb/dwc2/hw.h   |  1 +
+ 3 files changed, 99 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index ebaefb45130f..4db8d6a4d0cb 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -335,12 +335,25 @@ static void etm4_disable_hw(void *info)
- static int etm4_disable_perf(struct coresight_device *csdev,
- 			     struct perf_event *event)
- {
-+	u32 control;
-+	struct etm_filters *filters = event->hw.addr_filters;
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+diff --git a/drivers/usb/dwc2/core.c b/drivers/usb/dwc2/core.c
+index 4135a5f..bb903e2 100644
+--- a/drivers/usb/dwc2/core.c
++++ b/drivers/usb/dwc2/core.c
+@@ -238,6 +238,78 @@ int dwc2_enter_hibernation(struct dwc2_hsotg *hsotg)
+ 	return ret;
+ }
  
- 	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
- 		return -EINVAL;
- 
- 	etm4_disable_hw(drvdata);
++/**
++ * dwc2_wait_for_mode() - Waits for the controller mode.
++ * @hsotg:	Programming view of the DWC_otg controller.
++ * @host_mode:	If true, waits for host mode, otherwise device mode.
++ * @timeout:	Time to wait in ms.
++ */
++static void dwc2_wait_for_mode(struct dwc2_hsotg *hsotg,
++			       bool host_mode,
++			       unsigned int timeout)
++{
++	ktime_t start;
++	ktime_t end;
++
++	dev_vdbg(hsotg->dev, "Waiting for %s mode\n",
++		 host_mode ? "host" : "device");
++
++	start = ktime_get();
++
++	while (1) {
++		s64 ms;
++
++		if (dwc2_is_host_mode(hsotg) == host_mode) {
++			dev_vdbg(hsotg->dev, "%s mode set\n",
++				 host_mode ? "Host" : "Device");
++			break;
++		}
++
++		end = ktime_get();
++		ms = ktime_to_ms(ktime_sub(end, start));
++
++		if (ms >= (s64)timeout) {
++			dev_warn(hsotg->dev, "%s: Couldn't set %s mode\n",
++				 __func__, host_mode ? "host" : "device");
++			break;
++		}
++
++		usleep_range(1000, 2000);
++	}
++}
++
++/**
++ * dwc2_iddig_filter_enabled() - Returns true if the IDDIG debounce
++ * filter is enabled.
++ */
++static bool dwc2_iddig_filter_enabled(struct dwc2_hsotg *hsotg)
++{
++	u32 gsnpsid;
++	u32 ghwcfg4;
++
++	if (!dwc2_hw_is_otg(hsotg))
++		return false;
++
++	/* Check if core configuration includes the IDDIG filter. */
++	ghwcfg4 = dwc2_readl(hsotg->regs + GHWCFG4);
++	if (!(ghwcfg4 & GHWCFG4_IDDIG_FILT_EN))
++		return false;
 +
 +	/*
-+	 * Check if the start/stop logic was active when the unit was stopped.
-+	 * That way we can re-enable the start/stop logic when the process is
-+	 * scheduled again.  Configuration of the start/stop logic happens in
-+	 * function etm4_set_event_filters().
++	 * Check if the IDDIG debounce filter is bypassed. Available
++	 * in core version >= 3.10a.
 +	 */
-+	control = readl_relaxed(drvdata->base + TRCVICTLR);
-+	/* TRCVICTLR::SSSTATUS, bit[9] */
-+	filters->ssstatus = (control & BIT(9));
++	gsnpsid = dwc2_readl(hsotg->regs + GSNPSID);
++	if (gsnpsid >= DWC2_CORE_REV_3_10a) {
++		u32 gotgctl = dwc2_readl(hsotg->regs + GOTGCTL);
++
++		if (gotgctl & GOTGCTL_DBNCE_FLTR_BYPASS)
++			return false;
++	}
++
++	return true;
++}
++
+ /*
+  * Do core a soft reset of the core.  Be careful with this because it
+  * resets all the internal state machines of the core.
+@@ -246,9 +318,30 @@ int dwc2_core_reset(struct dwc2_hsotg *hsotg)
+ {
+ 	u32 greset;
+ 	int count = 0;
++	bool wait_for_host_mode = false;
+ 
+ 	dev_vdbg(hsotg->dev, "%s()\n", __func__);
+ 
++	/*
++	 * If the current mode is host, either due to the force mode
++	 * bit being set (which persists after core reset) or the
++	 * connector id pin, a core soft reset will temporarily reset
++	 * the mode to device. A delay from the IDDIG debounce filter
++	 * will occur before going back to host mode.
++	 *
++	 * Determine whether we will go back into host mode after a
++	 * reset and account for this delay after the reset.
++	 */
++	if (dwc2_iddig_filter_enabled(hsotg)) {
++		u32 gotgctl = dwc2_readl(hsotg->regs + GOTGCTL);
++		u32 gusbcfg = dwc2_readl(hsotg->regs + GUSBCFG);
++
++		if (!(gotgctl & GOTGCTL_CONID_B) ||
++		    (gusbcfg & GUSBCFG_FORCEHOSTMODE)) {
++			wait_for_host_mode = true;
++		}
++	}
++
+ 	/* Core Soft Reset */
+ 	greset = dwc2_readl(hsotg->regs + GRSTCTL);
+ 	greset |= GRSTCTL_CSFTRST;
+@@ -277,6 +370,10 @@ int dwc2_core_reset(struct dwc2_hsotg *hsotg)
+ 		}
+ 	} while (!(greset & GRSTCTL_AHBIDLE));
+ 
++	/* Wait up to 50 ms for the IDDIG debounce filter. */
++	if (wait_for_host_mode)
++		dwc2_wait_for_mode(hsotg, true, 50);
 +
  	return 0;
  }
  
-@@ -657,6 +670,27 @@ static void etm4_set_comparator_filter(struct etmv4_config *config,
- 	config->viiectlr |= BIT(comparator / 2);
- }
+diff --git a/drivers/usb/dwc2/core.h b/drivers/usb/dwc2/core.h
+index 9fae029..a6b6103 100644
+--- a/drivers/usb/dwc2/core.h
++++ b/drivers/usb/dwc2/core.h
+@@ -889,6 +889,7 @@ struct dwc2_hsotg {
+ #define DWC2_CORE_REV_2_92a	0x4f54292a
+ #define DWC2_CORE_REV_2_94a	0x4f54294a
+ #define DWC2_CORE_REV_3_00a	0x4f54300a
++#define DWC2_CORE_REV_3_10a	0x4f54310a
  
-+static void etm4_set_start_stop_filter(struct etmv4_config *config,
-+				       u64 address, int comparator,
-+				       enum etm_addr_type type)
-+{
-+	int shift;
-+	u64 access_type = etm4_get_access_type(config);
-+
-+	/* Configure the comparator */
-+	config->addr_val[comparator] = address;
-+	config->addr_acc[comparator] = access_type;
-+	config->addr_type[comparator] = type;
-+
-+	/*
-+	 * Configure ViewInst Start-Stop control register.
-+	 * Addresses configured to start tracing go from bit 0 to n-1,
-+	 * while those configured to stop tracing from 16 to 16 + n-1.
-+	 */
-+	shift = (type == ETM_ADDR_TYPE_START ? 0 : 16);
-+	config->vissctlr |= BIT(shift + comparator);
-+}
-+
- static void etm4_set_default_filter(struct etmv4_config *config)
- {
- 	u64 start, stop;
-@@ -721,6 +755,14 @@ static int etm4_get_next_comparator(struct etmv4_drvdata *drvdata, u32 type)
- 			/* Address range comparators go in pairs */
- 			index += 2;
- 			break;
-+		case ETM_ADDR_TYPE_START:
-+		case ETM_ADDR_TYPE_STOP:
-+			if (config->addr_type[index] == ETM_ADDR_TYPE_NONE)
-+				return index;
-+
-+			/* Start/stop address can have odd indexes */
-+			index += 1;
-+			break;
- 		default:
- 			return -EINVAL;
- 		}
-@@ -734,6 +776,7 @@ static int etm4_set_event_filters(struct etmv4_drvdata *drvdata,
- 				  struct perf_event *event)
- {
- 	int i, comparator, ret = 0;
-+	u64 address;
- 	struct etmv4_config *config = &drvdata->config;
- 	struct etm_filters *filters = event->hw.addr_filters;
- 
-@@ -776,6 +819,34 @@ static int etm4_set_event_filters(struct etmv4_drvdata *drvdata,
- 			/* No start-stop filtering for ViewInst */
- 			config->vissctlr = 0x0;
- 			break;
-+		case ETM_ADDR_TYPE_START:
-+		case ETM_ADDR_TYPE_STOP:
-+			/* Get the right start or stop address */
-+			address = (type == ETM_ADDR_TYPE_START ?
-+				   filter->start_addr :
-+				   filter->stop_addr);
-+
-+			/* Configure comparator */
-+			etm4_set_start_stop_filter(config, address,
-+						   comparator, type);
-+
-+			/*
-+			 * If filters::ssstatus == 1, trace acquisition was
-+			 * started but the process was yanked away before the
-+			 * the stop address was hit.  As such the start/stop
-+			 * logic needs to be re-started so that tracing can
-+			 * resume where it left.
-+			 *
-+			 * The start/stop logic status when a process is
-+			 * scheduled out is checked in function
-+			 * etm4_disable_perf().
-+			 */
-+			if (filters->ssstatus)
-+				config->vinst_ctrl |= BIT(9);
-+
-+			/* No include/exclude filtering for ViewInst */
-+			config->viiectlr = 0x0;
-+			break;
- 		default:
- 			ret = -EINVAL;
- 			goto out;
+ #if IS_ENABLED(CONFIG_USB_DWC2_HOST) || IS_ENABLED(CONFIG_USB_DWC2_DUAL_ROLE)
+ 	union dwc2_hcd_internal_flags {
+diff --git a/drivers/usb/dwc2/hw.h b/drivers/usb/dwc2/hw.h
+index efc3bcd..9105844 100644
+--- a/drivers/usb/dwc2/hw.h
++++ b/drivers/usb/dwc2/hw.h
+@@ -48,6 +48,7 @@
+ #define GOTGCTL_ASESVLD			(1 << 18)
+ #define GOTGCTL_DBNC_SHORT		(1 << 17)
+ #define GOTGCTL_CONID_B			(1 << 16)
++#define GOTGCTL_DBNCE_FLTR_BYPASS	(1 << 15)
+ #define GOTGCTL_DEVHNPEN		(1 << 11)
+ #define GOTGCTL_HSTSETHNPEN		(1 << 10)
+ #define GOTGCTL_HNPREQ			(1 << 9)
 -- 
-2.7.4
+2.9.0
