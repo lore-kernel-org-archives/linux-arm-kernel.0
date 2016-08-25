@@ -1,28 +1,23 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 25 Aug 2016 12:44:24 +0100
-Subject: [RESEND PATCH v2 00/13] Clock improvement for video playback
-In-Reply-To: <1466068833-5055-1-git-send-email-gabriel.fernandez@linaro.org>
-References: <1466068833-5055-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <20160825114424.GB3281@griffinp-ThinkPad-X1-Carbon-2nd>
+Date: Thu, 25 Aug 2016 12:51:37 +0100
+Subject: [STLinux Kernel] [PATCH v4 00/17] pwm: Add support for PWM Capture
+In-Reply-To: <20160816093508.28307-1-lee.jones@linaro.org>
+References: <20160816093508.28307-1-lee.jones@linaro.org>
+Message-ID: <20160825115137.GD3281@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabriel,
+Hi Lee,
 
-On Thu, 16 Jun 2016, Gabriel Fernandez wrote:
+On Tue, 16 Aug 2016, Lee Jones wrote:
 
-> v2:
->   - Simpliflication of clock binding
->     remark from Rob https://lkml.org/lkml/2016/5/25/492
->   - Suppression of stih415-416 support for the clocks (in order
-> 	to help simplification of clock binding)
->     (others patchs for the machine and drivers will come)
-> 
-> This serie allows to increase video resolutions and make audio
-> adjustment during a video playback.
+> This patch-set makes use of the new Capture API by supplying PWM
+> Capture functionality into the already existing STi PWM driver.
 
 For the series: -
 
 Acked-by: Peter Griffin <peter.griffin@linaro.org>
+
+Regards,
 
 Peter.
