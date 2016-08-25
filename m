@@ -1,102 +1,100 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 25 Aug 2016 15:19:14 -0600
-Subject: [PATCH 24/28] coresight: etm4x: cleaning up default filter
- configuration
+Date: Thu, 25 Aug 2016 15:19:15 -0600
+Subject: [PATCH 25/28] coresight: etm4x: adding range filter configuration
+ function
 In-Reply-To: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1472159958-5981-25-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1472159958-5981-26-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default filter configuration was hard to read and included
-some redundancy.  This patch attempts to stream line configuration
-and improve readability.
-
-No change of functionality is included.
+Introducing a new function to do address range configuration
+generic enough to work for any address range and any comparator.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm4x.c | 53 ++++++++++++++-------------
- 1 file changed, 27 insertions(+), 26 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm4x.c | 56 ++++++++++++++++++---------
+ 1 file changed, 38 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index f890d1de39e3..04462fffe8e4 100644
+index 04462fffe8e4..aca624010b9f 100644
 --- a/drivers/hwtracing/coresight/coresight-etm4x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -583,39 +583,34 @@ static void etm4_set_default_config(struct etmv4_config *config)
- 
- static void etm4_set_default_filter(struct etmv4_config *config)
- {
--	/*
--	 * TRCVICTLR::SSSTATUS == 1, the start-stop logic is
--	 * in the started state
--	 */
--	config->vinst_ctrl |= BIT(9);
-+	u64 start, stop, access_type = 0;
- 
- 	/*
- 	 * Configure address range comparator '0' to encompass all
- 	 * possible addresses.
- 	 */
-+	start = 0x0;
-+	stop = ~0x0;
- 
--	/* First half of default address comparator: start at address 0 */
--	config->addr_val[ETM_DEFAULT_ADDR_COMP] = 0x0;
--	/* trace instruction addresses */
--	config->addr_acc[ETM_DEFAULT_ADDR_COMP] &= ~(BIT(0) | BIT(1));
--	/* EXLEVEL_NS, bits[12:15], only trace application and kernel space */
--	config->addr_acc[ETM_DEFAULT_ADDR_COMP] |= ETM_EXLEVEL_NS_HYP;
--	/* EXLEVEL_S, bits[11:8], don't trace anything in secure state */
--	config->addr_acc[ETM_DEFAULT_ADDR_COMP] |= (ETM_EXLEVEL_S_APP |
--						    ETM_EXLEVEL_S_OS |
--						    ETM_EXLEVEL_S_HYP);
--	config->addr_type[ETM_DEFAULT_ADDR_COMP] = ETM_ADDR_TYPE_RANGE;
-+	/* EXLEVEL_NS, bits[12:15], always stay away from hypervisor mode. */
-+	access_type = ETM_EXLEVEL_NS_HYP;
- 
- 	/*
--	 * Second half of default address comparator: go all
--	 * the way to the top.
--	*/
--	config->addr_val[ETM_DEFAULT_ADDR_COMP + 1] = ~0x0;
--	/* trace instruction addresses */
--	config->addr_acc[ETM_DEFAULT_ADDR_COMP + 1] &= ~(BIT(0) | BIT(1));
--	/* Address comparator type must be equal for both halves */
--	config->addr_acc[ETM_DEFAULT_ADDR_COMP + 1] =
--					config->addr_acc[ETM_DEFAULT_ADDR_COMP];
-+	 * EXLEVEL_S, bits[11:8], don't trace anything happening
-+	 * in secure state.
-+	 */
-+	access_type |= (ETM_EXLEVEL_S_APP	|
-+			ETM_EXLEVEL_S_OS	|
-+			ETM_EXLEVEL_S_HYP);
-+
-+	/* First half of default address comparator */
-+	config->addr_val[ETM_DEFAULT_ADDR_COMP] = start;
-+	config->addr_acc[ETM_DEFAULT_ADDR_COMP] = access_type;
-+	config->addr_type[ETM_DEFAULT_ADDR_COMP] = ETM_ADDR_TYPE_RANGE;
-+
-+	/* Second half of default address comparator */
-+	config->addr_val[ETM_DEFAULT_ADDR_COMP + 1] = stop;
-+	config->addr_acc[ETM_DEFAULT_ADDR_COMP + 1] = access_type;
- 	config->addr_type[ETM_DEFAULT_ADDR_COMP + 1] = ETM_ADDR_TYPE_RANGE;
- 
- 	/*
-@@ -624,7 +619,13 @@ static void etm4_set_default_filter(struct etmv4_config *config)
- 	 */
- 	config->viiectlr = BIT(0);
- 
--	/* no start-stop filtering for ViewInst */
-+	/*
-+	 * TRCVICTLR::SSSTATUS == 1, the start-stop logic is
-+	 * in the started state
-+	 */
-+	config->vinst_ctrl |= BIT(9);
-+
-+	/* No start-stop filtering for ViewInst */
- 	config->vissctlr = 0x0;
+@@ -581,16 +581,10 @@ static void etm4_set_default_config(struct etmv4_config *config)
+ 	config->vinst_ctrl |= BIT(0);
  }
  
+-static void etm4_set_default_filter(struct etmv4_config *config)
++static void etm4_set_comparator_filter(struct etmv4_config *config,
++				       u64 start, u64 stop, int comparator)
+ {
+-	u64 start, stop, access_type = 0;
+-
+-	/*
+-	 * Configure address range comparator '0' to encompass all
+-	 * possible addresses.
+-	 */
+-	start = 0x0;
+-	stop = ~0x0;
++	u64 access_type = 0;
+ 
+ 	/* EXLEVEL_NS, bits[12:15], always stay away from hypervisor mode. */
+ 	access_type = ETM_EXLEVEL_NS_HYP;
+@@ -604,20 +598,46 @@ static void etm4_set_default_filter(struct etmv4_config *config)
+ 			ETM_EXLEVEL_S_HYP);
+ 
+ 	/* First half of default address comparator */
+-	config->addr_val[ETM_DEFAULT_ADDR_COMP] = start;
+-	config->addr_acc[ETM_DEFAULT_ADDR_COMP] = access_type;
+-	config->addr_type[ETM_DEFAULT_ADDR_COMP] = ETM_ADDR_TYPE_RANGE;
++	config->addr_val[comparator] = start;
++	config->addr_acc[comparator] = access_type;
++	config->addr_type[comparator] = ETM_ADDR_TYPE_RANGE;
+ 
+ 	/* Second half of default address comparator */
+-	config->addr_val[ETM_DEFAULT_ADDR_COMP + 1] = stop;
+-	config->addr_acc[ETM_DEFAULT_ADDR_COMP + 1] = access_type;
+-	config->addr_type[ETM_DEFAULT_ADDR_COMP + 1] = ETM_ADDR_TYPE_RANGE;
++	config->addr_val[comparator + 1] = stop;
++	config->addr_acc[comparator + 1] = access_type;
++	config->addr_type[comparator + 1] = ETM_ADDR_TYPE_RANGE;
++
++	/*
++	 * Configure the ViewInst function to include this address range
++	 * comparator.
++	 *
++	 * @comparator is divided by two since it is the index in the
++	 * etmv4_config::addr_val array but register TRCVIIECTLR deals with
++	 * address range comparator _pairs_.
++	 *
++	 * Therefore:
++	 *	index 0 -> compatator pair 0
++	 *	index 2 -> comparator pair 1
++	 *	index 4 -> comparator pair 2
++	 *	...
++	 *	index 14 -> comparator pair 7
++	 */
++	config->viiectlr |= BIT(comparator / 2);
++}
++
++static void etm4_set_default_filter(struct etmv4_config *config)
++{
++	u64 start, stop;
+ 
+ 	/*
+-	 * Configure the ViewInst function to filter on address range
+-	 * comparator '0'.
++	 * Configure address range comparator '0' to encompass all
++	 * possible addresses.
+ 	 */
+-	config->viiectlr = BIT(0);
++	start = 0x0;
++	stop = ~0x0;
++
++	etm4_set_comparator_filter(config, start, stop,
++				   ETM_DEFAULT_ADDR_COMP);
+ 
+ 	/*
+ 	 * TRCVICTLR::SSSTATUS == 1, the start-stop logic is
 -- 
 2.7.4
