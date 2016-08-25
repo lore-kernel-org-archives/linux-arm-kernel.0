@@ -1,58 +1,69 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 25 Aug 2016 23:34:44 +0900
-Subject: [PATCH v2 4/7] pinctrl: samsung: Add GPF support for Exynos5433
-In-Reply-To: <1472046551-703-5-git-send-email-cw00.choi@samsung.com>
+Date: Thu, 25 Aug 2016 23:41:04 +0900
+Subject: [PATCH v2 3/7] pinctrl: samsung: Add the support the multiple
+ IORESOURCE_MEM for one pin-bank
+In-Reply-To: <CA+Ln22Ew=8S382zn+M8Ys5vztqvzp1+3EOTKtd81WSfuSyvY6w@mail.gmail.com>
 References: <1472046551-703-1-git-send-email-cw00.choi@samsung.com>
- <1472046551-703-5-git-send-email-cw00.choi@samsung.com>
-Message-ID: <CA+Ln22EpkNUVKj1a1OdOkYuDQbrOOqQjGpz295s_d31U9bs__w@mail.gmail.com>
+ <1472046551-703-4-git-send-email-cw00.choi@samsung.com>
+ <CA+Ln22Ew=8S382zn+M8Ys5vztqvzp1+3EOTKtd81WSfuSyvY6w@mail.gmail.com>
+Message-ID: <CA+Ln22Guw1LghdV64cSKjByDExr+2HnvEK7DNkYz+XPAmVuAzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo, Joonyoung,
-
-2016-08-24 22:49 GMT+09:00 Chanwoo Choi <cw00.choi@samsung.com>:
-> diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-> index 37bc692445d4..499fb3484915 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-> @@ -19,6 +19,7 @@ Required Properties:
->    - "samsung,exynos5260-pinctrl": for Exynos5260 compatible pin-controller.
->    - "samsung,exynos5410-pinctrl": for Exynos5410 compatible pin-controller.
->    - "samsung,exynos5420-pinctrl": for Exynos5420 compatible pin-controller.
-> +  - "samsung,exynos5433-pinctrl": for Exynos5433 compatible pin-controller.
->    - "samsung,exynos7-pinctrl": for Exynos7 compatible pin-controller.
-
-I suppose this patch is adding the compatible string because it was
-forgotten in earlier patch? I believe it should be split into separate
-patch and mentioned in description.
-
+2016-08-25 23:30 GMT+09:00 Tomasz Figa <tomasz.figa@gmail.com>:
+>> +       }
+>> +
+>> +#define EXYNOS_PIN_BANK_EINTN_EXT(pins, reg, id, pctl_idx, eint_idx)   \
+>> +       {                                               \
+>> +               .type           = &bank_type_off,       \
+>> +               .pctl_offset    = reg,                  \
+>> +               .nr_pins        = pins,                 \
+>> +               .eint_type      = EINT_TYPE_NONE,       \
+>> +               .name           = id,                   \
+>> +               .pctl_res_idx   = pctl_idx,             \
+>> +               .eint_res_idx   = eint_dix              \
+>> +       }
 >
->  - reg: Base address of the pin controller hardware module and length of
-> diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
-> index 12fa9d3f1113..b9605b8282be 100644
-> --- a/drivers/pinctrl/samsung/pinctrl-exynos.c
-> +++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-> @@ -1360,6 +1360,11 @@ static const struct samsung_pin_bank_data exynos5433_pin_banks0[] = {
->         EXYNOS_PIN_BANK_EINTW(8, 0x020, "gpa1", 0x04),
->         EXYNOS_PIN_BANK_EINTW(8, 0x040, "gpa2", 0x08),
->         EXYNOS_PIN_BANK_EINTW(8, 0x060, "gpa3", 0x0c),
-> +       EXYNOS_PIN_BANK_EINTW_EXT(8, 0x020, "gpf1", 0x1004, 1, 0),
-> +       EXYNOS_PIN_BANK_EINTW_EXT(4, 0x040, "gpf2", 0x1008, 1, 0),
-> +       EXYNOS_PIN_BANK_EINTW_EXT(4, 0x060, "gpf3", 0x100c, 1, 0),
-> +       EXYNOS_PIN_BANK_EINTW_EXT(8, 0x080, "gpf4", 0x1010, 1, 0),
-> +       EXYNOS_PIN_BANK_EINTW_EXT(8, 0x0a0, "gpf5", 0x1014, 1, 0),
->  };
+> Your patch 4/7 doesn't seem to use this one, so this is dead code for
+> the time being. Please add when there is real need for it.
 >
->  /* pin banks of exynos5433 pin-controller - AUD */
-> @@ -1441,6 +1446,7 @@ const struct samsung_pin_ctrl exynos5433_pin_ctrl[] = {
->                 .eint_wkup_init = exynos_eint_wkup_init,
->                 .suspend        = exynos_pinctrl_suspend,
->                 .resume         = exynos_pinctrl_resume,
-> +               .nr_ext_resources = 1,
+> Also it doesn't really make much sense to have index for both pctl and
+> eint. Please define first entry of regs property as always pointing to
+> pctl registers and by also eint registers for usual controllers. Then
+> second regs entry would be eint registers for controllers with
+> separate register blocks. Then there is only a need to have
+> eint_res_idx in the driver and no need for pctl_res_idx, because it
+> would be always 0.
 
-Note that it makes it incompatible with previous DT bindings, because
-the extra resource becomes mandatory now. But if there was no DTS for
-any Exynos5433 in the tree before then I guess it's okay.
+Ah, sorry, I got confused again by which registers are where in these
+GPF banks. Let's make it the other way around and make DT contain eint
+registers in first regs entry and hardcode eint_res_idx to 0 for the
+time being. However it should be still beneficial to refactor the code
+and calculate per-bank eint_base to avoid adding the offset every
+time, similarly to pctl_base/offset, from my suggestion below.
+
+>> @@ -345,7 +346,8 @@ static void pin_to_reg_bank(struct samsung_pinctrl_drv_data *drvdata,
+>>                         ((b->pin_base + b->nr_pins - 1) < pin))
+>>                 b++;
+>>
+>> -       *reg = drvdata->virt_base + b->pctl_offset;
+>> +       pctl_res_idx = b->pctl_res_idx;
+>> +       *reg = drvdata->virt_base[pctl_res_idx] + b->pctl_offset;
+>
+> I suggested something slightly different. Instead of
+> bank::pctl_res_idx, I proposed bank::pctl_base.
+> bank_info::pctl_res_idx would be specified only in init driver data
+> and bank::pctl_base would be calculated at probe time as
+> drvdata->virt_base[bank_info->pctl_res_idx] + bank_info->pctl_offset.
+> This would eliminate the need to do any indexing and adding further in
+> the code and make things simpler.
+>
+> Taking my other comments above, pctl part would be unchanged and only
+> eint addresses and offsets would be affected.
+
+Ah, scratch this one sentence. I got confused with the register layout
+again, sorry. Please refactor both eint and pctl as I suggested in the
+upper paragraph.
 
 Best regards,
 Tomasz
