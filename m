@@ -1,119 +1,36 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 25 Aug 2016 15:18:57 -0600
-Subject: [PATCH 07/28] coresight: tmc: Limit the trace to available data
+Date: Thu, 25 Aug 2016 15:18:59 -0600
+Subject: [PATCH 09/28] coresight: Cleanup TMC status check
 In-Reply-To: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1472159958-5981-8-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1472159958-5981-10-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-At present the ETF or ETR gives out the entire device
-buffer, even if there is less or even no trace data
-available. This patch limits the trace data given out to
-the actual trace data collected.
+Use the defined symbol rather than hardcoding the value to
+check whether the TMC buffer is full.
 
-Cc: mathieu.poirier at linaro.org
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etf.c |  2 ++
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 12 +++++++++---
- drivers/hwtracing/coresight/coresight-tmc.c     |  6 +++---
- drivers/hwtracing/coresight/coresight-tmc.h     |  4 +++-
- 4 files changed, 17 insertions(+), 7 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index 466af86fd76f..e68289b8c072 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -48,6 +48,7 @@ static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
- 	int i;
- 
- 	bufp = drvdata->buf;
-+	drvdata->len = 0;
- 	while (1) {
- 		for (i = 0; i < drvdata->memwidth; i++) {
- 			read_data = readl_relaxed(drvdata->base + TMC_RRD);
-@@ -55,6 +56,7 @@ static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
- 				return;
- 			memcpy(bufp, &read_data, 4);
- 			bufp += 4;
-+			drvdata->len += 4;
- 		}
- 	}
- }
 diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index 688be9e060fc..03f36cb8b0c8 100644
+index 03f36cb8b0c8..6d7de0309e94 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -64,11 +64,17 @@ static void tmc_etr_dump_hw(struct tmc_drvdata *drvdata)
- 	rwp = readl_relaxed(drvdata->base + TMC_RWP);
- 	val = readl_relaxed(drvdata->base + TMC_STS);
- 
--	/* How much memory do we still have */
--	if (val & BIT(0))
-+	/*
-+	 * Adjust the buffer to point to the beginning of the trace data
-+	 * and update the available trace data.
-+	 */
-+	if (val & BIT(0)) {
+@@ -68,7 +68,7 @@ static void tmc_etr_dump_hw(struct tmc_drvdata *drvdata)
+ 	 * Adjust the buffer to point to the beginning of the trace data
+ 	 * and update the available trace data.
+ 	 */
+-	if (val & BIT(0)) {
++	if (val & TMC_STS_FULL) {
  		drvdata->buf = drvdata->vaddr + rwp - drvdata->paddr;
--	else
-+		drvdata->len = drvdata->size;
-+	} else {
- 		drvdata->buf = drvdata->vaddr;
-+		drvdata->len = rwp - drvdata->paddr;
-+	}
- }
- 
- static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 1b47258e01c9..b3275bb4d035 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -140,8 +140,8 @@ static ssize_t tmc_read(struct file *file, char __user *data, size_t len,
- 						   struct tmc_drvdata, miscdev);
- 	char *bufp = drvdata->buf + *ppos;
- 
--	if (*ppos + len > drvdata->size)
--		len = drvdata->size - *ppos;
-+	if (*ppos + len > drvdata->len)
-+		len = drvdata->len - *ppos;
- 
- 	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
- 		if (bufp == (char *)(drvdata->vaddr + drvdata->size))
-@@ -160,7 +160,7 @@ static ssize_t tmc_read(struct file *file, char __user *data, size_t len,
- 	*ppos += len;
- 
- 	dev_dbg(drvdata->dev, "%s: %zu bytes copied, %d bytes left\n",
--		__func__, len, (int)(drvdata->size - *ppos));
-+		__func__, len, (int)(drvdata->len - *ppos));
- 	return len;
- }
- 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index 5c5fe2ad2ca7..44b3ae346118 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.h
-+++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -98,7 +98,8 @@ enum tmc_mem_intf_width {
-  * @buf:	area of memory where trace data get sent.
-  * @paddr:	DMA start location in RAM.
-  * @vaddr:	virtual representation of @paddr.
-- * @size:	@buf size.
-+ * @size:	trace buffer size.
-+ * @len:	size of the available trace.
-  * @mode:	how this TMC is being used.
-  * @config_type: TMC variant, must be of type @tmc_config_type.
-  * @memwidth:	width of the memory interface databus, in bytes.
-@@ -115,6 +116,7 @@ struct tmc_drvdata {
- 	dma_addr_t		paddr;
- 	void __iomem		*vaddr;
- 	u32			size;
-+	u32			len;
- 	local_t			mode;
- 	enum tmc_config_type	config_type;
- 	enum tmc_mem_intf_width	memwidth;
+ 		drvdata->len = drvdata->size;
+ 	} else {
 -- 
 2.7.4
