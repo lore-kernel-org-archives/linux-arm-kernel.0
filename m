@@ -1,44 +1,65 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 25 Aug 2016 17:11:31 +0300
-Subject: [PATCH] ARM: dts: keystone: specify usb mode explicitly
-In-Reply-To: <09af5947-1a0e-9f44-e046-67276062530d@oracle.com>
-References: <20160628094245.9521-1-grygorii.strashko@ti.com>
- <578D15B3.1040705@ti.com> <09af5947-1a0e-9f44-e046-67276062530d@oracle.com>
-Message-ID: <62e7960a-7f47-8125-c369-2407ffc5a2dd@ti.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Thu, 25 Aug 2016 22:12:35 +0800
+Subject: [PATCH 2/2] ARM: dts: sun8i: enable UART1 for iNet D978 Rev2 board
+In-Reply-To: <20160825080334.GD7776@lukather>
+References: <20160823064451.25997-1-icenowy@aosc.xyz>
+ <20160823064451.25997-3-icenowy@aosc.xyz>
+ <20160824193600.GS8103@lukather> <43951472083107@web23m.yandex.ru>
+ <CAGb2v66tFENk8QBw7D1+bwFN-zWaE2SGDrNyc-zdbJSRzENk4Q@mail.gmail.com>
+ <97321472108244@web8m.yandex.ru> <20160825080334.GD7776@lukather>
+Message-ID: <116041472134355@web12g.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
 
-On 07/18/2016 08:49 PM, Santosh Shilimkar wrote:
-> On 7/18/2016 10:45 AM, Grygorii Strashko wrote:
->> Hi Santosh,
->> On 06/28/2016 12:42 PM, Grygorii Strashko wrote:
->>> The USB OTG mode is not supported by Kestone 2 devices, as result, the
->>> USB devices enumeration and detection will not work properly when
->>> kernel is built with CONFIG_USB_DWC3_DUAL_ROLE=y (default for multi
->>> platform build):
->>>   - it's required to load gadget drivers manually to make host mode
->>> work and this confuses current Keystone 2 users
->>>   - device mode is not working, because port can't detect and switch to
->>> peripheral/host mode dynamically.
->>>
->>> Hence, specify usb mode explicitly in DT: usb0 = "host" for all KS2
->>> devices and usb1 = "peripheral" for K2E.
->>>
->>> Cc: Sekhar Nori <nsekhar@ti.com>
->>> Cc: Roger Quadros <rogerq@ti.com>
->>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+
+25.08.2016, 16:03, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> Hi,
+>
+> On Thu, Aug 25, 2016 at 02:57:24PM +0800, Icenowy Zheng wrote:
+>> ?>>>> ??diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+>> ?>>>> ??index 78823d8..3ac22d4 100644
+>> ?>>>> ??--- a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+>> ?>>>> ??+++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+>> ?>>>> ??@@ -48,6 +48,10 @@
+>> ?>>>> ???????????model = "INet-D978 Rev 02";
+>> ?>>>> ???????????compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
+>> ?>>>>
+>> ?>>>> ??+ aliases {
+>> ?>>>> ??+ serial1 = &uart1;
+>> ?>>>> ??+ };
+>> ?>>>> ??+
+>> ?>>>
+>> ?>>> ?Is there any other UART in the system?
+>> ?>>
+>> ?>> ?serial0 is defined in sun8i-reference-design-tablet.dtsi, as r_uart.
+>> ?>
+>> ?> If your board does not have r_uart pads, then the right thing to do
+>> ?> would be to disable it. You can then have uart1 as serial0.
 >>
->> Do you expect any additional actions from my side relate to this patch?
->>
-> Nope. I will pick this up though it has to wait for next merge window
-> now.
+>> ?I don't know it. The RX/TX is wired on PF2/PF4 on the board (UART0 muxed with
+>> ?MMC)
+>
+> Then you don't support it and you need to disable it.
+>
+>> ?But many codes will require a ttyS0 as console... So I think the
+>> ?bluetooth should be located at ttyS1...
+>
+> Most of them would use /dev/console anyway. What do you have in mind?
 
-I'd like to remind you about this patch. 
-Would you like me to resend it ?
-(I've checked - it can be applied as is on top master and next/master without issues)
+As a general configuration, /dev/ttyS0 will be indicated as the default console=
+value... (Otherwise more boards will fail)
 
--- 
-regards,
--grygorii
+Or maybe we can specify uart0 as serial0, and leave it as disabled? (Thus if the
+debug port is needed, we can easily apply a overlay with &mmc0 status as disabled,
+and &uart0 status as okay)
+
+On all my A33 boards, the official boot0, u-boot all uses uart0 as debugging port.
+
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
