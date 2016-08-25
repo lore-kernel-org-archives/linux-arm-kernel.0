@@ -1,203 +1,39 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 25 Aug 2016 15:19:17 -0600
-Subject: [PATCH 27/28] coresight: etm4x: adding configurable address range
- filtering
-In-Reply-To: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1472159958-5981-28-git-send-email-mathieu.poirier@linaro.org>
+From: johnyoun@synopsys.com (John Youn)
+Date: Thu, 25 Aug 2016 14:26:36 -0700
+Subject: [RFT PATCH v3 1/3] usb: dwc2: gadget: Only initialize device if in
+ device mode
+In-Reply-To: <cover.1472160194.git.johnyoun@synopsys.com>
+References: <cover.1472160194.git.johnyoun@synopsys.com>
+Message-ID: <64471143a4dd89251db46a9f1e14f9720ba67bd0.1472160194.git.johnyoun@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the capability to specify address ranges from
-the perf cmd line using the --filter option.  If the IP
-falls within the range(s) program flow traces are generated.
+In dwc2_hsotg_udc_start(), don't initialize the controller for device
+mode unless we are actually in device mode.
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+Signed-off-by: John Youn <johnyoun@synopsys.com>
 ---
- drivers/hwtracing/coresight/coresight-etm4x.c | 128 ++++++++++++++++++++++++--
- 1 file changed, 119 insertions(+), 9 deletions(-)
+ drivers/usb/dwc2/gadget.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 1044ed609d81..ebaefb45130f 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -45,7 +45,9 @@ module_param_named(boot_enable, boot_enable, int, S_IRUGO);
- /* The number of ETMv4 currently registered */
- static int etm4_count;
- static struct etmv4_drvdata *etmdrvdata[NR_CPUS];
--static void etm4_set_default(struct etmv4_config *config);
-+static void etm4_set_default_config(struct etmv4_config *config);
-+static int etm4_set_event_filters(struct etmv4_drvdata *drvdata,
-+				  struct perf_event *event);
+diff --git a/drivers/usb/dwc2/gadget.c b/drivers/usb/dwc2/gadget.c
+index af46adf..358ba5a 100644
+--- a/drivers/usb/dwc2/gadget.c
++++ b/drivers/usb/dwc2/gadget.c
+@@ -3475,8 +3475,11 @@ static int dwc2_hsotg_udc_start(struct usb_gadget *gadget,
+ 		otg_set_peripheral(hsotg->uphy->otg, &hsotg->gadget);
  
- static enum cpuhp_state hp_online;
- 
-@@ -187,11 +189,14 @@ static void etm4_enable_hw(void *info)
- static int etm4_parse_event_config(struct etmv4_drvdata *drvdata,
- 				   struct perf_event *event)
- {
-+	int ret = 0;
- 	struct etmv4_config *config = &drvdata->config;
- 	struct perf_event_attr *attr = &event->attr;
- 
--	if (!attr)
--		return -EINVAL;
-+	if (!attr) {
-+		ret = -EINVAL;
-+		goto out;
-+	}
- 
- 	/* Clear configuration from previous run */
- 	memset(config, 0, sizeof(struct etmv4_config));
-@@ -203,7 +208,12 @@ static int etm4_parse_event_config(struct etmv4_drvdata *drvdata,
- 		config->mode = ETM_MODE_EXCL_USER;
- 
- 	/* Always start from the default config */
--	etm4_set_default(config);
-+	etm4_set_default_config(config);
-+
-+	/* Configure filters specified on the perf cmd line, if any. */
-+	ret = etm4_set_event_filters(drvdata, event);
-+	if (ret)
-+		goto out;
- 
- 	/* Go from generic option to ETMv4 specifics */
- 	if (attr->config & BIT(ETM_OPT_CYCACC))
-@@ -211,23 +221,30 @@ static int etm4_parse_event_config(struct etmv4_drvdata *drvdata,
- 	if (attr->config & BIT(ETM_OPT_TS))
- 		config->cfg |= ETMv4_MODE_TIMESTAMP;
- 
--	return 0;
-+out:
-+	return ret;
- }
- 
- static int etm4_enable_perf(struct coresight_device *csdev,
- 			    struct perf_event *event)
- {
-+	int ret = 0;
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
--	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
--		return -EINVAL;
-+	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id())) {
-+		ret = -EINVAL;
-+		goto out;
-+	}
- 
- 	/* Configure the tracer based on the session's specifics */
--	etm4_parse_event_config(drvdata, event);
-+	ret = etm4_parse_event_config(drvdata, event);
-+	if (ret)
-+		goto out;
- 	/* And enable it */
- 	etm4_enable_hw(drvdata);
- 
--	return 0;
-+out:
-+	return ret;
- }
- 
- static int etm4_enable_sysfs(struct coresight_device *csdev)
-@@ -682,6 +699,99 @@ static void etm4_set_default(struct etmv4_config *config)
- 	etm4_set_default_filter(config);
- }
- 
-+static int etm4_get_next_comparator(struct etmv4_drvdata *drvdata, u32 type)
-+{
-+	int nr_comparator, index = 0;
-+	struct etmv4_config *config = &drvdata->config;
-+
-+	/*
-+	 * nr_addr_cmp holds the number of comparator _pair_, so time 2
-+	 * for the total number of comparators.
-+	 */
-+	nr_comparator = drvdata->nr_addr_cmp * 2;
-+
-+	/* Go through the tally of comparators looking for a free one. */
-+	while (index < nr_comparator) {
-+		switch (type) {
-+		case ETM_ADDR_TYPE_RANGE:
-+			if (config->addr_type[index] == ETM_ADDR_TYPE_NONE &&
-+			    config->addr_type[index + 1] == ETM_ADDR_TYPE_NONE)
-+				return index;
-+
-+			/* Address range comparators go in pairs */
-+			index += 2;
-+			break;
-+		default:
-+			return -EINVAL;
-+		}
+ 	spin_lock_irqsave(&hsotg->lock, flags);
+-	dwc2_hsotg_init(hsotg);
+-	dwc2_hsotg_core_init_disconnected(hsotg, false);
++	if (dwc2_hw_is_device(hsotg)) {
++		dwc2_hsotg_init(hsotg);
++		dwc2_hsotg_core_init_disconnected(hsotg, false);
 +	}
 +
-+	/* If we are here all the comparators have been used. */
-+	return -ENOSPC;
-+}
-+
-+static int etm4_set_event_filters(struct etmv4_drvdata *drvdata,
-+				  struct perf_event *event)
-+{
-+	int i, comparator, ret = 0;
-+	struct etmv4_config *config = &drvdata->config;
-+	struct etm_filters *filters = event->hw.addr_filters;
-+
-+	if (!filters)
-+		goto default_filter;
-+
-+	/* Sync events with what Perf got */
-+	perf_event_addr_filters_sync(event);
-+
-+	/*
-+	 * If there are no filters to deal with simply go ahead with
-+	 * the default filter, i.e the entire address range.
-+	 */
-+	if (!filters->nr_filters)
-+		goto default_filter;
-+
-+	for (i = 0; i < filters->nr_filters; i++) {
-+		struct etm_filter *filter = &filters->etm_filter[i];
-+		enum etm_addr_type type = filter->type;
-+
-+		/* See if a comparator is free. */
-+		comparator = etm4_get_next_comparator(drvdata, type);
-+		if (comparator < 0) {
-+			ret = comparator;
-+			goto out;
-+		}
-+
-+		switch (type) {
-+		case ETM_ADDR_TYPE_RANGE:
-+			etm4_set_comparator_filter(config,
-+						   filter->start_addr,
-+						   filter->stop_addr,
-+						   comparator);
-+			/*
-+			 * TRCVICTLR::SSSTATUS == 1, the start-stop logic is
-+			 * in the started state
-+			 */
-+			config->vinst_ctrl |= BIT(9);
-+
-+			/* No start-stop filtering for ViewInst */
-+			config->vissctlr = 0x0;
-+			break;
-+		default:
-+			ret = -EINVAL;
-+			goto out;
-+		}
-+	}
-+
-+	goto out;
-+
-+
-+default_filter:
-+	etm4_set_default_filter(config);
-+
-+out:
-+	return ret;
-+}
-+
- void etm4_config_trace_mode(struct etmv4_config *config)
- {
- 	u32 addr_acc, mode;
+ 	hsotg->enabled = 0;
+ 	spin_unlock_irqrestore(&hsotg->lock, flags);
+ 
 -- 
-2.7.4
+2.9.0
