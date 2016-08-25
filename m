@@ -1,54 +1,48 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 25 Aug 2016 20:02:35 +0200
-Subject: [PATCH] smc91x: remove ARM hack for unaligned 16-bit writes
-In-Reply-To: <3062310.z9h3CgCZ7p@wuerfel> (Arnd Bergmann's message of "Thu, 25
- Aug 2016 16:45:12 +0200")
-References: <20160825144314.1850730-1-arnd@arndb.de>
- <3062310.z9h3CgCZ7p@wuerfel>
-Message-ID: <87inuopw04.fsf@belgarion.home>
+From: fabio.estevam@nxp.com (Fabio Estevam)
+Date: Thu, 25 Aug 2016 15:05:47 -0300
+Subject: [PATCH] ARM: dts: imx7s-warp: Let the codec control MCLK pinctrl
+Message-ID: <1472148347-504-1-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+sgtl5000 codec needs MCLK clock to be provided so that it can
+successfully read/write via I2C, so we should better let the
+codec control the pinctrl for such pin.
 
-> On Thursday, August 25, 2016 4:43:04 PM CEST Arnd Bergmann wrote:
->>  drivers/net/ethernet/smsc/smc91x.h | 50 +++++++++++++++++++++++---------------
->>  1 file changed, 30 insertions(+), 20 deletions(-)
->> 
->> While this patch fixes one bug on Neponset, it probably doesn't address
->> the one that Russell ran into first, so this is for review only for now,
->> until the remaining problem(s) have been worked out.
->> 
->
-> The comment should have been on another patch, my mistake. please
-> see v2.
->
-> 	Arnd
+Thanks to Stefan Agner who provided the fix on Toradex's tree:
+http://git.toradex.com/cgit/linux-toradex.git/commit/?h=toradex_imx_4.1.15_1.0.0_ga-next&id=0a55a7e5f58d46eef0d4d1d357d89e36d0c32fa4
 
-Hi Arnd,
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx7s-warp.dts | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-I didn't review the patch thoroughly, but I launched your 2 patches in my pxa
-little farm.
-
-The result is that lubbock and mainstone are all right, but zylonite is broken
-(ie. networkless). I removed then these 2 patches and zylonite worked again.
-
-I have also an error message on the console on a "broken" zylonite :
-  Changing smcs91x MAC address to 08:00:3e:26:0a:5b: ifconfig: SIOCSIFHWADDR:
-  Device or resource busy
-
-I reran the test twice (2 times with your patches, 2 times without), the result
-looks consistent, ie. zylonite doesn't really like them.
-
-Cheers.
-
+diff --git a/arch/arm/boot/dts/imx7s-warp.dts b/arch/arm/boot/dts/imx7s-warp.dts
+index 92d9c857..7c3f110e 100644
+--- a/arch/arm/boot/dts/imx7s-warp.dts
++++ b/arch/arm/boot/dts/imx7s-warp.dts
+@@ -199,6 +199,8 @@
+ 		reg = <0x0a>;
+ 		compatible = "fsl,sgtl5000";
+ 		clocks = <&clks IMX7D_AUDIO_MCLK_ROOT_CLK>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_sai1_mclk>;
+ 		VDDA-supply = <&vgen4_reg>;
+ 		VDDIO-supply = <&vgen4_reg>;
+ 		VDDD-supply = <&vgen2_reg>;
+@@ -291,7 +293,12 @@
+ 			MX7D_PAD_SAI1_TX_BCLK__SAI1_TX_BCLK	0x1f
+ 			MX7D_PAD_SAI1_TX_SYNC__SAI1_TX_SYNC	0x1f
+ 			MX7D_PAD_SAI1_TX_DATA__SAI1_TX_DATA0	0x30
+-			MX7D_PAD_SAI1_MCLK__SAI1_MCLK		0x1f
++		>;
++	};
++
++	pinctrl_sai1_mclk: sai1grp_mclk {
++		fsl,pins = <
++			MX7D_PAD_SAI1_MCLK__SAI1_MCLK           0x1f
+ 		>;
+ 	};
+ 
 -- 
-Robert
-
-PS: even if zylonite defconfig is not in the tree, it uses this driver, with :
-CONFIG_SMC91X=y
-...and...
-static struct smc91x_platdata zylonite_smc91x_info = {
-	.flags	= SMC91X_USE_8BIT | SMC91X_USE_16BIT |
-		  SMC91X_NOWAIT | SMC91X_USE_DMA,
-};
+1.9.1
