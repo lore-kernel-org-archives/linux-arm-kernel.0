@@ -1,149 +1,160 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 25 Aug 2016 13:51:38 -0600
-Subject: [PATCH v4 08/16] ARM: cpuidle: Add runtime PM support for CPUs
+Date: Thu, 25 Aug 2016 13:51:42 -0600
+Subject: [PATCH v4 12/16] drivers: firmware: psci: Allow OS Initiated suspend
+ mode
 In-Reply-To: <1472154706-40119-1-git-send-email-lina.iyer@linaro.org>
 References: <1472154706-40119-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1472154706-40119-9-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1472154706-40119-13-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Notify runtime PM when the CPU is going to be powered off in the idle
-state. This allows for runtime PM suspend/resume of the CPU as well as
-its PM domain.
+PSCI firmware v1.0 onwards may support 2 different modes for
+CPU_SUSPEND. Platform coordinated mode is the default and every firmware
+should support it. OS Initiated mode is optional for the firmware to
+implement and allow Linux to make an better decision on the state of
+the CPU cluster heirarchy.
 
-We do not call into runtime PM for ARM WFI to keep the default state
-simple and faster.
+With the kernel capable of deciding the state for CPU cluster and
+coherency domains, the OS Initiated mode may now be used by the kernel,
+provided the firmware supports it. SET_SUSPEND_MODE is a PSCI function
+available on v1.0 onwards and can be used to set the mode in the
+firmware.
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+[Ulf: Rebased on 4.7 rc1]
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/cpuidle/cpuidle-arm.c | 55 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+ drivers/firmware/psci.c   | 42 +++++++++++++++++++++++++++++-------------
+ include/uapi/linux/psci.h |  5 +++++
+ 2 files changed, 34 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-index e342565e..3abd145 100644
---- a/drivers/cpuidle/cpuidle-arm.c
-+++ b/drivers/cpuidle/cpuidle-arm.c
-@@ -11,12 +11,14 @@
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 03e0458..759b134 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -52,6 +52,7 @@
+  * require cooperation with a Trusted OS driver.
+  */
+ static int resident_cpu = -1;
++static bool psci_has_osi;
  
- #define pr_fmt(fmt) "CPUidle arm: " fmt
- 
-+#include <linux/cpu.h>
- #include <linux/cpuidle.h>
- #include <linux/cpumask.h>
- #include <linux/cpu_pm.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/pm_runtime.h>
- #include <linux/slab.h>
- 
- #include <asm/cpuidle.h>
-@@ -37,6 +39,7 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
- 				struct cpuidle_driver *drv, int idx)
+ bool psci_tos_resident_on(int cpu)
  {
- 	int ret;
-+	struct device *cpu_dev = get_cpu_device(dev->cpu);
+@@ -506,9 +507,8 @@ static int __init psci_0_2_init(struct device_node *np)
+ 	int err;
  
- 	if (!idx) {
- 		cpu_do_idle();
-@@ -46,12 +49,20 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
- 	ret = cpu_pm_enter();
- 	if (!ret) {
- 		/*
-+		 * Call runtime PM suspend on our device
-+		 * Notify RCU to pay attention to critical sections
-+		 * called from within runtime PM.
-+		 */
-+		RCU_NONIDLE(pm_runtime_put_sync_suspend(cpu_dev));
-+
-+		/*
- 		 * Pass idle state index to cpu_suspend which in turn will
- 		 * call the CPU ops suspend protocol with idle index as a
- 		 * parameter.
- 		 */
- 		ret = arm_cpuidle_suspend(idx);
+ 	err = get_set_conduit_method(np);
+-
+ 	if (err)
+-		goto out_put_node;
++		return err;
+ 	/*
+ 	 * Starting with v0.2, the PSCI specification introduced a call
+ 	 * (PSCI_VERSION) that allows probing the firmware version, so
+@@ -516,11 +516,7 @@ static int __init psci_0_2_init(struct device_node *np)
+ 	 * can be carried out according to the specific version reported
+ 	 * by firmware
+ 	 */
+-	err = psci_probe();
+-
+-out_put_node:
+-	of_node_put(np);
+-	return err;
++	return psci_probe();
+ }
  
-+		RCU_NONIDLE(pm_runtime_get_sync(cpu_dev));
- 		cpu_pm_exit();
+ /*
+@@ -532,9 +528,8 @@ static int __init psci_0_1_init(struct device_node *np)
+ 	int err;
+ 
+ 	err = get_set_conduit_method(np);
+-
+ 	if (err)
+-		goto out_put_node;
++		return err;
+ 
+ 	pr_info("Using PSCI v0.1 Function IDs from DT\n");
+ 
+@@ -558,15 +553,31 @@ static int __init psci_0_1_init(struct device_node *np)
+ 		psci_ops.migrate = psci_migrate;
  	}
  
-@@ -84,6 +95,34 @@ static const struct of_device_id arm_idle_state_match[] __initconst = {
- 	{ },
- };
+-out_put_node:
+-	of_node_put(np);
+ 	return err;
+ }
  
-+#ifdef CONFIG_HOTPLUG_CPU
-+static int arm_idle_cpu_hotplug(struct notifier_block *nb,
-+			unsigned long action, void *data)
++static int __init psci_1_0_init(struct device_node *np)
 +{
-+	struct device *cpu_dev = get_cpu_device(smp_processor_id());
++	int ret;
 +
-+	/* Execute CPU runtime PM on that CPU */
-+	switch (action & ~CPU_TASKS_FROZEN) {
-+	case CPU_DYING:
-+		pm_runtime_put_sync_suspend(cpu_dev);
-+		break;
-+	case CPU_STARTING:
-+		pm_runtime_get_sync(cpu_dev);
-+		break;
-+	default:
-+		break;
++	ret = psci_0_2_init(np);
++	if (ret)
++		return ret;
++
++	/* Check if PSCI OSI mode is available */
++	ret = psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND]);
++	if (ret & PSCI_1_0_OS_INITIATED) {
++		if (!psci_features(PSCI_1_0_FN_SET_SUSPEND_MODE))
++			psci_has_osi = true;
 +	}
 +
-+	return NOTIFY_OK;
++	return 0;
 +}
-+#else
-+static int arm_idle_cpu_hotplug(struct notifier_block *nb,
-+			unsigned long action, void *data)
-+{
-+	return NOTIFY_OK;
-+}
-+#endif
 +
- /*
-  * arm_idle_init
-  *
-@@ -96,6 +135,7 @@ static int __init arm_idle_init(void)
- 	int cpu, ret;
- 	struct cpuidle_driver *drv = &arm_idle_driver;
- 	struct cpuidle_device *dev;
-+	struct device *cpu_dev;
+ static const struct of_device_id psci_of_match[] __initconst = {
+ 	{ .compatible = "arm,psci",	.data = psci_0_1_init},
+ 	{ .compatible = "arm,psci-0.2",	.data = psci_0_2_init},
+-	{ .compatible = "arm,psci-1.0",	.data = psci_0_2_init},
++	{ .compatible = "arm,psci-1.0",	.data = psci_1_0_init},
+ 	{},
+ };
  
- 	/*
- 	 * Initialize idle states data, starting at index 1.
-@@ -118,6 +158,16 @@ static int __init arm_idle_init(void)
- 	 * idle states suspend back-end specific data
- 	 */
- 	for_each_possible_cpu(cpu) {
-+
-+		/* Initialize Runtime PM for the CPU */
-+		cpu_dev = get_cpu_device(cpu);
-+		pm_runtime_irq_safe(cpu_dev);
-+		pm_runtime_enable(cpu_dev);
-+		if (cpu_online(cpu)) {
-+			pm_runtime_get_noresume(cpu_dev);
-+			pm_runtime_set_active(cpu_dev);
-+		}
-+
- 		ret = arm_cpuidle_init(cpu);
+@@ -575,6 +586,7 @@ int __init psci_dt_init(void)
+ 	struct device_node *np;
+ 	const struct of_device_id *matched_np;
+ 	psci_initcall_t init_fn;
++	int ret;
  
- 		/*
-@@ -148,10 +198,15 @@ static int __init arm_idle_init(void)
- 		}
- 	}
+ 	np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
  
-+	/* Register for hotplug notifications for runtime PM */
-+	hotcpu_notifier(arm_idle_cpu_hotplug, 0);
+@@ -582,7 +594,11 @@ int __init psci_dt_init(void)
+ 		return -ENODEV;
+ 
+ 	init_fn = (psci_initcall_t)matched_np->data;
+-	return init_fn(np);
++	ret = init_fn(np);
 +
- 	return 0;
- out_fail:
- 	while (--cpu >= 0) {
- 		dev = per_cpu(cpuidle_devices, cpu);
-+		cpu_dev = get_cpu_device(cpu);
-+		__pm_runtime_disable(cpu_dev, false);
- 		cpuidle_unregister_device(dev);
- 		kfree(dev);
- 	}
++	of_node_put(np);
++
++	return ret;
+ }
+ 
+ #ifdef CONFIG_ACPI
+diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+index 3d7a0fc..7dd778e 100644
+--- a/include/uapi/linux/psci.h
++++ b/include/uapi/linux/psci.h
+@@ -48,6 +48,7 @@
+ 
+ #define PSCI_1_0_FN_PSCI_FEATURES		PSCI_0_2_FN(10)
+ #define PSCI_1_0_FN_SYSTEM_SUSPEND		PSCI_0_2_FN(14)
++#define PSCI_1_0_FN_SET_SUSPEND_MODE		PSCI_0_2_FN(15)
+ 
+ #define PSCI_1_0_FN64_SYSTEM_SUSPEND		PSCI_0_2_FN64(14)
+ 
+@@ -93,6 +94,10 @@
+ #define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK	\
+ 			(0x1 << PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT)
+ 
++#define PSCI_1_0_OS_INITIATED			BIT(0)
++#define PSCI_1_0_SUSPEND_MODE_PC		0
++#define PSCI_1_0_SUSPEND_MODE_OSI		1
++
+ /* PSCI return values (inclusive of all PSCI versions) */
+ #define PSCI_RET_SUCCESS			0
+ #define PSCI_RET_NOT_SUPPORTED			-1
 -- 
 2.7.4
