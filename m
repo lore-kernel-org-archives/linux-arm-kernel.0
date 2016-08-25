@@ -1,142 +1,265 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Thu, 25 Aug 2016 17:56:31 +0100
-Subject: [PATCH v2] efi: arm64: treat regions with WT/WC set but WB
- cleared as memory
-In-Reply-To: <1472141829-12026-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1472141829-12026-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160825165631.GB4715@bivouac.eciton.net>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 25 Aug 2016 09:56:31 -0700
+Subject: [PATCH v3 1/2] input: misc: Add generic input driver to read
+ encoded GPIO lines
+In-Reply-To: <20160824075859.30979-2-vigneshr@ti.com>
+References: <20160824075859.30979-1-vigneshr@ti.com>
+ <20160824075859.30979-2-vigneshr@ti.com>
+Message-ID: <20160825165631.GE11206@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2016 at 06:17:09PM +0200, Ard Biesheuvel wrote:
-> Currently, memory regions are only recorded in the memblock memory table
-> if they have the EFI_MEMORY_WB memory type attribute set. In case the
-> region is of a reserved type, it is also marked as MEMBLOCK_NOMAP, which
-> will leave it out of the linear mapping.
+On Wed, Aug 24, 2016 at 01:28:58PM +0530, Vignesh R wrote:
+> Add a driver to read group of GPIO lines and provide its status as a
+> numerical value as input event to the system. This will help in
+> interfacing devices, that can be connected over GPIOs, that provide
+> input to the system by driving GPIO lines connected to them like a
+> rotary dial or a switch.
 > 
-> However, memory regions may legally have the EFI_MEMORY_WT or EFI_MEMORY_WC
-> attributes set, and the EFI_MEMORY_WB cleared, in which case the region in
-> question is obviously backed by normal memory, but is not recorded in the
-> memblock memory table at all. Since it would be useful to be able to
-> identify any UEFI reported memory region using memblock_is_memory(), it
-> makes sense to add all memory to the memblock memory table, and simply mark
-> it as MEMBLOCK_NOMAP if it lacks the EFI_MEMORY_WB attribute.
+> For example, a rotary switch can be connected to four GPIO lines. The
+> status of the GPIO lines reflect the actual position of the rotary
+> switch dial. For example, if dial points to 9, then the four GPIO lines
+> connected to the switch will read HLLH(0b'1001 = 9). This value
+> can be reported as an ABS_* event to the input subsystem.
 > 
-> While implementing this, let's refactor the code slightly to make it easier
-> to understand: replace is_normal_ram() with is_memory(), and make it return
-> true for each region that has any of the WB|WT|WC bits set. (This follows
-> the AArch64 bindings in the UEFI spec, which state that those are the
-> attributes that map to normal memory)
-> 
-> Also, replace is_reserve_region() with is_usable_memory(), and only invoke
-> it if the region in question was identified as memory by is_memory() in the
-> first place. The net result is the same (only reserved regions that are
-> backed by memory end up in the memblock memory table with the MEMBLOCK_NOMAP
-> flag set) but carried out in a more straightforward way.
-> 
-> Finally, we remove the trailing asterisk in the EFI debug output. Keeping it
-> clutters the code, and it serves no real purpose now that we no longer
-> temporarily reserve BootServices code and data regions like we did in the
-> early days of EFI support on arm64 Linux (which it inherited from the x86
-> implementation)
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-Reviewed-by: Leif Lindholm <leif.lindholm@linaro.org>
-
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 > ---
-> v2: refactor is_normal_ram and is_reserve_region
->     drop trailing asterisk in EFI debug output
 > 
->  drivers/firmware/efi/arm-init.c | 32 +++++++++++---------
->  1 file changed, 17 insertions(+), 15 deletions(-)
+> v3: Fix comments by Andrew and Dmitry
+> Link to v2: https://lkml.org/lkml/2016/8/23/79
 > 
-> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-> index c49d50e68aee..c2ac5975fd5d 100644
-> --- a/drivers/firmware/efi/arm-init.c
-> +++ b/drivers/firmware/efi/arm-init.c
-> @@ -26,9 +26,9 @@
+>  .../devicetree/bindings/input/gpio-decoder.txt     |  23 ++++
+>  drivers/input/misc/Kconfig                         |  12 ++
+>  drivers/input/misc/Makefile                        |   1 +
+>  drivers/input/misc/gpio_decoder.c                  | 134 +++++++++++++++++++++
+>  4 files changed, 170 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/input/gpio-decoder.txt
+>  create mode 100644 drivers/input/misc/gpio_decoder.c
+> 
+> diff --git a/Documentation/devicetree/bindings/input/gpio-decoder.txt b/Documentation/devicetree/bindings/input/gpio-decoder.txt
+> new file mode 100644
+> index 000000000000..14a77fb96cf0
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/input/gpio-decoder.txt
+> @@ -0,0 +1,23 @@
+> +* GPIO Decoder DT bindings
+> +
+> +Required Properties:
+> +- compatible: should be "gpio-decoder"
+> +- gpios: a spec of gpios (at least two) to be decoded to a number with
+> +  first entry representing the MSB.
+> +
+> +Optional Properties:
+> +- decoder-max-value: Maximum possible value that can be reported by
+> +  the gpios.
+> +- linux,axis: the input subsystem axis to map to (ABS_X/ABS_Y).
+> +  Defaults to 0 (ABS_X).
+> +
+> +Example:
+> +	gpio-decoder0 {
+> +		compatible = "gpio-decoder";
+> +		gpios = <&pca9536 3 GPIO_ACTIVE_HIGH>,
+> +			<&pca9536 2 GPIO_ACTIVE_HIGH>,
+> +			<&pca9536 1 GPIO_ACTIVE_HIGH>,
+> +			<&pca9536 0 GPIO_ACTIVE_HIGH>;
+> +		linux,axis = <0>; /* ABS_X */
+> +		decoder-max-value = <9>;
+> +	};
+> diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
+> index efb0ca871327..7cdb89397d18 100644
+> --- a/drivers/input/misc/Kconfig
+> +++ b/drivers/input/misc/Kconfig
+> @@ -292,6 +292,18 @@ config INPUT_GPIO_TILT_POLLED
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called gpio_tilt_polled.
 >  
->  u64 efi_system_table;
->  
-> -static int __init is_normal_ram(efi_memory_desc_t *md)
-> +static int __init is_memory(efi_memory_desc_t *md)
->  {
-> -	if (md->attribute & EFI_MEMORY_WB)
-> +	if (md->attribute & (EFI_MEMORY_WB|EFI_MEMORY_WT|EFI_MEMORY_WC))
->  		return 1;
->  	return 0;
->  }
-> @@ -152,9 +152,9 @@ out:
->  }
->  
->  /*
-> - * Return true for RAM regions we want to permanently reserve.
-> + * Return true for regions that can be used as System RAM.
->   */
-> -static __init int is_reserve_region(efi_memory_desc_t *md)
-> +static __init int is_usable_memory(efi_memory_desc_t *md)
->  {
->  	switch (md->type) {
->  	case EFI_LOADER_CODE:
-> @@ -163,18 +163,22 @@ static __init int is_reserve_region(efi_memory_desc_t *md)
->  	case EFI_BOOT_SERVICES_DATA:
->  	case EFI_CONVENTIONAL_MEMORY:
->  	case EFI_PERSISTENT_MEMORY:
-> -		return 0;
-> +		/*
-> +		 * According to the spec, these regions are no longer reserved
-> +		 * after calling ExitBootServices(). However, we can only use
-> +		 * them as System RAM if they can be mapped writeback cacheable.
-> +		 */
-> +		return (md->attribute & EFI_MEMORY_WB);
->  	default:
->  		break;
->  	}
-> -	return is_normal_ram(md);
-> +	return false;
->  }
->  
->  static __init void reserve_regions(void)
->  {
->  	efi_memory_desc_t *md;
->  	u64 paddr, npages, size;
-> -	int resv;
->  
->  	if (efi_enabled(EFI_DBG))
->  		pr_info("Processing EFI memory map:\n");
-> @@ -191,25 +195,23 @@ static __init void reserve_regions(void)
->  		paddr = md->phys_addr;
->  		npages = md->num_pages;
->  
-> -		resv = is_reserve_region(md);
->  		if (efi_enabled(EFI_DBG)) {
->  			char buf[64];
->  
-> -			pr_info("  0x%012llx-0x%012llx %s%s\n",
-> +			pr_info("  0x%012llx-0x%012llx %s\n",
->  				paddr, paddr + (npages << EFI_PAGE_SHIFT) - 1,
-> -				efi_md_typeattr_format(buf, sizeof(buf), md),
-> -				resv ? "*" : "");
-> +				efi_md_typeattr_format(buf, sizeof(buf), md));
->  		}
->  
->  		memrange_efi_to_native(&paddr, &npages);
->  		size = npages << PAGE_SHIFT;
->  
-> -		if (is_normal_ram(md))
-> +		if (is_memory(md)) {
->  			early_init_dt_add_memory_arch(paddr, size);
->  
-> -		if (resv)
-> -			memblock_mark_nomap(paddr, size);
-> -
-> +			if (!is_usable_memory(md))
-> +				memblock_mark_nomap(paddr, size);
+> +config INPUT_GPIO_DECODER
+> +	tristate "Polled GPIO Decoder Input driver"
+> +	depends on GPIOLIB || COMPILE_TEST
+> +	select INPUT_POLLDEV
+> +	help
+> +	 Say Y here if you want driver to read status of multiple GPIO
+> +	 lines and report the encoded value as an absolute integer to
+> +	 input subsystem.
+> +
+> +	 To compile this driver as a module, choose M here: the module
+> +	 will be called gpio_decoder.
+> +
+>  config INPUT_IXP4XX_BEEPER
+>  	tristate "IXP4XX Beeper support"
+>  	depends on ARCH_IXP4XX
+> diff --git a/drivers/input/misc/Makefile b/drivers/input/misc/Makefile
+> index 6a1e5e20fc1c..0b6d025f0487 100644
+> --- a/drivers/input/misc/Makefile
+> +++ b/drivers/input/misc/Makefile
+> @@ -35,6 +35,7 @@ obj-$(CONFIG_INPUT_DRV2667_HAPTICS)	+= drv2667.o
+>  obj-$(CONFIG_INPUT_GP2A)		+= gp2ap002a00f.o
+>  obj-$(CONFIG_INPUT_GPIO_BEEPER)		+= gpio-beeper.o
+>  obj-$(CONFIG_INPUT_GPIO_TILT_POLLED)	+= gpio_tilt_polled.o
+> +obj-$(CONFIG_INPUT_GPIO_DECODER)	+= gpio_decoder.o
+>  obj-$(CONFIG_INPUT_HISI_POWERKEY)	+= hisi_powerkey.o
+>  obj-$(CONFIG_HP_SDC_RTC)		+= hp_sdc_rtc.o
+>  obj-$(CONFIG_INPUT_IMS_PCU)		+= ims-pcu.o
+> diff --git a/drivers/input/misc/gpio_decoder.c b/drivers/input/misc/gpio_decoder.c
+> new file mode 100644
+> index 000000000000..1c2191d4b143
+> --- /dev/null
+> +++ b/drivers/input/misc/gpio_decoder.c
+> @@ -0,0 +1,134 @@
+> +/*
+> + * Copyright (C) 2016 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation version 2.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * A generic driver to read multiple gpio lines and translate the
+> + * encoded numeric value into an input event.
+> + */
+> +
+> +#include <linux/device.h>
+> +#include <linux/gpio/consumer.h>
+> +#include <linux/input.h>
+> +#include <linux/input-polldev.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +
+> +struct gpio_decoder {
+> +	struct input_polled_dev *poll_dev;
+> +	struct gpio_descs *input_gpios;
+> +	struct device *dev;
+> +	u32 axis;
+> +	u32 last_stable;
+> +};
+> +
+> +static unsigned int gpio_decoder_get_gpios_state(struct gpio_decoder
+> +						 *decoder)
+> +{
+> +	struct gpio_descs *gpios = decoder->input_gpios;
+> +	unsigned int ret = 0;
+> +	int i, val;
+> +
+> +	for (i = 0; i < gpios->ndescs; i++) {
+> +		val = gpiod_get_value_cansleep(gpios->desc[i]);
+> +		if (val >= 0) {
+> +			ret = (ret << 1) | !!val;
+> +		} else {
+> +			dev_err(decoder->dev, "Error reading gpio\n");
+> +			break;
+
+I think if we fail reading any one of gpio lines we should skip
+reporting the event.
+
 > +		}
->  	}
->  
->  	set_bit(EFI_MEMMAP, &efi.flags);
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static void gpio_decoder_poll_gpios(struct input_polled_dev *poll_dev)
+> +{
+> +	struct gpio_decoder *decoder = poll_dev->private;
+> +	unsigned int state = gpio_decoder_get_gpios_state(decoder);
+> +
+> +	if (state != decoder->last_stable) {
+> +		input_report_abs(poll_dev->input, decoder->axis, state);
+> +		input_sync(poll_dev->input);
+> +		decoder->last_stable = state;
+> +	}
+> +}
+> +
+> +static int gpio_decoder_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct gpio_decoder *decoder;
+> +	struct input_polled_dev *poll_dev;
+> +	u32  max;
+> +	int err;
+> +
+> +	decoder = devm_kzalloc(dev, sizeof(struct gpio_decoder), GFP_KERNEL);
+> +	if (!decoder)
+> +		return -ENOMEM;
+> +
+> +	device_property_read_u32(dev, "linux,axis", &decoder->axis);
+> +	decoder->input_gpios = devm_gpiod_get_array(dev, NULL, GPIOD_IN);
+> +	if (IS_ERR(decoder->input_gpios)) {
+> +		dev_err(dev, "unable to acquire input gpios\n");
+> +		return PTR_ERR(decoder->input_gpios);
+> +	}
+> +	if (decoder->input_gpios->ndescs < 2) {
+> +		dev_err(dev, "not enough gpios found\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (device_property_read_u32(dev, "decoder-max-value", &max))
+> +		max = BIT(decoder->input_gpios->ndescs);
+
+Shouldn't this be
+
+		max = (1U << decoder->input_gpios->ndescs) - 1;
+
+?
+
+> +
+> +	decoder->dev = dev;
+> +	poll_dev = devm_input_allocate_polled_device(decoder->dev);
+> +	if (!poll_dev)
+> +		return -ENOMEM;
+> +
+> +	poll_dev->private = decoder;
+> +	poll_dev->poll = gpio_decoder_poll_gpios;
+> +	decoder->poll_dev = poll_dev;
+> +
+> +	poll_dev->input->name = pdev->name;
+> +	poll_dev->input->id.bustype = BUS_HOST;
+> +	input_set_abs_params(poll_dev->input, decoder->axis, 0, max, 0, 1);
+
+Why do you need flat == 1? Do you actually use joydev for this device?
+
+> +
+> +	err = input_register_polled_device(poll_dev);
+> +	if (err) {
+> +		dev_err(dev, "failed to register polled  device\n");
+> +		return err;
+> +	}
+> +	platform_set_drvdata(pdev, decoder);
+> +
+> +	return 0;
+> +}
+> +
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id gpio_decoder_of_match[] = {
+> +	{ .compatible = "gpio-decoder", },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, gpio_decoder_of_match);
+> +#endif
+> +
+> +static struct platform_driver gpio_decoder_driver = {
+> +	.probe		= gpio_decoder_probe,
+> +	.driver		= {
+> +		.name	= "gpio-decoder",
+> +		.of_match_table = of_match_ptr(gpio_decoder_of_match),
+> +	}
+> +};
+> +module_platform_driver(gpio_decoder_driver);
+> +
+> +MODULE_DESCRIPTION("GPIO decoder input driver");
+> +MODULE_AUTHOR("Vignesh R <vigneshr@ti.com>");
+> +MODULE_LICENSE("GPL v2");
 > -- 
-> 2.7.4
+> 2.9.2
 > 
+
+No need to resubmit, I can adjust on my side.
+
+-- 
+Dmitry
