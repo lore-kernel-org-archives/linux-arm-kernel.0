@@ -1,58 +1,164 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 25 Aug 2016 16:28:22 +0900
-Subject: [PATCH 1/2] clk: samsung: exynos5260: Move struct samsung_cmu_info
- to init section
-In-Reply-To: <20160825001109.GO19826@codeaurora.org>
-References: <1471834185-20249-1-git-send-email-cw00.choi@samsung.com>
- <1471834185-20249-2-git-send-email-cw00.choi@samsung.com>
- <CGME20160823005523epcas1p3993794ba487bb055cbf8a0b247fcb280@epcas1p3.samsung.com>
- <20160823005512.GP6502@codeaurora.org> <57BBB66E.2060807@samsung.com>
- <84e40b9b-1e08-24e0-f1ef-60b38b760ae6@samsung.com>
- <20160824044346.GR6502@codeaurora.org> <57BD5CFB.5050500@samsung.com>
- <20160825001109.GO19826@codeaurora.org>
-Message-ID: <57BE9E16.7090309@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 25 Aug 2016 09:35:55 +0200
+Subject: [PATCH 1/2] ARM: dts: sun8i: Add dts file for inet-d978_rev2
+ tablets
+In-Reply-To: <43601472083053@web23m.yandex.ru>
+References: <20160823064451.25997-1-icenowy@aosc.xyz>
+ <20160823064451.25997-2-icenowy@aosc.xyz>
+ <20160824193235.GR8103@lukather> <43601472083053@web23m.yandex.ru>
+Message-ID: <20160825073555.GC7776@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On 2016? 08? 25? 09:11, Stephen Boyd wrote:
-> On 08/24, Chanwoo Choi wrote:
->> On 2016? 08? 24? 13:43, Stephen Boyd wrote:
->>> On 08/23, Sylwester Nawrocki wrote:
->>>> So the saving is rather insignificant but the patch doesn't make
->>>> things worse and I'd say it might be worth applying.
->>>>
->>>
->>> Sounds good. This sort of information should be in the commit
->>> text though. Talking about const doesn't make any sense to me.
->>
->> Do you mean that 'const' is initconst secion?
+On Thu, Aug 25, 2016 at 07:57:33AM +0800, Icenowy Zheng wrote:
 > 
-> No. Marking it as initconst in the patch is correct.
-
-OK.
-
 > 
->> If possible, could you explain the anything
->> why you don't make sense about 'const'?
->>
+> 25.08.2016, 03:32, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> > Hi,
+> >
+> > On Tue, Aug 23, 2016 at 02:44:50PM +0800, Icenowy Zheng wrote:
+> >> ?The inet-d978_rev2 is a pcb used in generic A33 based tablets. It features
+> >> ?volume buttons, micro-usb otg, headphone connector and a power button.
+> >>
+> >> ?On the board a Realtek RTL8723BS SDIO Wi-Fi module are soldered, and there
+> >> ?is also a accompanied board which has a Goodix GT9271 soldered.
+> >>
+> >> ?As this board is desired to create tablets with a Home key dealed by
+> >> ?GT9271, a LED is present at the front panel at the position of the
+> >> ?Home key.
+> >>
+> >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> >> ?---
+> >> ??arch/arm/boot/dts/Makefile | 1 +
+> >> ??arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts | 87 ++++++++++++++++++++++++++
+> >> ??2 files changed, 88 insertions(+)
+> >> ??create mode 100644 arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+> >>
+> >> ?diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >> ?index faacd52..d1812a0 100644
+> >> ?--- a/arch/arm/boot/dts/Makefile
+> >> ?+++ b/arch/arm/boot/dts/Makefile
+> >> ?@@ -782,6 +782,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+> >> ??????????sun8i-a23-q8-tablet.dtb \
+> >> ??????????sun8i-a33-et-q8-v1.6.dtb \
+> >> ??????????sun8i-a33-ga10h-v1.1.dtb \
+> >> ?+ sun8i-a33-inet-d978-rev2.dtb \
+> >> ??????????sun8i-a33-ippo-q8h-v1.2.dtb \
+> >> ??????????sun8i-a33-q8-tablet.dtb \
+> >> ??????????sun8i-a33-sinlinx-sina33.dtb \
+> >> ?diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+> >> ?new file mode 100644
+> >> ?index 0000000..78823d8
+> >> ?--- /dev/null
+> >> ?+++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+> >> ?@@ -0,0 +1,87 @@
+> >> ?+/*
+> >> ?+ * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
+> >
+> > I guess you are the author too :)
+> >
+> >> ?+ *
+> >> ?+ * This file is dual-licensed: you can use it either under the terms
+> >> ?+ * of the GPL or the X11 license, at your option. Note that this dual
+> >> ?+ * licensing only applies to this file, and not this project as a
+> >> ?+ * whole.
+> >> ?+ *
+> >> ?+ * a) This file is free software; you can redistribute it and/or
+> >> ?+ * modify it under the terms of the GNU General Public License as
+> >> ?+ * published by the Free Software Foundation; either version 2 of the
+> >> ?+ * License, or (at your option) any later version.
+> >> ?+ *
+> >> ?+ * This file is distributed in the hope that it will be useful,
+> >> ?+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> ?+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> >> ?+ * GNU General Public License for more details.
+> >> ?+ *
+> >> ?+ * Or, alternatively,
+> >> ?+ *
+> >> ?+ * b) Permission is hereby granted, free of charge, to any person
+> >> ?+ * obtaining a copy of this software and associated documentation
+> >> ?+ * files (the "Software"), to deal in the Software without
+> >> ?+ * restriction, including without limitation the rights to use,
+> >> ?+ * copy, modify, merge, publish, distribute, sublicense, and/or
+> >> ?+ * sell copies of the Software, and to permit persons to whom the
+> >> ?+ * Software is furnished to do so, subject to the following
+> >> ?+ * conditions:
+> >> ?+ *
+> >> ?+ * The above copyright notice and this permission notice shall be
+> >> ?+ * included in all copies or substantial portions of the Software.
+> >> ?+ *
+> >> ?+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> >> ?+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> >> ?+ * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> >> ?+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> >> ?+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> >> ?+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> >> ?+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> >> ?+ * OTHER DEALINGS IN THE SOFTWARE.
+> >> ?+ */
+> >> ?+
+> >> ?+/dts-v1/;
+> >> ?+#include "sun8i-a33.dtsi"
+> >> ?+#include "sun8i-reference-design-tablet.dtsi"
+> >> ?+
+> >> ?+/ {
+> >> ?+ model = "INet-D978 Rev 02";
+> >> ?+ compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
+> >> ?+
+> >> ?+ leds {
+> >> ?+ compatible = "gpio-leds";
+> >> ?+ pinctrl-names = "default";
+> >> ?+ pinctrl-0 = <&led_pin_d978>;
+> >> ?+
+> >> ?+ home {
+> >> ?+ label = "d978:home";
+> >
+> > This is not the proper format for the led labels.
+> >
+> > It's supposed to be <board>:<color>:<function>
 > 
-> I'm just saying that the reasoning to move it from the text
-> section to the data section shouldn't be because of const. There
-> should be better reasons to do this, like size benefits.
+> Thanks.
+> So I'd use "d978:blue:home".
 > 
+> >
+> >> ?+ gpios = <&r_pio 0 5 GPIO_ACTIVE_HIGH>; /* PL5 */
+> >> ?+ };
+> >> ?+ };
+> >> ?+};
+> >> ?+
+> >> ?+&mmc1_pins_a {
+> >> ?+ allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> >> ?+};
+> >> ?+
+> >> ?+&mmc1 {
+> >> ?+ pinctrl-names = "default";
+> >> ?+ pinctrl-0 = <&mmc1_pins_a>;
+> >> ?+ vmmc-supply = <&reg_dldo1>;
+> >> ?+ bus-width = <4>;
+> >> ?+ non-removable;
+> >> ?+ status = "okay";
+> >> ?+
+> >> ?+ rtl8723bs: sdio_wifi at 1 {
+> >> ?+ reg = <1>;
+> >> ?+ };
+> >
+> > Don't you need an alias to this node to have the MAC address set?
+> 
+> It seems that rtl8723bs come with an eFUSE.
 
-As I already said, the samsung_cmu_register_on() requires
-the 'const' type argument for 'struct samsung_cmu_info'.
+Ok, good to know.
 
-So, I defined the instance on the out of the exynos5260_clk_aud_init() as following:
-	static const struct samsung_cmu_info aud_cmu __initconst = {
-
-How can i add the 'const' keyword and '__initsecion' to the 
-"struct samsung_cmu_info aud_cmu" in the "static void __init 
-exynos5260_clk_aud_init(struct device_node *np)"?
+Thanks!
+Maxime
 
 -- 
-Best Regards,
-Chanwoo Choi
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160825/f4533945/attachment.sig>
