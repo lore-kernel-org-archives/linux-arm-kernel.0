@@ -1,59 +1,42 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Thu, 25 Aug 2016 07:58:27 +0800
-Subject: [PATCH 2/2] ARM: dts: sun8i: enable UART1 for iNet D978 Rev2 board
-In-Reply-To: <20160824193600.GS8103@lukather>
-References: <20160823064451.25997-1-icenowy@aosc.xyz>
- <20160823064451.25997-3-icenowy@aosc.xyz> <20160824193600.GS8103@lukather>
-Message-ID: <43951472083107@web23m.yandex.ru>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 24 Aug 2016 17:11:09 -0700
+Subject: [PATCH 1/2] clk: samsung: exynos5260: Move struct
+ samsung_cmu_info to init section
+In-Reply-To: <57BD5CFB.5050500@samsung.com>
+References: <1471834185-20249-1-git-send-email-cw00.choi@samsung.com>
+ <1471834185-20249-2-git-send-email-cw00.choi@samsung.com>
+ <CGME20160823005523epcas1p3993794ba487bb055cbf8a0b247fcb280@epcas1p3.samsung.com>
+ <20160823005512.GP6502@codeaurora.org>
+ <57BBB66E.2060807@samsung.com>
+ <84e40b9b-1e08-24e0-f1ef-60b38b760ae6@samsung.com>
+ <20160824044346.GR6502@codeaurora.org>
+ <57BD5CFB.5050500@samsung.com>
+Message-ID: <20160825001109.GO19826@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 08/24, Chanwoo Choi wrote:
+> On 2016? 08? 24? 13:43, Stephen Boyd wrote:
+> > On 08/23, Sylwester Nawrocki wrote:
+> >> So the saving is rather insignificant but the patch doesn't make
+> >> things worse and I'd say it might be worth applying.
+> >>
+> > 
+> > Sounds good. This sort of information should be in the commit
+> > text though. Talking about const doesn't make any sense to me.
+> 
+> Do you mean that 'const' is initconst secion?
 
+No. Marking it as initconst in the patch is correct.
 
-25.08.2016, 03:36, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> Hi,
->
-> On Tue, Aug 23, 2016 at 02:44:51PM +0800, Icenowy Zheng wrote:
->> ?UART1 is connected to the bluetooth part of RTL8723BS WiFi/BT combo card
->> ?on iNet D978 Rev2 board.
->>
->> ?Enable the UART1 to make it possible to use the modified hciattach by
->> ?Realtek to drive the BT part of RTL8723BS.
->>
->> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->
-> I guess you could fold that patch into the previous one.
->
->> ?---
->> ??arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts | 11 +++++++++++
->> ??1 file changed, 11 insertions(+)
->>
->> ?diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
->> ?index 78823d8..3ac22d4 100644
->> ?--- a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
->> ?+++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
->> ?@@ -48,6 +48,10 @@
->> ??????????model = "INet-D978 Rev 02";
->> ??????????compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
->>
->> ?+ aliases {
->> ?+ serial1 = &uart1;
->> ?+ };
->> ?+
->
-> Is there any other UART in the system?
+> If possible, could you explain the anything
+> why you don't make sense about 'const'?
+> 
 
-serial0 is defined in sun8i-reference-design-tablet.dtsi, as r_uart.
+I'm just saying that the reasoning to move it from the text
+section to the data section shouldn't be because of const. There
+should be better reasons to do this, like size benefits.
 
->
-> The alias is not supposed to be about the controller index, but the
-> index in the board, meaning that if you only have a single UART, that
-> would be serial0.
->
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
