@@ -1,113 +1,88 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Thu, 25 Aug 2016 09:03:40 +0200
-Subject: [PATCH v3 3/5] gpu: drm: exynos_hdmi: Move DDC logic into single
- function
-In-Reply-To: <1472044039-16536-4-git-send-email-woogyom.kim@gmail.com>
-References: <1472044039-16536-1-git-send-email-woogyom.kim@gmail.com>
- <1472044039-16536-4-git-send-email-woogyom.kim@gmail.com>
-Message-ID: <f343128f-9794-fcb8-78b4-61fcdd7fb935@samsung.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Thu, 25 Aug 2016 15:08:38 +0800
+Subject: [PATCH] ARM: imx: add cpuidle support for i.mx6ul
+In-Reply-To: <1472055231-28434-1-git-send-email-Anson.Huang@nxp.com>
+References: <1472055231-28434-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <CAL411-rVg6HHj=MoZ32tK6QoioehPKjbu71mHr1c4QCoD8mXCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/24/2016 03:07 PM, Milo Kim wrote:
-> Paring DT properties and getting the I2C adapter in one function.
 >
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Cc: David Airlie <airlied@linux.ie>
-> Cc: Inki Dae <inki.dae@samsung.com>
-> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
-> Cc: Seung-Woo Kim <sw0312.kim@samsung.com>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: dri-devel at lists.freedesktop.org
-> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 > ---
->  drivers/gpu/drm/exynos/exynos_hdmi.c | 46 ++++++++++++++++++++----------------
->  1 file changed, 25 insertions(+), 21 deletions(-)
+>  arch/arm/mach-imx/cpuidle-imx6sx.c | 10 ++++++++++
+>  arch/arm/mach-imx/mach-imx6ul.c    |  3 +++
+>  2 files changed, 13 insertions(+)
 >
-> diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-> index 2275efe..8d99b5d 100644
-> --- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-> +++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-> @@ -1760,16 +1760,34 @@ static const struct component_ops hdmi_component_ops = {
->  	.unbind = hdmi_unbind,
->  };
->  
-> -static struct device_node *hdmi_legacy_ddc_dt_binding(struct device *dev)
-> +static int hdmi_get_ddc_adapter(struct hdmi_context *hdata)
+> diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c b/arch/arm/mach-imx/cpuidle-imx6sx.c
+> index 41cdce6..b4fcc8ae 100644
+> --- a/arch/arm/mach-imx/cpuidle-imx6sx.c
+> +++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
+> @@ -9,14 +9,21 @@
+>  #include <linux/cpuidle.h>
+>  #include <linux/cpu_pm.h>
+>  #include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <asm/cacheflush.h>
+>  #include <asm/cpuidle.h>
+>  #include <asm/suspend.h>
+>
+>  #include "common.h"
+>  #include "cpuidle.h"
+>
+> +static bool pl310_available;
+> +
+
+
+>  static int imx6sx_idle_finish(unsigned long val)
 >  {
->  	const char *compatible_str = "samsung,exynos4210-hdmiddc";
->  	struct device_node *np;
-> +	struct i2c_adapter *adpt;
->  
->  	np = of_find_compatible_node(NULL, NULL, compatible_str);
->  	if (np)
-> -		return of_get_next_parent(np);
-> +		np = of_get_next_parent(np);
-> +	else
-> +		np = of_parse_phandle(hdata->dev->of_node, "ddc", 0);
+> +       /* check if need to flush internal L2 cache */
+> +       if (!pl310_available)
+
+Just wondering why you need an extra variable here?
+Calling of_find_compatible_node takes long time at that time?
+
+Peter
+
+> +               flush_cache_all();
+>         cpu_do_idle();
+>
+>         return 0;
+> @@ -101,5 +108,8 @@ int __init imx6sx_cpuidle_init(void)
+>         imx_gpc_set_arm_power_up_timing(2, 1);
+>         imx_gpc_set_arm_power_down_timing(1, 1);
+>
+> +       if (of_find_compatible_node(NULL, NULL, "arm,pl310-cache"))
+> +               pl310_available = true;
 > +
-> +	if (!np) {
-> +		DRM_ERROR("Failed to find ddc node in device tree\n");
-> +		return -ENODEV;
-> +	}
->  
-> -	return NULL;
-> +	adpt = of_find_i2c_adapter_by_node(np);
-You can put of_node_put here, instead of duplicating it on both
-execution paths.
-> +	if (!adpt) {
-> +		DRM_ERROR("Failed to get ddc i2c adapter by node\n");
-In case of probe deferring DRM_INFO should be enough, or even DRM_DEBUG.
-> +		of_node_put(np);
-> +		return -EPROBE_DEFER;
-> +	}
-> +
-> +	hdata->ddc_adpt = adpt;
-> +	of_node_put(np);
-> +
-> +	return 0;
+>         return cpuidle_register(&imx6sx_cpuidle_driver, NULL);
 >  }
->  
->  static struct device_node *hdmi_legacy_phy_dt_binding(struct device *dev)
-> @@ -1781,7 +1799,7 @@ static struct device_node *hdmi_legacy_phy_dt_binding(struct device *dev)
->  
->  static int hdmi_probe(struct platform_device *pdev)
+> diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
+> index c2cd61c..9c5e8f3 100644
+> --- a/arch/arm/mach-imx/mach-imx6ul.c
+> +++ b/arch/arm/mach-imx/mach-imx6ul.c
+> @@ -16,6 +16,7 @@
+>  #include <asm/mach/map.h>
+>
+>  #include "common.h"
+> +#include "cpuidle.h"
+>
+>  static void __init imx6ul_enet_clk_init(void)
 >  {
-> -	struct device_node *ddc_node, *phy_node;
-> +	struct device_node *phy_node;
->  	struct device *dev = &pdev->dev;
->  	struct hdmi_context *hdata;
->  	struct resource *res;
-> @@ -1811,23 +1829,9 @@ static int hdmi_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> -	ddc_node = hdmi_legacy_ddc_dt_binding(dev);
-> -	if (ddc_node)
-> -		goto out_get_ddc_adpt;
-> -
-> -	ddc_node = of_parse_phandle(dev->of_node, "ddc", 0);
-> -	if (!ddc_node) {
-> -		DRM_ERROR("Failed to find ddc node in device tree\n");
-> -		return -ENODEV;
-> -	}
-> -	of_node_put(dev->of_node);
-> -
-> -out_get_ddc_adpt:
-> -	hdata->ddc_adpt = of_find_i2c_adapter_by_node(ddc_node);
-> -	if (!hdata->ddc_adpt) {
-> -		DRM_ERROR("Failed to get ddc i2c adapter by node\n");
-> -		return -EPROBE_DEFER;
-> -	}
-> +	ret = hdmi_get_ddc_adapter(hdata);
-> +	if (ret)
-> +		return ret;
->  
->  	phy_node = hdmi_legacy_phy_dt_binding(dev);
->  	if (phy_node)
+> @@ -80,6 +81,8 @@ static void __init imx6ul_init_irq(void)
+>
+>  static void __init imx6ul_init_late(void)
+>  {
+> +       imx6sx_cpuidle_init();
+> +
+>         if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
+>                 imx6_pm_opp_init();
+>                 platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
