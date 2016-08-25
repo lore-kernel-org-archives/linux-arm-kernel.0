@@ -1,89 +1,265 @@
-From: chris.brandt@renesas.com (Chris Brandt)
-Date: Thu, 25 Aug 2016 11:31:15 -0400
-Subject: [PATCH] ARM: dts: rskrza1: initial device tree
-Message-ID: <20160825153115.15291-1-chris.brandt@renesas.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Aug 2016 17:39:00 +0200
+Subject: [PATCH v2 1/2] smc91x: always use 8-bit access if necessary
+In-Reply-To: <20160825144633.1850889-1-arnd@arndb.de>
+References: <20160825144633.1850889-1-arnd@arndb.de>
+Message-ID: <3107598.uul2xx8LJA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the initial device tree for the RZ/A1 based development board (RSK).
+As Russell King found out the hard way, a change I did to fix multiplatform
+builds with this driver broke the old Assabet/Neponset platform: It turns
+out that while the driver is runtime configurable in principle, the
+runtime configuration does not cover the specific case of machines that
+can not do any 16-bit I/O on the smc91x registers.
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+The driver currently provides helpers to access 16-bit registers for
+architectures that are known at compile-time to only have 8-bit I/O,
+but my patch changed it to a runtime flag that never gets consulted
+most register accesses.
+
+This introduces new SMC_out16()/SMC_in16 helpers (if anyone can suggest
+a better name, I'm glad to modify this) that behaves like SMC_outw()/SMC_inw()
+most of the time, but uses a pair of 8-bit accesses on platforms that
+have no support for wider register accesses.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Reported-by: Russell King <linux@armlinux.org.uk>
+Fixes: b70661c70830d ("net: smc91x: use run-time configuration on all ARM machines")
 ---
- arch/arm/boot/dts/Makefile             |  1 +
- arch/arm/boot/dts/r7s72100-rskrza1.dts | 53 ++++++++++++++++++++++++++++++++++
- 2 files changed, 54 insertions(+)
- create mode 100644 arch/arm/boot/dts/r7s72100-rskrza1.dts
+Having bad luck streak with this patch, the version I sent
+had a couple of mistakes from the last rebase before sending
+it out, this version should actually apply and build.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index faacd52..c1c4d912 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -651,6 +651,7 @@ dtb-$(CONFIG_ARCH_S5PV210) += \
- dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
- 	emev2-kzm9d.dtb \
- 	r7s72100-genmai.dtb \
-+	r7s72100-rskrza1.dtb \
- 	r8a73a4-ape6evm.dtb \
- 	r8a7740-armadillo800eva.dtb \
- 	r8a7778-bockw.dtb \
-diff --git a/arch/arm/boot/dts/r7s72100-rskrza1.dts b/arch/arm/boot/dts/r7s72100-rskrza1.dts
-new file mode 100644
-index 0000000..df9b979e
---- /dev/null
-+++ b/arch/arm/boot/dts/r7s72100-rskrza1.dts
-@@ -0,0 +1,53 @@
-+/*
-+ * Device Tree Source for the RZ/A1H RSK board
-+ *
-+ * Copyright (C) 2016 Renesas Electronics
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
+diff --git a/drivers/net/ethernet/smsc/smc91x.h b/drivers/net/ethernet/smsc/smc91x.h
+index 1a55c7976df0..497411ed6de2 100644
+--- a/drivers/net/ethernet/smsc/smc91x.h
++++ b/drivers/net/ethernet/smsc/smc91x.h
+@@ -414,30 +414,32 @@ smc_pxa_dma_insw(void __iomem *ioaddr, struct smc_local *lp, int reg, int dma,
+ #define SMC_outsl(a, r, p, l)		BUG()
+ #endif
+ 
+-#if ! SMC_CAN_USE_16BIT
+-
+ /*
+- * Any 16-bit access is performed with two 8-bit accesses if the hardware
+- * can't do it directly. Most registers are 16-bit so those are mandatory.
++ * Any 16-bit register access is performed with two 8-bit accesses if the
++ * hardware can't do it directly.
+  */
+-#define SMC_outw(x, ioaddr, reg)					\
+-	do {								\
+-		unsigned int __val16 = (x);				\
+-		SMC_outb( __val16, ioaddr, reg );			\
+-		SMC_outb( __val16 >> 8, ioaddr, reg + (1 << SMC_IO_SHIFT));\
+-	} while (0)
+-#define SMC_inw(ioaddr, reg)						\
+-	({								\
+-		unsigned int __val16;					\
+-		__val16 =  SMC_inb( ioaddr, reg );			\
++#define SMC_out16(x, ioaddr, reg)					     \
++do {									     \
++	if (SMC_CAN_USE_8BIT && !SMC_16BIT(lp)) {			     \
++		unsigned int __val16 = (x);				     \
++		SMC_outb(__val16, ioaddr, reg );			     \
++		SMC_outb(__val16 >> 8, ioaddr, reg + (1 << SMC_IO_SHIFT));   \
++	} else {							     \
++		SMC_outw(x, ioaddr, reg);				     \
++	}								     \
++} while (0)
 +
-+/dts-v1/;
-+#include "r7s72100.dtsi"
-+
-+/ {
-+	model = "RSKRZA1";
-+	compatible = "renesas,rskrza1", "renesas,r7s72100";
-+
-+	aliases {
-+		serial0 = &scif2;
-+	};
-+
-+	chosen {
-+		bootargs = "ignore_loglevel";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 8000000 {
-+		device_type = "memory";
-+		reg = <0x08000000 0x02000000>;
-+	};
-+
-+	lbsc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <13330000>;
-+};
-+
-+&usb_x1_clk {
-+	clock-frequency = <48000000>;
-+};
-+
-+&mtu2 {
-+	status = "okay";
-+};
-+
-+&scif2 {
-+	status = "okay";
-+};
-+
--- 
-2.9.2
++#define SMC_in16(ioaddr, reg)						     \
++({									     \
++	unsigned int __val16;					   	     \
++	if (SMC_CAN_USE_8BIT && !SMC_16BIT(lp)) {			     \
++		__val16 =  SMC_inb( ioaddr, reg );			     \
+ 		__val16 |= SMC_inb( ioaddr, reg + (1 << SMC_IO_SHIFT)) << 8; \
+-		__val16;						\
+-	})
+-
+-#define SMC_insw(a, r, p, l)		BUG()
+-#define SMC_outsw(a, r, p, l)		BUG()
+-
+-#endif
++	} else {							     \
++		__val16 = SMC_inw(ioaddr, reg);				     \
++	}								     \
++	__val16;							     \
++})
+ 
+ #if !defined(SMC_insw) || !defined(SMC_outsw)
+ #define SMC_insw(a, r, p, l)		BUG()
+@@ -927,113 +929,113 @@ static const char * chip_ids[ 16 ] =  {
+ 			SMC_outw((x) << 8, ioaddr, INT_REG(lp));	\
+ 	} while (0)
+ 
+-#define SMC_CURRENT_BANK(lp)	SMC_inw(ioaddr, BANK_SELECT)
++#define SMC_CURRENT_BANK(lp)	SMC_in16(ioaddr, BANK_SELECT)
+ 
+ #define SMC_SELECT_BANK(lp, x)					\
+ 	do {								\
+ 		if (SMC_MUST_ALIGN_WRITE(lp))				\
+ 			SMC_outl((x)<<16, ioaddr, 12<<SMC_IO_SHIFT);	\
+ 		else							\
+-			SMC_outw(x, ioaddr, BANK_SELECT);		\
++			SMC_out16(x, ioaddr, BANK_SELECT);		\
+ 	} while (0)
+ 
+-#define SMC_GET_BASE(lp)		SMC_inw(ioaddr, BASE_REG(lp))
++#define SMC_GET_BASE(lp)	SMC_in16(ioaddr, BASE_REG(lp))
+ 
+-#define SMC_SET_BASE(lp, x)		SMC_outw(x, ioaddr, BASE_REG(lp))
++#define SMC_SET_BASE(lp, x)	SMC_out16(x, ioaddr, BASE_REG(lp))
+ 
+-#define SMC_GET_CONFIG(lp)	SMC_inw(ioaddr, CONFIG_REG(lp))
++#define SMC_GET_CONFIG(lp)	SMC_in16(ioaddr, CONFIG_REG(lp))
+ 
+-#define SMC_SET_CONFIG(lp, x)	SMC_outw(x, ioaddr, CONFIG_REG(lp))
++#define SMC_SET_CONFIG(lp, x)	SMC_out16(x, ioaddr, CONFIG_REG(lp))
+ 
+-#define SMC_GET_COUNTER(lp)	SMC_inw(ioaddr, COUNTER_REG(lp))
++#define SMC_GET_COUNTER(lp)	SMC_in16(ioaddr, COUNTER_REG(lp))
+ 
+-#define SMC_GET_CTL(lp)		SMC_inw(ioaddr, CTL_REG(lp))
++#define SMC_GET_CTL(lp)		SMC_in16(ioaddr, CTL_REG(lp))
+ 
+-#define SMC_SET_CTL(lp, x)		SMC_outw(x, ioaddr, CTL_REG(lp))
++#define SMC_SET_CTL(lp, x)	SMC_out16(x, ioaddr, CTL_REG(lp))
+ 
+-#define SMC_GET_MII(lp)		SMC_inw(ioaddr, MII_REG(lp))
++#define SMC_GET_MII(lp)		SMC_in16(ioaddr, MII_REG(lp))
+ 
+-#define SMC_GET_GP(lp)		SMC_inw(ioaddr, GP_REG(lp))
++#define SMC_GET_GP(lp)		SMC_in16(ioaddr, GP_REG(lp))
+ 
+ #define SMC_SET_GP(lp, x)						\
+ 	do {								\
+ 		if (SMC_MUST_ALIGN_WRITE(lp))				\
+ 			SMC_outl((x)<<16, ioaddr, SMC_REG(lp, 8, 1));	\
+ 		else							\
+-			SMC_outw(x, ioaddr, GP_REG(lp));		\
++			SMC_out16(x, ioaddr, GP_REG(lp));		\
+ 	} while (0)
+ 
+-#define SMC_SET_MII(lp, x)		SMC_outw(x, ioaddr, MII_REG(lp))
++#define SMC_SET_MII(lp, x)	SMC_out16(x, ioaddr, MII_REG(lp))
+ 
+-#define SMC_GET_MIR(lp)		SMC_inw(ioaddr, MIR_REG(lp))
++#define SMC_GET_MIR(lp)		SMC_in16(ioaddr, MIR_REG(lp))
+ 
+-#define SMC_SET_MIR(lp, x)		SMC_outw(x, ioaddr, MIR_REG(lp))
++#define SMC_SET_MIR(lp, x)	SMC_out16(x, ioaddr, MIR_REG(lp))
+ 
+-#define SMC_GET_MMU_CMD(lp)	SMC_inw(ioaddr, MMU_CMD_REG(lp))
++#define SMC_GET_MMU_CMD(lp)	SMC_in16(ioaddr, MMU_CMD_REG(lp))
+ 
+-#define SMC_SET_MMU_CMD(lp, x)	SMC_outw(x, ioaddr, MMU_CMD_REG(lp))
++#define SMC_SET_MMU_CMD(lp, x)	SMC_out16(x, ioaddr, MMU_CMD_REG(lp))
+ 
+-#define SMC_GET_FIFO(lp)		SMC_inw(ioaddr, FIFO_REG(lp))
++#define SMC_GET_FIFO(lp)	SMC_in16(ioaddr, FIFO_REG(lp))
+ 
+-#define SMC_GET_PTR(lp)		SMC_inw(ioaddr, PTR_REG(lp))
++#define SMC_GET_PTR(lp)		SMC_in16(ioaddr, PTR_REG(lp))
+ 
+ #define SMC_SET_PTR(lp, x)						\
+ 	do {								\
+ 		if (SMC_MUST_ALIGN_WRITE(lp))				\
+ 			SMC_outl((x)<<16, ioaddr, SMC_REG(lp, 4, 2));	\
+ 		else							\
+-			SMC_outw(x, ioaddr, PTR_REG(lp));		\
++			SMC_out16(x, ioaddr, PTR_REG(lp));		\
+ 	} while (0)
+ 
+-#define SMC_GET_EPH_STATUS(lp)	SMC_inw(ioaddr, EPH_STATUS_REG(lp))
++#define SMC_GET_EPH_STATUS(lp)	SMC_in16(ioaddr, EPH_STATUS_REG(lp))
+ 
+-#define SMC_GET_RCR(lp)		SMC_inw(ioaddr, RCR_REG(lp))
++#define SMC_GET_RCR(lp)		SMC_in16(ioaddr, RCR_REG(lp))
+ 
+-#define SMC_SET_RCR(lp, x)		SMC_outw(x, ioaddr, RCR_REG(lp))
++#define SMC_SET_RCR(lp, x)	SMC_out16(x, ioaddr, RCR_REG(lp))
+ 
+-#define SMC_GET_REV(lp)		SMC_inw(ioaddr, REV_REG(lp))
++#define SMC_GET_REV(lp)		SMC_in16(ioaddr, REV_REG(lp))
+ 
+-#define SMC_GET_RPC(lp)		SMC_inw(ioaddr, RPC_REG(lp))
++#define SMC_GET_RPC(lp)		SMC_in16(ioaddr, RPC_REG(lp))
+ 
+ #define SMC_SET_RPC(lp, x)						\
+ 	do {								\
+ 		if (SMC_MUST_ALIGN_WRITE(lp))				\
+ 			SMC_outl((x)<<16, ioaddr, SMC_REG(lp, 8, 0));	\
+ 		else							\
+-			SMC_outw(x, ioaddr, RPC_REG(lp));		\
++			SMC_out16(x, ioaddr, RPC_REG(lp));		\
+ 	} while (0)
+ 
+-#define SMC_GET_TCR(lp)		SMC_inw(ioaddr, TCR_REG(lp))
++#define SMC_GET_TCR(lp)		SMC_in16(ioaddr, TCR_REG(lp))
+ 
+-#define SMC_SET_TCR(lp, x)		SMC_outw(x, ioaddr, TCR_REG(lp))
++#define SMC_SET_TCR(lp, x)	SMC_out16(x, ioaddr, TCR_REG(lp))
+ 
+ #ifndef SMC_GET_MAC_ADDR
+ #define SMC_GET_MAC_ADDR(lp, addr)					\
+ 	do {								\
+ 		unsigned int __v;					\
+-		__v = SMC_inw(ioaddr, ADDR0_REG(lp));			\
++		__v = SMC_in16(ioaddr, ADDR0_REG(lp));			\
+ 		addr[0] = __v; addr[1] = __v >> 8;			\
+-		__v = SMC_inw(ioaddr, ADDR1_REG(lp));			\
++		__v = SMC_in16(ioaddr, ADDR1_REG(lp));			\
+ 		addr[2] = __v; addr[3] = __v >> 8;			\
+-		__v = SMC_inw(ioaddr, ADDR2_REG(lp));			\
++		__v = SMC_in16(ioaddr, ADDR2_REG(lp));			\
+ 		addr[4] = __v; addr[5] = __v >> 8;			\
+ 	} while (0)
+ #endif
+ 
+ #define SMC_SET_MAC_ADDR(lp, addr)					\
+ 	do {								\
+-		SMC_outw(addr[0]|(addr[1] << 8), ioaddr, ADDR0_REG(lp)); \
+-		SMC_outw(addr[2]|(addr[3] << 8), ioaddr, ADDR1_REG(lp)); \
+-		SMC_outw(addr[4]|(addr[5] << 8), ioaddr, ADDR2_REG(lp)); \
++		SMC_out16(addr[0]|(addr[1] << 8), ioaddr, ADDR0_REG(lp)); \
++		SMC_out16(addr[2]|(addr[3] << 8), ioaddr, ADDR1_REG(lp)); \
++		SMC_out16(addr[4]|(addr[5] << 8), ioaddr, ADDR2_REG(lp)); \
+ 	} while (0)
+ 
+ #define SMC_SET_MCAST(lp, x)						\
+ 	do {								\
+ 		const unsigned char *mt = (x);				\
+-		SMC_outw(mt[0] | (mt[1] << 8), ioaddr, MCAST_REG1(lp)); \
+-		SMC_outw(mt[2] | (mt[3] << 8), ioaddr, MCAST_REG2(lp)); \
+-		SMC_outw(mt[4] | (mt[5] << 8), ioaddr, MCAST_REG3(lp)); \
+-		SMC_outw(mt[6] | (mt[7] << 8), ioaddr, MCAST_REG4(lp)); \
++		SMC_out16(mt[0] | (mt[1] << 8), ioaddr, MCAST_REG1(lp)); \
++		SMC_out16(mt[2] | (mt[3] << 8), ioaddr, MCAST_REG2(lp)); \
++		SMC_out16(mt[4] | (mt[5] << 8), ioaddr, MCAST_REG3(lp)); \
++		SMC_out16(mt[6] | (mt[7] << 8), ioaddr, MCAST_REG4(lp)); \
+ 	} while (0)
+ 
+ #define SMC_PUT_PKT_HDR(lp, status, length)				\
+@@ -1042,8 +1044,8 @@ static const char * chip_ids[ 16 ] =  {
+ 			SMC_outl((status) | (length)<<16, ioaddr,	\
+ 				 DATA_REG(lp));			\
+ 		else {							\
+-			SMC_outw(status, ioaddr, DATA_REG(lp));	\
+-			SMC_outw(length, ioaddr, DATA_REG(lp));	\
++			SMC_out16(status, ioaddr, DATA_REG(lp));	\
++			SMC_out16(length, ioaddr, DATA_REG(lp));	\
+ 		}							\
+ 	} while (0)
+ 
+@@ -1054,8 +1056,8 @@ static const char * chip_ids[ 16 ] =  {
+ 			(status) = __val & 0xffff;			\
+ 			(length) = __val >> 16;				\
+ 		} else {						\
+-			(status) = SMC_inw(ioaddr, DATA_REG(lp));	\
+-			(length) = SMC_inw(ioaddr, DATA_REG(lp));	\
++			(status) = SMC_in16(ioaddr, DATA_REG(lp));	\
++			(length) = SMC_in16(ioaddr, DATA_REG(lp));	\
+ 		}							\
+ 	} while (0)
+ 
