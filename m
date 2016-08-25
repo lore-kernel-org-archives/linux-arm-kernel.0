@@ -1,61 +1,86 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 25 Aug 2016 15:18:58 -0600
-Subject: [PATCH 08/28] coresight: etmv4: Fix ETMv4x peripheral ID table
+Date: Thu, 25 Aug 2016 15:18:56 -0600
+Subject: [PATCH 06/28] coresight: Fix csdev connections initialisation
 In-Reply-To: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1472159958-5981-9-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1472159958-5981-7-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-This patch cleans up the peripheral id table for different ETMv4
-implementations.
+This is a cleanup patch.
 
-As per Cortex-A53 TRM, the ETM has following id values:
+coresight_device->conns holds an array to point to the devices
+connected to the OUT ports of a component. Sinks, e.g ETR, do not
+have an OUT port (nr_outport = 0), as it streams the trace to
+memory via AXI.
 
-Peripheral ID0	0x5D	0xFE0
-Peripheral ID1	0xB9	0xFE4
-Peripheral ID2	0x4B	0xFE8
-Peripheral ID3	0x00	0xFEC
+At coresight_register() we do :
 
-where, PID2: has the following format:
+	conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
+	if (!conns) {
+		ret = -ENOMEM;
+		goto err_kzalloc_conns;
+	}
 
-[7:4]   Revision
-[3]     JEDEC   0b1     res1. Indicates a JEP106 identity code is used
-[2:0]   DES_1   0b011   ARM Limited. This is bits[6:4] of JEP106 ID code
-
-The existing table entry checks only the bits [1:0], which is not
-sufficient enough. Fix it to match bits [3:0], just like the other
-entries do. While at it, correct the comment for A57 and the A53 entry.
+For ETR, since the total size requested for kcalloc is zero, the return
+value is, ZERO_SIZE_PTR ( != NULL). Hence, csdev->conns = ZERO_SIZE_PTR
+which cannot be verified later to contain a valid pointer. The code which
+accesses the csdev->conns is bounded by the csdev->nr_outport check,
+hence we don't try to dereference the ZERO_SIZE_PTR. This patch cleans
+up the csdev->conns initialisation to make sure we initialise it
+properly(i.e, either NULL or valid conns array).
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm4x.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/hwtracing/coresight/coresight.c | 24 ++++++++++++++----------
+ 1 file changed, 14 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 17e2e81d2e90..bc5ed207a3b5 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -812,12 +812,12 @@ err_arch_supported:
- }
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index ceeaaea41ed6..bb20ee9747e1 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -894,7 +894,7 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
+ 	int nr_refcnts = 1;
+ 	atomic_t *refcnts = NULL;
+ 	struct coresight_device *csdev;
+-	struct coresight_connection *conns;
++	struct coresight_connection *conns = NULL;
  
- static struct amba_id etm4_ids[] = {
--	{       /* ETM 4.0 - Qualcomm */
--		.id	= 0x0003b95d,
--		.mask	= 0x0003ffff,
-+	{       /* ETM 4.0 - Cortex-A53  */
-+		.id	= 0x000bb95d,
-+		.mask	= 0x000fffff,
- 		.data	= "ETM 4.0",
- 	},
--	{       /* ETM 4.0 - Juno board */
-+	{       /* ETM 4.0 - Cortex-A57 */
- 		.id	= 0x000bb95e,
- 		.mask	= 0x000fffff,
- 		.data	= "ETM 4.0",
+ 	csdev = kzalloc(sizeof(*csdev), GFP_KERNEL);
+ 	if (!csdev) {
+@@ -922,16 +922,20 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
+ 
+ 	csdev->nr_inport = desc->pdata->nr_inport;
+ 	csdev->nr_outport = desc->pdata->nr_outport;
+-	conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
+-	if (!conns) {
+-		ret = -ENOMEM;
+-		goto err_kzalloc_conns;
+-	}
+ 
+-	for (i = 0; i < csdev->nr_outport; i++) {
+-		conns[i].outport = desc->pdata->outports[i];
+-		conns[i].child_name = desc->pdata->child_names[i];
+-		conns[i].child_port = desc->pdata->child_ports[i];
++	/* Initialise connections if there is at least one outport */
++	if (csdev->nr_outport) {
++		conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
++		if (!conns) {
++			ret = -ENOMEM;
++			goto err_kzalloc_conns;
++		}
++
++		for (i = 0; i < csdev->nr_outport; i++) {
++			conns[i].outport = desc->pdata->outports[i];
++			conns[i].child_name = desc->pdata->child_names[i];
++			conns[i].child_port = desc->pdata->child_ports[i];
++		}
+ 	}
+ 
+ 	csdev->conns = conns;
 -- 
 2.7.4
