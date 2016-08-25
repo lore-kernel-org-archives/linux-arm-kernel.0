@@ -1,137 +1,88 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 25 Aug 2016 17:11:30 +0200
-Subject: [PATCH] tty/serial: atmel: add fractional baud rate support
-In-Reply-To: <20160825134756.6261-1-ludovic.desroches@atmel.com>
-References: <20160825134756.6261-1-ludovic.desroches@atmel.com>
-Message-ID: <0a43b5e9-e449-1a0d-6aef-605e5fb5f5cc@atmel.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 25 Aug 2016 17:13:15 +0200
+Subject: [PATCH 2/2] ARM: dts: sun8i: enable UART1 for iNet D978 Rev2 board
+In-Reply-To: <438381472136802@web24g.yandex.ru>
+References: <20160823064451.25997-1-icenowy@aosc.xyz>
+ <20160823064451.25997-3-icenowy@aosc.xyz> <20160824193600.GS8103@lukather>
+ <43951472083107@web23m.yandex.ru>
+ <CAGb2v66tFENk8QBw7D1+bwFN-zWaE2SGDrNyc-zdbJSRzENk4Q@mail.gmail.com>
+ <97321472108244@web8m.yandex.ru> <20160825080334.GD7776@lukather>
+ <116041472134355@web12g.yandex.ru>
+ <6580ba1b-f542-58d4-9f0a-fdd8e9b86092@redhat.com>
+ <438381472136802@web24g.yandex.ru>
+Message-ID: <235ab6d3-7b9c-631e-80e1-c8e2de868eb0@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 25/08/2016 ? 15:47, Ludovic Desroches a ?crit :
-> The USART device provides a fractional baud rate generator to get a more
-> accurate baud rate. It can be used only when the USART is configured in
-> 'normal mode' and this feature is not available on AT91RM9200 SoC.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+HI,
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On 25-08-16 16:53, Icenowy Zheng wrote:
+>
+>
+> 25.08.2016, 22:18, "Hans de Goede" <hdegoede@redhat.com>:
+>> Hi,
+>>
+>> On 25-08-16 16:12, Icenowy Zheng wrote:
+>>>  25.08.2016, 16:03, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>>>>  Hi,
+>>>>
+>>>>  On Thu, Aug 25, 2016 at 02:57:24PM +0800, Icenowy Zheng wrote:
+>>>>>   >>>> diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+>>>>>   >>>> index 78823d8..3ac22d4 100644
+>>>>>   >>>> --- a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+>>>>>   >>>> +++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+>>>>>   >>>> @@ -48,6 +48,10 @@
+>>>>>   >>>> model = "INet-D978 Rev 02";
+>>>>>   >>>> compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
+>>>>>   >>>>
+>>>>>   >>>> + aliases {
+>>>>>   >>>> + serial1 = &uart1;
+>>>>>   >>>> + };
+>>>>>   >>>> +
+>>>>>   >>>
+>>>>>   >>> Is there any other UART in the system?
+>>>>>   >>
+>>>>>   >> serial0 is defined in sun8i-reference-design-tablet.dtsi, as r_uart.
+>>>>>   >
+>>>>>   > If your board does not have r_uart pads, then the right thing to do
+>>>>>   > would be to disable it. You can then have uart1 as serial0.
+>>>>>
+>>>>>   I don't know it. The RX/TX is wired on PF2/PF4 on the board (UART0 muxed with
+>>>>>   MMC)
+>>>>
+>>>>  Then you don't support it and you need to disable it.
+>>>>
+>>>>>   But many codes will require a ttyS0 as console... So I think the
+>>>>>   bluetooth should be located at ttyS1...
+>>>>
+>>>>  Most of them would use /dev/console anyway. What do you have in mind?
+>>>
+>>>  As a general configuration, /dev/ttyS0 will be indicated as the default console=
+>>>  value... (Otherwise more boards will fail)
+>>>
+>>>  Or maybe we can specify uart0 as serial0, and leave it as disabled? (Thus if the
+>>>  debug port is needed, we can easily apply a overlay with &mmc0 status as disabled,
+>>>  and &uart0 status as okay)
+>>>
+>>>  On all my A33 boards, the official boot0, u-boot all uses uart0 as debugging port.
+>>
+>> If no uart is available (and being muxed with the mmc counts as not being available)
+>> then you should not have any serial alias in the dts.
+>>
+>> In u-boot you need to use:
+>>
+>> # CONFIG_REQUIRE_SERIAL_CONSOLE is not set
+>>
+>> In the defconfig in this case, otherwise u-boot is going to be unhappy about
+>> not having a serial console.
+>
+> It's not the problem.
+>
+> Can I have no ttyS0 and just make bluetooth ttyS1?
 
-Thanks, bye,
+Ah, yes having a serial1 alias should do that I believe and I agree that it
+is probably better to not use ttyS0 for the bluetooth uart.
 
-> ---
->  drivers/tty/serial/atmel_serial.c | 41 +++++++++++++++++++++++++++++++--------
->  include/linux/atmel_serial.h      |  1 +
->  2 files changed, 34 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index 2eaa18d..1759239 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -166,6 +166,7 @@ struct atmel_uart_port {
->  	u32			rts_low;
->  	bool			ms_irq_enabled;
->  	u32			rtor;	/* address of receiver timeout register if it exists */
-> +	bool			has_frac_baudrate;
->  	bool			has_hw_timer;
->  	struct timer_list	uart_timer;
->  
-> @@ -1745,6 +1746,11 @@ static void atmel_get_ip_name(struct uart_port *port)
->  	dbgu_uart = 0x44424755;	/* DBGU */
->  	new_uart = 0x55415254;	/* UART */
->  
-> +	/*
-> +	 * Only USART devices from at91sam9260 SOC implement fractional
-> +	 * baudrate.
-> +	 */
-> +	atmel_port->has_frac_baudrate = false;
->  	atmel_port->has_hw_timer = false;
->  
->  	if (name == new_uart) {
-> @@ -1753,6 +1759,7 @@ static void atmel_get_ip_name(struct uart_port *port)
->  		atmel_port->rtor = ATMEL_UA_RTOR;
->  	} else if (name == usart) {
->  		dev_dbg(port->dev, "Usart\n");
-> +		atmel_port->has_frac_baudrate = true;
->  		atmel_port->has_hw_timer = true;
->  		atmel_port->rtor = ATMEL_US_RTOR;
->  	} else if (name == dbgu_uart) {
-> @@ -1764,6 +1771,7 @@ static void atmel_get_ip_name(struct uart_port *port)
->  		case 0x302:
->  		case 0x10213:
->  			dev_dbg(port->dev, "This version is usart\n");
-> +			atmel_port->has_frac_baudrate = true;
->  			atmel_port->has_hw_timer = true;
->  			atmel_port->rtor = ATMEL_US_RTOR;
->  			break;
-> @@ -2025,8 +2033,9 @@ static void atmel_serial_pm(struct uart_port *port, unsigned int state,
->  static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  			      struct ktermios *old)
->  {
-> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
->  	unsigned long flags;
-> -	unsigned int old_mode, mode, imr, quot, baud;
-> +	unsigned int old_mode, mode, imr, quot, baud, div, cd, fp = 0;
->  
->  	/* save the current mode register */
->  	mode = old_mode = atmel_uart_readl(port, ATMEL_US_MR);
-> @@ -2036,12 +2045,6 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  		  ATMEL_US_PAR | ATMEL_US_USMODE);
->  
->  	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk / 16);
-> -	quot = uart_get_divisor(port, baud);
-> -
-> -	if (quot > 65535) {	/* BRGR is 16-bit, so switch to slower clock */
-> -		quot /= 8;
-> -		mode |= ATMEL_US_USCLKS_MCK_DIV8;
-> -	}
->  
->  	/* byte size */
->  	switch (termios->c_cflag & CSIZE) {
-> @@ -2160,7 +2163,29 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  		atmel_uart_writel(port, ATMEL_US_CR, rts_state);
->  	}
->  
-> -	/* set the baud rate */
-> +	/*
-> +	 * Set the baud rate:
-> +	 * Fractional baudrate allows to setup output frequency more
-> +	 * accurately. This feature is enabled only when using normal mode.
-> +	 * baudrate = selected clock / (8 * (2 - OVER) * (CD + FP / 8))
-> +	 * Currently, OVER is always set to 0 so we get
-> +	 * baudrate = selected clock (16 * (CD + FP / 8))
-> +	 */
-> +	if (atmel_port->has_frac_baudrate &&
-> +	    (mode & ATMEL_US_USMODE) == ATMEL_US_USMODE_NORMAL) {
-> +		div = DIV_ROUND_CLOSEST(port->uartclk, baud);
-> +		cd = div / 16;
-> +		fp = DIV_ROUND_CLOSEST(div % 16, 2);
-> +	} else {
-> +		cd = uart_get_divisor(port, baud);
-> +	}
-> +
-> +	if (cd > 65535) {	/* BRGR is 16-bit, so switch to slower clock */
-> +		cd /= 8;
-> +		mode |= ATMEL_US_USCLKS_MCK_DIV8;
-> +	}
-> +	quot = cd | fp << ATMEL_US_FP_OFFSET;
-> +
->  	atmel_uart_writel(port, ATMEL_US_BRGR, quot);
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
->  	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN | ATMEL_US_RXEN);
-> diff --git a/include/linux/atmel_serial.h b/include/linux/atmel_serial.h
-> index 5a4d664..f8e452a 100644
-> --- a/include/linux/atmel_serial.h
-> +++ b/include/linux/atmel_serial.h
-> @@ -118,6 +118,7 @@
->  
->  #define ATMEL_US_BRGR		0x20	/* Baud Rate Generator Register */
->  #define	ATMEL_US_CD		GENMASK(15, 0)	/* Clock Divider */
-> +#define ATMEL_US_FP_OFFSET	16	/* Fractional Part */
->  
->  #define ATMEL_US_RTOR		0x24	/* Receiver Time-out Register for USART */
->  #define ATMEL_UA_RTOR		0x28	/* Receiver Time-out Register for UART */
-> 
+Regards,
 
-
--- 
-Nicolas Ferre
+Hans
