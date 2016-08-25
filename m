@@ -1,85 +1,138 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 25 Aug 2016 15:19:16 -0600
-Subject: [PATCH 26/28] coresight: etm4x: configuring include/exclude function
+Date: Thu, 25 Aug 2016 15:19:18 -0600
+Subject: [PATCH 28/28] coresight: etm4x: adding configurable start/stop
+ filtering
 In-Reply-To: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1472159958-5981-27-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1472159958-5981-29-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The include/exclude function of a tracer is applicable to address
-range and start/stop filters.  To avoid duplication and reuse code
-moving the include/exclude configuration to a function of its own.
+With this patch we add start/stop filtering as specified on
+the perf cmd line.  When the IP matches the start address
+trace generation gets triggered.  The stop condition is
+achieved when the IP matches the stop address.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm4x.c | 35 +++++++++++++++++++--------
- 1 file changed, 25 insertions(+), 10 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm4x.c | 71 +++++++++++++++++++++++++++
+ 1 file changed, 71 insertions(+)
 
 diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index aca624010b9f..1044ed609d81 100644
+index ebaefb45130f..4db8d6a4d0cb 100644
 --- a/drivers/hwtracing/coresight/coresight-etm4x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -205,13 +205,6 @@ static int etm4_parse_event_config(struct etmv4_drvdata *drvdata,
- 	/* Always start from the default config */
- 	etm4_set_default(config);
+@@ -335,12 +335,25 @@ static void etm4_disable_hw(void *info)
+ static int etm4_disable_perf(struct coresight_device *csdev,
+ 			     struct perf_event *event)
+ {
++	u32 control;
++	struct etm_filters *filters = event->hw.addr_filters;
+ 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
  
--	/*
--	 * By default the tracers are configured to trace the whole address
--	 * range.  Narrow the field only if requested by user space.
--	 */
--	if (config->mode)
--		etm4_config_trace_mode(config);
--
- 	/* Go from generic option to ETMv4 specifics */
- 	if (attr->config & BIT(ETM_OPT_CYCACC))
- 		config->cfg |= ETMv4_MODE_CYCACC;
-@@ -581,14 +574,28 @@ static void etm4_set_default_config(struct etmv4_config *config)
- 	config->vinst_ctrl |= BIT(0);
+ 	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
+ 		return -EINVAL;
+ 
+ 	etm4_disable_hw(drvdata);
++
++	/*
++	 * Check if the start/stop logic was active when the unit was stopped.
++	 * That way we can re-enable the start/stop logic when the process is
++	 * scheduled again.  Configuration of the start/stop logic happens in
++	 * function etm4_set_event_filters().
++	 */
++	control = readl_relaxed(drvdata->base + TRCVICTLR);
++	/* TRCVICTLR::SSSTATUS, bit[9] */
++	filters->ssstatus = (control & BIT(9));
++
+ 	return 0;
  }
  
--static void etm4_set_comparator_filter(struct etmv4_config *config,
--				       u64 start, u64 stop, int comparator)
-+static u64 etm4_get_access_type(struct etmv4_config *config)
- {
- 	u64 access_type = 0;
+@@ -657,6 +670,27 @@ static void etm4_set_comparator_filter(struct etmv4_config *config,
+ 	config->viiectlr |= BIT(comparator / 2);
+ }
  
--	/* EXLEVEL_NS, bits[12:15], always stay away from hypervisor mode. */
-+	/*
-+	 * EXLEVEL_NS, bits[15:12]
-+	 * The Exception levels are:
-+	 *   Bit[12] Exception level 0 - Application
-+	 *   Bit[13] Exception level 1 - OS
-+	 *   Bit[14] Exception level 2 - Hypervisor
-+	 *   Bit[15] Never implemented
-+	 *
-+	 * Always stay away from hypervisor mode.
-+	 */
- 	access_type = ETM_EXLEVEL_NS_HYP;
- 
-+	if (config->mode & ETM_MODE_EXCL_KERN)
-+		access_type |= ETM_EXLEVEL_NS_OS;
-+
-+	if (config->mode & ETM_MODE_EXCL_USER)
-+		access_type |= ETM_EXLEVEL_NS_APP;
-+
- 	/*
- 	 * EXLEVEL_S, bits[11:8], don't trace anything happening
- 	 * in secure state.
-@@ -597,6 +604,14 @@ static void etm4_set_comparator_filter(struct etmv4_config *config,
- 			ETM_EXLEVEL_S_OS	|
- 			ETM_EXLEVEL_S_HYP);
- 
-+	return access_type;
-+}
-+
-+static void etm4_set_comparator_filter(struct etmv4_config *config,
-+				       u64 start, u64 stop, int comparator)
++static void etm4_set_start_stop_filter(struct etmv4_config *config,
++				       u64 address, int comparator,
++				       enum etm_addr_type type)
 +{
++	int shift;
 +	u64 access_type = etm4_get_access_type(config);
 +
- 	/* First half of default address comparator */
- 	config->addr_val[comparator] = start;
- 	config->addr_acc[comparator] = access_type;
++	/* Configure the comparator */
++	config->addr_val[comparator] = address;
++	config->addr_acc[comparator] = access_type;
++	config->addr_type[comparator] = type;
++
++	/*
++	 * Configure ViewInst Start-Stop control register.
++	 * Addresses configured to start tracing go from bit 0 to n-1,
++	 * while those configured to stop tracing from 16 to 16 + n-1.
++	 */
++	shift = (type == ETM_ADDR_TYPE_START ? 0 : 16);
++	config->vissctlr |= BIT(shift + comparator);
++}
++
+ static void etm4_set_default_filter(struct etmv4_config *config)
+ {
+ 	u64 start, stop;
+@@ -721,6 +755,14 @@ static int etm4_get_next_comparator(struct etmv4_drvdata *drvdata, u32 type)
+ 			/* Address range comparators go in pairs */
+ 			index += 2;
+ 			break;
++		case ETM_ADDR_TYPE_START:
++		case ETM_ADDR_TYPE_STOP:
++			if (config->addr_type[index] == ETM_ADDR_TYPE_NONE)
++				return index;
++
++			/* Start/stop address can have odd indexes */
++			index += 1;
++			break;
+ 		default:
+ 			return -EINVAL;
+ 		}
+@@ -734,6 +776,7 @@ static int etm4_set_event_filters(struct etmv4_drvdata *drvdata,
+ 				  struct perf_event *event)
+ {
+ 	int i, comparator, ret = 0;
++	u64 address;
+ 	struct etmv4_config *config = &drvdata->config;
+ 	struct etm_filters *filters = event->hw.addr_filters;
+ 
+@@ -776,6 +819,34 @@ static int etm4_set_event_filters(struct etmv4_drvdata *drvdata,
+ 			/* No start-stop filtering for ViewInst */
+ 			config->vissctlr = 0x0;
+ 			break;
++		case ETM_ADDR_TYPE_START:
++		case ETM_ADDR_TYPE_STOP:
++			/* Get the right start or stop address */
++			address = (type == ETM_ADDR_TYPE_START ?
++				   filter->start_addr :
++				   filter->stop_addr);
++
++			/* Configure comparator */
++			etm4_set_start_stop_filter(config, address,
++						   comparator, type);
++
++			/*
++			 * If filters::ssstatus == 1, trace acquisition was
++			 * started but the process was yanked away before the
++			 * the stop address was hit.  As such the start/stop
++			 * logic needs to be re-started so that tracing can
++			 * resume where it left.
++			 *
++			 * The start/stop logic status when a process is
++			 * scheduled out is checked in function
++			 * etm4_disable_perf().
++			 */
++			if (filters->ssstatus)
++				config->vinst_ctrl |= BIT(9);
++
++			/* No include/exclude filtering for ViewInst */
++			config->viiectlr = 0x0;
++			break;
+ 		default:
+ 			ret = -EINVAL;
+ 			goto out;
 -- 
 2.7.4
