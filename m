@@ -1,72 +1,87 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 25 Aug 2016 15:18:51 -0600
-Subject: [PATCH 01/28] coresight: access conn->child_name only if it's
- initialised
+Date: Thu, 25 Aug 2016 15:18:52 -0600
+Subject: [PATCH 02/28] coresight-stm: support mmapping channel regions with
+ mmio_addr
 In-Reply-To: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1472159958-5981-2-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1472159958-5981-3-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudeep Holla <sudeep.holla@arm.com>
+From: Chunyan Zhang <zhang.chunyan@linaro.org>
 
-If the addition of the coresight devices get deferred, then there's a
-window before child_name is populated by of_get_coresight_platform_data
-from the respective component driver's probe and the attempted to access
-the same from coresight_orphan_match resulting in kernel NULL pointer
-dereference as below:
+CoreSight STM device allows direct mapping of the channel regions to
+userspace for zero-copy writing. To support this ability, the STM
+framework has provided a hook 'mmio_addr', this patch just implemented
+this hook for CoreSight STM.
 
-Unable to handle kernel NULL pointer dereference at virtual address 0x0
-Internal error: Oops: 96000004 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 0 PID: 1038 Comm: kworker/0:1 Not tainted 4.7.0-rc3 #124
-Hardware name: ARM Juno development board (r2) (DT)
-Workqueue: events amba_deferred_retry_func
-PC is at strcmp+0x1c/0x160
-LR is at coresight_orphan_match+0x7c/0xd0
-Call trace:
- strcmp+0x1c/0x160
- bus_for_each_dev+0x60/0xa0
- coresight_register+0x264/0x2e0
- tmc_probe+0x130/0x310
- amba_probe+0xd4/0x1c8
- driver_probe_device+0x22c/0x418
- __device_attach_driver+0xbc/0x158
- bus_for_each_drv+0x58/0x98
- __device_attach+0xc4/0x160
- device_initial_probe+0x10/0x18
- bus_probe_device+0x94/0xa0
- device_add+0x344/0x580
- amba_device_try_add+0x194/0x238
- amba_deferred_retry_func+0x48/0xd0
- process_one_work+0x118/0x378
- worker_thread+0x48/0x498
- kthread+0xd0/0xe8
- ret_from_fork+0x10/0x40
+This patch also added an item into 'channel_space' to save the physical
+base address of channel region which mmap operation needs to know.
 
-This patch adds a check for non-NULL conn->child_name before accessing
-the same.
-
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/hwtracing/coresight/coresight-stm.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index d08d1ab9bba5..ceeaaea41ed6 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -725,7 +725,8 @@ static int coresight_orphan_match(struct device *dev, void *data)
- 		/* We have found at least one orphan connection */
- 		if (conn->child_dev == NULL) {
- 			/* Does it match this newly added device? */
--			if (!strcmp(dev_name(&csdev->dev), conn->child_name)) {
-+			if (conn->child_name &&
-+			    !strcmp(dev_name(&csdev->dev), conn->child_name)) {
- 				conn->child_dev = csdev;
- 			} else {
- 				/* This component still has an orphan */
+diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
+index 73be58a11e4f..482c8bb27f87 100644
+--- a/drivers/hwtracing/coresight/coresight-stm.c
++++ b/drivers/hwtracing/coresight/coresight-stm.c
+@@ -105,10 +105,12 @@ module_param_named(
+ /**
+  * struct channel_space - central management entity for extended ports
+  * @base:		memory mapped base address where channels start.
++ * @phys:		physical base address of channel region.
+  * @guaraneed:		is the channel delivery guaranteed.
+  */
+ struct channel_space {
+ 	void __iomem		*base;
++	phys_addr_t		phys;
+ 	unsigned long		*guaranteed;
+ };
+ 
+@@ -356,6 +358,23 @@ static void stm_generic_unlink(struct stm_data *stm_data,
+ 	stm_disable(drvdata->csdev);
+ }
+ 
++static phys_addr_t
++stm_mmio_addr(struct stm_data *stm_data, unsigned int master,
++	      unsigned int channel, unsigned int nr_chans)
++{
++	struct stm_drvdata *drvdata = container_of(stm_data,
++						   struct stm_drvdata, stm);
++	phys_addr_t addr;
++
++	addr = drvdata->chs.phys + channel * BYTES_PER_CHANNEL;
++
++	if (offset_in_page(addr) ||
++	    offset_in_page(nr_chans * BYTES_PER_CHANNEL))
++		return 0;
++
++	return addr;
++}
++
+ static long stm_generic_set_options(struct stm_data *stm_data,
+ 				    unsigned int master,
+ 				    unsigned int channel,
+@@ -761,7 +780,9 @@ static void stm_init_generic_data(struct stm_drvdata *drvdata)
+ 	drvdata->stm.sw_end = 1;
+ 	drvdata->stm.hw_override = true;
+ 	drvdata->stm.sw_nchannels = drvdata->numsp;
++	drvdata->stm.sw_mmiosz = BYTES_PER_CHANNEL;
+ 	drvdata->stm.packet = stm_generic_packet;
++	drvdata->stm.mmio_addr = stm_mmio_addr;
+ 	drvdata->stm.link = stm_generic_link;
+ 	drvdata->stm.unlink = stm_generic_unlink;
+ 	drvdata->stm.set_options = stm_generic_set_options;
+@@ -808,6 +829,7 @@ static int stm_probe(struct amba_device *adev, const struct amba_id *id)
+ 	ret = stm_get_resource_byname(np, "stm-stimulus-base", &ch_res);
+ 	if (ret)
+ 		return ret;
++	drvdata->chs.phys = ch_res.start;
+ 
+ 	base = devm_ioremap_resource(dev, &ch_res);
+ 	if (IS_ERR(base))
 -- 
 2.7.4
