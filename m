@@ -1,70 +1,83 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 25 Aug 2016 14:26:59 +0800
-Subject: [PATCH v3] clocksource: sun4i: Clear interrupts after stopping timer
- in probe function
-Message-ID: <20160825062659.17433-1-wens@csie.org>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Thu, 25 Aug 2016 15:19:51 +0800
+Subject: [PATCH v8 03/11] power: act8945a_charger: Remove "battery_temperature"
+In-Reply-To: <1472109599-21915-1-git-send-email-wenyou.yang@atmel.com>
+References: <1472109599-21915-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1472109599-21915-4-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bootloader (U-boot) sometimes uses this timer for various delays.
-It uses it as a ongoing counter, and does comparisons on the current
-counter value. The timer counter is never stopped.
+Remove "battery_temperature" member, it is redundant, it is the
+hardware's responsibility to handle TH pin properly.
+It is unnecessary to use the dt property to check if there is
+a battery temperature monitor or not.
 
-In some cases when the user interacts with the bootloader, or lets
-it idle for some time before loading Linux, the timer may expire,
-and an interrupt will be pending. This results in an unexpected
-interrupt when the timer interrupt is enabled by the kernel, at
-which point the event_handler isn't set yet. This results in a NULL
-pointer dereference exception, panic, and no way to reboot.
-
-Clear any pending interrupts after we stop the timer in the probe
-function to avoid this.
-
-Cc: stable at vger.kernel.org
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 ---
-Changes since v2:
 
-  - Add static helper function to clear interrupts as suggested by Daniel.
+Changes in v8: None
+Changes in v7:
+ - Fix the missing negation sign.
 
-Changes since v1:
+Changes in v6: None
+Changes in v5: None
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
 
-  - Add stable kernel to Cc.
----
- drivers/clocksource/sun4i_timer.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ drivers/power/supply/act8945a_charger.c | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 97669ee4df2a..c83452cacb41 100644
---- a/drivers/clocksource/sun4i_timer.c
-+++ b/drivers/clocksource/sun4i_timer.c
-@@ -123,12 +123,16 @@ static struct clock_event_device sun4i_clockevent = {
- 	.set_next_event = sun4i_clkevt_next_event,
+diff --git a/drivers/power/supply/act8945a_charger.c b/drivers/power/supply/act8945a_charger.c
+index 3f486c9..af00668 100644
+--- a/drivers/power/supply/act8945a_charger.c
++++ b/drivers/power/supply/act8945a_charger.c
+@@ -76,7 +76,6 @@ static const char *act8945a_charger_manufacturer = "Active-semi";
+ 
+ struct act8945a_charger {
+ 	struct regmap *regmap;
+-	bool battery_temperature;
  };
  
-+static void sun4i_timer_clear_interrupt(void)
-+{
-+	writel(TIMER_IRQ_EN(0), timer_base + TIMER_IRQ_ST_REG);
-+}
+ static int act8945a_get_charger_state(struct regmap *regmap, int *val)
+@@ -138,8 +137,7 @@ static int act8945a_get_charge_type(struct regmap *regmap, int *val)
+ 	return 0;
+ }
  
- static irqreturn_t sun4i_timer_interrupt(int irq, void *dev_id)
+-static int act8945a_get_battery_health(struct act8945a_charger *charger,
+-				       struct regmap *regmap, int *val)
++static int act8945a_get_battery_health(struct regmap *regmap, int *val)
  {
- 	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
+ 	int ret;
+ 	unsigned int status;
+@@ -148,7 +146,7 @@ static int act8945a_get_battery_health(struct act8945a_charger *charger,
+ 	if (ret < 0)
+ 		return ret;
  
--	writel(0x1, timer_base + TIMER_IRQ_ST_REG);
-+	sun4i_timer_clear_interrupt();
- 	evt->event_handler(evt);
+-	if (charger->battery_temperature && !(status & APCH_STATUS_TEMPDAT))
++	if (!(status & APCH_STATUS_TEMPDAT))
+ 		*val = POWER_SUPPLY_HEALTH_OVERHEAT;
+ 	else if (!(status & APCH_STATUS_INDAT))
+ 		*val = POWER_SUPPLY_HEALTH_OVERVOLTAGE;
+@@ -188,8 +186,7 @@ static int act8945a_charger_get_property(struct power_supply *psy,
+ 		val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
+ 		break;
+ 	case POWER_SUPPLY_PROP_HEALTH:
+-		ret = act8945a_get_battery_health(charger,
+-						  regmap, &val->intval);
++		ret = act8945a_get_battery_health(regmap, &val->intval);
+ 		break;
+ 	case POWER_SUPPLY_PROP_MODEL_NAME:
+ 		val->strval = act8945a_charger_model;
+@@ -235,9 +232,6 @@ static int act8945a_charger_config(struct device *dev,
+ 		return -EINVAL;
+ 	}
  
- 	return IRQ_HANDLED;
-@@ -208,6 +212,9 @@ static int __init sun4i_timer_init(struct device_node *node)
- 	/* Make sure timer is stopped before playing with interrupts */
- 	sun4i_clkevt_time_stop(0);
- 
-+	/* clear timer0 interrupt */
-+	sun4i_timer_clear_interrupt();
-+
- 	sun4i_clockevent.cpumask = cpu_possible_mask;
- 	sun4i_clockevent.irq = irq;
+-	charger->battery_temperature = of_property_read_bool(np,
+-				"active-semi,check-battery-temperature");
+-
+ 	chglev_pin = of_get_named_gpio_flags(np,
+ 				"active-semi,chglev-gpios", 0, &flags);
  
 -- 
-2.9.3
+2.7.4
