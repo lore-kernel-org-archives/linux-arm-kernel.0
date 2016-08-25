@@ -1,164 +1,66 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 25 Aug 2016 09:35:55 +0200
-Subject: [PATCH 1/2] ARM: dts: sun8i: Add dts file for inet-d978_rev2
- tablets
-In-Reply-To: <43601472083053@web23m.yandex.ru>
-References: <20160823064451.25997-1-icenowy@aosc.xyz>
- <20160823064451.25997-2-icenowy@aosc.xyz>
- <20160824193235.GR8103@lukather> <43601472083053@web23m.yandex.ru>
-Message-ID: <20160825073555.GC7776@lukather>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Thu, 25 Aug 2016 15:38:35 +0800
+Subject: [PATCH v8 09/11] doc: bindings: mfd: act8945a: Update the example
+In-Reply-To: <1472109599-21915-1-git-send-email-wenyou.yang@atmel.com>
+References: <1472109599-21915-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1472110715-22242-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2016 at 07:57:33AM +0800, Icenowy Zheng wrote:
-> 
-> 
-> 25.08.2016, 03:32, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> > Hi,
-> >
-> > On Tue, Aug 23, 2016 at 02:44:50PM +0800, Icenowy Zheng wrote:
-> >> ?The inet-d978_rev2 is a pcb used in generic A33 based tablets. It features
-> >> ?volume buttons, micro-usb otg, headphone connector and a power button.
-> >>
-> >> ?On the board a Realtek RTL8723BS SDIO Wi-Fi module are soldered, and there
-> >> ?is also a accompanied board which has a Goodix GT9271 soldered.
-> >>
-> >> ?As this board is desired to create tablets with a Home key dealed by
-> >> ?GT9271, a LED is present at the front panel at the position of the
-> >> ?Home key.
-> >>
-> >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> >> ?---
-> >> ??arch/arm/boot/dts/Makefile | 1 +
-> >> ??arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts | 87 ++++++++++++++++++++++++++
-> >> ??2 files changed, 88 insertions(+)
-> >> ??create mode 100644 arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
-> >>
-> >> ?diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> >> ?index faacd52..d1812a0 100644
-> >> ?--- a/arch/arm/boot/dts/Makefile
-> >> ?+++ b/arch/arm/boot/dts/Makefile
-> >> ?@@ -782,6 +782,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
-> >> ??????????sun8i-a23-q8-tablet.dtb \
-> >> ??????????sun8i-a33-et-q8-v1.6.dtb \
-> >> ??????????sun8i-a33-ga10h-v1.1.dtb \
-> >> ?+ sun8i-a33-inet-d978-rev2.dtb \
-> >> ??????????sun8i-a33-ippo-q8h-v1.2.dtb \
-> >> ??????????sun8i-a33-q8-tablet.dtb \
-> >> ??????????sun8i-a33-sinlinx-sina33.dtb \
-> >> ?diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
-> >> ?new file mode 100644
-> >> ?index 0000000..78823d8
-> >> ?--- /dev/null
-> >> ?+++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
-> >> ?@@ -0,0 +1,87 @@
-> >> ?+/*
-> >> ?+ * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
-> >
-> > I guess you are the author too :)
-> >
-> >> ?+ *
-> >> ?+ * This file is dual-licensed: you can use it either under the terms
-> >> ?+ * of the GPL or the X11 license, at your option. Note that this dual
-> >> ?+ * licensing only applies to this file, and not this project as a
-> >> ?+ * whole.
-> >> ?+ *
-> >> ?+ * a) This file is free software; you can redistribute it and/or
-> >> ?+ * modify it under the terms of the GNU General Public License as
-> >> ?+ * published by the Free Software Foundation; either version 2 of the
-> >> ?+ * License, or (at your option) any later version.
-> >> ?+ *
-> >> ?+ * This file is distributed in the hope that it will be useful,
-> >> ?+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> ?+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> >> ?+ * GNU General Public License for more details.
-> >> ?+ *
-> >> ?+ * Or, alternatively,
-> >> ?+ *
-> >> ?+ * b) Permission is hereby granted, free of charge, to any person
-> >> ?+ * obtaining a copy of this software and associated documentation
-> >> ?+ * files (the "Software"), to deal in the Software without
-> >> ?+ * restriction, including without limitation the rights to use,
-> >> ?+ * copy, modify, merge, publish, distribute, sublicense, and/or
-> >> ?+ * sell copies of the Software, and to permit persons to whom the
-> >> ?+ * Software is furnished to do so, subject to the following
-> >> ?+ * conditions:
-> >> ?+ *
-> >> ?+ * The above copyright notice and this permission notice shall be
-> >> ?+ * included in all copies or substantial portions of the Software.
-> >> ?+ *
-> >> ?+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> >> ?+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> >> ?+ * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> >> ?+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> >> ?+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> >> ?+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> >> ?+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> >> ?+ * OTHER DEALINGS IN THE SOFTWARE.
-> >> ?+ */
-> >> ?+
-> >> ?+/dts-v1/;
-> >> ?+#include "sun8i-a33.dtsi"
-> >> ?+#include "sun8i-reference-design-tablet.dtsi"
-> >> ?+
-> >> ?+/ {
-> >> ?+ model = "INet-D978 Rev 02";
-> >> ?+ compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
-> >> ?+
-> >> ?+ leds {
-> >> ?+ compatible = "gpio-leds";
-> >> ?+ pinctrl-names = "default";
-> >> ?+ pinctrl-0 = <&led_pin_d978>;
-> >> ?+
-> >> ?+ home {
-> >> ?+ label = "d978:home";
-> >
-> > This is not the proper format for the led labels.
-> >
-> > It's supposed to be <board>:<color>:<function>
-> 
-> Thanks.
-> So I'd use "d978:blue:home".
-> 
-> >
-> >> ?+ gpios = <&r_pio 0 5 GPIO_ACTIVE_HIGH>; /* PL5 */
-> >> ?+ };
-> >> ?+ };
-> >> ?+};
-> >> ?+
-> >> ?+&mmc1_pins_a {
-> >> ?+ allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-> >> ?+};
-> >> ?+
-> >> ?+&mmc1 {
-> >> ?+ pinctrl-names = "default";
-> >> ?+ pinctrl-0 = <&mmc1_pins_a>;
-> >> ?+ vmmc-supply = <&reg_dldo1>;
-> >> ?+ bus-width = <4>;
-> >> ?+ non-removable;
-> >> ?+ status = "okay";
-> >> ?+
-> >> ?+ rtl8723bs: sdio_wifi at 1 {
-> >> ?+ reg = <1>;
-> >> ?+ };
-> >
-> > Don't you need an alias to this node to have the MAC address set?
-> 
-> It seems that rtl8723bs come with an eFUSE.
+Since the act8945a-charger is regarded as a sub-device and it using
+"interrupts" property, update the examples section.
 
-Ok, good to know.
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
 
-Thanks!
-Maxime
+Changes in v8: None
+Changes in v7: None
+Changes in v6: None
+Changes in v5: None
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
 
+ Documentation/devicetree/bindings/mfd/act8945a.txt | 22 +++++++++++++++-------
+ 1 file changed, 15 insertions(+), 7 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/mfd/act8945a.txt b/Documentation/devicetree/bindings/mfd/act8945a.txt
+index f712830..462819a 100644
+--- a/Documentation/devicetree/bindings/mfd/act8945a.txt
++++ b/Documentation/devicetree/bindings/mfd/act8945a.txt
+@@ -14,13 +14,6 @@ Example:
+ 		reg = <0x5b>;
+ 		status = "okay";
+ 
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_charger_chglev>;
+-		active-semi,chglev-gpio = <&pioA 12 GPIO_ACTIVE_HIGH>;
+-		active-semi,input-voltage-threshold-microvolt = <6600>;
+-		active-semi,precondition-timeout = <40>;
+-		active-semi,total-timeout = <3>;
+-
+ 		active-semi,vsel-high;
+ 
+ 		regulators {
+@@ -73,4 +66,19 @@ Example:
+ 				regulator-always-on;
+ 			};
+ 		};
++
++		charger {
++			compatible = "active-semi,act8945a-charger";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_charger_chglev &pinctrl_charger_lbo &pinctrl_charger_irq>;
++			interrupt-parent = <&pioA>;
++			interrupts = <45 GPIO_ACTIVE_LOW>;
++
++			active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
++			active-semi,lbo-gpios = <&pioA 72 GPIO_ACTIVE_LOW>;
++			active-semi,input-voltage-threshold-microvolt = <6600>;
++			active-semi,precondition-timeout = <40>;
++			active-semi,total-timeout = <3>;
++			status = "okay";
++		};
+ 	};
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160825/f4533945/attachment.sig>
+2.7.4
