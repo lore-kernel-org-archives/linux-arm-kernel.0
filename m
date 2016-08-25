@@ -1,77 +1,55 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Thu, 25 Aug 2016 12:53:25 +0100
-Subject: [PATCH] efi: arm64: treat regions with WT/WC set but WB cleared
- as memory
-In-Reply-To: <1472052256-26365-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1472052256-26365-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160825115325.GG31760@bivouac.eciton.net>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Thu, 25 Aug 2016 09:41:14 -0300
+Subject: [PATCH v4 4/6] media: rc: meson-ir: Add support for newer
+ versions of the IR decoder
+In-Reply-To: <7hy43s5r7d.fsf@baylibre.com>
+References: <20160628191802.21227-1-martin.blumenstingl@googlemail.com>
+ <20160819215547.20063-1-martin.blumenstingl@googlemail.com>
+ <20160819215547.20063-5-martin.blumenstingl@googlemail.com>
+ <7hy43s5r7d.fsf@baylibre.com>
+Message-ID: <20160825094114.2ca0a9e9@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 05:24:16PM +0200, Ard Biesheuvel wrote:
-> Currently, memory regions are only recorded in the memblock memory table
-> if they have the EFI_MEMORY_WB memory type attribute set. In case the
-> region is of a reserved type, it is also marked as MEMBLOCK_NOMAP, which
-> will leave it out of the linear mapping.
-> 
-> However, memory regions may legally have the EFI_MEMORY_WT or EFI_MEMORY_WC
-> attributes set, and the EFI_MEMORY_WB cleared, in which case the region in
-> question is obviously backed by normal memory, but is not recorded in the
-> memblock memory table at all. Since it would be useful to be able to
-> identify any UEFI reported memory region using memblock_is_memory(), it
-> makes sense to add all memory to the memblock memory table, and simply mark
-> it as MEMBLOCK_NOMAP if it lacks the EFI_MEMORY_WB attribute.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> 
-> Note that this will also result in regions with EFI_MEMORY_WB cleared to
-> be listed in /proc/iomem as 'System RAM', which may be incorrect. However,
-> we already display this incorrect behavior for runtime services code/data
-> regions, so this should be fixed in a separate patch, of which an example
-> has been proposed here:
-> https://www.spinics.net/lists/arm-kernel/msg525369.html
-> 
->  drivers/firmware/efi/arm-init.c | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-> index c49d50e68aee..678672d332f8 100644
-> --- a/drivers/firmware/efi/arm-init.c
-> +++ b/drivers/firmware/efi/arm-init.c
-> @@ -28,7 +28,7 @@ u64 efi_system_table;
->  
->  static int __init is_normal_ram(efi_memory_desc_t *md)
->  {
-> -	if (md->attribute & EFI_MEMORY_WB)
-> +	if (md->attribute & (EFI_MEMORY_WB|EFI_MEMORY_WT|EFI_MEMORY_WC))
+Em Fri, 19 Aug 2016 15:28:22 -0700
+Kevin Hilman <khilman@baylibre.com> escreveu:
 
-The code change makes a lot of sense, but this makes the call sites a
-bit confusing. It would make sense to rename this function.
+> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+> 
+> > From: Neil Armstrong <narmstrong@baylibre.com>
+> >
+> > Newer SoCs (Meson 8b and GXBB) are using REG2 (offset 0x20) instead of
+> > REG1 to configure the decoder mode. This makes it necessary to
+> > introduce new bindings so the driver knows which register has to be
+> > used.
+> >
+> > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> > Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>  
+> 
+> Acked-by: Kevin Hilman <khilman@baylibre.com>
+> 
+> Mauro, are you the one to pick up new media/rc drivers?  Or if you
+> prefer, with your ack, I'll take this along with the DT and submit via
+> arm-soc.
 
-Would supports_unaligned() be too silly? That's basically what the
-above makes it mean.
+I generally pick new media rc drivers, but in the specific case of this
+patchset, it is just adding a few extra lines to existing drivers, and
+most of the work are actually at the ARM tree.
 
-/
-    Leif
+So, feel free to merge via arm-soc with my ack:
 
->  		return 1;
->  	return 0;
->  }
-> @@ -163,7 +163,13 @@ static __init int is_reserve_region(efi_memory_desc_t *md)
->  	case EFI_BOOT_SERVICES_DATA:
->  	case EFI_CONVENTIONAL_MEMORY:
->  	case EFI_PERSISTENT_MEMORY:
-> -		return 0;
-> +		/*
-> +		 * According to the spec, these regions are no longer reserved
-> +		 * after calling ExitBootServices(). However, we can only use
-> +		 * them as System RAM if they can be mapped writeback cacheable.
-> +		 * Otherwise, treat them as reserved.
-> +		 */
-> +		return (md->type & EFI_MEMORY_WB) == 0;
->  	default:
->  		break;
->  	}
-> -- 
-> 2.7.4
+Acked-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+
+> 
+> Thanks,
+> 
+> Kevin
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+Thanks,
+Mauro
