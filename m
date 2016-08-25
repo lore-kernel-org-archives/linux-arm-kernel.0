@@ -1,32 +1,28 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 25 Aug 2016 12:34:00 +0100
-Subject: [STLinux Kernel] [PATCH 0/7] ARM: dts: STi: Make way for new
- Linaro 96Board: ST B2260
-In-Reply-To: <20160815121740.29515-1-lee.jones@linaro.org>
-References: <20160815121740.29515-1-lee.jones@linaro.org>
-Message-ID: <20160825113400.GA3281@griffinp-ThinkPad-X1-Carbon-2nd>
+Date: Thu, 25 Aug 2016 12:44:24 +0100
+Subject: [RESEND PATCH v2 00/13] Clock improvement for video playback
+In-Reply-To: <1466068833-5055-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1466068833-5055-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <20160825114424.GB3281@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Patrice / Lee,
+Hi Gabriel,
 
-On Mon, 15 Aug 2016, Lee Jones wrote:
+On Thu, 16 Jun 2016, Gabriel Fernandez wrote:
 
-> This series paves the way for the new Linaro B2260 96Board, designed
-> and built by ST-Microelectronics.
+> v2:
+>   - Simpliflication of clock binding
+>     remark from Rob https://lkml.org/lkml/2016/5/25/492
+>   - Suppression of stih415-416 support for the clocks (in order
+> 	to help simplification of clock binding)
+>     (others patchs for the machine and drivers will come)
 > 
-> Patrice Chotard (7):
->   ARM: dts: STiH407: Move pio20 node to fix kernel warning
->   ARM: dts: STiH410: Add thermal node
->   ARM: dts: STiH407-pinctrl: Add i2c2_alt2_1 node
->   ARM: dts: STiH407: Move non-removable property to board file
->   ARM: dts: STiH407-pinctrl: Add pinctrl_rgmii1_mdio_1 node
->   ARM: dts: STiH407-family: Add ports-implemented property in sata nodes
->   ARM: dts: STi: Introduce B2260 board
+> This serie allows to increase video resolutions and make audio
+> adjustment during a video playback.
 
 For the series: -
-Reviewed-by: Peter Griffin <peter.griffin@linaro.org>
 
-regards,
+Acked-by: Peter Griffin <peter.griffin@linaro.org>
 
 Peter.
