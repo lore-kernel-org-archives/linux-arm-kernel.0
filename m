@@ -1,85 +1,42 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 25 Aug 2016 15:18:53 -0600
-Subject: [PATCH 03/28] coresight: always use stashed trace id value in
- etm4_trace_id
+Date: Thu, 25 Aug 2016 15:18:54 -0600
+Subject: [PATCH 04/28] coresight: Remove erroneous dma_free_coherent in
+ tmc_probe
 In-Reply-To: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1472159958-5981-4-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1472159958-5981-5-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudeep Holla <sudeep.holla@arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-etm4_trace_id is not guaranteed to be executed on the CPU whose ETM is
-being accessed. This leads to exception similar to below one if the
-CPU whose ETM is being accessed is in deeper idle states. So it must
-be executed on the CPU whose ETM is being accessed.
+commit de5461970b3e9e194 ("coresight: tmc: allocating memory when needed")
+removed the static allocation of buffer for the trace data in ETR mode in
+tmc_probe. However it failed to remove the "devm_free_coherent" in
+tmc_probe when the probe fails due to other reasons. This patch gets
+rid of the incorrect dma_free_coherent() call.
 
-Unhandled fault: synchronous external abort (0x96000210) at 0xffff000008db4040
-Internal error: : 96000210 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 5 PID: 5979 Comm: etm.sh Not tainted 4.7.0-rc3 #159
-Hardware name: ARM Juno development board (r2) (DT)
-task: ffff80096dd34b00 ti: ffff80096dfe4000 task.ti: ffff80096dfe4000
-PC is at etm4_trace_id+0x5c/0x90
-LR is at etm4_trace_id+0x3c/0x90
-Call trace:
- etm4_trace_id+0x5c/0x90
- coresight_id_match+0x78/0xa8
- bus_for_each_dev+0x60/0xa0
- coresight_enable+0xc0/0x1b8
- enable_source_store+0x3c/0x70
- dev_attr_store+0x18/0x28
- sysfs_kf_write+0x48/0x58
- kernfs_fop_write+0x14c/0x1e0
- __vfs_write+0x1c/0x100
- vfs_write+0xa0/0x1b8
- SyS_write+0x44/0xa0
- el0_svc_naked+0x24/0x28
-
-However, TRCTRACEIDR is not guaranteed to hold the previous programmed
-trace id if it enters deeper idle states. Further, the trace id that is
-computed in etm4_init_trace_id is programmed into TRCTRACEIDR only in
-etm4_enable_hw which happens much later in the sequence after
-coresight_id_match is executed from enable_source_store.
-
-This patch simplifies etm4_trace_id by returning the stashed trace id
-value similar to etm4_cpu_id.
-
+Fixes: commit de5461970b3e9e194 ("coresight: tmc: allocating memory when needed")
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm4x.c | 16 +---------------
- 1 file changed, 1 insertion(+), 15 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 1a5e0d14c1dd..17e2e81d2e90 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -79,22 +79,8 @@ static int etm4_cpu_id(struct coresight_device *csdev)
- static int etm4_trace_id(struct coresight_device *csdev)
- {
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
--	unsigned long flags;
--	int trace_id = -1;
- 
--	if (!local_read(&drvdata->mode))
--		return drvdata->trcid;
--
--	spin_lock_irqsave(&drvdata->spinlock, flags);
--
--	CS_UNLOCK(drvdata->base);
--	trace_id = readl_relaxed(drvdata->base + TRCTRACEIDR);
--	trace_id &= ETM_TRACEID_MASK;
--	CS_LOCK(drvdata->base);
--
--	spin_unlock_irqrestore(&drvdata->spinlock, flags);
--
--	return trace_id;
-+	return drvdata->trcid;
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index 9e02ac963cd0..3978cbb6b038 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -388,9 +388,6 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ err_misc_register:
+ 	coresight_unregister(drvdata->csdev);
+ err_devm_kzalloc:
+-	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR)
+-		dma_free_coherent(dev, drvdata->size,
+-				drvdata->vaddr, drvdata->paddr);
+ 	return ret;
  }
  
- static void etm4_enable_hw(void *info)
 -- 
 2.7.4
