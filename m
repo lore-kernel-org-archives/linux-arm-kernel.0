@@ -1,77 +1,75 @@
-From: kbeldan@baylibre.com (Karl Beldan)
-Date: Thu, 25 Aug 2016 14:15:10 +0000
-Subject: [PATCH] ARM: dts: da850: Add missing pin muxing for the UARTs
-In-Reply-To: <354081bd-653d-ec98-f18e-eb0b1b1ee7e3@ti.com>
-References: <20160804110656.25318-1-kbeldan@baylibre.com>
- <m2eg64pchw.fsf@baylibre.com> <20160804210045.GD15013@gobelin>
- <m2fuqknnqk.fsf@baylibre.com>
- <fe36e8d1-f371-b093-de15-5e03370ea38c@ti.com>
- <dd4712ba-6144-8c64-59a6-7673936af53c@ti.com>
- <20160824082934.GA20246@gobelin>
- <354081bd-653d-ec98-f18e-eb0b1b1ee7e3@ti.com>
-Message-ID: <20160825140507.GA13734@gobelin>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 25 Aug 2016 16:17:50 +0200
+Subject: [PATCH 2/2] ARM: dts: sun8i: enable UART1 for iNet D978 Rev2 board
+In-Reply-To: <116041472134355@web12g.yandex.ru>
+References: <20160823064451.25997-1-icenowy@aosc.xyz>
+ <20160823064451.25997-3-icenowy@aosc.xyz> <20160824193600.GS8103@lukather>
+ <43951472083107@web23m.yandex.ru>
+ <CAGb2v66tFENk8QBw7D1+bwFN-zWaE2SGDrNyc-zdbJSRzENk4Q@mail.gmail.com>
+ <97321472108244@web8m.yandex.ru> <20160825080334.GD7776@lukather>
+ <116041472134355@web12g.yandex.ru>
+Message-ID: <6580ba1b-f542-58d4-9f0a-fdd8e9b86092@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2016 at 07:12:16PM +0530, Sekhar Nori wrote:
-> On Wednesday 24 August 2016 02:08 PM, Karl Beldan wrote:
-> > On Tue, Aug 23, 2016 at 04:46:03PM +0530, Sekhar Nori wrote:
-> >> On Tuesday 23 August 2016 04:39 PM, Sekhar Nori wrote:
-> >>> On Friday 05 August 2016 04:30 AM, Kevin Hilman wrote:
-> >>>> Karl Beldan <kbeldan@baylibre.com> writes:
-> >>>>
-> >>>>> On Thu, Aug 04, 2016 at 12:20:27PM -0700, Kevin Hilman wrote:
-> >>>>>> Karl Beldan <kbeldan@baylibre.com> writes:
-> >>>>>>
-> >>>>>>> This adds 2 pinctrl groups (rtscts, rxtx) for each of the 3 UARTs.
-> >>>>>>>
-> >>>>>>> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
-> >>>>>>
-> >>>>>> Should da850-evm be updated to use the serial2_rxtx_pins also?
-> >>>>>>
-> >>>>> I could not find the EVM schematics on the net and I only have an LCDK,
-> >>>>> but according to the code it should, however I can't tell whether flow
-> >>>>> control pins are used.
-> >>>>
-> >>>> Ok, let's just leave it for now, since it's working fine.  Sekhar can
-> >>>> fix that up if he can dig up the schematics.
-> >>>
-> >>> Looks like the flow control pins are being used for McASP also on the
-> >>> EVM. So lets leave the EVM as-is.
-> >>
-> >> Rather, the EVM dts file should be updated to use serial2_rxtx_pins like
-> >> the LCDK. Right now it seems to be relying on bootloader to serial2
-> >> setup pimux correctly. I can make a patch to fix that. Or if you can do
-> >> it, that will be great too.
-> >>
-> > 
-> > Indeed ATM the EVM relies on the bootloader to setup the pin muxing.
-> > 
-> > I just checked the uart pins routing of the EVM, the dts:
-> > - should reclaim serial2_rxtx_pins and serial2_rtscts_pins
-> 
-> Can you please clarify what you mean by dts should "reclaim". You mean
-> move the pins from da850.dtsi to da850-evm.dts or something else?
+Hi,
+
+On 25-08-16 16:12, Icenowy Zheng wrote:
 >
+>
+> 25.08.2016, 16:03, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>> Hi,
+>>
+>> On Thu, Aug 25, 2016 at 02:57:24PM +0800, Icenowy Zheng wrote:
+>>>  >>>>   diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+>>>  >>>>   index 78823d8..3ac22d4 100644
+>>>  >>>>   --- a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+>>>  >>>>   +++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+>>>  >>>>   @@ -48,6 +48,10 @@
+>>>  >>>>            model = "INet-D978 Rev 02";
+>>>  >>>>            compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
+>>>  >>>>
+>>>  >>>>   + aliases {
+>>>  >>>>   + serial1 = &uart1;
+>>>  >>>>   + };
+>>>  >>>>   +
+>>>  >>>
+>>>  >>>  Is there any other UART in the system?
+>>>  >>
+>>>  >>  serial0 is defined in sun8i-reference-design-tablet.dtsi, as r_uart.
+>>>  >
+>>>  > If your board does not have r_uart pads, then the right thing to do
+>>>  > would be to disable it. You can then have uart1 as serial0.
+>>>
+>>>  I don't know it. The RX/TX is wired on PF2/PF4 on the board (UART0 muxed with
+>>>  MMC)
+>>
+>> Then you don't support it and you need to disable it.
+>>
+>>>  But many codes will require a ttyS0 as console... So I think the
+>>>  bluetooth should be located at ttyS1...
+>>
+>> Most of them would use /dev/console anyway. What do you have in mind?
+>
+> As a general configuration, /dev/ttyS0 will be indicated as the default console=
+> value... (Otherwise more boards will fail)
+>
+> Or maybe we can specify uart0 as serial0, and leave it as disabled? (Thus if the
+> debug port is needed, we can easily apply a overlay with &mmc0 status as disabled,
+> and &uart0 status as okay)
+>
+> On all my A33 boards, the official boot0, u-boot all uses uart0 as debugging port.
 
-No, in the part you are replying to I am not referring to moving the
-pins but reclaiming them. The pins are declared in the dtsi, as they
-should. Eg. the LCDK dts reclaims serial2_rxtx_pins but doesn't reclaim
-serial2_rtscts_pins while their declarations remain in the dtsi.
+If no uart is available (and being muxed with the mmc counts as not being available)
+then you should not have any serial alias in the dts.
 
-The purpose of this part was to clarify what I saw on the schematics
-because your emails include the following 2 statements:
+In u-boot you need to use:
 
-> >>> Looks like the flow control pins are being used for McASP also on the
-> >>> EVM. So lets leave the EVM as-is.
+# CONFIG_REQUIRE_SERIAL_CONSOLE is not set
 
-> >> Rather, the EVM dts file should be updated to use serial2_rxtx_pins like
-> >> the LCDK. Right now it seems to be relying on bootloader to serial2
+In the defconfig in this case, otherwise u-boot is going to be unhappy about
+not having a serial console.
 
-My email was to inform that it concerns the flow control pins of the
-UART1 only and that the UART2 flow control pins are not concerned and, 
-since they are dedicated to the UART2, should be reclaimed unlike
-in the LCDK.
+Regards,
 
- 
-Karl
+Hans
