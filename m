@@ -1,85 +1,44 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 25 Aug 2016 15:07:32 +0100
-Subject: [PATCH] efi: arm64: treat regions with WT/WC set but WB cleared
- as memory
-In-Reply-To: <20160825115325.GG31760@bivouac.eciton.net>
-References: <1472052256-26365-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160825115325.GG31760@bivouac.eciton.net>
-Message-ID: <CAKv+Gu89ofCBv+_-vy979c67Bhrt7soFNyHEYwe4r3=x8_gwgg@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 25 Aug 2016 17:11:31 +0300
+Subject: [PATCH] ARM: dts: keystone: specify usb mode explicitly
+In-Reply-To: <09af5947-1a0e-9f44-e046-67276062530d@oracle.com>
+References: <20160628094245.9521-1-grygorii.strashko@ti.com>
+ <578D15B3.1040705@ti.com> <09af5947-1a0e-9f44-e046-67276062530d@oracle.com>
+Message-ID: <62e7960a-7f47-8125-c369-2407ffc5a2dd@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 August 2016 at 12:53, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> On Wed, Aug 24, 2016 at 05:24:16PM +0200, Ard Biesheuvel wrote:
->> Currently, memory regions are only recorded in the memblock memory table
->> if they have the EFI_MEMORY_WB memory type attribute set. In case the
->> region is of a reserved type, it is also marked as MEMBLOCK_NOMAP, which
->> will leave it out of the linear mapping.
->>
->> However, memory regions may legally have the EFI_MEMORY_WT or EFI_MEMORY_WC
->> attributes set, and the EFI_MEMORY_WB cleared, in which case the region in
->> question is obviously backed by normal memory, but is not recorded in the
->> memblock memory table at all. Since it would be useful to be able to
->> identify any UEFI reported memory region using memblock_is_memory(), it
->> makes sense to add all memory to the memblock memory table, and simply mark
->> it as MEMBLOCK_NOMAP if it lacks the EFI_MEMORY_WB attribute.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>
->> Note that this will also result in regions with EFI_MEMORY_WB cleared to
->> be listed in /proc/iomem as 'System RAM', which may be incorrect. However,
->> we already display this incorrect behavior for runtime services code/data
->> regions, so this should be fixed in a separate patch, of which an example
->> has been proposed here:
->> https://www.spinics.net/lists/arm-kernel/msg525369.html
->>
->>  drivers/firmware/efi/arm-init.c | 10 ++++++++--
->>  1 file changed, 8 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
->> index c49d50e68aee..678672d332f8 100644
->> --- a/drivers/firmware/efi/arm-init.c
->> +++ b/drivers/firmware/efi/arm-init.c
->> @@ -28,7 +28,7 @@ u64 efi_system_table;
->>
->>  static int __init is_normal_ram(efi_memory_desc_t *md)
->>  {
->> -     if (md->attribute & EFI_MEMORY_WB)
->> +     if (md->attribute & (EFI_MEMORY_WB|EFI_MEMORY_WT|EFI_MEMORY_WC))
->
-> The code change makes a lot of sense, but this makes the call sites a
-> bit confusing. It would make sense to rename this function.
->
-> Would supports_unaligned() be too silly? That's basically what the
-> above makes it mean.
->
+Hi Santosh,
 
-How about is_memory() ?
+On 07/18/2016 08:49 PM, Santosh Shilimkar wrote:
+> On 7/18/2016 10:45 AM, Grygorii Strashko wrote:
+>> Hi Santosh,
+>> On 06/28/2016 12:42 PM, Grygorii Strashko wrote:
+>>> The USB OTG mode is not supported by Kestone 2 devices, as result, the
+>>> USB devices enumeration and detection will not work properly when
+>>> kernel is built with CONFIG_USB_DWC3_DUAL_ROLE=y (default for multi
+>>> platform build):
+>>>   - it's required to load gadget drivers manually to make host mode
+>>> work and this confuses current Keystone 2 users
+>>>   - device mode is not working, because port can't detect and switch to
+>>> peripheral/host mode dynamically.
+>>>
+>>> Hence, specify usb mode explicitly in DT: usb0 = "host" for all KS2
+>>> devices and usb1 = "peripheral" for K2E.
+>>>
+>>> Cc: Sekhar Nori <nsekhar@ti.com>
+>>> Cc: Roger Quadros <rogerq@ti.com>
+>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>>
+>> Do you expect any additional actions from my side relate to this patch?
+>>
+> Nope. I will pick this up though it has to wait for next merge window
+> now.
 
-And we could invert is_reserve_region, and call it is_usable_memory() ...
+I'd like to remind you about this patch. 
+Would you like me to resend it ?
+(I've checked - it can be applied as is on top master and next/master without issues)
 
-
-> /
->     Leif
->
->>               return 1;
->>       return 0;
->>  }
->> @@ -163,7 +163,13 @@ static __init int is_reserve_region(efi_memory_desc_t *md)
->>       case EFI_BOOT_SERVICES_DATA:
->>       case EFI_CONVENTIONAL_MEMORY:
->>       case EFI_PERSISTENT_MEMORY:
->> -             return 0;
->> +             /*
->> +              * According to the spec, these regions are no longer reserved
->> +              * after calling ExitBootServices(). However, we can only use
->> +              * them as System RAM if they can be mapped writeback cacheable.
->> +              * Otherwise, treat them as reserved.
->> +              */
->> +             return (md->type & EFI_MEMORY_WB) == 0;
->>       default:
->>               break;
->>       }
->> --
->> 2.7.4
+-- 
+regards,
+-grygorii
