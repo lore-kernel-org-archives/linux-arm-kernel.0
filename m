@@ -1,93 +1,30 @@
-From: johnyoun@synopsys.com (John Youn)
-Date: Thu, 25 Aug 2016 14:26:43 -0700
-Subject: [RFT PATCH v3 3/3] usb: dwc2: Properly account for the force mode
- delays
-In-Reply-To: <cover.1472160194.git.johnyoun@synopsys.com>
-References: <cover.1472160194.git.johnyoun@synopsys.com>
-Message-ID: <956d56eb750dee544dd4317bdd9cc0bcc325d8a9.1472160194.git.johnyoun@synopsys.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 25 Aug 2016 23:33:08 +0100
+Subject: [PATCH 1/2] smc91x: always use 8-bit access if necessary
+In-Reply-To: <20160825144633.1850889-1-arnd@arndb.de>
+References: <20160825144633.1850889-1-arnd@arndb.de>
+Message-ID: <20160825223308.GJ1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a force mode bit is set and the IDDIG debounce filter is enabled,
-there is a delay for the forced mode to take effect. This delay is due
-to the IDDIG debounce filter and is variable depending on the platform's
-PHY clock speed. To account for this delay we can poll for the expected
-mode.
+On Thu, Aug 25, 2016 at 04:46:20PM +0200, Arnd Bergmann wrote:
+> +#define SMC_out16(x, ioaddr, reg)					     \
+> +do {									     \
+> +	if (SMC_CAN_USE_8BIT && !SMC_16BIT(lp)) {			     \
+> +		unsigned int __val16 = (x);				     \
+> +		SMC_outb(__val16, ioaddr, reg );			     \
+> +		SMC_outb(__val16 >> 8, ioaddr, reg + (1 << SMC_IO_SHIFT));   \
+> +	} else {							     \
+> +		SMC_outw(x, ioaddr, reg);				     \
+> +	}								     \
 
-On a clear force mode, since we don't know what mode to poll for, delay
-for a fixed 50 ms. This is the maximum delay based on the slowest PHY
-clock speed.
+This is insufficient.  If you look at how SMC_REG works, you'll notice
+that it has side effects which can disrupt other accesses (it reads
+the bank register if debugging is enabled.)
 
-Signed-off-by: John Youn <johnyoun@synopsys.com>
----
- drivers/usb/dwc2/core.c | 31 ++++++++++++++-----------------
- 1 file changed, 14 insertions(+), 17 deletions(-)
+In any case, please wait for my tested patch for this.
 
-diff --git a/drivers/usb/dwc2/core.c b/drivers/usb/dwc2/core.c
-index bb903e2..cbd7436 100644
---- a/drivers/usb/dwc2/core.c
-+++ b/drivers/usb/dwc2/core.c
-@@ -397,9 +397,9 @@ int dwc2_core_reset(struct dwc2_hsotg *hsotg)
-  * Checks are done in this function to determine whether doing a force
-  * would be valid or not.
-  *
-- * If a force is done, it requires a 25ms delay to take effect.
-- *
-- * Returns true if the mode was forced.
-+ * If a force is done, it requires a IDDIG debounce filter delay if
-+ * the filter is configured and enabled. We poll the current mode of
-+ * the controller to account for this delay.
-  */
- static bool dwc2_force_mode(struct dwc2_hsotg *hsotg, bool host)
- {
-@@ -434,12 +434,18 @@ static bool dwc2_force_mode(struct dwc2_hsotg *hsotg, bool host)
- 	gusbcfg |= set;
- 	dwc2_writel(gusbcfg, hsotg->regs + GUSBCFG);
- 
--	msleep(25);
-+	dwc2_wait_for_mode(hsotg, host, 50);
- 	return true;
- }
- 
--/*
-- * Clears the force mode bits.
-+/**
-+ * dwc2_clear_force_mode() - Clears the force mode bits.
-+ *
-+ * After clearing the bits, wait up to 50 ms to account for any
-+ * potential IDDIG filter delay. We can't know if we expect this delay
-+ * or not because the value of the connector ID status is affected by
-+ * the force mode. We only need to call this once during probe if
-+ * dr_mode == OTG.
-  */
- static void dwc2_clear_force_mode(struct dwc2_hsotg *hsotg)
- {
-@@ -450,11 +456,8 @@ static void dwc2_clear_force_mode(struct dwc2_hsotg *hsotg)
- 	gusbcfg &= ~GUSBCFG_FORCEDEVMODE;
- 	dwc2_writel(gusbcfg, hsotg->regs + GUSBCFG);
- 
--	/*
--	 * NOTE: This long sleep is _very_ important, otherwise the core will
--	 * not stay in host mode after a connector ID change!
--	 */
--	msleep(25);
-+	if (dwc2_iddig_filter_enabled(hsotg))
-+		msleep(50);
- }
- 
- /*
-@@ -477,12 +480,6 @@ void dwc2_force_dr_mode(struct dwc2_hsotg *hsotg)
- 			 __func__, hsotg->dr_mode);
- 		break;
- 	}
--
--	/*
--	 * NOTE: This is required for some rockchip soc based
--	 * platforms.
--	 */
--	msleep(50);
- }
- 
- /*
 -- 
-2.9.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
