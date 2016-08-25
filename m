@@ -1,75 +1,117 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 25 Aug 2016 09:23:43 +0200
-Subject: [PATCH 10/10] reset: hi6220: allow to compile test driver on
- other architectures
-In-Reply-To: <CAK7LNAQd770utOisbeAZearej4pf0scbRnP+mkbU=MUCV-1CXQ@mail.gmail.com>
-References: <1472045342-7434-1-git-send-email-p.zabel@pengutronix.de>
- <1472045342-7434-10-git-send-email-p.zabel@pengutronix.de>
- <CAK7LNAQd770utOisbeAZearej4pf0scbRnP+mkbU=MUCV-1CXQ@mail.gmail.com>
-Message-ID: <1472109823.3032.22.camel@pengutronix.de>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Thu, 25 Aug 2016 15:19:54 +0800
+Subject: [PATCH v8 06/11] power: act8945a_charger: Fix the power supply type
+In-Reply-To: <1472109599-21915-1-git-send-email-wenyou.yang@atmel.com>
+References: <1472109599-21915-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1472109599-21915-7-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 25.08.2016, 03:00 +0900 schrieb Masahiro Yamada:
-> 2016-08-24 22:29 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
-> > Also remove the RESET_CONTROLLER dependency, this Kconfig file is
-> > included inside the menuconfig already.
-> >
-> > Cc: Chen Feng <puck.chen@hisilicon.com>
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > ---
-> >  drivers/reset/hisilicon/Kconfig | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/reset/hisilicon/Kconfig b/drivers/reset/hisilicon/Kconfig
-> > index 26bf95a..1ff8b0c 100644
-> > --- a/drivers/reset/hisilicon/Kconfig
-> > +++ b/drivers/reset/hisilicon/Kconfig
-> > @@ -1,5 +1,6 @@
-> >  config COMMON_RESET_HI6220
-> >         tristate "Hi6220 Reset Driver"
-> > -       depends on (ARCH_HISI && RESET_CONTROLLER)
-> > +       depends on ARCH_HISI || COMPILE_TEST
-> > +       default ARCH_HISI
-> >         help
-> >           Build the Hisilicon Hi6220 reset driver.
-> > --
-> > 2.8.1
-> >
-> 
-> 
-> As you see
-> 
-> obj-$(CONFIG_ARCH_HISI) += hisilicon/
-> 
-> in drivers/reset/Makefile,
-> Kbuild can descend into drivers/reset/hisilicon/
-> only when CONFIG_ARCH_HISI is enabled.
-> 
-> So, this patch does not add compile-test'ability.
-> 
-> 
-> Currently, I only see a single file in drivers/reset/hisilicon/ directory,
-> but perhaps they might be planning to add more reset drivers for
-> other Hisilicon SoCs in the future.
-> 
-> 
-> Change to
-> 
-> obj-y += hisilicon/
+The power supply type property is varying as the external power
+supply changes. It is not a constant.
 
-Good catch, I'll do that for now ...
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
 
-> or
-> 
-> create "config RESET_HISI" as a vendor-common option and
-> 
-> obj-$(CONFIG_RESET_HISI)  += hisilicon/
-> 
-> ?
+Changes in v8: None
+Changes in v7: None
+Changes in v6: None
+Changes in v5: None
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
 
-... since I'm not quite sure if there are currently patches selecting
-COMMON_RESET_HI6220 floating around.
+ drivers/power/supply/act8945a_charger.c | 48 ++++++++++++++++++++++++++-------
+ 1 file changed, 39 insertions(+), 9 deletions(-)
 
-regards
-Philipp
+diff --git a/drivers/power/supply/act8945a_charger.c b/drivers/power/supply/act8945a_charger.c
+index e129255..48775f8 100644
+--- a/drivers/power/supply/act8945a_charger.c
++++ b/drivers/power/supply/act8945a_charger.c
+@@ -78,6 +78,7 @@ static const char *act8945a_charger_manufacturer = "Active-semi";
+ 
+ struct act8945a_charger {
+ 	struct power_supply *psy;
++	struct power_supply_desc desc;
+ 	struct regmap *regmap;
+ 	struct work_struct work;
+ 
+@@ -250,14 +251,6 @@ static int act8945a_charger_get_property(struct power_supply *psy,
+ 	return ret;
+ }
+ 
+-static const struct power_supply_desc act8945a_charger_desc = {
+-	.name		= "act8945a-charger",
+-	.type		= POWER_SUPPLY_TYPE_BATTERY,
+-	.get_property	= act8945a_charger_get_property,
+-	.properties	= act8945a_charger_props,
+-	.num_properties	= ARRAY_SIZE(act8945a_charger_props),
+-};
+-
+ static int act8945a_enable_interrupt(struct act8945a_charger *charger)
+ {
+ 	struct regmap *regmap = charger->regmap;
+@@ -281,11 +274,39 @@ static int act8945a_enable_interrupt(struct act8945a_charger *charger)
+ 	return 0;
+ }
+ 
++static unsigned int act8945a_set_supply_type(struct act8945a_charger *charger,
++					     unsigned int *type)
++{
++	unsigned int status, state;
++	int ret;
++
++	ret = regmap_read(charger->regmap, ACT8945A_APCH_STATUS, &status);
++	if (ret < 0)
++		return ret;
++
++	ret = regmap_read(charger->regmap, ACT8945A_APCH_STATE, &state);
++	if (ret < 0)
++		return ret;
++
++	if (status & APCH_STATUS_INDAT) {
++		if (state & APCH_STATE_ACINSTAT)
++			*type = POWER_SUPPLY_TYPE_MAINS;
++		else
++			*type = POWER_SUPPLY_TYPE_USB;
++	} else {
++		*type = POWER_SUPPLY_TYPE_BATTERY;
++	}
++
++	return 0;
++}
++
+ static void act8945a_work(struct work_struct *work)
+ {
+ 	struct act8945a_charger *charger =
+ 			container_of(work, struct act8945a_charger, work);
+ 
++	act8945a_set_supply_type(charger, &charger->desc.type);
++
+ 	power_supply_changed(charger->psy);
+ }
+ 
+@@ -440,11 +461,20 @@ static int act8945a_charger_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++	charger->desc.name = "act8945a-charger";
++	charger->desc.get_property = act8945a_charger_get_property;
++	charger->desc.properties = act8945a_charger_props;
++	charger->desc.num_properties = ARRAY_SIZE(act8945a_charger_props);
++
++	ret = act8945a_set_supply_type(charger, &charger->desc.type);
++	if (ret)
++		return -EINVAL;
++
+ 	psy_cfg.of_node	= pdev->dev.of_node;
+ 	psy_cfg.drv_data = charger;
+ 
+ 	charger->psy = devm_power_supply_register(&pdev->dev,
+-						  &act8945a_charger_desc,
++						  &charger->desc,
+ 						  &psy_cfg);
+ 	if (IS_ERR(charger->psy)) {
+ 		dev_err(&pdev->dev, "failed to register power supply\n");
+-- 
+2.7.4
