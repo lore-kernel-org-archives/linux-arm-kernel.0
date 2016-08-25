@@ -1,66 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 25 Aug 2016 11:30:42 +0100
-Subject: [PATCH] arm64: Introduce execute-only page access permissions
-In-Reply-To: <20160816161824.GB7609@e104818-lin.cambridge.arm.com>
-References: <1470937490-7375-1-git-send-email-catalin.marinas@arm.com>
- <CAGXu5jJTuJ+k948BU4rDGF=tHv54TR0JQVTbcVvzp=NtfQrL9Q@mail.gmail.com>
- <20160815104751.GC22320@e104818-lin.cambridge.arm.com>
- <CAGXu5jJTeta2OnL8KKHesG_HdeCvcXtaqjAir1cUvyfivaQeuQ@mail.gmail.com>
- <20160816161824.GB7609@e104818-lin.cambridge.arm.com>
-Message-ID: <20160825103042.GA12599@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 25 Aug 2016 18:31:48 +0800
+Subject: [PATCH 01/10] reset: ath79: add driver Kconfig option
+In-Reply-To: <1472045342-7434-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <201608251826.2MYolse5%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 05:18:24PM +0100, Catalin Marinas wrote:
-> On Mon, Aug 15, 2016 at 10:45:09AM -0700, Kees Cook wrote:
-> > On Mon, Aug 15, 2016 at 3:47 AM, Catalin Marinas
-> > <catalin.marinas@arm.com> wrote:
-> > > On Fri, Aug 12, 2016 at 11:23:03AM -0700, Kees Cook wrote:
-> > >> On Thu, Aug 11, 2016 at 10:44 AM, Catalin Marinas
-> > >> <catalin.marinas@arm.com> wrote:
-> > >> > The ARMv8 architecture allows execute-only user permissions by clearing
-> > >> > the PTE_UXN and PTE_USER bits. However, the kernel running on a CPU
-> > >> > implementation without User Access Override (ARMv8.2 onwards) can still
-> > >> > access such page, so execute-only page permission does not protect
-> > >> > against read(2)/write(2) etc. accesses. Systems requiring such
-> > >> > protection must enable features like SECCOMP.
-> > >>
-> > >> So, UAO CPUs will bypass this protection in userspace if using
-> > >> read/write on a memory-mapped file?
-> > >
-> > > It's the other way around. CPUs prior to ARMv8.2 (when UAO was
-> > > introduced) or with the CONFIG_ARM64_UAO disabled can still access
-> > > user execute-only memory regions while running in kernel mode via the
-> > > copy_*_user, (get|put)_user etc. routines. So a way user can bypass this
-> > > protection is by using such address as argument to read/write file
-> > > operations.
-> > 
-> > Ah, okay. So exec-only for _userspace_ will always work, but exec-only
-> > for _kernel_ will only work on ARMv8.2 with CONFIG_ARM64_UAO?
-> 
-> Yes (mostly). With UAO, we changed the user access routines in the
-> kernel to use the LDTR/STTR instructions which always behave
-> unprivileged even when executed in kernel mode (unless the UAO bit is
-> set to override this restriction, needed for set_fs(KERNEL_DS)).
-> 
-> Even with UAO, we still have two cases where the kernel cannot perform
-> unprivileged accesses (LDTR/STTR) since they don't have an exclusives
-> equivalent (LDXR/STXR). These are in-user futex atomic ops and the SWP
-> emulation for 32-bit binaries (armv8_deprecated.c). But these require
-> write permission, so they would always fault even when running in the
-> kernel. futex_atomic_cmpxchg_inatomic() is able to return the old value
-> without a write (if it differs from "oldval") but it doesn't look like
-> such value could leak to user space.
+Hi Philipp,
 
-If this was an issue, couldn't we add a dummy LDTR before the LDXR, and
-have the fixup handler return -EFAULT?
+[auto build test ERROR on pza/reset/next]
+[also build test ERROR on v4.8-rc3 next-20160824]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
+[Check https://git-scm.com/docs/git-format-patch for more information]
 
-Either way, this series looks technically fine to me:
+url:    https://github.com/0day-ci/linux/commits/Philipp-Zabel/reset-ath79-add-driver-Kconfig-option/20160824-213846
+base:   git://git.pengutronix.de/git/pza/linux reset/next
+config: blackfin-allyesconfig (attached as .config)
+compiler: bfin-uclinux-gcc (GCC) 4.6.3
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=blackfin 
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+All errors (new ones prefixed by >>):
 
-but it would be good for some security-focussed person (Hi, Kees!) to
-comment on whether or not this is useful, given the caveats you've
-described. If it is, I can queue it for 4.9.
+   drivers/reset/reset-ath79.c: In function 'ath79_reset_update':
+>> drivers/reset/reset-ath79.c:38:2: error: implicit declaration of function 'readl' [-Werror=implicit-function-declaration]
+>> drivers/reset/reset-ath79.c:43:2: error: implicit declaration of function 'writel' [-Werror=implicit-function-declaration]
+   cc1: some warnings being treated as errors
 
-Will
+vim +/readl +38 drivers/reset/reset-ath79.c
+
+ff591a91 Alban Bedel 2015-08-03  32  	struct ath79_reset *ath79_reset =
+ff591a91 Alban Bedel 2015-08-03  33  		container_of(rcdev, struct ath79_reset, rcdev);
+ff591a91 Alban Bedel 2015-08-03  34  	unsigned long flags;
+ff591a91 Alban Bedel 2015-08-03  35  	u32 val;
+ff591a91 Alban Bedel 2015-08-03  36  
+ff591a91 Alban Bedel 2015-08-03  37  	spin_lock_irqsave(&ath79_reset->lock, flags);
+ff591a91 Alban Bedel 2015-08-03 @38  	val = readl(ath79_reset->base);
+ff591a91 Alban Bedel 2015-08-03  39  	if (assert)
+ff591a91 Alban Bedel 2015-08-03  40  		val |= BIT(id);
+ff591a91 Alban Bedel 2015-08-03  41  	else
+ff591a91 Alban Bedel 2015-08-03  42  		val &= ~BIT(id);
+ff591a91 Alban Bedel 2015-08-03 @43  	writel(val, ath79_reset->base);
+ff591a91 Alban Bedel 2015-08-03  44  	spin_unlock_irqrestore(&ath79_reset->lock, flags);
+ff591a91 Alban Bedel 2015-08-03  45  
+ff591a91 Alban Bedel 2015-08-03  46  	return 0;
+
+:::::: The code at line 38 was first introduced by commit
+:::::: ff591a91225d3621a503bb18faa0f0d747a06e50 reset: Add a driver for the reset controller on the AR71XX/AR9XXX
+
+:::::: TO: Alban Bedel <albeu@free.fr>
+:::::: CC: Philipp Zabel <p.zabel@pengutronix.de>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 41344 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160825/073e47c9/attachment-0001.obj>
