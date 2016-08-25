@@ -1,42 +1,47 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 25 Aug 2016 13:51:44 -0600
-Subject: [PATCH v4 14/16] dt/bindings: Add PSCI OS-Initiated PM Domains
- bindings
-In-Reply-To: <1472154706-40119-1-git-send-email-lina.iyer@linaro.org>
-References: <1472154706-40119-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1472154706-40119-15-git-send-email-lina.iyer@linaro.org>
+Date: Thu, 25 Aug 2016 14:03:11 -0600
+Subject: [PATCH v4 02/16] dt/bindings: Update binding for PM domain idle states
+In-Reply-To: <1472155405-41841-1-git-send-email-lina.iyer@linaro.org>
+References: <1472155405-41841-1-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1472155405-41841-3-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings for defining a OS-Initiated based CPU PM domain.
+From: Axel Haslam <ahaslam+renesas@baylibre.com>
+
+Update DT bindings to describe idle states of PM domains.
 
 Cc: <devicetree@vger.kernel.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+[Lina: Added state properties, removed state names, wakeup-latency,
+added of_pm_genpd_init() API, pruned commit text]
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+[Ulf: Moved around code to make it compile properly, rebased on top of multiple state support]
 ---
- Documentation/devicetree/bindings/arm/psci.txt | 79 ++++++++++++++++++++++++++
- 1 file changed, 79 insertions(+)
+ .../devicetree/bindings/power/power_domain.txt     | 57 ++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
-index a2c4f1d..63a229b 100644
---- a/Documentation/devicetree/bindings/arm/psci.txt
-+++ b/Documentation/devicetree/bindings/arm/psci.txt
-@@ -105,7 +105,86 @@ Case 3: PSCI v0.2 and PSCI v0.1.
- 		...
- 	};
+diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+index 025b5e7..4960486 100644
+--- a/Documentation/devicetree/bindings/power/power_domain.txt
++++ b/Documentation/devicetree/bindings/power/power_domain.txt
+@@ -29,6 +29,10 @@ Optional properties:
+    specified by this binding. More details about power domain specifier are
+    available in the next section.
  
-+PSCI v1.0 onwards, supports OS-Initiated mode for powering off CPU domains
-+from the firmware. Such PM domains for which the PSCI firmware driver acts as
-+pseudo-controller, may also be specified in the DT under the psci node. The
-+domain definitions must follow the domain idle state specifications per [3].
-+The domain states themselves must be compatible with 'arm,idle-state' defined
-+in [1] and need to specify the arm,psci-suspend-param property for each idle
-+state.
++- domain-idle-states : A phandle of an idle-state that shall be soaked into a
++                generic domain power state. The idle state definitions are
++                compatible with arm,idle-state specified in [1].
 +
-+More information on defining CPU PM domains is available in [4].
-+
-+Example: OS-Iniated PSCI based PM domains with 1 CPU in each domain
+ Example:
+ 
+ 	power: power-controller at 12340000 {
+@@ -59,6 +63,57 @@ The nodes above define two power controllers: 'parent' and 'child'.
+ Domains created by the 'child' power controller are subdomains of '0' power
+ domain provided by the 'parent' power controller.
+ 
++Example 3: ARM v7 style CPU PM domains (Linux domain controller)
 +
 +	cpus {
 +		#address-cells = <1>;
@@ -44,70 +49,57 @@ index a2c4f1d..63a229b 100644
 +
 +		CPU0: cpu at 0 {
 +			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
++			compatible = "arm,cortex-a7", "arm,armv7";
 +			reg = <0x0>;
-+			enable-method = "psci";
-+			cpu-idle-states = <&CPU_PWRDN>;
-+			power-domains = <&CPU_PD0>;
++			power-domains = <&a7_pd>;
 +		};
 +
 +		CPU1: cpu at 1 {
 +			device_type = "cpu";
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			reg = <0x100>;
-+			enable-method = "psci";
-+			cpu-idle-states = <&CPU_PWRDN>;
-+			power-domains = <&CPU_PD1>;
-+		};
-+
-+		idle-states {
-+			CPU_PWRDN: cpu_power_down{
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x000001>;
-+				entry-latency-us = <10>;
-+				exit-latency-us = <10>;
-+				min-residency-us = <100>;
-+			};
-+
-+			CLUSTER_RET: domain_ret {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x1000010>;
-+				entry-latency-us = <500>;
-+				exit-latency-us = <500>;
-+				min-residency-us = <2000>;
-+			};
-+
-+			CLUSTER_PWR_DWN: domain_gdhs {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x1000030>;
-+				entry-latency-us = <2000>;
-+				exit-latency-us = <2000>;
-+				min-residency-us = <6000>;
-+			};
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-1.0";
-+		method = "smc";
-+
-+		CPU_PD0: cpu-pd at 0 {
-+			#power-domain-cells = <0>;
-+			domain-idle-states = <&CLUSTER_RET>, <&CLUSTER_PWR_DWN>;
-+		};
-+
-+		CPU_PD1: cpu-pd at 1 {
-+			#power-domain-cells = <0>;
-+			domain-idle-states =  <&CLUSTER_PWR_DWN>;
++			compatible = "arm,cortex-a15", "arm,armv7";
++			reg = <0x0>;
++			power-domains = <&a15_pd>;
 +		};
 +	};
 +
- [1] Kernel documentation - ARM idle states bindings
-     Documentation/devicetree/bindings/arm/idle-states.txt
- [2] Power State Coordination Interface (PSCI) specification
-     http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
-+[3]. PM Domains description
-+    Documentation/devicetree/bindings/power/power_domain.txt
-+[4]. CPU PM Domains description
-+    Documentation/power/cpu_domains.txt
++	pm-domains {
++		a15_pd: a15_pd {
++			/* will have A15 platform ARM_PD_METHOD_OF_DECLARE*/
++			compatible = "arm,cortex-a15";
++			#power-domain-cells = <0>;
++			domain-idle-states = <&CLUSTER_SLEEP_0>;
++		};
++
++		a7_pd: a7_pd {
++			/* will have a A7 platform ARM_PD_METHOD_OF_DECLARE*/
++			compatible = "arm,cortex-a7";
++			#power-domain-cells = <0>;
++			domain-idle-states = <&CLUSTER_SLEEP_0>, <&CLUSTER_SLEEP_1>;
++		};
++
++		CLUSTER_SLEEP_0: state0 {
++			compatible = "arm,idle-state";
++			entry-latency-us = <1000>;
++			exit-latency-us = <2000>;
++			min-residency-us = <10000>;
++		};
++
++		CLUSTER_SLEEP_1: state1 {
++			compatible = "arm,idle-state";
++			entry-latency-us = <5000>;
++			exit-latency-us = <5000>;
++			min-residency-us = <100000>;
++		};
++	};
++
+ ==PM domain consumers==
+ 
+ Required properties:
+@@ -76,3 +131,5 @@ Example:
+ The node above defines a typical PM domain consumer device, which is located
+ inside a PM domain with index 0 of a power controller represented by a node
+ with the label "power".
++
++[1]. Documentation/devicetree/bindings/arm/idle-states.txt
 -- 
 2.7.4
