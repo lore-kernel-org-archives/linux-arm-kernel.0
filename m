@@ -1,39 +1,38 @@
-From: johnyoun@synopsys.com (John Youn)
-Date: Thu, 25 Aug 2016 14:26:36 -0700
-Subject: [RFT PATCH v3 1/3] usb: dwc2: gadget: Only initialize device if in
- device mode
-In-Reply-To: <cover.1472160194.git.johnyoun@synopsys.com>
-References: <cover.1472160194.git.johnyoun@synopsys.com>
-Message-ID: <64471143a4dd89251db46a9f1e14f9720ba67bd0.1472160194.git.johnyoun@synopsys.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 25 Aug 2016 15:19:07 -0600
+Subject: [PATCH 17/28] coresight: tmc: Delete an unnecessary check before the
+ function call "kfree"
+In-Reply-To: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1472159958-5981-18-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In dwc2_hsotg_udc_start(), don't initialize the controller for device
-mode unless we are actually in device mode.
+From: Markus Elfring <elfring@users.sourceforge.net>
 
-Tested-by: Heiko Stuebner <heiko@sntech.de>
-Signed-off-by: John Youn <johnyoun@synopsys.com>
+The kfree() function tests whether its argument is NULL and then
+returns immediately. Thus the test around the call is not needed.
+
+This issue was detected by using the Coccinelle software.
+
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/usb/dwc2/gadget.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc-etf.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/usb/dwc2/gadget.c b/drivers/usb/dwc2/gadget.c
-index af46adf..358ba5a 100644
---- a/drivers/usb/dwc2/gadget.c
-+++ b/drivers/usb/dwc2/gadget.c
-@@ -3475,8 +3475,11 @@ static int dwc2_hsotg_udc_start(struct usb_gadget *gadget,
- 		otg_set_peripheral(hsotg->uphy->otg, &hsotg->gadget);
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+index e68289b8c072..5fa49c4252f6 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+@@ -168,7 +168,7 @@ out:
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
  
- 	spin_lock_irqsave(&hsotg->lock, flags);
--	dwc2_hsotg_init(hsotg);
--	dwc2_hsotg_core_init_disconnected(hsotg, false);
-+	if (dwc2_hw_is_device(hsotg)) {
-+		dwc2_hsotg_init(hsotg);
-+		dwc2_hsotg_core_init_disconnected(hsotg, false);
-+	}
-+
- 	hsotg->enabled = 0;
- 	spin_unlock_irqrestore(&hsotg->lock, flags);
+ 	/* Free memory outside the spinlock if need be */
+-	if (!used && buf)
++	if (!used)
+ 		kfree(buf);
  
+ 	if (!ret)
 -- 
-2.9.0
+2.7.4
