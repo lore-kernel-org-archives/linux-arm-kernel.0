@@ -1,43 +1,81 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 25 Aug 2016 13:51:35 -0600
-Subject: [PATCH v4 05/16] PM / doc: Update device documentation for devices in
- IRQ safe PM domains
+Date: Thu, 25 Aug 2016 13:51:45 -0600
+Subject: [PATCH v4 15/16] ARM64: dts: Add PSCI cpuidle support for MSM8916
 In-Reply-To: <1472154706-40119-1-git-send-email-lina.iyer@linaro.org>
 References: <1472154706-40119-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1472154706-40119-6-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1472154706-40119-16-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update documentation to reflect the changes made to support IRQ safe PM
-domains.
+Add device bindings for CPUs to suspend using PSCI as the enable-method.
 
+Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- Documentation/power/devices.txt | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/Documentation/power/devices.txt b/Documentation/power/devices.txt
-index 8ba6625..a622136 100644
---- a/Documentation/power/devices.txt
-+++ b/Documentation/power/devices.txt
-@@ -607,7 +607,17 @@ individually.  Instead, a set of devices sharing a power resource can be put
- into a low-power state together at the same time by turning off the shared
- power resource.  Of course, they also need to be put into the full-power state
- together, by turning the shared power resource on.  A set of devices with this
--property is often referred to as a power domain.
-+property is often referred to as a power domain. A power domain may also be
-+nested inside another power domain.
-+
-+Devices, by default, operate in process context. If a device can operate in
-+IRQ safe context that has to be explicitly indicated by setting the irq_safe
-+boolean inside struct generic_pm_domain to be true. Power domains by default,
-+operate in process context but could have devices that are IRQ safe. Such
-+power domains cannot be powered on/off during runtime PM. On the other hand,
-+IRQ safe PM domains that have IRQ safe devices may be powered off when all
-+the devices are in idle. An IRQ safe domain may only be attached as a
-+subdomain to another IRQ safe domain.
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index 9681200..3029773 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -62,6 +62,8 @@
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0>;
+ 			next-level-cache = <&L2_0>;
++			enable-method = "psci";
++			cpu-idle-states = <&CPU_SPC>;
+ 		};
  
- Support for power domains is provided through the pm_domain field of struct
- device.  This field is a pointer to an object of type struct dev_pm_domain,
+ 		CPU1: cpu at 1 {
+@@ -69,6 +71,8 @@
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x1>;
+ 			next-level-cache = <&L2_0>;
++			enable-method = "psci";
++			cpu-idle-states = <&CPU_SPC>;
+ 		};
+ 
+ 		CPU2: cpu at 2 {
+@@ -76,6 +80,8 @@
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x2>;
+ 			next-level-cache = <&L2_0>;
++			enable-method = "psci";
++			cpu-idle-states = <&CPU_SPC>;
+ 		};
+ 
+ 		CPU3: cpu at 3 {
+@@ -83,12 +89,30 @@
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x3>;
+ 			next-level-cache = <&L2_0>;
++			enable-method = "psci";
++			cpu-idle-states = <&CPU_SPC>;
+ 		};
+ 
+ 		L2_0: l2-cache {
+ 		      compatible = "cache";
+ 		      cache-level = <2>;
+ 		};
++
++		idle-states {
++			CPU_SPC: spc {
++				compatible = "arm,idle-state";
++				arm,psci-suspend-param = <0x40000002>;
++				entry-latency-us = <130>;
++				exit-latency-us = <150>;
++				min-residency-us = <2000>;
++				local-timer-stop;
++			};
++		};
++	};
++
++	psci {
++		compatible = "arm,psci-1.0";
++		method = "smc";
+ 	};
+ 
+ 	timer {
 -- 
 2.7.4
