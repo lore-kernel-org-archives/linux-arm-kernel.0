@@ -1,87 +1,85 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 25 Aug 2016 15:18:52 -0600
-Subject: [PATCH 02/28] coresight-stm: support mmapping channel regions with
- mmio_addr
+Date: Thu, 25 Aug 2016 15:18:53 -0600
+Subject: [PATCH 03/28] coresight: always use stashed trace id value in
+ etm4_trace_id
 In-Reply-To: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1472159958-5981-3-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1472159958-5981-4-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chunyan Zhang <zhang.chunyan@linaro.org>
+From: Sudeep Holla <sudeep.holla@arm.com>
 
-CoreSight STM device allows direct mapping of the channel regions to
-userspace for zero-copy writing. To support this ability, the STM
-framework has provided a hook 'mmio_addr', this patch just implemented
-this hook for CoreSight STM.
+etm4_trace_id is not guaranteed to be executed on the CPU whose ETM is
+being accessed. This leads to exception similar to below one if the
+CPU whose ETM is being accessed is in deeper idle states. So it must
+be executed on the CPU whose ETM is being accessed.
 
-This patch also added an item into 'channel_space' to save the physical
-base address of channel region which mmap operation needs to know.
+Unhandled fault: synchronous external abort (0x96000210) at 0xffff000008db4040
+Internal error: : 96000210 [#1] PREEMPT SMP
+Modules linked in:
+CPU: 5 PID: 5979 Comm: etm.sh Not tainted 4.7.0-rc3 #159
+Hardware name: ARM Juno development board (r2) (DT)
+task: ffff80096dd34b00 ti: ffff80096dfe4000 task.ti: ffff80096dfe4000
+PC is at etm4_trace_id+0x5c/0x90
+LR is at etm4_trace_id+0x3c/0x90
+Call trace:
+ etm4_trace_id+0x5c/0x90
+ coresight_id_match+0x78/0xa8
+ bus_for_each_dev+0x60/0xa0
+ coresight_enable+0xc0/0x1b8
+ enable_source_store+0x3c/0x70
+ dev_attr_store+0x18/0x28
+ sysfs_kf_write+0x48/0x58
+ kernfs_fop_write+0x14c/0x1e0
+ __vfs_write+0x1c/0x100
+ vfs_write+0xa0/0x1b8
+ SyS_write+0x44/0xa0
+ el0_svc_naked+0x24/0x28
 
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+However, TRCTRACEIDR is not guaranteed to hold the previous programmed
+trace id if it enters deeper idle states. Further, the trace id that is
+computed in etm4_init_trace_id is programmed into TRCTRACEIDR only in
+etm4_enable_hw which happens much later in the sequence after
+coresight_id_match is executed from enable_source_store.
+
+This patch simplifies etm4_trace_id by returning the stashed trace id
+value similar to etm4_cpu_id.
+
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-stm.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ drivers/hwtracing/coresight/coresight-etm4x.c | 16 +---------------
+ 1 file changed, 1 insertion(+), 15 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index 73be58a11e4f..482c8bb27f87 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -105,10 +105,12 @@ module_param_named(
- /**
-  * struct channel_space - central management entity for extended ports
-  * @base:		memory mapped base address where channels start.
-+ * @phys:		physical base address of channel region.
-  * @guaraneed:		is the channel delivery guaranteed.
-  */
- struct channel_space {
- 	void __iomem		*base;
-+	phys_addr_t		phys;
- 	unsigned long		*guaranteed;
- };
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index 1a5e0d14c1dd..17e2e81d2e90 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -79,22 +79,8 @@ static int etm4_cpu_id(struct coresight_device *csdev)
+ static int etm4_trace_id(struct coresight_device *csdev)
+ {
+ 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+-	unsigned long flags;
+-	int trace_id = -1;
  
-@@ -356,6 +358,23 @@ static void stm_generic_unlink(struct stm_data *stm_data,
- 	stm_disable(drvdata->csdev);
+-	if (!local_read(&drvdata->mode))
+-		return drvdata->trcid;
+-
+-	spin_lock_irqsave(&drvdata->spinlock, flags);
+-
+-	CS_UNLOCK(drvdata->base);
+-	trace_id = readl_relaxed(drvdata->base + TRCTRACEIDR);
+-	trace_id &= ETM_TRACEID_MASK;
+-	CS_LOCK(drvdata->base);
+-
+-	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+-
+-	return trace_id;
++	return drvdata->trcid;
  }
  
-+static phys_addr_t
-+stm_mmio_addr(struct stm_data *stm_data, unsigned int master,
-+	      unsigned int channel, unsigned int nr_chans)
-+{
-+	struct stm_drvdata *drvdata = container_of(stm_data,
-+						   struct stm_drvdata, stm);
-+	phys_addr_t addr;
-+
-+	addr = drvdata->chs.phys + channel * BYTES_PER_CHANNEL;
-+
-+	if (offset_in_page(addr) ||
-+	    offset_in_page(nr_chans * BYTES_PER_CHANNEL))
-+		return 0;
-+
-+	return addr;
-+}
-+
- static long stm_generic_set_options(struct stm_data *stm_data,
- 				    unsigned int master,
- 				    unsigned int channel,
-@@ -761,7 +780,9 @@ static void stm_init_generic_data(struct stm_drvdata *drvdata)
- 	drvdata->stm.sw_end = 1;
- 	drvdata->stm.hw_override = true;
- 	drvdata->stm.sw_nchannels = drvdata->numsp;
-+	drvdata->stm.sw_mmiosz = BYTES_PER_CHANNEL;
- 	drvdata->stm.packet = stm_generic_packet;
-+	drvdata->stm.mmio_addr = stm_mmio_addr;
- 	drvdata->stm.link = stm_generic_link;
- 	drvdata->stm.unlink = stm_generic_unlink;
- 	drvdata->stm.set_options = stm_generic_set_options;
-@@ -808,6 +829,7 @@ static int stm_probe(struct amba_device *adev, const struct amba_id *id)
- 	ret = stm_get_resource_byname(np, "stm-stimulus-base", &ch_res);
- 	if (ret)
- 		return ret;
-+	drvdata->chs.phys = ch_res.start;
- 
- 	base = devm_ioremap_resource(dev, &ch_res);
- 	if (IS_ERR(base))
+ static void etm4_enable_hw(void *info)
 -- 
 2.7.4
