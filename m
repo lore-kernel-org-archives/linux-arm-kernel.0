@@ -1,55 +1,76 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 25 Aug 2016 14:56:12 +0800
-Subject: [PATCH 2/2] sdhci-of-arasan: Add quirk and device tree parameter
- to fake CD bit
-In-Reply-To: <1472080984-17373-2-git-send-email-zach.brown@ni.com>
-Message-ID: <201608251442.Eq8iwx18%fengguang.wu@intel.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Thu, 25 Aug 2016 14:57:24 +0800
+Subject: [PATCH 2/2] ARM: dts: sun8i: enable UART1 for iNet D978 Rev2 board
+In-Reply-To: <CAGb2v66tFENk8QBw7D1+bwFN-zWaE2SGDrNyc-zdbJSRzENk4Q@mail.gmail.com>
+References: <20160823064451.25997-1-icenowy@aosc.xyz>
+ <20160823064451.25997-3-icenowy@aosc.xyz>
+ <20160824193600.GS8103@lukather> <43951472083107@web23m.yandex.ru>
+ <CAGb2v66tFENk8QBw7D1+bwFN-zWaE2SGDrNyc-zdbJSRzENk4Q@mail.gmail.com>
+Message-ID: <97321472108244@web8m.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zach,
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.8-rc3 next-20160824]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-[Check https://git-scm.com/docs/git-format-patch for more information]
 
-url:    https://github.com/0day-ci/linux/commits/Zach-Brown/sdhci-of-arasan-Add-quirk-and-device-tree-parameter-to-fake-CD-bit/20160825-072554
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: x86_64-allmodconfig (attached as .config)
-compiler: gcc-6 (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+25.08.2016, 12:41, "Chen-Yu Tsai" <wens@csie.org>:
+> On Thu, Aug 25, 2016 at 7:58 AM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+>> ?25.08.2016, 03:36, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>>> ?Hi,
+>>>
+>>> ?On Tue, Aug 23, 2016 at 02:44:51PM +0800, Icenowy Zheng wrote:
+>>>> ??UART1 is connected to the bluetooth part of RTL8723BS WiFi/BT combo card
+>>>> ??on iNet D978 Rev2 board.
+>>>>
+>>>> ??Enable the UART1 to make it possible to use the modified hciattach by
+>>>> ??Realtek to drive the BT part of RTL8723BS.
+>>>>
+>>>> ??Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>>>
+>>> ?I guess you could fold that patch into the previous one.
+>>>
+>>>> ??---
+>>>> ???arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts | 11 +++++++++++
+>>>> ???1 file changed, 11 insertions(+)
+>>>>
+>>>> ??diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+>>>> ??index 78823d8..3ac22d4 100644
+>>>> ??--- a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+>>>> ??+++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+>>>> ??@@ -48,6 +48,10 @@
+>>>> ???????????model = "INet-D978 Rev 02";
+>>>> ???????????compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
+>>>>
+>>>> ??+ aliases {
+>>>> ??+ serial1 = &uart1;
+>>>> ??+ };
+>>>> ??+
+>>>
+>>> ?Is there any other UART in the system?
+>>
+>> ?serial0 is defined in sun8i-reference-design-tablet.dtsi, as r_uart.
+>
+> If your board does not have r_uart pads, then the right thing to do
+> would be to disable it. You can then have uart1 as serial0.
 
-All errors (new ones prefixed by >>):
+I don't know it. The RX/TX is wired on PF2/PF4 on the board (UART0 muxed with
+MMC)
 
-   drivers/mmc/host/sdhci-of-arasan.c: In function 'sdhci_arasan_probe':
->> drivers/mmc/host/sdhci-of-arasan.c:539:12: error: 'struct sdhci_pltfm_host' has no member named 'priv'; did you mean 'private'?
-     pltfm_host->priv = sdhci_arasan;
-               ^~
+But many codes will require a ttyS0 as console... So I think the bluetooth should be
+located at ttyS1...
 
-vim +539 drivers/mmc/host/sdhci-of-arasan.c
-
-   533		sdhci_get_of_property(pdev);
-   534	
-   535		if (of_get_property(pdev->dev.of_node, "fake-cd", NULL))
-   536			host->quirks2 |= SDHCI_QUIRK2_NEED_FAKE_CD;
-   537	
-   538		pltfm_host = sdhci_priv(host);
- > 539		pltfm_host->priv = sdhci_arasan;
-   540		pltfm_host->clk = clk_xin;
-   541	
-   542		sdhci_arasan_update_baseclkfreq(host);
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 55503 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160825/0050a60d/attachment-0001.obj>
+>
+> AFAIK Linux requires a console, but that console can be simplefb.
+>
+> ChenYu
+>
+>>> ?The alias is not supposed to be about the controller index, but the
+>>> ?index in the board, meaning that if you only have a single UART, that
+>>> ?would be serial0.
+>>>
+>>> ?Thanks!
+>>> ?Maxime
+>>>
+>>> ?--
+>>> ?Maxime Ripard, Free Electrons
+>>> ?Embedded Linux and Kernel engineering
+>>> ?http://free-electrons.com
