@@ -1,69 +1,67 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 25 Aug 2016 23:41:04 +0900
-Subject: [PATCH v2 3/7] pinctrl: samsung: Add the support the multiple
- IORESOURCE_MEM for one pin-bank
-In-Reply-To: <CA+Ln22Ew=8S382zn+M8Ys5vztqvzp1+3EOTKtd81WSfuSyvY6w@mail.gmail.com>
-References: <1472046551-703-1-git-send-email-cw00.choi@samsung.com>
- <1472046551-703-4-git-send-email-cw00.choi@samsung.com>
- <CA+Ln22Ew=8S382zn+M8Ys5vztqvzp1+3EOTKtd81WSfuSyvY6w@mail.gmail.com>
-Message-ID: <CA+Ln22Guw1LghdV64cSKjByDExr+2HnvEK7DNkYz+XPAmVuAzA@mail.gmail.com>
+Date: Thu, 25 Aug 2016 23:43:10 +0900
+Subject: [PATCH 1/2] clk: samsung: exynos5260: Move struct
+ samsung_cmu_info to init section
+In-Reply-To: <57BE9E16.7090309@samsung.com>
+References: <1471834185-20249-1-git-send-email-cw00.choi@samsung.com>
+ <1471834185-20249-2-git-send-email-cw00.choi@samsung.com>
+ <CGME20160823005523epcas1p3993794ba487bb055cbf8a0b247fcb280@epcas1p3.samsung.com>
+ <20160823005512.GP6502@codeaurora.org> <57BBB66E.2060807@samsung.com>
+ <84e40b9b-1e08-24e0-f1ef-60b38b760ae6@samsung.com>
+ <20160824044346.GR6502@codeaurora.org>
+ <57BD5CFB.5050500@samsung.com> <20160825001109.GO19826@codeaurora.org>
+ <57BE9E16.7090309@samsung.com>
+Message-ID: <CA+Ln22E7ZeFTuzmAT-S9xDWq5kE1_XhkDp8fp7=odrudgaivYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-08-25 23:30 GMT+09:00 Tomasz Figa <tomasz.figa@gmail.com>:
->> +       }
->> +
->> +#define EXYNOS_PIN_BANK_EINTN_EXT(pins, reg, id, pctl_idx, eint_idx)   \
->> +       {                                               \
->> +               .type           = &bank_type_off,       \
->> +               .pctl_offset    = reg,                  \
->> +               .nr_pins        = pins,                 \
->> +               .eint_type      = EINT_TYPE_NONE,       \
->> +               .name           = id,                   \
->> +               .pctl_res_idx   = pctl_idx,             \
->> +               .eint_res_idx   = eint_dix              \
->> +       }
+2016-08-25 16:28 GMT+09:00 Chanwoo Choi <cw00.choi@samsung.com>:
+> Hi Stephen,
 >
-> Your patch 4/7 doesn't seem to use this one, so this is dead code for
-> the time being. Please add when there is real need for it.
->
-> Also it doesn't really make much sense to have index for both pctl and
-> eint. Please define first entry of regs property as always pointing to
-> pctl registers and by also eint registers for usual controllers. Then
-> second regs entry would be eint registers for controllers with
-> separate register blocks. Then there is only a need to have
-> eint_res_idx in the driver and no need for pctl_res_idx, because it
-> would be always 0.
-
-Ah, sorry, I got confused again by which registers are where in these
-GPF banks. Let's make it the other way around and make DT contain eint
-registers in first regs entry and hardcode eint_res_idx to 0 for the
-time being. However it should be still beneficial to refactor the code
-and calculate per-bank eint_base to avoid adding the offset every
-time, similarly to pctl_base/offset, from my suggestion below.
-
->> @@ -345,7 +346,8 @@ static void pin_to_reg_bank(struct samsung_pinctrl_drv_data *drvdata,
->>                         ((b->pin_base + b->nr_pins - 1) < pin))
->>                 b++;
+> On 2016? 08? 25? 09:11, Stephen Boyd wrote:
+>> On 08/24, Chanwoo Choi wrote:
+>>> On 2016? 08? 24? 13:43, Stephen Boyd wrote:
+>>>> On 08/23, Sylwester Nawrocki wrote:
+>>>>> So the saving is rather insignificant but the patch doesn't make
+>>>>> things worse and I'd say it might be worth applying.
+>>>>>
+>>>>
+>>>> Sounds good. This sort of information should be in the commit
+>>>> text though. Talking about const doesn't make any sense to me.
+>>>
+>>> Do you mean that 'const' is initconst secion?
 >>
->> -       *reg = drvdata->virt_base + b->pctl_offset;
->> +       pctl_res_idx = b->pctl_res_idx;
->> +       *reg = drvdata->virt_base[pctl_res_idx] + b->pctl_offset;
+>> No. Marking it as initconst in the patch is correct.
 >
-> I suggested something slightly different. Instead of
-> bank::pctl_res_idx, I proposed bank::pctl_base.
-> bank_info::pctl_res_idx would be specified only in init driver data
-> and bank::pctl_base would be calculated at probe time as
-> drvdata->virt_base[bank_info->pctl_res_idx] + bank_info->pctl_offset.
-> This would eliminate the need to do any indexing and adding further in
-> the code and make things simpler.
+> OK.
 >
-> Taking my other comments above, pctl part would be unchanged and only
-> eint addresses and offsets would be affected.
+>>
+>>> If possible, could you explain the anything
+>>> why you don't make sense about 'const'?
+>>>
+>>
+>> I'm just saying that the reasoning to move it from the text
+>> section to the data section shouldn't be because of const. There
+>> should be better reasons to do this, like size benefits.
+>>
+>
+> As I already said, the samsung_cmu_register_on() requires
+> the 'const' type argument for 'struct samsung_cmu_info'.
 
-Ah, scratch this one sentence. I got confused with the register layout
-again, sorry. Please refactor both eint and pctl as I suggested in the
-upper paragraph.
+If a function takes a const pointer as an argument, then it's
+perfectly valid to give a non-const pointer. Casting from non-cost
+into const is valid, other way around not.
+
+>
+> So, I defined the instance on the out of the exynos5260_clk_aud_init() as following:
+>         static const struct samsung_cmu_info aud_cmu __initconst = {
+>
+> How can i add the 'const' keyword and '__initsecion' to the
+> "struct samsung_cmu_info aud_cmu" in the "static void __init
+> exynos5260_clk_aud_init(struct device_node *np)"?
+
+Stephen meant that there must be some benefit from a change to make it
+worth being included into the kernel.
 
 Best regards,
 Tomasz
