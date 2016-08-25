@@ -1,51 +1,66 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 25 Aug 2016 11:24:54 +0100
-Subject: [PATCH v2 0/8] ARM: V7M: Support caches
-In-Reply-To: <DE49772B-3F4D-46A4-AC46-320A0ECCA1C2@esh.hu>
-References: <1471524360-31554-1-git-send-email-vladimir.murzin@arm.com>
- <20160818145300.GA1041@n2100.armlinux.org.uk> <57B5CCDE.10504@arm.com>
- <DE49772B-3F4D-46A4-AC46-320A0ECCA1C2@esh.hu>
-Message-ID: <57BEC776.3080600@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 25 Aug 2016 11:30:42 +0100
+Subject: [PATCH] arm64: Introduce execute-only page access permissions
+In-Reply-To: <20160816161824.GB7609@e104818-lin.cambridge.arm.com>
+References: <1470937490-7375-1-git-send-email-catalin.marinas@arm.com>
+ <CAGXu5jJTuJ+k948BU4rDGF=tHv54TR0JQVTbcVvzp=NtfQrL9Q@mail.gmail.com>
+ <20160815104751.GC22320@e104818-lin.cambridge.arm.com>
+ <CAGXu5jJTeta2OnL8KKHesG_HdeCvcXtaqjAir1cUvyfivaQeuQ@mail.gmail.com>
+ <20160816161824.GB7609@e104818-lin.cambridge.arm.com>
+Message-ID: <20160825103042.GA12599@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Tue, Aug 16, 2016 at 05:18:24PM +0100, Catalin Marinas wrote:
+> On Mon, Aug 15, 2016 at 10:45:09AM -0700, Kees Cook wrote:
+> > On Mon, Aug 15, 2016 at 3:47 AM, Catalin Marinas
+> > <catalin.marinas@arm.com> wrote:
+> > > On Fri, Aug 12, 2016 at 11:23:03AM -0700, Kees Cook wrote:
+> > >> On Thu, Aug 11, 2016 at 10:44 AM, Catalin Marinas
+> > >> <catalin.marinas@arm.com> wrote:
+> > >> > The ARMv8 architecture allows execute-only user permissions by clearing
+> > >> > the PTE_UXN and PTE_USER bits. However, the kernel running on a CPU
+> > >> > implementation without User Access Override (ARMv8.2 onwards) can still
+> > >> > access such page, so execute-only page permission does not protect
+> > >> > against read(2)/write(2) etc. accesses. Systems requiring such
+> > >> > protection must enable features like SECCOMP.
+> > >>
+> > >> So, UAO CPUs will bypass this protection in userspace if using
+> > >> read/write on a memory-mapped file?
+> > >
+> > > It's the other way around. CPUs prior to ARMv8.2 (when UAO was
+> > > introduced) or with the CONFIG_ARM64_UAO disabled can still access
+> > > user execute-only memory regions while running in kernel mode via the
+> > > copy_*_user, (get|put)_user etc. routines. So a way user can bypass this
+> > > protection is by using such address as argument to read/write file
+> > > operations.
+> > 
+> > Ah, okay. So exec-only for _userspace_ will always work, but exec-only
+> > for _kernel_ will only work on ARMv8.2 with CONFIG_ARM64_UAO?
+> 
+> Yes (mostly). With UAO, we changed the user access routines in the
+> kernel to use the LDTR/STTR instructions which always behave
+> unprivileged even when executed in kernel mode (unless the UAO bit is
+> set to override this restriction, needed for set_fs(KERNEL_DS)).
+> 
+> Even with UAO, we still have two cases where the kernel cannot perform
+> unprivileged accesses (LDTR/STTR) since they don't have an exclusives
+> equivalent (LDXR/STXR). These are in-user futex atomic ops and the SWP
+> emulation for 32-bit binaries (armv8_deprecated.c). But these require
+> write permission, so they would always fault even when running in the
+> kernel. futex_atomic_cmpxchg_inatomic() is able to return the old value
+> without a write (if it differs from "oldval") but it doesn't look like
+> such value could leak to user space.
 
-On 25/08/16 11:15, Szemz? Andr?s wrote:
-> Hi,
-> 
->> On 18 Aug 2016, at 16:57, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
->>
->> Is it acceptable if patches hang on a list for awhile, so people (I'm
->> looking at Alex and  Szemz?) can test them?
->>
-> 
-> This is my first email to the list, so sorry If I make mistakes with my report,
-> I still need to learn?
-> 
-> I have tested these patches on my custom board with ATMEL SAME70 armv7m SoC.
-> 
-> With default memory mapping configured MPU booting and rebooting works fine, I don?t see any issues. 
-> The system shows significant overall speedup as expected.
-> 
-> [    0.000000] Booting Linux on physical CPU 0x0
-> [    0.000000] Linux version 4.8.0-rc2 (root at debian) (gcc version 4.8.3 20140320 (prerelease) 
-> (Sourcery CodeBench Lite 2014.05-29) ) #23 PREEMPT Tue Aug 23 22:5 0:19 CEST 2016
-> [    0.000000] CPU: ARMv7-M [410fc271] revision 1 (ARMv7M), cr=00000000
-> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
-> [    0.000000] OF: fdt:Machine model: SAME70-sampione board
-> 
-> So you can add my Tested-by.
-> 
-> Thanks for the patches!
+If this was an issue, couldn't we add a dummy LDTR before the LDXR, and
+have the fixup handler return -EFAULT?
 
-Thanks a lot for testing!
+Either way, this series looks technically fine to me:
 
-Cheers
-Vladimir
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-> 
-> Regards,
-> Andras Szemzo
-> 
-> 
+but it would be good for some security-focussed person (Hi, Kees!) to
+comment on whether or not this is useful, given the caveats you've
+described. If it is, I can queue it for 4.9.
+
+Will
