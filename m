@@ -1,255 +1,88 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 25 Aug 2016 15:19:10 -0600
-Subject: [PATCH 20/28] coresight: etm-perf: pass struct perf_event to
- source::enable/disable()
+Date: Thu, 25 Aug 2016 15:19:13 -0600
+Subject: [PATCH 23/28] coresight: etm4x: split default and filter configuration
 In-Reply-To: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1472159958-5981-21-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1472159958-5981-24-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With this commit [1] address range filter information is now found
-in the struct hw_perf_event::addr_filters.  As such pass the event
-itself to the coresight_source::enable/disable() functions so that
-both event attribute and filter can be accessible for configuration.
+Splitting the steps involved in the configuration of a tracer.
+The first part is generic and can be reused for both sysFS and
+Perf methods.
 
-[1] 'commit 375637bc5249 ("perf/core: Introduce address range filtering")'
+The second part pertains to the configuration of filters
+themselves where the source of the information used to
+configure the filters will vary depending on the access
+methods.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm-perf.c |  4 ++--
- drivers/hwtracing/coresight/coresight-etm3x.c    | 14 ++++++++------
- drivers/hwtracing/coresight/coresight-etm4x.c    | 19 +++++++++++--------
- drivers/hwtracing/coresight/coresight-stm.c      |  7 ++++---
- drivers/hwtracing/coresight/coresight.c          |  2 +-
- include/linux/coresight.h                        |  5 +++--
- 6 files changed, 29 insertions(+), 22 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm4x.c | 36 ++++++++++++++++-----------
+ 1 file changed, 22 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index 755125f7917f..e4754e8e6906 100644
---- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -258,7 +258,7 @@ static void etm_event_start(struct perf_event *event, int flags)
- 	event->hw.state = 0;
- 
- 	/* Finally enable the tracer */
--	if (source_ops(csdev)->enable(csdev, &event->attr, CS_MODE_PERF))
-+	if (source_ops(csdev)->enable(csdev, event, CS_MODE_PERF))
- 		goto fail_end_stop;
- 
- out:
-@@ -291,7 +291,7 @@ static void etm_event_stop(struct perf_event *event, int mode)
- 		return;
- 
- 	/* stop tracer */
--	source_ops(csdev)->disable(csdev);
-+	source_ops(csdev)->disable(csdev, event);
- 
- 	/* tell the core */
- 	event->hw.state = PERF_HES_STOPPED;
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 326afe49251a..3fe368b23d15 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -311,9 +311,10 @@ void etm_config_trace_mode(struct etm_config *config)
- #define ETM3X_SUPPORTED_OPTIONS (ETMCR_CYC_ACC | ETMCR_TIMESTAMP_EN)
- 
- static int etm_parse_event_config(struct etm_drvdata *drvdata,
--				  struct perf_event_attr *attr)
-+				  struct perf_event *event)
- {
- 	struct etm_config *config = &drvdata->config;
-+	struct perf_event_attr *attr = &event->attr;
- 
- 	if (!attr)
- 		return -EINVAL;
-@@ -459,7 +460,7 @@ static int etm_trace_id(struct coresight_device *csdev)
- }
- 
- static int etm_enable_perf(struct coresight_device *csdev,
--			   struct perf_event_attr *attr)
-+			   struct perf_event *event)
- {
- 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-@@ -467,7 +468,7 @@ static int etm_enable_perf(struct coresight_device *csdev,
- 		return -EINVAL;
- 
- 	/* Configure the tracer based on the session's specifics */
--	etm_parse_event_config(drvdata, attr);
-+	etm_parse_event_config(drvdata, event);
- 	/* And enable it */
- 	etm_enable_hw(drvdata);
- 
-@@ -504,7 +505,7 @@ err:
- }
- 
- static int etm_enable(struct coresight_device *csdev,
--		      struct perf_event_attr *attr, u32 mode)
-+		      struct perf_event *event, u32 mode)
- {
- 	int ret;
- 	u32 val;
-@@ -521,7 +522,7 @@ static int etm_enable(struct coresight_device *csdev,
- 		ret = etm_enable_sysfs(csdev);
- 		break;
- 	case CS_MODE_PERF:
--		ret = etm_enable_perf(csdev, attr);
-+		ret = etm_enable_perf(csdev, event);
- 		break;
- 	default:
- 		ret = -EINVAL;
-@@ -601,7 +602,8 @@ static void etm_disable_sysfs(struct coresight_device *csdev)
- 	dev_info(drvdata->dev, "ETM tracing disabled\n");
- }
- 
--static void etm_disable(struct coresight_device *csdev)
-+static void etm_disable(struct coresight_device *csdev,
-+			struct perf_event *event)
- {
- 	u32 mode;
- 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index c8c7829f7046..b9e26d4f6b84 100644
+index b9e26d4f6b84..f890d1de39e3 100644
 --- a/drivers/hwtracing/coresight/coresight-etm4x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -185,9 +185,10 @@ static void etm4_enable_hw(void *info)
+@@ -562,21 +562,8 @@ static void etm4_init_arch_data(void *info)
+ 	CS_LOCK(drvdata->base);
  }
  
- static int etm4_parse_event_config(struct etmv4_drvdata *drvdata,
--				   struct perf_event_attr *attr)
-+				   struct perf_event *event)
+-static void etm4_set_default(struct etmv4_config *config)
++static void etm4_set_default_config(struct etmv4_config *config)
  {
- 	struct etmv4_config *config = &drvdata->config;
-+	struct perf_event_attr *attr = &event->attr;
+-	if (WARN_ON_ONCE(!config))
+-		return;
+-
+-	/*
+-	 * Make default initialisation trace everything
+-	 *
+-	 * Select the "always true" resource selector on the
+-	 * "Enablign Event" line and configure address range comparator
+-	 * '0' to trace all the possible address range.  From there
+-	 * configure the "include/exclude" engine to include address
+-	 * range comparator '0'.
+-	 */
+-
+ 	/* disable all events tracing */
+ 	config->eventctrl0 = 0x0;
+ 	config->eventctrl1 = 0x0;
+@@ -592,7 +579,10 @@ static void etm4_set_default(struct etmv4_config *config)
  
- 	if (!attr)
- 		return -EINVAL;
-@@ -221,7 +222,7 @@ static int etm4_parse_event_config(struct etmv4_drvdata *drvdata,
+ 	/* TRCVICTLR::EVENT = 0x01, select the always on logic */
+ 	config->vinst_ctrl |= BIT(0);
++}
+ 
++static void etm4_set_default_filter(struct etmv4_config *config)
++{
+ 	/*
+ 	 * TRCVICTLR::SSSTATUS == 1, the start-stop logic is
+ 	 * in the started state
+@@ -638,6 +628,24 @@ static void etm4_set_default(struct etmv4_config *config)
+ 	config->vissctlr = 0x0;
  }
  
- static int etm4_enable_perf(struct coresight_device *csdev,
--			    struct perf_event_attr *attr)
-+			    struct perf_event *event)
++static void etm4_set_default(struct etmv4_config *config)
++{
++	if (WARN_ON_ONCE(!config))
++		return;
++
++	/*
++	 * Make default initialisation trace everything
++	 *
++	 * Select the "always true" resource selector on the
++	 * "Enablign Event" line and configure address range comparator
++	 * '0' to trace all the possible address range.  From there
++	 * configure the "include/exclude" engine to include address
++	 * range comparator '0'.
++	 */
++	etm4_set_default_config(config);
++	etm4_set_default_filter(config);
++}
++
+ void etm4_config_trace_mode(struct etmv4_config *config)
  {
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-@@ -229,7 +230,7 @@ static int etm4_enable_perf(struct coresight_device *csdev,
- 		return -EINVAL;
- 
- 	/* Configure the tracer based on the session's specifics */
--	etm4_parse_event_config(drvdata, attr);
-+	etm4_parse_event_config(drvdata, event);
- 	/* And enable it */
- 	etm4_enable_hw(drvdata);
- 
-@@ -264,7 +265,7 @@ err:
- }
- 
- static int etm4_enable(struct coresight_device *csdev,
--		       struct perf_event_attr *attr, u32 mode)
-+		       struct perf_event *event, u32 mode)
- {
- 	int ret;
- 	u32 val;
-@@ -281,7 +282,7 @@ static int etm4_enable(struct coresight_device *csdev,
- 		ret = etm4_enable_sysfs(csdev);
- 		break;
- 	case CS_MODE_PERF:
--		ret = etm4_enable_perf(csdev, attr);
-+		ret = etm4_enable_perf(csdev, event);
- 		break;
- 	default:
- 		ret = -EINVAL;
-@@ -321,7 +322,8 @@ static void etm4_disable_hw(void *info)
- 	dev_dbg(drvdata->dev, "cpu: %d disable smp call done\n", drvdata->cpu);
- }
- 
--static int etm4_disable_perf(struct coresight_device *csdev)
-+static int etm4_disable_perf(struct coresight_device *csdev,
-+			     struct perf_event *event)
- {
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-@@ -357,7 +359,8 @@ static void etm4_disable_sysfs(struct coresight_device *csdev)
- 	dev_info(drvdata->dev, "ETM tracing disabled\n");
- }
- 
--static void etm4_disable(struct coresight_device *csdev)
-+static void etm4_disable(struct coresight_device *csdev,
-+			 struct perf_event *event)
- {
- 	u32 mode;
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-@@ -376,7 +379,7 @@ static void etm4_disable(struct coresight_device *csdev)
- 		etm4_disable_sysfs(csdev);
- 		break;
- 	case CS_MODE_PERF:
--		etm4_disable_perf(csdev);
-+		etm4_disable_perf(csdev, event);
- 		break;
- 	}
- 
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index 7949f0f6744a..49e0f1b925a5 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -198,7 +198,7 @@ static void stm_enable_hw(struct stm_drvdata *drvdata)
- }
- 
- static int stm_enable(struct coresight_device *csdev,
--		      struct perf_event_attr *attr, u32 mode)
-+		      struct perf_event *event, u32 mode)
- {
- 	u32 val;
- 	struct stm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-@@ -260,7 +260,8 @@ static void stm_disable_hw(struct stm_drvdata *drvdata)
- 		stm_hwevent_disable_hw(drvdata);
- }
- 
--static void stm_disable(struct coresight_device *csdev)
-+static void stm_disable(struct coresight_device *csdev,
-+			struct perf_event *event)
- {
- 	struct stm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-@@ -355,7 +356,7 @@ static void stm_generic_unlink(struct stm_data *stm_data,
- 	if (!drvdata || !drvdata->csdev)
- 		return;
- 
--	stm_disable(drvdata->csdev);
-+	stm_disable(drvdata->csdev, NULL);
- }
- 
- static phys_addr_t
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index bb20ee9747e1..fcbedd3905e3 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -257,7 +257,7 @@ static void coresight_disable_source(struct coresight_device *csdev)
- {
- 	if (atomic_dec_return(csdev->refcnt) == 0) {
- 		if (source_ops(csdev)->disable) {
--			source_ops(csdev)->disable(csdev);
-+			source_ops(csdev)->disable(csdev, NULL);
- 			csdev->enable = false;
- 		}
- 	}
-diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-index 385d62e64abb..2a5982c37dfb 100644
---- a/include/linux/coresight.h
-+++ b/include/linux/coresight.h
-@@ -232,8 +232,9 @@ struct coresight_ops_source {
- 	int (*cpu_id)(struct coresight_device *csdev);
- 	int (*trace_id)(struct coresight_device *csdev);
- 	int (*enable)(struct coresight_device *csdev,
--		      struct perf_event_attr *attr,  u32 mode);
--	void (*disable)(struct coresight_device *csdev);
-+		      struct perf_event *event,  u32 mode);
-+	void (*disable)(struct coresight_device *csdev,
-+			struct perf_event *event);
- };
- 
- struct coresight_ops {
+ 	u32 addr_acc, mode;
 -- 
 2.7.4
