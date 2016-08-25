@@ -1,132 +1,154 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 25 Aug 2016 13:59:53 -0400 (EDT)
-Subject: [PATCH 2/2] smc91x: remove ARM hack for unaligned 16-bit
- writes
-In-Reply-To: <cvvmbcA3dSJWccvvnbQPVX@videotron.ca>
-References: <20160825144633.1850889-1-arnd@arndb.de>
- <cvvmbcA3dSJWccvvnbQPVX@videotron.ca>
-Message-ID: <alpine.LFD.2.20.1608251350350.17623@knanqh.ubzr>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 25 Aug 2016 20:00:18 +0200
+Subject: [PATCH v4 7/7] musb: sunxi: Add support for platform_set_mode
+Message-ID: <20160825180018.23736-1-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Aug 2016, Arnd Bergmann wrote:
+This allows run-time dr_mode switching support via the "mode" musb
+sysfs attribute.
 
-> The ARM specific I/O operations are almost the same as the generic
-> ones, with the exception of the SMC_outw macro that works around
-> a problem of some platforms that cannot write to 16-bit registers
-> at an address that is not 32-bit aligned.
-> 
-> By inspection, I found that this is handled already in the
-> register abstractions for almost all cases, the exceptions being
-> SMC_SET_MAC_ADDR() and SMC_SET_MCAST(). I assume that all
-> platforms that require the hack for the other registers also
-> need it here, so the ones listed explictly here are the only
-> ones that work correctly, while the other ones either don't
-> need the hack at all, or they will set an incorrect MAC
-> address (which can often go unnoticed).
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v2:
+-No changes
+Changes in v3:
+-Fix switch-case code style
+Changes in v4:
+-Call musb_root_disconnect() before role change to make sure any attached
+ devices get seen as disconnected by the kernel
+---
+ drivers/usb/musb/sunxi.c | 61 ++++++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 57 insertions(+), 4 deletions(-)
 
-Probably that all PXA based platforms that use the SMC91x with 32-bit 
-accesses need this.  The others simply wired only 16 data lines, or 
-only 8 like the Neponset.
-
-However I no longer have the concerned hardware and can't test it.
-
-> This changes the two macros that set the unaligned registers
-> to use 32-bit writes if possible, which should do the right
-> thing in all combinations. The ARM specific SMC_outw gets removed
-> as a consequence.
-> 
-> The only difference between the ARM behavior and the default is
-> the selection of the LED settings. The fact that we have different
-> defaults based on the CPU architectures here is a bit suspicious,
-> but probably harmless, and I have no plan of touching that.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/net/ethernet/smsc/smc91x.h | 50 +++++++++++++++++++++++---------------
->  1 file changed, 30 insertions(+), 20 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/smsc/smc91x.h b/drivers/net/ethernet/smsc/smc91x.h
-> index 22333477d0b5..908473d9ede0 100644
-> --- a/drivers/net/ethernet/smsc/smc91x.h
-> +++ b/drivers/net/ethernet/smsc/smc91x.h
-> @@ -58,6 +58,7 @@
->  #define SMC_inw(a, r)		readw((a) + (r))
->  #define SMC_inl(a, r)		readl((a) + (r))
->  #define SMC_outb(v, a, r)	writeb(v, (a) + (r))
-> +#define SMC_outw(v, a, r)	writew(v, (a) + (r))
->  #define SMC_outl(v, a, r)	writel(v, (a) + (r))
->  #define SMC_insw(a, r, p, l)	readsw((a) + (r), p, l)
->  #define SMC_outsw(a, r, p, l)	writesw((a) + (r), p, l)
-> @@ -65,19 +66,6 @@
->  #define SMC_outsl(a, r, p, l)	writesl((a) + (r), p, l)
->  #define SMC_IRQ_FLAGS		(-1)	/* from resource */
->  
-> -/* We actually can't write halfwords properly if not word aligned */
-> -static inline void SMC_outw(u16 val, void __iomem *ioaddr, int reg)
-> -{
-> -	if ((machine_is_mainstone() || machine_is_stargate2() ||
-> -	     machine_is_pxa_idp()) && reg & 2) {
-> -		unsigned int v = val << 16;
-> -		v |= readl(ioaddr + (reg & ~2)) & 0xffff;
-> -		writel(v, ioaddr + (reg & ~2));
-> -	} else {
-> -		writew(val, ioaddr + reg);
-> -	}
-> -}
-> -
->  #elif	defined(CONFIG_SH_SH4202_MICRODEV)
->  
->  #define SMC_CAN_USE_8BIT	0
-> @@ -1029,18 +1017,40 @@ static const char * chip_ids[ 16 ] =  {
->  
->  #define SMC_SET_MAC_ADDR(lp, addr)					\
->  	do {								\
-> -		SMC_out16(addr[0]|(addr[1] << 8), ioaddr, ADDR0_REG(lp)); \
-> -		SMC_out16(addr[2]|(addr[3] << 8), ioaddr, ADDR1_REG(lp)); \
-> -		SMC_out16(addr[4]|(addr[5] << 8), ioaddr, ADDR2_REG(lp)); \
-> +		if (SMC_32BIT(lp)) {					\
-> +			SMC_outl((addr[0]      )|(addr[1] <<  8) |	\
-> +				 (addr[2] << 16)|(addr[3] << 24),	\
-> +				 ioaddr, ADDR0_REG(lp));		\
-> +		} else {						\
-> +			SMC_out16(addr[0]|(addr[1] << 8), ioaddr,	\
-> +				  ADDR0_REG(lp));			\
-> +			SMC_out16(addr[2]|(addr[3] << 8), ioaddr,	\
-> +				  ADDR1_REG(lp));			\
-> +		}							\
-> +		SMC_out16(addr[4]|(addr[5] << 8), ioaddr,		\
-> +			  ADDR2_REG(lp)); \
->  	} while (0)
->  
->  #define SMC_SET_MCAST(lp, x)						\
->  	do {								\
->  		const unsigned char *mt = (x);				\
-> -		SMC_out16(mt[0] | (mt[1] << 8), ioaddr, MCAST_REG1(lp)); \
-> -		SMC_out16(mt[2] | (mt[3] << 8), ioaddr, MCAST_REG2(lp)); \
-> -		SMC_out16(mt[4] | (mt[5] << 8), ioaddr, MCAST_REG3(lp)); \
-> -		SMC_out16(mt[6] | (mt[7] << 8), ioaddr, MCAST_REG4(lp)); \
-> +		if (SMC_32BIT(lp)) {					\
-> +			SMC_outl((mt[0]      ) | (mt[1] <<  8) |	\
-> +				 (mt[2] << 16) | (mt[3] << 24),		\
-> +				 ioaddr, MCAST_REG1(lp));		\
-> +			SMC_outl((mt[4]      ) | (mt[5] <<  8) |	\
-> +				 (mt[6] << 16) | (mt[7] << 24),		\
-> +				 ioaddr, MCAST_REG3(lp));		\
-> +		} else {						\
-> +			SMC_out16(mt[0] | (mt[1] << 8),			\
-> +				  ioaddr, MCAST_REG1(lp));		\
-> +			SMC_out16(mt[2] | (mt[3] << 8),			\
-> +				  ioaddr, MCAST_REG2(lp));		\
-> +			SMC_out16(mt[4] | (mt[5] << 8),			\
-> +				  ioaddr, MCAST_REG3(lp));		\
-> +			SMC_out16(mt[6] | (mt[7] << 8),			\
-> +				  ioaddr, MCAST_REG4(lp));		\
-> +		}							\
->  	} while (0)
->  
->  #define SMC_PUT_PKT_HDR(lp, status, length)				\
-> -- 
-> 2.9.0
-> 
-> 
+diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+index c6ee166..1408245 100644
+--- a/drivers/usb/musb/sunxi.c
++++ b/drivers/usb/musb/sunxi.c
+@@ -74,6 +74,7 @@
+ #define SUNXI_MUSB_FL_HAS_SRAM			5
+ #define SUNXI_MUSB_FL_HAS_RESET			6
+ #define SUNXI_MUSB_FL_NO_CONFIGDATA		7
++#define SUNXI_MUSB_FL_PHY_MODE_PEND		8
+ 
+ /* Our read/write methods need access and do not get passed in a musb ref :| */
+ static struct musb *sunxi_musb;
+@@ -87,6 +88,7 @@ struct sunxi_glue {
+ 	struct phy		*phy;
+ 	struct platform_device	*usb_phy;
+ 	struct usb_phy		*xceiv;
++	enum phy_mode		phy_mode;
+ 	unsigned long		flags;
+ 	struct work_struct	work;
+ 	struct extcon_dev	*extcon;
+@@ -140,6 +142,9 @@ static void sunxi_musb_work(struct work_struct *work)
+ 			clear_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
+ 		}
+ 	}
++
++	if (test_and_clear_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags))
++		phy_set_mode(glue->phy, glue->phy_mode);
+ }
+ 
+ static void sunxi_musb_set_vbus(struct musb *musb, int is_on)
+@@ -341,6 +346,50 @@ static void sunxi_musb_dma_controller_destroy(struct dma_controller *c)
+ {
+ }
+ 
++static int sunxi_musb_set_mode(struct musb *musb, u8 mode)
++{
++	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
++	enum phy_mode new_mode;
++
++	switch (mode) {
++	case MUSB_HOST:
++		new_mode = PHY_MODE_USB_HOST;
++		break;
++	case MUSB_PERIPHERAL:
++		new_mode = PHY_MODE_USB_DEVICE;
++		break;
++	case MUSB_OTG:
++		new_mode = PHY_MODE_USB_OTG;
++		break;
++	default:
++		dev_err(musb->controller->parent,
++			"Error requested mode not supported by this kernel\n");
++		return -EINVAL;
++	}
++
++	if (glue->phy_mode == new_mode)
++		return 0;
++
++	if (musb->port_mode != MUSB_PORT_MODE_DUAL_ROLE) {
++		dev_err(musb->controller->parent,
++			"Error changing modes is only supported in dual role mode\n");
++		return -EINVAL;
++	}
++
++	if (musb->port1_status & USB_PORT_STAT_ENABLE)
++		musb_root_disconnect(musb);
++
++	/*
++	 * phy_set_mode may sleep, and we're called with a spinlock held,
++	 * so let sunxi_musb_work deal with it.
++	 */
++	glue->phy_mode = new_mode;
++	set_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags);
++	schedule_work(&glue->work);
++
++	return 0;
++}
++
+ /*
+  * sunxi musb register layout
+  * 0x00 - 0x17	fifo regs, 1 long per fifo
+@@ -568,6 +617,7 @@ static const struct musb_platform_ops sunxi_musb_ops = {
+ 	.writew		= sunxi_musb_writew,
+ 	.dma_init	= sunxi_musb_dma_controller_create,
+ 	.dma_exit	= sunxi_musb_dma_controller_destroy,
++	.set_mode	= sunxi_musb_set_mode,
+ 	.set_vbus	= sunxi_musb_set_vbus,
+ 	.pre_root_reset_end = sunxi_musb_pre_root_reset_end,
+ 	.post_root_reset_end = sunxi_musb_post_root_reset_end,
+@@ -614,21 +664,28 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
++	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
++	if (!glue)
++		return -ENOMEM;
++
+ 	memset(&pdata, 0, sizeof(pdata));
+ 	switch (usb_get_dr_mode(&pdev->dev)) {
+ #if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_HOST
+ 	case USB_DR_MODE_HOST:
+ 		pdata.mode = MUSB_PORT_MODE_HOST;
++		glue->phy_mode = PHY_MODE_USB_HOST;
+ 		break;
+ #endif
+ #if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_GADGET
+ 	case USB_DR_MODE_PERIPHERAL:
+ 		pdata.mode = MUSB_PORT_MODE_GADGET;
++		glue->phy_mode = PHY_MODE_USB_DEVICE;
+ 		break;
+ #endif
+ #ifdef CONFIG_USB_MUSB_DUAL_ROLE
+ 	case USB_DR_MODE_OTG:
+ 		pdata.mode = MUSB_PORT_MODE_DUAL_ROLE;
++		glue->phy_mode = PHY_MODE_USB_OTG;
+ 		break;
+ #endif
+ 	default:
+@@ -638,10 +695,6 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+ 	pdata.platform_ops	= &sunxi_musb_ops;
+ 	pdata.config		= &sunxi_musb_hdrc_config;
+ 
+-	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
+-	if (!glue)
+-		return -ENOMEM;
+-
+ 	glue->dev = &pdev->dev;
+ 	INIT_WORK(&glue->work, sunxi_musb_work);
+ 	glue->host_nb.notifier_call = sunxi_musb_host_notifier;
+-- 
+2.9.3
