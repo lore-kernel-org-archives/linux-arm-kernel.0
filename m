@@ -1,95 +1,72 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 25 Aug 2016 15:18:50 -0600
-Subject: [PATCH 00/28] coresight: next v4.8-rc3 
-Message-ID: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Thu, 25 Aug 2016 15:18:51 -0600
+Subject: [PATCH 01/28] coresight: access conn->child_name only if it's
+ initialised
+In-Reply-To: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1472159958-5981-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Greg,
+From: Sudeep Holla <sudeep.holla@arm.com>
 
-These are a combination of the CoreSight subsystem patches tallied
-during v4.7 cycle (that were not picked) and those for this cycle.
-My hope is to see them all considered for the v4.9 cycle. 
+If the addition of the coresight devices get deferred, then there's a
+window before child_name is populated by of_get_coresight_platform_data
+from the respective component driver's probe and the attempted to access
+the same from coresight_orphan_match resulting in kernel NULL pointer
+dereference as below:
 
-Everything applies cleanly on your 'char-misc-next' branch
-(4c73c0882b34).
+Unable to handle kernel NULL pointer dereference at virtual address 0x0
+Internal error: Oops: 96000004 [#1] PREEMPT SMP
+Modules linked in:
+CPU: 0 PID: 1038 Comm: kworker/0:1 Not tainted 4.7.0-rc3 #124
+Hardware name: ARM Juno development board (r2) (DT)
+Workqueue: events amba_deferred_retry_func
+PC is at strcmp+0x1c/0x160
+LR is at coresight_orphan_match+0x7c/0xd0
+Call trace:
+ strcmp+0x1c/0x160
+ bus_for_each_dev+0x60/0xa0
+ coresight_register+0x264/0x2e0
+ tmc_probe+0x130/0x310
+ amba_probe+0xd4/0x1c8
+ driver_probe_device+0x22c/0x418
+ __device_attach_driver+0xbc/0x158
+ bus_for_each_drv+0x58/0x98
+ __device_attach+0xc4/0x160
+ device_initial_probe+0x10/0x18
+ bus_probe_device+0x94/0xa0
+ device_add+0x344/0x580
+ amba_device_try_add+0x194/0x238
+ amba_deferred_retry_func+0x48/0xd0
+ process_one_work+0x118/0x378
+ worker_thread+0x48/0x498
+ kthread+0xd0/0xe8
+ ret_from_fork+0x10/0x40
 
-With a little help from the universe there will be a few more.
+This patch adds a check for non-NULL conn->child_name before accessing
+the same.
 
-Thanks,
-Mathieu 
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Chunyan Zhang (1):
-  coresight-stm: support mmapping channel regions with mmio_addr
-
-Markus Elfring (1):
-  coresight: tmc: Delete an unnecessary check before the function call
-    "kfree"
-
-Mathieu Poirier (11):
-  coresight: delay initialisation when children are missing
-  coresight: add PM runtime calls to coresight_simple_func()
-  coresight: etm-perf: pass struct perf_event to
-    source::enable/disable()
-  coresight: remove duplicated enumeration
-  coresight: etm-perf: configuring filters from perf core
-  coresight: etm4x: split default and filter configuration
-  coresight: etm4x: cleaning up default filter configuration
-  coresight: etm4x: adding range filter configuration function
-  coresight: etm4x: configuring include/exclude function
-  coresight: etm4x: adding configurable address range filtering
-  coresight: etm4x: adding configurable start/stop filtering
-
-Olivier Schonken (1):
-  coresight-etm3x: Add ARM ETM 3.5 Cortex-A5 peripheral ID
-
-Peter Chen (1):
-  hwtracing: coresight: of_coresight: add missing of_node_put after
-    calling of_parse_phandle
-
-Sudeep Holla (4):
-  coresight: access conn->child_name only if it's initialised
-  coresight: always use stashed trace id value in etm4_trace_id
-  coresight: etm4x: request to retain power to the trace unit when
-    active
-  coresight: fix handling of ETM trace register access via sysfs
-
-Suzuki K Poulose (8):
-  coresight: Remove erroneous dma_free_coherent in tmc_probe
-  coresight: Consolidate error handling path for tmc_probe
-  coresight: Fix csdev connections initialisation
-  coresight: tmc: Limit the trace to available data
-  coresight: etmv4: Fix ETMv4x peripheral ID table
-  coresight: Cleanup TMC status check
-  coresight: Add better messages for coresight_timeout
-  coresight: Use local coresight_desc instances
-
-Wei Yongjun (1):
-  coresight: etm4x: remove duplicated include from coresight-etm4x.c
-
- drivers/hwtracing/coresight/coresight-etb10.c      |  28 +-
- drivers/hwtracing/coresight/coresight-etm-perf.c   | 153 +++++++-
- drivers/hwtracing/coresight/coresight-etm-perf.h   |  34 ++
- drivers/hwtracing/coresight/coresight-etm.h        |   8 -
- .../hwtracing/coresight/coresight-etm3x-sysfs.c    |   3 +-
- drivers/hwtracing/coresight/coresight-etm3x.c      |  39 +-
- .../hwtracing/coresight/coresight-etm4x-sysfs.c    |  63 +++-
- drivers/hwtracing/coresight/coresight-etm4x.c      | 419 ++++++++++++++++-----
- drivers/hwtracing/coresight/coresight-etm4x.h      |  11 +-
- drivers/hwtracing/coresight/coresight-funnel.c     |  20 +-
- drivers/hwtracing/coresight/coresight-priv.h       |  23 +-
- .../coresight/coresight-replicator-qcom.c          |  18 +-
- drivers/hwtracing/coresight/coresight-replicator.c |  20 +-
- drivers/hwtracing/coresight/coresight-stm.c        |  53 ++-
- drivers/hwtracing/coresight/coresight-tmc-etf.c    |   4 +-
- drivers/hwtracing/coresight/coresight-tmc-etr.c    |  12 +-
- drivers/hwtracing/coresight/coresight-tmc.c        |  76 ++--
- drivers/hwtracing/coresight/coresight-tmc.h        |   4 +-
- drivers/hwtracing/coresight/coresight-tpiu.c       |  18 +-
- drivers/hwtracing/coresight/coresight.c            |  29 +-
- drivers/hwtracing/coresight/of_coresight.c         |   3 +-
- include/linux/coresight.h                          |   5 +-
- 22 files changed, 727 insertions(+), 316 deletions(-)
-
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index d08d1ab9bba5..ceeaaea41ed6 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -725,7 +725,8 @@ static int coresight_orphan_match(struct device *dev, void *data)
+ 		/* We have found at least one orphan connection */
+ 		if (conn->child_dev == NULL) {
+ 			/* Does it match this newly added device? */
+-			if (!strcmp(dev_name(&csdev->dev), conn->child_name)) {
++			if (conn->child_name &&
++			    !strcmp(dev_name(&csdev->dev), conn->child_name)) {
+ 				conn->child_dev = csdev;
+ 			} else {
+ 				/* This component still has an orphan */
 -- 
 2.7.4
