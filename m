@@ -1,91 +1,77 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 25 Aug 2016 13:51:46 -0600
-Subject: [PATCH v4 16/16] ARM64: dts: Define CPU power domain for MSM8916
+Date: Thu, 25 Aug 2016 13:51:39 -0600
+Subject: [PATCH v4 09/16] timer: Export next wake up of a CPU
 In-Reply-To: <1472154706-40119-1-git-send-email-lina.iyer@linaro.org>
 References: <1472154706-40119-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1472154706-40119-17-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1472154706-40119-10-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define power domain and the power states for the domain as defined by
-the PSCI firmware. The 8916 firmware supports OS initiated method of
-powering off the CPU clusters.
+Knowing the sleep length of the CPU is useful for the power state
+determination on idle. The value is relative to the time when the call
+was invoked by the CPU. This doesn't work well when there is a need to
+know when the actual wakeup is.
 
-Cc: <devicetree@vger.kernel.org>
+By reading the next wake up event of a CPU, governors can determine the
+first CPU to wake up (due to timer) amongst a cluster of CPUs and the
+sleep time available between the last CPU to idle and the first CPU to
+resume. This information is useful to determine if the caches and other
+common hardware blocks can also be put in idle during this common period
+of inactivity.
+
+Cc: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ include/linux/tick.h     |  7 +++++++
+ kernel/time/tick-sched.c | 11 +++++++++++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 3029773..506c712 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -64,6 +64,7 @@
- 			next-level-cache = <&L2_0>;
- 			enable-method = "psci";
- 			cpu-idle-states = <&CPU_SPC>;
-+			power-domains = <&CPU_PD>;
- 		};
+diff --git a/include/linux/tick.h b/include/linux/tick.h
+index 62be0786..92fa4b0 100644
+--- a/include/linux/tick.h
++++ b/include/linux/tick.h
+@@ -117,6 +117,7 @@ extern void tick_nohz_idle_enter(void);
+ extern void tick_nohz_idle_exit(void);
+ extern void tick_nohz_irq_exit(void);
+ extern ktime_t tick_nohz_get_sleep_length(void);
++extern ktime_t tick_nohz_get_next_wakeup(int cpu);
+ extern u64 get_cpu_idle_time_us(int cpu, u64 *last_update_time);
+ extern u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time);
+ #else /* !CONFIG_NO_HZ_COMMON */
+@@ -131,6 +132,12 @@ static inline ktime_t tick_nohz_get_sleep_length(void)
  
- 		CPU1: cpu at 1 {
-@@ -73,6 +74,7 @@
- 			next-level-cache = <&L2_0>;
- 			enable-method = "psci";
- 			cpu-idle-states = <&CPU_SPC>;
-+			power-domains = <&CPU_PD>;
- 		};
- 
- 		CPU2: cpu at 2 {
-@@ -82,6 +84,7 @@
- 			next-level-cache = <&L2_0>;
- 			enable-method = "psci";
- 			cpu-idle-states = <&CPU_SPC>;
-+			power-domains = <&CPU_PD>;
- 		};
- 
- 		CPU3: cpu at 3 {
-@@ -91,6 +94,7 @@
- 			next-level-cache = <&L2_0>;
- 			enable-method = "psci";
- 			cpu-idle-states = <&CPU_SPC>;
-+			power-domains = <&CPU_PD>;
- 		};
- 
- 		L2_0: l2-cache {
-@@ -107,12 +111,33 @@
- 				min-residency-us = <2000>;
- 				local-timer-stop;
- 			};
+ 	return len;
+ }
 +
-+			CLUSTER_RET: cluster_retention {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x1000010>;
-+				entry-latency-us = <500>;
-+				exit-latency-us = <500>;
-+				min-residency-us = <2000>;
-+			};
++static inline ktime_t tick_nohz_get_next_wakeup(int cpu)
++{
++	return tick_next_period;
++}
 +
-+			CLUSTER_PWR_DWN: cluster_gdhs {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x1000030>;
-+				entry-latency-us = <2000>;
-+				exit-latency-us = <2000>;
-+				min-residency-us = <6000>;
-+			};
- 		};
- 	};
+ static inline u64 get_cpu_idle_time_us(int cpu, u64 *unused) { return -1; }
+ static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
+ #endif /* !CONFIG_NO_HZ_COMMON */
+diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
+index 536ada8..5c7ac17 100644
+--- a/kernel/time/tick-sched.c
++++ b/kernel/time/tick-sched.c
+@@ -979,6 +979,17 @@ ktime_t tick_nohz_get_sleep_length(void)
+ 	return ts->sleep_length;
+ }
  
- 	psci {
- 		compatible = "arm,psci-1.0";
- 		method = "smc";
++/**
++ * tick_nohz_get_next_wakeup - return the next wake up of the CPU
++ */
++ktime_t tick_nohz_get_next_wakeup(int cpu)
++{
++	struct clock_event_device *dev =
++			per_cpu(tick_cpu_device.evtdev, cpu);
 +
-+		CPU_PD: cpu-pd at 0 {
-+			#power-domain-cells = <0>;
-+			domain-idle-states = <&CLUSTER_RET>, <&CLUSTER_PWR_DWN>;
-+		};
- 	};
- 
- 	timer {
++	return dev->next_event;
++}
++
+ static void tick_nohz_account_idle_ticks(struct tick_sched *ts)
+ {
+ #ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
 -- 
 2.7.4
