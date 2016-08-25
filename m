@@ -1,71 +1,40 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 25 Aug 2016 10:08:46 +0900
-Subject: [PATCH 09/10] reset: zynq: add driver Kconfig option
-In-Reply-To: <CAK7LNATr0WDx0aMXEJMxrDY6WxBtqis-DkZiOjGnrjM8zqYi-A@mail.gmail.com>
-References: <1472045342-7434-1-git-send-email-p.zabel@pengutronix.de>
- <1472045342-7434-9-git-send-email-p.zabel@pengutronix.de>
- <CAK7LNATr0WDx0aMXEJMxrDY6WxBtqis-DkZiOjGnrjM8zqYi-A@mail.gmail.com>
-Message-ID: <CAK7LNASJ0gQ-_4H3+=deNAXYVSWkek4sH2uUrTkyxGH5R7i1Xw@mail.gmail.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Thu, 25 Aug 2016 01:26:10 +0000
+Subject: [PATCH] ARM: imx6: enable WAIT mode hardware workaround for imx6sx
+In-Reply-To: <1471885400-9140-1-git-send-email-Anson.Huang@nxp.com>
+References: <1471885400-9140-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <HE1PR04MB145001C26FC1A9A40849F0308BED0@HE1PR04MB1450.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-08-25 2:48 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> 2016-08-24 22:29 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
->> Visible only if COMPILE_TEST is enabled, this allows to include the
->> driver in build tests.
->>
->> Cc: Moritz Fischer <moritz.fischer@ettus.com>
->> Cc: Michal Simek <michal.simek@xilinx.com>
->> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
->> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
->> ---
->>  drivers/reset/Kconfig  | 6 ++++++
->>  drivers/reset/Makefile | 2 +-
->>  2 files changed, 7 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
->> index 17030e2..86b49a2 100644
->> --- a/drivers/reset/Kconfig
->> +++ b/drivers/reset/Kconfig
->> @@ -67,6 +67,12 @@ config RESET_SUNXI
->>         help
->>           This enables the reset driver for Allwinner SoCs.
->>
->> +config RESET_ZYNQ
->> +       bool "ZYNQ Reset Driver" if COMPILE_TEST
->> +       default ARCH_ZYNQ
->> +       help
->> +         This enables the reset driver for Xilinx Zynq FPGAs.
->> +
+ 
+>Need to enable INT_MEM_CLK_LPM bit in CCM_CGPR for WAIT mode, without
+>this bit set, if there is pending interrupt during ARM platform entering WAIT mode
+>without power gating, cache data will be corrupted, this is a hardware workaround for
+>WAIT mode and must be enabled.
 >
-> Please move this below RESET_UNIPHIER
-> as I assume you are sorting Kconfig entries alphabetically.
+>Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+>---
+> arch/arm/mach-imx/cpuidle-imx6sx.c | 1 +
+> 1 file changed, 1 insertion(+)
 >
+>diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c b/arch/arm/mach-imx/cpuidle-
+>imx6sx.c
+>index 3c6672b..41cdce6 100644
+>--- a/arch/arm/mach-imx/cpuidle-imx6sx.c
+>+++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
+>@@ -90,6 +90,7 @@ static struct cpuidle_driver imx6sx_cpuidle_driver = {
 >
-> Otherwise,
->
-> Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->
+> int __init imx6sx_cpuidle_init(void)
+> {
+>+	imx6q_set_int_mem_clk_lpm(true);
+> 	imx6_enable_rbc(false);
+> 	/*
+> 	 * set ARM power up/down timing to the fastest,
+>--
+>1.9.1
 
+It fixed the system unstable problem at my imx6sx-sdb board. So:
+Tested-by: Peter Chen <peter.chen@nxp.com>
 
-
-
->> +         This enables the reset driver for Xilinx Zynq FPGAs.
-
-
-One more thing, I thought this statement is not precise
-because Zynq is not only an FPGA,
-but ARM SoC + FPGA.
-
-Please consider to reword
-
-"This enables the reset driver for Xilinx Zynq SoC"
-
-
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Peter
