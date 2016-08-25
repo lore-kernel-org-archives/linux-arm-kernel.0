@@ -1,34 +1,62 @@
-From: wsa-dev@sang-engineering.com (Wolfram Sang)
-Date: Thu, 25 Aug 2016 19:39:05 +0200
-Subject: [PATCH 13/44] usb: gadget: udc: udc-xilinx: don't print on ENOMEM
-In-Reply-To: <20160825173947.26624-1-wsa-dev@sang-engineering.com>
-References: <20160825173947.26624-1-wsa-dev@sang-engineering.com>
-Message-ID: <20160825173947.26624-14-wsa-dev@sang-engineering.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 25 Aug 2016 13:46:10 -0400 (EDT)
+Subject: [PATCH] arm: sys_oabi-compat: Use kmalloc_array() in two functions
+In-Reply-To: <5deba521-2dd4-cd2e-23d7-226a1a7728c3@users.sourceforge.net>
+References: <5deba521-2dd4-cd2e-23d7-226a1a7728c3@users.sourceforge.net>
+Message-ID: <alpine.LFD.2.20.1608251334360.17623@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All kmalloc-based functions print enough information on failures.
+On Thu, 25 Aug 2016, SF Markus Elfring wrote:
 
-Signed-off-by: Wolfram Sang <wsa-dev@sang-engineering.com>
----
- drivers/usb/gadget/udc/udc-xilinx.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Thu, 25 Aug 2016 17:45:23 +0200
+> 
+> Multiplications for the size determination of memory allocations
+> indicated that array data structures should be processed.
+> Thus use the corresponding function "kmalloc_array".
+> 
+> This issue was detected by using the Coccinelle software.
+> 
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 
-diff --git a/drivers/usb/gadget/udc/udc-xilinx.c b/drivers/usb/gadget/udc/udc-xilinx.c
-index f8bf290f189444..588e2531b8b81e 100644
---- a/drivers/usb/gadget/udc/udc-xilinx.c
-+++ b/drivers/usb/gadget/udc/udc-xilinx.c
-@@ -973,10 +973,8 @@ static struct usb_request *xudc_ep_alloc_request(struct usb_ep *_ep,
- 
- 	udc = ep->udc;
- 	req = kzalloc(sizeof(*req), gfp_flags);
--	if (!req) {
--		dev_err(udc->dev, "%s:not enough memory", __func__);
-+	if (!req)
- 		return NULL;
--	}
- 
- 	req->ep = ep;
- 	INIT_LIST_HEAD(&req->queue);
--- 
-2.9.3
+The use of kmalloc_array() introduces a duplicate of the size capping 
+check that already exists in the code.  However it seems that gcc is 
+smart enough to figure that out and doesn't emit it twice.
+
+Note that I'm not implying that the existing check should be removed if 
+this patch is applied though. Having it there makes the code clearer. 
+But if this patch makes a Coccinelle script happier then ...
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+> ---
+>  arch/arm/kernel/sys_oabi-compat.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/sys_oabi-compat.c b/arch/arm/kernel/sys_oabi-compat.c
+> index 5f221ac..e624db9 100644
+> --- a/arch/arm/kernel/sys_oabi-compat.c
+> +++ b/arch/arm/kernel/sys_oabi-compat.c
+> @@ -285,7 +285,7 @@ asmlinkage long sys_oabi_epoll_wait(int epfd,
+>  		return -EINVAL;
+>  	if (!access_ok(VERIFY_WRITE, events, sizeof(*events) * maxevents))
+>  		return -EFAULT;
+> -	kbuf = kmalloc(sizeof(*kbuf) * maxevents, GFP_KERNEL);
+> +	kbuf = kmalloc_array(maxevents, sizeof(*kbuf), GFP_KERNEL);
+>  	if (!kbuf)
+>  		return -ENOMEM;
+>  	fs = get_fs();
+> @@ -323,7 +323,7 @@ asmlinkage long sys_oabi_semtimedop(int semid,
+>  		return -EINVAL;
+>  	if (!access_ok(VERIFY_READ, tsops, sizeof(*tsops) * nsops))
+>  		return -EFAULT;
+> -	sops = kmalloc(sizeof(*sops) * nsops, GFP_KERNEL);
+> +	sops = kmalloc_array(nsops, sizeof(*sops), GFP_KERNEL);
+>  	if (!sops)
+>  		return -ENOMEM;
+>  	err = 0;
+> -- 
+> 2.9.3
+> 
+> 
