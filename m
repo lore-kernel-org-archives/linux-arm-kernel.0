@@ -1,78 +1,126 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 25 Aug 2016 14:45:58 +0100
-Subject: [PATCH v2 0/7] scpi: Add support for legacy SCPI protocol
-In-Reply-To: <f6c7249f-f103-fd91-2c89-a30c191427aa@baylibre.com>
-References: <1471952816-30877-1-git-send-email-narmstrong@baylibre.com>
- <f6c7249f-f103-fd91-2c89-a30c191427aa@baylibre.com>
-Message-ID: <73cce388-219d-2daa-811a-059c3d84c2e4@arm.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 25 Aug 2016 15:47:56 +0200
+Subject: [PATCH] tty/serial: atmel: add fractional baud rate support
+Message-ID: <20160825134756.6261-1-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The USART device provides a fractional baud rate generator to get a more
+accurate baud rate. It can be used only when the USART is configured in
+'normal mode' and this feature is not available on AT91RM9200 SoC.
 
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/tty/serial/atmel_serial.c | 41 +++++++++++++++++++++++++++++++--------
+ include/linux/atmel_serial.h      |  1 +
+ 2 files changed, 34 insertions(+), 8 deletions(-)
 
-On 25/08/16 14:18, Neil Armstrong wrote:
-> On 08/23/2016 01:46 PM, Neil Armstrong wrote:
->> This patchset aims to support the legacy SCPI firmware implementation that was
->> delivered as early technology preview for the JUNO platform.
->>
->> Finally a stable, maintained and public implementation for the SCPI protocol
->> has been upstreamed part of the JUNO support and it is the recommended way
->> of implementing SCP communication on ARMv8 platforms.
->>
->> The Amlogic GXBB platform is using this legacy protocol, as the RK3368 & RK3399
->> platforms. This patchset will only add support for Amlogic GXBB SoC.
->>
->> This patchset add support for the legacy protocol in the arm_scpi.c file,
->> avoiding code duplication.
->>
->> Last RFC discution tread can be found at : https://lkml.org/lkml/2016/8/9/210
->>
->> The last patch depends on the "Platform MHU" dtsi patch.
->>
->> Changes since v1 at : http://lkml.kernel.org/r/1471515066-3626-1-git-send-email-narmstrong at baylibre.com
->>  - Dropped vendor_send_message and rockchip vendor mechanism patches
->>  - Merged alternate functions into main functions using is_legacy boolean
->>  - Added DT match table to set is_legacy to true
->>  - Kept alternate scpi_ops structure for legacy
->>
->> Neil Armstrong (7):
->>   scpi: Add alternative legacy structures, functions and macros
->>   scpi: Use legacy variants command index calling scpi_send_message
->>   scpi: Add support for Legacy match table for Amlogic GXBB SoC
->>   scpi: grow MAX_DVFS_OPPS to 16 entries
->>   dt-bindings: Add support for Amlogic GXBB SCPI Interface
->>   ARM64: dts: meson-gxbb: Add SRAM node
->>   ARM64: dts: meson-gxbb: Add SCPI with cpufreq & sensors Nodes
->>
->>  Documentation/devicetree/bindings/arm/arm,scpi.txt |   8 +-
->>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  45 ++++
->>  drivers/firmware/arm_scpi.c                        | 279 +++++++++++++++++++--
->>  3 files changed, 302 insertions(+), 30 deletions(-)
->>
->
-> Hi Sudeep,
->
-> Sorry but I posted this V2 before you had time to look at my
-> previous  v1 replies...
->
-
-That's fine.
-
-> In this series, I merged the scpi_send_message, but I must still
-> evaluate how it's possible  to use the list to queue commands.
->
-
-Ah OK.
-
-> Here I used if(is_legacy) to stop duplicating functions, is this ok
-> for you ?
->
-
-I am still thinking if it can be abstracted well, some kind of mapping
-but haven't thought too much about that yet. Also I was thinking about
-bitmap for high priority commands. I remember doing something before but
-seem to have lost that copy. I will try to dig it out..
-
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 2eaa18d..1759239 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -166,6 +166,7 @@ struct atmel_uart_port {
+ 	u32			rts_low;
+ 	bool			ms_irq_enabled;
+ 	u32			rtor;	/* address of receiver timeout register if it exists */
++	bool			has_frac_baudrate;
+ 	bool			has_hw_timer;
+ 	struct timer_list	uart_timer;
+ 
+@@ -1745,6 +1746,11 @@ static void atmel_get_ip_name(struct uart_port *port)
+ 	dbgu_uart = 0x44424755;	/* DBGU */
+ 	new_uart = 0x55415254;	/* UART */
+ 
++	/*
++	 * Only USART devices from at91sam9260 SOC implement fractional
++	 * baudrate.
++	 */
++	atmel_port->has_frac_baudrate = false;
+ 	atmel_port->has_hw_timer = false;
+ 
+ 	if (name == new_uart) {
+@@ -1753,6 +1759,7 @@ static void atmel_get_ip_name(struct uart_port *port)
+ 		atmel_port->rtor = ATMEL_UA_RTOR;
+ 	} else if (name == usart) {
+ 		dev_dbg(port->dev, "Usart\n");
++		atmel_port->has_frac_baudrate = true;
+ 		atmel_port->has_hw_timer = true;
+ 		atmel_port->rtor = ATMEL_US_RTOR;
+ 	} else if (name == dbgu_uart) {
+@@ -1764,6 +1771,7 @@ static void atmel_get_ip_name(struct uart_port *port)
+ 		case 0x302:
+ 		case 0x10213:
+ 			dev_dbg(port->dev, "This version is usart\n");
++			atmel_port->has_frac_baudrate = true;
+ 			atmel_port->has_hw_timer = true;
+ 			atmel_port->rtor = ATMEL_US_RTOR;
+ 			break;
+@@ -2025,8 +2033,9 @@ static void atmel_serial_pm(struct uart_port *port, unsigned int state,
+ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+ 			      struct ktermios *old)
+ {
++	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+ 	unsigned long flags;
+-	unsigned int old_mode, mode, imr, quot, baud;
++	unsigned int old_mode, mode, imr, quot, baud, div, cd, fp = 0;
+ 
+ 	/* save the current mode register */
+ 	mode = old_mode = atmel_uart_readl(port, ATMEL_US_MR);
+@@ -2036,12 +2045,6 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+ 		  ATMEL_US_PAR | ATMEL_US_USMODE);
+ 
+ 	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk / 16);
+-	quot = uart_get_divisor(port, baud);
+-
+-	if (quot > 65535) {	/* BRGR is 16-bit, so switch to slower clock */
+-		quot /= 8;
+-		mode |= ATMEL_US_USCLKS_MCK_DIV8;
+-	}
+ 
+ 	/* byte size */
+ 	switch (termios->c_cflag & CSIZE) {
+@@ -2160,7 +2163,29 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+ 		atmel_uart_writel(port, ATMEL_US_CR, rts_state);
+ 	}
+ 
+-	/* set the baud rate */
++	/*
++	 * Set the baud rate:
++	 * Fractional baudrate allows to setup output frequency more
++	 * accurately. This feature is enabled only when using normal mode.
++	 * baudrate = selected clock / (8 * (2 - OVER) * (CD + FP / 8))
++	 * Currently, OVER is always set to 0 so we get
++	 * baudrate = selected clock (16 * (CD + FP / 8))
++	 */
++	if (atmel_port->has_frac_baudrate &&
++	    (mode & ATMEL_US_USMODE) == ATMEL_US_USMODE_NORMAL) {
++		div = DIV_ROUND_CLOSEST(port->uartclk, baud);
++		cd = div / 16;
++		fp = DIV_ROUND_CLOSEST(div % 16, 2);
++	} else {
++		cd = uart_get_divisor(port, baud);
++	}
++
++	if (cd > 65535) {	/* BRGR is 16-bit, so switch to slower clock */
++		cd /= 8;
++		mode |= ATMEL_US_USCLKS_MCK_DIV8;
++	}
++	quot = cd | fp << ATMEL_US_FP_OFFSET;
++
+ 	atmel_uart_writel(port, ATMEL_US_BRGR, quot);
+ 	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
+ 	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN | ATMEL_US_RXEN);
+diff --git a/include/linux/atmel_serial.h b/include/linux/atmel_serial.h
+index 5a4d664..f8e452a 100644
+--- a/include/linux/atmel_serial.h
++++ b/include/linux/atmel_serial.h
+@@ -118,6 +118,7 @@
+ 
+ #define ATMEL_US_BRGR		0x20	/* Baud Rate Generator Register */
+ #define	ATMEL_US_CD		GENMASK(15, 0)	/* Clock Divider */
++#define ATMEL_US_FP_OFFSET	16	/* Fractional Part */
+ 
+ #define ATMEL_US_RTOR		0x24	/* Receiver Time-out Register for USART */
+ #define ATMEL_UA_RTOR		0x28	/* Receiver Time-out Register for UART */
 -- 
-Regards,
-Sudeep
+2.9.0
