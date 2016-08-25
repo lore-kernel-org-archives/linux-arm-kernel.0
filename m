@@ -1,55 +1,71 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Thu, 25 Aug 2016 15:33:25 +0200
-Subject: [PATCH 5/5] arm64: Add uprobe support
-In-Reply-To: <20160824155649.GG16944@arm.com>
-References: <cover.1470114993.git.panand@redhat.com>
- <abaac6ebaa5dd63889803ec568663bc8c8c65b02.1470114993.git.panand@redhat.com>
- <20160809184943.GA17112@redhat.com>
- <20160824071308.GA24311@localhost.localdomain>
- <20160824154711.GA25531@redhat.com> <20160824155649.GG16944@arm.com>
-Message-ID: <20160825133325.GA7653@redhat.com>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Thu, 25 Aug 2016 21:37:27 +0800
+Subject: [PATCH v13 0/4] Mediatek MT8173 CMDQ support
+In-Reply-To: <20b10079-3ae2-9da9-1149-0bceabac9837@gmail.com>
+References: <1472009252-1074-1-git-send-email-hs.liao@mediatek.com>
+ <20b10079-3ae2-9da9-1149-0bceabac9837@gmail.com>
+Message-ID: <1472132247.26044.23.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/24, Will Deacon wrote:
->
-> On Wed, Aug 24, 2016 at 05:47:11PM +0200, Oleg Nesterov wrote:
-> > On 08/24, Pratyush Anand wrote:
-> > >
-> > > > I don't think we want user_{enable,disable{_single_step in the long term,
-> > > > please look at 9bd1190a11c9d2 "uprobes/x86: Do not (ab)use TIF_SINGLESTEP
-> > > > /user_*_single_step() for single-stepping". it seems that ARM64 sets/clears
-> > > > TIF_SINGLESTEP. You can also lool at saved_tf logic, probably ARM64 needs
-> > > > the same.
-> > >
-> > > IIUC, then you mean that TIF_SINGLESTEP is a per task flag,
+Hi Matthias,
+
+On Wed, 2016-08-24 at 13:00 +0200, Matthias Brugger wrote:
+> On 24/08/16 05:27, HS Liao wrote:
+[...]
+> > Changes since v12:
+> >  - remove mediatek,gce from device tree
+> 
+> Why? The binding got accepted by Rob.
+
+We can get cmdq dev from mailbox controller,
+so we don't need mediatek,gce anymore.
+
 > >
-> > Yes, and nobody but ptrace should use it, otherwise ptrace/uprobes can confuse
-> > each other. And uprobes simply doesn't need to set/clear it.
->
-> We're already using it for kprobes, hw_breakpoint and kgdb as well as
-> ptrace, so I'd rather uprobes either followed existing practice, or we
-> converted everybody off the current code.
+> > Best regards,
+> > HS Liao
+> >
+> > HS Liao (4):
+> >   dt-bindings: soc: Add documentation for the MediaTek GCE unit
+> >   CMDQ: Mediatek CMDQ driver
+> >   arm64: dts: mt8173: Add GCE node
+> >   CMDQ: save more energy in idle
+> >
+> >  .../devicetree/bindings/soc/mediatek/gce.txt       |  44 +
+> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  10 +
+> >  drivers/soc/mediatek/Kconfig                       |  11 +
+> >  drivers/soc/mediatek/Makefile                      |   1 +
+> >  drivers/soc/mediatek/mtk-cmdq.c                    | 983 +++++++++++++++++++++
+> 
+> The driver uses the mailbox framework, so it should live in the 
+> drivers/mailbox folder.
 
-And perhaps this is fine for arm64, I do not know.
+As you know, the maximum number of gce threads is 16.
+However, we plan to support more clients in the future,
+and they may need to use more than 16 gce threads.
 
-> In what way do things get confused?
+For this issue, our plan is to let multiple clients share the same gce
+thread; i.e. we will acquire gce thread for client dynamically by
+internal policy in cmdq driver.
+Unfortunately. mailbox channel has exclusive feature.
+Quote from comment of mbox_request_channel().
+"The channel is exclusively allocated and can't be used by another
+client before the owner calls mbox_free_channel."
+Therefore, we plan to remove mailbox framework from cmdq driver in the
+future.
 
-Say, arch_uprobe_post_xol() should not blindly do user_disable_single_step(),
-this can confuse ptrace if TIF_SINGLESTEP was set by debugger which wants
-to step over the probed insn.
+For current status, could you tell us your preference?
+(1) Move cmdq to mailbox folder and then move it back here when we
+submit another patch to support more than 16 gce clients; or
+(2) Remove mailbox framework from cmdq now for its future extensibility.
 
-> > I can't really answer since I know nothing about arm. x86 just needs to set
-> > X86_EFLAGS_TF, I guess arm needs to modify some register too?
->
-> We have {user,kernel}_{enable,disable}_single_step for managing the various
-> registers controlling the single-step state machine on arm64.
+Thanks,
+HS
 
-Yes, and perhaps uprobes can just do set_regs_spsr_ss() ? I never looked into
-arch/arm64/, but it seems that we only need to ensure that call_step_hook()
-will be called even if user_mode() == T, why do we need TIF_SINGLESTEP ?
-
-Nevermind. I can be easily wrong and let me repeat that I agree with
-user_{enable,disable}_single_step in the initial version in any case.
-
-Oleg.
+> Please don't forget to add Jassi to the loop, as he is the maintainer of 
+> this subsystem and the last instance to decide if/when the driver will 
+> get accepted.
+> 
+> Thanks,
+> Matthias
+> 
