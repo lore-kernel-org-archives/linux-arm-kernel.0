@@ -1,93 +1,41 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Thu, 25 Aug 2016 23:29:41 +0800
-Subject: [PATCH 2/2] ARM: dts: sun8i: enable UART1 for iNet D978 Rev2 board
-In-Reply-To: <235ab6d3-7b9c-631e-80e1-c8e2de868eb0@redhat.com>
-References: <20160823064451.25997-1-icenowy@aosc.xyz>
- <20160823064451.25997-3-icenowy@aosc.xyz> <20160824193600.GS8103@lukather>
- <43951472083107@web23m.yandex.ru>
- <CAGb2v66tFENk8QBw7D1+bwFN-zWaE2SGDrNyc-zdbJSRzENk4Q@mail.gmail.com>
- <97321472108244@web8m.yandex.ru> <20160825080334.GD7776@lukather>
- <116041472134355@web12g.yandex.ru>
- <6580ba1b-f542-58d4-9f0a-fdd8e9b86092@redhat.com>
- <438381472136802@web24g.yandex.ru>
- <235ab6d3-7b9c-631e-80e1-c8e2de868eb0@redhat.com>
-Message-ID: <544431472138981@web24g.yandex.ru>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 25 Aug 2016 08:29:44 -0700
+Subject: [PATCH 1/2] sdhci-of-arasan: Add quirk and device tree parameter
+ to fake CD bit
+In-Reply-To: <d5dd97b1-f58f-2e45-5c95-17a77a46b30c@metafoo.de>
+References: <1472080984-17373-1-git-send-email-zach.brown@ni.com>
+ <20160825151047.GO16583@xsjsorenbubuntu>
+ <d5dd97b1-f58f-2e45-5c95-17a77a46b30c@metafoo.de>
+Message-ID: <20160825152944.GP16583@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 2016-08-25 at 17:23:47 +0200, Lars-Peter Clausen wrote:
+> On 08/25/2016 05:10 PM, S?ren Brinkmann wrote:
+> > On Wed, 2016-08-24 at 18:23:03 -0500, Zach Brown wrote:
+> >> The sdhci controller on xilinx zynq devices will not function unless
+> >> the cd bit is provided. http://www.xilinx.com/support/answers/61064.html
+> >> In cases where it is impossible to provide the cd bit in hardware,
+> >> setting the controller to test mode and then setting inserted to true
+> >> will get the controller to function with out the cd bit.
+> >>
+> >> The device property "fake-cd" will let the arasan driver know it needs
+> >> to fake the cd bit for the controller inorder for the controller to
+> >> function with a SD card that does not provide the CD bit.
+> > 
+> > I thought the CD is, if not pinned out, tied off to some valid logic
+> > level. Isn't it enough to specify cd-inverted if needed to make it work
+> > in those cases?
+> 
+> It is always brought out to some pin, that is the problem on the Zynq. This
+> means you'd have to set at least one pin aside as dummy CD or WP pin. Which
+> is not always possible when you are tight on available pins.
 
+I have to admit that I haven't looked at Vivado for quite a while. Is it
+possible to select EMIO for those pins? If those are not routed anything
+they should be tied to some logic level, I believe.
+If they are always forced to be on a physical pin, do you let that pin
+just float? Otherwise, the logic level should also be defined, give and
+take a logic inversion.
 
-25.08.2016, 23:13, "Hans de Goede" <hdegoede@redhat.com>:
-> HI,
->
-> On 25-08-16 16:53, Icenowy Zheng wrote:
->> ?25.08.2016, 22:18, "Hans de Goede" <hdegoede@redhat.com>:
->>> ?Hi,
->>>
->>> ?On 25-08-16 16:12, Icenowy Zheng wrote:
->>>> ??25.08.2016, 16:03, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
->>>>> ??Hi,
->>>>>
->>>>> ??On Thu, Aug 25, 2016 at 02:57:24PM +0800, Icenowy Zheng wrote:
->>>>>> ???>>>> diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
->>>>>> ???>>>> index 78823d8..3ac22d4 100644
->>>>>> ???>>>> --- a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
->>>>>> ???>>>> +++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
->>>>>> ???>>>> @@ -48,6 +48,10 @@
->>>>>> ???>>>> model = "INet-D978 Rev 02";
->>>>>> ???>>>> compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
->>>>>> ???>>>>
->>>>>> ???>>>> + aliases {
->>>>>> ???>>>> + serial1 = &uart1;
->>>>>> ???>>>> + };
->>>>>> ???>>>> +
->>>>>> ???>>>
->>>>>> ???>>> Is there any other UART in the system?
->>>>>> ???>>
->>>>>> ???>> serial0 is defined in sun8i-reference-design-tablet.dtsi, as r_uart.
->>>>>> ???>
->>>>>> ???> If your board does not have r_uart pads, then the right thing to do
->>>>>> ???> would be to disable it. You can then have uart1 as serial0.
->>>>>>
->>>>>> ???I don't know it. The RX/TX is wired on PF2/PF4 on the board (UART0 muxed with
->>>>>> ???MMC)
->>>>>
->>>>> ??Then you don't support it and you need to disable it.
->>>>>
->>>>>> ???But many codes will require a ttyS0 as console... So I think the
->>>>>> ???bluetooth should be located at ttyS1...
->>>>>
->>>>> ??Most of them would use /dev/console anyway. What do you have in mind?
->>>>
->>>> ??As a general configuration, /dev/ttyS0 will be indicated as the default console=
->>>> ??value... (Otherwise more boards will fail)
->>>>
->>>> ??Or maybe we can specify uart0 as serial0, and leave it as disabled? (Thus if the
->>>> ??debug port is needed, we can easily apply a overlay with &mmc0 status as disabled,
->>>> ??and &uart0 status as okay)
->>>>
->>>> ??On all my A33 boards, the official boot0, u-boot all uses uart0 as debugging port.
->>>
->>> ?If no uart is available (and being muxed with the mmc counts as not being available)
->>> ?then you should not have any serial alias in the dts.
->>>
->>> ?In u-boot you need to use:
->>>
->>> ?# CONFIG_REQUIRE_SERIAL_CONSOLE is not set
->>>
->>> ?In the defconfig in this case, otherwise u-boot is going to be unhappy about
->>> ?not having a serial console.
->>
->> ?It's not the problem.
->>
->> ?Can I have no ttyS0 and just make bluetooth ttyS1?
->
-> Ah, yes having a serial1 alias should do that I believe and I agree that it
-> is probably better to not use ttyS0 for the bluetooth uart.
-
-Yes, I will refer to sun5i-a13-utoo-p66.dts for it.
-
->
-> Regards,
->
-> Hans
+	S?ren
