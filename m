@@ -1,44 +1,25 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 25 Aug 2016 19:28:55 +0100
-Subject: [PATCH 1/2] sdhci-of-arasan: Add quirk and device tree parameter
- to fake CD bit
-In-Reply-To: <20160825182621.GA14817@zach-desktop>
-References: <1472080984-17373-1-git-send-email-zach.brown@ni.com>
- <20160825105640.GA5439@remoulade>
- <20160825171539.GA13571@zach-desktop>
- <20160825180959.GA14705@remoulade>
- <20160825182621.GA14817@zach-desktop>
-Message-ID: <20160825182852.GB15000@remoulade>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 25 Aug 2016 20:34:44 +0200
+Subject: [PATCH v2] arm: KVM: Fix idmap overlap detection when the kernel
+ is idmap'ed
+In-Reply-To: <1471852877-17197-1-git-send-email-marc.zyngier@arm.com>
+References: <1471852877-17197-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160825183444.GA13095@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2016 at 01:26:22PM -0500, Zach Brown wrote:
-> On Thu, Aug 25, 2016 at 07:10:00PM +0100, Mark Rutland wrote:
-> > On Thu, Aug 25, 2016 at 12:15:44PM -0500, Zach Brown wrote:
-> > > In cases where the card is non-removable then polling doesn't make sense.
-> > 
-> > We have the non-removable property to describe that, so we can also look at that.
-> > 
-> > > So it doesn't make sense to tie the test mode workaround into the broken-cd
-> > > property, even though I agree the nature of the defect fits under the notion
-> > > of the CD being broken.
-> > 
-> > Maybe not solely on broken-cd, but I think that we dont necessarily need a new
-> > DT property. As above, broken-cd, non-removable, and the compatible string may
-> > together give the kernel enough information to choose the right thing to do.
-> > 
-> > Thanks,
-> > Mark.
+On Mon, Aug 22, 2016 at 09:01:17AM +0100, Marc Zyngier wrote:
+> We're trying hard to detect when the HYP idmap overlaps with the
+> HYP va, as it makes the teardown of a cpu dangerous. But there is
+> one case where an overlap is completely safe, which is when the
+> whole of the kernel is idmap'ed, which is likely to happen on 32bit
+> when RAM is at 0x8000000 and we're using a 2G/2G VA split.
 > 
-> I'm not sure if I understand your suggestion completely. Are you suggesting
-> setting both the broken-cd and non-removable properties? That would make sense,
-> but my understanding was that the two properities are not meant to co-exist. In
-> /Documentation/devicetree/bindings/mmc/mmc.txt it states that only one should
-> be supplied. Don't the two properties conflict with each other?
+> In that case, we can proceed safely.
+> 
+> Reported-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-They do for the cases that exist today, but given we're updating the document
-anyway, we could simply clarify the cases in which the two can sanely co-exist
-(e.g.  for this particular IP block).
+Thanks, applied.
 
-Thanks,
-Mark.
+-Christoffer
