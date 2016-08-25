@@ -1,58 +1,45 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 25 Aug 2016 17:50:16 +0200
-Subject: [PATCH 1/2] sdhci-of-arasan: Add quirk and device tree parameter
- to fake CD bit
-In-Reply-To: <20160825152944.GP16583@xsjsorenbubuntu>
-References: <1472080984-17373-1-git-send-email-zach.brown@ni.com>
- <20160825151047.GO16583@xsjsorenbubuntu>
- <d5dd97b1-f58f-2e45-5c95-17a77a46b30c@metafoo.de>
- <20160825152944.GP16583@xsjsorenbubuntu>
-Message-ID: <e703a068-810f-77fe-d702-138911669147@metafoo.de>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Thu, 25 Aug 2016 17:50:36 +0200
+Subject: [PATCH] arm: sys_oabi-compat: Use kmalloc_array() in two functions
+Message-ID: <5deba521-2dd4-cd2e-23d7-226a1a7728c3@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25/2016 05:29 PM, S?ren Brinkmann wrote:
-> On Thu, 2016-08-25 at 17:23:47 +0200, Lars-Peter Clausen wrote:
->> On 08/25/2016 05:10 PM, S?ren Brinkmann wrote:
->>> On Wed, 2016-08-24 at 18:23:03 -0500, Zach Brown wrote:
->>>> The sdhci controller on xilinx zynq devices will not function unless
->>>> the cd bit is provided. http://www.xilinx.com/support/answers/61064.html
->>>> In cases where it is impossible to provide the cd bit in hardware,
->>>> setting the controller to test mode and then setting inserted to true
->>>> will get the controller to function with out the cd bit.
->>>>
->>>> The device property "fake-cd" will let the arasan driver know it needs
->>>> to fake the cd bit for the controller inorder for the controller to
->>>> function with a SD card that does not provide the CD bit.
->>>
->>> I thought the CD is, if not pinned out, tied off to some valid logic
->>> level. Isn't it enough to specify cd-inverted if needed to make it work
->>> in those cases?
->>
->> It is always brought out to some pin, that is the problem on the Zynq. This
->> means you'd have to set at least one pin aside as dummy CD or WP pin. Which
->> is not always possible when you are tight on available pins.
-> 
-> I have to admit that I haven't looked at Vivado for quite a while. Is it
-> possible to select EMIO for those pins? If those are not routed anything
-> they should be tied to some logic level, I believe.
-> If they are always forced to be on a physical pin, do you let that pin
-> just float? Otherwise, the logic level should also be defined, give and
-> take a logic inversion.
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Thu, 25 Aug 2016 17:45:23 +0200
 
-Yes, it is possible to source them from EMIO. We had the same issue with WP
-on one of our boards and the routing to EMIO approach was one of the
-solutions I considered. But I could not find documentation on whether and
-how the pins are tied when the FPGA is not configured or what happens during
-reconfiguration, is there a chance of glitches.
+Multiplications for the size determination of memory allocations
+indicated that array data structures should be processed.
+Thus use the corresponding function "kmalloc_array".
 
-So I went with the software solution of specifying disable-wp for the slot
-instead.
+This issue was detected by using the Coccinelle software.
 
-But even if using EMIO works I think correctly describing the hardware,
-which is that there is no external WP or CD pin connected, is the better
-approach rather than playing around with invert flags, which has a different
-semantical meaning. Software can than work with that information and take
-the approach it is best to handle the situation. And this approach might
-change if we find better ways to handle it, whereas the hardware description
-stays static.
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ arch/arm/kernel/sys_oabi-compat.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/sys_oabi-compat.c b/arch/arm/kernel/sys_oabi-compat.c
+index 5f221ac..e624db9 100644
+--- a/arch/arm/kernel/sys_oabi-compat.c
++++ b/arch/arm/kernel/sys_oabi-compat.c
+@@ -285,7 +285,7 @@ asmlinkage long sys_oabi_epoll_wait(int epfd,
+ 		return -EINVAL;
+ 	if (!access_ok(VERIFY_WRITE, events, sizeof(*events) * maxevents))
+ 		return -EFAULT;
+-	kbuf = kmalloc(sizeof(*kbuf) * maxevents, GFP_KERNEL);
++	kbuf = kmalloc_array(maxevents, sizeof(*kbuf), GFP_KERNEL);
+ 	if (!kbuf)
+ 		return -ENOMEM;
+ 	fs = get_fs();
+@@ -323,7 +323,7 @@ asmlinkage long sys_oabi_semtimedop(int semid,
+ 		return -EINVAL;
+ 	if (!access_ok(VERIFY_READ, tsops, sizeof(*tsops) * nsops))
+ 		return -EFAULT;
+-	sops = kmalloc(sizeof(*sops) * nsops, GFP_KERNEL);
++	sops = kmalloc_array(nsops, sizeof(*sops), GFP_KERNEL);
+ 	if (!sops)
+ 		return -ENOMEM;
+ 	err = 0;
+-- 
+2.9.3
