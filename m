@@ -1,114 +1,72 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Thu, 25 Aug 2016 11:05:26 +0800
-Subject: [RESEND PATCH,
- v5 2/5] dt-bindings: mt8173-mtu3: add devicetree bindings
-In-Reply-To: <1472094329-18466-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1472094329-18466-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1472094329-18466-3-git-send-email-chunfeng.yun@mediatek.com>
+From: long.cheng@mediatek.com (Long Cheng)
+Date: Thu, 25 Aug 2016 11:15:06 +0800
+Subject: [PATCH] serial: 8250_mtk: support big baud rate.
+In-Reply-To: <1470969671-17235-1-git-send-email-long.cheng@mediatek.com>
+References: <1470969671-17235-1-git-send-email-long.cheng@mediatek.com>
+Message-ID: <1472094906.19004.2.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add a DT binding doc for MediaTek USB3 DRD driver
+On Fri, 2016-08-12 at 10:41 +0800, Long Cheng wrote:
+> From: Eddie Huang <eddie.huang@mediatek.com>
+> 
+> mediatek can support baud rate up to 4M.
+> the 'uart_get_baud_rate' function will limit the max baud rate.
+> Modify max baud to remove the limit.
+> 
+> Signed-off-by: Long Cheng <long.cheng@mediatek.com>
+> ---
+>  drivers/tty/serial/8250/8250_mtk.c  |    6 +-----
+>  drivers/tty/serial/8250/8250_port.c |    4 +---
+>  2 files changed, 2 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
+> index 3611ec9..ce0cc47 100644
+> --- a/drivers/tty/serial/8250/8250_mtk.c
+> +++ b/drivers/tty/serial/8250/8250_mtk.c
+> @@ -62,7 +62,7 @@ mtk8250_set_termios(struct uart_port *port, struct ktermios *termios,
+>  	 */
+>  	baud = uart_get_baud_rate(port, termios, old,
+>  				  port->uartclk / 16 / 0xffff,
+> -				  port->uartclk / 16);
+> +				  port->uartclk);
+>  
+>  	if (baud <= 115200) {
+>  		serial_port_out(port, UART_MTK_HIGHS, 0x0);
+> @@ -76,10 +76,6 @@ mtk8250_set_termios(struct uart_port *port, struct ktermios *termios,
+>  		quot = DIV_ROUND_UP(port->uartclk, 4 * baud);
+>  	} else {
+>  		serial_port_out(port, UART_MTK_HIGHS, 0x3);
+> -
+> -		/* Set to highest baudrate supported */
+> -		if (baud >= 1152000)
+> -			baud = 921600;
+>  		quot = DIV_ROUND_UP(port->uartclk, 256 * baud);
+>  	}
+>  
+> diff --git a/drivers/tty/serial/8250/8250_port.c b/drivers/tty/serial/8250/8250_port.c
+> index 7481b95..c45c1e3 100644
+> --- a/drivers/tty/serial/8250/8250_port.c
+> +++ b/drivers/tty/serial/8250/8250_port.c
+> @@ -2504,8 +2504,6 @@ static unsigned int serial8250_get_baud_rate(struct uart_port *port,
+>  					     struct ktermios *termios,
+>  					     struct ktermios *old)
+>  {
+> -	unsigned int tolerance = port->uartclk / 100;
+> -
+>  	/*
+>  	 * Ask the core to calculate the divisor for us.
+>  	 * Allow 1% tolerance at the upper limit so uart clks marginally
+> @@ -2514,7 +2512,7 @@ static unsigned int serial8250_get_baud_rate(struct uart_port *port,
+>  	 */
+>  	return uart_get_baud_rate(port, termios, old,
+>  				  port->uartclk / 16 / 0xffff,
+> -				  (port->uartclk + tolerance) / 16);
+> +				  port->uartclk);
+>  }
+>  
+>  void
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/usb/mt8173-mtu3.txt        |   87 ++++++++++++++++++++
- 1 file changed, 87 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
+Ping? Any reaction to the above?
 
-diff --git a/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt b/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
-new file mode 100644
-index 0000000..e049d19
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
-@@ -0,0 +1,87 @@
-+The device node for Mediatek USB3.0 DRD controller
-+
-+Required properties:
-+ - compatible : should be "mediatek,mt8173-mtu3"
-+ - reg : specifies physical base address and size of the registers
-+ - reg-names: should be "mac" for device IP and "ippc" for IP port control
-+ - interrupts : interrupt used by the device IP
-+ - power-domains : a phandle to USB power domain node to control USB's
-+	mtcmos
-+ - vusb33-supply : regulator of USB avdd3.3v
-+ - clocks : a list of phandle + clock-specifier pairs, one for each
-+	entry in clock-names
-+ - clock-names : must contain "sys_ck" for clock of controller;
-+	"wakeup_deb_p0" and "wakeup_deb_p1" are optional, they are
-+	depends on "mediatek,enable-wakeup"
-+ - phys : a list of phandle + phy specifier pairs
-+ - dr_mode : should be one of "host", "peripheral" or "otg",
-+	refer to usb/generic.txt
-+
-+Optional properties:
-+ - #address-cells, #size-cells : should be '2' if the device has sub-nodes
-+	with 'reg' property
-+ - ranges : allows valid 1:1 translation between child's address space and
-+	parent's address space
-+ - extcon : external connector for vbus and idpin changes detection, needed
-+	when supports dual-role mode.
-+ - vbus-supply : reference to the VBUS regulator, needed when supports
-+	dual-role mode.
-+ - pinctl-names : a pinctrl state named "default" must be defined,
-+	"id_float" and "id_ground" are optinal which depends on
-+	"mediatek,enable-manual-drd"
-+ - pinctrl-0 : pin control group
-+	See: Documentation/devicetree/bindings/pinctrl/pinctrl-binding.txt
-+
-+ - maximum-speed : valid arguments are "super-speed", "high-speed" and
-+	"full-speed"; refer to usb/generic.txt
-+ - enable-manual-drd : supports manual dual-role switch via debugfs; usually
-+	used when receptacle is TYPE-A and also wants to support dual-role
-+	mode.
-+ - mediatek,enable-wakeup : supports ip sleep wakeup used by host mode
-+ - mediatek,syscon-wakeup : phandle to syscon used to access USB wakeup
-+	control register, it depends on "mediatek,enable-wakeup".
-+
-+Sub-nodes:
-+The xhci should be added as subnode to mtu3 as shown in the following example
-+if host mode is enabled. The DT binding details of xhci can be found in:
-+Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-+
-+Example:
-+ssusb: usb at 11271000 {
-+	compatible = "mediatek,mt8173-mtu3";
-+	reg = <0 0x11271000 0 0x3000>,
-+	      <0 0x11280700 0 0x0100>;
-+	reg-names = "mac", "ippc";
-+	interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_LOW>;
-+	phys = <&phy_port0 PHY_TYPE_USB3>,
-+	       <&phy_port1 PHY_TYPE_USB2>;
-+	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-+	clocks = <&topckgen CLK_TOP_USB30_SEL>,
-+		 <&pericfg CLK_PERI_USB0>,
-+		 <&pericfg CLK_PERI_USB1>;
-+	clock-names = "sys_ck",
-+		      "wakeup_deb_p0",
-+		      "wakeup_deb_p1";
-+	vusb33-supply = <&mt6397_vusb_reg>;
-+	vbus-supply = <&usb_p0_vbus>;
-+	extcon = <&extcon_usb>;
-+	dr_mode = "otg";
-+	mediatek,enable-wakeup;
-+	mediatek,syscon-wakeup = <&pericfg>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+	ranges;
-+	status = "disabled";
-+
-+	usb_host: xhci at 11270000 {
-+		compatible = "mediatek,mt8173-xhci";
-+		reg = <0 0x11270000 0 0x1000>;
-+		reg-names = "mac";
-+		interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-+		power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-+		clocks = <&topckgen CLK_TOP_USB30_SEL>;
-+		clock-names = "sys_ck";
-+		vusb33-supply = <&mt6397_vusb_reg>;
-+		status = "disabled";
-+	};
-+};
--- 
-1.7.9.5
+Regards, thanks.
