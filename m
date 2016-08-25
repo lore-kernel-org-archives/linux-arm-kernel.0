@@ -1,21 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Aug 2016 12:50:03 +0200
-Subject: [PATCH 01/10] reset: ath79: add driver Kconfig option
-In-Reply-To: <201608251826.2MYolse5%fengguang.wu@intel.com>
-References: <201608251826.2MYolse5%fengguang.wu@intel.com>
-Message-ID: <12166705.J71eyMyDGE@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 25 Aug 2016 11:56:55 +0100
+Subject: [PATCH 1/2] sdhci-of-arasan: Add quirk and device tree parameter
+ to fake CD bit
+In-Reply-To: <1472080984-17373-1-git-send-email-zach.brown@ni.com>
+References: <1472080984-17373-1-git-send-email-zach.brown@ni.com>
+Message-ID: <20160825105640.GA5439@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, August 25, 2016 6:31:48 PM CEST kbuild test robot wrote:
+On Wed, Aug 24, 2016 at 06:23:03PM -0500, Zach Brown wrote:
+> The sdhci controller on xilinx zynq devices will not function unless
+> the cd bit is provided. http://www.xilinx.com/support/answers/61064.html
+> In cases where it is impossible to provide the cd bit in hardware,
+> setting the controller to test mode and then setting inserted to true
+> will get the controller to function with out the cd bit.
 > 
->    drivers/reset/reset-ath79.c: In function 'ath79_reset_update':
-> >> drivers/reset/reset-ath79.c:38:2: error: implicit declaration of function 'readl' [-Werror=implicit-function-declaration]
-> >> drivers/reset/reset-ath79.c:43:2: error: implicit declaration of function 'writel' [-Werror=implicit-function-declaration]
->    cc1: some warnings being treated as errors
-> 
-> 
+> The device property "fake-cd" will let the arasan driver know it needs
+> to fake the cd bit for the controller inorder for the controller to
 
-The file lacks "#include <linux/io.h"
+Nit: s/inorder/in order/
 
-	Arnd
+Comments on the actual patch below.
+
+> function with a SD card that does not provide the CD bit.
+> 
+> Signed-off-by: Zach Brown <zach.brown@ni.com>
+> ---
+>  Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> index 3404afa..3b9f406 100644
+> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> @@ -21,6 +21,10 @@ Required Properties:
+>    - interrupts: Interrupt specifier
+>    - interrupt-parent: Phandle for the interrupt controller that services
+>  		      interrupts for this device.
+> +Optional Properties:
+> +- fake-cd: On Zynq Devices the SDHCI Controller will not work without the cd
+> +  bit. When this option is set the driver will put the controller in test mode
+> +  and fake the cd bit so it will function.
+
+As Lars noted, the DT should describe the HW, and the policy of how to deal
+with that should be left to the kernel. So from a DT perspective the above is
+not correct.
+
+If I understand the linked documentation, this is slightly different to typical
+uses of broken-cd in that in the absence of a card detect signal the HW will
+not be able to access the SD card at all, even if requested to. Is that correct?
+
+If so, perhaps a better option is to have the combination of broken-cd and the
+compatible string for this IP block imply that the test mode workaround is
+required. Obviously that requires a fixup to the usual broken-cd binding to
+remove the implication that polling alone must be used.
+
+Thanks,
+Mark.
