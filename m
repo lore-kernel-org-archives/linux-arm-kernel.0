@@ -1,11 +1,11 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Aug 2016 17:30:27 -0700
-Subject: [PATCH 28/34] clk: si5351: Migrate to clk_hw based OF and
+Date: Wed, 24 Aug 2016 17:30:29 -0700
+Subject: [PATCH 27/34] clk: si514: Migrate to clk_hw based OF and
  registration APIs
-In-Reply-To: <20160601231533.9354-29-stephen.boyd@linaro.org>
+In-Reply-To: <20160601231533.9354-28-stephen.boyd@linaro.org>
 References: <20160601231533.9354-1-stephen.boyd@linaro.org>
- <20160601231533.9354-29-stephen.boyd@linaro.org>
-Message-ID: <20160825003027.GB19826@codeaurora.org>
+ <20160601231533.9354-28-stephen.boyd@linaro.org>
+Message-ID: <20160825003029.GC19826@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
