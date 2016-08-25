@@ -1,55 +1,49 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Thu, 25 Aug 2016 09:41:14 -0300
-Subject: [PATCH v4 4/6] media: rc: meson-ir: Add support for newer
- versions of the IR decoder
-In-Reply-To: <7hy43s5r7d.fsf@baylibre.com>
-References: <20160628191802.21227-1-martin.blumenstingl@googlemail.com>
- <20160819215547.20063-1-martin.blumenstingl@googlemail.com>
- <20160819215547.20063-5-martin.blumenstingl@googlemail.com>
- <7hy43s5r7d.fsf@baylibre.com>
-Message-ID: <20160825094114.2ca0a9e9@vento.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Aug 2016 14:59:28 +0200
+Subject: Support for configurable PCIe endpoint
+In-Reply-To: <57B5B4A1.9030308@ti.com>
+References: <57A18927.9070003@ti.com> <2422602.ltmdGR0pWX@wuerfel>
+ <57B5B4A1.9030308@ti.com>
+Message-ID: <1944530.NcryPj8uKU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri, 19 Aug 2016 15:28:22 -0700
-Kevin Hilman <khilman@baylibre.com> escreveu:
-
-> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+On Thursday, August 18, 2016 6:44:09 PM CEST Kishon Vijay Abraham I wrote:
+> Hi Arnd,
 > 
-> > From: Neil Armstrong <narmstrong@baylibre.com>
-> >
-> > Newer SoCs (Meson 8b and GXBB) are using REG2 (offset 0x20) instead of
-> > REG1 to configure the decoder mode. This makes it necessary to
-> > introduce new bindings so the driver knows which register has to be
-> > used.
-> >
-> > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> > Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>  
+> On Thursday 04 August 2016 04:43 PM, Arnd Bergmann wrote:
+> > On Thursday, August 4, 2016 3:32:01 PM CEST Kishon Vijay Abraham I wrote:
+> >> On Wednesday 03 August 2016 07:09 PM, Joao Pinto wrote:
+> >>>
+> >>> You are rising a topic that we are also addressing in Synopsys.
+> >>>
+> >>> For the PCIe RC hardware validation we are currently using the standard
+> >>> pcie-designware and pcie-designware-plat drivers.
+> >>>
+> >>> For the Endpoint we have to use an internal software package. Its main purpose
+> >>> is to initialize the IP registers, eDMA channels and make data transfer to prove
+> >>> that the everything is working properly. This is done in 2 levels, a custom
+> >>> driver built and loaded and an application that makes some ioctl to the driver
+> >>> executing some interesting functions to check the Endpoint status and make some
+> >>> data exchange.
+> >>
+> >> hmm.. the platform I have doesn't have a DMA in PCIe IP
+> >> (http://www.ti.com/lit/ug/spruhz6g/spruhz6g.pdf). So in your testing does the
+> >> EP access RC memory? i.e the driver in the RC allocates memory from it's DDR
+> >> and gives it's DDR address to the EP. The EP then transfers data to this
+> >> address. (This is a typical use case with ethernet PCIe cards). IIUC that's not
+> >> simple with configurable EPs. I'd like to know more about your testing though.
+> > 
+> > 
+> > What's the difference between using the EDMA on that chip or a DMA engine
+> > that is part of the PCIe bridge?
 > 
-> Acked-by: Kevin Hilman <khilman@baylibre.com>
-> 
-> Mauro, are you the one to pick up new media/rc drivers?  Or if you
-> prefer, with your ack, I'll take this along with the DT and submit via
-> arm-soc.
+> Do you mean the difference between using DMA on an EP (like ethernet card or
+> sata card) and DMA on PCI RC system? or is it the difference between eDMA
+> within the PCIe IP and system DMA?
 
-I generally pick new media rc drivers, but in the specific case of this
-patchset, it is just adding a few extra lines to existing drivers, and
-most of the work are actually at the ARM tree.
+The latter. You write that there is no DMA in the PCIe IP, but from the
+perspective of the RC, it should not matter whether the DMA engine is
+part of the EP logic or behind it.
 
-So, feel free to merge via arm-soc with my ack:
-
-Acked-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
-
-> 
-> Thanks,
-> 
-> Kevin
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
-
-Thanks,
-Mauro
+	Arnd
