@@ -1,137 +1,91 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 25 Aug 2016 13:51:40 -0600
-Subject: [PATCH v4 10/16] PM / cpu_domains: Add PM Domain governor for CPUs
+Date: Thu, 25 Aug 2016 13:51:46 -0600
+Subject: [PATCH v4 16/16] ARM64: dts: Define CPU power domain for MSM8916
 In-Reply-To: <1472154706-40119-1-git-send-email-lina.iyer@linaro.org>
 References: <1472154706-40119-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1472154706-40119-11-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1472154706-40119-17-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A PM domain comprising of CPUs may be powered off when all the CPUs in
-the domain are powered down. Powering down a CPU domain is generally a
-expensive operation and therefore the power performance trade offs
-should be considered. The time between the last CPU powering down and
-the first CPU powering up in a domain, is the time available for the
-domain to sleep. Ideally, the sleep time of the domain should fulfill
-the residency requirement of the domains' idle state.
+Define power domain and the power states for the domain as defined by
+the PSCI firmware. The 8916 firmware supports OS initiated method of
+powering off the CPU clusters.
 
-To do this effectively, read the time before the wakeup of the cluster's
-CPUs and ensure that the domain's idle state sleep time guarantees the
-QoS requirements of each of the CPU, the PM QoS CPU_DMA_LATENCY and the
-state's residency.
-
+Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- drivers/base/power/cpu_domains.c | 80 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 79 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/drivers/base/power/cpu_domains.c b/drivers/base/power/cpu_domains.c
-index 8bf61e2..79fa4ae 100644
---- a/drivers/base/power/cpu_domains.c
-+++ b/drivers/base/power/cpu_domains.c
-@@ -17,9 +17,12 @@
- #include <linux/list.h>
- #include <linux/of.h>
- #include <linux/pm_domain.h>
-+#include <linux/pm_qos.h>
-+#include <linux/pm_runtime.h>
- #include <linux/rculist.h>
- #include <linux/rcupdate.h>
- #include <linux/slab.h>
-+#include <linux/tick.h>
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index 3029773..506c712 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -64,6 +64,7 @@
+ 			next-level-cache = <&L2_0>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SPC>;
++			power-domains = <&CPU_PD>;
+ 		};
  
- #define CPU_PD_NAME_MAX 36
+ 		CPU1: cpu at 1 {
+@@ -73,6 +74,7 @@
+ 			next-level-cache = <&L2_0>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SPC>;
++			power-domains = <&CPU_PD>;
+ 		};
  
-@@ -51,6 +54,81 @@ static inline struct cpu_pm_domain *to_cpu_pd(struct generic_pm_domain *d)
- 	return res;
- }
+ 		CPU2: cpu at 2 {
+@@ -82,6 +84,7 @@
+ 			next-level-cache = <&L2_0>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SPC>;
++			power-domains = <&CPU_PD>;
+ 		};
  
-+static bool cpu_pd_down_ok(struct dev_pm_domain *pd)
-+{
-+	struct generic_pm_domain *genpd = pd_to_genpd(pd);
-+	struct cpu_pm_domain *cpu_pd = to_cpu_pd(genpd);
-+	int qos_ns = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
-+	u64 sleep_ns;
-+	ktime_t earliest, next_wakeup;
-+	int cpu;
-+	int i;
-+
-+	/* Reset the last set genpd state, default to index 0 */
-+	genpd->state_idx = 0;
-+
-+	/* We don't want to power down, if QoS is 0 */
-+	if (!qos_ns)
-+		return false;
-+
-+	/*
-+	 * Find the sleep time for the cluster.
-+	 * The time between now and the first wake up of any CPU that
-+	 * are in this domain hierarchy is the time available for the
-+	 * domain to be idle.
-+	 *
-+	 * We only care about the next wakeup for any online CPU in that
-+	 * cluster. Hotplug off any of the CPUs that we care about will
-+	 * wait on the genpd lock, until we are done. Any other CPU hotplug
-+	 * is not of consequence to our sleep time.
-+	 */
-+	earliest = ktime_set(KTIME_SEC_MAX, 0);
-+	for_each_cpu_and(cpu, cpu_pd->cpus, cpu_online_mask) {
-+		next_wakeup = tick_nohz_get_next_wakeup(cpu);
-+		if (earliest.tv64 > next_wakeup.tv64)
-+			earliest = next_wakeup;
-+	}
-+
-+	sleep_ns = ktime_to_ns(ktime_sub(earliest, ktime_get()));
-+	if (sleep_ns <= 0)
-+		return false;
-+
-+	/*
-+	 * Find the deepest sleep state that satisfies the residency
-+	 * requirement and the QoS constraint
-+	 */
-+	for (i = genpd->state_count - 1; i >= 0; i--) {
-+		u64 state_sleep_ns;
-+
-+		state_sleep_ns = genpd->states[i].power_off_latency_ns +
-+			genpd->states[i].power_on_latency_ns +
-+			genpd->states[i].residency_ns;
-+
-+		/*
-+		 * If we can't sleep to save power in the state, move on
-+		 * to the next lower idle state.
-+		 */
-+		if (state_sleep_ns > sleep_ns)
-+			continue;
-+
-+		/*
-+		 * We also don't want to sleep more than we should to
-+		 * gaurantee QoS.
-+		 */
-+		if (state_sleep_ns < (qos_ns * NSEC_PER_USEC))
-+			break;
-+	}
-+
-+	if (i >= 0)
-+		genpd->state_idx = i;
-+
-+	return (i >= 0);
-+}
-+
-+static struct dev_power_governor cpu_pd_gov = {
-+	.power_down_ok = cpu_pd_down_ok,
-+};
-+
- static int cpu_pd_power_on(struct generic_pm_domain *genpd)
- {
- 	struct cpu_pm_domain *pd = to_cpu_pd(genpd);
-@@ -172,7 +250,7 @@ struct generic_pm_domain *cpu_pd_init(struct generic_pm_domain *genpd,
- 	list_add_rcu(&pd->link, &of_cpu_pd_list);
- 	mutex_unlock(&cpu_pd_list_lock);
+ 		CPU3: cpu at 3 {
+@@ -91,6 +94,7 @@
+ 			next-level-cache = <&L2_0>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SPC>;
++			power-domains = <&CPU_PD>;
+ 		};
  
--	ret = pm_genpd_init(genpd, &simple_qos_governor, false);
-+	ret = pm_genpd_init(genpd, &cpu_pd_gov, false);
- 	if (ret) {
- 		pr_err("Unable to initialize domain %s\n", genpd->name);
- 		goto fail;
+ 		L2_0: l2-cache {
+@@ -107,12 +111,33 @@
+ 				min-residency-us = <2000>;
+ 				local-timer-stop;
+ 			};
++
++			CLUSTER_RET: cluster_retention {
++				compatible = "arm,idle-state";
++				arm,psci-suspend-param = <0x1000010>;
++				entry-latency-us = <500>;
++				exit-latency-us = <500>;
++				min-residency-us = <2000>;
++			};
++
++			CLUSTER_PWR_DWN: cluster_gdhs {
++				compatible = "arm,idle-state";
++				arm,psci-suspend-param = <0x1000030>;
++				entry-latency-us = <2000>;
++				exit-latency-us = <2000>;
++				min-residency-us = <6000>;
++			};
+ 		};
+ 	};
+ 
+ 	psci {
+ 		compatible = "arm,psci-1.0";
+ 		method = "smc";
++
++		CPU_PD: cpu-pd at 0 {
++			#power-domain-cells = <0>;
++			domain-idle-states = <&CLUSTER_RET>, <&CLUSTER_PWR_DWN>;
++		};
+ 	};
+ 
+ 	timer {
 -- 
 2.7.4
