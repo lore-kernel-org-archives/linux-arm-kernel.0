@@ -1,77 +1,29 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 26 Aug 2016 15:56:52 +0100
-Subject: [PATCH v8 17/18] drm/virtio: kconfig: Fix recursive dependency.
-In-Reply-To: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
-References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1472223413-7254-18-git-send-email-peter.griffin@linaro.org>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Fri, 26 Aug 2016 23:00:56 +0800
+Subject: [PATCH 0/3] ARM: dts: sun8i: Add dt nodes for sdio wifi
+In-Reply-To: <20160826145236.30210-1-hdegoede@redhat.com>
+References: <20160826145236.30210-1-hdegoede@redhat.com>
+Message-ID: <1318301472223656@web13m.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[..]
-drivers/video/fbdev/Kconfig:5:error: recursive dependency detected!
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/video/fbdev/Kconfig:5:	symbol FB is selected by DRM_KMS_FB_HELPER
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/gpu/drm/Kconfig:42:	symbol DRM_KMS_FB_HELPER depends on DRM_KMS_HELPER
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/gpu/drm/Kconfig:36:	symbol DRM_KMS_HELPER is selected by DRM_VIRTIO_GPU
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/gpu/drm/virtio/Kconfig:1:	symbol DRM_VIRTIO_GPU depends on VIRTIO
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/virtio/Kconfig:1:	symbol VIRTIO is selected by REMOTEPROC
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/remoteproc/Kconfig:4:	symbol REMOTEPROC is selected by ST_SLIM_REMOTEPROC
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/remoteproc/Kconfig:103:	symbol ST_SLIM_REMOTEPROC is selected by ST_FDMA
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/dma/Kconfig:440:	symbol ST_FDMA depends on DMADEVICES
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/dma/Kconfig:5:	symbol DMADEVICES is selected by SND_SOC_SH4_SIU
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-sound/soc/sh/Kconfig:29:	symbol SND_SOC_SH4_SIU is selected by SND_SIU_MIGOR
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-sound/soc/sh/Kconfig:64:	symbol SND_SIU_MIGOR depends on I2C
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/i2c/Kconfig:7:	symbol I2C is selected by FB_DDC
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/video/fbdev/Kconfig:63:	symbol FB_DDC is selected by FB_CYBER2000_DDC
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/video/fbdev/Kconfig:378:	symbol FB_CYBER2000_DDC depends on FB_CYBER2000
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/video/fbdev/Kconfig:366:	symbol FB_CYBER2000 depends on FB
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- drivers/gpu/drm/virtio/Kconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/virtio/Kconfig b/drivers/gpu/drm/virtio/Kconfig
-index e1afc3d..90357d9 100644
---- a/drivers/gpu/drm/virtio/Kconfig
-+++ b/drivers/gpu/drm/virtio/Kconfig
-@@ -1,6 +1,7 @@
- config DRM_VIRTIO_GPU
- 	tristate "Virtio GPU driver"
--	depends on DRM && VIRTIO
-+	depends on DRM
-+	select VIRTIO
-         select DRM_KMS_HELPER
-         select DRM_TTM
- 	help
--- 
-1.9.1
+26.08.2016, 22:58, "Hans de Goede" <hdegoede@redhat.com>:
+> Hi Maxime,
+>
+> Now that Ulf has merged the post-power-on-delay-ms mmc-pwrseq patches
+> in his mmc/next tree and Rob Herring has accepted the esp8089 dt
+> bindings (and specifically the esp,crystal-26M-en property), these
+> are ready for merging.
+
+Can the driver now work without broken-cd?
+>
+> Thanks & Regards,
+>
+> Hans
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
