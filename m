@@ -1,156 +1,295 @@
-From: po.liu@nxp.com (Po Liu)
-Date: Fri, 26 Aug 2016 08:17:48 +0000
-Subject: [PATCH v1] arm64:pci: fix the IOV device enabled crash issue in
- designware
-In-Reply-To: <20160825180935.GD11257@localhost>
-References: <1471932072-6980-1-git-send-email-po.liu@nxp.com>
- <20160824205059.GG23914@localhost>
- <VI1PR0401MB1709E238FDD324547EE8B13D92ED0@VI1PR0401MB1709.eurprd04.prod.outlook.com>
- <20160825180935.GD11257@localhost>
-Message-ID: <VI1PR0401MB17093A71A515F101DB7B225792EC0@VI1PR0401MB1709.eurprd04.prod.outlook.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 26 Aug 2016 09:21:48 +0100
+Subject: [PATCH v2 6/6] bus: Add support for Tegra Generic Memory Interface
+In-Reply-To: <1472045838-22628-7-git-send-email-mirza.krak@gmail.com>
+References: <1472045838-22628-1-git-send-email-mirza.krak@gmail.com>
+ <1472045838-22628-7-git-send-email-mirza.krak@gmail.com>
+Message-ID: <6d50452c-67ba-cdd6-51c9-14288e41c9ee@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
 
-Best regards,
-Liu Po
+On 24/08/16 14:37, Mirza Krak wrote:
+> From: Mirza Krak <mirza.krak@gmail.com>
+> 
+> The Generic Memory Interface bus can be used to connect high-speed
+> devices such as NOR flash, FPGAs, DSPs...
+> 
+> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
+> ---
+> Changes in v2:
+> - Fixed some checkpatch errors
+> - Re-ordered probe to get rid of local variables
+> - Moved of_platform_default_populate call to the end of probe
+> - Use the timing and configuration properties from the child device
+> - Added warning if more then 1 child device exist
+> 
+> 
+>  drivers/bus/Kconfig     |   8 ++
+>  drivers/bus/Makefile    |   1 +
+>  drivers/bus/tegra-gmi.c | 231 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 240 insertions(+)
+>  create mode 100644 drivers/bus/tegra-gmi.c
+> 
+> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+> index 4ed7d26..2e75a7f 100644
+> --- a/drivers/bus/Kconfig
+> +++ b/drivers/bus/Kconfig
+> @@ -141,6 +141,14 @@ config TEGRA_ACONNECT
+>  	  Driver for the Tegra ACONNECT bus which is used to interface with
+>  	  the devices inside the Audio Processing Engine (APE) for Tegra210.
+> 
+> +config TEGRA_GMI
+> +	tristate "Tegra Generic Memory Interface bus driver"
+> +	depends on ARCH_TEGRA
+> +	help
+> +	  Driver for the Tegra Generic Memory Interface bus which can be used
+> +	  to attach devices such as NOR, UART, FPGA and more.
+> +
+> +
+>  config UNIPHIER_SYSTEM_BUS
+>  	tristate "UniPhier System Bus driver"
+>  	depends on ARCH_UNIPHIER && OF
+> diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
+> index ac84cc4..34e2bab 100644
+> --- a/drivers/bus/Makefile
+> +++ b/drivers/bus/Makefile
+> @@ -18,5 +18,6 @@ obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
+>  obj-$(CONFIG_SUNXI_RSB)		+= sunxi-rsb.o
+>  obj-$(CONFIG_SIMPLE_PM_BUS)	+= simple-pm-bus.o
+>  obj-$(CONFIG_TEGRA_ACONNECT)	+= tegra-aconnect.o
+> +obj-$(CONFIG_TEGRA_GMI)		+= tegra-gmi.o
+>  obj-$(CONFIG_UNIPHIER_SYSTEM_BUS)	+= uniphier-system-bus.o
+>  obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-config.o
+> diff --git a/drivers/bus/tegra-gmi.c b/drivers/bus/tegra-gmi.c
+> new file mode 100644
+> index 0000000..b068ef9
+> --- /dev/null
+> +++ b/drivers/bus/tegra-gmi.c
+> @@ -0,0 +1,231 @@
+> +/*
+> + * Driver for NVIDIA Generic Memory Interface
+> + *
+> + * Copyright (C) 2016 Host Mobility AB. All rights reserved.
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of_device.h>
+> +#include <linux/reset.h>
+> +
+> +#define TEGRA_GMI_CONFIG		0x00
+> +#define TEGRA_GMI_CONFIG_GO		BIT(31)
+> +#define TEGRA_GMI_BUS_WIDTH_32BIT	BIT(30)
+> +#define TEGRA_GMI_MUX_MODE		BIT(28)
+> +#define TEGRA_GMI_RDY_BEFORE_DATA	BIT(24)
+> +#define TEGRA_GMI_RDY_ACTIVE_HIGH	BIT(23)
+> +#define TEGRA_GMI_ADV_ACTIVE_HIGH	BIT(22)
+> +#define TEGRA_GMI_OE_ACTIVE_HIGH	BIT(21)
+> +#define TEGRA_GMI_CS_ACTIVE_HIGH	BIT(20)
+> +#define TEGRA_GMI_CS_SELECT(x)		((x & 0x7) << 4)
+> +
+> +#define TEGRA_GMI_TIMING0		0x10
+> +#define TEGRA_GMI_MUXED_WIDTH(x)	((x & 0xf) << 12)
+> +#define TEGRA_GMI_HOLD_WIDTH(x)		((x & 0xf) << 8)
+> +#define TEGRA_GMI_ADV_WIDTH(x)		((x & 0xf) << 4)
+> +#define TEGRA_GMI_CE_WIDTH(x)		(x & 0xf)
+> +
+> +#define TEGRA_GMI_TIMING1		0x14
+> +#define TEGRA_GMI_WE_WIDTH(x)		((x & 0xff) << 16)
+> +#define TEGRA_GMI_OE_WIDTH(x)		((x & 0xff) << 8)
+> +#define TEGRA_GMI_WAIT_WIDTH(x)		(x & 0xff)
+> +
+> +struct tegra_gmi_priv {
+> +	void __iomem *base;
+> +	struct reset_control *rst;
+> +	struct clk *clk;
+> +
+> +	u32 snor_config;
+> +	u32 snor_timing0;
+> +	u32 snor_timing1;
+> +};
+> +
+> +static void tegra_gmi_init(struct device *dev, struct tegra_gmi_priv *priv)
+> +{
+> +	writel(priv->snor_timing0, priv->base + TEGRA_GMI_TIMING0);
+> +	writel(priv->snor_timing1, priv->base + TEGRA_GMI_TIMING1);
+> +
+> +	priv->snor_config |= TEGRA_GMI_CONFIG_GO;
+> +	writel(priv->snor_config, priv->base + TEGRA_GMI_CONFIG);
+> +}
+> +
+> +static void tegra_gmi_parse_dt(struct device *dev, struct tegra_gmi_priv *priv)
+> +{
+> +	struct device_node *child = of_get_next_available_child(dev->of_node,
+> +		NULL);
+> +	u32 property;
+> +
+> +	if (!child) {
+> +		dev_warn(dev, "no child nodes found\n");
+> +		return;
+> +	}
+> +
+> +	/*
+> +	 * We currently only support one child device due to lack of
+> +	 * chip-select address decoding. Which means that we only have one
+> +	 * chip-select line from the GMI controller.
+> +	 */
+> +	if (of_get_child_count(dev->of_node) > 1)
+> +		dev_warn(dev, "only one child device is supported.");
+> +
+> +	if (of_property_read_bool(child, "nvidia,snor-data-width-32bit"))
+> +		priv->snor_config |= TEGRA_GMI_BUS_WIDTH_32BIT;
+> +
+> +	if (of_property_read_bool(child, "nvidia,snor-mux-mode"))
+> +		priv->snor_config |= TEGRA_GMI_MUX_MODE;
+> +
+> +	if (of_property_read_bool(child, "nvidia,snor-rdy-active-before-data"))
+> +		priv->snor_config |= TEGRA_GMI_RDY_BEFORE_DATA;
+> +
+> +	if (of_property_read_bool(child, "nvidia,snor-rdy-inv"))
+> +		priv->snor_config |= TEGRA_GMI_RDY_ACTIVE_HIGH;
+> +
+> +	if (of_property_read_bool(child, "nvidia,snor-adv-inv"))
+> +		priv->snor_config |= TEGRA_GMI_ADV_ACTIVE_HIGH;
+> +
+> +	if (of_property_read_bool(child, "nvidia,snor-oe-inv"))
+> +		priv->snor_config |= TEGRA_GMI_OE_ACTIVE_HIGH;
+> +
+> +	if (of_property_read_bool(child, "nvidia,snor-cs-inv"))
+> +		priv->snor_config |= TEGRA_GMI_CS_ACTIVE_HIGH;
+> +
+> +	/* Use the reg property to determine which CS is to be used. */
+> +	if (!of_property_read_u32(child, "reg", &property))
+> +		priv->snor_config |= TEGRA_GMI_CS_SELECT(property);
+> +
+> +	/* The default values that are provided below are reset values */
+> +	if (!of_property_read_u32(child, "nvidia,snor-muxed-width", &property))
+> +		priv->snor_timing0 |= TEGRA_GMI_MUXED_WIDTH(property);
+> +	else
+> +		priv->snor_timing0 |= TEGRA_GMI_MUXED_WIDTH(1);
+> +
+> +	if (!of_property_read_u32(child, "nvidia,snor-hold-width", &property))
+> +		priv->snor_timing0 |= TEGRA_GMI_HOLD_WIDTH(property);
+> +	else
+> +		priv->snor_timing0 |= TEGRA_GMI_HOLD_WIDTH(1);
+> +
+> +	if (!of_property_read_u32(child, "nvidia,snor-adv-width", &property))
+> +		priv->snor_timing0 |= TEGRA_GMI_ADV_WIDTH(property);
+> +	else
+> +		priv->snor_timing0 |= TEGRA_GMI_ADV_WIDTH(1);
+> +
+> +	if (!of_property_read_u32(child, "nvidia,snor-ce-width", &property))
+> +		priv->snor_timing0 |= TEGRA_GMI_CE_WIDTH(property);
+> +	else
+> +		priv->snor_timing0 |= TEGRA_GMI_CE_WIDTH(4);
+> +
+> +	if (!of_property_read_u32(child, "nvidia,snor-we-width", &property))
+> +		priv->snor_timing1 |= TEGRA_GMI_WE_WIDTH(property);
+> +	else
+> +		priv->snor_timing1 |= TEGRA_GMI_WE_WIDTH(1);
+> +
+> +	if (!of_property_read_u32(child, "nvidia,snor-oe-width", &property))
+> +		priv->snor_timing1 |= TEGRA_GMI_OE_WIDTH(property);
+> +	else
+> +		priv->snor_timing1 |= TEGRA_GMI_OE_WIDTH(1);
+> +
+> +	if (!of_property_read_u32(child, "nvidia,snor-wait-width", &property))
+> +		priv->snor_timing1 |= TEGRA_GMI_WAIT_WIDTH(property);
+> +	else
+> +		priv->snor_timing1 |= TEGRA_GMI_WAIT_WIDTH(3);
+> +
+> +	of_node_put(child);
+> +}
+> +
+> +static int tegra_gmi_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *res;
+> +	struct device *dev = &pdev->dev;
+> +	struct tegra_gmi_priv *priv;
+> +	int ret;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	priv->base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(priv->base))
+> +		return PTR_ERR(priv->base);
+> +
+> +	priv->clk = devm_clk_get(dev, "gmi");
+> +	if (IS_ERR(priv->clk)) {
+> +		dev_err(dev, "can not get clock\n");
+> +		return PTR_ERR(priv->clk);
+> +	}
+> +
+> +	priv->rst = devm_reset_control_get(dev, "gmi");
+> +	if (IS_ERR(priv->rst)) {
+> +		dev_err(dev, "can not get reset\n");
+> +		return PTR_ERR(priv->rst);
+> +	}
+> +
+> +	ret = clk_prepare_enable(priv->clk);
+> +	if (ret) {
+> +		dev_err(dev, "fail to enable clock.\n");
+> +		return ret;
+> +	}
+> +
+> +	reset_control_assert(priv->rst);
+> +	udelay(2);
+> +	reset_control_deassert(priv->rst);
+> +
+> +	tegra_gmi_parse_dt(dev, priv);
+> +	tegra_gmi_init(dev, priv);
+> +
+> +	ret = of_platform_default_populate(dev->of_node, NULL, dev);
+> +	if (ret < 0) {
+> +		dev_err(dev, "fail to create devices.\n");
+> +		clk_disable_unprepare(priv->clk);
+> +		reset_control_assert(priv->rst);
 
+nit ... I would assert the reset first and then disable the clock. This
+allows the reset a few clocks to reset the logic.
 
->  -----Original Message-----
->  From: Bjorn Helgaas [mailto:helgaas at kernel.org]
->  Sent: Friday, August 26, 2016 2:10 AM
->  To: Po Liu
->  Cc: S?ren Brinkmann; Roy Zang; Arnd Bergmann; linux-pci at vger.kernel.org;
->  Pratyush Anand; Stuart Yoder; Yang-Leo Li; Mingkai Hu; Jingoo Han; Bjorn
->  Helgaas; Ley Foon Tan; Michal Simek; linux-arm-
->  kernel at lists.infradead.org
->  Subject: Re: [PATCH v1] arm64:pci: fix the IOV device enabled crash
->  issue in designware
->  
->  On Thu, Aug 25, 2016 at 04:53:19AM +0000, Po Liu wrote:
->  > >  -----Original Message-----
->  > >  From: Bjorn Helgaas [mailto:helgaas at kernel.org]
->  > >  Sent: Thursday, August 25, 2016 4:51 AM
->  > >  To: Po Liu
->  > >  Cc: linux-pci at vger.kernel.org; Roy Zang; Arnd Bergmann; Stuart
->  > > Yoder;  Yang-Leo Li; linux-arm-kernel at lists.infradead.org; Bjorn
->  > > Helgaas;  Mingkai Hu; Ley Foon Tan; Michal Simek; S?ren Brinkmann;
->  > > Jingoo Han;  Pratyush Anand
->  > >  Subject: Re: [PATCH v1] arm64:pci: fix the IOV device enabled crash
->  > > issue in designware
->  > >
->  > >  [+cc Jingoo, Pratyush, Michal, S?ren, Ley]
->  > >
->  > >  On Tue, Aug 23, 2016 at 02:01:12PM +0800, Po Liu wrote:
->  > >  > When echo a number to /sys/bus/pci/devices/xxx/sriov_numvfs to
->  > > enable  > the VF devices. A crash log occurred. This found to be
->  > > access the IOV  > devices config space failure issue.
->  > >
->  > >  What was the actual crash?  The mere fact that we made a config
->  > > read  fail should not cause a crash.  We might erroneously prevent
->  > > access to  VF devices, but it shouldn't crash.  So maybe there's
->  > > another bug  elsewhere that we should fix first.
->  >
->  > I built with CONFIG_PCI_IOV=y and notice a crash when I use it:
->  >
->  > centqds-60 cd /sys/class/net/
->  > centqds-61 ls
->  > enP1p1s0@ enP2p1s0f0@ enP2p1s0f1@ lo@ sit0@
->  > centqds-62 cd enP2p1s0f1/device
->  > centqds-63 ls
->  > broken_parity_status driver_override msi_irqs/ sriov_numvfs class
->  > enable net/ sriov_totalvfs config iommu_group@ power/ subsystem@
->  > consistent_dma_mask_bits irq remove subsystem_device device
->  > local_cpulist rescan subsystem_vendor devspec local_cpus reset uevent
->  > dma_mask_bits modalias resource vendor driver@ msi_bus rom
->  > centqds-64 zcat /proc/config.gz | grep _IOV CONFIG_PCI_IOV=y
->  > centqds-65 sudo su
->  > [root at centqds 0002:01:00.1]# echo 2 > sriov_numvfs [ 317.604543] ixgbe
->  > 0002:01:00.1 enP2p1s0f1: SR-IOV enabled with 2 VFs [ 317.714431]
->  > (null): of_irq_parse_pci() failed with rc=134
->  
->  
->  > [ 317.719906] -----------[ cut here ]----------- [ 317.724525]
->  > WARNING: CPU: 6 PID: 3179 at drivers/pci/probe.c:1555
->  > pci_device_add+0x144/0x148() [ 317.733123] Modules linked in:
->  > [ 317.736175] CPU: 6 PID: 3179 Comm: bash Not tainted
->  > 4.1.8-00024-g0a32d65-dirty #32 [ 317.743731] Hardware name: Freescale
->  > Layerscape 2088a QDS Board (DT) [ 317.750077] Call trace:
->  > [ 317.752516] [<fffffe0000096cf8>] dump_backtrace+0x0/0x12c Message
->  > from[ 317.757916] [<fffffe0000096e34>] show_stack+0x10/0x1c
->  > syslogd at centqds[ 317.764341] [<fffffe00008937fc>] dump_stack+0x84/0xd4
->  > at Jul 26 15:51[ 317.770770] [<fffffe00000be590>]
->  > warn_slowpath_common+0x94/0xcc
->  > :10 ...
->  > kerne[ 317.778067] [<fffffe00000be68c>] warn_slowpath_null+0x14/0x20
->  > l:Call trace:
->  > [ 317.785192] [<fffffe00003c5fa4>] pci_device_add+0x140/0x148 [
->  > 317.792133] [<fffffe00003de784>] pci_enable_sriov+0x470/0x7a0 [
->  > 317.797873] [<fffffe00005fa9dc>] ixgbe_pci_sriov_configure+0x8c/0x148
->  > [ 317.804302] [<fffffe00003cf354>] sriov_numvfs_store+0x78/0x11c [
->  > 317.810129] [<fffffe0000443d80>] dev_attr_store+0x14/0x28 [
->  > 317.815521] [<fffffe0000200164>] sysfs_kf_write+0x40/0x4c [
->  > 317.820908] [<fffffe00001ff5ec>] kernfs_fop_write+0xb8/0x180 [
->  > 317.826561] [<fffffe000019a568>] __vfs_write+0x28/0x10c [ 317.831775]
->  > [<fffffe000019ad00>] vfs_write+0x90/0x1a0 [ 317.836819]
->  > [<fffffe000019b584>] SyS_write+0x40/0xa0 [ 317.841772] --[ end trace
->  > 83725a9784fd702a ]-- [ 317.846393] BUG: failure at
->  > fs/sysfs/file.c:481/sysfs_create_bin_file()!
->  > [ 317.853081] Kernel panic - not syncing: BUG!
->  > [ 317.857339] CPU: 6 PID: 3179 Comm: bash Tainted: G W
->  > 4.1.8-00024-g0a32d65-dirty #32 [ 317.866110] Hardware name: Freescale
->  > Layerscape 2088a QDS Board (DT) [ 317.872451] Call trace:
->  > [ 317.874887] [<fffffe0000096cf8>] dump_backtrace+0x0/0x12c [
->  > 317.880274] [<fffffe0000096e34>] show_stack+0x10/0x1c [ 317.885315]
->  > [<fffffe00008937fc>] dump_stack+0x84/0xd4 [ 317.890354]
->  > [<fffffe00008909e8>] panic+0xe4/0x21c [ 317.895047]
->  > [<fffffe0000200988>] sysfs_create_bin_file+0x60/0x64 [ 317.901041]
->  > [<fffffe00003cf52c>] pci_create_sysfs_dev_files+0x48/0x2a8
->  > [ 317.907556] [<fffffe00003c4238>] pci_bus_add_device+0x20/0x6c
->  >
->  > The code process is that: "echo 2 > sriov_numvf" makes driver
->  load .sriov_configure. At last to load pci_enable_sriov().
->  > The first time vf device operate the config space in the
->  pci_setup_device() (this function was load in the virtfn_add()) is
->  pci_read_config_byte(dev, PCI_HEADER_TYPE, &hdr_type) return failure. So
->  the virtfn didn't initialized proper.
->  >
->  > This found to be "bus->primary == pp->root_bus_nr && dev > 0" then
->  return failure in host controller. The dev came from devfn must not
->  zero(is about 0x10).
->  >
->  > then read config space failure. This makes the dev->bus is NULL. Lead
->  to upper crash.
->  
->  I think the crash (BUG: failure at
->  fs/sysfs/file.c:481/sysfs_create_bin_file())
->  happens in this path:
->  
->    sriov_numvfs_store
->      ixgbe_pci_sriov_configure
->        ixgbe_pci_sriov_enable
->          pci_enable_sriov
->            sriov_enable
->              pci_iov_add_virtfn
->                virtfn = pci_alloc_dev()
->                pci_setup_device(virtfn)
->                  if (pci_read_config_byte(dev, PCI_HEADER_TYPE,
->  &hdr_type))
->                    return -EIO
->                pci_bus_add_device(virtfn)
->                  pci_create_sysfs_dev_files
->                    sysfs_create_bin_file
->                      BUG_ON(!kobj)
->  
->  If the config read of PCI_HEADER_TYPE fails, pci_setup_device() returns
->  -EIO, but pci_iov_add_virtfn() doesn't check it.  Can you update
->  pci_iov_add_virtfn() so it checks that return value?  That should fix
->  the crash, even without your designware patch.
->  
->  Obviously, it won't make SR-IOV work, so we still need both patches.
+Do you also need to clear the GO bit like in the remove here for
+consistency? Could be worth adding a helper function to do this.
 
-Thanks, I'll provide patch in V2.
+> +		return ret;
+> +	}
+> +
+> +	dev_set_drvdata(dev, priv);
+> +
+> +	return 0;
+> +}
+> +
+> +static int tegra_gmi_remove(struct platform_device *pdev)
+> +{
+> +	struct tegra_gmi_priv *priv = dev_get_drvdata(&pdev->dev);
+> +	u32 config;
+> +
+> +	of_platform_depopulate(&pdev->dev);
+> +
+> +	config = readl(priv->base + TEGRA_GMI_CONFIG);
+> +	config &= ~TEGRA_GMI_CONFIG_GO;
+> +	writel(config, priv->base + TEGRA_GMI_CONFIG);
+> +
+> +	clk_disable_unprepare(priv->clk);
+> +	reset_control_assert(priv->rst);
 
->  
->  Bjorn
+I would re-order the reset and clock here as well.
+
+Otherwise ...
+
+Reviewed-by: Jon Hunter <jonathanh@nvidia.com>
+
+Cheers
+Jon
+
+-- 
+nvpublic
