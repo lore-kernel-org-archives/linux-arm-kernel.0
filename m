@@ -1,28 +1,55 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 26 Aug 2016 18:02:19 +0200
-Subject: [PATCH v2 1/7] clocksource: exynos_mct: Add the support for ARM64
-In-Reply-To: <1472046551-703-2-git-send-email-cw00.choi@samsung.com>
-References: <1472046551-703-1-git-send-email-cw00.choi@samsung.com>
- <1472046551-703-2-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20160826160219.GA15511@kozik-book>
+From: leoyang.li@nxp.com (Yang-Leo Li)
+Date: Fri, 26 Aug 2016 16:08:49 +0000
+Subject: [linux-devel] [PATCH 02/10] dt-bindings: esdhc: Update bindings
+ for	LS1012A
+In-Reply-To: <1472207269-18499-2-git-send-email-Bhaskar.Upadhaya@nxp.com>
+References: <1472207269-18499-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
+ <1472207269-18499-2-git-send-email-Bhaskar.Upadhaya@nxp.com>
+Message-ID: <AM2PR04MB07709867FC1968AAB4B6FE208FEC0@AM2PR04MB0770.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 10:49:05PM +0900, Chanwoo Choi wrote:
-> This patch adds the support for ARM 64bit. The delay_timer is only supported
-> on ARM 32bit.
+
+
+> -----Original Message-----
+> From: linux-devel-bounces at gforge.freescale.net [mailto:linux-devel-
+> bounces at gforge.freescale.net] On Behalf Of Bhaskar Upadhaya
+> Sent: Friday, August 26, 2016 5:28 AM
+> To: devicetree at vger.kernel.org; shawnguo at kernel.org
+> Cc: oss at buserror.net; linux-devel at gforge.freescale.net; Bhaskar U
+> <bhaskar.upadhaya@nxp.com>; linux-arm-kernel at lists.infradead.org
+> Subject: [linux-devel] [PATCH 02/10] dt-bindings: esdhc: Update bindings for
+> LS1012A
 > 
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
 > ---
->  drivers/clocksource/Kconfig      | 2 +-
->  drivers/clocksource/exynos_mct.c | 4 ++++
->  2 files changed, 5 insertions(+), 1 deletion(-)
+>  Documentation/devicetree/bindings/mmc/fsl-esdhc.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/fsl-esdhc.txt
+> b/Documentation/devicetree/bindings/mmc/fsl-esdhc.txt
+> index dedfb02..3257b4a 100644
+> --- a/Documentation/devicetree/bindings/mmc/fsl-esdhc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/fsl-esdhc.txt
+> @@ -7,9 +7,9 @@ This file documents differences between the core properties
+> described  by mmc.txt and the properties used by the sdhci-esdhc driver.
+> 
+>  Required properties:
+> +  - compatible : "fsl,mpc8378-esdhc", "fsl,ls1012a-esdhc0", "fsl,ls1012a-
+> esdhc1".
 
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+What does it mean for esdhc0 and esdhc1?  If these are two different controllers used on the same chip, please describe what is the difference.  It is not clear from the name itself.
 
-Best regards,
-Krzysztof
+>    - interrupt-parent : interrupt source phandle.
+>    - clock-frequency : specifies eSDHC base clock frequency.
+> -
+>  Optional properties:
+>    - sdhci,wp-inverted : specifies that eSDHC controller reports
+>      inverted write-protect state; New devices should use the generic
+> --
+> 1.9.1
+> 
+> _______________________________________________
+> linux-devel mailing list
+> linux-devel at gforge.freescale.net
+> http://gforge.freescale.net/mailman/listinfo/linux-devel
