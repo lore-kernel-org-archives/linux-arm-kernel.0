@@ -1,43 +1,60 @@
 From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Fri, 26 Aug 2016 18:48:01 +0800
-Subject: [PATCH v2] arm64: dts: rockchip: fix the address map for WDT0 and WDT1
-Message-ID: <1472208482-30862-1-git-send-email-zhengxing@rock-chips.com>
+Date: Fri, 26 Aug 2016 18:49:16 +0800
+Subject: [PATCH] arm64: dts: rockchip: fix the address map for WDT0 and
+ WDT1
+In-Reply-To: <607537bf-1c49-d7e0-ead9-8c1e6164e44e@rock-chips.com>
+References: <1472192551-16754-1-git-send-email-zhengxing@rock-chips.com>
+ <607537bf-1c49-d7e0-ead9-8c1e6164e44e@rock-chips.com>
+Message-ID: <57C01EAC.4020501@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To rename "watchdog" to "watchdog0" explicitly for looking up.
-Dues to incorrect description in the TRM, the WDTs base address
-should be fixed and swap them like this:
-WDT0 - 0xff848000
-WDT1 - 0xff840000
+Hi Shawn,
 
-And, it is right that only WDT0 can generate global software reset.
-We will update the TRM to fix it.
+On 2016?08?26? 17:41, Shawn Lin wrote:
+> On 2016/8/26 14:22, Xing Zheng wrote:
+>> Dues to incorrect description in the TRM, the WDTs base address
+>> should be fixed and swap them like this:
+>> WDT0 - 0xff848000
+>> WDT1 - 0xff840000
+>>
+>> And, it is right that only WDT0 can generate global software reset.
+>> We will update the TRM to fix it.
+>>
+>> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+>> ---
+>>
+>> arch/arm64/boot/dts/rockchip/rk3399.dtsi | 4 ++--
+>> 1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi 
+>> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> index bc86e8c..f0f52c1 100644
+>> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> @@ -1002,9 +1002,9 @@
+>> };
+>> };
+>>
+>> - watchdog at ff840000 {
+>> + watchdog at ff848000 {
+>
+> Just a nit, should we mark this explicitly as "watchdog0" ?
+> I still need to look up for which wdt you are using.:)
+Done.
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
----
+Thanks.
+>
+>> compatible = "snps,dw-wdt";
+>> - reg = <0x0 0xff840000 0x0 0x100>;
+>> + reg = <0x0 0xff848000 0x0 0x100>;
+>> clocks = <&cru PCLK_WDT>;
+>> interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+>> };
+>>
+>
+>
 
-Changes in v2:
-- rename node name "watchdog" to "watchdog0" explicitly
 
- arch/arm64/boot/dts/rockchip/rk3399.dtsi |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index bc86e8c..1e714a9 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1002,9 +1002,9 @@
- 		};
- 	};
- 
--	watchdog at ff840000 {
-+	watchdog0 at ff848000 {
- 		compatible = "snps,dw-wdt";
--		reg = <0x0 0xff840000 0x0 0x100>;
-+		reg = <0x0 0xff848000 0x0 0x100>;
- 		clocks = <&cru PCLK_WDT>;
- 		interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
- 	};
 -- 
-1.7.9.5
+- Xing Zheng
