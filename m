@@ -1,18 +1,24 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 26 Aug 2016 17:23:34 +0200
-Subject: [PATCH] MAINTAINERS: Add myself as reviewer for Samsung Exynos
- support
-In-Reply-To: <1472137008-17751-1-git-send-email-javier@osg.samsung.com>
-References: <1472137008-17751-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <6ea9d132-5629-5e72-f209-b9b9faca239e@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 26 Aug 2016 08:24:49 -0700
+Subject: [PATCH] ARM: dts: am335x-wega: Add audio support
+In-Reply-To: <7109f6e5-e7fd-4b60-98b7-85b9d78ef690@ti.com>
+References: <1470841935-14190-1-git-send-email-s.mueller-klieser@phytec.de>
+ <7109f6e5-e7fd-4b60-98b7-85b9d78ef690@ti.com>
+Message-ID: <20160826152449.qmlrro3ka3vvh266@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25/2016 04:56 PM, Javier Martinez Canillas wrote:
-> I've been helping reviewing and testing Exynos SoC support patches
-> for the last couple of years. But it would be easier for me if I'm
-> cc'ed for patches, so I'm adding myself as reviewer for this entry.
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [160811 02:26]:
+> On 08/10/16 18:12, Stefan M?ller-Klieser wrote:
+> > The wega board has a TLV320AIC3007 connected via McASP0. In the default
+> > configuration, no external crystal is mounted. We run a system clock of
+> > 25 MHz, so we use the audio codec PLL for audio clock generation.
 > 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> It is great that the "ti,da830-evm-audio" works for you. I hope I will have
+> time soon to work on the McASP driver's CCF support in the near future.
+> 
+> Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Applying into omap-for-v4.9/dt thanks.
+
+Tony
