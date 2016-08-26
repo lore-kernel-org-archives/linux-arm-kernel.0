@@ -1,43 +1,81 @@
-From: oss@buserror.net (Scott Wood)
-Date: Fri, 26 Aug 2016 17:26:54 -0500
-Subject: [PATCH 04/10] dt-bindings: spi-nor: Update bindings for LS1012A
-In-Reply-To: <1472207269-18499-4-git-send-email-Bhaskar.Upadhaya@nxp.com>
-References: <1472207269-18499-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
- <1472207269-18499-4-git-send-email-Bhaskar.Upadhaya@nxp.com>
-Message-ID: <1472250414.13245.3.camel@buserror.net>
+From: zach.brown@ni.com (Zach Brown)
+Date: Fri, 26 Aug 2016 17:29:46 -0500
+Subject: [PATCH 1/2] sdhci-of-arasan: Add quirk and device tree parameter
+ to fake CD bit
+In-Reply-To: <CAPDyKFpcFus1oysdRuK6vUALXXdy8_SsDZ3n8LkyM1AZLZY+QQ@mail.gmail.com>
+References: <1472080984-17373-1-git-send-email-zach.brown@ni.com>
+ <20160825105640.GA5439@remoulade>
+ <20160825171539.GA13571@zach-desktop>
+ <20160825180959.GA14705@remoulade>
+ <20160825182621.GA14817@zach-desktop>
+ <20160825182852.GB15000@remoulade>
+ <20160825204645.GA19450@zach-desktop>
+ <CAPDyKFpcFus1oysdRuK6vUALXXdy8_SsDZ3n8LkyM1AZLZY+QQ@mail.gmail.com>
+Message-ID: <20160826222945.GA6679@zach-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-08-26 at 15:57 +0530, Bhaskar Upadhaya wrote:
-> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
-> ---
-> ?Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt | 2 ++
-> ?1 file changed, 2 insertions(+)
+On Fri, Aug 26, 2016 at 09:42:38AM +0200, Ulf Hansson wrote:
+> On 25 August 2016 at 22:46, Zach Brown <zach.brown@ni.com> wrote:
+> > On Thu, Aug 25, 2016 at 07:28:55PM +0100, Mark Rutland wrote:
+> >> On Thu, Aug 25, 2016 at 01:26:22PM -0500, Zach Brown wrote:
+> >> > On Thu, Aug 25, 2016 at 07:10:00PM +0100, Mark Rutland wrote:
+> >> > > On Thu, Aug 25, 2016 at 12:15:44PM -0500, Zach Brown wrote:
+> >> > > > In cases where the card is non-removable then polling doesn't make sense.
+> >> > >
+> >> > > We have the non-removable property to describe that, so we can also look at that.
+> >> > >
+> >> > > > So it doesn't make sense to tie the test mode workaround into the broken-cd
+> >> > > > property, even though I agree the nature of the defect fits under the notion
+> >> > > > of the CD being broken.
+> >> > >
+> >> > > Maybe not solely on broken-cd, but I think that we dont necessarily need a new
+> >> > > DT property. As above, broken-cd, non-removable, and the compatible string may
+> >> > > together give the kernel enough information to choose the right thing to do.
+> >> > >
+> >> > > Thanks,
+> >> > > Mark.
+> >> >
+> >> > I'm not sure if I understand your suggestion completely. Are you suggesting
+> >> > setting both the broken-cd and non-removable properties? That would make sense,
+> >> > but my understanding was that the two properities are not meant to co-exist. In
+> >> > /Documentation/devicetree/bindings/mmc/mmc.txt it states that only one should
+> >> > be supplied. Don't the two properties conflict with each other?
+> >>
+> >> They do for the cases that exist today, but given we're updating the document
+> >> anyway, we could simply clarify the cases in which the two can sanely co-exist
+> >> (e.g.  for this particular IP block).
 > 
-> diff --git a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> index 2c91c03..fc99ef2 100644
-> --- a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> +++ b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> @@ -13,6 +13,7 @@ Required properties:
-> ??????????????????at25df321a
-> ??????????????????at25df641
-> ??????????????????at26df081a
-> +		?eon,en25s64
-> ??????????????????mr25h256
-> ??????????????????mx25l4005a
-> ??????????????????mx25l1606e
-> @@ -29,6 +30,7 @@ Required properties:
-> ??????????????????s25fl008k
-> ??????????????????s25fl064k
-> ??????????????????sst25vf040b
-> +		?sst,sst25wf040b
-> ??????????????????m25p40
-> ??????????????????m25p80
-> ??????????????????m25p16
+> No, please!
+> 
+> Depending on the SDHCI variant there is already some difference on how
+> broken-cd is treated.
+> 
+> Let's not add yet another, as I think it will be too complicated for
+> people to understand the bindings.
+> 
 
-Whitespace doesn't match what's already there.
+Shawn Lin pointed out that there might be instances of the arasan controller 
+that don't have the behavior the patch addresses. Having a new DT binding
+specific for this case would avoid needing to maintain a list of controllers
+that need the fix.  
 
-Why are these the only lines that have a vendor prefix?
+> >>
+> >> Thanks,
+> >> Mark.
+> >
+> > That makes sense. I'll change the documentation for broken-cd and non-removable
+> > in the IP specific document and change the driver accordingly.
+> 
+> I rather have a new DT binding specific for this case.
+> 
+> Perhaps there's a better name than "fake-cd". How about "force-cd", or
+> if someone can come up with a better name.
+> 
+> Kind regards
+> Uffe
 
--Scott
+I've been trying to come up with a better name. Here are a few ideas
+cd-not-wired
+needs-test-cd
+fails-without-force-cd
