@@ -1,55 +1,40 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Aug 2016 13:35:50 +0100
-Subject: [PATCH 3/3] ARM: imx: add SMP support for i.MX7D
-In-Reply-To: <AM3PR04MB13154FA0116D397AABD75E10F5EC0@AM3PR04MB1315.eurprd04.prod.outlook.com>
-References: <1472209971-32469-1-git-send-email-Anson.Huang@nxp.com>
- <1472209971-32469-4-git-send-email-Anson.Huang@nxp.com>
- <20160826111356.GM1041@n2100.armlinux.org.uk>
- <AM3PR04MB13154FA0116D397AABD75E10F5EC0@AM3PR04MB1315.eurprd04.prod.outlook.com>
-Message-ID: <20160826123550.GQ1041@n2100.armlinux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 26 Aug 2016 13:39:29 +0100
+Subject: [PATCH v7 03/14] arm64/numa: add nid check for memory block
+In-Reply-To: <1472024693-12912-4-git-send-email-thunder.leizhen@huawei.com>
+References: <1472024693-12912-1-git-send-email-thunder.leizhen@huawei.com>
+ <1472024693-12912-4-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <20160826123929.GA30302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2016 at 12:20:15PM +0000, Yongcai Huang wrote:
-> > On Fri, Aug 26, 2016 at 07:12:51PM +0800, Anson Huang wrote:
-> > > diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
-> > > index 711dbbd..63af911 100644
-> > > --- a/arch/arm/mach-imx/platsmp.c
-> > > +++ b/arch/arm/mach-imx/platsmp.c
-> > > @@ -60,8 +60,17 @@ static int imx_boot_secondary(unsigned int cpu,
-> > > struct task_struct *idle)  static void __init imx_smp_init_cpus(void)
-> > > {
-> > >  	int i, ncores;
-> > > +	unsigned long val, arch_type;
-> > >
-> > > -	ncores = scu_get_core_count(scu_base);
-> > > +	asm volatile("mrc p15, 0, %0, c0, c0, 0" : "=r" (arch_type));
-> > > +
-> > > +	if (((arch_type >> 4) & 0xfff) == 0xc07) {
-> > 
-> > This is buggy.  Plus, we have macros for this.  Please use the macros in
-> > asm/cputype.h to achieve these tests.
+On Wed, Aug 24, 2016 at 03:44:42PM +0800, Zhen Lei wrote:
+> Use the same tactic to cpu and numa-distance nodes.
 > 
-> Thanks, I will use read_cpuid_id() API intead of putting asm code here.
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>  drivers/of/of_numa.c | 5 +++++
+>  1 file changed, 5 insertions(+)
 
-Nope.  Do this:
+The subject has arm64/numa, but this is clearly core OF code and
+requires an ack from Rob.
 
-	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A7) {
+The commit message also doesn't make much sense to me.
 
-Because the part number field is defined by the implementer, so before
-you can interpret the part number field, you have to first check who
-has implemented the device.
+> diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
+> index 7b3fbdc..afaeb9c 100644
+> --- a/drivers/of/of_numa.c
+> +++ b/drivers/of/of_numa.c
+> @@ -75,6 +75,11 @@ static int __init of_numa_parse_memory_nodes(void)
+>  			 */
+>  			continue;
+> 
+> +		if (nid >= MAX_NUMNODES) {
+> +			pr_warn("NUMA: Node id %u exceeds maximum value\n", nid);
+> +			return -EINVAL;
+> +		}
 
-That's exactly why these macros exist - to help you get these tests
-correct, so when someone else releases an ARM core with the same value
-in the part number field, we don't end up with a load of tests which
-incorrectly matching.
+Do you really want to return from the function here? Shouldn't we at least
+of_node_put(np), i.e. by using a break; ?
 
-While it may be unlikely that an iMX7 would end up with a non-ARM CPU,
-that's no real excuse for avoiding using what's been provided for you,
-especially when avoiding it causes issues for static analysis.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Will
