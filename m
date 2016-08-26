@@ -1,218 +1,65 @@
-From: finley.xiao@rock-chips.com (Finley Xiao)
-Date: Fri, 26 Aug 2016 00:36:31 -0700
-Subject: [PATCH v3 3/3] nvmem: rockchip-efuse: add rk3399-efuse support
-In-Reply-To: <1472196991-8529-1-git-send-email-finley.xiao@rock-chips.com>
-References: <1472196991-8529-1-git-send-email-finley.xiao@rock-chips.com>
-Message-ID: <1472196991-8529-4-git-send-email-finley.xiao@rock-chips.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 26 Aug 2016 09:42:38 +0200
+Subject: [PATCH 1/2] sdhci-of-arasan: Add quirk and device tree parameter
+ to fake CD bit
+In-Reply-To: <20160825204645.GA19450@zach-desktop>
+References: <1472080984-17373-1-git-send-email-zach.brown@ni.com>
+ <20160825105640.GA5439@remoulade> <20160825171539.GA13571@zach-desktop>
+ <20160825180959.GA14705@remoulade> <20160825182621.GA14817@zach-desktop>
+ <20160825182852.GB15000@remoulade> <20160825204645.GA19450@zach-desktop>
+Message-ID: <CAPDyKFpcFus1oysdRuK6vUALXXdy8_SsDZ3n8LkyM1AZLZY+QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1) the efuse timing of rk3399 is different from earlier SoCs.
-2) rk3399-efuse is organized as 32bits by 32 one-time programmable
-electrical fuses, the efuse of earlier SoCs is organized as 32bits
-by 8 one-time programmable electrical fuses with random access interface.
+On 25 August 2016 at 22:46, Zach Brown <zach.brown@ni.com> wrote:
+> On Thu, Aug 25, 2016 at 07:28:55PM +0100, Mark Rutland wrote:
+>> On Thu, Aug 25, 2016 at 01:26:22PM -0500, Zach Brown wrote:
+>> > On Thu, Aug 25, 2016 at 07:10:00PM +0100, Mark Rutland wrote:
+>> > > On Thu, Aug 25, 2016 at 12:15:44PM -0500, Zach Brown wrote:
+>> > > > In cases where the card is non-removable then polling doesn't make sense.
+>> > >
+>> > > We have the non-removable property to describe that, so we can also look at that.
+>> > >
+>> > > > So it doesn't make sense to tie the test mode workaround into the broken-cd
+>> > > > property, even though I agree the nature of the defect fits under the notion
+>> > > > of the CD being broken.
+>> > >
+>> > > Maybe not solely on broken-cd, but I think that we dont necessarily need a new
+>> > > DT property. As above, broken-cd, non-removable, and the compatible string may
+>> > > together give the kernel enough information to choose the right thing to do.
+>> > >
+>> > > Thanks,
+>> > > Mark.
+>> >
+>> > I'm not sure if I understand your suggestion completely. Are you suggesting
+>> > setting both the broken-cd and non-removable properties? That would make sense,
+>> > but my understanding was that the two properities are not meant to co-exist. In
+>> > /Documentation/devicetree/bindings/mmc/mmc.txt it states that only one should
+>> > be supplied. Don't the two properties conflict with each other?
+>>
+>> They do for the cases that exist today, but given we're updating the document
+>> anyway, we could simply clarify the cases in which the two can sanely co-exist
+>> (e.g.  for this particular IP block).
 
-This patch adds a new read function for rk3399-efuse.
+No, please!
 
-Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/nvmem/rockchip-efuse.c | 131 +++++++++++++++++++++++++++++++++++------
- 1 file changed, 112 insertions(+), 19 deletions(-)
+Depending on the SDHCI variant there is already some difference on how
+broken-cd is treated.
 
-diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-index 4d3f391..2fb6c34 100644
---- a/drivers/nvmem/rockchip-efuse.c
-+++ b/drivers/nvmem/rockchip-efuse.c
-@@ -22,17 +22,29 @@
- #include <linux/nvmem-provider.h>
- #include <linux/slab.h>
- #include <linux/of.h>
-+#include <linux/of_platform.h>
- #include <linux/platform_device.h>
- 
--#define EFUSE_A_SHIFT			6
--#define EFUSE_A_MASK			0x3ff
--#define EFUSE_PGENB			BIT(3)
--#define EFUSE_LOAD			BIT(2)
--#define EFUSE_STROBE			BIT(1)
--#define EFUSE_CSB			BIT(0)
--
--#define REG_EFUSE_CTRL			0x0000
--#define REG_EFUSE_DOUT			0x0004
-+#define RK3288_A_SHIFT		6
-+#define RK3288_A_MASK		0x3ff
-+#define RK3288_PGENB		BIT(3)
-+#define RK3288_LOAD			BIT(2)
-+#define RK3288_STROBE		BIT(1)
-+#define RK3288_CSB			BIT(0)
-+
-+#define RK3399_A_SHIFT		16
-+#define RK3399_A_MASK		0x3ff
-+#define RK3399_NBYTES		4
-+#define RK3399_STROBSFTSEL	BIT(9)
-+#define RK3399_RSB			BIT(7)
-+#define RK3399_PD			BIT(5)
-+#define RK3399_PGENB		BIT(3)
-+#define RK3399_LOAD			BIT(2)
-+#define RK3399_STROBE		BIT(1)
-+#define RK3399_CSB			BIT(0)
-+
-+#define REG_EFUSE_CTRL		0x0000
-+#define REG_EFUSE_DOUT		0x0004
- 
- struct rockchip_efuse_chip {
- 	struct device *dev;
-@@ -40,8 +52,8 @@ struct rockchip_efuse_chip {
- 	struct clk *clk;
- };
- 
--static int rockchip_efuse_read(void *context, unsigned int offset,
--			       void *val, size_t bytes)
-+static int rockchip_rk3288_efuse_read(void *context, unsigned int offset,
-+				      void *val, size_t bytes)
- {
- 	struct rockchip_efuse_chip *efuse = context;
- 	u8 *buf = val;
-@@ -53,27 +65,80 @@ static int rockchip_efuse_read(void *context, unsigned int offset,
- 		return ret;
- 	}
- 
--	writel(EFUSE_LOAD | EFUSE_PGENB, efuse->base + REG_EFUSE_CTRL);
-+	writel(RK3288_LOAD | RK3288_PGENB, efuse->base + REG_EFUSE_CTRL);
- 	udelay(1);
- 	while (bytes--) {
- 		writel(readl(efuse->base + REG_EFUSE_CTRL) &
--			     (~(EFUSE_A_MASK << EFUSE_A_SHIFT)),
-+			     (~(RK3288_A_MASK << RK3288_A_SHIFT)),
- 			     efuse->base + REG_EFUSE_CTRL);
- 		writel(readl(efuse->base + REG_EFUSE_CTRL) |
--			     ((offset++ & EFUSE_A_MASK) << EFUSE_A_SHIFT),
-+			     ((offset++ & RK3288_A_MASK) << RK3288_A_SHIFT),
- 			     efuse->base + REG_EFUSE_CTRL);
- 		udelay(1);
- 		writel(readl(efuse->base + REG_EFUSE_CTRL) |
--			     EFUSE_STROBE, efuse->base + REG_EFUSE_CTRL);
-+			     RK3288_STROBE, efuse->base + REG_EFUSE_CTRL);
- 		udelay(1);
- 		*buf++ = readb(efuse->base + REG_EFUSE_DOUT);
- 		writel(readl(efuse->base + REG_EFUSE_CTRL) &
--		     (~EFUSE_STROBE), efuse->base + REG_EFUSE_CTRL);
-+		     (~RK3288_STROBE), efuse->base + REG_EFUSE_CTRL);
- 		udelay(1);
- 	}
- 
- 	/* Switch to standby mode */
--	writel(EFUSE_PGENB | EFUSE_CSB, efuse->base + REG_EFUSE_CTRL);
-+	writel(RK3288_PGENB | RK3288_CSB, efuse->base + REG_EFUSE_CTRL);
-+
-+	clk_disable_unprepare(efuse->clk);
-+
-+	return 0;
-+}
-+
-+static int rockchip_rk3399_efuse_read(void *context, unsigned int offset,
-+				      void *val, size_t bytes)
-+{
-+	struct rockchip_efuse_chip *efuse = context;
-+	unsigned int addr_start, addr_end, addr_offset, addr_len;
-+	unsigned int out_value;
-+	unsigned char *buf;
-+	int ret, i = 0;
-+
-+	ret = clk_prepare_enable(efuse->clk);
-+	if (ret < 0) {
-+		dev_err(efuse->dev, "failed to prepare/enable efuse clk\n");
-+		return ret;
-+	}
-+
-+	addr_start = rounddown(offset, RK3399_NBYTES) / RK3399_NBYTES;
-+	addr_end = roundup(offset + bytes, RK3399_NBYTES) / RK3399_NBYTES;
-+	addr_offset = offset % RK3399_NBYTES;
-+	addr_len = addr_end - addr_start;
-+
-+	buf = kzalloc(sizeof(*buf) * addr_len * RK3399_NBYTES, GFP_KERNEL);
-+	if (!buf)
-+		return -ENOMEM;
-+
-+	writel(RK3399_LOAD | RK3399_PGENB | RK3399_STROBSFTSEL | RK3399_RSB,
-+	       efuse->base + REG_EFUSE_CTRL);
-+	udelay(1);
-+	while (addr_len--) {
-+		writel(readl(efuse->base + REG_EFUSE_CTRL) | RK3399_STROBE |
-+			((addr_start++ & RK3399_A_MASK) << RK3399_A_SHIFT),
-+			efuse->base + REG_EFUSE_CTRL);
-+		udelay(1);
-+		out_value = readl(efuse->base + REG_EFUSE_DOUT);
-+		writel(readl(efuse->base + REG_EFUSE_CTRL) & (~RK3399_STROBE),
-+		       efuse->base + REG_EFUSE_CTRL);
-+		udelay(1);
-+
-+		memcpy(&buf[i], &out_value, RK3399_NBYTES);
-+		i += RK3399_NBYTES;
-+	}
-+
-+	/* Switch to standby mode */
-+	writel(RK3399_PD | RK3399_CSB, efuse->base + REG_EFUSE_CTRL);
-+
-+	memcpy(val, buf + addr_offset, bytes);
-+
-+	kfree(buf);
- 
- 	clk_disable_unprepare(efuse->clk);
- 
-@@ -89,7 +154,27 @@ static struct nvmem_config econfig = {
- };
- 
- static const struct of_device_id rockchip_efuse_match[] = {
--	{ .compatible = "rockchip,rockchip-efuse", },
-+	/* deprecated but kept around for dts binding compatibility */
-+	{
-+		.compatible = "rockchip,rockchip-efuse",
-+		.data = (void *)&rockchip_rk3288_efuse_read,
-+	},
-+	{
-+		.compatible = "rockchip,rk3066a-efuse",
-+		.data = (void *)&rockchip_rk3288_efuse_read,
-+	},
-+	{
-+		.compatible = "rockchip,rk3188-efuse",
-+		.data = (void *)&rockchip_rk3288_efuse_read,
-+	},
-+	{
-+		.compatible = "rockchip,rk3288-efuse",
-+		.data = (void *)&rockchip_rk3288_efuse_read,
-+	},
-+	{
-+		.compatible = "rockchip,rk3399-efuse",
-+		.data = (void *)&rockchip_rk3399_efuse_read,
-+	},
- 	{ /* sentinel */},
- };
- MODULE_DEVICE_TABLE(of, rockchip_efuse_match);
-@@ -99,6 +184,14 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	struct nvmem_device *nvmem;
- 	struct rockchip_efuse_chip *efuse;
-+	const struct of_device_id *match;
-+	struct device *dev = &pdev->dev;
-+
-+	match = of_match_device(dev->driver->of_match_table, dev);
-+	if (!match || !match->data) {
-+		dev_err(dev, "failed to get match data\n");
-+		return -EINVAL;
-+	}
- 
- 	efuse = devm_kzalloc(&pdev->dev, sizeof(struct rockchip_efuse_chip),
- 			     GFP_KERNEL);
-@@ -116,7 +209,7 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
- 
- 	efuse->dev = &pdev->dev;
- 	econfig.size = resource_size(res);
--	econfig.reg_read = rockchip_efuse_read;
-+	econfig.reg_read = match->data;
- 	econfig.priv = efuse;
- 	econfig.dev = efuse->dev;
- 	nvmem = nvmem_register(&econfig);
--- 
-1.9.1
+Let's not add yet another, as I think it will be too complicated for
+people to understand the bindings.
+
+>>
+>> Thanks,
+>> Mark.
+>
+> That makes sense. I'll change the documentation for broken-cd and non-removable
+> in the IP specific document and change the driver accordingly.
+
+I rather have a new DT binding specific for this case.
+
+Perhaps there's a better name than "fake-cd". How about "force-cd", or
+if someone can come up with a better name.
+
+Kind regards
+Uffe
