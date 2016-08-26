@@ -1,59 +1,42 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 26 Aug 2016 19:11:33 +0200
-Subject: [PATCH v2 6/7] arm64: dts: exynos: Add dts file for
- Exynos5433-based TM2 board
-In-Reply-To: <20160826163236.GC15511@kozik-book>
-References: <1472046551-703-1-git-send-email-cw00.choi@samsung.com>
- <1472046551-703-7-git-send-email-cw00.choi@samsung.com>
- <20160826163236.GC15511@kozik-book>
-Message-ID: <20160826171133.GA18773@kozik-book>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 26 Aug 2016 12:11:55 -0500
+Subject: [PATCH] drivers/perf: arm-pmu: Fix handling of SPI lacking
+ "interrupt-affinity" property
+In-Reply-To: <1468939142-23693-1-git-send-email-marc.zyngier@arm.com>
+References: <1468939142-23693-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAOi56cXFCZoMox3XrJvsQAXHa1uxOBPEKO266B2yYONv3pTY7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2016 at 06:32:36PM +0200, Krzysztof Kozlowski wrote:
-> On Wed, Aug 24, 2016 at 10:49:10PM +0900, Chanwoo Choi wrote:
-> > This patch adds the Device Tree source for Exynos5433-based Samsung TM2 board.
-> > This board fully support the all things for mobile target.
-> > 
-> > This patch supports the following devices:
-> > 1. basic SoC
-> > - Initial booting for Samsung Exynos5433 SoC
-> > - DRAM LPDDR3 (3GB)
-> > - eMMC (32GB)
-> > - ARM architecture timer
-> > 
-> > 2. power management devices
-> > - Sasmung S2MPS13 PMIC for the power supply
-> > - CPUFREQ for big.LITTLE cores
-> > - TMU for big.LITTLE cores and GPU
-> > - ADC with thermistor to measure the temperature of AP/Battery/Charger
-> > - Maxim MAX77843 Interface PMIC (MUIC/Haptic/Regulator)
-> > 
-> > 3. sound devices
-> > - I2S for sound bus
-> > - LPASS for sound power control
-> > - Wolfson WM5110 for sound codec
-> > - Maxim MAX98504 for speaker amplifier
-> > - TM2 ASoC Machine device driver node
-> > 
-> > 3. display devices
-> > - DECON, DSI and MIC for the panel output
-> > 
-> > 4. usb devices
-> > - USB 3.0 DRD (Dual Role Device)
-> > - USB 3.0 Host controller
-> > 
-> > 5. storage devices
-> > - MSHC (Mobile Storae Host Controller) for eMMC device
-> 
-> Not fixed. Mobile Storage.
-> 
-> Everything else looks fine, so fix above only if you are going to resend
-> everything. If there won't be resend, I can fix it when applying.
+Hi Marc,
 
-Ah, I saw the kbuild report. The patchset needs a resend fixing this -
-spit the makefile change into two.
+On Tue, Jul 19, 2016 at 9:39 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Patch 19a469a58720 ("drivers/perf: arm-pmu: Handle per-interrupt
+> affinity mask") added support for partitionned PPI setups, but
+> inadvertently broke setups using SPIs without the "interrupt-affinity"
+> property (which is the case for UP platforms).
+>
+> This patch restore the broken functionnality by testing whether the
+> interrupt is percpu or not instead of relying on the using_spi flag
+> that really means "SPI *and* interrupt-affinity property".
+>
+> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Fixes: 19a469a58720 ("drivers/perf: arm-pmu: Handle per-interrupt affinity mask")
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
+kernelci.org detected boot failures on bcm2835-rpi-b in mainline[1]
+and was bisected down to this patch.  I verified that reverting this
+patch on top of mainline gets bcm2835-rpi-b booting again.
 
-Best regards,
-Krzysztof
+I haven't been closely tracking this change, but a quick glance and it
+looks like this platform is possibly missing IRQ properties from its
+PMU node?  The DT for this platform simply has:
+
+        arm-pmu {
+            compatible = "arm,arm1176-pmu";
+        };
+
+Kevin
+
+[1] https://kernelci.org/boot/id/57bb4d9259b514895348b564/
