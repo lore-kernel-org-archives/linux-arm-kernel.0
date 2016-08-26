@@ -1,81 +1,55 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 26 Aug 2016 15:56:41 +0100
-Subject: [PATCH v8 06/18] ARM: STi: DT: STiH407: Add FDMA driver dt nodes.
+Date: Fri, 26 Aug 2016 15:56:46 +0100
+Subject: [PATCH v8 11/18] ARM: DT: STiH407: Add i2s_in pinctrl configuration
 In-Reply-To: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
 References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1472223413-7254-7-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1472223413-7254-12-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These nodes are required to get the fdma driver working
-on STiH407 based silicon.
+This patch adds the pinctrl config for the i2s_in pins
+used by the uniperif reader IP.
 
+Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- arch/arm/boot/dts/stih407-family.dtsi | 52 +++++++++++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+ arch/arm/boot/dts/stih407-pinctrl.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index d294e82..45cab30 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -821,5 +821,57 @@
- 			clock-frequency	= <600000000>;
- 			st,syscfg	= <&syscfg_core 0x224>;
- 		};
+diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+index 0fb5c8a..537db7e 100644
+--- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+@@ -1090,6 +1090,30 @@
+ 				};
+ 			};
+ 
++			i2s_in {
++				pinctrl_i2s_8ch_in: i2s_8ch_in{
++					st,pins {
++						mclk = <&pio32 5 ALT1 IN>;
++						lrclk = <&pio32 7 ALT1 IN>;
++						sclk = <&pio32 6 ALT1 IN>;
++						data0 = <&pio32 4 ALT1 IN>;
++						data1 = <&pio33 0 ALT1 IN>;
++						data2 = <&pio33 1 ALT1 IN>;
++						data3 = <&pio33 2 ALT1 IN>;
++						data4 = <&pio33 3 ALT1 IN>;
++					};
++				};
 +
-+		/* fdma audio */
-+		fdma0: dma-controller at 8e20000 {
-+			compatible = "st,stih407-fdma-mpe31-11", "st,slim-rproc";
-+			reg = <0x8e20000 0x8000>,
-+			      <0x8e30000 0x3000>,
-+			      <0x8e37000 0x1000>,
-+			      <0x8e38000 0x8000>;
-+			reg-names = "slimcore", "dmem", "peripherals", "imem";
-+			clocks = <&clk_s_c0_flexgen CLK_FDMA>,
-+				 <&clk_s_c0_flexgen CLK_EXT2F_A9>,
-+				 <&clk_s_c0_flexgen CLK_EXT2F_A9>,
-+				 <&clk_s_c0_flexgen CLK_EXT2F_A9>;
-+			interrupts = <GIC_SPI 5 IRQ_TYPE_NONE>;
-+			dma-channels = <16>;
-+			#dma-cells = <3>;
-+		};
++				pinctrl_i2s_2ch_in: i2s_2ch_in{
++					st,pins {
++						mclk = <&pio32 5 ALT1 IN>;
++						lrclk = <&pio32 7 ALT1 IN>;
++						sclk = <&pio32 6 ALT1 IN>;
++						data0 = <&pio32 4 ALT1 IN>;
++					};
++				};
++			};
 +
-+		/* fdma app */
-+		fdma1: dma-controller at 8e40000 {
-+			compatible = "st,stih407-fdma-mpe31-12", "st,slim-rproc";
-+			reg = <0x8e40000 0x8000>,
-+			      <0x8e50000 0x3000>,
-+			      <0x8e57000 0x1000>,
-+			      <0x8e58000 0x8000>;
-+			reg-names = "slimcore", "dmem", "peripherals", "imem";
-+			clocks = <&clk_s_c0_flexgen CLK_FDMA>,
-+				<&clk_s_c0_flexgen CLK_TX_ICN_DMU>,
-+				<&clk_s_c0_flexgen CLK_TX_ICN_DMU>,
-+				<&clk_s_c0_flexgen CLK_EXT2F_A9>;
-+
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_NONE>;
-+			dma-channels = <16>;
-+			#dma-cells = <3>;
-+		};
-+
-+		/* fdma free running */
-+		fdma2: dma-controller at 8e60000 {
-+			compatible = "st,stih407-fdma-mpe31-13", "st,slim-rproc";
-+			reg = <0x8e60000 0x8000>,
-+			      <0x8e70000 0x3000>,
-+			      <0x8e77000 0x1000>,
-+			      <0x8e78000 0x8000>;
-+			reg-names = "slimcore", "dmem", "peripherals", "imem";
-+			interrupts = <GIC_SPI 9 IRQ_TYPE_NONE>;
-+			dma-channels = <16>;
-+			#dma-cells = <3>;
-+			clocks = <&clk_s_c0_flexgen CLK_FDMA>,
-+				<&clk_s_c0_flexgen CLK_EXT2F_A9>,
-+				<&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
-+				<&clk_s_c0_flexgen CLK_EXT2F_A9>;
-+		};
- 	};
- };
+ 			serial3 {
+ 				pinctrl_serial3: serial3-0 {
+ 					st,pins {
 -- 
 1.9.1
