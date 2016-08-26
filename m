@@ -1,29 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Aug 2016 15:48:08 +0200
-Subject: [PATCH 3/3] ARM: imx: add SMP support for i.MX7D
-In-Reply-To: <AM3PR04MB13154FA0116D397AABD75E10F5EC0@AM3PR04MB1315.eurprd04.prod.outlook.com>
-References: <1472209971-32469-1-git-send-email-Anson.Huang@nxp.com>
- <20160826111356.GM1041@n2100.armlinux.org.uk>
- <AM3PR04MB13154FA0116D397AABD75E10F5EC0@AM3PR04MB1315.eurprd04.prod.outlook.com>
-Message-ID: <201608261548.08227.arnd@arndb.de>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 26 Aug 2016 15:49:41 +0200
+Subject: [PATCH 3/4] ARM: dts: gose: remove label property from led nodes
+In-Reply-To: <1472219382-22789-1-git-send-email-horms+renesas@verge.net.au>
+References: <1472219382-22789-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1472219382-22789-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 August 2016, Yongcai Huang wrote:
-> > 
-> > It's about time iMX folk learned that "imx*" is a SoC and not a CPU.
-> > It should be "soc_is_imx7d()" because we're wanting to know whether the
-> > SoC is an iMX7D.  The CPU is a _Cortex-A7_.
-> 
-> Agree, I will add a new patch in this patch set to replace all the cpu_is_xxx with
-> Soc_is_xxx.
+Remove label property from led nodes. This seems to have little
+value and is used inconsistently amongst Renesas SoCs.
 
-I recently did a patch to remove all the cpu_is_mx{1,2,3,5}* macros, which ended up
-making the code simpler and more readable in most places. I think we can
-do the same for the cpu_is_imx{6,7}* macros.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7793-gose.dts | 3 ---
+ 1 file changed, 3 deletions(-)
 
-In this instance, the easy alternative is to have a separate smp_operation
-structure for imx7d rather than using the same as imx6 and then figuring
-out at runtime which one you have.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+index 90af18600124..c63213c7a173 100644
+--- a/arch/arm/boot/dts/r8a7793-gose.dts
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -146,15 +146,12 @@
+ 		compatible = "gpio-leds";
+ 		led6 {
+ 			gpios = <&gpio2 19 GPIO_ACTIVE_HIGH>;
+-			label = "LED6";
+ 		};
+ 		led7 {
+ 			gpios = <&gpio2 20 GPIO_ACTIVE_HIGH>;
+-			label = "LED7";
+ 		};
+ 		led8 {
+ 			gpios = <&gpio2 21 GPIO_ACTIVE_HIGH>;
+-			label = "LED8";
+ 		};
+ 	};
+ 
+-- 
+2.7.0.rc3.207.g0ac5344
