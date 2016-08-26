@@ -1,77 +1,29 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 26 Aug 2016 15:56:51 +0100
-Subject: [PATCH v8 16/18] ARM: DT: STi: stihxxx-b2120: Add DT nodes for STi
- audio card
-In-Reply-To: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
-References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1472223413-7254-17-git-send-email-peter.griffin@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 26 Aug 2016 16:29:16 +0100
+Subject: [PATCH v7 10/14] arm64/numa: define numa_distance as array to
+ simplify code
+In-Reply-To: <1472024693-12912-11-git-send-email-thunder.leizhen@huawei.com>
+References: <1472024693-12912-1-git-send-email-thunder.leizhen@huawei.com>
+ <1472024693-12912-11-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <20160826152915.GH30302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the uniperif players 2 & 3 for b2120 boards
-and also adds the "simple-audio-card" device node to interconnect
-the SoC sound device and the codec.
+On Wed, Aug 24, 2016 at 03:44:49PM +0800, Zhen Lei wrote:
+> 1. MAX_NUMNODES is base on CONFIG_NODES_SHIFT, the default value of the
+>    latter is very small now.
+> 2. Suppose the default value of MAX_NUMNODES is enlarged to 64, so the
+>    size of numa_distance is 4K, it's still acceptable if run the Image
+>    on other processors.
+> 3. It will make function __node_distance quicker than before.
+> 
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>  arch/arm64/include/asm/numa.h |  1 -
+>  arch/arm64/mm/numa.c          | 74 +++----------------------------------------
+>  2 files changed, 5 insertions(+), 70 deletions(-)
 
-Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- arch/arm/boot/dts/stihxxx-b2120.dtsi | 45 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+I fail to see the advantages of this patch. Do you have some compelling
+performance figures or something?
 
-diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-index 722c63f..1f64bb6 100644
---- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
-+++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-@@ -131,5 +131,50 @@
- 				dvb-card	= <STV0367_TDA18212_NIMA_1>;
- 			};
- 		};
-+
-+		sti_uni_player2: sti-uni-player at 2 {
-+			status = "okay";
-+		};
-+
-+		sti_uni_player3: sti-uni-player at 3 {
-+			status = "okay";
-+		};
-+
-+		sti_sasg_codec: sti-sasg-codec {
-+			status = "okay";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_spdif_out>;
-+		};
-+
-+		sound {
-+			compatible = "simple-audio-card";
-+			simple-audio-card,name = "sti audio card";
-+			status = "okay";
-+
-+			simple-audio-card,dai-link at 0 {
-+				/* DAC */
-+				format = "i2s";
-+				mclk-fs = <256>;
-+				cpu {
-+					sound-dai = <&sti_uni_player2>;
-+				};
-+
-+				codec {
-+					sound-dai = <&sti_sasg_codec 1>;
-+				};
-+			};
-+			simple-audio-card,dai-link at 1 {
-+				/* SPDIF */
-+				format = "left_j";
-+				mclk-fs = <128>;
-+				cpu {
-+					sound-dai = <&sti_uni_player3>;
-+				};
-+
-+				codec {
-+					sound-dai = <&sti_sasg_codec 0>;
-+				};
-+			};
-+		};
- 	};
- };
--- 
-1.9.1
+Will
