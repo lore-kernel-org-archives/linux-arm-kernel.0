@@ -1,49 +1,77 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 26 Aug 2016 16:03:42 +0100
-Subject: [PATCH] arm64: kernel: Fix unmasked debug exceptions when restoring
- mdscr_el1
-Message-ID: <1472223822-21059-1-git-send-email-james.morse@arm.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri, 26 Aug 2016 15:56:51 +0100
+Subject: [PATCH v8 16/18] ARM: DT: STi: stihxxx-b2120: Add DT nodes for STi
+ audio card
+In-Reply-To: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
+References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1472223413-7254-17-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes to make the resume from cpu_suspend() code behave more like
-secondary boot caused debug exceptions to be unmasked early by
-__cpu_setup(). We then go on to restore mdscr_el1 in cpu_do_resume(),
-potentially taking break or watch points based on uninitialised registers.
+This patch enables the uniperif players 2 & 3 for b2120 boards
+and also adds the "simple-audio-card" device node to interconnect
+the SoC sound device and the codec.
 
-Mask debug exceptions in cpu_do_resume(), which is specific to resume
-from cpu_suspend(). Debug exceptions will be restored to their original
-state by local_dbg_restore() in cpu_suspend(), which runs after
-hw_breakpoint_restore() has re-initialised the other registers.
-
-Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Fixes: cabe1c81ea5b ("arm64: Change cpu_resume() to enable mmu early then access sleep_sp by va")
-Cc: <stable@vger.kernel.org> #4.7
-Signed-off-by: James Morse <james.morse@arm.com>
+Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- arch/arm64/mm/proc.S | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/stihxxx-b2120.dtsi | 45 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 5bb61de23201..9d37e967fa19 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -100,7 +100,16 @@ ENTRY(cpu_do_resume)
- 
- 	msr	tcr_el1, x8
- 	msr	vbar_el1, x9
+diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+index 722c63f..1f64bb6 100644
+--- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
++++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+@@ -131,5 +131,50 @@
+ 				dvb-card	= <STV0367_TDA18212_NIMA_1>;
+ 			};
+ 		};
 +
-+	/*
-+	 * __cpu_setup() cleared MDSCR_EL1.MDE and friends, before unmasking
-+	 * debug exceptions. By restoring MDSCR_EL1 here, we may take a debug
-+	 * exception. Mask them until local_dbg_restore() in cpu_suspend()
-+	 * resets them.
-+	 */
-+	disable_dbg
- 	msr	mdscr_el1, x10
++		sti_uni_player2: sti-uni-player at 2 {
++			status = "okay";
++		};
 +
- 	msr	sctlr_el1, x12
- 	/*
- 	 * Restore oslsr_el1 by writing oslar_el1
++		sti_uni_player3: sti-uni-player at 3 {
++			status = "okay";
++		};
++
++		sti_sasg_codec: sti-sasg-codec {
++			status = "okay";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_spdif_out>;
++		};
++
++		sound {
++			compatible = "simple-audio-card";
++			simple-audio-card,name = "sti audio card";
++			status = "okay";
++
++			simple-audio-card,dai-link at 0 {
++				/* DAC */
++				format = "i2s";
++				mclk-fs = <256>;
++				cpu {
++					sound-dai = <&sti_uni_player2>;
++				};
++
++				codec {
++					sound-dai = <&sti_sasg_codec 1>;
++				};
++			};
++			simple-audio-card,dai-link at 1 {
++				/* SPDIF */
++				format = "left_j";
++				mclk-fs = <128>;
++				cpu {
++					sound-dai = <&sti_uni_player3>;
++				};
++
++				codec {
++					sound-dai = <&sti_sasg_codec 0>;
++				};
++			};
++		};
+ 	};
+ };
 -- 
-2.8.0.rc3
+1.9.1
