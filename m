@@ -1,36 +1,20 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 26 Aug 2016 15:56:53 +0100
-Subject: [PATCH v8 18/18] drm/virtio: kconfig: Fixup white space.
-In-Reply-To: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
-References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1472223413-7254-19-git-send-email-peter.griffin@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 26 Aug 2016 16:59:13 +0200
+Subject: [PATCH 7/8] arm: orion5x: Remove old non-DT-based WNR854T support
+In-Reply-To: <1472203264-21089-8-git-send-email-jm@lentin.co.uk>
+References: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
+ <1472203264-21089-1-git-send-email-jm@lentin.co.uk>
+ <1472203264-21089-8-git-send-email-jm@lentin.co.uk>
+Message-ID: <20160826145913.GL25046@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use tabs instead of spaces.
+On Fri, Aug 26, 2016 at 10:21:03AM +0100, Jamie Lentin wrote:
+> The non-DT-based support is now redundant, remove it and replace it
+> with the DT-support in defconfigs.
+> 
+> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- drivers/gpu/drm/virtio/Kconfig | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-diff --git a/drivers/gpu/drm/virtio/Kconfig b/drivers/gpu/drm/virtio/Kconfig
-index 90357d9..2d83932 100644
---- a/drivers/gpu/drm/virtio/Kconfig
-+++ b/drivers/gpu/drm/virtio/Kconfig
-@@ -2,10 +2,10 @@ config DRM_VIRTIO_GPU
- 	tristate "Virtio GPU driver"
- 	depends on DRM
- 	select VIRTIO
--        select DRM_KMS_HELPER
--        select DRM_TTM
-+	select DRM_KMS_HELPER
-+	select DRM_TTM
- 	help
- 	   This is the virtual GPU driver for virtio.  It can be used with
--           QEMU based VMMs (like KVM or Xen).
-+	   QEMU based VMMs (like KVM or Xen).
- 
- 	   If unsure say M.
--- 
-1.9.1
+    Andrew
