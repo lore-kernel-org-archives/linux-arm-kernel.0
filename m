@@ -1,29 +1,34 @@
-From: Bhaskar.Upadhaya@nxp.com (Bhaskar Upadhaya)
-Date: Fri, 26 Aug 2016 15:57:46 +0530
-Subject: [PATCH 07/10] dt-bindings: thermal: Update bindings for LS1012A
-In-Reply-To: <1472207269-18499-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
-References: <1472207269-18499-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
-Message-ID: <1472207269-18499-7-git-send-email-Bhaskar.Upadhaya@nxp.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 26 Aug 2016 16:35:51 +0100
+Subject: [PATCH v7 14/14] Documentation: remove the constraint on the
+ distances of node pairs
+In-Reply-To: <1472024693-12912-15-git-send-email-thunder.leizhen@huawei.com>
+References: <1472024693-12912-1-git-send-email-thunder.leizhen@huawei.com>
+ <1472024693-12912-15-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <20160826153550.GI30302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
----
- Documentation/devicetree/bindings/thermal/qoriq-thermal.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Wed, Aug 24, 2016 at 03:44:53PM +0800, Zhen Lei wrote:
+> Update documentation. This limit is unneccessary.
+> 
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+>  Documentation/devicetree/bindings/numa.txt | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
+> index 21b3505..c0ea4a7 100644
+> --- a/Documentation/devicetree/bindings/numa.txt
+> +++ b/Documentation/devicetree/bindings/numa.txt
+> @@ -48,7 +48,6 @@ distance (memory latency) between all numa nodes.
+> 
+>    Note:
+>  	1. Each entry represents distance from first node to second node.
+> -	The distances are equal in either direction.
 
-diff --git a/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt b/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
-index 66223d5..8e2b211 100644
---- a/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
-@@ -1,7 +1,7 @@
- * Thermal Monitoring Unit (TMU) on Freescale QorIQ SoCs
- 
- Required properties:
--- compatible : Must include "fsl,qoriq-tmu". The version of the device is
-+- compatible :"fsl,qoriq-tmu", "fsl,ls1012a-tmu". The version of the device is
- 	determined by the TMU IP Block Revision Register (IPBRR0) at
- 	offset 0x0BF8.
- 	Table of correspondences between IPBRR0 values and example  chips:
--- 
-1.9.1
+Hmm, so what happens now if firmware provides a description where both
+distances (in either direction) are supplied, but are different?
+
+Will
