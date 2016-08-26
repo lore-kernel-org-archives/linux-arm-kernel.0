@@ -1,61 +1,36 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 26 Aug 2016 14:08:01 +0100
-Subject: [PATCH v2 9/9] arm64: Work around systems with mismatched cache
- line sizes
-In-Reply-To: <f2ff63f1-9cc7-6930-60eb-5f1fb8fde2e6@arm.com>
-References: <1472203398-8751-1-git-send-email-suzuki.poulose@arm.com>
- <1472203398-8751-10-git-send-email-suzuki.poulose@arm.com>
- <CAKv+Gu_AyrQLdjf+1-QuZu3k2goT-_6Dk5mQbvP6XSmu30V4cQ@mail.gmail.com>
- <f2ff63f1-9cc7-6930-60eb-5f1fb8fde2e6@arm.com>
-Message-ID: <f72be21a-fd67-dc30-ca1b-278dd99821a2@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 26 Aug 2016 14:12:43 +0100
+Subject: [PATCH 00/10] PM / Domains: Add support for removing PM domains
+In-Reply-To: <1471340976-5379-1-git-send-email-jonathanh@nvidia.com>
+References: <1471340976-5379-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <fd3ea080-2ec5-e22d-b0cc-8cdc4155af3c@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/08/16 14:04, Suzuki K Poulose wrote:
-> On 26/08/16 12:03, Ard Biesheuvel wrote:
->> Hello Suzuki,
->>
->
->
->>> For faster access (i.e, avoiding to lookup the system wide value of CTR_EL0
->>> via read_system_reg), we keep track of the pointer to table entry for
->>> CTR_EL0 in the CPU feature infrastructure.
->>>
->>
->> IIUC it is the runtime sorting of the arm64_ftr_reg array that
->> requires you to stash a pointer to CTR_EL0's entry somewhere, so that
->> you can dereference it without doing the bsearch.
->
-> Correct.
+Hi Ulf,
 
+On 16/08/16 10:49, Jon Hunter wrote:
+> In order to safely remove PM domains there are a few changes that need to be
+> made to ensure that no one is holding an external reference to a PM domain
+> after it has been removed. One solution, implemented here, solves this by
+> eliminating external references to PM domain.
+> 
+> This is a follow-up to the initial RFC I sent out [0].
+> 
+> Changes from initial RFC:
+> - Renamed functions made static per Ulf's feedback.
+> - Added patch to clean-up provider/xlate APIs per Ulf's feedback
+> - Re-worked and simplified the association between PM domains and PM
+>   domain providers. Dropped the 'provider_data' variable from the
+>   generic_pm_domain structure in favour of using the fwnode_handle.
+> - Split patch for removing PM domains into multiple patches per Ulf's
+>   feedback.
 
+Let me know if you have any feedback on this. Please note I will be out
+next week.
 
->
->>
->> IMO, this is a pattern that we should avoid: you are introducing one
->> instance now, which will make it hard to say no to the next one in the
->> future. Isn't there a better way to organize the arm64_ftr_reg array
->> that allows us to reference entries directly? Ideally, a way that gets
->> rid of the runtime sorting, since I don't think that is a good
->> replacement for developer discipline anyway (although I should have
->> spoken up when that was first introduced) Or am I missing something
->> here?
->
-> I had some form of direct access to the feature register in one of
-> the versions [0], but was dropped based on Catalin's suggestion at [1].
+Cheers
+Jon
 
-Forgot to add, [0] wouldn't solve this issue cleanly either. It would simply
-speed up the read_system_reg(). So we do need a call to read_system_reg()
-from assembly code, which makes it a little bit tricky.
-
-Suzuki
-
->
->
-> [0] https://lkml.org/lkml/2015/10/5/504
-> [1] https://lkml.org/lkml/2015/10/7/558
->
->
-> Suzuki
->
->
+-- 
+nvpublic
