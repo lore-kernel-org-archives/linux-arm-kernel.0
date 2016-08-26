@@ -1,62 +1,43 @@
-From: zach.brown@ni.com (Zach Brown)
-Date: Thu, 25 Aug 2016 18:01:50 -0500
-Subject: [PATCH v2 1/2] sdhci-of-arasan: Modify arasan sdhci documentation
- about broken-cd and non-removable properties.
-Message-ID: <1472166111-28872-1-git-send-email-zach.brown@ni.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Fri, 26 Aug 2016 08:00:44 +0800
+Subject: [PATCH] arm64: dts: rockchip: set to CCI clock of RK3399 to 600M
+Message-ID: <1472169644-32560-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sdhci controller on xilinx zynq devices will not function unless
-the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
-In cases where it is impossible to provide the CD bit in hardware,
-setting the controller to test mode and then setting inserted to true
-will get the controller to function without the CD bit.
+From: Shunqian Zheng <zhengsq@rock-chips.com>
 
-Additionally in some situations it will make sense to use the
-"broken-cd" and "non-removable" property together.
-i.e the sd device is non-removable so polling doesn't make sense, but
-the CD is broken and the controller will need to be in test mode to
-function.
+Per testing, this can reduce the memory latency and d8 gets
+better socres.
 
-This patch modifies the documentation to reflect those differences
-from the standard behaviours.
-
-Signed-off-by: Zach Brown <zach.brown@ni.com>
+Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 ---
-v2:
-  * improved commit messages
-  * removed fake-cd device property
-  * removed fake-cd quirk
-  * use broken-cd device property
-  * documented new usage of broken-cd
 
- Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-index 3404afa..b41c448 100644
---- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-+++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-@@ -37,6 +37,14 @@ Optional Properties:
-     in place we will export a clock representing the Card Clock.  This clock
-     is expected to be consumed by our PHY.  You must also specify
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index bc86e8c..962f65d 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -935,7 +935,7 @@
+ 			<&cru ACLK_PERIHP>, <&cru HCLK_PERIHP>,
+ 			<&cru PCLK_PERIHP>,
+ 			<&cru ACLK_PERILP0>, <&cru HCLK_PERILP0>,
+-			<&cru PCLK_PERILP0>,
++			<&cru PCLK_PERILP0>, <&cru ACLK_CCI>,
+ 			<&cru HCLK_PERILP1>, <&cru PCLK_PERILP1>;
+ 		assigned-clock-rates =
+ 			 <594000000>,  <800000000>,
+@@ -943,7 +943,7 @@
+ 			 <150000000>,   <75000000>,
+ 			  <37500000>,
+ 			 <100000000>,  <100000000>,
+-			  <50000000>,
++			  <50000000>, <600000000>,
+ 			 <100000000>,   <50000000>;
+ 	};
  
-+Card detection:
-+The arasan controller does not work
-+when the CD bit is not supplied unless in test mode.
-+- broken-cd: The CD bit is not supplied and the controller will
-+  need to be set to test mode to function.
-+- non-removable: like normal, except it can now be partnered with
-+  broken-cd, which will turn off polling, but keep test mode on.
-+
- Example:
- 	sdhci at e0100000 {
- 		compatible = "arasan,sdhci-8.9a";
-@@ -72,4 +80,4 @@ Example:
- 		phy-names = "phy_arasan";
- 		#clock-cells = <0>;
- 		status = "disabled";
--	};
-+	} ;
 -- 
-2.7.4
+1.9.1
