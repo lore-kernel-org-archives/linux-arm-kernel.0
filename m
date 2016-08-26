@@ -1,110 +1,130 @@
-From: anson.huang@nxp.com (Yongcai Huang)
-Date: Fri, 26 Aug 2016 03:33:58 +0000
-Subject: [PATCH] ARM: imx: add cpuidle support for i.mx6ul
-In-Reply-To: <CAL411-rVg6HHj=MoZ32tK6QoioehPKjbu71mHr1c4QCoD8mXCQ@mail.gmail.com>
-References: <1472055231-28434-1-git-send-email-Anson.Huang@nxp.com>
- <CAL411-rVg6HHj=MoZ32tK6QoioehPKjbu71mHr1c4QCoD8mXCQ@mail.gmail.com>
-Message-ID: <DB5PR04MB13201BA49DEDCD7D03910C42F5EC0@DB5PR04MB1320.eurprd04.prod.outlook.com>
+From: mirza.krak@gmail.com (Mirza Krak)
+Date: Fri, 26 Aug 2016 06:53:59 +0200
+Subject: [PATCH v2 3/6] dt/bindings: Add bindings for Tegra GMI controller
+In-Reply-To: <CALw8SCVcPymDZ8NyUbeanRF0TCT1TZzL6iRDticYA42FWrEWqw@mail.gmail.com>
+References: <1472045838-22628-1-git-send-email-mirza.krak@gmail.com>
+ <1472045838-22628-4-git-send-email-mirza.krak@gmail.com>
+ <de2fb909-829e-6c04-4f6a-442cbb9171c9@nvidia.com>
+ <CALw8SCVcPymDZ8NyUbeanRF0TCT1TZzL6iRDticYA42FWrEWqw@mail.gmail.com>
+Message-ID: <CALw8SCWtTvWGmKru2MX7T7sFpoUpD-V400+w2nPkxaFB5WUKSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2016-08-24 21:54 GMT+02:00 Mirza Krak <mirza.krak@gmail.com>:
+> 2016-08-24 17:56 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
+> +
+>>> +Example with two SJA1000 CAN controllers connected to the GMI bus. We wrap the
+>>> +controllers with a simple-bus node since they are all connected to the same
+>>> +chip-select (CS4), in this example external address decoding is provided:
+>>> +
+>>> +gmi at 70090000 {
+>>> +     compatible = "nvidia,tegra20-gmi";
+>>> +     reg = <0x70009000 0x1000>;
+>>> +     #address-cells = <1>;
+>>> +     #size-cells = <1>;
+>>> +     clocks = <&tegra_car TEGRA20_CLK_NOR>;
+>>> +     clock-names = "gmi";
+>>> +     resets = <&tegra_car 42>;
+>>> +     reset-names = "gmi";
+>>> +     ranges = <4 0x48000000 0x7ffffff>;
+>>> +
+>>> +     status = "disabled";
+>>> +
+>>> +     bus at 4 {
+>>> +             compatible = "simple-bus";
+>>> +             reg = <4>;
+>>> +             #address-cells = <1>;
+>>> +             #size-cells = <1>;
+>>> +             ranges = <0 4 0x40100>;
+>>
+>> Does this work? I tried to add an example like this and I got ...
+>>
+>> Warning (reg_format): "reg" property in /gmi at 70009000/bus at 4 has invalid
+>> length (4 bytes) (#address-cells == 1, #size-cells == 1)
+>
+> Shoot, to get rid of the warning it should be
+>
+> reg = <4 0 >;
+>
+> But it works either way.
+>
+>>
+>> I am wondering if we should just following the arm,pl172 example and
+>> have ...
+>>
+>>         cs4 {
+>>                 compatible = "simple-bus";
+>>                 #address-cells = <1>;
+>>                 #size-cells = <1>;
+>>                 ranges;
+>>
+>>                 nvidia,snor-cs = <4>;
+>>                 nvidia,snor-mux-mode;
+>>                 nvidia,snor-adv-inv;
+>>
+>>                 can at 0 {
+>>                         reg = <0 0x100>;
+>>                         ...
+>>                 };
+>>
+>>                 ...
+>>         };
+>>
+>
+> That means to go back to V1 really (almost :)). Which I do not mind.
+> Will give it a test run.
+>
+> But I am a little hesitant if will be any better/cleaner. In your example above:
+>
+> can at 0 {
+>          reg = <0 0x100>;
+>          ...
+> };
+>
+> Would this really translate correctly? In the pl172 example they have
+> multiple ranges and address with "flash at 0,0" which a range defined in
+> parent node. "can at 0" does not have valid match in parent node in our
+> example. So I probably need add some more logic for it to properly
+> translate.
+>
+> I have an idea which is following:
+>
+> gmi at 70090000 {
+>          status = "okay";
+>          #address-cells = <2>;
+>          #size-cells = <1>;
+>          ranges = <4 0 0x48000000 0x00040000>;
+>
+>          cs4 {
+>                  compatible = "simple-bus";
+>                  #address-cells = <2>;
+>                  #size-cells = <1>;
+>                  ranges;
+>
+>                  nvidia,snor-cs = <4>;
+>                  nvidia,snor-mux-mode;
+>                  nvidia,snor-adv-inv;
+>
+>                  can at 0 {
+>                          compatible = "nxp,sja1000";
+>                          reg = <4 0 0x100>;
+>                          ...
+>                  };
+>
+>
+>                  can at 40000 {
+>                          compatible = "nxp,sja1000";
+>                          reg = <4 0x40000 0x100>;
+>                          ...
+>                  };
+>          };
+> };
+>
+> Do not know if above will work at all (not able to test at current
+> location), anyway I will play around with it some more and get back to
+> you.
 
+Gave above a test run and it works like a charm. Are we happy with that?
 
-Best Regards!
-Anson Huang
-
-
-
-> -----Original Message-----
-> From: Peter Chen [mailto:hzpeterchen at gmail.com]
-> Sent: 2016-08-25 3:09 PM
-> To: Yongcai Huang <anson.huang@nxp.com>
-> Cc: linux-arm-kernel at lists.infradead.org; lkml <linux-kernel@vger.kernel.org>;
-> Fabio Estevam <fabio.estevam@nxp.com>; shawnguo at kernel.org;
-> linux at armlinux.org.uk; kernel at pengutronix.de
-> Subject: Re: [PATCH] ARM: imx: add cpuidle support for i.mx6ul
-> 
-> >
-> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> > ---
-> >  arch/arm/mach-imx/cpuidle-imx6sx.c | 10 ++++++++++
-> >  arch/arm/mach-imx/mach-imx6ul.c    |  3 +++
-> >  2 files changed, 13 insertions(+)
-> >
-> > diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c
-> > b/arch/arm/mach-imx/cpuidle-imx6sx.c
-> > index 41cdce6..b4fcc8ae 100644
-> > --- a/arch/arm/mach-imx/cpuidle-imx6sx.c
-> > +++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
-> > @@ -9,14 +9,21 @@
-> >  #include <linux/cpuidle.h>
-> >  #include <linux/cpu_pm.h>
-> >  #include <linux/module.h>
-> > +#include <linux/of.h>
-> > +#include <asm/cacheflush.h>
-> >  #include <asm/cpuidle.h>
-> >  #include <asm/suspend.h>
-> >
-> >  #include "common.h"
-> >  #include "cpuidle.h"
-> >
-> > +static bool pl310_available;
-> > +
-> 
-> 
-> >  static int imx6sx_idle_finish(unsigned long val)  {
-> > +       /* check if need to flush internal L2 cache */
-> > +       if (!pl310_available)
-> 
-> Just wondering why you need an extra variable here?
-> Calling of_find_compatible_node takes long time at that time?
-> 
-> Peter
-> 
-
-Because cpu idle enter/exit is called very frequently, so calling
-of_find_compatible_node in every cpu idle thread is adding too
-many latency, I think adding a variable is better.
-
-Anson
-
-> > +               flush_cache_all();
-> >         cpu_do_idle();
-> >
-> >         return 0;
-> > @@ -101,5 +108,8 @@ int __init imx6sx_cpuidle_init(void)
-> >         imx_gpc_set_arm_power_up_timing(2, 1);
-> >         imx_gpc_set_arm_power_down_timing(1, 1);
-> >
-> > +       if (of_find_compatible_node(NULL, NULL, "arm,pl310-cache"))
-> > +               pl310_available = true;
-> > +
-> >         return cpuidle_register(&imx6sx_cpuidle_driver, NULL);  } diff
-> > --git a/arch/arm/mach-imx/mach-imx6ul.c
-> > b/arch/arm/mach-imx/mach-imx6ul.c index c2cd61c..9c5e8f3 100644
-> > --- a/arch/arm/mach-imx/mach-imx6ul.c
-> > +++ b/arch/arm/mach-imx/mach-imx6ul.c
-> > @@ -16,6 +16,7 @@
-> >  #include <asm/mach/map.h>
-> >
-> >  #include "common.h"
-> > +#include "cpuidle.h"
-> >
-> >  static void __init imx6ul_enet_clk_init(void)  { @@ -80,6 +81,8 @@
-> > static void __init imx6ul_init_irq(void)
-> >
-> >  static void __init imx6ul_init_late(void)  {
-> > +       imx6sx_cpuidle_init();
-> > +
-> >         if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
-> >                 imx6_pm_opp_init();
-> >                 platform_device_register_simple("imx6q-cpufreq", -1,
-> > NULL, 0);
-> > --
-> > 1.9.1
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Best Regards
+Mirza
