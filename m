@@ -1,71 +1,55 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 26 Aug 2016 10:22:13 +0100
-Subject: [PATCH 2/2] arm64: Use static keys for CPU features
-In-Reply-To: <1472145992-10660-3-git-send-email-catalin.marinas@arm.com>
-References: <1472145992-10660-1-git-send-email-catalin.marinas@arm.com>
- <1472145992-10660-3-git-send-email-catalin.marinas@arm.com>
-Message-ID: <f690f532-a05e-5c13-6b97-b94203701d3d@arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 26 Aug 2016 10:23:10 +0100
+Subject: [PATCH v2 1/9] arm64: Set the safe value for L1 icache policy
+In-Reply-To: <1472203398-8751-1-git-send-email-suzuki.poulose@arm.com>
+References: <1472203398-8751-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1472203398-8751-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/08/16 18:26, Catalin Marinas wrote:
-> This patch adds static keys transparently for all the cpu_hwcaps
-> features by implementing an array of default-false static keys and
-> enabling them when detected. The cpus_have_cap() check uses the static
-> keys if the feature being checked is a constant, otherwise the compiler
-> generates the bitmap test.
->
-> Because of the early call to static_branch_enable() via
-> check_local_cpu_errata() -> update_cpu_capabilities(), the jump labels
-> are initialised in cpuinfo_store_boot_cpu().
->
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Suzuki K. Poulose <Suzuki.Poulose@arm.com>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
+Right now we use 0 as the safe value for CTR_EL0:L1Ip, which is
+not defined at the moment. The safer value for the L1Ip should be
+the weakest of the policies, which happens to be AIVIVT. While at it,
+fix the comment about safe_val.
 
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/include/asm/cpufeature.h | 2 +-
+ arch/arm64/kernel/cpufeature.c      | 5 +++--
+ 2 files changed, 4 insertions(+), 3 deletions(-)
 
->  static inline int __attribute_const__
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 62272eac1352..919b2d0d68ae 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -46,6 +46,9 @@ unsigned int compat_elf_hwcap2 __read_mostly;
->
->  DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
->
-> +DEFINE_STATIC_KEY_ARRAY_FALSE(cpu_hwcap_keys, ARM64_NCAPS);
-> +EXPORT_SYMBOL(cpu_hwcap_keys);
-> +
->  #define __ARM64_FTR_BITS(SIGNED, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
->  	{						\
->  		.sign = SIGNED,				\
-> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> index ed1b84fe6925..6a141e399daf 100644
-> --- a/arch/arm64/kernel/cpuinfo.c
-> +++ b/arch/arm64/kernel/cpuinfo.c
-> @@ -377,6 +377,12 @@ void cpuinfo_store_cpu(void)
->  void __init cpuinfo_store_boot_cpu(void)
->  {
->  	struct cpuinfo_arm64 *info = &per_cpu(cpu_data, 0);
-> +
-> +	/*
-> +	 * Initialise the static keys early as they may be enabled by
-> +	 * check_local_cpu_errata() -> update_cpu_capabilities().
-> +	 */
-> +	jump_label_init();
->  	__cpuinfo_store_cpu(info);
-
-Catalin,
-
-Just a heads up. I have a patch [1] which moves the "check_local_cpu_errata()"
-around to smp_prepare_boot_cpu(). This patch should still work fine with that
-case. Only that may be we could move the jump_lable_init() to smp_prepare_boot_cpu(),
-before we call "update_cpu_errata_work_arounds()" for Boot CPU.
-
-Either way, this will be useful for some of the other feature checks.
-
-Thanks
-Suzuki
-
-[1] https://lkml.kernel.org/r/1471525832-21209-4-git-send-email-suzuki.poulose at arm.com
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 7099f26..f6f5e49 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -63,7 +63,7 @@ struct arm64_ftr_bits {
+ 	enum ftr_type	type;
+ 	u8		shift;
+ 	u8		width;
+-	s64		safe_val; /* safe value for discrete features */
++	s64		safe_val; /* safe value for FTR_EXACT features */
+ };
+ 
+ /*
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 62272ea..43f73e0 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -147,9 +147,10 @@ static struct arm64_ftr_bits ftr_ctr[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 1),	/* DminLine */
+ 	/*
+ 	 * Linux can handle differing I-cache policies. Userspace JITs will
+-	 * make use of *minLine
++	 * make use of *minLine.
++	 * If we have differing I-cache policies, report it as the weakest - AIVIVT.
+ 	 */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, 14, 2, 0),	/* L1Ip */
++	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, 14, 2, ICACHE_POLICY_AIVIVT),	/* L1Ip */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 10, 0),	/* RAZ */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* IminLine */
+ 	ARM64_FTR_END,
+-- 
+2.7.4
