@@ -1,24 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 26 Aug 2016 08:24:49 -0700
-Subject: [PATCH] ARM: dts: am335x-wega: Add audio support
-In-Reply-To: <7109f6e5-e7fd-4b60-98b7-85b9d78ef690@ti.com>
-References: <1470841935-14190-1-git-send-email-s.mueller-klieser@phytec.de>
- <7109f6e5-e7fd-4b60-98b7-85b9d78ef690@ti.com>
-Message-ID: <20160826152449.qmlrro3ka3vvh266@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 26 Aug 2016 16:28:06 +0100
+Subject: [PATCH] arm64: Enable HIBERNATION in defconfig
+Message-ID: <1472225286-22032-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [160811 02:26]:
-> On 08/10/16 18:12, Stefan M?ller-Klieser wrote:
-> > The wega board has a TLV320AIC3007 connected via McASP0. In the default
-> > configuration, no external crystal is mounted. We run a system clock of
-> > 25 MHz, so we use the audio codec PLL for audio clock generation.
-> 
-> It is great that the "ti,da830-evm-audio" works for you. I hope I will have
-> time soon to work on the McASP driver's CCF support in the near future.
-> 
-> Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+This patch adds CONFIG_HIBERNATION to the arm64 defconfig.
 
-Applying into omap-for-v4.9/dt thanks.
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
 
-Tony
+Trivial patch, please apply it when you think it's appropriate.
+
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index eadf4855ad2d..91a7592029e3 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -80,6 +80,7 @@ CONFIG_KEXEC=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+ CONFIG_COMPAT=y
+ CONFIG_CPU_IDLE=y
++CONFIG_HIBERNATION=y
+ CONFIG_ARM_CPUIDLE=y
+ CONFIG_CPU_FREQ=y
+ CONFIG_ARM_BIG_LITTLE_CPUFREQ=y
