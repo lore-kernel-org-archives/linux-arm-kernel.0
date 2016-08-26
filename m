@@ -1,190 +1,110 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Fri, 26 Aug 2016 19:12:51 +0800
-Subject: [PATCH 3/3] ARM: imx: add SMP support for i.MX7D
-In-Reply-To: <1472209971-32469-1-git-send-email-Anson.Huang@nxp.com>
-References: <1472209971-32469-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1472209971-32469-4-git-send-email-Anson.Huang@nxp.com>
+From: anson.huang@nxp.com (Yongcai Huang)
+Date: Fri, 26 Aug 2016 03:33:58 +0000
+Subject: [PATCH] ARM: imx: add cpuidle support for i.mx6ul
+In-Reply-To: <CAL411-rVg6HHj=MoZ32tK6QoioehPKjbu71mHr1c4QCoD8mXCQ@mail.gmail.com>
+References: <1472055231-28434-1-git-send-email-Anson.Huang@nxp.com>
+ <CAL411-rVg6HHj=MoZ32tK6QoioehPKjbu71mHr1c4QCoD8mXCQ@mail.gmail.com>
+Message-ID: <DB5PR04MB13201BA49DEDCD7D03910C42F5EC0@DB5PR04MB1320.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX7D has 2 cortex-a7 ARM core, add support for
-booting up SMP kernel with 2 CPUs.
 
-The existing i.MX SMP code is designed for i.MX6
-series SoCs which have cortex-a9 ARM core, but i.MX7D
-has 2 cortex-a7 ARM core, so we need to add runtime
-check for those differences between cortex-a9 and
-cortex-a7.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- arch/arm/mach-imx/headsmp.S    | 11 +++++++++++
- arch/arm/mach-imx/mach-imx7d.c |  2 ++
- arch/arm/mach-imx/platsmp.c    | 19 ++++++++++++++++++-
- arch/arm/mach-imx/src.c        | 38 ++++++++++++++++++++++++++++++--------
- 4 files changed, 61 insertions(+), 9 deletions(-)
+Best Regards!
+Anson Huang
 
-diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
-index 6c28d28..a26e459 100644
---- a/arch/arm/mach-imx/headsmp.S
-+++ b/arch/arm/mach-imx/headsmp.S
-@@ -26,7 +26,18 @@ diag_reg_offset:
- 	.endm
- 
- ENTRY(v7_secondary_startup)
-+	.word	0xc070			@ 0xc07 is cortex-a7 id
-+	.word	0xfff0			@ mask for core type
-+
- ARM_BE8(setend be)			@ go BE8 if entered LE
-+	mrc     p15, 0, r0, c0, c0, 0
-+	adr	r1, v7_secondary_startup
-+	ldr	r2, [r1]
-+	ldr	r3, [r1, #0x4]
-+	and     r0, r0, r3
-+	cmp     r0, r2
-+	beq     secondary_startup
-+
- 	set_diag_reg
- 	b	secondary_startup
- ENDPROC(v7_secondary_startup)
-diff --git a/arch/arm/mach-imx/mach-imx7d.c b/arch/arm/mach-imx/mach-imx7d.c
-index 26ca744..ef3dce6 100644
---- a/arch/arm/mach-imx/mach-imx7d.c
-+++ b/arch/arm/mach-imx/mach-imx7d.c
-@@ -99,6 +99,7 @@ static void __init imx7d_init_machine(void)
- 
- static void __init imx7d_init_irq(void)
- {
-+	imx_gpcv2_check_dt();
- 	imx_init_revision_from_anatop();
- 	imx_src_init();
- 	irqchip_init();
-@@ -111,6 +112,7 @@ static const char *const imx7d_dt_compat[] __initconst = {
- };
- 
- DT_MACHINE_START(IMX7D, "Freescale i.MX7 Dual (Device Tree)")
-+	.smp		= smp_ops(imx_smp_ops),
- 	.init_irq	= imx7d_init_irq,
- 	.init_machine	= imx7d_init_machine,
- 	.dt_compat	= imx7d_dt_compat,
-diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
-index 711dbbd..63af911 100644
---- a/arch/arm/mach-imx/platsmp.c
-+++ b/arch/arm/mach-imx/platsmp.c
-@@ -60,8 +60,17 @@ static int imx_boot_secondary(unsigned int cpu, struct task_struct *idle)
- static void __init imx_smp_init_cpus(void)
- {
- 	int i, ncores;
-+	unsigned long val, arch_type;
- 
--	ncores = scu_get_core_count(scu_base);
-+	asm volatile("mrc p15, 0, %0, c0, c0, 0" : "=r" (arch_type));
-+
-+	if (((arch_type >> 4) & 0xfff) == 0xc07) {
-+		/* cortex-a7 core number is in bit[25:24] of CP15 L2CTLR */
-+		asm volatile("mrc p15, 1, %0, c9, c0, 2" : "=r" (val));
-+		ncores = ((val >> 24) & 0x3) + 1;
-+	} else {
-+		ncores = scu_get_core_count(scu_base);
-+	}
- 
- 	for (i = ncores; i < NR_CPUS; i++)
- 		set_cpu_possible(i, false);
-@@ -74,6 +83,14 @@ void imx_smp_prepare(void)
- 
- static void __init imx_smp_prepare_cpus(unsigned int max_cpus)
- {
-+	unsigned long arch_type;
-+
-+	asm volatile("mrc p15, 0, %0, c0, c0, 0" : "=r" (arch_type));
-+
-+	/* no need for cortex-a7 */
-+	if (((arch_type >> 4) & 0xfff) == 0xc07)
-+		return;
-+
- 	imx_smp_prepare();
- 
- 	/*
-diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
-index 70b083f..1fda72a 100644
---- a/arch/arm/mach-imx/src.c
-+++ b/arch/arm/mach-imx/src.c
-@@ -18,6 +18,7 @@
- #include <linux/smp.h>
- #include <asm/smp_plat.h>
- #include "common.h"
-+#include "hardware.h"
- 
- #define SRC_SCR				0x000
- #define SRC_GPR1			0x020
-@@ -30,6 +31,15 @@
- #define BP_SRC_SCR_CORE1_RST		14
- #define BP_SRC_SCR_CORE1_ENABLE		22
- 
-+/* below are for i.MX7D */
-+#define SRC_GPR1_V2                     0x074
-+#define SRC_A7RCR0                      0x004
-+#define SRC_A7RCR1                      0x008
-+#define SRC_M4RCR                       0x00C
-+
-+#define BP_SRC_A7RCR0_A7_CORE_RESET0   0
-+#define BP_SRC_A7RCR1_A7_CORE1_ENABLE  1
-+
- static void __iomem *src_base;
- static DEFINE_SPINLOCK(scr_lock);
- 
-@@ -87,12 +97,21 @@ void imx_enable_cpu(int cpu, bool enable)
- 	u32 mask, val;
- 
- 	cpu = cpu_logical_map(cpu);
--	mask = 1 << (BP_SRC_SCR_CORE1_ENABLE + cpu - 1);
- 	spin_lock(&scr_lock);
--	val = readl_relaxed(src_base + SRC_SCR);
--	val = enable ? val | mask : val & ~mask;
--	val |= 1 << (BP_SRC_SCR_CORE1_RST + cpu - 1);
--	writel_relaxed(val, src_base + SRC_SCR);
-+	if (cpu_is_imx7d()) {
-+		if (enable)
-+			imx_gpcv2_set_core1_pdn_pup_by_software(false);
-+		mask = 1 << (BP_SRC_A7RCR1_A7_CORE1_ENABLE + cpu - 1);
-+		val = readl_relaxed(src_base + SRC_A7RCR1);
-+		val = enable ? val | mask : val & ~mask;
-+		writel_relaxed(val, src_base + SRC_A7RCR1);
-+	} else {
-+		mask = 1 << (BP_SRC_SCR_CORE1_ENABLE + cpu - 1);
-+		val = readl_relaxed(src_base + SRC_SCR);
-+		val = enable ? val | mask : val & ~mask;
-+		val |= 1 << (BP_SRC_SCR_CORE1_RST + cpu - 1);
-+		writel_relaxed(val, src_base + SRC_SCR);
-+	}
- 	spin_unlock(&scr_lock);
- }
- 
-@@ -100,19 +119,22 @@ void imx_set_cpu_jump(int cpu, void *jump_addr)
- {
- 	cpu = cpu_logical_map(cpu);
- 	writel_relaxed(virt_to_phys(jump_addr),
--		       src_base + SRC_GPR1 + cpu * 8);
-+		       src_base + (cpu_is_imx7d() ?
-+		       SRC_GPR1_V2 : SRC_GPR1) + cpu * 8);
- }
- 
- u32 imx_get_cpu_arg(int cpu)
- {
- 	cpu = cpu_logical_map(cpu);
--	return readl_relaxed(src_base + SRC_GPR1 + cpu * 8 + 4);
-+	return readl_relaxed(src_base + (cpu_is_imx7d() ?
-+		SRC_GPR1_V2 : SRC_GPR1) + cpu * 8 + 4);
- }
- 
- void imx_set_cpu_arg(int cpu, u32 arg)
- {
- 	cpu = cpu_logical_map(cpu);
--	writel_relaxed(arg, src_base + SRC_GPR1 + cpu * 8 + 4);
-+	writel_relaxed(arg, src_base + (cpu_is_imx7d() ?
-+		SRC_GPR1_V2 : SRC_GPR1) + cpu * 8 + 4);
- }
- 
- void __init imx_src_init(void)
--- 
-1.9.1
+
+
+> -----Original Message-----
+> From: Peter Chen [mailto:hzpeterchen at gmail.com]
+> Sent: 2016-08-25 3:09 PM
+> To: Yongcai Huang <anson.huang@nxp.com>
+> Cc: linux-arm-kernel at lists.infradead.org; lkml <linux-kernel@vger.kernel.org>;
+> Fabio Estevam <fabio.estevam@nxp.com>; shawnguo at kernel.org;
+> linux at armlinux.org.uk; kernel at pengutronix.de
+> Subject: Re: [PATCH] ARM: imx: add cpuidle support for i.mx6ul
+> 
+> >
+> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> > ---
+> >  arch/arm/mach-imx/cpuidle-imx6sx.c | 10 ++++++++++
+> >  arch/arm/mach-imx/mach-imx6ul.c    |  3 +++
+> >  2 files changed, 13 insertions(+)
+> >
+> > diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c
+> > b/arch/arm/mach-imx/cpuidle-imx6sx.c
+> > index 41cdce6..b4fcc8ae 100644
+> > --- a/arch/arm/mach-imx/cpuidle-imx6sx.c
+> > +++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
+> > @@ -9,14 +9,21 @@
+> >  #include <linux/cpuidle.h>
+> >  #include <linux/cpu_pm.h>
+> >  #include <linux/module.h>
+> > +#include <linux/of.h>
+> > +#include <asm/cacheflush.h>
+> >  #include <asm/cpuidle.h>
+> >  #include <asm/suspend.h>
+> >
+> >  #include "common.h"
+> >  #include "cpuidle.h"
+> >
+> > +static bool pl310_available;
+> > +
+> 
+> 
+> >  static int imx6sx_idle_finish(unsigned long val)  {
+> > +       /* check if need to flush internal L2 cache */
+> > +       if (!pl310_available)
+> 
+> Just wondering why you need an extra variable here?
+> Calling of_find_compatible_node takes long time at that time?
+> 
+> Peter
+> 
+
+Because cpu idle enter/exit is called very frequently, so calling
+of_find_compatible_node in every cpu idle thread is adding too
+many latency, I think adding a variable is better.
+
+Anson
+
+> > +               flush_cache_all();
+> >         cpu_do_idle();
+> >
+> >         return 0;
+> > @@ -101,5 +108,8 @@ int __init imx6sx_cpuidle_init(void)
+> >         imx_gpc_set_arm_power_up_timing(2, 1);
+> >         imx_gpc_set_arm_power_down_timing(1, 1);
+> >
+> > +       if (of_find_compatible_node(NULL, NULL, "arm,pl310-cache"))
+> > +               pl310_available = true;
+> > +
+> >         return cpuidle_register(&imx6sx_cpuidle_driver, NULL);  } diff
+> > --git a/arch/arm/mach-imx/mach-imx6ul.c
+> > b/arch/arm/mach-imx/mach-imx6ul.c index c2cd61c..9c5e8f3 100644
+> > --- a/arch/arm/mach-imx/mach-imx6ul.c
+> > +++ b/arch/arm/mach-imx/mach-imx6ul.c
+> > @@ -16,6 +16,7 @@
+> >  #include <asm/mach/map.h>
+> >
+> >  #include "common.h"
+> > +#include "cpuidle.h"
+> >
+> >  static void __init imx6ul_enet_clk_init(void)  { @@ -80,6 +81,8 @@
+> > static void __init imx6ul_init_irq(void)
+> >
+> >  static void __init imx6ul_init_late(void)  {
+> > +       imx6sx_cpuidle_init();
+> > +
+> >         if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
+> >                 imx6_pm_opp_init();
+> >                 platform_device_register_simple("imx6q-cpufreq", -1,
+> > NULL, 0);
+> > --
+> > 1.9.1
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
