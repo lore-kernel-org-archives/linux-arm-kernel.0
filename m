@@ -1,88 +1,52 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 26 Aug 2016 12:08:08 +0200
-Subject: [PATCH v2] efi: arm64: treat regions with WT/WC set but WB
- cleared as memory
-In-Reply-To: <57C00FA7.8010908@arm.com>
-References: <1472141829-12026-1-git-send-email-ard.biesheuvel@linaro.org>
- <57C00FA7.8010908@arm.com>
-Message-ID: <CAKv+Gu8-u7bqEj3Y9N0W0xogRM7t6rzxcY=Of2HHHzhKjo59Dg@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 26 Aug 2016 12:09:38 +0200 (CEST)
+Subject: [PATCH v5 1/3] cpu/hotplug: Allow suspend/resume CPU to be
+ specified
+In-Reply-To: <20160826093241.GC13554@arm.com>
+References: <1471438227-8747-1-git-send-email-james.morse@arm.com>
+ <1471438227-8747-2-git-send-email-james.morse@arm.com>
+ <20160826093241.GC13554@arm.com>
+Message-ID: <alpine.DEB.2.20.1608261207510.5714@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 August 2016 at 11:45, James Morse <james.morse@arm.com> wrote:
-> Hi Ard,
->
-> On 25/08/16 17:17, Ard Biesheuvel wrote:
->> Currently, memory regions are only recorded in the memblock memory table
->> if they have the EFI_MEMORY_WB memory type attribute set. In case the
->> region is of a reserved type, it is also marked as MEMBLOCK_NOMAP, which
->> will leave it out of the linear mapping.
->>
->> However, memory regions may legally have the EFI_MEMORY_WT or EFI_MEMORY_WC
->> attributes set, and the EFI_MEMORY_WB cleared, in which case the region in
->> question is obviously backed by normal memory, but is not recorded in the
->> memblock memory table at all.
->
-> I've been hitting this when applying weird (but permissible) attributes to the
-> ACPI regions. Currently without WB we map these as device memory, then let
-> acpica make unaligned accesses to it.
->
-> This patch fixes all that, and from the conversation on irc, the 'UC only' case
-> for ACPI tables is x86-legacy, and should never happen.
->
+On Fri, 26 Aug 2016, Will Deacon wrote:
+> On Wed, Aug 17, 2016 at 01:50:25PM +0100, James Morse wrote:
+> > disable_nonboot_cpus() assumes that the lowest numbered online CPU is
+> > the boot CPU, and that this is the correct CPU to run any power
+> > management code on.
+> > 
+> > On x86 this is always correct, as CPU0 cannot (easily) by taken offline.
+> > 
+> > On arm64 CPU0 can be taken offline. For hibernate/resume this means we
+> > may hibernate on a CPU other than CPU0. If the system is rebooted with
+> > kexec 'CPU0' will be assigned to a different physical CPU. This
+> > complicates hibernate/resume as now we can't trust the CPU numbers.
+> > Arch code can find the correct physical CPU, and ensure it is online
+> > before resume from hibernate begins, but also needs to influence
+> > disable_nonboot_cpus()s choice of CPU.
+> > 
+> > Rename disable_nonboot_cpus() as freeze_secondary_cpus() and add an
+> > argument indicating which CPU should be left standing. Follow the logic
+> > in migrate_to_reboot_cpu() to use the lowest numbered online CPU if the
+> > requested CPU is not online.
+> > Add disable_nonboot_cpus() as an inline function that has the existing
+> > behaviour.
+> > 
+> > Signed-off-by: James Morse <james.morse@arm.com>
+> > Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> > ---
+> > An alternative is to provide two functions calling a common function,
+> > but this would mean spilling the cpu_maps_update_begin() into these two.
+> > 
+> >  include/linux/cpu.h | 6 +++++-
+> >  kernel/cpu.c        | 9 +++++----
+> >  2 files changed, 10 insertions(+), 5 deletions(-)
+> 
+> Thomas, does this look ok to you? If so, would you prefer to merge this
+> series via -tip, or have us take this one via the arm64 tree?
 
-Indeed, deliberately exposing a region containing ACPI tables as
-something that *requires* strongly ordered access does not make sense.
+You can take it via ARM64. It's not conflicting with the stuff I have in the
+pipeline.
 
-The problem here is that the UEFI memory map describes both occupied
-and available regions, and in the 'available' case, it is obvious that
-these bits describe the nature of the physical backing of the region,
-i.e., whether the bus fabric, memory, etc allow writeback/writethrough
-caching, write buffering etc. This explains why most regions have all
-the bits set.
-
-In the occupied case, this can be misinterpreted as describing the
-nature of the content, like an ACPI table containing fields that are
-not naturally aligned. I.e, I don't think clearing the UC bit here
-should be interpreted to mean that the payload *requires* WB/WT/WC. It
-is up to the kernel to complain if it interprets a region, and notices
-that the only supported mapping type conflicts with the nature of the
-accesses we intend to perform.
-
->
->> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
->> index c49d50e68aee..c2ac5975fd5d 100644
->> --- a/drivers/firmware/efi/arm-init.c
->> +++ b/drivers/firmware/efi/arm-init.c
->> @@ -163,18 +163,22 @@ static __init int is_reserve_region(efi_memory_desc_t *md)
->>       case EFI_BOOT_SERVICES_DATA:
->>       case EFI_CONVENTIONAL_MEMORY:
->>       case EFI_PERSISTENT_MEMORY:
->> -             return 0;
->> +             /*
->> +              * According to the spec, these regions are no longer reserved
->> +              * after calling ExitBootServices(). However, we can only use
->> +              * them as System RAM if they can be mapped writeback cacheable.
->> +              */
->> +             return (md->attribute & EFI_MEMORY_WB);
->>       default:
->>               break;
->
-> Micro-nit: break here in order to immediately return false looks a bit odd...
->
-
-Yes, I could not decide what to do with it so I left it.
-
->
->>       }
->> -     return is_normal_ram(md);
->> +     return false;
->>  }
->
->
-> Tested-by: James Morse <james.morse@arm.com>
-> Reviewed-by: James Morse <james.morse@arm.com>
->
-
-Thanks,
-Ard.
+Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
