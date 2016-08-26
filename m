@@ -1,204 +1,118 @@
-From: anson.huang@nxp.com (Yongcai Huang)
-Date: Fri, 26 Aug 2016 12:20:15 +0000
-Subject: [PATCH 3/3] ARM: imx: add SMP support for i.MX7D
-In-Reply-To: <20160826111356.GM1041@n2100.armlinux.org.uk>
-References: <1472209971-32469-1-git-send-email-Anson.Huang@nxp.com>
- <1472209971-32469-4-git-send-email-Anson.Huang@nxp.com>
- <20160826111356.GM1041@n2100.armlinux.org.uk>
-Message-ID: <AM3PR04MB13154FA0116D397AABD75E10F5EC0@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 26 Aug 2016 13:21:38 +0100
+Subject: [RFC PATCH 6/7] arm64: KVM: Handle trappable TLB instructions
+In-Reply-To: <87h9a7rhvf.fsf@e105922-lin.cambridge.arm.com>
+References: <1471344312-26685-1-git-send-email-punit.agrawal@arm.com>
+ <1471344312-26685-7-git-send-email-punit.agrawal@arm.com>
+ <20160819151846.GE9893@arm.com>
+ <87a8g2sb4o.fsf@e105922-lin.cambridge.arm.com>
+ <87h9a7rhvf.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20160826132138.04abb500@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 26 Aug 2016 10:37:08 +0100
+Punit Agrawal <punit.agrawal@arm.com> wrote:
 
-
-Best Regards!
-Anson Huang
-
-
-
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at armlinux.org.uk]
-> Sent: 2016-08-26 7:14 PM
-> To: Yongcai Huang <anson.huang@nxp.com>
-> Cc: linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org; linux-
-> kernel at vger.kernel.org; shawnguo at kernel.org; kernel at pengutronix.de;
-> Fabio Estevam <fabio.estevam@nxp.com>; robh+dt at kernel.org;
-> mark.rutland at arm.com
-> Subject: Re: [PATCH 3/3] ARM: imx: add SMP support for i.MX7D
+> Punit Agrawal <punit.agrawal@arm.com> writes:
 > 
-> On Fri, Aug 26, 2016 at 07:12:51PM +0800, Anson Huang wrote:
-> > i.MX7D has 2 cortex-a7 ARM core, add support for booting up SMP kernel
-> > with 2 CPUs.
+> > Will Deacon <will.deacon@arm.com> writes:
+> >  
+> >> Hi Punit,
+> >>
+> >> On Tue, Aug 16, 2016 at 11:45:11AM +0100, Punit Agrawal wrote:  
+> >>> The ARMv8 architecture allows trapping of TLB maintenane instructions
+> >>> from EL0/EL1 to higher exception levels. On encountering a trappable TLB
+> >>> instruction in a guest, an exception is taken to EL2.
+> >>> 
+> >>> Add functionality to handle emulating the TLB instructions.
+> >>> 
+> >>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> >>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> >>> Cc: Marc Zyngier <marc.zyngier@arm.com>  
+> >>
+> >> [...]
+> >>  
+> >>> +void __hyp_text
+> >>> +__kvm_emulate_tlb_invalidate(struct kvm *kvm, u32 sys_op, u64 regval)
+> >>> +{
+> >>> +	kvm = kern_hyp_va(kvm);
+> >>> +
+> >>> +	/*
+> >>> +	 * Switch to the guest before performing any TLB operations to
+> >>> +	 * target the appropriate VMID
+> >>> +	 */
+> >>> +	__switch_to_guest_regime(kvm);
+> >>> +
+> >>> +	/*
+> >>> +	 *  TLB maintenance operations broadcast to inner-shareable
+> >>> +	 *  domain when HCR_FB is set (default for KVM).
+> >>> +	 */
+> >>> +	switch (sys_op) {
+> >>> +	case TLBIALL:
+> >>> +	case TLBIALLIS:
+> >>> +	case ITLBIALL:
+> >>> +	case DTLBIALL:
+> >>> +	case TLBI_VMALLE1:
+> >>> +	case TLBI_VMALLE1IS:
+> >>> +		__tlbi(vmalle1is);
+> >>> +		break;
+> >>> +	case TLBIMVA:
+> >>> +	case TLBIMVAIS:
+> >>> +	case ITLBIMVA:
+> >>> +	case DTLBIMVA:
+> >>> +	case TLBI_VAE1:
+> >>> +	case TLBI_VAE1IS:
+> >>> +		__tlbi(vae1is, regval);  
+> >>
+> >> I'm pretty nervous about this. Although you've switched in the guest stage-2
+> >> page table before the TLB maintenance, we're still running on a host stage-1
+> >> and it's not clear to me that the stage-1 context is completely ignored for
+> >> the purposes of a stage-1 TLBI executed at EL2.
+> >>
+> >> For example, if TCR_EL1.TBI0 is set in the guest but cleared in the host,
+> >> my reading of the architecture is that it will be treated as zero when
+> >> we perform this invalidation operation. I worry that we have similar
+> >> problems with the granule size, where bits become RES0 in the TLBI VA
+> >> ops.  
 > >
-> > The existing i.MX SMP code is designed for i.MX6 series SoCs which
-> > have cortex-a9 ARM core, but i.MX7D has 2 cortex-a7 ARM core, so we
-> > need to add runtime check for those differences between cortex-a9 and
-> > cortex-a7.
+> > Some control bits seem to be explicitly called out to not affect TLB
+> > maintenance operations[0] but I hadn't considered the ones you highlight.
 > >
-> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> > ---
-> >  arch/arm/mach-imx/headsmp.S    | 11 +++++++++++
-> >  arch/arm/mach-imx/mach-imx7d.c |  2 ++
-> >  arch/arm/mach-imx/platsmp.c    | 19 ++++++++++++++++++-
-> >  arch/arm/mach-imx/src.c        | 38 ++++++++++++++++++++++++++++++----
-> ----
-> >  4 files changed, 61 insertions(+), 9 deletions(-)
+> > [0] ARMv8 ARM DDI 0487A.j D4.7, Pg D4-1814
+> >  
+> >>
+> >> Finally, we should probably be masking out the RES0 bits in the TLBI
+> >> ops, just in case some future extension to the architecture defines them
+> >> in such a way where they have different meanings when executed at EL2
+> >> or EL1.  
 > >
-> > diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-
-> imx/headsmp.S
-> > index 6c28d28..a26e459 100644
-> > --- a/arch/arm/mach-imx/headsmp.S
-> > +++ b/arch/arm/mach-imx/headsmp.S
-> > @@ -26,7 +26,18 @@ diag_reg_offset:
-> >  	.endm
+> > Although, the RES0 bits for TLBI VA ops are currently ignored, I agree
+> > that masking them out based on granule size protects against future
+> > incompatible changes.
+> >  
+> >>
+> >> The easiest thing to do is just TLBI VMALLE1IS for all trapped operations,
+> >> but you might want to see how that performs.  
 > >
-> >  ENTRY(v7_secondary_startup)
-> > +	.word	0xc070			@ 0xc07 is cortex-a7 id
-> > +	.word	0xfff0			@ mask for core type
-> > +
-> >  ARM_BE8(setend be)			@ go BE8 if entered LE
-> > +	mrc     p15, 0, r0, c0, c0, 0
-> > +	adr	r1, v7_secondary_startup
-> > +	ldr	r2, [r1]
-> > +	ldr	r3, [r1, #0x4]
-> > +	and     r0, r0, r3
-> > +	cmp     r0, r2
-> > +	beq     secondary_startup
-> > +
+> > That sounds reasonable for correctness. But I suspect we'll have to do
+> > more to claw back some performance. Let me run a few tests and come back
+> > on this.  
 > 
-> Total NAK on the above.  There's no way that we want to even try executing
-> those two .word values (and I don't care if "it works when tested", we just
-> don't try and execute data.)
+> Assuming I've correctly switched in TCR and replacing the various TLB
+> operations in this patch with TLBI VMALLE1IS, there is a drop in kernel
+> build times of ~5% (384s vs 363s).
 
-Sure, I misunderstood the way of putting .word, actually, for i.MX7D, I can
-just call common secondary_startup instead of v7_seondary_startup, so I can
-remove all changes in this file.
+Note that if all you're doing is a VMALLE1IS, switching TCR_EL1 should
+not be necessary, as all that is required for this invalidation is the
+VMID.
 
-> 
-> >  	set_diag_reg
-> >  	b	secondary_startup
-> >  ENDPROC(v7_secondary_startup)
-> > diff --git a/arch/arm/mach-imx/mach-imx7d.c
-> > b/arch/arm/mach-imx/mach-imx7d.c index 26ca744..ef3dce6 100644
-> > --- a/arch/arm/mach-imx/mach-imx7d.c
-> > +++ b/arch/arm/mach-imx/mach-imx7d.c
-> > @@ -99,6 +99,7 @@ static void __init imx7d_init_machine(void)
-> >
-> >  static void __init imx7d_init_irq(void)  {
-> > +	imx_gpcv2_check_dt();
-> >  	imx_init_revision_from_anatop();
-> >  	imx_src_init();
-> >  	irqchip_init();
-> > @@ -111,6 +112,7 @@ static const char *const imx7d_dt_compat[]
-> > __initconst = {  };
-> >
-> >  DT_MACHINE_START(IMX7D, "Freescale i.MX7 Dual (Device Tree)")
-> > +	.smp		= smp_ops(imx_smp_ops),
-> >  	.init_irq	= imx7d_init_irq,
-> >  	.init_machine	= imx7d_init_machine,
-> >  	.dt_compat	= imx7d_dt_compat,
-> > diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
-> > index 711dbbd..63af911 100644
-> > --- a/arch/arm/mach-imx/platsmp.c
-> > +++ b/arch/arm/mach-imx/platsmp.c
-> > @@ -60,8 +60,17 @@ static int imx_boot_secondary(unsigned int cpu,
-> > struct task_struct *idle)  static void __init imx_smp_init_cpus(void)
-> > {
-> >  	int i, ncores;
-> > +	unsigned long val, arch_type;
-> >
-> > -	ncores = scu_get_core_count(scu_base);
-> > +	asm volatile("mrc p15, 0, %0, c0, c0, 0" : "=r" (arch_type));
-> > +
-> > +	if (((arch_type >> 4) & 0xfff) == 0xc07) {
-> 
-> This is buggy.  Plus, we have macros for this.  Please use the macros in
-> asm/cputype.h to achieve these tests.
+> For the next version, I'll use this as a starting point and try clawing
+> back the loss by using the appropriate TLB instructions albeit with
+> additional sanity checking based on context.
 
-Thanks, I will use read_cpuid_id() API intead of putting asm code here.
+Great, thanks!
 
-> 
-> > +		/* cortex-a7 core number is in bit[25:24] of CP15 L2CTLR */
-> > +		asm volatile("mrc p15, 1, %0, c9, c0, 2" : "=r" (val));
-> > +		ncores = ((val >> 24) & 0x3) + 1;
-> > +	} else {
-> > +		ncores = scu_get_core_count(scu_base);
-> > +	}
-> >
-> >  	for (i = ncores; i < NR_CPUS; i++)
-> >  		set_cpu_possible(i, false);
-> > @@ -74,6 +83,14 @@ void imx_smp_prepare(void)
-> >
-> >  static void __init imx_smp_prepare_cpus(unsigned int max_cpus)  {
-> > +	unsigned long arch_type;
-> > +
-> > +	asm volatile("mrc p15, 0, %0, c0, c0, 0" : "=r" (arch_type));
-> > +
-> > +	/* no need for cortex-a7 */
-> > +	if (((arch_type >> 4) & 0xfff) == 0xc07)
-> 
-> Ditto.
-
-Ditto.
-
-> 
-> > +		return;
-> > +
-> >  	imx_smp_prepare();
-> >
-> >  	/*
-> > diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c index
-> > 70b083f..1fda72a 100644
-> > --- a/arch/arm/mach-imx/src.c
-> > +++ b/arch/arm/mach-imx/src.c
-> > @@ -18,6 +18,7 @@
-> >  #include <linux/smp.h>
-> >  #include <asm/smp_plat.h>
-> >  #include "common.h"
-> > +#include "hardware.h"
-> >
-> >  #define SRC_SCR				0x000
-> >  #define SRC_GPR1			0x020
-> > @@ -30,6 +31,15 @@
-> >  #define BP_SRC_SCR_CORE1_RST		14
-> >  #define BP_SRC_SCR_CORE1_ENABLE		22
-> >
-> > +/* below are for i.MX7D */
-> > +#define SRC_GPR1_V2                     0x074
-> > +#define SRC_A7RCR0                      0x004
-> > +#define SRC_A7RCR1                      0x008
-> > +#define SRC_M4RCR                       0x00C
-> > +
-> > +#define BP_SRC_A7RCR0_A7_CORE_RESET0   0
-> > +#define BP_SRC_A7RCR1_A7_CORE1_ENABLE  1
-> > +
-> >  static void __iomem *src_base;
-> >  static DEFINE_SPINLOCK(scr_lock);
-> >
-> > @@ -87,12 +97,21 @@ void imx_enable_cpu(int cpu, bool enable)
-> >  	u32 mask, val;
-> >
-> >  	cpu = cpu_logical_map(cpu);
-> > -	mask = 1 << (BP_SRC_SCR_CORE1_ENABLE + cpu - 1);
-> >  	spin_lock(&scr_lock);
-> > -	val = readl_relaxed(src_base + SRC_SCR);
-> > -	val = enable ? val | mask : val & ~mask;
-> > -	val |= 1 << (BP_SRC_SCR_CORE1_RST + cpu - 1);
-> > -	writel_relaxed(val, src_base + SRC_SCR);
-> > +	if (cpu_is_imx7d()) {
-> 
-> It's about time iMX folk learned that "imx*" is a SoC and _not_ a CPU.
-> It should be "soc_is_imx7d()" because we're wanting to know whether the
-> _SoC_ is an iMX7D.  The _CPU_ is a _Cortex-A7_.
-
-Agree, I will add a new patch in this patch set to replace all the cpu_is_xxx with
-Soc_is_xxx.
-
-Thanks for review.
-Anson.
-
-> 
-> --
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+	M.
+-- 
+Jazz is not dead. It just smells funny.
