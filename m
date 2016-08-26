@@ -1,36 +1,59 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Fri, 26 Aug 2016 14:12:43 +0100
-Subject: [PATCH 00/10] PM / Domains: Add support for removing PM domains
-In-Reply-To: <1471340976-5379-1-git-send-email-jonathanh@nvidia.com>
-References: <1471340976-5379-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <fd3ea080-2ec5-e22d-b0cc-8cdc4155af3c@nvidia.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Fri, 26 Aug 2016 15:22:29 +0200
+Subject: [PATCH] arm: sys_oabi-compat: Use kmalloc_array() in two functions
+In-Reply-To: <20160825224632.GL1041@n2100.armlinux.org.uk>
+References: <5deba521-2dd4-cd2e-23d7-226a1a7728c3@users.sourceforge.net>
+ <20160825224632.GL1041@n2100.armlinux.org.uk>
+Message-ID: <dd343c72-2ec7-2114-bee5-1d16fc6c04ac@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
-
-On 16/08/16 10:49, Jon Hunter wrote:
-> In order to safely remove PM domains there are a few changes that need to be
-> made to ensure that no one is holding an external reference to a PM domain
-> after it has been removed. One solution, implemented here, solves this by
-> eliminating external references to PM domain.
+>> Multiplications for the size determination of memory allocations
+>> indicated that array data structures should be processed.
 > 
-> This is a follow-up to the initial RFC I sent out [0].
+> I'm afraid the above comment doesn't mean much to me, can you rephrase?
+
+Yes, of course.
+
+How verbose should the explanation for this update suggestion become?
+
+
+> Maybe:
 > 
-> Changes from initial RFC:
-> - Renamed functions made static per Ulf's feedback.
-> - Added patch to clean-up provider/xlate APIs per Ulf's feedback
-> - Re-worked and simplified the association between PM domains and PM
->   domain providers. Dropped the 'provider_data' variable from the
->   generic_pm_domain structure in favour of using the fwnode_handle.
-> - Split patch for removing PM domains into multiple patches per Ulf's
->   feedback.
+> "Multiplications for kmalloc size arguments are liable to overflow,
+> potentially causing a potential security issue.  Using kmalloc_array()
+> allows the overflow to be caught and the allocation failed.  Switch
+> these callsites to kmalloc_array()."
 
-Let me know if you have any feedback on this. Please note I will be out
-next week.
+Thanks for your wording variant.
 
-Cheers
-Jon
 
--- 
-nvpublic
+>> @@ -285,7 +285,7 @@ asmlinkage long sys_oabi_epoll_wait(int epfd,
+>>  		return -EINVAL;
+>>  	if (!access_ok(VERIFY_WRITE, events, sizeof(*events) * maxevents))
+>>  		return -EFAULT;
+>> -	kbuf = kmalloc(sizeof(*kbuf) * maxevents, GFP_KERNEL);
+>> +	kbuf = kmalloc_array(maxevents, sizeof(*kbuf), GFP_KERNEL);
+> 
+> kmalloc_array() here actually buys us no additional safety at either
+> of the callsites in your patch
+
+Can this inline function apply a few sanity checks in a consistent way?
+http://lxr.free-electrons.com/source/include/linux/slab.h#L564
+
+
+> - we need to have carefully checked the values to ensure
+> they don't overflow prior to the kmalloc for other reasons.
+
+Are there any more constraints to consider?
+
+
+> That's probably something that should be noted in the commit message too,
+> so reviewers have the confidence that you're not blindly changing everything...
+
+I imagine that a few contributors can get mixed feelings from a bunch
+of my recent patches. There is a significant patch number in the works
+for various Linux software modules.
+
+Regards,
+Markus
