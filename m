@@ -1,89 +1,115 @@
-From: npiggin@gmail.com (Nicholas Piggin)
-Date: Fri, 26 Aug 2016 21:17:29 +1000
-Subject: [PATCH] arm: add an option for erratum 657417
-In-Reply-To: <2147968.tzghefjZMo@wuerfel>
-References: <1470989957-23671-1-git-send-email-npiggin@gmail.com>
- <20160824190530.5b67b356@roar.ozlabs.ibm.com>
- <20160824205646.4d6170e1@roar.ozlabs.ibm.com>
- <2147968.tzghefjZMo@wuerfel>
-Message-ID: <20160826211729.592ff5cd@roar.ozlabs.ibm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 26 Aug 2016 12:17:58 +0100
+Subject: [PATCH 2/3] ARM: imx: add gpcv2 support
+In-Reply-To: <1472209971-32469-3-git-send-email-Anson.Huang@nxp.com>
+References: <1472209971-32469-1-git-send-email-Anson.Huang@nxp.com>
+ <1472209971-32469-3-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20160826111758.GN1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Aug 2016 17:01:30 +0200
-Arnd Bergmann <arnd@arndb.de> wrote:
+On Fri, Aug 26, 2016 at 07:12:50PM +0800, Anson Huang wrote:
+> diff --git a/arch/arm/mach-imx/gpcv2.c b/arch/arm/mach-imx/gpcv2.c
+> new file mode 100644
+> index 0000000..98577c4
+> --- /dev/null
+> +++ b/arch/arm/mach-imx/gpcv2.c
+> @@ -0,0 +1,66 @@
+> +/*
+> + * Copyright 2016 Freescale Semiconductor, Inc.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +
+> +#include "common.h"
+> +
+> +#define GPC_CPU_PGC_SW_PUP_REQ	0xf0
+> +#define GPC_CPU_PGC_SW_PDN_REQ	0xfc
+> +#define GPC_PGC_C1		0x840
+> +
+> +#define BM_CPU_PGC_SW_PDN_PUP_REQ_CORE1_A7	0x2
+> +#define BM_GPC_PGC_PCG				0x1
+> +
+> +static void __iomem *gpcv2_base;
+> +
+> +static void imx_gpcv2_set_m_core_pgc(bool enable, u32 offset)
+> +{
+> +	u32 val = readl_relaxed(gpcv2_base + offset) & (~BM_GPC_PGC_PCG);
 
-> On Wednesday, August 24, 2016 8:56:46 PM CEST Nicholas Piggin wrote:
-> > On Wed, 24 Aug 2016 19:05:30 +1000
-> > Nicholas Piggin <npiggin@gmail.com> wrote:  
-> > > Thanks, I'll take a look.  
-> > 
-> > Okay, I can't reproduce your bad linking times even with gc-sections. It's
-> > possible I'm doing something wrong, but with my patches + your patch and
-> > standard arm allyesconfig:
-> > 
-> >   20:33:56  AR      built-in.o
-> >   20:33:57  LD      vmlinux.o
-> >   MODPOST vmlinux.o
-> >   20:34:12  GEN     .version
-> >   CHK     include/generated/compile.h
-> >   UPD     include/generated/compile.h
-> >   CC      init/version.o
-> >   AR      init/built-in.o
-> >   20:34:24  KSYM    .tmp_kallsyms1.o
-> >   20:34:45  KSYM    .tmp_kallsyms2.o
-> >   20:34:54  LD      vmlinux
-> >   20:35:07  SORTEX  vmlinux
-> >   20:35:07  SYSMAP  System.map
-> > 
-> > I have about 71 seconds for the final link phase.  
+Unnecessary parens, and the code doesn't flow with the bit clearance
+here...
+
+> +
+> +	if (enable)
+> +		val |= BM_GPC_PGC_PCG;
+
+My first read of this lead me to think "okay, so what's the point of
+enable=false".  It would be clearer with:
+
+	u32 val = readl_relaxed(gpcv2_base + offset);
+
+	if (enable)
+		val |= BM_GPC_PGC_PCG;
+	else
+		val &= ~BM_GPC_PGC_PCG;
+
+here.
+
+> +
+> +	writel_relaxed(val, gpcv2_base + offset);
+> +}
+> +
+> +void imx_gpcv2_set_core1_pdn_pup_by_software(bool pdn)
+> +{
+> +	u32 val = readl_relaxed(gpcv2_base + (pdn ?
+> +		GPC_CPU_PGC_SW_PDN_REQ : GPC_CPU_PGC_SW_PUP_REQ));
+> +
+> +	imx_gpcv2_set_m_core_pgc(true, GPC_PGC_C1);
+> +	val |= BM_CPU_PGC_SW_PDN_PUP_REQ_CORE1_A7;
+> +	writel_relaxed(val, gpcv2_base + (pdn ?
+> +		GPC_CPU_PGC_SW_PDN_REQ : GPC_CPU_PGC_SW_PUP_REQ));
+> +
+> +	while ((readl_relaxed(gpcv2_base + (pdn ?
+> +		GPC_CPU_PGC_SW_PDN_REQ : GPC_CPU_PGC_SW_PUP_REQ)) &
+> +		BM_CPU_PGC_SW_PDN_PUP_REQ_CORE1_A7) != 0)
+> +		;
+> +	imx_gpcv2_set_m_core_pgc(false, GPC_PGC_C1);
+> +}
+> +
+> +void __init imx_gpcv2_check_dt(void)
+> +{
+> +	struct device_node *np;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx7d-gpc");
+> +	if (WARN_ON(!np))
+> +		return;
+> +
+> +	gpcv2_base = of_iomap(np, 0);
+> +	WARN_ON(!gpcv2_base);
+
+What happens if gpcv2_base is NULL (apart from the obvious warning
+from the above line)?  I guess a bit later in the boot,
+imx_gpcv2_set_core1_pdn_pup_by_software() oopses the kernel,
+probably before the console has been initialised.  Probably not
+nice behaviour.
+
+> +}
+> -- 
+> 1.9.1
 > 
-> 
-> I've tracked down my remaining build time regression to
-> a bad binutils snapshot (2.26.51) I had been using, and upgraded
-> to the 2.27 release now, which is roughly the same as what
-> you have:
-> 
-> 14:45:41   LINK    vmlinux
-> 14:45:41  AR      built-in.o
-> 14:45:42  LD      vmlinux.o
-> 14:51:49   MODPOST vmlinux.o
-> 14:51:51  GEN     .version
-> 14:51:51   CHK     include/generated/compile.h
->   UPD     include/generated/compile.h
-> 14:51:51   CC      init/version.o
-> 14:51:52   AR      init/built-in.o
-> 14:52:04  KSYM    .tmp_kallsyms1.o
-> 14:52:31  KSYM    .tmp_kallsyms2.o
-> 14:52:43  LD      vmlinux
-> 14:52:55  SORTEX  vmlinux
-> 14:52:55  SYSMAP  System.map
-> 14:52:56   OBJCOPY arch/arm/boot/Image
-> 
-> The long minutes that were spent in "arm-linux-gnueabi-ld 
-> -r -o vmlinux.o --whole-archive built-in.o" are all gone now.
 
-Thanks for tracking it down, that's good to hear.
-
-
-> I still see a problem with big-endian builds failing with
-> thinarc/gc-sections, I'll investigate that some other day,
-> or you could have a look at that if you want to make sure
-> it's an ARM specific problem, not something with your
-> patches in general.
-> 
-> The patch that I sent for enabling the two on ARM blocks
-> out CONFIG_CPU_BIG_ENDIAN, so just revert that hunk to see
-> the problem. It's possible that it only breaks when doing
-> a big-endian build after a little-endian build without
-> a "make clean" inbetween.
-
-I'm able to build big endian ARM allyesconfig with thin
-archives and gc-sections, worked fine.
-
-There have been a few bugs in powerpc when failing to notice
-the change when endian of builds was swapped, so maybe you
-got bitten by something similar.
-
-Thanks,
-Nick
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
