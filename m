@@ -1,55 +1,47 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 26 Aug 2016 21:00:54 +0800
-Subject: [PATCH 3/3] ARM: imx: add SMP support for i.MX7D
-In-Reply-To: <1472209971-32469-4-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <201608262046.PdVznvgd%fengguang.wu@intel.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 26 Aug 2016 14:04:50 +0100
+Subject: [PATCH v2 9/9] arm64: Work around systems with mismatched cache
+ line sizes
+In-Reply-To: <CAKv+Gu_AyrQLdjf+1-QuZu3k2goT-_6Dk5mQbvP6XSmu30V4cQ@mail.gmail.com>
+References: <1472203398-8751-1-git-send-email-suzuki.poulose@arm.com>
+ <1472203398-8751-10-git-send-email-suzuki.poulose@arm.com>
+ <CAKv+Gu_AyrQLdjf+1-QuZu3k2goT-_6Dk5mQbvP6XSmu30V4cQ@mail.gmail.com>
+Message-ID: <f2ff63f1-9cc7-6930-60eb-5f1fb8fde2e6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anson,
+On 26/08/16 12:03, Ard Biesheuvel wrote:
+> Hello Suzuki,
+>
 
-[auto build test ERROR on shawnguo/for-next]
-[also build test ERROR on next-20160825]
-[cannot apply to v4.8-rc3]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-[Check https://git-scm.com/docs/git-format-patch for more information]
 
-url:    https://github.com/0day-ci/linux/commits/Anson-Huang/Add-SMP-support-for-i-MX7D/20160826-140342
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git for-next
-config: arm-arm67 (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+>> For faster access (i.e, avoiding to lookup the system wide value of CTR_EL0
+>> via read_system_reg), we keep track of the pointer to table entry for
+>> CTR_EL0 in the CPU feature infrastructure.
+>>
+>
+> IIUC it is the runtime sorting of the arm64_ftr_reg array that
+> requires you to stash a pointer to CTR_EL0's entry somewhere, so that
+> you can dereference it without doing the bsearch.
 
-All errors (new ones prefixed by >>):
+Correct.
 
-   arch/arm/mach-imx/built-in.o: In function `imx_enable_cpu':
->> arch/arm/mach-imx/src.c:103: undefined reference to `imx_gpcv2_set_core1_pdn_pup_by_software'
+>
+> IMO, this is a pattern that we should avoid: you are introducing one
+> instance now, which will make it hard to say no to the next one in the
+> future. Isn't there a better way to organize the arm64_ftr_reg array
+> that allows us to reference entries directly? Ideally, a way that gets
+> rid of the runtime sorting, since I don't think that is a good
+> replacement for developer discipline anyway (although I should have
+> spoken up when that was first introduced) Or am I missing something
+> here?
 
-vim +103 arch/arm/mach-imx/src.c
+I had some form of direct access to the feature register in one of
+the versions [0], but was dropped based on Catalin's suggestion at [1].
 
-    97		u32 mask, val;
-    98	
-    99		cpu = cpu_logical_map(cpu);
-   100		spin_lock(&scr_lock);
-   101		if (cpu_is_imx7d()) {
-   102			if (enable)
- > 103				imx_gpcv2_set_core1_pdn_pup_by_software(false);
-   104			mask = 1 << (BP_SRC_A7RCR1_A7_CORE1_ENABLE + cpu - 1);
-   105			val = readl_relaxed(src_base + SRC_A7RCR1);
-   106			val = enable ? val | mask : val & ~mask;
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 29845 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160826/bb7e3530/attachment-0001.obj>
+[0] https://lkml.org/lkml/2015/10/5/504
+[1] https://lkml.org/lkml/2015/10/7/558
+
+
+Suzuki
