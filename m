@@ -1,146 +1,66 @@
-From: oss@buserror.net (Scott Wood)
-Date: Fri, 26 Aug 2016 17:57:14 -0500
-Subject: [PATCH 10/10] dt-bindings: sec: Update bindings for LS1012A
-In-Reply-To: <1472207269-18499-10-git-send-email-Bhaskar.Upadhaya@nxp.com>
-References: <1472207269-18499-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
- <1472207269-18499-10-git-send-email-Bhaskar.Upadhaya@nxp.com>
-Message-ID: <1472252234.13245.28.camel@buserror.net>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 27 Aug 2016 07:10:08 +0800
+Subject: [PATCH v5 11/16] PM / cpu_domains: Add PM Domain governor for CPUs
+In-Reply-To: <1472242678-33700-12-git-send-email-lina.iyer@linaro.org>
+Message-ID: <201608270733.QrApGubQ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-08-26 at 15:57 +0530, Bhaskar Upadhaya wrote:
-> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
-> ---
-> ?.../devicetree/bindings/crypto/fsl-sec5.txt????????| 153
-> +++++++++++++++++++++
-> ?1 file changed, 153 insertions(+)
-> ?create mode 100644 Documentation/devicetree/bindings/crypto/fsl-sec5.txt
+Hi Lina,
 
-Again, the subject should explain what you're adding, not why. ?You're adding
-a sec5 binding, not an LS1012A binding.
+[auto build test WARNING on pm/linux-next]
+[also build test WARNING on v4.8-rc3 next-20160825]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
+[Check https://git-scm.com/docs/git-format-patch for more information]
 
-Why aren't the crypto maintainers/list CCed?
+url:    https://github.com/0day-ci/linux/commits/Lina-Iyer/PM-SoC-idle-support-using-PM-domains/20160827-042847
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
+config: i386-randconfig-s0-201634 (attached as .config)
+compiler: gcc-6 (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-Why do we need a separate binding document for each SEC version? ?What is
-different from the sec4 binding or the sec6 binding? ?Especially given that
-the example claims compatibility with sec4?
+All warnings (new ones prefixed by >>):
 
-> diff --git a/Documentation/devicetree/bindings/crypto/fsl-sec5.txt
-> b/Documentation/devicetree/bindings/crypto/fsl-sec5.txt
-> new file mode 100644
-> index 0000000..7bcaa6f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/crypto/fsl-sec5.txt
-> @@ -0,0 +1,153 @@
-> +SEC 5 is Freescale's Cryptographic Accelerator and Assurance Module (CAAM).
-> +Currently Freescale arm chip LS1012A is embedded with SEC 5.
-> +SEC 5 device tree binding include:
-> +???-SEC 5 Node
-> +???-Job Ring Node
-> +???-Full Example
-> +
-> +=====================================================================
-> +SEC 5 Node
-> +
-> +Description
-> +
-> +????Node defines the base address of the SEC 5 block.
-> +????This block specifies the address range of all global
-> +????configuration registers for the SEC 5 block.
-> +????For example, In LS1012A, we could see three SEC 5 node.
-> +
-> +PROPERTIES
-> +
-> +???- compatible
-> +??????Usage: required
-> +??????Value type: <string>
-> +??????Definition: Must include "fsl,sec-v5.4".
+   In file included from drivers/base/power/cpu_domains.c:25:0:
+   include/linux/tick.h: In function 'tick_nohz_get_next_wakeup':
+   include/linux/tick.h:138:9: error: 'tick_next_period' undeclared (first use in this function)
+     return tick_next_period;
+            ^~~~~~~~~~~~~~~~
+   include/linux/tick.h:138:9: note: each undeclared identifier is reported only once for each function it appears in
+>> include/linux/tick.h:139:1: warning: control reaches end of non-void function [-Wreturn-type]
+    }
+    ^
 
-There was no v5.x prior to v5.4?
+vim +139 include/linux/tick.h
 
-> +???- fsl,sec-era
-> +??????Usage: optional
-> +??????Value type: <u32>
-> +??????Definition: A standard property. Define the 'ERA' of the SEC
-> +??????????device.
+4f86d3a8 Len Brown                     2007-10-03  132  
+4f86d3a8 Len Brown                     2007-10-03  133  	return len;
+4f86d3a8 Len Brown                     2007-10-03  134  }
+4fad5e09 Lina Iyer                     2016-08-26  135  
+4fad5e09 Lina Iyer                     2016-08-26  136  static inline ktime_t tick_nohz_get_next_wakeup(int cpu)
+4fad5e09 Lina Iyer                     2016-08-26  137  {
+4fad5e09 Lina Iyer                     2016-08-26 @138  	return tick_next_period;
+4fad5e09 Lina Iyer                     2016-08-26 @139  }
+4fad5e09 Lina Iyer                     2016-08-26  140  
+8083e4ad venkatesh.pallipadi at intel.com 2008-08-04  141  static inline u64 get_cpu_idle_time_us(int cpu, u64 *unused) { return -1; }
+0224cf4c Arjan van de Ven              2010-05-09  142  static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
 
-This is not "a standard property".
+:::::: The code at line 139 was first introduced by commit
+:::::: 4fad5e091fe06e14a8258812e6df31f1fbb69d7f timer: Export next wake up of a CPU
 
-> +???- reg
-> +??????Usage: required
-> +??????Value type: <prop-encoded-array>
-> +??????Definition: A standard property.??Specifies the physical
-> +??????????address and length of the SEC 5 configuration registers.
+:::::: TO: Lina Iyer <lina.iyer@linaro.org>
+:::::: CC: 0day robot <fengguang.wu@intel.com>
 
-Whether this property expresses the raw physical address depends on the ranges
-of the parent node. ?Just say that there's one reg resource which is the SEC
-configuration registers.
-
-> +
-> +???- ranges
-> +???????Usage: required
-> +???????Value type: <prop-encoded-array>
-> +???????Definition: A standard property.??Specifies the physical address
-> +???????????range of the SEC 5.0 register space (-SNVS not included).??A
-> +???????????triplet that includes the child address, parent address, &
-> +???????????length.
-
-Likewise with the talk about "physical address". ?It's also not required that
-it contain such a triplet -- it could theoretically be an empty ranges
-property, or there could be multiple translations. ?Bindings shouldn't try to
-(poorly) repeat the definition of standard properties. ?They should specify
-information that is specific to this binding.
-
-The only thing worth mentioning here about ranges is if the driver will expect
-a particular translation independently of whether a child reg is using it.
-
-> +===================================================================
-> +Full Example
-> +
-> +Since some chips may contain more than one SEC, the dtsi contains
-> +only the node contents, not the node itself.??A chip using the SEC
-> +should include the dtsi inside each SEC node.??Example:
-
-Bindings generally describe what the OS expects to see, not the details of the
-dtsi structure.
-
-> +
-> +In fsl-ls1012a.dtsi:
-> +
-> +	compatible = "fsl,sec-v5.4";
-> +	fsl,sec-era = <8>;
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +
-> +	sec_jr0: jr at 10000 {
-> +		compatible = "fsl,sec-v5.4-job-ring",
-> +			"fsl,sec-v5.0-job-ring",
-> +			"fsl,sec-v4.0-job-ring";
-> +			reg = <0x10000 0x10000>;
-> +			interrupts = <0 71 0x4>;
-> +	};
-> +	sec_jr1: jr at 20000 {
-> +		compatible = "fsl,sec-v5.4-job-ring",
-> +			"fsl,sec-v5.0-job-ring",
-> +			"fsl,sec-v4.0-job-ring";
-> +			reg = <0x20000 0x10000>;
-> +			interrupts = <0 72 0x4>;
-> +	};
-> +	sec_jr2: jr at 30000 {
-> +		compatible = "fsl,sec-v5.4-job-ring",
-> +			"fsl,sec-v5.0-job-ring",
-> +			"fsl,sec-v4.0-job-ring";
-> +			reg = <0x30000 0x10000>;
-> +			interrupts = <0 73 0x4>;
-> +	};
-> +	sec_jr3: jr at 40000 {
-> +		compatible = "fsl,sec-v5.4-job-ring",
-> +			"fsl,sec-v5.0-job-ring",
-> +			"fsl,sec-v4.0-job-ring";
-> +			reg = <0x40000 0x10000>;
-> +			interrupts = <0 74 0x4>;
-> +	};
-
-This is terrible whitespace.
-
--Scott
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 25925 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160827/7fc905d0/attachment-0001.obj>
