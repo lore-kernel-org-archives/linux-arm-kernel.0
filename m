@@ -1,39 +1,41 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 26 Aug 2016 13:20:53 -0400 (EDT)
-Subject: [PATCH] USB: ohci-omap - avoid including mach/irqs.h
-In-Reply-To: <20160826164351.GV5783@n2100.arm.linux.org.uk>
-Message-ID: <Pine.LNX.4.44L0.1608261319550.1794-100000@iolanthe.rowland.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 26 Aug 2016 18:24:15 +0100
+Subject: [kernel-hardening] [PATCH 0/7] arm64: Privileged Access Never
+ using TTBR0_EL1 switching
+In-Reply-To: <20160826153904.GA19844@davidb.org>
+References: <1471015666-23125-1-git-send-email-catalin.marinas@arm.com>
+ <20160826153904.GA19844@davidb.org>
+Message-ID: <20160826172414.GE15779@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Aug 2016, Russell King - ARM Linux wrote:
-
-> On Mon, Aug 22, 2016 at 11:28:21AM -0400, Alan Stern wrote:
-> > On Fri, 19 Aug 2016, Russell King wrote:
-> > 
-> > > ohci-omap doesn't need to include mach/irqs.h - nothing within this
-> > > driver needs anything from this header file.  Remove this include.
-> > > 
-> > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> > > ---
-> > >  drivers/usb/host/ohci-omap.c | 1 -
-> > >  1 file changed, 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/usb/host/ohci-omap.c b/drivers/usb/host/ohci-omap.c
-> > > index de7c68602a7e..495c1454b9e8 100644
-> > > --- a/drivers/usb/host/ohci-omap.c
-> > > +++ b/drivers/usb/host/ohci-omap.c
-> > > @@ -36,7 +36,6 @@
-> > >  #include <mach/mux.h>
-> > >  
-> > >  #include <mach/hardware.h>
-> > > -#include <mach/irqs.h>
-> > >  #include <mach/usb.h>
-> > 
-> > Acked-by: Alan Stern <stern@rowland.harvard.edu>
+On Fri, Aug 26, 2016 at 11:39:04AM -0400, David Brown wrote:
+> On Fri, Aug 12, 2016 at 04:27:39PM +0100, Catalin Marinas wrote:
+> >This is the first (public) attempt at emulating PAN by disabling
+> >TTBR0_EL1 accesses on arm64. I chose to use a per-CPU saved_ttbr0_el1
+> >variable to store the actual TTBR0 as, IMO, it looks better w.r.t. the
+> >context switching code, to the detriment of a slightly more complex
+> >uaccess_enable() implementation. The alternative was storing the saved
+> >TTBR0 in thread_info but with more complex thread switching since TTBR0
+> >is normally tied to switch_mm() rather than switch_to(). The latter may
+> >also get more complicated if we are to decouple the kernel stack from
+> >thread_info at some point (vmalloc'ed stacks).
+> >
+> >The code requires more testing, especially for combinations where UAO is
+> >present but PAN is not.
 > 
-> Thanks.  Will Greg be picking this up?
+> I briefly tried to run these patches on my HiKey board and I get a
+> panic on boot.  Unfortunately, I've had to head off to the Linux
+> Security Summit, so I haven't been able to try to figure out what is
+> going on (and I don't seem to be able to even get a capture of the log
+> output).  But I ran into Mark Rutland who convinced me to at least
+> state the failure on the list here.
 
-Yes, he should.  Unless you want it to go via a different tree...
+Thanks for trying to test this series. Without more information, I can't
+really say where the problem is or why it fails that early (in theory it
+should only affect user space). Is it with recent/latest mainline?
+defconfig? Anyway, I'll wait until you get back from the conference,
+maybe you get some early console output.
 
-Alan Stern
+-- 
+Catalin
