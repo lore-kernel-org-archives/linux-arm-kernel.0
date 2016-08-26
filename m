@@ -1,61 +1,45 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 26 Aug 2016 16:20:22 +0200
-Subject: [PULL] clockevents/clocksource fixes for 4.8-rc3
-Message-ID: <57C05026.7010905@linaro.org>
+Date: Fri, 26 Aug 2016 16:20:43 +0200
+Subject: [PATCH 1/3] clocksource/drivers/timer-atmel-pit: Enable mck clock
+In-Reply-To: <57C05026.7010905@linaro.org>
+References: <57C05026.7010905@linaro.org>
+Message-ID: <1472221245-14265-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Hi Thomas, Ingo,
+mck is needed to get the PIT working. Explicitly prepare_enable it instead
+of assuming it is enabled.
 
-this is the second round of fixes for 4.8-rc3.
+This solves an issue where the system is freezing when the ETM/ETB drivers
+are enabled.
 
- - Add the mck clock enablement for the ETM/ETB driver (Alexandre Belloni)
-
- - Clear the interrupts after stopping the timer in order to prevent
-spurious interrupt at init time (Chen-Yu Tsai)
-
- - Fix a memory corruption on pistachio by replacing a reference to
-pointer by the pointer itself (Marcin Nowakowski)
-
-Thanks !
-
-  -- Daniel
-
-The following changes since commit aa8c0f1ad7e862147f4efb32bbb71ff66eb38caa:
-
-  clocksource/drivers/pxa: Fix include files for compilation (2016-08-24
-11:16:38 +0200)
-
-are available in the git repository at:
-
-  http://git.linaro.org/people/daniel.lezcano/linux.git
-clockevents/4.8-fixes
-
-for you to fetch changes up to b53e7d000d9e6e9fd2c6eb6b82d2783c67fd599e:
-
-  clocksource/drivers/sun4i: Clear interrupts after stopping timer in
-probe function (2016-08-26 15:56:01 +0200)
-
-----------------------------------------------------------------
-Alexandre Belloni (1):
-      clocksource/drivers/timer-atmel-pit: Enable mck clock
-
-Chen-Yu Tsai (1):
-      clocksource/drivers/sun4i: Clear interrupts after stopping timer
-in probe function
-
-Marcin Nowakowski (1):
-      drivers/clocksource/pistachio: Fix memory corruption in init
-
- drivers/clocksource/sun4i_timer.c     | 9 ++++++++-
- drivers/clocksource/time-pistachio.c  | 8 ++++----
+Reported-by: Olivier Schonken <olivier.schonken@gmail.com>
+Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
  drivers/clocksource/timer-atmel-pit.c | 6 ++++++
- 3 files changed, 18 insertions(+), 5 deletions(-)
+ 1 file changed, 6 insertions(+)
 
+diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
+index 1ffac0c..3494bc5 100644
+--- a/drivers/clocksource/timer-atmel-pit.c
++++ b/drivers/clocksource/timer-atmel-pit.c
+@@ -261,6 +261,12 @@ static int __init at91sam926x_pit_dt_init(struct device_node *node)
+ 		return PTR_ERR(data->mck);
+ 	}
+ 
++	ret = clk_prepare_enable(data->mck);
++	if (ret) {
++		pr_err("Unable to enable mck\n");
++		return ret;
++	}
++
+ 	/* Get the interrupts property */
+ 	data->irq = irq_of_parse_and_map(node, 0);
+ 	if (!data->irq) {
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.9.1
