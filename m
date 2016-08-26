@@ -1,32 +1,88 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Aug 2016 11:56:16 +0200
-Subject: [PATCH] smc91x: remove ARM hack for unaligned 16-bit writes
-In-Reply-To: <1899384.M1jdqOztqi@wuerfel>
-References: <20160825144314.1850730-1-arnd@arndb.de>
- <20160825223743.GK1041@n2100.armlinux.org.uk> <1899384.M1jdqOztqi@wuerfel>
-Message-ID: <4142998.LszVVqOYjE@wuerfel>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 26 Aug 2016 12:08:08 +0200
+Subject: [PATCH v2] efi: arm64: treat regions with WT/WC set but WB
+ cleared as memory
+In-Reply-To: <57C00FA7.8010908@arm.com>
+References: <1472141829-12026-1-git-send-email-ard.biesheuvel@linaro.org>
+ <57C00FA7.8010908@arm.com>
+Message-ID: <CAKv+Gu8-u7bqEj3Y9N0W0xogRM7t6rzxcY=Of2HHHzhKjo59Dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, August 26, 2016 11:41:21 AM CEST Arnd Bergmann wrote:
-> 
-> I think this breaks machines that declare a device that just lists
-> SMC91X_USE_32BIT but not SMC91X_USE_16BIT. Right now, the way this
-> is interpreted is to use 32-bit accessors for most things, but
-> not avoiding 16-bit reads.
+On 26 August 2016 at 11:45, James Morse <james.morse@arm.com> wrote:
+> Hi Ard,
+>
+> On 25/08/16 17:17, Ard Biesheuvel wrote:
+>> Currently, memory regions are only recorded in the memblock memory table
+>> if they have the EFI_MEMORY_WB memory type attribute set. In case the
+>> region is of a reserved type, it is also marked as MEMBLOCK_NOMAP, which
+>> will leave it out of the linear mapping.
+>>
+>> However, memory regions may legally have the EFI_MEMORY_WT or EFI_MEMORY_WC
+>> attributes set, and the EFI_MEMORY_WB cleared, in which case the region in
+>> question is obviously backed by normal memory, but is not recorded in the
+>> memblock memory table at all.
+>
+> I've been hitting this when applying weird (but permissible) attributes to the
+> ACPI regions. Currently without WB we map these as device memory, then let
+> acpica make unaligned accesses to it.
+>
+> This patch fixes all that, and from the conversation on irc, the 'UC only' case
+> for ACPI tables is x86-legacy, and should never happen.
+>
 
-I guess my patch has the same problem here, with the
+Indeed, deliberately exposing a region containing ACPI tables as
+something that *requires* strongly ordered access does not make sense.
 
-	if (SMC_CAN_USE_8BIT && !SMC_16BIT(lp))
+The problem here is that the UEFI memory map describes both occupied
+and available regions, and in the 'available' case, it is obvious that
+these bits describe the nature of the physical backing of the region,
+i.e., whether the bus fabric, memory, etc allow writeback/writethrough
+caching, write buffering etc. This explains why most regions have all
+the bits set.
 
-check that is true when a platform device is declared with 32-bit
-I/O only but all three are enabled at compile-time. The best check
-I can think of here (aside from redefining how the flags work)
-would be
+In the occupied case, this can be misinterpreted as describing the
+nature of the content, like an ACPI table containing fields that are
+not naturally aligned. I.e, I don't think clearing the UC bit here
+should be interpreted to mean that the payload *requires* WB/WT/WC. It
+is up to the kernel to complain if it interprets a region, and notices
+that the only supported mapping type conflicts with the nature of the
+accesses we intend to perform.
 
-#define SMC_8BIT_ONLY(p) 	\
-	(((p)->cfg.flags & (SMC91X_USE_8BIT |SMC91X_USE_16BIT | SMC91X_USE_32BIT)) == \
-	 SMC91X_USE_8BIT)
+>
+>> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+>> index c49d50e68aee..c2ac5975fd5d 100644
+>> --- a/drivers/firmware/efi/arm-init.c
+>> +++ b/drivers/firmware/efi/arm-init.c
+>> @@ -163,18 +163,22 @@ static __init int is_reserve_region(efi_memory_desc_t *md)
+>>       case EFI_BOOT_SERVICES_DATA:
+>>       case EFI_CONVENTIONAL_MEMORY:
+>>       case EFI_PERSISTENT_MEMORY:
+>> -             return 0;
+>> +             /*
+>> +              * According to the spec, these regions are no longer reserved
+>> +              * after calling ExitBootServices(). However, we can only use
+>> +              * them as System RAM if they can be mapped writeback cacheable.
+>> +              */
+>> +             return (md->attribute & EFI_MEMORY_WB);
+>>       default:
+>>               break;
+>
+> Micro-nit: break here in order to immediately return false looks a bit odd...
+>
 
+Yes, I could not decide what to do with it so I left it.
 
-	Arnd
+>
+>>       }
+>> -     return is_normal_ram(md);
+>> +     return false;
+>>  }
+>
+>
+> Tested-by: James Morse <james.morse@arm.com>
+> Reviewed-by: James Morse <james.morse@arm.com>
+>
+
+Thanks,
+Ard.
