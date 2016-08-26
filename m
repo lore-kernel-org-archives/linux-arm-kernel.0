@@ -1,87 +1,72 @@
-From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Fri, 26 Aug 2016 10:42:39 +0200
-Subject: [PATCH v2 2/2] sdhci-of-arasan: Set controller to test mode when
- Card Detection is broken.
-In-Reply-To: <1472166111-28872-2-git-send-email-zach.brown@ni.com>
-References: <1472166111-28872-1-git-send-email-zach.brown@ni.com>
- <1472166111-28872-2-git-send-email-zach.brown@ni.com>
-Message-ID: <57C000FF.3090307@topic.nl>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 26 Aug 2016 10:58:20 +0200
+Subject: [PATCH 4/4] arm64: dts: marvell: describe the PIC and PMU on
+ Armada 7K/8K
+In-Reply-To: <1470408921-447-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Fri, 5 Aug 2016 16:55:21 +0200")
+References: <1470408921-447-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1470408921-447-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <87bn0fkitv.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26-08-16 01:01, Zach Brown wrote:
-> The sdhci controller on xilinx zynq devices will not function unless
-> the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
-> In cases where it is impossible to provide the CD bit in hardware,
-> setting the controller to test mode and then setting inserted to true
-> will get the controller to function without the CD bit.
+Hi Thomas,
+ 
+ On ven., ao?t 05 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+
+> This commit adds the necessary Device Tree description for the PIC
+> interrupt controller and the PMU available in the Marvell Armada 7K and
+> Armada 8K SoCs.
 >
-> When the device has the property broken-cd the driver changes the
-> controller to test mode and sets test inserted to true to make the
-> controller function.
->
-> Signed-off-by: Zach Brown <zach.brown@ni.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+Applied on mvebu/dt64
+
+Thanks,
+
+Gregory
 > ---
->   drivers/mmc/host/sdhci-of-arasan.c | 17 ++++++++++++++++-
->   drivers/mmc/host/sdhci.h           |  2 ++
->   2 files changed, 18 insertions(+), 1 deletion(-)
+>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
 >
-> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> index e0f193f..3798a3b 100644
-> --- a/drivers/mmc/host/sdhci-of-arasan.c
-> +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> @@ -26,6 +26,7 @@
->   #include <linux/phy/phy.h>
->   #include <linux/regmap.h>
->   #include "sdhci-pltfm.h"
-> +#include <linux/of.h>
-
-Not needed.
-
->   #define SDHCI_ARASAN_CLK_CTRL_OFFSET	0x2c
->   #define SDHCI_ARASAN_VENDOR_REGISTER	0x78
-> @@ -203,12 +204,26 @@ static void sdhci_arasan_hs400_enhanced_strobe(struct mmc_host *mmc,
->   	writel(vendor, host->ioaddr + SDHCI_ARASAN_VENDOR_REGISTER);
->   }
->
-> +void sdhci_arasan_reset(struct sdhci_host *host, u8 mask)
-> +{
-> +	u8 ctrl;
+> diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> index eab1a42..e70b996 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> @@ -128,6 +128,12 @@
+>  					     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_EDGE_RISING)>;
+>  			};
+>  
+> +			pmu {
+> +				compatible = "arm,cortex-a72-pmu";
+> +				interrupt-parent = <&pic>;
+> +				interrupts = <17>;
+> +			};
 > +
-> +	sdhci_reset(host, mask);
+>  			odmi: odmi at 300000 {
+>  				compatible = "marvell,odmi-controller";
+>  				interrupt-controller;
+> @@ -140,6 +146,14 @@
+>  				marvell,spi-base = <128>, <136>, <144>, <152>;
+>  			};
+>  
+> +			pic: interrupt-controller at 3f0100 {
+> +				compatible = "marvell,armada-8k-pic";
+> +				reg = <0x3f0100 0x10>;
+> +				#interrupt-cells = <1>;
+> +				interrupt-controller;
+> +				interrupts = <GIC_PPI 15 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
 > +
-> +	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION) {
-> +		ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
-> +		ctrl |= SDHCI_CTRL_CDTEST_INS |
-> +			SDHCI_CTRL_CDTEST_EN;
-> +		sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
-> +	}
-> +}
-> +
->   static struct sdhci_ops sdhci_arasan_ops = {
->   	.set_clock = sdhci_arasan_set_clock,
->   	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
->   	.get_timeout_clock = sdhci_arasan_get_timeout_clock,
->   	.set_bus_width = sdhci_set_bus_width,
-> -	.reset = sdhci_reset,
-> +	.reset = sdhci_arasan_reset,
->   	.set_uhs_signaling = sdhci_set_uhs_signaling,
->   };
+>  			xor at 400000 {
+>  				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
+>  				reg = <0x400000 0x1000>,
+> -- 
+> 2.7.4
 >
-> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> index 0411c9f..8d92d6e9 100644
-> --- a/drivers/mmc/host/sdhci.h
-> +++ b/drivers/mmc/host/sdhci.h
-> @@ -84,6 +84,8 @@
->   #define   SDHCI_CTRL_ADMA32	0x10
->   #define   SDHCI_CTRL_ADMA64	0x18
->   #define   SDHCI_CTRL_8BITBUS	0x20
-> +#define  SDHCI_CTRL_CDTEST_INS   0x40
-> +#define  SDHCI_CTRL_CDTEST_EN     0x80
->
->   #define SDHCI_POWER_CONTROL	0x29
->   #define  SDHCI_POWER_ON		0x01
 
-Looks okay, tested it and appears to work just as well as a tie-off in logic.
-
-Tested-by: mike.looijmans at topic.nl
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
