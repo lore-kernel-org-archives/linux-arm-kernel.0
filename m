@@ -1,94 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 27 Aug 2016 00:25:23 +0200
-Subject: [PATCH 2/2] pwm: sunxi: Yield some time to the pwm-block to
- become ready
-In-Reply-To: <1472147411-30424-3-git-send-email-oliver@schinagl.nl>
-References: <1472147411-30424-1-git-send-email-oliver@schinagl.nl>
- <1472147411-30424-3-git-send-email-oliver@schinagl.nl>
-Message-ID: <20160826222523.GH3165@lukather>
+From: oss@buserror.net (Scott Wood)
+Date: Fri, 26 Aug 2016 17:26:54 -0500
+Subject: [PATCH 04/10] dt-bindings: spi-nor: Update bindings for LS1012A
+In-Reply-To: <1472207269-18499-4-git-send-email-Bhaskar.Upadhaya@nxp.com>
+References: <1472207269-18499-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
+ <1472207269-18499-4-git-send-email-Bhaskar.Upadhaya@nxp.com>
+Message-ID: <1472250414.13245.3.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Aug 25, 2016 at 07:50:11PM +0200, Olliver Schinagl wrote:
-> From: Olliver Schinagl <o.schinagl@ultimaker.com>
-> 
-> The pwm-block of some of the sunxi chips feature a 'ready' flag to
-> indicate the software that it is ready for new commands.
-> 
-> Right now, when we call pwm_config and set the period, we write the
-> values to the registers, and turn off the clock to the IP. Because of
-> this, the hardware does not have time to configure the hardware and set
-> the 'ready' flag.
-> 
-> By running the clock just before making new changes and before checking
-> if the hardware is ready, the hardware has time to reconfigure itself
-> and set the clear the flag appropriately.
-> 
-> Signed-off-by: Olliver Schinagl <o.schinagl@ultimaker.com>
+On Fri, 2016-08-26 at 15:57 +0530, Bhaskar Upadhaya wrote:
+> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
 > ---
->  drivers/pwm/pwm-sun4i.c | 43 +++++++++++++++++++++++++------------------
->  1 file changed, 25 insertions(+), 18 deletions(-)
+> ?Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt | 2 ++
+> ?1 file changed, 2 insertions(+)
 > 
-> diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
-> index 5e97c8a..dd198c3 100644
-> --- a/drivers/pwm/pwm-sun4i.c
-> +++ b/drivers/pwm/pwm-sun4i.c
-> @@ -105,6 +105,22 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->  	u64 clk_rate, div = 0;
->  	unsigned int prescaler = 0;
->  	int err;
-> +	int ret = 0;
-> +
-> +	/* Let the PWM hardware run before making any changes. We do this to
-> +	 * allow the hardware to have some time to clear the 'ready' flag.
-> +	 */
+> diff --git a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+> b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+> index 2c91c03..fc99ef2 100644
+> --- a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+> +++ b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+> @@ -13,6 +13,7 @@ Required properties:
+> ??????????????????at25df321a
+> ??????????????????at25df641
+> ??????????????????at26df081a
+> +		?eon,en25s64
+> ??????????????????mr25h256
+> ??????????????????mx25l4005a
+> ??????????????????mx25l1606e
+> @@ -29,6 +30,7 @@ Required properties:
+> ??????????????????s25fl008k
+> ??????????????????s25fl064k
+> ??????????????????sst25vf040b
+> +		?sst,sst25wf040b
+> ??????????????????m25p40
+> ??????????????????m25p80
+> ??????????????????m25p16
 
-This is not the proper comment style.
+Whitespace doesn't match what's already there.
 
-> +	err = clk_prepare_enable(sun4i_pwm->clk);
-> +	if (err) {
-> +		dev_err(chip->dev, "failed to enable PWM clock\n");
-> +		return err;
-> +	}
+Why are these the only lines that have a vendor prefix?
 
-New line please.
-
-> +	spin_lock(&sun4i_pwm->ctrl_lock);
-> +	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
-> +	clk_gate = val & BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-> +	val |= BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-
-What are you doing here? You clear a bit, and then put the same one
-back in?
-
-> +	sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
-> +	spin_unlock(&sun4i_pwm->ctrl_lock);
->  
->  	clk_rate = clk_get_rate(sun4i_pwm->clk);
->  
-> @@ -137,7 +153,9 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->  
->  		if (div - 1 > PWM_PRD_MASK) {
->  			dev_err(chip->dev, "period exceeds the maximum value\n");
-> -			return -EINVAL;
-> +			ret = -EINVAL;
-> +			spin_lock(&sun4i_pwm->ctrl_lock);
-
-Uh? That's really suspicious. And even if right, please don't do that,
-this is just really bad for the comprehension of the workflow.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160827/f7e46b13/attachment-0001.sig>
+-Scott
