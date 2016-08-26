@@ -1,36 +1,30 @@
-From: oss@buserror.net (Scott Wood)
-Date: Fri, 26 Aug 2016 17:30:28 -0500
-Subject: [PATCH 05/10] dt-bindings: pci: Update bindings for LS1012A
-In-Reply-To: <1472207269-18499-5-git-send-email-Bhaskar.Upadhaya@nxp.com>
-References: <1472207269-18499-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
- <1472207269-18499-5-git-send-email-Bhaskar.Upadhaya@nxp.com>
-Message-ID: <1472250628.13245.6.camel@buserror.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 27 Aug 2016 00:32:10 +0200
+Subject: [PATCH 1/4] ARM: dts: sun4i: Disable ohci1 on ba10-tv-box
+In-Reply-To: <20160826144226.29969-1-hdegoede@redhat.com>
+References: <20160826144226.29969-1-hdegoede@redhat.com>
+Message-ID: <20160826223210.GJ3165@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-08-26 at 15:57 +0530, Bhaskar Upadhaya wrote:
-> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
-> ---
-> ?Documentation/devicetree/bindings/pci/layerscape-pci.txt | 1 +
-> ?1 file changed, 1 insertion(+)
+On Fri, Aug 26, 2016 at 04:42:23PM +0200, Hans de Goede wrote:
+> The ehci1/ohci1 pair on the ba10-tv-box is connected to an USB-2 wifi
+> module soldered on the PCB, so there enabling ohci1 is not necessary.
 > 
-> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> index 41e9f55..5755697 100644
-> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> @@ -15,6 +15,7 @@ Required properties:
-> ?- compatible: should contain the platform identifier such as:
-> ?????????"fsl,ls1021a-pcie", "snps,dw-pcie"
-> ?????????"fsl,ls2080a-pcie", "fsl,ls2085a-pcie", "snps,dw-pcie"
-> +	"fsl,ls1012a-pcie", "fsl,ls1043a-pcie" ,"snps,dw-pcie"
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Whitespace doesn't match.
+Applied, thanks
 
-Why are you listing both ls1012a and ls1043a together? ?Are they 100%
-compatible?
+Maxime
 
-Why are we updating all these bindings every time we come out with a new chip,
-rather than having a <chip> pattern like we did in other bindings?
-
--Scott
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160827/3ea4403c/attachment.sig>
