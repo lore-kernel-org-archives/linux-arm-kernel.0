@@ -1,39 +1,77 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 26 Aug 2016 15:56:47 +0100
-Subject: [PATCH v8 12/18] ARM: DT: STiH407: Add spdif_out pinctrl config
+Date: Fri, 26 Aug 2016 15:56:52 +0100
+Subject: [PATCH v8 17/18] drm/virtio: kconfig: Fix recursive dependency.
 In-Reply-To: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
 References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1472223413-7254-13-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1472223413-7254-18-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the pinctrl config for the spidf out
-pins used by the sasg codec IP.
+[..]
+drivers/video/fbdev/Kconfig:5:error: recursive dependency detected!
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/video/fbdev/Kconfig:5:	symbol FB is selected by DRM_KMS_FB_HELPER
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/gpu/drm/Kconfig:42:	symbol DRM_KMS_FB_HELPER depends on DRM_KMS_HELPER
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/gpu/drm/Kconfig:36:	symbol DRM_KMS_HELPER is selected by DRM_VIRTIO_GPU
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/gpu/drm/virtio/Kconfig:1:	symbol DRM_VIRTIO_GPU depends on VIRTIO
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/virtio/Kconfig:1:	symbol VIRTIO is selected by REMOTEPROC
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/remoteproc/Kconfig:4:	symbol REMOTEPROC is selected by ST_SLIM_REMOTEPROC
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/remoteproc/Kconfig:103:	symbol ST_SLIM_REMOTEPROC is selected by ST_FDMA
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/dma/Kconfig:440:	symbol ST_FDMA depends on DMADEVICES
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/dma/Kconfig:5:	symbol DMADEVICES is selected by SND_SOC_SH4_SIU
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+sound/soc/sh/Kconfig:29:	symbol SND_SOC_SH4_SIU is selected by SND_SIU_MIGOR
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+sound/soc/sh/Kconfig:64:	symbol SND_SIU_MIGOR depends on I2C
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/i2c/Kconfig:7:	symbol I2C is selected by FB_DDC
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/video/fbdev/Kconfig:63:	symbol FB_DDC is selected by FB_CYBER2000_DDC
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/video/fbdev/Kconfig:378:	symbol FB_CYBER2000_DDC depends on FB_CYBER2000
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/video/fbdev/Kconfig:366:	symbol FB_CYBER2000 depends on FB
 
-Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- arch/arm/boot/dts/stih407-pinctrl.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/gpu/drm/virtio/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-index 537db7e..598dbab 100644
---- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-@@ -1114,6 +1114,14 @@
- 				};
- 			};
- 
-+			spdif_out {
-+				pinctrl_spdif_out: spdif_out{
-+					st,pins {
-+						spdif_out = <&pio34 7 ALT1 OUT>;
-+					};
-+				};
-+			};
-+
- 			serial3 {
- 				pinctrl_serial3: serial3-0 {
- 					st,pins {
+diff --git a/drivers/gpu/drm/virtio/Kconfig b/drivers/gpu/drm/virtio/Kconfig
+index e1afc3d..90357d9 100644
+--- a/drivers/gpu/drm/virtio/Kconfig
++++ b/drivers/gpu/drm/virtio/Kconfig
+@@ -1,6 +1,7 @@
+ config DRM_VIRTIO_GPU
+ 	tristate "Virtio GPU driver"
+-	depends on DRM && VIRTIO
++	depends on DRM
++	select VIRTIO
+         select DRM_KMS_HELPER
+         select DRM_TTM
+ 	help
 -- 
 1.9.1
