@@ -1,501 +1,272 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 26 Aug 2016 15:56:36 +0100
-Subject: [PATCH v8 01/18] remoteproc: st_slim_rproc: add a slimcore rproc
- driver
+Date: Fri, 26 Aug 2016 15:56:39 +0100
+Subject: [PATCH v8 04/18] dmaengine: st_fdma: Add STMicroelectronics FDMA
+ driver header file
 In-Reply-To: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
 References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1472223413-7254-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1472223413-7254-5-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-slim core is used as a basis for many IPs in the STi
-chipsets such as fdma and demux. To avoid duplicating
-the elf loading code in each device driver a slim
-rproc driver has been created.
+This header file will also be used by the dma xbar driver in the
+future.
 
-This driver is designed to be used by other device drivers
-such as fdma, or demux whose IP is based around a slim core.
-The device driver can call slim_rproc_alloc() to allocate
-a slim rproc and slim_rproc_put() when finished.
-
-This driver takes care of ioremapping the slim
-registers (dmem, imem, slimcore, peripherals), whose offsets
-and sizes can change between IP's. It also obtains and enables
-any clocks used by the device. This approach avoids having
-a double mapping of the registers as slim_rproc does not register
-its own platform device. It also maps well to device tree
-abstraction as it allows us to have one dt node for the whole
-device.
-
-All of the generic rproc elf loading code can be reused, and
-we provide start() stop() hooks to start and stop the slim
-core once the firmware has been loaded. This has been tested
-successfully with fdma driver.
-
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- drivers/remoteproc/Kconfig               |   8 +
- drivers/remoteproc/Makefile              |   1 +
- drivers/remoteproc/st_slim_rproc.c       | 364 +++++++++++++++++++++++++++++++
- include/linux/remoteproc/st_slim_rproc.h |  53 +++++
- 4 files changed, 426 insertions(+)
- create mode 100644 drivers/remoteproc/st_slim_rproc.c
- create mode 100644 include/linux/remoteproc/st_slim_rproc.h
+ drivers/dma/st_fdma.h | 244 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 244 insertions(+)
+ create mode 100644 drivers/dma/st_fdma.h
 
-diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
-index 1a8bf76a..06765e0 100644
---- a/drivers/remoteproc/Kconfig
-+++ b/drivers/remoteproc/Kconfig
-@@ -100,4 +100,12 @@ config ST_REMOTEPROC
- 	  processor framework.
- 	  This can be either built-in or a loadable module.
- 
-+config ST_SLIM_REMOTEPROC
-+	tristate "ST Slim remoteproc support"
-+	select REMOTEPROC
-+	help
-+	  Say y here to support firmware loading on IP based around
-+	  the Slim core.
-+	  If unsure say N.
-+
- endmenu
-diff --git a/drivers/remoteproc/Makefile b/drivers/remoteproc/Makefile
-index 92d3758..db1dae7 100644
---- a/drivers/remoteproc/Makefile
-+++ b/drivers/remoteproc/Makefile
-@@ -14,3 +14,4 @@ obj-$(CONFIG_DA8XX_REMOTEPROC)		+= da8xx_remoteproc.o
- obj-$(CONFIG_QCOM_MDT_LOADER)		+= qcom_mdt_loader.o
- obj-$(CONFIG_QCOM_Q6V5_PIL)		+= qcom_q6v5_pil.o
- obj-$(CONFIG_ST_REMOTEPROC)		+= st_remoteproc.o
-+obj-$(CONFIG_ST_SLIM_REMOTEPROC)	+= st_slim_rproc.o
-diff --git a/drivers/remoteproc/st_slim_rproc.c b/drivers/remoteproc/st_slim_rproc.c
+diff --git a/drivers/dma/st_fdma.h b/drivers/dma/st_fdma.h
 new file mode 100644
-index 0000000..f4bf2d7
+index 0000000..16fa6f5
 --- /dev/null
-+++ b/drivers/remoteproc/st_slim_rproc.c
-@@ -0,0 +1,364 @@
++++ b/drivers/dma/st_fdma.h
+@@ -0,0 +1,244 @@
 +/*
-+ * st_slim_rproc.c
++ * st_fdma.h
 + *
-+ * Copyright (C) 2016 STMicroelectronics
-+ * Author: Peter Griffin <peter.griffin@linaro.org>
++ * Copyright (C) 2014 STMicroelectronics
++ * Author: Ludovic Barre <Ludovic.barre@st.com>
 + * License terms:  GNU General Public License (GPL), version 2
 + */
++#ifndef __DMA_ST_FDMA_H
++#define __DMA_ST_FDMA_H
 +
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/remoteproc.h>
++#include <linux/dmaengine.h>
++#include <linux/dmapool.h>
++#include <linux/io.h>
 +#include <linux/remoteproc/st_slim_rproc.h>
-+#include "remoteproc_internal.h"
++#include "virt-dma.h"
 +
-+/* slimcore registers */
-+#define SLIM_ID_OFST		0x0
-+#define SLIM_VER_OFST		0x4
++#define ST_FDMA_NR_DREQS 32
 +
-+#define SLIM_EN_OFST		0x8
-+#define SLIM_EN_RUN			BIT(0)
-+
-+#define SLIM_CLK_GATE_OFST	0xC
-+#define SLIM_CLK_GATE_DIS		BIT(0)
-+#define SLIM_CLK_GATE_RESET		BIT(2)
-+
-+#define SLIM_SLIM_PC_OFST	0x20
-+
-+/* dmem registers */
-+#define SLIM_REV_ID_OFST	0x0
-+#define SLIM_REV_ID_MIN_MASK		GENMASK(15, 8)
-+#define SLIM_REV_ID_MIN(id)		((id & SLIM_REV_ID_MIN_MASK) >> 8)
-+#define SLIM_REV_ID_MAJ_MASK		GENMASK(23, 16)
-+#define SLIM_REV_ID_MAJ(id)		((id & SLIM_REV_ID_MAJ_MASK) >> 16)
-+
-+
-+/* peripherals registers */
-+#define SLIM_STBUS_SYNC_OFST	0xF88
-+#define SLIM_STBUS_SYNC_DIS		BIT(0)
-+
-+#define SLIM_INT_SET_OFST	0xFD4
-+#define SLIM_INT_CLR_OFST	0xFD8
-+#define SLIM_INT_MASK_OFST	0xFDC
-+
-+#define SLIM_CMD_CLR_OFST	0xFC8
-+#define SLIM_CMD_MASK_OFST	0xFCC
-+
-+static const char *mem_names[ST_SLIM_MEM_MAX] = {
-+	[ST_SLIM_DMEM]	= "dmem",
-+	[ST_SLIM_IMEM]	= "imem",
-+};
-+
-+static int slim_clk_get(struct st_slim_rproc *slim_rproc, struct device *dev)
-+{
-+	int clk, err;
-+
-+	for (clk = 0; clk < ST_SLIM_MAX_CLK; clk++) {
-+		slim_rproc->clks[clk] = of_clk_get(dev->of_node, clk);
-+		if (IS_ERR(slim_rproc->clks[clk])) {
-+			err = PTR_ERR(slim_rproc->clks[clk]);
-+			if (err == -EPROBE_DEFER)
-+				goto err_put_clks;
-+			slim_rproc->clks[clk] = NULL;
-+			break;
-+		}
-+	}
-+
-+	return 0;
-+
-+err_put_clks:
-+	while (--clk >= 0)
-+		clk_put(slim_rproc->clks[clk]);
-+
-+	return err;
-+}
-+
-+static void slim_clk_disable(struct st_slim_rproc *slim_rproc)
-+{
-+	int clk;
-+
-+	for (clk = 0; clk < ST_SLIM_MAX_CLK && slim_rproc->clks[clk]; clk++)
-+		clk_disable_unprepare(slim_rproc->clks[clk]);
-+}
-+
-+static int slim_clk_enable(struct st_slim_rproc *slim_rproc)
-+{
-+	int clk, ret;
-+
-+	for (clk = 0; clk < ST_SLIM_MAX_CLK && slim_rproc->clks[clk]; clk++) {
-+		ret = clk_prepare_enable(slim_rproc->clks[clk]);
-+		if (ret)
-+			goto err_disable_clks;
-+	}
-+
-+	return 0;
-+
-+err_disable_clks:
-+	while (--clk >= 0)
-+		clk_disable_unprepare(slim_rproc->clks[clk]);
-+
-+	return ret;
-+}
++#define FW_NAME_SIZE 30
 +
 +/**
-+ * Remoteproc slim specific device handlers
-+ */
-+static int slim_rproc_start(struct rproc *rproc)
-+{
-+	struct device *dev = &rproc->dev;
-+	struct st_slim_rproc *slim_rproc = rproc->priv;
-+	unsigned long hw_id, hw_ver, fw_rev;
-+	u32 val;
-+	int ret;
-+
-+	ret = slim_clk_enable(slim_rproc);
-+	if (ret) {
-+		dev_err(dev, "Failed to enable clocks\n");
-+		return ret;
-+	}
-+
-+	/* disable CPU pipeline clock & reset cpu pipeline */
-+	val = SLIM_CLK_GATE_DIS | SLIM_CLK_GATE_RESET;
-+	writel(val, slim_rproc->slimcore + SLIM_CLK_GATE_OFST);
-+
-+	/* disable SLIM core STBus sync */
-+	writel(SLIM_STBUS_SYNC_DIS, slim_rproc->peri + SLIM_STBUS_SYNC_OFST);
-+
-+	/* enable cpu pipeline clock */
-+	writel(!SLIM_CLK_GATE_DIS,
-+		slim_rproc->slimcore + SLIM_CLK_GATE_OFST);
-+
-+	/* clear int & cmd mailbox */
-+	writel(~0U, slim_rproc->peri + SLIM_INT_CLR_OFST);
-+	writel(~0U, slim_rproc->peri + SLIM_CMD_CLR_OFST);
-+
-+	/* enable all channels cmd & int */
-+	writel(~0U, slim_rproc->peri + SLIM_INT_MASK_OFST);
-+	writel(~0U, slim_rproc->peri + SLIM_CMD_MASK_OFST);
-+
-+	/* enable cpu */
-+	writel(SLIM_EN_RUN, slim_rproc->slimcore + SLIM_EN_OFST);
-+
-+	hw_id = readl_relaxed(slim_rproc->slimcore + SLIM_ID_OFST);
-+	hw_ver = readl_relaxed(slim_rproc->slimcore + SLIM_VER_OFST);
-+
-+	fw_rev = readl(slim_rproc->mem[ST_SLIM_DMEM].cpu_addr +
-+			SLIM_REV_ID_OFST);
-+
-+	dev_info(dev, "fw rev:%ld.%ld on SLIM %ld.%ld\n",
-+		 SLIM_REV_ID_MAJ(fw_rev), SLIM_REV_ID_MIN(fw_rev),
-+		 hw_id, hw_ver);
-+
-+	return 0;
-+}
-+
-+static int slim_rproc_stop(struct rproc *rproc)
-+{
-+	struct st_slim_rproc *slim_rproc = rproc->priv;
-+	u32 val;
-+
-+	/* mask all (cmd & int) channels */
-+	writel(0UL, slim_rproc->peri + SLIM_INT_MASK_OFST);
-+	writel(0UL, slim_rproc->peri + SLIM_CMD_MASK_OFST);
-+
-+	/* disable cpu pipeline clock */
-+	writel(SLIM_CLK_GATE_DIS, slim_rproc->slimcore + SLIM_CLK_GATE_OFST);
-+
-+	writel(!SLIM_EN_RUN, slim_rproc->slimcore + SLIM_EN_OFST);
-+
-+	val = readl(slim_rproc->slimcore + SLIM_EN_OFST);
-+	if (val & SLIM_EN_RUN)
-+		dev_warn(&rproc->dev, "Failed to disable SLIM");
-+
-+	slim_clk_disable(slim_rproc);
-+
-+	dev_dbg(&rproc->dev, "slim stopped\n");
-+
-+	return 0;
-+}
-+
-+static void *slim_rproc_da_to_va(struct rproc *rproc, u64 da, int len)
-+{
-+	struct st_slim_rproc *slim_rproc = rproc->priv;
-+	void *va = NULL;
-+	int i;
-+
-+	for (i = 0; i < ST_SLIM_MEM_MAX; i++) {
-+		if (da != slim_rproc->mem[i].bus_addr)
-+			continue;
-+
-+		if (len <= slim_rproc->mem[i].size) {
-+			/* __force to make sparse happy with type conversion */
-+			va = (__force void *)slim_rproc->mem[i].cpu_addr;
-+			break;
-+		}
-+	}
-+
-+	dev_dbg(&rproc->dev, "%s: da = 0x%llx len = 0x%x va = 0x%p\n",
-+		__func__, da, len, va);
-+
-+	return va;
-+}
-+
-+static struct rproc_ops slim_rproc_ops = {
-+	.start		= slim_rproc_start,
-+	.stop		= slim_rproc_stop,
-+	.da_to_va       = slim_rproc_da_to_va,
-+};
-+
-+/**
-+ * Firmware handler operations: sanity, boot address, load ...
-+ */
-+
-+static struct resource_table empty_rsc_tbl = {
-+	.ver = 1,
-+	.num = 0,
-+};
-+
-+static struct resource_table *slim_rproc_find_rsc_table(struct rproc *rproc,
-+					       const struct firmware *fw,
-+					       int *tablesz)
-+{
-+	*tablesz = sizeof(empty_rsc_tbl);
-+	return &empty_rsc_tbl;
-+}
-+
-+static struct rproc_fw_ops slim_rproc_fw_ops = {
-+	.find_rsc_table = slim_rproc_find_rsc_table,
-+};
-+
-+/**
-+ * st_slim_rproc_alloc() - allocate and initialise slim rproc
-+ * @pdev: Pointer to the platform_device struct
-+ * @fw_name: Name of firmware for rproc to use
++ * struct st_fdma_generic_node - Free running/paced generic node
 + *
-+ * Function for allocating and initialising a slim rproc for use by
-+ * device drivers whose IP is based around the slim slim core. It
-+ * obtains and enables any clocks required by the slim core and also
-+ * ioremaps the various IO.
-+ *
-+ * Returns st_slim_rproc pointer or PTR_ERR() on error.
++ * @length: Length in bytes of a line in a 2D mem to mem
++ * @sstride: Stride, in bytes, between source lines in a 2D data move
++ * @dstride: Stride, in bytes, between destination lines in a 2D data move
 + */
-+
-+struct st_slim_rproc *st_slim_rproc_alloc(struct platform_device *pdev,
-+				char *fw_name)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct st_slim_rproc *slim_rproc;
-+	struct device_node *np = dev->of_node;
-+	struct rproc *rproc;
-+	struct resource *res;
-+	int err, i;
-+	const struct rproc_fw_ops *elf_ops;
-+
-+	if (WARN_ON(!np || !fw_name))
-+		return ERR_PTR(-EINVAL);
-+
-+	if (!of_device_is_compatible(np, "st,slim-rproc"))
-+		return ERR_PTR(-EINVAL);
-+
-+	rproc = rproc_alloc(dev, np->name, &slim_rproc_ops,
-+			fw_name, sizeof(*slim_rproc));
-+	if (!rproc)
-+		return ERR_PTR(-ENOMEM);
-+
-+	rproc->has_iommu = false;
-+
-+	slim_rproc = rproc->priv;
-+	slim_rproc->rproc = rproc;
-+
-+	elf_ops = rproc->fw_ops;
-+	/* Use some generic elf ops */
-+	slim_rproc_fw_ops.load = elf_ops->load;
-+	slim_rproc_fw_ops.sanity_check = elf_ops->sanity_check;
-+
-+	rproc->fw_ops = &slim_rproc_fw_ops;
-+
-+	/* get imem and dmem */
-+	for (i = 0; i < ARRAY_SIZE(mem_names); i++) {
-+
-+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-+						mem_names[i]);
-+
-+		slim_rproc->mem[i].cpu_addr = devm_ioremap_resource(dev, res);
-+		if (IS_ERR(slim_rproc->mem[i].cpu_addr)) {
-+			dev_err(&pdev->dev, "devm_ioremap_resource failed\n");
-+			err = PTR_ERR(slim_rproc->mem[i].cpu_addr);
-+			goto err;
-+		}
-+		slim_rproc->mem[i].bus_addr = res->start;
-+		slim_rproc->mem[i].size = resource_size(res);
-+	}
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "slimcore");
-+
-+	slim_rproc->slimcore = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(slim_rproc->slimcore)) {
-+		dev_err(&pdev->dev,
-+			"devm_ioremap_resource failed for slimcore\n");
-+		err = PTR_ERR(slim_rproc->slimcore);
-+		goto err;
-+	}
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "peripherals");
-+
-+	slim_rproc->peri = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(slim_rproc->peri)) {
-+		dev_err(&pdev->dev, "devm_ioremap_resource failed for peri\n");
-+		err = PTR_ERR(slim_rproc->peri);
-+		goto err;
-+	}
-+
-+	err = slim_clk_get(slim_rproc, dev);
-+	if (err)
-+		goto err;
-+
-+	/* Register as a remoteproc device */
-+	err = rproc_add(rproc);
-+	if (err) {
-+		dev_err(dev, "registration of slim remoteproc failed\n");
-+		goto err_clk;
-+	}
-+
-+	return slim_rproc;
-+
-+err_clk:
-+	for (i = 0; i < ST_SLIM_MAX_CLK && slim_rproc->clks[i]; i++)
-+		clk_put(slim_rproc->clks[i]);
-+err:
-+	rproc_put(rproc);
-+	return ERR_PTR(err);
-+}
-+EXPORT_SYMBOL(st_slim_rproc_alloc);
++struct st_fdma_generic_node {
++	u32 length;
++	u32 sstride;
++	u32 dstride;
++};
 +
 +/**
-+  * st_slim_rproc_put() - put slim rproc resources
-+  * @slim_rproc: Pointer to the st_slim_rproc struct
-+  *
-+  * Function for calling respective _put() functions on
-+  * slim_rproc resources.
-+  *
-+  */
-+void st_slim_rproc_put(struct st_slim_rproc *slim_rproc)
-+{
-+	int clk;
++ * struct st_fdma_hw_node - Node structure used by fdma hw
++ *
++ * @next: Pointer to next node
++ * @control: Transfer Control Parameters
++ * @nbytes: Number of Bytes to read
++ * @saddr: Source address
++ * @daddr: Destination address
++ *
++ * @generic: generic node for free running/paced transfert type
++ * 2 others transfert type are possible, but not yet implemented
++ *
++ * The NODE structures must be aligned to a 32 byte boundary
++ */
++struct st_fdma_hw_node {
++	u32 next;
++	u32 control;
++	u32 nbytes;
++	u32 saddr;
++	u32 daddr;
++	union {
++		struct st_fdma_generic_node generic;
++	};
++} __aligned(32);
 +
-+	if (!slim_rproc)
-+		return;
-+
-+	for (clk = 0; clk < ST_SLIM_MAX_CLK && slim_rproc->clks[clk]; clk++)
-+		clk_put(slim_rproc->clks[clk]);
-+
-+	rproc_del(slim_rproc->rproc);
-+	rproc_put(slim_rproc->rproc);
-+}
-+EXPORT_SYMBOL(st_slim_rproc_put);
-+
-+MODULE_AUTHOR("Peter Griffin");
-+MODULE_DESCRIPTION("STMicroelectronics SLIM rproc driver");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/remoteproc/st_slim_rproc.h b/include/linux/remoteproc/st_slim_rproc.h
-new file mode 100644
-index 0000000..64a2c5b
---- /dev/null
-+++ b/include/linux/remoteproc/st_slim_rproc.h
-@@ -0,0 +1,53 @@
 +/*
-+ * st_slim_rproc.h
++ * node control parameters
++ */
++#define FDMA_NODE_CTRL_REQ_MAP_MASK	GENMASK(4, 0)
++#define FDMA_NODE_CTRL_REQ_MAP_FREE_RUN	0x0
++#define FDMA_NODE_CTRL_REQ_MAP_DREQ(n)	((n)&FDMA_NODE_CTRL_REQ_MAP_MASK)
++#define FDMA_NODE_CTRL_REQ_MAP_EXT		FDMA_NODE_CTRL_REQ_MAP_MASK
++#define FDMA_NODE_CTRL_SRC_MASK		GENMASK(6, 5)
++#define FDMA_NODE_CTRL_SRC_STATIC	BIT(5)
++#define FDMA_NODE_CTRL_SRC_INCR		BIT(6)
++#define FDMA_NODE_CTRL_DST_MASK		GENMASK(8, 7)
++#define FDMA_NODE_CTRL_DST_STATIC	BIT(7)
++#define FDMA_NODE_CTRL_DST_INCR		BIT(8)
++#define FDMA_NODE_CTRL_SECURE		BIT(15)
++#define FDMA_NODE_CTRL_PAUSE_EON	BIT(30)
++#define FDMA_NODE_CTRL_INT_EON		BIT(31)
++
++/**
++ * struct st_fdma_sw_node - descriptor structure for link list
 + *
-+ * Copyright (C) 2016 STMicroelectronics
-+ * Author: Peter Griffin <peter.griffin@linaro.org>
-+ * License terms:  GNU General Public License (GPL), version 2
++ * @pdesc: Physical address of desc
++ * @node: link used for putting this into a channel queue
 + */
-+#ifndef _ST_SLIM_H
-+#define _ST_SLIM_H
-+
-+#define ST_SLIM_MEM_MAX 2
-+#define ST_SLIM_MAX_CLK 4
-+
-+enum {
-+	ST_SLIM_DMEM,
-+	ST_SLIM_IMEM,
++struct st_fdma_sw_node {
++	dma_addr_t pdesc;
++	struct st_fdma_hw_node *desc;
 +};
 +
-+/**
-+ * struct st_slim_mem - slim internal memory structure
-+ * @cpu_addr: MPU virtual address of the memory region
-+ * @bus_addr: Bus address used to access the memory region
-+ * @size: Size of the memory region
-+ */
-+struct st_slim_mem {
-+	void __iomem *cpu_addr;
-+	phys_addr_t bus_addr;
-+	size_t size;
++#define NAME_SZ 10
++
++struct st_fdma_driverdata {
++	u32 id;
++	char name[NAME_SZ];
 +};
 +
-+/**
-+ * struct st_slim_rproc - SLIM slim core
-+ * @rproc: rproc handle
-+ * @mem: slim memory information
-+ * @slimcore: slim slimcore regs
-+ * @peri: slim peripheral regs
-+ * @clks: slim clocks
-+ */
-+struct st_slim_rproc {
-+	struct rproc *rproc;
-+	struct st_slim_mem mem[ST_SLIM_MEM_MAX];
-+	void __iomem *slimcore;
-+	void __iomem *peri;
-+
-+	/* st_slim_rproc private */
-+	struct clk *clks[ST_SLIM_MAX_CLK];
++struct st_fdma_desc {
++	struct virt_dma_desc vdesc;
++	struct st_fdma_chan *fchan;
++	bool iscyclic;
++	unsigned int n_nodes;
++	struct st_fdma_sw_node node[];
 +};
 +
-+struct st_slim_rproc *st_slim_rproc_alloc(struct platform_device *pdev,
-+					char *fw_name);
-+void st_slim_rproc_put(struct st_slim_rproc *slim_rproc);
++enum st_fdma_type {
++	ST_FDMA_TYPE_FREE_RUN,
++	ST_FDMA_TYPE_PACED,
++};
 +
-+#endif
++struct st_fdma_cfg {
++	struct device_node *of_node;
++	enum st_fdma_type type;
++	dma_addr_t dev_addr;
++	enum dma_transfer_direction dir;
++	int req_line; /* request line */
++	long req_ctrl; /* Request control */
++};
++
++struct st_fdma_chan {
++	struct st_fdma_dev *fdev;
++	struct dma_pool *node_pool;
++	struct dma_slave_config scfg;
++	struct st_fdma_cfg cfg;
++
++	int dreq_line;
++
++	struct virt_dma_chan vchan;
++	struct st_fdma_desc *fdesc;
++	enum dma_status	status;
++};
++
++struct st_fdma_dev {
++	struct device *dev;
++	const struct st_fdma_driverdata *drvdata;
++	struct dma_device dma_device;
++
++	struct st_slim_rproc *slim_rproc;
++
++	int irq;
++
++	struct st_fdma_chan *chans;
++
++	spinlock_t dreq_lock;
++	unsigned long dreq_mask;
++
++	u32 nr_channels;
++	char fw_name[FW_NAME_SIZE];
++};
++
++/* Peripheral Registers*/
++
++#define FDMA_CMD_STA_OFST	0xFC0
++#define FDMA_CMD_SET_OFST	0xFC4
++#define FDMA_CMD_CLR_OFST	0xFC8
++#define FDMA_CMD_MASK_OFST	0xFCC
++#define FDMA_CMD_START(ch)		(0x1 << (ch << 1))
++#define FDMA_CMD_PAUSE(ch)		(0x2 << (ch << 1))
++#define FDMA_CMD_FLUSH(ch)		(0x3 << (ch << 1))
++
++#define FDMA_INT_STA_OFST	0xFD0
++#define FDMA_INT_STA_CH			0x1
++#define FDMA_INT_STA_ERR		0x2
++
++#define FDMA_INT_SET_OFST	0xFD4
++#define FDMA_INT_CLR_OFST	0xFD8
++#define FDMA_INT_MASK_OFST	0xFDC
++
++#define fdma_read(fdev, name) \
++	readl((fdev)->slim_rproc->peri + name)
++
++#define fdma_write(fdev, val, name) \
++	writel((val), (fdev)->slim_rproc->peri + name)
++
++/* fchan interface (dmem) */
++#define FDMA_CH_CMD_OFST	0x200
++#define FDMA_CH_CMD_STA_MASK		GENMASK(1, 0)
++#define FDMA_CH_CMD_STA_IDLE		(0x0)
++#define FDMA_CH_CMD_STA_START		(0x1)
++#define FDMA_CH_CMD_STA_RUNNING		(0x2)
++#define FDMA_CH_CMD_STA_PAUSED		(0x3)
++#define FDMA_CH_CMD_ERR_MASK		GENMASK(4, 2)
++#define FDMA_CH_CMD_ERR_INT		(0x0 << 2)
++#define FDMA_CH_CMD_ERR_NAND		(0x1 << 2)
++#define FDMA_CH_CMD_ERR_MCHI		(0x2 << 2)
++#define FDMA_CH_CMD_DATA_MASK		GENMASK(31, 5)
++#define fchan_read(fchan, name) \
++	readl((fchan)->fdev->slim_rproc->mem[ST_SLIM_DMEM].cpu_addr \
++			+ (fchan)->vchan.chan.chan_id * 0x4 \
++			+ name)
++
++#define fchan_write(fchan, val, name) \
++	writel((val), (fchan)->fdev->slim_rproc->mem[ST_SLIM_DMEM].cpu_addr \
++			+ (fchan)->vchan.chan.chan_id * 0x4 \
++			+ name)
++
++/* req interface */
++#define FDMA_REQ_CTRL_OFST	0x240
++#define dreq_write(fchan, val, name) \
++	writel((val), (fchan)->fdev->slim_rproc->mem[ST_SLIM_DMEM].cpu_addr \
++			+ fchan->dreq_line * 0x04 \
++			+ name)
++/* node interface */
++#define FDMA_NODE_SZ 128
++#define FDMA_PTRN_OFST		0x800
++#define FDMA_CNTN_OFST		0x808
++#define FDMA_SADDRN_OFST	0x80c
++#define FDMA_DADDRN_OFST	0x810
++#define fnode_read(fchan, name) \
++	readl((fchan)->fdev->slim_rproc->mem[ST_SLIM_DMEM].cpu_addr \
++			+ (fchan)->vchan.chan.chan_id * FDMA_NODE_SZ \
++			+ name)
++
++#define fnode_write(fchan, val, name) \
++	writel((val), (fchan)->fdev->slim_rproc->mem[ST_SLIM_DMEM].cpu_addr \
++			+ (fchan)->vchan.chan.chan_id * FDMA_NODE_SZ \
++			+ name)
++
++/*
++ * request control bits
++ */
++#define FDMA_REQ_CTRL_NUM_OPS_MASK	GENMASK(31, 24)
++#define FDMA_REQ_CTRL_NUM_OPS(n)	(FDMA_REQ_CTRL_NUM_OPS_MASK & \
++					((n) << 24))
++#define FDMA_REQ_CTRL_INITIATOR_MASK	BIT(22)
++#define FDMA_REQ_CTRL_INIT0		(0x0 << 22)
++#define FDMA_REQ_CTRL_INIT1		(0x1 << 22)
++#define FDMA_REQ_CTRL_INC_ADDR_ON	BIT(21)
++#define FDMA_REQ_CTRL_DATA_SWAP_ON	BIT(17)
++#define FDMA_REQ_CTRL_WNR		BIT(14)
++#define FDMA_REQ_CTRL_OPCODE_MASK	GENMASK(7, 4)
++#define FDMA_REQ_CTRL_OPCODE_LD_ST1	(0x0 << 4)
++#define FDMA_REQ_CTRL_OPCODE_LD_ST2	(0x1 << 4)
++#define FDMA_REQ_CTRL_OPCODE_LD_ST4	(0x2 << 4)
++#define FDMA_REQ_CTRL_OPCODE_LD_ST8	(0x3 << 4)
++#define FDMA_REQ_CTRL_OPCODE_LD_ST16	(0x4 << 4)
++#define FDMA_REQ_CTRL_OPCODE_LD_ST32	(0x5 << 4)
++#define FDMA_REQ_CTRL_OPCODE_LD_ST64	(0x6 << 4)
++#define FDMA_REQ_CTRL_HOLDOFF_MASK	GENMASK(2, 0)
++#define FDMA_REQ_CTRL_HOLDOFF(n)	((n) & FDMA_REQ_CTRL_HOLDOFF_MASK)
++
++/* bits used by client to configure request control */
++#define FDMA_REQ_CTRL_CFG_MASK (FDMA_REQ_CTRL_HOLDOFF_MASK | \
++				FDMA_REQ_CTRL_DATA_SWAP_ON | \
++				FDMA_REQ_CTRL_INC_ADDR_ON | \
++				FDMA_REQ_CTRL_INITIATOR_MASK)
++
++#endif	/* __DMA_ST_FDMA_H */
 -- 
 1.9.1
