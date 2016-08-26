@@ -1,50 +1,67 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 26 Aug 2016 09:10:09 +0200
-Subject: [PATCH] clkdev: Detect errors in clk_hw_register_clkdev() for mass
- registration
-Message-ID: <1472195409-14268-1-git-send-email-geert@linux-m68k.org>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 26 Aug 2016 09:19:00 +0200
+Subject: [PATCH v2 1/2] sdhci-of-arasan: Modify arasan sdhci documentation
+ about broken-cd and non-removable properties.
+In-Reply-To: <1472166111-28872-1-git-send-email-zach.brown@ni.com>
+References: <1472166111-28872-1-git-send-email-zach.brown@ni.com>
+Message-ID: <f2a24bba-3faf-0882-4d7f-6b654247da7f@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unlike clkdev_create(), clkdev_hw_create() doesn't check for passed
-error objects from a previous registration call. Hence the caller of
-clk_hw_register_*() had to check for errors before calling
-clkdev_hw_create*().
+On 26.8.2016 01:01, Zach Brown wrote:
+> The sdhci controller on xilinx zynq devices will not function unless
+> the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
+> In cases where it is impossible to provide the CD bit in hardware,
+> setting the controller to test mode and then setting inserted to true
+> will get the controller to function without the CD bit.
+> 
+> Additionally in some situations it will make sense to use the
+> "broken-cd" and "non-removable" property together.
+> i.e the sd device is non-removable so polling doesn't make sense, but
+> the CD is broken and the controller will need to be in test mode to
+> function.
+> 
+> This patch modifies the documentation to reflect those differences
+> from the standard behaviours.
+> 
+> Signed-off-by: Zach Brown <zach.brown@ni.com>
+> ---
+> v2:
+>   * improved commit messages
+>   * removed fake-cd device property
+>   * removed fake-cd quirk
+>   * use broken-cd device property
+>   * documented new usage of broken-cd
+> 
+>  Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> index 3404afa..b41c448 100644
+> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> @@ -37,6 +37,14 @@ Optional Properties:
+>      in place we will export a clock representing the Card Clock.  This clock
+>      is expected to be consumed by our PHY.  You must also specify
+>  
+> +Card detection:
+> +The arasan controller does not work
+> +when the CD bit is not supplied unless in test mode.
+> +- broken-cd: The CD bit is not supplied and the controller will
+> +  need to be set to test mode to function.
+> +- non-removable: like normal, except it can now be partnered with
+> +  broken-cd, which will turn off polling, but keep test mode on.
+> +
+>  Example:
+>  	sdhci at e0100000 {
+>  		compatible = "arasan,sdhci-8.9a";
+> @@ -72,4 +80,4 @@ Example:
+>  		phy-names = "phy_arasan";
+>  		#clock-cells = <0>;
+>  		status = "disabled";
+> -	};
+> +	} ;
 
-Make clkdev_hw_create() more similar to clkdev_create() by adding this
-error check, removing the burden from callers that do mass registration.
+Probably you don't need this change.
 
-Fixes: e4f1b49bda6d6aa2 ("clkdev: Add clk_hw based registration APIs")
-Fixes: 944b9a41e004534f ("clk: ls1x: Migrate to clk_hw based OF and registration APIs")
-Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
----
- drivers/clk/clkdev.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 97ae60fa15849954..bb8a77a5985f8627 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -448,12 +448,20 @@ EXPORT_SYMBOL(clk_register_clkdev);
-  *
-  * con_id or dev_id may be NULL as a wildcard, just as in the rest of
-  * clkdev.
-+ *
-+ * To make things easier for mass registration, we detect error clk_hws
-+ * from a previous clk_hw_register_*() call, and return the error code for
-+ * those.  This is to permit this function to be called immediately
-+ * after clk_hw_register_*().
-  */
- int clk_hw_register_clkdev(struct clk_hw *hw, const char *con_id,
- 	const char *dev_id)
- {
- 	struct clk_lookup *cl;
- 
-+	if (IS_ERR(hw))
-+		return PTR_ERR(hw);
-+
- 	/*
- 	 * Since dev_id can be NULL, and NULL is handled specially, we must
- 	 * pass it as either a NULL format string, or with "%s".
--- 
-1.9.1
+M
