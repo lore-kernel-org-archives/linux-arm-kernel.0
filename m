@@ -1,47 +1,25 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Fri, 26 Aug 2016 11:54:02 -0700
-Subject: [PATCH v2 03/22] usb: ulpi: Support device discovery via device
- properties
-In-Reply-To: <20160824073134.GB12117@kuha.fi.intel.com>
-References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-4-stephen.boyd@linaro.org>
- <20160708090458.GB20485@shlinux2>
- <147043245520.26915.14153612182716236022@sboyd-linaro>
- <CAJOFmgz=BSq=mmo4-2p-BZLbb=qeE-2paUcgCv0_vx72PTYfWg@mail.gmail.com>
- <20160824073134.GB12117@kuha.fi.intel.com>
-Message-ID: <147223764261.20053.3850778721234482249@sboyd-linaro>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 26 Aug 2016 23:16:49 +0300
+Subject: [PATCH 0/3] Add R8A7792/Wheat board support
+Message-ID: <3665116.9BjHTnhfR3@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Heikki Krogerus (2016-08-24 00:31:34)
-> On Tue, Aug 23, 2016 at 12:58:07PM -0700, Stephen Boyd wrote:
-> > On Fri, Aug 5, 2016 at 2:27 PM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
-> > > Quoting Peter Chen (2016-07-08 02:04:58)
-> > >> On Thu, Jul 07, 2016 at 03:20:54PM -0700, Stephen Boyd wrote:
-> > >> > @@ -39,6 +42,10 @@ static int ulpi_match(struct device *dev, struct device_driver *driver)
-> > >> >       struct ulpi *ulpi = to_ulpi_dev(dev);
-> > >> >       const struct ulpi_device_id *id;
-> > >> >
-> > >> > +     /* Some ULPI devices don't have a product id so rely on OF match */
-> > >> > +     if (ulpi->id.product == 0)
-> > >> > +             return of_driver_match_device(dev, driver);
-> > >> > +
-> > >>
-> > >> How about using vendor id? It can't be 0, but pid may be 0.
-> > >> See: http://www.linux-usb.org/usb.ids
-> > >
-> > > Heikki suggested a product id of 0 would mean we need to use DT
-> > > matching. Should it be changed to vendor id instead?
-> > 
-> > Any comments here?
-> 
-> It makes sense. I don't have any problem with that.
+Hello.
 
-Ok. Having pid equal to 0 in DT/device properties seems wrong, so I
-think I'll be dropping those properties that this patch introduced and
-go back to always attempting to read the hardware when the device is
-populated.
+   Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-20160826-v4.8-rc3' tag. We add the device tree support for
+the R8A7792-based Wheat board. I have only sparse board documentation
+at this point, according to which this board somewhat differs from the other
+R-Car evaluation boards in that it has debug serial port, debug Ethernet chip,
+and a NOR flash on the separate debug board (connected to the main board
+with a ribbon cable). I'm not sure how to approach this (DT overlay, perhaps?),
+for now I'm just posting the debug UART/Ethernet support the same way it was
+done for the Blanche board -- these components seem to be the same between 
+these 2 boards...
 
-That will bring back the power sequencing problem though, so I have to
-think of some way to solve that. For now I'll just set the pid and vid
-to 0 when the power is off and we try to read and see how it goes.
+[1/3] DT: arm: shmobile: document Wheat board
+[2/3] ARM: dts: wheat: initial device tree
+[3/3] ARM: dts: wheat: add Ethernet support
+
+WBR, Sergei
