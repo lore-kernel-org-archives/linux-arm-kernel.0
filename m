@@ -1,91 +1,92 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 26 Aug 2016 14:17:58 -0600
-Subject: [PATCH v5 16/16] ARM64: dts: Define CPU power domain for MSM8916
-In-Reply-To: <1472242678-33700-1-git-send-email-lina.iyer@linaro.org>
-References: <1472242678-33700-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1472242678-33700-17-git-send-email-lina.iyer@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 26 Aug 2016 23:21:42 +0300
+Subject: [PATCH 2/3] ARM: dts: wheat: initial device tree
+In-Reply-To: <3665116.9BjHTnhfR3@wasted.cogentembedded.com>
+References: <3665116.9BjHTnhfR3@wasted.cogentembedded.com>
+Message-ID: <4464163.ssfn2FILGm@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define power domain and the power states for the domain as defined by
-the PSCI firmware. The 8916 firmware supports OS initiated method of
-powering off the CPU clusters.
+Add the initial device tree for the R8A7792  SoC based Wheat board.
+The Wheat board itself has  no serial ports  wired up, the USB serial chips
+are situated on a separate  debug board and  one of them is connected to
+SCFI0  -- include unconditional support for  it, so that the serial console
+can work.
 
-Cc: <devicetree@vger.kernel.org>
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Based  on the original (and large) patch by Vladimir Barinov 
+<vladimir.barinov@cogentembedded.com>.
+
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
 ---
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/Makefile          |    1 
+ arch/arm/boot/dts/r8a7792-wheat.dts |   50 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 51 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 11bdc24..e6d8c3b 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -99,6 +99,7 @@
- 			next-level-cache = <&L2_0>;
- 			enable-method = "psci";
- 			cpu-idle-states = <&CPU_SPC>;
-+			power-domains = <&CPU_PD>;
- 		};
- 
- 		CPU1: cpu at 1 {
-@@ -108,6 +109,7 @@
- 			next-level-cache = <&L2_0>;
- 			enable-method = "psci";
- 			cpu-idle-states = <&CPU_SPC>;
-+			power-domains = <&CPU_PD>;
- 		};
- 
- 		CPU2: cpu at 2 {
-@@ -117,6 +119,7 @@
- 			next-level-cache = <&L2_0>;
- 			enable-method = "psci";
- 			cpu-idle-states = <&CPU_SPC>;
-+			power-domains = <&CPU_PD>;
- 		};
- 
- 		CPU3: cpu at 3 {
-@@ -126,6 +129,7 @@
- 			next-level-cache = <&L2_0>;
- 			enable-method = "psci";
- 			cpu-idle-states = <&CPU_SPC>;
-+			power-domains = <&CPU_PD>;
- 		};
- 
- 		L2_0: l2-cache {
-@@ -142,12 +146,33 @@
- 				min-residency-us = <2000>;
- 				local-timer-stop;
- 			};
+Index: renesas/arch/arm/boot/dts/Makefile
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/Makefile
++++ renesas/arch/arm/boot/dts/Makefile
+@@ -659,6 +659,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
+ 	r8a7791-koelsch.dtb \
+ 	r8a7791-porter.dtb \
+ 	r8a7792-blanche.dtb \
++	r8a7792-wheat.dtb \
+ 	r8a7793-gose.dtb \
+ 	r8a7794-alt.dtb \
+ 	r8a7794-silk.dtb \
+Index: renesas/arch/arm/boot/dts/r8a7792-wheat.dts
+===================================================================
+--- /dev/null
++++ renesas/arch/arm/boot/dts/r8a7792-wheat.dts
+@@ -0,0 +1,50 @@
++/*
++ * Device Tree Source for the Wheat board
++ *
++ * Copyright (C) 2016 Renesas Electronics Corporation
++ * Copyright (C) 2016 Cogent  Embedded, Inc.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
-+			CLUSTER_RET: cluster_retention {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x1000010>;
-+				entry-latency-us = <500>;
-+				exit-latency-us = <500>;
-+				min-residency-us = <2000>;
-+			};
++/dts-v1/;
++#include "r8a7792.dtsi"
 +
-+			CLUSTER_PWR_DWN: cluster_gdhs {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x1000030>;
-+				entry-latency-us = <2000>;
-+				exit-latency-us = <2000>;
-+				min-residency-us = <6000>;
-+			};
- 		};
- 	};
- 
- 	psci {
- 		compatible = "arm,psci-1.0";
- 		method = "smc";
++/ {
++	model = "Wheat";
++	compatible = "renesas,wheat", "renesas,r8a7792";
 +
-+		CPU_PD: cpu-pd at 0 {
-+			#power-domain-cells = <0>;
-+			domain-idle-states = <&CLUSTER_RET>, <&CLUSTER_PWR_DWN>;
-+		};
- 	};
- 
- 	pmu {
--- 
-2.7.4
++	aliases {
++		serial0 = &scif0;
++	};
++
++	chosen {
++		bootargs = "ignore_loglevel";
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x40000000>;
++	};
++};
++
++&extal_clk {
++	clock-frequency = <20000000>;
++};
++
++&pfc {
++	scif0_pins: scif0 {
++		groups = "scif0_data";
++		function = "scif0";
++	};
++};
++
++&scif0 {
++	pinctrl-0 = <&scif0_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
