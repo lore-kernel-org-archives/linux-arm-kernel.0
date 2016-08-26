@@ -1,31 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 27 Aug 2016 00:36:45 +0200
-Subject: [PATCH 2/3] ARM: dts: sun8i: Add dt node for esp8089 wifi chip
- on polaroid-mid2809
-In-Reply-To: <20160826145236.30210-3-hdegoede@redhat.com>
-References: <20160826145236.30210-1-hdegoede@redhat.com>
- <20160826145236.30210-3-hdegoede@redhat.com>
-Message-ID: <20160826223645.GO3165@lukather>
+From: oss@buserror.net (Scott Wood)
+Date: Fri, 26 Aug 2016 17:37:50 -0500
+Subject: [PATCH 07/10] dt-bindings: thermal: Update bindings for LS1012A
+In-Reply-To: <1472207269-18499-7-git-send-email-Bhaskar.Upadhaya@nxp.com>
+References: <1472207269-18499-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
+ <1472207269-18499-7-git-send-email-Bhaskar.Upadhaya@nxp.com>
+Message-ID: <1472251070.13245.10.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2016 at 04:52:35PM +0200, Hans de Goede wrote:
-> The polaroid-mid2809 tablet has an esp8089 wifi chip,
-> add a dt node describing it.
+On Fri, 2016-08-26 at 15:57 +0530, Bhaskar Upadhaya wrote:
+> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
+> ---
+> ?Documentation/devicetree/bindings/thermal/qoriq-thermal.txt | 2 +-
+> ?1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> diff --git a/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
+> b/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
+> index 66223d5..8e2b211 100644
+> --- a/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
+> +++ b/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
+> @@ -1,7 +1,7 @@
+> ?* Thermal Monitoring Unit (TMU) on Freescale QorIQ SoCs
+> ?
+> ?Required properties:
+> -- compatible : Must include "fsl,qoriq-tmu". The version of the device is
+> +- compatible :"fsl,qoriq-tmu", "fsl,ls1012a-tmu". The version of the device
+> is
+> ?	determined by the TMU IP Block Revision Register (IPBRR0) at
+> ?	offset 0x0BF8.
+> ?	Table of correspondences between IPBRR0 values and example??chips:
 
-Applied, Thanks!
-Maxime
+Why is this needed given that the block has a version register?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160827/192cfdd3/attachment.sig>
+-Scott
