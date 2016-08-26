@@ -1,115 +1,43 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Aug 2016 12:17:58 +0100
-Subject: [PATCH 2/3] ARM: imx: add gpcv2 support
-In-Reply-To: <1472209971-32469-3-git-send-email-Anson.Huang@nxp.com>
-References: <1472209971-32469-1-git-send-email-Anson.Huang@nxp.com>
- <1472209971-32469-3-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <20160826111758.GN1041@n2100.armlinux.org.uk>
+From: jorik@kippendief.biz (jorik at kippendief.biz)
+Date: Fri, 26 Aug 2016 13:24:13 +0200
+Subject: [PATCH] clk: sunxi-ng: Fix wrong reset register offsets
+Message-ID: <1472210653-32170-1-git-send-email-jorik@kippendief.biz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2016 at 07:12:50PM +0800, Anson Huang wrote:
-> diff --git a/arch/arm/mach-imx/gpcv2.c b/arch/arm/mach-imx/gpcv2.c
-> new file mode 100644
-> index 0000000..98577c4
-> --- /dev/null
-> +++ b/arch/arm/mach-imx/gpcv2.c
-> @@ -0,0 +1,66 @@
-> +/*
-> + * Copyright 2016 Freescale Semiconductor, Inc.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +
-> +#include "common.h"
-> +
-> +#define GPC_CPU_PGC_SW_PUP_REQ	0xf0
-> +#define GPC_CPU_PGC_SW_PDN_REQ	0xfc
-> +#define GPC_PGC_C1		0x840
-> +
-> +#define BM_CPU_PGC_SW_PDN_PUP_REQ_CORE1_A7	0x2
-> +#define BM_GPC_PGC_PCG				0x1
-> +
-> +static void __iomem *gpcv2_base;
-> +
-> +static void imx_gpcv2_set_m_core_pgc(bool enable, u32 offset)
-> +{
-> +	u32 val = readl_relaxed(gpcv2_base + offset) & (~BM_GPC_PGC_PCG);
+From: Jorik Jonker <jorik@kippendief.biz>
 
-Unnecessary parens, and the code doesn't flow with the bit clearance
-here...
+The reset register offsets for UART*, I2C* and SCR were off by a few bytes.
+---
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-> +
-> +	if (enable)
-> +		val |= BM_GPC_PGC_PCG;
-
-My first read of this lead me to think "okay, so what's the point of
-enable=false".  It would be clearer with:
-
-	u32 val = readl_relaxed(gpcv2_base + offset);
-
-	if (enable)
-		val |= BM_GPC_PGC_PCG;
-	else
-		val &= ~BM_GPC_PGC_PCG;
-
-here.
-
-> +
-> +	writel_relaxed(val, gpcv2_base + offset);
-> +}
-> +
-> +void imx_gpcv2_set_core1_pdn_pup_by_software(bool pdn)
-> +{
-> +	u32 val = readl_relaxed(gpcv2_base + (pdn ?
-> +		GPC_CPU_PGC_SW_PDN_REQ : GPC_CPU_PGC_SW_PUP_REQ));
-> +
-> +	imx_gpcv2_set_m_core_pgc(true, GPC_PGC_C1);
-> +	val |= BM_CPU_PGC_SW_PDN_PUP_REQ_CORE1_A7;
-> +	writel_relaxed(val, gpcv2_base + (pdn ?
-> +		GPC_CPU_PGC_SW_PDN_REQ : GPC_CPU_PGC_SW_PUP_REQ));
-> +
-> +	while ((readl_relaxed(gpcv2_base + (pdn ?
-> +		GPC_CPU_PGC_SW_PDN_REQ : GPC_CPU_PGC_SW_PUP_REQ)) &
-> +		BM_CPU_PGC_SW_PDN_PUP_REQ_CORE1_A7) != 0)
-> +		;
-> +	imx_gpcv2_set_m_core_pgc(false, GPC_PGC_C1);
-> +}
-> +
-> +void __init imx_gpcv2_check_dt(void)
-> +{
-> +	struct device_node *np;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx7d-gpc");
-> +	if (WARN_ON(!np))
-> +		return;
-> +
-> +	gpcv2_base = of_iomap(np, 0);
-> +	WARN_ON(!gpcv2_base);
-
-What happens if gpcv2_base is NULL (apart from the obvious warning
-from the above line)?  I guess a bit later in the boot,
-imx_gpcv2_set_core1_pdn_pup_by_software() oopses the kernel,
-probably before the console has been initialised.  Probably not
-nice behaviour.
-
-> +}
-> -- 
-> 1.9.1
-> 
-
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+index feabc0f..280ba74 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+@@ -783,14 +783,14 @@ static struct ccu_reset_map sun8i_h3_ccu_resets[] = {
+ 	[RST_BUS_I2S1]		=  { 0x2d0, BIT(13) },
+ 	[RST_BUS_I2S2]		=  { 0x2d0, BIT(14) },
+ 
+-	[RST_BUS_I2C0]		=  { 0x2d4, BIT(0) },
+-	[RST_BUS_I2C1]		=  { 0x2d4, BIT(1) },
+-	[RST_BUS_I2C2]		=  { 0x2d4, BIT(2) },
+-	[RST_BUS_UART0]		=  { 0x2d4, BIT(16) },
+-	[RST_BUS_UART1]		=  { 0x2d4, BIT(17) },
+-	[RST_BUS_UART2]		=  { 0x2d4, BIT(18) },
+-	[RST_BUS_UART3]		=  { 0x2d4, BIT(19) },
+-	[RST_BUS_SCR]		=  { 0x2d4, BIT(20) },
++	[RST_BUS_I2C0]		=  { 0x2d8, BIT(0) },
++	[RST_BUS_I2C1]		=  { 0x2d8, BIT(1) },
++	[RST_BUS_I2C2]		=  { 0x2d8, BIT(2) },
++	[RST_BUS_UART0]		=  { 0x2d8, BIT(16) },
++	[RST_BUS_UART1]		=  { 0x2d8, BIT(17) },
++	[RST_BUS_UART2]		=  { 0x2d8, BIT(18) },
++	[RST_BUS_UART3]		=  { 0x2d8, BIT(19) },
++	[RST_BUS_SCR]		=  { 0x2d8, BIT(20) },
+ };
+ 
+ static const struct sunxi_ccu_desc sun8i_h3_ccu_desc = {
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.7.4
