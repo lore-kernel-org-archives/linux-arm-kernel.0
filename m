@@ -1,43 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Aug 2016 17:16:27 +0100
-Subject: [PATCH v2 9/9] arm64: Work around systems with mismatched cache
- line sizes
-In-Reply-To: <f72be21a-fd67-dc30-ca1b-278dd99821a2@arm.com>
-References: <1472203398-8751-1-git-send-email-suzuki.poulose@arm.com>
- <1472203398-8751-10-git-send-email-suzuki.poulose@arm.com>
- <CAKv+Gu_AyrQLdjf+1-QuZu3k2goT-_6Dk5mQbvP6XSmu30V4cQ@mail.gmail.com>
- <f2ff63f1-9cc7-6930-60eb-5f1fb8fde2e6@arm.com>
- <f72be21a-fd67-dc30-ca1b-278dd99821a2@arm.com>
-Message-ID: <20160826161627.GL30302@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 26 Aug 2016 17:25:16 +0100
+Subject: [PATCH v15 08/13] arch/arm64: enable task isolation functionality
+In-Reply-To: <1471382376-5443-9-git-send-email-cmetcalf@mellanox.com>
+References: <1471382376-5443-1-git-send-email-cmetcalf@mellanox.com>
+ <1471382376-5443-9-git-send-email-cmetcalf@mellanox.com>
+Message-ID: <20160826162516.GC15779@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2016 at 02:08:01PM +0100, Suzuki K Poulose wrote:
-> On 26/08/16 14:04, Suzuki K Poulose wrote:
-> >On 26/08/16 12:03, Ard Biesheuvel wrote:
-> >>IMO, this is a pattern that we should avoid: you are introducing one
-> >>instance now, which will make it hard to say no to the next one in the
-> >>future. Isn't there a better way to organize the arm64_ftr_reg array
-> >>that allows us to reference entries directly? Ideally, a way that gets
-> >>rid of the runtime sorting, since I don't think that is a good
-> >>replacement for developer discipline anyway (although I should have
-> >>spoken up when that was first introduced) Or am I missing something
-> >>here?
-> >
-> >I had some form of direct access to the feature register in one of
-> >the versions [0], but was dropped based on Catalin's suggestion at [1].
+On Tue, Aug 16, 2016 at 05:19:31PM -0400, Chris Metcalf wrote:
+> In do_notify_resume(), call task_isolation_ready() for
+> TIF_TASK_ISOLATION tasks when we are checking the thread-info flags;
+> and after we've handled the other work, call task_isolation_enter()
+> for such tasks.  To ensure we always call task_isolation_enter() when
+> returning to userspace, add _TIF_TASK_ISOLATION to _TIF_WORK_MASK,
+> while leaving the old bitmask value as _TIF_WORK_LOOP_MASK to
+> check while looping.
 > 
-> Forgot to add, [0] wouldn't solve this issue cleanly either. It would simply
-> speed up the read_system_reg(). So we do need a call to read_system_reg()
-> from assembly code, which makes it a little bit tricky.
+> We tweak syscall_trace_enter() slightly to carry the "flags"
+> value from current_thread_info()->flags for each of the tests,
+> rather than doing a volatile read from memory for each one.  This
+> avoids a small overhead for each test, and in particular avoids
+> that overhead for TIF_NOHZ when TASK_ISOLATION is not enabled.
+> 
+> We instrument the smp_send_reschedule() routine so that it checks for
+> isolated tasks and generates a suitable warning if we are about
+> to disturb one of them in strict or debug mode.
+> 
+> Finally, report on page faults in task-isolation processes in
+> do_page_faults().
+> 
+> Signed-off-by: Chris Metcalf <cmetcalf@mellanox.com>
+> ---
+>  arch/arm64/Kconfig                   |  1 +
+>  arch/arm64/include/asm/thread_info.h |  5 ++++-
+>  arch/arm64/kernel/ptrace.c           | 18 +++++++++++++++---
+>  arch/arm64/kernel/signal.c           | 10 ++++++++++
+>  arch/arm64/kernel/smp.c              |  2 ++
+>  arch/arm64/mm/fault.c                |  8 +++++++-
 
-It might be worth looking to see if we can pass the ctr as an extra
-parameter to the assembly routines that need it. Then you can access it
-easily from C code, and if you pass it as 0 that could result in the asm
-code reading it from the h/w register, removing the need for the _raw
-stuff you add.
+Not sure when/how this series will be merged (Will already picked patch
+07/13 as a general clean-up) but this arm64 patch:
 
-Of course, it could also be a complete mess fixing up all the callers,
-but it's probably worth investigating to see what the trade-off is.
-
-Will
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
