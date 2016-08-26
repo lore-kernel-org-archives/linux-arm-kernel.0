@@ -1,25 +1,105 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 26 Aug 2016 23:16:49 +0300
-Subject: [PATCH 0/3] Add R8A7792/Wheat board support
-Message-ID: <3665116.9BjHTnhfR3@wasted.cogentembedded.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Fri, 26 Aug 2016 14:17:44 -0600
+Subject: [PATCH v5 02/16] dt/bindings: Update binding for PM domain idle states
+In-Reply-To: <1472242678-33700-1-git-send-email-lina.iyer@linaro.org>
+References: <1472242678-33700-1-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1472242678-33700-3-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+From: Axel Haslam <ahaslam+renesas@baylibre.com>
 
-   Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
-'renesas-devel-20160826-v4.8-rc3' tag. We add the device tree support for
-the R8A7792-based Wheat board. I have only sparse board documentation
-at this point, according to which this board somewhat differs from the other
-R-Car evaluation boards in that it has debug serial port, debug Ethernet chip,
-and a NOR flash on the separate debug board (connected to the main board
-with a ribbon cable). I'm not sure how to approach this (DT overlay, perhaps?),
-for now I'm just posting the debug UART/Ethernet support the same way it was
-done for the Blanche board -- these components seem to be the same between 
-these 2 boards...
+Update DT bindings to describe idle states of PM domains.
 
-[1/3] DT: arm: shmobile: document Wheat board
-[2/3] ARM: dts: wheat: initial device tree
-[3/3] ARM: dts: wheat: add Ethernet support
+Cc: <devicetree@vger.kernel.org>
+Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+[Lina: Added state properties, removed state names, wakeup-latency,
+added of_pm_genpd_init() API, pruned commit text]
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+[Ulf: Moved around code to make it compile properly, rebased on top of multiple state support]
+---
+ .../devicetree/bindings/power/power_domain.txt     | 57 ++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
 
-WBR, Sergei
+diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+index 025b5e7..4960486 100644
+--- a/Documentation/devicetree/bindings/power/power_domain.txt
++++ b/Documentation/devicetree/bindings/power/power_domain.txt
+@@ -29,6 +29,10 @@ Optional properties:
+    specified by this binding. More details about power domain specifier are
+    available in the next section.
+ 
++- domain-idle-states : A phandle of an idle-state that shall be soaked into a
++                generic domain power state. The idle state definitions are
++                compatible with arm,idle-state specified in [1].
++
+ Example:
+ 
+ 	power: power-controller at 12340000 {
+@@ -59,6 +63,57 @@ The nodes above define two power controllers: 'parent' and 'child'.
+ Domains created by the 'child' power controller are subdomains of '0' power
+ domain provided by the 'parent' power controller.
+ 
++Example 3: ARM v7 style CPU PM domains (Linux domain controller)
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		CPU0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7", "arm,armv7";
++			reg = <0x0>;
++			power-domains = <&a7_pd>;
++		};
++
++		CPU1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15", "arm,armv7";
++			reg = <0x0>;
++			power-domains = <&a15_pd>;
++		};
++	};
++
++	pm-domains {
++		a15_pd: a15_pd {
++			/* will have A15 platform ARM_PD_METHOD_OF_DECLARE*/
++			compatible = "arm,cortex-a15";
++			#power-domain-cells = <0>;
++			domain-idle-states = <&CLUSTER_SLEEP_0>;
++		};
++
++		a7_pd: a7_pd {
++			/* will have a A7 platform ARM_PD_METHOD_OF_DECLARE*/
++			compatible = "arm,cortex-a7";
++			#power-domain-cells = <0>;
++			domain-idle-states = <&CLUSTER_SLEEP_0>, <&CLUSTER_SLEEP_1>;
++		};
++
++		CLUSTER_SLEEP_0: state0 {
++			compatible = "arm,idle-state";
++			entry-latency-us = <1000>;
++			exit-latency-us = <2000>;
++			min-residency-us = <10000>;
++		};
++
++		CLUSTER_SLEEP_1: state1 {
++			compatible = "arm,idle-state";
++			entry-latency-us = <5000>;
++			exit-latency-us = <5000>;
++			min-residency-us = <100000>;
++		};
++	};
++
+ ==PM domain consumers==
+ 
+ Required properties:
+@@ -76,3 +131,5 @@ Example:
+ The node above defines a typical PM domain consumer device, which is located
+ inside a PM domain with index 0 of a power controller represented by a node
+ with the label "power".
++
++[1]. Documentation/devicetree/bindings/arm/idle-states.txt
+-- 
+2.7.4
