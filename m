@@ -1,31 +1,18 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Fri, 26 Aug 2016 17:07:07 +0200
-Subject: arm: sys_oabi-compat: Use kmalloc_array() in two functions
-In-Reply-To: <20160826134459.GR1041@n2100.armlinux.org.uk>
-References: <5deba521-2dd4-cd2e-23d7-226a1a7728c3@users.sourceforge.net>
- <20160825224632.GL1041@n2100.armlinux.org.uk>
- <dd343c72-2ec7-2114-bee5-1d16fc6c04ac@users.sourceforge.net>
- <20160826134459.GR1041@n2100.armlinux.org.uk>
-Message-ID: <6ed97ce3-4378-496f-848b-c66dcc05b21d@users.sourceforge.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 26 Aug 2016 08:15:09 -0700
+Subject: [PATCH] ARM: dts: dra7xx: Increase spi-max-frequency to 76.8MHz
+ for QSPI
+In-Reply-To: <20160801130655.15004-1-vigneshr@ti.com>
+References: <20160801130655.15004-1-vigneshr@ti.com>
+Message-ID: <20160826151508.ac5uy7557lovbd7r@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> It should at least make basic English sense.  I'm afraid the above
-> doesn't convey any meaning what so ever, at least to me.  It doesn't
-> matter how many times I read it, I still end up wondering "wtf is
-> this trying to tell me?"
+* Vignesh R <vigneshr@ti.com> [160801 06:07]:
+> According to AM572x DM SPRS953A, QSPI maximum bus speed can be 76.8MHz.
+> Therefore, increase the spi-max-frequency value of QSPI node to 76.8MHz
+> for DRA74 and DRA72 evm. This improves flash raw read speed by ~2MB/s.
 
-I have started to look a bit more on the usage of the following
-function pairs in some Linux source files.
+Applying into omap-for-v4.9/dt thanks.
 
-kmalloc() ? kmalloc_array()
-kzalloc() ? kcalloc()
-
-Can such combinations be extended anyhow?
-
-
-Some update candidates can be found for this use case in several
-software areas.
-
-Regards,
-Markus
+Tony
