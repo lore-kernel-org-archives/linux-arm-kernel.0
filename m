@@ -1,45 +1,48 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 26 Aug 2016 16:20:43 +0200
-Subject: [PATCH 1/3] clocksource/drivers/timer-atmel-pit: Enable mck clock
-In-Reply-To: <57C05026.7010905@linaro.org>
+Date: Fri, 26 Aug 2016 16:20:44 +0200
+Subject: [PATCH 2/3] drivers/clocksource/pistachio: Fix memory corruption in
+ init
+In-Reply-To: <1472221245-14265-1-git-send-email-daniel.lezcano@linaro.org>
 References: <57C05026.7010905@linaro.org>
-Message-ID: <1472221245-14265-1-git-send-email-daniel.lezcano@linaro.org>
+ <1472221245-14265-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1472221245-14265-2-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+From: Marcin Nowakowski <marcin.nowakowski@imgtec.com>
 
-mck is needed to get the PIT working. Explicitly prepare_enable it instead
-of assuming it is enabled.
+Driver init code incorrectly uses the block base address and as a result
+clears clocksource structure's fields instead of the hardware registers.
 
-This solves an issue where the system is freezing when the ETM/ETB drivers
-are enabled.
+Commit 09a998201649 ("timekeeping: Lift clocksource cacheline
+restriction") has changed the offsets within pistachio_clocksource
+structure and what has previously gone unnoticed now leads to a kernel
+panic during boot.
 
-Reported-by: Olivier Schonken <olivier.schonken@gmail.com>
-Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Marcin Nowakowski <marcin.nowakowski@imgtec.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/timer-atmel-pit.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/clocksource/time-pistachio.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
-index 1ffac0c..3494bc5 100644
---- a/drivers/clocksource/timer-atmel-pit.c
-+++ b/drivers/clocksource/timer-atmel-pit.c
-@@ -261,6 +261,12 @@ static int __init at91sam926x_pit_dt_init(struct device_node *node)
- 		return PTR_ERR(data->mck);
- 	}
+diff --git a/drivers/clocksource/time-pistachio.c b/drivers/clocksource/time-pistachio.c
+index a7d9a08..a8e6c7d 100644
+--- a/drivers/clocksource/time-pistachio.c
++++ b/drivers/clocksource/time-pistachio.c
+@@ -202,10 +202,10 @@ static int __init pistachio_clksrc_of_init(struct device_node *node)
+ 	rate = clk_get_rate(fast_clk);
  
-+	ret = clk_prepare_enable(data->mck);
-+	if (ret) {
-+		pr_err("Unable to enable mck\n");
-+		return ret;
-+	}
-+
- 	/* Get the interrupts property */
- 	data->irq = irq_of_parse_and_map(node, 0);
- 	if (!data->irq) {
+ 	/* Disable irq's for clocksource usage */
+-	gpt_writel(&pcs_gpt.base, 0, TIMER_IRQ_MASK, 0);
+-	gpt_writel(&pcs_gpt.base, 0, TIMER_IRQ_MASK, 1);
+-	gpt_writel(&pcs_gpt.base, 0, TIMER_IRQ_MASK, 2);
+-	gpt_writel(&pcs_gpt.base, 0, TIMER_IRQ_MASK, 3);
++	gpt_writel(pcs_gpt.base, 0, TIMER_IRQ_MASK, 0);
++	gpt_writel(pcs_gpt.base, 0, TIMER_IRQ_MASK, 1);
++	gpt_writel(pcs_gpt.base, 0, TIMER_IRQ_MASK, 2);
++	gpt_writel(pcs_gpt.base, 0, TIMER_IRQ_MASK, 3);
+ 
+ 	/* Enable timer block */
+ 	writel(TIMER_ME_GLOBAL, pcs_gpt.base);
 -- 
 1.9.1
