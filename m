@@ -1,133 +1,146 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 26 Aug 2016 17:44:59 -0500
-Subject: [PATCH v7 8/9] arm64: pmu: Detect and enable multiple PMUs in an
- ACPI system
-In-Reply-To: <8737lro9lq.fsf@e105922-lin.cambridge.arm.com>
-References: <1471985280-2243-1-git-send-email-jeremy.linton@arm.com>
- <1471985280-2243-9-git-send-email-jeremy.linton@arm.com>
- <8737lro9lq.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <b4d5397f-2ab0-8c19-d36e-ea23edb71bfb@arm.com>
+From: oss@buserror.net (Scott Wood)
+Date: Fri, 26 Aug 2016 17:57:14 -0500
+Subject: [PATCH 10/10] dt-bindings: sec: Update bindings for LS1012A
+In-Reply-To: <1472207269-18499-10-git-send-email-Bhaskar.Upadhaya@nxp.com>
+References: <1472207269-18499-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
+ <1472207269-18499-10-git-send-email-Bhaskar.Upadhaya@nxp.com>
+Message-ID: <1472252234.13245.28.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 2016-08-26 at 15:57 +0530, Bhaskar Upadhaya wrote:
+> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
+> ---
+> ?.../devicetree/bindings/crypto/fsl-sec5.txt????????| 153
+> +++++++++++++++++++++
+> ?1 file changed, 153 insertions(+)
+> ?create mode 100644 Documentation/devicetree/bindings/crypto/fsl-sec5.txt
 
-On 08/26/2016 10:04 AM, Punit Agrawal wrote:
-(trimming)
->> +			pmu = kzalloc(sizeof(struct pmu_types), GFP_KERNEL);
->> +			if (!pmu) {
->> +				pr_warn("Unable to allocate pmu_types\n");
->> +				/*
->> +				 * continue to count cpus for any pmu_types
->> +				 * already allocated, but don't allocate any
->> +				 * more pmu_types. This avoids undercounting.
->> +				 */
->> +				alloc_failure = true;
->
-> Why not just fail probe and return an error? What is the benefit of
-> having some of the PMUs available?
+Again, the subject should explain what you're adding, not why. ?You're adding
+a sec5 binding, not an LS1012A binding.
 
-AFAIC, there isn't a good reason for penalizing PMU's which we can get 
-working if a subset of the system PMUs can't be created. But this is per 
-PMU type, so with current systems the kzalloc will be called a max of 2 
-times (there is the potential of a 3rd time, due to some other error 
-handling, but that doesn't change the argument much). AKA, this doesn't 
-result in "partial registration" of a PMU.
+Why aren't the crypto maintainers/list CCed?
 
-So, really the only question in my mind is does it work if one of the 
-allocations fails and the other succeeds, and the answer is yes, the 
-remaining interrupts/etc get associated with the correct PMU, and it 
-gets created and should work as well as perf currently works in systems 
-with heterogeneous PMUs (cue discussion about CPU process migration).
+Why do we need a separate binding document for each SEC version? ?What is
+different from the sec4 binding or the sec6 binding? ?Especially given that
+the example claims compatibility with sec4?
 
-So, since this is early boot, and we are taking a tiny allocation, if 
-this fails i suspect that the machine will probably die anyway, not due 
-to the choice of whether the PMU is counted properly or not. I would 
-guess the platform allocation or similar will die..
+> diff --git a/Documentation/devicetree/bindings/crypto/fsl-sec5.txt
+> b/Documentation/devicetree/bindings/crypto/fsl-sec5.txt
+> new file mode 100644
+> index 0000000..7bcaa6f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/crypto/fsl-sec5.txt
+> @@ -0,0 +1,153 @@
+> +SEC 5 is Freescale's Cryptographic Accelerator and Assurance Module (CAAM).
+> +Currently Freescale arm chip LS1012A is embedded with SEC 5.
+> +SEC 5 device tree binding include:
+> +???-SEC 5 Node
+> +???-Job Ring Node
+> +???-Full Example
+> +
+> +=====================================================================
+> +SEC 5 Node
+> +
+> +Description
+> +
+> +????Node defines the base address of the SEC 5 block.
+> +????This block specifies the address range of all global
+> +????configuration registers for the SEC 5 block.
+> +????For example, In LS1012A, we could see three SEC 5 node.
+> +
+> +PROPERTIES
+> +
+> +???- compatible
+> +??????Usage: required
+> +??????Value type: <string>
+> +??????Definition: Must include "fsl,sec-v5.4".
 
-(trimming)
+There was no v5.x prior to v5.4?
 
->> +/*
->> + * For the given cpu/pmu type, walk all known GSIs, register them, and add
->> + * them to the resource structure. Return the number of GSI's contained
->> + * in the res structure, and the id of the last CPU/PMU we added.
->> + */
->> +static int __init arm_pmu_acpi_gsi_res(struct pmu_types *pmus,
->> +				       struct resource *res, int *last_cpu_id)
->> +{
->> +	int i, count;
->> +	int irq;
->> +
->> +	/* lets group all the PMU's from similar CPU's together */
->> +	count = 0;
->> +	for_each_possible_cpu(i) {
->> +		struct cpuinfo_arm64 *cinfo = per_cpu_ptr(&cpu_data, i);
->> +
->> +		if (pmus->cpu_type == MIDR_PARTNUM(cinfo->reg_midr)) {
->> +			if (pmu_irqs[i].gsi == 0)
->> +				continue;
->
-> Please don't silently continue if the irq is missing. It deserves a user
-> visible message. We don't want users complaining about kernel issues
-> when the firmware fails to provide the required information.
+> +???- fsl,sec-era
+> +??????Usage: optional
+> +??????Value type: <u32>
+> +??????Definition: A standard property. Define the 'ERA' of the SEC
+> +??????????device.
 
-See below.
+This is not "a standard property".
 
->
->> +
->> +			irq = acpi_register_gsi(NULL, pmu_irqs[i].gsi,
->> +						pmu_irqs[i].trigger,
->> +						ACPI_ACTIVE_HIGH);
->
-> Check for the return value of acpi_register_gsi as it can return an
-> error.
+> +???- reg
+> +??????Usage: required
+> +??????Value type: <prop-encoded-array>
+> +??????Definition: A standard property.??Specifies the physical
+> +??????????address and length of the SEC 5 configuration registers.
 
-Ok, so this is probably a little subtle, but IIRC from a few months back 
-when I was testing this/reworking it, duplicate GSI registrations for 
-exclusive PPI's result in errors (see any random discussion about PPI's 
-not being ACPI GSI's). As the code to handle SPI vs PPI exists in the 
-platform code, I decided to ignore registration errors until such a 
-determination can be made. AKA, i'm potentially tossing invalid irq's 
-into the irq list for PPIs, but it doesn't matter because they are 
-temporary ignored. The core ARM PMU code, has a much better handle on 
-what is a correct interrupt binding, so the decision about whether these 
-failures need to be worried about are delayed until then. This results 
-in a large simplification because we handle the irq deregistration 
-necessarily for any further errors together, AKA you will notice a 
-complete lack of differing code paths for PPI vs SPI in this module.
+Whether this property expresses the raw physical address depends on the ranges
+of the parent node. ?Just say that there's one reg resource which is the SEC
+configuration registers.
 
-As far as gsi=0, in cases where there are placeholder GICC entries in 
-the MADT (think disabled CPU) then i've seen gsi=0. I'm not sure that is 
-incorrect, so again it gets skipped, the pmu mask doesn't have it 
-listed, and everything "works". So if i'm going to add a message here 
-i'm, going to wrap it in a reg_midr!=0 check.
+> +
+> +???- ranges
+> +???????Usage: required
+> +???????Value type: <prop-encoded-array>
+> +???????Definition: A standard property.??Specifies the physical address
+> +???????????range of the SEC 5.0 register space (-SNVS not included).??A
+> +???????????triplet that includes the child address, parent address, &
+> +???????????length.
 
->
->> +
->> +			res[count].start = res[count].end = irq;
->> +			res[count].flags = IORESOURCE_IRQ;
->> +
->> +			if (pmu_irqs[i].trigger == ACPI_EDGE_SENSITIVE)
->> +				res[count].flags |= IORESOURCE_IRQ_HIGHEDGE;
->> +			else
->> +				res[count].flags |= IORESOURCE_IRQ_HIGHLEVEL;
->> +
->> +			pmu_irqs[i].registered = true;
->> +			count++;
->> +			(*last_cpu_id) = cinfo->reg_midr;
->
-> What is the benefit of using the entire MIDR for cpu_id when the
-> grouping is done on the basis of a subset, i.e., part number.
+Likewise with the talk about "physical address". ?It's also not required that
+it contain such a triplet -- it could theoretically be an empty ranges
+property, or there could be multiple translations. ?Bindings shouldn't try to
+(poorly) repeat the definition of standard properties. ?They should specify
+information that is specific to this binding.
 
-Because the platform code isn't partnum specific, unless the the 
-ARMV8_PMU_PART_PROBE() macro is utilized. Delaying any decisions about 
-what part of the MIDR happens to be used (if any) to the part probe 
-table is probably a good idea. Especially if someone happens to think 
-that they want a ARMV8_PMU_PART_REVISION_PROBE() or similar macro..
+The only thing worth mentioning here about ranges is if the driver will expect
+a particular translation independently of whether a child reg is using it.
 
+> +===================================================================
+> +Full Example
+> +
+> +Since some chips may contain more than one SEC, the dtsi contains
+> +only the node contents, not the node itself.??A chip using the SEC
+> +should include the dtsi inside each SEC node.??Example:
 
-If anything It might be worth removing the partnum checks in this module 
-as well. That way should someone ship a machine with the same CPU only 
-differing by revision (or pick your favorite !partnum field) they get 
-different PMUs definitions. Why anyone would do that I cannot guess, but 
-I do see that apparently the xscale version was important at one point.
+Bindings generally describe what the OS expects to see, not the details of the
+dtsi structure.
+
+> +
+> +In fsl-ls1012a.dtsi:
+> +
+> +	compatible = "fsl,sec-v5.4";
+> +	fsl,sec-era = <8>;
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +
+> +	sec_jr0: jr at 10000 {
+> +		compatible = "fsl,sec-v5.4-job-ring",
+> +			"fsl,sec-v5.0-job-ring",
+> +			"fsl,sec-v4.0-job-ring";
+> +			reg = <0x10000 0x10000>;
+> +			interrupts = <0 71 0x4>;
+> +	};
+> +	sec_jr1: jr at 20000 {
+> +		compatible = "fsl,sec-v5.4-job-ring",
+> +			"fsl,sec-v5.0-job-ring",
+> +			"fsl,sec-v4.0-job-ring";
+> +			reg = <0x20000 0x10000>;
+> +			interrupts = <0 72 0x4>;
+> +	};
+> +	sec_jr2: jr at 30000 {
+> +		compatible = "fsl,sec-v5.4-job-ring",
+> +			"fsl,sec-v5.0-job-ring",
+> +			"fsl,sec-v4.0-job-ring";
+> +			reg = <0x30000 0x10000>;
+> +			interrupts = <0 73 0x4>;
+> +	};
+> +	sec_jr3: jr at 40000 {
+> +		compatible = "fsl,sec-v5.4-job-ring",
+> +			"fsl,sec-v5.0-job-ring",
+> +			"fsl,sec-v4.0-job-ring";
+> +			reg = <0x40000 0x10000>;
+> +			interrupts = <0 74 0x4>;
+> +	};
+
+This is terrible whitespace.
+
+-Scott
