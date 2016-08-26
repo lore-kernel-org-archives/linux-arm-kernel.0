@@ -1,58 +1,136 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Aug 2016 11:19:53 +0100
-Subject: [PATCH v5 1/3] cpu/hotplug: Allow suspend/resume CPU to be
- specified
-In-Reply-To: <alpine.DEB.2.20.1608261207510.5714@nanos>
-References: <1471438227-8747-1-git-send-email-james.morse@arm.com>
- <1471438227-8747-2-git-send-email-james.morse@arm.com>
- <20160826093241.GC13554@arm.com>
- <alpine.DEB.2.20.1608261207510.5714@nanos>
-Message-ID: <20160826101952.GF13554@arm.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Fri, 26 Aug 2016 18:23:56 +0800
+Subject: [PATCH v2] ARM: dts: sun8i: Add dts file for inet-d978_rev2 tablets
+Message-ID: <20160826102356.9524-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2016 at 12:09:38PM +0200, Thomas Gleixner wrote:
-> On Fri, 26 Aug 2016, Will Deacon wrote:
-> > On Wed, Aug 17, 2016 at 01:50:25PM +0100, James Morse wrote:
-> > > disable_nonboot_cpus() assumes that the lowest numbered online CPU is
-> > > the boot CPU, and that this is the correct CPU to run any power
-> > > management code on.
-> > > 
-> > > On x86 this is always correct, as CPU0 cannot (easily) by taken offline.
-> > > 
-> > > On arm64 CPU0 can be taken offline. For hibernate/resume this means we
-> > > may hibernate on a CPU other than CPU0. If the system is rebooted with
-> > > kexec 'CPU0' will be assigned to a different physical CPU. This
-> > > complicates hibernate/resume as now we can't trust the CPU numbers.
-> > > Arch code can find the correct physical CPU, and ensure it is online
-> > > before resume from hibernate begins, but also needs to influence
-> > > disable_nonboot_cpus()s choice of CPU.
-> > > 
-> > > Rename disable_nonboot_cpus() as freeze_secondary_cpus() and add an
-> > > argument indicating which CPU should be left standing. Follow the logic
-> > > in migrate_to_reboot_cpu() to use the lowest numbered online CPU if the
-> > > requested CPU is not online.
-> > > Add disable_nonboot_cpus() as an inline function that has the existing
-> > > behaviour.
-> > > 
-> > > Signed-off-by: James Morse <james.morse@arm.com>
-> > > Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> > > ---
-> > > An alternative is to provide two functions calling a common function,
-> > > but this would mean spilling the cpu_maps_update_begin() into these two.
-> > > 
-> > >  include/linux/cpu.h | 6 +++++-
-> > >  kernel/cpu.c        | 9 +++++----
-> > >  2 files changed, 10 insertions(+), 5 deletions(-)
-> > 
-> > Thomas, does this look ok to you? If so, would you prefer to merge this
-> > series via -tip, or have us take this one via the arm64 tree?
-> 
-> You can take it via ARM64. It's not conflicting with the stuff I have in the
-> pipeline.
-> 
-> Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
+The inet-d978_rev2 is a pcb used in generic A33 based tablets. It features
+volume buttons, micro-usb otg, headphone connector and a power button.
 
-Brill, thanks Thomas.
+On the board a Realtek RTL8723BS SDIO Wi-Fi module are soldered, and there
+is also a accompanied board which has a Goodix GT9271 soldered.
 
-Will
+As this board is desired to create tablets with a Home key dealed by
+GT9271, a LED is present at the front panel at the position of the
+Home key.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+Changes since v1:
+- Add copyright infomation of me.
+- Rename LED node to d978:blue:home, as it's a blue LED.
+
+ arch/arm/boot/dts/Makefile                     |  1 +
+ arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts | 88 ++++++++++++++++++++++++++
+ 2 files changed, 89 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index faacd52..d1812a0 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -782,6 +782,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a23-q8-tablet.dtb \
+ 	sun8i-a33-et-q8-v1.6.dtb \
+ 	sun8i-a33-ga10h-v1.1.dtb \
++	sun8i-a33-inet-d978-rev2.dtb \
+ 	sun8i-a33-ippo-q8h-v1.2.dtb \
+ 	sun8i-a33-q8-tablet.dtb \
+ 	sun8i-a33-sinlinx-sina33.dtb \
+diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+new file mode 100644
+index 0000000..0f52cd9
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+@@ -0,0 +1,88 @@
++/*
++ * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
++ * Copyright 2016 Icenowy Zheng <icenowy@aosc.xyz>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun8i-a33.dtsi"
++#include "sun8i-reference-design-tablet.dtsi"
++
++/ {
++	model = "INet-D978 Rev 02";
++	compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pin_d978>;
++
++		home {
++			label = "d978:blue:home";
++			gpios = <&r_pio 0 5 GPIO_ACTIVE_HIGH>; /* PL5 */
++		};
++	};
++};
++
++&mmc1_pins_a {
++	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++};
++
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins_a>;
++	vmmc-supply = <&reg_dldo1>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++
++	rtl8723bs: sdio_wifi at 1 {
++		reg = <1>;
++	};
++};
++
++&r_pio {
++	led_pin_d978: led_pin_d978 at 0 {
++		allwinner,pins = "PL5";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
+-- 
+2.9.3
