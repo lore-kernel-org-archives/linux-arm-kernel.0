@@ -1,77 +1,53 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 26 Aug 2016 14:17:52 -0600
-Subject: [PATCH v5 10/16] timer: Export next wake up of a CPU
-In-Reply-To: <1472242678-33700-1-git-send-email-lina.iyer@linaro.org>
-References: <1472242678-33700-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1472242678-33700-11-git-send-email-lina.iyer@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 26 Aug 2016 22:18:42 +0200
+Subject: [PATCH 2/2] ARM: dts: sun8i: Add extra UART pinmux settings for
+ A23/33
+In-Reply-To: <69271471960265@web26h.yandex.ru>
+References: <20160823055826.20591-1-icenowy@aosc.xyz>
+ <20160823055826.20591-2-icenowy@aosc.xyz>
+ <20160823114251.GL2598@lukather> <69271471960265@web26h.yandex.ru>
+Message-ID: <20160826201842.GB3165@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Knowing the sleep length of the CPU is useful for the power state
-determination on idle. The value is relative to the time when the call
-was invoked by the CPU. This doesn't work well when there is a need to
-know when the actual wakeup is.
+Hi,
 
-By reading the next wake up event of a CPU, governors can determine the
-first CPU to wake up (due to timer) amongst a cluster of CPUs and the
-sleep time available between the last CPU to idle and the first CPU to
-resume. This information is useful to determine if the caches and other
-common hardware blocks can also be put in idle during this common period
-of inactivity.
+On Tue, Aug 23, 2016 at 09:51:05PM +0800, Icenowy Zheng wrote:
+> 
+> 
+> 23.08.2016, 19:42, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> > Hi,
+> >
+> > On Tue, Aug 23, 2016 at 01:58:26PM +0800, Icenowy Zheng wrote:
+> >> ?A23/33 have 4 UART controllers outside PRCM. However, the devicetree used
+> >> ?to mentioned only UART0's pinmux settings. Some extra UART controllers have
+> >> ?RTS/CTS, and is suitable for using as bluetooth UART controller.
+> >>
+> >> ?Add the pinmux settings for the UART controller, to make use of the
+> >> ?bluetooth function of some tablets.
+> >>
+> >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> >
+> > Our policy is that we avoid adding unused pinctrl nodes to not cripple
+> > the DT for no particular reason.
+> >
+> > So please add only the nodes you'll need in your tablet.
+> 
+> Then... if what I needs is the PG group of uart1, should I name it as
+> uart1_pins_a or uart1_pins_b?
 
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
----
- include/linux/tick.h     |  7 +++++++
- kernel/time/tick-sched.c | 11 +++++++++++
- 2 files changed, 18 insertions(+)
+We don't have any rules here, whichever comes first wins.
 
-diff --git a/include/linux/tick.h b/include/linux/tick.h
-index 62be0786..92fa4b0 100644
---- a/include/linux/tick.h
-+++ b/include/linux/tick.h
-@@ -117,6 +117,7 @@ extern void tick_nohz_idle_enter(void);
- extern void tick_nohz_idle_exit(void);
- extern void tick_nohz_irq_exit(void);
- extern ktime_t tick_nohz_get_sleep_length(void);
-+extern ktime_t tick_nohz_get_next_wakeup(int cpu);
- extern u64 get_cpu_idle_time_us(int cpu, u64 *last_update_time);
- extern u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time);
- #else /* !CONFIG_NO_HZ_COMMON */
-@@ -131,6 +132,12 @@ static inline ktime_t tick_nohz_get_sleep_length(void)
- 
- 	return len;
- }
-+
-+static inline ktime_t tick_nohz_get_next_wakeup(int cpu)
-+{
-+	return tick_next_period;
-+}
-+
- static inline u64 get_cpu_idle_time_us(int cpu, u64 *unused) { return -1; }
- static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
- #endif /* !CONFIG_NO_HZ_COMMON */
-diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
-index 204fdc8..7d8df93 100644
---- a/kernel/time/tick-sched.c
-+++ b/kernel/time/tick-sched.c
-@@ -990,6 +990,17 @@ ktime_t tick_nohz_get_sleep_length(void)
- 	return ts->sleep_length;
- }
- 
-+/**
-+ * tick_nohz_get_next_wakeup - return the next wake up of the CPU
-+ */
-+ktime_t tick_nohz_get_next_wakeup(int cpu)
-+{
-+	struct clock_event_device *dev =
-+			per_cpu(tick_cpu_device.evtdev, cpu);
-+
-+	return dev->next_event;
-+}
-+
- static void tick_nohz_account_idle_ticks(struct tick_sched *ts)
- {
- #ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
+Maxime
+
 -- 
-2.7.4
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160826/e190ebe2/attachment-0001.sig>
