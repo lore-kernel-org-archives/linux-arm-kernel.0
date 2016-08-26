@@ -1,33 +1,58 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 26 Aug 2016 17:52:05 +0200
-Subject: [PATCH 0/3] ARM: dts: sun8i: Add dt nodes for sdio wifi
-In-Reply-To: <1318301472223656@web13m.yandex.ru>
-References: <20160826145236.30210-1-hdegoede@redhat.com>
- <1318301472223656@web13m.yandex.ru>
-Message-ID: <43e78c53-77ee-5e20-a060-9e60ce37d3f0@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 26 Aug 2016 17:00:34 +0100
+Subject: [PATCH v2 2/3] arm64: dts: Add ZTE ZX296718 SoC dts and Makefile
+In-Reply-To: <1472221932-6730-3-git-send-email-jun.nie@linaro.org>
+References: <1472221932-6730-1-git-send-email-jun.nie@linaro.org>
+ <1472221932-6730-3-git-send-email-jun.nie@linaro.org>
+Message-ID: <20160826160034.GA32695@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Aug 26, 2016 at 10:32:11PM +0800, Jun Nie wrote:
+> Add device tree support for ZX296718 SoC and evaluation board based on it.
+> Also document new values.
+> 
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 
-On 26-08-16 17:00, Icenowy Zheng wrote:
->
->
-> 26.08.2016, 22:58, "Hans de Goede" <hdegoede@redhat.com>:
->> Hi Maxime,
->>
->> Now that Ulf has merged the post-power-on-delay-ms mmc-pwrseq patches
->> in his mmc/next tree and Rob Herring has accepted the esp8089 dt
->> bindings (and specifically the esp,crystal-26M-en property), these
->> are ready for merging.
->
-> Can the driver now work without broken-cd?
+NAK.
 
-Sort-off, my fork of the esp8089 driver has a workaround so that
-it does not need broken-cd. I'm also working together with
-Ulf (the mmc maintainer) to come up with a clean upstream
-solution for this.
+I did *not* provide a Reviewed-by in v1 [1,2]. Please remove this tag.
 
-Regards,
+Unless explicitly provided, do not add a Reviewed-by tag. Comments alone do not
+imply a Reviewed-by tag.
 
-Hans
+I also have a further comment below.
+
+> +		gic: interrupt-controller at 2a00000 {
+> +			compatible = "arm,gic-v3";
+> +			#interrupt-cells = <3>;
+> +			#address-cells = <0>;
+> +			#redistributor-regions = <6>;
+> +			redistributor-stride = <0x0 0x40000>;
+> +			interrupt-controller;
+> +			reg = <0x02a00000 0x10000>,
+> +			      <0x02b00000 0x20000>,
+> +			      <0x02b20000 0x20000>,
+> +			      <0x02b40000 0x20000>,
+> +			      <0x02b60000 0x20000>,
+> +			      <0x02b80000 0x20000>,
+> +			      <0x02ba0000 0x20000>;
+> +			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
+> +		};
+> +
+> +		timer {
+> +			compatible = "arm,armv8-timer";
+> +			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+> +				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+> +				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+> +				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
+> +		};
+
+GIC_CPU_MASK* is only valid for GICv2, not GICv3. Please remove the
+GIC_CPU_MASK_SIMPLE(8) uses from these.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/449162.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/449230.html
