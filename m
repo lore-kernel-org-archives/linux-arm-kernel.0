@@ -1,147 +1,190 @@
 From: Anson.Huang@nxp.com (Anson Huang)
-Date: Fri, 26 Aug 2016 19:12:50 +0800
-Subject: [PATCH 2/3] ARM: imx: add gpcv2 support
+Date: Fri, 26 Aug 2016 19:12:51 +0800
+Subject: [PATCH 3/3] ARM: imx: add SMP support for i.MX7D
 In-Reply-To: <1472209971-32469-1-git-send-email-Anson.Huang@nxp.com>
 References: <1472209971-32469-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1472209971-32469-3-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1472209971-32469-4-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX7's GPC(general power controller) module is
-different from i.MX6, name it as GPCV2 and add
-its driver for SMP support, as secondary CPUs
-boot up will need GPC to enable power.
+i.MX7D has 2 cortex-a7 ARM core, add support for
+booting up SMP kernel with 2 CPUs.
+
+The existing i.MX SMP code is designed for i.MX6
+series SoCs which have cortex-a9 ARM core, but i.MX7D
+has 2 cortex-a7 ARM core, so we need to add runtime
+check for those differences between cortex-a9 and
+cortex-a7.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
- arch/arm/mach-imx/Kconfig  |  4 +++
- arch/arm/mach-imx/Makefile |  1 +
- arch/arm/mach-imx/common.h |  2 ++
- arch/arm/mach-imx/gpcv2.c  | 66 ++++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 73 insertions(+)
- create mode 100644 arch/arm/mach-imx/gpcv2.c
+ arch/arm/mach-imx/headsmp.S    | 11 +++++++++++
+ arch/arm/mach-imx/mach-imx7d.c |  2 ++
+ arch/arm/mach-imx/platsmp.c    | 19 ++++++++++++++++++-
+ arch/arm/mach-imx/src.c        | 38 ++++++++++++++++++++++++++++++--------
+ 4 files changed, 61 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 0ac05a0..13d5952 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -51,6 +51,9 @@ config HAVE_IMX_GPC
- 	bool
- 	select PM_GENERIC_DOMAINS if PM
+diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
+index 6c28d28..a26e459 100644
+--- a/arch/arm/mach-imx/headsmp.S
++++ b/arch/arm/mach-imx/headsmp.S
+@@ -26,7 +26,18 @@ diag_reg_offset:
+ 	.endm
  
-+config HAVE_IMX_GPCV2
-+	bool
+ ENTRY(v7_secondary_startup)
++	.word	0xc070			@ 0xc07 is cortex-a7 id
++	.word	0xfff0			@ mask for core type
 +
- config HAVE_IMX_MMDC
- 	bool
+ ARM_BE8(setend be)			@ go BE8 if entered LE
++	mrc     p15, 0, r0, c0, c0, 0
++	adr	r1, v7_secondary_startup
++	ldr	r2, [r1]
++	ldr	r3, [r1, #0x4]
++	and     r0, r0, r3
++	cmp     r0, r2
++	beq     secondary_startup
++
+ 	set_diag_reg
+ 	b	secondary_startup
+ ENDPROC(v7_secondary_startup)
+diff --git a/arch/arm/mach-imx/mach-imx7d.c b/arch/arm/mach-imx/mach-imx7d.c
+index 26ca744..ef3dce6 100644
+--- a/arch/arm/mach-imx/mach-imx7d.c
++++ b/arch/arm/mach-imx/mach-imx7d.c
+@@ -99,6 +99,7 @@ static void __init imx7d_init_machine(void)
  
-@@ -537,6 +540,7 @@ config SOC_IMX7D
- 	select HAVE_IMX_ANATOP
- 	select HAVE_IMX_MMDC
- 	select HAVE_IMX_SRC
-+	select HAVE_IMX_GPCV2
- 	help
- 		This enables support for Freescale i.MX7 Dual processor.
+ static void __init imx7d_init_irq(void)
+ {
++	imx_gpcv2_check_dt();
+ 	imx_init_revision_from_anatop();
+ 	imx_src_init();
+ 	irqchip_init();
+@@ -111,6 +112,7 @@ static const char *const imx7d_dt_compat[] __initconst = {
+ };
  
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index edce8df..6d812f6 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -66,6 +66,7 @@ obj-$(CONFIG_MACH_IMX35_DT) += imx35-dt.o
+ DT_MACHINE_START(IMX7D, "Freescale i.MX7 Dual (Device Tree)")
++	.smp		= smp_ops(imx_smp_ops),
+ 	.init_irq	= imx7d_init_irq,
+ 	.init_machine	= imx7d_init_machine,
+ 	.dt_compat	= imx7d_dt_compat,
+diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
+index 711dbbd..63af911 100644
+--- a/arch/arm/mach-imx/platsmp.c
++++ b/arch/arm/mach-imx/platsmp.c
+@@ -60,8 +60,17 @@ static int imx_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ static void __init imx_smp_init_cpus(void)
+ {
+ 	int i, ncores;
++	unsigned long val, arch_type;
  
- obj-$(CONFIG_HAVE_IMX_ANATOP) += anatop.o
- obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
-+obj-$(CONFIG_HAVE_IMX_GPCV2) += gpcv2.o
- obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
- obj-$(CONFIG_HAVE_IMX_SRC) += src.o
- ifneq ($(CONFIG_SOC_IMX6)$(CONFIG_SOC_LS1021A),)
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index b757811..732a19a 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -58,9 +58,11 @@ void imx_init_revision_from_anatop(void);
- struct device *imx_soc_device_init(void);
- void imx6_enable_rbc(bool enable);
- void imx_gpc_check_dt(void);
-+void imx_gpcv2_check_dt(void);
- void imx_gpc_set_arm_power_in_lpm(bool power_off);
- void imx_gpc_set_arm_power_up_timing(u32 sw2iso, u32 sw);
- void imx_gpc_set_arm_power_down_timing(u32 sw2iso, u32 sw);
-+void imx_gpcv2_set_core1_pdn_pup_by_software(bool pdn);
- void imx25_pm_init(void);
- void imx27_pm_init(void);
+-	ncores = scu_get_core_count(scu_base);
++	asm volatile("mrc p15, 0, %0, c0, c0, 0" : "=r" (arch_type));
++
++	if (((arch_type >> 4) & 0xfff) == 0xc07) {
++		/* cortex-a7 core number is in bit[25:24] of CP15 L2CTLR */
++		asm volatile("mrc p15, 1, %0, c9, c0, 2" : "=r" (val));
++		ncores = ((val >> 24) & 0x3) + 1;
++	} else {
++		ncores = scu_get_core_count(scu_base);
++	}
  
-diff --git a/arch/arm/mach-imx/gpcv2.c b/arch/arm/mach-imx/gpcv2.c
-new file mode 100644
-index 0000000..98577c4
---- /dev/null
-+++ b/arch/arm/mach-imx/gpcv2.c
-@@ -0,0 +1,66 @@
-+/*
-+ * Copyright 2016 Freescale Semiconductor, Inc.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
+ 	for (i = ncores; i < NR_CPUS; i++)
+ 		set_cpu_possible(i, false);
+@@ -74,6 +83,14 @@ void imx_smp_prepare(void)
+ 
+ static void __init imx_smp_prepare_cpus(unsigned int max_cpus)
+ {
++	unsigned long arch_type;
 +
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
++	asm volatile("mrc p15, 0, %0, c0, c0, 0" : "=r" (arch_type));
 +
-+#include "common.h"
-+
-+#define GPC_CPU_PGC_SW_PUP_REQ	0xf0
-+#define GPC_CPU_PGC_SW_PDN_REQ	0xfc
-+#define GPC_PGC_C1		0x840
-+
-+#define BM_CPU_PGC_SW_PDN_PUP_REQ_CORE1_A7	0x2
-+#define BM_GPC_PGC_PCG				0x1
-+
-+static void __iomem *gpcv2_base;
-+
-+static void imx_gpcv2_set_m_core_pgc(bool enable, u32 offset)
-+{
-+	u32 val = readl_relaxed(gpcv2_base + offset) & (~BM_GPC_PGC_PCG);
-+
-+	if (enable)
-+		val |= BM_GPC_PGC_PCG;
-+
-+	writel_relaxed(val, gpcv2_base + offset);
-+}
-+
-+void imx_gpcv2_set_core1_pdn_pup_by_software(bool pdn)
-+{
-+	u32 val = readl_relaxed(gpcv2_base + (pdn ?
-+		GPC_CPU_PGC_SW_PDN_REQ : GPC_CPU_PGC_SW_PUP_REQ));
-+
-+	imx_gpcv2_set_m_core_pgc(true, GPC_PGC_C1);
-+	val |= BM_CPU_PGC_SW_PDN_PUP_REQ_CORE1_A7;
-+	writel_relaxed(val, gpcv2_base + (pdn ?
-+		GPC_CPU_PGC_SW_PDN_REQ : GPC_CPU_PGC_SW_PUP_REQ));
-+
-+	while ((readl_relaxed(gpcv2_base + (pdn ?
-+		GPC_CPU_PGC_SW_PDN_REQ : GPC_CPU_PGC_SW_PUP_REQ)) &
-+		BM_CPU_PGC_SW_PDN_PUP_REQ_CORE1_A7) != 0)
-+		;
-+	imx_gpcv2_set_m_core_pgc(false, GPC_PGC_C1);
-+}
-+
-+void __init imx_gpcv2_check_dt(void)
-+{
-+	struct device_node *np;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx7d-gpc");
-+	if (WARN_ON(!np))
++	/* no need for cortex-a7 */
++	if (((arch_type >> 4) & 0xfff) == 0xc07)
 +		return;
 +
-+	gpcv2_base = of_iomap(np, 0);
-+	WARN_ON(!gpcv2_base);
-+}
+ 	imx_smp_prepare();
+ 
+ 	/*
+diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
+index 70b083f..1fda72a 100644
+--- a/arch/arm/mach-imx/src.c
++++ b/arch/arm/mach-imx/src.c
+@@ -18,6 +18,7 @@
+ #include <linux/smp.h>
+ #include <asm/smp_plat.h>
+ #include "common.h"
++#include "hardware.h"
+ 
+ #define SRC_SCR				0x000
+ #define SRC_GPR1			0x020
+@@ -30,6 +31,15 @@
+ #define BP_SRC_SCR_CORE1_RST		14
+ #define BP_SRC_SCR_CORE1_ENABLE		22
+ 
++/* below are for i.MX7D */
++#define SRC_GPR1_V2                     0x074
++#define SRC_A7RCR0                      0x004
++#define SRC_A7RCR1                      0x008
++#define SRC_M4RCR                       0x00C
++
++#define BP_SRC_A7RCR0_A7_CORE_RESET0   0
++#define BP_SRC_A7RCR1_A7_CORE1_ENABLE  1
++
+ static void __iomem *src_base;
+ static DEFINE_SPINLOCK(scr_lock);
+ 
+@@ -87,12 +97,21 @@ void imx_enable_cpu(int cpu, bool enable)
+ 	u32 mask, val;
+ 
+ 	cpu = cpu_logical_map(cpu);
+-	mask = 1 << (BP_SRC_SCR_CORE1_ENABLE + cpu - 1);
+ 	spin_lock(&scr_lock);
+-	val = readl_relaxed(src_base + SRC_SCR);
+-	val = enable ? val | mask : val & ~mask;
+-	val |= 1 << (BP_SRC_SCR_CORE1_RST + cpu - 1);
+-	writel_relaxed(val, src_base + SRC_SCR);
++	if (cpu_is_imx7d()) {
++		if (enable)
++			imx_gpcv2_set_core1_pdn_pup_by_software(false);
++		mask = 1 << (BP_SRC_A7RCR1_A7_CORE1_ENABLE + cpu - 1);
++		val = readl_relaxed(src_base + SRC_A7RCR1);
++		val = enable ? val | mask : val & ~mask;
++		writel_relaxed(val, src_base + SRC_A7RCR1);
++	} else {
++		mask = 1 << (BP_SRC_SCR_CORE1_ENABLE + cpu - 1);
++		val = readl_relaxed(src_base + SRC_SCR);
++		val = enable ? val | mask : val & ~mask;
++		val |= 1 << (BP_SRC_SCR_CORE1_RST + cpu - 1);
++		writel_relaxed(val, src_base + SRC_SCR);
++	}
+ 	spin_unlock(&scr_lock);
+ }
+ 
+@@ -100,19 +119,22 @@ void imx_set_cpu_jump(int cpu, void *jump_addr)
+ {
+ 	cpu = cpu_logical_map(cpu);
+ 	writel_relaxed(virt_to_phys(jump_addr),
+-		       src_base + SRC_GPR1 + cpu * 8);
++		       src_base + (cpu_is_imx7d() ?
++		       SRC_GPR1_V2 : SRC_GPR1) + cpu * 8);
+ }
+ 
+ u32 imx_get_cpu_arg(int cpu)
+ {
+ 	cpu = cpu_logical_map(cpu);
+-	return readl_relaxed(src_base + SRC_GPR1 + cpu * 8 + 4);
++	return readl_relaxed(src_base + (cpu_is_imx7d() ?
++		SRC_GPR1_V2 : SRC_GPR1) + cpu * 8 + 4);
+ }
+ 
+ void imx_set_cpu_arg(int cpu, u32 arg)
+ {
+ 	cpu = cpu_logical_map(cpu);
+-	writel_relaxed(arg, src_base + SRC_GPR1 + cpu * 8 + 4);
++	writel_relaxed(arg, src_base + (cpu_is_imx7d() ?
++		SRC_GPR1_V2 : SRC_GPR1) + cpu * 8 + 4);
+ }
+ 
+ void __init imx_src_init(void)
 -- 
 1.9.1
