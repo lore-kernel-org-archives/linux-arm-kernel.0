@@ -1,35 +1,30 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Fri, 26 Aug 2016 14:26:21 +0000
-Subject: [PATCH -next] iio: adc: mt2701: Remove redundant dev_err call in
- mt6577_auxadc_probe()
-Message-ID: <1472221581-28836-1-git-send-email-weiyj.lk@gmail.com>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Fri, 26 Aug 2016 22:32:09 +0800
+Subject: [PATCH v2 0/3] Add ZTE ZX296718 support
+Message-ID: <1472221932-6730-1-git-send-email-jun.nie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <weiyongjun1@huawei.com>
+Changes vs version1:
+  - Use more precise cpu and pmu compatible name in dts.
+  - fix minor coding style issue.
 
-There is a error message within devm_ioremap_resource
-already, so remove the dev_err call to avoid redundant
-error message.
+Jun Nie (3):
+  arm64: add ZTE ZX SoC family
+  arm64: dts: Add ZTE ZX296718 SoC dts and Makefile
+  arm64: defconfig: enable ZTE ZX related config
 
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
----
- drivers/iio/adc/mt6577_auxadc.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ Documentation/devicetree/bindings/arm/zte.txt |  24 +++
+ arch/arm64/Kconfig.platforms                  |   5 +
+ arch/arm64/boot/dts/Makefile                  |   1 +
+ arch/arm64/boot/dts/zte/Makefile              |   5 +
+ arch/arm64/boot/dts/zte/zx296718.dts          |  21 +++
+ arch/arm64/boot/dts/zte/zx296718.dtsi         | 253 ++++++++++++++++++++++++++
+ arch/arm64/configs/defconfig                  |   1 +
+ 7 files changed, 310 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/zte/Makefile
+ create mode 100644 arch/arm64/boot/dts/zte/zx296718.dts
+ create mode 100644 arch/arm64/boot/dts/zte/zx296718.dtsi
 
-diff --git a/drivers/iio/adc/mt6577_auxadc.c b/drivers/iio/adc/mt6577_auxadc.c
-index 2d104c8..a268954 100644
---- a/drivers/iio/adc/mt6577_auxadc.c
-+++ b/drivers/iio/adc/mt6577_auxadc.c
-@@ -206,10 +206,8 @@ static int mt6577_auxadc_probe(struct platform_device *pdev)
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	adc_dev->reg_base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(adc_dev->reg_base)) {
--		dev_err(&pdev->dev, "failed to get auxadc base address\n");
-+	if (IS_ERR(adc_dev->reg_base))
- 		return PTR_ERR(adc_dev->reg_base);
--	}
- 
- 	adc_dev->adc_clk = devm_clk_get(&pdev->dev, "main");
- 	if (IS_ERR(adc_dev->adc_clk)) {
+-- 
+1.9.1
