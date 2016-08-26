@@ -1,34 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Aug 2016 16:35:51 +0100
-Subject: [PATCH v7 14/14] Documentation: remove the constraint on the
- distances of node pairs
-In-Reply-To: <1472024693-12912-15-git-send-email-thunder.leizhen@huawei.com>
-References: <1472024693-12912-1-git-send-email-thunder.leizhen@huawei.com>
- <1472024693-12912-15-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <20160826153550.GI30302@arm.com>
+From: Bhaskar.Upadhaya@nxp.com (Bhaskar Upadhaya)
+Date: Fri, 26 Aug 2016 15:57:44 +0530
+Subject: [PATCH 05/10] dt-bindings: pci: Update bindings for LS1012A
+In-Reply-To: <1472207269-18499-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
+References: <1472207269-18499-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
+Message-ID: <1472207269-18499-5-git-send-email-Bhaskar.Upadhaya@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 03:44:53PM +0800, Zhen Lei wrote:
-> Update documentation. This limit is unneccessary.
-> 
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
->  Documentation/devicetree/bindings/numa.txt | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
-> index 21b3505..c0ea4a7 100644
-> --- a/Documentation/devicetree/bindings/numa.txt
-> +++ b/Documentation/devicetree/bindings/numa.txt
-> @@ -48,7 +48,6 @@ distance (memory latency) between all numa nodes.
-> 
->    Note:
->  	1. Each entry represents distance from first node to second node.
-> -	The distances are equal in either direction.
+Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
+---
+ Documentation/devicetree/bindings/pci/layerscape-pci.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Hmm, so what happens now if firmware provides a description where both
-distances (in either direction) are supplied, but are different?
-
-Will
+diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+index 41e9f55..5755697 100644
+--- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
++++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+@@ -15,6 +15,7 @@ Required properties:
+ - compatible: should contain the platform identifier such as:
+         "fsl,ls1021a-pcie", "snps,dw-pcie"
+         "fsl,ls2080a-pcie", "fsl,ls2085a-pcie", "snps,dw-pcie"
++	"fsl,ls1012a-pcie", "fsl,ls1043a-pcie" ,"snps,dw-pcie"
+ - reg: base addresses and lengths of the PCIe controller
+ - interrupts: A list of interrupt outputs of the controller. Must contain an
+   entry for each entry in the interrupt-names property.
+-- 
+1.9.1
