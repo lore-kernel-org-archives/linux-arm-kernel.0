@@ -1,37 +1,29 @@
 From: Bhaskar.Upadhaya@nxp.com (Bhaskar Upadhaya)
-Date: Fri, 26 Aug 2016 15:57:48 +0530
-Subject: [PATCH 09/10] dt-bindings: Update bindings with additional vendor for
- LS1012A
+Date: Fri, 26 Aug 2016 15:57:46 +0530
+Subject: [PATCH 07/10] dt-bindings: thermal: Update bindings for LS1012A
 In-Reply-To: <1472207269-18499-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
 References: <1472207269-18499-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
-Message-ID: <1472207269-18499-9-git-send-email-Bhaskar.Upadhaya@nxp.com>
+Message-ID: <1472207269-18499-7-git-send-email-Bhaskar.Upadhaya@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/thermal/qoriq-thermal.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index a7440bc..e9f923d 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -85,6 +85,7 @@ elan	Elan Microelectronic Corp.
- embest	Shenzhen Embest Technology Co., Ltd.
- emmicro	EM Microelectronic
- energymicro	Silicon Laboratories (formerly Energy Micro AS)
-+eon	Eon Silicon Solution, Inc.
- epcos	EPCOS AG
- epfl	Ecole Polytechnique F?d?rale de Lausanne
- epson	Seiko Epson Corp.
-@@ -246,6 +247,7 @@ solomon        Solomon Systech Limited
- sony	Sony Corporation
- spansion	Spansion Inc.
- sprd	Spreadtrum Communications Inc.
-+sst	Silicon Storage Technology, Inc.
- st	STMicroelectronics
- startek	Startek
- ste	ST-Ericsson
+diff --git a/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt b/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
+index 66223d5..8e2b211 100644
+--- a/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
++++ b/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
+@@ -1,7 +1,7 @@
+ * Thermal Monitoring Unit (TMU) on Freescale QorIQ SoCs
+ 
+ Required properties:
+-- compatible : Must include "fsl,qoriq-tmu". The version of the device is
++- compatible :"fsl,qoriq-tmu", "fsl,ls1012a-tmu". The version of the device is
+ 	determined by the TMU IP Block Revision Register (IPBRR0) at
+ 	offset 0x0BF8.
+ 	Table of correspondences between IPBRR0 values and example  chips:
 -- 
 1.9.1
