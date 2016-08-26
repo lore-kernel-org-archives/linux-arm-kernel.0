@@ -1,43 +1,46 @@
-From: jorik@kippendief.biz (jorik at kippendief.biz)
-Date: Fri, 26 Aug 2016 13:24:13 +0200
-Subject: [PATCH] clk: sunxi-ng: Fix wrong reset register offsets
-Message-ID: <1472210653-32170-1-git-send-email-jorik@kippendief.biz>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri, 26 Aug 2016 13:28:06 +0200
+Subject: [RFC PATCH 1/2] arm64: hw_breakpoint: convert CPU hotplug
+ notifier to new infrastructure
+In-Reply-To: <1472207758-24394-1-git-send-email-will.deacon@arm.com>
+References: <1472207758-24394-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20160826112806.rr3apxva73frag5x@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jorik Jonker <jorik@kippendief.biz>
+On 2016-08-26 11:35:57 [+0100], Will Deacon wrote:
+> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+> index 26a6bf77d272..948b73148d56 100644
+> --- a/arch/arm64/kernel/hw_breakpoint.c
+> +++ b/arch/arm64/kernel/hw_breakpoint.c
+> @@ -857,7 +857,7 @@ void hw_breakpoint_thread_switch(struct task_struct *next)
+?
+> -static int hw_breakpoint_reset_notify(struct notifier_block *self,
+> -						unsigned long action,
+> -						void *hcpu)
+> -{
+> -	if ((action & ~CPU_TASKS_FROZEN) == CPU_ONLINE) {
+> -		local_irq_disable();
+> -		hw_breakpoint_reset(NULL);
 
-The reset register offsets for UART*, I2C* and SCR were off by a few bytes.
----
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+so the old one was invoked at CPU_ONLINE time.
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-index feabc0f..280ba74 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-@@ -783,14 +783,14 @@ static struct ccu_reset_map sun8i_h3_ccu_resets[] = {
- 	[RST_BUS_I2S1]		=  { 0x2d0, BIT(13) },
- 	[RST_BUS_I2S2]		=  { 0x2d0, BIT(14) },
- 
--	[RST_BUS_I2C0]		=  { 0x2d4, BIT(0) },
--	[RST_BUS_I2C1]		=  { 0x2d4, BIT(1) },
--	[RST_BUS_I2C2]		=  { 0x2d4, BIT(2) },
--	[RST_BUS_UART0]		=  { 0x2d4, BIT(16) },
--	[RST_BUS_UART1]		=  { 0x2d4, BIT(17) },
--	[RST_BUS_UART2]		=  { 0x2d4, BIT(18) },
--	[RST_BUS_UART3]		=  { 0x2d4, BIT(19) },
--	[RST_BUS_SCR]		=  { 0x2d4, BIT(20) },
-+	[RST_BUS_I2C0]		=  { 0x2d8, BIT(0) },
-+	[RST_BUS_I2C1]		=  { 0x2d8, BIT(1) },
-+	[RST_BUS_I2C2]		=  { 0x2d8, BIT(2) },
-+	[RST_BUS_UART0]		=  { 0x2d8, BIT(16) },
-+	[RST_BUS_UART1]		=  { 0x2d8, BIT(17) },
-+	[RST_BUS_UART2]		=  { 0x2d8, BIT(18) },
-+	[RST_BUS_UART3]		=  { 0x2d8, BIT(19) },
-+	[RST_BUS_SCR]		=  { 0x2d8, BIT(20) },
- };
- 
- static const struct sunxi_ccu_desc sun8i_h3_ccu_desc = {
--- 
-2.7.4
+> -		local_irq_enable();
+> -	}
+> -	return NOTIFY_OK;
+> +	return 0;
+>  }
+?
+> @@ -919,36 +905,34 @@ static inline void cpu_suspend_set_dbg_restorer(void (*hw_bp_restore)(void *))
+?
+> +	/*
+> +	 * Reset the breakpoint resources. We assume that a halting
+> +	 * debugger will leave the world in a nice state for us.
+> +	 */
+> +	ret = cpuhp_setup_state(CPUHP_AP_PERF_ARM_HW_BREAKPOINT_STARTING,
+> +			  "CPUHP_AP_PERF_ARM_HW_BREAKPOINT_STARTING",
+> +			  hw_breakpoint_reset, NULL);
+
+But this will move it to CPU_STARTING. May I ask why?
+
+Sebastian
