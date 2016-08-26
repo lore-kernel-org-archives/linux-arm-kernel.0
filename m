@@ -1,150 +1,43 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 26 Aug 2016 14:30:23 -0400
-Subject: [PATCH v2 6/7] arm64: dts: exynos: Add dts file for
- Exynos5433-based TM2 board
-In-Reply-To: <1472046551-703-7-git-send-email-cw00.choi@samsung.com>
+Date: Fri, 26 Aug 2016 14:32:06 -0400
+Subject: [PATCH v2 7/7] arm64: dts: exynos: Add dts file for
+ Exynos5433-based TM2E board
+In-Reply-To: <1472046551-703-8-git-send-email-cw00.choi@samsung.com>
 References: <1472046551-703-1-git-send-email-cw00.choi@samsung.com>
- <1472046551-703-7-git-send-email-cw00.choi@samsung.com>
-Message-ID: <0a6dffe0-8508-724e-c831-d14c32f8cd64@osg.samsung.com>
+ <1472046551-703-8-git-send-email-cw00.choi@samsung.com>
+Message-ID: <fdd386ea-638e-acd8-d7c8-acb05762a79e@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello Chanwoo,
 
-The patch looks mostly good to me, I've just some comments:
+On 08/24/2016 09:49 AM, Chanwoo Choi wrote:
+> This patch adds the Device Tree source for Exynos5433-based Samsung TM2E
+> board. TM2E board is the most similar with TM2 board. The exynos5433-tm2e.dts
+> include the difference between TM2 and TM2E.
+> 
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
+> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+> Signed-off-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
+> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
+> Signed-off-by: Jaewon Kim <jaewon02.kim@samsung.com>
+> Signed-off-by: Hyungwon Hwang <human.hwang@samsung.com>
+> Signed-off-by: Inha Song <ideal.song@samsung.com>
+> Signed-off-by: Ingi kim <ingi2.kim@samsung.com>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
 
-[snip]
-
-> +
-> +&decon {
-> +	status = "okay";
-> +	iommu-reserved-mapping = <0x20000000 0x20000000 0xc0000000>;
-> +
-
-This property never made to mainline due not having an agreement on
-how this should be fixed properly IIUC [0]. So you should remove it.
-
-[snip]
-
-> +
-> +	s2mps13-pmic at 66 {
-> +		compatible = "samsung,s2mps13-pmic";
-> +		interrupt-parent = <&gpa0>;
-> +		interrupts = <7 IRQ_TYPE_NONE>;
-> +		reg = <0x66>;
-> +		samsung,s2mps11-wrstbi-ground;
-> +
-> +		s2mps13_osc: clocks {
-> +			compatible = "samsung,s2mps13-clk";
-> +			#clock-cells = <1>;
-> +			clock-output-names = "s2mps13_ap", "s2mps13_cp",
-> +				"s2mps13_bt";
-> +		};
-> +
-
-I see that most of the following regulators are marked as always-on
-but I wonder if this is really needed. For example some of them are
-looked up by consumer devices.
-
-[snip]
-
-> +			};
-> +
-> +			ldo3_reg: LDO3 {
-> +				regulator-name = "VDD1_E_1.8V_AP";
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-always-on;
-> +			};
-
-This is used by both the ADC and the TMU so I guess it should be safe
-to not mark it as always-on (unless is used by other critical IP block
-not described in the DT).
-
-[snip]
-
-> +
-> +			ldo6_reg: LDO6 {
-> +				regulator-name = "VDD10_MIPI2L_1.0V_AP";
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <1000000>;
-> +				regulator-always-on;
-
-Same question, this is used by both the dsi and usbdrd30 nodes so maybe
-it shouldn't be marked as always-on as well.
-
-> +				regulator-state-mem {
-> +					regulator-off-in-suspend;
-> +				};
-> +			};
-> +
-> +			ldo7_reg: LDO7 {
-> +				regulator-name = "VDD18_MIPI2L_1.8V_AP";
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-always-on;
-
-This is used by the dsi node as well.
-
-[snip]
-
-> +
-> +			ldo10_reg: LDO10 {
-> +				regulator-name = "VDD33_USB30_3.0V_AP";
-> +				regulator-min-microvolt = <3000000>;
-> +				regulator-max-microvolt = <3000000>;
-> +				regulator-always-on;
-
-Use by the usbdrd30 node.
-
-[snip]
-
-> +
-> +			ldo18_reg: LDO18 {
-> +				regulator-name = "V_CODEC_1.8V_AP";
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-always-on;
-
-Use by the wm5110-codec node.
-
-[snip]
-
-> +
-> +			buck2_reg: BUCK2 {
-> +				regulator-name = "VDD_EGL_1.0V_AP";
-
-I wonder if this shouldn't be "VDD_ATL_1.0V_AP" or something since
-the big cluster isn't called Eagle like in arm32 Exynos but Atlas?
-
-> +				regulator-min-microvolt = <900000>;
-> +				regulator-max-microvolt = <1300000>;
-> +				regulator-always-on;
-> +				regulator-state-mem {
-> +					regulator-off-in-suspend;
-> +				};
-> +			};
-> +
-> +			buck3_reg: BUCK3 {
-> +				regulator-name = "VDD_KFC_1.0V_AP";
-
-Same, maybe using "VDD_APL_1.0V_AP" since the big cluster is Apollo?
-
-> +				regulator-min-microvolt = <800000>;
-> +				regulator-max-microvolt = <1200000>;
-> +				regulator-always-on;
-> +				regulator-state-mem {
-> +					regulator-off-in-suspend;
-> +				};
-> +			};
-> +
-
-Used by the big and LITTLE clusters respectively, although for these two
-I'm not that sure if it would be safe to remove the always-on property.
+Patch looks good to me.
 
 Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-[0]: http://www.spinics.net/lists/arm-kernel/msg419747.html
 
 Best regards,
 -- 
