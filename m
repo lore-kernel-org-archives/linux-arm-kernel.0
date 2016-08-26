@@ -1,116 +1,90 @@
 From: jm@lentin.co.uk (Jamie Lentin)
-Date: Fri, 26 Aug 2016 10:20:58 +0100
-Subject: [PATCH 2/8] arm: orion5x: Add clk support for mv88f5181
-In-Reply-To: <1472203264-21089-1-git-send-email-jm@lentin.co.uk>
+Date: Fri, 26 Aug 2016 10:20:56 +0100
+Subject: [PATCH 0/8] Convert Netgear WNR854T to devicetree
+In-Reply-To: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
 References: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
- <1472203264-21089-1-git-send-email-jm@lentin.co.uk>
-Message-ID: <1472203264-21089-3-git-send-email-jm@lentin.co.uk>
+Message-ID: <1472203264-21089-1-git-send-email-jm@lentin.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Referring to the u-boot sources for the Netgear WNR854T, add support
-for the mv88f5181.
+This is an attempt to resurrect the mainline WNR854T support and
+convert to device tree. The major change since v0 is the embedded
+ethernet switch is now functional, thanks to Andrew Lunn, making the
+device actually useful. Full list of changes:
 
-Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/clock/mvebu-core-clock.txt |  1 +
- drivers/clk/mvebu/orion.c                          | 70 ++++++++++++++++++++++
- 2 files changed, 71 insertions(+)
+* The DT definition for the switch in this patchset has changed to
+match the 88e6131 DSA driver currently in net-next, and all
+now-superflous attempts at fixing up the DSA driver have been removed
+from this patchset.
 
-diff --git a/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
-index 670c2af..eb985a6 100644
---- a/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
-@@ -52,6 +52,7 @@ Required properties:
- 	"marvell,dove-core-clock" - for Dove SoC core clocks
- 	"marvell,kirkwood-core-clock" - for Kirkwood SoC (except mv88f6180)
- 	"marvell,mv88f6180-core-clock" - for Kirkwood MV88f6180 SoC
-+	"marvell,mv88f5181-core-clock" - for Orion MV88F5181 SoC
- 	"marvell,mv88f5182-core-clock" - for Orion MV88F5182 SoC
- 	"marvell,mv88f5281-core-clock" - for Orion MV88F5281 SoC
- 	"marvell,mv88f6183-core-clock" - for Orion MV88F6183 SoC
-diff --git a/drivers/clk/mvebu/orion.c b/drivers/clk/mvebu/orion.c
-index fd12956..a6e5bee 100644
---- a/drivers/clk/mvebu/orion.c
-+++ b/drivers/clk/mvebu/orion.c
-@@ -21,6 +21,76 @@ static const struct coreclk_ratio orion_coreclk_ratios[] __initconst = {
- };
- 
- /*
-+ * Orion 5181
-+ */
-+
-+#define SAR_MV88F5181_TCLK_FREQ      8
-+#define SAR_MV88F5181_TCLK_FREQ_MASK 0x3
-+
-+static u32 __init mv88f5181_get_tclk_freq(void __iomem *sar)
-+{
-+	u32 opt = (readl(sar) >> SAR_MV88F5181_TCLK_FREQ) &
-+		SAR_MV88F5181_TCLK_FREQ_MASK;
-+	if (opt == 0)
-+		return 133333333;
-+	else if (opt == 1)
-+		return 150000000;
-+	else if (opt == 2)
-+		return 166666667;
-+	else
-+		return 0;
-+}
-+
-+#define SAR_MV88F5181_CPU_FREQ       4
-+#define SAR_MV88F5181_CPU_FREQ_MASK  0xf
-+
-+static u32 __init mv88f5181_get_cpu_freq(void __iomem *sar)
-+{
-+	u32 opt = (readl(sar) >> SAR_MV88F5181_CPU_FREQ) &
-+		SAR_MV88F5181_CPU_FREQ_MASK;
-+	if (opt == 0)
-+		return 333333333;
-+	else if (opt == 1 || opt == 2)
-+		return 400000000;
-+	else if (opt == 3)
-+		return 500000000;
-+	else
-+		return 0;
-+}
-+
-+static void __init mv88f5181_get_clk_ratio(void __iomem *sar, int id,
-+					   int *mult, int *div)
-+{
-+	u32 opt = (readl(sar) >> SAR_MV88F5181_CPU_FREQ) &
-+		SAR_MV88F5181_CPU_FREQ_MASK;
-+	if (opt == 0 || opt == 1) {
-+		*mult = 1;
-+		*div  = 2;
-+	} else if (opt == 2 || opt == 3) {
-+		*mult = 1;
-+		*div  = 3;
-+	} else {
-+		*mult = 0;
-+		*div  = 1;
-+	}
-+}
-+
-+static const struct coreclk_soc_desc mv88f5181_coreclks = {
-+	.get_tclk_freq = mv88f5181_get_tclk_freq,
-+	.get_cpu_freq = mv88f5181_get_cpu_freq,
-+	.get_clk_ratio = mv88f5181_get_clk_ratio,
-+	.ratios = orion_coreclk_ratios,
-+	.num_ratios = ARRAY_SIZE(orion_coreclk_ratios),
-+};
-+
-+static void __init mv88f5181_clk_init(struct device_node *np)
-+{
-+	return mvebu_coreclk_setup(np, &mv88f5181_coreclks);
-+}
-+
-+CLK_OF_DECLARE(mv88f5181_clk, "marvell,mv88f5181-core-clock", mv88f5181_clk_init);
-+
-+/*
-  * Orion 5182
-  */
- 
+* Use Flash partition scheme from original netgear Linux image (but
+keeping the uboot/uboot_env split) instead of the partition scheme from
+the old non-DT support, which didn't match either Netgear's layout,
+u-boot or openWRT. NB: I've no copy of the original flash contents
+(Netgear's firmware images only contain a squashfs image of the rootfs),
+so I can't confirm the other partitions are accurately named.
+
+* Set NOR Flash bank-width to correct value
+
+* Reassign defconfig entries pointing at CONFIG_MACH_WNR854T (old
+non-DT support) to CONFIG_MACH_WNR854T_DT
+
+* Move eth0 pinctrl definitions and assignment to
+orion5x-mv88f5181.dtsi [Andrew Lunn]
+
+* Get the copyright year right [Rob Herring]
+
+* Reformat pinctrl docs to one-compatible-string-per-line [Rob Herring]
+
+* Rename reset button pinctrl to pmx_reset_button [Andrew Lunn]
+
+* Move pmx_ge pinctrl definition to SoC include [Andrew Lunn]
+
+* Put flash partitions into their own node [Andrew Lunn]
+
+* Make LED names standards-compliant [Andrew Lunn]
+
+* Use standard stdout-path definition for bootargs [Andrew Lunn]
+
+The patches are also available at https://github.com/lentinj/linux
+wnr854t-support-v1 - this is based on net-next to use in the
+88e6131 changes there, and applies the patch in
+https://lkml.org/lkml/2016/8/3/93 to allow the device to boot.
+
+Thanks,
+
+Jamie Lentin (8):
+  arm: orion5x: Add documentation for SoC and board bindings
+  arm: orion5x: Add clk support for mv88f5181
+  arm: orion5x: Generalise mv88f5181l pinctrl support for 88f5181
+  arm: orion5x: Alias uart0 to serial0 for all orion5x
+  arm: orion5x: Add DT include for mv88f5181
+  arm: orion5x: Add DT-based support for Netgear WNR854T
+  arm: orion5x: Remove old non-DT-based WNR854T support
+  arm: orion5x: Configure WNR854T ethernet PHY LEDs
+
+ .../bindings/arm/marvell/marvell,orion5x.txt       |  25 ++
+ .../devicetree/bindings/clock/mvebu-core-clock.txt |   1 +
+ .../bindings/pinctrl/marvell,orion-pinctrl.txt     |   4 +-
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/orion5x-mv88f5181.dtsi           |  49 ++++
+ arch/arm/boot/dts/orion5x-netgear-wnr854t.dts      | 263 +++++++++++++++++++++
+ arch/arm/boot/dts/orion5x.dtsi                     |   1 +
+ arch/arm/configs/multi_v5_defconfig                |   2 +-
+ arch/arm/configs/mvebu_v5_defconfig                |   2 +-
+ arch/arm/configs/orion5x_defconfig                 |   2 +-
+ arch/arm/mach-orion5x/Kconfig                      |   4 +-
+ arch/arm/mach-orion5x/Makefile                     |   2 +-
+ arch/arm/mach-orion5x/board-wnr854t.c              |  78 ++++++
+ arch/arm/mach-orion5x/wnr854t-setup.c              | 185 ---------------
+ drivers/clk/mvebu/orion.c                          |  70 ++++++
+ drivers/pinctrl/mvebu/pinctrl-orion.c              |  23 +-
+ 16 files changed, 509 insertions(+), 203 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell/marvell,orion5x.txt
+ create mode 100644 arch/arm/boot/dts/orion5x-mv88f5181.dtsi
+ create mode 100644 arch/arm/boot/dts/orion5x-netgear-wnr854t.dts
+ create mode 100644 arch/arm/mach-orion5x/board-wnr854t.c
+ delete mode 100644 arch/arm/mach-orion5x/wnr854t-setup.c
+
 -- 
 2.8.1
