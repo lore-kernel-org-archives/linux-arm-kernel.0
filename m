@@ -1,226 +1,178 @@
-From: sr@denx.de (Stefan Roese)
-Date: Fri, 26 Aug 2016 07:39:01 +0200
-Subject: [PATCH v2] dmaengine: mv_xor: Add support for IO (PCIe) src/dst areas
-Message-ID: <20160826053901.18763-1-sr@denx.de>
+From: jitao.shi@mediatek.com (Jitao Shi)
+Date: Fri, 26 Aug 2016 14:10:31 +0800
+Subject: drm/mediatek: fixed the calc method of data rate per lane
+Message-ID: <1472191831-7150-1-git-send-email-jitao.shi@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To enable the access to a specific area, the MVEBU XOR controllers needs
-to have this area enabled / mapped via an address window. Right now,
-only the DRAM memory area is enabled via such memory windows. So
-using this driver to DMA to / from a e.g. PCIe memory region is
-currently not supported.
+Tune dsi frame rate by pixel clock, dsi add some extra signal (i.e. Tlpx,
+Ths-prepare, Ths-zero, Ths-trail,Ths-exit) when enter and exit LP mode, this
+signal will cause h-time larger than normal and reduce FPS.
+Need to multiply a coefficient to offset the extra signal's effect.
+coefficient = ((htotal*bpp/lane_number)+Tlpx+Ths_prep+Ths_zero+Ths_trail+
+                Ths_exit)/(htotal*bpp/lane_number))
 
-This patch now adds support for such PCIe / IO regions by checking
-if the src / dst address is located in an IO memory area in contrast
-to being located in DRAM. This is done by using the newly introduced
-MBus function mvebu_mbus_get_io_win_info(). If the src / dst address
-is located in such an IO area, a new address window is created in
-the XOR DMA controller. Enabling the controller to access this area.
-
-Signed-off-by: Stefan Roese <sr@denx.de>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Marcin Wojtas <mw@semihalf.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Vinod Koul <vinod.koul@intel.com>
+Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
 ---
-v1 -> v2:
-- Removed COMPILE_TEST from Kconfig entry as this results in compilation
-  errors on non-Marvell platforms because of references to MBus driver
-  functions. Since this driver will never be used on non-Marvell platforms
-  this should be okay.
+ drivers/gpu/drm/mediatek/mtk_dsi.c |  111 ++++++++++++++++++++++--------------
+ 1 file changed, 67 insertions(+), 44 deletions(-)
 
-RFC -> v1:
-- Use a cache for the already mapped areas for performance reasons, as
-  the MMIO registers don't need to get queried any more if the area is
-  already mapped now
-
- drivers/dma/Kconfig  |  2 +-
- drivers/dma/mv_xor.c | 91 +++++++++++++++++++++++++++++++++++++++++++++++++++-
- drivers/dma/mv_xor.h |  7 ++++
- 3 files changed, 98 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index 8c98779..b878da1 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -332,7 +332,7 @@ config MPC512X_DMA
+diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
+index 28b2044..506aa22 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dsi.c
++++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
+@@ -85,28 +85,26 @@
+ #define LD0_WAKEUP_EN			BIT(2)
  
- config MV_XOR
- 	bool "Marvell XOR engine support"
--	depends on PLAT_ORION || ARCH_MVEBU || COMPILE_TEST
-+	depends on PLAT_ORION || ARCH_MVEBU
- 	select DMA_ENGINE
- 	select DMA_ENGINE_RAID
- 	select ASYNC_TX_ENABLE_CHANNEL_SWITCH
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index f4c9f98..0162750 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -470,12 +470,86 @@ static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
- 	return mv_chan->slots_allocated ? : -ENOMEM;
+ #define DSI_PHY_TIMECON0	0x110
+-#define LPX				(0xff << 0)
+-#define HS_PRPR				(0xff << 8)
+-#define HS_ZERO				(0xff << 16)
+-#define HS_TRAIL			(0xff << 24)
++#define LPX(x)				((x) << 0)
++#define HS_PRPR(x)			((x) << 8)
++#define HS_ZERO(x)			((x) << 16)
++#define HS_TRAIL(x)			((x) << 24)
+ 
+ #define DSI_PHY_TIMECON1	0x114
+-#define TA_GO				(0xff << 0)
+-#define TA_SURE				(0xff << 8)
+-#define TA_GET				(0xff << 16)
+-#define DA_HS_EXIT			(0xff << 24)
++#define TA_GO(x)			((x) << 0)
++#define TA_SURE(x)			((x) << 8)
++#define TA_GET(x)			((x) << 16)
++#define DA_HS_EXIT(x)			((x) << 24)
+ 
+ #define DSI_PHY_TIMECON2	0x118
+-#define CONT_DET			(0xff << 0)
+-#define CLK_ZERO			(0xff << 16)
+-#define CLK_TRAIL			(0xff << 24)
++#define CONT_DET(x)			((x) << 0)
++#define CLK_ZERO(x)			((x) << 16)
++#define CLK_TRAIL(x)			((x) << 24)
+ 
+ #define DSI_PHY_TIMECON3	0x11c
+-#define CLK_HS_PRPR			(0xff << 0)
+-#define CLK_HS_POST			(0xff << 8)
+-#define CLK_HS_EXIT			(0xff << 16)
+-
+-#define NS_TO_CYCLE(n, c)    ((n) / (c) + (((n) % (c)) ? 1 : 0))
++#define CLK_HS_PRPR(x)			((x) << 0)
++#define CLK_HS_POST(x)			((x) << 8)
++#define CLK_HS_EXIT(x)			((x) << 16)
+ 
+ struct phy;
+ 
+@@ -158,28 +156,14 @@ static void mtk_dsi_mask(struct mtk_dsi *dsi, u32 offset, u32 mask, u32 data)
+ 	writel((temp & ~mask) | (data & mask), dsi->regs + offset);
  }
  
-+/*
-+ * Check if source or destination is an PCIe/IO address (non-SDRAM) and add
-+ * a new MBus window if necessary. Use a cache for these check so that
-+ * the MMIO mapped registers don't have to be accessed for this check
-+ * to speed up this process.
-+ */
-+static int mv_xor_add_io_win(struct mv_xor_chan *mv_chan, u32 addr)
-+{
-+	struct mv_xor_device *xordev = mv_chan->xordev;
-+	void __iomem *base = mv_chan->mmr_high_base;
-+	u32 win_enable;
-+	u32 size;
-+	u8 target, attr;
-+	int ret;
-+	int i;
-+
-+	/*
-+	 * Loop over the cached windows to check, if the requested area
-+	 * is already mapped. If this the case, nothing needs to be done
-+	 * and we can return.
-+	 */
-+	for (i = 0; i < WINDOW_COUNT; i++) {
-+		if (addr >= xordev->win_start[i] &&
-+		    addr <= xordev->win_end[i]) {
-+			/* Window is already mapped */
-+			return 0;
-+		}
-+	}
-+
-+	/*
-+	 * The window is not mapped, so we need to create the new mapping
-+	 */
-+
-+	/* If no IO window is found that addr has to be located in SDRAM */
-+	ret = mvebu_mbus_get_io_win_info(addr, &size, &target, &attr);
-+	if (ret < 0)
-+		return 0;
-+
-+	/*
-+	 * Mask the base addr 'addr' according to 'size' read back from the
-+	 * MBus window. Otherwise we might end up with an address located
-+	 * somewhere in the middle of this area here.
-+	 */
-+	size -= 1;
-+	addr &= ~size;
-+
-+	/*
-+	 * Reading one of both enabled register is enough, as they are always
-+	 * programmed to the identical values
-+	 */
-+	win_enable = readl(base + WINDOW_BAR_ENABLE(0));
-+
-+	/* Set 'i' to the first free window to write the new values to */
-+	i = ffs(~win_enable) - 1;
-+	if (i >= WINDOW_COUNT)
-+		return -ENOMEM;
-+
-+	writel((addr & 0xffff0000) | (attr << 8) | target,
-+	       base + WINDOW_BASE(i));
-+	writel(size & 0xffff0000, base + WINDOW_SIZE(i));
-+
-+	/* Fill the caching variables for later use */
-+	xordev->win_start[i] = addr;
-+	xordev->win_end[i] = addr + size;
-+
-+	win_enable |= (1 << i);
-+	win_enable |= 3 << (16 + (2 * i));
-+	writel(win_enable, base + WINDOW_BAR_ENABLE(0));
-+	writel(win_enable, base + WINDOW_BAR_ENABLE(1));
-+
-+	return 0;
-+}
-+
- static struct dma_async_tx_descriptor *
- mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
- 		    unsigned int src_cnt, size_t len, unsigned long flags)
+-static void dsi_phy_timconfig(struct mtk_dsi *dsi)
++static void dsi_phy_timconfig(struct mtk_dsi *dsi, u32 phy_timing0,
++			      u32 phy_timing1, u32 phy_timing2,
++			      u32 phy_timing3)
  {
- 	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
- 	struct mv_xor_desc_slot *sw_desc;
-+	int ret;
+-	u32 timcon0, timcon1, timcon2, timcon3;
+-	unsigned int ui, cycle_time;
+-	unsigned int lpx;
+-
+-	ui = 1000 / dsi->data_rate + 0x01;
+-	cycle_time = 8000 / dsi->data_rate + 0x01;
+-	lpx = 5;
+-
+-	timcon0 = (8 << 24) | (0xa << 16) | (0x6 << 8) | lpx;
+-	timcon1 = (7 << 24) | (5 * lpx << 16) | ((3 * lpx) / 2) << 8 |
+-		  (4 * lpx);
+-	timcon2 = ((NS_TO_CYCLE(0x64, cycle_time) + 0xa) << 24) |
+-		  (NS_TO_CYCLE(0x150, cycle_time) << 16);
+-	timcon3 = (2 * lpx) << 16 | NS_TO_CYCLE(80 + 52 * ui, cycle_time) << 8 |
+-		   NS_TO_CYCLE(0x40, cycle_time);
+-
+-	writel(timcon0, dsi->regs + DSI_PHY_TIMECON0);
+-	writel(timcon1, dsi->regs + DSI_PHY_TIMECON1);
+-	writel(timcon2, dsi->regs + DSI_PHY_TIMECON2);
+-	writel(timcon3, dsi->regs + DSI_PHY_TIMECON3);
++	writel(phy_timing0, dsi->regs + DSI_PHY_TIMECON0);
++	writel(phy_timing1, dsi->regs + DSI_PHY_TIMECON1);
++	writel(phy_timing2, dsi->regs + DSI_PHY_TIMECON2);
++	writel(phy_timing3, dsi->regs + DSI_PHY_TIMECON3);
+ }
  
- 	if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
- 		return NULL;
-@@ -486,6 +560,11 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
- 		"%s src_cnt: %d len: %zu dest %pad flags: %ld\n",
- 		__func__, src_cnt, len, &dest, flags);
+ static void mtk_dsi_enable(struct mtk_dsi *dsi)
+@@ -202,19 +186,57 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
+ {
+ 	struct device *dev = dsi->dev;
+ 	int ret;
++	u64 bit_clock, total_bits;
++	u32 htotal, htotal_bits, bit_per_pixel, overhead_cycles, overhead_bits;
++	u32 phy_timing0, phy_timing1, phy_timing2, phy_timing3;
  
-+	/* Check if a new window needs to get added for 'dest' */
-+	ret = mv_xor_add_io_win(mv_chan, dest);
-+	if (ret)
-+		return NULL;
+ 	if (++dsi->refcount != 1)
+ 		return 0;
+ 
++	phy_timing0 = LPX(5) | HS_PRPR(6) | HS_ZERO(10) | HS_TRAIL(8);
++	phy_timing1 = TA_GO(20) | TA_SURE(7) | TA_GET(25) | DA_HS_EXIT(7);
++	phy_timing2 = CLK_ZERO(38) | CLK_TRAIL(22);
++	phy_timing3 = CLK_HS_PRPR(8) | CLK_HS_POST(21) | CLK_HS_EXIT(10);
 +
- 	sw_desc = mv_chan_alloc_slot(mv_chan);
- 	if (sw_desc) {
- 		sw_desc->type = DMA_XOR;
-@@ -493,8 +572,13 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
- 		mv_desc_init(sw_desc, dest, len, flags);
- 		if (mv_chan->op_in_desc == XOR_MODE_IN_DESC)
- 			mv_desc_set_mode(sw_desc);
--		while (src_cnt--)
-+		while (src_cnt--) {
-+			/* Check if a new window needs to get added for 'src' */
-+			ret = mv_xor_add_io_win(mv_chan, src[src_cnt]);
-+			if (ret)
-+				return NULL;
- 			mv_desc_set_src_addr(sw_desc, src_cnt, src[src_cnt]);
-+		}
- 	}
- 
- 	dev_dbg(mv_chan_to_devp(mv_chan),
-@@ -959,6 +1043,7 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
- 		mv_chan->op_in_desc = XOR_MODE_IN_DESC;
- 
- 	dma_dev = &mv_chan->dmadev;
-+	mv_chan->xordev = xordev;
- 
- 	/*
- 	 * These source and destination dummy buffers are used to implement
-@@ -1086,6 +1171,10 @@ mv_xor_conf_mbus_windows(struct mv_xor_device *xordev,
- 		       dram->mbus_dram_target_id, base + WINDOW_BASE(i));
- 		writel((cs->size - 1) & 0xffff0000, base + WINDOW_SIZE(i));
- 
-+		/* Fill the caching variables for later use */
-+		xordev->win_start[i] = cs->base;
-+		xordev->win_end[i] = cs->base + cs->size - 1;
++	switch (dsi->format) {
++	case MIPI_DSI_FMT_RGB565:
++		bit_per_pixel = 16;
++		break;
++	case MIPI_DSI_FMT_RGB666_PACKED:
++		bit_per_pixel = 18;
++		break;
++	case MIPI_DSI_FMT_RGB666:
++	case MIPI_DSI_FMT_RGB888:
++	default:
++		bit_per_pixel = 24;
++		break;
++	}
+ 	/**
+-	 * data_rate = (pixel_clock / 1000) * pixel_dipth * mipi_ratio;
+-	 * pixel_clock unit is Khz, data_rata unit is MHz, so need divide 1000.
+-	 * mipi_ratio is mipi clk coefficient for balance the pixel clk in mipi.
+-	 * we set mipi_ratio is 1.05.
++	 * data_rate = (pixel_clock) * bit_per_pixel * mipi_ratio / lane_num;
++	 * vm.pixelclock is Khz, data_rata unit is Hz, so need to multiply 1000
++	 * mipi_ratio is (htotal * byte_per_pixel / lane_num + Tlpx + Ths_prep
++	 *		  + Thstrail + Ths_exit + Ths_zero) /
++	 *		 (htotal * byte_per_pixel /lane_number)
+ 	 */
+-	dsi->data_rate = dsi->vm.pixelclock * 3 * 21 / (1 * 1000 * 10);
++	bit_clock = dsi->vm.pixelclock * 1000 * bit_per_pixel;
++	htotal = dsi->vm.hactive + dsi->vm.hback_porch + dsi->vm.hfront_porch +
++		 dsi->vm.hsync_len;
++	htotal_bits = htotal * bit_per_pixel;
 +
- 		win_enable |= (1 << i);
- 		win_enable |= 3 << (16 + (2 * i));
- 	}
-diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
-index bf56e08..88eeab2 100644
---- a/drivers/dma/mv_xor.h
-+++ b/drivers/dma/mv_xor.h
-@@ -80,12 +80,17 @@
- #define WINDOW_BAR_ENABLE(chan)	(0x40 + ((chan) << 2))
- #define WINDOW_OVERRIDE_CTRL(chan)	(0xA0 + ((chan) << 2))
- 
-+#define WINDOW_COUNT		8
++	/**
++	 * overhead = lpx + hs_prepare + hs_zero + hs_trail + hs_exit
++	 */
++	overhead_cycles = (phy_timing0 & 0xff) + (phy_timing0 >> 8 & 0xff) +
++			  (phy_timing0 >> 16 & 0xff) +
++			  (phy_timing0 >> 24 & 0xff) +
++			  (phy_timing1 >> 24 & 0xff);
++	overhead_bits = overhead_cycles * dsi->lanes * 8;
++	total_bits = htotal_bits + overhead_bits;
 +
- struct mv_xor_device {
- 	void __iomem	     *xor_base;
- 	void __iomem	     *xor_high_base;
- 	struct clk	     *clk;
- 	struct mv_xor_chan   *channels[MV_XOR_MAX_CHANNELS];
- 	int		     xor_type;
-+
-+	u32                  win_start[WINDOW_COUNT];
-+	u32                  win_end[WINDOW_COUNT];
- };
++	dsi->data_rate = DIV_ROUND_UP_ULL(bit_clock * total_bits,
++					  htotal_bits * dsi->lanes);
  
- /**
-@@ -127,6 +132,8 @@ struct mv_xor_chan {
- 	char			dummy_dst[MV_XOR_MIN_BYTE_COUNT];
- 	dma_addr_t		dummy_src_addr, dummy_dst_addr;
- 	u32                     saved_config_reg, saved_int_mask_reg;
-+
-+	struct mv_xor_device	*xordev;
- };
+-	ret = clk_set_rate(dsi->hs_clk, dsi->data_rate * 1000000);
++	ret = clk_set_rate(dsi->hs_clk, dsi->data_rate);
+ 	if (ret < 0) {
+ 		dev_err(dev, "Failed to set data rate: %d\n", ret);
+ 		goto err_refcount;
+@@ -236,7 +258,8 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
  
- /**
+ 	mtk_dsi_enable(dsi);
+ 	mtk_dsi_reset(dsi);
+-	dsi_phy_timconfig(dsi);
++	dsi_phy_timconfig(dsi, phy_timing0, phy_timing1, phy_timing2,
++			  phy_timing3);
+ 
+ 	return 0;
+ 
 -- 
-2.9.3
+1.7.9.5
