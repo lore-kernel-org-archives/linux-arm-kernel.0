@@ -1,54 +1,39 @@
 From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 26 Aug 2016 13:18:25 -0400 (EDT)
-Subject: [PATCH 1/2] usb: ohci-sa1111: remove machine_has_neponset()
-In-Reply-To: <E1bdKCC-0001lZ-1v@rmk-PC.armlinux.org.uk>
-Message-ID: <Pine.LNX.4.44L0.1608261313030.1794-100000@iolanthe.rowland.org>
+Date: Fri, 26 Aug 2016 13:20:53 -0400 (EDT)
+Subject: [PATCH] USB: ohci-omap - avoid including mach/irqs.h
+In-Reply-To: <20160826164351.GV5783@n2100.arm.linux.org.uk>
+Message-ID: <Pine.LNX.4.44L0.1608261319550.1794-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Aug 2016, Russell King wrote:
+On Fri, 26 Aug 2016, Russell King - ARM Linux wrote:
 
-> The neponset is a daughter board for the Assabet platform, which has a
-> SA1111 chip on it.  If we're initialising the SA1111 OHCI, and we're
-> part of a neponset, the host platform must be an Assabet.
+> On Mon, Aug 22, 2016 at 11:28:21AM -0400, Alan Stern wrote:
+> > On Fri, 19 Aug 2016, Russell King wrote:
+> > 
+> > > ohci-omap doesn't need to include mach/irqs.h - nothing within this
+> > > driver needs anything from this header file.  Remove this include.
+> > > 
+> > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > > ---
+> > >  drivers/usb/host/ohci-omap.c | 1 -
+> > >  1 file changed, 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/usb/host/ohci-omap.c b/drivers/usb/host/ohci-omap.c
+> > > index de7c68602a7e..495c1454b9e8 100644
+> > > --- a/drivers/usb/host/ohci-omap.c
+> > > +++ b/drivers/usb/host/ohci-omap.c
+> > > @@ -36,7 +36,6 @@
+> > >  #include <mach/mux.h>
+> > >  
+> > >  #include <mach/hardware.h>
+> > > -#include <mach/irqs.h>
+> > >  #include <mach/usb.h>
+> > 
+> > Acked-by: Alan Stern <stern@rowland.harvard.edu>
 > 
-> This allows us to eliminate machine_has_neponset() from this driver,
-> replacing it instead with machine_is_assabet(), and killing the
-> mach/assabet.h include.
+> Thanks.  Will Greg be picking this up?
 
-Silly question: What happens when there's an SA1111 OHCI controller on
-an Assabet platform, but contained in something other than a neponset
-daughterboard?
-
-If that's a possible configuration, the test in the original driver 
-would fail whereas the test in the patched driver would succeed.
+Yes, he should.  Unless you want it to go via a different tree...
 
 Alan Stern
-
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  drivers/usb/host/ohci-sa1111.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/drivers/usb/host/ohci-sa1111.c b/drivers/usb/host/ohci-sa1111.c
-> index 2ac266d692a2..6dc5eaed8551 100644
-> --- a/drivers/usb/host/ohci-sa1111.c
-> +++ b/drivers/usb/host/ohci-sa1111.c
-> @@ -15,7 +15,6 @@
->  
->  #include <mach/hardware.h>
->  #include <asm/mach-types.h>
-> -#include <mach/assabet.h>
->  #include <asm/hardware/sa1111.h>
->  
->  #ifndef CONFIG_SA1111
-> @@ -127,7 +126,7 @@ static int sa1111_start_hc(struct sa1111_dev *dev)
->  	dev_dbg(&dev->dev, "starting SA-1111 OHCI USB Controller\n");
->  
->  	if (machine_is_xp860() ||
-> -	    machine_has_neponset() ||
-> +	    machine_is_assabet() ||
->  	    machine_is_pfs168() ||
->  	    machine_is_badge4())
->  		usb_rst = USB_RESET_PWRSENSELOW | USB_RESET_PWRCTRLLOW;
-> 
