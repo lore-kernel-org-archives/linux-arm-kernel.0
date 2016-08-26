@@ -1,50 +1,58 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 26 Aug 2016 16:22:54 +0200
-Subject: [PATCH] ARM: dts: imx6sx: Add GPU bindings
-Message-ID: <20160826142254.6950-1-marex@denx.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 26 Aug 2016 16:24:32 +0200
+Subject: [PATCH 2/8] arm: orion5x: Add clk support for mv88f5181
+In-Reply-To: <alpine.DEB.2.11.1608261256170.19980@marmot.wormnet.eu>
+References: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
+ <1472203264-21089-1-git-send-email-jm@lentin.co.uk>
+ <1472203264-21089-3-git-send-email-jm@lentin.co.uk>
+ <20160826113437.GA12692@Red>
+ <alpine.DEB.2.11.1608261256170.19980@marmot.wormnet.eu>
+Message-ID: <20160826142432.GH25046@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings for the Vivante GC400T GPU found in the i.MX6SX .
+On Fri, Aug 26, 2016 at 01:24:18PM +0100, Jamie Lentin wrote:
+> On Fri, 26 Aug 2016, LABBE Corentin wrote:
+> 
+> >Hello
+> >
+> >I have some minor comments below
+> >
+> >[...]
+> >>+
+> >>+static u32 __init mv88f5181_get_tclk_freq(void __iomem *sar)
+> >>+{
+> >>+	u32 opt = (readl(sar) >> SAR_MV88F5181_TCLK_FREQ) &
+> >>+		SAR_MV88F5181_TCLK_FREQ_MASK;
+> >
+> >Checkpatch complain about a missing blank line after declaration.
+> >And spliting the read and the & operation will prevent this line breaking
+> 
+> It isn't here, although I'm not arguing the line is missing. Is
+> there an extra switch I'm missing?
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
----
- arch/arm/boot/dts/imx6sx.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+I agree it is a false positive.
 
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 6a993bfda..901c2d2 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -1250,6 +1250,16 @@
- 			};
- 		};
+Probably the best action is to report it to the checkpatch people.
+
+> >>+	if (opt == 0)
+> >>+		return 133333333;
+> >>+	else if (opt == 1)
+> >>+		return 150000000;
+> >>+	else if (opt == 2)
+> >>+		return 166666667;
+> >>+	else
+> >>+		return 0;
+> >>+}
+> >
+> >Why not using a switch here ?
+> 
+> If you look at this in context[0], this is one of several
+> code-as-config declarations, none of which use a switch. IMO it's
+> more useful to make the similarity as obvious as possible if this is
+> ever refactored.
+
+Agreed. Please leave it as is, and if anybody does care about this,
+they can submit a followup patch refactoring all instances.
  
-+		gpu: gpu at 01800000 {
-+			compatible = "vivante,gc";
-+			reg = <0x01800000 0x4000>;
-+			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks IMX6SX_CLK_GPU>,
-+				 <&clks IMX6SX_CLK_GPU>,
-+				 <&clks IMX6SX_CLK_GPU>;
-+			clock-names = "bus", "core", "shader";
-+		};
-+
- 		pcie: pcie at 0x08000000 {
- 			compatible = "fsl,imx6sx-pcie", "snps,dw-pcie";
- 			reg = <0x08ffc000 0x4000>; /* DBI */
-@@ -1273,4 +1283,9 @@
- 			status = "disabled";
- 		};
- 	};
-+
-+	gpu-subsystem {
-+		compatible = "fsl,imx-gpu-subsystem";
-+		cores = <&gpu>;
-+	};
- };
--- 
-2.9.3
+	Andrew
