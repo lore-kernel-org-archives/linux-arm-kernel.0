@@ -1,39 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Aug 2016 10:59:11 +0200
-Subject: [PATCH 3/3] ARM: imx: add SMP support for i.MX7D
-In-Reply-To: <1472209971-32469-4-git-send-email-Anson.Huang@nxp.com>
-References: <1472209971-32469-1-git-send-email-Anson.Huang@nxp.com>
- <1472209971-32469-4-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <3283479.PKRDjkX0Md@wuerfel>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 26 Aug 2016 11:03:37 +0200
+Subject: [PATCH] arm64: configs: enable PCIe driver for Aardvark
+In-Reply-To: <1470672788-13652-1-git-send-email-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Mon, 8 Aug 2016 18:13:08 +0200")
+References: <1470672788-13652-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <877fb3kil2.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, August 26, 2016 7:12:51 PM CEST Anson Huang wrote:
-> i.MX7D has 2 cortex-a7 ARM core, add support for
-> booting up SMP kernel with 2 CPUs.
-> 
-> The existing i.MX SMP code is designed for i.MX6
-> series SoCs which have cortex-a9 ARM core, but i.MX7D
-> has 2 cortex-a7 ARM core, so we need to add runtime
-> check for those differences between cortex-a9 and
-> cortex-a7.
-> 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> 
+ 
+ On lun., ao?t 08 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-Can't you just point i.MX7D to start from secondary_startup
-rather than v7_secondary_startup?
+> This patch enables the driver for the PCIe host controller found on the
+> Marvell Armada 3700 ARM64 SoCs.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
- ENTRY(v7_secondary_startup)
-+       .word   0xc070                  @ 0xc07 is cortex-a7 id
-+       .word   0xfff0                  @ mask for core type
-+
+Applied on mvebu/defconfig64
 
-This looks like you are trying to execute instructions that are
-actually data. Does this work?
+Gregory
+> ---
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 423a1cc91224..03cecc68df68 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -58,6 +58,7 @@ CONFIG_ARCH_ZYNQMP=y
+>  CONFIG_PCI=y
+>  CONFIG_PCI_MSI=y
+>  CONFIG_PCI_IOV=y
+> +CONFIG_PCI_AARDVARK=y
+>  CONFIG_PCIE_RCAR=y
+>  CONFIG_PCI_HOST_GENERIC=y
+>  CONFIG_PCI_XGENE=y
+> -- 
+> 2.8.1
+>
 
-On a side note, could you rename v7_secondary_startup to
-imx6_secondary_startup? The name sounds overly generic
-on a multiplatform kernel.
-
-	Arnd
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
