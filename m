@@ -1,87 +1,228 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 26 Aug 2016 10:23:14 +0100
-Subject: [PATCH v2 5/9] arm64: insn: Add helpers for adrp offsets
+Date: Fri, 26 Aug 2016 10:23:17 +0100
+Subject: [PATCH v2 8/9] arm64: Refactor sysinstr exception handling
 In-Reply-To: <1472203398-8751-1-git-send-email-suzuki.poulose@arm.com>
 References: <1472203398-8751-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1472203398-8751-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1472203398-8751-9-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds helpers for decoding/encoding the PC relative addresses for adrp.
-This will be used for handling dynamic patching of 'adrp' instructions
-in alternative code patching.
+Right now we trap some of the user space data cache operations
+based on a few Errata (ARM 819472, 826319, 827319 and 824069).
+We need to trap userspace access to CTR_EL0, if we detect mismatched
+cache line size. Since both these traps share the EC, refactor
+the handler a little bit to make it a bit more reader friendly.
 
+Cc: Andre Przywara <andre.przywara@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+
 ---
 Changes since V1:
- - Replace adr_adrp with seperate handlers for adr and adrp (Marc Zyngier)
+ - Add comments for iss field definitions for other exceptions.
 ---
- arch/arm64/include/asm/insn.h | 11 ++++++++++-
- arch/arm64/kernel/insn.c      | 13 +++++++++++++
- 2 files changed, 23 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/esr.h | 76 ++++++++++++++++++++++++++++++++++++++------
+ arch/arm64/kernel/traps.c    | 73 +++++++++++++++++++++++++++---------------
+ 2 files changed, 114 insertions(+), 35 deletions(-)
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index 1dbaa90..bc85366 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -246,7 +246,8 @@ static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
- static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
- { return (val); }
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index f772e15..9875b32 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -78,6 +78,23 @@
  
--__AARCH64_INSN_FUNCS(adr_adrp,	0x1F000000, 0x10000000)
-+__AARCH64_INSN_FUNCS(adr,	0x9F000000, 0x10000000)
-+__AARCH64_INSN_FUNCS(adrp,	0x9F000000, 0x90000000)
- __AARCH64_INSN_FUNCS(prfm_lit,	0xFF000000, 0xD8000000)
- __AARCH64_INSN_FUNCS(str_reg,	0x3FE0EC00, 0x38206800)
- __AARCH64_INSN_FUNCS(ldr_reg,	0x3FE0EC00, 0x38606800)
-@@ -318,6 +319,11 @@ __AARCH64_INSN_FUNCS(msr_reg,	0xFFF00000, 0xD5100000)
- bool aarch64_insn_is_nop(u32 insn);
- bool aarch64_insn_is_branch_imm(u32 insn);
- 
-+static inline bool aarch64_insn_is_adr_adrp(u32 insn)
-+{
-+	return aarch64_insn_is_adr(insn) || aarch64_insn_is_adrp(insn);
-+}
+ #define ESR_ELx_IL		(UL(1) << 25)
+ #define ESR_ELx_ISS_MASK	(ESR_ELx_IL - 1)
 +
- int aarch64_insn_read(void *addr, u32 *insnp);
- int aarch64_insn_write(void *addr, u32 insn);
- enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
-@@ -398,6 +404,9 @@ int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
- int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
- int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
- 
-+s32 aarch64_insn_adrp_get_offset(u32 insn);
-+u32 aarch64_insn_adrp_set_offset(u32 insn, s32 offset);
++/* ISS field definitions shared by different classes */
++#define ESR_ELx_WNR		(UL(1) << 6)
 +
- bool aarch32_insn_is_wide(u32 insn);
++/* Shared ISS field definitions for Data/Instruction aborts */
++#define ESR_ELx_EA		(UL(1) << 9)
++#define ESR_ELx_S1PTW		(UL(1) << 7)
++
++/* Shared ISS fault status code(IFSC/DFSC) for Data/Instruction aborts */
++#define ESR_ELx_FSC		(0x3F)
++#define ESR_ELx_FSC_TYPE	(0x3C)
++#define ESR_ELx_FSC_EXTABT	(0x10)
++#define ESR_ELx_FSC_ACCESS	(0x08)
++#define ESR_ELx_FSC_FAULT	(0x04)
++#define ESR_ELx_FSC_PERM	(0x0C)
++
++/* ISS field definitions for Data Aborts */
+ #define ESR_ELx_ISV		(UL(1) << 24)
+ #define ESR_ELx_SAS_SHIFT	(22)
+ #define ESR_ELx_SAS		(UL(3) << ESR_ELx_SAS_SHIFT)
+@@ -86,16 +103,9 @@
+ #define ESR_ELx_SRT_MASK	(UL(0x1F) << ESR_ELx_SRT_SHIFT)
+ #define ESR_ELx_SF 		(UL(1) << 15)
+ #define ESR_ELx_AR 		(UL(1) << 14)
+-#define ESR_ELx_EA 		(UL(1) << 9)
+ #define ESR_ELx_CM 		(UL(1) << 8)
+-#define ESR_ELx_S1PTW 		(UL(1) << 7)
+-#define ESR_ELx_WNR		(UL(1) << 6)
+-#define ESR_ELx_FSC		(0x3F)
+-#define ESR_ELx_FSC_TYPE	(0x3C)
+-#define ESR_ELx_FSC_EXTABT	(0x10)
+-#define ESR_ELx_FSC_ACCESS	(0x08)
+-#define ESR_ELx_FSC_FAULT	(0x04)
+-#define ESR_ELx_FSC_PERM	(0x0C)
++
++/* ISS field definitions for exceptions taken in to Hyp */
+ #define ESR_ELx_CV		(UL(1) << 24)
+ #define ESR_ELx_COND_SHIFT	(20)
+ #define ESR_ELx_COND_MASK	(UL(0xF) << ESR_ELx_COND_SHIFT)
+@@ -109,6 +119,54 @@
+ 	((ESR_ELx_EC_BRK64 << ESR_ELx_EC_SHIFT) | ESR_ELx_IL |	\
+ 	 ((imm) & 0xffff))
  
- #define A32_RN_OFFSET	16
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index 63f9432..f022af4 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -1202,6 +1202,19 @@ u32 aarch64_set_branch_offset(u32 insn, s32 offset)
- 	BUG();
++/* ISS field definitions for System instruction traps */
++#define ESR_ELx_SYS64_ISS_RES0_SHIFT	22
++#define ESR_ELx_SYS64_ISS_RES0_MASK	(UL(0x7) << ESR_ELx_SYS64_ISS_RES0_SHIFT)
++#define ESR_ELx_SYS64_ISS_DIR_MASK	0x1
++#define ESR_ELx_SYS64_ISS_DIR_READ	0x1
++#define ESR_ELx_SYS64_ISS_DIR_WRITE	0x0
++
++#define ESR_ELx_SYS64_ISS_RT_SHIFT	5
++#define ESR_ELx_SYS64_ISS_RT_MASK	(UL(0x1f) << ESR_ELx_SYS64_ISS_RT_SHIFT)
++#define ESR_ELx_SYS64_ISS_CRM_SHIFT	1
++#define ESR_ELx_SYS64_ISS_CRM_MASK	(UL(0xf) << ESR_ELx_SYS64_ISS_CRM_SHIFT)
++#define ESR_ELx_SYS64_ISS_CRN_SHIFT	10
++#define ESR_ELx_SYS64_ISS_CRN_MASK	(UL(0xf) << ESR_ELx_SYS64_ISS_CRN_SHIFT)
++#define ESR_ELx_SYS64_ISS_OP1_SHIFT	14
++#define ESR_ELx_SYS64_ISS_OP1_MASK	(UL(0x7) << ESR_ELx_SYS64_ISS_OP1_SHIFT)
++#define ESR_ELx_SYS64_ISS_OP2_SHIFT	17
++#define ESR_ELx_SYS64_ISS_OP2_MASK	(UL(0x7) << ESR_ELx_SYS64_ISS_OP2_SHIFT)
++#define ESR_ELx_SYS64_ISS_OP0_SHIFT	20
++#define ESR_ELx_SYS64_ISS_OP0_MASK	(UL(0x3) << ESR_ELx_SYS64_ISS_OP0_SHIFT)
++#define ESR_ELx_SYS64_ISS_SYS_MASK	(ESR_ELx_SYS64_ISS_OP0_MASK | \
++					 ESR_ELx_SYS64_ISS_OP1_MASK | \
++					 ESR_ELx_SYS64_ISS_OP2_MASK | \
++					 ESR_ELx_SYS64_ISS_CRN_MASK | \
++					 ESR_ELx_SYS64_ISS_CRM_MASK)
++#define ESR_ELx_SYS64_ISS_SYS_VAL(op0, op1, op2, crn, crm) \
++					(((op0) << ESR_ELx_SYS64_ISS_OP0_SHIFT) | \
++					 ((op1) << ESR_ELx_SYS64_ISS_OP1_SHIFT) | \
++					 ((op2) << ESR_ELx_SYS64_ISS_OP2_SHIFT) | \
++					 ((crn) << ESR_ELx_SYS64_ISS_CRN_SHIFT) | \
++					 ((crm) << ESR_ELx_SYS64_ISS_CRM_SHIFT))
++/*
++ * User space cache operations have the following sysreg encoding
++ * in System instructions.
++ * op0=1, op1=3, op2=1, crn=7, crm={ 5, 10, 11, 14 }, WRITE (L=0)
++ */
++#define ESR_ELx_SYS64_ISS_CRM_DC_CIVAC	14
++#define ESR_ELx_SYS64_ISS_CRM_DC_CVAU	11
++#define ESR_ELx_SYS64_ISS_CRM_DC_CVAC	10
++#define ESR_ELx_SYS64_ISS_CRM_IC_IVAU	5
++
++#define ESR_ELx_SYS64_ISS_EL0_CACHE_OP_MASK	(ESR_ELx_SYS64_ISS_OP0_MASK | \
++						 ESR_ELx_SYS64_ISS_OP1_MASK | \
++						 ESR_ELx_SYS64_ISS_OP2_MASK | \
++						 ESR_ELx_SYS64_ISS_CRN_MASK | \
++						 ESR_ELx_SYS64_ISS_DIR_MASK)
++#define ESR_ELx_SYS64_ISS_EL0_CACHE_OP_VAL \
++				(ESR_ELx_SYS64_ISS_SYS_VAL(1, 3, 1, 7, 0) | \
++				 ESR_ELx_SYS64_ISS_DIR_WRITE)
+ #ifndef __ASSEMBLY__
+ #include <asm/types.h>
+ 
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index e04f838..224f64e 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -447,36 +447,29 @@ void cpu_enable_cache_maint_trap(void *__unused)
+ 		: "=r" (res)					\
+ 		: "r" (address), "i" (-EFAULT) )
+ 
+-asmlinkage void __exception do_sysinstr(unsigned int esr, struct pt_regs *regs)
++static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
+ {
+ 	unsigned long address;
+-	int ret;
++	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
++	int crm = (esr & ESR_ELx_SYS64_ISS_CRM_MASK) >> ESR_ELx_SYS64_ISS_CRM_SHIFT;
++	int ret = 0;
+ 
+-	/* if this is a write with: Op0=1, Op2=1, Op1=3, CRn=7 */
+-	if ((esr & 0x01fffc01) == 0x0012dc00) {
+-		int rt = (esr >> 5) & 0x1f;
+-		int crm = (esr >> 1) & 0x0f;
++	address = (rt == 31) ? 0 : regs->regs[rt];
+ 
+-		address = (rt == 31) ? 0 : regs->regs[rt];
+-
+-		switch (crm) {
+-		case 11:		/* DC CVAU, gets promoted */
+-			__user_cache_maint("dc civac", address, ret);
+-			break;
+-		case 10:		/* DC CVAC, gets promoted */
+-			__user_cache_maint("dc civac", address, ret);
+-			break;
+-		case 14:		/* DC CIVAC */
+-			__user_cache_maint("dc civac", address, ret);
+-			break;
+-		case 5:			/* IC IVAU */
+-			__user_cache_maint("ic ivau", address, ret);
+-			break;
+-		default:
+-			force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
+-			return;
+-		}
+-	} else {
++	switch (crm) {
++	case ESR_ELx_SYS64_ISS_CRM_DC_CVAU:	/* DC CVAU, gets promoted */
++		__user_cache_maint("dc civac", address, ret);
++		break;
++	case ESR_ELx_SYS64_ISS_CRM_DC_CVAC:	/* DC CVAC, gets promoted */
++		__user_cache_maint("dc civac", address, ret);
++		break;
++	case ESR_ELx_SYS64_ISS_CRM_DC_CIVAC:	/* DC CIVAC */
++		__user_cache_maint("dc civac", address, ret);
++		break;
++	case ESR_ELx_SYS64_ISS_CRM_IC_IVAU:	/* IC IVAU */
++		__user_cache_maint("ic ivau", address, ret);
++		break;
++	default:
+ 		force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
+ 		return;
+ 	}
+@@ -487,6 +480,34 @@ asmlinkage void __exception do_sysinstr(unsigned int esr, struct pt_regs *regs)
+ 		regs->pc += 4;
  }
  
-+s32 aarch64_insn_adrp_get_offset(u32 insn)
++struct sys64_hook {
++	unsigned int esr_mask;
++	unsigned int esr_val;
++	void (*handler)(unsigned int esr, struct pt_regs *regs);
++};
++
++static struct sys64_hook sys64_hooks[] = {
++	{
++		.esr_mask = ESR_ELx_SYS64_ISS_EL0_CACHE_OP_MASK,
++		.esr_val = ESR_ELx_SYS64_ISS_EL0_CACHE_OP_VAL,
++		.handler = user_cache_maint_handler,
++	},
++	{},
++};
++
++asmlinkage void __exception do_sysinstr(unsigned int esr, struct pt_regs *regs)
 +{
-+	BUG_ON(!aarch64_insn_is_adrp(insn));
-+	return aarch64_insn_decode_immediate(AARCH64_INSN_IMM_ADR, insn) << 12;
++	struct sys64_hook *hook;
++
++	for (hook = sys64_hooks; hook->handler; hook++)
++		if ((hook->esr_mask & esr) == hook->esr_val) {
++			hook->handler(esr, regs);
++			return;
++		}
++
++	force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
 +}
 +
-+u32 aarch64_insn_adrp_set_offset(u32 insn, s32 offset)
-+{
-+	BUG_ON(!aarch64_insn_is_adrp(insn));
-+	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_ADR, insn,
-+						offset >> 12);
-+}
-+
- /*
-  * Extract the Op/CR data from a msr/mrs instruction.
-  */
+ long compat_arm_syscall(struct pt_regs *regs);
+ 
+ asmlinkage long do_ni_syscall(struct pt_regs *regs)
 -- 
 2.7.4
