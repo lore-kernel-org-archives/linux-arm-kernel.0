@@ -1,60 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 26 Aug 2016 18:15:42 +0100
-Subject: [RFC PATCH 3/3] arm64: cpufeature: expose arm64_ftr_reg struct for
- CTR_EL0
-In-Reply-To: <1472231742-13387-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1472231742-13387-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1472231742-13387-4-git-send-email-ard.biesheuvel@linaro.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 26 Aug 2016 13:18:25 -0400 (EDT)
+Subject: [PATCH 1/2] usb: ohci-sa1111: remove machine_has_neponset()
+In-Reply-To: <E1bdKCC-0001lZ-1v@rmk-PC.armlinux.org.uk>
+Message-ID: <Pine.LNX.4.44L0.1608261313030.1794-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Expose the arm64_ftr_reg struct outside of cpufeature.o so that other
-code can refer to it directly (i.e., without performing the binary
-search)
+On Fri, 26 Aug 2016, Russell King wrote:
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/cpufeature.h | 2 ++
- arch/arm64/kernel/cpufeature.c      | 7 ++++++-
- 2 files changed, 8 insertions(+), 1 deletion(-)
+> The neponset is a daughter board for the Assabet platform, which has a
+> SA1111 chip on it.  If we're initialising the SA1111 OHCI, and we're
+> part of a neponset, the host platform must be an Assabet.
+> 
+> This allows us to eliminate machine_has_neponset() from this driver,
+> replacing it instead with machine_is_assabet(), and killing the
+> mach/assabet.h include.
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 8bb4f1527b26..858d8d03a101 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -109,6 +109,8 @@ struct arm64_cpu_capabilities {
- 
- extern DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
- 
-+extern struct arm64_ftr_reg ctrel0_ftr_reg;
-+
- bool this_cpu_has_cap(unsigned int cap);
- 
- static inline bool cpu_have_feature(unsigned int num)
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 35a17487ffb9..3aa7ad6c5e60 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -155,6 +155,11 @@ static const struct arm64_ftr_bits ftr_ctr[] = {
- 	ARM64_FTR_END,
- };
- 
-+struct arm64_ftr_reg ctrel0_ftr_reg = {
-+	.name		= "SYS_CTR_EL0",
-+	.ftr_bits	= ftr_ctr
-+};
-+
- static const struct arm64_ftr_bits ftr_id_mmfr0[] = {
- 	S_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 28, 4, 0xf),	/* InnerShr */
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 24, 4, 0),	/* FCSE */
-@@ -318,7 +323,7 @@ static const struct __ftr_reg_entry {
- 	ARM64_FTR_REG(SYS_ID_AA64MMFR2_EL1, ftr_id_aa64mmfr2),
- 
- 	/* Op1 = 3, CRn = 0, CRm = 0 */
--	ARM64_FTR_REG(SYS_CTR_EL0, ftr_ctr),
-+	{ SYS_CTR_EL0, &ctrel0_ftr_reg },
- 	ARM64_FTR_REG(SYS_DCZID_EL0, ftr_dczid),
- 
- 	/* Op1 = 3, CRn = 14, CRm = 0 */
--- 
-2.7.4
+Silly question: What happens when there's an SA1111 OHCI controller on
+an Assabet platform, but contained in something other than a neponset
+daughterboard?
+
+If that's a possible configuration, the test in the original driver 
+would fail whereas the test in the patched driver would succeed.
+
+Alan Stern
+
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  drivers/usb/host/ohci-sa1111.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/drivers/usb/host/ohci-sa1111.c b/drivers/usb/host/ohci-sa1111.c
+> index 2ac266d692a2..6dc5eaed8551 100644
+> --- a/drivers/usb/host/ohci-sa1111.c
+> +++ b/drivers/usb/host/ohci-sa1111.c
+> @@ -15,7 +15,6 @@
+>  
+>  #include <mach/hardware.h>
+>  #include <asm/mach-types.h>
+> -#include <mach/assabet.h>
+>  #include <asm/hardware/sa1111.h>
+>  
+>  #ifndef CONFIG_SA1111
+> @@ -127,7 +126,7 @@ static int sa1111_start_hc(struct sa1111_dev *dev)
+>  	dev_dbg(&dev->dev, "starting SA-1111 OHCI USB Controller\n");
+>  
+>  	if (machine_is_xp860() ||
+> -	    machine_has_neponset() ||
+> +	    machine_is_assabet() ||
+>  	    machine_is_pfs168() ||
+>  	    machine_is_badge4())
+>  		usb_rst = USB_RESET_PWRSENSELOW | USB_RESET_PWRCTRLLOW;
+> 
