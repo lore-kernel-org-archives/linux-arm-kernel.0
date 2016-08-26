@@ -1,109 +1,32 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 26 Aug 2016 17:50:43 +0800
-Subject: [PATCH v2 2/2] sdhci-of-arasan: Set controller to test mode when
- Card Detection is broken.
-In-Reply-To: <57C000FF.3090307@topic.nl>
-References: <1472166111-28872-1-git-send-email-zach.brown@ni.com>
- <1472166111-28872-2-git-send-email-zach.brown@ni.com>
- <57C000FF.3090307@topic.nl>
-Message-ID: <0fa180a6-5634-bac9-f933-7d68eef84796@rock-chips.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Aug 2016 11:56:16 +0200
+Subject: [PATCH] smc91x: remove ARM hack for unaligned 16-bit writes
+In-Reply-To: <1899384.M1jdqOztqi@wuerfel>
+References: <20160825144314.1850730-1-arnd@arndb.de>
+ <20160825223743.GK1041@n2100.armlinux.org.uk> <1899384.M1jdqOztqi@wuerfel>
+Message-ID: <4142998.LszVVqOYjE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/8/26 16:42, Mike Looijmans wrote:
-> On 26-08-16 01:01, Zach Brown wrote:
->> The sdhci controller on xilinx zynq devices will not function unless
->> the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
->> In cases where it is impossible to provide the CD bit in hardware,
->> setting the controller to test mode and then setting inserted to true
->> will get the controller to function without the CD bit.
->>
->> When the device has the property broken-cd the driver changes the
->> controller to test mode and sets test inserted to true to make the
->> controller function.
->>
->> Signed-off-by: Zach Brown <zach.brown@ni.com>
->> ---
->>   drivers/mmc/host/sdhci-of-arasan.c | 17 ++++++++++++++++-
->>   drivers/mmc/host/sdhci.h           |  2 ++
->>   2 files changed, 18 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/mmc/host/sdhci-of-arasan.c
->> b/drivers/mmc/host/sdhci-of-arasan.c
->> index e0f193f..3798a3b 100644
->> --- a/drivers/mmc/host/sdhci-of-arasan.c
->> +++ b/drivers/mmc/host/sdhci-of-arasan.c
->> @@ -26,6 +26,7 @@
->>   #include <linux/phy/phy.h>
->>   #include <linux/regmap.h>
->>   #include "sdhci-pltfm.h"
->> +#include <linux/of.h>
->
-> Not needed.
->
->>   #define SDHCI_ARASAN_CLK_CTRL_OFFSET    0x2c
->>   #define SDHCI_ARASAN_VENDOR_REGISTER    0x78
->> @@ -203,12 +204,26 @@ static void
->> sdhci_arasan_hs400_enhanced_strobe(struct mmc_host *mmc,
->>       writel(vendor, host->ioaddr + SDHCI_ARASAN_VENDOR_REGISTER);
->>   }
->>
->> +void sdhci_arasan_reset(struct sdhci_host *host, u8 mask)
->> +{
->> +    u8 ctrl;
->> +
->> +    sdhci_reset(host, mask);
->> +
->> +    if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION) {
->> +        ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
->> +        ctrl |= SDHCI_CTRL_CDTEST_INS |
->> +            SDHCI_CTRL_CDTEST_EN;
->> +        sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
->> +    }
->> +}
+On Friday, August 26, 2016 11:41:21 AM CEST Arnd Bergmann wrote:
+> 
+> I think this breaks machines that declare a device that just lists
+> SMC91X_USE_32BIT but not SMC91X_USE_16BIT. Right now, the way this
+> is interpreted is to use 32-bit accessors for most things, but
+> not avoiding 16-bit reads.
 
-Although I don't have a "broken-cd" arasan controller,
-but are you suring that all the broken-cd arasan controller
-need to set these bit either? It seems your case is vendor specific?:)
+I guess my patch has the same problem here, with the
 
->> +
->>   static struct sdhci_ops sdhci_arasan_ops = {
->>       .set_clock = sdhci_arasan_set_clock,
->>       .get_max_clock = sdhci_pltfm_clk_get_max_clock,
->>       .get_timeout_clock = sdhci_arasan_get_timeout_clock,
->>       .set_bus_width = sdhci_set_bus_width,
->> -    .reset = sdhci_reset,
->> +    .reset = sdhci_arasan_reset,
->>       .set_uhs_signaling = sdhci_set_uhs_signaling,
->>   };
->>
->> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
->> index 0411c9f..8d92d6e9 100644
->> --- a/drivers/mmc/host/sdhci.h
->> +++ b/drivers/mmc/host/sdhci.h
->> @@ -84,6 +84,8 @@
->>   #define   SDHCI_CTRL_ADMA32    0x10
->>   #define   SDHCI_CTRL_ADMA64    0x18
->>   #define   SDHCI_CTRL_8BITBUS    0x20
->> +#define  SDHCI_CTRL_CDTEST_INS   0x40
->> +#define  SDHCI_CTRL_CDTEST_EN     0x80
->>
->>   #define SDHCI_POWER_CONTROL    0x29
->>   #define  SDHCI_POWER_ON        0x01
->
-> Looks okay, tested it and appears to work just as well as a tie-off in
-> logic.
->
-> Tested-by: mike.looijmans at topic.nl
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+	if (SMC_CAN_USE_8BIT && !SMC_16BIT(lp))
+
+check that is true when a platform device is declared with 32-bit
+I/O only but all three are enabled at compile-time. The best check
+I can think of here (aside from redefining how the flags work)
+would be
+
+#define SMC_8BIT_ONLY(p) 	\
+	(((p)->cfg.flags & (SMC91X_USE_8BIT |SMC91X_USE_16BIT | SMC91X_USE_32BIT)) == \
+	 SMC91X_USE_8BIT)
 
 
--- 
-Best Regards
-Shawn Lin
+	Arnd
