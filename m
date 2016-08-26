@@ -1,57 +1,83 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 27 Aug 2016 00:19:00 +0200
-Subject: [PATCH 1/2] pwm: sunxi: allow the pwm to finish its pulse before
- disable
-In-Reply-To: <1472147411-30424-2-git-send-email-oliver@schinagl.nl>
+Date: Sat, 27 Aug 2016 00:25:23 +0200
+Subject: [PATCH 2/2] pwm: sunxi: Yield some time to the pwm-block to
+ become ready
+In-Reply-To: <1472147411-30424-3-git-send-email-oliver@schinagl.nl>
 References: <1472147411-30424-1-git-send-email-oliver@schinagl.nl>
- <1472147411-30424-2-git-send-email-oliver@schinagl.nl>
-Message-ID: <20160826221900.GG3165@lukather>
+ <1472147411-30424-3-git-send-email-oliver@schinagl.nl>
+Message-ID: <20160826222523.GH3165@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2016 at 07:50:10PM +0200, Olliver Schinagl wrote:
-> When we inform the PWM block to stop toggeling the output, we may end up
-> in a state where the output is not what we would expect (e.g. not the
-> low-pulse) but whatever the output was at when the clock got disabled.
+Hi,
+
+On Thu, Aug 25, 2016 at 07:50:11PM +0200, Olliver Schinagl wrote:
+> From: Olliver Schinagl <o.schinagl@ultimaker.com>
 > 
-> To counter this we have to wait for maximally the time of one whole
-> period to ensure the pwm hardware was able to finish. Since we already
-> told the PWM hardware to disable it self, it will not continue toggling
-> but merly finish its current pulse.
+> The pwm-block of some of the sunxi chips feature a 'ready' flag to
+> indicate the software that it is ready for new commands.
 > 
-> If a whole period is considered to much, it may be contemplated to use a
-> half period + a little bit to ensure we get passed the transition.
+> Right now, when we call pwm_config and set the period, we write the
+> values to the registers, and turn off the clock to the IP. Because of
+> this, the hardware does not have time to configure the hardware and set
+> the 'ready' flag.
 > 
-> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+> By running the clock just before making new changes and before checking
+> if the hardware is ready, the hardware has time to reconfigure itself
+> and set the clear the flag appropriately.
+> 
+> Signed-off-by: Olliver Schinagl <o.schinagl@ultimaker.com>
 > ---
->  drivers/pwm/pwm-sun4i.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
+>  drivers/pwm/pwm-sun4i.c | 43 +++++++++++++++++++++++++------------------
+>  1 file changed, 25 insertions(+), 18 deletions(-)
 > 
 > diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
-> index 03a99a5..5e97c8a 100644
+> index 5e97c8a..dd198c3 100644
 > --- a/drivers/pwm/pwm-sun4i.c
 > +++ b/drivers/pwm/pwm-sun4i.c
-> @@ -8,6 +8,7 @@
->  
->  #include <linux/bitops.h>
->  #include <linux/clk.h>
-> +#include <linux/delay.h>
->  #include <linux/err.h>
->  #include <linux/io.h>
->  #include <linux/module.h>
-> @@ -245,6 +246,16 @@ static void sun4i_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
->  	spin_lock(&sun4i_pwm->ctrl_lock);
->  	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
->  	val &= ~BIT_CH(PWM_EN, pwm->hwpwm);
+> @@ -105,6 +105,22 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+>  	u64 clk_rate, div = 0;
+>  	unsigned int prescaler = 0;
+>  	int err;
+> +	int ret = 0;
+> +
+> +	/* Let the PWM hardware run before making any changes. We do this to
+> +	 * allow the hardware to have some time to clear the 'ready' flag.
+> +	 */
+
+This is not the proper comment style.
+
+> +	err = clk_prepare_enable(sun4i_pwm->clk);
+> +	if (err) {
+> +		dev_err(chip->dev, "failed to enable PWM clock\n");
+> +		return err;
+> +	}
+
+New line please.
+
+> +	spin_lock(&sun4i_pwm->ctrl_lock);
+> +	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
+> +	clk_gate = val & BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
+> +	val |= BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
+
+What are you doing here? You clear a bit, and then put the same one
+back in?
+
 > +	sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
 > +	spin_unlock(&sun4i_pwm->ctrl_lock);
-> +
-> +	/* Allow for the PWM hardware to finish its last toggle. The pulse
-> +	 * may have just started and thus we should wait a full period.
-> +	 */
-> +	ndelay(pwm_get_period(pwm));
+>  
+>  	clk_rate = clk_get_rate(sun4i_pwm->clk);
+>  
+> @@ -137,7 +153,9 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+>  
+>  		if (div - 1 > PWM_PRD_MASK) {
+>  			dev_err(chip->dev, "period exceeds the maximum value\n");
+> -			return -EINVAL;
+> +			ret = -EINVAL;
+> +			spin_lock(&sun4i_pwm->ctrl_lock);
 
-Can't that use the ready bit as well?
+Uh? That's really suspicious. And even if right, please don't do that,
+this is just really bad for the comprehension of the workflow.
 
 Maxime
 
@@ -65,4 +91,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160827/11536fac/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160827/f7e46b13/attachment-0001.sig>
