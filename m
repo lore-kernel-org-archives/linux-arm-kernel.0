@@ -1,47 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Aug 2016 11:57:11 +0100
-Subject: [PATCH] arm64: debug: avoid resetting stepping state machine when
- TIF_SINGLESTEP
-Message-ID: <1472209031-25681-1-git-send-email-will.deacon@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 26 Aug 2016 13:00:05 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.8 (#2)
+Message-ID: <87d1kviymi.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When TIF_SINGLESTEP is set for a task, the single-step state machine is
-enabled and we must take care not to reset it to the active-not-pending
-state if it is already in the active-pending state.
+Hi,
 
-Unfortunately, that's exactly what user_enable_single_step does, by
-unconditionally setting the SS bit in the SPSR for the current task.
-This causes failures in the GDB testsuite, where GDB ends up missing
-expected step traps if the instruction being stepped generates another
-trap, e.g. PTRACE_EVENT_FORK from an SVC instruction.
+Here is the second pull request for fixes for mvebu for v4.8.
 
-This patch fixes the problem by preserving the current state of the
-stepping state machine when TIF_SINGLESTEP is set on the current thread.
+Gregory
 
-Cc: <stable@vger.kernel.org>
-Reported-by: Yao Qi <yao.qi@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/debug-monitors.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+The following changes since commit d9fd3c918114cfd3995947339549c7341181efb0:
 
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index 3f9023654dac..30821928106f 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -417,8 +417,10 @@ NOKPROBE_SYMBOL(kernel_active_single_step);
- /* ptrace API */
- void user_enable_single_step(struct task_struct *task)
- {
--	set_ti_thread_flag(task_thread_info(task), TIF_SINGLESTEP);
--	set_regs_spsr_ss(task_pt_regs(task));
-+	struct thread_info *ti = task_thread_info(task);
-+
-+	if (!test_and_set_ti_thread_flag(ti, TIF_SINGLESTEP))
-+		set_regs_spsr_ss(task_pt_regs(task));
- }
- NOKPROBE_SYMBOL(user_enable_single_step);
- 
--- 
-2.1.4
+  ARM: dts: armada-388-clearfog: number LAN ports properly (2016-08-08 13:20:24 +0200)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.8-2
+
+for you to fetch changes up to c721da1d05760ad0b4e7670896dae31b6b07d8d6:
+
+  ARM: dts: kirkwood: Fix PCIe label on OpenRD (2016-08-26 11:33:16 +0200)
+
+----------------------------------------------------------------
+mvebu fixes for 4.8 (part 1)
+
+Few device tree fix on kirkwood:
+- enable PCIe on OpenRD
+- use correct u-boot environment partition size on ib62x0
+
+----------------------------------------------------------------
+Gregory CLEMENT (1):
+      ARM: dts: kirkwood: Fix PCIe label on OpenRD
+
+Simon Baatz (1):
+      ARM: kirkwood: ib62x0: fix size of u-boot environment partition
+
+ arch/arm/boot/dts/kirkwood-ib62x0.dts  | 2 +-
+ arch/arm/boot/dts/kirkwood-openrd.dtsi | 4 ++++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
