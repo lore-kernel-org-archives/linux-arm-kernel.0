@@ -1,53 +1,87 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 26 Aug 2016 09:31:54 +0100
-Subject: [GIT PULL v2] CCN driver fixes for 4.8
-In-Reply-To: <20160826001823.GF6209@localhost>
-References: <20160826001823.GF6209@localhost>
-Message-ID: <1472200314-32445-1-git-send-email-pawel.moll@arm.com>
+From: mike.looijmans@topic.nl (Mike Looijmans)
+Date: Fri, 26 Aug 2016 10:42:39 +0200
+Subject: [PATCH v2 2/2] sdhci-of-arasan: Set controller to test mode when
+ Card Detection is broken.
+In-Reply-To: <1472166111-28872-2-git-send-email-zach.brown@ni.com>
+References: <1472166111-28872-1-git-send-email-zach.brown@ni.com>
+ <1472166111-28872-2-git-send-email-zach.brown@ni.com>
+Message-ID: <57C000FF.3090307@topic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greetings,
+On 26-08-16 01:01, Zach Brown wrote:
+> The sdhci controller on xilinx zynq devices will not function unless
+> the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
+> In cases where it is impossible to provide the CD bit in hardware,
+> setting the controller to test mode and then setting inserted to true
+> will get the controller to function without the CD bit.
+>
+> When the device has the property broken-cd the driver changes the
+> controller to test mode and sets test inserted to true to make the
+> controller function.
+>
+> Signed-off-by: Zach Brown <zach.brown@ni.com>
+> ---
+>   drivers/mmc/host/sdhci-of-arasan.c | 17 ++++++++++++++++-
+>   drivers/mmc/host/sdhci.h           |  2 ++
+>   2 files changed, 18 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+> index e0f193f..3798a3b 100644
+> --- a/drivers/mmc/host/sdhci-of-arasan.c
+> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> @@ -26,6 +26,7 @@
+>   #include <linux/phy/phy.h>
+>   #include <linux/regmap.h>
+>   #include "sdhci-pltfm.h"
+> +#include <linux/of.h>
 
-I've got a small series of fixes for the CCN driver. A couple of them
-are cc-ed to stable, starting at 3.17 (the very beginning of the
-driver...). I've unified the subject prefixes in this v2.
+Not needed.
 
-Please consider pulling:
+>   #define SDHCI_ARASAN_CLK_CTRL_OFFSET	0x2c
+>   #define SDHCI_ARASAN_VENDOR_REGISTER	0x78
+> @@ -203,12 +204,26 @@ static void sdhci_arasan_hs400_enhanced_strobe(struct mmc_host *mmc,
+>   	writel(vendor, host->ioaddr + SDHCI_ARASAN_VENDOR_REGISTER);
+>   }
+>
+> +void sdhci_arasan_reset(struct sdhci_host *host, u8 mask)
+> +{
+> +	u8 ctrl;
+> +
+> +	sdhci_reset(host, mask);
+> +
+> +	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION) {
+> +		ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
+> +		ctrl |= SDHCI_CTRL_CDTEST_INS |
+> +			SDHCI_CTRL_CDTEST_EN;
+> +		sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
+> +	}
+> +}
+> +
+>   static struct sdhci_ops sdhci_arasan_ops = {
+>   	.set_clock = sdhci_arasan_set_clock,
+>   	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
+>   	.get_timeout_clock = sdhci_arasan_get_timeout_clock,
+>   	.set_bus_width = sdhci_set_bus_width,
+> -	.reset = sdhci_reset,
+> +	.reset = sdhci_arasan_reset,
+>   	.set_uhs_signaling = sdhci_set_uhs_signaling,
+>   };
+>
+> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+> index 0411c9f..8d92d6e9 100644
+> --- a/drivers/mmc/host/sdhci.h
+> +++ b/drivers/mmc/host/sdhci.h
+> @@ -84,6 +84,8 @@
+>   #define   SDHCI_CTRL_ADMA32	0x10
+>   #define   SDHCI_CTRL_ADMA64	0x18
+>   #define   SDHCI_CTRL_8BITBUS	0x20
+> +#define  SDHCI_CTRL_CDTEST_INS   0x40
+> +#define  SDHCI_CTRL_CDTEST_EN     0x80
+>
+>   #define SDHCI_POWER_CONTROL	0x29
+>   #define  SDHCI_POWER_ON		0x01
 
-The following changes since commit 694d0d0bb2030d2e36df73e2d23d5770511dbc8d:
+Looks okay, tested it and appears to work just as well as a tie-off in logic.
 
-  Linux 4.8-rc2 (2016-08-14 19:11:36 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/pawel.moll/linux.git tags/ccn/fixes-for-4.8-v2
-
-for you to fetch changes up to d662ed2e50c9dab1d4c25e80fa3e01ebe257bd65:
-
-  bus: arm-ccn: make event groups reliable (2016-08-26 09:16:18 +0100)
-
-----------------------------------------------------------------
-bus: ARM CCN PMU driver updates:
-- Fixes and improvements for XP watchpoint and events handling
-- Added missing condition checks for KVM-related exclusions
-- Improved interrupt affinity handling
-- Fix for hrtimer use in polling mode
-- Event grouping implementation improvement
-
-----------------------------------------------------------------
-Mark Rutland (3):
-      bus: arm-ccn: fix PMU interrupt flags
-      bus: arm-ccn: fix hrtimer registration
-      bus: arm-ccn: make event groups reliable
-
-Pawel Moll (5):
-      bus: arm-ccn: Fix PMU handling of MN
-      bus: arm-ccn: Do not attempt to configure XPs for cycle counter
-      bus: arm-ccn: Fix XP watchpoint settings bitmask
-      bus: arm-ccn: Correct required arguments for XP PMU events
-      bus: arm-ccn: Add missing event attribute exclusions for host/guest
-
- Documentation/arm/CCN.txt |  16 ++++---
- drivers/bus/arm-ccn.c     | 112 ++++++++++++++++++++++++++++++++--------------
- 2 files changed, 89 insertions(+), 39 deletions(-)
+Tested-by: mike.looijmans at topic.nl
