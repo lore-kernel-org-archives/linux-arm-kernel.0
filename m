@@ -1,59 +1,120 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Fri, 26 Aug 2016 15:22:29 +0200
-Subject: [PATCH] arm: sys_oabi-compat: Use kmalloc_array() in two functions
-In-Reply-To: <20160825224632.GL1041@n2100.armlinux.org.uk>
-References: <5deba521-2dd4-cd2e-23d7-226a1a7728c3@users.sourceforge.net>
- <20160825224632.GL1041@n2100.armlinux.org.uk>
-Message-ID: <dd343c72-2ec7-2114-bee5-1d16fc6c04ac@users.sourceforge.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 26 Aug 2016 14:28:38 +0100
+Subject: [PATCH v7 09/14] arm64/numa: support HAVE_SETUP_PER_CPU_AREA
+In-Reply-To: <1472024693-12912-10-git-send-email-thunder.leizhen@huawei.com>
+References: <1472024693-12912-1-git-send-email-thunder.leizhen@huawei.com>
+ <1472024693-12912-10-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <20160826132838.GE30302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Multiplications for the size determination of memory allocations
->> indicated that array data structures should be processed.
+On Wed, Aug 24, 2016 at 03:44:48PM +0800, Zhen Lei wrote:
+> To make each percpu area allocated from its local numa node. Without this
+> patch, all percpu areas will be allocated from the node which cpu0 belongs
+> to.
 > 
-> I'm afraid the above comment doesn't mean much to me, can you rephrase?
-
-Yes, of course.
-
-How verbose should the explanation for this update suggestion become?
-
-
-> Maybe:
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>  arch/arm64/Kconfig   |  8 ++++++++
+>  arch/arm64/mm/numa.c | 55 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 63 insertions(+)
 > 
-> "Multiplications for kmalloc size arguments are liable to overflow,
-> potentially causing a potential security issue.  Using kmalloc_array()
-> allows the overflow to be caught and the allocation failed.  Switch
-> these callsites to kmalloc_array()."
-
-Thanks for your wording variant.
-
-
->> @@ -285,7 +285,7 @@ asmlinkage long sys_oabi_epoll_wait(int epfd,
->>  		return -EINVAL;
->>  	if (!access_ok(VERIFY_WRITE, events, sizeof(*events) * maxevents))
->>  		return -EFAULT;
->> -	kbuf = kmalloc(sizeof(*kbuf) * maxevents, GFP_KERNEL);
->> +	kbuf = kmalloc_array(maxevents, sizeof(*kbuf), GFP_KERNEL);
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index bc3f00f..2815af6 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -603,6 +603,14 @@ config USE_PERCPU_NUMA_NODE_ID
+>  	def_bool y
+>  	depends on NUMA
 > 
-> kmalloc_array() here actually buys us no additional safety at either
-> of the callsites in your patch
+> +config HAVE_SETUP_PER_CPU_AREA
+> +	def_bool y
+> +	depends on NUMA
+> +
+> +config NEED_PER_CPU_EMBED_FIRST_CHUNK
+> +	def_bool y
+> +	depends on NUMA
 
-Can this inline function apply a few sanity checks in a consistent way?
-http://lxr.free-electrons.com/source/include/linux/slab.h#L564
+Why do we need this? Is it purely about using block mappings for the
+pcpu area?
 
+>  source kernel/Kconfig.preempt
+>  source kernel/Kconfig.hz
+> 
+> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+> index 7b73808..5e44ad1 100644
+> --- a/arch/arm64/mm/numa.c
+> +++ b/arch/arm64/mm/numa.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/of.h>
+> 
+>  #include <asm/acpi.h>
+> +#include <asm/sections.h>
+> 
+>  struct pglist_data *node_data[MAX_NUMNODES] __read_mostly;
+>  EXPORT_SYMBOL(node_data);
+> @@ -131,6 +132,60 @@ void __init early_map_cpu_to_node(unsigned int cpu, int nid)
+>  	cpu_to_node_map[cpu] = nid;
+>  }
+> 
+> +#ifdef CONFIG_HAVE_SETUP_PER_CPU_AREA
+> +unsigned long __per_cpu_offset[NR_CPUS] __read_mostly;
+> +EXPORT_SYMBOL(__per_cpu_offset);
+> +
+> +static int __init early_cpu_to_node(int cpu)
+> +{
+> +	return cpu_to_node_map[cpu];
+> +}
+> +
+> +static int __init pcpu_cpu_distance(unsigned int from, unsigned int to)
+> +{
+> +	if (early_cpu_to_node(from) == early_cpu_to_node(to))
+> +		return LOCAL_DISTANCE;
+> +	else
+> +		return REMOTE_DISTANCE;
+> +}
 
-> - we need to have carefully checked the values to ensure
-> they don't overflow prior to the kmalloc for other reasons.
+Is it too early to use __node_distance here?
 
-Are there any more constraints to consider?
+> +static void * __init pcpu_fc_alloc(unsigned int cpu, size_t size,
+> +				       size_t align)
+> +{
+> +	int nid = early_cpu_to_node(cpu);
+> +
+> +	return  memblock_virt_alloc_try_nid(size, align,
+> +			__pa(MAX_DMA_ADDRESS), MEMBLOCK_ALLOC_ACCESSIBLE, nid);
+> +}
+> +
+> +static void __init pcpu_fc_free(void *ptr, size_t size)
+> +{
+> +	memblock_free_early(__pa(ptr), size);
+> +}
+> +
+> +void __init setup_per_cpu_areas(void)
+> +{
+> +	unsigned long delta;
+> +	unsigned int cpu;
+> +	int rc;
+> +
+> +	/*
+> +	 * Always reserve area for module percpu variables.  That's
+> +	 * what the legacy allocator did.
+> +	 */
+> +	rc = pcpu_embed_first_chunk(PERCPU_MODULE_RESERVE,
+> +				    PERCPU_DYNAMIC_RESERVE, PAGE_SIZE,
+> +				    pcpu_cpu_distance,
+> +				    pcpu_fc_alloc, pcpu_fc_free);
+> +	if (rc < 0)
+> +		panic("Failed to initialize percpu areas.");
+> +
+> +	delta = (unsigned long)pcpu_base_addr - (unsigned long)__per_cpu_start;
+> +	for_each_possible_cpu(cpu)
+> +		__per_cpu_offset[cpu] = delta + pcpu_unit_offsets[cpu];
+> +}
+> +#endif
 
+It's a pity that this is practically identical to PowerPC. Ideally, there
+would be definitions of this initialisation gunk in the core code that
+could be reused across architectures.
 
-> That's probably something that should be noted in the commit message too,
-> so reviewers have the confidence that you're not blindly changing everything...
-
-I imagine that a few contributors can get mixed feelings from a bunch
-of my recent patches. There is a significant patch number in the works
-for various Linux software modules.
-
-Regards,
-Markus
+Will
