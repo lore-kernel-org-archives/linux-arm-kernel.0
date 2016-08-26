@@ -1,56 +1,31 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 26 Aug 2016 15:56:50 +0100
-Subject: [PATCH v8 15/18] ARM: STi: DT: STiH407: Add uniperif reader dt nodes
-In-Reply-To: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
-References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1472223413-7254-16-git-send-email-peter.griffin@linaro.org>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Fri, 26 Aug 2016 17:07:07 +0200
+Subject: arm: sys_oabi-compat: Use kmalloc_array() in two functions
+In-Reply-To: <20160826134459.GR1041@n2100.armlinux.org.uk>
+References: <5deba521-2dd4-cd2e-23d7-226a1a7728c3@users.sourceforge.net>
+ <20160825224632.GL1041@n2100.armlinux.org.uk>
+ <dd343c72-2ec7-2114-bee5-1d16fc6c04ac@users.sourceforge.net>
+ <20160826134459.GR1041@n2100.armlinux.org.uk>
+Message-ID: <6ed97ce3-4378-496f-848b-c66dcc05b21d@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the DT node for the uniperif reader
-IP block found on STiH407 family silicon.
+> It should at least make basic English sense.  I'm afraid the above
+> doesn't convey any meaning what so ever, at least to me.  It doesn't
+> matter how many times I read it, I still end up wondering "wtf is
+> this trying to tell me?"
 
-Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- arch/arm/boot/dts/stih407-family.dtsi | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+I have started to look a bit more on the usage of the following
+function pairs in some Linux source files.
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index d263c96..bdddf2c 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -956,5 +956,31 @@
- 			st,version = <5>;
- 			st,mode = "SPDIF";
- 		};
-+
-+		sti_uni_reader0: sti-uni-reader at 0 {
-+			compatible = "st,sti-uni-reader";
-+			status = "disabled";
-+			#sound-dai-cells = <0>;
-+			st,syscfg = <&syscfg_core>;
-+			reg = <0x8D83000 0x158>;
-+			interrupts = <GIC_SPI 87 IRQ_TYPE_NONE>;
-+			dmas = <&fdma0 5 0 1>;
-+			dma-names = "rx";
-+			dai-name = "Uni Reader #0 (PCM IN)";
-+			st,version = <3>;
-+		};
-+
-+		sti_uni_reader1: sti-uni-reader at 1 {
-+			compatible = "st,sti-uni-reader";
-+			status = "disabled";
-+			#sound-dai-cells = <0>;
-+			st,syscfg = <&syscfg_core>;
-+			reg = <0x8D84000 0x158>;
-+			interrupts = <GIC_SPI 88 IRQ_TYPE_NONE>;
-+			dmas = <&fdma0 6 0 1>;
-+			dma-names = "rx";
-+			dai-name = "Uni Reader #1 (HDMI RX)";
-+			st,version = <3>;
-+		};
- 	};
- };
--- 
-1.9.1
+kmalloc() ? kmalloc_array()
+kzalloc() ? kcalloc()
+
+Can such combinations be extended anyhow?
+
+
+Some update candidates can be found for this use case in several
+software areas.
+
+Regards,
+Markus
