@@ -1,44 +1,72 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Aug 2016 10:15:30 +0100
-Subject: [PATCH] arm64: always enable DEBUG_RODATA and remove the Kconfig
- option
-In-Reply-To: <1472142204-14258-1-git-send-email-mark.rutland@arm.com>
-References: <1472142204-14258-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160826091530.GB13554@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 26 Aug 2016 11:17:06 +0200
+Subject: [PATCH] DT: kirkwood: Fix Openblock A6 external GPIO pins
+In-Reply-To: <20160815145104.14135-1-jason@lakedaemon.net> (Jason Cooper's
+ message of "Mon, 15 Aug 2016 14:51:04 +0000")
+References: <20160815013538.8056-1-jason@lakedaemon.net>
+ <20160815145104.14135-1-jason@lakedaemon.net>
+Message-ID: <87y43jj3e5.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2016 at 05:23:23PM +0100, Mark Rutland wrote:
-> Follow the example set by x86 in commit 9ccaf77cf05915f5 ("x86/mm:
-> Always enable CONFIG_DEBUG_RODATA and remove the Kconfig option"), and
-> make these protections a fundamental security feature rather than an
-> opt-in. This also results in a minor code simplification.
-> 
-> For those rare cases when users wish to disable this protection (e.g.
-> for debugging), this can be done by passing 'rodata=off' on the command
-> line.
-> 
-> As DEBUG_RODATA_ALIGN is only intended to address a performance/memory
-> tradeoff, and does not affect correctness, this is left user-selectable.
-> DEBUG_MODULE_RONX is also left user-selectable until the core code
-> provides a boot-time option to disable the protection for debugging
-> use-cases.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Laura Abbott <labbott@redhat.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+Hi Jason,
+ 
+ On lun., ao?t 15 2016, Jason Cooper <jason@lakedaemon.net> wrote:
+
+> By assigning the pin hog to the pinctrl node, we correctly configure the
+> MPPs.  However, they are not available to userspace.
+>
+> Fix this by assigning the hogs to the gpio node.
+>
+> After this, the following works as expected:
+>
+>   # echo 28 >/sys/class/gpio/export
+>   # echo low >/sys/class/gpio/gpio28/direction
+>
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+
+Applied on mvebu/dt with Reviewed-by flag from Andrew and I changed the
+title to "ARM: dts: kirkwood: ..."
+
+Thanks,
+
+Gregory
 > ---
->  arch/arm64/Kconfig       |  3 +++
->  arch/arm64/Kconfig.debug | 10 ----------
->  arch/arm64/kernel/insn.c |  2 +-
->  3 files changed, 4 insertions(+), 11 deletions(-)
+> After sleeping on it a night, I decided to leave the dip switches alone.
+>
+>  arch/arm/boot/dts/kirkwood-openblocks_a6.dts | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+> index 0db0e3edc88f..94e49f32d5f9 100644
+> --- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+> +++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+> @@ -41,7 +41,7 @@
+>  		};
+>  
+>  		pinctrl: pin-controller at 10000 {
+> -			pinctrl-0 = <&pmx_dip_switches &pmx_gpio_header>;
+> +			pinctrl-0 = <&pmx_dip_switches>;
+>  			pinctrl-names = "default";
+>  
+>  			pmx_uart0: pmx-uart0 {
+> @@ -174,3 +174,10 @@
+>  		phy-handle = <&ethphy0>;
+>  	};
+>  };
+> +
+> +&gpio0 {
+> +	status = "okay";
+> +
+> +	pinctrl-0 = <&pmx_gpio_header>;
+> +	pinctrl-names = "default";
+> +};
+> -- 
+> 2.9.2
+>
 
-This is a very popular patch.
-
-Applied for 4.9. Perhaps it makes up for all the unpopular patches I've
-applied in the past.
-
-Will
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
