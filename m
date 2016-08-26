@@ -1,151 +1,254 @@
-From: kbeldan@baylibre.com (Karl Beldan)
-Date: Fri, 26 Aug 2016 17:17:18 +0000
-Subject: [PATCH] ARM: dts: da850: Add missing pin muxing for the UARTs
-In-Reply-To: <a076cc95-d338-ec13-ba05-360c1857cda5@ti.com>
-References: <20160804110656.25318-1-kbeldan@baylibre.com>
- <m2eg64pchw.fsf@baylibre.com> <20160804210045.GD15013@gobelin>
- <m2fuqknnqk.fsf@baylibre.com>
- <fe36e8d1-f371-b093-de15-5e03370ea38c@ti.com>
- <dd4712ba-6144-8c64-59a6-7673936af53c@ti.com>
- <20160824082934.GA20246@gobelin>
- <a076cc95-d338-ec13-ba05-360c1857cda5@ti.com>
-Message-ID: <20160826171718.GB20752@gobelin>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 26 Aug 2016 18:15:40 +0100
+Subject: [RFC PATCH 1/3] arm64: cpufeature: constify arm64_ftr_bits structures
+In-Reply-To: <1472231742-13387-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1472231742-13387-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1472231742-13387-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2016 at 05:55:23PM +0530, Sekhar Nori wrote:
-> On Wednesday 24 August 2016 02:08 PM, Karl Beldan wrote:
-> > On Tue, Aug 23, 2016 at 04:46:03PM +0530, Sekhar Nori wrote:
-> >> On Tuesday 23 August 2016 04:39 PM, Sekhar Nori wrote:
-> >>> On Friday 05 August 2016 04:30 AM, Kevin Hilman wrote:
-> >>>> Karl Beldan <kbeldan@baylibre.com> writes:
-> >>>>
-> >>>>> On Thu, Aug 04, 2016 at 12:20:27PM -0700, Kevin Hilman wrote:
-> >>>>>> Karl Beldan <kbeldan@baylibre.com> writes:
-> >>>>>>
-> >>>>>>> This adds 2 pinctrl groups (rtscts, rxtx) for each of the 3 UARTs.
-> >>>>>>>
-> >>>>>>> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
-> >>>>>>
-> >>>>>> Should da850-evm be updated to use the serial2_rxtx_pins also?
-> >>>>>>
-> >>>>> I could not find the EVM schematics on the net and I only have an LCDK,
-> >>>>> but according to the code it should, however I can't tell whether flow
-> >>>>> control pins are used.
-> >>>>
-> >>>> Ok, let's just leave it for now, since it's working fine.  Sekhar can
-> >>>> fix that up if he can dig up the schematics.
-> >>>
-> >>> Looks like the flow control pins are being used for McASP also on the
-> >>> EVM. So lets leave the EVM as-is.
-> >>
-> >> Rather, the EVM dts file should be updated to use serial2_rxtx_pins like
-> >> the LCDK. Right now it seems to be relying on bootloader to serial2
-> >> setup pimux correctly. I can make a patch to fix that. Or if you can do
-> >> it, that will be great too.
-> >>
-> > 
-> > Indeed ATM the EVM relies on the bootloader to setup the pin muxing.
-> > 
-> > I just checked the uart pins routing of the EVM, the dts:
-> > - should reclaim serial2_rxtx_pins and serial2_rtscts_pins
-> 
-> Agree.
-> 
-> > - can reclaim serial1_rxtx_pins (out on Audio connector but very
-> >   unlikely used for audio)
-> 
-> I would leave alone pins which are unused on the board. Most likely the
-> SPI pins are being send to audio connector for codec control over SPI.
-> 
-> > - should leave serial1_rtscts_pins (out on Audio connector but used by
-> >   McASP so used for audio)
-> 
-> Agree.
-> 
-> > Also I think it would be better for the serial nodes to reclaim the rxtx
-> > pins in the dtsi, and override the reclaimed pins in the .dts only for
-> > the nodes reclaiming flow control (some other pins could also be
-> > directly reclaimed in the dtsi).
-> 
-> You lost me here. I guess I will benefit from a code snippet to
-> illustrate the intention.
-> 
+The arm64_ftr_bits structures are never modified, so make them read-only.
 
-Sure, instead of having: {
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/include/asm/cpufeature.h | 14 +++---
+ arch/arm64/kernel/cpufeature.c      | 46 ++++++++++----------
+ 2 files changed, 31 insertions(+), 29 deletions(-)
 
-### board.dts:
-&serialN {
-	pinctrl-names = "default";
-	pinctrl-0 = <&serialN_rxtx_pins>;
-	status = "okay";
-};
-&serialN+1 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&serialN+1_rxtx_pins>, <&serialN+1_rtscts_pins>;
-	status = "okay";
-};
-
-} use ------------------ {
-
-### plat.dtsi:
-serialN: serial at xxxxx {
-	compatible = "ns16550a";
-	pinctrl-0 = <&serialN_rxtx_pins>;
-	status = "disabled";
-	[...]
-};
-serialN+1: serial at xxxxx {
-	compatible = "ns16550a";
-	pinctrl-0 = <&serialN+1_rxtx_pins>;
-	status = "disabled";
-	[...]
-};
-
-### board.dts:
-&serialN {
-	status = "okay";
-};
-&serialN+1 {
-	pinctrl-0 = <&serialN+1_rxtx_pins>, <&serialN+1_rtscts_pins>;
-	status = "okay";
-};
-
-}
-
-> > 
-> > Some other cleanups would also be in order for the da850*:
-> > - use labels for non dtsi (like I did for the LCDK)
-> 
-> Agree. That would be better and more modern.
-> 
-> > - add chosen,memory nodes (I guess currently only the LCDK can
-> >   dispense with ATAGS)
-> 
-> ok.
-> 
-> > - use a null range translation in the da850 dtsi for the soc node
-> >   (computing the offsets is error prone and is there a point)
-> 
-> I do agree its easier to read if offsets directly matches addresses
-> specified in the technical reference manual than doing the math with
-> offsets and making sure they are correct.
-> 
-> That said, I am not sure null range translation is really the preferred
-> approach. I would go with what DT maintainers say here.
-> 
-> > 
-> > Sure I could fix that, along with some of the above suggestions if you
-> > are ok with it.
-> 
-> It would be nice if you could fixup mcasp0_pins in da850-evm.dts. Surely
-> it is doing more than what is needed.
-> 
-
-According to the schematics it is indeed, I could squeeze it in the series.
-
-Rgds, 
-Karl
-
-> Regards,
-> Sekhar
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 7099f26e3702..7c0b7cff17df 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -72,11 +72,11 @@ struct arm64_ftr_bits {
+  * @sys_val		Safe value across the CPUs (system view)
+  */
+ struct arm64_ftr_reg {
+-	u32			sys_id;
+-	const char		*name;
+-	u64			strict_mask;
+-	u64			sys_val;
+-	struct arm64_ftr_bits	*ftr_bits;
++	u32				sys_id;
++	const char			*name;
++	u64				strict_mask;
++	u64				sys_val;
++	const struct arm64_ftr_bits	*ftr_bits;
+ };
+ 
+ /* scope of capability check */
+@@ -157,7 +157,7 @@ cpuid_feature_extract_unsigned_field(u64 features, int field)
+ 	return cpuid_feature_extract_unsigned_field_width(features, field, 4);
+ }
+ 
+-static inline u64 arm64_ftr_mask(struct arm64_ftr_bits *ftrp)
++static inline u64 arm64_ftr_mask(const struct arm64_ftr_bits *ftrp)
+ {
+ 	return (u64)GENMASK(ftrp->shift + ftrp->width - 1, ftrp->shift);
+ }
+@@ -170,7 +170,7 @@ cpuid_feature_extract_field(u64 features, int field, bool sign)
+ 		cpuid_feature_extract_unsigned_field(features, field);
+ }
+ 
+-static inline s64 arm64_ftr_value(struct arm64_ftr_bits *ftrp, u64 val)
++static inline s64 arm64_ftr_value(const struct arm64_ftr_bits *ftrp, u64 val)
+ {
+ 	return (s64)cpuid_feature_extract_field(val, ftrp->shift, ftrp->sign);
+ }
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 62272eac1352..eac76cb3a206 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -74,7 +74,7 @@ static bool __maybe_unused
+ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused);
+ 
+ 
+-static struct arm64_ftr_bits ftr_id_aa64isar0[] = {
++static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 24, 4, 0),
+@@ -87,7 +87,7 @@ static struct arm64_ftr_bits ftr_id_aa64isar0[] = {
+ 	ARM64_FTR_END,
+ };
+ 
+-static struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
++static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 28, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64PFR0_GIC_SHIFT, 4, 0),
+@@ -101,7 +101,7 @@ static struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
+ 	ARM64_FTR_END,
+ };
+ 
+-static struct arm64_ftr_bits ftr_id_aa64mmfr0[] = {
++static const struct arm64_ftr_bits ftr_id_aa64mmfr0[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
+ 	S_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN4_SHIFT, 4, ID_AA64MMFR0_TGRAN4_NI),
+ 	S_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN64_SHIFT, 4, ID_AA64MMFR0_TGRAN64_NI),
+@@ -119,7 +119,7 @@ static struct arm64_ftr_bits ftr_id_aa64mmfr0[] = {
+ 	ARM64_FTR_END,
+ };
+ 
+-static struct arm64_ftr_bits ftr_id_aa64mmfr1[] = {
++static const struct arm64_ftr_bits ftr_id_aa64mmfr1[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_PAN_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_LOR_SHIFT, 4, 0),
+@@ -130,7 +130,7 @@ static struct arm64_ftr_bits ftr_id_aa64mmfr1[] = {
+ 	ARM64_FTR_END,
+ };
+ 
+-static struct arm64_ftr_bits ftr_id_aa64mmfr2[] = {
++static const struct arm64_ftr_bits ftr_id_aa64mmfr2[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_LVA_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_IESB_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_LSM_SHIFT, 4, 0),
+@@ -139,7 +139,7 @@ static struct arm64_ftr_bits ftr_id_aa64mmfr2[] = {
+ 	ARM64_FTR_END,
+ };
+ 
+-static struct arm64_ftr_bits ftr_ctr[] = {
++static const struct arm64_ftr_bits ftr_ctr[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 31, 1, 1),	/* RAO */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 28, 3, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_HIGHER_SAFE, 24, 4, 0),	/* CWG */
+@@ -155,7 +155,7 @@ static struct arm64_ftr_bits ftr_ctr[] = {
+ 	ARM64_FTR_END,
+ };
+ 
+-static struct arm64_ftr_bits ftr_id_mmfr0[] = {
++static const struct arm64_ftr_bits ftr_id_mmfr0[] = {
+ 	S_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 28, 4, 0xf),	/* InnerShr */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 24, 4, 0),	/* FCSE */
+ 	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_LOWER_SAFE, 20, 4, 0),	/* AuxReg */
+@@ -167,7 +167,7 @@ static struct arm64_ftr_bits ftr_id_mmfr0[] = {
+ 	ARM64_FTR_END,
+ };
+ 
+-static struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
++static const struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
+@@ -178,14 +178,14 @@ static struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
+ 	ARM64_FTR_END,
+ };
+ 
+-static struct arm64_ftr_bits ftr_mvfr2[] = {
++static const struct arm64_ftr_bits ftr_mvfr2[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 8, 24, 0),	/* RAZ */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 4, 0),		/* FPMisc */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 4, 0),		/* SIMDMisc */
+ 	ARM64_FTR_END,
+ };
+ 
+-static struct arm64_ftr_bits ftr_dczid[] = {
++static const struct arm64_ftr_bits ftr_dczid[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 5, 27, 0),	/* RAZ */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 1, 1),		/* DZP */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* BS */
+@@ -193,7 +193,7 @@ static struct arm64_ftr_bits ftr_dczid[] = {
+ };
+ 
+ 
+-static struct arm64_ftr_bits ftr_id_isar5[] = {
++static const struct arm64_ftr_bits ftr_id_isar5[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_RDM_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 20, 4, 0),	/* RAZ */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_CRC32_SHIFT, 4, 0),
+@@ -204,14 +204,14 @@ static struct arm64_ftr_bits ftr_id_isar5[] = {
+ 	ARM64_FTR_END,
+ };
+ 
+-static struct arm64_ftr_bits ftr_id_mmfr4[] = {
++static const struct arm64_ftr_bits ftr_id_mmfr4[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 8, 24, 0),	/* RAZ */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 4, 0),		/* ac2 */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 4, 0),		/* RAZ */
+ 	ARM64_FTR_END,
+ };
+ 
+-static struct arm64_ftr_bits ftr_id_pfr0[] = {
++static const struct arm64_ftr_bits ftr_id_pfr0[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 16, 16, 0),	/* RAZ */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 12, 4, 0),	/* State3 */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 8, 4, 0),		/* State2 */
+@@ -220,7 +220,7 @@ static struct arm64_ftr_bits ftr_id_pfr0[] = {
+ 	ARM64_FTR_END,
+ };
+ 
+-static struct arm64_ftr_bits ftr_id_dfr0[] = {
++static const struct arm64_ftr_bits ftr_id_dfr0[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 28, 4, 0),
+ 	S_ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 24, 4, 0xf),	/* PerfMon */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),
+@@ -238,7 +238,7 @@ static struct arm64_ftr_bits ftr_id_dfr0[] = {
+  * 0. Covers the following 32bit registers:
+  * id_isar[0-4], id_mmfr[1-3], id_pfr1, mvfr[0-1]
+  */
+-static struct arm64_ftr_bits ftr_generic_32bits[] = {
++static const struct arm64_ftr_bits ftr_generic_32bits[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 28, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 24, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),
+@@ -250,17 +250,17 @@ static struct arm64_ftr_bits ftr_generic_32bits[] = {
+ 	ARM64_FTR_END,
+ };
+ 
+-static struct arm64_ftr_bits ftr_generic[] = {
++static const struct arm64_ftr_bits ftr_generic[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 64, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+-static struct arm64_ftr_bits ftr_generic32[] = {
++static const struct arm64_ftr_bits ftr_generic32[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 32, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+-static struct arm64_ftr_bits ftr_aa64raz[] = {
++static const struct arm64_ftr_bits ftr_aa64raz[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 64, 0),
+ 	ARM64_FTR_END,
+ };
+@@ -346,7 +346,8 @@ static struct arm64_ftr_reg *get_arm64_ftr_reg(u32 sys_id)
+ 			search_cmp_ftr_reg);
+ }
+ 
+-static u64 arm64_ftr_set_value(struct arm64_ftr_bits *ftrp, s64 reg, s64 ftr_val)
++static u64 arm64_ftr_set_value(const struct arm64_ftr_bits *ftrp, s64 reg,
++			       s64 ftr_val)
+ {
+ 	u64 mask = arm64_ftr_mask(ftrp);
+ 
+@@ -355,7 +356,8 @@ static u64 arm64_ftr_set_value(struct arm64_ftr_bits *ftrp, s64 reg, s64 ftr_val
+ 	return reg;
+ }
+ 
+-static s64 arm64_ftr_safe_value(struct arm64_ftr_bits *ftrp, s64 new, s64 cur)
++static s64 arm64_ftr_safe_value(const struct arm64_ftr_bits *ftrp, s64 new,
++				s64 cur)
+ {
+ 	s64 ret = 0;
+ 
+@@ -407,7 +409,7 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
+ {
+ 	u64 val = 0;
+ 	u64 strict_mask = ~0x0ULL;
+-	struct arm64_ftr_bits *ftrp;
++	const struct arm64_ftr_bits *ftrp;
+ 	struct arm64_ftr_reg *reg = get_arm64_ftr_reg(sys_reg);
+ 
+ 	BUG_ON(!reg);
+@@ -464,7 +466,7 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
+ 
+ static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
+ {
+-	struct arm64_ftr_bits *ftrp;
++	const struct arm64_ftr_bits *ftrp;
+ 
+ 	for (ftrp = reg->ftr_bits; ftrp->width; ftrp++) {
+ 		s64 ftr_cur = arm64_ftr_value(ftrp, reg->sys_val);
+-- 
+2.7.4
