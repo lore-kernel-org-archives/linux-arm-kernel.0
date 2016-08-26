@@ -1,17 +1,18 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 26 Aug 2016 23:21:42 +0300
-Subject: [PATCH 2/3] ARM: dts: wheat: initial device tree
+Date: Fri, 26 Aug 2016 23:23:13 +0300
+Subject: [PATCH 3/3] ARM: dts: wheat: add Ethernet support
 In-Reply-To: <3665116.9BjHTnhfR3@wasted.cogentembedded.com>
 References: <3665116.9BjHTnhfR3@wasted.cogentembedded.com>
-Message-ID: <4464163.ssfn2FILGm@wasted.cogentembedded.com>
+Message-ID: <6321460.7sCGaKUd5m@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the initial device tree for the R8A7792  SoC based Wheat board.
-The Wheat board itself has  no serial ports  wired up, the USB serial chips
-are situated on a separate  debug board and  one of them is connected to
-SCFI0  -- include unconditional support for  it, so that the serial console
-can work.
+R8A7792  SoC  doesn't have the  EtherMAC core, so SMSC LAN89218 Ethernet
+chip was used instead on the Wheat debug board; this chip is compatible
+with SMSC LAN9115 for which  there's a (device  tree aware)  driver.
+Describe the chip  in the Wheat device tree unconditionally (the driver
+should fail the probe if the debug board isn't connected); enable DHCP and
+NFS root in the command line for the kernel boot...
 
 Based  on the original (and large) patch by Vladimir Barinov 
 <vladimir.barinov@cogentembedded.com>.
@@ -19,74 +20,69 @@ Based  on the original (and large) patch by Vladimir Barinov
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
- arch/arm/boot/dts/Makefile          |    1 
- arch/arm/boot/dts/r8a7792-wheat.dts |   50 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 51 insertions(+)
+ arch/arm/boot/dts/r8a7792-wheat.dts |   38 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 37 insertions(+), 1 deletion(-)
 
-Index: renesas/arch/arm/boot/dts/Makefile
-===================================================================
---- renesas.orig/arch/arm/boot/dts/Makefile
-+++ renesas/arch/arm/boot/dts/Makefile
-@@ -659,6 +659,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
- 	r8a7791-koelsch.dtb \
- 	r8a7791-porter.dtb \
- 	r8a7792-blanche.dtb \
-+	r8a7792-wheat.dtb \
- 	r8a7793-gose.dtb \
- 	r8a7794-alt.dtb \
- 	r8a7794-silk.dtb \
 Index: renesas/arch/arm/boot/dts/r8a7792-wheat.dts
 ===================================================================
---- /dev/null
+--- renesas.orig/arch/arm/boot/dts/r8a7792-wheat.dts
 +++ renesas/arch/arm/boot/dts/r8a7792-wheat.dts
-@@ -0,0 +1,50 @@
-+/*
-+ * Device Tree Source for the Wheat board
-+ *
-+ * Copyright (C) 2016 Renesas Electronics Corporation
-+ * Copyright (C) 2016 Cogent  Embedded, Inc.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
+@@ -21,7 +21,7 @@
+ 	};
+ 
+ 	chosen {
+-		bootargs = "ignore_loglevel";
++		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
+@@ -29,6 +29,31 @@
+ 		device_type = "memory";
+ 		reg = <0 0x40000000 0 0x40000000>;
+ 	};
 +
-+/dts-v1/;
-+#include "r8a7792.dtsi"
-+
-+/ {
-+	model = "Wheat";
-+	compatible = "renesas,wheat", "renesas,r8a7792";
-+
-+	aliases {
-+		serial0 = &scif0;
++	d3_3v: regulator-3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "D3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
 +	};
 +
-+	chosen {
-+		bootargs = "ignore_loglevel";
-+		stdout-path = "serial0:115200n8";
++	ethernet at 18000000 {
++		compatible = "smsc,lan89218", "smsc,lan9115";
++		reg = <0 0x18000000 0 0x100>;
++		phy-mode = "mii";
++		interrupt-parent = <&irqc>;
++		interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
++		smsc,irq-push-pull;
++		smsc,save-mac-address;
++		reg-io-width = <4>;
++		vddvario-supply = <&d3_3v>;
++		vdd33a-supply = <&d3_3v>;
++
++		pinctrl-0 = <&lan89218_pins>;
++		pinctrl-names = "default";
 +	};
+ };
+ 
+ &extal_clk {
+@@ -40,6 +65,17 @@
+ 		groups = "scif0_data";
+ 		function = "scif0";
+ 	};
 +
-+	memory at 40000000 {
-+		device_type = "memory";
-+		reg = <0 0x40000000 0 0x40000000>;
++	lan89218_pins: lan89218 {
++		intc {
++			groups = "intc_irq0";
++			function = "intc";
++		};
++		lbsc {
++			groups = "lbsc_ex_cs0";
++			function = "lbsc";
++		};
 +	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <20000000>;
-+};
-+
-+&pfc {
-+	scif0_pins: scif0 {
-+		groups = "scif0_data";
-+		function = "scif0";
-+	};
-+};
-+
-+&scif0 {
-+	pinctrl-0 = <&scif0_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
+ };
+ 
+ &scif0 {
