@@ -1,67 +1,26 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 26 Aug 2016 09:19:00 +0200
-Subject: [PATCH v2 1/2] sdhci-of-arasan: Modify arasan sdhci documentation
- about broken-cd and non-removable properties.
-In-Reply-To: <1472166111-28872-1-git-send-email-zach.brown@ni.com>
-References: <1472166111-28872-1-git-send-email-zach.brown@ni.com>
-Message-ID: <f2a24bba-3faf-0882-4d7f-6b654247da7f@xilinx.com>
+From: myungjoo.ham@samsung.com (=?UTF-8?B?TXl1bmdKb28gSGFt?=)
+Date: Fri, 26 Aug 2016 07:20:38 +0000
+Subject: =?UTF-8?B?UkU6IFtQQVRDSCB2NyA3LzhdIFBNIC8gZGV2ZnJlcTogcm9j?=
+ =?UTF-8?B?a2NoaXA6IGFkZCBkZXZmcmVxIGRyaXZlciBmb3IgcmszMzk5?=
+ =?UTF-8?B?IGRtYw==?=
+References: <1471836984-6316-1-git-send-email-hl@rock-chips.com>
+ <CGME20160822033650epcas1p38e945746186fb0b2a64d1da3ee50b3e3@epcas1p3.samsung.com>
+Message-ID: <231650248.101111.1472196038139.JavaMail.weblogic@ep2ml101a>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.8.2016 01:01, Zach Brown wrote:
-> The sdhci controller on xilinx zynq devices will not function unless
-> the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
-> In cases where it is impossible to provide the CD bit in hardware,
-> setting the controller to test mode and then setting inserted to true
-> will get the controller to function without the CD bit.
-> 
-> Additionally in some situations it will make sense to use the
-> "broken-cd" and "non-removable" property together.
-> i.e the sd device is non-removable so polling doesn't make sense, but
-> the CD is broken and the controller will need to be in test mode to
-> function.
-> 
-> This patch modifies the documentation to reflect those differences
-> from the standard behaviours.
-> 
-> Signed-off-by: Zach Brown <zach.brown@ni.com>
+> base on dfi result, we do ddr frequency scaling, register
+> dmc driver to devfreq framework, and use simple-ondemand
+> policy.
+>
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
 > ---
-> v2:
->   * improved commit messages
->   * removed fake-cd device property
->   * removed fake-cd quirk
->   * use broken-cd device property
->   * documented new usage of broken-cd
-> 
->  Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> index 3404afa..b41c448 100644
-> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> @@ -37,6 +37,14 @@ Optional Properties:
->      in place we will export a clock representing the Card Clock.  This clock
->      is expected to be consumed by our PHY.  You must also specify
->  
-> +Card detection:
-> +The arasan controller does not work
-> +when the CD bit is not supplied unless in test mode.
-> +- broken-cd: The CD bit is not supplied and the controller will
-> +  need to be set to test mode to function.
-> +- non-removable: like normal, except it can now be partnered with
-> +  broken-cd, which will turn off polling, but keep test mode on.
-> +
->  Example:
->  	sdhci at e0100000 {
->  		compatible = "arasan,sdhci-8.9a";
-> @@ -72,4 +80,4 @@ Example:
->  		phy-names = "phy_arasan";
->  		#clock-cells = <0>;
->  		status = "disabled";
-> -	};
-> +	} ;
 
-Probably you don't need this change.
+Thanks. LGTM.
 
-M
+
+Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+
+Cheers,
+MyungJoo.
