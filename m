@@ -1,29 +1,54 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Fri, 26 Aug 2016 23:00:56 +0800
-Subject: [PATCH 0/3] ARM: dts: sun8i: Add dt nodes for sdio wifi
-In-Reply-To: <20160826145236.30210-1-hdegoede@redhat.com>
-References: <20160826145236.30210-1-hdegoede@redhat.com>
-Message-ID: <1318301472223656@web13m.yandex.ru>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri, 26 Aug 2016 15:56:45 +0100
+Subject: [PATCH v8 10/18] ARM: DT: STiH407: Add i2s_out pinctrl configuration
+In-Reply-To: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
+References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1472223413-7254-11-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds the pinctrl config for the i2s_out pins
+used by the uniperif player IP.
 
+Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+---
+ arch/arm/boot/dts/stih407-pinctrl.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-26.08.2016, 22:58, "Hans de Goede" <hdegoede@redhat.com>:
-> Hi Maxime,
->
-> Now that Ulf has merged the post-power-on-delay-ms mmc-pwrseq patches
-> in his mmc/next tree and Rob Herring has accepted the esp8089 dt
-> bindings (and specifically the esp,crystal-26M-en property), these
-> are ready for merging.
-
-Can the driver now work without broken-cd?
->
-> Thanks & Regards,
->
-> Hans
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+index a538ae5..0fb5c8a 100644
+--- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+@@ -1067,6 +1067,29 @@
+ 				};
+ 			};
+ 
++			i2s_out {
++				pinctrl_i2s_8ch_out: i2s_8ch_out{
++					st,pins {
++						mclk = <&pio33 5 ALT1 OUT>;
++						lrclk = <&pio33 7 ALT1 OUT>;
++						sclk = <&pio33 6 ALT1 OUT>;
++						data0 = <&pio33 4 ALT1 OUT>;
++						data1 = <&pio34 0 ALT1 OUT>;
++						data2 = <&pio34 1 ALT1 OUT>;
++						data3 = <&pio34 2 ALT1 OUT>;
++					};
++				};
++
++				pinctrl_i2s_2ch_out: i2s_2ch_out{
++					st,pins {
++						mclk = <&pio33 5 ALT1 OUT>;
++						lrclk = <&pio33 7 ALT1 OUT>;
++						sclk = <&pio33 6 ALT1 OUT>;
++						data0 = <&pio33 4 ALT1 OUT>;
++					};
++				};
++			};
++
+ 			serial3 {
+ 				pinctrl_serial3: serial3-0 {
+ 					st,pins {
+-- 
+1.9.1
