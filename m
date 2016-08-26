@@ -1,61 +1,45 @@
-From: finley.xiao@rock-chips.com (Finley Xiao)
-Date: Fri, 26 Aug 2016 00:36:29 -0700
-Subject: [PATCH v3 1/3] nvmem: rockchip-efuse: update compatible strings for
- Rockchip efuse
-In-Reply-To: <1472196991-8529-1-git-send-email-finley.xiao@rock-chips.com>
-References: <1472196991-8529-1-git-send-email-finley.xiao@rock-chips.com>
-Message-ID: <1472196991-8529-2-git-send-email-finley.xiao@rock-chips.com>
+From: kgene.kim@gmail.com (Kukjin Kim)
+Date: Fri, 26 Aug 2016 17:17:00 +0900
+Subject: [PATCH] MAINTAINERS: Add myself as reviewer for Samsung Exynos
+ support
+In-Reply-To: <1472137008-17751-1-git-send-email-javier@osg.samsung.com>
+References: <1472137008-17751-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <7BBAF30C-2CCE-4048-9EA5-C2DBAAAB964C@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rk3399-efuse is organized as 32bits by 32 one-time programmable electrical
-fuses. The efuse of earlier SoCs are organized as 32bits by 8 one-time
-programmable electrical fuses with random access interface.
+Javier Martinez Canillas <javier@osg.samsung.com> wrote:
+> I've been helping reviewing and testing Exynos SoC support patches
+> for the last couple of years. But it would be easier for me if I'm
+> cc'ed for patches, so I'm adding myself as reviewer for this entry.
 
-Add different device tree compatible string for different SoCs to be able
-to differentiate between the two. The old binding is of course preserved,
-though deprecated.
+Hi Javier,
 
-Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
----
- Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+Thanks for your review and support :)
 
-diff --git a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
-index 8f86ab3..94aeeea 100644
---- a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
-+++ b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
-@@ -1,11 +1,20 @@
- = Rockchip eFuse device tree bindings =
- 
- Required properties:
--- compatible: Should be "rockchip,rockchip-efuse"
-+- compatible: Should be one of the following.
-+  - "rockchip,rk3066a-efuse" - for RK3066a SoCs.
-+  - "rockchip,rk3188-efuse" - for RK3188 SoCs.
-+  - "rockchip,rk3288-efuse" - for RK3288 SoCs.
-+  - "rockchip,rk3399-efuse" - for RK3399 SoCs.
- - reg: Should contain the registers location and exact eFuse size
- - clocks: Should be the clock id of eFuse
- - clock-names: Should be "pclk_efuse"
- 
-+Deprecated properties:
-+- compatible: "rockchip,rockchip-efuse"
-+  Old efuse compatible value compatible to rk3066a, rk3188 and rk3288
-+  efuses
-+
- = Data cells =
- Are child nodes of eFuse, bindings of which as described in
- bindings/nvmem/nvmem.txt
-@@ -13,7 +22,7 @@ bindings/nvmem/nvmem.txt
- Example:
- 
- 	efuse: efuse at ffb40000 {
--		compatible = "rockchip,rockchip-efuse";
-+		compatible = "rockchip,rk3288-efuse";
- 		reg = <0xffb40000 0x20>;
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--- 
-1.9.1
+Acked-by: Kukjin Kim <kgene@kernel.org>
+
+BRs,
+k-gene
+
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> ---
+> 
+> MAINTAINERS | 1 +
+> 1 file changed, 1 insertion(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index d8e81b1dde30..27ffdb2a98e0 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1635,6 +1635,7 @@ N:    rockchip
+> ARM/SAMSUNG EXYNOS ARM ARCHITECTURES
+> M:    Kukjin Kim <kgene@kernel.org>
+> M:    Krzysztof Kozlowski <krzk@kernel.org>
+> +R:    Javier Martinez Canillas <javier@osg.samsung.com>
+> L:    linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> L:    linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+> S:    Maintained
+> -- 
+> 2.5.5
