@@ -1,109 +1,43 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 26 Aug 2016 14:17:49 -0600
-Subject: [PATCH v5 07/16] kernel/cpu_pm: Add runtime PM support for CPUs
+Date: Fri, 26 Aug 2016 14:17:47 -0600
+Subject: [PATCH v5 05/16] PM / doc: Update device documentation for devices in
+ IRQ safe PM domains
 In-Reply-To: <1472242678-33700-1-git-send-email-lina.iyer@linaro.org>
 References: <1472242678-33700-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1472242678-33700-8-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1472242678-33700-6-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Notify runtime PM when the CPU is going to be powered off in the idle
-state. This allows for runtime PM suspend/resume of the CPU as well as
-its PM domain.
+Update documentation to reflect the changes made to support IRQ safe PM
+domains.
 
-Cc: Kevin Hilman <khilman@kernel.org>
-Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- kernel/cpu_pm.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+ Documentation/power/devices.txt | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/kernel/cpu_pm.c b/kernel/cpu_pm.c
-index 009cc9a..657ce06 100644
---- a/kernel/cpu_pm.c
-+++ b/kernel/cpu_pm.c
-@@ -16,9 +16,11 @@
-  */
+diff --git a/Documentation/power/devices.txt b/Documentation/power/devices.txt
+index 8ba6625..a622136 100644
+--- a/Documentation/power/devices.txt
++++ b/Documentation/power/devices.txt
+@@ -607,7 +607,17 @@ individually.  Instead, a set of devices sharing a power resource can be put
+ into a low-power state together at the same time by turning off the shared
+ power resource.  Of course, they also need to be put into the full-power state
+ together, by turning the shared power resource on.  A set of devices with this
+-property is often referred to as a power domain.
++property is often referred to as a power domain. A power domain may also be
++nested inside another power domain.
++
++Devices, by default, operate in process context. If a device can operate in
++IRQ safe context that has to be explicitly indicated by setting the irq_safe
++boolean inside struct generic_pm_domain to be true. Power domains by default,
++operate in process context but could have devices that are IRQ safe. Such
++power domains cannot be powered on/off during runtime PM. On the other hand,
++IRQ safe PM domains that have IRQ safe devices may be powered off when all
++the devices are in idle. An IRQ safe domain may only be attached as a
++subdomain to another IRQ safe domain.
  
- #include <linux/kernel.h>
-+#include <linux/cpu.h>
- #include <linux/cpu_pm.h>
- #include <linux/module.h>
- #include <linux/notifier.h>
-+#include <linux/pm_runtime.h>
- #include <linux/spinlock.h>
- #include <linux/syscore_ops.h>
- 
-@@ -99,6 +101,7 @@ int cpu_pm_enter(void)
- {
- 	int nr_calls;
- 	int ret = 0;
-+	struct device *dev = get_cpu_device(smp_processor_id());
- 
- 	read_lock(&cpu_pm_notifier_lock);
- 	ret = cpu_pm_notify(CPU_PM_ENTER, -1, &nr_calls);
-@@ -110,6 +113,10 @@ int cpu_pm_enter(void)
- 		cpu_pm_notify(CPU_PM_ENTER_FAILED, nr_calls - 1, NULL);
- 	read_unlock(&cpu_pm_notifier_lock);
- 
-+	/* Notify Runtime PM that we are suspending the CPU */
-+	if (!ret && dev)
-+		RCU_NONIDLE(pm_runtime_put_sync_suspend(dev));
-+
- 	return ret;
- }
- EXPORT_SYMBOL_GPL(cpu_pm_enter);
-@@ -129,6 +136,11 @@ EXPORT_SYMBOL_GPL(cpu_pm_enter);
- int cpu_pm_exit(void)
- {
- 	int ret;
-+	struct device *dev = get_cpu_device(smp_processor_id());
-+
-+	/* Notify Runtime PM that we are resuming the CPU */
-+	if (dev)
-+		RCU_NONIDLE(pm_runtime_get_sync(dev));
- 
- 	read_lock(&cpu_pm_notifier_lock);
- 	ret = cpu_pm_notify(CPU_PM_EXIT, -1, NULL);
-@@ -200,6 +212,39 @@ int cpu_cluster_pm_exit(void)
- }
- EXPORT_SYMBOL_GPL(cpu_cluster_pm_exit);
- 
-+#ifdef CONFIG_HOTPLUG_CPU
-+static int cpu_pm_cpu_hotplug(struct notifier_block *nb,
-+			unsigned long action, void *data)
-+{
-+	struct device *dev = get_cpu_device(smp_processor_id());
-+
-+	if (!dev)
-+		return NOTIFY_OK;
-+
-+	/* Execute CPU runtime PM on that CPU */
-+	switch (action & ~CPU_TASKS_FROZEN) {
-+	case CPU_DYING:
-+		pm_runtime_put_sync_suspend(dev);
-+		break;
-+	case CPU_STARTING:
-+		pm_runtime_get_sync(dev);
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+static int __init cpu_pm_hotplug_init(void)
-+{
-+	/* Register for hotplug notifications for runtime PM */
-+	hotcpu_notifier(cpu_pm_cpu_hotplug, 0);
-+	return 0;
-+}
-+device_initcall(cpu_pm_hotplug_init);
-+#endif
-+
- #ifdef CONFIG_PM
- static int cpu_pm_suspend(void)
- {
+ Support for power domains is provided through the pm_domain field of struct
+ device.  This field is a pointer to an object of type struct dev_pm_domain,
 -- 
 2.7.4
