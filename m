@@ -1,58 +1,109 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Aug 2016 10:48:00 +0100
-Subject: [PATCH] arm/perf: Fix pmu percpu irq handling at hotplug.
-In-Reply-To: <20160819142514.GB28422@leverpostej>
-References: <CALJ9ZPMixfGKspzaz+vTGQZG4EaQB5Futss-aC-Z+8oztVX9Nw@mail.gmail.com>
- <20160819142514.GB28422@leverpostej>
-Message-ID: <20160826094800.GD13554@arm.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Fri, 26 Aug 2016 17:50:43 +0800
+Subject: [PATCH v2 2/2] sdhci-of-arasan: Set controller to test mode when
+ Card Detection is broken.
+In-Reply-To: <57C000FF.3090307@topic.nl>
+References: <1472166111-28872-1-git-send-email-zach.brown@ni.com>
+ <1472166111-28872-2-git-send-email-zach.brown@ni.com>
+ <57C000FF.3090307@topic.nl>
+Message-ID: <0fa180a6-5634-bac9-f933-7d68eef84796@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+On 2016/8/26 16:42, Mike Looijmans wrote:
+> On 26-08-16 01:01, Zach Brown wrote:
+>> The sdhci controller on xilinx zynq devices will not function unless
+>> the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
+>> In cases where it is impossible to provide the CD bit in hardware,
+>> setting the controller to test mode and then setting inserted to true
+>> will get the controller to function without the CD bit.
+>>
+>> When the device has the property broken-cd the driver changes the
+>> controller to test mode and sets test inserted to true to make the
+>> controller function.
+>>
+>> Signed-off-by: Zach Brown <zach.brown@ni.com>
+>> ---
+>>   drivers/mmc/host/sdhci-of-arasan.c | 17 ++++++++++++++++-
+>>   drivers/mmc/host/sdhci.h           |  2 ++
+>>   2 files changed, 18 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mmc/host/sdhci-of-arasan.c
+>> b/drivers/mmc/host/sdhci-of-arasan.c
+>> index e0f193f..3798a3b 100644
+>> --- a/drivers/mmc/host/sdhci-of-arasan.c
+>> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+>> @@ -26,6 +26,7 @@
+>>   #include <linux/phy/phy.h>
+>>   #include <linux/regmap.h>
+>>   #include "sdhci-pltfm.h"
+>> +#include <linux/of.h>
+>
+> Not needed.
+>
+>>   #define SDHCI_ARASAN_CLK_CTRL_OFFSET    0x2c
+>>   #define SDHCI_ARASAN_VENDOR_REGISTER    0x78
+>> @@ -203,12 +204,26 @@ static void
+>> sdhci_arasan_hs400_enhanced_strobe(struct mmc_host *mmc,
+>>       writel(vendor, host->ioaddr + SDHCI_ARASAN_VENDOR_REGISTER);
+>>   }
+>>
+>> +void sdhci_arasan_reset(struct sdhci_host *host, u8 mask)
+>> +{
+>> +    u8 ctrl;
+>> +
+>> +    sdhci_reset(host, mask);
+>> +
+>> +    if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION) {
+>> +        ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
+>> +        ctrl |= SDHCI_CTRL_CDTEST_INS |
+>> +            SDHCI_CTRL_CDTEST_EN;
+>> +        sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
+>> +    }
+>> +}
 
-On Fri, Aug 19, 2016 at 03:25:14PM +0100, Mark Rutland wrote:
-> On Thu, Aug 18, 2016 at 01:24:38PM -0700, Yabin Cui wrote:
-> >    If the cpu pmu is using a percpu irq: ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
-> >    ? ? ??
-> >    1. When a cpu is down, we should disable pmu irq on ? ? ? ? ? ? ? ? ? ? ?
-> >    that cpu. Otherwise, if the cpu is still down when ? ? ? ? ? ? ? ? ? ? ? ?
-> >    the last perf event is released, the pmu irq can't ? ? ? ? ? ? ? ? ? ? ? ?
-> >    be freed. Because the irq is still enabled on the ? ? ? ? ? ? ? ? ? ? ? ?
-> >    offlined cpu. And following perf_event_open() ? ? ? ? ? ? ? ? ? ? ? ? ? ?
-> >    syscalls will fail. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
-> >
-> >    2. When a cpu is up, we should enable pmu irq on ? ? ? ? ? ? ? ? ? ? ? ? ?
-> >    that cpu. Otherwise, profiling tools can't sample ? ? ? ? ? ? ? ? ? ? ? ?
-> >    events on the cpu before all perf events are ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
-> >    released, because pmu irq is disabled on that cpu. ? ? ? ? ? ? ? ? ? ? ? ?
-> 
-> It also looks like if a CPU is taken down while events are active, a
-> non-percpu interrupt will get migrated to another CPU, yet we don't
-> retarget it if/when the CPU is brought back online. So we have at least
-> three bugs with IRQ manipulation around hotplug.
-> 
-> Rather than adding more moving parts to the IRQ manipulation logic, I'd
-> rather we rework the IRQ manipulation logic to:
-> 
-> * At probe time, request all the interrupts. If we can't, bail out and
->   fail the probe.
-> 
-> * Upon hotplug in (and at probe time), configure the affinity and
->   enable the relevant interrupt(s).
-> 
-> * Upon hotplug out, disable the relevant interrupt.
-> 
-> That way we have fewer moving parts that need to interact with each
-> other (e.g. we don't need to inhibit hotplug in places), and we know
-> early whether things will or will not work.
-> 
-> The {reserve,release}_hardware dance is largely a legacy thing that was
-> there to cater for sharing the PMU with other subsystems, and we should
-> be able to get rid of it.
-> 
-> I'm taking a look at doing the above, but I don't yet have a patch.
+Although I don't have a "broken-cd" arasan controller,
+but are you suring that all the broken-cd arasan controller
+need to set these bit either? It seems your case is vendor specific?:)
 
-Any update on this? I'd quite like to do *something* to fix the issues
-reported here.
+>> +
+>>   static struct sdhci_ops sdhci_arasan_ops = {
+>>       .set_clock = sdhci_arasan_set_clock,
+>>       .get_max_clock = sdhci_pltfm_clk_get_max_clock,
+>>       .get_timeout_clock = sdhci_arasan_get_timeout_clock,
+>>       .set_bus_width = sdhci_set_bus_width,
+>> -    .reset = sdhci_reset,
+>> +    .reset = sdhci_arasan_reset,
+>>       .set_uhs_signaling = sdhci_set_uhs_signaling,
+>>   };
+>>
+>> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+>> index 0411c9f..8d92d6e9 100644
+>> --- a/drivers/mmc/host/sdhci.h
+>> +++ b/drivers/mmc/host/sdhci.h
+>> @@ -84,6 +84,8 @@
+>>   #define   SDHCI_CTRL_ADMA32    0x10
+>>   #define   SDHCI_CTRL_ADMA64    0x18
+>>   #define   SDHCI_CTRL_8BITBUS    0x20
+>> +#define  SDHCI_CTRL_CDTEST_INS   0x40
+>> +#define  SDHCI_CTRL_CDTEST_EN     0x80
+>>
+>>   #define SDHCI_POWER_CONTROL    0x29
+>>   #define  SDHCI_POWER_ON        0x01
+>
+> Looks okay, tested it and appears to work just as well as a tie-off in
+> logic.
+>
+> Tested-by: mike.looijmans at topic.nl
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
 
-Will
+
+-- 
+Best Regards
+Shawn Lin
