@@ -1,52 +1,30 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 26 Aug 2016 15:34:05 +0100
-Subject: [PATCH v7 1/9] arm64: pmu: add fallback probe table
-References: <1471985280-2243-1-git-send-email-jeremy.linton@arm.com>
- <1471985280-2243-2-git-send-email-jeremy.linton@arm.com>
-Message-ID: <87r39boazm.fsf@e105922-lin.cambridge.arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 26 Aug 2016 16:33:58 +0200
+Subject: [PATCH 0/8] Convert Netgear WNR854T to devicetree
+In-Reply-To: <alpine.DEB.2.11.1608261325310.19980@marmot.wormnet.eu>
+References: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
+ <1472203264-21089-1-git-send-email-jm@lentin.co.uk>
+ <op.ymsxegsy2s3iss@ecaz>
+ <alpine.DEB.2.11.1608261325310.19980@marmot.wormnet.eu>
+Message-ID: <20160826143358.GI25046@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeremy,
+> >- the factory layout gives you almost no space to play with
 
-One comment below.
+Given that the kernel has grown in size over the years, does the
+mainline kernel fit in the factory layout?
 
-Jeremy Linton <jeremy.linton@arm.com> writes:
+> Of course, one could also argue I'm breaking backwards compatibility
+> at this point by changing it, so maybe I should put it back.
 
-> From: Mark Salter <msalter@redhat.com>
->
-> In preparation for ACPI support, add a pmu_probe_info table to
-> the arm_pmu_device_probe() call. This table gets used when
-> probing in the absence of a devicetree node for PMU.
->
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
+I don't mind breaking backwards compatibility, if the factory defaults
+no longer actually work.....
 
-[...]
+Also, lets think about the users here. This is a very old box. Anybody
+playing with one are probably of the sort who tinker with a classic
+car in the garage, taking the engine apart and putting it back
+together again. I doubt there are users of this box who take their car
+in for a service once they are out of windscreen washing water.
 
-
-> diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-> index e188438..65d8e27 100644
-> --- a/include/linux/perf/arm_pmu.h
-> +++ b/include/linux/perf/arm_pmu.h
-> @@ -147,6 +147,9 @@ struct pmu_probe_info {
->  #define XSCALE_PMU_PROBE(_version, _fn) \
->  	PMU_PROBE(ARM_CPU_IMP_INTEL << 24 | _version, ARM_PMU_XSCALE_MASK, _fn)
->  
-> +#define ARMV8_PMU_PART_PROBE(_part, _fn) \
-> +	PMU_PROBE((_part) << MIDR_PARTNUM_SHIFT, MIDR_PARTNUM_MASK, _fn)
-> +
-
-This hunk could be dropped as it doesn't seem to be used in the
-patchset.
-
-With the above change -
-
-FWIW,
-        Acked-by: Punit Agrawal <punit.agrawal@arm.com>
-
-
->  int arm_pmu_device_probe(struct platform_device *pdev,
->  			 const struct of_device_id *of_table,
->  			 const struct pmu_probe_info *probe_table);
+    Andrew
