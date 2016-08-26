@@ -1,43 +1,33 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 25 Aug 2016 17:30:26 -0700
-Subject: [GIT PULL] ARM: exynos: Fixes for v4.8
-In-Reply-To: <1471501915-4746-1-git-send-email-k.kozlowski@samsung.com>
-References: <1471501915-4746-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20160826003026.GB8515@localhost>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Fri, 26 Aug 2016 19:12:48 +0800
+Subject: [PATCH 0/3] Add SMP support for i.MX7D
+Message-ID: <1472209971-32469-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2016 at 08:31:55AM +0200, Krzysztof Kozlowski wrote:
-> Hi,
-> 
-> A fix and a maintainers update for current release cycle (v4.8).
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
-> The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
-> 
->   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-fixes-4.8
-> 
-> for you to fetch changes up to 326dce0734b63c3b82b6a88e5645eab8b54c6692:
-> 
->   MAINTAINERS: Switch to kernel.org account for Krzysztof Kozlowski (2016-08-17 17:54:56 +0200)
-> 
-> ----------------------------------------------------------------
-> Fix for v4.8-rc1:
-> 1. Select proper eMMC HighSpeed mode on Odroid XU.  DTS was mixing
->    "samsung,exynos5250-dw-mshc" compatible (with HS200 as fastest mode)
->    with a property "mmc-hs400-1_8v" thus leading to failures during
->    probe.
-> 
-> 2. Update Krzysztof Kozlowski's email address in maintainers.
+i.MX7D has 2 Cortex-A7 ARM cores, and it has a different GPC design
+than i.MX6, so this patch set adds a new GPCV2 driver for i.MX7D,
+and also adds runtime check in SMP code to support both Cortex-A9
+and Cortex-A7 ARM cores.
 
-Merged, thanks.
+With this patch set, i.MX7D can boot up SMP kernel with 2 CPUs.
 
+Anson Huang (3):
+  ARM: dts: imx7: support SMP boot up
+  ARM: imx: add gpcv2 support
+  ARM: imx: add SMP support for i.MX7D
 
--Olof
+ arch/arm/boot/dts/imx7s.dtsi   |  8 +++++
+ arch/arm/mach-imx/Kconfig      |  4 +++
+ arch/arm/mach-imx/Makefile     |  1 +
+ arch/arm/mach-imx/common.h     |  2 ++
+ arch/arm/mach-imx/gpcv2.c      | 66 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/headsmp.S    | 11 +++++++
+ arch/arm/mach-imx/mach-imx7d.c |  2 ++
+ arch/arm/mach-imx/platsmp.c    | 23 ++++++++++++++-
+ arch/arm/mach-imx/src.c        | 38 +++++++++++++++++++-----
+ 9 files changed, 146 insertions(+), 9 deletions(-)
+ create mode 100644 arch/arm/mach-imx/gpcv2.c
+
+-- 
+1.9.1
