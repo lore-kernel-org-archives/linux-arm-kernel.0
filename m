@@ -1,130 +1,226 @@
-From: mirza.krak@gmail.com (Mirza Krak)
-Date: Fri, 26 Aug 2016 06:53:59 +0200
-Subject: [PATCH v2 3/6] dt/bindings: Add bindings for Tegra GMI controller
-In-Reply-To: <CALw8SCVcPymDZ8NyUbeanRF0TCT1TZzL6iRDticYA42FWrEWqw@mail.gmail.com>
-References: <1472045838-22628-1-git-send-email-mirza.krak@gmail.com>
- <1472045838-22628-4-git-send-email-mirza.krak@gmail.com>
- <de2fb909-829e-6c04-4f6a-442cbb9171c9@nvidia.com>
- <CALw8SCVcPymDZ8NyUbeanRF0TCT1TZzL6iRDticYA42FWrEWqw@mail.gmail.com>
-Message-ID: <CALw8SCWtTvWGmKru2MX7T7sFpoUpD-V400+w2nPkxaFB5WUKSA@mail.gmail.com>
+From: sr@denx.de (Stefan Roese)
+Date: Fri, 26 Aug 2016 07:39:01 +0200
+Subject: [PATCH v2] dmaengine: mv_xor: Add support for IO (PCIe) src/dst areas
+Message-ID: <20160826053901.18763-1-sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-08-24 21:54 GMT+02:00 Mirza Krak <mirza.krak@gmail.com>:
-> 2016-08-24 17:56 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
-> +
->>> +Example with two SJA1000 CAN controllers connected to the GMI bus. We wrap the
->>> +controllers with a simple-bus node since they are all connected to the same
->>> +chip-select (CS4), in this example external address decoding is provided:
->>> +
->>> +gmi at 70090000 {
->>> +     compatible = "nvidia,tegra20-gmi";
->>> +     reg = <0x70009000 0x1000>;
->>> +     #address-cells = <1>;
->>> +     #size-cells = <1>;
->>> +     clocks = <&tegra_car TEGRA20_CLK_NOR>;
->>> +     clock-names = "gmi";
->>> +     resets = <&tegra_car 42>;
->>> +     reset-names = "gmi";
->>> +     ranges = <4 0x48000000 0x7ffffff>;
->>> +
->>> +     status = "disabled";
->>> +
->>> +     bus at 4 {
->>> +             compatible = "simple-bus";
->>> +             reg = <4>;
->>> +             #address-cells = <1>;
->>> +             #size-cells = <1>;
->>> +             ranges = <0 4 0x40100>;
->>
->> Does this work? I tried to add an example like this and I got ...
->>
->> Warning (reg_format): "reg" property in /gmi at 70009000/bus at 4 has invalid
->> length (4 bytes) (#address-cells == 1, #size-cells == 1)
->
-> Shoot, to get rid of the warning it should be
->
-> reg = <4 0 >;
->
-> But it works either way.
->
->>
->> I am wondering if we should just following the arm,pl172 example and
->> have ...
->>
->>         cs4 {
->>                 compatible = "simple-bus";
->>                 #address-cells = <1>;
->>                 #size-cells = <1>;
->>                 ranges;
->>
->>                 nvidia,snor-cs = <4>;
->>                 nvidia,snor-mux-mode;
->>                 nvidia,snor-adv-inv;
->>
->>                 can at 0 {
->>                         reg = <0 0x100>;
->>                         ...
->>                 };
->>
->>                 ...
->>         };
->>
->
-> That means to go back to V1 really (almost :)). Which I do not mind.
-> Will give it a test run.
->
-> But I am a little hesitant if will be any better/cleaner. In your example above:
->
-> can at 0 {
->          reg = <0 0x100>;
->          ...
-> };
->
-> Would this really translate correctly? In the pl172 example they have
-> multiple ranges and address with "flash at 0,0" which a range defined in
-> parent node. "can at 0" does not have valid match in parent node in our
-> example. So I probably need add some more logic for it to properly
-> translate.
->
-> I have an idea which is following:
->
-> gmi at 70090000 {
->          status = "okay";
->          #address-cells = <2>;
->          #size-cells = <1>;
->          ranges = <4 0 0x48000000 0x00040000>;
->
->          cs4 {
->                  compatible = "simple-bus";
->                  #address-cells = <2>;
->                  #size-cells = <1>;
->                  ranges;
->
->                  nvidia,snor-cs = <4>;
->                  nvidia,snor-mux-mode;
->                  nvidia,snor-adv-inv;
->
->                  can at 0 {
->                          compatible = "nxp,sja1000";
->                          reg = <4 0 0x100>;
->                          ...
->                  };
->
->
->                  can at 40000 {
->                          compatible = "nxp,sja1000";
->                          reg = <4 0x40000 0x100>;
->                          ...
->                  };
->          };
-> };
->
-> Do not know if above will work at all (not able to test at current
-> location), anyway I will play around with it some more and get back to
-> you.
+To enable the access to a specific area, the MVEBU XOR controllers needs
+to have this area enabled / mapped via an address window. Right now,
+only the DRAM memory area is enabled via such memory windows. So
+using this driver to DMA to / from a e.g. PCIe memory region is
+currently not supported.
 
-Gave above a test run and it works like a charm. Are we happy with that?
+This patch now adds support for such PCIe / IO regions by checking
+if the src / dst address is located in an IO memory area in contrast
+to being located in DRAM. This is done by using the newly introduced
+MBus function mvebu_mbus_get_io_win_info(). If the src / dst address
+is located in such an IO area, a new address window is created in
+the XOR DMA controller. Enabling the controller to access this area.
 
-Best Regards
-Mirza
+Signed-off-by: Stefan Roese <sr@denx.de>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Marcin Wojtas <mw@semihalf.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Vinod Koul <vinod.koul@intel.com>
+---
+v1 -> v2:
+- Removed COMPILE_TEST from Kconfig entry as this results in compilation
+  errors on non-Marvell platforms because of references to MBus driver
+  functions. Since this driver will never be used on non-Marvell platforms
+  this should be okay.
+
+RFC -> v1:
+- Use a cache for the already mapped areas for performance reasons, as
+  the MMIO registers don't need to get queried any more if the area is
+  already mapped now
+
+ drivers/dma/Kconfig  |  2 +-
+ drivers/dma/mv_xor.c | 91 +++++++++++++++++++++++++++++++++++++++++++++++++++-
+ drivers/dma/mv_xor.h |  7 ++++
+ 3 files changed, 98 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index 8c98779..b878da1 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -332,7 +332,7 @@ config MPC512X_DMA
+ 
+ config MV_XOR
+ 	bool "Marvell XOR engine support"
+-	depends on PLAT_ORION || ARCH_MVEBU || COMPILE_TEST
++	depends on PLAT_ORION || ARCH_MVEBU
+ 	select DMA_ENGINE
+ 	select DMA_ENGINE_RAID
+ 	select ASYNC_TX_ENABLE_CHANNEL_SWITCH
+diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+index f4c9f98..0162750 100644
+--- a/drivers/dma/mv_xor.c
++++ b/drivers/dma/mv_xor.c
+@@ -470,12 +470,86 @@ static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
+ 	return mv_chan->slots_allocated ? : -ENOMEM;
+ }
+ 
++/*
++ * Check if source or destination is an PCIe/IO address (non-SDRAM) and add
++ * a new MBus window if necessary. Use a cache for these check so that
++ * the MMIO mapped registers don't have to be accessed for this check
++ * to speed up this process.
++ */
++static int mv_xor_add_io_win(struct mv_xor_chan *mv_chan, u32 addr)
++{
++	struct mv_xor_device *xordev = mv_chan->xordev;
++	void __iomem *base = mv_chan->mmr_high_base;
++	u32 win_enable;
++	u32 size;
++	u8 target, attr;
++	int ret;
++	int i;
++
++	/*
++	 * Loop over the cached windows to check, if the requested area
++	 * is already mapped. If this the case, nothing needs to be done
++	 * and we can return.
++	 */
++	for (i = 0; i < WINDOW_COUNT; i++) {
++		if (addr >= xordev->win_start[i] &&
++		    addr <= xordev->win_end[i]) {
++			/* Window is already mapped */
++			return 0;
++		}
++	}
++
++	/*
++	 * The window is not mapped, so we need to create the new mapping
++	 */
++
++	/* If no IO window is found that addr has to be located in SDRAM */
++	ret = mvebu_mbus_get_io_win_info(addr, &size, &target, &attr);
++	if (ret < 0)
++		return 0;
++
++	/*
++	 * Mask the base addr 'addr' according to 'size' read back from the
++	 * MBus window. Otherwise we might end up with an address located
++	 * somewhere in the middle of this area here.
++	 */
++	size -= 1;
++	addr &= ~size;
++
++	/*
++	 * Reading one of both enabled register is enough, as they are always
++	 * programmed to the identical values
++	 */
++	win_enable = readl(base + WINDOW_BAR_ENABLE(0));
++
++	/* Set 'i' to the first free window to write the new values to */
++	i = ffs(~win_enable) - 1;
++	if (i >= WINDOW_COUNT)
++		return -ENOMEM;
++
++	writel((addr & 0xffff0000) | (attr << 8) | target,
++	       base + WINDOW_BASE(i));
++	writel(size & 0xffff0000, base + WINDOW_SIZE(i));
++
++	/* Fill the caching variables for later use */
++	xordev->win_start[i] = addr;
++	xordev->win_end[i] = addr + size;
++
++	win_enable |= (1 << i);
++	win_enable |= 3 << (16 + (2 * i));
++	writel(win_enable, base + WINDOW_BAR_ENABLE(0));
++	writel(win_enable, base + WINDOW_BAR_ENABLE(1));
++
++	return 0;
++}
++
+ static struct dma_async_tx_descriptor *
+ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
+ 		    unsigned int src_cnt, size_t len, unsigned long flags)
+ {
+ 	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
+ 	struct mv_xor_desc_slot *sw_desc;
++	int ret;
+ 
+ 	if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
+ 		return NULL;
+@@ -486,6 +560,11 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
+ 		"%s src_cnt: %d len: %zu dest %pad flags: %ld\n",
+ 		__func__, src_cnt, len, &dest, flags);
+ 
++	/* Check if a new window needs to get added for 'dest' */
++	ret = mv_xor_add_io_win(mv_chan, dest);
++	if (ret)
++		return NULL;
++
+ 	sw_desc = mv_chan_alloc_slot(mv_chan);
+ 	if (sw_desc) {
+ 		sw_desc->type = DMA_XOR;
+@@ -493,8 +572,13 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
+ 		mv_desc_init(sw_desc, dest, len, flags);
+ 		if (mv_chan->op_in_desc == XOR_MODE_IN_DESC)
+ 			mv_desc_set_mode(sw_desc);
+-		while (src_cnt--)
++		while (src_cnt--) {
++			/* Check if a new window needs to get added for 'src' */
++			ret = mv_xor_add_io_win(mv_chan, src[src_cnt]);
++			if (ret)
++				return NULL;
+ 			mv_desc_set_src_addr(sw_desc, src_cnt, src[src_cnt]);
++		}
+ 	}
+ 
+ 	dev_dbg(mv_chan_to_devp(mv_chan),
+@@ -959,6 +1043,7 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
+ 		mv_chan->op_in_desc = XOR_MODE_IN_DESC;
+ 
+ 	dma_dev = &mv_chan->dmadev;
++	mv_chan->xordev = xordev;
+ 
+ 	/*
+ 	 * These source and destination dummy buffers are used to implement
+@@ -1086,6 +1171,10 @@ mv_xor_conf_mbus_windows(struct mv_xor_device *xordev,
+ 		       dram->mbus_dram_target_id, base + WINDOW_BASE(i));
+ 		writel((cs->size - 1) & 0xffff0000, base + WINDOW_SIZE(i));
+ 
++		/* Fill the caching variables for later use */
++		xordev->win_start[i] = cs->base;
++		xordev->win_end[i] = cs->base + cs->size - 1;
++
+ 		win_enable |= (1 << i);
+ 		win_enable |= 3 << (16 + (2 * i));
+ 	}
+diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
+index bf56e08..88eeab2 100644
+--- a/drivers/dma/mv_xor.h
++++ b/drivers/dma/mv_xor.h
+@@ -80,12 +80,17 @@
+ #define WINDOW_BAR_ENABLE(chan)	(0x40 + ((chan) << 2))
+ #define WINDOW_OVERRIDE_CTRL(chan)	(0xA0 + ((chan) << 2))
+ 
++#define WINDOW_COUNT		8
++
+ struct mv_xor_device {
+ 	void __iomem	     *xor_base;
+ 	void __iomem	     *xor_high_base;
+ 	struct clk	     *clk;
+ 	struct mv_xor_chan   *channels[MV_XOR_MAX_CHANNELS];
+ 	int		     xor_type;
++
++	u32                  win_start[WINDOW_COUNT];
++	u32                  win_end[WINDOW_COUNT];
+ };
+ 
+ /**
+@@ -127,6 +132,8 @@ struct mv_xor_chan {
+ 	char			dummy_dst[MV_XOR_MIN_BYTE_COUNT];
+ 	dma_addr_t		dummy_src_addr, dummy_dst_addr;
+ 	u32                     saved_config_reg, saved_int_mask_reg;
++
++	struct mv_xor_device	*xordev;
+ };
+ 
+ /**
+-- 
+2.9.3
