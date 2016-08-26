@@ -1,88 +1,114 @@
 From: jm@lentin.co.uk (Jamie Lentin)
-Date: Fri, 26 Aug 2016 10:21:01 +0100
-Subject: [PATCH 5/8] arm: orion5x: Add DT include for mv88f5181
+Date: Fri, 26 Aug 2016 10:21:04 +0100
+Subject: [PATCH 8/8] arm: orion5x: Configure WNR854T ethernet PHY LEDs
 In-Reply-To: <1472203264-21089-1-git-send-email-jm@lentin.co.uk>
 References: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
  <1472203264-21089-1-git-send-email-jm@lentin.co.uk>
-Message-ID: <1472203264-21089-6-git-send-email-jm@lentin.co.uk>
+Message-ID: <1472203264-21089-9-git-send-email-jm@lentin.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Common definitions for the SoC for board definitions to use.
+The default PHY configuration disables most of the LEDs. The following
+configures the ethernet activity LEDs as Netgear intended.
 
 Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
 ---
- .../bindings/arm/marvell/marvell,orion5x.txt       |  1 +
- arch/arm/boot/dts/orion5x-mv88f5181.dtsi           | 49 ++++++++++++++++++++++
- 2 files changed, 50 insertions(+)
- create mode 100644 arch/arm/boot/dts/orion5x-mv88f5181.dtsi
+Andrew, note that the slave mdio bus is called "mdio", however there is
+an example in bindings/net/dsa/dsa.txt using "mdio-bus". Is this a
+mismatch to fix?
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell/marvell,orion5x.txt b/Documentation/devicetree/bindings/arm/marvell/marvell,orion5x.txt
-index a888011..ff3c120 100644
---- a/Documentation/devicetree/bindings/arm/marvell/marvell,orion5x.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell/marvell,orion5x.txt
-@@ -9,6 +9,7 @@ compatible: must contain "marvell,orion5x"
- In addition, the above compatible shall be extended with the specific
- SoC. Currently known SoC compatibles are:
+That said there's no formal definition of either node, and there's at
+least one DT (vf610-zii-dev-rev-b.dts) that uses "mdio" already merged.
+---
+ arch/arm/boot/dts/orion5x-netgear-wnr854t.dts | 51 +++++++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
+
+diff --git a/arch/arm/boot/dts/orion5x-netgear-wnr854t.dts b/arch/arm/boot/dts/orion5x-netgear-wnr854t.dts
+index 402a364..2a35a04 100644
+--- a/arch/arm/boot/dts/orion5x-netgear-wnr854t.dts
++++ b/arch/arm/boot/dts/orion5x-netgear-wnr854t.dts
+@@ -136,31 +136,82 @@
+ 			port at 0 {
+ 				reg = <0>;
+ 				label = "lan3";
++				phy-handle = <&lan3phy>;
+ 			};
  
-+"marvell,orion5x-88f5181"
- "marvell,orion5x-88f5182"
+ 			port at 1 {
+ 				reg = <1>;
+ 				label = "lan4";
++				phy-handle = <&lan4phy>;
+ 			};
  
- And in addition, the compatible shall be extended with the specific
-diff --git a/arch/arm/boot/dts/orion5x-mv88f5181.dtsi b/arch/arm/boot/dts/orion5x-mv88f5181.dtsi
-new file mode 100644
-index 0000000..f667012
---- /dev/null
-+++ b/arch/arm/boot/dts/orion5x-mv88f5181.dtsi
-@@ -0,0 +1,49 @@
-+/*
-+ * Copyright (C) 2016 Jamie Lentin <jm@lentin.co.uk>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include "orion5x.dtsi"
-+
-+/ {
-+	compatible = "marvell,orion5x-88f5181", "marvell,orion5x";
-+
-+	soc {
-+		compatible = "marvell,orion5x-88f5181-mbus", "simple-bus";
-+
-+		internal-regs {
-+			pinctrl: pinctrl at 10000 {
-+				compatible = "marvell,88f5181-pinctrl";
-+				reg = <0x10000 0x8>, <0x10050 0x4>;
-+			};
-+
-+			core_clk: core-clocks at 10030 {
-+				compatible = "marvell,mv88f5181-core-clock";
-+				reg = <0x10010 0x4>;
-+				#clock-cells = <1>;
-+			};
-+
-+			mbusc: mbus-controller at 20000 {
-+				compatible = "marvell,mbus-controller";
-+				reg = <0x20000 0x100>, <0x1500 0x20>;
+ 			port at 2 {
+ 				reg = <2>;
+ 				label = "wan";
++				phy-handle = <&wanphy>;
+ 			};
+ 
+ 			port at 3 {
+ 				reg = <3>;
+ 				label = "cpu";
++				ethernet = <&ethport>;
+ 			};
+ 
+ 			port at 5 {
+ 				reg = <5>;
+ 				label = "lan1";
++				phy-handle = <&lan1phy>;
+ 			};
+ 
+ 			port at 7 {
+ 				reg = <7>;
+ 				label = "lan2";
++				phy-handle = <&lan2phy>;
 +			};
 +		};
-+	};
-+};
 +
-+&pinctrl {
-+	pmx_ge: pmx-ge {
-+		marvell,pins = "mpp8", "mpp9", "mpp10", "mpp11",
-+			       "mpp12", "mpp13", "mpp14", "mpp15",
-+			       "mpp16", "mpp17", "mpp18", "mpp19";
-+		marvell,function = "ge";
-+	};
-+};
++		mdio {
++			#address-cells = <1>;
++			#size-cells = <0>;
 +
-+&eth {
-+	pinctrl-0 = <&pmx_ge>;
-+	pinctrl-names = "default";
-+};
++			lan3phy: ethernet-phy at 0 {
++				/* Marvell 88E1121R (port 1) */
++				compatible = "ethernet-phy-id0141.0cb0",
++					     "ethernet-phy-ieee802.3-c22";
++				reg = <0>;
++				marvell,reg-init = <3 16 0 0x1777 3 17 0 0x15>;
++			};
++
++			lan4phy: ethernet-phy at 1 {
++				/* Marvell 88E1121R (port 2) */
++				compatible = "ethernet-phy-id0141.0cb0",
++					     "ethernet-phy-ieee802.3-c22";
++				reg = <1>;
++				marvell,reg-init = <3 16 0 0x1777 3 17 0 0x15>;
++			};
++
++			wanphy: ethernet-phy at 2 {
++				/* Marvell 88E1121R (port 1) */
++				compatible = "ethernet-phy-id0141.0cb0",
++					     "ethernet-phy-ieee802.3-c22";
++				reg = <2>;
++				marvell,reg-init = <3 16 0 0x1777 3 17 0 0x15>;
++			};
++
++			lan1phy: ethernet-phy at 5 {
++				/* Marvell 88E1112 */
++				compatible = "ethernet-phy-id0141.0cb0",
++					     "ethernet-phy-ieee802.3-c22";
++				reg = <5>;
++				marvell,reg-init = <3 16 0 0x1777 3 17 0 0x15>;
++			};
++
++			lan2phy: ethernet-phy at 7 {
++				/* Marvell 88E1112 */
++				compatible = "ethernet-phy-id0141.0cb0",
++					     "ethernet-phy-ieee802.3-c22";
++				reg = <7>;
++				marvell,reg-init = <3 16 0 0x1777 3 17 0 0x15>;
+ 			};
+ 		};
+ 	};
 -- 
 2.8.1
