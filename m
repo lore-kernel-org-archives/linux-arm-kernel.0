@@ -1,155 +1,61 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 26 Aug 2016 09:47:28 +0200
-Subject: [PATCH v2 1/2] mtd: brcmnand: iProc big endian and ONFI support
-In-Reply-To: <1469051631-7896-2-git-send-email-ray.jui@broadcom.com>
-References: <1469051631-7896-1-git-send-email-ray.jui@broadcom.com>
- <1469051631-7896-2-git-send-email-ray.jui@broadcom.com>
-Message-ID: <20160826094728.1a68f443@bbrezillon>
+From: finley.xiao@rock-chips.com (Finley Xiao)
+Date: Fri, 26 Aug 2016 00:36:29 -0700
+Subject: [PATCH v3 1/3] nvmem: rockchip-efuse: update compatible strings for
+ Rockchip efuse
+In-Reply-To: <1472196991-8529-1-git-send-email-finley.xiao@rock-chips.com>
+References: <1472196991-8529-1-git-send-email-finley.xiao@rock-chips.com>
+Message-ID: <1472196991-8529-2-git-send-email-finley.xiao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Jul 2016 14:53:50 -0700
-Ray Jui <ray.jui@broadcom.com> wrote:
+Rk3399-efuse is organized as 32bits by 32 one-time programmable electrical
+fuses. The efuse of earlier SoCs are organized as 32bits by 8 one-time
+programmable electrical fuses with random access interface.
 
-> This patch adds big endian and ONFI support for various iProc based
-> SoCs that use the core brcmstb NAND controller
-> 
-> This patch was originally implemented by Prafulla Kota
-> <prafulla.kota@broadcom.com> and fully tested on iProc based NS2 SVK
-> 
-> Signed-off-by: Prafulla Kota <prafulla.kota@broadcom.com>
-> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+Add different device tree compatible string for different SoCs to be able
+to differentiate between the two. The old binding is of course preserved,
+though deprecated.
 
-Applied.
+Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+---
+ Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-Thanks,
-
-Boris
-
-> ---
->  drivers/mtd/nand/brcmnand/brcmnand.c   | 12 ++++++------
->  drivers/mtd/nand/brcmnand/brcmnand.h   | 13 ++++++++-----
->  drivers/mtd/nand/brcmnand/iproc_nand.c | 18 ++++++++++++++----
->  3 files changed, 28 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
-> index b76ad7c..12a1585 100644
-> --- a/drivers/mtd/nand/brcmnand/brcmnand.c
-> +++ b/drivers/mtd/nand/brcmnand/brcmnand.c
-> @@ -1279,7 +1279,7 @@ static void brcmnand_cmdfunc(struct mtd_info *mtd, unsigned command,
->  		u32 *flash_cache = (u32 *)ctrl->flash_cache;
->  		int i;
->  
-> -		brcmnand_soc_data_bus_prepare(ctrl->soc);
-> +		brcmnand_soc_data_bus_prepare(ctrl->soc, true);
->  
->  		/*
->  		 * Must cache the FLASH_CACHE now, since changes in
-> @@ -1292,7 +1292,7 @@ static void brcmnand_cmdfunc(struct mtd_info *mtd, unsigned command,
->  			 */
->  			flash_cache[i] = be32_to_cpu(brcmnand_read_fc(ctrl, i));
->  
-> -		brcmnand_soc_data_bus_unprepare(ctrl->soc);
-> +		brcmnand_soc_data_bus_unprepare(ctrl->soc, true);
->  
->  		/* Cleanup from HW quirk: restore SECTOR_SIZE_1K */
->  		if (host->hwcfg.sector_size_1k)
-> @@ -1508,12 +1508,12 @@ static int brcmnand_read_by_pio(struct mtd_info *mtd, struct nand_chip *chip,
->  		brcmnand_waitfunc(mtd, chip);
->  
->  		if (likely(buf)) {
-> -			brcmnand_soc_data_bus_prepare(ctrl->soc);
-> +			brcmnand_soc_data_bus_prepare(ctrl->soc, false);
->  
->  			for (j = 0; j < FC_WORDS; j++, buf++)
->  				*buf = brcmnand_read_fc(ctrl, j);
->  
-> -			brcmnand_soc_data_bus_unprepare(ctrl->soc);
-> +			brcmnand_soc_data_bus_unprepare(ctrl->soc, false);
->  		}
->  
->  		if (oob)
-> @@ -1678,12 +1678,12 @@ static int brcmnand_write(struct mtd_info *mtd, struct nand_chip *chip,
->  		(void)brcmnand_read_reg(ctrl, BRCMNAND_CMD_ADDRESS);
->  
->  		if (buf) {
-> -			brcmnand_soc_data_bus_prepare(ctrl->soc);
-> +			brcmnand_soc_data_bus_prepare(ctrl->soc, false);
->  
->  			for (j = 0; j < FC_WORDS; j++, buf++)
->  				brcmnand_write_fc(ctrl, j, *buf);
->  
-> -			brcmnand_soc_data_bus_unprepare(ctrl->soc);
-> +			brcmnand_soc_data_bus_unprepare(ctrl->soc, false);
->  		} else if (oob) {
->  			for (j = 0; j < FC_WORDS; j++)
->  				brcmnand_write_fc(ctrl, j, 0xffffffff);
-> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.h b/drivers/mtd/nand/brcmnand/brcmnand.h
-> index ef5eabb..5c44cd4 100644
-> --- a/drivers/mtd/nand/brcmnand/brcmnand.h
-> +++ b/drivers/mtd/nand/brcmnand/brcmnand.h
-> @@ -23,19 +23,22 @@ struct dev_pm_ops;
->  struct brcmnand_soc {
->  	bool (*ctlrdy_ack)(struct brcmnand_soc *soc);
->  	void (*ctlrdy_set_enabled)(struct brcmnand_soc *soc, bool en);
-> -	void (*prepare_data_bus)(struct brcmnand_soc *soc, bool prepare);
-> +	void (*prepare_data_bus)(struct brcmnand_soc *soc, bool prepare,
-> +				 bool is_param);
->  };
->  
-> -static inline void brcmnand_soc_data_bus_prepare(struct brcmnand_soc *soc)
-> +static inline void brcmnand_soc_data_bus_prepare(struct brcmnand_soc *soc,
-> +						 bool is_param)
->  {
->  	if (soc && soc->prepare_data_bus)
-> -		soc->prepare_data_bus(soc, true);
-> +		soc->prepare_data_bus(soc, true, is_param);
->  }
->  
-> -static inline void brcmnand_soc_data_bus_unprepare(struct brcmnand_soc *soc)
-> +static inline void brcmnand_soc_data_bus_unprepare(struct brcmnand_soc *soc,
-> +						   bool is_param)
->  {
->  	if (soc && soc->prepare_data_bus)
-> -		soc->prepare_data_bus(soc, false);
-> +		soc->prepare_data_bus(soc, false, is_param);
->  }
->  
->  static inline u32 brcmnand_readl(void __iomem *addr)
-> diff --git a/drivers/mtd/nand/brcmnand/iproc_nand.c b/drivers/mtd/nand/brcmnand/iproc_nand.c
-> index 585596c..4c6ae11 100644
-> --- a/drivers/mtd/nand/brcmnand/iproc_nand.c
-> +++ b/drivers/mtd/nand/brcmnand/iproc_nand.c
-> @@ -74,7 +74,8 @@ static void iproc_nand_intc_set(struct brcmnand_soc *soc, bool en)
->  	spin_unlock_irqrestore(&priv->idm_lock, flags);
->  }
->  
-> -static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare)
-> +static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare,
-> +				  bool is_param)
->  {
->  	struct iproc_nand_soc *priv =
->  			container_of(soc, struct iproc_nand_soc, soc);
-> @@ -86,10 +87,19 @@ static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare)
->  
->  	val = brcmnand_readl(mmio);
->  
-> -	if (prepare)
-> -		val |= IPROC_NAND_APB_LE_MODE;
-> -	else
-> +	/*
-> +	 * In the case of BE or when dealing with NAND data, alway configure
-> +	 * the APB bus to LE mode before accessing the FIFO and back to BE mode
-> +	 * after the access is done
-> +	 */
-> +	if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN) || !is_param) {
-> +		if (prepare)
-> +			val |= IPROC_NAND_APB_LE_MODE;
-> +		else
-> +			val &= ~IPROC_NAND_APB_LE_MODE;
-> +	} else { /* when in LE accessing the parameter page, keep APB in BE */
->  		val &= ~IPROC_NAND_APB_LE_MODE;
-> +	}
->  
->  	brcmnand_writel(val, mmio);
->  
+diff --git a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
+index 8f86ab3..94aeeea 100644
+--- a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
++++ b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
+@@ -1,11 +1,20 @@
+ = Rockchip eFuse device tree bindings =
+ 
+ Required properties:
+-- compatible: Should be "rockchip,rockchip-efuse"
++- compatible: Should be one of the following.
++  - "rockchip,rk3066a-efuse" - for RK3066a SoCs.
++  - "rockchip,rk3188-efuse" - for RK3188 SoCs.
++  - "rockchip,rk3288-efuse" - for RK3288 SoCs.
++  - "rockchip,rk3399-efuse" - for RK3399 SoCs.
+ - reg: Should contain the registers location and exact eFuse size
+ - clocks: Should be the clock id of eFuse
+ - clock-names: Should be "pclk_efuse"
+ 
++Deprecated properties:
++- compatible: "rockchip,rockchip-efuse"
++  Old efuse compatible value compatible to rk3066a, rk3188 and rk3288
++  efuses
++
+ = Data cells =
+ Are child nodes of eFuse, bindings of which as described in
+ bindings/nvmem/nvmem.txt
+@@ -13,7 +22,7 @@ bindings/nvmem/nvmem.txt
+ Example:
+ 
+ 	efuse: efuse at ffb40000 {
+-		compatible = "rockchip,rockchip-efuse";
++		compatible = "rockchip,rk3288-efuse";
+ 		reg = <0xffb40000 0x20>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-- 
+1.9.1
