@@ -1,130 +1,43 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 26 Aug 2016 18:14:42 +0200
-Subject: [PATCH v2 5/7] arm64: dts: exynos: Add dts files for Samsung
- Exynos5433 64bit SoC
-In-Reply-To: <1472046551-703-6-git-send-email-cw00.choi@samsung.com>
-References: <1472046551-703-1-git-send-email-cw00.choi@samsung.com>
- <1472046551-703-6-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20160826161442.GB15511@kozik-book>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 26 Aug 2016 17:16:27 +0100
+Subject: [PATCH v2 9/9] arm64: Work around systems with mismatched cache
+ line sizes
+In-Reply-To: <f72be21a-fd67-dc30-ca1b-278dd99821a2@arm.com>
+References: <1472203398-8751-1-git-send-email-suzuki.poulose@arm.com>
+ <1472203398-8751-10-git-send-email-suzuki.poulose@arm.com>
+ <CAKv+Gu_AyrQLdjf+1-QuZu3k2goT-_6Dk5mQbvP6XSmu30V4cQ@mail.gmail.com>
+ <f2ff63f1-9cc7-6930-60eb-5f1fb8fde2e6@arm.com>
+ <f72be21a-fd67-dc30-ca1b-278dd99821a2@arm.com>
+Message-ID: <20160826161627.GL30302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 10:49:09PM +0900, Chanwoo Choi wrote:
-> This patch adds new Exynos5433 dtsi to support 64-bit Exynos5433 SoC based on
-> Octa-core CPUs (quad Cortex-A57 and quad Cortex-A53). And Exynos5433 supports
-> PSCI (Power State Coordination Interface) v0.1.
+On Fri, Aug 26, 2016 at 02:08:01PM +0100, Suzuki K Poulose wrote:
+> On 26/08/16 14:04, Suzuki K Poulose wrote:
+> >On 26/08/16 12:03, Ard Biesheuvel wrote:
+> >>IMO, this is a pattern that we should avoid: you are introducing one
+> >>instance now, which will make it hard to say no to the next one in the
+> >>future. Isn't there a better way to organize the arm64_ftr_reg array
+> >>that allows us to reference entries directly? Ideally, a way that gets
+> >>rid of the runtime sorting, since I don't think that is a good
+> >>replacement for developer discipline anyway (although I should have
+> >>spoken up when that was first introduced) Or am I missing something
+> >>here?
+> >
+> >I had some form of direct access to the feature register in one of
+> >the versions [0], but was dropped based on Catalin's suggestion at [1].
 > 
-> This patch includes following Device Tree node to support Exynos5433 SoC:
-> 1. Octa cores for big.LITTLE architecture
-> - Cortex-A53 LITTLE Quad-core
-> - Cortex-A57 big Quad-core
-> - Support PSCI v0.1
-> 
-> 2. Clock controller node
-> - CMU_TOP   : clocks for IMEM/FSYS/G3D/GSCL/HEVC/MSCL/G2D/MFC/PERIC/PERIS
-> - CMU_CPIF  : clocks for LLI (Low Latency Interface)
-> - CMU_MIF   : clocks for DRAM Memory Controller
-> - CMU_PERIC : clocks for UART/I2C/SPI/I2S/PCM/SPDIF/PWM/SLIMBUS
-> - CMU_PERIS : clocks for PMU/TMU/MCT/WDT/RTC/SECKEY/TZPC
-> - CMU_FSYS  : clocks for USB/UFS/SDMMC/TSI/PDMA
-> - CMU_G2D   : clocks for G2D/MDMA
-> - CMU_DISP  : clocks for DECON/HDMI/DSIM/MIXER
-> - CMU_AUD   : clocks for Cortex-A5/BUS/AUDIO
-> - CMU_BUS{0|1|2} : clocks for global data buses and global peripheral buses
-> - CMU_G3D   : clocks for 3D Graphics Engine
-> - CMU_GSCL  : clocks for GSCALER
-> - CMU_APOLLO: clocks for Cortex-A53 Quad-core processor.
-> - CMU_ATLAS : clocks for Cortex-A57 Quad-core processor,
->               CoreSight and L2 cache controller.
-> - CMU_MSCL  : clocks for M2M (Memory to Memory) scaler and JPEG IPs.
-> - CMU_MFC   : clocks for MFC (Multi-Format Codec) IP.
-> - CMU_HEVC  : clocks for HEVC(High Efficiency Video Codec) decoder IP.
-> - CMU_ISP   : clocks for FIMC-ISP/DRC/SCLC/DIS/3DNR IPs.
-> - CMU_CAM0  : clocks for MIPI_CSIS{0|1}/FIMC_LITE_{A|B|D}/FIMC_3AA{0|1} IPs.
-> - CMU_CAM1  : clocks for COrtex-A5/MIPI_CSIS2/FIMC_LITE_C/FIMC-FD IPs.
-> 
-> 3. pinctrl node for GPIO
-> - alive/aud/cpif/ese/finger/fsys/imem/nfc/peric/touch pad
-> 
-> 4. Timer
-> - ARM architecture timer (armv8-timer)
-> - MCT (Multi Core Timer) timer
-> 
-> 5. Interrupt controller (GIC-400)
-> 
-> 6. BUS devices
-> - HS-I2C (High-Speed I2C) device
-> - SPI (Serial Peripheral Interface) device
-> 
-> 7. Sound devices
-> - I2S bus
-> - LPASS (Low Power Audio Subsystem)
-> 
-> 8. Power management devices
-> - CPUFREQ for for Cortex-A53/A57
-> - TMU (Thermal Management Unit) for Cortex-A53/A57, G3D, ISP
-> 
-> 9. Display controller devices
-> - DECON (Display and enhancement controller) for panel output
-> - DSI (Display Serial Interface)
-> - MIC (Mobile Image Compressor)
-> 
-> 10. USB
-> - USB 3.0 DRD (Dual Role Device) controller
-> - USB 3.0 Host controller
-> 
-> 11. Storage devices
-> - MSHC (Mobile Stoarage Host Controller)
-> 
-> 12. Misc devices
-> - UART device
-> - ADC (Analog Digital Converter)
-> - PWM (Pulse Width Modulation)
-> - ADMA (Advanced DMA) and PDMA (Peripheral DMA)
-> 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
-> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-> Signed-off-by: Inki Dae <inki.dae@samsung.com>
-> Signed-off-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
-> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
-> Signed-off-by: Jaewon Kim <jaewon02.kim@samsung.com>
-> Signed-off-by: Hyungwon Hwang <human.hwang@samsung.com>
-> Signed-off-by: Inha Song <ideal.song@samsung.com>
-> Signed-off-by: Ingi kim <ingi2.kim@samsung.com>
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
->  arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi |  792 ++++++++++++
->  .../dts/exynos/exynos5433-tmu-g3d-sensor-conf.dtsi |   23 +
->  .../dts/exynos/exynos5433-tmu-sensor-conf.dtsi     |   22 +
->  arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi     |  306 +++++
->  arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 1327 ++++++++++++++++++++
->  5 files changed, 2470 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi
->  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu-g3d-sensor-conf.dtsi
->  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu-sensor-conf.dtsi
->  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
->  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433.dtsi
+> Forgot to add, [0] wouldn't solve this issue cleanly either. It would simply
+> speed up the read_system_reg(). So we do need a call to read_system_reg()
+> from assembly code, which makes it a little bit tricky.
 
-I got only one question:
+It might be worth looking to see if we can pass the ctr as an extra
+parameter to the assembly routines that need it. Then you can access it
+easily from C code, and if you pass it as 0 that could result in the asm
+code reading it from the h/w register, removing the need for the _raw
+stuff you add.
 
- +
-> +		cooling-maps {
-> +			map0 {
-> +				/* Set maximum frequency as 1300MHz  */
-> +				trip = <&apollo_alert_0>;
-> +				cooling-device = <&cpu0 0 0>;
+Of course, it could also be a complete mess fixing up all the callers,
+but it's probably worth investigating to see what the trade-off is.
 
-Is cooling level=0 really a cooling level? I think it does nothing so it
-should be just removed.
-
-The same for big cluster.
-
-Rest looks good.
-
-BR,
-Krzysztof
+Will
