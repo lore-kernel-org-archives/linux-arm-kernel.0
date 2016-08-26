@@ -1,178 +1,256 @@
-From: jitao.shi@mediatek.com (Jitao Shi)
-Date: Fri, 26 Aug 2016 14:10:31 +0800
-Subject: drm/mediatek: fixed the calc method of data rate per lane
-Message-ID: <1472191831-7150-1-git-send-email-jitao.shi@mediatek.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 26 Aug 2016 15:22:03 +0900
+Subject: [PATCH v24 5/9] arm64: kdump: add kdump support
+In-Reply-To: <CAKv+Gu9HabCP5irxZB6pKgtDCVpy23Wdu7eppMsW2++jK7Dk1w@mail.gmail.com>
+References: <20160809015248.28414-2-takahiro.akashi@linaro.org>
+ <20160809015615.28527-1-takahiro.akashi@linaro.org>
+ <20160809015615.28527-3-takahiro.akashi@linaro.org>
+ <CAKv+Gu9HabCP5irxZB6pKgtDCVpy23Wdu7eppMsW2++jK7Dk1w@mail.gmail.com>
+Message-ID: <20160826062201.GO20080@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tune dsi frame rate by pixel clock, dsi add some extra signal (i.e. Tlpx,
-Ths-prepare, Ths-zero, Ths-trail,Ths-exit) when enter and exit LP mode, this
-signal will cause h-time larger than normal and reduce FPS.
-Need to multiply a coefficient to offset the extra signal's effect.
-coefficient = ((htotal*bpp/lane_number)+Tlpx+Ths_prep+Ths_zero+Ths_trail+
-                Ths_exit)/(htotal*bpp/lane_number))
+On Wed, Aug 24, 2016 at 04:44:09PM +0200, Ard Biesheuvel wrote:
+> On 9 August 2016 at 03:56, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+> > On crash dump kernel, all the information about primary kernel's system
+> > memory (core image) is available in elf core header.
+> > The primary kernel will set aside this header with reserve_elfcorehdr()
+> > at boot time and inform crash dump kernel of its location via a new
+> > device-tree property, "linux,elfcorehdr".
+> >
+> > Please note that all other architectures use traditional "elfcorehdr="
+> > kernel parameter for this purpose.
+> >
+> > Then crash dump kernel will access the primary kernel's memory with
+> > copy_oldmem_page(), which reads one page by ioremap'ing it since it does
+> > not reside in linear mapping on crash dump kernel.
+> >
+> > We also need our own elfcorehdr_read() here since the header is placed
+> > within crash dump kernel's usable memory.
+> >
+> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > ---
+> >  arch/arm64/Kconfig             | 11 +++++++
+> >  arch/arm64/kernel/Makefile     |  1 +
+> >  arch/arm64/kernel/crash_dump.c | 71 ++++++++++++++++++++++++++++++++++++++++++
+> >  arch/arm64/mm/init.c           | 54 ++++++++++++++++++++++++++++++++
+> >  4 files changed, 137 insertions(+)
+> >  create mode 100644 arch/arm64/kernel/crash_dump.c
+> >
+> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > index 69c8787..9ede54b 100644
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -682,6 +682,17 @@ config KEXEC
+> >           but it is independent of the system firmware.   And like a reboot
+> >           you can start any kernel with it, not just Linux.
+> >
+> > +config CRASH_DUMP
+> > +       bool "Build kdump crash kernel"
+> > +       help
+> > +         Generate crash dump after being started by kexec. This should
+> > +         be normally only set in special crash dump kernels which are
+> > +         loaded in the main kernel with kexec-tools into a specially
+> > +         reserved region and then later executed after a crash by
+> > +         kdump/kexec.
+> > +
+> > +         For more details see Documentation/kdump/kdump.txt
+> > +
+> >  config XEN_DOM0
+> >         def_bool y
+> >         depends on XEN
+> > diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> > index 14f7b65..f1cbfc8 100644
+> > --- a/arch/arm64/kernel/Makefile
+> > +++ b/arch/arm64/kernel/Makefile
+> > @@ -48,6 +48,7 @@ arm64-obj-$(CONFIG_RANDOMIZE_BASE)    += kaslr.o
+> >  arm64-obj-$(CONFIG_HIBERNATION)                += hibernate.o hibernate-asm.o
+> >  arm64-obj-$(CONFIG_KEXEC)              += machine_kexec.o relocate_kernel.o    \
+> >                                            cpu-reset.o
+> > +arm64-obj-$(CONFIG_CRASH_DUMP)         += crash_dump.o
+> >
+> >  obj-y                                  += $(arm64-obj-y) vdso/ probes/
+> >  obj-m                                  += $(arm64-obj-m)
+> > diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
+> > new file mode 100644
+> > index 0000000..2dc54d1
+> > --- /dev/null
+> > +++ b/arch/arm64/kernel/crash_dump.c
+> > @@ -0,0 +1,71 @@
+> > +/*
+> > + * Routines for doing kexec-based kdump
+> > + *
+> > + * Copyright (C) 2014 Linaro Limited
+> > + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +
+> > +#include <linux/crash_dump.h>
+> > +#include <linux/errno.h>
+> > +#include <linux/io.h>
+> > +#include <linux/memblock.h>
+> > +#include <linux/uaccess.h>
+> > +#include <asm/memory.h>
+> > +
+> > +/**
+> > + * copy_oldmem_page() - copy one page from old kernel memory
+> > + * @pfn: page frame number to be copied
+> > + * @buf: buffer where the copied page is placed
+> > + * @csize: number of bytes to copy
+> > + * @offset: offset in bytes into the page
+> > + * @userbuf: if set, @buf is in a user address space
+> > + *
+> > + * This function copies one page from old kernel memory into buffer pointed by
+> > + * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
+> > + * copied or negative error in case of failure.
+> > + */
+> > +ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
+> > +                        size_t csize, unsigned long offset,
+> > +                        int userbuf)
+> > +{
+> > +       void *vaddr;
+> > +
+> > +       if (!csize)
+> > +               return 0;
+> > +
+> > +       vaddr = ioremap_cache(__pfn_to_phys(pfn), PAGE_SIZE);
+> 
+> Could we please use memremap() here?
+> 
+> > +       if (!vaddr)
+> > +               return -ENOMEM;
+> > +
+> > +       if (userbuf) {
+> > +               if (copy_to_user(buf, vaddr + offset, csize)) {
+> > +                       iounmap(vaddr);
+> > +                       return -EFAULT;
+> > +               }
+> > +       } else {
+> > +               memcpy(buf, vaddr + offset, csize);
+> > +       }
+> > +
+> > +       iounmap(vaddr);
+> 
+> ... and memunmap here?
+> 
+> ioremap_cache() is not very well defined, and memremap() has been
+> introduced specifically to replace it, so I think we should use it in
+> new code.
 
-Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
----
- drivers/gpu/drm/mediatek/mtk_dsi.c |  111 ++++++++++++++++++++++--------------
- 1 file changed, 67 insertions(+), 44 deletions(-)
+Sure. I will use memremap(MEMREMAP_WB) instead.
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-index 28b2044..506aa22 100644
---- a/drivers/gpu/drm/mediatek/mtk_dsi.c
-+++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-@@ -85,28 +85,26 @@
- #define LD0_WAKEUP_EN			BIT(2)
- 
- #define DSI_PHY_TIMECON0	0x110
--#define LPX				(0xff << 0)
--#define HS_PRPR				(0xff << 8)
--#define HS_ZERO				(0xff << 16)
--#define HS_TRAIL			(0xff << 24)
-+#define LPX(x)				((x) << 0)
-+#define HS_PRPR(x)			((x) << 8)
-+#define HS_ZERO(x)			((x) << 16)
-+#define HS_TRAIL(x)			((x) << 24)
- 
- #define DSI_PHY_TIMECON1	0x114
--#define TA_GO				(0xff << 0)
--#define TA_SURE				(0xff << 8)
--#define TA_GET				(0xff << 16)
--#define DA_HS_EXIT			(0xff << 24)
-+#define TA_GO(x)			((x) << 0)
-+#define TA_SURE(x)			((x) << 8)
-+#define TA_GET(x)			((x) << 16)
-+#define DA_HS_EXIT(x)			((x) << 24)
- 
- #define DSI_PHY_TIMECON2	0x118
--#define CONT_DET			(0xff << 0)
--#define CLK_ZERO			(0xff << 16)
--#define CLK_TRAIL			(0xff << 24)
-+#define CONT_DET(x)			((x) << 0)
-+#define CLK_ZERO(x)			((x) << 16)
-+#define CLK_TRAIL(x)			((x) << 24)
- 
- #define DSI_PHY_TIMECON3	0x11c
--#define CLK_HS_PRPR			(0xff << 0)
--#define CLK_HS_POST			(0xff << 8)
--#define CLK_HS_EXIT			(0xff << 16)
--
--#define NS_TO_CYCLE(n, c)    ((n) / (c) + (((n) % (c)) ? 1 : 0))
-+#define CLK_HS_PRPR(x)			((x) << 0)
-+#define CLK_HS_POST(x)			((x) << 8)
-+#define CLK_HS_EXIT(x)			((x) << 16)
- 
- struct phy;
- 
-@@ -158,28 +156,14 @@ static void mtk_dsi_mask(struct mtk_dsi *dsi, u32 offset, u32 mask, u32 data)
- 	writel((temp & ~mask) | (data & mask), dsi->regs + offset);
- }
- 
--static void dsi_phy_timconfig(struct mtk_dsi *dsi)
-+static void dsi_phy_timconfig(struct mtk_dsi *dsi, u32 phy_timing0,
-+			      u32 phy_timing1, u32 phy_timing2,
-+			      u32 phy_timing3)
- {
--	u32 timcon0, timcon1, timcon2, timcon3;
--	unsigned int ui, cycle_time;
--	unsigned int lpx;
--
--	ui = 1000 / dsi->data_rate + 0x01;
--	cycle_time = 8000 / dsi->data_rate + 0x01;
--	lpx = 5;
--
--	timcon0 = (8 << 24) | (0xa << 16) | (0x6 << 8) | lpx;
--	timcon1 = (7 << 24) | (5 * lpx << 16) | ((3 * lpx) / 2) << 8 |
--		  (4 * lpx);
--	timcon2 = ((NS_TO_CYCLE(0x64, cycle_time) + 0xa) << 24) |
--		  (NS_TO_CYCLE(0x150, cycle_time) << 16);
--	timcon3 = (2 * lpx) << 16 | NS_TO_CYCLE(80 + 52 * ui, cycle_time) << 8 |
--		   NS_TO_CYCLE(0x40, cycle_time);
--
--	writel(timcon0, dsi->regs + DSI_PHY_TIMECON0);
--	writel(timcon1, dsi->regs + DSI_PHY_TIMECON1);
--	writel(timcon2, dsi->regs + DSI_PHY_TIMECON2);
--	writel(timcon3, dsi->regs + DSI_PHY_TIMECON3);
-+	writel(phy_timing0, dsi->regs + DSI_PHY_TIMECON0);
-+	writel(phy_timing1, dsi->regs + DSI_PHY_TIMECON1);
-+	writel(phy_timing2, dsi->regs + DSI_PHY_TIMECON2);
-+	writel(phy_timing3, dsi->regs + DSI_PHY_TIMECON3);
- }
- 
- static void mtk_dsi_enable(struct mtk_dsi *dsi)
-@@ -202,19 +186,57 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
- {
- 	struct device *dev = dsi->dev;
- 	int ret;
-+	u64 bit_clock, total_bits;
-+	u32 htotal, htotal_bits, bit_per_pixel, overhead_cycles, overhead_bits;
-+	u32 phy_timing0, phy_timing1, phy_timing2, phy_timing3;
- 
- 	if (++dsi->refcount != 1)
- 		return 0;
- 
-+	phy_timing0 = LPX(5) | HS_PRPR(6) | HS_ZERO(10) | HS_TRAIL(8);
-+	phy_timing1 = TA_GO(20) | TA_SURE(7) | TA_GET(25) | DA_HS_EXIT(7);
-+	phy_timing2 = CLK_ZERO(38) | CLK_TRAIL(22);
-+	phy_timing3 = CLK_HS_PRPR(8) | CLK_HS_POST(21) | CLK_HS_EXIT(10);
-+
-+	switch (dsi->format) {
-+	case MIPI_DSI_FMT_RGB565:
-+		bit_per_pixel = 16;
-+		break;
-+	case MIPI_DSI_FMT_RGB666_PACKED:
-+		bit_per_pixel = 18;
-+		break;
-+	case MIPI_DSI_FMT_RGB666:
-+	case MIPI_DSI_FMT_RGB888:
-+	default:
-+		bit_per_pixel = 24;
-+		break;
-+	}
- 	/**
--	 * data_rate = (pixel_clock / 1000) * pixel_dipth * mipi_ratio;
--	 * pixel_clock unit is Khz, data_rata unit is MHz, so need divide 1000.
--	 * mipi_ratio is mipi clk coefficient for balance the pixel clk in mipi.
--	 * we set mipi_ratio is 1.05.
-+	 * data_rate = (pixel_clock) * bit_per_pixel * mipi_ratio / lane_num;
-+	 * vm.pixelclock is Khz, data_rata unit is Hz, so need to multiply 1000
-+	 * mipi_ratio is (htotal * byte_per_pixel / lane_num + Tlpx + Ths_prep
-+	 *		  + Thstrail + Ths_exit + Ths_zero) /
-+	 *		 (htotal * byte_per_pixel /lane_number)
- 	 */
--	dsi->data_rate = dsi->vm.pixelclock * 3 * 21 / (1 * 1000 * 10);
-+	bit_clock = dsi->vm.pixelclock * 1000 * bit_per_pixel;
-+	htotal = dsi->vm.hactive + dsi->vm.hback_porch + dsi->vm.hfront_porch +
-+		 dsi->vm.hsync_len;
-+	htotal_bits = htotal * bit_per_pixel;
-+
-+	/**
-+	 * overhead = lpx + hs_prepare + hs_zero + hs_trail + hs_exit
-+	 */
-+	overhead_cycles = (phy_timing0 & 0xff) + (phy_timing0 >> 8 & 0xff) +
-+			  (phy_timing0 >> 16 & 0xff) +
-+			  (phy_timing0 >> 24 & 0xff) +
-+			  (phy_timing1 >> 24 & 0xff);
-+	overhead_bits = overhead_cycles * dsi->lanes * 8;
-+	total_bits = htotal_bits + overhead_bits;
-+
-+	dsi->data_rate = DIV_ROUND_UP_ULL(bit_clock * total_bits,
-+					  htotal_bits * dsi->lanes);
- 
--	ret = clk_set_rate(dsi->hs_clk, dsi->data_rate * 1000000);
-+	ret = clk_set_rate(dsi->hs_clk, dsi->data_rate);
- 	if (ret < 0) {
- 		dev_err(dev, "Failed to set data rate: %d\n", ret);
- 		goto err_refcount;
-@@ -236,7 +258,8 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
- 
- 	mtk_dsi_enable(dsi);
- 	mtk_dsi_reset(dsi);
--	dsi_phy_timconfig(dsi);
-+	dsi_phy_timconfig(dsi, phy_timing0, phy_timing1, phy_timing2,
-+			  phy_timing3);
- 
- 	return 0;
- 
--- 
-1.7.9.5
+Thanks,
+-Takahiro AKASHI
+
+> Thanks,
+> Ard.
+> 
+> 
+> > +
+> > +       return csize;
+> > +}
+> > +
+> > +/**
+> > + * elfcorehdr_read - read from ELF core header
+> > + * @buf: buffer where the data is placed
+> > + * @csize: number of bytes to read
+> > + * @ppos: address in the memory
+> > + *
+> > + * This function reads @count bytes from elf core header which exists
+> > + * on crash dump kernel's memory.
+> > + */
+> > +ssize_t elfcorehdr_read(char *buf, size_t count, u64 *ppos)
+> > +{
+> > +       memcpy(buf, phys_to_virt((phys_addr_t)*ppos), count);
+> > +       return count;
+> > +}
+> > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> > index e3771c4..bba1e39 100644
+> > --- a/arch/arm64/mm/init.c
+> > +++ b/arch/arm64/mm/init.c
+> > @@ -36,6 +36,7 @@
+> >  #include <linux/efi.h>
+> >  #include <linux/swiotlb.h>
+> >  #include <linux/kexec.h>
+> > +#include <linux/crash_dump.h>
+> >
+> >  #include <asm/boot.h>
+> >  #include <asm/fixmap.h>
+> > @@ -186,6 +187,57 @@ static void __init reserve_crashkernel(void)
+> >  }
+> >  #endif /* CONFIG_KEXEC_CORE */
+> >
+> > +#ifdef CONFIG_CRASH_DUMP
+> > +static int __init early_init_dt_scan_elfcorehdr(unsigned long node,
+> > +               const char *uname, int depth, void *data)
+> > +{
+> > +       const __be32 *reg;
+> > +       int len;
+> > +
+> > +       if (depth != 1 || strcmp(uname, "chosen") != 0)
+> > +               return 0;
+> > +
+> > +       reg = of_get_flat_dt_prop(node, "linux,elfcorehdr", &len);
+> > +       if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
+> > +               return 1;
+> > +
+> > +       elfcorehdr_addr = dt_mem_next_cell(dt_root_addr_cells, &reg);
+> > +       elfcorehdr_size = dt_mem_next_cell(dt_root_size_cells, &reg);
+> > +
+> > +       return 1;
+> > +}
+> > +
+> > +/*
+> > + * reserve_elfcorehdr() - reserves memory for elf core header
+> > + *
+> > + * This function reserves elf core header given in "elfcorehdr=" kernel
+> > + * command line parameter. This region contains all the information about
+> > + * primary kernel's core image and is used by a dump capture kernel to
+> > + * access the system memory on primary kernel.
+> > + */
+> > +static void __init reserve_elfcorehdr(void)
+> > +{
+> > +       of_scan_flat_dt(early_init_dt_scan_elfcorehdr, NULL);
+> > +
+> > +       if (!elfcorehdr_size)
+> > +               return;
+> > +
+> > +       if (memblock_is_region_reserved(elfcorehdr_addr, elfcorehdr_size)) {
+> > +               pr_warn("elfcorehdr is overlapped\n");
+> > +               return;
+> > +       }
+> > +
+> > +       memblock_reserve(elfcorehdr_addr, elfcorehdr_size);
+> > +
+> > +       pr_info("Reserving %lldKB of memory at 0x%llx for elfcorehdr\n",
+> > +               elfcorehdr_size >> 10, elfcorehdr_addr);
+> > +}
+> > +#else
+> > +static void __init reserve_elfcorehdr(void)
+> > +{
+> > +       ;
+> > +}
+> > +#endif /* CONFIG_CRASH_DUMP */
+> >  /*
+> >   * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
+> >   * currently assumes that for memory starting above 4G, 32-bit devices will
+> > @@ -444,6 +496,8 @@ void __init arm64_memblock_init(void)
+> >
+> >         reserve_crashkernel();
+> >
+> > +       reserve_elfcorehdr();
+> > +
+> >         dma_contiguous_reserve(arm64_dma_phys_limit);
+> >
+> >         memblock_allow_resize();
+> > --
+> > 2.9.0
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
