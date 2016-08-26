@@ -1,113 +1,155 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 26 Aug 2016 09:46:53 +0200
-Subject: [PATCH] mtd: mxc_nand: Set timing for v2 controllers
-In-Reply-To: <1471948445-29936-1-git-send-email-s.hauer@pengutronix.de>
-References: <1471948445-29936-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20160826094653.762be9fb@bbrezillon>
+Date: Fri, 26 Aug 2016 09:47:28 +0200
+Subject: [PATCH v2 1/2] mtd: brcmnand: iProc big endian and ONFI support
+In-Reply-To: <1469051631-7896-2-git-send-email-ray.jui@broadcom.com>
+References: <1469051631-7896-1-git-send-email-ray.jui@broadcom.com>
+ <1469051631-7896-2-git-send-email-ray.jui@broadcom.com>
+Message-ID: <20160826094728.1a68f443@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Wed, 20 Jul 2016 14:53:50 -0700
+Ray Jui <ray.jui@broadcom.com> wrote:
 
-On Tue, 23 Aug 2016 12:34:05 +0200
-Sascha Hauer <s.hauer@pengutronix.de> wrote:
-
-> So far we relied on reset default or the bootloader to configure a
-> suitable clk rate for the Nand controller. This works but we can
-> optimize the timing for better performance. This sets the clk rate for
-> v2 controllers (i.MX25/35) based on the timing mode read from the ONFI
-> parameter page. This may also enable the symmetric mode (aks EDO mode)
-> if necessary which reads one word per clock cycle.
-> Tested on an i.MX25 with a Micron MT29F4G08ABBDAHC attached.
+> This patch adds big endian and ONFI support for various iProc based
+> SoCs that use the core brcmstb NAND controller
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  drivers/mtd/nand/mxc_nand.c | 41 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 41 insertions(+)
+> This patch was originally implemented by Prafulla Kota
+> <prafulla.kota@broadcom.com> and fully tested on iProc based NS2 SVK
 > 
-> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-> index 5173fad..725223c 100644
-> --- a/drivers/mtd/nand/mxc_nand.c
-> +++ b/drivers/mtd/nand/mxc_nand.c
-> @@ -1012,6 +1012,45 @@ static void preset_v1(struct mtd_info *mtd)
->  	writew(0x4, NFC_V1_V2_WRPROT);
->  }
->  
-> +static void mxc_nand_v2_set_timing(struct mtd_info *mtd, uint16_t *config1)
-> +{
-> +	struct nand_chip *nand_chip = mtd->priv;
-> +	struct mxc_nand_host *host = nand_chip->priv;
-> +	int mode, ret, tRC_min_ns;
-> +	unsigned long rate;
-> +	const struct nand_sdr_timings *timings;
-> +
-> +	mode = onfi_get_async_timing_mode(nand_chip);
-> +	if (mode == ONFI_TIMING_MODE_UNKNOWN)
-> +		return;
-> +
-> +	mode = fls(mode) - 1;
-> +	if (mode < 0)
-> +		mode = 0;
-> +
-> +	timings = onfi_async_timing_mode_to_sdr_timings(mode);
-> +	if (IS_ERR(timings))
-> +		return;
-> +
+> Signed-off-by: Prafulla Kota <prafulla.kota@broadcom.com>
+> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
 
-AFAIR, you should apply the new mode on the NAND side
-(ONFI_FEATURE_ADDR_TIMING_MODE) before applying the new config to the
-controller.
-
-See what's done here [1].
-
-Note that on all the NANDs I tested, it seems to work even if you don't
-set ONFI_FEATURE_ADDR_TIMING_MODE, but the ONFI Spec describes the
-procedure as:
-
-1/ detect supported modes
-2/ select one
-3/ apply it to the NAND using set(ONFI_FEATURE_ADDR_TIMING_MODE)
-4/ release the CS
-5/ adjust the controller setting to match the new config
-
-On a side note, I really think we should handle this timing selection in
-the core, and only ask the NAND controller drivers to adapt the
-controller settings.
+Applied.
 
 Thanks,
 
 Boris
 
-> +	tRC_min_ns = timings->tRC_min / 1000;
-> +	rate = 1000000000 / tRC_min_ns;
-> +
-> +	if (clk_round_rate(host->clk, rate) > 33333333)
-> +		/*
-> +		 * If tRC is smaller than 30ns (that is, the rate is higher
-> +		 * than 33.333MHz) we have to use EDO timing.
-> +		 */
-> +		*config1 |= NFC_V2_CONFIG1_ONE_CYCLE;
-> +	else
-> +		/* Otherwise we have two clock cycles per access. */
-> +		rate *= 2;
-> +
-> +	ret = clk_set_rate(host->clk, rate);
-> +	if (ret)
-> +		/* Don't worry, continue with old rate */
-> +		dev_err(host->dev, "failed to set clk rate: %d\n", ret);
-> +}
-> +
->  static void preset_v2(struct mtd_info *mtd)
+> ---
+>  drivers/mtd/nand/brcmnand/brcmnand.c   | 12 ++++++------
+>  drivers/mtd/nand/brcmnand/brcmnand.h   | 13 ++++++++-----
+>  drivers/mtd/nand/brcmnand/iproc_nand.c | 18 ++++++++++++++----
+>  3 files changed, 28 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
+> index b76ad7c..12a1585 100644
+> --- a/drivers/mtd/nand/brcmnand/brcmnand.c
+> +++ b/drivers/mtd/nand/brcmnand/brcmnand.c
+> @@ -1279,7 +1279,7 @@ static void brcmnand_cmdfunc(struct mtd_info *mtd, unsigned command,
+>  		u32 *flash_cache = (u32 *)ctrl->flash_cache;
+>  		int i;
+>  
+> -		brcmnand_soc_data_bus_prepare(ctrl->soc);
+> +		brcmnand_soc_data_bus_prepare(ctrl->soc, true);
+>  
+>  		/*
+>  		 * Must cache the FLASH_CACHE now, since changes in
+> @@ -1292,7 +1292,7 @@ static void brcmnand_cmdfunc(struct mtd_info *mtd, unsigned command,
+>  			 */
+>  			flash_cache[i] = be32_to_cpu(brcmnand_read_fc(ctrl, i));
+>  
+> -		brcmnand_soc_data_bus_unprepare(ctrl->soc);
+> +		brcmnand_soc_data_bus_unprepare(ctrl->soc, true);
+>  
+>  		/* Cleanup from HW quirk: restore SECTOR_SIZE_1K */
+>  		if (host->hwcfg.sector_size_1k)
+> @@ -1508,12 +1508,12 @@ static int brcmnand_read_by_pio(struct mtd_info *mtd, struct nand_chip *chip,
+>  		brcmnand_waitfunc(mtd, chip);
+>  
+>  		if (likely(buf)) {
+> -			brcmnand_soc_data_bus_prepare(ctrl->soc);
+> +			brcmnand_soc_data_bus_prepare(ctrl->soc, false);
+>  
+>  			for (j = 0; j < FC_WORDS; j++, buf++)
+>  				*buf = brcmnand_read_fc(ctrl, j);
+>  
+> -			brcmnand_soc_data_bus_unprepare(ctrl->soc);
+> +			brcmnand_soc_data_bus_unprepare(ctrl->soc, false);
+>  		}
+>  
+>  		if (oob)
+> @@ -1678,12 +1678,12 @@ static int brcmnand_write(struct mtd_info *mtd, struct nand_chip *chip,
+>  		(void)brcmnand_read_reg(ctrl, BRCMNAND_CMD_ADDRESS);
+>  
+>  		if (buf) {
+> -			brcmnand_soc_data_bus_prepare(ctrl->soc);
+> +			brcmnand_soc_data_bus_prepare(ctrl->soc, false);
+>  
+>  			for (j = 0; j < FC_WORDS; j++, buf++)
+>  				brcmnand_write_fc(ctrl, j, *buf);
+>  
+> -			brcmnand_soc_data_bus_unprepare(ctrl->soc);
+> +			brcmnand_soc_data_bus_unprepare(ctrl->soc, false);
+>  		} else if (oob) {
+>  			for (j = 0; j < FC_WORDS; j++)
+>  				brcmnand_write_fc(ctrl, j, 0xffffffff);
+> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.h b/drivers/mtd/nand/brcmnand/brcmnand.h
+> index ef5eabb..5c44cd4 100644
+> --- a/drivers/mtd/nand/brcmnand/brcmnand.h
+> +++ b/drivers/mtd/nand/brcmnand/brcmnand.h
+> @@ -23,19 +23,22 @@ struct dev_pm_ops;
+>  struct brcmnand_soc {
+>  	bool (*ctlrdy_ack)(struct brcmnand_soc *soc);
+>  	void (*ctlrdy_set_enabled)(struct brcmnand_soc *soc, bool en);
+> -	void (*prepare_data_bus)(struct brcmnand_soc *soc, bool prepare);
+> +	void (*prepare_data_bus)(struct brcmnand_soc *soc, bool prepare,
+> +				 bool is_param);
+>  };
+>  
+> -static inline void brcmnand_soc_data_bus_prepare(struct brcmnand_soc *soc)
+> +static inline void brcmnand_soc_data_bus_prepare(struct brcmnand_soc *soc,
+> +						 bool is_param)
 >  {
->  	struct nand_chip *nand_chip = mtd_to_nand(mtd);
-> @@ -1020,6 +1059,8 @@ static void preset_v2(struct mtd_info *mtd)
+>  	if (soc && soc->prepare_data_bus)
+> -		soc->prepare_data_bus(soc, true);
+> +		soc->prepare_data_bus(soc, true, is_param);
+>  }
 >  
->  	config1 |= NFC_V2_CONFIG1_FP_INT;
+> -static inline void brcmnand_soc_data_bus_unprepare(struct brcmnand_soc *soc)
+> +static inline void brcmnand_soc_data_bus_unprepare(struct brcmnand_soc *soc,
+> +						   bool is_param)
+>  {
+>  	if (soc && soc->prepare_data_bus)
+> -		soc->prepare_data_bus(soc, false);
+> +		soc->prepare_data_bus(soc, false, is_param);
+>  }
 >  
-> +	mxc_nand_v2_set_timing(mtd, &config1);
-> +
->  	if (!host->devtype_data->irqpending_quirk)
->  		config1 |= NFC_V1_V2_CONFIG1_INT_MSK;
+>  static inline u32 brcmnand_readl(void __iomem *addr)
+> diff --git a/drivers/mtd/nand/brcmnand/iproc_nand.c b/drivers/mtd/nand/brcmnand/iproc_nand.c
+> index 585596c..4c6ae11 100644
+> --- a/drivers/mtd/nand/brcmnand/iproc_nand.c
+> +++ b/drivers/mtd/nand/brcmnand/iproc_nand.c
+> @@ -74,7 +74,8 @@ static void iproc_nand_intc_set(struct brcmnand_soc *soc, bool en)
+>  	spin_unlock_irqrestore(&priv->idm_lock, flags);
+>  }
 >  
-
-[1]http://lxr.free-electrons.com/source/drivers/mtd/nand/sunxi_nand.c#L1406
+> -static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare)
+> +static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare,
+> +				  bool is_param)
+>  {
+>  	struct iproc_nand_soc *priv =
+>  			container_of(soc, struct iproc_nand_soc, soc);
+> @@ -86,10 +87,19 @@ static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare)
+>  
+>  	val = brcmnand_readl(mmio);
+>  
+> -	if (prepare)
+> -		val |= IPROC_NAND_APB_LE_MODE;
+> -	else
+> +	/*
+> +	 * In the case of BE or when dealing with NAND data, alway configure
+> +	 * the APB bus to LE mode before accessing the FIFO and back to BE mode
+> +	 * after the access is done
+> +	 */
+> +	if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN) || !is_param) {
+> +		if (prepare)
+> +			val |= IPROC_NAND_APB_LE_MODE;
+> +		else
+> +			val &= ~IPROC_NAND_APB_LE_MODE;
+> +	} else { /* when in LE accessing the parameter page, keep APB in BE */
+>  		val &= ~IPROC_NAND_APB_LE_MODE;
+> +	}
+>  
+>  	brcmnand_writel(val, mmio);
+>  
