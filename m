@@ -1,30 +1,22 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 26 Aug 2016 13:14:01 +0200
-Subject: [PATCH v2] arm64: dts: rockchip: fix the address map for WDT0 and
- WDT1
-In-Reply-To: <1472208482-30862-1-git-send-email-zhengxing@rock-chips.com>
-References: <1472208482-30862-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <17136512.4k6A6uo3GV@diego>
+Date: Fri, 26 Aug 2016 13:14:41 +0200
+Subject: [PATCH] arm64: dts: rockchip: set to CCI clock of RK3399 to 600M
+In-Reply-To: <1472169644-32560-1-git-send-email-wxt@rock-chips.com>
+References: <1472169644-32560-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1567485.qxkgRg37m7@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 26. August 2016, 18:48:01 schrieb Xing Zheng:
-> To rename "watchdog" to "watchdog0" explicitly for looking up.
-> Dues to incorrect description in the TRM, the WDTs base address
-> should be fixed and swap them like this:
-> WDT0 - 0xff848000
-> WDT1 - 0xff840000
+Am Freitag, 26. August 2016, 08:00:44 schrieb Caesar Wang:
+> From: Shunqian Zheng <zhengsq@rock-chips.com>
 > 
-> And, it is right that only WDT0 can generate global software reset.
-> We will update the TRM to fix it.
+> Per testing, this can reduce the memory latency and d8 gets
+> better socres.
 > 
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+> Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 
-I had applied v1 already, so I have now just amended it with the watchdog0
-change [0]. In any case the fix is in my dts64 branch for 4.9 now.
+applied to my dts64 branch for 4.9
 
-
+Thanks
 Heiko
-
-
-[0] https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commit/?id=8859d81a562e484f06712fadb8886d78ed0be851
