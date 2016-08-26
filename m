@@ -1,39 +1,22 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Fri, 26 Aug 2016 14:22:30 +0800
-Subject: [PATCH] arm64: dts: rockchip: fix the address map for WDT0 and WDT1
-Message-ID: <1472192551-16754-1-git-send-email-zhengxing@rock-chips.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Fri, 26 Aug 2016 08:27:20 +0200
+Subject: [PATCH 00/44] usb: don't print on ENOMEM
+In-Reply-To: <20160825173947.26624-1-wsa-dev@sang-engineering.com>
+References: <20160825173947.26624-1-wsa-dev@sang-engineering.com>
+Message-ID: <20160826082720.39f1e394@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dues to incorrect description in the TRM, the WDTs base address
-should be fixed and swap them like this:
-WDT0 - 0xff848000
-WDT1 - 0xff840000
+Hi,
 
-And, it is right that only WDT0 can generate global software reset.
-We will update the TRM to fix it.
+On Thu, 25 Aug 2016 19:38:52 +0200 Wolfram Sang wrote:
+> Here is my next series to save memory by removing unneeded strings. It removes
+> in the usb subsystem all unspecific error messages after calling malloc-based
+> functions, i.e. (devm_)k[zcm]alloc. kmalloc prints enough information in that
+> case. If the message was specific (e.g. "can't save CLEAR_TT_BUFFER state"), I
+> left it. This series saves ~4.5KB of "out of memory" permutations in .text and
+> .rodata. For modified lines, (x == NULL) was replaced with (!NULL) as well.
+s/!NULL/!x/
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
----
 
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index bc86e8c..f0f52c1 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1002,9 +1002,9 @@
- 		};
- 	};
- 
--	watchdog at ff840000 {
-+	watchdog at ff848000 {
- 		compatible = "snps,dw-wdt";
--		reg = <0x0 0xff840000 0x0 0x100>;
-+		reg = <0x0 0xff848000 0x0 0x100>;
- 		clocks = <&cru PCLK_WDT>;
- 		interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
- 	};
--- 
-1.9.1
+Lothar Wa?mann
