@@ -1,24 +1,34 @@
-From: linux@dominikbrodowski.net (Dominik Brodowski)
-Date: Sat, 27 Aug 2016 14:05:22 +0200
-Subject: [PATCH] pcmcia: ds: fix suspend/resume
-In-Reply-To: <E1bbFKU-0001OO-RA@rmk-PC.armlinux.org.uk>
-References: <E1bbFKU-0001OO-RA@rmk-PC.armlinux.org.uk>
-Message-ID: <20160827120522.GA3933@light.dominikbrodowski.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 27 Aug 2016 14:15:45 +0200
+Subject: [PATCH] clk: sunxi-ng: Fix wrong reset register offsets
+In-Reply-To: <1472210653-32170-1-git-send-email-jorik@kippendief.biz>
+References: <1472210653-32170-1-git-send-email-jorik@kippendief.biz>
+Message-ID: <20160827121545.GT3165@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Hi,
 
-On Sun, Aug 21, 2016 at 12:05:30AM +0100, Russell King wrote:
-> PCMCIA suspend/resume no longer works since the commit mentioned below,
-> as the callbacks are no longer made.  Convert the driver to the new
-> dev_pm_ops, which restores the suspend/resume functionality.  Tested on
-> the arm arch Assabet platform with a pcnet_cs CF card.
+Thanks a lot for your patch.
+
+On Fri, Aug 26, 2016 at 01:24:13PM +0200, jorik at kippendief.biz wrote:
+> From: Jorik Jonker <jorik@kippendief.biz>
 > 
-> Fixes: aa8e54b559479 ("PM / sleep: Go direct_complete if driver has no callbacks")
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> The reset register offsets for UART*, I2C* and SCR were off by a few bytes.
 
-Looks goot to me. Can you push it upstream, please?
+You're missing your signed-off-by though. Could you resend it with it?
 
-Best
-	Dominik
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160827/09779014/attachment.sig>
