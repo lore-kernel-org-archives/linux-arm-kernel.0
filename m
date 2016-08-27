@@ -1,44 +1,71 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Sat, 27 Aug 2016 15:43:44 +0200
-Subject: [PATCH v3 2/6] documentation: Add secure monitor bindings
- documentation
+Date: Sat, 27 Aug 2016 15:43:48 +0200
+Subject: [PATCH v3 6/6] ARM64: dts: amlogic: gxbb: Enable NVMEM
 In-Reply-To: <1472305428-16874-1-git-send-email-carlo@caione.org>
 References: <1472305428-16874-1-git-send-email-carlo@caione.org>
-Message-ID: <1472305428-16874-3-git-send-email-carlo@caione.org>
+Message-ID: <1472305428-16874-7-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Carlo Caione <carlo@endlessm.com>
 
-Add the binding documentation for the Amlogic secure monitor driver.
+Add the NVMEM device node in the DTSI.
 
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Carlo Caione <carlo@endlessm.com>
 ---
- .../devicetree/bindings/firmware/meson/meson_sm.txt       | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 18 ++++++++++++++++++
+ drivers/firmware/meson/meson_sm.c           |  3 ++-
+ 2 files changed, 20 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
-new file mode 100644
-index 0000000..c248cd4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
-@@ -0,0 +1,15 @@
-+* Amlogic Secure Monitor
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index ca428e8..aea8fd6 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -105,6 +105,24 @@
+ 		};
+ 	};
+ 
++	efuse: efuse {
++		compatible = "amlogic,meson-gxbb-efuse";
++		#address-cells = <1>;
++		#size-cells = <1>;
 +
-+In the Amlogic SoCs the Secure Monitor code is used to provide access to the
-+NVMEM, enable JTAG, set USB boot, etc...
++		sn: sn at 14 {
++			reg = <0x14 0x10>;
++		};
 +
-+Required properties for the secure monitor node:
-+- compatible: Should be "amlogic,meson-gxbb-sm"
++		eth_mac: eth_mac at 34 {
++			reg = <0x34 0x10>;
++		};
 +
-+Example:
-+
-+	firmware {
-+		sm: secure-monitor {
-+			compatible = "amlogic,meson-gxbb-sm";
++		bid: bid at 46 {
++			reg = <0x46 0x30>;
 +		};
 +	};
++
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupts = <GIC_PPI 13
+diff --git a/drivers/firmware/meson/meson_sm.c b/drivers/firmware/meson/meson_sm.c
+index bba594e..b0d2549 100644
+--- a/drivers/firmware/meson/meson_sm.c
++++ b/drivers/firmware/meson/meson_sm.c
+@@ -21,6 +21,7 @@
+ #include <linux/of_device.h>
+ #include <linux/printk.h>
+ #include <linux/types.h>
++#include <linux/sizes.h>
+ 
+ #include <linux/firmware/meson/meson_sm.h>
+ 
+@@ -38,7 +39,7 @@ struct meson_sm_chip {
+ };
+ 
+ struct meson_sm_chip gxbb_chip = {
+-	.shmem_size		= 0x1000,
++	.shmem_size		= SZ_4K,
+ 	.cmd_shmem_in_base	= 0x82000020,
+ 	.cmd_shmem_out_base	= 0x82000021,
+ 	.cmd = {
 -- 
 2.7.4
