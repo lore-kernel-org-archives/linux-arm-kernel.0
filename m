@@ -1,76 +1,70 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Sat, 27 Aug 2016 23:05:20 +0800
-Subject: [PATCH 2/2] arm64: dts: rockchip: add eMMC's power domain support
- for rk3399
-In-Reply-To: <20160827134103.28160-3-xzy.xu@rock-chips.com>
-References: <20160827134103.28160-1-xzy.xu@rock-chips.com>
- <20160827134103.28160-3-xzy.xu@rock-chips.com>
-Message-ID: <2ab8ab94-fa4d-2cd6-5805-a92ac5f9697e@rock-chips.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 27 Aug 2016 17:30:42 +0200
+Subject: [PATCH] smc91x: remove ARM hack for unaligned 16-bit writes
+References: <20160825144314.1850730-1-arnd@arndb.de>
+ <3062310.z9h3CgCZ7p@wuerfel> <87inuopw04.fsf@belgarion.home>
+ <20160825223743.GK1041@n2100.armlinux.org.uk>
+Message-ID: <87vaymdyal.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/8/27 21:41, Ziyuan Xu wrote:
-> Control power domain for eMMC via genpd to reduce power consumption.
->
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-> Signed-off-by: Ziyuan Xu <xzy.xu@rock-chips.com>
->
+Russell King - ARM Linux <linux@armlinux.org.uk> writes:
 
-It looks nice to me. But this should be merged after applying that[0]
-as your patch will break bind/unbind test for sdhci-of-arasan on rk3399
-without it[0]. Moreover, Elaine should make sure that upstreamed
-rockchip power domain stuff would not off pd for emmc, *otherwise*, I
-should update my patch to make sure we update clkmul every time when
-doing suspend 2 resume..
+> On Thu, Aug 25, 2016 at 08:02:35PM +0200, Robert Jarzmik wrote:
+>> Arnd Bergmann <arnd@arndb.de> writes:
+>> 
+>> > On Thursday, August 25, 2016 4:43:04 PM CEST Arnd Bergmann wrote:
+>> >>  drivers/net/ethernet/smsc/smc91x.h | 50 +++++++++++++++++++++++---------------
+>> >>  1 file changed, 30 insertions(+), 20 deletions(-)
+>> >> 
+>> >> While this patch fixes one bug on Neponset, it probably doesn't address
+>> >> the one that Russell ran into first, so this is for review only for now,
+>> >> until the remaining problem(s) have been worked out.
+>> >> 
+>> >
+>> > The comment should have been on another patch, my mistake. please
+>> > see v2.
+>> >
+>> > 	Arnd
+>> 
+>> Hi Arnd,
+>> 
+>> I didn't review the patch thoroughly, but I launched your 2 patches in my pxa
+>> little farm.
+>> 
+>> The result is that lubbock and mainstone are all right, but zylonite is broken
+>> (ie. networkless). I removed then these 2 patches and zylonite worked again.
+>> 
+>> I have also an error message on the console on a "broken" zylonite :
+>>   Changing smcs91x MAC address to 08:00:3e:26:0a:5b: ifconfig: SIOCSIFHWADDR:
+>>   Device or resource busy
+>> 
+>> I reran the test twice (2 times with your patches, 2 times without), the result
+>> looks consistent, ie. zylonite doesn't really like them.
+>
+> Please try the patch below.  I sent this to Will a few days ago, as
+> he said (on irc) that he was also seeing problems on a platform he
+> had, but I've yet to hear back.  I've not posted it yet because I
+> haven't got around to writing a commit description for it.
+>
+> It does require that at least one of 8-bit or 16-bit accesses are
+> supported, but I think that's already true.
 
+Hi Russell,
 
+With your patch :
+ - lubbock, mainstone and zylonite boards are working correctly
+   => ie. all my boards are working correctly
 
-[0]: https://patchwork.kernel.org/patch/9300971/
+ - the message "ifconfig: SIOCSIFHWADDR: Device or resource busy" is still there
+   => this message is here even without your patch, so it's rather not relevant
+   => this message is triggered by an "/sbin/ifconfig eth0 hw ether
+   08:00:3e:26:0a:5b" command
 
-> ---
->
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 11 +++++++++++
->  1 file changed, 11 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> index 32aebc8..71733d4 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> @@ -239,6 +239,7 @@
->  		#clock-cells = <0>;
->  		phys = <&emmc_phy>;
->  		phy-names = "phy_arasan";
-> +		power-domains = <&power RK3399_PD_EMMC>;
->  		status = "disabled";
->  	};
->
-> @@ -611,6 +612,11 @@
->  		status = "disabled";
->  	};
->
-> +	qos_emmc: qos at ffa58000 {
-> +		compatible = "syscon";
-> +		reg = <0x0 0xffa58000 0x0 0x20>;
-> +	};
-> +
->  	qos_hdcp: qos at ffa90000 {
->  		compatible = "syscon";
->  		reg = <0x0 0xffa90000 0x0 0x20>;
-> @@ -739,6 +745,11 @@
->  			};
->
->  			/* These power domains are grouped by VD_LOGIC */
-> +			pd_emmc at RK3399_PD_EMMC {
-> +				reg = <RK3399_PD_EMMC>;
-> +				clocks = <&cru ACLK_EMMC>;
-> +				pm_qos = <&qos_emmc>;
-> +			};
->  			pd_vio at RK3399_PD_VIO {
->  				reg = <RK3399_PD_VIO>;
->  				#address-cells = <1>;
->
+So from a PXA testing point of view it's all good, ie.
+Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
+Cheers.
 
 -- 
-Best Regards
-Shawn Lin
+Robert
