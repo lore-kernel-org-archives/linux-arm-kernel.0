@@ -1,74 +1,37 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 27 Aug 2016 15:55:37 +0800
-Subject: [PATCH v2 1/8] mfd: axp20x: Add bindings for AXP806 PMIC
+Date: Sat, 27 Aug 2016 15:55:41 +0800
+Subject: [PATCH v2 5/8] ARM: dts: sun9i: cubieboard4: Declare AXP809 SW
+ regulator as unused
 In-Reply-To: <20160827075544.26316-1-wens@csie.org>
 References: <20160827075544.26316-1-wens@csie.org>
-Message-ID: <20160827075544.26316-2-wens@csie.org>
+Message-ID: <20160827075544.26316-6-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the basic and regulator bindings for the X-Powers AXP806
-PMIC.
+The AXP809's SW (switch) regulator is unused on the Cubieboard 4.
+Add an empty node for it so that the OS can generate constraints.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
 Changes since v1: none
 ---
- Documentation/devicetree/bindings/mfd/axp20x.txt | 28 ++++++++++++++++++++++--
- 1 file changed, 26 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-index 585a95546288..8f3ad9ab4637 100644
---- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-+++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-@@ -10,7 +10,8 @@ axp809 (X-Powers)
- 
- Required properties:
- - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
--	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp809"
-+	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp806",
-+	      "x-powers,axp809"
- - reg: The I2C slave address or RSB hardware address for the AXP chip
- - interrupt-parent: The parent interrupt controller
- - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
-@@ -47,7 +48,6 @@ Optional properties for DCDC regulators:
- 			  probably makes sense for HiFi audio related
- 			  applications that aren't battery constrained.
- 
--
- AXP202/AXP209 regulators, type, and corresponding input supply names:
- 
- Regulator	  Type		  Supply Name		  Notes
-@@ -86,6 +86,30 @@ LDO_IO1		: LDO		: ips-supply		: GPIO 1
- RTC_LDO		: LDO		: ips-supply		: always on
- DRIVEVBUS	: Enable output	: drivevbus-supply	: external regulator
- 
-+AXP806 regulators, type, and corresponding input supply names:
+diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+index 04b014603659..910b29f0f0b5 100644
+--- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
++++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+@@ -253,6 +253,10 @@
+ 			reg_rtc_ldo: rtc_ldo {
+ 				regulator-name = "vcc-rtc-vdd1v8-io";
+ 			};
 +
-+Regulator	  Type		  Supply Name		  Notes
-+---------	  ----		  -----------		  -----
-+DCDCA		: DC-DC buck	: vina-supply		: poly-phase capable
-+DCDCB		: DC-DC buck	: vinb-supply		: poly-phase capable
-+DCDCC		: DC-DC	buck	: vinc-supply		: poly-phase capable
-+DCDCD		: DC-DC	buck	: vind-supply		: poly-phase capable
-+DCDCE		: DC-DC	buck	: vine-supply		: poly-phase capable
-+ALDO1		: LDO		: aldoin-supply		: shared supply
-+ALDO2		: LDO		: aldoin-supply		: shared supply
-+ALDO3		: LDO		: aldoin-supply		: shared supply
-+BLDO1		: LDO		: bldoin-supply		: shared supply
-+BLDO2		: LDO		: bldoin-supply		: shared supply
-+BLDO3		: LDO		: bldoin-supply		: shared supply
-+BLDO4		: LDO		: bldoin-supply		: shared supply
-+CLDO1		: LDO		: cldoin-supply		: shared supply
-+CLDO2		: LDO		: cldoin-supply		: shared supply
-+CLDO3		: LDO		: cldoin-supply		: shared supply
-+SW		: On/Off Switch : swin-supply
-+
-+Additionally, the AXP806 DC-DC regulators support poly-phase arrangements
-+for higher output current. The possible groupings are: A+B, A+B+C, D+E.
-+
- AXP809 regulators, type, and corresponding input supply names:
++			sw {
++				/* unused */
++			};
+ 		};
+ 	};
  
- Regulator	  Type		  Supply Name		  Notes
 -- 
 2.9.3
