@@ -1,7 +1,7 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Sat, 27 Aug 2016 17:28:54 +0100
-Subject: [PATCH] net: smc91x: fix SMC accesses
-Message-ID: <E1bdgTW-0004gV-2n@rmk-PC.armlinux.org.uk>
+Date: Sat, 27 Aug 2016 17:33:03 +0100
+Subject: [PATCH v2] net: smc91x: fix SMC accesses
+Message-ID: <E1bdgXX-0005I4-1N@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -48,6 +48,9 @@ this approach and to confirm that what I've said above is correct.
 I'm not asking for you to test it.
 
 Thanks.
+
+Sorry, v2 against mainline rather than with some of my other SMC91x
+changes.  Please ignore the previous version.
 
  arch/arm/mach-pxa/idp.c                    |  3 +-
  arch/arm/mach-pxa/xcep.c                   |  3 +-
@@ -144,10 +147,10 @@ index f35525b55819..57d1c43726d9 100644
  	.ledb = RPC_LED_TX_RX,
  };
 diff --git a/drivers/net/ethernet/smsc/smc91x.c b/drivers/net/ethernet/smsc/smc91x.c
-index d864cebe4e5f..301b2ae5aea9 100644
+index 726b80f45906..503a3b6dce91 100644
 --- a/drivers/net/ethernet/smsc/smc91x.c
 +++ b/drivers/net/ethernet/smsc/smc91x.c
-@@ -2270,6 +2270,13 @@ static int smc_drv_probe(struct platform_device *pdev)
+@@ -2275,6 +2275,13 @@ static int smc_drv_probe(struct platform_device *pdev)
  	if (pd) {
  		memcpy(&lp->cfg, pd, sizeof(lp->cfg));
  		lp->io_shift = SMC91X_IO_SHIFT(lp->cfg.flags);
@@ -160,9 +163,9 @@ index d864cebe4e5f..301b2ae5aea9 100644
 +		}
  	}
  
- 	lp->oscen_gpio = devm_gpiod_get_optional(&pdev->dev, "oscen",
+ #if IS_BUILTIN(CONFIG_OF)
 diff --git a/drivers/net/ethernet/smsc/smc91x.h b/drivers/net/ethernet/smsc/smc91x.h
-index 5f9e69abb89f..fd3a99db04fc 100644
+index 1a55c7976df0..e17671c9d1b0 100644
 --- a/drivers/net/ethernet/smsc/smc91x.h
 +++ b/drivers/net/ethernet/smsc/smc91x.h
 @@ -37,6 +37,27 @@
@@ -234,7 +237,7 @@ index 5f9e69abb89f..fd3a99db04fc 100644
  {
  	if ((machine_is_mainstone() || machine_is_stargate2() ||
  	     machine_is_pxa_idp()) && reg & 2) {
-@@ -417,24 +458,8 @@ smc_pxa_dma_insw(void __iomem *ioaddr, struct smc_local *lp, int reg, int dma,
+@@ -416,24 +457,8 @@ smc_pxa_dma_insw(void __iomem *ioaddr, struct smc_local *lp, int reg, int dma,
  
  #if ! SMC_CAN_USE_16BIT
  
