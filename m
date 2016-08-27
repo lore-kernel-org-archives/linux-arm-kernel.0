@@ -1,37 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 27 Aug 2016 14:04:09 +0200
-Subject: [PATCH v2] ARM: dts: sun8i: Add dts file for inet-d978_rev2
- tablets
-In-Reply-To: <20160826102356.9524-1-icenowy@aosc.xyz>
-References: <20160826102356.9524-1-icenowy@aosc.xyz>
-Message-ID: <20160827120409.GR3165@lukather>
+From: linux@dominikbrodowski.net (Dominik Brodowski)
+Date: Sat, 27 Aug 2016 14:05:22 +0200
+Subject: [PATCH] pcmcia: ds: fix suspend/resume
+In-Reply-To: <E1bbFKU-0001OO-RA@rmk-PC.armlinux.org.uk>
+References: <E1bbFKU-0001OO-RA@rmk-PC.armlinux.org.uk>
+Message-ID: <20160827120522.GA3933@light.dominikbrodowski.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2016 at 06:23:56PM +0800, Icenowy Zheng wrote:
-> The inet-d978_rev2 is a pcb used in generic A33 based tablets. It features
-> volume buttons, micro-usb otg, headphone connector and a power button.
-> 
-> On the board a Realtek RTL8723BS SDIO Wi-Fi module are soldered, and there
-> is also a accompanied board which has a Goodix GT9271 soldered.
-> 
-> As this board is desired to create tablets with a Home key dealed by
-> GT9271, a LED is present at the front panel at the position of the
-> Home key.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Russell,
 
-Applied, thanks!
-Maxime
+On Sun, Aug 21, 2016 at 12:05:30AM +0100, Russell King wrote:
+> PCMCIA suspend/resume no longer works since the commit mentioned below,
+> as the callbacks are no longer made.  Convert the driver to the new
+> dev_pm_ops, which restores the suspend/resume functionality.  Tested on
+> the arm arch Assabet platform with a pcnet_cs CF card.
+> 
+> Fixes: aa8e54b559479 ("PM / sleep: Go direct_complete if driver has no callbacks")
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160827/b751e235/attachment.sig>
+Looks goot to me. Can you push it upstream, please?
+
+Best
+	Dominik
