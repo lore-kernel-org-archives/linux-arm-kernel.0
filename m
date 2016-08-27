@@ -1,10 +1,10 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 27 Aug 2016 15:55:43 +0800
-Subject: [PATCH v2 7/8] ARM: dts: sun9i: cubieboard4: Add AXP806 PMIC device
+Date: Sat, 27 Aug 2016 15:55:42 +0800
+Subject: [PATCH v2 6/8] ARM: dts: sun9i: a80-optimus: Add AXP806 PMIC device
  node and regulators
 In-Reply-To: <20160827075544.26316-1-wens@csie.org>
 References: <20160827075544.26316-1-wens@csie.org>
-Message-ID: <20160827075544.26316-8-wens@csie.org>
+Message-ID: <20160827075544.26316-7-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,14 +19,14 @@ Changes since v1:
   - Fixed up bldo* voltage constraints to match regulator voltage step.
 
 ---
- arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 112 ++++++++++++++++++++++++++++
- 1 file changed, 112 insertions(+)
+ arch/arm/boot/dts/sun9i-a80-optimus.dts | 113 ++++++++++++++++++++++++++++++++
+ 1 file changed, 113 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
-index 910b29f0f0b5..439847acd41e 100644
---- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
-+++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
-@@ -260,6 +260,118 @@
+diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+index caf0091e71ba..d805cb50b5c8 100644
+--- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
++++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+@@ -332,6 +332,118 @@
  		};
  	};
  
@@ -145,5 +145,13 @@ index 910b29f0f0b5..439847acd41e 100644
  	ac100: codec at e89 {
  		compatible = "x-powers,ac100";
  		reg = <0xe89>;
+@@ -371,6 +483,7 @@
+ };
+ 
+ &usbphy2 {
++	phy-supply = <&reg_bldo4>;
+ 	status = "okay";
+ };
+ 
 -- 
 2.9.3
