@@ -1,80 +1,54 @@
-From: jitao.shi@mediatek.com (Jitao Shi)
-Date: Sat, 27 Aug 2016 14:44:22 +0800
-Subject: [v17 1/2] Documentation: bridge: Add documentation for ps8640 DT
- properties
-Message-ID: <1472280263-18177-1-git-send-email-jitao.shi@mediatek.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Sat, 27 Aug 2016 16:02:07 +0800
+Subject: [PATCH v7 03/14] arm64/numa: add nid check for memory block
+In-Reply-To: <20160826123929.GA30302@arm.com>
+References: <1472024693-12912-1-git-send-email-thunder.leizhen@huawei.com>
+ <1472024693-12912-4-git-send-email-thunder.leizhen@huawei.com>
+ <20160826123929.GA30302@arm.com>
+Message-ID: <57C148FF.3060506@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation for DT properties supported by
-ps8640 DSI-eDP converter.
 
-Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
----
-Changes since v16:
- - No change.
 
-Changes since v15:
- - No change.
+On 2016/8/26 20:39, Will Deacon wrote:
+> On Wed, Aug 24, 2016 at 03:44:42PM +0800, Zhen Lei wrote:
+>> Use the same tactic to cpu and numa-distance nodes.
+>>
+>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>> ---
+>>  drivers/of/of_numa.c | 5 +++++
+>>  1 file changed, 5 insertions(+)
+> 
+> The subject has arm64/numa, but this is clearly core OF code and
+I originally added below check in arch/arm64/mm/numa.c, until Hanjun Guo
+told me that it should move into drivers/of/of_numa.c
 
-Changes since v14:
- - change mode-sel-gpios as optional.
----
- .../devicetree/bindings/display/bridge/ps8640.txt  |   44 ++++++++++++++++++++
- 1 file changed, 44 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/bridge/ps8640.txt
+I forgot updating this.
 
-diff --git a/Documentation/devicetree/bindings/display/bridge/ps8640.txt b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
-new file mode 100644
-index 0000000..7b13f92
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
-@@ -0,0 +1,44 @@
-+ps8640-bridge bindings
-+
-+Required properties:
-+	- compatible: "parade,ps8640"
-+	- reg: first page address of the bridge.
-+	- sleep-gpios: OF device-tree gpio specification for PD pin.
-+	- reset-gpios: OF device-tree gpio specification for reset pin.
-+	- vdd12-supply: OF device-tree regulator specification for 1.2V power.
-+	- vdd33-supply: OF device-tree regulator specification for 3.3V power.
-+	- ports: The device node can contain video interface port nodes per
-+		 the video-interfaces bind[1]. For port at 0,set the reg = <0> as
-+		 ps8640 dsi in and port at 1,set the reg = <1> as ps8640 eDP out.
-+
-+Optional properties:
-+	- mode-sel-gpios: OF device-tree gpio specification for mode-sel pin.
-+[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
-+
-+Example:
-+	edp-bridge at 18 {
-+		compatible = "parade,ps8640";
-+		reg = <0x18>;
-+		sleep-gpios = <&pio 116 GPIO_ACTIVE_LOW>;
-+		reset-gpios = <&pio 115 GPIO_ACTIVE_LOW>;
-+		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
-+		vdd12-supply = <&ps8640_fixed_1v2>;
-+		vdd33-supply = <&mt6397_vgp2_reg>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			port at 0 {
-+				reg = <0>;
-+				ps8640_in: endpoint {
-+					remote-endpoint = <&dsi0_out>;
-+				};
-+			};
-+			port at 1 {
-+				reg = <1>;
-+				ps8640_out: endpoint {
-+					remote-endpoint = <&panel_in>;
-+				};
-+			};
-+		};
-+	};
--- 
-1.7.9.5
+> requires an ack from Rob.
+> 
+> The commit message also doesn't make much sense to me.
+> 
+>> diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
+>> index 7b3fbdc..afaeb9c 100644
+>> --- a/drivers/of/of_numa.c
+>> +++ b/drivers/of/of_numa.c
+>> @@ -75,6 +75,11 @@ static int __init of_numa_parse_memory_nodes(void)
+>>  			 */
+>>  			continue;
+>>
+>> +		if (nid >= MAX_NUMNODES) {
+>> +			pr_warn("NUMA: Node id %u exceeds maximum value\n", nid);
+>> +			return -EINVAL;
+>> +		}
+> 
+> Do you really want to return from the function here? Shouldn't we at least
+> of_node_put(np), i.e. by using a break; ?
+Thanks for pointing out this mistake. I will change to "r = -EINVAL" in the next version.
+
+> 
+> Will
+> 
+> .
+> 
