@@ -1,58 +1,60 @@
-From: xzy.xu@rock-chips.com (Ziyuan Xu)
-Date: Sat, 27 Aug 2016 21:41:03 +0800
-Subject: [PATCH 2/2] arm64: dts: rockchip: add eMMC's power domain support for
- rk3399
-In-Reply-To: <20160827134103.28160-1-xzy.xu@rock-chips.com>
-References: <20160827134103.28160-1-xzy.xu@rock-chips.com>
-Message-ID: <20160827134103.28160-3-xzy.xu@rock-chips.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Sat, 27 Aug 2016 15:43:42 +0200
+Subject: [PATCH v3 0/6] Add Amlogic secure monitor and NVMEM drivers
+Message-ID: <1472305428-16874-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Control power domain for eMMC via genpd to reduce power consumption.
+From: Carlo Caione <carlo@endlessm.com>
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-Signed-off-by: Ziyuan Xu <xzy.xu@rock-chips.com>
+I decided to respin again the secure monitor driver this time with the NVMEM
+driver in the same patchset to have a clear view on how a generic driver can
+use the monitor.
 
----
+The latest patchset for the secure monitor with the Changelog is here [1].
 
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+[1] http://www.spinics.net/lists/arm-kernel/msg510441.html
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 32aebc8..71733d4 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -239,6 +239,7 @@
- 		#clock-cells = <0>;
- 		phys = <&emmc_phy>;
- 		phy-names = "phy_arasan";
-+		power-domains = <&power RK3399_PD_EMMC>;
- 		status = "disabled";
- 	};
- 
-@@ -611,6 +612,11 @@
- 		status = "disabled";
- 	};
- 
-+	qos_emmc: qos at ffa58000 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffa58000 0x0 0x20>;
-+	};
-+
- 	qos_hdcp: qos at ffa90000 {
- 		compatible = "syscon";
- 		reg = <0x0 0xffa90000 0x0 0x20>;
-@@ -739,6 +745,11 @@
- 			};
- 
- 			/* These power domains are grouped by VD_LOGIC */
-+			pd_emmc at RK3399_PD_EMMC {
-+				reg = <RK3399_PD_EMMC>;
-+				clocks = <&cru ACLK_EMMC>;
-+				pm_qos = <&qos_emmc>;
-+			};
- 			pd_vio at RK3399_PD_VIO {
- 				reg = <RK3399_PD_VIO>;
- 				#address-cells = <1>;
+Changelog:
+v3:
+  - Add missing ACKs
+  - s/0x1000/SZ_4K/
+v2:
+  - nvmem driver not using regmap anymore
+  - headers list cleanup
+  - disable sm driver for !4K kernels
+  - removed meson_sm_get_fw()
+  - better debug printing
+  - general cleanup  
+
+Carlo Caione (6):
+  firmware: Amlogic: Add secure monitor driver
+  documentation: Add secure monitor bindings documentation
+  ARM64: dts: amlogic: gxbb: Enable secure monitor
+  nvmem: amlogic: Add Amlogic Meson EFUSE driver
+  documentation: Add nvmem bindings documentation
+  ARM64: dts: amlogic: gxbb: Enable NVMEM
+
+ .../bindings/firmware/meson/meson_sm.txt           |  15 ++
+ .../devicetree/bindings/nvmem/amlogic-efuse.txt    |  39 ++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  24 ++
+ drivers/firmware/Kconfig                           |   1 +
+ drivers/firmware/Makefile                          |   1 +
+ drivers/firmware/meson/Kconfig                     |   9 +
+ drivers/firmware/meson/Makefile                    |   1 +
+ drivers/firmware/meson/meson_sm.c                  | 248 +++++++++++++++++++++
+ drivers/nvmem/Kconfig                              |  10 +
+ drivers/nvmem/Makefile                             |   2 +
+ drivers/nvmem/meson-efuse.c                        |  93 ++++++++
+ include/linux/firmware/meson/meson_sm.h            |  31 +++
+ 12 files changed, 474 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+ create mode 100644 Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
+ create mode 100644 drivers/firmware/meson/Kconfig
+ create mode 100644 drivers/firmware/meson/Makefile
+ create mode 100644 drivers/firmware/meson/meson_sm.c
+ create mode 100644 drivers/nvmem/meson-efuse.c
+ create mode 100644 include/linux/firmware/meson/meson_sm.h
+
 -- 
-2.9.2
+2.7.4
