@@ -1,48 +1,53 @@
-From: jorik@kippendief.biz (jorik at kippendief.biz)
-Date: Sat, 27 Aug 2016 21:04:33 +0200
-Subject: [PATCH] clk: sunxi-ng: Fix wrong reset register offsets
-In-Reply-To: <20160827121545.GT3165@lukather>
-References: <20160827121545.GT3165@lukather>
-Message-ID: <1472324673-11233-1-git-send-email-jorik@kippendief.biz>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 27 Aug 2016 21:15:22 +0200 (CEST)
+Subject: [PATCH RFC 0/3] mmc: mxs-mmc: Implement DDR support
+In-Reply-To: <1470488140-10104-1-git-send-email-stefan.wahren@i2se.com>
+References: <1470488140-10104-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1082892691.24336.3dd5cc50-579f-4f46-b1de-7868392729ec.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jorik Jonker <jorik@kippendief.biz>
+Hi Ulf,
 
-The reset register offsets for UART*, I2C* and SCR were off by a few bytes.
+> Stefan Wahren <stefan.wahren@i2se.com> hat am 6. August 2016 um 14:55
+> geschrieben:
+> 
+> 
+> Based on these discussions: [1], [2] this patch series implements
+> DDR support for the MXS MMC host driver. This feature has never been
+> ported from the vendor kernel.
+> 
+> It has been tested on a i.MX28 board with eMMC which is currently
+> not in mainline (Duckbill 2).
+> 
+> * without DDR support
+> dd if=/dev/zero of=test bs=8k count=10000
+> 81920000 bytes (82 MB) copied, 14.3321 s, 5.7 MB/s
+> 
+> * with DDR support:
+> dd if=/dev/zero of=test bs=8k count=10000
+> 81920000 bytes (82 MB) copied, 13.4781 s, 6.1 MB/s
+> 
+> [1] - http://www.spinics.net/lists/linux-mmc/msg32285.html
+> [2] - http://www.spinics.net/lists/linux-mmc/msg34418.html
 
-Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
+do you want to add some comments about this series?
 
----
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+Regards
+Stefan
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-index feabc0f..280ba74 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-@@ -783,14 +783,14 @@ static struct ccu_reset_map sun8i_h3_ccu_resets[] = {
- 	[RST_BUS_I2S1]		=  { 0x2d0, BIT(13) },
- 	[RST_BUS_I2S2]		=  { 0x2d0, BIT(14) },
- 
--	[RST_BUS_I2C0]		=  { 0x2d4, BIT(0) },
--	[RST_BUS_I2C1]		=  { 0x2d4, BIT(1) },
--	[RST_BUS_I2C2]		=  { 0x2d4, BIT(2) },
--	[RST_BUS_UART0]		=  { 0x2d4, BIT(16) },
--	[RST_BUS_UART1]		=  { 0x2d4, BIT(17) },
--	[RST_BUS_UART2]		=  { 0x2d4, BIT(18) },
--	[RST_BUS_UART3]		=  { 0x2d4, BIT(19) },
--	[RST_BUS_SCR]		=  { 0x2d4, BIT(20) },
-+	[RST_BUS_I2C0]		=  { 0x2d8, BIT(0) },
-+	[RST_BUS_I2C1]		=  { 0x2d8, BIT(1) },
-+	[RST_BUS_I2C2]		=  { 0x2d8, BIT(2) },
-+	[RST_BUS_UART0]		=  { 0x2d8, BIT(16) },
-+	[RST_BUS_UART1]		=  { 0x2d8, BIT(17) },
-+	[RST_BUS_UART2]		=  { 0x2d8, BIT(18) },
-+	[RST_BUS_UART3]		=  { 0x2d8, BIT(19) },
-+	[RST_BUS_SCR]		=  { 0x2d8, BIT(20) },
- };
- 
- static const struct sunxi_ccu_desc sun8i_h3_ccu_desc = {
--- 
-2.7.4
+> 
+> Stefan Wahren (3):
+>   DT: bindings: mmc: Add property for 3.3V only support
+>   mmc: core: add new cap for 3.3V only DDR MMCs
+>   mmc: mxs-mmc: Implement DDR support
+> 
+>  Documentation/devicetree/bindings/mmc/mmc.txt |    7 +++++--
+>  drivers/mmc/core/host.c                       |    2 ++
+>  drivers/mmc/core/mmc.c                        |    6 ++++++
+>  drivers/mmc/host/mxs-mmc.c                    |   22 ++++++++++++++++++++++
+>  include/linux/mmc/host.h                      |    1 +
+>  5 files changed, 36 insertions(+), 2 deletions(-)
+> 
+> -- 
+> 1.7.9.5
