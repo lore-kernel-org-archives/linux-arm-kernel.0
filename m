@@ -1,53 +1,56 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 27 Aug 2016 21:15:22 +0200 (CEST)
-Subject: [PATCH RFC 0/3] mmc: mxs-mmc: Implement DDR support
-In-Reply-To: <1470488140-10104-1-git-send-email-stefan.wahren@i2se.com>
-References: <1470488140-10104-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1082892691.24336.3dd5cc50-579f-4f46-b1de-7868392729ec.open-xchange@email.1und1.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 28 Aug 2016 00:09:49 +0200
+Subject: [PATCH v2] net: smc91x: fix SMC accesses
+In-Reply-To: <E1bdgXX-0005I4-1N@rmk-PC.armlinux.org.uk> (Russell King's
+ message of "Sat, 27 Aug 2016 17:33:03 +0100")
+References: <E1bdgXX-0005I4-1N@rmk-PC.armlinux.org.uk>
+Message-ID: <87r399eudu.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Russell King <rmk+kernel@armlinux.org.uk> writes:
 
-> Stefan Wahren <stefan.wahren@i2se.com> hat am 6. August 2016 um 14:55
-> geschrieben:
-> 
-> 
-> Based on these discussions: [1], [2] this patch series implements
-> DDR support for the MXS MMC host driver. This feature has never been
-> ported from the vendor kernel.
-> 
-> It has been tested on a i.MX28 board with eMMC which is currently
-> not in mainline (Duckbill 2).
-> 
-> * without DDR support
-> dd if=/dev/zero of=test bs=8k count=10000
-> 81920000 bytes (82 MB) copied, 14.3321 s, 5.7 MB/s
-> 
-> * with DDR support:
-> dd if=/dev/zero of=test bs=8k count=10000
-> 81920000 bytes (82 MB) copied, 13.4781 s, 6.1 MB/s
-> 
-> [1] - http://www.spinics.net/lists/linux-mmc/msg32285.html
-> [2] - http://www.spinics.net/lists/linux-mmc/msg34418.html
+> Commit b70661c70830 ("net: smc91x: use run-time configuration on all ARM
+> machines") broke some ARM platforms through several mistakes.  Firstly,
+> the access size must correspond to the following rule:
+>
+> (a) at least one of 16-bit or 8-bit access size must be supported
+> (b) 32-bit accesses are optional, and may be enabled in addition to
+>     the above.
+>
+> Secondly, it provides no emulation of 16-bit accesses, instead blindly
+> making 16-bit accesses even when the platform specifies that only 8-bit
+> is supported.
+>
+> Reorganise smc91x.h so we can make use of the existing 16-bit access
+> emulation already provided - if 16-bit accesses are supported, use
+> 16-bit accesses directly, otherwise if 8-bit accesses are supported,
+> use the provided 16-bit access emulation.  If neither, BUG().  This
+> exactly reflects the driver behaviour prior to the commit being fixed.
+>
+> Since the conversion incorrectly cut down the available access sizes on
+> several platforms, we also need to go through every platform and fix up
+> the overly-restrictive access size: Arnd assumed that if a platform can
+> perform 32-bit, 16-bit and 8-bit accesses, then only a 32-bit access
+> size needed to be specified - not so, all available access sizes must
+> be specified.
+>
+> This likely fixes some performance regressions in doing this: if a
+> platform does not support 8-bit accesses, 8-bit accesses have been
+> emulated by performing a 16-bit read-modify-write access.
+>
+> Tested on the Intel Assabet/Neponset platform, which supports only 8-bit
+> accesses, which was broken by the original commit.
+>
+> Fixes: b70661c70830 ("net: smc91x: use run-time configuration on all ARM machines")
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+> Robert, this is the full patch - can I add your tested-by to this for
+> the subset patch please?
+Yes, I just retested it, so :
+Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-do you want to add some comments about this series?
+Cheers.
 
-Regards
-Stefan
-
-> 
-> Stefan Wahren (3):
->   DT: bindings: mmc: Add property for 3.3V only support
->   mmc: core: add new cap for 3.3V only DDR MMCs
->   mmc: mxs-mmc: Implement DDR support
-> 
->  Documentation/devicetree/bindings/mmc/mmc.txt |    7 +++++--
->  drivers/mmc/core/host.c                       |    2 ++
->  drivers/mmc/core/mmc.c                        |    6 ++++++
->  drivers/mmc/host/mxs-mmc.c                    |   22 ++++++++++++++++++++++
->  include/linux/mmc/host.h                      |    1 +
->  5 files changed, 36 insertions(+), 2 deletions(-)
-> 
-> -- 
-> 1.7.9.5
+--
+Robert
