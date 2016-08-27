@@ -1,153 +1,54 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sat, 27 Aug 2016 15:43:46 +0200
-Subject: [PATCH v3 4/6] nvmem: amlogic: Add Amlogic Meson EFUSE driver
-In-Reply-To: <1472305428-16874-1-git-send-email-carlo@caione.org>
-References: <1472305428-16874-1-git-send-email-carlo@caione.org>
-Message-ID: <1472305428-16874-5-git-send-email-carlo@caione.org>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Sat, 27 Aug 2016 21:45:23 +0800
+Subject: [PATCH] ASoC: rockchip: use SPI dependency for rt5514
+In-Reply-To: <20160826155120.1162512-1-arnd@arndb.de>
+References: <20160826155120.1162512-1-arnd@arndb.de>
+Message-ID: <57C19973.1050906@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+Hi Arnd,
 
-Add Amlogic EFUSE driver to access hardware data like ethernet address,
-serial number or IDs.
+On 2016?08?26? 23:50, Arnd Bergmann wrote:
+> The rk3399 scans the spi_bus_type to find the rt5514 driver, but does not
+> actually have a Kconfig dependency on SPI, so we can end up with a link
+> failure:
+>
+> sound/soc/codecs/snd-soc-rt5514-spi.o: In function `rt5514_spi_driver_init':
+> rt5514-spi.c:(.init.text+0x14): undefined reference to `__spi_register_driver'
+> sound/soc/codecs/snd-soc-rt5514-spi.o: In function `rt5514_spi_burst_read':
+> rt5514-spi.c:(.text.rt5514_spi_burst_read+0x18c): undefined reference to `spi_sync'
+> sound/soc/codecs/snd-soc-rt5514-spi.o: In function `rt5514_spi_burst_write':
+> rt5514-spi.c:(.text.rt5514_spi_burst_write+0x1b4): undefined reference to `spi_sync'
+> sound/soc/rockchip/snd-soc-rk3399-gru-sound.o: In function `rockchip_sound_probe':
+> rk3399_gru_sound.c:(.text.rockchip_sound_probe+0x128): undefined reference to `spi_bus_type'
+>
+> This adds the missing dependency.
+>
+> Signed-off-by: Arnd Bergmann<arnd@arndb.de>
+> Fixes: c6eac8a36a84 ("ASoC: rockchip: Add machine driver for RK3399 GRU Boards")
+> ---
+>   sound/soc/rockchip/Kconfig | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/sound/soc/rockchip/Kconfig b/sound/soc/rockchip/Kconfig
+> index d82d763d4854..c783f9a22595 100644
+> --- a/sound/soc/rockchip/Kconfig
+> +++ b/sound/soc/rockchip/Kconfig
+> @@ -44,7 +44,7 @@ config SND_SOC_ROCKCHIP_RT5645
+>
+>   config SND_SOC_RK3399_GRU_SOUND
+>   	tristate "ASoC support multiple codecs for Rockchip RK3399 GRU boards"
+> -	depends on SND_SOC_ROCKCHIP&&  I2C&&  GPIOLIB&&  CLKDEV_LOOKUP
+> +	depends on SND_SOC_ROCKCHIP&&  I2C&&  GPIOLIB&&  CLKDEV_LOOKUP&&  SPI
+>   	select SND_SOC_ROCKCHIP_I2S
+>   	select SND_SOC_MAX98357A
+>   	select SND_SOC_RT5514
+So sorry to miss it... Thanks to help us to fix it. :-)
 
-Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
----
- drivers/nvmem/Kconfig       | 10 +++++
- drivers/nvmem/Makefile      |  2 +
- drivers/nvmem/meson-efuse.c | 93 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 105 insertions(+)
- create mode 100644 drivers/nvmem/meson-efuse.c
+Tested-by: Xing Zheng <zhengxing@rock-chips.com>
 
-diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-index f550c45..ba140ea 100644
---- a/drivers/nvmem/Kconfig
-+++ b/drivers/nvmem/Kconfig
-@@ -101,4 +101,14 @@ config NVMEM_VF610_OCOTP
- 	  This driver can also be build as a module. If so, the module will
- 	  be called nvmem-vf610-ocotp.
- 
-+config MESON_EFUSE
-+	tristate "Amlogic eFuse Support"
-+	depends on (ARCH_MESON || COMPILE_TEST) && MESON_SM
-+	help
-+	  This is a driver to retrieve specific values from the eFuse found on
-+	  the Amlogic Meson SoCs.
-+
-+	  This driver can also be built as a module. If so, the module
-+	  will be called nvmem_meson_efuse.
-+
- endif
-diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
-index 45ab1ae..8f942a0 100644
---- a/drivers/nvmem/Makefile
-+++ b/drivers/nvmem/Makefile
-@@ -22,3 +22,5 @@ obj-$(CONFIG_NVMEM_SUNXI_SID)	+= nvmem_sunxi_sid.o
- nvmem_sunxi_sid-y		:= sunxi_sid.o
- obj-$(CONFIG_NVMEM_VF610_OCOTP)	+= nvmem-vf610-ocotp.o
- nvmem-vf610-ocotp-y		:= vf610-ocotp.o
-+obj-$(CONFIG_MESON_EFUSE)	+= nvmem_meson_efuse.o
-+nvmem_meson_efuse-y		:= meson-efuse.o
-diff --git a/drivers/nvmem/meson-efuse.c b/drivers/nvmem/meson-efuse.c
-new file mode 100644
-index 0000000..f207c3b
---- /dev/null
-+++ b/drivers/nvmem/meson-efuse.c
-@@ -0,0 +1,93 @@
-+/*
-+ * Amlogic eFuse Driver
-+ *
-+ * Copyright (c) 2016 Endless Computers, Inc.
-+ * Author: Carlo Caione <carlo@endlessm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of version 2 of the GNU General Public License as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-+ * more details.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/nvmem-provider.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+
-+#include <linux/firmware/meson/meson_sm.h>
-+
-+static int meson_efuse_read(void *context, unsigned int offset,
-+			    void *val, size_t bytes)
-+{
-+	u8 *buf = val;
-+	int ret;
-+
-+	ret = meson_sm_call_read(buf, SM_EFUSE_READ, offset,
-+				 bytes, 0, 0, 0);
-+	if (ret < 0)
-+		return ret;
-+
-+	return 0;
-+}
-+
-+static struct nvmem_config econfig = {
-+	.name = "meson-efuse",
-+	.owner = THIS_MODULE,
-+	.stride = 1,
-+	.word_size = 1,
-+	.read_only = true,
-+};
-+
-+static const struct of_device_id meson_efuse_match[] = {
-+	{ .compatible = "amlogic,meson-gxbb-efuse", },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, meson_efuse_match);
-+
-+static int meson_efuse_probe(struct platform_device *pdev)
-+{
-+	struct nvmem_device *nvmem;
-+	unsigned int size;
-+
-+	if (meson_sm_call(SM_EFUSE_USER_MAX, &size, 0, 0, 0, 0, 0) < 0)
-+		return -EINVAL;
-+
-+	econfig.dev = &pdev->dev;
-+	econfig.reg_read = meson_efuse_read;
-+	econfig.size = size;
-+
-+	nvmem = nvmem_register(&econfig);
-+	if (IS_ERR(nvmem))
-+		return PTR_ERR(nvmem);
-+
-+	platform_set_drvdata(pdev, nvmem);
-+
-+	return 0;
-+}
-+
-+static int meson_efuse_remove(struct platform_device *pdev)
-+{
-+	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
-+
-+	return nvmem_unregister(nvmem);
-+}
-+
-+static struct platform_driver meson_efuse_driver = {
-+	.probe = meson_efuse_probe,
-+	.remove = meson_efuse_remove,
-+	.driver = {
-+		.name = "meson-efuse",
-+		.of_match_table = meson_efuse_match,
-+	},
-+};
-+
-+module_platform_driver(meson_efuse_driver);
-+
-+MODULE_AUTHOR("Carlo Caione <carlo@endlessm.com>");
-+MODULE_DESCRIPTION("Amlogic Meson NVMEM driver");
-+MODULE_LICENSE("GPL v2");
+Thanks.
+
 -- 
-2.7.4
+- Xing Zheng
