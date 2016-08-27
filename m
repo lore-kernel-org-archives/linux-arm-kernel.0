@@ -1,40 +1,31 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 27 Aug 2016 16:38:49 +0100
-Subject: [PATCH] smc91x: remove ARM hack for unaligned 16-bit writes
-In-Reply-To: <87vaymdyal.fsf@belgarion.home>
-References: <20160825144314.1850730-1-arnd@arndb.de>
- <3062310.z9h3CgCZ7p@wuerfel> <87inuopw04.fsf@belgarion.home>
- <20160825223743.GK1041@n2100.armlinux.org.uk>
- <87vaymdyal.fsf@belgarion.home>
-Message-ID: <20160827153849.GA1041@n2100.armlinux.org.uk>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 27 Aug 2016 16:19:49 +0000
+Subject: [PATCH 1/2] drivers/perf: arm_pmu: Fix leak in error path
+Message-ID: <1472314790-4268-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 27, 2016 at 05:30:42PM +0200, Robert Jarzmik wrote:
-> Hi Russell,
-> 
-> With your patch :
->  - lubbock, mainstone and zylonite boards are working correctly
->    => ie. all my boards are working correctly
-> 
->  - the message "ifconfig: SIOCSIFHWADDR: Device or resource busy" is still there
->    => this message is here even without your patch, so it's rather not relevant
->    => this message is triggered by an "/sbin/ifconfig eth0 hw ether
->    08:00:3e:26:0a:5b" command
-> 
-> So from a PXA testing point of view it's all good, ie.
-> Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
+In case of a IRQ type mismatch in of_pmu_irq_cfg() the
+device node for interrupt affinity isn't freed. So fix this
+issue by calling of_node_put().
 
-Thanks for testing, that's good news.
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+Fixes: fa8ad7889d83 ("arm: perf: factor arm_pmu core out to drivers")
+---
+ drivers/perf/arm_pmu.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-You'll get "SIOCSIFHWADDR: Device or resource busy" if the device is
-already up and has no support for changing the address while the NIC
-is "live" - we only program the MAC address when bringing the smc91x
-device up (or resetting it after a timeout).
-
-See net/ethernet/eth.c::eth_prepare_mac_addr_change() and smc_enable().
-
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index c494613..1b48bf0 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -925,6 +925,7 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
+ 			if (i > 0 && spi != using_spi) {
+ 				pr_err("PPI/SPI IRQ type mismatch for %s!\n",
+ 					dn->name);
++				of_node_put(dn);
+ 				kfree(irqs);
+ 				return -EINVAL;
+ 			}
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.7.9.5
