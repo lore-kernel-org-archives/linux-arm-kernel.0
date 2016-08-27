@@ -1,267 +1,228 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 27 Aug 2016 15:55:38 +0800
-Subject: [PATCH v2 2/8] mfd: axp20x: Add support for AXP806 PMIC
+Date: Sat, 27 Aug 2016 15:55:39 +0800
+Subject: [PATCH v2 3/8] regulator: axp20x: support AXP806 variant
 In-Reply-To: <20160827075544.26316-1-wens@csie.org>
 References: <20160827075544.26316-1-wens@csie.org>
-Message-ID: <20160827075544.26316-3-wens@csie.org>
+Message-ID: <20160827075544.26316-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The X-Powers AXP806 is a new PMIC that is paired with Allwinner's A80
-SoC, along with a master AXP809 PMIC.
+The X-Powers AXP806 PMIC has a new set of buck and LDO regulators, and
+also a switch. The buck regulators support teaming into multi-phase
+groups, with A+B, A+B+C, D+E groupings.
 
-This PMIC has a new register layout, and supports some functions not
-seen in other X-Powers PMICs, such as master-slave mode, or having
-multiple AXP806 PMICs on the same bus with address space extension,
-or supporting both I2C and RSB mode. I2C has not been tested.
+Some registers controlling DCDC converter work settings are at different
+offsets. Deal with them as well.
 
-This patch adds support for the interrupts of the PMIC. A regulator
-sub-device is enabled, but actual regulator support will come in a
-later patch.
+Add support for this new variant.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
-Changes since v1: none
----
- drivers/mfd/axp20x-rsb.c   |  1 +
- drivers/mfd/axp20x.c       | 72 ++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/mfd/axp20x.h | 60 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 133 insertions(+)
+Changes since v1:
 
-diff --git a/drivers/mfd/axp20x-rsb.c b/drivers/mfd/axp20x-rsb.c
-index a407527bcd09..a732cb50bcff 100644
---- a/drivers/mfd/axp20x-rsb.c
-+++ b/drivers/mfd/axp20x-rsb.c
-@@ -61,6 +61,7 @@ static int axp20x_rsb_remove(struct sunxi_rsb_device *rdev)
- 
- static const struct of_device_id axp20x_rsb_of_match[] = {
- 	{ .compatible = "x-powers,axp223", .data = (void *)AXP223_ID },
-+	{ .compatible = "x-powers,axp806", .data = (void *)AXP806_ID },
- 	{ .compatible = "x-powers,axp809", .data = (void *)AXP809_ID },
- 	{ },
- };
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index fd80b0981f0f..96102753847f 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -38,6 +38,7 @@ static const char * const axp20x_model_names[] = {
- 	"AXP221",
- 	"AXP223",
- 	"AXP288",
-+	"AXP806",
- 	"AXP809",
+  - Use switch-case block in axp20x_is_polyphase_slave
+
+---
+ drivers/regulator/axp20x-regulator.c | 118 ++++++++++++++++++++++++++++++++---
+ 1 file changed, 111 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+index 6d9ac76a772f..54382ef902c6 100644
+--- a/drivers/regulator/axp20x-regulator.c
++++ b/drivers/regulator/axp20x-regulator.c
+@@ -244,16 +244,64 @@ static const struct regulator_desc axp22x_drivevbus_regulator = {
+ 	.ops		= &axp20x_ops_sw,
  };
  
-@@ -129,6 +130,27 @@ static const struct regmap_access_table axp288_volatile_table = {
- 	.n_yes_ranges	= ARRAY_SIZE(axp288_volatile_ranges),
+-static const struct regulator_linear_range axp809_dcdc4_ranges[] = {
+-	REGULATOR_LINEAR_RANGE(600000, 0x0, 0x2f, 20000),
+-	REGULATOR_LINEAR_RANGE(1800000, 0x30, 0x38, 100000),
++static const struct regulator_linear_range axp806_dcdca_ranges[] = {
++	REGULATOR_LINEAR_RANGE(600000, 0x0, 0x32, 10000),
++	REGULATOR_LINEAR_RANGE(1120000, 0x33, 0x47, 20000),
  };
  
-+static const struct regmap_range axp806_writeable_ranges[] = {
-+	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_DATACACHE(3)),
-+	regmap_reg_range(AXP806_PWR_OUT_CTRL1, AXP806_CLDO3_V_CTRL),
-+	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ2_EN),
-+	regmap_reg_range(AXP20X_IRQ1_STATE, AXP20X_IRQ2_STATE),
+-static const struct regulator_linear_range axp809_dldo1_ranges[] = {
++static const struct regulator_linear_range axp806_dcdcd_ranges[] = {
++	REGULATOR_LINEAR_RANGE(600000, 0x0, 0x2d, 20000),
++	REGULATOR_LINEAR_RANGE(1600000, 0x2e, 0x3f, 100000),
 +};
 +
-+static const struct regmap_range axp806_volatile_ranges[] = {
-+	regmap_reg_range(AXP20X_IRQ1_STATE, AXP20X_IRQ2_STATE),
-+};
-+
-+static const struct regmap_access_table axp806_writeable_table = {
-+	.yes_ranges	= axp806_writeable_ranges,
-+	.n_yes_ranges	= ARRAY_SIZE(axp806_writeable_ranges),
-+};
-+
-+static const struct regmap_access_table axp806_volatile_table = {
-+	.yes_ranges	= axp806_volatile_ranges,
-+	.n_yes_ranges	= ARRAY_SIZE(axp806_volatile_ranges),
-+};
-+
- static struct resource axp152_pek_resources[] = {
- 	DEFINE_RES_IRQ_NAMED(AXP152_IRQ_PEK_RIS_EDGE, "PEK_DBR"),
- 	DEFINE_RES_IRQ_NAMED(AXP152_IRQ_PEK_FAL_EDGE, "PEK_DBF"),
-@@ -278,6 +300,15 @@ static const struct regmap_config axp288_regmap_config = {
- 	.cache_type	= REGCACHE_RBTREE,
++static const struct regulator_linear_range axp806_cldo2_ranges[] = {
+ 	REGULATOR_LINEAR_RANGE(700000, 0x0, 0x1a, 100000),
+ 	REGULATOR_LINEAR_RANGE(3400000, 0x1b, 0x1f, 200000),
  };
  
-+static const struct regmap_config axp806_regmap_config = {
-+	.reg_bits	= 8,
-+	.val_bits	= 8,
-+	.wr_table	= &axp806_writeable_table,
-+	.volatile_table	= &axp806_volatile_table,
-+	.max_register	= AXP806_VREF_TEMP_WARN_L,
-+	.cache_type	= REGCACHE_RBTREE,
++static const struct regulator_desc axp806_regulators[] = {
++	AXP_DESC_RANGES(AXP806, DCDCA, "dcdca", "vina", axp806_dcdca_ranges,
++			72, AXP806_DCDCA_V_CTRL, 0x7f, AXP806_PWR_OUT_CTRL1,
++			BIT(0)),
++	AXP_DESC(AXP806, DCDCB, "dcdcb", "vinb", 1000, 2550, 50,
++		 AXP806_DCDCB_V_CTRL, 0x1f, AXP806_PWR_OUT_CTRL1, BIT(1)),
++	AXP_DESC_RANGES(AXP806, DCDCC, "dcdcc", "vinc", axp806_dcdca_ranges,
++			72, AXP806_DCDCC_V_CTRL, 0x7f, AXP806_PWR_OUT_CTRL1,
++			BIT(2)),
++	AXP_DESC_RANGES(AXP806, DCDCD, "dcdcd", "vind", axp806_dcdcd_ranges,
++			64, AXP806_DCDCD_V_CTRL, 0x3f, AXP806_PWR_OUT_CTRL1,
++			BIT(3)),
++	AXP_DESC(AXP806, DCDCE, "dcdce", "vine", 1100, 3400, 100,
++		 AXP806_DCDCB_V_CTRL, 0x1f, AXP806_PWR_OUT_CTRL1, BIT(4)),
++	AXP_DESC(AXP806, ALDO1, "aldo1", "aldoin", 700, 3300, 100,
++		 AXP806_ALDO1_V_CTRL, 0x1f, AXP806_PWR_OUT_CTRL1, BIT(5)),
++	AXP_DESC(AXP806, ALDO2, "aldo2", "aldoin", 700, 3400, 100,
++		 AXP806_ALDO2_V_CTRL, 0x1f, AXP806_PWR_OUT_CTRL1, BIT(6)),
++	AXP_DESC(AXP806, ALDO3, "aldo3", "aldoin", 700, 3300, 100,
++		 AXP806_ALDO3_V_CTRL, 0x1f, AXP806_PWR_OUT_CTRL1, BIT(7)),
++	AXP_DESC(AXP806, BLDO1, "bldo1", "bldoin", 700, 1900, 100,
++		 AXP806_BLDO1_V_CTRL, 0x0f, AXP806_PWR_OUT_CTRL2, BIT(0)),
++	AXP_DESC(AXP806, BLDO2, "bldo2", "bldoin", 700, 1900, 100,
++		 AXP806_BLDO2_V_CTRL, 0x0f, AXP806_PWR_OUT_CTRL2, BIT(1)),
++	AXP_DESC(AXP806, BLDO3, "bldo3", "bldoin", 700, 1900, 100,
++		 AXP806_BLDO3_V_CTRL, 0x0f, AXP806_PWR_OUT_CTRL2, BIT(2)),
++	AXP_DESC(AXP806, BLDO4, "bldo4", "bldoin", 700, 1900, 100,
++		 AXP806_BLDO4_V_CTRL, 0x0f, AXP806_PWR_OUT_CTRL2, BIT(3)),
++	AXP_DESC(AXP806, CLDO1, "cldo1", "cldoin", 700, 3300, 100,
++		 AXP806_CLDO1_V_CTRL, 0x1f, AXP806_PWR_OUT_CTRL2, BIT(4)),
++	AXP_DESC_RANGES(AXP806, CLDO2, "cldo2", "cldoin", axp806_cldo2_ranges,
++			32, AXP806_CLDO2_V_CTRL, 0x1f, AXP806_PWR_OUT_CTRL2,
++			BIT(5)),
++	AXP_DESC(AXP806, CLDO3, "cldo3", "cldoin", 700, 3300, 100,
++		 AXP806_CLDO3_V_CTRL, 0x1f, AXP806_PWR_OUT_CTRL2, BIT(6)),
++	AXP_DESC_SW(AXP806, SW, "sw", "swin", AXP806_PWR_OUT_CTRL2, BIT(7)),
 +};
 +
- #define INIT_REGMAP_IRQ(_variant, _irq, _off, _mask)			\
- 	[_variant##_IRQ_##_irq] = { .reg_offset = (_off), .mask = BIT(_mask) }
- 
-@@ -409,6 +440,21 @@ static const struct regmap_irq axp288_regmap_irqs[] = {
- 	INIT_REGMAP_IRQ(AXP288, BC_USB_CHNG,            5, 1),
- };
- 
-+static const struct regmap_irq axp806_regmap_irqs[] = {
-+	INIT_REGMAP_IRQ(AXP806, DIE_TEMP_HIGH_LV1,	0, 0),
-+	INIT_REGMAP_IRQ(AXP806, DIE_TEMP_HIGH_LV2,	0, 1),
-+	INIT_REGMAP_IRQ(AXP806, DCDCA_V_LOW,		0, 3),
-+	INIT_REGMAP_IRQ(AXP806, DCDCB_V_LOW,		0, 4),
-+	INIT_REGMAP_IRQ(AXP806, DCDCC_V_LOW,		0, 5),
-+	INIT_REGMAP_IRQ(AXP806, DCDCD_V_LOW,		0, 6),
-+	INIT_REGMAP_IRQ(AXP806, DCDCE_V_LOW,		0, 7),
-+	INIT_REGMAP_IRQ(AXP806, PWROK_LONG,		1, 0),
-+	INIT_REGMAP_IRQ(AXP806, PWROK_SHORT,		1, 1),
-+	INIT_REGMAP_IRQ(AXP806, WAKEUP,			1, 4),
-+	INIT_REGMAP_IRQ(AXP806, PWROK_FALL,		1, 5),
-+	INIT_REGMAP_IRQ(AXP806, PWROK_RISE,		1, 6),
++static const struct regulator_linear_range axp809_dcdc4_ranges[] = {
++	REGULATOR_LINEAR_RANGE(600000, 0x0, 0x2f, 20000),
++	REGULATOR_LINEAR_RANGE(1800000, 0x30, 0x38, 100000),
 +};
 +
- static const struct regmap_irq axp809_regmap_irqs[] = {
- 	INIT_REGMAP_IRQ(AXP809, ACIN_OVER_V,		0, 7),
- 	INIT_REGMAP_IRQ(AXP809, ACIN_PLUGIN,		0, 6),
-@@ -494,6 +540,18 @@ static const struct regmap_irq_chip axp288_regmap_irq_chip = {
+ static const struct regulator_desc axp809_regulators[] = {
+ 	AXP_DESC(AXP809, DCDC1, "dcdc1", "vin1", 1600, 3400, 100,
+ 		 AXP22X_DCDC1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL1, BIT(1)),
+@@ -278,7 +326,7 @@ static const struct regulator_desc axp809_regulators[] = {
+ 		 AXP22X_ALDO2_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL1, BIT(7)),
+ 	AXP_DESC(AXP809, ALDO3, "aldo3", "aldoin", 700, 3300, 100,
+ 		 AXP22X_ALDO3_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(5)),
+-	AXP_DESC_RANGES(AXP809, DLDO1, "dldo1", "dldoin", axp809_dldo1_ranges,
++	AXP_DESC_RANGES(AXP809, DLDO1, "dldo1", "dldoin", axp806_cldo2_ranges,
+ 			32, AXP22X_DLDO1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2,
+ 			BIT(3)),
+ 	AXP_DESC(AXP809, DLDO2, "dldo2", "dldoin", 700, 3300, 100,
+@@ -302,6 +350,7 @@ static const struct regulator_desc axp809_regulators[] = {
+ static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
+ {
+ 	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
++	unsigned int reg = AXP20X_DCDC_FREQ;
+ 	u32 min, max, def, step;
  
- };
- 
-+static const struct regmap_irq_chip axp806_regmap_irq_chip = {
-+	.name			= "axp806",
-+	.status_base		= AXP20X_IRQ1_STATE,
-+	.ack_base		= AXP20X_IRQ1_STATE,
-+	.mask_base		= AXP20X_IRQ1_EN,
-+	.mask_invert		= true,
-+	.init_ack_masked	= true,
-+	.irqs			= axp806_regmap_irqs,
-+	.num_irqs		= ARRAY_SIZE(axp806_regmap_irqs),
-+	.num_regs		= 2,
-+};
-+
- static const struct regmap_irq_chip axp809_regmap_irq_chip = {
- 	.name			= "axp809",
- 	.status_base		= AXP20X_IRQ1_STATE,
-@@ -660,12 +718,20 @@ static struct mfd_cell axp288_cells[] = {
- 	},
- };
- 
-+static struct mfd_cell axp806_cells[] = {
-+	{
-+		.id			= 2,
-+		.name			= "axp20x-regulator",
-+	},
-+};
-+
- static struct mfd_cell axp809_cells[] = {
- 	{
- 		.name			= "axp20x-pek",
- 		.num_resources		= ARRAY_SIZE(axp809_pek_resources),
- 		.resources		= axp809_pek_resources,
- 	}, {
-+		.id			= 1,
- 		.name			= "axp20x-regulator",
- 	},
- };
-@@ -732,6 +798,12 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
- 		axp20x->regmap_cfg = &axp288_regmap_config;
- 		axp20x->regmap_irq_chip = &axp288_regmap_irq_chip;
+ 	switch (axp20x->variant) {
+@@ -312,6 +361,14 @@ static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
+ 		def = 1500;
+ 		step = 75;
  		break;
 +	case AXP806_ID:
-+		axp20x->nr_cells = ARRAY_SIZE(axp806_cells);
-+		axp20x->cells = axp806_cells;
-+		axp20x->regmap_cfg = &axp806_regmap_config;
-+		axp20x->regmap_irq_chip = &axp806_regmap_irq_chip;
++		/*
++		 * AXP806 DCDC work frequency setting has the same range and
++		 * step as AXP22X, but at a different register.
++		 * Fall through to the check below.
++		 * (See include/linux/mfd/axp20x.h)
++		 */
++		reg = AXP806_DCDC_FREQ_CTRL;
+ 	case AXP221_ID:
+ 	case AXP223_ID:
+ 	case AXP809_ID:
+@@ -343,7 +400,7 @@ static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
+ 
+ 	dcdcfreq = (dcdcfreq - min) / step;
+ 
+-	return regmap_update_bits(axp20x->regmap, AXP20X_DCDC_FREQ,
++	return regmap_update_bits(axp20x->regmap, reg,
+ 				  AXP20X_FREQ_DCDC_MASK, dcdcfreq);
+ }
+ 
+@@ -377,6 +434,7 @@ static int axp20x_regulator_parse_dt(struct platform_device *pdev)
+ static int axp20x_set_dcdc_workmode(struct regulator_dev *rdev, int id, u32 workmode)
+ {
+ 	struct axp20x_dev *axp20x = rdev_get_drvdata(rdev);
++	unsigned int reg = AXP20X_DCDC_MODE;
+ 	unsigned int mask;
+ 
+ 	switch (axp20x->variant) {
+@@ -392,6 +450,13 @@ static int axp20x_set_dcdc_workmode(struct regulator_dev *rdev, int id, u32 work
+ 		workmode <<= ffs(mask) - 1;
+ 		break;
+ 
++	case AXP806_ID:
++		reg = AXP806_DCDC_MODE_CTRL2;
++		/*
++		 * AXP806 DCDC regulator IDs have the same range as AXP22X.
++		 * Fall through to the check below.
++		 * (See include/linux/mfd/axp20x.h)
++		 */
+ 	case AXP221_ID:
+ 	case AXP223_ID:
+ 	case AXP809_ID:
+@@ -408,7 +473,34 @@ static int axp20x_set_dcdc_workmode(struct regulator_dev *rdev, int id, u32 work
+ 		return -EINVAL;
+ 	}
+ 
+-	return regmap_update_bits(rdev->regmap, AXP20X_DCDC_MODE, mask, workmode);
++	return regmap_update_bits(rdev->regmap, reg, mask, workmode);
++}
++
++/*
++ * This function checks whether a regulator is part of a poly-phase
++ * output setup based on the registers settings. Returns true if it is.
++ */
++static bool axp20x_is_polyphase_slave(struct axp20x_dev *axp20x, int id)
++{
++	u32 reg = 0;
++
++	/* Only AXP806 has poly-phase outputs */
++	if (axp20x->variant != AXP806_ID)
++		return false;
++
++	regmap_read(axp20x->regmap, AXP806_DCDC_MODE_CTRL2, &reg);
++
++	switch (id) {
++	case AXP806_DCDCB:
++		return (((reg & GENMASK(7, 6)) == BIT(6)) ||
++			((reg & GENMASK(7, 6)) == BIT(7)));
++	case AXP806_DCDCC:
++		return ((reg & GENMASK(7, 6)) == BIT(7));
++	case AXP806_DCDCE:
++		return !!(reg & BIT(5));
++	}
++
++	return false;
+ }
+ 
+ static int axp20x_regulator_probe(struct platform_device *pdev)
+@@ -440,6 +532,10 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 		drivevbus = of_property_read_bool(pdev->dev.parent->of_node,
+ 						  "x-powers,drive-vbus-en");
+ 		break;
++	case AXP806_ID:
++		regulators = axp806_regulators;
++		nregulators = AXP806_REG_ID_MAX;
 +		break;
  	case AXP809_ID:
- 		axp20x->nr_cells = ARRAY_SIZE(axp809_cells);
- 		axp20x->cells = axp809_cells;
-diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
-index 0be4982f08fe..fec597fb34cb 100644
---- a/include/linux/mfd/axp20x.h
-+++ b/include/linux/mfd/axp20x.h
-@@ -20,6 +20,7 @@ enum {
- 	AXP221_ID,
- 	AXP223_ID,
- 	AXP288_ID,
-+	AXP806_ID,
- 	AXP809_ID,
- 	NR_AXP20X_VARIANTS,
- };
-@@ -91,6 +92,30 @@ enum {
- #define AXP22X_ALDO3_V_OUT		0x2a
- #define AXP22X_CHRG_CTRL3		0x35
+ 		regulators = axp809_regulators;
+ 		nregulators = AXP809_REG_ID_MAX;
+@@ -458,6 +554,14 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 		struct regulator_desc *new_desc;
  
-+#define AXP806_STARTUP_SRC		0x00
-+#define AXP806_CHIP_ID			0x03
-+#define AXP806_PWR_OUT_CTRL1		0x10
-+#define AXP806_PWR_OUT_CTRL2		0x11
-+#define AXP806_DCDCA_V_CTRL		0x12
-+#define AXP806_DCDCB_V_CTRL		0x13
-+#define AXP806_DCDCC_V_CTRL		0x14
-+#define AXP806_DCDCD_V_CTRL		0x15
-+#define AXP806_DCDCE_V_CTRL		0x16
-+#define AXP806_ALDO1_V_CTRL		0x17
-+#define AXP806_ALDO2_V_CTRL		0x18
-+#define AXP806_ALDO3_V_CTRL		0x19
-+#define AXP806_DCDC_MODE_CTRL1		0x1a
-+#define AXP806_DCDC_MODE_CTRL2		0x1b
-+#define AXP806_DCDC_FREQ_CTRL		0x1c
-+#define AXP806_BLDO1_V_CTRL		0x20
-+#define AXP806_BLDO2_V_CTRL		0x21
-+#define AXP806_BLDO3_V_CTRL		0x22
-+#define AXP806_BLDO4_V_CTRL		0x23
-+#define AXP806_CLDO1_V_CTRL		0x24
-+#define AXP806_CLDO2_V_CTRL		0x25
-+#define AXP806_CLDO3_V_CTRL		0x26
-+#define AXP806_VREF_TEMP_WARN_L		0xf3
+ 		/*
++		 * If this regulator is a slave in a poly-phase setup,
++		 * skip it, as its controls are bound to the master
++		 * regulator and won't work.
++		 */
++		if (axp20x_is_polyphase_slave(axp20x, i))
++			continue;
 +
- /* Interrupt */
- #define AXP152_IRQ1_EN			0x40
- #define AXP152_IRQ2_EN			0x41
-@@ -266,6 +291,26 @@ enum {
- };
- 
- enum {
-+	AXP806_DCDCA = 0,
-+	AXP806_DCDCB,
-+	AXP806_DCDCC,
-+	AXP806_DCDCD,
-+	AXP806_DCDCE,
-+	AXP806_ALDO1,
-+	AXP806_ALDO2,
-+	AXP806_ALDO3,
-+	AXP806_BLDO1,
-+	AXP806_BLDO2,
-+	AXP806_BLDO3,
-+	AXP806_BLDO4,
-+	AXP806_CLDO1,
-+	AXP806_CLDO2,
-+	AXP806_CLDO3,
-+	AXP806_SW,
-+	AXP806_REG_ID_MAX,
-+};
-+
-+enum {
- 	AXP809_DCDC1 = 0,
- 	AXP809_DCDC2,
- 	AXP809_DCDC3,
-@@ -414,6 +459,21 @@ enum axp288_irqs {
- 	AXP288_IRQ_BC_USB_CHNG,
- };
- 
-+enum axp806_irqs {
-+	AXP806_IRQ_DIE_TEMP_HIGH_LV1,
-+	AXP806_IRQ_DIE_TEMP_HIGH_LV2,
-+	AXP806_IRQ_DCDCA_V_LOW,
-+	AXP806_IRQ_DCDCB_V_LOW,
-+	AXP806_IRQ_DCDCC_V_LOW,
-+	AXP806_IRQ_DCDCD_V_LOW,
-+	AXP806_IRQ_DCDCE_V_LOW,
-+	AXP806_IRQ_PWROK_LONG,
-+	AXP806_IRQ_PWROK_SHORT,
-+	AXP806_IRQ_WAKEUP,
-+	AXP806_IRQ_PWROK_FALL,
-+	AXP806_IRQ_PWROK_RISE,
-+};
-+
- enum axp809_irqs {
- 	AXP809_IRQ_ACIN_OVER_V = 1,
- 	AXP809_IRQ_ACIN_PLUGIN,
++		/*
+ 		 * Regulators DC1SW and DC5LDO are connected internally,
+ 		 * so we have to handle their supply names separately.
+ 		 *
 -- 
 2.9.3
