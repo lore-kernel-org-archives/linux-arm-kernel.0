@@ -1,52 +1,49 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sat, 27 Aug 2016 18:53:19 +0200
-Subject: [PATCH v2 0/8] ARM: V7M: Support caches
-In-Reply-To: <57B5CCDE.10504@arm.com>
-References: <1471524360-31554-1-git-send-email-vladimir.murzin@arm.com>
- <20160818145300.GA1041@n2100.armlinux.org.uk> <57B5CCDE.10504@arm.com>
-Message-ID: <CAGhQ9Vxn3cC4RiYfiYJh9Buh+3i_n_gJ+3zeth150xF=ZLGAMw@mail.gmail.com>
+From: netz.kernel@gmail.com (Marty Plummer)
+Date: Sat, 27 Aug 2016 13:53:25 -0500
+Subject: Older hisilicon chipsets
+In-Reply-To: <20160827150457.GM10637@io.lakedaemon.net>
+References: <7773f0e5-d045-1e93-529b-74a601467ed1@gmail.com>
+ <20160827150457.GM10637@io.lakedaemon.net>
+Message-ID: <ec3ec22f-f05e-aaec-8e9a-bfc0565b9e9d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
-
-On 18 August 2016 at 16:57, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
-> On 18/08/16 15:53, Russell King - ARM Linux wrote:
->> On Thu, Aug 18, 2016 at 01:45:52PM +0100, Vladimir Murzin wrote:
->>> This patch set allows M-class cpus benefit of optional cache support.
->>> It originally was written by Jonny, I've been keeping it locally mainly
->>> rebasing over Linux versions.
->>>
->>> The original idea behind patches was to reuse existing cache handling
->>> code from v7A/R with help of extra macros to factor out cache handling
->>> logic (v7M cache operations are provided via memory mapped interface
->>> rather than co-processor instructions).
->>> However, that idea was rejected and starting form this (v2) version
->>> V7M cache logic lives into file and macros to indirect memory-mapped
->>> operations stay there locally since they make it easier to follow the
->>> code.
->>>
->>> Along with the v7M cache support the first user (Cortex-M7) is
->>> introduced.
->>>
->>> Patches were tested on MPS2 platform with Cortex-M3/M4/M7. The later
->>> one showed significant boot speed-up.
->>
->>>From a quick read through, the approach looks sane, and I think I'm
->> now happy with these.
->>
->
-> Thanks!
->
-> Is it acceptable if patches hang on a list for awhile, so people (I'm
-> looking at Alex and  Szemz?) can test them?
-
-These patches doesn't seem to break anything on the cache-less
-Cortex-M4 NXP LPC4357.
-
-So FWIW:
-Tested-by: Joachim Eastwood <manabian@gmail.com>
+On 08/27/2016 10:04 AM, Jason Cooper wrote:
+> 
+> Ah, yes.  The same device we were discussing on #mvlinux?
+> 
+Indeed, the very same
+> 
+> Note that I have no experience with HiSilicon. :-)  However, I think
+> it's correct to add it mach-hisi/.   A quick grep shows that there is
+> devicetree support for hisilicon SoCs (arch/arm/boot/dts/).  So that
+> means there's a *lot* less code to add under mach-hisi/.
+> 
+The issue here is that mach-hisi/Kconfig and CONFIG_ARCH_HISI require
+ARMv7, whereas the hi3520 has an arm1176/arm926 core, thereby being
+ARMv6/v5
+> 
+> Ideally, most of it will be a devicetree.  Assuming we have code for the
+> SoC and associated drivers.
+> 
+Yes, I've been doing some work on that already, but as I've said, unsure
+where one should/would insert all these different things.
+> 
+> I've added GregKH to the Cc to see if he knows of anyone currently
+> working with Hisilicon.
+> 
+Thanks, mayhaps someone can get even a response from Hisilicon, as I've
+yet to recieve even that.
+> thx,
+> 
+> Jason.
+> 
 
 
-regards,
-Joachim Eastwood
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160827/7294fccb/attachment.sig>
