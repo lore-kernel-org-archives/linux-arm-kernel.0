@@ -1,32 +1,49 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 27 Aug 2016 13:42:51 +0100
-Subject: [PATCH] pcmcia: ds: fix suspend/resume
-In-Reply-To: <20160827120522.GA3933@light.dominikbrodowski.net>
-References: <E1bbFKU-0001OO-RA@rmk-PC.armlinux.org.uk>
- <20160827120522.GA3933@light.dominikbrodowski.net>
-Message-ID: <20160827124251.GZ1041@n2100.armlinux.org.uk>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sat, 27 Aug 2016 14:51:19 +0200
+Subject: [PATCH] USB: ohci-omap - avoid including mach/irqs.h
+In-Reply-To: <20160826180519.GW5783@n2100.arm.linux.org.uk>
+References: <20160826164351.GV5783@n2100.arm.linux.org.uk>
+ <Pine.LNX.4.44L0.1608261319550.1794-100000@iolanthe.rowland.org>
+ <20160826180519.GW5783@n2100.arm.linux.org.uk>
+Message-ID: <20160827125119.GB24415@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 27, 2016 at 02:05:22PM +0200, Dominik Brodowski wrote:
-> Russell,
-> 
-> On Sun, Aug 21, 2016 at 12:05:30AM +0100, Russell King wrote:
-> > PCMCIA suspend/resume no longer works since the commit mentioned below,
-> > as the callbacks are no longer made.  Convert the driver to the new
-> > dev_pm_ops, which restores the suspend/resume functionality.  Tested on
-> > the arm arch Assabet platform with a pcnet_cs CF card.
+On Fri, Aug 26, 2016 at 07:05:19PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Aug 26, 2016 at 01:20:53PM -0400, Alan Stern wrote:
+> > On Fri, 26 Aug 2016, Russell King - ARM Linux wrote:
 > > 
-> > Fixes: aa8e54b559479 ("PM / sleep: Go direct_complete if driver has no callbacks")
-> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > > On Mon, Aug 22, 2016 at 11:28:21AM -0400, Alan Stern wrote:
+> > > > On Fri, 19 Aug 2016, Russell King wrote:
+> > > > 
+> > > > > ohci-omap doesn't need to include mach/irqs.h - nothing within this
+> > > > > driver needs anything from this header file.  Remove this include.
+> > > > > 
+> > > > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > > > > ---
+> > > > >  drivers/usb/host/ohci-omap.c | 1 -
+> > > > >  1 file changed, 1 deletion(-)
+> > > > > 
+> > > > > diff --git a/drivers/usb/host/ohci-omap.c b/drivers/usb/host/ohci-omap.c
+> > > > > index de7c68602a7e..495c1454b9e8 100644
+> > > > > --- a/drivers/usb/host/ohci-omap.c
+> > > > > +++ b/drivers/usb/host/ohci-omap.c
+> > > > > @@ -36,7 +36,6 @@
+> > > > >  #include <mach/mux.h>
+> > > > >  
+> > > > >  #include <mach/hardware.h>
+> > > > > -#include <mach/irqs.h>
+> > > > >  #include <mach/usb.h>
+> > > > 
+> > > > Acked-by: Alan Stern <stern@rowland.harvard.edu>
+> > > 
+> > > Thanks.  Will Greg be picking this up?
+> > 
+> > Yes, he should.  Unless you want it to go via a different tree...
 > 
-> Looks goot to me. Can you push it upstream, please?
+> I'm fine with Greg picking this (and the other two) up as none
+> of my (increasing) patch stack depends on these patches.
 
-I can do - should I take that as an Acked-by?
+Ok, I'll take it in my next round, thanks.
 
-Thanks.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+greg k-h
