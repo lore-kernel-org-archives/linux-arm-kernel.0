@@ -1,43 +1,51 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sat, 27 Aug 2016 16:33:11 +0200
-Subject: [GIT PULL] LPC18xx DTS changes for v4.9
-Message-ID: <20160827143311.7303-1-manabian@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 27 Aug 2016 15:04:57 +0000
+Subject: Older hisilicon chipsets
+In-Reply-To: <7773f0e5-d045-1e93-529b-74a601467ed1@gmail.com>
+References: <7773f0e5-d045-1e93-529b-74a601467ed1@gmail.com>
+Message-ID: <20160827150457.GM10637@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi arm-soc team,
+Hi Marty,
 
-Please consider pulling these DTS changes for the NXP LPC18xx
-platform into arm-soc/dt for Linux 4.9.
++ Arnd, GregKH,
 
-Just a couple of small patches this time around.
+On Fri, Aug 26, 2016 at 07:48:06PM -0500, Marty Plummer wrote:
+> It has recently come to my mind to begin working on an updated firmware
+> for my employer's CCTV/DVR boxes, which are based around the Hi3520 line
+> of arm SoC.
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+Ah, yes.  The same device we were discussing on #mvlinux?
 
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+> In the process of learning which files I need to edit in order to
+> integrate my changes into the linux build system, I've come to find that
+> arch/arm/mach-hisi/{Kconfig,Makefile} covers no less than four different
+> chips from Hisilicon, and that seems to make it a bit awkward to insert
+> a whole new arch/arm/mach- directory for one single SoC and create
+> duplicate menuitems for Hisilicon.
 
-are available in the git repository at:
+Note that I have no experience with HiSilicon. :-)  However, I think
+it's correct to add it mach-hisi/.   A quick grep shows that there is
+devicetree support for hisilicon SoCs (arch/arm/boot/dts/).  So that
+means there's a *lot* less code to add under mach-hisi/.
 
-  https://github.com/manabian/linux-lpc.git tags/lpc18xx_dts_for_4.9
+> So, I'm wondering whereabouts I should place the data for the chips that
+> I am working on, for the sake of organization and whatnot.
 
-for you to fetch changes up to 3ed6d3cb14097218629ace56aa1a2d0a862b3125:
+Ideally, most of it will be a devicetree.  Assuming we have code for the
+SoC and associated drivers.
 
-  ARM: dts: lpc18xx: configure dwmac properly (2016-08-27 16:13:19 +0200)
+> Also, I've been having difficulty getting a response from Hisilicon
+> regarding my request for source code for this and a few other of their
+> chips running in our other, newer DVRs, even though a cursory
+> examination after accessing the devices via telnet shows they do in fact
+> run a busybox/linux/uClibc based system, with a number of GPL licensed
+> libraries and kernel modules.
 
-----------------------------------------------------------------
-Device Tree additions for LPC18xx platform
+I've added GregKH to the Cc to see if he knows of anyone currently
+working with Hisilicon.
 
-Small fix for the compatible string for the NXP SE97 I2C chip on the
-Hitex Eval board from Guenter and a couple of additional DT properties
-for the DWMAC that is need for correct operation.
+thx,
 
-----------------------------------------------------------------
-Guenter Roeck (1):
-      ARM: dts: lpc4350-hitex-eval: fix binding for SE97 i2c device
-
-Joachim Eastwood (1):
-      ARM: dts: lpc18xx: configure dwmac properly
-
- arch/arm/boot/dts/lpc18xx.dtsi           | 4 ++++
- arch/arm/boot/dts/lpc4350-hitex-eval.dts | 2 +-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+Jason.
