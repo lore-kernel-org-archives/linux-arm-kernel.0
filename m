@@ -1,66 +1,52 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 27 Aug 2016 18:33:10 +0200
-Subject: [PATCH v2 3/3] ARM: dts: Set the clock rate for DREX block
- 800Mhz on exynos5422-odroidxu3
-In-Reply-To: <1472108238-24309-4-git-send-email-cw00.choi@samsung.com>
-References: <1472108238-24309-1-git-send-email-cw00.choi@samsung.com>
- <1472108238-24309-4-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20160827163310.GA8616@kozik-book>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sat, 27 Aug 2016 18:53:19 +0200
+Subject: [PATCH v2 0/8] ARM: V7M: Support caches
+In-Reply-To: <57B5CCDE.10504@arm.com>
+References: <1471524360-31554-1-git-send-email-vladimir.murzin@arm.com>
+ <20160818145300.GA1041@n2100.armlinux.org.uk> <57B5CCDE.10504@arm.com>
+Message-ID: <CAGhQ9Vxn3cC4RiYfiYJh9Buh+3i_n_gJ+3zeth150xF=ZLGAMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2016 at 03:57:18PM +0900, Chanwoo Choi wrote:
-> This patch sets the clock rate for DREX (DRAM Express) block
-> on exynos5422-odroidxu3 board. In the exynos5422 TRM,
-> DRAM clocks use BPLL clock and CMU_CDREX generates
-> the 800MHz DRAM clock.
-> 
+Hi Vladimir,
 
->From the commit message I don't get two things:
-1. Why setting this on XU3-family of boards, not all 542x/5800?
-2. Why this is needed? The commit msg lacks the answer to the "why".
-
-> [clk_summary on exynos5422-odroidxu3 board]
-> fout_bpll                             0            0   800000000          0 0
->     mout_bpll                          0            0   800000000          0 0
->        mout_mclk_cdrex                 0            0   800000000          0 0
->           dout_pclk_core_mem           0            0   200000000          0 0
->           dout_sclk_cdrex              0            0   800000000          0 0
+On 18 August 2016 at 16:57, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
+> On 18/08/16 15:53, Russell King - ARM Linux wrote:
+>> On Thu, Aug 18, 2016 at 01:45:52PM +0100, Vladimir Murzin wrote:
+>>> This patch set allows M-class cpus benefit of optional cache support.
+>>> It originally was written by Jonny, I've been keeping it locally mainly
+>>> rebasing over Linux versions.
+>>>
+>>> The original idea behind patches was to reuse existing cache handling
+>>> code from v7A/R with help of extra macros to factor out cache handling
+>>> logic (v7M cache operations are provided via memory mapped interface
+>>> rather than co-processor instructions).
+>>> However, that idea was rejected and starting form this (v2) version
+>>> V7M cache logic lives into file and macros to indirect memory-mapped
+>>> operations stay there locally since they make it easier to follow the
+>>> code.
+>>>
+>>> Along with the v7M cache support the first user (Cortex-M7) is
+>>> introduced.
+>>>
+>>> Patches were tested on MPS2 platform with Cortex-M3/M4/M7. The later
+>>> one showed significant boot speed-up.
+>>
+>>>From a quick read through, the approach looks sane, and I think I'm
+>> now happy with these.
+>>
 >
+> Thanks!
+>
+> Is it acceptable if patches hang on a list for awhile, so people (I'm
+> looking at Alex and  Szemz?) can test them?
 
-What is the purpose of this dump of clk_summary? Is it a state before or
-after the change? After it is quite obvious that it should have
-800MHz...
+These patches doesn't seem to break anything on the cache-less
+Cortex-M4 NXP LPC4357.
 
-Best regards,
-Krzysztof
+So FWIW:
+Tested-by: Joachim Eastwood <manabian@gmail.com>
 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> index d56253049ccb..fd3f67c72039 100644
-> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> @@ -229,6 +229,11 @@
->  	status = "okay";
->  };
->  
-> +&clock {
-> +	assigned-clocks = <&clock CLK_DOUT_SCLK_CDREX>;
-> +	assigned-clock-rates = <800000000>;
-> +};
-> +
->  &clock_audss {
->  	assigned-clocks = <&clock_audss EXYNOS_MOUT_AUDSS>,
->  			<&clock_audss EXYNOS_MOUT_I2S>,
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+regards,
+Joachim Eastwood
