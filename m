@@ -1,40 +1,42 @@
-From: netz.kernel@gmail.com (Marty Plummer)
-Date: Fri, 26 Aug 2016 19:48:06 -0500
-Subject: Older hisilicon chipsets
-Message-ID: <7773f0e5-d045-1e93-529b-74a601467ed1@gmail.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Fri, 26 Aug 2016 20:39:38 -0700
+Subject: [PATCH] drm/rockchip: vop: make vop register setting take effect
+Message-ID: <1472269178-16593-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greetings.
+The setting of vop registers need a reg_done writing to take effect.
+In vop_enable the vop return to work by by restoring registers, but the
+registers do not take effect immediately, it should a vop_cfg_done
+after it. The same thing is needed by windows_disabled in
+vop_crtc_disable.
 
-It has recently come to my mind to begin working on an updated firmware
-for my employer's CCTV/DVR boxes, which are based around the Hi3520 line
-of arm SoC.
+Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-In the process of learning which files I need to edit in order to
-integrate my changes into the linux build system, I've come to find that
-arch/arm/mach-hisi/{Kconfig,Makefile} covers no less than four different
-chips from Hisilicon, and that seems to make it a bit awkward to insert
-a whole new arch/arm/mach- directory for one single SoC and create
-duplicate menuitems for Hisilicon.
-
-So, I'm wondering whereabouts I should place the data for the chips that
-I am working on, for the sake of organization and whatnot.
-
-Also, I've been having difficulty getting a response from Hisilicon
-regarding my request for source code for this and a few other of their
-chips running in our other, newer DVRs, even though a cursory
-examination after accessing the devices via telnet shows they do in fact
-run a busybox/linux/uClibc based system, with a number of GPL licensed
-libraries and kernel modules.
-
-Regards,
-	Marty
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160826/222521ef/attachment.sig>
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index efbc41a..a0bfcff 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -464,6 +464,8 @@ static int vop_enable(struct drm_crtc *crtc)
+ 	}
+ 
+ 	memcpy(vop->regs, vop->regsbak, vop->len);
++	vop_cfg_done(vop);
++
+ 	/*
+ 	 * At here, vop clock & iommu is enable, R/W vop regs would be safe.
+ 	 */
+@@ -513,6 +515,8 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
+ 		spin_unlock(&vop->reg_lock);
+ 	}
+ 
++	vop_cfg_done(vop);
++
+ 	drm_crtc_vblank_off(crtc);
+ 
+ 	/*
+-- 
+1.9.1
