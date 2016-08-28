@@ -1,42 +1,30 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun, 28 Aug 2016 18:47:25 +0200
-Subject: [PATCH 2/2] ARM64: dts: meson-gxbb: add the SDIO pins
-In-Reply-To: <20160828164725.19429-1-martin.blumenstingl@googlemail.com>
-References: <20160828164725.19429-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20160828164725.19429-3-martin.blumenstingl@googlemail.com>
+From: nicolas.iooss_linux@m4x.org (Nicolas Iooss)
+Date: Sun, 28 Aug 2016 18:58:15 +0200
+Subject: [PATCH 1/1] ARM: add printf format attribute to early_print()
+Message-ID: <20160828165815.25647-1-nicolas.iooss_linux@m4x.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This can be passed to the sd_emmc_a controller to which the SDIO module
-is connected (when available).
+Adding such an attribute is helpful to detect errors related to printf
+formats at compile-time.
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Signed-off-by: Nicolas Iooss <nicolas.iooss_linux@m4x.org>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/include/asm/setup.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index e2dae1a..6864523 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -355,6 +355,18 @@
- 					};
- 				};
+diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
+index 3613d7e9fc40..797b8505b49a 100644
+--- a/arch/arm/include/asm/setup.h
++++ b/arch/arm/include/asm/setup.h
+@@ -22,7 +22,7 @@
+ static const struct tagtable __tagtable_##fn __tag = { tag, fn }
  
-+				sdio_pins: sdio {
-+					mux {
-+						groups = "sdio_d0",
-+						       "sdio_d1",
-+						       "sdio_d2",
-+						       "sdio_d3",
-+						       "sdio_cmd",
-+						       "sdio_clk";
-+						function = "sdio";
-+					};
-+				};
-+
- 				uart_a_pins: uart_a {
- 					mux {
- 						groups = "uart_tx_a",
+ extern int arm_add_memory(u64 start, u64 size);
+-extern void early_print(const char *str, ...);
++extern __printf(1, 2) void early_print(const char *str, ...);
+ extern void dump_machine_table(void);
+ 
+ #ifdef CONFIG_ATAGS_PROC
 -- 
 2.9.3
