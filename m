@@ -1,75 +1,88 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 27 Aug 2016 16:12:32 -0700
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable BCM47xx/BCM5301x drivers
-Message-ID: <1472339552-9960-1-git-send-email-f.fainelli@gmail.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Sun, 28 Aug 2016 08:55:21 +0800
+Subject: [PATCH v2] ARM: dts: sun8i: enable UART1 for iNet D978 Rev2 board
+Message-ID: <20160828005521.58221-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a bunch of required drivers and subsystems:
+UART1 is connected to the bluetooth part of RTL8723BS WiFi/BT combo card
+on iNet D978 Rev2 board.
 
-- BCMA is the on-chip discoverable bus which registers a bunch of
-  peripherals
-- Enable the BCM47xx watchdog driver to get working system reboot
-- Enable the BCM47xx NVRAM/SPROM drivers to be able to fetch MAC
-  addresses and other variables needed for system operation
-- Make BGMAC (built-in Ethernet adapter) a module
+Enable the UART1 to make it possible to use the modified hciattach by
+Realtek to drive the BT part of RTL8723BS.
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+On the board no r_uart pins are found now (the onboard RX/TX pins are
+wired to PF2/PF4, which is muxed with mmc0), so also disabled it.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
- arch/arm/configs/multi_v7_defconfig | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Changes since v1:
+- Deleted r_uart.
+- Added the pinmux of uart1 at PG.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 2c8665cd9dc5..958ff2932f32 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -170,6 +170,11 @@ CONFIG_CAN_RCAR=m
- CONFIG_CAN_XILINXCAN=y
- CONFIG_CAN_MCP251X=y
- CONFIG_NET_DSA_BCM_SF2=m
-+CONFIG_B53=m
-+CONFIG_B53_SPI_DRIVER=m
-+CONFIG_B53_MDIO_DRIVER=m
-+CONFIG_B53_MMAP_DRIVER=m
-+CONFIG_B53_SRAB_DRIVER=m
- CONFIG_CAN_SUN4I=y
- CONFIG_BT=m
- CONFIG_BT_MRVL=m
-@@ -231,6 +236,7 @@ CONFIG_HIX5HD2_GMAC=y
- CONFIG_SUN4I_EMAC=y
- CONFIG_MACB=y
- CONFIG_BCMGENET=m
-+CONFIG_BGMAC_BCMA=y
- CONFIG_SYSTEMPORT=m
- CONFIG_NET_CALXEDA_XGMAC=y
- CONFIG_GIANFAR=y
-@@ -463,6 +469,7 @@ CONFIG_MESON_WATCHDOG=y
- CONFIG_DW_WATCHDOG=y
- CONFIG_DIGICOLOR_WATCHDOG=y
- CONFIG_BCM2835_WDT=y
-+CONFIG_BCM47XX_WATCHDOG=y
- CONFIG_BCM7038_WDT=m
- CONFIG_BCM_KONA_WDT=y
- CONFIG_MFD_ACT8945A=y
-@@ -791,6 +798,10 @@ CONFIG_KEYBOARD_NVEC=y
- CONFIG_SERIO_NVEC_PS2=y
- CONFIG_NVEC_POWER=y
- CONFIG_NVEC_PAZ00=y
-+CONFIG_BCMA=y
-+CONFIG_BCMA_HOST_SOC=y
-+CONFIG_BCMA_DRIVER_GMAC_CMN=y
-+CONFIG_BCMA_DRIVER_GPIO=y
- CONFIG_QCOM_GSBI=y
- CONFIG_QCOM_PM=y
- CONFIG_QCOM_SMEM=y
-@@ -867,6 +878,8 @@ CONFIG_NVMEM=y
- CONFIG_NVMEM_SUNXI_SID=y
- CONFIG_BCM2835_MBOX=y
- CONFIG_RASPBERRYPI_FIRMWARE=y
-+CONFIG_CONFIG_BCM47XX_NVRAM=y
-+CONFIG_BCM47XX_SPROM=y
- CONFIG_EXT4_FS=y
- CONFIG_AUTOFS4_FS=y
- CONFIG_MSDOS_FS=y
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi           | 14 ++++++++++++++
+ arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts | 20 ++++++++++++++++++++
+ 2 files changed, 34 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+index 7e05e09..d236104 100644
+--- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+@@ -361,6 +361,20 @@
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
+ 
++			uart1_pins_a: uart1 at 0 {
++				allwinner,pins = "PG6", "PG7";
++				allwinner,function = "uart1";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			uart1_pins_cts_rts_a: uart1_cts_rts at 0 {
++				allwinner,pins = "PG8", "PG9";
++				allwinner,function = "uart1";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
+ 			mmc0_pins_a: mmc0 at 0 {
+ 				allwinner,pins = "PF0", "PF1", "PF2",
+ 						 "PF3", "PF4", "PF5";
+diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+index 0f52cd9..a1f654a8 100644
+--- a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
++++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+@@ -49,6 +49,15 @@
+ 	model = "INet-D978 Rev 02";
+ 	compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
+ 
++	aliases {
++		/delete-property/serial0;
++		serial1 = &uart1;
++	};
++
++	chosen {
++		/delete-property/stdout-path;
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		pinctrl-names = "default";
+@@ -86,3 +95,14 @@
+ 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 	};
+ };
++
++&r_uart {
++	status = "disabled";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins_a>,
++		    <&uart1_pins_cts_rts_a>;
++	status = "okay";
++};
 -- 
-2.7.4
+2.9.3
