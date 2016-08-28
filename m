@@ -1,292 +1,443 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sun, 28 Aug 2016 17:21:08 +0200
-Subject: [RFC PATCH] clk: rockchip: rk3399: support pll setting
- automatically
-In-Reply-To: <1470144852-20708-1-git-send-email-zhengxing@rock-chips.com>
-References: <1470144852-20708-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <4830789.1bI8OsvZy1@phil>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 28 Aug 2016 18:00:05 +0200
+Subject: [PATCH v2] input: touchscreen: Add support for Elan eKTF2127
+ touchscreen controller
+Message-ID: <20160828160005.20415-1-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xing, Elaine,
+From: Siebren Vroegindeweij <siebren.vroegindeweij@hotmail.com>
 
-Am Dienstag, 2. August 2016, 21:34:12 schrieb Xing Zheng:
-> From: Elaine Zhang <zhangqing@rock-chips.com>
-> 
-> The goal is that we can configure the most suitable pll params
-> automatically.
-> 
-> If setting freq is not supported in rockchip_pll_rate_table
-> rk3399_pll_rates[], we can set pll params automatically.
-> 
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+This adds a driver for the Elan eKTF2127 touchscreen controller,
+which speaks an i2c protocol which is distinctly different from
+the already supported eKTH controllers.
 
-first off, I really like that idea of calculating the generic pll frequencies 
-instead of duplicating these entries in every soc clock driver.
+Signed-off-by: Michel Verlaan <michel.verl@gmail.com>
+Signed-off-by: Siebren Vroegindeweij <siebren.vroegindeweij@hotmail.com>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v2:
+-Improve devicetree bindings document
+-Use touchscreen_parse_properties and touchscreen_report_pos instead of DIY
+-Remove a bunch of unused defines (copy and paste leftover from chipone driver)
+-Some other minor cleanups and review comments addressed
+-Add defines for some command / address hex-values
+-Check packet header in interrupt handler
+---
+ .../bindings/input/touchscreen/ektf2127.txt        |  27 ++
+ drivers/input/touchscreen/Kconfig                  |  12 +
+ drivers/input/touchscreen/Makefile                 |   1 +
+ drivers/input/touchscreen/ektf2127.c               | 333 +++++++++++++++++++++
+ 4 files changed, 373 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/ektf2127.txt
+ create mode 100644 drivers/input/touchscreen/ektf2127.c
 
-Please also provide a follow up patch, removing the then unneeded frequencies 
-from the rate tables.
-
-I still have some comments inline below:
-
-> ---
-> 
->  drivers/clk/rockchip/clk-pll.c |  213
-> +++++++++++++++++++++++++++++++++++++--- 1 file changed, 200 insertions(+),
-> 13 deletions(-)
-> 
-> diff --git a/drivers/clk/rockchip/clk-pll.c b/drivers/clk/rockchip/clk-pll.c
-> index 35994e8..08979f9 100644
-> --- a/drivers/clk/rockchip/clk-pll.c
-> +++ b/drivers/clk/rockchip/clk-pll.c
-> @@ -23,6 +23,7 @@
->  #include <linux/clk-provider.h>
->  #include <linux/regmap.h>
->  #include <linux/clk.h>
-> +#include <linux/gcd.h>
->  #include "clk.h"
-> 
->  #define PLL_MODE_MASK		0x3
-> @@ -54,6 +55,200 @@ struct rockchip_clk_pll {
->  #define to_rockchip_clk_pll_nb(nb) \
->  			container_of(nb, struct rockchip_clk_pll, clk_nb)
-> 
-> +#define MHZ			(1000UL * 1000UL)
-> +#define KHZ			(1000UL)
-> +
-> +/* CLK_PLL_TYPE_RK3066_AUTO type ops */
-
-wouldn't that better be 
-/* rk3066 pll frequency ranges */
-
-> +#define PLL_FREF_MIN		(269 * KHZ)
-> +#define PLL_FREF_MAX		(2200 * MHZ)
-> +
-> +#define PLL_FVCO_MIN		(440 * MHZ)
-> +#define PLL_FVCO_MAX		(2200 * MHZ)
-> +
-> +#define PLL_FOUT_MIN		(27500 * KHZ)
-> +#define PLL_FOUT_MAX		(2200 * MHZ)
-> +
-> +#define PLL_NF_MAX		(4096)
-> +#define PLL_NR_MAX		(64)
-> +#define PLL_NO_MAX		(16)
-
-instead of using a comment, please prefix these constants accordingly, like
-	RK3066_PLL_FVCO_MIN
-etc, especially as some of those contstraints actually _are different_ between 
-implementations. See rk3188 vs. rk3288 for example. With the current static 
-rate table we just have matching values already, so never had to care about 
-that.
-
-Another idea might be to have the constraints as table in the soc clock-
-drivers, similar to how we transfer we handle the rate tables right now.
-
-> +
-> +/* CLK_PLL_TYPE_RK3036/3366/3399_AUTO type ops */
-> +#define MIN_FOUTVCO_FREQ	(800 * MHZ)
-> +#define MAX_FOUTVCO_FREQ	(2000 * MHZ)
-
-same here, RK3036_PLL_FOUTVCO_MIN etc.
-
-> +
-> +static struct rockchip_pll_rate_table auto_table;
-> +
-> +static struct rockchip_pll_rate_table *rk_pll_rate_table_get(void)
-> +{
-> +	return &auto_table;
-> +}
-> +
-> +static int rockchip_pll_clk_set_postdiv(unsigned long fout_hz,
-
-the rk3036, rk3366, rk3399 pll type won't be the last one Rockchip will use, 
-so please add a prefix. Same for everything else below :-) .
-
-> +					u32 *postdiv1,
-> +					u32 *postdiv2,
-> +					u32 *foutvco)
-> +{
-> +	unsigned long freq;
-> +
-> +	if (fout_hz < MIN_FOUTVCO_FREQ) {
-> +		for (*postdiv1 = 1; *postdiv1 <= 7; (*postdiv1)++) {
-> +			for (*postdiv2 = 1; *postdiv2 <= 7; (*postdiv2)++) {
-> +				freq = fout_hz * (*postdiv1) * (*postdiv2);
-> +				if (freq >= MIN_FOUTVCO_FREQ &&
-> +				    freq <= MAX_FOUTVCO_FREQ) {
-> +					*foutvco = freq;
-> +					return 0;
-> +				}
-> +			}
-> +			pr_err("CANNOT FIND postdiv1/2 to make fout in range from 800M to
-> 2000M,fout = %lu\n", +			       fout_hz);
-> +		}
-> +	} else {
-> +		*postdiv1 = 1;
-> +		*postdiv2 = 1;
-> +	}
-> +	return 0;
-> +}
-> +
-> +static struct rockchip_pll_rate_table *
-> +rockchip_pll_clk_set_by_auto(struct rockchip_clk_pll *pll,
-> +			     unsigned long fin_hz,
-> +			     unsigned long fout_hz)
-> +{
-> +	struct rockchip_pll_rate_table *rate_table = rk_pll_rate_table_get();
-> +	/* FIXME set postdiv1/2 always 1*/
-> +	u32 foutvco = fout_hz;
-> +	u64 fin_64, frac_64;
-> +	u32 f_frac, postdiv1, postdiv2;
-> +	unsigned long clk_gcd = 0;
-> +
-> +	if (fin_hz == 0 || fout_hz == 0 || fout_hz == fin_hz)
-> +		return NULL;
-> +
-> +	rockchip_pll_clk_set_postdiv(fout_hz, &postdiv1, &postdiv2, &foutvco);
-> +	rate_table->postdiv1 = postdiv1;
-> +	rate_table->postdiv2 = postdiv2;
-> +	rate_table->dsmpd = 1;
-> +
-> +	if (fin_hz / MHZ * MHZ == fin_hz && fout_hz / MHZ * MHZ == fout_hz) {
-> +		fin_hz /= MHZ;
-> +		foutvco /= MHZ;
-> +		clk_gcd = gcd(fin_hz, foutvco);
-> +		rate_table->refdiv = fin_hz / clk_gcd;
-> +		rate_table->fbdiv = foutvco / clk_gcd;
-> +
-> +		rate_table->frac = 0;
-> +
-> +		pr_debug("fin = %lu, fout = %lu, clk_gcd = %lu, refdiv = %u, fbdiv = 
-%u,
-> postdiv1 = %u, postdiv2 = %u, frac = %u\n", +			 fin_hz, fout_hz, 
-clk_gcd,
-> rate_table->refdiv,
-> +			 rate_table->fbdiv, rate_table->postdiv1,
-> +			 rate_table->postdiv2, rate_table->frac);
-> +	} else {
-> +		pr_debug("frac div running, fin_hz = %lu, fout_hz = %lu, fin_INT_mhz =
-> %lu, fout_INT_mhz = %lu\n", +			 fin_hz, fout_hz,
-> +			 fin_hz / MHZ * MHZ,
-> +			 fout_hz / MHZ * MHZ);
-> +		pr_debug("frac get postdiv1 = %u,  postdiv2 = %u, foutvco = %u\n",
-> +			 rate_table->postdiv1, rate_table->postdiv2, foutvco);
-> +		clk_gcd = gcd(fin_hz / MHZ, foutvco / MHZ);
-> +		rate_table->refdiv = fin_hz / MHZ / clk_gcd;
-> +		rate_table->fbdiv = foutvco / MHZ / clk_gcd;
-> +		pr_debug("frac get refdiv = %u,  fbdiv = %u\n",
-> +			 rate_table->refdiv, rate_table->fbdiv);
-> +
-> +		rate_table->frac = 0;
-> +
-> +		f_frac = (foutvco % MHZ);
-> +		fin_64 = fin_hz;
-> +		do_div(fin_64, (u64)rate_table->refdiv);
-> +		frac_64 = (u64)f_frac << 24;
-> +		do_div(frac_64, fin_64);
-> +		rate_table->frac = (u32)frac_64;
-> +		if (rate_table->frac > 0)
-> +			rate_table->dsmpd = 0;
-> +		pr_debug("frac = %x\n", rate_table->frac);
-> +	}
-> +	return rate_table;
-> +}
-> +
-> +static struct rockchip_pll_rate_table *
-> +rockchip_rk3066_pll_clk_set_by_auto(struct rockchip_clk_pll *pll,
-> +				    unsigned long fin_hz,
-> +				    unsigned long fout_hz)
-> +{
-> +	struct rockchip_pll_rate_table *rate_table = rk_pll_rate_table_get();
-> +	u32 nr, nf, no, nonr;
-> +	u32 nr_out, nf_out, no_out;
-> +	u32 n;
-> +	u32 numerator, denominator;
-> +	u64 fref, fvco, fout;
-> +	unsigned long clk_gcd = 0;
-> +
-> +	nr_out = PLL_NR_MAX + 1;
-> +	nf_out = 0;
-> +	no_out = 0;
-> +
-> +	if (fin_hz == 0 || fout_hz == 0 || fout_hz == fin_hz)
-> +		return NULL;
-> +
-> +	clk_gcd = gcd(fin_hz, fout_hz);
-> +
-> +	numerator = fout_hz / clk_gcd;
-> +	denominator = fin_hz / clk_gcd;
-> +
-> +	for (n = 1;; n++) {
-> +		nf = numerator * n;
-> +		nonr = denominator * n;
-> +		if (nf > PLL_NF_MAX || nonr > (PLL_NO_MAX * PLL_NR_MAX))
-> +			break;
-> +
-> +		for (no = 1; no <= PLL_NO_MAX; no++) {
-> +			if (!(no == 1 || !(no % 2)))
-> +				continue;
-> +
-> +			if (nonr % no)
-> +				continue;
-> +			nr = nonr / no;
-> +
-> +			if (nr > PLL_NR_MAX)
-> +				continue;
-> +
-> +			fref = fin_hz / nr;
-> +			if (fref < PLL_FREF_MIN || fref > PLL_FREF_MAX)
-> +				continue;
-> +
-> +			fvco = fref * nf;
-> +			if (fvco < PLL_FVCO_MIN || fvco > PLL_FVCO_MAX)
-> +				continue;
-> +
-> +			fout = fvco / no;
-> +			if (fout < PLL_FOUT_MIN || fout > PLL_FOUT_MAX)
-> +				continue;
-> +
-> +			/* select the best from all available PLL settings */
-> +			if ((no > no_out) ||
-> +			    ((no == no_out) && (nr < nr_out))) {
-> +				nr_out = nr;
-> +				nf_out = nf;
-> +				no_out = no;
-> +			}
-> +		}
-> +	}
-> +
-> +	/* output the best PLL setting */
-> +	if ((nr_out <= PLL_NR_MAX) && (no_out > 0)) {
-> +		if (rate_table->nr && rate_table->nf && rate_table->no) {
-> +			rate_table->nr = nr_out;
-> +			rate_table->nf = nf_out;
-> +			rate_table->no = no_out;
-> +		}
-> +	} else {
-> +		return NULL;
-> +	}
-> +
-> +	return rate_table;
-> +}
-> +
->  static const struct rockchip_pll_rate_table *rockchip_get_pll_settings(
->  			    struct rockchip_clk_pll *pll, unsigned long rate)
->  {
-> @@ -65,24 +260,16 @@ static const struct rockchip_pll_rate_table
-> *rockchip_get_pll_settings( return &rate_table[i];
->  	}
-> 
-> -	return NULL;
-> +	if (pll->type == pll_rk3066)
-
-this should be a switch as well, to prepare for other pll types.
-
-> +		return rockchip_rk3066_pll_clk_set_by_auto(pll, 24 * MHZ, rate);
-> +	else
-> +		return rockchip_pll_clk_set_by_auto(pll, 24 * MHZ, rate);
->  }
-> 
-
-Heiko
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/ektf2127.txt b/Documentation/devicetree/bindings/input/touchscreen/ektf2127.txt
+new file mode 100644
+index 0000000..5a19f4c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/touchscreen/ektf2127.txt
+@@ -0,0 +1,27 @@
++* Elan eKTF2127 I2C touchscreen controller
++
++Required properties:
++ - compatible		  : "elan,ektf2127"
++ - reg			  : I2C slave address of the chip (0x40)
++ - interrupt-parent	  : a phandle pointing to the interrupt controller
++			    serving the interrupt for this chip
++ - interrupts		  : interrupt specification for the ektf2127 interrupt
++ - power-gpios		  : GPIO specification for the pin connected to the
++			    ektf2127's wake input. This needs to be driven high
++			    to take ektf2127 out of it's low power state
++
++For additional optional properties see: touchscreen.txt
++
++Example:
++
++i2c at 00000000 {
++	ektf2127: touchscreen at 15 {
++		compatible = "elan,ektf2127";
++		reg = <0x15>;
++		interrupt-parent = <&pio>;
++		interrupts = <6 11 IRQ_TYPE_EDGE_FALLING>
++		power-gpios = <&pio 1 3 GPIO_ACTIVE_HIGH>;
++		touchscreen-inverted-x;
++		touchscreen-swapped-x-y;
++	};
++};
+diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
+index 3b3d07a..880aa50 100644
+--- a/drivers/input/touchscreen/Kconfig
++++ b/drivers/input/touchscreen/Kconfig
+@@ -396,6 +396,18 @@ config TOUCHSCREEN_ELAN
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called elants_i2c.
+ 
++config TOUCHSCREEN_EKTF2127
++	tristate "Elan eKTF2127 I2C touchscreen"
++	depends on I2C
++	help
++	  Say Y here if you have an Elan eKTF2127 touchscreen
++	  connected to your system.
++
++	  If unsure, say N.
++
++	  To compile this driver as a module, choose M here: the
++	  module will be called ektf2127.
++
+ config TOUCHSCREEN_ELO
+ 	tristate "Elo serial touchscreens"
+ 	select SERIO
+diff --git a/drivers/input/touchscreen/Makefile b/drivers/input/touchscreen/Makefile
+index 33b2eb8..db876ef 100644
+--- a/drivers/input/touchscreen/Makefile
++++ b/drivers/input/touchscreen/Makefile
+@@ -33,6 +33,7 @@ obj-$(CONFIG_TOUCHSCREEN_HAMPSHIRE)	+= hampshire.o
+ obj-$(CONFIG_TOUCHSCREEN_GUNZE)		+= gunze.o
+ obj-$(CONFIG_TOUCHSCREEN_EETI)		+= eeti_ts.o
+ obj-$(CONFIG_TOUCHSCREEN_ELAN)		+= elants_i2c.o
++obj-$(CONFIG_TOUCHSCREEN_EKTF2127)	+= ektf2127.o
+ obj-$(CONFIG_TOUCHSCREEN_ELO)		+= elo.o
+ obj-$(CONFIG_TOUCHSCREEN_EGALAX)	+= egalax_ts.o
+ obj-$(CONFIG_TOUCHSCREEN_EGALAX_SERIAL)	+= egalax_ts_serial.o
+diff --git a/drivers/input/touchscreen/ektf2127.c b/drivers/input/touchscreen/ektf2127.c
+new file mode 100644
+index 0000000..512a394
+--- /dev/null
++++ b/drivers/input/touchscreen/ektf2127.c
+@@ -0,0 +1,333 @@
++/*
++ * Driver for ELAN eKTF2127 i2c touchscreen controller
++ *
++ * For this driver the layout of the Chipone icn8318 i2c
++ * touchscreencontroller is used.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * Author:
++ * Michel Verlaan <michel.verl@gmail.com>
++ * Siebren Vroegindeweij <siebren.vroegindeweij@hotmail.com>
++ *
++ * Original chipone_icn8318 driver:
++ * Hans de Goede <hdegoede@redhat.com>
++ */
++
++#include <linux/gpio/consumer.h>
++#include <linux/interrupt.h>
++#include <linux/i2c.h>
++#include <linux/input.h>
++#include <linux/input/mt.h>
++#include <linux/input/touchscreen.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/delay.h>
++
++/* Packet header defines (first byte of data send / received) */
++#define EKTF2127_NOISE			0x40
++#define EKTF2127_RESPONSE		0x52
++#define EKTF2127_REQUEST		0x53
++#define EKTF2127_HELLO			0x55
++#define EKTF2127_REPORT			0x5d
++#define EKTF2127_CALIB_DONE		0x66
++
++/* Register deines (second byte of data send / received) */
++#define EKTF2127_ENV_NOISY		0x41
++#define EKTF2127_HEIGHT			0x60
++#define EKTF2127_WIDTH			0x63
++
++/* 2 bytes header + 5 * 3 bytes coordinates + 3 bytes pressure info + footer */
++#define EKTF2127_TOUCH_REPORT_SIZE	21
++#define EKTF2127_MAX_TOUCHES		5
++
++struct ektf2127_data {
++	struct i2c_client *client;
++	struct input_dev *input;
++	struct gpio_desc *power_gpios;
++	struct touchscreen_properties prop;
++};
++
++static void retrieve_coordinates(struct input_mt_pos *touches,
++				int touch_count, char *buf)
++{
++	int index = 0;
++	int i = 0;
++
++	for (i = 0; i < touch_count; i++) {
++		index = 2 + i * 3;
++
++		touches[i].x = (buf[index] & 0x0f);
++		touches[i].x <<= 8;
++		touches[i].x |= buf[index + 2];
++
++		touches[i].y = (buf[index] & 0xf0);
++		touches[i].y <<= 4;
++		touches[i].y |= buf[index + 1];
++	}
++}
++
++static irqreturn_t ektf2127_irq(int irq, void *dev_id)
++{
++	struct ektf2127_data *data = dev_id;
++	struct device *dev = &data->client->dev;
++	struct input_mt_pos touches[EKTF2127_MAX_TOUCHES];
++	int touch_count;
++	int slots[EKTF2127_MAX_TOUCHES];
++	char buff[EKTF2127_TOUCH_REPORT_SIZE];
++	int i, ret;
++
++	ret = i2c_master_recv(data->client, buff, EKTF2127_TOUCH_REPORT_SIZE);
++	if (ret != EKTF2127_TOUCH_REPORT_SIZE) {
++		dev_err(dev, "Error reading touch data\n");
++		return IRQ_HANDLED;
++	}
++
++	switch (buff[0]) {
++	case EKTF2127_REPORT:
++		/* Handled below */
++		break;
++	case EKTF2127_NOISE:
++		if (buff[1] == EKTF2127_ENV_NOISY)
++			dev_dbg(dev, "Environment is electically noisy\n");
++		return IRQ_HANDLED;
++	case EKTF2127_HELLO:
++	case EKTF2127_CALIB_DONE:
++		return IRQ_HANDLED;
++	default:
++		dev_err(dev, "Unexpected packet header byte %02x\n", buff[0]);
++		return IRQ_HANDLED;
++	}
++
++	touch_count = buff[1] & 0x07;
++
++	if (touch_count > EKTF2127_MAX_TOUCHES) {
++		dev_err(dev, "Too many touches %d > %d\n",
++			touch_count, EKTF2127_MAX_TOUCHES);
++		touch_count = EKTF2127_MAX_TOUCHES;
++	}
++
++	retrieve_coordinates(touches, touch_count, buff);
++	input_mt_assign_slots(data->input, slots, touches,
++			      touch_count, 0);
++
++	for (i = 0; i < touch_count; i++) {
++		input_mt_slot(data->input, slots[i]);
++		input_mt_report_slot_state(data->input, MT_TOOL_FINGER, true);
++		touchscreen_report_pos(data->input, &data->prop, touches[i].x,
++			touches[i].y, true);
++	}
++
++	input_mt_sync_frame(data->input);
++	input_sync(data->input);
++
++	return IRQ_HANDLED;
++}
++
++static int ektf2127_start(struct input_dev *dev)
++{
++	struct ektf2127_data *data = input_get_drvdata(dev);
++
++	enable_irq(data->client->irq);
++	gpiod_set_value_cansleep(data->power_gpios, 1);
++
++	return 0;
++}
++
++static void ektf2127_stop(struct input_dev *dev)
++{
++	struct ektf2127_data *data = input_get_drvdata(dev);
++
++	disable_irq(data->client->irq);
++	gpiod_set_value_cansleep(data->power_gpios, 0);
++}
++
++static int ektf2127_suspend(struct device *dev)
++{
++	struct ektf2127_data *data = i2c_get_clientdata(to_i2c_client(dev));
++
++	mutex_lock(&data->input->mutex);
++	if (data->input->users)
++		ektf2127_stop(data->input);
++	mutex_unlock(&data->input->mutex);
++
++	return 0;
++}
++
++static int ektf2127_resume(struct device *dev)
++{
++	struct ektf2127_data *data = i2c_get_clientdata(to_i2c_client(dev));
++
++	mutex_lock(&data->input->mutex);
++	if (data->input->users)
++		ektf2127_start(data->input);
++	mutex_unlock(&data->input->mutex);
++
++	return 0;
++}
++
++static SIMPLE_DEV_PM_OPS(ektf2127_pm_ops, ektf2127_suspend,
++			ektf2127_resume);
++
++static int ektf2127_probe(struct i2c_client *client,
++			 const struct i2c_device_id *id)
++{
++	struct device *dev = &client->dev;
++	struct ektf2127_data *data;
++	struct input_dev *input;
++	char buff[4];
++	int error, max_x, max_y, ret = 0;
++
++	if (!client->irq) {
++		dev_err(dev, "Error no irq specified\n");
++		return -EINVAL;
++	}
++
++	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	/* This requests the gpio *and* turns on the touchscreen controller */
++	data->power_gpios = devm_gpiod_get(dev, "power", GPIOD_OUT_HIGH);
++	if (IS_ERR(data->power_gpios)) {
++		error = PTR_ERR(data->power_gpios);
++		if (error != -EPROBE_DEFER)
++			dev_err(dev, "Error getting power gpio: %d\n", error);
++		return error;
++	}
++
++	input = devm_input_allocate_device(dev);
++	if (!input)
++		return -ENOMEM;
++
++	input->name = client->name;
++	input->id.bustype = BUS_I2C;
++	input->open = ektf2127_start;
++	input->close = ektf2127_stop;
++
++	data->client = client;
++
++	/* Read hello (ignore result, depends on initial power state) */
++	msleep(20);
++	i2c_master_recv(data->client, buff, 4);
++
++	/* Read resolution from chip */
++
++	/* Request width */
++	buff[0] = EKTF2127_REQUEST;
++	buff[1] = EKTF2127_WIDTH;
++	buff[2] = 0x00;
++	buff[3] = 0x00;
++	ret = i2c_master_send(data->client, buff, 4);
++	if (ret != 4) {
++		dev_err(dev, "Error requesting width\n");
++		return ret < 0 ? ret : -EIO;
++	}
++
++	msleep(20);
++
++	/* Read response */
++	ret = i2c_master_recv(data->client, buff, 4);
++	if (ret != 4) {
++		dev_err(dev, "Error receiving width\n");
++		return ret < 0 ? ret : -EIO;
++	}
++
++	if ((buff[0] == EKTF2127_RESPONSE) && (buff[1] == EKTF2127_WIDTH)) {
++		max_x = (((buff[3] & 0xf0) << 4) | buff[2]) - 1;
++	} else {
++		dev_err(dev, "Error unexpected width data\n");
++		return -EIO;
++	}
++
++	/* Request height */
++	buff[0] = EKTF2127_REQUEST;
++	buff[1] = EKTF2127_HEIGHT;
++	buff[2] = 0x00;
++	buff[3] = 0x00;
++	ret = i2c_master_send(data->client, buff, 4);
++	if (ret != 4) {
++		dev_err(dev, "Error requesting height\n");
++		return ret < 0 ? ret : -EIO;
++	}
++
++	msleep(20);
++
++	/* Read response */
++	ret = i2c_master_recv(data->client, buff, 4);
++	if (ret != 4) {
++		dev_err(dev, "Error receiving height\n");
++		return ret < 0 ? ret : -EIO;
++	}
++
++	if ((buff[0] == EKTF2127_RESPONSE) && (buff[1] == EKTF2127_HEIGHT)) {
++		max_y = (((buff[3] & 0xf0) << 4) | buff[2]) - 1;
++	} else {
++		dev_err(dev, "Error unexpected height data\n");
++		return -EIO;
++	}
++
++	input_set_abs_params(input, ABS_MT_POSITION_X, 0, max_x, 0, 0);
++	input_set_abs_params(input, ABS_MT_POSITION_Y, 0, max_y, 0, 0);
++	touchscreen_parse_properties(input, true, &data->prop);
++
++	error = input_mt_init_slots(input, EKTF2127_MAX_TOUCHES,
++				    INPUT_MT_DIRECT | INPUT_MT_DROP_UNUSED
++				    | INPUT_MT_TRACK);
++	if (error)
++		return error;
++
++	data->input = input;
++	input_set_drvdata(input, data);
++
++	error = devm_request_threaded_irq(dev, client->irq, NULL, ektf2127_irq,
++					  IRQF_ONESHOT, client->name, data);
++	if (error) {
++		dev_err(dev, "Error requesting irq: %d\n", error);
++		return error;
++	}
++
++	/* Stop device till opened */
++	ektf2127_stop(data->input);
++
++	error = input_register_device(input);
++	if (error)
++		return error;
++
++	i2c_set_clientdata(client, data);
++
++	return 0;
++}
++
++#ifdef CONFIG_OF
++static const struct of_device_id ektf2127_of_match[] = {
++	{ .compatible = "elan,ektf2127" },
++	{}
++};
++MODULE_DEVICE_TABLE(of, ektf2127_of_match);
++#endif
++
++static const struct i2c_device_id ektf2127_i2c_id[] = {
++	{ "ektf2127", 0 },
++	{}
++};
++MODULE_DEVICE_TABLE(i2c, ektf2127_i2c_id);
++
++static struct i2c_driver ektf2127_driver = {
++	.driver = {
++		.name	= "elan_ektf2127",
++		.pm	= &ektf2127_pm_ops,
++		.of_match_table = of_match_ptr(ektf2127_of_match),
++	},
++	.probe = ektf2127_probe,
++	.id_table = ektf2127_i2c_id,
++};
++
++module_i2c_driver(ektf2127_driver);
++
++MODULE_DESCRIPTION("ELAN eKTF2127 I2C Touchscreen Driver");
++MODULE_AUTHOR("Michel Verlaan, Siebren Vroegindeweij");
++MODULE_LICENSE("GPL");
+-- 
+2.9.3
