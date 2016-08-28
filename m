@@ -1,30 +1,34 @@
-From: nicolas.iooss_linux@m4x.org (Nicolas Iooss)
-Date: Sun, 28 Aug 2016 18:58:15 +0200
-Subject: [PATCH 1/1] ARM: add printf format attribute to early_print()
-Message-ID: <20160828165815.25647-1-nicolas.iooss_linux@m4x.org>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Sun, 28 Aug 2016 19:32:44 +0200
+Subject: [PATCH 2/4] ARM: tegra: nyan: Use external control for bq24735 charger
+In-Reply-To: <20160828173246.32621-1-contact@paulk.fr>
+References: <20160828173246.32621-1-contact@paulk.fr>
+Message-ID: <20160828173246.32621-2-contact@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding such an attribute is helpful to detect errors related to printf
-formats at compile-time.
+Nyan boards come with an embedded controller that controls when to
+enable and disable the charge. Thus, it should not be left up to the
+kernel to handle that.
 
-Signed-off-by: Nicolas Iooss <nicolas.iooss_linux@m4x.org>
+Using the ti,external-control property allows specifying this use-case.
+
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
 ---
- arch/arm/include/asm/setup.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/tegra124-nyan.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
-index 3613d7e9fc40..797b8505b49a 100644
---- a/arch/arm/include/asm/setup.h
-+++ b/arch/arm/include/asm/setup.h
-@@ -22,7 +22,7 @@
- static const struct tagtable __tagtable_##fn __tag = { tag, fn }
+diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi b/arch/arm/boot/dts/tegra124-nyan.dtsi
+index 30a77ec..18db797 100644
+--- a/arch/arm/boot/dts/tegra124-nyan.dtsi
++++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
+@@ -329,6 +329,7 @@
+ 					ti,ac-detect-gpios = <&gpio
+ 							TEGRA_GPIO(J, 0)
+ 							GPIO_ACTIVE_HIGH>;
++					ti,external-control;
+ 				};
  
- extern int arm_add_memory(u64 start, u64 size);
--extern void early_print(const char *str, ...);
-+extern __printf(1, 2) void early_print(const char *str, ...);
- extern void dump_machine_table(void);
- 
- #ifdef CONFIG_ATAGS_PROC
+ 				battery: sbs-battery at b {
 -- 
 2.9.3
