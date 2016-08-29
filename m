@@ -1,47 +1,41 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 29 Aug 2016 13:44:18 +0800
-Subject: [PATCH] ARM: imx6: enable WAIT mode hardware workaround for imx6sx
-In-Reply-To: <1471885400-9140-1-git-send-email-Anson.Huang@nxp.com>
-References: <1471885400-9140-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <20160829054418.GB31367@tiger>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 29 Aug 2016 07:49:18 +0200
+Subject: MFC: different h264 profile and level output the same size encoded
+ result
+In-Reply-To: <3c01aadb-259f-0f38-47be-8170a87a7d7b@rock-chips.com>
+References: <3c01aadb-259f-0f38-47be-8170a87a7d7b@rock-chips.com>
+Message-ID: <75aa1b3d-9270-3af1-f74b-dba4ceeb41a0@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2016 at 01:03:20AM +0800, Anson Huang wrote:
-> Need to enable INT_MEM_CLK_LPM bit in CCM_CGPR for WAIT mode,
-> without this bit set, if there is pending interrupt during
-> ARM platform entering WAIT mode without power gating, cache
-> data will be corrupted, this is a hardware workaround for WAIT
-> mode and must be enabled.
-> 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> ---
->  arch/arm/mach-imx/cpuidle-imx6sx.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c b/arch/arm/mach-imx/cpuidle-imx6sx.c
-> index 3c6672b..41cdce6 100644
-> --- a/arch/arm/mach-imx/cpuidle-imx6sx.c
-> +++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
-> @@ -90,6 +90,7 @@ static struct cpuidle_driver imx6sx_cpuidle_driver = {
->  
->  int __init imx6sx_cpuidle_init(void)
->  {
-> +	imx6q_set_int_mem_clk_lpm(true);
+Hi,
 
-It might be the time to rename the function to imx6_set_int_mem_clk_lpm()
-with a beforehand patch.
+On 08/27/2016 11:55 AM, Randy Li wrote:
+> Hi:
+>
+>    I have been reported that the setting the profile, level and bitrate 
+> through the v4l2 extra controls would not make the encoded result 
+> different. I tried it recently, it is true. Although the h264 parser 
+> would tell me the result have been applied as different h264 profile and 
+> level, but size is the same.
+>
+> You may try this in Gstreamer.
+>
+> gst-launch-1.0 -v \
+> videotestsrc num-buffers=500 ! video/x-raw, width=1920,height=1080 ! \
+> videoconvert ! \
+> v4l2video4h264enc 
+> extra-controls="controls,h264_profile=1,video_bitrate=100;" ! \
+> h264parse ! matroskamux ! filesink location=/tmp/1.mkv
+>
+> Is there any way to reduce the size of MFC encoded data?
+>
 
-Shawn
+There is control called rc_enable (rate control enable), it must be set
+to one if you want to control bitrate.
+This control confuses many users, I guess it cannot be removed as it
+is already part of UAPI, but enabling it internally by the driver
+if user sets bitrate, profille, etc, would make it more saner.
 
->  	imx6_enable_rbc(false);
->  	/*
->  	 * set ARM power up/down timing to the fastest,
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards
+Andrzej
