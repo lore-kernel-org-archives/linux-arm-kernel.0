@@ -1,85 +1,58 @@
-From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Mon, 29 Aug 2016 13:31:13 -0500
-Subject: [PATCH 2/2] arm64: dts: add stdout-path to chosen node for
- ls2080a/ls1043a boards
-In-Reply-To: <1472495473-27387-1-git-send-email-stuart.yoder@nxp.com>
-References: <1472495473-27387-1-git-send-email-stuart.yoder@nxp.com>
-Message-ID: <1472495473-27387-3-git-send-email-stuart.yoder@nxp.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 29 Aug 2016 20:38:31 +0200
+Subject: [RFC PATCH 0/3] ARm64: amlogic: Introduce common GX family dtsi
+In-Reply-To: <CAOQ7t2YGbASh7v25wgDspKNWgFOcRsikJs_WZptn+LkVXmaHig@mail.gmail.com>
+References: <1472457371-1305-1-git-send-email-narmstrong@baylibre.com>
+ <CAOQ7t2YGbASh7v25wgDspKNWgFOcRsikJs_WZptn+LkVXmaHig@mail.gmail.com>
+Message-ID: <2983d731-82fd-63fc-7541-8c1d6a929416@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a default stdout-path to chosen node for ls2080a/ls1043a boards to
-allow booting kernels without specifying console info in bootargs.
+Am 29.08.2016 um 10:01 schrieb Carlo Caione:
+> On Mon, Aug 29, 2016 at 9:56 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+>> The new Amlogic GLX SoCs (S905X and S905D) are part of the Meson GX family so
+>> they share some basic characteritics that can be described in a common GX
+>> dtsi file used by the Meson GXBB and Meson GXL dtsi.
+>>
+>> This patchset introduces the common dtsi and switches the GLX and GXBB to use
+>> the common dtsi, the GXBB dtsi is reformated to handle this situation.
+>>
+>> This patchset depends on Carlo Caione "ARM64: dts: amlogic: Add basic support for Amlogic S905X" [1]
+>>
+>> [1] http://lkml.kernel.org/r/1472382113-10754-1-git-send-email-carlo at caione.org
+>>
+>> Neil Armstrong (3):
+>>   ARM64: dts: amlogic: Add Meson GX Family common dtsi
+>>   ARM64: dts: amlogic: Switch Meson GXL dtsi to use common GX dtsi
+>>   ARM64: dts: amlogic: Switch Meson GXBB dtsi to use common GX dtsi
+> 
+> FWIW
+> Acked-by: Carlo Caione <carlo@endlessm.com>
 
-Signed-off-by: Stuart Yoder <stuart.yoder@nxp.com>
----
--v2
-  -no change
+Adding an unused .dtsi duplicating GXBB makes me uneasy.
 
- arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts | 4 ++++
- arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts | 4 ++++
- arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts | 3 +++
- arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts | 4 ++++
- 4 files changed, 15 insertions(+)
+Any chance we can simplify this to at most two steps?
+1) Move code from gxbb to gx (1/3 + 3/3)
+2) Add gxl using gx ("Add basic support for Amlogic S905X" + 2/3)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-index f813d67..dd9e919 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-@@ -61,6 +61,10 @@
- 		serial2 = &duart2;
- 		serial3 = &duart3;
- 	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
- };
- 
- &duart0 {
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-index 8031cde..d2313e0 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-@@ -57,6 +57,10 @@
- 		serial2 = &duart2;
- 		serial3 = &duart3;
- 	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
- };
- 
- &i2c0 {
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
-index e8801fa..b0dd010 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
-@@ -57,6 +57,9 @@
- 		serial1 = &serial1;
- 	};
- 
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
- };
- 
- &esdhc {
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
-index e127f0b..ad0ebb8 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
-@@ -56,6 +56,10 @@
- 		serial0 = &serial0;
- 		serial1 = &serial1;
- 	};
-+
-+	chosen {
-+		stdout-path = "serial1:115200n8";
-+	};
- };
- 
- &esdhc {
+Alternatively:
+1) "Add basic support for Amlogic S905X"
+2) Factor out common bits (1/3 + 2/3 + 3/3)
+
+As for bike-shedding, is there a GX family as well or could we drop
+-common? .dtsi is always something common - compare Exynos or i.MX.
+Since there are meson8b and meson8 I was anticipating that after gxbb
+would come gx, not gxl.
+
+Do you know what the L in GXL is for? Should we consider renaming gxbb
+to gxb, and then also insert -s905 as suggested by Kevin, for symmetry?
+U-Boot is still in an early stage with $fdtfile issues remaining that I
+need to iterate over; DT compatible strings would need to remain though.
+
+Regards,
+Andreas
+
 -- 
-1.9.0
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
