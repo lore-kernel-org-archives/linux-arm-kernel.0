@@ -1,75 +1,60 @@
-From: anson.huang@nxp.com (Yongcai Huang)
-Date: Mon, 29 Aug 2016 14:44:47 +0000
-Subject: [PATCH V2] ARM: dts: imx6ul iomuxc syscon is compatible to imx6q
-In-Reply-To: <20160829143447.GV30790@tiger>
-References: <1472480743-8405-1-git-send-email-Anson.Huang@nxp.com>
- <20160829143447.GV30790@tiger>
-Message-ID: <AM3PR04MB1315C6AE3AC95A1150DB04D7F5E10@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 29 Aug 2016 22:47:00 +0800
+Subject: [PATCH] ARM: imx6: add opp table when cpufreq is enabled
+In-Reply-To: <AM3PR04MB13156D30B684387793054569F5E10@AM3PR04MB1315.eurprd04.prod.outlook.com>
+References: <1471964171-27480-1-git-send-email-Anson.Huang@nxp.com>
+ <20160829061910.GG30790@tiger> <20160829062720.GI30790@tiger>
+ <AM3PR04MB13156D30B684387793054569F5E10@AM3PR04MB1315.eurprd04.prod.outlook.com>
+Message-ID: <20160829144700.GX30790@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-Best Regards!
-Anson Huang
-
-
-
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: 2016-08-29 10:35 PM
-> To: Yongcai Huang <anson.huang@nxp.com>
-> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> devicetree at vger.kernel.org; mark.rutland at arm.com; robh+dt at kernel.org;
-> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
-> linux at armlinux.org.uk
-> Subject: Re: [PATCH V2] ARM: dts: imx6ul iomuxc syscon is compatible to imx6q
+On Mon, Aug 29, 2016 at 08:49:04AM +0000, Yongcai Huang wrote:
 > 
-> On Mon, Aug 29, 2016 at 10:25:43PM +0800, Anson Huang wrote:
-> > The imx6ul iomuxc syscon is compatible to imx6q, so let's add
-> > compatible string 'fsl,imx6q-iomuxc-gpr'
-> > for imx6ul iomuxc syscon node.
-> >
-> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> > -----Original Message-----
+> > From: Shawn Guo [mailto:shawnguo at kernel.org]
+> > Sent: 2016-08-29 2:27 PM
+> > To: Yongcai Huang <anson.huang@nxp.com>
+> > Cc: Fabio Estevam <fabio.estevam@nxp.com>; Peter Chen
+> > <peter.chen@nxp.com>; linux at armlinux.org.uk; linux-arm-
+> > kernel at lists.infradead.org; kernel at pengutronix.de
+> > Subject: Re: [PATCH] ARM: imx6: add opp table when cpufreq is enabled
+> > 
+> > On Mon, Aug 29, 2016 at 02:19:10PM +0800, Shawn Guo wrote:
+> > > On Tue, Aug 23, 2016 at 10:56:11PM +0800, Anson Huang wrote:
+> > > > On those i.MX6 platforms which have no speed grading check, opp
+> > > > table will NOT be created in platform code, so cpufreq driver will
+> > > > have below error message:
+> > > >
+> > > > cpu cpu0: dev_pm_opp_get_opp_count: OPP table not found (-19)
+> > >
+> > > The cpufreq driver calls dev_pm_opp_get_opp_count() to test if
+> > > platform supplies an OPP table.  If not, the driver will call into
+> > > dev_pm_opp_of_add_table() on its own.  So this is not an error
+> > > message, and cpufreq driver should just work fine on i.MX6SX and i.MX6SL.
+> > 
+> > If you think the message might confuse people, we can add an info message in
+> > cpufreq driver in case it adds OPP table by its own, which can explain the 'error'
+> > message a bit from dev_pm_opp_get_opp_count().
+> > 
+> > Shawn
 > 
-> Will this patch still be needed if you implement imx6ul suspend support with
-> PSCI?
+> After rethink this, if we can avoid this "error" message printed out from common OPP
+> framework, why NOT do it? Although the code change is kind of big, but the logic is
+> quite simple. Adding info message in cpufreq driver is a bit better, but the "error" message
+> is still there which may concern some people who really care about it, adding this patch
+> would make it easier for our future kernel upgrade.
 > 
-> Shawn
+> Actually, if we do NOT have speed grading fuse check need for some platforms, the opp
+> table init can be put in cpufreq for all platforms, so I think the best way is to put
+> all opp table init in either platform code or cpufreq driver, some platforms put it in platform
+> code and some in cpufreq driver is NOT the best. 
 
-This patch is to set the GINT bit for all low power mode transition.
+It will be the best if we can have cpufreq driver handle OPP table for
+all i.MX6 cases.
 
-Do we decide to go with PSCI for all i.MX6 SoCs? Currently i.MX6UL's suspend is
-already supported with non-PCSI method, only i.MX7D uses PSCI, right? If we decide
-to implement all power management feature with PSCI, then yes, all these changes
-can be put into PSCI. But since current suspend/cpuidle function are already supported
-using old method, this bit must be set to avoid system goes into low power mode
-unexpected.
+My problem with the platform approach is that every time we have a new
+platform support, we need to patch platform code to add OPP table.
+That's not good.
 
-Regards!
-Anson.
-
-> 
-> > ---
-> > changes since V1:
-> > 	improve commit message.
-> >  arch/arm/boot/dts/imx6ul.dtsi | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/boot/dts/imx6ul.dtsi
-> > b/arch/arm/boot/dts/imx6ul.dtsi index 33b95d7..acc9486 100644
-> > --- a/arch/arm/boot/dts/imx6ul.dtsi
-> > +++ b/arch/arm/boot/dts/imx6ul.dtsi
-> > @@ -644,7 +644,8 @@
-> >  			};
-> >
-> >  			gpr: iomuxc-gpr at 020e4000 {
-> > -				compatible = "fsl,imx6ul-iomuxc-gpr", "syscon";
-> > +				compatible = "fsl,imx6ul-iomuxc-gpr",
-> > +					     "fsl,imx6q-iomuxc-gpr", "syscon";
-> >  				reg = <0x020e4000 0x4000>;
-> >  			};
-> >
-> > --
-> > 1.9.1
-> >
+Shawn
