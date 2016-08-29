@@ -1,36 +1,78 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Mon, 29 Aug 2016 15:30:18 -0700
-Subject: [PATCH 3/5] firmware: ti_sci: Add support for Device control
-In-Reply-To: <CAGo_u6p3Bm+zGDtxpOyT+DeGN8_XPWWE0zhCYuxsH47n41Z8jg@mail.gmail.com>
-References: <20160819225159.10758-1-nm@ti.com>
- <20160819225159.10758-4-nm@ti.com>
- <9a6a8663-a3f7-7875-253f-98232d56b860@ti.com>
- <CAGo_u6p3Bm+zGDtxpOyT+DeGN8_XPWWE0zhCYuxsH47n41Z8jg@mail.gmail.com>
-Message-ID: <e936ee55-34ec-dbc6-5ba0-7fe9c54013cc@oracle.com>
+From: ayaka@soulik.info (Randy Li)
+Date: Tue, 30 Aug 2016 06:50:02 +0800
+Subject: [PATCH RFC] ARM: dts: samsung: add rga-lvds panel in itop elite
+Message-ID: <1472511002-9019-1-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishant,
+It is actually a lvds panel connected through a rga-lvds bridge.
+But I really have no idea about what does a port mean in fimd node.
 
-On 8/23/2016 11:45 AM, Nishanth Menon wrote:
-> On Sun, Aug 21, 2016 at 10:56 PM, Lokesh Vutla <lokeshvutla@ti.com> wrote:
->>>  /**
->>> + * tis_sci_is_response_ack() - Generic ACK/NACK message checkup
->>> + * @r:       pointer to response buffer
->>> + *
->>> + * Return: true if the response was an ACK, else returns false.
->>> + */
->>> +static inline bool tis_sci_is_response_ack(void *r)
->>
->> May be just ti_sci_is_response_ack() to be consistent? or you wanted to
->> keep it tis_sci* ?
->
->
-> Uggh.. Fat fingered that one.. thanks for catching.. fixed and will
-> post a v2 next week if there is no further comments
->
-I would like to send the next merge window queue up so please repost
-the reviewed patches which needs to be queued up.
+Also how should I configure this panel size? I think the i2c found
+on the panel schematic, but it more likely to be used a touch screen
+touth. Also the touch screen is not supported in currently driver.
 
-Regards,
-Santosh
+Signed-off-by: Randy Li <ayaka@soulik.info>
+---
+ arch/arm/boot/dts/exynos4412-itop-elite.dts | 35 ++++++++++++++++++++++++++---
+ 1 file changed, 32 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos4412-itop-elite.dts b/arch/arm/boot/dts/exynos4412-itop-elite.dts
+index e1cda54..2d67385 100644
+--- a/arch/arm/boot/dts/exynos4412-itop-elite.dts
++++ b/arch/arm/boot/dts/exynos4412-itop-elite.dts
+@@ -139,6 +139,20 @@
+ 		assigned-clocks = <&clock CLK_MOUT_CAM0>;
+ 		assigned-clock-parents = <&clock CLK_XUSBXTI>;
+ 	};
++	
++	vcc_sys_lcd: sys-lcd {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc_5v";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpl0 4 GPIO_ACTIVE_HIGH>;
++	};
++
++	panel: panel {
++		ddc-i2c-bus = <&i2c_3>;
++		power-supply = <&vcc_sys_lcd>;
++		enable-gpios = <&gpl0 2 GPIO_ACTIVE_HIGH>;
++	};
+ };
+ 
+ &pinctrl_1 {
+@@ -221,9 +235,6 @@
+ };
+ 
+ &pwm {
+-	pinctrl-0 = <&pwm1_out>;
+-	pinctrl-names = "default";
+-	samsung,pwm-outputs = <1>;
+ 	status = "okay";
+ };
+ 
+@@ -239,3 +250,21 @@
+ 	assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
+ 	assigned-clock-rates = <0>, <176000000>;
+ };
++
++&i2c_3 {
++	status = "okay";
++};
++
++&fimd {
++	pinctrl-0 = <&lcd_clk &lcd_data24 &pwm1_out>;
++	pinctrl-names = "default";
++	status = "okay";
++	#address-cells = <1>;
++	#size-cells = <0>;
++	port at 0 {
++		reg = <0>;
++		rga_lvds: endpoint {
++			remote-endpoint = <&panel>;
++		};
++	};
++};
+-- 
+2.7.4
