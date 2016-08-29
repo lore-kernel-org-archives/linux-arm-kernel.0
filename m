@@ -1,41 +1,96 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Mon, 29 Aug 2016 07:49:18 +0200
-Subject: MFC: different h264 profile and level output the same size encoded
- result
-In-Reply-To: <3c01aadb-259f-0f38-47be-8170a87a7d7b@rock-chips.com>
-References: <3c01aadb-259f-0f38-47be-8170a87a7d7b@rock-chips.com>
-Message-ID: <75aa1b3d-9270-3af1-f74b-dba4ceeb41a0@samsung.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 29 Aug 2016 13:57:04 +0800
+Subject: [PATCH] ARM: dts: imx7s-warp: Add Bluetooth support
+In-Reply-To: <1471886526-19251-1-git-send-email-vanessa.maegima@nxp.com>
+References: <1471886526-19251-1-git-send-email-vanessa.maegima@nxp.com>
+Message-ID: <20160829055704.GF30790@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Aug 22, 2016 at 02:22:06PM -0300, Vanessa Maegima wrote:
+> WaRP7 has a BCM4343 Bluetooth chip.
+> 
+> Add support for it.
+> 
+> Signed-off-by: Vanessa Maegima <vanessa.maegima@nxp.com>
+> ---
+>  arch/arm/boot/dts/imx7s-warp.dts | 29 +++++++++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx7s-warp.dts b/arch/arm/boot/dts/imx7s-warp.dts
+> index 92d9c85..6ce8953 100644
+> --- a/arch/arm/boot/dts/imx7s-warp.dts
+> +++ b/arch/arm/boot/dts/imx7s-warp.dts
+> @@ -66,6 +66,16 @@
+>  		startup-delay-us = <200000>;
+>  	};
+>  
+> +	reg_bt: bt-reg {
 
-On 08/27/2016 11:55 AM, Randy Li wrote:
-> Hi:
->
->    I have been reported that the setting the profile, level and bitrate 
-> through the v4l2 extra controls would not make the encoded result 
-> different. I tried it recently, it is true. Although the h264 parser 
-> would tell me the result have been applied as different h264 profile and 
-> level, but size is the same.
->
-> You may try this in Gstreamer.
->
-> gst-launch-1.0 -v \
-> videotestsrc num-buffers=500 ! video/x-raw, width=1920,height=1080 ! \
-> videoconvert ! \
-> v4l2video4h264enc 
-> extra-controls="controls,h264_profile=1,video_bitrate=100;" ! \
-> h264parse ! matroskamux ! filesink location=/tmp/1.mkv
->
-> Is there any way to reduce the size of MFC encoded data?
->
+Please name the fixed regulator like regulator-xxx.
 
-There is control called rc_enable (rate control enable), it must be set
-to one if you want to control bitrate.
-This control confuses many users, I guess it cannot be removed as it
-is already part of UAPI, but enabling it internally by the driver
-if user sets bitrate, profille, etc, would make it more saner.
+> +		compatible = "regulator-fixed";
+> +		enable-active-high;
+> +		gpio = <&gpio5 17 GPIO_ACTIVE_HIGH>;
+> +		regulator-name = "bt_reg";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		regulator-always-on;
 
-Regards
-Andrzej
+Why should it be always-on?
+
+> +	};
+> +
+>  	sound {
+>  		compatible = "simple-audio-card";
+>  		simple-audio-card,name = "imx7-sgtl5000";
+> @@ -228,6 +238,15 @@
+>  	status = "okay";
+>  };
+>  
+> +&uart3  {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart3>;
+> +	assigned-clocks = <&clks IMX7D_UART3_ROOT_SRC>;
+> +	assigned-clock-parents = <&clks IMX7D_PLL_SYS_MAIN_240M_CLK>;
+> +	fsl,uart-has-rtscts;
+
+This vendor specific property is deprecated.  Please use generic one,
+uart-has-rtscts, instead.
+
+> +	status = "okay";
+> +};
+> +
+>  &usbotg1 {
+>  	dr_mode = "peripheral";
+>  	status = "okay";
+> @@ -302,6 +321,16 @@
+>  		>;
+>  	};
+>  
+> +	pinctrl_uart3: uart3grp {
+> +		fsl,pins = <
+> +			MX7D_PAD_UART3_TX_DATA__UART3_DCE_TX 0x79
+> +			MX7D_PAD_UART3_RX_DATA__UART3_DCE_RX 0x79
+> +			MX7D_PAD_UART3_CTS_B__UART3_DCE_CTS 0x79
+> +			MX7D_PAD_UART3_RTS_B__UART3_DCE_RTS 0x79
+> +			MX7D_PAD_SD2_DATA3__GPIO5_IO17 0x14 /*BT_REG_ON*/
+
+It should be in a separate pinctrl entry for regulator.
+
+Shawn
+
+> +		>;
+> +	};
+> +
+>  	pinctrl_usdhc1: usdhc1grp {
+>  		fsl,pins = <
+>  			MX7D_PAD_SD1_CMD__SD1_CMD	0x59
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
