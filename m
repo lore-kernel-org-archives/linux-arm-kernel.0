@@ -1,88 +1,61 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 29 Aug 2016 13:54:50 -0700
-Subject: [PATCH v5 1/2] ARM: dts: imx6: Add support for Toradex Apalis
- iMX6Q/D SoM
-In-Reply-To: <97a3d506-35a0-2a15-18ef-2719c0596cc1@mentor.com>
-References: <1454688741-4238-1-git-send-email-marcel.ziswiler@toradex.com>
- <1454688741-4238-2-git-send-email-marcel.ziswiler@toradex.com>
- <97a3d506-35a0-2a15-18ef-2719c0596cc1@mentor.com>
-Message-ID: <8379c5d41f44fc1b59a5c15650f30c68@agner.ch>
+From: stuart.yoder@nxp.com (Stuart Yoder)
+Date: Mon, 29 Aug 2016 21:10:09 +0000
+Subject: [PATCH 1/2] arm64: dts: updates serial aliases for ls1043a rdb
+ and qds boards
+In-Reply-To: <201608292238.17985.arnd@arndb.de>
+References: <1472244381-1766-1-git-send-email-stuart.yoder@nxp.com>
+ <8035333.yr2FRs5mHk@wuerfel>
+ <VI1PR0401MB2638BCBA99A6305262FD3EE78DE10@VI1PR0401MB2638.eurprd04.prod.outlook.com>
+ <201608292238.17985.arnd@arndb.de>
+Message-ID: <VI1PR0401MB263861544E640ED526373EC78DE10@VI1PR0401MB2638.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-08-29 06:28, Vladimir Zapolskiy wrote:
-> Hi Marcel,
-> 
-> On 02/05/2016 06:12 PM, Marcel Ziswiler wrote:
->> From: Petr ?tetiar <ynezz@true.cz>
->>
->> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
->> Signed-off-by: Petr ?tetiar <ynezz@true.cz>
->> Reviewed-by: Stefan Agner <stefan@agner.ch>
->> ---
->>
-> 
-> because the change is in mainline now below is kind of out of date
-> information, but you may find it helpful.
-> 
-> [snip]
-> 
->> - fixed HDMI DDC (requires GPIO-based bitbanging I2C to be enabled)
-> 
-> This is not needed.
-> 
-> [snip]
-> 
->> +	/* DDC_I2C: I2C2_SDA/SCL on MXM3 205/207 */
->> +	i2cddc: i2c at 0 {
->> +		compatible = "i2c-gpio";
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&pinctrl_i2c_ddc>;
->> +		gpios = <&gpio3 16 GPIO_ACTIVE_HIGH /* sda */
->> +			 &gpio2 30 GPIO_ACTIVE_HIGH /* scl */
->> +			>;
->> +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
->> +		status = "disabled";
->> +	};
->> +
-> 
-> This is not needed.
-> 
-> [snip]
-> 
->> +	pinctrl_i2c_ddc: gpioi2cddcgrp {
->> +		fsl,pins = <
->> +			/* DDC bitbang */
->> +			MX6QDL_PAD_EIM_EB2__GPIO2_IO30 0x1b0b0
->> +			MX6QDL_PAD_EIM_D16__GPIO3_IO16 0x1b0b0
->> +		>;
->> +	};
->> +
-> 
-> Practically you don't need this overcomplicated GPIO-based bitbanging
-> to emulate I2C, because the DW HDMI controller has a reduced I2C
-> controller on board, you may take a look at its support published here:
-> 
->    http://www.spinics.net/lists/dri-devel/msg116308.html
-> 
-> To utilize it the pads should be set to HDMI function instead of
-> I2C or GPIO.
 
-Thanks for the notification! I guess we'd also have to remove...
 
-+&hdmi {
-+    ddc-i2c-bus = <&i2cddc>;
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Monday, August 29, 2016 3:38 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Stuart Yoder <stuart.yoder@nxp.com>; devicetree at vger.kernel.org; shawnguo at kernel.org
+> Subject: Re: [PATCH 1/2] arm64: dts: updates serial aliases for ls1043a rdb and qds boards
+> 
+> On Monday 29 August 2016, Stuart Yoder wrote:
+> > > -----Original Message-----
+> > > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > > Sent: Monday, August 29, 2016 6:01 AM
+> > > To: Stuart Yoder <stuart.yoder@nxp.com>
+> > > Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; shawnguo at kernel.org
+> > > Subject: Re: [PATCH 1/2] arm64: dts: updates serial aliases for ls1043a rdb and qds boards
+> > >
+> > > On Friday, August 26, 2016 3:46:20 PM CEST Stuart Yoder wrote:
+> > > > -               serial0 = &lpuart0;
+> > > > -               serial1 = &lpuart1;
+> > > > -               serial2 = &lpuart2;
+> > > > -               serial3 = &lpuart3;
+> > > > -               serial4 = &lpuart4;
+> > > > -               serial5 = &lpuart5;
+> > > > +               serial0 = &duart0;
+> > > > +               serial1 = &duart1;
+> > > > +               serial2 = &duart2;
+> > > > +               serial3 = &duart3;
+> > >
+> > > It looks like your board has six uarts that are all driven with the
+> > > lpuart driver, but after the change, you only list four. Should
+> > > the serial4 and serial5 aliases keep pointing at lpuart devices
+> > > so you can still drive all physical connectors?
+> >
+> > The only existing reference I can find to the serial aliases is if the
+> > OF_STDOUT_VIA_ALIAS is enabled in u-boot to specify the console.  The
+> > standard ls1043aqds_defconfig in u-boot specifies DUARTs for the console,
+> > which is why I'm proposing making the 4 DUARTs the default serial aliases
+> > in the device tree.
+> 
+> Ok, so they are mutually exclusive, and the last two ports are
+> unavailable in the default configuration?
 
-...this line...
+Yes, that's the case with u-boot's defconfig.  I'm still trying to
+find out whether that mutual exlusivity was a firmware decision or
+a hardware limitation.
 
-+    status = "okay";
-+};
-+
-+&i2cddc {
-+    status = "okay";
-+};
-
-and this from arch/arm/boot/dts/imx6q-apalis-ixora.dts.
-
---
-Stefan
+Stuart
