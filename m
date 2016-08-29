@@ -1,94 +1,69 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 29 Aug 2016 11:26:23 +0100
-Subject: [PATCH 27/33] ARM: sa1100/simpad: switch simpad CF to use gpiod APIs
+Date: Mon, 29 Aug 2016 11:26:29 +0100
+Subject: [PATCH 28/33] ARM: sa1100/neponset: add GPIOs for PCMCIA
 In-Reply-To: <20160829102328.GA28796@n2100.armlinux.org.uk>
 References: <20160829102328.GA28796@n2100.armlinux.org.uk>
-Message-ID: <E1beJln-0000oL-Tv@rmk-PC.armlinux.org.uk>
+Message-ID: <E1beJlt-0000oR-2p@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch simpad's CF implementation to use the gpiod APIs.  The inverted
-detection is handled using gpiolib's native inversion abilities.
+Add the gpiod table for Neponset PCMCIA power control.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/mach-sa1100/simpad.c  | 12 ++++++++++++
- drivers/pcmcia/sa1100_simpad.c | 12 +++---------
- 2 files changed, 15 insertions(+), 9 deletions(-)
+ arch/arm/mach-sa1100/neponset.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
-index bb3ca9c763de..5301a3036212 100644
---- a/arch/arm/mach-sa1100/simpad.c
-+++ b/arch/arm/mach-sa1100/simpad.c
+diff --git a/arch/arm/mach-sa1100/neponset.c b/arch/arm/mach-sa1100/neponset.c
+index 75d758ca6799..790d8da233da 100644
+--- a/arch/arm/mach-sa1100/neponset.c
++++ b/arch/arm/mach-sa1100/neponset.c
 @@ -3,6 +3,7 @@
   */
- 
- #include <linux/module.h>
+ #include <linux/err.h>
+ #include <linux/gpio/driver.h>
 +#include <linux/gpio/machine.h>
+ #include <linux/gpio-reg.h>
  #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/tty.h>
-@@ -354,12 +355,23 @@ static struct platform_device *devices[] __initdata = {
- 	&simpad_i2c,
+ #include <linux/ioport.h>
+@@ -95,6 +96,19 @@ struct neponset_drvdata {
+ 	struct gpio_chip *gpio[4];
  };
  
-+/* Compact Flash */
-+static struct gpiod_lookup_table simpad_cf_gpio_table = {
-+	.dev_id = "sa11x0-pcmcia",
++static struct gpiod_lookup_table neponset_pcmcia_table = {
++	.dev_id = "1800",
 +	.table = {
-+		GPIO_LOOKUP("gpio", GPIO_CF_IRQ, "cf-ready", GPIO_ACTIVE_HIGH),
-+		GPIO_LOOKUP("gpio", GPIO_CF_CD, "cf-detect", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("sa1111", 1, "a0vcc", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("sa1111", 0, "a1vcc", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("neponset-ncr", 5, "a0vpp", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("neponset-ncr", 6, "a1vpp", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("sa1111", 2, "b0vcc", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("sa1111", 3, "b1vcc", GPIO_ACTIVE_HIGH),
 +		{ },
 +	},
 +};
- 
- 
- static int __init simpad_init(void)
- {
- 	int ret;
- 
-+	gpiod_add_lookup_table(&simpad_cf_gpio_table);
 +
- 	spin_lock_init(&cs3_lock);
+ static struct neponset_drvdata *nep;
  
- 	cs3_gpio.label = "simpad_cs3";
-diff --git a/drivers/pcmcia/sa1100_simpad.c b/drivers/pcmcia/sa1100_simpad.c
-index 73fd37968b6a..e14b2f5a18bb 100644
---- a/drivers/pcmcia/sa1100_simpad.c
-+++ b/drivers/pcmcia/sa1100_simpad.c
-@@ -11,7 +11,6 @@
+ void neponset_ncr_frob(unsigned int mask, unsigned int val)
+@@ -370,6 +384,8 @@ static int neponset_probe(struct platform_device *dev)
+ 			   d->base + AUD_CTL, AUD_NGPIO, false,
+ 			   neponset_aud_names);
  
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
--#include <asm/irq.h>
- #include <mach/simpad.h>
- #include "sa1100_generic.h"
-  
-@@ -20,12 +19,10 @@ static int simpad_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
- 
- 	simpad_clear_cs3_bit(VCC_3V_EN|VCC_5V_EN|EN0|EN1);
- 
--	skt->stat[SOC_STAT_CD].gpio = GPIO_CF_CD;
--	skt->stat[SOC_STAT_CD].name = "CF_CD";
--	skt->stat[SOC_STAT_RDY].gpio = GPIO_CF_IRQ;
--	skt->stat[SOC_STAT_RDY].name = "CF_RDY";
-+	skt->stat[SOC_STAT_CD].name = "cf-detect";
-+	skt->stat[SOC_STAT_RDY].name = "cf-ready";
- 
--	return 0;
-+	return soc_pcmcia_request_gpiods(skt);
- }
- 
- static void simpad_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
-@@ -41,9 +38,6 @@ simpad_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
- {
- 	long cs3reg = simpad_get_cs3_ro();
- 
--	/* the detect signal is inverted - fix that up here */
--	state->detect = !state->detect;
--
- 	state->bvd1 = 1; /* Might be cs3reg & PCMCIA_BVD1 */
- 	state->bvd2 = 1; /* Might be cs3reg & PCMCIA_BVD2 */
- 
++	gpiod_add_lookup_table(&neponset_pcmcia_table);
++
+ 	/*
+ 	 * We would set IRQ_GPIO25 to be a wake-up IRQ, but unfortunately
+ 	 * something on the Neponset activates this IRQ on sleep (eth?)
+@@ -423,6 +439,9 @@ static int neponset_remove(struct platform_device *dev)
+ 		platform_device_unregister(d->sa1111);
+ 	if (!IS_ERR(d->smc91x))
+ 		platform_device_unregister(d->smc91x);
++
++	gpiod_remove_lookup_table(&neponset_pcmcia_table);
++
+ 	irq_set_chained_handler(irq, NULL);
+ 	irq_free_descs(d->irq_base, NEP_IRQ_NR);
+ 	nep = NULL;
 -- 
 2.1.0
