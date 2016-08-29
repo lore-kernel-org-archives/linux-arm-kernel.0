@@ -1,63 +1,59 @@
-From: w.egorov@phytec.de (Wadim Egorov)
-Date: Mon, 29 Aug 2016 13:33:31 +0200
-Subject: [PATCH] ARM: rockchip: add UART0 as debug uart for RK32xx based
- platforms
-Message-ID: <1472470411-46922-1-git-send-email-w.egorov@phytec.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 29 Aug 2016 17:17:16 +0530
+Subject: Support for configurable PCIe endpoint
+In-Reply-To: <1944530.NcryPj8uKU@wuerfel>
+References: <57A18927.9070003@ti.com> <2422602.ltmdGR0pWX@wuerfel>
+ <57B5B4A1.9030308@ti.com> <1944530.NcryPj8uKU@wuerfel>
+Message-ID: <57C420C4.4000004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to allow low-level debugging messages via Rockchip RK32 UART0.
+Hi Arnd,
 
-Signed-off-by: Wadim Egorov <w.egorov@phytec.de>
----
- arch/arm/Kconfig.debug | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+On Thursday 25 August 2016 06:29 PM, Arnd Bergmann wrote:
+> On Thursday, August 18, 2016 6:44:09 PM CEST Kishon Vijay Abraham I wrote:
+>> Hi Arnd,
+>>
+>> On Thursday 04 August 2016 04:43 PM, Arnd Bergmann wrote:
+>>> On Thursday, August 4, 2016 3:32:01 PM CEST Kishon Vijay Abraham I wrote:
+>>>> On Wednesday 03 August 2016 07:09 PM, Joao Pinto wrote:
+>>>>>
+>>>>> You are rising a topic that we are also addressing in Synopsys.
+>>>>>
+>>>>> For the PCIe RC hardware validation we are currently using the standard
+>>>>> pcie-designware and pcie-designware-plat drivers.
+>>>>>
+>>>>> For the Endpoint we have to use an internal software package. Its main purpose
+>>>>> is to initialize the IP registers, eDMA channels and make data transfer to prove
+>>>>> that the everything is working properly. This is done in 2 levels, a custom
+>>>>> driver built and loaded and an application that makes some ioctl to the driver
+>>>>> executing some interesting functions to check the Endpoint status and make some
+>>>>> data exchange.
+>>>>
+>>>> hmm.. the platform I have doesn't have a DMA in PCIe IP
+>>>> (http://www.ti.com/lit/ug/spruhz6g/spruhz6g.pdf). So in your testing does the
+>>>> EP access RC memory? i.e the driver in the RC allocates memory from it's DDR
+>>>> and gives it's DDR address to the EP. The EP then transfers data to this
+>>>> address. (This is a typical use case with ethernet PCIe cards). IIUC that's not
+>>>> simple with configurable EPs. I'd like to know more about your testing though.
+>>>
+>>>
+>>> What's the difference between using the EDMA on that chip or a DMA engine
+>>> that is part of the PCIe bridge?
+>>
+>> Do you mean the difference between using DMA on an EP (like ethernet card or
+>> sata card) and DMA on PCI RC system? or is it the difference between eDMA
+>> within the PCIe IP and system DMA?
+> 
+> The latter. You write that there is no DMA in the PCIe IP, but from the
+> perspective of the RC, it should not matter whether the DMA engine is
+> part of the EP logic or behind it.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index a9693b6..5b0d6dd 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -831,6 +831,14 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on Rockchip based platforms.
- 
-+	config DEBUG_RK32_UART0
-+		bool "Kernel low-level debugging messages via Rockchip RK32 UART0"
-+		depends on ARCH_ROCKCHIP
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on Rockchip RK32xx based platforms.
-+
- 	config DEBUG_RK32_UART2
- 		bool "Kernel low-level debugging messages via Rockchip RK32 UART2"
- 		depends on ARCH_ROCKCHIP
-@@ -1531,6 +1539,7 @@ config DEBUG_UART_PHYS
- 	default 0xfcb00000 if DEBUG_HI3620_UART
- 	default 0xfd883000 if DEBUG_ALPINE_UART0
- 	default 0xfe800000 if ARCH_IOP32X
-+	default 0xff180000 if DEBUG_RK32_UART0
- 	default 0xff690000 if DEBUG_RK32_UART2
- 	default 0xffc02000 if DEBUG_SOCFPGA_UART0
- 	default 0xffc02100 if DEBUG_SOCFPGA_UART1
-@@ -1631,6 +1640,7 @@ config DEBUG_UART_VIRT
- 	default 0xfec20000 if DEBUG_DAVINCI_DMx_UART0
- 	default 0xfec20000 if DEBUG_SIRFATLAS7_UART1
- 	default 0xfec60000 if DEBUG_SIRFPRIMA2_UART1
-+	default 0xfe780000 if DEBUG_RK32_UART0
- 	default 0xfec90000 if DEBUG_RK32_UART2
- 	default 0xfed0c000 if DEBUG_DAVINCI_DA8XX_UART1
- 	default 0xfed0d000 if DEBUG_DAVINCI_DA8XX_UART2
-@@ -1677,8 +1687,8 @@ config DEBUG_UART_8250_WORD
- 		DEBUG_ALPINE_UART0 || \
- 		DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
- 		DEBUG_DAVINCI_DA8XX_UART2 || \
--		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2 || \
--		DEBUG_BRCMSTB_UART
-+		DEBUG_BCM_KONA_UART || DEBUG_BRCMSTB_UART || \
-+		DEBUG_RK32_UART0 || DEBUG_RK32_UART2
- 
- config DEBUG_UART_8250_PALMCHIP
- 	bool "8250 UART is Palmchip BK-310x"
--- 
-1.9.1
+right, from the RC perspective there is no difference.
+
+What I meant is DMA support in PCIe driver has to be added newly (i.e for
+designware) and the the platform I have doesn't have a DMA in PCIe IP. Anyways,
+we'll come back to this later after I post my RFC series, maybe by this week end.
+
+Thanks
+Kishon
