@@ -1,66 +1,51 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 29 Aug 2016 10:42:28 -0500
-Subject: [PATCH 1/3] Documentation: dtb: xgene: Add PMD clock binding
-In-Reply-To: <1471967561-23634-2-git-send-email-hotran@apm.com>
-References: <1471967561-23634-1-git-send-email-hotran@apm.com>
- <1471967561-23634-2-git-send-email-hotran@apm.com>
-Message-ID: <20160829154228.GA23350@rob-hp-laptop>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 29 Aug 2016 15:46:14 +0000
+Subject: Older hisilicon chipsets
+In-Reply-To: <7850061.5OOjP34nIO@wuerfel>
+References: <7773f0e5-d045-1e93-529b-74a601467ed1@gmail.com>
+ <20160827150457.GM10637@io.lakedaemon.net>
+ <ec3ec22f-f05e-aaec-8e9a-bfc0565b9e9d@gmail.com>
+ <7850061.5OOjP34nIO@wuerfel>
+Message-ID: <20160829154614.GP10637@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2016 at 08:52:39AM -0700, Hoan Tran wrote:
-> Add APM X-Gene clock binding documentation for PMD clock.
+On Mon, Aug 29, 2016 at 12:54:15PM +0200, Arnd Bergmann wrote:
+> On Saturday, August 27, 2016 1:53:25 PM CEST Marty Plummer wrote:
+> > On 08/27/2016 10:04 AM, Jason Cooper wrote:
+...
+> > > Ideally, most of it will be a devicetree.  Assuming we have code for the
+> > > SoC and associated drivers.
+> > > 
+> > Yes, I've been doing some work on that already, but as I've said, unsure
+> > where one should/would insert all these different things.
 > 
-> Signed-off-by: Hoan Tran <hotran@apm.com>
-> ---
->  Documentation/devicetree/bindings/clock/xgene.txt | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
+> start with getting the serial console working. debug_ll is useful for
+> early bringup and should only need a patch to arch/arm/Kconfig.debug.
+
+It looks like the other hisi board we have in the tree uses arm,pl011
+for the serial ports.  Sometimes, a vendor will stick with an IP block
+across multiple SoCs.  It's worth trying a minimal mainline kernel with
+a minimal dts file and the serial node.  If that works, then everything
+else is a lot easier. :-)
+
+Since you stated on irc that you have some form of documentation, then
+that should go a long way towards mapping uart0 to a register address.
+
+> Later you would typically use earlycon (using a stdout-path property
+> in DT to point to the UART and configuration). The approximate order
+> in which you need other drivers is:
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/xgene.txt b/Documentation/devicetree/bindings/clock/xgene.txt
-> index 82f9638..c381733 100644
-> --- a/Documentation/devicetree/bindings/clock/xgene.txt
-> +++ b/Documentation/devicetree/bindings/clock/xgene.txt
-> @@ -8,6 +8,7 @@ Required properties:
->  - compatible : shall be one of the following:
->  	"apm,xgene-socpll-clock" - for a X-Gene SoC PLL clock
->  	"apm,xgene-pcppll-clock" - for a X-Gene PCP PLL clock
-> +	"apm,xgene-pmd-clock" - for a X-Gene PMD clock
->  	"apm,xgene-device-clock" - for a X-Gene device clock
->  	"apm,xgene-socpll-v2-clock" - for a X-Gene SoC PLL v2 clock
->  	"apm,xgene-pcppll-v2-clock" - for a X-Gene PCP PLL v2 clock
-> @@ -22,6 +23,17 @@ Required properties for SoC or PCP PLL clocks:
->  Optional properties for PLL clocks:
->  - clock-names : shall be the name of the PLL. If missing, use the device name.
->  
-> +Required properties for PMD clocks:
-> +- reg : shall be the physical register address for the pmd clock.
-> +- clocks : shall be the input parent clock phandle for the clock.
-> +- #clock-cells : shall be set to 1.
-> +- clock-output-names : shall be the name of the clock referenced by derive
-> +  clock.
-> +- clock-shift: Bit shift of the clock register. Default is 0.
-> +- clock-width: Width of the clock register. Default is 32.
-> +Optional properties for PLL clocks:
-> +- clock-names : shall be the name of the clock. If missing, use the device name.
-> +
->  Required properties for device clocks:
->  - reg : shall be a list of address and length pairs describing the CSR
->           reset and/or the divider. Either may be omitted, but at least
-> @@ -59,6 +71,16 @@ For example:
->  		type = <0>;
->  	};
->  
-> +	pmd0clk: pmd0clk {
-> +		compatible = "apm,xgene-pmd-clock";
-> +		#clock-cells = <1>;
-> +		clocks = <&pmdpll 0>;
-> +		reg = <0x0 0x7E200200 0x0 0x10>;
-> +		clock-shift = <8>;
-> +		clock-width = <3>;
+> * drivers/irqchip (often a standard VIC or GIC)
 
-These should be implied by the compatible string. It's not a big deal 
-for just adding this clock, but if you have lots more clocks to add then 
-it is a problem. We only want leaf clocks (the ones going to devices) in 
-DT unless there is only a few clocks.
+the hip04 is heavily based on the ARM GIC, which just about everyone
+uses.  You may get lucky here.  You're working with an older SoC, so
+they might've just used the stock GIC and only branched out later.  Or,
+worst case, they started with some in-house one-off and the hip04 is them
+working towards using a vanilla GIC.
 
-Rob
+The rest we can worry about later.
+
+thx,
+
+Jason.
