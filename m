@@ -1,24 +1,31 @@
-From: ccc94453@vip.cybercity.dk (Rask Ingemann Lambertsen)
-Date: Sun, 28 Aug 2016 23:13:14 +0200
-Subject: [PATCH 1/4] ARM: dts: Add TOPEET itop core board SCP package
- version
-In-Reply-To: <1472383269-3126-2-git-send-email-ayaka@soulik.info>
-References: <CAL_JsqKY=VEZ+U11kY+XbMWuXhaFDr6GpnR3AXKd1U=9_=8fgA@mail.gmail.com>
- <1472383269-3126-1-git-send-email-ayaka@soulik.info>
- <1472383269-3126-2-git-send-email-ayaka@soulik.info>
-Message-ID: <20160828211314.nj2hxepxym3x3tee@vip.cybercity.dk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 28 Aug 2016 21:33:17 -0300
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select the wm8960 codec driver
+Message-ID: <1472430797-16787-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 28, 2016 at 07:21:06PM +0800, Randy Li wrote:
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-> +	s5m8767: s5m8767_pmic at 66 {
-> +		compatible = "samsung,s5m8767-pmic";
-> +		reg = <0x66>;
+Select CONFIG_SND_SOC_WM8960 so that we can have audio functional
+by default on imx6ul-evk and imx7-sdb boards.
 
-You shouldn't use underscores in node names.
-https://www.mail-archive.com/linux-kernel%40vger.kernel.org/msg1122967.html
-https://www.mail-archive.com/linux-kernel%40vger.kernel.org/msg1145633.html
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 6302dbc..8ec4dbb 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -262,6 +262,7 @@ CONFIG_SND_SOC_IMX_MC13783=y
+ CONFIG_SND_SOC_FSL_ASOC_CARD=y
+ CONFIG_SND_SOC_CS42XX8_I2C=y
+ CONFIG_SND_SOC_TLV320AIC3X=y
++CONFIG_SND_SOC_WM8960=y
+ CONFIG_SND_SIMPLE_CARD=y
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
 -- 
-Rask Ingemann Lambertsen
+1.9.1
