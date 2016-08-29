@@ -1,132 +1,85 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 29 Aug 2016 12:26:15 +0100
-Subject: [PATCH 3/8] net: irda/sa1100_ir: add gpiod APIs for controlling IrDA
- transceiver
+Date: Mon, 29 Aug 2016 12:26:31 +0100
+Subject: [PATCH 6/8] ARM: sa1100/collie: switch collie IrDA to use gpiod APIs
 In-Reply-To: <20160829112540.GF1041@n2100.armlinux.org.uk>
 References: <20160829112540.GF1041@n2100.armlinux.org.uk>
-Message-ID: <E1beKhj-0001Gz-HL@rmk-PC.armlinux.org.uk>
+Message-ID: <E1beKhz-0001HH-Di@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add GPIO support using the gpiod APIs for controlling the IrDA
-transceiver modes (FIR vs SIR), power and range.
+Switch the IrDA code to use the gpiod APIs rather than platform data
+with function callbacks.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/net/irda/sa1100_ir.c | 58 ++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 56 insertions(+), 2 deletions(-)
+ arch/arm/mach-sa1100/collie.c | 40 ++++++++++++----------------------------
+ 1 file changed, 12 insertions(+), 28 deletions(-)
 
-diff --git a/drivers/net/irda/sa1100_ir.c b/drivers/net/irda/sa1100_ir.c
-index 7bc9c2955d4b..25c63c9ff33c 100644
---- a/drivers/net/irda/sa1100_ir.c
-+++ b/drivers/net/irda/sa1100_ir.c
-@@ -23,6 +23,7 @@
- #include <linux/types.h>
- #include <linux/init.h>
- #include <linux/errno.h>
-+#include <linux/gpio/consumer.h>
- #include <linux/netdevice.h>
- #include <linux/slab.h>
- #include <linux/rtnetlink.h>
-@@ -72,6 +73,10 @@ struct sa1100_irda {
- 
- 	int (*tx_start)(struct sk_buff *, struct net_device *, struct sa1100_irda *);
- 	irqreturn_t (*irq)(struct net_device *, struct sa1100_irda *);
-+
-+	struct gpio_desc	*fsel_gpio;
-+	struct gpio_desc	*pwr_gpio;
-+	struct gpio_desc	*md_gpio[2];
+diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
+index 3cc2b71e16f0..8ed0cbfaa0f4 100644
+--- a/arch/arm/mach-sa1100/collie.c
++++ b/arch/arm/mach-sa1100/collie.c
+@@ -21,6 +21,7 @@
+ #include <linux/kernel.h>
+ #include <linux/tty.h>
+ #include <linux/delay.h>
++#include <linux/gpio/machine.h>
+ #include <linux/platform_data/sa11x0-serial.h>
+ #include <linux/platform_device.h>
+ #include <linux/mfd/ucb1x00.h>
+@@ -97,35 +98,16 @@ static struct mcp_plat_data collie_mcp_data = {
+ 	.codec_pdata	= &collie_ucb1x00_data,
  };
  
- static int sa1100_irda_set_speed(struct sa1100_irda *, int);
-@@ -574,6 +579,8 @@ static int sa1100_irda_set_speed(struct sa1100_irda *si, int speed)
+-static int collie_ir_startup(struct device *dev)
+-{
+-	int rc = gpio_request(COLLIE_GPIO_IR_ON, "IrDA");
+-	if (rc)
+-		return rc;
+-	rc = gpio_direction_output(COLLIE_GPIO_IR_ON, 1);
+-
+-	if (!rc)
+-		return 0;
+-
+-	gpio_free(COLLIE_GPIO_IR_ON);
+-	return rc;
+-}
+-
+-static void collie_ir_shutdown(struct device *dev)
+-{
+-	gpio_free(COLLIE_GPIO_IR_ON);
+-}
+-
+-static int collie_ir_set_power(struct device *dev, unsigned int state)
+-{
+-	gpio_set_value(COLLIE_GPIO_IR_ON, !state);
+-	return 0;
+-}
+-
+ static struct irda_platform_data collie_ir_data = {
+-	.startup = collie_ir_startup,
+-	.shutdown = collie_ir_shutdown,
+-	.set_power = collie_ir_set_power,
++};
++
++/* IrDA GPIO mappings */
++static struct gpiod_lookup_table collie_irda_gpio_table = {
++	.dev_id = "sa11x0-ir",
++	.table = {
++		GPIO_LOOKUP("ucb1x00", 3, "ir-power", GPIO_ACTIVE_LOW),
++		{ },
++	},
+ };
  
- 		if (si->pdata->set_speed)
- 			si->pdata->set_speed(si->dev, speed);
-+		if (si->fsel_gpio)
-+			gpiod_set_value(si->fsel_gpio, 0);
- 
- 		si->speed = speed;
- 		si->tx_start = sa1100_irda_sir_tx_start;
-@@ -600,6 +607,8 @@ static int sa1100_irda_set_speed(struct sa1100_irda *si, int speed)
- 
- 		if (si->pdata->set_speed)
- 			si->pdata->set_speed(si->dev, speed);
-+		if (si->fsel_gpio)
-+			gpiod_set_value(si->fsel_gpio, 1);
- 
- 		sa1100_irda_rx_alloc(si);
- 		sa1100_irda_rx_dma_start(si);
-@@ -629,9 +638,19 @@ static int
- __sa1100_irda_set_power(struct sa1100_irda *si, unsigned int state)
+ /*
+@@ -357,6 +339,8 @@ static void __init collie_init(void)
  {
  	int ret = 0;
--	if (si->pdata->set_power)
-+	if (si->pdata->set_power) {
- 		ret = si->pdata->set_power(si->dev, state);
--	return ret;
-+	} else if (si->pwr_gpio) {
-+		gpiod_set_value_cansleep(si->pwr_gpio, state);
-+	} else if (si->md_gpio[0] && si->md_gpio[1]) {
-+		int vals[2];
-+
-+		vals[0] = state < 2;
-+		vals[1] = state == 1 || state == 2;
-+
-+		gpiod_set_array_value_cansleep(2, si->md_gpio, vals);
-+	}
-+	return 0;
- }
  
- static inline int
-@@ -914,6 +933,21 @@ static const struct net_device_ops sa1100_irda_netdev_ops = {
- 	.ndo_do_ioctl		= sa1100_irda_ioctl,
- };
- 
-+static int sa1100_irda_get_gpio(struct device *dev, struct gpio_desc **descp,
-+	const char *name, enum gpiod_flags flags)
-+{
-+	struct gpio_desc *desc = devm_gpiod_get_optional(dev, name, flags);
++	gpiod_add_lookup_table(&collie_irda_gpio_table);
 +
-+	if (IS_ERR(desc)) {
-+		int err = PTR_ERR(desc);
-+		dev_err(dev, "unable to get %s gpio: %d\n", name, err);
-+		return err;
-+	}
-+
-+	*descp = desc;
-+	return 0;
-+}
-+
- static int sa1100_irda_probe(struct platform_device *pdev)
- {
- 	struct net_device *dev;
-@@ -950,6 +984,26 @@ static int sa1100_irda_probe(struct platform_device *pdev)
- 	si->dev = &pdev->dev;
- 	si->pdata = pdev->dev.platform_data;
- 
-+	err = sa1100_irda_get_gpio(&pdev->dev, &si->fsel_gpio, "ir-fsel",
-+				   GPIOD_OUT_LOW);
-+	if (err)
-+		goto err_mem_5;
-+
-+	err = sa1100_irda_get_gpio(&pdev->dev, &si->pwr_gpio, "ir-power",
-+				   GPIOD_OUT_LOW);
-+	if (err)
-+		goto err_mem_5;
-+
-+	err = sa1100_irda_get_gpio(&pdev->dev, &si->md_gpio[0], "ir-md0",
-+				   GPIOD_OUT_HIGH);
-+	if (err)
-+		goto err_mem_5;
-+
-+	err = sa1100_irda_get_gpio(&pdev->dev, &si->md_gpio[1], "ir-md1",
-+				   GPIOD_OUT_LOW);
-+	if (err)
-+		goto err_mem_5;
-+
- 	sg_init_table(&si->dma_rx.sg, 1);
- 	sg_init_table(&si->dma_tx.sg, 1);
- 
+ 	/* cpu initialize */
+ 	GAFR = GPIO_SSP_TXD | GPIO_SSP_SCLK | GPIO_SSP_SFRM | GPIO_SSP_CLK |
+ 		GPIO_MCP_CLK | GPIO_32_768kHz;
 -- 
 2.1.0
