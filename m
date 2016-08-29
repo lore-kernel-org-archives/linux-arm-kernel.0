@@ -1,38 +1,145 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Mon, 29 Aug 2016 11:11:24 -0700
-Subject: [PATCH] arm64: dts: rockchip: Explicitly set pclk_pmu_src on rk3399
-Message-ID: <1472494284-11315-1-git-send-email-dianders@chromium.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 29 Aug 2016 20:13:55 +0200
+Subject: [PATCH] arm64: KVM: Save two instructions in __guest_enter()
+In-Reply-To: <1470791736-13949-1-git-send-email-shankerd@codeaurora.org>
+References: <1470791736-13949-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <20160829181355.GB10162@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On rk3399 we explicitly set ppll in the device tree to 676000000.  The
-ppll has one major child, pclk_pmu_src, that is the parent of lots of
-other clocks.  Right now nobody is setting that clock rate and we're
-relying on the divider to just happen to be something sane.  Let's be
-explicit in our request so we're not relying on the firmware.
+On Tue, Aug 09, 2016 at 08:15:36PM -0500, Shanker Donthineni wrote:
+> We are doing an unnecessary stack push/pop operation when restoring
+> the guest registers x0-x18 in __guest_enter(). This patch saves the
+> two instructions by using x18 as a base register. No need to store
+> the vcpu context pointer in stack because it is redundant and not
+> being used anywhere, the same information is available in tpidr_el2.
+> 
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> ---
+>  arch/arm64/kvm/hyp/entry.S | 66 ++++++++++++++++++++++------------------------
+>  1 file changed, 32 insertions(+), 34 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+> index ce9e5e5..d2e09a1 100644
+> --- a/arch/arm64/kvm/hyp/entry.S
+> +++ b/arch/arm64/kvm/hyp/entry.S
+> @@ -55,37 +55,32 @@
+>   */
+>  ENTRY(__guest_enter)
+>  	// x0: vcpu
+> -	// x1: host/guest context
+> -	// x2-x18: clobbered by macros
+> +	// x1: host context
+> +	// x2-x17: clobbered by macros
+> +	// x18: guest context
+>  
+>  	// Store the host regs
+>  	save_callee_saved_regs x1
+>  
+> -	// Preserve vcpu & host_ctxt for use at exit time
+> -	stp	x0, x1, [sp, #-16]!
+> +	// Preserve the host_ctxt for use at exit time
+> +	str	x1, [sp, #-16]!
+>  
+> -	add	x1, x0, #VCPU_CONTEXT
+> +	add	x18, x0, #VCPU_CONTEXT
+>  
+> -	// Prepare x0-x1 for later restore by pushing them onto the stack
+> -	ldp	x2, x3, [x1, #CPU_XREG_OFFSET(0)]
+> -	stp	x2, x3, [sp, #-16]!
+> +	// Restore guest regs x19-x29, lr
+> +	restore_callee_saved_regs x18
 
-With the current firmware I tested with this patch has no expected
-impact but it's probably good to do anyway.
+couldn't moving this load here be bad for prefetching?
 
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
----
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+>  
+> -	// x2-x18
+> -	ldp	x2, x3,   [x1, #CPU_XREG_OFFSET(2)]
+> -	ldp	x4, x5,   [x1, #CPU_XREG_OFFSET(4)]
+> -	ldp	x6, x7,   [x1, #CPU_XREG_OFFSET(6)]
+> -	ldp	x8, x9,   [x1, #CPU_XREG_OFFSET(8)]
+> -	ldp	x10, x11, [x1, #CPU_XREG_OFFSET(10)]
+> -	ldp	x12, x13, [x1, #CPU_XREG_OFFSET(12)]
+> -	ldp	x14, x15, [x1, #CPU_XREG_OFFSET(14)]
+> -	ldp	x16, x17, [x1, #CPU_XREG_OFFSET(16)]
+> -	ldr	x18,      [x1, #CPU_XREG_OFFSET(18)]
+> -
+> -	// x19-x29, lr
+> -	restore_callee_saved_regs x1
+> -
+> -	// Last bits of the 64bit state
+> -	ldp	x0, x1, [sp], #16
+> +	// Restore guest regs x0-x18
+> +	ldp	x0, x1,   [x18, #CPU_XREG_OFFSET(0)]
+> +	ldp	x2, x3,   [x18, #CPU_XREG_OFFSET(2)]
+> +	ldp	x4, x5,   [x18, #CPU_XREG_OFFSET(4)]
+> +	ldp	x6, x7,   [x18, #CPU_XREG_OFFSET(6)]
+> +	ldp	x8, x9,   [x18, #CPU_XREG_OFFSET(8)]
+> +	ldp	x10, x11, [x18, #CPU_XREG_OFFSET(10)]
+> +	ldp	x12, x13, [x18, #CPU_XREG_OFFSET(12)]
+> +	ldp	x14, x15, [x18, #CPU_XREG_OFFSET(14)]
+> +	ldp	x16, x17, [x18, #CPU_XREG_OFFSET(16)]
+> +	ldr	x18,      [x18, #CPU_XREG_OFFSET(18)]
+>  
+>  	// Do not touch any register after this!
+>  	eret
+> @@ -100,6 +95,16 @@ ENTRY(__guest_exit)
+>  
+>  	add	x2, x0, #VCPU_CONTEXT
+>  
+> +	// Store the guest regs x19-x29, lr
+> +	save_callee_saved_regs x2
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 62d450935a57..ffb3faa8c176 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -908,8 +908,8 @@
- 		reg = <0x0 0xff750000 0x0 0x1000>;
- 		#clock-cells = <1>;
- 		#reset-cells = <1>;
--		assigned-clocks = <&pmucru PLL_PPLL>;
--		assigned-clock-rates = <676000000>;
-+		assigned-clocks = <&pmucru PLL_PPLL>, <&pmucru PCLK_SRC_PMU>;
-+		assigned-clock-rates = <676000000>, <112666667>;
- 	};
- 
- 	cru: clock-controller at ff760000 {
--- 
-2.8.0.rc3.226.g39d4020
+same question here (although with a different weight as we were already
+'jumping back' with the memory address in our store sequence.
+
+If this is a real concern, a better approach would be to override x0
+with the vcpu context pointer, do two pairs of load/stores using x2,x3
+for the vcpu x0-x3, and then proceed with the rest of the registers.
+
+> +
+> +	// Retrieve the guest regs x0-x3 from the stack
+> +	ldp	x21, x22, [sp], #16	// x2, x3
+> +	ldp	x19, x20, [sp], #16	// x0, x1
+> +
+> +	// Store the guest regs x0-x18
+> +	stp	x19, x20, [x2, #CPU_XREG_OFFSET(0)]
+> +	stp	x21, x22, [x2, #CPU_XREG_OFFSET(2)]
+>  	stp	x4, x5,   [x2, #CPU_XREG_OFFSET(4)]
+>  	stp	x6, x7,   [x2, #CPU_XREG_OFFSET(6)]
+>  	stp	x8, x9,   [x2, #CPU_XREG_OFFSET(8)]
+> @@ -109,20 +114,13 @@ ENTRY(__guest_exit)
+>  	stp	x16, x17, [x2, #CPU_XREG_OFFSET(16)]
+>  	str	x18,      [x2, #CPU_XREG_OFFSET(18)]
+>  
+> -	ldp	x6, x7, [sp], #16	// x2, x3
+> -	ldp	x4, x5, [sp], #16	// x0, x1
+> +	// Restore the host_ctxt from the stack
+> +	ldr	x2, [sp], #16
+>  
+> -	stp	x4, x5, [x2, #CPU_XREG_OFFSET(0)]
+> -	stp	x6, x7, [x2, #CPU_XREG_OFFSET(2)]
+> -
+> -	save_callee_saved_regs x2
+> -
+> -	// Restore vcpu & host_ctxt from the stack
+> -	// (preserving return code in x1)
+> -	ldp	x0, x2, [sp], #16
+>  	// Now restore the host regs
+>  	restore_callee_saved_regs x2
+>  
+> +	// Preserving return code (x1)
+
+nit: preserve is a strange word to choose to describe what you do here.
+
+if you want to do what I suggested above, you could change the two
+callers to return the return code in x0, and the vcpu pointer in x1 and
+then you can save this instruction as well.
+
+>  	mov	x0, x1
+>  	ret
+>  ENDPROC(__guest_exit)
+> -- 
+
+Thanks,
+-Christoffer
