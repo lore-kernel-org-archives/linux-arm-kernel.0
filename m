@@ -1,213 +1,202 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 29 Aug 2016 11:25:47 +0100
-Subject: [PATCH 20/33] pcmcia: add MAX1600 driver
+Date: Mon, 29 Aug 2016 11:26:03 +0100
+Subject: [PATCH 23/33] ARM: sa1100/cerf: convert to generic CF sockets
 In-Reply-To: <20160829102328.GA28796@n2100.armlinux.org.uk>
 References: <20160829102328.GA28796@n2100.armlinux.org.uk>
-Message-ID: <E1beJlD-0000nf-Vv@rmk-PC.armlinux.org.uk>
+Message-ID: <E1beJlT-0000nx-DC@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a driver for the MAX1600 PCMCIA power switch device.  This is a
-dual-channel device, controlled via four GPIO signals per channel.
-Two signals control the Vcc output, and two control the Vpp output.
+Convert Cerf to use the generic CF socket support.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/pcmcia/Kconfig   |   3 ++
- drivers/pcmcia/Makefile  |   1 +
- drivers/pcmcia/max1600.c | 119 +++++++++++++++++++++++++++++++++++++++++++++++
- drivers/pcmcia/max1600.h |  31 ++++++++++++
- 4 files changed, 154 insertions(+)
- create mode 100644 drivers/pcmcia/max1600.c
- create mode 100644 drivers/pcmcia/max1600.h
+ arch/arm/mach-sa1100/cerf.c     | 18 +++++++--
+ drivers/pcmcia/Makefile         |  1 -
+ drivers/pcmcia/sa1100_cerf.c    | 85 -----------------------------------------
+ drivers/pcmcia/sa1100_generic.c |  3 --
+ drivers/pcmcia/sa1100_generic.h |  1 -
+ 5 files changed, 15 insertions(+), 93 deletions(-)
+ delete mode 100644 drivers/pcmcia/sa1100_cerf.c
 
-diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
-index d3c378b4db6c..8ac7f9f270c8 100644
---- a/drivers/pcmcia/Kconfig
-+++ b/drivers/pcmcia/Kconfig
-@@ -63,6 +63,9 @@ config CARDBUS
+diff --git a/arch/arm/mach-sa1100/cerf.c b/arch/arm/mach-sa1100/cerf.c
+index 2d25ececb415..b2a4b41626ef 100644
+--- a/arch/arm/mach-sa1100/cerf.c
++++ b/arch/arm/mach-sa1100/cerf.c
+@@ -11,6 +11,7 @@
+  */
  
- 	  If unsure, say Y.
+ #include <linux/init.h>
++#include <linux/gpio/machine.h>
+ #include <linux/kernel.h>
+ #include <linux/tty.h>
+ #include <linux/platform_data/sa11x0-serial.h>
+@@ -45,6 +46,19 @@ static struct platform_device cerfuart2_device = {
+ 	.resource	= cerfuart2_resources,
+ };
  
-+config PCMCIA_MAX1600
-+	tristate
++/* Compact Flash */
++static struct gpiod_lookup_table cerf_cf_gpio_table = {
++	.dev_id = "sa11x0-pcmcia.1",
++	.table = {
++		GPIO_LOOKUP("gpio", 19, "bvd2", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("gpio", 20, "bvd1", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("gpio", 21, "reset", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("gpio", 22, "ready", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("gpio", 23, "detect", GPIO_ACTIVE_LOW),
++		{ },
++	},
++};
 +
- comment "PC-card bridges"
+ /* LEDs */
+ struct gpio_led cerf_gpio_leds[] = {
+ 	{
+@@ -151,9 +165,6 @@ static void __init cerf_map_io(void)
+ 	sa1100_register_uart(0, 3);
+ 	sa1100_register_uart(1, 2); /* disable this and the uart2 device for sa1100_fir */
+ 	sa1100_register_uart(2, 1);
+-
+-	/* set some GPDR bits here while it's safe */
+-	GPDR |= CERF_GPIO_CF_RESET;
+ }
  
- config YENTA
+ static struct mcp_plat_data cerf_mcp_data = {
+@@ -167,6 +178,7 @@ static void __init cerf_init(void)
+ 	platform_add_devices(cerf_devices, ARRAY_SIZE(cerf_devices));
+ 	sa11x0_register_mtd(&cerf_flash_data, &cerf_flash_resource, 1);
+ 	sa11x0_register_mcp(&cerf_mcp_data);
++	sa11x0_register_pcmcia(1, &cerf_cf_gpio_table);
+ }
+ 
+ MACHINE_START(CERF, "Intrinsyc CerfBoard/CerfCube")
 diff --git a/drivers/pcmcia/Makefile b/drivers/pcmcia/Makefile
-index 27e94b30cf96..56880f354361 100644
+index f2f614abc470..dc6a568e7967 100644
 --- a/drivers/pcmcia/Makefile
 +++ b/drivers/pcmcia/Makefile
-@@ -37,6 +37,7 @@ obj-$(CONFIG_BFIN_CFPCMCIA)			+= bfin_cf_pcmcia.o
- obj-$(CONFIG_AT91_CF)				+= at91_cf.o
- obj-$(CONFIG_ELECTRA_CF)			+= electra_cf.o
- obj-$(CONFIG_PCMCIA_ALCHEMY_DEVBOARD)		+= db1xxx_ss.o
-+obj-$(CONFIG_PCMCIA_MAX1600)			+= max1600.o
+@@ -46,7 +46,6 @@ sa1111_cs-$(CONFIG_SA1100_JORNADA720)		+= sa1111_jornada720.o
+ sa1111_cs-$(CONFIG_ARCH_LUBBOCK)		+= sa1111_lubbock.o
  
- sa1111_cs-y					+= sa1111_generic.o
- sa1111_cs-$(CONFIG_ASSABET_NEPONSET)		+= sa1111_neponset.o
-diff --git a/drivers/pcmcia/max1600.c b/drivers/pcmcia/max1600.c
-new file mode 100644
-index 000000000000..476627a29baa
---- /dev/null
-+++ b/drivers/pcmcia/max1600.c
-@@ -0,0 +1,119 @@
-+/*
-+ * MAX1600 PCMCIA power switch driver
-+ *
-+ * Copyright (C) 2016 Russell King
-+ */
-+#include <linux/device.h>
-+#include <linux/export.h>
-+#include <linux/gpio/consumer.h>
-+#include <linux/slab.h>
-+#include "max1600.h"
-+
-+static const char *max1600_gpio_name[2][MAX1600_GPIO_MAX] = {
-+	{ "a0vcc", "a1vcc", "a0vpp", "a1vpp" },
-+	{ "b0vcc", "b1vcc", "b0vpp", "b1vpp" },
-+};
-+
-+int max1600_init(struct device *dev, struct max1600 **ptr,
-+	unsigned int channel, unsigned int code)
-+{
-+	struct max1600 *m;
-+	int chan;
-+	int i;
-+
-+	switch (channel) {
-+	case MAX1600_CHAN_A:
-+		chan = 0;
-+		break;
-+	case MAX1600_CHAN_B:
-+		chan = 1;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	if (code != MAX1600_CODE_LOW && code != MAX1600_CODE_HIGH)
-+		return -EINVAL;
-+
-+	m = devm_kzalloc(dev, sizeof(*m), GFP_KERNEL);
-+	if (!m)
-+		return -ENOMEM;
-+
-+	m->dev = dev;
-+	m->code = code;
-+
-+	for (i = 0; i < MAX1600_GPIO_MAX; i++) {
-+		const char *name;
-+
-+		name = max1600_gpio_name[chan][i];
-+		if (i != MAX1600_GPIO_0VPP) {
-+			m->gpio[i] = gpiod_get(dev, name, GPIOD_OUT_LOW);
-+		} else {
-+			m->gpio[i] = gpiod_get_optional(dev, name, GPIOD_OUT_LOW);
-+			if (!m->gpio[i])
-+				break;
-+		}
-+		if (IS_ERR(m->gpio[i]))
-+			return PTR_ERR(m->gpio[i]);
-+	}
-+
-+	*ptr = m;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(max1600_init);
-+
-+int max1600_configure(struct max1600 *m, unsigned int vcc, unsigned int vpp)
-+{
-+	int values[MAX1600_GPIO_MAX], n = MAX1600_GPIO_0VPP;
-+
-+	if (m->gpio[MAX1600_GPIO_0VPP]) {
-+		if (vpp == 0) {
-+			values[MAX1600_GPIO_0VPP] = 0;
-+			values[MAX1600_GPIO_1VPP] = 0;
-+		} else if (vpp == 120) {
-+			values[MAX1600_GPIO_0VPP] = 0;
-+			values[MAX1600_GPIO_1VPP] = 1;
-+		} else if (vpp == vcc) {
-+			values[MAX1600_GPIO_0VPP] = 1;
-+			values[MAX1600_GPIO_1VPP] = 0;
-+		} else {
-+			dev_err(m->dev, "unrecognised Vpp %u.%uV\n",
-+				vpp / 10, vpp % 10);
-+			return -EINVAL;
-+		}
-+		n = MAX1600_GPIO_MAX;
-+	} else if (vpp != vcc && vpp != 0) {
-+		dev_err(m->dev, "no VPP control\n");
-+		return -EINVAL;
-+	}
-+
-+	if (vcc == 0) {
-+		values[MAX1600_GPIO_0VCC] = 0;
-+		values[MAX1600_GPIO_1VCC] = 0;
-+	} else if (vcc == 33) { /* VY */
-+		values[MAX1600_GPIO_0VCC] = 1;
-+		values[MAX1600_GPIO_1VCC] = 0;
-+	} else if (vcc == 50) { /* VX */
-+		values[MAX1600_GPIO_0VCC] = 0;
-+		values[MAX1600_GPIO_1VCC] = 1;
-+	} else {
-+		dev_err(m->dev, "unrecognised Vcc %u.%uV\n",
-+			vcc / 10, vcc % 10);
-+		return -EINVAL;
-+	}
-+
-+	if (m->code == MAX1600_CODE_HIGH) {
-+		/*
-+		 * Cirrus mode appears to be the same as Intel mode,
-+		 * except the VCC pins are inverted.
-+		 */
-+		values[MAX1600_GPIO_0VCC] = !values[MAX1600_GPIO_0VCC];
-+		values[MAX1600_GPIO_1VCC] = !values[MAX1600_GPIO_1VCC];
-+	}
-+
-+	gpiod_set_array_value_cansleep(n, m->gpio, values);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(max1600_configure);
-diff --git a/drivers/pcmcia/max1600.h b/drivers/pcmcia/max1600.h
-new file mode 100644
-index 000000000000..a674ddb5784b
---- /dev/null
-+++ b/drivers/pcmcia/max1600.h
-@@ -0,0 +1,31 @@
-+#ifndef MAX1600_H
-+#define MAX1600_H
-+
-+struct gpio_desc;
-+
-+enum {
-+	MAX1600_GPIO_0VCC = 0,
-+	MAX1600_GPIO_1VCC,
-+	MAX1600_GPIO_0VPP,
-+	MAX1600_GPIO_1VPP,
-+	MAX1600_GPIO_MAX,
-+
-+	MAX1600_CHAN_A,
-+	MAX1600_CHAN_B,
-+
-+	MAX1600_CODE_LOW,
-+	MAX1600_CODE_HIGH,
-+};
-+
-+struct max1600 {
-+	struct gpio_desc *gpio[MAX1600_GPIO_MAX];
-+	struct device *dev;
-+	unsigned int code;
-+};
-+
-+int max1600_init(struct device *dev, struct max1600 **ptr,
-+	unsigned int channel, unsigned int code);
-+
-+int max1600_configure(struct max1600 *, unsigned int vcc, unsigned int vpp);
-+
-+#endif
+ sa1100_cs-y					+= sa1100_generic.o
+-sa1100_cs-$(CONFIG_SA1100_CERF)			+= sa1100_cerf.o
+ sa1100_cs-$(CONFIG_SA1100_COLLIE)		+= pxa2xx_sharpsl.o
+ sa1100_cs-$(CONFIG_SA1100_H3100)		+= sa1100_h3600.o
+ sa1100_cs-$(CONFIG_SA1100_H3600)		+= sa1100_h3600.o
+diff --git a/drivers/pcmcia/sa1100_cerf.c b/drivers/pcmcia/sa1100_cerf.c
+deleted file mode 100644
+index c3f67363f6a1..000000000000
+--- a/drivers/pcmcia/sa1100_cerf.c
++++ /dev/null
+@@ -1,85 +0,0 @@
+-/*
+- * drivers/pcmcia/sa1100_cerf.c
+- *
+- * PCMCIA implementation routines for CerfBoard
+- * Based off the Assabet.
+- *
+- */
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/device.h>
+-#include <linux/init.h>
+-#include <linux/delay.h>
+-#include <linux/gpio.h>
+-
+-#include <mach/hardware.h>
+-#include <asm/mach-types.h>
+-#include <asm/irq.h>
+-#include <mach/cerf.h>
+-#include "sa1100_generic.h"
+-
+-#define CERF_SOCKET	1
+-
+-static int cerf_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
+-{
+-	int ret;
+-
+-	ret = gpio_request_one(CERF_GPIO_CF_RESET, GPIOF_OUT_INIT_LOW, "CF_RESET");
+-	if (ret)
+-		return ret;
+-
+-	skt->stat[SOC_STAT_CD].gpio = CERF_GPIO_CF_CD;
+-	skt->stat[SOC_STAT_CD].name = "CF_CD";
+-	skt->stat[SOC_STAT_BVD1].gpio = CERF_GPIO_CF_BVD1;
+-	skt->stat[SOC_STAT_BVD1].name = "CF_BVD1";
+-	skt->stat[SOC_STAT_BVD2].gpio = CERF_GPIO_CF_BVD2;
+-	skt->stat[SOC_STAT_BVD2].name = "CF_BVD2";
+-	skt->stat[SOC_STAT_RDY].gpio = CERF_GPIO_CF_IRQ;
+-	skt->stat[SOC_STAT_RDY].name = "CF_IRQ";
+-
+-	return 0;
+-}
+-
+-static void cerf_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
+-{
+-	gpio_free(CERF_GPIO_CF_RESET);
+-}
+-
+-static int
+-cerf_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
+-			     const socket_state_t *state)
+-{
+-	switch (state->Vcc) {
+-	case 0:
+-	case 50:
+-	case 33:
+-		break;
+-
+-	default:
+-		printk(KERN_ERR "%s(): unrecognized Vcc %u\n",
+-			__func__, state->Vcc);
+-		return -1;
+-	}
+-
+-	gpio_set_value(CERF_GPIO_CF_RESET, !!(state->flags & SS_RESET));
+-
+-	return 0;
+-}
+-
+-static struct pcmcia_low_level cerf_pcmcia_ops = { 
+-	.owner			= THIS_MODULE,
+-	.hw_init		= cerf_pcmcia_hw_init,
+-	.hw_shutdown		= cerf_pcmcia_hw_shutdown,
+-	.socket_state		= soc_common_cf_socket_state,
+-	.configure_socket	= cerf_pcmcia_configure_socket,
+-};
+-
+-int pcmcia_cerf_init(struct device *dev)
+-{
+-	int ret = -ENODEV;
+-
+-	if (machine_is_cerf())
+-		ret = sa11xx_drv_pcmcia_probe(dev, &cerf_pcmcia_ops, CERF_SOCKET, 1);
+-
+-	return ret;
+-}
+diff --git a/drivers/pcmcia/sa1100_generic.c b/drivers/pcmcia/sa1100_generic.c
+index 00746fef4453..83b365f060ea 100644
+--- a/drivers/pcmcia/sa1100_generic.c
++++ b/drivers/pcmcia/sa1100_generic.c
+@@ -115,9 +115,6 @@ static struct pcmcia_low_level sa11x0_ops = {
+ int __init pcmcia_collie_init(struct device *dev);
+ 
+ static int (*sa11x0_pcmcia_legacy_hw_init[])(struct device *dev) = {
+-#ifdef CONFIG_SA1100_CERF
+-	pcmcia_cerf_init,
+-#endif
+ #if defined(CONFIG_SA1100_H3100) || defined(CONFIG_SA1100_H3600)
+ 	pcmcia_h3600_init,
+ #endif
+diff --git a/drivers/pcmcia/sa1100_generic.h b/drivers/pcmcia/sa1100_generic.h
+index 92e0010b4ded..3f5495957ca5 100644
+--- a/drivers/pcmcia/sa1100_generic.h
++++ b/drivers/pcmcia/sa1100_generic.h
+@@ -6,7 +6,6 @@
+  */
+ extern int pcmcia_adsbitsy_init(struct device *);
+ extern int pcmcia_badge4_init(struct device *);
+-extern int pcmcia_cerf_init(struct device *);
+ extern int pcmcia_flexanet_init(struct device *);
+ extern int pcmcia_freebird_init(struct device *);
+ extern int pcmcia_gcplus_init(struct device *);
 -- 
 2.1.0
