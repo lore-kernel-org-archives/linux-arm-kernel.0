@@ -1,59 +1,90 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 29 Aug 2016 17:17:16 +0530
-Subject: Support for configurable PCIe endpoint
-In-Reply-To: <1944530.NcryPj8uKU@wuerfel>
-References: <57A18927.9070003@ti.com> <2422602.ltmdGR0pWX@wuerfel>
- <57B5B4A1.9030308@ti.com> <1944530.NcryPj8uKU@wuerfel>
-Message-ID: <57C420C4.4000004@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 29 Aug 2016 13:51:12 +0200
+Subject: [PATCH 1/4] soc: qcom: add an EBI2 device tree bindings
+In-Reply-To: <CACRpkdZ=HU6j3=Ye4dm=tFU=KmG54bq06KDfxPViWUouOA=jOA@mail.gmail.com>
+References: <1470691445-27571-1-git-send-email-linus.walleij@linaro.org>
+ <2988918.zNxvaGl6en@wuerfel>
+ <CACRpkdZ=HU6j3=Ye4dm=tFU=KmG54bq06KDfxPViWUouOA=jOA@mail.gmail.com>
+Message-ID: <201608291351.12915.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Thursday 18 August 2016, Linus Walleij wrote:
+> On Mon, Aug 8, 2016 at 11:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday, August 8, 2016 11:24:02 PM CEST Linus Walleij wrote:
 
-On Thursday 25 August 2016 06:29 PM, Arnd Bergmann wrote:
-> On Thursday, August 18, 2016 6:44:09 PM CEST Kishon Vijay Abraham I wrote:
->> Hi Arnd,
->>
->> On Thursday 04 August 2016 04:43 PM, Arnd Bergmann wrote:
->>> On Thursday, August 4, 2016 3:32:01 PM CEST Kishon Vijay Abraham I wrote:
->>>> On Wednesday 03 August 2016 07:09 PM, Joao Pinto wrote:
->>>>>
->>>>> You are rising a topic that we are also addressing in Synopsys.
->>>>>
->>>>> For the PCIe RC hardware validation we are currently using the standard
->>>>> pcie-designware and pcie-designware-plat drivers.
->>>>>
->>>>> For the Endpoint we have to use an internal software package. Its main purpose
->>>>> is to initialize the IP registers, eDMA channels and make data transfer to prove
->>>>> that the everything is working properly. This is done in 2 levels, a custom
->>>>> driver built and loaded and an application that makes some ioctl to the driver
->>>>> executing some interesting functions to check the Endpoint status and make some
->>>>> data exchange.
->>>>
->>>> hmm.. the platform I have doesn't have a DMA in PCIe IP
->>>> (http://www.ti.com/lit/ug/spruhz6g/spruhz6g.pdf). So in your testing does the
->>>> EP access RC memory? i.e the driver in the RC allocates memory from it's DDR
->>>> and gives it's DDR address to the EP. The EP then transfers data to this
->>>> address. (This is a typical use case with ethernet PCIe cards). IIUC that's not
->>>> simple with configurable EPs. I'd like to know more about your testing though.
->>>
->>>
->>> What's the difference between using the EDMA on that chip or a DMA engine
->>> that is part of the PCIe bridge?
->>
->> Do you mean the difference between using DMA on an EP (like ethernet card or
->> sata card) and DMA on PCI RC system? or is it the difference between eDMA
->> within the PCIe IP and system DMA?
 > 
-> The latter. You write that there is no DMA in the PCIe IP, but from the
-> perspective of the RC, it should not matter whether the DMA engine is
-> part of the EP logic or behind it.
+> So two devices "foo" and "bar" on the EBI2 bus, in the old
+> scheme.
+> 
+> So I need to encode the CS in the first cell of the reg for
+> foo-ebi2, and get rid of chipselect = <2> fine:
+> 
+> ebi2 at 1a100000 {
+>        compatible = "qcom,msm8660-ebi2";
+>        #address-cells = <1>;
+>        #size-cells = <1>;
+>        (...)
+>        cs2 at 1b800000 {
+>                #address-cells = <2>;
+>                #size-cells = <1>;
+>                qcom,xmem-recovery-cycles = <5>;
+>                foo-ebi2 at 1b800000 {
+>                        compatible = "foo";
+>                        reg = <2 0x1b800000 0x100>;
+>                        (...)
+>                };
+>                bar-ebi2 at 1ba00000 {
+>                        compatible = "bar";
+>                        reg = <2 0x1ba00000 0x100>;
+>                        (...)
+>                };
+>        };
+> };
+> 
+> This is not looking good at all. First: the configuration settings for
+> the chipselect (i.e. all devices below it, both "foo" and "bar" are
+> just floating in space. When parsing the tree how should you know
+> what chipselect to set up the stuff on? Shall I check the child nodes
+> first value in the reg property and then make a majority vote on what
+> chipselect they apply to or what? That doesn't make sense.
 
-right, from the RC perspective there is no difference.
+I would have one node per chip-select and then put the devices on
+that CS below it, with #address-cells=1 again.
 
-What I meant is DMA support in PCIe driver has to be added newly (i.e for
-designware) and the the platform I have doesn't have a DMA in PCIe IP. Anyways,
-we'll come back to this later after I post my RFC series, maybe by this week end.
+> So I assume doing away with the chipselect node altogether would
+> be prefered. But then: where do I put stuff like "qcom,xmem-recovery-cycles"
+> that apply to the whole chipselect, not just a single subdevice on that
+> chipselect? I certainly cannot encode it in the reg since it needs
+> to be the same for all devices and it's not about addressing.
+> 
+> The only thing I can reasonably come up with would be this:
+> 
+> ebi2 at 1a100000 {
+>        compatible = "qcom,msm8660-ebi2";
+>        #address-cells = <2>;
+>        #size-cells = <1>;
+>        qcom,xmem-recovery-cycles = <0>, <0>, <5>, <0>, <0>, <0>;
 
-Thanks
-Kishon
+No, better put the settings into one device per cs.
+
+> So the chip select settings are shoehorned into an array in the top
+> node that is then indexed to find the settings for cs0, cs1 etc.
+> 
+> There will be 6 such arrays for the different per-cs settings.
+> 
+> Is this what you want? I kind of thought the hierarchical model
+> was nice since each device was below its chipselect node, but
+> I understand that it breaks the pattern of other similar bus drivers.
+
+Nothing wrong with having a hierarchy here, what I'm interested
+in is making the addressing reflect what the hardware actually
+does. With the empty "ranges", it looks like the entire 32-bit
+address is getting exposed to the external bus, which is usually
+not how things work: instead, each "cs" line gets raised by an I/O
+operation on a particular CPU address range, and that range should
+be part of the "ranges" propert of the main bus node, and the
+externally visible addresses should be the translated addresses
+in the child bus representation in DT.
+
+	Arnd
