@@ -1,56 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 Aug 2016 11:29:31 +0200
-Subject: [PATCH] video: ARM CLCD: fix up Integrator support
-Message-ID: <1472462971-8935-1-git-send-email-linus.walleij@linaro.org>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 29 Aug 2016 11:32:11 +0200
+Subject: [PATCH] ARM: imx: use IS_ENABLED() instead of checking for built-in
+ or module
+Message-ID: <1472463131-29899-1-git-send-email-javier@dowhile0.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to mask all registers of the Integrator/CP core module
-control register, and actually write the calculated value to the
-control register, not the mask.
+From: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Tested on the Integrator/CP with RGB5551 VGA and works like a
-charm after this patch.
+The IS_ENABLED() macro checks if a Kconfig symbol has been enabled either
+built-in or as a module, use that macro instead of open coding the same.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Using the macro makes the code more readable by helping abstract away some
+of the Kconfig built-in and module enable details.
+
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
 ---
- drivers/video/fbdev/amba-clcd-versatile.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/video/fbdev/amba-clcd-versatile.c b/drivers/video/fbdev/amba-clcd-versatile.c
-index 9a90817b1550..5c1e03928d7f 100644
---- a/drivers/video/fbdev/amba-clcd-versatile.c
-+++ b/drivers/video/fbdev/amba-clcd-versatile.c
-@@ -262,7 +262,10 @@ static const struct of_device_id versatile_clcd_of_match[] = {
- /* 0 = 24bit VGA, 1 = 18bit VGA */
- #define INTEGRATOR_CLCD_LCD_N24BITEN	BIT(19)
+ arch/arm/mach-imx/mach-kzm_arm11_01.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-imx/mach-kzm_arm11_01.c b/arch/arm/mach-imx/mach-kzm_arm11_01.c
+index 31df4361996f..e277d9c230e5 100644
+--- a/arch/arm/mach-imx/mach-kzm_arm11_01.c
++++ b/arch/arm/mach-imx/mach-kzm_arm11_01.c
+@@ -63,7 +63,7 @@
+  */
+ #define KZM_ARM11_16550		(MX31_CS4_BASE_ADDR + 0x1050)
  
--#define INTEGRATOR_CLCD_MASK		(INTEGRATOR_CLCD_LCDMUX_MASK | \
-+#define INTEGRATOR_CLCD_MASK		(INTEGRATOR_CLCD_LCDBIASEN | \
-+					 INTEGRATOR_CLCD_LCDBIASUP | \
-+					 INTEGRATOR_CLCD_LCDBIASDN | \
-+					 INTEGRATOR_CLCD_LCDMUX_MASK | \
- 					 INTEGRATOR_CLCD_LCD0_EN | \
- 					 INTEGRATOR_CLCD_LCD1_EN | \
- 					 INTEGRATOR_CLCD_LCD_STATIC1 | \
-@@ -277,6 +280,7 @@ static void integrator_clcd_enable(struct clcd_fb *fb)
- 
- 	dev_info(&fb->dev->dev, "enable Integrator CLCD connectors\n");
- 
-+	/* FIXME: really needed? */
- 	val = INTEGRATOR_CLCD_LCD_STATIC1 | INTEGRATOR_CLCD_LCD_STATIC2 |
- 		INTEGRATOR_CLCD_LCD0_EN | INTEGRATOR_CLCD_LCD1_EN;
- 	if (var->bits_per_pixel <= 8 ||
-@@ -291,8 +295,8 @@ static void integrator_clcd_enable(struct clcd_fb *fb)
- 
- 	regmap_update_bits(versatile_syscon_map,
- 			   INTEGRATOR_HDR_CTRL_OFFSET,
--			   0,
--			   INTEGRATOR_CLCD_MASK);
-+			   INTEGRATOR_CLCD_MASK,
-+			   val);
- }
- 
+-#if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
++#if IS_ENABLED(CONFIG_SERIAL_8250)
  /*
+  * KZM-ARM11-01 has an external UART on FPGA
+  */
+@@ -141,7 +141,7 @@ static inline int kzm_init_ext_uart(void)
+ /*
+  * SMSC LAN9118
+  */
+-#if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
++#if IS_ENABLED(CONFIG_SMSC911X)
+ static struct smsc911x_platform_config kzm_smsc9118_config = {
+ 	.phy_interface	= PHY_INTERFACE_MODE_MII,
+ 	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
+@@ -201,7 +201,7 @@ static inline int kzm_init_smsc9118(void)
+ }
+ #endif
+ 
+-#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
++#if IS_ENABLED(CONFIG_SERIAL_IMX)
+ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
+ };
 -- 
 2.7.4
