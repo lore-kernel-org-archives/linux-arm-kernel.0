@@ -1,108 +1,79 @@
-From: oss@buserror.net (Scott Wood)
-Date: Mon, 29 Aug 2016 12:51:01 -0500
-Subject: [PATCH v2 1/1] arm64: Add DTS support for FSL's LS1012A SoC
-In-Reply-To: <20160829095239.GM30790@tiger>
-References: <1472207241-18461-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
- <20160829095239.GM30790@tiger>
-Message-ID: <1472493061.13245.39.camel@buserror.net>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 29 Aug 2016 19:54:09 +0200
+Subject: [RFC PATCH] clk: rockchip: rk3399: support pll setting
+ automatically
+In-Reply-To: <CAD=FV=VMqHrKHThSNoz_i=SCwgw=OeOfaww3Ote1id66LXO8JQ@mail.gmail.com>
+References: <1470144852-20708-1-git-send-email-zhengxing@rock-chips.com>
+ <4830789.1bI8OsvZy1@phil>
+ <CAD=FV=VMqHrKHThSNoz_i=SCwgw=OeOfaww3Ote1id66LXO8JQ@mail.gmail.com>
+Message-ID: <13164913.BHiQzGsdBU@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-08-29 at 17:52 +0800, Shawn Guo wrote:
-> On Fri, Aug 26, 2016 at 03:57:21PM +0530, Bhaskar Upadhaya wrote:
-> > 
-> > +		clockgen: clocking at 1ee1000 {
-> > +			compatible = "fsl,ls1012a-clockgen";
-> The compatible cannot be found in binding docs.
-
-From?Documentation/devicetree/bindings/clock/qoriq-clock.txt:
-
-- compatible: Should contain a chip-specific clock block compatible
-????????string and (if applicable) may contain a chassis-version clock
-????????compatible string.
-
-? ? ? ? Chip-specific strings are of the form "fsl,<chip>-clockgen", such as:
-????????* "fsl,p2041-clockgen"
-????????* "fsl,p3041-clockgen"
-????????* "fsl,p4080-clockgen"
-????????* "fsl,p5020-clockgen"
-????????* "fsl,p5040-clockgen"
-????????* "fsl,t4240-clockgen"
-????????* "fsl,b4420-clockgen"
-????????* "fsl,b4860-clockgen"
-????????* "fsl,ls1021a-clockgen"
-????????Chassis-version clock strings include:
-????????* "fsl,qoriq-clockgen-1.0": for chassis 1.0 clocks
-????????* "fsl,qoriq-clockgen-2.0": for chassis 2.0 clocks
-
-I really hope we don't have to update every single fsl,<chip>-whatever binding
-every time a new chip comes out. ?There are already other chips not listed,
-FWIW (e.g. t1040, t2080, ls1043a, and ls2080a). ?That's why it says "such as".
-
-> > +		scfg: scfg at 1570000 {
-> > +			compatible = "fsl,ls1012a-scfg", "syscon";
-> Ditto
+Am Montag, 29. August 2016, 10:35:44 schrieb Doug Anderson:
+> Hi,
 > 
+> On Sun, Aug 28, 2016 at 8:21 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> > Hi Xing, Elaine,
 > > 
-> > +			reg = <0x0 0x1570000 0x0 0x10000>;
-> > +			big-endian;
-> > +		};
-> > +
-> > +		dcfg: dcfg at 1ee0000 {
-> > +			compatible = "fsl,ls1012a-dcfg",
-> > +				?????"fsl,ls1043a-dcfg",
-> If these compatibles are not documented or used, we can drop them???I
-> guess we only need "syscon" to get it work?
-
-If you only have "syscon" then how to do the users of the node properly know
-what register set they're dealing with? ?"syscon" should not be the only
-compatible on a node.
-
-
-
-> > +
-> > +		rcpm: rcpm at 1ee2000 {
-> > +			compatible = "fsl,ls1012a-rcpm";
-> Undocumented/unsupported bindings?
-
-Documentation/devicetree/bindings/soc/fsl/rcpm.txt
-
-> > +		tmu: tmu at 1f00000 {
-> > +			compatible = "fsl,ls1012a-tmu", "fsl,qoriq-tmu";
-> > +			reg = <0x0 0x1f00000 0x0 0x10000>;
-> > +			interrupts = <0 33 0x4>;
-> > +			fsl,tmu-range = <0xb0000 0x9002a 0x6004c
-> > 0x30062>;
-> > +			fsl,tmu-calibration = <0x00000000 0x00000026
-> > +					???????0x00000001 0x0000002d
-> > +					???????0x00000002 0x00000032
-> > +					???????0x00000003 0x00000039
-> > +					???????0x00000004 0x0000003f
-> > +					???????0x00000005 0x00000046
-> > +					???????0x00000006 0x0000004d
-> > +					???????0x00000007 0x00000054
-> > +					???????0x00000008 0x0000005a
-> > +					???????0x00000009 0x00000061
-> > +					???????0x0000000a 0x0000006a
-> > +					???????0x0000000b 0x00000071
-> > +
-> Drop the newline.
+> > Am Dienstag, 2. August 2016, 21:34:12 schrieb Xing Zheng:
+> >> From: Elaine Zhang <zhangqing@rock-chips.com>
+> >> 
+> >> The goal is that we can configure the most suitable pll params
+> >> automatically.
+> >> 
+> >> If setting freq is not supported in rockchip_pll_rate_table
+> >> rk3399_pll_rates[], we can set pll params automatically.
+> >> 
+> >> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> >> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+> > 
+> > first off, I really like that idea of calculating the generic pll
+> > frequencies instead of duplicating these entries in every soc clock
+> > driver.
 > 
-> > 
-> > +					???????0x00010000 0x00000025
-> > +					???????0x00010001 0x0000002c
-> > +					???????0x00010002 0x00000035
-> > +					???????0x00010003 0x0000003d
-> > +					???????0x00010004 0x00000045
-> > +					???????0x00010005 0x0000004e
-> > +					???????0x00010006 0x00000057
-> > +					???????0x00010007 0x00000061
-> > +					???????0x00010008 0x0000006b
-> > +					???????0x00010009 0x00000076
-> > +
-> Ditto
+> I probably won't have time to look at this any time soon, but when I
+> saw this patch fly by I was a little hesitant because:
+> 
+> * Not all PLL settings produce the same jitter.  On rk3288 I spent
+> loads of time searching for PLL settings that would be low jitter
+> enough to make a pixel clock that was happy with lots of different TVs
+> / monitors.  It's true that there were certain heuristics that could
+> be followed but certainly my predictions didn't always match what
+> happened.
+> 
+> * Depending on what's using the PLL, you might want very different
+> settings.  One can optimize for lock time, power usage, jitter,
+> accuracy, etc.  For instance for a CPU clock that you change a lot you
+> probably don't care about hitting an exact frequency and you probably
+> don't care overly much about jitter, but you want low lock times.  For
+> HDMI you don't care about lock times and and probably don't care about
+> power usage, but you care about meeting an exact clock and really
+> really care about jitter.
+> 
+> * I know that in the past the way I found to make some of the best
+> rates for HDMI was to have the PLL make a rate that was several times
+> what I wanted and then activate a divider later in the clock tree.
+> That gave me the best jitter / clock accuracy.  I have no idea how to
+> do that automatically, but in the past I relied on the PLL only having
+> a fixed set of rates it could make so it would fail to make the lower
+> clock rate (higher jitter) and eventually end up with the better one.
+> 
+> 
+> Anyway, I don't know how to solve all of the above, but I just wanted
+> to bring it up as a concern.
 
-This is how other instances of this property are formatted -- is it so wrong
-to provide visual grouping?
+after talking with Doug on irc, I realized that this really can become a 
+problem, as right now we have a list with known-good rates, can adjust those 
+as needed and have the clock framework select the best for a certain target 
+rate.
 
--Scott
+But with the automatic calculation it would open up nearly unlimited different 
+rates with possible negative effects and no way to eliminate or even test most 
+of them.
+
+So it may very well be best to stay with static rates, in a component as core 
+as the PLLs are?
+
+
+Heiko
