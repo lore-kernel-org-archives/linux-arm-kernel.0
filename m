@@ -1,69 +1,81 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 29 Aug 2016 09:49:13 +0200
-Subject: [RFC PATCH v2 0/7] AC97 device/driver model revamp
-In-Reply-To: <20160824113953.GF22076@sirena.org.uk> (Mark Brown's message of
- "Wed, 24 Aug 2016 12:39:53 +0100")
-References: <1464380819-19075-1-git-send-email-robert.jarzmik@free.fr>
- <87twebphh4.fsf@belgarion.home> <20160824113953.GF22076@sirena.org.uk>
-Message-ID: <87mvjwdngm.fsf@belgarion.home>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Mon, 29 Aug 2016 23:41:12 +0800
+Subject: [PATCH V2] ARM: imx: add cpuidle support for i.mx6ul
+Message-ID: <1472485272-17036-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown <broonie@kernel.org> writes:
+This patch enables cpuidle driver for i.MX6UL, it
+reuses i.MX6SX's cpuidle driver, 3 levels of cpuidle
+supported:
 
-> On Tue, Aug 23, 2016 at 06:39:35PM +0200, Robert Jarzmik wrote:
->
->> In the old ac97 bus, the match function was always returning "true", and the
->> driver did probe. With this new implementation, the ac97 is discovered and
->> sound/soc/codecs/wm9713.c#wm9713_ac97_probe() is called. I don't export
->> ac97_bus_type (nor want to do it), and only _one_ device is created upon
->> discovery, while the wm97xx-core.c would benefic a second ac97 device.
->
->> I'm wondering how to work around this :
->>  - either I add a wm97xx-ts ac97 device in wm9713_ac97_probe()
->>  - or I add a platform device in wm9713_ac97_probe() and add a new
->>    platform_driver in wm97xx-core ...
->>  - or something smarter
->
-> That device really should be a MFD.
->
->> What's behind this question is : should I keep to my initial solution of 1 ac97
->> device discovered is bound on the ac97 to _at most_ 1 ac97 driver, or is there a
->> know smart way to have several drivers for one device (that sounds a bit heretic
->> regarding my understanding of the device/driver model but who knows ...) ?
->
-> MFDs are how we do multiple drivers per device.
+1. ARM WFI;
+2. SOC in WAIT mode;
+3. SOC in WAIT mode + ARM power off.
 
-Ok Mark, I took the bait and implemented it in
-https://github.com/rjarzmik/linux/commits/work/ac97, and more specifically in :
-  https://github.com/rjarzmik/linux/commit/4689ab3085b6e3959c873b4aa6dc4bc94ca5fd5c
-  https://github.com/rjarzmik/linux/commit/152d57d535070871e401fab512b9babdcda9a545
-  https://github.com/rjarzmik/linux/commit/903569ff077d1ea992dfc69d2f3014ce0d10fa99
+As i.MX6UL has cortex-A7 CORE with an internal L2
+cache, so flushing it before powering down ARM platform
+is necessary, flush_cache_all() in last step of cpu_suspend
+has very small overhead, just call it to avoid cache
+type check for different platforms.
 
-I didn't send the patches for review yet as I face another kind of problem.
-I converted wm9713 to an mfd device :
- - with a core in drivers/mfd
- - a codec in drivers/sound/soc/codec
- - a touchscreen in drivers/input/touchscreen
- - a battery in drivers/power/
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+changes since V1:
+	remove L2 cache contional code, just call flush_cache_all
+	is just fine since it has very small overhead for L1 cache flush.
+ arch/arm/mach-imx/cpuidle-imx6sx.c | 10 ++++++++++
+ arch/arm/mach-imx/mach-imx6ul.c    |  3 +++
+ 2 files changed, 13 insertions(+)
 
-The remaining problem is the lack of possibility to "customize" through
-platform_data, which impact wm97xx_battery.c.
-The reason of this is that :
- - the core in driver/mfd is "autoprobed" by the ac97 discovery mecanism
-   As such, it has no platform data
- - the battery in drivers/power/wm97xx_battery.c will have its device spawned
-   from the core and any platform data from it.
-
-As you probably know wm97xx_battery needs platform data to be properly set up,
-and unless I add a special "glue" in the ac97 device to provide this data I see
-no other option. Would you think of something better ?
-
-Actually the wm97xx could be even further improved by "offering" an ADC API the
-battery driver could be bound to and consume just as regulators are, but that's
-probably not worth it for only one old driver.
-
-I'll post the serie within this week.
-
+diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c b/arch/arm/mach-imx/cpuidle-imx6sx.c
+index 261aaa4..c5a5c3a 100644
+--- a/arch/arm/mach-imx/cpuidle-imx6sx.c
++++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
+@@ -9,6 +9,7 @@
+ #include <linux/cpuidle.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/module.h>
++#include <asm/cacheflush.h>
+ #include <asm/cpuidle.h>
+ #include <asm/suspend.h>
+ 
+@@ -17,6 +18,15 @@
+ 
+ static int imx6sx_idle_finish(unsigned long val)
+ {
++	/*
++	 * for Cortex-A7 which has an internal L2
++	 * cache, need to flush it before powering
++	 * down ARM platform, since flushing L1 cache
++	 * here again has very small overhead, compared
++	 * to adding conditional code for L2 cache type,
++	 * just call flush_cache_all() is fine.
++	 */
++	flush_cache_all();
+ 	cpu_do_idle();
+ 
+ 	return 0;
+diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
+index 6bb7d9c..58a2b88 100644
+--- a/arch/arm/mach-imx/mach-imx6ul.c
++++ b/arch/arm/mach-imx/mach-imx6ul.c
+@@ -16,6 +16,7 @@
+ #include <asm/mach/map.h>
+ 
+ #include "common.h"
++#include "cpuidle.h"
+ 
+ static void __init imx6ul_enet_clk_init(void)
+ {
+@@ -80,6 +81,8 @@ static void __init imx6ul_init_irq(void)
+ 
+ static void __init imx6ul_init_late(void)
+ {
++	imx6sx_cpuidle_init();
++
+ 	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
+ 		platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
+ }
 -- 
-Robert
+1.9.1
