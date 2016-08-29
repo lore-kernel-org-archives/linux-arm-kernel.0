@@ -1,97 +1,117 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Mon, 29 Aug 2016 10:50:51 +0800
-Subject: [PATCH 2/2] arm64: dts: rockchip: add eMMC's power domain support
- for rk3399
-In-Reply-To: <2ab8ab94-fa4d-2cd6-5805-a92ac5f9697e@rock-chips.com>
-References: <20160827134103.28160-1-xzy.xu@rock-chips.com>
- <20160827134103.28160-3-xzy.xu@rock-chips.com>
- <2ab8ab94-fa4d-2cd6-5805-a92ac5f9697e@rock-chips.com>
-Message-ID: <57C3A30B.5080707@rock-chips.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Mon, 29 Aug 2016 19:10:45 +0800
+Subject: [PATCH v6 0/8] power: add power sequence library
+In-Reply-To: <20160824085335.GB27233@shlinux2>
+References: <1471252398-957-1-git-send-email-peter.chen@nxp.com>
+ <b1848eb2-9298-9089-ee4d-5356998c6c08@linaro.org>
+ <20160824085335.GB27233@shlinux2>
+Message-ID: <20160829111045.GB3736@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Aug 24, 2016 at 04:53:35PM +0800, Peter Chen wrote:
+> On Tue, Aug 23, 2016 at 04:02:48PM +0530, Vaibhav Hiremath wrote:
+> > 
+> > 
+> > On Monday 15 August 2016 02:43 PM, Peter Chen wrote:
+> > >Hi all,
+> > >
+> > >This is a follow-up for my last power sequence framework patch set [1].
+> > >According to Rob Herring and Ulf Hansson's comments[2], I use a generic
+> > >power sequence library for parsing the power sequence elements on DT,
+> > >and implement generic power sequence on library. The host driver
+> > >can allocate power sequence instance, and calls pwrseq APIs accordingly.
+> > >
+> > >In future, if there are special power sequence requirements, the special
+> > >power sequence library can be created.
+> > >
+> > >This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+> > >two hot-plug devices to simulate this use case, the related binding
+> > >change is updated at patch [1/6], The udoo board changes were tested
+> > >using my last power sequence patch set.[3]
+> > >
+> > >Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
+> > >need to power on itself before it can be found by ULPI bus.
+> > >
+> > >[1] http://www.spinics.net/lists/linux-usb/msg142755.html
+> > >[2] http://www.spinics.net/lists/linux-usb/msg143106.html
+> > >[3] http://www.spinics.net/lists/linux-usb/msg142815.html
+> > (Please ignore my response on V2)
+> > 
+> > Sorry being so late in the discussion...
+> > 
+> > If I am not missing anything, then I am afraid to say that the
+> > generic library
+> > implementation in this patch series is not going to solve many of
+> > the custom
+> > requirement of power on, off, etc...
+> > I know you mentioned about adding another library when we come
+> > across such platforms, but should we not keep provision (or easy
+> > hooks/path)
+> > to enable that ?
+> > 
+> > Let me bring in the use case I am dealing with,
+> > 
+> > 
+> >                               Host
+> >                                |
+> >                                V
+> >                            USB port
+> > ------------------------------------------------------------
+> >                                |
+> >                                V
+> >                       USB HUB device (May need custom on/off seq)
+> >                                |
+> >                                V
+> >               =============================
+> >              |                             |
+> >              V                             V
+> >          Device-1                       Device-2
+> > (Needs special power               (Needs special power
+> >  on/off sequence.                   on/off sequence.
+> >  Also may need custom               Also, may need custom
+> >  sequence for                       sequence for
+> >  suspend/resume)                    suspend/resume)
+> > 
+> > 
+> > Note: Both Devices are connected to HUB via HSIC and may differ
+> >           in terms of functionality, features they support.
+> > 
+> > In the above case, both Device-1 and Device-2, need separate
+> > power on/off sequence. So generic library currently we have in this
+> > patch series is not going to satisfy the need here.
+> > 
+> > I looked at all 6 revisions of this patch-series, went through the
+> > review comments, and looked at MMC power sequence code;
+> > what I can say here is, we need something similar to
+> > MMC power sequence here, where every device can have its own
+> > power sequence (if needed).
+> > 
+> > I know Rob is not in favor of creating platform device for
+> > this, and I understand his comment.
+> > If not platform device, but atleast we need mechanism to
+> > connect each device back to its of_node and its respective
+> > driver/library fns. For example, the Devices may support different
+> > boot modes, and platform driver needs to make sure that
+> > the right sequence is followed for booting.
+> > 
+> > Peter, My apologies for taking you back again on this series.
+> > I am OK, if you wish to address this in incremental addition,
+> > but my point is, we know that the current generic way is not
+> > enough for us, so I think we should try to fix it in initial phase only.
+> > 
+> 
+> Rob, it seems generic power sequence can't cover all cases.
+> Without information from DT, we can't know which power sequence
+> for which device.
+> 
 
+Vaibhav, do you agree that I create pwrseq library list using postcore_initcall
+for each library, and choose pwrseq library according to compatible
+string first, if there is no compatible string for this library, just
+use generic pwrseq library.
 
-On 08/27/2016 11:05 PM, Shawn Lin wrote:
-> On 2016/8/27 21:41, Ziyuan Xu wrote:
->> Control power domain for eMMC via genpd to reduce power consumption.
->>
->> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
->> Signed-off-by: Ziyuan Xu <xzy.xu@rock-chips.com>
->>
->
-> It looks nice to me. But this should be merged after applying that[0]
-> as your patch will break bind/unbind test for sdhci-of-arasan on rk3399
-> without it[0]. Moreover, Elaine should make sure that upstreamed
-> rockchip power domain stuff would not off pd for emmc, *otherwise*, I
-> should update my patch to make sure we update clkmul every time when
-> doing suspend 2 resume..
->
->
-Forgot to say:
-If use pd, Although there is no call to power odd the pd_emmc,
-it will be power off when the system doing suspend 2 resume.
-(Because the system call 
-__device_suspend_noirq->pm_genpd_suspend_noirq->rockchip_pd_power_off)
+-- 
 
-And it's important to note:
-If the pd has been power off, some grf regs will be back to the default 
-value.(which grf regs in this pd)
-So if the pd support power off , this grf regs need to save and restore 
-or reinit.
-For example:
-pd_emmc
-	aclk_emmc_grf
-
-If the pd is always on,and this pd have wakeup func.
-The device need to add device_init_wakeup() to make the pd always on 
-when the system doing suspend 2 resume.
-
->
-> [0]: https://patchwork.kernel.org/patch/9300971/
->
->> ---
->>
->>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 11 +++++++++++
->>  1 file changed, 11 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> index 32aebc8..71733d4 100644
->> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> @@ -239,6 +239,7 @@
->>          #clock-cells = <0>;
->>          phys = <&emmc_phy>;
->>          phy-names = "phy_arasan";
->> +        power-domains = <&power RK3399_PD_EMMC>;
->>          status = "disabled";
->>      };
->>
->> @@ -611,6 +612,11 @@
->>          status = "disabled";
->>      };
->>
->> +    qos_emmc: qos at ffa58000 {
->> +        compatible = "syscon";
->> +        reg = <0x0 0xffa58000 0x0 0x20>;
->> +    };
->> +
->>      qos_hdcp: qos at ffa90000 {
->>          compatible = "syscon";
->>          reg = <0x0 0xffa90000 0x0 0x20>;
->> @@ -739,6 +745,11 @@
->>              };
->>
->>              /* These power domains are grouped by VD_LOGIC */
->> +            pd_emmc at RK3399_PD_EMMC {
->> +                reg = <RK3399_PD_EMMC>;
->> +                clocks = <&cru ACLK_EMMC>;
->> +                pm_qos = <&qos_emmc>;
->> +            };
->>              pd_vio at RK3399_PD_VIO {
->>                  reg = <RK3399_PD_VIO>;
->>                  #address-cells = <1>;
->>
->
->
+Best Regards,
+Peter Chen
