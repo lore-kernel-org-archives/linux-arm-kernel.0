@@ -1,70 +1,58 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 29 Aug 2016 21:50:30 +0200
-Subject: [RFC PATCH 0/3] ARm64: amlogic: Introduce common GX family dtsi
-In-Reply-To: <2983d731-82fd-63fc-7541-8c1d6a929416@suse.de>
-References: <1472457371-1305-1-git-send-email-narmstrong@baylibre.com>
- <CAOQ7t2YGbASh7v25wgDspKNWgFOcRsikJs_WZptn+LkVXmaHig@mail.gmail.com>
- <2983d731-82fd-63fc-7541-8c1d6a929416@suse.de>
-Message-ID: <20160829195030.GA10797@localhost>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 29 Aug 2016 21:57:20 +0200
+Subject: [PATCH 06/33] ARM: pxa/lubbock: add GPIO driver for LUB_MISC_WR
+ register
+In-Reply-To: <E1beJk4-0000mH-4P@rmk-PC.armlinux.org.uk> (Russell King's
+ message of "Mon, 29 Aug 2016 11:24:36 +0100")
+References: <20160829102328.GA28796@n2100.armlinux.org.uk>
+ <E1beJk4-0000mH-4P@rmk-PC.armlinux.org.uk>
+Message-ID: <87a8fve4bj.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/08/16 20:38, Andreas F?rber wrote:
-> Am 29.08.2016 um 10:01 schrieb Carlo Caione:
-> > On Mon, Aug 29, 2016 at 9:56 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
-> >> The new Amlogic GLX SoCs (S905X and S905D) are part of the Meson GX family so
-> >> they share some basic characteritics that can be described in a common GX
-> >> dtsi file used by the Meson GXBB and Meson GXL dtsi.
-> >>
-> >> This patchset introduces the common dtsi and switches the GLX and GXBB to use
-> >> the common dtsi, the GXBB dtsi is reformated to handle this situation.
-> >>
-> >> This patchset depends on Carlo Caione "ARM64: dts: amlogic: Add basic support for Amlogic S905X" [1]
-> >>
-> >> [1] http://lkml.kernel.org/r/1472382113-10754-1-git-send-email-carlo at caione.org
-> >>
-> >> Neil Armstrong (3):
-> >>   ARM64: dts: amlogic: Add Meson GX Family common dtsi
-> >>   ARM64: dts: amlogic: Switch Meson GXL dtsi to use common GX dtsi
-> >>   ARM64: dts: amlogic: Switch Meson GXBB dtsi to use common GX dtsi
-> > 
-> > FWIW
-> > Acked-by: Carlo Caione <carlo@endlessm.com>
-> 
-> Adding an unused .dtsi duplicating GXBB makes me uneasy.
+Russell King <rmk+kernel@armlinux.org.uk> writes:
 
-S905x (GXL) is different from S905 (GXBB), it's unused now but in the
-future we can expect something different in the two DTSI.
+..zip...
+> diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
+> index 7245f3359564..e974d1eb0f88 100644
+> --- a/arch/arm/mach-pxa/lubbock.c
+> +++ b/arch/arm/mach-pxa/lubbock.c
+...zip...
 
-> Any chance we can simplify this to at most two steps?
-> 1) Move code from gxbb to gx (1/3 + 3/3)
-> 2) Add gxl using gx ("Add basic support for Amlogic S905X" + 2/3)
+> @@ -110,20 +111,18 @@ static unsigned long lubbock_pin_config[] __initdata = {
+>  };
+>  
+>  #define LUB_HEXLED		__LUB_REG(LUBBOCK_FPGA_PHYS + 0x010)
+> -#define LUB_MISC_WR		__LUB_REG(LUBBOCK_FPGA_PHYS + 0x080)
+>  
+>  void lubbock_set_hexled(uint32_t value)
+>  {
+>  	LUB_HEXLED = value;
+>  }
+>  
+> +static struct gpio_chip *lubbock_misc_wr_gc;
+> +
+>  void lubbock_set_misc_wr(unsigned int mask, unsigned int set)
+>  {
+> -	unsigned long flags;
+> -
+> -	local_irq_save(flags);
+> -	LUB_MISC_WR = (LUB_MISC_WR & ~mask) | (set & mask);
+> -	local_irq_restore(flags);
+> +	unsigned long m = mask, v = set;
+> +	lubbock_misc_wr_gc->set_multiple(lubbock_misc_wr_gc, &m, &v);
+If gpio_reg_init() failed (and I know, the probability of a lack of memory at
+that stage of the kernel boot is ridiculous), this will end up as an NULL
+pointer dereference if either IRDA or PCMCIA is used.
 
-fine by me.
+If it's expected, then the the pr_err() below would deserve a pr_crit(). I would
+as well take an option on a "panic()" if lubbock_misc_wr_gc allocation fails. If
+not, maybe a not-NULL test on lubbock_misc_wr_gc is in order, even if that would
+be "hidding under the carpet" and rather difficult to debug later.
 
-> Alternatively:
-> 1) "Add basic support for Amlogic S905X"
-> 2) Factor out common bits (1/3 + 2/3 + 3/3)
+Apart this detail point, it's good for me.
 
-how is this different from this patchset?
-
-> As for bike-shedding, is there a GX family as well or could we drop
-> -common? .dtsi is always something common - compare Exynos or i.MX.
-> Since there are meson8b and meson8 I was anticipating that after gxbb
-> would come gx, not gxl.
-
-AFAIK we have:
-- GXBB
-- GXL
-- GXM
-- GXTVBB
-
-> Do you know what the L in GXL is for? Should we consider renaming gxbb
-> to gxb, and then also insert -s905 as suggested by Kevin, for symmetry?
-
-Yes, that make sense.
-
-Cheers,
+Cheers.
 
 -- 
-Carlo Caione
+Robert
