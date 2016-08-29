@@ -1,44 +1,56 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Mon, 29 Aug 2016 15:51:30 +0200
-Subject: [Patch v4 9/9] arm64: Update device tree for Layerscape SoCs
-In-Reply-To: <20160829083350.GL30790@tiger>
-References: <1470780000-16750-1-git-send-email-york.sun@nxp.com>
- <20160812091354.GB333@nazgul.tnic> <20160829063448.GA32489@tiger>
- <20160829080530.GA25468@nazgul.tnic> <20160829083350.GL30790@tiger>
-Message-ID: <20160829135130.GB28806@nazgul.tnic>
+From: atull@opensource.altera.com (atull)
+Date: Mon, 29 Aug 2016 09:35:36 -0500
+Subject: FPGA manager: What is the proper way to load a bitstream now?
+In-Reply-To: <57C3DE04.4030109@topic.nl>
+References: <57C3DE04.4030109@topic.nl>
+Message-ID: <alpine.DEB.2.02.1608290927380.2561@linuxheads99>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 04:33:50PM +0800, Shawn Guo wrote:
-> To avoid potential merge conflicts. 
+On Mon, 29 Aug 2016, Mike Looijmans wrote:
 
-Haven't heard of any so far. And I don't see how adding 1 or 2 DT
-entries more per driver is a serious merge conflict.
+> The "FPGA manager" has been around for a while now, so I thought to integrate
+> it. However, there's apparently only a kernel-to-kernel interface and it isn't
+> actually being used in current mainline kernels?
+> 
+> So far, I've been using vendor provided drivers to load the FPGA bitstream
+> (e.g. "cat fpga.bin > /dev/xdevcfg") somewhere early during boot.
+> 
+> With the FPGA manager, while looking for a userspace interface, all I found
+> were proposals to do so, that have been 'shot down', even the nice ones using
+> DT overlays, and in the end, there is apparently no way whatsover to simply
+> load a bitstream at boot, other that writing (yet another) driver to trigger
+> the firmware load at some stage.
+> 
+> Is this an accurate summary of the current state, or is there something I've
+> missed?
+> 
+> (resent because of corporate mailserver turning plaintext into HTML)
+> 
 
-> Unless there are hard dependencies like making it compile, avoiding
-> regression or maintaining bisect, patches should go through their
-> established subsystem/architecture tree.
+Hi Mike,
 
-Well, doh, the driver simply doesn't work. How are people even supposed
-to test the EDAC tree?
+There is some stuff that is not yet accepted upstream.  Please see
+my tree (either branch socfpga-4.6 or socfpga-4.1.22-ltsi, take your
+pick).
 
-Why is it even such a big deal if it is acked by the proper maintainers?
-Cross-tree maintainer acking happens all the time. So don't tell me the
-merge conflicts are your big issue with this.
+git clone https://github.com/altera-opensource/linux-socfpga.git
 
-> Luckily.  If there are many patches on architecture DT branch changing
-> the same file, when driver branch and DT branch merges in upstream
-> branch, there will likely be merge conflicts.
+Documentation for the in-kernel API is
+ Documentation/fpga/fpga-mgr.txt
 
-So? There are tools to resolve those. And again, the DT changes for
-EDAC are basically adding blocks so resolving those conflicts should be
-trivial most of the time.
+Documentation for using device tree overlays is 
+ Documentation/devicetree/bindings/fpga/fpga-region.txt
 
-So no, I don't consider the potential merge conflicts an issue here.
+The in kernel device tree compiler has to be upgraded to include
+some of Pantelis Antoniou's patches.
 
--- 
-Regards/Gruss,
-    Boris.
+This interface uses the firmware layer to load files from the
+root filesystem.  This all happens under control of applying
+device tree overlays as documented in the fpga-region.txt
+document.
 
-ECO tip #101: Trim your mails when you reply.
---
+I think the DTO stuff is close to being accepted, but that
+will take time still.
+
+Alan
