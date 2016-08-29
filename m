@@ -1,42 +1,77 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Mon, 29 Aug 2016 09:34:16 +0200
-Subject: [PATCH v1 4/5] ARM: dts: ls1043a: add qDMA node
-In-Reply-To: <1471502328-28305-5-git-send-email-yao.yuan@freescale.com>
-References: <1471502328-28305-1-git-send-email-yao.yuan@freescale.com>
- <1471502328-28305-5-git-send-email-yao.yuan@freescale.com>
-Message-ID: <3583547.0zriK9IoAs@ws-stein>
+From: mirza.krak@gmail.com (Mirza Krak)
+Date: Mon, 29 Aug 2016 09:38:39 +0200
+Subject: [PATCH v2 3/6] dt/bindings: Add bindings for Tegra GMI controller
+In-Reply-To: <a7851104-1aa1-fd8d-a594-545a01046cdf@nvidia.com>
+References: <1472045838-22628-1-git-send-email-mirza.krak@gmail.com>
+ <1472045838-22628-4-git-send-email-mirza.krak@gmail.com>
+ <de2fb909-829e-6c04-4f6a-442cbb9171c9@nvidia.com>
+ <CALw8SCVcPymDZ8NyUbeanRF0TCT1TZzL6iRDticYA42FWrEWqw@mail.gmail.com>
+ <CALw8SCWtTvWGmKru2MX7T7sFpoUpD-V400+w2nPkxaFB5WUKSA@mail.gmail.com>
+ <a7851104-1aa1-fd8d-a594-545a01046cdf@nvidia.com>
+Message-ID: <CALw8SCV4a98B0ct483wxf9ZMuCv8qV1BPM_9g6vV3huyp6YdOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 18 August 2016 14:38:47, Yuan Yao wrote:
-> From: Yuan Yao <yao.yuan@nxp.com>
-> 
-> Add the QDMA node for ls1043a platform to
-> support QDMA driver.
-> 
-> Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
-> ---
->  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi index e8e4c3e..e463074
-> 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> @@ -467,6 +467,16 @@
->  				 <&clockgen 4 0>;
->  		};
-> 
-> +		qdma: qdma at 8390000 {
-> +			compatible = "fsl,ls1021a-qdma", "fsl,ls1043a-qdma";
+2016-08-26 9:25 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
+>
+> On 26/08/16 05:53, Mirza Krak wrote:
+>
+> ...
+>
+>>> I have an idea which is following:
+>>>
+>>> gmi at 70090000 {
+>>>          status = "okay";
+>>>          #address-cells = <2>;
+>>>          #size-cells = <1>;
+>>>          ranges = <4 0 0x48000000 0x00040000>;
+>>>
+>>>          cs4 {
+>>>                  compatible = "simple-bus";
+>>>                  #address-cells = <2>;
+>>>                  #size-cells = <1>;
+>>>                  ranges;
+>>>
+>>>                  nvidia,snor-cs = <4>;
+>>>                  nvidia,snor-mux-mode;
+>>>                  nvidia,snor-adv-inv;
+>>>
+>>>                  can at 0 {
+>>>                          compatible = "nxp,sja1000";
+>>>                          reg = <4 0 0x100>;
+>>>                          ...
+>>>                  };
+>>>
+>>>
+>>>                  can at 40000 {
+>>>                          compatible = "nxp,sja1000";
+>>>                          reg = <4 0x40000 0x100>;
+>>>                          ...
+>>>                  };
+>>>          };
+>>> };
+>>>
+>>> Do not know if above will work at all (not able to test at current
+>>> location), anyway I will play around with it some more and get back to
+>>> you.
+>>
+>> Gave above a test run and it works like a charm. Are we happy with that?
+>
+> Does it not work with #address-cells = <1>? Seems odd to have the cs in
+> the reg for the device.
+>
 
-This doesn't match the order of your binding in Patch 2/5:
-> +- compatible :
-> +       - "fsl,ls1021a-qdma",
-> +       Or "fsl,ls1043a-qdma" followed by "fsl,ls1021a-qdma",
+No it does not work with #address-cells = <1> with the current
+structure that we have.
 
-It should be the other way around.
+With #address-cells = <2>, we can state that this device is on
+chip-select 4 and on this specific offset of chip-select 4 (that is
+the second address cell). I do not see how we can specify this with
+only one address cell.
 
-Best regards,
-Alexander
+And is it really that odd? Looking at other drivers they all use the
+same metod, even the arm,pl172 that you where referring to as a base
+for our implementation.
+
+Best Regards
+Mirza
