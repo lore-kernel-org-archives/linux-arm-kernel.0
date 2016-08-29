@@ -1,52 +1,79 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 29 Aug 2016 09:58:51 -0600
-Subject: [PATCH V6 0/5] perf: Driver specific configuration for PMU
-In-Reply-To: <20160828141808.GC32293@krava>
-References: <1472156445-24283-1-git-send-email-mathieu.poirier@linaro.org>
- <20160828141808.GC32293@krava>
-Message-ID: <CANLsYkyzYaF3Z=MPAwevtosN-XU5BK7qSwppaJ1nBNqT-qoCwA@mail.gmail.com>
+From: hotran@apm.com (Hoan Tran)
+Date: Mon, 29 Aug 2016 09:05:29 -0700
+Subject: [PATCH 1/3] Documentation: dtb: xgene: Add PMD clock binding
+In-Reply-To: <20160829154228.GA23350@rob-hp-laptop>
+References: <1471967561-23634-1-git-send-email-hotran@apm.com>
+ <1471967561-23634-2-git-send-email-hotran@apm.com>
+ <20160829154228.GA23350@rob-hp-laptop>
+Message-ID: <CAFHUOYxUh5dCkjJddfJy1ODR5p4P9v7C=8dxEvsbnJ6mPiscXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 August 2016 at 08:18, Jiri Olsa <jolsa@redhat.com> wrote:
-> On Thu, Aug 25, 2016 at 02:20:40PM -0600, Mathieu Poirier wrote:
+Hi Rob,
+
+
+
+On Mon, Aug 29, 2016 at 8:42 AM, Rob Herring <robh@kernel.org> wrote:
+> On Tue, Aug 23, 2016 at 08:52:39AM -0700, Hoan Tran wrote:
+>> Add APM X-Gene clock binding documentation for PMD clock.
+>>
+>> Signed-off-by: Hoan Tran <hotran@apm.com>
+>> ---
+>>  Documentation/devicetree/bindings/clock/xgene.txt | 22 ++++++++++++++++++++++
+>>  1 file changed, 22 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/xgene.txt b/Documentation/devicetree/bindings/clock/xgene.txt
+>> index 82f9638..c381733 100644
+>> --- a/Documentation/devicetree/bindings/clock/xgene.txt
+>> +++ b/Documentation/devicetree/bindings/clock/xgene.txt
+>> @@ -8,6 +8,7 @@ Required properties:
+>>  - compatible : shall be one of the following:
+>>       "apm,xgene-socpll-clock" - for a X-Gene SoC PLL clock
+>>       "apm,xgene-pcppll-clock" - for a X-Gene PCP PLL clock
+>> +     "apm,xgene-pmd-clock" - for a X-Gene PMD clock
+>>       "apm,xgene-device-clock" - for a X-Gene device clock
+>>       "apm,xgene-socpll-v2-clock" - for a X-Gene SoC PLL v2 clock
+>>       "apm,xgene-pcppll-v2-clock" - for a X-Gene PCP PLL v2 clock
+>> @@ -22,6 +23,17 @@ Required properties for SoC or PCP PLL clocks:
+>>  Optional properties for PLL clocks:
+>>  - clock-names : shall be the name of the PLL. If missing, use the device name.
+>>
+>> +Required properties for PMD clocks:
+>> +- reg : shall be the physical register address for the pmd clock.
+>> +- clocks : shall be the input parent clock phandle for the clock.
+>> +- #clock-cells : shall be set to 1.
+>> +- clock-output-names : shall be the name of the clock referenced by derive
+>> +  clock.
+>> +- clock-shift: Bit shift of the clock register. Default is 0.
+>> +- clock-width: Width of the clock register. Default is 32.
+>> +Optional properties for PLL clocks:
+>> +- clock-names : shall be the name of the clock. If missing, use the device name.
+>> +
+>>  Required properties for device clocks:
+>>  - reg : shall be a list of address and length pairs describing the CSR
+>>           reset and/or the divider. Either may be omitted, but at least
+>> @@ -59,6 +71,16 @@ For example:
+>>               type = <0>;
+>>       };
+>>
+>> +     pmd0clk: pmd0clk {
+>> +             compatible = "apm,xgene-pmd-clock";
+>> +             #clock-cells = <1>;
+>> +             clocks = <&pmdpll 0>;
+>> +             reg = <0x0 0x7E200200 0x0 0x10>;
+>> +             clock-shift = <8>;
+>> +             clock-width = <3>;
 >
-> SNIP
->
->> perf record -e some_event/@cfg1, at cfg2=config/ ...
->>
->> The above are all valid configuration and will see the strings 'cfg1'
->> and 'cfg2=config' sent to the PMU driver for parsing and interpretation
->> using the existing ioctl() mechanism.
->>
->> The primary customers for this feature are the CoreSight drivers where
->> the selection of a sink (where trace data is accumulated) needs to be
->> done in a previous, and separated step, from the launching of the perf
->> command.
->>
->> As such something that used to be a two-step process:
->>
->> # echo 1 > /sys/bus/coresight/devices/20070000.etr/enable_sink
->> # perf record -e cs_etm//u --per-thread  uname
->>
->> is integrated in a single command:
->>
->> # perf record -e cs_etm/@20070000.etr/u --per-thread  uname
->>
->> Thanks,
->> Mathieu
->>
->> Changes for V6:
->> - Using sysFS rather than an ioctl() to communicate command line
->>   parameters to the CoreSight PMU.
->
-> apart from few nits it looks good.. but can't say for patch 2/5 ;-)
->
-> Acked-by: Jiri Olsa <jolsa@kernel.org>
+> These should be implied by the compatible string. It's not a big deal
+> for just adding this clock, but if you have lots more clocks to add then
+> it is a problem. We only want leaf clocks (the ones going to devices) in
+> DT unless there is only a few clocks.
 >
 
-Many thanks for taking the time to look at this set - your time is
-much appreciated.
+This clock node is the clock of CPU.
+A PMD has 2 CPUs, and they are using the same PMD clock.
 
-> thanks,
-> jirka
+Thanks
+Hoan
+
+> Rob
