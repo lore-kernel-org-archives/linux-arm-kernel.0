@@ -1,126 +1,60 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 29 Aug 2016 13:53:56 +0100
-Subject: [PATCH v4 4/4] ARM: kernel: avoid brute force search on PLT generation
-In-Reply-To: <1472475236-3083-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1472475236-3083-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1472475236-3083-5-git-send-email-ard.biesheuvel@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 29 Aug 2016 14:57:53 +0200
+Subject: [PATCH 1/2] bus: mvebu-mbus: Provide stub function for
+ mvebu_mbus_get_io_win_info()
+In-Reply-To: <20160829110456.12206-1-sr@denx.de>
+References: <20160829110456.12206-1-sr@denx.de>
+Message-ID: <20160829125753.GC12465@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Given that we now sort the relocation sections in a way that guarantees
-that entries that can share a single PLT entry end up adjacently, there
-is no a longer a need to go over the entire list to look for an existing
-entry that matches our jump target. If such a match exists, it was the
-last one to be emitted, so we can simply check the preceding slot.
+On Mon, Aug 29, 2016 at 01:04:55PM +0200, Stefan Roese wrote:
+> This patch provides a stub function for mvebu_mbus_get_io_win_info(),
+> which will be used for all non-Orion (ARM32 MVEBU) platforms for
+> compile test coverage.
+> 
+> Signed-off-by: Stefan Roese <sr@denx.de>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Marcin Wojtas <mw@semihalf.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> ---
+>  include/linux/mbus.h | 9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
+> 
+> diff --git a/include/linux/mbus.h b/include/linux/mbus.h
+> index d610232..a884405 100644
+> --- a/include/linux/mbus.h
+> +++ b/include/linux/mbus.h
+> @@ -55,6 +55,8 @@ struct mbus_dram_target_info
+>  #ifdef CONFIG_PLAT_ORION
+>  extern const struct mbus_dram_target_info *mv_mbus_dram_info(void);
+>  extern const struct mbus_dram_target_info *mv_mbus_dram_info_nooverlap(void);
+> +int mvebu_mbus_get_io_win_info(phys_addr_t phyaddr, u32 *size, u8 *target,
+> +			       u8 *attr);
+>  #else
+>  static inline const struct mbus_dram_target_info *mv_mbus_dram_info(void)
+>  {
+> @@ -64,14 +66,17 @@ static inline const struct mbus_dram_target_info *mv_mbus_dram_info_nooverlap(vo
+>  {
+>  	return NULL;
+>  }
+> +static inline int mvebu_mbus_get_io_win_info(phys_addr_t phyaddr, u32 *size,
+> +					     u8 *target, u8 *attr)
+> +{
+> +	return 0;
+> +}
+>  #endif
 
-Note that this will still work correctly in the [theoretical] presence of
-call/jump relocations against SHN_UNDEF symbols with non-zero addends,
-although not optimally. Since the relocations are presented in the same
-order that we checked them for duplicates, any duplicates that we failed
-to spot the first time around will be accounted for in the PLT allocation
-so there is guaranteed to be sufficient space for them when actually
-emitting the PLT.
+Hi Stefan
 
-For instance, the following sequence of relocations:
+If i understand it correctly, this should never be used for real, it
+is here only for compile testing?
 
-  000004d8  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
-  000004fc  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
-  0000050e  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
-  00000520  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
-  00000532  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
-  00000544  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
-  00000556  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
-  00000568  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
-  0000057a  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
-  0000058c  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
-  0000059e  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
-  000005b0  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
-  000005c2  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
-  000005d4  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
+Maybe add a WARN_ON_ONCE(1) here? And a comment, why it should never
+happen.
 
-may result in several PLT entries to be allocated, and also emitted, if
-any of the entries in the middle refer to a Place that contains a non-zero
-addend (i.e., one for all the preceding zero-addend relocations, one for
-all the following zero-addend relocations, and one for the non-zero addend
-relocation itself)
+Thanks
 
-Tested-by: Jongsung Kim <neidhard.kim@lge.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/kernel/module-plts.c | 60 +++++++++++---------
- 1 file changed, 32 insertions(+), 28 deletions(-)
-
-diff --git a/arch/arm/kernel/module-plts.c b/arch/arm/kernel/module-plts.c
-index ad1b98fbcd98..3a5cba90c971 100644
---- a/arch/arm/kernel/module-plts.c
-+++ b/arch/arm/kernel/module-plts.c
-@@ -33,35 +33,39 @@ struct plt_entries {
- 
- u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
- {
--	struct plt_entries *plt, *plt_end;
--	int c;
--
--	plt = (void *)mod->arch.plt->sh_addr;
--	plt_end = (void *)plt + mod->arch.plt->sh_size;
--
--	/* Look for an existing entry pointing to 'val' */
--	for (c = mod->arch.plt_count; plt < plt_end; c -= PLT_ENT_COUNT, plt++) {
--		int i;
--
--		if (!c) {
--			/* Populate a new set of entries */
--			*plt = (struct plt_entries){
--				{ [0 ... PLT_ENT_COUNT - 1] = PLT_ENT_LDR, },
--				{ val, }
--			};
--			mod->arch.plt_count++;
--			return (u32)plt->ldr;
--		}
--		for (i = 0; i < PLT_ENT_COUNT; i++) {
--			if (!plt->lit[i]) {
--				plt->lit[i] = val;
--				mod->arch.plt_count++;
--			}
--			if (plt->lit[i] == val)
--				return (u32)&plt->ldr[i];
--		}
-+	struct plt_entries *plt = (struct plt_entries *)mod->arch.plt->sh_addr;
-+	int idx = 0;
-+
-+	/*
-+	 * Look for an existing entry pointing to 'val'. Given that the
-+	 * relocations are sorted, this will be the last entry we allocated.
-+	 * (if one exists).
-+	 */
-+	if (mod->arch.plt_count > 0) {
-+		plt += (mod->arch.plt_count - 1) / PLT_ENT_COUNT;
-+		idx = (mod->arch.plt_count - 1) % PLT_ENT_COUNT;
-+
-+		if (plt->lit[idx] == val)
-+			return (u32)&plt->ldr[idx];
-+
-+		idx = (idx + 1) % PLT_ENT_COUNT;
-+		if (!idx)
-+			plt++;
- 	}
--	BUG();
-+
-+	mod->arch.plt_count++;
-+	BUG_ON(mod->arch.plt_count * PLT_ENT_SIZE > mod->arch.plt->sh_size);
-+
-+	if (!idx)
-+		/* Populate a new set of entries */
-+		*plt = (struct plt_entries){
-+			{ [0 ... PLT_ENT_COUNT - 1] = PLT_ENT_LDR, },
-+			{ val, }
-+		};
-+	else
-+		plt->lit[idx] = val;
-+
-+	return (u32)&plt->ldr[idx];
- }
- 
- #define cmp_3way(a,b)	((a) < (b) ? -1 : (a) > (b))
--- 
-2.7.4
+      Andrew
