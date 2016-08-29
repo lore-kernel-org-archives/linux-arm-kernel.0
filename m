@@ -1,24 +1,94 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 29 Aug 2016 20:15:09 +0200
-Subject: [PATCH] arm64: KVM: Save two instructions in __guest_enter()
-In-Reply-To: <daa6aa0c-27d0-25bd-02fd-4e87e9a908fe@codeaurora.org>
-References: <1470791736-13949-1-git-send-email-shankerd@codeaurora.org>
- <20160825133122.GA8016@lvm>
- <daa6aa0c-27d0-25bd-02fd-4e87e9a908fe@codeaurora.org>
-Message-ID: <20160829181509.GC10162@cbox>
+From: chris.brandt@renesas.com (Chris Brandt)
+Date: Mon, 29 Aug 2016 14:13:22 -0400
+Subject: [PATCH v2] ARM: dts: rskrza1: initial device tree
+In-Reply-To: <20160825153115.15291-1-chris.brandt@renesas.com>
+References: <20160825153115.15291-1-chris.brandt@renesas.com>
+Message-ID: <20160829181322.25064-1-chris.brandt@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 10:22:06AM -0500, Shanker Donthineni wrote:
-> Hi Christoffer,
-> 
-> This is change may not provide the measurable performance
-> improvement, but still we can
-> save a few cpu cycles on vCPU context switch and also improves the
-> code readability.
+Add the initial device tree for the RZ/A1 based development board (RSK).
 
-I'm not so convinced about saving CPU cycles, but now when I've reviewed
-your patch I think it has potential to slightly improve the code.  See
-my review of your patch.
+Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v2:
+* Removed empty line at end
+---
+ arch/arm/boot/dts/Makefile             |  1 +
+ arch/arm/boot/dts/r7s72100-rskrza1.dts | 52 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 53 insertions(+)
+ create mode 100644 arch/arm/boot/dts/r7s72100-rskrza1.dts
 
--Christoffer
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index faacd52..c1c4d912 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -651,6 +651,7 @@ dtb-$(CONFIG_ARCH_S5PV210) += \
+ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
+ 	emev2-kzm9d.dtb \
+ 	r7s72100-genmai.dtb \
++	r7s72100-rskrza1.dtb \
+ 	r8a73a4-ape6evm.dtb \
+ 	r8a7740-armadillo800eva.dtb \
+ 	r8a7778-bockw.dtb \
+diff --git a/arch/arm/boot/dts/r7s72100-rskrza1.dts b/arch/arm/boot/dts/r7s72100-rskrza1.dts
+new file mode 100644
+index 0000000..aabfa04
+--- /dev/null
++++ b/arch/arm/boot/dts/r7s72100-rskrza1.dts
+@@ -0,0 +1,52 @@
++/*
++ * Device Tree Source for the RZ/A1H RSK board
++ *
++ * Copyright (C) 2016 Renesas Electronics
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/dts-v1/;
++#include "r7s72100.dtsi"
++
++/ {
++	model = "RSKRZA1";
++	compatible = "renesas,rskrza1", "renesas,r7s72100";
++
++	aliases {
++		serial0 = &scif2;
++	};
++
++	chosen {
++		bootargs = "ignore_loglevel";
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory at 8000000 {
++		device_type = "memory";
++		reg = <0x08000000 0x02000000>;
++	};
++
++	lbsc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++	};
++};
++
++&extal_clk {
++	clock-frequency = <13330000>;
++};
++
++&usb_x1_clk {
++	clock-frequency = <48000000>;
++};
++
++&mtu2 {
++	status = "okay";
++};
++
++&scif2 {
++	status = "okay";
++};
+-- 
+2.9.2
