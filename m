@@ -1,52 +1,66 @@
-From: mathias.nyman@linux.intel.com (Mathias Nyman)
-Date: Mon, 29 Aug 2016 13:59:14 +0300
-Subject: PROBLEM: DWC3 USB 3.0 not working on Odroid-XU4 with Exynos 5422
-In-Reply-To: <87lgzgdof3.fsf@linux.intel.com>
-References: <1472414695.3845.3.camel@mniewoehner.de>
- <87lgzgdof3.fsf@linux.intel.com>
-Message-ID: <57C41582.1030604@linux.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 29 Aug 2016 12:54:15 +0200
+Subject: Older hisilicon chipsets
+In-Reply-To: <ec3ec22f-f05e-aaec-8e9a-bfc0565b9e9d@gmail.com>
+References: <7773f0e5-d045-1e93-529b-74a601467ed1@gmail.com>
+ <20160827150457.GM10637@io.lakedaemon.net>
+ <ec3ec22f-f05e-aaec-8e9a-bfc0565b9e9d@gmail.com>
+Message-ID: <7850061.5OOjP34nIO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.08.2016 10:28, Felipe Balbi wrote:
->
-> Hi,
->
-> Michael Niew?hner <linux@mniewoehner.de> writes:
->> [1.] One line summary of the problem:
->> DWC3 USB 3.0 not working on Odroid-XU4 with Exynos 5422
->>
->> [2.] Full description of the problem/report:
->> No usb 3.0 devices are being detected when attached while USB 2.0
->> devices work on the same port.
->> USB 3.0 works after applying patches [9.1] and [9.2], but seems to be
->> buggy. The usb hub is redetected every time an usb device is attached.
->
-> dwc3 is host, which means it's actually XHCI :-)
->
-> Adding Mathias
->
->> dmesg:
->> [  192.287080] usb 3-1.2: USB disconnect, device number 7
->> [  210.370699] hub 3-1:1.0: hub_ext_port_status failed (err = -71)
+On Saturday, August 27, 2016 1:53:25 PM CEST Marty Plummer wrote:
+> On 08/27/2016 10:04 AM, Jason Cooper wrote:
+> > 
+> > Ah, yes.  The same device we were discussing on #mvlinux?
+> > 
+> Indeed, the very same
+> > 
+> > Note that I have no experience with HiSilicon. :-)  However, I think
+> > it's correct to add it mach-hisi/.   A quick grep shows that there is
+> > devicetree support for hisilicon SoCs (arch/arm/boot/dts/).  So that
+> > means there's a *lot* less code to add under mach-hisi/.
+> > 
+> The issue here is that mach-hisi/Kconfig and CONFIG_ARCH_HISI require
+> ARMv7, whereas the hi3520 has an arm1176/arm926 core, thereby being
+> ARMv6/v5
 
-Looks like the hub GetPortStatus request fails with protocol error.
+No problem, just modify the dependency list for the top-level option.
 
-Reading xhci root hub port status is mostly just register reads and writes. It
-shouldn't include any actual transfers that could return -EPROTO
+> > Ideally, most of it will be a devicetree.  Assuming we have code for the
+> > SoC and associated drivers.
+> > 
+> Yes, I've been doing some work on that already, but as I've said, unsure
+> where one should/would insert all these different things.
 
-So this is not the root hub? but a external or integrated on your board, right?
+start with getting the serial console working. debug_ll is useful for
+early bringup and should only need a patch to arch/arm/Kconfig.debug.
 
-The protocol error -71 is returned at transfer errors or if device stalled.
+Later you would typically use earlycon (using a stdout-path property
+in DT to point to the UART and configuration). The approximate order
+in which you need other drivers is:
 
-Adding more xhci debugging options could show something:
-echo -n 'module xhci_hcd =p' > /sys/kernel/debug/dynamic_debug/control
+* drivers/irqchip (often a standard VIC or GIC)
+* drivers/clocksource
+* drivers/tty/serial/
+* drivers/clk
+* drivers/pinctrl (or drivers/gpio for simpler I/O pins)
+* drivers/mmc
+* drivers/net/ethernet
+* drivers/spi/
+* drivers/i2c/
+* drivers/mtd/
 
->> [9.] Other notes, patches, fixes, workarounds:
->> [9.1] https://lkml.org/lkml/2014/4/28/234
->> [9.2] https://lkml.org/lkml/2015/2/2/259
+In each case, look for a driver that works on your hardware first,
+or create one based on the old source if that doesn't exist upstream.
 
-The additional patches that makes things somehow work involve tuning the PHY,
-this is an area I'm not familiar with
+> > I've added GregKH to the Cc to see if he knows of anyone currently
+> > working with Hisilicon.
+> > 
+> Thanks, mayhaps someone can get even a response from Hisilicon, as I've
+> yet to recieve even that.
 
--Mathias
+I expect that Xu Wei will pick up the patches once they are ready to
+go in, but he probably won't have a lot of comments for your patches.
+
+	Arnd
