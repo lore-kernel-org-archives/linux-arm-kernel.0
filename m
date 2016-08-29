@@ -1,74 +1,55 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 29 Aug 2016 11:25:06 +0100
-Subject: [PATCH 12/33] pcmcia: soc_common: add support for reset and bus
- enable GPIOs
+Date: Mon, 29 Aug 2016 11:26:49 +0100
+Subject: [PATCH 32/33] pcmcia: sa1100*: remove redundant bvd1/bvd2 setting
 In-Reply-To: <20160829102328.GA28796@n2100.armlinux.org.uk>
 References: <20160829102328.GA28796@n2100.armlinux.org.uk>
-Message-ID: <E1beJkY-0000ms-Ut@rmk-PC.armlinux.org.uk>
+Message-ID: <E1beJmD-0000oq-Ix@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to soc_common for controlling reset and bus enable GPIOs
-from within the generic soc_common layer, rather than having
-individual drivers having to perform this themselves.
+bvd1 and bvd2 both default to 1 in the generic soc_common code, so
+having a driver repeat this is redundant.  Remove it.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/pcmcia/soc_common.c | 20 ++++++++++++++++++++
- drivers/pcmcia/soc_common.h |  3 +++
- 2 files changed, 23 insertions(+)
+ drivers/pcmcia/sa1100_shannon.c | 4 ----
+ drivers/pcmcia/sa1100_simpad.c  | 4 ++--
+ 2 files changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/pcmcia/soc_common.c b/drivers/pcmcia/soc_common.c
-index edfb6045fcda..822de207c408 100644
---- a/drivers/pcmcia/soc_common.c
-+++ b/drivers/pcmcia/soc_common.c
-@@ -122,6 +122,11 @@ static void __soc_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt,
- 	if (skt->ops->hw_shutdown)
- 		skt->ops->hw_shutdown(skt);
+diff --git a/drivers/pcmcia/sa1100_shannon.c b/drivers/pcmcia/sa1100_shannon.c
+index 51985c8ba830..7409cb36083b 100644
+--- a/drivers/pcmcia/sa1100_shannon.c
++++ b/drivers/pcmcia/sa1100_shannon.c
+@@ -32,15 +32,11 @@ shannon_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
+ {
+ 	switch (skt->nr) {
+ 	case 0:
+-		state->bvd1   = 1; 
+-		state->bvd2   = 1; 
+ 		state->vs_3v  = 1; /* FIXME Can only apply 3.3V on Shannon. */
+ 		state->vs_Xv  = 0;
+ 		break;
  
-+	if (skt->gpio_reset)
-+		gpiod_put(skt->gpio_reset);
-+	if (skt->gpio_bus_enable)
-+		gpiod_put(skt->gpio_bus_enable);
-+
- 	clk_disable_unprepare(skt->clk);
- }
+ 	case 1:
+-		state->bvd1   = 1; 
+-		state->bvd2   = 1; 
+ 		state->vs_3v  = 1; /* FIXME Can only apply 3.3V on Shannon. */
+ 		state->vs_Xv  = 0;
+ 		break;
+diff --git a/drivers/pcmcia/sa1100_simpad.c b/drivers/pcmcia/sa1100_simpad.c
+index e14b2f5a18bb..b59bbe68c6d7 100644
+--- a/drivers/pcmcia/sa1100_simpad.c
++++ b/drivers/pcmcia/sa1100_simpad.c
+@@ -38,8 +38,8 @@ simpad_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
+ {
+ 	long cs3reg = simpad_get_cs3_ro();
  
-@@ -288,6 +293,21 @@ static int soc_common_pcmcia_config_skt(
+-	state->bvd1 = 1; /* Might be cs3reg & PCMCIA_BVD1 */
+-	state->bvd2 = 1; /* Might be cs3reg & PCMCIA_BVD2 */
++	/* bvd1 might be cs3reg & PCMCIA_BVD1 */
++	/* bvd2 might be cs3reg & PCMCIA_BVD2 */
  
- 	ret = skt->ops->configure_socket(skt, state);
- 	if (ret == 0) {
-+		struct gpio_desc *descs[2];
-+		int values[2], n = 0;
-+
-+		if (skt->gpio_reset) {
-+			descs[n] = skt->gpio_reset;
-+			values[n++] = !!(state->flags & SS_RESET);
-+		}
-+		if (skt->gpio_bus_enable) {
-+			descs[n] = skt->gpio_bus_enable;
-+			values[n++] = !!(state->flags & SS_OUTPUT_ENA);
-+		}
-+
-+		if (n)
-+			gpiod_set_array_value_cansleep(n, descs, values);
-+
- 		/*
- 		 * This really needs a better solution.  The IRQ
- 		 * may or may not be claimed by the driver.
-diff --git a/drivers/pcmcia/soc_common.h b/drivers/pcmcia/soc_common.h
-index ee40db16dc40..686ba3238c76 100644
---- a/drivers/pcmcia/soc_common.h
-+++ b/drivers/pcmcia/soc_common.h
-@@ -62,6 +62,9 @@ struct soc_pcmcia_socket {
- #define SOC_STAT_BVD2		2	/* BATWARN / IOSPKR */
- #define SOC_STAT_RDY		3	/* Ready / Interrupt */
- 
-+	struct gpio_desc	*gpio_reset;
-+	struct gpio_desc	*gpio_bus_enable;
-+
- 	unsigned int		irq_state;
- 
- 	struct timer_list	poll_timer;
+ 	if ((cs3reg & (PCMCIA_VS1|PCMCIA_VS2)) ==
+ 			(PCMCIA_VS1|PCMCIA_VS2)) {
 -- 
 2.1.0
