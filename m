@@ -1,53 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Aug 2016 15:31:12 +0200
-Subject: [PATCH v2 1/4] net: dt-bindings: Document the new Meson8b and
- GXBB DWMAC bindings
-In-Reply-To: <CAFBinCDnHGf=wgvm9KzYQsf=kCrOUeO3bnEwdGy_OK-wgWkDug@mail.gmail.com>
-References: <20160815164100.27766-1-martin.blumenstingl@googlemail.com>
- <4041259.IszN4229Cj@wuerfel>
- <CAFBinCDnHGf=wgvm9KzYQsf=kCrOUeO3bnEwdGy_OK-wgWkDug@mail.gmail.com>
-Message-ID: <201608291531.12188.arnd@arndb.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 29 Aug 2016 15:34:57 +0200
+Subject: [PATCH] ARM: dts: rskrza1: initial device tree
+In-Reply-To: <20160825153115.15291-1-chris.brandt@renesas.com>
+References: <20160825153115.15291-1-chris.brandt@renesas.com>
+Message-ID: <CAMuHMdXmJPcgDcLkeVuF5YVfpwxRkJpACHGwtbNab18gK-nBbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 28 August 2016, Martin Blumenstingl wrote:
-> On Mon, Aug 22, 2016 at 5:25 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > It really depends on the kind of SoC. Some may have a suboptimal
-> > binding, on some others there may be a distinct register area that
-> > just contains a few additional registers for the dwmac.
-> the dwmac PHY configuration registers (2x32bit) on the GXBB SoC are
-> part of the "periphs" region/module. This is already defined as
-> "simple-bus" in meson-gxbb.dtsi, see [0]
-> On Meson8b this is slightly different: there is no specific "periphs"
-> region - there the dwmac PHY configuration registers are directly
-> located in the cbus region at a slightly different offset than on the
-> GXBB SoCs.
-> 
-> In the future we might need a third memory region because the latest
-> reference kernel contains some more PHY configuration registers on
-> newer SoCs (GXL = S905X).
-> 
-> Please let me know if you're OK with the dts definition in it's
-> current state - or let me know how you would like to change it.
-> 
-> PS: I will re-send the patches in a v3 in a few minutes because that
-> fixes a bug during module unload.
+Hi Chris,
 
-I don't really see a good way to describe this hardware then. If it
-was only the first case, I'd suggest marking the periphs bus node
-as "compatible="simple-bus","syscon";" so you could have a
-reference to it, but that doesn't seem to work well in the second
-case, unless you can a separate DT node just for the PHY config
-registers there.
+On Thu, Aug 25, 2016 at 5:31 PM, Chris Brandt <chris.brandt@renesas.com> wrote:
+> Add the initial device tree for the RZ/A1 based development board (RSK).
 
-With the third case, is there any logic at all behind the
-register map?
+Thanks for your patch!
 
-Maybe someone else has a better idea for how to describe this.
-In general, we try to avoid overlapping "reg" properties, but I
-even see that the "periphs" node  on gxbb has a "reg" property
-(is this intentional) that overlaps with the registers in its
-ranges, so adding another one won't make this worse than it
-already is.
+> Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
 
-	Arnd
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/r7s72100-rskrza1.dts
+
+> +       compatible = "renesas,rskrza1", "renesas,r7s72100";
+
+scripts/checkpatch.pl says:
+
+    DT compatible string "renesas,rskrza1" appears un-documented --
+check ./Documentation/devicetree/bindings/
+
+Please send a follow-up patch to add this compatible value to
+Documentation/devicetree/bindings/arm/shmobile.txt.
+
+> +&scif2 {
+> +       status = "okay";
+> +};
+> +
+
+Please drop the trailing empty line.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
