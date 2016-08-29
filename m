@@ -1,181 +1,126 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 29 Aug 2016 13:53:55 +0100
-Subject: [PATCH v4 3/4] ARM: kernel: sort relocation sections before
- allocating PLTs
+Date: Mon, 29 Aug 2016 13:53:56 +0100
+Subject: [PATCH v4 4/4] ARM: kernel: avoid brute force search on PLT generation
 In-Reply-To: <1472475236-3083-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1472475236-3083-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1472475236-3083-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1472475236-3083-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PLT allocation routines try to establish an upper bound on the
-number of PLT entries that will be required at relocation time, and
-optimize this by disregarding duplicates (i.e., PLT entries that will
-end up pointing to the same function). This is currently a O(n^2)
-algorithm, but we can greatly simplify this by
-- sorting the relocation section so that relocations that can use the
-  same PLT entry will be listed adjacently,
-- disregard jump/call relocations with addends; these are highly unusual,
-  for relocations against SHN_UNDEF symbols, and so we can simply allocate
-  a PLT entry for each one we encounter, without trying to optimize away
-  duplicates.
+Given that we now sort the relocation sections in a way that guarantees
+that entries that can share a single PLT entry end up adjacently, there
+is no a longer a need to go over the entire list to look for an existing
+entry that matches our jump target. If such a match exists, it was the
+last one to be emitted, so we can simply check the preceding slot.
+
+Note that this will still work correctly in the [theoretical] presence of
+call/jump relocations against SHN_UNDEF symbols with non-zero addends,
+although not optimally. Since the relocations are presented in the same
+order that we checked them for duplicates, any duplicates that we failed
+to spot the first time around will be accounted for in the PLT allocation
+so there is guaranteed to be sufficient space for them when actually
+emitting the PLT.
+
+For instance, the following sequence of relocations:
+
+  000004d8  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
+  000004fc  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
+  0000050e  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
+  00000520  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
+  00000532  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
+  00000544  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
+  00000556  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
+  00000568  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
+  0000057a  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
+  0000058c  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
+  0000059e  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
+  000005b0  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
+  000005c2  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
+  000005d4  00058b0a R_ARM_THM_CALL    00000000   warn_slowpath_null
+
+may result in several PLT entries to be allocated, and also emitted, if
+any of the entries in the middle refer to a Place that contains a non-zero
+addend (i.e., one for all the preceding zero-addend relocations, one for
+all the following zero-addend relocations, and one for the non-zero addend
+relocation itself)
 
 Tested-by: Jongsung Kim <neidhard.kim@lge.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/kernel/module-plts.c | 98 ++++++++++++++------
- 1 file changed, 69 insertions(+), 29 deletions(-)
+ arch/arm/kernel/module-plts.c | 60 +++++++++++---------
+ 1 file changed, 32 insertions(+), 28 deletions(-)
 
 diff --git a/arch/arm/kernel/module-plts.c b/arch/arm/kernel/module-plts.c
-index 6f93a905eeee..ad1b98fbcd98 100644
+index ad1b98fbcd98..3a5cba90c971 100644
 --- a/arch/arm/kernel/module-plts.c
 +++ b/arch/arm/kernel/module-plts.c
-@@ -9,6 +9,7 @@
- #include <linux/elf.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
-+#include <linux/sort.h>
+@@ -33,35 +33,39 @@ struct plt_entries {
  
- #include <asm/cache.h>
- #include <asm/opcodes.h>
-@@ -63,28 +64,63 @@ u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
- 	BUG();
- }
- 
--static int duplicate_rel(Elf32_Addr base, const Elf32_Rel *rel, int num,
--			   u32 mask)
-+#define cmp_3way(a,b)	((a) < (b) ? -1 : (a) > (b))
-+
-+static int cmp_rel(const void *a, const void *b)
+ u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
  {
--	u32 *loc1, *loc2;
-+	const Elf32_Rel *x = a, *y = b;
- 	int i;
- 
--	for (i = 0; i < num; i++) {
--		if (rel[i].r_info != rel[num].r_info)
--			continue;
-+	/* sort by type and symbol index */
-+	i = cmp_3way(ELF32_R_TYPE(x->r_info), ELF32_R_TYPE(y->r_info));
-+	if (i == 0)
-+		i = cmp_3way(ELF32_R_SYM(x->r_info), ELF32_R_SYM(y->r_info));
-+	return i;
-+}
- 
--		/*
--		 * Identical relocation types against identical symbols can
--		 * still result in different PLT entries if the addend in the
--		 * place is different. So resolve the target of the relocation
--		 * to compare the values.
--		 */
--		loc1 = (u32 *)(base + rel[i].r_offset);
--		loc2 = (u32 *)(base + rel[num].r_offset);
--		if (((*loc1 ^ *loc2) & mask) == 0)
--			return 1;
-+static bool is_zero_addend_relocation(Elf32_Addr base, const Elf32_Rel *rel)
-+{
-+	u32 *tval = (u32 *)(base + rel->r_offset);
-+
-+	/*
-+	 * Do a bitwise compare on the raw addend rather than fully decoding
-+	 * the offset and doing an arithmetic comparison.
-+	 * Note that a zero-addend jump/call relocation is encoded taking the
-+	 * PC bias into account, i.e., -8 for ARM and -4 for Thumb2.
-+	 */
-+	switch (ELF32_R_TYPE(rel->r_info)) {
-+		u16 upper, lower;
-+
-+	case R_ARM_THM_CALL:
-+	case R_ARM_THM_JUMP24:
-+		upper = __mem_to_opcode_thumb16(((u16 *)tval)[0]);
-+		lower = __mem_to_opcode_thumb16(((u16 *)tval)[1]);
-+
-+		return (upper & 0x7ff) == 0x7ff && (lower & 0x2fff) == 0x2ffe;
-+
-+	case R_ARM_CALL:
-+	case R_ARM_PC24:
-+	case R_ARM_JUMP24:
-+		return (__mem_to_opcode_arm(*tval) & 0xffffff) == 0xfffffe;
- 	}
--	return 0;
-+	BUG();
-+}
-+
-+static bool duplicate_rel(Elf32_Addr base, const Elf32_Rel *rel, int num)
-+{
-+	const Elf32_Rel *prev;
-+
-+	/*
-+	 * Entries are sorted by type and symbol index. That means that,
-+	 * if a duplicate entry exists, it must be in the preceding
-+	 * slot.
-+	 */
-+	if (!num)
-+		return false;
-+
-+	prev = rel + num - 1;
-+	return cmp_rel(rel + num, prev) == 0 &&
-+	       is_zero_addend_relocation(base, prev);
- }
- 
- /* Count how many PLT entries we may need */
-@@ -93,18 +129,8 @@ static unsigned int count_plts(const Elf32_Sym *syms, Elf32_Addr base,
- {
- 	unsigned int ret = 0;
- 	const Elf32_Sym *s;
--	u32 mask;
- 	int i;
- 
--	if (IS_ENABLED(CONFIG_THUMB2_KERNEL))
--		mask = __opcode_to_mem_thumb32(0x07ff2fff);
--	else
--		mask = __opcode_to_mem_arm(0x00ffffff);
+-	struct plt_entries *plt, *plt_end;
+-	int c;
 -
--	/*
--	 * Sure, this is order(n^2), but it's usually short, and not
--	 * time critical
--	 */
- 	for (i = 0; i < num; i++) {
- 		switch (ELF32_R_TYPE(rel[i].r_info)) {
- 		case R_ARM_CALL:
-@@ -123,7 +149,18 @@ static unsigned int count_plts(const Elf32_Sym *syms, Elf32_Addr base,
- 			if (s->st_shndx != SHN_UNDEF)
- 				break;
- 
--			if (!duplicate_rel(base, rel, i, mask))
-+			/*
-+			 * Jump relocations with non-zero addends against
-+			 * undefined symbols are supported by the ELF spec, but
-+			 * do not occur in practice (e.g., 'jump n bytes past
-+			 * the entry point of undefined function symbol f').
-+			 * So we need to support them, but there is no need to
-+			 * take them into consideration when trying to optimize
-+			 * this code. So let's only check for duplicates when
-+			 * the addend is zero.
-+			 */
-+			if (!is_zero_addend_relocation(base, rel + i) ||
-+			    !duplicate_rel(base, rel, i))
- 				ret++;
- 		}
- 	}
-@@ -158,7 +195,7 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
- 	}
- 
- 	for (s = sechdrs + 1; s < sechdrs_end; ++s) {
--		const Elf32_Rel *rels = (void *)ehdr + s->sh_offset;
-+		Elf32_Rel *rels = (void *)ehdr + s->sh_offset;
- 		int numrels = s->sh_size / sizeof(Elf32_Rel);
- 		Elf32_Shdr *dstsec = sechdrs + s->sh_info;
- 
-@@ -169,6 +206,9 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
- 		if (!(dstsec->sh_flags & SHF_EXECINSTR))
- 			continue;
- 
-+		/* sort by type and symbol index */
-+		sort(rels, numrels, sizeof(Elf32_Rel), cmp_rel, NULL);
+-	plt = (void *)mod->arch.plt->sh_addr;
+-	plt_end = (void *)plt + mod->arch.plt->sh_size;
+-
+-	/* Look for an existing entry pointing to 'val' */
+-	for (c = mod->arch.plt_count; plt < plt_end; c -= PLT_ENT_COUNT, plt++) {
+-		int i;
+-
+-		if (!c) {
+-			/* Populate a new set of entries */
+-			*plt = (struct plt_entries){
+-				{ [0 ... PLT_ENT_COUNT - 1] = PLT_ENT_LDR, },
+-				{ val, }
+-			};
+-			mod->arch.plt_count++;
+-			return (u32)plt->ldr;
+-		}
+-		for (i = 0; i < PLT_ENT_COUNT; i++) {
+-			if (!plt->lit[i]) {
+-				plt->lit[i] = val;
+-				mod->arch.plt_count++;
+-			}
+-			if (plt->lit[i] == val)
+-				return (u32)&plt->ldr[i];
+-		}
++	struct plt_entries *plt = (struct plt_entries *)mod->arch.plt->sh_addr;
++	int idx = 0;
 +
- 		plts += count_plts(syms, dstsec->sh_addr, rels, numrels);
++	/*
++	 * Look for an existing entry pointing to 'val'. Given that the
++	 * relocations are sorted, this will be the last entry we allocated.
++	 * (if one exists).
++	 */
++	if (mod->arch.plt_count > 0) {
++		plt += (mod->arch.plt_count - 1) / PLT_ENT_COUNT;
++		idx = (mod->arch.plt_count - 1) % PLT_ENT_COUNT;
++
++		if (plt->lit[idx] == val)
++			return (u32)&plt->ldr[idx];
++
++		idx = (idx + 1) % PLT_ENT_COUNT;
++		if (!idx)
++			plt++;
  	}
+-	BUG();
++
++	mod->arch.plt_count++;
++	BUG_ON(mod->arch.plt_count * PLT_ENT_SIZE > mod->arch.plt->sh_size);
++
++	if (!idx)
++		/* Populate a new set of entries */
++		*plt = (struct plt_entries){
++			{ [0 ... PLT_ENT_COUNT - 1] = PLT_ENT_LDR, },
++			{ val, }
++		};
++	else
++		plt->lit[idx] = val;
++
++	return (u32)&plt->ldr[idx];
+ }
  
+ #define cmp_3way(a,b)	((a) < (b) ? -1 : (a) > (b))
 -- 
 2.7.4
