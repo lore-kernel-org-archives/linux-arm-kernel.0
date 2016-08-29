@@ -1,58 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Aug 2016 22:38:17 +0200
-Subject: [PATCH 1/2] arm64: dts: updates serial aliases for ls1043a rdb
- and qds boards
-In-Reply-To: <VI1PR0401MB2638BCBA99A6305262FD3EE78DE10@VI1PR0401MB2638.eurprd04.prod.outlook.com>
-References: <1472244381-1766-1-git-send-email-stuart.yoder@nxp.com>
- <8035333.yr2FRs5mHk@wuerfel>
- <VI1PR0401MB2638BCBA99A6305262FD3EE78DE10@VI1PR0401MB2638.eurprd04.prod.outlook.com>
-Message-ID: <201608292238.17985.arnd@arndb.de>
+From: James.Hartley@imgtec.com (James Hartley)
+Date: Mon, 29 Aug 2016 20:40:12 +0000
+Subject: [PATCH 05/10] reset: pistachio: add driver Kconfig option
+In-Reply-To: <1472045342-7434-5-git-send-email-p.zabel@pengutronix.de>
+References: <1472045342-7434-1-git-send-email-p.zabel@pengutronix.de>
+ <1472045342-7434-5-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <72BC0C8BD7BB6F45988A99382E5FBAE586505835@HHMAIL01.hh.imgtec.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 29 August 2016, Stuart Yoder wrote:
-> > -----Original Message-----
-> > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > Sent: Monday, August 29, 2016 6:01 AM
-> > To: Stuart Yoder <stuart.yoder@nxp.com>
-> > Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; shawnguo at kernel.org
-> > Subject: Re: [PATCH 1/2] arm64: dts: updates serial aliases for ls1043a rdb and qds boards
-> > 
-> > On Friday, August 26, 2016 3:46:20 PM CEST Stuart Yoder wrote:
-> > > -               serial0 = &lpuart0;
-> > > -               serial1 = &lpuart1;
-> > > -               serial2 = &lpuart2;
-> > > -               serial3 = &lpuart3;
-> > > -               serial4 = &lpuart4;
-> > > -               serial5 = &lpuart5;
-> > > +               serial0 = &duart0;
-> > > +               serial1 = &duart1;
-> > > +               serial2 = &duart2;
-> > > +               serial3 = &duart3;
-> > 
-> > It looks like your board has six uarts that are all driven with the
-> > lpuart driver, but after the change, you only list four. Should
-> > the serial4 and serial5 aliases keep pointing at lpuart devices
-> > so you can still drive all physical connectors?
+Acked-by: James Hartley <james.hartley@imgtec.com>
+
+James.
+
+> -----Original Message-----
+> From: Philipp Zabel [mailto:p.zabel at pengutronix.de]
+> Sent: 24 August 2016 14:29
+> To: linux-kernel at vger.kernel.org
+> Cc: Masahiro Yamada; Arnd Bergmann; Axel Lin; Hans de Goede; Maxime
+> Ripard; Lee Jones; linux-arm-kernel at lists.infradead.org; Philipp Zabel;
+> Damien Horsley; James Hartley
+> Subject: [PATCH 05/10] reset: pistachio: add driver Kconfig option
 > 
-> The only existing reference I can find to the serial aliases is if the
-> OF_STDOUT_VIA_ALIAS is enabled in u-boot to specify the console.  The
-> standard ls1043aqds_defconfig in u-boot specifies DUARTs for the console,
-> which is why I'm proposing making the 4 DUARTs the default serial aliases
-> in the device tree.
-
-Ok, so they are mutually exclusive, and the last two ports are
-unavailable in the default configuration?
- 
-> There is a separate defconfig in u-boot to enable/use LPUARTs instead
-> of the normal DUARTs.  For that scenario, my take is that firmware should
-> update the DT aliases to reflect the actual use of the serial ports.
-
-Yes, makes sense.
-
-> But, the default should be the DUARTs which is the normal case for this
-> board, which is why this patch is changing them.
-
-Ok
-
-	Arnd
+> Visible only if COMPILE_TEST is enabled, this allows to include the driver in
+> build tests.
+> 
+> Cc: Damien Horsley <Damien.Horsley@imgtec.com>
+> Cc: James Hartley <james.hartley@imgtec.com>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+>  drivers/reset/Kconfig  | 6 ++++++
+>  drivers/reset/Makefile | 2 +-
+>  2 files changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig index
+> fdf942d..6ac631e 100644
+> --- a/drivers/reset/Kconfig
+> +++ b/drivers/reset/Kconfig
+> @@ -43,6 +43,12 @@ config RESET_MESON
+>  config RESET_OXNAS
+>  	bool
+> 
+> +config RESET_PISTACHIO
+> +	bool "Pistachio Reset Driver" if COMPILE_TEST
+> +	default MACH_PISTACHIO
+> +	help
+> +	  This enables the reset driver for ImgTec Pistachio SoCs.
+> +
+>  config TI_SYSCON_RESET
+>  	tristate "TI SYSCON Reset Driver"
+>  	depends on HAS_IOMEM
+> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile index
+> 1408cba..c796a14 100644
+> --- a/drivers/reset/Makefile
+> +++ b/drivers/reset/Makefile
+> @@ -1,6 +1,5 @@
+>  obj-y += core.o
+>  obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
+> -obj-$(CONFIG_MACH_PISTACHIO) += reset-pistachio.o
+>  obj-$(CONFIG_ARCH_STM32) += reset-stm32.o
+>  obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
+>  obj-$(CONFIG_ARCH_STI) += sti/
+> @@ -11,5 +10,6 @@ obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
+>  obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
+>  obj-$(CONFIG_RESET_MESON) += reset-meson.o
+>  obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
+> +obj-$(CONFIG_RESET_PISTACHIO) += reset-pistachio.o
+>  obj-$(CONFIG_TI_SYSCON_RESET) += reset-ti-syscon.o
+>  obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
+> --
+> 2.8.1
