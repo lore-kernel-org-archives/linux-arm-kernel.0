@@ -1,64 +1,31 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 29 Aug 2016 09:53:23 +0200
-Subject: [PATCH 1/4] ARM: dts: shmobile: remove label property from led
-In-Reply-To: <1472219382-22789-1-git-send-email-horms+renesas@verge.net.au>
-References: <1472219382-22789-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdW7=XB_-7YvMwBw-7WLaEj8A4=znsvRkTbdf5SCYe00rg@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 29 Aug 2016 09:56:08 +0200
+Subject: [RFC PATCH 0/3] ARm64: amlogic: Introduce common GX family dtsi
+Message-ID: <1472457371-1305-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+The new Amlogic GLX SoCs (S905X and S905D) are part of the Meson GX family so
+they share some basic characteritics that can be described in a common GX
+dtsi file used by the Meson GXBB and Meson GXL dtsi.
 
-The patch index in the subject should have been 0/4. You're breaking my
-script to extract patch series from email threads ;-)
+This patchset introduces the common dtsi and switches the GLX and GXBB to use
+the common dtsi, the GXBB dtsi is reformated to handle this situation.
 
-On Fri, Aug 26, 2016 at 3:49 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Remove label property from led nodes. This seems to have little
-> value and is used inconsistently amongst Renesas SoCs.
->
-> Based on renesas-devel-20160824-v4.8-rc3
->
-> Simon Horman (4):
->   ARM: dts: armadillo800eva: remove label property from led nodes
->   ARM: dts: koelsch: remove label property from led nodes
->   ARM: dts: gose: remove label property from led nodes
->   ARM: dts: kzm9g: remove label property from led nodes
+This patchset depends on Carlo Caione "ARM64: dts: amlogic: Add basic support for Amlogic S905X" [1]
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+[1] http://lkml.kernel.org/r/1472382113-10754-1-git-send-email-carlo at caione.org
 
-I assume you are aware this is a user-visible change?
-The LED name is exposed under /sys/class/leds/.
-Fortunately my LED init script is agnostic to the actual names ;-)
+Neil Armstrong (3):
+  ARM64: dts: amlogic: Add Meson GX Family common dtsi
+  ARM64: dts: amlogic: Switch Meson GXL dtsi to use common GX dtsi
+  ARM64: dts: amlogic: Switch Meson GXBB dtsi to use common GX dtsi
 
-if [ -d /sys/class/leds ]; then
-        echo -n Enabling LEDs:
-        i=-1
-        for led in /sys/class/leds/*; do
-                case $i in
-                -1)
-                        echo -n " heartbeat"
-                        echo heartbeat > $led/trigger
-                        ;;
-                *)
-                        if grep -qP "^processor.*: $i$" /proc/cpuinfo; then
-                                echo -n " cpu$i"
-                                echo cpu$i > $led/trigger
-                        fi
-                        ;;
-                esac
-                i=$(($i + 1))
-        done
-        echo
-fi
+ arch/arm64/boot/dts/amlogic/meson-gx-common.dtsi | 181 +++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi      | 320 +++++++----------------
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi       | 133 +---------
+ 3 files changed, 281 insertions(+), 353 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gx-common.dtsi
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+1.9.1
