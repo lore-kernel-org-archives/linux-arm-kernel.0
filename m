@@ -1,34 +1,31 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Mon, 29 Aug 2016 22:25:43 +0800
-Subject: [PATCH V2] ARM: dts: imx6ul iomuxc syscon is compatible to imx6q
-Message-ID: <1472480743-8405-1-git-send-email-Anson.Huang@nxp.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 29 Aug 2016 08:39:16 +0200
+Subject: [PATCH] clk: sunxi-ng: Fix wrong reset register offsets
+In-Reply-To: <1472324673-11233-1-git-send-email-jorik@kippendief.biz>
+References: <20160827121545.GT3165@lukather>
+ <1472324673-11233-1-git-send-email-jorik@kippendief.biz>
+Message-ID: <20160829063916.GA7612@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx6ul iomuxc syscon is compatible to imx6q,
-so let's add compatible string 'fsl,imx6q-iomuxc-gpr'
-for imx6ul iomuxc syscon node.
+On Sat, Aug 27, 2016 at 09:04:33PM +0200, jorik at kippendief.biz wrote:
+> From: Jorik Jonker <jorik@kippendief.biz>
+> 
+> The reset register offsets for UART*, I2C* and SCR were off by a few bytes.
+> 
+> Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
-changes since V1:
-	improve commit message.
- arch/arm/boot/dts/imx6ul.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Applied, thanks!
+Maxime
 
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 33b95d7..acc9486 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -644,7 +644,8 @@
- 			};
- 
- 			gpr: iomuxc-gpr at 020e4000 {
--				compatible = "fsl,imx6ul-iomuxc-gpr", "syscon";
-+				compatible = "fsl,imx6ul-iomuxc-gpr",
-+					     "fsl,imx6q-iomuxc-gpr", "syscon";
- 				reg = <0x020e4000 0x4000>;
- 			};
- 
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160829/980071bc/attachment-0001.sig>
