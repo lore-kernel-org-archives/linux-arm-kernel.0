@@ -1,60 +1,18 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 29 Aug 2016 17:11:35 +0300
-Subject: [PATCHv3 03/11] crypto: omap-sham: implement context
- export/import APIs
-In-Reply-To: <20160809100633.GA6751@gondor.apana.org.au>
-References: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
- <1470306526-27219-4-git-send-email-t-kristo@ti.com>
- <20160809100633.GA6751@gondor.apana.org.au>
-Message-ID: <d828fca9-a97a-7722-c4cb-24e07816cbc4@ti.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 29 Aug 2016 22:18:11 +0800
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select the wm8960 codec driver
+In-Reply-To: <1472430797-16787-1-git-send-email-festevam@gmail.com>
+References: <1472430797-16787-1-git-send-email-festevam@gmail.com>
+Message-ID: <20160829141811.GQ30790@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/16 13:06, Herbert Xu wrote:
-> On Thu, Aug 04, 2016 at 01:28:38PM +0300, Tero Kristo wrote:
->> Context export/import are now required for ahash algorithms due to
->> required support in algif_hash. Implement these for OMAP SHA driver,
->> saving and restoring the internal state of the driver.
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> ---
->>  drivers/crypto/omap-sham.c | 31 +++++++++++++++++++++++++++++--
->>  1 file changed, 29 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
->> index 6e53944..aa71e61 100644
->> --- a/drivers/crypto/omap-sham.c
->> +++ b/drivers/crypto/omap-sham.c
->> @@ -1379,6 +1379,27 @@ exit_unlock:
->>  	return ret;
->>  }
->>
->> +static int omap_sham_export(struct ahash_request *req, void *out)
->> +{
->> +	struct omap_sham_reqctx *rctx = ahash_request_ctx(req);
->> +
->> +	while (omap_sham_flush(req) == -EINPROGRESS)
->> +		msleep(10);
->
-> Do we really need this? You must not call export until the previous
-> operation has completed.
->
-> Cheers,
->
+On Sun, Aug 28, 2016 at 09:33:17PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> Select CONFIG_SND_SOC_WM8960 so that we can have audio functional
+> by default on imx6ul-evk and imx7-sdb boards.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Sorry about a late reply, I was out on vacation.
-
-For OMAP SHAM, this is actually needed, because the driver still has a 
-very large internal buffer for performance reasons, and the whole buffer 
-can't be exported. The flush functionality pushes out sufficient amount 
-of data to the hardware, so that the rest of the buffer can be exported 
-to the available space.
-
-This is pretty much related to the discussion we had previously here:
-
-https://patchwork.kernel.org/patch/9192881/
-
-Basically I decided to keep the driver buffer the same size as 
-previously, but flush out any extra data.
-
--Tero
+Applied, thanks.
