@@ -1,50 +1,36 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 29 Aug 2016 11:30:34 +0300
-Subject: [GIT PULL] omap-gpmc changes for v4.9 merge window
-Message-ID: <16b618d9-735f-f20c-7966-6e3d23b6b44e@ti.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 29 Aug 2016 16:33:50 +0800
+Subject: [Patch v4 9/9] arm64: Update device tree for Layerscape SoCs
+In-Reply-To: <20160829080530.GA25468@nazgul.tnic>
+References: <1470780000-16750-1-git-send-email-york.sun@nxp.com>
+ <20160812091354.GB333@nazgul.tnic> <20160829063448.GA32489@tiger>
+ <20160829080530.GA25468@nazgul.tnic>
+Message-ID: <20160829083350.GL30790@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof/Arnd,
+On Mon, Aug 29, 2016 at 10:05:30AM +0200, Borislav Petkov wrote:
+> On Mon, Aug 29, 2016 at 02:34:48PM +0800, Shawn Guo wrote:
+> > Is it mandatory to have DTS changes go with driver part altogether?
+> 
+> Yes, because the EDAC driver needs them to even load properly.
 
-The following changes since commit fa8410b355251fd30341662a40ac6b22d3e38468:
+When separate branches get merged on Linus tree, it works anyway.
 
-  Linux 4.8-rc3 (2016-08-21 16:14:10 -0700)
+> 
+> > Otherwise, I prefer to have them go through separate tree.
+> 
+> Any particular reason why you prefer that?
 
-are available in the git repository at:
+To avoid potential merge conflicts.  Unless there are hard dependencies
+like making it compile, avoiding regression or maintaining bisect,
+patches should go through their established subsystem/architecture tree.
 
-  https://github.com/rogerq/linux.git tags/gpmc-omap-for-v4.9
+> We've been doing this for other ARM EDAC drivers already and there were
+> no issues whatsoever.
 
-for you to fetch changes up to 3950fffdf0c088dd4d9e85c9a5a6be4c6e8b5a07:
+Luckily.  If there are many patches on architecture DT branch changing
+the same file, when driver branch and DT branch merges in upstream
+branch, there will likely be merge conflicts.
 
-  memory: omap-gpmc: make gpmc_clk_ticks_to_ns() static (2016-08-29 11:00:24 +0300)
-
-----------------------------------------------------------------
-OMAP-GPMC: driver updates for v4.9
-
-* Fix potential build failure if CONFIG_OMAP_GPMC is disabled while
-  OMAP_NAND driver is enabled
-* Trivial fixes which fix build warnings and code check tool warnings
-  (Coccinelle)
-* Use devm_gpiochip_add_data()
-
-----------------------------------------------------------------
-Baoyou Xie (1):
-      memory: omap-gpmc: make gpmc_clk_ticks_to_ns() static
-
-Linus Walleij (1):
-      memory: omap-gpmc: use devm_gpiochip_add_data()
-
-Markus Elfring (1):
-      memory: omap-gpmc: Delete an unnecessary check before the function call "gpiochip_free_own_desc"
-
-Roger Quadros (1):
-      memory: omap-gpmc: Fix build with CONFIG_OMAP_GPMC disabled
-
- drivers/memory/omap-gpmc.c | 20 +++++---------------
- include/linux/omap-gpmc.h  |  4 ++--
- 2 files changed, 7 insertions(+), 17 deletions(-)
-
---
-cheers,
--roger
+Shawn
