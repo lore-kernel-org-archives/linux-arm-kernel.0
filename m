@@ -1,83 +1,37 @@
-From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Mon, 29 Aug 2016 13:44:44 -0500
-Subject: [PATCH 2/2 v2] arm64: dts: add stdout-path to chosen node for
- ls2080a/ls1043a boards
-Message-ID: <1472496284-28403-1-git-send-email-stuart.yoder@nxp.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 29 Aug 2016 14:28:10 -0500
+Subject: [PATCH v5 0/6] Add Meson 8b / GXBB support to the IR driver
+In-Reply-To: <20160820095424.636-1-martin.blumenstingl@googlemail.com> (Martin
+ Blumenstingl's message of "Sat, 20 Aug 2016 11:54:18 +0200")
+References: <20160819215547.20063-1-martin.blumenstingl@googlemail.com>
+ <20160820095424.636-1-martin.blumenstingl@googlemail.com>
+Message-ID: <m2shtniddh.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a default stdout-path to chosen node for ls2080a/ls1043a boards to
-allow booting kernels without specifying console info in bootargs.
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-Signed-off-by: Stuart Yoder <stuart.yoder@nxp.com>
----
--v2
-  -no change
+> Newer Amlogic platforms (Meson 8b and GXBB) use a slightly different
+> register layout for their Infrared Remoete Controller. The decoder mode
+> is now configured in another register. Without the changes to the
+> meson-ir driver we are simply getting incorrect "durations" reported
+> from the hardware (because the hardware is not in time measurement aka
+> software decode mode).
+>
+> This problem was also noticed by some people trying to use this on an
+> ODROID-C1 and ODROID-C2 - the workaround there (probably because the
+> datasheets were not publicy available yet at that time) was to switch
+> to ir_raw_event_store_edge (which leaves it up to the kernel to measure
+> the duration of a pulse). See [0] and [1] for the corresponding
+> patches.
+>
+> Changes in v5:
+> - changed pin function and group names to remote_input_ao so they match
+>   with the datasheet
+>
+> Tested-by: Neil Armstrong <narmstrong@baylibre.com>
 
- arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts | 4 ++++
- arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts | 4 ++++
- arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts | 3 +++
- arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts | 4 ++++
- 4 files changed, 15 insertions(+)
+Thanks for the respin.  I'll take the driver and DT/bindings through the
+arm-soc tree and Linus has taken the pinctrl patch.
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-index f813d67..dd9e919 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-@@ -61,6 +61,10 @@
- 		serial2 = &duart2;
- 		serial3 = &duart3;
- 	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
- };
- 
- &duart0 {
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-index 8031cde..d2313e0 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-@@ -57,6 +57,10 @@
- 		serial2 = &duart2;
- 		serial3 = &duart3;
- 	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
- };
- 
- &i2c0 {
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
-index e8801fa..b0dd010 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
-@@ -57,6 +57,9 @@
- 		serial1 = &serial1;
- 	};
- 
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
- };
- 
- &esdhc {
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
-index e127f0b..ad0ebb8 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
-@@ -56,6 +56,10 @@
- 		serial0 = &serial0;
- 		serial1 = &serial1;
- 	};
-+
-+	chosen {
-+		stdout-path = "serial1:115200n8";
-+	};
- };
- 
- &esdhc {
--- 
-1.9.0
+Kevin
