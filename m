@@ -1,52 +1,57 @@
-From: sr@denx.de (Stefan Roese)
-Date: Mon, 29 Aug 2016 12:07:16 +0200
-Subject: [PATCH] dmaengine: mv_xor: Add support for IO (PCIe) src/dst areas
-In-Reply-To: <20160824144314.18928e13@free-electrons.com>
-References: <201608241240.aEXnCS9C%fengguang.wu@intel.com>
- <b8c09619-22a5-a677-8841-9760c275a618@denx.de>
- <20160824144314.18928e13@free-electrons.com>
-Message-ID: <940069ae-25eb-9106-ac41-300e1730d833@denx.de>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 29 Aug 2016 12:12:04 +0200
+Subject: [PATCH v2] ARM: imx: use IS_ENABLED() instead of checking for
+ built-in or module
+Message-ID: <1472465524-2374-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+The IS_ENABLED() macro checks if a Kconfig symbol has been enabled either
+built-in or as a module, use that macro instead of open coding the same.
 
-On 24.08.2016 14:43, Thomas Petazzoni wrote:
-> On Wed, 24 Aug 2016 10:23:02 +0200, Stefan Roese wrote:
->
->>> All errors (new ones prefixed by >>):
->>>
->>>    drivers/built-in.o: In function `set_param_ifnum':
->>>>> ipmi_poweroff.c:(.text+0x10157c): undefined reference to `mvebu_mbus_get_io_win_info'
->>>    drivers/built-in.o: In function `mv_xor_add_io_win':
->>>    mv_xor.c:(.text+0x11039e): undefined reference to `mvebu_mbus_get_io_win_info'
->>
->> Does it really make sense to compile this driver for all archs?
->> Or should I send a v2 of this patch that removes COMPILE_TEST for
->> this driver from Kconfig so that its only compiled for the
->> target platforms?
->
-> I'm not sure what's the exact policy, but I believe kernel maintainers
-> like when the compilation coverage is as wide as possible. The MBus
-> driver could provide some stub functions when not enabled? I don't know
-> if it's worth it, since indeed mv_xor is only ever going to be used on
-> ARM.
+Using the macro makes the code more readable by helping abstract away some
+of the Kconfig built-in and module enable details.
 
-As you've probably already noticed, v2 of this patch with
-COMPILE_TEST removed also did run into this linking problem -
-for ARM64 in this case. So its perhaps best to provide this MBus
-driver stub function. COMPILE_TEST could then be enabled again.
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-What do you think? Should I post a separate patch to the MBus
-driver (also attached)? Or should I squash it into v3 of this
-XOR DMA driver patch (with COMPILE_TEST added gain)?
+---
 
-Thanks,
-Stefan
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-bus-mvebu-mbus-Provide-stub-function-for-mvebu_mbus_.patch
-Type: text/x-diff
-Size: 1834 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160829/7bb3708b/attachment.bin>
+Changes in v2:
+- Remove duplicated Signed-off-by tag.
+
+ arch/arm/mach-imx/mach-kzm_arm11_01.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-imx/mach-kzm_arm11_01.c b/arch/arm/mach-imx/mach-kzm_arm11_01.c
+index 31df4361996f..e277d9c230e5 100644
+--- a/arch/arm/mach-imx/mach-kzm_arm11_01.c
++++ b/arch/arm/mach-imx/mach-kzm_arm11_01.c
+@@ -63,7 +63,7 @@
+  */
+ #define KZM_ARM11_16550		(MX31_CS4_BASE_ADDR + 0x1050)
+ 
+-#if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
++#if IS_ENABLED(CONFIG_SERIAL_8250)
+ /*
+  * KZM-ARM11-01 has an external UART on FPGA
+  */
+@@ -141,7 +141,7 @@ static inline int kzm_init_ext_uart(void)
+ /*
+  * SMSC LAN9118
+  */
+-#if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
++#if IS_ENABLED(CONFIG_SMSC911X)
+ static struct smsc911x_platform_config kzm_smsc9118_config = {
+ 	.phy_interface	= PHY_INTERFACE_MODE_MII,
+ 	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
+@@ -201,7 +201,7 @@ static inline int kzm_init_smsc9118(void)
+ }
+ #endif
+ 
+-#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
++#if IS_ENABLED(CONFIG_SERIAL_IMX)
+ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
+ };
+-- 
+2.7.4
