@@ -1,80 +1,51 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Mon, 29 Aug 2016 09:58:42 +0800
-Subject: [PATCH 2/2] arm64: dts: rockchip: add eMMC's power domain support
- for rk3399
-In-Reply-To: <2ab8ab94-fa4d-2cd6-5805-a92ac5f9697e@rock-chips.com>
-References: <20160827134103.28160-1-xzy.xu@rock-chips.com>
- <20160827134103.28160-3-xzy.xu@rock-chips.com>
- <2ab8ab94-fa4d-2cd6-5805-a92ac5f9697e@rock-chips.com>
-Message-ID: <57C396D2.4090607@rock-chips.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 29 Aug 2016 11:21:35 +0900
+Subject: [PATCH v6 1/2] clk: uniphier: add core support code for UniPhier
+ clock driver
+In-Reply-To: <20160819191612.GU361@codeaurora.org>
+References: <1470112223-24835-1-git-send-email-yamada.masahiro@socionext.com>
+ <1470112223-24835-2-git-send-email-yamada.masahiro@socionext.com>
+ <20160819002507.GS361@codeaurora.org>
+ <CAK7LNAQg-LcK-vsWVU-b0WsF=Y_NBNR_cWqNDJKyMqp7Svdvqg@mail.gmail.com>
+ <20160819191612.GU361@codeaurora.org>
+Message-ID: <CAK7LNAQownrE0n8rAYGgUs9_byvok8W0V=c6gts_C=8Wvio86g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Stephen,
 
 
-On 08/27/2016 11:05 PM, Shawn Lin wrote:
-> On 2016/8/27 21:41, Ziyuan Xu wrote:
->> Control power domain for eMMC via genpd to reduce power consumption.
+2016-08-20 4:16 GMT+09:00 Stephen Boyd <sboyd@codeaurora.org>:
 >>
->> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
->> Signed-off-by: Ziyuan Xu <xzy.xu@rock-chips.com>
+>> >> +
+>> >> +     parent = of_get_parent(dev->of_node); /* parent should be syscon node */
+>> >> +     regmap = syscon_node_to_regmap(parent);
+>> >> +     of_node_put(parent);
+>> >
+>> > devm_get_regmap(dev->parent) should work then? Why do we need to
+>> > use OF APIs?
+>>
+>> "git grep devm_get_regmap" did not hit anything.
+>>
+>> Where is it defined?
 >>
 >
-> It looks nice to me. But this should be merged after applying that[0]
-> as your patch will break bind/unbind test for sdhci-of-arasan on rk3399
-> without it[0]. Moreover, Elaine should make sure that upstreamed
-> rockchip power domain stuff would not off pd for emmc, *otherwise*, I
-> should update my patch to make sure we update clkmul every time when
-> doing suspend 2 resume..
+> Sorry I meant dev_get_regmap().
 >
-It looks nice to me. I was going on to submit with other Pds.
 
->
->
-> [0]: https://patchwork.kernel.org/patch/9300971/
->
->> ---
->>
->>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 11 +++++++++++
->>  1 file changed, 11 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> index 32aebc8..71733d4 100644
->> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> @@ -239,6 +239,7 @@
->>          #clock-cells = <0>;
->>          phys = <&emmc_phy>;
->>          phy-names = "phy_arasan";
->> +        power-domains = <&power RK3399_PD_EMMC>;
->>          status = "disabled";
->>      };
->>
->> @@ -611,6 +612,11 @@
->>          status = "disabled";
->>      };
->>
->> +    qos_emmc: qos at ffa58000 {
->> +        compatible = "syscon";
->> +        reg = <0x0 0xffa58000 0x0 0x20>;
->> +    };
->> +
->>      qos_hdcp: qos at ffa90000 {
->>          compatible = "syscon";
->>          reg = <0x0 0xffa90000 0x0 0x20>;
->> @@ -739,6 +745,11 @@
->>              };
->>
->>              /* These power domains are grouped by VD_LOGIC */
->> +            pd_emmc at RK3399_PD_EMMC {
->> +                reg = <RK3399_PD_EMMC>;
->> +                clocks = <&cru ACLK_EMMC>;
->> +                pm_qos = <&qos_emmc>;
->> +            };
->>              pd_vio at RK3399_PD_VIO {
->>                  reg = <RK3399_PD_VIO>;
->>                  #address-cells = <1>;
->>
->
->
+I tried this, but it did not work.
+
+To make dev_get_regmap() work,
+the parent device needs to call dev_regmap_init_mmio() beforehand.
+
+
+Since commit bdb0066df96e74a4002125467ebe459feff1ebef
+(mfd: syscon: Decouple syscon interface from platform devices),
+syscon_probe() is not called for platform devices,
+so that never happens.
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
