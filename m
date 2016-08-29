@@ -1,57 +1,43 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 29 Aug 2016 21:29:37 +0200
-Subject: [PATCH v2 2/2] input: touchscreen: silead_gsl1680: Use "silead/"
- prefix for firmware loading
-In-Reply-To: <20160829192937.32129-1-hdegoede@redhat.com>
-References: <20160829192937.32129-1-hdegoede@redhat.com>
-Message-ID: <20160829192937.32129-3-hdegoede@redhat.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 29 Aug 2016 12:38:57 -0700
+Subject: [GIT PULL] bcm2835-dt-next-2016-08-29
+Message-ID: <20160829193857.29994-1-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The silead touch-controller ICs use a different firmware per digitizer /
-tablet model. So there are going to be quite a few of then and they really
-should be under a separate subdir.
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
-This commit prefixes the default firmware names with "silead/" just like
-we are already doing for devicetree specified firmware names.
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/input/touchscreen/silead.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+are available in the git repository at:
 
-diff --git a/drivers/input/touchscreen/silead.c b/drivers/input/touchscreen/silead.c
-index 7709f5b..c6a1ae9 100644
---- a/drivers/input/touchscreen/silead.c
-+++ b/drivers/input/touchscreen/silead.c
-@@ -414,14 +414,14 @@ static int silead_ts_set_default_fw_name(struct silead_ts_data *data,
- 		if (!acpi_id)
- 			return -ENODEV;
- 
--		snprintf(data->fw_name, sizeof(data->fw_name), "%s.fw",
--			acpi_id->id);
-+		snprintf(data->fw_name, sizeof(data->fw_name),
-+			 "silead/%s.fw", acpi_id->id);
- 
- 		for (i = 0; i < strlen(data->fw_name); i++)
- 			data->fw_name[i] = tolower(data->fw_name[i]);
- 	} else {
--		snprintf(data->fw_name, sizeof(data->fw_name), "%s.fw",
--			id->name);
-+		snprintf(data->fw_name, sizeof(data->fw_name),
-+			 "silead/%s.fw", id->name);
- 	}
- 
- 	return 0;
-@@ -430,7 +430,8 @@ static int silead_ts_set_default_fw_name(struct silead_ts_data *data,
- static int silead_ts_set_default_fw_name(struct silead_ts_data *data,
- 					 const struct i2c_device_id *id)
- {
--	snprintf(data->fw_name, sizeof(data->fw_name), "%s.fw", id->name);
-+	snprintf(data->fw_name, sizeof(data->fw_name),
-+		 "silead/%s.fw", id->name);
- 	return 0;
- }
- #endif
--- 
-2.9.3
+  https://github.com/anholt/linux bcm2835-dt-next-2016-08-29
+
+for you to fetch changes up to c8336249c1eeca288919e3286f7dd03ae1d8ceae:
+
+  ARM: dts: bcm2835: Add Raspberry Pi Zero (2016-08-24 13:33:19 -0700)
+
+----------------------------------------------------------------
+This pull request brings in support for Raspberry Pi Zero.
+
+----------------------------------------------------------------
+Stefan Wahren (4):
+      ARM: dts: bcm283x: Add missing USB clock
+      ARM: dts: bcm283x: Add dtsi for USB host mode
+      DT: bindings: bcm: Add Raspberry Pi Zero
+      ARM: dts: bcm2835: Add Raspberry Pi Zero
+
+ .../devicetree/bindings/arm/bcm/brcm,bcm2835.txt   |  4 +++
+ arch/arm/boot/dts/Makefile                         |  3 +-
+ arch/arm/boot/dts/bcm2835-rpi-a-plus.dts           |  1 +
+ arch/arm/boot/dts/bcm2835-rpi-a.dts                |  1 +
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts           |  1 +
+ arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts           |  1 +
+ arch/arm/boot/dts/bcm2835-rpi-b.dts                |  1 +
+ arch/arm/boot/dts/bcm2835-rpi-zero.dts             | 40 ++++++++++++++++++++++
+ arch/arm/boot/dts/bcm2836-rpi-2-b.dts              |  1 +
+ arch/arm/boot/dts/bcm283x-rpi-usb-host.dtsi        |  3 ++
+ arch/arm/boot/dts/bcm283x.dtsi                     |  9 +++++
+ 11 files changed, 64 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/bcm2835-rpi-zero.dts
+ create mode 100644 arch/arm/boot/dts/bcm283x-rpi-usb-host.dtsi
