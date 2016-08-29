@@ -1,81 +1,31 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 29 Aug 2016 08:49:04 +0200
-Subject: [PATCH v2] ARM: dts: sun8i: enable UART1 for iNet D978 Rev2 board
-In-Reply-To: <20160828005521.58221-1-icenowy@aosc.xyz>
-References: <20160828005521.58221-1-icenowy@aosc.xyz>
-Message-ID: <20160829064904.GB7612@lukather>
+Date: Mon, 29 Aug 2016 08:56:20 +0200
+Subject: [PATCH 3/3] ARM: dts: sun8i-q8-common: Add support for SDIO wifi
+ controllers
+In-Reply-To: <20160826145236.30210-4-hdegoede@redhat.com>
+References: <20160826145236.30210-1-hdegoede@redhat.com>
+ <20160826145236.30210-4-hdegoede@redhat.com>
+Message-ID: <20160829065620.GC7612@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, Aug 28, 2016 at 08:55:21AM +0800, Icenowy Zheng wrote:
-> UART1 is connected to the bluetooth part of RTL8723BS WiFi/BT combo card
-> on iNet D978 Rev2 board.
+On Fri, Aug 26, 2016 at 04:52:36PM +0200, Hans de Goede wrote:
+> Most of the sun8i q8 boards have an usb wifi controller, on the
+> variants which use an USB wifi controller, this will result in a
+> couple of error msg-s in dmesg when proving the sdio bus and
+> an used mmc controller.
 > 
-> Enable the UART1 to make it possible to use the modified hciattach by
-> Realtek to drive the BT part of RTL8723BS.
-> 
-> On the board no r_uart pins are found now (the onboard RX/TX pins are
-> wired to PF2/PF4, which is muxed with mmc0), so also disabled it.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
-> Changes since v1:
-> - Deleted r_uart.
-> - Added the pinmux of uart1 at PG.
-> 
->  arch/arm/boot/dts/sun8i-a23-a33.dtsi           | 14 ++++++++++++++
->  arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts | 20 ++++++++++++++++++++
->  2 files changed, 34 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> index 7e05e09..d236104 100644
-> --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> @@ -361,6 +361,20 @@
->  				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->  			};
->  
-> +			uart1_pins_a: uart1 at 0 {
-> +				allwinner,pins = "PG6", "PG7";
-> +				allwinner,function = "uart1";
-> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +			};
-> +
-> +			uart1_pins_cts_rts_a: uart1_cts_rts at 0 {
-> +				allwinner,pins = "PG8", "PG9";
-> +				allwinner,function = "uart1";
-> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +			};
-> +
+> The best way to deal with wifi on this boards really is to simply
+> let the kernel auto-detect usb or sdio wifi controllers, so we
+> will just have to live with the few errors in dmesg.
 
-This should be in a different patch.
+No, because that grabs PINs that might or might not be supposed to be
+used for that, it leaves clocks and regulators enabled, which draw
+power, to no end. And that's even worth since most boards will not use
+it.
 
->  			mmc0_pins_a: mmc0 at 0 {
->  				allwinner,pins = "PF0", "PF1", "PF2",
->  						 "PF3", "PF4", "PF5";
-> diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
-> index 0f52cd9..a1f654a8 100644
-> --- a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
-> +++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
-> @@ -49,6 +49,15 @@
->  	model = "INet-D978 Rev 02";
->  	compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
->  
-> +	aliases {
-> +		/delete-property/serial0;
-> +		serial1 = &uart1;
-
-And to restate what I said, there's exactly *no* reason to have it a
-serial0.
-
-Every device in Linux is enumerated from 0 (or equivalent). The hard
-disks are (if you have only one, it will be /dev/sda or /dev/hda), the
-MMC cards are, the SPI buses are, the framebuffers are, why would the
-UART be a special case?
+You can put the definition of the nodes in the DTSI, but the final
+status will have to be in the (relevant) DTS.
 
 Maxime
 
@@ -89,4 +39,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160829/c83f542b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160829/b1c25ce3/attachment.sig>
