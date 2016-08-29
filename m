@@ -1,44 +1,38 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 29 Aug 2016 15:45:47 +0200
-Subject: [PATCH] ARM: dts: imx6sx: Add GPU bindings
-In-Reply-To: <20160829134100.GO30790@tiger>
-References: <20160826142254.6950-1-marex@denx.de>
- <20160829134100.GO30790@tiger>
-Message-ID: <d65711de-d225-8229-4dfd-399a4fe92289@denx.de>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Mon, 29 Aug 2016 11:11:24 -0700
+Subject: [PATCH] arm64: dts: rockchip: Explicitly set pclk_pmu_src on rk3399
+Message-ID: <1472494284-11315-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/29/2016 03:41 PM, Shawn Guo wrote:
-> On Fri, Aug 26, 2016 at 04:22:54PM +0200, Marek Vasut wrote:
->> Add bindings for the Vivante GC400T GPU found in the i.MX6SX .
->>
->> Signed-off-by: Marek Vasut <marex@denx.de>
->> Cc: Lucas Stach <l.stach@pengutronix.de>
->> Cc: Fabio Estevam <fabio.estevam@nxp.com>
->> Cc: Shawn Guo <shawnguo@kernel.org>
->> ---
->>  arch/arm/boot/dts/imx6sx.dtsi | 15 +++++++++++++++
->>  1 file changed, 15 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
->> index 6a993bfda..901c2d2 100644
->> --- a/arch/arm/boot/dts/imx6sx.dtsi
->> +++ b/arch/arm/boot/dts/imx6sx.dtsi
->> @@ -1250,6 +1250,16 @@
->>  			};
->>  		};
->>  
->> +		gpu: gpu at 01800000 {
-> 
-> Wrong place for the node.  It should go right before dma-apbh at 01804000.
-> I fixed it up and applied patch.
+On rk3399 we explicitly set ppll in the device tree to 676000000.  The
+ppll has one major child, pclk_pmu_src, that is the parent of lots of
+other clocks.  Right now nobody is setting that clock rate and we're
+relying on the divider to just happen to be something sane.  Let's be
+explicit in our request so we're not relying on the firmware.
 
-Thanks!
+With the current firmware I tested with this patch has no expected
+impact but it's probably good to do anyway.
 
-> Shawn
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+---
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-[..]
-
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 62d450935a57..ffb3faa8c176 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -908,8 +908,8 @@
+ 		reg = <0x0 0xff750000 0x0 0x1000>;
+ 		#clock-cells = <1>;
+ 		#reset-cells = <1>;
+-		assigned-clocks = <&pmucru PLL_PPLL>;
+-		assigned-clock-rates = <676000000>;
++		assigned-clocks = <&pmucru PLL_PPLL>, <&pmucru PCLK_SRC_PMU>;
++		assigned-clock-rates = <676000000>, <112666667>;
+ 	};
+ 
+ 	cru: clock-controller at ff760000 {
 -- 
-Best regards,
-Marek Vasut
+2.8.0.rc3.226.g39d4020
