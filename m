@@ -1,36 +1,55 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 29 Aug 2016 16:33:50 +0800
-Subject: [Patch v4 9/9] arm64: Update device tree for Layerscape SoCs
-In-Reply-To: <20160829080530.GA25468@nazgul.tnic>
-References: <1470780000-16750-1-git-send-email-york.sun@nxp.com>
- <20160812091354.GB333@nazgul.tnic> <20160829063448.GA32489@tiger>
- <20160829080530.GA25468@nazgul.tnic>
-Message-ID: <20160829083350.GL30790@tiger>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 29 Aug 2016 10:35:58 +0200
+Subject: [PATCH] mtd: mxc_nand: Set timing for v2 controllers
+In-Reply-To: <20160826094653.762be9fb@bbrezillon>
+References: <1471948445-29936-1-git-send-email-s.hauer@pengutronix.de>
+ <20160826094653.762be9fb@bbrezillon>
+Message-ID: <20160829083558.gfydmebh7bx3wdxz@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 10:05:30AM +0200, Borislav Petkov wrote:
-> On Mon, Aug 29, 2016 at 02:34:48PM +0800, Shawn Guo wrote:
-> > Is it mandatory to have DTS changes go with driver part altogether?
+Hi Boris,
+
+On Fri, Aug 26, 2016 at 09:46:53AM +0200, Boris Brezillon wrote:
+> Hi Sascha,
 > 
-> Yes, because the EDAC driver needs them to even load properly.
+> On Tue, 23 Aug 2016 12:34:05 +0200
+> Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> 
+> AFAIR, you should apply the new mode on the NAND side
+> (ONFI_FEATURE_ADDR_TIMING_MODE) before applying the new config to the
+> controller.
+> 
+> See what's done here [1].
+> 
+> Note that on all the NANDs I tested, it seems to work even if you don't
+> set ONFI_FEATURE_ADDR_TIMING_MODE, but the ONFI Spec describes the
+> procedure as:
 
-When separate branches get merged on Linus tree, it works anyway.
+Indeed, works here without notifying the NAND chip aswell. I wasn't even
+aware that there is a possibility to notify the NAND chip.
 
 > 
-> > Otherwise, I prefer to have them go through separate tree.
+> 1/ detect supported modes
+> 2/ select one
+> 3/ apply it to the NAND using set(ONFI_FEATURE_ADDR_TIMING_MODE)
+> 4/ release the CS
+> 5/ adjust the controller setting to match the new config
 > 
-> Any particular reason why you prefer that?
+> On a side note, I really think we should handle this timing selection in
+> the core, and only ask the NAND controller drivers to adapt the
+> controller settings.
 
-To avoid potential merge conflicts.  Unless there are hard dependencies
-like making it compile, avoiding regression or maintaining bisect,
-patches should go through their established subsystem/architecture tree.
+I agree that the core should do this. Do you already have any thoughts
+how the API could could look like? The Nand drivers probably have to
+propagate somehow which modes they support, maybe we add a onfi_modes
+field to struct nand_chip. Then if onfi_modes is nonzero we call a
+nand_chip->set_onfi_mode() function?
 
-> We've been doing this for other ARM EDAC drivers already and there were
-> no issues whatsoever.
+Sascha
 
-Luckily.  If there are many patches on architecture DT branch changing
-the same file, when driver branch and DT branch merges in upstream
-branch, there will likely be merge conflicts.
-
-Shawn
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
