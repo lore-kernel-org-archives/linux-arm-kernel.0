@@ -1,499 +1,78 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Mon, 29 Aug 2016 11:06:44 -0500
-Subject: [PATCH v3] Added perf functionality to mmdc driver
-In-Reply-To: <20160817194253.16300-1-zhengyu.shen@nxp.com>
-References: <20160817194253.16300-1-zhengyu.shen@nxp.com>
-Message-ID: <CAHrpEqTtCnEU1v1sEuN8yJGPudDRZ5A79=Wn5Bp4SgTxDiNTQQ@mail.gmail.com>
+From: cmetcalf@mellanox.com (Chris Metcalf)
+Date: Mon, 29 Aug 2016 12:12:47 -0400
+Subject: [PATCH v9 2/4] nmi_backtrace: do a local dump_stack() instead of a
+ self-NMI
+In-Reply-To: <1472487169-14923-1-git-send-email-cmetcalf@mellanox.com>
+References: <1472487169-14923-1-git-send-email-cmetcalf@mellanox.com>
+Message-ID: <1472487169-14923-3-git-send-email-cmetcalf@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2016 at 2:42 PM, Zhengyu Shen <zhengyu.shen@nxp.com> wrote:
-> MMDC is a multi-mode DDR controller that supports DDR3/DDR3L x16/x32/x64
-> and LPDDR2 two channel x16/x32 memory types. MMDC is configurable, high
-> performance, and optimized. MMDC is present on i.MX6 Quad and i.MX6
-> QuadPlus devices, but this driver only supports i.MX6 Quad at the moment.
-> MMDC provides registers for performance counters which read via this
-> driver to help debug memory throughput and similar issues.
->
-> $ perf stat -a -e mmdc/busy-cycles/,mmdc/read-accesses/,mmdc/read-bytes/,mmdc/total-cycles/,mmdc/write-accesses/,mmdc/write-bytes/ dd if=/dev/zero of=/dev/null bs=1M count=5000
-> Performance counter stats for 'dd if=/dev/zero of=/dev/null bs=1M count=5000':
->
->          898021787      mmdc/busy-cycles/
->           14819600      mmdc/read-accesses/
->             471.30 MB   mmdc/read-bytes/
->         2815419216      mmdc/total-cycles/
->           13367354      mmdc/write-accesses/
->             427.76 MB   mmdc/write-bytes/
->
->        5.334757334 seconds time elapsed
->
-> Signed-off-by: Zhengyu Shen <zhengyu.shen@nxp.com>
-> Signed-off-by: Frank Li <frank.li@nxp.com>
+Currently on arm there is code that checks whether it should call
+dump_stack() explicitly, to avoid trying to raise an NMI when the
+current context is not preemptible by the backtrace IPI.  Similarly,
+the forthcoming arch/tile support uses an IPI mechanism that does
+not support generating an NMI to self.
 
-Shawn Guo:
+Accordingly, move the code that guards this case into the generic
+mechanism, and invoke it unconditionally whenever we want a
+backtrace of the current cpu.  It seems plausible that in all cases,
+dump_stack() will generate better information than generating a
+stack from the NMI handler.  The register state will be missing,
+but that state is likely not particularly helpful in any case.
 
-         No new comments got more than 1 weeks.
-         Did you plan accept it?
+Or, if we think it is helpful, we should be capturing and emitting
+the current register state in all cases when regs == NULL is passed
+to nmi_cpu_backtrace().
 
-best regards
-Frank Li
+Signed-off-by: Chris Metcalf <cmetcalf@mellanox.com>
+Acked-by: Aaron Tomlin <atomlin@redhat.com>
+Reviewed-by: Petr Mladek <pmladek@suse.com>
+Tested-by: Daniel Thompson <daniel.thompson@linaro.org> [arm]
+---
+ arch/arm/kernel/smp.c | 9 ---------
+ lib/nmi_backtrace.c   | 9 +++++++++
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
-
-> ---
-> Changes from v2 to v3:
->         Use WARN_ONCE instead of returning generic error values
->         Replace CPU Notifiers with newer state machine hotplug
->         Added additional checks on event_init for grouping and sampling
->         Remove useless mmdc_enable_profiling function
->         Added comments
->         Moved start index of events from 0x01 to 0x00
->         Added a counter to pmu_mmdc to only stop hrtimer after all events are finished
->         Replace readl_relaxed and writel_relaxed with readl and writel
->         Removed duplicate update function
->         Used devm_kasprintf when naming mmdcs probed
->
-> Changes from v1 to v2:
->         Added cpumask and migration handling support to driver
->         Validated event during event_init
->         Added code to properly stop counters
->         Used perf_invalid_context instead of perf_sw_context
->         Added hrtimer to poll for overflow
->         Added better description
->         Added support for multiple mmdcs
->
->  arch/arm/mach-imx/mmdc.c | 384 ++++++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 383 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-imx/mmdc.c b/arch/arm/mach-imx/mmdc.c
-> index db9621c..5fe7696 100644
-> --- a/arch/arm/mach-imx/mmdc.c
-> +++ b/arch/arm/mach-imx/mmdc.c
-> @@ -1,5 +1,5 @@
->  /*
-> - * Copyright 2011 Freescale Semiconductor, Inc.
-> + * Copyright 2011,2016 Freescale Semiconductor, Inc.
->   * Copyright 2011 Linaro Ltd.
->   *
->   * The code contained herein is licensed under the GNU General Public
-> @@ -16,6 +16,11 @@
->  #include <linux/of.h>
->  #include <linux/of_address.h>
->  #include <linux/of_device.h>
-> +#include <linux/perf_event.h>
-> +#include <linux/slab.h>
-> +#include <linux/hrtimer.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/spinlock.h>
->
->  #include "common.h"
->
-> @@ -27,14 +32,363 @@
->  #define BM_MMDC_MDMISC_DDR_TYPE        0x18
->  #define BP_MMDC_MDMISC_DDR_TYPE        0x3
->
-> +#define TOTAL_CYCLES   0x0
-> +#define BUSY_CYCLES            0x1
-> +#define READ_ACCESSES  0x2
-> +#define WRITE_ACCESSES 0x3
-> +#define READ_BYTES             0x4
-> +#define WRITE_BYTES            0x5
-> +
-> +/* Enables, resets, freezes, overflow profiling*/
-> +#define DBG_DIS                        0x0
-> +#define DBG_EN                 0x1
-> +#define DBG_RST                        0x2
-> +#define PRF_FRZ                        0x4
-> +#define CYC_OVF                        0x8
-> +
-> +#define MMDC_MADPCR0   0x410
-> +#define MMDC_MADPSR0   0x418
-> +#define MMDC_MADPSR1   0x41C
-> +#define MMDC_MADPSR2   0x420
-> +#define MMDC_MADPSR3   0x424
-> +#define MMDC_MADPSR4   0x428
-> +#define MMDC_MADPSR5   0x42C
-> +
-> +#define MMDC_NUM_COUNTERS      6
-> +
-> +#define to_mmdc_pmu(p) (container_of(p, struct mmdc_pmu, pmu))
-> +
-> +static DEFINE_IDA(mmdc_ida);
-> +
->  static int ddr_type;
->
-> +PMU_EVENT_ATTR_STRING(total-cycles, mmdc_total_cycles, "event=0x00")
-> +PMU_EVENT_ATTR_STRING(busy-cycles, mmdc_busy_cycles, "event=0x01")
-> +PMU_EVENT_ATTR_STRING(read-accesses, mmdc_read_accesses, "event=0x02")
-> +PMU_EVENT_ATTR_STRING(write-accesses, mmdc_write_accesses, "config=0x03")
-> +PMU_EVENT_ATTR_STRING(read-bytes, mmdc_read_bytes, "event=0x04")
-> +PMU_EVENT_ATTR_STRING(read-bytes.unit, mmdc_read_bytes_unit, "MB");
-> +PMU_EVENT_ATTR_STRING(read-bytes.scale, mmdc_read_bytes_scale, "0.000001");
-> +PMU_EVENT_ATTR_STRING(write-bytes, mmdc_write_bytes, "event=0x05")
-> +PMU_EVENT_ATTR_STRING(write-bytes.unit, mmdc_write_bytes_unit, "MB");
-> +PMU_EVENT_ATTR_STRING(write-bytes.scale, mmdc_write_bytes_scale, "0.000001");
-> +
-> +struct mmdc_pmu {
-> +       struct pmu pmu;
-> +       void __iomem *mmdc_base;
-> +       cpumask_t cpu;
-> +       struct hrtimer hrtimer;
-> +       unsigned int irq;
-> +       unsigned int active_events;
-> +       struct device *dev;
-> +       struct perf_event *mmdc_events[MMDC_NUM_COUNTERS];
-> +       spinlock_t mmdc_active_events_lock;
-> +};
-> +static struct mmdc_pmu *cpuhp_mmdc_pmu;
-> +
-> +/* polling period is set to one second, overflow of total-cycles (the fastest
-> + * increasing counter) takes ten seconds so one second is safe
-> + */
-> +static unsigned int mmdc_poll_period_us = 1000000;
-> +module_param_named(pmu_poll_period_us, mmdc_poll_period_us, uint,
-> +               S_IRUGO | S_IWUSR);
-> +
-> +static ktime_t mmdc_timer_period(void)
-> +{
-> +       return ns_to_ktime((u64)mmdc_poll_period_us * 1000);
-> +}
-> +
-> +static ssize_t mmdc_cpumask_show(struct device *dev,
-> +               struct device_attribute *attr, char *buf)
-> +{
-> +       struct mmdc_pmu *pmu_mmdc = dev_get_drvdata(dev);
-> +
-> +       return cpumap_print_to_pagebuf(true, buf, &pmu_mmdc->cpu);
-> +}
-> +
-> +static struct device_attribute mmdc_cpumask_attr =
-> +__ATTR(cpumask, S_IRUGO, mmdc_cpumask_show, NULL);
-> +
-> +static struct attribute *mmdc_cpumask_attrs[] = {
-> +       &mmdc_cpumask_attr.attr,
-> +       NULL,
-> +};
-> +
-> +static struct attribute_group mmdc_cpumask_attr_group = {
-> +       .attrs = mmdc_cpumask_attrs,
-> +};
-> +
-> +static struct attribute *mmdc_events_attrs[] = {
-> +       &mmdc_total_cycles.attr.attr,
-> +       &mmdc_busy_cycles.attr.attr,
-> +       &mmdc_read_accesses.attr.attr,
-> +       &mmdc_write_accesses.attr.attr,
-> +       &mmdc_read_bytes.attr.attr,
-> +       &mmdc_read_bytes_unit.attr.attr,
-> +       &mmdc_read_bytes_scale.attr.attr,
-> +       &mmdc_write_bytes.attr.attr,
-> +       &mmdc_write_bytes_unit.attr.attr,
-> +       &mmdc_write_bytes_scale.attr.attr,
-> +       NULL,
-> +};
-> +
-> +static struct attribute_group mmdc_events_attr_group = {
-> +       .name = "events",
-> +       .attrs = mmdc_events_attrs,
-> +};
-> +
-> +PMU_FORMAT_ATTR(event, "config:0-63");
-> +static struct attribute *mmdc_format_attrs[] = {
-> +       &format_attr_event.attr,
-> +       NULL,
-> +};
-> +
-> +static struct attribute_group mmdc_format_attr_group = {
-> +       .name = "format",
-> +       .attrs = mmdc_format_attrs,
-> +};
-> +
-> +static const struct attribute_group *attr_groups[] = {
-> +       &mmdc_events_attr_group,
-> +       &mmdc_format_attr_group,
-> +       &mmdc_cpumask_attr_group,
-> +       NULL,
-> +};
-> +
-> +static u32 mmdc_read_counter(struct mmdc_pmu *pmu_mmdc, int cfg, u64 prev_val)
-> +{
-> +       u32 val;
-> +       void __iomem *mmdc_base, *reg;
-> +
-> +       mmdc_base = pmu_mmdc->mmdc_base;
-> +
-> +       switch (cfg) {
-> +       case TOTAL_CYCLES:
-> +               reg = mmdc_base + MMDC_MADPSR0;
-> +               break;
-> +       case BUSY_CYCLES:
-> +               reg = mmdc_base + MMDC_MADPSR1;
-> +               break;
-> +       case READ_ACCESSES:
-> +               reg = mmdc_base + MMDC_MADPSR2;
-> +               break;
-> +       case WRITE_ACCESSES:
-> +               reg = mmdc_base + MMDC_MADPSR3;
-> +               break;
-> +       case READ_BYTES:
-> +               reg = mmdc_base + MMDC_MADPSR4;
-> +               break;
-> +       case WRITE_BYTES:
-> +               reg = mmdc_base + MMDC_MADPSR5;
-> +               break;
-> +       default:
-> +               return WARN_ONCE(1,
-> +                       "invalid configuration %d for mmdc counter", cfg);
-> +       }
-> +       val = readl(reg);
-> +       return val;
-> +}
-> +
-> +static int mmdc_pmu_offline_cpu(unsigned int cpu)
-> +{
-> +       struct mmdc_pmu *pmu_mmdc = cpuhp_mmdc_pmu;
-> +       int target;
-> +
-> +       if (!cpumask_test_and_clear_cpu(cpu, &pmu_mmdc->cpu))
-> +               return 0;
-> +       target = cpumask_any_but(cpu_online_mask, cpu);
-> +       if (target >= nr_cpu_ids)
-> +               return 0;
-> +       perf_pmu_migrate_context(&pmu_mmdc->pmu, cpu, target);
-> +       cpumask_set_cpu(target, &pmu_mmdc->cpu);
-> +       if (pmu_mmdc->irq)
-> +               WARN_ON(irq_set_affinity_hint(
-> +                                       pmu_mmdc->irq, &pmu_mmdc->cpu) != 0);
-> +       return 0;
-> +}
-> +
-> +static int mmdc_event_init(struct perf_event *event)
-> +{
-> +       struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
-> +       int cfg = event->attr.config;
-> +       struct perf_event *sibling;
-> +
-> +       if (event->attr.type != event->pmu->type)
-> +               return -ENOENT;
-> +
-> +       if (event->cpu < 0) {
-> +               dev_warn(pmu_mmdc->dev, "Can't provide per-task data!\n");
-> +               return -EOPNOTSUPP;
-> +       }
-> +
-> +       if (event->attr.exclude_user            ||
-> +                       event->attr.exclude_kernel      ||
-> +                       event->attr.exclude_hv          ||
-> +                       event->attr.exclude_idle        ||
-> +                       event->attr.exclude_host        ||
-> +                       event->attr.exclude_guest       ||
-> +                       event->attr.sample_period)
-> +               return -EINVAL;
-> +
-> +       if (cfg < 0 || cfg >= MMDC_NUM_COUNTERS)
-> +               return -EINVAL;
-> +
-> +       if (event->group_leader->pmu != event->pmu &&
-> +                       !is_software_event(event->group_leader))
-> +               return -EINVAL;
-> +
-> +       list_for_each_entry(sibling, &event->group_leader->sibling_list,
-> +                       group_entry)
-> +               if (sibling->pmu != event->pmu &&
-> +                               !is_software_event(sibling))
-> +                       return -EINVAL;
-> +
-> +       event->cpu = cpumask_first(&pmu_mmdc->cpu);
-> +       return 0;
-> +}
-> +
-> +static void mmdc_event_update(struct perf_event *event)
-> +{
-> +       struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
-> +       u32 val;
-> +       u64 prev_val;
-> +
-> +       prev_val = local64_read(&event->count);
-> +       val = mmdc_read_counter(pmu_mmdc, (int) event->attr.config, prev_val);
-> +       local64_add(val - (u32)(prev_val & 0xFFFFFFFF), &event->count);
-> +}
-> +
-> +static void mmdc_event_start(struct perf_event *event, int flags)
-> +{
-> +       struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
-> +       void __iomem *mmdc_base, *reg;
-> +
-> +       mmdc_base = pmu_mmdc->mmdc_base;
-> +       reg = mmdc_base + MMDC_MADPCR0;
-> +       /* hrtimer is required because mmdc does not provide an interrupt so
-> +        * polling is necessary
-> +        */
-> +       hrtimer_start(&pmu_mmdc->hrtimer, mmdc_timer_period(),
-> +                       HRTIMER_MODE_REL_PINNED);
-> +
-> +       writel(DBG_RST, reg);
-> +       writel(DBG_EN, reg);
-> +}
-> +
-> +static int mmdc_event_add(struct perf_event *event, int flags)
-> +{
-> +       struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
-> +       int cfg = (int)event->attr.config;
-> +
-> +       if (WARN_ONCE((cfg < 0 || cfg >= MMDC_NUM_COUNTERS),
-> +                               "invalid configuration %d for mmdc", cfg))
-> +               return -1;
-> +       pmu_mmdc->mmdc_events[cfg] = event;
-> +       local64_set(&event->count, 0);
-> +       if (flags & PERF_EF_START)
-> +               mmdc_event_start(event, flags);
-> +       spin_lock(&pmu_mmdc->mmdc_active_events_lock);
-> +       pmu_mmdc->active_events++;
-> +       spin_unlock(&pmu_mmdc->mmdc_active_events_lock);
-> +       return 0;
-> +}
-> +
-> +static void mmdc_event_stop(struct perf_event *event, int flags)
-> +{
-> +       struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
-> +       void __iomem *mmdc_base, *reg;
-> +       int cfg = (int)event->attr.config;
-> +
-> +       mmdc_base = pmu_mmdc->mmdc_base;
-> +       reg = mmdc_base + MMDC_MADPCR0;
-> +       if (WARN_ONCE((cfg < 0 || cfg >= MMDC_NUM_COUNTERS),
-> +                               "invalid configuration %d for mmdc counter", cfg))
-> +               return;
-> +       spin_lock(&pmu_mmdc->mmdc_active_events_lock);
-> +       if (pmu_mmdc->active_events <= 0)
-> +               hrtimer_cancel(&pmu_mmdc->hrtimer);
-> +       spin_unlock(&pmu_mmdc->mmdc_active_events_lock);
-> +       writel(PRF_FRZ, reg);
-> +       mmdc_event_update(event);
-> +}
-> +
-> +static void mmdc_event_del(struct perf_event *event, int flags)
-> +{
-> +       struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
-> +
-> +       spin_lock(&pmu_mmdc->mmdc_active_events_lock);
-> +       pmu_mmdc->active_events--;
-> +       spin_unlock(&pmu_mmdc->mmdc_active_events_lock);
-> +       mmdc_event_stop(event, PERF_EF_UPDATE);
-> +}
-> +
-> +static void mmdc_overflow_handler(struct mmdc_pmu *pmu_mmdc)
-> +{
-> +       int i;
-> +
-> +       for (i = 0; i < MMDC_NUM_COUNTERS; i++) {
-> +               struct perf_event *event = pmu_mmdc->mmdc_events[i];
-> +
-> +               if (event)
-> +                       mmdc_event_update(event);
-> +       }
-> +}
-> +
-> +static enum hrtimer_restart mmdc_timer_handler(struct hrtimer *hrtimer)
-> +{
-> +       struct mmdc_pmu *pmu_mmdc = container_of(hrtimer, struct mmdc_pmu,
-> +                       hrtimer);
-> +
-> +       mmdc_overflow_handler(pmu_mmdc);
-> +
-> +       hrtimer_forward_now(hrtimer, mmdc_timer_period());
-> +       return HRTIMER_RESTART;
-> +}
-> +
-> +static int mmdc_pmu_init(struct mmdc_pmu *pmu_mmdc,
-> +               void __iomem *mmdc_base, struct device *dev)
-> +{
-> +       int mmdc_num;
-> +
-> +       *pmu_mmdc = (struct mmdc_pmu) {
-> +               .pmu = (struct pmu) {
-> +                       .task_ctx_nr    = perf_invalid_context,
-> +                       .attr_groups    = attr_groups,
-> +                       .event_init     = mmdc_event_init,
-> +                       .add            = mmdc_event_add,
-> +                       .del            = mmdc_event_del,
-> +                       .start          = mmdc_event_start,
-> +                       .stop           = mmdc_event_stop,
-> +                       .read           = mmdc_event_update,
-> +               },
-> +               .mmdc_base = mmdc_base,
-> +       };
-> +
-> +       mmdc_num = ida_simple_get(&mmdc_ida, 0, 0, GFP_KERNEL);
-> +
-> +       cpumask_set_cpu(smp_processor_id(), &pmu_mmdc->cpu);
-> +
-> +       pmu_mmdc->dev = dev;
-> +       pmu_mmdc->active_events = 0;
-> +       spin_lock_init(&pmu_mmdc->mmdc_active_events_lock);
-> +
-> +       cpuhp_mmdc_pmu = pmu_mmdc;
-> +       cpuhp_setup_state(CPUHP_ONLINE,
-> +                       "PERF_MMDC_ONLINE", NULL,
-> +                       mmdc_pmu_offline_cpu);
-> +
-> +       return mmdc_num;
-> +}
-> +
->  static int imx_mmdc_probe(struct platform_device *pdev)
->  {
->         struct device_node *np = pdev->dev.of_node;
->         void __iomem *mmdc_base, *reg;
-> +       struct mmdc_pmu *pmu_mmdc;
-> +       char *name;
->         u32 val;
->         int timeout = 0x400;
-> +       int mmdc_num;
->
->         mmdc_base = of_iomap(np, 0);
->         WARN_ON(!mmdc_base);
-> @@ -61,7 +415,34 @@ static int imx_mmdc_probe(struct platform_device *pdev)
->                         __func__);
->                 return -EBUSY;
->         }
-> +       pmu_mmdc = kzalloc(sizeof(*pmu_mmdc), GFP_KERNEL);
-> +
-> +       if (!pmu_mmdc) {
-> +               pr_err("failed to allocate PMU device!\n");
-> +               return -ENOMEM;
-> +       }
-> +       mmdc_num = mmdc_pmu_init(pmu_mmdc, mmdc_base, &pdev->dev);
-> +       hrtimer_init(&pmu_mmdc->hrtimer, CLOCK_MONOTONIC,
-> +                       HRTIMER_MODE_REL);
-> +       pmu_mmdc->hrtimer.function = mmdc_timer_handler;
-> +       if (mmdc_num == 0)
-> +               name = "mmdc";
-> +       else
-> +               name = devm_kasprintf(&pdev->dev,
-> +                               GFP_KERNEL, "mmdc_%d", mmdc_num);
-> +       platform_set_drvdata(pdev, pmu_mmdc);
-> +       perf_pmu_register(&(pmu_mmdc->pmu), name, -1);
-> +       return 0;
-> +}
-> +
-> +static int imx_mmdc_remove(struct platform_device *pdev)
-> +{
-> +       struct mmdc_pmu *pmu_mmdc = platform_get_drvdata(pdev);
->
-> +       perf_pmu_unregister(&pmu_mmdc->pmu);
-> +       cpuhp_remove_state_nocalls(CPUHP_ONLINE);
-> +       cpuhp_mmdc_pmu = NULL;
-> +       kfree(pmu_mmdc);
->         return 0;
->  }
->
-> @@ -81,6 +462,7 @@ static struct platform_driver imx_mmdc_driver = {
->                 .of_match_table = imx_mmdc_dt_ids,
->         },
->         .probe          = imx_mmdc_probe,
-> +       .remove         = imx_mmdc_remove,
->  };
->
->  static int __init imx_mmdc_init(void)
-> --
-> 2.9.3
->
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 2a367b2de0e1..173ad30c20e0 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -748,15 +748,6 @@ core_initcall(register_cpufreq_notifier);
+ 
+ static void raise_nmi(cpumask_t *mask)
+ {
+-	/*
+-	 * Generate the backtrace directly if we are running in a calling
+-	 * context that is not preemptible by the backtrace IPI. Note
+-	 * that nmi_cpu_backtrace() automatically removes the current cpu
+-	 * from mask.
+-	 */
+-	if (cpumask_test_cpu(smp_processor_id(), mask) && irqs_disabled())
+-		nmi_cpu_backtrace(NULL);
+-
+ 	smp_cross_call(mask, IPI_CPU_BACKTRACE);
+ }
+ 
+diff --git a/lib/nmi_backtrace.c b/lib/nmi_backtrace.c
+index df347e355267..393a3cca1f47 100644
+--- a/lib/nmi_backtrace.c
++++ b/lib/nmi_backtrace.c
+@@ -49,6 +49,15 @@ void nmi_trigger_cpumask_backtrace(const cpumask_t *mask,
+ 	if (exclude_self)
+ 		cpumask_clear_cpu(this_cpu, to_cpumask(backtrace_mask));
+ 
++	/*
++	 * Don't try to send an NMI to this cpu; it may work on some
++	 * architectures, but on others it may not, and we'll get
++	 * information at least as useful just by doing a dump_stack() here.
++	 * Note that nmi_cpu_backtrace(NULL) will clear the cpu bit.
++	 */
++	if (cpumask_test_cpu(this_cpu, to_cpumask(backtrace_mask)))
++		nmi_cpu_backtrace(NULL);
++
+ 	if (!cpumask_empty(to_cpumask(backtrace_mask))) {
+ 		pr_info("Sending NMI from CPU %d to CPUs %*pbl:\n",
+ 			this_cpu, nr_cpumask_bits, to_cpumask(backtrace_mask));
+-- 
+2.7.2
