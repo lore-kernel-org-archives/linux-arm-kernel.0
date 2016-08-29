@@ -1,58 +1,71 @@
-From: anson.huang@nxp.com (Yongcai Huang)
-Date: Mon, 29 Aug 2016 08:49:04 +0000
-Subject: [PATCH] ARM: imx6: add opp table when cpufreq is enabled
-In-Reply-To: <20160829062720.GI30790@tiger>
-References: <1471964171-27480-1-git-send-email-Anson.Huang@nxp.com>
- <20160829061910.GG30790@tiger> <20160829062720.GI30790@tiger>
-Message-ID: <AM3PR04MB13156D30B684387793054569F5E10@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 29 Aug 2016 10:50:50 +0200
+Subject: [PATCH] mtd: mxc_nand: Set timing for v2 controllers
+In-Reply-To: <20160829083558.gfydmebh7bx3wdxz@pengutronix.de>
+References: <1471948445-29936-1-git-send-email-s.hauer@pengutronix.de>
+ <20160826094653.762be9fb@bbrezillon>
+ <20160829083558.gfydmebh7bx3wdxz@pengutronix.de>
+Message-ID: <20160829105050.574a2b8a@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sascha,
 
+On Mon, 29 Aug 2016 10:35:58 +0200
+Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-Best Regards!
-Anson Huang
-
-
-
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: 2016-08-29 2:27 PM
-> To: Yongcai Huang <anson.huang@nxp.com>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>; Peter Chen
-> <peter.chen@nxp.com>; linux at armlinux.org.uk; linux-arm-
-> kernel at lists.infradead.org; kernel at pengutronix.de
-> Subject: Re: [PATCH] ARM: imx6: add opp table when cpufreq is enabled
+> Hi Boris,
 > 
-> On Mon, Aug 29, 2016 at 02:19:10PM +0800, Shawn Guo wrote:
-> > On Tue, Aug 23, 2016 at 10:56:11PM +0800, Anson Huang wrote:
-> > > On those i.MX6 platforms which have no speed grading check, opp
-> > > table will NOT be created in platform code, so cpufreq driver will
-> > > have below error message:
-> > >
-> > > cpu cpu0: dev_pm_opp_get_opp_count: OPP table not found (-19)
-> >
-> > The cpufreq driver calls dev_pm_opp_get_opp_count() to test if
-> > platform supplies an OPP table.  If not, the driver will call into
-> > dev_pm_opp_of_add_table() on its own.  So this is not an error
-> > message, and cpufreq driver should just work fine on i.MX6SX and i.MX6SL.
+> On Fri, Aug 26, 2016 at 09:46:53AM +0200, Boris Brezillon wrote:
+> > Hi Sascha,
+> > 
+> > On Tue, 23 Aug 2016 12:34:05 +0200
+> > Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > 
+> > AFAIR, you should apply the new mode on the NAND side
+> > (ONFI_FEATURE_ADDR_TIMING_MODE) before applying the new config to the
+> > controller.
+> > 
+> > See what's done here [1].
+> > 
+> > Note that on all the NANDs I tested, it seems to work even if you don't
+> > set ONFI_FEATURE_ADDR_TIMING_MODE, but the ONFI Spec describes the
+> > procedure as:  
 > 
-> If you think the message might confuse people, we can add an info message in
-> cpufreq driver in case it adds OPP table by its own, which can explain the 'error'
-> message a bit from dev_pm_opp_get_opp_count().
+> Indeed, works here without notifying the NAND chip aswell. I wasn't even
+> aware that there is a possibility to notify the NAND chip.
 > 
-> Shawn
+> > 
+> > 1/ detect supported modes
+> > 2/ select one
+> > 3/ apply it to the NAND using set(ONFI_FEATURE_ADDR_TIMING_MODE)
+> > 4/ release the CS
+> > 5/ adjust the controller setting to match the new config
+> > 
+> > On a side note, I really think we should handle this timing selection in
+> > the core, and only ask the NAND controller drivers to adapt the
+> > controller settings.  
+> 
+> I agree that the core should do this. Do you already have any thoughts
+> how the API could could look like?
 
-After rethink this, if we can avoid this "error" message printed out from common OPP
-framework, why NOT do it? Although the code change is kind of big, but the logic is
-quite simple. Adding info message in cpufreq driver is a bit better, but the "error" message
-is still there which may concern some people who really care about it, adding this patch
-would make it easier for our future kernel upgrade.
+I already provided a simple implementation a while ago [1]. Not sure it
+handles all the corner cases though.
 
-Actually, if we do NOT have speed grading fuse check need for some platforms, the opp
-table init can be put in cpufreq for all platforms, so I think the best way is to put
-all opp table init in either platform code or cpufreq driver, some platforms put it in platform
-code and some in cpufreq driver is NOT the best. 
+> The Nand drivers probably have to
+> propagate somehow which modes they support, maybe we add a onfi_modes
+> field to struct nand_chip. Then if onfi_modes is nonzero we call a
+> nand_chip->set_onfi_mode() function?
 
-Thanks.
-Anson.
+The idea was to have some way to ask the controller whether it supports
+specific timings or not. I don't remember if this was part of my
+initial proposal.
+
+Note that we should pass struct real timings and not ONFI timing
+mode.
+
+Regards,
+
+Boris
+
+[1]https://lkml.org/lkml/2015/10/23/179
