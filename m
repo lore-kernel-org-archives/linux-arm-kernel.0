@@ -1,28 +1,63 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Mon, 29 Aug 2016 10:05:30 +0200
-Subject: [Patch v4 9/9] arm64: Update device tree for Layerscape SoCs
-In-Reply-To: <20160829063448.GA32489@tiger>
-References: <1470780000-16750-1-git-send-email-york.sun@nxp.com>
- <20160812091354.GB333@nazgul.tnic> <20160829063448.GA32489@tiger>
-Message-ID: <20160829080530.GA25468@nazgul.tnic>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 29 Aug 2016 16:18:10 +0800
+Subject: [PATCH] ARM: dts: imx7s-warp: Let the codec control MCLK pinctrl
+In-Reply-To: <1472148347-504-1-git-send-email-fabio.estevam@nxp.com>
+References: <1472148347-504-1-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <20160829081810.GK30790@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 02:34:48PM +0800, Shawn Guo wrote:
-> Is it mandatory to have DTS changes go with driver part altogether?
+On Thu, Aug 25, 2016 at 03:05:47PM -0300, Fabio Estevam wrote:
+> sgtl5000 codec needs MCLK clock to be provided so that it can
+> successfully read/write via I2C, so we should better let the
+> codec control the pinctrl for such pin.
+> 
+> Thanks to Stefan Agner who provided the fix on Toradex's tree:
+> http://git.toradex.com/cgit/linux-toradex.git/commit/?h=toradex_imx_4.1.15_1.0.0_ga-next&id=0a55a7e5f58d46eef0d4d1d357d89e36d0c32fa4
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> ---
+>  arch/arm/boot/dts/imx7s-warp.dts | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx7s-warp.dts b/arch/arm/boot/dts/imx7s-warp.dts
+> index 92d9c857..7c3f110e 100644
+> --- a/arch/arm/boot/dts/imx7s-warp.dts
+> +++ b/arch/arm/boot/dts/imx7s-warp.dts
+> @@ -199,6 +199,8 @@
+>  		reg = <0x0a>;
+>  		compatible = "fsl,sgtl5000";
+>  		clocks = <&clks IMX7D_AUDIO_MCLK_ROOT_CLK>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_sai1_mclk>;
+>  		VDDA-supply = <&vgen4_reg>;
+>  		VDDIO-supply = <&vgen4_reg>;
+>  		VDDD-supply = <&vgen2_reg>;
+> @@ -291,7 +293,12 @@
+>  			MX7D_PAD_SAI1_TX_BCLK__SAI1_TX_BCLK	0x1f
+>  			MX7D_PAD_SAI1_TX_SYNC__SAI1_TX_SYNC	0x1f
+>  			MX7D_PAD_SAI1_TX_DATA__SAI1_TX_DATA0	0x30
+> -			MX7D_PAD_SAI1_MCLK__SAI1_MCLK		0x1f
+> +		>;
+> +	};
+> +
+> +	pinctrl_sai1_mclk: sai1grp_mclk {
 
-Yes, because the EDAC driver needs them to even load properly.
+We do not use underscore in node name.  I changed it to sai1mclkgrp and
+applied the patch.
 
-> Otherwise, I prefer to have them go through separate tree.
+Shawn
 
-Any particular reason why you prefer that?
-
-We've been doing this for other ARM EDAC drivers already and there were
-no issues whatsoever.
-
--- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+> +		fsl,pins = <
+> +			MX7D_PAD_SAI1_MCLK__SAI1_MCLK           0x1f
+>  		>;
+>  	};
+>  
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
