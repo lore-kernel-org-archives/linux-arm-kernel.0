@@ -1,56 +1,66 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 29 Aug 2016 11:32:11 +0200
-Subject: [PATCH] ARM: imx: use IS_ENABLED() instead of checking for built-in
- or module
-Message-ID: <1472463131-29899-1-git-send-email-javier@dowhile0.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 29 Aug 2016 11:33:04 +0200
+Subject: [PATCH] ARM: integrator: move CP CLCD display to DTS
+Message-ID: <1472463184-9272-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Javier Martinez Canillas <javier@osg.samsung.com>
+The Integrator/CP CLCD VGA display can now be registered
+fully from the device tree. Delete the board file code and
+add the display definition to the DTS.
 
-The IS_ENABLED() macro checks if a Kconfig symbol has been enabled either
-built-in or as a module, use that macro instead of open coding the same.
-
-Using the macro makes the code more readable by helping abstract away some
-of the Kconfig built-in and module enable details.
-
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
+ arch/arm/boot/dts/integratorcp.dts | 37 ++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 36 insertions(+), 1 deletion(-)
 
- arch/arm/mach-imx/mach-kzm_arm11_01.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-imx/mach-kzm_arm11_01.c b/arch/arm/mach-imx/mach-kzm_arm11_01.c
-index 31df4361996f..e277d9c230e5 100644
---- a/arch/arm/mach-imx/mach-kzm_arm11_01.c
-+++ b/arch/arm/mach-imx/mach-kzm_arm11_01.c
-@@ -63,7 +63,7 @@
-  */
- #define KZM_ARM11_16550		(MX31_CS4_BASE_ADDR + 0x1050)
- 
--#if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
-+#if IS_ENABLED(CONFIG_SERIAL_8250)
- /*
-  * KZM-ARM11-01 has an external UART on FPGA
-  */
-@@ -141,7 +141,7 @@ static inline int kzm_init_ext_uart(void)
- /*
-  * SMSC LAN9118
-  */
--#if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
-+#if IS_ENABLED(CONFIG_SMSC911X)
- static struct smsc911x_platform_config kzm_smsc9118_config = {
- 	.phy_interface	= PHY_INTERFACE_MODE_MII,
- 	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
-@@ -201,7 +201,7 @@ static inline int kzm_init_smsc9118(void)
- }
- #endif
- 
--#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
-+#if IS_ENABLED(CONFIG_SERIAL_IMX)
- static const struct imxuart_platform_data uart_pdata __initconst = {
- 	.flags = IMXUART_HAVE_RTSCTS,
+diff --git a/arch/arm/boot/dts/integratorcp.dts b/arch/arm/boot/dts/integratorcp.dts
+index 371173ec63fd..915203b4083f 100644
+--- a/arch/arm/boot/dts/integratorcp.dts
++++ b/arch/arm/boot/dts/integratorcp.dts
+@@ -249,7 +249,42 @@
+ 			reg = <0xC0000000 0x1000>;
+ 			interrupts = <22>;
+ 			clocks = <&auxosc>, <&pclk>;
+-			clock-names = "clcd", "apb_pclk";
++			clock-names = "clcdclk", "apb_pclk";
++
++			port {
++				/*
++				 * The VGA connected is implemented with a
++				 * THS8134A triple DAC that can be run in 24bit
++				 * or 16bit RGB mode.
++				 */
++				clcd_pads: endpoint {
++					remote-endpoint = <&clcd_panel>;
++					arm,pl11x,tft-r0g0b0-pads = <1 7 13>;
++				};
++			};
++
++			panel {
++				compatible = "panel-dpi";
++
++				port {
++					clcd_panel: endpoint {
++						remote-endpoint = <&clcd_pads>;
++					};
++				};
++
++				/* Standard 640x480 VGA timings */
++				panel-timing {
++					clock-frequency = <25175000>;
++					hactive = <640>;
++					hback-porch = <48>;
++					hfront-porch = <16>;
++					hsync-len = <96>;
++					vactive = <480>;
++					vback-porch = <33>;
++					vfront-porch = <10>;
++					vsync-len = <2>;
++				};
++			};
+ 		};
+ 	};
  };
 -- 
 2.7.4
