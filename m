@@ -1,149 +1,181 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 29 Aug 2016 13:53:54 +0100
-Subject: [PATCH v4 2/4] ARM: kernel: allocate PLT entries only for external
- symbols
+Date: Mon, 29 Aug 2016 13:53:55 +0100
+Subject: [PATCH v4 3/4] ARM: kernel: sort relocation sections before
+ allocating PLTs
 In-Reply-To: <1472475236-3083-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1472475236-3083-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1472475236-3083-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1472475236-3083-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_ARM_MODULE_PLTS is enabled, jump and call instructions in
-modules no longer need to be within 16 MB (8 MB for Thumb2) of their
-targets. If they are further away, a PLT entry will be generated on the
-fly for each of them, which extends the range to the entire 32-bit
-address space.
-
-However, since these PLT entries will become the branch targets of the
-original jump and call instructions, the PLT itself needs to be in
-range, or we end up in the same situation we started in. Since the PLT
-is in a separate section, this essentially means that all jumps and calls
-inside the same module must be resolvable without PLT entries.
-
-The PLT allocation code executes before the module itself is loaded in
-its final location, and so it has to use a worst-case estimate for
-which jumps and calls will require an entry in the PLT at relocation
-time. As an optimization, this code deduplicates entries pointing to
-the same symbol, using a O(n^2) algorithm. However, it does not take
-the above into account, i.e., that PLT entries will only be needed for
-jump and call relocations against symbols that are not defined in the
-module.
-
-So disregard relocations against symbols that are defined in the module
-itself.
-
-As an additional minor optimization, ignore input sections that lack
-the SHF_EXECINSTR flag. Since jump and call relocations operate on
-executable instructions only, there is no need to look in sections that
-do not contain executable code.
+The PLT allocation routines try to establish an upper bound on the
+number of PLT entries that will be required at relocation time, and
+optimize this by disregarding duplicates (i.e., PLT entries that will
+end up pointing to the same function). This is currently a O(n^2)
+algorithm, but we can greatly simplify this by
+- sorting the relocation section so that relocations that can use the
+  same PLT entry will be listed adjacently,
+- disregard jump/call relocations with addends; these are highly unusual,
+  for relocations against SHN_UNDEF symbols, and so we can simply allocate
+  a PLT entry for each one we encounter, without trying to optimize away
+  duplicates.
 
 Tested-by: Jongsung Kim <neidhard.kim@lge.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/kernel/module-plts.c | 49 +++++++++++++++-----
- 1 file changed, 37 insertions(+), 12 deletions(-)
+ arch/arm/kernel/module-plts.c | 98 ++++++++++++++------
+ 1 file changed, 69 insertions(+), 29 deletions(-)
 
 diff --git a/arch/arm/kernel/module-plts.c b/arch/arm/kernel/module-plts.c
-index 6832d1d6444e..6f93a905eeee 100644
+index 6f93a905eeee..ad1b98fbcd98 100644
 --- a/arch/arm/kernel/module-plts.c
 +++ b/arch/arm/kernel/module-plts.c
-@@ -88,32 +88,45 @@ static int duplicate_rel(Elf32_Addr base, const Elf32_Rel *rel, int num,
+@@ -9,6 +9,7 @@
+ #include <linux/elf.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/sort.h>
+ 
+ #include <asm/cache.h>
+ #include <asm/opcodes.h>
+@@ -63,28 +64,63 @@ u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
+ 	BUG();
+ }
+ 
+-static int duplicate_rel(Elf32_Addr base, const Elf32_Rel *rel, int num,
+-			   u32 mask)
++#define cmp_3way(a,b)	((a) < (b) ? -1 : (a) > (b))
++
++static int cmp_rel(const void *a, const void *b)
+ {
+-	u32 *loc1, *loc2;
++	const Elf32_Rel *x = a, *y = b;
+ 	int i;
+ 
+-	for (i = 0; i < num; i++) {
+-		if (rel[i].r_info != rel[num].r_info)
+-			continue;
++	/* sort by type and symbol index */
++	i = cmp_3way(ELF32_R_TYPE(x->r_info), ELF32_R_TYPE(y->r_info));
++	if (i == 0)
++		i = cmp_3way(ELF32_R_SYM(x->r_info), ELF32_R_SYM(y->r_info));
++	return i;
++}
+ 
+-		/*
+-		 * Identical relocation types against identical symbols can
+-		 * still result in different PLT entries if the addend in the
+-		 * place is different. So resolve the target of the relocation
+-		 * to compare the values.
+-		 */
+-		loc1 = (u32 *)(base + rel[i].r_offset);
+-		loc2 = (u32 *)(base + rel[num].r_offset);
+-		if (((*loc1 ^ *loc2) & mask) == 0)
+-			return 1;
++static bool is_zero_addend_relocation(Elf32_Addr base, const Elf32_Rel *rel)
++{
++	u32 *tval = (u32 *)(base + rel->r_offset);
++
++	/*
++	 * Do a bitwise compare on the raw addend rather than fully decoding
++	 * the offset and doing an arithmetic comparison.
++	 * Note that a zero-addend jump/call relocation is encoded taking the
++	 * PC bias into account, i.e., -8 for ARM and -4 for Thumb2.
++	 */
++	switch (ELF32_R_TYPE(rel->r_info)) {
++		u16 upper, lower;
++
++	case R_ARM_THM_CALL:
++	case R_ARM_THM_JUMP24:
++		upper = __mem_to_opcode_thumb16(((u16 *)tval)[0]);
++		lower = __mem_to_opcode_thumb16(((u16 *)tval)[1]);
++
++		return (upper & 0x7ff) == 0x7ff && (lower & 0x2fff) == 0x2ffe;
++
++	case R_ARM_CALL:
++	case R_ARM_PC24:
++	case R_ARM_JUMP24:
++		return (__mem_to_opcode_arm(*tval) & 0xffffff) == 0xfffffe;
+ 	}
+-	return 0;
++	BUG();
++}
++
++static bool duplicate_rel(Elf32_Addr base, const Elf32_Rel *rel, int num)
++{
++	const Elf32_Rel *prev;
++
++	/*
++	 * Entries are sorted by type and symbol index. That means that,
++	 * if a duplicate entry exists, it must be in the preceding
++	 * slot.
++	 */
++	if (!num)
++		return false;
++
++	prev = rel + num - 1;
++	return cmp_rel(rel + num, prev) == 0 &&
++	       is_zero_addend_relocation(base, prev);
  }
  
  /* Count how many PLT entries we may need */
--static unsigned int count_plts(Elf32_Addr base, const Elf32_Rel *rel, int num)
-+static unsigned int count_plts(const Elf32_Sym *syms, Elf32_Addr base,
-+			       const Elf32_Rel *rel, int num)
+@@ -93,18 +129,8 @@ static unsigned int count_plts(const Elf32_Sym *syms, Elf32_Addr base,
  {
  	unsigned int ret = 0;
-+	const Elf32_Sym *s;
-+	u32 mask;
+ 	const Elf32_Sym *s;
+-	u32 mask;
  	int i;
  
-+	if (IS_ENABLED(CONFIG_THUMB2_KERNEL))
-+		mask = __opcode_to_mem_thumb32(0x07ff2fff);
-+	else
-+		mask = __opcode_to_mem_arm(0x00ffffff);
-+
- 	/*
- 	 * Sure, this is order(n^2), but it's usually short, and not
- 	 * time critical
- 	 */
--	for (i = 0; i < num; i++)
-+	for (i = 0; i < num; i++) {
+-	if (IS_ENABLED(CONFIG_THUMB2_KERNEL))
+-		mask = __opcode_to_mem_thumb32(0x07ff2fff);
+-	else
+-		mask = __opcode_to_mem_arm(0x00ffffff);
+-
+-	/*
+-	 * Sure, this is order(n^2), but it's usually short, and not
+-	 * time critical
+-	 */
+ 	for (i = 0; i < num; i++) {
  		switch (ELF32_R_TYPE(rel[i].r_info)) {
  		case R_ARM_CALL:
- 		case R_ARM_PC24:
- 		case R_ARM_JUMP24:
--			if (!duplicate_rel(base, rel, i,
--					   __opcode_to_mem_arm(0x00ffffff)))
--				ret++;
--			break;
--#ifdef CONFIG_THUMB2_KERNEL
- 		case R_ARM_THM_CALL:
- 		case R_ARM_THM_JUMP24:
--			if (!duplicate_rel(base, rel, i,
--					   __opcode_to_mem_thumb32(0x07ff2fff)))
+@@ -123,7 +149,18 @@ static unsigned int count_plts(const Elf32_Sym *syms, Elf32_Addr base,
+ 			if (s->st_shndx != SHN_UNDEF)
+ 				break;
+ 
+-			if (!duplicate_rel(base, rel, i, mask))
 +			/*
-+			 * We only have to consider branch targets that resolve
-+			 * to undefined symbols. This is not simply a heuristic,
-+			 * it is a fundamental limitation, since the PLT itself
-+			 * is part of the module, and needs to be within range
-+			 * as well, so modules can never grow beyond that limit.
++			 * Jump relocations with non-zero addends against
++			 * undefined symbols are supported by the ELF spec, but
++			 * do not occur in practice (e.g., 'jump n bytes past
++			 * the entry point of undefined function symbol f').
++			 * So we need to support them, but there is no need to
++			 * take them into consideration when trying to optimize
++			 * this code. So let's only check for duplicates when
++			 * the addend is zero.
 +			 */
-+			s = syms + ELF32_R_SYM(rel[i].r_info);
-+			if (s->st_shndx != SHN_UNDEF)
-+				break;
-+
-+			if (!duplicate_rel(base, rel, i, mask))
++			if (!is_zero_addend_relocation(base, rel + i) ||
++			    !duplicate_rel(base, rel, i))
  				ret++;
--#endif
  		}
-+	}
- 	return ret;
- }
- 
-@@ -122,19 +135,27 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
- {
- 	unsigned long plts = 0;
- 	Elf32_Shdr *s, *sechdrs_end = sechdrs + ehdr->e_shnum;
-+	Elf32_Sym *syms = NULL;
- 
- 	/*
- 	 * To store the PLTs, we expand the .text section for core module code
- 	 * and for initialization code.
- 	 */
--	for (s = sechdrs; s < sechdrs_end; ++s)
-+	for (s = sechdrs; s < sechdrs_end; ++s) {
- 		if (strcmp(".plt", secstrings + s->sh_name) == 0)
- 			mod->arch.plt = s;
-+		else if (s->sh_type == SHT_SYMTAB)
-+			syms = (Elf32_Sym *)s->sh_addr;
-+	}
- 
- 	if (!mod->arch.plt) {
- 		pr_err("%s: module PLT section missing\n", mod->name);
- 		return -ENOEXEC;
  	}
-+	if (!syms) {
-+		pr_err("%s: module symtab section missing\n", mod->name);
-+		return -ENOEXEC;
-+	}
+@@ -158,7 +195,7 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+ 	}
  
  	for (s = sechdrs + 1; s < sechdrs_end; ++s) {
- 		const Elf32_Rel *rels = (void *)ehdr + s->sh_offset;
-@@ -144,7 +165,11 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
- 		if (s->sh_type != SHT_REL)
+-		const Elf32_Rel *rels = (void *)ehdr + s->sh_offset;
++		Elf32_Rel *rels = (void *)ehdr + s->sh_offset;
+ 		int numrels = s->sh_size / sizeof(Elf32_Rel);
+ 		Elf32_Shdr *dstsec = sechdrs + s->sh_info;
+ 
+@@ -169,6 +206,9 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+ 		if (!(dstsec->sh_flags & SHF_EXECINSTR))
  			continue;
  
--		plts += count_plts(dstsec->sh_addr, rels, numrels);
-+		/* ignore relocations that operate on non-exec sections */
-+		if (!(dstsec->sh_flags & SHF_EXECINSTR))
-+			continue;
++		/* sort by type and symbol index */
++		sort(rels, numrels, sizeof(Elf32_Rel), cmp_rel, NULL);
 +
-+		plts += count_plts(syms, dstsec->sh_addr, rels, numrels);
+ 		plts += count_plts(syms, dstsec->sh_addr, rels, numrels);
  	}
  
- 	mod->arch.plt->sh_type = SHT_NOBITS;
 -- 
 2.7.4
