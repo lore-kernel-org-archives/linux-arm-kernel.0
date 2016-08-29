@@ -1,71 +1,53 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Mon, 29 Aug 2016 16:28:50 +0300
-Subject: [PATCH v5 1/2] ARM: dts: imx6: Add support for Toradex Apalis
- iMX6Q/D SoM
-In-Reply-To: <1454688741-4238-2-git-send-email-marcel.ziswiler@toradex.com>
-References: <1454688741-4238-1-git-send-email-marcel.ziswiler@toradex.com>
- <1454688741-4238-2-git-send-email-marcel.ziswiler@toradex.com>
-Message-ID: <97a3d506-35a0-2a15-18ef-2719c0596cc1@mentor.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 29 Aug 2016 15:31:12 +0200
+Subject: [PATCH v2 1/4] net: dt-bindings: Document the new Meson8b and
+ GXBB DWMAC bindings
+In-Reply-To: <CAFBinCDnHGf=wgvm9KzYQsf=kCrOUeO3bnEwdGy_OK-wgWkDug@mail.gmail.com>
+References: <20160815164100.27766-1-martin.blumenstingl@googlemail.com>
+ <4041259.IszN4229Cj@wuerfel>
+ <CAFBinCDnHGf=wgvm9KzYQsf=kCrOUeO3bnEwdGy_OK-wgWkDug@mail.gmail.com>
+Message-ID: <201608291531.12188.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcel,
+On Sunday 28 August 2016, Martin Blumenstingl wrote:
+> On Mon, Aug 22, 2016 at 5:25 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > It really depends on the kind of SoC. Some may have a suboptimal
+> > binding, on some others there may be a distinct register area that
+> > just contains a few additional registers for the dwmac.
+> the dwmac PHY configuration registers (2x32bit) on the GXBB SoC are
+> part of the "periphs" region/module. This is already defined as
+> "simple-bus" in meson-gxbb.dtsi, see [0]
+> On Meson8b this is slightly different: there is no specific "periphs"
+> region - there the dwmac PHY configuration registers are directly
+> located in the cbus region at a slightly different offset than on the
+> GXBB SoCs.
+> 
+> In the future we might need a third memory region because the latest
+> reference kernel contains some more PHY configuration registers on
+> newer SoCs (GXL = S905X).
+> 
+> Please let me know if you're OK with the dts definition in it's
+> current state - or let me know how you would like to change it.
+> 
+> PS: I will re-send the patches in a v3 in a few minutes because that
+> fixes a bug during module unload.
 
-On 02/05/2016 06:12 PM, Marcel Ziswiler wrote:
-> From: Petr ?tetiar <ynezz@true.cz>
->
-> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> Signed-off-by: Petr ?tetiar <ynezz@true.cz>
-> Reviewed-by: Stefan Agner <stefan@agner.ch>
-> ---
->
+I don't really see a good way to describe this hardware then. If it
+was only the first case, I'd suggest marking the periphs bus node
+as "compatible="simple-bus","syscon";" so you could have a
+reference to it, but that doesn't seem to work well in the second
+case, unless you can a separate DT node just for the PHY config
+registers there.
 
-because the change is in mainline now below is kind of out of date
-information, but you may find it helpful.
+With the third case, is there any logic at all behind the
+register map?
 
-[snip]
+Maybe someone else has a better idea for how to describe this.
+In general, we try to avoid overlapping "reg" properties, but I
+even see that the "periphs" node  on gxbb has a "reg" property
+(is this intentional) that overlaps with the registers in its
+ranges, so adding another one won't make this worse than it
+already is.
 
-> - fixed HDMI DDC (requires GPIO-based bitbanging I2C to be enabled)
-
-This is not needed.
-
-[snip]
-
-> +	/* DDC_I2C: I2C2_SDA/SCL on MXM3 205/207 */
-> +	i2cddc: i2c at 0 {
-> +		compatible = "i2c-gpio";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_i2c_ddc>;
-> +		gpios = <&gpio3 16 GPIO_ACTIVE_HIGH /* sda */
-> +			 &gpio2 30 GPIO_ACTIVE_HIGH /* scl */
-> +			>;
-> +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-> +		status = "disabled";
-> +	};
-> +
-
-This is not needed.
-
-[snip]
-
-> +	pinctrl_i2c_ddc: gpioi2cddcgrp {
-> +		fsl,pins = <
-> +			/* DDC bitbang */
-> +			MX6QDL_PAD_EIM_EB2__GPIO2_IO30 0x1b0b0
-> +			MX6QDL_PAD_EIM_D16__GPIO3_IO16 0x1b0b0
-> +		>;
-> +	};
-> +
-
-Practically you don't need this overcomplicated GPIO-based bitbanging
-to emulate I2C, because the DW HDMI controller has a reduced I2C
-controller on board, you may take a look at its support published here:
-
-    http://www.spinics.net/lists/dri-devel/msg116308.html
-
-To utilize it the pads should be set to HDMI function instead of
-I2C or GPIO.
-
---
-With best wishes,
-Vladimir
+	Arnd
