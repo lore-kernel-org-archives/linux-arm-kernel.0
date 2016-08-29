@@ -1,28 +1,120 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 29 Aug 2016 11:02:46 +0200
-Subject: [PATCH 0/3] Add R8A7792/Wheat board support
-In-Reply-To: <3665116.9BjHTnhfR3@wasted.cogentembedded.com>
-References: <3665116.9BjHTnhfR3@wasted.cogentembedded.com>
-Message-ID: <20160829090245.GB12085@verge.net.au>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 29 Aug 2016 11:29:25 +0200
+Subject: [PATCH] ARM: dts: mvebu: fix reference to a390 spi controller
+In-Reply-To: <20160826153925.863488-1-arnd@arndb.de> (Arnd Bergmann's message
+ of "Fri, 26 Aug 2016 17:38:54 +0200")
+References: <20160826153925.863488-1-arnd@arndb.de>
+Message-ID: <87k2ezhqiy.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2016 at 11:16:49PM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
->    Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
-> 'renesas-devel-20160826-v4.8-rc3' tag. We add the device tree support for
-> the R8A7792-based Wheat board. I have only sparse board documentation
-> at this point, according to which this board somewhat differs from the other
-> R-Car evaluation boards in that it has debug serial port, debug Ethernet chip,
-> and a NOR flash on the separate debug board (connected to the main board
-> with a ribbon cable). I'm not sure how to approach this (DT overlay, perhaps?),
-> for now I'm just posting the debug UART/Ethernet support the same way it was
-> done for the Blanche board -- these components seem to be the same between 
-> these 2 boards...
-> 
-> [1/3] DT: arm: shmobile: document Wheat board
-> [2/3] ARM: dts: wheat: initial device tree
-> [3/3] ARM: dts: wheat: add Ethernet support
+Hi Arnd,
+ 
+ On ven., ao?t 26 2016, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Thanks, I have queued this up.
+> The SPI controller in the arch/arm/boot/dts/armada-39x.dtsi file has moved
+> to a different location in the hierarchy, which breaks the overrides
+> in the board specific file:
+>
+> Warning (reg_format): "reg" property in /soc/internal-regs/spi at 10680/spi-flash at 1 has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
+> Warning (avoid_default_addr_size): Relying on default #address-cells value for /soc/internal-regs/spi at 10680/spi-flash at 1
+>
+> This changes the board to reference the spi controller by its label
+> (which has not changed) rather than the full path.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 0160a4b68987 ("ARM: dts: mvebu: A37x/XP/38x/39x: Move SPI controller nodes into 'soc' node")
+
+Applied on mvebu/dt
+
+Thanks,
+
+Gregory
+> ---
+>  arch/arm/boot/dts/armada-390-db.dts | 60 ++++++++++++++++++-------------------
+>  1 file changed, 30 insertions(+), 30 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-390-db.dts b/arch/arm/boot/dts/armada-390-db.dts
+> index 9d0d9b2e9bfc..34e279d973c8 100644
+> --- a/arch/arm/boot/dts/armada-390-db.dts
+> +++ b/arch/arm/boot/dts/armada-390-db.dts
+> @@ -66,36 +66,6 @@
+>  			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
+>  
+>  		internal-regs {
+> -			spi at 10680 {
+> -				status = "okay";
+> -				pinctrl-0 = <&spi1_pins>;
+> -				pinctrl-names = "default";
+> -
+> -				spi-flash at 1 {
+> -					#address-cells = <1>;
+> -					#size-cells = <1>;
+> -					compatible = "n25q128a13",
+> -						     "jedec,spi-nor";
+> -					reg = <0>; /* Chip select 0 */
+> -					spi-max-frequency = <108000000>;
+> -
+> -					partitions {
+> -						compatible = "fixed-partitions";
+> -						#address-cells = <1>;
+> -						#size-cells = <1>;
+> -
+> -						partition at 0 {
+> -							label = "U-Boot";
+> -							reg = <0 0x400000>;
+> -						};
+> -						partition at 400000 {
+> -							label = "Filesystem";
+> -							reg = <0x400000 0xc00000>;
+> -						};
+> -					};
+> -				};
+> -			};
+> -
+>  			i2c at 11000 {
+>  				status = "okay";
+>  				clock-frequency = <100000>;
+> @@ -173,3 +143,33 @@
+>  		};
+>  	};
+>  };
+> +
+> +&spi1 {
+> +	status = "okay";
+> +	pinctrl-0 = <&spi1_pins>;
+> +	pinctrl-names = "default";
+> +
+> +	spi-flash at 1 {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "n25q128a13",
+> +			     "jedec,spi-nor";
+> +		reg = <0>; /* Chip select 0 */
+> +		spi-max-frequency = <108000000>;
+> +
+> +		partitions {
+> +			compatible = "fixed-partitions";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +
+> +			partition at 0 {
+> +				label = "U-Boot";
+> +				reg = <0 0x400000>;
+> +			};
+> +			partition at 400000 {
+> +				label = "Filesystem";
+> +				reg = <0x400000 0xc00000>;
+> +			};
+> +		};
+> +	};
+> +};
+> -- 
+> 2.9.0
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
