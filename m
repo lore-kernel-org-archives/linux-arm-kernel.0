@@ -1,51 +1,49 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 29 Aug 2016 11:21:35 +0900
-Subject: [PATCH v6 1/2] clk: uniphier: add core support code for UniPhier
- clock driver
-In-Reply-To: <20160819191612.GU361@codeaurora.org>
-References: <1470112223-24835-1-git-send-email-yamada.masahiro@socionext.com>
- <1470112223-24835-2-git-send-email-yamada.masahiro@socionext.com>
- <20160819002507.GS361@codeaurora.org>
- <CAK7LNAQg-LcK-vsWVU-b0WsF=Y_NBNR_cWqNDJKyMqp7Svdvqg@mail.gmail.com>
- <20160819191612.GU361@codeaurora.org>
-Message-ID: <CAK7LNAQownrE0n8rAYGgUs9_byvok8W0V=c6gts_C=8Wvio86g@mail.gmail.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Mon, 29 Aug 2016 10:51:45 +0800
+Subject: [PATCH] drm/rockchip: vop: make vop register setting take effect
+In-Reply-To: <1472269178-16593-1-git-send-email-zyw@rock-chips.com>
+References: <1472269178-16593-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <57C3A341.9030302@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-
-2016-08-20 4:16 GMT+09:00 Stephen Boyd <sboyd@codeaurora.org>:
->>
->> >> +
->> >> +     parent = of_get_parent(dev->of_node); /* parent should be syscon node */
->> >> +     regmap = syscon_node_to_regmap(parent);
->> >> +     of_node_put(parent);
->> >
->> > devm_get_regmap(dev->parent) should work then? Why do we need to
->> > use OF APIs?
->>
->> "git grep devm_get_regmap" did not hit anything.
->>
->> Where is it defined?
->>
+On 2016?08?27? 11:39, Chris Zhong wrote:
+> The setting of vop registers need a reg_done writing to take effect.
+> In vop_enable the vop return to work by by restoring registers, but the
+> registers do not take effect immediately, it should a vop_cfg_done
+> after it. The same thing is needed by windows_disabled in
+> vop_crtc_disable.
 >
-> Sorry I meant dev_get_regmap().
->
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> ---
+>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 4 ++++
+>   1 file changed, 4 insertions(+)
+Thanks for your fix.
 
-I tried this, but it did not work.
+applied to my drm-fixes.
 
-To make dev_get_regmap() work,
-the parent device needs to call dev_regmap_init_mmio() beforehand.
-
-
-Since commit bdb0066df96e74a4002125467ebe459feff1ebef
-(mfd: syscon: Decouple syscon interface from platform devices),
-syscon_probe() is not called for platform devices,
-so that never happens.
-
-
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index efbc41a..a0bfcff 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -464,6 +464,8 @@ static int vop_enable(struct drm_crtc *crtc)
+>   	}
+>   
+>   	memcpy(vop->regs, vop->regsbak, vop->len);
+> +	vop_cfg_done(vop);
+> +
+>   	/*
+>   	 * At here, vop clock & iommu is enable, R/W vop regs would be safe.
+>   	 */
+> @@ -513,6 +515,8 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
+>   		spin_unlock(&vop->reg_lock);
+>   	}
+>   
+> +	vop_cfg_done(vop);
+> +
+>   	drm_crtc_vblank_off(crtc);
+>   
+>   	/*
 
 -- 
-Best Regards
-Masahiro Yamada
+?ark Yao
