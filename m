@@ -1,72 +1,39 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Mon, 29 Aug 2016 14:22:36 -0700
-Subject: [PATCH] i2c: rk3x: Restore clock settings at resume time
-Message-ID: <1472505756-8302-1-git-send-email-dianders@chromium.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 29 Aug 2016 14:39:21 -0700
+Subject: [Patch v4 9/9] arm64: Update device tree for Layerscape SoCs
+In-Reply-To: <20160829080530.GA25468@nazgul.tnic>
+References: <1470780000-16750-1-git-send-email-york.sun@nxp.com>
+ <20160812091354.GB333@nazgul.tnic> <20160829063448.GA32489@tiger>
+ <20160829080530.GA25468@nazgul.tnic>
+Message-ID: <CAOesGMjg3XNrVESr+fS-D5HkwVZEx+ng8TCUriRyohCu0NvJAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Depending on a number of factors including:
-- Which exact Rockchip SoC we're working with
-- How deep we suspend
-- Which i2c port we're on
+On Mon, Aug 29, 2016 at 1:05 AM, Borislav Petkov <bp@alien8.de> wrote:
+> On Mon, Aug 29, 2016 at 02:34:48PM +0800, Shawn Guo wrote:
+>> Is it mandatory to have DTS changes go with driver part altogether?
+>
+> Yes, because the EDAC driver needs them to even load properly.
+>
+>> Otherwise, I prefer to have them go through separate tree.
+>
+> Any particular reason why you prefer that?
+>
+> We've been doing this for other ARM EDAC drivers already and there were
+> no issues whatsoever.
 
-We might lose the state of the i2c registers at suspend time.
-Specifically we've found that on rk3399 the i2c ports that are not in
-the PMU power domain lose their state with the current suspend depth
-configured by ARM Tursted Firmware.
+DT changes need to go through arm-soc. It's how we've been operating
+for several years now.
 
-Note that there are very few actual i2c registers that aren't configured
-per transfer anyway so all we actually need to re-configure are the
-clock config registers.  We'll just add a call to rk3x_i2c_adapt_div()
-at resume time and be done with it.
+It can be a huge pain when DT patches get merged through driver trees
+and others are also modifying those files. Don't do it. You don't know
+if someone else out there is changing these files, that's why we have
+maintainers who own them and coordinate the changes.
 
-NOTE: On rk3399 on ports whose power was lost, I put printouts in at
-resume time.  I saw things like:
-  before: con=0x00010300, div=0x00060006
-  after:  con=0x00010200, div=0x00180025
 
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
----
-Tested on chromeos-4.4 kernel with backports.
+If there are special circumstances such that the DT contents has to go
+in with the same tree, then we can consider alternatives. But I can't
+remember having one of those situations for quite a while now.
 
-drivers/i2c/busses/i2c-rk3x.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-index 3b87afe82f63..0df5ad6bfa31 100644
---- a/drivers/i2c/busses/i2c-rk3x.c
-+++ b/drivers/i2c/busses/i2c-rk3x.c
-@@ -1111,6 +1111,15 @@ static int rk3x_i2c_xfer(struct i2c_adapter *adap,
- 	return ret < 0 ? ret : num;
- }
- 
-+static __maybe_unused int rk3x_i2c_resume(struct device *dev)
-+{
-+	struct rk3x_i2c *i2c = dev_get_drvdata(dev);
-+
-+	rk3x_i2c_adapt_div(i2c, clk_get_rate(i2c->clk));
-+
-+	return 0;
-+}
-+
- static u32 rk3x_i2c_func(struct i2c_adapter *adap)
- {
- 	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL | I2C_FUNC_PROTOCOL_MANGLING;
-@@ -1332,12 +1341,15 @@ static int rk3x_i2c_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const SIMPLE_DEV_PM_OPS(rk3x_i2c_pm_ops, NULL, rk3x_i2c_resume);
-+
- static struct platform_driver rk3x_i2c_driver = {
- 	.probe   = rk3x_i2c_probe,
- 	.remove  = rk3x_i2c_remove,
- 	.driver  = {
- 		.name  = "rk3x-i2c",
- 		.of_match_table = rk3x_i2c_match,
-+		.pm = &rk3x_i2c_pm_ops,
- 	},
- };
- 
--- 
-2.8.0.rc3.226.g39d4020
+-Olof
