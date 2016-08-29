@@ -1,82 +1,91 @@
-From: linux@mniewoehner.de (Michael =?ISO-8859-1?Q?Niew=F6hner?=)
-Date: Mon, 29 Aug 2016 13:05:30 +0200
-Subject: PROBLEM: DWC3 USB 3.0 not working on Odroid-XU4 with Exynos 5422
-In-Reply-To: <57C41582.1030604@linux.intel.com>
-References: <1472414695.3845.3.camel@mniewoehner.de>
- <87lgzgdof3.fsf@linux.intel.com> <57C41582.1030604@linux.intel.com>
-Message-ID: <1472468730.4925.3.camel@mniewoehner.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 29 Aug 2016 13:21:41 +0200
+Subject: [PATCH 1/2] sdhci-of-arasan: Add quirk and device tree parameter
+ to fake CD bit
+In-Reply-To: <20160826222945.GA6679@zach-desktop>
+References: <1472080984-17373-1-git-send-email-zach.brown@ni.com>
+ <20160825105640.GA5439@remoulade> <20160825171539.GA13571@zach-desktop>
+ <20160825180959.GA14705@remoulade> <20160825182621.GA14817@zach-desktop>
+ <20160825182852.GB15000@remoulade> <20160825204645.GA19450@zach-desktop>
+ <CAPDyKFpcFus1oysdRuK6vUALXXdy8_SsDZ3n8LkyM1AZLZY+QQ@mail.gmail.com>
+ <20160826222945.GA6679@zach-desktop>
+Message-ID: <CAPDyKFpGJ=0y3B5dsQZsaU41pzEoU5PuwWi9R-zXtKet7O87ZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathias,
-On Mo, 2016-08-29 at 13:59 +0300, Mathias Nyman wrote:
-> On 29.08.2016 10:28, Felipe Balbi wrote:
-> > 
-> > 
-> > Hi,
-> > 
-> > Michael Niew?hner <linux@mniewoehner.de> writes:
-> > > 
-> > > [1.] One line summary of the problem:
-> > > DWC3 USB 3.0 not working on Odroid-XU4 with Exynos 5422
-> > > 
-> > > [2.] Full description of the problem/report:
-> > > No usb 3.0 devices are being detected when attached while USB 2.0
-> > > devices work on the same port.
-> > > USB 3.0 works after applying patches [9.1] and [9.2], but seems
-> > > to be
-> > > buggy. The usb hub is redetected every time an usb device is
-> > > attached.
-> > 
-> > dwc3 is host, which means it's actually XHCI :-)
-> > 
-> > Adding Mathias
-> > 
-> > > 
-> > > dmesg:
-> > > [??192.287080] usb 3-1.2: USB disconnect, device number 7
-> > > [??210.370699] hub 3-1:1.0: hub_ext_port_status failed (err =
-> > > -71)
-> 
-> Looks like the hub GetPortStatus request fails with protocol error.
-> 
-> Reading xhci root hub port status is mostly just register reads and
-> writes. It
-> shouldn't include any actual transfers that could return -EPROTO
-> 
-> So this is not the root hub? but a external or integrated on your
-> board, right?
-> 
-> The protocol error -71 is returned at transfer errors or if device
-> stalled.
-> 
-> Adding more xhci debugging options could show something:
-> echo -n 'module xhci_hcd =p' >
-> /sys/kernel/debug/dynamic_debug/control
-> 
-> > 
-> > > 
-> > > [9.] Other notes, patches, fixes, workarounds:
-> > > [9.1] https://lkml.org/lkml/2014/4/28/234
-> > > [9.2] https://lkml.org/lkml/2015/2/2/259
-> 
-> The additional patches that makes things somehow work involve tuning
-> the PHY,
-> this is an area I'm not familiar with
-> 
-> -Mathias
-> 
+On 27 August 2016 at 00:29, Zach Brown <zach.brown@ni.com> wrote:
+> On Fri, Aug 26, 2016 at 09:42:38AM +0200, Ulf Hansson wrote:
+>> On 25 August 2016 at 22:46, Zach Brown <zach.brown@ni.com> wrote:
+>> > On Thu, Aug 25, 2016 at 07:28:55PM +0100, Mark Rutland wrote:
+>> >> On Thu, Aug 25, 2016 at 01:26:22PM -0500, Zach Brown wrote:
+>> >> > On Thu, Aug 25, 2016 at 07:10:00PM +0100, Mark Rutland wrote:
+>> >> > > On Thu, Aug 25, 2016 at 12:15:44PM -0500, Zach Brown wrote:
+>> >> > > > In cases where the card is non-removable then polling doesn't make sense.
+>> >> > >
+>> >> > > We have the non-removable property to describe that, so we can also look at that.
+>> >> > >
+>> >> > > > So it doesn't make sense to tie the test mode workaround into the broken-cd
+>> >> > > > property, even though I agree the nature of the defect fits under the notion
+>> >> > > > of the CD being broken.
+>> >> > >
+>> >> > > Maybe not solely on broken-cd, but I think that we dont necessarily need a new
+>> >> > > DT property. As above, broken-cd, non-removable, and the compatible string may
+>> >> > > together give the kernel enough information to choose the right thing to do.
+>> >> > >
+>> >> > > Thanks,
+>> >> > > Mark.
+>> >> >
+>> >> > I'm not sure if I understand your suggestion completely. Are you suggesting
+>> >> > setting both the broken-cd and non-removable properties? That would make sense,
+>> >> > but my understanding was that the two properities are not meant to co-exist. In
+>> >> > /Documentation/devicetree/bindings/mmc/mmc.txt it states that only one should
+>> >> > be supplied. Don't the two properties conflict with each other?
+>> >>
+>> >> They do for the cases that exist today, but given we're updating the document
+>> >> anyway, we could simply clarify the cases in which the two can sanely co-exist
+>> >> (e.g.  for this particular IP block).
+>>
+>> No, please!
+>>
+>> Depending on the SDHCI variant there is already some difference on how
+>> broken-cd is treated.
+>>
+>> Let's not add yet another, as I think it will be too complicated for
+>> people to understand the bindings.
+>>
+>
+> Shawn Lin pointed out that there might be instances of the arasan controller
+> that don't have the behavior the patch addresses. Having a new DT binding
+> specific for this case would avoid needing to maintain a list of controllers
+> that need the fix.
+>
 
+Okay!
 
-I'm sorry, I should have said that this is the dmesg output with the
-patches applied. Without them there is no output at all when I attach
-an usb 3.0 device.
+>> >>
+>> >> Thanks,
+>> >> Mark.
+>> >
+>> > That makes sense. I'll change the documentation for broken-cd and non-removable
+>> > in the IP specific document and change the driver accordingly.
+>>
+>> I rather have a new DT binding specific for this case.
+>>
+>> Perhaps there's a better name than "fake-cd". How about "force-cd", or
+>> if someone can come up with a better name.
+>>
+>> Kind regards
+>> Uffe
+>
+> I've been trying to come up with a better name. Here are a few ideas
+> cd-not-wired
+> needs-test-cd
+> fails-without-force-cd
 
-Michael
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 630 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160829/c0397bee/attachment.sig>
+Yeah, we could probably announce a naming competition for this. :-)
+
+Just select one of them and try to get an ack from Rob/Mark then I
+will pick up the change.
+
+Kind regards
+Uffe
