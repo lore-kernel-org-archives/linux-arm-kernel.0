@@ -1,20 +1,18 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 29 Aug 2016 22:29:12 +0800
-Subject: [PATCH v2] ARM: imx: use IS_ENABLED() instead of checking for
- built-in or module
-In-Reply-To: <1472465524-2374-1-git-send-email-javier@osg.samsung.com>
-References: <1472465524-2374-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <20160829142911.GT30790@tiger>
+Date: Mon, 29 Aug 2016 22:32:23 +0800
+Subject: [PATCH V2 1/2] ARM: imx: rename imx6q_set_int_mem_clk_lpm()
+ function
+In-Reply-To: <1472478597-6731-1-git-send-email-Anson.Huang@nxp.com>
+References: <1472478597-6731-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20160829143223.GU30790@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 12:12:04PM +0200, Javier Martinez Canillas wrote:
-> The IS_ENABLED() macro checks if a Kconfig symbol has been enabled either
-> built-in or as a module, use that macro instead of open coding the same.
+On Mon, Aug 29, 2016 at 09:49:56PM +0800, Anson Huang wrote:
+> Let's rename the function imx6q_set_int_mem_clk_lpm()
+> to imx6_set_int_mem_clk_lpm() since it's actually
+> common for all i.MX6 SoCs.
 > 
-> Using the macro makes the code more readable by helping abstract away some
-> of the Kconfig built-in and module enable details.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
-Applied, thanks.
+Applied both, thanks.
