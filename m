@@ -1,39 +1,48 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 29 Aug 2016 12:25:41 +0100
-Subject: [PATCH 0/8] SA11x0 DMA engine/IrDA updates
-In-Reply-To: <20160829110157.GE1041@n2100.armlinux.org.uk>
-References: <20160829100232.GC1041@n2100.armlinux.org.uk>
- <20160829102328.GA28796@n2100.armlinux.org.uk>
- <20160829110157.GE1041@n2100.armlinux.org.uk>
-Message-ID: <20160829112540.GF1041@n2100.armlinux.org.uk>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Mon, 29 Aug 2016 12:26:04 +0100
+Subject: [PATCH 1/8] dmaengine: sa11x0: add DMA filters
+In-Reply-To: <20160829112540.GF1041@n2100.armlinux.org.uk>
+References: <20160829112540.GF1041@n2100.armlinux.org.uk>
+Message-ID: <E1beKhY-0001Gn-PB@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following on from the previous series of patches, this updates the
-SA11x0 DMA engine code to use the modern method of lookup up DMA
-channels, and converts the SA11x0 IrDA driver to use this.  We then
-convert the SA11x0 IrDA driver to use gpiolib APIs to manipulate the
-transceiver FIR mode select, power and range signals.
+Add DMA filters for the sa11x0 DMA channels.  This will allow us to
+migrate away from directly using the DMA filter function in drivers.
 
-Obviously, as this is part of a larger series (and has dependencies
-on the previous series) this can not be applied to individual
-subsystem maintainer trees.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ drivers/dma/sa11x0-dma.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
- arch/arm/mach-sa1100/assabet.c            | 44 ++++-----------
- arch/arm/mach-sa1100/collie.c             | 42 ++++----------
- arch/arm/mach-sa1100/generic.c            |  4 +-
- arch/arm/mach-sa1100/generic.h            |  3 +-
- arch/arm/mach-sa1100/h3100.c              | 48 ++++------------
- arch/arm/mach-sa1100/h3600.c              | 48 ++++------------
- drivers/dma/sa11x0-dma.c                  | 32 ++++++-----
- drivers/net/irda/sa1100_ir.c              | 91 ++++++++++++++++++++-----------
- include/linux/platform_data/irda-sa11x0.h | 20 -------
- include/linux/sa11x0-dma.h                | 24 --------
- 10 files changed, 127 insertions(+), 229 deletions(-)
- delete mode 100644 include/linux/platform_data/irda-sa11x0.h
- delete mode 100644 include/linux/sa11x0-dma.h
-
+diff --git a/drivers/dma/sa11x0-dma.c b/drivers/dma/sa11x0-dma.c
+index 43db255050d2..565bc67fac7e 100644
+--- a/drivers/dma/sa11x0-dma.c
++++ b/drivers/dma/sa11x0-dma.c
+@@ -823,6 +823,13 @@ static const struct sa11x0_dma_channel_desc chan_desc[] = {
+ 	CD(Ser4SSPRc, DDAR_RW),
+ };
+ 
++static const struct dma_slave_map sa11x0_dma_map[] = {
++	{ "sa11x0-ir", "tx", "Ser2ICPTr" },
++	{ "sa11x0-ir", "rx", "Ser2ICPRc" },
++	{ "sa11x0-ssp", "tx", "Ser4SSPTr" },
++	{ "sa11x0-ssp", "rx", "Ser4SSPRc" },
++};
++
+ static int sa11x0_dma_init_dmadev(struct dma_device *dmadev,
+ 	struct device *dev)
+ {
+@@ -909,6 +916,10 @@ static int sa11x0_dma_probe(struct platform_device *pdev)
+ 	spin_lock_init(&d->lock);
+ 	INIT_LIST_HEAD(&d->chan_pending);
+ 
++	d->slave.filter.fn = sa11x0_dma_filter_fn;
++	d->slave.filter.mapcnt = ARRAY_SIZE(sa11x0_dma_map);
++	d->slave.filter.map = sa11x0_dma_map;
++
+ 	d->base = ioremap(res->start, resource_size(res));
+ 	if (!d->base) {
+ 		ret = -ENOMEM;
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.1.0
