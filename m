@@ -1,47 +1,38 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Mon, 29 Aug 2016 17:51:14 -0500
-Subject: [PATCH 1/4] soc: qcom: add an EBI2 device tree bindings
-In-Reply-To: <CACRpkdbZdRc+75YKTGLSogK6zqnR9crks3-YYmMFOLsxHbk2dQ@mail.gmail.com>
-References: <1470691445-27571-1-git-send-email-linus.walleij@linaro.org>
- <2988918.zNxvaGl6en@wuerfel>
- <CACRpkdZ=HU6j3=Ye4dm=tFU=KmG54bq06KDfxPViWUouOA=jOA@mail.gmail.com>
- <201608291351.12915.arnd@arndb.de>
- <CAL_JsqJPckLGDSiqnspvtP_=t+yZ+0vO-8MxGB6x7poOZiyK+Q@mail.gmail.com>
- <CACRpkdaRPa=tCH2FQUOUzp0Q2YvdLNA7R2y3w==sH40DwJ2vGA@mail.gmail.com>
- <CAL_JsqJSO4Bco_BJqYFVEQ73_-nm_QeHy=HF3u6bNhxsikOAGw@mail.gmail.com>
- <CACRpkdbZdRc+75YKTGLSogK6zqnR9crks3-YYmMFOLsxHbk2dQ@mail.gmail.com>
-Message-ID: <CAL_JsqLTHTt9ZMLLxhK4bFCYjF_aX0cYDc0nueGS8ByDFzCsVw@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 29 Aug 2016 23:58:32 +0100
+Subject: [PATCH 06/33] ARM: pxa/lubbock: add GPIO driver for LUB_MISC_WR
+ register
+In-Reply-To: <87a8fve4bj.fsf@belgarion.home>
+References: <20160829102328.GA28796@n2100.armlinux.org.uk>
+ <E1beJk4-0000mH-4P@rmk-PC.armlinux.org.uk>
+ <87a8fve4bj.fsf@belgarion.home>
+Message-ID: <20160829225832.GH1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 12:21 PM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Mon, Aug 29, 2016 at 4:06 PM, Rob Herring <robh+dt@kernel.org> wrote:
->> [Me]
->>> That is very close to how
->>> Documentation/devicetree/bindings/bus/imx-weim.txt
->>> drivers/bus/imx-weim.c
->>> does things, just with the additional property arrays.
->>
->> Maybe so, but I'm trying to bring some consistency here, so I'd
->> suggest looking at newer ones like atmel IIRC.
->
-> The Uniphier bindings also look like this and it's the most recent
-> bus driver ...
-> Documentation/devicetree/bindings/bus/uniphier-system-bus.txt
->
-> But OK it's probably best to follow an example so I get it the way
-> you prefer. Which binding and driver is that?
->
-> There's no Atmel stuff in Documentation/devicetree/bindings/bus/
-> nor drivers/bus from what I can tell, so just point out what you're
-> referring to here and I'll do my best to follow that example.
+On Mon, Aug 29, 2016 at 09:57:20PM +0200, Robert Jarzmik wrote:
+> Russell King <rmk+kernel@armlinux.org.uk> writes:
+> If gpio_reg_init() failed (and I know, the probability of a lack of memory at
+> that stage of the kernel boot is ridiculous), this will end up as an NULL
+> pointer dereference if either IRDA or PCMCIA is used.
+> 
+> If it's expected, then the the pr_err() below would deserve a pr_crit(). I would
+> as well take an option on a "panic()" if lubbock_misc_wr_gc allocation fails. If
+> not, maybe a not-NULL test on lubbock_misc_wr_gc is in order, even if that would
+> be "hidding under the carpet" and rather difficult to debug later.
+> 
+> Apart this detail point, it's good for me.
 
-Argg, that's because it is in a different spot:
+I'd prefer to kill the function entirely.  The PCMCIA user of it goes
+later in the series, and all that's left are the three users in lubbock.c,
+those being IrDA and ads7846.  I'd like to see pxaficp go the same way
+as sa1100_ir - converting to using gpiolib gpiod* APIs to manage the
+FIR mode select GPIO itself internally.
 
-Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+That leaves ads7846_cs(), and I'd be surprised if SPI didn't already of
+wiring GPIOs up as chip selects.
 
-Time to clean things up... bindings/bus is supposed to be internal,
-on-chip buses.
-
-Rob
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
