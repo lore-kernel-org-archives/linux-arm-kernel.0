@@ -1,99 +1,94 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 29 Aug 2016 11:26:18 +0100
-Subject: [PATCH 26/33] ARM: sa1100/shannon: switch shannon PCMCIA to use gpiod
- APIs
+Date: Mon, 29 Aug 2016 11:26:23 +0100
+Subject: [PATCH 27/33] ARM: sa1100/simpad: switch simpad CF to use gpiod APIs
 In-Reply-To: <20160829102328.GA28796@n2100.armlinux.org.uk>
 References: <20160829102328.GA28796@n2100.armlinux.org.uk>
-Message-ID: <E1beJli-0000oF-Q0@rmk-PC.armlinux.org.uk>
+Message-ID: <E1beJln-0000oL-Tv@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch shannon's PCMCIA implementation to use the gpiod APIs.
+Switch simpad's CF implementation to use the gpiod APIs.  The inverted
+detection is handled using gpiolib's native inversion abilities.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/mach-sa1100/shannon.c  | 13 +++++++++++++
- drivers/pcmcia/sa1100_shannon.c | 25 ++++++-------------------
- 2 files changed, 19 insertions(+), 19 deletions(-)
+ arch/arm/mach-sa1100/simpad.c  | 12 ++++++++++++
+ drivers/pcmcia/sa1100_simpad.c | 12 +++---------
+ 2 files changed, 15 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/shannon.c b/arch/arm/mach-sa1100/shannon.c
-index c8866bce7386..f2cc896e582f 100644
---- a/arch/arm/mach-sa1100/shannon.c
-+++ b/arch/arm/mach-sa1100/shannon.c
-@@ -4,6 +4,7 @@
+diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
+index bb3ca9c763de..5301a3036212 100644
+--- a/arch/arm/mach-sa1100/simpad.c
++++ b/arch/arm/mach-sa1100/simpad.c
+@@ -3,6 +3,7 @@
+  */
  
- #include <linux/init.h>
- #include <linux/device.h>
+ #include <linux/module.h>
 +#include <linux/gpio/machine.h>
+ #include <linux/init.h>
  #include <linux/kernel.h>
- #include <linux/platform_data/sa11x0-serial.h>
  #include <linux/tty.h>
-@@ -71,8 +72,20 @@ static struct sa1100fb_mach_info shannon_lcd_info = {
- 	.lccr3		= LCCR3_ACBsDiv(512),
+@@ -354,12 +355,23 @@ static struct platform_device *devices[] __initdata = {
+ 	&simpad_i2c,
  };
  
-+static struct gpiod_lookup_table shannon_pcmcia_gpio_table = {
++/* Compact Flash */
++static struct gpiod_lookup_table simpad_cf_gpio_table = {
 +	.dev_id = "sa11x0-pcmcia",
 +	.table = {
-+		GPIO_LOOKUP("gpio", 24, "pcmcia0-detect", GPIO_ACTIVE_LOW),
-+		GPIO_LOOKUP("gpio", 25, "pcmcia1-detect", GPIO_ACTIVE_LOW),
-+		GPIO_LOOKUP("gpio", 26, "pcmcia0-ready", GPIO_ACTIVE_HIGH),
-+		GPIO_LOOKUP("gpio", 27, "pcmcia1-ready", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("gpio", GPIO_CF_IRQ, "cf-ready", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("gpio", GPIO_CF_CD, "cf-detect", GPIO_ACTIVE_HIGH),
 +		{ },
 +	},
 +};
-+
- static void __init shannon_init(void)
- {
-+	gpiod_add_lookup_table(&shannon_pcmcia_gpio_table);
- 	sa11x0_ppc_configure_mcp();
- 	sa11x0_register_lcd(&shannon_lcd_info);
- 	sa11x0_register_mtd(&shannon_flash_data, &shannon_flash_resource, 1);
-diff --git a/drivers/pcmcia/sa1100_shannon.c b/drivers/pcmcia/sa1100_shannon.c
-index b07a2dc3296e..51985c8ba830 100644
---- a/drivers/pcmcia/sa1100_shannon.c
-+++ b/drivers/pcmcia/sa1100_shannon.c
-@@ -8,35 +8,22 @@
- #include <linux/kernel.h>
- #include <linux/device.h>
- #include <linux/init.h>
--#include <linux/io.h>
  
--#include <mach/hardware.h>
+ 
+ static int __init simpad_init(void)
+ {
+ 	int ret;
+ 
++	gpiod_add_lookup_table(&simpad_cf_gpio_table);
++
+ 	spin_lock_init(&cs3_lock);
+ 
+ 	cs3_gpio.label = "simpad_cs3";
+diff --git a/drivers/pcmcia/sa1100_simpad.c b/drivers/pcmcia/sa1100_simpad.c
+index 73fd37968b6a..e14b2f5a18bb 100644
+--- a/drivers/pcmcia/sa1100_simpad.c
++++ b/drivers/pcmcia/sa1100_simpad.c
+@@ -11,7 +11,6 @@
+ 
+ #include <mach/hardware.h>
  #include <asm/mach-types.h>
--#include <mach/shannon.h>
 -#include <asm/irq.h>
-+
+ #include <mach/simpad.h>
  #include "sa1100_generic.h"
+  
+@@ -20,12 +19,10 @@ static int simpad_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
  
- static int shannon_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
- {
--	/* All those are inputs */
--	GAFR &= ~(GPIO_GPIO(SHANNON_GPIO_EJECT_0) |
--		  GPIO_GPIO(SHANNON_GPIO_EJECT_1) |
--		  GPIO_GPIO(SHANNON_GPIO_RDY_0) |
--		  GPIO_GPIO(SHANNON_GPIO_RDY_1));
--
- 	if (skt->nr == 0) {
--		skt->stat[SOC_STAT_CD].gpio = SHANNON_GPIO_EJECT_0;
--		skt->stat[SOC_STAT_CD].name = "PCMCIA_CD_0";
--		skt->stat[SOC_STAT_RDY].gpio = SHANNON_GPIO_RDY_0;
--		skt->stat[SOC_STAT_RDY].name = "PCMCIA_RDY_0";
-+		skt->stat[SOC_STAT_CD].name = "pcmcia0-detect";
-+		skt->stat[SOC_STAT_RDY].name = "pcmcia0-ready";
- 	} else {
--		skt->stat[SOC_STAT_CD].gpio = SHANNON_GPIO_EJECT_1;
--		skt->stat[SOC_STAT_CD].name = "PCMCIA_CD_1";
--		skt->stat[SOC_STAT_RDY].gpio = SHANNON_GPIO_RDY_1;
--		skt->stat[SOC_STAT_RDY].name = "PCMCIA_RDY_1";
-+		skt->stat[SOC_STAT_CD].name = "pcmcia1-detect";
-+		skt->stat[SOC_STAT_RDY].name = "pcmcia1-ready";
- 	}
+ 	simpad_clear_cs3_bit(VCC_3V_EN|VCC_5V_EN|EN0|EN1);
+ 
+-	skt->stat[SOC_STAT_CD].gpio = GPIO_CF_CD;
+-	skt->stat[SOC_STAT_CD].name = "CF_CD";
+-	skt->stat[SOC_STAT_RDY].gpio = GPIO_CF_IRQ;
+-	skt->stat[SOC_STAT_RDY].name = "CF_RDY";
++	skt->stat[SOC_STAT_CD].name = "cf-detect";
++	skt->stat[SOC_STAT_RDY].name = "cf-ready";
  
 -	return 0;
 +	return soc_pcmcia_request_gpiods(skt);
  }
  
- static void
+ static void simpad_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
+@@ -41,9 +38,6 @@ simpad_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
+ {
+ 	long cs3reg = simpad_get_cs3_ro();
+ 
+-	/* the detect signal is inverted - fix that up here */
+-	state->detect = !state->detect;
+-
+ 	state->bvd1 = 1; /* Might be cs3reg & PCMCIA_BVD1 */
+ 	state->bvd2 = 1; /* Might be cs3reg & PCMCIA_BVD2 */
+ 
 -- 
 2.1.0
