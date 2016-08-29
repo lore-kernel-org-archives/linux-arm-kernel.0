@@ -1,92 +1,69 @@
-From: kbeldan@baylibre.com (Karl Beldan)
-Date: Mon, 29 Aug 2016 07:49:58 +0000
-Subject: [PATCH 3/4] ARM: dts: da850-lcdk: Add NAND to DT
-In-Reply-To: <20160816232029.GA31105@gobelin>
-References: <20160809171518.22690-1-kbeldan@baylibre.com>
- <20160809171518.22690-4-kbeldan@baylibre.com>
- <57AAE67D.4000404@ti.com> <20160810090417.GE16481@gobelin>
- <57AAF472.7000804@ti.com> <20160810111944.GA31616@gobelin>
- <57AB15B3.1050907@ti.com> <20160816232029.GA31105@gobelin>
-Message-ID: <20160829074958.GA30462@gobelin>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 29 Aug 2016 09:49:13 +0200
+Subject: [RFC PATCH v2 0/7] AC97 device/driver model revamp
+In-Reply-To: <20160824113953.GF22076@sirena.org.uk> (Mark Brown's message of
+ "Wed, 24 Aug 2016 12:39:53 +0100")
+References: <1464380819-19075-1-git-send-email-robert.jarzmik@free.fr>
+ <87twebphh4.fsf@belgarion.home> <20160824113953.GF22076@sirena.org.uk>
+Message-ID: <87mvjwdngm.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 11:20:29PM +0000, Karl Beldan wrote:
-> On Wed, Aug 10, 2016 at 05:23:23PM +0530, Sekhar Nori wrote:
-> > On Wednesday 10 August 2016 04:49 PM, Karl Beldan wrote:
-> > > On Wed, Aug 10, 2016 at 03:01:30PM +0530, Sekhar Nori wrote:
-> > >> On Wednesday 10 August 2016 02:34 PM, Karl Beldan wrote:
-> > >>> On Wed, Aug 10, 2016 at 02:01:57PM +0530, Sekhar Nori wrote:
-> > >>>> On Tuesday 09 August 2016 10:45 PM, Karl Beldan wrote:
-> > >>>>> This adds DT support for the NAND connected to the SoC AEMIF.
-> > >>>>> The parameters (timings, ecc) are the same as what the board ships with
-> > >>>>> (default AEMIF timings, 1bit ECC) and improvements will be handled in
-> > >>>>> due course.
-> > >>>>
-> > >>>> I disagree that we need to be compatible to the software that ships with
-> > >>>> the board. Thats software was last updated 3 years ago. Instead I would
-> > >>>> concern with what the hardware supports. So, if the hardware can support
-> > >>>> 4-bit ECC, I would use that.
-> > >>>>
-> > >>> I am not saying we _need_ to be compatible.
-> > >>
-> > >> Alright then, please drop references to what software the board ships
-> > >> with in the commit message and in the patch itself.
-> > >>
-> > > 
-> > > I hadn't seen this comment before sending v2.
-> > > 
-> > >>>
-> > >>>> If driver is broken for 4-bit ECC, please fix that up first.
-> > >>>>
-> > >>> Since this issue is completely separate from my DT improvements
-> > >>> I'll stick to resubmitting the series, applying my LCDK changes to the
-> > >>> EVM too, besides you'll be able to compare the behavior without ECC
-> > >>> discrepancies.
-> > >>> I took note that you are likely to not apply without the ECC fix.
-> > >>
-> > >> Yeah, I would not like to apply with 1-bit ECC now and then change to
-> > >> 4-bit ECC soon after.
-> > >>
-> > > 
-> > > Both mityomapl138 from mainline and hawkboard from TI's BSP release
-> > > include the comment:
-> > > - "4 bit mode is not supported with 16 bit NAND"
-> > > It is not clear whether they imply that the HW has issues or if it's SW
-> > 
-> > At least the TRM says "The EMIFA supports 4-bit ECC on 8-bit/16-bit NAND
-> > Flash.". And then the TRM goes on to describe how 4-bit ECC is supposed
-> > to work for 16-bit NAND. I could not find any errata related to this in
-> > the errata document.
-> > 
-> > > only, but 4-bits ECC is a different matter and I hope you'll integrate
-> > > the current changes prior to tackling it.
-> > 
-> > Lets apply everything together. This is a new feature, not a bug fix.
-> > There is no need to rush it. Also, for the NAND part on LCDK, per the
-> > micron datasheet, minimum of 4-bit ECC is needed.
-> > 
-> 
-> FYI my patches are related to a small contracting work spanning 20 days
-> amounting to 15 real days (from scratch).  ATM my SoW not only doesn't
-> include this 'new feature' but excludes it. So I cannot promise I'll
-> look into it, though it shouldn't be too big a thing.
+Mark Brown <broonie@kernel.org> writes:
 
-I took a look at it yesterday, cf. https://lkml.org/lkml/2016/8/29/71
- 
-Karl
+> On Tue, Aug 23, 2016 at 06:39:35PM +0200, Robert Jarzmik wrote:
+>
+>> In the old ac97 bus, the match function was always returning "true", and the
+>> driver did probe. With this new implementation, the ac97 is discovered and
+>> sound/soc/codecs/wm9713.c#wm9713_ac97_probe() is called. I don't export
+>> ac97_bus_type (nor want to do it), and only _one_ device is created upon
+>> discovery, while the wm97xx-core.c would benefic a second ac97 device.
+>
+>> I'm wondering how to work around this :
+>>  - either I add a wm97xx-ts ac97 device in wm9713_ac97_probe()
+>>  - or I add a platform device in wm9713_ac97_probe() and add a new
+>>    platform_driver in wm97xx-core ...
+>>  - or something smarter
+>
+> That device really should be a MFD.
+>
+>> What's behind this question is : should I keep to my initial solution of 1 ac97
+>> device discovered is bound on the ac97 to _at most_ 1 ac97 driver, or is there a
+>> know smart way to have several drivers for one device (that sounds a bit heretic
+>> regarding my understanding of the device/driver model but who knows ...) ?
+>
+> MFDs are how we do multiple drivers per device.
 
-> It seemed clear that you wanted to squeeze it with the rest, but after
-> setting things up for the EVM and observing mainline was broken with
-> 4bits ECC on an 8bits NAND I thought it was impossible nobody hadn't
-> noticed it .. so I dug in the mail archive, only to find there had
-> already been some alerts raised some months ago on the list, so I picked
-> up my next item.
-> 
-> > I will take a look at other patches in this series.
-> > 
-> 
-> Ok, thanks.
-> 
-> Rgds, 
-> Karl
+Ok Mark, I took the bait and implemented it in
+https://github.com/rjarzmik/linux/commits/work/ac97, and more specifically in :
+  https://github.com/rjarzmik/linux/commit/4689ab3085b6e3959c873b4aa6dc4bc94ca5fd5c
+  https://github.com/rjarzmik/linux/commit/152d57d535070871e401fab512b9babdcda9a545
+  https://github.com/rjarzmik/linux/commit/903569ff077d1ea992dfc69d2f3014ce0d10fa99
+
+I didn't send the patches for review yet as I face another kind of problem.
+I converted wm9713 to an mfd device :
+ - with a core in drivers/mfd
+ - a codec in drivers/sound/soc/codec
+ - a touchscreen in drivers/input/touchscreen
+ - a battery in drivers/power/
+
+The remaining problem is the lack of possibility to "customize" through
+platform_data, which impact wm97xx_battery.c.
+The reason of this is that :
+ - the core in driver/mfd is "autoprobed" by the ac97 discovery mecanism
+   As such, it has no platform data
+ - the battery in drivers/power/wm97xx_battery.c will have its device spawned
+   from the core and any platform data from it.
+
+As you probably know wm97xx_battery needs platform data to be properly set up,
+and unless I add a special "glue" in the ac97 device to provide this data I see
+no other option. Would you think of something better ?
+
+Actually the wm97xx could be even further improved by "offering" an ADC API the
+battery driver could be bound to and consume just as regulators are, but that's
+probably not worth it for only one old driver.
+
+I'll post the serie within this week.
+
+-- 
+Robert
