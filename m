@@ -1,51 +1,53 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 28 Aug 2016 22:13:23 -0700
-Subject: [PATCH 2/3] ARM: dts: imx7-colibri: add basic supply regulators
-In-Reply-To: <20160829051324.2276-1-stefan@agner.ch>
-References: <20160829051324.2276-1-stefan@agner.ch>
-Message-ID: <20160829051324.2276-2-stefan@agner.ch>
+Date: Sun, 28 Aug 2016 22:13:22 -0700
+Subject: [PATCH 1/3] ARM: dts: imx7-colibri: move SD-card to module level
+Message-ID: <20160829051324.2276-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Colibri modules need to be powered using the power pins 3V3 and
-AVDD_AUDIO. Add fixed regulators which represent this power rails.
-Potentially, those power rails could be switched on a carrier
-board. A carrier board device tree could add a own regulator with
-a GPIO, and reference that regulator in a vin-supply property of
-those new module level system regulators. This also synchronize
-the name of the +3.3V regulator with the one used in the Colibri
-VF50/VF61 device tree.
+Move SD-card definition to module level. While at it, also disable
+write-protect since the Colibri standard does not define a pin for
+SD-Card write-protection.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/imx7-colibri.dtsi | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi | 4 ----
+ arch/arm/boot/dts/imx7-colibri.dtsi         | 8 ++++++++
+ 2 files changed, 8 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi b/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
+index 1545661..373ee19 100644
+--- a/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
++++ b/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
+@@ -138,10 +138,6 @@
+ };
+ 
+ &usdhc1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_usdhc1 &pinctrl_cd_usdhc1>;
+-	no-1-8-v;
+-	cd-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
+ 	keep-power-in-suspend;
+ 	wakeup-source;
+ 	status = "okay";
 diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi b/arch/arm/boot/dts/imx7-colibri.dtsi
-index 044b83e..06fb567 100644
+index 0a9d3a8..044b83e 100644
 --- a/arch/arm/boot/dts/imx7-colibri.dtsi
 +++ b/arch/arm/boot/dts/imx7-colibri.dtsi
-@@ -46,12 +46,18 @@
- 		pwms = <&pwm1 0 5000000>;
- 	};
+@@ -251,6 +251,14 @@
+ 	dr_mode = "host";
+ };
  
--	reg_3p3v: regulator-3p3v {
-+	reg_module_3v3: regulator-module-3v3 {
- 		compatible = "regulator-fixed";
--		regulator-name = "3P3V";
-+		regulator-name = "+V3.3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc1 &pinctrl_cd_usdhc1>;
++	no-1-8-v;
++	cd-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
++	disable-wp;
++};
 +
-+	reg_module_3v3_avdd: regulator-module-3v3-avdd {
-+		compatible = "regulator-fixed";
-+		regulator-name = "+V3.3_AVDD_AUDIO";
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
--		regulator-always-on;
- 	};
- 
- 	reg_vref_1v8: regulator-vref-1v8 {
+ &iomuxc {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_gpio1 &pinctrl_gpio2 &pinctrl_gpio3 &pinctrl_gpio4>;
 -- 
 2.9.0
