@@ -1,77 +1,92 @@
-From: jsarha@ti.com (Jyri Sarha)
-Date: Mon, 29 Aug 2016 10:41:26 +0300
-Subject: [PATCH RFC] drm/tilcdc: Write DMA base and ceiling address with
- single instruction
-Message-ID: <1472456486-22919-1-git-send-email-jsarha@ti.com>
+From: kbeldan@baylibre.com (Karl Beldan)
+Date: Mon, 29 Aug 2016 07:49:58 +0000
+Subject: [PATCH 3/4] ARM: dts: da850-lcdk: Add NAND to DT
+In-Reply-To: <20160816232029.GA31105@gobelin>
+References: <20160809171518.22690-1-kbeldan@baylibre.com>
+ <20160809171518.22690-4-kbeldan@baylibre.com>
+ <57AAE67D.4000404@ti.com> <20160810090417.GE16481@gobelin>
+ <57AAF472.7000804@ti.com> <20160810111944.GA31616@gobelin>
+ <57AB15B3.1050907@ti.com> <20160816232029.GA31105@gobelin>
+Message-ID: <20160829074958.GA30462@gobelin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Write DMA base and ceiling address with a single instruction, if
-available. This should make it more unlikely that LCDC would fetch the
-DMA addresses in the middle of an update. Having bad combination of
-addresses in dma base and ceiling (e.g base > ceiling) can cause
-unpredictaple behavior in LCDC.
+On Tue, Aug 16, 2016 at 11:20:29PM +0000, Karl Beldan wrote:
+> On Wed, Aug 10, 2016 at 05:23:23PM +0530, Sekhar Nori wrote:
+> > On Wednesday 10 August 2016 04:49 PM, Karl Beldan wrote:
+> > > On Wed, Aug 10, 2016 at 03:01:30PM +0530, Sekhar Nori wrote:
+> > >> On Wednesday 10 August 2016 02:34 PM, Karl Beldan wrote:
+> > >>> On Wed, Aug 10, 2016 at 02:01:57PM +0530, Sekhar Nori wrote:
+> > >>>> On Tuesday 09 August 2016 10:45 PM, Karl Beldan wrote:
+> > >>>>> This adds DT support for the NAND connected to the SoC AEMIF.
+> > >>>>> The parameters (timings, ecc) are the same as what the board ships with
+> > >>>>> (default AEMIF timings, 1bit ECC) and improvements will be handled in
+> > >>>>> due course.
+> > >>>>
+> > >>>> I disagree that we need to be compatible to the software that ships with
+> > >>>> the board. Thats software was last updated 3 years ago. Instead I would
+> > >>>> concern with what the hardware supports. So, if the hardware can support
+> > >>>> 4-bit ECC, I would use that.
+> > >>>>
+> > >>> I am not saying we _need_ to be compatible.
+> > >>
+> > >> Alright then, please drop references to what software the board ships
+> > >> with in the commit message and in the patch itself.
+> > >>
+> > > 
+> > > I hadn't seen this comment before sending v2.
+> > > 
+> > >>>
+> > >>>> If driver is broken for 4-bit ECC, please fix that up first.
+> > >>>>
+> > >>> Since this issue is completely separate from my DT improvements
+> > >>> I'll stick to resubmitting the series, applying my LCDK changes to the
+> > >>> EVM too, besides you'll be able to compare the behavior without ECC
+> > >>> discrepancies.
+> > >>> I took note that you are likely to not apply without the ECC fix.
+> > >>
+> > >> Yeah, I would not like to apply with 1-bit ECC now and then change to
+> > >> 4-bit ECC soon after.
+> > >>
+> > > 
+> > > Both mityomapl138 from mainline and hawkboard from TI's BSP release
+> > > include the comment:
+> > > - "4 bit mode is not supported with 16 bit NAND"
+> > > It is not clear whether they imply that the HW has issues or if it's SW
+> > 
+> > At least the TRM says "The EMIFA supports 4-bit ECC on 8-bit/16-bit NAND
+> > Flash.". And then the TRM goes on to describe how 4-bit ECC is supposed
+> > to work for 16-bit NAND. I could not find any errata related to this in
+> > the errata document.
+> > 
+> > > only, but 4-bits ECC is a different matter and I hope you'll integrate
+> > > the current changes prior to tackling it.
+> > 
+> > Lets apply everything together. This is a new feature, not a bug fix.
+> > There is no need to rush it. Also, for the NAND part on LCDK, per the
+> > micron datasheet, minimum of 4-bit ECC is needed.
+> > 
+> 
+> FYI my patches are related to a small contracting work spanning 20 days
+> amounting to 15 real days (from scratch).  ATM my SoW not only doesn't
+> include this 'new feature' but excludes it. So I cannot promise I'll
+> look into it, though it shouldn't be too big a thing.
 
-Signed-off-by: Jyri Sarha <jsarha@ti.com>
----
-I am not sure what would be the least ugly way of utilizing ARM7 strd
-instruction. Using inline assebler would be the most straight forward
-way, but this looks less ugly to me.
+I took a look at it yesterday, cf. https://lkml.org/lkml/2016/8/29/71
+ 
+Karl
 
- drivers/gpu/drm/tilcdc/tilcdc_crtc.c |  9 +++++++--
- drivers/gpu/drm/tilcdc/tilcdc_regs.h | 13 +++++++++++++
- 2 files changed, 20 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_crtc.c b/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
-index 6350f2a..41ec5b3 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
-@@ -70,6 +70,7 @@ static void set_scanout(struct drm_crtc *crtc, struct drm_framebuffer *fb)
- 	struct drm_gem_cma_object *gem;
- 	unsigned int depth, bpp;
- 	dma_addr_t start, end;
-+	u64 dma_base_and_ceiling;
- 
- 	drm_fb_get_bpp_depth(fb->pixel_format, &depth, &bpp);
- 	gem = drm_fb_cma_get_gem_obj(fb, 0);
-@@ -80,8 +81,12 @@ static void set_scanout(struct drm_crtc *crtc, struct drm_framebuffer *fb)
- 
- 	end = start + (crtc->mode.vdisplay * fb->pitches[0]);
- 
--	tilcdc_write(dev, LCDC_DMA_FB_BASE_ADDR_0_REG, start);
--	tilcdc_write(dev, LCDC_DMA_FB_CEILING_ADDR_0_REG, end - 1);
-+	/* Write DMA base and ceiling address with a single insruction,
-+	 * if available. This should make it more unlikely that LCDC would
-+	 * fetch the DMA addresses in the middle of an update.
-+	 */
-+	dma_base_and_ceiling = (u64)(end - 1) << 32 | start;
-+	tilcdc_write64(dev, LCDC_DMA_FB_BASE_ADDR_0_REG, dma_base_and_ceiling);
- 
- 	if (tilcdc_crtc->curr_fb)
- 		drm_flip_work_queue(&tilcdc_crtc->unref_work,
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_regs.h b/drivers/gpu/drm/tilcdc/tilcdc_regs.h
-index 1bf5e25..ea934c9 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_regs.h
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_regs.h
-@@ -119,6 +119,19 @@ static inline void tilcdc_write(struct drm_device *dev, u32 reg, u32 data)
- 	iowrite32(data, priv->mmio + reg);
- }
- 
-+static inline void tilcdc_write64(struct drm_device *dev, u32 reg, u64 data)
-+{
-+	struct tilcdc_drm_private *priv = dev->dev_private;
-+	volatile void __iomem *addr = priv->mmio + reg;
-+
-+#ifdef iowrite64
-+	iowrite64(data, addr);
-+#else
-+	/* This compiles to strd (=64-bit write) on ARM7 */
-+	*(volatile u64 __force *)addr = data;
-+#endif
-+}
-+
- static inline u32 tilcdc_read(struct drm_device *dev, u32 reg)
- {
- 	struct tilcdc_drm_private *priv = dev->dev_private;
--- 
-1.9.1
+> It seemed clear that you wanted to squeeze it with the rest, but after
+> setting things up for the EVM and observing mainline was broken with
+> 4bits ECC on an 8bits NAND I thought it was impossible nobody hadn't
+> noticed it .. so I dug in the mail archive, only to find there had
+> already been some alerts raised some months ago on the list, so I picked
+> up my next item.
+> 
+> > I will take a look at other patches in this series.
+> > 
+> 
+> Ok, thanks.
+> 
+> Rgds, 
+> Karl
