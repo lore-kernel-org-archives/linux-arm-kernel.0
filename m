@@ -1,36 +1,20 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Mon, 29 Aug 2016 14:56:37 +0000
-Subject: [PATCH] ARM: dts: rskrza1: initial device tree
-In-Reply-To: <CAMuHMdXmJPcgDcLkeVuF5YVfpwxRkJpACHGwtbNab18gK-nBbQ@mail.gmail.com>
-References: <20160825153115.15291-1-chris.brandt@renesas.com>
- <CAMuHMdXmJPcgDcLkeVuF5YVfpwxRkJpACHGwtbNab18gK-nBbQ@mail.gmail.com>
-Message-ID: <SG2PR06MB116594771BED3BAF944ECE298AE10@SG2PR06MB1165.apcprd06.prod.outlook.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 29 Aug 2016 16:57:23 +0200
+Subject: [PATCH 1/2] bus: mvebu-mbus: Provide stub function for
+ mvebu_mbus_get_io_win_info()
+In-Reply-To: <87bn0bhdwh.fsf@free-electrons.com>
+References: <20160829110456.12206-1-sr@denx.de>
+ <20160829125753.GC12465@lunn.ch>
+ <87bn0bhdwh.fsf@free-electrons.com>
+Message-ID: <20160829145723.GB17231@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+> Actually arm64 mvebu SoC such as the Armada 3700 do not have mbus bus
+> but can still reuse the same driver than the other mvebu SoC. So in
+> this case I would prefer that the function return an error.
 
-On Aug 29, Geert Uytterhoeven wrote:
+O.K. An error would be good, assuming the code actually catches it.
+I think the code change in patch [2/2] did not catch the error.
 
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/r7s72100-rskrza1.dts
->
-> > +       compatible = "renesas,rskrza1", "renesas,r7s72100";
->
-> scripts/checkpatch.pl says:
->
->    DT compatible string "renesas,rskrza1" appears un-documented -- check ./Documentation/devicetree/bindings/
->
-> Please send a follow-up patch to add this compatible value to Documentation/devicetree/bindings/arm/shmobile.txt.
->
-> > +&scif2 {
-> > +       status = "okay";
-> > +};
-> > +
->
-> Please drop the trailing empty line.
-
-Thank you for the review.
-I will modify and resend.
-
-Chris
+  Andrew
