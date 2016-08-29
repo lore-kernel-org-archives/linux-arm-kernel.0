@@ -1,65 +1,52 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 29 Aug 2016 11:25:12 +0100
-Subject: [PATCH 13/33] pcmcia: soc_common: restore previous socket state on
- error
-In-Reply-To: <20160829102328.GA28796@n2100.armlinux.org.uk>
-References: <20160829102328.GA28796@n2100.armlinux.org.uk>
-Message-ID: <E1beJke-0000my-2P@rmk-PC.armlinux.org.uk>
+From: mathias.nyman@linux.intel.com (Mathias Nyman)
+Date: Mon, 29 Aug 2016 13:59:14 +0300
+Subject: PROBLEM: DWC3 USB 3.0 not working on Odroid-XU4 with Exynos 5422
+In-Reply-To: <87lgzgdof3.fsf@linux.intel.com>
+References: <1472414695.3845.3.camel@mniewoehner.de>
+ <87lgzgdof3.fsf@linux.intel.com>
+Message-ID: <57C41582.1030604@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If an attempt to set a socket state returns an error, restore the
-previous socket state.  If restoring the previous socket state
-fails, warn about this.
+On 29.08.2016 10:28, Felipe Balbi wrote:
+>
+> Hi,
+>
+> Michael Niew?hner <linux@mniewoehner.de> writes:
+>> [1.] One line summary of the problem:
+>> DWC3 USB 3.0 not working on Odroid-XU4 with Exynos 5422
+>>
+>> [2.] Full description of the problem/report:
+>> No usb 3.0 devices are being detected when attached while USB 2.0
+>> devices work on the same port.
+>> USB 3.0 works after applying patches [9.1] and [9.2], but seems to be
+>> buggy. The usb hub is redetected every time an usb device is attached.
+>
+> dwc3 is host, which means it's actually XHCI :-)
+>
+> Adding Mathias
+>
+>> dmesg:
+>> [  192.287080] usb 3-1.2: USB disconnect, device number 7
+>> [  210.370699] hub 3-1:1.0: hub_ext_port_status failed (err = -71)
 
-This allows us to have simple error handling in the socket state
-configuration handlers - there is no need for every handler
-implementation to manually undo the updates, which can be complex
-when regulators are involved.
+Looks like the hub GetPortStatus request fails with protocol error.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- drivers/pcmcia/soc_common.c | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+Reading xhci root hub port status is mostly just register reads and writes. It
+shouldn't include any actual transfers that could return -EPROTO
 
-diff --git a/drivers/pcmcia/soc_common.c b/drivers/pcmcia/soc_common.c
-index 822de207c408..d8508c41d7da 100644
---- a/drivers/pcmcia/soc_common.c
-+++ b/drivers/pcmcia/soc_common.c
-@@ -292,6 +292,14 @@ static int soc_common_pcmcia_config_skt(
- 	int ret;
- 
- 	ret = skt->ops->configure_socket(skt, state);
-+	if (ret < 0) {
-+		pr_err("soc_common_pcmcia: unable to configure socket %d\n",
-+		       skt->nr);
-+		/* restore the previous state */
-+		WARN_ON(skt->ops->configure_socket(skt, &skt->cs_state));
-+		return ret;
-+	}
-+
- 	if (ret == 0) {
- 		struct gpio_desc *descs[2];
- 		int values[2], n = 0;
-@@ -324,10 +332,6 @@ static int soc_common_pcmcia_config_skt(
- 		skt->cs_state = *state;
- 	}
- 
--	if (ret < 0)
--		printk(KERN_ERR "soc_common_pcmcia: unable to configure "
--		       "socket %d\n", skt->nr);
--
- 	return ret;
- }
- 
-@@ -776,6 +780,8 @@ int soc_pcmcia_add_one(struct soc_pcmcia_socket *skt)
- {
- 	int ret;
- 
-+	skt->cs_state = dead_socket;
-+
- 	setup_timer(&skt->poll_timer, soc_common_pcmcia_poll_event,
- 		    (unsigned long)skt);
- 	skt->poll_timer.expires = jiffies + SOC_PCMCIA_POLL_PERIOD;
--- 
-2.1.0
+So this is not the root hub? but a external or integrated on your board, right?
+
+The protocol error -71 is returned at transfer errors or if device stalled.
+
+Adding more xhci debugging options could show something:
+echo -n 'module xhci_hcd =p' > /sys/kernel/debug/dynamic_debug/control
+
+>> [9.] Other notes, patches, fixes, workarounds:
+>> [9.1] https://lkml.org/lkml/2014/4/28/234
+>> [9.2] https://lkml.org/lkml/2015/2/2/259
+
+The additional patches that makes things somehow work involve tuning the PHY,
+this is an area I'm not familiar with
+
+-Mathias
