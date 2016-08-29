@@ -1,41 +1,54 @@
-From: cmetcalf@mellanox.com (Chris Metcalf)
-Date: Mon, 29 Aug 2016 11:46:52 -0400
-Subject: [PATCH v8 4/4] nmi_backtrace: generate one-line reports for idle
- cpus
-In-Reply-To: <20160818151211.GN13300@pathway.suse.cz>
-References: <1471377024-2244-1-git-send-email-cmetcalf@mellanox.com>
- <1471377024-2244-5-git-send-email-cmetcalf@mellanox.com>
- <20160818151211.GN13300@pathway.suse.cz>
-Message-ID: <aa556fe4-901c-196b-d3a1-ab92a701cbaa@mellanox.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 29 Aug 2016 09:56:02 -0600
+Subject: [PATCH V6 1/5] perf tools: making coresight PMU listable
+In-Reply-To: <20160828141611.GA32293@krava>
+References: <1472156445-24283-1-git-send-email-mathieu.poirier@linaro.org>
+ <1472156445-24283-2-git-send-email-mathieu.poirier@linaro.org>
+ <20160828141611.GA32293@krava>
+Message-ID: <CANLsYky4TY5s46nVTra+7-Zx+czjWZbmmJgqHenLTRNd1TM=CQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/18/2016 11:12 AM, Petr Mladek wrote:
-> On Tue 2016-08-16 15:50:24, Chris Metcalf wrote:
->> [...]
->> -static inline void native_safe_halt(void)
->> +static __always_inline void native_safe_halt(void)
->>   {
->>   	asm volatile("sti; hlt": : :"memory");
->>   }
-> Ah, the __always_inline stuff did not helped here. It was
-> not inlined:
+On 28 August 2016 at 08:16, Jiri Olsa <jolsa@redhat.com> wrote:
+> On Thu, Aug 25, 2016 at 02:20:41PM -0600, Mathieu Poirier wrote:
 >
-> $> nm -n vmlinux | grep native_safe_halt
-> ffffffff81050bc0 t native_safe_halt
+> SNIP
 >
-> The reason seems to be that it is called via
-> PVOP_VCALL0(pv_irq_ops.safe_halt);, see below
-> in the disassembly.
+>>  ARM/CORGI MACHINE SUPPORT
+>>  M:   Richard Purdie <rpurdie@rpsys.net>
+>> diff --git a/tools/perf/Makefile.config b/tools/perf/Makefile.config
+>> index 24803c58049a..72edf83d76b7 100644
+>> --- a/tools/perf/Makefile.config
+>> +++ b/tools/perf/Makefile.config
+>> @@ -746,10 +746,13 @@ ifdef LIBBABELTRACE
+>>  endif
+>>
+>>  ifndef NO_AUXTRACE
+>> -  ifeq ($(feature-get_cpuid), 0)
+>> -    msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
+>> -    NO_AUXTRACE := 1
+>> -  else
+>> +  ifeq ($(ARCH),x86)
+>> +    ifeq ($(feature-get_cpuid), 0)
+>> +      msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
+>> +      NO_AUXTRACE := 1
+>> +    endif
+>> +  endif
+>> +  ifndef NO_AUXTRACE
 >
-> I guess that it is because I have
-> CONFIG_PARAVIRT=y
+> hum, how's this hunk connected to the issue described in changelog?
 
-I fixed this by reverting to using __cpuidle instead of __always_inline.
-As you discovered, we can't use <linux/cpu.h> here, but I chose to
-just duplicate the #define of __cpuidle in <asm/irqflags.h> instead
-since I think that's cleaner.
+Patch 1/6 and 2/6 are needed by [3, 4, 5, 6]/6 of this set.
+Originally they were part of a separate patchset I but decided to
+include them here for completeness.  Let me know if you'd like to see
+them split again.
 
--- 
-Chris Metcalf, Mellanox Technologies
-http://www.mellanox.com
+>
+> thanks,
+> jirka
+>
+>>      $(call detected,CONFIG_AUXTRACE)
+>>      CFLAGS += -DHAVE_AUXTRACE_SUPPORT
+>>    endif
+>
+> SNIP
