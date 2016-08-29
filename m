@@ -1,51 +1,41 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 29 Aug 2016 15:46:14 +0000
-Subject: Older hisilicon chipsets
-In-Reply-To: <7850061.5OOjP34nIO@wuerfel>
-References: <7773f0e5-d045-1e93-529b-74a601467ed1@gmail.com>
- <20160827150457.GM10637@io.lakedaemon.net>
- <ec3ec22f-f05e-aaec-8e9a-bfc0565b9e9d@gmail.com>
- <7850061.5OOjP34nIO@wuerfel>
-Message-ID: <20160829154614.GP10637@io.lakedaemon.net>
+From: cmetcalf@mellanox.com (Chris Metcalf)
+Date: Mon, 29 Aug 2016 11:46:52 -0400
+Subject: [PATCH v8 4/4] nmi_backtrace: generate one-line reports for idle
+ cpus
+In-Reply-To: <20160818151211.GN13300@pathway.suse.cz>
+References: <1471377024-2244-1-git-send-email-cmetcalf@mellanox.com>
+ <1471377024-2244-5-git-send-email-cmetcalf@mellanox.com>
+ <20160818151211.GN13300@pathway.suse.cz>
+Message-ID: <aa556fe4-901c-196b-d3a1-ab92a701cbaa@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 12:54:15PM +0200, Arnd Bergmann wrote:
-> On Saturday, August 27, 2016 1:53:25 PM CEST Marty Plummer wrote:
-> > On 08/27/2016 10:04 AM, Jason Cooper wrote:
-...
-> > > Ideally, most of it will be a devicetree.  Assuming we have code for the
-> > > SoC and associated drivers.
-> > > 
-> > Yes, I've been doing some work on that already, but as I've said, unsure
-> > where one should/would insert all these different things.
-> 
-> start with getting the serial console working. debug_ll is useful for
-> early bringup and should only need a patch to arch/arm/Kconfig.debug.
+On 8/18/2016 11:12 AM, Petr Mladek wrote:
+> On Tue 2016-08-16 15:50:24, Chris Metcalf wrote:
+>> [...]
+>> -static inline void native_safe_halt(void)
+>> +static __always_inline void native_safe_halt(void)
+>>   {
+>>   	asm volatile("sti; hlt": : :"memory");
+>>   }
+> Ah, the __always_inline stuff did not helped here. It was
+> not inlined:
+>
+> $> nm -n vmlinux | grep native_safe_halt
+> ffffffff81050bc0 t native_safe_halt
+>
+> The reason seems to be that it is called via
+> PVOP_VCALL0(pv_irq_ops.safe_halt);, see below
+> in the disassembly.
+>
+> I guess that it is because I have
+> CONFIG_PARAVIRT=y
 
-It looks like the other hisi board we have in the tree uses arm,pl011
-for the serial ports.  Sometimes, a vendor will stick with an IP block
-across multiple SoCs.  It's worth trying a minimal mainline kernel with
-a minimal dts file and the serial node.  If that works, then everything
-else is a lot easier. :-)
+I fixed this by reverting to using __cpuidle instead of __always_inline.
+As you discovered, we can't use <linux/cpu.h> here, but I chose to
+just duplicate the #define of __cpuidle in <asm/irqflags.h> instead
+since I think that's cleaner.
 
-Since you stated on irc that you have some form of documentation, then
-that should go a long way towards mapping uart0 to a register address.
-
-> Later you would typically use earlycon (using a stdout-path property
-> in DT to point to the UART and configuration). The approximate order
-> in which you need other drivers is:
-> 
-> * drivers/irqchip (often a standard VIC or GIC)
-
-the hip04 is heavily based on the ARM GIC, which just about everyone
-uses.  You may get lucky here.  You're working with an older SoC, so
-they might've just used the stock GIC and only branched out later.  Or,
-worst case, they started with some in-house one-off and the hip04 is them
-working towards using a vanilla GIC.
-
-The rest we can worry about later.
-
-thx,
-
-Jason.
+-- 
+Chris Metcalf, Mellanox Technologies
+http://www.mellanox.com
