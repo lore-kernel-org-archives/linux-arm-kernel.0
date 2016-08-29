@@ -1,94 +1,51 @@
-From: kbeldan@baylibre.com (Karl Beldan)
-Date: Mon, 29 Aug 2016 15:32:42 +0000
-Subject: [PATCH] ARM: dts: da850-lcdk: Add NAND to DT
-Message-ID: <20160829153242.18615-1-kbeldan@baylibre.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon, 29 Aug 2016 10:35:58 -0500
+Subject: [PATCH] irqchip/gicv3-its: Enable cacheable attribute
+ Read-allocate hints
+In-Reply-To: <5784F188.3010609@codeaurora.org>
+References: <1468294608-30619-1-git-send-email-shankerd@codeaurora.org>
+ <5784A5C8.4080103@arm.com> <5784F188.3010609@codeaurora.org>
+Message-ID: <11225da6-559e-c1bd-2ba5-a941595d6532@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds DT support for the NAND connected to the SoC AEMIF.
-Passed torture hashing a 40MB file on top of UBIFS using subpages.
+Marc,
 
-Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
----
-v2:
+Are you planning to push this change? I talked to Qualcomm ITS hw team 
+and they told me nice to have this change even though we see a small gain.
 
-- Removed comments pertaining to the BSP the LCDK ships with (Sekhar)
-- s/"ok"/"okay"/
-- Removed partitions since it relates to the BSP the LCDK ships with and
-  also removed the references to the shortcomings of davinci_nand wrt DT
-  parsing vs scan_ident (use of ti,davinci-ecc* vs nand-ecc*)
-- use 4-bit ECC (since I have sent a fix for the driver)
+Shanker
 
- arch/arm/boot/dts/da850-lcdk.dts | 53 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
 
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index 7563260..1665eee 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -63,6 +63,27 @@
- 			0x04 0x00000110 0x00000ff0
- 		>;
- 	};
-+
-+	nand_pins: nand_pins {
-+		pinctrl-single,bits = <
-+			/* EMA_WAIT[0], EMA_OE, EMA_WE, EMA_CS[3] */
-+			0x1c 0x10110010  0xf0ff00f0
-+			/*
-+			 * EMA_D[0], EMA_D[1], EMA_D[2],
-+			 * EMA_D[3], EMA_D[4], EMA_D[5],
-+			 * EMA_D[6], EMA_D[7]
-+			 */
-+			0x24 0x11111111  0xffffffff
-+			/*
-+			 * EMA_D[8],  EMA_D[9],  EMA_D[10],
-+			 * EMA_D[11], EMA_D[12], EMA_D[13],
-+			 * EMA_D[14], EMA_D[15]
-+			 */
-+			0x20 0x11111111  0xffffffff
-+			/* EMA_A[1], EMA_A[2] */
-+			0x30 0x01100000  0x0ff00000
-+		>;
-+	};
- };
- 
- &serial2 {
-@@ -136,3 +157,35 @@
- 	tx-num-evt = <32>;
- 	rx-num-evt = <32>;
- };
-+
-+&aemif {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&nand_pins>;
-+	status = "okay";
-+	cs3 {
-+		#address-cells = <2>;
-+		#size-cells = <1>;
-+		clock-ranges;
-+		ranges;
-+
-+		ti,cs-chipselect = <3>;
-+
-+		nand at 2000000,0 {
-+			compatible = "ti,davinci-nand";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0 0x02000000 0x02000000
-+			       1 0x00000000 0x00008000>;
-+
-+			ti,davinci-chipselect = <1>;
-+			ti,davinci-mask-ale = <0>;
-+			ti,davinci-mask-cle = <0>;
-+			ti,davinci-mask-chipsel = <0>;
-+
-+			ti,davinci-nand-buswidth = <16>;
-+			ti,davinci-ecc-mode = "hw";
-+			ti,davinci-ecc-bits = <4>;
-+			ti,davinci-nand-use-bbt;
-+		};
-+	};
-+};
+On 07/12/2016 08:32 AM, Shanker Donthineni wrote:
+> Hi Marc,
+>
+> On 07/12/2016 03:09 AM, Marc Zyngier wrote:
+>> Hi Shanker,
+>>
+>> On 12/07/16 04:36, Shanker Donthineni wrote:
+>>> Read-allocation hints are not enabled for both the GIC-ITS and GICR
+>>> tables. This forces the hardware to always read the table contents
+>>> from an external memory (DDR) which is slow compared to cache memory.
+>>> Most of the tables are often read by hardware. So, it's better to
+>>> enable Read-allocate hints in addition to Write-allocate hints in
+>>> order to improve the GICR_PEND, GICR_PROP, Collection, Device, and
+>>> vCPU tables lookup time.
+>> While I'm not opposed to such a change, I'd like to see some evidence
+>> that this actually makes a difference. Have you measured an improvement
+>> on a particular implementation? If so, could you share your benchmarking
+>> method so that it could be be measured on others as well?
+> I have seen at least 5% performance gain when I was testing direct 
+> VLPI feature
+> on Qualcomm emulation platforms. On Silicon, this gain is not noticeable.
+>
+>
+>> Thanks,
+>>
+>>     M.
+>
+
 -- 
-2.9.2
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
