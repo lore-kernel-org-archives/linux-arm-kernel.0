@@ -1,60 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 Aug 2016 14:45:49 +0200
-Subject: [PATCH 1/4] soc: qcom: add an EBI2 device tree bindings
-In-Reply-To: <201608291351.12915.arnd@arndb.de>
-References: <1470691445-27571-1-git-send-email-linus.walleij@linaro.org>
- <2988918.zNxvaGl6en@wuerfel>
- <CACRpkdZ=HU6j3=Ye4dm=tFU=KmG54bq06KDfxPViWUouOA=jOA@mail.gmail.com>
- <201608291351.12915.arnd@arndb.de>
-Message-ID: <CACRpkdZ4bGJYuR+hJQ5sZR+pYQ5dnmtHY6RRS0oLtcd_N=akZg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 29 Aug 2016 13:53:52 +0100
+Subject: [PATCH v4 0/4] ARM: kernel: module PLT optimizations
+Message-ID: <1472475236-3083-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 1:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 18 August 2016, Linus Walleij wrote:
+As reported by Jongsung, the O(n^2) search in the PLT allocation code may
+disproportionately affect module load time for modules with a larger number
+of relocations.
 
->> This is not looking good at all. First: the configuration settings for
->> the chipselect (i.e. all devices below it, both "foo" and "bar" are
->> just floating in space. When parsing the tree how should you know
->> what chipselect to set up the stuff on? Shall I check the child nodes
->> first value in the reg property and then make a majority vote on what
->> chipselect they apply to or what? That doesn't make sense.
->
-> I would have one node per chip-select and then put the devices on
-> that CS below it, with #address-cells=1 again.
+Since the existing routines rather naively take branch instructions into
+account that are internal to the module, we can improve the situation
+significantly by checking the symbol section index first, and disregarding
+symbols that are defined in the same module. Also, we can reduce the
+algorithmic complexity to O(n log n) by sorting the reloc section before
+processing it, and disregarding zero-addend relocations in the optimization.
 
-Hm I already sent out a new version I think...
-http://marc.info/?l=linux-arm-kernel&m=147202889722541&w=2
-http://marc.info/?l=linux-arm-kernel&m=147202889622540&w=2
-http://marc.info/?l=linux-arm-kernel&m=147202890622543&w=2
-http://marc.info/?l=linux-arm-kernel&m=147202894222555&w=2
-http://marc.info/?l=linux-arm-kernel&m=147202898022571&w=2
+Patch #1 merge the core and init PLTs, since the latter is virtually empty
+anyway.
 
-(OK I know, no patience this guy...)
+Patch #2 implements the optimization to only take SHN_UNDEF symbols into
+account.
 
-Check it and see what you think.
+Patch #3 sort the reloc section, so that the duplicate check can be done by
+comparing an entry with the previous one. Since REL entries (as opposed to
+RELA entries) do not contain the addend, simply disregard non-zero addends
+in the optimization since those are rare anyway.
 
->> ebi2 at 1a100000 {
->>        compatible = "qcom,msm8660-ebi2";
->>        #address-cells = <2>;
->>        #size-cells = <1>;
->>        qcom,xmem-recovery-cycles = <0>, <0>, <5>, <0>, <0>, <0>;
->
-> No, better put the settings into one device per cs.
+Patch #4 replaces the brute force search for a matching existing entry in
+the PLT generation routine with a simple check against the last entry that
+was emitted. This is now sufficient since the relocation section is sorted,
+and presented at relocation time in the same order.
 
-Yeah sigh I already made a version like this...
+Note that this implementation is now mostly aligned with the arm64 version
+(with the exception that the arm64 implementation stashes the address of the
+PLT entry in the symtab instead of comparing the last emitted entry)
 
-> Nothing wrong with having a hierarchy here, what I'm interested
-> in is making the addressing reflect what the hardware actually
-> does. With the empty "ranges", it looks like the entire 32-bit
-> address is getting exposed to the external bus, which is usually
-> not how things work: instead, each "cs" line gets raised by an I/O
-> operation on a particular CPU address range, and that range should
-> be part of the "ranges" propert of the main bus node, and the
-> externally visible addresses should be the translated addresses
-> in the child bus representation in DT.
+v4:
+- Update is_zero_addend_relocation() to take the actual relocation type into
+  account rather than treat all encountered jump/call relocations as ARM or
+  Thumb2 depending on the mode the kernel was built in. This is not necessary
+  in practice, but since the ARM version of apply_relocate() does not reject
+  ARM-to-ARM calls in the Thumb2 build, it is required for strict correctness.
+  (patch #3)
+- added Jongsung's Tested-by (patches #1 - #4)
 
-I have fixed the ranges too in the new version.
+v3: 
+- move the SHN_UNDEF check into the switch statement, so that we only
+  dereference the symbol for relocations we care about (#2)
+- compare the undecoded addend values bitwise when checking for zero addends,
+  rather than fully decoding the offsets and doing an arithmetic comparison
+  against '-8' (or '-4' for Thumb)
+- added patch #4
+   
+v2:
+- added patch #3
 
-Yours,
-Linus Walleij
+Ard Biesheuvel (4):
+  ARM: kernel: merge core and init PLTs
+  ARM: kernel: allocate PLT entries only for external symbols
+  ARM: kernel: sort relocation sections before allocating PLTs
+  ARM: kernel: avoid brute force search on PLT generation
+
+ arch/arm/include/asm/module.h |   6 +-
+ arch/arm/kernel/module-plts.c | 243 ++++++++++++--------
+ arch/arm/kernel/module.lds    |   3 +-
+ 3 files changed, 147 insertions(+), 105 deletions(-)
+
+-- 
+2.7.4
