@@ -1,56 +1,27 @@
-From: atull@opensource.altera.com (atull)
-Date: Mon, 29 Aug 2016 09:35:36 -0500
-Subject: FPGA manager: What is the proper way to load a bitstream now?
-In-Reply-To: <57C3DE04.4030109@topic.nl>
-References: <57C3DE04.4030109@topic.nl>
-Message-ID: <alpine.DEB.2.02.1608290927380.2561@linuxheads99>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 29 Aug 2016 22:41:18 +0800
+Subject: [PATCH V2] ARM: imx: add cpuidle support for i.mx6ul
+In-Reply-To: <1472485272-17036-1-git-send-email-Anson.Huang@nxp.com>
+References: <1472485272-17036-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20160829144118.GW30790@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 29 Aug 2016, Mike Looijmans wrote:
-
-> The "FPGA manager" has been around for a while now, so I thought to integrate
-> it. However, there's apparently only a kernel-to-kernel interface and it isn't
-> actually being used in current mainline kernels?
+On Mon, Aug 29, 2016 at 11:41:12PM +0800, Anson Huang wrote:
+> This patch enables cpuidle driver for i.MX6UL, it
+> reuses i.MX6SX's cpuidle driver, 3 levels of cpuidle
+> supported:
 > 
-> So far, I've been using vendor provided drivers to load the FPGA bitstream
-> (e.g. "cat fpga.bin > /dev/xdevcfg") somewhere early during boot.
+> 1. ARM WFI;
+> 2. SOC in WAIT mode;
+> 3. SOC in WAIT mode + ARM power off.
 > 
-> With the FPGA manager, while looking for a userspace interface, all I found
-> were proposals to do so, that have been 'shot down', even the nice ones using
-> DT overlays, and in the end, there is apparently no way whatsover to simply
-> load a bitstream at boot, other that writing (yet another) driver to trigger
-> the firmware load at some stage.
+> As i.MX6UL has cortex-A7 CORE with an internal L2
+> cache, so flushing it before powering down ARM platform
+> is necessary, flush_cache_all() in last step of cpu_suspend
+> has very small overhead, just call it to avoid cache
+> type check for different platforms.
 > 
-> Is this an accurate summary of the current state, or is there something I've
-> missed?
-> 
-> (resent because of corporate mailserver turning plaintext into HTML)
-> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
-Hi Mike,
-
-There is some stuff that is not yet accepted upstream.  Please see
-my tree (either branch socfpga-4.6 or socfpga-4.1.22-ltsi, take your
-pick).
-
-git clone https://github.com/altera-opensource/linux-socfpga.git
-
-Documentation for the in-kernel API is
- Documentation/fpga/fpga-mgr.txt
-
-Documentation for using device tree overlays is 
- Documentation/devicetree/bindings/fpga/fpga-region.txt
-
-The in kernel device tree compiler has to be upgraded to include
-some of Pantelis Antoniou's patches.
-
-This interface uses the firmware layer to load files from the
-root filesystem.  This all happens under control of applying
-device tree overlays as documented in the fpga-region.txt
-document.
-
-I think the DTO stuff is close to being accepted, but that
-will take time still.
-
-Alan
+Applied, thanks.
