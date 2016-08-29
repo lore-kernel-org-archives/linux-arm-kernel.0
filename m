@@ -1,54 +1,94 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 29 Aug 2016 11:30:31 -0400
-Subject: [PATCH V3 0/3] dmaengine: qcom_hidma: add error reporting
-In-Reply-To: <1471927691-28827-1-git-send-email-okaya@codeaurora.org>
-References: <1471927691-28827-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1ebe7070-065e-d5a4-cab0-02aa1d6bb9a4@codeaurora.org>
+From: kbeldan@baylibre.com (Karl Beldan)
+Date: Mon, 29 Aug 2016 15:32:42 +0000
+Subject: [PATCH] ARM: dts: da850-lcdk: Add NAND to DT
+Message-ID: <20160829153242.18615-1-kbeldan@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+This adds DT support for the NAND connected to the SoC AEMIF.
+Passed torture hashing a 40MB file on top of UBIFS using subpages.
 
-On 8/23/2016 12:48 AM, Sinan Kaya wrote:
-> Three changes:
-> 1. There is a race condition between data transfer callback and descriptor
->    free code. The callback routine may decide to clear the resources even
->    though the descriptor has not yet been freed.
-> 
-> 2. DMA Engine framework now supports direct error reporting to the client
-> via the callback.
-> 
-> Pass the DMA errors to the client by passing a result argument. The HW only
-> supports a generic error when something goes wrong. That's why, using
-> DMA_TRANS_ABORTED all the time.
-> 
-> 3. The HIDMA driver is capable of error detection. However, the error was
-> not being passed back to the client when tx_status API is called.
-> 
-> ------------------------
-> Changes from v2 (https://patchwork.kernel.org/patch/9253379/)
-> ------------------------
-> - Implement the error passing to the client.
-> - Get rid of the reset in the interrupt handler when an error happens and
->   put the HW into disabled state. The only way to recover is for the client to
-> terminate the channel.
-> 
-> Sinan Kaya (3):
->   dmaengine: qcom_hidma: release the descriptor before the callback
->   dmaengine: qcom_hidma: report transfer errors with new interface
->   dmaengine: qcom_hidma: add error reporting for tx_status
-> 
->  drivers/dma/qcom/hidma.c    | 50 +++++++++++++++++++++++++++++++++++----------
->  drivers/dma/qcom/hidma.h    |  1 +
->  drivers/dma/qcom/hidma_ll.c | 32 +++++++----------------------
->  3 files changed, 47 insertions(+), 36 deletions(-)
-> 
+Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+---
+v2:
 
-Any feedback here?
+- Removed comments pertaining to the BSP the LCDK ships with (Sekhar)
+- s/"ok"/"okay"/
+- Removed partitions since it relates to the BSP the LCDK ships with and
+  also removed the references to the shortcomings of davinci_nand wrt DT
+  parsing vs scan_ident (use of ti,davinci-ecc* vs nand-ecc*)
+- use 4-bit ECC (since I have sent a fix for the driver)
 
-Does this implementation look like what you were expecting?
+ arch/arm/boot/dts/da850-lcdk.dts | 53 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
 
+diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+index 7563260..1665eee 100644
+--- a/arch/arm/boot/dts/da850-lcdk.dts
++++ b/arch/arm/boot/dts/da850-lcdk.dts
+@@ -63,6 +63,27 @@
+ 			0x04 0x00000110 0x00000ff0
+ 		>;
+ 	};
++
++	nand_pins: nand_pins {
++		pinctrl-single,bits = <
++			/* EMA_WAIT[0], EMA_OE, EMA_WE, EMA_CS[3] */
++			0x1c 0x10110010  0xf0ff00f0
++			/*
++			 * EMA_D[0], EMA_D[1], EMA_D[2],
++			 * EMA_D[3], EMA_D[4], EMA_D[5],
++			 * EMA_D[6], EMA_D[7]
++			 */
++			0x24 0x11111111  0xffffffff
++			/*
++			 * EMA_D[8],  EMA_D[9],  EMA_D[10],
++			 * EMA_D[11], EMA_D[12], EMA_D[13],
++			 * EMA_D[14], EMA_D[15]
++			 */
++			0x20 0x11111111  0xffffffff
++			/* EMA_A[1], EMA_A[2] */
++			0x30 0x01100000  0x0ff00000
++		>;
++	};
+ };
+ 
+ &serial2 {
+@@ -136,3 +157,35 @@
+ 	tx-num-evt = <32>;
+ 	rx-num-evt = <32>;
+ };
++
++&aemif {
++	pinctrl-names = "default";
++	pinctrl-0 = <&nand_pins>;
++	status = "okay";
++	cs3 {
++		#address-cells = <2>;
++		#size-cells = <1>;
++		clock-ranges;
++		ranges;
++
++		ti,cs-chipselect = <3>;
++
++		nand at 2000000,0 {
++			compatible = "ti,davinci-nand";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0 0x02000000 0x02000000
++			       1 0x00000000 0x00008000>;
++
++			ti,davinci-chipselect = <1>;
++			ti,davinci-mask-ale = <0>;
++			ti,davinci-mask-cle = <0>;
++			ti,davinci-mask-chipsel = <0>;
++
++			ti,davinci-nand-buswidth = <16>;
++			ti,davinci-ecc-mode = "hw";
++			ti,davinci-ecc-bits = <4>;
++			ti,davinci-nand-use-bbt;
++		};
++	};
++};
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.9.2
