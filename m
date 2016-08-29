@@ -1,29 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Aug 2016 13:01:20 +0200
-Subject: [PATCH 1/2] arm64: dts: updates serial aliases for ls1043a rdb
- and qds boards
-In-Reply-To: <1472244381-1766-2-git-send-email-stuart.yoder@nxp.com>
-References: <1472244381-1766-1-git-send-email-stuart.yoder@nxp.com>
- <1472244381-1766-2-git-send-email-stuart.yoder@nxp.com>
-Message-ID: <8035333.yr2FRs5mHk@wuerfel>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 29 Aug 2016 12:01:57 +0100
+Subject: [PATCH 0/3] SA11x0 gpio keys/leds
+In-Reply-To: <20160829102328.GA28796@n2100.armlinux.org.uk>
+References: <20160829100232.GC1041@n2100.armlinux.org.uk>
+ <20160829102328.GA28796@n2100.armlinux.org.uk>
+Message-ID: <20160829110157.GE1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, August 26, 2016 3:46:20 PM CEST Stuart Yoder wrote:
-> -               serial0 = &lpuart0;
-> -               serial1 = &lpuart1;
-> -               serial2 = &lpuart2;
-> -               serial3 = &lpuart3;
-> -               serial4 = &lpuart4;
-> -               serial5 = &lpuart5;
-> +               serial0 = &duart0;
-> +               serial1 = &duart1;
-> +               serial2 = &duart2;
-> +               serial3 = &duart3;
+These patches:
 
-It looks like your board has six uarts that are all driven with the
-lpuart driver, but after the change, you only list four. Should
-the serial4 and serial5 aliases keep pointing at lpuart devices
-so you can still drive all physical connectors?
+* convert Assabet LEDs to use the gpiolib LED driver, now that we have
+  the assabet board control register modelled as a gpiolib driver.
+* adds gpiokeys support for the buttons connected to GPIO0/1, which
+  are used to wake up the system after putting it to S2R sleep.  Without
+  this, it's hard to test S2R.
+* convert Cerf to ues the gpioleds registration API.
 
-	Arnd
+ arch/arm/mach-sa1100/Kconfig   |   2 +
+ arch/arm/mach-sa1100/assabet.c | 139 ++++++++++++++++-------------------------
+ arch/arm/mach-sa1100/cerf.c    |  11 +---
+ 3 files changed, 57 insertions(+), 95 deletions(-)
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
