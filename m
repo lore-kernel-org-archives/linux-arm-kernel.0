@@ -1,61 +1,72 @@
-From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Mon, 29 Aug 2016 21:10:09 +0000
-Subject: [PATCH 1/2] arm64: dts: updates serial aliases for ls1043a rdb
- and qds boards
-In-Reply-To: <201608292238.17985.arnd@arndb.de>
-References: <1472244381-1766-1-git-send-email-stuart.yoder@nxp.com>
- <8035333.yr2FRs5mHk@wuerfel>
- <VI1PR0401MB2638BCBA99A6305262FD3EE78DE10@VI1PR0401MB2638.eurprd04.prod.outlook.com>
- <201608292238.17985.arnd@arndb.de>
-Message-ID: <VI1PR0401MB263861544E640ED526373EC78DE10@VI1PR0401MB2638.eurprd04.prod.outlook.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Mon, 29 Aug 2016 14:22:36 -0700
+Subject: [PATCH] i2c: rk3x: Restore clock settings at resume time
+Message-ID: <1472505756-8302-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Depending on a number of factors including:
+- Which exact Rockchip SoC we're working with
+- How deep we suspend
+- Which i2c port we're on
 
+We might lose the state of the i2c registers at suspend time.
+Specifically we've found that on rk3399 the i2c ports that are not in
+the PMU power domain lose their state with the current suspend depth
+configured by ARM Tursted Firmware.
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Monday, August 29, 2016 3:38 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Stuart Yoder <stuart.yoder@nxp.com>; devicetree at vger.kernel.org; shawnguo at kernel.org
-> Subject: Re: [PATCH 1/2] arm64: dts: updates serial aliases for ls1043a rdb and qds boards
-> 
-> On Monday 29 August 2016, Stuart Yoder wrote:
-> > > -----Original Message-----
-> > > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > > Sent: Monday, August 29, 2016 6:01 AM
-> > > To: Stuart Yoder <stuart.yoder@nxp.com>
-> > > Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; shawnguo at kernel.org
-> > > Subject: Re: [PATCH 1/2] arm64: dts: updates serial aliases for ls1043a rdb and qds boards
-> > >
-> > > On Friday, August 26, 2016 3:46:20 PM CEST Stuart Yoder wrote:
-> > > > -               serial0 = &lpuart0;
-> > > > -               serial1 = &lpuart1;
-> > > > -               serial2 = &lpuart2;
-> > > > -               serial3 = &lpuart3;
-> > > > -               serial4 = &lpuart4;
-> > > > -               serial5 = &lpuart5;
-> > > > +               serial0 = &duart0;
-> > > > +               serial1 = &duart1;
-> > > > +               serial2 = &duart2;
-> > > > +               serial3 = &duart3;
-> > >
-> > > It looks like your board has six uarts that are all driven with the
-> > > lpuart driver, but after the change, you only list four. Should
-> > > the serial4 and serial5 aliases keep pointing at lpuart devices
-> > > so you can still drive all physical connectors?
-> >
-> > The only existing reference I can find to the serial aliases is if the
-> > OF_STDOUT_VIA_ALIAS is enabled in u-boot to specify the console.  The
-> > standard ls1043aqds_defconfig in u-boot specifies DUARTs for the console,
-> > which is why I'm proposing making the 4 DUARTs the default serial aliases
-> > in the device tree.
-> 
-> Ok, so they are mutually exclusive, and the last two ports are
-> unavailable in the default configuration?
+Note that there are very few actual i2c registers that aren't configured
+per transfer anyway so all we actually need to re-configure are the
+clock config registers.  We'll just add a call to rk3x_i2c_adapt_div()
+at resume time and be done with it.
 
-Yes, that's the case with u-boot's defconfig.  I'm still trying to
-find out whether that mutual exlusivity was a firmware decision or
-a hardware limitation.
+NOTE: On rk3399 on ports whose power was lost, I put printouts in at
+resume time.  I saw things like:
+  before: con=0x00010300, div=0x00060006
+  after:  con=0x00010200, div=0x00180025
 
-Stuart
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+---
+Tested on chromeos-4.4 kernel with backports.
+
+drivers/i2c/busses/i2c-rk3x.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index 3b87afe82f63..0df5ad6bfa31 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -1111,6 +1111,15 @@ static int rk3x_i2c_xfer(struct i2c_adapter *adap,
+ 	return ret < 0 ? ret : num;
+ }
+ 
++static __maybe_unused int rk3x_i2c_resume(struct device *dev)
++{
++	struct rk3x_i2c *i2c = dev_get_drvdata(dev);
++
++	rk3x_i2c_adapt_div(i2c, clk_get_rate(i2c->clk));
++
++	return 0;
++}
++
+ static u32 rk3x_i2c_func(struct i2c_adapter *adap)
+ {
+ 	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL | I2C_FUNC_PROTOCOL_MANGLING;
+@@ -1332,12 +1341,15 @@ static int rk3x_i2c_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const SIMPLE_DEV_PM_OPS(rk3x_i2c_pm_ops, NULL, rk3x_i2c_resume);
++
+ static struct platform_driver rk3x_i2c_driver = {
+ 	.probe   = rk3x_i2c_probe,
+ 	.remove  = rk3x_i2c_remove,
+ 	.driver  = {
+ 		.name  = "rk3x-i2c",
+ 		.of_match_table = rk3x_i2c_match,
++		.pm = &rk3x_i2c_pm_ops,
+ 	},
+ };
+ 
+-- 
+2.8.0.rc3.226.g39d4020
