@@ -1,31 +1,24 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 28 Aug 2016 21:33:17 -0300
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select the wm8960 codec driver
-Message-ID: <1472430797-16787-1-git-send-email-festevam@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Sun, 28 Aug 2016 19:37:25 -0500
+Subject: [PATCH] dt-bindings: touchscreen: silead_gsl1680: Document
+ touchscreen-fw-name
+In-Reply-To: <1471964688-12188-1-git-send-email-hdegoede@redhat.com>
+References: <1471964688-12188-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160829003725.GA20749@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On Tue, Aug 23, 2016 at 05:04:48PM +0200, Hans de Goede wrote:
+> The driver has supported touchscreen-fw-name to specify the firmware to
+> load since day 0, but this was omitted from the binding, document this.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-Select CONFIG_SND_SOC_WM8960 so that we can have audio functional
-by default on imx6ul-evk and imx7-sdb boards.
+I'd really like to deprecate in favor of a standard property name. We've 
+somewhat agreed on 'firmware-name' though there is no common binding doc 
+yet. But given this is in use:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 6302dbc..8ec4dbb 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -262,6 +262,7 @@ CONFIG_SND_SOC_IMX_MC13783=y
- CONFIG_SND_SOC_FSL_ASOC_CARD=y
- CONFIG_SND_SOC_CS42XX8_I2C=y
- CONFIG_SND_SOC_TLV320AIC3X=y
-+CONFIG_SND_SOC_WM8960=y
- CONFIG_SND_SIMPLE_CARD=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
--- 
-1.9.1
+Acked-by: Rob Herring <robh@kernel.org>
