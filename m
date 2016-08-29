@@ -1,120 +1,56 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 29 Aug 2016 11:29:25 +0200
-Subject: [PATCH] ARM: dts: mvebu: fix reference to a390 spi controller
-In-Reply-To: <20160826153925.863488-1-arnd@arndb.de> (Arnd Bergmann's message
- of "Fri, 26 Aug 2016 17:38:54 +0200")
-References: <20160826153925.863488-1-arnd@arndb.de>
-Message-ID: <87k2ezhqiy.fsf@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 29 Aug 2016 11:29:31 +0200
+Subject: [PATCH] video: ARM CLCD: fix up Integrator support
+Message-ID: <1472462971-8935-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+We need to mask all registers of the Integrator/CP core module
+control register, and actually write the calculated value to the
+control register, not the mask.
+
+Tested on the Integrator/CP with RGB5551 VGA and works like a
+charm after this patch.
+
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/video/fbdev/amba-clcd-versatile.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/video/fbdev/amba-clcd-versatile.c b/drivers/video/fbdev/amba-clcd-versatile.c
+index 9a90817b1550..5c1e03928d7f 100644
+--- a/drivers/video/fbdev/amba-clcd-versatile.c
++++ b/drivers/video/fbdev/amba-clcd-versatile.c
+@@ -262,7 +262,10 @@ static const struct of_device_id versatile_clcd_of_match[] = {
+ /* 0 = 24bit VGA, 1 = 18bit VGA */
+ #define INTEGRATOR_CLCD_LCD_N24BITEN	BIT(19)
  
- On ven., ao?t 26 2016, Arnd Bergmann <arnd@arndb.de> wrote:
-
-> The SPI controller in the arch/arm/boot/dts/armada-39x.dtsi file has moved
-> to a different location in the hierarchy, which breaks the overrides
-> in the board specific file:
->
-> Warning (reg_format): "reg" property in /soc/internal-regs/spi at 10680/spi-flash at 1 has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
-> Warning (avoid_default_addr_size): Relying on default #address-cells value for /soc/internal-regs/spi at 10680/spi-flash at 1
->
-> This changes the board to reference the spi controller by its label
-> (which has not changed) rather than the full path.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 0160a4b68987 ("ARM: dts: mvebu: A37x/XP/38x/39x: Move SPI controller nodes into 'soc' node")
-
-Applied on mvebu/dt
-
-Thanks,
-
-Gregory
-> ---
->  arch/arm/boot/dts/armada-390-db.dts | 60 ++++++++++++++++++-------------------
->  1 file changed, 30 insertions(+), 30 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-390-db.dts b/arch/arm/boot/dts/armada-390-db.dts
-> index 9d0d9b2e9bfc..34e279d973c8 100644
-> --- a/arch/arm/boot/dts/armada-390-db.dts
-> +++ b/arch/arm/boot/dts/armada-390-db.dts
-> @@ -66,36 +66,6 @@
->  			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
->  
->  		internal-regs {
-> -			spi at 10680 {
-> -				status = "okay";
-> -				pinctrl-0 = <&spi1_pins>;
-> -				pinctrl-names = "default";
-> -
-> -				spi-flash at 1 {
-> -					#address-cells = <1>;
-> -					#size-cells = <1>;
-> -					compatible = "n25q128a13",
-> -						     "jedec,spi-nor";
-> -					reg = <0>; /* Chip select 0 */
-> -					spi-max-frequency = <108000000>;
-> -
-> -					partitions {
-> -						compatible = "fixed-partitions";
-> -						#address-cells = <1>;
-> -						#size-cells = <1>;
-> -
-> -						partition at 0 {
-> -							label = "U-Boot";
-> -							reg = <0 0x400000>;
-> -						};
-> -						partition at 400000 {
-> -							label = "Filesystem";
-> -							reg = <0x400000 0xc00000>;
-> -						};
-> -					};
-> -				};
-> -			};
-> -
->  			i2c at 11000 {
->  				status = "okay";
->  				clock-frequency = <100000>;
-> @@ -173,3 +143,33 @@
->  		};
->  	};
->  };
-> +
-> +&spi1 {
-> +	status = "okay";
-> +	pinctrl-0 = <&spi1_pins>;
-> +	pinctrl-names = "default";
-> +
-> +	spi-flash at 1 {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "n25q128a13",
-> +			     "jedec,spi-nor";
-> +		reg = <0>; /* Chip select 0 */
-> +		spi-max-frequency = <108000000>;
-> +
-> +		partitions {
-> +			compatible = "fixed-partitions";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +
-> +			partition at 0 {
-> +				label = "U-Boot";
-> +				reg = <0 0x400000>;
-> +			};
-> +			partition at 400000 {
-> +				label = "Filesystem";
-> +				reg = <0x400000 0xc00000>;
-> +			};
-> +		};
-> +	};
-> +};
-> -- 
-> 2.9.0
->
-
+-#define INTEGRATOR_CLCD_MASK		(INTEGRATOR_CLCD_LCDMUX_MASK | \
++#define INTEGRATOR_CLCD_MASK		(INTEGRATOR_CLCD_LCDBIASEN | \
++					 INTEGRATOR_CLCD_LCDBIASUP | \
++					 INTEGRATOR_CLCD_LCDBIASDN | \
++					 INTEGRATOR_CLCD_LCDMUX_MASK | \
+ 					 INTEGRATOR_CLCD_LCD0_EN | \
+ 					 INTEGRATOR_CLCD_LCD1_EN | \
+ 					 INTEGRATOR_CLCD_LCD_STATIC1 | \
+@@ -277,6 +280,7 @@ static void integrator_clcd_enable(struct clcd_fb *fb)
+ 
+ 	dev_info(&fb->dev->dev, "enable Integrator CLCD connectors\n");
+ 
++	/* FIXME: really needed? */
+ 	val = INTEGRATOR_CLCD_LCD_STATIC1 | INTEGRATOR_CLCD_LCD_STATIC2 |
+ 		INTEGRATOR_CLCD_LCD0_EN | INTEGRATOR_CLCD_LCD1_EN;
+ 	if (var->bits_per_pixel <= 8 ||
+@@ -291,8 +295,8 @@ static void integrator_clcd_enable(struct clcd_fb *fb)
+ 
+ 	regmap_update_bits(versatile_syscon_map,
+ 			   INTEGRATOR_HDR_CTRL_OFFSET,
+-			   0,
+-			   INTEGRATOR_CLCD_MASK);
++			   INTEGRATOR_CLCD_MASK,
++			   val);
+ }
+ 
+ /*
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.7.4
