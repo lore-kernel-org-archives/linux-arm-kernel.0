@@ -1,38 +1,64 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 Aug 2016 19:21:41 +0200
-Subject: [PATCH 1/4] soc: qcom: add an EBI2 device tree bindings
-In-Reply-To: <CAL_JsqJSO4Bco_BJqYFVEQ73_-nm_QeHy=HF3u6bNhxsikOAGw@mail.gmail.com>
-References: <1470691445-27571-1-git-send-email-linus.walleij@linaro.org>
- <2988918.zNxvaGl6en@wuerfel>
- <CACRpkdZ=HU6j3=Ye4dm=tFU=KmG54bq06KDfxPViWUouOA=jOA@mail.gmail.com>
- <201608291351.12915.arnd@arndb.de>
- <CAL_JsqJPckLGDSiqnspvtP_=t+yZ+0vO-8MxGB6x7poOZiyK+Q@mail.gmail.com>
- <CACRpkdaRPa=tCH2FQUOUzp0Q2YvdLNA7R2y3w==sH40DwJ2vGA@mail.gmail.com>
- <CAL_JsqJSO4Bco_BJqYFVEQ73_-nm_QeHy=HF3u6bNhxsikOAGw@mail.gmail.com>
-Message-ID: <CACRpkdbZdRc+75YKTGLSogK6zqnR9crks3-YYmMFOLsxHbk2dQ@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 29 Aug 2016 10:35:44 -0700
+Subject: [RFC PATCH] clk: rockchip: rk3399: support pll setting
+ automatically
+In-Reply-To: <4830789.1bI8OsvZy1@phil>
+References: <1470144852-20708-1-git-send-email-zhengxing@rock-chips.com>
+ <4830789.1bI8OsvZy1@phil>
+Message-ID: <CAD=FV=VMqHrKHThSNoz_i=SCwgw=OeOfaww3Ote1id66LXO8JQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 4:06 PM, Rob Herring <robh+dt@kernel.org> wrote:
-> [Me]
->> That is very close to how
->> Documentation/devicetree/bindings/bus/imx-weim.txt
->> drivers/bus/imx-weim.c
->> does things, just with the additional property arrays.
+Hi,
+
+On Sun, Aug 28, 2016 at 8:21 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> Hi Xing, Elaine,
 >
-> Maybe so, but I'm trying to bring some consistency here, so I'd
-> suggest looking at newer ones like atmel IIRC.
+> Am Dienstag, 2. August 2016, 21:34:12 schrieb Xing Zheng:
+>> From: Elaine Zhang <zhangqing@rock-chips.com>
+>>
+>> The goal is that we can configure the most suitable pll params
+>> automatically.
+>>
+>> If setting freq is not supported in rockchip_pll_rate_table
+>> rk3399_pll_rates[], we can set pll params automatically.
+>>
+>> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+>> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+>
+> first off, I really like that idea of calculating the generic pll frequencies
+> instead of duplicating these entries in every soc clock driver.
 
-The Uniphier bindings also look like this and it's the most recent
-bus driver ...
-Documentation/devicetree/bindings/bus/uniphier-system-bus.txt
+I probably won't have time to look at this any time soon, but when I
+saw this patch fly by I was a little hesitant because:
 
-But OK it's probably best to follow an example so I get it the way
-you prefer. Which binding and driver is that?
+* Not all PLL settings produce the same jitter.  On rk3288 I spent
+loads of time searching for PLL settings that would be low jitter
+enough to make a pixel clock that was happy with lots of different TVs
+/ monitors.  It's true that there were certain heuristics that could
+be followed but certainly my predictions didn't always match what
+happened.
 
-There's no Atmel stuff in Documentation/devicetree/bindings/bus/
-nor drivers/bus from what I can tell, so just point out what you're
-referring to here and I'll do my best to follow that example.
+* Depending on what's using the PLL, you might want very different
+settings.  One can optimize for lock time, power usage, jitter,
+accuracy, etc.  For instance for a CPU clock that you change a lot you
+probably don't care about hitting an exact frequency and you probably
+don't care overly much about jitter, but you want low lock times.  For
+HDMI you don't care about lock times and and probably don't care about
+power usage, but you care about meeting an exact clock and really
+really care about jitter.
 
-Yours,
-Linus Walleij
+* I know that in the past the way I found to make some of the best
+rates for HDMI was to have the PLL make a rate that was several times
+what I wanted and then activate a divider later in the clock tree.
+That gave me the best jitter / clock accuracy.  I have no idea how to
+do that automatically, but in the past I relied on the PLL only having
+a fixed set of rates it could make so it would fail to make the lower
+clock rate (higher jitter) and eventually end up with the better one.
+
+
+Anyway, I don't know how to solve all of the above, but I just wanted
+to bring it up as a concern.
+
+
+-Doug
