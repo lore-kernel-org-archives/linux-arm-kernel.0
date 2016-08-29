@@ -1,28 +1,31 @@
-From: felipe.balbi@linux.intel.com (Felipe Balbi)
-Date: Mon, 29 Aug 2016 11:01:02 +0300
-Subject: [RESEND PATCH, v5 3/5] usb: xhci-mtk: make IPPC register optional
-In-Reply-To: <1472094329-18466-4-git-send-email-chunfeng.yun@mediatek.com>
-References: <1472094329-18466-1-git-send-email-chunfeng.yun@mediatek.com>
- <1472094329-18466-4-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <877fb0dmwx.fsf@linux.intel.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon, 29 Aug 2016 10:01:46 +0200
+Subject: [RFC PATCH 0/3] ARm64: amlogic: Introduce common GX family dtsi
+In-Reply-To: <1472457371-1305-1-git-send-email-narmstrong@baylibre.com>
+References: <1472457371-1305-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <CAOQ7t2YGbASh7v25wgDspKNWgFOcRsikJs_WZptn+LkVXmaHig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chunfeng Yun <chunfeng.yun@mediatek.com> writes:
-> Make IPPC register optional to support host side of dual-role mode,
-> due to it is moved into common glue layer for simplification.
+On Mon, Aug 29, 2016 at 9:56 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+> The new Amlogic GLX SoCs (S905X and S905D) are part of the Meson GX family so
+> they share some basic characteritics that can be described in a common GX
+> dtsi file used by the Meson GXBB and Meson GXL dtsi.
 >
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> This patchset introduces the common dtsi and switches the GLX and GXBB to use
+> the common dtsi, the GXBB dtsi is reformated to handle this situation.
+>
+> This patchset depends on Carlo Caione "ARM64: dts: amlogic: Add basic support for Amlogic S905X" [1]
+>
+> [1] http://lkml.kernel.org/r/1472382113-10754-1-git-send-email-carlo at caione.org
+>
+> Neil Armstrong (3):
+>   ARM64: dts: amlogic: Add Meson GX Family common dtsi
+>   ARM64: dts: amlogic: Switch Meson GXL dtsi to use common GX dtsi
+>   ARM64: dts: amlogic: Switch Meson GXBB dtsi to use common GX dtsi
 
-Mathias? Are you taking these patches?? I don't wanna take peripheral
-side driver if you won't take xhci side.
+FWIW
+Acked-by: Carlo Caione <carlo@endlessm.com>
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160829/18a8eb6b/attachment.sig>
+Carlo Caione
