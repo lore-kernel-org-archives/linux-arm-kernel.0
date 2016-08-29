@@ -1,57 +1,39 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 29 Aug 2016 12:12:04 +0200
-Subject: [PATCH v2] ARM: imx: use IS_ENABLED() instead of checking for
- built-in or module
-Message-ID: <1472465524-2374-1-git-send-email-javier@osg.samsung.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 29 Aug 2016 12:14:38 +0200
+Subject: [PATCH] dmaengine: mv_xor: Add support for IO (PCIe) src/dst areas
+In-Reply-To: <940069ae-25eb-9106-ac41-300e1730d833@denx.de>
+References: <201608241240.aEXnCS9C%fengguang.wu@intel.com>
+ <b8c09619-22a5-a677-8841-9760c275a618@denx.de>
+ <20160824144314.18928e13@free-electrons.com>
+ <940069ae-25eb-9106-ac41-300e1730d833@denx.de>
+Message-ID: <20160829121438.7b9ecf7a@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IS_ENABLED() macro checks if a Kconfig symbol has been enabled either
-built-in or as a module, use that macro instead of open coding the same.
+Hello,
 
-Using the macro makes the code more readable by helping abstract away some
-of the Kconfig built-in and module enable details.
+On Mon, 29 Aug 2016 12:07:16 +0200, Stefan Roese wrote:
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> As you've probably already noticed, v2 of this patch with
+> COMPILE_TEST removed also did run into this linking problem -
+> for ARM64 in this case. So its perhaps best to provide this MBus
+> driver stub function. COMPILE_TEST could then be enabled again.
 
----
+Yes, I noticed.
 
-Changes in v2:
-- Remove duplicated Signed-off-by tag.
+> What do you think? Should I post a separate patch to the MBus
+> driver (also attached)? Or should I squash it into v3 of this
+> XOR DMA driver patch (with COMPILE_TEST added gain)?
 
- arch/arm/mach-imx/mach-kzm_arm11_01.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Submitting as a separate patch is better IMO, it's touching a separate
+driver. Just submit both in the same patch series, the kbuild test
+robot will then only test building the XOR change with the MBus change
+applied.
 
-diff --git a/arch/arm/mach-imx/mach-kzm_arm11_01.c b/arch/arm/mach-imx/mach-kzm_arm11_01.c
-index 31df4361996f..e277d9c230e5 100644
---- a/arch/arm/mach-imx/mach-kzm_arm11_01.c
-+++ b/arch/arm/mach-imx/mach-kzm_arm11_01.c
-@@ -63,7 +63,7 @@
-  */
- #define KZM_ARM11_16550		(MX31_CS4_BASE_ADDR + 0x1050)
- 
--#if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
-+#if IS_ENABLED(CONFIG_SERIAL_8250)
- /*
-  * KZM-ARM11-01 has an external UART on FPGA
-  */
-@@ -141,7 +141,7 @@ static inline int kzm_init_ext_uart(void)
- /*
-  * SMSC LAN9118
-  */
--#if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
-+#if IS_ENABLED(CONFIG_SMSC911X)
- static struct smsc911x_platform_config kzm_smsc9118_config = {
- 	.phy_interface	= PHY_INTERFACE_MODE_MII,
- 	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
-@@ -201,7 +201,7 @@ static inline int kzm_init_smsc9118(void)
- }
- #endif
- 
--#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
-+#if IS_ENABLED(CONFIG_SERIAL_IMX)
- static const struct imxuart_platform_data uart_pdata __initconst = {
- 	.flags = IMXUART_HAVE_RTSCTS,
- };
+Thanks a lot!
+
+Thomas
 -- 
-2.7.4
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
