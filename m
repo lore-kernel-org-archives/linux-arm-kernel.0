@@ -1,71 +1,88 @@
-From: James.Hartley@imgtec.com (James Hartley)
-Date: Mon, 29 Aug 2016 20:40:12 +0000
-Subject: [PATCH 05/10] reset: pistachio: add driver Kconfig option
-In-Reply-To: <1472045342-7434-5-git-send-email-p.zabel@pengutronix.de>
-References: <1472045342-7434-1-git-send-email-p.zabel@pengutronix.de>
- <1472045342-7434-5-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <72BC0C8BD7BB6F45988A99382E5FBAE586505835@HHMAIL01.hh.imgtec.org>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 29 Aug 2016 13:54:50 -0700
+Subject: [PATCH v5 1/2] ARM: dts: imx6: Add support for Toradex Apalis
+ iMX6Q/D SoM
+In-Reply-To: <97a3d506-35a0-2a15-18ef-2719c0596cc1@mentor.com>
+References: <1454688741-4238-1-git-send-email-marcel.ziswiler@toradex.com>
+ <1454688741-4238-2-git-send-email-marcel.ziswiler@toradex.com>
+ <97a3d506-35a0-2a15-18ef-2719c0596cc1@mentor.com>
+Message-ID: <8379c5d41f44fc1b59a5c15650f30c68@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: James Hartley <james.hartley@imgtec.com>
+On 2016-08-29 06:28, Vladimir Zapolskiy wrote:
+> Hi Marcel,
+> 
+> On 02/05/2016 06:12 PM, Marcel Ziswiler wrote:
+>> From: Petr ?tetiar <ynezz@true.cz>
+>>
+>> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+>> Signed-off-by: Petr ?tetiar <ynezz@true.cz>
+>> Reviewed-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>
+> 
+> because the change is in mainline now below is kind of out of date
+> information, but you may find it helpful.
+> 
+> [snip]
+> 
+>> - fixed HDMI DDC (requires GPIO-based bitbanging I2C to be enabled)
+> 
+> This is not needed.
+> 
+> [snip]
+> 
+>> +	/* DDC_I2C: I2C2_SDA/SCL on MXM3 205/207 */
+>> +	i2cddc: i2c at 0 {
+>> +		compatible = "i2c-gpio";
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&pinctrl_i2c_ddc>;
+>> +		gpios = <&gpio3 16 GPIO_ACTIVE_HIGH /* sda */
+>> +			 &gpio2 30 GPIO_ACTIVE_HIGH /* scl */
+>> +			>;
+>> +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+>> +		status = "disabled";
+>> +	};
+>> +
+> 
+> This is not needed.
+> 
+> [snip]
+> 
+>> +	pinctrl_i2c_ddc: gpioi2cddcgrp {
+>> +		fsl,pins = <
+>> +			/* DDC bitbang */
+>> +			MX6QDL_PAD_EIM_EB2__GPIO2_IO30 0x1b0b0
+>> +			MX6QDL_PAD_EIM_D16__GPIO3_IO16 0x1b0b0
+>> +		>;
+>> +	};
+>> +
+> 
+> Practically you don't need this overcomplicated GPIO-based bitbanging
+> to emulate I2C, because the DW HDMI controller has a reduced I2C
+> controller on board, you may take a look at its support published here:
+> 
+>    http://www.spinics.net/lists/dri-devel/msg116308.html
+> 
+> To utilize it the pads should be set to HDMI function instead of
+> I2C or GPIO.
 
-James.
+Thanks for the notification! I guess we'd also have to remove...
 
-> -----Original Message-----
-> From: Philipp Zabel [mailto:p.zabel at pengutronix.de]
-> Sent: 24 August 2016 14:29
-> To: linux-kernel at vger.kernel.org
-> Cc: Masahiro Yamada; Arnd Bergmann; Axel Lin; Hans de Goede; Maxime
-> Ripard; Lee Jones; linux-arm-kernel at lists.infradead.org; Philipp Zabel;
-> Damien Horsley; James Hartley
-> Subject: [PATCH 05/10] reset: pistachio: add driver Kconfig option
-> 
-> Visible only if COMPILE_TEST is enabled, this allows to include the driver in
-> build tests.
-> 
-> Cc: Damien Horsley <Damien.Horsley@imgtec.com>
-> Cc: James Hartley <james.hartley@imgtec.com>
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
->  drivers/reset/Kconfig  | 6 ++++++
->  drivers/reset/Makefile | 2 +-
->  2 files changed, 7 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig index
-> fdf942d..6ac631e 100644
-> --- a/drivers/reset/Kconfig
-> +++ b/drivers/reset/Kconfig
-> @@ -43,6 +43,12 @@ config RESET_MESON
->  config RESET_OXNAS
->  	bool
-> 
-> +config RESET_PISTACHIO
-> +	bool "Pistachio Reset Driver" if COMPILE_TEST
-> +	default MACH_PISTACHIO
-> +	help
-> +	  This enables the reset driver for ImgTec Pistachio SoCs.
-> +
->  config TI_SYSCON_RESET
->  	tristate "TI SYSCON Reset Driver"
->  	depends on HAS_IOMEM
-> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile index
-> 1408cba..c796a14 100644
-> --- a/drivers/reset/Makefile
-> +++ b/drivers/reset/Makefile
-> @@ -1,6 +1,5 @@
->  obj-y += core.o
->  obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
-> -obj-$(CONFIG_MACH_PISTACHIO) += reset-pistachio.o
->  obj-$(CONFIG_ARCH_STM32) += reset-stm32.o
->  obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
->  obj-$(CONFIG_ARCH_STI) += sti/
-> @@ -11,5 +10,6 @@ obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
->  obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
->  obj-$(CONFIG_RESET_MESON) += reset-meson.o
->  obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
-> +obj-$(CONFIG_RESET_PISTACHIO) += reset-pistachio.o
->  obj-$(CONFIG_TI_SYSCON_RESET) += reset-ti-syscon.o
->  obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
-> --
-> 2.8.1
++&hdmi {
++    ddc-i2c-bus = <&i2cddc>;
+
+...this line...
+
++    status = "okay";
++};
++
++&i2cddc {
++    status = "okay";
++};
+
+and this from arch/arm/boot/dts/imx6q-apalis-ixora.dts.
+
+--
+Stefan
