@@ -1,47 +1,28 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 29 Aug 2016 14:23:26 +0800
-Subject: [PATCH] ARM: dts: imx6ul: set GINT to enable IOMUXC irq
-In-Reply-To: <1471969101-12455-1-git-send-email-Anson.Huang@nxp.com>
-References: <1471969101-12455-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <20160829062326.GH30790@tiger>
+Date: Mon, 29 Aug 2016 14:27:20 +0800
+Subject: [PATCH] ARM: imx6: add opp table when cpufreq is enabled
+In-Reply-To: <20160829061910.GG30790@tiger>
+References: <1471964171-27480-1-git-send-email-Anson.Huang@nxp.com>
+ <20160829061910.GG30790@tiger>
+Message-ID: <20160829062720.GI30790@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 12:18:21AM +0800, Anson Huang wrote:
-> Add "fsl,imx6q-iomuxc-gpr" for IOMUXC-GPR to enable
-> IOMUXC irq which is required for ERR007265 software
-> workaround.
+On Mon, Aug 29, 2016 at 02:19:10PM +0800, Shawn Guo wrote:
+> On Tue, Aug 23, 2016 at 10:56:11PM +0800, Anson Huang wrote:
+> > On those i.MX6 platforms which have no speed grading
+> > check, opp table will NOT be created in platform code,
+> > so cpufreq driver will have below error message:
+> > 
+> > cpu cpu0: dev_pm_opp_get_opp_count: OPP table not found (-19)
 > 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> The cpufreq driver calls dev_pm_opp_get_opp_count() to test if platform
+> supplies an OPP table.  If not, the driver will call into
+> dev_pm_opp_of_add_table() on its own.  So this is not an error message,
+> and cpufreq driver should just work fine on i.MX6SX and i.MX6SL.
 
-The patch subject is confusing.  It doesn't match commit log and code
-change.
+If you think the message might confuse people, we can add an info
+message in cpufreq driver in case it adds OPP table by its own, which
+can explain the 'error' message a bit from dev_pm_opp_get_opp_count().
 
 Shawn
-
-> ---
->  arch/arm/boot/dts/imx6ul.dtsi | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-> index 33b95d7..acc9486 100644
-> --- a/arch/arm/boot/dts/imx6ul.dtsi
-> +++ b/arch/arm/boot/dts/imx6ul.dtsi
-> @@ -644,7 +644,8 @@
->  			};
->  
->  			gpr: iomuxc-gpr at 020e4000 {
-> -				compatible = "fsl,imx6ul-iomuxc-gpr", "syscon";
-> +				compatible = "fsl,imx6ul-iomuxc-gpr",
-> +					     "fsl,imx6q-iomuxc-gpr", "syscon";
->  				reg = <0x020e4000 0x4000>;
->  			};
->  
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
