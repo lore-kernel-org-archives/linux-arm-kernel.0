@@ -1,260 +1,156 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Mon, 29 Aug 2016 14:26:56 +0200
-Subject: [PATCH v3 04/14] drivers: clk: st: Add fs660c32 synthesizer algorithm
+Date: Mon, 29 Aug 2016 14:26:58 +0200
+Subject: [PATCH v3 06/14] drivers: clk: st: Handle clk synchronous mode for
+ video clocks
 In-Reply-To: <1472473626-15398-1-git-send-email-gabriel.fernandez@st.com>
 References: <1472473626-15398-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1472473626-15398-5-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1472473626-15398-7-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-Use an algorithm instead of a table to compute clocks for fs660c32
-synthesizer.
-During a video playback we need to adjust audio & video frequencies.
-A table can't cover all HDMI resolutions and audio adjustment.
+This patch configures the semi-synchronous mode of the video clocks
+of clkgenD2.
 
+Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 Acked-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- drivers/clk/st/clkgen-fsyn.c | 180 ++++++++++++++++++++++++++-----------------
- 1 file changed, 111 insertions(+), 69 deletions(-)
+ .../devicetree/bindings/clock/st/st,flexgen.txt    |  2 ++
+ drivers/clk/st/clk-flexgen.c                       | 37 ++++++++++++++++++++--
+ 2 files changed, 37 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
-index 2f11bbd..14819d9 100644
---- a/drivers/clk/st/clkgen-fsyn.c
-+++ b/drivers/clk/st/clkgen-fsyn.c
-@@ -42,40 +42,6 @@ struct stm_fs {
- 	unsigned long nsdiv;
+diff --git a/Documentation/devicetree/bindings/clock/st/st,flexgen.txt b/Documentation/devicetree/bindings/clock/st/st,flexgen.txt
+index d68f6a5f..7ff77fc 100644
+--- a/Documentation/devicetree/bindings/clock/st/st,flexgen.txt
++++ b/Documentation/devicetree/bindings/clock/st/st,flexgen.txt
+@@ -62,6 +62,8 @@ Required properties:
+   "st,flexgen"
+   "st,flexgen-audio", "st,flexgen" (enable clock propagation on parent for
+   audio use case)
++  "st,flexgen-video", "st,flexgen" (enable clock propagation on parent
++					and activate synchronous mode)
+ 
+ - #clock-cells : from common clock binding; shall be set to 1 (multiple clock
+   outputs).
+diff --git a/drivers/clk/st/clk-flexgen.c b/drivers/clk/st/clk-flexgen.c
+index 7ed05f0..a485f3b 100644
+--- a/drivers/clk/st/clk-flexgen.c
++++ b/drivers/clk/st/clk-flexgen.c
+@@ -17,6 +17,7 @@
+ 
+ struct clkgen_data {
+ 	unsigned long flags;
++	bool mode;
  };
  
--static const struct stm_fs fs660c32_rtbl[] = {
--	{ .mdiv = 0x14, .pe = 0x376b,	.sdiv = 0x4,	.nsdiv = 1 },	/* 25.175  MHz */
--	{ .mdiv = 0x14, .pe = 0x30c3,	.sdiv = 0x4,	.nsdiv = 1 },	/* 25.200  MHz */
--	{ .mdiv = 0x10, .pe = 0x71c7,	.sdiv = 0x4,	.nsdiv = 1 },	/* 27.000  MHz */
--	{ .mdiv = 0x00, .pe = 0x47af,	.sdiv = 0x3,	.nsdiv = 0 },	/* 27.027  MHz */
--	{ .mdiv = 0x0e, .pe = 0x4e1a,	.sdiv = 0x4,	.nsdiv = 1 },	/* 28.320  MHz */
--	{ .mdiv = 0x0b, .pe = 0x534d,	.sdiv = 0x4,	.nsdiv = 1 },	/* 30.240  MHz */
--	{ .mdiv = 0x17, .pe = 0x6fbf,	.sdiv = 0x2,	.nsdiv = 0 },	/* 31.500  MHz */
--	{ .mdiv = 0x01, .pe = 0x0,	.sdiv = 0x4,	.nsdiv = 1 },	/* 40.000  MHz */
--	{ .mdiv = 0x15, .pe = 0x2aab,	.sdiv = 0x3,	.nsdiv = 1 },	/* 49.500  MHz */
--	{ .mdiv = 0x14, .pe = 0x6666,	.sdiv = 0x3,	.nsdiv = 1 },	/* 50.000  MHz */
--	{ .mdiv = 0x1d, .pe = 0x395f,	.sdiv = 0x1,	.nsdiv = 0 },	/* 57.284  MHz */
--	{ .mdiv = 0x08, .pe = 0x4ec5,	.sdiv = 0x3,	.nsdiv = 1 },	/* 65.000  MHz */
--	{ .mdiv = 0x05, .pe = 0x1770,	.sdiv = 0x3,	.nsdiv = 1 },	/* 71.000  MHz */
--	{ .mdiv = 0x03, .pe = 0x4ba7,	.sdiv = 0x3,	.nsdiv = 1 },	/* 74.176  MHz */
--	{ .mdiv = 0x0f, .pe = 0x3426,	.sdiv = 0x1,	.nsdiv = 0 },	/* 74.250  MHz */
--	{ .mdiv = 0x0e, .pe = 0x7777,	.sdiv = 0x1,	.nsdiv = 0 },	/* 75.000  MHz */
--	{ .mdiv = 0x01, .pe = 0x4053,	.sdiv = 0x3,	.nsdiv = 1 },	/* 78.800  MHz */
--	{ .mdiv = 0x09, .pe = 0x15b5,	.sdiv = 0x1,	.nsdiv = 0 },	/* 85.500  MHz */
--	{ .mdiv = 0x1b, .pe = 0x3f19,	.sdiv = 0x2,	.nsdiv = 1 },	/* 88.750  MHz */
--	{ .mdiv = 0x10, .pe = 0x71c7,	.sdiv = 0x2,	.nsdiv = 1 },	/* 108.000 MHz */
--	{ .mdiv = 0x00, .pe = 0x47af,	.sdiv = 0x1,	.nsdiv = 0 },	/* 108.108 MHz */
--	{ .mdiv = 0x0c, .pe = 0x3118,	.sdiv = 0x2,	.nsdiv = 1 },	/* 118.963 MHz */
--	{ .mdiv = 0x0c, .pe = 0x2f54,	.sdiv = 0x2,	.nsdiv = 1 },	/* 119.000 MHz */
--	{ .mdiv = 0x07, .pe = 0xe39,	.sdiv = 0x2,	.nsdiv = 1 },	/* 135.000 MHz */
--	{ .mdiv = 0x03, .pe = 0x4ba7,	.sdiv = 0x2,	.nsdiv = 1 },	/* 148.352 MHz */
--	{ .mdiv = 0x0f, .pe = 0x3426,	.sdiv = 0x0,	.nsdiv = 0 },	/* 148.500 MHz */
--	{ .mdiv = 0x03, .pe = 0x4ba7,	.sdiv = 0x1,	.nsdiv = 1 },	/* 296.704 MHz */
--	{ .mdiv = 0x03, .pe = 0x471c,	.sdiv = 0x1,	.nsdiv = 1 },	/* 297.000 MHz */
--	{ .mdiv = 0x00, .pe = 0x295f,	.sdiv = 0x1,	.nsdiv = 1 },	/* 326.700 MHz */
--	{ .mdiv = 0x1f, .pe = 0x3633,	.sdiv = 0x0,	.nsdiv = 1 },	/* 333.000 MHz */
--	{ .mdiv = 0x1c, .pe = 0x0,	.sdiv = 0x0,	.nsdiv = 1 },	/* 352.000 Mhz */
--};
--
- struct clkgen_quadfs_data {
- 	bool reset_present;
- 	bool bwfilter_present;
-@@ -99,8 +65,7 @@ struct clkgen_quadfs_data {
- 	struct clkgen_field nsdiv[QUADFS_MAX_CHAN];
- 
- 	const struct clk_ops *pll_ops;
--	const struct stm_fs *rtbl;
--	u8 rtbl_cnt;
-+	int  (*get_params)(unsigned long, unsigned long, struct stm_fs *);
- 	int  (*get_rate)(unsigned long , const struct stm_fs *,
- 			unsigned long *);
- };
-@@ -108,6 +73,8 @@ struct clkgen_quadfs_data {
- static const struct clk_ops st_quadfs_pll_c32_ops;
- static const struct clk_ops st_quadfs_fs660c32_ops;
- 
-+static int clk_fs660c32_dig_get_params(unsigned long input,
-+		unsigned long output, struct stm_fs *fs);
- static int clk_fs660c32_dig_get_rate(unsigned long, const struct stm_fs *,
- 		unsigned long *);
- 
-@@ -149,8 +116,7 @@ static const struct clkgen_quadfs_data st_fs660c32_C = {
- 	.powerup_polarity = 1,
- 	.standby_polarity = 1,
- 	.pll_ops	= &st_quadfs_pll_c32_ops,
--	.rtbl		= fs660c32_rtbl,
--	.rtbl_cnt	= ARRAY_SIZE(fs660c32_rtbl),
-+	.get_params	= clk_fs660c32_dig_get_params,
- 	.get_rate	= clk_fs660c32_dig_get_rate,
+ struct flexgen {
+@@ -32,9 +33,14 @@ struct flexgen {
+ 	struct clk_gate fgate;
+ 	/* Final divisor */
+ 	struct clk_divider fdiv;
++	/* Asynchronous mode control */
++	struct clk_gate sync;
++	/* hw control flags */
++	bool control_mode;
  };
  
-@@ -192,8 +158,7 @@ static const struct clkgen_quadfs_data st_fs660c32_D = {
- 	.powerup_polarity = 1,
- 	.standby_polarity = 1,
- 	.pll_ops	= &st_quadfs_pll_c32_ops,
--	.rtbl		= fs660c32_rtbl,
--	.rtbl_cnt	= ARRAY_SIZE(fs660c32_rtbl),
-+	.get_params	= clk_fs660c32_dig_get_params,
- 	.get_rate	= clk_fs660c32_dig_get_rate,};
+ #define to_flexgen(_hw) container_of(_hw, struct flexgen, hw)
++#define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
  
- /**
-@@ -620,6 +585,107 @@ static int clk_fs660c32_dig_get_rate(unsigned long input,
- 	return 0;
- }
- 
-+
-+static int clk_fs660c32_get_pe(int m, int si, unsigned long *deviation,
-+		signed long input, unsigned long output, uint64_t *p,
-+		struct stm_fs *fs)
-+{
-+	unsigned long new_freq, new_deviation;
-+	struct stm_fs fs_tmp;
-+	uint64_t val;
-+
-+	val = (uint64_t)output << si;
-+
-+	*p = (uint64_t)input * P20 - (32LL  + (uint64_t)m) * val * (P20 / 32LL);
-+
-+	*p = div64_u64(*p, val);
-+
-+	if (*p > 32767LL)
-+		return 1;
-+
-+	fs_tmp.mdiv = (unsigned long) m;
-+	fs_tmp.pe = (unsigned long)*p;
-+	fs_tmp.sdiv = si;
-+	fs_tmp.nsdiv = 1;
-+
-+	clk_fs660c32_dig_get_rate(input, &fs_tmp, &new_freq);
-+
-+	new_deviation = abs(output - new_freq);
-+
-+	if (new_deviation < *deviation) {
-+		fs->mdiv = m;
-+		fs->pe = (unsigned long)*p;
-+		fs->sdiv = si;
-+		fs->nsdiv = 1;
-+		*deviation = new_deviation;
-+	}
-+	return 0;
-+}
-+
-+static int clk_fs660c32_dig_get_params(unsigned long input,
-+		unsigned long output, struct stm_fs *fs)
-+{
-+	int si;	/* sdiv_reg (8 downto 0) */
-+	int m; /* md value */
-+	unsigned long new_freq, new_deviation;
-+	/* initial condition to say: "infinite deviation" */
-+	unsigned long deviation = ~0;
-+	uint64_t p, p1, p2;	/* pe value */
-+	int r1, r2;
-+
-+	struct stm_fs fs_tmp;
-+
-+	for (si = 0; (si <= 8) && deviation; si++) {
-+
-+		/* Boundary test to avoid useless iteration */
-+		r1 = clk_fs660c32_get_pe(0, si, &deviation,
-+				input, output, &p1, fs);
-+		r2 = clk_fs660c32_get_pe(31, si, &deviation,
-+				input, output, &p2, fs);
-+
-+		/* No solution */
-+		if (r1 && r2 && (p1 > p2))
-+			continue;
-+
-+		/* Try to find best deviation */
-+		for (m = 1; (m < 31) && deviation; m++)
-+			clk_fs660c32_get_pe(m, si, &deviation,
-+					input, output, &p, fs);
-+
-+	}
-+
-+	if (deviation == ~0) /* No solution found */
-+		return -1;
-+
-+	/* pe fine tuning if deviation not 0: +/- 2 around computed pe value */
-+	if (deviation) {
-+		fs_tmp.mdiv = fs->mdiv;
-+		fs_tmp.sdiv = fs->sdiv;
-+		fs_tmp.nsdiv = fs->nsdiv;
-+
-+		if (fs->pe > 2)
-+			p2 = fs->pe - 2;
-+		else
-+			p2 = 0;
-+
-+		for (; p2 < 32768ll && (p2 <= (fs->pe + 2)); p2++) {
-+			fs_tmp.pe = (unsigned long)p2;
-+
-+			clk_fs660c32_dig_get_rate(input, &fs_tmp, &new_freq);
-+
-+			new_deviation = abs(output - new_freq);
-+
-+			/* Check if this is a better solution */
-+			if (new_deviation < deviation) {
-+				fs->pe = (unsigned long)p2;
-+				deviation = new_deviation;
-+
-+			}
-+		}
-+	}
-+	return 0;
-+}
-+
- static int quadfs_fsynt_get_hw_value_for_recalc(struct st_clk_quadfs_fsynth *fs,
- 		struct stm_fs *params)
+ static int flexgen_enable(struct clk_hw *hw)
  {
-@@ -655,38 +721,14 @@ static long quadfs_find_best_rate(struct clk_hw *hw, unsigned long drate,
- 	struct st_clk_quadfs_fsynth *fs = to_quadfs_fsynth(hw);
- 	int (*clk_fs_get_rate)(unsigned long ,
- 				const struct stm_fs *, unsigned long *);
--	struct stm_fs prev_params;
--	unsigned long prev_rate, rate = 0;
--	unsigned long diff_rate, prev_diff_rate = ~0;
--	int index;
-+	int (*clk_fs_get_params)(unsigned long, unsigned long, struct stm_fs *);
-+	unsigned long rate = 0;
+@@ -143,12 +149,21 @@ static int flexgen_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	struct flexgen *flexgen = to_flexgen(hw);
+ 	struct clk_hw *pdiv_hw = &flexgen->pdiv.hw;
+ 	struct clk_hw *fdiv_hw = &flexgen->fdiv.hw;
++	struct clk_hw *sync_hw = &flexgen->sync.hw;
++	struct clk_gate *config = to_clk_gate(sync_hw);
+ 	unsigned long div = 0;
+ 	int ret = 0;
++	u32 reg;
  
- 	clk_fs_get_rate = fs->data->get_rate;
-+	clk_fs_get_params = fs->data->get_params;
+ 	__clk_hw_set_clk(pdiv_hw, hw);
+ 	__clk_hw_set_clk(fdiv_hw, hw);
  
--	for (index = 0; index < fs->data->rtbl_cnt; index++) {
--		prev_rate = rate;
--
--		*params = fs->data->rtbl[index];
--		prev_params = *params;
--
--		clk_fs_get_rate(prate, &fs->data->rtbl[index], &rate);
--
--		diff_rate = abs(drate - rate);
--
--		if (diff_rate > prev_diff_rate) {
--			rate = prev_rate;
--			*params = prev_params;
--			break;
--		}
--
--		prev_diff_rate = diff_rate;
--
--		if (drate == rate)
--			return rate;
--	}
--
--
--	if (index == fs->data->rtbl_cnt)
--		*params = prev_params;
-+	if (!clk_fs_get_params(prate, drate, params))
-+		clk_fs_get_rate(prate, params, &rate);
++	if (flexgen->control_mode) {
++		reg = readl(config->reg);
++		reg &= ~BIT(config->bit_idx);
++		writel(reg, config->reg);
++	}
++
+ 	div = clk_best_div(parent_rate, rate);
  
- 	return rate;
- }
+ 	/*
+@@ -182,7 +197,7 @@ static const struct clk_ops flexgen_ops = {
+ static struct clk *clk_register_flexgen(const char *name,
+ 				const char **parent_names, u8 num_parents,
+ 				void __iomem *reg, spinlock_t *lock, u32 idx,
+-				unsigned long flexgen_flags) {
++				unsigned long flexgen_flags, bool mode) {
+ 	struct flexgen *fgxbar;
+ 	struct clk *clk;
+ 	struct clk_init_data init;
+@@ -231,6 +246,13 @@ static struct clk *clk_register_flexgen(const char *name,
+ 	fgxbar->fdiv.reg = fdiv_reg;
+ 	fgxbar->fdiv.width = 6;
+ 
++	/* Final divider sync config */
++	fgxbar->sync.lock = lock;
++	fgxbar->sync.reg = fdiv_reg;
++	fgxbar->sync.bit_idx = 7;
++
++	fgxbar->control_mode = mode;
++
+ 	fgxbar->hw.init = &init;
+ 
+ 	clk = clk_register(NULL, &fgxbar->hw);
+@@ -267,11 +289,20 @@ static const struct clkgen_data clkgen_audio = {
+ 	.flags = CLK_SET_RATE_PARENT,
+ };
+ 
++static const struct clkgen_data clkgen_video = {
++	.flags = CLK_SET_RATE_PARENT,
++	.mode = 1,
++};
++
+ static const struct of_device_id flexgen_of_match[] = {
+ 	{
+ 		.compatible = "st,flexgen-audio",
+ 		.data = &clkgen_audio,
+ 	},
++	{
++		.compatible = "st,flexgen-video",
++		.data = &clkgen_video,
++	},
+ 	{}
+ };
+ 
+@@ -287,6 +318,7 @@ static void __init st_of_flexgen_setup(struct device_node *np)
+ 	struct clkgen_data *data = NULL;
+ 	unsigned long flex_flags = 0;
+ 	int ret;
++	bool clk_mode = 0;
+ 
+ 	pnode = of_get_parent(np);
+ 	if (!pnode)
+@@ -304,6 +336,7 @@ static void __init st_of_flexgen_setup(struct device_node *np)
+ 	if (match) {
+ 		data = (struct clkgen_data *)match->data;
+ 		flex_flags = data->flags;
++		clk_mode = data->mode;
+ 	}
+ 
+ 	clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
+@@ -347,7 +380,7 @@ static void __init st_of_flexgen_setup(struct device_node *np)
+ 			continue;
+ 
+ 		clk = clk_register_flexgen(clk_name, parents, num_parents,
+-					   reg, rlock, i, flex_flags);
++					   reg, rlock, i, flex_flags, clk_mode);
+ 
+ 		if (IS_ERR(clk))
+ 			goto err;
 -- 
 1.9.1
