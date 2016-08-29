@@ -1,188 +1,213 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 29 Aug 2016 11:25:37 +0100
-Subject: [PATCH 18/33] pcmcia: sa1100: provide generic CF support
+Date: Mon, 29 Aug 2016 11:25:47 +0100
+Subject: [PATCH 20/33] pcmcia: add MAX1600 driver
 In-Reply-To: <20160829102328.GA28796@n2100.armlinux.org.uk>
 References: <20160829102328.GA28796@n2100.armlinux.org.uk>
-Message-ID: <E1beJl3-0000nS-Nw@rmk-PC.armlinux.org.uk>
+Message-ID: <E1beJlD-0000nf-Vv@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide generic non-voltage sensing socket support for StrongARM
-platforms using the gpiolib and regulator subsystems to obtain the
-resources to control the socket.
+Add a driver for the MAX1600 PCMCIA power switch device.  This is a
+dual-channel device, controlled via four GPIO signals per channel.
+Two signals control the Vcc output, and two control the Vpp output.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/pcmcia/sa1100_generic.c | 120 ++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 115 insertions(+), 5 deletions(-)
+ drivers/pcmcia/Kconfig   |   3 ++
+ drivers/pcmcia/Makefile  |   1 +
+ drivers/pcmcia/max1600.c | 119 +++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/pcmcia/max1600.h |  31 ++++++++++++
+ 4 files changed, 154 insertions(+)
+ create mode 100644 drivers/pcmcia/max1600.c
+ create mode 100644 drivers/pcmcia/max1600.h
 
-diff --git a/drivers/pcmcia/sa1100_generic.c b/drivers/pcmcia/sa1100_generic.c
-index 66acdc85727c..21ccf6360b3e 100644
---- a/drivers/pcmcia/sa1100_generic.c
-+++ b/drivers/pcmcia/sa1100_generic.c
-@@ -31,7 +31,9 @@
- ======================================================================*/
+diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
+index d3c378b4db6c..8ac7f9f270c8 100644
+--- a/drivers/pcmcia/Kconfig
++++ b/drivers/pcmcia/Kconfig
+@@ -63,6 +63,9 @@ config CARDBUS
  
- #include <linux/module.h>
+ 	  If unsure, say Y.
+ 
++config PCMCIA_MAX1600
++	tristate
++
+ comment "PC-card bridges"
+ 
+ config YENTA
+diff --git a/drivers/pcmcia/Makefile b/drivers/pcmcia/Makefile
+index 27e94b30cf96..56880f354361 100644
+--- a/drivers/pcmcia/Makefile
++++ b/drivers/pcmcia/Makefile
+@@ -37,6 +37,7 @@ obj-$(CONFIG_BFIN_CFPCMCIA)			+= bfin_cf_pcmcia.o
+ obj-$(CONFIG_AT91_CF)				+= at91_cf.o
+ obj-$(CONFIG_ELECTRA_CF)			+= electra_cf.o
+ obj-$(CONFIG_PCMCIA_ALCHEMY_DEVBOARD)		+= db1xxx_ss.o
++obj-$(CONFIG_PCMCIA_MAX1600)			+= max1600.o
+ 
+ sa1111_cs-y					+= sa1111_generic.o
+ sa1111_cs-$(CONFIG_ASSABET_NEPONSET)		+= sa1111_neponset.o
+diff --git a/drivers/pcmcia/max1600.c b/drivers/pcmcia/max1600.c
+new file mode 100644
+index 000000000000..476627a29baa
+--- /dev/null
++++ b/drivers/pcmcia/max1600.c
+@@ -0,0 +1,119 @@
++/*
++ * MAX1600 PCMCIA power switch driver
++ *
++ * Copyright (C) 2016 Russell King
++ */
++#include <linux/device.h>
++#include <linux/export.h>
 +#include <linux/gpio/consumer.h>
- #include <linux/init.h>
-+#include <linux/regulator/consumer.h>
- #include <linux/slab.h>
- #include <linux/platform_device.h>
- 
-@@ -41,9 +43,78 @@
- 
- #include "sa1100_generic.h"
- 
-+static const char *gpio_name[] = {
-+	[SOC_STAT_CD] = "detect",
-+	[SOC_STAT_BVD1] = "bvd1",
-+	[SOC_STAT_BVD2] = "bvd2",
-+	[SOC_STAT_RDY] = "ready",
++#include <linux/slab.h>
++#include "max1600.h"
++
++static const char *max1600_gpio_name[2][MAX1600_GPIO_MAX] = {
++	{ "a0vcc", "a1vcc", "a0vpp", "a1vpp" },
++	{ "b0vcc", "b1vcc", "b0vpp", "b1vpp" },
 +};
 +
-+static int sa11x0_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
++int max1600_init(struct device *dev, struct max1600 **ptr,
++	unsigned int channel, unsigned int code)
 +{
-+	struct device *dev = skt->socket.dev.parent;
++	struct max1600 *m;
++	int chan;
 +	int i;
 +
-+	skt->gpio_reset = gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
-+	if (IS_ERR(skt->gpio_reset))
-+		return PTR_ERR(skt->gpio_reset);
-+
-+	skt->gpio_bus_enable = gpiod_get_optional(dev, "bus-enable",
-+						  GPIOD_OUT_HIGH);
-+	if (IS_ERR(skt->gpio_bus_enable)) {
-+		gpiod_put(skt->gpio_reset);
-+		return PTR_ERR(skt->gpio_bus_enable);
++	switch (channel) {
++	case MAX1600_CHAN_A:
++		chan = 0;
++		break;
++	case MAX1600_CHAN_B:
++		chan = 1;
++		break;
++	default:
++		return -EINVAL;
 +	}
 +
-+	skt->vcc.reg = regulator_get_optional(dev, "vcc");
-+	if (IS_ERR(skt->vcc.reg)) {
-+		if (skt->gpio_bus_enable)
-+			gpiod_put(skt->gpio_bus_enable);
-+		gpiod_put(skt->gpio_reset);
-+		return PTR_ERR(skt->vcc.reg);
-+	}
++	if (code != MAX1600_CODE_LOW && code != MAX1600_CODE_HIGH)
++		return -EINVAL;
 +
-+	if (!skt->vcc.reg)
-+		dev_warn(dev,
-+			 "no Vcc regulator provided, ignoring Vcc controls\n");
-+
-+	for (i = 0; i < ARRAY_SIZE(skt->stat); i++) {
-+		skt->stat[i].name = gpio_name[i];
-+		skt->stat[i].desc = gpiod_get_optional(dev, gpio_name[i],
-+						       GPIOD_IN);
-+		if (IS_ERR(skt->stat[i].desc)) {
-+			int err = PTR_ERR(skt->stat[i].desc);
-+
-+			while (--i >= 0) {
-+				if (skt->stat[i].desc)
-+					gpiod_put(skt->stat[i].desc);
-+			}
-+			if (skt->gpio_bus_enable)
-+				gpiod_put(skt->gpio_bus_enable);
-+			gpiod_put(skt->gpio_reset);
-+
-+			return err;
-+		}
-+	}
-+	return 0;
-+}
-+
-+static int sa11x0_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
-+	const socket_state_t *state)
-+{
-+	return soc_pcmcia_regulator_set(skt, &skt->vcc, state->Vcc);
-+}
-+
-+static struct pcmcia_low_level sa11x0_ops = {
-+	.owner = THIS_MODULE,
-+	.hw_init = sa11x0_pcmcia_hw_init,
-+	.socket_state = soc_common_cf_socket_state,
-+	.configure_socket = sa11x0_pcmcia_configure_socket,
-+};
-+
- int __init pcmcia_collie_init(struct device *dev);
- 
--static int (*sa11x0_pcmcia_hw_init[])(struct device *dev) = {
-+static int (*sa11x0_pcmcia_legacy_hw_init[])(struct device *dev) = {
- #ifdef CONFIG_SA1100_ASSABET
- 	pcmcia_assabet_init,
- #endif
-@@ -67,15 +138,15 @@ static int (*sa11x0_pcmcia_hw_init[])(struct device *dev) = {
- #endif
- };
- 
--static int sa11x0_drv_pcmcia_probe(struct platform_device *dev)
-+static int sa11x0_drv_pcmcia_legacy_probe(struct platform_device *dev)
- {
- 	int i, ret = -ENODEV;
- 
- 	/*
- 	 * Initialise any "on-board" PCMCIA sockets.
- 	 */
--	for (i = 0; i < ARRAY_SIZE(sa11x0_pcmcia_hw_init); i++) {
--		ret = sa11x0_pcmcia_hw_init[i](&dev->dev);
-+	for (i = 0; i < ARRAY_SIZE(sa11x0_pcmcia_legacy_hw_init); i++) {
-+		ret = sa11x0_pcmcia_legacy_hw_init[i](&dev->dev);
- 		if (ret == 0)
- 			break;
- 	}
-@@ -83,7 +154,7 @@ static int sa11x0_drv_pcmcia_probe(struct platform_device *dev)
- 	return ret;
- }
- 
--static int sa11x0_drv_pcmcia_remove(struct platform_device *dev)
-+static int sa11x0_drv_pcmcia_legacy_remove(struct platform_device *dev)
- {
- 	struct skt_dev_info *sinfo = platform_get_drvdata(dev);
- 	int i;
-@@ -96,6 +167,45 @@ static int sa11x0_drv_pcmcia_remove(struct platform_device *dev)
- 	return 0;
- }
- 
-+static int sa11x0_drv_pcmcia_probe(struct platform_device *pdev)
-+{
-+	struct soc_pcmcia_socket *skt;
-+	struct device *dev = &pdev->dev;
-+
-+	if (dev->id == -1)
-+		return sa11x0_drv_pcmcia_legacy_probe(pdev);
-+
-+	skt = devm_kzalloc(dev, sizeof(*skt), GFP_KERNEL);
-+	if (!skt)
++	m = devm_kzalloc(dev, sizeof(*m), GFP_KERNEL);
++	if (!m)
 +		return -ENOMEM;
 +
-+	platform_set_drvdata(pdev, skt);
++	m->dev = dev;
++	m->code = code;
 +
-+	skt->nr = pdev->id;
-+	skt->clk = devm_clk_get(dev, NULL);
-+	if (IS_ERR(skt->clk))
-+		return PTR_ERR(skt->clk);
++	for (i = 0; i < MAX1600_GPIO_MAX; i++) {
++		const char *name;
 +
-+	sa11xx_drv_pcmcia_ops(&sa11x0_ops);
-+	soc_pcmcia_init_one(skt, &sa11x0_ops, dev);
++		name = max1600_gpio_name[chan][i];
++		if (i != MAX1600_GPIO_0VPP) {
++			m->gpio[i] = gpiod_get(dev, name, GPIOD_OUT_LOW);
++		} else {
++			m->gpio[i] = gpiod_get_optional(dev, name, GPIOD_OUT_LOW);
++			if (!m->gpio[i])
++				break;
++		}
++		if (IS_ERR(m->gpio[i]))
++			return PTR_ERR(m->gpio[i]);
++	}
 +
-+	return sa11xx_drv_pcmcia_add_one(skt);
-+}
-+
-+static int sa11x0_drv_pcmcia_remove(struct platform_device *dev)
-+{
-+	struct soc_pcmcia_socket *skt;
-+
-+	if (dev->id == -1)
-+		return sa11x0_drv_pcmcia_legacy_remove(dev);
-+
-+	skt = platform_get_drvdata(dev);
-+
-+	soc_pcmcia_remove_one(skt);
++	*ptr = m;
 +
 +	return 0;
 +}
++EXPORT_SYMBOL_GPL(max1600_init);
 +
- static struct platform_driver sa11x0_pcmcia_driver = {
- 	.driver = {
- 		.name		= "sa11x0-pcmcia",
++int max1600_configure(struct max1600 *m, unsigned int vcc, unsigned int vpp)
++{
++	int values[MAX1600_GPIO_MAX], n = MAX1600_GPIO_0VPP;
++
++	if (m->gpio[MAX1600_GPIO_0VPP]) {
++		if (vpp == 0) {
++			values[MAX1600_GPIO_0VPP] = 0;
++			values[MAX1600_GPIO_1VPP] = 0;
++		} else if (vpp == 120) {
++			values[MAX1600_GPIO_0VPP] = 0;
++			values[MAX1600_GPIO_1VPP] = 1;
++		} else if (vpp == vcc) {
++			values[MAX1600_GPIO_0VPP] = 1;
++			values[MAX1600_GPIO_1VPP] = 0;
++		} else {
++			dev_err(m->dev, "unrecognised Vpp %u.%uV\n",
++				vpp / 10, vpp % 10);
++			return -EINVAL;
++		}
++		n = MAX1600_GPIO_MAX;
++	} else if (vpp != vcc && vpp != 0) {
++		dev_err(m->dev, "no VPP control\n");
++		return -EINVAL;
++	}
++
++	if (vcc == 0) {
++		values[MAX1600_GPIO_0VCC] = 0;
++		values[MAX1600_GPIO_1VCC] = 0;
++	} else if (vcc == 33) { /* VY */
++		values[MAX1600_GPIO_0VCC] = 1;
++		values[MAX1600_GPIO_1VCC] = 0;
++	} else if (vcc == 50) { /* VX */
++		values[MAX1600_GPIO_0VCC] = 0;
++		values[MAX1600_GPIO_1VCC] = 1;
++	} else {
++		dev_err(m->dev, "unrecognised Vcc %u.%uV\n",
++			vcc / 10, vcc % 10);
++		return -EINVAL;
++	}
++
++	if (m->code == MAX1600_CODE_HIGH) {
++		/*
++		 * Cirrus mode appears to be the same as Intel mode,
++		 * except the VCC pins are inverted.
++		 */
++		values[MAX1600_GPIO_0VCC] = !values[MAX1600_GPIO_0VCC];
++		values[MAX1600_GPIO_1VCC] = !values[MAX1600_GPIO_1VCC];
++	}
++
++	gpiod_set_array_value_cansleep(n, m->gpio, values);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(max1600_configure);
+diff --git a/drivers/pcmcia/max1600.h b/drivers/pcmcia/max1600.h
+new file mode 100644
+index 000000000000..a674ddb5784b
+--- /dev/null
++++ b/drivers/pcmcia/max1600.h
+@@ -0,0 +1,31 @@
++#ifndef MAX1600_H
++#define MAX1600_H
++
++struct gpio_desc;
++
++enum {
++	MAX1600_GPIO_0VCC = 0,
++	MAX1600_GPIO_1VCC,
++	MAX1600_GPIO_0VPP,
++	MAX1600_GPIO_1VPP,
++	MAX1600_GPIO_MAX,
++
++	MAX1600_CHAN_A,
++	MAX1600_CHAN_B,
++
++	MAX1600_CODE_LOW,
++	MAX1600_CODE_HIGH,
++};
++
++struct max1600 {
++	struct gpio_desc *gpio[MAX1600_GPIO_MAX];
++	struct device *dev;
++	unsigned int code;
++};
++
++int max1600_init(struct device *dev, struct max1600 **ptr,
++	unsigned int channel, unsigned int code);
++
++int max1600_configure(struct max1600 *, unsigned int vcc, unsigned int vpp);
++
++#endif
 -- 
 2.1.0
