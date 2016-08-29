@@ -1,56 +1,54 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 29 Aug 2016 12:30:00 +0200
-Subject: [PATCH] ARM: ixp4xx: use IS_ENABLED() instead of checking for
- built-in or module
-Message-ID: <1472466600-7682-1-git-send-email-javier@osg.samsung.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Mon, 29 Aug 2016 11:25:01 +0100
+Subject: [PATCH 11/33] pcmcia: soc_common: request legacy detect GPIO with
+ active low
+In-Reply-To: <20160829102328.GA28796@n2100.armlinux.org.uk>
+References: <20160829102328.GA28796@n2100.armlinux.org.uk>
+Message-ID: <E1beJkT-0000mm-Pz@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IS_ENABLED() macro checks if a Kconfig symbol has been enabled either
-built-in or as a module, use that macro instead of open coding the same.
+Request the legacy card detect signal with the active low property and
+remove our own negation of the detection value.  This allows us to use
+the firmware-defined polarities rather than hard-coding it into the
+driver.
 
-Using the macro makes the code more readable by helping abstract away some
-of the Kconfig built-in and module enable details.
-
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
+ drivers/pcmcia/soc_common.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
- arch/arm/mach-ixp4xx/ixdp425-setup.c | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-ixp4xx/ixdp425-setup.c b/arch/arm/mach-ixp4xx/ixdp425-setup.c
-index 508c2d7786e2..35582b1a5ffc 100644
---- a/arch/arm/mach-ixp4xx/ixdp425-setup.c
-+++ b/arch/arm/mach-ixp4xx/ixdp425-setup.c
-@@ -58,8 +58,7 @@ static struct platform_device ixdp425_flash = {
- 	.resource	= &ixdp425_flash_resource,
- };
+diff --git a/drivers/pcmcia/soc_common.c b/drivers/pcmcia/soc_common.c
+index 5d167512e96e..edfb6045fcda 100644
+--- a/drivers/pcmcia/soc_common.c
++++ b/drivers/pcmcia/soc_common.c
+@@ -168,7 +168,13 @@ static int soc_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
  
--#if defined(CONFIG_MTD_NAND_PLATFORM) || \
--    defined(CONFIG_MTD_NAND_PLATFORM_MODULE)
-+#if IS_ENABLED(CONFIG_MTD_NAND_PLATFORM)
+ 	for (i = 0; i < ARRAY_SIZE(skt->stat); i++) {
+ 		if (gpio_is_valid(skt->stat[i].gpio)) {
+-			ret = gpio_request_one(skt->stat[i].gpio, GPIOF_IN,
++			unsigned long flags = GPIOF_IN;
++
++			/* CD is active low by default */
++			if (i == SOC_STAT_CD)
++				flags |= GPIOF_ACTIVE_LOW;
++
++			ret = gpio_request_one(skt->stat[i].gpio, flags,
+ 					       skt->stat[i].name);
+ 			if (ret) {
+ 				__soc_pcmcia_hw_shutdown(skt, i);
+@@ -235,11 +241,8 @@ static unsigned int soc_common_pcmcia_skt_state(struct soc_pcmcia_socket *skt)
+ 	state.bvd1 = 1;
+ 	state.bvd2 = 1;
  
- static struct mtd_partition ixdp425_partitions[] = {
- 	{
-@@ -206,8 +205,7 @@ static struct platform_device ixdp425_eth[] = {
- static struct platform_device *ixdp425_devices[] __initdata = {
- 	&ixdp425_i2c_gpio,
- 	&ixdp425_flash,
--#if defined(CONFIG_MTD_NAND_PLATFORM) || \
--    defined(CONFIG_MTD_NAND_PLATFORM_MODULE)
-+#if IS_ENABLED(CONFIG_MTD_NAND_PLATFORM)
- 	&ixdp425_flash_nand,
- #endif
- 	&ixdp425_uart,
-@@ -223,8 +221,7 @@ static void __init ixdp425_init(void)
- 	ixdp425_flash_resource.end =
- 		IXP4XX_EXP_BUS_BASE(0) + ixp4xx_exp_bus_size - 1;
- 
--#if defined(CONFIG_MTD_NAND_PLATFORM) || \
--    defined(CONFIG_MTD_NAND_PLATFORM_MODULE)
-+#if defined(CONFIG_MTD_NAND_PLATFORM)
- 	ixdp425_flash_nand_resource.start = IXP4XX_EXP_BUS_BASE(3),
- 	ixdp425_flash_nand_resource.end   = IXP4XX_EXP_BUS_BASE(3) + 0x10 - 1;
- 
+-	/* CD is active low by default */
+ 	if (skt->stat[SOC_STAT_CD].desc)
+-		state.detect = !gpiod_get_raw_value(skt->stat[SOC_STAT_CD].desc);
+-
+-	/* RDY and BVD are active high by default */
++		state.detect = !!gpiod_get_value(skt->stat[SOC_STAT_CD].desc);
+ 	if (skt->stat[SOC_STAT_RDY].desc)
+ 		state.ready = !!gpiod_get_value(skt->stat[SOC_STAT_RDY].desc);
+ 	if (skt->stat[SOC_STAT_BVD1].desc)
 -- 
-2.7.4
+2.1.0
