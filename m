@@ -1,49 +1,25 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 29 Aug 2016 11:29:04 +0800
-Subject: [PATCH] pinctrl: imx: output one pin/config pair per line in
- pinconf-groups
-In-Reply-To: <1471644337-10162-1-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1471644337-10162-1-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <20160829032904.GA31367@tiger>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 28 Aug 2016 23:40:08 -0400 (EDT)
+Subject: [PATCH v3 0/5] meson: Meson8b and GXBB DWMAC glue driver
+In-Reply-To: <20160828161637.9941-1-martin.blumenstingl@googlemail.com>
+References: <20160820093538.9707-1-martin.blumenstingl@googlemail.com>
+ <20160828161637.9941-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20160828.234008.445367966910278179.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 20, 2016 at 01:05:37AM +0300, Vladimir Zapolskiy wrote:
-> cat /sys/kernel/debug/pinctrl/${pinctrl}/pinconf-groups output is
-> hardly readable, if a pin group contains more than one pin the output
-> is glued and looks like this:
-> 
->   MX6Q_PAD_SD1_DAT0: 0x17071MX6Q_PAD_SD1_CMD: 0x17071MX6Q_PAD_SD1_CLK: 0x17071
-> 
-> Add two space indentation and a new line separator to improve
-> readability of the output.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Date: Sun, 28 Aug 2016 18:16:32 +0200
 
-Acked-by: Shawn Guo <shawnguo@kernel.org>
+> This adds a DWMAC glue driver for the PRG_ETHERNET registers found in
+> Meson8b and GXBB SoCs. Based on the "old" meson6b-dwmac glue driver
+> the register layout is completely different.
+> Thus I introduced a separate driver.
+> 
+> Changes since v2:
+> - fixed unloading the glue driver when built as module. This pulls in a
+>   patch from Joachim Eastwood (thanks) to get our private data structure
+>   (bsp_priv).
 
-> ---
->  drivers/pinctrl/freescale/pinctrl-imx.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
-> index 71391757938b..56fd88013850 100644
-> --- a/drivers/pinctrl/freescale/pinctrl-imx.c
-> +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
-> @@ -501,7 +501,7 @@ static void imx_pinconf_group_dbg_show(struct pinctrl_dev *pctldev,
->  		ret = imx_pinconf_get(pctldev, pin->pin, &config);
->  		if (ret)
->  			return;
-> -		seq_printf(s, "%s: 0x%lx", name, config);
-> +		seq_printf(s, "  %s: 0x%lx\n", name, config);
->  	}
->  }
->  
-> -- 
-> 2.8.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+This doesn't apply cleanly at all to the net-next tree, so I have
+no idea where you expect these changes to be applied.
