@@ -1,24 +1,36 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 29 Aug 2016 23:20:06 +0800
-Subject: [PATCH V2] ARM: dts: imx6ul iomuxc syscon is compatible to imx6q
-In-Reply-To: <AM3PR04MB1315C6AE3AC95A1150DB04D7F5E10@AM3PR04MB1315.eurprd04.prod.outlook.com>
-References: <1472480743-8405-1-git-send-email-Anson.Huang@nxp.com>
- <20160829143447.GV30790@tiger>
- <AM3PR04MB1315C6AE3AC95A1150DB04D7F5E10@AM3PR04MB1315.eurprd04.prod.outlook.com>
-Message-ID: <20160829152006.GZ30790@tiger>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon, 29 Aug 2016 10:22:06 -0500
+Subject: [PATCH] arm64: KVM: Save two instructions in __guest_enter()
+In-Reply-To: <20160825133122.GA8016@lvm>
+References: <1470791736-13949-1-git-send-email-shankerd@codeaurora.org>
+ <20160825133122.GA8016@lvm>
+Message-ID: <daa6aa0c-27d0-25bd-02fd-4e87e9a908fe@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 02:44:47PM +0000, Yongcai Huang wrote:
-> This patch is to set the GINT bit for all low power mode transition.
-> 
-> Do we decide to go with PSCI for all i.MX6 SoCs? Currently i.MX6UL's suspend is
-> already supported with non-PCSI method, only i.MX7D uses PSCI, right? If we decide
-> to implement all power management feature with PSCI, then yes, all these changes
-> can be put into PSCI. But since current suspend/cpuidle function are already supported
-> using old method, this bit must be set to avoid system goes into low power mode
-> unexpected.
+Hi Christoffer,
 
-My apology.  I messed up it with i.MX7D.  Patch applied, thanks.
+This is change may not provide the measurable performance improvement, 
+but still we can
+save a few cpu cycles on vCPU context switch and also improves the code 
+readability.
 
-Shawn
+
+On 08/25/2016 08:31 AM, Christoffer Dall wrote:
+> Hi Shanker,
+>
+> On Tue, Aug 09, 2016 at 08:15:36PM -0500, Shanker Donthineni wrote:
+>> We are doing an unnecessary stack push/pop operation when restoring
+>> the guest registers x0-x18 in __guest_enter(). This patch saves the
+>> two instructions by using x18 as a base register. No need to store
+>> the vcpu context pointer in stack because it is redundant and not
+>> being used anywhere, the same information is available in tpidr_el2.
+> Does this have any measureable benefit?
+>
+> Thanks,
+> -Christoffer
+
+-- 
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
