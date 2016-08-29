@@ -1,159 +1,230 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 29 Aug 2016 11:24:56 +0100
-Subject: [PATCH 10/33] pcmcia: soc_common: switch to using gpio_descs
+Date: Mon, 29 Aug 2016 11:26:13 +0100
+Subject: [PATCH 25/33] ARM: sa1100/nanoengine: convert to generic CF sockets
 In-Reply-To: <20160829102328.GA28796@n2100.armlinux.org.uk>
 References: <20160829102328.GA28796@n2100.armlinux.org.uk>
-Message-ID: <E1beJkO-0000mg-Lu@rmk-PC.armlinux.org.uk>
+Message-ID: <E1beJld-0000o9-Lu@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to using the gpiod_* consumer API rather than the legacy API.
+Convert nanoengine to use the generic CF socket support.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/pcmcia/soc_common.c | 57 +++++++++++++++++++++++++++++++++------------
- drivers/pcmcia/soc_common.h |  3 +++
- 2 files changed, 45 insertions(+), 15 deletions(-)
+ arch/arm/mach-sa1100/nanoengine.c  |  23 +++++++
+ drivers/pcmcia/sa1100_generic.c    |   3 -
+ drivers/pcmcia/sa1100_generic.h    |   1 -
+ drivers/pcmcia/sa1100_nanoengine.c | 133 -------------------------------------
+ 4 files changed, 23 insertions(+), 137 deletions(-)
+ delete mode 100644 drivers/pcmcia/sa1100_nanoengine.c
 
-diff --git a/drivers/pcmcia/soc_common.c b/drivers/pcmcia/soc_common.c
-index d5ca760c4eb2..5d167512e96e 100644
---- a/drivers/pcmcia/soc_common.c
-+++ b/drivers/pcmcia/soc_common.c
-@@ -33,6 +33,7 @@
+diff --git a/arch/arm/mach-sa1100/nanoengine.c b/arch/arm/mach-sa1100/nanoengine.c
+index f1cb3784d525..4d35258a7b32 100644
+--- a/arch/arm/mach-sa1100/nanoengine.c
++++ b/arch/arm/mach-sa1100/nanoengine.c
+@@ -12,6 +12,7 @@
+  */
  
- #include <linux/cpufreq.h>
- #include <linux/gpio.h>
-+#include <linux/gpio/consumer.h>
  #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/io.h>
-@@ -114,8 +115,8 @@ static void __soc_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt,
- 	for (i = 0; i < nr; i++) {
- 		if (skt->stat[i].irq)
- 			free_irq(skt->stat[i].irq, skt);
--		if (gpio_is_valid(skt->stat[i].gpio))
--			gpio_free(skt->stat[i].gpio);
-+		if (skt->stat[i].desc)
-+			gpiod_put(skt->stat[i].desc);
- 	}
- 
- 	if (skt->ops->hw_shutdown)
-@@ -129,6 +130,30 @@ static void soc_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
- 	__soc_pcmcia_hw_shutdown(skt, ARRAY_SIZE(skt->stat));
++#include <linux/gpio/machine.h>
+ #include <linux/kernel.h>
+ #include <linux/platform_data/sa11x0-serial.h>
+ #include <linux/mtd/mtd.h>
+@@ -99,8 +100,30 @@ static void __init nanoengine_map_io(void)
+ 	Ser2HSCR0 = 0;
  }
  
-+int soc_pcmcia_request_gpiods(struct soc_pcmcia_socket *skt)
-+{
-+	int i;
++static struct gpiod_lookup_table nanoengine_pcmcia0_gpio_table = {
++	.dev_id = "sa11x0-pcmcia.0",
++	.table = {
++		GPIO_LOOKUP("gpio", 11, "ready", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("gpio", 13, "detect", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("gpio", 15, "reset", GPIO_ACTIVE_HIGH),
++		{ },
++	},
++};
 +
-+	for (i = 0; i < ARRAY_SIZE(skt->stat); i++) {
-+		struct gpio_desc *desc;
++static struct gpiod_lookup_table nanoengine_pcmcia1_gpio_table = {
++	.dev_id = "sa11x0-pcmcia.1",
++	.table = {
++		GPIO_LOOKUP("gpio", 12, "ready", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("gpio", 14, "detect", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("gpio", 16, "reset", GPIO_ACTIVE_HIGH),
++		{ },
++	},
++};
 +
-+		desc = gpiod_get(skt->socket.dev.parent,
-+				 skt->stat[i].name, GPIOD_IN);
-+		if (IS_ERR(desc)) {
-+			dev_err(skt->socket.dev.parent,
-+				"Failed to get GPIO for %s: %ld\n",
-+				skt->stat[i].name, PTR_ERR(desc));
-+			__soc_pcmcia_hw_shutdown(skt, i);
-+			return PTR_ERR(desc);
-+		}
-+
-+		skt->stat[i].desc = desc;
-+	}
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(soc_pcmcia_request_gpiods);
-+
- static int soc_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
+ static void __init nanoengine_init(void)
  {
- 	int ret = 0, i;
-@@ -143,8 +168,6 @@ static int soc_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
- 
- 	for (i = 0; i < ARRAY_SIZE(skt->stat); i++) {
- 		if (gpio_is_valid(skt->stat[i].gpio)) {
--			int irq;
++	sa11x0_register_pcmcia(0, &nanoengine_pcmcia0_gpio_table);
++	sa11x0_register_pcmcia(1, &nanoengine_pcmcia1_gpio_table);
+ 	sa11x0_register_mtd(&nanoengine_flash_data, nanoengine_flash_resources,
+ 		ARRAY_SIZE(nanoengine_flash_resources));
+ }
+diff --git a/drivers/pcmcia/sa1100_generic.c b/drivers/pcmcia/sa1100_generic.c
+index 83b365f060ea..a8290973538b 100644
+--- a/drivers/pcmcia/sa1100_generic.c
++++ b/drivers/pcmcia/sa1100_generic.c
+@@ -118,9 +118,6 @@ static int (*sa11x0_pcmcia_legacy_hw_init[])(struct device *dev) = {
+ #if defined(CONFIG_SA1100_H3100) || defined(CONFIG_SA1100_H3600)
+ 	pcmcia_h3600_init,
+ #endif
+-#ifdef CONFIG_SA1100_NANOENGINE
+-	pcmcia_nanoengine_init,
+-#endif
+ #ifdef CONFIG_SA1100_SHANNON
+ 	pcmcia_shannon_init,
+ #endif
+diff --git a/drivers/pcmcia/sa1100_generic.h b/drivers/pcmcia/sa1100_generic.h
+index 3f5495957ca5..f74b269e87d3 100644
+--- a/drivers/pcmcia/sa1100_generic.h
++++ b/drivers/pcmcia/sa1100_generic.h
+@@ -11,7 +11,6 @@ extern int pcmcia_freebird_init(struct device *);
+ extern int pcmcia_gcplus_init(struct device *);
+ extern int pcmcia_graphicsmaster_init(struct device *);
+ extern int pcmcia_h3600_init(struct device *);
+-extern int pcmcia_nanoengine_init(struct device *);
+ extern int pcmcia_pangolin_init(struct device *);
+ extern int pcmcia_pfs168_init(struct device *);
+ extern int pcmcia_shannon_init(struct device *);
+diff --git a/drivers/pcmcia/sa1100_nanoengine.c b/drivers/pcmcia/sa1100_nanoengine.c
+deleted file mode 100644
+index 35c30ff41e81..000000000000
+--- a/drivers/pcmcia/sa1100_nanoengine.c
++++ /dev/null
+@@ -1,133 +0,0 @@
+-/*
+- * drivers/pcmcia/sa1100_nanoengine.c
+- *
+- * PCMCIA implementation routines for BSI nanoEngine.
+- *
+- * In order to have a fully functional pcmcia subsystem in a BSE nanoEngine
+- * board you should carefully read this:
+- * http://cambuca.ldhs.cetuc.puc-rio.br/nanoengine/
+- *
+- * Copyright (C) 2010 Marcelo Roberto Jimenez <mroberto@cpti.cetuc.puc-rio.br>
+- *
+- * Based on original work for kernel 2.4 by
+- * Miguel Freitas <miguel@cpti.cetuc.puc-rio.br>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- */
+-#include <linux/device.h>
+-#include <linux/errno.h>
+-#include <linux/gpio.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+-#include <linux/init.h>
+-#include <linux/kernel.h>
+-#include <linux/module.h>
+-#include <linux/signal.h>
 -
- 			ret = gpio_request_one(skt->stat[i].gpio, GPIOF_IN,
- 					       skt->stat[i].name);
- 			if (ret) {
-@@ -152,7 +175,11 @@ static int soc_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
- 				return ret;
- 			}
- 
--			irq = gpio_to_irq(skt->stat[i].gpio);
-+			skt->stat[i].desc = gpio_to_desc(skt->stat[i].gpio);
-+		}
-+
-+		if (skt->stat[i].desc) {
-+			int irq = gpiod_to_irq(skt->stat[i].desc);
- 
- 			if (i == SOC_STAT_RDY)
- 				skt->socket.pci_irq = irq;
-@@ -166,8 +193,8 @@ static int soc_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
- 					  IRQF_TRIGGER_NONE,
- 					  skt->stat[i].name, skt);
- 			if (ret) {
--				if (gpio_is_valid(skt->stat[i].gpio))
--					gpio_free(skt->stat[i].gpio);
-+				if (skt->stat[i].desc)
-+					gpiod_put(skt->stat[i].desc);
- 				__soc_pcmcia_hw_shutdown(skt, i);
- 				return ret;
- 			}
-@@ -209,16 +236,16 @@ static unsigned int soc_common_pcmcia_skt_state(struct soc_pcmcia_socket *skt)
- 	state.bvd2 = 1;
- 
- 	/* CD is active low by default */
--	if (gpio_is_valid(skt->stat[SOC_STAT_CD].gpio))
--		state.detect = !gpio_get_value(skt->stat[SOC_STAT_CD].gpio);
-+	if (skt->stat[SOC_STAT_CD].desc)
-+		state.detect = !gpiod_get_raw_value(skt->stat[SOC_STAT_CD].desc);
- 
- 	/* RDY and BVD are active high by default */
--	if (gpio_is_valid(skt->stat[SOC_STAT_RDY].gpio))
--		state.ready = !!gpio_get_value(skt->stat[SOC_STAT_RDY].gpio);
--	if (gpio_is_valid(skt->stat[SOC_STAT_BVD1].gpio))
--		state.bvd1 = !!gpio_get_value(skt->stat[SOC_STAT_BVD1].gpio);
--	if (gpio_is_valid(skt->stat[SOC_STAT_BVD2].gpio))
--		state.bvd2 = !!gpio_get_value(skt->stat[SOC_STAT_BVD2].gpio);
-+	if (skt->stat[SOC_STAT_RDY].desc)
-+		state.ready = !!gpiod_get_value(skt->stat[SOC_STAT_RDY].desc);
-+	if (skt->stat[SOC_STAT_BVD1].desc)
-+		state.bvd1 = !!gpiod_get_value(skt->stat[SOC_STAT_BVD1].desc);
-+	if (skt->stat[SOC_STAT_BVD2].desc)
-+		state.bvd2 = !!gpiod_get_value(skt->stat[SOC_STAT_BVD2].desc);
- 
- 	skt->ops->socket_state(skt, &state);
- 
-diff --git a/drivers/pcmcia/soc_common.h b/drivers/pcmcia/soc_common.h
-index 94762a54d731..ee40db16dc40 100644
---- a/drivers/pcmcia/soc_common.h
-+++ b/drivers/pcmcia/soc_common.h
-@@ -17,6 +17,7 @@
- 
- 
- struct device;
-+struct gpio_desc;
- struct pcmcia_low_level;
- 
- /*
-@@ -52,6 +53,7 @@ struct soc_pcmcia_socket {
- 
- 	struct {
- 		int		gpio;
-+		struct gpio_desc *desc;
- 		unsigned int	irq;
- 		const char	*name;
- 	} stat[4];
-@@ -136,6 +138,7 @@ void soc_pcmcia_init_one(struct soc_pcmcia_socket *skt,
- 	struct pcmcia_low_level *ops, struct device *dev);
- void soc_pcmcia_remove_one(struct soc_pcmcia_socket *skt);
- int soc_pcmcia_add_one(struct soc_pcmcia_socket *skt);
-+int soc_pcmcia_request_gpiods(struct soc_pcmcia_socket *skt);
- 
- 
- #ifdef CONFIG_PCMCIA_DEBUG
+-#include <asm/mach-types.h>
+-#include <asm/irq.h>
+-
+-#include <mach/hardware.h>
+-#include <mach/nanoengine.h>
+-
+-#include "sa1100_generic.h"
+-
+-struct nanoengine_pins {
+-	unsigned output_pins;
+-	unsigned clear_outputs;
+-	int gpio_rst;
+-	int gpio_cd;
+-	int gpio_rdy;
+-};
+-
+-static struct nanoengine_pins nano_skts[] = {
+-	{
+-		.gpio_rst		= GPIO_PC_RESET0,
+-		.gpio_cd		= GPIO_PC_CD0,
+-		.gpio_rdy		= GPIO_PC_READY0,
+-	}, {
+-		.gpio_rst		= GPIO_PC_RESET1,
+-		.gpio_cd		= GPIO_PC_CD1,
+-		.gpio_rdy		= GPIO_PC_READY1,
+-	}
+-};
+-
+-unsigned num_nano_pcmcia_sockets = ARRAY_SIZE(nano_skts);
+-
+-static int nanoengine_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
+-{
+-	unsigned i = skt->nr;
+-	int ret;
+-
+-	if (i >= num_nano_pcmcia_sockets)
+-		return -ENXIO;
+-
+-	ret = gpio_request_one(nano_skts[i].gpio_rst, GPIOF_OUT_INIT_LOW,
+-		i ? "PC RST1" : "PC RST0");
+-	if (ret)
+-		return ret;
+-
+-	skt->stat[SOC_STAT_CD].gpio = nano_skts[i].gpio_cd;
+-	skt->stat[SOC_STAT_CD].name = i ? "PC CD1" : "PC CD0";
+-	skt->stat[SOC_STAT_RDY].gpio = nano_skts[i].gpio_rdy;
+-	skt->stat[SOC_STAT_RDY].name = i ? "PC RDY1" : "PC RDY0";
+-
+-	return 0;
+-}
+-
+-static void nanoengine_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
+-{
+-	gpio_free(nano_skts[skt->nr].gpio_rst);
+-}
+-
+-static int nanoengine_pcmcia_configure_socket(
+-	struct soc_pcmcia_socket *skt, const socket_state_t *state)
+-{
+-	unsigned i = skt->nr;
+-
+-	if (i >= num_nano_pcmcia_sockets)
+-		return -ENXIO;
+-
+-	gpio_set_value(nano_skts[skt->nr].gpio_rst, !!(state->flags & SS_RESET));
+-
+-	return 0;
+-}
+-
+-static void nanoengine_pcmcia_socket_state(
+-	struct soc_pcmcia_socket *skt, struct pcmcia_state *state)
+-{
+-	unsigned i = skt->nr;
+-
+-	if (i >= num_nano_pcmcia_sockets)
+-		return;
+-
+-	state->bvd1 = 1;
+-	state->bvd2 = 1;
+-	state->vs_3v = 1; /* Can only apply 3.3V */
+-	state->vs_Xv = 0;
+-}
+-
+-static struct pcmcia_low_level nanoengine_pcmcia_ops = {
+-	.owner			= THIS_MODULE,
+-
+-	.hw_init		= nanoengine_pcmcia_hw_init,
+-	.hw_shutdown		= nanoengine_pcmcia_hw_shutdown,
+-
+-	.configure_socket	= nanoengine_pcmcia_configure_socket,
+-	.socket_state		= nanoengine_pcmcia_socket_state,
+-};
+-
+-int pcmcia_nanoengine_init(struct device *dev)
+-{
+-	int ret = -ENODEV;
+-
+-	if (machine_is_nanoengine())
+-		ret = sa11xx_drv_pcmcia_probe(
+-			dev, &nanoengine_pcmcia_ops, 0, 2);
+-
+-	return ret;
+-}
+-
 -- 
 2.1.0
