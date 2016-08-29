@@ -1,175 +1,96 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 29 Aug 2016 11:25:27 +0100
-Subject: [PATCH 16/33] pcmcia: soc_common: switch to a per-socket cpufreq
- notifier
+Date: Mon, 29 Aug 2016 11:25:53 +0100
+Subject: [PATCH 21/33] ARM: sa1100: provide infrastructure to support generic
+ CF sockets
 In-Reply-To: <20160829102328.GA28796@n2100.armlinux.org.uk>
 References: <20160829102328.GA28796@n2100.armlinux.org.uk>
-Message-ID: <E1beJkt-0000nG-Fl@rmk-PC.armlinux.org.uk>
+Message-ID: <E1beJlJ-0000nl-3j@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to a per-socket cpufreq notifier rather than a global notifier.
-This allows each socket to be self-contained.
+Provide the SoC-level infrastructure to support the generic CF sockets.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/pcmcia/soc_common.c | 77 ++++++++++++++-------------------------------
- drivers/pcmcia/soc_common.h |  3 ++
- 2 files changed, 26 insertions(+), 54 deletions(-)
+ arch/arm/mach-sa1100/clock.c   |  2 ++
+ arch/arm/mach-sa1100/generic.c | 14 +++++++++++++-
+ arch/arm/mach-sa1100/generic.h |  3 +++
+ 3 files changed, 18 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pcmcia/soc_common.c b/drivers/pcmcia/soc_common.c
-index 128d8611f39a..c8111807a6aa 100644
---- a/drivers/pcmcia/soc_common.c
-+++ b/drivers/pcmcia/soc_common.c
-@@ -750,50 +750,15 @@ static struct pccard_operations soc_common_pcmcia_operations = {
+diff --git a/arch/arm/mach-sa1100/clock.c b/arch/arm/mach-sa1100/clock.c
+index 0db46895c82a..f6f75c9325bf 100644
+--- a/arch/arm/mach-sa1100/clock.c
++++ b/arch/arm/mach-sa1100/clock.c
+@@ -137,6 +137,8 @@ static struct clk_lookup sa11xx_clkregs[] = {
+ 	CLKDEV_INIT("sa1100-rtc", NULL, NULL),
+ 	CLKDEV_INIT("sa11x0-fb", NULL, &clk_cpu),
+ 	CLKDEV_INIT("sa11x0-pcmcia", NULL, &clk_cpu),
++	CLKDEV_INIT("sa11x0-pcmcia.0", NULL, &clk_cpu),
++	CLKDEV_INIT("sa11x0-pcmcia.1", NULL, &clk_cpu),
+ 	/* sa1111 names devices using internal offsets, PCMCIA is at 0x1800 */
+ 	CLKDEV_INIT("1800", NULL, &clk_cpu),
+ 	CLKDEV_INIT(NULL, "OSTIMER0", &clk_36864),
+diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+index 3e09beddb6e8..a005eef1a24e 100644
+--- a/arch/arm/mach-sa1100/generic.c
++++ b/arch/arm/mach-sa1100/generic.c
+@@ -10,6 +10,7 @@
+  * published by the Free Software Foundation.
+  */
+ #include <linux/gpio.h>
++#include <linux/gpio/machine.h>
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+@@ -232,11 +233,19 @@ void sa11x0_register_lcd(struct sa1100fb_mach_info *inf)
+ 	sa11x0_register_device(&sa11x0fb_device, inf);
+ }
+ 
++static bool sa11x0pcmcia_legacy = true;
+ static struct platform_device sa11x0pcmcia_device = {
+ 	.name		= "sa11x0-pcmcia",
+ 	.id		= -1,
  };
  
- 
--static LIST_HEAD(soc_pcmcia_sockets);
--static DEFINE_MUTEX(soc_pcmcia_sockets_lock);
--
- #ifdef CONFIG_CPU_FREQ
--static int
--soc_pcmcia_notifier(struct notifier_block *nb, unsigned long val, void *data)
-+static int soc_common_pcmcia_cpufreq_nb(struct notifier_block *nb,
-+	unsigned long val, void *data)
++void sa11x0_register_pcmcia(int socket, struct gpiod_lookup_table *table)
++{
++	gpiod_add_lookup_table(table);
++	platform_device_register_simple("sa11x0-pcmcia", socket, NULL, 0);
++	sa11x0pcmcia_legacy = false;
++}
++
+ static struct platform_device sa11x0mtd_device = {
+ 	.name		= "sa1100-mtd",
+ 	.id		= -1,
+@@ -311,7 +320,6 @@ static struct platform_device *sa11x0_devices[] __initdata = {
+ 	&sa11x0uart1_device,
+ 	&sa11x0uart3_device,
+ 	&sa11x0ssp_device,
+-	&sa11x0pcmcia_device,
+ 	&sa11x0rtc_device,
+ 	&sa11x0dma_device,
+ };
+@@ -319,6 +327,10 @@ static struct platform_device *sa11x0_devices[] __initdata = {
+ static int __init sa1100_init(void)
  {
--	struct soc_pcmcia_socket *skt;
-+	struct soc_pcmcia_socket *skt = container_of(nb, struct soc_pcmcia_socket, cpufreq_nb);
- 	struct cpufreq_freqs *freqs = data;
--	int ret = 0;
--
--	mutex_lock(&soc_pcmcia_sockets_lock);
--	list_for_each_entry(skt, &soc_pcmcia_sockets, node)
--		if (skt->ops->frequency_change)
--			ret += skt->ops->frequency_change(skt, val, freqs);
--	mutex_unlock(&soc_pcmcia_sockets_lock);
--
--	return ret;
--}
--
--static struct notifier_block soc_pcmcia_notifier_block = {
--	.notifier_call	= soc_pcmcia_notifier
--};
- 
--static int soc_pcmcia_cpufreq_register(void)
--{
--	int ret;
--
--	ret = cpufreq_register_notifier(&soc_pcmcia_notifier_block,
--					CPUFREQ_TRANSITION_NOTIFIER);
--	if (ret < 0)
--		printk(KERN_ERR "Unable to register CPU frequency change "
--				"notifier for PCMCIA (%d)\n", ret);
--	return ret;
--}
--fs_initcall(soc_pcmcia_cpufreq_register);
--
--static void soc_pcmcia_cpufreq_unregister(void)
--{
--	cpufreq_unregister_notifier(&soc_pcmcia_notifier_block,
--		CPUFREQ_TRANSITION_NOTIFIER);
-+	return skt->ops->frequency_change(skt, val, freqs);
+ 	pm_power_off = sa1100_power_off;
++
++	if (sa11x0pcmcia_legacy)
++		platform_device_register(&sa11x0pcmcia_device);
++
+ 	return platform_add_devices(sa11x0_devices, ARRAY_SIZE(sa11x0_devices));
  }
--module_exit(soc_pcmcia_cpufreq_unregister);
--
+ 
+diff --git a/arch/arm/mach-sa1100/generic.h b/arch/arm/mach-sa1100/generic.h
+index 68199b603ff7..22c432979150 100644
+--- a/arch/arm/mach-sa1100/generic.h
++++ b/arch/arm/mach-sa1100/generic.h
+@@ -46,3 +46,6 @@ static inline int sa11x0_pm_init(void) { return 0; }
  #endif
  
- void soc_pcmcia_init_one(struct soc_pcmcia_socket *skt,
-@@ -813,19 +778,21 @@ EXPORT_SYMBOL(soc_pcmcia_init_one);
- 
- void soc_pcmcia_remove_one(struct soc_pcmcia_socket *skt)
- {
--	mutex_lock(&soc_pcmcia_sockets_lock);
- 	del_timer_sync(&skt->poll_timer);
- 
- 	pcmcia_unregister_socket(&skt->socket);
- 
-+#ifdef CONFIG_CPU_FREQ
-+	if (skt->ops->frequency_change)
-+		cpufreq_unregister_notifier(&skt->cpufreq_nb,
-+					    CPUFREQ_TRANSITION_NOTIFIER);
-+#endif
+ int sa11xx_clk_init(void);
 +
- 	soc_pcmcia_hw_shutdown(skt);
- 
- 	/* should not be required; violates some lowlevel drivers */
- 	soc_common_pcmcia_config_skt(skt, &dead_socket);
- 
--	list_del(&skt->node);
--	mutex_unlock(&soc_pcmcia_sockets_lock);
--
- 	iounmap(skt->virt_io);
- 	skt->virt_io = NULL;
- 	release_resource(&skt->res_attr);
-@@ -867,10 +834,6 @@ int soc_pcmcia_add_one(struct soc_pcmcia_socket *skt)
- 		goto out_err_5;
- 	}
- 
--	mutex_lock(&soc_pcmcia_sockets_lock);
--
--	list_add(&skt->node, &soc_pcmcia_sockets);
--
- 	/*
- 	 * We initialize default socket timing here, because
- 	 * we are not guaranteed to see a SetIOMap operation at
-@@ -891,14 +854,23 @@ int soc_pcmcia_add_one(struct soc_pcmcia_socket *skt)
- 
- 	skt->status = soc_common_pcmcia_skt_state(skt);
- 
-+#ifdef CONFIG_CPU_FREQ
-+	if (skt->ops->frequency_change) {
-+		skt->cpufreq_nb.notifier_call = soc_common_pcmcia_cpufreq_nb;
-+
-+		ret = cpufreq_register_notifier(&skt->cpufreq_nb,
-+						CPUFREQ_TRANSITION_NOTIFIER);
-+		if (ret < 0)
-+			dev_err(skt->socket.dev.parent,
-+				"unable to register CPU frequency change notifier for PCMCIA (%d)\n",
-+				ret);
-+	}
-+#endif
-+
- 	ret = pcmcia_register_socket(&skt->socket);
- 	if (ret)
- 		goto out_err_7;
- 
--	add_timer(&skt->poll_timer);
--
--	mutex_unlock(&soc_pcmcia_sockets_lock);
--
- 	ret = device_create_file(&skt->socket.dev, &dev_attr_status);
- 	if (ret)
- 		goto out_err_8;
-@@ -906,15 +878,12 @@ int soc_pcmcia_add_one(struct soc_pcmcia_socket *skt)
- 	return ret;
- 
-  out_err_8:
--	mutex_lock(&soc_pcmcia_sockets_lock);
- 	del_timer_sync(&skt->poll_timer);
- 	pcmcia_unregister_socket(&skt->socket);
- 
-  out_err_7:
- 	soc_pcmcia_hw_shutdown(skt);
-  out_err_6:
--	list_del(&skt->node);
--	mutex_unlock(&soc_pcmcia_sockets_lock);
- 	iounmap(skt->virt_io);
-  out_err_5:
- 	release_resource(&skt->res_attr);
-diff --git a/drivers/pcmcia/soc_common.h b/drivers/pcmcia/soc_common.h
-index 18a6df5ca374..f66e2fb1f33f 100644
---- a/drivers/pcmcia/soc_common.h
-+++ b/drivers/pcmcia/soc_common.h
-@@ -75,6 +75,9 @@ struct soc_pcmcia_socket {
- 
- 	unsigned int		irq_state;
- 
-+#ifdef CONFIG_CPU_FREQ
-+	struct notifier_block	cpufreq_nb;
-+#endif
- 	struct timer_list	poll_timer;
- 	struct list_head	node;
- };
++struct gpiod_lookup_table;
++void sa11x0_register_pcmcia(int socket, struct gpiod_lookup_table *);
 -- 
 2.1.0
