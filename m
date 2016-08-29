@@ -1,44 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Aug 2016 15:16:59 +0200
-Subject: [PATCH 1/4 v2] soc: qcom: add EBI2 device tree bindings
-In-Reply-To: <1472028758-29272-2-git-send-email-linus.walleij@linaro.org>
-References: <1472028758-29272-1-git-send-email-linus.walleij@linaro.org>
- <1472028758-29272-2-git-send-email-linus.walleij@linaro.org>
-Message-ID: <201608291516.59380.arnd@arndb.de>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 29 Aug 2016 21:18:12 +0800
+Subject: [PATCH 08/10] dt-bindings: usb: Update bindings for LS1012A
+In-Reply-To: <1472207269-18499-8-git-send-email-Bhaskar.Upadhaya@nxp.com>
+References: <1472207269-18499-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
+ <1472207269-18499-8-git-send-email-Bhaskar.Upadhaya@nxp.com>
+Message-ID: <20160829131812.GN30790@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 August 2016, Linus Walleij wrote:
+On Fri, Aug 26, 2016 at 03:57:47PM +0530, Bhaskar Upadhaya wrote:
+> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
+> ---
+>  Documentation/devicetree/bindings/usb/fsl-usb.txt | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/fsl-usb.txt b/Documentation/devicetree/bindings/usb/fsl-usb.txt
+> index 4779c02..08ccc6e 100644
+> --- a/Documentation/devicetree/bindings/usb/fsl-usb.txt
+> +++ b/Documentation/devicetree/bindings/usb/fsl-usb.txt
+> @@ -81,3 +81,13 @@ Example dual role USB controller device node for MPC5121ADS:
+>  		fsl,invert-drvvbus;
+>  		fsl,invert-pwr-fault;
+>  	};
 > +
-> +ebi2 at 1a100000 {
-> +	compatible = "qcom,apq8060-ebi2";
-> +	#address-cells = <2>;
-> +	#size-cells = <1>;
-> +	ranges = <0 0x0 0x1a800000 0x00800000>,
-> +		 <1 0x0 0x1b000000 0x00800000>,
-> +		 <2 0x0 0x1b800000 0x00800000>,
-> +		 <3 0x0 0x1d000000 0x00800000>,
-> +		 <4 0x0 0x1c800000 0x00800000>,
-> +		 <5 0x0 0x1c000000 0x00800000>;
-> +	reg = <0x1a100000 0x1000>, <0x1a110000 0x1000>;
-> +	reg-names = "ebi2", "xmem";
+> +Example dual role USB controller device node for LS1012A:
+> +	usb at 8600000 {
+> +		compatible = "fsl-usb2-dr-v2.5", "fsl-usb2-dr";
+> +		reg = <0x0 0x8600000 0x0 0x1000>;
+> +		interrupts = <0 139 0x4>;
+> +		dr_mode = "host";
+> +		phy_type = "ulpi";
+> +		fsl,usb-erratum-a005697;
 
-...
+I cannot find this 'fsl,usb-erratum-a005697' property definition in the
+bindings doc.
 
-> + 	foo-ebi2 at 1b800000 {
-> +		compatible = "foo";
-> +		reg = <2 0x1b800000 0x100>;
-> +		(...)
+Shawn
+
 > +	};
-> +};
-
-In this example, the addresses don't match: I assume the child
-node should be listed as
-
-	foo-ebi at 2,0 {
-		reg = <2 0 0x100>;
-	};
-
-instead.
-
-	Arnd
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
