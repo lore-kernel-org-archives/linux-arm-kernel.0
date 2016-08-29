@@ -1,49 +1,97 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Mon, 29 Aug 2016 10:51:45 +0800
-Subject: [PATCH] drm/rockchip: vop: make vop register setting take effect
-In-Reply-To: <1472269178-16593-1-git-send-email-zyw@rock-chips.com>
-References: <1472269178-16593-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <57C3A341.9030302@rock-chips.com>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Mon, 29 Aug 2016 10:50:51 +0800
+Subject: [PATCH 2/2] arm64: dts: rockchip: add eMMC's power domain support
+ for rk3399
+In-Reply-To: <2ab8ab94-fa4d-2cd6-5805-a92ac5f9697e@rock-chips.com>
+References: <20160827134103.28160-1-xzy.xu@rock-chips.com>
+ <20160827134103.28160-3-xzy.xu@rock-chips.com>
+ <2ab8ab94-fa4d-2cd6-5805-a92ac5f9697e@rock-chips.com>
+Message-ID: <57C3A30B.5080707@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?08?27? 11:39, Chris Zhong wrote:
-> The setting of vop registers need a reg_done writing to take effect.
-> In vop_enable the vop return to work by by restoring registers, but the
-> registers do not take effect immediately, it should a vop_cfg_done
-> after it. The same thing is needed by windows_disabled in
-> vop_crtc_disable.
+
+
+On 08/27/2016 11:05 PM, Shawn Lin wrote:
+> On 2016/8/27 21:41, Ziyuan Xu wrote:
+>> Control power domain for eMMC via genpd to reduce power consumption.
+>>
+>> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+>> Signed-off-by: Ziyuan Xu <xzy.xu@rock-chips.com>
+>>
 >
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> ---
->   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 4 ++++
->   1 file changed, 4 insertions(+)
-Thanks for your fix.
+> It looks nice to me. But this should be merged after applying that[0]
+> as your patch will break bind/unbind test for sdhci-of-arasan on rk3399
+> without it[0]. Moreover, Elaine should make sure that upstreamed
+> rockchip power domain stuff would not off pd for emmc, *otherwise*, I
+> should update my patch to make sure we update clkmul every time when
+> doing suspend 2 resume..
+>
+>
+Forgot to say:
+If use pd, Although there is no call to power odd the pd_emmc,
+it will be power off when the system doing suspend 2 resume.
+(Because the system call 
+__device_suspend_noirq->pm_genpd_suspend_noirq->rockchip_pd_power_off)
 
-applied to my drm-fixes.
+And it's important to note:
+If the pd has been power off, some grf regs will be back to the default 
+value.(which grf regs in this pd)
+So if the pd support power off , this grf regs need to save and restore 
+or reinit.
+For example:
+pd_emmc
+	aclk_emmc_grf
 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index efbc41a..a0bfcff 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -464,6 +464,8 @@ static int vop_enable(struct drm_crtc *crtc)
->   	}
->   
->   	memcpy(vop->regs, vop->regsbak, vop->len);
-> +	vop_cfg_done(vop);
-> +
->   	/*
->   	 * At here, vop clock & iommu is enable, R/W vop regs would be safe.
->   	 */
-> @@ -513,6 +515,8 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
->   		spin_unlock(&vop->reg_lock);
->   	}
->   
-> +	vop_cfg_done(vop);
-> +
->   	drm_crtc_vblank_off(crtc);
->   
->   	/*
+If the pd is always on,and this pd have wakeup func.
+The device need to add device_init_wakeup() to make the pd always on 
+when the system doing suspend 2 resume.
 
--- 
-?ark Yao
+>
+> [0]: https://patchwork.kernel.org/patch/9300971/
+>
+>> ---
+>>
+>>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 11 +++++++++++
+>>  1 file changed, 11 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> index 32aebc8..71733d4 100644
+>> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> @@ -239,6 +239,7 @@
+>>          #clock-cells = <0>;
+>>          phys = <&emmc_phy>;
+>>          phy-names = "phy_arasan";
+>> +        power-domains = <&power RK3399_PD_EMMC>;
+>>          status = "disabled";
+>>      };
+>>
+>> @@ -611,6 +612,11 @@
+>>          status = "disabled";
+>>      };
+>>
+>> +    qos_emmc: qos at ffa58000 {
+>> +        compatible = "syscon";
+>> +        reg = <0x0 0xffa58000 0x0 0x20>;
+>> +    };
+>> +
+>>      qos_hdcp: qos at ffa90000 {
+>>          compatible = "syscon";
+>>          reg = <0x0 0xffa90000 0x0 0x20>;
+>> @@ -739,6 +745,11 @@
+>>              };
+>>
+>>              /* These power domains are grouped by VD_LOGIC */
+>> +            pd_emmc at RK3399_PD_EMMC {
+>> +                reg = <RK3399_PD_EMMC>;
+>> +                clocks = <&cru ACLK_EMMC>;
+>> +                pm_qos = <&qos_emmc>;
+>> +            };
+>>              pd_vio at RK3399_PD_VIO {
+>>                  reg = <RK3399_PD_VIO>;
+>>                  #address-cells = <1>;
+>>
+>
+>
