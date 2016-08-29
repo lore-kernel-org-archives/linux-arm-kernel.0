@@ -1,60 +1,66 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 29 Aug 2016 14:57:53 +0200
-Subject: [PATCH 1/2] bus: mvebu-mbus: Provide stub function for
- mvebu_mbus_get_io_win_info()
-In-Reply-To: <20160829110456.12206-1-sr@denx.de>
-References: <20160829110456.12206-1-sr@denx.de>
-Message-ID: <20160829125753.GC12465@lunn.ch>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 29 Aug 2016 15:03:33 +0200
+Subject: [PATCH v3 0/2] Embedding Position Independent Executables
+Message-ID: <20160829130335.12089-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 01:04:55PM +0200, Stefan Roese wrote:
-> This patch provides a stub function for mvebu_mbus_get_io_win_info(),
-> which will be used for all non-Orion (ARM32 MVEBU) platforms for
-> compile test coverage.
-> 
-> Signed-off-by: Stefan Roese <sr@denx.de>
-> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Marcin Wojtas <mw@semihalf.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> ---
->  include/linux/mbus.h | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/include/linux/mbus.h b/include/linux/mbus.h
-> index d610232..a884405 100644
-> --- a/include/linux/mbus.h
-> +++ b/include/linux/mbus.h
-> @@ -55,6 +55,8 @@ struct mbus_dram_target_info
->  #ifdef CONFIG_PLAT_ORION
->  extern const struct mbus_dram_target_info *mv_mbus_dram_info(void);
->  extern const struct mbus_dram_target_info *mv_mbus_dram_info_nooverlap(void);
-> +int mvebu_mbus_get_io_win_info(phys_addr_t phyaddr, u32 *size, u8 *target,
-> +			       u8 *attr);
->  #else
->  static inline const struct mbus_dram_target_info *mv_mbus_dram_info(void)
->  {
-> @@ -64,14 +66,17 @@ static inline const struct mbus_dram_target_info *mv_mbus_dram_info_nooverlap(vo
->  {
->  	return NULL;
->  }
-> +static inline int mvebu_mbus_get_io_win_info(phys_addr_t phyaddr, u32 *size,
-> +					     u8 *target, u8 *attr)
-> +{
-> +	return 0;
-> +}
->  #endif
+Hi,
 
-Hi Stefan
+This series introduces Position Independent Executables (PIEs) for the
+ARM architecture.
+The main goal is to avoid having to write low level code in assembly as
+this is currently the case for suspend/resume. Multiple platforms will
+benefit from this infrastructure: at91, rockchip, am335x.
 
-If i understand it correctly, this should never be used for real, it
-is here only for compile testing?
+Russell, do you see any remaining issues with the current approach?
 
-Maybe add a WARN_ON_ONCE(1) here? And a comment, why it should never
-happen.
+Changes in v3:
+ - rebased on v4.8-rc1
 
-Thanks
+Changes in v2:
+ - handle big endian
+ - handle gcov and ftrace by disabling them before compilling the PIE
+ - Get the alignment from the original ELF to ensure the PIE is
+   properly aligned in SRAM.
+ - stop using fncpy
+ - rebased on v4.7-rc1
 
-      Andrew
+
+*** BLURB HERE ***
+
+Alexandre Belloni (2):
+  ARM: PIE infrastructure
+  ARM: at91: pm: switch to the PIE infrastructure
+
+ arch/arm/Kconfig                 |   2 +
+ arch/arm/Makefile                |   1 +
+ arch/arm/mach-at91/Kconfig       |   1 +
+ arch/arm/mach-at91/Makefile      |   2 +-
+ arch/arm/mach-at91/pm.c          |  31 ++--
+ arch/arm/mach-at91/pm/.gitignore |   2 +
+ arch/arm/mach-at91/pm/Makefile   |   3 +
+ arch/arm/mach-at91/pm/atmel_pm.c |  97 +++++++++++
+ arch/arm/mach-at91/pm_suspend.S  | 338 ---------------------------------------
+ arch/arm/pie/Kconfig             |   8 +
+ arch/arm/pie/Makefile            |   1 +
+ arch/arm/pie/Makefile.pie        |  86 ++++++++++
+ arch/arm/pie/lib/empty.c         |  15 ++
+ arch/arm/pie/pie.c               |  97 +++++++++++
+ arch/arm/pie/pie.lds.S           |  40 +++++
+ include/linux/pie.h              | 146 +++++++++++++++++
+ 16 files changed, 510 insertions(+), 360 deletions(-)
+ create mode 100644 arch/arm/mach-at91/pm/.gitignore
+ create mode 100644 arch/arm/mach-at91/pm/Makefile
+ create mode 100644 arch/arm/mach-at91/pm/atmel_pm.c
+ delete mode 100644 arch/arm/mach-at91/pm_suspend.S
+ create mode 100644 arch/arm/pie/Kconfig
+ create mode 100644 arch/arm/pie/Makefile
+ create mode 100644 arch/arm/pie/Makefile.pie
+ create mode 100644 arch/arm/pie/lib/empty.c
+ create mode 100644 arch/arm/pie/pie.c
+ create mode 100644 arch/arm/pie/pie.lds.S
+ create mode 100644 include/linux/pie.h
+
+-- 
+2.9.3
