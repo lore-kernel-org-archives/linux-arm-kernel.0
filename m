@@ -1,29 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 Aug 2016 12:27:19 +0100
-Subject: [PATCH 2/2] drivers/perf: arm_pmu: Fix NULL pointer dereference
- during probe
-In-Reply-To: <1472314790-4268-2-git-send-email-stefan.wahren@i2se.com>
-References: <1472314790-4268-1-git-send-email-stefan.wahren@i2se.com>
- <1472314790-4268-2-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <20160830112718.GC24906@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 30 Aug 2016 19:43:29 +0800
+Subject: [PATCH v3] Added perf functionality to mmdc driver
+In-Reply-To: <CAHrpEqTtCnEU1v1sEuN8yJGPudDRZ5A79=Wn5Bp4SgTxDiNTQQ@mail.gmail.com>
+References: <20160817194253.16300-1-zhengyu.shen@nxp.com>
+ <CAHrpEqTtCnEU1v1sEuN8yJGPudDRZ5A79=Wn5Bp4SgTxDiNTQQ@mail.gmail.com>
+Message-ID: <20160830114329.GB8366@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 27, 2016 at 04:19:50PM +0000, Stefan Wahren wrote:
-> Patch 7f1d642fbb5c ("drivers/perf: arm-pmu: Fix handling of SPI lacking
-> interrupt-affinity property") unintended also fixes perf_event support
-> for bcm2835 which doesn't have PMU interrupts. Unfortunately this change
-> introduce a NULL pointer dereference on bcm2835, because irq_is_percpu
-> always expected to be called with a valid IRQ. So fix this regression
-> by validating the IRQ before.
+On Mon, Aug 29, 2016 at 11:06:44AM -0500, Zhi Li wrote:
+> On Wed, Aug 17, 2016 at 2:42 PM, Zhengyu Shen <zhengyu.shen@nxp.com> wrote:
+> > MMDC is a multi-mode DDR controller that supports DDR3/DDR3L x16/x32/x64
+> > and LPDDR2 two channel x16/x32 memory types. MMDC is configurable, high
+> > performance, and optimized. MMDC is present on i.MX6 Quad and i.MX6
+> > QuadPlus devices, but this driver only supports i.MX6 Quad at the moment.
+> > MMDC provides registers for performance counters which read via this
+> > driver to help debug memory throughput and similar issues.
+> >
+> > $ perf stat -a -e mmdc/busy-cycles/,mmdc/read-accesses/,mmdc/read-bytes/,mmdc/total-cycles/,mmdc/write-accesses/,mmdc/write-bytes/ dd if=/dev/zero of=/dev/null bs=1M count=5000
+> > Performance counter stats for 'dd if=/dev/zero of=/dev/null bs=1M count=5000':
+> >
+> >          898021787      mmdc/busy-cycles/
+> >           14819600      mmdc/read-accesses/
+> >             471.30 MB   mmdc/read-bytes/
+> >         2815419216      mmdc/total-cycles/
+> >           13367354      mmdc/write-accesses/
+> >             427.76 MB   mmdc/write-bytes/
+> >
+> >        5.334757334 seconds time elapsed
+> >
+> > Signed-off-by: Zhengyu Shen <zhengyu.shen@nxp.com>
+> > Signed-off-by: Frank Li <frank.li@nxp.com>
 > 
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> Fixes: 7f1d642fbb5c ("drivers/perf: arm-pmu: Fix handling of SPI lacking \"interrupt-affinity\" property")
-> ---
->  drivers/perf/arm_pmu.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Shawn Guo:
+> 
+>          No new comments got more than 1 weeks.
+>          Did you plan accept it?
 
-Thanks, these two look good to me. I'll queue them up as fixes and hopefully
-they'll land in -rc5.
+@Mark, how do you think of this version?
 
-Will
+Shawn
