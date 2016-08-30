@@ -1,43 +1,59 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 30 Aug 2016 17:57:54 +0100
-Subject: [GIT PULL] ARM: module PLT optimizations
-Message-ID: <CAKv+Gu-=C_WwO30D=0nZCx9FMhj7qrHFzvkk4xnG81Y0t1bdUw@mail.gmail.com>
+From: nleeder@codeaurora.org (Neil Leeder)
+Date: Tue, 30 Aug 2016 13:01:31 -0400
+Subject: [PATCH v4 0/2] qcom: add l2 cache perf events driver
+Message-ID: <1472576493-26382-1-git-send-email-nleeder@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+This adds a new dynamic PMU to the perf events framework to program
+and control the L2 cache PMUs in Qualcomm Centriq SOCs.
 
-The following changes since commit 3eab887a55424fc2c27553b7bfe32330df83f7b8:
+The driver exports formatting and event information to sysfs so it
+can be used by the perf user space tools with the syntax:
+perf stat -a -e l2cache_0/event=0x42/
 
-  Linux 4.8-rc4 (2016-08-28 15:04:33 -0700)
+Qualcomm Technologies PMUs have events arranged in a matrix of rows and columns.
+Only one event can be enabled from each column at once. This is enforced
+by the filter_match callback.
 
-are available in the git repository at:
+v4:
+Replace notifier with hotplug statemachine
+Allocate PMU struct dynamically
 
-  git://git.linaro.org/people/ard.biesheuvel/linux-arm.git \
-                                          tags/arm-plt-optimizations-for-v4.9
+v3:
+Remove exports from l2-accessors
+Change l2-accessors Kconfig to make it not user-selectable
+Reorder and remove unnecessary includes
 
-for you to fetch changes up to 66e94ba3c8ea5ff5f1443a50441f953ef44010b1:
+v2:
 
-  ARM: kernel: avoid brute force search on PLT generation
-                                          (2016-08-30 17:45:34 +0100)
+Add the l2-accessors patch to this patchset, previously posted separately.
+Remove sampling and per-task functionality for this uncore PMU.
+Use cpumask to replace code which filtered events to one cpu per slice.
+Replace manual event filtering with filter_match callback.
+Use a separate used_mask for event groups.
+Add hotplug notifier for CPU and irq migration.
+Remove extraneous synchronisation instructions.
+Other miscellaneous cleanup.
 
-----------------------------------------------------------------
-This series of 4 patches optimizes the ARM PLT generation code that
-is invoked at module load time, to get rid of the O(n^2) algorithm
-that results in pathological load times of 10 seconds or more for
-large modules on certain STB platforms
+Neil Leeder (2):
+  soc: qcom: provide mechanism for drivers to access L2 registers
+  soc: qcom: add l2 cache perf events driver
 
-----------------------------------------------------------------
-Ard Biesheuvel (4):
-      ARM: kernel: merge core and init PLTs
-      ARM: kernel: allocate PLT entries only for external symbols
-      ARM: kernel: sort relocation sections before allocating PLTs
-      ARM: kernel: avoid brute force search on PLT generation
+ drivers/soc/qcom/Kconfig               |  16 +
+ drivers/soc/qcom/Makefile              |   2 +
+ drivers/soc/qcom/l2-accessors.c        |  63 +++
+ drivers/soc/qcom/perf_event_l2.c       | 855 +++++++++++++++++++++++++++++++++
+ include/linux/cpuhotplug.h             |   1 +
+ include/linux/soc/qcom/l2-accessors.h  |  20 +
+ include/linux/soc/qcom/perf_event_l2.h |  79 +++
+ 7 files changed, 1036 insertions(+)
+ create mode 100644 drivers/soc/qcom/l2-accessors.c
+ create mode 100644 drivers/soc/qcom/perf_event_l2.c
+ create mode 100644 include/linux/soc/qcom/l2-accessors.h
+ create mode 100644 include/linux/soc/qcom/perf_event_l2.h
 
- arch/arm/include/asm/module.h |   6 +-
- arch/arm/kernel/module-plts.c | 243 +++++++++++++++++++++++++-----------------
- arch/arm/kernel/module.lds    |   3 +-
- 3 files changed, 147 insertions(+), 105 deletions(-)
-
-Thanks,
-Ard.
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
