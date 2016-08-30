@@ -1,33 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 30 Aug 2016 23:11:30 +0200
-Subject: [PATCH 1/3] ARM: integrator: delete some auxdata
-In-Reply-To: <201608301641.59299.arnd@arndb.de>
-References: <1472565569-11414-1-git-send-email-linus.walleij@linaro.org>
- <201608301641.59299.arnd@arndb.de>
-Message-ID: <CACRpkdaWOPbJNijYp7omGWPd5_Z59AjRSkjDR35XLNN2VH-WeA@mail.gmail.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Tue, 30 Aug 2016 14:20:17 -0700
+Subject: [RFC PATCH V5 0/5] ECAM quirks handling for ARM64 platforms
+In-Reply-To: <1470661002-26213-1-git-send-email-tn@semihalf.com>
+References: <1470661002-26213-1-git-send-email-tn@semihalf.com>
+Message-ID: <CADaLND=pbbtVZt6bg6Lg-21v3_SU+qDJGGDH0Qf+9maf8oTA5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2016 at 4:41 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 30 August 2016, Linus Walleij wrote:
->> There is just a few auxdata entries still needed on the Integrators:
->>
->> - UART RTS/CTS callbacks for Integrator/AP
->> - MMC/SD special card detect quirk for Integrator/CP
->>
->> Delete the rest.
->>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+On Mon, Aug 8, 2016 at 5:56 AM, Tomasz Nowicki <tn@semihalf.com> wrote:
 >
-> Nice patches! I've had a look over them and they all seem reasonable,
-> and I didn't see any obvious other parts that can be as easily removed
-> here (I thought I did at first, but they all ended up being
-> slightly trickier).
+> Quirk handling relies on an idea of matching MCFG OEM ID, TABLE ID and
+> revision (the ones from standard header of MCFG table).
+>
+> Static array is used to keep quirk entries. Each entry consists of
+> mentioned MCFG IDs along with custom pci_ops structure and initialization call.
+>
+> As an example, the last patch presents quirk handling mechanism usage for
+> ThunderX PEM driver.
 
-Yeah I will stack them all up and send as a combined cleanup+DTS
-pull request, it has to be like that since the display patch and
-some others can only be bisectable if code is removed from the
-board files and added to the DTS at the same time.
+Hi Tomasz,
 
-Yours,
-Linus Walleij
+Are you planning to change this series into a real one (not RFC) any time soon?
+>
+> v4 -> v5
+> - rebase against v4.8-rc1
+> - rework to exact MCFG OEM ID, TABLE ID, rev match
+>   - use memcmp instead of strncmp
+>   - no substring match
+> - fix typos and dmesg message
+>
+> Tomasz Nowicki (5):
+>   PCI: Embed pci_ecam_ops in pci_config_window structure
+>   PCI/ACPI: Move ACPI ECAM mapping to generic MCFG driver
+>   PCI: Check platform specific ECAM quirks
+>   ARM64/PCI: Start using quirks handling for ACPI based PCI host
+>     controller
+>   PCI: thunder-pem: Support quirky configuration space access for ACPI
+>     based PCI host controller
+>
+>  arch/arm64/kernel/pci.c            | 42 +----------------
+>  drivers/acpi/pci_mcfg.c            | 40 ++++++++++++++++
+>  drivers/pci/ecam.c                 |  6 +--
+>  drivers/pci/host/Makefile          |  1 +
+>  drivers/pci/host/mcfg-quirks.c     | 93 ++++++++++++++++++++++++++++++++++++
+>  drivers/pci/host/mcfg-quirks.h     | 24 ++++++++++
+>  drivers/pci/host/pci-thunder-pem.c | 96 ++++++++++++++++++++++++++++++++------
+>  include/linux/pci-acpi.h           |  5 ++
+>  include/linux/pci-ecam.h           |  2 +-
+>  9 files changed, 252 insertions(+), 57 deletions(-)
+>  create mode 100644 drivers/pci/host/mcfg-quirks.c
+>  create mode 100644 drivers/pci/host/mcfg-quirks.h
+>
+> --
+> 1.9.1
+>
+Regards,
+Duc Dang.
