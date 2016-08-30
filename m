@@ -1,90 +1,58 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 30 Aug 2016 11:26:19 +0100
-Subject: [PATCH v8 06/18] ARM: STi: DT: STiH407: Add FDMA driver dt nodes.
-In-Reply-To: <1472223413-7254-7-git-send-email-peter.griffin@linaro.org>
-References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
- <1472223413-7254-7-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20160830102619.GA10121@dell>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 30 Aug 2016 11:24:39 +0100
+Subject: [PATCH v2 4/9] arm64: head.S: move KASLR processing out of
+ __enable_mmu()
+In-Reply-To: <CAKv+Gu-N+-Qykg30UDaisgA+J1e0p-+GGuE9diz1=Hoh_yPPtw@mail.gmail.com>
+References: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1472049366-10922-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20160824203609.GA1642@remoulade> <20160824204654.GA1775@remoulade>
+ <CAKv+Gu-N+-Qykg30UDaisgA+J1e0p-+GGuE9diz1=Hoh_yPPtw@mail.gmail.com>
+Message-ID: <20160830102439.GC1223@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Aug 2016, Peter Griffin wrote:
-
-> These nodes are required to get the fdma driver working
-> on STiH407 based silicon.
+On Thu, Aug 25, 2016 at 02:59:51PM +0100, Ard Biesheuvel wrote:
+> On 24 August 2016 at 21:46, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Wed, Aug 24, 2016 at 09:36:10PM +0100, Mark Rutland wrote:
+> >> On Wed, Aug 24, 2016 at 04:36:01PM +0200, Ard Biesheuvel wrote:
+> >> > +__primary_switch:
+> >> > +#ifdef CONFIG_RANDOMIZE_BASE
+> >> > +   mov     x19, x0                         // preserve new SCTLR_EL1 value
+> >> > +   mrs     x20, sctlr_el1                  // preserve old SCTLR_EL1 value
+> >> > +#endif
+> >> > +
+> >> > +   adr     x27, 0f
+> >> > +   b       __enable_mmu
+> >>
+> >> As we do elsewhere, it's probably worth a comment on the line with the ADR into
+> >> x27, mentioning that __enable_mmu will branch there.
+> >>
+> >> ... or perhaps we should just have __enable_mmu return to the LR like a normal
+> >> AAPCS function, place the switch routines in the idmap, and use the idiomatic
+> >> sequence:
+> >>
+> >> __thing_switch:
+> >>       bl      __enable_mmu
+> >>       ldr     xN, =__thing
+> >>       blr     xN
+> >
+> > ... and now I see that this is what subsequent patches do ;)
+> >
+> > Is it possible to first AAPCS-ify __enable_mmu (with shuffling of callers as
+> > above) in one patch, prior to this?
 > 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  arch/arm/boot/dts/stih407-family.dtsi | 52 +++++++++++++++++++++++++++++++++++
->  1 file changed, 52 insertions(+)
+> Yes, but that would result in an __enable_mmu() that needs to stash
+> the link register value, and essentially returns twice in the KASLR
+> case.
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
-  
-> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> index d294e82..45cab30 100644
-> --- a/arch/arm/boot/dts/stih407-family.dtsi
-> +++ b/arch/arm/boot/dts/stih407-family.dtsi
-> @@ -821,5 +821,57 @@
->  			clock-frequency	= <600000000>;
->  			st,syscfg	= <&syscfg_core 0x224>;
->  		};
-> +
-> +		/* fdma audio */
-> +		fdma0: dma-controller at 8e20000 {
-> +			compatible = "st,stih407-fdma-mpe31-11", "st,slim-rproc";
-> +			reg = <0x8e20000 0x8000>,
-> +			      <0x8e30000 0x3000>,
-> +			      <0x8e37000 0x1000>,
-> +			      <0x8e38000 0x8000>;
-> +			reg-names = "slimcore", "dmem", "peripherals", "imem";
-> +			clocks = <&clk_s_c0_flexgen CLK_FDMA>,
-> +				 <&clk_s_c0_flexgen CLK_EXT2F_A9>,
-> +				 <&clk_s_c0_flexgen CLK_EXT2F_A9>,
-> +				 <&clk_s_c0_flexgen CLK_EXT2F_A9>;
-> +			interrupts = <GIC_SPI 5 IRQ_TYPE_NONE>;
-> +			dma-channels = <16>;
-> +			#dma-cells = <3>;
-> +		};
-> +
-> +		/* fdma app */
-> +		fdma1: dma-controller at 8e40000 {
-> +			compatible = "st,stih407-fdma-mpe31-12", "st,slim-rproc";
-> +			reg = <0x8e40000 0x8000>,
-> +			      <0x8e50000 0x3000>,
-> +			      <0x8e57000 0x1000>,
-> +			      <0x8e58000 0x8000>;
-> +			reg-names = "slimcore", "dmem", "peripherals", "imem";
-> +			clocks = <&clk_s_c0_flexgen CLK_FDMA>,
-> +				<&clk_s_c0_flexgen CLK_TX_ICN_DMU>,
-> +				<&clk_s_c0_flexgen CLK_TX_ICN_DMU>,
-> +				<&clk_s_c0_flexgen CLK_EXT2F_A9>;
-> +
-> +			interrupts = <GIC_SPI 7 IRQ_TYPE_NONE>;
-> +			dma-channels = <16>;
-> +			#dma-cells = <3>;
-> +		};
-> +
-> +		/* fdma free running */
-> +		fdma2: dma-controller at 8e60000 {
-> +			compatible = "st,stih407-fdma-mpe31-13", "st,slim-rproc";
-> +			reg = <0x8e60000 0x8000>,
-> +			      <0x8e70000 0x3000>,
-> +			      <0x8e77000 0x1000>,
-> +			      <0x8e78000 0x8000>;
-> +			reg-names = "slimcore", "dmem", "peripherals", "imem";
-> +			interrupts = <GIC_SPI 9 IRQ_TYPE_NONE>;
-> +			dma-channels = <16>;
-> +			#dma-cells = <3>;
-> +			clocks = <&clk_s_c0_flexgen CLK_FDMA>,
-> +				<&clk_s_c0_flexgen CLK_EXT2F_A9>,
-> +				<&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
-> +				<&clk_s_c0_flexgen CLK_EXT2F_A9>;
-> +		};
->  	};
->  };
+Ah, good point. I had missed that.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> As an intermediate step working towards the result after the series, I
+> think the adr + label above is the lesser evil
+
+Yes, it probably is.
+
+I'll try to flip back into review mode, keeping the above in mind.
+
+Thanks,
+Mark.
