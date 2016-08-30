@@ -1,33 +1,11 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 30 Aug 2016 11:18:56 +0200
-Subject: [GIT PULL 4/4] ARM: defconfig: Exynos for v4.9
+Date: Tue, 30 Aug 2016 11:18:57 +0200
+Subject: [GIT PULL 2/4] ARM: dts: exynos: DeviceTree for v4.9
 In-Reply-To: <1472548739-20050-1-git-send-email-k.kozlowski@samsung.com>
 References: <1472548739-20050-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1472548739-20050-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1472548739-20050-3-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi,
-
-Expected conflict in multi_v7 - take all the changes:
-
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@@ -135,8 -136,7 +136,8 @@@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=
-  CONFIG_CPU_FREQ_GOV_POWERSAVE=m
-  CONFIG_CPU_FREQ_GOV_USERSPACE=m
-  CONFIG_CPU_FREQ_GOV_CONSERVATIVE=m
-- CONFIG_CPU_FREQ_GOV_SCHEDUTIL=m
-+ CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
- +CONFIG_ARM_IMX6Q_CPUFREQ=y
-  CONFIG_QORIQ_CPUFREQ=y
-  CONFIG_CPU_IDLE=y
-  CONFIG_ARM_CPUIDLE=y
-
-
-
-Best regards,
-Krzysztof
 
 
 The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
@@ -36,39 +14,35 @@ The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-4.9
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.9
 
-for you to fetch changes up to 88ea168f0a35c6aeab3c6703f7eb3b1c925c5b12:
+for you to fetch changes up to 05b01dd936b46f2c3cfbb10bc89c0ec79c745e5d:
 
-  Merge tag 'tags/samsung-defconfig-schedutil-4.9' into next/defconfig (2016-08-24 06:54:32 +0200)
-
-----------------------------------------------------------------
-
-Samsung defconfig update for v4.9:
-1. Device dynamic frequency and voltage scalling is now supported
-   on many Exynos boards, enable it.
-2. Enable PM_DEBUG, cleanup old IPV6_PRIVACY.
-3. Enable SECCOMP for Systemd on Arch.
-4. cpufreq schedutil cannot be module anymore.
+  ARM: dts: exynos: Use 'hpd-gpios' instead of 'hpd-gpio' (2016-08-24 21:09:24 +0200)
 
 ----------------------------------------------------------------
-Borislav Petkov (1):
-      ARM: s3c2410_defconfig: Remove CONFIG_IPV6_PRIVACY
+Samsung DeviceTree update for v4.9:
+1. Set chosen serial bitrate which allows proper serial output when
+   bootloader does pass all the data in command line.
+2. Cleanup.
 
-Chanwoo Choi (1):
-      ARM: exynos_defconfig: Enable bus frequency scaling with devfreq
+----------------------------------------------------------------
+Krzysztof Kozlowski (1):
+      ARM: dts: exynos: Use stdout non-deprecated property and add serial options to Odroid XU/XU3/XU4
 
-Javier Martinez Canillas (2):
-      ARM: exynos_defconfig: Don't attempt to enable schedutil governor as module
-      ARM: multi_v7_defconfig: Don't attempt to enable schedutil governor as module
+Milo Kim (1):
+      ARM: dts: exynos: Use 'hpd-gpios' instead of 'hpd-gpio'
 
-Krzysztof Kozlowski (4):
-      ARM: exynos_defconfig: Enable PM_DEBUG
-      ARM: exynos_defconfig: Enable SECCOMP
-      ARM: multi_v7_defconfig: Enable SECCOMP
-      Merge tag 'tags/samsung-defconfig-schedutil-4.9' into next/defconfig
-
- arch/arm/configs/exynos_defconfig   | 11 ++++++++++-
- arch/arm/configs/multi_v7_defconfig |  3 ++-
- arch/arm/configs/s3c2410_defconfig  |  1 -
- 3 files changed, 12 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/display/exynos/exynos_hdmi.txt | 4 ++--
+ arch/arm/boot/dts/exynos4210-universal_c210.dts                  | 2 +-
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi                  | 2 +-
+ arch/arm/boot/dts/exynos5250-arndale.dts                         | 2 +-
+ arch/arm/boot/dts/exynos5250-smdk5250.dts                        | 2 +-
+ arch/arm/boot/dts/exynos5250-snow-common.dtsi                    | 2 +-
+ arch/arm/boot/dts/exynos5250-spring.dts                          | 2 +-
+ arch/arm/boot/dts/exynos5410-odroidxu.dts                        | 2 +-
+ arch/arm/boot/dts/exynos5420-peach-pit.dts                       | 2 +-
+ arch/arm/boot/dts/exynos5420-smdk5420.dts                        | 2 +-
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi               | 4 ++--
+ arch/arm/boot/dts/exynos5800-peach-pi.dts                        | 2 +-
+ 12 files changed, 14 insertions(+), 14 deletions(-)
