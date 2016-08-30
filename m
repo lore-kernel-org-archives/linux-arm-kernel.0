@@ -1,86 +1,74 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 30 Aug 2016 17:58:01 +0300
-Subject: [PATCH 2/2] ARM: dts: dra7: cpsw: fix clocks tree
-In-Reply-To: <20160830145801.10364-1-grygorii.strashko@ti.com>
-References: <20160830145801.10364-1-grygorii.strashko@ti.com>
-Message-ID: <20160830145801.10364-2-grygorii.strashko@ti.com>
+Date: Tue, 30 Aug 2016 17:58:00 +0300
+Subject: [RESEND PATCH 1/2] ARM: dts: dra7: Fix clock data for
+ gmac_gmii_ref_clk_div
+Message-ID: <20160830145801.10364-1-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current clocks tree definition for CPSW/CPTS doesn't
-correspond TRM for dra7/am57 SoCs.
+From: "J.D. Schroeder" <jay.schroeder@garmin.com>
 
-CPTS: has to be sourced from gmac_rft_clk_mux clock
-CPSW: DPLL_GMAC -> CLKOUT_M2 -> GMAC_250M_CLK -> 1/2 ->
-      -> GMAC_MAIN_CLK (125 MHZ)
+This commit fixes the clock data inside the DRA7xx clocks device tree
+structure for the gmac_gmii_ref_clk_div clock. This clock is actually
+the GMAC_MAIN_CLK and has nothing to do with the register at address
+0x4a0093d0. If CLKSEL_REF bit 24 inside of CM_GMAC_GMAC_CLKCTRL, is
+set to 1 in order to use the GMAC_RMII_CLK instead of the
+GMAC_RMII_HS_CLK, the kernel generates a clock divider warning:
+    WARNING: CPU: 0 PID: 0 at drivers/clk/clk-divider.c:129 clk_divider_recalc_rate+0xa8/0xe0()
+    gmac_gmii_ref_clk_div: Zero divisor and CLK_DIVIDER_ALLOW_ZERO not set
 
-Hence, correct clock tree for GMAC_MAIN_CLK and use proper
-clock for CPTS. This also require updating of CPTS clock
-multiplier.
+By properly configuring the gmac_gmii_ref_clk_div (GMAC_MAIN_CLK) to
+have the parent of dpll_gmac_m2_ck always divided by 2 the warning is
+resolved and the clock tree is fixed up.
+
+Additionally, a new clock called rmii_50mhz_clk_mux is defined that
+does utilize CM_GMAC_GMAC_CLKCTRL[24] CLKSEL_REF to configure the
+source clock for the RMII_50MHZ_CLK.
 
 Cc: Tero Kristo <t-kristo@ti.com>
-Cc: Mugunthan V N <mugunthanvnm@ti.com>
+Cc: Lokesh Vutla <lokeshvutla@ti.com>
+Signed-off-by: J.D. Schroeder <jay.schroeder@garmin.com>
+Reviewed-by: Trenton Andres <trenton.andres@garmin.com>
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi          |  4 ++--
- arch/arm/boot/dts/dra7xx-clocks.dtsi | 16 ++++++++--------
- 2 files changed, 10 insertions(+), 10 deletions(-)
+Hi Tony,
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index d9bfb94..9f14eed 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1717,7 +1717,7 @@
- 		mac: ethernet at 48484000 {
- 			compatible = "ti,dra7-cpsw","ti,cpsw";
- 			ti,hwmods = "gmac";
--			clocks = <&dpll_gmac_ck>, <&gmac_gmii_ref_clk_div>;
-+			clocks = <&gmac_main_clk>, <&gmac_rft_clk_mux>;
- 			clock-names = "fck", "cpts";
- 			cpdma_channels = <8>;
- 			ale_entries = <1024>;
-@@ -1726,7 +1726,7 @@
- 			mac_control = <0x20>;
- 			slaves = <2>;
- 			active_slave = <0>;
--			cpts_clock_mult = <0x80000000>;
-+			cpts_clock_mult = <0x784CFE14>;
- 			cpts_clock_shift = <29>;
- 			reg = <0x48484000 0x1000
- 			       0x48485200 0x2E00>;
+Originally this patch was posted (and acked) here
+https://lkml.org/lkml/2016/4/27/272, 
+but it, unfortunatelly, has never been merged. 
+So re-send + minor subj change.
+
+ arch/arm/boot/dts/dra7xx-clocks.dtsi | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
+
 diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-index 3f0c61d..3330738e 100644
+index 8378b44..3f0c61d 100644
 --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
 +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-@@ -1003,6 +1003,14 @@
- 		ti,index-power-of-two;
+@@ -1718,13 +1718,20 @@
+ 		reg = <0x0c00>;
  	};
  
-+	gmac_main_clk: gmac_main_clk {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clocks = <&gmac_250m_dclk_div>;
-+		clock-mult = <1>;
-+		clock-div = <2>;
+-	gmac_gmii_ref_clk_div: gmac_gmii_ref_clk_div at 13d0 {
++	rmii_50mhz_clk_mux: rmii_50mhz_clk_mux at 13d0 {
+ 		#clock-cells = <0>;
+-		compatible = "ti,divider-clock";
+-		clocks = <&dpll_gmac_m2_ck>;
++		compatible = "ti,mux-clock";
++		clocks = <&dpll_gmac_h11x2_ck>, <&rmii_clk_ck>;
+ 		ti,bit-shift = <24>;
+ 		reg = <0x13d0>;
+-		ti,dividers = <2>;
 +	};
 +
- 	l3init_480m_dclk_div: l3init_480m_dclk_div at 1ac {
- 		#clock-cells = <0>;
- 		compatible = "ti,divider-clock";
-@@ -1726,14 +1734,6 @@
- 		reg = <0x13d0>;
++	gmac_gmii_ref_clk_div: gmac_gmii_ref_clk_div {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&dpll_gmac_m2_ck>;
++		clock-mult = <1>;
++		clock-div = <2>;
  	};
  
--	gmac_gmii_ref_clk_div: gmac_gmii_ref_clk_div {
--		#clock-cells = <0>;
--		compatible = "fixed-factor-clock";
--		clocks = <&dpll_gmac_m2_ck>;
--		clock-mult = <1>;
--		clock-div = <2>;
--	};
--
  	gmac_rft_clk_mux: gmac_rft_clk_mux at 13d0 {
- 		#clock-cells = <0>;
- 		compatible = "ti,mux-clock";
 -- 
 2.9.2
