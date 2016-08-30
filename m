@@ -1,50 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 Aug 2016 18:27:10 +0100
-Subject: [PATCH] drivers/perf: arm-pmu: Fix handling of SPI lacking
- "interrupt-affinity" property
-In-Reply-To: <CAOi56cXFCZoMox3XrJvsQAXHa1uxOBPEKO266B2yYONv3pTY7g@mail.gmail.com>
-References: <1468939142-23693-1-git-send-email-marc.zyngier@arm.com>
- <CAOi56cXFCZoMox3XrJvsQAXHa1uxOBPEKO266B2yYONv3pTY7g@mail.gmail.com>
-Message-ID: <20160830172710.GJ24906@arm.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 30 Aug 2016 19:32:02 +0200
+Subject: [PATCH v3] mmc: sunxi: Handle the 'New Timing' mode
+In-Reply-To: <20160830162613.GG18605@lukather>
+References: <20160813175611.79E0323C@mail.free-electrons.com>
+ <20160830162613.GG18605@lukather>
+Message-ID: <20160830193202.4baaefd508a5d20d48b2cbed@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+On Tue, 30 Aug 2016 18:26:13 +0200
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-Thanks for reporting this.
-
-On Fri, Aug 26, 2016 at 12:11:55PM -0500, Kevin Hilman wrote:
-> On Tue, Jul 19, 2016 at 9:39 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > Patch 19a469a58720 ("drivers/perf: arm-pmu: Handle per-interrupt
-> > affinity mask") added support for partitionned PPI setups, but
-> > inadvertently broke setups using SPIs without the "interrupt-affinity"
-> > property (which is the case for UP platforms).
-> >
-> > This patch restore the broken functionnality by testing whether the
-> > interrupt is percpu or not instead of relying on the using_spi flag
-> > that really means "SPI *and* interrupt-affinity property".
-> >
-> > Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> > Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> > Fixes: 19a469a58720 ("drivers/perf: arm-pmu: Handle per-interrupt affinity mask")
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > There are 2 flags saying that the new timing is used:
+> > - the bit 'mode select' in the clock register, and
+> > - the bit 'new timing' in the MMC register.
+> > Both bits must be set/reset at the same time, otherwise the device
+> > does not work (tested with wifi and eMMC in H3 and A83T boards).
+> > So, some synchronization must exist.
+> > 
+> > The previous versions was using a DT property for the MMC and a flag
+> > in the clock driver. This did work with a correct configuration
+> > on both sides, but experiment showed that it was easy to do an error.
 > 
-> kernelci.org detected boot failures on bcm2835-rpi-b in mainline[1]
-> and was bisected down to this patch.  I verified that reverting this
-> patch on top of mainline gets bcm2835-rpi-b booting again.
-> 
-> I haven't been closely tracking this change, but a quick glance and it
-> looks like this platform is possibly missing IRQ properties from its
-> PMU node?  The DT for this platform simply has:
-> 
->         arm-pmu {
->             compatible = "arm,arm1176-pmu";
->         };
+> I still believe that we will need a property, at least to identify on
+> which we can try the new mode, and on which clocks it's irrelevant (at
+> least for the A33 and A83T).
 
+As told above, setting the new mode on side (clock or MMC) and not on
+the other one prevents the devices to work. Then, it is safer to have
+the new mode capability flag only once for both sides.
 
-Stefan Wahren posted a fix for this, so I've queued it locally and plan
-to send via Catalin:
+Now, as the clocks are defined by memory tables and not by the DT, it
+seems natural to have the flag on the clock side.
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/452475.html
+> However, I also believe we should make that mode switching explicit
+> through a function call, instead of relying on some side effect (of
+> some non-upstream code).
 
-Will
+Do you mean a direct call from the MMC driver to the clock driver?
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
