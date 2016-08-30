@@ -1,40 +1,54 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 30 Aug 2016 18:42:03 +0200
-Subject: [PATCH 05/33] gpio: add generic single-register fixed-direction
- GPIO driver
-In-Reply-To: <20160830091805.GL1041@n2100.armlinux.org.uk> (Russell King's
- message of "Tue, 30 Aug 2016 10:18:06 +0100")
-References: <20160829102328.GA28796@n2100.armlinux.org.uk>
- <E1beJjz-0000mA-0o@rmk-PC.armlinux.org.uk>
- <87eg57e54l.fsf@belgarion.home>
- <20160830091805.GL1041@n2100.armlinux.org.uk>
-Message-ID: <87k2eycip0.fsf@belgarion.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 30 Aug 2016 17:53:40 +0100
+Subject: [PATCH] arm64: kernel: Fix unmasked debug exceptions when
+ restoring mdscr_el1
+In-Reply-To: <1472223822-21059-1-git-send-email-james.morse@arm.com>
+References: <1472223822-21059-1-git-send-email-james.morse@arm.com>
+Message-ID: <20160830165339.GI24906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@armlinux.org.uk> writes:
+On Fri, Aug 26, 2016 at 04:03:42PM +0100, James Morse wrote:
+> Changes to make the resume from cpu_suspend() code behave more like
+> secondary boot caused debug exceptions to be unmasked early by
+> __cpu_setup(). We then go on to restore mdscr_el1 in cpu_do_resume(),
+> potentially taking break or watch points based on uninitialised registers.
+> 
+> Mask debug exceptions in cpu_do_resume(), which is specific to resume
+> from cpu_suspend(). Debug exceptions will be restored to their original
+> state by local_dbg_restore() in cpu_suspend(), which runs after
+> hw_breakpoint_restore() has re-initialised the other registers.
+> 
+> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Fixes: cabe1c81ea5b ("arm64: Change cpu_resume() to enable mmu early then access sleep_sp by va")
+> Cc: <stable@vger.kernel.org> #4.7
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+>  arch/arm64/mm/proc.S | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index 5bb61de23201..9d37e967fa19 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -100,7 +100,16 @@ ENTRY(cpu_do_resume)
+>  
+>  	msr	tcr_el1, x8
+>  	msr	vbar_el1, x9
+> +
+> +	/*
+> +	 * __cpu_setup() cleared MDSCR_EL1.MDE and friends, before unmasking
+> +	 * debug exceptions. By restoring MDSCR_EL1 here, we may take a debug
+> +	 * exception. Mask them until local_dbg_restore() in cpu_suspend()
+> +	 * resets them.
+> +	 */
+> +	disable_dbg
+>  	msr	mdscr_el1, x10
+> +
+>  	msr	sctlr_el1, x12
 
-> On Mon, Aug 29, 2016 at 09:39:54PM +0200, Robert Jarzmik wrote:
->> Maybe this one would deserve a doxygen comment ?
->
-> Does this solve it?
-Oh yes, that's very nice, especially the "1 = in" for which I have always a
-doubt.
+Looks good to me:
 
-Reviewed-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-I hope to have an "attempt" to test all your series on the lubbock board in the
-next days. The "attempt" part is because last time I checked pcmcia support was
-broken on lubbock (ie. CONFIG_PCMCIA_SA1111 activated implies an Oops), and I
-don't remember having repaired it (and it's disabled on my test farm which is a
-sign I was not very confident about this part).
-
-If you happen to have somewhere a branch I can pull, with all your series (at
-least "[RFC PATCH 00/33] SA11x0/PXA GPIO rework (Core + PCMCIA only)" and
-"[PATCH 0/8] SA11x0/PXA remainder & cleanups"), that would spare me the multiple
-git-am to make the test(s).
-
-Cheers.
-
---
-Robert
+Will
