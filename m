@@ -1,33 +1,105 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 30 Aug 2016 17:05:54 +0100
-Subject: [PATCH 0/2] arm{,64}/kvm: excise redundant cache maintenance
-Message-ID: <1472573156-30414-1-git-send-email-mark.rutland@arm.com>
+Date: Tue, 30 Aug 2016 17:05:55 +0100
+Subject: [PATCH 1/2] arm/kvm: excise redundant cache maintenance
+In-Reply-To: <1472573156-30414-1-git-send-email-mark.rutland@arm.com>
+References: <1472573156-30414-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1472573156-30414-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As noted in a jailhouse thread a short while ago [1,2], the presence of the
-virtualization extensions implies that page table walks are coherent, and do
-not require that updates are cleaned to the PoU.
+When modifying Stage-2 page tables, we perform cache maintenance to
+account for non-coherent page table walks. However, this is unnecessary,
+as page table walks are guaranteed to be coherent in the presence of the
+virtualization extensions.
 
-These patches remove the redundant maintenance and related infrastructure.
+Per ARM DDI 0406C.c, section B1.7 ("The Virtualization Extensions"), the
+virtualization extensions mandate the multiprocessing extensions.
 
-As I do not have a suitably configured ARMv7 board, I have not been able to
-test the patches myself, and any testing would be appreciated.
+Per ARM DDI 0406C.c, section B3.10.1 ("General TLB maintenance
+requirements"), as described in the sub-section titled "TLB maintenance
+operations and the memory order model", this maintenance is not required
+in the presence of the multiprocessing extensions.
 
-Thanks,
-Mark.
+Hence, we need not perform this cache maintenance when modifying Stage-2
+entries.
 
-[1] https://groups.google.com/d/msg/jailhouse-dev/c9Ier7mUNoI/JWUJGyxfAQAJ
-[2] https://groups.google.com/d/msg/jailhouse-dev/c9Ier7mUNoI/qagpektgAQAJ
+This patch removes the logic for performing the redundant maintenance.
+To ensure visibility and ordering of updates, a dsb(ishst) that was
+otherwise implicit in the maintenance is folded into kvm_set_pmd() and
+kvm_set_pte().
 
-Mark Rutland (2):
-  arm/kvm: excise redundant cache maintenance
-  arm64/kvm: remove unused stub functions
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: kvmarm at lists.cs.columbia.edu
+---
+ arch/arm/include/asm/kvm_mmu.h | 28 ++--------------------------
+ arch/arm/kvm/mmu.c             |  2 --
+ 2 files changed, 2 insertions(+), 28 deletions(-)
 
- arch/arm/include/asm/kvm_mmu.h   | 28 ++--------------------------
- arch/arm/kvm/mmu.c               |  2 --
- arch/arm64/include/asm/kvm_mmu.h |  6 ------
- 3 files changed, 2 insertions(+), 34 deletions(-)
-
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 3bb803d..74a44727 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -63,37 +63,13 @@ void kvm_clear_hyp_idmap(void);
+ static inline void kvm_set_pmd(pmd_t *pmd, pmd_t new_pmd)
+ {
+ 	*pmd = new_pmd;
+-	flush_pmd_entry(pmd);
++	dsb(ishst);
+ }
+ 
+ static inline void kvm_set_pte(pte_t *pte, pte_t new_pte)
+ {
+ 	*pte = new_pte;
+-	/*
+-	 * flush_pmd_entry just takes a void pointer and cleans the necessary
+-	 * cache entries, so we can reuse the function for ptes.
+-	 */
+-	flush_pmd_entry(pte);
+-}
+-
+-static inline void kvm_clean_pgd(pgd_t *pgd)
+-{
+-	clean_dcache_area(pgd, PTRS_PER_S2_PGD * sizeof(pgd_t));
+-}
+-
+-static inline void kvm_clean_pmd(pmd_t *pmd)
+-{
+-	clean_dcache_area(pmd, PTRS_PER_PMD * sizeof(pmd_t));
+-}
+-
+-static inline void kvm_clean_pmd_entry(pmd_t *pmd)
+-{
+-	clean_pmd_entry(pmd);
+-}
+-
+-static inline void kvm_clean_pte(pte_t *pte)
+-{
+-	clean_pte_table(pte);
++	dsb(ishst);
+ }
+ 
+ static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 29d0b23..344755d 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -744,7 +744,6 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
+ 	if (!pgd)
+ 		return -ENOMEM;
+ 
+-	kvm_clean_pgd(pgd);
+ 	kvm->arch.pgd = pgd;
+ 	return 0;
+ }
+@@ -936,7 +935,6 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+ 		if (!cache)
+ 			return 0; /* ignore calls from kvm_set_spte_hva */
+ 		pte = mmu_memory_cache_alloc(cache);
+-		kvm_clean_pte(pte);
+ 		pmd_populate_kernel(NULL, pmd, pte);
+ 		get_page(virt_to_page(pmd));
+ 	}
 -- 
 1.9.1
