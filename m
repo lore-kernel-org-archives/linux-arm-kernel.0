@@ -1,64 +1,33 @@
-From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Tue, 30 Aug 2016 20:10:25 +0200
-Subject: [linux-sunxi] [PATCH v9 2/2] Add mixer controls: Line-In,
- FM-In, Mic 2, Capture Source, Differential Line-In.
-In-Reply-To: <CAEKpxBn9AbxHQE03BVtR4NuF-KzqE_0-+nLGqcSyNrc=nbQgow@mail.gmail.com>
-References: <20160829180321.11695-1-dannym@scratchpost.org>
- <20160829180321.11695-3-dannym@scratchpost.org>
- <CAEKpxBn9AbxHQE03BVtR4NuF-KzqE_0-+nLGqcSyNrc=nbQgow@mail.gmail.com>
-Message-ID: <20160830201025.506b30ae@scratchpost.org>
+From: jingoohan1@gmail.com (Jingoo Han)
+Date: Tue, 30 Aug 2016 14:15:00 -0400
+Subject: [PATCH v2] arm64:pci: fix the IOV device access config space
+ valid condition
+In-Reply-To: <HE1PR0402MB2748F7A71F8A0073644EE3568BE00@HE1PR0402MB2748.eurprd04.prod.outlook.com>
+References: <1471932072-6980-1-git-send-email-po.liu@nxp.com>
+ <1472455618-17892-1-git-send-email-po.liu@nxp.com>
+ <000a01d202d5$3f86e3a0$be94aae0$@gmail.com>
+ <HE1PR0402MB2748F7A71F8A0073644EE3568BE00@HE1PR0402MB2748.eurprd04.prod.outlook.com>
+Message-ID: <000401d202ea$6e6d5ef0$4b481cd0$@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi CK,
+On Tuesday, August 30, 2016 11:55 AM, Roy Zang wrote:
+> 
+> On 08/30/2016 10:43 AM, Jingoo Han wrote:
+> > I really don't like to modify host driver stuffs.
+> > But, if there is no alternatives, this patch looks good.
+> 
+> I do not see other good place to fix the bug.
 
-On Tue, 30 Aug 2016 08:49:40 +0200
-Code Kipper <codekipper@gmail.com> wrote:
+Hi Roy Zang,
 
-> On 29 August 2016 at 20:03, Danny Milosavljevic <dannym@scratchpost.org> wrote:
-> I think this should be delivered in a series of patches like what I've
-> attempted to do here
-> https://github.com/codekipper/linux-sunxi/commits/sunxi-wip?page=2
+I didn't find other good place, too.
+At that time, I did IOV test with the similar patch like this.
 
-Feel free to do it. But I've gotten questions from users why they have to
-apply my patch manually again and again, so let's get this done one way
-or another.
+Best regards,
+Jingoo Han
 
-> I haven't worked with my A20 for a while which is why I haven't
-> delivered these changes, however summer is coming to an end and should
-> be able to retest and deliver soon.
-
-Good :)
-
-Please check whether you use the same routes and registers in your
-version - my patch has been in use by multiple people for months
-so I'm quite positive that it works, whatever cosmetic issues there may be.
-
-Especially pay attention to Line Playback Volume - it has two possible values.
-
-0 means -1.5 dB and 1 means 0 dB. Many userspace tools seem to be confused
-about it not being a boolean and alsa-lib also did stupid stuff with it
-depending on the name. So make sure that it does work.
-
-Also if someone tests my patch, please also test this.
-
-(It has been notoriously difficult to reproduce this problem reliably
- in the past with different people's setups)
-
-> I can see that there is a difference like you've mentioned between the
-> A10 and A20 with the MIC pre-amps so approve of the use of a common
-> array.
-
-Yeah, it's necessary.
-
-> Something also looks wrong with the whitespacing for sun4i_codec_codec.
-
-Depends on your tab width - the committed version used Tab characters in
-order to line up the equals signs. So it was really just luck how it looked.
-
-That means that depending on the tab width it did either line up or not
-(it didn't line up for me).
-
-Now it's using spaces around the equal sign and so it shows up
-the same for everyone - lined up. I fixed this because I touched the line
-anyway.
+> 
+> Roy Zang <roy.zang@nxp.com>
+> 
+> Roy
