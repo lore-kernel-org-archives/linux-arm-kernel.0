@@ -1,477 +1,590 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 30 Aug 2016 14:31:26 +0200
-Subject: [RFC PATCH v3 2/5] arm/arm64: vgic-new: Add distributor and
- redistributor access
-In-Reply-To: <1472037609-4164-3-git-send-email-vijay.kilari@gmail.com>
-References: <1472037609-4164-1-git-send-email-vijay.kilari@gmail.com>
- <1472037609-4164-3-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <20160830123126.GH10162@cbox>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 30 Aug 2016 13:34:53 +0100
+Subject: [PATCH v8 01/18] remoteproc: st_slim_rproc: add a slimcore rproc
+ driver
+In-Reply-To: <1472223413-7254-2-git-send-email-peter.griffin@linaro.org>
+References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
+ <1472223413-7254-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20160830123453.GG10121@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 04:50:06PM +0530, vijay.kilari at gmail.com wrote:
-> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+On Fri, 26 Aug 2016, Peter Griffin wrote:
+
+> slim core is used as a basis for many IPs in the STi
+> chipsets such as fdma and demux. To avoid duplicating
+> the elf loading code in each device driver a slim
+> rproc driver has been created.
 > 
-> VGICv3 Distributor and Redistributor registers are accessed using
-> KVM_DEV_ARM_VGIC_GRP_DIST_REGS and KVM_DEV_ARM_VGIC_GRP_DIST_REGS
-> with KVM_SET_DEVICE_ATTR and KVM_GET_DEVICE_ATTR ioctls.
-> These registers are accessed as 32-bit and cpu mpidr
-> value passed along with register offset is used to identify the
-> cpu for redistributor registers access.
+> This driver is designed to be used by other device drivers
+> such as fdma, or demux whose IP is based around a slim core.
+> The device driver can call slim_rproc_alloc() to allocate
+> a slim rproc and slim_rproc_put() when finished.
 > 
-> The version of VGIC v3 specification is define here
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
+> This driver takes care of ioremapping the slim
+> registers (dmem, imem, slimcore, peripherals), whose offsets
+> and sizes can change between IP's. It also obtains and enables
+> any clocks used by the device. This approach avoids having
+> a double mapping of the registers as slim_rproc does not register
+> its own platform device. It also maps well to device tree
+> abstraction as it allows us to have one dt node for the whole
+> device.
 > 
-> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> All of the generic rproc elf loading code can be reused, and
+> we provide start() stop() hooks to start and stop the slim
+> core once the firmware has been loaded. This has been tested
+> successfully with fdma driver.
+
+Nit.  It would be good to use a constant line-wrap.
+
+'M-x post-mode' will help with this.
+
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 > ---
->  arch/arm64/include/uapi/asm/kvm.h   |   3 +
->  virt/kvm/arm/vgic/vgic-kvm-device.c | 127 +++++++++++++++++++++++++++++++++++-
->  virt/kvm/arm/vgic/vgic-mmio-v3.c    | 113 ++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic-mmio.c       |   2 +-
->  virt/kvm/arm/vgic/vgic.h            |   8 +++
->  5 files changed, 250 insertions(+), 3 deletions(-)
+>  drivers/remoteproc/Kconfig               |   8 +
+>  drivers/remoteproc/Makefile              |   1 +
+>  drivers/remoteproc/st_slim_rproc.c       | 364 +++++++++++++++++++++++++++++++
+>  include/linux/remoteproc/st_slim_rproc.h |  53 +++++
+>  4 files changed, 426 insertions(+)
+>  create mode 100644 drivers/remoteproc/st_slim_rproc.c
+>  create mode 100644 include/linux/remoteproc/st_slim_rproc.h
 > 
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index 3051f86..94ea676 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -201,10 +201,13 @@ struct kvm_arch_memory_slot {
->  #define KVM_DEV_ARM_VGIC_GRP_CPU_REGS	2
->  #define   KVM_DEV_ARM_VGIC_CPUID_SHIFT	32
->  #define   KVM_DEV_ARM_VGIC_CPUID_MASK	(0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
-> +#define   KVM_DEV_ARM_VGIC_V3_CPUID_MASK \
-> +				(0xffffffffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
+> diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+> index 1a8bf76a..06765e0 100644
+> --- a/drivers/remoteproc/Kconfig
+> +++ b/drivers/remoteproc/Kconfig
+> @@ -100,4 +100,12 @@ config ST_REMOTEPROC
+>  	  processor framework.
+>  	  This can be either built-in or a loadable module.
+>  
+> +config ST_SLIM_REMOTEPROC
+> +	tristate "ST Slim remoteproc support"
+> +	select REMOTEPROC
+> +	help
+> +	  Say y here to support firmware loading on IP based around
+> +	  the Slim core.
+> +	  If unsure say N.
+> +
+>  endmenu
+> diff --git a/drivers/remoteproc/Makefile b/drivers/remoteproc/Makefile
+> index 92d3758..db1dae7 100644
+> --- a/drivers/remoteproc/Makefile
+> +++ b/drivers/remoteproc/Makefile
+> @@ -14,3 +14,4 @@ obj-$(CONFIG_DA8XX_REMOTEPROC)		+= da8xx_remoteproc.o
+>  obj-$(CONFIG_QCOM_MDT_LOADER)		+= qcom_mdt_loader.o
+>  obj-$(CONFIG_QCOM_Q6V5_PIL)		+= qcom_q6v5_pil.o
+>  obj-$(CONFIG_ST_REMOTEPROC)		+= st_remoteproc.o
+> +obj-$(CONFIG_ST_SLIM_REMOTEPROC)	+= st_slim_rproc.o
+> diff --git a/drivers/remoteproc/st_slim_rproc.c b/drivers/remoteproc/st_slim_rproc.c
+> new file mode 100644
+> index 0000000..f4bf2d7
+> --- /dev/null
+> +++ b/drivers/remoteproc/st_slim_rproc.c
+> @@ -0,0 +1,364 @@
+> +/*
+> + * st_slim_rproc.c
 
-I think this should be KVM_DEV_ARM_VGIC_V3_MPIDR_MASK, and I would
-probably define a V3 of the shift as well, since we're really talking
-about two distinct APIs here.
+These serve no purpose and have a habit of becoming out-of-date.
+Please remove it and replace with a nice succinct description
+instead.
 
->  #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
->  #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
->  #define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
->  #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
-> +#define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
->  #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
->  
->  /* Device Control API on vcpu fd */
-> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> index 163b057..06f0158 100644
-> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> @@ -433,16 +433,136 @@ struct kvm_device_ops kvm_arm_vgic_v2_ops = {
->  
->  #ifdef CONFIG_KVM_ARM_VGIC_V3
->  
-> +static int parse_vgic_v3_attr(struct kvm_device *dev,
-> +			      struct kvm_device_attr *attr,
-> +			      struct vgic_reg_attr *reg_attr)
+> + * Copyright (C) 2016 STMicroelectronics
+
+Nit: '\n' here.
+
+> + * Author: Peter Griffin <peter.griffin@linaro.org>
+
+Nit: '\n' here.
+
+> + * License terms:  GNU General Public License (GPL), version 2
+
+Are you sure ST are okay with the shortened version of the GPL?
+
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/err.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/remoteproc.h>
+> +#include <linux/remoteproc/st_slim_rproc.h>
+> +#include "remoteproc_internal.h"
+> +
+> +/* slimcore registers */
+
+What's it called? slimcore, slim core, ST Slim?
+
+Please be consistent.  Use the name from the datasheet.
+
+> +#define SLIM_ID_OFST		0x0
+> +#define SLIM_VER_OFST		0x4
+> +
+> +#define SLIM_EN_OFST		0x8
+> +#define SLIM_EN_RUN			BIT(0)
+> +
+> +#define SLIM_CLK_GATE_OFST	0xC
+> +#define SLIM_CLK_GATE_DIS		BIT(0)
+> +#define SLIM_CLK_GATE_RESET		BIT(2)
+> +
+> +#define SLIM_SLIM_PC_OFST	0x20
+> +
+> +/* dmem registers */
+> +#define SLIM_REV_ID_OFST	0x0
+> +#define SLIM_REV_ID_MIN_MASK		GENMASK(15, 8)
+> +#define SLIM_REV_ID_MIN(id)		((id & SLIM_REV_ID_MIN_MASK) >> 8)
+> +#define SLIM_REV_ID_MAJ_MASK		GENMASK(23, 16)
+> +#define SLIM_REV_ID_MAJ(id)		((id & SLIM_REV_ID_MAJ_MASK) >> 16)
+> +
+> +
+> +/* peripherals registers */
+> +#define SLIM_STBUS_SYNC_OFST	0xF88
+> +#define SLIM_STBUS_SYNC_DIS		BIT(0)
+> +
+> +#define SLIM_INT_SET_OFST	0xFD4
+> +#define SLIM_INT_CLR_OFST	0xFD8
+> +#define SLIM_INT_MASK_OFST	0xFDC
+> +
+> +#define SLIM_CMD_CLR_OFST	0xFC8
+> +#define SLIM_CMD_MASK_OFST	0xFCC
+> +
+> +static const char *mem_names[ST_SLIM_MEM_MAX] = {
+> +	[ST_SLIM_DMEM]	= "dmem",
+> +	[ST_SLIM_IMEM]	= "imem",
+> +};
+> +
+> +static int slim_clk_get(struct st_slim_rproc *slim_rproc, struct device *dev)
 > +{
-> +	int cpuid;
+> +	int clk, err;
 > +
-> +	cpuid = (attr->attr & KVM_DEV_ARM_VGIC_V3_CPUID_MASK) >>
-> +		 KVM_DEV_ARM_VGIC_CPUID_SHIFT;
+> +	for (clk = 0; clk < ST_SLIM_MAX_CLK; clk++) {
+> +		slim_rproc->clks[clk] = of_clk_get(dev->of_node, clk);
+> +		if (IS_ERR(slim_rproc->clks[clk])) {
+> +			err = PTR_ERR(slim_rproc->clks[clk]);
+> +			if (err == -EPROBE_DEFER)
+> +				goto err_put_clks;
+> +			slim_rproc->clks[clk] = NULL;
+> +			break;
+> +		}
+> +	}
 > +
-> +	if (cpuid >= atomic_read(&dev->kvm->online_vcpus))
-> +		return -EINVAL;
-
-huh?  it's an MPIDR, not a cpu id.
-
-just resolve it with kvm_mpidr_to_vcpu and check its return value.
-
-
+> +	return 0;
 > +
-> +	reg_attr->vcpu = kvm_mpidr_to_vcpu(dev->kvm, cpuid);
+> +err_put_clks:
+> +	while (--clk >= 0)
+> +		clk_put(slim_rproc->clks[clk]);
+> +
+> +	return err;
+> +}
+> +
+> +static void slim_clk_disable(struct st_slim_rproc *slim_rproc)
+> +{
+> +	int clk;
+> +
+> +	for (clk = 0; clk < ST_SLIM_MAX_CLK && slim_rproc->clks[clk]; clk++)
+> +		clk_disable_unprepare(slim_rproc->clks[clk]);
+> +}
+> +
+> +static int slim_clk_enable(struct st_slim_rproc *slim_rproc)
+> +{
+> +	int clk, ret;
+> +
+> +	for (clk = 0; clk < ST_SLIM_MAX_CLK && slim_rproc->clks[clk]; clk++) {
+> +		ret = clk_prepare_enable(slim_rproc->clks[clk]);
+> +		if (ret)
+> +			goto err_disable_clks;
+> +	}
+> +
+> +	return 0;
+> +
+> +err_disable_clks:
+> +	while (--clk >= 0)
+> +		clk_disable_unprepare(slim_rproc->clks[clk]);
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+> + * Remoteproc slim specific device handlers
+> + */
 
-please check the return value of this function in any case...
+I suggest not using kernel-doc format for this type of comment.
 
-> +	reg_attr->addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
+> +static int slim_rproc_start(struct rproc *rproc)
+> +{
+> +	struct device *dev = &rproc->dev;
+> +	struct st_slim_rproc *slim_rproc = rproc->priv;
+> +	unsigned long hw_id, hw_ver, fw_rev;
+> +	u32 val;
+> +	int ret;
+> +
+> +	ret = slim_clk_enable(slim_rproc);
+> +	if (ret) {
+> +		dev_err(dev, "Failed to enable clocks\n");
+> +		return ret;
+> +	}
+> +
+> +	/* disable CPU pipeline clock & reset cpu pipeline */
+
+Be consistent.  Is it 'cpu' or 'CPU'.  Personally I find using
+'correct English' to be the most consistent way of formatting
+comments i.e. Capitals for names, acronyms and at the start of a
+sentence.
+
+> +	val = SLIM_CLK_GATE_DIS | SLIM_CLK_GATE_RESET;
+> +	writel(val, slim_rproc->slimcore + SLIM_CLK_GATE_OFST);
+> +
+> +	/* disable SLIM core STBus sync */
+> +	writel(SLIM_STBUS_SYNC_DIS, slim_rproc->peri + SLIM_STBUS_SYNC_OFST);
+> +
+> +	/* enable cpu pipeline clock */
+> +	writel(!SLIM_CLK_GATE_DIS,
+> +		slim_rproc->slimcore + SLIM_CLK_GATE_OFST);
+> +
+> +	/* clear int & cmd mailbox */
+> +	writel(~0U, slim_rproc->peri + SLIM_INT_CLR_OFST);
+> +	writel(~0U, slim_rproc->peri + SLIM_CMD_CLR_OFST);
+> +
+> +	/* enable all channels cmd & int */
+> +	writel(~0U, slim_rproc->peri + SLIM_INT_MASK_OFST);
+> +	writel(~0U, slim_rproc->peri + SLIM_CMD_MASK_OFST);
+> +
+> +	/* enable cpu */
+> +	writel(SLIM_EN_RUN, slim_rproc->slimcore + SLIM_EN_OFST);
+> +
+> +	hw_id = readl_relaxed(slim_rproc->slimcore + SLIM_ID_OFST);
+> +	hw_ver = readl_relaxed(slim_rproc->slimcore + SLIM_VER_OFST);
+> +
+> +	fw_rev = readl(slim_rproc->mem[ST_SLIM_DMEM].cpu_addr +
+> +			SLIM_REV_ID_OFST);
+> +
+> +	dev_info(dev, "fw rev:%ld.%ld on SLIM %ld.%ld\n",
+> +		 SLIM_REV_ID_MAJ(fw_rev), SLIM_REV_ID_MIN(fw_rev),
+> +		 hw_id, hw_ver);
 > +
 > +	return 0;
 > +}
 > +
+> +static int slim_rproc_stop(struct rproc *rproc)
+> +{
+> +	struct st_slim_rproc *slim_rproc = rproc->priv;
+> +	u32 val;
+> +
+> +	/* mask all (cmd & int) channels */
+> +	writel(0UL, slim_rproc->peri + SLIM_INT_MASK_OFST);
+> +	writel(0UL, slim_rproc->peri + SLIM_CMD_MASK_OFST);
+> +
+> +	/* disable cpu pipeline clock */
+> +	writel(SLIM_CLK_GATE_DIS, slim_rproc->slimcore + SLIM_CLK_GATE_OFST);
+> +
+> +	writel(!SLIM_EN_RUN, slim_rproc->slimcore + SLIM_EN_OFST);
+> +
+> +	val = readl(slim_rproc->slimcore + SLIM_EN_OFST);
+> +	if (val & SLIM_EN_RUN)
+> +		dev_warn(&rproc->dev, "Failed to disable SLIM");
+> +
+> +	slim_clk_disable(slim_rproc);
+> +
+> +	dev_dbg(&rproc->dev, "slim stopped\n");
+> +
+> +	return 0;
+> +}
+> +
+> +static void *slim_rproc_da_to_va(struct rproc *rproc, u64 da, int len)
+> +{
+> +	struct st_slim_rproc *slim_rproc = rproc->priv;
+> +	void *va = NULL;
+> +	int i;
+> +
+> +	for (i = 0; i < ST_SLIM_MEM_MAX; i++) {
+> +		if (da != slim_rproc->mem[i].bus_addr)
+> +			continue;
+> +
+> +		if (len <= slim_rproc->mem[i].size) {
+> +			/* __force to make sparse happy with type conversion */
+> +			va = (__force void *)slim_rproc->mem[i].cpu_addr;
+> +			break;
+> +		}
+> +	}
+> +
+> +	dev_dbg(&rproc->dev, "%s: da = 0x%llx len = 0x%x va = 0x%p\n",
+> +		__func__, da, len, va);
+
+Non-consistent with other debug prints.  I suggest dropping the
+_func_.  It's a nice to have during initial debugging, but I don't
+usually find them useful upstream.
+
+> +	return va;
+> +}
+> +
+> +static struct rproc_ops slim_rproc_ops = {
+> +	.start		= slim_rproc_start,
+> +	.stop		= slim_rproc_stop,
+> +	.da_to_va       = slim_rproc_da_to_va,
+> +};
+> +
 > +/**
-> + * vgic_attr_regs_access_v3 - allows user space to access VGIC v3 state
+> + * Firmware handler operations: sanity, boot address, load ...
+> + */
+
+Don't use kernel-doc for these.
+
+> +static struct resource_table empty_rsc_tbl = {
+> +	.ver = 1,
+> +	.num = 0,
+> +};
+
+This should go away soon.
+
+Be prepared to remove this once the code lands.
+
+> +static struct resource_table *slim_rproc_find_rsc_table(struct rproc *rproc,
+> +					       const struct firmware *fw,
+> +					       int *tablesz)
+> +{
+> +	*tablesz = sizeof(empty_rsc_tbl);
+> +	return &empty_rsc_tbl;
+> +}
+> +
+> +static struct rproc_fw_ops slim_rproc_fw_ops = {
+> +	.find_rsc_table = slim_rproc_find_rsc_table,
+> +};
+> +
+> +/**
+> + * st_slim_rproc_alloc() - allocate and initialise slim rproc
+> + * @pdev: Pointer to the platform_device struct
+> + * @fw_name: Name of firmware for rproc to use
 > + *
-> + * @dev:      kvm device handle
-> + * @attr:     kvm device attribute
-> + * @reg:      address the value is read or written
-> + * @is_write: true if userspace is writing a register
+> + * Function for allocating and initialising a slim rproc for use by
+> + * device drivers whose IP is based around the slim slim core. It
+
+"slim slim"?  Do you mean "really slim"? ;)
+
+> + * obtains and enables any clocks required by the slim core and also
+> + * ioremaps the various IO.
+> + *
+> + * Returns st_slim_rproc pointer or PTR_ERR() on error.
 > + */
-> +static int vgic_attr_regs_access_v3(struct kvm_device *dev,
-> +				    struct kvm_device_attr *attr,
-> +				    u64 *reg, bool is_write)
+> +
+> +struct st_slim_rproc *st_slim_rproc_alloc(struct platform_device *pdev,
+> +				char *fw_name)
 > +{
-> +	struct vgic_reg_attr reg_attr;
-> +	gpa_t addr;
-> +	struct kvm_vcpu *vcpu;
-> +	int ret;
-> +	u32 tmp32;
+> +	struct device *dev = &pdev->dev;
+> +	struct st_slim_rproc *slim_rproc;
+> +	struct device_node *np = dev->of_node;
+> +	struct rproc *rproc;
+> +	struct resource *res;
+> +	int err, i;
+> +	const struct rproc_fw_ops *elf_ops;
 > +
-> +	ret = parse_vgic_v3_attr(dev, attr, &reg_attr);
-> +	if (ret)
-> +		return ret;
-> +
-> +	vcpu = reg_attr.vcpu;
-> +	addr = reg_attr.addr;
-> +
-> +	mutex_lock(&dev->kvm->lock);
-> +
-> +	ret = vgic_init(dev->kvm);
-> +	if (ret)
-> +		goto out;
+> +	if (WARN_ON(!np || !fw_name))
+> +		return ERR_PTR(-EINVAL);
 
-no, no, please no more auto-init at userspace access time.  This code
-should instead check vgic_initialized() and return an error to userspace
-if not initialized.
+!np should not happen, ever.  You can remove the check.
 
-
+> +	if (!of_device_is_compatible(np, "st,slim-rproc"))
+> +		return ERR_PTR(-EINVAL);
 > +
-> +	if (!lock_all_vcpus(dev->kvm)) {
-> +		ret = -EBUSY;
-> +		goto out;
+> +	rproc = rproc_alloc(dev, np->name, &slim_rproc_ops,
+> +			fw_name, sizeof(*slim_rproc));
+> +	if (!rproc)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	rproc->has_iommu = false;
+> +
+> +	slim_rproc = rproc->priv;
+> +	slim_rproc->rproc = rproc;
+> +
+> +	elf_ops = rproc->fw_ops;
+> +	/* Use some generic elf ops */
+> +	slim_rproc_fw_ops.load = elf_ops->load;
+> +	slim_rproc_fw_ops.sanity_check = elf_ops->sanity_check;
+> +
+> +	rproc->fw_ops = &slim_rproc_fw_ops;
+> +
+> +	/* get imem and dmem */
+> +	for (i = 0; i < ARRAY_SIZE(mem_names); i++) {
+> +
+
+Superfluous '\n'.
+
+> +		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+> +						mem_names[i]);
+> +
+> +		slim_rproc->mem[i].cpu_addr = devm_ioremap_resource(dev, res);
+> +		if (IS_ERR(slim_rproc->mem[i].cpu_addr)) {
+> +			dev_err(&pdev->dev, "devm_ioremap_resource failed\n");
+> +			err = PTR_ERR(slim_rproc->mem[i].cpu_addr);
+> +			goto err;
+> +		}
+> +		slim_rproc->mem[i].bus_addr = res->start;
+> +		slim_rproc->mem[i].size = resource_size(res);
 > +	}
 > +
-> +	switch (attr->group) {
-> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-> +		tmp32 = *reg;
+> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "slimcore");
 
-why is this assignment not predicated on if (is_write) ?
+Superfluous '\n'.
 
-also, all this type conversion nonsense is probably unnecessary, see my
-comment below.
+> +	slim_rproc->slimcore = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(slim_rproc->slimcore)) {
+> +		dev_err(&pdev->dev,
+> +			"devm_ioremap_resource failed for slimcore\n");
 
-> +		ret = vgic_v3_dist_uaccess(vcpu, is_write, addr, &tmp32);
-> +		if (!is_write)
-> +			*reg = tmp32;
-> +		break;
-> +	case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS:
-> +		tmp32 = *reg;
-> +		ret = vgic_v3_redist_uaccess(vcpu, is_write, addr, &tmp32);
-> +		if (!is_write)
-> +			*reg = tmp32;
-> +		break;
-> +	default:
-> +		ret = -EINVAL;
-> +		break;
+Best not to quote function names.  Instead write the description in
+plain English; "failed to remap 'slimcore' IO", or similar. 
+
+> +		err = PTR_ERR(slim_rproc->slimcore);
+> +		goto err;
 > +	}
 > +
-> +	unlock_all_vcpus(dev->kvm);
-> +out:
-> +	mutex_unlock(&dev->kvm->lock);
-> +	return ret;
+> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "peripherals");
+> +
+
+Superfluous '\n'.
+
+> +	slim_rproc->peri = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(slim_rproc->peri)) {
+> +		dev_err(&pdev->dev, "devm_ioremap_resource failed for peri\n");
+
+As above.
+
+> +		err = PTR_ERR(slim_rproc->peri);
+> +		goto err;
+> +	}
+> +
+> +	err = slim_clk_get(slim_rproc, dev);
+> +	if (err)
+> +		goto err;
+> +
+> +	/* Register as a remoteproc device */
+> +	err = rproc_add(rproc);
+> +	if (err) {
+> +		dev_err(dev, "registration of slim remoteproc failed\n");
+> +		goto err_clk;
+> +	}
+> +
+> +	return slim_rproc;
+> +
+> +err_clk:
+> +	for (i = 0; i < ST_SLIM_MAX_CLK && slim_rproc->clks[i]; i++)
+> +		clk_put(slim_rproc->clks[i]);
+> +err:
+> +	rproc_put(rproc);
+> +	return ERR_PTR(err);
 > +}
+> +EXPORT_SYMBOL(st_slim_rproc_alloc);
 > +
->  static int vgic_v3_set_attr(struct kvm_device *dev,
->  			    struct kvm_device_attr *attr)
->  {
-> -	return vgic_set_common_attr(dev, attr);
-> +	int ret;
-> +
-> +	ret = vgic_set_common_attr(dev, attr);
-> +	if (ret != -ENXIO)
-> +		return ret;
-> +
-> +	switch (attr->group) {
-> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-> +	case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS: {
-> +		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-> +		u32 tmp32;
-> +		u64 reg;
-> +
-> +		if (get_user(tmp32, uaddr))
-> +			return -EFAULT;
-> +
-> +		reg = tmp32;
-> +		return vgic_attr_regs_access_v3(dev, attr, &reg, true);
+> +/**
+> +  * st_slim_rproc_put() - put slim rproc resources
+> +  * @slim_rproc: Pointer to the st_slim_rproc struct
+> +  *
+> +  * Function for calling respective _put() functions on
 
-oh, but wait, you already had a 32-bit value, which you convert into a
-64-bit value, just to convert it back again, to do some extra data
-copies?
+Early line wrap
 
-I'm really confused as to why this has to be so complicated.
+   <--------|---------|---------|---------|---------|---------|---------|--------->
+   
+> +  * slim_rproc resources.
+> +  *
 
-Why not simply use u32 all the way?
+Superfluous '\n'.
 
-> +	}
-> +	}
-> +	return -ENXIO;
->  }
->  
->  static int vgic_v3_get_attr(struct kvm_device *dev,
->  			    struct kvm_device_attr *attr)
->  {
-> -	return vgic_get_common_attr(dev, attr);
-> +	int ret;
-> +
-> +	ret = vgic_get_common_attr(dev, attr);
-> +	if (ret != -ENXIO)
-> +		return ret;
-> +
-> +	switch (attr->group) {
-> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-> +	case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS: {
-> +		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-> +		u64 reg;
-> +		u32 tmp32;
-> +
-> +		ret = vgic_attr_regs_access_v3(dev, attr, &reg, false);
-> +		if (ret)
-> +			return ret;
-> +		tmp32 = reg;
-> +		ret = put_user(tmp32, uaddr);
-
-same, type stuff.
-
-> +		return ret;
-> +	}
-> +	}
-> +
-> +	return -ENXIO;
->  }
->  
->  static int vgic_v3_has_attr(struct kvm_device *dev,
-> @@ -456,6 +576,9 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
->  			return 0;
->  		}
->  		break;
-> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-> +	case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS:
-> +		return vgic_v3_has_attr_regs(dev, attr);
->  	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
->  		return 0;
->  	case KVM_DEV_ARM_VGIC_GRP_CTRL:
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> index dd0d602..c2df103 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -18,6 +18,8 @@
->  #include <kvm/arm_vgic.h>
->  
->  #include <asm/kvm_emulate.h>
-> +#include <asm/kvm_arm.h>
-> +#include <asm/kvm_mmu.h>
->  
->  #include "vgic.h"
->  #include "vgic-mmio.h"
-> @@ -391,6 +393,9 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
->  	REGISTER_DESC_WITH_LENGTH(GICD_CTLR,
->  		vgic_mmio_read_v3_misc, vgic_mmio_write_v3_misc, 16,
->  		VGIC_ACCESS_32bit),
-> +	REGISTER_DESC_WITH_LENGTH(GICD_STATUSR,
-> +		vgic_mmio_read_rao, vgic_mmio_write_wi, 4,
-> +		VGIC_ACCESS_32bit),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGROUPR,
->  		vgic_mmio_read_rao, vgic_mmio_write_wi, 1,
->  		VGIC_ACCESS_32bit),
-> @@ -438,12 +443,18 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
->  	REGISTER_DESC_WITH_LENGTH(GICR_CTLR,
->  		vgic_mmio_read_v3r_ctlr, vgic_mmio_write_v3r_ctlr, 4,
->  		VGIC_ACCESS_32bit),
-> +	REGISTER_DESC_WITH_LENGTH(GICR_STATUSR,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
-> +		VGIC_ACCESS_32bit),
->  	REGISTER_DESC_WITH_LENGTH(GICR_IIDR,
->  		vgic_mmio_read_v3r_iidr, vgic_mmio_write_wi, 4,
->  		VGIC_ACCESS_32bit),
->  	REGISTER_DESC_WITH_LENGTH(GICR_TYPER,
->  		vgic_mmio_read_v3r_typer, vgic_mmio_write_wi, 8,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
-> +	REGISTER_DESC_WITH_LENGTH(GICR_WAKER,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-> +		VGIC_ACCESS_32bit),
->  	REGISTER_DESC_WITH_LENGTH(GICR_PROPBASER,
->  		vgic_mmio_read_propbase, vgic_mmio_write_propbase, 8,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
-> @@ -564,6 +575,46 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
->  	return ret;
->  }
->  
-> +int vgic_v3_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
+> +  */
+> +void st_slim_rproc_put(struct st_slim_rproc *slim_rproc)
 > +{
-> +	struct kvm_vcpu *vcpu;
-> +	int nr_irqs = dev->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
-> +	const struct vgic_register_region *regions;
-> +	gpa_t addr;
-> +	int nr_regions, i, len, cpuid;
+> +	int clk;
 > +
-> +	addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
-> +	cpuid = (attr->attr & KVM_DEV_ARM_VGIC_V3_CPUID_MASK) >>
-> +		 KVM_DEV_ARM_VGIC_CPUID_SHIFT;
-> +	vcpu = kvm_mpidr_to_vcpu(dev->kvm, cpuid);
-
-why do you need the vcpu variable?
-(also, you don't check the return value)
-
+> +	if (!slim_rproc)
+> +		return;
 > +
-> +	switch (attr->group) {
-> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-> +		regions = vgic_v3_dist_registers;
-> +		nr_regions = ARRAY_SIZE(vgic_v3_dist_registers);
-> +		break;
-> +	case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS:{
-> +		regions = vgic_v3_rdbase_registers;
-> +		nr_regions = ARRAY_SIZE(vgic_v3_rdbase_registers);
-> +		break;
-> +	}
-> +	default:
-> +		return -ENXIO;
-> +	}
-
-why don't you need an address alignment check here?
-
+> +	for (clk = 0; clk < ST_SLIM_MAX_CLK && slim_rproc->clks[clk]; clk++)
+> +		clk_put(slim_rproc->clks[clk]);
 > +
-> +	for (i = 0; i < nr_regions; i++) {
-> +		if (regions[i].bits_per_irq)
-> +			len = (regions[i].bits_per_irq * nr_irqs) / 8;
-> +		else
-> +			len = regions[i].len;
-> +
-> +		if (regions[i].reg_offset <= addr &&
-> +		    regions[i].reg_offset + len > addr)
-> +			return 0;
-> +	}
-
-this is directly lifted from v2, definitely this loop or the whole
-function can be shared between v2/v3 somehow.
-
-> +
-> +	return -ENXIO;
+> +	rproc_del(slim_rproc->rproc);
+> +	rproc_put(slim_rproc->rproc);
 > +}
->  /*
->   * Compare a given affinity (level 1-3 and a level 0 mask, from the SGI
->   * generation register ICC_SGI1R_EL1) with a given VCPU.
-> @@ -670,3 +721,65 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
->  		vgic_put_irq(vcpu->kvm, irq);
->  	}
->  }
+> +EXPORT_SYMBOL(st_slim_rproc_put);
 > +
+> +MODULE_AUTHOR("Peter Griffin");
+
+Email.
+
+> +MODULE_DESCRIPTION("STMicroelectronics SLIM rproc driver");
+
+Now it's "SLIM"?  Make up your mind.
+
+> +MODULE_LICENSE("GPL v2");
+> diff --git a/include/linux/remoteproc/st_slim_rproc.h b/include/linux/remoteproc/st_slim_rproc.h
+> new file mode 100644
+> index 0000000..64a2c5b
+> --- /dev/null
+> +++ b/include/linux/remoteproc/st_slim_rproc.h
+> @@ -0,0 +1,53 @@
 > +/*
-> + * When userland tries to access the VGIC register handlers, we need to
-> + * create a usable struct vgic_io_device to be passed to the handlers and we
-> + * have to set up a buffer similar to what would have happened if a guest MMIO
-> + * access occurred, including doing endian conversions on BE systems.
+> + * st_slim_rproc.h
+
+As above.
+
+> + * Copyright (C) 2016 STMicroelectronics
+> + * Author: Peter Griffin <peter.griffin@linaro.org>
+> + * License terms:  GNU General Public License (GPL), version 2
 > + */
-> +static int vgic_v3_uaccess(struct kvm_vcpu *vcpu, struct vgic_io_device *dev,
-> +			   bool is_write, int offset, u32 *val)
-> +{
-> +	unsigned int len = 4;
-> +	u8 buf[4];
-> +	int ret;
+
+Same for the *.c header.
+
+> +#ifndef _ST_SLIM_H
+> +#define _ST_SLIM_H
+
+Best to mention the subsystem too.
+
+> +#define ST_SLIM_MEM_MAX 2
+> +#define ST_SLIM_MAX_CLK 4
 > +
-> +	if (is_write) {
-> +		vgic_data_host_to_mmio_bus(buf, len, *val);
-> +		ret = vgic_mmio_uaccess_write(vcpu, &dev->dev, offset,
-> +					      len, buf);
-> +	} else {
-> +		ret = vgic_mmio_uaccess_read(vcpu, &dev->dev, offset, len, buf);
-> +		if (!ret)
-> +			*val = vgic_data_mmio_bus_to_host(buf, len);
-> +	}
+> +enum {
+> +	ST_SLIM_DMEM,
+> +	ST_SLIM_IMEM,
+> +};
 > +
-> +	return ret;
-> +}
-
-this as well seems to be completely identical to the v2 version, or am I
-missing something?
-
+> +/**
+> + * struct st_slim_mem - slim internal memory structure
+> + * @cpu_addr: MPU virtual address of the memory region
+> + * @bus_addr: Bus address used to access the memory region
+> + * @size: Size of the memory region
+> + */
+> +struct st_slim_mem {
+> +	void __iomem *cpu_addr;
+> +	phys_addr_t bus_addr;
+> +	size_t size;
+> +};
 > +
-> +int vgic_v3_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-> +			 int offset, u32 *val)
-> +{
-> +	struct vgic_io_device dev = {
-> +		.regions = vgic_v3_dist_registers,
-> +		.nr_regions = ARRAY_SIZE(vgic_v3_dist_registers),
-> +	};
+> +/**
+> + * struct st_slim_rproc - SLIM slim core
+> + * @rproc: rproc handle
+> + * @mem: slim memory information
+> + * @slimcore: slim slimcore regs
+> + * @peri: slim peripheral regs
+> + * @clks: slim clocks
+> + */
+> +struct st_slim_rproc {
+> +	struct rproc *rproc;
+> +	struct st_slim_mem mem[ST_SLIM_MEM_MAX];
+> +	void __iomem *slimcore;
+> +	void __iomem *peri;
 > +
-> +	return vgic_v3_uaccess(vcpu, &dev, is_write, offset, val);
-> +}
+> +	/* st_slim_rproc private */
+> +	struct clk *clks[ST_SLIM_MAX_CLK];
+> +};
 > +
-> +int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-> +			   int offset, u32 *val)
-> +{
-> +	struct vgic_io_device *dev;
-> +	const struct vgic_register_region *region;
+> +struct st_slim_rproc *st_slim_rproc_alloc(struct platform_device *pdev,
+> +					char *fw_name);
+> +void st_slim_rproc_put(struct st_slim_rproc *slim_rproc);
 > +
-> +	struct vgic_io_device rd_dev = {
-> +		.regions = vgic_v3_rdbase_registers,
-> +		.nr_regions = ARRAY_SIZE(vgic_v3_rdbase_registers),
-> +	};
-> +
-> +	struct vgic_io_device sgi_dev = {
-> +		.regions = vgic_v3_sgibase_registers,
-> +		.nr_regions = ARRAY_SIZE(vgic_v3_sgibase_registers),
-> +	};
-> +
+> +#endif
 
-The whole bit following here deserves a comment.
-
-I'm guessing the idea is to check if the offset falls into the sgi_dev
-or rd_dev region?
-
-Why not simply do:
-
-	/* SGI_base is the next 64K frame after RD_base */
-	if (offset >= SZ_64K)
-		return vgic_v3_uaccess(vcpu, &sgi_dev, is_write,
-				       offset - SZ_64K, val);
-	else
-		return vgic_v3_uaccess(vcpu, &rd_dev, is_write, offset, val);
-
-
-
-> +	dev = &sgi_dev;
-> +	region = vgic_find_mmio_region(dev->regions, dev->nr_regions,
-> +				       offset - dev->base_addr);
-
-In any case, this doesn't look right: dev->base_addr is not set?
-
-> +	if (region == NULL)
-
-If you must, then do: if (!region)
-
-> +		dev = &rd_dev;
-> +
-> +	return vgic_v3_uaccess(vcpu, dev, is_write, offset, val);
-> +}
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> index dcf5d25..38f2c75 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> @@ -406,7 +406,7 @@ static int match_region(const void *key, const void *elt)
->  }
->  
->  /* Find the proper register handler entry given a certain address offset. */
-> -static const struct vgic_register_region *
-> +const struct vgic_register_region *
->  vgic_find_mmio_region(const struct vgic_register_region *region, int nr_regions,
->  		      unsigned int offset)
->  {
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 1d8e21d..14e4ce5 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -72,6 +72,9 @@ static inline void vgic_get_irq_kref(struct vgic_irq *irq)
->  	kref_get(&irq->refcount);
->  }
->  
-> +const struct vgic_register_region *
-> +	vgic_find_mmio_region(const struct vgic_register_region *region,
-> +			      int nr_regions, unsigned int offset);
->  #ifdef CONFIG_KVM_ARM_VGIC_V3
->  void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu);
->  void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu);
-> @@ -88,6 +91,11 @@ bool vgic_has_its(struct kvm *kvm);
->  int kvm_vgic_register_its_device(void);
->  void vgic_enable_lpis(struct kvm_vcpu *vcpu);
->  int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi);
-> +int vgic_v3_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
-> +int vgic_v3_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-> +			 int offset, u32 *val);
-> +int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-> +			 int offset, u32 *val);
->  #else
->  static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
->  {
-> -- 
-> 1.9.1
-> 
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
