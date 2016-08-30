@@ -1,34 +1,32 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 Aug 2016 17:24:47 +0200
-Subject: [PATCH 0/3] pcie-designware: support for external MSI controller
-In-Reply-To: <1472561830-20932-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1472561830-20932-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20160830172447.65d10772@free-electrons.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 30 Aug 2016 17:29:08 +0200
+Subject: [PATCH v3 01/13] ARM: dts: lager: rename and reindex i2cexio
+In-Reply-To: <1466567031-20381-2-git-send-email-horms+renesas@verge.net.au>
+References: <1466567031-20381-1-git-send-email-horms+renesas@verge.net.au>
+ <1466567031-20381-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20160830151819.GA1695@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Simon,
 
-On Tue, 30 Aug 2016 14:57:07 +0200, Thomas Petazzoni wrote:
+>  		serial0 = &scif0;
+>  		serial1 = &scifa1;
+> -		i2c8 = "i2cexio";
+> +		i2c10 = "i2cexio0";
 
-> Thomas Petazzoni (3):
->   dt-bindings: designware-pcie: document optional msi-parent property
->   pci: pcie-designware: add support for external MSI controller
->   arm64: dts: marvell: enable MSI for PCIe on Armada 7K/8K
+Those should be pointers, i.e. "&i2cexio0;", here and in the rest of
+your series. Sorry for the broken template! Did you have a chance to
+test my fix for the demuxer?
 
-Please discard this patch series, it's just pure crap. No changes at
-all are needed on the pcie-designware driver, using the msi-parent
-property already works, and my new code does nothing good.
+Regards,
 
-The of_pci_find_msi_chip_by_node() API is on its way to being removed,
-and it doesn't return anything useful.
+   Wolfram
 
-Only PATCH 3/3 is needed, which I'll resubmit separately.
-
-Sorry for the noise.
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160830/6e38476e/attachment.sig>
