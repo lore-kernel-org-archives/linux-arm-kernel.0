@@ -1,39 +1,33 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Tue, 30 Aug 2016 16:55:00 +1000
-Subject: [PATCH] drm/sun4i: rgb: add missing calls to drm_panel_{prepare,
- unprepare}
-Message-ID: <20160830065500.31847-1-net147@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 30 Aug 2016 09:02:51 +0200
+Subject: [PATCH 1/4] ARM: dts: shmobile: remove label property from led
+In-Reply-To: <20160830065213.GA12845@verge.net.au>
+References: <1472219382-22789-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdW7=XB_-7YvMwBw-7WLaEj8A4=znsvRkTbdf5SCYe00rg@mail.gmail.com>
+ <20160830065213.GA12845@verge.net.au>
+Message-ID: <CAMuHMdWkLeZp1mjFkTX8NMbrdCS-9RbuB4DxRMuQBqnjCWmocQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the enable-gpios property of a simple panel in device tree is set,
-the GPIO is not toggled on/off because of missing calls to
-drm_panel_prepare and drm_panel_unprepare.
+Hi Simon,
 
-Signed-off-by: Jonathan Liu <net147@gmail.com>
----
- drivers/gpu/drm/sun4i/sun4i_rgb.c | 2 ++
- 1 file changed, 2 insertions(+)
+On Tue, Aug 30, 2016 at 8:52 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Aug 29, 2016 at 09:53:23AM +0200, Geert Uytterhoeven wrote:
+>> The patch index in the subject should have been 0/4. You're breaking my
+>> script to extract patch series from email threads ;-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index f5bbac6..d6943e9 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -151,6 +151,7 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
- 
- 	DRM_DEBUG_DRIVER("Enabling RGB output\n");
- 
-+	drm_panel_prepare(tcon->panel);
- 	drm_panel_enable(tcon->panel);
- 	sun4i_tcon_channel_enable(tcon, 0);
- }
-@@ -165,6 +166,7 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
- 
- 	sun4i_tcon_channel_disable(tcon, 0);
- 	drm_panel_disable(tcon->panel);
-+	drm_panel_unprepare(tcon->panel);
- }
- 
- static void sun4i_rgb_encoder_mode_set(struct drm_encoder *encoder,
--- 
-2.9.3
+I think you're quoting the wrong part?
+
+> True. Probably we should not apply this series as its just a clean up
+> and not worth the risk of breaking user-space.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
