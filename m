@@ -1,50 +1,39 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 30 Aug 2016 15:43:16 +0100
-Subject: [PATCH v2 9/9] arm64: head.S: document the use of callee saved
- registers
-In-Reply-To: <1472049366-10922-10-git-send-email-ard.biesheuvel@linaro.org>
-References: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
- <1472049366-10922-10-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160830144316.GL1223@leverpostej>
+From: netz.kernel@gmail.com (Marty Plummer)
+Date: Tue, 30 Aug 2016 09:43:52 -0500
+Subject: Older hisilicon chipsets
+In-Reply-To: <57C54A05.9090601@hisilicon.com>
+References: <7773f0e5-d045-1e93-529b-74a601467ed1@gmail.com>
+ <20160827150457.GM10637@io.lakedaemon.net>
+ <ec3ec22f-f05e-aaec-8e9a-bfc0565b9e9d@gmail.com> <7850061.5OOjP34nIO@wuerfel>
+ <57C54A05.9090601@hisilicon.com>
+Message-ID: <7d7ff37b-a16b-8532-214c-de0a46c9de8e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 04:36:06PM +0200, Ard Biesheuvel wrote:
-> Now that the only remaining occurrences of the use of callee saved
-> registers are on the primary boot path, add a comment to the code
-> which register is used for what.
+On 08/30/2016 03:55 AM, Wei Xu wrote:
+> Hi Arnd, Marty
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
-> ---
->  arch/arm64/kernel/head.S | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+> I will once they are ready.
+> Thanks for your kindly guiding!
 > 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index ad1dc61d67ac..8bc9458f9add 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -208,6 +208,16 @@ efi_header_end:
->  
->  	__INIT
->  
-> +	/*
-> +	 * The following callee saved general purpose registers are used on the
-> +	 * primary lowlevel boot path:
-> +	 *
-> +	 *  Register   Scope                      Purpose
-> +	 *  x21        stext() .. start_kernel()  FDT pointer passed at boot in x0
-> +	 *  x23        stext() .. start_kernel()  physical misalignment/KASLR offset
-> +	 *  x28        __create_page_tables()     callee preserved temp register
-> +	 *  x19/x20    __primary_switch()         callee preserved temp registers
-> +	 */
->  ENTRY(stext)
->  	bl	preserve_boot_args
->  	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
-> -- 
-> 2.7.4
+> Best Regards,
+> Wei
 > 
+> 
+Hi Wei,
+
+Do you think you could change the references to the Hi3620 in the code
+and dts files from `hi3xxx' to `hi3620'? As it currently stands, the
+wildcard matches hi3520 too, but that's not a good idea whit devicetree,
+its best to be completely explicit as to which sort of device the
+binding is for.
+
+Thanks.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160830/ded6f6e0/attachment.sig>
