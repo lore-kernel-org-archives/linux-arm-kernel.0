@@ -1,55 +1,54 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 30 Aug 2016 11:23:50 +0100
-Subject: [PATCH v8 11/18] ARM: DT: STiH407: Add i2s_in pinctrl
+Date: Tue, 30 Aug 2016 11:24:13 +0100
+Subject: [PATCH v8 10/18] ARM: DT: STiH407: Add i2s_out pinctrl
  configuration
-In-Reply-To: <1472223413-7254-12-git-send-email-peter.griffin@linaro.org>
+In-Reply-To: <1472223413-7254-11-git-send-email-peter.griffin@linaro.org>
 References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
- <1472223413-7254-12-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20160830102350.GT1661@dell>
+ <1472223413-7254-11-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20160830102413.GU1661@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 26 Aug 2016, Peter Griffin wrote:
 
-> This patch adds the pinctrl config for the i2s_in pins
-> used by the uniperif reader IP.
+> This patch adds the pinctrl config for the i2s_out pins
+> used by the uniperif player IP.
 > 
 > Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 > ---
->  arch/arm/boot/dts/stih407-pinctrl.dtsi | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
+>  arch/arm/boot/dts/stih407-pinctrl.dtsi | 23 +++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
 
 Acked-by: Lee Jones <lee.jones@linaro.org>
-  
+
 > diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> index 0fb5c8a..537db7e 100644
+> index a538ae5..0fb5c8a 100644
 > --- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
 > +++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> @@ -1090,6 +1090,30 @@
+> @@ -1067,6 +1067,29 @@
 >  				};
 >  			};
 >  
-> +			i2s_in {
-> +				pinctrl_i2s_8ch_in: i2s_8ch_in{
+> +			i2s_out {
+> +				pinctrl_i2s_8ch_out: i2s_8ch_out{
 > +					st,pins {
-> +						mclk = <&pio32 5 ALT1 IN>;
-> +						lrclk = <&pio32 7 ALT1 IN>;
-> +						sclk = <&pio32 6 ALT1 IN>;
-> +						data0 = <&pio32 4 ALT1 IN>;
-> +						data1 = <&pio33 0 ALT1 IN>;
-> +						data2 = <&pio33 1 ALT1 IN>;
-> +						data3 = <&pio33 2 ALT1 IN>;
-> +						data4 = <&pio33 3 ALT1 IN>;
+> +						mclk = <&pio33 5 ALT1 OUT>;
+> +						lrclk = <&pio33 7 ALT1 OUT>;
+> +						sclk = <&pio33 6 ALT1 OUT>;
+> +						data0 = <&pio33 4 ALT1 OUT>;
+> +						data1 = <&pio34 0 ALT1 OUT>;
+> +						data2 = <&pio34 1 ALT1 OUT>;
+> +						data3 = <&pio34 2 ALT1 OUT>;
 > +					};
 > +				};
 > +
-> +				pinctrl_i2s_2ch_in: i2s_2ch_in{
+> +				pinctrl_i2s_2ch_out: i2s_2ch_out{
 > +					st,pins {
-> +						mclk = <&pio32 5 ALT1 IN>;
-> +						lrclk = <&pio32 7 ALT1 IN>;
-> +						sclk = <&pio32 6 ALT1 IN>;
-> +						data0 = <&pio32 4 ALT1 IN>;
+> +						mclk = <&pio33 5 ALT1 OUT>;
+> +						lrclk = <&pio33 7 ALT1 OUT>;
+> +						sclk = <&pio33 6 ALT1 OUT>;
+> +						data0 = <&pio33 4 ALT1 OUT>;
 > +					};
 > +				};
 > +			};
