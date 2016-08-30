@@ -1,24 +1,27 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 30 Aug 2016 11:26:05 -0700
-Subject: [PATCH] char: hw_random: bcm2835: handle of_iomap failures in
- bcm2835 driver
-In-Reply-To: <1472490616-9597-1-git-send-email-arvind.yadav.cs@gmail.com>
-References: <1472490616-9597-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <87bn0aazb6.fsf@eliezer.anholt.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 30 Aug 2016 11:41:58 -0700
+Subject: [RESEND PATCH 1/2] ARM: dts: dra7: Fix clock data for
+ gmac_gmii_ref_clk_div
+In-Reply-To: <20160830145801.10364-1-grygorii.strashko@ti.com>
+References: <20160830145801.10364-1-grygorii.strashko@ti.com>
+Message-ID: <20160830184158.xydy3ixy7c5b73le@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arvind Yadav <arvind.yadav.cs@gmail.com> writes:
+* Grygorii Strashko <grygorii.strashko@ti.com> [160830 07:58]:
+> 
+> Originally this patch was posted (and acked) here
+> https://lkml.org/lkml/2016/4/27/272, 
+> but it, unfortunatelly, has never been merged. 
+> So re-send + minor subj change.
 
-> Check return value of of_iomap and handle errors correctly.
->
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+OK yeah sorry about that. And thanks for the resend. If some patches
+have pending discussion as I tend to tag threads that have pending
+discussion as read and then forget them. And I miss patches in other
+ways too..
 
-Acked-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160830/8cc1fefe/attachment.sig>
+Tero, care to take a look and ack?
+
+Regards,
+
+Tony
