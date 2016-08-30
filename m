@@ -1,66 +1,264 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 30 Aug 2016 14:45:05 +0100
-Subject: [PATCH v2 4/9] arm64: head.S: move KASLR processing out of
- __enable_mmu()
-In-Reply-To: <1472049366-10922-5-git-send-email-ard.biesheuvel@linaro.org>
-References: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
- <1472049366-10922-5-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160830134505.GH1223@leverpostej>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 30 Aug 2016 16:00:34 +0200
+Subject: [RFC PATCH v3 5/5] arm/arm64: vgic-new: Implement
+ KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
+In-Reply-To: <1472037609-4164-6-git-send-email-vijay.kilari@gmail.com>
+References: <1472037609-4164-1-git-send-email-vijay.kilari@gmail.com>
+ <1472037609-4164-6-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <20160830140034.GK10162@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Aug 24, 2016 at 04:50:09PM +0530, vijay.kilari at gmail.com wrote:
+> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> 
+> Userspace requires to store and restore of line_level for
+> level triggered interrupts. For this ioctl KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO
+> is defined.
+> 
+> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> ---
+>  arch/arm64/include/uapi/asm/kvm.h   |  6 +++++
+>  virt/kvm/arm/vgic/vgic-kvm-device.c | 44 ++++++++++++++++++++++++++++++++++++-
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c    | 19 ++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-mmio.c       | 34 ++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-mmio.h       |  6 +++++
+>  virt/kvm/arm/vgic/vgic.h            |  3 +++
+>  6 files changed, 111 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index b13c944..45c56d7 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -209,6 +209,12 @@ struct kvm_arch_memory_slot {
+>  #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
+>  #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
+>  #define KVM_DEV_ARM_VGIC_CPU_SYSREGS    6
+> +#define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO 7
+> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	9
 
-On Wed, Aug 24, 2016 at 04:36:01PM +0200, Ard Biesheuvel wrote:
-> @@ -742,25 +739,6 @@ ENTRY(__enable_mmu)
->  	ic	iallu
->  	dsb	nsh
->  	isb
-> -#ifdef CONFIG_RANDOMIZE_BASE
-> -	mov	x19, x0				// preserve new SCTLR_EL1 value
-> -	blr	x27
-> -
-> -	/*
-> -	 * If we return here, we have a KASLR displacement in x23 which we need
-> -	 * to take into account by discarding the current kernel mapping and
-> -	 * creating a new one.
-> -	 */
-> -	msr	sctlr_el1, x22			// disable the MMU
-> -	isb
-> -	bl	__create_page_tables		// recreate kernel mapping
-> -
-> -	msr	sctlr_el1, x19			// re-enable the MMU
-> -	isb
-> -	ic	iallu				// flush instructions fetched
-> -	dsb	nsh				// via old mapping
-> -	isb
-> -#endif
->  	br	x27
->  ENDPROC(__enable_mmu)
+This should be 10, bits 0 through 9 gives you 10 to work with.
 
-As a heads-up, this clashes with fd363bd417ddb610 ("arm64: avoid TLB
-conflict with CONFIG_RANDOMIZE_BASE") [1], which went in for v4.8-rc4.
+> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
+> +			(0x7fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
 
-The fixup (moving the new TLBI; DSB into __primary_switch) is
-trivial/obvious, but beyond git's automated resolution capabilities.
+this mask is also wrong, 32 - 10 == 22, not 23.
 
-> @@ -770,11 +748,11 @@ __no_granule_support:
->  1:
->  	wfe
->  	wfi
-> -	b 1b
-> +	b	1b
->  ENDPROC(__no_granule_support)
+> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK	0x1ff
 
-As mentioned in another reply, it might be worth moving the whitespace
-fixups into a preparatory patch, so as to make it less distracting when
-looking at the diff.
+this is also wrong, you have 10 bits, not 9 bits.
 
-Regardless, FWIW:
+Hint: the max SPI number is around 1024.
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_VAL	1
 
-Thanks,
-Mark.
+This should really be KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO_LEVEL.  Why is 0
+not a valid value?
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/451294.html
+>  
+>  #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
+>  #define   KVM_DEV_ARM_VGIC_SYSREG_MASK (KVM_REG_ARM64_SYSREG_OP0_MASK | \
+> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+> index 74e5c38..7e3bc49 100644
+> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
+> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+> @@ -509,6 +509,23 @@ static int vgic_attr_regs_access_v3(struct kvm_device *dev,
+>  						  regid, reg);
+>  		break;
+>  	}
+> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
+> +		unsigned int info, intid;
+> +
+> +		info = (attr->attr & KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK) >>
+> +			KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT;
+> +		if (info == KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_VAL) {
+> +			intid = attr->attr &
+> +				KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK;
+> +			ret = vgic_v3_line_level_info_uaccess(vcpu, is_write,
+> +							      intid, &tmp32);
+> +			if (!is_write)
+> +				*reg = tmp32;
+> +		} else {
+> +			ret = -EINVAL;
+> +		}
+> +		break;
+> +	}
+>  	default:
+>  		ret = -EINVAL;
+>  		break;
+> @@ -551,6 +568,17 @@ static int vgic_v3_set_attr(struct kvm_device *dev,
+>  
+>  		return vgic_attr_regs_access_v3(dev, attr, &reg, true);
+>  	}
+> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
+> +		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+> +		u64 reg;
+> +		u32 tmp32;
+
+here we have more type fun, which I assume you fix based on my comments
+on a previous patch.
+
+> +
+> +		if (get_user(tmp32, uaddr))
+> +			return -EFAULT;
+> +
+> +		reg = tmp32;
+> +		return vgic_attr_regs_access_v3(dev, attr, &reg, true);
+> +	}
+>  	}
+>  	return -ENXIO;
+>  }
+> @@ -588,8 +616,19 @@ static int vgic_v3_get_attr(struct kvm_device *dev,
+>  		ret = put_user(reg, uaddr);
+>  		return ret;
+>  	}
+> -	}
+> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
+> +		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+> +		u64 reg;
+> +		u32 tmp32;
+>  
+> +		ret = vgic_attr_regs_access_v3(dev, attr, &reg, false);
+> +		if (ret)
+> +			return ret;
+> +		tmp32 = reg;
+> +		ret = put_user(tmp32, uaddr);
+> +		return ret;
+> +	}
+> +	}
+>  	return -ENXIO;
+>  }
+>  
+> @@ -610,11 +649,14 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+>  		return vgic_v3_has_attr_regs(dev, attr);
+>  	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
+>  		return 0;
+> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO:
+> +		return 0;
+
+probably you should check the info field here as well
+
+>  	case KVM_DEV_ARM_VGIC_GRP_CTRL:
+>  		switch (attr->attr) {
+>  		case KVM_DEV_ARM_VGIC_CTRL_INIT:
+>  			return 0;
+>  		}
+> +		break;
+>  	}
+>  	return -ENXIO;
+>  }
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index 61abea0..fde1472 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -789,3 +789,22 @@ int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+>  
+>  	return vgic_v3_uaccess(vcpu, dev, is_write, offset, val);
+>  }
+> +
+> +int vgic_v3_line_level_info_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+> +				    u32 intid, u32 *val)
+> +{
+> +	unsigned int len = 4;
+> +	u8 buf[4];
+> +	int ret;
+> +
+> +	if (is_write) {
+> +		vgic_data_host_to_mmio_bus(buf, len, *val);
+
+why do you involve the mmio bus in this?
+
+> +		ret = vgic_write_irq_line_level_info(vcpu, intid, len, buf);
+> +	} else {
+> +		ret = vgic_read_irq_line_level_info(vcpu, intid, len, buf);
+> +		if (!ret)
+> +			*val = vgic_data_mmio_bus_to_host(buf, len);
+> +	}
+> +
+> +	return ret;
+> +}
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> index 38f2c75..74d0449 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> @@ -391,6 +391,40 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
+>  	}
+>  }
+>  
+> +int vgic_read_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
+> +				  unsigned int len, void *val)
+> +{
+> +	unsigned long data = 0;
+> +	int i;
+> +
+> +	for (i = 0; i < len * 8; i++) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		if (irq->line_level)
+> +			data |= (1U << i);
+> +	}
+> +	vgic_data_host_to_mmio_bus(val, len, data);
+
+why???
+
+> +
+> +	return 0;
+> +}
+> +
+> +int vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
+> +				   unsigned int len, const void *val)
+> +{
+> +	int i;
+> +	unsigned long data = vgic_data_mmio_bus_to_host(val, len);
+
+why???
+
+> +
+> +	for_each_set_bit(i, &data, len * 8) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		spin_lock(&irq->irq_lock);
+> +		irq->line_level = true;
+> +		spin_unlock(&irq->irq_lock);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static int match_region(const void *key, const void *elt)
+>  {
+>  	const unsigned int offset = (unsigned long)key;
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+> index b97a97b..b03c4e7 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.h
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
+> @@ -183,6 +183,12 @@ int vgic_mmio_uaccess_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+>  int vgic_mmio_uaccess_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+>  			    gpa_t addr, int len, const void *val);
+>  
+> +int vgic_read_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
+> +				  unsigned int len, void *val);
+> +
+> +int vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
+> +				   unsigned int len, const void *val);
+> +
+>  unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
+>  
+>  unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev);
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index 20eab36c..b8ee5b9 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -100,6 +100,9 @@ int vgic_v3_cpu_sysregs_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+>  			 u64 id, u64 *val);
+>  int vgic_v3_has_cpu_sysregs_attr(struct kvm_vcpu *vcpu, bool is_write, u64 id,
+>  				u64 *reg);
+> +int vgic_v3_line_level_info_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+> +				    u32 intid, u32 *val);
+> +
+>  #else
+>  static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
+>  {
+> -- 
+> 1.9.1
+> 
