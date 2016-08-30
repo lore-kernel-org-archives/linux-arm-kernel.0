@@ -1,36 +1,80 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 Aug 2016 14:57:07 +0200
-Subject: [PATCH 0/3] pcie-designware: support for external MSI controller
-Message-ID: <1472561830-20932-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 30 Aug 2016 14:57:10 +0200
+Subject: [PATCH 3/3] arm64: dts: marvell: enable MSI for PCIe on Armada 7K/8K
+In-Reply-To: <1472561830-20932-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1472561830-20932-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1472561830-20932-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This commit adds a reference to the appropriate MSI controller in the
+description of the PCIe controllers on Marvel Armada 7K and 8K
+platforms.
 
-This short patch series extends the pcie-designware code to support
-using an external MSI controller, rather than the built-in MSI
-controller. It does so by making the pcie-designware driver handle the
-"msi-parent" DT property.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+Please only apply once the DT binding and the driver change have been
+accepted.
 
-The first patch updates the Device Tree binding documentation, the
-second patch makes the change to the Designware PCIe controller driver
-itself, and finally the third patch updates the Marvell Armada 7K/8K
-Device Tree to use the msi-parent property.
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 3 +++
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 3 +++
+ 2 files changed, 6 insertions(+)
 
-Thanks,
-
-Thomas
-
-Thomas Petazzoni (3):
-  dt-bindings: designware-pcie: document optional msi-parent property
-  pci: pcie-designware: add support for external MSI controller
-  arm64: dts: marvell: enable MSI for PCIe on Armada 7K/8K
-
- .../devicetree/bindings/pci/designware-pcie.txt    |  2 ++
- .../boot/dts/marvell/armada-cp110-master.dtsi      |  3 +++
- .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |  3 +++
- drivers/pci/host/pcie-designware.c                 | 24 ++++++++++++++++------
- 4 files changed, 26 insertions(+), 6 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index ceb83b0..ff469e1 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -177,6 +177,7 @@
+ 			#interrupt-cells = <1>;
+ 			device_type = "pci";
+ 			dma-coherent;
++			msi-parent = <&gic_v2m0>;
+ 
+ 			bus-range = <0 0xff>;
+ 			ranges =
+@@ -202,6 +203,7 @@
+ 			#interrupt-cells = <1>;
+ 			device_type = "pci";
+ 			dma-coherent;
++			msi-parent = <&gic_v2m0>;
+ 
+ 			bus-range = <0 0xff>;
+ 			ranges =
+@@ -228,6 +230,7 @@
+ 			#interrupt-cells = <1>;
+ 			device_type = "pci";
+ 			dma-coherent;
++			msi-parent = <&gic_v2m0>;
+ 
+ 			bus-range = <0 0xff>;
+ 			ranges =
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 2d863f2..43cecf0 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -177,6 +177,7 @@
+ 			#interrupt-cells = <1>;
+ 			device_type = "pci";
+ 			dma-coherent;
++			msi-parent = <&gic_v2m0>;
+ 
+ 			bus-range = <0 0xff>;
+ 			ranges =
+@@ -202,6 +203,7 @@
+ 			#interrupt-cells = <1>;
+ 			device_type = "pci";
+ 			dma-coherent;
++			msi-parent = <&gic_v2m0>;
+ 
+ 			bus-range = <0 0xff>;
+ 			ranges =
+@@ -228,6 +230,7 @@
+ 			#interrupt-cells = <1>;
+ 			device_type = "pci";
+ 			dma-coherent;
++			msi-parent = <&gic_v2m0>;
+ 
+ 			bus-range = <0 0xff>;
+ 			ranges =
 -- 
 2.7.4
