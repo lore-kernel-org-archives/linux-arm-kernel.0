@@ -1,102 +1,83 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Tue, 30 Aug 2016 15:01:37 +0000
-Subject: [PATCH v2 0/6] Add support for Tegra GMI bus controller
-In-Reply-To: <1472045838-22628-1-git-send-email-mirza.krak@gmail.com>
-References: <1472045838-22628-1-git-send-email-mirza.krak@gmail.com>
-Message-ID: <1472569295.5703.20.camel@toradex.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 30 Aug 2016 16:02:00 +0100
+Subject: [PATCH 3/3] PCI: Xilinx NWL PCIe: Fix Error for multi function
+ device for legacy interrupts.
+In-Reply-To: <8520D5D51A55D047800579B094147198258D239D@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1472553558-27215-1-git-send-email-bharatku@xilinx.com>
+ <1472553558-27215-3-git-send-email-bharatku@xilinx.com>
+ <57C57975.7040306@arm.com>
+ <8520D5D51A55D047800579B094147198258D239D@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <57C59FE8.30307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mirza
-
-Sorry, I long since wanted to give you some feedback on this as well.
-
-BTW: Thank you very much for taking this on!
-
-On Wed, 2016-08-24 at 15:37 +0200, Mirza Krak wrote:
-> From: Mirza Krak <mirza.krak@gmail.com>
+On 30/08/16 15:13, Bharat Kumar Gogada wrote:
+>> Hi Bharat,
+>>> @@ -561,7 +561,7 @@ static int nwl_pcie_init_irq_domain(struct nwl_pcie
+>> *pcie)
+>>>     }
+>>>
+>>>     pcie->legacy_irq_domain = irq_domain_add_linear(legacy_intc_node,
+>>> -                                                   INTX_NUM,
+>>> +                                                   INTX_NUM + 1,
+>>>                                                     &legacy_domain_ops,
+>>>                                                     pcie);
+>>
+>> This feels like the wrong thing to do. You have INTX_NUM irqs, so the domain
+>> allocation should reflect this. On the other hand, the way the driver currently
+>> deals with mappings is quite broken (consistently adding 1 to the HW interrupt).
+>>
+> Hi Marc,
 > 
-> Hi.
+> Without above change I get following crash in kernel while booting.
 > 
-> This is a follow up to my previous RFC to add support for Tegra GMI
-> bus
-> controller.
+> [    2.441684] error: hwirq 0x4 is too large for dummy
 > 
-> I have tested this series on a Tegra30 using a Colibri T30 SOM on a
-> custom
-> carrier board which has multiple CAN controllers (SJA1000) connected
-> to the
-> GMI bus.
+> [    2.441694] ------------[ cut here ]------------
+> 
+> [    2.441698] WARNING: at kernel/irq/irqdomain.c:344
+> 
+> [    2.441702] Modules linked in:
+> 
+> [    2.441706]
+> 
+> [    2.441714] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.4.0 #8
+> 
+> [    2.441718] Hardware name: xlnx,zynqmp (DT)
+> 
+> [    2.441723] task: ffffffc071886b80 ti: ffffffc071888000 task.ti: ffffffc071888000
+> 
+> [    2.441732] PC is at irq_domain_associate+0x138/0x1c0
+> 
+> [    2.441738] LR is at irq_domain_associate+0x138/0x1c0
+> 
+> In kernel/irq/irqdomain.c function irq_domain_associate
+> 
+> if (WARN(hwirq >= domain->hwirq_max,
+>                  "error: hwirq 0x%x is too large for %s\n", (int)hwirq, domain->name))
+>                 return -EINVAL;
+> 
+> Here the hwirq and hwirq_max are equal to 4 without the above condition (INTX_NUM + 1) due to which crash is coming.
+> This is happening as the legacy interrupts are starting from 1 (INTA).
 
-We once did a nice GMI-Memory Board which mates with the extension
-connector X3 of our V3.x Colibri Evaluation boards and allows testing
-SRAM access not only in muxed but also in non-muxed mode albeit 16-bit
-only. I took your driver for a spin both on Colibri T20 as well as
-Colibri T30 both in muxed as well as non-muxed mode and it passed all
-tests being both manual devmem2 type reads/writes as well as memtester
-runs on the full 128K SRAM giving it the physical address using the -p
-argument.
+I understood that. I'm still persisting in saying that you have the
+wrong fix.
 
-So you may add the following to the whole series:
+Your domain should always allocate many interrupts as you have interrupt
+sources. These interrupts (hwirq) should be numbered from 0 to (n-1).
 
-Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-Tested-on: Colibri T20/T30 on EvalBoard V3.x and GMI-Memory Board
+> And I'm  consistently adding 1 to the HW interrupt as in
+> nwl_pcie_leg_handler I get 0th bit set from MSGF_LEG_STATUS if INTA
+> interrupt is raised but my hwirq number being mapped for INTA is 0x1
+> so that's I'm adding 1 to obtain correct virtual irq. Same case in
+> nwl_pcie_free_irq_domain since hwirq starts from one I'm adding 1 to
+> obtain virtual irq and free it.
 
-I will leave further comments on the individual patches.
+I can see that. Nonetheless, this is wrong. Can you please test the
+patch I provided in my reply and report what happens?
 
-BTW: Of course for non-muxed mode I also had to adjust the pin muxing
-as they default to muxed.
+Thanks,
 
-> I have rebased on top of latest tegra/for-next in V2. Also see
-> individual
-> patches for changes in V2.
-> 
-> See below links for previous discussions.
-> 
-> Comments on RFC:
-> https://marc.info/?l=linux-clk&m=146893557629903&w=2
-> https://marc.info/?l=linux-tegra&m=146893541829801&w=2
-> https://marc.info/?l=linux-tegra&m=146893542429814&w=2
-> 
-> Comments on V1:
-> https://marc.info/?l=linux-arm-kernel&m=147051551821122&w=2
-> https://marc.info/?l=linux-arm-kernel&m=147051553121150&w=2
-> https://marc.info/?l=linux-arm-kernel&m=147194856600627&w=2
-> https://marc.info/?l=linux-arm-kernel&m=147072742432211&w=2
-> 
-> 
-> Mirza Krak (6):
-> ? clk: tegra: add TEGRA20_CLK_NOR to init table
-> ? clk: tegra: add TEGRA30_CLK_NOR to init table
-> ? dt/bindings: Add bindings for Tegra GMI controller
-> ? ARM: tegra: Add Tegra30 GMI support
-> ? ARM: tegra: Add Tegra20 GMI support
-> ? bus: Add support for Tegra Generic Memory Interface
-> 
-> ?.../devicetree/bindings/bus/nvidia,tegra20-gmi.txt | 132
-> ++++++++++++
-> ?arch/arm/boot/dts/tegra20.dtsi?????????????????????|??13 ++
-> ?arch/arm/boot/dts/tegra30.dtsi?????????????????????|??12 ++
-> ?drivers/bus/Kconfig????????????????????????????????|???8 +
-> ?drivers/bus/Makefile???????????????????????????????|???1 +
-> ?drivers/bus/tegra-gmi.c????????????????????????????| 231
-> +++++++++++++++++++++
-> ?drivers/clk/tegra/clk-tegra20.c????????????????????|???1 +
-> ?drivers/clk/tegra/clk-tegra30.c????????????????????|???1 +
-> ?8 files changed, 399 insertions(+)
-> ?create mode 100644
-> Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt
-> ?create mode 100644 drivers/bus/tegra-gmi.c
-> 
-> --
-> 2.1.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-clk"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at??http://vger.kernel.org/majordomo-info.html
-
-Cheers
-
-Marcel
+	M.
+-- 
+Jazz is not dead. It just smells funny...
