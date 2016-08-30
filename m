@@ -1,49 +1,115 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Tue, 30 Aug 2016 10:06:36 -0700
-Subject: [PATCH] arm64: dts: rockchip: Explicitly set pclk_pmu_src on
- rk3399
-In-Reply-To: <4298293.ZqJ4n19bHK@diego>
-References: <1472494284-11315-1-git-send-email-dianders@chromium.org>
- <20160829181841.GA8682@localhost> <57C4DA73.5000505@rock-chips.com>
- <4298293.ZqJ4n19bHK@diego>
-Message-ID: <20160830170635.GA129134@google.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 30 Aug 2016 12:11:46 -0500
+Subject: [PATCH v2 6/7] arm64: dts: exynos: Add dts file for
+ Exynos5433-based TM2 board
+In-Reply-To: <1472046551-703-7-git-send-email-cw00.choi@samsung.com>
+References: <1472046551-703-1-git-send-email-cw00.choi@samsung.com>
+ <1472046551-703-7-git-send-email-cw00.choi@samsung.com>
+Message-ID: <20160830171146.GA22946@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2016 at 09:05:06AM +0200, Heiko Stuebner wrote:
-> Am Dienstag, 30. August 2016, 08:59:31 schrieb Elaine Zhang:
-> > On 08/30/2016 02:18 AM, Brian Norris wrote:
-> > > On Mon, Aug 29, 2016 at 11:11:24AM -0700, Doug Anderson wrote:
-> > >> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > >> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > >> @@ -908,8 +908,8 @@
-> > >> 
-> > >>   		reg = <0x0 0xff750000 0x0 0x1000>;
-> > >>   		#clock-cells = <1>;
-> > >>   		#reset-cells = <1>;
-> > >> 
-> > >> -		assigned-clocks = <&pmucru PLL_PPLL>;
-> > >> -		assigned-clock-rates = <676000000>;
-> > >> +		assigned-clocks = <&pmucru PLL_PPLL>, <&pmucru PCLK_SRC_PMU>;
-> > >> +		assigned-clock-rates = <676000000>, <112666667>;
-> > > 
-> > > I think this makes sense and is a good idea. One alternative would be to
-> > > have the various children actually set a rate that they expect, but
-> > > several of them don't have a separate driver at all, and that would be
-> > > of dubious value anyway I think.
-> > 
-> > I agree with you. This clk default div is set in the uboot or coreboot.
-> > And if is need to set in kernel ,I hope the freq is 50M(<48285714>).
-> > This freq can meet the performance,and the power consumption is not too
-> > much.
+On Wed, Aug 24, 2016 at 10:49:10PM +0900, Chanwoo Choi wrote:
+> This patch adds the Device Tree source for Exynos5433-based Samsung TM2 board.
+> This board fully support the all things for mobile target.
 > 
-> can you maybe also provide a tag like the one Brian did below. Your sentence 
-> above indicates that you reviewed and approve, but it's helpful to also state 
-> that explicitly :-)
+> This patch supports the following devices:
+> 1. basic SoC
+> - Initial booting for Samsung Exynos5433 SoC
+> - DRAM LPDDR3 (3GB)
+> - eMMC (32GB)
+> - ARM architecture timer
+> 
+> 2. power management devices
+> - Sasmung S2MPS13 PMIC for the power supply
+> - CPUFREQ for big.LITTLE cores
+> - TMU for big.LITTLE cores and GPU
+> - ADC with thermistor to measure the temperature of AP/Battery/Charger
+> - Maxim MAX77843 Interface PMIC (MUIC/Haptic/Regulator)
+> 
+> 3. sound devices
+> - I2S for sound bus
+> - LPASS for sound power control
+> - Wolfson WM5110 for sound codec
+> - Maxim MAX98504 for speaker amplifier
+> - TM2 ASoC Machine device driver node
+> 
+> 3. display devices
+> - DECON, DSI and MIC for the panel output
+> 
+> 4. usb devices
+> - USB 3.0 DRD (Dual Role Device)
+> - USB 3.0 Host controller
+> 
+> 5. storage devices
+> - MSHC (Mobile Storae Host Controller) for eMMC device
+> 
+> 6. misc devices
+> - gpio-keys (power, volume up/down, home key)
+> - PWM (Pulse Width Modulation Timer)
+> 
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
+> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+> Signed-off-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
+> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
+> Signed-off-by: Jaewon Kim <jaewon02.kim@samsung.com>
+> Signed-off-by: Hyungwon Hwang <human.hwang@samsung.com>
+> Signed-off-by: Inha Song <ideal.song@samsung.com>
+> Signed-off-by: Ingi kim <ingi2.kim@samsung.com>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+>  .../bindings/arm/samsung/samsung-boards.txt        |   1 +
+>  arch/arm64/boot/dts/exynos/Makefile                |   5 +-
+>  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 985 +++++++++++++++++++++
+>  3 files changed, 990 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+> index 0ea7f14ef294..c704b4bf6137 100644
+> --- a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+> +++ b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+> @@ -15,6 +15,7 @@ Required root node properties:
+>  	- "samsung,xyref5260"	- for Exynos5260-based Samsung board.
+>  	- "samsung,smdk5410"	- for Exynos5410-based Samsung SMDK5410 eval board.
+>  	- "samsung,smdk5420"	- for Exynos5420-based Samsung SMDK5420 eval board.
+> +	- "samsung,tm2"		- for Exynos5333-based Samsung TM2 board.
 
-If I understand Elaine correctly, that's not actually a full agreement;
-it looks like a suggestion to change that from 112 MHz to 48.2 MHz. I
-haven't tested that out personally yet, but if that's a formal
-recommendation from Rockchip, we'd like to know more about it :)
+This does not match...
 
-Brian
+> +	compatible = "samsung,exynos5433-tm2", "samsung,exynos5433";
+
+Is it 5433 or 5333?
+
+> +
+> +	aliases {
+> +		pinctrl0 = &pinctrl_alive;
+> +		pinctrl1 = &pinctrl_aud;
+> +		pinctrl2 = &pinctrl_cpif;
+> +		pinctrl3 = &pinctrl_ese;
+> +		pinctrl4 = &pinctrl_finger;
+> +		pinctrl5 = &pinctrl_fsys;
+> +		pinctrl6 = &pinctrl_imem;
+> +		pinctrl7 = &pinctrl_nfc;
+> +		pinctrl8 = &pinctrl_peric;
+> +		pinctrl9 = &pinctrl_touch;
+
+Drop all these.
+
+> +		serial0 = &serial_0;
+> +		serial1 = &serial_1;
+> +		serial2 = &serial_2;
+> +		serial3 = &serial_3;
+
+> +		spi0 = &spi_0;
+> +		spi1 = &spi_1;
+> +		spi2 = &spi_2;
+> +		spi3 = &spi_3;
+> +		spi4 = &spi_4;
+
+And these.
