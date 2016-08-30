@@ -1,33 +1,20 @@
-From: jingoohan1@gmail.com (Jingoo Han)
-Date: Tue, 30 Aug 2016 14:15:00 -0400
-Subject: [PATCH v2] arm64:pci: fix the IOV device access config space
- valid condition
-In-Reply-To: <HE1PR0402MB2748F7A71F8A0073644EE3568BE00@HE1PR0402MB2748.eurprd04.prod.outlook.com>
-References: <1471932072-6980-1-git-send-email-po.liu@nxp.com>
- <1472455618-17892-1-git-send-email-po.liu@nxp.com>
- <000a01d202d5$3f86e3a0$be94aae0$@gmail.com>
- <HE1PR0402MB2748F7A71F8A0073644EE3568BE00@HE1PR0402MB2748.eurprd04.prod.outlook.com>
-Message-ID: <000401d202ea$6e6d5ef0$4b481cd0$@gmail.com>
+From: mindentropy@gmail.com (mind entropy)
+Date: Tue, 30 Aug 2016 23:55:18 +0530
+Subject: disable_anatop_clocks switches off the pll2_pfd2_396m used for lpddr2
+ causing a hang
+Message-ID: <CAM2a4uxxJbAAEaW6zb7YZPi-j3Rx9mmJraC5UJ3c1jg67TvxQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, August 30, 2016 11:55 AM, Roy Zang wrote:
-> 
-> On 08/30/2016 10:43 AM, Jingoo Han wrote:
-> > I really don't like to modify host driver stuffs.
-> > But, if there is no alternatives, this patch looks good.
-> 
-> I do not see other good place to fix the bug.
+Hi,
 
-Hi Roy Zang,
+  The patch as present in the
+https://marc.info/?l=linux-arm-kernel&m=140198575118026&q=raw disables
+the pll2_pfd2_396m in the i.mx6 dual lite which is being used by the
+lpddr2. I have a board which I run lpddr2 at 200 MHz which uses the
+pll2_pfd2 (/2). How do I make the parent of IMX6QDL_CLK_PERPIH_PRE,
+IMX6QDL_CLK_PLL2_PFD2_396M ? Should it be in the dts file or in the
+code?
 
-I didn't find other good place, too.
-At that time, I did IOV test with the similar patch like this.
-
-Best regards,
-Jingoo Han
-
-> 
-> Roy Zang <roy.zang@nxp.com>
-> 
-> Roy
+Thanks,
+Gautam.
