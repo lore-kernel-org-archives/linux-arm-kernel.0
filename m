@@ -1,45 +1,35 @@
-From: majun258@huawei.com (majun (F))
-Date: Tue, 30 Aug 2016 18:35:39 +0800
-Subject: [PATCH] generic: Add the exception case checking routine for ppi
- interrupt
-In-Reply-To: <57C548D0.3090700@arm.com>
-References: <1472530639-21616-1-git-send-email-majun258@huawei.com>
- <57C548D0.3090700@arm.com>
-Message-ID: <57C5617B.6080801@huawei.com>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Tue, 30 Aug 2016 16:09:18 +0530
+Subject: [PATCH 3/3] PCI: Xilinx NWL PCIe: Fix Error for multi function device
+ for legacy interrupts.
+In-Reply-To: <1472553558-27215-1-git-send-email-bharatku@xilinx.com>
+References: <1472553558-27215-1-git-send-email-bharatku@xilinx.com>
+Message-ID: <1472553558-27215-3-git-send-email-bharatku@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+PCIe legacy interrupts start at 1, not at 0.
+When testing with multi function device "error: hwirq 0x4 is too large for
+dummy" error comes.
+So adding one addtional interrupt when creating irq domain.
 
+Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+---
+ drivers/pci/host/pcie-xilinx-nwl.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-? 2016/8/30 16:50, Marc Zyngier ??:
-> On 30/08/16 05:17, MaJun wrote:
->> From: Ma Jun <majun258@huawei.com>
->>
->> During system booting, if the interrupt which has no action registered
->> is triggered, it would cause system panic when try to access the
->> action member.
-> 
-> And why would that interrupt be enabled? If you enable a PPI before
-> registering a handler, you're doing something wrong.
-> 
-
-Actually,the problem described above happened during the capture kernel booting.
-
-In my system, sometimes there is a pending physical timer interrupt(30)
-when the first kernel panic and the status is kept until the capture kernel booting.
-
-So, this interrupt will be handled during capture kernel booting.
-
-Becasue we use virt timer interrupt but not physical timer interrupt in capture kernel,
-the interrupt 30 has no action handler.
-
-Besides, I think we need to do exception check in this function just
-like "handle_fasteoi_irq" does.
-
-Thanks
-MaJun
-
-> Thanks,
-> 
-> 	M.
-> 
+diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
+index d8d43e6..9f04411 100644
+--- a/drivers/pci/host/pcie-xilinx-nwl.c
++++ b/drivers/pci/host/pcie-xilinx-nwl.c
+@@ -561,7 +561,7 @@ static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
+ 	}
+ 
+ 	pcie->legacy_irq_domain = irq_domain_add_linear(legacy_intc_node,
+-							INTX_NUM,
++							INTX_NUM + 1,
+ 							&legacy_domain_ops,
+ 							pcie);
+ 
+-- 
+2.1.1
