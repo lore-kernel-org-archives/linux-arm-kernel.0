@@ -1,27 +1,45 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 30 Aug 2016 19:04:36 +0900
-Subject: [PATCH v2 10/10] reset: hi6220: allow to compile test driver on
- other architectures
-In-Reply-To: <1472545496-14373-10-git-send-email-p.zabel@pengutronix.de>
-References: <1472545496-14373-1-git-send-email-p.zabel@pengutronix.de>
- <1472545496-14373-10-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <CAK7LNAQyy+U_sNR9FfOc46cc-v2OLyBbm32nD4d2WcXNQfYKtQ@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 30 Aug 2016 11:15:42 +0100
+Subject: [RFC PATCH 2/3] arm64: cpufeature: constify arm64_ftr_regs array
+In-Reply-To: <1472231742-13387-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1472231742-13387-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1472231742-13387-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1555bf25-a086-ae32-1dae-e84782b97380@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-08-30 17:24 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
-> Also remove the RESET_CONTROLLER dependency, this Kconfig file is
-> included inside the menuconfig already.
+On 26/08/16 18:15, Ard Biesheuvel wrote:
+> Constify the arm64_ftr_regs array, by moving the mutable arm64_ftr_reg
+> fields out of the array itself. This also streamlines the bsearch, since
+> the entire array can be covered by fewer cachelines. Moving the payload
+> out of the array also allows us to have special explicitly defined
+> struct instance in case other code needs to refer to it directly.
 >
-> Cc: Chen Feng <puck.chen@hisilicon.com>
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Note that this replaces the runtime sorting of the array with a runtime
+> BUG() check whether the array is sorted correctly in the code.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Ard,
+
+Thanks a lot for the nice, quick cleanup !
+
+> +	int i;
+> +
+> +	/* Check that the array is sorted so that we can do the binary search */
+> +	for (i = 1; i < ARRAY_SIZE(arm64_ftr_regs); i++)
 
 
+> +		if (arm64_ftr_regs[i].sys_id < arm64_ftr_regs[i - 1].sys_id)
+> +			BUG();
+
+minor nit: We could do :
+	for (i = 1; i < ARRAY_SIZE(arm64_ftr_regs); i++)
+		BUG_ON(!(arm64_ftr_regs[i].sys_id < arm64_ftr_regs[i - 1].sys_id));
 
 
+The entire series looks good to me. For the series :
 
--- 
-Best Regards
-Masahiro Yamada
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+
+Suzuki
