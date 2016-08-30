@@ -1,42 +1,23 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 30 Aug 2016 09:54:09 -0700
-Subject: [PATCH v8 01/18] remoteproc: st_slim_rproc: add a slimcore rproc
- driver
-In-Reply-To: <20160830123453.GG10121@dell>
-References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
- <1472223413-7254-2-git-send-email-peter.griffin@linaro.org>
- <20160830123453.GG10121@dell>
-Message-ID: <20160830165409.GM15161@tuxbot>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 30 Aug 2016 22:34:22 +0530
+Subject: [PATCH V3 3/3] dmaengine: qcom_hidma: add error reporting for
+ tx_status
+In-Reply-To: <1471927691-28827-4-git-send-email-okaya@codeaurora.org>
+References: <1471927691-28827-1-git-send-email-okaya@codeaurora.org>
+ <1471927691-28827-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <20160830170422.GN9355@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 30 Aug 05:34 PDT 2016, Lee Jones wrote:
+On Tue, Aug 23, 2016 at 12:48:11AM -0400, Sinan Kaya wrote:
 
-Thanks for your review Lee.
+>  	spin_lock_init(&lldev->lock);
+> -	tasklet_init(&lldev->rst_task, hidma_ll_abort, (unsigned long)lldev);
 
-> On Fri, 26 Aug 2016, Peter Griffin wrote:
-[..]
-> > diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
-> > index 1a8bf76a..06765e0 100644
-> > --- a/drivers/remoteproc/Kconfig
-> > +++ b/drivers/remoteproc/Kconfig
-> > @@ -100,4 +100,12 @@ config ST_REMOTEPROC
-> >  	  processor framework.
-> >  	  This can be either built-in or a loadable module.
-> >  
-> > +config ST_SLIM_REMOTEPROC
-> > +	tristate "ST Slim remoteproc support"
-> > +	select REMOTEPROC
-> > +	help
-> > +	  Say y here to support firmware loading on IP based around
-> > +	  the Slim core.
-> > +	  If unsure say N.
+??
 
-Saw one more thing when browsing through...
+This is not described in changlog? If you are not using in anywhere else,
+then rst_task variable should be removed too..
 
-As this piece of code doesn't do anything on its own and is going to be
-selected by the "function driver" I don't think this should be
-user-selectable.
-
-Regards,
-Bjorn
+-- 
+~Vinod
