@@ -1,72 +1,87 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed, 31 Aug 2016 04:30:07 +0800
-Subject: [PATCH 4/4] arm64: dts: rockchip: enable the gmac for rk3399 evb board
-In-Reply-To: <1472589008-7713-1-git-send-email-wxt@rock-chips.com>
-References: <1472589008-7713-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1472589008-7713-5-git-send-email-wxt@rock-chips.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Tue, 30 Aug 2016 22:52:49 +0200
+Subject: [PATCH 2/3] ARM: dts: lpc18xx: remove skeleton.dtsi include and fix
+ unit address warnings
+In-Reply-To: <20160830205250.15616-1-manabian@gmail.com>
+References: <20160830205250.15616-1-manabian@gmail.com>
+Message-ID: <20160830205250.15616-3-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We add the required and optional properties for evb board.
-See the [0] to get the detail information.
+Removale of skeleton.dtsi allows us also to fix the following
+warning from the dts compiler:
+  Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
 
-[0]:
-Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+by adding proper unit addresses to the memory nodes.
 
-Signed-off-by: Roger Chen <roger.chen@rock-chips.com>
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
+ arch/arm/boot/dts/lpc18xx.dtsi              | 4 +++-
+ arch/arm/boot/dts/lpc4337-ciaa.dts          | 2 +-
+ arch/arm/boot/dts/lpc4350-hitex-eval.dts    | 2 +-
+ arch/arm/boot/dts/lpc4357-ea4357-devkit.dts | 2 +-
+ 4 files changed, 6 insertions(+), 4 deletions(-)
 
- arch/arm64/boot/dts/rockchip/rk3399-evb.dts | 31 +++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-index d47b4e9..ed6f2e8 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-@@ -94,12 +94,43 @@
- 		regulator-always-on;
- 		regulator-boot-on;
+diff --git a/arch/arm/boot/dts/lpc18xx.dtsi b/arch/arm/boot/dts/lpc18xx.dtsi
+index a1ecfe3..860ffa8 100644
+--- a/arch/arm/boot/dts/lpc18xx.dtsi
++++ b/arch/arm/boot/dts/lpc18xx.dtsi
+@@ -11,7 +11,6 @@
+  *
+  */
+ 
+-#include "skeleton.dtsi"
+ #include "armv7-m.dtsi"
+ 
+ #include "dt-bindings/clock/lpc18xx-cgu.h"
+@@ -21,6 +20,9 @@
+ #define LPC_GPIO(port, pin)	(port * 32 + pin)
+ 
+ / {
++	#address-cells = <1>;
++	#size-cells = <1>;
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/lpc4337-ciaa.dts b/arch/arm/boot/dts/lpc4337-ciaa.dts
+index 5cfadb0..7c16d63 100644
+--- a/arch/arm/boot/dts/lpc4337-ciaa.dts
++++ b/arch/arm/boot/dts/lpc4337-ciaa.dts
+@@ -30,7 +30,7 @@
+ 		stdout-path = &uart2;
  	};
-+
-+	clkin_gmac: external-gmac-clock {
-+		compatible = "fixed-clock";
-+		clock-frequency = <125000000>;
-+		clock-output-names = "clkin_gmac";
-+		#clock-cells = <0>;
-+	};
-+
-+	vcc_phy: vcc-phy-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_phy";
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+
- };
  
- &emmc_phy {
- 	status = "okay";
- };
+-	memory {
++	memory at 28000000 {
+ 		device_type = "memory";
+ 		reg = <0x28000000 0x0800000>; /* 8 MB */
+ 	};
+diff --git a/arch/arm/boot/dts/lpc4350-hitex-eval.dts b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
+index d37779e..bc89702 100644
+--- a/arch/arm/boot/dts/lpc4350-hitex-eval.dts
++++ b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
+@@ -34,7 +34,7 @@
+ 		stdout-path = &uart0;
+ 	};
  
-+&gmac {
-+	phy-supply = <&vcc_phy>;
-+	phy-mode = "rgmii";
-+	clock_in_out = "input";
-+	snps,reset-gpio = <&gpio3 15 GPIO_ACTIVE_LOW>;
-+	snps,reset-active-low;
-+	snps,reset-delays-us = <0 10000 50000>;
-+	assigned-clocks = <&cru SCLK_RMII_SRC>;
-+	assigned-clock-parents = <&clkin_gmac>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins>;
-+	tx_delay = <0x28>;
-+	rx_delay = <0x11>;
-+	status = "okay";
-+};
-+
- &pwm0 {
- 	status = "okay";
- };
+-	memory {
++	memory at 28000000 {
+ 		device_type = "memory";
+ 		reg = <0x28000000 0x800000>; /* 8 MB */
+ 	};
+diff --git a/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts b/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
+index 37bbcb6..5ca5eb5 100644
+--- a/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
++++ b/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
+@@ -35,7 +35,7 @@
+ 		stdout-path = &uart0;
+ 	};
+ 
+-	memory {
++	memory at 28000000 {
+ 		device_type = "memory";
+ 		reg = <0x28000000 0x2000000>; /* 32 MB */
+ 	};
 -- 
-1.9.1
+2.9.3
