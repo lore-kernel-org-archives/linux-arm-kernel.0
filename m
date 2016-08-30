@@ -1,54 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 Aug 2016 17:53:40 +0100
-Subject: [PATCH] arm64: kernel: Fix unmasked debug exceptions when
- restoring mdscr_el1
-In-Reply-To: <1472223822-21059-1-git-send-email-james.morse@arm.com>
-References: <1472223822-21059-1-git-send-email-james.morse@arm.com>
-Message-ID: <20160830165339.GI24906@arm.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 30 Aug 2016 09:54:09 -0700
+Subject: [PATCH v8 01/18] remoteproc: st_slim_rproc: add a slimcore rproc
+ driver
+In-Reply-To: <20160830123453.GG10121@dell>
+References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
+ <1472223413-7254-2-git-send-email-peter.griffin@linaro.org>
+ <20160830123453.GG10121@dell>
+Message-ID: <20160830165409.GM15161@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2016 at 04:03:42PM +0100, James Morse wrote:
-> Changes to make the resume from cpu_suspend() code behave more like
-> secondary boot caused debug exceptions to be unmasked early by
-> __cpu_setup(). We then go on to restore mdscr_el1 in cpu_do_resume(),
-> potentially taking break or watch points based on uninitialised registers.
-> 
-> Mask debug exceptions in cpu_do_resume(), which is specific to resume
-> from cpu_suspend(). Debug exceptions will be restored to their original
-> state by local_dbg_restore() in cpu_suspend(), which runs after
-> hw_breakpoint_restore() has re-initialised the other registers.
-> 
-> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Fixes: cabe1c81ea5b ("arm64: Change cpu_resume() to enable mmu early then access sleep_sp by va")
-> Cc: <stable@vger.kernel.org> #4.7
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
->  arch/arm64/mm/proc.S | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index 5bb61de23201..9d37e967fa19 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -100,7 +100,16 @@ ENTRY(cpu_do_resume)
->  
->  	msr	tcr_el1, x8
->  	msr	vbar_el1, x9
-> +
-> +	/*
-> +	 * __cpu_setup() cleared MDSCR_EL1.MDE and friends, before unmasking
-> +	 * debug exceptions. By restoring MDSCR_EL1 here, we may take a debug
-> +	 * exception. Mask them until local_dbg_restore() in cpu_suspend()
-> +	 * resets them.
-> +	 */
-> +	disable_dbg
->  	msr	mdscr_el1, x10
-> +
->  	msr	sctlr_el1, x12
+On Tue 30 Aug 05:34 PDT 2016, Lee Jones wrote:
 
-Looks good to me:
+Thanks for your review Lee.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+> On Fri, 26 Aug 2016, Peter Griffin wrote:
+[..]
+> > diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+> > index 1a8bf76a..06765e0 100644
+> > --- a/drivers/remoteproc/Kconfig
+> > +++ b/drivers/remoteproc/Kconfig
+> > @@ -100,4 +100,12 @@ config ST_REMOTEPROC
+> >  	  processor framework.
+> >  	  This can be either built-in or a loadable module.
+> >  
+> > +config ST_SLIM_REMOTEPROC
+> > +	tristate "ST Slim remoteproc support"
+> > +	select REMOTEPROC
+> > +	help
+> > +	  Say y here to support firmware loading on IP based around
+> > +	  the Slim core.
+> > +	  If unsure say N.
 
-Will
+Saw one more thing when browsing through...
+
+As this piece of code doesn't do anything on its own and is going to be
+selected by the "function driver" I don't think this should be
+user-selectable.
+
+Regards,
+Bjorn
