@@ -1,35 +1,93 @@
 From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Tue, 30 Aug 2016 16:09:18 +0530
-Subject: [PATCH 3/3] PCI: Xilinx NWL PCIe: Fix Error for multi function device
- for legacy interrupts.
-In-Reply-To: <1472553558-27215-1-git-send-email-bharatku@xilinx.com>
-References: <1472553558-27215-1-git-send-email-bharatku@xilinx.com>
-Message-ID: <1472553558-27215-3-git-send-email-bharatku@xilinx.com>
+Date: Tue, 30 Aug 2016 16:09:16 +0530
+Subject: [PATCH 1/3] PCI: Xilinx NWL PCIe: Expanding PCIe core errors and
+ printing event occurred.
+Message-ID: <1472553558-27215-1-git-send-email-bharatku@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PCIe legacy interrupts start at 1, not at 0.
-When testing with multi function device "error: hwirq 0x4 is too large for
-dummy" error comes.
-So adding one addtional interrupt when creating irq domain.
+The current driver prints pcie core error, for all core events.
+Instead of just printing PCIe core error, now adding prints to show
+individual core events occurred.
 
 Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
 ---
- drivers/pci/host/pcie-xilinx-nwl.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pci/host/pcie-xilinx-nwl.c | 48 +++++++++++++++++++++++++++++++-------
+ 1 file changed, 40 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-index d8d43e6..9f04411 100644
+index 3479d30..86c1834 100644
 --- a/drivers/pci/host/pcie-xilinx-nwl.c
 +++ b/drivers/pci/host/pcie-xilinx-nwl.c
-@@ -561,7 +561,7 @@ static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
- 	}
+@@ -85,10 +85,15 @@
+ #define MSGF_MISC_SR_MASTER_ERR		BIT(5)
+ #define MSGF_MISC_SR_I_ADDR_ERR		BIT(6)
+ #define MSGF_MISC_SR_E_ADDR_ERR		BIT(7)
+-#define MSGF_MISC_SR_UR_DETECT          BIT(20)
+-
+-#define MSGF_MISC_SR_PCIE_CORE		GENMASK(18, 16)
+-#define MSGF_MISC_SR_PCIE_CORE_ERR	GENMASK(31, 22)
++#define MSGF_MISC_SR_FATAL_AER		BIT(16)
++#define MSGF_MISC_SR_NON_FATAL_AER	BIT(17)
++#define MSGF_MISC_SR_CORR_AER		BIT(18)
++#define MSGF_MISC_SR_UR_DETECT		BIT(20)
++#define MSGF_MISC_SR_NON_FATAL_DEV	BIT(22)
++#define MSGF_MISC_SR_FATAL_DEV		BIT(23)
++#define MSGF_MISC_SR_LINK_DOWN		BIT(24)
++#define MSGF_MSIC_SR_LINK_AUTO_BWIDTH	BIT(25)
++#define MSGF_MSIC_SR_LINK_BWIDTH	BIT(26)
  
- 	pcie->legacy_irq_domain = irq_domain_add_linear(legacy_intc_node,
--							INTX_NUM,
-+							INTX_NUM + 1,
- 							&legacy_domain_ops,
- 							pcie);
+ #define MSGF_MISC_SR_MASKALL		(MSGF_MISC_SR_RXMSG_AVAIL | \
+ 					MSGF_MISC_SR_RXMSG_OVER | \
+@@ -96,9 +101,15 @@
+ 					MSGF_MISC_SR_MASTER_ERR | \
+ 					MSGF_MISC_SR_I_ADDR_ERR | \
+ 					MSGF_MISC_SR_E_ADDR_ERR | \
++					MSGF_MISC_SR_FATAL_AER | \
++					MSGF_MISC_SR_NON_FATAL_AER | \
++					MSGF_MISC_SR_CORR_AER | \
+ 					MSGF_MISC_SR_UR_DETECT | \
+-					MSGF_MISC_SR_PCIE_CORE | \
+-					MSGF_MISC_SR_PCIE_CORE_ERR)
++					MSGF_MISC_SR_NON_FATAL_DEV | \
++					MSGF_MISC_SR_FATAL_DEV | \
++					MSGF_MISC_SR_LINK_DOWN | \
++					MSGF_MSIC_SR_LINK_AUTO_BWIDTH | \
++					MSGF_MSIC_SR_LINK_BWIDTH)
  
+ /* Legacy interrupt status mask bits */
+ #define MSGF_LEG_SR_INTA		BIT(0)
+@@ -291,8 +302,29 @@ static irqreturn_t nwl_pcie_misc_handler(int irq, void *data)
+ 		dev_err(pcie->dev,
+ 			"In Misc Egress address translation error\n");
+ 
+-	if (misc_stat & MSGF_MISC_SR_PCIE_CORE_ERR)
+-		dev_err(pcie->dev, "PCIe Core error\n");
++	if (misc_stat & MSGF_MISC_SR_FATAL_AER)
++		dev_err(pcie->dev, "Fatal Error in AER Capability\n");
++
++	if (misc_stat & MSGF_MISC_SR_NON_FATAL_AER)
++		dev_err(pcie->dev, "Non-Fatal Error in AER Capability\n");
++
++	if (misc_stat & MSGF_MISC_SR_CORR_AER)
++		dev_err(pcie->dev, "Correctable Error in AER Capability\n");
++
++	if (misc_stat & MSGF_MISC_SR_UR_DETECT)
++		dev_err(pcie->dev, "Unsupported request Detected\n");
++
++	if (misc_stat & MSGF_MISC_SR_NON_FATAL_DEV)
++		dev_err(pcie->dev, "Non-Fatal Error Detected\n");
++
++	if (misc_stat & MSGF_MISC_SR_FATAL_DEV)
++		dev_err(pcie->dev, "Fatal Error Detected\n");
++
++	if (misc_stat & MSGF_MSIC_SR_LINK_AUTO_BWIDTH)
++		dev_info(pcie->dev, "Link Autonomous Bandwidth Management Status bit set\n");
++
++	if (misc_stat & MSGF_MSIC_SR_LINK_BWIDTH)
++		dev_info(pcie->dev, "Link Bandwidth Management Status bit set\n");
+ 
+ 	/* Clear misc interrupt status */
+ 	nwl_bridge_writel(pcie, misc_stat, MSGF_MISC_STATUS);
 -- 
 2.1.1
