@@ -1,138 +1,58 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue, 30 Aug 2016 17:31:21 +0200
-Subject: [PATCH 2/2] clk: mvebu: dynamically allocate resources in Armada
- CP110 system controller
-In-Reply-To: <20160825001613.GQ19826@codeaurora.org>
-References: <1471933609-8456-1-git-send-email-mw@semihalf.com>
- <1471933609-8456-3-git-send-email-mw@semihalf.com>
- <20160825001613.GQ19826@codeaurora.org>
-Message-ID: <CAPv3WKdVX1p3qmUufXE_cd=A0fuS8Eg9ELT0AYnXV6Z=cgJg-w@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 30 Aug 2016 11:31:15 -0400 (EDT)
+Subject: [PATCH 0/4] SA11x0 Clocks and removal of Neponset SMC91x hack
+In-Reply-To: <20160830105117.GM1041@n2100.armlinux.org.uk>
+References: <20160829120531.GG1041@n2100.armlinux.org.uk>
+ <E1beLKT-0001U1-HK@rmk-PC.armlinux.org.uk>
+ <20160830105117.GM1041@n2100.armlinux.org.uk>
+Message-ID: <alpine.LFD.2.20.1608301129520.1525@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Tue, 30 Aug 2016, Russell King - ARM Linux wrote:
 
-2016-08-25 2:16 GMT+02:00 Stephen Boyd <sboyd@codeaurora.org>:
-> On 08/23, Marcin Wojtas wrote:
->> Original commit, which added support for Armada CP110 system controller
->> used global variables for storing all clock information. It worked
->> fine for Armada 7k SoC, with single CP110 block. After dual-CP110 Armada 8k
->> was introduced, the data got overwritten and corrupted.
->>
->> This patch fixes the issue by allocating resources dynamically in the
->> driver probe and storing it as platform drvdata.
->>
->> Fixes: d3da3eaef7f4 ("clk: mvebu: new driver for Armada CP110 system ...")
->>
->
-> Please drop the space between fixes tag and the signoff.
+> This mini-series (which follows several other series on which it
+> depends) gets rid of the Assabet/Neponset hack in the smc91x driver.
+> 
+> In order to do that, we need to get several pieces in place first:
+> * gpiolib support throughout SA11x0/Assabet/Neponset so that we can
+>   represent control signals through gpiolib
+> * CCF support, so we can re-use the code in drivers/clk to implement
+>   the external crystal oscillator attached to the SMC91x.  This
+>   external crystal oscillator is enabled via a control signal.
+> 
+> This series:
+> - performs the SA11x0 CCF conversion
+> - adds an optional clock to SMC91x to cater for an external crystal
+>   oscillator
+> - switches the Neponset code to provide a 'struct clk' representing
+>   this oscillator
+> - removes the SMC91x hack to assert the enable signal
+> 
+> This results in the platform specific includes being removed from the
+> SMC91x driver.
+> 
+> Please ack these changes; due to the dependencies, I wish to merge
+> them through my tree.  Thanks.
 
-Ok.
+Looks nice to me.
 
->
->> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
->> ---
->>  drivers/clk/mvebu/cp110-system-controller.c | 29 ++++++++++++++++++++---------
->>  1 file changed, 20 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/clk/mvebu/cp110-system-controller.c b/drivers/clk/mvebu/cp110-system-controller.c
->> index 0835e1d..2bd87d2 100644
->> --- a/drivers/clk/mvebu/cp110-system-controller.c
->> +++ b/drivers/clk/mvebu/cp110-system-controller.c
->> @@ -81,13 +81,6 @@ enum {
->>  #define CP110_GATE_EIP150            25
->>  #define CP110_GATE_EIP197            26
->>
->> -static struct clk *cp110_clks[CP110_CLK_NUM];
->> -
->> -static struct clk_onecell_data cp110_clk_data = {
->> -     .clks = cp110_clks,
->> -     .clk_num = CP110_CLK_NUM,
->> -};
->> -
->>  struct cp110_gate_clk {
->>       struct clk_hw hw;
->>       struct regmap *regmap;
->> @@ -195,7 +188,8 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
->>       struct regmap *regmap;
->>       struct device_node *np = pdev->dev.of_node;
->>       const char *ppv2_name, *apll_name, *core_name, *eip_name, *nand_name;
->> -     struct clk *clk;
->> +     struct clk_onecell_data *cp110_clk_data;
->> +     struct clk *clk, **cp110_clks;
->>       u32 nand_clk_ctrl;
->>       int i, ret;
->>
->> @@ -208,6 +202,20 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
->>       if (ret)
->>               return ret;
->>
->> +     cp110_clks = devm_kcalloc(&pdev->dev, sizeof(struct clk *),
->> +                               CP110_CLK_NUM, GFP_KERNEL);
->> +     if (IS_ERR(cp110_clks))
->
-> Doesn't that return NULL on error?
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Will change to 'if (!cp110clks)'
-
->
->> +             return PTR_ERR(cp110_clks);
->> +
->> +     cp110_clk_data = devm_kzalloc(&pdev->dev,
->> +                                   sizeof(struct clk_onecell_data),
->
-> sizeof(*cp110_clk_data) please
-
-Ok.
-
->
->> +                                   GFP_KERNEL);
->> +     if (IS_ERR(cp110_clk_data))
->
-> Doesn't that return NULL on error?
-
-Same as above, will change.
-
->
->> +             return PTR_ERR(cp110_clk_data);
->> +
->> +     cp110_clk_data->clks = cp110_clks;
->> +     cp110_clk_data->clk_num = CP110_CLK_NUM;
->> +
->>       /* Register the APLL which is the root of the clk tree */
->>       of_property_read_string_index(np, "core-clock-output-names",
->>                                     CP110_CORE_APLL, &apll_name);
->> @@ -335,10 +343,12 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
->>               cp110_clks[CP110_MAX_CORE_CLOCKS + i] = clk;
->>       }
->>
->> -     ret = of_clk_add_provider(np, cp110_of_clk_get, &cp110_clk_data);
->> +     ret = of_clk_add_provider(np, cp110_of_clk_get, cp110_clk_data);
->
-> It would be nice if this could be converted to
-> of_clk_add_hw_provider().
-
-Will try it. Shouldn't such change be placed in separate commit?
-
->
->>       if (ret)
->>               goto fail_clk_add;
->>
->> +     platform_set_drvdata(pdev, cp110_clks);
->> +
->>       return 0;
->>
->>  fail_clk_add:
->> @@ -365,6 +375,7 @@ fail0:
->>
->>  static int cp110_syscon_clk_remove(struct platform_device *pdev)
->>  {
->> +     struct clk **cp110_clks = platform_get_drvdata(pdev);
->
-> Is this variable unused now?
-
-No, why? Just below there is a loop using it. Before it was taken from
-global variable, which I got rid of.
-
-Best regards,
-Marcin
+>  arch/arm/Kconfig                   |   1 +
+>  arch/arm/mach-sa1100/clock.c       | 191 +++++++++++++++++--------------------
+>  arch/arm/mach-sa1100/neponset.c    |  42 ++++++++
+>  drivers/net/ethernet/smsc/smc91x.c |  47 ++++++---
+>  drivers/net/ethernet/smsc/smc91x.h |   1 +
+>  5 files changed, 166 insertions(+), 116 deletions(-)
+> 
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
