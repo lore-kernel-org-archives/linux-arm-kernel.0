@@ -1,113 +1,59 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Tue, 30 Aug 2016 16:07:30 +0800
-Subject: [PATCHV5 3/3] stm: Mark the functions of writing buffer with notrace
-In-Reply-To: <1472544450-9915-1-git-send-email-zhang.chunyan@linaro.org>
-References: <1472544450-9915-1-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <1472544450-9915-4-git-send-email-zhang.chunyan@linaro.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 30 Aug 2016 10:24:50 +0200
+Subject: [PATCH v2 04/10] reset: meson: add driver Kconfig option
+In-Reply-To: <1472545496-14373-1-git-send-email-p.zabel@pengutronix.de>
+References: <1472545496-14373-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1472545496-14373-4-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_STM_FTRACE is selected, Function trace data can be writen
-to sink via STM, all functions that related to writing data packets
-to STM should be marked 'notrace' to avoid being traced by Ftrace,
-otherwise the program would stall into an endless loop.
+Visible only if COMPILE_TEST is enabled, this allows to include the
+driver in build tests.
 
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- drivers/hwtracing/coresight/coresight-stm.c |  2 +-
- drivers/hwtracing/intel_th/sth.c            | 11 +++++++----
- drivers/hwtracing/stm/core.c                |  7 ++++---
- drivers/hwtracing/stm/dummy_stm.c           |  2 +-
- include/linux/stm.h                         |  4 ++--
- 5 files changed, 15 insertions(+), 11 deletions(-)
+ drivers/reset/Kconfig  | 6 ++++++
+ drivers/reset/Makefile | 2 +-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index 73be58a..345c81e 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -386,7 +386,7 @@ static long stm_generic_set_options(struct stm_data *stm_data,
- 	return 0;
- }
+diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+index 72c9b78..3fa6afe 100644
+--- a/drivers/reset/Kconfig
++++ b/drivers/reset/Kconfig
+@@ -33,6 +33,12 @@ config RESET_LPC18XX
+ 	help
+ 	  This enables the reset controller driver for NXP LPC18xx/43xx SoCs.
  
--static ssize_t stm_generic_packet(struct stm_data *stm_data,
-+static ssize_t notrace stm_generic_packet(struct stm_data *stm_data,
- 				  unsigned int master,
- 				  unsigned int channel,
- 				  unsigned int packet,
-diff --git a/drivers/hwtracing/intel_th/sth.c b/drivers/hwtracing/intel_th/sth.c
-index e1aee61..b034446 100644
---- a/drivers/hwtracing/intel_th/sth.c
-+++ b/drivers/hwtracing/intel_th/sth.c
-@@ -67,10 +67,13 @@ static void sth_iowrite(void __iomem *dest, const unsigned char *payload,
- 	}
- }
++config RESET_MESON
++	bool "Meson Reset Driver" if COMPILE_TEST
++	default ARCH_MESON
++	help
++	  This enables the reset driver for Amlogic Meson SoCs.
++
+ config RESET_OXNAS
+ 	bool
  
--static ssize_t sth_stm_packet(struct stm_data *stm_data, unsigned int master,
--			      unsigned int channel, unsigned int packet,
--			      unsigned int flags, unsigned int size,
--			      const unsigned char *payload)
-+static ssize_t notrace sth_stm_packet(struct stm_data *stm_data,
-+				      unsigned int master,
-+				      unsigned int channel,
-+				      unsigned int packet,
-+				      unsigned int flags,
-+				      unsigned int size,
-+				      const unsigned char *payload)
- {
- 	struct sth_device *sth = container_of(stm_data, struct sth_device, stm);
- 	struct intel_th_channel __iomem *out =
-diff --git a/drivers/hwtracing/stm/core.c b/drivers/hwtracing/stm/core.c
-index 51f81d6..37d3bcb 100644
---- a/drivers/hwtracing/stm/core.c
-+++ b/drivers/hwtracing/stm/core.c
-@@ -425,7 +425,7 @@ static int stm_file_assign(struct stm_file *stmf, char *id, unsigned int width)
- 	return ret;
- }
- 
--static ssize_t stm_write(struct stm_data *data, unsigned int master,
-+static ssize_t notrace stm_write(struct stm_data *data, unsigned int master,
- 			  unsigned int channel, const char *buf, size_t count)
- {
- 	unsigned int flags = STP_PACKET_TIMESTAMPED;
-@@ -1121,8 +1121,9 @@ void stm_source_unregister_device(struct stm_source_data *data)
- }
- EXPORT_SYMBOL_GPL(stm_source_unregister_device);
- 
--int stm_source_write(struct stm_source_data *data, unsigned int chan,
--		     const char *buf, size_t count)
-+int notrace stm_source_write(struct stm_source_data *data,
-+			     unsigned int chan,
-+			     const char *buf, size_t count)
- {
- 	struct stm_source_device *src = data->src;
- 	struct stm_device *stm;
-diff --git a/drivers/hwtracing/stm/dummy_stm.c b/drivers/hwtracing/stm/dummy_stm.c
-index a86612d..c5f94ca 100644
---- a/drivers/hwtracing/stm/dummy_stm.c
-+++ b/drivers/hwtracing/stm/dummy_stm.c
-@@ -21,7 +21,7 @@
- #include <linux/slab.h>
- #include <linux/stm.h>
- 
--static ssize_t
-+static ssize_t notrace
- dummy_stm_packet(struct stm_data *stm_data, unsigned int master,
- 		 unsigned int channel, unsigned int packet, unsigned int flags,
- 		 unsigned int size, const unsigned char *payload)
-diff --git a/include/linux/stm.h b/include/linux/stm.h
-index 8369d8a..210ff22 100644
---- a/include/linux/stm.h
-+++ b/include/linux/stm.h
-@@ -133,7 +133,7 @@ int stm_source_register_device(struct device *parent,
- 			       struct stm_source_data *data);
- void stm_source_unregister_device(struct stm_source_data *data);
- 
--int stm_source_write(struct stm_source_data *data, unsigned int chan,
--		     const char *buf, size_t count);
-+int notrace stm_source_write(struct stm_source_data *data, unsigned int chan,
-+			     const char *buf, size_t count);
- 
- #endif /* _STM_H_ */
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index 25aa05a..1408cba 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -1,7 +1,6 @@
+ obj-y += core.o
+ obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
+ obj-$(CONFIG_MACH_PISTACHIO) += reset-pistachio.o
+-obj-$(CONFIG_ARCH_MESON) += reset-meson.o
+ obj-$(CONFIG_ARCH_STM32) += reset-stm32.o
+ obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
+ obj-$(CONFIG_ARCH_STI) += sti/
+@@ -10,6 +9,7 @@ obj-$(CONFIG_ARCH_ZYNQ) += reset-zynq.o
+ obj-$(CONFIG_RESET_ATH79) += reset-ath79.o
+ obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
+ obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
++obj-$(CONFIG_RESET_MESON) += reset-meson.o
+ obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
+ obj-$(CONFIG_TI_SYSCON_RESET) += reset-ti-syscon.o
+ obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
 -- 
-2.7.4
+2.8.1
