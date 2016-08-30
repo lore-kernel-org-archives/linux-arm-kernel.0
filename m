@@ -1,60 +1,63 @@
-From: anson.huang@nxp.com (Yongcai Huang)
-Date: Mon, 29 Aug 2016 23:37:27 +0000
-Subject: [PATCH] ARM: imx6: add missing BM_CLPCR_BYPASS_PMIC_READY setting
- for imx6sx
-In-Reply-To: <1471881205-6389-1-git-send-email-Anson.Huang@nxp.com>
-References: <1471881205-6389-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <AM3PR04MB1315B37C3A91FFF7F3A374B0F5E10@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Tue, 30 Aug 2016 08:59:31 +0800
+Subject: [PATCH] arm64: dts: rockchip: Explicitly set pclk_pmu_src on
+ rk3399
+In-Reply-To: <20160829181841.GA8682@localhost>
+References: <1472494284-11315-1-git-send-email-dianders@chromium.org>
+ <20160829181841.GA8682@localhost>
+Message-ID: <57C4DA73.5000505@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping..
-
-Just a kind reminder in case this patch is missed, without this patch, i.MX6SX latest suspend/resume can NOT work.
-
-Best Regards!
-Anson Huang
 
 
+On 08/30/2016 02:18 AM, Brian Norris wrote:
+> On Mon, Aug 29, 2016 at 11:11:24AM -0700, Doug Anderson wrote:
+>> On rk3399 we explicitly set ppll in the device tree to 676000000.  The
+>> ppll has one major child, pclk_pmu_src, that is the parent of lots of
+>> other clocks.  Right now nobody is setting that clock rate and we're
+>> relying on the divider to just happen to be something sane.  Let's be
+>> explicit in our request so we're not relying on the firmware.
+>>
+>> With the current firmware I tested with this patch has no expected
+>> impact but it's probably good to do anyway.
+>>
+>> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+>> ---
+>>   arch/arm64/boot/dts/rockchip/rk3399.dtsi | 4 ++--
+>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> index 62d450935a57..ffb3faa8c176 100644
+>> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> @@ -908,8 +908,8 @@
+>>   		reg = <0x0 0xff750000 0x0 0x1000>;
+>>   		#clock-cells = <1>;
+>>   		#reset-cells = <1>;
+>> -		assigned-clocks = <&pmucru PLL_PPLL>;
+>> -		assigned-clock-rates = <676000000>;
+>> +		assigned-clocks = <&pmucru PLL_PPLL>, <&pmucru PCLK_SRC_PMU>;
+>> +		assigned-clock-rates = <676000000>, <112666667>;
+>
+> I think this makes sense and is a good idea. One alternative would be to
+> have the various children actually set a rate that they expect, but
+> several of them don't have a separate driver at all, and that would be
+> of dubious value anyway I think.
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
-> On Behalf Of Anson Huang
-> Sent: 2016-08-22 11:53 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>; Peter Chen
-> <peter.chen@nxp.com>; shawnguo at kernel.org; kernel at pengutronix.de
-> Subject: [PATCH] ARM: imx6: add missing BM_CLPCR_BYPASS_PMIC_READY
-> setting for imx6sx
-> 
-> i.MX6SX has bypass PMIC ready function, as this function is normally NOT
-> enabled on the board design, so we need to bypass the PMIC ready pin check
-> during DSM mode resume flow, otherwise, the internal DSM resume logic will
-> be waiting for this signal to be ready forever and cause resume fail.
-> 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> ---
->  arch/arm/mach-imx/pm-imx6.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-> index 67bab74..fe708e2 100644
-> --- a/arch/arm/mach-imx/pm-imx6.c
-> +++ b/arch/arm/mach-imx/pm-imx6.c
-> @@ -310,7 +310,7 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
->  		val |= 0x3 << BP_CLPCR_STBY_COUNT;
->  		val |= BM_CLPCR_VSTBY;
->  		val |= BM_CLPCR_SBYOS;
-> -		if (cpu_is_imx6sl())
-> +		if (cpu_is_imx6sl() || cpu_is_imx6sx())
->  			val |= BM_CLPCR_BYPASS_PMIC_READY;
->  		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
->  			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
-> --
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I agree with you. This clk default div is set in the uboot or coreboot.
+And if is need to set in kernel ,I hope the freq is 50M(<48285714>).
+This freq can meet the performance,and the power consumption is not too 
+much.
+>
+> Reviewed-by: Brian Norris <briannorris@chromium.org>
+>
+>>   	};
+>>
+>>   	cru: clock-controller at ff760000 {
+>> --
+>> 2.8.0.rc3.226.g39d4020
+>>
+>
+>
+>
