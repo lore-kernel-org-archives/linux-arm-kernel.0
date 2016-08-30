@@ -1,105 +1,46 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 30 Aug 2016 17:05:55 +0100
-Subject: [PATCH 1/2] arm/kvm: excise redundant cache maintenance
-In-Reply-To: <1472573156-30414-1-git-send-email-mark.rutland@arm.com>
-References: <1472573156-30414-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1472573156-30414-2-git-send-email-mark.rutland@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 30 Aug 2016 18:06:33 +0200
+Subject: [PATCH 0/3] pcie-designware: support for external MSI controller
+In-Reply-To: <000c01d202d5$a3809bd0$ea81d370$@gmail.com>
+References: <1472561830-20932-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160830172447.65d10772@free-electrons.com>
+ <000c01d202d5$a3809bd0$ea81d370$@gmail.com>
+Message-ID: <20160830180633.67d6479d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When modifying Stage-2 page tables, we perform cache maintenance to
-account for non-coherent page table walks. However, this is unnecessary,
-as page table walks are guaranteed to be coherent in the presence of the
-virtualization extensions.
+Hello,
 
-Per ARM DDI 0406C.c, section B1.7 ("The Virtualization Extensions"), the
-virtualization extensions mandate the multiprocessing extensions.
+On Tue, 30 Aug 2016 11:46:13 -0400, Jingoo Han wrote:
 
-Per ARM DDI 0406C.c, section B3.10.1 ("General TLB maintenance
-requirements"), as described in the sub-section titled "TLB maintenance
-operations and the memory order model", this maintenance is not required
-in the presence of the multiprocessing extensions.
+> > Please discard this patch series, it's just pure crap. No changes at all
+> > are needed on the pcie-designware driver, using the msi-parent property
+> > already works, and my new code does nothing good.
+> > 
+> > The of_pci_find_msi_chip_by_node() API is on its way to being removed, and
+> > it doesn't return anything useful.
+> > 
+> > Only PATCH 3/3 is needed, which I'll resubmit separately.
+> > 
+> > Sorry for the noise.  
+> 
+> Oh, good.
+> The support for External MSI controller is really necessary.
+> Thank you for your patch!
 
-Hence, we need not perform this cache maintenance when modifying Stage-2
-entries.
+Well, no change in the driver is needed to use an external MSI
+controller. Just specify:
 
-This patch removes the logic for performing the redundant maintenance.
-To ensure visibility and ordering of updates, a dsb(ishst) that was
-otherwise implicit in the maintenance is folded into kvm_set_pmd() and
-kvm_set_pte().
+	msi-parent = <&....>
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: kvmarm at lists.cs.columbia.edu
----
- arch/arm/include/asm/kvm_mmu.h | 28 ++--------------------------
- arch/arm/kvm/mmu.c             |  2 --
- 2 files changed, 2 insertions(+), 28 deletions(-)
+in the DT description of your Designware PCIe controller. And that's
+it. I've tested it with the GIC v2m MSI controller on an ARM64
+platform, and it works as expected.
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 3bb803d..74a44727 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -63,37 +63,13 @@ void kvm_clear_hyp_idmap(void);
- static inline void kvm_set_pmd(pmd_t *pmd, pmd_t new_pmd)
- {
- 	*pmd = new_pmd;
--	flush_pmd_entry(pmd);
-+	dsb(ishst);
- }
- 
- static inline void kvm_set_pte(pte_t *pte, pte_t new_pte)
- {
- 	*pte = new_pte;
--	/*
--	 * flush_pmd_entry just takes a void pointer and cleans the necessary
--	 * cache entries, so we can reuse the function for ptes.
--	 */
--	flush_pmd_entry(pte);
--}
--
--static inline void kvm_clean_pgd(pgd_t *pgd)
--{
--	clean_dcache_area(pgd, PTRS_PER_S2_PGD * sizeof(pgd_t));
--}
--
--static inline void kvm_clean_pmd(pmd_t *pmd)
--{
--	clean_dcache_area(pmd, PTRS_PER_PMD * sizeof(pmd_t));
--}
--
--static inline void kvm_clean_pmd_entry(pmd_t *pmd)
--{
--	clean_pmd_entry(pmd);
--}
--
--static inline void kvm_clean_pte(pte_t *pte)
--{
--	clean_pte_table(pte);
-+	dsb(ishst);
- }
- 
- static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 29d0b23..344755d 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -744,7 +744,6 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
- 	if (!pgd)
- 		return -ENOMEM;
- 
--	kvm_clean_pgd(pgd);
- 	kvm->arch.pgd = pgd;
- 	return 0;
- }
-@@ -936,7 +935,6 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- 		if (!cache)
- 			return 0; /* ignore calls from kvm_set_spte_hva */
- 		pte = mmu_memory_cache_alloc(cache);
--		kvm_clean_pte(pte);
- 		pmd_populate_kernel(NULL, pmd, pte);
- 		get_page(virt_to_page(pmd));
- 	}
+Best regards,
+
+Thomas
 -- 
-1.9.1
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
