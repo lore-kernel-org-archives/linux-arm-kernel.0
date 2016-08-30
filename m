@@ -1,80 +1,36 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 30 Aug 2016 14:56:22 +0200
-Subject: [PATCH] drm/sun4i: Clear encoder->bridge if a bridge is not found
-In-Reply-To: <20160830122223.21377-1-wens@csie.org>
-References: <20160830122223.21377-1-wens@csie.org>
-Message-ID: <20160830125622.GF18605@lukather>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 30 Aug 2016 14:57:07 +0200
+Subject: [PATCH 0/3] pcie-designware: support for external MSI controller
+Message-ID: <1472561830-20932-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On Tue, Aug 30, 2016 at 08:22:23PM +0800, Chen-Yu Tsai wrote:
-> The KMS helpers (drm_atomic_helper_check_modeset/mode_fixup) pass
-> encoder->bridge directly to drm_bridge_mode_fixup, which expects a
-> valid pointer, or NULL (in which case it just returns).
-> 
-> Clear encoder->bridge if a bridge is not found, instead of keeping
-> the ERR_PTR value.
-> 
-> Since other drm_bridge functions also follow this pattern of checking
-> for a non-NULL pointer, we can drop the ifs around the calls and just
-> pass the pointer directly.
-> 
-> Fixes: 894f5a9f4b4a ("drm/sun4i: Add bridge support")
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_rgb.c | 11 ++++++-----
->  1 file changed, 6 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> index d4e52522ec53..ee0795152a33 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> @@ -154,8 +154,7 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
->  	if (!IS_ERR(tcon->panel))
->  		drm_panel_enable(tcon->panel);
->  
-> -	if (!IS_ERR(encoder->bridge))
-> -		drm_bridge_enable(encoder->bridge);
-> +	drm_bridge_enable(encoder->bridge);
->  
->  	sun4i_tcon_channel_enable(tcon, 0);
->  }
-> @@ -170,8 +169,7 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
->  
->  	sun4i_tcon_channel_disable(tcon, 0);
->  
-> -	if (!IS_ERR(encoder->bridge))
-> -		drm_bridge_disable(encoder->bridge);
-> +	drm_bridge_disable(encoder->bridge);
+This short patch series extends the pcie-designware code to support
+using an external MSI controller, rather than the built-in MSI
+controller. It does so by making the pcie-designware driver handle the
+"msi-parent" DT property.
 
-I'd rather keep those changes, it makes it obvious that it's something
-optionnal, that can be set to NULL.
+The first patch updates the Device Tree binding documentation, the
+second patch makes the change to the Designware PCIe controller driver
+itself, and finally the third patch updates the Marvell Armada 7K/8K
+Device Tree to use the msi-parent property.
 
->  	if (!IS_ERR(tcon->panel))
->  		drm_panel_disable(tcon->panel);
-> @@ -230,6 +228,9 @@ int sun4i_rgb_init(struct drm_device *drm)
->  		return 0;
->  	}
->  
-> +	if (IS_ERR(encoder->bridge))
-> +		encoder->bridge = NULL;
-> +
+Thanks,
 
-And that could be the else condition of the if statement below.
+Thomas
 
-Thanks!
-Maxime
+Thomas Petazzoni (3):
+  dt-bindings: designware-pcie: document optional msi-parent property
+  pci: pcie-designware: add support for external MSI controller
+  arm64: dts: marvell: enable MSI for PCIe on Armada 7K/8K
+
+ .../devicetree/bindings/pci/designware-pcie.txt    |  2 ++
+ .../boot/dts/marvell/armada-cp110-master.dtsi      |  3 +++
+ .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |  3 +++
+ drivers/pci/host/pcie-designware.c                 | 24 ++++++++++++++++------
+ 4 files changed, 26 insertions(+), 6 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160830/9deb77a5/attachment.sig>
+2.7.4
