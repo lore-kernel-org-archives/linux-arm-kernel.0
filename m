@@ -1,58 +1,44 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 30 Aug 2016 11:31:15 -0400 (EDT)
-Subject: [PATCH 0/4] SA11x0 Clocks and removal of Neponset SMC91x hack
-In-Reply-To: <20160830105117.GM1041@n2100.armlinux.org.uk>
-References: <20160829120531.GG1041@n2100.armlinux.org.uk>
- <E1beLKT-0001U1-HK@rmk-PC.armlinux.org.uk>
- <20160830105117.GM1041@n2100.armlinux.org.uk>
-Message-ID: <alpine.LFD.2.20.1608301129520.1525@knanqh.ubzr>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Tue, 30 Aug 2016 16:34:32 +0100
+Subject: Older hisilicon chipsets
+In-Reply-To: <7d7ff37b-a16b-8532-214c-de0a46c9de8e@gmail.com>
+References: <7773f0e5-d045-1e93-529b-74a601467ed1@gmail.com>
+ <20160827150457.GM10637@io.lakedaemon.net>
+ <ec3ec22f-f05e-aaec-8e9a-bfc0565b9e9d@gmail.com> <7850061.5OOjP34nIO@wuerfel>
+ <57C54A05.9090601@hisilicon.com>
+ <7d7ff37b-a16b-8532-214c-de0a46c9de8e@gmail.com>
+Message-ID: <57C5A788.8090901@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 30 Aug 2016, Russell King - ARM Linux wrote:
+Hi Marty,
 
-> This mini-series (which follows several other series on which it
-> depends) gets rid of the Assabet/Neponset hack in the smc91x driver.
+On 30/08/2016 15:43, Marty Plummer wrote:
+> On 08/30/2016 03:55 AM, Wei Xu wrote:
+>> Hi Arnd, Marty
+>>
+>> I will once they are ready.
+>> Thanks for your kindly guiding!
+>>
+>> Best Regards,
+>> Wei
+>>
+>>
+> Hi Wei,
 > 
-> In order to do that, we need to get several pieces in place first:
-> * gpiolib support throughout SA11x0/Assabet/Neponset so that we can
->   represent control signals through gpiolib
-> * CCF support, so we can re-use the code in drivers/clk to implement
->   the external crystal oscillator attached to the SMC91x.  This
->   external crystal oscillator is enabled via a control signal.
-> 
-> This series:
-> - performs the SA11x0 CCF conversion
-> - adds an optional clock to SMC91x to cater for an external crystal
->   oscillator
-> - switches the Neponset code to provide a 'struct clk' representing
->   this oscillator
-> - removes the SMC91x hack to assert the enable signal
-> 
-> This results in the platform specific includes being removed from the
-> SMC91x driver.
-> 
-> Please ack these changes; due to the dependencies, I wish to merge
-> them through my tree.  Thanks.
+> Do you think you could change the references to the Hi3620 in the code
+> and dts files from `hi3xxx' to `hi3620'? As it currently stands, the
+> wildcard matches hi3520 too, but that's not a good idea whit devicetree,
+> its best to be completely explicit as to which sort of device the
+> binding is for.
 
-Looks nice to me.
+Yes, originally it also stands for hi3519 and please send the patch to me.
+Please do not add a new DT_MACHINE entry if we could use the general one.
+Thanks?
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Best Regards,
+Wei
 
->  arch/arm/Kconfig                   |   1 +
->  arch/arm/mach-sa1100/clock.c       | 191 +++++++++++++++++--------------------
->  arch/arm/mach-sa1100/neponset.c    |  42 ++++++++
->  drivers/net/ethernet/smsc/smc91x.c |  47 ++++++---
->  drivers/net/ethernet/smsc/smc91x.h |   1 +
->  5 files changed, 166 insertions(+), 116 deletions(-)
 > 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Thanks.
 > 
