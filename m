@@ -1,32 +1,108 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 30 Aug 2016 14:52:23 -0500
-Subject: [PATCH v8 09/11] doc: bindings: mfd: act8945a: Update the example
-In-Reply-To: <1472110715-22242-1-git-send-email-wenyou.yang@atmel.com>
-References: <1472109599-21915-1-git-send-email-wenyou.yang@atmel.com>
- <1472110715-22242-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20160830195223.GA2824@rob-hp-laptop>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 30 Aug 2016 19:44:52 +0000
+Subject: [PATCH 1/1] mach-hisi: Make Hi3620 explicit, remove wildcard
+In-Reply-To: <891242ab-6792-282f-4df4-b2aef34d8a3d@gmail.com>
+References: <07dd3b37-3cd9-6f89-4c84-ce534880d200@gmail.com>
+ <20160830191729.GT10637@io.lakedaemon.net>
+ <891242ab-6792-282f-4df4-b2aef34d8a3d@gmail.com>
+Message-ID: <20160830194452.GV10637@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2016 at 03:38:35PM +0800, Wenyou Yang wrote:
-> Since the act8945a-charger is regarded as a sub-device and it using
-> "interrupts" property, update the examples section.
-> 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
-> 
-> Changes in v8: None
-> Changes in v7: None
-> Changes in v6: None
-> Changes in v5: None
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2: None
+On Tue, Aug 30, 2016 at 02:29:36PM -0500, Marty Plummer wrote:
+> On 08/30/2016 02:17 PM, Jason Cooper wrote:
+> > On Tue, Aug 30, 2016 at 12:38:27PM -0500, Marty Plummer wrote:
+> > 
+> > Please put an explanation in the commit log that gives future readers
+> > (and reviewers) the "why".
+> > 
+> > e.g. "This is a preparatory series for adding the ARMv5 hisi35xx SoCs.
+> > Assumptions were made when adding hisi 36xx that don't hold water in
+> > light of adding support for the ARMv5 SoC.  Fix the issue by renaming
+> > config options and other namespaces to avoid collisions with the new
+> > work.
+> > 
+> > Only internal APIs are modified with this series."
+> > 
+> > Or something like that.
+> > 
+> Ah, well since it pretty much only consists of renames and no actual
+> changes in behavior I though it fell under the category of a trivial
+> patch.
 
-Humm, appears to be a new patch to me.
+Right, we try not to add useless dogma, but this helps reviewers quickly
+assess the magnitude of the patch and why it exists.  The easier we can
+make it for them to go "Uh-huh... Got it, Acked-by ---" the better off
+we are.
 
-> 
->  Documentation/devicetree/bindings/mfd/act8945a.txt | 22 +++++++++++++++-------
->  1 file changed, 15 insertions(+), 7 deletions(-)
+> >> Signed-off-by: Marty Plummer <netz.kernel@gmail.com>
+> >> ---
+> > 
+> > This needs to be split up into a series of patches:
+> > 
+> >>  arch/arm/Kconfig.debug              |  2 +-
+> > 
+> >>  arch/arm/boot/dts/Makefile          |  2 +-
+> > 
+> >>  arch/arm/configs/hisi_defconfig     |  2 +-
+> > 
+> >>  arch/arm/configs/multi_v7_defconfig |  2 +-
+> > 
+> >>  arch/arm/mach-hisi/Kconfig          |  6 +++---
+> >>  arch/arm/mach-hisi/core.h           | 10 +++++-----
+> >>  arch/arm/mach-hisi/hisilicon.c      |  4 ++--
+> >>  arch/arm/mach-hisi/hotplug.c        | 16 ++++++++--------
+> >>  arch/arm/mach-hisi/platsmp.c        | 24 ++++++++++++------------
+> > 
+> >>  drivers/clk/hisilicon/Makefile      |  2 +-
+> > 
+> >>  drivers/dma/Kconfig                 |  2 +-
+> > 
+> > Most likely, the subsystem maintainers will Ack the relevant patch and
+> > then they'll go in together to avoid bisection issues.
+> > 
+> Ah, ok. Once again, I thought since it made little in the way of 'real'
+> changes it was more or less irrelevant. I used `git format-patch' to
+> make the patch, and it was all one commit. should I instead then break
+> it down into multiple commits, then?
 
-Acked-by: Rob Herring <robh@kernel.org>
+Please do.
+
+> >>  11 files changed, 36 insertions(+), 36 deletions(-)
+> >>
+> >> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> >> index a9693b6..9094ca6 100644
+> >> --- a/arch/arm/Kconfig.debug
+> >> +++ b/arch/arm/Kconfig.debug
+> >> @@ -280,7 +280,7 @@ choice
+> >>  
+> >>  	config DEBUG_HI3620_UART
+> >>  		bool "Hisilicon HI3620 Debug UART"
+> >> -		depends on ARCH_HI3xxx
+> >> +		depends on ARCH_HI3620
+> > 
+> > Is there a general rule like
+> > 
+> > 	ARCH_HI36xx = ARMv7
+> > 	ARCH_HI35xx = ARMv5
+> > 
+> > ?
+> Unsure about all Hi35xx chipsets, I've not had reason to look into those
+> yet for lack of hardware. However, ARCH_HI3520 is ARMv6/ARMv5, it has
+> two cores, arm1176/arm926
+
+Ok, I'll defer to Arnd on this one.  I'd be inclined to do the above, or
+_HI36xx, _HI3520 at least.  Since you run separate kernels on each core,
+it's probably best to treat them like two different boards.  Perhaps we
+need _HI3520_ARM1176, _HI3520_ARM926?
+
+> Also, there is one area I'd simply like to reorder some struct
+> initialization so it matches the definition, iirc it was the struct
+> map_desc.
+
+Let's get the 'trivial' stuff in first.  There may be a good reason for
+the ordering.
+
+thx,
+
+Jason.
