@@ -1,20 +1,55 @@
-From: roy.zang@nxp.com (Roy Zang)
-Date: Tue, 30 Aug 2016 15:54:43 +0000
-Subject: [PATCH v2] arm64:pci: fix the IOV device access config space
- valid condition
-References: <1471932072-6980-1-git-send-email-po.liu@nxp.com>
- <1472455618-17892-1-git-send-email-po.liu@nxp.com>
- <000a01d202d5$3f86e3a0$be94aae0$@gmail.com>
-Message-ID: <HE1PR0402MB2748F7A71F8A0073644EE3568BE00@HE1PR0402MB2748.eurprd04.prod.outlook.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Tue, 30 Aug 2016 16:56:48 +0100
+Subject: [PATCH v2 1/2] arm64: dts: hikey: extend default cma size to 128MB
+In-Reply-To: <1472094041-5357-1-git-send-email-guodong.xu@linaro.org>
+References: <1472094041-5357-1-git-send-email-guodong.xu@linaro.org>
+Message-ID: <57C5ACC0.90902@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/30/2016 10:43 AM, Jingoo Han wrote:
-> I really don't like to modify host driver stuffs.
-> But, if there is no alternatives, this patch looks good.
+Hi Guodong,
 
-I do not see other good place to fix the bug.
+On 25/08/2016 04:00, Guodong Xu wrote:
+> To support display in Debian on HiKey, cma heap is used to allocate
+> graphic buffers. The default size of CMA is 16 MB which is not enough.
+> 
+> Increase the default CMA size to 128 MB.
+> 
+> cc: Fathi Boudra <fathi.boudra@linaro.org>
+> cc: John Stultz <john.stultz@linaro.org>
+> cc: Xinliang Liu <xinliang.liu@linaro.org>
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
 
-Roy Zang <roy.zang@nxp.com>
+Series applied to the hisilicon dt branch.
+Thanks!
 
-Roy
+Best Regards,
+Wei
+
+>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> index 9e4e06a..dba3c13 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> @@ -57,8 +57,15 @@
+>  			console-size	= <0x00020000>;
+>  			ftrace-size	= <0x00020000>;
+>  		};
+> -	};
+>  
+> +		/* global autoconfigured region for contiguous allocations */
+> +		linux,cma {
+> +			compatible = "shared-dma-pool";
+> +			reusable;
+> +			size = <0x00000000 0x08000000>;
+> +			linux,cma-default;
+> +		};
+> +	};
+>  
+>  	reboot-mode-syscon at 5f01000 {
+>  		compatible = "syscon", "simple-mfd";
+> 
