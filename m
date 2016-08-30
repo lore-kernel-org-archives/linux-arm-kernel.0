@@ -1,104 +1,78 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 30 Aug 2016 15:14:50 -0700
-Subject: [PATCH 1/3] ARM: dts: armv7-m: remove skeleton.dtsi include
-In-Reply-To: <20160830205250.15616-2-manabian@gmail.com>
-References: <20160830205250.15616-1-manabian@gmail.com>
- <20160830205250.15616-2-manabian@gmail.com>
-Message-ID: <09f062bb82a99d393c38acfbfebc8cad@agner.ch>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 31 Aug 2016 01:24:41 +0300
+Subject: [PATCH] ARM: dts: wheat: add SDHI0 support
+In-Reply-To: <34968644.DhifNderY8@wasted.cogentembedded.com>
+References: <34968644.DhifNderY8@wasted.cogentembedded.com>
+Message-ID: <1659137.gEKJxNrmrk@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-08-30 13:52, Joachim Eastwood wrote:
-> Remove skeleton.dtsi from the common ARM Cortex-M dtsi. This will allow
-> us to remove skeleton.dtsi on a per platform basis and get rid of the
-> unit address warning on the memory nodes without getting duplicate memory
-> nodes.
-> 
-> See 3ebee5a2e141 ("arm64: dts: kill skeleton.dtsi") for additional
-> reasons not to use the skeleton.dtsi.
-> 
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> ---
->  arch/arm/boot/dts/armv7-m.dtsi   | 2 --
->  arch/arm/boot/dts/efm32gg.dtsi   | 2 ++
->  arch/arm/boot/dts/lpc18xx.dtsi   | 1 +
->  arch/arm/boot/dts/mps2.dtsi      | 1 +
->  arch/arm/boot/dts/stm32f429.dtsi | 1 +
->  arch/arm/boot/dts/vf610m4.dtsi   | 1 +
+Define the Wheat board dependent  part of  the SDHI0 (connected to the
+micro-SD slot)  device node along with the necessary voltage regulator.
 
-For VF610:
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Acked-by: Stefan Agner <stefan@agner.ch>
+---
+This patch is against the 'renesas-devel-20160830-v4.8-rc4' of Simon Horman's
+'renesas.git' repo plus the CAN patch posted yesterday.
+Starting with this patch, SMSC LAN89218 Ethernet chip starts to misbehave on my
+board...
 
->  6 files changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/armv7-m.dtsi b/arch/arm/boot/dts/armv7-m.dtsi
-> index 16331aa..ba332e3 100644
-> --- a/arch/arm/boot/dts/armv7-m.dtsi
-> +++ b/arch/arm/boot/dts/armv7-m.dtsi
-> @@ -1,5 +1,3 @@
-> -#include "skeleton.dtsi"
-> -
->  / {
->  	nvic: interrupt-controller at e000e100  {
->  		compatible = "arm,armv7m-nvic";
-> diff --git a/arch/arm/boot/dts/efm32gg.dtsi b/arch/arm/boot/dts/efm32gg.dtsi
-> index c747983..d9dbf7f 100644
-> --- a/arch/arm/boot/dts/efm32gg.dtsi
-> +++ b/arch/arm/boot/dts/efm32gg.dtsi
-> @@ -4,6 +4,8 @@
->   * Documentation available from
->   * http://www.silabs.com/Support%20Documents/TechnicalDocs/EFM32GG-RM.pdf
->   */
-> +
-> +#include "skeleton.dtsi"
->  #include "armv7-m.dtsi"
->  #include "dt-bindings/clock/efm32-cmu.h"
->  
-> diff --git a/arch/arm/boot/dts/lpc18xx.dtsi b/arch/arm/boot/dts/lpc18xx.dtsi
-> index 1cd39fd..a1ecfe3 100644
-> --- a/arch/arm/boot/dts/lpc18xx.dtsi
-> +++ b/arch/arm/boot/dts/lpc18xx.dtsi
-> @@ -11,6 +11,7 @@
->   *
->   */
->  
-> +#include "skeleton.dtsi"
->  #include "armv7-m.dtsi"
->  
->  #include "dt-bindings/clock/lpc18xx-cgu.h"
-> diff --git a/arch/arm/boot/dts/mps2.dtsi b/arch/arm/boot/dts/mps2.dtsi
-> index e3fed8d..efb8a03 100644
-> --- a/arch/arm/boot/dts/mps2.dtsi
-> +++ b/arch/arm/boot/dts/mps2.dtsi
-> @@ -42,6 +42,7 @@
->   *     OTHER DEALINGS IN THE SOFTWARE.
->   */
->  
-> +#include "skeleton.dtsi"
->  #include "armv7-m.dtsi"
->  
->  / {
-> diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-> index 35df462..8e69328 100644
-> --- a/arch/arm/boot/dts/stm32f429.dtsi
-> +++ b/arch/arm/boot/dts/stm32f429.dtsi
-> @@ -45,6 +45,7 @@
->   *     OTHER DEALINGS IN THE SOFTWARE.
->   */
->  
-> +#include "skeleton.dtsi"
->  #include "armv7-m.dtsi"
->  #include <dt-bindings/pinctrl/stm32f429-pinfunc.h>
->  
-> diff --git a/arch/arm/boot/dts/vf610m4.dtsi b/arch/arm/boot/dts/vf610m4.dtsi
-> index 9ffe2eb..9f2c731 100644
-> --- a/arch/arm/boot/dts/vf610m4.dtsi
-> +++ b/arch/arm/boot/dts/vf610m4.dtsi
-> @@ -42,6 +42,7 @@
->   *     OTHER DEALINGS IN THE SOFTWARE.
->   */
->  
-> +#include "skeleton.dtsi"
->  #include "armv7-m.dtsi"
->  #include "vfxxx.dtsi"
+ arch/arm/boot/dts/r8a7792-wheat.dts |   26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/r8a7792-wheat.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7792-wheat.dts
++++ renesas/arch/arm/boot/dts/r8a7792-wheat.dts
+@@ -11,6 +11,7 @@
+ 
+ /dts-v1/;
+ #include "r8a7792.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	model = "Wheat";
+@@ -54,6 +55,17 @@
+ 		pinctrl-0 = <&lan89218_pins>;
+ 		pinctrl-names = "default";
+ 	};
++
++	vcc_sdhi0: regulator-vcc-sdhi0 {
++		compatible = "regulator-fixed";
++
++		regulator-name = "SDHI0 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpio = <&gpio11 12 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
+ };
+ 
+ &extal_clk {
+@@ -86,6 +98,11 @@
+ 		groups = "can1_data";
+ 		function = "can1";
+ 	};
++
++	sdhi0_pins: sdhi0 {
++		groups = "sdhi0_data4", "sdhi0_ctrl";
++		function = "sdhi0";
++	};
+ };
+ 
+ &scif0 {
+@@ -108,3 +125,12 @@
+ 
+ 	status = "okay";
+ };
++
++&sdhi0 {
++	pinctrl-0 = <&sdhi0_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&vcc_sdhi0>;
++	cd-gpios = <&gpio11 11 GPIO_ACTIVE_LOW>;
++	status = "okay";
++};
