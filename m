@@ -1,61 +1,86 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 30 Aug 2016 15:50:21 +0100
-Subject: [PATCH v2 0/9] arm64: clean up early boot function calls
-In-Reply-To: <20160830144803.GM1223@leverpostej>
-References: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160830144803.GM1223@leverpostej>
-Message-ID: <CAKv+Gu-99z2VTyFxB0_Cg7m1pQm=fviw1eUh8=G4ARPaUdE5uw@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 30 Aug 2016 17:58:01 +0300
+Subject: [PATCH 2/2] ARM: dts: dra7: cpsw: fix clocks tree
+In-Reply-To: <20160830145801.10364-1-grygorii.strashko@ti.com>
+References: <20160830145801.10364-1-grygorii.strashko@ti.com>
+Message-ID: <20160830145801.10364-2-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 August 2016 at 15:48, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi,
->
-> On Wed, Aug 24, 2016 at 04:35:57PM +0200, Ard Biesheuvel wrote:
->> This v2 series is a followup to the single patch #1, whose v1 I sent out
->> about a week ago.
->>
->> In a couple of places, the early boot code uses non-standard argument,
->> return value or return address registers when calling functions. This makes
->> the code more complicated than it needs to be, which was not a problem in the
->> early days, but with all the recent changes for KASLR, hibernate etc, it
->> makes sense to clean this up once and for all. This code removes all uses of
->> callee saved registers on the secondary boot and resume paths, and on th
->> primary boot path, it only leaves the necessary ones, and documents them
->> explicitly in patch #9.
->>
->> I will leave it to the honourable arm64 maintainers to decide if any of
->> these improvements weigh up against the churn, given that this code has
->> already been updated numerous times over the past couple of kernel versions.
->
-> Which ones are honourable? ;)
->
-> FWIW, I think that overall this is a nice improvement in legibility for
-> the boot code.
->
->> Adding James to cc since patch #6 may conflict with this hibernate/
->> debug-pagealloc series [0], to which I replied that merging .idmap.text
->> with .mmuoff.text would be a worthwhile simplification.
->
-> I'll leave it to you, James, and the honourable maintainers to figure
-> out the details on that front.
->
+Current clocks tree definition for CPSW/CPTS doesn't
+correspond TRM for dra7/am57 SoCs.
 
-Thanks. James's patches have been queued already, so I can simply
-rebase onto for-next/core, with the caveat that it does not have your
-KASLR TLB fix yet.
+CPTS: has to be sourced from gmac_rft_clk_mux clock
+CPSW: DPLL_GMAC -> CLKOUT_M2 -> GMAC_250M_CLK -> 1/2 ->
+      -> GMAC_MAIN_CLK (125 MHZ)
 
-> I've given this a spin on Juno (R1) with KASAN and CONFIG_RANDOMIZE_BASE
-> selected (though I have no entropy source, so I'm bailing out early).
-> That all works, so for the series:
->
-> Tested-by: Mark Rutland <mark.rutland@arm.com>
->
-> For patch 1, feel free to upgrade the Acked-by to a Reviewed-by to match
-> the rest of the series.
->
+Hence, correct clock tree for GMAC_MAIN_CLK and use proper
+clock for CPTS. This also require updating of CPTS clock
+multiplier.
 
-Thanks a lot!
+Cc: Tero Kristo <t-kristo@ti.com>
+Cc: Mugunthan V N <mugunthanvnm@ti.com>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ arch/arm/boot/dts/dra7.dtsi          |  4 ++--
+ arch/arm/boot/dts/dra7xx-clocks.dtsi | 16 ++++++++--------
+ 2 files changed, 10 insertions(+), 10 deletions(-)
 
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index d9bfb94..9f14eed 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -1717,7 +1717,7 @@
+ 		mac: ethernet at 48484000 {
+ 			compatible = "ti,dra7-cpsw","ti,cpsw";
+ 			ti,hwmods = "gmac";
+-			clocks = <&dpll_gmac_ck>, <&gmac_gmii_ref_clk_div>;
++			clocks = <&gmac_main_clk>, <&gmac_rft_clk_mux>;
+ 			clock-names = "fck", "cpts";
+ 			cpdma_channels = <8>;
+ 			ale_entries = <1024>;
+@@ -1726,7 +1726,7 @@
+ 			mac_control = <0x20>;
+ 			slaves = <2>;
+ 			active_slave = <0>;
+-			cpts_clock_mult = <0x80000000>;
++			cpts_clock_mult = <0x784CFE14>;
+ 			cpts_clock_shift = <29>;
+ 			reg = <0x48484000 0x1000
+ 			       0x48485200 0x2E00>;
+diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+index 3f0c61d..3330738e 100644
+--- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
++++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+@@ -1003,6 +1003,14 @@
+ 		ti,index-power-of-two;
+ 	};
+ 
++	gmac_main_clk: gmac_main_clk {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&gmac_250m_dclk_div>;
++		clock-mult = <1>;
++		clock-div = <2>;
++	};
++
+ 	l3init_480m_dclk_div: l3init_480m_dclk_div at 1ac {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,divider-clock";
+@@ -1726,14 +1734,6 @@
+ 		reg = <0x13d0>;
+ 	};
+ 
+-	gmac_gmii_ref_clk_div: gmac_gmii_ref_clk_div {
+-		#clock-cells = <0>;
+-		compatible = "fixed-factor-clock";
+-		clocks = <&dpll_gmac_m2_ck>;
+-		clock-mult = <1>;
+-		clock-div = <2>;
+-	};
+-
+ 	gmac_rft_clk_mux: gmac_rft_clk_mux at 13d0 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,mux-clock";
 -- 
-Ard.
+2.9.2
