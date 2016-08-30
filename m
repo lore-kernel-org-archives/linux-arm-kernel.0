@@ -1,68 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 Aug 2016 18:51:15 +0100
-Subject: [PATCH v7 05/14] arm64/numa: avoid inconsistent information to
- be printed
-In-Reply-To: <57C15560.6020702@huawei.com>
-References: <1472024693-12912-1-git-send-email-thunder.leizhen@huawei.com>
- <1472024693-12912-6-git-send-email-thunder.leizhen@huawei.com>
- <20160826124746.GB30302@arm.com> <57C15560.6020702@huawei.com>
-Message-ID: <20160830175115.GL24906@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 30 Aug 2016 18:54:19 +0100
+Subject: [PATCH] KVM: arm: vgic: Drop build compatibility hack for older
+ kernel versions
+Message-ID: <1472579659-20772-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 27, 2016 at 04:54:56PM +0800, Leizhen (ThunderTown) wrote:
-> 
-> 
-> On 2016/8/26 20:47, Will Deacon wrote:
-> > On Wed, Aug 24, 2016 at 03:44:44PM +0800, Zhen Lei wrote:
-> >> numa_init(of_numa_init) may returned error because of numa configuration
-> >> error. So "No NUMA configuration found" is inaccurate. In fact, specific
-> >> configuration error information should be immediately printed by the
-> >> testing branch.
-> >>
-> >> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> >> ---
-> >>  arch/arm64/mm/numa.c | 6 +++---
-> >>  1 file changed, 3 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-> >> index 5bb15ea..d97c6e2 100644
-> >> --- a/arch/arm64/mm/numa.c
-> >> +++ b/arch/arm64/mm/numa.c
-> >> @@ -335,8 +335,10 @@ static int __init numa_init(int (*init_func)(void))
-> >>  	if (ret < 0)
-> >>  		return ret;
-> >>
-> >> -	if (nodes_empty(numa_nodes_parsed))
-> >> +	if (nodes_empty(numa_nodes_parsed)) {
-> >> +		pr_info("No NUMA configuration found\n");
-> >>  		return -EINVAL;
-> > 
-> > Hmm, but dummy_numa_init calls node_set(nid, numa_nodes_parsed) for a
-> > completely artificial setup, created by adding all memblocks to node 0,
-> > so this new message will be suppressed even though things really did go
-> > wrong.
-> It will be printed by the former: numa_init(of_numa_init)
+As kvm_set_routing_entry() was changing prototype between 4.7 and 4.8,
+an ugly hack was put in place in order to survive both building in
+-next and the merge window.
 
-Does that print an error for every possible failure case? What about the
-acpi path?
+Now that everything has been merged, let's dump the compatibility
+hack for good.
 
-> > In that case, don't we want to print *something* (like we do today in
-> > dummy_numa_init) but maybe not "No NUMA configuration found"? What
-> > exactly do you find inaccurate about the current message?
-> For example:
-> [    0.000000] NUMA: No distance-matrix property in distance-map
-> [    0.000000] No NUMA configuration found
-> 
-> So if of_numa_init or arm64_acpi_numa_init returned error, because of
-> some numa configuration error had been found, it's no good to print "No
-> NUMA ...".
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-irqfd.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-Sure, I'm all for changing the message. I just think removing it is
-probably unhelpful. Something like:
-
-"NUMA: Failed to initialise from firmware"
-
-might do the trick?
-
-Will
+diff --git a/virt/kvm/arm/vgic/vgic-irqfd.c b/virt/kvm/arm/vgic/vgic-irqfd.c
+index b31a51a..d918dcf 100644
+--- a/virt/kvm/arm/vgic/vgic-irqfd.c
++++ b/virt/kvm/arm/vgic/vgic-irqfd.c
+@@ -46,15 +46,9 @@ static int vgic_irqfd_set_irq(struct kvm_kernel_irq_routing_entry *e,
+  * @ue: user api routing entry handle
+  * return 0 on success, -EINVAL on errors.
+  */
+-#ifdef KVM_CAP_X2APIC_API
+ int kvm_set_routing_entry(struct kvm *kvm,
+ 			  struct kvm_kernel_irq_routing_entry *e,
+ 			  const struct kvm_irq_routing_entry *ue)
+-#else
+-/* Remove this version and the ifdefery once merged into 4.8 */
+-int kvm_set_routing_entry(struct kvm_kernel_irq_routing_entry *e,
+-			  const struct kvm_irq_routing_entry *ue)
+-#endif
+ {
+ 	int r = -EINVAL;
+ 
+-- 
+2.1.4
