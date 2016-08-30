@@ -1,40 +1,68 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 30 Aug 2016 13:51:02 -0400
-Subject: [PATCH V3 3/3] dmaengine: qcom_hidma: add error reporting for
- tx_status
-In-Reply-To: <d3c5e9ca-2381-71e0-5b03-5bad68868b97@codeaurora.org>
-References: <1471927691-28827-1-git-send-email-okaya@codeaurora.org>
- <1471927691-28827-4-git-send-email-okaya@codeaurora.org>
- <20160830170422.GN9355@localhost>
- <d3c5e9ca-2381-71e0-5b03-5bad68868b97@codeaurora.org>
-Message-ID: <de65e834-03bf-49bc-422b-141c1c4d6100@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 30 Aug 2016 18:51:15 +0100
+Subject: [PATCH v7 05/14] arm64/numa: avoid inconsistent information to
+ be printed
+In-Reply-To: <57C15560.6020702@huawei.com>
+References: <1472024693-12912-1-git-send-email-thunder.leizhen@huawei.com>
+ <1472024693-12912-6-git-send-email-thunder.leizhen@huawei.com>
+ <20160826124746.GB30302@arm.com> <57C15560.6020702@huawei.com>
+Message-ID: <20160830175115.GL24906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/30/2016 1:37 PM, Sinan Kaya wrote:
-> On 8/30/2016 1:04 PM, Vinod Koul wrote:
->> On Tue, Aug 23, 2016 at 12:48:11AM -0400, Sinan Kaya wrote:
->>
->>>  	spin_lock_init(&lldev->lock);
->>> -	tasklet_init(&lldev->rst_task, hidma_ll_abort, (unsigned long)lldev);
->>
->> ??
->>
->> This is not described in changlog? If you are not using in anywhere else,
->> then rst_task variable should be removed too..
->>
+On Sat, Aug 27, 2016 at 04:54:56PM +0800, Leizhen (ThunderTown) wrote:
 > 
-> Sure, I can add more description. I thought I did mention that we are no longer
-> resetting the hardware in ISR. 
 > 
-> I can certainly mention that rst_task variable is removed and can get rid of it.
-> It is no longer in use.
-> 
+> On 2016/8/26 20:47, Will Deacon wrote:
+> > On Wed, Aug 24, 2016 at 03:44:44PM +0800, Zhen Lei wrote:
+> >> numa_init(of_numa_init) may returned error because of numa configuration
+> >> error. So "No NUMA configuration found" is inaccurate. In fact, specific
+> >> configuration error information should be immediately printed by the
+> >> testing branch.
+> >>
+> >> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> >> ---
+> >>  arch/arm64/mm/numa.c | 6 +++---
+> >>  1 file changed, 3 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+> >> index 5bb15ea..d97c6e2 100644
+> >> --- a/arch/arm64/mm/numa.c
+> >> +++ b/arch/arm64/mm/numa.c
+> >> @@ -335,8 +335,10 @@ static int __init numa_init(int (*init_func)(void))
+> >>  	if (ret < 0)
+> >>  		return ret;
+> >>
+> >> -	if (nodes_empty(numa_nodes_parsed))
+> >> +	if (nodes_empty(numa_nodes_parsed)) {
+> >> +		pr_info("No NUMA configuration found\n");
+> >>  		return -EINVAL;
+> > 
+> > Hmm, but dummy_numa_init calls node_set(nid, numa_nodes_parsed) for a
+> > completely artificial setup, created by adding all memblocks to node 0,
+> > so this new message will be suppressed even though things really did go
+> > wrong.
+> It will be printed by the former: numa_init(of_numa_init)
 
-It looks like I mentioned this in the cover letter only not in the commit message.
-I'll pull the description into the commit message too.
+Does that print an error for every possible failure case? What about the
+acpi path?
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> > In that case, don't we want to print *something* (like we do today in
+> > dummy_numa_init) but maybe not "No NUMA configuration found"? What
+> > exactly do you find inaccurate about the current message?
+> For example:
+> [    0.000000] NUMA: No distance-matrix property in distance-map
+> [    0.000000] No NUMA configuration found
+> 
+> So if of_numa_init or arm64_acpi_numa_init returned error, because of
+> some numa configuration error had been found, it's no good to print "No
+> NUMA ...".
+
+Sure, I'm all for changing the message. I just think removing it is
+probably unhelpful. Something like:
+
+"NUMA: Failed to initialise from firmware"
+
+might do the trick?
+
+Will
