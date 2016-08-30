@@ -1,119 +1,66 @@
-From: netz.kernel@gmail.com (Marty Plummer)
-Date: Tue, 30 Aug 2016 15:01:03 -0500
-Subject: [PATCH 1/1] mach-hisi: Make Hi3620 explicit, remove wildcard
-In-Reply-To: <20160830194452.GV10637@io.lakedaemon.net>
-References: <07dd3b37-3cd9-6f89-4c84-ce534880d200@gmail.com>
- <20160830191729.GT10637@io.lakedaemon.net>
- <891242ab-6792-282f-4df4-b2aef34d8a3d@gmail.com>
- <20160830194452.GV10637@io.lakedaemon.net>
-Message-ID: <12e27a85-620a-8ed3-15cb-db6c4ed3e342@gmail.com>
+From: zhengyu.shen@nxp.com (Zhengyu Shen)
+Date: Tue, 30 Aug 2016 20:01:18 +0000
+Subject: [PATCH v3] Added perf functionality to mmdc driver
+In-Reply-To: <20160830125420.GG1223@leverpostej>
+References: <20160817194253.16300-1-zhengyu.shen@nxp.com>
+ <CAHrpEqTtCnEU1v1sEuN8yJGPudDRZ5A79=Wn5Bp4SgTxDiNTQQ@mail.gmail.com>
+ <20160830114329.GB8366@tiger> <20160830125420.GG1223@leverpostej>
+Message-ID: <DB5PR04MB1430D8A0284123B5C475800E9FE00@DB5PR04MB1430.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/30/2016 02:44 PM, Jason Cooper wrote:
-> On Tue, Aug 30, 2016 at 02:29:36PM -0500, Marty Plummer wrote:
->> On 08/30/2016 02:17 PM, Jason Cooper wrote:
->>> On Tue, Aug 30, 2016 at 12:38:27PM -0500, Marty Plummer wrote:
->>>
->>> Please put an explanation in the commit log that gives future readers
->>> (and reviewers) the "why".
->>>
->>> e.g. "This is a preparatory series for adding the ARMv5 hisi35xx SoCs.
->>> Assumptions were made when adding hisi 36xx that don't hold water in
->>> light of adding support for the ARMv5 SoC.  Fix the issue by renaming
->>> config options and other namespaces to avoid collisions with the new
->>> work.
->>>
->>> Only internal APIs are modified with this series."
->>>
->>> Or something like that.
->>>
->> Ah, well since it pretty much only consists of renames and no actual
->> changes in behavior I though it fell under the category of a trivial
->> patch.
+> Hi,
 > 
-> Right, we try not to add useless dogma, but this helps reviewers quickly
-> assess the magnitude of the patch and why it exists.  The easier we can
-> make it for them to go "Uh-huh... Got it, Acked-by ---" the better off
-> we are.
+> On Tue, Aug 30, 2016 at 07:43:29PM +0800, Shawn Guo wrote:
+> > On Mon, Aug 29, 2016 at 11:06:44AM -0500, Zhi Li wrote:
+> > > On Wed, Aug 17, 2016 at 2:42 PM, Zhengyu Shen
+> <zhengyu.shen@nxp.com> wrote:
+> > > > MMDC is a multi-mode DDR controller that supports DDR3/DDR3L
+> > > > x16/x32/x64 and LPDDR2 two channel x16/x32 memory types. MMDC is
+> > > > configurable, high performance, and optimized. MMDC is present on
+> > > > i.MX6 Quad and i.MX6 QuadPlus devices, but this driver only supports
+> i.MX6 Quad at the moment.
+> > > > MMDC provides registers for performance counters which read via
+> > > > this driver to help debug memory throughput and similar issues.
+> > > >
+> > > > $ perf stat -a -e
+> > > > mmdc/busy-cycles/,mmdc/read-accesses/,mmdc/read-
+> bytes/,mmdc/total-cycles/,mmdc/write-accesses/,mmdc/write-bytes/ dd
+> if=/dev/zero of=/dev/null bs=1M count=5000 Performance counter stats for
+> 'dd if=/dev/zero of=/dev/null bs=1M count=5000':
+> > > >
+> > > >          898021787      mmdc/busy-cycles/
+> > > >           14819600      mmdc/read-accesses/
+> > > >             471.30 MB   mmdc/read-bytes/
+> > > >         2815419216      mmdc/total-cycles/
+> > > >           13367354      mmdc/write-accesses/
+> > > >             427.76 MB   mmdc/write-bytes/
+> > > >
+> > > >        5.334757334 seconds time elapsed
+> > > >
+> > > > Signed-off-by: Zhengyu Shen <zhengyu.shen@nxp.com>
+> > > > Signed-off-by: Frank Li <frank.li@nxp.com>
+> > >
+> > > Shawn Guo:
+> > >
+> > >          No new comments got more than 1 weeks.
+> > >          Did you plan accept it?
+> >
+> > @Mark, how do you think of this version?
 > 
-A gotcha. Basically a "Hey, this patch is nothing really too much to
-worry about, just some renames".
+> Sorry, I've been away for the last week and haven't had the chance to look at
+> this yet. I will try to get round to it in the next few days.
+> 
+> In the meantime, could you please try attacking this with Vince's perf fuzzer
+> [1] (as root, or with perf_event_paranoid dropped to -1)? It's rather good at
+> finding (subtle) issues in drivers.
+> 
+> Thanks,
+> Mark.
+> 
+> [1] https://github.com/deater/perf_event_tests
 
-Also, 'commit log' is what, here?
->>>> Signed-off-by: Marty Plummer <netz.kernel@gmail.com>
->>>> ---
->>>
->>> This needs to be split up into a series of patches:
->>>
->>>>  arch/arm/Kconfig.debug              |  2 +-
->>>
->>>>  arch/arm/boot/dts/Makefile          |  2 +-
->>>
->>>>  arch/arm/configs/hisi_defconfig     |  2 +-
->>>
->>>>  arch/arm/configs/multi_v7_defconfig |  2 +-
->>>
->>>>  arch/arm/mach-hisi/Kconfig          |  6 +++---
->>>>  arch/arm/mach-hisi/core.h           | 10 +++++-----
->>>>  arch/arm/mach-hisi/hisilicon.c      |  4 ++--
->>>>  arch/arm/mach-hisi/hotplug.c        | 16 ++++++++--------
->>>>  arch/arm/mach-hisi/platsmp.c        | 24 ++++++++++++------------
->>>
->>>>  drivers/clk/hisilicon/Makefile      |  2 +-
->>>
->>>>  drivers/dma/Kconfig                 |  2 +-
->>>
->>> Most likely, the subsystem maintainers will Ack the relevant patch and
->>> then they'll go in together to avoid bisection issues.
->>>
->> Ah, ok. Once again, I thought since it made little in the way of 'real'
->> changes it was more or less irrelevant. I used `git format-patch' to
->> make the patch, and it was all one commit. should I instead then break
->> it down into multiple commits, then?
-> 
-> Please do.
-> 
->>>>  11 files changed, 36 insertions(+), 36 deletions(-)
->>>>
->>>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->>>> index a9693b6..9094ca6 100644
->>>> --- a/arch/arm/Kconfig.debug
->>>> +++ b/arch/arm/Kconfig.debug
->>>> @@ -280,7 +280,7 @@ choice
->>>>  
->>>>  	config DEBUG_HI3620_UART
->>>>  		bool "Hisilicon HI3620 Debug UART"
->>>> -		depends on ARCH_HI3xxx
->>>> +		depends on ARCH_HI3620
->>>
->>> Is there a general rule like
->>>
->>> 	ARCH_HI36xx = ARMv7
->>> 	ARCH_HI35xx = ARMv5
->>>
->>> ?
->> Unsure about all Hi35xx chipsets, I've not had reason to look into those
->> yet for lack of hardware. However, ARCH_HI3520 is ARMv6/ARMv5, it has
->> two cores, arm1176/arm926
-> 
-> Ok, I'll defer to Arnd on this one.  I'd be inclined to do the above, or
-> _HI36xx, _HI3520 at least.  Since you run separate kernels on each core,
-> it's probably best to treat them like two different boards.  Perhaps we
-> need _HI3520_ARM1176, _HI3520_ARM926?
-> 
-Yeah. I was going to go with HI3520, HI3520_SLAVE, but I suppose a more
-explicit naming would be better in this instance.
->> Also, there is one area I'd simply like to reorder some struct
->> initialization so it matches the definition, iirc it was the struct
->> map_desc.
-> 
-> Let's get the 'trivial' stuff in first.  There may be a good reason for
-> the ordering.
-> 
-> thx,
-> 
-> Jason.
-> 
-Alrigty... funny how getting a patch submitted right is far harder than
-making one :P
+Hi, I've done some testing with the fuzzer. Mmdc was only responsible 
+for one crash which I fixed (had to remove the event from the pmu properly). 
+Other drivers also cause crashes and the program reports that events are
+Throttling. Is this normal?
