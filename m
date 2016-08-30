@@ -1,37 +1,45 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Tue, 30 Aug 2016 17:25:58 +0930
-Subject: [PATCH v3 5/7] aspeed-g4: Add gpio controller to devicetree
+Date: Tue, 30 Aug 2016 17:25:54 +0930
+Subject: [PATCH v3 1/7] mach-aspeed: Select pinctrl drivers
 In-Reply-To: <20160830075600.11559-1-andrew@aj.id.au>
 References: <20160830075600.11559-1-andrew@aj.id.au>
-Message-ID: <20160830075600.11559-6-andrew@aj.id.au>
+Message-ID: <20160830075600.11559-2-andrew@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
 ---
- arch/arm/boot/dts/aspeed-g4.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/mach-aspeed/Kconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index a5d6e81e318a..7c2b73c4d5ab 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -492,6 +492,16 @@
- 				reg = <0x1e720000 0x8000>;	// 32K
- 			};
+diff --git a/arch/arm/mach-aspeed/Kconfig b/arch/arm/mach-aspeed/Kconfig
+index 5225fbcb250d..f3f8c5c658db 100644
+--- a/arch/arm/mach-aspeed/Kconfig
++++ b/arch/arm/mach-aspeed/Kconfig
+@@ -5,6 +5,8 @@ menuconfig ARCH_ASPEED
+ 	select WATCHDOG
+ 	select ASPEED_WATCHDOG
+ 	select MOXART_TIMER
++	select MFD_SYSCON
++	select PINCTRL
+ 	help
+ 	  Say Y here if you want to run your kernel on an ASpeed BMC SoC.
  
-+			gpio: gpio at 1e780000 {
-+				#gpio-cells = <2>;
-+				gpio-controller;
-+				compatible = "aspeed,ast2400-gpio";
-+				reg = <0x1e780000 0x1000>;
-+				interrupts = <20>;
-+				gpio-ranges = <&pinctrl 0 0 220>;
-+				interrupt-controller;
-+			};
-+
- 			timer: timer at 1e782000 {
- 				compatible = "aspeed,ast2400-timer";
- 				reg = <0x1e782000 0x90>;
+@@ -14,6 +16,7 @@ config MACH_ASPEED_G4
+ 	bool "Aspeed SoC 4th Generation"
+ 	depends on ARCH_MULTI_V5
+ 	select CPU_ARM926T
++	select PINCTRL_ASPEED_G4
+ 	help
+ 	 Say yes if you intend to run on an Aspeed ast2400 or similar
+ 	 fourth generation BMCs, such as those used by OpenPower Power8
+@@ -23,6 +26,7 @@ config MACH_ASPEED_G5
+ 	bool "Aspeed SoC 5th Generation"
+ 	depends on ARCH_MULTI_V6
+ 	select CPU_V6
++	select PINCTRL_ASPEED_G5
+ 	help
+ 	 Say yes if you intend to run on an Aspeed ast2500 or similar
+ 	 fifth generation Aspeed BMCs.
 -- 
 2.9.3.1.g0db844e
