@@ -1,29 +1,32 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Tue, 30 Aug 2016 09:08:03 +0300
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAwNS8zM10gZ3BpbzogYWRkIGdlbmVyaWMgc2luZ2xlLXJl?=
- =?UTF-8?B?Z2lzdGVyIGZpeGVkLWRpcmVjdGlvbiBHUElPIGRyaXZlcg==?=
-In-Reply-To: <20160829231232.GI1041@n2100.armlinux.org.uk>
-References: <20160829102328.GA28796@n2100.armlinux.org.uk>
- <87eg57e54l.fsf@belgarion.home>
- <20160829231232.GI1041@n2100.armlinux.org.uk>
-Message-ID: <1472537283.46556776@f170.i.mail.ru>
+From: liguozhu@hisilicon.com (Kenneth Lee)
+Date: Tue, 30 Aug 2016 14:35:31 +0800
+Subject: [PATCH] [bugfix] replace unnessary ldax with common ldr 
+Message-ID: <1472538931-145463-1-git-send-email-liguozhu@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->???????, 30 ??????? 2016, 2:12 +03:00 ?? Russell King - ARM Linux <linux@armlinux.org.uk>:
->
->On Mon, Aug 29, 2016 at 09:39:54PM +0200, Robert Jarzmik wrote:
->> Hi Russell,
->> 
->> Russell King < rmk+kernel@armlinux.org.uk > writes:
->> 
->> > Add a simple, generic, single register fixed-direction GPIO driver.
->> > This is able to support a single register where a fixed number of
->> > bits are used for input and a fixed number of bits used for output.
->> >
->> > Signed-off-by: Russell King < rmk+kernel@armlinux.org.uk >
+(add comment for the previous mail, sorry for the duplication)
 
-There is a GPIO driver which already performs these tasks.
-Plaease take a look on the gpio-74xx-mmio driver.
+There is no store_ex pairing with this load_ex. It is not necessary and
+gave wrong hint to the cache system.
 
+Signed-off-by: Kenneth Lee <liguozhu@hisilicon.com>
 ---
+ arch/arm64/include/asm/spinlock.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
+index c85e96d..3334c4f 100644
+--- a/arch/arm64/include/asm/spinlock.h
++++ b/arch/arm64/include/asm/spinlock.h
+@@ -63,7 +63,7 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
+ 	 */
+ "	sevl\n"
+ "2:	wfe\n"
+-"	ldaxrh	%w2, %4\n"
++"	ldrh	%w2, %4\n"
+ "	eor	%w1, %w2, %w0, lsr #16\n"
+ "	cbnz	%w1, 2b\n"
+ 	/* We got the lock. Critical section starts here. */
+-- 
+1.9.1
