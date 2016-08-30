@@ -1,61 +1,67 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 30 Aug 2016 10:24:55 +0200
-Subject: [PATCH v2 09/10] reset: zynq: add driver Kconfig option
-In-Reply-To: <1472545496-14373-1-git-send-email-p.zabel@pengutronix.de>
-References: <1472545496-14373-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1472545496-14373-9-git-send-email-p.zabel@pengutronix.de>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 30 Aug 2016 09:26:11 +0100
+Subject: [PATCH v2 0/8] ARM: V7M: Support caches
+In-Reply-To: <CAGhQ9Vxn3cC4RiYfiYJh9Buh+3i_n_gJ+3zeth150xF=ZLGAMw@mail.gmail.com>
+References: <1471524360-31554-1-git-send-email-vladimir.murzin@arm.com>
+ <20160818145300.GA1041@n2100.armlinux.org.uk> <57B5CCDE.10504@arm.com>
+ <CAGhQ9Vxn3cC4RiYfiYJh9Buh+3i_n_gJ+3zeth150xF=ZLGAMw@mail.gmail.com>
+Message-ID: <57C54323.7080007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Visible only if COMPILE_TEST is enabled, this allows to include the
-driver in build tests.
+Hi Joachim,
 
-Cc: Moritz Fischer <moritz.fischer@ettus.com>
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
-Changes since v1:
- - Fix alphabetical order of Kconfig options
----
- drivers/reset/Kconfig  | 6 ++++++
- drivers/reset/Makefile | 2 +-
- 2 files changed, 7 insertions(+), 1 deletion(-)
+On 27/08/16 17:53, Joachim Eastwood wrote:
+> Hi Vladimir,
+> 
+> On 18 August 2016 at 16:57, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
+>> On 18/08/16 15:53, Russell King - ARM Linux wrote:
+>>> On Thu, Aug 18, 2016 at 01:45:52PM +0100, Vladimir Murzin wrote:
+>>>> This patch set allows M-class cpus benefit of optional cache support.
+>>>> It originally was written by Jonny, I've been keeping it locally mainly
+>>>> rebasing over Linux versions.
+>>>>
+>>>> The original idea behind patches was to reuse existing cache handling
+>>>> code from v7A/R with help of extra macros to factor out cache handling
+>>>> logic (v7M cache operations are provided via memory mapped interface
+>>>> rather than co-processor instructions).
+>>>> However, that idea was rejected and starting form this (v2) version
+>>>> V7M cache logic lives into file and macros to indirect memory-mapped
+>>>> operations stay there locally since they make it easier to follow the
+>>>> code.
+>>>>
+>>>> Along with the v7M cache support the first user (Cortex-M7) is
+>>>> introduced.
+>>>>
+>>>> Patches were tested on MPS2 platform with Cortex-M3/M4/M7. The later
+>>>> one showed significant boot speed-up.
+>>>
+>>> >From a quick read through, the approach looks sane, and I think I'm
+>>> now happy with these.
+>>>
+>>
+>> Thanks!
+>>
+>> Is it acceptable if patches hang on a list for awhile, so people (I'm
+>> looking at Alex and  Szemz?) can test them?
+> 
+> These patches doesn't seem to break anything on the cache-less
+> Cortex-M4 NXP LPC4357.
+> 
 
-diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-index 7f748af..06d9fa2 100644
---- a/drivers/reset/Kconfig
-+++ b/drivers/reset/Kconfig
-@@ -86,6 +86,12 @@ config RESET_UNIPHIER
- 	  Say Y if you want to control reset signals provided by System Control
- 	  block, Media I/O block, Peripheral Block.
- 
-+config RESET_ZYNQ
-+	bool "ZYNQ Reset Driver" if COMPILE_TEST
-+	default ARCH_ZYNQ
-+	help
-+	  This enables the reset controller driver for Xilinx Zynq SoCs.
-+
- source "drivers/reset/sti/Kconfig"
- source "drivers/reset/hisilicon/Kconfig"
- 
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index 4a163c7..56f90ea 100644
---- a/drivers/reset/Makefile
-+++ b/drivers/reset/Makefile
-@@ -1,7 +1,6 @@
- obj-y += core.o
- obj-$(CONFIG_ARCH_STI) += sti/
- obj-$(CONFIG_ARCH_HISI) += hisilicon/
--obj-$(CONFIG_ARCH_ZYNQ) += reset-zynq.o
- obj-$(CONFIG_RESET_ATH79) += reset-ath79.o
- obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
- obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
-@@ -13,3 +12,4 @@ obj-$(CONFIG_RESET_STM32) += reset-stm32.o
- obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
- obj-$(CONFIG_TI_SYSCON_RESET) += reset-ti-syscon.o
- obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
-+obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
--- 
-2.8.1
+Great!
+
+> So FWIW:
+> Tested-by: Joachim Eastwood <manabian@gmail.com>
+> 
+
+Thanks a lot for testing!
+
+Cheers
+Vladimir
+
+> 
+> regards,
+> Joachim Eastwood
+> 
+> 
