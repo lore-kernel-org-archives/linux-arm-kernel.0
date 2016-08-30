@@ -1,88 +1,65 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 30 Aug 2016 22:00:19 +0530
-Subject: [PATCH v8 05/18] dmaengine: st_fdma: Add STMicroelectronics FDMA
- engine driver support
-In-Reply-To: <1472223413-7254-6-git-send-email-peter.griffin@linaro.org>
-References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
- <1472223413-7254-6-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20160830163019.GM9355@localhost>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 30 Aug 2016 18:26:13 +0200
+Subject: [PATCH v3] mmc: sunxi: Handle the 'New Timing' mode
+In-Reply-To: <20160813175611.79E0323C@mail.free-electrons.com>
+References: <20160813175611.79E0323C@mail.free-electrons.com>
+Message-ID: <20160830162613.GG18605@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2016 at 03:56:40PM +0100, Peter Griffin wrote:
+On Sat, Aug 13, 2016 at 06:41:45PM +0200, Jean-Francois Moine wrote:
+> Some MMC devices as mmc2 in the A83T or mmc1 and mmc2 in the H3 have
+> a 'New Timing' mode.
+> When aware about this capability, and when this is possible (clock
+> rate great enough), the clock driver switches the MMC clock to the
+> 'new mode', meaning that the phase delays are defined in the MMC
+> registers instead of in the clock registers.
+> To alert the MMC driver about this switch, the clock driver returns
+> the error code EPERM on calling clk_set_phase().
+> 
+> This patch makes the MMC driver to handle this returned code and to
+> activate or not the 'New Timing' mode on the MMC side.
+> 
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+> Some explanations:
+> In the old timing, the phase delays are set in the clock only
+> (that's why there is a function clk_set_phase() which is called from
+> the MMC side).
+> In the new timing, the delays are in the MMC register SDXC_REG_NTSR
+> only.
+> The new timing works only when the clock rate is greater or equal
+> to 50MHz.
+> 
+> There are 2 flags saying that the new timing is used:
+> - the bit 'mode select' in the clock register, and
+> - the bit 'new timing' in the MMC register.
+> Both bits must be set/reset at the same time, otherwise the device
+> does not work (tested with wifi and eMMC in H3 and A83T boards).
+> So, some synchronization must exist.
+> 
+> The previous versions was using a DT property for the MMC and a flag
+> in the clock driver. This did work with a correct configuration
+> on both sides, but experiment showed that it was easy to do an error.
 
->  config STM32_DMA
->  	bool "STMicroelectronics STM32 DMA support"
->  	depends on ARCH_STM32
-> @@ -567,7 +580,6 @@ config ZX_DMA
->  	help
->  	  Support the DMA engine for ZTE ZX296702 platform devices.
->  
-> -
+I still believe that we will need a property, at least to identify on
+which we can try the new mode, and on which clocks it's irrelevant (at
+least for the A33 and A83T).
 
-unrelated change?
+However, I also believe we should make that mode switching explicit
+through a function call, instead of relying on some side effect (of
+some non-upstream code).
 
-> +	fdev->chans = devm_kzalloc(&pdev->dev,
-> +				   fdev->nr_channels
-> +				   * sizeof(struct st_fdma_chan), GFP_KERNEL);
-
-devm_kcalloc()
-
-> +	if (!fdev->chans)
-> +		return -ENOMEM;
-> +
-> +	fdev->dev = &pdev->dev;
-> +	fdev->drvdata = drvdata;
-> +	platform_set_drvdata(pdev, fdev);
-> +
-> +	fdev->irq = platform_get_irq(pdev, 0);
-> +	if (fdev->irq < 0) {
-> +		dev_err(&pdev->dev, "Failed to get irq resource\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	ret = devm_request_irq(&pdev->dev, fdev->irq, st_fdma_irq_handler, 0,
-> +			       dev_name(&pdev->dev), fdev);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Failed to request irq (%d)\n", ret);
-> +		goto err;
-> +	}
-> +
-> +	fdev->slim_rproc = st_slim_rproc_alloc(pdev, fdev->fw_name);
-> +	if (!fdev->slim_rproc) {
-> +		ret = PTR_ERR(fdev->slim_rproc);
-> +		dev_err(&pdev->dev, "slim_rproc_alloc failed (%d)\n", ret);
-> +		goto err;
-> +	}
-> +
-> +	/* Initialise list of FDMA channels */
-> +	INIT_LIST_HEAD(&fdev->dma_device.channels);
-> +	for (i = 0; i < fdev->nr_channels; i++) {
-> +		struct st_fdma_chan *fchan = &fdev->chans[i];
-> +
-> +		fchan->fdev = fdev;
-> +		fchan->vchan.desc_free = st_fdma_free_desc;
-> +		vchan_init(&fchan->vchan, &fdev->dma_device);
-
-this initialized a tasklet
-
-> +static int st_fdma_remove(struct platform_device *pdev)
-> +{
-> +	struct st_fdma_dev *fdev = platform_get_drvdata(pdev);
-> +
-> +	devm_free_irq(&pdev->dev, fdev->irq, fdev);
-> +	st_slim_rproc_put(fdev->slim_rproc);
-> +	of_dma_controller_free(pdev->dev.of_node);
-> +	dma_async_device_unregister(&fdev->dma_device);
-
-and that vchan tasklet is not quisced here :(
-
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_DESCRIPTION("STMicroelectronics FDMA engine driver");
-> +MODULE_AUTHOR("Ludovic.barre <Ludovic.barre@st.com>");
-> +MODULE_AUTHOR("Peter Griffin <peter.griffin@linaro.org>");
-
-No MODULE_ALIAS?
+Maxime
 
 -- 
-~Vinod
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160830/b503a2fa/attachment.sig>
