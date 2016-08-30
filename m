@@ -1,27 +1,61 @@
-From: liguozhu@hisilicon.com (Kenneth Lee)
-Date: Tue, 30 Aug 2016 12:13:30 +0800
-Subject: [PATCH] [bugfix] replace unnessary ldax with common ldr
-Message-ID: <1472530410-132185-1-git-send-email-liguozhu@hisilicon.com>
+From: majun258@huawei.com (MaJun)
+Date: Tue, 30 Aug 2016 12:17:19 +0800
+Subject: [PATCH] generic: Add the exception case checking routine for ppi
+ interrupt
+Message-ID: <1472530639-21616-1-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Kenneth Lee <liguozhu@hisilicon.com>
----
- arch/arm64/include/asm/spinlock.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+From: Ma Jun <majun258@huawei.com>
 
-diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
-index c85e96d..3334c4f 100644
---- a/arch/arm64/include/asm/spinlock.h
-+++ b/arch/arm64/include/asm/spinlock.h
-@@ -63,7 +63,7 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
- 	 */
- "	sevl\n"
- "2:	wfe\n"
--"	ldaxrh	%w2, %4\n"
-+"	ldrh	%w2, %4\n"
- "	eor	%w1, %w2, %w0, lsr #16\n"
- "	cbnz	%w1, 2b\n"
- 	/* We got the lock. Critical section starts here. */
+During system booting, if the interrupt which has no action registered
+is triggered, it would cause system panic when try to access the
+action member.
+
+Signed-off-by: Ma Jun <majun258@huawei.com>
+---
+ kernel/irq/chip.c |   20 ++++++++++++++++----
+ 1 files changed, 16 insertions(+), 4 deletions(-)
+
+diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+index 8114d06..9a0e872 100644
+--- a/kernel/irq/chip.c
++++ b/kernel/irq/chip.c
+@@ -766,11 +766,23 @@ handle_percpu_irq(unsigned int irq, struct irq_desc *desc)
+  */
+ void handle_percpu_devid_irq(unsigned int irq, struct irq_desc *desc)
+ {
+-	struct irq_chip *chip = irq_desc_get_chip(desc);
+-	struct irqaction *action = desc->action;
+-	void *dev_id = raw_cpu_ptr(action->percpu_dev_id);
++	struct irq_chip *chip = NULL;
++	struct irqaction *action;
++	void *dev_id;
+ 	irqreturn_t res;
+ 
++	action = desc->action;
++
++	/* Unexpected interrupt in some execption case
++	 * we just send eoi to end this interrupt
++	 */
++	if (unlikely(!action)) {
++		mask_irq(desc);
++		goto out;
++	}
++	dev_id = raw_cpu_ptr(action->percpu_dev_id);
++
++	chip = irq_desc_get_chip(desc);
+ 	kstat_incr_irqs_this_cpu(irq, desc);
+ 
+ 	if (chip->irq_ack)
+@@ -779,7 +791,7 @@ void handle_percpu_devid_irq(unsigned int irq, struct irq_desc *desc)
+ 	trace_irq_handler_entry(irq, action);
+ 	res = action->handler(irq, dev_id);
+ 	trace_irq_handler_exit(irq, action, res);
+-
++out:
+ 	if (chip->irq_eoi)
+ 		chip->irq_eoi(&desc->irq_data);
+ }
 -- 
-1.9.1
+1.7.1
