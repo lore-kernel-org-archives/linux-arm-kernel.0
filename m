@@ -1,112 +1,94 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 30 Aug 2016 15:21:12 +0100
-Subject: [PATCH v8 15/18] ARM: STi: DT: STiH407: Add uniperif reader dt
- nodes
-In-Reply-To: <20160830100148.GO1661@dell>
-References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
- <1472223413-7254-16-git-send-email-peter.griffin@linaro.org>
- <20160830100148.GO1661@dell>
-Message-ID: <20160830142112.GA22514@griffinp-ThinkPad-X1-Carbon-2nd>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 30 Aug 2016 15:26:38 +0100
+Subject: [PATCH v2 7/9] arm64: kernel: drop use of x24 from primary boot
+ path
+In-Reply-To: <1472049366-10922-8-git-send-email-ard.biesheuvel@linaro.org>
+References: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1472049366-10922-8-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160830142637.GJ1223@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-Thanks for reviewing and your very valuable feedback.
-
-On Tue, 30 Aug 2016, Lee Jones wrote:
-
-> On Fri, 26 Aug 2016, Peter Griffin wrote:
+On Wed, Aug 24, 2016 at 04:36:04PM +0200, Ard Biesheuvel wrote:
+> Keeping __PHYS_OFFSET in x24 is actually less clear than simply taking
+> the value of __PHYS_OFFSET using an adrp instruction in the three places
+> that we need it. So change that.
 > 
-> > This patch adds the DT node for the uniperif reader
-> > IP block found on STiH407 family silicon.
-> > 
-> > Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> > ---
-> >  arch/arm/boot/dts/stih407-family.dtsi | 26 ++++++++++++++++++++++++++
-> >  1 file changed, 26 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> > index d263c96..bdddf2c 100644
-> > --- a/arch/arm/boot/dts/stih407-family.dtsi
-> > +++ b/arch/arm/boot/dts/stih407-family.dtsi
-> > @@ -956,5 +956,31 @@
-> >  			st,version = <5>;
-> >  			st,mode = "SPDIF";
-> >  		};
-> > +
-> > +		sti_uni_reader0: sti-uni-reader at 0 {
-> > +			compatible = "st,sti-uni-reader";
-> > +			status = "disabled";
-> 
-> I find it's normally nicer to place the status of the node at the
-> bottom, separated by a '\n'.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Ok I'll add a superflous '\n' in the next version.
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 
->  There isn't a functional difference
-> admittedly, but it would be my preference, since it's not describing
-> the device per se.
+Mark.
 
-Will change to your preference in the next version.
-
+> ---
+>  arch/arm64/kernel/head.S | 20 ++++++++++++--------
+>  1 file changed, 12 insertions(+), 8 deletions(-)
 > 
-> > +			#sound-dai-cells = <0>;
-> > +			st,syscfg = <&syscfg_core>;
-> > +			reg = <0x8D83000 0x158>;
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index c112c153821e..27f51272de68 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -211,8 +211,8 @@ efi_header_end:
+>  ENTRY(stext)
+>  	bl	preserve_boot_args
+>  	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
+> -	adrp	x24, __PHYS_OFFSET
+> -	and	x23, x24, MIN_KIMG_ALIGN - 1	// KASLR offset, defaults to 0
+> +	adrp	x23, __PHYS_OFFSET
+> +	and	x23, x23, MIN_KIMG_ALIGN - 1	// KASLR offset, defaults to 0
+>  	bl	set_cpu_boot_mode_flag
+>  	bl	__create_page_tables
+>  	/*
+> @@ -412,6 +412,8 @@ ENDPROC(__create_page_tables)
+>  
+>  /*
+>   * The following fragment of code is executed with the MMU enabled.
+> + *
+> + *   x0 = __PHYS_OFFSET
+>   */
+>  	.set	initial_sp, init_thread_union + THREAD_START_SP
+>  __primary_switched:
+> @@ -420,6 +422,12 @@ __primary_switched:
+>  	msr	vbar_el1, x8			// vector table address
+>  	isb
+>  
+> +	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
+> +
+> +	ldr_l	x4, kimage_vaddr		// Save the offset between
+> +	sub	x4, x4, x0			// the kernel virtual and
+> +	str_l	x4, kimage_voffset, x5		// physical mappings
+> +
+>  	// Clear BSS
+>  	adr_l	x0, __bss_start
+>  	mov	x1, xzr
+> @@ -432,12 +440,6 @@ __primary_switched:
+>  	mov	x4, sp
+>  	and	x4, x4, #~(THREAD_SIZE - 1)
+>  	msr	sp_el0, x4			// Save thread_info
+> -	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
+> -
+> -	ldr_l	x4, kimage_vaddr		// Save the offset between
+> -	sub	x4, x4, x24			// the kernel virtual and
+> -	str_l	x4, kimage_voffset, x5		// physical mappings
+> -
+>  	mov	x29, #0
+>  #ifdef CONFIG_KASAN
+>  	bl	kasan_early_init
+> @@ -792,6 +794,7 @@ __primary_switch:
+>  	bl	__relocate_kernel
+>  #ifdef CONFIG_RANDOMIZE_BASE
+>  	ldr	x8, =__primary_switched
+> +	adrp	x0, __PHYS_OFFSET
+>  	blr	x8
+>  
+>  	/*
+> @@ -813,5 +816,6 @@ __primary_switch:
+>  #endif
+>  #endif
+>  	ldr	x8, =__primary_switched
+> +	adrp	x0, __PHYS_OFFSET
+>  	br	x8
+>  ENDPROC(__primary_switch)
+> -- 
+> 2.7.4
 > 
-> We usually use lower-case for the address.
-
-Will fix.
-
-> 
-> Since this has a 'reg' property, the '0' in the node name does not
-> look appropriate.
-
-Will fix.
-> 
-> > +			interrupts = <GIC_SPI 87 IRQ_TYPE_NONE>;
-> > +			dmas = <&fdma0 5 0 1>;
-> > +			dma-names = "rx";
-> > +			dai-name = "Uni Reader #0 (PCM IN)";
-> 
-> Oooo, not seen something like this before.
-> 
-> If it does not already have one, it would require a DT Ack.
-
-No idea, the driver got merged 1 year ago.
-
-Arnaud did you get a DT ack when you merged this driver & binding?
-> 
-> > +			st,version = <3>;
-> 
-> This will likely need a DT Ack too.  We usually encode this sort of
-> information in the compatible string.
-
-See 05c1b4480e86a871b18030d6f3d532dc0ecdf38c
-> 
-> > +		};
-> > +
-> > +		sti_uni_reader1: sti-uni-reader at 1 {
-> > +			compatible = "st,sti-uni-reader";
-> > +			status = "disabled";
-> > +			#sound-dai-cells = <0>;
-> > +			st,syscfg = <&syscfg_core>;
-> > +			reg = <0x8D84000 0x158>;
-> > +			interrupts = <GIC_SPI 88 IRQ_TYPE_NONE>;
-> > +			dmas = <&fdma0 6 0 1>;
-> > +			dma-names = "rx";
-> > +			dai-name = "Uni Reader #1 (HDMI RX)";
-> > +			st,version = <3>;
-> > +		};
-> 
-> All as above.
-> 
-> >  	};
-> >  };
-> 
-
-Regards,
-
-Peter.
