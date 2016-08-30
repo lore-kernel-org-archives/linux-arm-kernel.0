@@ -1,120 +1,53 @@
 From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
-Date: Tue, 30 Aug 2016 20:25:43 +0800
-Subject: [PATCH v5 4/5] arm64: dts: mediatek: Add MDP for MT8173
+Date: Tue, 30 Aug 2016 20:25:40 +0800
+Subject: [PATCH v5 1/5] VPU: mediatek: Add mdp support
 In-Reply-To: <1472559944-55114-1-git-send-email-minghsiu.tsai@mediatek.com>
 References: <1472559944-55114-1-git-send-email-minghsiu.tsai@mediatek.com>
-Message-ID: <1472559944-55114-5-git-send-email-minghsiu.tsai@mediatek.com>
+Message-ID: <1472559944-55114-2-git-send-email-minghsiu.tsai@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MDP node for MT8173
+VPU driver add mdp support
 
 Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
 ---
- arch/arm64/boot/dts/mediatek/mt8173.dtsi |   84 ++++++++++++++++++++++++++++++
- 1 file changed, 84 insertions(+)
+ drivers/media/platform/mtk-vpu/mtk_vpu.h |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 10f638f..cd93228 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -41,6 +41,14 @@
- 		dpi0 = &dpi0;
- 		dsi0 = &dsi0;
- 		dsi1 = &dsi1;
-+		mdp_rdma0 = &mdp_rdma0;
-+		mdp_rdma1 = &mdp_rdma1;
-+		mdp_rsz0 = &mdp_rsz0;
-+		mdp_rsz1 = &mdp_rsz1;
-+		mdp_rsz2 = &mdp_rsz2;
-+		mdp_wdma0 = &mdp_wdma0;
-+		mdp_wrot0 = &mdp_wrot0;
-+		mdp_wrot1 = &mdp_wrot1;
- 	};
+diff --git a/drivers/media/platform/mtk-vpu/mtk_vpu.h b/drivers/media/platform/mtk-vpu/mtk_vpu.h
+index f457479..291ae46 100644
+--- a/drivers/media/platform/mtk-vpu/mtk_vpu.h
++++ b/drivers/media/platform/mtk-vpu/mtk_vpu.h
+@@ -53,6 +53,8 @@ typedef void (*ipi_handler_t) (void *data,
+ 			 handle H264 video encoder job, and vice versa.
+  * @IPI_VENC_VP8:	 The interrupt fro vpu is to notify kernel to
+ 			 handle VP8 video encoder job,, and vice versa.
++ * @IPI_MDP:		 The interrupt from vpu is to notify kernel to
++			 handle MDP (Media Data Path) job, and vice versa.
+  * @IPI_MAX:		 The maximum IPI number
+  */
  
- 	cpus {
-@@ -716,6 +724,82 @@
- 			#clock-cells = <1>;
- 		};
+@@ -63,6 +65,7 @@ enum ipi_id {
+ 	IPI_VDEC_VP9,
+ 	IPI_VENC_H264,
+ 	IPI_VENC_VP8,
++	IPI_MDP,
+ 	IPI_MAX,
+ };
  
-+		mdp {
-+			compatible = "mediatek,mt8173-mdp";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges;
-+			mediatek,vpu = <&vpu>;
-+
-+			mdp_rdma0: rdma at 14001000 {
-+				compatible = "mediatek,mt8173-mdp-rdma";
-+				reg = <0 0x14001000 0 0x1000>;
-+				clocks = <&mmsys CLK_MM_MDP_RDMA0>,
-+					 <&mmsys CLK_MM_MUTEX_32K>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+				iommus = <&iommu M4U_PORT_MDP_RDMA0>;
-+				mediatek,larb = <&larb0>;
-+			};
-+
-+			mdp_rdma1: rdma at 14002000 {
-+				compatible = "mediatek,mt8173-mdp-rdma";
-+				reg = <0 0x14002000 0 0x1000>;
-+				clocks = <&mmsys CLK_MM_MDP_RDMA1>,
-+					 <&mmsys CLK_MM_MUTEX_32K>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+				iommus = <&iommu M4U_PORT_MDP_RDMA1>;
-+				mediatek,larb = <&larb4>;
-+			};
-+
-+			mdp_rsz0: rsz at 14003000 {
-+				compatible = "mediatek,mt8173-mdp-rsz";
-+				reg = <0 0x14003000 0 0x1000>;
-+				clocks = <&mmsys CLK_MM_MDP_RSZ0>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			};
-+
-+			mdp_rsz1: rsz at 14004000 {
-+				compatible = "mediatek,mt8173-mdp-rsz";
-+				reg = <0 0x14004000 0 0x1000>;
-+				clocks = <&mmsys CLK_MM_MDP_RSZ1>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			};
-+
-+			mdp_rsz2: rsz at 14005000 {
-+				compatible = "mediatek,mt8173-mdp-rsz";
-+				reg = <0 0x14005000 0 0x1000>;
-+				clocks = <&mmsys CLK_MM_MDP_RSZ2>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			};
-+
-+			mdp_wdma0: wdma at 14006000 {
-+				compatible = "mediatek,mt8173-mdp-wdma";
-+				reg = <0 0x14006000 0 0x1000>;
-+				clocks = <&mmsys CLK_MM_MDP_WDMA>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+				iommus = <&iommu M4U_PORT_MDP_WDMA>;
-+				mediatek,larb = <&larb0>;
-+			};
-+
-+			mdp_wrot0: wrot at 14007000 {
-+				compatible = "mediatek,mt8173-mdp-wrot";
-+				reg = <0 0x14007000 0 0x1000>;
-+				clocks = <&mmsys CLK_MM_MDP_WROT0>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+				iommus = <&iommu M4U_PORT_MDP_WROT0>;
-+				mediatek,larb = <&larb0>;
-+			};
-+
-+			mdp_wrot1: wrot at 14008000 {
-+				compatible = "mediatek,mt8173-mdp-wrot";
-+				reg = <0 0x14008000 0 0x1000>;
-+				clocks = <&mmsys CLK_MM_MDP_WROT1>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+				iommus = <&iommu M4U_PORT_MDP_WROT1>;
-+				mediatek,larb = <&larb4>;
-+			};
-+		};
-+
- 		ovl0: ovl at 1400c000 {
- 			compatible = "mediatek,mt8173-disp-ovl";
- 			reg = <0 0x1400c000 0 0x1000>;
+@@ -71,11 +74,13 @@ enum ipi_id {
+  *
+  * @VPU_RST_ENC: encoder reset id
+  * @VPU_RST_DEC: decoder reset id
++ * @VPU_RST_MDP: MDP (Media Data Path) reset id
+  * @VPU_RST_MAX: maximum reset id
+  */
+ enum rst_id {
+ 	VPU_RST_ENC,
+ 	VPU_RST_DEC,
++	VPU_RST_MDP,
+ 	VPU_RST_MAX,
+ };
+ 
 -- 
 1.7.9.5
