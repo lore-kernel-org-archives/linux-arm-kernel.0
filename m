@@ -1,100 +1,72 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 30 Aug 2016 22:52:48 +0200
-Subject: [PATCH 1/3] ARM: dts: armv7-m: remove skeleton.dtsi include
+Date: Tue, 30 Aug 2016 22:52:50 +0200
+Subject: [PATCH 3/3] ARM: dts: efm32: remove skeleton.dtsi include and fix
+ unit address warnings
 In-Reply-To: <20160830205250.15616-1-manabian@gmail.com>
 References: <20160830205250.15616-1-manabian@gmail.com>
-Message-ID: <20160830205250.15616-2-manabian@gmail.com>
+Message-ID: <20160830205250.15616-4-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove skeleton.dtsi from the common ARM Cortex-M dtsi. This will allow
-us to remove skeleton.dtsi on a per platform basis and get rid of the
-unit address warning on the memory nodes without getting duplicate memory
-nodes.
+Removale of skeleton.dtsi allows us also to fix the following
+warning from the dts compiler:
+  Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
 
-See 3ebee5a2e141 ("arm64: dts: kill skeleton.dtsi") for additional
-reasons not to use the skeleton.dtsi.
+by adding proper unit addresses to the memory nodes. Also add missing
+device_type to the memory node while at it.
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- arch/arm/boot/dts/armv7-m.dtsi   | 2 --
- arch/arm/boot/dts/efm32gg.dtsi   | 2 ++
- arch/arm/boot/dts/lpc18xx.dtsi   | 1 +
- arch/arm/boot/dts/mps2.dtsi      | 1 +
- arch/arm/boot/dts/stm32f429.dtsi | 1 +
- arch/arm/boot/dts/vf610m4.dtsi   | 1 +
- 6 files changed, 6 insertions(+), 2 deletions(-)
+Hi Uwe,
 
-diff --git a/arch/arm/boot/dts/armv7-m.dtsi b/arch/arm/boot/dts/armv7-m.dtsi
-index 16331aa..ba332e3 100644
---- a/arch/arm/boot/dts/armv7-m.dtsi
-+++ b/arch/arm/boot/dts/armv7-m.dtsi
-@@ -1,5 +1,3 @@
--#include "skeleton.dtsi"
--
- / {
- 	nvic: interrupt-controller at e000e100  {
- 		compatible = "arm,armv7m-nvic";
+If you want I can take this through the lpc18xx tree. There doesn't seem
+too be many patches for efm32 lately (last one dates from 2014).
+
+ arch/arm/boot/dts/efm32gg-dk3750.dts | 5 +++--
+ arch/arm/boot/dts/efm32gg.dtsi       | 4 +++-
+ 2 files changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/efm32gg-dk3750.dts b/arch/arm/boot/dts/efm32gg-dk3750.dts
+index 504cf45..98fc667 100644
+--- a/arch/arm/boot/dts/efm32gg-dk3750.dts
++++ b/arch/arm/boot/dts/efm32gg-dk3750.dts
+@@ -16,7 +16,8 @@
+ 		bootargs = "console=ttyefm4,115200 init=/linuxrc ignore_loglevel ihash_entries=64 dhash_entries=64 earlyprintk uclinux.physaddr=0x8c400000 root=/dev/mtdblock0";
+ 	};
+ 
+-	memory {
++	memory at 88000000 {
++		device_type = "memory";
+ 		reg = <0x88000000 0x400000>;
+ 	};
+ 
+@@ -74,7 +75,7 @@
+ 			status = "ok";
+ 		};
+ 
+-		boardfpga: boardfpga {
++		boardfpga: boardfpga at 80000000 {
+ 			compatible = "efm32board";
+ 			reg = <0x80000000 0x400>;
+ 			irq-gpios = <&gpio 64 1>;
 diff --git a/arch/arm/boot/dts/efm32gg.dtsi b/arch/arm/boot/dts/efm32gg.dtsi
-index c747983..d9dbf7f 100644
+index d9dbf7f..b78c57e 100644
 --- a/arch/arm/boot/dts/efm32gg.dtsi
 +++ b/arch/arm/boot/dts/efm32gg.dtsi
-@@ -4,6 +4,8 @@
-  * Documentation available from
+@@ -5,11 +5,13 @@
   * http://www.silabs.com/Support%20Documents/TechnicalDocs/EFM32GG-RM.pdf
   */
-+
-+#include "skeleton.dtsi"
+ 
+-#include "skeleton.dtsi"
  #include "armv7-m.dtsi"
  #include "dt-bindings/clock/efm32-cmu.h"
  
-diff --git a/arch/arm/boot/dts/lpc18xx.dtsi b/arch/arm/boot/dts/lpc18xx.dtsi
-index 1cd39fd..a1ecfe3 100644
---- a/arch/arm/boot/dts/lpc18xx.dtsi
-+++ b/arch/arm/boot/dts/lpc18xx.dtsi
-@@ -11,6 +11,7 @@
-  *
-  */
- 
-+#include "skeleton.dtsi"
- #include "armv7-m.dtsi"
- 
- #include "dt-bindings/clock/lpc18xx-cgu.h"
-diff --git a/arch/arm/boot/dts/mps2.dtsi b/arch/arm/boot/dts/mps2.dtsi
-index e3fed8d..efb8a03 100644
---- a/arch/arm/boot/dts/mps2.dtsi
-+++ b/arch/arm/boot/dts/mps2.dtsi
-@@ -42,6 +42,7 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
-+#include "skeleton.dtsi"
- #include "armv7-m.dtsi"
- 
  / {
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index 35df462..8e69328 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -45,6 +45,7 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
-+#include "skeleton.dtsi"
- #include "armv7-m.dtsi"
- #include <dt-bindings/pinctrl/stm32f429-pinfunc.h>
- 
-diff --git a/arch/arm/boot/dts/vf610m4.dtsi b/arch/arm/boot/dts/vf610m4.dtsi
-index 9ffe2eb..9f2c731 100644
---- a/arch/arm/boot/dts/vf610m4.dtsi
-+++ b/arch/arm/boot/dts/vf610m4.dtsi
-@@ -42,6 +42,7 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
-+#include "skeleton.dtsi"
- #include "armv7-m.dtsi"
- #include "vfxxx.dtsi"
- 
++	#address-cells = <1>;
++	#size-cells = <1>;
++
+ 	aliases {
+ 		i2c0 = &i2c0;
+ 		i2c1 = &i2c1;
 -- 
 2.9.3
