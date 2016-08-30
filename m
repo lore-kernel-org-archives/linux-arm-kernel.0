@@ -1,35 +1,51 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 30 Aug 2016 12:00:25 +0100
-Subject: [PATCH 1/8] mfd: ucb1x00: allow IRQ probing to work with IRQs > 32
+Date: Tue, 30 Aug 2016 12:00:30 +0100
+Subject: [PATCH 2/8] ARM: pxa/lubbock: remove lubbock_set_misc_wr() from
+ global view
 In-Reply-To: <20160830105950.GA15580@n2100.armlinux.org.uk>
 References: <20160830105950.GA15580@n2100.armlinux.org.uk>
-Message-ID: <E1begmH-0007Hx-Ky@rmk-PC.armlinux.org.uk>
+Message-ID: <E1begmM-0007I4-PK@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-probe_irq_on() only returns non-zero if it found any interrupts below
-IRQ32 which could be probe candidates.  If all the probable interrupts
-are higher than 32, then this will cause a failure.  Fix this.
+There are now no users of lubbock_set_misc_wr() outside lubbock.c, so
+make this function static.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/mfd/ucb1x00-core.c | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm/mach-pxa/include/mach/lubbock.h | 4 ----
+ arch/arm/mach-pxa/lubbock.c              | 3 +--
+ 2 files changed, 1 insertion(+), 6 deletions(-)
 
-diff --git a/drivers/mfd/ucb1x00-core.c b/drivers/mfd/ucb1x00-core.c
-index 9ab9ec47ea75..48bea5038654 100644
---- a/drivers/mfd/ucb1x00-core.c
-+++ b/drivers/mfd/ucb1x00-core.c
-@@ -446,10 +446,6 @@ static int ucb1x00_detect_irq(struct ucb1x00 *ucb)
- 	unsigned long mask;
+diff --git a/arch/arm/mach-pxa/include/mach/lubbock.h b/arch/arm/mach-pxa/include/mach/lubbock.h
+index 1eecf794acd2..9926a5d741f7 100644
+--- a/arch/arm/mach-pxa/include/mach/lubbock.h
++++ b/arch/arm/mach-pxa/include/mach/lubbock.h
+@@ -50,7 +50,3 @@
+ #define LUBBOCK_LAST_IRQ	LUBBOCK_IRQ(6)
  
- 	mask = probe_irq_on();
--	if (!mask) {
--		probe_irq_off(mask);
--		return NO_IRQ;
--	}
+ #define LUBBOCK_SA1111_IRQ_BASE	(LUBBOCK_NR_IRQS + 32)
+-
+-#ifndef __ASSEMBLY__
+-extern void lubbock_set_misc_wr(unsigned int mask, unsigned int set);
+-#endif
+diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
+index 8686c5d0dc3b..ffbab27cb581 100644
+--- a/arch/arm/mach-pxa/lubbock.c
++++ b/arch/arm/mach-pxa/lubbock.c
+@@ -119,12 +119,11 @@ void lubbock_set_hexled(uint32_t value)
  
- 	/*
- 	 * Enable the ADC interrupt.
+ static struct gpio_chip *lubbock_misc_wr_gc;
+ 
+-void lubbock_set_misc_wr(unsigned int mask, unsigned int set)
++static void lubbock_set_misc_wr(unsigned int mask, unsigned int set)
+ {
+ 	unsigned long m = mask, v = set;
+ 	lubbock_misc_wr_gc->set_multiple(lubbock_misc_wr_gc, &m, &v);
+ }
+-EXPORT_SYMBOL(lubbock_set_misc_wr);
+ 
+ static int lubbock_udc_is_connected(void)
+ {
 -- 
 2.1.0
