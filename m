@@ -1,52 +1,40 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 30 Aug 2016 17:40:38 +0100
-Subject: [PATCH v2 0/8] ARM: V7M: Support caches
-In-Reply-To: <20160818151113.GB1041@n2100.armlinux.org.uk>
-References: <1471524360-31554-1-git-send-email-vladimir.murzin@arm.com>
- <20160818145300.GA1041@n2100.armlinux.org.uk> <57B5CCDE.10504@arm.com>
- <20160818151113.GB1041@n2100.armlinux.org.uk>
-Message-ID: <57C5B706.2060500@arm.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 30 Aug 2016 18:42:03 +0200
+Subject: [PATCH 05/33] gpio: add generic single-register fixed-direction
+ GPIO driver
+In-Reply-To: <20160830091805.GL1041@n2100.armlinux.org.uk> (Russell King's
+ message of "Tue, 30 Aug 2016 10:18:06 +0100")
+References: <20160829102328.GA28796@n2100.armlinux.org.uk>
+ <E1beJjz-0000mA-0o@rmk-PC.armlinux.org.uk>
+ <87eg57e54l.fsf@belgarion.home>
+ <20160830091805.GL1041@n2100.armlinux.org.uk>
+Message-ID: <87k2eycip0.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/08/16 16:11, Russell King - ARM Linux wrote:
-> On Thu, Aug 18, 2016 at 03:57:34PM +0100, Vladimir Murzin wrote:
->> On 18/08/16 15:53, Russell King - ARM Linux wrote:
->>> On Thu, Aug 18, 2016 at 01:45:52PM +0100, Vladimir Murzin wrote:
->>>> This patch set allows M-class cpus benefit of optional cache support.
->>>> It originally was written by Jonny, I've been keeping it locally mainly
->>>> rebasing over Linux versions.
->>>>
->>>> The original idea behind patches was to reuse existing cache handling
->>>> code from v7A/R with help of extra macros to factor out cache handling
->>>> logic (v7M cache operations are provided via memory mapped interface
->>>> rather than co-processor instructions).
->>>> However, that idea was rejected and starting form this (v2) version
->>>> V7M cache logic lives into file and macros to indirect memory-mapped
->>>> operations stay there locally since they make it easier to follow the
->>>> code.
->>>>
->>>> Along with the v7M cache support the first user (Cortex-M7) is
->>>> introduced.
->>>>
->>>> Patches were tested on MPS2 platform with Cortex-M3/M4/M7. The later
->>>> one showed significant boot speed-up.
->>>
->>> >From a quick read through, the approach looks sane, and I think I'm
->>> now happy with these.
->>>
->>
->> Thanks!
->>
->> Is it acceptable if patches hang on a list for awhile, so people (I'm
->> looking at Alex and  Szemz?) can test them?
-> 
-> Of course.
-> 
+Russell King - ARM Linux <linux@armlinux.org.uk> writes:
 
-Russell, given that it was tested on platforms with and without cache
-support, I've just dropped this set into patch system. Please, let me
-know if you see issues with that.
+> On Mon, Aug 29, 2016 at 09:39:54PM +0200, Robert Jarzmik wrote:
+>> Maybe this one would deserve a doxygen comment ?
+>
+> Does this solve it?
+Oh yes, that's very nice, especially the "1 = in" for which I have always a
+doubt.
 
-Thanks
-Vladimir
+Reviewed-by: Robert Jarzmik <robert.jarzmik@free.fr>
+
+I hope to have an "attempt" to test all your series on the lubbock board in the
+next days. The "attempt" part is because last time I checked pcmcia support was
+broken on lubbock (ie. CONFIG_PCMCIA_SA1111 activated implies an Oops), and I
+don't remember having repaired it (and it's disabled on my test farm which is a
+sign I was not very confident about this part).
+
+If you happen to have somewhere a branch I can pull, with all your series (at
+least "[RFC PATCH 00/33] SA11x0/PXA GPIO rework (Core + PCMCIA only)" and
+"[PATCH 0/8] SA11x0/PXA remainder & cleanups"), that would spare me the multiple
+git-am to make the test(s).
+
+Cheers.
+
+--
+Robert
