@@ -1,27 +1,60 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 30 Aug 2016 16:35:32 +0530
-Subject: [RESEND PATCH v3 1/3] ARM: dts: DRA7: Add "linux,pci-domain"
- property for pci dt nodes
-In-Reply-To: <20160826153035.h6uyplc4mjlbc3v3@atomide.com>
-References: <1470832400-11929-1-git-send-email-kishon@ti.com>
- <1470832400-11929-2-git-send-email-kishon@ti.com>
- <20160826153035.h6uyplc4mjlbc3v3@atomide.com>
-Message-ID: <57C5687C.8030805@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 30 Aug 2016 12:07:36 +0100
+Subject: [PATCH] generic: Add the exception case checking routine for ppi
+ interrupt
+In-Reply-To: <57C5617B.6080801@huawei.com>
+References: <1472530639-21616-1-git-send-email-majun258@huawei.com>
+ <57C548D0.3090700@arm.com> <57C5617B.6080801@huawei.com>
+Message-ID: <57C568F8.20802@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
++Mark
 
-On Friday 26 August 2016 09:00 PM, Tony Lindgren wrote:
-> * Kishon Vijay Abraham I <kishon@ti.com> [160810 05:34]:
->> Since DRA7 has multiple PCIe Rootcomplex, add "linux,pci-domain"
->> property to assign a PCI domain number to each of the host
->> bridges.
+On 30/08/16 11:35, majun (F) wrote:
 > 
-> Is this patch safe to apply without the other changes?
+> 
+> ? 2016/8/30 16:50, Marc Zyngier ??:
+>> On 30/08/16 05:17, MaJun wrote:
+>>> From: Ma Jun <majun258@huawei.com>
+>>>
+>>> During system booting, if the interrupt which has no action registered
+>>> is triggered, it would cause system panic when try to access the
+>>> action member.
+>>
+>> And why would that interrupt be enabled? If you enable a PPI before
+>> registering a handler, you're doing something wrong.
+>>
+> 
+> Actually,the problem described above happened during the capture
+> kernel booting.
+> 
+> In my system, sometimes there is a pending physical timer
+> interrupt(30) when the first kernel panic and the status is kept
+> until the capture kernel booting.
 
-Yes. I verified pcie on dra7x by applying only this patch and it doesn't break
-anything.
+And that's perfectly fine. The interrupt can be pending forever, as it
+shouldn't get enabled.
 
-Thanks
-Kishon
+> So, this interrupt will be handled during capture kernel booting.
+
+Why? Who enables it?
+
+> 
+> Becasue we use virt timer interrupt but not physical timer interrupt
+> in capture kernel, the interrupt 30 has no action handler.
+
+Again: who enables this interrupt? Whichever driver enables it should be
+fixed.
+
+> Besides, I think we need to do exception check in this function just
+> like "handle_fasteoi_irq" does.
+
+I respectfully disagree. This will only hide a whole class of silly
+bugs, and I'd rather squash them instead of papering over them.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
