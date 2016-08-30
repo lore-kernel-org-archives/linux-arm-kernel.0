@@ -1,17 +1,17 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 30 Aug 2016 10:24:53 +0200
-Subject: [PATCH v2 07/10] reset: stm32: add driver Kconfig option
+Date: Tue, 30 Aug 2016 10:24:48 +0200
+Subject: [PATCH v2 02/10] reset: berlin: add driver Kconfig option
 In-Reply-To: <1472545496-14373-1-git-send-email-p.zabel@pengutronix.de>
 References: <1472545496-14373-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1472545496-14373-7-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1472545496-14373-2-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Visible only if COMPILE_TEST is enabled, this allows to include the
 driver in build tests.
 
-Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-Cc: Gabriel Fernandez <gabriel.fernandez@st.com>
+Cc: Antoine Tenart <antoine.tenart@free-electrons.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
@@ -20,37 +20,40 @@ Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
  2 files changed, 7 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-index fc0947f..afcbb99 100644
+index 9da0507..1194cbe 100644
 --- a/drivers/reset/Kconfig
 +++ b/drivers/reset/Kconfig
-@@ -54,6 +54,12 @@ config RESET_SOCFPGA
- 	help
- 	  This enables the reset controller driver for Altera SoCFPGAs.
+@@ -21,6 +21,12 @@ config RESET_ATH79
+ 	  This enables the ATH79 reset controller driver that supports the
+ 	  AR71xx SoC reset controller.
  
-+config RESET_STM32
-+	bool "STM32 Reset Driver" if COMPILE_TEST
-+	default ARCH_STM32
++config RESET_BERLIN
++	bool "Berlin Reset Driver" if COMPILE_TEST
++	default ARCH_BERLIN
 +	help
-+	  This enables the RCC reset controller driver for STM32 MCUs.
++	  This enables the reset controller driver for Marvell Berlin SoCs.
 +
- config TI_SYSCON_RESET
- 	tristate "TI SYSCON Reset Driver"
- 	depends on HAS_IOMEM
+ config RESET_OXNAS
+ 	bool
+ 
 diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index 61e4c64..6276f82 100644
+index e3fc337..34c0b23 100644
 --- a/drivers/reset/Makefile
 +++ b/drivers/reset/Makefile
-@@ -1,5 +1,4 @@
+@@ -1,7 +1,6 @@
  obj-y += core.o
--obj-$(CONFIG_ARCH_STM32) += reset-stm32.o
- obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
- obj-$(CONFIG_ARCH_STI) += sti/
+ obj-$(CONFIG_ARCH_LPC18XX) += reset-lpc18xx.o
+ obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
+-obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
+ obj-$(CONFIG_MACH_PISTACHIO) += reset-pistachio.o
+ obj-$(CONFIG_ARCH_MESON) += reset-meson.o
+ obj-$(CONFIG_ARCH_STM32) += reset-stm32.o
+@@ -10,6 +9,7 @@ obj-$(CONFIG_ARCH_STI) += sti/
  obj-$(CONFIG_ARCH_HISI) += hisilicon/
-@@ -11,5 +10,6 @@ obj-$(CONFIG_RESET_MESON) += reset-meson.o
+ obj-$(CONFIG_ARCH_ZYNQ) += reset-zynq.o
+ obj-$(CONFIG_RESET_ATH79) += reset-ath79.o
++obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
  obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
- obj-$(CONFIG_RESET_PISTACHIO) += reset-pistachio.o
- obj-$(CONFIG_RESET_SOCFPGA) += reset-socfpga.o
-+obj-$(CONFIG_RESET_STM32) += reset-stm32.o
  obj-$(CONFIG_TI_SYSCON_RESET) += reset-ti-syscon.o
  obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
 -- 
