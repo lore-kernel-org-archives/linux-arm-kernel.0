@@ -1,37 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 30 Aug 2016 14:53:56 +0200
-Subject: [PATCH] drm/sun4i: rgb: add missing calls to
- drm_panel_{prepare,unprepare}
-In-Reply-To: <20160830065500.31847-1-net147@gmail.com>
-References: <20160830065500.31847-1-net147@gmail.com>
-Message-ID: <20160830125356.GE18605@lukather>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 30 Aug 2016 13:54:20 +0100
+Subject: [PATCH v3] Added perf functionality to mmdc driver
+In-Reply-To: <20160830114329.GB8366@tiger>
+References: <20160817194253.16300-1-zhengyu.shen@nxp.com>
+ <CAHrpEqTtCnEU1v1sEuN8yJGPudDRZ5A79=Wn5Bp4SgTxDiNTQQ@mail.gmail.com>
+ <20160830114329.GB8366@tiger>
+Message-ID: <20160830125420.GG1223@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Aug 30, 2016 at 04:55:00PM +1000, Jonathan Liu wrote:
-> If the enable-gpios property of a simple panel in device tree is set,
-> the GPIO is not toggled on/off because of missing calls to
-> drm_panel_prepare and drm_panel_unprepare.
+On Tue, Aug 30, 2016 at 07:43:29PM +0800, Shawn Guo wrote:
+> On Mon, Aug 29, 2016 at 11:06:44AM -0500, Zhi Li wrote:
+> > On Wed, Aug 17, 2016 at 2:42 PM, Zhengyu Shen <zhengyu.shen@nxp.com> wrote:
+> > > MMDC is a multi-mode DDR controller that supports DDR3/DDR3L x16/x32/x64
+> > > and LPDDR2 two channel x16/x32 memory types. MMDC is configurable, high
+> > > performance, and optimized. MMDC is present on i.MX6 Quad and i.MX6
+> > > QuadPlus devices, but this driver only supports i.MX6 Quad at the moment.
+> > > MMDC provides registers for performance counters which read via this
+> > > driver to help debug memory throughput and similar issues.
+> > >
+> > > $ perf stat -a -e mmdc/busy-cycles/,mmdc/read-accesses/,mmdc/read-bytes/,mmdc/total-cycles/,mmdc/write-accesses/,mmdc/write-bytes/ dd if=/dev/zero of=/dev/null bs=1M count=5000
+> > > Performance counter stats for 'dd if=/dev/zero of=/dev/null bs=1M count=5000':
+> > >
+> > >          898021787      mmdc/busy-cycles/
+> > >           14819600      mmdc/read-accesses/
+> > >             471.30 MB   mmdc/read-bytes/
+> > >         2815419216      mmdc/total-cycles/
+> > >           13367354      mmdc/write-accesses/
+> > >             427.76 MB   mmdc/write-bytes/
+> > >
+> > >        5.334757334 seconds time elapsed
+> > >
+> > > Signed-off-by: Zhengyu Shen <zhengyu.shen@nxp.com>
+> > > Signed-off-by: Frank Li <frank.li@nxp.com>
+> > 
+> > Shawn Guo:
+> > 
+> >          No new comments got more than 1 weeks.
+> >          Did you plan accept it?
 > 
-> Signed-off-by: Jonathan Liu <net147@gmail.com>
+> @Mark, how do you think of this version?
 
-This was not applying properly, but I merged it.
+Sorry, I've been away for the last week and haven't had the chance to
+look at this yet. I will try to get round to it in the next few days.
 
-Please make sure that it applies on top of the current next branch.
+In the meantime, could you please try attacking this with Vince's perf
+fuzzer [1] (as root, or with perf_event_paranoid dropped to -1)? It's
+rather good at finding (subtle) issues in drivers.
 
-Good catch, thanks!
-Maxime
+Thanks,
+Mark.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160830/f006f93f/attachment.sig>
+[1] https://github.com/deater/perf_event_tests
