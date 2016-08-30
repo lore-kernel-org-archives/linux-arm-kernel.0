@@ -1,100 +1,69 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 30 Aug 2016 11:34:10 -0500
-Subject: [PATCH v24 9/9] Documentation: dt: chosen properties for arm64
- kdump
-In-Reply-To: <20160822042832.GJ20080@linaro.org>
-References: <20160809015248.28414-2-takahiro.akashi@linaro.org>
- <20160809015747.28591-1-takahiro.akashi@linaro.org>
- <20160819132641.GA12709@rob-hp-laptop>
- <20160822042832.GJ20080@linaro.org>
-Message-ID: <CAL_JsqJ5SqesEL5QWX_NJj+gL2jpne4NN_WzADiH+1VB7CkvOA@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 30 Aug 2016 17:39:20 +0100
+Subject: [PATCH v2 0/8] ARM: V7M: Support caches
+In-Reply-To: <8a0c4963-4f22-9914-b2c8-046bba8b9764@st.com>
+References: <1471524360-31554-1-git-send-email-vladimir.murzin@arm.com>
+ <20160818145300.GA1041@n2100.armlinux.org.uk> <57B5CCDE.10504@arm.com>
+ <8a0c4963-4f22-9914-b2c8-046bba8b9764@st.com>
+Message-ID: <57C5B6B8.7020203@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 21, 2016 at 11:28 PM, AKASHI Takahiro
-<takahiro.akashi@linaro.org> wrote:
-> Rob,
-> [Cc: Mark]
->
-> On Fri, Aug 19, 2016 at 08:26:41AM -0500, Rob Herring wrote:
->> On Tue, Aug 09, 2016 at 10:57:47AM +0900, AKASHI Takahiro wrote:
->> > From: James Morse <james.morse@arm.com>
->> >
->> > Add documentation for
->> >     linux,crashkernel-base and crashkernel-size,
->> >     linux,usable-memory-range, and
->> >     linux,elfcorehdr
->> > used by arm64 kexec/kdump to decribe the kdump reserved area, and
->> > the elfcorehdr's location within it.
->> >
->> > Signed-off-by: James Morse <james.morse@arm.com>
->> > [takahiro.akashi at linaro.org:
->> >     renamed "usable-memory" to "usable-memory-range",
->> >     added "linux,crashkernel-base" and "-size" ]
->> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> > ---
->> >  Documentation/devicetree/bindings/chosen.txt | 50 ++++++++++++++++++++++++++++
->> >  1 file changed, 50 insertions(+)
->> >
->> > diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
->> > index 6ae9d82..236188a 100644
->> > --- a/Documentation/devicetree/bindings/chosen.txt
->> > +++ b/Documentation/devicetree/bindings/chosen.txt
->> > @@ -52,3 +52,53 @@ This property is set (currently only on PowerPC, and only needed on
->> >  book3e) by some versions of kexec-tools to tell the new kernel that it
->> >  is being booted by kexec, as the booting environment may differ (e.g.
->> >  a different secondary CPU release mechanism)
->> > +
->> > +linux,crashkernel-base
->> > +linux,crashkernel-size
->> > +----------------------
->> > +These properties (currently used on PowerPC and arm64) indicates
->> > +the base address and the size, respectively, of the reserved memory
->> > +range for crash dump kernel.
->> > +e.g.
->> > +
->> > +/ {
->> > +   chosen {
->> > +           linux,crashkernel-base = <0x9 0xf0000000>;
->> > +           linux,crashkernel-size = <0x0 0x10000000>;
->> > +   };
->> > +};
->> > +
->> > +linux,usable-memory-range
->> > +-------------------------
->> > +
->> > +This property (currently used only on arm64) holds the memory range,
->> > +the base address and the size, which can be used as system ram on
->> > +the *current* kernel. Note that, if this property is present, any memory
->> > +regions under "memory" nodes in DT blob or ones marked as "conventional
->> > +memory" in EFI memory map should be ignored.
->> > +e.g.
->> > +
->> > +/ {
->> > +   chosen {
->> > +           linux,usable-memory-range = <0x9 0xf0000000 0x0 0x10000000>;
->> > +   };
->> > +};
+Hi Alex,
+
+On 30/08/16 16:47, Alexandre Torgue wrote:
+> Hi Vladimir,
+> 
+> On 08/18/2016 04:57 PM, Vladimir Murzin wrote:
+>> On 18/08/16 15:53, Russell King - ARM Linux wrote:
+>>> On Thu, Aug 18, 2016 at 01:45:52PM +0100, Vladimir Murzin wrote:
+>>>> This patch set allows M-class cpus benefit of optional cache support.
+>>>> It originally was written by Jonny, I've been keeping it locally mainly
+>>>> rebasing over Linux versions.
+>>>>
+>>>> The original idea behind patches was to reuse existing cache handling
+>>>> code from v7A/R with help of extra macros to factor out cache handling
+>>>> logic (v7M cache operations are provided via memory mapped interface
+>>>> rather than co-processor instructions).
+>>>> However, that idea was rejected and starting form this (v2) version
+>>>> V7M cache logic lives into file and macros to indirect memory-mapped
+>>>> operations stay there locally since they make it easier to follow the
+>>>> code.
+>>>>
+>>>> Along with the v7M cache support the first user (Cortex-M7) is
+>>>> introduced.
+>>>>
+>>>> Patches were tested on MPS2 platform with Cortex-M3/M4/M7. The later
+>>>> one showed significant boot speed-up.
+>>>
+>>> >From a quick read through, the approach looks sane, and I think I'm
+>>> now happy with these.
+>>>
 >>
->> I've read the discussion on this. I think you should use the existing
->> linux,usable-memory property in the memory nodes. If UEFI systems don't
->> have memory nodes, then you can find an UEFI way to describe this. DT is
->> not the dumping ground for what doesn't fit in UEFI. How do x86 systems
->> work?
->
-> Kdump for x86 passes the range of usable memory to crash dump kernel
-> either via:
-> (a) "memmap=nn at ss" command line parameter, or
-> (b) faked BIOS e820 map (a sort of memory map table)
->
-> (a) was rejected by Mark [1], and (b) is x86-specific.
->
-> I believe that my approach is better because it works in the same way
-> either on UEFI systems or DT-based systems.
+>> Thanks!
+>>
+>> Is it acceptable if patches hang on a list for awhile, so people (I'm
+>> looking at Alex and  Szemz?) can test them?
+> 
+> I just tested this v2 patch set. I don't see behavior issues.
+> You can add:
+> Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
+> 
 
-So we have a new way for both UEFI and DT. If UEFI folks can't come up
-with a standard way to do things in the UEFI standard, then we just
-dump them into DT? I'd rather see alignment with existing DT systems
-(PPC) and in particular the tools.
+Thanks a lot for testing, Alex!
 
-Rob
+Cheers
+Vladimir
+
+> Regards
+> 
+> Alex
+> 
+>>
+>> Vladimir
+>>
+>>> Thanks.
+>>>
+>>
+> 
+> 
