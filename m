@@ -1,287 +1,184 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 29 Aug 2016 20:25:28 -0700
-Subject: [PATCH v3 1/2] input: misc: Add generic input driver to read
- encoded GPIO lines
-In-Reply-To: <a41d31b7-9d7a-0d94-a045-1e2285064040@ti.com>
-References: <20160824075859.30979-1-vigneshr@ti.com>
- <20160824075859.30979-2-vigneshr@ti.com>
- <20160825165631.GE11206@dtor-ws>
- <a41d31b7-9d7a-0d94-a045-1e2285064040@ti.com>
-Message-ID: <20160830032528.GB2150@dtor-ws>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon, 29 Aug 2016 22:51:14 -0500
+Subject: [PATCH v2] arm64: KVM: Save four instructions in __guest_enter/exit()
+Message-ID: <1472529074-19261-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 09:50:28AM +0530, Vignesh R wrote:
-> 
-> 
-> On Thursday 25 August 2016 10:26 PM, Dmitry Torokhov wrote:
-> > On Wed, Aug 24, 2016 at 01:28:58PM +0530, Vignesh R wrote:
-> >> Add a driver to read group of GPIO lines and provide its status as a
-> >> numerical value as input event to the system. This will help in
-> >> interfacing devices, that can be connected over GPIOs, that provide
-> >> input to the system by driving GPIO lines connected to them like a
-> >> rotary dial or a switch.
-> >>
-> >> For example, a rotary switch can be connected to four GPIO lines. The
-> >> status of the GPIO lines reflect the actual position of the rotary
-> >> switch dial. For example, if dial points to 9, then the four GPIO lines
-> >> connected to the switch will read HLLH(0b'1001 = 9). This value
-> >> can be reported as an ABS_* event to the input subsystem.
-> >>
-> >> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> >> Acked-by: Rob Herring <robh@kernel.org>
-> >> ---
-> >>
-> >> v3: Fix comments by Andrew and Dmitry
-> >> Link to v2: https://lkml.org/lkml/2016/8/23/79
-> >>
-> >>  .../devicetree/bindings/input/gpio-decoder.txt     |  23 ++++
-> >>  drivers/input/misc/Kconfig                         |  12 ++
-> >>  drivers/input/misc/Makefile                        |   1 +
-> >>  drivers/input/misc/gpio_decoder.c                  | 134 +++++++++++++++++++++
-> >>  4 files changed, 170 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/input/gpio-decoder.txt
-> >>  create mode 100644 drivers/input/misc/gpio_decoder.c
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/input/gpio-decoder.txt b/Documentation/devicetree/bindings/input/gpio-decoder.txt
-> >> new file mode 100644
-> >> index 000000000000..14a77fb96cf0
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/input/gpio-decoder.txt
-> >> @@ -0,0 +1,23 @@
-> >> +* GPIO Decoder DT bindings
-> >> +
-> >> +Required Properties:
-> >> +- compatible: should be "gpio-decoder"
-> >> +- gpios: a spec of gpios (at least two) to be decoded to a number with
-> >> +  first entry representing the MSB.
-> >> +
-> >> +Optional Properties:
-> >> +- decoder-max-value: Maximum possible value that can be reported by
-> >> +  the gpios.
-> >> +- linux,axis: the input subsystem axis to map to (ABS_X/ABS_Y).
-> >> +  Defaults to 0 (ABS_X).
-> >> +
-> >> +Example:
-> >> +	gpio-decoder0 {
-> >> +		compatible = "gpio-decoder";
-> >> +		gpios = <&pca9536 3 GPIO_ACTIVE_HIGH>,
-> >> +			<&pca9536 2 GPIO_ACTIVE_HIGH>,
-> >> +			<&pca9536 1 GPIO_ACTIVE_HIGH>,
-> >> +			<&pca9536 0 GPIO_ACTIVE_HIGH>;
-> >> +		linux,axis = <0>; /* ABS_X */
-> >> +		decoder-max-value = <9>;
-> >> +	};
-> >> diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
-> >> index efb0ca871327..7cdb89397d18 100644
-> >> --- a/drivers/input/misc/Kconfig
-> >> +++ b/drivers/input/misc/Kconfig
-> >> @@ -292,6 +292,18 @@ config INPUT_GPIO_TILT_POLLED
-> >>  	  To compile this driver as a module, choose M here: the
-> >>  	  module will be called gpio_tilt_polled.
-> >>  
-> >> +config INPUT_GPIO_DECODER
-> >> +	tristate "Polled GPIO Decoder Input driver"
-> >> +	depends on GPIOLIB || COMPILE_TEST
-> >> +	select INPUT_POLLDEV
-> >> +	help
-> >> +	 Say Y here if you want driver to read status of multiple GPIO
-> >> +	 lines and report the encoded value as an absolute integer to
-> >> +	 input subsystem.
-> >> +
-> >> +	 To compile this driver as a module, choose M here: the module
-> >> +	 will be called gpio_decoder.
-> >> +
-> >>  config INPUT_IXP4XX_BEEPER
-> >>  	tristate "IXP4XX Beeper support"
-> >>  	depends on ARCH_IXP4XX
-> >> diff --git a/drivers/input/misc/Makefile b/drivers/input/misc/Makefile
-> >> index 6a1e5e20fc1c..0b6d025f0487 100644
-> >> --- a/drivers/input/misc/Makefile
-> >> +++ b/drivers/input/misc/Makefile
-> >> @@ -35,6 +35,7 @@ obj-$(CONFIG_INPUT_DRV2667_HAPTICS)	+= drv2667.o
-> >>  obj-$(CONFIG_INPUT_GP2A)		+= gp2ap002a00f.o
-> >>  obj-$(CONFIG_INPUT_GPIO_BEEPER)		+= gpio-beeper.o
-> >>  obj-$(CONFIG_INPUT_GPIO_TILT_POLLED)	+= gpio_tilt_polled.o
-> >> +obj-$(CONFIG_INPUT_GPIO_DECODER)	+= gpio_decoder.o
-> >>  obj-$(CONFIG_INPUT_HISI_POWERKEY)	+= hisi_powerkey.o
-> >>  obj-$(CONFIG_HP_SDC_RTC)		+= hp_sdc_rtc.o
-> >>  obj-$(CONFIG_INPUT_IMS_PCU)		+= ims-pcu.o
-> >> diff --git a/drivers/input/misc/gpio_decoder.c b/drivers/input/misc/gpio_decoder.c
-> >> new file mode 100644
-> >> index 000000000000..1c2191d4b143
-> >> --- /dev/null
-> >> +++ b/drivers/input/misc/gpio_decoder.c
-> >> @@ -0,0 +1,134 @@
-> >> +/*
-> >> + * Copyright (C) 2016 Texas Instruments Incorporated - http://www.ti.com/
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or
-> >> + * modify it under the terms of the GNU General Public License as
-> >> + * published by the Free Software Foundation version 2.
-> >> + *
-> >> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> >> + * kind, whether express or implied; without even the implied warranty
-> >> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> + * GNU General Public License for more details.
-> >> + *
-> >> + * A generic driver to read multiple gpio lines and translate the
-> >> + * encoded numeric value into an input event.
-> >> + */
-> >> +
-> >> +#include <linux/device.h>
-> >> +#include <linux/gpio/consumer.h>
-> >> +#include <linux/input.h>
-> >> +#include <linux/input-polldev.h>
-> >> +#include <linux/kernel.h>
-> >> +#include <linux/module.h>
-> >> +#include <linux/of.h>
-> >> +#include <linux/platform_device.h>
-> >> +
-> >> +struct gpio_decoder {
-> >> +	struct input_polled_dev *poll_dev;
-> >> +	struct gpio_descs *input_gpios;
-> >> +	struct device *dev;
-> >> +	u32 axis;
-> >> +	u32 last_stable;
-> >> +};
-> >> +
-> >> +static unsigned int gpio_decoder_get_gpios_state(struct gpio_decoder
-> >> +						 *decoder)
-> >> +{
-> >> +	struct gpio_descs *gpios = decoder->input_gpios;
-> >> +	unsigned int ret = 0;
-> >> +	int i, val;
-> >> +
-> >> +	for (i = 0; i < gpios->ndescs; i++) {
-> >> +		val = gpiod_get_value_cansleep(gpios->desc[i]);
-> >> +		if (val >= 0) {
-> >> +			ret = (ret << 1) | !!val;
-> >> +		} else {
-> >> +			dev_err(decoder->dev, "Error reading gpio\n");
-> >> +			break;
-> > 
-> > I think if we fail reading any one of gpio lines we should skip
-> > reporting the event.
-> > 
-> 
-> Ok.
-> 
-> >> +		}
-> >> +	}
-> >> +
-> >> +	return ret;
-> >> +}
-> >> +
-> >> +static void gpio_decoder_poll_gpios(struct input_polled_dev *poll_dev)
-> >> +{
-> >> +	struct gpio_decoder *decoder = poll_dev->private;
-> >> +	unsigned int state = gpio_decoder_get_gpios_state(decoder);
-> >> +
-> >> +	if (state != decoder->last_stable) {
-> >> +		input_report_abs(poll_dev->input, decoder->axis, state);
-> >> +		input_sync(poll_dev->input);
-> >> +		decoder->last_stable = state;
-> >> +	}
-> >> +}
-> >> +
-> >> +static int gpio_decoder_probe(struct platform_device *pdev)
-> >> +{
-> >> +	struct device *dev = &pdev->dev;
-> >> +	struct gpio_decoder *decoder;
-> >> +	struct input_polled_dev *poll_dev;
-> >> +	u32  max;
-> >> +	int err;
-> >> +
-> >> +	decoder = devm_kzalloc(dev, sizeof(struct gpio_decoder), GFP_KERNEL);
-> >> +	if (!decoder)
-> >> +		return -ENOMEM;
-> >> +
-> >> +	device_property_read_u32(dev, "linux,axis", &decoder->axis);
-> >> +	decoder->input_gpios = devm_gpiod_get_array(dev, NULL, GPIOD_IN);
-> >> +	if (IS_ERR(decoder->input_gpios)) {
-> >> +		dev_err(dev, "unable to acquire input gpios\n");
-> >> +		return PTR_ERR(decoder->input_gpios);
-> >> +	}
-> >> +	if (decoder->input_gpios->ndescs < 2) {
-> >> +		dev_err(dev, "not enough gpios found\n");
-> >> +		return -EINVAL;
-> >> +	}
-> >> +
-> >> +	if (device_property_read_u32(dev, "decoder-max-value", &max))
-> >> +		max = BIT(decoder->input_gpios->ndescs);
-> > 
-> > Shouldn't this be
-> > 
-> > 		max = (1U << decoder->input_gpios->ndescs) - 1;
-> > 
-> > ?
-> 
-> Oops, you are right.
-> 
-> > 
-> >> +
-> >> +	decoder->dev = dev;
-> >> +	poll_dev = devm_input_allocate_polled_device(decoder->dev);
-> >> +	if (!poll_dev)
-> >> +		return -ENOMEM;
-> >> +
-> >> +	poll_dev->private = decoder;
-> >> +	poll_dev->poll = gpio_decoder_poll_gpios;
-> >> +	decoder->poll_dev = poll_dev;
-> >> +
-> >> +	poll_dev->input->name = pdev->name;
-> >> +	poll_dev->input->id.bustype = BUS_HOST;
-> >> +	input_set_abs_params(poll_dev->input, decoder->axis, 0, max, 0, 1);
-> > 
-> > Why do you need flat == 1? Do you actually use joydev for this device?
-> > 
-> 
-> Sorry, I overlooked flat param when I copied this line from
-> rotary-encoder.c.
-> 
-> >> +
-> >> +	err = input_register_polled_device(poll_dev);
-> >> +	if (err) {
-> >> +		dev_err(dev, "failed to register polled  device\n");
-> >> +		return err;
-> >> +	}
-> >> +	platform_set_drvdata(pdev, decoder);
-> >> +
-> >> +	return 0;
-> >> +}
-> >> +
-> >> +#ifdef CONFIG_OF
-> >> +static const struct of_device_id gpio_decoder_of_match[] = {
-> >> +	{ .compatible = "gpio-decoder", },
-> >> +	{ },
-> >> +};
-> >> +MODULE_DEVICE_TABLE(of, gpio_decoder_of_match);
-> >> +#endif
-> >> +
-> >> +static struct platform_driver gpio_decoder_driver = {
-> >> +	.probe		= gpio_decoder_probe,
-> >> +	.driver		= {
-> >> +		.name	= "gpio-decoder",
-> >> +		.of_match_table = of_match_ptr(gpio_decoder_of_match),
-> >> +	}
-> >> +};
-> >> +module_platform_driver(gpio_decoder_driver);
-> >> +
-> >> +MODULE_DESCRIPTION("GPIO decoder input driver");
-> >> +MODULE_AUTHOR("Vignesh R <vigneshr@ti.com>");
-> >> +MODULE_LICENSE("GPL v2");
-> >> -- 
-> >> 2.9.2
-> >>
-> > 
-> > No need to resubmit, I can adjust on my side.
-> 
-> Thanks a lot!
+We are doing an unnecessary stack push/pop operation when restoring
+the guest registers x0-x18 in __guest_enter(). This patch saves the
+two instructions by using x18 as a base register. No need to store
+the vcpu context pointer in stack because it is redundant, the same
+information is available in tpidr_el2. The function __guest_exit()
+prototype is simplified and caller pushes the regs x0-x1 to stack
+instead of regs x0-x3.
 
-Applied, thank you.
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+Changes since v1:
+  Incorporated Cristoffer suggestions.
+  __guest_exit prototype is changed to 'void __guest_exit(u64 reason, struct kvm_vcpu *vcpu)'.
 
-DTS change should go through some other tree though.
+ arch/arm64/kvm/hyp/entry.S     | 101 +++++++++++++++++++++--------------------
+ arch/arm64/kvm/hyp/hyp-entry.S |  11 +++--
+ 2 files changed, 57 insertions(+), 55 deletions(-)
 
+diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+index ce9e5e5..f70489a 100644
+--- a/arch/arm64/kvm/hyp/entry.S
++++ b/arch/arm64/kvm/hyp/entry.S
+@@ -55,75 +55,76 @@
+  */
+ ENTRY(__guest_enter)
+ 	// x0: vcpu
+-	// x1: host/guest context
+-	// x2-x18: clobbered by macros
++	// x1: host context
++	// x2-x17: clobbered by macros
++	// x18: guest context
+ 
+ 	// Store the host regs
+ 	save_callee_saved_regs x1
+ 
+-	// Preserve vcpu & host_ctxt for use at exit time
+-	stp	x0, x1, [sp, #-16]!
++	// Store the host_ctxt for use at exit time
++	str	x1, [sp, #-16]!
+ 
+-	add	x1, x0, #VCPU_CONTEXT
++	add	x18, x0, #VCPU_CONTEXT
+ 
+-	// Prepare x0-x1 for later restore by pushing them onto the stack
+-	ldp	x2, x3, [x1, #CPU_XREG_OFFSET(0)]
+-	stp	x2, x3, [sp, #-16]!
++	// Restore guest regs x0-x17
++	ldp	x0, x1,   [x18, #CPU_XREG_OFFSET(0)]
++	ldp	x2, x3,   [x18, #CPU_XREG_OFFSET(2)]
++	ldp	x4, x5,   [x18, #CPU_XREG_OFFSET(4)]
++	ldp	x6, x7,   [x18, #CPU_XREG_OFFSET(6)]
++	ldp	x8, x9,   [x18, #CPU_XREG_OFFSET(8)]
++	ldp	x10, x11, [x18, #CPU_XREG_OFFSET(10)]
++	ldp	x12, x13, [x18, #CPU_XREG_OFFSET(12)]
++	ldp	x14, x15, [x18, #CPU_XREG_OFFSET(14)]
++	ldp	x16, x17, [x18, #CPU_XREG_OFFSET(16)]
+ 
+-	// x2-x18
+-	ldp	x2, x3,   [x1, #CPU_XREG_OFFSET(2)]
+-	ldp	x4, x5,   [x1, #CPU_XREG_OFFSET(4)]
+-	ldp	x6, x7,   [x1, #CPU_XREG_OFFSET(6)]
+-	ldp	x8, x9,   [x1, #CPU_XREG_OFFSET(8)]
+-	ldp	x10, x11, [x1, #CPU_XREG_OFFSET(10)]
+-	ldp	x12, x13, [x1, #CPU_XREG_OFFSET(12)]
+-	ldp	x14, x15, [x1, #CPU_XREG_OFFSET(14)]
+-	ldp	x16, x17, [x1, #CPU_XREG_OFFSET(16)]
+-	ldr	x18,      [x1, #CPU_XREG_OFFSET(18)]
++	// Restore guest regs x19-x29, lr
++	restore_callee_saved_regs x18
+ 
+-	// x19-x29, lr
+-	restore_callee_saved_regs x1
+-
+-	// Last bits of the 64bit state
+-	ldp	x0, x1, [sp], #16
++	// Restore guest reg x18
++	ldr	x18,      [x18, #CPU_XREG_OFFSET(18)]
+ 
+ 	// Do not touch any register after this!
+ 	eret
+ ENDPROC(__guest_enter)
+ 
++/*
++ * void __guest_exit(u64 exit_reason, struct kvm_vcpu *vcpu);
++ */
+ ENTRY(__guest_exit)
+-	// x0: vcpu
+-	// x1: return code
+-	// x2-x3: free
+-	// x4-x29,lr: vcpu regs
+-	// vcpu x0-x3 on the stack
+-
+-	add	x2, x0, #VCPU_CONTEXT
+-
+-	stp	x4, x5,   [x2, #CPU_XREG_OFFSET(4)]
+-	stp	x6, x7,   [x2, #CPU_XREG_OFFSET(6)]
+-	stp	x8, x9,   [x2, #CPU_XREG_OFFSET(8)]
+-	stp	x10, x11, [x2, #CPU_XREG_OFFSET(10)]
+-	stp	x12, x13, [x2, #CPU_XREG_OFFSET(12)]
+-	stp	x14, x15, [x2, #CPU_XREG_OFFSET(14)]
+-	stp	x16, x17, [x2, #CPU_XREG_OFFSET(16)]
+-	str	x18,      [x2, #CPU_XREG_OFFSET(18)]
+-
+-	ldp	x6, x7, [sp], #16	// x2, x3
+-	ldp	x4, x5, [sp], #16	// x0, x1
+-
+-	stp	x4, x5, [x2, #CPU_XREG_OFFSET(0)]
+-	stp	x6, x7, [x2, #CPU_XREG_OFFSET(2)]
++	// x0: return code
++	// x1: vcpu
++	// x2-x29,lr: vcpu regs
++	// vcpu x0-x1 on the stack
++
++	add	x1, x1, #VCPU_CONTEXT
++
++	// Store the guest regs x2 and x3
++	stp	x2, x3,   [x1, #CPU_XREG_OFFSET(2)]
++
++	// Retrieve the guest regs x0-x1 from the stack
++	ldp	x2, x3, [sp], #16	// x0, x1
++
++	// Store the guest regs x0-x1 and x4-x18
++	stp	x2, x3,   [x1, #CPU_XREG_OFFSET(0)]
++	stp	x4, x5,   [x1, #CPU_XREG_OFFSET(4)]
++	stp	x6, x7,   [x1, #CPU_XREG_OFFSET(6)]
++	stp	x8, x9,   [x1, #CPU_XREG_OFFSET(8)]
++	stp	x10, x11, [x1, #CPU_XREG_OFFSET(10)]
++	stp	x12, x13, [x1, #CPU_XREG_OFFSET(12)]
++	stp	x14, x15, [x1, #CPU_XREG_OFFSET(14)]
++	stp	x16, x17, [x1, #CPU_XREG_OFFSET(16)]
++	str	x18,      [x1, #CPU_XREG_OFFSET(18)]
++
++	// Store the guest regs x19-x29, lr
++	save_callee_saved_regs x1
+ 
+-	save_callee_saved_regs x2
++	// Restore the host_ctxt from the stack
++	ldr	x2, [sp], #16
+ 
+-	// Restore vcpu & host_ctxt from the stack
+-	// (preserving return code in x1)
+-	ldp	x0, x2, [sp], #16
+ 	// Now restore the host regs
+ 	restore_callee_saved_regs x2
+ 
+-	mov	x0, x1
+ 	ret
+ ENDPROC(__guest_exit)
+ 
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index f6d9694..06e8b3b 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -121,14 +121,15 @@ el1_trap:
+ 	cmp	x2, #ESR_ELx_EC_FP_ASIMD
+ 	b.eq	__fpsimd_guest_restore
+ 
+-	mrs	x0, tpidr_el2
+-	mov	x1, #ARM_EXCEPTION_TRAP
++	ldp     x2, x3, [sp], #16
++	mrs	x1, tpidr_el2
++	mov	x0, #ARM_EXCEPTION_TRAP
+ 	b	__guest_exit
+ 
+ el1_irq:
+-	save_x0_to_x3
+-	mrs	x0, tpidr_el2
+-	mov	x1, #ARM_EXCEPTION_IRQ
++	stp     x0, x1, [sp, #-16]!
++	mrs	x1, tpidr_el2
++	mov	x0, #ARM_EXCEPTION_IRQ
+ 	b	__guest_exit
+ 
+ ENTRY(__hyp_do_panic)
 -- 
-Dmitry
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
