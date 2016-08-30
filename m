@@ -1,57 +1,50 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 30 Aug 2016 10:24:51 +0200
-Subject: [PATCH v2 05/10] reset: pistachio: add driver Kconfig option
-In-Reply-To: <1472545496-14373-1-git-send-email-p.zabel@pengutronix.de>
-References: <1472545496-14373-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1472545496-14373-5-git-send-email-p.zabel@pengutronix.de>
+Date: Tue, 30 Aug 2016 10:24:47 +0200
+Subject: [PATCH v2 01/10] reset: ath79: add driver Kconfig option
+Message-ID: <1472545496-14373-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Visible only if COMPILE_TEST is enabled, this allows to include the
 driver in build tests.
 
-Cc: Damien Horsley <Damien.Horsley@imgtec.com>
-Acked-by: James Hartley <james.hartley@imgtec.com>
+Acked-by: Aban Bedel <albeu@free.fr>
 Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- drivers/reset/Kconfig  | 6 ++++++
+ drivers/reset/Kconfig  | 7 +++++++
  drivers/reset/Makefile | 2 +-
- 2 files changed, 7 insertions(+), 1 deletion(-)
+ 2 files changed, 8 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-index 3fa6afe..8bb1d87 100644
+index 7dfe8d8..9da0507 100644
 --- a/drivers/reset/Kconfig
 +++ b/drivers/reset/Kconfig
-@@ -42,6 +42,12 @@ config RESET_MESON
+@@ -14,6 +14,13 @@ menuconfig RESET_CONTROLLER
+ 
+ if RESET_CONTROLLER
+ 
++config RESET_ATH79
++	bool "AR71xx Reset Driver" if COMPILE_TEST
++	default ATH79
++	help
++	  This enables the ATH79 reset controller driver that supports the
++	  AR71xx SoC reset controller.
++
  config RESET_OXNAS
  	bool
  
-+config RESET_PISTACHIO
-+	bool "Pistachio Reset Driver" if COMPILE_TEST
-+	default MACH_PISTACHIO
-+	help
-+	  This enables the reset driver for ImgTec Pistachio SoCs.
-+
- config TI_SYSCON_RESET
- 	tristate "TI SYSCON Reset Driver"
- 	depends on HAS_IOMEM
 diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index 1408cba..c796a14 100644
+index 9b45dcf..e3fc337 100644
 --- a/drivers/reset/Makefile
 +++ b/drivers/reset/Makefile
-@@ -1,6 +1,5 @@
- obj-y += core.o
- obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
--obj-$(CONFIG_MACH_PISTACHIO) += reset-pistachio.o
- obj-$(CONFIG_ARCH_STM32) += reset-stm32.o
- obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
+@@ -9,7 +9,7 @@ obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
  obj-$(CONFIG_ARCH_STI) += sti/
-@@ -11,5 +10,6 @@ obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
- obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
- obj-$(CONFIG_RESET_MESON) += reset-meson.o
+ obj-$(CONFIG_ARCH_HISI) += hisilicon/
+ obj-$(CONFIG_ARCH_ZYNQ) += reset-zynq.o
+-obj-$(CONFIG_ATH79) += reset-ath79.o
++obj-$(CONFIG_RESET_ATH79) += reset-ath79.o
  obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
-+obj-$(CONFIG_RESET_PISTACHIO) += reset-pistachio.o
  obj-$(CONFIG_TI_SYSCON_RESET) += reset-ti-syscon.o
  obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
 -- 
