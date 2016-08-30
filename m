@@ -1,94 +1,89 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 30 Aug 2016 15:26:38 +0100
-Subject: [PATCH v2 7/9] arm64: kernel: drop use of x24 from primary boot
- path
-In-Reply-To: <1472049366-10922-8-git-send-email-ard.biesheuvel@linaro.org>
-References: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
- <1472049366-10922-8-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160830142637.GJ1223@leverpostej>
+From: mmarek@suse.com (Michal Marek)
+Date: Tue, 30 Aug 2016 16:28:49 +0200
+Subject: [PATCH v2] arm64: Set UTS_MACHINE in the Makefile
+In-Reply-To: <a2518725-e0ed-06de-ee1b-bcc70c455263@suse.com>
+References: <a2518725-e0ed-06de-ee1b-bcc70c455263@suse.com>
+Message-ID: <1472567329-10254-1-git-send-email-mmarek@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 04:36:04PM +0200, Ard Biesheuvel wrote:
-> Keeping __PHYS_OFFSET in x24 is actually less clear than simply taking
-> the value of __PHYS_OFFSET using an adrp instruction in the three places
-> that we need it. So change that.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+UTS_MACHINE is set to the kbuild architecture name by the main Makefile,
+and optionally adjusted by the arch Makefiles, so that it holds the
+architecture name as presented to userspace (uname -m). In particular,
+the make rpm target relies on proper UTS_MACHINE definition. Do the same
+in the arm64 Makefile and also, use the variable in
+arch/arm64/kernel/setup.c, so that it's not accidentally removed in the
+future. Meanwhile, the make deb-pkg target adapted to the wrong
+UTS_MACHINE definition, fix that as well.
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Reported-and-tested-by: Fabian Vogt <fvogt@suse.com>
+Signed-off-by: Michal Marek <mmarek@suse.com>
+---
 
-Mark.
+v2: Explain the problem more in the changelog and also fix make deb-pkg
+    (thanks to Will Deacon)
 
-> ---
->  arch/arm64/kernel/head.S | 20 ++++++++++++--------
->  1 file changed, 12 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index c112c153821e..27f51272de68 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -211,8 +211,8 @@ efi_header_end:
->  ENTRY(stext)
->  	bl	preserve_boot_args
->  	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
-> -	adrp	x24, __PHYS_OFFSET
-> -	and	x23, x24, MIN_KIMG_ALIGN - 1	// KASLR offset, defaults to 0
-> +	adrp	x23, __PHYS_OFFSET
-> +	and	x23, x23, MIN_KIMG_ALIGN - 1	// KASLR offset, defaults to 0
->  	bl	set_cpu_boot_mode_flag
->  	bl	__create_page_tables
->  	/*
-> @@ -412,6 +412,8 @@ ENDPROC(__create_page_tables)
->  
->  /*
->   * The following fragment of code is executed with the MMU enabled.
-> + *
-> + *   x0 = __PHYS_OFFSET
->   */
->  	.set	initial_sp, init_thread_union + THREAD_START_SP
->  __primary_switched:
-> @@ -420,6 +422,12 @@ __primary_switched:
->  	msr	vbar_el1, x8			// vector table address
->  	isb
->  
-> +	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
-> +
-> +	ldr_l	x4, kimage_vaddr		// Save the offset between
-> +	sub	x4, x4, x0			// the kernel virtual and
-> +	str_l	x4, kimage_voffset, x5		// physical mappings
-> +
->  	// Clear BSS
->  	adr_l	x0, __bss_start
->  	mov	x1, xzr
-> @@ -432,12 +440,6 @@ __primary_switched:
->  	mov	x4, sp
->  	and	x4, x4, #~(THREAD_SIZE - 1)
->  	msr	sp_el0, x4			// Save thread_info
-> -	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
-> -
-> -	ldr_l	x4, kimage_vaddr		// Save the offset between
-> -	sub	x4, x4, x24			// the kernel virtual and
-> -	str_l	x4, kimage_voffset, x5		// physical mappings
-> -
->  	mov	x29, #0
->  #ifdef CONFIG_KASAN
->  	bl	kasan_early_init
-> @@ -792,6 +794,7 @@ __primary_switch:
->  	bl	__relocate_kernel
->  #ifdef CONFIG_RANDOMIZE_BASE
->  	ldr	x8, =__primary_switched
-> +	adrp	x0, __PHYS_OFFSET
->  	blr	x8
->  
->  	/*
-> @@ -813,5 +816,6 @@ __primary_switch:
->  #endif
->  #endif
->  	ldr	x8, =__primary_switched
-> +	adrp	x0, __PHYS_OFFSET
->  	br	x8
->  ENDPROC(__primary_switch)
-> -- 
-> 2.7.4
-> 
+ arch/arm64/Makefile        | 2 ++
+ arch/arm64/kernel/Makefile | 2 ++
+ arch/arm64/kernel/setup.c  | 2 +-
+ scripts/package/builddeb   | 2 +-
+ 4 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 5b54f8c021d8..ab3df36fdfbb 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -38,10 +38,12 @@ ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
+ KBUILD_CPPFLAGS	+= -mbig-endian
+ AS		+= -EB
+ LD		+= -EB
++UTS_MACHINE	:= aarch64_be
+ else
+ KBUILD_CPPFLAGS	+= -mlittle-endian
+ AS		+= -EL
+ LD		+= -EL
++UTS_MACHINE	:= aarch64
+ endif
+ 
+ CHECKFLAGS	+= -D__aarch64__
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 14f7b651c787..7d66bbaafc0c 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -10,6 +10,8 @@ CFLAGS_REMOVE_ftrace.o = -pg
+ CFLAGS_REMOVE_insn.o = -pg
+ CFLAGS_REMOVE_return_address.o = -pg
+ 
++CFLAGS_setup.o = -DUTS_MACHINE='"$(UTS_MACHINE)"'
++
+ # Object file lists.
+ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
+ 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 536dce22fe76..c5dd09778c75 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -228,7 +228,7 @@ void __init setup_arch(char **cmdline_p)
+ {
+ 	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
+ 
+-	sprintf(init_utsname()->machine, ELF_PLATFORM);
++	sprintf(init_utsname()->machine, UTS_MACHINE);
+ 	init_mm.start_code = (unsigned long) _text;
+ 	init_mm.end_code   = (unsigned long) _etext;
+ 	init_mm.end_data   = (unsigned long) _edata;
+diff --git a/scripts/package/builddeb b/scripts/package/builddeb
+index e1c09e2f9be7..b8900db5115a 100755
+--- a/scripts/package/builddeb
++++ b/scripts/package/builddeb
+@@ -51,7 +51,7 @@ set_debarch() {
+ 		debarch=hppa ;;
+ 	mips*)
+ 		debarch=mips$(grep -q CPU_LITTLE_ENDIAN=y $KCONFIG_CONFIG && echo el || true) ;;
+-	arm64)
++	aarch64*)
+ 		debarch=arm64 ;;
+ 	arm*)
+ 		if grep -q CONFIG_AEABI=y $KCONFIG_CONFIG; then
+-- 
+2.6.6
