@@ -1,72 +1,50 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 30 Aug 2016 19:20:55 +0200
-Subject: [RESEND PATCH, v5 4/5] usb: Add MediaTek USB3 DRD Driver
-In-Reply-To: <1472204307.27677.41.camel@mhfsdcap03>
-References: <1472094329-18466-1-git-send-email-chunfeng.yun@mediatek.com>
- <1472094329-18466-5-git-send-email-chunfeng.yun@mediatek.com>
- <1472113973.2877.22.camel@suse.com>
- <1472204307.27677.41.camel@mhfsdcap03>
-Message-ID: <20160830172055.GA29742@kroah.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 30 Aug 2016 18:27:10 +0100
+Subject: [PATCH] drivers/perf: arm-pmu: Fix handling of SPI lacking
+ "interrupt-affinity" property
+In-Reply-To: <CAOi56cXFCZoMox3XrJvsQAXHa1uxOBPEKO266B2yYONv3pTY7g@mail.gmail.com>
+References: <1468939142-23693-1-git-send-email-marc.zyngier@arm.com>
+ <CAOi56cXFCZoMox3XrJvsQAXHa1uxOBPEKO266B2yYONv3pTY7g@mail.gmail.com>
+Message-ID: <20160830172710.GJ24906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2016 at 05:38:27PM +0800, chunfeng yun wrote:
-> Hi,
+Hi Kevin,
+
+Thanks for reporting this.
+
+On Fri, Aug 26, 2016 at 12:11:55PM -0500, Kevin Hilman wrote:
+> On Tue, Jul 19, 2016 at 9:39 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > Patch 19a469a58720 ("drivers/perf: arm-pmu: Handle per-interrupt
+> > affinity mask") added support for partitionned PPI setups, but
+> > inadvertently broke setups using SPIs without the "interrupt-affinity"
+> > property (which is the case for UP platforms).
+> >
+> > This patch restore the broken functionnality by testing whether the
+> > interrupt is percpu or not instead of relying on the using_spi flag
+> > that really means "SPI *and* interrupt-affinity property".
+> >
+> > Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> > Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> > Fixes: 19a469a58720 ("drivers/perf: arm-pmu: Handle per-interrupt affinity mask")
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> On Thu, 2016-08-25 at 10:32 +0200, Oliver Neukum wrote:
-> > On Thu, 2016-08-25 at 11:05 +0800, Chunfeng Yun wrote:
-> > > This patch adds support for the MediaTek USB3 controller
-> > > integrated into MT8173. It can be configured as Dual-Role
-> > > Device (DRD), Peripheral Only and Host Only (xHCI) modes.
-> > > 
-> > 
-> > > +/**
-> > > + * General Purpose Descriptor (GPD):
-> > > + *	The format of TX GPD is a little different from RX one.
-> > > + *	And the size of GPD is 16 bytes.
-> > > + *
-> > > + * @flag:
-> > > + *	bit0: Hardware Own (HWO)
-> > > + *	bit1: Buffer Descriptor Present (BDP), always 0, BD is not supported
-> > > + *	bit2: Bypass (BPS), 1: HW skips this GPD if HWO = 1
-> > > + *	bit7: Interrupt On Completion (IOC)
-> > > + * @chksum: This is used to validate the contents of this GPD;
-> > > + *	If TXQ_CS_EN / RXQ_CS_EN bit is set, an interrupt is issued
-> > > + *	when checksum validation fails;
-> > > + *	Checksum value is calculated over the 16 bytes of the GPD by default;
-> > > + * @data_buf_len (RX ONLY): This value indicates the length of
-> > > + *	the assigned data buffer
-> > > + * @next_gpd: Physical address of the next GPD
-> > > + * @buffer: Physical address of the data buffer
-> > > + * @buf_len:
-> > > + *	(TX): This value indicates the length of the assigned data buffer
-> > > + *	(RX): The total length of data received
-> > > + * @ext_len: reserved
-> > > + * @ext_flag:
-> > > + *	bit5 (TX ONLY): Zero Length Packet (ZLP),
-> > > + */
-> > > +struct qmu_gpd {
-> > > +	u8 flag;
-> > > +	u8 chksum;
-> > > +	u16 data_buf_len;
-> > > +	u32 next_gpd;
-> > > +	u32 buffer;
-> > > +	u16 buf_len;
-> > > +	u8 ext_len;
-> > > +	u8 ext_flag;
-> > > +} __packed;
-> > 
-> > It looks like this is shared with hardware in memory.
-> > But you leave the endianness of the bigger fields undeclared.
-> > 
-> The driver only supports Little-Endian SoCs currently, because I have no
-> Big-Endian platform to test it.
+> kernelci.org detected boot failures on bcm2835-rpi-b in mainline[1]
+> and was bisected down to this patch.  I verified that reverting this
+> patch on top of mainline gets bcm2835-rpi-b booting again.
+> 
+> I haven't been closely tracking this change, but a quick glance and it
+> looks like this platform is possibly missing IRQ properties from its
+> PMU node?  The DT for this platform simply has:
+> 
+>         arm-pmu {
+>             compatible = "arm,arm1176-pmu";
+>         };
 
-that's ok, you still have to mark the endian of the data and use it in
-that manner, you can't just not worry about it.
 
-Please fix up.
+Stefan Wahren posted a fix for this, so I've queued it locally and plan
+to send via Catalin:
 
-thanks,
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/452475.html
 
-greg k-h
+Will
