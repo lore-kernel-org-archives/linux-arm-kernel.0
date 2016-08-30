@@ -1,86 +1,130 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 30 Aug 2016 08:06:42 -0500
-Subject: [PATCH V2 0/5] firmware: Add support for TI System Control Interface
- (TI-SCI) protocol driver
-Message-ID: <20160830130647.6828-1-nm@ti.com>
+Date: Tue, 30 Aug 2016 08:06:43 -0500
+Subject: [PATCH V2 1/5] Documentation: Add support for TI System Control
+ Interface (TI-SCI) protocol
+In-Reply-To: <20160830130647.6828-1-nm@ti.com>
+References: <20160830130647.6828-1-nm@ti.com>
+Message-ID: <20160830130647.6828-2-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Texas Instrument's System Control Interface (TI-SCI) Message Protocol
+is used in Texas Instrument's System on Chip (SoC) such as those in
+newer SoCs in the keystone processor family starting with K2G.
 
-Thanks for the reviews on the patches, here is v2 of the series.
+This message protocol is used to communicate between various compute
+or processing entities (such as ARM, DSP etc.) with a central system
+controller entity.
 
-Texas Instruments' Keystone generation System on Chips (SoC)
-starting with 66AK2G02[1], now include a dedicated SoC System Control
-entity called PMMC(Power Management Micro Controller) in line with
-ARM architecture recommendations. The function of this module is
-to integrate all system operations in a centralized location.
-Communication with the SoC System Control entity from various
-processing units like ARM/DSP occurs over Message Manager hardware
-block.
+TI-SCI message protocol provides support for management of various
+hardware entities within the SoC.
 
-This series adds the base support for TI System Control Interface
-(TI-SCI) protocol[2]. The protocol is built on top of Texas
-Instrument's Message Manager communication mechanism[3].
+The message protocol can be found here:
+http://processors.wiki.ti.com/index.php/TISCI
 
-Overall architecture is very similar to SCPI[4] as follows:
-+-------------+   +---------+     +------^-----+
-| TI SCI GENPD|   |TISCI Clk|     |TISCI reset |
-+------+------+   +----+----+     +------+-----+
-       |               |                 |
-       |          +----v--------------+  |
-       +----------> TISCI Protocol(*) <--+
-                  +----+--------------+
-                       |
-                   +---v-----------+
-                   | MAILBOX  FWK  |
-                   +---+-----------+
-                       |
-                   +---v-----------+
-                   |  TI MSGMGR    |-> TISCI hardware block
-                   +---------------+
-(*) This series.
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+Changes since v1:
+	- squashed the bindings changes for reset on review comments from
+		https://patchwork.kernel.org/patch/9291351/
 
-V2 of the series is based off v4.8-rc1 and is also available here:
-https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.9/tisci-base-v2
+V1: https://patchwork.kernel.org/patch/9291343/
 
-V1 of the series: https://lkml.org/lkml/2016/8/19/768
-
-Changes in V2 of the series:
-	- Review comments incorporated from Lokesh and Rob
-	- Minor cleanup of comments for debug interface.
-
-[1] http://www.ti.com/product/66ak2g02
-[2] http://processors.wiki.ti.com/index.php/TISCI
-[3] Documentation/devicetree/bindings/mailbox/ti,message-manager.txt
-[4] Documentation/devicetree/bindings/arm/arm,scpi.txt
-
-Related series (based on v1):
-
-* https://lkml.org/lkml/2016/8/19/790 (GENPD for TISCI)
-* https://lkml.org/lkml/2016/8/19/811 (Clock support for TISCI) 
-
-Nishanth Menon (5):
-  Documentation: Add support for TI System Control Interface (TI-SCI)
-    protocol
-  firmware: Add basic support for TI System Control Interface (TI-SCI)
-    protocol
-  firmware: ti_sci: Add support for Device control
-  firmware: ti_sci: Add support for Clock control
-  firmware: ti_sci: Add support for reboot core service
-
- .../devicetree/bindings/arm/keystone/ti,sci.txt    |   66 +
- MAINTAINERS                                        |   10 +
- drivers/firmware/Kconfig                           |   15 +
- drivers/firmware/Makefile                          |    1 +
- drivers/firmware/ti_sci.c                          | 1997 ++++++++++++++++++++
- drivers/firmware/ti_sci.h                          |  492 +++++
- include/linux/soc/ti/ti_sci_protocol.h             |  249 +++
- 7 files changed, 2830 insertions(+)
+ .../devicetree/bindings/arm/keystone/ti,sci.txt    | 66 ++++++++++++++++++++++
+ MAINTAINERS                                        |  8 +++
+ 2 files changed, 74 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
- create mode 100644 drivers/firmware/ti_sci.c
- create mode 100644 drivers/firmware/ti_sci.h
- create mode 100644 include/linux/soc/ti/ti_sci_protocol.h
 
+diff --git a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+new file mode 100644
+index 000000000000..ed5b8fc185f1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+@@ -0,0 +1,66 @@
++Texas Instruments System Control Interface (TI-SCI) Message Protocol
++-------------------------------------------------------------------
++
++Texas Instrument's processors including those belonging to Keystone generation
++of processors have separate hardware entity which is now responsible for the
++management of the System on Chip (SoC) system. These include various system
++level functions as well.
++
++An example of such an SoC is K2G, which contains the system control hardware
++block called Power Management Micro Controller (PMMC). This hardware block is
++initialized early into boot process and provides services to Operating Systems
++on multiple processors including ones running Linux.
++
++See http://processors.wiki.ti.com/index.php/TISCI for protocol definition.
++
++TI-SCI controller Device Node:
++=============================
++
++Required properties:
++--------------------
++- compatible: should be "ti,k2g-sci"
++- mbox-names:
++	"rx" - Mailbox corresponding to receive path
++	"tx" - Mailbox corresponding to transmit path
++
++- mboxes: Mailboxes corresponding to the mbox-names. Each value of the mboxes
++	  property should contain a phandle to the mailbox controller device
++	  node and an args specifier that will be the phandle to the intended
++	  sub-mailbox child node to be used for communication.
++
++See Documentation/devicetree/bindings/mailbox/mailbox.txt for more details
++about the generic mailbox controller and client driver bindings. Also see
++Documentation/devicetree/bindings/mailbox/ti,message-manager.txt for typical
++controller that is used to communicate with this System controllers.
++
++Optional Properties:
++--------------------
++- reg-names:
++	debug_messages - Map the Debug message region
++- reg:  register space corresponding to the debug_messages
++- ti,system-reboot-controller: If system reboot can be triggered by SoC reboot
++
++Example (K2G):
++--------
++	pmmc: pmmc {
++		compatible = "ti,k2g-sci";
++		mbox-names = "rx", "tx";
++		mboxes= <&msgmgr &msgmgr_proxy_pmmc_rx>,
++			<&msgmgr &msgmgr_proxy_pmmc_tx>;
++		reg-names = "debug_messages";
++		reg = <0x02921800 0x800>;
++	};
++
++
++TI-SCI Client Device Node:
++========================
++
++Client nodes refer to the required TI-SCI device using the "ti,sci" property.
++
++Example (K2G):
++-------------
++	my_dev_node: dev_node {
++		...
++		ti,sci = <&pmmc>;
++		...
++	}
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 20bb1d00098c..ce7306897ae0 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -11564,6 +11564,14 @@ S:	Maintained
+ F:	arch/xtensa/
+ F:	drivers/irqchip/irq-xtensa-*
+ 
++Texas Instruments' System Control Interface (TISCI) Protocol Driver
++M:	Nishanth Menon <nm@ti.com>
++M:	Tero Kristo <t-kristo@ti.com>
++M:	Santosh Shilimkar <ssantosh@kernel.org>
++L:	linux-arm-kernel at lists.infradead.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
++
+ THANKO'S RAREMONO AM/FM/SW RADIO RECEIVER USB DRIVER
+ M:	Hans Verkuil <hverkuil@xs4all.nl>
+ L:	linux-media at vger.kernel.org
 -- 
 2.9.1.200.gb1ec08f
