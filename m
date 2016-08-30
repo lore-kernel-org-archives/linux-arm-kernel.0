@@ -1,39 +1,31 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Tue, 30 Aug 2016 20:49:28 +0200
-Subject: [PATCH v3 0/5] meson: Meson8b and GXBB DWMAC glue driver
-In-Reply-To: <20160828.234008.445367966910278179.davem@davemloft.net>
-References: <20160820093538.9707-1-martin.blumenstingl@googlemail.com>
- <20160828161637.9941-1-martin.blumenstingl@googlemail.com>
- <20160828.234008.445367966910278179.davem@davemloft.net>
-Message-ID: <CAFBinCCmg-+8mjd0Xc5c7bEWL9_S_4kizs_UMiiW9ATBH_G8iw@mail.gmail.com>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Tue, 30 Aug 2016 14:08:39 -0500
+Subject: [PATCH 2/2] arm64: don't select PERF_USE_VMALLOC by default
+Message-ID: <20160830140839.75e0689719bf884c9e38e5e4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 5:40 AM, David Miller <davem@davemloft.net> wrote:
-> From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> Date: Sun, 28 Aug 2016 18:16:32 +0200
->
->> This adds a DWMAC glue driver for the PRG_ETHERNET registers found in
->> Meson8b and GXBB SoCs. Based on the "old" meson6b-dwmac glue driver
->> the register layout is completely different.
->> Thus I introduced a separate driver.
->>
->> Changes since v2:
->> - fixed unloading the glue driver when built as module. This pulls in a
->>   patch from Joachim Eastwood (thanks) to get our private data structure
->>   (bsp_priv).
->
-> This doesn't apply cleanly at all to the net-next tree, so I have
-> no idea where you expect these changes to be applied.
-OK, maybe Kevin can me help out here as I think the patches should go
-to various trees.
+Any arm64 based parts that have cache aliasing issues can set it
+manually.  Apparently dragged in from ARM(32) defaults in commit
+8c2c3df "arm64: Build infrastructure".
 
-I think patches 1, 3 and 4 should go through the net-next tree (as
-these touch drivers/net/ethernet/stmicro/stmmac/ and the corresponding
-documentation).
-Patch 2 should probably go through clk-meson-gxbb / clk-next (just
-like the other clk changes we had).
-The last patch (patch 5) should probably go through the ARM SoC tree
-(just like the other dts changes we had).
+Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-@David, Kevin: would this be fine for you?
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index bc3f00f..2e6874f 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -105,7 +105,6 @@ config ARM64
+ 	select OF_NUMA if NUMA && OF
+ 	select OF_RESERVED_MEM
+ 	select PCI_ECAM if ACPI
+-	select PERF_USE_VMALLOC
+ 	select POWER_RESET
+ 	select POWER_SUPPLY
+ 	select SPARSE_IRQ
+-- 
+2.9.3
