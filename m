@@ -1,47 +1,37 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 30 Aug 2016 13:47:09 +0100
-Subject: [PATCHv3] arm: l2x0: add PMU support
-In-Reply-To: <20160830111222.GN1041@n2100.armlinux.org.uk>
-References: <1472552178-26201-1-git-send-email-mark.rutland@arm.com>
- <20160830111222.GN1041@n2100.armlinux.org.uk>
-Message-ID: <20160830124709.GF1223@leverpostej>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 30 Aug 2016 14:53:56 +0200
+Subject: [PATCH] drm/sun4i: rgb: add missing calls to
+ drm_panel_{prepare,unprepare}
+In-Reply-To: <20160830065500.31847-1-net147@gmail.com>
+References: <20160830065500.31847-1-net147@gmail.com>
+Message-ID: <20160830125356.GE18605@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2016 at 12:12:22PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Aug 30, 2016 at 11:16:18AM +0100, Mark Rutland wrote:
-> > The L2C-220 (AKA L220) and L2C-310 (AKA PL310) cache controllers feature
-> > a Performance Monitoring Unit (PMU), which can be useful for tuning
-> > and/or debugging. This hardware is always present and the relevant
-> > registers are accessible to non-secure accesses. Thus, no special
-> > firmware interface is necessary.
-> > 
-> > This patch adds support for the PMU, plugging into the usual perf
-> > infrastructure. The overflow interrupt is not always available (e.g. on
-> > RealView PBX A9 it is not wired up at all), and the hardware counters
-> > saturate, so the driver does not make use of this. Instead, the driver
-> > periodically polls and reset counters as required to avoid losing
-> > events due to saturation.
-> ...
-> > +	/*
-> > +	 * Choose the name to identify the PMU under sysfs. This is also used
-> > +	 * by l2x0_pmu_event_attr_is_visible to determine which events to
-> > +	 * display, as the PL310 PMU supports a superset of L220 events.
-> > +	 *
-> > +	 * The L210 PMU has a different programmer's interface, and is not
-> > +	 * supported by this driver.
-> 
-> This rather worries me a bit - if the L2C-210 needs a different driver,
-> should we be putting this driver in this file, or should we be keeping
-> it as a separate file?  What if L2C-210 grows a PMU driver which is
-> also tacked on the end of the file - it seems to me that this is rather
-> unwieldy.
-> 
-> My feeling is that we've already enough random bits tacked into this
-> file supporting all the L2C-210 related variants.
+Hi,
 
-Sure. I'll see about factoring the PMU parts out into a separate file,
-modulo a couple of hooks for suspend/resume and init.
+On Tue, Aug 30, 2016 at 04:55:00PM +1000, Jonathan Liu wrote:
+> If the enable-gpios property of a simple panel in device tree is set,
+> the GPIO is not toggled on/off because of missing calls to
+> drm_panel_prepare and drm_panel_unprepare.
+> 
+> Signed-off-by: Jonathan Liu <net147@gmail.com>
 
-Thanks,
-Mark.
+This was not applying properly, but I merged it.
+
+Please make sure that it applies on top of the current next branch.
+
+Good catch, thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160830/f006f93f/attachment.sig>
