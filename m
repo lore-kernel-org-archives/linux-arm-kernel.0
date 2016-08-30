@@ -1,44 +1,37 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Tue, 30 Aug 2016 17:25:57 +0930
-Subject: [PATCH v3 4/7] palmetto: Request relevant mux functions in devicetree
+Date: Tue, 30 Aug 2016 17:25:58 +0930
+Subject: [PATCH v3 5/7] aspeed-g4: Add gpio controller to devicetree
 In-Reply-To: <20160830075600.11559-1-andrew@aj.id.au>
 References: <20160830075600.11559-1-andrew@aj.id.au>
-Message-ID: <20160830075600.11559-5-andrew@aj.id.au>
+Message-ID: <20160830075600.11559-6-andrew@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The requested functions are parented by the pinctrl node to provide the
-Palmetto's static pin configuration.
-
 Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
 ---
- arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/aspeed-g4.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-index cc5fcf2940bf..648fb6b9e427 100644
---- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-+++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-@@ -20,6 +20,20 @@
- 	};
- };
+diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+index a5d6e81e318a..7c2b73c4d5ab 100644
+--- a/arch/arm/boot/dts/aspeed-g4.dtsi
++++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+@@ -492,6 +492,16 @@
+ 				reg = <0x1e720000 0x8000>;	// 32K
+ 			};
  
-+&pinctrl {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flbusy_default &pinctrl_flwp_default
-+			&pinctrl_vgahs_default &pinctrl_vgavs_default
-+			&pinctrl_ddcclk_default &pinctrl_ddcdat_default
++			gpio: gpio at 1e780000 {
++				#gpio-cells = <2>;
++				gpio-controller;
++				compatible = "aspeed,ast2400-gpio";
++				reg = <0x1e780000 0x1000>;
++				interrupts = <20>;
++				gpio-ranges = <&pinctrl 0 0 220>;
++				interrupt-controller;
++			};
 +
-+			&pinctrl_pwm1_default &pinctrl_pwm2_default
-+			&pinctrl_pwm3_default &pinctrl_pwm4_default
-+			&pinctrl_pwm5_default &pinctrl_pwm6_default
-+			&pinctrl_pwm7_default
-+
-+			&pinctrl_bmcint_default &pinctrl_flack_default>;
-+};
-+
- &uart5 {
- 	status = "okay";
- };
+ 			timer: timer at 1e782000 {
+ 				compatible = "aspeed,ast2400-timer";
+ 				reg = <0x1e782000 0x90>;
 -- 
 2.9.3.1.g0db844e
