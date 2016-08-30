@@ -1,63 +1,65 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Tue, 30 Aug 2016 08:59:31 +0800
-Subject: [PATCH] arm64: dts: rockchip: Explicitly set pclk_pmu_src on
- rk3399
-In-Reply-To: <20160829181841.GA8682@localhost>
-References: <1472494284-11315-1-git-send-email-dianders@chromium.org>
- <20160829181841.GA8682@localhost>
-Message-ID: <57C4DA73.5000505@rock-chips.com>
+From: zhiyong.tao@mediatek.com (zhiyong tao)
+Date: Tue, 30 Aug 2016 09:29:59 +0800
+Subject: [PATCH -next] iio: adc: mt2701: Remove redundant dev_err call
+ in mt6577_auxadc_probe()
+In-Reply-To: <88307772-dd0f-a2f2-efd8-6c64a0cb14e4@kernel.org>
+References: <1472221581-28836-1-git-send-email-weiyj.lk@gmail.com>
+ <88307772-dd0f-a2f2-efd8-6c64a0cb14e4@kernel.org>
+Message-ID: <1472520599.24148.13.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 2016-08-29 at 19:47 +0100, Jonathan Cameron wrote:
+> On 26/08/16 15:26, Wei Yongjun wrote:
+> > From: Wei Yongjun <weiyongjun1@huawei.com>
+> > 
+> > There is a error message within devm_ioremap_resource
+> > already, so remove the dev_err call to avoid redundant
+> > error message.
+> > 
+> > Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> Hi Wei,
+> 
+> I'm not so sure these are actually redundant.  Overly verbose perhaps,
+> but they do provide additional information in the log as the
+> devm_ioremap_resource doesn't know 'what' has failed, merely how
+> it has failed.
+> 
+> I'm happy to take these, if the driver author / maintainers
+> agree, but I'm not keen enough to take them without that.
+> 
+> Zhiyong Tao, what do you think on this one?
+> 
+> Jonathan
 
+Dear Jonathan,
 
-On 08/30/2016 02:18 AM, Brian Norris wrote:
-> On Mon, Aug 29, 2016 at 11:11:24AM -0700, Doug Anderson wrote:
->> On rk3399 we explicitly set ppll in the device tree to 676000000.  The
->> ppll has one major child, pclk_pmu_src, that is the parent of lots of
->> other clocks.  Right now nobody is setting that clock rate and we're
->> relying on the divider to just happen to be something sane.  Let's be
->> explicit in our request so we're not relying on the firmware.
->>
->> With the current firmware I tested with this patch has no expected
->> impact but it's probably good to do anyway.
->>
->> Signed-off-by: Douglas Anderson <dianders@chromium.org>
->> ---
->>   arch/arm64/boot/dts/rockchip/rk3399.dtsi | 4 ++--
->>   1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> index 62d450935a57..ffb3faa8c176 100644
->> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> @@ -908,8 +908,8 @@
->>   		reg = <0x0 0xff750000 0x0 0x1000>;
->>   		#clock-cells = <1>;
->>   		#reset-cells = <1>;
->> -		assigned-clocks = <&pmucru PLL_PPLL>;
->> -		assigned-clock-rates = <676000000>;
->> +		assigned-clocks = <&pmucru PLL_PPLL>, <&pmucru PCLK_SRC_PMU>;
->> +		assigned-clock-rates = <676000000>, <112666667>;
->
-> I think this makes sense and is a good idea. One alternative would be to
-> have the various children actually set a rate that they expect, but
-> several of them don't have a separate driver at all, and that would be
-> of dubious value anyway I think.
+Thank you for your suggestion. I think that we can know 'what' has
+failed in the driver, if we retain the error message log. It maybe 
+advantageous to debug issues.
 
-I agree with you. This clk default div is set in the uboot or coreboot.
-And if is need to set in kernel ,I hope the freq is 50M(<48285714>).
-This freq can meet the performance,and the power consumption is not too 
-much.
->
-> Reviewed-by: Brian Norris <briannorris@chromium.org>
->
->>   	};
->>
->>   	cru: clock-controller at ff760000 {
->> --
->> 2.8.0.rc3.226.g39d4020
->>
->
->
->
+Zhiyong
+> > ---
+> >  drivers/iio/adc/mt6577_auxadc.c | 4 +---
+> >  1 file changed, 1 insertion(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/iio/adc/mt6577_auxadc.c b/drivers/iio/adc/mt6577_auxadc.c
+> > index 2d104c8..a268954 100644
+> > --- a/drivers/iio/adc/mt6577_auxadc.c
+> > +++ b/drivers/iio/adc/mt6577_auxadc.c
+> > @@ -206,10 +206,8 @@ static int mt6577_auxadc_probe(struct platform_device *pdev)
+> >  
+> >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >  	adc_dev->reg_base = devm_ioremap_resource(&pdev->dev, res);
+> > -	if (IS_ERR(adc_dev->reg_base)) {
+> > -		dev_err(&pdev->dev, "failed to get auxadc base address\n");
+> > +	if (IS_ERR(adc_dev->reg_base))
+> >  		return PTR_ERR(adc_dev->reg_base);
+> > -	}
+> >  
+> >  	adc_dev->adc_clk = devm_clk_get(&pdev->dev, "main");
+> >  	if (IS_ERR(adc_dev->adc_clk)) {
+> > 
+> > 
+> > 
+> 
