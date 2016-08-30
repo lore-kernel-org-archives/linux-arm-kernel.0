@@ -1,66 +1,45 @@
-From: zhengyu.shen@nxp.com (Zhengyu Shen)
-Date: Tue, 30 Aug 2016 20:01:18 +0000
-Subject: [PATCH v3] Added perf functionality to mmdc driver
-In-Reply-To: <20160830125420.GG1223@leverpostej>
-References: <20160817194253.16300-1-zhengyu.shen@nxp.com>
- <CAHrpEqTtCnEU1v1sEuN8yJGPudDRZ5A79=Wn5Bp4SgTxDiNTQQ@mail.gmail.com>
- <20160830114329.GB8366@tiger> <20160830125420.GG1223@leverpostej>
-Message-ID: <DB5PR04MB1430D8A0284123B5C475800E9FE00@DB5PR04MB1430.eurprd04.prod.outlook.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Tue, 30 Aug 2016 15:16:42 -0500
+Subject: [PATCH 1/2] arm64: kernel: Add SMC Session ID to results
+In-Reply-To: <20160823103841.GD8724@red-moon>
+References: <1471672274-19317-1-git-send-email-andy.gross@linaro.org>
+ <1471672274-19317-2-git-send-email-andy.gross@linaro.org>
+ <20160822134313.GJ14680@arm.com>
+ <20160822140246.GA30923@hector.attlocal.net>
+ <20160822145326.GK14680@arm.com>
+ <20160823003831.GN6502@codeaurora.org>
+ <20160823103841.GD8724@red-moon>
+Message-ID: <20160830201642.GD24683@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hi,
+On Tue, Aug 23, 2016 at 11:38:41AM +0100, Lorenzo Pieralisi wrote:
+> On Mon, Aug 22, 2016 at 05:38:31PM -0700, Stephen Boyd wrote:
 > 
-> On Tue, Aug 30, 2016 at 07:43:29PM +0800, Shawn Guo wrote:
-> > On Mon, Aug 29, 2016 at 11:06:44AM -0500, Zhi Li wrote:
-> > > On Wed, Aug 17, 2016 at 2:42 PM, Zhengyu Shen
-> <zhengyu.shen@nxp.com> wrote:
-> > > > MMDC is a multi-mode DDR controller that supports DDR3/DDR3L
-> > > > x16/x32/x64 and LPDDR2 two channel x16/x32 memory types. MMDC is
-> > > > configurable, high performance, and optimized. MMDC is present on
-> > > > i.MX6 Quad and i.MX6 QuadPlus devices, but this driver only supports
-> i.MX6 Quad at the moment.
-> > > > MMDC provides registers for performance counters which read via
-> > > > this driver to help debug memory throughput and similar issues.
-> > > >
-> > > > $ perf stat -a -e
-> > > > mmdc/busy-cycles/,mmdc/read-accesses/,mmdc/read-
-> bytes/,mmdc/total-cycles/,mmdc/write-accesses/,mmdc/write-bytes/ dd
-> if=/dev/zero of=/dev/null bs=1M count=5000 Performance counter stats for
-> 'dd if=/dev/zero of=/dev/null bs=1M count=5000':
-> > > >
-> > > >          898021787      mmdc/busy-cycles/
-> > > >           14819600      mmdc/read-accesses/
-> > > >             471.30 MB   mmdc/read-bytes/
-> > > >         2815419216      mmdc/total-cycles/
-> > > >           13367354      mmdc/write-accesses/
-> > > >             427.76 MB   mmdc/write-bytes/
-> > > >
-> > > >        5.334757334 seconds time elapsed
-> > > >
-> > > > Signed-off-by: Zhengyu Shen <zhengyu.shen@nxp.com>
-> > > > Signed-off-by: Frank Li <frank.li@nxp.com>
-> > >
-> > > Shawn Guo:
-> > >
-> > >          No new comments got more than 1 weeks.
-> > >          Did you plan accept it?
-> >
-> > @Mark, how do you think of this version?
+> [...]
 > 
-> Sorry, I've been away for the last week and haven't had the chance to look at
-> this yet. I will try to get round to it in the next few days.
+> > This all comes about because the firmware generates a session id
+> > for the SMC call and jams it in x6. The assembly on the
+> > non-secure side is written with a tight loop around the smc
+> > instruction so that when the return value indicates
+> > "interrupted", x6 is kept intact and the non-secure OS can jump
+> > back to the secure OS without register reloading. Perhaps
+> > referring to x6 as result value is not correct because it's
+> > really a session id that's irrelevant once the smc call
+> > completes.
 > 
-> In the meantime, could you please try attacking this with Vince's perf fuzzer
-> [1] (as root, or with perf_event_paranoid dropped to -1)? It's rather good at
-> finding (subtle) issues in drivers.
+> Sorry I missed this bit. The session id is _generated_ by secure
+> firmware (probably only when the value passed in x6 == 0 (?))
+> and actually returned to the caller so that subsequent (interrupted)
+> calls can re-issue the same value, is that correct ?
 > 
-> Thanks,
-> Mark.
+> If that's the case the value in x6 is a result value from an SMCCC
+> perspective and your current FW is not SMCCC compliant.
 > 
-> [1] https://github.com/deater/perf_event_tests
 
-Hi, I've done some testing with the fuzzer. Mmdc was only responsible 
-for one crash which I fixed (had to remove the event from the pmu properly). 
-Other drivers also cause crashes and the program reports that events are
-Throttling. Is this normal?
+So is Will's solution to this ok?  If so I will respin with the minor change to
+get it working and resend.  If not, do I roll my own smccc wrapper?
+
+Regards,
+
+Andy
