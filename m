@@ -1,78 +1,33 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 31 Aug 2016 01:24:41 +0300
-Subject: [PATCH] ARM: dts: wheat: add SDHI0 support
-In-Reply-To: <34968644.DhifNderY8@wasted.cogentembedded.com>
-References: <34968644.DhifNderY8@wasted.cogentembedded.com>
-Message-ID: <1659137.gEKJxNrmrk@wasted.cogentembedded.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 30 Aug 2016 18:09:08 -0500
+Subject: [PATCH 04/10] dt-bindings: spi-nor: Update bindings for LS1012A
+In-Reply-To: <1472207269-18499-4-git-send-email-Bhaskar.Upadhaya@nxp.com>
+References: <1472207269-18499-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
+ <1472207269-18499-4-git-send-email-Bhaskar.Upadhaya@nxp.com>
+Message-ID: <CAL_Jsq+bXYeKJSKzpVaUsKAbX-4TFk1QerqQHDudurGhtRzb3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Wheat board dependent  part of  the SDHI0 (connected to the
-micro-SD slot)  device node along with the necessary voltage regulator.
+On Fri, Aug 26, 2016 at 5:27 AM, Bhaskar Upadhaya
+<Bhaskar.Upadhaya@nxp.com> wrote:
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Make the subject reflect what the patch does.
 
----
-This patch is against the 'renesas-devel-20160830-v4.8-rc4' of Simon Horman's
-'renesas.git' repo plus the CAN patch posted yesterday.
-Starting with this patch, SMSC LAN89218 Ethernet chip starts to misbehave on my
-board...
+> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
+> ---
+>  Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+> index 2c91c03..fc99ef2 100644
+> --- a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+> +++ b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+> @@ -13,6 +13,7 @@ Required properties:
+>                   at25df321a
+>                   at25df641
+>                   at26df081a
+> +                eon,en25s64
 
- arch/arm/boot/dts/r8a7792-wheat.dts |   26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+To answer Scott's question, see the paragraph above this.
 
-Index: renesas/arch/arm/boot/dts/r8a7792-wheat.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7792-wheat.dts
-+++ renesas/arch/arm/boot/dts/r8a7792-wheat.dts
-@@ -11,6 +11,7 @@
- 
- /dts-v1/;
- #include "r8a7792.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "Wheat";
-@@ -54,6 +55,17 @@
- 		pinctrl-0 = <&lan89218_pins>;
- 		pinctrl-names = "default";
- 	};
-+
-+	vcc_sdhi0: regulator-vcc-sdhi0 {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "SDHI0 Vcc";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpio = <&gpio11 12 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
- };
- 
- &extal_clk {
-@@ -86,6 +98,11 @@
- 		groups = "can1_data";
- 		function = "can1";
- 	};
-+
-+	sdhi0_pins: sdhi0 {
-+		groups = "sdhi0_data4", "sdhi0_ctrl";
-+		function = "sdhi0";
-+	};
- };
- 
- &scif0 {
-@@ -108,3 +125,12 @@
- 
- 	status = "okay";
- };
-+
-+&sdhi0 {
-+	pinctrl-0 = <&sdhi0_pins>;
-+	pinctrl-names = "default";
-+
-+	vmmc-supply = <&vcc_sdhi0>;
-+	cd-gpios = <&gpio11 11 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
+Rob
