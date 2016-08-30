@@ -1,36 +1,45 @@
-From: sumitg@nvidia.com (Sumit Gupta)
-Date: Tue, 30 Aug 2016 10:35:56 +0000
-Subject: [PATCH ] arm64: cpuinfo: Add "model name" in /proc/cpuinfo for
- 64bit tasks also
-In-Reply-To: <20160830091935.GD5163@e104818-lin.cambridge.arm.com>
-References: <1472461345-28219-1-git-send-email-sumitg@nvidia.com>
- <20160830091935.GD5163@e104818-lin.cambridge.arm.com>
-Message-ID: <6a6e87361e7c4a1fab9639cb83276765@BGMAIL104.nvidia.com>
+From: majun258@huawei.com (majun (F))
+Date: Tue, 30 Aug 2016 18:35:39 +0800
+Subject: [PATCH] generic: Add the exception case checking routine for ppi
+ interrupt
+In-Reply-To: <57C548D0.3090700@arm.com>
+References: <1472530639-21616-1-git-send-email-majun258@huawei.com>
+ <57C548D0.3090700@arm.com>
+Message-ID: <57C5617B.6080801@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> On Mon, Aug 29, 2016 at 02:32:25PM +0530, Sumit Gupta wrote:
-> > Removed restriction of displaying model name for 32 bit tasks only.
-> > Because of this Processor details were not displayed in "System
-> > setting -> Details" in Ubuntu model name display is generic and can be
-> > printed for 64 bit also.
-> >
-> > model name : ARMv8 Processor rev X (v8l)
-> >
-> > Signed-off-by: Sumit Gupta <sumitg@nvidia.com>
+
+
+? 2016/8/30 16:50, Marc Zyngier ??:
+> On 30/08/16 05:17, MaJun wrote:
+>> From: Ma Jun <majun258@huawei.com>
+>>
+>> During system booting, if the interrupt which has no action registered
+>> is triggered, it would cause system panic when try to access the
+>> action member.
 > 
-> You didn't give a reason why this is needed. For 32-bit tasks, we did it for
-> backwards compatibility with code checking for it.
+> And why would that interrupt be enabled? If you enable a PPI before
+> registering a handler, you're doing something wrong.
 > 
 
-Within Ubuntu Home Screen "System setting -> details", processor details were coming as null.
-It seems those details are retrieved from "model name" in /proc/cpuinfo and
-because of check for 32 bit tasks only, "model name" was not getting displayed.
-On removing this check for model name, processor details are getting displayed in
-Ubuntu Home Screen.
-I think model name field is general and can be displayed irrespective of compatibility.
-Please suggest if I am missing anything.
+Actually,the problem described above happened during the capture kernel booting.
 
-> --
-> Catalin
+In my system, sometimes there is a pending physical timer interrupt(30)
+when the first kernel panic and the status is kept until the capture kernel booting.
+
+So, this interrupt will be handled during capture kernel booting.
+
+Becasue we use virt timer interrupt but not physical timer interrupt in capture kernel,
+the interrupt 30 has no action handler.
+
+Besides, I think we need to do exception check in this function just
+like "handle_fasteoi_irq" does.
+
+Thanks
+MaJun
+
+> Thanks,
+> 
+> 	M.
+> 
