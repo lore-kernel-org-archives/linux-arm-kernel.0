@@ -1,39 +1,51 @@
-From: netz.kernel@gmail.com (Marty Plummer)
-Date: Tue, 30 Aug 2016 09:43:52 -0500
-Subject: Older hisilicon chipsets
-In-Reply-To: <57C54A05.9090601@hisilicon.com>
-References: <7773f0e5-d045-1e93-529b-74a601467ed1@gmail.com>
- <20160827150457.GM10637@io.lakedaemon.net>
- <ec3ec22f-f05e-aaec-8e9a-bfc0565b9e9d@gmail.com> <7850061.5OOjP34nIO@wuerfel>
- <57C54A05.9090601@hisilicon.com>
-Message-ID: <7d7ff37b-a16b-8532-214c-de0a46c9de8e@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 30 Aug 2016 15:48:03 +0100
+Subject: [PATCH v2 0/9] arm64: clean up early boot function calls
+In-Reply-To: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160830144803.GM1223@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/30/2016 03:55 AM, Wei Xu wrote:
-> Hi Arnd, Marty
-> 
-> I will once they are ready.
-> Thanks for your kindly guiding!
-> 
-> Best Regards,
-> Wei
-> 
-> 
-Hi Wei,
+Hi,
 
-Do you think you could change the references to the Hi3620 in the code
-and dts files from `hi3xxx' to `hi3620'? As it currently stands, the
-wildcard matches hi3520 too, but that's not a good idea whit devicetree,
-its best to be completely explicit as to which sort of device the
-binding is for.
+On Wed, Aug 24, 2016 at 04:35:57PM +0200, Ard Biesheuvel wrote:
+> This v2 series is a followup to the single patch #1, whose v1 I sent out
+> about a week ago.
+> 
+> In a couple of places, the early boot code uses non-standard argument,
+> return value or return address registers when calling functions. This makes
+> the code more complicated than it needs to be, which was not a problem in the
+> early days, but with all the recent changes for KASLR, hibernate etc, it
+> makes sense to clean this up once and for all. This code removes all uses of
+> callee saved registers on the secondary boot and resume paths, and on th
+> primary boot path, it only leaves the necessary ones, and documents them
+> explicitly in patch #9.
+> 
+> I will leave it to the honourable arm64 maintainers to decide if any of
+> these improvements weigh up against the churn, given that this code has
+> already been updated numerous times over the past couple of kernel versions.
 
-Thanks.
+Which ones are honourable? ;)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160830/ded6f6e0/attachment.sig>
+FWIW, I think that overall this is a nice improvement in legibility for
+the boot code.
+
+> Adding James to cc since patch #6 may conflict with this hibernate/
+> debug-pagealloc series [0], to which I replied that merging .idmap.text
+> with .mmuoff.text would be a worthwhile simplification. 
+
+I'll leave it to you, James, and the honourable maintainers to figure
+out the details on that front.
+
+I've given this a spin on Juno (R1) with KASAN and CONFIG_RANDOMIZE_BASE
+selected (though I have no entropy source, so I'm bailing out early).
+That all works, so for the series:
+
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+
+For patch 1, feel free to upgrade the Acked-by to a Reviewed-by to match
+the rest of the series.
+
+Thanks,
+Mark.
