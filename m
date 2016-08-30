@@ -1,12 +1,35 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 30 Aug 2016 11:18:57 +0200
-Subject: [GIT PULL 2/4] ARM: dts: exynos: DeviceTree for v4.9
+Date: Tue, 30 Aug 2016 11:18:58 +0200
+Subject: [GIT PULL 3/4] arm64: dts: exynos: DeviceTree ARM64 for v4.9
 In-Reply-To: <1472548739-20050-1-git-send-email-k.kozlowski@samsung.com>
 References: <1472548739-20050-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1472548739-20050-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1472548739-20050-4-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
+This is an old one. It was ready for v4.8 but then Marc Zynger posted
+some conflicting change so I postponed it. Marc's patch didn't get in,
+so there is no reason to wait.
+
+No conflict expected yet, but if you apply Marc's "arm64: dts: Fix
+broken architected timer interrupt trigger" then proper resolution would be:
+
+arch/arm64/boot/dts/exynos/exynos7.dtsi:
+
++                       interrupts = <GIC_PPI 13
++                                       (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
++                                    <GIC_PPI 14
++                                       (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
++                                    <GIC_PPI 11
++                                       (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
++                                    <GIC_PPI 10
++                                       (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
+
+
+Best regards,
+Krzysztof
 
 The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
@@ -14,35 +37,19 @@ The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.9
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.9
 
-for you to fetch changes up to 05b01dd936b46f2c3cfbb10bc89c0ec79c745e5d:
+for you to fetch changes up to 36d1c9cd07cd6a065f1dde3cbbfe3a9867d693a4:
 
-  ARM: dts: exynos: Use 'hpd-gpios' instead of 'hpd-gpio' (2016-08-24 21:09:24 +0200)
+  arm64: dts: exynos: Use human-friendly symbols for timer interrupt flags (2016-08-10 11:09:46 +0200)
 
 ----------------------------------------------------------------
-Samsung DeviceTree update for v4.9:
-1. Set chosen serial bitrate which allows proper serial output when
-   bootloader does pass all the data in command line.
-2. Cleanup.
+Samsung DeviceTree ARM64 update for v4.9:
+1. Use human-friendly symbols for interrupt flags.
 
 ----------------------------------------------------------------
 Krzysztof Kozlowski (1):
-      ARM: dts: exynos: Use stdout non-deprecated property and add serial options to Odroid XU/XU3/XU4
+      arm64: dts: exynos: Use human-friendly symbols for timer interrupt flags
 
-Milo Kim (1):
-      ARM: dts: exynos: Use 'hpd-gpios' instead of 'hpd-gpio'
-
- Documentation/devicetree/bindings/display/exynos/exynos_hdmi.txt | 4 ++--
- arch/arm/boot/dts/exynos4210-universal_c210.dts                  | 2 +-
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi                  | 2 +-
- arch/arm/boot/dts/exynos5250-arndale.dts                         | 2 +-
- arch/arm/boot/dts/exynos5250-smdk5250.dts                        | 2 +-
- arch/arm/boot/dts/exynos5250-snow-common.dtsi                    | 2 +-
- arch/arm/boot/dts/exynos5250-spring.dts                          | 2 +-
- arch/arm/boot/dts/exynos5410-odroidxu.dts                        | 2 +-
- arch/arm/boot/dts/exynos5420-peach-pit.dts                       | 2 +-
- arch/arm/boot/dts/exynos5420-smdk5420.dts                        | 2 +-
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi               | 4 ++--
- arch/arm/boot/dts/exynos5800-peach-pi.dts                        | 2 +-
- 12 files changed, 14 insertions(+), 14 deletions(-)
+ arch/arm64/boot/dts/exynos/exynos7.dtsi | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
