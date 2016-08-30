@@ -1,56 +1,80 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 30 Aug 2016 13:54:20 +0100
-Subject: [PATCH v3] Added perf functionality to mmdc driver
-In-Reply-To: <20160830114329.GB8366@tiger>
-References: <20160817194253.16300-1-zhengyu.shen@nxp.com>
- <CAHrpEqTtCnEU1v1sEuN8yJGPudDRZ5A79=Wn5Bp4SgTxDiNTQQ@mail.gmail.com>
- <20160830114329.GB8366@tiger>
-Message-ID: <20160830125420.GG1223@leverpostej>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 30 Aug 2016 14:56:22 +0200
+Subject: [PATCH] drm/sun4i: Clear encoder->bridge if a bridge is not found
+In-Reply-To: <20160830122223.21377-1-wens@csie.org>
+References: <20160830122223.21377-1-wens@csie.org>
+Message-ID: <20160830125622.GF18605@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Aug 30, 2016 at 07:43:29PM +0800, Shawn Guo wrote:
-> On Mon, Aug 29, 2016 at 11:06:44AM -0500, Zhi Li wrote:
-> > On Wed, Aug 17, 2016 at 2:42 PM, Zhengyu Shen <zhengyu.shen@nxp.com> wrote:
-> > > MMDC is a multi-mode DDR controller that supports DDR3/DDR3L x16/x32/x64
-> > > and LPDDR2 two channel x16/x32 memory types. MMDC is configurable, high
-> > > performance, and optimized. MMDC is present on i.MX6 Quad and i.MX6
-> > > QuadPlus devices, but this driver only supports i.MX6 Quad at the moment.
-> > > MMDC provides registers for performance counters which read via this
-> > > driver to help debug memory throughput and similar issues.
-> > >
-> > > $ perf stat -a -e mmdc/busy-cycles/,mmdc/read-accesses/,mmdc/read-bytes/,mmdc/total-cycles/,mmdc/write-accesses/,mmdc/write-bytes/ dd if=/dev/zero of=/dev/null bs=1M count=5000
-> > > Performance counter stats for 'dd if=/dev/zero of=/dev/null bs=1M count=5000':
-> > >
-> > >          898021787      mmdc/busy-cycles/
-> > >           14819600      mmdc/read-accesses/
-> > >             471.30 MB   mmdc/read-bytes/
-> > >         2815419216      mmdc/total-cycles/
-> > >           13367354      mmdc/write-accesses/
-> > >             427.76 MB   mmdc/write-bytes/
-> > >
-> > >        5.334757334 seconds time elapsed
-> > >
-> > > Signed-off-by: Zhengyu Shen <zhengyu.shen@nxp.com>
-> > > Signed-off-by: Frank Li <frank.li@nxp.com>
-> > 
-> > Shawn Guo:
-> > 
-> >          No new comments got more than 1 weeks.
-> >          Did you plan accept it?
+On Tue, Aug 30, 2016 at 08:22:23PM +0800, Chen-Yu Tsai wrote:
+> The KMS helpers (drm_atomic_helper_check_modeset/mode_fixup) pass
+> encoder->bridge directly to drm_bridge_mode_fixup, which expects a
+> valid pointer, or NULL (in which case it just returns).
 > 
-> @Mark, how do you think of this version?
+> Clear encoder->bridge if a bridge is not found, instead of keeping
+> the ERR_PTR value.
+> 
+> Since other drm_bridge functions also follow this pattern of checking
+> for a non-NULL pointer, we can drop the ifs around the calls and just
+> pass the pointer directly.
+> 
+> Fixes: 894f5a9f4b4a ("drm/sun4i: Add bridge support")
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  drivers/gpu/drm/sun4i/sun4i_rgb.c | 11 ++++++-----
+>  1 file changed, 6 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> index d4e52522ec53..ee0795152a33 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> @@ -154,8 +154,7 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
+>  	if (!IS_ERR(tcon->panel))
+>  		drm_panel_enable(tcon->panel);
+>  
+> -	if (!IS_ERR(encoder->bridge))
+> -		drm_bridge_enable(encoder->bridge);
+> +	drm_bridge_enable(encoder->bridge);
+>  
+>  	sun4i_tcon_channel_enable(tcon, 0);
+>  }
+> @@ -170,8 +169,7 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
+>  
+>  	sun4i_tcon_channel_disable(tcon, 0);
+>  
+> -	if (!IS_ERR(encoder->bridge))
+> -		drm_bridge_disable(encoder->bridge);
+> +	drm_bridge_disable(encoder->bridge);
 
-Sorry, I've been away for the last week and haven't had the chance to
-look at this yet. I will try to get round to it in the next few days.
+I'd rather keep those changes, it makes it obvious that it's something
+optionnal, that can be set to NULL.
 
-In the meantime, could you please try attacking this with Vince's perf
-fuzzer [1] (as root, or with perf_event_paranoid dropped to -1)? It's
-rather good at finding (subtle) issues in drivers.
+>  	if (!IS_ERR(tcon->panel))
+>  		drm_panel_disable(tcon->panel);
+> @@ -230,6 +228,9 @@ int sun4i_rgb_init(struct drm_device *drm)
+>  		return 0;
+>  	}
+>  
+> +	if (IS_ERR(encoder->bridge))
+> +		encoder->bridge = NULL;
+> +
 
-Thanks,
-Mark.
+And that could be the else condition of the if statement below.
 
-[1] https://github.com/deater/perf_event_tests
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160830/9deb77a5/attachment.sig>
