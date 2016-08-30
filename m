@@ -1,86 +1,25 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 30 Aug 2016 15:38:25 +0100
-Subject: [PATCH v2 8/9] arm64: head.S: use ordinary stack frame for
- __primary_switched()
-In-Reply-To: <1472049366-10922-9-git-send-email-ard.biesheuvel@linaro.org>
-References: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
- <1472049366-10922-9-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160830143825.GK1223@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 30 Aug 2016 16:41:59 +0200
+Subject: [PATCH 1/3] ARM: integrator: delete some auxdata
+In-Reply-To: <1472565569-11414-1-git-send-email-linus.walleij@linaro.org>
+References: <1472565569-11414-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <201608301641.59299.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 04:36:05PM +0200, Ard Biesheuvel wrote:
-> Instead of stashing the value of the link register in x28 before setting
-> up the stack and calling into C code, create an ordinary PCS compatible
-> stack frame so that we can push the return address onto the stack.
+On Tuesday 30 August 2016, Linus Walleij wrote:
+> There is just a few auxdata entries still needed on the Integrators:
 > 
-> Since exception handlers require a stack as well, assign the stach pointer
-> register before installing the vector table.
-
-Nit: s/stach/stack/
-
-> Note that this accounts for the difference between THREAD_START_SP and
-> THREAD_SIZE, given that the stack pointer is always decremented before
-> calling into any C code.
+> - UART RTS/CTS callbacks for Integrator/AP
+> - MMC/SD special card detect quirk for Integrator/CP
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
-> ---
->  arch/arm64/kernel/head.S | 18 +++++++++---------
->  1 file changed, 9 insertions(+), 9 deletions(-)
+> Delete the rest.
 > 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 27f51272de68..ad1dc61d67ac 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -415,13 +415,18 @@ ENDPROC(__create_page_tables)
->   *
->   *   x0 = __PHYS_OFFSET
->   */
-> -	.set	initial_sp, init_thread_union + THREAD_START_SP
->  __primary_switched:
-> -	mov	x28, lr				// preserve LR
-> +	adrp	x4, init_thread_union
-> +	add	sp, x4, #THREAD_SIZE
-> +	msr	sp_el0, x4			// Save thread_info
-> +
->  	adr_l	x8, vectors			// load VBAR_EL1 with virtual
->  	msr	vbar_el1, x8			// vector table address
->  	isb
->  
-> +	stp	xzr, x30, [sp, #-16]!
-> +	mov	x29, sp
-> +
->  	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
->  
->  	ldr_l	x4, kimage_vaddr		// Save the offset between
-> @@ -436,11 +441,6 @@ __primary_switched:
->  	bl	__pi_memset
->  	dsb	ishst				// Make zero page visible to PTW
->  
-> -	adr_l	sp, initial_sp, x4
-> -	mov	x4, sp
-> -	and	x4, x4, #~(THREAD_SIZE - 1)
-> -	msr	sp_el0, x4			// Save thread_info
-> -	mov	x29, #0
->  #ifdef CONFIG_KASAN
->  	bl	kasan_early_init
->  #endif
-> @@ -452,8 +452,8 @@ __primary_switched:
->  	bl	kaslr_early_init		// parse FDT for KASLR options
->  	cbz	x0, 0f				// KASLR disabled? just proceed
->  	orr	x23, x23, x0			// record KASLR offset
-> -	ret	x28				// we must enable KASLR, return
-> -						// to __primary_switch()
-> +	ldp	x29, x30, [sp], #16		// we must enable KASLR, return
-> +	ret					// to __primary_switch()
->  0:
->  #endif
->  	b	start_kernel
-> -- 
-> 2.7.4
-> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+
+Nice patches! I've had a look over them and they all seem reasonable,
+and I didn't see any obvious other parts that can be as easily removed
+here (I thought I did at first, but they all ended up being
+slightly trickier).
+
+	Arnd
