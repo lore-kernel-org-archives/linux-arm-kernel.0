@@ -1,93 +1,48 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Tue, 30 Aug 2016 17:25:56 +0930
-Subject: [PATCH v3 3/7] aspeed-g4: Add syscon and pin controller nodes
+Date: Tue, 30 Aug 2016 17:25:59 +0930
+Subject: [PATCH v3 6/7] aspeed-g5: Add syscon and pin controller nodes
 In-Reply-To: <20160830075600.11559-1-andrew@aj.id.au>
 References: <20160830075600.11559-1-andrew@aj.id.au>
-Message-ID: <20160830075600.11559-4-andrew@aj.id.au>
+Message-ID: <20160830075600.11559-7-andrew@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The pin controller's child nodes expose the functions currently
-implemented in the the g4 pin controller driver.
+implemented in the g5 pin controller driver.
 
 Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
 ---
- arch/arm/boot/dts/aspeed-g4.dtsi | 420 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 420 insertions(+)
+ arch/arm/boot/dts/aspeed-g5.dtsi | 204 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 204 insertions(+)
 
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 22dee5937d5c..a5d6e81e318a 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -54,6 +54,426 @@
- 				clocks = <&clk_clkin>;
+diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+index dd94d9361fda..24d79c88019f 100644
+--- a/arch/arm/boot/dts/aspeed-g5.dtsi
++++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+@@ -44,6 +44,210 @@
+ 				reg = <0x1e6e2070 0x04>;
  			};
  
 +			syscon: syscon at 1e6e2000 {
-+				compatible = "aspeed,g4-scu", "syscon", "simple-mfd";
++				compatible = "aspeed,g5-scu", "syscon", "simple-mfd";
 +				reg = <0x1e6e2000 0x1a8>;
 +
 +				pinctrl: pinctrl {
-+					compatible = "aspeed,g4-pinctrl";
-+
-+					pinctrl_acpi_default: acpi_default {
-+						function = "ACPI";
-+						groups = "ACPI";
-+					};
-+
-+					pinctrl_bmcint_default: bmcint_default {
-+						function = "BMCINT";
-+						groups = "BMCINT";
-+					};
-+
-+					pinctrl_ddcclk_default: ddcclk_default {
-+						function = "DDCCLK";
-+						groups = "DDCCLK";
-+					};
-+
-+					pinctrl_ddcdat_default: ddcdat_default {
-+						function = "DDCDAT";
-+						groups = "DDCDAT";
-+					};
-+
-+					pinctrl_flack_default: flack_default {
-+						function = "FLACK";
-+						groups = "FLACK";
-+					};
-+
-+					pinctrl_flbusy_default: flbusy_default {
-+						function = "FLBUSY";
-+						groups = "FLBUSY";
-+					};
-+
-+					pinctrl_flwp_default: flwp_default {
-+						function = "FLWP";
-+						groups = "FLWP";
-+					};
++					compatible = "aspeed,g5-pinctrl";
 +
 +					pinctrl_gpid0_default: gpid0_default {
 +						function = "GPID0";
 +						groups = "GPID0";
 +					};
 +
++					pinctrl_gpid2_default: gpid2_default {
++						function = "GPID2";
++						groups = "GPID2";
++					};
++
 +					pinctrl_gpie0_default: gpie0_default {
 +						function = "GPIE0";
 +						groups = "GPIE0";
-+					};
-+
-+					pinctrl_gpie2_default: gpie2_default {
-+						function = "GPIE2";
-+						groups = "GPIE2";
-+					};
-+
-+					pinctrl_gpie4_default: gpie4_default {
-+						function = "GPIE4";
-+						groups = "GPIE4";
-+					};
-+
-+					pinctrl_gpie6_default: gpie6_default {
-+						function = "GPIE6";
-+						groups = "GPIE6";
 +					};
 +
 +					pinctrl_i2c10_default: i2c10_default {
@@ -108,6 +63,11 @@ index 22dee5937d5c..a5d6e81e318a 100644
 +					pinctrl_i2c13_default: i2c13_default {
 +						function = "I2C13";
 +						groups = "I2C13";
++					};
++
++					pinctrl_i2c14_default: i2c14_default {
++						function = "I2C14";
++						groups = "I2C14";
 +					};
 +
 +					pinctrl_i2c3_default: i2c3_default {
@@ -145,19 +105,9 @@ index 22dee5937d5c..a5d6e81e318a 100644
 +						groups = "I2C9";
 +					};
 +
-+					pinctrl_lpcpd_default: lpcpd_default {
-+						function = "LPCPD";
-+						groups = "LPCPD";
-+					};
-+
-+					pinctrl_lpcpme_default: lpcpme_default {
-+						function = "LPCPME";
-+						groups = "LPCPME";
-+					};
-+
-+					pinctrl_lpcsmi_default: lpcsmi_default {
-+						function = "LPCSMI";
-+						groups = "LPCSMI";
++					pinctrl_mac1link_default: mac1link_default {
++						function = "MAC1LINK";
++						groups = "MAC1LINK";
 +					};
 +
 +					pinctrl_mdio1_default: mdio1_default {
@@ -170,79 +120,14 @@ index 22dee5937d5c..a5d6e81e318a 100644
 +						groups = "MDIO2";
 +					};
 +
-+					pinctrl_ncts1_default: ncts1_default {
-+						function = "NCTS1";
-+						groups = "NCTS1";
++					pinctrl_oscclk_default: oscclk_default {
++						function = "OSCCLK";
++						groups = "OSCCLK";
 +					};
 +
-+					pinctrl_ncts3_default: ncts3_default {
-+						function = "NCTS3";
-+						groups = "NCTS3";
-+					};
-+
-+					pinctrl_ncts4_default: ncts4_default {
-+						function = "NCTS4";
-+						groups = "NCTS4";
-+					};
-+
-+					pinctrl_ndcd1_default: ndcd1_default {
-+						function = "NDCD1";
-+						groups = "NDCD1";
-+					};
-+
-+					pinctrl_ndcd3_default: ndcd3_default {
-+						function = "NDCD3";
-+						groups = "NDCD3";
-+					};
-+
-+					pinctrl_ndcd4_default: ndcd4_default {
-+						function = "NDCD4";
-+						groups = "NDCD4";
-+					};
-+
-+					pinctrl_ndsr1_default: ndsr1_default {
-+						function = "NDSR1";
-+						groups = "NDSR1";
-+					};
-+
-+					pinctrl_ndsr3_default: ndsr3_default {
-+						function = "NDSR3";
-+						groups = "NDSR3";
-+					};
-+
-+					pinctrl_ndtr1_default: ndtr1_default {
-+						function = "NDTR1";
-+						groups = "NDTR1";
-+					};
-+
-+					pinctrl_ndtr3_default: ndtr3_default {
-+						function = "NDTR3";
-+						groups = "NDTR3";
-+					};
-+
-+					pinctrl_nri1_default: nri1_default {
-+						function = "NRI1";
-+						groups = "NRI1";
-+					};
-+
-+					pinctrl_nri3_default: nri3_default {
-+						function = "NRI3";
-+						groups = "NRI3";
-+					};
-+
-+					pinctrl_nri4_default: nri4_default {
-+						function = "NRI4";
-+						groups = "NRI4";
-+					};
-+
-+					pinctrl_nrts1_default: nrts1_default {
-+						function = "NRTS1";
-+						groups = "NRTS1";
-+					};
-+
-+					pinctrl_nrts3_default: nrts3_default {
-+						function = "NRTS3";
-+						groups = "NRTS3";
++					pinctrl_pewake_default: pewake_default {
++						function = "PEWAKE";
++						groups = "PEWAKE";
 +					};
 +
 +					pinctrl_pwm0_default: pwm0_default {
@@ -290,54 +175,19 @@ index 22dee5937d5c..a5d6e81e318a 100644
 +						groups = "RGMII1";
 +					};
 +
++					pinctrl_rgmii2_default: rgmii2_default {
++						function = "RGMII2";
++						groups = "RGMII2";
++					};
++
 +					pinctrl_rmii1_default: rmii1_default {
 +						function = "RMII1";
 +						groups = "RMII1";
 +					};
 +
-+					pinctrl_rom16_default: rom16_default {
-+						function = "ROM16";
-+						groups = "ROM16";
-+					};
-+
-+					pinctrl_rom8_default: rom8_default {
-+						function = "ROM8";
-+						groups = "ROM8";
-+					};
-+
-+					pinctrl_romcs1_default: romcs1_default {
-+						function = "ROMCS1";
-+						groups = "ROMCS1";
-+					};
-+
-+					pinctrl_romcs2_default: romcs2_default {
-+						function = "ROMCS2";
-+						groups = "ROMCS2";
-+					};
-+
-+					pinctrl_romcs3_default: romcs3_default {
-+						function = "ROMCS3";
-+						groups = "ROMCS3";
-+					};
-+
-+					pinctrl_romcs4_default: romcs4_default {
-+						function = "ROMCS4";
-+						groups = "ROMCS4";
-+					};
-+
-+					pinctrl_rxd1_default: rxd1_default {
-+						function = "RXD1";
-+						groups = "RXD1";
-+					};
-+
-+					pinctrl_rxd3_default: rxd3_default {
-+						function = "RXD3";
-+						groups = "RXD3";
-+					};
-+
-+					pinctrl_rxd4_default: rxd4_default {
-+						function = "RXD4";
-+						groups = "RXD4";
++					pinctrl_rmii2_default: rmii2_default {
++						function = "RMII2";
++						groups = "RMII2";
 +					};
 +
 +					pinctrl_sd1_default: sd1_default {
@@ -345,24 +195,14 @@ index 22dee5937d5c..a5d6e81e318a 100644
 +						groups = "SD1";
 +					};
 +
-+					pinctrl_sgpmi_default: sgpmi_default {
-+						function = "SGPMI";
-+						groups = "SGPMI";
++					pinctrl_spi1_default: spi1_default {
++						function = "SPI1";
++						groups = "SPI1";
 +					};
 +
-+					pinctrl_siopbi_default: siopbi_default {
-+						function = "SIOPBI";
-+						groups = "SIOPBI";
-+					};
-+
-+					pinctrl_siopbo_default: siopbo_default {
-+						function = "SIOPBO";
-+						groups = "SIOPBO";
-+					};
-+
-+					pinctrl_timer3_default: timer3_default {
-+						function = "TIMER3";
-+						groups = "TIMER3";
++					pinctrl_timer4_default: timer4_default {
++						function = "TIMER4";
++						groups = "TIMER4";
 +					};
 +
 +					pinctrl_timer5_default: timer5_default {
@@ -384,67 +224,11 @@ index 22dee5937d5c..a5d6e81e318a 100644
 +						function = "TIMER8";
 +						groups = "TIMER8";
 +					};
-+
-+					pinctrl_txd1_default: txd1_default {
-+						function = "TXD1";
-+						groups = "TXD1";
-+					};
-+
-+					pinctrl_txd3_default: txd3_default {
-+						function = "TXD3";
-+						groups = "TXD3";
-+					};
-+
-+					pinctrl_txd4_default: txd4_default {
-+						function = "TXD4";
-+						groups = "TXD4";
-+					};
-+
-+					pinctrl_uart6_default: uart6_default {
-+						function = "UART6";
-+						groups = "UART6";
-+					};
-+
-+					pinctrl_vgahs_default: vgahs_default {
-+						function = "VGAHS";
-+						groups = "VGAHS";
-+					};
-+
-+					pinctrl_vgavs_default: vgavs_default {
-+						function = "VGAVS";
-+						groups = "VGAVS";
-+					};
-+
-+					pinctrl_vpi18_default: vpi18_default {
-+						function = "VPI18";
-+						groups = "VPI18";
-+					};
-+
-+					pinctrl_vpi24_default: vpi24_default {
-+						function = "VPI24";
-+						groups = "VPI24";
-+					};
-+
-+					pinctrl_vpi30_default: vpi30_default {
-+						function = "VPI30";
-+						groups = "VPI30";
-+					};
-+
-+					pinctrl_vpo12_default: vpo12_default {
-+						function = "VPO12";
-+						groups = "VPO12";
-+					};
-+
-+					pinctrl_vpo24_default: vpo24_default {
-+						function = "VPO24";
-+						groups = "VPO24";
-+					};
-+
 +				};
 +			};
 +
- 			clk_apb: clk_apb at 1e6e2008 {
+ 			clk_hpll: clk_hpll at 1e6e2024 {
  				#clock-cells = <0>;
- 				compatible = "aspeed,g4-apb-clock";
+ 				compatible = "aspeed,g5-hpll-clock";
 -- 
 2.9.3.1.g0db844e
