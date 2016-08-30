@@ -1,83 +1,111 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 30 Aug 2016 11:01:48 +0100
-Subject: [PATCH v8 15/18] ARM: STi: DT: STiH407: Add uniperif reader dt
+Date: Tue, 30 Aug 2016 11:02:58 +0100
+Subject: [PATCH v8 14/18] ARM: STi: DT: STiH407: Add uniperif player dt
  nodes
-In-Reply-To: <1472223413-7254-16-git-send-email-peter.griffin@linaro.org>
+In-Reply-To: <1472223413-7254-15-git-send-email-peter.griffin@linaro.org>
 References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
- <1472223413-7254-16-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20160830100148.GO1661@dell>
+ <1472223413-7254-15-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20160830100258.GP1661@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 26 Aug 2016, Peter Griffin wrote:
 
-> This patch adds the DT node for the uniperif reader
-> IP block found on STiH407 family silicon.
+> This patch adds the DT nodes for the uniperif player
+> IP blocks found on STiH407 family silicon.
 > 
 > Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 > ---
->  arch/arm/boot/dts/stih407-family.dtsi | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
-> 
+>  arch/arm/boot/dts/stih407-family.dtsi | 76 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 76 insertions(+)
+
+Same comments as in patch 14.
+
 > diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> index d263c96..bdddf2c 100644
+> index d1258d5..d263c96 100644
 > --- a/arch/arm/boot/dts/stih407-family.dtsi
 > +++ b/arch/arm/boot/dts/stih407-family.dtsi
-> @@ -956,5 +956,31 @@
->  			st,version = <5>;
->  			st,mode = "SPDIF";
+> @@ -880,5 +880,81 @@
+>  			status = "disabled";
+>  			st,syscfg = <&syscfg_core>;
 >  		};
 > +
-> +		sti_uni_reader0: sti-uni-reader at 0 {
-> +			compatible = "st,sti-uni-reader";
+> +		sti_uni_player0: sti-uni-player at 0 {
+> +			compatible = "st,sti-uni-player";
 > +			status = "disabled";
-
-I find it's normally nicer to place the status of the node at the
-bottom, separated by a '\n'.  There isn't a functional difference
-admittedly, but it would be my preference, since it's not describing
-the device per se.
-
 > +			#sound-dai-cells = <0>;
 > +			st,syscfg = <&syscfg_core>;
-> +			reg = <0x8D83000 0x158>;
-
-We usually use lower-case for the address.
-
-Since this has a 'reg' property, the '0' in the node name does not
-look appropriate.
-
-> +			interrupts = <GIC_SPI 87 IRQ_TYPE_NONE>;
-> +			dmas = <&fdma0 5 0 1>;
-> +			dma-names = "rx";
-> +			dai-name = "Uni Reader #0 (PCM IN)";
-
-Oooo, not seen something like this before.
-
-If it does not already have one, it would require a DT Ack.
-
-> +			st,version = <3>;
-
-This will likely need a DT Ack too.  We usually encode this sort of
-information in the compatible string.
-
+> +			clocks = <&clk_s_d0_flexgen CLK_PCM_0>;
+> +			assigned-clocks = <&clk_s_d0_quadfs 0>, <&clk_s_d0_flexgen CLK_PCM_0>;
+> +			assigned-clock-parents = <0>, <&clk_s_d0_quadfs 0>;
+> +			assigned-clock-rates = <50000000>;
+> +			reg = <0x8D80000 0x158>;
+> +			interrupts = <GIC_SPI 84 IRQ_TYPE_NONE>;
+> +			dmas = <&fdma0 2 0 1>;
+> +			dai-name = "Uni Player #0 (HDMI)";
+> +			dma-names = "tx";
+> +			st,uniperiph-id = <0>;
+> +			st,version = <5>;
+> +			st,mode = "HDMI";
 > +		};
 > +
-> +		sti_uni_reader1: sti-uni-reader at 1 {
-> +			compatible = "st,sti-uni-reader";
+> +		sti_uni_player1: sti-uni-player at 1 {
+> +			compatible = "st,sti-uni-player";
 > +			status = "disabled";
 > +			#sound-dai-cells = <0>;
 > +			st,syscfg = <&syscfg_core>;
-> +			reg = <0x8D84000 0x158>;
-> +			interrupts = <GIC_SPI 88 IRQ_TYPE_NONE>;
-> +			dmas = <&fdma0 6 0 1>;
-> +			dma-names = "rx";
-> +			dai-name = "Uni Reader #1 (HDMI RX)";
-> +			st,version = <3>;
+> +			clocks = <&clk_s_d0_flexgen CLK_PCM_1>;
+> +			assigned-clocks = <&clk_s_d0_quadfs 1>, <&clk_s_d0_flexgen CLK_PCM_1>;
+> +			assigned-clock-parents = <0>, <&clk_s_d0_quadfs 1>;
+> +			assigned-clock-rates = <50000000>;
+> +			reg = <0x8D81000 0x158>;
+> +			interrupts = <GIC_SPI 85 IRQ_TYPE_NONE>;
+> +			dmas = <&fdma0 3 0 1>;
+> +			dai-name = "Uni Player #1 (PIO)";
+> +			dma-names = "tx";
+> +			st,uniperiph-id = <1>;
+> +			st,version = <5>;
+> +			st,mode = "PCM";
 > +		};
-
-All as above.
-
+> +
+> +		sti_uni_player2: sti-uni-player at 2 {
+> +			compatible = "st,sti-uni-player";
+> +			status = "disabled";
+> +			#sound-dai-cells = <0>;
+> +			st,syscfg = <&syscfg_core>;
+> +			clocks = <&clk_s_d0_flexgen CLK_PCM_2>;
+> +			assigned-clocks = <&clk_s_d0_quadfs 2>, <&clk_s_d0_flexgen CLK_PCM_2>;
+> +			assigned-clock-parents = <0>, <&clk_s_d0_quadfs 2>;
+> +			assigned-clock-rates = <50000000>;
+> +			reg = <0x8D82000 0x158>;
+> +			interrupts = <GIC_SPI 86 IRQ_TYPE_NONE>;
+> +			dmas = <&fdma0 4 0 1>;
+> +			dai-name = "Uni Player #1 (DAC)";
+> +			dma-names = "tx";
+> +			st,uniperiph-id = <2>;
+> +			st,version = <5>;
+> +			st,mode = "PCM";
+> +		};
+> +
+> +		sti_uni_player3: sti-uni-player at 3 {
+> +			compatible = "st,sti-uni-player";
+> +			status = "disabled";
+> +			#sound-dai-cells = <0>;
+> +			st,syscfg = <&syscfg_core>;
+> +			clocks = <&clk_s_d0_flexgen CLK_SPDIFF>;
+> +			assigned-clocks = <&clk_s_d0_quadfs 3>, <&clk_s_d0_flexgen CLK_SPDIFF>;
+> +			assigned-clock-parents = <0>, <&clk_s_d0_quadfs 3>;
+> +			assigned-clock-rates = <50000000>;
+> +			reg = <0x8D85000 0x158>;
+> +			interrupts = <GIC_SPI 89 IRQ_TYPE_NONE>;
+> +			dmas = <&fdma0 7 0 1>;
+> +			dma-names = "tx";
+> +			dai-name = "Uni Player #1 (PIO)";
+> +			st,uniperiph-id = <3>;
+> +			st,version = <5>;
+> +			st,mode = "SPDIF";
+> +		};
 >  	};
 >  };
 
