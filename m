@@ -1,61 +1,44 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 30 Aug 2016 11:24:13 +0100
-Subject: [PATCH v8 10/18] ARM: DT: STiH407: Add i2s_out pinctrl
- configuration
-In-Reply-To: <1472223413-7254-11-git-send-email-peter.griffin@linaro.org>
+Date: Tue, 30 Aug 2016 11:25:03 +0100
+Subject: [PATCH v8 09/18] ARM: multi_v7_defconfig: Enable STi and
+ simple-card drivers.
+In-Reply-To: <1472223413-7254-10-git-send-email-peter.griffin@linaro.org>
 References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
- <1472223413-7254-11-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20160830102413.GU1661@dell>
+ <1472223413-7254-10-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20160830102503.GV1661@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Aug 2016, Peter Griffin wrote:
+Nit: Remove full-stop from $SUBJECT
 
-> This patch adds the pinctrl config for the i2s_out pins
-> used by the uniperif player IP.
+On Fri, 26 Aug 2016, Peter Griffin wrote:
+> This patch enables the STi ALSA drivers found on STi platforms
+> as well as the simple-card driver which is a dependency to have
+> working sound.
 > 
-> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Cc: arnaud.pouliquen at st.com
+> Cc: broonie at kernel.org
 > ---
->  arch/arm/boot/dts/stih407-pinctrl.dtsi | 23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
+>  arch/arm/configs/multi_v7_defconfig | 3 +++
+>  1 file changed, 3 insertions(+)
 
 Acked-by: Lee Jones <lee.jones@linaro.org>
-
-> diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> index a538ae5..0fb5c8a 100644
-> --- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> @@ -1067,6 +1067,29 @@
->  				};
->  			};
->  
-> +			i2s_out {
-> +				pinctrl_i2s_8ch_out: i2s_8ch_out{
-> +					st,pins {
-> +						mclk = <&pio33 5 ALT1 OUT>;
-> +						lrclk = <&pio33 7 ALT1 OUT>;
-> +						sclk = <&pio33 6 ALT1 OUT>;
-> +						data0 = <&pio33 4 ALT1 OUT>;
-> +						data1 = <&pio34 0 ALT1 OUT>;
-> +						data2 = <&pio34 1 ALT1 OUT>;
-> +						data3 = <&pio34 2 ALT1 OUT>;
-> +					};
-> +				};
-> +
-> +				pinctrl_i2s_2ch_out: i2s_2ch_out{
-> +					st,pins {
-> +						mclk = <&pio33 5 ALT1 OUT>;
-> +						lrclk = <&pio33 7 ALT1 OUT>;
-> +						sclk = <&pio33 6 ALT1 OUT>;
-> +						data0 = <&pio33 4 ALT1 OUT>;
-> +					};
-> +				};
-> +			};
-> +
->  			serial3 {
->  				pinctrl_serial3: serial3-0 {
->  					st,pins {
+  
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 998578a..51a38b1 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -644,6 +644,9 @@ CONFIG_SND_SOC_AK4642=m
+>  CONFIG_SND_SOC_SGTL5000=m
+>  CONFIG_SND_SOC_SPDIF=m
+>  CONFIG_SND_SOC_WM8978=m
+> +CONFIG_SND_SOC_STI=m
+> +CONFIG_SND_SOC_STI_SAS=m
+> +CONFIG_SND_SIMPLE_CARD=m
+>  CONFIG_USB=y
+>  CONFIG_USB_XHCI_HCD=y
+>  CONFIG_USB_XHCI_MVEBU=y
 
 -- 
 Lee Jones
