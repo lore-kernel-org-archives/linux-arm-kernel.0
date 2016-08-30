@@ -1,85 +1,33 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 30 Aug 2016 14:24:53 +0530
-Subject: [PATCH] ARM: dts: da850: Add missing pin muxing for the UARTs
-In-Reply-To: <20160826171718.GB20752@gobelin>
-References: <20160804110656.25318-1-kbeldan@baylibre.com>
- <m2eg64pchw.fsf@baylibre.com> <20160804210045.GD15013@gobelin>
- <m2fuqknnqk.fsf@baylibre.com> <fe36e8d1-f371-b093-de15-5e03370ea38c@ti.com>
- <dd4712ba-6144-8c64-59a6-7673936af53c@ti.com>
- <20160824082934.GA20246@gobelin>
- <a076cc95-d338-ec13-ba05-360c1857cda5@ti.com>
- <20160826171718.GB20752@gobelin>
-Message-ID: <c3b0be53-d9ed-574e-4699-3e294ec6c927@ti.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 30 Aug 2016 11:54:42 +0300
+Subject: [PATCH] video: ARM CLCD: fix up Integrator support
+In-Reply-To: <1472462971-8935-1-git-send-email-linus.walleij@linaro.org>
+References: <1472462971-8935-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <533a2463-daf2-be9c-491a-da7d6037728b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 August 2016 10:47 PM, Karl Beldan wrote:
-
->>> Also I think it would be better for the serial nodes to reclaim the rxtx
->>> pins in the dtsi, and override the reclaimed pins in the .dts only for
->>> the nodes reclaiming flow control (some other pins could also be
->>> directly reclaimed in the dtsi).
->>
->> You lost me here. I guess I will benefit from a code snippet to
->> illustrate the intention.
->>
+On 29/08/16 12:29, Linus Walleij wrote:
+> We need to mask all registers of the Integrator/CP core module
+> control register, and actually write the calculated value to the
+> control register, not the mask.
 > 
-> Sure, instead of having: {
+> Tested on the Integrator/CP with RGB5551 VGA and works like a
+> charm after this patch.
 > 
-> ### board.dts:
-> &serialN {
-> 	pinctrl-names = "default";
-> 	pinctrl-0 = <&serialN_rxtx_pins>;
-> 	status = "okay";
-> };
-> &serialN+1 {
-> 	pinctrl-names = "default";
-> 	pinctrl-0 = <&serialN+1_rxtx_pins>, <&serialN+1_rtscts_pins>;
-> 	status = "okay";
-> };
-> 
-> } use ------------------ {
-> 
-> ### plat.dtsi:
-> serialN: serial at xxxxx {
-> 	compatible = "ns16550a";
-> 	pinctrl-0 = <&serialN_rxtx_pins>;
-> 	status = "disabled";
-> 	[...]
-> };
-> serialN+1: serial at xxxxx {
-> 	compatible = "ns16550a";
-> 	pinctrl-0 = <&serialN+1_rxtx_pins>;
-> 	status = "disabled";
-> 	[...]
-> };
-> 
-> ### board.dts:
-> &serialN {
-> 	status = "okay";
-> };
-> &serialN+1 {
-> 	pinctrl-0 = <&serialN+1_rxtx_pins>, <&serialN+1_rtscts_pins>;
-> 	status = "okay";
-> };
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/video/fbdev/amba-clcd-versatile.c | 10 +++++++---
+>  1 file changed, 7 insertions(+), 3 deletions(-)
 
-I dont think it is a good idea to specify a pinctrl setting in
-da850.dtsi and override it in board.dts. Fundamentally I am against
-having properties in <soc.dtsi> overridden from <board.dts>.  Sure, it
-saves some code in some cases, but it is confusing to read/debug and you
-are never sure that the property you seen set in one place is the one
-finally taking effect.
+Thanks, queued for 4.9.
 
-The only notable exception is 'status' property. If you see other
-exceptions in DaVinci, its only because of my oversight.
+ Tomi
 
->> It would be nice if you could fixup mcasp0_pins in da850-evm.dts. Surely
->> it is doing more than what is needed.
->>
-> 
-> According to the schematics it is indeed, I could squeeze it in the series.
-
-Thanks!
-
-Regards,
-Sekhar
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160830/b2b1d6df/attachment.sig>
