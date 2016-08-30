@@ -1,23 +1,43 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 30 Aug 2016 22:34:22 +0530
-Subject: [PATCH V3 3/3] dmaengine: qcom_hidma: add error reporting for
- tx_status
-In-Reply-To: <1471927691-28827-4-git-send-email-okaya@codeaurora.org>
-References: <1471927691-28827-1-git-send-email-okaya@codeaurora.org>
- <1471927691-28827-4-git-send-email-okaya@codeaurora.org>
-Message-ID: <20160830170422.GN9355@localhost>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 30 Aug 2016 17:57:54 +0100
+Subject: [GIT PULL] ARM: module PLT optimizations
+Message-ID: <CAKv+Gu-=C_WwO30D=0nZCx9FMhj7qrHFzvkk4xnG81Y0t1bdUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2016 at 12:48:11AM -0400, Sinan Kaya wrote:
+Hello Russell,
 
->  	spin_lock_init(&lldev->lock);
-> -	tasklet_init(&lldev->rst_task, hidma_ll_abort, (unsigned long)lldev);
+The following changes since commit 3eab887a55424fc2c27553b7bfe32330df83f7b8:
 
-??
+  Linux 4.8-rc4 (2016-08-28 15:04:33 -0700)
 
-This is not described in changlog? If you are not using in anywhere else,
-then rst_task variable should be removed too..
+are available in the git repository at:
 
--- 
-~Vinod
+  git://git.linaro.org/people/ard.biesheuvel/linux-arm.git \
+                                          tags/arm-plt-optimizations-for-v4.9
+
+for you to fetch changes up to 66e94ba3c8ea5ff5f1443a50441f953ef44010b1:
+
+  ARM: kernel: avoid brute force search on PLT generation
+                                          (2016-08-30 17:45:34 +0100)
+
+----------------------------------------------------------------
+This series of 4 patches optimizes the ARM PLT generation code that
+is invoked at module load time, to get rid of the O(n^2) algorithm
+that results in pathological load times of 10 seconds or more for
+large modules on certain STB platforms
+
+----------------------------------------------------------------
+Ard Biesheuvel (4):
+      ARM: kernel: merge core and init PLTs
+      ARM: kernel: allocate PLT entries only for external symbols
+      ARM: kernel: sort relocation sections before allocating PLTs
+      ARM: kernel: avoid brute force search on PLT generation
+
+ arch/arm/include/asm/module.h |   6 +-
+ arch/arm/kernel/module-plts.c | 243 +++++++++++++++++++++++++-----------------
+ arch/arm/kernel/module.lds    |   3 +-
+ 3 files changed, 147 insertions(+), 105 deletions(-)
+
+Thanks,
+Ard.
