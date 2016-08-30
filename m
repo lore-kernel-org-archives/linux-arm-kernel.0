@@ -1,23 +1,47 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 30 Aug 2016 14:41:56 +0200
-Subject: [RFC PATCH v3 3/5] arm/arm64: vgic-new: Introduce find_reg_by_id()
-In-Reply-To: <1472037609-4164-4-git-send-email-vijay.kilari@gmail.com>
-References: <1472037609-4164-1-git-send-email-vijay.kilari@gmail.com>
- <1472037609-4164-4-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <20160830124156.GI10162@cbox>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 30 Aug 2016 13:47:09 +0100
+Subject: [PATCHv3] arm: l2x0: add PMU support
+In-Reply-To: <20160830111222.GN1041@n2100.armlinux.org.uk>
+References: <1472552178-26201-1-git-send-email-mark.rutland@arm.com>
+ <20160830111222.GN1041@n2100.armlinux.org.uk>
+Message-ID: <20160830124709.GF1223@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 04:50:07PM +0530, vijay.kilari at gmail.com wrote:
-> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+On Tue, Aug 30, 2016 at 12:12:22PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Aug 30, 2016 at 11:16:18AM +0100, Mark Rutland wrote:
+> > The L2C-220 (AKA L220) and L2C-310 (AKA PL310) cache controllers feature
+> > a Performance Monitoring Unit (PMU), which can be useful for tuning
+> > and/or debugging. This hardware is always present and the relevant
+> > registers are accessible to non-secure accesses. Thus, no special
+> > firmware interface is necessary.
+> > 
+> > This patch adds support for the PMU, plugging into the usual perf
+> > infrastructure. The overflow interrupt is not always available (e.g. on
+> > RealView PBX A9 it is not wired up at all), and the hardware counters
+> > saturate, so the driver does not make use of this. Instead, the driver
+> > periodically polls and reset counters as required to avoid losing
+> > events due to saturation.
+> ...
+> > +	/*
+> > +	 * Choose the name to identify the PMU under sysfs. This is also used
+> > +	 * by l2x0_pmu_event_attr_is_visible to determine which events to
+> > +	 * display, as the PL310 PMU supports a superset of L220 events.
+> > +	 *
+> > +	 * The L210 PMU has a different programmer's interface, and is not
+> > +	 * supported by this driver.
 > 
-> In order to implement vGICv3 CPU interface access, we will need to perform
-> table lookup of system registers. We would need both index_to_params() and
-> find_reg() exported for that purpose, but instead we export a single
-> function which combines them both.
+> This rather worries me a bit - if the L2C-210 needs a different driver,
+> should we be putting this driver in this file, or should we be keeping
+> it as a separate file?  What if L2C-210 grows a PMU driver which is
+> also tacked on the end of the file - it seems to me that this is rather
+> unwieldy.
 > 
-> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
-> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> My feeling is that we've already enough random bits tacked into this
+> file supporting all the L2C-210 related variants.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Sure. I'll see about factoring the PMU parts out into a separate file,
+modulo a couple of hooks for suspend/resume and init.
+
+Thanks,
+Mark.
