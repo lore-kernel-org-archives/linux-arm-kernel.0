@@ -1,46 +1,27 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 30 Aug 2016 11:03:48 +0100
-Subject: [PATCH v8 13/18] ARM: STi: DT: STiH407: Add sti-sasg-codec dt node
-In-Reply-To: <1472223413-7254-14-git-send-email-peter.griffin@linaro.org>
-References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
- <1472223413-7254-14-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20160830100348.GR1661@dell>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 30 Aug 2016 19:04:36 +0900
+Subject: [PATCH v2 10/10] reset: hi6220: allow to compile test driver on
+ other architectures
+In-Reply-To: <1472545496-14373-10-git-send-email-p.zabel@pengutronix.de>
+References: <1472545496-14373-1-git-send-email-p.zabel@pengutronix.de>
+ <1472545496-14373-10-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <CAK7LNAQyy+U_sNR9FfOc46cc-v2OLyBbm32nD4d2WcXNQfYKtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Aug 2016, Peter Griffin wrote:
+2016-08-30 17:24 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
+> Also remove the RESET_CONTROLLER dependency, this Kconfig file is
+> included inside the menuconfig already.
+>
+> Cc: Chen Feng <puck.chen@hisilicon.com>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-> This patch adds the dt node for the internal audio
-> codec IP.
-> 
-> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  arch/arm/boot/dts/stih407-family.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
+Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
-  
-> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> index 45cab30..d1258d5 100644
-> --- a/arch/arm/boot/dts/stih407-family.dtsi
-> +++ b/arch/arm/boot/dts/stih407-family.dtsi
-> @@ -873,5 +873,12 @@
->  				<&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
->  				<&clk_s_c0_flexgen CLK_EXT2F_A9>;
->  		};
-> +
-> +		sti_sasg_codec: sti-sasg-codec {
-> +			compatible = "st,stih407-sas-codec";
-> +			#sound-dai-cells = <1>;
-> +			status = "disabled";
-> +			st,syscfg = <&syscfg_core>;
-> +		};
->  	};
->  };
+
+
+
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Best Regards
+Masahiro Yamada
