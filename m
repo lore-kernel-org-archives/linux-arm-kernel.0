@@ -1,90 +1,64 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 30 Aug 2016 15:59:29 +0200
-Subject: [PATCH 3/3] ARM: integrator: read counter using syscon/regmap
-In-Reply-To: <1472565569-11414-1-git-send-email-linus.walleij@linaro.org>
-References: <1472565569-11414-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1472565569-11414-3-git-send-email-linus.walleij@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 30 Aug 2016 16:07:05 +0200
+Subject: [RFC PATCH v3 5/5] arm/arm64: vgic-new: Implement
+ KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
+In-Reply-To: <20160830140034.GK10162@cbox>
+References: <1472037609-4164-1-git-send-email-vijay.kilari@gmail.com>
+ <1472037609-4164-6-git-send-email-vijay.kilari@gmail.com>
+ <20160830140034.GK10162@cbox>
+Message-ID: <20160830140705.GL10162@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Look up the core module base address from the device tree and
-register a sched_clock() using the regmap to the core module
-on the Integrator/CP.
+On Tue, Aug 30, 2016 at 04:00:34PM +0200, Christoffer Dall wrote:
+> On Wed, Aug 24, 2016 at 04:50:09PM +0530, vijay.kilari at gmail.com wrote:
+> > From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> > 
+> > Userspace requires to store and restore of line_level for
+> > level triggered interrupts. For this ioctl KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO
+> > is defined.
+> > 
+> > Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> > ---
+> >  arch/arm64/include/uapi/asm/kvm.h   |  6 +++++
+> >  virt/kvm/arm/vgic/vgic-kvm-device.c | 44 ++++++++++++++++++++++++++++++++++++-
+> >  virt/kvm/arm/vgic/vgic-mmio-v3.c    | 19 ++++++++++++++++
+> >  virt/kvm/arm/vgic/vgic-mmio.c       | 34 ++++++++++++++++++++++++++++
+> >  virt/kvm/arm/vgic/vgic-mmio.h       |  6 +++++
+> >  virt/kvm/arm/vgic/vgic.h            |  3 +++
+> >  6 files changed, 111 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> > index b13c944..45c56d7 100644
+> > --- a/arch/arm64/include/uapi/asm/kvm.h
+> > +++ b/arch/arm64/include/uapi/asm/kvm.h
+> > @@ -209,6 +209,12 @@ struct kvm_arch_memory_slot {
+> >  #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
+> >  #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
+> >  #define KVM_DEV_ARM_VGIC_CPU_SYSREGS    6
+> > +#define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO 7
+> > +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	9
+> 
+> This should be 10, bits 0 through 9 gives you 10 to work with.
+> 
+> > +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
+> > +			(0x7fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
+> 
+> this mask is also wrong, 32 - 10 == 22, not 23.
+> 
+> > +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK	0x1ff
+> 
+> this is also wrong, you have 10 bits, not 9 bits.
+> 
+> Hint: the max SPI number is around 1024.
+> 
+> > +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_VAL	1
+> 
+> This should really be KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO_LEVEL.  Why is 0
+> not a valid value?
+> 
 
-MFD_SYSCON is selected by the arch so it is always available.
+actually, the API documentation specifies that this should simply be
+defined as VGIC_LEVEL_INFO_LINE_LEVEL.
 
-This further makes it possible to remove one more static map.
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-integrator/integrator_cp.c | 23 ++++++++++++++---------
- 1 file changed, 14 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index 8db029fa6052..772a7cf2010e 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -15,6 +15,8 @@
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
- #include <linux/sched_clock.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -23,12 +25,15 @@
- #include "cm.h"
- #include "common.h"
- 
-+/* Base address to the core module header */
-+static struct regmap *cm_map;
- /* Base address to the CP controller */
- static void __iomem *intcp_con_base;
- 
-+#define CM_COUNTER_OFFSET 0x28
-+
- /*
-  * Logical      Physical
-- * f1000000	10000000	Core module registers
-  * f1400000	14000000	Interrupt controller
-  * f1600000	16000000	UART 0
-  * fca00000	ca000000	SIC
-@@ -36,11 +41,6 @@ static void __iomem *intcp_con_base;
- 
- static struct map_desc intcp_io_desc[] __initdata __maybe_unused = {
- 	{
--		.virtual	= IO_ADDRESS(INTEGRATOR_HDR_BASE),
--		.pfn		= __phys_to_pfn(INTEGRATOR_HDR_BASE),
--		.length		= SZ_4K,
--		.type		= MT_DEVICE
--	}, {
- 		.virtual	= IO_ADDRESS(INTEGRATOR_IC_BASE),
- 		.pfn		= __phys_to_pfn(INTEGRATOR_IC_BASE),
- 		.length		= SZ_4K,
-@@ -84,15 +84,20 @@ static struct mmci_platform_data mmc_data = {
- 	.gpio_cd	= -1,
- };
- 
--#define REFCOUNTER (__io_address(INTEGRATOR_HDR_BASE) + 0x28)
--
- static u64 notrace intcp_read_sched_clock(void)
- {
--	return readl(REFCOUNTER);
-+	unsigned int val;
-+
-+	/* MMIO so discard return code */
-+	regmap_read(cm_map, CM_COUNTER_OFFSET, &val);
-+	return val;
- }
- 
- static void __init intcp_init_early(void)
- {
-+	cm_map = syscon_regmap_lookup_by_compatible("arm,core-module-integrator");
-+	if (IS_ERR(cm_map))
-+		return;
- 	sched_clock_register(intcp_read_sched_clock, 32, 24000000);
- }
- 
--- 
-2.7.4
+-Christoffer
