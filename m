@@ -1,109 +1,119 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 30 Aug 2016 10:19:21 -0600
-Subject: [PATCH V7 1/5] perf tools: making coresight PMU listable
-In-Reply-To: <1472573965-3881-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1472573965-3881-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1472573965-3881-2-git-send-email-mathieu.poirier@linaro.org>
+Date: Tue, 30 Aug 2016 10:19:20 -0600
+Subject: [PATCH V7 0/5] perf: Driver specific configuration for PMU
+Message-ID: <1472573965-3881-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding the required mechanic allowing 'perf list pmu' to
-discover coresight ETM/PTM tracers.
+Original blurb:
+---------------
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
-Acked-by: Jiri Olsa <jolsa@kernel.org>
----
- MAINTAINERS                    |  1 +
- tools/perf/Makefile.config     | 11 +++++++----
- tools/perf/arch/arm/util/Build |  2 ++
- tools/perf/arch/arm/util/pmu.c | 34 ++++++++++++++++++++++++++++++++++
- 4 files changed, 44 insertions(+), 4 deletions(-)
+This patchset adds the possiblity of specifying PMU driver configuration
+directly from the perf command line.  Anything that falls within the
+event specifiers '/.../' and that is preceded by the '@' symbol is
+treated as a configurable.  Two formats are supported, @cfg and
+@cfg=config.
+
+For example:
+
+perf record -e some_event/@cfg1/ ...
+
+or
+
+perf record -e some_event/@cfg2=config/ ...
+
+or
+
+perf record -e some_event/@cfg1, at cfg2=config/ ...
+
+The above are all valid configuration and will see the strings 'cfg1'
+and 'cfg2=config' sent to the PMU driver for parsing and interpretation
+using the existing ioctl() mechanism.
+
+The primary customers for this feature are the CoreSight drivers where
+the selection of a sink (where trace data is accumulated) needs to be
+done in a previous, and separated step, from the launching of the perf
+command.
+
+As such something that used to be a two-step process:
+
+# echo 1 > /sys/bus/coresight/devices/20070000.etr/enable_sink
+# perf record -e cs_etm//u --per-thread  uname
+
+is integrated in a single command:
+
+# perf record -e cs_etm/@20070000.etr/u --per-thread  uname
+
+Thanks,
+Mathieu
+
+Changes for V7:
+- Got rid of a miscellaneous debug message.
+- Rebased to v4.8-rc4
+- Added Jiri Olsa's Acked-by.
+
+Changes for V6:
+- Using sysFS rather than an ioctl() to communicate command line
+  parameters to the CoreSight PMU.
+
+Changes for V5:
+- Made commit log in 5/9 more descriptive.
+- Addressed missing return code in builtin-top.c.
+- Overhauled the kernel portion to do parsing in the core.
+
+Changes for V4:
+- Pushing PMU driver configuration for 'perf top'.
+- Rebased to the latest perf/core branch[1]. 
+
+Changes for V3:
+- Added comment for function drv_str() that explains the reason for
+  keeping the entire token intact.
+- Added driver config terms to the existing list of config terms.
+- Added documenation for driver specific configuration.
+- Pushing PMU driver configuration for 'perf stat' as well.  
+- Preventing users from selecting a sink from sysFS _and_ perf.
+
+Changes for V2:
+- Rebased to [1] as per Jiri's request.
+
+
+Mathieu Poirier (5):
+  perf tools: making coresight PMU listable
+  perf tools: adding coresight etm PMU record capabilities
+  perf tools: add infrastructure for PMU specific configuration
+  perf tools: Pushing configuration down to PMU driver
+  perf tools: adding sink configuration for cs_etm PMU
+
+ MAINTAINERS                              |   5 +
+ tools/perf/Documentation/perf-record.txt |  12 +
+ tools/perf/Makefile.config               |  11 +-
+ tools/perf/arch/arm/util/Build           |   2 +
+ tools/perf/arch/arm/util/auxtrace.c      |  54 +++
+ tools/perf/arch/arm/util/cs-etm.c        | 615 +++++++++++++++++++++++++++++++
+ tools/perf/arch/arm/util/cs-etm.h        |  26 ++
+ tools/perf/arch/arm/util/pmu.c           |  37 ++
+ tools/perf/arch/arm64/util/Build         |   4 +
+ tools/perf/builtin-record.c              |   9 +
+ tools/perf/builtin-stat.c                |   8 +
+ tools/perf/builtin-top.c                 |  12 +
+ tools/perf/util/auxtrace.c               |   1 +
+ tools/perf/util/auxtrace.h               |   1 +
+ tools/perf/util/cs-etm.h                 |  74 ++++
+ tools/perf/util/evlist.c                 |  18 +
+ tools/perf/util/evlist.h                 |   3 +
+ tools/perf/util/evsel.c                  |  40 ++
+ tools/perf/util/evsel.h                  |   4 +
+ tools/perf/util/parse-events.c           |   7 +-
+ tools/perf/util/parse-events.h           |   1 +
+ tools/perf/util/parse-events.l           |  22 ++
+ tools/perf/util/parse-events.y           |  11 +
+ tools/perf/util/pmu.h                    |   2 +
+ 24 files changed, 974 insertions(+), 5 deletions(-)
+ create mode 100644 tools/perf/arch/arm/util/auxtrace.c
+ create mode 100644 tools/perf/arch/arm/util/cs-etm.c
+ create mode 100644 tools/perf/arch/arm/util/cs-etm.h
  create mode 100644 tools/perf/arch/arm/util/pmu.c
+ create mode 100644 tools/perf/util/cs-etm.h
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 71aa5daeae8f..58c91461548e 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1122,6 +1122,7 @@ F:	drivers/hwtracing/coresight/*
- F:	Documentation/trace/coresight.txt
- F:	Documentation/devicetree/bindings/arm/coresight.txt
- F:	Documentation/ABI/testing/sysfs-bus-coresight-devices-*
-+F:	tools/perf/arch/arm/util/pmu.c
- 
- ARM/CORGI MACHINE SUPPORT
- M:	Richard Purdie <rpurdie@rpsys.net>
-diff --git a/tools/perf/Makefile.config b/tools/perf/Makefile.config
-index 24803c58049a..72edf83d76b7 100644
---- a/tools/perf/Makefile.config
-+++ b/tools/perf/Makefile.config
-@@ -746,10 +746,13 @@ ifdef LIBBABELTRACE
- endif
- 
- ifndef NO_AUXTRACE
--  ifeq ($(feature-get_cpuid), 0)
--    msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
--    NO_AUXTRACE := 1
--  else
-+  ifeq ($(ARCH),x86)
-+    ifeq ($(feature-get_cpuid), 0)
-+      msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
-+      NO_AUXTRACE := 1
-+    endif
-+  endif
-+  ifndef NO_AUXTRACE
-     $(call detected,CONFIG_AUXTRACE)
-     CFLAGS += -DHAVE_AUXTRACE_SUPPORT
-   endif
-diff --git a/tools/perf/arch/arm/util/Build b/tools/perf/arch/arm/util/Build
-index f98da17357c0..4093fd146f46 100644
---- a/tools/perf/arch/arm/util/Build
-+++ b/tools/perf/arch/arm/util/Build
-@@ -2,3 +2,5 @@ libperf-$(CONFIG_DWARF) += dwarf-regs.o
- 
- libperf-$(CONFIG_LOCAL_LIBUNWIND)    += unwind-libunwind.o
- libperf-$(CONFIG_LIBDW_DWARF_UNWIND) += unwind-libdw.o
-+
-+libperf-$(CONFIG_AUXTRACE) += pmu.o
-diff --git a/tools/perf/arch/arm/util/pmu.c b/tools/perf/arch/arm/util/pmu.c
-new file mode 100644
-index 000000000000..af9fb666b44f
---- /dev/null
-+++ b/tools/perf/arch/arm/util/pmu.c
-@@ -0,0 +1,34 @@
-+/*
-+ * Copyright(C) 2015 Linaro Limited. All rights reserved.
-+ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <string.h>
-+#include <linux/coresight-pmu.h>
-+#include <linux/perf_event.h>
-+
-+#include "../../util/pmu.h"
-+
-+struct perf_event_attr
-+*perf_pmu__get_default_config(struct perf_pmu *pmu __maybe_unused)
-+{
-+#ifdef HAVE_AUXTRACE_SUPPORT
-+	if (!strcmp(pmu->name, CORESIGHT_ETM_PMU_NAME)) {
-+		/* add ETM default config here */
-+		pmu->selectable = true;
-+	}
-+#endif
-+	return NULL;
-+}
 -- 
 2.7.4
