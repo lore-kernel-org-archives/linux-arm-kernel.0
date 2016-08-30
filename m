@@ -1,29 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Aug 2016 17:36:49 +0200
-Subject: Older hisilicon chipsets
-In-Reply-To: <20160830145843.GS10637@io.lakedaemon.net>
-References: <7773f0e5-d045-1e93-529b-74a601467ed1@gmail.com>
- <7d7ff37b-a16b-8532-214c-de0a46c9de8e@gmail.com>
- <20160830145843.GS10637@io.lakedaemon.net>
-Message-ID: <201608301736.49102.arnd@arndb.de>
+From: voker57@gmail.com (Iaroslav Gridin)
+Date: Tue, 30 Aug 2016 18:37:40 +0300
+Subject: [PATCH] ARM: dts: msm8974: Add definitions for QCE & cryptobam
+Message-ID: <20160830153740.13275-1-voker57@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 August 2016, Jason Cooper wrote:
-> On Tue, Aug 30, 2016 at 09:43:52AM -0500, Marty Plummer wrote:
-> > Hi Wei,
-> > 
-> > Do you think you could change the references to the Hi3620 in the code
-> > and dts files from `hi3xxx' to `hi3620'? As it currently stands, the
-> > wildcard matches hi3520 too, but that's not a good idea whit devicetree,
-> > its best to be completely explicit as to which sort of device the
-> > binding is for.
-> 
-> Please submit a patch, there shouldn't be wildcards in devicetree
-> compatible strings. :-/
+From: Voker57 <voker57@gmail.com>
 
-Fortunately, I don't see wildcards in the dts files, I think we were
-careful enough here. The Linux-internal identifiers and file names
-are easily renamed, unlike the DT bindings.
+Add device tree definitions for Qualcomm Cryptography engine and its BAM
+Signed-off-by: Iaroslav Gridin <voker57@gmail.com>
+---
+ arch/arm/boot/dts/qcom-msm8974.dtsi | 42 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-	Arnd
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index 561d4d1..c0da739 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -287,6 +287,48 @@
+ 			reg = <0xf9011000 0x1000>;
+ 		};
+ 
++		cryptobam: dma at fd444000 {
++			compatible = "qcom,bam-v1.4.0";
++			reg = <0xfd444000 0x15000>;
++			interrupts = <0 236 0>;
++			clocks = <&gcc GCC_CE2_AHB_CLK>,
++				 <&gcc GCC_CE2_AXI_CLK>,
++				 <&gcc GCC_CE2_CLK>;
++			clock-names = "bam_clk", "axi_clk", "core_clk";
++			#dma-cells = <1>;
++			qcom,ee = <1>;
++			qcom,controlled-remotely;
++			};
++
++		qcom,qcrypto at fd440000 {
++			compatible = "qcom,crypto-v5.1";
++			reg = <0xfd45a000 0x6000>;
++			reg-names = "crypto-base";
++			interrupts = <0 236 0>;
++			qcom,bam-pipe-pair = <2>;
++			qcom,ce-hw-instance = <1>;
++			qcom,ce-device = <0>;
++			clocks = <&gcc GCC_CE2_CLK>,
++				 <&gcc GCC_CE2_AHB_CLK>,
++				 <&gcc GCC_CE2_AXI_CLK>,
++				 <&gcc CE2_CLK_SRC>;
++
++			dmas = <&cryptobam 2>, <&cryptobam 3>;
++			dma-names = "rx", "tx";
++			clock-names = "core", "iface", "bus", "core_src";
++			qcom,clk-mgmt-sus-res;
++			qcom,msm-bus,name = "qcrypto-noc";
++
++			qcom,msm-bus,num-cases = <2>;
++			qcom,msm-bus,num-paths = <1>;
++			qcom,use-sw-aes-cbc-ecb-ctr-algo;
++			qcom,use-sw-aes-xts-algo;
++			qcom,use-sw-ahash-algo;
++			qcom,msm-bus,vectors-KBps = <56 512 0 0>,
++						    <56 512 3936000 393600>;
++			};
++
++
+ 		timer at f9020000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-- 
+2.9.3
