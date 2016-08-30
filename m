@@ -1,92 +1,33 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Tue, 30 Aug 2016 09:30:55 +0800
-Subject: [RFC PATCH] clk: rockchip: rk3399: support pll setting
- automatically
-In-Reply-To: <13164913.BHiQzGsdBU@diego>
-References: <1470144852-20708-1-git-send-email-zhengxing@rock-chips.com>
- <4830789.1bI8OsvZy1@phil>
- <CAD=FV=VMqHrKHThSNoz_i=SCwgw=OeOfaww3Ote1id66LXO8JQ@mail.gmail.com>
- <13164913.BHiQzGsdBU@diego>
-Message-ID: <57C4E1CF.2060502@rock-chips.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 30 Aug 2016 09:58:46 +0800
+Subject: [PATCH v9 0/2] sun4i-codec: Add Line-In, FM-In, Mic 2, Capture
+ Source, Differential Line-In
+In-Reply-To: <20160829200347.7e6aa714@scratchpost.org>
+References: <20160826072230.30429-1-dannym@scratchpost.org>
+ <20160827120251.GQ3165@lukather> <20160829200347.7e6aa714@scratchpost.org>
+Message-ID: <CAGb2v641btw_4Y+s2Ufbk98N=ekwh6yfMQKLHModLM-4QPRsrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 08/30/2016 01:54 AM, Heiko St?bner wrote:
-> Am Montag, 29. August 2016, 10:35:44 schrieb Doug Anderson:
->> Hi,
->>
->> On Sun, Aug 28, 2016 at 8:21 AM, Heiko St?bner <heiko@sntech.de> wrote:
->>> Hi Xing, Elaine,
->>>
->>> Am Dienstag, 2. August 2016, 21:34:12 schrieb Xing Zheng:
->>>> From: Elaine Zhang <zhangqing@rock-chips.com>
->>>>
->>>> The goal is that we can configure the most suitable pll params
->>>> automatically.
->>>>
->>>> If setting freq is not supported in rockchip_pll_rate_table
->>>> rk3399_pll_rates[], we can set pll params automatically.
->>>>
->>>> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
->>>> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
->>>
->>> first off, I really like that idea of calculating the generic pll
->>> frequencies instead of duplicating these entries in every soc clock
->>> driver.
->>
->> I probably won't have time to look at this any time soon, but when I
->> saw this patch fly by I was a little hesitant because:
->>
->> * Not all PLL settings produce the same jitter.  On rk3288 I spent
->> loads of time searching for PLL settings that would be low jitter
->> enough to make a pixel clock that was happy with lots of different TVs
->> / monitors.  It's true that there were certain heuristics that could
->> be followed but certainly my predictions didn't always match what
->> happened.
->>
->> * Depending on what's using the PLL, you might want very different
->> settings.  One can optimize for lock time, power usage, jitter,
->> accuracy, etc.  For instance for a CPU clock that you change a lot you
->> probably don't care about hitting an exact frequency and you probably
->> don't care overly much about jitter, but you want low lock times.  For
->> HDMI you don't care about lock times and and probably don't care about
->> power usage, but you care about meeting an exact clock and really
->> really care about jitter.
->>
->> * I know that in the past the way I found to make some of the best
->> rates for HDMI was to have the PLL make a rate that was several times
->> what I wanted and then activate a divider later in the clock tree.
->> That gave me the best jitter / clock accuracy.  I have no idea how to
->> do that automatically, but in the past I relied on the PLL only having
->> a fixed set of rates it could make so it would fail to make the lower
->> clock rate (higher jitter) and eventually end up with the better one.
->>
->>
->> Anyway, I don't know how to solve all of the above, but I just wanted
->> to bring it up as a concern.
+On Tue, Aug 30, 2016 at 2:03 AM, Danny Milosavljevic
+<dannym@scratchpost.org> wrote:
+> Hi Maxime,
 >
-> after talking with Doug on irc, I realized that this really can become a
-> problem, as right now we have a list with known-good rates, can adjust those
-> as needed and have the clock framework select the best for a certain target
-> rate.
+> On Sat, 27 Aug 2016 14:02:51 +0200
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 >
-> But with the automatic calculation it would open up nearly unlimited different
-> rates with possible negative effects and no way to eliminate or even test most
-> of them.
+>> Please send your patches using send-email.
 >
-> So it may very well be best to stay with static rates, in a component as core
-> as the PLLs are?
+> If you are referring to "git send-email", I did send the patch series using that (with almost the same setup I use for many other projects). It probably barfed because my description enumeration contained a dash like "- Line In". Sigh.
 
-I also thought of this question, and really cant't solve all of the above.
-According to before product experience,if the clk test jitter is not 
-accept,we can add this freq to the static freq table.
-And others use the pll setting automatically.
+The problem is your patches are being treated as attachments.
+Try using '--no-attach' with git format-patch, regenerate the patches
+and check that they are not mulit-part before sending them again.
+
+ChenYu
 
 >
+> Anyway, I'll send the E-Mail again.
 >
-> Heiko
->
->
->
+> Thanks,
+>    Danny
