@@ -1,35 +1,40 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 30 Aug 2016 16:08:17 -0500
-Subject: [PATCH v4 2/3] devicetree: Add vendor prefix for Shenzhen
- Sunchip Technology Co., Ltd
-In-Reply-To: <a4e01da87f9439f2a1e97f6281ab6d9b545191df.1471637309.git.ccc94453@vip.cybercity.dk>
-References: <9f39145aa6a46a1e130c4b91bd120eabeb7c8929.1471637309.git.ccc94453@vip.cybercity.dk>
- <a4e01da87f9439f2a1e97f6281ab6d9b545191df.1471637309.git.ccc94453@vip.cybercity.dk>
-Message-ID: <20160830210817.GA18526@rob-hp-laptop>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 30 Aug 2016 14:09:29 -0700
+Subject: [PATCH v2 1/2] arm64: dts: qcom: msm8916: Add Hexagon SMD edge
+Message-ID: <1472591370-20550-1-git-send-email-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2016 at 11:32:22PM +0200, Rask Ingemann Lambertsen wrote:
-> Shenzhen Sunchip Technology Co., Ltd produces TV boxes and TV dongles,
-> some of which are sold under other brands. Website:
-> <URL:http://www.sunchip-tech.com/>
-> 
-> Signed-off-by: Rask Ingemann Lambertsen <ccc94453@vip.cybercity.dk>
-> ---
-> 
-> Changes in v4:
-> None.
-> 
-> Changes in v3:
-> None.
-> 
-> Changes in v2:
-> No patch changes, but added CC to the ARM kernel mailing list.
-> 
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
+Add the Hexagon SMD edge, so that QRTR is probed when the Hexagon is
+booted.
 
-I've applied patches 1 and 2 since the alphabetizing will create 
-conflicts.
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
 
-Rob
+Changes since v1:
+- Rebase ontop of linux-next
+
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index 74daf89d977d..5a1b5f5b3a90 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -731,6 +731,14 @@
+ 				};
+ 			};
+ 		};
++
++		hexagon {
++			interrupts = <0 25 IRQ_TYPE_EDGE_RISING>;
++
++			qcom,smd-edge = <0>;
++			qcom,ipc = <&apcs 8 12>;
++			qcom,remote-pid = <1>;
++		};
+ 	};
+ 
+ 	hexagon-smp2p {
+-- 
+2.5.0
