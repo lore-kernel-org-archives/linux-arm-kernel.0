@@ -1,44 +1,59 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 30 Aug 2016 19:32:02 +0200
-Subject: [PATCH v3] mmc: sunxi: Handle the 'New Timing' mode
-In-Reply-To: <20160830162613.GG18605@lukather>
-References: <20160813175611.79E0323C@mail.free-electrons.com>
- <20160830162613.GG18605@lukather>
-Message-ID: <20160830193202.4baaefd508a5d20d48b2cbed@free.fr>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 30 Aug 2016 18:32:25 +0100
+Subject: [PATCH] arm/perf: Fix pmu percpu irq handling at hotplug.
+In-Reply-To: <20160826094800.GD13554@arm.com>
+References: <CALJ9ZPMixfGKspzaz+vTGQZG4EaQB5Futss-aC-Z+8oztVX9Nw@mail.gmail.com>
+ <20160819142514.GB28422@leverpostej>
+ <20160826094800.GD13554@arm.com>
+Message-ID: <20160830173224.GN1223@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 30 Aug 2016 18:26:13 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+Hi,
 
-> > There are 2 flags saying that the new timing is used:
-> > - the bit 'mode select' in the clock register, and
-> > - the bit 'new timing' in the MMC register.
-> > Both bits must be set/reset at the same time, otherwise the device
-> > does not work (tested with wifi and eMMC in H3 and A83T boards).
-> > So, some synchronization must exist.
+On Fri, Aug 26, 2016 at 10:48:00AM +0100, Will Deacon wrote:
+> On Fri, Aug 19, 2016 at 03:25:14PM +0100, Mark Rutland wrote:
+> > On Thu, Aug 18, 2016 at 01:24:38PM -0700, Yabin Cui wrote:
+> > >    If the cpu pmu is using a percpu irq: ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
+> > >    ? ? ??
+> > >    1. When a cpu is down, we should disable pmu irq on ? ? ? ? ? ? ? ? ? ? ?
+> > >    that cpu. Otherwise, if the cpu is still down when ? ? ? ? ? ? ? ? ? ? ? ?
+> > >    the last perf event is released, the pmu irq can't ? ? ? ? ? ? ? ? ? ? ? ?
+> > >    be freed. Because the irq is still enabled on the ? ? ? ? ? ? ? ? ? ? ? ?
+> > >    offlined cpu. And following perf_event_open() ? ? ? ? ? ? ? ? ? ? ? ? ? ?
+> > >    syscalls will fail. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
+> > >
+> > >    2. When a cpu is up, we should enable pmu irq on ? ? ? ? ? ? ? ? ? ? ? ? ?
+> > >    that cpu. Otherwise, profiling tools can't sample ? ? ? ? ? ? ? ? ? ? ? ?
+> > >    events on the cpu before all perf events are ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
+> > >    released, because pmu irq is disabled on that cpu. ? ? ? ? ? ? ? ? ? ? ? ?
+
+[...]
+
+> > Rather than adding more moving parts to the IRQ manipulation logic, I'd
+> > rather we rework the IRQ manipulation logic to:
 > > 
-> > The previous versions was using a DT property for the MMC and a flag
-> > in the clock driver. This did work with a correct configuration
-> > on both sides, but experiment showed that it was easy to do an error.
+> > * At probe time, request all the interrupts. If we can't, bail out and
+> >   fail the probe.
+> > 
+> > * Upon hotplug in (and at probe time), configure the affinity and
+> >   enable the relevant interrupt(s).
+> > 
+> > * Upon hotplug out, disable the relevant interrupt.
+
+> > I'm taking a look at doing the above, but I don't yet have a patch.
 > 
-> I still believe that we will need a property, at least to identify on
-> which we can try the new mode, and on which clocks it's irrelevant (at
-> least for the A33 and A83T).
+> Any update on this? I'd quite like to do *something* to fix the issues
+> reported here.
 
-As told above, setting the new mode on side (clock or MMC) and not on
-the other one prevents the devices to work. Then, it is safer to have
-the new mode capability flag only once for both sides.
+Apologies for the delay.
 
-Now, as the clocks are defined by memory tables and not by the DT, it
-seems natural to have the flag on the clock side.
+I've been away from my development hardware for the last week, so I
+ahven't fought with this for a few days.
 
-> However, I also believe we should make that mode switching explicit
-> through a function call, instead of relying on some side effect (of
-> some non-upstream code).
+Given it's requiring that I practically rewrite of_pmu_irq_cfg and
+friends, it may be better to take Yabin's patch for the timebeing if you
+want a quick fix for this particular issue.
 
-Do you mean a direct call from the MMC driver to the clock driver?
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Thanks,
+Mark.
