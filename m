@@ -1,42 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 30 Aug 2016 18:54:19 +0100
-Subject: [PATCH] KVM: arm: vgic: Drop build compatibility hack for older
- kernel versions
-Message-ID: <1472579659-20772-1-git-send-email-marc.zyngier@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 30 Aug 2016 18:55:18 +0100
+Subject: [PATCH v7 14/14] Documentation: remove the constraint on the
+ distances of node pairs
+In-Reply-To: <57C16F17.5070609@huawei.com>
+References: <1472024693-12912-1-git-send-email-thunder.leizhen@huawei.com>
+ <1472024693-12912-15-git-send-email-thunder.leizhen@huawei.com>
+ <20160826153550.GI30302@arm.com> <57C16F17.5070609@huawei.com>
+Message-ID: <20160830175517.GM24906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As kvm_set_routing_entry() was changing prototype between 4.7 and 4.8,
-an ugly hack was put in place in order to survive both building in
--next and the merge window.
+On Sat, Aug 27, 2016 at 06:44:39PM +0800, Leizhen (ThunderTown) wrote:
+> 
+> 
+> On 2016/8/26 23:35, Will Deacon wrote:
+> > On Wed, Aug 24, 2016 at 03:44:53PM +0800, Zhen Lei wrote:
+> >> Update documentation. This limit is unneccessary.
+> >>
+> >> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> >> Acked-by: Rob Herring <robh@kernel.org>
+> >> ---
+> >>  Documentation/devicetree/bindings/numa.txt | 1 -
+> >>  1 file changed, 1 deletion(-)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
+> >> index 21b3505..c0ea4a7 100644
+> >> --- a/Documentation/devicetree/bindings/numa.txt
+> >> +++ b/Documentation/devicetree/bindings/numa.txt
+> >> @@ -48,7 +48,6 @@ distance (memory latency) between all numa nodes.
+> >>
+> >>    Note:
+> >>  	1. Each entry represents distance from first node to second node.
+> >> -	The distances are equal in either direction.
+> > 
+> > Hmm, so what happens now if firmware provides a description where both
+> > distances (in either direction) are supplied, but are different?
+> I have not known any hardware that the distances of two direction are
+> different yet
 
-Now that everything has been merged, let's dump the compatibility
-hack for good.
+Then let's not add support for this just yet. When we have systems that
+actually need it, we'll be in a much better position to assess the
+suitability of any patches. At the moment, the whole thing is pretty
+questionable and it adds needless complication to the code.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/vgic/vgic-irqfd.c | 6 ------
- 1 file changed, 6 deletions(-)
-
-diff --git a/virt/kvm/arm/vgic/vgic-irqfd.c b/virt/kvm/arm/vgic/vgic-irqfd.c
-index b31a51a..d918dcf 100644
---- a/virt/kvm/arm/vgic/vgic-irqfd.c
-+++ b/virt/kvm/arm/vgic/vgic-irqfd.c
-@@ -46,15 +46,9 @@ static int vgic_irqfd_set_irq(struct kvm_kernel_irq_routing_entry *e,
-  * @ue: user api routing entry handle
-  * return 0 on success, -EINVAL on errors.
-  */
--#ifdef KVM_CAP_X2APIC_API
- int kvm_set_routing_entry(struct kvm *kvm,
- 			  struct kvm_kernel_irq_routing_entry *e,
- 			  const struct kvm_irq_routing_entry *ue)
--#else
--/* Remove this version and the ifdefery once merged into 4.8 */
--int kvm_set_routing_entry(struct kvm_kernel_irq_routing_entry *e,
--			  const struct kvm_irq_routing_entry *ue)
--#endif
- {
- 	int r = -EINVAL;
- 
--- 
-2.1.4
+Will
