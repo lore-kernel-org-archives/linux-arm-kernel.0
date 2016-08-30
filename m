@@ -1,55 +1,39 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 30 Aug 2016 16:56:48 +0100
-Subject: [PATCH v2 1/2] arm64: dts: hikey: extend default cma size to 128MB
-In-Reply-To: <1472094041-5357-1-git-send-email-guodong.xu@linaro.org>
-References: <1472094041-5357-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <57C5ACC0.90902@hisilicon.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 30 Aug 2016 17:05:56 +0100
+Subject: [PATCH 2/2] arm64/kvm: remove unused stub functions
+In-Reply-To: <1472573156-30414-1-git-send-email-mark.rutland@arm.com>
+References: <1472573156-30414-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1472573156-30414-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guodong,
+Now that 32-bit KVM no longer performs cache maintenance for page table
+updates, we no longer need empty stubs for arm64. Remove them.
 
-On 25/08/2016 04:00, Guodong Xu wrote:
-> To support display in Debian on HiKey, cma heap is used to allocate
-> graphic buffers. The default size of CMA is 16 MB which is not enough.
-> 
-> Increase the default CMA size to 128 MB.
-> 
-> cc: Fathi Boudra <fathi.boudra@linaro.org>
-> cc: John Stultz <john.stultz@linaro.org>
-> cc: Xinliang Liu <xinliang.liu@linaro.org>
-> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: kvmarm at lists.cs.columbia.edu
+---
+ arch/arm64/include/asm/kvm_mmu.h | 6 ------
+ 1 file changed, 6 deletions(-)
 
-Series applied to the hisilicon dt branch.
-Thanks!
-
-Best Regards,
-Wei
-
->  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> index 9e4e06a..dba3c13 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> @@ -57,8 +57,15 @@
->  			console-size	= <0x00020000>;
->  			ftrace-size	= <0x00020000>;
->  		};
-> -	};
->  
-> +		/* global autoconfigured region for contiguous allocations */
-> +		linux,cma {
-> +			compatible = "shared-dma-pool";
-> +			reusable;
-> +			size = <0x00000000 0x08000000>;
-> +			linux,cma-default;
-> +		};
-> +	};
->  
->  	reboot-mode-syscon at 5f01000 {
->  		compatible = "syscon", "simple-mfd";
-> 
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index b6bb834..8f99ab6 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -166,12 +166,6 @@ void kvm_clear_hyp_idmap(void);
+ #define	kvm_set_pte(ptep, pte)		set_pte(ptep, pte)
+ #define	kvm_set_pmd(pmdp, pmd)		set_pmd(pmdp, pmd)
+ 
+-static inline void kvm_clean_pgd(pgd_t *pgd) {}
+-static inline void kvm_clean_pmd(pmd_t *pmd) {}
+-static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
+-static inline void kvm_clean_pte(pte_t *pte) {}
+-static inline void kvm_clean_pte_entry(pte_t *pte) {}
+-
+ static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
+ {
+ 	pte_val(pte) |= PTE_S2_RDWR;
+-- 
+1.9.1
