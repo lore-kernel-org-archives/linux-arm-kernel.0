@@ -1,65 +1,92 @@
-From: zhiyong.tao@mediatek.com (zhiyong tao)
-Date: Tue, 30 Aug 2016 09:29:59 +0800
-Subject: [PATCH -next] iio: adc: mt2701: Remove redundant dev_err call
- in mt6577_auxadc_probe()
-In-Reply-To: <88307772-dd0f-a2f2-efd8-6c64a0cb14e4@kernel.org>
-References: <1472221581-28836-1-git-send-email-weiyj.lk@gmail.com>
- <88307772-dd0f-a2f2-efd8-6c64a0cb14e4@kernel.org>
-Message-ID: <1472520599.24148.13.camel@mhfsdcap03>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Tue, 30 Aug 2016 09:30:55 +0800
+Subject: [RFC PATCH] clk: rockchip: rk3399: support pll setting
+ automatically
+In-Reply-To: <13164913.BHiQzGsdBU@diego>
+References: <1470144852-20708-1-git-send-email-zhengxing@rock-chips.com>
+ <4830789.1bI8OsvZy1@phil>
+ <CAD=FV=VMqHrKHThSNoz_i=SCwgw=OeOfaww3Ote1id66LXO8JQ@mail.gmail.com>
+ <13164913.BHiQzGsdBU@diego>
+Message-ID: <57C4E1CF.2060502@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-08-29 at 19:47 +0100, Jonathan Cameron wrote:
-> On 26/08/16 15:26, Wei Yongjun wrote:
-> > From: Wei Yongjun <weiyongjun1@huawei.com>
-> > 
-> > There is a error message within devm_ioremap_resource
-> > already, so remove the dev_err call to avoid redundant
-> > error message.
-> > 
-> > Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-> Hi Wei,
-> 
-> I'm not so sure these are actually redundant.  Overly verbose perhaps,
-> but they do provide additional information in the log as the
-> devm_ioremap_resource doesn't know 'what' has failed, merely how
-> it has failed.
-> 
-> I'm happy to take these, if the driver author / maintainers
-> agree, but I'm not keen enough to take them without that.
-> 
-> Zhiyong Tao, what do you think on this one?
-> 
-> Jonathan
 
-Dear Jonathan,
 
-Thank you for your suggestion. I think that we can know 'what' has
-failed in the driver, if we retain the error message log. It maybe 
-advantageous to debug issues.
+On 08/30/2016 01:54 AM, Heiko St?bner wrote:
+> Am Montag, 29. August 2016, 10:35:44 schrieb Doug Anderson:
+>> Hi,
+>>
+>> On Sun, Aug 28, 2016 at 8:21 AM, Heiko St?bner <heiko@sntech.de> wrote:
+>>> Hi Xing, Elaine,
+>>>
+>>> Am Dienstag, 2. August 2016, 21:34:12 schrieb Xing Zheng:
+>>>> From: Elaine Zhang <zhangqing@rock-chips.com>
+>>>>
+>>>> The goal is that we can configure the most suitable pll params
+>>>> automatically.
+>>>>
+>>>> If setting freq is not supported in rockchip_pll_rate_table
+>>>> rk3399_pll_rates[], we can set pll params automatically.
+>>>>
+>>>> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+>>>> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+>>>
+>>> first off, I really like that idea of calculating the generic pll
+>>> frequencies instead of duplicating these entries in every soc clock
+>>> driver.
+>>
+>> I probably won't have time to look at this any time soon, but when I
+>> saw this patch fly by I was a little hesitant because:
+>>
+>> * Not all PLL settings produce the same jitter.  On rk3288 I spent
+>> loads of time searching for PLL settings that would be low jitter
+>> enough to make a pixel clock that was happy with lots of different TVs
+>> / monitors.  It's true that there were certain heuristics that could
+>> be followed but certainly my predictions didn't always match what
+>> happened.
+>>
+>> * Depending on what's using the PLL, you might want very different
+>> settings.  One can optimize for lock time, power usage, jitter,
+>> accuracy, etc.  For instance for a CPU clock that you change a lot you
+>> probably don't care about hitting an exact frequency and you probably
+>> don't care overly much about jitter, but you want low lock times.  For
+>> HDMI you don't care about lock times and and probably don't care about
+>> power usage, but you care about meeting an exact clock and really
+>> really care about jitter.
+>>
+>> * I know that in the past the way I found to make some of the best
+>> rates for HDMI was to have the PLL make a rate that was several times
+>> what I wanted and then activate a divider later in the clock tree.
+>> That gave me the best jitter / clock accuracy.  I have no idea how to
+>> do that automatically, but in the past I relied on the PLL only having
+>> a fixed set of rates it could make so it would fail to make the lower
+>> clock rate (higher jitter) and eventually end up with the better one.
+>>
+>>
+>> Anyway, I don't know how to solve all of the above, but I just wanted
+>> to bring it up as a concern.
+>
+> after talking with Doug on irc, I realized that this really can become a
+> problem, as right now we have a list with known-good rates, can adjust those
+> as needed and have the clock framework select the best for a certain target
+> rate.
+>
+> But with the automatic calculation it would open up nearly unlimited different
+> rates with possible negative effects and no way to eliminate or even test most
+> of them.
+>
+> So it may very well be best to stay with static rates, in a component as core
+> as the PLLs are?
 
-Zhiyong
-> > ---
-> >  drivers/iio/adc/mt6577_auxadc.c | 4 +---
-> >  1 file changed, 1 insertion(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/iio/adc/mt6577_auxadc.c b/drivers/iio/adc/mt6577_auxadc.c
-> > index 2d104c8..a268954 100644
-> > --- a/drivers/iio/adc/mt6577_auxadc.c
-> > +++ b/drivers/iio/adc/mt6577_auxadc.c
-> > @@ -206,10 +206,8 @@ static int mt6577_auxadc_probe(struct platform_device *pdev)
-> >  
-> >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >  	adc_dev->reg_base = devm_ioremap_resource(&pdev->dev, res);
-> > -	if (IS_ERR(adc_dev->reg_base)) {
-> > -		dev_err(&pdev->dev, "failed to get auxadc base address\n");
-> > +	if (IS_ERR(adc_dev->reg_base))
-> >  		return PTR_ERR(adc_dev->reg_base);
-> > -	}
-> >  
-> >  	adc_dev->adc_clk = devm_clk_get(&pdev->dev, "main");
-> >  	if (IS_ERR(adc_dev->adc_clk)) {
-> > 
-> > 
-> > 
-> 
+I also thought of this question, and really cant't solve all of the above.
+According to before product experience,if the clk test jitter is not 
+accept,we can add this freq to the static freq table.
+And others use the pll setting automatically.
+
+>
+>
+> Heiko
+>
+>
+>
