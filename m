@@ -1,83 +1,47 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 30 Aug 2016 23:51:26 +0800
-Subject: [PATCH] drm/sun4i: Clear encoder->bridge if a bridge is not found
-In-Reply-To: <20160830125622.GF18605@lukather>
-References: <20160830122223.21377-1-wens@csie.org>
- <20160830125622.GF18605@lukather>
-Message-ID: <CAGb2v64JC5+uzsvLjZVi_Xi8q=U+_Bokqnu33w3oQ-2h2DLnKg@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 30 Aug 2016 21:32:45 +0530
+Subject: [PATCH] dmaengine: mv_xor: Add support for IO (PCIe) src/dst areas
+In-Reply-To: <b8c09619-22a5-a677-8841-9760c275a618@denx.de>
+References: <201608241240.aEXnCS9C%fengguang.wu@intel.com>
+ <b8c09619-22a5-a677-8841-9760c275a618@denx.de>
+Message-ID: <20160830160245.GK9355@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2016 at 8:56 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Tue, Aug 30, 2016 at 08:22:23PM +0800, Chen-Yu Tsai wrote:
->> The KMS helpers (drm_atomic_helper_check_modeset/mode_fixup) pass
->> encoder->bridge directly to drm_bridge_mode_fixup, which expects a
->> valid pointer, or NULL (in which case it just returns).
->>
->> Clear encoder->bridge if a bridge is not found, instead of keeping
->> the ERR_PTR value.
->>
->> Since other drm_bridge functions also follow this pattern of checking
->> for a non-NULL pointer, we can drop the ifs around the calls and just
->> pass the pointer directly.
->>
->> Fixes: 894f5a9f4b4a ("drm/sun4i: Add bridge support")
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  drivers/gpu/drm/sun4i/sun4i_rgb.c | 11 ++++++-----
->>  1 file changed, 6 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
->> index d4e52522ec53..ee0795152a33 100644
->> --- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
->> +++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
->> @@ -154,8 +154,7 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
->>       if (!IS_ERR(tcon->panel))
->>               drm_panel_enable(tcon->panel);
->>
->> -     if (!IS_ERR(encoder->bridge))
->> -             drm_bridge_enable(encoder->bridge);
->> +     drm_bridge_enable(encoder->bridge);
->>
->>       sun4i_tcon_channel_enable(tcon, 0);
->>  }
->> @@ -170,8 +169,7 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
->>
->>       sun4i_tcon_channel_disable(tcon, 0);
->>
->> -     if (!IS_ERR(encoder->bridge))
->> -             drm_bridge_disable(encoder->bridge);
->> +     drm_bridge_disable(encoder->bridge);
->
-> I'd rather keep those changes, it makes it obvious that it's something
-> optionnal, that can be set to NULL.
+On Wed, Aug 24, 2016 at 10:23:02AM +0200, Stefan Roese wrote:
+> On 24.08.2016 06:16, kbuild test robot wrote:
+> > Hi Stefan,
+> > 
+> > [auto build test ERROR on linus/master]
+> > [also build test ERROR on v4.8-rc3 next-20160823]
+> > [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> > [Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
+> > [Check https://git-scm.com/docs/git-format-patch for more information]
+> > 
+> > url:    https://github.com/0day-ci/linux/commits/Stefan-Roese/dmaengine-mv_xor-Add-support-for-IO-PCIe-src-dst-areas/20160817-175632
+> > config: xtensa-allyesconfig (attached as .config)
+> > compiler: xtensa-linux-gcc (GCC) 4.9.0
+> > reproduce:
+> >         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+> >         chmod +x ~/bin/make.cross
+> >         # save the attached .config to linux build tree
+> >         make.cross ARCH=xtensa 
+> > 
+> > All errors (new ones prefixed by >>):
+> > 
+> >    drivers/built-in.o: In function `set_param_ifnum':
+> >>> ipmi_poweroff.c:(.text+0x10157c): undefined reference to `mvebu_mbus_get_io_win_info'
+> >    drivers/built-in.o: In function `mv_xor_add_io_win':
+> >    mv_xor.c:(.text+0x11039e): undefined reference to `mvebu_mbus_get_io_win_info'
+> 
+> Does it really make sense to compile this driver for all archs?
+> Or should I send a v2 of this patch that removes COMPILE_TEST for
+> this driver from Kconfig so that its only compiled for the
+> target platforms?
 
-OK.
+Compile test is helpful :) 
 
->>       if (!IS_ERR(tcon->panel))
->>               drm_panel_disable(tcon->panel);
->> @@ -230,6 +228,9 @@ int sun4i_rgb_init(struct drm_device *drm)
->>               return 0;
->>       }
->>
->> +     if (IS_ERR(encoder->bridge))
->> +             encoder->bridge = NULL;
->> +
->
-> And that could be the else condition of the if statement below.
+If it is reasonable possible, that I would urge you to keep it.
 
-That would be a bit confusing, changing it after calling drm_encoder_init.
-The code says it ok to do though.
-
-ChenYu
-
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+-- 
+~Vinod
