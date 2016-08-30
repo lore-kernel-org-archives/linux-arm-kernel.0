@@ -1,29 +1,44 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Tue, 30 Aug 2016 17:25:55 +0930
-Subject: [PATCH v3 2/7] mach-aspeed: Select GPIO driver
+Date: Tue, 30 Aug 2016 17:25:57 +0930
+Subject: [PATCH v3 4/7] palmetto: Request relevant mux functions in devicetree
 In-Reply-To: <20160830075600.11559-1-andrew@aj.id.au>
 References: <20160830075600.11559-1-andrew@aj.id.au>
-Message-ID: <20160830075600.11559-3-andrew@aj.id.au>
+Message-ID: <20160830075600.11559-5-andrew@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The requested functions are parented by the pinctrl node to provide the
+Palmetto's static pin configuration.
+
 Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
 ---
- arch/arm/mach-aspeed/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/mach-aspeed/Kconfig b/arch/arm/mach-aspeed/Kconfig
-index f3f8c5c658db..5aba9598f821 100644
---- a/arch/arm/mach-aspeed/Kconfig
-+++ b/arch/arm/mach-aspeed/Kconfig
-@@ -7,6 +7,8 @@ menuconfig ARCH_ASPEED
- 	select MOXART_TIMER
- 	select MFD_SYSCON
- 	select PINCTRL
-+	select GPIOLIB
-+	select GPIO_ASPEED
- 	help
- 	  Say Y here if you want to run your kernel on an ASpeed BMC SoC.
+diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+index cc5fcf2940bf..648fb6b9e427 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+@@ -20,6 +20,20 @@
+ 	};
+ };
  
++&pinctrl {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flbusy_default &pinctrl_flwp_default
++			&pinctrl_vgahs_default &pinctrl_vgavs_default
++			&pinctrl_ddcclk_default &pinctrl_ddcdat_default
++
++			&pinctrl_pwm1_default &pinctrl_pwm2_default
++			&pinctrl_pwm3_default &pinctrl_pwm4_default
++			&pinctrl_pwm5_default &pinctrl_pwm6_default
++			&pinctrl_pwm7_default
++
++			&pinctrl_bmcint_default &pinctrl_flack_default>;
++};
++
+ &uart5 {
+ 	status = "okay";
+ };
 -- 
 2.9.3.1.g0db844e
