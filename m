@@ -1,83 +1,50 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 30 Aug 2016 10:56:46 +0100
-Subject: [PATCH v8 16/18] ARM: DT: STi: stihxxx-b2120: Add DT nodes for
- STi audio card
-In-Reply-To: <1472223413-7254-17-git-send-email-peter.griffin@linaro.org>
+Date: Tue, 30 Aug 2016 10:57:24 +0100
+Subject: [PATCH v8 18/18] drm/virtio: kconfig: Fixup white space.
+In-Reply-To: <20160830095425.GK1661@dell>
 References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
- <1472223413-7254-17-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20160830095646.GM1661@dell>
+ <1472223413-7254-19-git-send-email-peter.griffin@linaro.org>
+ <20160830095425.GK1661@dell>
+Message-ID: <20160830095724.GN1661@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Aug 2016, Peter Griffin wrote:
+On Tue, 30 Aug 2016, Lee Jones wrote:
 
-> This patch enables the uniperif players 2 & 3 for b2120 boards
-> and also adds the "simple-audio-card" device node to interconnect
-> the SoC sound device and the codec.
+> On Fri, 26 Aug 2016, Peter Griffin wrote:
 > 
-> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  arch/arm/boot/dts/stihxxx-b2120.dtsi | 45 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
+> > Use tabs instead of spaces.
+> > 
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > ---
+> >  drivers/gpu/drm/virtio/Kconfig | 6 +++---
+> >  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> For my own reference:
+>   Acked-by: Lee Jones <lee.jones@linaro.org>
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+Whoops!  Please ignore the "For my own reference" part.  I used the
+wrong key-combo shortcut.
 
-> diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-> index 722c63f..1f64bb6 100644
-> --- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
-> +++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-> @@ -131,5 +131,50 @@
->  				dvb-card	= <STV0367_TDA18212_NIMA_1>;
->  			};
->  		};
-> +
-> +		sti_uni_player2: sti-uni-player at 2 {
-> +			status = "okay";
-> +		};
-> +
-> +		sti_uni_player3: sti-uni-player at 3 {
-> +			status = "okay";
-> +		};
-> +
-> +		sti_sasg_codec: sti-sasg-codec {
-> +			status = "okay";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_spdif_out>;
-> +		};
-> +
-> +		sound {
-> +			compatible = "simple-audio-card";
-> +			simple-audio-card,name = "sti audio card";
-> +			status = "okay";
-> +
-> +			simple-audio-card,dai-link at 0 {
-> +				/* DAC */
-> +				format = "i2s";
-> +				mclk-fs = <256>;
-> +				cpu {
-> +					sound-dai = <&sti_uni_player2>;
-> +				};
-> +
-> +				codec {
-> +					sound-dai = <&sti_sasg_codec 1>;
-> +				};
-> +			};
-> +			simple-audio-card,dai-link at 1 {
-> +				/* SPDIF */
-> +				format = "left_j";
-> +				mclk-fs = <128>;
-> +				cpu {
-> +					sound-dai = <&sti_uni_player3>;
-> +				};
-> +
-> +				codec {
-> +					sound-dai = <&sti_sasg_codec 0>;
-> +				};
-> +			};
-> +		};
->  	};
->  };
+> > diff --git a/drivers/gpu/drm/virtio/Kconfig b/drivers/gpu/drm/virtio/Kconfig
+> > index 90357d9..2d83932 100644
+> > --- a/drivers/gpu/drm/virtio/Kconfig
+> > +++ b/drivers/gpu/drm/virtio/Kconfig
+> > @@ -2,10 +2,10 @@ config DRM_VIRTIO_GPU
+> >  	tristate "Virtio GPU driver"
+> >  	depends on DRM
+> >  	select VIRTIO
+> > -        select DRM_KMS_HELPER
+> > -        select DRM_TTM
+> > +	select DRM_KMS_HELPER
+> > +	select DRM_TTM
+> >  	help
+> >  	   This is the virtual GPU driver for virtio.  It can be used with
+> > -           QEMU based VMMs (like KVM or Xen).
+> > +	   QEMU based VMMs (like KVM or Xen).
+> >  
+> >  	   If unsure say M.
+> 
 
 -- 
 Lee Jones
