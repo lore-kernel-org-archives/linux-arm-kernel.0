@@ -1,115 +1,72 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 30 Aug 2016 12:11:46 -0500
-Subject: [PATCH v2 6/7] arm64: dts: exynos: Add dts file for
- Exynos5433-based TM2 board
-In-Reply-To: <1472046551-703-7-git-send-email-cw00.choi@samsung.com>
-References: <1472046551-703-1-git-send-email-cw00.choi@samsung.com>
- <1472046551-703-7-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20160830171146.GA22946@rob-hp-laptop>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 30 Aug 2016 19:20:55 +0200
+Subject: [RESEND PATCH, v5 4/5] usb: Add MediaTek USB3 DRD Driver
+In-Reply-To: <1472204307.27677.41.camel@mhfsdcap03>
+References: <1472094329-18466-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1472094329-18466-5-git-send-email-chunfeng.yun@mediatek.com>
+ <1472113973.2877.22.camel@suse.com>
+ <1472204307.27677.41.camel@mhfsdcap03>
+Message-ID: <20160830172055.GA29742@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 10:49:10PM +0900, Chanwoo Choi wrote:
-> This patch adds the Device Tree source for Exynos5433-based Samsung TM2 board.
-> This board fully support the all things for mobile target.
+On Fri, Aug 26, 2016 at 05:38:27PM +0800, chunfeng yun wrote:
+> Hi,
 > 
-> This patch supports the following devices:
-> 1. basic SoC
-> - Initial booting for Samsung Exynos5433 SoC
-> - DRAM LPDDR3 (3GB)
-> - eMMC (32GB)
-> - ARM architecture timer
-> 
-> 2. power management devices
-> - Sasmung S2MPS13 PMIC for the power supply
-> - CPUFREQ for big.LITTLE cores
-> - TMU for big.LITTLE cores and GPU
-> - ADC with thermistor to measure the temperature of AP/Battery/Charger
-> - Maxim MAX77843 Interface PMIC (MUIC/Haptic/Regulator)
-> 
-> 3. sound devices
-> - I2S for sound bus
-> - LPASS for sound power control
-> - Wolfson WM5110 for sound codec
-> - Maxim MAX98504 for speaker amplifier
-> - TM2 ASoC Machine device driver node
-> 
-> 3. display devices
-> - DECON, DSI and MIC for the panel output
-> 
-> 4. usb devices
-> - USB 3.0 DRD (Dual Role Device)
-> - USB 3.0 Host controller
-> 
-> 5. storage devices
-> - MSHC (Mobile Storae Host Controller) for eMMC device
-> 
-> 6. misc devices
-> - gpio-keys (power, volume up/down, home key)
-> - PWM (Pulse Width Modulation Timer)
-> 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
-> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-> Signed-off-by: Inki Dae <inki.dae@samsung.com>
-> Signed-off-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
-> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
-> Signed-off-by: Jaewon Kim <jaewon02.kim@samsung.com>
-> Signed-off-by: Hyungwon Hwang <human.hwang@samsung.com>
-> Signed-off-by: Inha Song <ideal.song@samsung.com>
-> Signed-off-by: Ingi kim <ingi2.kim@samsung.com>
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
->  .../bindings/arm/samsung/samsung-boards.txt        |   1 +
->  arch/arm64/boot/dts/exynos/Makefile                |   5 +-
->  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 985 +++++++++++++++++++++
->  3 files changed, 990 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-> index 0ea7f14ef294..c704b4bf6137 100644
-> --- a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-> +++ b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-> @@ -15,6 +15,7 @@ Required root node properties:
->  	- "samsung,xyref5260"	- for Exynos5260-based Samsung board.
->  	- "samsung,smdk5410"	- for Exynos5410-based Samsung SMDK5410 eval board.
->  	- "samsung,smdk5420"	- for Exynos5420-based Samsung SMDK5420 eval board.
-> +	- "samsung,tm2"		- for Exynos5333-based Samsung TM2 board.
+> On Thu, 2016-08-25 at 10:32 +0200, Oliver Neukum wrote:
+> > On Thu, 2016-08-25 at 11:05 +0800, Chunfeng Yun wrote:
+> > > This patch adds support for the MediaTek USB3 controller
+> > > integrated into MT8173. It can be configured as Dual-Role
+> > > Device (DRD), Peripheral Only and Host Only (xHCI) modes.
+> > > 
+> > 
+> > > +/**
+> > > + * General Purpose Descriptor (GPD):
+> > > + *	The format of TX GPD is a little different from RX one.
+> > > + *	And the size of GPD is 16 bytes.
+> > > + *
+> > > + * @flag:
+> > > + *	bit0: Hardware Own (HWO)
+> > > + *	bit1: Buffer Descriptor Present (BDP), always 0, BD is not supported
+> > > + *	bit2: Bypass (BPS), 1: HW skips this GPD if HWO = 1
+> > > + *	bit7: Interrupt On Completion (IOC)
+> > > + * @chksum: This is used to validate the contents of this GPD;
+> > > + *	If TXQ_CS_EN / RXQ_CS_EN bit is set, an interrupt is issued
+> > > + *	when checksum validation fails;
+> > > + *	Checksum value is calculated over the 16 bytes of the GPD by default;
+> > > + * @data_buf_len (RX ONLY): This value indicates the length of
+> > > + *	the assigned data buffer
+> > > + * @next_gpd: Physical address of the next GPD
+> > > + * @buffer: Physical address of the data buffer
+> > > + * @buf_len:
+> > > + *	(TX): This value indicates the length of the assigned data buffer
+> > > + *	(RX): The total length of data received
+> > > + * @ext_len: reserved
+> > > + * @ext_flag:
+> > > + *	bit5 (TX ONLY): Zero Length Packet (ZLP),
+> > > + */
+> > > +struct qmu_gpd {
+> > > +	u8 flag;
+> > > +	u8 chksum;
+> > > +	u16 data_buf_len;
+> > > +	u32 next_gpd;
+> > > +	u32 buffer;
+> > > +	u16 buf_len;
+> > > +	u8 ext_len;
+> > > +	u8 ext_flag;
+> > > +} __packed;
+> > 
+> > It looks like this is shared with hardware in memory.
+> > But you leave the endianness of the bigger fields undeclared.
+> > 
+> The driver only supports Little-Endian SoCs currently, because I have no
+> Big-Endian platform to test it.
 
-This does not match...
+that's ok, you still have to mark the endian of the data and use it in
+that manner, you can't just not worry about it.
 
-> +	compatible = "samsung,exynos5433-tm2", "samsung,exynos5433";
+Please fix up.
 
-Is it 5433 or 5333?
+thanks,
 
-> +
-> +	aliases {
-> +		pinctrl0 = &pinctrl_alive;
-> +		pinctrl1 = &pinctrl_aud;
-> +		pinctrl2 = &pinctrl_cpif;
-> +		pinctrl3 = &pinctrl_ese;
-> +		pinctrl4 = &pinctrl_finger;
-> +		pinctrl5 = &pinctrl_fsys;
-> +		pinctrl6 = &pinctrl_imem;
-> +		pinctrl7 = &pinctrl_nfc;
-> +		pinctrl8 = &pinctrl_peric;
-> +		pinctrl9 = &pinctrl_touch;
-
-Drop all these.
-
-> +		serial0 = &serial_0;
-> +		serial1 = &serial_1;
-> +		serial2 = &serial_2;
-> +		serial3 = &serial_3;
-
-> +		spi0 = &spi_0;
-> +		spi1 = &spi_1;
-> +		spi2 = &spi_2;
-> +		spi3 = &spi_3;
-> +		spi4 = &spi_4;
-
-And these.
+greg k-h
