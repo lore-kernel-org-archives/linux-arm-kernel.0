@@ -1,76 +1,106 @@
-From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Tue, 30 Aug 2016 14:07:17 +0000
-Subject: [PATCH v2 1/1] arm64: Add DTS support for FSL's LS1012A SoC
-In-Reply-To: <20160830120220.GC8363@tiger>
-References: <1472207241-18461-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
- <20160829095239.GM30790@tiger> <1472493061.13245.39.camel@buserror.net>
- <20160830120220.GC8363@tiger>
-Message-ID: <HE1PR0401MB2636B40376255680B6A58CFB8DE00@HE1PR0401MB2636.eurprd04.prod.outlook.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 30 Aug 2016 15:07:55 +0100
+Subject: [PATCH v2 6/9] arm64: call __enable_mmu as an ordinary function
+ for secondary/resume
+In-Reply-To: <1472049366-10922-7-git-send-email-ard.biesheuvel@linaro.org>
+References: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1472049366-10922-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160830140755.GI1223@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Tuesday, August 30, 2016 7:02 AM
-> To: Scott Wood <oss@buserror.net>
-> Cc: Bhaskar U <bhaskar.upadhaya@nxp.com>; devicetree at vger.kernel.org; Pratiyush Srivastava
-> <pratiyush.srivastava@nxp.com>; Stuart Yoder <stuart.yoder@nxp.com>; Prabhakar Kushwaha
-> <prabhakar.kushwaha@nxp.com>; linux-devel at gforge.freescale.net; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v2 1/1] arm64: Add DTS support for FSL's LS1012A SoC
+On Wed, Aug 24, 2016 at 04:36:03PM +0200, Ard Biesheuvel wrote:
+> This updates the secondary and cpu_resume call sites to simply call
+> __enable_mmu as an ordinary function, with a bl instruction. This
+> requires the callers to be covered by .idmap.text.
 > 
-> On Mon, Aug 29, 2016 at 12:51:01PM -0500, Scott Wood wrote:
-> > On Mon, 2016-08-29 at 17:52 +0800, Shawn Guo wrote:
-> > > On Fri, Aug 26, 2016 at 03:57:21PM +0530, Bhaskar Upadhaya wrote:
-> > > >
-> > > > +		clockgen: clocking at 1ee1000 {
-> > > > +			compatible = "fsl,ls1012a-clockgen";
-> > > The compatible cannot be found in binding docs.
-> >
-> > From?Documentation/devicetree/bindings/clock/qoriq-clock.txt:
-> >
-> > - compatible: Should contain a chip-specific clock block compatible
-> > ????????string and (if applicable) may contain a chassis-version clock
-> > ????????compatible string.
-> >
-> > ? ? ? ? Chip-specific strings are of the form "fsl,<chip>-clockgen", such as:
-> > ????????* "fsl,p2041-clockgen"
-> > ????????* "fsl,p3041-clockgen"
-> > ????????* "fsl,p4080-clockgen"
-> > ????????* "fsl,p5020-clockgen"
-> > ????????* "fsl,p5040-clockgen"
-> > ????????* "fsl,t4240-clockgen"
-> > ????????* "fsl,b4420-clockgen"
-> > ????????* "fsl,b4860-clockgen"
-> > ????????* "fsl,ls1021a-clockgen"
-> > ????????Chassis-version clock strings include:
-> > ????????* "fsl,qoriq-clockgen-1.0": for chassis 1.0 clocks
-> > ????????* "fsl,qoriq-clockgen-2.0": for chassis 2.0 clocks
-> >
-> > I really hope we don't have to update every single fsl,<chip>-whatever binding
-> > every time a new chip comes out. ?There are already other chips not listed,
-> > FWIW (e.g. t1040, t2080, ls1043a, and ls2080a). ?That's why it says "such as".
-> 
-> If I remember correctly, DT maintainers want every supported compatible
-> string explicitly listed in bindings doc.  And they even added a check
-> into checkpatch.pl with commit bff5da433525 ("checkpatch: add DT
-> compatible string documentation checks").
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/head.S  | 14 ++++++--------
+>  arch/arm64/kernel/sleep.S | 10 +++-------
+>  2 files changed, 9 insertions(+), 15 deletions(-)
 
-See Documentation/devicetree/bindings/submitting-patches.txt:
+Can we please fold this with patch 5?
 
-  5) The wildcard "<chip>" may be used in compatible strings, as in
-     the following example:
+>From my PoV the combined diff is simpler to follow, and by doing so we
+avoid a few temporary issues (misleading comment above __enable_mmu, fun
+and games with the lr) that the series is generally cleaning up.
 
-         - compatible: Must contain '"nvidia,<chip>-pcie",
-           "nvidia,tegra20-pcie"' where <chip> is tegra30, tegra132, ...
+>From a quick look at __idmap_text_{start,end}, we have plenty of
+headroom in the idmap page, so moving a few more things in there is fine
+by me.
 
-     As in the above example, the known values of "<chip>" should be
-     documented if it is used.
+FWIW, With the two patches folded:
 
-It _is_ allowed to use the <chip> wildcard, and so you will not find all
-full compatible strings explicitly listed in bindings.  However, the
-chips themselves "should" be listed.
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 
 Thanks,
-Stuart
+Mark.
+
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 3e08e51578d5..c112c153821e 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -634,6 +634,7 @@ ENTRY(__boot_cpu_mode)
+>  	 * This provides a "holding pen" for platforms to hold all secondary
+>  	 * cores are held until we're ready for them to initialise.
+>  	 */
+> +	.pushsection	".idmap.text", "ax"
+>  ENTRY(secondary_holding_pen)
+>  	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
+>  	bl	set_cpu_boot_mode_flag
+> @@ -663,10 +664,12 @@ secondary_startup:
+>  	 * Common entry point for secondary CPUs.
+>  	 */
+>  	bl	__cpu_setup			// initialise processor
+> -
+> -	adr_l	lr, __secondary_switch		// address to jump to after enabling the MMU
+> -	b	__enable_mmu
+> +	bl	__enable_mmu
+> +	ldr	x8, =__secondary_switched
+> +	br	x8
+>  ENDPROC(secondary_startup)
+> +	.ltorg
+> +	.popsection
+>  
+>  __secondary_switched:
+>  	adr_l	x5, vectors
+> @@ -812,8 +815,3 @@ __primary_switch:
+>  	ldr	x8, =__primary_switched
+>  	br	x8
+>  ENDPROC(__primary_switch)
+> -
+> -__secondary_switch:
+> -	ldr	x8, =__secondary_switched
+> -	br	x8
+> -ENDPROC(__secondary_switch)
+> diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+> index 4bce95cd656a..1d4aba6fcc7a 100644
+> --- a/arch/arm64/kernel/sleep.S
+> +++ b/arch/arm64/kernel/sleep.S
+> @@ -95,19 +95,15 @@ ENTRY(__cpu_suspend_enter)
+>  	ret
+>  ENDPROC(__cpu_suspend_enter)
+>  
+> +	.pushsection	".idmap.text", "ax"
+>  ENTRY(cpu_resume)
+>  	bl	el2_setup		// if in EL2 drop to EL1 cleanly
+>  	bl	__cpu_setup
+>  	/* enable the MMU early - so we can access sleep_save_stash by va */
+> -	adr_l	lr, _resume_switched	/* __enable_mmu will branch here */
+> -	b	__enable_mmu
+> -ENDPROC(cpu_resume)
+> -
+> -	.pushsection	".idmap.text", "ax"
+> -_resume_switched:
+> +	bl	__enable_mmu
+>  	ldr	x8, =_cpu_resume
+>  	br	x8
+> -ENDPROC(_resume_switched)
+> +ENDPROC(cpu_resume)
+>  	.ltorg
+>  	.popsection
+>  
+> -- 
+> 2.7.4
+> 
