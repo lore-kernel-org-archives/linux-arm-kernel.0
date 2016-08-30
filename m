@@ -1,136 +1,100 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 31 Aug 2016 08:45:46 +0900
-Subject: [PATCH v24 9/9] Documentation: dt: chosen properties for arm64
- kdump
-In-Reply-To: <CAL_JsqJ5SqesEL5QWX_NJj+gL2jpne4NN_WzADiH+1VB7CkvOA@mail.gmail.com>
-References: <20160809015248.28414-2-takahiro.akashi@linaro.org>
- <20160809015747.28591-1-takahiro.akashi@linaro.org>
- <20160819132641.GA12709@rob-hp-laptop>
- <20160822042832.GJ20080@linaro.org>
- <CAL_JsqJ5SqesEL5QWX_NJj+gL2jpne4NN_WzADiH+1VB7CkvOA@mail.gmail.com>
-Message-ID: <20160830234545.GP20080@linaro.org>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 30 Aug 2016 16:47:03 -0700
+Subject: [PATCH v2 1/4] dt-binding: remoteproc: Introduce ADSP loader
+ binding
+In-Reply-To: <20160823185720.GD15161@tuxbot>
+References: <1471931866-3107-1-git-send-email-bjorn.andersson@linaro.org>
+ <20160823183121.GA13010@rob-hp-laptop>
+ <20160823185720.GD15161@tuxbot>
+Message-ID: <20160830234703.GR15161@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
+On Tue 23 Aug 11:57 PDT 2016, Bjorn Andersson wrote:
 
-On Tue, Aug 30, 2016 at 11:34:10AM -0500, Rob Herring wrote:
-> On Sun, Aug 21, 2016 at 11:28 PM, AKASHI Takahiro
-> <takahiro.akashi@linaro.org> wrote:
-> > Rob,
-> > [Cc: Mark]
-> >
-> > On Fri, Aug 19, 2016 at 08:26:41AM -0500, Rob Herring wrote:
-> >> On Tue, Aug 09, 2016 at 10:57:47AM +0900, AKASHI Takahiro wrote:
-> >> > From: James Morse <james.morse@arm.com>
-> >> >
-> >> > Add documentation for
-> >> >     linux,crashkernel-base and crashkernel-size,
-> >> >     linux,usable-memory-range, and
-> >> >     linux,elfcorehdr
-> >> > used by arm64 kexec/kdump to decribe the kdump reserved area, and
-> >> > the elfcorehdr's location within it.
-> >> >
-> >> > Signed-off-by: James Morse <james.morse@arm.com>
-> >> > [takahiro.akashi at linaro.org:
-> >> >     renamed "usable-memory" to "usable-memory-range",
-> >> >     added "linux,crashkernel-base" and "-size" ]
-> >> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> >> > ---
-> >> >  Documentation/devicetree/bindings/chosen.txt | 50 ++++++++++++++++++++++++++++
-> >> >  1 file changed, 50 insertions(+)
-> >> >
-> >> > diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
-> >> > index 6ae9d82..236188a 100644
-> >> > --- a/Documentation/devicetree/bindings/chosen.txt
-> >> > +++ b/Documentation/devicetree/bindings/chosen.txt
-> >> > @@ -52,3 +52,53 @@ This property is set (currently only on PowerPC, and only needed on
-> >> >  book3e) by some versions of kexec-tools to tell the new kernel that it
-> >> >  is being booted by kexec, as the booting environment may differ (e.g.
-> >> >  a different secondary CPU release mechanism)
-> >> > +
-> >> > +linux,crashkernel-base
-> >> > +linux,crashkernel-size
-> >> > +----------------------
-> >> > +These properties (currently used on PowerPC and arm64) indicates
-> >> > +the base address and the size, respectively, of the reserved memory
-> >> > +range for crash dump kernel.
-> >> > +e.g.
-> >> > +
-> >> > +/ {
-> >> > +   chosen {
-> >> > +           linux,crashkernel-base = <0x9 0xf0000000>;
-> >> > +           linux,crashkernel-size = <0x0 0x10000000>;
-> >> > +   };
-> >> > +};
-> >> > +
-> >> > +linux,usable-memory-range
-> >> > +-------------------------
-> >> > +
-> >> > +This property (currently used only on arm64) holds the memory range,
-> >> > +the base address and the size, which can be used as system ram on
-> >> > +the *current* kernel. Note that, if this property is present, any memory
-> >> > +regions under "memory" nodes in DT blob or ones marked as "conventional
-> >> > +memory" in EFI memory map should be ignored.
-> >> > +e.g.
-> >> > +
-> >> > +/ {
-> >> > +   chosen {
-> >> > +           linux,usable-memory-range = <0x9 0xf0000000 0x0 0x10000000>;
-> >> > +   };
-> >> > +};
-> >>
-> >> I've read the discussion on this. I think you should use the existing
-> >> linux,usable-memory property in the memory nodes. If UEFI systems don't
-> >> have memory nodes, then you can find an UEFI way to describe this. DT is
-> >> not the dumping ground for what doesn't fit in UEFI. How do x86 systems
-> >> work?
-> >
-> > Kdump for x86 passes the range of usable memory to crash dump kernel
-> > either via:
-> > (a) "memmap=nn at ss" command line parameter, or
-> > (b) faked BIOS e820 map (a sort of memory map table)
-> >
-> > (a) was rejected by Mark [1], and (b) is x86-specific.
-> >
-> > I believe that my approach is better because it works in the same way
-> > either on UEFI systems or DT-based systems.
+> On Tue 23 Aug 11:31 PDT 2016, Rob Herring wrote:
 > 
-> So we have a new way for both UEFI and DT. If UEFI folks can't come up
-> with a standard way to do things in the UEFI standard, then we just
-> dump them into DT?
+> > On Mon, Aug 22, 2016 at 10:57:43PM -0700, Bjorn Andersson wrote:
+> > > This document defines the binding for a component that loads firmware
+> > > and control the life cycle of the Qualcomm ADSP core.
+> > > 
+> > > Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> > > ---
+> > > 
+> > > Changes since v1:
+> > > - Added platform names to compatibility
+> > > 
+> > >  .../devicetree/bindings/remoteproc/qcom,adsp.txt   | 70 ++++++++++++++++++++++
+> > >  1 file changed, 70 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/remoteproc/qcom,adsp.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/remoteproc/qcom,adsp.txt b/Documentation/devicetree/bindings/remoteproc/qcom,adsp.txt
+> > > new file mode 100644
+> > > index 000000000000..3820151ce3e9
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/remoteproc/qcom,adsp.txt
+> > > @@ -0,0 +1,70 @@
+> > > +Qualcomm ADSP Peripheral Image Loader
+> > > +
+> > > +This document defines the binding for a component that loads and boots firmware
+> > > +on the Qualcomm ADSP core.
+> > 
+> > ADSP is for Audio DSP? So there is another driver for the audio 
+> > functions? Why doesn't it do the firmware loading? I'm still confused 
+> > why this binding is separate? If you had one common interface (a rproc) 
+> > to load and boot various other blocks like ADSP and Venus, then this 
+> > would make sense.
 
-No, I don't think so.
-According to "Documentation/devicetree/bindings/chosen.txt,
-  "The chosen node does not represent a real device, but serves as a place
-   for passing data between firmware and the operating system, like boot
-   arguments."
+> > Or does every accel block have some separate control 
+> > uC associated with it?
 
-Since kexec/dump is some sort of boot loader, it all makes sense to
-add a new property as an interface from the old kernel(kexec/dump)
-to the new kernel. So my approach doesn't break any DT rules.
+Sorry for the lengthy explanation below, in case you rather want a
+TL;DR:
 
-Please note that, even on UEFI/APCI systems, there are already a few
-properties used under /chosen, like "linux,uefi-system-table" and 
-"linux,mmap-*."
-(Those properties are currently *not* defined in this document, though.)
+This is not an accel block, it's a general purpose CPU exposing among
+other thing audio related services.
 
-> I'd rather see alignment with existing DT systems
-> (PPC) and in particular the tools.
+> > 
+> 
+> The ADSP is a general purpose CPU [1] mainly running services related to
+> audio handling - including controlling audio paths, driving the audio
+> blocks, audio effects, audio codec decoding.
+> 
+> On some platforms it also sports services for sensor batch offloading
+> (or whatever Google calls it) and video decoding for certain codecs.
+> 
+> All these services show up in a semi-probable fashion on other buses;
+> often on SMD, APR, QRTR.
+> 
+> 
+> There are a few blocks that share mechanism with the remoteproc, that
+> does not have a separate uC - with a destinct life cycle - I'm still
+> investigating how to describe these, but most likely those cases will
+> not show up in DT at all.
+> 
+> On msm8916 you have the following additional uCs; RPM, Hexagon, Wireless
+> and Venus; the RPM is always-on.
+> 
+> On msm8960 we have the following uCs; RPM, Hexagon for audio, DSPS (ARM
+> for sensor processing), two(?) Hexagons for modem, WCNSS (ARM core for
+> wireless), Venus (seems to be another ARM core) and an optional ARM core
+> for GPS if you don't have the modem Hexagons.
+> 
+> So, we have between 4 and 8 extra uCs in these SoCs; most are controlled
+> in a very similar fashion, but requires different resources and some
+> tweaks to the steps of bringing them up, down and handling crashes.
+> 
+> Downstream this is handled by having a "rproc" driver that's completely
+> generic, DT provides lists of resources controlling each step and a
+> callback mechanism is used to extend the rproc drivers with specific
+> functionality - it took me months to figure out how to boot the WCNSS
+> because the logic and resources are scattered throughout.
+> 
+> [1] https://en.wikipedia.org/wiki/Qualcomm_Hexagon
+> 
 
-I'm not sure what you mean here, but I guess:
-1) On DT-only systems, we should follow the way that PPC does.
-   (That is, adding "usable-memory" property to each "memory" node.)
-2) On UEFI/ACPI system, we must invent a new own way for our purpose
-   because, as I said before, there is no standard, but x86-specific way. 
+Rob, did this answer your questions, do you find this acceptable or do
+you have any suggestion to how I should model this?
 
-Is this what you want to do?
-
-If so,
-do you agree to my approach of adding "linux,usable-memory-range" property
-to /chosen *for UEFI/ACPI use*?
-
-Thanks,
--Takahiro AKASHI
-
-> Rob
+Regards,
+Bjorn
