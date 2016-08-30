@@ -1,52 +1,135 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 30 Aug 2016 11:52:18 +0100
-Subject: [PATCH ] arm64: cpuinfo: Add "model name" in /proc/cpuinfo for
- 64bit tasks also
-In-Reply-To: <6a6e87361e7c4a1fab9639cb83276765@BGMAIL104.nvidia.com>
-References: <1472461345-28219-1-git-send-email-sumitg@nvidia.com>
- <20160830091935.GD5163@e104818-lin.cambridge.arm.com>
- <6a6e87361e7c4a1fab9639cb83276765@BGMAIL104.nvidia.com>
-Message-ID: <20160830105218.GD1223@leverpostej>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Tue, 30 Aug 2016 11:52:40 +0100
+Subject: [PATCH 2/4] net: smc91x: add external clock support
+In-Reply-To: <20160830105117.GM1041@n2100.armlinux.org.uk>
+References: <20160830105117.GM1041@n2100.armlinux.org.uk>
+Message-ID: <E1begem-00076w-Ef@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2016 at 10:35:56AM +0000, Sumit Gupta wrote:
->  
-> > On Mon, Aug 29, 2016 at 02:32:25PM +0530, Sumit Gupta wrote:
-> > > Removed restriction of displaying model name for 32 bit tasks only.
-> > > Because of this Processor details were not displayed in "System
-> > > setting -> Details" in Ubuntu model name display is generic and can be
-> > > printed for 64 bit also.
-> > >
-> > > model name : ARMv8 Processor rev X (v8l)
-> > >
-> > > Signed-off-by: Sumit Gupta <sumitg@nvidia.com>
-> > 
-> > You didn't give a reason why this is needed. For 32-bit tasks, we did it for
-> > backwards compatibility with code checking for it.
-> 
-> Within Ubuntu Home Screen "System setting -> details", processor details were coming as null.
-> It seems those details are retrieved from "model name" in /proc/cpuinfo and
-> because of check for 32 bit tasks only, "model name" was not getting displayed.
+The smc91x can be operated with either a directly attached crystal, or
+an externally supplied clock.  When used with an externally supplied
+clock, this clock may require some configuration or control.  Add calls
+to the driver to lookup, enable and disable this optional clock.
 
-It's worth noting that for arm64, we have never exposed a "model name"
-field for AArch64 tasks. i.e. the code was looking for something which
-did not exist to begin with.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ drivers/net/ethernet/smsc/smc91x.c | 38 ++++++++++++++++++++++++++++++++++++--
+ drivers/net/ethernet/smsc/smc91x.h |  1 +
+ 2 files changed, 37 insertions(+), 2 deletions(-)
 
-> On removing this check for model name, processor details are getting
-> displayed in Ubuntu Home Screen.
-> I think model name field is general and can be displayed irrespective
-> of compatibility.
-
-The "model name" field is somewhat useless, given we cannot query a
-usable string from the HW. We'd deliberately chosen to not expose it, to
-not give the impression that we would support trying to generate a
-string. We do expose the decoded MIDR_EL1 fields, which we can query
-from the HW.
-
-As above, this has never existed for arm64, and so 64-bit code relying
-on this non-existent field has never worked. It would be better to fix
-the code in question.
-
-Thanks,
-Mark.
+diff --git a/drivers/net/ethernet/smsc/smc91x.c b/drivers/net/ethernet/smsc/smc91x.c
+index 503a3b6dce91..43dbc1c7b9a5 100644
+--- a/drivers/net/ethernet/smsc/smc91x.c
++++ b/drivers/net/ethernet/smsc/smc91x.c
+@@ -73,6 +73,7 @@ static const char version[] =
+ #include <linux/irq.h>
+ #include <linux/errno.h>
+ #include <linux/ioport.h>
++#include <linux/clk.h>
+ #include <linux/crc32.h>
+ #include <linux/platform_device.h>
+ #include <linux/spinlock.h>
+@@ -2284,6 +2285,18 @@ static int smc_drv_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	/*
++	 * Some platforms drive the xtal input from an external clock
++	 * source which may require some control.  Request the clock,
++	 * but allow probing to continue if no clock is specified.
++	 */
++	lp->xtal = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(lp->xtal)) {
++		if (PTR_ERR(lp->xtal) != -ENOENT)
++			return PTR_ERR(lp->xtal);
++		lp->xtal = NULL;
++	}
++
+ #if IS_BUILTIN(CONFIG_OF)
+ 	match = of_match_device(of_match_ptr(smc91x_match), &pdev->dev);
+ 	if (match) {
+@@ -2375,15 +2388,20 @@ static int smc_drv_probe(struct platform_device *pdev)
+ 	if (machine_is_assabet() && machine_has_neponset())
+ 		neponset_ncr_set(NCR_ENET_OSC_EN);
+ #endif
++	if (lp->xtal) {
++		ret = clk_prepare_enable(lp->xtal);
++		if (ret)
++			goto out_release_attrib;
++	}
+ 	platform_set_drvdata(pdev, ndev);
+ 	ret = smc_enable_device(pdev);
+ 	if (ret)
+-		goto out_release_attrib;
++		goto out_disable_xtal;
+ 
+ 	addr = ioremap(res->start, SMC_IO_EXTENT);
+ 	if (!addr) {
+ 		ret = -ENOMEM;
+-		goto out_release_attrib;
++		goto out_disable_xtal;
+ 	}
+ 
+ #ifdef CONFIG_ARCH_PXA
+@@ -2407,6 +2425,9 @@ static int smc_drv_probe(struct platform_device *pdev)
+ 	iounmap(addr);
+  out_release_attrib:
+ 	smc_release_attrib(pdev, ndev);
++ out_disable_xtal:
++	if (lp->xtal)
++		clk_disable_unprepare(lp->xtal);
+  out_release_io:
+ 	release_mem_region(res->start, SMC_IO_EXTENT);
+  out_free_netdev:
+@@ -2441,6 +2462,9 @@ static int smc_drv_remove(struct platform_device *pdev)
+ 		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	release_mem_region(res->start, SMC_IO_EXTENT);
+ 
++	if (lp->xtal)
++		clk_disable_unprepare(lp->xtal);
++
+ 	free_netdev(ndev);
+ 
+ 	return 0;
+@@ -2453,9 +2477,14 @@ static int smc_drv_suspend(struct device *dev)
+ 
+ 	if (ndev) {
+ 		if (netif_running(ndev)) {
++			struct smc_local *lp = netdev_priv(ndev);
++
+ 			netif_device_detach(ndev);
+ 			smc_shutdown(ndev);
+ 			smc_phy_powerdown(ndev);
++
++			if (lp->xtal)
++				clk_disable_unprepare(lp->xtal);
+ 		}
+ 	}
+ 	return 0;
+@@ -2468,6 +2497,11 @@ static int smc_drv_resume(struct device *dev)
+ 
+ 	if (ndev) {
+ 		struct smc_local *lp = netdev_priv(ndev);
++		if (lp->xtal) {
++			int ret = clk_prepare_enable(lp->xtal);
++			if (ret)
++				return ret;
++		}
+ 		smc_enable_device(pdev);
+ 		if (netif_running(ndev)) {
+ 			smc_reset(ndev);
+diff --git a/drivers/net/ethernet/smsc/smc91x.h b/drivers/net/ethernet/smsc/smc91x.h
+index e17671c9d1b0..5377c2e1b8b9 100644
+--- a/drivers/net/ethernet/smsc/smc91x.h
++++ b/drivers/net/ethernet/smsc/smc91x.h
+@@ -266,6 +266,7 @@ struct smc_local {
+ 
+ 	struct gpio_desc *power_gpio;
+ 	struct gpio_desc *reset_gpio;
++	struct clk *xtal;
+ 
+ 	/* version/revision of the SMC91x chip */
+ 	int	version;
+-- 
+2.1.0
