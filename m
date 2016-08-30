@@ -1,80 +1,88 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 30 Aug 2016 10:55:55 +0100
-Subject: [PATCH 1/3] clocksource/drivers/timer-atmel-pit: Enable mck clock
-In-Reply-To: <1472221245-14265-1-git-send-email-daniel.lezcano@linaro.org>
-References: <57C05026.7010905@linaro.org>
- <1472221245-14265-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20160830095555.GB1223@leverpostej>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 30 Aug 2016 11:01:48 +0100
+Subject: [PATCH v8 15/18] ARM: STi: DT: STiH407: Add uniperif reader dt
+ nodes
+In-Reply-To: <1472223413-7254-16-git-send-email-peter.griffin@linaro.org>
+References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
+ <1472223413-7254-16-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20160830100148.GO1661@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 26 Aug 2016, Peter Griffin wrote:
 
-On Fri, Aug 26, 2016 at 04:20:43PM +0200, Daniel Lezcano wrote:
-> From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> This patch adds the DT node for the uniperif reader
+> IP block found on STiH407 family silicon.
 > 
-> mck is needed to get the PIT working. Explicitly prepare_enable it instead
-> of assuming it is enabled.
-> 
-> This solves an issue where the system is freezing when the ETM/ETB drivers
-> are enabled.
-> 
-> Reported-by: Olivier Schonken <olivier.schonken@gmail.com>
-> Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 > ---
->  drivers/clocksource/timer-atmel-pit.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+>  arch/arm/boot/dts/stih407-family.dtsi | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
 > 
-> diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
-> index 1ffac0c..3494bc5 100644
-> --- a/drivers/clocksource/timer-atmel-pit.c
-> +++ b/drivers/clocksource/timer-atmel-pit.c
-> @@ -261,6 +261,12 @@ static int __init at91sam926x_pit_dt_init(struct device_node *node)
->  		return PTR_ERR(data->mck);
->  	}
->  
-> +	ret = clk_prepare_enable(data->mck);
-> +	if (ret) {
-> +		pr_err("Unable to enable mck\n");
-> +		return ret;
-> +	}
+> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> index d263c96..bdddf2c 100644
+> --- a/arch/arm/boot/dts/stih407-family.dtsi
+> +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> @@ -956,5 +956,31 @@
+>  			st,version = <5>;
+>  			st,mode = "SPDIF";
+>  		};
 > +
+> +		sti_uni_reader0: sti-uni-reader at 0 {
+> +			compatible = "st,sti-uni-reader";
+> +			status = "disabled";
 
-Apologies if the below is a duplicate report.
+I find it's normally nicer to place the status of the node at the
+bottom, separated by a '\n'.  There isn't a functional difference
+admittedly, but it would be my preference, since it's not describing
+the device per se.
 
-When building v4.8-rc4 multi_v7_defconfig, I get:
+> +			#sound-dai-cells = <0>;
+> +			st,syscfg = <&syscfg_core>;
+> +			reg = <0x8D83000 0x158>;
 
-[mark at leverpostej:~/src/linux]% uselinaro 15.08 make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j10 -s
-drivers/clocksource/timer-atmel-pit.c: In function 'at91sam926x_pit_dt_init':
-drivers/clocksource/timer-atmel-pit.c:264:2: error: 'ret' undeclared (first use in this function)
-  ret = clk_prepare_enable(data->mck);
-  ^
-drivers/clocksource/timer-atmel-pit.c:264:2: note: each undeclared identifier is reported only once for each function it appears in
-make[2]: *** [drivers/clocksource/timer-atmel-pit.o] Error 1
-make[1]: *** [drivers/clocksource] Error 2
-make[1]: *** Waiting for unfinished jobs....
-make: *** [drivers] Error 2
+We usually use lower-case for the address.
 
-As far as I can see, there's no local 'ret' variable. Locally I've fixed this
-up with:
+Since this has a 'reg' property, the '0' in the node name does not
+look appropriate.
 
-----8----
-diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
-index 3494bc5..7f0f5b2 100644
---- a/drivers/clocksource/timer-atmel-pit.c
-+++ b/drivers/clocksource/timer-atmel-pit.c
-@@ -240,6 +240,7 @@ static int __init at91sam926x_pit_common_init(struct pit_data *data)
- static int __init at91sam926x_pit_dt_init(struct device_node *node)
- {
-        struct pit_data *data;
-+       int ret;
- 
-        data = kzalloc(sizeof(*data), GFP_KERNEL);
-        if (!data)
----->8----
+> +			interrupts = <GIC_SPI 87 IRQ_TYPE_NONE>;
+> +			dmas = <&fdma0 5 0 1>;
+> +			dma-names = "rx";
+> +			dai-name = "Uni Reader #0 (PCM IN)";
 
-Thanks,
-Mark.
+Oooo, not seen something like this before.
+
+If it does not already have one, it would require a DT Ack.
+
+> +			st,version = <3>;
+
+This will likely need a DT Ack too.  We usually encode this sort of
+information in the compatible string.
+
+> +		};
+> +
+> +		sti_uni_reader1: sti-uni-reader at 1 {
+> +			compatible = "st,sti-uni-reader";
+> +			status = "disabled";
+> +			#sound-dai-cells = <0>;
+> +			st,syscfg = <&syscfg_core>;
+> +			reg = <0x8D84000 0x158>;
+> +			interrupts = <GIC_SPI 88 IRQ_TYPE_NONE>;
+> +			dmas = <&fdma0 6 0 1>;
+> +			dma-names = "rx";
+> +			dai-name = "Uni Reader #1 (HDMI RX)";
+> +			st,version = <3>;
+> +		};
+
+All as above.
+
+>  	};
+>  };
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
