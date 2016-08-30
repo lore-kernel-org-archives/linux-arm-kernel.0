@@ -1,106 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 30 Aug 2016 15:07:55 +0100
-Subject: [PATCH v2 6/9] arm64: call __enable_mmu as an ordinary function
- for secondary/resume
-In-Reply-To: <1472049366-10922-7-git-send-email-ard.biesheuvel@linaro.org>
-References: <1472049366-10922-1-git-send-email-ard.biesheuvel@linaro.org>
- <1472049366-10922-7-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160830140755.GI1223@leverpostej>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Tue, 30 Aug 2016 14:13:01 +0000
+Subject: [PATCH 3/3] PCI: Xilinx NWL PCIe: Fix Error for multi function
+ device for legacy interrupts.
+In-Reply-To: <57C57975.7040306@arm.com>
+References: <1472553558-27215-1-git-send-email-bharatku@xilinx.com>
+ <1472553558-27215-3-git-send-email-bharatku@xilinx.com>
+ <57C57975.7040306@arm.com>
+Message-ID: <8520D5D51A55D047800579B094147198258D239D@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 04:36:03PM +0200, Ard Biesheuvel wrote:
-> This updates the secondary and cpu_resume call sites to simply call
-> __enable_mmu as an ordinary function, with a bl instruction. This
-> requires the callers to be covered by .idmap.text.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/head.S  | 14 ++++++--------
->  arch/arm64/kernel/sleep.S | 10 +++-------
->  2 files changed, 9 insertions(+), 15 deletions(-)
+> Hi Bharat,
+> > @@ -561,7 +561,7 @@ static int nwl_pcie_init_irq_domain(struct nwl_pcie
+> *pcie)
+> >     }
+> >
+> >     pcie->legacy_irq_domain = irq_domain_add_linear(legacy_intc_node,
+> > -                                                   INTX_NUM,
+> > +                                                   INTX_NUM + 1,
+> >                                                     &legacy_domain_ops,
+> >                                                     pcie);
+>
+> This feels like the wrong thing to do. You have INTX_NUM irqs, so the domain
+> allocation should reflect this. On the other hand, the way the driver currently
+> deals with mappings is quite broken (consistently adding 1 to the HW interrupt).
+>
+Hi Marc,
 
-Can we please fold this with patch 5?
+Without above change I get following crash in kernel while booting.
 
->From my PoV the combined diff is simpler to follow, and by doing so we
-avoid a few temporary issues (misleading comment above __enable_mmu, fun
-and games with the lr) that the series is generally cleaning up.
+[    2.441684] error: hwirq 0x4 is too large for dummy
 
->From a quick look at __idmap_text_{start,end}, we have plenty of
-headroom in the idmap page, so moving a few more things in there is fine
-by me.
+[    2.441694] ------------[ cut here ]------------
 
-FWIW, With the two patches folded:
+[    2.441698] WARNING: at kernel/irq/irqdomain.c:344
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+[    2.441702] Modules linked in:
 
-Thanks,
-Mark.
+[    2.441706]
 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 3e08e51578d5..c112c153821e 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -634,6 +634,7 @@ ENTRY(__boot_cpu_mode)
->  	 * This provides a "holding pen" for platforms to hold all secondary
->  	 * cores are held until we're ready for them to initialise.
->  	 */
-> +	.pushsection	".idmap.text", "ax"
->  ENTRY(secondary_holding_pen)
->  	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
->  	bl	set_cpu_boot_mode_flag
-> @@ -663,10 +664,12 @@ secondary_startup:
->  	 * Common entry point for secondary CPUs.
->  	 */
->  	bl	__cpu_setup			// initialise processor
-> -
-> -	adr_l	lr, __secondary_switch		// address to jump to after enabling the MMU
-> -	b	__enable_mmu
-> +	bl	__enable_mmu
-> +	ldr	x8, =__secondary_switched
-> +	br	x8
->  ENDPROC(secondary_startup)
-> +	.ltorg
-> +	.popsection
->  
->  __secondary_switched:
->  	adr_l	x5, vectors
-> @@ -812,8 +815,3 @@ __primary_switch:
->  	ldr	x8, =__primary_switched
->  	br	x8
->  ENDPROC(__primary_switch)
-> -
-> -__secondary_switch:
-> -	ldr	x8, =__secondary_switched
-> -	br	x8
-> -ENDPROC(__secondary_switch)
-> diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-> index 4bce95cd656a..1d4aba6fcc7a 100644
-> --- a/arch/arm64/kernel/sleep.S
-> +++ b/arch/arm64/kernel/sleep.S
-> @@ -95,19 +95,15 @@ ENTRY(__cpu_suspend_enter)
->  	ret
->  ENDPROC(__cpu_suspend_enter)
->  
-> +	.pushsection	".idmap.text", "ax"
->  ENTRY(cpu_resume)
->  	bl	el2_setup		// if in EL2 drop to EL1 cleanly
->  	bl	__cpu_setup
->  	/* enable the MMU early - so we can access sleep_save_stash by va */
-> -	adr_l	lr, _resume_switched	/* __enable_mmu will branch here */
-> -	b	__enable_mmu
-> -ENDPROC(cpu_resume)
-> -
-> -	.pushsection	".idmap.text", "ax"
-> -_resume_switched:
-> +	bl	__enable_mmu
->  	ldr	x8, =_cpu_resume
->  	br	x8
-> -ENDPROC(_resume_switched)
-> +ENDPROC(cpu_resume)
->  	.ltorg
->  	.popsection
->  
-> -- 
-> 2.7.4
-> 
+[    2.441714] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.4.0 #8
+
+[    2.441718] Hardware name: xlnx,zynqmp (DT)
+
+[    2.441723] task: ffffffc071886b80 ti: ffffffc071888000 task.ti: ffffffc071888000
+
+[    2.441732] PC is at irq_domain_associate+0x138/0x1c0
+
+[    2.441738] LR is at irq_domain_associate+0x138/0x1c0
+
+In kernel/irq/irqdomain.c function irq_domain_associate
+
+if (WARN(hwirq >= domain->hwirq_max,
+                 "error: hwirq 0x%x is too large for %s\n", (int)hwirq, domain->name))
+                return -EINVAL;
+
+Here the hwirq and hwirq_max are equal to 4 without the above condition (INTX_NUM + 1) due to which crash is coming.
+This is happening as the legacy interrupts are starting from 1 (INTA).
+
+And I'm  consistently adding 1 to the HW interrupt as in nwl_pcie_leg_handler I get 0th bit set from MSGF_LEG_STATUS
+if INTA interrupt is raised but my hwirq number being mapped for INTA is 0x1 so that's I'm adding 1 to obtain correct virtual irq.
+Same case in nwl_pcie_free_irq_domain since hwirq starts from one I'm adding 1 to obtain virtual irq and free it.
+
+Thanks & Regards,
+Bharat
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
