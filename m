@@ -1,31 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 Aug 2016 12:20:36 +0100
-Subject: [PATCH] arm64: Set UTS_MACHINE in the Makefile
-In-Reply-To: <435a26f2-29ce-f40c-4749-6d8d6d81ac67@suse.com>
-References: <1472545895-7237-1-git-send-email-mmarek@suse.com>
- <20160830095322.GA24906@arm.com>
- <435a26f2-29ce-f40c-4749-6d8d6d81ac67@suse.com>
-Message-ID: <20160830112036.GB24906@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 30 Aug 2016 12:21:13 +0100
+Subject: [PATCH] generic: Add the exception case checking routine for ppi
+ interrupt
+In-Reply-To: <57C568F8.20802@arm.com>
+References: <1472530639-21616-1-git-send-email-majun258@huawei.com>
+ <57C548D0.3090700@arm.com> <57C5617B.6080801@huawei.com>
+ <57C568F8.20802@arm.com>
+Message-ID: <20160830112113.GE1223@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2016 at 12:50:41PM +0200, Michal Marek wrote:
-> On 2016-08-30 11:53, Will Deacon wrote:
-> > On Tue, Aug 30, 2016 at 10:31:35AM +0200, Michal Marek wrote:
-> >> The make rpm target depends on proper UTS_MACHINE definition.  Also, use
-> >> the variable in arch/arm64/kernel/setup.c, so that it's not accidentally
-> >> removed in the future.
+On Tue, Aug 30, 2016 at 12:07:36PM +0100, Marc Zyngier wrote:
+> +Mark
+> On 30/08/16 11:35, majun (F) wrote:
+> > ? 2016/8/30 16:50, Marc Zyngier ??:
+> >> On 30/08/16 05:17, MaJun wrote:
+> >>> From: Ma Jun <majun258@huawei.com>
+> >>>
+> >>> During system booting, if the interrupt which has no action registered
+> >>> is triggered, it would cause system panic when try to access the
+> >>> action member.
 > >>
-> >> Reported-and-tested-by: Fabian Vogt <fvogt@suse.com>
-> >> Signed-off-by: Michal Marek <mmarek@suse.com>
-> >> ---
+> >> And why would that interrupt be enabled? If you enable a PPI before
+> >> registering a handler, you're doing something wrong.
 > > 
-> > What exactly do you mean by "proper", here? Is it just the endianness
-> > suffix that you need?
+> > Actually,the problem described above happened during the capture
+> > kernel booting.
+> > 
+> > In my system, sometimes there is a pending physical timer
+> > interrupt(30) when the first kernel panic and the status is kept
+> > until the capture kernel booting.
 > 
-> The default for UTS_MACHINE is the kbuild arch name, which would be arm64.
+> And that's perfectly fine. The interrupt can be pending forever, as it
+> shouldn't get enabled.
+> 
+> > So, this interrupt will be handled during capture kernel booting.
+> 
+> Why? Who enables it?
+> 
+> > Becasue we use virt timer interrupt but not physical timer interrupt
+> > in capture kernel, the interrupt 30 has no action handler.
+> 
+> Again: who enables this interrupt? Whichever driver enables it should be
+> fixed.
 
-Ok, but why doesn't that work for rpm?
-Did you see the other part of my reply?
+I'm also at a loss.
 
-Will
+In this case, arch_timer_uses_ppi must be VIRT_PPI. So in
+arch_timer_register(), we'll only request_percpu_irq the virt PPI.
+arch_timer_has_nonsecure_ppi() will be false, given arch_timer_uses_ppi
+is VIRT_PPI, so in arch_timer_starting_cpu() we'll only
+enable_percpu_irq() the virt PPI.
+
+We don't fiddle with arch_timer_uses_ppi after calling
+arch_timer_register(). So I can't see how we could enable another IRQ in
+this case.
+
+Looking at the driver in virt/kvm/arm/arch_timer.c, we only enable what
+we've succesfully requested, so it doesnt' seem like there's an issue
+there.
+
+>From a quick look at teh GIC driver, it looks like we reset PPIs
+correctly, so it doesn't look like we have a "latent enable".
+
+Thanks,
+Mark.
