@@ -1,98 +1,86 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 Aug 2016 14:57:09 +0200
-Subject: [PATCH 2/3] pci: pcie-designware: add support for external MSI
- controller
-In-Reply-To: <1472561830-20932-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1472561830-20932-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1472561830-20932-3-git-send-email-thomas.petazzoni@free-electrons.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 30 Aug 2016 08:06:42 -0500
+Subject: [PATCH V2 0/5] firmware: Add support for TI System Control Interface
+ (TI-SCI) protocol driver
+Message-ID: <20160830130647.6828-1-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Designware PCIe controllers have a built-in MSI controller, which is
-already supported by the existing. However, in some situations, it might
-be a better choice to use an external MSI controller, especially when it
-provides a higher number of MSI interrupts than the built-in one.
+Hi,
 
-Therefore, this commit extends the pcie-designware driver to support the
-"msi-parent" DT property, already used by other drivers. It contains a
-phandle pointing to the external MSI controller to be used.
+Thanks for the reviews on the patches, here is v2 of the series.
 
-Following this commit, the pcie-designware code supports three
-possibilities, in this order:
+Texas Instruments' Keystone generation System on Chips (SoC)
+starting with 66AK2G02[1], now include a dedicated SoC System Control
+entity called PMMC(Power Management Micro Controller) in line with
+ARM architecture recommendations. The function of this module is
+to integrate all system operations in a centralized location.
+Communication with the SoC System Control entity from various
+processing units like ARM/DSP occurs over Message Manager hardware
+block.
 
- 1. If msi-parent is provided, then the MSI controller pointed by this
-    property is used.
+This series adds the base support for TI System Control Interface
+(TI-SCI) protocol[2]. The protocol is built on top of Texas
+Instrument's Message Manager communication mechanism[3].
 
- 2. Otherwise, and if no ->msi_host_init() function is provided by the
-    platform-specific "glue", then the built-in MSI controller of the
-    Designware controller is used.
+Overall architecture is very similar to SCPI[4] as follows:
++-------------+   +---------+     +------^-----+
+| TI SCI GENPD|   |TISCI Clk|     |TISCI reset |
++------+------+   +----+----+     +------+-----+
+       |               |                 |
+       |          +----v--------------+  |
+       +----------> TISCI Protocol(*) <--+
+                  +----+--------------+
+                       |
+                   +---v-----------+
+                   | MAILBOX  FWK  |
+                   +---+-----------+
+                       |
+                   +---v-----------+
+                   |  TI MSGMGR    |-> TISCI hardware block
+                   +---------------+
+(*) This series.
 
- 3. Otherwise, the ->msi_host_init() function of the platform-specific
-    "glue" is used to do some additional initialization, but it's still
-    the built-in MSI controller that is used.
+V2 of the series is based off v4.8-rc1 and is also available here:
+https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.9/tisci-base-v2
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/pci/host/pcie-designware.c | 24 ++++++++++++++++++------
- 1 file changed, 18 insertions(+), 6 deletions(-)
+V1 of the series: https://lkml.org/lkml/2016/8/19/768
 
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 12afce1..1e18a85 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -437,6 +437,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 	int i, ret;
- 	LIST_HEAD(res);
- 	struct resource_entry *win;
-+	struct msi_controller *msi = NULL;
- 
- 	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
- 	if (cfg_res) {
-@@ -525,10 +526,21 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 		pp->lanes = 0;
- 
- 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
--		if (!pp->ops->msi_host_init) {
-+		if (of_find_property(pp->dev->of_node, "msi-parent", NULL)) {
-+			struct device_node *msi_node;
-+
-+			msi_node = of_parse_phandle(pp->dev->of_node,
-+						    "msi-parent", 0);
-+			if (!msi_node)
-+				return -ENODEV;
-+
-+			msi = of_pci_find_msi_chip_by_node(msi_node);
-+		} else if (!pp->ops->msi_host_init) {
-+			msi = &dw_pcie_msi_chip;
-+			msi->dev = pp->dev;
- 			pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
- 						MAX_MSI_IRQS, &msi_domain_ops,
--						&dw_pcie_msi_chip);
-+						msi);
- 			if (!pp->irq_domain) {
- 				dev_err(pp->dev, "irq domain init failed\n");
- 				ret = -ENXIO;
-@@ -538,7 +550,9 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 			for (i = 0; i < MAX_MSI_IRQS; i++)
- 				irq_create_mapping(pp->irq_domain, i);
- 		} else {
--			ret = pp->ops->msi_host_init(pp, &dw_pcie_msi_chip);
-+			msi = &dw_pcie_msi_chip;
-+			msi->dev = pp->dev;
-+			ret = pp->ops->msi_host_init(pp, msi);
- 			if (ret < 0)
- 				goto error;
- 		}
-@@ -550,9 +564,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 	pp->root_bus_nr = pp->busn->start;
- 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
- 		bus = pci_scan_root_bus_msi(pp->dev, pp->root_bus_nr,
--					    &dw_pcie_ops, pp, &res,
--					    &dw_pcie_msi_chip);
--		dw_pcie_msi_chip.dev = pp->dev;
-+					    &dw_pcie_ops, pp, &res, msi);
- 	} else
- 		bus = pci_scan_root_bus(pp->dev, pp->root_bus_nr, &dw_pcie_ops,
- 					pp, &res);
+Changes in V2 of the series:
+	- Review comments incorporated from Lokesh and Rob
+	- Minor cleanup of comments for debug interface.
+
+[1] http://www.ti.com/product/66ak2g02
+[2] http://processors.wiki.ti.com/index.php/TISCI
+[3] Documentation/devicetree/bindings/mailbox/ti,message-manager.txt
+[4] Documentation/devicetree/bindings/arm/arm,scpi.txt
+
+Related series (based on v1):
+
+* https://lkml.org/lkml/2016/8/19/790 (GENPD for TISCI)
+* https://lkml.org/lkml/2016/8/19/811 (Clock support for TISCI) 
+
+Nishanth Menon (5):
+  Documentation: Add support for TI System Control Interface (TI-SCI)
+    protocol
+  firmware: Add basic support for TI System Control Interface (TI-SCI)
+    protocol
+  firmware: ti_sci: Add support for Device control
+  firmware: ti_sci: Add support for Clock control
+  firmware: ti_sci: Add support for reboot core service
+
+ .../devicetree/bindings/arm/keystone/ti,sci.txt    |   66 +
+ MAINTAINERS                                        |   10 +
+ drivers/firmware/Kconfig                           |   15 +
+ drivers/firmware/Makefile                          |    1 +
+ drivers/firmware/ti_sci.c                          | 1997 ++++++++++++++++++++
+ drivers/firmware/ti_sci.h                          |  492 +++++
+ include/linux/soc/ti/ti_sci_protocol.h             |  249 +++
+ 7 files changed, 2830 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+ create mode 100644 drivers/firmware/ti_sci.c
+ create mode 100644 drivers/firmware/ti_sci.h
+ create mode 100644 include/linux/soc/ti/ti_sci_protocol.h
+
 -- 
-2.7.4
+2.9.1.200.gb1ec08f
