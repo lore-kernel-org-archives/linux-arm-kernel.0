@@ -1,51 +1,78 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 31 Aug 2016 15:43:39 +0800
-Subject: [linux-sunxi] Re: [PATCH v9 2/2] Add mixer controls: Line-In,
- FM-In, Mic 2, Capture Source, Differential Line-In.
-In-Reply-To: <20160831094044.1c3227d6@scratchpost.org>
-References: <20160830054403.7878-1-dannym@scratchpost.org>
- <20160830054403.7878-3-dannym@scratchpost.org>
- <CAGb2v64zA3iSOe7ku=pF0RhJkvErxt_tbPWG4H8D6r5UEUJAMQ@mail.gmail.com>
- <20160831094044.1c3227d6@scratchpost.org>
-Message-ID: <CAGb2v67YGiZEzBezub5HcEBZ5689uF1yQYj2xJkbVdHyEpOm5Q@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 31 Aug 2016 09:44:55 +0200
+Subject: [GIT PULL] Integrator cleanups and DTS
+Message-ID: <CACRpkdYBB0rw3uQZnmpsuc_=mf5Ra-HmbRfdm6aT0kn9rn41Lg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 31, 2016 at 3:40 PM, Danny Milosavljevic
-<dannym@scratchpost.org> wrote:
->> And what about microphone bias?
->
-> Would this be OK?
->
-> static int sun4i_codec_handle_mic_bias_event(struct snd_soc_dapm_widget *w,
->                                              struct snd_kcontrol *k, int event)
-> {
->         struct sun4i_codec *scodec = snd_soc_card_get_drvdata(w->dapm->card);
->         if (SND_SOC_DAPM_EVENT_ON(event))
->                 regmap_update_bits(scodec->regmap,
->                                    SUN4I_CODEC_ADC_ACTL,
->                                    BIT(SUN4I_CODEC_ADC_ACTL_VMICEN),
->                                    BIT(SUN4I_CODEC_ADC_ACTL_VMICEN));
->         else
->                 regmap_update_bits(scodec->regmap,
->                                    SUN4I_CODEC_ADC_ACTL,
->                                    BIT(SUN4I_CODEC_ADC_ACTL_VMICEN),
->                                    0);
-> }
->
-> static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
-> ...
->         SND_SOC_DAPM_MIC("Mic1", sun4i_codec_handle_mic_bias_event),
->         SND_SOC_DAPM_MIC("Mic2", sun4i_codec_handle_mic_bias_event),
->
-> Do I then remove
->
->          SND_SOC_DAPM_SUPPLY("VMIC", SUN4I_CODEC_ADC_ACTL,
->                             SUN4I_CODEC_ADC_ACTL_VMICEN, 0, NULL, 0),
->
-> completely? What about the routes?
+Hi ARM SoC people,
 
-My apologies. I didn't notice that VMIC was already in the driver.
-In that your original patch did everything right.
+this is a request to pull a combined cleanup and DTS changes batch
+for the Integrators.
 
-ChenYu
+Since I have commits such as "move CLCD display to DTS" that is
+a single functional change deleting stuff from the boardfile and adding
+the same to the DTS, it is a combination of DTS and boardfile patches.
+All with the goal to cut down on boardfile code and move to device tree.
+
+The changes require the corresponding changes from the video/fbdev
+and clk subsystems to come in, but these are orthogonal and depend
+solely on the DTS things coming in place. As the DTS repository is
+"kind of external" I am deliverately relaxed about synchronizing changes
+here and just optimistically assume they will come in during the merge
+window and start working.
+
+There are no compile-time dependencies on fbdev or clk, just runtime,
+with the DT changes. This cleanup can be merged totally orthogonally,
+and when ARM SoC, fbdev and clk are all merged in the merge window,
+the result will compile and boot nicely.
+
+I don't expect any conflicting changes to the Integrator in this merge
+window, neither to board files nor DTS.
+
+Please pull it in.
+
+Yours,
+Linus Walleij
+
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+tags/integrator-armsoc-1
+
+for you to fetch changes up to bdb249fce9ad44aab340be3b7a77060114f7193b:
+
+  ARM: integrator: read counter using syscon/regmap (2016-08-31 09:30:34 +0200)
+
+----------------------------------------------------------------
+This is a bunch of Integrator changes for v4.9:
+
+- Add and fix a bunch of clocks in the DTS corresponding
+  to the new clock support merged into the clk tree.
+- Move the CLCD display configuration from boardfile to
+  device tree using the new CLCD support merged into the
+  fbdev tree.
+- Cut some auxdata.
+- Cut some static remappings.
+- Move the sched_clock() counter to use syscon+regmap.
+
+----------------------------------------------------------------
+Linus Walleij (8):
+      ARM: dts: set the 24MHz xtal as parent of the UART clock
+      ARM: dts: add the Integrator/AP baseboard clocks
+      ARM: dts: Add the core module clocks to Integrator/AP
+      ARM: dts: add the core module clocks to Integrator/CP
+      ARM: integrator: move CP CLCD display to DTS
+      ARM: integrator: delete some auxdata
+      ARM: integrator: cut down on static maps
+      ARM: integrator: read counter using syscon/regmap
+
+ arch/arm/boot/dts/integratorap.dts       |  51 ++++++++++++-
+ arch/arm/boot/dts/integratorcp.dts       |  74 ++++++++++++++++---
+ arch/arm/mach-integrator/integrator_ap.c |  36 ---------
+ arch/arm/mach-integrator/integrator_cp.c | 123 ++++---------------------------
+ 4 files changed, 126 insertions(+), 158 deletions(-)
