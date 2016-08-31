@@ -1,65 +1,44 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 31 Aug 2016 10:18:14 +0200
-Subject: [PATCH 3/6] drm/panel: simple: Add A10 EVB 5 inch panel support
+Date: Wed, 31 Aug 2016 10:18:12 +0200
+Subject: [PATCH 1/6] backlight: pwm_bl: Handle gpio that can sleep
 In-Reply-To: <20160831081817.5191-1-maxime.ripard@free-electrons.com>
 References: <20160831081817.5191-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160831081817.5191-4-maxime.ripard@free-electrons.com>
+Message-ID: <20160831081817.5191-2-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A10-EVB from Allwinner comes with an unidentified panel, with the only
-mark on the PCB being A10-SUB-EVB-5LCD.
+Some backlight GPIOs might be connected to some i2c based expanders whose
+access might sleep.
 
-Add timings to simple panel to handle it.
+Since it's not in any critical path, use the cansleep variant of the GPIO
+API.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/panel/panel-simple.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ drivers/video/backlight/pwm_bl.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index 85143d1b9b31..be371b053aab 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -386,6 +386,29 @@ static void panel_simple_shutdown(struct device *dev)
- 	panel_simple_disable(&panel->base);
- }
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index b2b366bb0f97..12614006211e 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -55,7 +55,7 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
+ 		dev_err(pb->dev, "failed to enable power supply\n");
  
-+static const struct drm_display_mode allwinner_a10_sub_evb_5lcd_mode = {
-+	.clock = 33000,
-+	.hdisplay = 800,
-+	.hsync_start = 800 + 209,
-+	.hsync_end = 800 + 209 + 1,
-+	.htotal = 800 + 209 + 1 + 45,
-+	.vdisplay = 480,
-+	.vsync_start = 480 + 22,
-+	.vsync_end = 480 + 22 + 1,
-+	.vtotal = 480 + 22 + 1 + 22,
-+	.vrefresh = 60,
-+};
-+
-+static const struct panel_desc allwinner_a10_sub_evb_5lcd = {
-+	.modes = &allwinner_a10_sub_evb_5lcd_mode,
-+	.num_modes = 1,
-+	.size = {
-+		.width = 110,
-+		.height = 67,
-+	},
-+	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
-+};
-+
- static const struct drm_display_mode ampire_am800480r3tmqwa1h_mode = {
- 	.clock = 33333,
- 	.hdisplay = 800,
-@@ -1515,6 +1538,9 @@ static const struct panel_desc urt_umsh_8596md_parallel = {
+ 	if (pb->enable_gpio)
+-		gpiod_set_value(pb->enable_gpio, 1);
++		gpiod_set_value_cansleep(pb->enable_gpio, 1);
  
- static const struct of_device_id platform_of_match[] = {
- 	{
-+		.compatible = "allwinner,sun4i-a10-sub-evb-5-lcd",
-+		.data = &allwinner_a10_sub_evb_5lcd,
-+	}, {
- 		.compatible = "ampire,am800480r3tmqwa1h",
- 		.data = &ampire_am800480r3tmqwa1h,
- 	}, {
+ 	pwm_enable(pb->pwm);
+ 	pb->enabled = true;
+@@ -70,7 +70,7 @@ static void pwm_backlight_power_off(struct pwm_bl_data *pb)
+ 	pwm_disable(pb->pwm);
+ 
+ 	if (pb->enable_gpio)
+-		gpiod_set_value(pb->enable_gpio, 0);
++		gpiod_set_value_cansleep(pb->enable_gpio, 0);
+ 
+ 	regulator_disable(pb->power_supply);
+ 	pb->enabled = false;
 -- 
 2.9.2
