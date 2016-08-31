@@ -1,36 +1,45 @@
 From: jorik@kippendief.biz (jorik at kippendief.biz)
-Date: Wed, 31 Aug 2016 15:53:59 +0200
-Subject: [PATCH 0/7] dts: sun8i: add extra uart/i2c to H3
-Message-ID: <1472651646-15579-1-git-send-email-jorik@kippendief.biz>
+Date: Wed, 31 Aug 2016 15:54:00 +0200
+Subject: [PATCH 1/7] dts: sun8i-h3: add pinmux definitions for uart2/uart3
+In-Reply-To: <1472651646-15579-1-git-send-email-jorik@kippendief.biz>
+References: <1472651646-15579-1-git-send-email-jorik@kippendief.biz>
+Message-ID: <1472651646-15579-2-git-send-email-jorik@kippendief.biz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jorik Jonker <jorik@kippendief.biz>
 
-This series is a follow-up to Martin Ayotte's efforts to add additional UARTS
-and I2C ports to the AllWinner H3 SoC DTS files. In this series I explicitly
-leave out i2c2, since this is not broken out on my boards, so I cannot verify if
-it actually works.
+This adds pinmux definitions for uarts 2 and 3 on H3 boards
 
-After the patch, one enables for example uart1 on a opi+ like this from u-boot:
- => fdt set /soc/serial at 01c28400 status okay
+Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
+---
+ arch/arm/boot/dts/sun8i-h3.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-Regards,
-Jorik
-
-Jorik Jonker (7):
-  dts: sun8i-h3: add pinmux definitions for uart2/uart3
-  dts: sun8i-h3: add pinmux definitions for i2c0/i2c1
-  dts: sun8i-h3: add i2c0/i2c1 SoC peripherals
-  dts: sun8i-h3: add UART1-3 to Orange Pi Plus
-  dts: sun8i-h3: add UART1-3 to Orange Pi PC
-  dts: sun8i-h3: add I2C0-1 to Orange Pi Plus
-  dts: sun8i-h3: add I2C0-1 to Orange Pi PC
-
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts   | 25 ++++++++++++++
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 25 ++++++++++++++
- arch/arm/boot/dts/sun8i-h3.dtsi              | 50 ++++++++++++++++++++++++++++
- 3 files changed, 100 insertions(+)
-
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index fdf9fdb..7740748 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -373,6 +373,20 @@
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
++
++			uart2_pins_a: uart2 at 0 {
++				allwinner,pins = "PA0", "PA1";
++				allwinner,function = "uart2";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			uart3_pins_a: uart3 at 0 {
++				allwinner,pins = "PA13", "PA14";
++				allwinner,function = "uart3";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
+ 		};
+ 
+ 		timer at 01c20c00 {
 -- 
 2.7.4
