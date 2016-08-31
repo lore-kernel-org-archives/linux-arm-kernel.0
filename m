@@ -1,41 +1,74 @@
-From: Per.Hallsmark@windriver.com (Hallsmark, Per)
-Date: Wed, 31 Aug 2016 10:14:07 +0000
-Subject: [PATCH] arm64: ni_syscall should be similar to other archs
-In-Reply-To: <20160825110008.GD20748@e104818-lin.cambridge.arm.com>
-References: <1456325699-25849-1-git-send-email-per.hallsmark@windriver.com>
- <20160418095808.GB18257@e104818-lin.cambridge.arm.com>
- <B7B4BB465792624BAF51F33077E990659D7C134D@ALA-MBB.corp.ad.wrs.com>,
- <20160825110008.GD20748@e104818-lin.cambridge.arm.com>
-Message-ID: <B7B4BB465792624BAF51F33077E99065ACA4BEF7@ALA-MBB.corp.ad.wrs.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 31 Aug 2016 11:27:21 +0100
+Subject: [PATCH 05/33] gpio: add generic single-register fixed-direction
+ GPIO driver
+In-Reply-To: <20160831084938.GQ1041@n2100.armlinux.org.uk>
+References: <20160829102328.GA28796@n2100.armlinux.org.uk>
+ <E1beJjz-0000mA-0o@rmk-PC.armlinux.org.uk>
+ <87eg57e54l.fsf@belgarion.home>
+ <20160830091805.GL1041@n2100.armlinux.org.uk>
+ <87k2eycip0.fsf@belgarion.home>
+ <20160830184612.GO1041@n2100.armlinux.org.uk>
+ <87fupmc59b.fsf@belgarion.home>
+ <20160831084938.GQ1041@n2100.armlinux.org.uk>
+Message-ID: <20160831102721.GR1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hmmm... sorry that was completely wrong syscall, sys_membarrier it should have been.
+On Wed, Aug 31, 2016 at 09:49:38AM +0100, Russell King - ARM Linux wrote:
+> On Tue, Aug 30, 2016 at 11:32:16PM +0200, Robert Jarzmik wrote:
+> > Russell King - ARM Linux <linux@armlinux.org.uk> writes:
+> > 
+> > > If you can wait a day or two, I'll push a branch out for everything in
+> > > all these multiple series.
+> > Sure, just ping me when you have something.
+> 
+> git://git.armlinux.org.uk/~rmk/linux-arm.git sa1100
+> 
+> should get you something suitable to test.  It's based on 4.7-rc3 plus
+> my fixes branch.
+> 
+> It would be great to have this tested on Lubbock, and get the PCMCIA
+> issues fixed.  Maybe we can look at converting mainstone as well?
+
+Yes, looking at mainstone's PCMCIA, it uses a MAX1602 device, which
+is supported by the new max1600.c code.
+
+#define MST_PCMCIA_PWR_VPP_0    0x0        /* voltage VPP = 0V */
+#define MST_PCMCIA_PWR_VPP_120  0x2        /* voltage VPP = 12V*/
+#define MST_PCMCIA_PWR_VPP_VCC  0x1        /* voltage VPP = VCC */
+#define MST_PCMCIA_PWR_VCC_0    0x0        /* voltage VCC = 0V */
+#define MST_PCMCIA_PWR_VCC_33   0x8        /* voltage VCC = 3.3V */
+#define MST_PCMCIA_PWR_VCC_50   0x4        /* voltage VCC = 5.0V */
+
+This follows the Cirrus code (also used by Lubbock.)  So, if we represent
+the MST_PCMCIA[01] registers as GPIOs, we can switch pxa2xx_mainstone.c
+to use the max1600.c code for power control.
+
+With the other signals in MST_PCMCIA[01] represented as GPIOs (we'd
+need to add the VS* to soc_common), we'd then have those read by
+generic code, which means mst_pcmcia_socket_state() becomes just the
+hack for STSCHG.
+
+With gpio-reg, we can represent these registers easily as GPIOs, eg:
+
+	gc = gpio_reg_init(NULL, (void __iomem *)&MST_PCMCIA0,
+			   -1, 11, "mst-pcmcia0", ~MST_PCMCIA_PWR_MASK, 0,
+			   mst_pcmcia_names);
+
+There is a slight issue, which is that the interrupts can't be
+translated to an interrupt by gpio-reg, which will currently cause
+soc_common problems - but that's an easy fix, though leaves us with
+more code than I'd desire in pxa2xx_mainstone.c.  Maybe a solution
+there would be to have gpio-reg also take an array of interrupt
+numbers... not sure yet.
 
 
-From: Catalin Marinas [catalin.marinas at arm.com]
-Sent: Thursday, August 25, 2016 13:00
-To: Hallsmark, Per
-Cc: Will Deacon; linux-arm-kernel at lists.infradead.org
-Subject: Re: [PATCH] arm64: ni_syscall should be similar to other archs
+For IrDA, it looks like it has the same transceiver as the assabet, so
+I've (already) patches to split out the gpio-based transceiver control
+from sa1100_ir - maybe we can re-use that in pxaficp_ir too.
 
-On Thu, Jun 30, 2016 at 01:58:08PM +0000, Hallsmark, Per wrote:
-> Catalin Marinas wrote:
-> > On Wed, Feb 24, 2016 at 03:54:59PM +0100, per.hallsmark at windriver.com wrote:
-> > > From: Per Hallsmark <per.hallsmark@windriver.com>
-> > >
-> > > Today arm64 have it's own variant when a userspace app is doing a
-> > > non-implemented syscall in that it dumps on console process name,
-> > > registers and such. This makes a different behaviour on arm64 than
-> > > on all other archs.
-> >
-> > Are you hitting a real issue with this? Test apps doing random syscalls?
->
-> The issue was found on a real case, running lttng that tries to make use
-> of sys_brk before falling back to internal variant. On arm64 this generates
-> an "ugly" dump on console which dont happen on arm, x86 etc.
-
-Why would a sys_brk() end up on the do_ni_syscall() path?
-
---
-Catalin
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
