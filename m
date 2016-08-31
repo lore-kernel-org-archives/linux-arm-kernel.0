@@ -1,55 +1,34 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Wed, 31 Aug 2016 07:18:47 +0000
-Subject: [PATCH v2 5/6] ARM: tegra: Add Tegra20 GMI support
-References: <1472569349.5703.25.camel@toradex.com>
-Message-ID: <1472627926.31008.7.camel@toradex.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 31 Aug 2016 08:35:49 +0100
+Subject: [PATCH] arm64: kernel: Fix unmasked debug exceptions when
+ restoring mdscr_el1
+In-Reply-To: <20160826163947.GB23885@red-moon>
+References: <1472223822-21059-1-git-send-email-james.morse@arm.com>
+ <20160826163947.GB23885@red-moon>
+Message-ID: <57C688D5.2040400@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-08-24 at 15:37 +0200, Mirza Krak wrote:
-> 
-> From: Mirza Krak <mirza.krak-Re5JQEeQqe8AvxtiuMwx3w@public.gmane.org>
-> 
-> Add a device node for the GMI controller found on Tegra20.
-> 
-> Signed-off-by: Mirza Krak <mirza.krak-Re5JQEeQqe8AvxtiuMwx3w@public.g
-> mane.org>
-> ---
-> Changes in v2:
-> - added address-cells, size-cells and ranges properties
-> 
-> ?arch/arm/boot/dts/tegra20.dtsi | 14 ++++++++++++++
-> ?1 file changed, 14 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/tegra20.dtsi
-> b/arch/arm/boot/dts/tegra20.dtsi
-> index 2207c08..03eb029 100644
-> --- a/arch/arm/boot/dts/tegra20.dtsi
-> +++ b/arch/arm/boot/dts/tegra20.dtsi
-> @@ -376,6 +376,20 @@
-> ?		status = "disabled";
-> ?	};
-> 
-> +
-> +	gmi at 70009000 {
-> +		compatible = "nvidia,tegra20-gmi";
-> +		reg = <70009000 0x1000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0 0x48000000 0x7ffffff>;
+Hi Lorenzo,
 
-On T20 it is actually rather 0xd0000000.
-
+On 26/08/16 17:39, Lorenzo Pieralisi wrote:
+> On Fri, Aug 26, 2016 at 04:03:42PM +0100, James Morse wrote:
+>> Changes to make the resume from cpu_suspend() code behave more like
+>> secondary boot caused debug exceptions to be unmasked early by
+>> __cpu_setup(). We then go on to restore mdscr_el1 in cpu_do_resume(),
+>> potentially taking break or watch points based on uninitialised registers.
 > 
-> +		clocks = <&tegra_car TEGRA20_CLK_NOR>;
-> +		clock-names = "gmi";
-> +		resets = < &tegra_car 42>;
-> +		reset-names = "gmi";
-> +		status = "disabled";
-> +	};
-> +
-> ?	pwm: pwm at 7000a000 {
-> ?		compatible = "nvidia,tegra20-pwm";
-> ?		reg = <0x7000a000 0x100>;
-> --
-> 2.1.4
+> Another option would be moving enable_dbg() out of __cpu_setup() and
+> calling when it returns in the cold boot path, that would not change
+> much in terms of debugging but we would avoid fiddling about with
+> daif three times in the resume path just to restore it to what it
+> was on suspend entry :)
+
+I agree, but there is/will-be quite a lot of churn in the code that calls
+enable_mmu() if Ard's cleanup series is taken. I think this is the tidiest fix
+to backport. I will post a patch to tidy this up as you suggest for v4.9-rc1.
+
+
+Thanks,
+
+James
