@@ -1,45 +1,28 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 31 Aug 2016 16:50:17 +0800
-Subject: [PATCH 3/3] arm64: defconfig: enable two common modules for power
- management
-In-Reply-To: <1472633417-9330-1-git-send-email-leo.yan@linaro.org>
-References: <1472633417-9330-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1472633417-9330-4-git-send-email-leo.yan@linaro.org>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed, 31 Aug 2016 11:17:34 +0200
+Subject: [PATCH] arm64: renesas: r8a7796/salvator-x: Add board part number to
+ DT bindings
+Message-ID: <1472635054-24372-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable two common modules for power management, one is to enable
-CPUFREQ_DT driver; this CPUFreq driver is used by many platforms by
-passing OPP table from device tree.
-
-Also enables CPU_THERMAL for CPU cooling device driver; so after we
-enabled thermal framework and can bind thermal zone with CPU cooling
-device driver.
-
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/arm/shmobile.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index eadf485..9fd2681 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -82,6 +82,7 @@ CONFIG_COMPAT=y
- CONFIG_CPU_IDLE=y
- CONFIG_ARM_CPUIDLE=y
- CONFIG_CPU_FREQ=y
-+CONFIG_CPUFREQ_DT=y
- CONFIG_ARM_BIG_LITTLE_CPUFREQ=y
- CONFIG_ARM_SCPI_CPUFREQ=y
- CONFIG_NET=y
-@@ -252,6 +253,7 @@ CONFIG_SENSORS_INA2XX=m
- CONFIG_SENSORS_ARM_SCPI=y
- CONFIG_THERMAL=y
- CONFIG_THERMAL_EMULATION=y
-+CONFIG_CPU_THERMAL=y
- CONFIG_EXYNOS_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_RENESAS_WDT=y
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index 90cf237ee5581978..42a046a97acba00f 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -65,7 +65,7 @@ Boards:
+     compatible = "renesas,porter", "renesas,r8a7791"
+   - Salvator-X (RTP0RC7795SIPB0010S)
+     compatible = "renesas,salvator-x", "renesas,r8a7795";
+-  - Salvator-X
++  - Salvator-X (RTP0RC7796SIPB0011S)
+     compatible = "renesas,salvator-x", "renesas,r8a7796";
+   - SILK (RTP0RC7794LCB00011S)
+     compatible = "renesas,silk", "renesas,r8a7794"
 -- 
 1.9.1
