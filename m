@@ -1,32 +1,76 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 31 Aug 2016 14:10:57 +0200
-Subject: [RFC PATCH V5 0/5] ECAM quirks handling for ARM64 platforms
-In-Reply-To: <CADaLND=pbbtVZt6bg6Lg-21v3_SU+qDJGGDH0Qf+9maf8oTA5w@mail.gmail.com>
-References: <1470661002-26213-1-git-send-email-tn@semihalf.com>
- <CADaLND=pbbtVZt6bg6Lg-21v3_SU+qDJGGDH0Qf+9maf8oTA5w@mail.gmail.com>
-Message-ID: <0fda1583-f95f-5fe0-b8b7-ae1e2c49db6b@semihalf.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Wed, 31 Aug 2016 20:11:26 +0800
+Subject: [RESEND PATCH, v5 4/5] usb: Add MediaTek USB3 DRD Driver
+In-Reply-To: <20160830172055.GA29742@kroah.com>
+References: <1472094329-18466-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1472094329-18466-5-git-send-email-chunfeng.yun@mediatek.com>
+ <1472113973.2877.22.camel@suse.com> <1472204307.27677.41.camel@mhfsdcap03>
+ <20160830172055.GA29742@kroah.com>
+Message-ID: <1472645486.27677.42.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.08.2016 23:20, Duc Dang wrote:
-> On Mon, Aug 8, 2016 at 5:56 AM, Tomasz Nowicki <tn@semihalf.com> wrote:
->>
->> Quirk handling relies on an idea of matching MCFG OEM ID, TABLE ID and
->> revision (the ones from standard header of MCFG table).
->>
->> Static array is used to keep quirk entries. Each entry consists of
->> mentioned MCFG IDs along with custom pci_ops structure and initialization call.
->>
->> As an example, the last patch presents quirk handling mechanism usage for
->> ThunderX PEM driver.
->
-> Hi Tomasz,
->
-> Are you planning to change this series into a real one (not RFC) any time soon?
+On Tue, 2016-08-30 at 19:20 +0200, Greg Kroah-Hartman wrote:
+> On Fri, Aug 26, 2016 at 05:38:27PM +0800, chunfeng yun wrote:
+> > Hi,
+> > 
+> > On Thu, 2016-08-25 at 10:32 +0200, Oliver Neukum wrote:
+> > > On Thu, 2016-08-25 at 11:05 +0800, Chunfeng Yun wrote:
+> > > > This patch adds support for the MediaTek USB3 controller
+> > > > integrated into MT8173. It can be configured as Dual-Role
+> > > > Device (DRD), Peripheral Only and Host Only (xHCI) modes.
+> > > > 
+> > > 
+> > > > +/**
+> > > > + * General Purpose Descriptor (GPD):
+> > > > + *	The format of TX GPD is a little different from RX one.
+> > > > + *	And the size of GPD is 16 bytes.
+> > > > + *
+> > > > + * @flag:
+> > > > + *	bit0: Hardware Own (HWO)
+> > > > + *	bit1: Buffer Descriptor Present (BDP), always 0, BD is not supported
+> > > > + *	bit2: Bypass (BPS), 1: HW skips this GPD if HWO = 1
+> > > > + *	bit7: Interrupt On Completion (IOC)
+> > > > + * @chksum: This is used to validate the contents of this GPD;
+> > > > + *	If TXQ_CS_EN / RXQ_CS_EN bit is set, an interrupt is issued
+> > > > + *	when checksum validation fails;
+> > > > + *	Checksum value is calculated over the 16 bytes of the GPD by default;
+> > > > + * @data_buf_len (RX ONLY): This value indicates the length of
+> > > > + *	the assigned data buffer
+> > > > + * @next_gpd: Physical address of the next GPD
+> > > > + * @buffer: Physical address of the data buffer
+> > > > + * @buf_len:
+> > > > + *	(TX): This value indicates the length of the assigned data buffer
+> > > > + *	(RX): The total length of data received
+> > > > + * @ext_len: reserved
+> > > > + * @ext_flag:
+> > > > + *	bit5 (TX ONLY): Zero Length Packet (ZLP),
+> > > > + */
+> > > > +struct qmu_gpd {
+> > > > +	u8 flag;
+> > > > +	u8 chksum;
+> > > > +	u16 data_buf_len;
+> > > > +	u32 next_gpd;
+> > > > +	u32 buffer;
+> > > > +	u16 buf_len;
+> > > > +	u8 ext_len;
+> > > > +	u8 ext_flag;
+> > > > +} __packed;
+> > > 
+> > > It looks like this is shared with hardware in memory.
+> > > But you leave the endianness of the bigger fields undeclared.
+> > > 
+> > The driver only supports Little-Endian SoCs currently, because I have no
+> > Big-Endian platform to test it.
+> 
+> that's ok, you still have to mark the endian of the data and use it in
+> that manner, you can't just not worry about it.
+> 
+> Please fix up.
+Ok, I will do it
 
-Yes, but first I would like to collect more feedback.
-
-BTW please respond to https://lkml.org/lkml/2016/8/8/273
-This series misses ACPI mailing list so I decided to resend it.
-
-Tomasz
+thank you
+> 
+> thanks,
+> 
+> greg k-h
