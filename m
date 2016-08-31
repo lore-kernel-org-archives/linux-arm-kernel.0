@@ -1,43 +1,63 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 31 Aug 2016 15:11:40 -0700
-Subject: [PATCH 0/3] drm/tilcdc: Some fixes for LCDC rev1
-In-Reply-To: <e659bff8-7c8e-35ed-e834-1e00d5c32931@ti.com> (Jyri Sarha's
- message of "Tue, 23 Aug 2016 19:24:42 +0300")
-References: <20160823125701.25700-1-kbeldan@baylibre.com>
- <e659bff8-7c8e-35ed-e834-1e00d5c32931@ti.com>
-Message-ID: <m28tvck2qr.fsf@baylibre.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 31 Aug 2016 15:24:36 -0700
+Subject: [PATCH] ASoC: rockchip: implement system suspend/resume for i2s
+In-Reply-To: <1467686711-52347-1-git-send-email-sugar.zhang@rock-chips.com>
+References: <1467686711-52347-1-git-send-email-sugar.zhang@rock-chips.com>
+Message-ID: <CAD=FV=VF7NJ0+tbuWsKOxFnFS+hBqhbXmMhs5w_+DJ3EdBW9bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jyri,
+Hi,
 
-Jyri Sarha <jsarha@ti.com> writes:
+On Mon, Jul 4, 2016 at 7:45 PM, Sugar Zhang <sugar.zhang@rock-chips.com> wrote:
+> restore hw registers after power loss during a suspend/resume cycle.
+>
+> Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
+> ---
+>
+>  sound/soc/rockchip/rockchip_i2s.c | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>
+> diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+> index 574c6af..53970ac 100644
+> --- a/sound/soc/rockchip/rockchip_i2s.c
+> +++ b/sound/soc/rockchip/rockchip_i2s.c
+> @@ -614,9 +614,35 @@ static const struct of_device_id rockchip_i2s_match[] = {
+>         {},
+>  };
+>
+> +#ifdef CONFIG_PM_SLEEP
+> +static int rockchip_i2s_suspend(struct device *dev)
 
-> On 08/23/16 15:56, Karl Beldan wrote:
->> Hi,
->> 
->> I found some missing bits for rev1 of the LCDC and here are some of the
->> changes I am using to use the DRM driver on an LCDCK (which has a rev1).
->> 1/3 seems required by rev1 of the IP and without it my the LCDC on my
->> LCDK keeps can't sync, 2/3 is required by the driver logic, while 3/3
->> is less of a requirement.
->
-> I'll drop 3/3, because my recent patches should take care of that:
-> http://www.spinics.net/lists/devicetree/msg138885.html
->
-> However, there will be v2 round of those patches. Only the DT binding
-> and its default value should change.
->
->> Although 1,2/3 would have fitted drm-fixes I based them on drm-next as
->> 2/3 would conflict with the recent changes in drm-next.
->> 
->
-> I'll pick these two up for my next pull request. Thanks!
->
+Rather than #ifdef, I think that the currently suggested way to do
+this is to use __maybe_unused, like:
+  static __maybe_unused int rockchip_i2s_suspend(struct device *dev)
 
-Can you share a branch which has your current series and these fixes
-included, so we can use that as a baseline for further development?
+> +{
+> +       struct rk_i2s_dev *i2s = dev_get_drvdata(dev);
+> +
+> +       regcache_mark_dirty(i2s->regmap);
+> +
+> +       return 0;
+> +}
 
-Thanks,
+I do wonder a little bit if we should be doing this work in pm_runtime
+instead of actually adding suspend/resume hooks.
 
-Kevin
+I think that technically you end up losing state when your power
+domain dies, right?  Looking at rk3399, I see that i2s is in
+"pd_sdioaudio" along with "sdio, spi, i2s, spdif".  That means (I
+think) that if all of those peripherals happen to runtime suspend at
+the same time (or they are totally unused) then you'll lose state when
+you are runtime suspended.  Then when you runtime resume you need to
+restore.
+
+Maybe in your case you never actually get into the situation where the
+power domain turns off except during suspend/resume, but it seems
+possible it could happen.
+
+Am I understanding this all properly?  Maybe someone can correct me.
+I'm still a bit of a PM Runtime noob.
+
+
+-Doug
