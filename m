@@ -1,23 +1,93 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 31 Aug 2016 12:11:15 +0100
-Subject: [PATCH v7 0/5] The series cleans up mainly the regulator driver
- and implements
-In-Reply-To: <1470833545-29462-1-git-send-email-j-keerthy@ti.com>
-References: <1470833545-29462-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <20160831111115.GF27357@dell>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 31 Aug 2016 19:09:23 +0800
+Subject: [PATCH] drm/sun4i: Clear encoder->bridge if a bridge is not found
+In-Reply-To: <CAGb2v64JC5+uzsvLjZVi_Xi8q=U+_Bokqnu33w3oQ-2h2DLnKg@mail.gmail.com>
+References: <20160830122223.21377-1-wens@csie.org>
+ <20160830125622.GF18605@lukather>
+ <CAGb2v64JC5+uzsvLjZVi_Xi8q=U+_Bokqnu33w3oQ-2h2DLnKg@mail.gmail.com>
+Message-ID: <CAGb2v67hiYhjQNXLZUz7ZT2214AAYsFwQkg42qKEFv-7kShsQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Aug 2016, Keerthy wrote:
+Hi Maxime,
 
-> One of the patch removes redundant read wrapper and makes
-> use of regmap_read wherever necessary.
+On Tue, Aug 30, 2016 at 11:51 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Tue, Aug 30, 2016 at 8:56 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> Hi,
+>>
+>> On Tue, Aug 30, 2016 at 08:22:23PM +0800, Chen-Yu Tsai wrote:
+>>> The KMS helpers (drm_atomic_helper_check_modeset/mode_fixup) pass
+>>> encoder->bridge directly to drm_bridge_mode_fixup, which expects a
+>>> valid pointer, or NULL (in which case it just returns).
+>>>
+>>> Clear encoder->bridge if a bridge is not found, instead of keeping
+>>> the ERR_PTR value.
+>>>
+>>> Since other drm_bridge functions also follow this pattern of checking
+>>> for a non-NULL pointer, we can drop the ifs around the calls and just
+>>> pass the pointer directly.
+>>>
+>>> Fixes: 894f5a9f4b4a ("drm/sun4i: Add bridge support")
+>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>>> ---
+>>>  drivers/gpu/drm/sun4i/sun4i_rgb.c | 11 ++++++-----
+>>>  1 file changed, 6 insertions(+), 5 deletions(-)
+>>>
+>>> diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+>>> index d4e52522ec53..ee0795152a33 100644
+>>> --- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
+>>> +++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+>>> @@ -154,8 +154,7 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
+>>>       if (!IS_ERR(tcon->panel))
+>>>               drm_panel_enable(tcon->panel);
+>>>
+>>> -     if (!IS_ERR(encoder->bridge))
+>>> -             drm_bridge_enable(encoder->bridge);
+>>> +     drm_bridge_enable(encoder->bridge);
+>>>
+>>>       sun4i_tcon_channel_enable(tcon, 0);
+>>>  }
+>>> @@ -170,8 +169,7 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
+>>>
+>>>       sun4i_tcon_channel_disable(tcon, 0);
+>>>
+>>> -     if (!IS_ERR(encoder->bridge))
+>>> -             drm_bridge_disable(encoder->bridge);
+>>> +     drm_bridge_disable(encoder->bridge);
+>>
+>> I'd rather keep those changes, it makes it obvious that it's something
+>> optionnal, that can be set to NULL.
+>
+> OK.
 
-I can't take this series yet, since it relies on a change which was
-taken into Mark's Regulator tree.
+What about having a comment instead? Saves an extra branch condition,
+while still showing that it's optional.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+ChenYu
+
+>
+>>>       if (!IS_ERR(tcon->panel))
+>>>               drm_panel_disable(tcon->panel);
+>>> @@ -230,6 +228,9 @@ int sun4i_rgb_init(struct drm_device *drm)
+>>>               return 0;
+>>>       }
+>>>
+>>> +     if (IS_ERR(encoder->bridge))
+>>> +             encoder->bridge = NULL;
+>>> +
+>>
+>> And that could be the else condition of the if statement below.
+>
+> That would be a bit confusing, changing it after calling drm_encoder_init.
+> The code says it ok to do though.
+>
+> ChenYu
+>
+>> Thanks!
+>> Maxime
+>>
+>> --
+>> Maxime Ripard, Free Electrons
+>> Embedded Linux and Kernel engineering
+>> http://free-electrons.com
