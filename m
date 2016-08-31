@@ -1,22 +1,25 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 31 Aug 2016 10:15:27 -0500
-Subject: [PATCH 5/8] arm: orion5x: Add DT include for mv88f5181
-In-Reply-To: <1472203264-21089-6-git-send-email-jm@lentin.co.uk>
-References: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
- <1472203264-21089-1-git-send-email-jm@lentin.co.uk>
- <1472203264-21089-6-git-send-email-jm@lentin.co.uk>
-Message-ID: <20160831151527.GA12171@rob-hp-laptop>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 31 Aug 2016 23:17:45 +0800
+Subject: [PATCH v2 0/2] HWRNG/PCI: Add driver for Cavium Thunder RNG
+In-Reply-To: <1471994835-2423-1-git-send-email-okhaliq@caviumnetworks.com>
+References: <1471994835-2423-1-git-send-email-okhaliq@caviumnetworks.com>
+Message-ID: <20160831151745.GA28366@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2016 at 10:21:01AM +0100, Jamie Lentin wrote:
-> Common definitions for the SoC for board definitions to use.
+On Tue, Aug 23, 2016 at 04:27:13PM -0700, Omer Khaliq wrote:
+> There is a hardware error rendering the FDL field incorrect for the some
+> Thunder RNG devices. The first patch adds a PCI quirk to fix the problem.
 > 
-> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
-> ---
->  .../bindings/arm/marvell/marvell,orion5x.txt       |  1 +
->  arch/arm/boot/dts/orion5x-mv88f5181.dtsi           | 49 ++++++++++++++++++++++
->  2 files changed, 50 insertions(+)
->  create mode 100644 arch/arm/boot/dts/orion5x-mv88f5181.dtsi
+> The second patch adds the driver.
+> 
+> Changes from v1:
+> 	Use PCI quirks as advised.
+> 	Removed unecessary headers
+> 	Format changes as advised
 
-Acked-by: Rob Herring <robh@kernel.org>
+All applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
