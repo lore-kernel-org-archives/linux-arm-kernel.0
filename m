@@ -1,35 +1,70 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 31 Aug 2016 10:37:43 +0100
-Subject: [PATCH V7 5/5] perf tools: adding sink configuration for cs_etm
- PMU
-In-Reply-To: <1472573965-3881-6-git-send-email-mathieu.poirier@linaro.org>
-References: <1472573965-3881-1-git-send-email-mathieu.poirier@linaro.org>
- <1472573965-3881-6-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <94a6e940-cce8-a179-fe0c-c69a543e302c@arm.com>
+From: mirza.krak@gmail.com (Mirza Krak)
+Date: Wed, 31 Aug 2016 11:47:03 +0200
+Subject: [Fwd: Re: [PATCH v2 1/6] clk: tegra: add TEGRA20_CLK_NOR to init
+ table]
+In-Reply-To: <1472627744.31008.2.camel@toradex.com>
+References: <1472569308.5703.22.camel@toradex.com>
+ <1472627744.31008.2.camel@toradex.com>
+Message-ID: <CALw8SCUHjFAr7RT3UCOkZ9W4Uf=nLHr2F3A_DqKiw1q_LOXDrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/08/16 17:19, Mathieu Poirier wrote:
-> Using the PMU::set_drv_config() callback to enable the CoreSight
-> sink that will be used for the trace session.
+2016-08-31 9:15 GMT+02:00 Marcel Ziswiler <marcel.ziswiler@toradex.com>:
+> On Wed, 2016-08-24 at 15:37 +0200, Mirza Krak wrote:
+>>
+>> From: Mirza Krak <mirza.krak-Re5JQEeQqe8AvxtiuMwx3w@public.gmane.org>
+>>
+>> Add TEGRA20_CLK_NOR to init tabel and set default rate to 92 MHz
+>> which
+>> is max rate.
+>
+> table
 
-> +int cs_etm_set_drv_config(struct perf_evsel_config_term *term)
-> +{
-> +	int ret;
-> +	char enable_sink[ENABLE_SINK_MAX];
-> +
-> +	snprintf(enable_sink, ENABLE_SINK_MAX, "%s/%s",
-> +		 term->val.drv_cfg, "enable_sink");
-> +
-> +	ret = cs_device__print_file(enable_sink, "%d", 1);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	return 0;
-> +}
+ACK
 
+>
+>>
+>> Signed-off-by: Mirza Krak <mirza.krak-Re5JQEeQqe8AvxtiuMwx3w@public.g
+>> mane.org>
+>> ---
+>> Changes in v2:
+>> - no changes
+>>
+>>  drivers/clk/tegra/clk-tegra20.c | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-
+>> tegra20.c
+>> index 837e5cb..13d3b5a 100644
+>> --- a/drivers/clk/tegra/clk-tegra20.c
+>> +++ b/drivers/clk/tegra/clk-tegra20.c
+>> @@ -1047,6 +1047,7 @@ static struct tegra_clk_init_table init_table[]
+>> __initdata = {
+>>       { TEGRA20_CLK_SDMMC3, TEGRA20_CLK_PLL_P, 48000000, 0 },
+>>       { TEGRA20_CLK_SDMMC4, TEGRA20_CLK_PLL_P, 48000000, 0 },
+>>       { TEGRA20_CLK_SPI, TEGRA20_CLK_PLL_P, 20000000, 0 },
+>> +     { TEGRA20_CLK_NOR, TEGRA20_CLK_PLL_P, 92000000, 0 },
+>
+> I'm just curious where that 92 MHz came from. According to the Tegra 2
+> Interface Design Guide up to 133 MHz should actually be possible.
 
-Don't we have to disable the sink at the end of the session ? How is that
-taken care of ? Did I miss that ?
+The maximum rates for both T20 and T30 are values that are set as
+maximum in the downstream L4T kernel.
 
-Suzuki
+In tegra2_clocks.c:
+PERIPH_CLK("nor", "tegra-nor", NULL, 42, 0x1d0, 0x31E, 92000000,
+mux_pllp_pllc_pllm_clkm, MUX | DIV_U71), /* requires min voltage */
+
+And in tegra3_clocks.c
+PERIPH_CLK("nor", "tegra-nor", NULL, 42, 0x1d0, 127000000,
+mux_pllp_pllc_pllm_clkm, MUX | DIV_U71), /* requires min voltage */
+
+I looked up the commit in the downstream kernel that added the "nor"
+clock, it does not mention reason behind the maximal rates. Author was
+Manoj Chourasia, added him to CC.
+
+I actually do not have the Tegra2 Interface Design Guide, do not know
+if I can get access to it.
+
+Best Regards
+Mirza
