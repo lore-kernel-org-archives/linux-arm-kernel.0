@@ -1,307 +1,95 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Wed, 31 Aug 2016 11:34:13 +0800
-Subject: [PATCHV5 1/3] tracing: add a possibility of exporting function
- trace to other places instead of ring buffer only
-In-Reply-To: <20160830103042.530d2281@gandalf.local.home>
-References: <1472544450-9915-1-git-send-email-zhang.chunyan@linaro.org>
- <1472544450-9915-2-git-send-email-zhang.chunyan@linaro.org>
- <20160830103042.530d2281@gandalf.local.home>
-Message-ID: <CAG2=9p8hFWB-yRrvagifD=v+hj_VTiaCQ5DP840aH_8oLnb1Pw@mail.gmail.com>
+From: mjaggi@caviumnetworks.com (Manish Jaggi)
+Date: Wed, 31 Aug 2016 09:11:52 +0530
+Subject: [PATCH v24 0/9] arm64: add kdump support
+In-Reply-To: <20160809015248.28414-1-takahiro.akashi@linaro.org>
+References: <20160809015248.28414-1-takahiro.akashi@linaro.org>
+Message-ID: <0267060a-d380-2e7a-0c33-0084bfc46d97@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 August 2016 at 22:30, Steven Rostedt <rostedt@goodmis.org> wrote:
-> On Tue, 30 Aug 2016 16:07:28 +0800
-> Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
->
->> Currently Function traces can be only exported to ring buffer, this
->> patch added trace_export concept which can process traces and export
->> them to a registered destination as an addition to the current only
->> output of Ftrace - i.e. ring buffer.
->>
->> In this way, if we want Function traces to be sent to other destination
->> rather than ring buffer only, we just need to register a new
->> trace_export and implement its own .commit() callback or just use
->> 'trace_generic_commit()' which this patch also added and hooks up its
->> own .write() function for writing traces to the storage.
->>
->> With this patch, only Function trace (trace type is TRACE_FN)
->> is supported.
->>
->> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
->> ---
->>  include/linux/trace.h |  35 ++++++++++++
->>  kernel/trace/trace.c  | 155 +++++++++++++++++++++++++++++++++++++++++++++++++-
->>  kernel/trace/trace.h  |   1 +
->>  3 files changed, 190 insertions(+), 1 deletion(-)
->>  create mode 100644 include/linux/trace.h
->>
->> diff --git a/include/linux/trace.h b/include/linux/trace.h
->> new file mode 100644
->> index 0000000..30ded92
->> --- /dev/null
->> +++ b/include/linux/trace.h
->> @@ -0,0 +1,35 @@
->> +#ifndef _LINUX_TRACE_H
->> +#define _LINUX_TRACE_H
->> +
->> +#include <linux/ring_buffer.h>
->> +struct trace_array;
->> +
->> +#ifdef CONFIG_TRACING
->> +/*
->> + * The trace export - an export of Ftrace. The trace_export can process
->> + * traces and export them to a registered destination as an addition to
->> + * the current only output of Ftrace - i.e. ring buffer.
->> + *
->> + * If you want traces to be sent to some other place rather than
->> + * ring buffer only, just need to register a new trace_export and
->> + * implement its own .commit() callback or just directly use
->> + * 'trace_generic_commit()' and hooks up its own .write() function
->> + * for writing traces to the storage.
->> + *
->> + * next              - pointer to the next trace_export
->> + * commit    - commit the traces to the destination
->> + * write     - copy traces which have been delt with ->commit() to
->> + *             the destination
->> + */
->> +struct trace_export {
->> +     struct trace_export __rcu       *next;
->> +     void (*commit)(struct trace_array *, struct ring_buffer_event *);
->> +     void (*write)(const char *, unsigned int);
->> +};
->> +
->> +int register_ftrace_export(struct trace_export *export);
->> +int unregister_ftrace_export(struct trace_export *export);
->> +
->> +#endif       /* CONFIG_TRACING */
->> +
->> +#endif       /* _LINUX_TRACE_H */
->> diff --git a/kernel/trace/trace.c b/kernel/trace/trace.c
->> index dade4c9..3163fa6 100644
->> --- a/kernel/trace/trace.c
->> +++ b/kernel/trace/trace.c
->> @@ -40,6 +40,7 @@
->>  #include <linux/poll.h>
->>  #include <linux/nmi.h>
->>  #include <linux/fs.h>
->> +#include <linux/trace.h>
->>  #include <linux/sched/rt.h>
->>
->>  #include "trace.h"
->> @@ -2128,6 +2129,155 @@ void trace_buffer_unlock_commit_regs(struct trace_array *tr,
->>       ftrace_trace_userstack(buffer, flags, pc);
->>  }
->>
->> +static DEFINE_STATIC_KEY_FALSE(ftrace_exports_enabled);
->> +
->> +static void ftrace_exports_enable(void)
->> +{
->> +     static_branch_enable(&ftrace_exports_enabled);
->> +}
->> +
->> +static void ftrace_exports_disable(void)
->> +{
->> +     static_branch_disable(&ftrace_exports_enabled);
->> +}
->> +
->> +static size_t trace_size[] = {
->> +     [TRACE_FN]              = sizeof(struct ftrace_entry),
->> +     [TRACE_CTX]             = sizeof(struct ctx_switch_entry),
->> +     [TRACE_WAKE]            = sizeof(struct ctx_switch_entry),
->> +     [TRACE_STACK]           = sizeof(struct stack_entry),
->> +     [TRACE_PRINT]           = sizeof(struct print_entry),
->> +     [TRACE_BPRINT]          = sizeof(struct bprint_entry),
->> +     [TRACE_MMIO_RW]         = sizeof(struct trace_mmiotrace_rw),
->> +     [TRACE_MMIO_MAP]        = sizeof(struct trace_mmiotrace_map),
->> +     [TRACE_BRANCH]          = sizeof(struct trace_branch),
->> +     [TRACE_GRAPH_RET]       = sizeof(struct ftrace_graph_ret_entry),
->> +     [TRACE_GRAPH_ENT]       = sizeof(struct ftrace_graph_ent_entry),
->> +     [TRACE_USER_STACK]      = sizeof(struct userstack_entry),
->> +     [TRACE_BPUTS]           = sizeof(struct bputs_entry),
->> +};
->> +
->> +static void
->> +trace_generic_commit(struct trace_array *tr,
->> +            struct ring_buffer_event *event)
->> +{
->> +     struct trace_entry *entry;
->> +     struct trace_export *export = tr->export;
->
-> Why not just pass in the export directly?
->
->> +     unsigned int size = 0;
->> +
->> +     entry = ring_buffer_event_data(event);
->> +
->> +     size = trace_size[entry->type];
->
-> BTW, it would make much more sense if you just did:
->
->         size = ring_buffer_event_length(event);
->
-> and get rid of that silly array, as that is prone to bugs if you add a
-> new type.
->
->> +     if (!size)
->> +             return;
->> +
->> +     if (export && export->write)
->> +             export->write((char *)entry, size);
->> +}
->> +
->> +static DEFINE_MUTEX(ftrace_export_lock);
->> +
->> +static struct trace_export __rcu *ftrace_exports_list __read_mostly;
->> +
->> +static inline void
->> +ftrace_exports(struct trace_array *tr, struct ring_buffer_event *event)
->> +{
->> +     struct trace_export *export;
->> +
->> +     preempt_disable_notrace();
->> +
->> +     for (export = rcu_dereference_raw_notrace(ftrace_exports_list);
->> +          export && export->commit;
->> +          export = rcu_dereference_raw_notrace(export->next)) {
->> +             tr->export = export;
->> +             export->commit(tr, event);
->
-> Um, what's the commit for?
->
-> Why not just call the trace_generic_commit() above. Nothing has
+Hi Akashi,
 
-The original thought was that allow other export (maybe added in the
-future) to implement its own .commit().
-But I accept your suggestion since there's no other trace_export so
-far rather than stm_ftrace only, the modification should be kept as
-simple as it can be.
+On 08/09/2016 07:22 AM, AKASHI Takahiro wrote:
+> This patch series adds kdump support on arm64.
+> 
+> To load a crash-dump kernel to the systems, a series of patches to
+> kexec-tools, which have not yet been merged upstream, are needed.
+> Please use my kdump patches [1].
+> 
+> To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
+>   - crash utility (coming v7.1.6 or later) [2]
+>     (Necessary patches have already been queued in the master.)
+> 
+> [1] T.B.D.
+> [2] https://github.com/crash-utility/crash.git
+> 
+> Changes for v24 (Aug 9, 2016):
+>   o Rebase to Linux-4.8-rc1
+>   o Update descriptions about newly added DT proerties
+> 
+> Changes for v23 (July 26, 2016):
+> 
+>   o Move memblock_reserve() to a single place in reserve_crashkernel()
+>   o Use  cpu_park_loop() in ipi_cpu_crash_stop()
+>   o Always enforce ARCH_LOW_ADDRESS_LIMIT to the memory range of crash kernel
+>   o Re-implement fdt_enforce_memory_region() to remove non-reserve regions
+>     (for ACPI) from usable memory at crash kernel
+> 
+> Changes for v22 (July 12, 2016):
+> 
+>   o Export "crashkernel-base" and "crashkernel-size" via device-tree,
+>     and add some descriptions about them in chosen.txt
+>   o Rename "usable-memory" to "usable-memory-range" to avoid inconsistency
+>     with powerpc's "usable-memory"
+>   o Make cosmetic changes regarding "ifdef" usage
+>   o Correct some wordings in kdump.txt
+> 
+> Changes for v21 (July 6, 2016):
+> 
+>   o Remove kexec patches.
+>   o Rebase to arm64's for-next/core (Linux-4.7-rc4 based).
+>   o Clarify the description about kvm in kdump.txt.
+> 
+> See the following link [3] for older changes:
+> [3]  http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438780.html
+> 
+> AKASHI Takahiro (8):
+>   arm64: kdump: reserve memory for crash dump kernel
+>   memblock: add memblock_cap_memory_range()
+>   arm64: limit memory regions based on DT property, usable-memory-range
+>   arm64: kdump: implement machine_crash_shutdown()
+>   arm64: kdump: add kdump support
+>   arm64: kdump: add VMCOREINFO's for user-space coredump tools
+>   arm64: kdump: enable kdump in the arm64 defconfig
+>   arm64: kdump: update a kernel doc
+> 
+> James Morse (1):
+>   Documentation: dt: chosen properties for arm64 kdump
+> 
+>  Documentation/devicetree/bindings/chosen.txt |  45 ++++++
+>  Documentation/kdump/kdump.txt                |  16 ++-
+>  arch/arm64/Kconfig                           |  11 ++
+>  arch/arm64/configs/defconfig                 |   1 +
+>  arch/arm64/include/asm/hardirq.h             |   2 +-
+>  arch/arm64/include/asm/kexec.h               |  41 +++++-
+>  arch/arm64/include/asm/smp.h                 |   2 +
+>  arch/arm64/kernel/Makefile                   |   1 +
+>  arch/arm64/kernel/crash_dump.c               |  71 ++++++++++
+>  arch/arm64/kernel/machine_kexec.c            |  67 ++++++++-
+>  arch/arm64/kernel/setup.c                    |   7 +-
+>  arch/arm64/kernel/smp.c                      |  63 +++++++++
+>  arch/arm64/mm/init.c                         | 202 +++++++++++++++++++++++++++
+>  include/linux/memblock.h                     |   1 +
+>  mm/memblock.c                                |  28 ++++
+>  15 files changed, 551 insertions(+), 7 deletions(-)
+>  create mode 100644 arch/arm64/kernel/crash_dump.c
+> 
+Couple of points
+a) Just a note, while testing, the crashkernel reserved memory should be less than ARCH_LOW_ADDRESS_LIMIT (=arm64_dma_phys_limit).
 
-Thanks for your review,
-Chunyan
+b) Has anyone tested this on a SoC with Gicv3 ITS ?
+Should the GICD/R be reset prior to switching to crash kernel ?
+I am seeing lot of GICv3: RWP timeout, gone fishing while crash kernel boots.
 
-> anything different. But change that name. Maybe call it
-> "process_export()" or something. And pass the export directly and get
-> rid of the tr->export.
->
->> +     }
->> +
->> +     preempt_enable_notrace();
->> +}
->> +
->> +static inline void
->> +add_trace_export(struct trace_export **list, struct trace_export *export)
->> +{
->> +     rcu_assign_pointer(export->next, *list);
->> +     /*
->> +      * We are entering export into the list but another
->> +      * CPU might be walking that list. We need to make sure
->> +      * the export->next pointer is valid before another CPU sees
->> +      * the export pointer included into the list.
->> +      */
->> +     rcu_assign_pointer(*list, export);
->> +}
->> +
->> +static inline int
->> +rm_trace_export(struct trace_export **list, struct trace_export *export)
->> +{
->> +     struct trace_export **p;
->> +
->> +     for (p = list; *p != NULL; p = &(*p)->next)
->> +             if (*p == export)
->> +                     break;
->> +
->> +     if (*p != export)
->> +             return -1;
->> +
->> +     rcu_assign_pointer(*p, (*p)->next);
->> +
->> +     return 0;
->> +}
->> +
->> +static inline void
->> +add_ftrace_export(struct trace_export **list, struct trace_export *export)
->> +{
->> +     if (*list == NULL)
->> +             ftrace_exports_enable();
->> +
->> +     add_trace_export(list, export);
->> +}
->> +
->> +static inline int
->> +rm_ftrace_export(struct trace_export **list, struct trace_export *export)
->> +{
->> +     int ret;
->> +
->> +     ret = rm_trace_export(list, export);
->> +     if (*list == NULL)
->> +             ftrace_exports_disable();
->> +
->> +     return ret;
->> +}
->> +
->> +int register_ftrace_export(struct trace_export *export)
->> +{
->> +     if (WARN_ON_ONCE(!export->write))
->> +             return -1;
->> +
->> +     mutex_lock(&ftrace_export_lock);
->> +
->> +     export->commit = trace_generic_commit;
->> +
->> +     add_ftrace_export(&ftrace_exports_list, export);
->> +
->> +     mutex_unlock(&ftrace_export_lock);
->> +
->> +     return 0;
->> +}
->> +EXPORT_SYMBOL_GPL(register_ftrace_export);
->> +
->> +int unregister_ftrace_export(struct trace_export *export)
->> +{
->> +     int ret;
->> +
->> +     mutex_lock(&ftrace_export_lock);
->> +
->> +     ret = rm_ftrace_export(&ftrace_exports_list, export);
->> +
->> +     mutex_unlock(&ftrace_export_lock);
->> +
->> +     return ret;
->> +}
->> +EXPORT_SYMBOL_GPL(unregister_ftrace_export);
->> +
->>  void
->>  trace_function(struct trace_array *tr,
->>              unsigned long ip, unsigned long parent_ip, unsigned long flags,
->> @@ -2146,8 +2296,11 @@ trace_function(struct trace_array *tr,
->>       entry->ip                       = ip;
->>       entry->parent_ip                = parent_ip;
->>
->> -     if (!call_filter_check_discard(call, entry, buffer, event))
->> +     if (!call_filter_check_discard(call, entry, buffer, event)) {
->> +             if (static_branch_unlikely(&ftrace_exports_enabled))
->> +                     ftrace_exports(tr, event);
->>               __buffer_unlock_commit(buffer, event);
->
-> We do the generic commit here.
->
-> -- Steve
->
->> +     }
->>  }
->>
->>  #ifdef CONFIG_STACKTRACE
->> diff --git a/kernel/trace/trace.h b/kernel/trace/trace.h
->> index f783df4..26a3088 100644
->> --- a/kernel/trace/trace.h
->> +++ b/kernel/trace/trace.h
->> @@ -260,6 +260,7 @@ struct trace_array {
->>       /* function tracing enabled */
->>       int                     function_enabled;
->>  #endif
->> +     struct trace_export     *export;
->>  };
->>
->>  enum {
->
+Thanks,
+Manish
