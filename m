@@ -1,60 +1,38 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed, 31 Aug 2016 14:47:45 +0200
-Subject: [PATCH v11 2/4] tee: generic TEE subsystem
-In-Reply-To: <e08f821b-bf7c-be65-59a5-281aa3343cf4@ti.com>
-References: <1471870856-18684-1-git-send-email-jens.wiklander@linaro.org>
- <1471870856-18684-3-git-send-email-jens.wiklander@linaro.org>
- <e08f821b-bf7c-be65-59a5-281aa3343cf4@ti.com>
-Message-ID: <20160831124744.GA25472@ermac>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Wed, 31 Aug 2016 20:47:35 +0800
+Subject: [PATCH] arm64: cleanup unused UDBG_* define
+In-Reply-To: <1472647130-61050-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1472647130-61050-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <0edea4d7-e335-9f83-3277-68f6ad608d05@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2016 at 02:29:45PM -0500, Andrew F. Davis wrote:
-> On 08/22/2016 08:00 AM, Jens Wiklander wrote:
-> > +/*
-> > + * Unprivileged devices in the in the lower half range and privileged
-> 
->                                 ^^ in the in the
-> [snip]
-> 
-> > +
-> > +	rc = alloc_chrdev_region(&tee_devt, 0, TEE_NUM_DEVICES, "tee");
-> > +	if (rc < 0) {
-> 
-> if (rc) ?
-> 
-> [snip]
-> 
-> > + * Memory allocated as global shared memory is automatically freed when the
-> > + * TEE file pointer is closed. The @flags field uses the bits defined by
-> > + * TEE_SHM_* above. TEE_SHM_MAPPED must currently always be set. If
-> 
->              ^^^ not really above anymore, out of file now looks like
-> 
-> > + * TEE_SHM_DMA_BUF global shared memory will be allocated and associated
-> > + * with a dma-buf handle, else driver private memory.
-> > + *
-> > + * @returns a pointer to 'struct tee_shm'
-> 
-> Doesn't say anything, is this really needed?
-> 
-> [snip]
-> 
-> > +/**
-> > + * struct tee_shm_pool_mem_info - holds information needed to create a shared
-> > + * memory pool
-> > + * @vaddr:	Virtual address of start of pool
-> > + * @paddr:	Physical address of start of pool
-> > + * @size:	Size in bytes of the pool
-> > + */
-> > +struct tee_shm_pool_mem_info {
-> > +	unsigned long vaddr;
-> > +	unsigned long paddr;
-> 
-> phys_addr_t paddr; ?
++ arm maillist
 
-Thanks for taking the time to review this. I'll address all your
-comments here in the next version of the patch set.
-
---
-Jens
+On 2016/8/31 20:38, Kefeng Wang wrote:
+> The UDBG_UNDEFINED/SYSCALL/BADABORT/SEGV are only used to show
+> verbose user fault messages in arm, not arm64, drop them.
+> 
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
+>  arch/arm64/include/asm/system_misc.h | 6 ------
+>  1 file changed, 6 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+> index 57f110b..bc81243 100644
+> --- a/arch/arm64/include/asm/system_misc.h
+> +++ b/arch/arm64/include/asm/system_misc.h
+> @@ -56,12 +56,6 @@ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+>  	__show_ratelimited;						\
+>  })
+>  
+> -#define UDBG_UNDEFINED	(1 << 0)
+> -#define UDBG_SYSCALL	(1 << 1)
+> -#define UDBG_BADABORT	(1 << 2)
+> -#define UDBG_SEGV	(1 << 3)
+> -#define UDBG_BUS	(1 << 4)
+> -
+>  #endif	/* __ASSEMBLY__ */
+>  
+>  #endif	/* __ASM_SYSTEM_MISC_H */
+> 
