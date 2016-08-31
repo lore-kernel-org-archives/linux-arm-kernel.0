@@ -1,95 +1,98 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 31 Aug 2016 18:28:19 +0200
-Subject: [PATCH 1/4] ARM: dts: sun8i: Extend Orange Pi PC dt to also
- handle the PC Plus
-In-Reply-To: <b6636083-917e-cc3a-9107-401fbd483fb7@redhat.com>
-References: <1468095718-18515-1-git-send-email-hdegoede@redhat.com>
- <20160713084505.GE4761@lukather>
- <bce2b340-a930-8771-4560-dc61bf5828d5@redhat.com>
- <20160725064033.GA7419@lukather>
- <74d3b5eb-601a-cc1d-a44e-fea2895fd8b2@redhat.com>
- <20160728181757.GD6682@lukather>
- <f71f9d2b-00d4-27b8-1535-1ddc58f04ca3@redhat.com>
- <b6636083-917e-cc3a-9107-401fbd483fb7@redhat.com>
-Message-ID: <20160831162819.GK14379@lukather>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 31 Aug 2016 10:30:16 -0600
+Subject: [PATCH V2] perf tools: adding support for address filters
+In-Reply-To: <20160831065731.GA31764@krava>
+References: <1472573415-3618-1-git-send-email-mathieu.poirier@linaro.org>
+ <20160831065731.GA31764@krava>
+Message-ID: <CANLsYkwfe7To8ySg_trjqrXWTckSnhkHKrZuV0SKejff7wnp7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+On 31 August 2016 at 00:57, Jiri Olsa <jolsa@redhat.com> wrote:
+> On Tue, Aug 30, 2016 at 10:10:15AM -0600, Mathieu Poirier wrote:
+>> This patch makes it possible to use the current filter
+>> framework with address filters.  That way address filters for
+>> HW tracers such as CoreSight and IntelPT can be communicated
+>> to the kernel drivers.
+>>
+>> CC: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>
+>> ---
+>> Changes for V2:
+>>  - Rebased to v4.8-rc4.
+>>  - Revisited error path.
+>> ---
+>>
+>>  tools/perf/util/parse-events.c | 30 +++++++++++++++++++++++++-----
+>>  1 file changed, 25 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/tools/perf/util/parse-events.c b/tools/perf/util/parse-events.c
+>> index 2eb8b1ed4cc8..1df413fbf7f8 100644
+>> --- a/tools/perf/util/parse-events.c
+>> +++ b/tools/perf/util/parse-events.c
+>> @@ -1760,12 +1760,26 @@ foreach_evsel_in_last_glob(struct perf_evlist *evlist,
+>>  static int set_filter(struct perf_evsel *evsel, const void *arg)
+>>  {
+>>       const char *str = arg;
+>> +     bool found = false;
+>> +     int nr_addr_filters = 0;
+>> +     struct perf_pmu *pmu = NULL;
+>>
+>> -     if (evsel == NULL || evsel->attr.type != PERF_TYPE_TRACEPOINT) {
+>> -             fprintf(stderr,
+>> -                     "--filter option should follow a -e tracepoint option\n");
+>> -             return -1;
+>> -     }
+>> +     if (evsel == NULL)
+>> +             goto err;
+>> +
+>> +     while ((pmu = perf_pmu__scan(pmu)) != NULL)
+>> +             if (pmu->type == evsel->attr.type) {
+>> +                     found = true;
+>> +                     break;
+>> +             }
+>> +
+>> +     if (found)
+>> +             perf_pmu__scan_file(pmu, "nr_addr_filters",
+>> +                                 "%d", &nr_addr_filters);
+>> +
+>> +
+>> +     if (evsel->attr.type != PERF_TYPE_TRACEPOINT && !nr_addr_filters)
+>> +             goto err;
+>
+> should we display another error message for !nr_addr_filters case?
+> the one below is misleading in this case
 
-Sorry for the slow response, it was burried in my inbox.
+The condition where nr_addr_filters == 0 is valid when we are dealing
+with a tracepoint event.  Since we don't have an attribute type for HW
+tracers the best we can do is improve on the error message.  What
+would you think of:
 
-On Sun, Aug 07, 2016 at 04:25:20PM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 28-07-16 22:36, Hans de Goede wrote:
-> >Hi,
-> >
-> >On 28-07-16 20:17, Maxime Ripard wrote:
-> >>Hi Hans,
-> >>
-> >>On Tue, Jul 26, 2016 at 11:07:23PM +0200, Hans de Goede wrote:
-> >>>>>>Nothing prevents you from including the orange pi pc dts, from the
-> >>>>>>orange pi plus dts.
-> >>>>>>
-> >>>>>>It prevents the duplication you were trying to avoid, and it doesn't
-> >>>>>>create all those spurious errors and devices.
-> >>>>>
-> >>>>>That would solve the copy paste problem on the kernel side, but that
-> >>>>>would still mean adding a new u-boot defconfig for this, which means that
-> >>>>>all the distro's which ship with prebuild u-boot binaries need to build
-> >>>>>for yet another board, something which I would like to avoid.
-> >>>>
-> >>>>Still, registering devices that are not present on the board is not an
-> >>>>option.
-> >>>
-> >>>Ok, new version send.
-> >>>
-> >>>What about the other 3 patches in this series ?
-> >>
-> >>I guess the same comment applies for patch 2.
-> >
-> >The difference is that there really is no harm at all from
-> >enabling the extra usb controllers used on the plus 2e
-> >on the plus and plus 2 as well, no errors, no nothing, they
-> >just sit their as usb controllers without an usb device plugged
-> >in. But if you insist I can do a separate dts + u-boot defconfig
-> >for the plus 2e as well (but I would rather not).
-> 
-> Ping, what is the verdict on this, are you ok with the patch or
-> do you want me to create a separate dts file for the Orange Pi
-> Plus 2E, note that doing so is going to be highly confusing to
-> users, there are 3 plus boards:
+"--filter option should follow an event that supports filtering"
 
-I still believe that enabling clocks, regulators, claiming pins for
-device that are entirely unused on the board is not ok.
+Thanks,
+Mathieu
 
-> Orange Pi Plus
-> Orange Pi Plus 2   (same as the original plus but with 2G RAM, uses same u-boot defconfig / dts file)
-
-Yes, that makes sense.
-
-> Orange Pi Plus 2E  (drops the USB-hub instead using all 3 host controllers)
-
-However, I'm really worried about this one. If we go this way, there's
-essentially no going back. If for some reason we want to have a
-separate DT in the future (some unforeseen quirk to apply, pin to
-setup that conflicts on another board, etc.), we will be completely
-screwed because our users will be expecting to use the common DT,
-while it wouldn't be wise anymore.
-
-The other way around is much easier to deal with.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160831/88e23c44/attachment.sig>
+>
+> jirka
+>
+>>
+>>       if (perf_evsel__append_filter(evsel, "&&", str) < 0) {
+>>               fprintf(stderr,
+>> @@ -1774,6 +1788,12 @@ static int set_filter(struct perf_evsel *evsel, const void *arg)
+>>       }
+>>
+>>       return 0;
+>> +
+>> +err:
+>> +     fprintf(stderr,
+>> +             "--filter option should follow a -e tracepoint or HW tracer option\n");
+>> +
+>> +     return -1;
+>>  }
+>>
+>>  int parse_filter(const struct option *opt, const char *str,
+>> --
+>> 2.7.4
+>>
