@@ -1,43 +1,55 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 31 Aug 2016 15:55:46 +0800
-Subject: [linux-sunxi] Re: [PATCH v9 2/2] Add mixer controls: Line-In,
- FM-In, Mic 2, Capture Source, Differential Line-In.
-In-Reply-To: <20160831094959.2e5e6ae7@scratchpost.org>
-References: <20160830054403.7878-1-dannym@scratchpost.org>
- <20160830054403.7878-3-dannym@scratchpost.org>
- <CAGb2v64zA3iSOe7ku=pF0RhJkvErxt_tbPWG4H8D6r5UEUJAMQ@mail.gmail.com>
- <20160831094044.1c3227d6@scratchpost.org>
- <CAGb2v67YGiZEzBezub5HcEBZ5689uF1yQYj2xJkbVdHyEpOm5Q@mail.gmail.com>
- <20160831094959.2e5e6ae7@scratchpost.org>
-Message-ID: <CAGb2v66jkd7+GMUbihQjA0ec9nDZc=k2yDT3afD1q6qo57PVVA@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 31 Aug 2016 09:59:36 +0200
+Subject: [PATCH V3 RFT 3/5] ARM64: dts: bcm283x: Use dtsi for USB host mode
+In-Reply-To: <1471792204-21908-4-git-send-email-stefan.wahren@i2se.com>
+References: <1471792204-21908-1-git-send-email-stefan.wahren@i2se.com>
+ <1471792204-21908-4-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <bb073ea3-2f89-4fc5-e3af-2e27c54f221e@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 31, 2016 at 3:49 PM, Danny Milosavljevic
-<dannym@scratchpost.org> wrote:
-> Hi Chen-Yu,
->
->> My apologies. I didn't notice that VMIC was already in the driver.
->> In that your original patch did everything right.
->
-> Don't worry about it :)
->
-> But I have a question:
->
-> If I replace DAPM_INPUT by DAPM_MIC it wants a callback that is supposed to
-> fiddle with the bias.
-> Do I provide one?
-> If so, will it conflict with the supply?
->
-> Or do I leave it as DAPM_INPUT ?
+Hi Gerd,
 
-I think leaving it as DAPM_INPUT will do. Also, if you use DAPM_MIC or any
-other widget type that takes a callback, the callback can be NULL.
+Am 21.08.2016 um 17:10 schrieb Stefan Wahren:
+> In case dr_mode isn't passed via DT, the dwc2 driver defaults
+> to OTG mode. But the Raspberry Pi 3 is designed only for host mode.
+> So fix this issue by linking to the dtsi file which set the dr_mode
+> to host.
 
-I took a quick look at other drivers. The codecs only use non-endpoint
-types, like INPUT/OUTPUT. It's up to the card to provide endpoints
-(HP/SPEAKER/LINE/MIC) and route them to the codec INPUT/OUTPUTs.
+this patch is pending and the rest has been merged. Since i don't have a
+RPi 3 it's only compile tested.
 
+Could you please test it (requires patch 1 and 2 of this series) on your
+RPi 3?
 
 Regards
-ChenYu
+Stefan
+
+>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> ---
+>  arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts   |    1 +
+>  .../boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi    |    1 +
+>  2 files changed, 2 insertions(+)
+>  create mode 120000 arch/arm64/boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi
+>
+> diff --git a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
+> index 7841b72..7625e57 100644
+> --- a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
+> +++ b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
+> @@ -2,6 +2,7 @@
+>  #include "bcm2837.dtsi"
+>  #include "bcm2835-rpi.dtsi"
+>  #include "bcm283x-rpi-smsc9514.dtsi"
+> +#include "bcm283x-rpi-usb-host.dtsi"
+>  
+>  / {
+>  	compatible = "raspberrypi,3-model-b", "brcm,bcm2837";
+> diff --git a/arch/arm64/boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi b/arch/arm64/boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi
+> new file mode 120000
+> index 0000000..cbeebe3
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi
+> @@ -0,0 +1 @@
+> +../../../../arm/boot/dts/bcm283x-rpi-usb-host.dtsi
+> \ No newline at end of file
