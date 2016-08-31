@@ -1,48 +1,43 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Wed, 31 Aug 2016 08:58:56 +0200
-Subject: [PATCH V6 1/5] perf tools: making coresight PMU listable
-In-Reply-To: <CANLsYky4TY5s46nVTra+7-Zx+czjWZbmmJgqHenLTRNd1TM=CQ@mail.gmail.com>
-References: <1472156445-24283-1-git-send-email-mathieu.poirier@linaro.org>
- <1472156445-24283-2-git-send-email-mathieu.poirier@linaro.org>
- <20160828141611.GA32293@krava>
- <CANLsYky4TY5s46nVTra+7-Zx+czjWZbmmJgqHenLTRNd1TM=CQ@mail.gmail.com>
-Message-ID: <20160831065856.GA4740@krava>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 31 Aug 2016 09:04:57 +0200
+Subject: [PATCH 1/2] perf_event: remove unused DEBUG_PERF_USE_VMALLOC
+In-Reply-To: <20160830140834.6d1edf7abd9d95c02dae7820@arm.com>
+References: <20160830140834.6d1edf7abd9d95c02dae7820@arm.com>
+Message-ID: <20160831070457.GY10138@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 09:56:02AM -0600, Mathieu Poirier wrote:
-> On 28 August 2016 at 08:16, Jiri Olsa <jolsa@redhat.com> wrote:
-> > On Thu, Aug 25, 2016 at 02:20:41PM -0600, Mathieu Poirier wrote:
-> >
-> > SNIP
-> >
-> >>  ARM/CORGI MACHINE SUPPORT
-> >>  M:   Richard Purdie <rpurdie@rpsys.net>
-> >> diff --git a/tools/perf/Makefile.config b/tools/perf/Makefile.config
-> >> index 24803c58049a..72edf83d76b7 100644
-> >> --- a/tools/perf/Makefile.config
-> >> +++ b/tools/perf/Makefile.config
-> >> @@ -746,10 +746,13 @@ ifdef LIBBABELTRACE
-> >>  endif
-> >>
-> >>  ifndef NO_AUXTRACE
-> >> -  ifeq ($(feature-get_cpuid), 0)
-> >> -    msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
-> >> -    NO_AUXTRACE := 1
-> >> -  else
-> >> +  ifeq ($(ARCH),x86)
-> >> +    ifeq ($(feature-get_cpuid), 0)
-> >> +      msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
-> >> +      NO_AUXTRACE := 1
-> >> +    endif
-> >> +  endif
-> >> +  ifndef NO_AUXTRACE
-> >
-> > hum, how's this hunk connected to the issue described in changelog?
+On Tue, Aug 30, 2016 at 02:08:34PM -0500, Kim Phillips wrote:
+> This 'DEBUG'-prefixed version of PERF_USE_VMALLOC is not used anywhere.
+> It appears to be leftovers from commit 906010b "perf_event: Provide
+> vmalloc() based mmap() backing" that introduced it.
 > 
-> Patch 1/6 and 2/6 are needed by [3, 4, 5, 6]/6 of this set.
-> Originally they were part of a separate patchset I but decided to
-> include them here for completeness.  Let me know if you'd like to see
-> them split again.
+> Not sure what commit cb30711 "perf_event: Don't allow vmalloc() backed
+> perf on powerpc" was trying to do with it either.
+> 
+> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+> Cc: Michael Ellerman <mpe@ellerman.id.au>
+> ---
+>  init/Kconfig | 13 -------------
+>  1 file changed, 13 deletions(-)
+> 
+> diff --git a/init/Kconfig b/init/Kconfig
+> index cac3f09..934a61f 100644
+> --- a/init/Kconfig
+> +++ b/init/Kconfig
+> @@ -1707,19 +1707,6 @@ config PERF_EVENTS
+>  
+>  	  Say Y if unsure.
+>  
+> -config DEBUG_PERF_USE_VMALLOC
+> -	default n
+> -	bool "Debug: use vmalloc to back perf mmap() buffers"
+> -	depends on PERF_EVENTS && DEBUG_KERNEL && !PPC
+> -	select PERF_USE_VMALLOC
 
-ook, jirka
+^^^^^
+
+
+It forces the use of vmalloc backed pages for the ring-buffer so that we
+can test that code on x86, which otherwise doesn't use it.
