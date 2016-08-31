@@ -1,86 +1,146 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 31 Aug 2016 12:05:15 +0100
-Subject: [PATCH v3 5/7] arm64: kernel: drop use of x24 from primary boot path
+Date: Wed, 31 Aug 2016 12:05:13 +0100
+Subject: [PATCH v3 3/7] arm64: head.S: move KASLR processing out of
+ __enable_mmu()
 In-Reply-To: <1472641517-15362-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1472641517-15362-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1472641517-15362-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1472641517-15362-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keeping __PHYS_OFFSET in x24 is actually less clear than simply taking
-the value of __PHYS_OFFSET using an adrp instruction in the three places
-that we need it. So change that.
+The KASLR processing is only used by the primary boot path, and
+complements the processing that takes place in __primary_switch().
+Move the two parts together, to make the code easier to understand.
+
+Also, fix up a minor whitespace issue.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/head.S | 20 ++++++++++++--------
- 1 file changed, 12 insertions(+), 8 deletions(-)
+ arch/arm64/kernel/head.S | 72 ++++++++++++--------
+ 1 file changed, 42 insertions(+), 30 deletions(-)
 
 diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 45b865e022cc..4dee51045e79 100644
+index 647aa82f2c7b..5543068da3ae 100644
 --- a/arch/arm64/kernel/head.S
 +++ b/arch/arm64/kernel/head.S
-@@ -211,8 +211,8 @@ efi_header_end:
- ENTRY(stext)
- 	bl	preserve_boot_args
- 	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
--	adrp	x24, __PHYS_OFFSET
--	and	x23, x24, MIN_KIMG_ALIGN - 1	// KASLR offset, defaults to 0
-+	adrp	x23, __PHYS_OFFSET
-+	and	x23, x23, MIN_KIMG_ALIGN - 1	// KASLR offset, defaults to 0
- 	bl	set_cpu_boot_mode_flag
- 	bl	__create_page_tables
- 	/*
-@@ -412,6 +412,8 @@ ENDPROC(__create_page_tables)
+@@ -222,9 +222,7 @@ ENTRY(stext)
+ 	 * the TCR will have been set.
+ 	 */
+ 	bl	__cpu_setup			// initialise processor
+-	adr_l	x27, __primary_switch		// address to jump to after
+-						// MMU has been enabled
+-	b	__enable_mmu
++	b	__primary_switch
+ ENDPROC(stext)
  
  /*
-  * The following fragment of code is executed with the MMU enabled.
-+ *
-+ *   x0 = __PHYS_OFFSET
+@@ -453,7 +451,7 @@ __primary_switched:
+ 	cbz	x0, 0f				// KASLR disabled? just proceed
+ 	orr	x23, x23, x0			// record KASLR offset
+ 	ret	x28				// we must enable KASLR, return
+-						// to __enable_mmu()
++						// to __primary_switch()
+ 0:
+ #endif
+ 	b	start_kernel
+@@ -726,7 +724,6 @@ ENDPROC(__secondary_switched)
+  * If it isn't, park the CPU
   */
- 	.set	initial_sp, init_thread_union + THREAD_START_SP
- __primary_switched:
-@@ -420,6 +422,12 @@ __primary_switched:
- 	msr	vbar_el1, x8			// vector table address
+ ENTRY(__enable_mmu)
+-	mrs	x22, sctlr_el1			// preserve old SCTLR_EL1 value
+ 	mrs	x1, ID_AA64MMFR0_EL1
+ 	ubfx	x2, x1, #ID_AA64MMFR0_TGRAN_SHIFT, 4
+ 	cmp	x2, #ID_AA64MMFR0_TGRAN_SUPPORTED
+@@ -747,28 +744,6 @@ ENTRY(__enable_mmu)
+ 	ic	iallu
+ 	dsb	nsh
  	isb
- 
-+	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
-+
-+	ldr_l	x4, kimage_vaddr		// Save the offset between
-+	sub	x4, x4, x0			// the kernel virtual and
-+	str_l	x4, kimage_voffset, x5		// physical mappings
-+
- 	// Clear BSS
- 	adr_l	x0, __bss_start
- 	mov	x1, xzr
-@@ -432,12 +440,6 @@ __primary_switched:
- 	mov	x4, sp
- 	and	x4, x4, #~(THREAD_SIZE - 1)
- 	msr	sp_el0, x4			// Save thread_info
--	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
+-#ifdef CONFIG_RANDOMIZE_BASE
+-	mov	x19, x0				// preserve new SCTLR_EL1 value
+-	blr	x27
 -
--	ldr_l	x4, kimage_vaddr		// Save the offset between
--	sub	x4, x4, x24			// the kernel virtual and
--	str_l	x4, kimage_voffset, x5		// physical mappings
+-	/*
+-	 * If we return here, we have a KASLR displacement in x23 which we need
+-	 * to take into account by discarding the current kernel mapping and
+-	 * creating a new one.
+-	 */
+-	msr	sctlr_el1, x22			// disable the MMU
+-	isb
+-	bl	__create_page_tables		// recreate kernel mapping
 -
- 	mov	x29, #0
- #ifdef CONFIG_KASAN
- 	bl	kasan_early_init
-@@ -794,6 +796,7 @@ __primary_switch:
- 	bl	__relocate_kernel
- #ifdef CONFIG_RANDOMIZE_BASE
- 	ldr	x8, =__primary_switched
-+	adrp	x0, __PHYS_OFFSET
- 	blr	x8
+-	tlbi	vmalle1				// Remove any stale TLB entries
+-	dsb	nsh
+-
+-	msr	sctlr_el1, x19			// re-enable the MMU
+-	isb
+-	ic	iallu				// flush instructions fetched
+-	dsb	nsh				// via old mapping
+-	isb
+-#endif
+ 	br	x27
+ ENDPROC(__enable_mmu)
  
+@@ -778,11 +753,11 @@ __no_granule_support:
+ 1:
+ 	wfe
+ 	wfi
+-	b 1b
++	b	1b
+ ENDPROC(__no_granule_support)
+ 
+-__primary_switch:
+ #ifdef CONFIG_RELOCATABLE
++__relocate_kernel:
  	/*
-@@ -818,5 +821,6 @@ __primary_switch:
- #endif
+ 	 * Iterate over each entry in the relocation table, and apply the
+ 	 * relocations in place.
+@@ -804,8 +779,45 @@ __primary_switch:
+ 	add	x13, x13, x23			// relocate
+ 	str	x13, [x11, x23]
+ 	b	0b
++1:	ret
++ENDPROC(__relocate_kernel)
++#endif
+ 
+-1:
++__primary_switch:
++#ifdef CONFIG_RANDOMIZE_BASE
++	mov	x19, x0				// preserve new SCTLR_EL1 value
++	mrs	x20, sctlr_el1			// preserve old SCTLR_EL1 value
++#endif
++
++	adr	x27, 0f
++	b	__enable_mmu
++0:
++#ifdef CONFIG_RELOCATABLE
++	bl	__relocate_kernel
++#ifdef CONFIG_RANDOMIZE_BASE
++	ldr	x8, =__primary_switched
++	blr	x8
++
++	/*
++	 * If we return here, we have a KASLR displacement in x23 which we need
++	 * to take into account by discarding the current kernel mapping and
++	 * creating a new one.
++	 */
++	msr	sctlr_el1, x20			// disable the MMU
++	isb
++	bl	__create_page_tables		// recreate kernel mapping
++
++	tlbi	vmalle1				// Remove any stale TLB entries
++	dsb	nsh
++
++	msr	sctlr_el1, x19			// re-enable the MMU
++	isb
++	ic	iallu				// flush instructions fetched
++	dsb	nsh				// via old mapping
++	isb
++
++	bl	__relocate_kernel
++#endif
  #endif
  	ldr	x8, =__primary_switched
-+	adrp	x0, __PHYS_OFFSET
  	br	x8
- ENDPROC(__primary_switch)
 -- 
 2.7.4
