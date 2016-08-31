@@ -1,183 +1,188 @@
 From: jsarha@ti.com (Jyri Sarha)
-Date: Wed, 31 Aug 2016 16:14:09 +0300
-Subject: [PATCH v3 4/8] drm/tilcdc: Choose console BPP that supports RGB
+Date: Wed, 31 Aug 2016 16:14:08 +0300
+Subject: [PATCH v3 3/8] drm/tilcdc: Add blue-and-red-crossed devicetree
+ property
 In-Reply-To: <cover.1472634657.git.jsarha@ti.com>
 References: <cover.1472634657.git.jsarha@ti.com>
-Message-ID: <a23e06024e41eeae42cc421fa6c68ebb480ed7b8.1472634657.git.jsarha@ti.com>
+Message-ID: <1fc6a6bb5b56b9bac845502b0724d7a07f0675fb.1472634657.git.jsarha@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Choose console BPP that supports RGB and remove the old fbdev bpp
-selection code. LCDC on AM335x has red and blue wires switched between
-24 bit and 16 bit colors. If 24 format is wired for RGB colors, the 16
-bit format is wired for BGR. drm_fbdev_cma_init() does not currently
-like anything else but RGB formats, so we must choose such bytes per
-pixel value that supports RGB.
+Add "blue-and-red-wiring"-device tree property and update devicetree
+binding document. The red and blue components are reversed between 24
+and 16 bit modes on am335x LCDC output pins. To get 24 RGB format the
+red and blue wires has to be crossed and this in turn causes 16 colors
+output to be in BGR format. With straight wiring the 16 color is RGB
+and 24 bit is BGR. The new property describes whether the red and blue
+wires are crossed or not. If the property is not present or its value
+is not recognized the legacy mode is assumed. The legacy configuration
+supports RGB565, RGB888 and XRGB8888 formats. However, depending on
+wiring, the red and blue colors are swapped in either 16 or 24-bit
+color modes.
+
+For more details see section 3.1.1 in AM335x Silicon Errata:
+http://www.ti.com/general/docs/lit/getliterature.tsp?baseLiteratureNumber=sprz360
 
 Signed-off-by: Jyri Sarha <jsarha@ti.com>
 ---
- drivers/gpu/drm/tilcdc/tilcdc_drv.c      | 14 +++++---------
- drivers/gpu/drm/tilcdc/tilcdc_drv.h      |  1 -
- drivers/gpu/drm/tilcdc/tilcdc_external.c |  7 +++----
- drivers/gpu/drm/tilcdc/tilcdc_external.h |  2 +-
- drivers/gpu/drm/tilcdc/tilcdc_panel.c    |  2 --
- drivers/gpu/drm/tilcdc/tilcdc_tfp410.c   |  2 --
- 6 files changed, 9 insertions(+), 19 deletions(-)
+ .../devicetree/bindings/display/tilcdc/tilcdc.txt  | 22 ++++++++++++
+ drivers/gpu/drm/tilcdc/tilcdc_drv.c                | 42 ++++++++++++++++++++++
+ drivers/gpu/drm/tilcdc/tilcdc_drv.h                |  4 +++
+ drivers/gpu/drm/tilcdc/tilcdc_plane.c              |  9 ++---
+ 4 files changed, 71 insertions(+), 6 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt b/Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt
+index 6efa4c5..5b7b5f8 100644
+--- a/Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt
++++ b/Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt
+@@ -17,6 +17,18 @@ Optional properties:
+    the lcd controller.
+  - max-pixelclock: The maximum pixel clock that can be supported
+    by the lcd controller in KHz.
++ - blue-and-red-wiring: Recognized values "default", "straight" or
++   "crossed". This property deals with the LCDC revision 2 (found on
++   AM335x) color errata [1].
++     - "default" and "straight" indicates normal wiring that supports
++      RGB565, BGR888, and XBGR8888 color formats.
++    - "crossed" indicates wiring that has blue and red wires
++      crossed. This setup supports BGR565, RGB888 and XRGB8888
++      formats.
++    - If the property is not present or its value is not recognized
++      the legacy mode is assumed. This configuration supports RGB565,
++      RGB888 and XRGB8888 formats. However, depending on wiring, the red
++      and blue colors are swapped in either 16 or 24-bit color modes.
+ 
+ Optional nodes:
+ 
+@@ -28,6 +40,14 @@ Optional nodes:
+    Documentation/devicetree/bindings/display/tilcdc/tfp410.txt for connecting
+    tfp410 DVI encoder or lcd panel to lcdc
+ 
++[1] There is an errata about AM335x color wiring. For 16-bit color mode
++    the wires work as they should (LCD_DATA[0:4] is for Blue[3:7]),
++    but for 24 bit color modes the wiring of blue and red components is
++    crossed and LCD_DATA[0:4] is for Red[3:7] and LCD_DATA[11:15] is
++    for Blue[3-7]. For more details see section 3.1.1 in AM335x
++    Silicon Errata:
++    http://www.ti.com/general/docs/lit/getliterature.tsp?baseLiteratureNumber=sprz360
++
+ Example:
+ 
+ 	fb: fb at 4830e000 {
+@@ -37,6 +57,8 @@ Example:
+ 		interrupts = <36>;
+ 		ti,hwmods = "lcdc";
+ 
++		blue-and-red-wiring = "crossed";
++
+ 		port {
+ 			lcdc_0: endpoint at 0 {
+ 				remote-endpoint = <&hdmi_0>;
 diff --git a/drivers/gpu/drm/tilcdc/tilcdc_drv.c b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-index 4371537..9a55ea2 100644
+index e45c268..4371537 100644
 --- a/drivers/gpu/drm/tilcdc/tilcdc_drv.c
 +++ b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-@@ -240,7 +240,6 @@ static int tilcdc_load(struct drm_device *dev, unsigned long flags)
- 	struct platform_device *pdev = dev->platformdev;
- 	struct device_node *node = pdev->dev.of_node;
- 	struct tilcdc_drm_private *priv;
--	struct tilcdc_module *mod;
- 	struct resource *res;
- 	u32 bpp = 0;
- 	int ret;
-@@ -336,6 +335,7 @@ static int tilcdc_load(struct drm_device *dev, unsigned long flags)
- 		DBG("Revision 1 LCDC supports only RGB565 format");
- 		priv->pixelformats = tilcdc_rev1_formats;
- 		priv->num_pixelformats = ARRAY_SIZE(tilcdc_rev1_formats);
-+		bpp = 16;
- 	} else {
- 		const char *str = "\0";
+@@ -33,6 +33,20 @@
  
-@@ -345,18 +345,21 @@ static int tilcdc_load(struct drm_device *dev, unsigned long flags)
- 			priv->pixelformats = tilcdc_crossed_formats;
- 			priv->num_pixelformats =
- 				ARRAY_SIZE(tilcdc_crossed_formats);
-+			bpp = 32; /* Choose bpp with RGB support for fbdef */
- 		} else if(0 == strcmp(str, "default") ||
- 			  0 == strcmp(str, "straight")) {
- 			DBG("Configured for straight blue and red wires");
- 			priv->pixelformats = tilcdc_straight_formats;
- 			priv->num_pixelformats =
- 				ARRAY_SIZE(tilcdc_straight_formats);
-+			bpp = 16; /* Choose bpp with RGB support for fbdef */
- 		} else {
- 			DBG("Blue and red wiring '%s' unknown, use legacy mode",
- 			    str);
- 			priv->pixelformats = tilcdc_legacy_formats;
- 			priv->num_pixelformats =
- 				ARRAY_SIZE(tilcdc_legacy_formats);
-+			bpp = 16; /* This is just a guess */
- 		}
- 	}
+ static LIST_HEAD(module_list);
  
-@@ -373,7 +376,7 @@ static int tilcdc_load(struct drm_device *dev, unsigned long flags)
- 		if (ret < 0)
- 			goto fail_mode_config_cleanup;
++static const u32 tilcdc_rev1_formats[] = { DRM_FORMAT_RGB565 };
++
++static const u32 tilcdc_straight_formats[] = { DRM_FORMAT_RGB565,
++					       DRM_FORMAT_BGR888,
++					       DRM_FORMAT_XBGR8888 };
++
++static const u32 tilcdc_crossed_formats[] = { DRM_FORMAT_BGR565,
++					      DRM_FORMAT_RGB888,
++					      DRM_FORMAT_XRGB8888 };
++
++static const u32 tilcdc_legacy_formats[] = { DRM_FORMAT_RGB565,
++					     DRM_FORMAT_RGB888,
++					     DRM_FORMAT_XRGB8888 };
++
+ void tilcdc_module_init(struct tilcdc_module *mod, const char *name,
+ 		const struct tilcdc_module_ops *funcs)
+ {
+@@ -318,6 +332,34 @@ static int tilcdc_load(struct drm_device *dev, unsigned long flags)
  
--		ret = tilcdc_add_external_encoders(dev, &bpp);
-+		ret = tilcdc_add_external_encoders(dev);
- 		if (ret < 0)
- 			goto fail_component_cleanup;
- 	}
-@@ -396,13 +399,6 @@ static int tilcdc_load(struct drm_device *dev, unsigned long flags)
- 		goto fail_vblank_cleanup;
- 	}
+ 	pm_runtime_put_sync(dev->dev);
  
--	list_for_each_entry(mod, &module_list, list) {
--		DBG("%s: preferred_bpp: %d", mod->name, mod->preferred_bpp);
--		bpp = mod->preferred_bpp;
--		if (bpp > 0)
--			break;
--	}
--
- 	drm_mode_config_reset(dev);
- 
- 	priv->fbdev = drm_fbdev_cma_init(dev, bpp,
++	if (priv->rev == 1) {
++		DBG("Revision 1 LCDC supports only RGB565 format");
++		priv->pixelformats = tilcdc_rev1_formats;
++		priv->num_pixelformats = ARRAY_SIZE(tilcdc_rev1_formats);
++	} else {
++		const char *str = "\0";
++
++		of_property_read_string(node, "blue-and-red-wiring", &str);
++		if (0 == strcmp(str, "crossed")) {
++			DBG("Configured for crossed blue and red wires");
++			priv->pixelformats = tilcdc_crossed_formats;
++			priv->num_pixelformats =
++				ARRAY_SIZE(tilcdc_crossed_formats);
++		} else if(0 == strcmp(str, "default") ||
++			  0 == strcmp(str, "straight")) {
++			DBG("Configured for straight blue and red wires");
++			priv->pixelformats = tilcdc_straight_formats;
++			priv->num_pixelformats =
++				ARRAY_SIZE(tilcdc_straight_formats);
++		} else {
++			DBG("Blue and red wiring '%s' unknown, use legacy mode",
++			    str);
++			priv->pixelformats = tilcdc_legacy_formats;
++			priv->num_pixelformats =
++				ARRAY_SIZE(tilcdc_legacy_formats);
++		}
++	}
++
+ 	ret = modeset_init(dev);
+ 	if (ret < 0) {
+ 		dev_err(dev->dev, "failed to initialize mode setting\n");
 diff --git a/drivers/gpu/drm/tilcdc/tilcdc_drv.h b/drivers/gpu/drm/tilcdc/tilcdc_drv.h
-index 0e19c14..a6e5e6d 100644
+index 13001df..0e19c14 100644
 --- a/drivers/gpu/drm/tilcdc/tilcdc_drv.h
 +++ b/drivers/gpu/drm/tilcdc/tilcdc_drv.h
-@@ -116,7 +116,6 @@ struct tilcdc_module {
- 	const char *name;
- 	struct list_head list;
- 	const struct tilcdc_module_ops *funcs;
--	unsigned int preferred_bpp;
- };
+@@ -65,6 +65,10 @@ struct tilcdc_drm_private {
+ 	 */
+ 	uint32_t max_width;
  
- void tilcdc_module_init(struct tilcdc_module *mod, const char *name,
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_external.c b/drivers/gpu/drm/tilcdc/tilcdc_external.c
-index 849b23e..68e8950 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_external.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_external.c
-@@ -52,7 +52,7 @@ static int tilcdc_external_mode_valid(struct drm_connector *connector,
- 	return MODE_OK;
- }
++	/* Supported pixel formats */
++	const uint32_t *pixelformats;
++	uint32_t num_pixelformats;
++
+ 	/* The context for pm susped/resume cycle is stored here */
+ 	struct drm_atomic_state *saved_state;
  
--static int tilcdc_add_external_encoder(struct drm_device *dev, int *bpp,
-+static int tilcdc_add_external_encoder(struct drm_device *dev,
- 				       struct drm_connector *connector)
- {
- 	struct tilcdc_drm_private *priv = dev->dev_private;
-@@ -64,7 +64,6 @@ static int tilcdc_add_external_encoder(struct drm_device *dev, int *bpp,
- 	/* Only tda998x is supported at the moment. */
- 	tilcdc_crtc_set_simulate_vesa_sync(priv->crtc, true);
- 	tilcdc_crtc_set_panel_info(priv->crtc, &panel_info_tda998x);
--	*bpp = panel_info_tda998x.bpp;
+diff --git a/drivers/gpu/drm/tilcdc/tilcdc_plane.c b/drivers/gpu/drm/tilcdc/tilcdc_plane.c
+index 41911e3..74c65fa 100644
+--- a/drivers/gpu/drm/tilcdc/tilcdc_plane.c
++++ b/drivers/gpu/drm/tilcdc/tilcdc_plane.c
+@@ -24,10 +24,6 @@
  
- 	connector_funcs = devm_kzalloc(dev->dev, sizeof(*connector_funcs),
- 				       GFP_KERNEL);
-@@ -94,7 +93,7 @@ static int tilcdc_add_external_encoder(struct drm_device *dev, int *bpp,
- 	return 0;
- }
+ #include "tilcdc_drv.h"
  
--int tilcdc_add_external_encoders(struct drm_device *dev, int *bpp)
-+int tilcdc_add_external_encoders(struct drm_device *dev)
- {
- 	struct tilcdc_drm_private *priv = dev->dev_private;
- 	struct drm_connector *connector;
-@@ -108,7 +107,7 @@ int tilcdc_add_external_encoders(struct drm_device *dev, int *bpp)
- 			if (connector == priv->connectors[i])
- 				found = true;
- 		if (!found) {
--			ret = tilcdc_add_external_encoder(dev, bpp, connector);
-+			ret = tilcdc_add_external_encoder(dev, connector);
- 			if (ret)
- 				return ret;
- 		}
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_external.h b/drivers/gpu/drm/tilcdc/tilcdc_external.h
-index 6aabe27..c700e0c 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_external.h
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_external.h
-@@ -18,7 +18,7 @@
- #ifndef __TILCDC_EXTERNAL_H__
- #define __TILCDC_EXTERNAL_H__
- 
--int tilcdc_add_external_encoders(struct drm_device *dev, int *bpp);
-+int tilcdc_add_external_encoders(struct drm_device *dev);
- void tilcdc_remove_external_encoders(struct drm_device *dev);
- int tilcdc_get_external_components(struct device *dev,
- 				   struct component_match **match);
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_panel.c b/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-index 4ac1d25..7b36509 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-@@ -397,8 +397,6 @@ static int panel_probe(struct platform_device *pdev)
- 		goto fail_timings;
- 	}
- 
--	mod->preferred_bpp = panel_mod->info->bpp;
+-static const u32 tilcdc_formats[] = { DRM_FORMAT_RGB565,
+-				      DRM_FORMAT_RGB888,
+-				      DRM_FORMAT_XRGB8888 };
 -
- 	return 0;
+ static struct drm_plane_funcs tilcdc_plane_funcs = {
+ 	.update_plane	= drm_atomic_helper_update_plane,
+ 	.disable_plane	= drm_atomic_helper_disable_plane,
+@@ -114,12 +110,13 @@ static const struct drm_plane_helper_funcs plane_helper_funcs = {
+ int tilcdc_plane_init(struct drm_device *dev,
+ 		      struct drm_plane *plane)
+ {
++	struct tilcdc_drm_private *priv = dev->dev_private;
+ 	int ret;
  
- fail_timings:
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c b/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-index 3faf735..6e64a4f 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-@@ -329,8 +329,6 @@ static int tfp410_probe(struct platform_device *pdev)
- 		goto fail;
- 	}
- 
--	mod->preferred_bpp = dvi_info.bpp;
--
- 	i2c_node = of_find_node_by_phandle(i2c_phandle);
- 	if (!i2c_node) {
- 		dev_err(&pdev->dev, "could not get i2c bus node\n");
+ 	ret = drm_plane_init(dev, plane, 1,
+ 			     &tilcdc_plane_funcs,
+-			     tilcdc_formats,
+-			     ARRAY_SIZE(tilcdc_formats),
++			     priv->pixelformats,
++			     priv->num_pixelformats,
+ 			     true);
+ 	if (ret) {
+ 		dev_err(dev->dev, "Failed to initialize plane: %d\n", ret);
 -- 
 1.9.1
