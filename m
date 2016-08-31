@@ -1,25 +1,170 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 31 Aug 2016 17:50:03 +0100
-Subject: [RFC PATCH 1/2] arm64: hw_breakpoint: convert CPU hotplug
- notifier to new infrastructure
-In-Reply-To: <20160831160427.5nilur7ky3rxn2by@linutronix.de>
-References: <1472207758-24394-1-git-send-email-will.deacon@arm.com>
- <20160826112806.rr3apxva73frag5x@linutronix.de>
- <20160826114141.GI13554@arm.com>
- <20160831160427.5nilur7ky3rxn2by@linutronix.de>
-Message-ID: <20160831165002.GH29505@arm.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Wed, 31 Aug 2016 22:28:20 +0530
+Subject: [PATCH v6 0/8] power: add power sequence library
+In-Reply-To: <20160831095220.GA11938@b29397-desktop>
+References: <1471252398-957-1-git-send-email-peter.chen@nxp.com>
+ <b1848eb2-9298-9089-ee4d-5356998c6c08@linaro.org>
+ <20160824085335.GB27233@shlinux2> <20160829111045.GB3736@b29397-desktop>
+ <3a45793f-18d9-0688-d2ab-ef79432c473c@linaro.org>
+ <20160831095220.GA11938@b29397-desktop>
+Message-ID: <fd94340b-1c1d-2307-7e57-5b05f1655d2c@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 31, 2016 at 06:04:28PM +0200, Sebastian Andrzej Siewior wrote:
-> On 2016-08-26 12:41:41 [+0100], Will Deacon wrote:
-> > 
-> > It probably should be there anyway, since the current code is explicitly
-> > disabling interrupts to mitigate being called with them enabled and debug
-> > is something we want as early as possible.
-> 
-> Good. This will go via the ARM64 tree then?
 
-Yup, I can queue these two for 4.9 if you're happy enough with them.
 
-Will
+On Wednesday 31 August 2016 03:22 PM, Peter Chen wrote:
+> On Wed, Aug 31, 2016 at 01:46:30PM +0530, Vaibhav Hiremath wrote:
+>>
+>> On Monday 29 August 2016 04:40 PM, Peter Chen wrote:
+>>> On Wed, Aug 24, 2016 at 04:53:35PM +0800, Peter Chen wrote:
+>>>> On Tue, Aug 23, 2016 at 04:02:48PM +0530, Vaibhav Hiremath wrote:
+>>>>> On Monday 15 August 2016 02:43 PM, Peter Chen wrote:
+>>>>>> Hi all,
+>>>>>>
+>>>>>> This is a follow-up for my last power sequence framework patch set [1].
+>>>>>> According to Rob Herring and Ulf Hansson's comments[2], I use a generic
+>>>>>> power sequence library for parsing the power sequence elements on DT,
+>>>>>> and implement generic power sequence on library. The host driver
+>>>>>> can allocate power sequence instance, and calls pwrseq APIs accordingly.
+>>>>>>
+>>>>>> In future, if there are special power sequence requirements, the special
+>>>>>> power sequence library can be created.
+>>>>>>
+>>>>>> This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+>>>>>> two hot-plug devices to simulate this use case, the related binding
+>>>>>> change is updated at patch [1/6], The udoo board changes were tested
+>>>>>> using my last power sequence patch set.[3]
+>>>>>>
+>>>>>> Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
+>>>>>> need to power on itself before it can be found by ULPI bus.
+>>>>>>
+>>>>>> [1]http://www.spinics.net/lists/linux-usb/msg142755.html
+>>>>>> [2]http://www.spinics.net/lists/linux-usb/msg143106.html
+>>>>>> [3]http://www.spinics.net/lists/linux-usb/msg142815.html
+>>>>> (Please ignore my response on V2)
+>>>>>
+>>>>> Sorry being so late in the discussion...
+>>>>>
+>>>>> If I am not missing anything, then I am afraid to say that the
+>>>>> generic library
+>>>>> implementation in this patch series is not going to solve many of
+>>>>> the custom
+>>>>> requirement of power on, off, etc...
+>>>>> I know you mentioned about adding another library when we come
+>>>>> across such platforms, but should we not keep provision (or easy
+>>>>> hooks/path)
+>>>>> to enable that ?
+>>>>>
+>>>>> Let me bring in the use case I am dealing with,
+>>>>>
+>>>>>
+>>>>>                                Host
+>>>>>                                 |
+>>>>>                                 V
+>>>>>                             USB port
+>>>>> ------------------------------------------------------------
+>>>>>                                 |
+>>>>>                                 V
+>>>>>                        USB HUB device (May need custom on/off seq)
+>>>>>                                 |
+>>>>>                                 V
+>>>>>                =============================
+>>>>>               |                             |
+>>>>>               V                             V
+>>>>>           Device-1                       Device-2
+>>>>> (Needs special power               (Needs special power
+>>>>>   on/off sequence.                   on/off sequence.
+>>>>>   Also may need custom               Also, may need custom
+>>>>>   sequence for                       sequence for
+>>>>>   suspend/resume)                    suspend/resume)
+>>>>>
+>>>>>
+>>>>> Note: Both Devices are connected to HUB via HSIC and may differ
+>>>>>            in terms of functionality, features they support.
+>>>>>
+>>>>> In the above case, both Device-1 and Device-2, need separate
+>>>>> power on/off sequence. So generic library currently we have in this
+>>>>> patch series is not going to satisfy the need here.
+>>>>>
+>>>>> I looked at all 6 revisions of this patch-series, went through the
+>>>>> review comments, and looked at MMC power sequence code;
+>>>>> what I can say here is, we need something similar to
+>>>>> MMC power sequence here, where every device can have its own
+>>>>> power sequence (if needed).
+>>>>>
+>>>>> I know Rob is not in favor of creating platform device for
+>>>>> this, and I understand his comment.
+>>>>> If not platform device, but atleast we need mechanism to
+>>>>> connect each device back to its of_node and its respective
+>>>>> driver/library fns. For example, the Devices may support different
+>>>>> boot modes, and platform driver needs to make sure that
+>>>>> the right sequence is followed for booting.
+>>>>>
+>>>>> Peter, My apologies for taking you back again on this series.
+>>>>> I am OK, if you wish to address this in incremental addition,
+>>>>> but my point is, we know that the current generic way is not
+>>>>> enough for us, so I think we should try to fix it in initial phase only.
+>>>>>
+>>>> Rob, it seems generic power sequence can't cover all cases.
+>>>> Without information from DT, we can't know which power sequence
+>>>> for which device.
+>>>>
+>>> Vaibhav, do you agree that I create pwrseq library list using postcore_initcall
+>>> for each library, and choose pwrseq library according to compatible
+>>> string first, if there is no compatible string for this library, just
+>>> use generic pwrseq library.
+>>>
+>> Lets hear from MMC folks. Ulf, do you agree on approach
+>> for pwr seq ??
+>>
+>>
+>> With above approach, I kind of agree on it, but I have couple
+>> of comments,
+>>
+>>   - How DTS looks like now ?? Can you put example here ?
+> The dts is the same with current version.
+
+How would consumer driver get the power sequence ?
+You must point to right power sequence driver.
+For example, in the above example, Device-1, should
+get handle to pwrseq-1, and Device-2 to pwrseq-2.
+
+>>   - Should we merge MMC power sequence in next series ?
+>>     We also can take this as an incremental change, to avoid further
+>>     delay :)
+> We had an agreement that keep mmc's pwrseq framework unchanging.
+> Unless Ulf and rob both agree to change.
+
+Why 2 separate approach for same problem ?
+And I see this as possible duplication of code/functionality :)
+
+Rob ??? Ulf ???
+
+>>   - Lets also add suspend/resume callback to struct pwrseq
+>>
+> Why suspend/resume can't do at related driver's suspend/resume API?
+
+Nope...
+The pwrseq library would have taken ownership of resources, so
+related driver cannot suspend the device. Again it is architecture
+specific, but we should have provision to handle this.
+
+The system I am dealing with today, does need suspend/resume
+callback. To be precise, suspend is close to off state for some devices or
+they could enter standby or different low power state, but to do that,
+we need same resource as used for ON/OFF functionality.
+
+
+Thanks,
+Vaibhav
+>> There are some comments I have on the patches,
+>> I will respond directly on respective patches, it would be useful
+>> for next series.
+>>
+> Thanks.
+>
+
+-- 
+Thanks,
+Vaibhav
