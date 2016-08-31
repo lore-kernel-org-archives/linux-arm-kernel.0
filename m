@@ -1,46 +1,38 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 31 Aug 2016 20:42:26 +0200
-Subject: [RESEND PATCH 1/3] ARM: dts: Add TOPEET itop core board SCP
- package version
-In-Reply-To: <1472648307-3818-1-git-send-email-ayaka@soulik.info>
-References: <a35686c3-294b-a16a-2b0e-0ef2fd460244@kernel.org>
- <1472648307-3818-1-git-send-email-ayaka@soulik.info>
-Message-ID: <20160831184226.GA23416@kozik-lap>
+From: jsarha@ti.com (Jyri Sarha)
+Date: Wed, 31 Aug 2016 21:48:24 +0300
+Subject: [PATCH v3 0/8] drm/tilcdc: Address LCDC rev 2 color errata +
+ other fixes
+In-Reply-To: <20160831180418.rte4sf5s4llyuuvn@atomide.com>
+References: <cover.1472634657.git.jsarha@ti.com>
+ <20160831180418.rte4sf5s4llyuuvn@atomide.com>
+Message-ID: <c049825a-0802-0637-3b1e-5290032e6d10@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 31, 2016 at 08:58:27PM +0800, Randy Li wrote:
-> The TOPEET itop is a samsung exnynos 4412 core board, which have
-> two package versions. This patch add the support for SCP version.
+On 08/31/16 21:04, Tony Lindgren wrote:
+> * Jyri Sarha <jsarha@ti.com> [160831 06:19]:
+>>   ARM: dts: am335x-boneblack: Add blue-and-red-wiring -property to LCDC
+>>     node
+>>   ARM: dts: am335x-evm: Add blue-and-red-wiring -property to lcdc node
+>>   ARM: dts: am335x-evmsk: Whitespace cleanup of lcdc related nodes
+>>   ARM: dts: am335x-evmsk: Add blue-and-red-wiring -property to lcdc node
 > 
-> Currently supported are USB3503A HSIC, USB OTG, eMMC, rtc and
-> PMIC. The future features are in the based board. Also MFC and
-> watchdog have been enabled.
+> If some of these dts changes are OK for me to apply separately already,
+> please let me know.
 > 
-> Signed-off-by: Randy Li <ayaka@soulik.info>
-> ---
->  arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi | 490 ++++++++++++++++++++++++
->  1 file changed, 490 insertions(+)
->  create mode 100644 arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
+> Otherwise I'll tag this thread as read and assume you'll send the dts
+> changes separately when ready :)
+> 
 
-You are not making the review process easier... I asked for:
-1. Not chaining the consecutive versions of patchset to the previous
-ones. But now you removed chain replies totally (also from patches).
-2. Versioning all patches.... but this is a resend of v1?
+According to my plan the drm side changes should go into 4.9.
 
-The changelog and cover letters disappeared...
+The commit messages and the comments may look confusing without the
+implementation, but otherwise there should be no harm in applying these
+already. The new properties in dts simply wont have any effect. On the
+other hand, not having the dts changes won't have any dramatic effect
+either. The supported colour formats will just remain in the same
+incorrect state as they have always been until the dts changes are
+there. So what ever is more convenient for you.
 
-Please, make it simple:
-[PATCH v5 0/3] ARM: dts: exynos: some cover letter etc etc
-  \---[PATCH v5 1/3] ARM: dts: exynos: Add TOPEET itop core board SCP
-  \---[PATCH v5 2/3] ARM: dts: exynos: something more
-  \---[PATCH v5 3/3] ARM: dts: exynos: something even more
-
-git format-patch and git send-email do this by default. In every
-sensible mail program this looks like that and is easy to read.
-
-I don't have a clue what happened to these patches and what is current
-status...
-
-Best regards,
-Krzysztof
+Thanks,
+Jyri
