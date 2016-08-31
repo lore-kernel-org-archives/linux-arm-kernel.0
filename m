@@ -1,292 +1,250 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 30 Aug 2016 17:04:28 -0700
-Subject: [PATCHv3 2/3] staging: ion: Add files for parsing the devicetree
+Date: Tue, 30 Aug 2016 17:04:29 -0700
+Subject: [PATCHv3 3/3] staging: android: ion: Convert hi6220 to common platform
 In-Reply-To: <1472601869-19469-1-git-send-email-labbott@redhat.com>
 References: <1472601869-19469-1-git-send-email-labbott@redhat.com>
-Message-ID: <1472601869-19469-3-git-send-email-labbott@redhat.com>
+Message-ID: <1472601869-19469-4-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Devicetree is the preferred mechanism for platform definition
-these days. Add a set of files for supporting Ion with devicetree.
-This includes a set of bindings for heaps common across all
-devices and parsing methods. Clients may use the standard
-bindings or they can call the parsing functions along with
-their own parsing for platform specific heaps.
+Now that we have common devicetree bindings, convert hisilicon
+platform to use the binding and parsing methods.
 
 Signed-off-by: Laura Abbott <labbott@redhat.com>
 ---
- drivers/staging/android/ion/Kconfig  |  11 +++
- drivers/staging/android/ion/Makefile |   1 +
- drivers/staging/android/ion/ion_of.c | 185 +++++++++++++++++++++++++++++++++++
- drivers/staging/android/ion/ion_of.h |  37 +++++++
- 4 files changed, 234 insertions(+)
- create mode 100644 drivers/staging/android/ion/ion_of.c
- create mode 100644 drivers/staging/android/ion/ion_of.h
+ drivers/staging/android/ion/hisilicon/hi6220_ion.c | 195 +++++----------------
+ 1 file changed, 44 insertions(+), 151 deletions(-)
 
-diff --git a/drivers/staging/android/ion/Kconfig b/drivers/staging/android/ion/Kconfig
-index 19c1572..8a54ddc 100644
---- a/drivers/staging/android/ion/Kconfig
-+++ b/drivers/staging/android/ion/Kconfig
-@@ -40,3 +40,14 @@ config ION_HISI
- 	  Choose this option if you wish to use ion on Hisilicon Platform.
+diff --git a/drivers/staging/android/ion/hisilicon/hi6220_ion.c b/drivers/staging/android/ion/hisilicon/hi6220_ion.c
+index fe9f0fd..f392db2 100644
+--- a/drivers/staging/android/ion/hisilicon/hi6220_ion.c
++++ b/drivers/staging/android/ion/hisilicon/hi6220_ion.c
+@@ -19,181 +19,74 @@
+ #include <linux/mm.h>
+ #include "../ion_priv.h"
+ #include "../ion.h"
++#include "../ion_of.h"
  
- source "drivers/staging/android/ion/hisilicon/Kconfig"
-+
-+config ION_OF
-+	bool "Devicetree support for Ion"
-+	depends on ION && OF
-+	help
-+	  Provides base support for defining Ion heaps in devicetree
-+	  and setting them up. Also includes functions for platforms
-+	  to parse the devicetree and expand for their own custom
-+	  extensions
-+
-+	  If using Ion and devicetree, you should say Y here
-diff --git a/drivers/staging/android/ion/Makefile b/drivers/staging/android/ion/Makefile
-index 18cc2aa..7669a29 100644
---- a/drivers/staging/android/ion/Makefile
-+++ b/drivers/staging/android/ion/Makefile
-@@ -8,4 +8,5 @@ endif
- obj-$(CONFIG_ION_DUMMY) += ion_dummy_driver.o
- obj-$(CONFIG_ION_TEGRA) += tegra/
- obj-$(CONFIG_ION_HISI) += hisilicon/
-+obj-$(CONFIG_ION_OF) += ion_of.o
- 
-diff --git a/drivers/staging/android/ion/ion_of.c b/drivers/staging/android/ion/ion_of.c
-new file mode 100644
-index 0000000..de0899a
---- /dev/null
-+++ b/drivers/staging/android/ion/ion_of.c
-@@ -0,0 +1,185 @@
-+/*
-+ * Based on work from:
-+ *   Andrew Andrianov <andrew@ncrmnt.org>
-+ *   Google
-+ *   The Linux Foundation
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_address.h>
-+#include <linux/clk.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/cma.h>
-+#include <linux/dma-contiguous.h>
-+#include <linux/io.h>
-+#include <linux/of_reserved_mem.h>
-+#include "ion.h"
-+#include "ion_priv.h"
-+#include "ion_of.h"
-+
-+int ion_parse_dt_heap_common(struct device_node *heap_node,
-+			struct ion_platform_heap *heap,
-+			struct ion_of_heap *compatible)
-+{
-+	int i;
-+
-+	for (i = 0; compatible[i].name != NULL; i++) {
-+		if (of_device_is_compatible(heap_node, compatible[i].compat))
-+			break;
-+	}
-+
-+	if (compatible[i].name == NULL)
-+		return -ENODEV;
-+
-+	heap->id = compatible[i].heap_id;
-+	heap->type = compatible[i].type;
-+	heap->name = compatible[i].name;
-+	heap->align = compatible[i].align;
-+
-+	/* Some kind of callback function pointer? */
-+
-+	pr_info("%s: id %d type %d name %s align %lx\n", __func__,
-+			heap->id, heap->type, heap->name, heap->align);
-+	return 0;
-+}
-+
-+int ion_setup_heap_common(struct platform_device *parent,
-+			struct device_node *heap_node,
-+			struct ion_platform_heap *heap)
-+{
-+	int ret = 0;
-+
-+	switch (heap->type) {
-+		case ION_HEAP_TYPE_CARVEOUT:
-+		case ION_HEAP_TYPE_CHUNK:
-+			if (heap->base && heap->size)
-+				return 0;
-+
-+			ret = of_reserved_mem_device_init(heap->priv);
-+			break;
-+		default:
-+			break;
-+	}
-+
-+	return ret;
-+}
-+
-+struct ion_platform_data *ion_parse_dt(struct platform_device *pdev,
-+					struct ion_of_heap *compatible)
-+{
-+	int num_heaps, ret;
-+	const struct device_node *dt_node = pdev->dev.of_node;
-+	struct device_node *node;
-+	struct ion_platform_heap *heaps;
+-struct hi6220_ion_type_table {
+-	const char *name;
+-	enum ion_heap_type type;
++struct hisi_ion_dev {
++	struct ion_heap	**heaps;
++	struct ion_device *idev;
 +	struct ion_platform_data *data;
-+	int i = 0;
-+
-+	num_heaps = of_get_available_child_count(dt_node);
-+
-+	if (!num_heaps)
-+		return ERR_PTR(-EINVAL);
-+
-+	heaps = devm_kzalloc(&pdev->dev,
-+				sizeof(struct ion_platform_heap)*num_heaps,
+ };
+ 
+-static struct hi6220_ion_type_table ion_type_table[] = {
+-	{"ion_system", ION_HEAP_TYPE_SYSTEM},
+-	{"ion_system_contig", ION_HEAP_TYPE_SYSTEM_CONTIG},
+-	{"ion_carveout", ION_HEAP_TYPE_CARVEOUT},
+-	{"ion_chunk", ION_HEAP_TYPE_CHUNK},
+-	{"ion_dma", ION_HEAP_TYPE_DMA},
+-	{"ion_custom", ION_HEAP_TYPE_CUSTOM},
++static struct ion_of_heap hisi_heaps[] = {
++	PLATFORM_HEAP("hisilicon,sys_user", 0,
++			ION_HEAP_TYPE_SYSTEM, "sys_user"),
++	PLATFORM_HEAP("hisilicon,sys_contig", 1,
++			ION_HEAP_TYPE_SYSTEM_CONTIG, "sys_contig"),
++	PLATFORM_HEAP("hisilicon,cma", ION_HEAP_TYPE_DMA, ION_HEAP_TYPE_DMA,
++			"cma"),
++	{}
+ };
+ 
+-static struct ion_device *idev;
+-static int num_heaps;
+-static struct ion_heap **heaps;
+-static struct ion_platform_heap **heaps_data;
+-
+-static int get_type_by_name(const char *name, enum ion_heap_type *type)
++static int hi6220_ion_probe(struct platform_device *pdev)
+ {
++	struct hisi_ion_dev *ipdev;
+ 	int i;
+ 
+-	for (i = 0; i < ARRAY_SIZE(ion_type_table); i++) {
+-		if (strncmp(name, ion_type_table[i].name, strlen(name)))
+-			continue;
+-
+-		*type = ion_type_table[i].type;
+-		return 0;
+-	}
+-
+-	return -EINVAL;
+-}
+-
+-static int hi6220_set_platform_data(struct platform_device *pdev)
+-{
+-	unsigned int base;
+-	unsigned int size;
+-	unsigned int id;
+-	const char *heap_name;
+-	const char *type_name;
+-	enum ion_heap_type type;
+-	int ret;
+-	struct device_node *np;
+-	struct ion_platform_heap *p_data;
+-	const struct device_node *dt_node = pdev->dev.of_node;
+-	int index = 0;
+-
+-	for_each_child_of_node(dt_node, np)
+-		num_heaps++;
+-
+-	heaps_data = devm_kzalloc(&pdev->dev,
+-				  sizeof(struct ion_platform_heap *) *
+-				  num_heaps,
+-				  GFP_KERNEL);
+-	if (!heaps_data)
++	ipdev = devm_kzalloc(&pdev->dev, sizeof(*ipdev), GFP_KERNEL);
++	if (!ipdev)
+ 		return -ENOMEM;
+ 
+-	for_each_child_of_node(dt_node, np) {
+-		ret = of_property_read_string(np, "heap-name", &heap_name);
+-		if (ret < 0) {
+-			pr_err("check the name of node %s\n", np->name);
+-			continue;
+-		}
+-
+-		ret = of_property_read_u32(np, "heap-id", &id);
+-		if (ret < 0) {
+-			pr_err("check the id %s\n", np->name);
+-			continue;
+-		}
+-
+-		ret = of_property_read_u32(np, "heap-base", &base);
+-		if (ret < 0) {
+-			pr_err("check the base of node %s\n", np->name);
+-			continue;
+-		}
+-
+-		ret = of_property_read_u32(np, "heap-size", &size);
+-		if (ret < 0) {
+-			pr_err("check the size of node %s\n", np->name);
+-			continue;
+-		}
+-
+-		ret = of_property_read_string(np, "heap-type", &type_name);
+-		if (ret < 0) {
+-			pr_err("check the type of node %s\n", np->name);
+-			continue;
+-		}
+-
+-		ret = get_type_by_name(type_name, &type);
+-		if (ret < 0) {
+-			pr_err("type name error %s!\n", type_name);
+-			continue;
+-		}
+-		pr_info("heap index %d : name %s base 0x%x size 0x%x id %d type %d\n",
+-			index, heap_name, base, size, id, type);
+-
+-		p_data = devm_kzalloc(&pdev->dev,
+-				      sizeof(struct ion_platform_heap),
+-				      GFP_KERNEL);
+-		if (!p_data)
+-			return -ENOMEM;
++	platform_set_drvdata(pdev, ipdev);
+ 
+-		p_data->name = heap_name;
+-		p_data->base = base;
+-		p_data->size = size;
+-		p_data->id = id;
+-		p_data->type = type;
++	ipdev->idev = ion_device_create(NULL);
++	if (!ipdev->idev)
++		return -ENOMEM;
+ 
+-		heaps_data[index] = p_data;
+-		index++;
+-	}
+-	return 0;
+-}
++	ipdev->data = ion_parse_dt(pdev, hisi_heaps);
++	if (IS_ERR(ipdev->data))
++		return PTR_ERR(ipdev->data);
+ 
+-static int hi6220_ion_probe(struct platform_device *pdev)
+-{
+-	int i;
+-	int err;
+-	static struct ion_platform_heap *p_heap;
+-
+-	idev = ion_device_create(NULL);
+-	err = hi6220_set_platform_data(pdev);
+-	if (err) {
+-		pr_err("ion set platform data error!\n");
+-		goto err_free_idev;
+-	}
+-	heaps = devm_kzalloc(&pdev->dev,
+-			     sizeof(struct ion_heap *) * num_heaps,
+-			     GFP_KERNEL);
+-	if (!heaps) {
+-		err = -ENOMEM;
+-		goto err_free_idev;
++	ipdev->heaps = devm_kzalloc(&pdev->dev,
++				sizeof(struct ion_heap)*ipdev->data->nr,
 +				GFP_KERNEL);
-+	if (!heaps)
-+		return ERR_PTR(-ENOMEM);
-+
-+	data = devm_kzalloc(&pdev->dev, sizeof(struct ion_platform_data),
-+				GFP_KERNEL);
-+	if (!data)
-+		return ERR_PTR(-ENOMEM);
-+
-+	for_each_available_child_of_node(dt_node, node) {
-+		struct platform_device *heap_pdev;
-+
-+		ret = ion_parse_dt_heap_common(node, &heaps[i], compatible);
-+		if (ret)
-+			return ERR_PTR(ret);
-+
-+		heap_pdev = of_platform_device_create(node, heaps[i].name,
-+							&pdev->dev);
-+		if (!pdev)
-+			return ERR_PTR(-ENOMEM);
-+		heap_pdev->dev.platform_data = &heaps[i];
-+
-+		heaps[i].priv = &heap_pdev->dev;
-+
-+		ret = ion_setup_heap_common(pdev, node, &heaps[i]);
-+		if (ret)
-+			goto out_err;
-+		i++;
-+	}
-+
-+
-+	data->heaps = heaps;
-+	data->nr = num_heaps;
-+	return data;
-+
-+out_err:
-+	for ( ; i >= 0; i--)
-+		if (heaps[i].priv)
-+			of_device_unregister(to_platform_device(heaps[i].priv));
-+
-+	return ERR_PTR(ret);
-+}
-+
-+void ion_destroy_platform_data(struct ion_platform_data *data)
-+{
-+	int i;
-+
-+	for (i = 0; i < data->nr; i++)
-+		if (data->heaps[i].priv)
-+			of_device_unregister(to_platform_device(
-+				data->heaps[i].priv));
-+}
-+
-+#ifdef CONFIG_OF_RESERVED_MEM
-+#include <linux/of.h>
-+#include <linux/of_fdt.h>
-+#include <linux/of_reserved_mem.h>
-+
-+static int rmem_ion_device_init(struct reserved_mem *rmem, struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct ion_platform_heap *heap = pdev->dev.platform_data;
-+
-+	heap->base = rmem->base;
-+	heap->base = rmem->size;
-+	pr_debug("%s: heap %s base %pa size %pa dev %p\n", __func__,
-+			heap->name, &rmem->base, &rmem->size, dev);
++	if (!ipdev->heaps) {
++		ion_destroy_platform_data(ipdev->data);
++		return -ENOMEM;
+ 	}
+ 
+-	/*
+-	 * create the heaps as specified in the dts file
+-	 */
+-	for (i = 0; i < num_heaps; i++) {
+-		p_heap = heaps_data[i];
+-		heaps[i] = ion_heap_create(p_heap);
+-		if (IS_ERR_OR_NULL(heaps[i])) {
+-			err = PTR_ERR(heaps[i]);
+-			goto err_free_heaps;
++	for (i = 0; i < ipdev->data->nr; i++) {
++		ipdev->heaps[i] = ion_heap_create(&ipdev->data->heaps[i]);
++		if (!ipdev->heaps) {
++			ion_destroy_platform_data(ipdev->data);
++			return -ENOMEM;
+ 		}
+-
+-		ion_device_add_heap(idev, heaps[i]);
+-
+-		pr_info("%s: adding heap %s of type %d with %lx@%lx\n",
+-			__func__, p_heap->name, p_heap->type,
+-			p_heap->base, (unsigned long)p_heap->size);
++		ion_device_add_heap(ipdev->idev, ipdev->heaps[i]);
+ 	}
+-	return err;
+-
+-err_free_heaps:
+-	for (i = 0; i < num_heaps; ++i) {
+-		ion_heap_destroy(heaps[i]);
+-		heaps[i] = NULL;
+-	}
+-err_free_idev:
+-	ion_device_destroy(idev);
+-
+-	return err;
 +	return 0;
-+}
+ }
+ 
+ static int hi6220_ion_remove(struct platform_device *pdev)
+ {
++	struct hisi_ion_dev *ipdev;
+ 	int i;
+ 
+-	for (i = 0; i < num_heaps; i++) {
+-		ion_heap_destroy(heaps[i]);
+-		heaps[i] = NULL;
++	ipdev = platform_get_drvdata(pdev);
 +
-+static void rmem_ion_device_release(struct reserved_mem *rmem,
-+					struct device *dev)
-+{
-+	return;
-+}
-+
-+static const struct reserved_mem_ops rmem_dma_ops = {
-+	.device_init	= rmem_ion_device_init,
-+	.device_release	= rmem_ion_device_release,
-+};
-+
-+static int __init rmem_ion_setup(struct reserved_mem *rmem)
-+{
-+	phys_addr_t size = rmem->size;
-+
-+	size = size / 1024;
-+
-+	pr_info("Ion memory setup at %pa size %pa MiB\n",
-+		&rmem->base, &size);
-+	rmem->ops = &rmem_dma_ops;
-+	return 0;
-+}
-+RESERVEDMEM_OF_DECLARE(ion, "ion-region", rmem_ion_setup);
-+#endif
-diff --git a/drivers/staging/android/ion/ion_of.h b/drivers/staging/android/ion/ion_of.h
-new file mode 100644
-index 0000000..8241a17
---- /dev/null
-+++ b/drivers/staging/android/ion/ion_of.h
-@@ -0,0 +1,37 @@
-+/*
-+ * Based on work from:
-+ *   Andrew Andrianov <andrew@ncrmnt.org>
-+ *   Google
-+ *   The Linux Foundation
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef _ION_OF_H
-+#define _ION_OF_H
-+
-+struct ion_of_heap {
-+	const char *compat;
-+	int heap_id;
-+	int type;
-+	const char *name;
-+	int align;
-+};
-+
-+#define PLATFORM_HEAP(_compat, _id, _type, _name) \
-+{ \
-+	.compat = _compat, \
-+	.heap_id = _id, \
-+	.type = _type, \
-+	.name = _name, \
-+	.align = PAGE_SIZE, \
-+}
-+
-+struct ion_platform_data *ion_parse_dt(struct platform_device *pdev,
-+					struct ion_of_heap *compatible);
-+
-+void ion_destroy_platform_data(struct ion_platform_data *data);
-+
-+#endif
++	for (i = 0; i < ipdev->data->nr; i++) {
++		ion_heap_destroy(ipdev->heaps[i]);
+ 	}
+-	ion_device_destroy(idev);
++	ion_destroy_platform_data(ipdev->data);
++	ion_device_destroy(ipdev->idev);
+ 
+ 	return 0;
+ }
 -- 
 2.7.4
