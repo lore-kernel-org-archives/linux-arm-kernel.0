@@ -1,41 +1,66 @@
-From: woogyom.kim@gmail.com (Milo Kim)
-Date: Wed, 31 Aug 2016 17:25:19 +0900
-Subject: [PATCH v2 3/4] pinctrl: sunxi: Remove unsupported PWM channel pinmux
- in H3
-In-Reply-To: <20160831082520.25962-1-woogyom.kim@gmail.com>
-References: <20160831082520.25962-1-woogyom.kim@gmail.com>
-Message-ID: <20160831082520.25962-4-woogyom.kim@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 31 Aug 2016 16:25:27 +0800
+Subject: [PATCH 4/6] ARM: sunxi: Support the Nextthing GR8
+In-Reply-To: <20160831081817.5191-5-maxime.ripard@free-electrons.com>
+References: <20160831081817.5191-1-maxime.ripard@free-electrons.com>
+ <20160831081817.5191-5-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v66CDdSJMN4STHug1bGU2fnRK=Y24kwKS_8EtD6PZg3T-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H3 has single PWM channel. The second PWM channel is not supported,
-so the pinctrl function should be removed.
+On Wed, Aug 31, 2016 at 4:18 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The GR8 is an SoC made by Nextthing Co, loosely based on the sun5i family.
+>
+> It has a number of new controllers compared to the A10s and A13 (SPDIF, I2S),
+> but some controllers missing too (Ethernet, less I2C, less UARTs).
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+>  MAINTAINERS                                     | 1 +
+>  arch/arm/mach-sunxi/sunxi.c                     | 1 +
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Chen-Yu Tsai <wens@csie.org>
-Cc: Icenowy Zheng <icenowy@aosc.xyz>
-Cc: Jens Kuske <jenskuske@gmail.com>
-Cc: Krzysztof Adamski <k@japko.eu>
-Cc: linux-gpio at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
----
- drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c | 1 -
- 1 file changed, 1 deletion(-)
+Please update Documentation/arm/sunxi/README as well. I don't suppose
+there's a datasheet available?
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
-index 26a2ad3..518a92d 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
-@@ -60,7 +60,6 @@ static const struct sunxi_desc_pin sun8i_h3_pins[] = {
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
- 		  SUNXI_FUNCTION(0x2, "sim"),		/* PWREN */
--		  SUNXI_FUNCTION(0x3, "pwm1"),
- 		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 6)),	/* PA_EINT6 */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 7),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
--- 
-2.9.3
+ChenYu
+
+>  3 files changed, 3 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+> index 7e79fcc36b0d..3975d0a0e4c2 100644
+> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+> @@ -14,3 +14,4 @@ using one of the following compatible strings:
+>    allwinner,sun8i-a83t
+>    allwinner,sun8i-h3
+>    allwinner,sun9i-a80
+> +  nextthing,gr8
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 20bb1d00098c..c6a9e6fda1d0 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -982,6 +982,7 @@ M:  Chen-Yu Tsai <wens@csie.org>
+>  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:     Maintained
+>  N:     sun[x456789]i
+> +F:     arch/arm/boot/dts/gr8*
+>
+>  ARM/Allwinner SoC Clock Support
+>  M:     Emilio L?pez <emilio@elopez.com.ar>
+> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> index 95dca8c2c9ed..2e2bde271205 100644
+> --- a/arch/arm/mach-sunxi/sunxi.c
+> +++ b/arch/arm/mach-sunxi/sunxi.c
+> @@ -22,6 +22,7 @@ static const char * const sunxi_board_dt_compat[] = {
+>         "allwinner,sun5i-a10s",
+>         "allwinner,sun5i-a13",
+>         "allwinner,sun5i-r8",
+> +       "nextthing,gr8",
+>         NULL,
+>  };
+>
+> --
+> 2.9.2
+>
