@@ -1,23 +1,17 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 31 Aug 2016 18:04:28 +0200
-Subject: [RFC PATCH 1/2] arm64: hw_breakpoint: convert CPU hotplug
- notifier to new infrastructure
-In-Reply-To: <20160826114141.GI13554@arm.com>
-References: <1472207758-24394-1-git-send-email-will.deacon@arm.com>
- <20160826112806.rr3apxva73frag5x@linutronix.de>
- <20160826114141.GI13554@arm.com>
-Message-ID: <20160831160427.5nilur7ky3rxn2by@linutronix.de>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 31 Aug 2016 11:05:42 -0500
+Subject: [PATCH 06/10] dt-bindings: dspi: Update bindings for LS1012A
+In-Reply-To: <1472207269-18499-6-git-send-email-Bhaskar.Upadhaya@nxp.com>
+References: <1472207269-18499-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
+ <1472207269-18499-6-git-send-email-Bhaskar.Upadhaya@nxp.com>
+Message-ID: <20160831160542.GA10666@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-08-26 12:41:41 [+0100], Will Deacon wrote:
-> 
-> It probably should be there anyway, since the current code is explicitly
-> disabling interrupts to mitigate being called with them enabled and debug
-> is something we want as early as possible.
+On Fri, Aug 26, 2016 at 03:57:45PM +0530, Bhaskar Upadhaya wrote:
+> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
+> ---
+>  Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-Good. This will go via the ARM64 tree then?
-
-> Will
-
-Sebastian
+Acked-by: Rob Herring <robh@kernel.org>
