@@ -1,116 +1,29 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 31 Aug 2016 14:31:10 +0900
-Subject: [PATCH v24 0/9] arm64: add kdump support
-In-Reply-To: <0267060a-d380-2e7a-0c33-0084bfc46d97@caviumnetworks.com>
-References: <20160809015248.28414-1-takahiro.akashi@linaro.org>
- <0267060a-d380-2e7a-0c33-0084bfc46d97@caviumnetworks.com>
-Message-ID: <20160831053109.GR20080@linaro.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 31 Aug 2016 09:08:12 +0300
+Subject: [RESEND PATCH 1/2] ARM: dts: dra7: Fix clock data for
+ gmac_gmii_ref_clk_div
+In-Reply-To: <20160830184158.xydy3ixy7c5b73le@atomide.com>
+References: <20160830145801.10364-1-grygorii.strashko@ti.com>
+ <20160830184158.xydy3ixy7c5b73le@atomide.com>
+Message-ID: <fd7850dd-b7a2-e6ef-508f-8406c3f2cea9@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Manish,
+On 30/08/16 21:41, Tony Lindgren wrote:
+> * Grygorii Strashko <grygorii.strashko@ti.com> [160830 07:58]:
+>>
+>> Originally this patch was posted (and acked) here
+>> https://lkml.org/lkml/2016/4/27/272,
+>> but it, unfortunatelly, has never been merged.
+>> So re-send + minor subj change.
+>
+> OK yeah sorry about that. And thanks for the resend. If some patches
+> have pending discussion as I tend to tag threads that have pending
+> discussion as read and then forget them. And I miss patches in other
+> ways too..
+>
+> Tero, care to take a look and ack?
 
-Thank you for testing my kdump and reporting issues.
+For both patches:
 
-On Wed, Aug 31, 2016 at 09:11:52AM +0530, Manish Jaggi wrote:
-> Hi Akashi,
-> 
-> On 08/09/2016 07:22 AM, AKASHI Takahiro wrote:
-> > This patch series adds kdump support on arm64.
-> > 
-> > To load a crash-dump kernel to the systems, a series of patches to
-> > kexec-tools, which have not yet been merged upstream, are needed.
-> > Please use my kdump patches [1].
-> > 
-> > To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
-> >   - crash utility (coming v7.1.6 or later) [2]
-> >     (Necessary patches have already been queued in the master.)
-> > 
-> > [1] T.B.D.
-> > [2] https://github.com/crash-utility/crash.git
-> > 
-> > Changes for v24 (Aug 9, 2016):
-> >   o Rebase to Linux-4.8-rc1
-> >   o Update descriptions about newly added DT proerties
-> > 
-> > Changes for v23 (July 26, 2016):
-> > 
-> >   o Move memblock_reserve() to a single place in reserve_crashkernel()
-> >   o Use  cpu_park_loop() in ipi_cpu_crash_stop()
-> >   o Always enforce ARCH_LOW_ADDRESS_LIMIT to the memory range of crash kernel
-> >   o Re-implement fdt_enforce_memory_region() to remove non-reserve regions
-> >     (for ACPI) from usable memory at crash kernel
-> > 
-> > Changes for v22 (July 12, 2016):
-> > 
-> >   o Export "crashkernel-base" and "crashkernel-size" via device-tree,
-> >     and add some descriptions about them in chosen.txt
-> >   o Rename "usable-memory" to "usable-memory-range" to avoid inconsistency
-> >     with powerpc's "usable-memory"
-> >   o Make cosmetic changes regarding "ifdef" usage
-> >   o Correct some wordings in kdump.txt
-> > 
-> > Changes for v21 (July 6, 2016):
-> > 
-> >   o Remove kexec patches.
-> >   o Rebase to arm64's for-next/core (Linux-4.7-rc4 based).
-> >   o Clarify the description about kvm in kdump.txt.
-> > 
-> > See the following link [3] for older changes:
-> > [3]  http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438780.html
-> > 
-> > AKASHI Takahiro (8):
-> >   arm64: kdump: reserve memory for crash dump kernel
-> >   memblock: add memblock_cap_memory_range()
-> >   arm64: limit memory regions based on DT property, usable-memory-range
-> >   arm64: kdump: implement machine_crash_shutdown()
-> >   arm64: kdump: add kdump support
-> >   arm64: kdump: add VMCOREINFO's for user-space coredump tools
-> >   arm64: kdump: enable kdump in the arm64 defconfig
-> >   arm64: kdump: update a kernel doc
-> > 
-> > James Morse (1):
-> >   Documentation: dt: chosen properties for arm64 kdump
-> > 
-> >  Documentation/devicetree/bindings/chosen.txt |  45 ++++++
-> >  Documentation/kdump/kdump.txt                |  16 ++-
-> >  arch/arm64/Kconfig                           |  11 ++
-> >  arch/arm64/configs/defconfig                 |   1 +
-> >  arch/arm64/include/asm/hardirq.h             |   2 +-
-> >  arch/arm64/include/asm/kexec.h               |  41 +++++-
-> >  arch/arm64/include/asm/smp.h                 |   2 +
-> >  arch/arm64/kernel/Makefile                   |   1 +
-> >  arch/arm64/kernel/crash_dump.c               |  71 ++++++++++
-> >  arch/arm64/kernel/machine_kexec.c            |  67 ++++++++-
-> >  arch/arm64/kernel/setup.c                    |   7 +-
-> >  arch/arm64/kernel/smp.c                      |  63 +++++++++
-> >  arch/arm64/mm/init.c                         | 202 +++++++++++++++++++++++++++
-> >  include/linux/memblock.h                     |   1 +
-> >  mm/memblock.c                                |  28 ++++
-> >  15 files changed, 551 insertions(+), 7 deletions(-)
-> >  create mode 100644 arch/arm64/kernel/crash_dump.c
-> > 
-> Couple of points
-> a) Just a note, while testing, the crashkernel reserved memory should be less than ARCH_LOW_ADDRESS_LIMIT (=arm64_dma_phys_limit).
-
-I think that this is a common mistake not only for kdump, but also
-for general kernels.
-Since request_standard_resources() calls alloc_bootmem_low(),
-the kernel will panic if any of usable "System RAM" is located
-above ARCH_LOW_ADDRESS_LIMIT.
-For kdump, using "crashkernel=SS" notation is a convenient way
-to avoid this issue.
-
-> b) Has anyone tested this on a SoC with Gicv3 ITS ?
-> Should the GICD/R be reset prior to switching to crash kernel ?
-> I am seeing lot of GICv3: RWP timeout, gone fishing while crash kernel boots.
-
-I've never seen this kind of messages.
-I usually do my testing on a fast model.
-"compatible" of interrupt-controller is "arm,gic-v3."
-
-Thanks,
--Takahiro AKASHI
-
-> Thanks,
-> Manish
+Acked-by: Tero Kristo <t-kristo@ti.com>
