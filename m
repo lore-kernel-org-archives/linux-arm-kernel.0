@@ -1,10 +1,10 @@
 From: ayaka@soulik.info (ayaka)
-Date: Thu, 1 Sep 2016 01:53:33 +0800
+Date: Thu, 1 Sep 2016 01:55:08 +0800
 Subject: [PATCH RFC] ARM: dts: samsung: add rga-lvds panel in itop elite
 In-Reply-To: <dee989f5-17b0-7445-514b-559e98d77acd@samsung.com>
 References: <1472511002-9019-1-git-send-email-ayaka@soulik.info>
  <dee989f5-17b0-7445-514b-559e98d77acd@samsung.com>
-Message-ID: <30e64895-34da-68ba-3616-f537e4196e9a@soulik.info>
+Message-ID: <790048d1-6533-2e43-5343-13782382bf84@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -56,9 +56,9 @@ simple-dpi for MIPI, but what is for parallel video or lvds?
 > Regards
 > Andrzej
 The other problem is that I don't how to configure the display-times, 
-the datasheet for CLAA070WP03XG should talk about total time, active 
-time and blank time for both Horizontal an Vertical time. Does it mean 
-the front-porch and sync-len for horizontal and vertical are zero ?
+the datasheet for CLAA070WP03XG only talk about total time, active time 
+and blank time for both Horizontal an Vertical time. Does it mean the 
+front-porch and sync-len for horizontal and vertical are zero ?
 
 +       ports {
 +               #address-cells = <1>;
@@ -88,3 +88,4 @@ the front-porch and sync-len for horizontal and vertical are zero ?
 +                               vback-porch = <8>;
 +                               vsync-len = <0>;
 +                       };
++      };
