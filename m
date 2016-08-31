@@ -1,34 +1,43 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 31 Aug 2016 08:35:49 +0100
-Subject: [PATCH] arm64: kernel: Fix unmasked debug exceptions when
- restoring mdscr_el1
-In-Reply-To: <20160826163947.GB23885@red-moon>
-References: <1472223822-21059-1-git-send-email-james.morse@arm.com>
- <20160826163947.GB23885@red-moon>
-Message-ID: <57C688D5.2040400@arm.com>
+From: dannym@scratchpost.org (Danny Milosavljevic)
+Date: Wed, 31 Aug 2016 09:40:44 +0200
+Subject: [linux-sunxi] Re: [PATCH v9 2/2] Add mixer controls: Line-In,
+ FM-In, Mic 2, Capture Source, Differential Line-In.
+In-Reply-To: <CAGb2v64zA3iSOe7ku=pF0RhJkvErxt_tbPWG4H8D6r5UEUJAMQ@mail.gmail.com>
+References: <20160830054403.7878-1-dannym@scratchpost.org>
+ <20160830054403.7878-3-dannym@scratchpost.org>
+ <CAGb2v64zA3iSOe7ku=pF0RhJkvErxt_tbPWG4H8D6r5UEUJAMQ@mail.gmail.com>
+Message-ID: <20160831094044.1c3227d6@scratchpost.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+> And what about microphone bias?
 
-On 26/08/16 17:39, Lorenzo Pieralisi wrote:
-> On Fri, Aug 26, 2016 at 04:03:42PM +0100, James Morse wrote:
->> Changes to make the resume from cpu_suspend() code behave more like
->> secondary boot caused debug exceptions to be unmasked early by
->> __cpu_setup(). We then go on to restore mdscr_el1 in cpu_do_resume(),
->> potentially taking break or watch points based on uninitialised registers.
-> 
-> Another option would be moving enable_dbg() out of __cpu_setup() and
-> calling when it returns in the cold boot path, that would not change
-> much in terms of debugging but we would avoid fiddling about with
-> daif three times in the resume path just to restore it to what it
-> was on suspend entry :)
+Would this be OK?
 
-I agree, but there is/will-be quite a lot of churn in the code that calls
-enable_mmu() if Ard's cleanup series is taken. I think this is the tidiest fix
-to backport. I will post a patch to tidy this up as you suggest for v4.9-rc1.
+static int sun4i_codec_handle_mic_bias_event(struct snd_soc_dapm_widget *w,
+                                             struct snd_kcontrol *k, int event)
+{
+        struct sun4i_codec *scodec = snd_soc_card_get_drvdata(w->dapm->card);
+        if (SND_SOC_DAPM_EVENT_ON(event))
+                regmap_update_bits(scodec->regmap,
+                                   SUN4I_CODEC_ADC_ACTL,
+                                   BIT(SUN4I_CODEC_ADC_ACTL_VMICEN),
+                                   BIT(SUN4I_CODEC_ADC_ACTL_VMICEN));
+        else
+                regmap_update_bits(scodec->regmap,
+                                   SUN4I_CODEC_ADC_ACTL,
+                                   BIT(SUN4I_CODEC_ADC_ACTL_VMICEN),
+                                   0);
+}
 
+static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
+...
+        SND_SOC_DAPM_MIC("Mic1", sun4i_codec_handle_mic_bias_event),
+        SND_SOC_DAPM_MIC("Mic2", sun4i_codec_handle_mic_bias_event),
 
-Thanks,
+Do I then remove
 
-James
+         SND_SOC_DAPM_SUPPLY("VMIC", SUN4I_CODEC_ADC_ACTL,
+                            SUN4I_CODEC_ADC_ACTL_VMICEN, 0, NULL, 0),
+
+completely? What about the routes?
