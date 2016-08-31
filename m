@@ -1,63 +1,75 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 31 Aug 2016 15:24:36 -0700
-Subject: [PATCH] ASoC: rockchip: implement system suspend/resume for i2s
-In-Reply-To: <1467686711-52347-1-git-send-email-sugar.zhang@rock-chips.com>
-References: <1467686711-52347-1-git-send-email-sugar.zhang@rock-chips.com>
-Message-ID: <CAD=FV=VF7NJ0+tbuWsKOxFnFS+hBqhbXmMhs5w_+DJ3EdBW9bw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 31 Aug 2016 15:31:01 -0700
+Subject: [PATCH 3/3] clk: keystone: Add sci-clk driver support
+In-Reply-To: <c1a66f45-fa81-8137-4d9b-73e84141f67f@ti.com>
+References: <20160820003342.13599-1-nm@ti.com>
+ <20160820003342.13599-4-nm@ti.com>
+ <20160824083415.GA6502@codeaurora.org>
+ <c1a66f45-fa81-8137-4d9b-73e84141f67f@ti.com>
+Message-ID: <20160831223101.GI12510@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 08/31, Tero Kristo wrote:
+> On 24/08/16 11:34, Stephen Boyd wrote:
+> >On 08/19, Nishanth Menon wrote:
+> >>diff --git a/drivers/clk/keystone/sci-clk.c b/drivers/clk/keystone/sci-clk.c
+> >>new file mode 100644
+> >>index 000000000000..6c43e097e6d6
+> >>--- /dev/null
+> >>+++ b/drivers/clk/keystone/sci-clk.c
+> >>@@ -0,0 +1,539 @@
+> >>+	return (int)new_rate;
+> >
+> >determine rate should return a negative number on failure and 0
+> >on success. The actual rate that was found should go into
+> >req->rate. This looks broken.
+> 
+> Yea it seems broken, I wonder how we haven't seen any issues with
+> this in testing.... Apparently positive return values from this are
+> interpreted as success. Having a quick look at clk.c seems to
+> confirm this.
+> 
+> Anyway, will fix.
 
-On Mon, Jul 4, 2016 at 7:45 PM, Sugar Zhang <sugar.zhang@rock-chips.com> wrote:
-> restore hw registers after power loss during a suspend/resume cycle.
->
-> Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
-> ---
->
->  sound/soc/rockchip/rockchip_i2s.c | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->
-> diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-> index 574c6af..53970ac 100644
-> --- a/sound/soc/rockchip/rockchip_i2s.c
-> +++ b/sound/soc/rockchip/rockchip_i2s.c
-> @@ -614,9 +614,35 @@ static const struct of_device_id rockchip_i2s_match[] = {
->         {},
->  };
->
-> +#ifdef CONFIG_PM_SLEEP
-> +static int rockchip_i2s_suspend(struct device *dev)
+True, perhaps we should fix that so we don't use a long to hold
+the int return value either.
 
-Rather than #ifdef, I think that the currently suggested way to do
-this is to use __maybe_unused, like:
-  static __maybe_unused int rockchip_i2s_suspend(struct device *dev)
+> >>+ *
+> >>+ * Gets a handle to an existing TI SCI clock, or builds a new clock
+> >>+ * entry and registers it with the common clock framework. Called from
+> >>+ * the common clock framework, when a corresponding of_clk_get call is
+> >>+ * executed, or recursively from itself when parsing parent clocks.
+> >>+ * Returns a pointer to the clock struct, or ERR_PTR value in failure.
+> >>+ */
+> >
+> >Please move this driver to clk_hw_register() and friends. This on
+> >the fly clk generation is scary considering how we hold locks
+> >while the provider is asked to give us the pointer, so allocating
+> >and registering clks (basically reentering the CCF again) could
+> >lead to a locking nightmare. Best to avoid that.
+> 
+> Ok, so just converting the driver to use provider->get_hw should be
+> enough? This seems to be a relatively new API in the CCF. Will look
+> at that.
 
-> +{
-> +       struct rk_i2s_dev *i2s = dev_get_drvdata(dev);
-> +
-> +       regcache_mark_dirty(i2s->regmap);
-> +
-> +       return 0;
-> +}
+Hopefully it will simplify things greatly.
 
-I do wonder a little bit if we should be doing this work in pm_runtime
-instead of actually adding suspend/resume hooks.
+> 
+> >>+	}
+> >>+
+> >>+	snprintf(name, 20, "%s:%d:%d", dev_name(provider->dev), sci_clk->dev_id,
+> >>+		 sci_clk->clk_id);
+> >
+> >I hope we don't make dev_name() longer than 20 characters
+> 
+> Shall I just increase the size of the buffer and add a length check?
+> Using kmalloc or something here seems overkill, as the name gets
+> copied by CCF anyway.
 
-I think that technically you end up losing state when your power
-domain dies, right?  Looking at rk3399, I see that i2s is in
-"pd_sdioaudio" along with "sdio, spi, i2s, spdif".  That means (I
-think) that if all of those peripherals happen to runtime suspend at
-the same time (or they are totally unused) then you'll lose state when
-you are runtime suspended.  Then when you runtime resume you need to
-restore.
+There's kasprintf() which would always make it long enough. I
+don't know if it really matters though.
 
-Maybe in your case you never actually get into the situation where the
-power domain turns off except during suspend/resume, but it seems
-possible it could happen.
-
-Am I understanding this all properly?  Maybe someone can correct me.
-I'm still a bit of a PM Runtime noob.
-
-
--Doug
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
