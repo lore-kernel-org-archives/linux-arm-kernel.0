@@ -1,182 +1,92 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 31 Aug 2016 16:35:16 +0100
-Subject: [RFC PATCH 1/2] arm64: hw_breakpoint: convert CPU hotplug
- notifier to new infrastructure
-In-Reply-To: <1472207758-24394-1-git-send-email-will.deacon@arm.com>
-References: <1472207758-24394-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20160831153516.GA28157@red-moon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 31 Aug 2016 17:40:02 +0200
+Subject: [PATCH] drm/sun4i: Clear encoder->bridge if a bridge is not found
+In-Reply-To: <CAGb2v64JC5+uzsvLjZVi_Xi8q=U+_Bokqnu33w3oQ-2h2DLnKg@mail.gmail.com>
+References: <20160830122223.21377-1-wens@csie.org>
+ <20160830125622.GF18605@lukather>
+ <CAGb2v64JC5+uzsvLjZVi_Xi8q=U+_Bokqnu33w3oQ-2h2DLnKg@mail.gmail.com>
+Message-ID: <20160831154002.GC14379@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2016 at 11:35:57AM +0100, Will Deacon wrote:
-> The arm64 hw_breakpoint implementation uses a CPU hotplug notifier to
-> reset the {break,watch}point registers when CPUs come online.
+On Tue, Aug 30, 2016 at 11:51:26PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Aug 30, 2016 at 8:56 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi,
+> >
+> > On Tue, Aug 30, 2016 at 08:22:23PM +0800, Chen-Yu Tsai wrote:
+> >> The KMS helpers (drm_atomic_helper_check_modeset/mode_fixup) pass
+> >> encoder->bridge directly to drm_bridge_mode_fixup, which expects a
+> >> valid pointer, or NULL (in which case it just returns).
+> >>
+> >> Clear encoder->bridge if a bridge is not found, instead of keeping
+> >> the ERR_PTR value.
+> >>
+> >> Since other drm_bridge functions also follow this pattern of checking
+> >> for a non-NULL pointer, we can drop the ifs around the calls and just
+> >> pass the pointer directly.
+> >>
+> >> Fixes: 894f5a9f4b4a ("drm/sun4i: Add bridge support")
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> ---
+> >>  drivers/gpu/drm/sun4i/sun4i_rgb.c | 11 ++++++-----
+> >>  1 file changed, 6 insertions(+), 5 deletions(-)
+> >>
+> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> >> index d4e52522ec53..ee0795152a33 100644
+> >> --- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> >> +++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> >> @@ -154,8 +154,7 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
+> >>       if (!IS_ERR(tcon->panel))
+> >>               drm_panel_enable(tcon->panel);
+> >>
+> >> -     if (!IS_ERR(encoder->bridge))
+> >> -             drm_bridge_enable(encoder->bridge);
+> >> +     drm_bridge_enable(encoder->bridge);
+> >>
+> >>       sun4i_tcon_channel_enable(tcon, 0);
+> >>  }
+> >> @@ -170,8 +169,7 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
+> >>
+> >>       sun4i_tcon_channel_disable(tcon, 0);
+> >>
+> >> -     if (!IS_ERR(encoder->bridge))
+> >> -             drm_bridge_disable(encoder->bridge);
+> >> +     drm_bridge_disable(encoder->bridge);
+> >
+> > I'd rather keep those changes, it makes it obvious that it's something
+> > optionnal, that can be set to NULL.
 > 
-> This patch converts the code to the new hotplug mechanism, whilst moving
-> the invocation earlier to remove the need to disable IRQs explicitly in
-> the driver (which could cause havok if we trip a watchpoint in an IRQ
-> handler whilst restoring the debug register state).
+> OK.
 > 
-> Cc: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/hw_breakpoint.c | 48 +++++++++++++--------------------------
->  arch/arm64/kernel/suspend.c       | 10 ++++----
->  include/linux/cpuhotplug.h        |  1 +
->  3 files changed, 23 insertions(+), 36 deletions(-)
-
-For both patches:
-
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
-> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-> index 26a6bf77d272..948b73148d56 100644
-> --- a/arch/arm64/kernel/hw_breakpoint.c
-> +++ b/arch/arm64/kernel/hw_breakpoint.c
-> @@ -857,7 +857,7 @@ void hw_breakpoint_thread_switch(struct task_struct *next)
->  /*
->   * CPU initialisation.
->   */
-> -static void hw_breakpoint_reset(void *unused)
-> +static int hw_breakpoint_reset(unsigned int cpu)
->  {
->  	int i;
->  	struct perf_event **slots;
-> @@ -888,28 +888,14 @@ static void hw_breakpoint_reset(void *unused)
->  			write_wb_reg(AARCH64_DBG_REG_WVR, i, 0UL);
->  		}
->  	}
-> -}
->  
-> -static int hw_breakpoint_reset_notify(struct notifier_block *self,
-> -						unsigned long action,
-> -						void *hcpu)
-> -{
-> -	if ((action & ~CPU_TASKS_FROZEN) == CPU_ONLINE) {
-> -		local_irq_disable();
-> -		hw_breakpoint_reset(NULL);
-> -		local_irq_enable();
-> -	}
-> -	return NOTIFY_OK;
-> +	return 0;
->  }
->  
-> -static struct notifier_block hw_breakpoint_reset_nb = {
-> -	.notifier_call = hw_breakpoint_reset_notify,
-> -};
-> -
->  #ifdef CONFIG_CPU_PM
-> -extern void cpu_suspend_set_dbg_restorer(void (*hw_bp_restore)(void *));
-> +extern void cpu_suspend_set_dbg_restorer(int (*hw_bp_restore)(unsigned int));
->  #else
-> -static inline void cpu_suspend_set_dbg_restorer(void (*hw_bp_restore)(void *))
-> +static inline void cpu_suspend_set_dbg_restorer(int (*hw_bp_restore)(unsigned int))
->  {
->  }
->  #endif
-> @@ -919,36 +905,34 @@ static inline void cpu_suspend_set_dbg_restorer(void (*hw_bp_restore)(void *))
->   */
->  static int __init arch_hw_breakpoint_init(void)
->  {
-> +	int ret;
-> +
->  	core_num_brps = get_num_brps();
->  	core_num_wrps = get_num_wrps();
->  
->  	pr_info("found %d breakpoint and %d watchpoint registers.\n",
->  		core_num_brps, core_num_wrps);
->  
-> -	cpu_notifier_register_begin();
-> -
-> -	/*
-> -	 * Reset the breakpoint resources. We assume that a halting
-> -	 * debugger will leave the world in a nice state for us.
-> -	 */
-> -	smp_call_function(hw_breakpoint_reset, NULL, 1);
-> -	hw_breakpoint_reset(NULL);
-> -
->  	/* Register debug fault handlers. */
->  	hook_debug_fault_code(DBG_ESR_EVT_HWBP, breakpoint_handler, SIGTRAP,
->  			      TRAP_HWBKPT, "hw-breakpoint handler");
->  	hook_debug_fault_code(DBG_ESR_EVT_HWWP, watchpoint_handler, SIGTRAP,
->  			      TRAP_HWBKPT, "hw-watchpoint handler");
->  
-> -	/* Register hotplug notifier. */
-> -	__register_cpu_notifier(&hw_breakpoint_reset_nb);
-> -
-> -	cpu_notifier_register_done();
-> +	/*
-> +	 * Reset the breakpoint resources. We assume that a halting
-> +	 * debugger will leave the world in a nice state for us.
-> +	 */
-> +	ret = cpuhp_setup_state(CPUHP_AP_PERF_ARM_HW_BREAKPOINT_STARTING,
-> +			  "CPUHP_AP_PERF_ARM_HW_BREAKPOINT_STARTING",
-> +			  hw_breakpoint_reset, NULL);
-> +	if (ret)
-> +		pr_err("failed to register CPU hotplug notifier: %d\n", ret);
->  
->  	/* Register cpu_suspend hw breakpoint restore hook */
->  	cpu_suspend_set_dbg_restorer(hw_breakpoint_reset);
->  
-> -	return 0;
-> +	return ret;
->  }
->  arch_initcall(arch_hw_breakpoint_init);
->  
-> diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
-> index b616e365cee3..ad734142070d 100644
-> --- a/arch/arm64/kernel/suspend.c
-> +++ b/arch/arm64/kernel/suspend.c
-> @@ -23,8 +23,8 @@ unsigned long *sleep_save_stash;
->   * time the notifier runs debug exceptions might have been enabled already,
->   * with HW breakpoints registers content still in an unknown state.
->   */
-> -static void (*hw_breakpoint_restore)(void *);
-> -void __init cpu_suspend_set_dbg_restorer(void (*hw_bp_restore)(void *))
-> +static int (*hw_breakpoint_restore)(unsigned int);
-> +void __init cpu_suspend_set_dbg_restorer(int (*hw_bp_restore)(unsigned int))
->  {
->  	/* Prevent multiple restore hook initializations */
->  	if (WARN_ON(hw_breakpoint_restore))
-> @@ -34,6 +34,8 @@ void __init cpu_suspend_set_dbg_restorer(void (*hw_bp_restore)(void *))
->  
->  void notrace __cpu_suspend_exit(void)
->  {
-> +	unsigned int cpu = smp_processor_id();
-> +
->  	/*
->  	 * We are resuming from reset with the idmap active in TTBR0_EL1.
->  	 * We must uninstall the idmap and restore the expected MMU
-> @@ -45,7 +47,7 @@ void notrace __cpu_suspend_exit(void)
->  	 * Restore per-cpu offset before any kernel
->  	 * subsystem relying on it has a chance to run.
->  	 */
-> -	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
-> +	set_my_cpu_offset(per_cpu_offset(cpu));
->  
->  	/*
->  	 * Restore HW breakpoint registers to sane values
-> @@ -53,7 +55,7 @@ void notrace __cpu_suspend_exit(void)
->  	 * through local_dbg_restore.
->  	 */
->  	if (hw_breakpoint_restore)
-> -		hw_breakpoint_restore(NULL);
-> +		hw_breakpoint_restore(cpu);
->  }
->  
->  /*
-> diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-> index 242bf530edfc..3758fe6d5968 100644
-> --- a/include/linux/cpuhotplug.h
-> +++ b/include/linux/cpuhotplug.h
-> @@ -45,6 +45,7 @@ enum cpuhp_state {
->  	CPUHP_AP_PERF_METAG_STARTING,
->  	CPUHP_AP_MIPS_OP_LOONGSON3_STARTING,
->  	CPUHP_AP_ARM_VFP_STARTING,
-> +	CPUHP_AP_PERF_ARM_HW_BREAKPOINT_STARTING,
->  	CPUHP_AP_PERF_ARM_STARTING,
->  	CPUHP_AP_ARM_L2X0_STARTING,
->  	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
-> -- 
-> 2.1.4
+> >>       if (!IS_ERR(tcon->panel))
+> >>               drm_panel_disable(tcon->panel);
+> >> @@ -230,6 +228,9 @@ int sun4i_rgb_init(struct drm_device *drm)
+> >>               return 0;
+> >>       }
+> >>
+> >> +     if (IS_ERR(encoder->bridge))
+> >> +             encoder->bridge = NULL;
+> >> +
+> >
+> > And that could be the else condition of the if statement below.
 > 
+> That would be a bit confusing, changing it after calling drm_encoder_init.
+> The code says it ok to do though.
+
+The magic really happens only after the encoder has been attached to
+something, so it's really safe.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160831/6f45c0e7/attachment.sig>
