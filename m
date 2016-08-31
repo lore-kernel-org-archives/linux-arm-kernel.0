@@ -1,36 +1,55 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 31 Aug 2016 09:18:03 +0200
-Subject: [PATCH v4] ARM: dts: exynos: Enable HDMI for Arndale Octa board
-In-Reply-To: <b6337c5b-90a3-21a3-a0b9-a5c4809e5ee1@samsung.com>
-References: <20160831060847.1350-1-woogyom.kim@gmail.com>
- <b6337c5b-90a3-21a3-a0b9-a5c4809e5ee1@samsung.com>
-Message-ID: <28fd9360-47b9-5e96-cec3-dc01a47e7071@samsung.com>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Wed, 31 Aug 2016 07:18:47 +0000
+Subject: [PATCH v2 5/6] ARM: tegra: Add Tegra20 GMI support
+References: <1472569349.5703.25.camel@toradex.com>
+Message-ID: <1472627926.31008.7.camel@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/31/2016 08:54 AM, Andrzej Hajda wrote:
-> On 08/31/2016 08:08 AM, Milo Kim wrote:
->> * GPIO for HDMI hot plug detect
->>   GPX3_7 is used. The HPD awareness is done when the GPIO is active high.
->>
->> * Enable HDMI block in Exynos5420
->>   HDMI VDD and PLL consume 1.0V LDO6 (PVDD_ANAIP_1V0) and HDMI oscillator
->>   requires 1.8V LDO7 (PVDD_ANAIP_1V8).
->>
->> * Support HDMI display data channel
->>   I2C #2 is assigned for the HDMI DDC. It enables the EDID access.
->>
->> Cc: Kukjin Kim <kgene@kernel.org>
->> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-samsung-soc at vger.kernel.org
->> Cc: linux-kernel at vger.kernel.org
->> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+On Wed, 2016-08-24 at 15:37 +0200, Mirza Krak wrote:
 > 
-> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+> From: Mirza Krak <mirza.krak-Re5JQEeQqe8AvxtiuMwx3w@public.gmane.org>
+> 
+> Add a device node for the GMI controller found on Tegra20.
+> 
+> Signed-off-by: Mirza Krak <mirza.krak-Re5JQEeQqe8AvxtiuMwx3w@public.g
+> mane.org>
+> ---
+> Changes in v2:
+> - added address-cells, size-cells and ranges properties
+> 
+> ?arch/arm/boot/dts/tegra20.dtsi | 14 ++++++++++++++
+> ?1 file changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/tegra20.dtsi
+> b/arch/arm/boot/dts/tegra20.dtsi
+> index 2207c08..03eb029 100644
+> --- a/arch/arm/boot/dts/tegra20.dtsi
+> +++ b/arch/arm/boot/dts/tegra20.dtsi
+> @@ -376,6 +376,20 @@
+> ?		status = "disabled";
+> ?	};
+> 
+> +
+> +	gmi at 70009000 {
+> +		compatible = "nvidia,tegra20-gmi";
+> +		reg = <70009000 0x1000>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges = <0 0x48000000 0x7ffffff>;
 
-Thanks, applied with Andrzej's review.
+On T20 it is actually rather 0xd0000000.
 
-Best regards,
-Krzysztof
+> 
+> +		clocks = <&tegra_car TEGRA20_CLK_NOR>;
+> +		clock-names = "gmi";
+> +		resets = < &tegra_car 42>;
+> +		reset-names = "gmi";
+> +		status = "disabled";
+> +	};
+> +
+> ?	pwm: pwm at 7000a000 {
+> ?		compatible = "nvidia,tegra20-pwm";
+> ?		reg = <0x7000a000 0x100>;
+> --
+> 2.1.4
