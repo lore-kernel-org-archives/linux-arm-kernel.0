@@ -1,35 +1,38 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 31 Aug 2016 09:49:38 +0100
-Subject: [PATCH 05/33] gpio: add generic single-register fixed-direction
- GPIO driver
-In-Reply-To: <87fupmc59b.fsf@belgarion.home>
-References: <20160829102328.GA28796@n2100.armlinux.org.uk>
- <E1beJjz-0000mA-0o@rmk-PC.armlinux.org.uk>
- <87eg57e54l.fsf@belgarion.home>
- <20160830091805.GL1041@n2100.armlinux.org.uk>
- <87k2eycip0.fsf@belgarion.home>
- <20160830184612.GO1041@n2100.armlinux.org.uk>
- <87fupmc59b.fsf@belgarion.home>
-Message-ID: <20160831084938.GQ1041@n2100.armlinux.org.uk>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 31 Aug 2016 16:50:14 +0800
+Subject: [PATCH 0/3] arm64: Hikey: enable CPUFreq and thermal drivers
+Message-ID: <1472633417-9330-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2016 at 11:32:16PM +0200, Robert Jarzmik wrote:
-> Russell King - ARM Linux <linux@armlinux.org.uk> writes:
-> 
-> > If you can wait a day or two, I'll push a branch out for everything in
-> > all these multiple series.
-> Sure, just ping me when you have something.
+Currently most power management code of 96boards Hikey have been merged
+into mainline kernel, but some of them have not been built by default;
+So this patch series is to build all these modules properly.
 
-git://git.armlinux.org.uk/~rmk/linux-arm.git sa1100
+The software layer is as below:
 
-should get you something suitable to test.  It's based on 4.7-rc3 plus
-my fixes branch.
+                        set constraint
+    cpufreq-dt driver  <--------------  thermal/cpu_cooling driver
+           |                                       |
+	   V                                       V
+  hi6220 stub clock driver                hisi thermal driver
 
-It would be great to have this tested on Lubbock, and get the PCMCIA
-issues fixed.  Maybe we can look at converting mainstone as well?
+So first two patches are two enable fundamental modules for hi6220 stub
+clock driver and hisilicon thermal driver. Based on these two drivers,
+we also need enable common drivers for cpufreq-dt.c and cpu_cooling.c;
+these two drivers are commonly used by other platforms, so enable these
+two common drivers in arm64's defconfig. arm32's defconfig has enabled
+these two configurations yet.
+
+Leo Yan (3):
+  clk: Hi6220: enable stub clock driver for ARCH_HISI
+  thermal: hisilicon: fix for dependency
+  arm64: defconfig: enable two common modules for power management
+
+ arch/arm64/configs/defconfig  | 2 ++
+ drivers/clk/hisilicon/Kconfig | 1 +
+ drivers/thermal/Kconfig       | 4 +++-
+ 3 files changed, 6 insertions(+), 1 deletion(-)
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
