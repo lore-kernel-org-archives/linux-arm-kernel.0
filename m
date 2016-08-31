@@ -1,76 +1,48 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Thu,  1 Sep 2016 07:28:52 +0800
-Subject: [PATCH v3 5/5] arm64: dts: rockchip: enable the gmac for rk3399 evb
- board
-In-Reply-To: <1472686132-27827-1-git-send-email-wxt@rock-chips.com>
-References: <1472686132-27827-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1472686132-27827-6-git-send-email-wxt@rock-chips.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 1 Sep 2016 07:40:37 +0800
+Subject: [arm:sa1100 22/78] arch/arm/mach-pxa/lubbock.c:16:33: fatal error:
+ linux/gpip/gpio-reg.h: No such file or directory
+Message-ID: <201609010735.0F5LJAkQ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We add the required and optional properties for evb board.
-See the [0] to get the detail information.
+tree:   http://repo.or.cz/linux-2.6/linux-2.6-arm.git sa1100
+head:   0f779cd824db07228231ffef10b56292c0bb1e4f
+commit: f11176f5d0535e0ddd1ab5895f940664893e31ca [22/78] ARM: pxa/lubbock: add GPIO driver for LUB_MISC_WR register
+config: arm-pxa_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout f11176f5d0535e0ddd1ab5895f940664893e31ca
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-[0]:
-Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+All errors (new ones prefixed by >>):
 
-Signed-off-by: Roger Chen <roger.chen@rock-chips.com>
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>> arch/arm/mach-pxa/lubbock.c:16:33: fatal error: linux/gpip/gpio-reg.h: No such file or directory
+   compilation terminated.
+
+vim +16 arch/arm/mach-pxa/lubbock.c
+
+    10	 *  This program is free software; you can redistribute it and/or modify
+    11	 *  it under the terms of the GNU General Public License version 2 as
+    12	 *  published by the Free Software Foundation.
+    13	 */
+    14	#include <linux/clkdev.h>
+    15	#include <linux/gpio.h>
+  > 16	#include <linux/gpip/gpio-reg.h>
+    17	#include <linux/gpio/machine.h>
+    18	#include <linux/module.h>
+    19	#include <linux/kernel.h>
+
 ---
-
-Changes in v3: None
-Changes in v2: None
-
- arch/arm64/boot/dts/rockchip/rk3399-evb.dts | 31 +++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-index d47b4e9..ed6f2e8 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-@@ -94,12 +94,43 @@
- 		regulator-always-on;
- 		regulator-boot-on;
- 	};
-+
-+	clkin_gmac: external-gmac-clock {
-+		compatible = "fixed-clock";
-+		clock-frequency = <125000000>;
-+		clock-output-names = "clkin_gmac";
-+		#clock-cells = <0>;
-+	};
-+
-+	vcc_phy: vcc-phy-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_phy";
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+
- };
- 
- &emmc_phy {
- 	status = "okay";
- };
- 
-+&gmac {
-+	phy-supply = <&vcc_phy>;
-+	phy-mode = "rgmii";
-+	clock_in_out = "input";
-+	snps,reset-gpio = <&gpio3 15 GPIO_ACTIVE_LOW>;
-+	snps,reset-active-low;
-+	snps,reset-delays-us = <0 10000 50000>;
-+	assigned-clocks = <&cru SCLK_RMII_SRC>;
-+	assigned-clock-parents = <&clkin_gmac>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins>;
-+	tx_delay = <0x28>;
-+	rx_delay = <0x11>;
-+	status = "okay";
-+};
-+
- &pwm0 {
- 	status = "okay";
- };
--- 
-1.9.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 30832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160901/b7256942/attachment-0001.obj>
