@@ -1,96 +1,88 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 31 Aug 2016 13:28:35 +0100
-Subject: [PATCH RFC 4/5] drm/bridge: add dw-hdmi cec driver using Hans
- Verkil's CEC code
-In-Reply-To: <57BC03D9.10707@cisco.com>
-References: <20160812141421.GB1041@n2100.armlinux.org.uk>
- <E1bYDEs-0004rs-FP@rmk-PC.armlinux.org.uk>
- <dcd9587f-be60-0cb6-92bb-3226c51bddfb@xs4all.nl>
- <20160823075950.GC1041@n2100.armlinux.org.uk>
- <57BC03D9.10707@cisco.com>
-Message-ID: <20160831122835.GT1041@n2100.armlinux.org.uk>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Wed, 31 Aug 2016 14:30:39 +0200
+Subject: [PATCH RFC] ARM: dts: samsung: add rga-lvds panel in itop elite
+In-Reply-To: <1472511002-9019-1-git-send-email-ayaka@soulik.info>
+References: <1472511002-9019-1-git-send-email-ayaka@soulik.info>
+Message-ID: <dee989f5-17b0-7445-514b-559e98d77acd@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2016 at 10:05:45AM +0200, Hans Verkuil wrote:
-> 
-> 
-> On 08/23/16 09:59, Russell King - ARM Linux wrote:
-> > On Tue, Aug 23, 2016 at 09:21:17AM +0200, Hans Verkuil wrote:
-> >> Hi Russell,
-> >>
-> >> On 08/12/2016 04:15 PM, Russell King wrote:
-> >>> Add a CEC driver for the dw-hdmi hardware using Hans Verkil's CEC
-> >>> implementation.
-> >>>
-> >>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> >>> ---
-> >>>  drivers/gpu/drm/bridge/Kconfig            |   7 +
-> >>>  drivers/gpu/drm/bridge/Makefile           |   1 +
-> >>>  drivers/gpu/drm/bridge/dw-hdmi-cec.c      | 344 ++++++++++++++++++++++++++++++
-> >>>  drivers/gpu/drm/bridge/dw-hdmi.c          |  64 +++++-
-> >>>  include/linux/platform_data/dw_hdmi-cec.h |  16 ++
-> >>>  5 files changed, 421 insertions(+), 11 deletions(-)
-> >>>  create mode 100644 drivers/gpu/drm/bridge/dw-hdmi-cec.c
-> >>>  create mode 100644 include/linux/platform_data/dw_hdmi-cec.h
-> >>>
-> >>
-> >> <snip>
-> >>
-> >>> +static unsigned int parse_hdmi_addr(const struct edid *edid)
-> >>> +{
-> >>> +	if (!edid || edid->extensions == 0)
-> >>> +		return (u16)~0;
-> >>> +
-> >>> +	return cec_get_edid_phys_addr((u8 *)edid,
-> >>> +				EDID_LENGTH * (edid->extensions + 1), NULL);
-> >>> +}
-> >>> +
-> >>> +static int dw_hdmi_cec_notify(struct notifier_block *nb, unsigned long event,
-> >>> +			      void *data)
-> >>> +{
-> >>> +	struct dw_hdmi_cec *cec = container_of(nb, struct dw_hdmi_cec, nb);
-> >>> +	union hdmi_event *event_block = data;
-> >>> +	unsigned int phys;
-> >>> +
-> >>> +	dev_info(event_block->base.source, "event %lu\n", event);
-> >>> +
-> >>> +	if (event_block->base.source != cec->adap->devnode.parent)
-> >>> +		return NOTIFY_OK;
-> >>> +
-> >>> +	switch (event) {
-> >>> +	case HDMI_CONNECTED:
-> >>> +		break;
-> >>> +
-> >>> +	case HDMI_DISCONNECTED:
-> >>> +		cec_s_phys_addr(cec->adap, CEC_PHYS_ADDR_INVALID, false);
-> >>> +		break;
-> >>> +
-> >>> +	case HDMI_NEW_EDID:
-> >>> +		phys = parse_hdmi_addr(event_block->edid.edid);
-> >>> +		cec_s_phys_addr(cec->adap, phys, false);
-> >>> +		break;
-> >>> +	}
-> >>> +
-> >>> +	return NOTIFY_OK;
-> >>> +}
-> >>
-> >> Wouldn't it make a lot of sense to integrate this into the cec framework?
-> >>
-> >> All you need is to pass an hdmi_notifier_dev as argument to cec_allocate_adapter()
-> >> and you can integrate this.
-> >>
-> >> If you are OK with that, then I can make patches for that.
-> > 
-> > It's not just about CEC.  It's also used for passing information between
-> > the video and audio parts, so tying this into CEC is wrong.
-> 
-> I'm not saying that the hdmi notifier should be integrated, just that the
-> CEC core can register itself as a notifier and handle cec_s_phys_addr.
+Hi,
 
-Yes, that would decrease the amount of code duplication.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+On 08/30/2016 12:50 AM, Randy Li wrote:
+> It is actually a lvds panel connected through a rga-lvds bridge.
+> But I really have no idea about what does a port mean in fimd node.
+>
+> Also how should I configure this panel size? I think the i2c found
+> on the panel schematic, but it more likely to be used a touch screen
+> touth. Also the touch screen is not supported in currently driver.
+>
+> Signed-off-by: Randy Li <ayaka@soulik.info>
+> ---
+>  arch/arm/boot/dts/exynos4412-itop-elite.dts | 35 ++++++++++++++++++++++++++---
+>  1 file changed, 32 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos4412-itop-elite.dts b/arch/arm/boot/dts/exynos4412-itop-elite.dts
+> index e1cda54..2d67385 100644
+> --- a/arch/arm/boot/dts/exynos4412-itop-elite.dts
+> +++ b/arch/arm/boot/dts/exynos4412-itop-elite.dts
+> @@ -139,6 +139,20 @@
+>  		assigned-clocks = <&clock CLK_MOUT_CAM0>;
+>  		assigned-clock-parents = <&clock CLK_XUSBXTI>;
+>  	};
+> +	
+> +	vcc_sys_lcd: sys-lcd {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc_5v";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		gpio = <&gpl0 4 GPIO_ACTIVE_HIGH>;
+> +	};
+> +
+> +	panel: panel {
+> +		ddc-i2c-bus = <&i2c_3>;
+> +		power-supply = <&vcc_sys_lcd>;
+> +		enable-gpios = <&gpl0 2 GPIO_ACTIVE_HIGH>;
+> +	};
+
+Panel has no compatible string, which driver will handle this node?
+
+Regards
+Andrzej
+
+>  };
+>  
+>  &pinctrl_1 {
+> @@ -221,9 +235,6 @@
+>  };
+>  
+>  &pwm {
+> -	pinctrl-0 = <&pwm1_out>;
+> -	pinctrl-names = "default";
+> -	samsung,pwm-outputs = <1>;
+>  	status = "okay";
+>  };
+>  
+> @@ -239,3 +250,21 @@
+>  	assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
+>  	assigned-clock-rates = <0>, <176000000>;
+>  };
+> +
+> +&i2c_3 {
+> +	status = "okay";
+> +};
+> +
+> +&fimd {
+> +	pinctrl-0 = <&lcd_clk &lcd_data24 &pwm1_out>;
+> +	pinctrl-names = "default";
+> +	status = "okay";
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	port at 0 {
+> +		reg = <0>;
+> +		rga_lvds: endpoint {
+> +			remote-endpoint = <&panel>;
+> +		};
+> +	};
+> +};
