@@ -1,74 +1,45 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Thu,  1 Sep 2016 00:21:23 +0200
-Subject: [PATCH 5/5] net: axienet: constify ethtool_ops structures
-In-Reply-To: <1472682083-5219-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1472682083-5219-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1472682083-5219-6-git-send-email-Julia.Lawall@lip6.fr>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Thu,  1 Sep 2016 07:28:47 +0800
+Subject: [PATCH v3 0/5] Support the rk3399 gmac pd function
+Message-ID: <1472686132-27827-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check for ethtool_ops structures that are only stored in the ethtool_ops
-field of a net_device structure or passed as the second argument to
-netdev_set_default_ethtool_ops.  These contexts are declared const, so
-ethtool_ops structures that have these properties can be declared as const
-also.
+This patch add to handle the gmac pd, and support
+the rk3399 gmac for devicetree.
 
-The semantic patch that makes this change is as follows:
-(http://coccinelle.lip6.fr/)
+The History version:
 
-// <smpl>
-@r disable optional_qualifier@
-identifier i;
-position p;
-@@
-static struct ethtool_ops i at p = { ... };
+v1: https://lkml.org/lkml/2016/8/30/668
+v2: https://lkml.org/lkml/2016/8/31/27
 
-@ok1@
-identifier r.i;
-struct net_device e;
-position p;
-@@
-e.ethtool_ops = &i at p;
 
-@ok2@
-identifier r.i;
-expression e;
-position p;
-@@
-netdev_set_default_ethtool_ops(e, &i at p)
+Changes in v3:
+- leave into two patches based on patchv2, and fix nits and commit, as
+  comment on https://patchwork.kernel.org/patch/9306339/
+- generate a patch from https://patchwork.kernel.org/patch/9306339/.
 
-@bad@
-position p != {r.p,ok1.p,ok2.p};
-identifier r.i;
-@@
-i at p
+Changes in v2:
+- rk_gmac_powerup instead of the rk_gmac_init.
+- fixes the build error on next kernel.
+- Fixes the order, ss Heiko commnets on
+  https://patchwork.kernel.org/patch/9305991/
 
-@depends on !bad disable optional_qualifier@
-identifier r.i;
-@@
-static
-+const
- struct ethtool_ops i = { ... };
-// </smpl>
+Caesar Wang (3):
+  arm64: dts: rockchip: add the gmac power domain on rk3399
+  arm64: dts: rockchip: add the gmac needed node for rk3399
+  arm64: dts: rockchip: enable the gmac for rk3399 evb board
 
-Suggested-by: Stephen Hemminger <stephen@networkplumber.org>
+David Wu (1):
+  net: stmmac: dwmac-rk: add pd_gmac support for rk3399
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Roger Chen (1):
+  net: stmmac: dwmac-rk: fixes the gmac resume after PD on/off
 
----
- drivers/net/ethernet/xilinx/xilinx_axienet_main.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/rockchip/rk3399-evb.dts    | 31 +++++++++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi       | 90 ++++++++++++++++++++++++++
+ drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c | 28 +++++---
+ 3 files changed, 140 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-index 36ee7ab..69e2a83 100644
---- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-@@ -1297,7 +1297,7 @@ static int axienet_ethtools_set_coalesce(struct net_device *ndev,
- 	return 0;
- }
- 
--static struct ethtool_ops axienet_ethtool_ops = {
-+static const struct ethtool_ops axienet_ethtool_ops = {
- 	.get_drvinfo    = axienet_ethtools_get_drvinfo,
- 	.get_regs_len   = axienet_ethtools_get_regs_len,
- 	.get_regs       = axienet_ethtools_get_regs,
+-- 
+1.9.1
