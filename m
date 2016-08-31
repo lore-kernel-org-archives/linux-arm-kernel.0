@@ -1,45 +1,56 @@
-From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Wed, 31 Aug 2016 10:56:48 -0300
-Subject: [PATCH] ARM: dts: imx6qdl: Fix SPDIF regression
-Message-ID: <1472651808-28034-1-git-send-email-fabio.estevam@nxp.com>
+From: greg@kroah.com (Greg KH)
+Date: Wed, 31 Aug 2016 16:00:36 +0200
+Subject: [PATCH] serial: imx: add rx and tx led trigger
+In-Reply-To: <1467646452-21243-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1467646452-21243-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20160831140036.GC13298@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 833f2cbf7091 ("ARM: dts: imx6: change the core clock of spdif")
-changed many more clocks than only the SPDIF core clock as stated in
-the commit message.
+On Mon, Jul 04, 2016 at 05:34:12PM +0200, Uwe Kleine-K?nig wrote:
+> Add support for two led triggers per UART instance that blink on
+> transmission and reception of data respectively.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  drivers/tty/serial/imx.c | 57 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 57 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> index 621e488cbb12..2b6ba3b8bdd5 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -39,6 +39,7 @@
+>  #include <linux/of_device.h>
+>  #include <linux/io.h>
+>  #include <linux/dma-mapping.h>
+> +#include <linux/leds.h>
+>  
+>  #include <asm/irq.h>
+>  #include <linux/platform_data/serial-imx.h>
+> @@ -227,6 +228,8 @@ struct imx_port {
+>  	wait_queue_head_t	dma_wait;
+>  	unsigned int            saved_reg[10];
+>  	bool			context_saved;
+> +	struct led_trigger	led_trigger_rx;
+> +	struct led_trigger	led_trigger_tx;
+>  };
+>  
+>  struct imx_port_ucrs {
+> @@ -293,6 +296,10 @@ static inline int is_imx6q_uart(struct imx_port *sport)
+>  {
+>  	return sport->devdata->devtype == IMX6Q_UART;
+>  }
+> +
+> +static unsigned long led_delay = 50;
+> +module_param(led_delay, ulong, 0644);
 
-The MLB clock has been added and this causes SPDIF regression as
-reported by Xavi Drudis Ferran and also in this forum post:
-https://forum.digikey.com/thread/34240
+I hate module parameters, and so should you, this isn't the 1990's
+anymore :(
 
-The MX6Q Reference Manual does not mention that MLB is a clock related
-to SPDIF, so change it back to a dummy clock to restore SPDIF
-functionality.
+And I'm with Arnd, let's make this work for all tty drivers that want to
+use it please.
 
-Thanks to Ambika for providing the fix at:
-https://community.nxp.com/thread/387131
+thanks,
 
-Fixes: 833f2cbf7091 ("ARM: dts: imx6: change the core clock of spdif")
-Cc: <stable@vger.kernel.org> # 4.4.x
-Reported-by: Xavi Drudis Ferran <xdrudis@tinet.cat>
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx6qdl.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index b620ac8..b13b0b2 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -243,7 +243,7 @@
- 					clocks = <&clks IMX6QDL_CLK_SPDIF_GCLK>, <&clks IMX6QDL_CLK_OSC>,
- 						 <&clks IMX6QDL_CLK_SPDIF>, <&clks IMX6QDL_CLK_ASRC>,
- 						 <&clks IMX6QDL_CLK_DUMMY>, <&clks IMX6QDL_CLK_ESAI_EXTAL>,
--						 <&clks IMX6QDL_CLK_IPG>, <&clks IMX6QDL_CLK_MLB>,
-+						 <&clks IMX6QDL_CLK_IPG>, <&clks IMX6QDL_CLK_DUMMY>,
- 						 <&clks IMX6QDL_CLK_DUMMY>, <&clks IMX6QDL_CLK_SPBA>;
- 					clock-names = "core",  "rxtx0",
- 						      "rxtx1", "rxtx2",
--- 
-1.9.1
+greg k-h
