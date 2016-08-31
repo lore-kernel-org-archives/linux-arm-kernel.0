@@ -1,38 +1,39 @@
-From: jsarha@ti.com (Jyri Sarha)
-Date: Wed, 31 Aug 2016 21:48:24 +0300
-Subject: [PATCH v3 0/8] drm/tilcdc: Address LCDC rev 2 color errata +
- other fixes
-In-Reply-To: <20160831180418.rte4sf5s4llyuuvn@atomide.com>
-References: <cover.1472634657.git.jsarha@ti.com>
- <20160831180418.rte4sf5s4llyuuvn@atomide.com>
-Message-ID: <c049825a-0802-0637-3b1e-5290032e6d10@ti.com>
+From: jorik@kippendief.biz (jorik at kippendief.biz)
+Date: Wed, 31 Aug 2016 21:30:51 +0200
+Subject: [PATCH v2 0/7] dts: sun8i: add extra uart/i2c to H3
+Message-ID: <1472671858-29220-1-git-send-email-jorik@kippendief.biz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/31/16 21:04, Tony Lindgren wrote:
-> * Jyri Sarha <jsarha@ti.com> [160831 06:19]:
->>   ARM: dts: am335x-boneblack: Add blue-and-red-wiring -property to LCDC
->>     node
->>   ARM: dts: am335x-evm: Add blue-and-red-wiring -property to lcdc node
->>   ARM: dts: am335x-evmsk: Whitespace cleanup of lcdc related nodes
->>   ARM: dts: am335x-evmsk: Add blue-and-red-wiring -property to lcdc node
-> 
-> If some of these dts changes are OK for me to apply separately already,
-> please let me know.
-> 
-> Otherwise I'll tag this thread as read and assume you'll send the dts
-> changes separately when ready :)
-> 
+From: Jorik Jonker <jorik@kippendief.biz>
 
-According to my plan the drm side changes should go into 4.9.
+This is v2 of my patch series. Just after sending I noticed the interrupts
+of i2c1 were too liberally copy/paste'd. This is fixed in v2.
 
-The commit messages and the comments may look confusing without the
-implementation, but otherwise there should be no harm in applying these
-already. The new properties in dts simply wont have any effect. On the
-other hand, not having the dts changes won't have any dramatic effect
-either. The supported colour formats will just remain in the same
-incorrect state as they have always been until the dts changes are
-there. So what ever is more convenient for you.
+This series is a follow-up to Martin Ayotte's efforts to add additional UARTS
+and I2C ports to the AllWinner H3 SoC DTS files. In this series I explicitly
+leave out i2c2, since this is not broken out on my boards, so I cannot verify if
+it actually works.
 
-Thanks,
-Jyri
+After the patch, one enables for example uart1 on a opi+ like this from u-boot:
+ => fdt set /soc/serial at 01c28400 status okay
+
+Regards,
+Jorik
+
+Jorik Jonker (7):
+  dts: sun8i-h3: add pinmux definitions for uart2/uart3
+  dts: sun8i-h3: add pinmux definitions for i2c0/i2c1
+  dts: sun8i-h3: add i2c0/i2c1 SoC peripherals
+  dts: sun8i-h3: add UART1-3 to Orange Pi Plus
+  dts: sun8i-h3: add UART1-3 to Orange Pi PC
+  dts: sun8i-h3: add I2C0-1 to Orange Pi Plus
+  dts: sun8i-h3: add I2C0-1 to Orange Pi PC
+
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts   | 25 ++++++++++++++
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 25 ++++++++++++++
+ arch/arm/boot/dts/sun8i-h3.dtsi              | 50 ++++++++++++++++++++++++++++
+ 3 files changed, 100 insertions(+)
+
+-- 
+2.7.4
