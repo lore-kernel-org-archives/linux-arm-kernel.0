@@ -1,38 +1,53 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Wed, 31 Aug 2016 20:47:35 +0800
-Subject: [PATCH] arm64: cleanup unused UDBG_* define
-In-Reply-To: <1472647130-61050-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1472647130-61050-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <0edea4d7-e335-9f83-3277-68f6ad608d05@huawei.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 31 Aug 2016 14:53:02 +0200
+Subject: [PATCH 1/9] ARM: dts: exynos: Add macros for GPIO configuration
+In-Reply-To: <28320955.k33BrW2NEN@wuerfel>
+References: <1472645613-5362-1-git-send-email-k.kozlowski@samsung.com>
+ <1472645613-5362-2-git-send-email-k.kozlowski@samsung.com>
+ <28320955.k33BrW2NEN@wuerfel>
+Message-ID: <07ddb8f8-a9e1-6105-ace9-edb5c8cc2f57@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ arm maillist
+On 08/31/2016 02:42 PM, Arnd Bergmann wrote:
+> On Wednesday, August 31, 2016 2:13:25 PM CEST Krzysztof Kozlowski wrote:
+>>
+>> +#define PIN_PULL_NONE          0
+>> +#define PIN_PULL_DOWN          1
+>> +#define PIN_PULL_UP            3
+>> +
+>> +#define PIN_DRV_LV1            0
+>> +#define PIN_DRV_LV2            2
+>> +#define PIN_DRV_LV3            1
+>> +#define PIN_DRV_LV4            3
+>> +
+>> +#define PIN_FUNC_INPUT         0
+>> +#define PIN_FUNC_OUTPUT                1
+>> +#define PIN_FUNC_SPC_2         2
+>> +#define PIN_FUNC_SPC_3         3
+>> +#define PIN_FUNC_SPC_4         4
+>> +#define PIN_FUNC_SPC_5         5
+>> +#define PIN_FUNC_SPC_F         0xf
+> 
+> Any reason for having a copy in each of those files instead of one
+> that is shared across all of them?
 
-On 2016/8/31 20:38, Kefeng Wang wrote:
-> The UDBG_UNDEFINED/SYSCALL/BADABORT/SEGV are only used to show
-> verbose user fault messages in arm, not arm64, drop them.
-> 
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> ---
->  arch/arm64/include/asm/system_misc.h | 6 ------
->  1 file changed, 6 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-> index 57f110b..bc81243 100644
-> --- a/arch/arm64/include/asm/system_misc.h
-> +++ b/arch/arm64/include/asm/system_misc.h
-> @@ -56,12 +56,6 @@ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
->  	__show_ratelimited;						\
->  })
->  
-> -#define UDBG_UNDEFINED	(1 << 0)
-> -#define UDBG_SYSCALL	(1 << 1)
-> -#define UDBG_BADABORT	(1 << 2)
-> -#define UDBG_SEGV	(1 << 3)
-> -#define UDBG_BUS	(1 << 4)
-> -
->  #endif	/* __ASSEMBLY__ */
->  
->  #endif	/* __ASM_SYSTEM_MISC_H */
-> 
+The drive strengths differ between some of them. There are three groups
+of drive strengths:
+1. Exynos3250, Exynos4 (all) and Exynos5250,
+2. Exynos5260,
+3. Exynos5410, 542x and 5800.
+
+Rest (functions and pull up/down) is the same so sharing the defines is
+possible but not that obvious. Solution would be for example adding a
+SoC-family prefix for PIN_DRV_LVx. Not that good...
+
+I could put it into three DTSI:
+ - exynos3-pinctrl.dtsi (new file)
+ - exynos5260-pinctrl.dtsi (like it is now)
+ - exynos54xx-pinctrl.dtsi (new file)
+
+which would reduce the duplication. Other ideas?
+
+Best regards,
+Krzysztof
