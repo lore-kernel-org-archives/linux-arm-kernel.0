@@ -1,81 +1,57 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 31 Aug 2016 15:07:00 +0200
-Subject: [PATCH 1/9] ARM: dts: exynos: Add macros for GPIO configuration
-In-Reply-To: <6113443.1q3Xq4YM82@wuerfel>
-References: <1472645613-5362-1-git-send-email-k.kozlowski@samsung.com>
- <28320955.k33BrW2NEN@wuerfel>
- <07ddb8f8-a9e1-6105-ace9-edb5c8cc2f57@samsung.com>
- <6113443.1q3Xq4YM82@wuerfel>
-Message-ID: <bf55b24c-b1ee-78be-d56d-8fdda4f2fdc9@samsung.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 31 Aug 2016 14:08:31 +0100
+Subject: [PATCH v3] Added perf functionality to mmdc driver
+In-Reply-To: <20160817194253.16300-1-zhengyu.shen@nxp.com>
+References: <20160817194253.16300-1-zhengyu.shen@nxp.com>
+Message-ID: <aa4ce6f3-6856-3516-1312-104656c5079d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/31/2016 02:58 PM, Arnd Bergmann wrote:
-> On Wednesday, August 31, 2016 2:53:02 PM CEST Krzysztof Kozlowski wrote:
->> On 08/31/2016 02:42 PM, Arnd Bergmann wrote:
->>> On Wednesday, August 31, 2016 2:13:25 PM CEST Krzysztof Kozlowski wrote:
->>>>
->>>> +#define PIN_PULL_NONE          0
->>>> +#define PIN_PULL_DOWN          1
->>>> +#define PIN_PULL_UP            3
->>>> +
->>>> +#define PIN_DRV_LV1            0
->>>> +#define PIN_DRV_LV2            2
->>>> +#define PIN_DRV_LV3            1
->>>> +#define PIN_DRV_LV4            3
->>>> +
->>>> +#define PIN_FUNC_INPUT         0
->>>> +#define PIN_FUNC_OUTPUT                1
->>>> +#define PIN_FUNC_SPC_2         2
->>>> +#define PIN_FUNC_SPC_3         3
->>>> +#define PIN_FUNC_SPC_4         4
->>>> +#define PIN_FUNC_SPC_5         5
->>>> +#define PIN_FUNC_SPC_F         0xf
->>>
->>> Any reason for having a copy in each of those files instead of one
->>> that is shared across all of them?
->>
->> The drive strengths differ between some of them. There are three groups
->> of drive strengths:
->> 1. Exynos3250, Exynos4 (all) and Exynos5250,
->> 2. Exynos5260,
->> 3. Exynos5410, 542x and 5800.
-> 
-> I see. That sounds like an even stronger reason to not duplicate
-> the definitions, as this is very confusing.
-
-Okay.
-
-> 
->> Rest (functions and pull up/down) is the same so sharing the defines is
->> possible but not that obvious. Solution would be for example adding a
->> SoC-family prefix for PIN_DRV_LVx. Not that good...
->>
->> I could put it into three DTSI:
->>  - exynos3-pinctrl.dtsi (new file)
->>  - exynos5260-pinctrl.dtsi (like it is now)
->>  - exynos54xx-pinctrl.dtsi (new file)
->>
->> which would reduce the duplication. Other ideas?
-> 
-> I think having the soc-family prefix is better, as it avoids
-> defining the same symbol to a different value. Better make this
-> as explicit as possible.
-
-Ok, sounds reasonable. I want to convert also older platforms S3C (drive
-strengths and pull up/down differ) and arm64 SoC: Exynos7. For the
-latter the problem is there is no common place for sharing DTS, except
-the headers. However this does not really belong to headers. I guess
-some level of duplication might be still exist.
+On 17/08/16 20:42, Zhengyu Shen wrote:
+> MMDC is a multi-mode DDR controller that supports DDR3/DDR3L x16/x32/x64
+> and LPDDR2 two channel x16/x32 memory types. MMDC is configurable, high
+> performance, and optimized. MMDC is present on i.MX6 Quad and i.MX6
+> QuadPlus devices, but this driver only supports i.MX6 Quad at the moment.
+> MMDC provides registers for performance counters which read via this
+> driver to help debug memory throughput and similar issues.
+>
+> $ perf stat -a -e mmdc/busy-cycles/,mmdc/read-accesses/,mmdc/read-bytes/,mmdc/total-cycles/,mmdc/write-accesses/,mmdc/write-bytes/ dd if=/dev/zero of=/dev/null bs=1M count=5000
+> Performance counter stats for 'dd if=/dev/zero of=/dev/null bs=1M count=5000':
+>
+>          898021787      mmdc/busy-cycles/
+>           14819600      mmdc/read-accesses/
+>             471.30 MB   mmdc/read-bytes/
+>         2815419216      mmdc/total-cycles/
+>           13367354      mmdc/write-accesses/
+>             427.76 MB   mmdc/write-bytes/
+>
+>        5.334757334 seconds time elapsed
+>
+> Signed-off-by: Zhengyu Shen <zhengyu.shen@nxp.com>
+> Signed-off-by: Frank Li <frank.li@nxp.com>
+> ---
+> Changes from v2 to v3:
+> 	Use WARN_ONCE instead of returning generic error values
+> 	Replace CPU Notifiers with newer state machine hotplug
+> 	Added additional checks on event_init for grouping and sampling
+> 	Remove useless mmdc_enable_profiling function
+> 	Added comments
+> 	Moved start index of events from 0x01 to 0x00
+> 	Added a counter to pmu_mmdc to only stop hrtimer after all events are finished
+> 	Replace readl_relaxed and writel_relaxed with readl and writel
+> 	Removed duplicate update function
+> 	Used devm_kasprintf when naming mmdcs probed
+>
+> Changes from v1 to v2:
+> 	Added cpumask and migration handling support to driver
+> 	Validated event during event_init
+> 	Added code to properly stop counters
+> 	Used perf_invalid_context instead of perf_sw_context
+> 	Added hrtimer to poll for overflow
+> 	Added better description
+> 	Added support for multiple mmdcs
 
 
-> I think overall, a better solution would have been to define the
-> constants globally (shared with non-exynos) to start with,
-> and have the driver translate generic numbers into vendor
-> specific ones. Obviously it's too late for that now.
+Should we move all the PMU specific code under at least CONFIG_PERF_EVENTS ?
 
-We could extend driver by adding new bindings accepting generic numbers
-(and still backward compatible) but this looks like an overkill.
-
-Best regards,
-Krzysztof
+Suzuki
