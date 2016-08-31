@@ -1,151 +1,99 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Wed, 31 Aug 2016 17:52:20 +0800
-Subject: [PATCH v6 0/8] power: add power sequence library
-In-Reply-To: <3a45793f-18d9-0688-d2ab-ef79432c473c@linaro.org>
-References: <1471252398-957-1-git-send-email-peter.chen@nxp.com>
- <b1848eb2-9298-9089-ee4d-5356998c6c08@linaro.org>
- <20160824085335.GB27233@shlinux2>
- <20160829111045.GB3736@b29397-desktop>
- <3a45793f-18d9-0688-d2ab-ef79432c473c@linaro.org>
-Message-ID: <20160831095220.GA11938@b29397-desktop>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Wed, 31 Aug 2016 09:56:02 +0000
+Subject: [PATCH 3/3] PCI: Xilinx NWL PCIe: Fix Error for multi function
+ device for legacy interrupts.
+In-Reply-To: <57C59FE8.30307@arm.com>
+References: <1472553558-27215-1-git-send-email-bharatku@xilinx.com>
+ <1472553558-27215-3-git-send-email-bharatku@xilinx.com>
+ <57C57975.7040306@arm.com>
+ <8520D5D51A55D047800579B094147198258D239D@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <57C59FE8.30307@arm.com>
+Message-ID: <8520D5D51A55D047800579B094147198258D28AF@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 31, 2016 at 01:46:30PM +0530, Vaibhav Hiremath wrote:
-> 
-> 
-> On Monday 29 August 2016 04:40 PM, Peter Chen wrote:
-> >On Wed, Aug 24, 2016 at 04:53:35PM +0800, Peter Chen wrote:
-> >>On Tue, Aug 23, 2016 at 04:02:48PM +0530, Vaibhav Hiremath wrote:
-> >>>On Monday 15 August 2016 02:43 PM, Peter Chen wrote:
-> >>>>Hi all,
-> >>>>
-> >>>>This is a follow-up for my last power sequence framework patch set [1].
-> >>>>According to Rob Herring and Ulf Hansson's comments[2], I use a generic
-> >>>>power sequence library for parsing the power sequence elements on DT,
-> >>>>and implement generic power sequence on library. The host driver
-> >>>>can allocate power sequence instance, and calls pwrseq APIs accordingly.
-> >>>>
-> >>>>In future, if there are special power sequence requirements, the special
-> >>>>power sequence library can be created.
-> >>>>
-> >>>>This patch set is tested on i.mx6 sabresx evk using a dts change, I use
-> >>>>two hot-plug devices to simulate this use case, the related binding
-> >>>>change is updated at patch [1/6], The udoo board changes were tested
-> >>>>using my last power sequence patch set.[3]
-> >>>>
-> >>>>Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
-> >>>>need to power on itself before it can be found by ULPI bus.
-> >>>>
-> >>>>[1]http://www.spinics.net/lists/linux-usb/msg142755.html
-> >>>>[2]http://www.spinics.net/lists/linux-usb/msg143106.html
-> >>>>[3]http://www.spinics.net/lists/linux-usb/msg142815.html
-> >>>(Please ignore my response on V2)
+ > On 30/08/16 15:13, Bharat Kumar Gogada wrote:
+> >> Hi Bharat,
+> >>> @@ -561,7 +561,7 @@ static int nwl_pcie_init_irq_domain(struct
+> >>> nwl_pcie
+> >> *pcie)
+> >>>     }
 > >>>
-> >>>Sorry being so late in the discussion...
-> >>>
-> >>>If I am not missing anything, then I am afraid to say that the
-> >>>generic library
-> >>>implementation in this patch series is not going to solve many of
-> >>>the custom
-> >>>requirement of power on, off, etc...
-> >>>I know you mentioned about adding another library when we come
-> >>>across such platforms, but should we not keep provision (or easy
-> >>>hooks/path)
-> >>>to enable that ?
-> >>>
-> >>>Let me bring in the use case I am dealing with,
-> >>>
-> >>>
-> >>>                               Host
-> >>>                                |
-> >>>                                V
-> >>>                            USB port
-> >>>------------------------------------------------------------
-> >>>                                |
-> >>>                                V
-> >>>                       USB HUB device (May need custom on/off seq)
-> >>>                                |
-> >>>                                V
-> >>>               =============================
-> >>>              |                             |
-> >>>              V                             V
-> >>>          Device-1                       Device-2
-> >>>(Needs special power               (Needs special power
-> >>>  on/off sequence.                   on/off sequence.
-> >>>  Also may need custom               Also, may need custom
-> >>>  sequence for                       sequence for
-> >>>  suspend/resume)                    suspend/resume)
-> >>>
-> >>>
-> >>>Note: Both Devices are connected to HUB via HSIC and may differ
-> >>>           in terms of functionality, features they support.
-> >>>
-> >>>In the above case, both Device-1 and Device-2, need separate
-> >>>power on/off sequence. So generic library currently we have in this
-> >>>patch series is not going to satisfy the need here.
-> >>>
-> >>>I looked at all 6 revisions of this patch-series, went through the
-> >>>review comments, and looked at MMC power sequence code;
-> >>>what I can say here is, we need something similar to
-> >>>MMC power sequence here, where every device can have its own
-> >>>power sequence (if needed).
-> >>>
-> >>>I know Rob is not in favor of creating platform device for
-> >>>this, and I understand his comment.
-> >>>If not platform device, but atleast we need mechanism to
-> >>>connect each device back to its of_node and its respective
-> >>>driver/library fns. For example, the Devices may support different
-> >>>boot modes, and platform driver needs to make sure that
-> >>>the right sequence is followed for booting.
-> >>>
-> >>>Peter, My apologies for taking you back again on this series.
-> >>>I am OK, if you wish to address this in incremental addition,
-> >>>but my point is, we know that the current generic way is not
-> >>>enough for us, so I think we should try to fix it in initial phase only.
-> >>>
-> >>Rob, it seems generic power sequence can't cover all cases.
-> >>Without information from DT, we can't know which power sequence
-> >>for which device.
+> >>>     pcie->legacy_irq_domain = irq_domain_add_linear(legacy_intc_node,
+> >>> -                                                   INTX_NUM,
+> >>> +                                                   INTX_NUM + 1,
+> >>>                                                     &legacy_domain_ops,
+> >>>                                                     pcie);
 > >>
-> >Vaibhav, do you agree that I create pwrseq library list using postcore_initcall
-> >for each library, and choose pwrseq library according to compatible
-> >string first, if there is no compatible string for this library, just
-> >use generic pwrseq library.
+> >> This feels like the wrong thing to do. You have INTX_NUM irqs, so the
+> >> domain allocation should reflect this. On the other hand, the way the
+> >> driver currently deals with mappings is quite broken (consistently adding 1 to
+> the HW interrupt).
+> >>
+> > Hi Marc,
 > >
+> > Without above change I get following crash in kernel while booting.
+> >
+> > [    2.441684] error: hwirq 0x4 is too large for dummy
+> >
+> > [    2.441694] ------------[ cut here ]------------
+> >
+> > [    2.441698] WARNING: at kernel/irq/irqdomain.c:344
+> >
+> > [    2.441702] Modules linked in:
+> >
+> > [    2.441706]
+> >
+> > [    2.441714] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.4.0 #8
+> >
+> > [    2.441718] Hardware name: xlnx,zynqmp (DT)
+> >
+> > [    2.441723] task: ffffffc071886b80 ti: ffffffc071888000 task.ti:
+> ffffffc071888000
+> >
+> > [    2.441732] PC is at irq_domain_associate+0x138/0x1c0
+> >
+> > [    2.441738] LR is at irq_domain_associate+0x138/0x1c0
+> >
+> > In kernel/irq/irqdomain.c function irq_domain_associate
+> >
+> > if (WARN(hwirq >= domain->hwirq_max,
+> >                  "error: hwirq 0x%x is too large for %s\n", (int)hwirq, domain->name))
+> >                 return -EINVAL;
+> >
+> > Here the hwirq and hwirq_max are equal to 4 without the above condition
+> (INTX_NUM + 1) due to which crash is coming.
+> > This is happening as the legacy interrupts are starting from 1 (INTA).
 > 
-> Lets hear from MMC folks. Ulf, do you agree on approach
-> for pwr seq ??
+> I understood that. I'm still persisting in saying that you have the wrong fix.
 > 
+> Your domain should always allocate many interrupts as you have interrupt
+> sources. These interrupts (hwirq) should be numbered from 0 to (n-1).
+
+Agreed, but here comes the problem the hwirq for legacy interrupts will start at 0x1 to 0x4 (INTA to INTD) and 
+these values are as per PCIe specification for legacy interrupts.
+So these cannot be numbered from 0. So when 0x4 (INTD) for a multi-function device comes the crash occurs.
+	
 > 
-> With above approach, I kind of agree on it, but I have couple
-> of comments,
+> > And I'm  consistently adding 1 to the HW interrupt as in
+> > nwl_pcie_leg_handler I get 0th bit set from MSGF_LEG_STATUS if INTA
+> > interrupt is raised but my hwirq number being mapped for INTA is 0x1
+> > so that's I'm adding 1 to obtain correct virtual irq. Same case in
+> > nwl_pcie_free_irq_domain since hwirq starts from one I'm adding 1 to
+> > obtain virtual irq and free it.
 > 
->  - How DTS looks like now ?? Can you put example here ?
+> I can see that. Nonetheless, this is wrong. Can you please test the patch I
+> provided in my reply and report what happens?
 
-The dts is the same with current version.
+Can you be more specific on what is the wrong, I'm adding one since the hwirq starts from 0x1 as mentioned 
+above.
+I did try your suggestion with Ethernet card, but kernel hangs (it does not show any crash also, just hangs) when I do 
+interface up (without bit + 1, using only bit position in handler). This is not working because in the legacy domain virq mapping
+starts with hwirq 0x1, there is no mapping for 0x0 in the domain, so EP interrupt is not serviced since virq being returned is zero.
 
->  - Should we merge MMC power sequence in next series ?
->    We also can take this as an incremental change, to avoid further
->    delay :)
+Thanks & Regards,
+Bharat
 
-We had an agreement that keep mmc's pwrseq framework unchanging.
-Unless Ulf and rob both agree to change.
 
->  - Lets also add suspend/resume callback to struct pwrseq
-> 
 
-Why suspend/resume can't do at related driver's suspend/resume API? 
-
-> 
-> There are some comments I have on the patches,
-> I will respond directly on respective patches, it would be useful
-> for next series.
-> 
-
-Thanks.
-
--- 
-
-Best Regards,
-Peter Chen
+ 
