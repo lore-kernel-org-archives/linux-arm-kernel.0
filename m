@@ -1,43 +1,33 @@
-From: ssantosh@kernel.org (Santosh Shilimkar)
-Date: Wed, 31 Aug 2016 19:05:09 -0400
-Subject: [GIT PULL 1/2] ARM: dts: Keystone DTS for 4.9
-Message-ID: <1472684710-22905-1-git-send-email-ssantosh@kernel.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 31 Aug 2016 16:44:38 -0700
+Subject: [PATCH] ARM: dts: da850-lcdk: Add NAND to DT
+In-Reply-To: <20160829153242.18615-1-kbeldan@baylibre.com> (Karl Beldan's
+ message of "Mon, 29 Aug 2016 15:32:42 +0000")
+References: <20160829153242.18615-1-kbeldan@baylibre.com>
+Message-ID: <7h37lk5wrd.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+Karl Beldan <kbeldan@baylibre.com> writes:
 
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+> This adds DT support for the NAND connected to the SoC AEMIF.
+> Passed torture hashing a 40MB file on top of UBIFS using subpages.
+>
+> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+> ---
+> v2:
+>
+> - Removed comments pertaining to the BSP the LCDK ships with (Sekhar)
+> - s/"ok"/"okay"/
+> - Removed partitions since it relates to the BSP the LCDK ships with
 
-are available in the git repository at:
+IMO, some default partitions are nice to have, at least for u-boot and
+u-boot env so factory-shipped u-boot is not accidentally overridden.
+The left over space can be labeled "free space".
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_dts_for_4.9
+Anyways, after adding some partitions back, I tested with ubifs on my
+LCDK:
 
-for you to fetch changes up to 11b897a2f7c6d6be93f9f6754438f96eed9236df:
+Tested-by: Kevin Hilman <khilman@baylibre.com>
 
-  ARM: dts: keystone-k2g: Add Message Manager node (2016-08-31 16:32:16 -0400)
-
-----------------------------------------------------------------
-ARM: dts: Keystone DTS for 4.9
-
-Add K2G nodes for GPIO, IRQ and Message Manager
-
-----------------------------------------------------------------
-Andrew F. Davis (3):
-      ARM: dts: keystone-k2g: Add device state controller node
-      ARM: dts: keystone-k2g: Add keystone IRQ controller node
-      ARM: dts: keystone-k2g: Add DSP GPIO controller node
-
-Grygorii Strashko (1):
-      ARM: dts: keystone: specify usb mode explicitly
-
-Nishanth Menon (1):
-      ARM: dts: keystone-k2g: Add Message Manager node
-
- arch/arm/boot/dts/keystone-k2e-evm.dts  | 12 ++++++++++--
- arch/arm/boot/dts/keystone-k2e.dtsi     |  4 ++--
- arch/arm/boot/dts/keystone-k2g.dtsi     | 32 ++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/keystone-k2hk-evm.dts |  6 +++++-
- arch/arm/boot/dts/keystone-k2l-evm.dts  |  6 +++++-
- arch/arm/boot/dts/keystone.dtsi         |  4 ++--
- 6 files changed, 56 insertions(+), 8 deletions(-)
+Kevin
