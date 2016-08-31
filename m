@@ -1,56 +1,36 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Wed, 31 Aug 2016 10:46:30 +0800
-Subject: [PATCH v7 14/14] Documentation: remove the constraint on the
- distances of node pairs
-In-Reply-To: <20160830175517.GM24906@arm.com>
-References: <1472024693-12912-1-git-send-email-thunder.leizhen@huawei.com>
- <1472024693-12912-15-git-send-email-thunder.leizhen@huawei.com>
- <20160826153550.GI30302@arm.com> <57C16F17.5070609@huawei.com>
- <20160830175517.GM24906@arm.com>
-Message-ID: <57C64506.4070605@huawei.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 30 Aug 2016 20:19:44 -0700
+Subject: [GIT PULL] bcm2835-dt-next-2016-08-29
+In-Reply-To: <20160829193857.29994-1-eric@anholt.net>
+References: <20160829193857.29994-1-eric@anholt.net>
+Message-ID: <a276112e-3d8b-fc55-6f0b-189221f97536@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Le 29/08/2016 ? 12:38, Eric Anholt a ?crit :
+> The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+> 
+>   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/anholt/linux bcm2835-dt-next-2016-08-29
+> 
+> for you to fetch changes up to c8336249c1eeca288919e3286f7dd03ae1d8ceae:
+> 
+>   ARM: dts: bcm2835: Add Raspberry Pi Zero (2016-08-24 13:33:19 -0700)
+> 
+> ----------------------------------------------------------------
+> This pull request brings in support for Raspberry Pi Zero.
 
+Merged thanks Eric!
+-- 
+Florian
 
-On 2016/8/31 1:55, Will Deacon wrote:
-> On Sat, Aug 27, 2016 at 06:44:39PM +0800, Leizhen (ThunderTown) wrote:
->>
->>
->> On 2016/8/26 23:35, Will Deacon wrote:
->>> On Wed, Aug 24, 2016 at 03:44:53PM +0800, Zhen Lei wrote:
->>>> Update documentation. This limit is unneccessary.
->>>>
->>>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->>>> Acked-by: Rob Herring <robh@kernel.org>
->>>> ---
->>>>  Documentation/devicetree/bindings/numa.txt | 1 -
->>>>  1 file changed, 1 deletion(-)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
->>>> index 21b3505..c0ea4a7 100644
->>>> --- a/Documentation/devicetree/bindings/numa.txt
->>>> +++ b/Documentation/devicetree/bindings/numa.txt
->>>> @@ -48,7 +48,6 @@ distance (memory latency) between all numa nodes.
->>>>
->>>>    Note:
->>>>  	1. Each entry represents distance from first node to second node.
->>>> -	The distances are equal in either direction.
->>>
->>> Hmm, so what happens now if firmware provides a description where both
->>> distances (in either direction) are supplied, but are different?
->> I have not known any hardware that the distances of two direction are
->> different yet
-> 
-> Then let's not add support for this just yet. When we have systems that
-> actually need it, we'll be in a much better position to assess the
-> suitability of any patches. At the moment, the whole thing is pretty
-> questionable and it adds needless complication to the code.
-How about I changed to:
-To simplify the configuration, the distance of the opposite direction is the same to it by default.
-
-> 
-> Will
-> 
-> .
-> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160830/c1b80372/attachment.sig>
