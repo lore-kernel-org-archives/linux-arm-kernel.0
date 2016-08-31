@@ -1,89 +1,95 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 31 Aug 2016 18:27:08 +0200
-Subject: [PATCH] drm/sun4i: Clear encoder->bridge if a bridge is not found
-In-Reply-To: <20160831154002.GC14379@lukather>
-References: <20160830122223.21377-1-wens@csie.org>
- <20160830125622.GF18605@lukather>
- <CAGb2v64JC5+uzsvLjZVi_Xi8q=U+_Bokqnu33w3oQ-2h2DLnKg@mail.gmail.com>
- <20160831154002.GC14379@lukather>
-Message-ID: <20160831162708.GD20761@phenom.ffwll.local>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 31 Aug 2016 18:28:19 +0200
+Subject: [PATCH 1/4] ARM: dts: sun8i: Extend Orange Pi PC dt to also
+ handle the PC Plus
+In-Reply-To: <b6636083-917e-cc3a-9107-401fbd483fb7@redhat.com>
+References: <1468095718-18515-1-git-send-email-hdegoede@redhat.com>
+ <20160713084505.GE4761@lukather>
+ <bce2b340-a930-8771-4560-dc61bf5828d5@redhat.com>
+ <20160725064033.GA7419@lukather>
+ <74d3b5eb-601a-cc1d-a44e-fea2895fd8b2@redhat.com>
+ <20160728181757.GD6682@lukather>
+ <f71f9d2b-00d4-27b8-1535-1ddc58f04ca3@redhat.com>
+ <b6636083-917e-cc3a-9107-401fbd483fb7@redhat.com>
+Message-ID: <20160831162819.GK14379@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 31, 2016 at 05:40:02PM +0200, Maxime Ripard wrote:
-> On Tue, Aug 30, 2016 at 11:51:26PM +0800, Chen-Yu Tsai wrote:
-> > On Tue, Aug 30, 2016 at 8:56 PM, Maxime Ripard
-> > <maxime.ripard@free-electrons.com> wrote:
-> > > Hi,
-> > >
-> > > On Tue, Aug 30, 2016 at 08:22:23PM +0800, Chen-Yu Tsai wrote:
-> > >> The KMS helpers (drm_atomic_helper_check_modeset/mode_fixup) pass
-> > >> encoder->bridge directly to drm_bridge_mode_fixup, which expects a
-> > >> valid pointer, or NULL (in which case it just returns).
-> > >>
-> > >> Clear encoder->bridge if a bridge is not found, instead of keeping
-> > >> the ERR_PTR value.
-> > >>
-> > >> Since other drm_bridge functions also follow this pattern of checking
-> > >> for a non-NULL pointer, we can drop the ifs around the calls and just
-> > >> pass the pointer directly.
-> > >>
-> > >> Fixes: 894f5a9f4b4a ("drm/sun4i: Add bridge support")
-> > >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> > >> ---
-> > >>  drivers/gpu/drm/sun4i/sun4i_rgb.c | 11 ++++++-----
-> > >>  1 file changed, 6 insertions(+), 5 deletions(-)
-> > >>
-> > >> diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> > >> index d4e52522ec53..ee0795152a33 100644
-> > >> --- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> > >> +++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> > >> @@ -154,8 +154,7 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
-> > >>       if (!IS_ERR(tcon->panel))
-> > >>               drm_panel_enable(tcon->panel);
-> > >>
-> > >> -     if (!IS_ERR(encoder->bridge))
-> > >> -             drm_bridge_enable(encoder->bridge);
-> > >> +     drm_bridge_enable(encoder->bridge);
-> > >>
-> > >>       sun4i_tcon_channel_enable(tcon, 0);
-> > >>  }
-> > >> @@ -170,8 +169,7 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
-> > >>
-> > >>       sun4i_tcon_channel_disable(tcon, 0);
-> > >>
-> > >> -     if (!IS_ERR(encoder->bridge))
-> > >> -             drm_bridge_disable(encoder->bridge);
-> > >> +     drm_bridge_disable(encoder->bridge);
-> > >
-> > > I'd rather keep those changes, it makes it obvious that it's something
-> > > optionnal, that can be set to NULL.
-> > 
-> > OK.
-> > 
-> > >>       if (!IS_ERR(tcon->panel))
-> > >>               drm_panel_disable(tcon->panel);
-> > >> @@ -230,6 +228,9 @@ int sun4i_rgb_init(struct drm_device *drm)
-> > >>               return 0;
-> > >>       }
-> > >>
-> > >> +     if (IS_ERR(encoder->bridge))
-> > >> +             encoder->bridge = NULL;
-> > >> +
-> > >
-> > > And that could be the else condition of the if statement below.
-> > 
-> > That would be a bit confusing, changing it after calling drm_encoder_init.
-> > The code says it ok to do though.
-> 
-> The magic really happens only after the encoder has been attached to
-> something, so it's really safe.
+Hi Hans,
 
-s/attached/registered using drm_dev_register(). Which should
-happen _way_ later for all drivers which have gotten rid of their ->load
-callback and implemented the recommend driver load sequence.
--Daniel
+Sorry for the slow response, it was burried in my inbox.
+
+On Sun, Aug 07, 2016 at 04:25:20PM +0200, Hans de Goede wrote:
+> Hi,
+> 
+> On 28-07-16 22:36, Hans de Goede wrote:
+> >Hi,
+> >
+> >On 28-07-16 20:17, Maxime Ripard wrote:
+> >>Hi Hans,
+> >>
+> >>On Tue, Jul 26, 2016 at 11:07:23PM +0200, Hans de Goede wrote:
+> >>>>>>Nothing prevents you from including the orange pi pc dts, from the
+> >>>>>>orange pi plus dts.
+> >>>>>>
+> >>>>>>It prevents the duplication you were trying to avoid, and it doesn't
+> >>>>>>create all those spurious errors and devices.
+> >>>>>
+> >>>>>That would solve the copy paste problem on the kernel side, but that
+> >>>>>would still mean adding a new u-boot defconfig for this, which means that
+> >>>>>all the distro's which ship with prebuild u-boot binaries need to build
+> >>>>>for yet another board, something which I would like to avoid.
+> >>>>
+> >>>>Still, registering devices that are not present on the board is not an
+> >>>>option.
+> >>>
+> >>>Ok, new version send.
+> >>>
+> >>>What about the other 3 patches in this series ?
+> >>
+> >>I guess the same comment applies for patch 2.
+> >
+> >The difference is that there really is no harm at all from
+> >enabling the extra usb controllers used on the plus 2e
+> >on the plus and plus 2 as well, no errors, no nothing, they
+> >just sit their as usb controllers without an usb device plugged
+> >in. But if you insist I can do a separate dts + u-boot defconfig
+> >for the plus 2e as well (but I would rather not).
+> 
+> Ping, what is the verdict on this, are you ok with the patch or
+> do you want me to create a separate dts file for the Orange Pi
+> Plus 2E, note that doing so is going to be highly confusing to
+> users, there are 3 plus boards:
+
+I still believe that enabling clocks, regulators, claiming pins for
+device that are entirely unused on the board is not ok.
+
+> Orange Pi Plus
+> Orange Pi Plus 2   (same as the original plus but with 2G RAM, uses same u-boot defconfig / dts file)
+
+Yes, that makes sense.
+
+> Orange Pi Plus 2E  (drops the USB-hub instead using all 3 host controllers)
+
+However, I'm really worried about this one. If we go this way, there's
+essentially no going back. If for some reason we want to have a
+separate DT in the future (some unforeseen quirk to apply, pin to
+setup that conflicts on another board, etc.), we will be completely
+screwed because our users will be expecting to use the common DT,
+while it wouldn't be wise anymore.
+
+The other way around is much easier to deal with.
+
+Maxime
+
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160831/88e23c44/attachment.sig>
