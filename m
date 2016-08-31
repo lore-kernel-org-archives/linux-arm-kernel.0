@@ -1,92 +1,30 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 31 Aug 2016 17:40:02 +0200
-Subject: [PATCH] drm/sun4i: Clear encoder->bridge if a bridge is not found
-In-Reply-To: <CAGb2v64JC5+uzsvLjZVi_Xi8q=U+_Bokqnu33w3oQ-2h2DLnKg@mail.gmail.com>
-References: <20160830122223.21377-1-wens@csie.org>
- <20160830125622.GF18605@lukather>
- <CAGb2v64JC5+uzsvLjZVi_Xi8q=U+_Bokqnu33w3oQ-2h2DLnKg@mail.gmail.com>
-Message-ID: <20160831154002.GC14379@lukather>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 31 Aug 2016 21:28:07 +0530
+Subject: [PATCH V4 0/3] dmaengine: qcom_hidma: add error reporting
+In-Reply-To: <1472656229-12955-1-git-send-email-okaya@codeaurora.org>
+References: <1472656229-12955-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20160831155807.GZ9355@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2016 at 11:51:26PM +0800, Chen-Yu Tsai wrote:
-> On Tue, Aug 30, 2016 at 8:56 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On Tue, Aug 30, 2016 at 08:22:23PM +0800, Chen-Yu Tsai wrote:
-> >> The KMS helpers (drm_atomic_helper_check_modeset/mode_fixup) pass
-> >> encoder->bridge directly to drm_bridge_mode_fixup, which expects a
-> >> valid pointer, or NULL (in which case it just returns).
-> >>
-> >> Clear encoder->bridge if a bridge is not found, instead of keeping
-> >> the ERR_PTR value.
-> >>
-> >> Since other drm_bridge functions also follow this pattern of checking
-> >> for a non-NULL pointer, we can drop the ifs around the calls and just
-> >> pass the pointer directly.
-> >>
-> >> Fixes: 894f5a9f4b4a ("drm/sun4i: Add bridge support")
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >>  drivers/gpu/drm/sun4i/sun4i_rgb.c | 11 ++++++-----
-> >>  1 file changed, 6 insertions(+), 5 deletions(-)
-> >>
-> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> >> index d4e52522ec53..ee0795152a33 100644
-> >> --- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> >> +++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> >> @@ -154,8 +154,7 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
-> >>       if (!IS_ERR(tcon->panel))
-> >>               drm_panel_enable(tcon->panel);
-> >>
-> >> -     if (!IS_ERR(encoder->bridge))
-> >> -             drm_bridge_enable(encoder->bridge);
-> >> +     drm_bridge_enable(encoder->bridge);
-> >>
-> >>       sun4i_tcon_channel_enable(tcon, 0);
-> >>  }
-> >> @@ -170,8 +169,7 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
-> >>
-> >>       sun4i_tcon_channel_disable(tcon, 0);
-> >>
-> >> -     if (!IS_ERR(encoder->bridge))
-> >> -             drm_bridge_disable(encoder->bridge);
-> >> +     drm_bridge_disable(encoder->bridge);
-> >
-> > I'd rather keep those changes, it makes it obvious that it's something
-> > optionnal, that can be set to NULL.
+On Wed, Aug 31, 2016 at 11:10:26AM -0400, Sinan Kaya wrote:
+> Three changes in the error handling area:
 > 
-> OK.
+> 1. There is a race condition between data transfer callback and descriptor
+>    free code. The callback routine may decide to clear the resources even
+>    though the descriptor has not yet been freed.
 > 
-> >>       if (!IS_ERR(tcon->panel))
-> >>               drm_panel_disable(tcon->panel);
-> >> @@ -230,6 +228,9 @@ int sun4i_rgb_init(struct drm_device *drm)
-> >>               return 0;
-> >>       }
-> >>
-> >> +     if (IS_ERR(encoder->bridge))
-> >> +             encoder->bridge = NULL;
-> >> +
-> >
-> > And that could be the else condition of the if statement below.
+> 2. DMA Engine framework now supports direct error reporting to the client
+>    via the callback.
 > 
-> That would be a bit confusing, changing it after calling drm_encoder_init.
-> The code says it ok to do though.
+>    Pass the DMA errors to the client by passing a result argument. The HW
+>    only supports a generic error when something goes wrong. That's why,
+>    using DMA_TRANS_ABORTED all the time.
+> 
+> 3. The HIDMA driver is capable of error detection. However, the error was
+>    not being passed back to the client when tx_status API is called.
 
-The magic really happens only after the encoder has been attached to
-something, so it's really safe.
-
-Maxime
+Applied all, thanks
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160831/6f45c0e7/attachment.sig>
+~Vinod
