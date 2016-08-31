@@ -1,39 +1,23 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 31 Aug 2016 10:54:13 -0500
-Subject: [PATCH 03/10] dt-bindings: quadspi: Update bindings for LS1012A
-In-Reply-To: <1472207269-18499-3-git-send-email-Bhaskar.Upadhaya@nxp.com>
-References: <1472207269-18499-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
- <1472207269-18499-3-git-send-email-Bhaskar.Upadhaya@nxp.com>
-Message-ID: <20160831155413.GA8841@rob-hp-laptop>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 31 Aug 2016 18:04:28 +0200
+Subject: [RFC PATCH 1/2] arm64: hw_breakpoint: convert CPU hotplug
+ notifier to new infrastructure
+In-Reply-To: <20160826114141.GI13554@arm.com>
+References: <1472207758-24394-1-git-send-email-will.deacon@arm.com>
+ <20160826112806.rr3apxva73frag5x@linutronix.de>
+ <20160826114141.GI13554@arm.com>
+Message-ID: <20160831160427.5nilur7ky3rxn2by@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2016 at 03:57:42PM +0530, Bhaskar Upadhaya wrote:
-> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
-> ---
->  Documentation/devicetree/bindings/mtd/fsl-quadspi.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On 2016-08-26 12:41:41 [+0100], Will Deacon wrote:
+> 
+> It probably should be there anyway, since the current code is explicitly
+> disabling interrupts to mitigate being called with them enabled and debug
+> is something we want as early as possible.
 
-Acked-by: Rob Herring <robh@kernel.org>
- 
-> diff --git a/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt b/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
-> index c34aa6f..071e87e 100644
-> --- a/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
-> +++ b/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
-> @@ -3,7 +3,7 @@
->  Required properties:
->    - compatible : Should be "fsl,vf610-qspi", "fsl,imx6sx-qspi",
->  		 "fsl,imx7d-qspi", "fsl,imx6ul-qspi",
-> -		 "fsl,ls1021a-qspi"
-> +		 "fsl,ls1012a-qspi, "fsl,ls1021a-qspi"
->  		 or
->  		 "fsl,ls2080a-qspi" followed by "fsl,ls1021a-qspi",
->  		 "fsl,ls1043a-qspi" followed by "fsl,ls1021a-qspi"
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Good. This will go via the ARM64 tree then?
+
+> Will
+
+Sebastian
