@@ -1,41 +1,45 @@
-From: jorik@kippendief.biz (jorik at kippendief.biz)
-Date: Wed, 31 Aug 2016 15:54:06 +0200
-Subject: [PATCH 7/7] dts: sun8i-h3: add I2C0-1 to Orange Pi PC
-In-Reply-To: <1472651646-15579-1-git-send-email-jorik@kippendief.biz>
-References: <1472651646-15579-1-git-send-email-jorik@kippendief.biz>
-Message-ID: <1472651646-15579-8-git-send-email-jorik@kippendief.biz>
+From: fabio.estevam@nxp.com (Fabio Estevam)
+Date: Wed, 31 Aug 2016 10:56:48 -0300
+Subject: [PATCH] ARM: dts: imx6qdl: Fix SPDIF regression
+Message-ID: <1472651808-28034-1-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jorik Jonker <jorik@kippendief.biz>
+Commit 833f2cbf7091 ("ARM: dts: imx6: change the core clock of spdif")
+changed many more clocks than only the SPDIF core clock as stated in
+the commit message.
 
-This board has I2C0-I2C1 exposed on its expansion header.
+The MLB clock has been added and this causes SPDIF regression as
+reported by Xavi Drudis Ferran and also in this forum post:
+https://forum.digikey.com/thread/34240
 
-Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
+The MX6Q Reference Manual does not mention that MLB is a clock related
+to SPDIF, so change it back to a dummy clock to restore SPDIF
+functionality.
+
+Thanks to Ambika for providing the fix at:
+https://community.nxp.com/thread/387131
+
+Fixes: 833f2cbf7091 ("ARM: dts: imx6: change the core clock of spdif")
+Cc: <stable@vger.kernel.org> # 4.4.x
+Reported-by: Xavi Drudis Ferran <xdrudis@tinet.cat>
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/imx6qdl.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-index 602b012..6102e37 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-@@ -108,6 +108,16 @@
- 	status = "okay";
- };
- 
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+};
-+
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index b620ac8..b13b0b2 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -243,7 +243,7 @@
+ 					clocks = <&clks IMX6QDL_CLK_SPDIF_GCLK>, <&clks IMX6QDL_CLK_OSC>,
+ 						 <&clks IMX6QDL_CLK_SPDIF>, <&clks IMX6QDL_CLK_ASRC>,
+ 						 <&clks IMX6QDL_CLK_DUMMY>, <&clks IMX6QDL_CLK_ESAI_EXTAL>,
+-						 <&clks IMX6QDL_CLK_IPG>, <&clks IMX6QDL_CLK_MLB>,
++						 <&clks IMX6QDL_CLK_IPG>, <&clks IMX6QDL_CLK_DUMMY>,
+ 						 <&clks IMX6QDL_CLK_DUMMY>, <&clks IMX6QDL_CLK_SPBA>;
+ 					clock-names = "core",  "rxtx0",
+ 						      "rxtx1", "rxtx2",
 -- 
-2.7.4
+1.9.1
