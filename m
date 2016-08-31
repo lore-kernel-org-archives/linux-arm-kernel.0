@@ -1,78 +1,157 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 31 Aug 2016 09:44:55 +0200
-Subject: [GIT PULL] Integrator cleanups and DTS
-Message-ID: <CACRpkdYBB0rw3uQZnmpsuc_=mf5Ra-HmbRfdm6aT0kn9rn41Lg@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 31 Aug 2016 15:46:51 +0800
+Subject: [PATCH v9 2/2] Add mixer controls: Line-In, FM-In, Mic 2, Capture
+ Source, Differential Line-In.
+In-Reply-To: <20160831091759.6ba20d1c@scratchpost.org>
+References: <20160830054403.7878-1-dannym@scratchpost.org>
+ <20160830054403.7878-3-dannym@scratchpost.org>
+ <CAGb2v64zA3iSOe7ku=pF0RhJkvErxt_tbPWG4H8D6r5UEUJAMQ@mail.gmail.com>
+ <20160831091759.6ba20d1c@scratchpost.org>
+Message-ID: <CAGb2v66X9NySAnC3k2Ga2iQgWt-W3ei+W=erbq7oqROi91dZ3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC people,
+On Wed, Aug 31, 2016 at 3:17 PM, Danny Milosavljevic
+<dannym@scratchpost.org> wrote:
+> Hi Chen-Yu,
+>
+>> > +static const char * const sun4i_codec_difflinein_capture_source[] = {
+>> > +       "Non-Differential",
+>> > +       "Differential",
+>>
+>> How about "Stereo"? And possibly "Mono Differential"? or just "Mono".
+>
+>> A differential input can be used single-ended by grounding one side.
+>
+> Yes, but that's interpretation of what it's going to be used for.
+> The hardware either subtracts or not, nothing more.
+> That said, I'll change it to "Stereo" and "Mono Differential".
+>
+>> > +       SOC_SINGLE_TLV("Line Capture Volume", \
+>> > +                      SUN4I_CODEC_ADC_ACTL, \
+>> > +                      SUN4I_CODEC_ADC_ACTL_LNPREG, \
+>> > +                      7, \
+>> > +                      0, \
+>> > +                      sun4i_codec_linein_preamp_gain_scale)
+>>
+>> Nope. This is a pre-gain or boost. It affects both playback and
+>> capture. "Line Boost Volume" would be better.
+>
+> According to Documentation/sound/alsa/ControlNames.txt that is not a valid name.
+> Also alsa-lib does special things depending on the control name so we are not
+> free to choose here. If it were me freely choosing the names then half the
+> control names in this module would change.
 
-this is a request to pull a combined cleanup and DTS changes batch
-for the Integrators.
+I saw some other drivers use "Boost Volume". Also, alsa-lib looks
+for suffices, such as "Volume", "Playback Volume", "Switch", etc..
 
-Since I have commits such as "move CLCD display to DTS" that is
-a single functional change deleting stuff from the boardfile and adding
-the same to the DTS, it is a combination of DTS and boardfile patches.
-All with the goal to cut down on boardfile code and move to device tree.
+"Boost" is not part of any special name treatment. Though if you
+want to follow ControlNames.txt closely, I would suggest "X Pre-Amp",
+which would really be the source.
 
-The changes require the corresponding changes from the video/fbdev
-and clk subsystems to come in, but these are orthogonal and depend
-solely on the DTS things coming in place. As the DTS repository is
-"kind of external" I am deliverately relaxed about synchronizing changes
-here and just optimistically assume they will come in during the merge
-window and start working.
+>
+>> Same for the Mic pre-amp gain controls.
+>
+> Likewise. I can see that it's confusing... but what should we do?
+>
+>> I have a few patches that introduce SOC_DAPM_DOUBLE, so you can share a
+>> control between left/right channels. IMHO it makes the userspace mixer
+>> less confusing.
+>
+> I agree. It would be nice to use this in the future when it's merged.
+> Will you post it?
 
-There are no compile-time dependencies on fbdev or clk, just runtime,
-with the DT changes. This cleanup can be merged totally orthogonally,
-and when ARM SoC, fbdev and clk are all merged in the merge window,
-the result will compile and boot nicely.
+I will, probably as part of the A31 codec series. If you really like it
+I can post it first, and we both can base our patches on it.
 
-I don't expect any conflicting changes to the Integrator in this merge
-window, neither to board files nor DTS.
+As you mentioned ControlNames.txt, I need to revisit the A31 control
+names.
 
-Please pull it in.
+>
+>> > +       /* MUX */
+>> > +       SND_SOC_DAPM_MUX("Left Capture Select", SND_SOC_NOPM, 0, 0,
+>> > +                        &sun4i_codec_capture_source_controls),
+>> > +       SND_SOC_DAPM_MUX("Right Capture Select", SND_SOC_NOPM, 0, 0,
+>> > +                        &sun4i_codec_capture_source_controls),
+>> > +       SND_SOC_DAPM_MUX("Differential Line Capture Switch", SND_SOC_NOPM,
+>> > +                        0,
+>> > +                        0,
+>> > +                        &sun4i_codec_difflinein_capture_source_controls),
+>>
+>> The proper function suffix is "Route", not "Select".
+>
+> Indeed. Also for "Differential Line Capture Switch" except for the enum, I suppose.
 
-Yours,
-Linus Walleij
+IIRC alsa-lib checks if it's an enum first, so it would appear as the right
+type of control anyway. I'm not sure though.
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+>
+>> > +       /* Inputs */
+>> >         SND_SOC_DAPM_INPUT("Mic1"),
+>> > +       SND_SOC_DAPM_INPUT("Mic2"),
+>>
+>> How about SND_SOC_DAPM_MIC?
+>
+> What does it do differently? Seems to use different callback and all.
+> Is it worth changing an extensively tested patch because of it?
 
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+Seems that you can tie an extra event handler to it, and it is treated
+as an endpoint on a fully routed card. Neither is the case here, so
+it really makes no difference. Lets keep it as INPUT for now.
 
-are available in the git repository at:
+Ref: On a fully routed card, INPUT/OUTPUT widgets are not endpoints.
+You need to route Mic/Headphone/Speaker/Line widgets to/from them
+for the whole path to work.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/integrator-armsoc-1
+I might need to rethink my approach as well.
 
-for you to fetch changes up to bdb249fce9ad44aab340be3b7a77060114f7193b:
+>
+>>And what about microphone bias?
+>
+> The User Manual mentions microphone bias exactly once - in the summary.
+>
+> Searching for just "bias", there's AC_ADDA_BIAS_CTRL "for DAC/ADC
+> performance tuning" and AC_DAC_CAL BIASCALI.
+> Is it one of those? How does it work?
 
-  ARM: integrator: read counter using syscon/regmap (2016-08-31 09:30:34 +0200)
+As I mentioned in my other reply, you did everything right in this
+patch. Sorry for the noise.
 
-----------------------------------------------------------------
-This is a bunch of Integrator changes for v4.9:
+>> > +       SND_SOC_DAPM_INPUT("Line Right"),
+>> > +       SND_SOC_DAPM_INPUT("Line Left"),
+>> > +       SND_SOC_DAPM_INPUT("FM Right"),
+>> > +       SND_SOC_DAPM_INPUT("FM Left"),
+>>
+>> Why the left/right channels?
+>
+> Because they exist in hardware.
+> Also Mic1 and Mic2 are listed as well, so for symmetry.
+>
+>> You aren't doing anything special for
+>> them. You could just have one Line and one FM, and have routes to
+>> left/right mixers.
+>
+>> >  static struct snd_soc_codec_driver sun7i_codec_codec = {
+>> >         .component_driver = {
+>> > -               .controls               = sun7i_codec_controls,
+>> > -               .num_controls           = ARRAY_SIZE(sun7i_codec_controls),
+>> > -               .dapm_widgets           = sun4i_codec_codec_dapm_widgets,
+>> > -               .num_dapm_widgets       = ARRAY_SIZE(sun4i_codec_codec_dapm_widgets),
+>> > -               .dapm_routes            = sun4i_codec_codec_dapm_routes,
+>> > -               .num_dapm_routes        = ARRAY_SIZE(sun4i_codec_codec_dapm_routes),
+>> > +               .controls         = sun7i_codec_controls,
+>> > +               .num_controls     = ARRAY_SIZE(sun7i_codec_controls),
+>> > +               .dapm_widgets     = sun4i_codec_codec_dapm_widgets,
+>> > +               .num_dapm_widgets = ARRAY_SIZE(sun4i_codec_codec_dapm_widgets),
+>> > +               .dapm_routes      = sun4i_codec_codec_dapm_routes,
+>> > +               .num_dapm_routes  = ARRAY_SIZE(sun4i_codec_codec_dapm_routes),
+>>
+>> You should put these changes in the first patch.
+>
+> Indeed.
+>
+> Cheers,
+>    Danny
 
-- Add and fix a bunch of clocks in the DTS corresponding
-  to the new clock support merged into the clk tree.
-- Move the CLCD display configuration from boardfile to
-  device tree using the new CLCD support merged into the
-  fbdev tree.
-- Cut some auxdata.
-- Cut some static remappings.
-- Move the sched_clock() counter to use syscon+regmap.
-
-----------------------------------------------------------------
-Linus Walleij (8):
-      ARM: dts: set the 24MHz xtal as parent of the UART clock
-      ARM: dts: add the Integrator/AP baseboard clocks
-      ARM: dts: Add the core module clocks to Integrator/AP
-      ARM: dts: add the core module clocks to Integrator/CP
-      ARM: integrator: move CP CLCD display to DTS
-      ARM: integrator: delete some auxdata
-      ARM: integrator: cut down on static maps
-      ARM: integrator: read counter using syscon/regmap
-
- arch/arm/boot/dts/integratorap.dts       |  51 ++++++++++++-
- arch/arm/boot/dts/integratorcp.dts       |  74 ++++++++++++++++---
- arch/arm/mach-integrator/integrator_ap.c |  36 ---------
- arch/arm/mach-integrator/integrator_cp.c | 123 ++++---------------------------
- 4 files changed, 126 insertions(+), 158 deletions(-)
+Regards
+ChenYu
