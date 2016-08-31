@@ -1,60 +1,71 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 31 Aug 2016 18:20:02 +0200
-Subject: [PATCH v2 1/4] ARM: dts: sun8i: Add PWM pin in H3
-In-Reply-To: <20160831082520.25962-2-woogyom.kim@gmail.com>
-References: <20160831082520.25962-1-woogyom.kim@gmail.com>
- <20160831082520.25962-2-woogyom.kim@gmail.com>
-Message-ID: <20160831162002.GI14379@lukather>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 31 Aug 2016 17:20:49 +0100
+Subject: [PATCH v3] Added perf functionality to mmdc driver
+In-Reply-To: <20160817194253.16300-1-zhengyu.shen@nxp.com>
+References: <20160817194253.16300-1-zhengyu.shen@nxp.com>
+Message-ID: <e8a82cd8-0920-9da8-77f7-5245a4d36f89@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Milo,
+On 17/08/16 20:42, Zhengyu Shen wrote:
+> MMDC is a multi-mode DDR controller that supports DDR3/DDR3L x16/x32/x64
+> and LPDDR2 two channel x16/x32 memory types. MMDC is configurable, high
+> performance, and optimized. MMDC is present on i.MX6 Quad and i.MX6
+> QuadPlus devices, but this driver only supports i.MX6 Quad at the moment.
+> MMDC provides registers for performance counters which read via this
+> driver to help debug memory throughput and similar issues.
+>
+> $ perf stat -a -e mmdc/busy-cycles/,mmdc/read-accesses/,mmdc/read-bytes/,mmdc/total-cycles/,mmdc/write-accesses/,mmdc/write-bytes/ dd if=/dev/zero of=/dev/null bs=1M count=5000
+> Performance counter stats for 'dd if=/dev/zero of=/dev/null bs=1M count=5000':
+>
+>          898021787      mmdc/busy-cycles/
+>           14819600      mmdc/read-accesses/
+>             471.30 MB   mmdc/read-bytes/
+>         2815419216      mmdc/total-cycles/
+>           13367354      mmdc/write-accesses/
+>             427.76 MB   mmdc/write-bytes/
+>
+>        5.334757334 seconds time elapsed
+>
+> Signed-off-by: Zhengyu Shen <zhengyu.shen@nxp.com>
+> Signed-off-by: Frank Li <frank.li@nxp.com>
 
-On Wed, Aug 31, 2016 at 05:25:17PM +0900, Milo Kim wrote:
-> H3 PA5 pin is assigned for single PWM channel.
-> 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
-> ---
->  arch/arm/boot/dts/sun8i-h3.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> index fdf9fdb..05d0c4b 100644
-> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> @@ -360,6 +360,13 @@
->  				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->  			};
->  
-> +			pwm0_pin_a: pwm0 at 0 {
-> +				allwinner,pins = "PA5";
-> +				allwinner,function = "pwm0";
-> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +			};
+
 > +
+> +static int mmdc_pmu_init(struct mmdc_pmu *pmu_mmdc,
+> +		void __iomem *mmdc_base, struct device *dev)
+> +{
+> +	int mmdc_num;
+> +
+> +	*pmu_mmdc = (struct mmdc_pmu) {
+> +		.pmu = (struct pmu) {
+> +			.task_ctx_nr    = perf_invalid_context,
+> +			.attr_groups    = attr_groups,
+> +			.event_init     = mmdc_event_init,
+> +			.add            = mmdc_event_add,
+> +			.del            = mmdc_event_del,
+> +			.start          = mmdc_event_start,
+> +			.stop           = mmdc_event_stop,
+> +			.read           = mmdc_event_update,
+> +		},
+> +		.mmdc_base = mmdc_base,
+> +	};
+> +
+> +	mmdc_num = ida_simple_get(&mmdc_ida, 0, 0, GFP_KERNEL);
+> +
+> +	cpumask_set_cpu(smp_processor_id(), &pmu_mmdc->cpu);
+> +
+> +	pmu_mmdc->dev = dev;
+> +	pmu_mmdc->active_events = 0;
+> +	spin_lock_init(&pmu_mmdc->mmdc_active_events_lock);
+> +
+> +	cpuhp_mmdc_pmu = pmu_mmdc;
+> +	cpuhp_setup_state(CPUHP_ONLINE,
+> +			"PERF_MMDC_ONLINE", NULL,
+> +			mmdc_pmu_offline_cpu);
 
-Is it used on any boards?
+You may want cpuhp_setup_state_nocalls instead here ?
 
-If not, we have the policy of not merging the pinctrl nodes that are
-not used by anyone to avoid bloating the DT for no particular reason.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160831/41aaa03c/attachment.sig>
+Cheers
+Suzuki
