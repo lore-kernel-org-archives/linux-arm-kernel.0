@@ -1,42 +1,46 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 31 Aug 2016 09:51:31 +0530
-Subject: [PATCH V3 3/3] dmaengine: qcom_hidma: add error reporting for
- tx_status
-In-Reply-To: <de65e834-03bf-49bc-422b-141c1c4d6100@codeaurora.org>
-References: <1471927691-28827-1-git-send-email-okaya@codeaurora.org>
- <1471927691-28827-4-git-send-email-okaya@codeaurora.org>
- <20160830170422.GN9355@localhost>
- <d3c5e9ca-2381-71e0-5b03-5bad68868b97@codeaurora.org>
- <de65e834-03bf-49bc-422b-141c1c4d6100@codeaurora.org>
-Message-ID: <20160831042131.GP9355@localhost>
+From: yao.yuan@nxp.com (Yao Yuan)
+Date: Wed, 31 Aug 2016 04:17:34 +0000
+Subject: [PATCH v1 4/5] ARM: dts: ls1043a: add qDMA node
+In-Reply-To: <3583547.0zriK9IoAs@ws-stein>
+References: <1471502328-28305-1-git-send-email-yao.yuan@freescale.com>
+ <1471502328-28305-5-git-send-email-yao.yuan@freescale.com>
+ <3583547.0zriK9IoAs@ws-stein>
+Message-ID: <DB6PR0401MB24074D504D53B4D64CD4723989E30@DB6PR0401MB2407.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2016 at 01:51:02PM -0400, Sinan Kaya wrote:
-> On 8/30/2016 1:37 PM, Sinan Kaya wrote:
-> > On 8/30/2016 1:04 PM, Vinod Koul wrote:
-> >> On Tue, Aug 23, 2016 at 12:48:11AM -0400, Sinan Kaya wrote:
-> >>
-> >>>  	spin_lock_init(&lldev->lock);
-> >>> -	tasklet_init(&lldev->rst_task, hidma_ll_abort, (unsigned long)lldev);
-> >>
-> >> ??
-> >>
-> >> This is not described in changlog? If you are not using in anywhere else,
-> >> then rst_task variable should be removed too..
-> >>
-> > 
-> > Sure, I can add more description. I thought I did mention that we are no longer
-> > resetting the hardware in ISR. 
-> > 
-> > I can certainly mention that rst_task variable is removed and can get rid of it.
-> > It is no longer in use.
-> > 
+On Mon 29 August 2016 03:34:47, : Alexander Stein  wrote:
+> On Thursday 18 August 2016 14:38:47, Yuan Yao wrote:
+> > From: Yuan Yao <yao.yuan@nxp.com>
+> >
+> > Add the QDMA node for ls1043a platform to support QDMA driver.
+> >
+> > Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
+> > ---
+> >  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 10 ++++++++++
+> >  1 file changed, 10 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> > b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi index
+> > e8e4c3e..e463074
+> > 100644
+> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> > @@ -467,6 +467,16 @@
+> >  				 <&clockgen 4 0>;
+> >  		};
+> >
+> > +		qdma: qdma at 8390000 {
+> > +			compatible = "fsl,ls1021a-qdma", "fsl,ls1043a-qdma";
 > 
-> It looks like I mentioned this in the cover letter only not in the commit message.
-> I'll pull the description into the commit message too.
+> This doesn't match the order of your binding in Patch 2/5:
+> > +- compatible :
+> > +       - "fsl,ls1021a-qdma",
+> > +       Or "fsl,ls1043a-qdma" followed by "fsl,ls1021a-qdma",
+> 
+> It should be the other way around.
 
-Sounds good to me, thanks
-
--- 
-~Vinod
+Thanks for your review.
+It should be compatible = "fsl,ls1043a-qspi", "fsl,ls1021a-qspi";
+ I will update it in the next version.
+Thanks.
