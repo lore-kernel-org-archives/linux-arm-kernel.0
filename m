@@ -1,54 +1,47 @@
-From: xdrudis@tinet.cat (Xavi Drudis Ferran)
-Date: Wed, 31 Aug 2016 16:10:44 +0200
-Subject: [PATCH] ARM: dts: imx6qdl: Fix SPDIF regression
-In-Reply-To: <1472651808-28034-1-git-send-email-fabio.estevam@nxp.com>
-References: <1472651808-28034-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <20160831141044.GC1967@begut>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 31 Aug 2016 08:14:22 -0600
+Subject: [PATCH V7 5/5] perf tools: adding sink configuration for cs_etm
+ PMU
+In-Reply-To: <94a6e940-cce8-a179-fe0c-c69a543e302c@arm.com>
+References: <1472573965-3881-1-git-send-email-mathieu.poirier@linaro.org>
+ <1472573965-3881-6-git-send-email-mathieu.poirier@linaro.org>
+ <94a6e940-cce8-a179-fe0c-c69a543e302c@arm.com>
+Message-ID: <CANLsYkzeS=1fY6uQVNpJMpOfqnT_BtUOfh+YHzZWi+XA+C=dwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El Wed, Aug 31, 2016 at 10:56:48AM -0300, Fabio Estevam deia:
-> Commit 833f2cbf7091 ("ARM: dts: imx6: change the core clock of spdif")
-> changed many more clocks than only the SPDIF core clock as stated in
-> the commit message.
-> 
-> The MLB clock has been added and this causes SPDIF regression as
-> reported by Xavi Drudis Ferran and also in this forum post:
-> https://forum.digikey.com/thread/34240
-> 
-> The MX6Q Reference Manual does not mention that MLB is a clock related
-> to SPDIF, so change it back to a dummy clock to restore SPDIF
-> functionality.
-> 
-> Thanks to Ambika for providing the fix at:
-> https://community.nxp.com/thread/387131
-> 
-> Fixes: 833f2cbf7091 ("ARM: dts: imx6: change the core clock of spdif")
-> Cc: <stable@vger.kernel.org> # 4.4.x
-> Reported-by: Xavi Drudis Ferran <xdrudis@tinet.cat>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> ---
->  arch/arm/boot/dts/imx6qdl.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index b620ac8..b13b0b2 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -243,7 +243,7 @@
->  					clocks = <&clks IMX6QDL_CLK_SPDIF_GCLK>, <&clks IMX6QDL_CLK_OSC>,
->  						 <&clks IMX6QDL_CLK_SPDIF>, <&clks IMX6QDL_CLK_ASRC>,
->  						 <&clks IMX6QDL_CLK_DUMMY>, <&clks IMX6QDL_CLK_ESAI_EXTAL>,
-> -						 <&clks IMX6QDL_CLK_IPG>, <&clks IMX6QDL_CLK_MLB>,
-> +						 <&clks IMX6QDL_CLK_IPG>, <&clks IMX6QDL_CLK_DUMMY>,
->  						 <&clks IMX6QDL_CLK_DUMMY>, <&clks IMX6QDL_CLK_SPBA>;
->  					clock-names = "core",  "rxtx0",
->  						      "rxtx1", "rxtx2",
-> -- 
-> 1.9.1
-> 
+On 31 August 2016 at 03:37, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 30/08/16 17:19, Mathieu Poirier wrote:
+>>
+>> Using the PMU::set_drv_config() callback to enable the CoreSight
+>> sink that will be used for the trace session.
+>
+>
+>> +int cs_etm_set_drv_config(struct perf_evsel_config_term *term)
+>> +{
+>> +       int ret;
+>> +       char enable_sink[ENABLE_SINK_MAX];
+>> +
+>> +       snprintf(enable_sink, ENABLE_SINK_MAX, "%s/%s",
+>> +                term->val.drv_cfg, "enable_sink");
+>> +
+>> +       ret = cs_device__print_file(enable_sink, "%d", 1);
+>> +       if (ret < 0)
+>> +               return ret;
+>> +
+>> +       return 0;
+>> +}
+>
+>
+>
+> Don't we have to disable the sink at the end of the session ? How is that
+> taken care of ? Did I miss that ?
+>
 
-Tested-by:  Xavi Drudis Ferran <xdrudis@tinet.cat>
+Correct - the sink has to be disabled once it is no longer needed.  It
+is a little tricky to do and I haven't decided on the best way to
+proceed.  Fortunately that aspect doesn't affect this patchset.
 
-(on linux-libre-4.7, wandboard-quad-rev-b1, imx6q MCIMX6Q5EYM10AC ,according to wandboard manual BOM)
-Before the change I didn't hear output on spdif, after the change output sounds ok. 
+Mathieu
+
+> Suzuki
