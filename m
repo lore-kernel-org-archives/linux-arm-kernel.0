@@ -1,93 +1,50 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 31 Aug 2016 19:09:23 +0800
-Subject: [PATCH] drm/sun4i: Clear encoder->bridge if a bridge is not found
-In-Reply-To: <CAGb2v64JC5+uzsvLjZVi_Xi8q=U+_Bokqnu33w3oQ-2h2DLnKg@mail.gmail.com>
-References: <20160830122223.21377-1-wens@csie.org>
- <20160830125622.GF18605@lukather>
- <CAGb2v64JC5+uzsvLjZVi_Xi8q=U+_Bokqnu33w3oQ-2h2DLnKg@mail.gmail.com>
-Message-ID: <CAGb2v67hiYhjQNXLZUz7ZT2214AAYsFwQkg42qKEFv-7kShsQQ@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 31 Aug 2016 12:11:36 +0100
+Subject: [PATCH v8 01/18] remoteproc: st_slim_rproc: add a slimcore rproc
+ driver
+In-Reply-To: <20160830165409.GM15161@tuxbot>
+References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
+ <1472223413-7254-2-git-send-email-peter.griffin@linaro.org>
+ <20160830123453.GG10121@dell> <20160830165409.GM15161@tuxbot>
+Message-ID: <20160831111136.GA16490@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi Bjorn,
 
-On Tue, Aug 30, 2016 at 11:51 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Tue, Aug 30, 2016 at 8:56 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> Hi,
->>
->> On Tue, Aug 30, 2016 at 08:22:23PM +0800, Chen-Yu Tsai wrote:
->>> The KMS helpers (drm_atomic_helper_check_modeset/mode_fixup) pass
->>> encoder->bridge directly to drm_bridge_mode_fixup, which expects a
->>> valid pointer, or NULL (in which case it just returns).
->>>
->>> Clear encoder->bridge if a bridge is not found, instead of keeping
->>> the ERR_PTR value.
->>>
->>> Since other drm_bridge functions also follow this pattern of checking
->>> for a non-NULL pointer, we can drop the ifs around the calls and just
->>> pass the pointer directly.
->>>
->>> Fixes: 894f5a9f4b4a ("drm/sun4i: Add bridge support")
->>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>> ---
->>>  drivers/gpu/drm/sun4i/sun4i_rgb.c | 11 ++++++-----
->>>  1 file changed, 6 insertions(+), 5 deletions(-)
->>>
->>> diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
->>> index d4e52522ec53..ee0795152a33 100644
->>> --- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
->>> +++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
->>> @@ -154,8 +154,7 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
->>>       if (!IS_ERR(tcon->panel))
->>>               drm_panel_enable(tcon->panel);
->>>
->>> -     if (!IS_ERR(encoder->bridge))
->>> -             drm_bridge_enable(encoder->bridge);
->>> +     drm_bridge_enable(encoder->bridge);
->>>
->>>       sun4i_tcon_channel_enable(tcon, 0);
->>>  }
->>> @@ -170,8 +169,7 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
->>>
->>>       sun4i_tcon_channel_disable(tcon, 0);
->>>
->>> -     if (!IS_ERR(encoder->bridge))
->>> -             drm_bridge_disable(encoder->bridge);
->>> +     drm_bridge_disable(encoder->bridge);
->>
->> I'd rather keep those changes, it makes it obvious that it's something
->> optionnal, that can be set to NULL.
->
-> OK.
+On Tue, 30 Aug 2016, Bjorn Andersson wrote:
 
-What about having a comment instead? Saves an extra branch condition,
-while still showing that it's optional.
+> On Tue 30 Aug 05:34 PDT 2016, Lee Jones wrote:
+> 
+> Thanks for your review Lee.
+> 
+> > On Fri, 26 Aug 2016, Peter Griffin wrote:
+> [..]
+> > > diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+> > > index 1a8bf76a..06765e0 100644
+> > > --- a/drivers/remoteproc/Kconfig
+> > > +++ b/drivers/remoteproc/Kconfig
+> > > @@ -100,4 +100,12 @@ config ST_REMOTEPROC
+> > >  	  processor framework.
+> > >  	  This can be either built-in or a loadable module.
+> > >  
+> > > +config ST_SLIM_REMOTEPROC
+> > > +	tristate "ST Slim remoteproc support"
+> > > +	select REMOTEPROC
+> > > +	help
+> > > +	  Say y here to support firmware loading on IP based around
+> > > +	  the Slim core.
+> > > +	  If unsure say N.
+> 
+> Saw one more thing when browsing through...
+> 
+> As this piece of code doesn't do anything on its own and is going to be
+> selected by the "function driver" I don't think this should be
+> user-selectable.
 
-ChenYu
+Applogies, I believe you pointed this out in a previous review, but it seems to
+have slipped through the net. Will fix in the next version.
 
->
->>>       if (!IS_ERR(tcon->panel))
->>>               drm_panel_disable(tcon->panel);
->>> @@ -230,6 +228,9 @@ int sun4i_rgb_init(struct drm_device *drm)
->>>               return 0;
->>>       }
->>>
->>> +     if (IS_ERR(encoder->bridge))
->>> +             encoder->bridge = NULL;
->>> +
->>
->> And that could be the else condition of the if statement below.
->
-> That would be a bit confusing, changing it after calling drm_encoder_init.
-> The code says it ok to do though.
->
-> ChenYu
->
->> Thanks!
->> Maxime
->>
->> --
->> Maxime Ripard, Free Electrons
->> Embedded Linux and Kernel engineering
->> http://free-electrons.com
+Regards,
+
+Peter.
