@@ -1,44 +1,33 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Wed, 31 Aug 2016 21:10:58 +0800
-Subject: [PATCH] arm64: dts: hi6220: add sd-uhs- properties into dwmmc_1
-Message-ID: <1472649058-22364-1-git-send-email-guodong.xu@linaro.org>
+From: jsarha@ti.com (Jyri Sarha)
+Date: Wed, 31 Aug 2016 16:14:06 +0300
+Subject: [PATCH v3 1/8] drm/tilcdc: Remove
+ drm_helper_disable_unused_functions() call
+In-Reply-To: <cover.1472634657.git.jsarha@ti.com>
+References: <cover.1472634657.git.jsarha@ti.com>
+Message-ID: <bcad1c1d6d91630b9e6302a406de2995bbbcc802.1472634657.git.jsarha@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With these properties added, sd cards inserted into hikey can work at UHS
-mode if they have such capability.
+drm_helper_disable_unused_functions() should not be called by atomic
+drivers.
 
-Note, this depends on HiKey UHS-SD support patch [1] to work properly.
-If you didn't add this patch, but added sd-uhs- properties into dwmmc_1,
-then sd cards cannot work. As of this post, patch [1] has been integrated
-into maintainer's next branch [2].
-
-[1]: [V4] mmc: dw_mmc-k3: UHS-SD card for Hisilicon Hikey,
- https://patchwork.kernel.org/patch/9262515/
-[2]: https://git.linaro.org/people/ulf.hansson/mmc.git next
- commit a8a5b2909cfc ("mmc: dw_mmc: k3: UHS-SD card for Hisilicon Hikey")
-
-cc: Ulf Hansson <ulf.hansson@linaro.org>
-cc: Jaehoon Chung <jh80.chung@samsung.com>
-cc: Jinguojun <kid.jin@hisilicon.com>
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+Signed-off-by: Jyri Sarha <jsarha@ti.com>
 ---
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/gpu/drm/tilcdc/tilcdc_drv.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 63608e9..17839db 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -785,6 +785,9 @@
- 			card-detect-delay = <200>;
- 			hisilicon,peripheral-syscon = <&ao_ctrl>;
- 			cap-sd-highspeed;
-+			sd-uhs-sdr12;
-+			sd-uhs-sdr25;
-+			sd-uhs-sdr50;
- 			reg = <0x0 0xf723e000 0x0 0x1000>;
- 			interrupts = <0x0 0x49 0x4>;
- 			#address-cells = <0x1>;
+diff --git a/drivers/gpu/drm/tilcdc/tilcdc_drv.c b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
+index 3404d24..e45c268 100644
+--- a/drivers/gpu/drm/tilcdc/tilcdc_drv.c
++++ b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
+@@ -361,8 +361,6 @@ static int tilcdc_load(struct drm_device *dev, unsigned long flags)
+ 			break;
+ 	}
+ 
+-	drm_helper_disable_unused_functions(dev);
+-
+ 	drm_mode_config_reset(dev);
+ 
+ 	priv->fbdev = drm_fbdev_cma_init(dev, bpp,
 -- 
 1.9.1
