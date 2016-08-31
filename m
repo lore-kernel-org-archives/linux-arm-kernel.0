@@ -1,33 +1,42 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 31 Aug 2016 09:41:37 +0530
-Subject: Kernel warning in cpufreq_add_dev()
-In-Reply-To: <1496109.Jd9MGDryNS@vostro.rjw.lan>
-References: <20160819110032.GM1041@n2100.armlinux.org.uk>
- <2310664.2BksGViL4r@vostro.rjw.lan> <20160824131316.GI25143@ubuntu>
- <1496109.Jd9MGDryNS@vostro.rjw.lan>
-Message-ID: <20160831041137.GE5539@vireshk-i7>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 31 Aug 2016 09:51:31 +0530
+Subject: [PATCH V3 3/3] dmaengine: qcom_hidma: add error reporting for
+ tx_status
+In-Reply-To: <de65e834-03bf-49bc-422b-141c1c4d6100@codeaurora.org>
+References: <1471927691-28827-1-git-send-email-okaya@codeaurora.org>
+ <1471927691-28827-4-git-send-email-okaya@codeaurora.org>
+ <20160830170422.GN9355@localhost>
+ <d3c5e9ca-2381-71e0-5b03-5bad68868b97@codeaurora.org>
+ <de65e834-03bf-49bc-422b-141c1c4d6100@codeaurora.org>
+Message-ID: <20160831042131.GP9355@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31-08-16, 03:26, Rafael J. Wysocki wrote:
-> On Wednesday, August 24, 2016 06:43:16 PM Viresh Kumar wrote:
-> > On 22-08-16, 19:32, Rafael J. Wysocki wrote:
-> > > But it will be called in that path during physical CPU hot-add, won't it?
+On Tue, Aug 30, 2016 at 01:51:02PM -0400, Sinan Kaya wrote:
+> On 8/30/2016 1:37 PM, Sinan Kaya wrote:
+> > On 8/30/2016 1:04 PM, Vinod Koul wrote:
+> >> On Tue, Aug 23, 2016 at 12:48:11AM -0400, Sinan Kaya wrote:
+> >>
+> >>>  	spin_lock_init(&lldev->lock);
+> >>> -	tasklet_init(&lldev->rst_task, hidma_ll_abort, (unsigned long)lldev);
+> >>
+> >> ??
+> >>
+> >> This is not described in changlog? If you are not using in anywhere else,
+> >> then rst_task variable should be removed too..
+> >>
 > > 
-> > What about something like this instead (completely untested) ?
+> > Sure, I can add more description. I thought I did mention that we are no longer
+> > resetting the hardware in ISR. 
+> > 
+> > I can certainly mention that rst_task variable is removed and can get rid of it.
+> > It is no longer in use.
+> > 
 > 
-> Inline, please?
+> It looks like I mentioned this in the cover letter only not in the commit message.
+> I'll pull the description into the commit message too.
 
-I am not sure what that means. I pasted that inline in my previous mail only.
-
-> > @Russell: Can you please try this ??
-> 
-> I was thinking about something similar, but won't the WARN_ON()s in
-> cpufreq_add/remove_dev_symlink() still trigger, say if there's more
-> than one CPU in a policy and both happen to be online initially?
-
-real CPUs should already be online and their device structure should be
-available, isn't it ?
+Sounds good to me, thanks
 
 -- 
-viresh
+~Vinod
