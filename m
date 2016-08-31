@@ -1,62 +1,121 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 31 Aug 2016 18:11:05 +0200
-Subject: [PATCH 2/5] ARM: dts: at91: sama5d2: Add secumod node
+Date: Wed, 31 Aug 2016 18:11:08 +0200
+Subject: [PATCH 5/5] misc: sram: add Atmel securam support
 In-Reply-To: <20160831161108.8780-1-alexandre.belloni@free-electrons.com>
 References: <20160831161108.8780-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20160831161108.8780-3-alexandre.belloni@free-electrons.com>
+Message-ID: <20160831161108.8780-6-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sama5d2 has a security module, add its node.
+The Atmel secure SRAM is connected to a security module and may be erased
+automatically under certain conditions. For that reason, it is necessary to
+wait for the security module to flag that SRAM accesses are allowed before
+accessing it.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/sama5d2.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Cc: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+ drivers/misc/sram.c | 52 +++++++++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 45 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index 353d0e5ec83b..b027e96e40ef 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -706,6 +706,11 @@
- 						atmel,clk-output-range = <0 83000000>;
- 					};
+diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
+index f84b53d6ce50..8d411c64d07f 100644
+--- a/drivers/misc/sram.c
++++ b/drivers/misc/sram.c
+@@ -19,12 +19,16 @@
+  */
  
-+					securam_clk: securam_clk {
-+						#clock-cells = <0>;
-+						reg = <51>;
-+					};
-+
- 					i2s0_clk: i2s0_clk {
- 						#clock-cells = <0>;
- 						reg = <54>;
-@@ -1029,6 +1034,15 @@
- 				status = "disabled";
- 			};
+ #include <linux/clk.h>
++#include <linux/delay.h>
+ #include <linux/genalloc.h>
+ #include <linux/io.h>
+ #include <linux/list_sort.h>
+ #include <linux/of_address.h>
+ #include <linux/platform_device.h>
++#include <linux/regmap.h>
+ #include <linux/slab.h>
++#include <linux/mfd/syscon.h>
++#include <soc/at91/atmel-secumod.h>
  
-+			securam: sram at f8044000 {
-+				compatible = "atmel,sama5d2-securam", "mmio-sram";
-+				reg = <0xf8044000 0x40000>;
-+				clocks = <&securam_clk>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges = <0 0xf8044000 0x1420>;
-+			};
-+
- 			rstc at f8048000 {
- 				compatible = "atmel,sama5d3-rstc";
- 				reg = <0xf8048000 0x10>;
-@@ -1231,6 +1245,11 @@
- 				clocks = <&pioA_clk>;
- 			};
+ #define SRAM_GRANULARITY	32
  
-+			secumod at fc040000 {
-+				compatible = "atmel,sama5d2-secumod", "syscon";
-+				reg = <0xfc040000 0x100>;
-+			};
+@@ -334,12 +338,43 @@ static int sram_reserve_regions(struct sram_dev *sram, struct resource *res)
+ 	return ret;
+ }
+ 
++static int atmel_securam_wait(void)
++{
++	struct regmap *regmap;
++	unsigned long timeout = jiffies + HZ;
++	u32 val;
 +
- 			tdes at fc044000 {
- 				compatible = "atmel,at91sam9g46-tdes";
- 				reg = <0xfc044000 0x100>;
++	regmap = syscon_regmap_lookup_by_compatible("atmel,sama5d2-secumod");
++	if (IS_ERR(regmap))
++		return -ENODEV;
++
++	regmap_read(regmap, AT91_SECUMOD_RAMRDY, &val);
++	while (!(val & AT91_SECUMOD_RAMRDY_READY) &&
++	       time_before(jiffies, timeout)) {
++		mdelay(10);
++		regmap_read(regmap, AT91_SECUMOD_RAMRDY, &val);
++	}
++	if (!time_before(jiffies, timeout))
++		return -ETIMEDOUT;
++
++	return 0;
++}
++
++#ifdef CONFIG_OF
++static const struct of_device_id sram_dt_ids[] = {
++	{ .compatible = "mmio-sram" },
++	{ .compatible = "atmel,sama5d2-securam", .data = atmel_securam_wait },
++	{}
++};
++#endif
++
+ static int sram_probe(struct platform_device *pdev)
+ {
+ 	struct sram_dev *sram;
+ 	struct resource *res;
+ 	size_t size;
+ 	int ret;
++	const struct of_device_id *match;
+ 
+ 	sram = devm_kzalloc(&pdev->dev, sizeof(*sram), GFP_KERNEL);
+ 	if (!sram)
+@@ -384,6 +419,16 @@ static int sram_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, sram);
+ 
++	match = of_match_node(sram_dt_ids, pdev->dev.of_node);
++	if (match->data) {
++		int (*init_func)(void);
++
++		init_func = match->data;
++		ret = init_func();
++		if (ret)
++			return ret;
++	}
++
+ 	dev_dbg(sram->dev, "SRAM pool: %zu KiB @ 0x%p\n",
+ 		gen_pool_size(sram->pool) / 1024, sram->virt_base);
+ 
+@@ -405,13 +450,6 @@ static int sram_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_OF
+-static const struct of_device_id sram_dt_ids[] = {
+-	{ .compatible = "mmio-sram" },
+-	{}
+-};
+-#endif
+-
+ static struct platform_driver sram_driver = {
+ 	.driver = {
+ 		.name = "sram",
 -- 
 2.9.3
