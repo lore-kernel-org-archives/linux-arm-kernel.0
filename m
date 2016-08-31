@@ -1,26 +1,26 @@
 From: jorik@kippendief.biz (jorik at kippendief.biz)
-Date: Wed, 31 Aug 2016 21:30:57 +0200
-Subject: [PATCH v2 6/7] dts: sun8i-h3: add I2C0-1 to Orange Pi Plus
+Date: Wed, 31 Aug 2016 21:30:58 +0200
+Subject: [PATCH v2 7/7] dts: sun8i-h3: add I2C0-1 to Orange Pi PC
 In-Reply-To: <1472671858-29220-1-git-send-email-jorik@kippendief.biz>
 References: <1472671858-29220-1-git-send-email-jorik@kippendief.biz>
-Message-ID: <1472671858-29220-7-git-send-email-jorik@kippendief.biz>
+Message-ID: <1472671858-29220-8-git-send-email-jorik@kippendief.biz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jorik Jonker <jorik@kippendief.biz>
 
-This board has I2C0-2 exposed on its expansion header.
+This board has I2C0-I2C1 exposed on its expansion header.
 
 Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 10 ++++++++++
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 10 ++++++++++
  1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-index 7a17839..fcacafa 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-@@ -64,6 +64,16 @@
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+index 602b012..6102e37 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+@@ -108,6 +108,16 @@
  	status = "okay";
  };
  
@@ -34,8 +34,8 @@ index 7a17839..fcacafa 100644
 +	pinctrl-0 = <&i2c1_pins_a>;
 +};
 +
- &mmc2 {
+ &mmc0 {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc2_8bit_pins>;
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
 -- 
 2.7.4
