@@ -1,111 +1,69 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 31 Aug 2016 12:01:58 +0100
-Subject: [RFC PATCH 1/7] perf/trace: Add notification for perf trace events
-In-Reply-To: <1471344312-26685-2-git-send-email-punit.agrawal@arm.com> (Punit
- Agrawal's message of "Tue, 16 Aug 2016 11:45:06 +0100")
-References: <1471344312-26685-1-git-send-email-punit.agrawal@arm.com>
- <1471344312-26685-2-git-send-email-punit.agrawal@arm.com>
-Message-ID: <87bn09mcbd.fsf@e105922-lin.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 31 Aug 2016 12:05:10 +0100
+Subject: [PATCH v3 0/7] arm64: clean up early boot function calls
+Message-ID: <1472641517-15362-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Punit Agrawal <punit.agrawal@arm.com> writes:
+In a couple of places, the early boot code uses non-standard argument,
+return value or return address registers when calling functions. This makes
+the code more complicated than it needs to be, which was not a problem in the
+early days, but with all the recent changes for KASLR, hibernate etc, it
+makes sense to clean this up once and for all. This code removes all uses of
+callee saved registers on the secondary boot and resume paths, and on the
+primary boot path, it only leaves the necessary ones, and documents them
+explicitly in patch #7.
 
-> Add a mechanism to notify listeners about perf trace event state
-> changes. This enables listeners to take actions requiring the event
-> context (e.g., attached process).
->
-> The notification mechanism can be used to reduce trace point based
-> profiling overhead by enabling/disabling hardware traps for specific
-> contexts (e.g., virtual machines).
->
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Steven Rostedt <rostedt@goodmis.org>
-> Cc: Ingo Molnar <mingo@redhat.com>
+I will leave it to the honourable arm64 maintainers to decide if any of
+these improvements weigh up against the churn, given that this code has
+already been updated numerous times over the past couple of kernel versions.
 
-While I respin the series addressing comments on the arm64 architectural
-bits, I'd appreciate any feedback on this patch as it forms the basis of
-the rest of the series.
+NOTE: this series applies onto today's for-next/core with fixes/core merged
+on top, since it depends on Mark's commit fd363bd417ddb610 ("arm64: avoid TLB
+conflict with CONFIG_RANDOMIZE_BASE")
 
-Thanks,
-Punit
+Changes since v2:
+- dropped patch that gets rid of x25/x26 as pgdir pointers, it has been merged
+  into for-next/core in the mean time
+- fixed commit log of #1 to indicate since when the comment that it fixes had
+  been incorrect
+- merged changes relating to the use of x27 by __enable_mmu() into a single
+  patch (#4)
+- added Mark's R-b to all patches
 
-> ---
->  include/linux/trace_events.h    |  3 +++
->  kernel/trace/trace_event_perf.c | 24 ++++++++++++++++++++++++
->  2 files changed, 27 insertions(+)
->
-> diff --git a/include/linux/trace_events.h b/include/linux/trace_events.h
-> index be00761..5924032 100644
-> --- a/include/linux/trace_events.h
-> +++ b/include/linux/trace_events.h
-> @@ -505,6 +505,9 @@ perf_trace_buf_submit(void *raw_data, int size, int rctx, u16 type,
->  {
->  	perf_tp_event(type, count, raw_data, size, regs, head, rctx, task);
->  }
-> +
-> +extern int perf_trace_notifier_register(struct notifier_block *nb);
-> +extern int perf_trace_notifier_unregister(struct notifier_block *nb);
->  #endif
->  
->  #endif /* _LINUX_TRACE_EVENT_H */
-> diff --git a/kernel/trace/trace_event_perf.c b/kernel/trace/trace_event_perf.c
-> index 562fa69..9aaaacf 100644
-> --- a/kernel/trace/trace_event_perf.c
-> +++ b/kernel/trace/trace_event_perf.c
-> @@ -6,10 +6,12 @@
->   */
->  
->  #include <linux/module.h>
-> +#include <linux/notifier.h>
->  #include <linux/kprobes.h>
->  #include "trace.h"
->  
->  static char __percpu *perf_trace_buf[PERF_NR_CONTEXTS];
-> +static RAW_NOTIFIER_HEAD(perf_trace_notifier_list);
->  
->  /*
->   * Force it to be aligned to unsigned long to avoid misaligned accesses
-> @@ -86,6 +88,26 @@ static int perf_trace_event_perm(struct trace_event_call *tp_event,
->  	return 0;
->  }
->  
-> +int perf_trace_notifier_register(struct notifier_block *nb)
-> +{
-> +	return raw_notifier_chain_register(&perf_trace_notifier_list, nb);
-> +}
-> +
-> +int perf_trace_notifier_unregister(struct notifier_block *nb)
-> +{
-> +	return raw_notifier_chain_unregister(&perf_trace_notifier_list, nb);
-> +}
-> +
-> +static void perf_trace_notify(enum trace_reg event, struct perf_event *p_event)
-> +{
-> +	/*
-> +	 * We use raw notifiers here as we are called with the
-> +	 * event_mutex held.
-> +	 */
-> +	raw_notifier_call_chain(&perf_trace_notifier_list,
-> +				     event, p_event);
-> +}
-> +
->  static int perf_trace_event_reg(struct trace_event_call *tp_event,
->  				struct perf_event *p_event)
->  {
-> @@ -176,6 +198,7 @@ out:
->  static int perf_trace_event_open(struct perf_event *p_event)
->  {
->  	struct trace_event_call *tp_event = p_event->tp_event;
-> +	perf_trace_notify(TRACE_REG_PERF_OPEN, p_event);
->  	return tp_event->class->reg(tp_event, TRACE_REG_PERF_OPEN, p_event);
->  }
->  
-> @@ -183,6 +206,7 @@ static void perf_trace_event_close(struct perf_event *p_event)
->  {
->  	struct trace_event_call *tp_event = p_event->tp_event;
->  	tp_event->class->reg(tp_event, TRACE_REG_PERF_CLOSE, p_event);
-> +	perf_trace_notify(TRACE_REG_PERF_CLOSE, p_event);
->  }
->  
->  static int perf_trace_event_init(struct trace_event_call *tp_event,
+Patch #1 fixes some style issues in sleep.S with no functional changes.
+
+Patch #2 removes the use of x20 between el2_setup() and set_cpu_boot_mode_flag()
+
+Patch #3 moves the part of the KASLR processing that resides in __enable_mmu()
+into primary_switch() (which is a more suitable place, given that only the
+primary boot path ever invokes it)
+
+Patch #4 replaces the special x27 return address of __enable_mmu() with x30/lr.
+Given that we can no longer dereference literals containing virtual addresses,
+all callers have already been updated to return from __enable_mmu() back to the
+idmap before performing a literal load + jump. Using x30 instead of x27 allows
+us to merge the code that executes before __enable_mmu() with the code that
+executes after it, and to change the invocation of __enable_mmu() itself into a
+simple bl instruction.
+
+Patch #5 removes the 'global' x24 register in head.S, containing __PHYS_OFFSET
+
+Patch #6 removes the use of x28 in __primary_switched(), and replaces it with
+an ordinary stack frame to preserve the return address.
+
+Ard Biesheuvel (7):
+  arm64: kernel: fix style issues in sleep.S
+  arm64: kernel: use ordinary return/argument register for el2_setup()
+  arm64: head.S: move KASLR processing out of __enable_mmu()
+  arm64: kernel: use x30 for __enable_mmu return address
+  arm64: kernel: drop use of x24 from primary boot path
+  arm64: head.S: use ordinary stack frame for __primary_switched()
+  arm64: head.S: document the use of callee saved registers
+
+ arch/arm64/kernel/head.S  | 147 +++++++++++---------
+ arch/arm64/kernel/sleep.S |  27 ++--
+ 2 files changed, 94 insertions(+), 80 deletions(-)
+
+-- 
+2.7.4
