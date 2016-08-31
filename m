@@ -1,49 +1,34 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 31 Aug 2016 14:30:40 +0100
-Subject: [PATCH] [bugfix] replace unnessary ldax with common ldr
-In-Reply-To: <20160830090721.GC5163@e104818-lin.cambridge.arm.com>
-References: <1472538931-145463-1-git-send-email-liguozhu@hisilicon.com>
- <20160830090721.GC5163@e104818-lin.cambridge.arm.com>
-Message-ID: <57C6DC00.2050709@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 31 Aug 2016 15:33:47 +0200
+Subject: [PATCH 1/9] ARM: dts: exynos: Add macros for GPIO configuration
+In-Reply-To: <bf55b24c-b1ee-78be-d56d-8fdda4f2fdc9@samsung.com>
+References: <1472645613-5362-1-git-send-email-k.kozlowski@samsung.com>
+ <6113443.1q3Xq4YM82@wuerfel>
+ <bf55b24c-b1ee-78be-d56d-8fdda4f2fdc9@samsung.com>
+Message-ID: <5709554.y3Mq6my3Uz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/08/16 10:07, Catalin Marinas wrote:
-> On Tue, Aug 30, 2016 at 02:35:31PM +0800, Kenneth Lee wrote:
->> (add comment for the previous mail, sorry for the duplication)
->>
->> There is no store_ex pairing with this load_ex. It is not necessary and
->> gave wrong hint to the cache system.
->>
->> Signed-off-by: Kenneth Lee <liguozhu@hisilicon.com>
->> ---
->>  arch/arm64/include/asm/spinlock.h | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
->> index c85e96d..3334c4f 100644
->> --- a/arch/arm64/include/asm/spinlock.h
->> +++ b/arch/arm64/include/asm/spinlock.h
->> @@ -63,7 +63,7 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
->>  	 */
->>  "	sevl\n"
->>  "2:	wfe\n"
->> -"	ldaxrh	%w2, %4\n"
->> +"	ldrh	%w2, %4\n"
->>  "	eor	%w1, %w2, %w0, lsr #16\n"
->>  "	cbnz	%w1, 2b\n"
->>  	/* We got the lock. Critical section starts here. */
+On Wednesday, August 31, 2016 3:07:00 PM CEST Krzysztof Kozlowski wrote:
 > 
-> This is needed because the arch_spin_unlock() code only uses an STLR
-> without an explicit SEV (like we have on AArch32). An event is
-> automatically generated when the exclusive monitor is cleared by STLR.
-> But without setting it with a load exclusive in arch_spin_lock() (even
-> though it does not acquire the lock), there won't be anything to clear,
-> hence no event to be generated. In this case, the WFE would wait
-> indefinitely.
+> Ok, sounds reasonable. I want to convert also older platforms S3C (drive
+> strengths and pull up/down differ) and arm64 SoC: Exynos7. For the
+> latter the problem is there is no common place for sharing DTS, except
+> the headers. However this does not really belong to headers. I guess
+> some level of duplication might be still exist.
+
+We have stuff in the headers that belongs way less there, so I wouldn't
+mind, but having a separate set of definitions for arm64 also isn't
+a problem at all.
+ 
+> > I think overall, a better solution would have been to define the
+> > constants globally (shared with non-exynos) to start with,
+> > and have the driver translate generic numbers into vendor
+> > specific ones. Obviously it's too late for that now.
 > 
+> We could extend driver by adding new bindings accepting generic numbers
+> (and still backward compatible) but this looks like an overkill.
 
-Maybe worth to add this as a comment, no?
+Agreed, that would only make things more confusing, not less.
 
-Cheers
-Vladimir
+	Arnd
