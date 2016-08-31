@@ -1,99 +1,262 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Wed, 31 Aug 2016 09:56:02 +0000
-Subject: [PATCH 3/3] PCI: Xilinx NWL PCIe: Fix Error for multi function
- device for legacy interrupts.
-In-Reply-To: <57C59FE8.30307@arm.com>
-References: <1472553558-27215-1-git-send-email-bharatku@xilinx.com>
- <1472553558-27215-3-git-send-email-bharatku@xilinx.com>
- <57C57975.7040306@arm.com>
- <8520D5D51A55D047800579B094147198258D239D@XAP-PVEXMBX01.xlnx.xilinx.com>
- <57C59FE8.30307@arm.com>
-Message-ID: <8520D5D51A55D047800579B094147198258D28AF@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 31 Aug 2016 12:11:34 +0200
+Subject: [PATCH v3] arm64: KVM: Optimize __guest_enter/exit() to save a
+ few instructions
+In-Reply-To: <1472609312-569-1-git-send-email-shankerd@codeaurora.org>
+References: <1472609312-569-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <20160831101134.GN10162@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- > On 30/08/16 15:13, Bharat Kumar Gogada wrote:
-> >> Hi Bharat,
-> >>> @@ -561,7 +561,7 @@ static int nwl_pcie_init_irq_domain(struct
-> >>> nwl_pcie
-> >> *pcie)
-> >>>     }
-> >>>
-> >>>     pcie->legacy_irq_domain = irq_domain_add_linear(legacy_intc_node,
-> >>> -                                                   INTX_NUM,
-> >>> +                                                   INTX_NUM + 1,
-> >>>                                                     &legacy_domain_ops,
-> >>>                                                     pcie);
-> >>
-> >> This feels like the wrong thing to do. You have INTX_NUM irqs, so the
-> >> domain allocation should reflect this. On the other hand, the way the
-> >> driver currently deals with mappings is quite broken (consistently adding 1 to
-> the HW interrupt).
-> >>
-> > Hi Marc,
-> >
-> > Without above change I get following crash in kernel while booting.
-> >
-> > [    2.441684] error: hwirq 0x4 is too large for dummy
-> >
-> > [    2.441694] ------------[ cut here ]------------
-> >
-> > [    2.441698] WARNING: at kernel/irq/irqdomain.c:344
-> >
-> > [    2.441702] Modules linked in:
-> >
-> > [    2.441706]
-> >
-> > [    2.441714] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.4.0 #8
-> >
-> > [    2.441718] Hardware name: xlnx,zynqmp (DT)
-> >
-> > [    2.441723] task: ffffffc071886b80 ti: ffffffc071888000 task.ti:
-> ffffffc071888000
-> >
-> > [    2.441732] PC is at irq_domain_associate+0x138/0x1c0
-> >
-> > [    2.441738] LR is at irq_domain_associate+0x138/0x1c0
-> >
-> > In kernel/irq/irqdomain.c function irq_domain_associate
-> >
-> > if (WARN(hwirq >= domain->hwirq_max,
-> >                  "error: hwirq 0x%x is too large for %s\n", (int)hwirq, domain->name))
-> >                 return -EINVAL;
-> >
-> > Here the hwirq and hwirq_max are equal to 4 without the above condition
-> (INTX_NUM + 1) due to which crash is coming.
-> > This is happening as the legacy interrupts are starting from 1 (INTA).
+On Tue, Aug 30, 2016 at 09:08:32PM -0500, Shanker Donthineni wrote:
+> We are doing an unnecessary stack push/pop operation when restoring
+> the guest registers x0-x18 in __guest_enter(). This patch saves the
+> two instructions by using x18 as a base register. No need to store
+> the vcpu context pointer in stack because it is redundant, the same
+> information is available in tpidr_el2. The function __guest_exit()
+> calling convention is slightly modified, caller only pushes the regs
+> x0-x1 to stack instead of regs x0-x3.
 > 
-> I understood that. I'm still persisting in saying that you have the wrong fix.
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+Applied, thanks.
+
+-Christoffer
+
+
+> ---
+> Tested this patch using the Qualcomm QDF24XXX platform.
 > 
-> Your domain should always allocate many interrupts as you have interrupt
-> sources. These interrupts (hwirq) should be numbered from 0 to (n-1).
-
-Agreed, but here comes the problem the hwirq for legacy interrupts will start at 0x1 to 0x4 (INTA to INTD) and 
-these values are as per PCIe specification for legacy interrupts.
-So these cannot be numbered from 0. So when 0x4 (INTD) for a multi-function device comes the crash occurs.
-	
+> Changes since v2:
+>   Removed macros save_x0_to_x3/restore_x0_to_x3.
+>   Modified el1_sync() to use regs x0 and x1.
+>   Edited commit text.
 > 
-> > And I'm  consistently adding 1 to the HW interrupt as in
-> > nwl_pcie_leg_handler I get 0th bit set from MSGF_LEG_STATUS if INTA
-> > interrupt is raised but my hwirq number being mapped for INTA is 0x1
-> > so that's I'm adding 1 to obtain correct virtual irq. Same case in
-> > nwl_pcie_free_irq_domain since hwirq starts from one I'm adding 1 to
-> > obtain virtual irq and free it.
+> Changes since v1:
+>   Incorporated Cristoffer suggestions.
+>   __guest_exit prototype is changed to 'void __guest_exit(u64 reason, struct kvm_vcpu *vcpu)'.
 > 
-> I can see that. Nonetheless, this is wrong. Can you please test the patch I
-> provided in my reply and report what happens?
-
-Can you be more specific on what is the wrong, I'm adding one since the hwirq starts from 0x1 as mentioned 
-above.
-I did try your suggestion with Ethernet card, but kernel hangs (it does not show any crash also, just hangs) when I do 
-interface up (without bit + 1, using only bit position in handler). This is not working because in the legacy domain virq mapping
-starts with hwirq 0x1, there is no mapping for 0x0 in the domain, so EP interrupt is not serviced since virq being returned is zero.
-
-Thanks & Regards,
-Bharat
-
-
-
- 
+>  arch/arm64/kvm/hyp/entry.S     | 101 ++++++++++++++++++++---------------------
+>  arch/arm64/kvm/hyp/hyp-entry.S |  37 ++++++---------
+>  2 files changed, 63 insertions(+), 75 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+> index ce9e5e5..3967c231 100644
+> --- a/arch/arm64/kvm/hyp/entry.S
+> +++ b/arch/arm64/kvm/hyp/entry.S
+> @@ -55,79 +55,78 @@
+>   */
+>  ENTRY(__guest_enter)
+>  	// x0: vcpu
+> -	// x1: host/guest context
+> -	// x2-x18: clobbered by macros
+> +	// x1: host context
+> +	// x2-x17: clobbered by macros
+> +	// x18: guest context
+>  
+>  	// Store the host regs
+>  	save_callee_saved_regs x1
+>  
+> -	// Preserve vcpu & host_ctxt for use at exit time
+> -	stp	x0, x1, [sp, #-16]!
+> +	// Store the host_ctxt for use at exit time
+> +	str	x1, [sp, #-16]!
+>  
+> -	add	x1, x0, #VCPU_CONTEXT
+> +	add	x18, x0, #VCPU_CONTEXT
+>  
+> -	// Prepare x0-x1 for later restore by pushing them onto the stack
+> -	ldp	x2, x3, [x1, #CPU_XREG_OFFSET(0)]
+> -	stp	x2, x3, [sp, #-16]!
+> +	// Restore guest regs x0-x17
+> +	ldp	x0, x1,   [x18, #CPU_XREG_OFFSET(0)]
+> +	ldp	x2, x3,   [x18, #CPU_XREG_OFFSET(2)]
+> +	ldp	x4, x5,   [x18, #CPU_XREG_OFFSET(4)]
+> +	ldp	x6, x7,   [x18, #CPU_XREG_OFFSET(6)]
+> +	ldp	x8, x9,   [x18, #CPU_XREG_OFFSET(8)]
+> +	ldp	x10, x11, [x18, #CPU_XREG_OFFSET(10)]
+> +	ldp	x12, x13, [x18, #CPU_XREG_OFFSET(12)]
+> +	ldp	x14, x15, [x18, #CPU_XREG_OFFSET(14)]
+> +	ldp	x16, x17, [x18, #CPU_XREG_OFFSET(16)]
+>  
+> -	// x2-x18
+> -	ldp	x2, x3,   [x1, #CPU_XREG_OFFSET(2)]
+> -	ldp	x4, x5,   [x1, #CPU_XREG_OFFSET(4)]
+> -	ldp	x6, x7,   [x1, #CPU_XREG_OFFSET(6)]
+> -	ldp	x8, x9,   [x1, #CPU_XREG_OFFSET(8)]
+> -	ldp	x10, x11, [x1, #CPU_XREG_OFFSET(10)]
+> -	ldp	x12, x13, [x1, #CPU_XREG_OFFSET(12)]
+> -	ldp	x14, x15, [x1, #CPU_XREG_OFFSET(14)]
+> -	ldp	x16, x17, [x1, #CPU_XREG_OFFSET(16)]
+> -	ldr	x18,      [x1, #CPU_XREG_OFFSET(18)]
+> -
+> -	// x19-x29, lr
+> -	restore_callee_saved_regs x1
+> -
+> -	// Last bits of the 64bit state
+> -	ldp	x0, x1, [sp], #16
+> +	// Restore guest regs x19-x29, lr
+> +	restore_callee_saved_regs x18
+> +
+> +	// Restore guest reg x18
+> +	ldr	x18,      [x18, #CPU_XREG_OFFSET(18)]
+>  
+>  	// Do not touch any register after this!
+>  	eret
+>  ENDPROC(__guest_enter)
+>  
+>  ENTRY(__guest_exit)
+> -	// x0: vcpu
+> -	// x1: return code
+> -	// x2-x3: free
+> -	// x4-x29,lr: vcpu regs
+> -	// vcpu x0-x3 on the stack
+> -
+> -	add	x2, x0, #VCPU_CONTEXT
+> -
+> -	stp	x4, x5,   [x2, #CPU_XREG_OFFSET(4)]
+> -	stp	x6, x7,   [x2, #CPU_XREG_OFFSET(6)]
+> -	stp	x8, x9,   [x2, #CPU_XREG_OFFSET(8)]
+> -	stp	x10, x11, [x2, #CPU_XREG_OFFSET(10)]
+> -	stp	x12, x13, [x2, #CPU_XREG_OFFSET(12)]
+> -	stp	x14, x15, [x2, #CPU_XREG_OFFSET(14)]
+> -	stp	x16, x17, [x2, #CPU_XREG_OFFSET(16)]
+> -	str	x18,      [x2, #CPU_XREG_OFFSET(18)]
+> -
+> -	ldp	x6, x7, [sp], #16	// x2, x3
+> -	ldp	x4, x5, [sp], #16	// x0, x1
+> -
+> -	stp	x4, x5, [x2, #CPU_XREG_OFFSET(0)]
+> -	stp	x6, x7, [x2, #CPU_XREG_OFFSET(2)]
+> +	// x0: return code
+> +	// x1: vcpu
+> +	// x2-x29,lr: vcpu regs
+> +	// vcpu x0-x1 on the stack
+> +
+> +	add	x1, x1, #VCPU_CONTEXT
+> +
+> +	// Store the guest regs x2 and x3
+> +	stp	x2, x3,   [x1, #CPU_XREG_OFFSET(2)]
+> +
+> +	// Retrieve the guest regs x0-x1 from the stack
+> +	ldp	x2, x3, [sp], #16	// x0, x1
+> +
+> +	// Store the guest regs x0-x1 and x4-x18
+> +	stp	x2, x3,   [x1, #CPU_XREG_OFFSET(0)]
+> +	stp	x4, x5,   [x1, #CPU_XREG_OFFSET(4)]
+> +	stp	x6, x7,   [x1, #CPU_XREG_OFFSET(6)]
+> +	stp	x8, x9,   [x1, #CPU_XREG_OFFSET(8)]
+> +	stp	x10, x11, [x1, #CPU_XREG_OFFSET(10)]
+> +	stp	x12, x13, [x1, #CPU_XREG_OFFSET(12)]
+> +	stp	x14, x15, [x1, #CPU_XREG_OFFSET(14)]
+> +	stp	x16, x17, [x1, #CPU_XREG_OFFSET(16)]
+> +	str	x18,      [x1, #CPU_XREG_OFFSET(18)]
+> +
+> +	// Store the guest regs x19-x29, lr
+> +	save_callee_saved_regs x1
+>  
+> -	save_callee_saved_regs x2
+> +	// Restore the host_ctxt from the stack
+> +	ldr	x2, [sp], #16
+>  
+> -	// Restore vcpu & host_ctxt from the stack
+> -	// (preserving return code in x1)
+> -	ldp	x0, x2, [sp], #16
+>  	// Now restore the host regs
+>  	restore_callee_saved_regs x2
+>  
+> -	mov	x0, x1
+>  	ret
+>  ENDPROC(__guest_exit)
+>  
+>  ENTRY(__fpsimd_guest_restore)
+> +	stp	x2, x3, [sp, #-16]!
+>  	stp	x4, lr, [sp, #-16]!
+>  
+>  alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+> index f6d9694..d6cae542 100644
+> --- a/arch/arm64/kvm/hyp/hyp-entry.S
+> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
+> @@ -27,16 +27,6 @@
+>  	.text
+>  	.pushsection	.hyp.text, "ax"
+>  
+> -.macro	save_x0_to_x3
+> -	stp	x0, x1, [sp, #-16]!
+> -	stp	x2, x3, [sp, #-16]!
+> -.endm
+> -
+> -.macro	restore_x0_to_x3
+> -	ldp	x2, x3, [sp], #16
+> -	ldp	x0, x1, [sp], #16
+> -.endm
+> -
+>  .macro do_el2_call
+>  	/*
+>  	 * Shuffle the parameters before calling the function
+> @@ -79,23 +69,23 @@ ENTRY(__kvm_hyp_teardown)
+>  ENDPROC(__kvm_hyp_teardown)
+>  	
+>  el1_sync:				// Guest trapped into EL2
+> -	save_x0_to_x3
+> +	stp	x0, x1, [sp, #-16]!
+>  
+>  alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+>  	mrs	x1, esr_el2
+>  alternative_else
+>  	mrs	x1, esr_el1
+>  alternative_endif
+> -	lsr	x2, x1, #ESR_ELx_EC_SHIFT
+> +	lsr	x0, x1, #ESR_ELx_EC_SHIFT
+>  
+> -	cmp	x2, #ESR_ELx_EC_HVC64
+> +	cmp	x0, #ESR_ELx_EC_HVC64
+>  	b.ne	el1_trap
+>  
+> -	mrs	x3, vttbr_el2		// If vttbr is valid, the 64bit guest
+> -	cbnz	x3, el1_trap		// called HVC
+> +	mrs	x1, vttbr_el2		// If vttbr is valid, the 64bit guest
+> +	cbnz	x1, el1_trap		// called HVC
+>  
+>  	/* Here, we're pretty sure the host called HVC. */
+> -	restore_x0_to_x3
+> +	ldp	x0, x1, [sp], #16
+>  
+>  	cmp	x0, #HVC_GET_VECTORS
+>  	b.ne	1f
+> @@ -113,22 +103,21 @@ alternative_endif
+>  
+>  el1_trap:
+>  	/*
+> -	 * x1: ESR
+> -	 * x2: ESR_EC
+> +	 * x0: ESR_EC
+>  	 */
+>  
+>  	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
+> -	cmp	x2, #ESR_ELx_EC_FP_ASIMD
+> +	cmp	x0, #ESR_ELx_EC_FP_ASIMD
+>  	b.eq	__fpsimd_guest_restore
+>  
+> -	mrs	x0, tpidr_el2
+> -	mov	x1, #ARM_EXCEPTION_TRAP
+> +	mrs	x1, tpidr_el2
+> +	mov	x0, #ARM_EXCEPTION_TRAP
+>  	b	__guest_exit
+>  
+>  el1_irq:
+> -	save_x0_to_x3
+> -	mrs	x0, tpidr_el2
+> -	mov	x1, #ARM_EXCEPTION_IRQ
+> +	stp     x0, x1, [sp, #-16]!
+> +	mrs	x1, tpidr_el2
+> +	mov	x0, #ARM_EXCEPTION_IRQ
+>  	b	__guest_exit
+>  
+>  ENTRY(__hyp_do_panic)
+> -- 
+> Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> 
