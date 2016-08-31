@@ -1,9 +1,9 @@
 From: jorik@kippendief.biz (jorik at kippendief.biz)
-Date: Wed, 31 Aug 2016 15:54:03 +0200
-Subject: [PATCH 4/7] dts: sun8i-h3: add UART1-3 to Orange Pi Plus
+Date: Wed, 31 Aug 2016 15:54:04 +0200
+Subject: [PATCH 5/7] dts: sun8i-h3: add UART1-3 to Orange Pi PC
 In-Reply-To: <1472651646-15579-1-git-send-email-jorik@kippendief.biz>
 References: <1472651646-15579-1-git-send-email-jorik@kippendief.biz>
-Message-ID: <1472651646-15579-5-git-send-email-jorik@kippendief.biz>
+Message-ID: <1472651646-15579-6-git-send-email-jorik@kippendief.biz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,15 +13,15 @@ This board has UARTS1-3 exposed on its expansion header
 
 Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 15 +++++++++++++++
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 15 +++++++++++++++
  1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-index b0cb417..7a17839 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-@@ -90,6 +90,21 @@
- 	};
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+index daf50b9..602b012 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+@@ -161,6 +161,21 @@
+ 	status = "okay";
  };
  
 +&uart1 {
@@ -40,7 +40,7 @@ index b0cb417..7a17839 100644
 +};
 +
  &usbphy {
- 	usb3_vbus-supply = <&reg_usb3_vbus>;
- };
+ 	/* USB VBUS is always on */
+ 	status = "okay";
 -- 
 2.7.4
