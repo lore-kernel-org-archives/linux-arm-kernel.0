@@ -1,88 +1,103 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 31 Aug 2016 12:05:11 +0100
-Subject: [PATCH v3 1/7] arm64: kernel: fix style issues in sleep.S
+Date: Wed, 31 Aug 2016 12:05:14 +0100
+Subject: [PATCH v3 4/7] arm64: kernel: use x30 for __enable_mmu return address
 In-Reply-To: <1472641517-15362-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1472641517-15362-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1472641517-15362-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1472641517-15362-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes a number of style issues in sleep.S. No functional changes are
-intended:
-- replace absolute literal references with relative references in
-  __cpu_suspend_enter(), which executes from its virtual address
-- replace explicit lr assignment plus branch with bl in cpu_resume(), which
-  aligns it with stext() and secondary_startup()
-- don't export _cpu_resume()
-- use adr_l for mpidr_hash reference, and fix the incorrect accompanying
-  comment, which has been out of date since commit cabe1c81ea5be983 ("arm64:
-  Change cpu_resume() to enable mmu early then access sleep_sp by va")
-- replace leading spaces with tabs, and add a bit of whitespace for
-  readability
+Using x27 for passing to __enable_mmu what is essentially the return
+address makes the code look more complicated than it needs to be. So
+switch to x30/lr, and update the secondary and cpu_resume call sites to
+simply call __enable_mmu as an ordinary function, with a bl instruction.
+This requires the callers to be covered by .idmap.text.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/sleep.S | 21 ++++++++++----------
- 1 file changed, 10 insertions(+), 11 deletions(-)
+ arch/arm64/kernel/head.S  | 21 +++++++-------------
+ arch/arm64/kernel/sleep.S |  8 ++------
+ 2 files changed, 9 insertions(+), 20 deletions(-)
 
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 5543068da3ae..45b865e022cc 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -675,9 +675,9 @@ secondary_startup:
+ 	 * Common entry point for secondary CPUs.
+ 	 */
+ 	bl	__cpu_setup			// initialise processor
+-
+-	adr_l	x27, __secondary_switch		// address to jump to after enabling the MMU
+-	b	__enable_mmu
++	bl	__enable_mmu
++	ldr	x8, =__secondary_switched
++	br	x8
+ ENDPROC(secondary_startup)
+ 
+ __secondary_switched:
+@@ -716,9 +716,9 @@ ENDPROC(__secondary_switched)
+  * Enable the MMU.
+  *
+  *  x0  = SCTLR_EL1 value for turning on the MMU.
+- *  x27 = *virtual* address to jump to upon completion
+  *
+- * Other registers depend on the function called upon completion.
++ * Returns to the caller via x30/lr. This requires the caller to be covered
++ * by the .idmap.text section.
+  *
+  * Checks if the selected granule size is supported by the CPU.
+  * If it isn't, park the CPU
+@@ -744,7 +744,7 @@ ENTRY(__enable_mmu)
+ 	ic	iallu
+ 	dsb	nsh
+ 	isb
+-	br	x27
++	ret
+ ENDPROC(__enable_mmu)
+ 
+ __no_granule_support:
+@@ -789,9 +789,7 @@ __primary_switch:
+ 	mrs	x20, sctlr_el1			// preserve old SCTLR_EL1 value
+ #endif
+ 
+-	adr	x27, 0f
+-	b	__enable_mmu
+-0:
++	bl	__enable_mmu
+ #ifdef CONFIG_RELOCATABLE
+ 	bl	__relocate_kernel
+ #ifdef CONFIG_RANDOMIZE_BASE
+@@ -822,8 +820,3 @@ __primary_switch:
+ 	ldr	x8, =__primary_switched
+ 	br	x8
+ ENDPROC(__primary_switch)
+-
+-__secondary_switch:
+-	ldr	x8, =__secondary_switched
+-	br	x8
+-ENDPROC(__secondary_switch)
 diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index 1fac020761da..6adc76bf8f91 100644
+index 6adc76bf8f91..0f7e0b2ac64c 100644
 --- a/arch/arm64/kernel/sleep.S
 +++ b/arch/arm64/kernel/sleep.S
-@@ -73,10 +73,9 @@ ENTRY(__cpu_suspend_enter)
- 	str	x2, [x0, #SLEEP_STACK_DATA_SYSTEM_REGS + CPU_CTX_SP]
- 
- 	/* find the mpidr_hash */
--	ldr	x1, =sleep_save_stash
--	ldr	x1, [x1]
-+	ldr_l	x1, sleep_save_stash
- 	mrs	x7, mpidr_el1
--	ldr	x9, =mpidr_hash
-+	adr_l	x9, mpidr_hash
- 	ldr	x10, [x9, #MPIDR_HASH_MASK]
- 	/*
- 	 * Following code relies on the struct mpidr_hash
-@@ -95,15 +94,14 @@ ENTRY(__cpu_suspend_enter)
- 	mov	x0, #1
- 	ret
- ENDPROC(__cpu_suspend_enter)
--	.ltorg
- 
- 	.pushsection ".idmap.text", "ax"
- ENTRY(cpu_resume)
+@@ -100,14 +100,10 @@ ENTRY(cpu_resume)
  	bl	el2_setup		// if in EL2 drop to EL1 cleanly
-+	bl	__cpu_setup
+ 	bl	__cpu_setup
  	/* enable the MMU early - so we can access sleep_save_stash by va */
--	adr_l	lr, __enable_mmu	/* __cpu_setup will return here */
- 	adr_l	x27, _resume_switched	/* __enable_mmu will branch here */
--	b	__cpu_setup
-+	b	__enable_mmu
- ENDPROC(cpu_resume)
- 
- _resume_switched:
-@@ -113,16 +111,17 @@ ENDPROC(_resume_switched)
+-	adr_l	x27, _resume_switched	/* __enable_mmu will branch here */
+-	b	__enable_mmu
+-ENDPROC(cpu_resume)
+-
+-_resume_switched:
++	bl	__enable_mmu
+ 	ldr	x8, =_cpu_resume
+ 	br	x8
+-ENDPROC(_resume_switched)
++ENDPROC(cpu_resume)
  	.ltorg
  	.popsection
  
--ENTRY(_cpu_resume)
-+_cpu_resume:
- 	mrs	x1, mpidr_el1
--	adrp	x8, mpidr_hash
--	add x8, x8, #:lo12:mpidr_hash // x8 = struct mpidr_hash phys address
--        /* retrieve mpidr_hash members to compute the hash */
-+	adr_l	x8, mpidr_hash		// x8 = struct mpidr_hash virt address
-+
-+	/* retrieve mpidr_hash members to compute the hash */
- 	ldr	x2, [x8, #MPIDR_HASH_MASK]
- 	ldp	w3, w4, [x8, #MPIDR_HASH_SHIFTS]
- 	ldp	w5, w6, [x8, #(MPIDR_HASH_SHIFTS + 8)]
- 	compute_mpidr_hash x7, x3, x4, x5, x6, x1, x2
--        /* x7 contains hash index, let's use it to grab context pointer */
-+
-+	/* x7 contains hash index, let's use it to grab context pointer */
- 	ldr_l	x0, sleep_save_stash
- 	ldr	x0, [x0, x7, lsl #3]
- 	add	x29, x0, #SLEEP_STACK_DATA_CALLEE_REGS
 -- 
 2.7.4
