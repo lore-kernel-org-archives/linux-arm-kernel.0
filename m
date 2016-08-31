@@ -1,47 +1,42 @@
 From: woogyom.kim@gmail.com (Milo Kim)
-Date: Wed, 31 Aug 2016 17:25:16 +0900
-Subject: [PATCH v2 0/4] Add PWM feature in Allwinner H3
-Message-ID: <20160831082520.25962-1-woogyom.kim@gmail.com>
+Date: Wed, 31 Aug 2016 17:25:17 +0900
+Subject: [PATCH v2 1/4] ARM: dts: sun8i: Add PWM pin in H3
+In-Reply-To: <20160831082520.25962-1-woogyom.kim@gmail.com>
+References: <20160831082520.25962-1-woogyom.kim@gmail.com>
+Message-ID: <20160831082520.25962-2-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the latest datasheet, H3 has single PWM channel.
-H3 PWM controller has same register layout as sun4i driver, so it works 
-by adding H3 specific data.
-And the second PWM channel is not supported, so the pinctrl function is removed.
+H3 PA5 pin is assigned for single PWM channel.
 
-Datasheet:
-  http://linux-sunxi.org/File:Allwinner_H3_Datasheet_V1.2.pdf
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Chen-Yu Tsai <wens@csie.org>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+---
+ arch/arm/boot/dts/sun8i-h3.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Test environment:
-  Tested on Nano Pi M1 board, but PA5 pin is assigned for UART0.
-  So the debug console should be changed to other port like UART1.
-
-  Ex)
-	aliases {
-		serial0 = &uart1;
-	};
-
-	&uart1 {
-        	pinctrl-names = "default";
-	        pinctrl-0 = <&uart1_pins_a>;
-        	status = "okay";
-	};
-
-v2:
-  Split v1 patch-set into several patches
-
-Milo Kim (4):
-  ARM: dts: sun8i: Add PWM pin in H3
-  ARM: dts: sun8i: Add PWM controller node in H3
-  pinctrl: sunxi: Remove unsupported PWM channel pinmux in H3
-  pwm: sunxi: Add H3 support
-
- Documentation/devicetree/bindings/pwm/pwm-sun4i.txt |  1 +
- arch/arm/boot/dts/sun8i-h3.dtsi                     | 15 +++++++++++++++
- drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c            |  1 -
- drivers/pwm/pwm-sun4i.c                             |  9 +++++++++
- 4 files changed, 25 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index fdf9fdb..05d0c4b 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -360,6 +360,13 @@
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
+ 
++			pwm0_pin_a: pwm0 at 0 {
++				allwinner,pins = "PA5";
++				allwinner,function = "pwm0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
+ 			uart0_pins_a: uart0 at 0 {
+ 				allwinner,pins = "PA4", "PA5";
+ 				allwinner,function = "uart0";
 -- 
 2.9.3
