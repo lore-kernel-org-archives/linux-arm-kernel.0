@@ -1,77 +1,89 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 31 Aug 2016 12:05:16 +0100
-Subject: [PATCH v3 6/7] arm64: head.S: use ordinary stack frame for
- __primary_switched()
+Date: Wed, 31 Aug 2016 12:05:12 +0100
+Subject: [PATCH v3 2/7] arm64: kernel: use ordinary return/argument register
+ for el2_setup()
 In-Reply-To: <1472641517-15362-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1472641517-15362-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1472641517-15362-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1472641517-15362-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of stashing the value of the link register in x28 before setting
-up the stack and calling into C code, create an ordinary PCS compatible
-stack frame so that we can push the return address onto the stack.
+The function el2_setup() passes its return value in register w20, and
+in the two cases where the caller actually cares about this return value,
+it is passed into set_cpu_boot_mode_flag() [almost] directly, which
+expects its input in w20 as well.
 
-Since exception handlers require a stack as well, assign the stack pointer
-register before installing the vector table.
-
-Note that this accounts for the difference between THREAD_START_SP and
-THREAD_SIZE, given that the stack pointer is always decremented before
-calling into any C code.
+So there is no reason to use a 'special' callee saved register here, but
+we can simply follow the PCS for return value and first argument,
+respectively.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/head.S | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+ arch/arm64/kernel/head.S | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 4dee51045e79..29a734ee0770 100644
+index 024812bfce34..647aa82f2c7b 100644
 --- a/arch/arm64/kernel/head.S
 +++ b/arch/arm64/kernel/head.S
-@@ -415,13 +415,18 @@ ENDPROC(__create_page_tables)
-  *
-  *   x0 = __PHYS_OFFSET
-  */
--	.set	initial_sp, init_thread_union + THREAD_START_SP
- __primary_switched:
--	mov	x28, lr				// preserve LR
-+	adrp	x4, init_thread_union
-+	add	sp, x4, #THREAD_SIZE
-+	msr	sp_el0, x4			// Save thread_info
-+
- 	adr_l	x8, vectors			// load VBAR_EL1 with virtual
- 	msr	vbar_el1, x8			// vector table address
+@@ -210,7 +210,7 @@ efi_header_end:
+ 
+ ENTRY(stext)
+ 	bl	preserve_boot_args
+-	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
++	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
+ 	adrp	x24, __PHYS_OFFSET
+ 	and	x23, x24, MIN_KIMG_ALIGN - 1	// KASLR offset, defaults to 0
+ 	bl	set_cpu_boot_mode_flag
+@@ -488,7 +488,7 @@ CPU_LE(	bic	x0, x0, #(1 << 25)	)	// Clear the EE bit for EL2
+ CPU_BE(	orr	x0, x0, #(3 << 24)	)	// Set the EE and E0E bits for EL1
+ CPU_LE(	bic	x0, x0, #(3 << 24)	)	// Clear the EE and E0E bits for EL1
+ 	msr	sctlr_el1, x0
+-	mov	w20, #BOOT_CPU_MODE_EL1		// This cpu booted in EL1
++	mov	w0, #BOOT_CPU_MODE_EL1		// This cpu booted in EL1
  	isb
+ 	ret
  
-+	stp	xzr, x30, [sp, #-16]!
-+	mov	x29, sp
-+
- 	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
+@@ -584,7 +584,7 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
  
- 	ldr_l	x4, kimage_vaddr		// Save the offset between
-@@ -436,11 +441,6 @@ __primary_switched:
- 	bl	__pi_memset
- 	dsb	ishst				// Make zero page visible to PTW
+ 	cbz	x2, install_el2_stub
  
--	adr_l	sp, initial_sp, x4
--	mov	x4, sp
--	and	x4, x4, #~(THREAD_SIZE - 1)
--	msr	sp_el0, x4			// Save thread_info
--	mov	x29, #0
- #ifdef CONFIG_KASAN
- 	bl	kasan_early_init
- #endif
-@@ -452,8 +452,8 @@ __primary_switched:
- 	bl	kaslr_early_init		// parse FDT for KASLR options
- 	cbz	x0, 0f				// KASLR disabled? just proceed
- 	orr	x23, x23, x0			// record KASLR offset
--	ret	x28				// we must enable KASLR, return
--						// to __primary_switch()
-+	ldp	x29, x30, [sp], #16		// we must enable KASLR, return
-+	ret					// to __primary_switch()
- 0:
- #endif
- 	b	start_kernel
+-	mov	w20, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
++	mov	w0, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
+ 	isb
+ 	ret
+ 
+@@ -599,7 +599,7 @@ install_el2_stub:
+ 		      PSR_MODE_EL1h)
+ 	msr	spsr_el2, x0
+ 	msr	elr_el2, lr
+-	mov	w20, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
++	mov	w0, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
+ 	eret
+ ENDPROC(el2_setup)
+ 
+@@ -609,10 +609,10 @@ ENDPROC(el2_setup)
+  */
+ set_cpu_boot_mode_flag:
+ 	adr_l	x1, __boot_cpu_mode
+-	cmp	w20, #BOOT_CPU_MODE_EL2
++	cmp	w0, #BOOT_CPU_MODE_EL2
+ 	b.ne	1f
+ 	add	x1, x1, #4
+-1:	str	w20, [x1]			// This CPU has booted in EL1
++1:	str	w0, [x1]			// This CPU has booted in EL1
+ 	dmb	sy
+ 	dc	ivac, x1			// Invalidate potentially stale cache line
+ 	ret
+@@ -649,7 +649,7 @@ ENTRY(__early_cpu_boot_status)
+ 	 * cores are held until we're ready for them to initialise.
+ 	 */
+ ENTRY(secondary_holding_pen)
+-	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
++	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
+ 	bl	set_cpu_boot_mode_flag
+ 	mrs	x0, mpidr_el1
+ 	mov_q	x1, MPIDR_HWID_BITMASK
 -- 
 2.7.4
