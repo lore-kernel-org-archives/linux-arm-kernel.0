@@ -1,69 +1,88 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 31 Aug 2016 12:05:10 +0100
-Subject: [PATCH v3 0/7] arm64: clean up early boot function calls
-Message-ID: <1472641517-15362-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Wed, 31 Aug 2016 12:05:11 +0100
+Subject: [PATCH v3 1/7] arm64: kernel: fix style issues in sleep.S
+In-Reply-To: <1472641517-15362-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1472641517-15362-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1472641517-15362-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a couple of places, the early boot code uses non-standard argument,
-return value or return address registers when calling functions. This makes
-the code more complicated than it needs to be, which was not a problem in the
-early days, but with all the recent changes for KASLR, hibernate etc, it
-makes sense to clean this up once and for all. This code removes all uses of
-callee saved registers on the secondary boot and resume paths, and on the
-primary boot path, it only leaves the necessary ones, and documents them
-explicitly in patch #7.
+This fixes a number of style issues in sleep.S. No functional changes are
+intended:
+- replace absolute literal references with relative references in
+  __cpu_suspend_enter(), which executes from its virtual address
+- replace explicit lr assignment plus branch with bl in cpu_resume(), which
+  aligns it with stext() and secondary_startup()
+- don't export _cpu_resume()
+- use adr_l for mpidr_hash reference, and fix the incorrect accompanying
+  comment, which has been out of date since commit cabe1c81ea5be983 ("arm64:
+  Change cpu_resume() to enable mmu early then access sleep_sp by va")
+- replace leading spaces with tabs, and add a bit of whitespace for
+  readability
 
-I will leave it to the honourable arm64 maintainers to decide if any of
-these improvements weigh up against the churn, given that this code has
-already been updated numerous times over the past couple of kernel versions.
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/sleep.S | 21 ++++++++++----------
+ 1 file changed, 10 insertions(+), 11 deletions(-)
 
-NOTE: this series applies onto today's for-next/core with fixes/core merged
-on top, since it depends on Mark's commit fd363bd417ddb610 ("arm64: avoid TLB
-conflict with CONFIG_RANDOMIZE_BASE")
-
-Changes since v2:
-- dropped patch that gets rid of x25/x26 as pgdir pointers, it has been merged
-  into for-next/core in the mean time
-- fixed commit log of #1 to indicate since when the comment that it fixes had
-  been incorrect
-- merged changes relating to the use of x27 by __enable_mmu() into a single
-  patch (#4)
-- added Mark's R-b to all patches
-
-Patch #1 fixes some style issues in sleep.S with no functional changes.
-
-Patch #2 removes the use of x20 between el2_setup() and set_cpu_boot_mode_flag()
-
-Patch #3 moves the part of the KASLR processing that resides in __enable_mmu()
-into primary_switch() (which is a more suitable place, given that only the
-primary boot path ever invokes it)
-
-Patch #4 replaces the special x27 return address of __enable_mmu() with x30/lr.
-Given that we can no longer dereference literals containing virtual addresses,
-all callers have already been updated to return from __enable_mmu() back to the
-idmap before performing a literal load + jump. Using x30 instead of x27 allows
-us to merge the code that executes before __enable_mmu() with the code that
-executes after it, and to change the invocation of __enable_mmu() itself into a
-simple bl instruction.
-
-Patch #5 removes the 'global' x24 register in head.S, containing __PHYS_OFFSET
-
-Patch #6 removes the use of x28 in __primary_switched(), and replaces it with
-an ordinary stack frame to preserve the return address.
-
-Ard Biesheuvel (7):
-  arm64: kernel: fix style issues in sleep.S
-  arm64: kernel: use ordinary return/argument register for el2_setup()
-  arm64: head.S: move KASLR processing out of __enable_mmu()
-  arm64: kernel: use x30 for __enable_mmu return address
-  arm64: kernel: drop use of x24 from primary boot path
-  arm64: head.S: use ordinary stack frame for __primary_switched()
-  arm64: head.S: document the use of callee saved registers
-
- arch/arm64/kernel/head.S  | 147 +++++++++++---------
- arch/arm64/kernel/sleep.S |  27 ++--
- 2 files changed, 94 insertions(+), 80 deletions(-)
-
+diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+index 1fac020761da..6adc76bf8f91 100644
+--- a/arch/arm64/kernel/sleep.S
++++ b/arch/arm64/kernel/sleep.S
+@@ -73,10 +73,9 @@ ENTRY(__cpu_suspend_enter)
+ 	str	x2, [x0, #SLEEP_STACK_DATA_SYSTEM_REGS + CPU_CTX_SP]
+ 
+ 	/* find the mpidr_hash */
+-	ldr	x1, =sleep_save_stash
+-	ldr	x1, [x1]
++	ldr_l	x1, sleep_save_stash
+ 	mrs	x7, mpidr_el1
+-	ldr	x9, =mpidr_hash
++	adr_l	x9, mpidr_hash
+ 	ldr	x10, [x9, #MPIDR_HASH_MASK]
+ 	/*
+ 	 * Following code relies on the struct mpidr_hash
+@@ -95,15 +94,14 @@ ENTRY(__cpu_suspend_enter)
+ 	mov	x0, #1
+ 	ret
+ ENDPROC(__cpu_suspend_enter)
+-	.ltorg
+ 
+ 	.pushsection ".idmap.text", "ax"
+ ENTRY(cpu_resume)
+ 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
++	bl	__cpu_setup
+ 	/* enable the MMU early - so we can access sleep_save_stash by va */
+-	adr_l	lr, __enable_mmu	/* __cpu_setup will return here */
+ 	adr_l	x27, _resume_switched	/* __enable_mmu will branch here */
+-	b	__cpu_setup
++	b	__enable_mmu
+ ENDPROC(cpu_resume)
+ 
+ _resume_switched:
+@@ -113,16 +111,17 @@ ENDPROC(_resume_switched)
+ 	.ltorg
+ 	.popsection
+ 
+-ENTRY(_cpu_resume)
++_cpu_resume:
+ 	mrs	x1, mpidr_el1
+-	adrp	x8, mpidr_hash
+-	add x8, x8, #:lo12:mpidr_hash // x8 = struct mpidr_hash phys address
+-        /* retrieve mpidr_hash members to compute the hash */
++	adr_l	x8, mpidr_hash		// x8 = struct mpidr_hash virt address
++
++	/* retrieve mpidr_hash members to compute the hash */
+ 	ldr	x2, [x8, #MPIDR_HASH_MASK]
+ 	ldp	w3, w4, [x8, #MPIDR_HASH_SHIFTS]
+ 	ldp	w5, w6, [x8, #(MPIDR_HASH_SHIFTS + 8)]
+ 	compute_mpidr_hash x7, x3, x4, x5, x6, x1, x2
+-        /* x7 contains hash index, let's use it to grab context pointer */
++
++	/* x7 contains hash index, let's use it to grab context pointer */
+ 	ldr_l	x0, sleep_save_stash
+ 	ldr	x0, [x0, x7, lsl #3]
+ 	add	x29, x0, #SLEEP_STACK_DATA_CALLEE_REGS
 -- 
 2.7.4
