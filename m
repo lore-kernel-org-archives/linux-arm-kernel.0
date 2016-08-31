@@ -1,117 +1,111 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 31 Aug 2016 11:56:49 +0100
-Subject: [PATCH 3/3] PCI: Xilinx NWL PCIe: Fix Error for multi function
- device for legacy interrupts.
-In-Reply-To: <8520D5D51A55D047800579B094147198258D28AF@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1472553558-27215-1-git-send-email-bharatku@xilinx.com>
- <1472553558-27215-3-git-send-email-bharatku@xilinx.com>
- <57C57975.7040306@arm.com>
- <8520D5D51A55D047800579B094147198258D239D@XAP-PVEXMBX01.xlnx.xilinx.com>
- <57C59FE8.30307@arm.com>
- <8520D5D51A55D047800579B094147198258D28AF@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <57C6B7F1.5000001@arm.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 31 Aug 2016 12:01:58 +0100
+Subject: [RFC PATCH 1/7] perf/trace: Add notification for perf trace events
+In-Reply-To: <1471344312-26685-2-git-send-email-punit.agrawal@arm.com> (Punit
+ Agrawal's message of "Tue, 16 Aug 2016 11:45:06 +0100")
+References: <1471344312-26685-1-git-send-email-punit.agrawal@arm.com>
+ <1471344312-26685-2-git-send-email-punit.agrawal@arm.com>
+Message-ID: <87bn09mcbd.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/08/16 10:56, Bharat Kumar Gogada wrote:
->  > On 30/08/16 15:13, Bharat Kumar Gogada wrote:
->>>> Hi Bharat,
->>>>> @@ -561,7 +561,7 @@ static int nwl_pcie_init_irq_domain(struct
->>>>> nwl_pcie
->>>> *pcie)
->>>>>     }
->>>>>
->>>>>     pcie->legacy_irq_domain = irq_domain_add_linear(legacy_intc_node,
->>>>> -                                                   INTX_NUM,
->>>>> +                                                   INTX_NUM + 1,
->>>>>                                                     &legacy_domain_ops,
->>>>>                                                     pcie);
->>>>
->>>> This feels like the wrong thing to do. You have INTX_NUM irqs, so the
->>>> domain allocation should reflect this. On the other hand, the way the
->>>> driver currently deals with mappings is quite broken (consistently adding 1 to
->> the HW interrupt).
->>>>
->>> Hi Marc,
->>>
->>> Without above change I get following crash in kernel while booting.
->>>
->>> [    2.441684] error: hwirq 0x4 is too large for dummy
->>>
->>> [    2.441694] ------------[ cut here ]------------
->>>
->>> [    2.441698] WARNING: at kernel/irq/irqdomain.c:344
->>>
->>> [    2.441702] Modules linked in:
->>>
->>> [    2.441706]
->>>
->>> [    2.441714] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.4.0 #8
->>>
->>> [    2.441718] Hardware name: xlnx,zynqmp (DT)
->>>
->>> [    2.441723] task: ffffffc071886b80 ti: ffffffc071888000 task.ti:
->> ffffffc071888000
->>>
->>> [    2.441732] PC is at irq_domain_associate+0x138/0x1c0
->>>
->>> [    2.441738] LR is at irq_domain_associate+0x138/0x1c0
->>>
->>> In kernel/irq/irqdomain.c function irq_domain_associate
->>>
->>> if (WARN(hwirq >= domain->hwirq_max,
->>>                  "error: hwirq 0x%x is too large for %s\n", (int)hwirq, domain->name))
->>>                 return -EINVAL;
->>>
->>> Here the hwirq and hwirq_max are equal to 4 without the above condition
->> (INTX_NUM + 1) due to which crash is coming.
->>> This is happening as the legacy interrupts are starting from 1 (INTA).
->>
->> I understood that. I'm still persisting in saying that you have the wrong fix.
->>
->> Your domain should always allocate many interrupts as you have interrupt
->> sources. These interrupts (hwirq) should be numbered from 0 to (n-1).
-> 
-> Agreed, but here comes the problem the hwirq for legacy interrupts
-> will start at 0x1 to 0x4 (INTA to INTD) and these values are as per
-> PCIe specification for legacy interrupts. So these cannot be numbered
-> from 0. So when 0x4 (INTD) for a multi-function device comes the
-> crash occurs. 
+Punit Agrawal <punit.agrawal@arm.com> writes:
 
-So who provides this hwirq? Who calls irq_domain_associate() with hwirq
-set to 4?
+> Add a mechanism to notify listeners about perf trace event state
+> changes. This enables listeners to take actions requiring the event
+> context (e.g., attached process).
+>
+> The notification mechanism can be used to reduce trace point based
+> profiling overhead by enabling/disabling hardware traps for specific
+> contexts (e.g., virtual machines).
+>
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Steven Rostedt <rostedt@goodmis.org>
+> Cc: Ingo Molnar <mingo@redhat.com>
 
->>
->>> And I'm  consistently adding 1 to the HW interrupt as in
->>> nwl_pcie_leg_handler I get 0th bit set from MSGF_LEG_STATUS if INTA
->>> interrupt is raised but my hwirq number being mapped for INTA is 0x1
->>> so that's I'm adding 1 to obtain correct virtual irq. Same case in
->>> nwl_pcie_free_irq_domain since hwirq starts from one I'm adding 1 to
->>> obtain virtual irq and free it.
->>
->> I can see that. Nonetheless, this is wrong. Can you please test the patch I
->> provided in my reply and report what happens?
-> 
-> Can you be more specific on what is the wrong, I'm adding one since
-> the hwirq starts from 0x1 as mentioned above.
-
-hwirq should always be the value that is reported by the HW. In your
-case, this ranges from 0 to 3, never 4. So if we can understand why you
-get called with 4 as a hwirq, we can fix this properly, for everyone. It
-is also worth noting that other drivers do not have to do this +1 dance.
-
-> I did try your suggestion with Ethernet card, but kernel hangs (it
-> does not show any crash also, just hangs) when I do interface up
-> (without bit + 1, using only bit position in handler). This is not
-> working because in the legacy domain virq mapping starts with hwirq
-> 0x1, there is no mapping for 0x0 in the domain, so EP interrupt is
-> not serviced since virq being returned is zero.
-
-Right. So let's go back to first principles and find out *who* decides
-about the hwirq starting at 1 instead of zero.
+While I respin the series addressing comments on the arm64 architectural
+bits, I'd appreciate any feedback on this patch as it forms the basis of
+the rest of the series.
 
 Thanks,
+Punit
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> ---
+>  include/linux/trace_events.h    |  3 +++
+>  kernel/trace/trace_event_perf.c | 24 ++++++++++++++++++++++++
+>  2 files changed, 27 insertions(+)
+>
+> diff --git a/include/linux/trace_events.h b/include/linux/trace_events.h
+> index be00761..5924032 100644
+> --- a/include/linux/trace_events.h
+> +++ b/include/linux/trace_events.h
+> @@ -505,6 +505,9 @@ perf_trace_buf_submit(void *raw_data, int size, int rctx, u16 type,
+>  {
+>  	perf_tp_event(type, count, raw_data, size, regs, head, rctx, task);
+>  }
+> +
+> +extern int perf_trace_notifier_register(struct notifier_block *nb);
+> +extern int perf_trace_notifier_unregister(struct notifier_block *nb);
+>  #endif
+>  
+>  #endif /* _LINUX_TRACE_EVENT_H */
+> diff --git a/kernel/trace/trace_event_perf.c b/kernel/trace/trace_event_perf.c
+> index 562fa69..9aaaacf 100644
+> --- a/kernel/trace/trace_event_perf.c
+> +++ b/kernel/trace/trace_event_perf.c
+> @@ -6,10 +6,12 @@
+>   */
+>  
+>  #include <linux/module.h>
+> +#include <linux/notifier.h>
+>  #include <linux/kprobes.h>
+>  #include "trace.h"
+>  
+>  static char __percpu *perf_trace_buf[PERF_NR_CONTEXTS];
+> +static RAW_NOTIFIER_HEAD(perf_trace_notifier_list);
+>  
+>  /*
+>   * Force it to be aligned to unsigned long to avoid misaligned accesses
+> @@ -86,6 +88,26 @@ static int perf_trace_event_perm(struct trace_event_call *tp_event,
+>  	return 0;
+>  }
+>  
+> +int perf_trace_notifier_register(struct notifier_block *nb)
+> +{
+> +	return raw_notifier_chain_register(&perf_trace_notifier_list, nb);
+> +}
+> +
+> +int perf_trace_notifier_unregister(struct notifier_block *nb)
+> +{
+> +	return raw_notifier_chain_unregister(&perf_trace_notifier_list, nb);
+> +}
+> +
+> +static void perf_trace_notify(enum trace_reg event, struct perf_event *p_event)
+> +{
+> +	/*
+> +	 * We use raw notifiers here as we are called with the
+> +	 * event_mutex held.
+> +	 */
+> +	raw_notifier_call_chain(&perf_trace_notifier_list,
+> +				     event, p_event);
+> +}
+> +
+>  static int perf_trace_event_reg(struct trace_event_call *tp_event,
+>  				struct perf_event *p_event)
+>  {
+> @@ -176,6 +198,7 @@ out:
+>  static int perf_trace_event_open(struct perf_event *p_event)
+>  {
+>  	struct trace_event_call *tp_event = p_event->tp_event;
+> +	perf_trace_notify(TRACE_REG_PERF_OPEN, p_event);
+>  	return tp_event->class->reg(tp_event, TRACE_REG_PERF_OPEN, p_event);
+>  }
+>  
+> @@ -183,6 +206,7 @@ static void perf_trace_event_close(struct perf_event *p_event)
+>  {
+>  	struct trace_event_call *tp_event = p_event->tp_event;
+>  	tp_event->class->reg(tp_event, TRACE_REG_PERF_CLOSE, p_event);
+> +	perf_trace_notify(TRACE_REG_PERF_CLOSE, p_event);
+>  }
+>  
+>  static int perf_trace_event_init(struct trace_event_call *tp_event,
