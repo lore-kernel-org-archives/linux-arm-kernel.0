@@ -1,43 +1,41 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 31 Aug 2016 16:58:02 +0200
-Subject: [PATCH v8 08/11] power: act8945a_charger: Add max current property
-In-Reply-To: <1472109599-21915-9-git-send-email-wenyou.yang@atmel.com>
-References: <1472109599-21915-1-git-send-email-wenyou.yang@atmel.com>
- <1472109599-21915-9-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20160831145802.hmbnddaaif6y522t@earth>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 31 Aug 2016 12:06:50 -0300
+Subject: [PATCH] ARM: dts: imx6ul-pico-hobbit: add adc081c support
+In-Reply-To: <1472646394-23772-1-git-send-email-wente.wang@nxp.com>
+References: <1472646394-23772-1-git-send-email-wente.wang@nxp.com>
+Message-ID: <CAOMZO5Ce5vOD26dgbExxq9MfMsbXoWZ271JHWy47ogLSmuy6UA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Winter,
 
-On Thu, Aug 25, 2016 at 03:19:56PM +0800, Wenyou Yang wrote:
-> Add the power supply's current max property,
-> POWER_SUPPLY_PROP_CURRENT_MAX.
+On Wed, Aug 31, 2016 at 9:26 AM, Winter Wang <wente.wang@nxp.com> wrote:
+> enable ADC081C on pico-hobbit
+>
+> Change-Id: Ib1575b50dcf32b74abe0ab618ddc55999d19ee47
 
-[...]
-  
-> -	chglev_pin = of_get_named_gpio_flags(np,
-> -				"active-semi,chglev-gpios", 0, &flags);
-> -
-> -	if (gpio_is_valid(chglev_pin)) {
-> -		gpio_set_value(chglev_pin,
-> -			       ((flags == OF_GPIO_ACTIVE_LOW) ? 0 : 1));
-> +	charger->chglev_gpio = devm_gpiod_get(dev,
-> +					      "active-semi,chglev", GPIOD_IN);
-> +	if (PTR_ERR(charger->chglev_gpio) == -EPROBE_DEFER) {
-> +		dev_info(dev, "probe retry requested for gpio \"chglev\"\n");
-> +		return -EPROBE_DEFER;
-> +	} else if (IS_ERR(charger->chglev_gpio)) {
-> +		dev_err(dev, "unable to claim gpio \"chglev\"\n");
-> +		charger->chglev_gpio = NULL;
+Please remove this line.
 
-Please also use devm_gpiod_get_optional() here (see previous patch).
+> Signed-off-by: Winter Wang <wente.wang@nxp.com>
+> ---
+>  arch/arm/boot/dts/imx6ul-pico-hobbit.dts | 6 ++++++
+>  1 file changed, 6 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/imx6ul-pico-hobbit.dts b/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
+> index c72ee8b..b400582 100644
+> --- a/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
+> +++ b/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
+> @@ -220,6 +220,12 @@
+>                         };
+>                 };
+>         };
+> +
+> +       adc: adc081c {
+> +               compatible = "ti,adc081c";
+> +               reg = <0x50>;
+> +               vref-supply = <&reg_3p3v>;
+> +       };
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160831/eb415d50/attachment-0001.sig>
+You missed the @50:
+
+adc: adc081 at 50
