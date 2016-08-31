@@ -1,61 +1,29 @@
-From: woogyom.kim@gmail.com (Milo Kim)
-Date: Wed, 31 Aug 2016 15:08:47 +0900
-Subject: [PATCH v4] ARM: dts: exynos: Enable HDMI for Arndale Octa board
-Message-ID: <20160831060847.1350-1-woogyom.kim@gmail.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Wed, 31 Aug 2016 14:13:44 +0800
+Subject: [RESEND PATCH 0/4] Support the rk3399 gmac pd function
+Message-ID: <1472624028-7082-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* GPIO for HDMI hot plug detect
-  GPX3_7 is used. The HPD awareness is done when the GPIO is active high.
+This patch add to handle the gmac pd issue, and support
+the rk3399 gmac for devicetree.
 
-* Enable HDMI block in Exynos5420
-  HDMI VDD and PLL consume 1.0V LDO6 (PVDD_ANAIP_1V0) and HDMI oscillator
-  requires 1.8V LDO7 (PVDD_ANAIP_1V8).
 
-* Support HDMI display data channel
-  I2C #2 is assigned for the HDMI DDC. It enables the EDID access.
 
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
----
- arch/arm/boot/dts/exynos5420-arndale-octa.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Caesar Wang (2):
+  arm64: dts: rockchip: support gmac for rk3399
+  arm64: dts: rockchip: enable the gmac for rk3399 evb board
 
-diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-index 39a3b81..d2ad48e 100644
---- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-+++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-@@ -70,6 +70,15 @@
- 	status = "disabled";
- };
- 
-+&hdmi {
-+	hpd-gpios = <&gpx3 7 GPIO_ACTIVE_HIGH>;
-+	vdd_osc-supply = <&ldo7_reg>;
-+	vdd_pll-supply = <&ldo6_reg>;
-+	vdd-supply = <&ldo6_reg>;
-+	ddc = <&i2c_2>;
-+	status = "okay";
-+};
-+
- &hsi2c_4 {
- 	status = "okay";
- 
-@@ -347,6 +356,10 @@
- 	};
- };
- 
-+&i2c_2 {
-+	status = "okay";
-+};
-+
- &mmc_0 {
- 	status = "okay";
- 	broken-cd;
+David Wu (1):
+  net: stmmac: dwmac-rk: add pd_gmac support for rk3399
+
+Roger Chen (1):
+  net: stmmac: dwmac-rk: fixes the gmac resume after PD on/off
+
+ arch/arm64/boot/dts/rockchip/rk3399-evb.dts    | 31 +++++++++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi       | 90 ++++++++++++++++++++++++++
+ drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c | 28 +++++---
+ 3 files changed, 140 insertions(+), 9 deletions(-)
+
 -- 
-2.9.3
+1.9.1
