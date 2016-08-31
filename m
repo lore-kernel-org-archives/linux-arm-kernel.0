@@ -1,51 +1,47 @@
-From: clg@kaod.org (=?UTF-8?q?C=C3=A9dric=20Le=20Goater?=)
-Date: Wed, 31 Aug 2016 19:24:19 +0200
-Subject: [PATCH 3/3] ARM: dts: aspeed: Enable BT IPMI host device
-In-Reply-To: <1472664259-23933-1-git-send-email-clg@kaod.org>
-References: <1472664259-23933-1-git-send-email-clg@kaod.org>
-Message-ID: <1472664259-23933-4-git-send-email-clg@kaod.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 31 Aug 2016 20:34:48 +0300
+Subject: [RESEND PATCH 1/2] ARM: dts: dra7: Fix clock data for
+ gmac_gmii_ref_clk_div
+In-Reply-To: <20160831143928.vxuaznyws2pipohu@atomide.com>
+References: <20160830145801.10364-1-grygorii.strashko@ti.com>
+ <20160830184158.xydy3ixy7c5b73le@atomide.com>
+ <fd7850dd-b7a2-e6ef-508f-8406c3f2cea9@ti.com>
+ <20160831143928.vxuaznyws2pipohu@atomide.com>
+Message-ID: <232e8fb7-320f-3d64-b1f2-599d53d65291@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: C?dric Le Goater <clg@kaod.org>
----
- arch/arm/boot/dts/aspeed-g4.dtsi | 6 ++++++
- arch/arm/boot/dts/aspeed-g5.dtsi | 6 ++++++
- 2 files changed, 12 insertions(+)
+On 31/08/16 17:39, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [160830 23:09]:
+>> On 30/08/16 21:41, Tony Lindgren wrote:
+>>> * Grygorii Strashko <grygorii.strashko@ti.com> [160830 07:58]:
+>>>>
+>>>> Originally this patch was posted (and acked) here
+>>>> https://lkml.org/lkml/2016/4/27/272,
+>>>> but it, unfortunatelly, has never been merged.
+>>>> So re-send + minor subj change.
+>>>
+>>> OK yeah sorry about that. And thanks for the resend. If some patches
+>>> have pending discussion as I tend to tag threads that have pending
+>>> discussion as read and then forget them. And I miss patches in other
+>>> ways too..
+>>>
+>>> Tero, care to take a look and ack?
+>>
+>> For both patches:
+>>
+>> Acked-by: Tero Kristo <t-kristo@ti.com>
+>
+> Thanks applying both into omap-for-v4.9/dt as the Ethernet works
+> currently.
+>
+> Regards,
+>
+> Tony
+>
 
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 22dee5937d5c..1cf57a2b08d3 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -82,6 +82,12 @@
- 				clocks = <&clk_apb>;
- 			};
- 
-+			ibt: ibt at 1e789140 {
-+				compatible = "aspeed,bt-host";
-+				reg = <0x1e789140 0x18>;
-+				interrupts = <8>;
-+			};
-+
- 			wdt1: wdt at 1e785000 {
- 				compatible = "aspeed,wdt";
- 				reg = <0x1e785000 0x1c>;
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index dd94d9361fda..9f29c409d606 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -86,6 +86,12 @@
- 				clocks = <&clk_apb>;
- 			};
- 
-+			ibt: ibt at 1e789140 {
-+				compatible = "aspeed,bt-host";
-+				reg = <0x1e789140 0x18>;
-+				interrupts = <8>;
-+			};
-+
- 			wdt1: wdt at 1e785000 {
- 				compatible = "aspeed,wdt";
- 				reg = <0x1e785000 0x1c>;
--- 
-2.7.4
+Yea I think the ethernet clock rate happens to be the same in the 
+existing setup, just the hierarchy is wrong. That is at least what I saw 
+with quick testing.
+
+-Tero
