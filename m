@@ -1,71 +1,126 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 31 Aug 2016 19:04:56 +0200
-Subject: [PATCH 5/5] misc: sram: add Atmel securam support
-In-Reply-To: <1472661937.9330.8.camel@pengutronix.de>
-References: <20160831161108.8780-1-alexandre.belloni@free-electrons.com>
- <20160831161108.8780-6-alexandre.belloni@free-electrons.com>
- <1472661937.9330.8.camel@pengutronix.de>
-Message-ID: <20160831170456.c7rm3h7kpqor5evg@piout.net>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Wed, 31 Aug 2016 18:08:35 +0100
+Subject: [PATCH v6 2/8] arm: parse cpu capacity-dmips-mhz from DT
+In-Reply-To: <CAKfTPtDAjedxh9J2rqOwafrmubN6+-wDyTRdNQh6fCAb2HS4RQ@mail.gmail.com>
+References: <1468932048-31635-1-git-send-email-juri.lelli@arm.com>
+ <1468932048-31635-3-git-send-email-juri.lelli@arm.com>
+ <CAKfTPtBy7LGCW2T4AGoqL5L_1AHtW6KxHigxFVFVc_EU4oUO0g@mail.gmail.com>
+ <20160830162853.GF9337@e106622-lin>
+ <CAKfTPtDAjedxh9J2rqOwafrmubN6+-wDyTRdNQh6fCAb2HS4RQ@mail.gmail.com>
+Message-ID: <20160831170835.GL9337@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/08/2016 at 18:45:37 +0200, Philipp Zabel wrote :
-> Hi Alexandre,
+On 31/08/16 10:14, Vincent Guittot wrote:
+> On 30 August 2016 at 18:28, Juri Lelli <juri.lelli@arm.com> wrote:
+> > Hi Vincent,
+> >
+> > On 16/08/16 10:20, Vincent Guittot wrote:
+> >> Hi Juri,
+> >>
+> >>
+> >> On 19 July 2016 at 14:40, Juri Lelli <juri.lelli@arm.com> wrote:
+> >
+> > [...]
+> >
+> >> > +static int
+> >> > +init_cpu_capacity_callback(struct notifier_block *nb,
+> >> > +                          unsigned long val,
+> >> > +                          void *data)
+> >> > +{
+> >> > +       struct cpufreq_policy *policy = data;
+> >> > +       int cpu;
+> >> > +
+> >> > +       if (cap_parsing_failed || cap_parsing_done)
+> >> > +               return 0;
+> >> > +
+> >> > +       switch (val) {
+> >> > +       case CPUFREQ_NOTIFY:
+> >> > +               pr_debug("cpu_capacity: init cpu capacity for CPUs [%*pbl] (to_visit=%*pbl)\n",
+> >> > +                               cpumask_pr_args(policy->related_cpus),
+> >> > +                               cpumask_pr_args(cpus_to_visit));
+> >> > +               cpumask_andnot(cpus_to_visit,
+> >> > +                              cpus_to_visit,
+> >> > +                              policy->related_cpus);
+> >> > +               for_each_cpu(cpu, policy->related_cpus) {
+> >> > +                       raw_capacity[cpu] = arch_scale_cpu_capacity(NULL, cpu) *
+> >> > +                                           policy->max / 1000UL;
+> >>
+> >> Should it be policy->cpuinfo.max_freq instead of policy->max ?
+> >>
+> >
+> > Right. I'll fix the arm64 bits as well.
+> >
+> >> > +                       capacity_scale = max(raw_capacity[cpu], capacity_scale);
+> >> > +               }
+> >> > +               if (cpumask_empty(cpus_to_visit)) {
+> >> > +                       normalize_cpu_capacity();
+> >> > +                       kfree(raw_capacity);
+> >> > +                       pr_debug("cpu_capacity: parsing done\n");
+> >> > +                       cap_parsing_done = true;
+> >>
+> >> ok so you do that once with the 1st governor that will be registered
+> >> for the CPU. Can't you unregister the notifier then ?
+> >>
+> >
+> > I tried, but the only place I could find to unregister it is from the
+> > callback itself; and it is not possible to do so AFAIK. Suggestions?
 > 
-> Am Mittwoch, den 31.08.2016, 18:11 +0200 schrieb Alexandre Belloni:
-> > The Atmel secure SRAM is connected to a security module and may be erased
-> > automatically under certain conditions. For that reason, it is necessary to
-> > wait for the security module to flag that SRAM accesses are allowed before
-> > accessing it.
-> > 
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > ---
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> > Cc: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> >  drivers/misc/sram.c | 52 +++++++++++++++++++++++++++++++++++++++++++++-------
-> >  1 file changed, 45 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
-> > index f84b53d6ce50..8d411c64d07f 100644
-> > --- a/drivers/misc/sram.c
-> > +++ b/drivers/misc/sram.c
-> > @@ -19,12 +19,16 @@
-> >   */
-> >  
-> >  #include <linux/clk.h>
-> > +#include <linux/delay.h>
-> >  #include <linux/genalloc.h>
-> >  #include <linux/io.h>
-> >  #include <linux/list_sort.h>
-> >  #include <linux/of_address.h>
-> >  #include <linux/platform_device.h>
-> > +#include <linux/regmap.h>
-> >  #include <linux/slab.h>
-> > +#include <linux/mfd/syscon.h>
-> > +#include <soc/at91/atmel-secumod.h>
-> >  
-> >  #define SRAM_GRANULARITY	32
-> >  
-> > @@ -334,12 +338,43 @@ static int sram_reserve_regions(struct sram_dev *sram, struct resource *res)
-> >  	return ret;
-> >  }
-> >  
-> > +static int atmel_securam_wait(void)
-> > +{
-> > +	struct regmap *regmap;
-> > +	unsigned long timeout = jiffies + HZ;
-> 
-> Can this really take up to a second?
-> 
+> yes, you're right
+> Can't you queue a work to unregister your callback ?
 
-Well, probably not but it can take some time. My understanding is that
-it can take up to almost half a second (4096 bytes at 8kHz). But quite
-frankly, by the time linux is starting, the delay has probably already
-expired so the while loop is unlikely to run.
+You mean something like this? I guess I thought it would be much more
+ugly. :)
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+If it looks OK, I'll add the same for arm64 and test it a bit more.
+
+--->8---
+ arch/arm/kernel/topology.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index cbc57c287145..672ae22e2768 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -215,7 +215,8 @@ static void normalize_cpu_capacity(void)
+ 
+ #ifdef CONFIG_CPU_FREQ
+ static cpumask_var_t cpus_to_visit;
+-static bool cap_parsing_done;
++static void parsing_done_workfn(struct work_struct *work);
++static DECLARE_WORK(parsing_done_work, parsing_done_workfn);
+ 
+ static int
+ init_cpu_capacity_callback(struct notifier_block *nb,
+@@ -225,7 +226,7 @@ init_cpu_capacity_callback(struct notifier_block *nb,
+ 	struct cpufreq_policy *policy = data;
+ 	int cpu;
+ 
+-	if (cap_parsing_failed || cap_parsing_done)
++	if (cap_parsing_failed)
+ 		return 0;
+ 
+ 	switch (val) {
+@@ -245,7 +246,7 @@ init_cpu_capacity_callback(struct notifier_block *nb,
+ 			normalize_cpu_capacity();
+ 			kfree(raw_capacity);
+ 			pr_debug("cpu_capacity: parsing done\n");
+-			cap_parsing_done = true;
++			schedule_work(&parsing_done_work);
+ 		}
+ 	}
+ 	return 0;
+@@ -270,6 +271,13 @@ static int __init register_cpufreq_notifier(void)
+ 					 CPUFREQ_POLICY_NOTIFIER);
+ }
+ core_initcall(register_cpufreq_notifier);
++
++static void parsing_done_workfn(struct work_struct *work)
++{
++	cpufreq_unregister_notifier(&init_cpu_capacity_notifier,
++					 CPUFREQ_POLICY_NOTIFIER);
++}
++
+ #else
+ static int __init free_raw_capacity(void)
+ {
