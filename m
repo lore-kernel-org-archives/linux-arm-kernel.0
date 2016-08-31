@@ -1,108 +1,67 @@
-From: po.liu@nxp.com (Po Liu)
-Date: Wed, 31 Aug 2016 14:37:22 +0800
-Subject: [PATCH v4 2/2] pci:aer: add support aer interrupt with none
- MSI/MSI-X/INTx mode
-In-Reply-To: <1472625442-23309-1-git-send-email-po.liu@nxp.com>
-References: <1465892645-32381-2-git-send-email-po.liu@nxp.com>
- <1472625442-23309-1-git-send-email-po.liu@nxp.com>
-Message-ID: <1472625442-23309-2-git-send-email-po.liu@nxp.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Wed, 31 Aug 2016 08:54:52 +0200
+Subject: [PATCH v4] ARM: dts: exynos: Enable HDMI for Arndale Octa board
+In-Reply-To: <20160831060847.1350-1-woogyom.kim@gmail.com>
+References: <20160831060847.1350-1-woogyom.kim@gmail.com>
+Message-ID: <b6337c5b-90a3-21a3-a0b9-a5c4809e5ee1@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
-When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
-maybe there is interrupt line for aer pme etc. Search the interrupt
-number in the fdt file. Then fixup the dev->irq with it.
+On 08/31/2016 08:08 AM, Milo Kim wrote:
+> * GPIO for HDMI hot plug detect
+>   GPX3_7 is used. The HPD awareness is done when the GPIO is active high.
+>
+> * Enable HDMI block in Exynos5420
+>   HDMI VDD and PLL consume 1.0V LDO6 (PVDD_ANAIP_1V0) and HDMI oscillator
+>   requires 1.8V LDO7 (PVDD_ANAIP_1V8).
+>
+> * Support HDMI display data channel
+>   I2C #2 is assigned for the HDMI DDC. It enables the EDID access.
+>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
 
-Signed-off-by: Po Liu <po.liu@nxp.com>
----
-Changes for v4:
-	- re-use the patch changes in the root port driver;
-	- add binding information;
-
- .../devicetree/bindings/pci/layerscape-pci.txt     |  4 +--
- drivers/pci/pcie/portdrv_core.c                    | 31 +++++++++++++++++++---
- 2 files changed, 30 insertions(+), 5 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-index 41e9f55..1dfb1da 100644
---- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-@@ -19,7 +19,7 @@ Required properties:
- - interrupts: A list of interrupt outputs of the controller. Must contain an
-   entry for each entry in the interrupt-names property.
- - interrupt-names: Must include the following entries:
--  "intr": The interrupt that is asserted for controller interrupts
-+  "aer": The interrupt that is asserted for aer interrupts
- - fsl,pcie-scfg: Must include two entries.
-   The first entry must be a link to the SCFG device node
-   The second entry must be '0' or '1' based on physical PCIe controller index.
-@@ -36,7 +36,7 @@ Example:
- 		       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
- 		reg-names = "regs", "config";
- 		interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
--		interrupt-names = "intr";
-+		interrupt-names = "aer";
- 		fsl,pcie-scfg = <&scfg 0>;
- 		#address-cells = <3>;
- 		#size-cells = <2>;
-diff --git a/drivers/pci/pcie/portdrv_core.c b/drivers/pci/pcie/portdrv_core.c
-index e9270b4..7c4943d 100644
---- a/drivers/pci/pcie/portdrv_core.c
-+++ b/drivers/pci/pcie/portdrv_core.c
-@@ -16,6 +16,7 @@
- #include <linux/slab.h>
- #include <linux/pcieport_if.h>
- #include <linux/aer.h>
-+#include <linux/of_irq.h>
- 
- #include "../pci.h"
- #include "portdrv.h"
-@@ -200,6 +201,28 @@ static int pcie_port_enable_msix(struct pci_dev *dev, int *vectors, int mask)
- static int init_service_irqs(struct pci_dev *dev, int *irqs, int mask)
- {
- 	int i, irq = -1;
-+	int ret;
-+	struct device_node *np = NULL;
-+
-+	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
-+		irqs[i] = 0;
-+
-+	if (dev->bus->dev.of_node)
-+		np = dev->bus->dev.of_node;
-+
-+	/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
-+	 * request irq for aer
-+	 */
-+	if (IS_ENABLED(CONFIG_OF_IRQ) && np &&
-+			(mask & PCIE_PORT_SERVICE_PME)) {
-+		ret = of_irq_get_byname(np, "aer");
-+		if (ret > 0) {
-+			irqs[PCIE_PORT_SERVICE_AER_SHIFT] = ret;
-+			if (dev->irq)
-+				irq = dev->irq;
-+			goto no_msi;
-+		}
-+	}
- 
- 	/*
- 	 * If MSI cannot be used for PCIe PME or hotplug, we have to use
-@@ -225,11 +248,13 @@ static int init_service_irqs(struct pci_dev *dev, int *irqs, int mask)
- 		irq = dev->irq;
- 
-  no_msi:
--	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
--		irqs[i] = irq;
-+	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++) {
-+		if (!irqs[i])
-+			irqs[i] = irq;
-+	}
- 	irqs[PCIE_PORT_SERVICE_VC_SHIFT] = -1;
- 
--	if (irq < 0)
-+	if (irq < 0 && irqs[PCIE_PORT_SERVICE_AER_SHIFT] < 0)
- 		return -ENODEV;
- 	return 0;
- }
--- 
-2.1.0.27.g96db324
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+--
+Regards
+Andrzej
+> ---
+>  arch/arm/boot/dts/exynos5420-arndale-octa.dts | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+> index 39a3b81..d2ad48e 100644
+> --- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+> +++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+> @@ -70,6 +70,15 @@
+>  	status = "disabled";
+>  };
+>  
+> +&hdmi {
+> +	hpd-gpios = <&gpx3 7 GPIO_ACTIVE_HIGH>;
+> +	vdd_osc-supply = <&ldo7_reg>;
+> +	vdd_pll-supply = <&ldo6_reg>;
+> +	vdd-supply = <&ldo6_reg>;
+> +	ddc = <&i2c_2>;
+> +	status = "okay";
+> +};
+> +
+>  &hsi2c_4 {
+>  	status = "okay";
+>  
+> @@ -347,6 +356,10 @@
+>  	};
+>  };
+>  
+> +&i2c_2 {
+> +	status = "okay";
+> +};
+> +
+>  &mmc_0 {
+>  	status = "okay";
+>  	broken-cd;
