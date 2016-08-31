@@ -1,24 +1,23 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 31 Aug 2016 13:08:49 +0200
-Subject: [PATCH 00/28] coresight: next v4.8-rc3
-In-Reply-To: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1472159958-5981-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20160831110849.GA13058@kroah.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 31 Aug 2016 12:11:15 +0100
+Subject: [PATCH v7 0/5] The series cleans up mainly the regulator driver
+ and implements
+In-Reply-To: <1470833545-29462-1-git-send-email-j-keerthy@ti.com>
+References: <1470833545-29462-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <20160831111115.GF27357@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2016 at 03:18:50PM -0600, Mathieu Poirier wrote:
-> Hello Greg,
-> 
-> These are a combination of the CoreSight subsystem patches tallied
-> during v4.7 cycle (that were not picked) and those for this cycle.
-> My hope is to see them all considered for the v4.9 cycle. 
-> 
-> Everything applies cleanly on your 'char-misc-next' branch
-> (4c73c0882b34).
-> 
-> With a little help from the universe there will be a few more.
+On Wed, 10 Aug 2016, Keerthy wrote:
 
-All now applied, sorry for the delay.
+> One of the patch removes redundant read wrapper and makes
+> use of regmap_read wherever necessary.
 
-greg k-h
+I can't take this series yet, since it relies on a change which was
+taken into Mark's Regulator tree.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
