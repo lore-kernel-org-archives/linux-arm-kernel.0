@@ -1,50 +1,47 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 31 Aug 2016 13:25:14 +0100
-Subject: [PATCH 1/6] backlight: pwm_bl: Handle gpio that can sleep
-In-Reply-To: <20160831081817.5191-2-maxime.ripard@free-electrons.com>
-References: <20160831081817.5191-1-maxime.ripard@free-electrons.com>
- <20160831081817.5191-2-maxime.ripard@free-electrons.com>
-Message-ID: <20160831122514.GE9415@dell>
+Date: Wed, 31 Aug 2016 13:28:49 +0100
+Subject: [PATCH v8 01/11] mfd: act8945a: Add .of_compatible for
+ act8945a-charger
+In-Reply-To: <1472109599-21915-2-git-send-email-wenyou.yang@atmel.com>
+References: <1472109599-21915-1-git-send-email-wenyou.yang@atmel.com>
+ <1472109599-21915-2-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20160831122849.GF9415@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 31 Aug 2016, Maxime Ripard wrote:
+On Thu, 25 Aug 2016, Wenyou Yang wrote:
 
-> Some backlight GPIOs might be connected to some i2c based expanders whose
-> access might sleep.
+> To regard the act8945a-charger as a sub-device, add .of_compatible for
+> act8945a-charger cell.
 > 
-> Since it's not in any critical path, use the cansleep variant of the GPIO
-> API.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 > ---
->  drivers/video/backlight/pwm_bl.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> Changes in v8: None
+> Changes in v7: None
+> Changes in v6: None
+> Changes in v5: None
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  drivers/mfd/act8945a.c | 1 +
+>  1 file changed, 1 insertion(+)
 
 Applied, thanks.
 
-> diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-> index b2b366bb0f97..12614006211e 100644
-> --- a/drivers/video/backlight/pwm_bl.c
-> +++ b/drivers/video/backlight/pwm_bl.c
-> @@ -55,7 +55,7 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
->  		dev_err(pb->dev, "failed to enable power supply\n");
+> diff --git a/drivers/mfd/act8945a.c b/drivers/mfd/act8945a.c
+> index 10c6d2d..a4024d9 100644
+> --- a/drivers/mfd/act8945a.c
+> +++ b/drivers/mfd/act8945a.c
+> @@ -23,6 +23,7 @@ static const struct mfd_cell act8945a_devs[] = {
+>  	},
+>  	{
+>  		.name = "act8945a-charger",
+> +		.of_compatible = "active-semi,act8945a-charger",
+>  	},
+>  };
 >  
->  	if (pb->enable_gpio)
-> -		gpiod_set_value(pb->enable_gpio, 1);
-> +		gpiod_set_value_cansleep(pb->enable_gpio, 1);
->  
->  	pwm_enable(pb->pwm);
->  	pb->enabled = true;
-> @@ -70,7 +70,7 @@ static void pwm_backlight_power_off(struct pwm_bl_data *pb)
->  	pwm_disable(pb->pwm);
->  
->  	if (pb->enable_gpio)
-> -		gpiod_set_value(pb->enable_gpio, 0);
-> +		gpiod_set_value_cansleep(pb->enable_gpio, 0);
->  
->  	regulator_disable(pb->power_supply);
->  	pb->enabled = false;
 
 -- 
 Lee Jones
