@@ -1,45 +1,47 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 31 Aug 2016 09:19:14 +0100
-Subject: [PATCH 0/3] remove skeleton.dtsi from armv7-m.dtsi
-In-Reply-To: <20160830205250.15616-1-manabian@gmail.com>
-References: <20160830205250.15616-1-manabian@gmail.com>
-Message-ID: <57C69302.9050308@arm.com>
+From: woogyom.kim@gmail.com (Milo Kim)
+Date: Wed, 31 Aug 2016 17:25:16 +0900
+Subject: [PATCH v2 0/4] Add PWM feature in Allwinner H3
+Message-ID: <20160831082520.25962-1-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/08/16 21:52, Joachim Eastwood wrote:
-> Hi
-> 
-> This patch set removes skeleton.dtsi from the common ARM Cortex-M dtsi.
-> This will allow us to remove skeleton.dtsi on a per platform basis and
-> get rid of the unit address warning on the memory nodes without getting
-> duplicate memory nodes.
-> 
-> See 3ebee5a2e141 ("arm64: dts: kill skeleton.dtsi") for additional
-> reasons not to use the skeleton.dtsi.
-> 
-> I plan to take atleast the first two patches through the lpc18xx tree.
-> Please ack if you are okey with the change to your platform dtsi file.
-> 
-> 
-> Joachim Eastwood (3):
->   ARM: dts: armv7-m: remove skeleton.dtsi include
->   ARM: dts: lpc18xx: remove skeleton.dtsi include and fix unit address warnings
->   ARM: dts: efm32: remove skeleton.dtsi include and fix unit address warnings
-> 
->  arch/arm/boot/dts/armv7-m.dtsi              | 2 --
->  arch/arm/boot/dts/efm32gg-dk3750.dts        | 5 +++--
->  arch/arm/boot/dts/efm32gg.dtsi              | 4 ++++
->  arch/arm/boot/dts/lpc18xx.dtsi              | 3 +++
->  arch/arm/boot/dts/lpc4337-ciaa.dts          | 2 +-
->  arch/arm/boot/dts/lpc4350-hitex-eval.dts    | 2 +-
->  arch/arm/boot/dts/lpc4357-ea4357-devkit.dts | 2 +-
->  arch/arm/boot/dts/mps2.dtsi                 | 1 +
->  arch/arm/boot/dts/stm32f429.dtsi            | 1 +
->  arch/arm/boot/dts/vf610m4.dtsi              | 1 +
->  10 files changed, 16 insertions(+), 7 deletions(-)
-> 
+According to the latest datasheet, H3 has single PWM channel.
+H3 PWM controller has same register layout as sun4i driver, so it works 
+by adding H3 specific data.
+And the second PWM channel is not supported, so the pinctrl function is removed.
 
-For MPS2:
+Datasheet:
+  http://linux-sunxi.org/File:Allwinner_H3_Datasheet_V1.2.pdf
 
-Acked-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Test environment:
+  Tested on Nano Pi M1 board, but PA5 pin is assigned for UART0.
+  So the debug console should be changed to other port like UART1.
+
+  Ex)
+	aliases {
+		serial0 = &uart1;
+	};
+
+	&uart1 {
+        	pinctrl-names = "default";
+	        pinctrl-0 = <&uart1_pins_a>;
+        	status = "okay";
+	};
+
+v2:
+  Split v1 patch-set into several patches
+
+Milo Kim (4):
+  ARM: dts: sun8i: Add PWM pin in H3
+  ARM: dts: sun8i: Add PWM controller node in H3
+  pinctrl: sunxi: Remove unsupported PWM channel pinmux in H3
+  pwm: sunxi: Add H3 support
+
+ Documentation/devicetree/bindings/pwm/pwm-sun4i.txt |  1 +
+ arch/arm/boot/dts/sun8i-h3.dtsi                     | 15 +++++++++++++++
+ drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c            |  1 -
+ drivers/pwm/pwm-sun4i.c                             |  9 +++++++++
+ 4 files changed, 25 insertions(+), 1 deletion(-)
+
+-- 
+2.9.3
