@@ -1,100 +1,50 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 31 Aug 2016 09:06:34 +0200
-Subject: [PATCH] ARM: dts: wheat: add SDHI0 support
-In-Reply-To: <1659137.gEKJxNrmrk@wasted.cogentembedded.com>
-References: <34968644.DhifNderY8@wasted.cogentembedded.com>
- <1659137.gEKJxNrmrk@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdXbVPigVM=ObWY724B6Yf1TFWBn2j9q2RVWse=Z57ovvA@mail.gmail.com>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Wed, 31 Aug 2016 07:15:45 +0000
+Subject: [Fwd: Re: [PATCH v2 1/6] clk: tegra: add TEGRA20_CLK_NOR to init
+ table]
+References: <1472569308.5703.22.camel@toradex.com>
+Message-ID: <1472627744.31008.2.camel@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On Wed, 2016-08-24 at 15:37 +0200, Mirza Krak wrote:
+> 
+> From: Mirza Krak <mirza.krak-Re5JQEeQqe8AvxtiuMwx3w@public.gmane.org>
+> 
+> Add TEGRA20_CLK_NOR to init tabel and set default rate to 92 MHz
+> which
+> is max rate.
 
-On Wed, Aug 31, 2016 at 12:24 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Define the Wheat board dependent  part of  the SDHI0 (connected to the
-> micro-SD slot)  device node along with the necessary voltage regulator.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->
+table
+
+> 
+> Signed-off-by: Mirza Krak <mirza.krak-Re5JQEeQqe8AvxtiuMwx3w@public.g
+> mane.org>
 > ---
-> This patch is against the 'renesas-devel-20160830-v4.8-rc4' of Simon Horman's
-> 'renesas.git' repo plus the CAN patch posted yesterday.
-> Starting with this patch, SMSC LAN89218 Ethernet chip starts to misbehave on my
-> board...
+> Changes in v2:
+> - no changes
+> 
+> ?drivers/clk/tegra/clk-tegra20.c | 1 +
+> ?1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-
+> tegra20.c
+> index 837e5cb..13d3b5a 100644
+> --- a/drivers/clk/tegra/clk-tegra20.c
+> +++ b/drivers/clk/tegra/clk-tegra20.c
+> @@ -1047,6 +1047,7 @@ static struct tegra_clk_init_table init_table[]
+> __initdata = {
+> ?	{ TEGRA20_CLK_SDMMC3, TEGRA20_CLK_PLL_P, 48000000, 0 },
+> ?	{ TEGRA20_CLK_SDMMC4, TEGRA20_CLK_PLL_P, 48000000, 0 },
+> ?	{ TEGRA20_CLK_SPI, TEGRA20_CLK_PLL_P, 20000000, 0 },
+> +	{ TEGRA20_CLK_NOR, TEGRA20_CLK_PLL_P, 92000000, 0 },
 
-Are GP11_11 or GP11_12 connected to the Ethernet chip?
-Does the misbehaving go away if you drop
-  - cd-gpios?
-  - The regulator?
-  - sdhi0-pins (there may be a bug in the pfc register bit definitions)?
+I'm just curious where that 92 MHz came from. According to the Tegra 2
+Interface Design Guide up to 133 MHz should actually be possible.
 
->  arch/arm/boot/dts/r8a7792-wheat.dts |   26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->
-> Index: renesas/arch/arm/boot/dts/r8a7792-wheat.dts
-> ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/r8a7792-wheat.dts
-> +++ renesas/arch/arm/boot/dts/r8a7792-wheat.dts
-> @@ -11,6 +11,7 @@
->
->  /dts-v1/;
->  #include "r8a7792.dtsi"
-> +#include <dt-bindings/gpio/gpio.h>
->
->  / {
->         model = "Wheat";
-> @@ -54,6 +55,17 @@
->                 pinctrl-0 = <&lan89218_pins>;
->                 pinctrl-names = "default";
->         };
-> +
-> +       vcc_sdhi0: regulator-vcc-sdhi0 {
-> +               compatible = "regulator-fixed";
-> +
-> +               regulator-name = "SDHI0 Vcc";
-> +               regulator-min-microvolt = <3300000>;
-> +               regulator-max-microvolt = <3300000>;
-> +
-> +               gpio = <&gpio11 12 GPIO_ACTIVE_HIGH>;
-> +               enable-active-high;
-> +       };
->  };
->
->  &extal_clk {
-> @@ -86,6 +98,11 @@
->                 groups = "can1_data";
->                 function = "can1";
->         };
-> +
-> +       sdhi0_pins: sdhi0 {
-> +               groups = "sdhi0_data4", "sdhi0_ctrl";
-> +               function = "sdhi0";
-> +       };
->  };
->
->  &scif0 {
-> @@ -108,3 +125,12 @@
->
->         status = "okay";
->  };
-> +
-> +&sdhi0 {
-> +       pinctrl-0 = <&sdhi0_pins>;
-> +       pinctrl-names = "default";
-> +
-> +       vmmc-supply = <&vcc_sdhi0>;
-> +       cd-gpios = <&gpio11 11 GPIO_ACTIVE_LOW>;
-> +       status = "okay";
-> +};
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> 
+> ?	{ TEGRA20_CLK_SBC1, TEGRA20_CLK_PLL_P, 100000000, 0 },
+> ?	{ TEGRA20_CLK_SBC2, TEGRA20_CLK_PLL_P, 100000000, 0 },
+> ?	{ TEGRA20_CLK_SBC3, TEGRA20_CLK_PLL_P, 100000000, 0 },
+> --
+> 2.1.4
