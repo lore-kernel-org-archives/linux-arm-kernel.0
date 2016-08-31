@@ -1,41 +1,45 @@
-From: jorik@kippendief.biz (jorik at kippendief.biz)
-Date: Wed, 31 Aug 2016 21:30:58 +0200
-Subject: [PATCH v2 7/7] dts: sun8i-h3: add I2C0-1 to Orange Pi PC
-In-Reply-To: <1472671858-29220-1-git-send-email-jorik@kippendief.biz>
-References: <1472671858-29220-1-git-send-email-jorik@kippendief.biz>
-Message-ID: <1472671858-29220-8-git-send-email-jorik@kippendief.biz>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 31 Aug 2016 12:44:49 -0700
+Subject: [PATCH v3 0/8] drm/tilcdc: Address LCDC rev 2 color errata +
+ other fixes
+In-Reply-To: <c049825a-0802-0637-3b1e-5290032e6d10@ti.com>
+References: <cover.1472634657.git.jsarha@ti.com>
+ <20160831180418.rte4sf5s4llyuuvn@atomide.com>
+ <c049825a-0802-0637-3b1e-5290032e6d10@ti.com>
+Message-ID: <20160831194449.6zca45xs3eyngpme@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jorik Jonker <jorik@kippendief.biz>
+* Jyri Sarha <jsarha@ti.com> [160831 11:49]:
+> On 08/31/16 21:04, Tony Lindgren wrote:
+> > * Jyri Sarha <jsarha@ti.com> [160831 06:19]:
+> >>   ARM: dts: am335x-boneblack: Add blue-and-red-wiring -property to LCDC
+> >>     node
+> >>   ARM: dts: am335x-evm: Add blue-and-red-wiring -property to lcdc node
+> >>   ARM: dts: am335x-evmsk: Whitespace cleanup of lcdc related nodes
+> >>   ARM: dts: am335x-evmsk: Add blue-and-red-wiring -property to lcdc node
+> > 
+> > If some of these dts changes are OK for me to apply separately already,
+> > please let me know.
+> > 
+> > Otherwise I'll tag this thread as read and assume you'll send the dts
+> > changes separately when ready :)
+> > 
+> 
+> According to my plan the drm side changes should go into 4.9.
+> 
+> The commit messages and the comments may look confusing without the
+> implementation, but otherwise there should be no harm in applying these
+> already. The new properties in dts simply wont have any effect. On the
+> other hand, not having the dts changes won't have any dramatic effect
+> either. The supported colour formats will just remain in the same
+> incorrect state as they have always been until the dts changes are
+> there. So what ever is more convenient for you.
 
-This board has I2C0-I2C1 exposed on its expansion header.
+OK well please ping me or resend just the dts changes once the driver
+changes are queued. Probably safer to wait a bit in case things still
+change.
 
-Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
----
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Thanks,
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-index 602b012..6102e37 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-@@ -108,6 +108,16 @@
- 	status = "okay";
- };
- 
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+};
-+
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
--- 
-2.7.4
+Tony
