@@ -1,170 +1,529 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed, 31 Aug 2016 22:28:20 +0530
-Subject: [PATCH v6 0/8] power: add power sequence library
-In-Reply-To: <20160831095220.GA11938@b29397-desktop>
-References: <1471252398-957-1-git-send-email-peter.chen@nxp.com>
- <b1848eb2-9298-9089-ee4d-5356998c6c08@linaro.org>
- <20160824085335.GB27233@shlinux2> <20160829111045.GB3736@b29397-desktop>
- <3a45793f-18d9-0688-d2ab-ef79432c473c@linaro.org>
- <20160831095220.GA11938@b29397-desktop>
-Message-ID: <fd94340b-1c1d-2307-7e57-5b05f1655d2c@linaro.org>
+From: zhengyu.shen@nxp.com (Zhengyu Shen)
+Date: Wed, 31 Aug 2016 12:00:29 -0500
+Subject: [PATCH v4] ARM: imx: Added perf functionality to mmdc driver
+Message-ID: <20160831170029.27756-1-zhengyu.shen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+MMDC is a multi-mode DDR controller that supports DDR3/DDR3L x16/x32/x64
+and LPDDR2 two channel x16/x32 memory types. MMDC is configurable, high
+performance, and optimized. MMDC is present on i.MX6 Quad and i.MX6
+QuadPlus devices, but this driver only supports i.MX6 Quad at the moment.
+MMDC provides registers for performance counters which read via this
+driver to help debug memory throughput and similar issues.
 
+$ perf stat -a -e mmdc/busy-cycles/,mmdc/read-accesses/,mmdc/read-bytes/,mmdc/total-cycles/,mmdc/write-accesses/,mmdc/write-bytes/ dd if=/dev/zero of=/dev/null bs=1M count=5000
+Performance counter stats for 'dd if=/dev/zero of=/dev/null bs=1M count=5000':
 
-On Wednesday 31 August 2016 03:22 PM, Peter Chen wrote:
-> On Wed, Aug 31, 2016 at 01:46:30PM +0530, Vaibhav Hiremath wrote:
->>
->> On Monday 29 August 2016 04:40 PM, Peter Chen wrote:
->>> On Wed, Aug 24, 2016 at 04:53:35PM +0800, Peter Chen wrote:
->>>> On Tue, Aug 23, 2016 at 04:02:48PM +0530, Vaibhav Hiremath wrote:
->>>>> On Monday 15 August 2016 02:43 PM, Peter Chen wrote:
->>>>>> Hi all,
->>>>>>
->>>>>> This is a follow-up for my last power sequence framework patch set [1].
->>>>>> According to Rob Herring and Ulf Hansson's comments[2], I use a generic
->>>>>> power sequence library for parsing the power sequence elements on DT,
->>>>>> and implement generic power sequence on library. The host driver
->>>>>> can allocate power sequence instance, and calls pwrseq APIs accordingly.
->>>>>>
->>>>>> In future, if there are special power sequence requirements, the special
->>>>>> power sequence library can be created.
->>>>>>
->>>>>> This patch set is tested on i.mx6 sabresx evk using a dts change, I use
->>>>>> two hot-plug devices to simulate this use case, the related binding
->>>>>> change is updated at patch [1/6], The udoo board changes were tested
->>>>>> using my last power sequence patch set.[3]
->>>>>>
->>>>>> Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
->>>>>> need to power on itself before it can be found by ULPI bus.
->>>>>>
->>>>>> [1]http://www.spinics.net/lists/linux-usb/msg142755.html
->>>>>> [2]http://www.spinics.net/lists/linux-usb/msg143106.html
->>>>>> [3]http://www.spinics.net/lists/linux-usb/msg142815.html
->>>>> (Please ignore my response on V2)
->>>>>
->>>>> Sorry being so late in the discussion...
->>>>>
->>>>> If I am not missing anything, then I am afraid to say that the
->>>>> generic library
->>>>> implementation in this patch series is not going to solve many of
->>>>> the custom
->>>>> requirement of power on, off, etc...
->>>>> I know you mentioned about adding another library when we come
->>>>> across such platforms, but should we not keep provision (or easy
->>>>> hooks/path)
->>>>> to enable that ?
->>>>>
->>>>> Let me bring in the use case I am dealing with,
->>>>>
->>>>>
->>>>>                                Host
->>>>>                                 |
->>>>>                                 V
->>>>>                             USB port
->>>>> ------------------------------------------------------------
->>>>>                                 |
->>>>>                                 V
->>>>>                        USB HUB device (May need custom on/off seq)
->>>>>                                 |
->>>>>                                 V
->>>>>                =============================
->>>>>               |                             |
->>>>>               V                             V
->>>>>           Device-1                       Device-2
->>>>> (Needs special power               (Needs special power
->>>>>   on/off sequence.                   on/off sequence.
->>>>>   Also may need custom               Also, may need custom
->>>>>   sequence for                       sequence for
->>>>>   suspend/resume)                    suspend/resume)
->>>>>
->>>>>
->>>>> Note: Both Devices are connected to HUB via HSIC and may differ
->>>>>            in terms of functionality, features they support.
->>>>>
->>>>> In the above case, both Device-1 and Device-2, need separate
->>>>> power on/off sequence. So generic library currently we have in this
->>>>> patch series is not going to satisfy the need here.
->>>>>
->>>>> I looked at all 6 revisions of this patch-series, went through the
->>>>> review comments, and looked at MMC power sequence code;
->>>>> what I can say here is, we need something similar to
->>>>> MMC power sequence here, where every device can have its own
->>>>> power sequence (if needed).
->>>>>
->>>>> I know Rob is not in favor of creating platform device for
->>>>> this, and I understand his comment.
->>>>> If not platform device, but atleast we need mechanism to
->>>>> connect each device back to its of_node and its respective
->>>>> driver/library fns. For example, the Devices may support different
->>>>> boot modes, and platform driver needs to make sure that
->>>>> the right sequence is followed for booting.
->>>>>
->>>>> Peter, My apologies for taking you back again on this series.
->>>>> I am OK, if you wish to address this in incremental addition,
->>>>> but my point is, we know that the current generic way is not
->>>>> enough for us, so I think we should try to fix it in initial phase only.
->>>>>
->>>> Rob, it seems generic power sequence can't cover all cases.
->>>> Without information from DT, we can't know which power sequence
->>>> for which device.
->>>>
->>> Vaibhav, do you agree that I create pwrseq library list using postcore_initcall
->>> for each library, and choose pwrseq library according to compatible
->>> string first, if there is no compatible string for this library, just
->>> use generic pwrseq library.
->>>
->> Lets hear from MMC folks. Ulf, do you agree on approach
->> for pwr seq ??
->>
->>
->> With above approach, I kind of agree on it, but I have couple
->> of comments,
->>
->>   - How DTS looks like now ?? Can you put example here ?
-> The dts is the same with current version.
+         898021787      mmdc/busy-cycles/
+          14819600      mmdc/read-accesses/
+            471.30 MB   mmdc/read-bytes/
+        2815419216      mmdc/total-cycles/
+          13367354      mmdc/write-accesses/
+            427.76 MB   mmdc/write-bytes/
 
-How would consumer driver get the power sequence ?
-You must point to right power sequence driver.
-For example, in the above example, Device-1, should
-get handle to pwrseq-1, and Device-2 to pwrseq-2.
+       5.334757334 seconds time elapsed
 
->>   - Should we merge MMC power sequence in next series ?
->>     We also can take this as an incremental change, to avoid further
->>     delay :)
-> We had an agreement that keep mmc's pwrseq framework unchanging.
-> Unless Ulf and rob both agree to change.
+Signed-off-by: Zhengyu Shen <zhengyu.shen@nxp.com>
+Signed-off-by: Frank Li <frank.li@nxp.com>
+---
+Changes from v3 to v4:
+    Tested and fixed crash relating to removing events with perf fuzzer
+    Adjusted formatting
+    Moved all perf event code under CONFIG_PERF_EVENTS
+	Switched cpuhp_setup_state to cpuhp_setup_state_nocalls
 
-Why 2 separate approach for same problem ?
-And I see this as possible duplication of code/functionality :)
+Changes from v2 to v3:
+    Use WARN_ONCE instead of returning generic error values
+    Replace CPU Notifiers with newer state machine hotplug
+    Added additional checks on event_init for grouping and sampling
+    Remove useless mmdc_enable_profiling function
+    Added comments
+    Moved start index of events from 0x01 to 0x00
+    Added a counter to pmu_mmdc to only stop hrtimer after all events are finished
+    Replace readl_relaxed and writel_relaxed with readl and writel
+    Removed duplicate update function
+    Used devm_kasprintf when naming mmdcs probed
 
-Rob ??? Ulf ???
+Changes from v1 to v2:
+    Added cpumask and migration handling support to driver
+    Validated event during event_init
+    Added code to properly stop counters
+    Used perf_invalid_context instead of perf_sw_context
+    Added hrtimer to poll for overflow
+    Added better description
+    Added support for multiple mmdcs
 
->>   - Lets also add suspend/resume callback to struct pwrseq
->>
-> Why suspend/resume can't do at related driver's suspend/resume API?
+ arch/arm/mach-imx/mmdc.c | 423 ++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 421 insertions(+), 2 deletions(-)
 
-Nope...
-The pwrseq library would have taken ownership of resources, so
-related driver cannot suspend the device. Again it is architecture
-specific, but we should have provision to handle this.
-
-The system I am dealing with today, does need suspend/resume
-callback. To be precise, suspend is close to off state for some devices or
-they could enter standby or different low power state, but to do that,
-we need same resource as used for ON/OFF functionality.
-
-
-Thanks,
-Vaibhav
->> There are some comments I have on the patches,
->> I will respond directly on respective patches, it would be useful
->> for next series.
->>
-> Thanks.
->
-
+diff --git a/arch/arm/mach-imx/mmdc.c b/arch/arm/mach-imx/mmdc.c
+index db9621c..77357c3 100644
+--- a/arch/arm/mach-imx/mmdc.c
++++ b/arch/arm/mach-imx/mmdc.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2011 Freescale Semiconductor, Inc.
++ * Copyright 2011,2016 Freescale Semiconductor, Inc.
+  * Copyright 2011 Linaro Ltd.
+  *
+  * The code contained herein is licensed under the GNU General Public
+@@ -10,12 +10,17 @@
+  * http://www.gnu.org/copyleft/gpl.html
+  */
+ 
++#include <linux/hrtimer.h>
+ #include <linux/init.h>
++#include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_device.h>
++#include <linux/perf_event.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
+ 
+ #include "common.h"
+ 
+@@ -27,8 +32,421 @@
+ #define BM_MMDC_MDMISC_DDR_TYPE	0x18
+ #define BP_MMDC_MDMISC_DDR_TYPE	0x3
+ 
++#define TOTAL_CYCLES		0x0
++#define BUSY_CYCLES		0x1
++#define READ_ACCESSES		0x2
++#define WRITE_ACCESSES		0x3
++#define READ_BYTES		0x4
++#define WRITE_BYTES		0x5
++
++/* Enables, resets, freezes, overflow profiling*/
++#define DBG_DIS			0x0
++#define DBG_EN			0x1
++#define DBG_RST			0x2
++#define PRF_FRZ			0x4
++#define CYC_OVF			0x8
++
++#define MMDC_MADPCR0	0x410
++#define MMDC_MADPSR0	0x418
++#define MMDC_MADPSR1	0x41C
++#define MMDC_MADPSR2	0x420
++#define MMDC_MADPSR3	0x424
++#define MMDC_MADPSR4	0x428
++#define MMDC_MADPSR5	0x42C
++
++#define MMDC_NUM_COUNTERS	6
++
++#define to_mmdc_pmu(p) container_of(p, struct mmdc_pmu, pmu)
++
+ static int ddr_type;
+ 
++#ifdef CONFIG_PERF_EVENTS
++
++static DEFINE_IDA(mmdc_ida);
++
++PMU_EVENT_ATTR_STRING(total-cycles, mmdc_total_cycles, "event=0x00")
++PMU_EVENT_ATTR_STRING(busy-cycles, mmdc_busy_cycles, "event=0x01")
++PMU_EVENT_ATTR_STRING(read-accesses, mmdc_read_accesses, "event=0x02")
++PMU_EVENT_ATTR_STRING(write-accesses, mmdc_write_accesses, "config=0x03")
++PMU_EVENT_ATTR_STRING(read-bytes, mmdc_read_bytes, "event=0x04")
++PMU_EVENT_ATTR_STRING(read-bytes.unit, mmdc_read_bytes_unit, "MB");
++PMU_EVENT_ATTR_STRING(read-bytes.scale, mmdc_read_bytes_scale, "0.000001");
++PMU_EVENT_ATTR_STRING(write-bytes, mmdc_write_bytes, "event=0x05")
++PMU_EVENT_ATTR_STRING(write-bytes.unit, mmdc_write_bytes_unit, "MB");
++PMU_EVENT_ATTR_STRING(write-bytes.scale, mmdc_write_bytes_scale, "0.000001");
++
++struct mmdc_pmu {
++	struct pmu pmu;
++	void __iomem *mmdc_base;
++	cpumask_t cpu;
++	struct hrtimer hrtimer;
++	unsigned int irq;
++	unsigned int active_events;
++	struct device *dev;
++	struct perf_event *mmdc_events[MMDC_NUM_COUNTERS];
++	spinlock_t mmdc_active_events_lock;
++};
++
++static struct mmdc_pmu *cpuhp_mmdc_pmu;
++
++/*
++ * Polling period is set to one second, overflow of total-cycles (the fastest
++ * increasing counter) takes ten seconds so one second is safe
++ */
++static unsigned int mmdc_poll_period_us = 1000000;
++
++module_param_named(pmu_poll_period_us, mmdc_poll_period_us, uint,
++		S_IRUGO | S_IWUSR);
++
++static ktime_t mmdc_timer_period(void)
++{
++	return ns_to_ktime((u64)mmdc_poll_period_us * 1000);
++}
++
++static ssize_t mmdc_cpumask_show(struct device *dev,
++		struct device_attribute *attr, char *buf)
++{
++	struct mmdc_pmu *pmu_mmdc = dev_get_drvdata(dev);
++
++	return cpumap_print_to_pagebuf(true, buf, &pmu_mmdc->cpu);
++}
++
++static struct device_attribute mmdc_cpumask_attr =
++__ATTR(cpumask, S_IRUGO, mmdc_cpumask_show, NULL);
++
++static struct attribute *mmdc_cpumask_attrs[] = {
++	&mmdc_cpumask_attr.attr,
++	NULL,
++};
++
++static struct attribute_group mmdc_cpumask_attr_group = {
++	.attrs = mmdc_cpumask_attrs,
++};
++
++static struct attribute *mmdc_events_attrs[] = {
++	&mmdc_total_cycles.attr.attr,
++	&mmdc_busy_cycles.attr.attr,
++	&mmdc_read_accesses.attr.attr,
++	&mmdc_write_accesses.attr.attr,
++	&mmdc_read_bytes.attr.attr,
++	&mmdc_read_bytes_unit.attr.attr,
++	&mmdc_read_bytes_scale.attr.attr,
++	&mmdc_write_bytes.attr.attr,
++	&mmdc_write_bytes_unit.attr.attr,
++	&mmdc_write_bytes_scale.attr.attr,
++	NULL,
++};
++
++static struct attribute_group mmdc_events_attr_group = {
++	.name = "events",
++	.attrs = mmdc_events_attrs,
++};
++
++PMU_FORMAT_ATTR(event, "config:0-63");
++static struct attribute *mmdc_format_attrs[] = {
++	&format_attr_event.attr,
++	NULL,
++};
++
++static struct attribute_group mmdc_format_attr_group = {
++	.name = "format",
++	.attrs = mmdc_format_attrs,
++};
++
++static const struct attribute_group *attr_groups[] = {
++	&mmdc_events_attr_group,
++	&mmdc_format_attr_group,
++	&mmdc_cpumask_attr_group,
++	NULL,
++};
++
++static u32 mmdc_read_counter(struct mmdc_pmu *pmu_mmdc, int cfg)
++{
++	void __iomem *mmdc_base, *reg;
++
++	mmdc_base = pmu_mmdc->mmdc_base;
++
++	switch (cfg) {
++	case TOTAL_CYCLES:
++		reg = mmdc_base + MMDC_MADPSR0;
++		break;
++	case BUSY_CYCLES:
++		reg = mmdc_base + MMDC_MADPSR1;
++		break;
++	case READ_ACCESSES:
++		reg = mmdc_base + MMDC_MADPSR2;
++		break;
++	case WRITE_ACCESSES:
++		reg = mmdc_base + MMDC_MADPSR3;
++		break;
++	case READ_BYTES:
++		reg = mmdc_base + MMDC_MADPSR4;
++		break;
++	case WRITE_BYTES:
++		reg = mmdc_base + MMDC_MADPSR5;
++		break;
++	default:
++		return WARN_ONCE(1,
++			"invalid configuration %d for mmdc counter", cfg);
++	}
++	return readl(reg);
++}
++
++static int mmdc_pmu_offline_cpu(unsigned int cpu)
++{
++	struct mmdc_pmu *pmu_mmdc = cpuhp_mmdc_pmu;
++	int target;
++
++	if (!cpumask_test_and_clear_cpu(cpu, &pmu_mmdc->cpu))
++		return 0;
++
++	target = cpumask_any_but(cpu_online_mask, cpu);
++	if (target >= nr_cpu_ids)
++		return 0;
++
++	perf_pmu_migrate_context(&pmu_mmdc->pmu, cpu, target);
++	cpumask_set_cpu(target, &pmu_mmdc->cpu);
++	if (pmu_mmdc->irq)
++		WARN_ON(irq_set_affinity_hint(pmu_mmdc->irq, &pmu_mmdc->cpu) != 0);
++
++	return 0;
++}
++
++static int mmdc_event_init(struct perf_event *event)
++{
++	struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
++	int cfg = event->attr.config;
++	struct perf_event *sibling;
++
++	if (event->attr.type != event->pmu->type)
++		return -ENOENT;
++
++	if (event->cpu < 0) {
++		dev_warn(pmu_mmdc->dev, "Can't provide per-task data!\n");
++		return -EOPNOTSUPP;
++	}
++
++	if (event->attr.exclude_user		||
++			event->attr.exclude_kernel	||
++			event->attr.exclude_hv		||
++			event->attr.exclude_idle	||
++			event->attr.exclude_host	||
++			event->attr.exclude_guest	||
++			event->attr.sample_period)
++		return -EINVAL;
++
++	if (cfg < 0 || cfg >= MMDC_NUM_COUNTERS)
++		return -EINVAL;
++
++	if (event->group_leader->pmu != event->pmu &&
++			!is_software_event(event->group_leader))
++		return -EINVAL;
++
++	list_for_each_entry(sibling, &event->group_leader->sibling_list,
++			group_entry)
++		if (sibling->pmu != event->pmu &&
++				!is_software_event(sibling))
++			return -EINVAL;
++
++	event->cpu = cpumask_first(&pmu_mmdc->cpu);
++	return 0;
++}
++
++static void mmdc_event_update(struct perf_event *event)
++{
++	struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
++	u32 val;
++	u64 prev_val;
++
++	prev_val = local64_read(&event->count);
++	val = mmdc_read_counter(pmu_mmdc, (int) event->attr.config);
++	local64_add(val - (u32)(prev_val & 0xFFFFFFFF), &event->count);
++}
++
++static void mmdc_event_start(struct perf_event *event, int flags)
++{
++	struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
++	void __iomem *mmdc_base, *reg;
++
++	mmdc_base = pmu_mmdc->mmdc_base;
++	reg = mmdc_base + MMDC_MADPCR0;
++
++	/*
++	 * hrtimer is required because mmdc does not provide an interrupt so
++	 * polling is necessary
++	 */
++	hrtimer_start(&pmu_mmdc->hrtimer, mmdc_timer_period(),
++			HRTIMER_MODE_REL_PINNED);
++
++	writel(DBG_RST, reg);
++	writel(DBG_EN, reg);
++}
++
++static int mmdc_event_add(struct perf_event *event, int flags)
++{
++	struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
++	int cfg = (int)event->attr.config;
++
++	if (WARN_ONCE((cfg < 0 || cfg >= MMDC_NUM_COUNTERS),
++				"invalid configuration %d for mmdc", cfg))
++		return -1;
++
++	local64_set(&event->count, 0);
++	if (flags & PERF_EF_START)
++		mmdc_event_start(event, flags);
++
++	spin_lock(&pmu_mmdc->mmdc_active_events_lock);
++	pmu_mmdc->mmdc_events[cfg] = event;
++	pmu_mmdc->active_events++;
++	spin_unlock(&pmu_mmdc->mmdc_active_events_lock);
++
++	return 0;
++}
++
++static void mmdc_event_stop(struct perf_event *event, int flags)
++{
++	struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
++	void __iomem *mmdc_base, *reg;
++	int cfg = (int)event->attr.config;
++
++	mmdc_base = pmu_mmdc->mmdc_base;
++	reg = mmdc_base + MMDC_MADPCR0;
++
++	if (WARN_ONCE((cfg < 0 || cfg >= MMDC_NUM_COUNTERS),
++				"invalid configuration %d for mmdc counter", cfg))
++		return;
++
++	spin_lock(&pmu_mmdc->mmdc_active_events_lock);
++	if (pmu_mmdc->active_events <= 0)
++		hrtimer_cancel(&pmu_mmdc->hrtimer);
++	spin_unlock(&pmu_mmdc->mmdc_active_events_lock);
++
++	writel(PRF_FRZ, reg);
++	mmdc_event_update(event);
++}
++
++static void mmdc_event_del(struct perf_event *event, int flags)
++{
++	struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
++	int cfg = (int)event->attr.config;
++
++	spin_lock(&pmu_mmdc->mmdc_active_events_lock);
++	pmu_mmdc->mmdc_events[cfg] = NULL;
++	pmu_mmdc->active_events--;
++	spin_unlock(&pmu_mmdc->mmdc_active_events_lock);
++
++	mmdc_event_stop(event, PERF_EF_UPDATE);
++}
++
++static void mmdc_overflow_handler(struct mmdc_pmu *pmu_mmdc)
++{
++	int i;
++
++	for (i = 0; i < MMDC_NUM_COUNTERS; i++) {
++		struct perf_event *event = pmu_mmdc->mmdc_events[i];
++
++		if (event)
++			mmdc_event_update(event);
++	}
++}
++
++static enum hrtimer_restart mmdc_timer_handler(struct hrtimer *hrtimer)
++{
++	struct mmdc_pmu *pmu_mmdc = container_of(hrtimer, struct mmdc_pmu,
++			hrtimer);
++
++	mmdc_overflow_handler(pmu_mmdc);
++	hrtimer_forward_now(hrtimer, mmdc_timer_period());
++
++	return HRTIMER_RESTART;
++}
++
++static int mmdc_pmu_init(struct mmdc_pmu *pmu_mmdc,
++		void __iomem *mmdc_base, struct device *dev)
++{
++	int mmdc_num;
++
++	*pmu_mmdc = (struct mmdc_pmu) {
++		.pmu = (struct pmu) {
++			.task_ctx_nr    = perf_invalid_context,
++			.attr_groups    = attr_groups,
++			.event_init     = mmdc_event_init,
++			.add            = mmdc_event_add,
++			.del            = mmdc_event_del,
++			.start          = mmdc_event_start,
++			.stop           = mmdc_event_stop,
++			.read           = mmdc_event_update,
++		},
++		.mmdc_base = mmdc_base,
++		.dev = dev,
++		.active_events = 0,
++	};
++
++	mmdc_num = ida_simple_get(&mmdc_ida, 0, 0, GFP_KERNEL);
++	cpumask_set_cpu(smp_processor_id(), &pmu_mmdc->cpu);
++	spin_lock_init(&pmu_mmdc->mmdc_active_events_lock);
++
++	cpuhp_mmdc_pmu = pmu_mmdc;
++	cpuhp_setup_state_nocalls(CPUHP_ONLINE,
++			"MMDC_ONLINE", NULL,
++			mmdc_pmu_offline_cpu);
++
++	return mmdc_num;
++}
++
++static int imx_mmdc_remove(struct platform_device *pdev)
++{
++	struct mmdc_pmu *pmu_mmdc = platform_get_drvdata(pdev);
++
++	perf_pmu_unregister(&pmu_mmdc->pmu);
++	cpuhp_remove_state_nocalls(CPUHP_ONLINE);
++	cpuhp_mmdc_pmu = NULL;
++	kfree(pmu_mmdc);
++	return 0;
++}
++
++static int imx_mmdc_perf_init(struct platform_device *pdev, void __iomem *mmdc_base)
++{
++	struct mmdc_pmu *pmu_mmdc;
++	char *name;
++	int mmdc_num;
++	int ret;
++
++	pmu_mmdc = kzalloc(sizeof(*pmu_mmdc), GFP_KERNEL);
++	if (!pmu_mmdc) {
++		pr_err("failed to allocate PMU device!\n");
++		return -ENOMEM;
++	}
++
++	mmdc_num = mmdc_pmu_init(pmu_mmdc, mmdc_base, &pdev->dev);
++	if (mmdc_num == 0)
++		name = "mmdc";
++	else
++		name = devm_kasprintf(&pdev->dev,
++				GFP_KERNEL, "mmdc_%d", mmdc_num);
++
++	hrtimer_init(&pmu_mmdc->hrtimer, CLOCK_MONOTONIC,
++			HRTIMER_MODE_REL);
++	pmu_mmdc->hrtimer.function = mmdc_timer_handler;
++
++	ret = perf_pmu_register(&(pmu_mmdc->pmu), name, -1);
++	platform_set_drvdata(pdev, pmu_mmdc);
++	if (ret)
++		goto pmu_register_err;
++	return 0;
++
++pmu_register_err:
++	pr_warn("MMDC Perf PMU failed (%d), disabled\n", ret);
++	hrtimer_cancel(&pmu_mmdc->hrtimer);
++	kfree(pmu_mmdc);
++	return ret;
++}
++
++#else
++#define imx_mmdc_remove NULL
++#define imx_mmdc_perf_init(pdev, mmdc_base) 0
++#endif
++
+ static int imx_mmdc_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+@@ -62,7 +480,7 @@ static int imx_mmdc_probe(struct platform_device *pdev)
+ 		return -EBUSY;
+ 	}
+ 
+-	return 0;
++	return imx_mmdc_perf_init(pdev, mmdc_base);
+ }
+ 
+ int imx_mmdc_get_ddr_type(void)
+@@ -81,6 +499,7 @@ static struct platform_driver imx_mmdc_driver = {
+ 		.of_match_table = imx_mmdc_dt_ids,
+ 	},
+ 	.probe		= imx_mmdc_probe,
++	.remove		= imx_mmdc_remove,
+ };
+ 
+ static int __init imx_mmdc_init(void)
 -- 
-Thanks,
-Vaibhav
+2.9.3
