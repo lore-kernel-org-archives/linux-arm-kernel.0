@@ -1,36 +1,124 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 30 Aug 2016 20:19:44 -0700
-Subject: [GIT PULL] bcm2835-dt-next-2016-08-29
-In-Reply-To: <20160829193857.29994-1-eric@anholt.net>
-References: <20160829193857.29994-1-eric@anholt.net>
-Message-ID: <a276112e-3d8b-fc55-6f0b-189221f97536@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 31 Aug 2016 11:22:14 +0800
+Subject: [PATCH v9 1/2] ASoC: sun4i-codec: Distinguish sun4i from sun7i
+In-Reply-To: <20160830054403.7878-2-dannym@scratchpost.org>
+References: <20160830054403.7878-1-dannym@scratchpost.org>
+ <20160830054403.7878-2-dannym@scratchpost.org>
+Message-ID: <CAGb2v66z-5+zHzjVp-zWEAMo0v9fykY=USTGkbSxzexJE=am2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 29/08/2016 ? 12:38, Eric Anholt a ?crit :
-> The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
-> 
->   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/anholt/linux bcm2835-dt-next-2016-08-29
-> 
-> for you to fetch changes up to c8336249c1eeca288919e3286f7dd03ae1d8ceae:
-> 
->   ARM: dts: bcm2835: Add Raspberry Pi Zero (2016-08-24 13:33:19 -0700)
-> 
-> ----------------------------------------------------------------
-> This pull request brings in support for Raspberry Pi Zero.
+On Tue, Aug 30, 2016 at 1:44 PM, Danny Milosavljevic
+<dannym@scratchpost.org> wrote:
+> This distinguishes sun4i from sun7i. It is necessary because they use
+> different registers for the audio mixer.
+> ---
+>  sound/soc/sunxi/sun4i-codec.c | 44 +++++++++++++++++++++++++++++++++----------
+>  1 file changed, 34 insertions(+), 10 deletions(-)
+>
+> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+> index 0e19c50..30f4ea2 100644
+> --- a/sound/soc/sunxi/sun4i-codec.c
+> +++ b/sound/soc/sunxi/sun4i-codec.c
+> @@ -96,8 +96,9 @@
+>  /* Other various ADC registers */
+>  #define SUN4I_CODEC_DAC_TXCNT                  (0x30)
+>  #define SUN4I_CODEC_ADC_RXCNT                  (0x34)
+> -#define SUN4I_CODEC_AC_SYS_VERI                        (0x38)
+> -#define SUN4I_CODEC_AC_MIC_PHONE_CAL           (0x3c)
+> +
+> +#define SUN7I_CODEC_AC_DAC_CAL                 (0x38)
+> +#define SUN7I_CODEC_AC_MIC_PHONE_CAL           (0x3c)
+>
+>  struct sun4i_codec {
+>         struct device   *dev;
+> @@ -509,10 +510,17 @@ static const struct snd_kcontrol_new sun4i_codec_pa_mute =
+>
+>  static DECLARE_TLV_DB_SCALE(sun4i_codec_pa_volume_scale, -6300, 100, 1);
+>
+> -static const struct snd_kcontrol_new sun4i_codec_widgets[] = {
+> -       SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,
+> -                      SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,
+> -                      sun4i_codec_pa_volume_scale),
+> +#define SUN4I_COMMON_CODEC_CONTROLS \
+> +       SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,\
+> +                      SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,\
+> +                      sun4i_codec_pa_volume_scale)
 
-Merged thanks Eric!
--- 
-Florian
+This is slightly worrying. It will get messy as you add more widgets.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160830/c1b80372/attachment.sig>
+> +
+> +static const struct snd_kcontrol_new sun4i_codec_controls[] = {
+> +       SUN4I_COMMON_CODEC_CONTROLS,
+> +};
+> +
+> +static const struct snd_kcontrol_new sun7i_codec_controls[] = {
+> +       SUN4I_COMMON_CODEC_CONTROLS,
+>  };
+>
+>  static const struct snd_kcontrol_new sun4i_codec_left_mixer_controls[] = {
+> @@ -629,8 +637,18 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
+>
+>  static struct snd_soc_codec_driver sun4i_codec_codec = {
+>         .component_driver = {
+> -               .controls               = sun4i_codec_widgets,
+> -               .num_controls           = ARRAY_SIZE(sun4i_codec_widgets),
+> +               .controls               = sun4i_codec_controls,
+> +               .num_controls           = ARRAY_SIZE(sun4i_codec_controls),
+> +               .dapm_widgets           = sun4i_codec_codec_dapm_widgets,
+> +               .num_dapm_widgets       = ARRAY_SIZE(sun4i_codec_codec_dapm_widgets),
+> +               .dapm_routes            = sun4i_codec_codec_dapm_routes,
+> +               .num_dapm_routes        = ARRAY_SIZE(sun4i_codec_codec_dapm_routes),
+> +       },
+> +};
+> +static struct snd_soc_codec_driver sun7i_codec_codec = {
+> +       .component_driver = {
+> +               .controls               = sun7i_codec_controls,
+> +               .num_controls           = ARRAY_SIZE(sun7i_codec_controls),
+>                 .dapm_widgets           = sun4i_codec_codec_dapm_widgets,
+>                 .num_dapm_widgets       = ARRAY_SIZE(sun4i_codec_codec_dapm_widgets),
+>                 .dapm_routes            = sun4i_codec_codec_dapm_routes,
+> @@ -682,7 +700,7 @@ static const struct regmap_config sun4i_codec_regmap_config = {
+>         .reg_bits       = 32,
+>         .reg_stride     = 4,
+>         .val_bits       = 32,
+> -       .max_register   = SUN4I_CODEC_AC_MIC_PHONE_CAL,
+> +       .max_register   = SUN7I_CODEC_AC_MIC_PHONE_CAL,
+>  };
+
+On sun4i the registers only go as far as SUN4I_CODEC_ADC_RXCNT.
+Could you add a separate regmap_config as well?
+
+>
+>  static const struct of_device_id sun4i_codec_of_match[] = {
+> @@ -760,6 +778,7 @@ static int sun4i_codec_probe(struct platform_device *pdev)
+>  {
+>         struct snd_soc_card *card;
+>         struct sun4i_codec *scodec;
+> +       struct snd_soc_codec_driver *codec;
+>         struct resource *res;
+>         void __iomem *base;
+>         int ret;
+> @@ -822,7 +841,12 @@ static int sun4i_codec_probe(struct platform_device *pdev)
+>         scodec->capture_dma_data.maxburst = 4;
+>         scodec->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+>
+> -       ret = snd_soc_register_codec(&pdev->dev, &sun4i_codec_codec,
+> +       if (of_device_is_compatible(pdev->dev.of_node,
+> +                                   "allwinner,sun7i-a20-codec"))
+> +               codec = &sun7i_codec_codec;
+> +       else
+> +               codec = &sun4i_codec_codec;
+> +       ret = snd_soc_register_codec(&pdev->dev, codec,
+
+This will get reworked into something like in
+
+https://github.com/wens/linux/commit/54a58e3087fb67572ca416256bc000e08b163480
+
+I haven't gotten around to posting this series yet though.
+
+ChenYu
+
+>                                      &sun4i_codec_dai, 1);
+>         if (ret) {
+>                 dev_err(&pdev->dev, "Failed to register our codec\n");
