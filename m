@@ -1,88 +1,49 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 31 Aug 2016 14:30:39 +0200
-Subject: [PATCH RFC] ARM: dts: samsung: add rga-lvds panel in itop elite
-In-Reply-To: <1472511002-9019-1-git-send-email-ayaka@soulik.info>
-References: <1472511002-9019-1-git-send-email-ayaka@soulik.info>
-Message-ID: <dee989f5-17b0-7445-514b-559e98d77acd@samsung.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 31 Aug 2016 14:40:52 +0200
+Subject: [PATCH 0/9] ARM: dts: exynos: Use macros for GPIO to make it more
+ readable
+In-Reply-To: <1472645613-5362-1-git-send-email-k.kozlowski@samsung.com>
+References: <1472645613-5362-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <9c17ea4e-780e-2e1b-4c97-40399c8e3086@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Krzysztof,
 
-
-On 08/30/2016 12:50 AM, Randy Li wrote:
-> It is actually a lvds panel connected through a rga-lvds bridge.
-> But I really have no idea about what does a port mean in fimd node.
->
-> Also how should I configure this panel size? I think the i2c found
-> on the panel schematic, but it more likely to be used a touch screen
-> touth. Also the touch screen is not supported in currently driver.
->
-> Signed-off-by: Randy Li <ayaka@soulik.info>
-> ---
->  arch/arm/boot/dts/exynos4412-itop-elite.dts | 35 ++++++++++++++++++++++++++---
->  1 file changed, 32 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos4412-itop-elite.dts b/arch/arm/boot/dts/exynos4412-itop-elite.dts
-> index e1cda54..2d67385 100644
-> --- a/arch/arm/boot/dts/exynos4412-itop-elite.dts
-> +++ b/arch/arm/boot/dts/exynos4412-itop-elite.dts
-> @@ -139,6 +139,20 @@
->  		assigned-clocks = <&clock CLK_MOUT_CAM0>;
->  		assigned-clock-parents = <&clock CLK_XUSBXTI>;
->  	};
-> +	
-> +	vcc_sys_lcd: sys-lcd {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc_5v";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		gpio = <&gpl0 4 GPIO_ACTIVE_HIGH>;
-> +	};
-> +
-> +	panel: panel {
-> +		ddc-i2c-bus = <&i2c_3>;
-> +		power-supply = <&vcc_sys_lcd>;
-> +		enable-gpios = <&gpl0 2 GPIO_ACTIVE_HIGH>;
-> +	};
-
-Panel has no compatible string, which driver will handle this node?
-
-Regards
-Andrzej
-
->  };
+On 08/31/2016 02:13 PM, Krzysztof Kozlowski wrote:
+> Hi,
+> 
+> Example:
+> -		samsung,pin-function = <0x2>;
+> -		samsung,pin-pud = <0>;
+> -		samsung,pin-drv = <0>;
+> +		samsung,pin-function = <PIN_FUNC_SPC_2>;
+> +		samsung,pin-pud = <PIN_PULL_NONE>;
+> +		samsung,pin-drv = <PIN_DRV_LV1>;
 >  
->  &pinctrl_1 {
-> @@ -221,9 +235,6 @@
->  };
->  
->  &pwm {
-> -	pinctrl-0 = <&pwm1_out>;
-> -	pinctrl-names = "default";
-> -	samsung,pwm-outputs = <1>;
->  	status = "okay";
->  };
->  
-> @@ -239,3 +250,21 @@
->  	assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
->  	assigned-clock-rates = <0>, <176000000>;
->  };
-> +
-> +&i2c_3 {
-> +	status = "okay";
-> +};
-> +
-> +&fimd {
-> +	pinctrl-0 = <&lcd_clk &lcd_data24 &pwm1_out>;
-> +	pinctrl-names = "default";
-> +	status = "okay";
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	port at 0 {
-> +		reg = <0>;
-> +		rga_lvds: endpoint {
-> +			remote-endpoint = <&panel>;
-> +		};
-> +	};
-> +};
+> This should be just more readable. Especially for drive strenghts which
+> are unobvious and different between some SoCs.
+>
+
+I agree that's better to have macros for these instead of using magic numbers.
+
+For all the series:
+
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+> Tested with dtx_diff:
+> for i in dts-old/exynos*dtb; do scripts/dtc/dtx_diff $i dts-new/$(basename $i);  done
+>
+
+I've also tested the patches on an Exynos5800 Peach Pi board, and as expected
+everything is working correctly since the compiled DTB is exactly the same.
+
+So for patches 1/9 and 9/9:
+
+Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
