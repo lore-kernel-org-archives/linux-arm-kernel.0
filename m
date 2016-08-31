@@ -1,53 +1,43 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 31 Aug 2016 14:45:40 -0700
-Subject: [RESEND PATCH 3/4] arm64: dts: rockchip: support gmac for rk3399
-In-Reply-To: <2498365.kqzATN1cjf@diego>
-References: <1472624028-7082-1-git-send-email-wxt@rock-chips.com>
- <1472624028-7082-4-git-send-email-wxt@rock-chips.com>
- <CAD=FV=XQX__rFqGLY2U5mPT8WR4P4aW5tbCqFmA+3rZunbzUZQ@mail.gmail.com>
- <2498365.kqzATN1cjf@diego>
-Message-ID: <CAD=FV=UkK2QqbCJrg72nvYYfg8-z5p0ye3mkASnxLKQfSR+wTw@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 31 Aug 2016 15:11:40 -0700
+Subject: [PATCH 0/3] drm/tilcdc: Some fixes for LCDC rev1
+In-Reply-To: <e659bff8-7c8e-35ed-e834-1e00d5c32931@ti.com> (Jyri Sarha's
+ message of "Tue, 23 Aug 2016 19:24:42 +0300")
+References: <20160823125701.25700-1-kbeldan@baylibre.com>
+ <e659bff8-7c8e-35ed-e834-1e00d5c32931@ti.com>
+Message-ID: <m28tvck2qr.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jyri,
 
-On Wed, Aug 31, 2016 at 2:29 PM, Heiko St?bner <heiko@sntech.de> wrote:
->> IMHO it would be nice if this were broken into two patches.
->>
->> 1. First patch would be the power domain patch and that could land any
->> time.  You wouldn't actually be able to use the gmac but at least
->> you'd be able to turn off its power.  This would be a handy patch to
->> be able to backport if you happened to not need Ethernet support but
->> wanted to save power.
->>
->> 2. Second patch would actually add the gmac.
+Jyri Sarha <jsarha@ti.com> writes:
+
+> On 08/23/16 15:56, Karl Beldan wrote:
+>> Hi,
+>> 
+>> I found some missing bits for rev1 of the LCDC and here are some of the
+>> changes I am using to use the DRM driver on an LCDCK (which has a rev1).
+>> 1/3 seems required by rev1 of the IP and without it my the LCDC on my
+>> LCDK keeps can't sync, 2/3 is required by the driver logic, while 3/3
+>> is less of a requirement.
 >
-> according to my talk with Caesar in the real v1, the gmac even with power-
-> domains should work just nicely even without the dts patches, as the driver
-> core takes care of powering up the pd before probe.
+> I'll drop 3/3, because my recent patches should take care of that:
+> http://www.spinics.net/lists/devicetree/msg138885.html
 >
-> But I may miss some peculiarity of the dwmac?
+> However, there will be v2 round of those patches. Only the DT binding
+> and its default value should change.
+>
+>> Although 1,2/3 would have fitted drm-fixes I based them on drm-next as
+>> 2/3 would conflict with the recent changes in drm-next.
+>> 
+>
+> I'll pick these two up for my next pull request. Thanks!
+>
 
-Nothing that I'm terribly aware of.  I was just being selfish because:
+Can you share a branch which has your current series and these fixes
+included, so we can use that as a baseline for further development?
 
-1. I'm on a board where I don't need Ethernet.
+Thanks,
 
-2. I'm running a semi old kernel (4.4)
-
-3. I don't want to pick back the various fixes that might be needed to
-make gmac work on rk3399 to that old kernel.
-
-4. I want it very obvious that gmac isn't really supported on this old
-kernel on rk3399 (and having stmmac not in the device tree would make
-it very obvious)
-
-5. I do want the power savings of turning the power domains off for the gmac.
-
-
-If this patch is broken in two then I can pick back just the power
-domain patch.  :-P
-
-
-
--Doug
+Kevin
