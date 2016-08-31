@@ -1,34 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 31 Aug 2016 15:33:47 +0200
-Subject: [PATCH 1/9] ARM: dts: exynos: Add macros for GPIO configuration
-In-Reply-To: <bf55b24c-b1ee-78be-d56d-8fdda4f2fdc9@samsung.com>
-References: <1472645613-5362-1-git-send-email-k.kozlowski@samsung.com>
- <6113443.1q3Xq4YM82@wuerfel>
- <bf55b24c-b1ee-78be-d56d-8fdda4f2fdc9@samsung.com>
-Message-ID: <5709554.y3Mq6my3Uz@wuerfel>
+From: zhengyu.shen@nxp.com (Zhengyu Shen)
+Date: Wed, 31 Aug 2016 13:46:55 +0000
+Subject: [PATCH v3] Added perf functionality to mmdc driver
+In-Reply-To: <20160831102937.GC4783@leverpostej>
+References: <20160817194253.16300-1-zhengyu.shen@nxp.com>
+ <CAHrpEqTtCnEU1v1sEuN8yJGPudDRZ5A79=Wn5Bp4SgTxDiNTQQ@mail.gmail.com>
+ <20160830114329.GB8366@tiger> <20160830125420.GG1223@leverpostej>
+ <DB5PR04MB1430D8A0284123B5C475800E9FE00@DB5PR04MB1430.eurprd04.prod.outlook.com>
+ <20160831102937.GC4783@leverpostej>
+Message-ID: <AM3PR04MB1426758359C2B769A28C3B849FE30@AM3PR04MB1426.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 31, 2016 3:07:00 PM CEST Krzysztof Kozlowski wrote:
+> > Mmdc was only responsible for one crash which I fixed (had to remove
+> > the event from the pmu properly).
 > 
-> Ok, sounds reasonable. I want to convert also older platforms S3C (drive
-> strengths and pull up/down differ) and arm64 SoC: Exynos7. For the
-> latter the problem is there is no common place for sharing DTS, except
-> the headers. However this does not really belong to headers. I guess
-> some level of duplication might be still exist.
+> Ok. I take it that there will be a v4 appearing shortly with that fix?
 
-We have stuff in the headers that belongs way less there, so I wouldn't
-mind, but having a separate set of definitions for arm64 also isn't
-a problem at all.
+Hopefully I'll get that out by the end of today. 
  
-> > I think overall, a better solution would have been to define the
-> > constants globally (shared with non-exynos) to start with,
-> > and have the driver translate generic numbers into vendor
-> > specific ones. Obviously it's too late for that now.
-> 
-> We could extend driver by adding new bindings accepting generic numbers
-> (and still backward compatible) but this looks like an overkill.
+> Crashes are very bad. Do you have any logs from those crashes in other
+> drivers that you can share?
 
-Agreed, that would only make things more confusing, not less.
-
-	Arnd
+It seems my kernel source was out of date, updating it seems to have fixed 
+The issue.
