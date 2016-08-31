@@ -1,46 +1,41 @@
 From: jorik@kippendief.biz (jorik at kippendief.biz)
-Date: Wed, 31 Aug 2016 15:54:04 +0200
-Subject: [PATCH 5/7] dts: sun8i-h3: add UART1-3 to Orange Pi PC
+Date: Wed, 31 Aug 2016 15:54:05 +0200
+Subject: [PATCH 6/7] dts: sun8i-h3: add I2C0-1 to Orange Pi Plus
 In-Reply-To: <1472651646-15579-1-git-send-email-jorik@kippendief.biz>
 References: <1472651646-15579-1-git-send-email-jorik@kippendief.biz>
-Message-ID: <1472651646-15579-6-git-send-email-jorik@kippendief.biz>
+Message-ID: <1472651646-15579-7-git-send-email-jorik@kippendief.biz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jorik Jonker <jorik@kippendief.biz>
 
-This board has UARTS1-3 exposed on its expansion header
+This board has I2C0-2 exposed on its expansion header.
 
 Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-index daf50b9..602b012 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-@@ -161,6 +161,21 @@
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+index 7a17839..fcacafa 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+@@ -64,6 +64,16 @@
  	status = "okay";
  };
  
-+&uart1 {
++&i2c0 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins_a>;
++	pinctrl-0 = <&i2c0_pins_a>;
 +};
 +
-+&uart2 {
++&i2c1 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&uart2_pins_a>;
++	pinctrl-0 = <&i2c1_pins_a>;
 +};
 +
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_pins_a>;
-+};
-+
- &usbphy {
- 	/* USB VBUS is always on */
- 	status = "okay";
+ &mmc2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc2_8bit_pins>;
 -- 
 2.7.4
