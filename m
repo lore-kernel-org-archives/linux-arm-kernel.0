@@ -1,75 +1,48 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 31 Aug 2016 12:28:19 +0100
-Subject: [PATCH v8 15/18] ARM: STi: DT: STiH407: Add uniperif reader dt
- nodes
-In-Reply-To: <20160830142112.GA22514@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
- <1472223413-7254-16-git-send-email-peter.griffin@linaro.org>
- <20160830100148.GO1661@dell>
- <20160830142112.GA22514@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <20160831112819.GJ27357@dell>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Wed, 31 Aug 2016 11:28:36 +0000
+Subject: [Fwd: Re: [PATCH v2 1/6] clk: tegra: add TEGRA20_CLK_NOR to init
+ table]
+In-Reply-To: <CALw8SCUHjFAr7RT3UCOkZ9W4Uf=nLHr2F3A_DqKiw1q_LOXDrg@mail.gmail.com>
+References: <1472569308.5703.22.camel@toradex.com>
+ <1472627744.31008.2.camel@toradex.com>
+ <CALw8SCUHjFAr7RT3UCOkZ9W4Uf=nLHr2F3A_DqKiw1q_LOXDrg@mail.gmail.com>
+Message-ID: <1472642915.31008.32.camel@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 30 Aug 2016, Peter Griffin wrote:
-> Thanks for reviewing and your very valuable feedback.
-> On Tue, 30 Aug 2016, Lee Jones wrote:
-> > On Fri, 26 Aug 2016, Peter Griffin wrote:
-> > 
-> > > This patch adds the DT node for the uniperif reader
-> > > IP block found on STiH407 family silicon.
-> > > 
-> > > Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-> > > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> > > ---
-> > >  arch/arm/boot/dts/stih407-family.dtsi | 26 ++++++++++++++++++++++++++
-> > >  1 file changed, 26 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> > > index d263c96..bdddf2c 100644
-> > > --- a/arch/arm/boot/dts/stih407-family.dtsi
-> > > +++ b/arch/arm/boot/dts/stih407-family.dtsi
-> > > @@ -956,5 +956,31 @@
-> > >  			st,version = <5>;
-> > >  			st,mode = "SPDIF";
-> > >  		};
-> > > +
-> > > +		sti_uni_reader0: sti-uni-reader at 0 {
-> > > +			compatible = "st,sti-uni-reader";
-> > > +			status = "disabled";
-> > 
-> > I find it's normally nicer to place the status of the node at the
-> > bottom, separated by a '\n'.
+On Wed, 2016-08-31 at 11:47 +0200, Mirza Krak wrote:
+> I'm just curious where that 92 MHz came from. According to the
+> > Tegra 2
+> > Interface Design Guide up to 133 MHz should actually be possible.
+> The maximum rates for both T20 and T30 are values that are set as
+> maximum in the downstream L4T kernel.
 > 
-> Ok I'll add a superflous '\n' in the next version.
-
-Everyone loves a smart arse!
-
-In this case I believe the '\n' to be a functional separator and not
-superfluous at all.
-
-> > > +			dai-name = "Uni Reader #0 (PCM IN)";
-> > 
-> > Oooo, not seen something like this before.
-> > 
-> > If it does not already have one, it would require a DT Ack.
+> In tegra2_clocks.c:
+> PERIPH_CLK("nor", "tegra-nor", NULL, 42, 0x1d0, 0x31E, 92000000,
+> mux_pllp_pllc_pllm_clkm, MUX | DIV_U71), /* requires min voltage */
 > 
-> No idea, the driver got merged 1 year ago.
+> And in tegra3_clocks.c
+> PERIPH_CLK("nor", "tegra-nor", NULL, 42, 0x1d0, 127000000,
+> mux_pllp_pllc_pllm_clkm, MUX | DIV_U71), /* requires min voltage */
 > 
-> Arnaud did you get a DT ack when you merged this driver & binding?
-> > 
-> > > +			st,version = <3>;
-> > 
-> > This will likely need a DT Ack too.  We usually encode this sort of
-> > information in the compatible string.
-> 
-> See 05c1b4480e86a871b18030d6f3d532dc0ecdf38c
+> I looked up the commit in the downstream kernel that added the "nor"
+> clock, it does not mention reason behind the maximal rates. Author
+> was
+> Manoj Chourasia, added him to CC.
 
-Well Rob's the boss.  We certainly never used to take 'device ID' or
-'version' attributes.  I guess something must have changed.
+Let's see whether we do get any feedback from him.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Nonetheless it may be good to add this information to the commit
+message so should somebody ever feel the same curiosity like I did he
+would at least know where it initially came from.
+
+> I actually do not have the Tegra2 Interface Design Guide, do not know
+> if I can get access to it.
+
+I guess that one is only accessible under NDA. We could of course try
+to get one in place for you but I can't promise you anything.
+
+> Best Regards
+> Mirza
+
+Thanks, Mirza
