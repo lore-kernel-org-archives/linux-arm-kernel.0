@@ -1,56 +1,65 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 31 Aug 2016 10:18:11 +0200
-Subject: [PATCH 0/6] Introduce NextThing GR8 support
-Message-ID: <20160831081817.5191-1-maxime.ripard@free-electrons.com>
+Date: Wed, 31 Aug 2016 10:18:14 +0200
+Subject: [PATCH 3/6] drm/panel: simple: Add A10 EVB 5 inch panel support
+In-Reply-To: <20160831081817.5191-1-maxime.ripard@free-electrons.com>
+References: <20160831081817.5191-1-maxime.ripard@free-electrons.com>
+Message-ID: <20160831081817.5191-4-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The A10-EVB from Allwinner comes with an unidentified panel, with the only
+mark on the PCB being A10-SUB-EVB-5LCD.
 
-This serie introduces the support for the NextThing GR8.
+Add timings to simple panel to handle it.
 
-This SoC is loosely based on the SoCs of the Allwinner sun5i family,
-hence we can use most of the support already there. Compared to the
-already existing A10s and A13/R8, the pin layout completely changed,
-meaning that also the set of available controllers is changed.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/gpu/drm/panel/panel-simple.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-There's some new controllers (SPDIF) and some are gone
-(Ethernet). This also introduces the support for the GR8 Evaluation
-Board.
-
-Even though it's not been tested yet, the SPDIF and I2S-related
-components have been listed but we do not create a card from them, so
-they won't be usable.
-
-Let me know if you have any questions,
-Maxime
-
-Maxime Ripard (3):
-  backlight: pwm_bl: Handle gpio that can sleep
-  drm/panel: simple: Add A10 EVB 5 inch panel support
-  ARM: sunxi: Support the Nextthing GR8
-
-Myl?ne Josserand (3):
-  pinctrl: sunxi: Add GR8 controller support
-  ARM: dts: Add NextThing GR8 dtsi
-  ARM: dts: gr8: Add support for the GR8 evaluation board
-
- Documentation/devicetree/bindings/arm/sunxi.txt    |    1 +
- .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |    1 +
- MAINTAINERS                                        |    1 +
- arch/arm/boot/dts/Makefile                         |    3 +-
- arch/arm/boot/dts/gr8-evb.dts                      |  378 +++++++
- arch/arm/boot/dts/gr8.dtsi                         | 1080 ++++++++++++++++++++
- arch/arm/mach-sunxi/sunxi.c                        |    1 +
- drivers/gpu/drm/panel/panel-simple.c               |   26 +
- drivers/pinctrl/sunxi/Kconfig                      |    4 +
- drivers/pinctrl/sunxi/Makefile                     |    1 +
- drivers/pinctrl/sunxi/pinctrl-gr8.c                |  541 ++++++++++
- drivers/video/backlight/pwm_bl.c                   |    4 +-
- 12 files changed, 2038 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/boot/dts/gr8-evb.dts
- create mode 100644 arch/arm/boot/dts/gr8.dtsi
- create mode 100644 drivers/pinctrl/sunxi/pinctrl-gr8.c
-
+diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+index 85143d1b9b31..be371b053aab 100644
+--- a/drivers/gpu/drm/panel/panel-simple.c
++++ b/drivers/gpu/drm/panel/panel-simple.c
+@@ -386,6 +386,29 @@ static void panel_simple_shutdown(struct device *dev)
+ 	panel_simple_disable(&panel->base);
+ }
+ 
++static const struct drm_display_mode allwinner_a10_sub_evb_5lcd_mode = {
++	.clock = 33000,
++	.hdisplay = 800,
++	.hsync_start = 800 + 209,
++	.hsync_end = 800 + 209 + 1,
++	.htotal = 800 + 209 + 1 + 45,
++	.vdisplay = 480,
++	.vsync_start = 480 + 22,
++	.vsync_end = 480 + 22 + 1,
++	.vtotal = 480 + 22 + 1 + 22,
++	.vrefresh = 60,
++};
++
++static const struct panel_desc allwinner_a10_sub_evb_5lcd = {
++	.modes = &allwinner_a10_sub_evb_5lcd_mode,
++	.num_modes = 1,
++	.size = {
++		.width = 110,
++		.height = 67,
++	},
++	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
++};
++
+ static const struct drm_display_mode ampire_am800480r3tmqwa1h_mode = {
+ 	.clock = 33333,
+ 	.hdisplay = 800,
+@@ -1515,6 +1538,9 @@ static const struct panel_desc urt_umsh_8596md_parallel = {
+ 
+ static const struct of_device_id platform_of_match[] = {
+ 	{
++		.compatible = "allwinner,sun4i-a10-sub-evb-5-lcd",
++		.data = &allwinner_a10_sub_evb_5lcd,
++	}, {
+ 		.compatible = "ampire,am800480r3tmqwa1h",
+ 		.data = &ampire_am800480r3tmqwa1h,
+ 	}, {
 -- 
 2.9.2
