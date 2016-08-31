@@ -1,33 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 31 Aug 2016 14:42:57 +0200
-Subject: [PATCH 1/9] ARM: dts: exynos: Add macros for GPIO configuration
-In-Reply-To: <1472645613-5362-2-git-send-email-k.kozlowski@samsung.com>
-References: <1472645613-5362-1-git-send-email-k.kozlowski@samsung.com>
- <1472645613-5362-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <28320955.k33BrW2NEN@wuerfel>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Wed, 31 Aug 2016 14:47:45 +0200
+Subject: [PATCH v11 2/4] tee: generic TEE subsystem
+In-Reply-To: <e08f821b-bf7c-be65-59a5-281aa3343cf4@ti.com>
+References: <1471870856-18684-1-git-send-email-jens.wiklander@linaro.org>
+ <1471870856-18684-3-git-send-email-jens.wiklander@linaro.org>
+ <e08f821b-bf7c-be65-59a5-281aa3343cf4@ti.com>
+Message-ID: <20160831124744.GA25472@ermac>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 31, 2016 2:13:25 PM CEST Krzysztof Kozlowski wrote:
+On Tue, Aug 30, 2016 at 02:29:45PM -0500, Andrew F. Davis wrote:
+> On 08/22/2016 08:00 AM, Jens Wiklander wrote:
+> > +/*
+> > + * Unprivileged devices in the in the lower half range and privileged
 > 
-> +#define PIN_PULL_NONE          0
-> +#define PIN_PULL_DOWN          1
-> +#define PIN_PULL_UP            3
-> +
-> +#define PIN_DRV_LV1            0
-> +#define PIN_DRV_LV2            2
-> +#define PIN_DRV_LV3            1
-> +#define PIN_DRV_LV4            3
-> +
-> +#define PIN_FUNC_INPUT         0
-> +#define PIN_FUNC_OUTPUT                1
-> +#define PIN_FUNC_SPC_2         2
-> +#define PIN_FUNC_SPC_3         3
-> +#define PIN_FUNC_SPC_4         4
-> +#define PIN_FUNC_SPC_5         5
-> +#define PIN_FUNC_SPC_F         0xf
+>                                 ^^ in the in the
+> [snip]
+> 
+> > +
+> > +	rc = alloc_chrdev_region(&tee_devt, 0, TEE_NUM_DEVICES, "tee");
+> > +	if (rc < 0) {
+> 
+> if (rc) ?
+> 
+> [snip]
+> 
+> > + * Memory allocated as global shared memory is automatically freed when the
+> > + * TEE file pointer is closed. The @flags field uses the bits defined by
+> > + * TEE_SHM_* above. TEE_SHM_MAPPED must currently always be set. If
+> 
+>              ^^^ not really above anymore, out of file now looks like
+> 
+> > + * TEE_SHM_DMA_BUF global shared memory will be allocated and associated
+> > + * with a dma-buf handle, else driver private memory.
+> > + *
+> > + * @returns a pointer to 'struct tee_shm'
+> 
+> Doesn't say anything, is this really needed?
+> 
+> [snip]
+> 
+> > +/**
+> > + * struct tee_shm_pool_mem_info - holds information needed to create a shared
+> > + * memory pool
+> > + * @vaddr:	Virtual address of start of pool
+> > + * @paddr:	Physical address of start of pool
+> > + * @size:	Size in bytes of the pool
+> > + */
+> > +struct tee_shm_pool_mem_info {
+> > +	unsigned long vaddr;
+> > +	unsigned long paddr;
+> 
+> phys_addr_t paddr; ?
 
-Any reason for having a copy in each of those files instead of one
-that is shared across all of them?
+Thanks for taking the time to review this. I'll address all your
+comments here in the next version of the patch set.
 
-	Arnd
+--
+Jens
