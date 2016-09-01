@@ -1,83 +1,59 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu,  1 Sep 2016 10:02:55 -0400
-Subject: [PATCH V3] dmaengine: dmatest: exclude compare and fill time during
- perf report
-Message-ID: <1472738575-7771-1-git-send-email-okaya@codeaurora.org>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Thu,  1 Sep 2016 16:05:03 +0200
+Subject: [PATCH v4 1/3] hwmon: iio_hwmon: delay probing with late_initcall
+In-Reply-To: <1472738705-20145-1-git-send-email-quentin.schulz@free-electrons.com>
+References: <1472738705-20145-1-git-send-email-quentin.schulz@free-electrons.com>
+Message-ID: <1472738705-20145-2-git-send-email-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmatest is currently including compare and fill time into the
-calculated performance numbers. This does not reflect the HW
-capability and the results vary based on the CPU speed instead of
-the HW speed.
+iio_channel_get_all returns -ENODEV when it cannot find either phandles and
+properties in the Device Tree or channels whose consumer_dev_name matches
+iio_hwmon in iio_map_list. The iio_map_list is filled in by iio drivers
+which might be probed after iio_hwmon.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+This makes sure iio_hwmon is probed after all iio drivers which provides
+channels to iio_hwmon are probed, be they present in the DT or using
+iio_map_list.
+
+This replaces module_platform_driver() by an explicit code variant which
+calls late_initcall() install of module_init(), meaning it probes after
+all the drivers using module_init() as their init.
+
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
- drivers/dma/dmatest.c | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/dma/dmatest.c b/drivers/dma/dmatest.c
-index 1245db5..738fbd1 100644
---- a/drivers/dma/dmatest.c
-+++ b/drivers/dma/dmatest.c
-@@ -426,7 +426,9 @@ static int dmatest_func(void *data)
- 	int			src_cnt;
- 	int			dst_cnt;
- 	int			i;
--	ktime_t			ktime;
-+	ktime_t			ktime, start, diff;
-+	ktime_t			filltime = ktime_set(0, 0);
-+	ktime_t			comparetime = ktime_set(0, 0);
- 	s64			runtime = 0;
- 	unsigned long long	total_len = 0;
+v4:
+ - use platform_driver_register instead of platform_register_drivers,
+
+v3:
+ - use late_initcall instead of deferring probe,
+
+ drivers/hwmon/iio_hwmon.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/hwmon/iio_hwmon.c b/drivers/hwmon/iio_hwmon.c
+index b550ba5..c509779 100644
+--- a/drivers/hwmon/iio_hwmon.c
++++ b/drivers/hwmon/iio_hwmon.c
+@@ -192,7 +192,17 @@ static struct platform_driver __refdata iio_hwmon_driver = {
+ 	.remove = iio_hwmon_remove,
+ };
  
-@@ -531,6 +533,7 @@ static int dmatest_func(void *data)
- 			src_off = 0;
- 			dst_off = 0;
- 		} else {
-+			start = ktime_get();
- 			src_off = dmatest_random() % (params->buf_size - len + 1);
- 			dst_off = dmatest_random() % (params->buf_size - len + 1);
- 
-@@ -541,6 +544,9 @@ static int dmatest_func(void *data)
- 					  params->buf_size);
- 			dmatest_init_dsts(thread->dsts, dst_off, len,
- 					  params->buf_size);
+-module_platform_driver(iio_hwmon_driver);
++static int __init iio_hwmon_late_init(void)
++{
++	return platform_driver_register(&iio_hwmon_driver);
++}
++late_initcall(iio_hwmon_late_init);
 +
-+			diff = ktime_sub(ktime_get(), start);
-+			filltime = ktime_add(filltime, diff);
- 		}
++static void __exit iio_hwmon_exit(void)
++{
++	platform_driver_unregister(&iio_hwmon_driver);
++}
++module_exit(iio_hwmon_exit);
  
- 		um = dmaengine_get_unmap_data(dev->dev, src_cnt+dst_cnt,
-@@ -683,6 +689,7 @@ static int dmatest_func(void *data)
- 			continue;
- 		}
- 
-+		start = ktime_get();
- 		pr_debug("%s: verifying source buffer...\n", current->comm);
- 		error_count = dmatest_verify(thread->srcs, 0, src_off,
- 				0, PATTERN_SRC, true);
-@@ -703,6 +710,9 @@ static int dmatest_func(void *data)
- 				params->buf_size, dst_off + len,
- 				PATTERN_DST, false);
- 
-+		diff = ktime_sub(ktime_get(), start);
-+		comparetime = ktime_add(comparetime, diff);
-+
- 		if (error_count) {
- 			result("data error", total_tests, src_off, dst_off,
- 			       len, error_count);
-@@ -712,7 +722,10 @@ static int dmatest_func(void *data)
- 				       dst_off, len, 0);
- 		}
- 	}
--	runtime = ktime_us_delta(ktime_get(), ktime);
-+	ktime = ktime_sub(ktime_get(), ktime);
-+	ktime = ktime_sub(ktime, comparetime);
-+	ktime = ktime_sub(ktime, filltime);
-+	runtime = ktime_to_us(ktime);
- 
- 	ret = 0;
- err_dstbuf:
+ MODULE_AUTHOR("Jonathan Cameron <jic23@kernel.org>");
+ MODULE_DESCRIPTION("IIO to hwmon driver");
 -- 
-1.9.1
+2.5.0
