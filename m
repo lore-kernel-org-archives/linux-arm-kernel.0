@@ -1,42 +1,45 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 1 Sep 2016 08:15:14 +0200
-Subject: [Patch v5 8/9] driver/edac/layerscape_edac: Add Layerscape EDAC
- support
-In-Reply-To: <1471990465-27443-1-git-send-email-york.sun@nxp.com>
-References: <1471990465-27443-1-git-send-email-york.sun@nxp.com>
-Message-ID: <20160901061514.GC16153@nazgul.tnic>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 1 Sep 2016 14:16:30 +0800
+Subject: [PATCHv3 03/11] crypto: omap-sham: implement context
+ export/import APIs
+In-Reply-To: <60a5ed40-5552-3ec8-fa21-7e6fb8213fc3@ti.com>
+References: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
+ <1470306526-27219-4-git-send-email-t-kristo@ti.com>
+ <20160809100633.GA6751@gondor.apana.org.au>
+ <d828fca9-a97a-7722-c4cb-24e07816cbc4@ti.com>
+ <20160901033320.GA650@gondor.apana.org.au>
+ <60a5ed40-5552-3ec8-fa21-7e6fb8213fc3@ti.com>
+Message-ID: <20160901061630.GB650@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2016 at 03:14:03PM -0700, York Sun wrote:
-> Add DDR EDAC for ARM-based compatible controllers. Both big-endian
-> and little-endian are supported, as specified in device tree.
+On Thu, Sep 01, 2016 at 09:12:59AM +0300, Tero Kristo wrote:
 > 
-> Signed-off-by: York Sun <york.sun@nxp.com>
+> Well, but the driver doesn't flush its buffers automatically, it
+> caches data until it has sufficient amount available. So, assuming
+> you want to do this:
 > 
-> ---
-> Change log
->   v5: Update author and copyright for the new driver
->       Drop initializing varaible with 0
->       Add pr_fmt macro
->   v4: Drop adding atomic_scrub() for armv8
->       Drop NO_IRQ
->   v3: no change
->   v2: Create new driver using shared DDR object
+> sham_init
+>   sham_update 256 bytes
+>   sham_update 256 bytes
+>   wait until two above updates are complete
+>   sham_export
 > 
->  arch/arm64/Kconfig.platforms   |  1 +
->  drivers/edac/Kconfig           |  7 ++++
->  drivers/edac/Makefile          |  3 ++
->  drivers/edac/fsl_ddr_edac.c    |  2 +-
->  drivers/edac/layerscape_edac.c | 73 ++++++++++++++++++++++++++++++++++++++++++
->  5 files changed, 85 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/edac/layerscape_edac.c
+> ... the execution hangs at the wait phase as the driver is still
 
-Applied, thanks.
+Well that's a bug in the driver.  While it's not illegal to wait
+for more data, it's usually unnecessary.  Because we instead try
+to get our users to generate as big a request as possible, e.g.,
+one packet for IPsec.
 
+If you really have to do the hold thing, then you must install a
+timer like sha1-mb does on x86 to do the flush.
+
+In any case, the completion function must not be called until
+you're actually complete.
+
+Cheers,
 -- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
