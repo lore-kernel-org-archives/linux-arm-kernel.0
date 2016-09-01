@@ -1,49 +1,69 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 01 Sep 2016 12:59:41 +0200
-Subject: [PATCH 5/6] ARM: dts: s3c2416: Use macros for pinctrl
- configuration
-In-Reply-To: <1472721715-2833-6-git-send-email-k.kozlowski@samsung.com>
-References: <1472721715-2833-1-git-send-email-k.kozlowski@samsung.com>
- <1472721715-2833-6-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1608454.1ZuTJsprje@amdc1976>
+Date: Thu, 01 Sep 2016 13:02:57 +0200
+Subject: [PATCH v2 01/10] pinctrl: dt-bindings: samsung: Add header with
+ values used for configuration
+In-Reply-To: <1472714638-15676-2-git-send-email-k.kozlowski@samsung.com>
+References: <1472714638-15676-1-git-send-email-k.kozlowski@samsung.com>
+ <1472714638-15676-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <3419428.Xfa2aHQ3xc@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Hi,
 
-On Thursday, September 01, 2016 11:21:54 AM Krzysztof Kozlowski wrote:
-> Usage of DTS macros instead of hard-coded numbers makes code easier
-> to read.  One does not have to remember which value means pull-up/down
-> or specific driver strength.
+On Thursday, September 01, 2016 09:23:49 AM Krzysztof Kozlowski wrote:
+> Hard-coded pinctrl configuration values are scattered through DTS files.
+> The numbers are difficult to decode by human, especially without the
+> datasheet.  Additionally the drive strength differs between Exynos SoC
+> families increasing the confusion.
+> 
+> The header will help making this more readable and maintainable.
 > 
 > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
->  arch/arm/boot/dts/s3c2416-pinctrl.dtsi | 38 ++++++++++++++++++----------------
->  1 file changed, 20 insertions(+), 18 deletions(-)
+>  MAINTAINERS                           |  1 +
+>  include/dt-bindings/pinctrl/samsung.h | 57 +++++++++++++++++++++++++++++++++++
+>  2 files changed, 58 insertions(+)
+>  create mode 100644 include/dt-bindings/pinctrl/samsung.h
 > 
-> diff --git a/arch/arm/boot/dts/s3c2416-pinctrl.dtsi b/arch/arm/boot/dts/s3c2416-pinctrl.dtsi
-> index 527e3193817f..6274359fb323 100644
-> --- a/arch/arm/boot/dts/s3c2416-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/s3c2416-pinctrl.dtsi
-> @@ -8,6 +8,8 @@
->   * published by the Free Software Foundation.
->   */
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index d8e81b1dde30..836bcd327ee4 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -9318,6 +9318,7 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+>  S:	Maintained
+>  F:	drivers/pinctrl/samsung/
+> +F:	include/dt-bindings/pinctrl/samsung.h
 >  
-> +#include <dt-bindings/pinctrl/samsung.h>
+>  PIN CONTROLLER - SINGLE
+>  M:	Tony Lindgren <tony@atomide.com>
+> diff --git a/include/dt-bindings/pinctrl/samsung.h b/include/dt-bindings/pinctrl/samsung.h
+> new file mode 100644
+> index 000000000000..0f410ba5ec7e
+> --- /dev/null
+> +++ b/include/dt-bindings/pinctrl/samsung.h
+> @@ -0,0 +1,57 @@
+> +/*
+> + * Samsung's Exynos pinctrl bindings
+> + *
+> + * Copyright (c) 2016 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + * Author: Krzysztof Kozlowski <krzk@kernel.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
 > +
->  &pinctrl_0 {
->  	/*
->  	 * Pin banks
-> @@ -83,91 +85,91 @@
->  
->  	uart0_data: uart0-data {
->  		samsung,pins = "gph-0", "gph-1";
-> -		samsung,pin-function = <2>;
-> +		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
+> +#ifndef __DT_BINDINGS_PINCTRL_EXYNOS_H__
+> +#define __DT_BINDINGS_PINCTRL_EXYNOS_H__
 
-Shouldn't macros that are also used by s3c* be named as
-SAMSUNG_PIN_FUNC_2 etc. (s3c* SoCs are not Exynos)?
+Minor nit:
+
+shouldn't this be __DT_BINDINGS_PINCTRL_SAMSUNG_H__ (the header file
+is named samsung.h and is going to be used also by s3c* SoCs)?
 
 Best regards,
 --
