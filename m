@@ -1,65 +1,58 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 01 Sep 2016 10:37:02 +0200
-Subject: [PATCH 2/2] ARM: dts: exynos: Fix mismatched values of SD drive
- strengh configuration on exynos4415
-In-Reply-To: <1472719022-27226-1-git-send-email-k.kozlowski@samsung.com>
-References: <1472719022-27226-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1472719022-27226-2-git-send-email-k.kozlowski@samsung.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 1 Sep 2016 10:40:32 +0200
+Subject: [linux-sunxi] Re: [PATCH v3] ARM: dts: sun8i: enable UART1 for
+ iNet D978 Rev2 board
+In-Reply-To: <20160831162240.GJ14379@lukather>
+References: <20160829141832.10566-1-icenowy@aosc.xyz>
+ <20160831162240.GJ14379@lukather>
+Message-ID: <a3097f99-a761-76e7-1405-2574c56ac94d@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pinctrl drive strength register on exynos4415 is 2-bit wide for each
-pin.  The pins for SD2 were configured with value of 4.  The driver does
-not validate the value so this overflow effectively set a bit 1 in
-adjacent pins thus configuring them to drive strength 2x.
+Hi,
 
-The author's intention was probably to set drive strength of 4x.
-All other SD pins are configured with drive strength of 4x.  Fix these
-with same pattern.
+On 31-08-16 18:22, Maxime Ripard wrote:
+> On Mon, Aug 29, 2016 at 10:18:32PM +0800, Icenowy Zheng wrote:
+>> UART1 is connected to the bluetooth part of RTL8723BS WiFi/BT combo card
+>> on iNet D978 Rev2 board.
+>>
+>> Enable the UART1 to make it possible to use the modified hciattach by
+>> Realtek to drive the BT part of RTL8723BS.
+>>
+>> On the board no r_uart pins are found now (the onboard RX/TX pins are
+>> wired to PF2/PF4, which is muxed with mmc0), so also disabled it.
+>>
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>
+> I'll make the same comments than in the v2.
+> https://www.spinics.net/lists/arm-kernel/msg527001.html
 
-Fixes: 9246e7ff24c5 ("ARM: dts: Add dts files for exynos4415 SoC")
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/boot/dts/exynos4415-pinctrl.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+I've a feeling there is a bit of miscommunication here,
+let me try to clarify things:
 
-diff --git a/arch/arm/boot/dts/exynos4415-pinctrl.dtsi b/arch/arm/boot/dts/exynos4415-pinctrl.dtsi
-index f54aee53b6ec..76cfd872ead3 100644
---- a/arch/arm/boot/dts/exynos4415-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos4415-pinctrl.dtsi
-@@ -480,14 +480,14 @@
- 		samsung,pins = "gpk2-0";
- 		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
--		samsung,pin-drv = <4>;
-+		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;
- 	};
- 
- 	sd2_cmd: sd2-cmd {
- 		samsung,pins = "gpk2-1";
- 		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
--		samsung,pin-drv = <4>;
-+		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;
- 	};
- 
- 	sd2_cd: sd2-cd {
-@@ -501,14 +501,14 @@
- 		samsung,pins = "gpk2-3";
- 		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 		samsung,pin-pud = <EXYNOS_PIN_PULL_UP>;
--		samsung,pin-drv = <4>;
-+		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;
- 	};
- 
- 	sd2_bus4: sd2-bus-width4 {
- 		samsung,pins = "gpk2-4", "gpk2-5", "gpk2-6";
- 		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 		samsung,pin-pud = <EXYNOS_PIN_PULL_UP>;
--		samsung,pin-drv = <4>;
-+		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;
- 	};
- 
- 	cam_port_b_io: cam-port-b-io {
--- 
-1.9.1
+Icenowy, Maxime wants you to split this into 2 patches:
+
+1) Adding just the uart1_pins_a and uart1_pins_cts_rts_a nodes to
+sun8i-a23-a33.dtsi; and
+2) Another patch with the sun8i-a33-inet-d978-rev2.dts changes
+
+And for 2. Maxime wants you to change:
+
+	aliases {
+		/delete-property/serial0;
+		serial1 = &uart1;
+	};
+
+to:
+
+	aliases {
+		serial0 = &uart1;
+	};
+
+There is no serial0 and Maxime wants the serial-s
+to be numbered starting at 0 (iow there is no reason
+to make the bluetooth uart serial1).
+
+Regards,
+
+Hans
