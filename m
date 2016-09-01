@@ -1,34 +1,36 @@
-From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Thu,  1 Sep 2016 18:51:48 +0800
-Subject: [PATCH] clk: sunxi-ng: mark ccu_nk_find_best() static
-Message-ID: <1472727108-18388-1-git-send-email-baoyou.xie@linaro.org>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 1 Sep 2016 12:53:25 +0200
+Subject: [PATCH 0/6] pinctrl: s3c/samsung: Add header with values used for
+ configuration
+In-Reply-To: <1472721715-2833-1-git-send-email-k.kozlowski@samsung.com>
+References: <1472721715-2833-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <f235a3a0-36cb-7816-6f57-4a09d63d109f@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We get 1 warning when building kernel with W=1:
-drivers/clk/sunxi-ng/ccu_nk.c:17:6: warning: no previous prototype for 'ccu_nk_find_best' [-Wmissing-prototypes]
+Hello Krzysztof,
 
-In fact, this function is only used in the file in which it is
-declared and don't need a declaration, but can be made static.
-So this patch marks it 'static'.
+On 09/01/2016 11:21 AM, Krzysztof Kozlowski wrote:
+> Hi,
+> 
+> Extend previous patchset (v2) [1] to older, legacy platforms.
+> This depends on v2 of prevoius patchset.
+> 
+> 
+> Changes in DTS/DTSI generated with:
+> sed -i -e 's/samsung,pin-drv = <0>;$/samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;/' arch/arm/boot/dts/s5p*
+> sed -i -e 's/samsung,pin-drv = <2>;$/samsung,pin-drv = <EXYNOS4_PIN_DRV_LV2>;/' arch/arm/boot/dts/s5p*
+> sed -i -e 's/samsung,pin-drv = <1>;$/samsung,pin-drv = <EXYNOS4_PIN_DRV_LV3>;/' arch/arm/boot/dts/s5p*
+> sed -i -e 's/samsung,pin-drv = <3>;$/samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;/' arch/arm/boot/dts/s5p*
+> 
 
-Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
----
- drivers/clk/sunxi-ng/ccu_nk.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Besides the comment for patch 1/6, the series looks good to me.
+So when posting v2 feel free to add:
 
-diff --git a/drivers/clk/sunxi-ng/ccu_nk.c b/drivers/clk/sunxi-ng/ccu_nk.c
-index 4470ffc..2adb62e 100644
---- a/drivers/clk/sunxi-ng/ccu_nk.c
-+++ b/drivers/clk/sunxi-ng/ccu_nk.c
-@@ -14,7 +14,7 @@
- #include "ccu_gate.h"
- #include "ccu_nk.h"
- 
--void ccu_nk_find_best(unsigned long parent, unsigned long rate,
-+static void ccu_nk_find_best(unsigned long parent, unsigned long rate,
- 		      unsigned int max_n, unsigned int max_k,
- 		      unsigned int *n, unsigned int *k)
- {
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
 -- 
-2.7.4
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
