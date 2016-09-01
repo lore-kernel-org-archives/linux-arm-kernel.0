@@ -1,25 +1,142 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 1 Sep 2016 22:50:34 +0200
-Subject: [PATCH 3/3] ARM: dts: rskrza1: add ethernet DT support
-In-Reply-To: <20160901155430.23400-3-chris.brandt@renesas.com>
-References: <20160901155430.23400-1-chris.brandt@renesas.com>
- <20160901155430.23400-3-chris.brandt@renesas.com>
-Message-ID: <CAMuHMdUSC3eP6oy+jcGPfV_urXS+pULzjxJ+A6NjFy7WXuWjLw@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 01 Sep 2016 14:05:47 -0700
+Subject: [PATCH] ARM: dts: meson-gxbb: Add support for the Nexbox A95X
+ Board
+In-Reply-To: <1471951370-29269-1-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Tue, 23 Aug 2016 13:22:50 +0200")
+References: <1471951370-29269-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <m2oa47ib4k.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 1, 2016 at 5:54 PM, Chris Brandt <chris.brandt@renesas.com> wrote:
-> Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+Hi Neil,
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-Gr{oetje,eeting}s,
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/Makefile               |  1 +
+>  .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    | 79 ++++++++++++++++++++++
+>  2 files changed, 80 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
 
-                        Geert
+Can we add this patch to your gx/gxbb/gxl breakup series?
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Some other minor nits below...
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
+> index 47ec703..2c50439 100644
+> --- a/arch/arm64/boot/dts/amlogic/Makefile
+> +++ b/arch/arm64/boot/dts/amlogic/Makefile
+> @@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-p201.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-pro.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-meta.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-telos.dtb
+> +dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-nexbox-a95x.dtb
+>  
+>  always		:= $(dtb-y)
+>  subdir-y	:= $(dts-dirs)
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+> new file mode 100644
+> index 0000000..c418bd7
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+> @@ -0,0 +1,79 @@
+> +/*
+> + * Copyright (c) 2016 Andreas F?rber
+> + * Copyright (c) 2016 BayLibre, Inc.
+> + * Author: Neil Armstrong <narmstrong@kernel.org>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "meson-gxbb.dtsi"
+> +#include <dt-bindings/gpio/gpio.h>
+> +
+> +/ {
+> +	compatible = "nexbox,a95x", "amlogic,meson-gxbb";
+
+>From checkpatch:
+
+ARNING: DT compatible string "nexbox,a95x" appears un-documented --
+check ./Documentation/devicetree/bindings/
+#78: FILE: arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts:51:
++       compatible = "nexbox,a95x", "amlogic,meson-gxbb";
+
+WARNING: DT compatible string vendor "nexbox" appears un-documented --
+check ./Documentation/devicetree/bindings/vendor-prefixes.txt
+#78: FILE: arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts:51:
++       compatible = "nexbox,a95x", "amlogic,meson-gxbb";
+
+
+> +	model = "NEXBOX A95X";
+> +	
+
+And some trailing whitespace here.
+
+> +	aliases {
+> +		serial0 = &uart_AO;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	memory at 0 {
+> +		device_type = "memory";
+> +		reg = <0x0 0x0 0x0 0x40000000>;
+> +	};
+> +};
+> +
+> +&uart_AO {
+> +	status = "okay";
+> +	pinctrl-0 = <&uart_ao_a_pins>;
+> +	pinctrl-names = "default";
+> +};
+> +
+> +&ethmac {
+> +	status = "okay";
+> +	pinctrl-0 = <&eth_pins>;
+> +	pinctrl-names = "default";
+> +};
+> +
+
+Kevin
