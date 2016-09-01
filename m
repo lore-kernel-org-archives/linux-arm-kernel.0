@@ -1,29 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 01 Sep 2016 13:17:13 +0200
-Subject: [PATCH 5/6] ARM: dts: s3c2416: Use macros for pinctrl
- configuration
-In-Reply-To: <e37fbfa0-f30c-ab34-3428-fb9a66182089@samsung.com>
-References: <1472721715-2833-1-git-send-email-k.kozlowski@samsung.com>
- <1608454.1ZuTJsprje@amdc1976>
- <e37fbfa0-f30c-ab34-3428-fb9a66182089@samsung.com>
-Message-ID: <5137342.oSWmFr9Y8D@wuerfel>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 01 Sep 2016 13:17:35 +0200
+Subject: [PATCH 1/2] ARM: dts: exynos: Fix mismatched value for SD4 pull
+ up/down configuration on exynos4210
+In-Reply-To: <1472719022-27226-1-git-send-email-k.kozlowski@samsung.com>
+References: <1472719022-27226-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <2498577.5hS2QaaMmd@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 1, 2016 1:12:18 PM CEST Krzysztof Kozlowski wrote:
-> > 
-> > Shouldn't macros that are also used by s3c* be named as
-> > SAMSUNG_PIN_FUNC_2 etc. (s3c* SoCs are not Exynos)?
+
+Hi,
+
+On Thursday, September 01, 2016 10:37:01 AM Krzysztof Kozlowski wrote:
+> The pinctrl pull up/down register on exynos4210 is 2-bit wide for each
+> pin and it accepts only values of 0, 1 and 3.  The pins sd4-bus-width8
+> were configured with value of 4.  The driver does not validate the value
+> so this overflow effectively set a bit 1 in adjacent pins thus
+> configuring them to pull down.
 > 
-> Right, this is the inconsistency. The problem with "samsung" prefix is
-> that there is no guarantee it will be like that for newer SoCs. How
-> about one of:
-> 1. using the oldest prefix (S3C24XX in this case),
-> 2. duplicating them per SoC family (so S3C24XX, S3C64XX, EXYNOS).
-> ?
+> The author's intention was probably to set drive strength of 4x.  All
+> other bus-widths pins are configured with pull up and drive strength of
+> 4x.  Fix this one with same pattern.
+> 
+> Fixes: 87711d8c7c70 ("ARM: dts: Add pinctrl node entries for SAMSUNG EXYNOS4210 SoC")
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-I'd suggest living with the inconsistency and using EXYNOS as the prefix,
-as that is the most common one these days, even if the other ones
-predate it.
+sd4_bus8 is currently unused by other drivers so there should be no
+problem with this change.
 
-	Arnd
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+
+> ---
+>  arch/arm/boot/dts/exynos4210-pinctrl.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4210-pinctrl.dtsi b/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
+> index 8046340e50ac..d9b6d25e4abe 100644
+> --- a/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
+> +++ b/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
+> @@ -649,7 +649,7 @@
+>  		sd4_bus8: sd4-bus-width8 {
+>  			samsung,pins = "gpk1-3", "gpk1-4", "gpk1-5", "gpk1-6";
+>  			samsung,pin-function = <EXYNOS_PIN_FUNC_3>;
+> -			samsung,pin-pud = <4>;
+> +			samsung,pin-pud = <EXYNOS_PIN_PULL_UP>;
+>  			samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;
+>  		};
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
