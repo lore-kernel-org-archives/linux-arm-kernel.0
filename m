@@ -1,271 +1,123 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Thu,  1 Sep 2016 15:27:55 -0700
-Subject: [PATCH v2 03/17] rpmsg: rpmsg_send() operations takes rpmsg_endpoint
+Date: Thu,  1 Sep 2016 15:27:56 -0700
+Subject: [PATCH v2 04/17] rpmsg: Make rpmsg_create_ept() take channel_info
+ struct
 In-Reply-To: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
 References: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <1472768889-3906-4-git-send-email-bjorn.andersson@linaro.org>
+Message-ID: <1472768889-3906-5-git-send-email-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rpmsg_send() operations has been taking a rpmsg_device, but this
-forces users of secondary rpmsg_endpoints to use the rpmsg_sendto()
-interface - by extracting source and destination from the given data
-structures. If we instead pass the rpmsg_endpoint to these functions a
-service can use rpmsg_sendto() to respond to messages, even on secondary
-endpoints.
-
-In addition this would allow us to support operations on multiple
-channels in future backends that does not support off-channel
-operations.
+As we introduce support for additional rpmsg backends, some of these
+only supports point-to-point "links" represented by a name. By making
+rpmsg_create_ept() take a channel_info struct we allow for these
+backends to either be passed a source address, a destination address or
+a name identifier.
 
 Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 ---
 
 Changes since v1:
-- Announcing the primary endpoint's address rather then the rpdev
+- None
 
- drivers/rpmsg/virtio_rpmsg_bus.c    |  6 ++--
- include/linux/rpmsg.h               | 70 +++++++++++++++++++++----------------
- samples/rpmsg/rpmsg_client_sample.c |  4 +--
- 3 files changed, 45 insertions(+), 35 deletions(-)
+ drivers/rpmsg/virtio_rpmsg_bus.c | 26 ++++++++++----------------
+ include/linux/rpmsg.h            | 15 ++++++++++++++-
+ 2 files changed, 24 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c b/drivers/rpmsg/virtio_rpmsg_bus.c
-index c4bd89ea7681..345036b485d7 100644
+index 345036b485d7..7c7c6a8b21d9 100644
 --- a/drivers/rpmsg/virtio_rpmsg_bus.c
 +++ b/drivers/rpmsg/virtio_rpmsg_bus.c
-@@ -379,10 +379,10 @@ static int rpmsg_dev_probe(struct device *dev)
- 		struct rpmsg_ns_msg nsm;
+@@ -73,18 +73,6 @@ struct virtproc_info {
+ 	struct rpmsg_endpoint *ns_ept;
+ };
  
- 		strncpy(nsm.name, rpdev->id.name, RPMSG_NAME_SIZE);
--		nsm.addr = rpdev->src;
-+		nsm.addr = rpdev->ept->addr;
- 		nsm.flags = RPMSG_NS_CREATE;
+-/**
+- * struct rpmsg_channel_info - internal channel info representation
+- * @name: name of service
+- * @src: local address
+- * @dst: destination address
+- */
+-struct rpmsg_channel_info {
+-	char name[RPMSG_NAME_SIZE];
+-	u32 src;
+-	u32 dst;
+-};
+-
+ #define to_rpmsg_channel(d) container_of(d, struct rpmsg_channel, dev)
+ #define to_rpmsg_driver(d) container_of(d, struct rpmsg_driver, drv)
  
--		err = rpmsg_sendto(rpdev, &nsm, sizeof(nsm), RPMSG_NS_ADDR);
-+		err = rpmsg_sendto(rpdev->ept, &nsm, sizeof(nsm), RPMSG_NS_ADDR);
- 		if (err)
- 			dev_err(dev, "failed to announce service %d\n", err);
- 	}
-@@ -407,7 +407,7 @@ static int rpmsg_dev_remove(struct device *dev)
- 		nsm.addr = rpdev->src;
- 		nsm.flags = RPMSG_NS_DESTROY;
+@@ -259,7 +247,7 @@ free_ept:
+  * @rpdev: rpmsg channel device
+  * @cb: rx callback handler
+  * @priv: private data for the driver's use
+- * @addr: local rpmsg address to bind with @cb
++ * @chinfo: channel_info with the local rpmsg address to bind with @cb
+  *
+  * Every rpmsg address in the system is bound to an rx callback (so when
+  * inbound messages arrive, they are dispatched by the rpmsg bus using the
+@@ -295,9 +283,10 @@ free_ept:
+  * Returns a pointer to the endpoint on success, or NULL on error.
+  */
+ struct rpmsg_endpoint *rpmsg_create_ept(struct rpmsg_channel *rpdev,
+-					rpmsg_rx_cb_t cb, void *priv, u32 addr)
++					rpmsg_rx_cb_t cb, void *priv,
++					struct rpmsg_channel_info chinfo)
+ {
+-	return __rpmsg_create_ept(rpdev->vrp, rpdev, cb, priv, addr);
++	return __rpmsg_create_ept(rpdev->vrp, rpdev, cb, priv, chinfo.src);
+ }
+ EXPORT_SYMBOL(rpmsg_create_ept);
  
--		err = rpmsg_sendto(rpdev, &nsm, sizeof(nsm), RPMSG_NS_ADDR);
-+		err = rpmsg_sendto(rpdev->ept, &nsm, sizeof(nsm), RPMSG_NS_ADDR);
- 		if (err)
- 			dev_err(dev, "failed to announce service %d\n", err);
- 	}
+@@ -353,10 +342,15 @@ static int rpmsg_dev_probe(struct device *dev)
+ 	struct rpmsg_channel *rpdev = to_rpmsg_channel(dev);
+ 	struct rpmsg_driver *rpdrv = to_rpmsg_driver(rpdev->dev.driver);
+ 	struct virtproc_info *vrp = rpdev->vrp;
++	struct rpmsg_channel_info chinfo = {};
+ 	struct rpmsg_endpoint *ept;
+ 	int err;
+ 
+-	ept = rpmsg_create_ept(rpdev, rpdrv->callback, NULL, rpdev->src);
++	strncpy(chinfo.name, rpdev->id.name, RPMSG_NAME_SIZE);
++	chinfo.src = rpdev->src;
++	chinfo.dst = RPMSG_ADDR_ANY;
++
++	ept = rpmsg_create_ept(rpdev, rpdrv->callback, NULL, chinfo);
+ 	if (!ept) {
+ 		dev_err(dev, "failed to create endpoint\n");
+ 		err = -ENOMEM;
 diff --git a/include/linux/rpmsg.h b/include/linux/rpmsg.h
-index 2b97c711a5e3..a901a331a190 100644
+index a901a331a190..f278407fcf48 100644
 --- a/include/linux/rpmsg.h
 +++ b/include/linux/rpmsg.h
-@@ -193,13 +193,14 @@ rpmsg_send_offchannel_raw(struct rpmsg_channel *, u32, u32, void *, int, bool);
+@@ -98,6 +98,18 @@ enum rpmsg_ns_flags {
+ struct virtproc_info;
  
  /**
-  * rpmsg_send() - send a message across to the remote processor
-- * @rpdev: the rpmsg channel
-+ * @ept: the rpmsg endpoint
-  * @data: payload of message
-  * @len: length of payload
-  *
-- * This function sends @data of length @len on the @rpdev channel.
-- * The message will be sent to the remote processor which the @rpdev
-- * channel belongs to, using @rpdev's source and destination addresses.
-+ * This function sends @data of length @len on the @ept endpoint.
-+ * The message will be sent to the remote processor which the @ept
-+ * endpoint belongs to, using @ept's address and its associated rpmsg
-+ * device destination addresses.
-  * In case there are no TX buffers available, the function will block until
-  * one becomes available, or a timeout of 15 seconds elapses. When the latter
-  * happens, -ERESTARTSYS is returned.
-@@ -208,23 +209,24 @@ rpmsg_send_offchannel_raw(struct rpmsg_channel *, u32, u32, void *, int, bool);
-  *
-  * Returns 0 on success and an appropriate error value on failure.
-  */
--static inline int rpmsg_send(struct rpmsg_channel *rpdev, void *data, int len)
-+static inline int rpmsg_send(struct rpmsg_endpoint *ept, void *data, int len)
- {
--	u32 src = rpdev->src, dst = rpdev->dst;
-+	struct rpmsg_channel *rpdev = ept->rpdev;
-+	u32 src = ept->addr, dst = rpdev->dst;
- 
- 	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, true);
- }
- 
- /**
-  * rpmsg_sendto() - send a message across to the remote processor, specify dst
-- * @rpdev: the rpmsg channel
-+ * @ept: the rpmsg endpoint
-  * @data: payload of message
-  * @len: length of payload
-  * @dst: destination address
-  *
-  * This function sends @data of length @len to the remote @dst address.
-- * The message will be sent to the remote processor which the @rpdev
-- * channel belongs to, using @rpdev's source address.
-+ * The message will be sent to the remote processor which the @ept
-+ * endpoint belongs to, using @ept's address as source.
-  * In case there are no TX buffers available, the function will block until
-  * one becomes available, or a timeout of 15 seconds elapses. When the latter
-  * happens, -ERESTARTSYS is returned.
-@@ -234,16 +236,17 @@ static inline int rpmsg_send(struct rpmsg_channel *rpdev, void *data, int len)
-  * Returns 0 on success and an appropriate error value on failure.
-  */
- static inline
--int rpmsg_sendto(struct rpmsg_channel *rpdev, void *data, int len, u32 dst)
-+int rpmsg_sendto(struct rpmsg_endpoint *ept, void *data, int len, u32 dst)
- {
--	u32 src = rpdev->src;
-+	struct rpmsg_channel *rpdev = ept->rpdev;
-+	u32 src = ept->addr;
- 
- 	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, true);
- }
- 
- /**
-  * rpmsg_send_offchannel() - send a message using explicit src/dst addresses
-- * @rpdev: the rpmsg channel
-+ * @ept: the rpmsg endpoint
-  * @src: source address
-  * @dst: destination address
-  * @data: payload of message
-@@ -251,8 +254,8 @@ int rpmsg_sendto(struct rpmsg_channel *rpdev, void *data, int len, u32 dst)
-  *
-  * This function sends @data of length @len to the remote @dst address,
-  * and uses @src as the source address.
-- * The message will be sent to the remote processor which the @rpdev
-- * channel belongs to.
-+ * The message will be sent to the remote processor which the @ept
-+ * endpoint belongs to.
-  * In case there are no TX buffers available, the function will block until
-  * one becomes available, or a timeout of 15 seconds elapses. When the latter
-  * happens, -ERESTARTSYS is returned.
-@@ -262,21 +265,24 @@ int rpmsg_sendto(struct rpmsg_channel *rpdev, void *data, int len, u32 dst)
-  * Returns 0 on success and an appropriate error value on failure.
-  */
- static inline
--int rpmsg_send_offchannel(struct rpmsg_channel *rpdev, u32 src, u32 dst,
-+int rpmsg_send_offchannel(struct rpmsg_endpoint *ept, u32 src, u32 dst,
- 			  void *data, int len)
- {
-+	struct rpmsg_channel *rpdev = ept->rpdev;
++ * struct rpmsg_channel_info - channel info representation
++ * @name: name of service
++ * @src: local address
++ * @dst: destination address
++ */
++struct rpmsg_channel_info {
++	char name[RPMSG_NAME_SIZE];
++	u32 src;
++	u32 dst;
++};
 +
- 	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, true);
- }
++/**
+  * rpmsg_channel - devices that belong to the rpmsg bus are called channels
+  * @vrp: the remote processor this channel belongs to
+  * @dev: the device struct
+@@ -171,7 +183,8 @@ int __register_rpmsg_driver(struct rpmsg_driver *drv, struct module *owner);
+ void unregister_rpmsg_driver(struct rpmsg_driver *drv);
+ void rpmsg_destroy_ept(struct rpmsg_endpoint *);
+ struct rpmsg_endpoint *rpmsg_create_ept(struct rpmsg_channel *,
+-					rpmsg_rx_cb_t cb, void *priv, u32 addr);
++					rpmsg_rx_cb_t cb, void *priv,
++					struct rpmsg_channel_info chinfo);
+ int
+ rpmsg_send_offchannel_raw(struct rpmsg_channel *, u32, u32, void *, int, bool);
  
- /**
-  * rpmsg_send() - send a message across to the remote processor
-- * @rpdev: the rpmsg channel
-+ * @ept: the rpmsg endpoint
-  * @data: payload of message
-  * @len: length of payload
-  *
-- * This function sends @data of length @len on the @rpdev channel.
-- * The message will be sent to the remote processor which the @rpdev
-- * channel belongs to, using @rpdev's source and destination addresses.
-+ * This function sends @data of length @len on the @ept endpoint.
-+ * The message will be sent to the remote processor which the @ept
-+ * endpoint belongs to, using @ept's address as source and its associated
-+ * rpdev's address as destination.
-  * In case there are no TX buffers available, the function will immediately
-  * return -ENOMEM without waiting until one becomes available.
-  *
-@@ -285,23 +291,24 @@ int rpmsg_send_offchannel(struct rpmsg_channel *rpdev, u32 src, u32 dst,
-  * Returns 0 on success and an appropriate error value on failure.
-  */
- static inline
--int rpmsg_trysend(struct rpmsg_channel *rpdev, void *data, int len)
-+int rpmsg_trysend(struct rpmsg_endpoint *ept, void *data, int len)
- {
--	u32 src = rpdev->src, dst = rpdev->dst;
-+	struct rpmsg_channel *rpdev = ept->rpdev;
-+	u32 src = ept->addr, dst = rpdev->dst;
- 
- 	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, false);
- }
- 
- /**
-  * rpmsg_sendto() - send a message across to the remote processor, specify dst
-- * @rpdev: the rpmsg channel
-+ * @ept: the rpmsg endpoint
-  * @data: payload of message
-  * @len: length of payload
-  * @dst: destination address
-  *
-  * This function sends @data of length @len to the remote @dst address.
-- * The message will be sent to the remote processor which the @rpdev
-- * channel belongs to, using @rpdev's source address.
-+ * The message will be sent to the remote processor which the @ept
-+ * endpoint belongs to, using @ept's address as source.
-  * In case there are no TX buffers available, the function will immediately
-  * return -ENOMEM without waiting until one becomes available.
-  *
-@@ -310,16 +317,17 @@ int rpmsg_trysend(struct rpmsg_channel *rpdev, void *data, int len)
-  * Returns 0 on success and an appropriate error value on failure.
-  */
- static inline
--int rpmsg_trysendto(struct rpmsg_channel *rpdev, void *data, int len, u32 dst)
-+int rpmsg_trysendto(struct rpmsg_endpoint *ept, void *data, int len, u32 dst)
- {
--	u32 src = rpdev->src;
-+	struct rpmsg_channel *rpdev = ept->rpdev;
-+	u32 src = ept->addr;
- 
- 	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, false);
- }
- 
- /**
-  * rpmsg_send_offchannel() - send a message using explicit src/dst addresses
-- * @rpdev: the rpmsg channel
-+ * @ept: the rpmsg endpoint
-  * @src: source address
-  * @dst: destination address
-  * @data: payload of message
-@@ -327,8 +335,8 @@ int rpmsg_trysendto(struct rpmsg_channel *rpdev, void *data, int len, u32 dst)
-  *
-  * This function sends @data of length @len to the remote @dst address,
-  * and uses @src as the source address.
-- * The message will be sent to the remote processor which the @rpdev
-- * channel belongs to.
-+ * The message will be sent to the remote processor which the @ept
-+ * endpoint belongs to.
-  * In case there are no TX buffers available, the function will immediately
-  * return -ENOMEM without waiting until one becomes available.
-  *
-@@ -337,9 +345,11 @@ int rpmsg_trysendto(struct rpmsg_channel *rpdev, void *data, int len, u32 dst)
-  * Returns 0 on success and an appropriate error value on failure.
-  */
- static inline
--int rpmsg_trysend_offchannel(struct rpmsg_channel *rpdev, u32 src, u32 dst,
-+int rpmsg_trysend_offchannel(struct rpmsg_endpoint *ept, u32 src, u32 dst,
- 			     void *data, int len)
- {
-+	struct rpmsg_channel *rpdev = ept->rpdev;
-+
- 	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, false);
- }
- 
-diff --git a/samples/rpmsg/rpmsg_client_sample.c b/samples/rpmsg/rpmsg_client_sample.c
-index 7e17d1c0aaf2..37975eddd64e 100644
---- a/samples/rpmsg/rpmsg_client_sample.c
-+++ b/samples/rpmsg/rpmsg_client_sample.c
-@@ -47,7 +47,7 @@ static void rpmsg_sample_cb(struct rpmsg_channel *rpdev, void *data, int len,
- 	}
- 
- 	/* send a new message now */
--	ret = rpmsg_send(rpdev, MSG, strlen(MSG));
-+	ret = rpmsg_send(rpdev->ept, MSG, strlen(MSG));
- 	if (ret)
- 		dev_err(&rpdev->dev, "rpmsg_send failed: %d\n", ret);
- }
-@@ -67,7 +67,7 @@ static int rpmsg_sample_probe(struct rpmsg_channel *rpdev)
- 	dev_set_drvdata(&rpdev->dev, idata);
- 
- 	/* send a message to our remote processor */
--	ret = rpmsg_send(rpdev, MSG, strlen(MSG));
-+	ret = rpmsg_send(rpdev->ept, MSG, strlen(MSG));
- 	if (ret) {
- 		dev_err(&rpdev->dev, "rpmsg_send failed: %d\n", ret);
- 		return ret;
 -- 
 2.5.0
