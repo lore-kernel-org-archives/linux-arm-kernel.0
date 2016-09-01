@@ -1,87 +1,92 @@
-From: david.wu@rock-chips.com (David.Wu)
-Date: Thu, 1 Sep 2016 10:10:08 +0800
-Subject: [PATCH] i2c: rk3x: Restore clock settings at resume time
-In-Reply-To: <1472505756-8302-1-git-send-email-dianders@chromium.org>
-References: <1472505756-8302-1-git-send-email-dianders@chromium.org>
-Message-ID: <19e4d0bf-28c9-0f10-fac9-c05d1e69d510@rock-chips.com>
+From: xzy.xu@rock-chips.com (Ziyuan Xu)
+Date: Thu, 1 Sep 2016 10:29:32 +0800
+Subject: [PATCH 2/2] arm64: dts: rockchip: add eMMC's power domain support
+ for rk3399
+In-Reply-To: <CAD=FV=W=LkVAm187hxp0Kbjxi5kSThwKnCMX+tr8SXQ-v_xQTQ@mail.gmail.com>
+References: <20160827134103.28160-1-xzy.xu@rock-chips.com>
+ <20160827134103.28160-3-xzy.xu@rock-chips.com>
+ <2ab8ab94-fa4d-2cd6-5805-a92ac5f9697e@rock-chips.com>
+ <57C3A30B.5080707@rock-chips.com>
+ <ceba6a89-6945-58c5-62e4-7d842cfa2312@rock-chips.com>
+ <CAD=FV=W=LkVAm187hxp0Kbjxi5kSThwKnCMX+tr8SXQ-v_xQTQ@mail.gmail.com>
+Message-ID: <77f5cff1-80a2-76b3-40e9-f77caced2257@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
+Hi,
 
-Last replied email HTML HEAD error, resend it.
 
-? 2016/8/30 5:22, Douglas Anderson ??:
-> Depending on a number of factors including:
-> - Which exact Rockchip SoC we're working with
-> - How deep we suspend
-> - Which i2c port we're on
+On 2016?09?01? 01:42, Doug Anderson wrote:
+> Hi,
 >
-> We might lose the state of the i2c registers at suspend time.
-> Specifically we've found that on rk3399 the i2c ports that are not in
-> the PMU power domain lose their state with the current suspend depth
-> configured by ARM Tursted Firmware.
->
-> Note that there are very few actual i2c registers that aren't configured
-> per transfer anyway so all we actually need to re-configure are the
-> clock config registers.  We'll just add a call to rk3x_i2c_adapt_div()
-> at resume time and be done with it.
->
-> NOTE: On rk3399 on ports whose power was lost, I put printouts in at
-> resume time.  I saw things like:
->   before: con=0x00010300, div=0x00060006
->   after:  con=0x00010200, div=0x00180025
->
+> On Sun, Aug 28, 2016 at 8:25 PM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
+>> On 2016/8/29 10:50, Elaine Zhang wrote:
+>>>
+>>>
+>>> On 08/27/2016 11:05 PM, Shawn Lin wrote:
+>>>> On 2016/8/27 21:41, Ziyuan Xu wrote:
+>>>>> Control power domain for eMMC via genpd to reduce power consumption.
+>>>>>
+>>>>> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+>>>>> Signed-off-by: Ziyuan Xu <xzy.xu@rock-chips.com>
+>>>>>
+>>>> It looks nice to me. But this should be merged after applying that[0]
+>>>> as your patch will break bind/unbind test for sdhci-of-arasan on rk3399
+>>>> without it[0]. Moreover, Elaine should make sure that upstreamed
+>>>> rockchip power domain stuff would not off pd for emmc, *otherwise*, I
+>>>> should update my patch to make sure we update clkmul every time when
+>>>> doing suspend 2 resume..
+>>>>
+>>>>
+>>> Forgot to say:
+>>> If use pd, Although there is no call to power odd the pd_emmc,
+>>> it will be power off when the system doing suspend 2 resume.
+>>> (Because the system call
+>>> __device_suspend_noirq->pm_genpd_suspend_noirq->rockchip_pd_power_off)
+>>
+>> Thanks for explaining this. I checked the code a bit and actually I
+>> don't need to updata clkmul since it was recorded, although it is still
+>> reset to 0x10 reading from syscon. So for that, we can now pick it
+>> up without waiting for my sdhci-of-arasan's update.
+>>
+>> Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
+> This is fine to pick up _only_ if you don't care about suspend/resume.
+> If you care about suspend/resume then someone needs to first write a
+> patch that will re-init all "corecfg" values after power is turned on.
 
-I do the suspend/resume stress test on my rk3399 & rk3288 board more 
-than 24 hours,
+Do you mean corecfg_clockmultiplier and corecfg_baseclkfreq, if yes, we 
+don't need to strore/re-init it after resume.
+corecfg_clockmultiplier is only used to fetch host->clk_mul, and 
+host->clk_mul has been a fixed value at run-time, unless driver unbind.
+The same as corecfg_clockmultiplier, corecfg_baseclkfreq is used to 
+check the xin_clk at probe time, we don't reference it at run-time.
+BTW, I have tested suspend/resume on rk3399 prior to this sumbit, eMMC 
+works fine.
 
-the patch works well, it looks nice to me.
+>
+> Technically I think this should probably use "pm runtime" and not
+> normal suspend/resume hooks.  Any time we end up pm runtime suspended
+> then I think our power will go off (because of genpd?) and we need to
+> restore values.
 
-Reviewed-by: David Wu <david.wu@rock-chips.com>
-Tested-by: David Wu <david.wu@rock-chips.com>
+I understand your consideration. BUT genpd is in charge of on/off pd if 
+the corresponding device node has "power-domains" property. RPM is 
+unnecessary for this situation, we will not use autosuspend, right?
 
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
-> ---
-> Tested on chromeos-4.4 kernel with backports.
+@shawn, what's your opinion?
+
 >
-> drivers/i2c/busses/i2c-rk3x.c | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+> I'm not sure if this should be done in a generic way where we try to
+> save and restore all values in the "sdhci_arasan_soc_ctl_map" or if we
+> should try to be smarter...
 >
-> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-> index 3b87afe82f63..0df5ad6bfa31 100644
-> --- a/drivers/i2c/busses/i2c-rk3x.c
-> +++ b/drivers/i2c/busses/i2c-rk3x.c
-> @@ -1111,6 +1111,15 @@ static int rk3x_i2c_xfer(struct i2c_adapter *adap,
->  	return ret < 0 ? ret : num;
->  }
 >
-> +static __maybe_unused int rk3x_i2c_resume(struct device *dev)
-> +{
-> +	struct rk3x_i2c *i2c = dev_get_drvdata(dev);
-> +
-> +	rk3x_i2c_adapt_div(i2c, clk_get_rate(i2c->clk));
-> +
-> +	return 0;
-> +}
-> +
->  static u32 rk3x_i2c_func(struct i2c_adapter *adap)
->  {
->  	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL | I2C_FUNC_PROTOCOL_MANGLING;
-> @@ -1332,12 +1341,15 @@ static int rk3x_i2c_remove(struct platform_device *pdev)
->  	return 0;
->  }
+> -Doug
 >
-> +static const SIMPLE_DEV_PM_OPS(rk3x_i2c_pm_ops, NULL, rk3x_i2c_resume);
-> +
->  static struct platform_driver rk3x_i2c_driver = {
->  	.probe   = rk3x_i2c_probe,
->  	.remove  = rk3x_i2c_remove,
->  	.driver  = {
->  		.name  = "rk3x-i2c",
->  		.of_match_table = rk3x_i2c_match,
-> +		.pm = &rk3x_i2c_pm_ops,
->  	},
->  };
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+>
 >
 >
