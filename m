@@ -1,102 +1,172 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 1 Sep 2016 14:29:20 -0700
-Subject: [PATCH 2/2] arm64: dts: rockchip: add eMMC's power domain support
- for rk3399
-In-Reply-To: <411dfc7b-1089-61a8-7a7e-6f378c0a6074@rock-chips.com>
-References: <20160827134103.28160-1-xzy.xu@rock-chips.com>
- <20160827134103.28160-3-xzy.xu@rock-chips.com>
- <2ab8ab94-fa4d-2cd6-5805-a92ac5f9697e@rock-chips.com>
- <57C3A30B.5080707@rock-chips.com>
- <ceba6a89-6945-58c5-62e4-7d842cfa2312@rock-chips.com>
- <CAD=FV=W=LkVAm187hxp0Kbjxi5kSThwKnCMX+tr8SXQ-v_xQTQ@mail.gmail.com>
- <77f5cff1-80a2-76b3-40e9-f77caced2257@rock-chips.com>
- <CAD=FV=WmoyoZmV_uj281S37ZpWqg8Dr2U8ntkD2Sr58qbcB0wg@mail.gmail.com>
- <411dfc7b-1089-61a8-7a7e-6f378c0a6074@rock-chips.com>
-Message-ID: <CAD=FV=Wrw=THuokXyOXSyihF4fDB4z2L0vCgkiR9XJ6aEzsNzg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 02 Sep 2016 00:29:48 +0300
+Subject: [PATCH] ARM: dts: wheat: add DU support
+In-Reply-To: <34968644.DhifNderY8@wasted.cogentembedded.com>
+References: <34968644.DhifNderY8@wasted.cogentembedded.com>
+Message-ID: <15676050.WJW1jK1n2R@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Define  the  Wheat board dependent  part of the DU device node.
+Add the device nodes for the Analog Devices ADV7513 HDMI transmitters
+connected to DU0/1.  Add the necessary subnodes to interconnect DU with
+HDMI transmitters/connectors.
 
-On Wed, Aug 31, 2016 at 11:56 PM, Ziyuan Xu <xzy.xu@rock-chips.com> wrote:
-> Hi
->
->
-> On 2016?09?01? 12:20, Doug Anderson wrote:
->>
->> Hi,
->>
->> On Wed, Aug 31, 2016 at 7:29 PM, Ziyuan Xu <xzy.xu@rock-chips.com> wrote:
->>>>
->>>> This is fine to pick up _only_ if you don't care about suspend/resume.
->>>> If you care about suspend/resume then someone needs to first write a
->>>> patch that will re-init all "corecfg" values after power is turned on.
->>>
->>>
->>> Do you mean corecfg_clockmultiplier and corecfg_baseclkfreq, if yes, we
->>> don't need to strore/re-init it after resume.
->>> corecfg_clockmultiplier is only used to fetch host->clk_mul, and
->>> host->clk_mul has been a fixed value at run-time, unless driver unbind.
->>> The same as corecfg_clockmultiplier, corecfg_baseclkfreq is used to check
->>> the xin_clk at probe time, we don't reference it at run-time.
->>> BTW, I have tested suspend/resume on rk3399 prior to this sumbit, eMMC
->>> works
->>> fine.
->>
->> I guess I don't actually know how the corecfg_clockmultiplier and
->> corecfg_baseclkfreq fields are actually used, but I presume that they
->> actually do something useful and aren't used to just communicate back
->> to software?
->
->
-> Take corecfg_clockmultiplier as example.
-> 1. sdhci driver fetch host->clk_mul from corecfg_clockmultiplier
-> 2. mmc->f_min and mmc->f_max are calculated via host->clk_mul, they're used
-> for further initialization.
-> 3. if the corecfg_clockmultiplier is incorrect, sdhci will use improper
-> frequency to play.
->
-> I think we don't need to store it due to it's a fixed value at run-time,
-> even if it is reset after a power cycle, the above will not be changed via
-> software, except for dirver unbind .
->
->>
->> I know that:
->>
->> 1. If I don't pick this patch and I suspend/resume,
->> corecfg_clockmultiplier and corecfg_baseclkfreq are still fine after
->> suspend / resume.
->>
->> 2. If I do pick this patch and I suspend/resume,
->> corecfg_clockmultiplier and corecfg_baseclkfreq are wrong after
->> suspend/resume (tested by reading /dev/mem directly from userspace
->> after suspend/resume).
->>
->>
->> Are you saying that it is unimportant that corecfg_clockmultiplier and
->> corecfg_baseclkfreq are wrong?
->
->
-> Yup, corecfg_* stuff will be reset after a power cycle.
-> I mean that we need only to guarantee they're correct at probe time.
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-So are you saying that the entire purpose of "corecfg_clockmultiplier"
-is that causes the "ClockMultiplier" field of the "EMMCCORE_CAP"
-register to get a certain value?
-...and that the entire purpose of "corecfg_baseclkfreq" is that it
-causes the "BaseClockFreqSDClock" field of the "EMMCCORE_CAP" register
-to get a certain value?
+---
+This patch is against the 'renesas-devel-20160901-v4.8-rc4' of Simon Horman's
+'renesas.git' repo plus the Wheat CAN and SDHI patches posted earlier...
+The path depends on the 2 DRM patches just posted in order to work correctly!
 
-That would have been nice to know before.  I had assumed that those
-"corecfg" settings did something else more useful.
+ arch/arm/boot/dts/r8a7792-wheat.dts |  126 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 126 insertions(+)
 
-If it is indeed true that these corecfg values are as silly as it
-seems, then I guess it's not terribly important to re-set them after
-suspend/resume.  Eventually it would be nice/clean to actually do so
-(in case the SDHCI driver eventually changes), but I guess we wouldn't
-need to block. this patch from landing.
-
-Can you please confirm my understanding above?
-
-
--Doug
+Index: renesas/arch/arm/boot/dts/r8a7792-wheat.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7792-wheat.dts
++++ renesas/arch/arm/boot/dts/r8a7792-wheat.dts
+@@ -66,6 +66,34 @@
+ 		gpio = <&gpio11 12 GPIO_ACTIVE_HIGH>;
+ 		enable-active-high;
+ 	};
++
++	hdmi-out0 {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con0: endpoint {
++				remote-endpoint = <&adv7513_0_out>;
++			};
++		};
++	};
++
++	hdmi-out1 {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con1: endpoint {
++				remote-endpoint = <&adv7513_1_out>;
++			};
++		};
++	};
++
++	osc2_clk: osc2 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <74250000>;
++	};
+ };
+ 
+ &extal_clk {
+@@ -103,6 +131,16 @@
+ 		groups = "sdhi0_data4", "sdhi0_ctrl";
+ 		function = "sdhi0";
+ 	};
++
++	du0_pins: du0 {
++		groups = "du0_rgb888", "du0_sync", "du0_disp";
++		function = "du0";
++	};
++
++	du1_pins: du1 {
++		groups = "du1_rgb666", "du1_sync", "du1_disp";
++		function = "du1";
++	};
+ };
+ 
+ &scif0 {
+@@ -134,3 +172,91 @@
+ 	cd-gpios = <&gpio11 11 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
++
++&i2c4 {
++	status = "okay";
++	clock-frequency = <400000>;
++
++	hdmi at 3d {
++		compatible = "adi,adv7513";
++		reg = <0x3d>;
++
++		adi,input-depth = <8>;
++		adi,input-colorspace = "rgb";
++		adi,input-clock = "1x";
++		adi,input-style = <1>;
++		adi,input-justification = "evenly";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				adv7513_0_in: endpoint {
++					remote-endpoint = <&du_out_rgb0>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++				adv7513_0_out: endpoint {
++					remote-endpoint = <&hdmi_con0>;
++				};
++			};
++		};
++	};
++
++	hdmi at 39 {
++		compatible = "adi,adv7513";
++		reg = <0x39>;
++
++		adi,input-depth = <8>;
++		adi,input-colorspace = "rgb";
++		adi,input-clock = "1x";
++		adi,input-style = <1>;
++		adi,input-justification = "evenly";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				adv7513_1_in: endpoint {
++					remote-endpoint = <&du_out_rgb1>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++				adv7513_1_out: endpoint {
++					remote-endpoint = <&hdmi_con1>;
++				};
++			};
++		};
++	};
++};
++
++&du {
++	pinctrl-0 = <&du0_pins &du1_pins>;
++	pinctrl-names = "default";
++
++	clocks = <&mstp7_clks R8A7792_CLK_DU0>, <&mstp7_clks R8A7792_CLK_DU1>,
++		 <&osc2_clk>;
++	clock-names = "du.0", "du.1", "dclkin.0";
++	status = "okay";
++
++	ports {
++		port at 0 {
++			endpoint {
++				remote-endpoint = <&adv7513_0_in>;
++			};
++		};
++		port at 1 {
++			endpoint {
++				remote-endpoint = <&adv7513_1_in>;
++			};
++		};
++	};
++};
