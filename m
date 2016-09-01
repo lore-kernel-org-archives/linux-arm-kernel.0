@@ -1,37 +1,101 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 1 Sep 2016 15:19:58 +0800
-Subject: [PATCHv3 03/11] crypto: omap-sham: implement context
- export/import APIs
-In-Reply-To: <70468d4d-9f26-1bad-ace1-4b7c5cf43b52@ti.com>
-References: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
- <1470306526-27219-4-git-send-email-t-kristo@ti.com>
- <20160809100633.GA6751@gondor.apana.org.au>
- <d828fca9-a97a-7722-c4cb-24e07816cbc4@ti.com>
- <20160901033320.GA650@gondor.apana.org.au>
- <60a5ed40-5552-3ec8-fa21-7e6fb8213fc3@ti.com>
- <20160901061630.GB650@gondor.apana.org.au>
- <70468d4d-9f26-1bad-ace1-4b7c5cf43b52@ti.com>
-Message-ID: <20160901071958.GA2076@gondor.apana.org.au>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 01 Sep 2016 09:23:49 +0200
+Subject: [PATCH v2 01/10] pinctrl: dt-bindings: samsung: Add header with values
+ used for configuration
+In-Reply-To: <1472714638-15676-1-git-send-email-k.kozlowski@samsung.com>
+References: <1472714638-15676-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1472714638-15676-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2016 at 09:56:06AM +0300, Tero Kristo wrote:
->
-> Hmm, looking at the driver, sham_update returns 0 immediately if it
-> just caches data. In a sense, the update is not completed at this
-> point. Are you saying this is illegal and can't be done?
+Hard-coded pinctrl configuration values are scattered through DTS files.
+The numbers are difficult to decode by human, especially without the
+datasheet.  Additionally the drive strength differs between Exynos SoC
+families increasing the confusion.
 
-Once you call the completion function (and returning zero from
-the update itself is equivalent to calling the completion function)
-the hardware must not touch the request anymore.
+The header will help making this more readable and maintainable.
 
-> From my understanding, valid results are expected from the driver
-> only after ->final is called.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ MAINTAINERS                           |  1 +
+ include/dt-bindings/pinctrl/samsung.h | 57 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 58 insertions(+)
+ create mode 100644 include/dt-bindings/pinctrl/samsung.h
 
-That's because you never implemented export/import :)
-
-Cheers,
+diff --git a/MAINTAINERS b/MAINTAINERS
+index d8e81b1dde30..836bcd327ee4 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9318,6 +9318,7 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	drivers/pinctrl/samsung/
++F:	include/dt-bindings/pinctrl/samsung.h
+ 
+ PIN CONTROLLER - SINGLE
+ M:	Tony Lindgren <tony@atomide.com>
+diff --git a/include/dt-bindings/pinctrl/samsung.h b/include/dt-bindings/pinctrl/samsung.h
+new file mode 100644
+index 000000000000..0f410ba5ec7e
+--- /dev/null
++++ b/include/dt-bindings/pinctrl/samsung.h
+@@ -0,0 +1,57 @@
++/*
++ * Samsung's Exynos pinctrl bindings
++ *
++ * Copyright (c) 2016 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ * Author: Krzysztof Kozlowski <krzk@kernel.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __DT_BINDINGS_PINCTRL_EXYNOS_H__
++#define __DT_BINDINGS_PINCTRL_EXYNOS_H__
++
++#define EXYNOS_PIN_PULL_NONE		0
++#define EXYNOS_PIN_PULL_DOWN		1
++#define EXYNOS_PIN_PULL_UP		3
++
++/* Pin function in power down mode */
++#define EXYNOS_PIN_PDN_OUT0		0
++#define EXYNOS_PIN_PDN_OUT1		1
++#define EXYNOS_PIN_PDN_INPUT		2
++#define EXYNOS_PIN_PDN_PREV		3
++
++/* Drive strengths for Exynos3250, Exynos4 (all) and Exynos5250 */
++#define EXYNOS4_PIN_DRV_LV1		0
++#define EXYNOS4_PIN_DRV_LV2		2
++#define EXYNOS4_PIN_DRV_LV3		1
++#define EXYNOS4_PIN_DRV_LV4		3
++
++/* Drive strengths for Exynos5260 */
++#define EXYNOS5260_PIN_DRV_LV1		0
++#define EXYNOS5260_PIN_DRV_LV2		1
++#define EXYNOS5260_PIN_DRV_LV4		2
++#define EXYNOS5260_PIN_DRV_LV6		3
++
++/* Drive strengths for Exynos5410, Exynos542x and Exynos5800 */
++#define EXYNOS5420_PIN_DRV_LV1		0
++#define EXYNOS5420_PIN_DRV_LV2		1
++#define EXYNOS5420_PIN_DRV_LV3		2
++#define EXYNOS5420_PIN_DRV_LV4		3
++
++#define EXYONS_PIN_PDN_OUT0		0
++#define EXYNOS_PIN_PDN_OUT1		1
++#define EXYNOS_PIN_PDN_INPUT		2
++#define EXYNOS_PIN_PDN_PREV		3
++
++#define EXYNOS_PIN_FUNC_INPUT		0
++#define EXYNOS_PIN_FUNC_OUTPUT		1
++#define EXYNOS_PIN_FUNC_2		2
++#define EXYNOS_PIN_FUNC_3		3
++#define EXYNOS_PIN_FUNC_4		4
++#define EXYNOS_PIN_FUNC_5		5
++#define EXYNOS_PIN_FUNC_F		0xf
++
++#endif /* __DT_BINDINGS_PINCTRL_EXYNOS_H__ */
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+1.9.1
