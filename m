@@ -1,25 +1,38 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 1 Sep 2016 13:11:54 +0100
-Subject: [PATCH] KVM: arm/arm64: Get rid of exported aliases to static
- functions
-In-Reply-To: <20160901111806.14972-1-christoffer.dall@linaro.org>
-References: <20160901111806.14972-1-christoffer.dall@linaro.org>
-Message-ID: <57C81B0A.2050003@arm.com>
+Date: Thu, 1 Sep 2016 13:21:23 +0100
+Subject: [PATCH 1/5] arm/arm64: KVM: Don't BUG_ON if IT bits are set in
+ ARM mode
+In-Reply-To: <20160901115616.GD10162@cbox>
+References: <1471610295-1456-1-git-send-email-marc.zyngier@arm.com>
+ <1471610295-1456-2-git-send-email-marc.zyngier@arm.com>
+ <20160901115616.GD10162@cbox>
+Message-ID: <57C81D43.4020606@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/16 12:18, Christoffer Dall wrote:
-> When rewriting the assembly code to C code, it was useful to have
-> exported aliases or static functions so that we could keep the existing
-> common C code unmodified and at the same time rewrite arm64 from
-> assembly to C code, and later do the arm part.
+On 01/09/16 12:56, Christoffer Dall wrote:
+> On Fri, Aug 19, 2016 at 01:38:11PM +0100, Marc Zyngier wrote:
+>> The ARM ARM asserts that having the IT bits set in ARM mode is
+>> unpredictable. But should a CPU do that (and still be able to
+>> run correctly), we shouldn't kill the system.
+>>
+>> So let's drop the BUG_ON that checks for this, as it is not
+>> very helpful.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> Now when both are done, we really don't need this level of indirection
-> anymore, and it's time to save a few lines and brain cells.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> not sure how this relates to the series, but looks fine otherwise:
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+In the following patch, I'm moving the whole function to be an inline
+that will be used in HYP as well. A BUG_ON in HYP is a pretty tasteless
+thing to do, so I opted for removing it here.
+
+But your remark on the following patch makes more sense over all. I'll
+follow up there.
+
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+Thanks,
 
 	M.
 -- 
