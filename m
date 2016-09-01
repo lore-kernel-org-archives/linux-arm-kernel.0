@@ -1,56 +1,37 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 1 Sep 2016 13:46:02 +0200
-Subject: [PATCH/RFC v3 00/22] soc: renesas: Add R-Car RST driver for
- obtaining mode pin state
-In-Reply-To: <20160630201407.GA27880@codeaurora.org>
-References: <1464808880-343-1-git-send-email-geert+renesas@glider.be>
- <20160630201407.GA27880@codeaurora.org>
-Message-ID: <CAMuHMdWu34OQSS6J3bf=0-1TYULc=coiVomBjtBatwGta5F3HQ@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 01 Sep 2016 13:49:49 +0200
+Subject: [PATCH v2 2/2] ARM: exynos_defconfig: Remove old non-working MIPI
+ driver
+In-Reply-To: <1472730589-18683-1-git-send-email-k.kozlowski@samsung.com>
+References: <1472730589-18683-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1472730589-18683-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+The Exynos MIPI driver does not work anymore (it is board file only) so
+it is removed.  Remove also config option.
 
-On Thu, Jun 30, 2016 at 10:14 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 06/01, Geert Uytterhoeven wrote:
->> Currently the R-Car Clock Pulse Generator (CPG) drivers obtains the
->> state of the mode pins either by a call from the board code, or directly
->> by using a hardcoded register access. This is a bit messy, and creates a
->> dependency between driver and platform code.
->>
->> This RFC patch series converts the various Renesas R-Car clock drivers
->> and support code from reading the mode pin states using a hardcoded
->> register access to using a new R-Car RST driver.
->
-> Dumb question, can we use the nvmem reading APIs instead of an
-> SoC specific function to read the modes?
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Thanks for your suggestion, the nvmem API indeed looks like a suitable API,
-as it does support read-only nvmems.
+---
 
-Unfortunately I also see a few disadvantages:
-  1. nvmem_init() is a subsys_initcall(), while most of our users (except for
-     the recent renesas-cpg-mssr driver) are clock drivers using
-     CLK_OF_DECLARE(), and are thus initialized from of_clk_init() at much
-     earlier time_init() time.
-     Of course the mvmem subsystem and/or the clock drivers can be changed, if
-     deemed useful.
-  2. Using the nvmem DT bindings means we have to add more DT glue from the
-     nvmem consumer(s) to the nvmem provider. As we need to provide backwards
-     compatibility with old DTSes, this means we need more C code or DT fixup
-     code to handle that.
-  3. The nvmem subsystem may be overkill to provide access to a simple 32-bit
-     read-only register that never changes value after boot.
+Changes since v1:
+1. New patch.
+---
+ arch/arm/configs/exynos_defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-Thoughts?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 4e484f406419..fea8edef1534 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -168,7 +168,6 @@ CONFIG_DRM_PANEL_SAMSUNG_LD9040=y
+ CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=y
+ CONFIG_DRM_NXP_PTN3460=y
+ CONFIG_DRM_PARADE_PS8622=y
+-CONFIG_EXYNOS_VIDEO=y
+ CONFIG_EXYNOS_MIPI_DSI=y
+ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_LCD_PLATFORM=y
+-- 
+1.9.1
