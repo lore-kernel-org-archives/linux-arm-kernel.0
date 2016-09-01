@@ -1,54 +1,73 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 01 Sep 2016 13:17:35 +0200
-Subject: [PATCH 1/2] ARM: dts: exynos: Fix mismatched value for SD4 pull
- up/down configuration on exynos4210
-In-Reply-To: <1472719022-27226-1-git-send-email-k.kozlowski@samsung.com>
-References: <1472719022-27226-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <2498577.5hS2QaaMmd@amdc1976>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 1 Sep 2016 12:22:51 +0100
+Subject: [PATCH v9 3/4] doc: bindings: mfd: act8945a: Update the example
+In-Reply-To: <1472722201-31872-4-git-send-email-wenyou.yang@atmel.com>
+References: <1472722201-31872-1-git-send-email-wenyou.yang@atmel.com>
+ <1472722201-31872-4-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20160901112251.GK4921@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 01 Sep 2016, Wenyou Yang wrote:
 
-Hi,
-
-On Thursday, September 01, 2016 10:37:01 AM Krzysztof Kozlowski wrote:
-> The pinctrl pull up/down register on exynos4210 is 2-bit wide for each
-> pin and it accepts only values of 0, 1 and 3.  The pins sd4-bus-width8
-> were configured with value of 4.  The driver does not validate the value
-> so this overflow effectively set a bit 1 in adjacent pins thus
-> configuring them to pull down.
+> Since the act8945a-charger is regarded as a sub-device and it using
+> "interrupts" property, update the examples section.
 > 
-> The author's intention was probably to set drive strength of 4x.  All
-> other bus-widths pins are configured with pull up and drive strength of
-> 4x.  Fix this one with same pattern.
-> 
-> Fixes: 87711d8c7c70 ("ARM: dts: Add pinctrl node entries for SAMSUNG EXYNOS4210 SoC")
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-sd4_bus8 is currently unused by other drivers so there should be no
-problem with this change.
-
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 > ---
->  arch/arm/boot/dts/exynos4210-pinctrl.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/exynos4210-pinctrl.dtsi b/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
-> index 8046340e50ac..d9b6d25e4abe 100644
-> --- a/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
-> @@ -649,7 +649,7 @@
->  		sd4_bus8: sd4-bus-width8 {
->  			samsung,pins = "gpk1-3", "gpk1-4", "gpk1-5", "gpk1-6";
->  			samsung,pin-function = <EXYNOS_PIN_FUNC_3>;
-> -			samsung,pin-pud = <4>;
-> +			samsung,pin-pud = <EXYNOS_PIN_PULL_UP>;
->  			samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;
->  		};
+> Changes in v9: None
+> Changes in v8: None
+> Changes in v7: None
+> Changes in v6: None
+> Changes in v4: None
+> 
+>  Documentation/devicetree/bindings/mfd/act8945a.txt | 22 +++++++++++++++-------
+>  1 file changed, 15 insertions(+), 7 deletions(-)
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+This is a functional change.  I'll require a DT Ack.
+
+> diff --git a/Documentation/devicetree/bindings/mfd/act8945a.txt b/Documentation/devicetree/bindings/mfd/act8945a.txt
+> index f712830..462819a 100644
+> --- a/Documentation/devicetree/bindings/mfd/act8945a.txt
+> +++ b/Documentation/devicetree/bindings/mfd/act8945a.txt
+> @@ -14,13 +14,6 @@ Example:
+>  		reg = <0x5b>;
+>  		status = "okay";
+>  
+> -		pinctrl-names = "default";
+> -		pinctrl-0 = <&pinctrl_charger_chglev>;
+> -		active-semi,chglev-gpio = <&pioA 12 GPIO_ACTIVE_HIGH>;
+> -		active-semi,input-voltage-threshold-microvolt = <6600>;
+> -		active-semi,precondition-timeout = <40>;
+> -		active-semi,total-timeout = <3>;
+> -
+>  		active-semi,vsel-high;
+>  
+>  		regulators {
+> @@ -73,4 +66,19 @@ Example:
+>  				regulator-always-on;
+>  			};
+>  		};
+> +
+> +		charger {
+> +			compatible = "active-semi,act8945a-charger";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_charger_chglev &pinctrl_charger_lbo &pinctrl_charger_irq>;
+> +			interrupt-parent = <&pioA>;
+> +			interrupts = <45 GPIO_ACTIVE_LOW>;
+> +
+> +			active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
+> +			active-semi,lbo-gpios = <&pioA 72 GPIO_ACTIVE_LOW>;
+> +			active-semi,input-voltage-threshold-microvolt = <6600>;
+> +			active-semi,precondition-timeout = <40>;
+> +			active-semi,total-timeout = <3>;
+> +			status = "okay";
+> +		};
+>  	};
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
