@@ -1,20 +1,34 @@
-From: woogyom.kim@gmail.com (Milo Kim)
-Date: Thu, 1 Sep 2016 21:51:00 +0900
-Subject: [PATCH v2 1/4] ARM: dts: sun8i: Add PWM pin in H3
-In-Reply-To: <CAGb2v66etp0AsYvs8n3MgBXehqV=kwkSnuq=Kt=aLtH4xvcDkA@mail.gmail.com>
-References: <20160831082520.25962-1-woogyom.kim@gmail.com>
- <20160831082520.25962-2-woogyom.kim@gmail.com>
- <CAGb2v66etp0AsYvs8n3MgBXehqV=kwkSnuq=Kt=aLtH4xvcDkA@mail.gmail.com>
-Message-ID: <85db83b5-a98d-dfc2-5082-8b235f2185c2@gmail.com>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Thu,  1 Sep 2016 20:51:39 +0800
+Subject: [PATCH v3 0/3] Add ZTE ZX296718 support
+Message-ID: <1472734302-8986-1-git-send-email-jun.nie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/31/2016 05:33 PM, Chen-Yu Tsai wrote:
->> +                       pwm0_pin_a: pwm0 at 0 {
-> This is the only possible configuration. You can drop the _a suffix
-> from the label, and @0 from the node name.
+Changes in version3:
+  - Remove unecessary flag of gic in dts.
 
-OK, thanks for your review.
+Changes in version2:
+  - Use more precise cpu and pmu compatible name in dts.
+  - fix minor coding style issue.
 
-Best regards,
-Milo
+
+Jun Nie (3):
+  arm64: add ZTE ZX SoC family
+  arm64: dts: Add ZTE ZX296718 SoC dts and Makefile
+  arm64: defconfig: enable ZTE ZX related config
+
+ Documentation/devicetree/bindings/arm/zte.txt |  24 +++
+ arch/arm64/Kconfig.platforms                  |   5 +
+ arch/arm64/boot/dts/Makefile                  |   1 +
+ arch/arm64/boot/dts/zte/Makefile              |   5 +
+ arch/arm64/boot/dts/zte/zx296718.dts          |  21 +++
+ arch/arm64/boot/dts/zte/zx296718.dtsi         | 253 ++++++++++++++++++++++++++
+ arch/arm64/configs/defconfig                  |   1 +
+ 7 files changed, 310 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/zte/Makefile
+ create mode 100644 arch/arm64/boot/dts/zte/zx296718.dts
+ create mode 100644 arch/arm64/boot/dts/zte/zx296718.dtsi
+
+-- 
+1.9.1
