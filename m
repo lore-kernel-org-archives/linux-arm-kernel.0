@@ -1,137 +1,56 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu,  1 Sep 2016 20:46:28 +0900
-Subject: [PATCH 1/3] i2c: uniphier: avoid WARN_ON() of clk_disable() in
- failure path
+Date: Thu,  1 Sep 2016 20:46:30 +0900
+Subject: [PATCH 3/3] i2c: uniphier-f: set the adapter to master mode when
+ probing
 In-Reply-To: <1472730390-8907-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1472730390-8907-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1472730390-8907-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1472730390-8907-4-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If clk_prepare_enable() fails, clk_disable_unprepare() is called in
-the failure path, where the enable_count is still zero, so it hits
-WARN_ON(core->enable_count == 0) in the clk_core_disable().
-
-To fix this, make the clock setting more linear in the probe function
-so that it can exploit "goto err" in case of error.
+Currently, the adapter is set to the master mode at the first use.
+Since then, it is kept in the slave mode, so unexpected glitch
+signals on the I2C lines may cause the adapter into insane state.
+Setting it to the master mode along with initialization solves the
+problem.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Reported-by: Akio Noda <noda.akio@socionext.com>
 ---
 
- drivers/i2c/busses/i2c-uniphier.c | 73 +++++++++++++++++----------------------
- 1 file changed, 31 insertions(+), 42 deletions(-)
+ drivers/i2c/busses/i2c-uniphier-f.c | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-uniphier.c b/drivers/i2c/busses/i2c-uniphier.c
-index d6e612a..56e92af 100644
---- a/drivers/i2c/busses/i2c-uniphier.c
-+++ b/drivers/i2c/busses/i2c-uniphier.c
-@@ -316,50 +316,15 @@ static struct i2c_bus_recovery_info uniphier_i2c_bus_recovery_info = {
- 	.unprepare_recovery = uniphier_i2c_unprepare_recovery,
- };
- 
--static int uniphier_i2c_clk_init(struct device *dev,
--				 struct uniphier_i2c_priv *priv)
-+static void uniphier_i2c_hw_init(struct uniphier_i2c_priv *priv,
-+				 u32 bus_speed, unsigned long clk_rate)
+diff --git a/drivers/i2c/busses/i2c-uniphier-f.c b/drivers/i2c/busses/i2c-uniphier-f.c
+index 2886685..829df91 100644
+--- a/drivers/i2c/busses/i2c-uniphier-f.c
++++ b/drivers/i2c/busses/i2c-uniphier-f.c
+@@ -458,16 +458,20 @@ static struct i2c_bus_recovery_info uniphier_fi2c_bus_recovery_info = {
+ static void uniphier_fi2c_hw_init(struct uniphier_fi2c_priv *priv,
+ 				  u32 bus_speed, unsigned long clk_rate)
  {
--	struct device_node *np = dev->of_node;
--	unsigned long clk_rate;
--	u32 bus_speed;
--	int ret;
--
--	if (of_property_read_u32(np, "clock-frequency", &bus_speed))
--		bus_speed = UNIPHIER_I2C_DEFAULT_SPEED;
--
--	if (!bus_speed) {
--		dev_err(dev, "clock-frequency should not be zero\n");
--		return -EINVAL;
--	}
--
--	if (bus_speed > UNIPHIER_I2C_MAX_SPEED)
--		bus_speed = UNIPHIER_I2C_MAX_SPEED;
--
--	/* Get input clk rate through clk driver */
--	priv->clk = devm_clk_get(dev, NULL);
--	if (IS_ERR(priv->clk)) {
--		dev_err(dev, "failed to get clock\n");
--		return PTR_ERR(priv->clk);
--	}
--
--	ret = clk_prepare_enable(priv->clk);
--	if (ret)
--		return ret;
--
--	clk_rate = clk_get_rate(priv->clk);
--	if (!clk_rate) {
--		dev_err(dev, "input clock rate should not be zero\n");
--		return -EINVAL;
--	}
--
- 	uniphier_i2c_reset(priv, true);
+-	u32 clk_count;
++	u32 tmp;
++
++	tmp = readl(priv->membase + UNIPHIER_FI2C_CR);
++	tmp |= UNIPHIER_FI2C_CR_MST;
++	writel(tmp, priv->membase + UNIPHIER_FI2C_CR);
  
- 	writel((clk_rate / bus_speed / 2 << 16) | (clk_rate / bus_speed),
- 	       priv->membase + UNIPHIER_I2C_CLK);
+ 	uniphier_fi2c_reset(priv);
  
- 	uniphier_i2c_reset(priv, false);
--
--	return 0;
+-	clk_count = clk_rate / bus_speed;
++	tmp = clk_rate / bus_speed;
+ 
+-	writel(clk_count, priv->membase + UNIPHIER_FI2C_CYC);
+-	writel(clk_count / 2, priv->membase + UNIPHIER_FI2C_LCTL);
+-	writel(clk_count / 2, priv->membase + UNIPHIER_FI2C_SSUT);
+-	writel(clk_count / 16, priv->membase + UNIPHIER_FI2C_DSUT);
++	writel(tmp, priv->membase + UNIPHIER_FI2C_CYC);
++	writel(tmp / 2, priv->membase + UNIPHIER_FI2C_LCTL);
++	writel(tmp / 2, priv->membase + UNIPHIER_FI2C_SSUT);
++	writel(tmp / 16, priv->membase + UNIPHIER_FI2C_DSUT);
+ 
+ 	uniphier_fi2c_prepare_operation(priv);
  }
- 
- static int uniphier_i2c_probe(struct platform_device *pdev)
-@@ -367,8 +332,9 @@ static int uniphier_i2c_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct uniphier_i2c_priv *priv;
- 	struct resource *regs;
--	int irq;
--	int ret;
-+	u32 bus_speed;
-+	unsigned long clk_rate;
-+	int irq, ret;
- 
- 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
- 	if (!priv)
-@@ -385,6 +351,31 @@ static int uniphier_i2c_probe(struct platform_device *pdev)
- 		return irq;
- 	}
- 
-+	if (of_property_read_u32(dev->of_node, "clock-frequency", &bus_speed))
-+		bus_speed = UNIPHIER_I2C_DEFAULT_SPEED;
-+
-+	if (!bus_speed || bus_speed > UNIPHIER_I2C_MAX_SPEED) {
-+		dev_err(dev, "invalid clock-frequency %d\n", bus_speed);
-+		return -EINVAL;
-+	}
-+
-+	priv->clk = devm_clk_get(dev, NULL);
-+	if (IS_ERR(priv->clk)) {
-+		dev_err(dev, "failed to get clock\n");
-+		return PTR_ERR(priv->clk);
-+	}
-+
-+	ret = clk_prepare_enable(priv->clk);
-+	if (ret)
-+		return ret;
-+
-+	clk_rate = clk_get_rate(priv->clk);
-+	if (!clk_rate) {
-+		dev_err(dev, "input clock rate should not be zero\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+
- 	init_completion(&priv->comp);
- 	priv->adap.owner = THIS_MODULE;
- 	priv->adap.algo = &uniphier_i2c_algo;
-@@ -395,9 +386,7 @@ static int uniphier_i2c_probe(struct platform_device *pdev)
- 	i2c_set_adapdata(&priv->adap, priv);
- 	platform_set_drvdata(pdev, priv);
- 
--	ret = uniphier_i2c_clk_init(dev, priv);
--	if (ret)
--		goto err;
-+	uniphier_i2c_hw_init(priv, bus_speed, clk_rate);
- 
- 	ret = devm_request_irq(dev, irq, uniphier_i2c_interrupt, 0, pdev->name,
- 			       priv);
 -- 
 1.9.1
