@@ -1,104 +1,104 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 1 Sep 2016 10:47:04 +0530
-Subject: [PATCH] ARM: dts: da850-lcdk: Add NAND to DT
-In-Reply-To: <7h37lk5wrd.fsf@baylibre.com>
-References: <20160829153242.18615-1-kbeldan@baylibre.com>
- <7h37lk5wrd.fsf@baylibre.com>
-Message-ID: <3945712b-d02f-d97a-2356-9383d7fe1984@ti.com>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Thu, 1 Sep 2016 05:19:55 +0000
+Subject: [PATCH 3/3] PCI: Xilinx NWL PCIe: Fix Error for multi function
+ device for legacy interrupts.
+In-Reply-To: <57C6B7F1.5000001@arm.com>
+References: <1472553558-27215-1-git-send-email-bharatku@xilinx.com>
+ <1472553558-27215-3-git-send-email-bharatku@xilinx.com>
+ <57C57975.7040306@arm.com>
+ <8520D5D51A55D047800579B094147198258D239D@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <57C59FE8.30307@arm.com>
+ <8520D5D51A55D047800579B094147198258D28AF@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <57C6B7F1.5000001@arm.com>
+Message-ID: <8520D5D51A55D047800579B094147198258D2C99@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 September 2016 05:14 AM, Kevin Hilman wrote:
-> Karl Beldan <kbeldan@baylibre.com> writes:
+> >>>> Hi Bharat,
+> >>>>> @@ -561,7 +561,7 @@ static int nwl_pcie_init_irq_domain(struct
+> >>>>> nwl_pcie
+> >>>> *pcie)
+> >>>>>     }
+> >>>>>
+> >>>>>     pcie->legacy_irq_domain = irq_domain_add_linear(legacy_intc_node,
+> >>>>> -                                                   INTX_NUM,
+> >>>>> +                                                   INTX_NUM + 1,
+> >>>>>                                                     &legacy_domain_ops,
+> >>>>>                                                     pcie);
+> >>>>
+> >>>> This feels like the wrong thing to do. You have INTX_NUM irqs, so
+> >>>> the domain allocation should reflect this. On the other hand, the
+> >>>> way the driver currently deals with mappings is quite broken
+> >>>> (consistently adding 1 to
+> >> the HW interrupt).
+> >>>>
+> >>> Hi Marc,
+> >>>
+> >>> Without above change I get following crash in kernel while booting.
+> >>>
+> >>> [    2.441684] error: hwirq 0x4 is too large for dummy
+> >>>
+> >>> [    2.441694] ------------[ cut here ]------------
+> >>>
+> >>> [    2.441698] WARNING: at kernel/irq/irqdomain.c:344
+> >>>
+> >>> [    2.441702] Modules linked in:
+> >>>
+> >>> [    2.441706]
+> >>>
+> >>> [    2.441714] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.4.0 #8
+> >>>
+> >>> [    2.441718] Hardware name: xlnx,zynqmp (DT)
+> >>>
+> >>> [    2.441723] task: ffffffc071886b80 ti: ffffffc071888000 task.ti:
+> >> ffffffc071888000
+> >>>
+> >>> [    2.441732] PC is at irq_domain_associate+0x138/0x1c0
+> >>>
+> >>> [    2.441738] LR is at irq_domain_associate+0x138/0x1c0
+> >>>
+> >>> In kernel/irq/irqdomain.c function irq_domain_associate
+> >>>
+> >>> if (WARN(hwirq >= domain->hwirq_max,
+> >>>                  "error: hwirq 0x%x is too large for %s\n", (int)hwirq, domain-
+> >name))
+> >>>                 return -EINVAL;
+> >>>
+> >>> Here the hwirq and hwirq_max are equal to 4 without the above
+> >>> condition
+> >> (INTX_NUM + 1) due to which crash is coming.
+> >>> This is happening as the legacy interrupts are starting from 1 (INTA).
+> >>
+> >> I understood that. I'm still persisting in saying that you have the wrong fix.
+> >>
+> >> Your domain should always allocate many interrupts as you have
+> >> interrupt sources. These interrupts (hwirq) should be numbered from 0 to (n-
+> 1).
+> >
+> > Agreed, but here comes the problem the hwirq for legacy interrupts
+> > will start at 0x1 to 0x4 (INTA to INTD) and these values are as per
+> > PCIe specification for legacy interrupts. So these cannot be numbered
+> > from 0. So when 0x4 (INTD) for a multi-function device comes the crash
+> > occurs.
 > 
->> This adds DT support for the NAND connected to the SoC AEMIF.
->> Passed torture hashing a 40MB file on top of UBIFS using subpages.
->>
->> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
->> ---
->> v2:
->>
->> - Removed comments pertaining to the BSP the LCDK ships with (Sekhar)
->> - s/"ok"/"okay"/
->> - Removed partitions since it relates to the BSP the LCDK ships with
+> So who provides this hwirq? Who calls irq_domain_associate() with hwirq set to
+> 4?
 > 
-> IMO, some default partitions are nice to have, at least for u-boot and
-> u-boot env so factory-shipped u-boot is not accidentally overridden.
-> The left over space can be labeled "free space".
-> 
-> Anyways, after adding some partitions back, I tested with ubifs on my
-> LCDK:
+PCIe subsystem invokes pcibios_add_device function in arch/arm64/kernel/pci.c for every pci device.
+The purpose of this function is to assign dev->irq using of_irq_parse_and_map_pci.
+of_irq_parse_and_map_pci invokes of_irq_parse_pci where it reads PCI_INTERRUPT_PIN from configuration space and saves it
+in parameter of struct of_phandle_args.
+This structure is passed to irq_create_of_mapping where it invokes irq_create_fwspec_mapping.
+irq_create_fwspec_mapping invokes irq_domain_translate and gets hwirq, here the above saved PCI_INTERRUPT_PIN value is assigned 
+to hwirq (*hwirq = fwspec->param[0]).
+And then using this hwirq irq_create_mapping -> irq_domain_associate were invoked and mapping is created for virtual irq with this hwirq.
+So for any end point PCI_INTERRUPT_PIN value starts from 0x1 to 0x4 and so hwirq starts from 0x1 to 0x4.
 
-This[1] is what I had commented on the partitions before. I did not 
-mean to remove partitions altogether, just comments referring to 
-compatibility with pre-flashed software shipping with LCDK (since that 
-changes without notice).
+So the values are more generic w.r.t to protocol, that's why hwirq will range from 0x1 to 0x4. 
+And then if you check pcie-altera.c they are doing this adding one in their handler and while creating legacy domain.
+ 
+Thanks & Regards,
+Bharat
+ 
 
-Apologies for any confusion caused. The "Rest of the patch looks good
-to me" in the end was to say that the partitions themselves look fine :)
-
-Can you please submit a v2 with partitions added?
-
-Thanks,
-Sekhar
-
-[1]
-
-> +
-> +			/*
-> +			 * LCDK original partitions:
-> +			 * 0x000000000000-0x000000020000 : "u-boot env"
-> +			 * 0x000000020000-0x0000000a0000 : "u-boot"
-> +			 * 0x0000000a0000-0x0000002a0000 : "kernel"
-> +			 * 0x0000002a0000-0x000020000000 : "filesystem"
-> +			 *
-> +			 * The 1st NAND block being guaranted to be valid w/o ECC (> 1k cycles),
-> +			 * it makes a perfect candidate as an SPL for the BootROM to jump to.
-> +			 * However the OMAP-L132/L138 Bootloader doc SPRAB41E reads:
-> +			 * "To boot from NAND Flash, the AIS should be written to NAND block 1
-> +			 * (NAND block 0 is not used by default)", which matches the LCDK
-> +			 * original partitioning.
-
-FWIW, silicon version 2.1 supports booting from block 0, but needs new
-boot pin settings not possible in stock LCDK.
-
-> +			 * Also, the LCDK ships with only the u-boot partition provisioned and
-> +			 * boots on it in its default configuration while using the MMC for the
-> +			 * kernel and rootfs, so preserve that one as is for now.
-> +			 * [1]: Ensuring for example that U-Boot LCDK SPL can handle it properly
-> +			 * and a proper boot chain ROM->SPL->U-Boot->Linux wrt ECC, would allow
-> +			 * for a better partitioning.
-> +			 */
-
-I would rather not refer to the software that LCDK ships with in the
-comments at all. Because that can change without notice. At some point,
-if mainline kernel works well enough on LCDK, TI might decide to ship
-LCDKs with mainline kernel flashed.
-
-> +			partitions {
-> +				compatible = "fixed-partitions";
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +
-> +				partition at 0 {
-> +					label = "u-boot env";
-> +					reg = <0 0x020000>;
-> +				};
-> +				partition at 0x020000 {
-> +					/* The LCDK defaults to booting from this partition */
-> +					label = "u-boot";
-> +					reg = <0x020000 0x080000>;
-> +				};
-> +				partition at 0x0a0000 {
-> +					label = "space";
-> +					reg = <0x0a0000 0>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +};
-
-Rest of the patch looks good to me.
-
-Regards,
-Sekhar
+ 
