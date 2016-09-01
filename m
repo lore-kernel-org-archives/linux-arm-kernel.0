@@ -1,36 +1,77 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  1 Sep 2016 17:41:22 +0200
-Subject: [PATCH 0/2] arm64: marvell: MSI support updates
-Message-ID: <1472744484-19132-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu,  1 Sep 2016 17:41:24 +0200
+Subject: [PATCH 2/2] arm64: dts: marvell: enable MSI for PCIe on Armada 7K/8K
+In-Reply-To: <1472744484-19132-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1472744484-19132-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1472744484-19132-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This commit adds a reference to the appropriate MSI controller in the
+description of the PCIe controllers on Marvel Armada 7K and 8K
+platforms.
 
-This small set of patches brings some MSI updates on Armada 3700 and
-Armada 7K/8K:
-
- - On Armada 3700, it removes a useless msi-parent property. This
-   patch should only be merged once "pci: pci-aardvark: move to MSI
-   handling using generic MSI support" has been applied and merged by
-   the PCI maintainer, otherwise MSI support will be broken.
-
- - On Armada 7K/8K, it enables MSI support by using the GIC
-   v2m. Adding an msi-parent property is enough to achieve this. This
-   can be applied right away.
-
-Thanks,
-
-Thomas
-
-Thomas Petazzoni (2):
-  arm64: dts: marvell: remove msi-parent from PCIe on Armada 3700
-  arm64: dts: marvell: enable MSI for PCIe on Armada 7K/8K
-
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi         | 1 -
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 3 +++
  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 3 +++
- 3 files changed, 6 insertions(+), 1 deletion(-)
+ 2 files changed, 6 insertions(+)
 
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index ceb83b0..ff469e1 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -177,6 +177,7 @@
+ 			#interrupt-cells = <1>;
+ 			device_type = "pci";
+ 			dma-coherent;
++			msi-parent = <&gic_v2m0>;
+ 
+ 			bus-range = <0 0xff>;
+ 			ranges =
+@@ -202,6 +203,7 @@
+ 			#interrupt-cells = <1>;
+ 			device_type = "pci";
+ 			dma-coherent;
++			msi-parent = <&gic_v2m0>;
+ 
+ 			bus-range = <0 0xff>;
+ 			ranges =
+@@ -228,6 +230,7 @@
+ 			#interrupt-cells = <1>;
+ 			device_type = "pci";
+ 			dma-coherent;
++			msi-parent = <&gic_v2m0>;
+ 
+ 			bus-range = <0 0xff>;
+ 			ranges =
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 2d863f2..43cecf0 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -177,6 +177,7 @@
+ 			#interrupt-cells = <1>;
+ 			device_type = "pci";
+ 			dma-coherent;
++			msi-parent = <&gic_v2m0>;
+ 
+ 			bus-range = <0 0xff>;
+ 			ranges =
+@@ -202,6 +203,7 @@
+ 			#interrupt-cells = <1>;
+ 			device_type = "pci";
+ 			dma-coherent;
++			msi-parent = <&gic_v2m0>;
+ 
+ 			bus-range = <0 0xff>;
+ 			ranges =
+@@ -228,6 +230,7 @@
+ 			#interrupt-cells = <1>;
+ 			device_type = "pci";
+ 			dma-coherent;
++			msi-parent = <&gic_v2m0>;
+ 
+ 			bus-range = <0 0xff>;
+ 			ranges =
 -- 
 2.7.4
