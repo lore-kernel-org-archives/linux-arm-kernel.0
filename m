@@ -1,50 +1,61 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 1 Sep 2016 11:33:20 +0800
-Subject: [PATCHv3 03/11] crypto: omap-sham: implement context
- export/import APIs
-In-Reply-To: <d828fca9-a97a-7722-c4cb-24e07816cbc4@ti.com>
-References: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
- <1470306526-27219-4-git-send-email-t-kristo@ti.com>
- <20160809100633.GA6751@gondor.apana.org.au>
- <d828fca9-a97a-7722-c4cb-24e07816cbc4@ti.com>
-Message-ID: <20160901033320.GA650@gondor.apana.org.au>
+From: liguozhu@hisilicon.com (Liguozhu (Kenneth))
+Date: Thu, 1 Sep 2016 03:44:11 +0000
+Subject: =?gb2312?B?tPC4tDogW1BBVENIXSBbYnVnZml4XSByZXBsYWNlIHVubmVzc2FyeSBsZGF4?=
+ =?gb2312?Q?_with_common_ldr?=
+In-Reply-To: <20160830090721.GC5163@e104818-lin.cambridge.arm.com>
+References: <1472538931-145463-1-git-send-email-liguozhu@hisilicon.com>
+ <20160830090721.GC5163@e104818-lin.cambridge.arm.com>
+Message-ID: <161EFA05D917D0419F95C4CAEEF86C10B0615519@SZXEMA504-MBS.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 05:11:35PM +0300, Tero Kristo wrote:
->
-> >>+static int omap_sham_export(struct ahash_request *req, void *out)
-> >>+{
-> >>+	struct omap_sham_reqctx *rctx = ahash_request_ctx(req);
-> >>+
-> >>+	while (omap_sham_flush(req) == -EINPROGRESS)
-> >>+		msleep(10);
-> >
-> >Do we really need this? You must not call export until the previous
-> >operation has completed.
-> >
-> >Cheers,
-> >
+Thanks for the clarification. 
+
+Add a comment there will be nice:)
+
+
+-Kenneth Lee (Hisilicon)
+
+
+-----????-----
+???: Catalin Marinas [mailto:catalin.marinas at arm.com] 
+????: 2016?8?30? 17:07
+???: Liguozhu (Kenneth)
+??: Will Deacon; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+??: Re: [PATCH] [bugfix] replace unnessary ldax with common ldr
+
+On Tue, Aug 30, 2016 at 02:35:31PM +0800, Kenneth Lee wrote:
+> (add comment for the previous mail, sorry for the duplication)
 > 
-> Sorry about a late reply, I was out on vacation.
+> There is no store_ex pairing with this load_ex. It is not necessary and
+> gave wrong hint to the cache system.
 > 
-> For OMAP SHAM, this is actually needed, because the driver still has
-> a very large internal buffer for performance reasons, and the whole
-> buffer can't be exported. The flush functionality pushes out
-> sufficient amount of data to the hardware, so that the rest of the
-> buffer can be exported to the available space.
+> Signed-off-by: Kenneth Lee <liguozhu@hisilicon.com>
+> ---
+>  arch/arm64/include/asm/spinlock.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
+> index c85e96d..3334c4f 100644
+> --- a/arch/arm64/include/asm/spinlock.h
+> +++ b/arch/arm64/include/asm/spinlock.h
+> @@ -63,7 +63,7 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
+>  	 */
+>  "	sevl\n"
+>  "2:	wfe\n"
+> -"	ldaxrh	%w2, %4\n"
+> +"	ldrh	%w2, %4\n"
+>  "	eor	%w1, %w2, %w0, lsr #16\n"
+>  "	cbnz	%w1, 2b\n"
+>  	/* We got the lock. Critical section starts here. */
 
-It doesn't matter whether you have a buffer or not.  The point
-is that the completion function should not be called until the
-operation is actually complete.  This is the whole point of the
-async interface.
+This is needed because the arch_spin_unlock() code only uses an STLR
+without an explicit SEV (like we have on AArch32). An event is
+automatically generated when the exclusive monitor is cleared by STLR.
+But without setting it with a load exclusive in arch_spin_lock() (even
+though it does not acquire the lock), there won't be anything to clear,
+hence no event to be generated. In this case, the WFE would wait
+indefinitely.
 
-As the user must not call export until the completion function
-has been called, there should be no need to wait in the export
-function.
-
-Cheers,
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Catalin
