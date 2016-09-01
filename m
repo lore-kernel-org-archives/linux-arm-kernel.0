@@ -1,132 +1,64 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Thu, 1 Sep 2016 13:06:04 -0500
-Subject: [PATCH v11 3/4] tee: add OP-TEE driver
-In-Reply-To: <20160901092213.GA3968@ermac>
-References: <1471870856-18684-1-git-send-email-jens.wiklander@linaro.org>
- <1471870856-18684-4-git-send-email-jens.wiklander@linaro.org>
- <050a2ce4-e175-d09e-ddff-3b0cbe766d88@ti.com> <20160831135015.GB25472@ermac>
- <fe88749e-82c7-c310-b2bc-4e73bf76302b@ti.com> <20160901092213.GA3968@ermac>
-Message-ID: <0f9a528e-5288-ad4b-256e-f7a0b5952c3c@ti.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Thu,  1 Sep 2016 19:51:30 +0200
+Subject: [PATCH 1/9] serial: st-asc: constify uart_ops structures
+In-Reply-To: <1472752298-981-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1472752298-981-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1472752298-981-2-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/2016 04:22 AM, Jens Wiklander wrote:
-> On Wed, Aug 31, 2016 at 11:40:20AM -0500, Andrew F. Davis wrote:
->> On 08/31/2016 08:50 AM, Jens Wiklander wrote:
->>> On Tue, Aug 30, 2016 at 03:23:24PM -0500, Andrew F. Davis wrote:
->>>> On 08/22/2016 08:00 AM, Jens Wiklander wrote:
->>>>> +static struct tee_shm_pool *
->>>>> +optee_config_shm_ioremap(struct device *dev, optee_invoke_fn *invoke_fn,
->>>>> +			 void __iomem **ioremaped_shm)
->>>>> +{
->>>>> +	struct arm_smccc_res res;
->>>>> +	struct tee_shm_pool *pool;
->>>>> +	unsigned long vaddr;
->>>>> +	phys_addr_t paddr;
->>>>> +	size_t size;
->>>>> +	phys_addr_t begin;
->>>>> +	phys_addr_t end;
->>>>> +	void __iomem *va;
->>>>> +	struct tee_shm_pool_mem_info priv_info;
->>>>> +	struct tee_shm_pool_mem_info dmabuf_info;
->>>>> +
->>>>> +	invoke_fn(OPTEE_SMC_GET_SHM_CONFIG, 0, 0, 0, 0, 0, 0, 0, &res);
->>>>> +	if (res.a0 != OPTEE_SMC_RETURN_OK) {
->>>>> +		dev_info(dev, "shm service not available\n");
->>>>> +		return ERR_PTR(-ENOENT);
->>>>> +	}
->>>>> +
->>>>> +	if (res.a3 != OPTEE_SMC_SHM_CACHED) {
->>>>> +		dev_err(dev, "only normal cached shared memory supported\n");
->>>>> +		return ERR_PTR(-EINVAL);
->>>>> +	}
->>>>> +
->>>>> +	begin = roundup(res.a1, PAGE_SIZE);
->>>>> +	end = rounddown(res.a1 + res.a2, PAGE_SIZE);
->>>>
->>>> res.a1/2/3 is really hard to review and understand, would it work better
->>>> to use a union or cast for the output of invoke_fn based on the function
->>>> type?
->>>>
->>>> In the header that defines what the returned info from these calls means
->>>> add:
->>>>
->>>> struct OPTEE_SMC_GET_SHM_CONFIG_RESULT {
->>>> 	unsigned long status;
->>>> 	unsigned long start;
->>>> 	unsigned long size;
->>>> 	unsigned long settings;
->>>> };
->>>>
->>>> then:
->>>>
->>>> union something result;
->>>>
->>>> begin = roundup(result.ret.start, PAGE_SIZE);
->>>> end = rounddown(result.ret.start + result.ret.size, PAGE_SIZE);
->>>>
->>>> or similar with just casting to the better named struct type.
->>>
->>> optee_smc.h describes what's passed in the registers during an SMC I'd
->>> rather not clutter it with structs that doesn't add any information
->>> there. I'm not that happy with casting or using unions to alias struct
->>> arm_smccc_res either. How about a simple wrapper function for this call
->>> to deal with the details instead?
->>>
->>
->> I think that would be a good idea anyway, for instance, someday if the
->> interface changes slightly then you will be able to contain the
->> compatibility fixes in the wrapper and not out here in the main driver.
-> 
-> That interface is supposed to be a stable ABI, incompatible changes in
-> the ABI should be discouraged. If there's an incompatible change it has
-> to be dealt with in the main driver.
+Check for uart_ops structures that are only stored in the ops field of a
+uart_port structure.  This field is declared const, so uart_ops structures
+that have this property can be declared as const also.
 
-Why? This driver is for "OPTEE" not "OPTEE v2.0.01.02", any minor ABI
-changes should be abstracted away as much as possible to keep the main
-driver logically simple, agnostic to any OPTEE version ABI quirks/handling.
+The semantic patch that makes this change is as follows:
+(http://coccinelle.lip6.fr/)
 
-> A small wrapper function in a
-> standalone header file has no chance here as it probably involves using
-> information gathered while probing secure world.
-> 
-> What I meant was a small wrapper function just above 
-> optee_config_shm_ioremap() to deal with only this call.
-> 
+// <smpl>
+@r disable optional_qualifier@
+identifier i;
+position p;
+@@
+static struct uart_ops i at p = { ... };
 
-This wouldn't do anything that a cast couldn't do. Why not put the
-wrapper function in the header as part of that OPTEE version's ABI
-definition?
+@ok@
+identifier r.i;
+struct uart_port e;
+position p;
+@@
+e.ops = &i at p;
 
->>>> [snip]
->>>>
->>>>> +#define OPTEE_MSG_ATTR_CACHE_SHIFT		16
->>>>> +#define OPTEE_MSG_ATTR_CACHE_MASK		0x7
->>>>
->>>> GENMASK
->>>
->>> Do you mean that OPTEE_MSG_ATTR_CACHE_MASK should be defined using the
->>> GENMASK() macro? If so I guess I should update OPTEE_MSG_ATTR_TYPE_MASK
->>> also.
->>>
->>
->> Right, I can tell what bits 0x7 mask, but sometimes it's not so easy
->> (7F8, etc) so I find it's best to use GENMASKS for all masks so I don't
->> have to ever think about it at all.
->>
->> Also I like to mask then shift, so it would be:
->>
->> #define OPTEE_MSG_ATTR_CACHE_SHIFT	16
->> #define OPTEE_MSG_ATTR_CACHE_MASK	GENMASK(18, 16)
->>
->> Then we can see at a glance the actual bits we are looking for (18-16)
->> and verify the shift is the right amount.
-> 
-> I'm wired the other way around, I usually shift then mask, I suppose
-> it's a matter of taste. I'm happy to use GENMASK instead to define
-> OPTEE_MSG_ATTR_CACHE_MASK, but I'd like to keep it unshifted if you
-> don't mind.
-> 
-> Thanks,
-> Jens
-> 
+@bad@
+position p != {r.p,ok.p};
+identifier r.i;
+struct uart_ops e;
+@@
+e at i@p
+
+@depends on !bad disable optional_qualifier@
+identifier r.i;
+@@
+static
++const
+ struct uart_ops i = { ... };
+// </smpl>
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+
+---
+ drivers/tty/serial/st-asc.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
+index 2d78cb3..379e5bd 100644
+--- a/drivers/tty/serial/st-asc.c
++++ b/drivers/tty/serial/st-asc.c
+@@ -639,7 +639,7 @@ static void asc_put_poll_char(struct uart_port *port, unsigned char c)
+ 
+ /*---------------------------------------------------------------------*/
+ 
+-static struct uart_ops asc_uart_ops = {
++static const struct uart_ops asc_uart_ops = {
+ 	.tx_empty	= asc_tx_empty,
+ 	.set_mctrl	= asc_set_mctrl,
+ 	.get_mctrl	= asc_get_mctrl,
