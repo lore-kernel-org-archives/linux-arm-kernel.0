@@ -1,69 +1,67 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 1 Sep 2016 09:12:59 +0300
-Subject: [PATCHv3 03/11] crypto: omap-sham: implement context
- export/import APIs
-In-Reply-To: <20160901033320.GA650@gondor.apana.org.au>
-References: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
- <1470306526-27219-4-git-send-email-t-kristo@ti.com>
- <20160809100633.GA6751@gondor.apana.org.au>
- <d828fca9-a97a-7722-c4cb-24e07816cbc4@ti.com>
- <20160901033320.GA650@gondor.apana.org.au>
-Message-ID: <60a5ed40-5552-3ec8-fa21-7e6fb8213fc3@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu,  1 Sep 2016 14:13:32 +0800
+Subject: [PATCH v2] drm/sun4i: Clear encoder->bridge if a bridge is not found
+Message-ID: <20160901061332.1803-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/16 06:33, Herbert Xu wrote:
-> On Mon, Aug 29, 2016 at 05:11:35PM +0300, Tero Kristo wrote:
->>
->>>> +static int omap_sham_export(struct ahash_request *req, void *out)
->>>> +{
->>>> +	struct omap_sham_reqctx *rctx = ahash_request_ctx(req);
->>>> +
->>>> +	while (omap_sham_flush(req) == -EINPROGRESS)
->>>> +		msleep(10);
->>>
->>> Do we really need this? You must not call export until the previous
->>> operation has completed.
->>>
->>> Cheers,
->>>
->>
->> Sorry about a late reply, I was out on vacation.
->>
->> For OMAP SHAM, this is actually needed, because the driver still has
->> a very large internal buffer for performance reasons, and the whole
->> buffer can't be exported. The flush functionality pushes out
->> sufficient amount of data to the hardware, so that the rest of the
->> buffer can be exported to the available space.
->
-> It doesn't matter whether you have a buffer or not.  The point
-> is that the completion function should not be called until the
-> operation is actually complete.  This is the whole point of the
-> async interface.
->
-> As the user must not call export until the completion function
-> has been called, there should be no need to wait in the export
-> function.
+The KMS helpers (drm_atomic_helper_check_modeset/mode_fixup) pass
+encoder->bridge directly to drm_bridge_mode_fixup, which expects a
+valid pointer, or NULL (in which case it just returns).
 
-Well, but the driver doesn't flush its buffers automatically, it caches 
-data until it has sufficient amount available. So, assuming you want to 
-do this:
+Clear encoder->bridge if a bridge is not found, instead of keeping
+the ERR_PTR value.
 
-sham_init
-   sham_update 256 bytes
-   sham_update 256 bytes
-   wait until two above updates are complete
-   sham_export
+Since other drm_bridge functions also follow this pattern of checking
+for a non-NULL pointer, we can drop the ifs around the calls and just
+pass the pointer directly.
 
-... the execution hangs at the wait phase as the driver is still waiting 
-for more data to cache, and will never complete the two update requests. 
-Currently, the driver is written in such way that it waits until it has 
-enough data cached before starting to push it out to hardware, or waits 
-until sham_final to be called. Pushing out small pieces of data causes 
-severe performance degradation on the driver, as setting up the DMA 
-operation itself is rather costly.
+Fixes: 894f5a9f4b4a ("drm/sun4i: Add bridge support")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+Changes since v2:
 
-Either way, flush for the buffers is needed, I wonder if automatic flush 
-should be added also based on some timer.
+  - Add comments stating encoder->bridge can be NULL and drm_bridge_*
+    functions check for it.
+  - Move clearing of encoder->bridge to if-else block of bridge setup
+---
+ drivers/gpu/drm/sun4i/sun4i_rgb.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
--Tero
+diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+index d4e52522ec53..d69847b243af 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
++++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+@@ -154,8 +154,8 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
+ 	if (!IS_ERR(tcon->panel))
+ 		drm_panel_enable(tcon->panel);
+ 
+-	if (!IS_ERR(encoder->bridge))
+-		drm_bridge_enable(encoder->bridge);
++	/* encoder->bridge can be NULL; drm_bridge_enable checks for it */
++	drm_bridge_enable(encoder->bridge);
+ 
+ 	sun4i_tcon_channel_enable(tcon, 0);
+ }
+@@ -170,8 +170,8 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
+ 
+ 	sun4i_tcon_channel_disable(tcon, 0);
+ 
+-	if (!IS_ERR(encoder->bridge))
+-		drm_bridge_disable(encoder->bridge);
++	/* encoder->bridge can be NULL; drm_bridge_disable checks for it */
++	drm_bridge_disable(encoder->bridge);
+ 
+ 	if (!IS_ERR(tcon->panel))
+ 		drm_panel_disable(tcon->panel);
+@@ -274,6 +274,8 @@ int sun4i_rgb_init(struct drm_device *drm)
+ 			dev_err(drm->dev, "Couldn't attach our bridge\n");
+ 			goto err_cleanup_connector;
+ 		}
++	} else {
++		encoder->bridge = NULL;
+ 	}
+ 
+ 	return 0;
+-- 
+2.9.3
