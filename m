@@ -1,46 +1,208 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 2 Sep 2016 05:49:32 +0800
-Subject: [PATCH 3/5] clocks: exynos4x12: add runtime pm support for ISP
- clocks
-In-Reply-To: <1472737551-15272-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <201609020505.HiC8887e%fengguang.wu@intel.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Thu, 01 Sep 2016 21:51:10 +0000
+Subject: [PATCH v5 1/3] kexec: Add common device tree routines
+In-Reply-To: <cover.1472766405.git.geoff@infradead.org>
+References: <cover.1472766405.git.geoff@infradead.org>
+Message-ID: <2c5adba8a9e67ec2c4f4254ba84769ce3553a400.1472766405.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Common device tree routines that can be shared between all arches
+that have device tree support.
 
-[auto build test WARNING on clk/clk-next]
-[also build test WARNING on next-20160825]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-[Check https://git-scm.com/docs/git-format-patch for more information]
-
-url:    https://github.com/0day-ci/linux/commits/Marek-Szyprowski/Add-runtime-PM-support-for-clocks-on-Exynos-SoC-example/20160901-215042
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All warnings (new ones prefixed by >>):
-
->> WARNING: vmlinux.o(.data+0x135420): Section mismatch in reference from the variable exynos4x12_isp_clk_driver to the function .init.text:exynos4x12_isp_clk_probe()
-   The variable exynos4x12_isp_clk_driver references
-   the function __init exynos4x12_isp_clk_probe()
-   If the reference is valid then annotate the
-   variable with or __refdata (see linux/init.h) or name the variable:
-   
-
+Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 58542 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160902/fb16b17c/attachment-0001.obj>
+ kexec/Makefile |   4 ++
+ kexec/dt-ops.c | 145 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ kexec/dt-ops.h |  13 ++++++
+ 3 files changed, 162 insertions(+)
+ create mode 100644 kexec/dt-ops.c
+ create mode 100644 kexec/dt-ops.h
+
+diff --git a/kexec/Makefile b/kexec/Makefile
+index e2aee84..cc3f08b 100644
+--- a/kexec/Makefile
++++ b/kexec/Makefile
+@@ -73,6 +73,10 @@ dist				+= kexec/mem_regions.c kexec/mem_regions.h
+ $(ARCH)_MEM_REGIONS		=
+ KEXEC_SRCS			+= $($(ARCH)_MEM_REGIONS)
+ 
++dist				+= kexec/dt-ops.c kexec/dt-ops.h
++$(ARCH)_DT_OPS		=
++KEXEC_SRCS			+= $($(ARCH)_DT_OPS)
++
+ include $(srcdir)/kexec/arch/alpha/Makefile
+ include $(srcdir)/kexec/arch/arm/Makefile
+ include $(srcdir)/kexec/arch/i386/Makefile
+diff --git a/kexec/dt-ops.c b/kexec/dt-ops.c
+new file mode 100644
+index 0000000..915dbf5
+--- /dev/null
++++ b/kexec/dt-ops.c
+@@ -0,0 +1,145 @@
++#include <assert.h>
++#include <errno.h>
++#include <inttypes.h>
++#include <libfdt.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++#include "kexec.h"
++#include "dt-ops.h"
++
++static const char n_chosen[] = "/chosen";
++
++static const char p_bootargs[] = "bootargs";
++static const char p_initrd_start[] = "linux,initrd-start";
++static const char p_initrd_end[] = "linux,initrd-end";
++
++int dtb_set_initrd(char **dtb, off_t *dtb_size, off_t start, off_t end)
++{
++	int result;
++	uint64_t value;
++
++	dbgprintf("%s: start %jd, end %jd, size %jd (%jd KiB)\n",
++		__func__, (intmax_t)start, (intmax_t)end,
++		(intmax_t)(end - start),
++		(intmax_t)(end - start) / 1024);
++
++	value = cpu_to_fdt64(start);
++
++	result = dtb_set_property(dtb, dtb_size, n_chosen, p_initrd_start,
++		&value, sizeof(value));
++
++	if (result)
++		return result;
++
++	value = cpu_to_fdt64(end);
++
++	result = dtb_set_property(dtb, dtb_size, n_chosen, p_initrd_end,
++		&value, sizeof(value));
++
++	if (result) {
++		dtb_delete_property(*dtb, n_chosen, p_initrd_start);
++		return result;
++	}
++
++	return 0;
++}
++
++int dtb_set_bootargs(char **dtb, off_t *dtb_size, const char *command_line)
++{
++	return dtb_set_property(dtb, dtb_size, n_chosen, p_bootargs,
++		command_line, strlen(command_line) + 1);
++}
++
++int dtb_set_property(char **dtb, off_t *dtb_size, const char *node,
++	const char *prop, const void *value, int value_len)
++{
++	int result;
++	int nodeoffset;
++	void *new_dtb;
++	int new_size;
++
++	value_len = FDT_TAGALIGN(value_len);
++
++	new_size = FDT_TAGALIGN(*dtb_size + fdt_node_len(node)
++		+ fdt_prop_len(prop, value_len));
++
++	new_dtb = malloc(new_size);
++
++	if (!new_dtb) {
++		dbgprintf("%s: malloc failed\n", __func__);
++		return -ENOMEM;
++	}
++
++	result = fdt_open_into(*dtb, new_dtb, new_size);
++
++	if (result) {
++		dbgprintf("%s: fdt_open_into failed: %s\n", __func__,
++			fdt_strerror(result));
++		goto on_error;
++	}
++
++	nodeoffset = fdt_path_offset(new_dtb, node);
++	
++	if (nodeoffset == -FDT_ERR_NOTFOUND) {
++		result = fdt_add_subnode(new_dtb, nodeoffset, node);
++
++		if (result) {
++			dbgprintf("%s: fdt_add_subnode failed: %s\n", __func__,
++				fdt_strerror(result));
++			goto on_error;
++		}
++	} else if (nodeoffset < 0) {
++		dbgprintf("%s: fdt_path_offset failed: %s\n", __func__,
++			fdt_strerror(nodeoffset));
++		goto on_error;
++	}
++
++	result = fdt_setprop(new_dtb, nodeoffset, prop, value, value_len);
++
++	if (result) {
++		dbgprintf("%s: fdt_setprop failed: %s\n", __func__,
++			fdt_strerror(result));
++		goto on_error;
++	}
++
++	/*
++	 * Can't call free on dtb since dtb may have been mmaped by
++	 * slurp_file().
++	 */
++
++	result = fdt_pack(new_dtb);
++
++	if (result)
++		dbgprintf("%s: Unable to pack device tree: %s\n", __func__,
++			fdt_strerror(result));
++
++	*dtb = new_dtb;
++	*dtb_size = fdt_totalsize(*dtb);
++
++	return 0;
++
++on_error:
++	free(new_dtb);
++	return result;
++}
++
++int dtb_delete_property(char *dtb, const char *node, const char *prop)
++{
++	int result;
++	int nodeoffset = fdt_path_offset(dtb, node);
++
++	if (nodeoffset < 0) {
++		dbgprintf("%s: fdt_path_offset failed: %s\n", __func__,
++			fdt_strerror(nodeoffset));
++		return nodeoffset;
++	}
++
++	result = fdt_delprop(dtb, nodeoffset, prop);
++
++	if (result)
++		dbgprintf("%s: fdt_delprop failed: %s\n", __func__,
++			fdt_strerror(nodeoffset));
++
++	return result;
++}
+diff --git a/kexec/dt-ops.h b/kexec/dt-ops.h
+new file mode 100644
+index 0000000..e70d15d
+--- /dev/null
++++ b/kexec/dt-ops.h
+@@ -0,0 +1,13 @@
++#if !defined(KEXEC_DT_OPS_H)
++#define KEXEC_DT_OPS_H
++
++#include <sys/types.h>
++
++int dtb_set_initrd(char **dtb, off_t *dtb_size, off_t start, off_t end);
++int dtb_set_bootargs(char **dtb, off_t *dtb_size, const char *command_line);
++int dtb_set_property(char **dtb, off_t *dtb_size, const char *node,
++	const char *prop, const void *value, int value_len);
++
++int dtb_delete_property(char *dtb, const char *node, const char *prop);
++
++#endif
+-- 
+2.7.4
