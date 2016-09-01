@@ -1,143 +1,120 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 01 Sep 2016 11:21:54 +0200
-Subject: [PATCH 5/6] ARM: dts: s3c2416: Use macros for pinctrl configuration
-In-Reply-To: <1472721715-2833-1-git-send-email-k.kozlowski@samsung.com>
-References: <1472721715-2833-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1472721715-2833-6-git-send-email-k.kozlowski@samsung.com>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Thu, 1 Sep 2016 11:22:18 +0200
+Subject: [PATCH v11 3/4] tee: add OP-TEE driver
+In-Reply-To: <fe88749e-82c7-c310-b2bc-4e73bf76302b@ti.com>
+References: <1471870856-18684-1-git-send-email-jens.wiklander@linaro.org>
+ <1471870856-18684-4-git-send-email-jens.wiklander@linaro.org>
+ <050a2ce4-e175-d09e-ddff-3b0cbe766d88@ti.com>
+ <20160831135015.GB25472@ermac>
+ <fe88749e-82c7-c310-b2bc-4e73bf76302b@ti.com>
+Message-ID: <20160901092213.GA3968@ermac>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Usage of DTS macros instead of hard-coded numbers makes code easier
-to read.  One does not have to remember which value means pull-up/down
-or specific driver strength.
+On Wed, Aug 31, 2016 at 11:40:20AM -0500, Andrew F. Davis wrote:
+> On 08/31/2016 08:50 AM, Jens Wiklander wrote:
+> > On Tue, Aug 30, 2016 at 03:23:24PM -0500, Andrew F. Davis wrote:
+> >> On 08/22/2016 08:00 AM, Jens Wiklander wrote:
+> >>> +static struct tee_shm_pool *
+> >>> +optee_config_shm_ioremap(struct device *dev, optee_invoke_fn *invoke_fn,
+> >>> +			 void __iomem **ioremaped_shm)
+> >>> +{
+> >>> +	struct arm_smccc_res res;
+> >>> +	struct tee_shm_pool *pool;
+> >>> +	unsigned long vaddr;
+> >>> +	phys_addr_t paddr;
+> >>> +	size_t size;
+> >>> +	phys_addr_t begin;
+> >>> +	phys_addr_t end;
+> >>> +	void __iomem *va;
+> >>> +	struct tee_shm_pool_mem_info priv_info;
+> >>> +	struct tee_shm_pool_mem_info dmabuf_info;
+> >>> +
+> >>> +	invoke_fn(OPTEE_SMC_GET_SHM_CONFIG, 0, 0, 0, 0, 0, 0, 0, &res);
+> >>> +	if (res.a0 != OPTEE_SMC_RETURN_OK) {
+> >>> +		dev_info(dev, "shm service not available\n");
+> >>> +		return ERR_PTR(-ENOENT);
+> >>> +	}
+> >>> +
+> >>> +	if (res.a3 != OPTEE_SMC_SHM_CACHED) {
+> >>> +		dev_err(dev, "only normal cached shared memory supported\n");
+> >>> +		return ERR_PTR(-EINVAL);
+> >>> +	}
+> >>> +
+> >>> +	begin = roundup(res.a1, PAGE_SIZE);
+> >>> +	end = rounddown(res.a1 + res.a2, PAGE_SIZE);
+> >>
+> >> res.a1/2/3 is really hard to review and understand, would it work better
+> >> to use a union or cast for the output of invoke_fn based on the function
+> >> type?
+> >>
+> >> In the header that defines what the returned info from these calls means
+> >> add:
+> >>
+> >> struct OPTEE_SMC_GET_SHM_CONFIG_RESULT {
+> >> 	unsigned long status;
+> >> 	unsigned long start;
+> >> 	unsigned long size;
+> >> 	unsigned long settings;
+> >> };
+> >>
+> >> then:
+> >>
+> >> union something result;
+> >>
+> >> begin = roundup(result.ret.start, PAGE_SIZE);
+> >> end = rounddown(result.ret.start + result.ret.size, PAGE_SIZE);
+> >>
+> >> or similar with just casting to the better named struct type.
+> > 
+> > optee_smc.h describes what's passed in the registers during an SMC I'd
+> > rather not clutter it with structs that doesn't add any information
+> > there. I'm not that happy with casting or using unions to alias struct
+> > arm_smccc_res either. How about a simple wrapper function for this call
+> > to deal with the details instead?
+> > 
+> 
+> I think that would be a good idea anyway, for instance, someday if the
+> interface changes slightly then you will be able to contain the
+> compatibility fixes in the wrapper and not out here in the main driver.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/boot/dts/s3c2416-pinctrl.dtsi | 38 ++++++++++++++++++----------------
- 1 file changed, 20 insertions(+), 18 deletions(-)
+That interface is supposed to be a stable ABI, incompatible changes in
+the ABI should be discouraged. If there's an incompatible change it has
+to be dealt with in the main driver. A small wrapper function in a
+standalone header file has no chance here as it probably involves using
+information gathered while probing secure world.
 
-diff --git a/arch/arm/boot/dts/s3c2416-pinctrl.dtsi b/arch/arm/boot/dts/s3c2416-pinctrl.dtsi
-index 527e3193817f..6274359fb323 100644
---- a/arch/arm/boot/dts/s3c2416-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/s3c2416-pinctrl.dtsi
-@@ -8,6 +8,8 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <dt-bindings/pinctrl/samsung.h>
-+
- &pinctrl_0 {
- 	/*
- 	 * Pin banks
-@@ -83,91 +85,91 @@
- 
- 	uart0_data: uart0-data {
- 		samsung,pins = "gph-0", "gph-1";
--		samsung,pin-function = <2>;
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 	};
- 
- 	uart0_fctl: uart0-fctl {
- 		samsung,pins = "gph-8", "gph-9";
--		samsung,pin-function = <2>;
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 	};
- 
- 	uart1_data: uart1-data {
- 		samsung,pins = "gph-2", "gph-3";
--		samsung,pin-function = <2>;
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 	};
- 
- 	uart1_fctl: uart1-fctl {
- 		samsung,pins = "gph-10", "gph-11";
--		samsung,pin-function = <2>;
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 	};
- 
- 	uart2_data: uart2-data {
- 		samsung,pins = "gph-4", "gph-5";
--		samsung,pin-function = <2>;
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 	};
- 
- 	uart2_fctl: uart2-fctl {
- 		samsung,pins = "gph-6", "gph-7";
--		samsung,pin-function = <2>;
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 	};
- 
- 	uart3_data: uart3-data {
- 		samsung,pins = "gph-6", "gph-7";
--		samsung,pin-function = <2>;
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 	};
- 
- 	extuart_clk: extuart-clk {
- 		samsung,pins = "gph-12";
--		samsung,pin-function = <2>;
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 	};
- 
- 	i2c0_bus: i2c0-bus {
- 		samsung,pins = "gpe-14", "gpe-15";
--		samsung,pin-function = <2>;
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 	};
- 
- 	spi0_bus: spi0-bus {
- 		samsung,pins = "gpe-11", "gpe-12", "gpe-13";
--		samsung,pin-function = <2>;
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 	};
- 
- 	sd0_clk: sd0-clk {
- 		samsung,pins = "gpe-5";
--		samsung,pin-function = <2>;
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 	};
- 
- 	sd0_cmd: sd0-cmd {
- 		samsung,pins = "gpe-6";
--		samsung,pin-function = <2>;
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 	};
- 
- 	sd0_bus1: sd0-bus1 {
- 		samsung,pins = "gpe-7";
--		samsung,pin-function = <2>;
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 	};
- 
- 	sd0_bus4: sd0-bus4 {
- 		samsung,pins = "gpe-8", "gpe-9", "gpe-10";
--		samsung,pin-function = <2>;
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 	};
- 
- 	sd1_cmd: sd1-cmd {
- 		samsung,pins = "gpl-8";
--		samsung,pin-function = <2>;
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 	};
- 
- 	sd1_clk: sd1-clk {
- 		samsung,pins = "gpl-9";
--		samsung,pin-function = <2>;
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 	};
- 
- 	sd1_bus1: sd1-bus1 {
- 		samsung,pins = "gpl-0";
--		samsung,pin-function = <2>;
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 	};
- 
- 	sd1_bus4: sd1-bus4 {
- 		samsung,pins = "gpl-1", "gpl-2", "gpl-3";
--		samsung,pin-function = <2>;
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
- 	};
- };
--- 
-1.9.1
+What I meant was a small wrapper function just above 
+optee_config_shm_ioremap() to deal with only this call.
+
+> >> [snip]
+> >>
+> >>> +#define OPTEE_MSG_ATTR_CACHE_SHIFT		16
+> >>> +#define OPTEE_MSG_ATTR_CACHE_MASK		0x7
+> >>
+> >> GENMASK
+> > 
+> > Do you mean that OPTEE_MSG_ATTR_CACHE_MASK should be defined using the
+> > GENMASK() macro? If so I guess I should update OPTEE_MSG_ATTR_TYPE_MASK
+> > also.
+> > 
+> 
+> Right, I can tell what bits 0x7 mask, but sometimes it's not so easy
+> (7F8, etc) so I find it's best to use GENMASKS for all masks so I don't
+> have to ever think about it at all.
+> 
+> Also I like to mask then shift, so it would be:
+> 
+> #define OPTEE_MSG_ATTR_CACHE_SHIFT	16
+> #define OPTEE_MSG_ATTR_CACHE_MASK	GENMASK(18, 16)
+> 
+> Then we can see at a glance the actual bits we are looking for (18-16)
+> and verify the shift is the right amount.
+
+I'm wired the other way around, I usually shift then mask, I suppose
+it's a matter of taste. I'm happy to use GENMASK instead to define
+OPTEE_MSG_ATTR_CACHE_MASK, but I'd like to keep it unshifted if you
+don't mind.
+
+Thanks,
+Jens
