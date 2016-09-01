@@ -1,51 +1,32 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 01 Sep 2016 15:07:03 +0200
-Subject: [RESEND PATCH 2/3] ARM: dts: add TOPEET itop elite based board
-In-Reply-To: <1472648361-3871-1-git-send-email-ayaka@soulik.info>
-References: <750b6941-7d22-971e-84c9-996deab9a7c1@kernel.org>
- <1472648361-3871-1-git-send-email-ayaka@soulik.info>
-Message-ID: <6405623.At7R6O470M@amdc1976>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 1 Sep 2016 08:10:28 -0500
+Subject: [PATCH] ARM: dts: explicitly mark skeleton.dtsi as deprecated
+In-Reply-To: <20160901124611.GA5049@leverpostej>
+References: <1472730037-4972-1-git-send-email-mark.rutland@arm.com>
+ <20160901124611.GA5049@leverpostej>
+Message-ID: <CAL_JsqLCrjWR6dN-u08iiv5xzbLvQZ_=qLz4YWYTrkPJLSTazQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Sep 1, 2016 at 7:46 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Sep 01, 2016 at 12:40:37PM +0100, Mark Rutland wrote:
+>> As noted in commit 3ebee5a2e141496b ("arm64: dts: kill skeleton.dtsi"),
+>> there are a number of problems with skeleton.dtsi, and it would be
+>> prefereable to remove it entirely. As there are a large number of
+>> existing users, fixing these up will take a while.
+>>
+>> This patch adds a note to arm's skeleton.dtsi noting that this is the
+>> case, to make this more obvious and hopefully minimize new uptake of
+>> skeleton.dtsi in the mean time.
+>>
+>> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Rob Herring <rob.herring@arm.com>
+>
+> This should have been linaro.org. not sure how I managed that.
 
-Hi,
+Well, kernel.org really.
 
-On Wednesday, August 31, 2016 08:59:21 PM Randy Li wrote:
-> The TOPEET itop exynos 4412 have three versions base board. The
-> Elite version is the cheap one without too much peripheral devices
-> on it.
-> 
-> Currently supported are serial console, wired networking(USB),
-> USB OTG in peripheral mode, USB host, SD storage, GPIO buttons,
-> PWM beeper, ADC and LEDs. The WM8960 analog audio codec is also
-> enabled.
-> 
-> The FIMC is not used for camera currently, I enabled it just for a
-> colorspace convertor.
-> 
-> Signed-off-by: Randy Li <ayaka@soulik.info>
+I was going to ask if we were getting close with the recent activity,
+but I just looked and no there's still a ton.
 
-[...]
-
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -135,6 +135,7 @@ dtb-$(CONFIG_ARCH_EXYNOS4) += \
->  	exynos4412-origen.dtb \
->  	exynos4412-smdk4412.dtb \
->  	exynos4412-tiny4412.dtb \
-> +	exynos4412-itop-elite.dtb \
-
-Minor nit:
-
-Please keep dtb files in alphabetical order.
-
->  	exynos4412-trats2.dtb
->  dtb-$(CONFIG_ARCH_EXYNOS5) += \
->  	exynos5250-arndale.dtb \
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Acked-by: Rob Herring <robh@kernel.org>
