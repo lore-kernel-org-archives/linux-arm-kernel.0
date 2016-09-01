@@ -1,67 +1,53 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Thu,  1 Sep 2016 15:27:52 -0700
-Subject: [PATCH v2 00/17] Make rpmsg a framework
-Message-ID: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
+Date: Thu,  1 Sep 2016 15:27:54 -0700
+Subject: [PATCH v2 02/17] rpmsg: Name rpmsg devices based on channel id
+In-Reply-To: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
+References: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
+Message-ID: <1472768889-3906-3-git-send-email-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series splits the virtio rpmsg bus driver into a rpmsg bus and a virtio
-backend/wireformat.
+By basing rpmsg device names on channel id we end up with human readable
+device names in sysfs and debug logs.
 
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
 
-As we discussed the Qualcomm SMD implementation a couple of years back people
-suggested that I should make it "a rpmsg thingie". With the introduction of the
-Qualcomm 8996 platform, we must support a variant of the communication
-mechanism that share many of the characteristics of SMD, but are different
-enough that it can't be done in a single implementation. As such there is
-enough benefit to do the necessary work and being able to make SMD a "rpmsg
-thingie".
+Changes since v1:
+- None
 
-On-top of this series I have patches to switch the current smd clients over to
-rpmsg (and by that drop the existing SMD implementation).
+ drivers/rpmsg/virtio_rpmsg_bus.c | 12 ++----------
+ 1 file changed, 2 insertions(+), 10 deletions(-)
 
-All this allows me to implement the new backend and reuse all existing SMD
-drivers with the new mechanism.
-
-
-Changes from v1:
-- Split up the patch moving core code to rpmsg_core into several commits
-- Dropped the wrapping struct in rpmsg_core and just added the ops to the
-  public API (but hid the implementation details)
-- Reordered things to reduce the size of the later patches
-
-Bjorn Andersson (17):
-  rpmsg: Enable matching devices with drivers based on DT
-  rpmsg: Name rpmsg devices based on channel id
-  rpmsg: rpmsg_send() operations takes rpmsg_endpoint
-  rpmsg: Make rpmsg_create_ept() take channel_info struct
-  rpmsg: Clean up rpmsg device vs channel naming
-  rpmsg: Introduce indirection table for rpmsg_device operations
-  rpmsg: Move rpmsg_device API to new file
-  rpmsg: Indirection table for rpmsg_endpoint operations
-  rpmsg: Move endpoint related interface to rpmsg core
-  rpmsg: Move helper for finding rpmsg devices to core
-  rpmsg: Split off generic tail of create_channel()
-  rpmsg: Split rpmsg core and virtio backend
-  rpmsg: Hide rpmsg indirection tables
-  rpmsg: virtio: Hide vrp pointer from the public API
-  rpmsg: Move virtio specifics from public header
-  rpmsg: Allow callback to return errors
-  rpmsg: Introduce Qualcomm SMD backend
-
- drivers/remoteproc/Kconfig          |    4 +-
- drivers/rpmsg/Kconfig               |   14 +
- drivers/rpmsg/Makefile              |    4 +-
- drivers/rpmsg/qcom_smd.c            | 1434 +++++++++++++++++++++++++++++++++++
- drivers/rpmsg/rpmsg_core.c          |  498 ++++++++++++
- drivers/rpmsg/rpmsg_internal.h      |   82 ++
- drivers/rpmsg/virtio_rpmsg_bus.c    |  487 +++++-------
- include/linux/rpmsg.h               |  246 +-----
- samples/rpmsg/rpmsg_client_sample.c |   14 +-
- 9 files changed, 2266 insertions(+), 517 deletions(-)
- create mode 100644 drivers/rpmsg/qcom_smd.c
- create mode 100644 drivers/rpmsg/rpmsg_core.c
- create mode 100644 drivers/rpmsg/rpmsg_internal.h
-
+diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c b/drivers/rpmsg/virtio_rpmsg_bus.c
+index 495fa0a282d3..c4bd89ea7681 100644
+--- a/drivers/rpmsg/virtio_rpmsg_bus.c
++++ b/drivers/rpmsg/virtio_rpmsg_bus.c
+@@ -136,14 +136,6 @@ rpmsg_show_attr(src, src, "0x%x\n");
+ rpmsg_show_attr(dst, dst, "0x%x\n");
+ rpmsg_show_attr(announce, announce ? "true" : "false", "%s\n");
+ 
+-/*
+- * Unique (and free running) index for rpmsg devices.
+- *
+- * Yeah, we're not recycling those numbers (yet?). will be easy
+- * to change if/when we want to.
+- */
+-static unsigned int rpmsg_dev_index;
+-
+ static ssize_t modalias_show(struct device *dev,
+ 			     struct device_attribute *attr, char *buf)
+ {
+@@ -531,8 +523,8 @@ static struct rpmsg_channel *rpmsg_create_channel(struct virtproc_info *vrp,
+ 
+ 	strncpy(rpdev->id.name, chinfo->name, RPMSG_NAME_SIZE);
+ 
+-	/* very simple device indexing plumbing which is enough for now */
+-	dev_set_name(&rpdev->dev, "rpmsg%d", rpmsg_dev_index++);
++	dev_set_name(&rpdev->dev, "%s:%s",
++		     dev_name(dev->parent), rpdev->id.name);
+ 
+ 	rpdev->dev.parent = &vrp->vdev->dev;
+ 	rpdev->dev.bus = &rpmsg_bus;
 -- 
 2.5.0
