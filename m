@@ -1,136 +1,39 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Thu, 1 Sep 2016 10:35:46 +0200
-Subject: [PATCH v3 3/4] mfd: mfd-core: reattach mfd of_node to cells
- without of_compatible
-In-Reply-To: <20160831115655.GE8649@dell>
-References: <1469519027-11387-1-git-send-email-quentin.schulz@free-electrons.com>
- <1469519027-11387-4-git-send-email-quentin.schulz@free-electrons.com>
- <20160809134847.GJ5243@dell> <20160824063853.GB8103@lukather>
- <20160831115655.GE8649@dell>
-Message-ID: <e01087ef-b5a3-a60f-fa7d-b05e12372f22@free-electrons.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 01 Sep 2016 10:37:01 +0200
+Subject: [PATCH 1/2] ARM: dts: exynos: Fix mismatched value for SD4 pull
+ up/down configuration on exynos4210
+Message-ID: <1472719022-27226-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/08/2016 13:56, Lee Jones wrote:
-> On Wed, 24 Aug 2016, Maxime Ripard wrote:
-> 
->> Hi Lee,
->>
->> On Tue, Aug 09, 2016 at 02:48:47PM +0100, Lee Jones wrote:
->>> On Tue, 26 Jul 2016, Quentin Schulz wrote:
->>>
->>>> When an MFD cell has an of_compatible (meaning it is present in the Device
->>>> Tree), other nodes can reference it using a phandle.
->>>>
->>>> However when the MFD cell is not declared in the Device Tree, the only way
->>>> other nodes can reference it are by using a phandle to the MFD. Then when
->>>> this MFD cell tries to register itself in one framework, the registration
->>>> is denied by the framework because it is not matching the of_node of the
->>>> node which is referenced by the phandle in one of the other nodes.
->>>>
->>>> This reattaches the of_node of the MFD to the MFD cell device structure
->>>> when the MFD cell has no of_compatible.
->>>>
->>>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->>>> ---
->>>>
->>>> We need this modification to register the thermal sensor in the thermal
->>>> framework.
->>>>
->>>> Added in v3.
->>>>
->>>>  drivers/mfd/mfd-core.c | 14 +++++++++-----
->>>>  1 file changed, 9 insertions(+), 5 deletions(-)
->>>
->>> Can you show me the DT code where this is used?
->>>
->>> Is it used by a patch in this series?
->>
->> Yes and no.
->>
->> This is not used directly by any code found in those patches.
->>
->> However, those patches are actually a rewrite of an existing driver
->> that was there before (drivers/input/touchscreen/sun4i-ts.c), that
->> already had some DT bindings and was enabled in a few DT already [1].
->>
->> The issue here is that for the new driver to be able to follow the
->> phandles as it used to (which is also already used [2]). Obviously, in
->> the usual mechanism (at least when you don't declare the mfd childs in
->> the DT), the childs won't have any of_node associated to it, and this
->> is fine in most cases.
->>
->> This is where things get messy. The MFD childs will also register to
->> their framework without, and then the whole phandle lookup goes nuts,
->> because the phandles will point to the MFD's of_node, but no one will
->> actually be registered anywhere with that of_node, which means that we
->> broke all the links expressed by the phandles.
-> 
-> I'm concerned that this change may have unintended side-effects for
-> existing drivers.  Can you point me to the C code where this is
-> causing an issue.  Perhaps we can solve the issue without changing
-> subsystem core code.  By doing so we reduced the chance of
-> destructive ramifications for others.
-> 
+The pinctrl pull up/down register on exynos4210 is 2-bit wide for each
+pin and it accepts only values of 0, 1 and 3.  The pins sd4-bus-width8
+were configured with value of 4.  The driver does not validate the value
+so this overflow effectively set a bit 1 in adjacent pins thus
+configuring them to pull down.
 
-I have actually a problem with this driver as well: the MFD driver is
-probed thrice (once for itself and once for each of its subdrivers). I
-haven't found yet why. Anyway.
+The author's intention was probably to set drive strength of 4x.  All
+other bus-widths pins are configured with pull up and drive strength of
+4x.  Fix this one with same pattern.
 
-In our case (Allwinner SoCs), the thermal sensor of the SoC is exposed
-via the ADC. As Maxime explained, this driver is meant to replace an
-existing driver
-(http://lxr.free-electrons.com/source/drivers/input/touchscreen/sun4i-ts.c)
-which already has its node
-(http://lxr.free-electrons.com/source/arch/arm/boot/dts/sun5i.dtsi#L653)
-in the DT.
+Fixes: 87711d8c7c70 ("ARM: dts: Add pinctrl node entries for SAMSUNG EXYNOS4210 SoC")
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/boot/dts/exynos4210-pinctrl.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The thermal driver has a node
-(http://lxr.free-electrons.com/source/arch/arm/boot/dts/sun5i-a13.dtsi#L70)
-in the DT which registers the ADC driver's node as a thermal sensor via
-a phandle.
-
-To avoid modifying the DT, the MFD driver is using the same node as the
-existing driver but the MFD children are not added as children of that
-node. This means the new ADC driver (which is a child of the MFD driver
-and "node-less") which registers in thermal framework will be registered
-without any of_node and thus, won't actually be used because the phandle
-registered by the thermal driver in the DT does not match the of_node
-(which is null) of the ADC driver registering in the thermal framework.
-
-The function used to register in the thermal framework is
-devm_thermal_zone_of_sensor_register
-(http://lxr.free-electrons.com/source/drivers/thermal/of-thermal.c#L602).
-It takes a device with an of_node referenced as a phandle in the DT and
-any structure to pass to the get_temp function of the thermal framework
-(among other parameters)
-AFAIK, the device is only used for node matching between the phandle in
-the thermal driver's node and the device's of_node while the structure
-is used to compute the temperature.
-
-
->From this, we found two solutions:
-- reattach the MFD driver's node to all its children, (what we did)
-- "impersonate" the MFD driver in the devm_thermal_zone_of_sensor_register:
-
-instead of
-tzd = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, info,
-                                           &sun4i_ts_tz_ops);
-
-we could have:
-tzd = devm_thermal_zone_of_sensor_register(pdev->dev.parent, 0, info,
-
-                                           &sun4i_ts_tz_ops);
-
-I'm starting to think the second solution is more appropriate.
-
-Let me know your thoughts on this!
-
-Quentin
-
->> 1: https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/sun7i-a20.dtsi#n1520
->> 2: https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/sun7i-a20.dtsi#n130
->>
-> 
-> 
-> 
+diff --git a/arch/arm/boot/dts/exynos4210-pinctrl.dtsi b/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
+index 8046340e50ac..d9b6d25e4abe 100644
+--- a/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
++++ b/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
+@@ -649,7 +649,7 @@
+ 		sd4_bus8: sd4-bus-width8 {
+ 			samsung,pins = "gpk1-3", "gpk1-4", "gpk1-5", "gpk1-6";
+ 			samsung,pin-function = <EXYNOS_PIN_FUNC_3>;
+-			samsung,pin-pud = <4>;
++			samsung,pin-pud = <EXYNOS_PIN_PULL_UP>;
+ 			samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;
+ 		};
+ 
+-- 
+1.9.1
