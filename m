@@ -1,18 +1,37 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 01 Sep 2016 16:32:41 -0700 (PDT)
-Subject: [PATCH 0/4] SA11x0 Clocks and removal of Neponset SMC91x hack
-In-Reply-To: <20160830105117.GM1041@n2100.armlinux.org.uk>
-References: <20160829120531.GG1041@n2100.armlinux.org.uk>
- <E1beLKT-0001U1-HK@rmk-PC.armlinux.org.uk>
- <20160830105117.GM1041@n2100.armlinux.org.uk>
-Message-ID: <20160901.163241.42322670097531471.davem@davemloft.net>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Thu,  1 Sep 2016 16:53:22 -0700
+Subject: [PATCH] arm64: dts: rockchip: Add pinctrl entry for 32k clock on
+ rk3399
+Message-ID: <1472774002-25986-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King - ARM Linux <linux@armlinux.org.uk>
-Date: Tue, 30 Aug 2016 11:51:17 +0100
+On some rk3399 boards GPIO0_A0 is hooked up to a 32 kHz clock.  This can
+be used as the source for various clocks in the system.
 
-> Please ack these changes; due to the dependencies, I wish to merge
-> them through my tree.  Thanks.
+Add a pinmux so boards can get this pin properly configured.
 
-Acked-by: David S. Miller <davem@davemloft.net>
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+---
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 62d450935a57..13e2a440fe43 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -1171,6 +1171,12 @@
+ 			drive-strength = <13>;
+ 		};
+ 
++		clock {
++			clk_32k: clk-32k {
++				rockchip,pins = <0 0 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
+ 		i2c0 {
+ 			i2c0_xfer: i2c0-xfer {
+ 				rockchip,pins =
+-- 
+2.8.0.rc3.226.g39d4020
