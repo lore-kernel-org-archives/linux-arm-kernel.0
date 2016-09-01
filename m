@@ -1,65 +1,74 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 01 Sep 2016 15:03:51 +0200
-Subject: [RESEND PATCH 1/3] ARM: dts: Add TOPEET itop core board SCP
- package version
-In-Reply-To: <1472648307-3818-1-git-send-email-ayaka@soulik.info>
-References: <a35686c3-294b-a16a-2b0e-0ef2fd460244@kernel.org>
- <1472648307-3818-1-git-send-email-ayaka@soulik.info>
-Message-ID: <5477278.USWYFxDPfA@amdc1976>
+From: woogyom.kim@gmail.com (Milo Kim)
+Date: Thu, 1 Sep 2016 22:06:12 +0900
+Subject: [PATCH v2 1/4] ARM: dts: sun8i: Add PWM pin in H3
+In-Reply-To: <20160831162002.GI14379@lukather>
+References: <20160831082520.25962-1-woogyom.kim@gmail.com>
+ <20160831082520.25962-2-woogyom.kim@gmail.com>
+ <20160831162002.GI14379@lukather>
+Message-ID: <998fe271-138b-ea4a-99ac-4cd75eefc9c4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 09/01/2016 01:20 AM, Maxime Ripard wrote:
+> Hi Milo,
+>
+> On Wed, Aug 31, 2016 at 05:25:17PM +0900, Milo Kim wrote:
+>> H3 PA5 pin is assigned for single PWM channel.
+>>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> Cc: Chen-Yu Tsai <wens@csie.org>
+>> Cc: devicetree at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
+>> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/sun8i-h3.dtsi | 7 +++++++
+>>  1 file changed, 7 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> index fdf9fdb..05d0c4b 100644
+>> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+>> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> @@ -360,6 +360,13 @@
+>>  				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>>  			};
+>>
+>> +			pwm0_pin_a: pwm0 at 0 {
+>> +				allwinner,pins = "PA5";
+>> +				allwinner,function = "pwm0";
+>> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>> +			};
+>> +
+>
+> Is it used on any boards?
+>
+> If not, we have the policy of not merging the pinctrl nodes that are
+> not used by anyone to avoid bloating the DT for no particular reason.
 
-Hi,
+Yes, I have. It's Nano Pi M1 which was derived from Orange Pi PC.
+The board DTS is ready to be sent out, but I'm not sure which is better.
 
-On Wednesday, August 31, 2016 08:58:27 PM Randy Li wrote:
-> The TOPEET itop is a samsung exnynos 4412 core board, which have
-> two package versions. This patch add the support for SCP version.
-> 
-> Currently supported are USB3503A HSIC, USB OTG, eMMC, rtc and
-> PMIC. The future features are in the based board. Also MFC and
-> watchdog have been enabled.
-> 
-> Signed-off-by: Randy Li <ayaka@soulik.info>
-> ---
->  arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi | 490 ++++++++++++++++++++++++
->  1 file changed, 490 insertions(+)
->  create mode 100644 arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
+	a) Send new board DTS file in other patch thread
 
-[...]
+	[PATCH v3 0/4] Add PWM feature in Allwinner H3
+	[PATCH v3 1/4] ARM: dts: sun8i: Add PWM pin in H3
+	..
+	[PATCH v3 4/4] pwm: sunxi: Add H3 support
 
-> +		s5m8767_osc: clocks {
+	[PATCH] ARM: dts: sun8i: Add Nano Pi M1 support
 
-Don't you also need:
+Or
 
-			compatible = "samsung,s5m8767-clk";
+	b) Include the DTS in next patch-set v3
+	[PATCH v3 0/4] Add PWM feature in Allwinner H3
+	[PATCH v3 1/4] ARM: dts: sun8i: Add PWM pin in H3
+	[PATCH v3 2/4] ARM: dts: sun8i: Add PWM controller node in H3
+	[PATCH v3 3/4] ARM: dts: sun8i: Add Nano Pi M1 support
+	...
 
-here?
-
-BTW Does anyone know why there are no users of
-"samsung,s2mps11-clk" compatible in the tree
-(commit 53c31b3437a6400c6ffc2c9315680217ad84cb6d
-"mfd: sec-core: Add of_compatible strings for
-clock MFD cells" added it in March 2014)?
-
-> +			#clock-cells = <1>;
-> +			clock-output-names = "s5m8767_ap",
-> +					"s5m8767_cp", "s5m8767_bt";
-> +		};
-> +
-> +	};
-> +};
-
-[...]
-
-> +&rtc {
-> +	status = "okay";
-> +	clocks = <&clock CLK_RTC>, <&s5m8767_osc S2MPS11_CLK_AP>;
-> +	clock-names = "rtc", "rtc_src";
-> +};
+I'd like to have your opinion.
 
 Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Milo
