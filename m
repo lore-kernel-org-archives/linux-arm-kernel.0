@@ -1,63 +1,70 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 1 Sep 2016 13:56:16 +0200
-Subject: [PATCH 1/5] arm/arm64: KVM: Don't BUG_ON if IT bits are set in
- ARM mode
-In-Reply-To: <1471610295-1456-2-git-send-email-marc.zyngier@arm.com>
-References: <1471610295-1456-1-git-send-email-marc.zyngier@arm.com>
- <1471610295-1456-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160901115616.GD10162@cbox>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 1 Sep 2016 12:54:36 +0100
+Subject: [PATCH] arm64: spinlock: clarify implementation details of
+ arch_spin_lock
+In-Reply-To: <20160901112726.GC6721@arm.com>
+References: <1472726820-32959-1-git-send-email-vladimir.murzin@arm.com>
+ <20160901112726.GC6721@arm.com>
+Message-ID: <57C816FC.5090403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2016 at 01:38:11PM +0100, Marc Zyngier wrote:
-> The ARM ARM asserts that having the IT bits set in ARM mode is
-> unpredictable. But should a CPU do that (and still be able to
-> run correctly), we shouldn't kill the system.
+On 01/09/16 12:27, Will Deacon wrote:
+> On Thu, Sep 01, 2016 at 11:47:00AM +0100, Vladimir Murzin wrote:
+>> It seems to be quite confusing to see atomic load not being paired
+>> with atomic store down to arch_spin_lock function. To prevent the same
+>> questions/patches around this add a comment block explaining what is
+>> going on there.
+>>
+>> The comment has been stolen from Catalin's reply [1].
+>>
+>> [1] https://lkml.org/lkml/2016/8/30/127
+>>
+>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+>> ---
+>>  arch/arm64/include/asm/spinlock.h |   12 ++++++++++++
+>>  1 file changed, 12 insertions(+)
+>>
+>> diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
+>> index e875a5a..9a2155c 100644
+>> --- a/arch/arm64/include/asm/spinlock.h
+>> +++ b/arch/arm64/include/asm/spinlock.h
+>> @@ -113,6 +113,18 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
+>>  	 */
+>>  "	sevl\n"
+>>  "2:	wfe\n"
+>> +	/*
+>> +	 * Don't be confused with atomic load bellow not being paired
+>> +	 * with atomic store. This is needed because the
+>> +	 * arch_spin_unlock() code only uses an STLR without an
+>> +	 * explicit SEV (like we have on AArch32). An event is
+>> +	 * automatically generated when the exclusive monitor is
+>> +	 * cleared by STLR. But without setting it with a load
+>> +	 * exclusive in arch_spin_lock() (even though it does not
+>> +	 * acquire the lock), there won't be anything to clear, hence
+>> +	 * no event to be generated. In this case, the WFE would wait
+>> +	 * indefinitely.
+>> +	 */
 > 
-> So let's drop the BUG_ON that checks for this, as it is not
-> very helpful.
+> So the purpose of our spin_lock implementation is to provide a spin_lock
+> primitive to kernel code which follows the semantics of Linux spin locks.
+> It's not intended to teach people the ARMv8 architecture.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-
-not sure how this relates to the series, but looks fine otherwise:
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-> ---
->  arch/arm/kvm/emulate.c   | 4 +---
->  arch/arm64/kvm/emulate.c | 4 +---
->  2 files changed, 2 insertions(+), 6 deletions(-)
+> If we comment this (and I don't think your comment is necessarily helpful),
+> then do we also comment arch_spin_unlock_wait, __cmpwait, the rwlocks, ...?
 > 
-> diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
-> index af93e3f..eda9ddd 100644
-> --- a/arch/arm/kvm/emulate.c
-> +++ b/arch/arm/kvm/emulate.c
-> @@ -221,9 +221,7 @@ static void kvm_adjust_itstate(struct kvm_vcpu *vcpu)
->  	unsigned long cpsr = *vcpu_cpsr(vcpu);
->  	bool is_arm = !(cpsr & PSR_T_BIT);
->  
-> -	BUG_ON(is_arm && (cpsr & PSR_IT_MASK));
-> -
-> -	if (!(cpsr & PSR_IT_MASK))
-> +	if (is_arm || !(cpsr & PSR_IT_MASK))
->  		return;
->  
->  	cond = (cpsr & 0xe000) >> 13;
-> diff --git a/arch/arm64/kvm/emulate.c b/arch/arm64/kvm/emulate.c
-> index f87d8fb..df76590 100644
-> --- a/arch/arm64/kvm/emulate.c
-> +++ b/arch/arm64/kvm/emulate.c
-> @@ -120,9 +120,7 @@ static void kvm_adjust_itstate(struct kvm_vcpu *vcpu)
->  	unsigned long cpsr = *vcpu_cpsr(vcpu);
->  	bool is_arm = !(cpsr & COMPAT_PSR_T_BIT);
->  
-> -	BUG_ON(is_arm && (cpsr & COMPAT_PSR_IT_MASK));
-> -
-> -	if (!(cpsr & COMPAT_PSR_IT_MASK))
-> +	if (is_arm || !(cpsr & COMPAT_PSR_IT_MASK))
->  		return;
->  
->  	cond = (cpsr & 0xe000) >> 13;
-> -- 
-> 2.1.4
+> At some point we have to assume that people attempting to understand the
+> low-level locking primitives for an architecture will bother to read the
+> documentation :/ Hell, the ARMv8 ARM even has an example ticket lock
+> implementation in "K10.3.4 Use of Wait For Event (WFE) and Send Event
+> (SEV) with locks" that uses this trick.
+> 
+
+So, NAK? ;)
+
+Cheers
+Vladimir
+
+> Will
+> 
 > 
