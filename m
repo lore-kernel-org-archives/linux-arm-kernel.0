@@ -1,43 +1,46 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Thu, 1 Sep 2016 16:38:02 -0500
-Subject: [PATCHv4] arm: l2x0: add PMU support
-In-Reply-To: <20160901153706.GZ1041@n2100.armlinux.org.uk>
-References: <1472653416-774-1-git-send-email-mark.rutland@arm.com>
- <20160901153706.GZ1041@n2100.armlinux.org.uk>
-Message-ID: <20160901163802.ee39ea1a3c664fd182b97489@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 2 Sep 2016 05:49:32 +0800
+Subject: [PATCH 3/5] clocks: exynos4x12: add runtime pm support for ISP
+ clocks
+In-Reply-To: <1472737551-15272-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <201609020505.HiC8887e%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Sep 2016 16:37:07 +0100
-Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+Hi Marek,
 
-> On Wed, Aug 31, 2016 at 03:23:36PM +0100, Mark Rutland wrote:
-> > The L2C-220 (AKA L220) and L2C-310 (AKA PL310) cache controllers feature
-> > a Performance Monitoring Unit (PMU), which can be useful for tuning
-> > and/or debugging. This hardware is always present and the relevant
-> > registers are accessible to non-secure accesses. Thus, no special
-> > firmware interface is necessary.
-> > 
-> > This patch adds support for the PMU, plugging into the usual perf
-> > infrastructure. The overflow interrupt is not always available (e.g. on
-> > RealView PBX A9 it is not wired up at all), and the hardware counters
-> > saturate, so the driver does not make use of this. Instead, the driver
-> > periodically polls and reset counters as required to avoid losing
-> > events due to saturation.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Acked-by: Pawel Moll <pawel.moll@arm.com>
-> > Cc: Kim Phillips <kim.phillips@arm.com>
-> > Cc: Russell King <linux@armlinux.org.uk>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> 
-> Much better, thanks.  When you're happy, please put it in the patch
-> system, thanks.
+[auto build test WARNING on clk/clk-next]
+[also build test WARNING on next-20160825]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
+[Check https://git-scm.com/docs/git-format-patch for more information]
 
-feel free to tack on my:
+url:    https://github.com/0day-ci/linux/commits/Marek-Szyprowski/Add-runtime-PM-support-for-clocks-on-Exynos-SoC-example/20160901-215042
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Tested-by: Kim Phillips <kim.phillips@arm.com>
+All warnings (new ones prefixed by >>):
 
-Thanks,
+>> WARNING: vmlinux.o(.data+0x135420): Section mismatch in reference from the variable exynos4x12_isp_clk_driver to the function .init.text:exynos4x12_isp_clk_probe()
+   The variable exynos4x12_isp_clk_driver references
+   the function __init exynos4x12_isp_clk_probe()
+   If the reference is valid then annotate the
+   variable with or __refdata (see linux/init.h) or name the variable:
+   
 
-Kim
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 58542 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160902/fb16b17c/attachment-0001.obj>
