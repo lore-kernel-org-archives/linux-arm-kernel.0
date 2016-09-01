@@ -1,90 +1,26 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Thu, 1 Sep 2016 17:39:21 +0530
-Subject: [PATCH] arm64:ftrace: add save_stack_trace_regs()
-In-Reply-To: <20160901113920.GD6721@arm.com>
-References: <1e8882680fd875de22db27c897727d0466a7e2e0.1438333085.git.panand@redhat.com>
- <CAHB_Guoec0-Z57VxYf94XcZFF+bx0410=X1mD-7y7zqxQeyypw@mail.gmail.com>
- <20160901113920.GD6721@arm.com>
-Message-ID: <CAHB_Guo=FJZEAoCrBp_jQDxOCR3sHC=A6UGC67F=Up9gdGbT9w@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 1 Sep 2016 13:11:54 +0100
+Subject: [PATCH] KVM: arm/arm64: Get rid of exported aliases to static
+ functions
+In-Reply-To: <20160901111806.14972-1-christoffer.dall@linaro.org>
+References: <20160901111806.14972-1-christoffer.dall@linaro.org>
+Message-ID: <57C81B0A.2050003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 1, 2016 at 5:09 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Sep 01, 2016 at 04:57:30PM +0530, Pratyush Anand wrote:
->> On Fri, Jul 31, 2015 at 2:51 PM, Pratyush Anand <panand@redhat.com> wrote:
->> > Implement save_stack_trace_regs, so that stacktrace of a kprobe events can be
->> > obtained.
->> >
->> > Signed-off-by: Pratyush Anand <panand@redhat.com>
->> > ---
->> > Function will be useful only after having ARM64 kprobes upstreamed.
->> > However, since there is no dependency in applying the patch, so it may be
->> > upstreamed independently (if there is no other review comment).
->>
->>
->> Since kprobe is already in mainline now. So any comment for this patch?
->> It still applies cleanly to the latest upstream.
+On 01/09/16 12:18, Christoffer Dall wrote:
+> When rewriting the assembly code to C code, it was useful to have
+> exported aliases or static functions so that we could keep the existing
+> common C code unmodified and at the same time rewrite arm64 from
+> assembly to C code, and later do the arm part.
+> 
+> Now when both are done, we really don't need this level of indirection
+> anymore, and it's time to save a few lines and brain cells.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Humm..it just applies cleanly, but does not even compile with latest
-kernel. I will rebase, retest and will resend then.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-~Pratyush
-
->
-> It would be nice if David or Akashi could review/test it.
->
-> Will
->
->> > I see following stack trace for kfree with this patch in one of the case.
->> >
->> > echo stacktrace > /sys/kernel/debug/tracing/trace_options
->> > echo "p kfree" >> /sys/kernel/debug/tracing/kprobe_events
->> > echo 1 > /sys/kernel/debug/tracing/events/kprobes/enable
->> > more /sys/kernel/debug/tracing/trace
->> >             bash-3868  [001] d...  2863.068271: p_kfree_0: (kfree+0x0/0x194)
->> >             bash-3868  [001] d...  2863.068276: <stack trace>
->> >  => kfree
->> >  => syscall_trace_exit
->> >  => __sys_trace_return_skipped
->> >
->> >  arch/arm64/kernel/stacktrace.c | 18 ++++++++++++++++++
->> >  1 file changed, 18 insertions(+)
->> >
->> > diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
->> > index 407991bf79f5..c7fa0431ef3e 100644
->> > --- a/arch/arm64/kernel/stacktrace.c
->> > +++ b/arch/arm64/kernel/stacktrace.c
->> > @@ -97,6 +97,24 @@ static int save_trace(struct stackframe *frame, void *d)
->> >         return trace->nr_entries >= trace->max_entries;
->> >  }
->> >
->> > +void save_stack_trace_regs(struct pt_regs *regs, struct stack_trace *trace)
->> > +{
->> > +       struct stack_trace_data data;
->> > +       struct stackframe frame;
->> > +
->> > +       data.trace = trace;
->> > +       data.skip = trace->skip;
->> > +       data.no_sched_functions = 0;
->> > +
->> > +       frame.fp = regs->regs[29];
->> > +       frame.sp = regs->sp;
->> > +       frame.pc = regs->pc;
->> > +
->> > +       walk_stackframe(&frame, save_trace, &data);
->> > +       if (trace->nr_entries < trace->max_entries)
->> > +               trace->entries[trace->nr_entries++] = ULONG_MAX;
->> > +}
->> > +
->> >  void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
->> >  {
->> >         struct stack_trace_data data;
->> > --
->> > 2.4.3
->> >
->> >
->> > _______________________________________________
->> > linux-arm-kernel mailing list
->> > linux-arm-kernel at lists.infradead.org
->> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
