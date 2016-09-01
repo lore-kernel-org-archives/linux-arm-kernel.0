@@ -1,150 +1,81 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 1 Sep 2016 13:23:38 +0100
-Subject: [PATCH 2/5] arm64: KVM: Allow kvm_skip_instr32 to be shared
- between kernel and HYP code
-In-Reply-To: <20160901120910.GE10162@cbox>
-References: <1471610295-1456-1-git-send-email-marc.zyngier@arm.com>
- <1471610295-1456-3-git-send-email-marc.zyngier@arm.com>
- <20160901120910.GE10162@cbox>
-Message-ID: <57C81DCA.7070505@arm.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 1 Sep 2016 15:27:33 +0300
+Subject: [PATCH 3/3] clk: keystone: Add sci-clk driver support
+In-Reply-To: <20160831223101.GI12510@codeaurora.org>
+References: <20160820003342.13599-1-nm@ti.com>
+ <20160820003342.13599-4-nm@ti.com> <20160824083415.GA6502@codeaurora.org>
+ <c1a66f45-fa81-8137-4d9b-73e84141f67f@ti.com>
+ <20160831223101.GI12510@codeaurora.org>
+Message-ID: <7b74dc9f-54f3-3081-72b7-116d4c44e98a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/16 13:09, Christoffer Dall wrote:
-> On Fri, Aug 19, 2016 at 01:38:12PM +0100, Marc Zyngier wrote:
->> As we're going to start emulating some instruction while in HYP,
->> we need to be able to move the PC forward. Pretty easy for AArch64,
->> but quite fidly for AArch32 (think Thumb2 and the IT state).
+On 01/09/16 01:31, Stephen Boyd wrote:
+> On 08/31, Tero Kristo wrote:
+>> On 24/08/16 11:34, Stephen Boyd wrote:
+>>> On 08/19, Nishanth Menon wrote:
+>>>> diff --git a/drivers/clk/keystone/sci-clk.c b/drivers/clk/keystone/sci-clk.c
+>>>> new file mode 100644
+>>>> index 000000000000..6c43e097e6d6
+>>>> --- /dev/null
+>>>> +++ b/drivers/clk/keystone/sci-clk.c
+>>>> @@ -0,0 +1,539 @@
+>>>> +	return (int)new_rate;
+>>>
+>>> determine rate should return a negative number on failure and 0
+>>> on success. The actual rate that was found should go into
+>>> req->rate. This looks broken.
 >>
->> In order to be able to reuse the existing code in HYP, move the bulk
->> of it to kvm_emulate.h, and let the implementation located in
->> emulate.c use it. HYP will be able to use it at the expense of an
->> additional copy in the object file, but we can at least share the
->> source code.
+>> Yea it seems broken, I wonder how we haven't seen any issues with
+>> this in testing.... Apparently positive return values from this are
+>> interpreted as success. Having a quick look at clk.c seems to
+>> confirm this.
 >>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/include/asm/kvm_emulate.h | 49 ++++++++++++++++++++++++++++++++++++
->>  arch/arm64/kvm/emulate.c             | 45 +--------------------------------
->>  2 files changed, 50 insertions(+), 44 deletions(-)
+>> Anyway, will fix.
+>
+> True, perhaps we should fix that so we don't use a long to hold
+> the int return value either.
+>
+>>>> + *
+>>>> + * Gets a handle to an existing TI SCI clock, or builds a new clock
+>>>> + * entry and registers it with the common clock framework. Called from
+>>>> + * the common clock framework, when a corresponding of_clk_get call is
+>>>> + * executed, or recursively from itself when parsing parent clocks.
+>>>> + * Returns a pointer to the clock struct, or ERR_PTR value in failure.
+>>>> + */
+>>>
+>>> Please move this driver to clk_hw_register() and friends. This on
+>>> the fly clk generation is scary considering how we hold locks
+>>> while the provider is asked to give us the pointer, so allocating
+>>> and registering clks (basically reentering the CCF again) could
+>>> lead to a locking nightmare. Best to avoid that.
 >>
->> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
->> index 4cdeae3..60db363 100644
->> --- a/arch/arm64/include/asm/kvm_emulate.h
->> +++ b/arch/arm64/include/asm/kvm_emulate.h
->> @@ -311,4 +311,53 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
->>  	return data;		/* Leave LE untouched */
->>  }
->>  
->> +/**
->> + * kvm_adjust_itstate - adjust ITSTATE when emulating instructions in IT-block
->> + * @vcpu:	The VCPU pointer
->> + *
->> + * When exceptions occur while instructions are executed in Thumb IF-THEN
->> + * blocks, the ITSTATE field of the CPSR is not advanced (updated), so we have
->> + * to do this little bit of work manually. The fields map like this:
->> + *
->> + * IT[7:0] -> CPSR[26:25],CPSR[15:10]
->> + */
->> +static inline void kvm_adjust_itstate(struct kvm_vcpu *vcpu)
->> +{
->> +	unsigned long itbits, cond;
->> +	unsigned long cpsr = *vcpu_cpsr(vcpu);
->> +	bool is_arm = !(cpsr & COMPAT_PSR_T_BIT);
->> +
->> +	if (is_arm || !(cpsr & COMPAT_PSR_IT_MASK))
->> +		return;
->> +
->> +	cond = (cpsr & 0xe000) >> 13;
->> +	itbits = (cpsr & 0x1c00) >> (10 - 2);
->> +	itbits |= (cpsr & (0x3 << 25)) >> 25;
->> +
->> +	/* Perform ITAdvance (see page A2-52 in ARM DDI 0406C) */
->> +	if ((itbits & 0x7) == 0)
->> +		itbits = cond = 0;
->> +	else
->> +		itbits = (itbits << 1) & 0x1f;
->> +
->> +	cpsr &= ~COMPAT_PSR_IT_MASK;
->> +	cpsr |= cond << 13;
->> +	cpsr |= (itbits & 0x1c) << (10 - 2);
->> +	cpsr |= (itbits & 0x3) << 25;
->> +	*vcpu_cpsr(vcpu) = cpsr;
->> +}
->> +
->> +static void inline kvm_skip_aarch32_instr(struct kvm_vcpu *vcpu,
->> +					  bool is_wide_instr)
->> +{
->> +	bool is_thumb;
->> +
->> +	is_thumb = !!(*vcpu_cpsr(vcpu) & COMPAT_PSR_T_BIT);
->> +	if (is_thumb && !is_wide_instr)
->> +		*vcpu_pc(vcpu) += 2;
->> +	else
->> +		*vcpu_pc(vcpu) += 4;
->> +	kvm_adjust_itstate(vcpu);
->> +}
->> +
->>  #endif /* __ARM64_KVM_EMULATE_H__ */
->> diff --git a/arch/arm64/kvm/emulate.c b/arch/arm64/kvm/emulate.c
->> index df76590..d5f6a29 100644
->> --- a/arch/arm64/kvm/emulate.c
->> +++ b/arch/arm64/kvm/emulate.c
->> @@ -105,53 +105,10 @@ bool kvm_condition_valid32(const struct kvm_vcpu *vcpu)
->>  }
->>  
->>  /**
->> - * adjust_itstate - adjust ITSTATE when emulating instructions in IT-block
->> - * @vcpu:	The VCPU pointer
->> - *
->> - * When exceptions occur while instructions are executed in Thumb IF-THEN
->> - * blocks, the ITSTATE field of the CPSR is not advanced (updated), so we have
->> - * to do this little bit of work manually. The fields map like this:
->> - *
->> - * IT[7:0] -> CPSR[26:25],CPSR[15:10]
->> - */
->> -static void kvm_adjust_itstate(struct kvm_vcpu *vcpu)
->> -{
->> -	unsigned long itbits, cond;
->> -	unsigned long cpsr = *vcpu_cpsr(vcpu);
->> -	bool is_arm = !(cpsr & COMPAT_PSR_T_BIT);
->> -
->> -	if (is_arm || !(cpsr & COMPAT_PSR_IT_MASK))
->> -		return;
->> -
->> -	cond = (cpsr & 0xe000) >> 13;
->> -	itbits = (cpsr & 0x1c00) >> (10 - 2);
->> -	itbits |= (cpsr & (0x3 << 25)) >> 25;
->> -
->> -	/* Perform ITAdvance (see page A2-52 in ARM DDI 0406C) */
->> -	if ((itbits & 0x7) == 0)
->> -		itbits = cond = 0;
->> -	else
->> -		itbits = (itbits << 1) & 0x1f;
->> -
->> -	cpsr &= ~COMPAT_PSR_IT_MASK;
->> -	cpsr |= cond << 13;
->> -	cpsr |= (itbits & 0x1c) << (10 - 2);
->> -	cpsr |= (itbits & 0x3) << 25;
->> -	*vcpu_cpsr(vcpu) = cpsr;
->> -}
->> -
->> -/**
-> 
-> This is completely duplicated in arch/arm/kvm/emulate.c (with the same
-> useless BUG_ON from the previous patch still around), and this is a
-> pretty long static inline.
-> 
-> How about adding virt/kvm/arm/emulate.c and move these functions in
-> there?
-> 
-> Making them available in hyp mode should just be a matter of annotating
-> them with __hyp_text, right?
+>> Ok, so just converting the driver to use provider->get_hw should be
+>> enough? This seems to be a relatively new API in the CCF. Will look
+>> at that.
+>
+> Hopefully it will simplify things greatly.
 
-That's pretty cunning. I'll give it a go.
+Well, it didn't simplify things greatly, but somewhat. I still need to 
+use of_parse_phandle_with_args with one of the helpers for example. Will 
+send out v2 in a bit.
 
-Thanks,
+>
+>>
+>>>> +	}
+>>>> +
+>>>> +	snprintf(name, 20, "%s:%d:%d", dev_name(provider->dev), sci_clk->dev_id,
+>>>> +		 sci_clk->clk_id);
+>>>
+>>> I hope we don't make dev_name() longer than 20 characters
+>>
+>> Shall I just increase the size of the buffer and add a length check?
+>> Using kmalloc or something here seems overkill, as the name gets
+>> copied by CCF anyway.
+>
+> There's kasprintf() which would always make it long enough. I
+> don't know if it really matters though.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Ok, I will use this one.
+
+-Tero
