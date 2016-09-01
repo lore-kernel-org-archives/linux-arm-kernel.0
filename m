@@ -1,28 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 1 Sep 2016 15:55:29 +0100
-Subject: [PATCH] arm64: KVM: VHE: reset PSTATE.PAN on entry to EL2
-In-Reply-To: <1472740143-40061-1-git-send-email-vladimir.murzin@arm.com>
-References: <1472740143-40061-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <57C84161.3030607@arm.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 1 Sep 2016 17:57:11 +0300
+Subject: [PATCH] ARM: dts: am57xx-beagle-x15: fix HDMI LS_OE GPIO
+In-Reply-To: <c69aadbf-90e4-7aaf-2b90-4d5b543c252a@ti.com>
+References: <1472737901-26494-1-git-send-email-tomi.valkeinen@ti.com>
+ <b8647621-197c-97d5-8291-26c079e5eae8@ti.com>
+ <CAOCHtYhF2KfeK3ccEzZcePbU5H1kwi1tKThZN3NRwXgPsW_bSA@mail.gmail.com>
+ <c69aadbf-90e4-7aaf-2b90-4d5b543c252a@ti.com>
+Message-ID: <cfa4ea2c-444c-a814-cbea-b183f4214c93@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/16 15:29, Vladimir Murzin wrote:
-> SCTLR_EL2.SPAN bit controls what happens with the PSTATE.PAN bit on an
-> exception. However, this bit has no effect on the PSTATE.PAN when
-> HCR_EL2.E2H or HCR_EL2.TGE is unset. Thus when VHE is used and
-> exception taken from a guest PSTATE.PAN bit left unchanged and we
-> continue with a value guest has set.
-> 
-> To address that always reset PSTATE.PAN on entry from EL1.
-> 
-> Fixes: 1f364c8c48a0 ("arm64: VHE: Add support for running Linux in EL2 mode")
-> 
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> Reviewed-by: James Morse <james.morse@arm.com>
+On 01/09/16 17:14, Nishanth Menon wrote:
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> I believe we have A2s being shipped as well. we dont want to break A2s
+>>> either -> I propose we refactor the dts to introduce revb1 X15.
+>>
+>> There are at-least 200 A2's that have been shipped to end users.
+>>
+>> http://uk.rs-online.com/web/p/processor-microcontroller-development-kits/8874764/
+>>
+> 
+> 
+> Thanks. Tomi: if you are ok - I already do have a refactoring code from
+> older kernel. I will rebase to latest and repost.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Sounds good to me.
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160901/a81fda17/attachment.sig>
