@@ -1,65 +1,72 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 1 Sep 2016 10:56:36 -0700
-Subject: [PATCH v5] Axi-usb: Add support for 64-bit addressing.
-In-Reply-To: <1472719976-25410-1-git-send-email-navam@xilinx.com>
-References: <1472719976-25410-1-git-send-email-navam@xilinx.com>
-Message-ID: <20160901175636.GV16583@xsjsorenbubuntu>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 1 Sep 2016 10:57:49 -0700
+Subject: [PATCH v2 3/4] arm64: dts: rockchip: add efuse0 device node for
+ rk3399
+In-Reply-To: <1470878029-11878-4-git-send-email-finley.xiao@rock-chips.com>
+References: <1470878029-11878-1-git-send-email-finley.xiao@rock-chips.com>
+ <1470878029-11878-4-git-send-email-finley.xiao@rock-chips.com>
+Message-ID: <CAD=FV=XHn-VGYZN0TrONHXrnpXP4a4Gk408SR0Q6xY9kVPV+aA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-09-01 at 14:22:56 +0530, Nava kishore Manne wrote:
-> This patch updates the driver to support 64-bit DMA addressing.
-> 
-> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
-> Acked-by: Rob Herring <robh@kernel.org>
+Hi,
+
+On Wed, Aug 10, 2016 at 6:13 PM, Finlye Xiao <finley.xiao@rock-chips.com> wrote:
+> From: Finley Xiao <finley.xiao@rock-chips.com>
+>
+> Add a efuse0 node in the device tree for the ARM64 rk3399 SoC.
+>
+> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
 > ---
-> Changes for v5:
->                 -None.
-> 
-> Changes for v4:
->                 -Used boolen property insted of addrwith property in the DT
->                  as suggested by Arnd Bergmann.
->                 -Adopt the DT relevant changes into the driver.
-> 
-> Changes for v3:
->                 -Added new compatable string for 5.00 IP version as suggested by
->                  Arnd Bergmann.
->                 -Used write_fn() insted of lo_hi_writeq() as suggested by
->                  Arnd Bergmann.
-> Changes for v2:
->                 -Added dma-ranges property in device tree as suggested by
->                  Arnd Bergmann.
->                 -Modified the driver code based on the xlnx,addrwidth.
-> 
->  .../devicetree/bindings/usb/udc-xilinx.txt         |  5 ++-
->  drivers/usb/gadget/udc/udc-xilinx.c                | 52 +++++++++++++++++++++-
->  2 files changed, 54 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/udc-xilinx.txt b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> index 47b4e39..d08d972 100644
-> --- a/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> +++ b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> @@ -1,12 +1,14 @@
->  Xilinx USB2 device controller
->  
->  Required properties:
-> -- compatible		: Should be "xlnx,usb2-device-4.00.a"
-> +- compatible		: Should be "xlnx,usb2-device-4.00.a" or
-> +			  "xlnx,usb2-device-5.00"
->  - reg			: Physical base address and size of the USB2
->  			  device registers map.
->  - interrupts		: Should contain single irq line of USB2 device
->  			  controller
->  - xlnx,has-builtin-dma	: if DMA is included
-> +- xlnx,has-64bit-dma	: if DMA is included 64-bit addressing support.
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 29 +++++++++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
 
-We add these properties to describe the IP configuration + we have the
-version indicator in the compatible string. Do we really need both? It
-seems that all versions use the same driver and differentiation is made
-through the DT properties that describe the IP configuration parameters.
-Wouldn't it be better to just have one generic 'xlnx,axi-usb2' (or
-whatever) compatible string instead of patching the driver for each new
-version without really needing to differentiate the IP versions through
-it?
+Oddly this patch seems to have been dropped from v3 and v4 of the
+series.  Seems like we still need it?
 
-	S?ren
+
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> index 4c84229..7f764ca 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -899,6 +899,35 @@
+>                 status = "disabled";
+>         };
+>
+> +       efuse0: efuse0 at ff690000 {
+
+nit: should be efuse0: efuse at ff690000
+
+AKA get rid of the "0" from the node name and just keep it in the alias.
+
+> +               compatible = "rockchip,rk3399-efuse";
+> +               reg = <0x0 0xff690000 0x0 0x80>;
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               clocks = <&cru PCLK_EFUSE1024NS>;
+> +               clock-names = "pclk_efuse";
+> +
+> +               /* Data cells */
+> +               cpul_leakage: cpul-leakage {
+> +                       reg = <0x1a 0x1>;
+> +               };
+> +               cpub_leakage: cpub-leakage {
+> +                       reg = <0x17 0x1>;
+> +               };
+> +               gpu_leakage: gpu-leakage {
+> +                       reg = <0x18 0x1>;
+> +               };
+> +               center_leakage: center-leakage {
+> +                       reg = <0x19 0x1>;
+> +               };
+> +               logic_leakage: logic-leakage {
+> +                       reg = <0x1b 0x1>;
+> +               };
+> +               wafer_info: wafer-info {
+> +                       reg = <0x1c 0x1>;
+> +               };
+> +       };
+
+Other than that this looks sane to me.
+
+-Doug
