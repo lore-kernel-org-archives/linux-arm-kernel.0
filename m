@@ -1,90 +1,60 @@
-From: zijun_hu@zoho.com (zijun_hu)
-Date: Fri, 2 Sep 2016 00:03:58 +0800
-Subject: [PATCH 2/2] arm64: regard FDT_SW_MAGIC as good fdt magic
-In-Reply-To: <20160901112113.GA4220@leverpostej>
-References: <a6a8826c-3006-ae43-ef4c-8049ef93cd9f@zoho.com>
- <20160901112113.GA4220@leverpostej>
-Message-ID: <57C8516E.7000105@zoho.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 1 Sep 2016 18:12:01 +0200
+Subject: [RESEND PATCH 1/3] ARM: dts: Add TOPEET itop core board SCP
+ package version
+In-Reply-To: <5477278.USWYFxDPfA@amdc1976>
+References: <a35686c3-294b-a16a-2b0e-0ef2fd460244@kernel.org>
+ <1472648307-3818-1-git-send-email-ayaka@soulik.info>
+ <5477278.USWYFxDPfA@amdc1976>
+Message-ID: <20160901161201.GA10971@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/2016 07:21 PM, Mark Rutland wrote:
-> On Thu, Sep 01, 2016 at 06:58:29PM +0800, zijun_hu wrote:
->> From: zijun_hu <zijun_hu@htc.com>
->>
->> regard FDT_SW_MAGIC as good fdt magic during mapping fdt area
->> see fdt_check_header() for details
+On Thu, Sep 01, 2016 at 03:03:51PM +0200, Bartlomiej Zolnierkiewicz wrote:
 > 
-> It looks like we should only see FDT_SW_MAGIC for a FDT that was in the
-> process of being created, but was not finished. So I'm somewhat confused
-> as to why fdt_check_header() would allow this.
+> Hi,
 > 
-> Neither ePAPR nor the new devicetree spec define FDT_SW_MAGIC. They both
-> only define 0xd00dfeed as a valid magic value. In libfdt, FDT_SW_MAGIC
-> is an internal constant, and it looks like fdt_check_header() simply
-> accepts this for convenience within libfdt.
+> On Wednesday, August 31, 2016 08:58:27 PM Randy Li wrote:
+> > The TOPEET itop is a samsung exnynos 4412 core board, which have
+> > two package versions. This patch add the support for SCP version.
+> > 
+> > Currently supported are USB3503A HSIC, USB OTG, eMMC, rtc and
+> > PMIC. The future features are in the based board. Also MFC and
+> > watchdog have been enabled.
+> > 
+> > Signed-off-by: Randy Li <ayaka@soulik.info>
+> > ---
+> >  arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi | 490 ++++++++++++++++++++++++
+> >  1 file changed, 490 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
 > 
-> Given all of that, it looks like the kernel should *not* accept
-> FDT_SW_MAGIC in any case.
+> [...]
 > 
-> Why do you think this is necessary? Have you seen a problem in practice?
->
+> > +		s5m8767_osc: clocks {
+> 
+> Don't you also need:
+> 
+> 			compatible = "samsung,s5m8767-clk";
+> 
+> here?
 
-i don't understand function modules involved with FDT_SW_MAGIC very well
-i just think it isn't a bad thing to keep consistent with fdt_check_header()
+No specific need... It is confusing but it is the same as with
+regulators. The parent MFD driver creates children devices and match
+drivers. The children (e.g. clk or regulator driver) look for hard-coded
+subnode - clocks/regulators.
 
-no, i have no problem about fdt magic in practice
+The compatible is actually not used in current form.
 
-BTW
-it seems FDT_SW_MAGIC is involved in fdt_create_empty_tree()@fdt_sw.c which
-operate fdt in runtime
-in kernel, this function is used in drivers/firmware/efi/libstub/fdt.c
-in u-boot, in arch/sandbox/cpu/cpu.c an arch/sandbox/cpu/state.c
-the sources mentioned above maybe help you for further decision
+> BTW Does anyone know why there are no users of
+> "samsung,s2mps11-clk" compatible in the tree
+> (commit 53c31b3437a6400c6ffc2c9315680217ad84cb6d
+> "mfd: sec-core: Add of_compatible strings for
+> clock MFD cells" added it in March 2014)?
 
->> --- a/scripts/dtc/libfdt/fdt.h
->> +++ b/scripts/dtc/libfdt/fdt.h
->> @@ -92,7 +92,8 @@ struct fdt_property {
->>  
->>  #endif /* !__ASSEMBLY */
->>  
->> -#define FDT_MAGIC	0xd00dfeed	/* 4: version, 4: total size */
->> +/* 4: version, 4: total size */
->> +#define FDT_MAGIC	((fdt32_t)0xd00dfeed)
->>  #define FDT_TAGSIZE	sizeof(fdt32_t)
->>  
->>  #define FDT_BEGIN_NODE	0x1		/* Start node: full name */
->> diff --git a/scripts/dtc/libfdt/libfdt.h b/scripts/dtc/libfdt/libfdt.h
->> index 59ca33976e56..6998f9249183 100644
->> --- a/scripts/dtc/libfdt/libfdt.h
->> +++ b/scripts/dtc/libfdt/libfdt.h
->> @@ -54,6 +54,8 @@
->>  #include "libfdt_env.h"
->>  #include "fdt.h"
->>  
->> +#define FDT_SW_MAGIC           (~FDT_MAGIC)
->> +
->>  #define FDT_FIRST_SUPPORTED_VERSION	0x10
->>  #define FDT_LAST_SUPPORTED_VERSION	0x11
->>  
->> diff --git a/scripts/dtc/libfdt/libfdt_internal.h b/scripts/dtc/libfdt/libfdt_internal.h
->> index 02cfa6fb612d..f4efde0119f2 100644
->> --- a/scripts/dtc/libfdt/libfdt_internal.h
->> +++ b/scripts/dtc/libfdt/libfdt_internal.h
->> @@ -90,6 +90,4 @@ static inline struct fdt_reserve_entry *_fdt_mem_rsv_w(void *fdt, int n)
->>  	return (void *)(uintptr_t)_fdt_mem_rsv(fdt, n);
->>  }
->>  
->> -#define FDT_SW_MAGIC		(~FDT_MAGIC)
->> -
->>  #endif /* _LIBFDT_INTERNAL_H */
-> 
-> Regardless of the above, changes to libfdt must happen in the upstream
-> libfdt codebase first.
+That is partially my fault. I got convinced by Lee Jones to add
+compatibles even there are no users of them. The compatibles could be
+added - for Arndale Octa and XU3/XU4. I think the only benefit of that
+would be attaching the clock driver to the of_node.
 
-okay, make sense
-FDT team maybe help decide whether to expose FDT_SW_MAGIC to users
->
-> Thanks,
-> Mark.
-> 
+Best regards,
+Krzysztof
