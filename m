@@ -1,25 +1,117 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 1 Sep 2016 19:54:01 +0300
-Subject: [PATCH 1/3] ARM: dts: r7s72100: add ethernet clock to device tree
-In-Reply-To: <SG2PR06MB116534DAEDA31113AB14C46B8AE20@SG2PR06MB1165.apcprd06.prod.outlook.com>
-References: <20160901155430.23400-1-chris.brandt@renesas.com>
- <aaf8c5de-a4f8-42e5-583d-c81a9d92edae@cogentembedded.com>
- <SG2PR06MB116534DAEDA31113AB14C46B8AE20@SG2PR06MB1165.apcprd06.prod.outlook.com>
-Message-ID: <e277692a-8ea5-9ca7-bfe5-c9980ec7a858@cogentembedded.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 01 Sep 2016 18:55:38 +0200
+Subject: [PATCH 5/5] clocks: exynos5433: add runtime pm support
+In-Reply-To: <1472737551-15272-6-git-send-email-m.szyprowski@samsung.com>
+References: <1472737551-15272-1-git-send-email-m.szyprowski@samsung.com>
+ <1472737551-15272-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <2519946.fIx2ZfLU7C@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/2016 07:38 PM, Chris Brandt wrote:
 
->>    I'd add the MSTP7 clock node itself in the same patch...
->
-> OK. I tried to look at previous commits to figure out what goes in what patch.
+Hi,
 
-    There's no single approach here... but it was just that your patch subject 
-doesn't seem to correspond well to what the patch does.
+On Thursday, September 01, 2016 03:45:51 PM Marek Szyprowski wrote:
+> Add runtime pm support for all clock controller units (CMU), which belongs
+> to power domains and require special handling during on/off operations.
+> Typically special values has to be written to MUX registers to change
+> internal clocks parents to OSC clock before turning power off. During such
+> operation all clocks, which enters CMU has to be enabled to let MUX to
+> stabilize. Also for each CMU there is one special parent clock, which has
+> to be enabled all the time when any access to CMU registers is done.
+> 
+> This patch solves most of the mysterious external abort and freeze issues
+> caused by a lack of proper parent CMU clock enabled or incorrect turn off
+> procedure.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos5433.c | 462 +++++++++++++++++++++++++++--------
+>  1 file changed, 363 insertions(+), 99 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
+> index ea1608682d7f..9fb896b56ddf 100644
+> --- a/drivers/clk/samsung/clk-exynos5433.c
+> +++ b/drivers/clk/samsung/clk-exynos5433.c
+> @@ -9,9 +9,14 @@
+>   * Common Clock Framework support for Exynos5443 SoC.
+>   */
+>  
+> +#include <linux/clk.h>
+>  #include <linux/clk-provider.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_runtime.h>
+> +#include <linux/slab.h>
+>  
+>  #include <dt-bindings/clock/exynos5433.h>
+>  
+> @@ -19,6 +24,37 @@
+>  #include "clk-cpu.h"
+>  #include "clk-pll.h"
+>  
+> +struct exynos5433_cmu_info {
+> +	/* total number of clocks with IDs assigned*/
+> +	unsigned int nr_clk_ids;
+> +	/* list of pll clocks and respective count */
+> +	const struct samsung_pll_clock *pll_clks;
+> +	unsigned int nr_pll_clks;
+> +	/* list of mux clocks and respective count */
+> +	const struct samsung_mux_clock *mux_clks;
+> +	unsigned int nr_mux_clks;
+> +	/* list of div clocks and respective count */
+> +	const struct samsung_div_clock *div_clks;
+> +	unsigned int nr_div_clks;
+> +	/* list of gate clocks and respective count */
+> +	const struct samsung_gate_clock *gate_clks;
+> +	unsigned int nr_gate_clks;
+> +	/* list of fixed clocks and respective count */
+> +	const struct samsung_fixed_rate_clock *fixed_clks;
+> +	unsigned int nr_fixed_clks;
+> +	/* list of fixed factor clocks and respective count */
+> +	const struct samsung_fixed_factor_clock *fixed_factor_clks;
+> +	unsigned int nr_fixed_factor_clks;
+> +	/* list and number of clocks registers */
+> +	const unsigned long *clk_regs;
+> +	unsigned int nr_clk_regs;
+> +	/* list and number of clocks registers to set before suspend */
+> +	const struct samsung_clk_reg_dump *suspend_regs;
+> +	unsigned int nr_suspend_regs;
+> +	/* name of the parent clock needed for CMU register access */
+> +	const char *clk_name;
+> +};
 
-> Thanks.
->
-> Chris
+Have you considered extending struct samsung_cmu_info instead
+(all instances are __initdata anyway so slight increase of struct's
+size shouldn't be a problem)?
 
-MBR, Sergei
+> +static const struct samsung_clk_reg_dump g2d_suspend_regs[] = {
+> +	{MUX_SEL_G2D0, 0},
+
+Minor nit: preferred CodingStyle is:
+
+	{ MUX_SEL_G2D0, 0 },
+
+( ditto for other struct samsung_clk_reg_dump instances )
+
+> +	clk_table = devm_kcalloc(dev, info->nr_clk_ids, sizeof(struct clk *),
+> +				 GFP_KERNEL);
+> +	if (!clk_table) {
+> +		dev_err(dev, "could not allocate clock lookup table\n");
+> +		return -ENOMEM;
+> +	}
+
+checkpatch.pl complains with:
+
+WARNING: Possible unnecessary 'out of memory' message
+#681: FILE: drivers/clk/samsung/clk-exynos5433.c:5541:
++       if (!clk_table) {
++               dev_err(dev, "could not allocate clock lookup table\n");
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
