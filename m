@@ -1,298 +1,120 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Thu,  1 Sep 2016 15:28:00 -0700
-Subject: [PATCH v2 08/17] rpmsg: Indirection table for rpmsg_endpoint
- operations
+Date: Thu,  1 Sep 2016 15:28:08 -0700
+Subject: [PATCH v2 16/17] rpmsg: Allow callback to return errors
 In-Reply-To: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
 References: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <1472768889-3906-9-git-send-email-bjorn.andersson@linaro.org>
+Message-ID: <1472768889-3906-17-git-send-email-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add indirection table for rpmsg_endpoint related operations and move
-virtio implementation behind this, this finishes of the decoupling of
-the virtio implementation from the public API.
+Some rpmsg backends support holding on to and redelivering messages upon
+failed handling of them, so provide a way for the callback to report and
+error and allow the backends to handle this.
 
 Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 ---
 
-Per Loic's comment I did consider adding parameter validation to the exposed
-functions in this patch, but as the previous implementation did not gracefully
-handle bad input parameters I decided to defer this until after this series has
-been merged.
-
 Changes since v1:
-- Split indirection table into device and endpoint ops
-- Moved ops pointer to the public structs to reduce code clutter
-- Kerneldoc for rpmsg_endpoint_ops
+- None
 
- drivers/rpmsg/virtio_rpmsg_bus.c | 85 ++++++++++++++++++++++++++++++++++++++--
- include/linux/rpmsg.h            | 62 +++++++++++++++++------------
- 2 files changed, 120 insertions(+), 27 deletions(-)
+ drivers/rpmsg/virtio_rpmsg_bus.c    | 10 ++++++----
+ include/linux/rpmsg.h               |  4 ++--
+ samples/rpmsg/rpmsg_client_sample.c |  6 ++++--
+ 3 files changed, 12 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c b/drivers/rpmsg/virtio_rpmsg_bus.c
-index 605e09c96d65..e5f256791fd3 100644
+index 671cb1803431..3090b0d3072f 100644
 --- a/drivers/rpmsg/virtio_rpmsg_bus.c
 +++ b/drivers/rpmsg/virtio_rpmsg_bus.c
-@@ -107,6 +107,18 @@ struct virtproc_info {
- /* Address 53 is reserved for advertising remote services */
- #define RPMSG_NS_ADDR			(53)
- 
-+static void virtio_rpmsg_destroy_ept(struct rpmsg_endpoint *ept);
-+static int virtio_rpmsg_send(struct rpmsg_endpoint *ept, void *data, int len);
-+static int virtio_rpmsg_sendto(struct rpmsg_endpoint *ept, void *data, int len,
-+			       u32 dst);
-+static int virtio_rpmsg_send_offchannel(struct rpmsg_endpoint *ept, u32 src,
-+					u32 dst, void *data, int len);
-+static int virtio_rpmsg_trysend(struct rpmsg_endpoint *ept, void *data, int len);
-+static int virtio_rpmsg_trysendto(struct rpmsg_endpoint *ept, void *data,
-+				  int len, u32 dst);
-+static int virtio_rpmsg_trysend_offchannel(struct rpmsg_endpoint *ept, u32 src,
-+					   u32 dst, void *data, int len);
-+
- /* sysfs show configuration fields */
- #define rpmsg_show_attr(field, path, format_string)			\
- static ssize_t								\
-@@ -172,6 +184,16 @@ static int rpmsg_uevent(struct device *dev, struct kobj_uevent_env *env)
- 					rpdev->id.name);
+@@ -791,8 +791,8 @@ static void rpmsg_xmit_done(struct virtqueue *svq)
  }
  
-+static const struct rpmsg_endpoint_ops virtio_endpoint_ops = {
-+	.destroy_ept = virtio_rpmsg_destroy_ept,
-+	.send = virtio_rpmsg_send,
-+	.sendto = virtio_rpmsg_sendto,
-+	.send_offchannel = virtio_rpmsg_send_offchannel,
-+	.trysend = virtio_rpmsg_trysend,
-+	.trysendto = virtio_rpmsg_trysendto,
-+	.trysend_offchannel = virtio_rpmsg_trysend_offchannel,
-+};
-+
- /**
-  * __ept_release() - deallocate an rpmsg endpoint
-  * @kref: the ept's reference count
-@@ -212,6 +234,7 @@ static struct rpmsg_endpoint *__rpmsg_create_ept(struct virtproc_info *vrp,
- 	ept->rpdev = rpdev;
- 	ept->cb = cb;
- 	ept->priv = priv;
-+	ept->ops = &virtio_endpoint_ops;
- 
- 	/* do we need to allocate a local address ? */
- 	if (addr == RPMSG_ADDR_ANY) {
-@@ -285,10 +308,15 @@ __rpmsg_destroy_ept(struct virtproc_info *vrp, struct rpmsg_endpoint *ept)
-  */
- void rpmsg_destroy_ept(struct rpmsg_endpoint *ept)
+ /* invoked when a name service announcement arrives */
+-static void rpmsg_ns_cb(struct rpmsg_device *rpdev, void *data, int len,
+-			void *priv, u32 src)
++static int rpmsg_ns_cb(struct rpmsg_device *rpdev, void *data, int len,
++		       void *priv, u32 src)
  {
--	__rpmsg_destroy_ept(ept->rpdev->vrp, ept);
-+	ept->ops->destroy_ept(ept);
+ 	struct rpmsg_ns_msg *msg = data;
+ 	struct rpmsg_device *newch;
+@@ -808,7 +808,7 @@ static void rpmsg_ns_cb(struct rpmsg_device *rpdev, void *data, int len,
+ 
+ 	if (len != sizeof(*msg)) {
+ 		dev_err(dev, "malformed ns msg (%d)\n", len);
+-		return;
++		return -EINVAL;
+ 	}
+ 
+ 	/*
+@@ -819,7 +819,7 @@ static void rpmsg_ns_cb(struct rpmsg_device *rpdev, void *data, int len,
+ 	 */
+ 	if (rpdev) {
+ 		dev_err(dev, "anomaly: ns ept has an rpdev handle\n");
+-		return;
++		return -EINVAL;
+ 	}
+ 
+ 	/* don't trust the remote processor for null terminating the name */
+@@ -842,6 +842,8 @@ static void rpmsg_ns_cb(struct rpmsg_device *rpdev, void *data, int len,
+ 		if (!newch)
+ 			dev_err(dev, "rpmsg_create_channel failed\n");
+ 	}
++
++	return 0;
  }
- EXPORT_SYMBOL(rpmsg_destroy_ept);
  
-+static void virtio_rpmsg_destroy_ept(struct rpmsg_endpoint *ept)
-+{
-+	__rpmsg_destroy_ept(ept->rpdev->vrp, ept);
-+}
-+
- /*
-  * when an rpmsg driver is probed with a channel, we seamlessly create
-  * it an endpoint, binding its rx callback to a unique local rpmsg
-@@ -657,8 +685,9 @@ static void rpmsg_downref_sleepers(struct virtproc_info *vrp)
-  *
-  * Returns 0 on success and an appropriate error value on failure.
-  */
--int rpmsg_send_offchannel_raw(struct rpmsg_device *rpdev, u32 src, u32 dst,
--			      void *data, int len, bool wait)
-+static int rpmsg_send_offchannel_raw(struct rpmsg_device *rpdev,
-+				     u32 src, u32 dst,
-+				     void *data, int len, bool wait)
- {
- 	struct virtproc_info *vrp = rpdev->vrp;
- 	struct device *dev = &rpdev->dev;
-@@ -754,6 +783,56 @@ out:
- }
- EXPORT_SYMBOL(rpmsg_send_offchannel_raw);
- 
-+static int virtio_rpmsg_send(struct rpmsg_endpoint *ept, void *data, int len)
-+{
-+	struct rpmsg_device *rpdev = ept->rpdev;
-+	u32 src = ept->addr, dst = rpdev->dst;
-+
-+	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, true);
-+}
-+
-+static int virtio_rpmsg_sendto(struct rpmsg_endpoint *ept, void *data, int len,
-+			       u32 dst)
-+{
-+	struct rpmsg_device *rpdev = ept->rpdev;
-+	u32 src = ept->addr;
-+
-+	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, true);
-+}
-+
-+static int virtio_rpmsg_send_offchannel(struct rpmsg_endpoint *ept, u32 src,
-+					u32 dst, void *data, int len)
-+{
-+	struct rpmsg_device *rpdev = ept->rpdev;
-+
-+	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, true);
-+}
-+
-+static int virtio_rpmsg_trysend(struct rpmsg_endpoint *ept, void *data, int len)
-+{
-+	struct rpmsg_device *rpdev = ept->rpdev;
-+	u32 src = ept->addr, dst = rpdev->dst;
-+
-+	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, false);
-+}
-+
-+static int virtio_rpmsg_trysendto(struct rpmsg_endpoint *ept, void *data,
-+				  int len, u32 dst)
-+{
-+	struct rpmsg_device *rpdev = ept->rpdev;
-+	u32 src = ept->addr;
-+
-+	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, false);
-+}
-+
-+static int virtio_rpmsg_trysend_offchannel(struct rpmsg_endpoint *ept, u32 src,
-+					   u32 dst, void *data, int len)
-+{
-+	struct rpmsg_device *rpdev = ept->rpdev;
-+
-+	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, false);
-+}
-+
- static int rpmsg_recv_single(struct virtproc_info *vrp, struct device *dev,
- 			     struct rpmsg_hdr *msg, unsigned int len)
- {
+ static int rpmsg_probe(struct virtio_device *vdev)
 diff --git a/include/linux/rpmsg.h b/include/linux/rpmsg.h
-index 9fdcfc7c7837..d54458effd54 100644
+index 71b16d37503a..452d393cc8dd 100644
 --- a/include/linux/rpmsg.h
 +++ b/include/linux/rpmsg.h
-@@ -96,8 +96,10 @@ enum rpmsg_ns_flags {
- #define RPMSG_ADDR_ANY		0xFFFFFFFF
- 
- struct virtproc_info;
-+struct rpmsg_device;
- struct rpmsg_endpoint;
- struct rpmsg_device_ops;
-+struct rpmsg_endpoint_ops;
- 
- /**
-  * struct rpmsg_channel_info - channel info representation
-@@ -184,6 +186,36 @@ struct rpmsg_endpoint {
- 	struct mutex cb_lock;
- 	u32 addr;
- 	void *priv;
-+
-+	const struct rpmsg_endpoint_ops *ops;
-+};
-+
-+/**
-+ * struct rpmsg_endpoint_ops - indirection table for rpmsg_endpoint operations
-+ * @destroy_ept:	destroy the given endpoint, required
-+ * @send:		see @rpmsg_send(), required
-+ * @sendto:		see @rpmsg_sendto(), optional
-+ * @send_offchannel:	see @rpmsg_send_offchannel(), optional
-+ * @trysend:		see @rpmsg_trysend(), required
-+ * @trysendto:		see @rpmsg_trysendto(), optional
-+ * @trysend_offchannel:	see @rpmsg_trysend_offchannel(), optional
-+ *
-+ * Indirection table for the operations that a rpmsg backend should implement.
-+ * In addition to @destroy_ept, the backend must at least implement @send and
-+ * @trysend, while the variants sending data off-channel are optional.
-+ */
-+struct rpmsg_endpoint_ops {
-+	void (*destroy_ept)(struct rpmsg_endpoint *ept);
-+
-+	int (*send)(struct rpmsg_endpoint *ept, void *data, int len);
-+	int (*sendto)(struct rpmsg_endpoint *ept, void *data, int len, u32 dst);
-+	int (*send_offchannel)(struct rpmsg_endpoint *ept, u32 src, u32 dst,
-+				  void *data, int len);
-+
-+	int (*trysend)(struct rpmsg_endpoint *ept, void *data, int len);
-+	int (*trysendto)(struct rpmsg_endpoint *ept, void *data, int len, u32 dst);
-+	int (*trysend_offchannel)(struct rpmsg_endpoint *ept, u32 src, u32 dst,
-+			     void *data, int len);
+@@ -80,7 +80,7 @@ struct rpmsg_device {
+ 	const struct rpmsg_device_ops *ops;
  };
  
- /**
-@@ -210,8 +242,6 @@ void rpmsg_destroy_ept(struct rpmsg_endpoint *);
- struct rpmsg_endpoint *rpmsg_create_ept(struct rpmsg_device *,
- 					rpmsg_rx_cb_t cb, void *priv,
- 					struct rpmsg_channel_info chinfo);
--int
--rpmsg_send_offchannel_raw(struct rpmsg_device *, u32, u32, void *, int, bool);
- 
- /* use a macro to avoid include chaining to get THIS_MODULE */
- #define register_rpmsg_driver(drv) \
-@@ -249,10 +279,7 @@ rpmsg_send_offchannel_raw(struct rpmsg_device *, u32, u32, void *, int, bool);
-  */
- static inline int rpmsg_send(struct rpmsg_endpoint *ept, void *data, int len)
- {
--	struct rpmsg_device *rpdev = ept->rpdev;
--	u32 src = ept->addr, dst = rpdev->dst;
--
--	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, true);
-+	return ept->ops->send(ept, data, len);
- }
+-typedef void (*rpmsg_rx_cb_t)(struct rpmsg_device *, void *, int, void *, u32);
++typedef int (*rpmsg_rx_cb_t)(struct rpmsg_device *, void *, int, void *, u32);
  
  /**
-@@ -276,10 +303,7 @@ static inline int rpmsg_send(struct rpmsg_endpoint *ept, void *data, int len)
- static inline
- int rpmsg_sendto(struct rpmsg_endpoint *ept, void *data, int len, u32 dst)
+  * struct rpmsg_endpoint - binds a local rpmsg address to its user
+@@ -129,7 +129,7 @@ struct rpmsg_driver {
+ 	const struct rpmsg_device_id *id_table;
+ 	int (*probe)(struct rpmsg_device *dev);
+ 	void (*remove)(struct rpmsg_device *dev);
+-	void (*callback)(struct rpmsg_device *, void *, int, void *, u32);
++	int (*callback)(struct rpmsg_device *, void *, int, void *, u32);
+ };
+ 
+ int register_rpmsg_device(struct rpmsg_device *dev);
+diff --git a/samples/rpmsg/rpmsg_client_sample.c b/samples/rpmsg/rpmsg_client_sample.c
+index 4fcd7ee13fb9..f161dfd3e70a 100644
+--- a/samples/rpmsg/rpmsg_client_sample.c
++++ b/samples/rpmsg/rpmsg_client_sample.c
+@@ -28,7 +28,7 @@ struct instance_data {
+ 	int rx_count;
+ };
+ 
+-static void rpmsg_sample_cb(struct rpmsg_device *rpdev, void *data, int len,
++static int rpmsg_sample_cb(struct rpmsg_device *rpdev, void *data, int len,
+ 						void *priv, u32 src)
  {
--	struct rpmsg_device *rpdev = ept->rpdev;
--	u32 src = ept->addr;
--
--	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, true);
-+	return ept->ops->sendto(ept, data, len, dst);
+ 	int ret;
+@@ -43,13 +43,15 @@ static void rpmsg_sample_cb(struct rpmsg_device *rpdev, void *data, int len,
+ 	/* samples should not live forever */
+ 	if (idata->rx_count >= MSG_LIMIT) {
+ 		dev_info(&rpdev->dev, "goodbye!\n");
+-		return;
++		return 0;
+ 	}
+ 
+ 	/* send a new message now */
+ 	ret = rpmsg_send(rpdev->ept, MSG, strlen(MSG));
+ 	if (ret)
+ 		dev_err(&rpdev->dev, "rpmsg_send failed: %d\n", ret);
++
++	return 0;
  }
  
- /**
-@@ -306,9 +330,7 @@ static inline
- int rpmsg_send_offchannel(struct rpmsg_endpoint *ept, u32 src, u32 dst,
- 			  void *data, int len)
- {
--	struct rpmsg_device *rpdev = ept->rpdev;
--
--	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, true);
-+	return ept->ops->send_offchannel(ept, src, dst, data, len);
- }
- 
- /**
-@@ -331,10 +353,7 @@ int rpmsg_send_offchannel(struct rpmsg_endpoint *ept, u32 src, u32 dst,
- static inline
- int rpmsg_trysend(struct rpmsg_endpoint *ept, void *data, int len)
- {
--	struct rpmsg_device *rpdev = ept->rpdev;
--	u32 src = ept->addr, dst = rpdev->dst;
--
--	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, false);
-+	return ept->ops->trysend(ept, data, len);
- }
- 
- /**
-@@ -357,10 +376,7 @@ int rpmsg_trysend(struct rpmsg_endpoint *ept, void *data, int len)
- static inline
- int rpmsg_trysendto(struct rpmsg_endpoint *ept, void *data, int len, u32 dst)
- {
--	struct rpmsg_device *rpdev = ept->rpdev;
--	u32 src = ept->addr;
--
--	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, false);
-+	return ept->ops->trysendto(ept, data, len, dst);
- }
- 
- /**
-@@ -386,9 +402,7 @@ static inline
- int rpmsg_trysend_offchannel(struct rpmsg_endpoint *ept, u32 src, u32 dst,
- 			     void *data, int len)
- {
--	struct rpmsg_device *rpdev = ept->rpdev;
--
--	return rpmsg_send_offchannel_raw(rpdev, src, dst, data, len, false);
-+	return ept->ops->trysend_offchannel(ept, src, dst, data, len);
- }
- 
- #endif /* _LINUX_RPMSG_H */
+ static int rpmsg_sample_probe(struct rpmsg_device *rpdev)
 -- 
 2.5.0
