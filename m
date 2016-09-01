@@ -1,92 +1,102 @@
-From: carlo@endlessm.com (Carlo Caione)
-Date: Thu, 1 Sep 2016 23:28:34 +0200
-Subject: [PATCH v3 6/6] ARM64: dts: amlogic: gxbb: Enable NVMEM
-In-Reply-To: <m2bn07ia64.fsf@baylibre.com>
-References: <1472305428-16874-1-git-send-email-carlo@caione.org>
- <1472305428-16874-7-git-send-email-carlo@caione.org>
- <m2bn07ia64.fsf@baylibre.com>
-Message-ID: <CAL9uMOEo8VOqF95ZLrPuwmg=C67jABzfErnggN8_y_S3ObEe8g@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 1 Sep 2016 14:29:20 -0700
+Subject: [PATCH 2/2] arm64: dts: rockchip: add eMMC's power domain support
+ for rk3399
+In-Reply-To: <411dfc7b-1089-61a8-7a7e-6f378c0a6074@rock-chips.com>
+References: <20160827134103.28160-1-xzy.xu@rock-chips.com>
+ <20160827134103.28160-3-xzy.xu@rock-chips.com>
+ <2ab8ab94-fa4d-2cd6-5805-a92ac5f9697e@rock-chips.com>
+ <57C3A30B.5080707@rock-chips.com>
+ <ceba6a89-6945-58c5-62e4-7d842cfa2312@rock-chips.com>
+ <CAD=FV=W=LkVAm187hxp0Kbjxi5kSThwKnCMX+tr8SXQ-v_xQTQ@mail.gmail.com>
+ <77f5cff1-80a2-76b3-40e9-f77caced2257@rock-chips.com>
+ <CAD=FV=WmoyoZmV_uj281S37ZpWqg8Dr2U8ntkD2Sr58qbcB0wg@mail.gmail.com>
+ <411dfc7b-1089-61a8-7a7e-6f378c0a6074@rock-chips.com>
+Message-ID: <CAD=FV=Wrw=THuokXyOXSyihF4fDB4z2L0vCgkiR9XJ6aEzsNzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 1, 2016 at 11:26 PM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Hi Carlo,
+Hi,
+
+On Wed, Aug 31, 2016 at 11:56 PM, Ziyuan Xu <xzy.xu@rock-chips.com> wrote:
+> Hi
 >
-> Carlo Caione <carlo@caione.org> writes:
 >
->> From: Carlo Caione <carlo@endlessm.com>
+> On 2016?09?01? 12:20, Doug Anderson wrote:
 >>
->> Add the NVMEM device node in the DTSI.
+>> Hi,
 >>
->> Signed-off-by: Carlo Caione <carlo@endlessm.com>
->> ---
->>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 18 ++++++++++++++++++
->>  drivers/firmware/meson/meson_sm.c           |  3 ++-
->>  2 files changed, 20 insertions(+), 1 deletion(-)
+>> On Wed, Aug 31, 2016 at 7:29 PM, Ziyuan Xu <xzy.xu@rock-chips.com> wrote:
+>>>>
+>>>> This is fine to pick up _only_ if you don't care about suspend/resume.
+>>>> If you care about suspend/resume then someone needs to first write a
+>>>> patch that will re-init all "corecfg" values after power is turned on.
+>>>
+>>>
+>>> Do you mean corecfg_clockmultiplier and corecfg_baseclkfreq, if yes, we
+>>> don't need to strore/re-init it after resume.
+>>> corecfg_clockmultiplier is only used to fetch host->clk_mul, and
+>>> host->clk_mul has been a fixed value at run-time, unless driver unbind.
+>>> The same as corecfg_clockmultiplier, corecfg_baseclkfreq is used to check
+>>> the xin_clk at probe time, we don't reference it at run-time.
+>>> BTW, I have tested suspend/resume on rk3399 prior to this sumbit, eMMC
+>>> works
+>>> fine.
 >>
->> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
->> index ca428e8..aea8fd6 100644
->> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
->> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
->> @@ -105,6 +105,24 @@
->>               };
->>       };
->>
->> +     efuse: efuse {
->> +             compatible = "amlogic,meson-gxbb-efuse";
->> +             #address-cells = <1>;
->> +             #size-cells = <1>;
->> +
->> +             sn: sn at 14 {
->> +                     reg = <0x14 0x10>;
->> +             };
->> +
->> +             eth_mac: eth_mac at 34 {
->> +                     reg = <0x34 0x10>;
->> +             };
->> +
->> +             bid: bid at 46 {
->> +                     reg = <0x46 0x30>;
->> +             };
->> +     };
->> +
->>       timer {
->>               compatible = "arm,armv8-timer";
->>               interrupts = <GIC_PPI 13
->> diff --git a/drivers/firmware/meson/meson_sm.c b/drivers/firmware/meson/meson_sm.c
->> index bba594e..b0d2549 100644
->> --- a/drivers/firmware/meson/meson_sm.c
->> +++ b/drivers/firmware/meson/meson_sm.c
->> @@ -21,6 +21,7 @@
->>  #include <linux/of_device.h>
->>  #include <linux/printk.h>
->>  #include <linux/types.h>
->> +#include <linux/sizes.h>
->>
->>  #include <linux/firmware/meson/meson_sm.h>
->>
->> @@ -38,7 +39,7 @@ struct meson_sm_chip {
->>  };
->>
->>  struct meson_sm_chip gxbb_chip = {
->> -     .shmem_size             = 0x1000,
->> +     .shmem_size             = SZ_4K,
->>       .cmd_shmem_in_base      = 0x82000020,
->>       .cmd_shmem_out_base     = 0x82000021,
->>       .cmd = {
+>> I guess I don't actually know how the corecfg_clockmultiplier and
+>> corecfg_baseclkfreq fields are actually used, but I presume that they
+>> actually do something useful and aren't used to just communicate back
+>> to software?
 >
-> This change doesn't reallly belong in this patch, and driver changes in
-> DT patches makes it hard to keep the DT changes separate from driver
-> changes, which is how we like to manage things in arm-soc.
+>
+> Take corecfg_clockmultiplier as example.
+> 1. sdhci driver fetch host->clk_mul from corecfg_clockmultiplier
+> 2. mmc->f_min and mmc->f_max are calculated via host->clk_mul, they're used
+> for further initialization.
+> 3. if the corecfg_clockmultiplier is incorrect, sdhci will use improper
+> frequency to play.
+>
+> I think we don't need to store it due to it's a fixed value at run-time,
+> even if it is reset after a power cycle, the above will not be changed via
+> software, except for dirver unbind .
+>
+>>
+>> I know that:
+>>
+>> 1. If I don't pick this patch and I suspend/resume,
+>> corecfg_clockmultiplier and corecfg_baseclkfreq are still fine after
+>> suspend / resume.
+>>
+>> 2. If I do pick this patch and I suspend/resume,
+>> corecfg_clockmultiplier and corecfg_baseclkfreq are wrong after
+>> suspend/resume (tested by reading /dev/mem directly from userspace
+>> after suspend/resume).
+>>
+>>
+>> Are you saying that it is unimportant that corecfg_clockmultiplier and
+>> corecfg_baseclkfreq are wrong?
+>
+>
+> Yup, corecfg_* stuff will be reset after a power cycle.
+> I mean that we need only to guarantee they're correct at probe time.
 
-Damn. Sorry, probably amended the wrong patch when trying to address
-mark's comments.
+So are you saying that the entire purpose of "corecfg_clockmultiplier"
+is that causes the "ClockMultiplier" field of the "EMMCCORE_CAP"
+register to get a certain value?
+...and that the entire purpose of "corecfg_baseclkfreq" is that it
+causes the "BaseClockFreqSDClock" field of the "EMMCCORE_CAP" register
+to get a certain value?
 
-> I've dropped it from this patch, and folded it into PATCH 1/6.
+That would have been nice to know before.  I had assumed that those
+"corecfg" settings did something else more useful.
 
-Where it belongs.
+If it is indeed true that these corecfg values are as silly as it
+seems, then I guess it's not terribly important to re-set them after
+suspend/resume.  Eventually it would be nice/clean to actually do so
+(in case the SDHCI driver eventually changes), but I guess we wouldn't
+need to block. this patch from landing.
 
-Thank you,
+Can you please confirm my understanding above?
 
--- 
-Carlo Caione  |  +39.340.80.30.096  |  Endless
+
+-Doug
