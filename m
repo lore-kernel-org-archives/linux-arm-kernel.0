@@ -1,356 +1,293 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed, 31 Aug 2016 17:40:23 -0700
-Subject: [PATCH v3 09/22] usb: chipidea: Add support for ULPI PHY bus
+Date: Wed, 31 Aug 2016 17:40:35 -0700
+Subject: [PATCH v3 21/22] phy: Add support for Qualcomm's USB HSIC phy
 In-Reply-To: <20160901004036.23936-1-stephen.boyd@linaro.org>
 References: <20160901004036.23936-1-stephen.boyd@linaro.org>
-Message-ID: <20160901004036.23936-10-stephen.boyd@linaro.org>
+Message-ID: <20160901004036.23936-22-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some phys for the chipidea controller are controlled via the ULPI
-viewport. Add support for the ULPI bus so that these sorts of
-phys can be probed and read/written automatically without having
-to duplicate the viewport logic in each phy driver.
+The HSIC USB controller on qcom SoCs has an integrated all
+digital phy controlled via the ULPI viewport.
 
-Cc: Peter Chen <peter.chen@nxp.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/usb/chipidea/Kconfig  |   7 +++
- drivers/usb/chipidea/Makefile |   1 +
- drivers/usb/chipidea/ci.h     |  21 ++++++++
- drivers/usb/chipidea/core.c   |  31 +++++++++---
- drivers/usb/chipidea/ulpi.c   | 113 ++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 167 insertions(+), 6 deletions(-)
- create mode 100644 drivers/usb/chipidea/ulpi.c
+ .../devicetree/bindings/phy/qcom,usb-hsic-phy.txt  |  65 +++++++++
+ drivers/phy/Kconfig                                |   7 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-qcom-usb-hsic.c                    | 160 +++++++++++++++++++++
+ 4 files changed, 233 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
+ create mode 100644 drivers/phy/phy-qcom-usb-hsic.c
 
-diff --git a/drivers/usb/chipidea/Kconfig b/drivers/usb/chipidea/Kconfig
-index 5e5b9eb7ebf6..19c20eaa23f2 100644
---- a/drivers/usb/chipidea/Kconfig
-+++ b/drivers/usb/chipidea/Kconfig
-@@ -38,4 +38,11 @@ config USB_CHIPIDEA_HOST
- 	  Say Y here to enable host controller functionality of the
- 	  ChipIdea driver.
- 
-+config USB_CHIPIDEA_ULPI
-+	bool "ChipIdea ULPI PHY support"
-+	depends on USB_ULPI_BUS=y || USB_ULPI_BUS=USB_CHIPIDEA
-+	help
-+	  Say Y here if you have a ULPI PHY attached to your ChipIdea
-+	  controller.
-+
- endif
-diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-index 518e445476c3..39fca5715ed3 100644
---- a/drivers/usb/chipidea/Makefile
-+++ b/drivers/usb/chipidea/Makefile
-@@ -4,6 +4,7 @@ ci_hdrc-y				:= core.o otg.o debug.o
- ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
- ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
- ci_hdrc-$(CONFIG_USB_OTG_FSM)		+= otg_fsm.o
-+ci_hdrc-$(CONFIG_USB_CHIPIDEA_ULPI)	+= ulpi.o
- 
- # Glue/Bridge layers go here
- 
-diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-index 05bc4d631cb9..59e22389c10b 100644
---- a/drivers/usb/chipidea/ci.h
-+++ b/drivers/usb/chipidea/ci.h
-@@ -18,6 +18,8 @@
- #include <linux/usb.h>
- #include <linux/usb/gadget.h>
- #include <linux/usb/otg-fsm.h>
-+#include <linux/usb/otg.h>
-+#include <linux/ulpi/interface.h>
- 
- /******************************************************************************
-  * DEFINE
-@@ -52,6 +54,7 @@ enum ci_hw_regs {
- 	OP_ENDPTLISTADDR,
- 	OP_TTCTRL,
- 	OP_BURSTSIZE,
-+	OP_ULPI_VIEWPORT,
- 	OP_PORTSC,
- 	OP_DEVLC,
- 	OP_OTGSC,
-@@ -187,6 +190,8 @@ struct hw_bank {
-  * @test_mode: the selected test mode
-  * @platdata: platform specific information supplied by parent device
-  * @vbus_active: is VBUS active
-+ * @ulpi: pointer to ULPI device, if any
-+ * @ulpi_ops: ULPI read/write ops for this device
-  * @phy: pointer to PHY, if any
-  * @usb_phy: pointer to USB PHY, if any and if using the USB PHY framework
-  * @hcd: pointer to usb_hcd for ehci host driver
-@@ -236,6 +241,10 @@ struct ci_hdrc {
- 
- 	struct ci_hdrc_platform_data	*platdata;
- 	int				vbus_active;
-+#ifdef CONFIG_USB_CHIPIDEA_ULPI
-+	struct ulpi			*ulpi;
-+	struct ulpi_ops 		ulpi_ops;
-+#endif
- 	struct phy			*phy;
- 	/* old usb_phy interface */
- 	struct usb_phy			*usb_phy;
-@@ -418,6 +427,16 @@ static inline bool ci_otg_is_fsm_mode(struct ci_hdrc *ci)
- #endif
- }
- 
-+#if IS_ENABLED(CONFIG_USB_CHIPIDEA_ULPI)
-+int ci_ulpi_init(struct ci_hdrc *ci);
-+void ci_ulpi_exit(struct ci_hdrc *ci);
-+int ci_ulpi_resume(struct ci_hdrc *ci);
-+#else
-+static inline int ci_ulpi_init(struct ci_hdrc *ci) { return 0; }
-+static inline void ci_ulpi_exit(struct ci_hdrc *ci) { }
-+static inline int ci_ulpi_resume(struct ci_hdrc *ci) { return 0; }
-+#endif
-+
- u32 hw_read_intr_enable(struct ci_hdrc *ci);
- 
- u32 hw_read_intr_status(struct ci_hdrc *ci);
-@@ -428,6 +447,8 @@ int hw_port_test_set(struct ci_hdrc *ci, u8 mode);
- 
- u8 hw_port_test_get(struct ci_hdrc *ci);
- 
-+void hw_phymode_configure(struct ci_hdrc *ci);
-+
- void ci_platform_configure(struct ci_hdrc *ci);
- 
- int dbg_create_files(struct ci_hdrc *ci);
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 532085a096d9..f144e1bbcc82 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -86,6 +86,7 @@ static const u8 ci_regs_nolpm[] = {
- 	[OP_ENDPTLISTADDR]	= 0x18U,
- 	[OP_TTCTRL]		= 0x1CU,
- 	[OP_BURSTSIZE]		= 0x20U,
-+	[OP_ULPI_VIEWPORT]	= 0x30U,
- 	[OP_PORTSC]		= 0x44U,
- 	[OP_DEVLC]		= 0x84U,
- 	[OP_OTGSC]		= 0x64U,
-@@ -110,6 +111,7 @@ static const u8 ci_regs_lpm[] = {
- 	[OP_ENDPTLISTADDR]	= 0x18U,
- 	[OP_TTCTRL]		= 0x1CU,
- 	[OP_BURSTSIZE]		= 0x20U,
-+	[OP_ULPI_VIEWPORT]	= 0x30U,
- 	[OP_PORTSC]		= 0x44U,
- 	[OP_DEVLC]		= 0x84U,
- 	[OP_OTGSC]		= 0xC4U,
-@@ -285,7 +287,7 @@ static int hw_device_init(struct ci_hdrc *ci, void __iomem *base)
- 	return 0;
- }
- 
--static void hw_phymode_configure(struct ci_hdrc *ci)
-+void hw_phymode_configure(struct ci_hdrc *ci)
- {
- 	u32 portsc, lpm, sts = 0;
- 
-@@ -894,6 +896,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 		CI_HDRC_IMX28_WRITE_FIX);
- 	ci->supports_runtime_pm = !!(ci->platdata->flags &
- 		CI_HDRC_SUPPORTS_RUNTIME_PM);
-+	platform_set_drvdata(pdev, ci);
- 
- 	ret = hw_device_init(ci, base);
- 	if (ret < 0) {
-@@ -901,6 +904,10 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
-+	ret = ci_ulpi_init(ci);
-+	if (ret)
-+		return ret;
-+
- 	if (ci->platdata->phy) {
- 		ci->phy = ci->platdata->phy;
- 	} else if (ci->platdata->usb_phy) {
-@@ -911,11 +918,15 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 
- 		/* if both generic PHY and USB PHY layers aren't enabled */
- 		if (PTR_ERR(ci->phy) == -ENOSYS &&
--				PTR_ERR(ci->usb_phy) == -ENXIO)
--			return -ENXIO;
-+				PTR_ERR(ci->usb_phy) == -ENXIO) {
-+			ret = -ENXIO;
-+			goto ulpi_exit;
-+		}
- 
--		if (IS_ERR(ci->phy) && IS_ERR(ci->usb_phy))
--			return -EPROBE_DEFER;
-+		if (IS_ERR(ci->phy) && IS_ERR(ci->usb_phy)) {
-+			ret = -EPROBE_DEFER;
-+			goto ulpi_exit;
-+		}
- 
- 		if (IS_ERR(ci->phy))
- 			ci->phy = NULL;
-@@ -1000,7 +1011,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	platform_set_drvdata(pdev, ci);
- 	ret = devm_request_irq(dev, ci->irq, ci_irq, IRQF_SHARED,
- 			ci->platdata->name, ci);
- 	if (ret)
-@@ -1032,6 +1042,8 @@ stop:
- 	ci_role_destroy(ci);
- deinit_phy:
- 	ci_usb_phy_exit(ci);
-+ulpi_exit:
-+	ci_ulpi_exit(ci);
- 
- 	return ret;
- }
-@@ -1051,6 +1063,7 @@ static int ci_hdrc_remove(struct platform_device *pdev)
- 	ci_role_destroy(ci);
- 	ci_hdrc_enter_lpm(ci, true);
- 	ci_usb_phy_exit(ci);
-+	ci_ulpi_exit(ci);
- 
- 	return 0;
- }
-@@ -1098,6 +1111,7 @@ static void ci_controller_suspend(struct ci_hdrc *ci)
- static int ci_controller_resume(struct device *dev)
- {
- 	struct ci_hdrc *ci = dev_get_drvdata(dev);
-+	int ret;
- 
- 	dev_dbg(dev, "at %s\n", __func__);
- 
-@@ -1107,6 +1121,11 @@ static int ci_controller_resume(struct device *dev)
- 	}
- 
- 	ci_hdrc_enter_lpm(ci, false);
-+
-+	ret = ci_ulpi_resume(ci);
-+	if (ret)
-+		return ret;
-+
- 	if (ci->usb_phy) {
- 		usb_phy_set_suspend(ci->usb_phy, 0);
- 		usb_phy_set_wakeup(ci->usb_phy, false);
-diff --git a/drivers/usb/chipidea/ulpi.c b/drivers/usb/chipidea/ulpi.c
+diff --git a/Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt b/Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
 new file mode 100644
-index 000000000000..3962255ff687
+index 000000000000..3c7cb2be4b12
 --- /dev/null
-+++ b/drivers/usb/chipidea/ulpi.c
-@@ -0,0 +1,113 @@
-+/*
-+ * Copyright (c) 2016 Linaro Ltd.
++++ b/Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
+@@ -0,0 +1,65 @@
++Qualcomm's USB HSIC PHY
++
++PROPERTIES
++
++- compatible:
++    Usage: required
++    Value type: <string>
++    Definition: Should contain "qcom,usb-hsic-phy" and more specifically one of the
++		following:
++
++			"qcom,usb-hsic-phy-mdm9615"
++			"qcom,usb-hsic-phy-msm8974"
++
++- #phy-cells:
++    Usage: required
++    Value type: <u32>
++    Definition: Should contain 0
++
++- clocks:
++    Usage: required
++    Value type: <prop-encoded-array>
++    Definition: Should contain clock specifier for phy, calibration and
++                a calibration sleep clock
++
++- clock-names:
++    Usage: required
++    Value type: <stringlist>
++    Definition: Should contain "phy, "cal" and "cal_sleep"
++
++- pinctrl-names:
++    Usage: required
++    Value type: <stringlist>
++    Definition: Should contain "init" and "default" in that order
++
++- pinctrl-0:
++    Usage: required
++    Value type: <prop-encoded-array>
++    Definition: List of pinctrl settings to apply to keep HSIC pins in a glitch
++                free state
++
++- pinctrl-1:
++    Usage: required
++    Value type: <prop-encoded-array>
++    Definition: List of pinctrl settings to apply to mux out the HSIC pins
++
++EXAMPLE
++
++usb-controller {
++	ulpi {
++		phy {
++			compatible = "qcom,usb-hsic-phy-msm8974",
++				     "qcom,usb-hsic-phy";
++			#phy-cells = <0>;
++			pinctrl-names = "init", "default";
++			pinctrl-0 = <&hsic_sleep>;
++			pinctrl-1 = <&hsic_default>;
++			clocks = <&gcc GCC_USB_HSIC_CLK>,
++				 <&gcc GCC_USB_HSIC_IO_CAL_CLK>,
++				 <&gcc GCC_USB_HSIC_IO_CAL_SLEEP_CLK>;
++			clock-names = "phy", "cal", "cal_sleep";
++			assigned-clocks = <&gcc GCC_USB_HSIC_IO_CAL_CLK>;
++			assigned-clock-rates = <960000>;
++		};
++	};
++};
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index 19bff3a10f69..830c443eeabf 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -417,6 +417,13 @@ config PHY_QCOM_UFS
+ 	help
+ 	  Support for UFS PHY on QCOM chipsets.
+ 
++config PHY_QCOM_USB_HSIC
++	tristate "Qualcomm USB HSIC ULPI PHY module"
++	depends on USB_ULPI_BUS
++	select GENERIC_PHY
++	help
++	  Support for the USB HSIC ULPI compliant PHY on QCOM chipsets.
++
+ config PHY_TUSB1210
+ 	tristate "TI TUSB1210 ULPI PHY module"
+ 	depends on USB_ULPI_BUS
+diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+index 90ae19879b0a..5422f543d17d 100644
+--- a/drivers/phy/Makefile
++++ b/drivers/phy/Makefile
+@@ -50,6 +50,7 @@ obj-$(CONFIG_PHY_STIH41X_USB)		+= phy-stih41x-usb.o
+ obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs.o
+ obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs-qmp-20nm.o
+ obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs-qmp-14nm.o
++obj-$(CONFIG_PHY_QCOM_USB_HSIC) 	+= phy-qcom-usb-hsic.o
+ obj-$(CONFIG_PHY_TUSB1210)		+= phy-tusb1210.o
+ obj-$(CONFIG_PHY_BRCM_SATA)		+= phy-brcm-sata.o
+ obj-$(CONFIG_PHY_PISTACHIO_USB)		+= phy-pistachio-usb.o
+diff --git a/drivers/phy/phy-qcom-usb-hsic.c b/drivers/phy/phy-qcom-usb-hsic.c
+new file mode 100644
+index 000000000000..47690f9945b9
+--- /dev/null
++++ b/drivers/phy/phy-qcom-usb-hsic.c
+@@ -0,0 +1,160 @@
++/**
++ * Copyright (C) 2016 Linaro Ltd
 + *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
++#include <linux/module.h>
++#include <linux/ulpi/driver.h>
++#include <linux/ulpi/regs.h>
++#include <linux/pinctrl/consumer.h>
++#include <linux/pinctrl/pinctrl-state.h>
++#include <linux/delay.h>
++#include <linux/clk.h>
 +
-+#include <linux/device.h>
-+#include <linux/usb/chipidea.h>
-+#include <linux/ulpi/interface.h>
++#include "ulpi_phy.h"
 +
-+#include "ci.h"
++#define ULPI_HSIC_CFG		0x30
++#define ULPI_HSIC_IO_CAL	0x33
 +
-+#define ULPI_WAKEUP		BIT(31)
-+#define ULPI_RUN		BIT(30)
-+#define ULPI_WRITE		BIT(29)
-+#define ULPI_SYNC_STATE		BIT(27)
-+#define ULPI_ADDR(n)		((n) << 16)
-+#define ULPI_DATA(n)		(n)
++struct qcom_usb_hsic_phy {
++	struct ulpi *ulpi;
++	struct phy *phy;
++	struct pinctrl *pctl;
++	struct clk *phy_clk;
++	struct clk *cal_clk;
++	struct clk *cal_sleep_clk;
++};
 +
-+static int ci_ulpi_wait(struct ci_hdrc *ci, u32 mask)
++static int qcom_usb_hsic_phy_power_on(struct phy *phy)
 +{
-+	unsigned long usec = 10000;
-+
-+	while (usec--) {
-+		if (!hw_read(ci, OP_ULPI_VIEWPORT, mask))
-+			return 0;
-+
-+		udelay(1);
-+	}
-+
-+	return -ETIMEDOUT;
-+}
-+
-+static int ci_ulpi_read(struct ulpi_ops *ops, u8 addr)
-+{
-+	struct ci_hdrc *ci = dev_get_drvdata(ops->dev);
++	struct qcom_usb_hsic_phy *uphy = phy_get_drvdata(phy);
++	struct ulpi *ulpi = uphy->ulpi;
++	struct pinctrl_state *pins_default;
 +	int ret;
 +
-+	hw_write(ci, OP_ULPI_VIEWPORT, 0xffffffff, ULPI_WRITE | ULPI_WAKEUP);
-+	ret = ci_ulpi_wait(ci, ULPI_WAKEUP);
++	ret = clk_prepare_enable(uphy->phy_clk);
 +	if (ret)
 +		return ret;
 +
-+	hw_write(ci, OP_ULPI_VIEWPORT, 0xffffffff, ULPI_RUN | ULPI_ADDR(addr));
-+	ret = ci_ulpi_wait(ci, ULPI_RUN);
++	ret = clk_prepare_enable(uphy->cal_clk);
 +	if (ret)
-+		return ret;
++		goto err_cal;
 +
-+	return hw_read(ci, OP_ULPI_VIEWPORT, GENMASK(15, 8)) >> 8;
-+}
-+
-+static int ci_ulpi_write(struct ulpi_ops *ops, u8 addr, u8 val)
-+{
-+	struct ci_hdrc *ci = dev_get_drvdata(ops->dev);
-+	int ret;
-+
-+	hw_write(ci, OP_ULPI_VIEWPORT, 0xffffffff, ULPI_WRITE | ULPI_WAKEUP);
-+	ret = ci_ulpi_wait(ci, ULPI_WAKEUP);
++	ret = clk_prepare_enable(uphy->cal_sleep_clk);
 +	if (ret)
-+		return ret;
++		goto err_sleep;
 +
-+	hw_write(ci, OP_ULPI_VIEWPORT, 0xffffffff,
-+		 ULPI_RUN | ULPI_WRITE | ULPI_ADDR(addr) | val);
-+	return ci_ulpi_wait(ci, ULPI_RUN);
++	/* Set periodic calibration interval to ~2.048sec in HSIC_IO_CAL_REG */
++	ret = ulpi_write(ulpi, ULPI_HSIC_IO_CAL, 0xff);
++	if (ret)
++		goto err_ulpi;
++
++	/* Enable periodic IO calibration in HSIC_CFG register */
++	ret = ulpi_write(ulpi, ULPI_HSIC_CFG, 0xa8);
++	if (ret)
++		goto err_ulpi;
++
++	/* Configure pins for HSIC functionality */
++	pins_default = pinctrl_lookup_state(uphy->pctl, PINCTRL_STATE_DEFAULT);
++	if (IS_ERR(pins_default))
++		return PTR_ERR(pins_default);
++
++	ret = pinctrl_select_state(uphy->pctl, pins_default);
++	if (ret)
++		goto err_ulpi;
++
++	 /* Enable HSIC mode in HSIC_CFG register */
++	ret = ulpi_write(ulpi, ULPI_SET(ULPI_HSIC_CFG), 0x01);
++	if (ret)
++		goto err_ulpi;
++
++	/* Disable auto-resume */
++	ret = ulpi_write(ulpi, ULPI_CLR(ULPI_IFC_CTRL),
++			 ULPI_IFC_CTRL_AUTORESUME);
++	if (ret)
++		goto err_ulpi;
++
++	return ret;
++err_ulpi:
++	clk_disable_unprepare(uphy->cal_sleep_clk);
++err_sleep:
++	clk_disable_unprepare(uphy->cal_clk);
++err_cal:
++	clk_disable_unprepare(uphy->phy_clk);
++	return ret;
 +}
 +
-+int ci_ulpi_init(struct ci_hdrc *ci)
++static int qcom_usb_hsic_phy_power_off(struct phy *phy)
 +{
-+	if (ci->platdata->phy_mode != USBPHY_INTERFACE_MODE_ULPI)
-+		return 0;
++	struct qcom_usb_hsic_phy *uphy = phy_get_drvdata(phy);
 +
-+	/*
-+	 * Set PORTSC correctly so we can read/write ULPI registers for
-+	 * identification purposes
-+	 */
-+	hw_phymode_configure(ci);
++	clk_disable_unprepare(uphy->cal_sleep_clk);
++	clk_disable_unprepare(uphy->cal_clk);
++	clk_disable_unprepare(uphy->phy_clk);
 +
-+	ci->ulpi_ops.read = ci_ulpi_read;
-+	ci->ulpi_ops.write = ci_ulpi_write;
-+	ci->ulpi = ulpi_register_interface(ci->dev, &ci->ulpi_ops);
-+	if (IS_ERR(ci->ulpi))
-+		dev_err(ci->dev, "failed to register ULPI interface");
-+
-+	return PTR_ERR_OR_ZERO(ci->ulpi);
++	return 0;
 +}
 +
-+void ci_ulpi_exit(struct ci_hdrc *ci)
++static const struct phy_ops qcom_usb_hsic_phy_ops = {
++	.power_on = qcom_usb_hsic_phy_power_on,
++	.power_off = qcom_usb_hsic_phy_power_off,
++	.owner = THIS_MODULE,
++};
++
++static int qcom_usb_hsic_phy_probe(struct ulpi *ulpi)
 +{
-+	if (ci->ulpi) {
-+		ulpi_unregister_interface(ci->ulpi);
-+		ci->ulpi = NULL;
-+	}
++	struct qcom_usb_hsic_phy *uphy;
++	struct phy_provider *p;
++	struct clk *clk;
++
++	uphy = devm_kzalloc(&ulpi->dev, sizeof(*uphy), GFP_KERNEL);
++	if (!uphy)
++		return -ENOMEM;
++	ulpi_set_drvdata(ulpi, uphy);
++
++	uphy->ulpi = ulpi;
++	uphy->pctl = devm_pinctrl_get(&ulpi->dev);
++	if (IS_ERR(uphy->pctl))
++		return PTR_ERR(uphy->pctl);
++
++	uphy->phy_clk = clk = devm_clk_get(&ulpi->dev, "phy");
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
++	uphy->cal_clk = clk = devm_clk_get(&ulpi->dev, "cal");
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
++	uphy->cal_sleep_clk = clk = devm_clk_get(&ulpi->dev, "cal_sleep");
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
++	uphy->phy = devm_phy_create(&ulpi->dev, ulpi->dev.of_node,
++				    &qcom_usb_hsic_phy_ops);
++	if (IS_ERR(uphy->phy))
++		return PTR_ERR(uphy->phy);
++	phy_set_drvdata(uphy->phy, uphy);
++
++	p = devm_of_phy_provider_register(&ulpi->dev, of_phy_simple_xlate);
++	return PTR_ERR_OR_ZERO(p);
 +}
 +
-+int ci_ulpi_resume(struct ci_hdrc *ci)
-+{
-+	int cnt = 100000;
++static const struct of_device_id qcom_usb_hsic_phy_match[] = {
++	{ .compatible = "qcom,usb-hsic-phy", },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, qcom_usb_hsic_phy_match);
 +
-+	while (cnt-- > 0) {
-+		if (hw_read(ci, OP_ULPI_VIEWPORT, ULPI_SYNC_STATE))
-+			return 0;
-+		udelay(1);
-+	}
++static struct ulpi_driver qcom_usb_hsic_phy_driver = {
++	.probe = qcom_usb_hsic_phy_probe,
++	.driver = {
++		.name = "qcom_usb_hsic_phy",
++		.of_match_table = qcom_usb_hsic_phy_match,
++	},
++};
++module_ulpi_driver(qcom_usb_hsic_phy_driver);
 +
-+	return -ETIMEDOUT;
-+}
++MODULE_DESCRIPTION("Qualcomm USB HSIC phy");
++MODULE_LICENSE("GPL v2");
 -- 
 2.9.0.rc2.8.ga28705d
