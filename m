@@ -1,29 +1,29 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Thu, 1 Sep 2016 17:58:43 -0500
-Subject: [PATCH 2/5] ARM: dts: keystone-k2l: Add MSM RAM node
+Date: Thu, 1 Sep 2016 17:58:44 -0500
+Subject: [PATCH 3/5] ARM: dts: keystone-k2e: Add MSM RAM node
 In-Reply-To: <20160901225846.31058-1-s-anna@ti.com>
 References: <20160901225846.31058-1-s-anna@ti.com>
-Message-ID: <20160901225846.31058-3-s-anna@ti.com>
+Message-ID: <20160901225846.31058-4-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the RAM managed by the Multicore Shared Memory Controller (MSMC)
-as a mmio-sram node. The Keystone 2 Lamarr SoC has 2 MB of such
+Add the RAM managed by the Multicire Shared Memory Controller (MSMC)
+as a mmio-sram node. The Keystone 2 Edison SoC has 2 MB of such
 memory. Any specific MSM memory range needed by a software module
 ought to be reserved using an appropriate child node.
 
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/boot/dts/keystone-k2l.dtsi | 8 ++++++++
+ arch/arm/boot/dts/keystone-k2e.dtsi | 8 ++++++++
  1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/keystone-k2l.dtsi b/arch/arm/boot/dts/keystone-k2l.dtsi
-index 2ee3d0ac2816..b2994c9ded43 100644
---- a/arch/arm/boot/dts/keystone-k2l.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2l.dtsi
-@@ -34,6 +34,14 @@
+diff --git a/arch/arm/boot/dts/keystone-k2e.dtsi b/arch/arm/boot/dts/keystone-k2e.dtsi
+index 9a51b8c88581..48846c36cbed 100644
+--- a/arch/arm/boot/dts/keystone-k2e.dtsi
++++ b/arch/arm/boot/dts/keystone-k2e.dtsi
+@@ -46,6 +46,14 @@
  	soc {
- 		/include/ "keystone-k2l-clocks.dtsi"
+ 		/include/ "keystone-k2e-clocks.dtsi"
  
 +		msm_ram: msmram at 0c000000 {
 +			compatible = "mmio-sram";
@@ -33,8 +33,8 @@ index 2ee3d0ac2816..b2994c9ded43 100644
 +			#size-cells = <1>;
 +		};
 +
- 		uart2: serial at 02348400 {
- 			compatible = "ns16550a";
- 			current-speed = <115200>;
+ 		usb: usb at 2680000 {
+ 			interrupts = <GIC_SPI 152 IRQ_TYPE_EDGE_RISING>;
+ 			dwc3 at 2690000 {
 -- 
 2.9.3
