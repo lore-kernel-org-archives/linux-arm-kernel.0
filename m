@@ -1,66 +1,100 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  1 Sep 2016 17:38:03 +0200
-Subject: [PATCH 2/3] pci: pci-mvebu: remove useless MSI enabling code
+Date: Thu,  1 Sep 2016 17:38:04 +0200
+Subject: [PATCH 3/3] of: pci: remove unused MSI controller helpers
 In-Reply-To: <1472744284-18305-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1472744284-18305-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1472744284-18305-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1472744284-18305-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit fcc392d501bd2 ("irqchip/armada-370-xp: Use the generic MSI
-infrastructure"), the irqchip driver used on Armada 370, XP, 375, 38x,
-39x for the MPIC interrupt controller has been converted to use the
-generic MSI infrastructure.
+All the users of the small MSI controller API have been migrated to use
+the generic MSI infrastructure instead. We no longer need a global
+chained list of msi_controller. Instead, MSI controllers are now
+represented as irq domains attached to OF nodes, and the resolution
+between a device requesting an MSI and the corresponding MSI controller
+is done by the generic interrupt resolution logic.
 
-Since this commit, it is no longer registering an msi_controller
-structure with the of_pci_msi_chip_add() function. Therefore, having the
-PCI driver used on the same platform calling
-of_pci_find_msi_chip_by_node() is pretty useless.
-
-The MSI resolution is now done in the generic interrupt resolution code,
-since the MSI controller is an irq domain attached to the interrupt
-controller node, which is pointed to by the msi-parent DT property in
-the PCIe controller node.
+Therefore, this API is now completely useless, and can be removed from
+the kernel.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/pci/host/pci-mvebu.c | 17 -----------------
- 1 file changed, 17 deletions(-)
+ drivers/of/of_pci.c    | 45 ---------------------------------------------
+ include/linux/of_pci.h | 11 -----------
+ 2 files changed, 56 deletions(-)
 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 307f81d..e7991f5 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -986,22 +986,6 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
- 	return -ENOENT;
+diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+index 589b30c..ea15616 100644
+--- a/drivers/of/of_pci.c
++++ b/drivers/of/of_pci.c
+@@ -263,48 +263,3 @@ parse_failed:
  }
- 
--static void mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
+ EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
+ #endif /* CONFIG_OF_ADDRESS */
+-
+-#ifdef CONFIG_PCI_MSI
+-
+-static LIST_HEAD(of_pci_msi_chip_list);
+-static DEFINE_MUTEX(of_pci_msi_chip_mutex);
+-
+-int of_pci_msi_chip_add(struct msi_controller *chip)
 -{
--	struct device_node *msi_node;
+-	if (!of_property_read_bool(chip->of_node, "msi-controller"))
+-		return -EINVAL;
 -
--	msi_node = of_parse_phandle(pcie->pdev->dev.of_node,
--				    "msi-parent", 0);
--	if (!msi_node)
--		return;
+-	mutex_lock(&of_pci_msi_chip_mutex);
+-	list_add(&chip->list, &of_pci_msi_chip_list);
+-	mutex_unlock(&of_pci_msi_chip_mutex);
 -
--	pcie->msi = of_pci_find_msi_chip_by_node(msi_node);
--	of_node_put(msi_node);
--
--	if (pcie->msi)
--		pcie->msi->dev = &pcie->pdev->dev;
+-	return 0;
 -}
+-EXPORT_SYMBOL_GPL(of_pci_msi_chip_add);
 -
- #ifdef CONFIG_PM_SLEEP
- static int mvebu_pcie_suspend(struct device *dev)
- {
-@@ -1282,7 +1266,6 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
- 	for (i = 0; i < (IO_SPACE_LIMIT - SZ_64K); i += SZ_64K)
- 		pci_ioremap_io(i, pcie->io.start + i);
+-void of_pci_msi_chip_remove(struct msi_controller *chip)
+-{
+-	mutex_lock(&of_pci_msi_chip_mutex);
+-	list_del(&chip->list);
+-	mutex_unlock(&of_pci_msi_chip_mutex);
+-}
+-EXPORT_SYMBOL_GPL(of_pci_msi_chip_remove);
+-
+-struct msi_controller *of_pci_find_msi_chip_by_node(struct device_node *of_node)
+-{
+-	struct msi_controller *c;
+-
+-	mutex_lock(&of_pci_msi_chip_mutex);
+-	list_for_each_entry(c, &of_pci_msi_chip_list, list) {
+-		if (c->of_node == of_node) {
+-			mutex_unlock(&of_pci_msi_chip_mutex);
+-			return c;
+-		}
+-	}
+-	mutex_unlock(&of_pci_msi_chip_mutex);
+-
+-	return NULL;
+-}
+-EXPORT_SYMBOL_GPL(of_pci_find_msi_chip_by_node);
+-
+-#endif /* CONFIG_PCI_MSI */
+diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+index b969e94..569c3f6 100644
+--- a/include/linux/of_pci.h
++++ b/include/linux/of_pci.h
+@@ -68,15 +68,4 @@ static inline int of_pci_get_host_bridge_resources(struct device_node *dev,
+ }
+ #endif
  
--	mvebu_pcie_msi_enable(pcie);
- 	mvebu_pcie_enable(pcie);
- 
- 	platform_set_drvdata(pdev, pcie);
+-#if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
+-int of_pci_msi_chip_add(struct msi_controller *chip);
+-void of_pci_msi_chip_remove(struct msi_controller *chip);
+-struct msi_controller *of_pci_find_msi_chip_by_node(struct device_node *of_node);
+-#else
+-static inline int of_pci_msi_chip_add(struct msi_controller *chip) { return -EINVAL; }
+-static inline void of_pci_msi_chip_remove(struct msi_controller *chip) { }
+-static inline struct msi_controller *
+-of_pci_find_msi_chip_by_node(struct device_node *of_node) { return NULL; }
+-#endif
+-
+ #endif
 -- 
 2.7.4
