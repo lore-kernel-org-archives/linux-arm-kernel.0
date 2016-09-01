@@ -1,355 +1,229 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 01 Sep 2016 11:34:50 +0200
-Subject: [PATCH v7 1/8] clk: rockchip: add new clock-type for the ddrclk
-In-Reply-To: <1471836984-6316-2-git-send-email-hl@rock-chips.com>
-References: <1471836984-6316-1-git-send-email-hl@rock-chips.com>
- <1471836984-6316-2-git-send-email-hl@rock-chips.com>
-Message-ID: <2457390.MqltFPe7p9@diego>
+From: sr@denx.de (Stefan Roese)
+Date: Thu,  1 Sep 2016 11:39:04 +0200
+Subject: [PATCH 2/2 v4] dmaengine: mv_xor: Add support for IO (PCIe) src/dst
+ areas
+In-Reply-To: <20160901093904.26564-1-sr@denx.de>
+References: <20160901093904.26564-1-sr@denx.de>
+Message-ID: <20160901093904.26564-2-sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 22. August 2016, 11:36:17 schrieb Lin Huang:
-> On new rockchip platform(rk3399 etc), there have dcf controller to
-> do ddr frequency scaling, and this controller will implement in
-> arm-trust-firmware. We add a special clock-type to handle that.
-> 
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
+To enable the access to a specific area, the MVEBU XOR controllers needs
+to have this area enabled / mapped via an address window. Right now,
+only the DRAM memory area is enabled via such memory windows. So
+using this driver to DMA to / from a e.g. PCIe memory region is
+currently not supported.
 
-Applied with some changes:
-- split the sip header into a separate patch [0], as we'll need the
-  devfreq part to also have access to that
-- reword the commit message [1] to have some more details on what
-  we want to accomplish here
-- drop the NO_CACHE flag as per our chat, as we now also have the
-  round-rate talking to the ATF, so the cached value should actuall match
+This patch now adds support for such PCIe / IO regions by checking
+if the src / dst address is located in an IO memory area in contrast
+to being located in DRAM. This is done by using the newly introduced
+MBus function mvebu_mbus_get_io_win_info(). If the src / dst address
+is located in such an IO area, a new address window is created in
+the XOR DMA controller. Enabling the controller to access this area.
 
+Signed-off-by: Stefan Roese <sr@denx.de>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Marcin Wojtas <mw@semihalf.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Vinod Koul <vinod.koul@intel.com>
+---
+v3 -> v4:
+- Don't try to add the IO windows on Armada 3700 which does not implement
+  the MBus driver
 
-[0] https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commit/?id=97dd82682f1a6174698fbea149a04b4cabc58c4f
-[1] https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commit/?id=a4f182bf81f18f91f1aef6289fcdfa6a2ac51b99
+v2 -> v3:
+- Included separate patch to add a stub function for mvebu_mbus_get_io_win_info()
+  to this patch series
+- COMPILE_TEST added again, as the stub function now allows compilation on
+  all platforms
 
+v1 -> v2:
+- Removed COMPILE_TEST from Kconfig entry as this results in compilation
+  errors on non-Marvell platforms because of references to MBus driver
+  functions. Since this driver will never be used on non-Marvell platforms
+  this should be okay.
 
+RFC -> v1:
+- Use a cache for the already mapped areas for performance reasons, as
+  the MMIO registers don't need to get queried any more if the area is
+  already mapped now
+  
+ drivers/dma/mv_xor.c | 95 +++++++++++++++++++++++++++++++++++++++++++++++++++-
+ drivers/dma/mv_xor.h |  7 ++++
+ 2 files changed, 101 insertions(+), 1 deletion(-)
 
-> ---
-> Changes in v7:
-> - add rockchip_ddrclk_sip_ops so we can distinguish other ddr clock operate
-> - add ROCKCHIP_SIP_CONFIG_* in rockchip_sip.h give constants a specific name
-> 
-> Changes in v6:
-> - none
-> 
-> Changes in v5:
-> - delete unuse mux_flag
-> - use div_flag to distinguish sip call and other operate
-> 
-> Changes in v4:
-> - use arm_smccc_smc() to set/read ddr rate
-> 
-> Changes in v3:
-> - use sip call to set/read ddr rate
-> 
-> Changes in v2:
-> - use GENMASK instead val_mask
-> - use divider_recalc_rate() instead DIV_ROUND_UP_ULL
-> - cleanup code
-> 
-> Changes in v1:
-> - none
-> 
->  drivers/clk/rockchip/Makefile       |   1 +
->  drivers/clk/rockchip/clk-ddr.c      | 157
-> ++++++++++++++++++++++++++++++++++++ drivers/clk/rockchip/clk.c          | 
->  9 +++
->  drivers/clk/rockchip/clk.h          |  35 ++++++++
->  include/soc/rockchip/rockchip_sip.h |  27 +++++++
->  5 files changed, 229 insertions(+)
->  create mode 100644 drivers/clk/rockchip/clk-ddr.c
->  create mode 100644 include/soc/rockchip/rockchip_sip.h
-> 
-> diff --git a/drivers/clk/rockchip/Makefile b/drivers/clk/rockchip/Makefile
-> index f47a2fa..b5f2c8e 100644
-> --- a/drivers/clk/rockchip/Makefile
-> +++ b/drivers/clk/rockchip/Makefile
-> @@ -8,6 +8,7 @@ obj-y	+= clk-pll.o
->  obj-y	+= clk-cpu.o
->  obj-y	+= clk-inverter.o
->  obj-y	+= clk-mmc-phase.o
-> +obj-y	+= clk-ddr.o
->  obj-$(CONFIG_RESET_CONTROLLER)	+= softrst.o
-> 
->  obj-y	+= clk-rk3036.o
-> diff --git a/drivers/clk/rockchip/clk-ddr.c b/drivers/clk/rockchip/clk-ddr.c
-> new file mode 100644
-> index 0000000..224e07e
-> --- /dev/null
-> +++ b/drivers/clk/rockchip/clk-ddr.c
-> @@ -0,0 +1,157 @@
-> +/*
-> + * Copyright (c) 2016 Rockchip Electronics Co. Ltd.
-> + * Author: Lin Huang <hl@rock-chips.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/arm-smccc.h>
-> +#include <linux/clk.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/slab.h>
-> +#include <soc/rockchip/rockchip_sip.h>
-> +
-> +#include "clk.h"
-> +
-> +struct rockchip_ddrclk {
-> +	struct clk_hw	hw;
-> +	void __iomem	*reg_base;
-> +	int		mux_offset;
-> +	int		mux_shift;
-> +	int		mux_width;
-> +	int		div_shift;
-> +	int		div_width;
-> +	int		ddr_flag;
-> +	spinlock_t	*lock;
-> +};
-> +
-> +#define to_rockchip_ddrclk_hw(hw) container_of(hw, struct rockchip_ddrclk,
-> hw) +
-> +static int rockchip_ddrclk_sip_set_rate(struct clk_hw *hw, unsigned long
-> drate, +					unsigned long prate)
-> +{
-> +	struct rockchip_ddrclk *ddrclk = to_rockchip_ddrclk_hw(hw);
-> +	unsigned long flags;
-> +	struct arm_smccc_res res;
-> +
-> +	spin_lock_irqsave(ddrclk->lock, flags);
-> +	arm_smccc_smc(ROCKCHIP_SIP_DRAM_FREQ, drate, 0,
-> +		      ROCKCHIP_SIP_CONFIG_DRAM_SET_RATE,
-> +		      0, 0, 0, 0, &res);
-> +	spin_unlock_irqrestore(ddrclk->lock, flags);
-> +
-> +	return res.a0;
-> +}
-> +
-> +static unsigned long
-> +rockchip_ddrclk_sip_recalc_rate(struct clk_hw *hw,
-> +				unsigned long parent_rate)
-> +{
-> +	struct arm_smccc_res res;
-> +
-> +	arm_smccc_smc(ROCKCHIP_SIP_DRAM_FREQ, 0, 0,
-> +		      ROCKCHIP_SIP_CONFIG_DRAM_GET_RATE,
-> +		      0, 0, 0, 0, &res);
-> +
-> +	return res.a0;
-> +}
-> +
-> +static long rockchip_ddrclk_sip_round_rate(struct clk_hw *hw,
-> +					   unsigned long rate,
-> +					   unsigned long *prate)
-> +{
-> +	struct arm_smccc_res res;
-> +
-> +	arm_smccc_smc(ROCKCHIP_SIP_DRAM_FREQ, rate, 0,
-> +		      ROCKCHIP_SIP_CONFIG_DRAM_ROUND_RATE,
-> +		      0, 0, 0, 0, &res);
-> +
-> +	return res.a0;
-> +}
-> +
-> +static u8 rockchip_ddrclk_get_parent(struct clk_hw *hw)
-> +{
-> +	struct rockchip_ddrclk *ddrclk = to_rockchip_ddrclk_hw(hw);
-> +	int num_parents = clk_hw_get_num_parents(hw);
-> +	u32 val;
-> +
-> +	val = clk_readl(ddrclk->reg_base +
-> +			ddrclk->mux_offset) >> ddrclk->mux_shift;
-> +	val &= GENMASK(ddrclk->mux_width - 1, 0);
-> +
-> +	if (val >= num_parents)
-> +		return -EINVAL;
-> +
-> +	return val;
-> +}
-> +
-> +static const struct clk_ops rockchip_ddrclk_sip_ops = {
-> +	.recalc_rate = rockchip_ddrclk_sip_recalc_rate,
-> +	.set_rate = rockchip_ddrclk_sip_set_rate,
-> +	.round_rate = rockchip_ddrclk_sip_round_rate,
-> +	.get_parent = rockchip_ddrclk_get_parent,
-> +};
-> +
-> +struct clk *rockchip_clk_register_ddrclk(const char *name, int flags,
-> +					 const char *const *parent_names,
-> +					 u8 num_parents, int mux_offset,
-> +					 int mux_shift, int mux_width,
-> +					 int div_shift, int div_width,
-> +					 int ddr_flag, void __iomem *reg_base,
-> +					 spinlock_t *lock)
-> +{
-> +	struct rockchip_ddrclk *ddrclk;
-> +	struct clk_init_data init;
-> +	struct clk *clk;
-> +
-> +	ddrclk = kzalloc(sizeof(*ddrclk), GFP_KERNEL);
-> +	if (!ddrclk)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	init.name = name;
-> +	init.parent_names = parent_names;
-> +	init.num_parents = num_parents;
-> +
-> +	init.flags = flags;
-> +	init.flags |= CLK_SET_RATE_NO_REPARENT;
-> +	init.flags |= CLK_GET_RATE_NOCACHE;
-> +
-> +	switch (ddr_flag) {
-> +	case ROCKCHIP_DDRCLK_SIP:
-> +		init.ops = &rockchip_ddrclk_sip_ops;
-> +		break;
-> +	default:
-> +		pr_err("%s: unsupported ddrclk type %d\n", __func__, ddr_flag);
-> +		kfree(ddrclk);
-> +		return ERR_PTR(-EINVAL);
-> +	}
-> +
-> +	ddrclk->reg_base = reg_base;
-> +	ddrclk->lock = lock;
-> +	ddrclk->hw.init = &init;
-> +	ddrclk->mux_offset = mux_offset;
-> +	ddrclk->mux_shift = mux_shift;
-> +	ddrclk->mux_width = mux_width;
-> +	ddrclk->div_shift = div_shift;
-> +	ddrclk->div_width = div_width;
-> +	ddrclk->ddr_flag = ddr_flag;
-> +
-> +	clk = clk_register(NULL, &ddrclk->hw);
-> +	if (IS_ERR(clk)) {
-> +		pr_err("%s: could not register ddrclk %s\n", __func__,	name);
-> +		kfree(ddrclk);
-> +		return NULL;
-> +	}
-> +
-> +	return clk;
-> +}
-> diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
-> index 1f1c74f..99baa5d 100644
-> --- a/drivers/clk/rockchip/clk.c
-> +++ b/drivers/clk/rockchip/clk.c
-> @@ -484,6 +484,15 @@ void __init rockchip_clk_register_branches(
->  				list->gate_offset, list->gate_shift,
->  				list->gate_flags, flags, &ctx->lock);
->  			break;
-> +		case branch_ddrc:
-> +			clk = rockchip_clk_register_ddrclk(
-> +				list->name, list->flags,
-> +				list->parent_names, list->num_parents,
-> +				list->muxdiv_offset, list->mux_shift,
-> +				list->mux_width, list->div_shift,
-> +				list->div_width, list->div_flags,
-> +				ctx->reg_base, &ctx->lock);
-> +			break;
->  		}
-> 
->  		/* none of the cases above matched */
-> diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-> index 3747de5..d6c58d0 100644
-> --- a/drivers/clk/rockchip/clk.h
-> +++ b/drivers/clk/rockchip/clk.h
-> @@ -281,6 +281,22 @@ struct clk *rockchip_clk_register_mmc(const char *name,
-> const char *const *parent_names, u8 num_parents,
->  				void __iomem *reg, int shift);
-> 
-> +/*
-> + * for COMPOSITE_DDRCLK div_flag,
-> + * there may have serval ways to set ddr clock, use
-> + * this flag to distinguish them.
-> + * ROCKCHIP_DDRCLK_SIP: use SIP call to bl31 to change ddrclk rate.
-> + */
-> +#define ROCKCHIP_DDRCLK_SIP		0x01
-> +
-> +struct clk *rockchip_clk_register_ddrclk(const char *name, int flags,
-> +					 const char *const *parent_names,
-> +					 u8 num_parents, int mux_offset,
-> +					 int mux_shift, int mux_width,
-> +					 int div_shift, int div_width,
-> +					 int ddr_flags, void __iomem *reg_base,
-> +					 spinlock_t *lock);
-> +
->  #define ROCKCHIP_INVERTER_HIWORD_MASK	BIT(0)
-> 
->  struct clk *rockchip_clk_register_inverter(const char *name,
-> @@ -299,6 +315,7 @@ enum rockchip_clk_branch_type {
->  	branch_mmc,
->  	branch_inverter,
->  	branch_factor,
-> +	branch_ddrc,
->  };
-> 
->  struct rockchip_clk_branch {
-> @@ -488,6 +505,24 @@ struct rockchip_clk_branch {
->  		.child		= ch,				\
->  	}
-> 
-> +#define COMPOSITE_DDRCLK(_id, cname, pnames, f, mo, ms, mw,	\
-> +			 ds, dw, df)				\
-> +	{							\
-> +		.id		= _id,				\
-> +		.branch_type	= branch_ddrc,			\
-> +		.name		= cname,			\
-> +		.parent_names	= pnames,			\
-> +		.num_parents	= ARRAY_SIZE(pnames),		\
-> +		.flags		= f,				\
-> +		.muxdiv_offset  = mo,                           \
-> +		.mux_shift      = ms,                           \
-> +		.mux_width      = mw,                           \
-> +		.div_shift      = ds,                           \
-> +		.div_width      = dw,                           \
-> +		.div_flags	= df,				\
-> +		.gate_offset    = -1,                           \
-> +	}
-> +
->  #define MUX(_id, cname, pnames, f, o, s, w, mf)			\
->  	{							\
->  		.id		= _id,				\
-> diff --git a/include/soc/rockchip/rockchip_sip.h
-> b/include/soc/rockchip/rockchip_sip.h new file mode 100644
-> index 0000000..7e28092
-> --- /dev/null
-> +++ b/include/soc/rockchip/rockchip_sip.h
-> @@ -0,0 +1,27 @@
-> +/*
-> + * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
-> + * Author: Lin Huang <hl@rock-chips.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
-> for + * more details.
-> + */
-> +#ifndef __SOC_ROCKCHIP_SIP_H
-> +#define __SOC_ROCKCHIP_SIP_H
-> +
-> +#define ROCKCHIP_SIP_DRAM_FREQ			0x82000008
-> +#define ROCKCHIP_SIP_CONFIG_DRAM_INIT		0x00
-> +#define ROCKCHIP_SIP_CONFIG_DRAM_SET_RATE	0x01
-> +#define ROCKCHIP_SIP_CONFIG_DRAM_ROUND_RATE	0x02
-> +#define ROCKCHIP_SIP_CONFIG_DRAM_SET_AT_SR	0x03
-> +#define ROCKCHIP_SIP_CONFIG_DRAM_GET_BW		0x04
-> +#define ROCKCHIP_SIP_CONFIG_DRAM_GET_RATE	0x05
-> +#define ROCKCHIP_SIP_CONFIG_DRAM_CLR_IRQ	0x06
-> +#define ROCKCHIP_SIP_CONFIG_DRAM_SET_PARAM	0x07
-> +
-> +#endif
+diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+index f4c9f98..ff4a094 100644
+--- a/drivers/dma/mv_xor.c
++++ b/drivers/dma/mv_xor.c
+@@ -470,12 +470,90 @@ static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
+ 	return mv_chan->slots_allocated ? : -ENOMEM;
+ }
+ 
++/*
++ * Check if source or destination is an PCIe/IO address (non-SDRAM) and add
++ * a new MBus window if necessary. Use a cache for these check so that
++ * the MMIO mapped registers don't have to be accessed for this check
++ * to speed up this process.
++ */
++static int mv_xor_add_io_win(struct mv_xor_chan *mv_chan, u32 addr)
++{
++	struct mv_xor_device *xordev = mv_chan->xordev;
++	void __iomem *base = mv_chan->mmr_high_base;
++	u32 win_enable;
++	u32 size;
++	u8 target, attr;
++	int ret;
++	int i;
++
++	/* Nothing needs to get done for the Armada 3700 */
++	if (xordev->xor_type == XOR_ARMADA_37XX)
++		return 0;
++
++	/*
++	 * Loop over the cached windows to check, if the requested area
++	 * is already mapped. If this the case, nothing needs to be done
++	 * and we can return.
++	 */
++	for (i = 0; i < WINDOW_COUNT; i++) {
++		if (addr >= xordev->win_start[i] &&
++		    addr <= xordev->win_end[i]) {
++			/* Window is already mapped */
++			return 0;
++		}
++	}
++
++	/*
++	 * The window is not mapped, so we need to create the new mapping
++	 */
++
++	/* If no IO window is found that addr has to be located in SDRAM */
++	ret = mvebu_mbus_get_io_win_info(addr, &size, &target, &attr);
++	if (ret < 0)
++		return 0;
++
++	/*
++	 * Mask the base addr 'addr' according to 'size' read back from the
++	 * MBus window. Otherwise we might end up with an address located
++	 * somewhere in the middle of this area here.
++	 */
++	size -= 1;
++	addr &= ~size;
++
++	/*
++	 * Reading one of both enabled register is enough, as they are always
++	 * programmed to the identical values
++	 */
++	win_enable = readl(base + WINDOW_BAR_ENABLE(0));
++
++	/* Set 'i' to the first free window to write the new values to */
++	i = ffs(~win_enable) - 1;
++	if (i >= WINDOW_COUNT)
++		return -ENOMEM;
++
++	writel((addr & 0xffff0000) | (attr << 8) | target,
++	       base + WINDOW_BASE(i));
++	writel(size & 0xffff0000, base + WINDOW_SIZE(i));
++
++	/* Fill the caching variables for later use */
++	xordev->win_start[i] = addr;
++	xordev->win_end[i] = addr + size;
++
++	win_enable |= (1 << i);
++	win_enable |= 3 << (16 + (2 * i));
++	writel(win_enable, base + WINDOW_BAR_ENABLE(0));
++	writel(win_enable, base + WINDOW_BAR_ENABLE(1));
++
++	return 0;
++}
++
+ static struct dma_async_tx_descriptor *
+ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
+ 		    unsigned int src_cnt, size_t len, unsigned long flags)
+ {
+ 	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
+ 	struct mv_xor_desc_slot *sw_desc;
++	int ret;
+ 
+ 	if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
+ 		return NULL;
+@@ -486,6 +564,11 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
+ 		"%s src_cnt: %d len: %zu dest %pad flags: %ld\n",
+ 		__func__, src_cnt, len, &dest, flags);
+ 
++	/* Check if a new window needs to get added for 'dest' */
++	ret = mv_xor_add_io_win(mv_chan, dest);
++	if (ret)
++		return NULL;
++
+ 	sw_desc = mv_chan_alloc_slot(mv_chan);
+ 	if (sw_desc) {
+ 		sw_desc->type = DMA_XOR;
+@@ -493,8 +576,13 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
+ 		mv_desc_init(sw_desc, dest, len, flags);
+ 		if (mv_chan->op_in_desc == XOR_MODE_IN_DESC)
+ 			mv_desc_set_mode(sw_desc);
+-		while (src_cnt--)
++		while (src_cnt--) {
++			/* Check if a new window needs to get added for 'src' */
++			ret = mv_xor_add_io_win(mv_chan, src[src_cnt]);
++			if (ret)
++				return NULL;
+ 			mv_desc_set_src_addr(sw_desc, src_cnt, src[src_cnt]);
++		}
+ 	}
+ 
+ 	dev_dbg(mv_chan_to_devp(mv_chan),
+@@ -959,6 +1047,7 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
+ 		mv_chan->op_in_desc = XOR_MODE_IN_DESC;
+ 
+ 	dma_dev = &mv_chan->dmadev;
++	mv_chan->xordev = xordev;
+ 
+ 	/*
+ 	 * These source and destination dummy buffers are used to implement
+@@ -1086,6 +1175,10 @@ mv_xor_conf_mbus_windows(struct mv_xor_device *xordev,
+ 		       dram->mbus_dram_target_id, base + WINDOW_BASE(i));
+ 		writel((cs->size - 1) & 0xffff0000, base + WINDOW_SIZE(i));
+ 
++		/* Fill the caching variables for later use */
++		xordev->win_start[i] = cs->base;
++		xordev->win_end[i] = cs->base + cs->size - 1;
++
+ 		win_enable |= (1 << i);
+ 		win_enable |= 3 << (16 + (2 * i));
+ 	}
+diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
+index bf56e08..88eeab2 100644
+--- a/drivers/dma/mv_xor.h
++++ b/drivers/dma/mv_xor.h
+@@ -80,12 +80,17 @@
+ #define WINDOW_BAR_ENABLE(chan)	(0x40 + ((chan) << 2))
+ #define WINDOW_OVERRIDE_CTRL(chan)	(0xA0 + ((chan) << 2))
+ 
++#define WINDOW_COUNT		8
++
+ struct mv_xor_device {
+ 	void __iomem	     *xor_base;
+ 	void __iomem	     *xor_high_base;
+ 	struct clk	     *clk;
+ 	struct mv_xor_chan   *channels[MV_XOR_MAX_CHANNELS];
+ 	int		     xor_type;
++
++	u32                  win_start[WINDOW_COUNT];
++	u32                  win_end[WINDOW_COUNT];
+ };
+ 
+ /**
+@@ -127,6 +132,8 @@ struct mv_xor_chan {
+ 	char			dummy_dst[MV_XOR_MIN_BYTE_COUNT];
+ 	dma_addr_t		dummy_src_addr, dummy_dst_addr;
+ 	u32                     saved_config_reg, saved_int_mask_reg;
++
++	struct mv_xor_device	*xordev;
+ };
+ 
+ /**
+-- 
+2.9.3
