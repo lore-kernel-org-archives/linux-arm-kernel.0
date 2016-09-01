@@ -1,64 +1,100 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Thu,  1 Sep 2016 19:51:33 +0200
-Subject: [PATCH 4/9] serial/bcm63xx_uart: constify uart_ops structures
-In-Reply-To: <1472752298-981-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1472752298-981-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1472752298-981-5-git-send-email-Julia.Lawall@lip6.fr>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 1 Sep 2016 13:23:45 -0500
+Subject: [RFC PATCH V5 1/5] PCI: Embed pci_ecam_ops in pci_config_window
+ structure
+In-Reply-To: <1470661541-26270-2-git-send-email-tn@semihalf.com>
+References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
+ <1470661541-26270-2-git-send-email-tn@semihalf.com>
+Message-ID: <20160901182345.GA18461@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check for uart_ops structures that are only stored in the ops field of a
-uart_port structure.  This field is declared const, so uart_ops structures
-that have this property can be declared as const also.
+On Mon, Aug 08, 2016 at 03:05:37PM +0200, Tomasz Nowicki wrote:
+> pci_config_window keeps pointer to pci_ecam_ops and every time
+> we want to deallocate pci_config_window (pci_ecam_free()) we need to make
+> sure to free pci_ecam_ops in case it was dynamically allocated prior to
+> pci_ecam_create() call.
 
-The semantic patch that makes this change is as follows:
-(http://coccinelle.lip6.fr/)
+I think this is a theoretical problem, right?  All the current callers
+pass a pointer to a static pci_ecam_ops struct that does not need to
+be deallocated.
 
-// <smpl>
-@r disable optional_qualifier@
-identifier i;
-position p;
-@@
-static struct uart_ops i at p = { ... };
+I see that the next patch uses a pci_ecam_ops struct on the stack,
+which would definitely cause issues without this patch, so I agree we
+need something like this; I'm just trying to make the changelog make
+more sense.
 
-@ok@
-identifier r.i;
-struct uart_port e;
-position p;
-@@
-e.ops = &i at p;
+> To avoid that extra effort, embed pci_ecam_ops in pci_config_window,
+> instead of just a pointer.
+> 
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> To: Jayachandran C <jchandra@broadcom.com>
 
-@bad@
-position p != {r.p,ok.p};
-identifier r.i;
-struct uart_ops e;
-@@
-e at i@p
+This looks like an editing mistake?
 
-@depends on !bad disable optional_qualifier@
-identifier r.i;
-@@
-static
-+const
- struct uart_ops i = { ... };
-// </smpl>
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
----
- drivers/tty/serial/bcm63xx_uart.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/tty/serial/bcm63xx_uart.c b/drivers/tty/serial/bcm63xx_uart.c
-index 5108fab..583c9a0 100644
---- a/drivers/tty/serial/bcm63xx_uart.c
-+++ b/drivers/tty/serial/bcm63xx_uart.c
-@@ -631,7 +631,7 @@ static int bcm_uart_verify_port(struct uart_port *port,
- }
- 
- /* serial core callbacks */
--static struct uart_ops bcm_uart_ops = {
-+static const struct uart_ops bcm_uart_ops = {
- 	.tx_empty	= bcm_uart_tx_empty,
- 	.get_mctrl	= bcm_uart_get_mctrl,
- 	.set_mctrl	= bcm_uart_set_mctrl,
+> ---
+>  arch/arm64/kernel/pci.c  | 2 +-
+>  drivers/pci/ecam.c       | 6 +++---
+>  include/linux/pci-ecam.h | 2 +-
+>  3 files changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> index acf3872..981e828 100644
+> --- a/arch/arm64/kernel/pci.c
+> +++ b/arch/arm64/kernel/pci.c
+> @@ -183,7 +183,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>  		return NULL;
+>  	}
+>  
+> -	acpi_pci_root_ops.pci_ops = &ri->cfg->ops->pci_ops;
+> +	acpi_pci_root_ops.pci_ops = &ri->cfg->ops.pci_ops;
+>  	bus = acpi_pci_root_create(root, &acpi_pci_root_ops, &ri->common,
+>  				   ri->cfg);
+>  	if (!bus)
+> diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
+> index 43ed08d..24242f0 100644
+> --- a/drivers/pci/ecam.c
+> +++ b/drivers/pci/ecam.c
+> @@ -52,7 +52,7 @@ struct pci_config_window *pci_ecam_create(struct device *dev,
+>  		return ERR_PTR(-ENOMEM);
+>  
+>  	cfg->parent = dev;
+> -	cfg->ops = ops;
+> +	cfg->ops = *ops;
+>  	cfg->busr.start = busr->start;
+>  	cfg->busr.end = busr->end;
+>  	cfg->busr.flags = IORESOURCE_BUS;
+> @@ -138,7 +138,7 @@ void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
+>  			       int where)
+>  {
+>  	struct pci_config_window *cfg = bus->sysdata;
+> -	unsigned int devfn_shift = cfg->ops->bus_shift - 8;
+> +	unsigned int devfn_shift = cfg->ops.bus_shift - 8;
+>  	unsigned int busn = bus->number;
+>  	void __iomem *base;
+>  
+> @@ -149,7 +149,7 @@ void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
+>  	if (per_bus_mapping)
+>  		base = cfg->winp[busn];
+>  	else
+> -		base = cfg->win + (busn << cfg->ops->bus_shift);
+> +		base = cfg->win + (busn << cfg->ops.bus_shift);
+>  	return base + (devfn << devfn_shift) + where;
+>  }
+>  
+> diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
+> index 7adad20..0ce2920 100644
+> --- a/include/linux/pci-ecam.h
+> +++ b/include/linux/pci-ecam.h
+> @@ -39,7 +39,7 @@ struct pci_config_window {
+>  	struct resource			res;
+>  	struct resource			busr;
+>  	void				*priv;
+> -	struct pci_ecam_ops		*ops;
+> +	struct pci_ecam_ops		ops;
+>  	union {
+>  		void __iomem		*win;	/* 64-bit single mapping */
+>  		void __iomem		**winp; /* 32-bit per-bus mapping */
+> -- 
+> 1.9.1
+> 
