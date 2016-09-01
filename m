@@ -1,29 +1,64 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Thu,  1 Sep 2016 19:51:29 +0200
-Subject: [PATCH 0/9] constify uart_ops structures
-Message-ID: <1472752298-981-1-git-send-email-Julia.Lawall@lip6.fr>
+Date: Thu,  1 Sep 2016 19:51:36 +0200
+Subject: [PATCH 7/9] tty: xuartps: constify uart_ops structures
+In-Reply-To: <1472752298-981-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1472752298-981-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1472752298-981-8-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Constify uart_ops structures.
+Check for uart_ops structures that are only stored in the ops field of a
+uart_port structure.  This field is declared const, so uart_ops structures
+that have this property can be declared as const also.
+
+The semantic patch that makes this change is as follows:
+(http://coccinelle.lip6.fr/)
+
+// <smpl>
+@r disable optional_qualifier@
+identifier i;
+position p;
+@@
+static struct uart_ops i at p = { ... };
+
+@ok@
+identifier r.i;
+struct uart_port e;
+position p;
+@@
+e.ops = &i at p;
+
+@bad@
+position p != {r.p,ok.p};
+identifier r.i;
+struct uart_ops e;
+@@
+e at i@p
+
+@depends on !bad disable optional_qualifier@
+identifier r.i;
+@@
+static
++const
+ struct uart_ops i = { ... };
+// </smpl>
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
+ drivers/tty/serial/xilinx_uartps.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- drivers/tty/serial/altera_jtaguart.c |    2 +-
- drivers/tty/serial/altera_uart.c     |    2 +-
- drivers/tty/serial/arc_uart.c        |    2 +-
- drivers/tty/serial/atmel_serial.c    |    2 +-
- drivers/tty/serial/bcm63xx_uart.c    |    2 +-
- drivers/tty/serial/fsl_lpuart.c      |    4 ++--
- drivers/tty/serial/imx.c             |    2 +-
- drivers/tty/serial/jsm/jsm_tty.c     |    2 +-
- drivers/tty/serial/max3100.c         |    2 +-
- drivers/tty/serial/men_z135_uart.c   |    2 +-
- drivers/tty/serial/mxs-auart.c       |    2 +-
- drivers/tty/serial/pch_uart.c        |    2 +-
- drivers/tty/serial/sh-sci.c          |    2 +-
- drivers/tty/serial/st-asc.c          |    2 +-
- drivers/tty/serial/timbuart.c        |    2 +-
- drivers/tty/serial/uartlite.c        |    2 +-
- drivers/tty/serial/xilinx_uartps.c   |    2 +-
- 17 files changed, 18 insertions(+), 18 deletions(-)
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index 9ca1a4d..11a2b36 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -993,7 +993,7 @@ static void cdns_uart_pm(struct uart_port *port, unsigned int state,
+ 	}
+ }
+ 
+-static struct uart_ops cdns_uart_ops = {
++static const struct uart_ops cdns_uart_ops = {
+ 	.set_mctrl	= cdns_uart_set_mctrl,
+ 	.get_mctrl	= cdns_uart_get_mctrl,
+ 	.start_tx	= cdns_uart_start_tx,
