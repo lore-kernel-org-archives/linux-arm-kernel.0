@@ -1,39 +1,22 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 1 Sep 2016 13:21:23 +0100
-Subject: [PATCH 1/5] arm/arm64: KVM: Don't BUG_ON if IT bits are set in
- ARM mode
-In-Reply-To: <20160901115616.GD10162@cbox>
-References: <1471610295-1456-1-git-send-email-marc.zyngier@arm.com>
- <1471610295-1456-2-git-send-email-marc.zyngier@arm.com>
- <20160901115616.GD10162@cbox>
-Message-ID: <57C81D43.4020606@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 1 Sep 2016 14:23:29 +0200
+Subject: [PATCH 1/2 v2] bus: mvebu-mbus: Provide stub function for
+ mvebu_mbus_get_io_win_info()
+In-Reply-To: <20160901093904.26564-1-sr@denx.de>
+References: <20160901093904.26564-1-sr@denx.de>
+Message-ID: <20160901122329.GA4367@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/16 12:56, Christoffer Dall wrote:
-> On Fri, Aug 19, 2016 at 01:38:11PM +0100, Marc Zyngier wrote:
->> The ARM ARM asserts that having the IT bits set in ARM mode is
->> unpredictable. But should a CPU do that (and still be able to
->> run correctly), we shouldn't kill the system.
->>
->> So let's drop the BUG_ON that checks for this, as it is not
->> very helpful.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> not sure how this relates to the series, but looks fine otherwise:
+Hi Stefan
 
-In the following patch, I'm moving the whole function to be an inline
-that will be used in HYP as well. A BUG_ON in HYP is a pretty tasteless
-thing to do, so I opted for removing it here.
+> +	/*
+> +	 * On all ARM32 MVEBU platforms with MBus support, this stub
+> +	 * function will not get called. The real function from the
+> +	 * MBus driver is called instead. ARM64 MVEBU platforms like
+> +	 * the Armada 3700 could do use the mv_xor device which calls
 
-But your remark on the following patch makes more sense over all. I'll
-follow up there.
+could us, or do us, but not both.
 
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks
+	Andrew
