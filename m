@@ -1,105 +1,85 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 2 Sep 2016 00:02:48 +0100
-Subject: [PATCH 05/33] gpio: add generic single-register fixed-direction
- GPIO driver
-In-Reply-To: <87oa47l1tn.fsf@belgarion.home>
-References: <87eg57e54l.fsf@belgarion.home>
- <20160830091805.GL1041@n2100.armlinux.org.uk>
- <87k2eycip0.fsf@belgarion.home>
- <20160830184612.GO1041@n2100.armlinux.org.uk>
- <87fupmc59b.fsf@belgarion.home>
- <20160831084938.GQ1041@n2100.armlinux.org.uk>
- <20160831102721.GR1041@n2100.armlinux.org.uk>
- <87twe0krym.fsf@belgarion.home>
- <20160901092754.GU1041@n2100.armlinux.org.uk>
- <87oa47l1tn.fsf@belgarion.home>
-Message-ID: <20160901230248.GA1041@n2100.armlinux.org.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 02 Sep 2016 01:17:41 +0200
+Subject: [PATCH 4/5] PM / devfreq: rockchip: add devfreq driver for rk3399
+ dmc
+In-Reply-To: <1472769085-20715-5-git-send-email-hl@rock-chips.com>
+References: <1472769085-20715-1-git-send-email-hl@rock-chips.com>
+ <1472769085-20715-5-git-send-email-hl@rock-chips.com>
+Message-ID: <8339852.vAWNvCSMju@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2016 at 11:58:28PM +0200, Robert Jarzmik wrote:
-> Russell King - ARM Linux <linux@armlinux.org.uk> writes:
-> > On Thu, Sep 01, 2016 at 09:19:13AM +0200, Robert Jarzmik wrote:
-> > It looks like:
-> >
-> > (a) pcmcia_probe() in drivers/pcmcia/sa1111_generic.c doesn't check the
-> >     return value from the platform specific init functions, meaning if
-> >     they fail, the driver still binds.  (note: they return -ENODEV to
-> >     indicate that they should skip to the next platform.)
-> You're right, I submitted a patch for that, and I confirm it actually happens on
-> lubbock.
-
-That'll work fine for lubbock, but not the others (we can have several
-of the others enabled on sa11x0 platforms - eg, badge4 with neponset.)
-
-> > (b) there is no clock provided for the sa1111 pcmcia device (aka "1800").
-> >     This should be the same clock as pxa2xx-pcmcia.
-> Again right in the spot.
-> I added temporarily a clock until I have a more complete understanding in
-> lubbock.c :
-> +	clk_add_alias(NULL, "1800", "SA1111_CLK", NULL);
+Am Freitag, 2. September 2016, 06:31:24 schrieb Lin Huang:
+> base on dfi result, we do ddr frequency scaling, register
+> dmc driver to devfreq framework, and use simple-ondemand
+> policy.
 > 
-> With this, things look way better :
-> [    1.507480] pcmcia_socket pcmcia_socket1: pccard: PCMCIA card inserted into slot 1
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> Signed-off-by: MyngJoo Ham <myngjoo.ham@samsung.com>
+> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
 
-Yay!
+[...]
 
-> I'm still investigating the new message errors:
-> [    0.479157] genirq: Setting trigger mode 3 for irq 387 failed (sa1111_type_highirq+0x0/0x6c)
-> [    0.488213] genirq: Setting trigger mode 3 for irq 389 failed (sa1111_type_highirq+0x0/0x6c)
-> [    0.507449] genirq: Setting trigger mode 3 for irq 388 failed (sa1111_type_highirq+0x0/0x6c)
-> [    0.516492] genirq: Setting trigger mode 3 for irq 390 failed (sa1111_type_highirq+0x0/0x6c)
+> diff --git a/drivers/devfreq/rk3399_dmc.c b/drivers/devfreq/rk3399_dmc.c
+> new file mode 100644
+> index 0000000..54d65f2
+> --- /dev/null
+> +++ b/drivers/devfreq/rk3399_dmc.c
+> @@ -0,0 +1,480 @@
+> +/*
+> + * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd.
+> + * Author: Lin Huang <hl@rock-chips.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+> for + * more details.
+> + */
+> +
+> +#include <linux/arm-smccc.h>
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/devfreq.h>
+> +#include <linux/devfreq-event.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_opp.h>
+> +#include <linux/regulator/consumer.h>
+> +#include <linux/rwsem.h>
+> +#include <linux/suspend.h>
+> +
+> +#include <soc/rockchip/rockchip_sip.h>
 
-Ignore those for now - the old ARM IRQ stuff was silent on that, but genirq
-is more noisy.  I should probably make the sa1111 irqchip handle the both-
-edge case itself.
+(Repeated from previous version)
+For the shared sip-interface header I've prepared a signed, stable tag
+which can be pulled from
 
-> Moreover, I have a bit of homework as I also see :
->  - no SA1111 interrupts at all, especially nothing when I insert/remove my
->    CompactFlash card
->    This might be an effect of pxa_cplds_irqs.c I created, I must have a look.
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
-Do you get other SA1111 interrupts (eg, the PS/2 interrupts) delivered?
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
 
->  - cat /sys/class/pcmcia_socket/pcmcia_socket1/cis 
->    cat: read error: Input/output error
->    That will cost me a review of the memory timings registers MCIO1/MECR/xxx,
->    the power lines, etc ...
+are available in the git repository at:
 
-Hmm, on Neponset with a CF card inserted, I can cat that, and it reports
-the CIS.  Any error messages in the kernel log?
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/rockchip-ddr-sip
 
->  - cat /sys/class/pcmcia_socket/pcmcia_socket1/status 
-> slot     : 1
-> status   : SS_READY SS_DETECT SS_POWERON SS_3VCARD
-> csc_mask : SS_DETECT
-> cs_flags : SS_OUTPUT_ENA
-> Vcc      : 33
-> Vpp      : 33
-> IRQ      : 0 (386)
+for you to fetch changes up to 97dd82682f1a6174698fbea149a04b4cabc58c4f:
 
-That looks hopeful, but the IRQ hasn't been properly assigned (probably
-because no driver has bound to the card.)
+  soc: rockchip: add header for ddr rate SIP interface (2016-08-31 18:53:24 +0200)
 
-> >> As your gpios are contiguous (0 .. 31), why an array instead of a simple offset
-> >> so that your translation is only a linear irq = gpio + offset ?
-> >
-> > There isn't a linear translation here:
-> ...zip...
-> > MST_PCMCIA_nCD		=> MAINSTONE_S0_CD_IRQ or MAINSTONE_S1_CD_IRQ
-> > MST_PCMCIA_nSTSCHG_BVD1 => MAINSTONE_S0_STSCHG_IRQ or MAINSTONE_S1_STSCHG_IRQ
-> > MST_PCMCIA_nIRQ		=> MAINSTONE_S0_IRQ or MAINSTONE_S1_IRQ
-> >
-> > So they aren't linear, and every "gpio" doesn't have a corresponding
-> > interrupt.
-> Ah yes, too bad, it would have been so much simpler.
+----------------------------------------------------------------
+Header file defining the SIP-interface to the ATF for DDR frequency changes
 
-Indeed, but a tabular approach isn't that painful, especially if we
-also insist on knowing an irqdomain as well, which relieves us of
-having to know absolute interrupt numbers, which may end up being
-dynamically allocated eventually.
+----------------------------------------------------------------
+Lin Huang (1):
+      soc: rockchip: add header for ddr rate SIP interface
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+ include/soc/rockchip/rockchip_sip.h | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+ create mode 100644 include/soc/rockchip/rockchip_sip.h
