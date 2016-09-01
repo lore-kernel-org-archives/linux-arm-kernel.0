@@ -1,62 +1,75 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu, 01 Sep 2016 19:29:37 +0100
-Subject: [RFC PATCH 6/7] arm64: KVM: Handle trappable TLB instructions
-In-Reply-To: <20160901145525.GM6721@arm.com> (Will Deacon's message of "Thu, 1
- Sep 2016 15:55:25 +0100")
-References: <1471344312-26685-1-git-send-email-punit.agrawal@arm.com>
- <1471344312-26685-7-git-send-email-punit.agrawal@arm.com>
- <20160819151846.GE9893@arm.com>
- <87a8g2sb4o.fsf@e105922-lin.cambridge.arm.com>
- <87h9a7rhvf.fsf@e105922-lin.cambridge.arm.com>
- <20160901145525.GM6721@arm.com>
-Message-ID: <878tvblbhq.fsf@e105922-lin.cambridge.arm.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Thu,  1 Sep 2016 20:42:19 +0200
+Subject: [PATCH 1/3] pinctrl: ns2: constify pinctrl_ops and pinmux_ops
+ structures
+In-Reply-To: <1472755341-9995-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1472755341-9995-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1472755341-9995-2-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon <will.deacon@arm.com> writes:
+Check for pinctrl_ops and pinmux_ops structures that are only stored in the
+pctlops field and the pmxops field, respectively, of a pinctrl_desc
+structure.  These fields are declared const, so pinctrl_ops and pinmux_ops
+structures that have this property can be declared as const also.
 
-> On Fri, Aug 26, 2016 at 10:37:08AM +0100, Punit Agrawal wrote:
->> > Will Deacon <will.deacon@arm.com> writes:
->> >> The easiest thing to do is just TLBI VMALLE1IS for all trapped operations,
->> >> but you might want to see how that performs.
->> >
->> > That sounds reasonable for correctness. But I suspect we'll have to do
->> > more to claw back some performance. Let me run a few tests and come back
->> > on this.
->> 
->> Assuming I've correctly switched in TCR and replacing the various TLB
->> operations in this patch with TLBI VMALLE1IS, there is a drop in kernel
->> build times of ~5% (384s vs 363s).
->
-> What do you mean by "switched in TCR"? Why is that necessary if you just
-> nuke the whole thing?
+The semantic patch that makes this change in the pinctrl_ops is as
+follows.  The pinmux_ops case is similar.  (http://coccinelle.lip6.fr/)
 
-You're right. it's not necessary. I'd misunderstood how TCR affects
-things and was switching it in the above tests.
+// <smpl>
+@r disable optional_qualifier@
+identifier i;
+position p;
+@@
+static struct pinctrl_ops i at p = { ... };
 
-> Is the ~5% relative to no trapping at all, or
-> trapping, but being selective about the operation?
+@ok@
+identifier r.i;
+struct pinctrl_desc e;
+position p;
+@@
+e.pctlops = &i at p;
 
-The reported number was relative to trapping and being selective about
-the operation. But I hadn't been careful in ensuring identical
-conditions (page caches, etc.) when running the numbers.
+@bad@
+position p != {r.p,ok.p};
+identifier r.i;
+struct pinctrl_ops e;
+@@
+e at i@p
 
-So I've done a fresh set of identical measurements by running "time make
--j 7" in a VM booted with 7 vcpus and see the following results
+@depends on !bad disable optional_qualifier@
+identifier r.i;
+@@
+static
++const
+ struct pinctrl_ops i = { ... };
+// </smpl>
 
-1. no trapping ~ 365s
-2. traps using selective tlb operations ~ 371s
-3. traps that nuke all stage 1 (tlbi vmalle1is) ~ 393s
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-So based on these measurements there is ~1% and ~7.5% drop in comparison
-between 2. and 3. compared to the base case of no trapping at all.
+---
+ drivers/pinctrl/bcm/pinctrl-ns2-mux.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Thanks,
-Punit
-
->
-> Will
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+diff --git a/drivers/pinctrl/bcm/pinctrl-ns2-mux.c b/drivers/pinctrl/bcm/pinctrl-ns2-mux.c
+index ca81789..13a4c27 100644
+--- a/drivers/pinctrl/bcm/pinctrl-ns2-mux.c
++++ b/drivers/pinctrl/bcm/pinctrl-ns2-mux.c
+@@ -531,7 +531,7 @@ static void ns2_pin_dbg_show(struct pinctrl_dev *pctrl_dev,
+ 	seq_printf(s, " %s", dev_name(pctrl_dev->dev));
+ }
+ 
+-static struct pinctrl_ops ns2_pinctrl_ops = {
++static const struct pinctrl_ops ns2_pinctrl_ops = {
+ 	.get_groups_count = ns2_get_groups_count,
+ 	.get_group_name = ns2_get_group_name,
+ 	.get_group_pins = ns2_get_group_pins,
+@@ -959,7 +959,7 @@ static int ns2_pin_config_set(struct pinctrl_dev *pctrldev, unsigned int pin,
+ out:
+ 	return ret;
+ }
+-static struct pinmux_ops ns2_pinmux_ops = {
++static const struct pinmux_ops ns2_pinmux_ops = {
+ 	.get_functions_count = ns2_get_functions_count,
+ 	.get_function_name = ns2_get_function_name,
+ 	.get_function_groups = ns2_get_function_groups,
