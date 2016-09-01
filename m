@@ -1,8 +1,8 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 1 Sep 2016 10:28:47 +0300
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 1 Sep 2016 15:31:13 +0800
 Subject: [PATCHv3 03/11] crypto: omap-sham: implement context
  export/import APIs
-In-Reply-To: <20160901071958.GA2076@gondor.apana.org.au>
+In-Reply-To: <4c45de7f-002c-48b5-c950-f445354adb09@ti.com>
 References: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
  <1470306526-27219-4-git-send-email-t-kristo@ti.com>
  <20160809100633.GA6751@gondor.apana.org.au>
@@ -12,34 +12,24 @@ References: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
  <20160901061630.GB650@gondor.apana.org.au>
  <70468d4d-9f26-1bad-ace1-4b7c5cf43b52@ti.com>
  <20160901071958.GA2076@gondor.apana.org.au>
-Message-ID: <4c45de7f-002c-48b5-c950-f445354adb09@ti.com>
+ <4c45de7f-002c-48b5-c950-f445354adb09@ti.com>
+Message-ID: <20160901073113.GA2232@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/16 10:19, Herbert Xu wrote:
-> On Thu, Sep 01, 2016 at 09:56:06AM +0300, Tero Kristo wrote:
->>
->> Hmm, looking at the driver, sham_update returns 0 immediately if it
->> just caches data. In a sense, the update is not completed at this
->> point. Are you saying this is illegal and can't be done?
+On Thu, Sep 01, 2016 at 10:28:47AM +0300, Tero Kristo wrote:
 >
-> Once you call the completion function (and returning zero from
-> the update itself is equivalent to calling the completion function)
-> the hardware must not touch the request anymore.
+> Yeah, the flush should do the trick now. Kind of a chicken-egg
+> problem here. :P How do you see the situation with the above
+> explanation?
 
-Yeah, it is not touching it anymore. All the data has been copied to the 
-local buffer at this point, and the driver isn't retaining any kind of a 
-handle to the request itself anymore. It is just that it has not been 
-processed by the hardware yet.
+The export function is not allowed to sleep so you must not wait
+for the hardware to complete in it.
 
->
->> From my understanding, valid results are expected from the driver
->> only after ->final is called.
->
-> That's because you never implemented export/import :)
+If you need to wait, then you must use the completion mechanism.
 
-Yeah, the flush should do the trick now. Kind of a chicken-egg problem 
-here. :P How do you see the situation with the above explanation?
-
-
--Tero
+Cheers,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
