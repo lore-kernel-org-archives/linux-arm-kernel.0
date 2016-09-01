@@ -1,29 +1,39 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 1 Sep 2016 11:10:38 +0100
-Subject: [PATCH v5 00/19] Generic DT bindings for PCI IOMMUs and ARM SMMU
-In-Reply-To: <CAALAos-OzPG=+aU8eKEZtx6EFXytPXq09k3QweHvtYCD=mN0mQ@mail.gmail.com>
-References: <cover.1471975357.git.robin.murphy@arm.com>
- <3a9a9369-d8cd-66f4-9344-965c80894bb6@arm.com>
- <CAALAos-OzPG=+aU8eKEZtx6EFXytPXq09k3QweHvtYCD=mN0mQ@mail.gmail.com>
-Message-ID: <18cc3892-5735-10a2-bd45-7e5087329d51@arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 1 Sep 2016 12:14:16 +0200
+Subject: [PATCH v2 00/10] pinctrl: exynos/samsung: Add header with values
+ used for configuration
+In-Reply-To: <1472714638-15676-1-git-send-email-k.kozlowski@samsung.com>
+References: <1472714638-15676-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <f56eacb7-d861-cc95-f63f-4101e738ca09@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/16 04:49, Anup Patel wrote:
-> Hi Robin,
+Hello Krzysztof,
+
+On 09/01/2016 09:23 AM, Krzysztof Kozlowski wrote:
+> Hi,
 > 
-> What are the chances of having this series in Linux-4.9?
-
-Well, I'm planning to do everything I can over the next few weeks to
-make that happen, but ultimately it's down to maintainers, not me ;)
-
-I'll certainly be posting a v6 next week to address the feedback so far,
-but the more people who can find time to give it a proper review
-(particularly, say, in terms of systems with funky PCI topology) the better!
-
-Robin.
-
+> Merging
+> =======
+> Patch #1 should probably go through pinctrl tree. In that case I would
+> appreciate a stable branch/tag so DTS could base on top of it.
 > 
-> Regards,
-> Anup
 > 
+> Changes since v1
+> ================
+> 1. Follow Arnd's suggestion about moving the macros to common place.
+> 2. Subjects: replace "GPIO" with "pinctrl".
+> 3. There were some major changes here so I did not add Javier's
+>    reviewed-by and tested-by tags.
+> 
+
+I've reviewed this series + the v2.1 1/10 resend and looks good to me.
+So for the whole series:
+
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
