@@ -1,53 +1,188 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Thu,  1 Sep 2016 15:27:54 -0700
-Subject: [PATCH v2 02/17] rpmsg: Name rpmsg devices based on channel id
+Date: Thu,  1 Sep 2016 15:27:58 -0700
+Subject: [PATCH v2 06/17] rpmsg: Introduce indirection table for rpmsg_device
+ operations
 In-Reply-To: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
 References: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <1472768889-3906-3-git-send-email-bjorn.andersson@linaro.org>
+Message-ID: <1472768889-3906-7-git-send-email-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By basing rpmsg device names on channel id we end up with human readable
-device names in sysfs and debug logs.
+To allow for multiple backend implementations add an indireection table
+for rpmsg_device related operations and move the virtio implementation
+behind this table.
 
 Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 ---
 
-Changes since v1:
-- None
+Per Loic's comment I did consider adding parameter validation to the exposed
+functions in this patch, but as the previous implementation did not gracefully
+handle bad input parameters I decided to defer this until after this series has
+been merged.
 
- drivers/rpmsg/virtio_rpmsg_bus.c | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+Changes since v1:
+- Split table in device vs endpoint
+- Moved ops pointer to the public structs to reduce code clutter
+- Kerneldoc for rpmsg_device_ops
+
+ drivers/rpmsg/virtio_rpmsg_bus.c | 48 +++++++++++++++++++++++++++++++++++-----
+ include/linux/rpmsg.h            | 23 +++++++++++++++++++
+ 2 files changed, 65 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c b/drivers/rpmsg/virtio_rpmsg_bus.c
-index 495fa0a282d3..c4bd89ea7681 100644
+index 1ac9fd871760..088203ed1df8 100644
 --- a/drivers/rpmsg/virtio_rpmsg_bus.c
 +++ b/drivers/rpmsg/virtio_rpmsg_bus.c
-@@ -136,14 +136,6 @@ rpmsg_show_attr(src, src, "0x%x\n");
- rpmsg_show_attr(dst, dst, "0x%x\n");
- rpmsg_show_attr(announce, announce ? "true" : "false", "%s\n");
- 
--/*
-- * Unique (and free running) index for rpmsg devices.
-- *
-- * Yeah, we're not recycling those numbers (yet?). will be easy
-- * to change if/when we want to.
-- */
--static unsigned int rpmsg_dev_index;
--
- static ssize_t modalias_show(struct device *dev,
- 			     struct device_attribute *attr, char *buf)
+@@ -286,10 +286,18 @@ struct rpmsg_endpoint *rpmsg_create_ept(struct rpmsg_device *rpdev,
+ 					rpmsg_rx_cb_t cb, void *priv,
+ 					struct rpmsg_channel_info chinfo)
  {
-@@ -531,8 +523,8 @@ static struct rpmsg_channel *rpmsg_create_channel(struct virtproc_info *vrp,
+-	return __rpmsg_create_ept(rpdev->vrp, rpdev, cb, priv, chinfo.src);
++	return rpdev->ops->create_ept(rpdev, cb, priv, chinfo);
+ }
+ EXPORT_SYMBOL(rpmsg_create_ept);
  
- 	strncpy(rpdev->id.name, chinfo->name, RPMSG_NAME_SIZE);
++static struct rpmsg_endpoint *virtio_rpmsg_create_ept(struct rpmsg_device *rpdev,
++						      rpmsg_rx_cb_t cb,
++						      void *priv,
++						      struct rpmsg_channel_info chinfo)
++{
++	return __rpmsg_create_ept(rpdev->vrp, rpdev, cb, priv, chinfo.src);
++}
++
+ /**
+  * __rpmsg_destroy_ept() - destroy an existing rpmsg endpoint
+  * @vrp: virtproc which owns this ept
+@@ -341,7 +349,6 @@ static int rpmsg_dev_probe(struct device *dev)
+ {
+ 	struct rpmsg_device *rpdev = to_rpmsg_device(dev);
+ 	struct rpmsg_driver *rpdrv = to_rpmsg_driver(rpdev->dev.driver);
+-	struct virtproc_info *vrp = rpdev->vrp;
+ 	struct rpmsg_channel_info chinfo = {};
+ 	struct rpmsg_endpoint *ept;
+ 	int err;
+@@ -367,6 +374,18 @@ static int rpmsg_dev_probe(struct device *dev)
+ 		goto out;
+ 	}
  
--	/* very simple device indexing plumbing which is enough for now */
--	dev_set_name(&rpdev->dev, "rpmsg%d", rpmsg_dev_index++);
-+	dev_set_name(&rpdev->dev, "%s:%s",
-+		     dev_name(dev->parent), rpdev->id.name);
++	if (rpdev->ops->announce_create)
++		err = rpdev->ops->announce_create(rpdev);
++out:
++	return err;
++}
++
++static int virtio_rpmsg_announce_create(struct rpmsg_device *rpdev)
++{
++	struct virtproc_info *vrp = rpdev->vrp;
++	struct device *dev = &rpdev->dev;
++	int err = 0;
++
+ 	/* need to tell remote processor's name service about this channel ? */
+ 	if (rpdev->announce &&
+ 	    virtio_has_feature(vrp->vdev, VIRTIO_RPMSG_F_NS)) {
+@@ -381,15 +400,13 @@ static int rpmsg_dev_probe(struct device *dev)
+ 			dev_err(dev, "failed to announce service %d\n", err);
+ 	}
  
- 	rpdev->dev.parent = &vrp->vdev->dev;
- 	rpdev->dev.bus = &rpmsg_bus;
+-out:
+ 	return err;
+ }
+ 
+-static int rpmsg_dev_remove(struct device *dev)
++static int virtio_rpmsg_announce_destroy(struct rpmsg_device *rpdev)
+ {
+-	struct rpmsg_device *rpdev = to_rpmsg_device(dev);
+-	struct rpmsg_driver *rpdrv = to_rpmsg_driver(rpdev->dev.driver);
+ 	struct virtproc_info *vrp = rpdev->vrp;
++	struct device *dev = &rpdev->dev;
+ 	int err = 0;
+ 
+ 	/* tell remote processor's name service we're removing this channel */
+@@ -406,6 +423,18 @@ static int rpmsg_dev_remove(struct device *dev)
+ 			dev_err(dev, "failed to announce service %d\n", err);
+ 	}
+ 
++	return err;
++}
++
++static int rpmsg_dev_remove(struct device *dev)
++{
++	struct rpmsg_device *rpdev = to_rpmsg_device(dev);
++	struct rpmsg_driver *rpdrv = to_rpmsg_driver(rpdev->dev.driver);
++	int err = 0;
++
++	if (rpdev->ops->announce_destroy)
++		err = rpdev->ops->announce_destroy(rpdev);
++
+ 	rpdrv->remove(rpdev);
+ 
+ 	rpmsg_destroy_ept(rpdev->ept);
+@@ -479,6 +508,12 @@ static int rpmsg_device_match(struct device *dev, void *data)
+ 	return 1;
+ }
+ 
++static const struct rpmsg_device_ops virtio_rpmsg_ops = {
++	.create_ept = virtio_rpmsg_create_ept,
++	.announce_create = virtio_rpmsg_announce_create,
++	.announce_destroy = virtio_rpmsg_announce_destroy,
++};
++
+ /*
+  * create an rpmsg channel using its name and address info.
+  * this function will be used to create both static and dynamic
+@@ -508,6 +543,7 @@ static struct rpmsg_device *rpmsg_create_channel(struct virtproc_info *vrp,
+ 	rpdev->vrp = vrp;
+ 	rpdev->src = chinfo->src;
+ 	rpdev->dst = chinfo->dst;
++	rpdev->ops = &virtio_rpmsg_ops;
+ 
+ 	/*
+ 	 * rpmsg server channels has predefined local address (for now),
+diff --git a/include/linux/rpmsg.h b/include/linux/rpmsg.h
+index 35a0f39fd09b..9fdcfc7c7837 100644
+--- a/include/linux/rpmsg.h
++++ b/include/linux/rpmsg.h
+@@ -96,6 +96,8 @@ enum rpmsg_ns_flags {
+ #define RPMSG_ADDR_ANY		0xFFFFFFFF
+ 
+ struct virtproc_info;
++struct rpmsg_endpoint;
++struct rpmsg_device_ops;
+ 
+ /**
+  * struct rpmsg_channel_info - channel info representation
+@@ -127,11 +129,32 @@ struct rpmsg_device {
+ 	u32 dst;
+ 	struct rpmsg_endpoint *ept;
+ 	bool announce;
++
++	const struct rpmsg_device_ops *ops;
+ };
+ 
+ typedef void (*rpmsg_rx_cb_t)(struct rpmsg_device *, void *, int, void *, u32);
+ 
+ /**
++ * struct rpmsg_device_ops - indirection table for the rpmsg_device operations
++ * @create_ept:		create backend-specific endpoint, requried
++ * @announce_create:	announce presence of new channel, optional
++ * @announce_destroy:	announce destruction of channel, optional
++ *
++ * Indirection table for the operations that a rpmsg backend should implement.
++ * @announce_create and @announce_destroy are optional as the backend might
++ * advertise new channels implicitly by creating the endpoints.
++ */
++struct rpmsg_device_ops {
++	struct rpmsg_endpoint *(*create_ept)(struct rpmsg_device *rpdev,
++					    rpmsg_rx_cb_t cb, void *priv,
++					    struct rpmsg_channel_info chinfo);
++
++	int (*announce_create)(struct rpmsg_device *ept);
++	int (*announce_destroy)(struct rpmsg_device *ept);
++};
++
++/**
+  * struct rpmsg_endpoint - binds a local rpmsg address to its user
+  * @rpdev: rpmsg channel device
+  * @refcount: when this drops to zero, the ept is deallocated
 -- 
 2.5.0
