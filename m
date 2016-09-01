@@ -1,62 +1,58 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed, 31 Aug 2016 17:40:20 -0700
-Subject: [PATCH v3 06/22] usb: chipidea: Add platform flag for wrapper phy
- management
+Date: Wed, 31 Aug 2016 17:40:21 -0700
+Subject: [PATCH v3 07/22] usb: chipidea: Notify events when switching host mode
 In-Reply-To: <20160901004036.23936-1-stephen.boyd@linaro.org>
 References: <20160901004036.23936-1-stephen.boyd@linaro.org>
-Message-ID: <20160901004036.23936-7-stephen.boyd@linaro.org>
+Message-ID: <20160901004036.23936-8-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ULPI phy on qcom platforms needs to be initialized and
-powered on after a USB reset and before we toggle the run/stop
-bit. Otherwise, the phy locks up and doesn't work properly.
-Therefore, add a flag to skip any phy power management in the
-core layer, leaving it up to the glue driver to manage.
+The chipidea/udc.c file sends a CI_HDRC_CONTROLLER_RESET_EVENT to
+the wrapper drivers when it calls hw_device_reset(), but that
+function is not called from chipidea/host.c. And the udc.c file
+sends the CI_HDRC_CONTROLLER_STOPPED_EVENT but the host.c file
+doesn't do anything.
+
+The intent of the reset event is to allow the wrapper driver to
+do any wrapper specific things after the reset bit has been set
+in the usb command register. Therefore, add this event hook in
+the host role after we toggle that bit.
+
+Similarly, the intent of the stopped event is to allow the
+wrapper driver to do any wrapper specific things after the device
+is stopped. So when we stop the host role, send the stopped
+event.
 
 Acked-by: Peter Chen <peter.chen@nxp.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/usb/chipidea/core.c  | 6 ++++++
- include/linux/usb/chipidea.h | 1 +
- 2 files changed, 7 insertions(+)
+ drivers/usb/chipidea/host.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 01390e02ee53..532085a096d9 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -361,6 +361,9 @@ static int _ci_usb_phy_init(struct ci_hdrc *ci)
-  */
- static void ci_usb_phy_exit(struct ci_hdrc *ci)
- {
-+	if (ci->platdata->flags & CI_HDRC_OVERRIDE_PHY_CONTROL)
-+		return;
-+
- 	if (ci->phy) {
- 		phy_power_off(ci->phy);
- 		phy_exit(ci->phy);
-@@ -379,6 +382,9 @@ static int ci_usb_phy_init(struct ci_hdrc *ci)
- {
- 	int ret;
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index 053bac9d983c..a1d8551ca79d 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -87,6 +87,9 @@ static int ehci_ci_reset(struct usb_hcd *hcd)
+ 	if (ret)
+ 		return ret;
  
-+	if (ci->platdata->flags & CI_HDRC_OVERRIDE_PHY_CONTROL)
-+		return 0;
++	if (ci->platdata->notify_event)
++		ci->platdata->notify_event(ci, CI_HDRC_CONTROLLER_RESET_EVENT);
 +
- 	switch (ci->platdata->phy_mode) {
- 	case USBPHY_INTERFACE_MODE_UTMI:
- 	case USBPHY_INTERFACE_MODE_UTMIW:
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index f9be467d6695..d07b162073f7 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -57,6 +57,7 @@ struct ci_hdrc_platform_data {
- #define CI_HDRC_OVERRIDE_AHB_BURST	BIT(9)
- #define CI_HDRC_OVERRIDE_TX_BURST	BIT(10)
- #define CI_HDRC_OVERRIDE_RX_BURST	BIT(11)
-+#define CI_HDRC_OVERRIDE_PHY_CONTROL	BIT(12) /* Glue layer manages phy */
- 	enum usb_dr_mode	dr_mode;
- #define CI_HDRC_CONTROLLER_RESET_EVENT		0
- #define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
+ 	ci_platform_configure(ci);
+ 
+ 	return ret;
+@@ -184,6 +187,9 @@ static void host_stop(struct ci_hdrc *ci)
+ 	struct usb_hcd *hcd = ci->hcd;
+ 
+ 	if (hcd) {
++		if (ci->platdata->notify_event)
++			ci->platdata->notify_event(ci,
++				CI_HDRC_CONTROLLER_STOPPED_EVENT);
+ 		usb_remove_hcd(hcd);
+ 		usb_put_hcd(hcd);
+ 		if (ci->platdata->reg_vbus && !ci_otg_is_fsm_mode(ci) &&
 -- 
 2.9.0.rc2.8.ga28705d
