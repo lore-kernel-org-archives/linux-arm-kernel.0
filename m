@@ -1,29 +1,29 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Thu, 1 Sep 2016 15:06:03 +0000
-Subject: [PATCH] Documentation: kasan: arm64 has kasan support too
-Message-ID: <57C843DA.8040705@nxp.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 1 Sep 2016 23:10:39 +0800
+Subject: [PATCH 1/5] clk: add support for runtime pm
+In-Reply-To: <1472737551-15272-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <201609012326.7939xqBY%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mention that arm64 also has kasan support.
+Hi Marek,
 
-Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+[auto build test WARNING on clk/clk-next]
+[also build test WARNING on v4.8-rc4 next-20160825]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
+[Check https://git-scm.com/docs/git-format-patch for more information]
+
+url:    https://github.com/0day-ci/linux/commits/Marek-Szyprowski/Add-runtime-PM-support-for-clocks-on-Exynos-SoC-example/20160901-215042
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+
+
+coccinelle warnings: (new ones prefixed by >>)
+
+>> drivers/clk/clk.c:123:9-10: WARNING: return of 0/1 in function 'clk_pm_runtime_suspended' with return type bool
+
+Please review and possibly fold the followup patch.
+
 ---
- Documentation/kasan.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/Documentation/kasan.txt b/Documentation/kasan.txt
-index 7dd95b3..c156934 100644
---- a/Documentation/kasan.txt
-+++ b/Documentation/kasan.txt
-@@ -12,7 +12,7 @@ KASAN uses compile-time instrumentation for checking every memory access,
- therefore you will need a GCC version 4.9.2 or later. GCC 5.0 or later is
- required for detection of out-of-bounds accesses to stack or global variables.
- 
--Currently KASAN is supported only for x86_64 architecture.
-+Currently KASAN is supported only for x86_64 and arm64 architectures.
- 
- 1. Usage
- ========
--- 
-1.8.3.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
