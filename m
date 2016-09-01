@@ -1,53 +1,54 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 1 Sep 2016 18:45:01 +0200
-Subject: [linux-sunxi] Re: [PATCH v9 1/2] ASoC: sun4i-codec: Distinguish
- sun4i from sun7i
-In-Reply-To: <20160831221402.670ab832@scratchpost.org>
-References: <20160830054403.7878-1-dannym@scratchpost.org>
- <20160830054403.7878-2-dannym@scratchpost.org>
- <20160831174623.GA20462@lukather>
- <20160831221402.670ab832@scratchpost.org>
-Message-ID: <20160901164501.GE20462@lukather>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 1 Sep 2016 17:45:49 +0100
+Subject: [PATCH 2/2] arm64: regard FDT_SW_MAGIC as good fdt magic
+In-Reply-To: <57C8516E.7000105@zoho.com>
+References: <a6a8826c-3006-ae43-ef4c-8049ef93cd9f@zoho.com>
+ <20160901112113.GA4220@leverpostej> <57C8516E.7000105@zoho.com>
+Message-ID: <20160901164549.GA7136@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Danny,
-
-On Wed, Aug 31, 2016 at 10:14:02PM +0200, Danny Milosavljevic wrote:
-> Hi Maxime,
-> 
-> On Wed, 31 Aug 2016 19:46:23 +0200
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> 
-> > > -#define SUN4I_CODEC_AC_SYS_VERI			(0x38)
-> > > -#define SUN4I_CODEC_AC_MIC_PHONE_CAL		(0x3c)
-> > > +
-> > > +#define SUN7I_CODEC_AC_DAC_CAL			(0x38)
-> > > +#define SUN7I_CODEC_AC_MIC_PHONE_CAL		(0x3c)  
+On Fri, Sep 02, 2016 at 12:03:58AM +0800, zijun_hu wrote:
+> On 09/01/2016 07:21 PM, Mark Rutland wrote:
+> > On Thu, Sep 01, 2016 at 06:58:29PM +0800, zijun_hu wrote:
+> >> From: zijun_hu <zijun_hu@htc.com>
+> >>
+> >> regard FDT_SW_MAGIC as good fdt magic during mapping fdt area
+> >> see fdt_check_header() for details
 > > 
-> > That will need at least some mention in the commit log.
-> 
-> Hm? It's now called like it is called in the user manual.
-> Also, the macro SUN4I_CODEC_AC_SYS_VERI was unused before anyway.
-> 
-> What should I write in the commit log?
+> > It looks like we should only see FDT_SW_MAGIC for a FDT that was in the
+> > process of being created, but was not finished. So I'm somewhat confused
+> > as to why fdt_check_header() would allow this.
+> > 
+> > Neither ePAPR nor the new devicetree spec define FDT_SW_MAGIC. They both
+> > only define 0xd00dfeed as a valid magic value. In libfdt, FDT_SW_MAGIC
+> > is an internal constant, and it looks like fdt_check_header() simply
+> > accepts this for convenience within libfdt.
 
-For example, that the current code was wrong and those registers are
-not present on the A10.
+> > Why do you think this is necessary? Have you seen a problem in practice?
 
-That way, you justify both the renaming, and the max_register change
-in the regmap.
+> i don't understand function modules involved with FDT_SW_MAGIC very well
+> i just think it isn't a bad thing to keep consistent with fdt_check_header()
 
-Maxime
+I agree that the inconsistency is not great.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160901/196be5c1/attachment.sig>
+However, I think that we do not want the kernel to accept FDT_SW_MAGIC
+in any case, given this implies a DTB mid-creation.
+
+Which is to say that either fdt_check_header() is doing the wrong thing,
+or that we're using it in places where it's inappropriate.
+
+> BTW
+> it seems FDT_SW_MAGIC is involved in fdt_create_empty_tree()@fdt_sw.c which
+> operate fdt in runtime
+> in kernel, this function is used in drivers/firmware/efi/libstub/fdt.c
+> in u-boot, in arch/sandbox/cpu/cpu.c an arch/sandbox/cpu/state.c
+> the sources mentioned above maybe help you for further decision
+
+Note that fdt_create_empty_tree() calls fdt_finish(), which fixes some
+details up, then sets the magic to the real FDT_MAGIC.
+
+So that should be fine.
+
+Thanks,
+Mark.
