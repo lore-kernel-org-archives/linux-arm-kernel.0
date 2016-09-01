@@ -1,150 +1,55 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed, 31 Aug 2016 17:40:32 -0700
-Subject: [PATCH v3 18/22] usb: chipidea: msm: Add reset controller for PHY POR
- bit
+Date: Wed, 31 Aug 2016 17:40:27 -0700
+Subject: [PATCH v3 13/22] usb: chipidea: msm: Use hw_write_id_reg() instead of
+ writel
 In-Reply-To: <20160901004036.23936-1-stephen.boyd@linaro.org>
 References: <20160901004036.23936-1-stephen.boyd@linaro.org>
-Message-ID: <20160901004036.23936-19-stephen.boyd@linaro.org>
+Message-ID: <20160901004036.23936-14-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MSM chipidea wrapper has two bits that are used to reset the
-first or second phy. Add support for these bits via the reset
-controller framework, so that phy drivers can reset their
-hardware at the right time during initialization.
+The MSM_USB_BASE macro trick is not very clear, and we're using
+it for only one register write so let's just move to using
+hw_write_id_reg() and passing the ci pointer instead. That
+clearly shows what offset we're using and avoids needing to
+include the msm_hsusb_hw.h file when we're going to delete that
+file soon.
 
-Cc: Peter Chen <peter.chen@nxp.com>
+Acked-by: Peter Chen <peter.chen@nxp.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/usb/chipidea/Kconfig       |  1 +
- drivers/usb/chipidea/ci_hdrc_msm.c | 50 ++++++++++++++++++++++++++++++++++++--
- 2 files changed, 49 insertions(+), 2 deletions(-)
+ drivers/usb/chipidea/ci_hdrc_msm.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/usb/chipidea/Kconfig b/drivers/usb/chipidea/Kconfig
-index 19c20eaa23f2..fc96f5cdcb5c 100644
---- a/drivers/usb/chipidea/Kconfig
-+++ b/drivers/usb/chipidea/Kconfig
-@@ -2,6 +2,7 @@ config USB_CHIPIDEA
- 	tristate "ChipIdea Highspeed Dual Role Controller"
- 	depends on ((USB_EHCI_HCD && USB_GADGET) || (USB_EHCI_HCD && !USB_GADGET) || (!USB_EHCI_HCD && USB_GADGET)) && HAS_DMA
- 	select EXTCON
-+	select RESET_CONTROLLER
- 	help
- 	  Say Y here if your system has a dual role high speed USB
- 	  controller based on ChipIdea silicon IP. It supports:
 diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
-index 2489a63d3e75..fe96df7b530c 100644
+index 719b20caf88e..b282a717bf8c 100644
 --- a/drivers/usb/chipidea/ci_hdrc_msm.c
 +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
-@@ -14,6 +14,7 @@
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
- #include <linux/io.h>
-+#include <linux/reset-controller.h>
- #include <linux/extcon.h>
- #include <linux/of.h>
+@@ -8,14 +8,12 @@
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+-#include <linux/usb/msm_hsusb_hw.h>
+-#include <linux/usb/ulpi.h>
+ #include <linux/usb/gadget.h>
+ #include <linux/usb/chipidea.h>
  
-@@ -31,8 +32,10 @@
- #define HSPHY_SESS_VLD_CTRL		BIT(25)
+ #include "ci.h"
  
- /* Vendor base starts at 0x200 beyond CI base */
-+#define HS_PHY_CTRL			0x0040
- #define HS_PHY_SEC_CTRL			0x0078
- #define HS_PHY_DIG_CLAMP_N		BIT(16)
-+#define HS_PHY_POR_ASSERT		BIT(0)
+-#define MSM_USB_BASE	(ci->hw_bank.abs)
++#define HS_PHY_AHB_MODE			0x0098
  
- struct ci_hdrc_msm {
- 	struct platform_device *ci;
-@@ -40,11 +43,43 @@ struct ci_hdrc_msm {
- 	struct clk *iface_clk;
- 	struct clk *fs_clk;
- 	struct ci_hdrc_platform_data pdata;
-+	struct reset_controller_dev rcdev;
- 	bool secondary_phy;
- 	bool hsic;
- 	void __iomem *base;
- };
- 
-+static int
-+ci_hdrc_msm_por_reset(struct reset_controller_dev *r, unsigned long id)
-+{
-+	struct ci_hdrc_msm *ci_msm = container_of(r, struct ci_hdrc_msm, rcdev);
-+	void __iomem *addr = ci_msm->base;
-+	u32 val;
-+
-+	if (id)
-+		addr += HS_PHY_SEC_CTRL;
-+	else
-+		addr += HS_PHY_CTRL;
-+
-+	val = readl_relaxed(addr);
-+	val |= HS_PHY_POR_ASSERT;
-+	writel(val, addr);
-+	/*
-+	 * wait for minimum 10 microseconds as suggested by manual.
-+	 * Use a slightly larger value since the exact value didn't
-+	 * work 100% of the time.
-+	 */
-+	udelay(12);
-+	val &= ~HS_PHY_POR_ASSERT;
-+	writel(val, addr);
-+
-+	return 0;
-+}
-+
-+static const struct reset_control_ops ci_hdrc_msm_reset_ops = {
-+	.reset = ci_hdrc_msm_por_reset,
-+};
-+
  static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
  {
- 	struct device *dev = ci->dev->parent;
-@@ -186,10 +221,18 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
- 	if (!ci->base)
- 		return -ENOMEM;
- 
--	ret = clk_prepare_enable(ci->fs_clk);
-+	ci->rcdev.owner = THIS_MODULE;
-+	ci->rcdev.ops = &ci_hdrc_msm_reset_ops;
-+	ci->rcdev.of_node = pdev->dev.of_node;
-+	ci->rcdev.nr_resets = 2;
-+	ret = reset_controller_register(&ci->rcdev);
- 	if (ret)
- 		return ret;
- 
-+	ret = clk_prepare_enable(ci->fs_clk);
-+	if (ret)
-+		goto err_fs;
-+
- 	reset_control_assert(reset);
- 	usleep_range(10000, 12000);
- 	reset_control_deassert(reset);
-@@ -198,7 +241,7 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
- 
- 	ret = clk_prepare_enable(ci->core_clk);
- 	if (ret)
--		return ret;
-+		goto err_fs;
- 
- 	ret = clk_prepare_enable(ci->iface_clk);
- 	if (ret)
-@@ -236,6 +279,8 @@ err_mux:
- 	clk_disable_unprepare(ci->iface_clk);
- err_iface:
- 	clk_disable_unprepare(ci->core_clk);
-+err_fs:
-+	reset_controller_unregister(&ci->rcdev);
- 	return ret;
- }
- 
-@@ -247,6 +292,7 @@ static int ci_hdrc_msm_remove(struct platform_device *pdev)
- 	ci_hdrc_remove_device(ci->ci);
- 	clk_disable_unprepare(ci->iface_clk);
- 	clk_disable_unprepare(ci->core_clk);
-+	reset_controller_unregister(&ci->rcdev);
- 
- 	return 0;
- }
+@@ -25,7 +23,7 @@ static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
+ 	case CI_HDRC_CONTROLLER_RESET_EVENT:
+ 		dev_dbg(dev, "CI_HDRC_CONTROLLER_RESET_EVENT received\n");
+ 		/* use AHB transactor, allow posted data writes */
+-		writel(0x8, USB_AHBMODE);
++		hw_write_id_reg(ci, HS_PHY_AHB_MODE, 0xffffffff, 0x8);
+ 		usb_phy_init(ci->usb_phy);
+ 		break;
+ 	case CI_HDRC_CONTROLLER_STOPPED_EVENT:
 -- 
 2.9.0.rc2.8.ga28705d
