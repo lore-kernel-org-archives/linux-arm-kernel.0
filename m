@@ -1,39 +1,36 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Thu, 1 Sep 2016 17:58:41 -0500
-Subject: [PATCH 0/5] Use mmio-sram driver for Keystone MSMC RAM
-Message-ID: <20160901225846.31058-1-s-anna@ti.com>
+Date: Thu, 1 Sep 2016 17:58:46 -0500
+Subject: [PATCH 5/5] ARM: configs: keystone: Enable Generic on-chip SRAM driver
+In-Reply-To: <20160901225846.31058-1-s-anna@ti.com>
+References: <20160901225846.31058-1-s-anna@ti.com>
+Message-ID: <20160901225846.31058-6-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+All the Keystone 2 SoCs have an on-chip RAM called the MultiCore
+Shared Memory (MSM) RAM managed by the Multicore Shared Memory
+Controller (MSMC) that provides faster access compared to normal
+DDR.
 
-The Keystone 2 family of SoCs have an on-chip RAM called the
-Multicore Shared Memory (MSM) RAM. This RAM is accessible through
-the Multicore Shared Memory Controller (MSMC). This series represents
-these on-chip RAMs as sram nodes so that the memory allocations
-can be managed by the in-kernel mmio-sram driver.
+This patch enables the Generic on-chip SRAM driver that manages
+this memory in software.
 
-The first 4 patches adds the basic SRAM nodes on each of the SoCs,
-and the last patch enables the generic on-chip SRAM driver for
-keystone defconfig.
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ arch/arm/configs/keystone_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-regards
-Suman
-
-
-Suman Anna (5):
-  ARM: dts: keystone-k2hk: Add MSM RAM node
-  ARM: dts: keystone-k2l: Add MSM RAM node
-  ARM: dts: keystone-k2e: Add MSM RAM node
-  ARM: dts: keystone-k2g: Add MSM RAM node
-  ARM: configs: keystone: Enable Generic on-chip SRAM driver
-
- arch/arm/boot/dts/keystone-k2e.dtsi  | 8 ++++++++
- arch/arm/boot/dts/keystone-k2g.dtsi  | 8 ++++++++
- arch/arm/boot/dts/keystone-k2hk.dtsi | 8 ++++++++
- arch/arm/boot/dts/keystone-k2l.dtsi  | 8 ++++++++
- arch/arm/configs/keystone_defconfig  | 1 +
- 5 files changed, 33 insertions(+)
-
+diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
+index 71b42e66488a..28afcf7733f2 100644
+--- a/arch/arm/configs/keystone_defconfig
++++ b/arch/arm/configs/keystone_defconfig
+@@ -126,6 +126,7 @@ CONFIG_MTD_NAND_DAVINCI=y
+ CONFIG_MTD_SPI_NOR=y
+ CONFIG_MTD_UBI=y
+ CONFIG_BLK_DEV_LOOP=y
++CONFIG_SRAM=y
+ CONFIG_EEPROM_AT24=y
+ CONFIG_SCSI=y
+ CONFIG_BLK_DEV_SD=y
 -- 
 2.9.3
