@@ -1,46 +1,95 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 1 Sep 2016 15:30:37 +0100
-Subject: [PATCH v7 8/9] arm64: pmu: Detect and enable multiple PMUs in an
- ACPI system
-In-Reply-To: <b4d5397f-2ab0-8c19-d36e-ea23edb71bfb@arm.com>
-References: <1471985280-2243-1-git-send-email-jeremy.linton@arm.com>
- <1471985280-2243-9-git-send-email-jeremy.linton@arm.com>
- <8737lro9lq.fsf@e105922-lin.cambridge.arm.com>
- <b4d5397f-2ab0-8c19-d36e-ea23edb71bfb@arm.com>
-Message-ID: <20160901143037.GL6721@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 1 Sep 2016 15:33:42 +0100
+Subject: [PATCH v2] efi: arm64: treat regions with WT/WC set but WB
+ cleared as memory
+In-Reply-To: <CAKv+Gu8-u7bqEj3Y9N0W0xogRM7t6rzxcY=Of2HHHzhKjo59Dg@mail.gmail.com>
+References: <1472141829-12026-1-git-send-email-ard.biesheuvel@linaro.org>
+ <57C00FA7.8010908@arm.com>
+ <CAKv+Gu8-u7bqEj3Y9N0W0xogRM7t6rzxcY=Of2HHHzhKjo59Dg@mail.gmail.com>
+Message-ID: <CAKv+Gu9QVUg2a=+efO+j+nVUNszpRYuzH9mRHTHLNNBBJX+b9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2016 at 05:44:59PM -0500, Jeremy Linton wrote:
-> Hi,
-> 
-> On 08/26/2016 10:04 AM, Punit Agrawal wrote:
-> (trimming)
-> >>+			pmu = kzalloc(sizeof(struct pmu_types), GFP_KERNEL);
-> >>+			if (!pmu) {
-> >>+				pr_warn("Unable to allocate pmu_types\n");
-> >>+				/*
-> >>+				 * continue to count cpus for any pmu_types
-> >>+				 * already allocated, but don't allocate any
-> >>+				 * more pmu_types. This avoids undercounting.
-> >>+				 */
-> >>+				alloc_failure = true;
-> >
-> >Why not just fail probe and return an error? What is the benefit of
-> >having some of the PMUs available?
-> 
-> AFAIC, there isn't a good reason for penalizing PMU's which we can get
-> working if a subset of the system PMUs can't be created. But this is per PMU
-> type, so with current systems the kzalloc will be called a max of 2 times
-> (there is the potential of a 3rd time, due to some other error handling, but
-> that doesn't change the argument much). AKA, this doesn't result in "partial
-> registration" of a PMU.
+On 26 August 2016 at 11:08, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 26 August 2016 at 11:45, James Morse <james.morse@arm.com> wrote:
+>> Hi Ard,
+>>
+>> On 25/08/16 17:17, Ard Biesheuvel wrote:
+>>> Currently, memory regions are only recorded in the memblock memory table
+>>> if they have the EFI_MEMORY_WB memory type attribute set. In case the
+>>> region is of a reserved type, it is also marked as MEMBLOCK_NOMAP, which
+>>> will leave it out of the linear mapping.
+>>>
+>>> However, memory regions may legally have the EFI_MEMORY_WT or EFI_MEMORY_WC
+>>> attributes set, and the EFI_MEMORY_WB cleared, in which case the region in
+>>> question is obviously backed by normal memory, but is not recorded in the
+>>> memblock memory table at all.
+>>
+>> I've been hitting this when applying weird (but permissible) attributes to the
+>> ACPI regions. Currently without WB we map these as device memory, then let
+>> acpica make unaligned accesses to it.
+>>
+>> This patch fixes all that, and from the conversation on irc, the 'UC only' case
+>> for ACPI tables is x86-legacy, and should never happen.
+>>
+>
+> Indeed, deliberately exposing a region containing ACPI tables as
+> something that *requires* strongly ordered access does not make sense.
+>
+> The problem here is that the UEFI memory map describes both occupied
+> and available regions, and in the 'available' case, it is obvious that
+> these bits describe the nature of the physical backing of the region,
+> i.e., whether the bus fabric, memory, etc allow writeback/writethrough
+> caching, write buffering etc. This explains why most regions have all
+> the bits set.
+>
+> In the occupied case, this can be misinterpreted as describing the
+> nature of the content, like an ACPI table containing fields that are
+> not naturally aligned. I.e, I don't think clearing the UC bit here
+> should be interpreted to mean that the payload *requires* WB/WT/WC. It
+> is up to the kernel to complain if it interprets a region, and notices
+> that the only supported mapping type conflicts with the nature of the
+> accesses we intend to perform.
+>
+>>
+>>> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+>>> index c49d50e68aee..c2ac5975fd5d 100644
+>>> --- a/drivers/firmware/efi/arm-init.c
+>>> +++ b/drivers/firmware/efi/arm-init.c
+>>> @@ -163,18 +163,22 @@ static __init int is_reserve_region(efi_memory_desc_t *md)
+>>>       case EFI_BOOT_SERVICES_DATA:
+>>>       case EFI_CONVENTIONAL_MEMORY:
+>>>       case EFI_PERSISTENT_MEMORY:
+>>> -             return 0;
+>>> +             /*
+>>> +              * According to the spec, these regions are no longer reserved
+>>> +              * after calling ExitBootServices(). However, we can only use
+>>> +              * them as System RAM if they can be mapped writeback cacheable.
+>>> +              */
+>>> +             return (md->attribute & EFI_MEMORY_WB);
+>>>       default:
+>>>               break;
+>>
+>> Micro-nit: break here in order to immediately return false looks a bit odd...
+>>
+>
+> Yes, I could not decide what to do with it so I left it.
+>
+>>
+>>>       }
+>>> -     return is_normal_ram(md);
+>>> +     return false;
+>>>  }
+>>
+>>
+>> Tested-by: James Morse <james.morse@arm.com>
+>> Reviewed-by: James Morse <james.morse@arm.com>
+>>
+>
 
-... but this will look mighty confusing to userspace, where things will
-appear to "half-work", if for some reason the machine makes it that far
-at all.
+Matt,
 
-I think we should stick with the KISS approach and just fail the probe
-as Punit is suggesting.
+Could we get this queued for v4.9 please?
 
-Will
+Thanks,
+Ard.
