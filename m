@@ -1,74 +1,52 @@
-From: zijun_hu@zoho.com (zijun_hu)
-Date: Thu, 1 Sep 2016 18:58:29 +0800
-Subject: [PATCH 2/2] arm64: regard FDT_SW_MAGIC as good fdt magic
-Message-ID: <a6a8826c-3006-ae43-ef4c-8049ef93cd9f@zoho.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 01 Sep 2016 12:59:41 +0200
+Subject: [PATCH 5/6] ARM: dts: s3c2416: Use macros for pinctrl
+ configuration
+In-Reply-To: <1472721715-2833-6-git-send-email-k.kozlowski@samsung.com>
+References: <1472721715-2833-1-git-send-email-k.kozlowski@samsung.com>
+ <1472721715-2833-6-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1608454.1ZuTJsprje@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: zijun_hu <zijun_hu@htc.com>
 
-regard FDT_SW_MAGIC as good fdt magic during mapping fdt area
-see fdt_check_header() for details
+Hi,
 
-Signed-off-by: zijun_hu <zijun_hu@htc.com>
----
- arch/arm64/mm/mmu.c                  | 3 ++-
- scripts/dtc/libfdt/fdt.h             | 3 ++-
- scripts/dtc/libfdt/libfdt.h          | 2 ++
- scripts/dtc/libfdt/libfdt_internal.h | 2 --
- 4 files changed, 6 insertions(+), 4 deletions(-)
+On Thursday, September 01, 2016 11:21:54 AM Krzysztof Kozlowski wrote:
+> Usage of DTS macros instead of hard-coded numbers makes code easier
+> to read.  One does not have to remember which value means pull-up/down
+> or specific driver strength.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/boot/dts/s3c2416-pinctrl.dtsi | 38 ++++++++++++++++++----------------
+>  1 file changed, 20 insertions(+), 18 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/s3c2416-pinctrl.dtsi b/arch/arm/boot/dts/s3c2416-pinctrl.dtsi
+> index 527e3193817f..6274359fb323 100644
+> --- a/arch/arm/boot/dts/s3c2416-pinctrl.dtsi
+> +++ b/arch/arm/boot/dts/s3c2416-pinctrl.dtsi
+> @@ -8,6 +8,8 @@
+>   * published by the Free Software Foundation.
+>   */
+>  
+> +#include <dt-bindings/pinctrl/samsung.h>
+> +
+>  &pinctrl_0 {
+>  	/*
+>  	 * Pin banks
+> @@ -83,91 +85,91 @@
+>  
+>  	uart0_data: uart0-data {
+>  		samsung,pins = "gph-0", "gph-1";
+> -		samsung,pin-function = <2>;
+> +		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 4989948d1feb..83df20509eae 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -716,7 +716,8 @@ void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
- 	create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE),
- 			dt_virt_base, SWAPPER_BLOCK_SIZE, prot);
- 
--	if (fdt_magic(dt_virt) != FDT_MAGIC)
-+	if (fdt_magic(dt_virt) != FDT_MAGIC &&
-+			fdt_magic(dt_virt) != FDT_SW_MAGIC)
- 		return NULL;
- 
- 	*size = fdt_totalsize(dt_virt);
-diff --git a/scripts/dtc/libfdt/fdt.h b/scripts/dtc/libfdt/fdt.h
-index 526aedb51556..0e8806327b53 100644
---- a/scripts/dtc/libfdt/fdt.h
-+++ b/scripts/dtc/libfdt/fdt.h
-@@ -92,7 +92,8 @@ struct fdt_property {
- 
- #endif /* !__ASSEMBLY */
- 
--#define FDT_MAGIC	0xd00dfeed	/* 4: version, 4: total size */
-+/* 4: version, 4: total size */
-+#define FDT_MAGIC	((fdt32_t)0xd00dfeed)
- #define FDT_TAGSIZE	sizeof(fdt32_t)
- 
- #define FDT_BEGIN_NODE	0x1		/* Start node: full name */
-diff --git a/scripts/dtc/libfdt/libfdt.h b/scripts/dtc/libfdt/libfdt.h
-index 59ca33976e56..6998f9249183 100644
---- a/scripts/dtc/libfdt/libfdt.h
-+++ b/scripts/dtc/libfdt/libfdt.h
-@@ -54,6 +54,8 @@
- #include "libfdt_env.h"
- #include "fdt.h"
- 
-+#define FDT_SW_MAGIC           (~FDT_MAGIC)
-+
- #define FDT_FIRST_SUPPORTED_VERSION	0x10
- #define FDT_LAST_SUPPORTED_VERSION	0x11
- 
-diff --git a/scripts/dtc/libfdt/libfdt_internal.h b/scripts/dtc/libfdt/libfdt_internal.h
-index 02cfa6fb612d..f4efde0119f2 100644
---- a/scripts/dtc/libfdt/libfdt_internal.h
-+++ b/scripts/dtc/libfdt/libfdt_internal.h
-@@ -90,6 +90,4 @@ static inline struct fdt_reserve_entry *_fdt_mem_rsv_w(void *fdt, int n)
- 	return (void *)(uintptr_t)_fdt_mem_rsv(fdt, n);
- }
- 
--#define FDT_SW_MAGIC		(~FDT_MAGIC)
--
- #endif /* _LIBFDT_INTERNAL_H */
--- 
-1.9.1
+Shouldn't macros that are also used by s3c* be named as
+SAMSUNG_PIN_FUNC_2 etc. (s3c* SoCs are not Exynos)?
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
