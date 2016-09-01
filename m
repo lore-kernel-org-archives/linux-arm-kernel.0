@@ -1,123 +1,172 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Thu,  1 Sep 2016 15:27:56 -0700
-Subject: [PATCH v2 04/17] rpmsg: Make rpmsg_create_ept() take channel_info
- struct
+Date: Thu,  1 Sep 2016 15:28:02 -0700
+Subject: [PATCH v2 10/17] rpmsg: Move helper for finding rpmsg devices to core
 In-Reply-To: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
 References: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <1472768889-3906-5-git-send-email-bjorn.andersson@linaro.org>
+Message-ID: <1472768889-3906-11-git-send-email-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we introduce support for additional rpmsg backends, some of these
-only supports point-to-point "links" represented by a name. By making
-rpmsg_create_ept() take a channel_info struct we allow for these
-backends to either be passed a source address, a destination address or
-a name identifier.
+Extract and move the helper function for finding rpmsg child devices to
+the core.
 
 Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 ---
 
 Changes since v1:
-- None
+- Extracted this from the big move to rpmsg_core.c in v1
 
- drivers/rpmsg/virtio_rpmsg_bus.c | 26 ++++++++++----------------
- include/linux/rpmsg.h            | 15 ++++++++++++++-
- 2 files changed, 24 insertions(+), 17 deletions(-)
+ drivers/rpmsg/rpmsg_core.c       | 33 +++++++++++++++++++++++++++++++++
+ drivers/rpmsg/rpmsg_internal.h   | 31 +++++++++++++++++++++++++++++++
+ drivers/rpmsg/virtio_rpmsg_bus.c | 29 ++++-------------------------
+ 3 files changed, 68 insertions(+), 25 deletions(-)
+ create mode 100644 drivers/rpmsg/rpmsg_internal.h
 
+diff --git a/drivers/rpmsg/rpmsg_core.c b/drivers/rpmsg/rpmsg_core.c
+index 3bee8e03a387..81101775fed0 100644
+--- a/drivers/rpmsg/rpmsg_core.c
++++ b/drivers/rpmsg/rpmsg_core.c
+@@ -22,6 +22,8 @@
+ #include <linux/kernel.h>
+ #include <linux/rpmsg.h>
+ 
++#include "rpmsg_internal.h"
++
+ /**
+  * rpmsg_create_ept() - create a new rpmsg_endpoint
+  * @rpdev: rpmsg channel device
+@@ -229,3 +231,34 @@ int rpmsg_trysend_offchannel(struct rpmsg_endpoint *ept, u32 src, u32 dst,
+ 	return ept->ops->trysend_offchannel(ept, src, dst, data, len);
+ }
+ EXPORT_SYMBOL(rpmsg_trysend_offchannel);
++
++/*
++ * match an rpmsg channel with a channel info struct.
++ * this is used to make sure we're not creating rpmsg devices for channels
++ * that already exist.
++ */
++static int rpmsg_device_match(struct device *dev, void *data)
++{
++	struct rpmsg_channel_info *chinfo = data;
++	struct rpmsg_device *rpdev = to_rpmsg_device(dev);
++
++	if (chinfo->src != RPMSG_ADDR_ANY && chinfo->src != rpdev->src)
++		return 0;
++
++	if (chinfo->dst != RPMSG_ADDR_ANY && chinfo->dst != rpdev->dst)
++		return 0;
++
++	if (strncmp(chinfo->name, rpdev->id.name, RPMSG_NAME_SIZE))
++		return 0;
++
++	/* found a match ! */
++	return 1;
++}
++
++struct device *rpmsg_find_device(struct device *parent,
++				 struct rpmsg_channel_info *chinfo)
++{
++	return device_find_child(parent, chinfo, rpmsg_device_match);
++
++}
++EXPORT_SYMBOL(rpmsg_find_device);
+diff --git a/drivers/rpmsg/rpmsg_internal.h b/drivers/rpmsg/rpmsg_internal.h
+new file mode 100644
+index 000000000000..205debf4ea65
+--- /dev/null
++++ b/drivers/rpmsg/rpmsg_internal.h
+@@ -0,0 +1,31 @@
++/*
++ * remote processor messaging bus internals
++ *
++ * Copyright (C) 2011 Texas Instruments, Inc.
++ * Copyright (C) 2011 Google, Inc.
++ *
++ * Ohad Ben-Cohen <ohad@wizery.com>
++ * Brian Swetland <swetland@google.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __RPMSG_INTERNAL_H__
++#define __RPMSG_INTERNAL_H__
++
++#include <linux/rpmsg.h>
++
++#define to_rpmsg_device(d) container_of(d, struct rpmsg_device, dev)
++#define to_rpmsg_driver(d) container_of(d, struct rpmsg_driver, drv)
++
++struct device *rpmsg_find_device(struct device *parent,
++				 struct rpmsg_channel_info *chinfo);
++
++#endif
 diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c b/drivers/rpmsg/virtio_rpmsg_bus.c
-index 345036b485d7..7c7c6a8b21d9 100644
+index 184663276e51..488fd93a290c 100644
 --- a/drivers/rpmsg/virtio_rpmsg_bus.c
 +++ b/drivers/rpmsg/virtio_rpmsg_bus.c
-@@ -73,18 +73,6 @@ struct virtproc_info {
- 	struct rpmsg_endpoint *ns_ept;
- };
+@@ -35,6 +35,8 @@
+ #include <linux/mutex.h>
+ #include <linux/of_device.h>
  
--/**
-- * struct rpmsg_channel_info - internal channel info representation
-- * @name: name of service
-- * @src: local address
-- * @dst: destination address
-- */
--struct rpmsg_channel_info {
--	char name[RPMSG_NAME_SIZE];
--	u32 src;
--	u32 dst;
--};
--
- #define to_rpmsg_channel(d) container_of(d, struct rpmsg_channel, dev)
- #define to_rpmsg_driver(d) container_of(d, struct rpmsg_driver, drv)
- 
-@@ -259,7 +247,7 @@ free_ept:
-  * @rpdev: rpmsg channel device
-  * @cb: rx callback handler
-  * @priv: private data for the driver's use
-- * @addr: local rpmsg address to bind with @cb
-+ * @chinfo: channel_info with the local rpmsg address to bind with @cb
-  *
-  * Every rpmsg address in the system is bound to an rx callback (so when
-  * inbound messages arrive, they are dispatched by the rpmsg bus using the
-@@ -295,9 +283,10 @@ free_ept:
-  * Returns a pointer to the endpoint on success, or NULL on error.
-  */
- struct rpmsg_endpoint *rpmsg_create_ept(struct rpmsg_channel *rpdev,
--					rpmsg_rx_cb_t cb, void *priv, u32 addr)
-+					rpmsg_rx_cb_t cb, void *priv,
-+					struct rpmsg_channel_info chinfo)
- {
--	return __rpmsg_create_ept(rpdev->vrp, rpdev, cb, priv, addr);
-+	return __rpmsg_create_ept(rpdev->vrp, rpdev, cb, priv, chinfo.src);
- }
- EXPORT_SYMBOL(rpmsg_create_ept);
- 
-@@ -353,10 +342,15 @@ static int rpmsg_dev_probe(struct device *dev)
- 	struct rpmsg_channel *rpdev = to_rpmsg_channel(dev);
- 	struct rpmsg_driver *rpdrv = to_rpmsg_driver(rpdev->dev.driver);
- 	struct virtproc_info *vrp = rpdev->vrp;
-+	struct rpmsg_channel_info chinfo = {};
- 	struct rpmsg_endpoint *ept;
- 	int err;
- 
--	ept = rpmsg_create_ept(rpdev, rpdrv->callback, NULL, rpdev->src);
-+	strncpy(chinfo.name, rpdev->id.name, RPMSG_NAME_SIZE);
-+	chinfo.src = rpdev->src;
-+	chinfo.dst = RPMSG_ADDR_ANY;
++#include "rpmsg_internal.h"
 +
-+	ept = rpmsg_create_ept(rpdev, rpdrv->callback, NULL, chinfo);
- 	if (!ept) {
- 		dev_err(dev, "failed to create endpoint\n");
- 		err = -ENOMEM;
-diff --git a/include/linux/rpmsg.h b/include/linux/rpmsg.h
-index a901a331a190..f278407fcf48 100644
---- a/include/linux/rpmsg.h
-+++ b/include/linux/rpmsg.h
-@@ -98,6 +98,18 @@ enum rpmsg_ns_flags {
- struct virtproc_info;
- 
  /**
-+ * struct rpmsg_channel_info - channel info representation
-+ * @name: name of service
-+ * @src: local address
-+ * @dst: destination address
-+ */
-+struct rpmsg_channel_info {
-+	char name[RPMSG_NAME_SIZE];
-+	u32 src;
-+	u32 dst;
-+};
-+
-+/**
-  * rpmsg_channel - devices that belong to the rpmsg bus are called channels
-  * @vrp: the remote processor this channel belongs to
-  * @dev: the device struct
-@@ -171,7 +183,8 @@ int __register_rpmsg_driver(struct rpmsg_driver *drv, struct module *owner);
- void unregister_rpmsg_driver(struct rpmsg_driver *drv);
- void rpmsg_destroy_ept(struct rpmsg_endpoint *);
- struct rpmsg_endpoint *rpmsg_create_ept(struct rpmsg_channel *,
--					rpmsg_rx_cb_t cb, void *priv, u32 addr);
-+					rpmsg_rx_cb_t cb, void *priv,
-+					struct rpmsg_channel_info chinfo);
- int
- rpmsg_send_offchannel_raw(struct rpmsg_channel *, u32, u32, void *, int, bool);
+  * struct virtproc_info - virtual remote processor state
+  * @vdev:	the virtio device
+@@ -452,29 +454,6 @@ static void rpmsg_release_device(struct device *dev)
+ 	kfree(rpdev);
+ }
+ 
+-/*
+- * match an rpmsg channel with a channel info struct.
+- * this is used to make sure we're not creating rpmsg devices for channels
+- * that already exist.
+- */
+-static int rpmsg_device_match(struct device *dev, void *data)
+-{
+-	struct rpmsg_channel_info *chinfo = data;
+-	struct rpmsg_device *rpdev = to_rpmsg_device(dev);
+-
+-	if (chinfo->src != RPMSG_ADDR_ANY && chinfo->src != rpdev->src)
+-		return 0;
+-
+-	if (chinfo->dst != RPMSG_ADDR_ANY && chinfo->dst != rpdev->dst)
+-		return 0;
+-
+-	if (strncmp(chinfo->name, rpdev->id.name, RPMSG_NAME_SIZE))
+-		return 0;
+-
+-	/* found a match ! */
+-	return 1;
+-}
+-
+ static const struct rpmsg_device_ops virtio_rpmsg_ops = {
+ 	.create_ept = virtio_rpmsg_create_ept,
+ 	.announce_create = virtio_rpmsg_announce_create,
+@@ -494,7 +473,7 @@ static struct rpmsg_device *rpmsg_create_channel(struct virtproc_info *vrp,
+ 	int ret;
+ 
+ 	/* make sure a similar channel doesn't already exist */
+-	tmp = device_find_child(dev, chinfo, rpmsg_device_match);
++	tmp = rpmsg_find_device(dev, chinfo);
+ 	if (tmp) {
+ 		/* decrement the matched device's refcount back */
+ 		put_device(tmp);
+@@ -547,7 +526,7 @@ static int rpmsg_destroy_channel(struct virtproc_info *vrp,
+ 	struct virtio_device *vdev = vrp->vdev;
+ 	struct device *dev;
+ 
+-	dev = device_find_child(&vdev->dev, chinfo, rpmsg_device_match);
++	dev = rpmsg_find_device(&vdev->dev, chinfo);
+ 	if (!dev)
+ 		return -EINVAL;
  
 -- 
 2.5.0
