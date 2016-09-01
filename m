@@ -1,79 +1,85 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri,  2 Sep 2016 01:50:04 +0800
-Subject: [PATCH v4 6/6] arm64: dts: rockchip: enable the gmac for rk3399 evb
- board
-In-Reply-To: <1472752204-8924-1-git-send-email-wxt@rock-chips.com>
-References: <1472752204-8924-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1472752204-8924-7-git-send-email-wxt@rock-chips.com>
+Date: Fri, 02 Sep 2016 01:53:37 +0800
+Subject: [PATCH v3 3/5] arm64: dts: rockchip: add the gmac power domain
+ on rk3399
+In-Reply-To: <2409903.3qiu7FpA8p@diego>
+References: <1472686132-27827-1-git-send-email-wxt@rock-chips.com>
+ <1472686132-27827-4-git-send-email-wxt@rock-chips.com>
+ <2409903.3qiu7FpA8p@diego>
+Message-ID: <57C86B21.4090409@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roger Chen <roger.chen@rock-chips.com>
 
-We add the required and optional properties for evb board.
-See the [0] to get the detail information.
+On 2016?09?01? 19:41, Heiko St?bner wrote:
+> Hi Caesar,
+>
+> Am Donnerstag, 1. September 2016, 07:28:50 schrieb Caesar Wang:
+>> This patch supports the gmac pd to save power consumption.
+>> Even though some boards not need Ethernet support, the driver
+>> core can also take care of powering up the pd before probe.
+>>
+>> Signed-off-by: Roger Chen <roger.chen@rock-chips.com>
+>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> who is the author of this patch? Roger or you? Because we should either drop
+> Roger's Signed-off or fix the authorship to list him.
 
-[0]:
-Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+Thanks for reminding me.
+Can you take a look at the newer v4 series patches? :)
+https://patchwork.kernel.org/patch/9308013/
 
-Signed-off-by: Roger Chen <roger.chen@rock-chips.com>
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
----
 
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+>
+>
+> Heiko
+>
+>> ---
+>>
+>> Changes in v3:
+>> - leave into two patches based on patchv2, and fix nits and commit, as
+>>    comment on https://patchwork.kernel.org/patch/9306339/
+>>
+>> Changes in v2:
+>> - Fixes the order, ss Heiko commnets on
+>>    https://patchwork.kernel.org/patch/9305991/
+>>
+>>   arch/arm64/boot/dts/rockchip/rk3399.dtsi | 10 ++++++++++
+>>   1 file changed, 10 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index 32aebc8..2ab233f 100644
+>> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> @@ -611,6 +611,11 @@
+>>   		status = "disabled";
+>>   	};
+>>
+>> +	qos_gmac: qos at ffa5c000 {
+>> +		compatible = "syscon";
+>> +		reg = <0x0 0xffa5c000 0x0 0x20>;
+>> +	};
+>> +
+>>   	qos_hdcp: qos at ffa90000 {
+>>   		compatible = "syscon";
+>>   		reg = <0x0 0xffa90000 0x0 0x20>;
+>> @@ -739,6 +744,11 @@
+>>   			};
+>>
+>>   			/* These power domains are grouped by VD_LOGIC */
+>> +			pd_gmac at RK3399_PD_GMAC {
+>> +				reg = <RK3399_PD_GMAC>;
+>> +				clocks = <&cru ACLK_GMAC>;
+>> +				pm_qos = <&qos_gmac>;
+>> +			};
+>>   			pd_vio at RK3399_PD_VIO {
+>>   				reg = <RK3399_PD_VIO>;
+>>   				#address-cells = <1>;
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
 
- arch/arm64/boot/dts/rockchip/rk3399-evb.dts | 31 +++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-index d47b4e9..ed6f2e8 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-@@ -94,12 +94,43 @@
- 		regulator-always-on;
- 		regulator-boot-on;
- 	};
-+
-+	clkin_gmac: external-gmac-clock {
-+		compatible = "fixed-clock";
-+		clock-frequency = <125000000>;
-+		clock-output-names = "clkin_gmac";
-+		#clock-cells = <0>;
-+	};
-+
-+	vcc_phy: vcc-phy-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_phy";
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+
- };
- 
- &emmc_phy {
- 	status = "okay";
- };
- 
-+&gmac {
-+	phy-supply = <&vcc_phy>;
-+	phy-mode = "rgmii";
-+	clock_in_out = "input";
-+	snps,reset-gpio = <&gpio3 15 GPIO_ACTIVE_LOW>;
-+	snps,reset-active-low;
-+	snps,reset-delays-us = <0 10000 50000>;
-+	assigned-clocks = <&cru SCLK_RMII_SRC>;
-+	assigned-clock-parents = <&clkin_gmac>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins>;
-+	tx_delay = <0x28>;
-+	rx_delay = <0x11>;
-+	status = "okay";
-+};
-+
- &pwm0 {
- 	status = "okay";
- };
 -- 
-1.9.1
+caesar wang | software engineer | wxt at rock-chip.com
