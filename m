@@ -1,47 +1,40 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Thu,  1 Sep 2016 15:53:28 -0700
-Subject: [PATCH 3/3] clk: rockchip: use the dclk_vop_frac clock ids
-In-Reply-To: <1472770408-32278-1-git-send-email-zyw@rock-chips.com>
-References: <1472770408-32278-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1472770408-32278-3-git-send-email-zyw@rock-chips.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 1 Sep 2016 17:58:42 -0500
+Subject: [PATCH 1/5] ARM: dts: keystone-k2hk: Add MSM RAM node
+In-Reply-To: <20160901225846.31058-1-s-anna@ti.com>
+References: <20160901225846.31058-1-s-anna@ti.com>
+Message-ID: <20160901225846.31058-2-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yakir Yang <ykk@rock-chips.com>
+Add the RAM managed by the Multicore Shared Memory Controller (MSMC)
+as a mmio-sram node. The Keystone 2 Hawking SoC has 6 MB of such
+memory. Any specific MSM memory range needed by a software module
+ought to be reserved using an appropriate child node.
 
-Export the dclk_vop_frac out, so we can set the dclk_vop as the
-child of dclk_vop_frac, and then we can start to take use of
-the fractional dividers.
-
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
+ arch/arm/boot/dts/keystone-k2hk.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
- drivers/clk/rockchip/clk-rk3399.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-index 4c59f2b..2c7cba7 100644
---- a/drivers/clk/rockchip/clk-rk3399.c
-+++ b/drivers/clk/rockchip/clk-rk3399.c
-@@ -1168,7 +1168,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 			RK3399_CLKSEL_CON(49), 8, 2, MFLAGS, 0, 8, DFLAGS,
- 			RK3399_CLKGATE_CON(10), 12, GFLAGS),
+diff --git a/arch/arm/boot/dts/keystone-k2hk.dtsi b/arch/arm/boot/dts/keystone-k2hk.dtsi
+index 8f67fa8df936..39e88d815235 100644
+--- a/arch/arm/boot/dts/keystone-k2hk.dtsi
++++ b/arch/arm/boot/dts/keystone-k2hk.dtsi
+@@ -46,6 +46,14 @@
+ 	soc {
+ 		/include/ "keystone-k2hk-clocks.dtsi"
  
--	COMPOSITE_FRACMUX_NOGATE(0, "dclk_vop0_frac", "dclk_vop0_div", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRACMUX_NOGATE(DCLK_VOP0_FRAC, "dclk_vop0_frac", "dclk_vop0_div", 0,
- 			RK3399_CLKSEL_CON(106), 0,
- 			&rk3399_dclk_vop0_fracmux),
- 
-@@ -1198,7 +1198,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 			RK3399_CLKSEL_CON(50), 8, 2, MFLAGS, 0, 8, DFLAGS,
- 			RK3399_CLKGATE_CON(10), 13, GFLAGS),
- 
--	COMPOSITE_FRACMUX_NOGATE(0, "dclk_vop1_frac", "dclk_vop1_div", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRACMUX_NOGATE(DCLK_VOP1_FRAC, "dclk_vop1_frac", "dclk_vop1_div", 0,
- 			RK3399_CLKSEL_CON(107), 0,
- 			&rk3399_dclk_vop1_fracmux),
- 
++		msm_ram: msmram at 0c000000 {
++			compatible = "mmio-sram";
++			reg = <0x0c000000 0x600000>;
++			ranges = <0x0 0x0c000000 0x600000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++		};
++
+ 		dspgpio0: keystone_dsp_gpio at 02620240 {
+ 			compatible = "ti,keystone-dsp-gpio";
+ 			gpio-controller;
 -- 
-1.9.1
+2.9.3
