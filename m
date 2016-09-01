@@ -1,85 +1,65 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri, 02 Sep 2016 01:53:37 +0800
-Subject: [PATCH v3 3/5] arm64: dts: rockchip: add the gmac power domain
- on rk3399
-In-Reply-To: <2409903.3qiu7FpA8p@diego>
-References: <1472686132-27827-1-git-send-email-wxt@rock-chips.com>
- <1472686132-27827-4-git-send-email-wxt@rock-chips.com>
- <2409903.3qiu7FpA8p@diego>
-Message-ID: <57C86B21.4090409@rock-chips.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 1 Sep 2016 10:56:36 -0700
+Subject: [PATCH v5] Axi-usb: Add support for 64-bit addressing.
+In-Reply-To: <1472719976-25410-1-git-send-email-navam@xilinx.com>
+References: <1472719976-25410-1-git-send-email-navam@xilinx.com>
+Message-ID: <20160901175636.GV16583@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 2016-09-01 at 14:22:56 +0530, Nava kishore Manne wrote:
+> This patch updates the driver to support 64-bit DMA addressing.
+> 
+> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+> Changes for v5:
+>                 -None.
+> 
+> Changes for v4:
+>                 -Used boolen property insted of addrwith property in the DT
+>                  as suggested by Arnd Bergmann.
+>                 -Adopt the DT relevant changes into the driver.
+> 
+> Changes for v3:
+>                 -Added new compatable string for 5.00 IP version as suggested by
+>                  Arnd Bergmann.
+>                 -Used write_fn() insted of lo_hi_writeq() as suggested by
+>                  Arnd Bergmann.
+> Changes for v2:
+>                 -Added dma-ranges property in device tree as suggested by
+>                  Arnd Bergmann.
+>                 -Modified the driver code based on the xlnx,addrwidth.
+> 
+>  .../devicetree/bindings/usb/udc-xilinx.txt         |  5 ++-
+>  drivers/usb/gadget/udc/udc-xilinx.c                | 52 +++++++++++++++++++++-
+>  2 files changed, 54 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/udc-xilinx.txt b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
+> index 47b4e39..d08d972 100644
+> --- a/Documentation/devicetree/bindings/usb/udc-xilinx.txt
+> +++ b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
+> @@ -1,12 +1,14 @@
+>  Xilinx USB2 device controller
+>  
+>  Required properties:
+> -- compatible		: Should be "xlnx,usb2-device-4.00.a"
+> +- compatible		: Should be "xlnx,usb2-device-4.00.a" or
+> +			  "xlnx,usb2-device-5.00"
+>  - reg			: Physical base address and size of the USB2
+>  			  device registers map.
+>  - interrupts		: Should contain single irq line of USB2 device
+>  			  controller
+>  - xlnx,has-builtin-dma	: if DMA is included
+> +- xlnx,has-64bit-dma	: if DMA is included 64-bit addressing support.
 
-On 2016?09?01? 19:41, Heiko St?bner wrote:
-> Hi Caesar,
->
-> Am Donnerstag, 1. September 2016, 07:28:50 schrieb Caesar Wang:
->> This patch supports the gmac pd to save power consumption.
->> Even though some boards not need Ethernet support, the driver
->> core can also take care of powering up the pd before probe.
->>
->> Signed-off-by: Roger Chen <roger.chen@rock-chips.com>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> who is the author of this patch? Roger or you? Because we should either drop
-> Roger's Signed-off or fix the authorship to list him.
+We add these properties to describe the IP configuration + we have the
+version indicator in the compatible string. Do we really need both? It
+seems that all versions use the same driver and differentiation is made
+through the DT properties that describe the IP configuration parameters.
+Wouldn't it be better to just have one generic 'xlnx,axi-usb2' (or
+whatever) compatible string instead of patching the driver for each new
+version without really needing to differentiate the IP versions through
+it?
 
-Thanks for reminding me.
-Can you take a look at the newer v4 series patches? :)
-https://patchwork.kernel.org/patch/9308013/
-
-
->
->
-> Heiko
->
->> ---
->>
->> Changes in v3:
->> - leave into two patches based on patchv2, and fix nits and commit, as
->>    comment on https://patchwork.kernel.org/patch/9306339/
->>
->> Changes in v2:
->> - Fixes the order, ss Heiko commnets on
->>    https://patchwork.kernel.org/patch/9305991/
->>
->>   arch/arm64/boot/dts/rockchip/rk3399.dtsi | 10 ++++++++++
->>   1 file changed, 10 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index 32aebc8..2ab233f 100644
->> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> @@ -611,6 +611,11 @@
->>   		status = "disabled";
->>   	};
->>
->> +	qos_gmac: qos at ffa5c000 {
->> +		compatible = "syscon";
->> +		reg = <0x0 0xffa5c000 0x0 0x20>;
->> +	};
->> +
->>   	qos_hdcp: qos at ffa90000 {
->>   		compatible = "syscon";
->>   		reg = <0x0 0xffa90000 0x0 0x20>;
->> @@ -739,6 +744,11 @@
->>   			};
->>
->>   			/* These power domains are grouped by VD_LOGIC */
->> +			pd_gmac at RK3399_PD_GMAC {
->> +				reg = <RK3399_PD_GMAC>;
->> +				clocks = <&cru ACLK_GMAC>;
->> +				pm_qos = <&qos_gmac>;
->> +			};
->>   			pd_vio at RK3399_PD_VIO {
->>   				reg = <RK3399_PD_VIO>;
->>   				#address-cells = <1>;
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
-
-
--- 
-caesar wang | software engineer | wxt at rock-chip.com
+	S?ren
