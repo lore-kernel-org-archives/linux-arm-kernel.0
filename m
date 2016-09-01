@@ -1,39 +1,65 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 01 Sep 2016 10:37:01 +0200
-Subject: [PATCH 1/2] ARM: dts: exynos: Fix mismatched value for SD4 pull
- up/down configuration on exynos4210
-Message-ID: <1472719022-27226-1-git-send-email-k.kozlowski@samsung.com>
+Date: Thu, 01 Sep 2016 10:37:02 +0200
+Subject: [PATCH 2/2] ARM: dts: exynos: Fix mismatched values of SD drive
+ strengh configuration on exynos4415
+In-Reply-To: <1472719022-27226-1-git-send-email-k.kozlowski@samsung.com>
+References: <1472719022-27226-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1472719022-27226-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pinctrl pull up/down register on exynos4210 is 2-bit wide for each
-pin and it accepts only values of 0, 1 and 3.  The pins sd4-bus-width8
-were configured with value of 4.  The driver does not validate the value
-so this overflow effectively set a bit 1 in adjacent pins thus
-configuring them to pull down.
+The pinctrl drive strength register on exynos4415 is 2-bit wide for each
+pin.  The pins for SD2 were configured with value of 4.  The driver does
+not validate the value so this overflow effectively set a bit 1 in
+adjacent pins thus configuring them to drive strength 2x.
 
-The author's intention was probably to set drive strength of 4x.  All
-other bus-widths pins are configured with pull up and drive strength of
-4x.  Fix this one with same pattern.
+The author's intention was probably to set drive strength of 4x.
+All other SD pins are configured with drive strength of 4x.  Fix these
+with same pattern.
 
-Fixes: 87711d8c7c70 ("ARM: dts: Add pinctrl node entries for SAMSUNG EXYNOS4210 SoC")
+Fixes: 9246e7ff24c5 ("ARM: dts: Add dts files for exynos4415 SoC")
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/boot/dts/exynos4210-pinctrl.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos4415-pinctrl.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos4210-pinctrl.dtsi b/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
-index 8046340e50ac..d9b6d25e4abe 100644
---- a/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
-@@ -649,7 +649,7 @@
- 		sd4_bus8: sd4-bus-width8 {
- 			samsung,pins = "gpk1-3", "gpk1-4", "gpk1-5", "gpk1-6";
- 			samsung,pin-function = <EXYNOS_PIN_FUNC_3>;
--			samsung,pin-pud = <4>;
-+			samsung,pin-pud = <EXYNOS_PIN_PULL_UP>;
- 			samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;
- 		};
+diff --git a/arch/arm/boot/dts/exynos4415-pinctrl.dtsi b/arch/arm/boot/dts/exynos4415-pinctrl.dtsi
+index f54aee53b6ec..76cfd872ead3 100644
+--- a/arch/arm/boot/dts/exynos4415-pinctrl.dtsi
++++ b/arch/arm/boot/dts/exynos4415-pinctrl.dtsi
+@@ -480,14 +480,14 @@
+ 		samsung,pins = "gpk2-0";
+ 		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
+ 		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+-		samsung,pin-drv = <4>;
++		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;
+ 	};
  
+ 	sd2_cmd: sd2-cmd {
+ 		samsung,pins = "gpk2-1";
+ 		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
+ 		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+-		samsung,pin-drv = <4>;
++		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;
+ 	};
+ 
+ 	sd2_cd: sd2-cd {
+@@ -501,14 +501,14 @@
+ 		samsung,pins = "gpk2-3";
+ 		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
+ 		samsung,pin-pud = <EXYNOS_PIN_PULL_UP>;
+-		samsung,pin-drv = <4>;
++		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;
+ 	};
+ 
+ 	sd2_bus4: sd2-bus-width4 {
+ 		samsung,pins = "gpk2-4", "gpk2-5", "gpk2-6";
+ 		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
+ 		samsung,pin-pud = <EXYNOS_PIN_PULL_UP>;
+-		samsung,pin-drv = <4>;
++		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;
+ 	};
+ 
+ 	cam_port_b_io: cam-port-b-io {
 -- 
 1.9.1
