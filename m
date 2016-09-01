@@ -1,39 +1,45 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 1 Sep 2016 14:54:55 +0800
-Subject: [PATCH v8 04/16] of/numa: remove a duplicated warning
+Date: Thu, 1 Sep 2016 14:54:57 +0800
+Subject: [PATCH v8 06/16] of_numa: Use of_get_next_parent to simplify code
 In-Reply-To: <1472712907-12700-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1472712907-12700-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1472712907-12700-5-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1472712907-12700-7-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This warning has been printed in of_numa_parse_cpu_nodes before.
+From: Kefeng Wang <wangkefeng.wang@huawei.com>
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+Use of_get_next_parent() instead of open-code.
+
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/of/of_numa.c | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+ drivers/of/of_numa.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
 diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
-index c1bd62c..625b057 100644
+index 625b057..0d7459b 100644
 --- a/drivers/of/of_numa.c
 +++ b/drivers/of/of_numa.c
-@@ -179,13 +179,8 @@ int of_node_to_nid(struct device_node *device)
- 			np->name);
- 	of_node_put(np);
+@@ -158,8 +158,6 @@ int of_node_to_nid(struct device_node *device)
+ 	np = of_node_get(device);
 
--	if (!r) {
--		if (nid >= MAX_NUMNODES)
--			pr_warn("NUMA: Node id %u exceeds maximum value\n",
--				nid);
--		else
--			return nid;
--	}
-+	if (!r)
-+		return nid;
+ 	while (np) {
+-		struct device_node *parent;
+-
+ 		r = of_property_read_u32(np, "numa-node-id", &nid);
+ 		/*
+ 		 * -EINVAL indicates the property was not found, and
+@@ -170,9 +168,7 @@ int of_node_to_nid(struct device_node *device)
+ 		if (r != -EINVAL)
+ 			break;
 
- 	return NUMA_NO_NODE;
- }
+-		parent = of_get_parent(np);
+-		of_node_put(np);
+-		np = parent;
++		np = of_get_next_parent(np);
+ 	}
+ 	if (np && r)
+ 		pr_warn("NUMA: Invalid \"numa-node-id\" property in node %s\n",
 --
 2.5.0
