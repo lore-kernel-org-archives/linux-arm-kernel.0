@@ -1,51 +1,39 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed, 31 Aug 2016 17:40:22 -0700
-Subject: [PATCH v3 08/22] usb: chipidea: Remove locking in ci_udc_start()
+Date: Wed, 31 Aug 2016 17:40:25 -0700
+Subject: [PATCH v3 11/22] usb: chipidea: msm: Mark device as runtime pm active
 In-Reply-To: <20160901004036.23936-1-stephen.boyd@linaro.org>
 References: <20160901004036.23936-1-stephen.boyd@linaro.org>
-Message-ID: <20160901004036.23936-9-stephen.boyd@linaro.org>
+Message-ID: <20160901004036.23936-12-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't call hw_device_reset() with the ci->lock held, so it
-doesn't seem like this lock here is protecting anything. Let's
-just remove it. This allows us to call sleeping functions like
-phy_init() from within the CI_HDRC_CONTROLLER_RESET_EVENT hook.
+We're not properly marking the glue layer/wrapper device as
+runtime active, so runtime PM believes that the hardware state is
+inactive when we call pm_runtime_enable() in this driver. This
+causes a problem when the glue layer has a power domain
+associated with it, because runtime PM will go and disable the
+power domain to match the 'inactive' state of the device. Let's
+mark the device as active so that runtime PM doesn't improperly
+power down this device when it's actually active.
 
 Acked-by: Peter Chen <peter.chen@nxp.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/usb/chipidea/udc.c | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/usb/chipidea/ci_hdrc_msm.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index 065f5d97aa67..f16be4710cdb 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -1719,7 +1719,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
- 			 struct usb_gadget_driver *driver)
- {
- 	struct ci_hdrc *ci = container_of(gadget, struct ci_hdrc, gadget);
--	unsigned long flags;
- 	int retval = -ENOMEM;
+diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
+index 3889809fd0c4..89c1a02d69b5 100644
+--- a/drivers/usb/chipidea/ci_hdrc_msm.c
++++ b/drivers/usb/chipidea/ci_hdrc_msm.c
+@@ -80,6 +80,7 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
  
- 	if (driver->disconnect == NULL)
-@@ -1746,7 +1745,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
+ 	platform_set_drvdata(pdev, plat_ci);
  
- 	pm_runtime_get_sync(&ci->gadget.dev);
- 	if (ci->vbus_active) {
--		spin_lock_irqsave(&ci->lock, flags);
- 		hw_device_reset(ci);
- 	} else {
- 		usb_udc_vbus_handler(&ci->gadget, false);
-@@ -1755,7 +1753,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
- 	}
- 
- 	retval = hw_device_state(ci, ci->ep0out->qh.dma);
--	spin_unlock_irqrestore(&ci->lock, flags);
- 	if (retval)
- 		pm_runtime_put_sync(&ci->gadget.dev);
++	pm_runtime_set_active(&pdev->dev);
+ 	pm_runtime_no_callbacks(&pdev->dev);
+ 	pm_runtime_enable(&pdev->dev);
  
 -- 
 2.9.0.rc2.8.ga28705d
