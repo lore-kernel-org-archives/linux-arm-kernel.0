@@ -1,99 +1,96 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu,  1 Sep 2016 19:00:00 -0400
-Subject: [PATCH 1/2] PCI: save and restore device state during bus reset
-Message-ID: <1472770801-30671-1-git-send-email-okaya@codeaurora.org>
+Date: Thu,  1 Sep 2016 19:00:01 -0400
+Subject: [PATCH 2/2] PCI: add CRS support to error handling path
+In-Reply-To: <1472770801-30671-1-git-send-email-okaya@codeaurora.org>
+References: <1472770801-30671-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1472770801-30671-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A secondary bus reset causes settings to be lost by all downstream
-devices on the tree. The code is currently saving and restoring device
-states only when called from the VFIO path via pci_probe_reset_bus
-and pci_reset_bus functions.
+The PCIE spec allows an endpoint device to extend the initialization time
+beyond 1 second by issuing Configuration Request Retry Status (CRS) for a
+vendor ID read request.
 
-Moving the save and restore into pci_reset_bridge_secondary_bus
-so that all users of the API have the same behavior.
+This basically means "I'm busy now, please call me back later".
+
+There are two moving parts to CRS support from the SW perspective. One part
+is to determine if CRS is supported or not. The second part is to set the
+CRS visibility register.
+
+As part of the probe, the Linux kernel sets the above two conditions in
+pci_enable_crs function. The kernel is also honoring the returned CRS in
+pci_bus_read_dev_vendor_id function if supported. The function will poll up
+to specified amount of time while endpoint is returning CRS response.
+
+The PCIe spec also allows CRS to be issued during cold, warm, hot and FLR
+resets.
+
+The hot reset is initiated by starting a secondary bus reset. This patch is
+adding vendor ID read immediately after a bus reset so that the
+initialization procedure can be extended by the amount of time endpoint
+requires.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/pci/pci.c | 36 +++++++++++++++---------------------
- 1 file changed, 15 insertions(+), 21 deletions(-)
+ drivers/pci/pci.c | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
 diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index aab9d51..b209378 100644
+index b209378..ebd0fc6 100644
 --- a/drivers/pci/pci.c
 +++ b/drivers/pci/pci.c
-@@ -3860,19 +3860,6 @@ void __weak pcibios_reset_secondary_bus(struct pci_dev *dev)
- 	pci_reset_secondary_bus(dev);
+@@ -3829,6 +3829,44 @@ static int pci_pm_reset(struct pci_dev *dev, int probe)
+ 	return 0;
  }
  
--/**
-- * pci_reset_bridge_secondary_bus - Reset the secondary bus on a PCI bridge.
-- * @dev: Bridge device
-- *
-- * Use the bridge control register to assert reset on the secondary bus.
-- * Devices on the secondary bus are left in power-on state.
-- */
--void pci_reset_bridge_secondary_bus(struct pci_dev *dev)
--{
--	pcibios_reset_secondary_bus(dev);
--}
--EXPORT_SYMBOL_GPL(pci_reset_bridge_secondary_bus);
--
- static int pci_parent_bus_reset(struct pci_dev *dev, int probe)
- {
- 	struct pci_dev *pdev;
-@@ -4362,6 +4349,21 @@ static void pci_slot_restore(struct pci_slot *slot)
- 	}
- }
- 
-+/**
-+ * pci_reset_bridge_secondary_bus - Reset the secondary bus on a PCI bridge.
-+ * @dev: Bridge device
-+ *
-+ * Use the bridge control register to assert reset on the secondary bus.
-+ * Devices on the secondary bus are left in power-on state.
++/*
++ * Mostly copy paste from pci_walk_bus with the exceptions of hard coded
++ * work and removed locks.
 + */
-+void pci_reset_bridge_secondary_bus(struct pci_dev *dev)
++static void pci_bus_probe_crs(struct pci_bus *top)
 +{
-+	pci_bus_save_and_disable(dev->bus);
-+	pcibios_reset_secondary_bus(dev);
-+	pci_bus_restore(dev->bus);
-+}
-+EXPORT_SYMBOL_GPL(pci_reset_bridge_secondary_bus);
++	struct pci_dev *dev;
++	struct pci_bus *bus;
++	struct list_head *next;
++	int retval;
++	u32 l;
 +
- static int pci_slot_reset(struct pci_slot *slot, int probe)
++	bus = top;
++	next = top->devices.next;
++	for (;;) {
++		if (next == &bus->devices) {
++			/* end of this bus, go up or finish */
++			if (bus == top)
++				break;
++			next = bus->self->bus_list.next;
++			bus = bus->self->bus;
++			continue;
++		}
++		dev = list_entry(next, struct pci_dev, bus_list);
++		if (dev->subordinate) {
++			/* this is a pci-pci bridge, do its devices next */
++			next = dev->subordinate->devices.next;
++			bus = dev->subordinate;
++		} else
++			next = dev->bus_list.next;
++
++		retval = pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &l,
++						    60 * 1000);
++		if (retval)
++			break;
++	}
++}
++
+ void pci_reset_secondary_bus(struct pci_dev *dev)
  {
- 	int rc;
-@@ -4504,12 +4506,8 @@ int pci_reset_bus(struct pci_bus *bus)
- 	if (rc)
- 		return rc;
- 
--	pci_bus_save_and_disable(bus);
--
- 	rc = pci_bus_reset(bus, 0);
- 
--	pci_bus_restore(bus);
--
- 	return rc;
+ 	u16 ctrl;
+@@ -4361,6 +4399,7 @@ void pci_reset_bridge_secondary_bus(struct pci_dev *dev)
+ 	pci_bus_save_and_disable(dev->bus);
+ 	pcibios_reset_secondary_bus(dev);
+ 	pci_bus_restore(dev->bus);
++	pci_bus_probe_crs(dev->subordinate);
  }
- EXPORT_SYMBOL_GPL(pci_reset_bus);
-@@ -4528,8 +4526,6 @@ int pci_try_reset_bus(struct pci_bus *bus)
- 	if (rc)
- 		return rc;
+ EXPORT_SYMBOL_GPL(pci_reset_bridge_secondary_bus);
  
--	pci_bus_save_and_disable(bus);
--
- 	if (pci_bus_trylock(bus)) {
- 		might_sleep();
- 		pci_reset_bridge_secondary_bus(bus->self);
-@@ -4537,8 +4533,6 @@ int pci_try_reset_bus(struct pci_bus *bus)
- 	} else
- 		rc = -EAGAIN;
- 
--	pci_bus_restore(bus);
--
- 	return rc;
- }
- EXPORT_SYMBOL_GPL(pci_try_reset_bus);
 -- 
 1.9.1
