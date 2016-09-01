@@ -1,19 +1,53 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Thu, 1 Sep 2016 16:38:42 +0000
-Subject: [PATCH 1/3] ARM: dts: r7s72100: add ethernet clock to device tree
-In-Reply-To: <aaf8c5de-a4f8-42e5-583d-c81a9d92edae@cogentembedded.com>
-References: <20160901155430.23400-1-chris.brandt@renesas.com>
- <aaf8c5de-a4f8-42e5-583d-c81a9d92edae@cogentembedded.com>
-Message-ID: <SG2PR06MB116534DAEDA31113AB14C46B8AE20@SG2PR06MB1165.apcprd06.prod.outlook.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 1 Sep 2016 18:45:01 +0200
+Subject: [linux-sunxi] Re: [PATCH v9 1/2] ASoC: sun4i-codec: Distinguish
+ sun4i from sun7i
+In-Reply-To: <20160831221402.670ab832@scratchpost.org>
+References: <20160830054403.7878-1-dannym@scratchpost.org>
+ <20160830054403.7878-2-dannym@scratchpost.org>
+ <20160831174623.GA20462@lukather>
+ <20160831221402.670ab832@scratchpost.org>
+Message-ID: <20160901164501.GE20462@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/2016, Sergei Shtylyov wrote:
->    I'd add the MSTP7 clock node itself in the same patch...
+Hi Danny,
 
-OK. I tried to look at previous commits to figure out what goes in what patch.
+On Wed, Aug 31, 2016 at 10:14:02PM +0200, Danny Milosavljevic wrote:
+> Hi Maxime,
+> 
+> On Wed, 31 Aug 2016 19:46:23 +0200
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+> > > -#define SUN4I_CODEC_AC_SYS_VERI			(0x38)
+> > > -#define SUN4I_CODEC_AC_MIC_PHONE_CAL		(0x3c)
+> > > +
+> > > +#define SUN7I_CODEC_AC_DAC_CAL			(0x38)
+> > > +#define SUN7I_CODEC_AC_MIC_PHONE_CAL		(0x3c)  
+> > 
+> > That will need at least some mention in the commit log.
+> 
+> Hm? It's now called like it is called in the user manual.
+> Also, the macro SUN4I_CODEC_AC_SYS_VERI was unused before anyway.
+> 
+> What should I write in the commit log?
 
+For example, that the current code was wrong and those registers are
+not present on the A10.
 
-Thanks.
+That way, you justify both the renaming, and the max_register change
+in the regmap.
 
-Chris
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160901/196be5c1/attachment.sig>
