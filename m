@@ -1,37 +1,26 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 01 Sep 2016 13:43:42 +0200
-Subject: [PATCH v3 4/5] arm64: dts: rockchip: add the gmac needed node for
- rk3399
-In-Reply-To: <1472686132-27827-5-git-send-email-wxt@rock-chips.com>
-References: <1472686132-27827-1-git-send-email-wxt@rock-chips.com>
- <1472686132-27827-5-git-send-email-wxt@rock-chips.com>
-Message-ID: <4350667.JBNzRWMVzQ@diego>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 01 Sep 2016 13:44:35 +0200
+Subject: [PATCH] video: fbdev: exynos: Remove old non-working MIPI driver
+In-Reply-To: <1472729876-9218-1-git-send-email-k.kozlowski@samsung.com>
+References: <1472729876-9218-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <176ff6ca-5e1e-1d7e-bfb6-7e0b9da44179@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
-
-Am Donnerstag, 1. September 2016, 07:28:51 schrieb Caesar Wang:
-> The RK3399 GMAC Ethernet Controller provides a complete Ethernet interface
-> from processor to a Reduced Media Independent Interface (RMII) and Reduced
-> Gigabit Media Independent Interface (RGMII) compliant Ethernet PHY.
+On 09/01/2016 01:37 PM, Krzysztof Kozlowski wrote:
+> The old non-DRM Exynos MIPI driver does not support DeviceTree and
+> requires board files.  Our platforms do not provide such so the driver
+> is not usable since a long time ago.  All features provided by the
+> driver (and associated s6e8ax0 panel driver) are already supported by
+> newer DRM version so the old code can be removed.
 > 
-> This patch adds the related needed device information.
-> e.g.: interrupts, grf, clocks, pinctrl and so on.
-> 
-> The full details are in [0].
-> 
-> [0]:
-> Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-
-the core rk3399 gmac support is still stuck and needs a respin. This patch is 
-part of that other series as well which needs a respin itself.
-
-Maybe you could just fold both series into one so that we don't have to track 
-two.
+> Cc: Inki Dae <inki.dae@samsung.com>
+> Cc: Donghwa Lee <dh09.lee@samsung.com>
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
 
-Thanks
-Heiko
+Damn, I forgot to update top-fbdev Makefile. I will resend soon.
+
+BR,
+Krzysztof
