@@ -1,48 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 1 Sep 2016 13:46:11 +0100
-Subject: [PATCH] ARM: dts: explicitly mark skeleton.dtsi as deprecated
-In-Reply-To: <1472730037-4972-1-git-send-email-mark.rutland@arm.com>
-References: <1472730037-4972-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160901124611.GA5049@leverpostej>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 1 Sep 2016 14:47:46 +0200
+Subject: [PATCH v9 3/4] doc: bindings: mfd: act8945a: Update the example
+In-Reply-To: <20160901112251.GK4921@dell>
+References: <1472722201-31872-1-git-send-email-wenyou.yang@atmel.com>
+ <1472722201-31872-4-git-send-email-wenyou.yang@atmel.com>
+ <20160901112251.GK4921@dell>
+Message-ID: <20160901124746.vbhrz4f53vb63d7t@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2016 at 12:40:37PM +0100, Mark Rutland wrote:
-> As noted in commit 3ebee5a2e141496b ("arm64: dts: kill skeleton.dtsi"),
-> there are a number of problems with skeleton.dtsi, and it would be
-> prefereable to remove it entirely. As there are a large number of
-> existing users, fixing these up will take a while.
-> 
-> This patch adds a note to arm's skeleton.dtsi noting that this is the
-> case, to make this more obvious and hopefully minimize new uptake of
-> skeleton.dtsi in the mean time.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Rob Herring <rob.herring@arm.com>
+Hi Lee,
 
-This should have been linaro.org. not sure how I managed that.
-
-Mark.
-
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> ---
->  arch/arm/boot/dts/skeleton.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
+On Thu, Sep 01, 2016 at 12:22:51PM +0100, Lee Jones wrote:
+> On Thu, 01 Sep 2016, Wenyou Yang wrote:
 > 
-> diff --git a/arch/arm/boot/dts/skeleton.dtsi b/arch/arm/boot/dts/skeleton.dtsi
-> index b41d241..28b81d6 100644
-> --- a/arch/arm/boot/dts/skeleton.dtsi
-> +++ b/arch/arm/boot/dts/skeleton.dtsi
-> @@ -1,4 +1,8 @@
->  /*
-> + * This file is deprecated, and will be removed once existing users have been
-> + * updated. New dts{,i} files should *not* include skeleton.dtsi, and should
-> + * instead explicitly provide the below nodes only as required.
-> + *
->   * Skeleton device tree; the bare minimum needed to boot; just include and
->   * add a compatible value.  The bootloader will typically populate the memory
->   * node.
-> -- 
-> 1.9.1
+> > Since the act8945a-charger is regarded as a sub-device and it using
+> > "interrupts" property, update the examples section.
+> > 
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > ---
+> > 
+> > Changes in v9: None
+> > Changes in v8: None
+> > Changes in v7: None
+> > Changes in v6: None
+> > Changes in v4: None
+> > 
+> >  Documentation/devicetree/bindings/mfd/act8945a.txt | 22 +++++++++++++++-------
+> >  1 file changed, 15 insertions(+), 7 deletions(-)
 > 
+> This is a functional change.  I'll require a DT Ack.
+
+Wenyou Yang forgot to take over Rob's Acked-By from the previous
+version: https://patchwork.kernel.org/patch/9298871/
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160901/51e83537/attachment.sig>
