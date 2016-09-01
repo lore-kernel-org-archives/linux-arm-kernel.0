@@ -1,63 +1,71 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  1 Sep 2016 17:32:01 +0200
-Subject: [PATCH 4/7] drm/panel: Add Sinlinx SinA33 7" panel
+Date: Thu,  1 Sep 2016 17:32:04 +0200
+Subject: [PATCH 7/7] ARM: sun8i: sina33: Enable display
 In-Reply-To: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
 References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160901153204.11217-5-maxime.ripard@free-electrons.com>
+Message-ID: <20160901153204.11217-8-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SinA33 has an unidentified panel. Add the timings for it under a new
-compatible.
+Enable the display pipeline with the associated 7" panel sold with the
+SinA33.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/panel/panel-simple.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 34 ++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index 85143d1b9b31..af142e804245 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -1409,6 +1409,29 @@ static const struct panel_desc shelly_sca07010_bfn_lnn = {
- 	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
+diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+index fef6abc0a703..1fa2b5a80ec2 100644
+--- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
++++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+@@ -61,6 +61,27 @@
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
+ 	};
++
++	panel {
++		compatible = "sinlinx,sina33-lcd-7";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port at 0 {
++			reg = <0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			panel_input: endpoint at 0 {
++				reg = <0>;
++				remote-endpoint = <&tcon0_out_panel>;
++			};
++		};
++	};
++};
++
++&de {
++	status = "okay";
  };
  
-+static const struct drm_display_mode sinlinx_sina33_lcd_7_mode = {
-+	.clock = 66000,
-+	.hdisplay = 1024,
-+	.hsync_start = 1024 + 160,
-+	.hsync_end = 1024 + 160 + 70,
-+	.htotal = 1024 + 160 + 70 + 90,
-+	.vdisplay = 600,
-+	.vsync_start = 600 + 127,
-+	.vsync_end = 600 + 127 + 20,
-+	.vtotal = 600 + 127 + 20 + 3,
-+	.vrefresh = 60,
+ &ehci0 {
+@@ -207,6 +228,19 @@
+ 	regulator-name = "vcc-rtc";
+ };
+ 
++&tcon0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&tcon0_rgb666_pins_a>;
++	status = "okay";
 +};
 +
-+static const struct panel_desc sinlinx_sina33_lcd_7 = {
-+	.modes = &sinlinx_sina33_lcd_7_mode,
-+	.num_modes = 1,
-+	.size = {
-+		.width = 154,
-+		.height = 87,
-+	},
-+	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
++&tcon0_out {
++	tcon0_out_panel: endpoint at 0 {
++		reg = <0>;
++		remote-endpoint = <&panel_input>;
++	};
 +};
 +
- static const struct drm_display_mode starry_kr122ea0sra_mode = {
- 	.clock = 147000,
- 	.hdisplay = 1920,
-@@ -1644,6 +1667,9 @@ static const struct of_device_id platform_of_match[] = {
- 		.compatible = "shelly,sca07010-bfn-lnn",
- 		.data = &shelly_sca07010_bfn_lnn,
- 	}, {
-+		.compatible = "sinlinx,sina33-lcd-7",
-+		.data = &sinlinx_sina33_lcd_7,
-+	}, {
- 		.compatible = "starry,kr122ea0sra",
- 		.data = &starry_kr122ea0sra,
- 	}, {
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_b>;
 -- 
 2.9.2
