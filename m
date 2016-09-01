@@ -1,96 +1,59 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu,  1 Sep 2016 19:00:01 -0400
-Subject: [PATCH 2/2] PCI: add CRS support to error handling path
-In-Reply-To: <1472770801-30671-1-git-send-email-okaya@codeaurora.org>
-References: <1472770801-30671-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1472770801-30671-2-git-send-email-okaya@codeaurora.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 2 Sep 2016 07:00:32 +0800
+Subject: [PATCH 5/5] clocks: exynos5433: add runtime pm support
+In-Reply-To: <1472737551-15272-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <201609020621.G99dsAmw%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCIE spec allows an endpoint device to extend the initialization time
-beyond 1 second by issuing Configuration Request Retry Status (CRS) for a
-vendor ID read request.
+Hi Marek,
 
-This basically means "I'm busy now, please call me back later".
+[auto build test WARNING on clk/clk-next]
+[also build test WARNING on v4.8-rc4 next-20160825]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
+[Check https://git-scm.com/docs/git-format-patch for more information]
 
-There are two moving parts to CRS support from the SW perspective. One part
-is to determine if CRS is supported or not. The second part is to set the
-CRS visibility register.
+url:    https://github.com/0day-ci/linux/commits/Marek-Szyprowski/Add-runtime-PM-support-for-clocks-on-Exynos-SoC-example/20160901-215042
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+config: sh-allmodconfig (attached as .config)
+compiler: sh4-linux-gnu-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=sh 
 
-As part of the probe, the Linux kernel sets the above two conditions in
-pci_enable_crs function. The kernel is also honoring the returned CRS in
-pci_bus_read_dev_vendor_id function if supported. The function will poll up
-to specified amount of time while endpoint is returning CRS response.
+All warnings (new ones prefixed by >>):
 
-The PCIe spec also allows CRS to be issued during cold, warm, hot and FLR
-resets.
+>> WARNING: drivers/built-in.o(.data+0x1546c): Section mismatch in reference from the variable exynos5433_cmu_driver to the function .init.text:irqchip_init()
+   The variable exynos5433_cmu_driver references
+   the function __init irqchip_init()
+   If the reference is valid then annotate the
+   variable with or __refdata (see linux/init.h) or name the variable:
+   
+--
+>> WARNING: drivers/clk/built-in.o(.data+0x31dc): Section mismatch in reference from the variable exynos5433_cmu_driver to the function .init.text:clk_ignore_unused_setup()
+   The variable exynos5433_cmu_driver references
+   the function __init clk_ignore_unused_setup()
+   If the reference is valid then annotate the
+   variable with or __refdata (see linux/init.h) or name the variable:
+   
+--
+>> WARNING: drivers/clk/samsung/built-in.o(.data+0x9c): Section mismatch in reference from the variable exynos5433_cmu_driver to the function .init.text:samsung_clk_init()
+   The variable exynos5433_cmu_driver references
+   the function __init samsung_clk_init()
+   If the reference is valid then annotate the
+   variable with or __refdata (see linux/init.h) or name the variable:
+   
 
-The hot reset is initiated by starting a secondary bus reset. This patch is
-adding vendor ID read immediately after a bus reset so that the
-initialization procedure can be extended by the amount of time endpoint
-requires.
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/pci/pci.c | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
-
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index b209378..ebd0fc6 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -3829,6 +3829,44 @@ static int pci_pm_reset(struct pci_dev *dev, int probe)
- 	return 0;
- }
- 
-+/*
-+ * Mostly copy paste from pci_walk_bus with the exceptions of hard coded
-+ * work and removed locks.
-+ */
-+static void pci_bus_probe_crs(struct pci_bus *top)
-+{
-+	struct pci_dev *dev;
-+	struct pci_bus *bus;
-+	struct list_head *next;
-+	int retval;
-+	u32 l;
-+
-+	bus = top;
-+	next = top->devices.next;
-+	for (;;) {
-+		if (next == &bus->devices) {
-+			/* end of this bus, go up or finish */
-+			if (bus == top)
-+				break;
-+			next = bus->self->bus_list.next;
-+			bus = bus->self->bus;
-+			continue;
-+		}
-+		dev = list_entry(next, struct pci_dev, bus_list);
-+		if (dev->subordinate) {
-+			/* this is a pci-pci bridge, do its devices next */
-+			next = dev->subordinate->devices.next;
-+			bus = dev->subordinate;
-+		} else
-+			next = dev->bus_list.next;
-+
-+		retval = pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &l,
-+						    60 * 1000);
-+		if (retval)
-+			break;
-+	}
-+}
-+
- void pci_reset_secondary_bus(struct pci_dev *dev)
- {
- 	u16 ctrl;
-@@ -4361,6 +4399,7 @@ void pci_reset_bridge_secondary_bus(struct pci_dev *dev)
- 	pci_bus_save_and_disable(dev->bus);
- 	pcibios_reset_secondary_bus(dev);
- 	pci_bus_restore(dev->bus);
-+	pci_bus_probe_crs(dev->subordinate);
- }
- EXPORT_SYMBOL_GPL(pci_reset_bridge_secondary_bus);
- 
--- 
-1.9.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 41355 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160902/a3ead47d/attachment-0001.obj>
