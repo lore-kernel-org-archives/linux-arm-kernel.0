@@ -1,231 +1,132 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 1 Sep 2016 10:58:07 -0700
-Subject: [PATCH v4 3/3] nvmem: rockchip-efuse: add rk3399-efuse support
-In-Reply-To: <1472464210-30252-4-git-send-email-finley.xiao@rock-chips.com>
-References: <1472464210-30252-1-git-send-email-finley.xiao@rock-chips.com>
- <1472464210-30252-4-git-send-email-finley.xiao@rock-chips.com>
-Message-ID: <CAD=FV=X7p9ikQeuMQ4OKiVJMtPpwnPe4Md_68seWmaZSdhFD_A@mail.gmail.com>
+From: afd@ti.com (Andrew F. Davis)
+Date: Thu, 1 Sep 2016 13:06:04 -0500
+Subject: [PATCH v11 3/4] tee: add OP-TEE driver
+In-Reply-To: <20160901092213.GA3968@ermac>
+References: <1471870856-18684-1-git-send-email-jens.wiklander@linaro.org>
+ <1471870856-18684-4-git-send-email-jens.wiklander@linaro.org>
+ <050a2ce4-e175-d09e-ddff-3b0cbe766d88@ti.com> <20160831135015.GB25472@ermac>
+ <fe88749e-82c7-c310-b2bc-4e73bf76302b@ti.com> <20160901092213.GA3968@ermac>
+Message-ID: <0f9a528e-5288-ad4b-256e-f7a0b5952c3c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 09/01/2016 04:22 AM, Jens Wiklander wrote:
+> On Wed, Aug 31, 2016 at 11:40:20AM -0500, Andrew F. Davis wrote:
+>> On 08/31/2016 08:50 AM, Jens Wiklander wrote:
+>>> On Tue, Aug 30, 2016 at 03:23:24PM -0500, Andrew F. Davis wrote:
+>>>> On 08/22/2016 08:00 AM, Jens Wiklander wrote:
+>>>>> +static struct tee_shm_pool *
+>>>>> +optee_config_shm_ioremap(struct device *dev, optee_invoke_fn *invoke_fn,
+>>>>> +			 void __iomem **ioremaped_shm)
+>>>>> +{
+>>>>> +	struct arm_smccc_res res;
+>>>>> +	struct tee_shm_pool *pool;
+>>>>> +	unsigned long vaddr;
+>>>>> +	phys_addr_t paddr;
+>>>>> +	size_t size;
+>>>>> +	phys_addr_t begin;
+>>>>> +	phys_addr_t end;
+>>>>> +	void __iomem *va;
+>>>>> +	struct tee_shm_pool_mem_info priv_info;
+>>>>> +	struct tee_shm_pool_mem_info dmabuf_info;
+>>>>> +
+>>>>> +	invoke_fn(OPTEE_SMC_GET_SHM_CONFIG, 0, 0, 0, 0, 0, 0, 0, &res);
+>>>>> +	if (res.a0 != OPTEE_SMC_RETURN_OK) {
+>>>>> +		dev_info(dev, "shm service not available\n");
+>>>>> +		return ERR_PTR(-ENOENT);
+>>>>> +	}
+>>>>> +
+>>>>> +	if (res.a3 != OPTEE_SMC_SHM_CACHED) {
+>>>>> +		dev_err(dev, "only normal cached shared memory supported\n");
+>>>>> +		return ERR_PTR(-EINVAL);
+>>>>> +	}
+>>>>> +
+>>>>> +	begin = roundup(res.a1, PAGE_SIZE);
+>>>>> +	end = rounddown(res.a1 + res.a2, PAGE_SIZE);
+>>>>
+>>>> res.a1/2/3 is really hard to review and understand, would it work better
+>>>> to use a union or cast for the output of invoke_fn based on the function
+>>>> type?
+>>>>
+>>>> In the header that defines what the returned info from these calls means
+>>>> add:
+>>>>
+>>>> struct OPTEE_SMC_GET_SHM_CONFIG_RESULT {
+>>>> 	unsigned long status;
+>>>> 	unsigned long start;
+>>>> 	unsigned long size;
+>>>> 	unsigned long settings;
+>>>> };
+>>>>
+>>>> then:
+>>>>
+>>>> union something result;
+>>>>
+>>>> begin = roundup(result.ret.start, PAGE_SIZE);
+>>>> end = rounddown(result.ret.start + result.ret.size, PAGE_SIZE);
+>>>>
+>>>> or similar with just casting to the better named struct type.
+>>>
+>>> optee_smc.h describes what's passed in the registers during an SMC I'd
+>>> rather not clutter it with structs that doesn't add any information
+>>> there. I'm not that happy with casting or using unions to alias struct
+>>> arm_smccc_res either. How about a simple wrapper function for this call
+>>> to deal with the details instead?
+>>>
+>>
+>> I think that would be a good idea anyway, for instance, someday if the
+>> interface changes slightly then you will be able to contain the
+>> compatibility fixes in the wrapper and not out here in the main driver.
+> 
+> That interface is supposed to be a stable ABI, incompatible changes in
+> the ABI should be discouraged. If there's an incompatible change it has
+> to be dealt with in the main driver.
 
-On Mon, Aug 29, 2016 at 2:50 AM, Finley Xiao <finley.xiao@rock-chips.com> wrote:
-> 1) the efuse timing of rk3399 is different from earlier SoCs.
-> 2) rk3399-efuse is organized as 32bits by 32 one-time programmable
-> electrical fuses, the efuse of earlier SoCs is organized as 32bits
-> by 8 one-time programmable electrical fuses with random access interface.
->
-> This patch adds a new read function for rk3399-efuse.
->
-> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/nvmem/rockchip-efuse.c | 131 +++++++++++++++++++++++++++++++++++------
->  1 file changed, 112 insertions(+), 19 deletions(-)
->
-> diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-> index 4d3f391..1825fd3 100644
-> --- a/drivers/nvmem/rockchip-efuse.c
-> +++ b/drivers/nvmem/rockchip-efuse.c
-> @@ -22,17 +22,29 @@
->  #include <linux/nvmem-provider.h>
->  #include <linux/slab.h>
->  #include <linux/of.h>
-> +#include <linux/of_platform.h>
->  #include <linux/platform_device.h>
->
-> -#define EFUSE_A_SHIFT                  6
-> -#define EFUSE_A_MASK                   0x3ff
-> -#define EFUSE_PGENB                    BIT(3)
-> -#define EFUSE_LOAD                     BIT(2)
-> -#define EFUSE_STROBE                   BIT(1)
-> -#define EFUSE_CSB                      BIT(0)
-> -
-> -#define REG_EFUSE_CTRL                 0x0000
-> -#define REG_EFUSE_DOUT                 0x0004
-> +#define RK3288_A_SHIFT         6
-> +#define RK3288_A_MASK          0x3ff
-> +#define RK3288_PGENB           BIT(3)
-> +#define RK3288_LOAD                    BIT(2)
-> +#define RK3288_STROBE          BIT(1)
-> +#define RK3288_CSB                     BIT(0)
-> +
-> +#define RK3399_A_SHIFT         16
-> +#define RK3399_A_MASK          0x3ff
-> +#define RK3399_NBYTES          4
-> +#define RK3399_STROBSFTSEL     BIT(9)
-> +#define RK3399_RSB                     BIT(7)
-> +#define RK3399_PD                      BIT(5)
-> +#define RK3399_PGENB           BIT(3)
-> +#define RK3399_LOAD                    BIT(2)
-> +#define RK3399_STROBE          BIT(1)
-> +#define RK3399_CSB                     BIT(0)
-> +
-> +#define REG_EFUSE_CTRL         0x0000
-> +#define REG_EFUSE_DOUT         0x0004
+Why? This driver is for "OPTEE" not "OPTEE v2.0.01.02", any minor ABI
+changes should be abstracted away as much as possible to keep the main
+driver logically simple, agnostic to any OPTEE version ABI quirks/handling.
 
-For me the alignment of the above is all off after your patch.  Are
-you sure you have your editor set to 8 spaces per tab?
+> A small wrapper function in a
+> standalone header file has no chance here as it probably involves using
+> information gathered while probing secure world.
+> 
+> What I meant was a small wrapper function just above 
+> optee_config_shm_ioremap() to deal with only this call.
+> 
 
->
->  struct rockchip_efuse_chip {
->         struct device *dev;
-> @@ -40,8 +52,8 @@ struct rockchip_efuse_chip {
->         struct clk *clk;
->  };
->
-> -static int rockchip_efuse_read(void *context, unsigned int offset,
-> -                              void *val, size_t bytes)
-> +static int rockchip_rk3288_efuse_read(void *context, unsigned int offset,
-> +                                     void *val, size_t bytes)
->  {
->         struct rockchip_efuse_chip *efuse = context;
->         u8 *buf = val;
-> @@ -53,27 +65,80 @@ static int rockchip_efuse_read(void *context, unsigned int offset,
->                 return ret;
->         }
->
-> -       writel(EFUSE_LOAD | EFUSE_PGENB, efuse->base + REG_EFUSE_CTRL);
-> +       writel(RK3288_LOAD | RK3288_PGENB, efuse->base + REG_EFUSE_CTRL);
->         udelay(1);
->         while (bytes--) {
->                 writel(readl(efuse->base + REG_EFUSE_CTRL) &
-> -                            (~(EFUSE_A_MASK << EFUSE_A_SHIFT)),
-> +                            (~(RK3288_A_MASK << RK3288_A_SHIFT)),
->                              efuse->base + REG_EFUSE_CTRL);
->                 writel(readl(efuse->base + REG_EFUSE_CTRL) |
-> -                            ((offset++ & EFUSE_A_MASK) << EFUSE_A_SHIFT),
-> +                            ((offset++ & RK3288_A_MASK) << RK3288_A_SHIFT),
->                              efuse->base + REG_EFUSE_CTRL);
->                 udelay(1);
->                 writel(readl(efuse->base + REG_EFUSE_CTRL) |
-> -                            EFUSE_STROBE, efuse->base + REG_EFUSE_CTRL);
-> +                            RK3288_STROBE, efuse->base + REG_EFUSE_CTRL);
->                 udelay(1);
->                 *buf++ = readb(efuse->base + REG_EFUSE_DOUT);
->                 writel(readl(efuse->base + REG_EFUSE_CTRL) &
-> -                    (~EFUSE_STROBE), efuse->base + REG_EFUSE_CTRL);
-> +                    (~RK3288_STROBE), efuse->base + REG_EFUSE_CTRL);
->                 udelay(1);
->         }
->
->         /* Switch to standby mode */
-> -       writel(EFUSE_PGENB | EFUSE_CSB, efuse->base + REG_EFUSE_CTRL);
-> +       writel(RK3288_PGENB | RK3288_CSB, efuse->base + REG_EFUSE_CTRL);
-> +
-> +       clk_disable_unprepare(efuse->clk);
-> +
-> +       return 0;
-> +}
-> +
-> +static int rockchip_rk3399_efuse_read(void *context, unsigned int offset,
-> +                                     void *val, size_t bytes)
-> +{
-> +       struct rockchip_efuse_chip *efuse = context;
-> +       unsigned int addr_start, addr_end, addr_offset, addr_len;
-> +       u32 out_value;
-> +       u8 *buf;
-> +       int ret, i = 0;
-> +
-> +       ret = clk_prepare_enable(efuse->clk);
-> +       if (ret < 0) {
-> +               dev_err(efuse->dev, "failed to prepare/enable efuse clk\n");
-> +               return ret;
-> +       }
-> +
-> +       addr_start = rounddown(offset, RK3399_NBYTES) / RK3399_NBYTES;
-> +       addr_end = roundup(offset + bytes, RK3399_NBYTES) / RK3399_NBYTES;
-> +       addr_offset = offset % RK3399_NBYTES;
-> +       addr_len = addr_end - addr_start;
-> +
-> +       buf = kzalloc(sizeof(*buf) * addr_len * RK3399_NBYTES, GFP_KERNEL);
-> +       if (!buf)
-> +               return -ENOMEM;
+This wouldn't do anything that a cast couldn't do. Why not put the
+wrapper function in the header as part of that OPTEE version's ABI
+definition?
 
-you forget to clk_disable_unprepare() here.
-
-> +
-> +       writel(RK3399_LOAD | RK3399_PGENB | RK3399_STROBSFTSEL | RK3399_RSB,
-> +              efuse->base + REG_EFUSE_CTRL);
-> +       udelay(1);
-> +       while (addr_len--) {
-> +               writel(readl(efuse->base + REG_EFUSE_CTRL) | RK3399_STROBE |
-> +                       ((addr_start++ & RK3399_A_MASK) << RK3399_A_SHIFT),
-> +                       efuse->base + REG_EFUSE_CTRL);
-> +               udelay(1);
-> +               out_value = readl(efuse->base + REG_EFUSE_DOUT);
-> +               writel(readl(efuse->base + REG_EFUSE_CTRL) & (~RK3399_STROBE),
-> +                      efuse->base + REG_EFUSE_CTRL);
-> +               udelay(1);
-> +
-> +               memcpy(&buf[i], &out_value, RK3399_NBYTES);
-> +               i += RK3399_NBYTES;
-> +       }
-> +
-> +       /* Switch to standby mode */
-> +       writel(RK3399_PD | RK3399_CSB, efuse->base + REG_EFUSE_CTRL);
-> +
-> +       memcpy(val, buf + addr_offset, bytes);
-> +
-> +       kfree(buf);
->
->         clk_disable_unprepare(efuse->clk);
->
-> @@ -89,7 +154,27 @@ static struct nvmem_config econfig = {
->  };
->
->  static const struct of_device_id rockchip_efuse_match[] = {
-> -       { .compatible = "rockchip,rockchip-efuse", },
-> +       /* deprecated but kept around for dts binding compatibility */
-> +       {
-> +               .compatible = "rockchip,rockchip-efuse",
-> +               .data = (void *)&rockchip_rk3288_efuse_read,
-> +       },
-> +       {
-> +               .compatible = "rockchip,rk3066a-efuse",
-> +               .data = (void *)&rockchip_rk3288_efuse_read,
-> +       },
-> +       {
-> +               .compatible = "rockchip,rk3188-efuse",
-> +               .data = (void *)&rockchip_rk3288_efuse_read,
-> +       },
-> +       {
-> +               .compatible = "rockchip,rk3288-efuse",
-> +               .data = (void *)&rockchip_rk3288_efuse_read,
-> +       },
-> +       {
-> +               .compatible = "rockchip,rk3399-efuse",
-> +               .data = (void *)&rockchip_rk3399_efuse_read,
-> +       },
->         { /* sentinel */},
->  };
->  MODULE_DEVICE_TABLE(of, rockchip_efuse_match);
-> @@ -99,6 +184,14 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
->         struct resource *res;
->         struct nvmem_device *nvmem;
->         struct rockchip_efuse_chip *efuse;
-> +       const struct of_device_id *match;
-> +       struct device *dev = &pdev->dev;
-> +
-> +       match = of_match_device(dev->driver->of_match_table, dev);
-> +       if (!match || !match->data) {
-> +               dev_err(dev, "failed to get match data\n");
-> +               return -EINVAL;
-> +       }
->
->         efuse = devm_kzalloc(&pdev->dev, sizeof(struct rockchip_efuse_chip),
->                              GFP_KERNEL);
-> @@ -116,7 +209,7 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
->
->         efuse->dev = &pdev->dev;
->         econfig.size = resource_size(res);
-> -       econfig.reg_read = rockchip_efuse_read;
-> +       econfig.reg_read = match->data;
->         econfig.priv = efuse;
->         econfig.dev = efuse->dev;
->         nvmem = nvmem_register(&econfig);
-> --
-> 1.9.1
->
->
+>>>> [snip]
+>>>>
+>>>>> +#define OPTEE_MSG_ATTR_CACHE_SHIFT		16
+>>>>> +#define OPTEE_MSG_ATTR_CACHE_MASK		0x7
+>>>>
+>>>> GENMASK
+>>>
+>>> Do you mean that OPTEE_MSG_ATTR_CACHE_MASK should be defined using the
+>>> GENMASK() macro? If so I guess I should update OPTEE_MSG_ATTR_TYPE_MASK
+>>> also.
+>>>
+>>
+>> Right, I can tell what bits 0x7 mask, but sometimes it's not so easy
+>> (7F8, etc) so I find it's best to use GENMASKS for all masks so I don't
+>> have to ever think about it at all.
+>>
+>> Also I like to mask then shift, so it would be:
+>>
+>> #define OPTEE_MSG_ATTR_CACHE_SHIFT	16
+>> #define OPTEE_MSG_ATTR_CACHE_MASK	GENMASK(18, 16)
+>>
+>> Then we can see at a glance the actual bits we are looking for (18-16)
+>> and verify the shift is the right amount.
+> 
+> I'm wired the other way around, I usually shift then mask, I suppose
+> it's a matter of taste. I'm happy to use GENMASK instead to define
+> OPTEE_MSG_ATTR_CACHE_MASK, but I'd like to keep it unshifted if you
+> don't mind.
+> 
+> Thanks,
+> Jens
+> 
