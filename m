@@ -1,37 +1,22 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 1 Sep 2016 21:54:14 +0200
-Subject: [PATCH] clk: sunxi-ng: mark ccu_nk_find_best() static
-In-Reply-To: <1472727108-18388-1-git-send-email-baoyou.xie@linaro.org>
-References: <1472727108-18388-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20160901195414.GH20462@lukather>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 1 Sep 2016 20:55:38 +0100
+Subject: [STLinux Kernel] [PATCH 1/9] serial: st-asc: constify uart_ops
+ structures
+In-Reply-To: <1472752298-981-2-git-send-email-Julia.Lawall@lip6.fr>
+References: <1472752298-981-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1472752298-981-2-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <20160901195538.GA19072@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 01 Sep 2016, Julia Lawall wrote:
 
-On Thu, Sep 01, 2016 at 06:51:48PM +0800, Baoyou Xie wrote:
-> We get 1 warning when building kernel with W=1:
-> drivers/clk/sunxi-ng/ccu_nk.c:17:6: warning: no previous prototype for 'ccu_nk_find_best' [-Wmissing-prototypes]
-> 
-> In fact, this function is only used in the file in which it is
-> declared and don't need a declaration, but can be made static.
-> So this patch marks it 'static'.
-> 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> Check for uart_ops structures that are only stored in the ops field of a
+> uart_port structure.  This field is declared const, so uart_ops structures
+> that have this property can be declared as const also.
 
-A similar patch has been merged already.
+Acked-by: Peter Griffin <peter.griffin@linaro.org>
 
-Thanks!
-Maxime
+regards,
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160901/e2f1f1f1/attachment-0001.sig>
+Peter.
