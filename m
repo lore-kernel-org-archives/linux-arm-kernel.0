@@ -1,50 +1,74 @@
-From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Thu, 1 Sep 2016 12:56:08 +0200
-Subject: [PATCH v9 2/2] Add mixer controls: Line-In, FM-In, Mic 2,
- Capture Source, Differential Line-In.
-In-Reply-To: <CAGb2v64zA3iSOe7ku=pF0RhJkvErxt_tbPWG4H8D6r5UEUJAMQ@mail.gmail.com>
-References: <20160830054403.7878-1-dannym@scratchpost.org>
- <20160830054403.7878-3-dannym@scratchpost.org>
- <CAGb2v64zA3iSOe7ku=pF0RhJkvErxt_tbPWG4H8D6r5UEUJAMQ@mail.gmail.com>
-Message-ID: <20160901125608.72808fac@scratchpost.org>
+From: zijun_hu@zoho.com (zijun_hu)
+Date: Thu, 1 Sep 2016 18:58:29 +0800
+Subject: [PATCH 2/2] arm64: regard FDT_SW_MAGIC as good fdt magic
+Message-ID: <a6a8826c-3006-ae43-ef4c-8049ef93cd9f@zoho.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+From: zijun_hu <zijun_hu@htc.com>
 
-> I have a few patches that introduce SOC_DAPM_DOUBLE, so you can share a
-> control between left/right channels. IMHO it makes the userspace mixer
-> less confusing.
+regard FDT_SW_MAGIC as good fdt magic during mapping fdt area
+see fdt_check_header() for details
 
-I definitely agree that cutting down on the number of sliders would be good.
-I do a double-take every time I open alsamixer - and I *added* these
-sun4i widgets :)
+Signed-off-by: zijun_hu <zijun_hu@htc.com>
+---
+ arch/arm64/mm/mmu.c                  | 3 ++-
+ scripts/dtc/libfdt/fdt.h             | 3 ++-
+ scripts/dtc/libfdt/libfdt.h          | 2 ++
+ scripts/dtc/libfdt/libfdt_internal.h | 2 --
+ 4 files changed, 6 insertions(+), 4 deletions(-)
 
-It would be good if your patch series was queued and I could use SOC_DAPM_DOUBLE
-in a future version of my patch. 
-
-Can you post it?
-
-Since it changes user space-visible API whether I group the widgets or not we
-have to be careful about it. So far my patch has not been merged which is good
-for API stability I guess.
-
-I wondered about why there's a SOC_DOUBLE_TLV but no SOC_DAPM_DOUBLE before,
-so it's good to know there's no deep reason.
-
-That said, I'd have to remove the distinction between Left Mixer and Right
-Mixer then. Right now it does distinguish. 
-
-Removing the distinction would remove noteworthy routes like
-
-        { "Right Mixer", "Left DAC Playback Switch", "Left DAC" },
-
-(not a typo). Would that be OK?
-
-Well, let's see how it will work out.
-
-In the mean time I added the second regmap and the quirks and will post another
-patch series for comments.
-
-Cheers,
-   Danny
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 4989948d1feb..83df20509eae 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -716,7 +716,8 @@ void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
+ 	create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE),
+ 			dt_virt_base, SWAPPER_BLOCK_SIZE, prot);
+ 
+-	if (fdt_magic(dt_virt) != FDT_MAGIC)
++	if (fdt_magic(dt_virt) != FDT_MAGIC &&
++			fdt_magic(dt_virt) != FDT_SW_MAGIC)
+ 		return NULL;
+ 
+ 	*size = fdt_totalsize(dt_virt);
+diff --git a/scripts/dtc/libfdt/fdt.h b/scripts/dtc/libfdt/fdt.h
+index 526aedb51556..0e8806327b53 100644
+--- a/scripts/dtc/libfdt/fdt.h
++++ b/scripts/dtc/libfdt/fdt.h
+@@ -92,7 +92,8 @@ struct fdt_property {
+ 
+ #endif /* !__ASSEMBLY */
+ 
+-#define FDT_MAGIC	0xd00dfeed	/* 4: version, 4: total size */
++/* 4: version, 4: total size */
++#define FDT_MAGIC	((fdt32_t)0xd00dfeed)
+ #define FDT_TAGSIZE	sizeof(fdt32_t)
+ 
+ #define FDT_BEGIN_NODE	0x1		/* Start node: full name */
+diff --git a/scripts/dtc/libfdt/libfdt.h b/scripts/dtc/libfdt/libfdt.h
+index 59ca33976e56..6998f9249183 100644
+--- a/scripts/dtc/libfdt/libfdt.h
++++ b/scripts/dtc/libfdt/libfdt.h
+@@ -54,6 +54,8 @@
+ #include "libfdt_env.h"
+ #include "fdt.h"
+ 
++#define FDT_SW_MAGIC           (~FDT_MAGIC)
++
+ #define FDT_FIRST_SUPPORTED_VERSION	0x10
+ #define FDT_LAST_SUPPORTED_VERSION	0x11
+ 
+diff --git a/scripts/dtc/libfdt/libfdt_internal.h b/scripts/dtc/libfdt/libfdt_internal.h
+index 02cfa6fb612d..f4efde0119f2 100644
+--- a/scripts/dtc/libfdt/libfdt_internal.h
++++ b/scripts/dtc/libfdt/libfdt_internal.h
+@@ -90,6 +90,4 @@ static inline struct fdt_reserve_entry *_fdt_mem_rsv_w(void *fdt, int n)
+ 	return (void *)(uintptr_t)_fdt_mem_rsv(fdt, n);
+ }
+ 
+-#define FDT_SW_MAGIC		(~FDT_MAGIC)
+-
+ #endif /* _LIBFDT_INTERNAL_H */
+-- 
+1.9.1
