@@ -1,15 +1,15 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Thu,  1 Sep 2016 15:28:08 -0700
-Subject: [PATCH v2 16/17] rpmsg: Allow callback to return errors
+Date: Thu,  1 Sep 2016 15:28:01 -0700
+Subject: [PATCH v2 09/17] rpmsg: Move endpoint related interface to rpmsg core
 In-Reply-To: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
 References: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <1472768889-3906-17-git-send-email-bjorn.andersson@linaro.org>
+Message-ID: <1472768889-3906-10-git-send-email-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some rpmsg backends support holding on to and redelivering messages upon
-failed handling of them, so provide a way for the callback to report and
-error and allow the backends to handle this.
+Move the rpmsg_send() and rpmsg_destroy_ept() interface to the rpmsg
+core, so that we eventually can hide the rpmsg_endpoint ops from the
+public API.
 
 Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 ---
@@ -17,104 +17,363 @@ Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 Changes since v1:
 - None
 
- drivers/rpmsg/virtio_rpmsg_bus.c    | 10 ++++++----
- include/linux/rpmsg.h               |  4 ++--
- samples/rpmsg/rpmsg_client_sample.c |  6 ++++--
- 3 files changed, 12 insertions(+), 8 deletions(-)
+ drivers/rpmsg/rpmsg_core.c       | 160 +++++++++++++++++++++++++++++++++++++++
+ drivers/rpmsg/virtio_rpmsg_bus.c |  13 ----
+ include/linux/rpmsg.h            | 148 ++----------------------------------
+ 3 files changed, 166 insertions(+), 155 deletions(-)
 
+diff --git a/drivers/rpmsg/rpmsg_core.c b/drivers/rpmsg/rpmsg_core.c
+index c511b5d64f89..3bee8e03a387 100644
+--- a/drivers/rpmsg/rpmsg_core.c
++++ b/drivers/rpmsg/rpmsg_core.c
+@@ -69,3 +69,163 @@ struct rpmsg_endpoint *rpmsg_create_ept(struct rpmsg_device *rpdev,
+ 	return rpdev->ops->create_ept(rpdev, cb, priv, chinfo);
+ }
+ EXPORT_SYMBOL(rpmsg_create_ept);
++
++/**
++ * rpmsg_destroy_ept() - destroy an existing rpmsg endpoint
++ * @ept: endpoing to destroy
++ *
++ * Should be used by drivers to destroy an rpmsg endpoint previously
++ * created with rpmsg_create_ept().
++ */
++void rpmsg_destroy_ept(struct rpmsg_endpoint *ept)
++{
++	ept->ops->destroy_ept(ept);
++}
++EXPORT_SYMBOL(rpmsg_destroy_ept);
++
++/**
++ * rpmsg_send() - send a message across to the remote processor
++ * @ept: the rpmsg endpoint
++ * @data: payload of message
++ * @len: length of payload
++ *
++ * This function sends @data of length @len on the @ept endpoint.
++ * The message will be sent to the remote processor which the @ept
++ * endpoint belongs to, using @ept's address and its associated rpmsg
++ * device destination addresses.
++ * In case there are no TX buffers available, the function will block until
++ * one becomes available, or a timeout of 15 seconds elapses. When the latter
++ * happens, -ERESTARTSYS is returned.
++ *
++ * Can only be called from process context (for now).
++ *
++ * Returns 0 on success and an appropriate error value on failure.
++ */
++int rpmsg_send(struct rpmsg_endpoint *ept, void *data, int len)
++{
++	return ept->ops->send(ept, data, len);
++}
++EXPORT_SYMBOL(rpmsg_send);
++
++/**
++ * rpmsg_sendto() - send a message across to the remote processor, specify dst
++ * @ept: the rpmsg endpoint
++ * @data: payload of message
++ * @len: length of payload
++ * @dst: destination address
++ *
++ * This function sends @data of length @len to the remote @dst address.
++ * The message will be sent to the remote processor which the @ept
++ * endpoint belongs to, using @ept's address as source.
++ * In case there are no TX buffers available, the function will block until
++ * one becomes available, or a timeout of 15 seconds elapses. When the latter
++ * happens, -ERESTARTSYS is returned.
++ *
++ * Can only be called from process context (for now).
++ *
++ * Returns 0 on success and an appropriate error value on failure.
++ */
++int rpmsg_sendto(struct rpmsg_endpoint *ept, void *data, int len, u32 dst)
++{
++	return ept->ops->sendto(ept, data, len, dst);
++}
++EXPORT_SYMBOL(rpmsg_sendto);
++
++/**
++ * rpmsg_send_offchannel() - send a message using explicit src/dst addresses
++ * @ept: the rpmsg endpoint
++ * @src: source address
++ * @dst: destination address
++ * @data: payload of message
++ * @len: length of payload
++ *
++ * This function sends @data of length @len to the remote @dst address,
++ * and uses @src as the source address.
++ * The message will be sent to the remote processor which the @ept
++ * endpoint belongs to.
++ * In case there are no TX buffers available, the function will block until
++ * one becomes available, or a timeout of 15 seconds elapses. When the latter
++ * happens, -ERESTARTSYS is returned.
++ *
++ * Can only be called from process context (for now).
++ *
++ * Returns 0 on success and an appropriate error value on failure.
++ */
++int rpmsg_send_offchannel(struct rpmsg_endpoint *ept, u32 src, u32 dst,
++			  void *data, int len)
++{
++	return ept->ops->send_offchannel(ept, src, dst, data, len);
++}
++EXPORT_SYMBOL(rpmsg_send_offchannel);
++
++/**
++ * rpmsg_send() - send a message across to the remote processor
++ * @ept: the rpmsg endpoint
++ * @data: payload of message
++ * @len: length of payload
++ *
++ * This function sends @data of length @len on the @ept endpoint.
++ * The message will be sent to the remote processor which the @ept
++ * endpoint belongs to, using @ept's address as source and its associated
++ * rpdev's address as destination.
++ * In case there are no TX buffers available, the function will immediately
++ * return -ENOMEM without waiting until one becomes available.
++ *
++ * Can only be called from process context (for now).
++ *
++ * Returns 0 on success and an appropriate error value on failure.
++ */
++int rpmsg_trysend(struct rpmsg_endpoint *ept, void *data, int len)
++{
++	return ept->ops->trysend(ept, data, len);
++}
++EXPORT_SYMBOL(rpmsg_trysend);
++
++/**
++ * rpmsg_sendto() - send a message across to the remote processor, specify dst
++ * @ept: the rpmsg endpoint
++ * @data: payload of message
++ * @len: length of payload
++ * @dst: destination address
++ *
++ * This function sends @data of length @len to the remote @dst address.
++ * The message will be sent to the remote processor which the @ept
++ * endpoint belongs to, using @ept's address as source.
++ * In case there are no TX buffers available, the function will immediately
++ * return -ENOMEM without waiting until one becomes available.
++ *
++ * Can only be called from process context (for now).
++ *
++ * Returns 0 on success and an appropriate error value on failure.
++ */
++int rpmsg_trysendto(struct rpmsg_endpoint *ept, void *data, int len, u32 dst)
++{
++	return ept->ops->trysendto(ept, data, len, dst);
++}
++EXPORT_SYMBOL(rpmsg_trysendto);
++
++/**
++ * rpmsg_send_offchannel() - send a message using explicit src/dst addresses
++ * @ept: the rpmsg endpoint
++ * @src: source address
++ * @dst: destination address
++ * @data: payload of message
++ * @len: length of payload
++ *
++ * This function sends @data of length @len to the remote @dst address,
++ * and uses @src as the source address.
++ * The message will be sent to the remote processor which the @ept
++ * endpoint belongs to.
++ * In case there are no TX buffers available, the function will immediately
++ * return -ENOMEM without waiting until one becomes available.
++ *
++ * Can only be called from process context (for now).
++ *
++ * Returns 0 on success and an appropriate error value on failure.
++ */
++int rpmsg_trysend_offchannel(struct rpmsg_endpoint *ept, u32 src, u32 dst,
++			     void *data, int len)
++{
++	return ept->ops->trysend_offchannel(ept, src, dst, data, len);
++}
++EXPORT_SYMBOL(rpmsg_trysend_offchannel);
 diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c b/drivers/rpmsg/virtio_rpmsg_bus.c
-index 671cb1803431..3090b0d3072f 100644
+index e5f256791fd3..184663276e51 100644
 --- a/drivers/rpmsg/virtio_rpmsg_bus.c
 +++ b/drivers/rpmsg/virtio_rpmsg_bus.c
-@@ -791,8 +791,8 @@ static void rpmsg_xmit_done(struct virtqueue *svq)
+@@ -299,19 +299,6 @@ __rpmsg_destroy_ept(struct virtproc_info *vrp, struct rpmsg_endpoint *ept)
+ 	kref_put(&ept->refcount, __ept_release);
  }
  
- /* invoked when a name service announcement arrives */
--static void rpmsg_ns_cb(struct rpmsg_device *rpdev, void *data, int len,
--			void *priv, u32 src)
-+static int rpmsg_ns_cb(struct rpmsg_device *rpdev, void *data, int len,
-+		       void *priv, u32 src)
+-/**
+- * rpmsg_destroy_ept() - destroy an existing rpmsg endpoint
+- * @ept: endpoing to destroy
+- *
+- * Should be used by drivers to destroy an rpmsg endpoint previously
+- * created with rpmsg_create_ept().
+- */
+-void rpmsg_destroy_ept(struct rpmsg_endpoint *ept)
+-{
+-	ept->ops->destroy_ept(ept);
+-}
+-EXPORT_SYMBOL(rpmsg_destroy_ept);
+-
+ static void virtio_rpmsg_destroy_ept(struct rpmsg_endpoint *ept)
  {
- 	struct rpmsg_ns_msg *msg = data;
- 	struct rpmsg_device *newch;
-@@ -808,7 +808,7 @@ static void rpmsg_ns_cb(struct rpmsg_device *rpdev, void *data, int len,
- 
- 	if (len != sizeof(*msg)) {
- 		dev_err(dev, "malformed ns msg (%d)\n", len);
--		return;
-+		return -EINVAL;
- 	}
- 
- 	/*
-@@ -819,7 +819,7 @@ static void rpmsg_ns_cb(struct rpmsg_device *rpdev, void *data, int len,
- 	 */
- 	if (rpdev) {
- 		dev_err(dev, "anomaly: ns ept has an rpdev handle\n");
--		return;
-+		return -EINVAL;
- 	}
- 
- 	/* don't trust the remote processor for null terminating the name */
-@@ -842,6 +842,8 @@ static void rpmsg_ns_cb(struct rpmsg_device *rpdev, void *data, int len,
- 		if (!newch)
- 			dev_err(dev, "rpmsg_create_channel failed\n");
- 	}
-+
-+	return 0;
- }
- 
- static int rpmsg_probe(struct virtio_device *vdev)
+ 	__rpmsg_destroy_ept(ept->rpdev->vrp, ept);
 diff --git a/include/linux/rpmsg.h b/include/linux/rpmsg.h
-index 71b16d37503a..452d393cc8dd 100644
+index d54458effd54..99efd598590e 100644
 --- a/include/linux/rpmsg.h
 +++ b/include/linux/rpmsg.h
-@@ -80,7 +80,7 @@ struct rpmsg_device {
- 	const struct rpmsg_device_ops *ops;
- };
+@@ -259,150 +259,14 @@ struct rpmsg_endpoint *rpmsg_create_ept(struct rpmsg_device *,
+ 	module_driver(__rpmsg_driver, register_rpmsg_driver, \
+ 			unregister_rpmsg_driver)
  
--typedef void (*rpmsg_rx_cb_t)(struct rpmsg_device *, void *, int, void *, u32);
-+typedef int (*rpmsg_rx_cb_t)(struct rpmsg_device *, void *, int, void *, u32);
+-/**
+- * rpmsg_send() - send a message across to the remote processor
+- * @ept: the rpmsg endpoint
+- * @data: payload of message
+- * @len: length of payload
+- *
+- * This function sends @data of length @len on the @ept endpoint.
+- * The message will be sent to the remote processor which the @ept
+- * endpoint belongs to, using @ept's address and its associated rpmsg
+- * device destination addresses.
+- * In case there are no TX buffers available, the function will block until
+- * one becomes available, or a timeout of 15 seconds elapses. When the latter
+- * happens, -ERESTARTSYS is returned.
+- *
+- * Can only be called from process context (for now).
+- *
+- * Returns 0 on success and an appropriate error value on failure.
+- */
+-static inline int rpmsg_send(struct rpmsg_endpoint *ept, void *data, int len)
+-{
+-	return ept->ops->send(ept, data, len);
+-}
+-
+-/**
+- * rpmsg_sendto() - send a message across to the remote processor, specify dst
+- * @ept: the rpmsg endpoint
+- * @data: payload of message
+- * @len: length of payload
+- * @dst: destination address
+- *
+- * This function sends @data of length @len to the remote @dst address.
+- * The message will be sent to the remote processor which the @ept
+- * endpoint belongs to, using @ept's address as source.
+- * In case there are no TX buffers available, the function will block until
+- * one becomes available, or a timeout of 15 seconds elapses. When the latter
+- * happens, -ERESTARTSYS is returned.
+- *
+- * Can only be called from process context (for now).
+- *
+- * Returns 0 on success and an appropriate error value on failure.
+- */
+-static inline
+-int rpmsg_sendto(struct rpmsg_endpoint *ept, void *data, int len, u32 dst)
+-{
+-	return ept->ops->sendto(ept, data, len, dst);
+-}
+-
+-/**
+- * rpmsg_send_offchannel() - send a message using explicit src/dst addresses
+- * @ept: the rpmsg endpoint
+- * @src: source address
+- * @dst: destination address
+- * @data: payload of message
+- * @len: length of payload
+- *
+- * This function sends @data of length @len to the remote @dst address,
+- * and uses @src as the source address.
+- * The message will be sent to the remote processor which the @ept
+- * endpoint belongs to.
+- * In case there are no TX buffers available, the function will block until
+- * one becomes available, or a timeout of 15 seconds elapses. When the latter
+- * happens, -ERESTARTSYS is returned.
+- *
+- * Can only be called from process context (for now).
+- *
+- * Returns 0 on success and an appropriate error value on failure.
+- */
+-static inline
++int rpmsg_send(struct rpmsg_endpoint *ept, void *data, int len);
++int rpmsg_sendto(struct rpmsg_endpoint *ept, void *data, int len, u32 dst);
+ int rpmsg_send_offchannel(struct rpmsg_endpoint *ept, u32 src, u32 dst,
+-			  void *data, int len)
+-{
+-	return ept->ops->send_offchannel(ept, src, dst, data, len);
+-}
++			  void *data, int len);
  
- /**
-  * struct rpmsg_endpoint - binds a local rpmsg address to its user
-@@ -129,7 +129,7 @@ struct rpmsg_driver {
- 	const struct rpmsg_device_id *id_table;
- 	int (*probe)(struct rpmsg_device *dev);
- 	void (*remove)(struct rpmsg_device *dev);
--	void (*callback)(struct rpmsg_device *, void *, int, void *, u32);
-+	int (*callback)(struct rpmsg_device *, void *, int, void *, u32);
- };
+-/**
+- * rpmsg_send() - send a message across to the remote processor
+- * @ept: the rpmsg endpoint
+- * @data: payload of message
+- * @len: length of payload
+- *
+- * This function sends @data of length @len on the @ept endpoint.
+- * The message will be sent to the remote processor which the @ept
+- * endpoint belongs to, using @ept's address as source and its associated
+- * rpdev's address as destination.
+- * In case there are no TX buffers available, the function will immediately
+- * return -ENOMEM without waiting until one becomes available.
+- *
+- * Can only be called from process context (for now).
+- *
+- * Returns 0 on success and an appropriate error value on failure.
+- */
+-static inline
+-int rpmsg_trysend(struct rpmsg_endpoint *ept, void *data, int len)
+-{
+-	return ept->ops->trysend(ept, data, len);
+-}
+-
+-/**
+- * rpmsg_sendto() - send a message across to the remote processor, specify dst
+- * @ept: the rpmsg endpoint
+- * @data: payload of message
+- * @len: length of payload
+- * @dst: destination address
+- *
+- * This function sends @data of length @len to the remote @dst address.
+- * The message will be sent to the remote processor which the @ept
+- * endpoint belongs to, using @ept's address as source.
+- * In case there are no TX buffers available, the function will immediately
+- * return -ENOMEM without waiting until one becomes available.
+- *
+- * Can only be called from process context (for now).
+- *
+- * Returns 0 on success and an appropriate error value on failure.
+- */
+-static inline
+-int rpmsg_trysendto(struct rpmsg_endpoint *ept, void *data, int len, u32 dst)
+-{
+-	return ept->ops->trysendto(ept, data, len, dst);
+-}
+-
+-/**
+- * rpmsg_send_offchannel() - send a message using explicit src/dst addresses
+- * @ept: the rpmsg endpoint
+- * @src: source address
+- * @dst: destination address
+- * @data: payload of message
+- * @len: length of payload
+- *
+- * This function sends @data of length @len to the remote @dst address,
+- * and uses @src as the source address.
+- * The message will be sent to the remote processor which the @ept
+- * endpoint belongs to.
+- * In case there are no TX buffers available, the function will immediately
+- * return -ENOMEM without waiting until one becomes available.
+- *
+- * Can only be called from process context (for now).
+- *
+- * Returns 0 on success and an appropriate error value on failure.
+- */
+-static inline
++int rpmsg_trysend(struct rpmsg_endpoint *ept, void *data, int len);
++int rpmsg_trysendto(struct rpmsg_endpoint *ept, void *data, int len, u32 dst);
+ int rpmsg_trysend_offchannel(struct rpmsg_endpoint *ept, u32 src, u32 dst,
+-			     void *data, int len)
+-{
+-	return ept->ops->trysend_offchannel(ept, src, dst, data, len);
+-}
++			     void *data, int len);
  
- int register_rpmsg_device(struct rpmsg_device *dev);
-diff --git a/samples/rpmsg/rpmsg_client_sample.c b/samples/rpmsg/rpmsg_client_sample.c
-index 4fcd7ee13fb9..f161dfd3e70a 100644
---- a/samples/rpmsg/rpmsg_client_sample.c
-+++ b/samples/rpmsg/rpmsg_client_sample.c
-@@ -28,7 +28,7 @@ struct instance_data {
- 	int rx_count;
- };
- 
--static void rpmsg_sample_cb(struct rpmsg_device *rpdev, void *data, int len,
-+static int rpmsg_sample_cb(struct rpmsg_device *rpdev, void *data, int len,
- 						void *priv, u32 src)
- {
- 	int ret;
-@@ -43,13 +43,15 @@ static void rpmsg_sample_cb(struct rpmsg_device *rpdev, void *data, int len,
- 	/* samples should not live forever */
- 	if (idata->rx_count >= MSG_LIMIT) {
- 		dev_info(&rpdev->dev, "goodbye!\n");
--		return;
-+		return 0;
- 	}
- 
- 	/* send a new message now */
- 	ret = rpmsg_send(rpdev->ept, MSG, strlen(MSG));
- 	if (ret)
- 		dev_err(&rpdev->dev, "rpmsg_send failed: %d\n", ret);
-+
-+	return 0;
- }
- 
- static int rpmsg_sample_probe(struct rpmsg_device *rpdev)
+ #endif /* _LINUX_RPMSG_H */
 -- 
 2.5.0
