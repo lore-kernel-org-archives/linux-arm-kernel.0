@@ -1,142 +1,47 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 01 Sep 2016 14:05:47 -0700
-Subject: [PATCH] ARM: dts: meson-gxbb: Add support for the Nexbox A95X
- Board
-In-Reply-To: <1471951370-29269-1-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Tue, 23 Aug 2016 13:22:50 +0200")
-References: <1471951370-29269-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <m2oa47ib4k.fsf@baylibre.com>
+From: johnyoun@synopsys.com (John Youn)
+Date: Thu, 01 Sep 2016 14:07:47 -0700
+Subject: [RFT PATCH v4 0/3] usb: dwc2: Fix core reset and force mode delays
+Message-ID: <cover.1472763969.git.johnyoun@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
+This series accounts for the delay from the IDDIG debounce filter when
+switching modes. This delay is a function of the PHY clock speed and
+can range from 5-50 ms. This delay must be taken into account on core
+reset and force modes. A full explanation is provided in the patch
+commit log and code comments.
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+This revision of the series increases the IDDIG delay to 100 ms. Some
+rockchip platforms seem to timeout even with 50 ms so I have doubled
+this.
 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  arch/arm64/boot/dts/amlogic/Makefile               |  1 +
->  .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    | 79 ++++++++++++++++++++++
->  2 files changed, 80 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+Appreciate any testing on RK3188 and RPi platforms.
 
-Can we add this patch to your gx/gxbb/gxl breakup series?
+v4:
+* Increased the IDDIG delay to 110ms.
+* Removed tested-by for patch 2 since I have changed the delays.
 
-Some other minor nits below...
+v3:
+* Added tested-bys for patch 1-2
+* Fixed an issue where a function was not returning a value
+* Dropped patch 4
 
-> diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-> index 47ec703..2c50439 100644
-> --- a/arch/arm64/boot/dts/amlogic/Makefile
-> +++ b/arch/arm64/boot/dts/amlogic/Makefile
-> @@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-p201.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-pro.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-meta.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-telos.dtb
-> +dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-nexbox-a95x.dtb
->  
->  always		:= $(dtb-y)
->  subdir-y	:= $(dts-dirs)
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-> new file mode 100644
-> index 0000000..c418bd7
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-> @@ -0,0 +1,79 @@
-> +/*
-> + * Copyright (c) 2016 Andreas F?rber
-> + * Copyright (c) 2016 BayLibre, Inc.
-> + * Author: Neil Armstrong <narmstrong@kernel.org>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "meson-gxbb.dtsi"
-> +#include <dt-bindings/gpio/gpio.h>
-> +
-> +/ {
-> +	compatible = "nexbox,a95x", "amlogic,meson-gxbb";
+v2:
+* Broke up the last patch of the original series
 
->From checkpatch:
+Regards,
+John
 
-ARNING: DT compatible string "nexbox,a95x" appears un-documented --
-check ./Documentation/devicetree/bindings/
-#78: FILE: arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts:51:
-+       compatible = "nexbox,a95x", "amlogic,meson-gxbb";
+John Youn (3):
+  usb: dwc2: gadget: Only initialize device if in device mode
+  usb: dwc2: Add delay to core soft reset
+  usb: dwc2: Properly account for the force mode delays
 
-WARNING: DT compatible string vendor "nexbox" appears un-documented --
-check ./Documentation/devicetree/bindings/vendor-prefixes.txt
-#78: FILE: arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts:51:
-+       compatible = "nexbox,a95x", "amlogic,meson-gxbb";
+ drivers/usb/dwc2/core.c   | 126 +++++++++++++++++++++++++++++++++++++++-------
+ drivers/usb/dwc2/core.h   |   1 +
+ drivers/usb/dwc2/gadget.c |   7 ++-
+ drivers/usb/dwc2/hw.h     |   1 +
+ 4 files changed, 116 insertions(+), 19 deletions(-)
 
-
-> +	model = "NEXBOX A95X";
-> +	
-
-And some trailing whitespace here.
-
-> +	aliases {
-> +		serial0 = &uart_AO;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	memory at 0 {
-> +		device_type = "memory";
-> +		reg = <0x0 0x0 0x0 0x40000000>;
-> +	};
-> +};
-> +
-> +&uart_AO {
-> +	status = "okay";
-> +	pinctrl-0 = <&uart_ao_a_pins>;
-> +	pinctrl-names = "default";
-> +};
-> +
-> +&ethmac {
-> +	status = "okay";
-> +	pinctrl-0 = <&eth_pins>;
-> +	pinctrl-names = "default";
-> +};
-> +
-
-Kevin
+-- 
+2.9.0
