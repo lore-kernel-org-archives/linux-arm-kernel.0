@@ -1,39 +1,31 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  1 Sep 2016 17:41:23 +0200
-Subject: [PATCH 1/2] arm64: dts: marvell: remove msi-parent from PCIe on
- Armada 3700
-In-Reply-To: <1472744484-19132-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1472744484-19132-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1472744484-19132-2-git-send-email-thomas.petazzoni@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu,  1 Sep 2016 08:45:21 -0700
+Subject: [GIT PULL 3/3] omap defconfig updates for v4.9 merge window
+In-Reply-To: <pull-1472744519-445833>
+References: <pull-1472744519-445833>
+Message-ID: <pull-1472744519-445833-3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following the switch of the Aardvark PCIe controller driver to the
-generic MSI support, the msi-parent property in the PCIe controller,
-pointing to itself is no longer needed: since the MSI irq domain is
-associated to the PCIe controller Device Tree node, this is sufficient
-for the interrupt resolution logic to work.
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
-Please only apply once "pci: pci-aardvark: move to MSI handling using
-generic MSI support" is merged, or it will break MSI support on Armada
-3700.
----
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index c476253..e56a34a 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -187,7 +187,6 @@
- 			bus-range = <0x00 0xff>;
- 			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
- 			#interrupt-cells = <1>;
--			msi-parent = <&pcie0>;
- 			msi-controller;
- 			ranges = <0x82000000 0 0xe8000000   0 0xe8000000 0 0x1000000 /* Port 0 MEM */
- 				  0x81000000 0 0xe9000000   0 0xe9000000 0 0x10000>; /* Port 0 IO*/
--- 
-2.7.4
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.9/defconfig-signed
+
+for you to fetch changes up to f56e6fe09c7848f0a299e661153977372a11abad:
+
+  ARM: omap2plus_defconfig: switch to the IIO BMP085 driver (2016-08-26 08:45:38 -0700)
+
+----------------------------------------------------------------
+A patch from Linus Walleij <linus.walleij@linaro.org> to switch to use
+generic IIO BMP280 driver instead of the BMP085.
+
+----------------------------------------------------------------
+Linus Walleij (1):
+      ARM: omap2plus_defconfig: switch to the IIO BMP085 driver
+
+ arch/arm/configs/omap2plus_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
