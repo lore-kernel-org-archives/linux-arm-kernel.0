@@ -1,72 +1,231 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 1 Sep 2016 10:57:49 -0700
-Subject: [PATCH v2 3/4] arm64: dts: rockchip: add efuse0 device node for
- rk3399
-In-Reply-To: <1470878029-11878-4-git-send-email-finley.xiao@rock-chips.com>
-References: <1470878029-11878-1-git-send-email-finley.xiao@rock-chips.com>
- <1470878029-11878-4-git-send-email-finley.xiao@rock-chips.com>
-Message-ID: <CAD=FV=XHn-VGYZN0TrONHXrnpXP4a4Gk408SR0Q6xY9kVPV+aA@mail.gmail.com>
+Date: Thu, 1 Sep 2016 10:58:07 -0700
+Subject: [PATCH v4 3/3] nvmem: rockchip-efuse: add rk3399-efuse support
+In-Reply-To: <1472464210-30252-4-git-send-email-finley.xiao@rock-chips.com>
+References: <1472464210-30252-1-git-send-email-finley.xiao@rock-chips.com>
+ <1472464210-30252-4-git-send-email-finley.xiao@rock-chips.com>
+Message-ID: <CAD=FV=X7p9ikQeuMQ4OKiVJMtPpwnPe4Md_68seWmaZSdhFD_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Aug 10, 2016 at 6:13 PM, Finlye Xiao <finley.xiao@rock-chips.com> wrote:
-> From: Finley Xiao <finley.xiao@rock-chips.com>
+On Mon, Aug 29, 2016 at 2:50 AM, Finley Xiao <finley.xiao@rock-chips.com> wrote:
+> 1) the efuse timing of rk3399 is different from earlier SoCs.
+> 2) rk3399-efuse is organized as 32bits by 32 one-time programmable
+> electrical fuses, the efuse of earlier SoCs is organized as 32bits
+> by 8 one-time programmable electrical fuses with random access interface.
 >
-> Add a efuse0 node in the device tree for the ARM64 rk3399 SoC.
+> This patch adds a new read function for rk3399-efuse.
 >
 > Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 > ---
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 29 +++++++++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
-
-Oddly this patch seems to have been dropped from v3 and v4 of the
-series.  Seems like we still need it?
-
-
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> index 4c84229..7f764ca 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> @@ -899,6 +899,35 @@
->                 status = "disabled";
->         };
+>  drivers/nvmem/rockchip-efuse.c | 131 +++++++++++++++++++++++++++++++++++------
+>  1 file changed, 112 insertions(+), 19 deletions(-)
 >
-> +       efuse0: efuse0 at ff690000 {
-
-nit: should be efuse0: efuse at ff690000
-
-AKA get rid of the "0" from the node name and just keep it in the alias.
-
-> +               compatible = "rockchip,rk3399-efuse";
-> +               reg = <0x0 0xff690000 0x0 0x80>;
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               clocks = <&cru PCLK_EFUSE1024NS>;
-> +               clock-names = "pclk_efuse";
+> diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
+> index 4d3f391..1825fd3 100644
+> --- a/drivers/nvmem/rockchip-efuse.c
+> +++ b/drivers/nvmem/rockchip-efuse.c
+> @@ -22,17 +22,29 @@
+>  #include <linux/nvmem-provider.h>
+>  #include <linux/slab.h>
+>  #include <linux/of.h>
+> +#include <linux/of_platform.h>
+>  #include <linux/platform_device.h>
+>
+> -#define EFUSE_A_SHIFT                  6
+> -#define EFUSE_A_MASK                   0x3ff
+> -#define EFUSE_PGENB                    BIT(3)
+> -#define EFUSE_LOAD                     BIT(2)
+> -#define EFUSE_STROBE                   BIT(1)
+> -#define EFUSE_CSB                      BIT(0)
+> -
+> -#define REG_EFUSE_CTRL                 0x0000
+> -#define REG_EFUSE_DOUT                 0x0004
+> +#define RK3288_A_SHIFT         6
+> +#define RK3288_A_MASK          0x3ff
+> +#define RK3288_PGENB           BIT(3)
+> +#define RK3288_LOAD                    BIT(2)
+> +#define RK3288_STROBE          BIT(1)
+> +#define RK3288_CSB                     BIT(0)
 > +
-> +               /* Data cells */
-> +               cpul_leakage: cpul-leakage {
-> +                       reg = <0x1a 0x1>;
-> +               };
-> +               cpub_leakage: cpub-leakage {
-> +                       reg = <0x17 0x1>;
-> +               };
-> +               gpu_leakage: gpu-leakage {
-> +                       reg = <0x18 0x1>;
-> +               };
-> +               center_leakage: center-leakage {
-> +                       reg = <0x19 0x1>;
-> +               };
-> +               logic_leakage: logic-leakage {
-> +                       reg = <0x1b 0x1>;
-> +               };
-> +               wafer_info: wafer-info {
-> +                       reg = <0x1c 0x1>;
-> +               };
-> +       };
+> +#define RK3399_A_SHIFT         16
+> +#define RK3399_A_MASK          0x3ff
+> +#define RK3399_NBYTES          4
+> +#define RK3399_STROBSFTSEL     BIT(9)
+> +#define RK3399_RSB                     BIT(7)
+> +#define RK3399_PD                      BIT(5)
+> +#define RK3399_PGENB           BIT(3)
+> +#define RK3399_LOAD                    BIT(2)
+> +#define RK3399_STROBE          BIT(1)
+> +#define RK3399_CSB                     BIT(0)
+> +
+> +#define REG_EFUSE_CTRL         0x0000
+> +#define REG_EFUSE_DOUT         0x0004
 
-Other than that this looks sane to me.
+For me the alignment of the above is all off after your patch.  Are
+you sure you have your editor set to 8 spaces per tab?
 
--Doug
+>
+>  struct rockchip_efuse_chip {
+>         struct device *dev;
+> @@ -40,8 +52,8 @@ struct rockchip_efuse_chip {
+>         struct clk *clk;
+>  };
+>
+> -static int rockchip_efuse_read(void *context, unsigned int offset,
+> -                              void *val, size_t bytes)
+> +static int rockchip_rk3288_efuse_read(void *context, unsigned int offset,
+> +                                     void *val, size_t bytes)
+>  {
+>         struct rockchip_efuse_chip *efuse = context;
+>         u8 *buf = val;
+> @@ -53,27 +65,80 @@ static int rockchip_efuse_read(void *context, unsigned int offset,
+>                 return ret;
+>         }
+>
+> -       writel(EFUSE_LOAD | EFUSE_PGENB, efuse->base + REG_EFUSE_CTRL);
+> +       writel(RK3288_LOAD | RK3288_PGENB, efuse->base + REG_EFUSE_CTRL);
+>         udelay(1);
+>         while (bytes--) {
+>                 writel(readl(efuse->base + REG_EFUSE_CTRL) &
+> -                            (~(EFUSE_A_MASK << EFUSE_A_SHIFT)),
+> +                            (~(RK3288_A_MASK << RK3288_A_SHIFT)),
+>                              efuse->base + REG_EFUSE_CTRL);
+>                 writel(readl(efuse->base + REG_EFUSE_CTRL) |
+> -                            ((offset++ & EFUSE_A_MASK) << EFUSE_A_SHIFT),
+> +                            ((offset++ & RK3288_A_MASK) << RK3288_A_SHIFT),
+>                              efuse->base + REG_EFUSE_CTRL);
+>                 udelay(1);
+>                 writel(readl(efuse->base + REG_EFUSE_CTRL) |
+> -                            EFUSE_STROBE, efuse->base + REG_EFUSE_CTRL);
+> +                            RK3288_STROBE, efuse->base + REG_EFUSE_CTRL);
+>                 udelay(1);
+>                 *buf++ = readb(efuse->base + REG_EFUSE_DOUT);
+>                 writel(readl(efuse->base + REG_EFUSE_CTRL) &
+> -                    (~EFUSE_STROBE), efuse->base + REG_EFUSE_CTRL);
+> +                    (~RK3288_STROBE), efuse->base + REG_EFUSE_CTRL);
+>                 udelay(1);
+>         }
+>
+>         /* Switch to standby mode */
+> -       writel(EFUSE_PGENB | EFUSE_CSB, efuse->base + REG_EFUSE_CTRL);
+> +       writel(RK3288_PGENB | RK3288_CSB, efuse->base + REG_EFUSE_CTRL);
+> +
+> +       clk_disable_unprepare(efuse->clk);
+> +
+> +       return 0;
+> +}
+> +
+> +static int rockchip_rk3399_efuse_read(void *context, unsigned int offset,
+> +                                     void *val, size_t bytes)
+> +{
+> +       struct rockchip_efuse_chip *efuse = context;
+> +       unsigned int addr_start, addr_end, addr_offset, addr_len;
+> +       u32 out_value;
+> +       u8 *buf;
+> +       int ret, i = 0;
+> +
+> +       ret = clk_prepare_enable(efuse->clk);
+> +       if (ret < 0) {
+> +               dev_err(efuse->dev, "failed to prepare/enable efuse clk\n");
+> +               return ret;
+> +       }
+> +
+> +       addr_start = rounddown(offset, RK3399_NBYTES) / RK3399_NBYTES;
+> +       addr_end = roundup(offset + bytes, RK3399_NBYTES) / RK3399_NBYTES;
+> +       addr_offset = offset % RK3399_NBYTES;
+> +       addr_len = addr_end - addr_start;
+> +
+> +       buf = kzalloc(sizeof(*buf) * addr_len * RK3399_NBYTES, GFP_KERNEL);
+> +       if (!buf)
+> +               return -ENOMEM;
+
+you forget to clk_disable_unprepare() here.
+
+> +
+> +       writel(RK3399_LOAD | RK3399_PGENB | RK3399_STROBSFTSEL | RK3399_RSB,
+> +              efuse->base + REG_EFUSE_CTRL);
+> +       udelay(1);
+> +       while (addr_len--) {
+> +               writel(readl(efuse->base + REG_EFUSE_CTRL) | RK3399_STROBE |
+> +                       ((addr_start++ & RK3399_A_MASK) << RK3399_A_SHIFT),
+> +                       efuse->base + REG_EFUSE_CTRL);
+> +               udelay(1);
+> +               out_value = readl(efuse->base + REG_EFUSE_DOUT);
+> +               writel(readl(efuse->base + REG_EFUSE_CTRL) & (~RK3399_STROBE),
+> +                      efuse->base + REG_EFUSE_CTRL);
+> +               udelay(1);
+> +
+> +               memcpy(&buf[i], &out_value, RK3399_NBYTES);
+> +               i += RK3399_NBYTES;
+> +       }
+> +
+> +       /* Switch to standby mode */
+> +       writel(RK3399_PD | RK3399_CSB, efuse->base + REG_EFUSE_CTRL);
+> +
+> +       memcpy(val, buf + addr_offset, bytes);
+> +
+> +       kfree(buf);
+>
+>         clk_disable_unprepare(efuse->clk);
+>
+> @@ -89,7 +154,27 @@ static struct nvmem_config econfig = {
+>  };
+>
+>  static const struct of_device_id rockchip_efuse_match[] = {
+> -       { .compatible = "rockchip,rockchip-efuse", },
+> +       /* deprecated but kept around for dts binding compatibility */
+> +       {
+> +               .compatible = "rockchip,rockchip-efuse",
+> +               .data = (void *)&rockchip_rk3288_efuse_read,
+> +       },
+> +       {
+> +               .compatible = "rockchip,rk3066a-efuse",
+> +               .data = (void *)&rockchip_rk3288_efuse_read,
+> +       },
+> +       {
+> +               .compatible = "rockchip,rk3188-efuse",
+> +               .data = (void *)&rockchip_rk3288_efuse_read,
+> +       },
+> +       {
+> +               .compatible = "rockchip,rk3288-efuse",
+> +               .data = (void *)&rockchip_rk3288_efuse_read,
+> +       },
+> +       {
+> +               .compatible = "rockchip,rk3399-efuse",
+> +               .data = (void *)&rockchip_rk3399_efuse_read,
+> +       },
+>         { /* sentinel */},
+>  };
+>  MODULE_DEVICE_TABLE(of, rockchip_efuse_match);
+> @@ -99,6 +184,14 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
+>         struct resource *res;
+>         struct nvmem_device *nvmem;
+>         struct rockchip_efuse_chip *efuse;
+> +       const struct of_device_id *match;
+> +       struct device *dev = &pdev->dev;
+> +
+> +       match = of_match_device(dev->driver->of_match_table, dev);
+> +       if (!match || !match->data) {
+> +               dev_err(dev, "failed to get match data\n");
+> +               return -EINVAL;
+> +       }
+>
+>         efuse = devm_kzalloc(&pdev->dev, sizeof(struct rockchip_efuse_chip),
+>                              GFP_KERNEL);
+> @@ -116,7 +209,7 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
+>
+>         efuse->dev = &pdev->dev;
+>         econfig.size = resource_size(res);
+> -       econfig.reg_read = rockchip_efuse_read;
+> +       econfig.reg_read = match->data;
+>         econfig.priv = efuse;
+>         econfig.dev = efuse->dev;
+>         nvmem = nvmem_register(&econfig);
+> --
+> 1.9.1
+>
+>
