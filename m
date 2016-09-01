@@ -1,69 +1,83 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 1 Sep 2016 14:56:36 +0100
-Subject: [PATCH v9 3/4] doc: bindings: mfd: act8945a: Update the example
-In-Reply-To: <F9F4555C4E01D7469D37975B62D0EFBB3B600E@CHN-SV-EXMX07.mchp-main.com>
-References: <1472722201-31872-1-git-send-email-wenyou.yang@atmel.com>
- <1472722201-31872-4-git-send-email-wenyou.yang@atmel.com>
- <20160901112251.GK4921@dell>
- <20160901124746.vbhrz4f53vb63d7t@earth>
- <F9F4555C4E01D7469D37975B62D0EFBB3B600E@CHN-SV-EXMX07.mchp-main.com>
-Message-ID: <20160901135636.GM4921@dell>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu,  1 Sep 2016 10:02:55 -0400
+Subject: [PATCH V3] dmaengine: dmatest: exclude compare and fill time during
+ perf report
+Message-ID: <1472738575-7771-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 01 Sep 2016, Wenyou.Yang at microchip.com wrote:
+Dmatest is currently including compare and fill time into the
+calculated performance numbers. This does not reflect the HW
+capability and the results vary based on the CPU speed instead of
+the HW speed.
 
-> 
-> 
-> > -----Original Message-----
-> > From: Sebastian Reichel [mailto:sre at kernel.org]
-> > Sent: 2016?9?1? 20:48
-> > To: Lee Jones <lee.jones@linaro.org>
-> > Cc: Wenyou Yang - A41535 <Wenyou.Yang@microchip.com>; Dmitry Eremin-
-> > Solenikov <dbaryshkov@gmail.com>; David Woodhouse
-> > <dwmw2@infradead.org>; Rob Herring <robh+dt@kernel.org>; Pawel Moll
-> > <pawel.moll@arm.com>; Mark Rutland <mark.rutland@arm.com>; Ian Campbell
-> > <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>; Nicolas
-> > Ferre <nicolas.ferre@atmel.com>; Alexandre Belloni <alexandre.belloni@free-
-> > electrons.com>; linux-kernel at vger.kernel.org; Wenyou Yang - A41535
-> > <Wenyou.Yang@microchip.com>; devicetree at vger.kernel.org; linux-arm-
-> > kernel at lists.infradead.org; linux-pm at vger.kernel.org
-> > Subject: Re: [PATCH v9 3/4] doc: bindings: mfd: act8945a: Update the example
-> > 
-> > Hi Lee,
-> > 
-> > On Thu, Sep 01, 2016 at 12:22:51PM +0100, Lee Jones wrote:
-> > > On Thu, 01 Sep 2016, Wenyou Yang wrote:
-> > >
-> > > > Since the act8945a-charger is regarded as a sub-device and it using
-> > > > "interrupts" property, update the examples section.
-> > > >
-> > > > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > > > ---
-> > > >
-> > > > Changes in v9: None
-> > > > Changes in v8: None
-> > > > Changes in v7: None
-> > > > Changes in v6: None
-> > > > Changes in v4: None
-> > > >
-> > > >  Documentation/devicetree/bindings/mfd/act8945a.txt | 22
-> > > > +++++++++++++++-------
-> > > >  1 file changed, 15 insertions(+), 7 deletions(-)
-> > >
-> > > This is a functional change.  I'll require a DT Ack.
-> > 
-> > Wenyou Yang forgot to take over Rob's Acked-By from the previous
-> > version: https://patchwork.kernel.org/patch/9298871/
-> 
-> Yes, sorry. I forgot.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/dma/dmatest.c | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
 
-Very well.
-
-Applied, thanks.
-
+diff --git a/drivers/dma/dmatest.c b/drivers/dma/dmatest.c
+index 1245db5..738fbd1 100644
+--- a/drivers/dma/dmatest.c
++++ b/drivers/dma/dmatest.c
+@@ -426,7 +426,9 @@ static int dmatest_func(void *data)
+ 	int			src_cnt;
+ 	int			dst_cnt;
+ 	int			i;
+-	ktime_t			ktime;
++	ktime_t			ktime, start, diff;
++	ktime_t			filltime = ktime_set(0, 0);
++	ktime_t			comparetime = ktime_set(0, 0);
+ 	s64			runtime = 0;
+ 	unsigned long long	total_len = 0;
+ 
+@@ -531,6 +533,7 @@ static int dmatest_func(void *data)
+ 			src_off = 0;
+ 			dst_off = 0;
+ 		} else {
++			start = ktime_get();
+ 			src_off = dmatest_random() % (params->buf_size - len + 1);
+ 			dst_off = dmatest_random() % (params->buf_size - len + 1);
+ 
+@@ -541,6 +544,9 @@ static int dmatest_func(void *data)
+ 					  params->buf_size);
+ 			dmatest_init_dsts(thread->dsts, dst_off, len,
+ 					  params->buf_size);
++
++			diff = ktime_sub(ktime_get(), start);
++			filltime = ktime_add(filltime, diff);
+ 		}
+ 
+ 		um = dmaengine_get_unmap_data(dev->dev, src_cnt+dst_cnt,
+@@ -683,6 +689,7 @@ static int dmatest_func(void *data)
+ 			continue;
+ 		}
+ 
++		start = ktime_get();
+ 		pr_debug("%s: verifying source buffer...\n", current->comm);
+ 		error_count = dmatest_verify(thread->srcs, 0, src_off,
+ 				0, PATTERN_SRC, true);
+@@ -703,6 +710,9 @@ static int dmatest_func(void *data)
+ 				params->buf_size, dst_off + len,
+ 				PATTERN_DST, false);
+ 
++		diff = ktime_sub(ktime_get(), start);
++		comparetime = ktime_add(comparetime, diff);
++
+ 		if (error_count) {
+ 			result("data error", total_tests, src_off, dst_off,
+ 			       len, error_count);
+@@ -712,7 +722,10 @@ static int dmatest_func(void *data)
+ 				       dst_off, len, 0);
+ 		}
+ 	}
+-	runtime = ktime_us_delta(ktime_get(), ktime);
++	ktime = ktime_sub(ktime_get(), ktime);
++	ktime = ktime_sub(ktime, comparetime);
++	ktime = ktime_sub(ktime, filltime);
++	runtime = ktime_to_us(ktime);
+ 
+ 	ret = 0;
+ err_dstbuf:
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
