@@ -1,70 +1,163 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 1 Sep 2016 12:54:36 +0100
-Subject: [PATCH] arm64: spinlock: clarify implementation details of
- arch_spin_lock
-In-Reply-To: <20160901112726.GC6721@arm.com>
-References: <1472726820-32959-1-git-send-email-vladimir.murzin@arm.com>
- <20160901112726.GC6721@arm.com>
-Message-ID: <57C816FC.5090403@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 1 Sep 2016 14:09:10 +0200
+Subject: [PATCH 2/5] arm64: KVM: Allow kvm_skip_instr32 to be shared
+ between kernel and HYP code
+In-Reply-To: <1471610295-1456-3-git-send-email-marc.zyngier@arm.com>
+References: <1471610295-1456-1-git-send-email-marc.zyngier@arm.com>
+ <1471610295-1456-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160901120910.GE10162@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/16 12:27, Will Deacon wrote:
-> On Thu, Sep 01, 2016 at 11:47:00AM +0100, Vladimir Murzin wrote:
->> It seems to be quite confusing to see atomic load not being paired
->> with atomic store down to arch_spin_lock function. To prevent the same
->> questions/patches around this add a comment block explaining what is
->> going on there.
->>
->> The comment has been stolen from Catalin's reply [1].
->>
->> [1] https://lkml.org/lkml/2016/8/30/127
->>
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->> ---
->>  arch/arm64/include/asm/spinlock.h |   12 ++++++++++++
->>  1 file changed, 12 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
->> index e875a5a..9a2155c 100644
->> --- a/arch/arm64/include/asm/spinlock.h
->> +++ b/arch/arm64/include/asm/spinlock.h
->> @@ -113,6 +113,18 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
->>  	 */
->>  "	sevl\n"
->>  "2:	wfe\n"
->> +	/*
->> +	 * Don't be confused with atomic load bellow not being paired
->> +	 * with atomic store. This is needed because the
->> +	 * arch_spin_unlock() code only uses an STLR without an
->> +	 * explicit SEV (like we have on AArch32). An event is
->> +	 * automatically generated when the exclusive monitor is
->> +	 * cleared by STLR. But without setting it with a load
->> +	 * exclusive in arch_spin_lock() (even though it does not
->> +	 * acquire the lock), there won't be anything to clear, hence
->> +	 * no event to be generated. In this case, the WFE would wait
->> +	 * indefinitely.
->> +	 */
+On Fri, Aug 19, 2016 at 01:38:12PM +0100, Marc Zyngier wrote:
+> As we're going to start emulating some instruction while in HYP,
+> we need to be able to move the PC forward. Pretty easy for AArch64,
+> but quite fidly for AArch32 (think Thumb2 and the IT state).
 > 
-> So the purpose of our spin_lock implementation is to provide a spin_lock
-> primitive to kernel code which follows the semantics of Linux spin locks.
-> It's not intended to teach people the ARMv8 architecture.
+> In order to be able to reuse the existing code in HYP, move the bulk
+> of it to kvm_emulate.h, and let the implementation located in
+> emulate.c use it. HYP will be able to use it at the expense of an
+> additional copy in the object file, but we can at least share the
+> source code.
 > 
-> If we comment this (and I don't think your comment is necessarily helpful),
-> then do we also comment arch_spin_unlock_wait, __cmpwait, the rwlocks, ...?
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/kvm_emulate.h | 49 ++++++++++++++++++++++++++++++++++++
+>  arch/arm64/kvm/emulate.c             | 45 +--------------------------------
+>  2 files changed, 50 insertions(+), 44 deletions(-)
 > 
-> At some point we have to assume that people attempting to understand the
-> low-level locking primitives for an architecture will bother to read the
-> documentation :/ Hell, the ARMv8 ARM even has an example ticket lock
-> implementation in "K10.3.4 Use of Wait For Event (WFE) and Send Event
-> (SEV) with locks" that uses this trick.
-> 
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index 4cdeae3..60db363 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -311,4 +311,53 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+>  	return data;		/* Leave LE untouched */
+>  }
+>  
+> +/**
+> + * kvm_adjust_itstate - adjust ITSTATE when emulating instructions in IT-block
+> + * @vcpu:	The VCPU pointer
+> + *
+> + * When exceptions occur while instructions are executed in Thumb IF-THEN
+> + * blocks, the ITSTATE field of the CPSR is not advanced (updated), so we have
+> + * to do this little bit of work manually. The fields map like this:
+> + *
+> + * IT[7:0] -> CPSR[26:25],CPSR[15:10]
+> + */
+> +static inline void kvm_adjust_itstate(struct kvm_vcpu *vcpu)
+> +{
+> +	unsigned long itbits, cond;
+> +	unsigned long cpsr = *vcpu_cpsr(vcpu);
+> +	bool is_arm = !(cpsr & COMPAT_PSR_T_BIT);
+> +
+> +	if (is_arm || !(cpsr & COMPAT_PSR_IT_MASK))
+> +		return;
+> +
+> +	cond = (cpsr & 0xe000) >> 13;
+> +	itbits = (cpsr & 0x1c00) >> (10 - 2);
+> +	itbits |= (cpsr & (0x3 << 25)) >> 25;
+> +
+> +	/* Perform ITAdvance (see page A2-52 in ARM DDI 0406C) */
+> +	if ((itbits & 0x7) == 0)
+> +		itbits = cond = 0;
+> +	else
+> +		itbits = (itbits << 1) & 0x1f;
+> +
+> +	cpsr &= ~COMPAT_PSR_IT_MASK;
+> +	cpsr |= cond << 13;
+> +	cpsr |= (itbits & 0x1c) << (10 - 2);
+> +	cpsr |= (itbits & 0x3) << 25;
+> +	*vcpu_cpsr(vcpu) = cpsr;
+> +}
+> +
+> +static void inline kvm_skip_aarch32_instr(struct kvm_vcpu *vcpu,
+> +					  bool is_wide_instr)
+> +{
+> +	bool is_thumb;
+> +
+> +	is_thumb = !!(*vcpu_cpsr(vcpu) & COMPAT_PSR_T_BIT);
+> +	if (is_thumb && !is_wide_instr)
+> +		*vcpu_pc(vcpu) += 2;
+> +	else
+> +		*vcpu_pc(vcpu) += 4;
+> +	kvm_adjust_itstate(vcpu);
+> +}
+> +
+>  #endif /* __ARM64_KVM_EMULATE_H__ */
+> diff --git a/arch/arm64/kvm/emulate.c b/arch/arm64/kvm/emulate.c
+> index df76590..d5f6a29 100644
+> --- a/arch/arm64/kvm/emulate.c
+> +++ b/arch/arm64/kvm/emulate.c
+> @@ -105,53 +105,10 @@ bool kvm_condition_valid32(const struct kvm_vcpu *vcpu)
+>  }
+>  
+>  /**
+> - * adjust_itstate - adjust ITSTATE when emulating instructions in IT-block
+> - * @vcpu:	The VCPU pointer
+> - *
+> - * When exceptions occur while instructions are executed in Thumb IF-THEN
+> - * blocks, the ITSTATE field of the CPSR is not advanced (updated), so we have
+> - * to do this little bit of work manually. The fields map like this:
+> - *
+> - * IT[7:0] -> CPSR[26:25],CPSR[15:10]
+> - */
+> -static void kvm_adjust_itstate(struct kvm_vcpu *vcpu)
+> -{
+> -	unsigned long itbits, cond;
+> -	unsigned long cpsr = *vcpu_cpsr(vcpu);
+> -	bool is_arm = !(cpsr & COMPAT_PSR_T_BIT);
+> -
+> -	if (is_arm || !(cpsr & COMPAT_PSR_IT_MASK))
+> -		return;
+> -
+> -	cond = (cpsr & 0xe000) >> 13;
+> -	itbits = (cpsr & 0x1c00) >> (10 - 2);
+> -	itbits |= (cpsr & (0x3 << 25)) >> 25;
+> -
+> -	/* Perform ITAdvance (see page A2-52 in ARM DDI 0406C) */
+> -	if ((itbits & 0x7) == 0)
+> -		itbits = cond = 0;
+> -	else
+> -		itbits = (itbits << 1) & 0x1f;
+> -
+> -	cpsr &= ~COMPAT_PSR_IT_MASK;
+> -	cpsr |= cond << 13;
+> -	cpsr |= (itbits & 0x1c) << (10 - 2);
+> -	cpsr |= (itbits & 0x3) << 25;
+> -	*vcpu_cpsr(vcpu) = cpsr;
+> -}
+> -
+> -/**
 
-So, NAK? ;)
+This is completely duplicated in arch/arm/kvm/emulate.c (with the same
+useless BUG_ON from the previous patch still around), and this is a
+pretty long static inline.
 
-Cheers
-Vladimir
+How about adding virt/kvm/arm/emulate.c and move these functions in
+there?
 
-> Will
-> 
+Making them available in hyp mode should just be a matter of annotating
+them with __hyp_text, right?
+
+
+Thanks,
+-Christoffer
+
+>   * kvm_skip_instr - skip a trapped instruction and proceed to the next
+>   * @vcpu: The vcpu pointer
+>   */
+>  void kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr)
+>  {
+> -	bool is_thumb;
+> -
+> -	is_thumb = !!(*vcpu_cpsr(vcpu) & COMPAT_PSR_T_BIT);
+> -	if (is_thumb && !is_wide_instr)
+> -		*vcpu_pc(vcpu) += 2;
+> -	else
+> -		*vcpu_pc(vcpu) += 4;
+> -	kvm_adjust_itstate(vcpu);
+> +	kvm_skip_aarch32_instr(vcpu, is_wide_instr);
+>  }
+> -- 
+> 2.1.4
 > 
