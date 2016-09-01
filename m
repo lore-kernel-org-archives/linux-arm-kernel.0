@@ -1,38 +1,34 @@
-From: zijun_hu@zoho.com (zijun_hu)
-Date: Thu, 1 Sep 2016 18:51:19 +0800
-Subject: [PATCH 1/2] arm64: remove duplicate macro __KERNEL__ check
-Message-ID: <456417d8-9167-e996-b940-82bdd4bd6fb4@zoho.com>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Thu,  1 Sep 2016 18:51:48 +0800
+Subject: [PATCH] clk: sunxi-ng: mark ccu_nk_find_best() static
+Message-ID: <1472727108-18388-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: zijun_hu <zijun_hu@htc.com>
+We get 1 warning when building kernel with W=1:
+drivers/clk/sunxi-ng/ccu_nk.c:17:6: warning: no previous prototype for 'ccu_nk_find_best' [-Wmissing-prototypes]
 
-remove duplicate macro __KERNEL__ check
+In fact, this function is only used in the file in which it is
+declared and don't need a declaration, but can be made static.
+So this patch marks it 'static'.
 
-Signed-off-by: zijun_hu <zijun_hu@htc.com>
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 ---
- arch/arm64/include/asm/processor.h | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/clk/sunxi-ng/ccu_nk.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index ace0a96e7d6e..df2e53d3a969 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -37,7 +37,6 @@
- #include <asm/ptrace.h>
- #include <asm/types.h>
+diff --git a/drivers/clk/sunxi-ng/ccu_nk.c b/drivers/clk/sunxi-ng/ccu_nk.c
+index 4470ffc..2adb62e 100644
+--- a/drivers/clk/sunxi-ng/ccu_nk.c
++++ b/drivers/clk/sunxi-ng/ccu_nk.c
+@@ -14,7 +14,7 @@
+ #include "ccu_gate.h"
+ #include "ccu_nk.h"
  
--#ifdef __KERNEL__
- #define STACK_TOP_MAX		TASK_SIZE_64
- #ifdef CONFIG_COMPAT
- #define AARCH32_VECTORS_BASE	0xffff0000
-@@ -49,7 +48,6 @@
- 
- extern phys_addr_t arm64_dma_phys_limit;
- #define ARCH_LOW_ADDRESS_LIMIT	(arm64_dma_phys_limit - 1)
--#endif /* __KERNEL__ */
- 
- struct debug_info {
- 	/* Have we suspended stepping by a debugger? */
+-void ccu_nk_find_best(unsigned long parent, unsigned long rate,
++static void ccu_nk_find_best(unsigned long parent, unsigned long rate,
+ 		      unsigned int max_n, unsigned int max_k,
+ 		      unsigned int *n, unsigned int *k)
+ {
 -- 
-1.9.1
+2.7.4
