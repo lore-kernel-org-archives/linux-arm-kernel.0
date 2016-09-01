@@ -1,39 +1,25 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 1 Sep 2016 18:46:19 +0200
-Subject: [PATCH v2] drm/sun4i: Clear encoder->bridge if a bridge is not
- found
-In-Reply-To: <20160901061332.1803-1-wens@csie.org>
-References: <20160901061332.1803-1-wens@csie.org>
-Message-ID: <20160901164619.GF20462@lukather>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 1 Sep 2016 19:54:01 +0300
+Subject: [PATCH 1/3] ARM: dts: r7s72100: add ethernet clock to device tree
+In-Reply-To: <SG2PR06MB116534DAEDA31113AB14C46B8AE20@SG2PR06MB1165.apcprd06.prod.outlook.com>
+References: <20160901155430.23400-1-chris.brandt@renesas.com>
+ <aaf8c5de-a4f8-42e5-583d-c81a9d92edae@cogentembedded.com>
+ <SG2PR06MB116534DAEDA31113AB14C46B8AE20@SG2PR06MB1165.apcprd06.prod.outlook.com>
+Message-ID: <e277692a-8ea5-9ca7-bfe5-c9980ec7a858@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2016 at 02:13:32PM +0800, Chen-Yu Tsai wrote:
-> The KMS helpers (drm_atomic_helper_check_modeset/mode_fixup) pass
-> encoder->bridge directly to drm_bridge_mode_fixup, which expects a
-> valid pointer, or NULL (in which case it just returns).
-> 
-> Clear encoder->bridge if a bridge is not found, instead of keeping
-> the ERR_PTR value.
-> 
-> Since other drm_bridge functions also follow this pattern of checking
-> for a non-NULL pointer, we can drop the ifs around the calls and just
-> pass the pointer directly.
-> 
-> Fixes: 894f5a9f4b4a ("drm/sun4i: Add bridge support")
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On 09/01/2016 07:38 PM, Chris Brandt wrote:
 
-Applied, thanks!
-Maxime
+>>    I'd add the MSTP7 clock node itself in the same patch...
+>
+> OK. I tried to look at previous commits to figure out what goes in what patch.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160901/50fb977c/attachment.sig>
+    There's no single approach here... but it was just that your patch subject 
+doesn't seem to correspond well to what the patch does.
+
+> Thanks.
+>
+> Chris
+
+MBR, Sergei
