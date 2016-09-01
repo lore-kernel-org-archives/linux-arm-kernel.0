@@ -1,99 +1,84 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 1 Sep 2016 22:37:33 +0200
-Subject: [PATCH 3/3] ARM: dts: sun8i-q8-common: Add support for SDIO wifi
- controllers
-In-Reply-To: <724a6222-36e3-e230-5071-a7cb23c51697@redhat.com>
-References: <20160826145236.30210-1-hdegoede@redhat.com>
- <20160826145236.30210-4-hdegoede@redhat.com>
- <20160829065620.GC7612@lukather>
- <724a6222-36e3-e230-5071-a7cb23c51697@redhat.com>
-Message-ID: <20160901203733.GI20462@lukather>
+From: dave.long@linaro.org (David Long)
+Date: Thu, 1 Sep 2016 16:38:20 -0400
+Subject: [PATCH V2] arm64:ftrace: add save_stack_trace_regs()
+In-Reply-To: <4f7d7a6bff7f06f814bf9a2bdc90bb0e3b833b66.1472734699.git.panand@redhat.com>
+References: <4f7d7a6bff7f06f814bf9a2bdc90bb0e3b833b66.1472734699.git.panand@redhat.com>
+Message-ID: <57C891BC.7030502@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+On 09/01/2016 09:35 AM, Pratyush Anand wrote:
+> Implement save_stack_trace_regs, so that stacktrace of a kprobe events can be
+> obtained.
+>
+> Signed-off-by: Pratyush Anand <panand@redhat.com>
+> ---
+> V1 to V2: Rebased to latest kernel.
+>
+> I see following stack trace for kprobe at xhci_irq():
+>
+> echo stacktrace > /sys/kernel/debug/tracing/trace_options
+> echo "p xhci_irq" > /sys/kernel/debug/tracing/kprobe_events
+> echo 1 > /sys/kernel/debug/tracing/events/kprobes/enable
+> more /sys/kernel/debug/tracing/trace
+>
+>            <idle>-0     [004] d.h.  1356.000496: p_xhci_irq_0:(xhci_irq+0x0/0x9ac)
+>            <idle>-0     [004] d.h.  1356.000497: <stack trace>
+>   => xhci_irq
+>   => __handle_irq_event_percpu
+>   => handle_irq_event_percpu
+>   => handle_irq_event
+>   => handle_fasteoi_irq
+>   => generic_handle_irq
+>   => __handle_domain_irq
+>   => gic_handle_irq
+>   => el1_irq
+>   => arch_cpu_idle
+>   => default_idle_call
+>   => cpu_startup_entry
+>   => secondary_start_kernel
+>   =>
+>
+>   arch/arm64/kernel/stacktrace.c | 18 ++++++++++++++++++
+>   1 file changed, 18 insertions(+)
+>
+> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+> index d9751a4769e7..bd6d9d8087f0 100644
+> --- a/arch/arm64/kernel/stacktrace.c
+> +++ b/arch/arm64/kernel/stacktrace.c
+> @@ -152,6 +152,24 @@ static int save_trace(struct stackframe *frame, void *d)
+>   	return trace->nr_entries >= trace->max_entries;
+>   }
+>
+> +void save_stack_trace_regs(struct pt_regs *regs, struct stack_trace *trace)
+> +{
+> +	struct stack_trace_data data;
+> +	struct stackframe frame;
+> +
+> +	data.trace = trace;
+> +	data.skip = trace->skip;
+> +	data.no_sched_functions = 0;
+> +
+> +	frame.fp = regs->regs[29];
+> +	frame.sp = regs->sp;
+> +	frame.pc = regs->pc;
 
-On Mon, Aug 29, 2016 at 11:46:14AM +0200, Hans de Goede wrote:
-> On 29-08-16 08:56, Maxime Ripard wrote:
-> >On Fri, Aug 26, 2016 at 04:52:36PM +0200, Hans de Goede wrote:
-> >>Most of the sun8i q8 boards have an usb wifi controller, on the
-> >>variants which use an USB wifi controller, this will result in a
-> >>couple of error msg-s in dmesg when proving the sdio bus and
-> >>an used mmc controller.
-> >>
-> >>The best way to deal with wifi on this boards really is to simply
-> >>let the kernel auto-detect usb or sdio wifi controllers, so we
-> >>will just have to live with the few errors in dmesg.
-> >
-> >No, because that grabs PINs that might or might not be supposed to be
-> >used for that, it leaves clocks and regulators enabled, which draw
-> >power, to no end. And that's even worth since most boards will not use
-> >it.
-> >
-> >You can put the definition of the nodes in the DTSI, but the final
-> >status will have to be in the (relevant) DTS.
-> 
-> This is again the q8-tablet thing where china produces a new variant
-> every 2 weeks. So we've sun8i-a23-q8-tablet.dts and sun8i-a33-q8-tablet.dts
-> which try to be generic dts files for these tablets, since creating
-> a custom dts per variant is madness.
+Interesting that arm64 does not define an "lr" field in struct 
+stackframe like 32-bit arm does.
 
-This is almost unrelated, and probably some wishful thinking, but I'd
-really prefer to support *one* board properly, with all its features,
-rather than supporting every random Allwinner device with half baked
-support, because no one ever updated the DT, or there's simply no
-driver. But hey, I can't force you to work on something either :)
+> +
+> +	walk_stackframe(current, &frame, save_trace, &data);
+> +	if (trace->nr_entries < trace->max_entries)
+> +		trace->entries[trace->nr_entries++] = ULONG_MAX;
+> +}
+> +
+>   void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+>   {
+>   	struct stack_trace_data data;
+>
 
-> This commit puts the node in sun8i-q8-common.dtsi because the
-> A23 and A33 are pin compatible and we've tablets where the
-> only difference is the SoC soldered on there, the use the _exact_
-> same PCB and components otherwise, so we have all the sun8i q8
-> stuff in a common place for sun8i-a23-q8-tablet.dts and
-> sun8i-a33-q8-tablet.dts, those are the only users of this
-> dtsi file.
-> 
-> You've already merged the bits which handle the variants with
-> an USB attached wifi module (enabling ehci0 also on boards
-> where nothing is connected). This is the counter-part for
-> PCB's which use a sdio wifi module (about 90% of all boards
-> in my experience).
+Looks OK to me.  I successfully (if briefly) tested it with v4.8-rc4 on 
+hikey.
 
-I'm confused. Are most boards using an USB wifi chip, like you were
-stating in your commit log, or an SDIO wifi chip like you just said?
-
-> As for turning a regulator on unnecessary, both the wifi and sdio
-> wifi solution use the same regulator, so that is already turned on
-> through the usb bits and it needs to be in either case.
-
-Ok, so indeed, that's not as bad as it sounds.
-
-> The only downside of this approach is that we either have
-> the USB controller turned on unnecessarily (in most cases)
-> or the mmc controller (in the rare A23 tablet which still
-> uses an USB wifi module).
-> 
-> This all actually fits neatly into the plans to do hardware
-> autodetection for these tablets which I'm working on, in
-> this case we can just let the kernel handle things without
-> additional code (think the beaglebone capemanager) since
-> both busses are discoverable.
-> 
-> Once we have the q8-hardwaremgr I'm working on and hope
-> to post an RFC of soon, we could even make that turn off
-> the unused controller (as a future enhancement).
-
-If that's on your to-do-list, that's fine by me.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160901/9ab81153/attachment.sig>
+Thanks,
+-dl
