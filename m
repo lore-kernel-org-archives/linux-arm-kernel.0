@@ -1,93 +1,65 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Thu, 1 Sep 2016 13:33:22 +0530
-Subject: [PATCH v6 1/8] binding-doc: power: pwrseq-generic: add binding
- doc for generic power sequence library
-In-Reply-To: <1471252398-957-2-git-send-email-peter.chen@nxp.com>
-References: <1471252398-957-1-git-send-email-peter.chen@nxp.com>
- <1471252398-957-2-git-send-email-peter.chen@nxp.com>
-Message-ID: <6832cc55-831a-1188-4878-bbbf0b3c3be8@linaro.org>
+From: majun258@huawei.com (majun (F))
+Date: Thu, 1 Sep 2016 16:15:50 +0800
+Subject: [PATCH] generic: Add the exception case checking routine for ppi
+ interrupt
+In-Reply-To: <57C696DA.4090301@arm.com>
+References: <1472530639-21616-1-git-send-email-majun258@huawei.com>
+ <57C548D0.3090700@arm.com> <57C5617B.6080801@huawei.com>
+ <57C568F8.20802@arm.com> <20160830112113.GE1223@leverpostej>
+ <57C67ABE.908@huawei.com> <57C696DA.4090301@arm.com>
+Message-ID: <57C7E3B6.1040605@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On Monday 15 August 2016 02:43 PM, Peter Chen wrote:
-> Add binding doc for generic power sequence library.
->
-> Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
->   .../bindings/power/pwrseq/pwrseq-generic.txt       | 48 ++++++++++++++++++++++
->   1 file changed, 48 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
->
-> diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
-> new file mode 100644
-> index 0000000..ebf0d47
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
-> @@ -0,0 +1,48 @@
-> +The generic power sequence library
-> +
-> +Some hard-wired devices (eg USB/MMC) need to do power sequence before
-> +the device can be enumerated on the bus, the typical power sequence
-> +like: enable USB PHY clock, toggle reset pin, etc. But current
-> +Linux device driver lacks of such code to do it, it may cause some
-> +hard-wired devices works abnormal or can't be recognized by
-> +controller at all. The power sequence will be done before this device
-> +can be found at the bus.
-> +
-> +The power sequence properties is under the device node.
-> +
-> +Optional properties:
-> +- clocks: the input clocks for device.
-> +- reset-gpios: Should specify the GPIO for reset.
-> +- reset-duration-us: the duration in microsecond for assert reset signal.
-> +
-> +Below is the example of USB power sequence properties on USB device
-> +nodes which have two level USB hubs.
-> +
-> +&usbotg1 {
-> +	vbus-supply = <&reg_usb_otg1_vbus>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usb_otg1_id>;
-> +	status = "okay";
-> +
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	genesys: hub at 1 {
-> +		compatible = "usb5e3,608";
-> +		reg = <1>;
-> +
-> +		clocks = <&clks IMX6SX_CLK_CKO>;
-> +		reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
-> +		reset-duration-us = <10>;
-> +
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		asix: ethernet at 1 {
-> +			compatible = "usbb95,1708";
+? 2016/8/31 16:35, Marc Zyngier ??:
+> On 31/08/16 07:35, majun (F) wrote:
+[...]
+>>>
+>>
+>> I just checked the status of irq 30 during capture kernel booting.
+>>
+>> The irq 30 status is: mask, pending after arch_timer_starting_cpu() called.
+>> Because irq 30 triggered only 1 time during capture kernel booting,
+>> I think this problem maybe happened in the case like:
+>> 1:irq 30 triggered, but not acked by cpu yet.
+>> 2:local_irq_disable() called
+>> 3:system reboot -->capture kernel booting
+>> 4:local_irq_enable()
+>> 5:irq 30 acked by CPU.
+>>
+>> Is this case possible?
+> 
+> I can't see how, because you've missed:
+> 
+> 3b: All PPIs are disabled as each CPU comes up
+> 
+> So for (5) to occur, I can only see two possibilities:
+> (a) either something else is enabling the timer PPI
 
-So I assume, with our recent discussion and the change
-we are proposing, the library would have some knowledge
-about this compatible string, right?
+I checked the whole process, the irq 30 alway keeping disabled.
 
-what I was asking on other email was, how are you connecting
-multiple power sequence libraries to their respective consumers ?
+> (b) your GIC doesn't correctly retire a pending PPI that is being disabled
 
-Thanks,
-Vaibhav
+According to our hardware guy said, GIC in our system has problem in this case.
+Usually, when we mask irq 30, the interrupt which in pending status but not acked by cpu
+should be released/cleared by hardware, but actually, we did't do like this in our system.
 
-> +			reg = <1>;
-> +
-> +			clocks = <&clks IMX6SX_CLK_IPG>;
-> +			reset-gpios = <&gpio4 6 GPIO_ACTIVE_LOW>; /* ethernet_rst */
-> +			reset-duration-us = <15>;
-> +		};
-> +	};
-> +};
+So, this conclusion just same as you assumption.
 
--- 
-Thanks,
-Vaibhav
+Do you have any suggestion or workaround for this problem?
+
+Thanks!
+Majun
+
+> 
+> I'm discounting (b) because I can't see how the system would work
+> otherwise, so (a) must be happening somehow.
+> 
+
+
+> Thanks,
+> 
+> 	M.
+> 
