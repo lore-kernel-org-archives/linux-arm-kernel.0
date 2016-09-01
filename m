@@ -1,100 +1,62 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 1 Sep 2016 13:23:45 -0500
-Subject: [RFC PATCH V5 1/5] PCI: Embed pci_ecam_ops in pci_config_window
- structure
-In-Reply-To: <1470661541-26270-2-git-send-email-tn@semihalf.com>
-References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
- <1470661541-26270-2-git-send-email-tn@semihalf.com>
-Message-ID: <20160901182345.GA18461@localhost>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Thu, 01 Sep 2016 19:29:37 +0100
+Subject: [RFC PATCH 6/7] arm64: KVM: Handle trappable TLB instructions
+In-Reply-To: <20160901145525.GM6721@arm.com> (Will Deacon's message of "Thu, 1
+ Sep 2016 15:55:25 +0100")
+References: <1471344312-26685-1-git-send-email-punit.agrawal@arm.com>
+ <1471344312-26685-7-git-send-email-punit.agrawal@arm.com>
+ <20160819151846.GE9893@arm.com>
+ <87a8g2sb4o.fsf@e105922-lin.cambridge.arm.com>
+ <87h9a7rhvf.fsf@e105922-lin.cambridge.arm.com>
+ <20160901145525.GM6721@arm.com>
+Message-ID: <878tvblbhq.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 08, 2016 at 03:05:37PM +0200, Tomasz Nowicki wrote:
-> pci_config_window keeps pointer to pci_ecam_ops and every time
-> we want to deallocate pci_config_window (pci_ecam_free()) we need to make
-> sure to free pci_ecam_ops in case it was dynamically allocated prior to
-> pci_ecam_create() call.
+Will Deacon <will.deacon@arm.com> writes:
 
-I think this is a theoretical problem, right?  All the current callers
-pass a pointer to a static pci_ecam_ops struct that does not need to
-be deallocated.
+> On Fri, Aug 26, 2016 at 10:37:08AM +0100, Punit Agrawal wrote:
+>> > Will Deacon <will.deacon@arm.com> writes:
+>> >> The easiest thing to do is just TLBI VMALLE1IS for all trapped operations,
+>> >> but you might want to see how that performs.
+>> >
+>> > That sounds reasonable for correctness. But I suspect we'll have to do
+>> > more to claw back some performance. Let me run a few tests and come back
+>> > on this.
+>> 
+>> Assuming I've correctly switched in TCR and replacing the various TLB
+>> operations in this patch with TLBI VMALLE1IS, there is a drop in kernel
+>> build times of ~5% (384s vs 363s).
+>
+> What do you mean by "switched in TCR"? Why is that necessary if you just
+> nuke the whole thing?
 
-I see that the next patch uses a pci_ecam_ops struct on the stack,
-which would definitely cause issues without this patch, so I agree we
-need something like this; I'm just trying to make the changelog make
-more sense.
+You're right. it's not necessary. I'd misunderstood how TCR affects
+things and was switching it in the above tests.
 
-> To avoid that extra effort, embed pci_ecam_ops in pci_config_window,
-> instead of just a pointer.
-> 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> To: Jayachandran C <jchandra@broadcom.com>
+> Is the ~5% relative to no trapping at all, or
+> trapping, but being selective about the operation?
 
-This looks like an editing mistake?
+The reported number was relative to trapping and being selective about
+the operation. But I hadn't been careful in ensuring identical
+conditions (page caches, etc.) when running the numbers.
 
-> ---
->  arch/arm64/kernel/pci.c  | 2 +-
->  drivers/pci/ecam.c       | 6 +++---
->  include/linux/pci-ecam.h | 2 +-
->  3 files changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index acf3872..981e828 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -183,7 +183,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->  		return NULL;
->  	}
->  
-> -	acpi_pci_root_ops.pci_ops = &ri->cfg->ops->pci_ops;
-> +	acpi_pci_root_ops.pci_ops = &ri->cfg->ops.pci_ops;
->  	bus = acpi_pci_root_create(root, &acpi_pci_root_ops, &ri->common,
->  				   ri->cfg);
->  	if (!bus)
-> diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
-> index 43ed08d..24242f0 100644
-> --- a/drivers/pci/ecam.c
-> +++ b/drivers/pci/ecam.c
-> @@ -52,7 +52,7 @@ struct pci_config_window *pci_ecam_create(struct device *dev,
->  		return ERR_PTR(-ENOMEM);
->  
->  	cfg->parent = dev;
-> -	cfg->ops = ops;
-> +	cfg->ops = *ops;
->  	cfg->busr.start = busr->start;
->  	cfg->busr.end = busr->end;
->  	cfg->busr.flags = IORESOURCE_BUS;
-> @@ -138,7 +138,7 @@ void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
->  			       int where)
->  {
->  	struct pci_config_window *cfg = bus->sysdata;
-> -	unsigned int devfn_shift = cfg->ops->bus_shift - 8;
-> +	unsigned int devfn_shift = cfg->ops.bus_shift - 8;
->  	unsigned int busn = bus->number;
->  	void __iomem *base;
->  
-> @@ -149,7 +149,7 @@ void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
->  	if (per_bus_mapping)
->  		base = cfg->winp[busn];
->  	else
-> -		base = cfg->win + (busn << cfg->ops->bus_shift);
-> +		base = cfg->win + (busn << cfg->ops.bus_shift);
->  	return base + (devfn << devfn_shift) + where;
->  }
->  
-> diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
-> index 7adad20..0ce2920 100644
-> --- a/include/linux/pci-ecam.h
-> +++ b/include/linux/pci-ecam.h
-> @@ -39,7 +39,7 @@ struct pci_config_window {
->  	struct resource			res;
->  	struct resource			busr;
->  	void				*priv;
-> -	struct pci_ecam_ops		*ops;
-> +	struct pci_ecam_ops		ops;
->  	union {
->  		void __iomem		*win;	/* 64-bit single mapping */
->  		void __iomem		**winp; /* 32-bit per-bus mapping */
-> -- 
-> 1.9.1
-> 
+So I've done a fresh set of identical measurements by running "time make
+-j 7" in a VM booted with 7 vcpus and see the following results
+
+1. no trapping ~ 365s
+2. traps using selective tlb operations ~ 371s
+3. traps that nuke all stage 1 (tlbi vmalle1is) ~ 393s
+
+So based on these measurements there is ~1% and ~7.5% drop in comparison
+between 2. and 3. compared to the base case of no trapping at all.
+
+Thanks,
+Punit
+
+>
+> Will
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
