@@ -1,33 +1,34 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Sep 2016 16:34:16 +0100
-Subject: [RFC PATCH 00/33] SA11x0/PXA GPIO rework (Core + PCMCIA only)
-In-Reply-To: <CACRpkdYuAh1r+N_yJkb9G24Y4zVvEdR8=U-K7etCQvuSZtr+6g@mail.gmail.com>
-References: <20160829100232.GC1041@n2100.armlinux.org.uk>
- <20160829102328.GA28796@n2100.armlinux.org.uk>
- <CACRpkdYuAh1r+N_yJkb9G24Y4zVvEdR8=U-K7etCQvuSZtr+6g@mail.gmail.com>
-Message-ID: <20160901153416.GY1041@n2100.armlinux.org.uk>
+Date: Thu, 1 Sep 2016 16:37:07 +0100
+Subject: [PATCHv4] arm: l2x0: add PMU support
+In-Reply-To: <1472653416-774-1-git-send-email-mark.rutland@arm.com>
+References: <1472653416-774-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20160901153706.GZ1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2016 at 11:31:58PM +0200, Linus Walleij wrote:
-> For all the GPIO patches:
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+On Wed, Aug 31, 2016 at 03:23:36PM +0100, Mark Rutland wrote:
+> The L2C-220 (AKA L220) and L2C-310 (AKA PL310) cache controllers feature
+> a Performance Monitoring Unit (PMU), which can be useful for tuning
+> and/or debugging. This hardware is always present and the relevant
+> registers are accessible to non-secure accesses. Thus, no special
+> firmware interface is necessary.
 > 
-> With the smallish changes needed to patch 5/33 that one is acked too.
+> This patch adds support for the PMU, plugging into the usual perf
+> infrastructure. The overflow interrupt is not always available (e.g. on
+> RealView PBX A9 it is not wired up at all), and the hardware counters
+> saturate, so the driver does not make use of this. Instead, the driver
+> periodically polls and reset counters as required to avoid losing
+> events due to saturation.
 > 
-> In fact I would ACK it anyway, because the net total cleanup is so
-> nice on the kernel at large... SA11x0 has never been prettier than
-> after this series.
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Pawel Moll <pawel.moll@arm.com>
+> Cc: Kim Phillips <kim.phillips@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-Thanks, ack applied to all the gpio patches.
-
-> I suspect you want to keep the series together and queue it in the ARM
-> tree? Else tell me what to apply in the GPIO tree.
-
-Yes, I need to keep the series together because of the dependencies -
-trying to split it up will lead to conflicts and breakage from missing
-include files, and when it's not from missing include files, it'll be
-non-functional.
+Much better, thanks.  When you're happy, please put it in the patch
+system, thanks.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
