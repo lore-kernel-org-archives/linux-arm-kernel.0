@@ -1,39 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  1 Sep 2016 12:40:37 +0100
-Subject: [PATCH] ARM: dts: explicitly mark skeleton.dtsi as deprecated
-Message-ID: <1472730037-4972-1-git-send-email-mark.rutland@arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 01 Sep 2016 13:41:42 +0200
+Subject: [PATCH v3 3/5] arm64: dts: rockchip: add the gmac power domain on
+ rk3399
+In-Reply-To: <1472686132-27827-4-git-send-email-wxt@rock-chips.com>
+References: <1472686132-27827-1-git-send-email-wxt@rock-chips.com>
+ <1472686132-27827-4-git-send-email-wxt@rock-chips.com>
+Message-ID: <2409903.3qiu7FpA8p@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As noted in commit 3ebee5a2e141496b ("arm64: dts: kill skeleton.dtsi"),
-there are a number of problems with skeleton.dtsi, and it would be
-prefereable to remove it entirely. As there are a large number of
-existing users, fixing these up will take a while.
+Hi Caesar,
 
-This patch adds a note to arm's skeleton.dtsi noting that this is the
-case, to make this more obvious and hopefully minimize new uptake of
-skeleton.dtsi in the mean time.
+Am Donnerstag, 1. September 2016, 07:28:50 schrieb Caesar Wang:
+> This patch supports the gmac pd to save power consumption.
+> Even though some boards not need Ethernet support, the driver
+> core can also take care of powering up the pd before probe.
+> 
+> Signed-off-by: Roger Chen <roger.chen@rock-chips.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Rob Herring <rob.herring@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
----
- arch/arm/boot/dts/skeleton.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+who is the author of this patch? Roger or you? Because we should either drop 
+Roger's Signed-off or fix the authorship to list him.
 
-diff --git a/arch/arm/boot/dts/skeleton.dtsi b/arch/arm/boot/dts/skeleton.dtsi
-index b41d241..28b81d6 100644
---- a/arch/arm/boot/dts/skeleton.dtsi
-+++ b/arch/arm/boot/dts/skeleton.dtsi
-@@ -1,4 +1,8 @@
- /*
-+ * This file is deprecated, and will be removed once existing users have been
-+ * updated. New dts{,i} files should *not* include skeleton.dtsi, and should
-+ * instead explicitly provide the below nodes only as required.
-+ *
-  * Skeleton device tree; the bare minimum needed to boot; just include and
-  * add a compatible value.  The bootloader will typically populate the memory
-  * node.
--- 
-1.9.1
+
+Heiko
+
+> ---
+> 
+> Changes in v3:
+> - leave into two patches based on patchv2, and fix nits and commit, as
+>   comment on https://patchwork.kernel.org/patch/9306339/
+> 
+> Changes in v2:
+> - Fixes the order, ss Heiko commnets on
+>   https://patchwork.kernel.org/patch/9305991/
+> 
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index 32aebc8..2ab233f 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -611,6 +611,11 @@
+>  		status = "disabled";
+>  	};
+> 
+> +	qos_gmac: qos at ffa5c000 {
+> +		compatible = "syscon";
+> +		reg = <0x0 0xffa5c000 0x0 0x20>;
+> +	};
+> +
+>  	qos_hdcp: qos at ffa90000 {
+>  		compatible = "syscon";
+>  		reg = <0x0 0xffa90000 0x0 0x20>;
+> @@ -739,6 +744,11 @@
+>  			};
+> 
+>  			/* These power domains are grouped by VD_LOGIC */
+> +			pd_gmac at RK3399_PD_GMAC {
+> +				reg = <RK3399_PD_GMAC>;
+> +				clocks = <&cru ACLK_GMAC>;
+> +				pm_qos = <&qos_gmac>;
+> +			};
+>  			pd_vio at RK3399_PD_VIO {
+>  				reg = <RK3399_PD_VIO>;
+>  				#address-cells = <1>;
