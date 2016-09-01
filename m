@@ -1,42 +1,42 @@
 From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Thu, 1 Sep 2016 15:44:43 +0530
-Subject: [PATCH 3/6] PCI: Xilinx: Clear correct msi set bit
+Date: Thu, 1 Sep 2016 15:44:46 +0530
+Subject: [PATCH 6/6] Microblaze: Modify microblaze pci specific code to
+ support multidomain.
 In-Reply-To: <1472724886-28301-1-git-send-email-bharatku@xilinx.com>
 References: <1472724886-28301-1-git-send-email-bharatku@xilinx.com>
-Message-ID: <1472724886-28301-3-git-send-email-bharatku@xilinx.com>
+Message-ID: <1472724886-28301-6-git-send-email-bharatku@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kernel provides virtual irq number at teardown.
-Get hwirq number from virtual irq and clear correct
-MSI set bit.
+Proc entries will be created for every pci bus.
+With current implementation,in multidomain same bus number
+will repaeat but in different domain, which causes kernel crash
+as already same bus number exists.
+
+Return domain number when kernel requests while creating proc
+entries for each bus.
 
 Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
 ---
- drivers/pci/host/pcie-xilinx.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/microblaze/pci/pci-common.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-index de1c758..ec2844a 100644
---- a/drivers/pci/host/pcie-xilinx.c
-+++ b/drivers/pci/host/pcie-xilinx.c
-@@ -221,13 +221,15 @@ static void xilinx_pcie_destroy_msi(unsigned int irq)
- {
- 	struct msi_desc *msi;
- 	struct xilinx_pcie_port *port;
-+	struct irq_data *d = irq_get_irq_data(irq);
-+	irq_hw_number_t hwirq = irqd_to_hwirq(d);
- 
--	if (!test_bit(irq, msi_irq_in_use)) {
-+	if (!test_bit(hwirq, msi_irq_in_use)) {
- 		msi = irq_get_msi_desc(irq);
- 		port = msi_desc_to_pci_sysdata(msi);
- 		dev_err(port->dev, "Trying to free unused MSI#%d\n", irq);
- 	} else {
--		clear_bit(irq, msi_irq_in_use);
-+		clear_bit(hwirq, msi_irq_in_use);
+diff --git a/arch/microblaze/pci/pci-common.c b/arch/microblaze/pci/pci-common.c
+index 81556b8..7f696f9 100644
+--- a/arch/microblaze/pci/pci-common.c
++++ b/arch/microblaze/pci/pci-common.c
+@@ -632,10 +632,10 @@ void pci_process_bridge_OF_ranges(struct pci_controller *hose,
  	}
  }
  
+-/* Decide whether to display the domain number in /proc */
++/* Display the domain number in /proc */
+ int pci_proc_domain(struct pci_bus *bus)
+ {
+-	return 0;
++	return pci_domain_nr(bus);
+ }
+ 
+ /* This header fixup will do the resource fixup for all devices as they are
 -- 
 2.1.1
