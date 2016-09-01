@@ -1,73 +1,71 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 1 Sep 2016 12:22:51 +0100
-Subject: [PATCH v9 3/4] doc: bindings: mfd: act8945a: Update the example
-In-Reply-To: <1472722201-31872-4-git-send-email-wenyou.yang@atmel.com>
-References: <1472722201-31872-1-git-send-email-wenyou.yang@atmel.com>
- <1472722201-31872-4-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20160901112251.GK4921@dell>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 1 Sep 2016 12:21:13 +0100
+Subject: [PATCH 2/2] arm64: regard FDT_SW_MAGIC as good fdt magic
+In-Reply-To: <a6a8826c-3006-ae43-ef4c-8049ef93cd9f@zoho.com>
+References: <a6a8826c-3006-ae43-ef4c-8049ef93cd9f@zoho.com>
+Message-ID: <20160901112113.GA4220@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 01 Sep 2016, Wenyou Yang wrote:
-
-> Since the act8945a-charger is regarded as a sub-device and it using
-> "interrupts" property, update the examples section.
+On Thu, Sep 01, 2016 at 06:58:29PM +0800, zijun_hu wrote:
+> From: zijun_hu <zijun_hu@htc.com>
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
-> 
-> Changes in v9: None
-> Changes in v8: None
-> Changes in v7: None
-> Changes in v6: None
-> Changes in v4: None
-> 
->  Documentation/devicetree/bindings/mfd/act8945a.txt | 22 +++++++++++++++-------
->  1 file changed, 15 insertions(+), 7 deletions(-)
+> regard FDT_SW_MAGIC as good fdt magic during mapping fdt area
+> see fdt_check_header() for details
 
-This is a functional change.  I'll require a DT Ack.
+It looks like we should only see FDT_SW_MAGIC for a FDT that was in the
+process of being created, but was not finished. So I'm somewhat confused
+as to why fdt_check_header() would allow this.
 
-> diff --git a/Documentation/devicetree/bindings/mfd/act8945a.txt b/Documentation/devicetree/bindings/mfd/act8945a.txt
-> index f712830..462819a 100644
-> --- a/Documentation/devicetree/bindings/mfd/act8945a.txt
-> +++ b/Documentation/devicetree/bindings/mfd/act8945a.txt
-> @@ -14,13 +14,6 @@ Example:
->  		reg = <0x5b>;
->  		status = "okay";
+Neither ePAPR nor the new devicetree spec define FDT_SW_MAGIC. They both
+only define 0xd00dfeed as a valid magic value. In libfdt, FDT_SW_MAGIC
+is an internal constant, and it looks like fdt_check_header() simply
+accepts this for convenience within libfdt.
+
+Given all of that, it looks like the kernel should *not* accept
+FDT_SW_MAGIC in any case.
+
+Why do you think this is necessary? Have you seen a problem in practice?
+
+> --- a/scripts/dtc/libfdt/fdt.h
+> +++ b/scripts/dtc/libfdt/fdt.h
+> @@ -92,7 +92,8 @@ struct fdt_property {
 >  
-> -		pinctrl-names = "default";
-> -		pinctrl-0 = <&pinctrl_charger_chglev>;
-> -		active-semi,chglev-gpio = <&pioA 12 GPIO_ACTIVE_HIGH>;
-> -		active-semi,input-voltage-threshold-microvolt = <6600>;
-> -		active-semi,precondition-timeout = <40>;
-> -		active-semi,total-timeout = <3>;
+>  #endif /* !__ASSEMBLY */
+>  
+> -#define FDT_MAGIC	0xd00dfeed	/* 4: version, 4: total size */
+> +/* 4: version, 4: total size */
+> +#define FDT_MAGIC	((fdt32_t)0xd00dfeed)
+>  #define FDT_TAGSIZE	sizeof(fdt32_t)
+>  
+>  #define FDT_BEGIN_NODE	0x1		/* Start node: full name */
+> diff --git a/scripts/dtc/libfdt/libfdt.h b/scripts/dtc/libfdt/libfdt.h
+> index 59ca33976e56..6998f9249183 100644
+> --- a/scripts/dtc/libfdt/libfdt.h
+> +++ b/scripts/dtc/libfdt/libfdt.h
+> @@ -54,6 +54,8 @@
+>  #include "libfdt_env.h"
+>  #include "fdt.h"
+>  
+> +#define FDT_SW_MAGIC           (~FDT_MAGIC)
+> +
+>  #define FDT_FIRST_SUPPORTED_VERSION	0x10
+>  #define FDT_LAST_SUPPORTED_VERSION	0x11
+>  
+> diff --git a/scripts/dtc/libfdt/libfdt_internal.h b/scripts/dtc/libfdt/libfdt_internal.h
+> index 02cfa6fb612d..f4efde0119f2 100644
+> --- a/scripts/dtc/libfdt/libfdt_internal.h
+> +++ b/scripts/dtc/libfdt/libfdt_internal.h
+> @@ -90,6 +90,4 @@ static inline struct fdt_reserve_entry *_fdt_mem_rsv_w(void *fdt, int n)
+>  	return (void *)(uintptr_t)_fdt_mem_rsv(fdt, n);
+>  }
+>  
+> -#define FDT_SW_MAGIC		(~FDT_MAGIC)
 > -
->  		active-semi,vsel-high;
->  
->  		regulators {
-> @@ -73,4 +66,19 @@ Example:
->  				regulator-always-on;
->  			};
->  		};
-> +
-> +		charger {
-> +			compatible = "active-semi,act8945a-charger";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_charger_chglev &pinctrl_charger_lbo &pinctrl_charger_irq>;
-> +			interrupt-parent = <&pioA>;
-> +			interrupts = <45 GPIO_ACTIVE_LOW>;
-> +
-> +			active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
-> +			active-semi,lbo-gpios = <&pioA 72 GPIO_ACTIVE_LOW>;
-> +			active-semi,input-voltage-threshold-microvolt = <6600>;
-> +			active-semi,precondition-timeout = <40>;
-> +			active-semi,total-timeout = <3>;
-> +			status = "okay";
-> +		};
->  	};
+>  #endif /* _LIBFDT_INTERNAL_H */
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regardless of the above, changes to libfdt must happen in the upstream
+libfdt codebase first.
+
+Thanks,
+Mark.
