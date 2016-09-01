@@ -1,71 +1,80 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 1 Sep 2016 12:21:13 +0100
-Subject: [PATCH 2/2] arm64: regard FDT_SW_MAGIC as good fdt magic
-In-Reply-To: <a6a8826c-3006-ae43-ef4c-8049ef93cd9f@zoho.com>
-References: <a6a8826c-3006-ae43-ef4c-8049ef93cd9f@zoho.com>
-Message-ID: <20160901112113.GA4220@leverpostej>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 01 Sep 2016 13:21:42 +0200
+Subject: [PATCH 2/2] ARM: dts: exynos: Fix mismatched values of SD drive
+ strengh configuration on exynos4415
+In-Reply-To: <1472719022-27226-2-git-send-email-k.kozlowski@samsung.com>
+References: <1472719022-27226-1-git-send-email-k.kozlowski@samsung.com>
+ <1472719022-27226-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <3122615.TmPyqONA3V@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2016 at 06:58:29PM +0800, zijun_hu wrote:
-> From: zijun_hu <zijun_hu@htc.com>
+
+Hi,
+
+On Thursday, September 01, 2016 10:37:02 AM Krzysztof Kozlowski wrote:
+> The pinctrl drive strength register on exynos4415 is 2-bit wide for each
+> pin.  The pins for SD2 were configured with value of 4.  The driver does
+> not validate the value so this overflow effectively set a bit 1 in
+> adjacent pins thus configuring them to drive strength 2x.
 > 
-> regard FDT_SW_MAGIC as good fdt magic during mapping fdt area
-> see fdt_check_header() for details
+> The author's intention was probably to set drive strength of 4x.
+> All other SD pins are configured with drive strength of 4x.  Fix these
+> with same pattern.
+> 
+> Fixes: 9246e7ff24c5 ("ARM: dts: Add dts files for exynos4415 SoC")
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-It looks like we should only see FDT_SW_MAGIC for a FDT that was in the
-process of being created, but was not finished. So I'm somewhat confused
-as to why fdt_check_header() would allow this.
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-Neither ePAPR nor the new devicetree spec define FDT_SW_MAGIC. They both
-only define 0xd00dfeed as a valid magic value. In libfdt, FDT_SW_MAGIC
-is an internal constant, and it looks like fdt_check_header() simply
-accepts this for convenience within libfdt.
+BTW This reminds me that there are still no board files for Exynos4415
+SoC based boards so maybe we should consider removal of its support?
 
-Given all of that, it looks like the kernel should *not* accept
-FDT_SW_MAGIC in any case.
-
-Why do you think this is necessary? Have you seen a problem in practice?
-
-> --- a/scripts/dtc/libfdt/fdt.h
-> +++ b/scripts/dtc/libfdt/fdt.h
-> @@ -92,7 +92,8 @@ struct fdt_property {
+> ---
+>  arch/arm/boot/dts/exynos4415-pinctrl.dtsi | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4415-pinctrl.dtsi b/arch/arm/boot/dts/exynos4415-pinctrl.dtsi
+> index f54aee53b6ec..76cfd872ead3 100644
+> --- a/arch/arm/boot/dts/exynos4415-pinctrl.dtsi
+> +++ b/arch/arm/boot/dts/exynos4415-pinctrl.dtsi
+> @@ -480,14 +480,14 @@
+>  		samsung,pins = "gpk2-0";
+>  		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
+>  		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+> -		samsung,pin-drv = <4>;
+> +		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;
+>  	};
 >  
->  #endif /* !__ASSEMBLY */
+>  	sd2_cmd: sd2-cmd {
+>  		samsung,pins = "gpk2-1";
+>  		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
+>  		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+> -		samsung,pin-drv = <4>;
+> +		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;
+>  	};
 >  
-> -#define FDT_MAGIC	0xd00dfeed	/* 4: version, 4: total size */
-> +/* 4: version, 4: total size */
-> +#define FDT_MAGIC	((fdt32_t)0xd00dfeed)
->  #define FDT_TAGSIZE	sizeof(fdt32_t)
+>  	sd2_cd: sd2-cd {
+> @@ -501,14 +501,14 @@
+>  		samsung,pins = "gpk2-3";
+>  		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
+>  		samsung,pin-pud = <EXYNOS_PIN_PULL_UP>;
+> -		samsung,pin-drv = <4>;
+> +		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;
+>  	};
 >  
->  #define FDT_BEGIN_NODE	0x1		/* Start node: full name */
-> diff --git a/scripts/dtc/libfdt/libfdt.h b/scripts/dtc/libfdt/libfdt.h
-> index 59ca33976e56..6998f9249183 100644
-> --- a/scripts/dtc/libfdt/libfdt.h
-> +++ b/scripts/dtc/libfdt/libfdt.h
-> @@ -54,6 +54,8 @@
->  #include "libfdt_env.h"
->  #include "fdt.h"
+>  	sd2_bus4: sd2-bus-width4 {
+>  		samsung,pins = "gpk2-4", "gpk2-5", "gpk2-6";
+>  		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
+>  		samsung,pin-pud = <EXYNOS_PIN_PULL_UP>;
+> -		samsung,pin-drv = <4>;
+> +		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;
+>  	};
 >  
-> +#define FDT_SW_MAGIC           (~FDT_MAGIC)
-> +
->  #define FDT_FIRST_SUPPORTED_VERSION	0x10
->  #define FDT_LAST_SUPPORTED_VERSION	0x11
->  
-> diff --git a/scripts/dtc/libfdt/libfdt_internal.h b/scripts/dtc/libfdt/libfdt_internal.h
-> index 02cfa6fb612d..f4efde0119f2 100644
-> --- a/scripts/dtc/libfdt/libfdt_internal.h
-> +++ b/scripts/dtc/libfdt/libfdt_internal.h
-> @@ -90,6 +90,4 @@ static inline struct fdt_reserve_entry *_fdt_mem_rsv_w(void *fdt, int n)
->  	return (void *)(uintptr_t)_fdt_mem_rsv(fdt, n);
->  }
->  
-> -#define FDT_SW_MAGIC		(~FDT_MAGIC)
-> -
->  #endif /* _LIBFDT_INTERNAL_H */
+>  	cam_port_b_io: cam-port-b-io {
 
-Regardless of the above, changes to libfdt must happen in the upstream
-libfdt codebase first.
-
-Thanks,
-Mark.
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
