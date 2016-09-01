@@ -1,138 +1,56 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu,  1 Sep 2016 20:46:29 +0900
-Subject: [PATCH 2/3] i2c: uniphier-f: avoid WARN_ON() of clk_disable() in
- failure path
-In-Reply-To: <1472730390-8907-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1472730390-8907-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1472730390-8907-3-git-send-email-yamada.masahiro@socionext.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 1 Sep 2016 13:46:02 +0200
+Subject: [PATCH/RFC v3 00/22] soc: renesas: Add R-Car RST driver for
+ obtaining mode pin state
+In-Reply-To: <20160630201407.GA27880@codeaurora.org>
+References: <1464808880-343-1-git-send-email-geert+renesas@glider.be>
+ <20160630201407.GA27880@codeaurora.org>
+Message-ID: <CAMuHMdWu34OQSS6J3bf=0-1TYULc=coiVomBjtBatwGta5F3HQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If clk_prepare_enable() fails, clk_disable_unprepare() is called in
-the failure path, where the enable_count is still zero, so it hits
-WARN_ON(core->enable_count == 0) in the clk_core_disable().
+Hi Stephen,
 
-To fix this, make the clock setting more linear in the probe function
-so that it can exploit "goto err" in case of error.
+On Thu, Jun 30, 2016 at 10:14 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 06/01, Geert Uytterhoeven wrote:
+>> Currently the R-Car Clock Pulse Generator (CPG) drivers obtains the
+>> state of the mode pins either by a call from the board code, or directly
+>> by using a hardcoded register access. This is a bit messy, and creates a
+>> dependency between driver and platform code.
+>>
+>> This RFC patch series converts the various Renesas R-Car clock drivers
+>> and support code from reading the mode pin states using a hardcoded
+>> register access to using a new R-Car RST driver.
+>
+> Dumb question, can we use the nvmem reading APIs instead of an
+> SoC specific function to read the modes?
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Thanks for your suggestion, the nvmem API indeed looks like a suitable API,
+as it does support read-only nvmems.
 
- drivers/i2c/busses/i2c-uniphier-f.c | 73 ++++++++++++++++---------------------
- 1 file changed, 32 insertions(+), 41 deletions(-)
+Unfortunately I also see a few disadvantages:
+  1. nvmem_init() is a subsys_initcall(), while most of our users (except for
+     the recent renesas-cpg-mssr driver) are clock drivers using
+     CLK_OF_DECLARE(), and are thus initialized from of_clk_init() at much
+     earlier time_init() time.
+     Of course the mvmem subsystem and/or the clock drivers can be changed, if
+     deemed useful.
+  2. Using the nvmem DT bindings means we have to add more DT glue from the
+     nvmem consumer(s) to the nvmem provider. As we need to provide backwards
+     compatibility with old DTSes, this means we need more C code or DT fixup
+     code to handle that.
+  3. The nvmem subsystem may be overkill to provide access to a simple 32-bit
+     read-only register that never changes value after boot.
 
-diff --git a/drivers/i2c/busses/i2c-uniphier-f.c b/drivers/i2c/busses/i2c-uniphier-f.c
-index 3560853..2886685 100644
---- a/drivers/i2c/busses/i2c-uniphier-f.c
-+++ b/drivers/i2c/busses/i2c-uniphier-f.c
-@@ -455,41 +455,10 @@ static struct i2c_bus_recovery_info uniphier_fi2c_bus_recovery_info = {
- 	.unprepare_recovery = uniphier_fi2c_unprepare_recovery,
- };
- 
--static int uniphier_fi2c_clk_init(struct device *dev,
--				  struct uniphier_fi2c_priv *priv)
-+static void uniphier_fi2c_hw_init(struct uniphier_fi2c_priv *priv,
-+				  u32 bus_speed, unsigned long clk_rate)
- {
--	struct device_node *np = dev->of_node;
--	unsigned long clk_rate;
--	u32 bus_speed, clk_count;
--	int ret;
--
--	if (of_property_read_u32(np, "clock-frequency", &bus_speed))
--		bus_speed = UNIPHIER_FI2C_DEFAULT_SPEED;
--
--	if (!bus_speed) {
--		dev_err(dev, "clock-frequency should not be zero\n");
--		return -EINVAL;
--	}
--
--	if (bus_speed > UNIPHIER_FI2C_MAX_SPEED)
--		bus_speed = UNIPHIER_FI2C_MAX_SPEED;
--
--	/* Get input clk rate through clk driver */
--	priv->clk = devm_clk_get(dev, NULL);
--	if (IS_ERR(priv->clk)) {
--		dev_err(dev, "failed to get clock\n");
--		return PTR_ERR(priv->clk);
--	}
--
--	ret = clk_prepare_enable(priv->clk);
--	if (ret)
--		return ret;
--
--	clk_rate = clk_get_rate(priv->clk);
--	if (!clk_rate) {
--		dev_err(dev, "input clock rate should not be zero\n");
--		return -EINVAL;
--	}
-+	u32 clk_count;
- 
- 	uniphier_fi2c_reset(priv);
- 
-@@ -501,8 +470,6 @@ static int uniphier_fi2c_clk_init(struct device *dev,
- 	writel(clk_count / 16, priv->membase + UNIPHIER_FI2C_DSUT);
- 
- 	uniphier_fi2c_prepare_operation(priv);
--
--	return 0;
- }
- 
- static int uniphier_fi2c_probe(struct platform_device *pdev)
-@@ -510,8 +477,9 @@ static int uniphier_fi2c_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct uniphier_fi2c_priv *priv;
- 	struct resource *regs;
--	int irq;
--	int ret;
-+	u32 bus_speed;
-+	unsigned long clk_rate;
-+	int irq, ret;
- 
- 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
- 	if (!priv)
-@@ -528,6 +496,31 @@ static int uniphier_fi2c_probe(struct platform_device *pdev)
- 		return irq;
- 	}
- 
-+	if (of_property_read_u32(dev->of_node, "clock-frequency", &bus_speed))
-+		bus_speed = UNIPHIER_FI2C_DEFAULT_SPEED;
-+
-+	if (!bus_speed || bus_speed > UNIPHIER_FI2C_MAX_SPEED) {
-+		dev_err(dev, "invalid clock-frequency %d\n", bus_speed);
-+		return -EINVAL;
-+	}
-+
-+	priv->clk = devm_clk_get(dev, NULL);
-+	if (IS_ERR(priv->clk)) {
-+		dev_err(dev, "failed to get clock\n");
-+		return PTR_ERR(priv->clk);
-+	}
-+
-+	ret = clk_prepare_enable(priv->clk);
-+	if (ret)
-+		return ret;
-+
-+	clk_rate = clk_get_rate(priv->clk);
-+	if (!clk_rate) {
-+		dev_err(dev, "input clock rate should not be zero\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+
- 	init_completion(&priv->comp);
- 	priv->adap.owner = THIS_MODULE;
- 	priv->adap.algo = &uniphier_fi2c_algo;
-@@ -538,9 +531,7 @@ static int uniphier_fi2c_probe(struct platform_device *pdev)
- 	i2c_set_adapdata(&priv->adap, priv);
- 	platform_set_drvdata(pdev, priv);
- 
--	ret = uniphier_fi2c_clk_init(dev, priv);
--	if (ret)
--		goto err;
-+	uniphier_fi2c_hw_init(priv, bus_speed, clk_rate);
- 
- 	ret = devm_request_irq(dev, irq, uniphier_fi2c_interrupt, 0,
- 			       pdev->name, priv);
--- 
-1.9.1
+Thoughts?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
