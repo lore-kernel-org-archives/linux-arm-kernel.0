@@ -1,220 +1,103 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  1 Sep 2016 17:32:02 +0200
-Subject: [PATCH 5/7] ARM: sun8i: a33: Add display pipeline
+Date: Thu,  1 Sep 2016 17:31:58 +0200
+Subject: [PATCH 1/7] drm/sun4i: support TCONs without channel 1
 In-Reply-To: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
 References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160901153204.11217-6-maxime.ripard@free-electrons.com>
+Message-ID: <20160901153204.11217-2-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add all the needed blocks to the A33 DTSI.
+Some Allwinner SoCs, such as the A33, have a variation of the TCON that
+doesn't have a second channel (or it is not wired to anything).
+
+Make sure we can handle that case.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun8i-a33.dtsi | 184 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 184 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 34 +++++++++++++++++++++-------------
+ drivers/gpu/drm/sun4i/sun4i_tcon.h |  2 ++
+ 2 files changed, 23 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index deb0cd613e97..5f9dbd17eb50 100644
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -64,6 +64,42 @@
- 	};
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 9180e7e7b551..fde6af1230d2 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -59,11 +59,13 @@ void sun4i_tcon_channel_disable(struct sun4i_tcon *tcon, int channel)
+ 		regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
+ 				   SUN4I_TCON0_CTL_TCON_ENABLE, 0);
+ 		clk_disable_unprepare(tcon->dclk);
+-	} else if (channel == 1) {
+-		regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
+-				   SUN4I_TCON1_CTL_TCON_ENABLE, 0);
+-		clk_disable_unprepare(tcon->sclk1);
++		return;
+ 	}
++
++	WARN_ON(!tcon->has_channel_1);
++	regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
++			   SUN4I_TCON1_CTL_TCON_ENABLE, 0);
++	clk_disable_unprepare(tcon->sclk1);
+ }
+ EXPORT_SYMBOL(sun4i_tcon_channel_disable);
  
- 	soc at 01c00000 {
-+		tcon0: lcd-controller at 01c0c000 {
-+			compatible = "allwinner,sun8i-a23-tcon";
-+			reg = <0x01c0c000 0x1000>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_LCD>,
-+				 <&ccu CLK_LCD_CH0>;
-+			clock-names = "ahb",
-+				      "tcon-ch0";
-+			clock-output-names = "tcon-pixel-clock";
-+			resets = <&ccu RST_BUS_LCD>;
-+			reset-names = "lcd";
-+			status = "disabled";
+@@ -75,12 +77,14 @@ void sun4i_tcon_channel_enable(struct sun4i_tcon *tcon, int channel)
+ 				   SUN4I_TCON0_CTL_TCON_ENABLE,
+ 				   SUN4I_TCON0_CTL_TCON_ENABLE);
+ 		clk_prepare_enable(tcon->dclk);
+-	} else if (channel == 1) {
+-		regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
+-				   SUN4I_TCON1_CTL_TCON_ENABLE,
+-				   SUN4I_TCON1_CTL_TCON_ENABLE);
+-		clk_prepare_enable(tcon->sclk1);
++		return;
+ 	}
 +
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
++	WARN_ON(!tcon->has_channel_1);
++	regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
++			   SUN4I_TCON1_CTL_TCON_ENABLE,
++			   SUN4I_TCON1_CTL_TCON_ENABLE);
++	clk_prepare_enable(tcon->sclk1);
+ }
+ EXPORT_SYMBOL(sun4i_tcon_channel_enable);
+ 
+@@ -198,6 +202,8 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+ 	u8 clk_delay;
+ 	u32 val;
+ 
++	WARN_ON(!tcon->has_channel_1);
 +
-+				tcon0_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
+ 	/* Adjust clock delay */
+ 	clk_delay = sun4i_tcon_get_clk_delay(mode, 1);
+ 	regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
+@@ -321,10 +327,12 @@ static int sun4i_tcon_init_clocks(struct device *dev,
+ 		return PTR_ERR(tcon->sclk0);
+ 	}
+ 
+-	tcon->sclk1 = devm_clk_get(dev, "tcon-ch1");
+-	if (IS_ERR(tcon->sclk1)) {
+-		dev_err(dev, "Couldn't get the TCON channel 1 clock\n");
+-		return PTR_ERR(tcon->sclk1);
++	if (tcon->has_channel_1) {
++		tcon->sclk1 = devm_clk_get(dev, "tcon-ch1");
++		if (IS_ERR(tcon->sclk1)) {
++			dev_err(dev, "Couldn't get the TCON channel 1 clock\n");
++			return PTR_ERR(tcon->sclk1);
++		}
+ 	}
+ 
+ 	return sun4i_dclk_create(dev, tcon);
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index 100bfa093277..12bd48925f4d 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -164,6 +164,8 @@ struct sun4i_tcon {
+ 	bool				has_mux;
+ 
+ 	struct drm_panel		*panel;
 +
-+					tcon0_in_drc0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&drc0_out_tcon0>;
-+					};
-+				};
-+
-+				tcon0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
- 		crypto: crypto-engine at 01c15000 {
- 			compatible = "allwinner,sun4i-a10-crypto";
- 			reg = <0x01c15000 0x1000>;
-@@ -104,6 +140,154 @@
- 			status = "disabled";
- 			#phy-cells = <1>;
- 		};
-+
-+		fe0: display-frontend at 01e00000 {
-+			compatible = "allwinner,sun8i-a33-display-frontend";
-+			reg = <0x01e00000 0x20000>;
-+			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_DE_FE>, <&ccu CLK_DE_FE>,
-+				 <&ccu CLK_DRAM_DE_FE>;
-+			clock-names = "ahb", "mod",
-+				      "ram";
-+			resets = <&ccu RST_BUS_DE_FE>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				fe0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					fe0_out_sat0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&sat0_in_fe0>;
-+					};
-+				};
-+			};
-+		};
-+
-+		be0: display-backend at 01e60000 {
-+			compatible = "allwinner,sun8i-a33-display-backend";
-+			reg = <0x01e60000 0x10000>;
-+			clocks = <&ccu CLK_BUS_DE_BE>, <&ccu CLK_DE_BE>,
-+				 <&ccu CLK_DRAM_DE_BE>;
-+			clock-names = "ahb", "mod",
-+				      "ram";
-+			resets = <&ccu RST_BUS_DE_BE>;
-+
-+			assigned-clocks = <&ccu CLK_DE_BE>;
-+			assigned-clock-rates = <300000000>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				be0_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					be0_in_sat0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&sat0_out_be0>;
-+					};
-+				};
-+
-+				be0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					be0_out_drc0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&drc0_in_be0>;
-+					};
-+				};
-+			};
-+		};
-+
-+		drc0: drc at 01e70000 {
-+			compatible = "allwinner,sun8i-a33-drc";
-+			reg = <0x01e70000 0x10000>;
-+			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_DRC>, <&ccu CLK_DRC>,
-+				 <&ccu CLK_DRAM_DRC>;
-+			clock-names = "ahb", "mod", "ram";
-+			resets = <&ccu RST_BUS_DRC>;
-+
-+			assigned-clocks = <&ccu CLK_DRC>;
-+			assigned-clock-rates = <300000000>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				drc0_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					drc0_in_be0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&be0_out_drc0>;
-+					};
-+				};
-+
-+				drc0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					drc0_out_tcon0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon0_in_drc0>;
-+					};
-+				};
-+			};
-+		};
-+
-+		sat0: sat at 01e80000 {
-+			compatible = "allwinner,sun8i-a33-sat";
-+			reg = <0x01e80000 0x1000>;
-+			clocks = <&ccu CLK_BUS_SAT>;
-+			resets = <&ccu RST_BUS_SAT>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				sat0_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					sat0_in_fe0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&fe0_out_sat0>;
-+					};
-+				};
-+
-+				sat0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					sat0_out_be0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&be0_in_sat0>;
-+					};
-+				};
-+			};
-+		};
-+	};
-+
-+	de: display-engine {
-+		compatible = "allwinner,sun8i-a33-display-engine";
-+		allwinner,pipelines = <&fe0>;
-+		status = "disabled";
- 	};
++	bool				has_channel_1;
  };
  
+ struct drm_bridge *sun4i_tcon_find_bridge(struct device_node *node);
 -- 
 2.9.2
