@@ -1,48 +1,38 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 1 Sep 2016 07:40:37 +0800
-Subject: [arm:sa1100 22/78] arch/arm/mach-pxa/lubbock.c:16:33: fatal error:
- linux/gpip/gpio-reg.h: No such file or directory
-Message-ID: <201609010735.0F5LJAkQ%fengguang.wu@intel.com>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Thu, 1 Sep 2016 08:58:42 +0800
+Subject: [PATCH v2] arm64:pci: fix the IOV device access config space
+ valid condition
+In-Reply-To: <1472455618-17892-1-git-send-email-po.liu@nxp.com>
+References: <1471932072-6980-1-git-send-email-po.liu@nxp.com>
+ <1472455618-17892-1-git-send-email-po.liu@nxp.com>
+Message-ID: <CAFiDJ5__WC=GeeA2Hg8LSG5xbQGc7frP6KfHfF_QhBm0=-w9Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   http://repo.or.cz/linux-2.6/linux-2.6-arm.git sa1100
-head:   0f779cd824db07228231ffef10b56292c0bb1e4f
-commit: f11176f5d0535e0ddd1ab5895f940664893e31ca [22/78] ARM: pxa/lubbock: add GPIO driver for LUB_MISC_WR register
-config: arm-pxa_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout f11176f5d0535e0ddd1ab5895f940664893e31ca
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On Mon, Aug 29, 2016 at 3:26 PM, Po Liu <po.liu@nxp.com> wrote:
+> When echo a number to /sys/bus/pci/devices/xxx/sriov_numvfs to enable the
+> VF devices. A crash log occurred. This found to be access the IOV devices
+> config space failure issue.
+>
+> The read/write config space from host would judge the pcie device plugin
+> or not by(Designware platform as example):
+>
+> if (bus->primary == pp->root_bus_nr && dev > 0)
+>     return 0;
+>
+> Although all PCIe devices for dev(coming from the device and function
+> number) is zero. But the dev is not zero for VF devices. So remove the
+> condition.
+>
+> These PCI hosts were changed: designware, altera, xilinx.
+>
+> Signed-off-by: Po Liu <po.liu@nxp.com>
+> ---
 
-All errors (new ones prefixed by >>):
+For pcie-altera.c:
+Acked-by: Ley Foon Tan <lftan@altera.com>
 
->> arch/arm/mach-pxa/lubbock.c:16:33: fatal error: linux/gpip/gpio-reg.h: No such file or directory
-   compilation terminated.
+Thanks.
 
-vim +16 arch/arm/mach-pxa/lubbock.c
-
-    10	 *  This program is free software; you can redistribute it and/or modify
-    11	 *  it under the terms of the GNU General Public License version 2 as
-    12	 *  published by the Free Software Foundation.
-    13	 */
-    14	#include <linux/clkdev.h>
-    15	#include <linux/gpio.h>
-  > 16	#include <linux/gpip/gpio-reg.h>
-    17	#include <linux/gpio/machine.h>
-    18	#include <linux/module.h>
-    19	#include <linux/kernel.h>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 30832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160901/b7256942/attachment-0001.obj>
+Regards
+Ley Foon
