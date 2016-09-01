@@ -1,65 +1,55 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 1 Sep 2016 09:14:34 -0500
-Subject: [PATCH] ARM: dts: am57xx-beagle-x15: fix HDMI LS_OE GPIO
-In-Reply-To: <CAOCHtYhF2KfeK3ccEzZcePbU5H1kwi1tKThZN3NRwXgPsW_bSA@mail.gmail.com>
-References: <1472737901-26494-1-git-send-email-tomi.valkeinen@ti.com>
- <b8647621-197c-97d5-8291-26c079e5eae8@ti.com>
- <CAOCHtYhF2KfeK3ccEzZcePbU5H1kwi1tKThZN3NRwXgPsW_bSA@mail.gmail.com>
-Message-ID: <c69aadbf-90e4-7aaf-2b90-4d5b543c252a@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu,  1 Sep 2016 16:16:11 +0200
+Subject: [PATCH 0/6] clk: sunxi-ng: Introduce support for A23 and A33 CCUs
+Message-ID: <20160901141617.9777-1-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/2016 09:12 AM, Robert Nelson wrote:
-> On Thu, Sep 1, 2016 at 9:09 AM, Nishanth Menon <nm@ti.com> wrote:
->> On 09/01/2016 08:51 AM, Tomi Valkeinen wrote:
->>>
->>> LS_OE GPIO was changed from gpio6_28 to gpio2_30 for the Rev B1 board,
->>> and the current .dts file has the old GPIO.
->>>
->>> Rev B1 is the earliest board supported, so we can just change the .dts.
->>>
->>> This fixes "omapdss error: HDMI I2C Master Error" which causes failure
->>> to read EDID from the monitor.
->>>
->>> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
->>> ---
->>>  arch/arm/boot/dts/am57xx-beagle-x15.dts | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts
->>> b/arch/arm/boot/dts/am57xx-beagle-x15.dts
->>> index c4d04c5293b9..07603d9e2da7 100644
->>> --- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
->>> +++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
->>> @@ -120,7 +120,7 @@
->>>                 pinctrl-0 = <&tpd12s015_pins>;
->>>
->>>                 gpios = <&gpio7 10 GPIO_ACTIVE_HIGH>,   /* gpio7_10, CT CP
->>> HPD */
->>> -                       <&gpio6 28 GPIO_ACTIVE_HIGH>,   /* gpio6_28, LS OE
->>> */
->>> +                       <&gpio2 30 GPIO_ACTIVE_HIGH>,   /* gpio2_30, LS OE
->>> */
->>>                         <&gpio7 12 GPIO_ACTIVE_HIGH>;   /*
->>> gpio7_12/sp1_cs2, HPD */
->>>
->>>                 ports {
->>>
->>
->> I believe we have A2s being shipped as well. we dont want to break A2s
->> either -> I propose we refactor the dts to introduce revb1 X15.
->
-> There are at-least 200 A2's that have been shipped to end users.
->
-> http://uk.rs-online.com/web/p/processor-microcontroller-development-kits/8874764/
+Hi everyone,
 
+Here is the migration for the A23 and A33 clocks to the sunxi-ng
+framework.
 
-Thanks. Tomi: if you are ok - I already do have a refactoring code 
-from older kernel. I will rebase to latest and repost.
+It has been tested on SinA33 board, and I made sure that everything
+was reported at the exact same rate, that the MMC was still working in
+DDR, etc.
 
-Tony: is there a branch youd' like me to base the changes on?
+This has also been tested to implement the DRM driver, so I'm
+confident things will work just fine.
 
+Let me know what you think,
+Maxime
+
+Maxime Ripard (6):
+  clk: sunxi-ng: div: Add mux table macros
+  clk: sunxi-ng: mux: Add mux table macro
+  clk: sunxi-ng: Add N-class clocks support
+  clk: sunxi-ng: Add A33 CCU support
+  clk: sunxi-ng: Add A23 CCU
+  ARM: sun8i: Convert the A23 and A33 to the CCU
+
+ .../devicetree/bindings/clock/sunxi-ccu.txt        |   2 +
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi               | 257 ++-----
+ arch/arm/boot/dts/sun8i-a23.dtsi                   |  51 +-
+ arch/arm/boot/dts/sun8i-a33.dtsi                   |  73 +-
+ drivers/clk/sunxi-ng/Kconfig                       |  28 +
+ drivers/clk/sunxi-ng/Makefile                      |   3 +
+ drivers/clk/sunxi-ng/ccu-sun8i-a23-a33.h           |  63 ++
+ drivers/clk/sunxi-ng/ccu-sun8i-a23.c               | 723 +++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun8i-a33.c               | 772 +++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu_div.h                     |  28 +-
+ drivers/clk/sunxi-ng/ccu_mult.c                    | 133 ++++
+ drivers/clk/sunxi-ng/ccu_mult.h                    |  35 +
+ drivers/clk/sunxi-ng/ccu_mux.h                     |  26 +-
+ include/dt-bindings/clock/sun8i-a23-a33-ccu.h      | 127 ++++
+ include/dt-bindings/reset/sun8i-a23-a33-ccu.h      |  87 +++
+ 15 files changed, 2082 insertions(+), 326 deletions(-)
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-a23-a33.h
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-a23.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-a33.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu_mult.c
+ create mode 100644 include/dt-bindings/clock/sun8i-a23-a33-ccu.h
+ create mode 100644 include/dt-bindings/reset/sun8i-a23-a33-ccu.h
 
 -- 
-Regards,
-Nishanth Menon
+2.9.2
