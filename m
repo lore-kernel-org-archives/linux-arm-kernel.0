@@ -1,58 +1,66 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 1 Sep 2016 19:31:45 +0800
-Subject: [PATCH 1/2 v2] bus: mvebu-mbus: Provide stub function for
- mvebu_mbus_get_io_win_info()
-In-Reply-To: <20160901093904.26564-1-sr@denx.de>
-Message-ID: <201609011930.BQGnLcb2%fengguang.wu@intel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 1 Sep 2016 13:35:22 +0200
+Subject: [PATCH] rtc: constify rtc_class_ops structures
+In-Reply-To: <1472630725-25465-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1472630725-25465-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <20160901113522.GC18255@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On Wed, Aug 31, 2016 at 10:05:25AM +0200, Julia Lawall wrote:
+> Check for rtc_class_ops structures that are only passed to
+> devm_rtc_device_register, rtc_device_register,
+> platform_device_register_data, all of which declare the corresponding
+> parameter as const.  Declare rtc_class_ops structures that have these
+> properties as const.
+> 
+> The semantic patch that makes this change is as follows:
+> (http://coccinelle.lip6.fr/)
+> 
+> // <smpl>
+> @r disable optional_qualifier@
+> identifier i;
+> position p;
+> @@
+> static struct rtc_class_ops i at p = { ... };
+> 
+> @ok@
+> identifier r.i;
+> expression e1,e2,e3,e4;
+> position p;
+> @@
+> (
+> devm_rtc_device_register(e1,e2,&i at p,e3)
+> |
+> rtc_device_register(e1,e2,&i at p,e3)
+> |
+> platform_device_register_data(e1,e2,e3,&i at p,e4)
+> )
+> 
+> @bad@
+> position p != {r.p,ok.p};
+> identifier r.i;
+> @@
+> i at p
+> 
+> @depends on !bad disable optional_qualifier@
+> identifier r.i;
+> @@
+> static
+> +const
+>  struct rtc_class_ops i = { ... };
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+[...]
+>  drivers/rtc/rtc-tegra.c      |    2 +-
+[...]
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.8-rc4 next-20160825]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-[Check https://git-scm.com/docs/git-format-patch for more information]
-
-url:    https://github.com/0day-ci/linux/commits/Stefan-Roese/bus-mvebu-mbus-Provide-stub-function-for-mvebu_mbus_get_io_win_info/20160901-174432
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
-
-All errors (new ones prefixed by >>):
-
-   In file included from drivers/ata/ahci_mvebu.c:16:0:
-   include/linux/mbus.h: In function 'mvebu_mbus_get_io_win_info':
->> include/linux/mbus.h:79:10: error: 'EINVAL' undeclared (first use in this function)
-     return -EINVAL;
-             ^
-   include/linux/mbus.h:79:10: note: each undeclared identifier is reported only once for each function it appears in
-
-vim +/EINVAL +79 include/linux/mbus.h
-
-    73		 * On all ARM32 MVEBU platforms with MBus support, this stub
-    74		 * function will not get called. The real function from the
-    75		 * MBus driver is called instead. ARM64 MVEBU platforms like
-    76		 * the Armada 3700 could do use the mv_xor device which calls
-    77		 * into this function
-    78		 */
-  > 79		return -EINVAL;
-    80	}
-    81	#endif
-    82	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Acked-by: Thierry Reding <treding@nvidia.com>
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 30700 bytes
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160901/3de94e7f/attachment-0001.obj>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160901/35fedc39/attachment.sig>
