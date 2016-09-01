@@ -1,73 +1,33 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 01 Sep 2016 13:13:02 +0200
-Subject: [PATCH v2 01/10] pinctrl: dt-bindings: samsung: Add header with
- values used for configuration
-In-Reply-To: <3419428.Xfa2aHQ3xc@amdc1976>
-References: <1472714638-15676-1-git-send-email-k.kozlowski@samsung.com>
- <1472714638-15676-2-git-send-email-k.kozlowski@samsung.com>
- <3419428.Xfa2aHQ3xc@amdc1976>
-Message-ID: <5d29ca8c-2dfc-4477-9c5c-80254d6ddac4@samsung.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 1 Sep 2016 13:15:45 +0200
+Subject: [PATCH 0/2] arm{,64}/kvm: excise redundant cache maintenance
+In-Reply-To: <20160830180020.GB19315@leverpostej>
+References: <1472573156-30414-1-git-send-email-mark.rutland@arm.com>
+ <20160830180020.GB19315@leverpostej>
+Message-ID: <20160901111545.GC10162@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/2016 01:02 PM, Bartlomiej Zolnierkiewicz wrote:
+On Tue, Aug 30, 2016 at 07:00:20PM +0100, Mark Rutland wrote:
+> On Tue, Aug 30, 2016 at 05:05:54PM +0100, Mark Rutland wrote:
+> > As noted in a jailhouse thread a short while ago [1,2], the presence of the
+> > virtualization extensions implies that page table walks are coherent, and do
+> > not require that updates are cleaned to the PoU.
+> > 
+> > These patches remove the redundant maintenance and related infrastructure.
+> > 
+> > As I do not have a suitably configured ARMv7 board, I have not been able to
+> > test the patches myself, and any testing would be appreciated.
 > 
-> Hi,
+> Having been lent a TC2 booting in Hyp mode, I've now given this a spin
+> with a few VMs, which I left running hackbench to fault in guest memory.
 > 
-> On Thursday, September 01, 2016 09:23:49 AM Krzysztof Kozlowski wrote:
->> Hard-coded pinctrl configuration values are scattered through DTS files.
->> The numbers are difficult to decode by human, especially without the
->> datasheet.  Additionally the drive strength differs between Exynos SoC
->> families increasing the confusion.
->>
->> The header will help making this more readable and maintainable.
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> ---
->>  MAINTAINERS                           |  1 +
->>  include/dt-bindings/pinctrl/samsung.h | 57 +++++++++++++++++++++++++++++++++++
->>  2 files changed, 58 insertions(+)
->>  create mode 100644 include/dt-bindings/pinctrl/samsung.h
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index d8e81b1dde30..836bcd327ee4 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -9318,6 +9318,7 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->>  L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
->>  S:	Maintained
->>  F:	drivers/pinctrl/samsung/
->> +F:	include/dt-bindings/pinctrl/samsung.h
->>  
->>  PIN CONTROLLER - SINGLE
->>  M:	Tony Lindgren <tony@atomide.com>
->> diff --git a/include/dt-bindings/pinctrl/samsung.h b/include/dt-bindings/pinctrl/samsung.h
->> new file mode 100644
->> index 000000000000..0f410ba5ec7e
->> --- /dev/null
->> +++ b/include/dt-bindings/pinctrl/samsung.h
->> @@ -0,0 +1,57 @@
->> +/*
->> + * Samsung's Exynos pinctrl bindings
->> + *
->> + * Copyright (c) 2016 Samsung Electronics Co., Ltd.
->> + *		http://www.samsung.com
->> + * Author: Krzysztof Kozlowski <krzk@kernel.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> +*/
->> +
->> +#ifndef __DT_BINDINGS_PINCTRL_EXYNOS_H__
->> +#define __DT_BINDINGS_PINCTRL_EXYNOS_H__
+> All of that ran happily.
 > 
-> Minor nit:
-> 
-> shouldn't this be __DT_BINDINGS_PINCTRL_SAMSUNG_H__ (the header file
-> is named samsung.h and is going to be used also by s3c* SoCs)?
+I've tested this on TC2 and CubieTruck as well, no problems as far as I
+can see.
 
-Yes, it should. Thanks!
+Applied.
 
-Best regards,
-Krzysztof
+Thanks,
+-Christoffer
