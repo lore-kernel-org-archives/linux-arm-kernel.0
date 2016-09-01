@@ -1,25 +1,39 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 01 Sep 2016 13:39:50 +0200
-Subject: [PATCH 0/3] support GMAC for RK3399 & RK3366
-In-Reply-To: <1470900288-10109-1-git-send-email-roger.chen@rock-chips.com>
-References: <1470900288-10109-1-git-send-email-roger.chen@rock-chips.com>
-Message-ID: <3113078.0eK6SFMBVA@diego>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu,  1 Sep 2016 12:40:37 +0100
+Subject: [PATCH] ARM: dts: explicitly mark skeleton.dtsi as deprecated
+Message-ID: <1472730037-4972-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger, Caesar,
+As noted in commit 3ebee5a2e141496b ("arm64: dts: kill skeleton.dtsi"),
+there are a number of problems with skeleton.dtsi, and it would be
+prefereable to remove it entirely. As there are a large number of
+existing users, fixing these up will take a while.
 
-Am Donnerstag, 11. August 2016, 15:24:45 schrieb Roger Chen:
-> This series adds registers description for RK3366 & RK3399 GMAC.
-> And also DT nodes for RK3399 SoC and EVB.
-> 
-> Roger Chen (3):
->   net: stmmac: dwmac-rk: add rk3366 & rk3399 specific data
->   arm64: dts: rockchip: add GMAC dt nodes for rk3399 SoC
->   arm64: dts: rockchip: add GMAC dt nodes for RK3399 evb
+This patch adds a note to arm's skeleton.dtsi noting that this is the
+case, to make this more obvious and hopefully minimize new uptake of
+skeleton.dtsi in the mean time.
 
-can you please respin this series addressing the comments from patch 1?
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Rob Herring <rob.herring@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/boot/dts/skeleton.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-
-Thanks
-Heiko
+diff --git a/arch/arm/boot/dts/skeleton.dtsi b/arch/arm/boot/dts/skeleton.dtsi
+index b41d241..28b81d6 100644
+--- a/arch/arm/boot/dts/skeleton.dtsi
++++ b/arch/arm/boot/dts/skeleton.dtsi
+@@ -1,4 +1,8 @@
+ /*
++ * This file is deprecated, and will be removed once existing users have been
++ * updated. New dts{,i} files should *not* include skeleton.dtsi, and should
++ * instead explicitly provide the below nodes only as required.
++ *
+  * Skeleton device tree; the bare minimum needed to boot; just include and
+  * add a compatible value.  The bootloader will typically populate the memory
+  * node.
+-- 
+1.9.1
