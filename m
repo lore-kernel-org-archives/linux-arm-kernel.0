@@ -1,55 +1,73 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 2 Sep 2016 11:21:43 +0100
-Subject: [PATCH] arm64: dts: hi6220: add sd-uhs- properties into dwmmc_1
-In-Reply-To: <1472649058-22364-1-git-send-email-guodong.xu@linaro.org>
-References: <1472649058-22364-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <57C952B7.3010207@hisilicon.com>
+Date: Fri, 2 Sep 2016 11:33:56 +0100
+Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.9
+Message-ID: <57C95594.40105@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guodong,
+Hi Arnd, Hi Olof, Hi Kevin,
 
-On 31/08/2016 14:10, Guodong Xu wrote:
-> With these properties added, sd cards inserted into hikey can work at UHS
-> mode if they have such capability.
-> 
-> Note, this depends on HiKey UHS-SD support patch [1] to work properly.
-> If you didn't add this patch, but added sd-uhs- properties into dwmmc_1,
-> then sd cards cannot work. As of this post, patch [1] has been integrated
-> into maintainer's next branch [2].
-> 
-> [1]: [V4] mmc: dw_mmc-k3: UHS-SD card for Hisilicon Hikey,
->  https://patchwork.kernel.org/patch/9262515/
-> [2]: https://git.linaro.org/people/ulf.hansson/mmc.git next
->  commit a8a5b2909cfc ("mmc: dw_mmc: k3: UHS-SD card for Hisilicon Hikey")
-> 
-> cc: Ulf Hansson <ulf.hansson@linaro.org>
-> cc: Jaehoon Chung <jh80.chung@samsung.com>
-> cc: Jinguojun <kid.jin@hisilicon.com>
-> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-
-Applied to the hisi-dt-4.9 branch.
+Please help to pull the following changes.
 Thanks!
 
 Best Regards,
 Wei
 
-> ---
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> index 63608e9..17839db 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> @@ -785,6 +785,9 @@
->  			card-detect-delay = <200>;
->  			hisilicon,peripheral-syscon = <&ao_ctrl>;
->  			cap-sd-highspeed;
-> +			sd-uhs-sdr12;
-> +			sd-uhs-sdr25;
-> +			sd-uhs-sdr50;
->  			reg = <0x0 0xf723e000 0x0 0x1000>;
->  			interrupts = <0x0 0x49 0x4>;
->  			#address-cells = <0x1>;
-> 
+---
+
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+
+are available in the git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-soc-dt-for-4.9
+
+for you to fetch changes up to 0f5d3ec5251066b1118ace0bf1369018de557bfb:
+
+  arm64: dts: hi6220: add sd-uhs- properties into dwmmc_1 (2016-09-02 09:36:50 +0100)
+
+----------------------------------------------------------------
+ARM64: DT: Hisilicon SoC DT updates for 4.9
+
+- Set UART1 clock frequency to 150MHz for higher baud rates on hikey
+- Add display subsystem, HDMI and cma nodes on hikey to support display
+- Add syscon-reboot-mode support on hikey
+- Add pstore support on hikey
+- Add resets and sd-uhs-sdr property dwmmc ndoe on hikey
+- Remove hip05_hns.dtsi since it can not be built without mbigenv1
+- Update system controller bingding document for hip05 and hip06
+- Add xge and sas support on hip06
+
+----------------------------------------------------------------
+Guodong Xu (3):
+      arm64: dts: hikey: extend default cma size to 128MB
+      arm64: dts: hi6220: add resets property into dwmmc nodes
+      arm64: dts: hi6220: add sd-uhs- properties into dwmmc_1
+
+John Stultz (2):
+      arm64: dts: hikey: Add hikey support for syscon-reboot-mode
+      arm64: dts: hikey: Add pstore support for HiKey
+
+Jorge Ramirez-Ortiz (1):
+      arm64: dts: set UART1 clock frequency to 150MHz
+
+Kefeng Wang (4):
+      arm64: dts: hip05: kill hip05_hns.dtsi
+      dt-bindings: hisilicon: Add Hip05 and Hip06 system controller support
+      arm64: dts: hip06: Append hns node
+      arm64: dts: hip06: Append sas node
+
+Xinliang Liu (2):
+      arm64: dts: Add display subsystem DT nodes for hi6220-hikey
+      arm64: dts: Add HDMI node for hi6220-hikey
+
+ .../bindings/arm/hisilicon/hisilicon.txt           |  39 ++-
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |  86 ++++-
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  61 ++++
+ arch/arm64/boot/dts/hisilicon/hip05.dtsi           |   5 -
+ arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi       | 180 ----------
+ arch/arm64/boot/dts/hisilicon/hip06-d03.dts        |  28 ++
+ arch/arm64/boot/dts/hisilicon/hip06.dtsi           | 365 +++++++++++++++++++++
+ 7 files changed, 566 insertions(+), 198 deletions(-)
+ delete mode 100644 arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
