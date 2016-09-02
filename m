@@ -1,119 +1,55 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 1 Sep 2016 22:22:33 -0700
-Subject: [PATCH 2/2] arm64: dts: rockchip: add eMMC's power domain support
- for rk3399
-In-Reply-To: <16314a2c-1ed9-0307-3497-9c1d8d41a149@rock-chips.com>
-References: <20160827134103.28160-1-xzy.xu@rock-chips.com>
- <20160827134103.28160-3-xzy.xu@rock-chips.com>
- <2ab8ab94-fa4d-2cd6-5805-a92ac5f9697e@rock-chips.com>
- <57C3A30B.5080707@rock-chips.com>
- <ceba6a89-6945-58c5-62e4-7d842cfa2312@rock-chips.com>
- <CAD=FV=W=LkVAm187hxp0Kbjxi5kSThwKnCMX+tr8SXQ-v_xQTQ@mail.gmail.com>
- <77f5cff1-80a2-76b3-40e9-f77caced2257@rock-chips.com>
- <CAD=FV=WmoyoZmV_uj281S37ZpWqg8Dr2U8ntkD2Sr58qbcB0wg@mail.gmail.com>
- <411dfc7b-1089-61a8-7a7e-6f378c0a6074@rock-chips.com>
- <CAD=FV=Wrw=THuokXyOXSyihF4fDB4z2L0vCgkiR9XJ6aEzsNzg@mail.gmail.com>
- <16314a2c-1ed9-0307-3497-9c1d8d41a149@rock-chips.com>
-Message-ID: <CAD=FV=V69XqyOp2OXrnjs-du=dFWShAWOzmf+NbtCZ8yk5dB3A@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 01 Sep 2016 22:37:31 -0700 (PDT)
+Subject: [PATCH v3 0/5] meson: Meson8b and GXBB DWMAC glue driver
+In-Reply-To: <m2poonexpj.fsf@baylibre.com>
+References: <CAFBinCCmg-+8mjd0Xc5c7bEWL9_S_4kizs_UMiiW9ATBH_G8iw@mail.gmail.com>
+ <20160830.215732.429612225008644820.davem@davemloft.net>
+ <m2poonexpj.fsf@baylibre.com>
+Message-ID: <20160901.223731.1152520865580611814.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Kevin Hilman <khilman@baylibre.com>
+Date: Thu, 01 Sep 2016 21:23:52 -0700
 
-On Thu, Sep 1, 2016 at 7:35 PM, Ziyuan Xu <xzy.xu@rock-chips.com> wrote:
->
->
-> On 2016?09?02? 05:29, Doug Anderson wrote:
+> David Miller <davem@davemloft.net> writes:
+> 
+>> From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>> Date: Tue, 30 Aug 2016 20:49:28 +0200
 >>
->> Hi,
->>
->> On Wed, Aug 31, 2016 at 11:56 PM, Ziyuan Xu <xzy.xu@rock-chips.com> wrote:
->>>
->>> Hi
->>>
->>>
->>> On 2016?09?01? 12:20, Doug Anderson wrote:
+>>> On Mon, Aug 29, 2016 at 5:40 AM, David Miller <davem@davemloft.net> wrote:
+>>>> From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>>>> Date: Sun, 28 Aug 2016 18:16:32 +0200
 >>>>
->>>> Hi,
->>>>
->>>> On Wed, Aug 31, 2016 at 7:29 PM, Ziyuan Xu <xzy.xu@rock-chips.com>
->>>> wrote:
->>>>>>
->>>>>> This is fine to pick up _only_ if you don't care about suspend/resume.
->>>>>> If you care about suspend/resume then someone needs to first write a
->>>>>> patch that will re-init all "corecfg" values after power is turned on.
+>>>>> This adds a DWMAC glue driver for the PRG_ETHERNET registers found in
+>>>>> Meson8b and GXBB SoCs. Based on the "old" meson6b-dwmac glue driver
+>>>>> the register layout is completely different.
+>>>>> Thus I introduced a separate driver.
 >>>>>
->>>>>
->>>>> Do you mean corecfg_clockmultiplier and corecfg_baseclkfreq, if yes, we
->>>>> don't need to strore/re-init it after resume.
->>>>> corecfg_clockmultiplier is only used to fetch host->clk_mul, and
->>>>> host->clk_mul has been a fixed value at run-time, unless driver unbind.
->>>>> The same as corecfg_clockmultiplier, corecfg_baseclkfreq is used to
->>>>> check
->>>>> the xin_clk at probe time, we don't reference it at run-time.
->>>>> BTW, I have tested suspend/resume on rk3399 prior to this sumbit, eMMC
->>>>> works
->>>>> fine.
+>>>>> Changes since v2:
+>>>>> - fixed unloading the glue driver when built as module. This pulls in a
+>>>>>   patch from Joachim Eastwood (thanks) to get our private data structure
+>>>>>   (bsp_priv).
 >>>>
->>>> I guess I don't actually know how the corecfg_clockmultiplier and
->>>> corecfg_baseclkfreq fields are actually used, but I presume that they
->>>> actually do something useful and aren't used to just communicate back
->>>> to software?
->>>
->>>
->>> Take corecfg_clockmultiplier as example.
->>> 1. sdhci driver fetch host->clk_mul from corecfg_clockmultiplier
->>> 2. mmc->f_min and mmc->f_max are calculated via host->clk_mul, they're
->>> used
->>> for further initialization.
->>> 3. if the corecfg_clockmultiplier is incorrect, sdhci will use improper
->>> frequency to play.
->>>
->>> I think we don't need to store it due to it's a fixed value at run-time,
->>> even if it is reset after a power cycle, the above will not be changed
->>> via
->>> software, except for dirver unbind .
->>>
->>>> I know that:
->>>>
->>>> 1. If I don't pick this patch and I suspend/resume,
->>>> corecfg_clockmultiplier and corecfg_baseclkfreq are still fine after
->>>> suspend / resume.
->>>>
->>>> 2. If I do pick this patch and I suspend/resume,
->>>> corecfg_clockmultiplier and corecfg_baseclkfreq are wrong after
->>>> suspend/resume (tested by reading /dev/mem directly from userspace
->>>> after suspend/resume).
->>>>
->>>>
->>>> Are you saying that it is unimportant that corecfg_clockmultiplier and
->>>> corecfg_baseclkfreq are wrong?
->>>
->>>
->>> Yup, corecfg_* stuff will be reset after a power cycle.
->>> I mean that we need only to guarantee they're correct at probe time.
+>>>> This doesn't apply cleanly at all to the net-next tree, so I have
+>>>> no idea where you expect these changes to be applied.
+>>> OK, maybe Kevin can me help out here as I think the patches should go
+>>> to various trees.
+>>> 
+>>> I think patches 1, 3 and 4 should go through the net-next tree (as
+>>> these touch drivers/net/ethernet/stmicro/stmmac/ and the corresponding
+>>> documentation).
+>>> Patch 2 should probably go through clk-meson-gxbb / clk-next (just
+>>> like the other clk changes we had).
+>>> The last patch (patch 5) should probably go through the ARM SoC tree
+>>> (just like the other dts changes we had).
+>>> 
+>>> @David, Kevin: would this be fine for you?
 >>
->> So are you saying that the entire purpose of "corecfg_clockmultiplier"
->> is that causes the "ClockMultiplier" field of the "EMMCCORE_CAP"
->> register to get a certain value?
->> ...and that the entire purpose of "corecfg_baseclkfreq" is that it
->> causes the "BaseClockFreqSDClock" field of the "EMMCCORE_CAP" register
->> to get a certain value?
->
-> Yes, on rk3399:
-> corecfg_clockmultiplier <===> EMMCCORE_CAP1[23:16] ClockMultiplier
-> corecfg_baseclkfreq <===> EMMCCORE_CAP[15:8] BaseClockFreqSDClock
->
-> If you re-write to either corecfg_* stuff,  the corresponding CAP register
-> field will be changed too.
-> sdhci driver will fetch CAP register for initialization, we only need to
-> guarantee they're correct at probe time.
->
-> Did that all make sense?
+>> I would prefer if all of the patches went through one tree, that way
+>> all the dependencies are satisfied in one place.
+> 
+> David, with your ack on the drivers/net changes, I can take them through
+> my tree for Amlogic SoCs (which then goes via the arm-soc tree.)
 
-Yes.  Very odd, but it makes sense.
-
-It would still be nice to get these restored after runtime resume just
-for cleanliness, but it's not a blocker IMHO.
-
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+Acked-by: David S. Miller <davem@davemloft.net>
