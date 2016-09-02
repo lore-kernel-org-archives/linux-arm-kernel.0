@@ -1,165 +1,124 @@
-From: bamvor.zhangjian@huawei.com (Bamvor Jian Zhang)
-Date: Fri, 2 Sep 2016 18:46:19 +0800
-Subject: [PATCH 12/18] arm64: ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <1471434403-25291-13-git-send-email-ynorov@caviumnetworks.com>
-References: <1471434403-25291-1-git-send-email-ynorov@caviumnetworks.com>
- <1471434403-25291-13-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <57C9587B.9080006@huawei.com>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Fri, 2 Sep 2016 12:49:52 +0200
+Subject: [PATCH v11 3/4] tee: add OP-TEE driver
+In-Reply-To: <0f9a528e-5288-ad4b-256e-f7a0b5952c3c@ti.com>
+References: <1471870856-18684-1-git-send-email-jens.wiklander@linaro.org>
+ <1471870856-18684-4-git-send-email-jens.wiklander@linaro.org>
+ <050a2ce4-e175-d09e-ddff-3b0cbe766d88@ti.com>
+ <20160831135015.GB25472@ermac>
+ <fe88749e-82c7-c310-b2bc-4e73bf76302b@ti.com>
+ <20160901092213.GA3968@ermac>
+ <0f9a528e-5288-ad4b-256e-f7a0b5952c3c@ti.com>
+Message-ID: <20160902104950.GA24088@ermac>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Yury
-
-On 08/17/2016 07:46 PM, Yury Norov wrote:
-> From: Andrew Pinski <apinski@cavium.com>
+On Thu, Sep 01, 2016 at 01:06:04PM -0500, Andrew F. Davis wrote:
+> On 09/01/2016 04:22 AM, Jens Wiklander wrote:
+> > On Wed, Aug 31, 2016 at 11:40:20AM -0500, Andrew F. Davis wrote:
+> >> On 08/31/2016 08:50 AM, Jens Wiklander wrote:
+> >>> On Tue, Aug 30, 2016 at 03:23:24PM -0500, Andrew F. Davis wrote:
+> >>>> On 08/22/2016 08:00 AM, Jens Wiklander wrote:
+> >>>>> +static struct tee_shm_pool *
+> >>>>> +optee_config_shm_ioremap(struct device *dev, optee_invoke_fn *invoke_fn,
+> >>>>> +			 void __iomem **ioremaped_shm)
+> >>>>> +{
+> >>>>> +	struct arm_smccc_res res;
+> >>>>> +	struct tee_shm_pool *pool;
+> >>>>> +	unsigned long vaddr;
+> >>>>> +	phys_addr_t paddr;
+> >>>>> +	size_t size;
+> >>>>> +	phys_addr_t begin;
+> >>>>> +	phys_addr_t end;
+> >>>>> +	void __iomem *va;
+> >>>>> +	struct tee_shm_pool_mem_info priv_info;
+> >>>>> +	struct tee_shm_pool_mem_info dmabuf_info;
+> >>>>> +
+> >>>>> +	invoke_fn(OPTEE_SMC_GET_SHM_CONFIG, 0, 0, 0, 0, 0, 0, 0, &res);
+> >>>>> +	if (res.a0 != OPTEE_SMC_RETURN_OK) {
+> >>>>> +		dev_info(dev, "shm service not available\n");
+> >>>>> +		return ERR_PTR(-ENOENT);
+> >>>>> +	}
+> >>>>> +
+> >>>>> +	if (res.a3 != OPTEE_SMC_SHM_CACHED) {
+> >>>>> +		dev_err(dev, "only normal cached shared memory supported\n");
+> >>>>> +		return ERR_PTR(-EINVAL);
+> >>>>> +	}
+> >>>>> +
+> >>>>> +	begin = roundup(res.a1, PAGE_SIZE);
+> >>>>> +	end = rounddown(res.a1 + res.a2, PAGE_SIZE);
+> >>>>
+> >>>> res.a1/2/3 is really hard to review and understand, would it work better
+> >>>> to use a union or cast for the output of invoke_fn based on the function
+> >>>> type?
+> >>>>
+> >>>> In the header that defines what the returned info from these calls means
+> >>>> add:
+> >>>>
+> >>>> struct OPTEE_SMC_GET_SHM_CONFIG_RESULT {
+> >>>> 	unsigned long status;
+> >>>> 	unsigned long start;
+> >>>> 	unsigned long size;
+> >>>> 	unsigned long settings;
+> >>>> };
+> >>>>
+> >>>> then:
+> >>>>
+> >>>> union something result;
+> >>>>
+> >>>> begin = roundup(result.ret.start, PAGE_SIZE);
+> >>>> end = rounddown(result.ret.start + result.ret.size, PAGE_SIZE);
+> >>>>
+> >>>> or similar with just casting to the better named struct type.
+> >>>
+> >>> optee_smc.h describes what's passed in the registers during an SMC I'd
+> >>> rather not clutter it with structs that doesn't add any information
+> >>> there. I'm not that happy with casting or using unions to alias struct
+> >>> arm_smccc_res either. How about a simple wrapper function for this call
+> >>> to deal with the details instead?
+> >>>
+> >>
+> >> I think that would be a good idea anyway, for instance, someday if the
+> >> interface changes slightly then you will be able to contain the
+> >> compatibility fixes in the wrapper and not out here in the main driver.
+> > 
+> > That interface is supposed to be a stable ABI, incompatible changes in
+> > the ABI should be discouraged. If there's an incompatible change it has
+> > to be dealt with in the main driver.
 > 
-[...]
-> diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
-> new file mode 100644
-> index 0000000..10fc0ca
-> --- /dev/null
-> +++ b/arch/arm64/kernel/sys_ilp32.c
-> @@ -0,0 +1,86 @@
-> +/*
-> + * AArch64- ILP32 specific system calls implementation
-> + *
-> + * Copyright (C) 2016 Cavium Inc.
-> + * Author: Andrew Pinski <apinski@cavium.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#define __SYSCALL_COMPAT
-> +
-> +#include <linux/compiler.h>
-> +#include <linux/errno.h>
-> +#include <linux/fs.h>
-> +#include <linux/mm.h>
-> +#include <linux/msg.h>
-> +#include <linux/export.h>
-> +#include <linux/sched.h>
-> +#include <linux/slab.h>
-> +#include <linux/syscalls.h>
-> +#include <linux/compat.h>
-> +#include <asm-generic/syscalls.h>
-> +
-> +/*
-> + * Using aarch32 syscall handlerss where off_t is passed.
-> + */
-> +#define compat_sys_fadvise64_64		compat_sys_fadvise64_64_wrapper
-> +#define compat_sys_fallocate		compat_sys_fallocate_wrapper
-> +#define compat_sys_fcntl64		sys_fcntl
-> +#define compat_sys_ftruncate64		compat_sys_ftruncate64_wrapper
-> +#define compat_sys_pread64		compat_sys_pread64_wrapper
-> +#define compat_sys_pwrite64		compat_sys_pwrite64_wrapper
-> +#define compat_sys_readahead		compat_sys_readahead_wrapper
-> +#define compat_sys_shmat		sys_shmat
-> +#define compat_sys_sync_file_range	compat_sys_sync_file_range2_wrapper
-> +#define compat_sys_truncate64		compat_sys_truncate64_wrapper
-When we test sync_file_range with our own testcase, we found that the parameter
-sequence is not correct for sync_file_range2 because glibc think kernel use
-the sync_file_range. So, in this patch we force to sync_file_range2.
+> Why? This driver is for "OPTEE" not "OPTEE v2.0.01.02", any minor ABI
+> changes should be abstracted away as much as possible to keep the main
+> driver logically simple, agnostic to any OPTEE version ABI quirks/handling.
 
-Is it make sense to you?
+Call me naive, but I don't expect any quirks. The ABI should only be
+extended with new functions and old may be deprecated.
 
-Regards
+Take the function optee_config_shm_ioremap() as an example. That
+function will not be used if OP-TEE doesn't use a specific shared memory
+pool but instead allocate shared memory via vmalloc() or from user
+space.
 
-Bamvor
+This kind of changes/extensions are expected, but that's probably things
+the driver need to deal with directly since if change doesn't add
+something significant it wouldn't be needed.
 
->From e730e4db23bca4dd0ff6bcca0bc4c04e5c13b5c7 Mon Sep 17 00:00:00 2001
-From: Bamvor Jian Zhang <bamvor.zhangjian@huawei.com>
-Date: Sat, 27 Aug 2016 12:26:31 +0800
-Subject: [PATCH] arm64:ilp32: force sync_file_range2
-
-Define __ARCH_WANT_SYNC_FILE_RANGE2 in order to select correct
-sync_file_range parameters sequence in glibc and kernel.
-
-Tested-by: Jianguo Chen <chenjianguo3@huawei.com>
-Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@huawei.com>
----
- arch/arm64/include/uapi/asm/unistd.h | 5 +++++
- arch/arm64/kernel/sys_ilp32.c        | 2 +-
- 2 files changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/uapi/asm/unistd.h b/arch/arm64/include/uapi/asm/unistd.h
-index 043d17a..78bea1d 100644
---- a/arch/arm64/include/uapi/asm/unistd.h
-+++ b/arch/arm64/include/uapi/asm/unistd.h
-@@ -16,4 +16,9 @@
-
- #define __ARCH_WANT_RENAMEAT
-
-+/* We need to make sure it works for both userspace and kernel(sys_ilp32.c) */
-+#if defined(__ILP32__) || defined(__SYSCALL_COMPAT)
-+#define __ARCH_WANT_SYNC_FILE_RANGE2
-+#endif
-+
- #include <asm-generic/unistd.h>
-diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
-index 10fc0ca..13c9c9d 100644
---- a/arch/arm64/kernel/sys_ilp32.c
-+++ b/arch/arm64/kernel/sys_ilp32.c
-@@ -42,7 +42,7 @@
- #define compat_sys_pwrite64            compat_sys_pwrite64_wrapper
- #define compat_sys_readahead           compat_sys_readahead_wrapper
- #define compat_sys_shmat               sys_shmat
--#define compat_sys_sync_file_range     compat_sys_sync_file_range2_wrapper
-+#define compat_sys_sync_file_range2    compat_sys_sync_file_range2_wrapper
- #define compat_sys_truncate64          compat_sys_truncate64_wrapper
- #define sys_mmap2                      compat_sys_mmap2_wrapper
- #define sys_ptrace                     compat_sys_ptrace
--- 
-1.8.4.5
-
-> +#define sys_mmap2			compat_sys_mmap2_wrapper
-> +#define sys_ptrace			compat_sys_ptrace
-> +
-> +/*
-> + * Use non-compat syscall handlers where rlimit, stat and statfs
-> + * structure pointers are passed, as their layout is identical to LP64.
-> + */
-> +#define compat_sys_fstatfs64		sys_fstatfs
-> +#define compat_sys_statfs64		sys_statfs
-> +#define sys_fstat64			sys_newfstat
-> +#define sys_fstatat64			sys_newfstatat
-> +#define compat_sys_getrlimit		sys_getrlimit
-> +#define compat_sys_setrlimit		sys_setrlimit
-> +
-> +asmlinkage long compat_sys_fadvise64_64_wrapper(void);
-> +asmlinkage long compat_sys_fallocate_wrapper(void);
-> +asmlinkage long compat_sys_ftruncate64_wrapper(void);
-> +asmlinkage long compat_sys_mmap2_wrapper(void);
-> +asmlinkage long compat_sys_pread64_wrapper(void);
-> +asmlinkage long compat_sys_pwrite64_wrapper(void);
-> +asmlinkage long compat_sys_readahead_wrapper(void);
-> +asmlinkage long compat_sys_sync_file_range2_wrapper(void);
-> +asmlinkage long compat_sys_truncate64_wrapper(void);
-> +
-> +asmlinkage long ilp32_sys_rt_sigreturn_wrapper(void);
-> +#define compat_sys_rt_sigreturn        ilp32_sys_rt_sigreturn_wrapper
-> +
-> +#include <asm/syscall.h>
-> +
-> +#undef __SYSCALL
-> +#define __SYSCALL(nr, sym)	[nr] = sym,
-> +
-> +/*
-> + * The sys_call_ilp32_table array must be 4K aligned to be accessible from
-> + * kernel/entry.S.
-> + */
-> +void *sys_call_ilp32_table[__NR_syscalls] __aligned(4096) = {
-> +	[0 ... __NR_syscalls - 1] = sys_ni_syscall,
-> +#include <asm/unistd.h>
-> +};
 > 
+> > A small wrapper function in a
+> > standalone header file has no chance here as it probably involves using
+> > information gathered while probing secure world.
+> > 
+> > What I meant was a small wrapper function just above 
+> > optee_config_shm_ioremap() to deal with only this call.
+> > 
+> 
+> This wouldn't do anything that a cast couldn't do. Why not put the
+> wrapper function in the header as part of that OPTEE version's ABI
+> definition?
+
+Choosing between wrapper functions or structs in optee_smc.h I'd choose
+structs. I'll add structs for the ABI functions where it helps, skipping
+for instance the OPTEE_SMC_*UID and OPTEE_SMC_CALL_WITH_ARG functions.
+Would that be OK?
+
+Thanks,
+Jens
