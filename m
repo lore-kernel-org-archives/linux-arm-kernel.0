@@ -1,7 +1,7 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 2 Sep 2016 11:33:56 +0100
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.9
-Message-ID: <57C95594.40105@hisilicon.com>
+Date: Fri, 2 Sep 2016 11:37:41 +0100
+Subject: [GIT PULL] arm64: defconfig: hisilicon config updates for v4.9
+Message-ID: <57C95675.5060504@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,53 +21,31 @@ The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
 are available in the git repository at:
 
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-soc-dt-for-4.9
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-defconfig-for-4.9
 
-for you to fetch changes up to 0f5d3ec5251066b1118ace0bf1369018de557bfb:
+for you to fetch changes up to 21adc4d7bb0260effe0a4395a8751d88a4aedf9a:
 
-  arm64: dts: hi6220: add sd-uhs- properties into dwmmc_1 (2016-09-02 09:36:50 +0100)
+  Kconfig: ARCH_HISI: Add PINCTRL to HISI platform (2016-08-24 15:56:28 +0100)
 
 ----------------------------------------------------------------
-ARM64: DT: Hisilicon SoC DT updates for 4.9
+ARM64: hisilicon: defconfig updates for 4.9
 
-- Set UART1 clock frequency to 150MHz for higher baud rates on hikey
-- Add display subsystem, HDMI and cma nodes on hikey to support display
-- Add syscon-reboot-mode support on hikey
-- Add pstore support on hikey
-- Add resets and sd-uhs-sdr property dwmmc ndoe on hikey
-- Remove hip05_hns.dtsi since it can not be built without mbigenv1
-- Update system controller bingding document for hip05 and hip06
-- Add xge and sas support on hip06
+- Enable hisilicon SAS and XGE for hip05 and hip06
+- Enable drm, powerkey, bluetooth and adv7511/adv7533 for hikey
+- Add PINCTRL to HISI platform
 
 ----------------------------------------------------------------
 Guodong Xu (3):
-      arm64: dts: hikey: extend default cma size to 128MB
-      arm64: dts: hi6220: add resets property into dwmmc nodes
-      arm64: dts: hi6220: add sd-uhs- properties into dwmmc_1
+      arm64: defconfig: Enable HiSilicon kirin drm, adv7533 for HiKey
+      arm64: defconfig: enable CONFIG_INPUT_HISI_POWERKEY for HiKey
+      arm64: defconfig: enable bluetooth supports as modules
 
-John Stultz (2):
-      arm64: dts: hikey: Add hikey support for syscon-reboot-mode
-      arm64: dts: hikey: Add pstore support for HiKey
+John Stultz (1):
+      Kconfig: ARCH_HISI: Add PINCTRL to HISI platform
 
-Jorge Ramirez-Ortiz (1):
-      arm64: dts: set UART1 clock frequency to 150MHz
+Kefeng Wang (1):
+      arm64: defconfig: Enable Hisi SAS and HNS
 
-Kefeng Wang (4):
-      arm64: dts: hip05: kill hip05_hns.dtsi
-      dt-bindings: hisilicon: Add Hip05 and Hip06 system controller support
-      arm64: dts: hip06: Append hns node
-      arm64: dts: hip06: Append sas node
-
-Xinliang Liu (2):
-      arm64: dts: Add display subsystem DT nodes for hi6220-hikey
-      arm64: dts: Add HDMI node for hi6220-hikey
-
- .../bindings/arm/hisilicon/hisilicon.txt           |  39 ++-
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |  86 ++++-
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  61 ++++
- arch/arm64/boot/dts/hisilicon/hip05.dtsi           |   5 -
- arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi       | 180 ----------
- arch/arm64/boot/dts/hisilicon/hip06-d03.dts        |  28 ++
- arch/arm64/boot/dts/hisilicon/hip06.dtsi           | 365 +++++++++++++++++++++
- 7 files changed, 566 insertions(+), 198 deletions(-)
- delete mode 100644 arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
+ arch/arm64/Kconfig.platforms |  1 +
+ arch/arm64/configs/defconfig | 16 +++++++++++++++-
+ 2 files changed, 16 insertions(+), 1 deletion(-)
