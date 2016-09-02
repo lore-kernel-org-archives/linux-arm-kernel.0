@@ -1,27 +1,59 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Sep 2016 09:41:04 -0700
-Subject: [GIT PULL 1/3] omap soc updates for v4.9 merge window
-In-Reply-To: <53601070.59VtCzPlgV@wuerfel>
-References: <53601070.59VtCzPlgV@wuerfel>
-Message-ID: <20160902164104.eybuj2gra3z7tizr@atomide.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Fri, 2 Sep 2016 18:58:00 +0200
+Subject: [RFC/RFT PATCH] arm64: mm: allow userland to run with one fewer
+ translation level
+In-Reply-To: <1471781914-16681-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1471781914-16681-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <abe7c6e4-8898-3e9b-da66-dd3ca10f27b0@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [160902 09:36]:
-> On Thursday, September 1, 2016 8:45:19 AM CEST Tony Lindgren wrote:
-> > Javier Martinez Canillas (2):
-> >       ARM: OMAP1: use IS_ENABLED() instead of checking for built-in or module
-> >       ARM: OMAP2+: use IS_ENABLED() instead of checking for built-in or module
-> > 
+
+
+On 21.08.16 14:18, Ard Biesheuvel wrote:
+> The choice of VA size is usually decided by the requirements on the kernel
+> side, particularly the size of the linear region, which must be large
+> enough to cover all of physical memory, including the holes in between,
+> which may be very large (~512 GB on some systems).
 > 
-> I've pulled this into next/cleanup as well, to avoid the trivial
-> conflict against the file removal in the omap3 legacy branch.
+> Since running with more translation levels could potentially result in
+> a performance penalty due to additional TLB pressure, this patch allows the
+> kernel to be configured so that it runs with one fewer translation level on
+> the userland side. Rather than modifying all the compile time logic to deal
+> with folded PUDs or PMDs, we simply allocate the root table and the next
+> table adjacently, so that we can simply point TTBR0_EL1 to the next table
+> (and update TCR_EL1.T0SZ accordingly)
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> 
+> This is just a proof of concept. *If* there is a performance penalty associated
+> with using 4 translation levels instead of 3, I would expect this patch to
+> compensate for that, given that the additional TLB pressure should be on the
+> userland side primarily. Benchmark results are highly appreciated.
+> 
+> As a bonus, this would fix the horrible yet real JIT issues we have been seeing
+> with 48-bit VA configurations. IOW, I expect this to be an easier sell than
+> simply limiting TASKSIZE to 47 bits (assuming anyone can show a benchmark where
+> this patch has a positive impact on the performance of a 48-bit/4 levels kernel)
+> and distros can ship kernels that work on all hardware (including Freescale and
+> Xgene with >= 64 GB) but don't break their JITs.
+> 
+> This patch is most likely broken for 16k/47-bit configs, but I didn't bother to
+> fix that before having the discussion.
 
-OK
+Let's roll forward by a few years. In that time, there's a good chance
+you will have nvdimms in a good number of systems out there with massive
+address spaces that easily reach beyond the lousy 512GB you get with 3
+levels.
 
-> Any other omap soc updates for v4.9 should just be based on this
-> omap-for-v4.9/soc-signed branch anyway.
+That means at that point we'd have to roll back and have 48 bits
+regardless - or add special attributes to have binaries that then can
+demand bigger address space. Overall that doesn't sound terribly
+appealing, so I'm not sure going for 39 as interim is a step into the
+right direction.
 
-Yeah thanks,
+That said, I'd be very happy to see benchmark results too :)
 
-Tony
+
+Alex
