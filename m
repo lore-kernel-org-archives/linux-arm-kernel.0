@@ -1,53 +1,31 @@
-From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
-Date: Fri, 2 Sep 2016 13:16:55 +0200
-Subject: [PATCH] ARM: LPAE: catch pending imprecise abort on unmask
-Message-ID: <e344c6fa-58be-615f-8d93-70f6f4e8ae89@nokia.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 2 Sep 2016 14:18:23 +0300
+Subject: [PATCH 2/2] ARM: dts: am57xx-beagle-x15: Add support for rev B1
+In-Reply-To: <dd74f5e1-304f-661e-7fd9-f5f81bcfc55e@ti.com>
+References: <20160902090600.27262-1-nm@ti.com>
+ <20160902090600.27262-3-nm@ti.com>
+ <dd74f5e1-304f-661e-7fd9-f5f81bcfc55e@ti.com>
+Message-ID: <0927d74a-17cf-dc4e-081d-b27c3bf5ac3c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Asynchronous external abort is coded differently in DFSR with LPAE enabled.
+On 02/09/16 13:41, Sekhar Nori wrote:
 
-Fixes: 9254970c "ARM: 8447/1: catch pending imprecise abort on unmask".
+> Also, how about renaming the existing dts to am57xx-beagle-x15-reva2.dts
+> and let the production version be called am57xx-beagle-x15.dts? Surely
+> this will cause some inconvenience to A2 users. But there are few users
+> of those and it might be more intuitive for the majority users if the
+> file for production version is without a specific version string
+> attached. Just a thought though, not sure about it myself either.
 
-Signed-off-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
----
- arch/arm/mm/fault.c | 4 ++--
- arch/arm/mm/fault.h | 4 ++++
- 2 files changed, 6 insertions(+), 2 deletions(-)
+I was about to suggest the same, so yes, this sounds good to me.
 
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index 3a2e678..0122ad1 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -610,9 +610,9 @@ static int __init early_abort_handler(unsigned long addr, unsigned int fsr,
- 
- void __init early_abt_enable(void)
- {
--	fsr_info[22].fn = early_abort_handler;
-+	fsr_info[FSR_FS_AEA].fn = early_abort_handler;
- 	local_abt_enable();
--	fsr_info[22].fn = do_bad;
-+	fsr_info[FSR_FS_AEA].fn = do_bad;
- }
- 
- #ifndef CONFIG_ARM_LPAE
-diff --git a/arch/arm/mm/fault.h b/arch/arm/mm/fault.h
-index 05ec5e0..7883065 100644
---- a/arch/arm/mm/fault.h
-+++ b/arch/arm/mm/fault.h
-@@ -11,11 +11,15 @@
- #define FSR_FS5_0		(0x3f)
- 
- #ifdef CONFIG_ARM_LPAE
-+#define FSR_FS_AEA		17
-+
- static inline int fsr_fs(unsigned int fsr)
- {
- 	return fsr & FSR_FS5_0;
- }
- #else
-+#define FSR_FS_AEA		22
-+
- static inline int fsr_fs(unsigned int fsr)
- {
- 	return (fsr & FSR_FS3_0) | (fsr & FSR_FS4) >> 6;
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160902/4a4c24ca/attachment.sig>
