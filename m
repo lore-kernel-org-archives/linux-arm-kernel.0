@@ -1,36 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Sep 2016 08:06:49 -0700
-Subject: [PATCH 2/2] ARM: dts: am57xx-beagle-x15: Add support for rev B1
-In-Reply-To: <CAOCHtYiFjB-cuABmCiw96spc-De+qNNQYGrjp-MmNDuH2mJ9Bw@mail.gmail.com>
-References: <20160902090600.27262-1-nm@ti.com>
- <20160902090600.27262-3-nm@ti.com>
- <dd74f5e1-304f-661e-7fd9-f5f81bcfc55e@ti.com>
- <CAOCHtYiFjB-cuABmCiw96spc-De+qNNQYGrjp-MmNDuH2mJ9Bw@mail.gmail.com>
-Message-ID: <20160902150648.lgbhxvyapo4p3lg3@atomide.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 2 Sep 2016 16:09:19 +0100
+Subject: irq_create_fwspec_mapping() in 4.8-rc2
+In-Reply-To: <F5716CCD-34FF-4CA8-B5F5-C2A33A5D9E91@gmail.com>
+References: <483F737F-9868-4E8A-A831-AA3F6F410AFF@gmail.com>
+ <57C98975.5020607@arm.com> <9FCA11A3-B677-42EA-80DB-674AC8E489E8@gmail.com>
+ <57C99111.3030105@arm.com> <F5716CCD-34FF-4CA8-B5F5-C2A33A5D9E91@gmail.com>
+Message-ID: <57C9961F.8080602@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Robert Nelson <robertcnelson@gmail.com> [160902 06:52]:
-> On Fri, Sep 2, 2016 at 5:41 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> > Instead, it seems to be easier for maintenance and safer overall if the
-> > older version has a file of its own which can be kept alone.
-> >
-> > Also, how about renaming the existing dts to am57xx-beagle-x15-reva2.dts
-> > and let the production version be called am57xx-beagle-x15.dts? Surely
-> > this will cause some inconvenience to A2 users. But there are few users
-> > of those and it might be more intuitive for the majority users if the
-> > file for production version is without a specific version string
-> > attached. Just a thought though, not sure about it myself either.
+On 02/09/16 15:52, Andras Szemzo wrote:
+>>
+>> Can you try this patch and report the values you find?
+>>
+> Sure, here is the output:
 > 
-> Nak, let's NOT do that to A2 users.
-> 
-> The am57xx-beagle-x15.dts went mainline in v3.19, u-boot installed on
-> devices would need to be updated and this would make bisecting a pain.
-> ;)
+> irq: type mismatch (2/3), failed to map hwirq-11 for /soc/pinctrl at 0x400e0e00/gpio at 0x400e1200!
 
-I agree, let's keep things working without forcing people to update
-their u-boot enviroment for the dtb name.
+So something has already configured the interrupt to be
+IRQ_TYPE_EDGE_BOTH, and this clashes with your
+IRQ_TYPE_EDGE_FALLING.
 
-Regards,
+My bet is on this one:
 
-Tony
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index 80daead..9f09041 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -1614,7 +1614,7 @@ static int at91_gpio_of_irq_setup(struct platform_device *pdev,
+ 				   &gpio_irqchip,
+ 				   0,
+ 				   handle_edge_irq,
+-				   IRQ_TYPE_EDGE_BOTH);
++				   IRQ_TYPE_NONE);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "at91_gpio.%d: Couldn't add irqchip to gpiochip.\n",
+ 			at91_gpio->pioc_idx);
+
+Can you give it a go and let me know what happens?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
