@@ -1,53 +1,85 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 2 Sep 2016 09:43:14 +0200
-Subject: [linux-sunxi] Re: [PATCH v3] ARM: dts: sun8i: enable UART1 for
- iNet D978 Rev2 board
-In-Reply-To: <a3097f99-a761-76e7-1405-2574c56ac94d@redhat.com>
-References: <20160829141832.10566-1-icenowy@aosc.xyz>
- <20160831162240.GJ14379@lukather>
- <a3097f99-a761-76e7-1405-2574c56ac94d@redhat.com>
-Message-ID: <20160902074314.GC6313@lukather>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 02 Sep 2016 10:09:55 +0200
+Subject: [PATCH 7/8] iommu: of: Handle IOMMU lookup failure with deferred
+ probing or error
+In-Reply-To: <000901d1f4af$e26b6c00$a7424400$@codeaurora.org>
+References: <1470696550-3416-1-git-send-email-sricharan@codeaurora.org>
+ <1470696550-3416-8-git-send-email-sricharan@codeaurora.org>
+ <CAAFQd5C8BuOCc5ySw_3tVELDG4S+r_5VyDvOPnBBuVr-6CBfxg@mail.gmail.com>
+ <000901d1f4af$e26b6c00$a7424400$@codeaurora.org>
+Message-ID: <1c5dde1d-1ffb-d045-c090-032b9f1c7de2@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2016 at 10:40:32AM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 31-08-16 18:22, Maxime Ripard wrote:
-> >On Mon, Aug 29, 2016 at 10:18:32PM +0800, Icenowy Zheng wrote:
-> >>UART1 is connected to the bluetooth part of RTL8723BS WiFi/BT combo card
-> >>on iNet D978 Rev2 board.
-> >>
-> >>Enable the UART1 to make it possible to use the modified hciattach by
-> >>Realtek to drive the BT part of RTL8723BS.
-> >>
-> >>On the board no r_uart pins are found now (the onboard RX/TX pins are
-> >>wired to PF2/PF4, which is muxed with mmc0), so also disabled it.
-> >>
-> >>Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> >
-> >I'll make the same comments than in the v2.
-> >https://www.spinics.net/lists/arm-kernel/msg527001.html
-> 
-> I've a feeling there is a bit of miscommunication here,
-> let me try to clarify things:
-> 
-> Icenowy, Maxime wants you to split this into 2 patches:
+Hi Sricharan,
 
-Hmm, yes, sorry if it was unclear.
 
-Thanks Hans
+On 2016-08-12 17:40, Sricharan wrote:
+> Hi Tomaz,
+>
+>>> +               if (ops->add_device)
+>>> +                       ops = ops->add_device(dev) ? ops : NULL;
+>> Patch description fails to mention anything about this change. Also it
+>> looks slightly incorrect to lose the error condition here. I think we
+>> should at least print some error message here and tell the user that
+>> we are falling back to non-IOMMU setup.
+>      Ok, will have to improve the patch description to add this and will
+>      fix the error value as well. Will also add the remove_device during
+>       deconfigure as well.
+>
+>>
+>>>                  of_node_put(np);
+>>>                  idx++;
+>>> @@ -200,7 +213,7 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
+>>>
+>>>   err_put_node:
+>>>          of_node_put(np);
+>>> -       return NULL;
+>>> +       return ops;
+>>>   }
+>>>
+>>>   void __init of_iommu_init(void)
+>>> @@ -211,7 +224,7 @@ void __init of_iommu_init(void)
+>>>          for_each_matching_node_and_match(np, matches, &match) {
+>>>                  const of_iommu_init_fn init_fn = match->data;
+>>>
+>>> -               if (init_fn(np))
+>>> +               if (init_fn && init_fn(np))
+>> When is it possible to have NULL init_fn?
+>     ya wrong, should not be needed.
 
-Maxime
+init_fn can be NULL if you convert IOMMU driver to use platform device
+infrastructure based initialization and you don't need to do anything
+before the driver gets probed, so please keep this check.
 
+I used this approach here:
+https://git.linaro.org/people/marek.szyprowski/linux-srpol.git/commitdiff/a30735973573128b14bb4a25cf4debaa0979a655
+(this commit is a part of v4.8-clocks-pm branch)
+
+IOMMU_OF_DECLARE() with NULL init_fn is needed to notify IOMMU core that
+this IOMMU driver is available in the system and core has to defer
+probing of drivers before the IOMMU driver gets initialized from its
+controller's platform device.
+
+>
+>>
+>>>                          pr_err("Failed to initialise IOMMU %s\n",
+>>>                                  of_node_full_name(np));
+>>>          }
+>>> diff --git a/drivers/of/device.c b/drivers/of/device.c
+>>> index e1fad50..92e02dc 100644
+>>> --- a/drivers/of/device.c
+>>> +++ b/drivers/of/device.c
+>>> @@ -149,6 +149,8 @@ int of_dma_configure_ops(struct device *dev, struct device_node *np)
+>>>                  coherent ? " " : " not ");
+>>>
+>>>          iommu = of_iommu_configure(dev, np);
+>>> +       if (IS_ERR(iommu))
+>>> +               return PTR_ERR(iommu);
+>> nit: Would be good to add a blank line here for improved readability.
+>     ok, will add.
+
+Best regards
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160902/97f9d7fe/attachment.sig>
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
