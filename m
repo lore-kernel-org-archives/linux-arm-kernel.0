@@ -1,49 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 2 Sep 2016 15:47:45 +0100
-Subject: irq_create_fwspec_mapping() in 4.8-rc2
-In-Reply-To: <9FCA11A3-B677-42EA-80DB-674AC8E489E8@gmail.com>
-References: <483F737F-9868-4E8A-A831-AA3F6F410AFF@gmail.com>
- <57C98975.5020607@arm.com> <9FCA11A3-B677-42EA-80DB-674AC8E489E8@gmail.com>
-Message-ID: <57C99111.3030105@arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 2 Sep 2016 09:52:21 -0500
+Subject: [PATCH 1/2] ARM: dts: am57xx-beagle-x15: Remove pinmux
+ configurations
+In-Reply-To: <9bdf5693-ba02-8ce5-04b0-08875ccf7603@ti.com>
+References: <20160902090600.27262-1-nm@ti.com>
+ <20160902090600.27262-2-nm@ti.com>
+ <9bdf5693-ba02-8ce5-04b0-08875ccf7603@ti.com>
+Message-ID: <007b3c61-ec4c-a89d-e80e-adcec314e298@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/16 15:29, Andras Szemzo wrote:
-> Hi,
-> 
->> On 02 Sep 2016, at 16:15, Marc Zyngier <marc.zyngier@arm.com> wrote:
+On 09/02/2016 05:18 AM, Sekhar Nori wrote:
+> On Friday 02 September 2016 02:35 PM, Nishanth Menon wrote:
+>> pinmuxing for DRA7x/AM57x family of processors need to be done in IO
+>> isolation as part of initial bootloader executed from SRAM. This is
+>> done as part of iodelay configuration sequence and is required due to
+>> the limitations introduced by erratum ID: i869[1] and elaborated in
+>> the Technical Reference Manual[2] 18.4.6.1.7 Isolation Requirements.
 >>
->> So this is the interrupt that gets a mismatch.
-> 
-> Yes.
-> 
->> Is there any other device in your system that uses the same interrupt?
->> Where can I see your full DT file?
-> 
-> There is no other device using pioC 11.
-> Here is the DT:
-> 
-> http://pastebin.com/G7Z0hF5v
+>> Only peripheral that is permitted for dynamic pin mux configuration is
+>> MMC. This is to accommodate the requirements for varied speeds (which
+>
+> Actually its MMC and DCAN. DCAN because of i893 ("DCAN Initialization
+> Sequence"). But I can see you may have omitted reference to it since
+> DCAN is not really used on the x15.
 
-Can you try this patch and report the values you find?
+True, I should add that for completeness. will do. thanks for catching 
+the same.
 
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 4752b43..d79d780 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -623,7 +623,8 @@ unsigned int irq_create_fwspec_mapping(struct irq_fwspec *fwspec)
- 			return virq;
- 		}
- 
--		pr_warn("type mismatch, failed to map hwirq-%lu for %s!\n",
-+		pr_warn("type mismatch (%u/%u), failed to map hwirq-%lu for %s!\n",
-+			type, irq_get_trigger_type(virq),
- 			hwirq, of_node_full_name(to_of_node(fwspec->fwnode)));
- 		return 0;
- 	}
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+Nishanth Menon
