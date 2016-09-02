@@ -1,29 +1,27 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 2 Sep 2016 11:06:24 +0100
-Subject: [PATCH v4 2/2] soc: qcom: add l2 cache perf events driver
-In-Reply-To: <20160901163051.GA6731@leverpostej>
-References: <1472576493-26382-1-git-send-email-nleeder@codeaurora.org>
- <1472576493-26382-3-git-send-email-nleeder@codeaurora.org>
- <20160901163051.GA6731@leverpostej>
-Message-ID: <20160902100624.GB9261@leverpostej>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 2 Sep 2016 15:48:54 +0530
+Subject: [PATCH 1/2] ARM: dts: am57xx-beagle-x15: Remove pinmux
+ configurations
+In-Reply-To: <20160902090600.27262-2-nm@ti.com>
+References: <20160902090600.27262-1-nm@ti.com>
+ <20160902090600.27262-2-nm@ti.com>
+Message-ID: <9bdf5693-ba02-8ce5-04b0-08875ccf7603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2016 at 05:30:52PM +0100, Mark Rutland wrote:
-> On Tue, Aug 30, 2016 at 01:01:33PM -0400, Neil Leeder wrote:
-> > +static DEFINE_MUTEX(l2cache_pmu_mutex);
+On Friday 02 September 2016 02:35 PM, Nishanth Menon wrote:
+> pinmuxing for DRA7x/AM57x family of processors need to be done in IO
+> isolation as part of initial bootloader executed from SRAM. This is
+> done as part of iodelay configuration sequence and is required due to
+> the limitations introduced by erratum ID: i869[1] and elaborated in
+> the Technical Reference Manual[2] 18.4.6.1.7 Isolation Requirements.
 > 
-> A mutex (which can sleep) is not safe for the hotplug state machine
-> stuff. See recent patches to the arm_pmu code.
-> 
-> That's further subsumed by the multi-instance stuff, so this (and the
-> list) will not be necessary shortly.
+> Only peripheral that is permitted for dynamic pin mux configuration is
+> MMC. This is to accommodate the requirements for varied speeds (which
 
-This has *just* landed in tip. See the smp/hotplug branch [1]. The
-arm_pmu change [2] should serve as an example of what to do.
+Actually its MMC and DCAN. DCAN because of i893 ("DCAN Initialization
+Sequence"). But I can see you may have omitted reference to it since
+DCAN is not really used on the x15.
 
 Thanks,
-Mark.
-
-[1] https://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/log/?h=smp/hotplug
-[2] https://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?h=smp/hotplug&id=cc727977acb0fe05b7aa1f00cccb893530820895
+Sekhar
