@@ -1,41 +1,136 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri,  2 Sep 2016 16:02:13 +0100
-Subject: [PATCH v2 7/7] arm64: Enable CONFIG_ARM64_TTBR0_PAN
-In-Reply-To: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
-References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1472828533-28197-8-git-send-email-catalin.marinas@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 2 Sep 2016 10:06:28 -0500
+Subject: [PATCH V2 1/5] Documentation: Add support for TI System Control
+ Interface (TI-SCI) protocol
+In-Reply-To: <20160830130647.6828-2-nm@ti.com>
+References: <20160830130647.6828-1-nm@ti.com> <20160830130647.6828-2-nm@ti.com>
+Message-ID: <20160902150628.GA19493@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the Kconfig option to enable support for TTBR0 PAN. The
-option is default off because of a slight performance hit when enabled,
-caused by the additional TTBR0_EL1 switching during user access
-operations or exception entry/exit code.
+On Tue, Aug 30, 2016 at 08:06:43AM -0500, Nishanth Menon wrote:
+> Texas Instrument's System Control Interface (TI-SCI) Message Protocol
+> is used in Texas Instrument's System on Chip (SoC) such as those in
+> newer SoCs in the keystone processor family starting with K2G.
+> 
+> This message protocol is used to communicate between various compute
+> or processing entities (such as ARM, DSP etc.) with a central system
+> controller entity.
+> 
+> TI-SCI message protocol provides support for management of various
+> hardware entities within the SoC.
+> 
+> The message protocol can be found here:
+> http://processors.wiki.ti.com/index.php/TISCI
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+> Changes since v1:
+> 	- squashed the bindings changes for reset on review comments from
+> 		https://patchwork.kernel.org/patch/9291351/
+> 
+> V1: https://patchwork.kernel.org/patch/9291343/
+> 
+>  .../devicetree/bindings/arm/keystone/ti,sci.txt    | 66 ++++++++++++++++++++++
+>  MAINTAINERS                                        |  8 +++
+>  2 files changed, 74 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+> new file mode 100644
+> index 000000000000..ed5b8fc185f1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+> @@ -0,0 +1,66 @@
+> +Texas Instruments System Control Interface (TI-SCI) Message Protocol
+> +-------------------------------------------------------------------
+> +
+> +Texas Instrument's processors including those belonging to Keystone generation
+> +of processors have separate hardware entity which is now responsible for the
+> +management of the System on Chip (SoC) system. These include various system
+> +level functions as well.
+> +
+> +An example of such an SoC is K2G, which contains the system control hardware
+> +block called Power Management Micro Controller (PMMC). This hardware block is
+> +initialized early into boot process and provides services to Operating Systems
+> +on multiple processors including ones running Linux.
+> +
+> +See http://processors.wiki.ti.com/index.php/TISCI for protocol definition.
+> +
+> +TI-SCI controller Device Node:
+> +=============================
+> +
+> +Required properties:
+> +--------------------
+> +- compatible: should be "ti,k2g-sci"
+> +- mbox-names:
+> +	"rx" - Mailbox corresponding to receive path
+> +	"tx" - Mailbox corresponding to transmit path
+> +
+> +- mboxes: Mailboxes corresponding to the mbox-names. Each value of the mboxes
+> +	  property should contain a phandle to the mailbox controller device
+> +	  node and an args specifier that will be the phandle to the intended
+> +	  sub-mailbox child node to be used for communication.
+> +
+> +See Documentation/devicetree/bindings/mailbox/mailbox.txt for more details
+> +about the generic mailbox controller and client driver bindings. Also see
+> +Documentation/devicetree/bindings/mailbox/ti,message-manager.txt for typical
+> +controller that is used to communicate with this System controllers.
+> +
+> +Optional Properties:
+> +--------------------
+> +- reg-names:
+> +	debug_messages - Map the Debug message region
+> +- reg:  register space corresponding to the debug_messages
+> +- ti,system-reboot-controller: If system reboot can be triggered by SoC reboot
+> +
+> +Example (K2G):
+> +--------
+> +	pmmc: pmmc {
+> +		compatible = "ti,k2g-sci";
+> +		mbox-names = "rx", "tx";
+> +		mboxes= <&msgmgr &msgmgr_proxy_pmmc_rx>,
+> +			<&msgmgr &msgmgr_proxy_pmmc_tx>;
+> +		reg-names = "debug_messages";
+> +		reg = <0x02921800 0x800>;
+> +	};
+> +
+> +
+> +TI-SCI Client Device Node:
+> +========================
+> +
+> +Client nodes refer to the required TI-SCI device using the "ti,sci" property.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Kees Cook <keescook@chromium.org>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/Kconfig | 8 ++++++++
- 1 file changed, 8 insertions(+)
+As I mentioned for power domains, for clients that are self contained 
+(i.e. a single function) I think the should be child nodes.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index bc3f00f586f1..3fb9a6ce464d 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -785,6 +785,14 @@ config SETEND_EMULATION
- 	  If unsure, say Y
- endif
- 
-+config ARM64_TTBR0_PAN
-+	bool "Priviledged Access Never using TTBR0_EL1 switching"
-+	help
-+	  Enabling this option prevents the kernel from accessing
-+	  user-space memory directly by pointing TTBR0_EL1 to a reserved
-+	  zeroed area and reserved ASID. The user access routines
-+	  restore the valid TTBR0_EL1 temporarily.
-+
- menu "ARMv8.1 architectural features"
- 
- config ARM64_HW_AFDBM
+> +
+> +Example (K2G):
+> +-------------
+> +	my_dev_node: dev_node {
+> +		...
+> +		ti,sci = <&pmmc>;
+> +		...
+> +	}
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 20bb1d00098c..ce7306897ae0 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -11564,6 +11564,14 @@ S:	Maintained
+>  F:	arch/xtensa/
+>  F:	drivers/irqchip/irq-xtensa-*
+>  
+> +Texas Instruments' System Control Interface (TISCI) Protocol Driver
+> +M:	Nishanth Menon <nm@ti.com>
+> +M:	Tero Kristo <t-kristo@ti.com>
+> +M:	Santosh Shilimkar <ssantosh@kernel.org>
+> +L:	linux-arm-kernel at lists.infradead.org
+> +S:	Maintained
+> +F:	Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+> +
+>  THANKO'S RAREMONO AM/FM/SW RADIO RECEIVER USB DRIVER
+>  M:	Hans Verkuil <hverkuil@xs4all.nl>
+>  L:	linux-media at vger.kernel.org
+> -- 
+> 2.9.1.200.gb1ec08f
+> 
