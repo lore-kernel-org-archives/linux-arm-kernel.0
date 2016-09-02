@@ -1,33 +1,26 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Fri, 02 Sep 2016 05:42:24 -0700
-Subject: [PATCH] ARM: imx: (trivial) fix typo and grammar
-In-Reply-To: <1472805280-5927-1-git-send-email-martin@kaiser.cx>
-References: <1993847.IzPN1S0Ejq@diplodocus>
- <1472805280-5927-1-git-send-email-martin@kaiser.cx>
-Message-ID: <2647588.TvIB393KzZ@diplodocus>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri,  2 Sep 2016 14:42:27 +0200
+Subject: mtd: nand: automate NAND timings selection
+Message-ID: <1472820149-24241-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 02, 2016 10:34:40 AM Martin Kaiser wrote:
-> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
-> ---
->  arch/arm/mach-imx/hardware.h |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/hardware.h b/arch/arm/mach-imx/hardware.h
-> index a42a6df..90e10cb 100644
-> --- a/arch/arm/mach-imx/hardware.h
-> +++ b/arch/arm/mach-imx/hardware.h
-> @@ -120,7 +120,7 @@
->  	.type = _type,							\
->  }
->  
-> -/* There's a off-by-one betweem the gpio bank number and the gpiochip */
-> +/* There's an off-by-one between the gpio bank number and the gpiochip */
->  /* range e.g. GPIO_1_5 is gpio 5 under linux */
->  #define IMX_GPIO_NR(bank, nr)		(((bank) - 1) * 32 + (nr))
->  
-> 
-That's Betterer! ;)
+This series aims at automating the NAND timings selection which is
+currently supposed to be done in each NAND controller driver, thus
+simplifying drivers implementation.
 
-Reviewed-by Joshua Clayton <stillcompiling@gmail.com>
+Patch 1 also opens the door to DDR NAND support, though setting DDR
+timings is currently not supported.
+
+I picked this up from earlier work from Boris Brezillon
+(https://lkml.org/lkml/2015/10/23/179). Changes since the initial
+posting from Boris:
+
+- Integrate Feedback from Ezequiel Garcia
+- When iterating over the chips calling onfi_set_features() for each
+  bail out when any of the calls fail, not only the last one.
+- When one of the onfi_set_features() calls fail then reset the chip
+  afterwards.
+- Drop Sunxi example, add patch for the mxc_nand controller instead.
+
+Sascha
