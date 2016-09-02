@@ -1,758 +1,109 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 2 Sep 2016 12:14:45 -0500
-Subject: [PATCH V2 2/2] ARM: dts: am57xx-beagle-x15: Add support for rev B1
-In-Reply-To: <20160902171445.27757-1-nm@ti.com>
-References: <20160902171445.27757-1-nm@ti.com>
-Message-ID: <20160902171445.27757-3-nm@ti.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 02 Sep 2016 19:50:35 +0200
+Subject: [PATCH 05/33] gpio: add generic single-register fixed-direction
+ GPIO driver
+In-Reply-To: <20160901230248.GA1041@n2100.armlinux.org.uk> (Russell King's
+ message of "Fri, 2 Sep 2016 00:02:48 +0100")
+References: <87eg57e54l.fsf@belgarion.home>
+ <20160830091805.GL1041@n2100.armlinux.org.uk>
+ <87k2eycip0.fsf@belgarion.home>
+ <20160830184612.GO1041@n2100.armlinux.org.uk>
+ <87fupmc59b.fsf@belgarion.home>
+ <20160831084938.GQ1041@n2100.armlinux.org.uk>
+ <20160831102721.GR1041@n2100.armlinux.org.uk>
+ <87twe0krym.fsf@belgarion.home>
+ <20160901092754.GU1041@n2100.armlinux.org.uk>
+ <87oa47l1tn.fsf@belgarion.home>
+ <20160901230248.GA1041@n2100.armlinux.org.uk>
+Message-ID: <87inuekx78.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Latest update to the BeagleBoard-X15 platform (revision B1)[1] updates
-for allowing UHS SD cards to function with the split of supply to SD
-card from a dedicated LDO.
+Russell King - ARM Linux <linux@armlinux.org.uk> writes:
 
-As a result of this, AM57xx BeagleBoard-X15 now uses gpio2_30 instead
-of gpio6_28 for HDMI because HDMI_LS_OE should now be switched from
-GPIO6_28(Y9) to GPIO2_30 (AG8) to avoid a 1.8V GPIO toggling a 3.3V
-SoC input when the SD card is in UHS 1.8V mode.
+>> You're right, I submitted a patch for that, and I confirm it actually happens on
+>> lubbock.
+>
+> That'll work fine for lubbock, but not the others (we can have several
+> of the others enabled on sa11x0 platforms - eg, badge4 with neponset.)
+Ah, I see. Let's drop the patch then, I won't be able to know what to return in
+this function if 2 initialisations fail, nor if the first failure should be
+fatal or not, nor if a rollback is possible after 1 success (badge4) and 1
+failure (neponset).
 
-NOTE: For UHS mode to function, we need full fledged IODelay support
-in kernel to be functional. IODelay support is yet to be added.
+> Ignore those for now - the old ARM IRQ stuff was silent on that, but genirq
+> is more noisy.  I should probably make the sa1111 irqchip handle the both-
+> edge case itself.
+Ok.
 
-Further, It does not make much sense to spin off a new board
-compatible flag since there is no real functional benefit for the
-same.
+>> Moreover, I have a bit of homework as I also see :
+>>  - no SA1111 interrupts at all, especially nothing when I insert/remove my
+>>    CompactFlash card
+>>    This might be an effect of pxa_cplds_irqs.c I created, I must have a look.
+>
+> Do you get other SA1111 interrupts (eg, the PS/2 interrupts) delivered?
+I see no other interrupts at all.
+Actually I see no interrupt claimed in /proc/interrupts, where I would have
+expected interrupt 305.
+	cat /proc/interrupts
+	           CPU0       
+	 24:       1419        SC   8 Edge      gpio-0
+	 25:          0        SC   9 Edge      gpio-1
+	 26:          0        SC  10 Edge      gpio-mux
+	 38:        118        SC  22 Edge      UART1
+	 41:          0        SC  25 Edge      DMA
+	 42:      40224        SC  26 Edge      ost0
+	112:       1419      GPIO   0 Edge      pxa_cplds_irqs
+	307:       1419  pxa_cplds   3 Edge      eth0
+	387:          0  SA1111-h Edge      SA1111 PCMCIA card detect
+	388:          0  SA1111-h Edge      SA1111 CF card detect
+	389:          0  SA1111-h Edge      SA1111 PCMCIA BVD1
+	390:          0  SA1111-h Edge      SA1111 CF BVD1
+	Err:          0
 
-Note: Even though production version is supposed to be B1, there is
-over ~200 boards of previous version (A2)[2] out there which continue
-to get supported with the existing dts file (to maintain compatibility
-with existing bootloaders for A2) and the production board is now
-supported as revb1.
+Actually this leads me to think that this interrupt 305 is not "requested" nor
+activated. I see in sa1111.c:506 :
+  "irq_set_chained_handler_and_data(sachip->irq, sa1111_irq_handler, ..."
+This puts in the handler and data, but I don't this is "enables" the interrupt,
+right ?
 
-[1] https://github.com/beagleboard/beagleboard-x15/blob/master/BEAGLEBOARD_X15_REV_B1.pdf
-[2] http://marc.info/?l=linux-arm-kernel&m=147273929820708&w=2
+I traced the code in the interrupt controller (pxa_cplds_irqs), the SA1111
+physical line is not set (even with an AT/2 keyboard connected, and I don't
+think anybody tried this AT/2 on a lubbock for a long time).
 
-Tested-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-Changes in v2:
-	- fixed up commit message to better illustrate why we are insisting on
-	  x15.dts to reflect A2 boards.
-	- Picked up Tomi's tested-by (no change in HDMI in this patch)
-	- Added comment to x15.dts for future reader without needing to dig
-	  through git log and figure out this commit..
-	- Fixed comment in x15-revb1 for LS OE gpio
-	- Fixed up vmmc-supply property for x15.dts
+The interrupt is for sure masked, and therefore the SA1111 interrupts are not
+fired. Even if they would have been enabled, the "pending interrupts register"
+doesn't show any sa1111 interrupt pending, so there is something else.
 
-and all the notes since v1 (note that the checkpatch.pl does not like long weblinks
-in commit message, I chose to ignore that warning rather than have broken links)
+As I don't know if "enable_irq()" in sa1111.c would be an option as I have no
+sight on sa1111.c requirements, I would take any advice here.
 
-v1: https://patchwork.kernel.org/patch/9310617/
+> Hmm, on Neponset with a CF card inserted, I can cat that, and it reports
+> the CIS.  Any error messages in the kernel log?
+None.
+I have an ever more suprising thing.
+I tried again this morning, without changing a single line of code (excepting in
+pxa_cplds_irqs.c) nor touching the CF card, and now it really rocks !!! :
+hexdump -C /sys/class/pcmcia_socket/pcmcia_socket1/cis
+hexdump -C /sys/class/pcmcia_socket/pcmcia_socket1/cis
+00000000  01 04 df 79 01 ff 1c 04  02 db 01 ff 18 02 df 01  |...y............|
+00000010  20 04 45 00 01 04 15 0b  04 01 00 43 46 43 41 52  | .E........CFCAR|
+00000020  44 00 ff 21 02 04 01 22  02 01 01 22 03 02 0c 0f  |D..!..."..."....|
+00000030  1a 05 01 03 00 02 0f 1b  08 c0 40 a1 01 55 08 00  |.......... at ..U..|
+00000040  20 1b 06 00 01 21 b5 1e  4d 1b 0a c1 41 99 01 55  | ....!..M...A..U|
+00000050  64 f0 ff ff 20 1b 06 01  01 21 b5 1e 4d 1b 0f c2  |d... ....!..M...|
+00000060  41 99 01 55 ea 61 f0 01  07 f6 03 01 ee 20 1b 06  |A..U.a....... ..|
+00000070  02 01 21 b5 1e 4d 1b 0f  c3 41 99 01 55 ea 61 70  |..!..M...A..U.ap|
+00000080  01 07 76 03 01 ee 20 1b  06 03 01 21 b5 1e 4d 14  |..v... ....!..M.|
+00000090  00                                                |.|
 
- arch/arm/boot/dts/Makefile                         |   1 +
- ...eagle-x15.dts => am57xx-beagle-x15-common.dtsi} |   8 +-
- arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts      |  24 +
- arch/arm/boot/dts/am57xx-beagle-x15.dts            | 592 +--------------------
- 4 files changed, 33 insertions(+), 592 deletions(-)
- copy arch/arm/boot/dts/{am57xx-beagle-x15.dts => am57xx-beagle-x15-common.dtsi} (97%)
- create mode 100644 arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts
+I think this proves that your patches related to lubbock pcmcia conversion to
+max1602 is fully functional !
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index faacd52370d2..b8d9840895c2 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -570,6 +570,7 @@ dtb-$(CONFIG_SOC_OMAP5) += \
- 	omap5-uevm.dtb
- dtb-$(CONFIG_SOC_DRA7XX) += \
- 	am57xx-beagle-x15.dtb \
-+	am57xx-beagle-x15-revb1.dtb \
- 	am57xx-cl-som-am57x.dtb \
- 	am57xx-sbc-am57x.dtb \
- 	am572x-idk.dtb \
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
-similarity index 97%
-copy from arch/arm/boot/dts/am57xx-beagle-x15.dts
-copy to arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
-index ef21da558ea3..ec85ff9004e8 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
-+ * Copyright (C) 2014-2016 Texas Instruments Incorporated - http://www.ti.com/
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -13,7 +13,6 @@
- #include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
--	model = "TI AM5728 BeagleBoard-X15";
- 	compatible = "ti,am572x-beagle-x15", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7";
- 
- 	aliases {
-@@ -114,10 +113,6 @@
- 	tpd12s015: encoder {
- 		compatible = "ti,tpd12s015";
- 
--		gpios = <&gpio7 10 GPIO_ACTIVE_HIGH>,	/* gpio7_10, CT CP HPD */
--			<&gpio6 28 GPIO_ACTIVE_HIGH>,	/* gpio6_28, LS OE */
--			<&gpio7 12 GPIO_ACTIVE_HIGH>;	/* gpio7_12/sp1_cs2, HPD */
--
- 		ports {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -448,7 +443,6 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc1_pins_default>;
- 
--	vmmc-supply = <&ldo1_reg>;
- 	bus-width = <4>;
- 	cd-gpios = <&gpio6 27 GPIO_ACTIVE_LOW>; /* gpio 219 */
- };
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts b/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts
-new file mode 100644
-index 000000000000..ca85570629fd
---- /dev/null
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts
-@@ -0,0 +1,24 @@
-+/*
-+ * Copyright (C) 2014-2016 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include "am57xx-beagle-x15-common.dtsi"
-+
-+/ {
-+	model = "TI AM5728 BeagleBoard-X15 rev B1";
-+};
-+
-+&tpd12s015 {
-+	gpios = <&gpio7 10 GPIO_ACTIVE_HIGH>,	/* gpio7_10, CT CP HPD */
-+		<&gpio2 30 GPIO_ACTIVE_HIGH>,	/* gpio2_30, LS OE */
-+		<&gpio7 12 GPIO_ACTIVE_HIGH>;	/* gpio7_12/sp1_cs2, HPD */
-+};
-+
-+&mmc1 {
-+	vmmc-supply = <&vdd_3v3>;
-+	vmmc-aux-supply = <&ldo1_reg>;
-+};
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-index ef21da558ea3..8c66f2efd283 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-@@ -1,602 +1,24 @@
- /*
-- * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
-+ * Copyright (C) 2014-2016 Texas Instruments Incorporated - http://www.ti.com/
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
--/dts-v1/;
- 
--#include "dra74x.dtsi"
--#include "am57xx-commercial-grade.dtsi"
--#include <dt-bindings/gpio/gpio.h>
--#include <dt-bindings/interrupt-controller/irq.h>
-+#include "am57xx-beagle-x15-common.dtsi"
- 
- / {
-+	/* NOTE: This describes the "original" pre-production A2 revision */
- 	model = "TI AM5728 BeagleBoard-X15";
--	compatible = "ti,am572x-beagle-x15", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7";
--
--	aliases {
--		rtc0 = &mcp_rtc;
--		rtc1 = &tps659038_rtc;
--		rtc2 = &rtc;
--		display0 = &hdmi0;
--	};
--
--	memory at 0 {
--		device_type = "memory";
--		reg = <0x0 0x80000000 0x0 0x80000000>;
--	};
--
--	vdd_3v3: fixedregulator-vdd_3v3 {
--		compatible = "regulator-fixed";
--		regulator-name = "vdd_3v3";
--		vin-supply = <&regen1>;
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--	};
--
--	aic_dvdd: fixedregulator-aic_dvdd {
--		compatible = "regulator-fixed";
--		regulator-name = "aic_dvdd_fixed";
--		vin-supply = <&vdd_3v3>;
--		regulator-min-microvolt = <1800000>;
--		regulator-max-microvolt = <1800000>;
--	};
--
--	vtt_fixed: fixedregulator-vtt {
--		/* TPS51200 */
--		compatible = "regulator-fixed";
--		regulator-name = "vtt_fixed";
--		vin-supply = <&smps3_reg>;
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--		regulator-always-on;
--		regulator-boot-on;
--		enable-active-high;
--		gpio = <&gpio7 11 GPIO_ACTIVE_HIGH>;
--	};
--
--	leds {
--		compatible = "gpio-leds";
--
--		led0 {
--			label = "beagle-x15:usr0";
--			gpios = <&gpio7 9 GPIO_ACTIVE_HIGH>;
--			linux,default-trigger = "heartbeat";
--			default-state = "off";
--		};
--
--		led1 {
--			label = "beagle-x15:usr1";
--			gpios = <&gpio7 8 GPIO_ACTIVE_HIGH>;
--			linux,default-trigger = "cpu0";
--			default-state = "off";
--		};
--
--		led2 {
--			label = "beagle-x15:usr2";
--			gpios = <&gpio7 14 GPIO_ACTIVE_HIGH>;
--			linux,default-trigger = "mmc0";
--			default-state = "off";
--		};
--
--		led3 {
--			label = "beagle-x15:usr3";
--			gpios = <&gpio7 15 GPIO_ACTIVE_HIGH>;
--			linux,default-trigger = "disk-activity";
--			default-state = "off";
--		};
--	};
--
--	gpio_fan: gpio_fan {
--		/* Based on 5v 500mA AFB02505HHB */
--		compatible = "gpio-fan";
--		gpios =  <&tps659038_gpio 2 GPIO_ACTIVE_HIGH>;
--		gpio-fan,speed-map = <0     0>,
--				     <13000 1>;
--		#cooling-cells = <2>;
--	};
--
--	hdmi0: connector {
--		compatible = "hdmi-connector";
--		label = "hdmi";
--
--		type = "a";
--
--		port {
--			hdmi_connector_in: endpoint {
--				remote-endpoint = <&tpd12s015_out>;
--			};
--		};
--	};
--
--	tpd12s015: encoder {
--		compatible = "ti,tpd12s015";
--
--		gpios = <&gpio7 10 GPIO_ACTIVE_HIGH>,	/* gpio7_10, CT CP HPD */
--			<&gpio6 28 GPIO_ACTIVE_HIGH>,	/* gpio6_28, LS OE */
--			<&gpio7 12 GPIO_ACTIVE_HIGH>;	/* gpio7_12/sp1_cs2, HPD */
--
--		ports {
--			#address-cells = <1>;
--			#size-cells = <0>;
--
--			port at 0 {
--				reg = <0>;
--
--				tpd12s015_in: endpoint {
--					remote-endpoint = <&hdmi_out>;
--				};
--			};
--
--			port at 1 {
--				reg = <1>;
--
--				tpd12s015_out: endpoint {
--					remote-endpoint = <&hdmi_connector_in>;
--				};
--			};
--		};
--	};
--
--	sound0: sound0 {
--		compatible = "simple-audio-card";
--		simple-audio-card,name = "BeagleBoard-X15";
--		simple-audio-card,widgets =
--			"Line", "Line Out",
--			"Line", "Line In";
--		simple-audio-card,routing =
--			"Line Out",	"LLOUT",
--			"Line Out",	"RLOUT",
--			"MIC2L",	"Line In",
--			"MIC2R",	"Line In";
--		simple-audio-card,format = "dsp_b";
--		simple-audio-card,bitclock-master = <&sound0_master>;
--		simple-audio-card,frame-master = <&sound0_master>;
--		simple-audio-card,bitclock-inversion;
--
--		simple-audio-card,cpu {
--			sound-dai = <&mcasp3>;
--		};
--
--		sound0_master: simple-audio-card,codec {
--			sound-dai = <&tlv320aic3104>;
--			clocks = <&clkout2_clk>;
--		};
--	};
--};
--
--&dra7_pmx_core {
--	mmc1_pins_default: mmc1_pins_default {
--		pinctrl-single,pins = <
--			DRA7XX_CORE_IOPAD(0x376c, PIN_INPUT | MUX_MODE14)	/* mmc1sdcd.gpio219 */
--			DRA7XX_CORE_IOPAD(0x3754, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_clk.clk */
--			DRA7XX_CORE_IOPAD(0x3758, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_cmd.cmd */
--			DRA7XX_CORE_IOPAD(0x375c, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat0.dat0 */
--			DRA7XX_CORE_IOPAD(0x3760, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat1.dat1 */
--			DRA7XX_CORE_IOPAD(0x3764, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat2.dat2 */
--			DRA7XX_CORE_IOPAD(0x3768, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat3.dat3 */
--		>;
--	};
--
--	mmc2_pins_default: mmc2_pins_default {
--		pinctrl-single,pins = <
--			DRA7XX_CORE_IOPAD(0x349c, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a23.mmc2_clk */
--			DRA7XX_CORE_IOPAD(0x34b0, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_cs1.mmc2_cmd */
--			DRA7XX_CORE_IOPAD(0x34a0, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a24.mmc2_dat0 */
--			DRA7XX_CORE_IOPAD(0x34a4, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a25.mmc2_dat1 */
--			DRA7XX_CORE_IOPAD(0x34a8, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a26.mmc2_dat2 */
--			DRA7XX_CORE_IOPAD(0x34ac, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a27.mmc2_dat3 */
--			DRA7XX_CORE_IOPAD(0x348c, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a19.mmc2_dat4 */
--			DRA7XX_CORE_IOPAD(0x3490, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a20.mmc2_dat5 */
--			DRA7XX_CORE_IOPAD(0x3494, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a21.mmc2_dat6 */
--			DRA7XX_CORE_IOPAD(0x3498, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a22.mmc2_dat7 */
--		>;
--	};
--};
--&i2c1 {
--	status = "okay";
--	clock-frequency = <400000>;
--
--	tps659038: tps659038 at 58 {
--		compatible = "ti,tps659038";
--		reg = <0x58>;
--		interrupt-parent = <&gpio1>;
--		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
--
--		#interrupt-cells = <2>;
--		interrupt-controller;
--
--		ti,system-power-controller;
--
--		tps659038_pmic {
--			compatible = "ti,tps659038-pmic";
--
--			regulators {
--				smps12_reg: smps12 {
--					/* VDD_MPU */
--					regulator-name = "smps12";
--					regulator-min-microvolt = < 850000>;
--					regulator-max-microvolt = <1250000>;
--					regulator-always-on;
--					regulator-boot-on;
--				};
--
--				smps3_reg: smps3 {
--					/* VDD_DDR */
--					regulator-name = "smps3";
--					regulator-min-microvolt = <1350000>;
--					regulator-max-microvolt = <1350000>;
--					regulator-always-on;
--					regulator-boot-on;
--				};
--
--				smps45_reg: smps45 {
--					/* VDD_DSPEVE, VDD_IVA, VDD_GPU */
--					regulator-name = "smps45";
--					regulator-min-microvolt = < 850000>;
--					regulator-max-microvolt = <1250000>;
--					regulator-always-on;
--					regulator-boot-on;
--				};
--
--				smps6_reg: smps6 {
--					/* VDD_CORE */
--					regulator-name = "smps6";
--					regulator-min-microvolt = <850000>;
--					regulator-max-microvolt = <1150000>;
--					regulator-always-on;
--					regulator-boot-on;
--				};
--
--				/* SMPS7 unused */
--
--				smps8_reg: smps8 {
--					/* VDD_1V8 */
--					regulator-name = "smps8";
--					regulator-min-microvolt = <1800000>;
--					regulator-max-microvolt = <1800000>;
--					regulator-always-on;
--					regulator-boot-on;
--				};
--
--				/* SMPS9 unused */
--
--				ldo1_reg: ldo1 {
--					/* VDD_SD / VDDSHV8  */
--					regulator-name = "ldo1";
--					regulator-min-microvolt = <1800000>;
--					regulator-max-microvolt = <3300000>;
--					regulator-boot-on;
--					regulator-always-on;
--				};
--
--				ldo2_reg: ldo2 {
--					/* VDD_SHV5 */
--					regulator-name = "ldo2";
--					regulator-min-microvolt = <3300000>;
--					regulator-max-microvolt = <3300000>;
--					regulator-always-on;
--					regulator-boot-on;
--				};
--
--				ldo3_reg: ldo3 {
--					/* VDDA_1V8_PHYA */
--					regulator-name = "ldo3";
--					regulator-min-microvolt = <1800000>;
--					regulator-max-microvolt = <1800000>;
--					regulator-always-on;
--					regulator-boot-on;
--				};
--
--				ldo4_reg: ldo4 {
--					/* VDDA_1V8_PHYB */
--					regulator-name = "ldo4";
--					regulator-min-microvolt = <1800000>;
--					regulator-max-microvolt = <1800000>;
--					regulator-always-on;
--					regulator-boot-on;
--				};
--
--				ldo9_reg: ldo9 {
--					/* VDD_RTC */
--					regulator-name = "ldo9";
--					regulator-min-microvolt = <1050000>;
--					regulator-max-microvolt = <1050000>;
--					regulator-always-on;
--					regulator-boot-on;
--				};
--
--				ldoln_reg: ldoln {
--					/* VDDA_1V8_PLL */
--					regulator-name = "ldoln";
--					regulator-min-microvolt = <1800000>;
--					regulator-max-microvolt = <1800000>;
--					regulator-always-on;
--					regulator-boot-on;
--				};
--
--				ldousb_reg: ldousb {
--					/* VDDA_3V_USB: VDDA_USBHS33 */
--					regulator-name = "ldousb";
--					regulator-min-microvolt = <3300000>;
--					regulator-max-microvolt = <3300000>;
--					regulator-boot-on;
--				};
--
--				regen1: regen1 {
--					/* VDD_3V3_ON */
--					regulator-name = "regen1";
--					regulator-boot-on;
--					regulator-always-on;
--				};
--			};
--		};
--
--		tps659038_rtc: tps659038_rtc {
--			compatible = "ti,palmas-rtc";
--			interrupt-parent = <&tps659038>;
--			interrupts = <8 IRQ_TYPE_EDGE_FALLING>;
--			wakeup-source;
--		};
--
--		tps659038_pwr_button: tps659038_pwr_button {
--			compatible = "ti,palmas-pwrbutton";
--			interrupt-parent = <&tps659038>;
--			interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
--			wakeup-source;
--			ti,palmas-long-press-seconds = <12>;
--		};
--
--		tps659038_gpio: tps659038_gpio {
--			compatible = "ti,palmas-gpio";
--			gpio-controller;
--			#gpio-cells = <2>;
--		};
--
--		extcon_usb2: tps659038_usb {
--			compatible = "ti,palmas-usb-vid";
--			ti,enable-vbus-detection;
--			vbus-gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
--		};
--
--	};
--
--	tmp102: tmp102 at 48 {
--		compatible = "ti,tmp102";
--		reg = <0x48>;
--		interrupt-parent = <&gpio7>;
--		interrupts = <16 IRQ_TYPE_LEVEL_LOW>;
--		#thermal-sensor-cells = <1>;
--	};
--
--	tlv320aic3104: tlv320aic3104 at 18 {
--		#sound-dai-cells = <0>;
--		compatible = "ti,tlv320aic3104";
--		reg = <0x18>;
--		assigned-clocks = <&clkoutmux2_clk_mux>;
--		assigned-clock-parents = <&sys_clk2_dclk_div>;
--
--		status = "okay";
--		adc-settle-ms = <40>;
--
--		AVDD-supply = <&vdd_3v3>;
--		IOVDD-supply = <&vdd_3v3>;
--		DRVDD-supply = <&vdd_3v3>;
--		DVDD-supply = <&aic_dvdd>;
--	};
--
--	eeprom: eeprom at 50 {
--		compatible = "at,24c32";
--		reg = <0x50>;
--	};
- };
- 
--&i2c3 {
--	status = "okay";
--	clock-frequency = <400000>;
--
--	mcp_rtc: rtc at 6f {
--		compatible = "microchip,mcp7941x";
--		reg = <0x6f>;
--		interrupts-extended = <&crossbar_mpu GIC_SPI 2 IRQ_TYPE_EDGE_RISING>,
--				      <&dra7_pmx_core 0x424>;
--		interrupt-names = "irq", "wakeup";
--
--		vcc-supply = <&vdd_3v3>;
--		wakeup-source;
--	};
--};
--
--&gpio7 {
--	ti,no-reset-on-init;
--	ti,no-idle-on-init;
--};
--
--&cpu0 {
--	cpu0-supply = <&smps12_reg>;
--	voltage-tolerance = <1>;
--};
--
--&uart3 {
--	status = "okay";
--	interrupts-extended = <&crossbar_mpu GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
--			      <&dra7_pmx_core 0x3f8>;
--};
--
--&mac {
--	status = "okay";
--	dual_emac;
--};
--
--&cpsw_emac0 {
--	phy_id = <&davinci_mdio>, <1>;
--	phy-mode = "rgmii";
--	dual_emac_res_vlan = <1>;
--};
--
--&cpsw_emac1 {
--	phy_id = <&davinci_mdio>, <2>;
--	phy-mode = "rgmii";
--	dual_emac_res_vlan = <2>;
-+&tpd12s015 {
-+	gpios = <&gpio7 10 GPIO_ACTIVE_HIGH>,	/* gpio7_10, CT CP HPD */
-+		<&gpio6 28 GPIO_ACTIVE_HIGH>,	/* gpio6_28, LS OE */
-+		<&gpio7 12 GPIO_ACTIVE_HIGH>;	/* gpio7_12/sp1_cs2, HPD */
- };
- 
- &mmc1 {
--	status = "okay";
--
--	pinctrl-names = "default";
--	pinctrl-0 = <&mmc1_pins_default>;
--
- 	vmmc-supply = <&ldo1_reg>;
--	bus-width = <4>;
--	cd-gpios = <&gpio6 27 GPIO_ACTIVE_LOW>; /* gpio 219 */
--};
--
--&mmc2 {
--	status = "okay";
--
--	pinctrl-names = "default";
--	pinctrl-0 = <&mmc1_pins_default>;
--
--	vmmc-supply = <&vdd_3v3>;
--	bus-width = <8>;
--	ti,non-removable;
--	cap-mmc-dual-data-rate;
--};
--
--&sata {
--	status = "okay";
--};
--
--&usb2_phy1 {
--	phy-supply = <&ldousb_reg>;
--};
--
--&usb2_phy2 {
--	phy-supply = <&ldousb_reg>;
--};
--
--&usb1 {
--	dr_mode = "host";
--};
--
--&omap_dwc3_2 {
--	extcon = <&extcon_usb2>;
--};
--
--&usb2 {
--	/*
--	 * Stand alone usage is peripheral only.
--	 * However, with some resistor modifications
--	 * this port can be used via expansion connectors
--	 * as "host" or "dual-role". If so, provide
--	 * the necessary dr_mode override in the expansion
--	 * board's DT.
--	 */
--	dr_mode = "peripheral";
--};
--
--&cpu_trips {
--	cpu_alert1: cpu_alert1 {
--		temperature = <50000>; /* millicelsius */
--		hysteresis = <2000>; /* millicelsius */
--		type = "active";
--	};
--};
--
--&cpu_cooling_maps {
--	map1 {
--		trip = <&cpu_alert1>;
--		cooling-device = <&gpio_fan THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
--	};
--};
--
--&thermal_zones {
--	board_thermal: board_thermal {
--		polling-delay-passive = <1250>; /* milliseconds */
--		polling-delay = <1500>; /* milliseconds */
--
--				/* sensor       ID */
--		thermal-sensors = <&tmp102     0>;
--
--		board_trips: trips {
--			board_alert0: board_alert {
--				temperature = <40000>; /* millicelsius */
--				hysteresis = <2000>; /* millicelsius */
--				type = "active";
--			};
--
--			board_crit: board_crit {
--				temperature = <105000>; /* millicelsius */
--				hysteresis = <0>; /* millicelsius */
--				type = "critical";
--			};
--		};
--
--		board_cooling_maps: cooling-maps {
--			map0 {
--				trip = <&board_alert0>;
--				cooling-device =
--				  <&gpio_fan THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
--			};
--		};
--       };
--};
--
--&dss {
--	status = "ok";
--
--	vdda_video-supply = <&ldoln_reg>;
--};
--
--&hdmi {
--	status = "ok";
--	vdda-supply = <&ldo4_reg>;
--
--	port {
--		hdmi_out: endpoint {
--			remote-endpoint = <&tpd12s015_in>;
--		};
--	};
--};
--
--&pcie1 {
--	gpios = <&gpio2 8 GPIO_ACTIVE_LOW>;
--};
--
--&mcasp3 {
--	#sound-dai-cells = <0>;
--	assigned-clocks = <&mcasp3_ahclkx_mux>;
--	assigned-clock-parents = <&sys_clkin2>;
--	status = "okay";
--
--	op-mode = <0>;	/* MCASP_IIS_MODE */
--	tdm-slots = <2>;
--	/* 4 serializers */
--	serial-dir = <	/* 0: INACTIVE, 1: TX, 2: RX */
--		1 2 0 0
--	>;
--	tx-num-evt = <32>;
--	rx-num-evt = <32>;
--};
--
--&mailbox5 {
--	status = "okay";
--	mbox_ipu1_ipc3x: mbox_ipu1_ipc3x {
--		status = "okay";
--	};
--	mbox_dsp1_ipc3x: mbox_dsp1_ipc3x {
--		status = "okay";
--	};
--};
--
--&mailbox6 {
--	status = "okay";
--	mbox_ipu2_ipc3x: mbox_ipu2_ipc3x {
--		status = "okay";
--	};
--	mbox_dsp2_ipc3x: mbox_dsp2_ipc3x {
--		status = "okay";
--	};
- };
+Only the interrupt part to fight a bit, and then I'll try to make a couple of
+tests on the IRDA part.
+
+Cheers.
+
 -- 
-2.9.1.200.gb1ec08f
+Robert
