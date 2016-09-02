@@ -1,62 +1,72 @@
 From: hl@rock-chips.com (Lin Huang)
-Date: Sat,  3 Sep 2016 05:08:40 +0800
-Subject: [PATCH v9 0/5] rk3399 support ddr frequency scaling
-Message-ID: <1472850525-25273-1-git-send-email-hl@rock-chips.com>
+Date: Sat,  3 Sep 2016 05:08:41 +0800
+Subject: [PATCH v9 1/5] Documentation: bindings: add dt documentation for dfi
+ controller
+In-Reply-To: <1472850525-25273-1-git-send-email-hl@rock-chips.com>
+References: <1472850525-25273-1-git-send-email-hl@rock-chips.com>
+Message-ID: <1472850525-25273-2-git-send-email-hl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rk3399 platform have dfi controller can monitor ddr load,
-and dcf controller to handle ddr register so we can get the
-right ddr frequency and make ddr controller happy work(which
-will implement in bl31). So we do ddr frequency scaling with
-following flow:
+This patch adds the documentation for rockchip dfi devfreq-event driver.
 
-             kernel                                bl31
+Signed-off-by: Lin Huang <hl@rock-chips.com>
+---
+Changes in v9:
+- reorder compatible and reg
 
-        monitor ddr load
-                |
-                |
-        get_target_rate
-                |
-                |           pass rate to bl31
-        clk_set_rate(ddr) --------------------->run dcf flow
-                |                                   |
-                |                                   |
-        wait dcf interrupt<-------------------trigger dcf interrupt
-                |
-                |
-              return
+Changes in v8:
+- delete a unuse blank line
 
+Changes in v7:
+- None
 
-Lin Huang (5):
-  Documentation: bindings: add dt documentation for dfi controller
-  PM / devfreq: event: support rockchip dfi controller
-  Documentation: bindings: add dt documentation for rk3399 dmc
-  PM / devfreq: rockchip: add devfreq driver for rk3399 dmc
-  drm/rockchip: Add dmc notifier in vop driver
+Changes in v6:
+- None
 
-Following patch:
-clk: rockchip: add new clock-type for the ddrclk
-clk: rockchip: rk3399: add SCLK_DDRCLK ID for ddrc
-clk: rockchip: rk3399: add ddrc clock support
-have applied to:
-http://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git/v4.9-clk/next
+Changes in v5:
+- None
 
+Changes in v4:
+- None
 
- .../bindings/devfreq/event/rockchip-dfi.txt        |  19 +
- .../devicetree/bindings/devfreq/rk3399_dmc.txt     | 202 +++++++++
- drivers/devfreq/Kconfig                            |  11 +
- drivers/devfreq/Makefile                           |   1 +
- drivers/devfreq/event/Kconfig                      |   7 +
- drivers/devfreq/event/Makefile                     |   1 +
- drivers/devfreq/event/rockchip-dfi.c               | 256 +++++++++++
- drivers/devfreq/rk3399_dmc.c                       | 480 +++++++++++++++++++++
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c        | 116 +++++
- 9 files changed, 1093 insertions(+)
+Changes in v3:
+- None
+
+Changes in v2:
+- None 
+
+Changes in v1:
+- None
+
+ .../bindings/devfreq/event/rockchip-dfi.txt           | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/devfreq/event/rockchip-dfi.txt
- create mode 100644 Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
- create mode 100644 drivers/devfreq/event/rockchip-dfi.c
- create mode 100644 drivers/devfreq/rk3399_dmc.c
 
+diff --git a/Documentation/devicetree/bindings/devfreq/event/rockchip-dfi.txt b/Documentation/devicetree/bindings/devfreq/event/rockchip-dfi.txt
+new file mode 100644
+index 0000000..f223313
+--- /dev/null
++++ b/Documentation/devicetree/bindings/devfreq/event/rockchip-dfi.txt
+@@ -0,0 +1,19 @@
++
++* Rockchip rk3399 DFI device
++
++Required properties:
++- compatible: Must be "rockchip,rk3399-dfi".
++- reg: physical base address of each DFI and length of memory mapped region
++- rockchip,pmu: phandle to the syscon managing the "pmu general register files"
++- clocks: phandles for clock specified in "clock-names" property
++- clock-names : the name of clock used by the DFI, must be "pclk_ddr_mon";
++
++Example:
++	dfi: dfi at 0xff630000 {
++		compatible = "rockchip,rk3399-dfi";
++		reg = <0x00 0xff630000 0x00 0x4000>;
++		rockchip,pmu = <&pmugrf>;
++		clocks = <&cru PCLK_DDR_MON>;
++		clock-names = "pclk_ddr_mon";
++		status = "disabled";
++	};
 -- 
 2.6.6
