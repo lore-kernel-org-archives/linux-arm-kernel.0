@@ -1,24 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 Sep 2016 16:01:07 +0200
-Subject: [PATCH 0/5] CCN fixes for 4.8
-In-Reply-To: <1471019156-5485-1-git-send-email-pawel.moll@arm.com>
-References: <1471019156-5485-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <4562884.ulVluvhm7B@wuerfel>
+Date: Fri, 02 Sep 2016 16:02:57 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.8 (#2)
+In-Reply-To: <87d1kviymi.fsf@free-electrons.com>
+References: <87d1kviymi.fsf@free-electrons.com>
+Message-ID: <4341512.jnFV14A7U4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, August 12, 2016 5:25:51 PM CEST Pawel Moll wrote:
-> Greetings, Arnd, Olof, Kevin,
+On Friday, August 26, 2016 1:00:05 PM CEST Gregory CLEMENT wrote:
+> mvebu fixes for 4.8 (part 1)
 > 
-> This is a small set of various CCN driver fixes I accumulated over the
-> last few weeks.
-> 
-> I'll send a pull request later, probably next week, that will also
-> include Mark's patches he sent out yesterday.
+> Few device tree fix on kirkwood:
+> - enable PCIe on OpenRD
+> - use correct u-boot environment partition size on ib62x0
 > 
 
-This seems to have gotten lost, I picked it up into the fixes branch now.
-
-Sorry for the delay.
+Pulled into next/fixes now, thanks!
 
 	Arnd
