@@ -1,46 +1,75 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Fri, 2 Sep 2016 06:52:26 +0000
-Subject: [PATCH v5] Axi-usb: Add support for 64-bit addressing.
-In-Reply-To: <20160902063917.GB14178@kroah.com>
-References: <1472719976-25410-1-git-send-email-navam@xilinx.com>
- <20160901175636.GV16583@xsjsorenbubuntu>
- <C89496FEAE474D468F30D558A9468D9F26D143CB@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20160902063917.GB14178@kroah.com>
-Message-ID: <C89496FEAE474D468F30D558A9468D9F26D143F8@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 2 Sep 2016 15:01:08 +0800
+Subject: [PATCH 4/7] drm/panel: Add Sinlinx SinA33 7" panel
+In-Reply-To: <20160901153204.11217-5-maxime.ripard@free-electrons.com>
+References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
+ <20160901153204.11217-5-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v66i3=qtOYJxFiJ7mLi4-ETRwhWn_-M=3ZwwAJ9JPnaKzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Sep 1, 2016 at 11:32 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The SinA33 has an unidentified panel. Add the timings for it under a new
+> compatible.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/gpu/drm/panel/panel-simple.c | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+> index 85143d1b9b31..af142e804245 100644
+> --- a/drivers/gpu/drm/panel/panel-simple.c
+> +++ b/drivers/gpu/drm/panel/panel-simple.c
+> @@ -1409,6 +1409,29 @@ static const struct panel_desc shelly_sca07010_bfn_lnn = {
+>         .bus_format = MEDIA_BUS_FMT_RGB666_1X18,
+>  };
+>
+> +static const struct drm_display_mode sinlinx_sina33_lcd_7_mode = {
 
+Nit on the name: the lcd panel also works with sina31s. The only
+difference is the ribbon cable used to connect it to the board.
+Maybe sinlinx_sinaxx_lcd_7? Just a suggestion though, the patch
+looks fine.
 
-> -----Original Message-----
-> From: gregkh at linuxfoundation.org [mailto:gregkh at linuxfoundation.org]
-> Sent: Friday, September 02, 2016 12:09 PM
-> To: Nava kishore Manne <navam@xilinx.com>
-> Cc: Soren Brinkmann <sorenb@xilinx.com>; robh+dt at kernel.org;
-> pawel.moll at arm.com; mark.rutland at arm.com;
-> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; balbi at kernel.org;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; linux-usb at vger.kernel.org
-> Subject: Re: [PATCH v5] Axi-usb: Add support for 64-bit addressing.
-> 
-> On Fri, Sep 02, 2016 at 06:02:14AM +0000, Nava kishore Manne wrote:
-> > This email and any attachments are intended for the sole use of the named
-> recipient(s) and contain(s) confidential information that may be proprietary,
-> privileged or copyrighted under applicable law. If you are not the intended
-> recipient, do not read, copy, or forward this email message or any
-> attachments. Delete this email message and any attachments immediately.
-> >
-> 
-> Now deleted.
-> 
-> I have told you this before, this type of footer guarantees that your patches,
-> or emails, will not get reviewed.  It is the exact opposite of working in public
-> together.
-> 
-> Please have your company fix this.
+ChenYu
 
-Sorry something fishy happened with my email-client
-I forgot to keep no-footer option in my email-client. Next time onwards will take care before giving replies...
-
-Regards,
-Navakishore.
+> +       .clock = 66000,
+> +       .hdisplay = 1024,
+> +       .hsync_start = 1024 + 160,
+> +       .hsync_end = 1024 + 160 + 70,
+> +       .htotal = 1024 + 160 + 70 + 90,
+> +       .vdisplay = 600,
+> +       .vsync_start = 600 + 127,
+> +       .vsync_end = 600 + 127 + 20,
+> +       .vtotal = 600 + 127 + 20 + 3,
+> +       .vrefresh = 60,
+> +};
+> +
+> +static const struct panel_desc sinlinx_sina33_lcd_7 = {
+> +       .modes = &sinlinx_sina33_lcd_7_mode,
+> +       .num_modes = 1,
+> +       .size = {
+> +               .width = 154,
+> +               .height = 87,
+> +       },
+> +       .bus_format = MEDIA_BUS_FMT_RGB666_1X18,
+> +};
+> +
+>  static const struct drm_display_mode starry_kr122ea0sra_mode = {
+>         .clock = 147000,
+>         .hdisplay = 1920,
+> @@ -1644,6 +1667,9 @@ static const struct of_device_id platform_of_match[] = {
+>                 .compatible = "shelly,sca07010-bfn-lnn",
+>                 .data = &shelly_sca07010_bfn_lnn,
+>         }, {
+> +               .compatible = "sinlinx,sina33-lcd-7",
+> +               .data = &sinlinx_sina33_lcd_7,
+> +       }, {
+>                 .compatible = "starry,kr122ea0sra",
+>                 .data = &starry_kr122ea0sra,
+>         }, {
+> --
+> 2.9.2
+>
