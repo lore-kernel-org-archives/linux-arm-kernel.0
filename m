@@ -1,39 +1,80 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Sat,  3 Sep 2016 04:39:06 +0800
-Subject: [PATCH] arm64: dts: rockchip: add the tcpc for rk3399 power domain
-Message-ID: <1472848746-30135-1-git-send-email-wxt@rock-chips.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 02 Sep 2016 13:54:56 -0700
+Subject: [PATCH v4] thermal: tango: add resume support
+In-Reply-To: <57C97BDD.4030101@sigmadesigns.com> (Marc Gonzalez's message of
+ "Fri, 2 Sep 2016 15:17:17 +0200")
+References: <57726196.5060909@free.fr> <57C97BDD.4030101@sigmadesigns.com>
+Message-ID: <7hpoom10pr.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tcpc is the Type C Port Controller and Type C Port Delivery (tcpd)
-is part of it, we haven't used them now, add it to save power consumption.
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
----
+> When this platform is suspended, firmware powers the entire SoC down,
+> except a few hardware blocks waiting for wakeup events. There is no
+> context to save for this particular block.
+>
+> Therefore, there is nothing useful for the driver to do on suspend;
+> so we define a NULL suspend hook. On resume, the driver initializes
+> the block exactly as is done in the probe callback.
+>
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Reviewed-by: Kevin Hilman <khilman@baylibre.com>
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 267b812..6c89d77 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -814,6 +814,16 @@
- 					pm_qos = <&qos_isp1_m0>,
- 						 <&qos_isp1_m1>;
- 				};
-+				pd_tcpc0 at RK3399_PD_TCPC0 {
-+					reg = <RK3399_PD_TCPD0>;
-+					clocks = <&cru SCLK_UPHY0_TCPDCORE>,
-+						 <&cru SCLK_UPHY0_TCPDPHY_REF>;
-+				};
-+				pd_tcpc1 at RK3399_PD_TCPC1 {
-+					reg = <RK3399_PD_TCPD1>;
-+					clocks = <&cru SCLK_UPHY1_TCPDCORE>,
-+						 <&cru SCLK_UPHY1_TCPDPHY_REF>;
-+				};
- 				pd_vo at RK3399_PD_VO {
- 					reg = <RK3399_PD_VO>;
- 					#address-cells = <1>;
--- 
-1.9.1
+> ---
+> Earlier versions of this patch were reviewed by Kevin and Thierry.
+> The current form is preferred by Arnd.
+> ---
+>  drivers/thermal/tango_thermal.c | 19 +++++++++++++++++--
+>  1 file changed, 17 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/thermal/tango_thermal.c b/drivers/thermal/tango_thermal.c
+> index 70e0d9f406e9..201304aeafeb 100644
+> --- a/drivers/thermal/tango_thermal.c
+> +++ b/drivers/thermal/tango_thermal.c
+> @@ -64,6 +64,12 @@ static const struct thermal_zone_of_device_ops ops = {
+>  	.get_temp	= tango_get_temp,
+>  };
+>  
+> +static void tango_thermal_init(struct tango_thermal_priv *priv)
+> +{
+> +	writel(0, priv->base + TEMPSI_CFG);
+> +	writel(CMD_ON, priv->base + TEMPSI_CMD);
+> +}
+> +
+>  static int tango_thermal_probe(struct platform_device *pdev)
+>  {
+>  	struct resource *res;
+> @@ -79,14 +85,22 @@ static int tango_thermal_probe(struct platform_device *pdev)
+>  	if (IS_ERR(priv->base))
+>  		return PTR_ERR(priv->base);
+>  
+> +	platform_set_drvdata(pdev, priv);
+>  	priv->thresh_idx = IDX_MIN;
+> -	writel(0, priv->base + TEMPSI_CFG);
+> -	writel(CMD_ON, priv->base + TEMPSI_CMD);
+> +	tango_thermal_init(priv);
+>  
+>  	tzdev = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, priv, &ops);
+>  	return PTR_ERR_OR_ZERO(tzdev);
+>  }
+>  
+> +static int __maybe_unused tango_thermal_resume(struct device *dev)
+> +{
+> +	tango_thermal_init(dev_get_drvdata(dev));
+> +	return 0;
+> +}
+> +
+> +static SIMPLE_DEV_PM_OPS(tango_thermal_pm, NULL, tango_thermal_resume);
+> +
+>  static const struct of_device_id tango_sensor_ids[] = {
+>  	{
+>  		.compatible = "sigma,smp8758-thermal",
+> @@ -99,6 +113,7 @@ static struct platform_driver tango_thermal_driver = {
+>  	.driver	= {
+>  		.name		= "tango-thermal",
+>  		.of_match_table	= tango_sensor_ids,
+> +		.pm		= &tango_thermal_pm,
+>  	},
+>  };
