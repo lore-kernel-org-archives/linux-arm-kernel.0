@@ -1,124 +1,91 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Fri, 2 Sep 2016 12:49:52 +0200
-Subject: [PATCH v11 3/4] tee: add OP-TEE driver
-In-Reply-To: <0f9a528e-5288-ad4b-256e-f7a0b5952c3c@ti.com>
-References: <1471870856-18684-1-git-send-email-jens.wiklander@linaro.org>
- <1471870856-18684-4-git-send-email-jens.wiklander@linaro.org>
- <050a2ce4-e175-d09e-ddff-3b0cbe766d88@ti.com>
- <20160831135015.GB25472@ermac>
- <fe88749e-82c7-c310-b2bc-4e73bf76302b@ti.com>
- <20160901092213.GA3968@ermac>
- <0f9a528e-5288-ad4b-256e-f7a0b5952c3c@ti.com>
-Message-ID: <20160902104950.GA24088@ermac>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 02 Sep 2016 11:50:15 +0100
+Subject: [PATCH V2] arm64:ftrace: add save_stack_trace_regs()
+In-Reply-To: <4f7d7a6bff7f06f814bf9a2bdc90bb0e3b833b66.1472734699.git.panand@redhat.com>
+References: <4f7d7a6bff7f06f814bf9a2bdc90bb0e3b833b66.1472734699.git.panand@redhat.com>
+Message-ID: <57C95967.9030308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2016 at 01:06:04PM -0500, Andrew F. Davis wrote:
-> On 09/01/2016 04:22 AM, Jens Wiklander wrote:
-> > On Wed, Aug 31, 2016 at 11:40:20AM -0500, Andrew F. Davis wrote:
-> >> On 08/31/2016 08:50 AM, Jens Wiklander wrote:
-> >>> On Tue, Aug 30, 2016 at 03:23:24PM -0500, Andrew F. Davis wrote:
-> >>>> On 08/22/2016 08:00 AM, Jens Wiklander wrote:
-> >>>>> +static struct tee_shm_pool *
-> >>>>> +optee_config_shm_ioremap(struct device *dev, optee_invoke_fn *invoke_fn,
-> >>>>> +			 void __iomem **ioremaped_shm)
-> >>>>> +{
-> >>>>> +	struct arm_smccc_res res;
-> >>>>> +	struct tee_shm_pool *pool;
-> >>>>> +	unsigned long vaddr;
-> >>>>> +	phys_addr_t paddr;
-> >>>>> +	size_t size;
-> >>>>> +	phys_addr_t begin;
-> >>>>> +	phys_addr_t end;
-> >>>>> +	void __iomem *va;
-> >>>>> +	struct tee_shm_pool_mem_info priv_info;
-> >>>>> +	struct tee_shm_pool_mem_info dmabuf_info;
-> >>>>> +
-> >>>>> +	invoke_fn(OPTEE_SMC_GET_SHM_CONFIG, 0, 0, 0, 0, 0, 0, 0, &res);
-> >>>>> +	if (res.a0 != OPTEE_SMC_RETURN_OK) {
-> >>>>> +		dev_info(dev, "shm service not available\n");
-> >>>>> +		return ERR_PTR(-ENOENT);
-> >>>>> +	}
-> >>>>> +
-> >>>>> +	if (res.a3 != OPTEE_SMC_SHM_CACHED) {
-> >>>>> +		dev_err(dev, "only normal cached shared memory supported\n");
-> >>>>> +		return ERR_PTR(-EINVAL);
-> >>>>> +	}
-> >>>>> +
-> >>>>> +	begin = roundup(res.a1, PAGE_SIZE);
-> >>>>> +	end = rounddown(res.a1 + res.a2, PAGE_SIZE);
-> >>>>
-> >>>> res.a1/2/3 is really hard to review and understand, would it work better
-> >>>> to use a union or cast for the output of invoke_fn based on the function
-> >>>> type?
-> >>>>
-> >>>> In the header that defines what the returned info from these calls means
-> >>>> add:
-> >>>>
-> >>>> struct OPTEE_SMC_GET_SHM_CONFIG_RESULT {
-> >>>> 	unsigned long status;
-> >>>> 	unsigned long start;
-> >>>> 	unsigned long size;
-> >>>> 	unsigned long settings;
-> >>>> };
-> >>>>
-> >>>> then:
-> >>>>
-> >>>> union something result;
-> >>>>
-> >>>> begin = roundup(result.ret.start, PAGE_SIZE);
-> >>>> end = rounddown(result.ret.start + result.ret.size, PAGE_SIZE);
-> >>>>
-> >>>> or similar with just casting to the better named struct type.
-> >>>
-> >>> optee_smc.h describes what's passed in the registers during an SMC I'd
-> >>> rather not clutter it with structs that doesn't add any information
-> >>> there. I'm not that happy with casting or using unions to alias struct
-> >>> arm_smccc_res either. How about a simple wrapper function for this call
-> >>> to deal with the details instead?
-> >>>
-> >>
-> >> I think that would be a good idea anyway, for instance, someday if the
-> >> interface changes slightly then you will be able to contain the
-> >> compatibility fixes in the wrapper and not out here in the main driver.
-> > 
-> > That interface is supposed to be a stable ABI, incompatible changes in
-> > the ABI should be discouraged. If there's an incompatible change it has
-> > to be dealt with in the main driver.
+Hi Pratyush,
+
+On 01/09/16 14:35, Pratyush Anand wrote:
+> Implement save_stack_trace_regs, so that stacktrace of a kprobe events can be
+> obtained.
+
+Hmm, kconfig enables 'CONFIG_KPROBE_EVENT' if we select KPROBES and FTRACE, this
+calls save_stack_trace_regs(), which we haven't implemented, giving:
+[  373.406982] save_stack_trace_regs() not implemented yet.
+[  373.413020] ------------[ cut here ]------------
+[  373.417601] WARNING: CPU: 1 PID: 0 at ../kernel/stacktrace.c:74 save_stack_tr
+ace_regs+0x3c/0x48
+[  373.426212] Modules linked in:
+[  373.429238]
+[  373.430716] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.8.0-rc4-dirty #5128
+[  373.437606] Hardware name: ARM Juno development board (r1) (DT)
+[  373.443466] task: ffff800975dd1900 task.stack: ffff800975ddc000
+[  373.449327] PC is at save_stack_trace_regs+0x3c/0x48
+[  373.454242] LR is at save_stack_trace_regs+0x3c/0x48
+[  373.459156] pc : [<ffff000008126c64>] lr : [<ffff000008126c64>] pstate: 600003c5
+[  373.466476] sp : ffff80097ef52c00
+
+[  373.554836] Call trace:
+[  373.641153] [<ffff000008126c64>] save_stack_trace_regs+0x3c/0x48
+[  373.647104] [<ffff00000817a0b0>] __ftrace_trace_stack+0x168/0x208
+[  373.653138] [<ffff00000817ad40>] trace_buffer_unlock_commit_regs+0x5c/0x7c
+[  373.659946] [<ffff00000818d57c>] kprobe_trace_func+0x308/0x3d8
+[  373.665721] [<ffff00000818defc>] kprobe_dispatcher+0x58/0x60
+[  373.671327] [<ffff0000088d8cfc>] kprobe_breakpoint_handler+0xbc/0x18c
+[  373.677705] [<ffff0000080851b8>] brk_handler+0x50/0x90
+[  373.682792] [<ffff000008081300>] do_debug_exception+0x50/0xbc
+
+
+I guess hitting a WARN_ONCE() while using a 'kernel hacking' feature isn't
+serious enough to make this a fix.
+
+
+> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+> index d9751a4769e7..bd6d9d8087f0 100644
+> --- a/arch/arm64/kernel/stacktrace.c
+> +++ b/arch/arm64/kernel/stacktrace.c
+> @@ -152,6 +152,24 @@ static int save_trace(struct stackframe *frame, void *d)
+>  	return trace->nr_entries >= trace->max_entries;
+>  }
+>  
+> +void save_stack_trace_regs(struct pt_regs *regs, struct stack_trace *trace)
+> +{
+> +	struct stack_trace_data data;
+> +	struct stackframe frame;
+> +
+> +	data.trace = trace;
+> +	data.skip = trace->skip;
+> +	data.no_sched_functions = 0;
+> +
+> +	frame.fp = regs->regs[29];
+> +	frame.sp = regs->sp;
+> +	frame.pc = regs->pc;
+
+What happens when a kprobe-event runs over a frame the function graph tracer has
+meddled with? You need:
+
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+	frame.graph = current->curr_ret_stack;
+#endif
+
+> +
+> +	walk_stackframe(current, &frame, save_trace, &data);
+> +	if (trace->nr_entries < trace->max_entries)
+> +		trace->entries[trace->nr_entries++] = ULONG_MAX;
+> +}
+> +
+>  void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+>  {
+>  	struct stack_trace_data data;
 > 
-> Why? This driver is for "OPTEE" not "OPTEE v2.0.01.02", any minor ABI
-> changes should be abstracted away as much as possible to keep the main
-> driver logically simple, agnostic to any OPTEE version ABI quirks/handling.
 
-Call me naive, but I don't expect any quirks. The ABI should only be
-extended with new functions and old may be deprecated.
+Reviewed-by: James Morse <james.morse@arm.com>
 
-Take the function optee_config_shm_ioremap() as an example. That
-function will not be used if OP-TEE doesn't use a specific shared memory
-pool but instead allocate shared memory via vmalloc() or from user
-space.
-
-This kind of changes/extensions are expected, but that's probably things
-the driver need to deal with directly since if change doesn't add
-something significant it wouldn't be needed.
-
-> 
-> > A small wrapper function in a
-> > standalone header file has no chance here as it probably involves using
-> > information gathered while probing secure world.
-> > 
-> > What I meant was a small wrapper function just above 
-> > optee_config_shm_ioremap() to deal with only this call.
-> > 
-> 
-> This wouldn't do anything that a cast couldn't do. Why not put the
-> wrapper function in the header as part of that OPTEE version's ABI
-> definition?
-
-Choosing between wrapper functions or structs in optee_smc.h I'd choose
-structs. I'll add structs for the ABI functions where it helps, skipping
-for instance the OPTEE_SMC_*UID and OPTEE_SMC_CALL_WITH_ARG functions.
-Would that be OK?
 
 Thanks,
-Jens
+
+James
