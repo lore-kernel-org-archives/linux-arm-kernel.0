@@ -1,113 +1,147 @@
-From: xzy.xu@rock-chips.com (Ziyuan Xu)
-Date: Fri, 2 Sep 2016 10:35:54 +0800
-Subject: [PATCH 2/2] arm64: dts: rockchip: add eMMC's power domain support
- for rk3399
-In-Reply-To: <CAD=FV=Wrw=THuokXyOXSyihF4fDB4z2L0vCgkiR9XJ6aEzsNzg@mail.gmail.com>
-References: <20160827134103.28160-1-xzy.xu@rock-chips.com>
- <20160827134103.28160-3-xzy.xu@rock-chips.com>
- <2ab8ab94-fa4d-2cd6-5805-a92ac5f9697e@rock-chips.com>
- <57C3A30B.5080707@rock-chips.com>
- <ceba6a89-6945-58c5-62e4-7d842cfa2312@rock-chips.com>
- <CAD=FV=W=LkVAm187hxp0Kbjxi5kSThwKnCMX+tr8SXQ-v_xQTQ@mail.gmail.com>
- <77f5cff1-80a2-76b3-40e9-f77caced2257@rock-chips.com>
- <CAD=FV=WmoyoZmV_uj281S37ZpWqg8Dr2U8ntkD2Sr58qbcB0wg@mail.gmail.com>
- <411dfc7b-1089-61a8-7a7e-6f378c0a6074@rock-chips.com>
- <CAD=FV=Wrw=THuokXyOXSyihF4fDB4z2L0vCgkiR9XJ6aEzsNzg@mail.gmail.com>
-Message-ID: <16314a2c-1ed9-0307-3497-9c1d8d41a149@rock-chips.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 2 Sep 2016 10:43:37 +0800
+Subject: [PATCH v3 04/22] usb: chipidea: Only read/write OTGSC from one
+ place
+In-Reply-To: <20160901004036.23936-5-stephen.boyd@linaro.org>
+References: <20160901004036.23936-1-stephen.boyd@linaro.org>
+ <20160901004036.23936-5-stephen.boyd@linaro.org>
+Message-ID: <20160902024337.GA16876@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Aug 31, 2016 at 05:40:18PM -0700, Stephen Boyd wrote:
+> With the id and vbus detection done via extcon we need to make
+> sure we poll the status of OTGSC properly by considering what the
+> extcon is saying, and not just what the register is saying. Let's
+> move this hw_wait_reg() function to the only place it's used and
+> simplify it for polling the OTGSC register. Then we can make
+> certain we only use the hw_read_otgsc() API to read OTGSC, which
+> will make sure we properly handle extcon events.
+> 
+> Cc: Peter Chen <peter.chen@nxp.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: "Ivan T. Ivanov" <iivanov.xz@gmail.com>
+> Fixes: 3ecb3e09b042 ("usb: chipidea: Use extcon framework for VBUS and ID detect")
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> ---
+>  drivers/usb/chipidea/ci.h   |  3 ---
+>  drivers/usb/chipidea/core.c | 32 --------------------------------
+>  drivers/usb/chipidea/otg.c  | 34 ++++++++++++++++++++++++++++++----
+>  3 files changed, 30 insertions(+), 39 deletions(-)
+> 
+> diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+> index cd414559040f..05bc4d631cb9 100644
+> --- a/drivers/usb/chipidea/ci.h
+> +++ b/drivers/usb/chipidea/ci.h
+> @@ -428,9 +428,6 @@ int hw_port_test_set(struct ci_hdrc *ci, u8 mode);
+>  
+>  u8 hw_port_test_get(struct ci_hdrc *ci);
+>  
+> -int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
+> -				u32 value, unsigned int timeout_ms);
+> -
+>  void ci_platform_configure(struct ci_hdrc *ci);
+>  
+>  int dbg_create_files(struct ci_hdrc *ci);
+> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> index 69426e644d17..01390e02ee53 100644
+> --- a/drivers/usb/chipidea/core.c
+> +++ b/drivers/usb/chipidea/core.c
+> @@ -516,38 +516,6 @@ int hw_device_reset(struct ci_hdrc *ci)
+>  	return 0;
+>  }
+>  
+> -/**
+> - * hw_wait_reg: wait the register value
+> - *
+> - * Sometimes, it needs to wait register value before going on.
+> - * Eg, when switch to device mode, the vbus value should be lower
+> - * than OTGSC_BSV before connects to host.
+> - *
+> - * @ci: the controller
+> - * @reg: register index
+> - * @mask: mast bit
+> - * @value: the bit value to wait
+> - * @timeout_ms: timeout in millisecond
+> - *
+> - * This function returns an error code if timeout
+> - */
+> -int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
+> -				u32 value, unsigned int timeout_ms)
+> -{
+> -	unsigned long elapse = jiffies + msecs_to_jiffies(timeout_ms);
+> -
+> -	while (hw_read(ci, reg, mask) != value) {
+> -		if (time_after(jiffies, elapse)) {
+> -			dev_err(ci->dev, "timeout waiting for %08x in %d\n",
+> -					mask, reg);
+> -			return -ETIMEDOUT;
+> -		}
+> -		msleep(20);
+> -	}
+> -
+> -	return 0;
+> -}
+> -
+>  static irqreturn_t ci_irq(int irq, void *data)
+>  {
+>  	struct ci_hdrc *ci = data;
+> diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
+> index 03b6743461d1..a829607c3e4d 100644
+> --- a/drivers/usb/chipidea/otg.c
+> +++ b/drivers/usb/chipidea/otg.c
+> @@ -104,7 +104,31 @@ void ci_handle_vbus_change(struct ci_hdrc *ci)
+>  		usb_gadget_vbus_disconnect(&ci->gadget);
+>  }
+>  
+> -#define CI_VBUS_STABLE_TIMEOUT_MS 5000
+> +/**
+> + * When we switch to device mode, the vbus value should be lower
+> + * than OTGSC_BSV before connecting to host.
+> + *
+> + * @ci: the controller
+> + *
+> + * This function returns an error code if timeout
+> + */
+> +static int hw_wait_vbus_lower_bsv(struct ci_hdrc *ci)
+> +{
+> +	unsigned long elapse = jiffies + msecs_to_jiffies(5000);
+> +	u32 mask = OTGSC_BSV;
+> +
+> +	while (hw_read_otgsc(ci, mask)) {
+> +		if (time_after(jiffies, elapse)) {
+> +			dev_err(ci->dev, "timeout waiting for %08x in OTGSC\n",
+> +					mask);
+> +			return -ETIMEDOUT;
+> +		}
+> +		msleep(20);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static void ci_handle_id_switch(struct ci_hdrc *ci)
+>  {
+>  	enum ci_role role = ci_otg_role(ci);
+> @@ -116,9 +140,11 @@ static void ci_handle_id_switch(struct ci_hdrc *ci)
+>  		ci_role_stop(ci);
+>  
+>  		if (role == CI_ROLE_GADGET)
+> -			/* wait vbus lower than OTGSC_BSV */
+> -			hw_wait_reg(ci, OP_OTGSC, OTGSC_BSV, 0,
+> -					CI_VBUS_STABLE_TIMEOUT_MS);
+> +			/*
+> +			 * wait vbus lower than OTGSC_BSV before connecting
+> +			 * to host
+> +			 */
+> +			hw_wait_vbus_lower_bsv(ci);
+>  
+>  		ci_role_start(ci, role);
+>  	}
 
+Acked-by: Peter Chen <peter.chen@nxp.com>
 
-On 2016?09?02? 05:29, Doug Anderson wrote:
-> Hi,
->
-> On Wed, Aug 31, 2016 at 11:56 PM, Ziyuan Xu <xzy.xu@rock-chips.com> wrote:
->> Hi
->>
->>
->> On 2016?09?01? 12:20, Doug Anderson wrote:
->>> Hi,
->>>
->>> On Wed, Aug 31, 2016 at 7:29 PM, Ziyuan Xu <xzy.xu@rock-chips.com> wrote:
->>>>> This is fine to pick up _only_ if you don't care about suspend/resume.
->>>>> If you care about suspend/resume then someone needs to first write a
->>>>> patch that will re-init all "corecfg" values after power is turned on.
->>>>
->>>> Do you mean corecfg_clockmultiplier and corecfg_baseclkfreq, if yes, we
->>>> don't need to strore/re-init it after resume.
->>>> corecfg_clockmultiplier is only used to fetch host->clk_mul, and
->>>> host->clk_mul has been a fixed value at run-time, unless driver unbind.
->>>> The same as corecfg_clockmultiplier, corecfg_baseclkfreq is used to check
->>>> the xin_clk at probe time, we don't reference it at run-time.
->>>> BTW, I have tested suspend/resume on rk3399 prior to this sumbit, eMMC
->>>> works
->>>> fine.
->>> I guess I don't actually know how the corecfg_clockmultiplier and
->>> corecfg_baseclkfreq fields are actually used, but I presume that they
->>> actually do something useful and aren't used to just communicate back
->>> to software?
->>
->> Take corecfg_clockmultiplier as example.
->> 1. sdhci driver fetch host->clk_mul from corecfg_clockmultiplier
->> 2. mmc->f_min and mmc->f_max are calculated via host->clk_mul, they're used
->> for further initialization.
->> 3. if the corecfg_clockmultiplier is incorrect, sdhci will use improper
->> frequency to play.
->>
->> I think we don't need to store it due to it's a fixed value at run-time,
->> even if it is reset after a power cycle, the above will not be changed via
->> software, except for dirver unbind .
->>
->>> I know that:
->>>
->>> 1. If I don't pick this patch and I suspend/resume,
->>> corecfg_clockmultiplier and corecfg_baseclkfreq are still fine after
->>> suspend / resume.
->>>
->>> 2. If I do pick this patch and I suspend/resume,
->>> corecfg_clockmultiplier and corecfg_baseclkfreq are wrong after
->>> suspend/resume (tested by reading /dev/mem directly from userspace
->>> after suspend/resume).
->>>
->>>
->>> Are you saying that it is unimportant that corecfg_clockmultiplier and
->>> corecfg_baseclkfreq are wrong?
->>
->> Yup, corecfg_* stuff will be reset after a power cycle.
->> I mean that we need only to guarantee they're correct at probe time.
-> So are you saying that the entire purpose of "corecfg_clockmultiplier"
-> is that causes the "ClockMultiplier" field of the "EMMCCORE_CAP"
-> register to get a certain value?
-> ...and that the entire purpose of "corecfg_baseclkfreq" is that it
-> causes the "BaseClockFreqSDClock" field of the "EMMCCORE_CAP" register
-> to get a certain value?
-Yes, on rk3399:
-corecfg_clockmultiplier <===> EMMCCORE_CAP1[23:16] ClockMultiplier
-corecfg_baseclkfreq <===> EMMCCORE_CAP[15:8] BaseClockFreqSDClock
+-- 
 
-If you re-write to either corecfg_* stuff,  the corresponding CAP 
-register field will be changed too.
-sdhci driver will fetch CAP register for initialization, we only need to 
-guarantee they're correct at probe time.
-
-Did that all make sense?
->
-> That would have been nice to know before.  I had assumed that those
-> "corecfg" settings did something else more useful.
->
-> If it is indeed true that these corecfg values are as silly as it
-> seems, then I guess it's not terribly important to re-set them after
-> suspend/resume.  Eventually it would be nice/clean to actually do so
-> (in case the SDHCI driver eventually changes), but I guess we wouldn't
-> need to block. this patch from landing.
->
-> Can you please confirm my understanding above?
->
->
-> -Doug
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+Best Regards,
+Peter Chen
