@@ -1,18 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 Sep 2016 18:29:54 +0200
-Subject: [GIT PULL] Reset controller changes for v4.9
-In-Reply-To: <1472631335.3085.3.camel@pengutronix.de>
-References: <1472631335.3085.3.camel@pengutronix.de>
-Message-ID: <5151517.p98zi7Zk81@wuerfel>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 2 Sep 2016 18:30:25 +0200
+Subject: [GIT PULL 4/4] ARM: defconfig: Exynos for v4.9
+In-Reply-To: <4575445.BeuOIIGatt@wuerfel>
+References: <1472548739-20050-1-git-send-email-k.kozlowski@samsung.com>
+ <1472548739-20050-2-git-send-email-k.kozlowski@samsung.com>
+ <4575445.BeuOIIGatt@wuerfel>
+Message-ID: <20160902163025.GA5534@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 31, 2016 10:15:35 AM CEST Philipp Zabel wrote:
-> Please consider merging this tag with new UniPhier and STM32 reset
-> controller drivers and Kconfig options to allow build testing drivers
-> outside of their architecture.
+On Fri, Sep 02, 2016 at 05:47:11PM +0200, Arnd Bergmann wrote:
+> On Tuesday, August 30, 2016 11:18:56 AM CEST Krzysztof Kozlowski wrote:
+> > Expected conflict in multi_v7 - take all the changes:
+> > 
+> > --- a/arch/arm/configs/multi_v7_defconfig
+> > +++ b/arch/arm/configs/multi_v7_defconfig
+> > @@@ -135,8 -136,7 +136,8 @@@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=
+> >   CONFIG_CPU_FREQ_GOV_POWERSAVE=m
+> >   CONFIG_CPU_FREQ_GOV_USERSPACE=m
+> >   CONFIG_CPU_FREQ_GOV_CONSERVATIVE=m
+> > - CONFIG_CPU_FREQ_GOV_SCHEDUTIL=m
+> > + CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
+> >  +CONFIG_ARM_IMX6Q_CPUFREQ=y
+> >   CONFIG_QORIQ_CPUFREQ=y
+> >   CONFIG_CPU_IDLE=y
+> >   CONFIG_ARM_CPUIDLE=y
+> > 
+> > 
 > 
+> I pulled this into next/defconfig, but didn't see the conflict,
+> presumably I'll get it after merging the other branches?
 
-Pulled into next/drivers, thanks!
+The conflict is between my tree and imx-mxs tree so you might encounter
+it later when merging IMX changes.
 
-	Arnd
+Best regards,
+Krzysztof
