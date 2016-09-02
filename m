@@ -1,30 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 Sep 2016 18:26:42 +0200
-Subject: [GIT PULL 1/4] ARM: exynos: SoC/Mach for v4.9
-In-Reply-To: <1472548739-20050-5-git-send-email-k.kozlowski@samsung.com>
-References: <1472548739-20050-1-git-send-email-k.kozlowski@samsung.com>
- <1472548739-20050-5-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <5635206.ooNAZCeQOe@wuerfel>
+Date: Fri, 02 Sep 2016 18:28:24 +0200
+Subject: [GIT PULL] omap-gpmc changes for v4.9 merge window
+In-Reply-To: <16b618d9-735f-f20c-7966-6e3d23b6b44e@ti.com>
+References: <16b618d9-735f-f20c-7966-6e3d23b6b44e@ti.com>
+Message-ID: <64181757.1UAW2kMoRa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, August 30, 2016 11:18:59 AM CEST Krzysztof Kozlowski wrote:
-> Samsung mach/soc update for v4.9:
-> 1. Fix for DMA on S3C24xx. This was probably broken for long time, nobody runs
->    this code... till now.
-
-Good to know. This reminds me that the s3c24xx DMA code is one of those
-that need to be converted to dma_slave_map at some point. Maybe if someone
-is now running that code, they could give that a try as well?
-
-It shouldn't be hard to convert, let me know if you need more information.
-
-> 2. After fixes from Matthew Leach and Ben Dooks, most of our mach code
->    and drivers is now endian-safe. Mark the platform as supporting big endian.
-> 3. Cleanups.
+On Monday, August 29, 2016 11:30:34 AM CEST Roger Quadros wrote:
+> OMAP-GPMC: driver updates for v4.9
 > 
+> * Fix potential build failure if CONFIG_OMAP_GPMC is disabled while
+>   OMAP_NAND driver is enabled
+> * Trivial fixes which fix build warnings and code check tool warnings
+>   (Coccinelle)
+> * Use devm_gpiochip_add_data()
 > 
 
-Pulled into next/soc, thanks!
+Pulled into next/drivers, thanks!
 
 	Arnd
