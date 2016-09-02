@@ -1,112 +1,36 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Thu,  1 Sep 2016 20:26:23 -0700
-Subject: [v2 PATCH 1/3] clk: rockchip: Fractional dividers can't set parent
- rates
-Message-ID: <1472786785-2393-1-git-send-email-zyw@rock-chips.com>
+Date: Thu,  1 Sep 2016 20:26:25 -0700
+Subject: [v2 PATCH 3/3] clk: rockchip: use the dclk_vop_frac clock ids
+In-Reply-To: <1472786785-2393-1-git-send-email-zyw@rock-chips.com>
+References: <1472786785-2393-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <1472786785-2393-3-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Douglas Anderson <dianders@chromium.org>
+From: Yakir Yang <ykk@rock-chips.com>
 
-Currently the fractional divider clock time can't handle the
-CLK_SET_RATE_PARENT flag. This is because, unlike normal dividers,
-there is no clk_divider_bestdiv() function to try speeding up the parent
-to see if it helps things.
+Export the dclk_vop_frac out, so we can set the dclk_vop as the
+child of dclk_vop_frac, and then we can start to take use of
+the fractional dividers.
 
-Eventually someone could try to figure out how to make fractional
-dividers able to use CLK_SET_RATE_PARENT, but until they do let's not
-confuse the common clock framework (and anyone using it) by setting the
-flag.
-
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 Signed-off-by: Chris Zhong <zyw@rock-chips.com>
 ---
 
- drivers/clk/rockchip/clk-rk3399.c | 26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+ drivers/clk/rockchip/clk-rk3399.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-index ea32b7e..59417c5 100644
+index 59417c5..2c7cba7 100644
 --- a/drivers/clk/rockchip/clk-rk3399.c
 +++ b/drivers/clk/rockchip/clk-rk3399.c
-@@ -585,7 +585,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 	COMPOSITE(0, "clk_spdif_div", mux_pll_src_cpll_gpll_p, 0,
- 			RK3399_CLKSEL_CON(32), 7, 1, MFLAGS, 0, 7, DFLAGS,
- 			RK3399_CLKGATE_CON(8), 13, GFLAGS),
--	COMPOSITE_FRACMUX(0, "clk_spdif_frac", "clk_spdif_div", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRACMUX(0, "clk_spdif_frac", "clk_spdif_div", 0,
- 			RK3399_CLKSEL_CON(99), 0,
- 			RK3399_CLKGATE_CON(8), 14, GFLAGS,
- 			&rk3399_spdif_fracmux),
-@@ -599,7 +599,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 	COMPOSITE(0, "clk_i2s0_div", mux_pll_src_cpll_gpll_p, 0,
- 			RK3399_CLKSEL_CON(28), 7, 1, MFLAGS, 0, 7, DFLAGS,
- 			RK3399_CLKGATE_CON(8), 3, GFLAGS),
--	COMPOSITE_FRACMUX(0, "clk_i2s0_frac", "clk_i2s0_div", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRACMUX(0, "clk_i2s0_frac", "clk_i2s0_div", 0,
- 			RK3399_CLKSEL_CON(96), 0,
- 			RK3399_CLKGATE_CON(8), 4, GFLAGS,
- 			&rk3399_i2s0_fracmux),
-@@ -609,7 +609,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 	COMPOSITE(0, "clk_i2s1_div", mux_pll_src_cpll_gpll_p, 0,
- 			RK3399_CLKSEL_CON(29), 7, 1, MFLAGS, 0, 7, DFLAGS,
- 			RK3399_CLKGATE_CON(8), 6, GFLAGS),
--	COMPOSITE_FRACMUX(0, "clk_i2s1_frac", "clk_i2s1_div", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRACMUX(0, "clk_i2s1_frac", "clk_i2s1_div", 0,
- 			RK3399_CLKSEL_CON(97), 0,
- 			RK3399_CLKGATE_CON(8), 7, GFLAGS,
- 			&rk3399_i2s1_fracmux),
-@@ -619,7 +619,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 	COMPOSITE(0, "clk_i2s2_div", mux_pll_src_cpll_gpll_p, 0,
- 			RK3399_CLKSEL_CON(30), 7, 1, MFLAGS, 0, 7, DFLAGS,
- 			RK3399_CLKGATE_CON(8), 9, GFLAGS),
--	COMPOSITE_FRACMUX(0, "clk_i2s2_frac", "clk_i2s2_div", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRACMUX(0, "clk_i2s2_frac", "clk_i2s2_div", 0,
- 			RK3399_CLKSEL_CON(98), 0,
- 			RK3399_CLKGATE_CON(8), 10, GFLAGS,
- 			&rk3399_i2s2_fracmux),
-@@ -638,7 +638,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 	COMPOSITE_NOMUX(0, "clk_uart0_div", "clk_uart0_src", 0,
- 			RK3399_CLKSEL_CON(33), 0, 7, DFLAGS,
- 			RK3399_CLKGATE_CON(9), 0, GFLAGS),
--	COMPOSITE_FRACMUX(0, "clk_uart0_frac", "clk_uart0_div", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRACMUX(0, "clk_uart0_frac", "clk_uart0_div", 0,
- 			RK3399_CLKSEL_CON(100), 0,
- 			RK3399_CLKGATE_CON(9), 1, GFLAGS,
- 			&rk3399_uart0_fracmux),
-@@ -648,7 +648,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 	COMPOSITE_NOMUX(0, "clk_uart1_div", "clk_uart_src", 0,
- 			RK3399_CLKSEL_CON(34), 0, 7, DFLAGS,
- 			RK3399_CLKGATE_CON(9), 2, GFLAGS),
--	COMPOSITE_FRACMUX(0, "clk_uart1_frac", "clk_uart1_div", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRACMUX(0, "clk_uart1_frac", "clk_uart1_div", 0,
- 			RK3399_CLKSEL_CON(101), 0,
- 			RK3399_CLKGATE_CON(9), 3, GFLAGS,
- 			&rk3399_uart1_fracmux),
-@@ -656,7 +656,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 	COMPOSITE_NOMUX(0, "clk_uart2_div", "clk_uart_src", 0,
- 			RK3399_CLKSEL_CON(35), 0, 7, DFLAGS,
- 			RK3399_CLKGATE_CON(9), 4, GFLAGS),
--	COMPOSITE_FRACMUX(0, "clk_uart2_frac", "clk_uart2_div", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRACMUX(0, "clk_uart2_frac", "clk_uart2_div", 0,
- 			RK3399_CLKSEL_CON(102), 0,
- 			RK3399_CLKGATE_CON(9), 5, GFLAGS,
- 			&rk3399_uart2_fracmux),
-@@ -664,7 +664,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 	COMPOSITE_NOMUX(0, "clk_uart3_div", "clk_uart_src", 0,
- 			RK3399_CLKSEL_CON(36), 0, 7, DFLAGS,
- 			RK3399_CLKGATE_CON(9), 6, GFLAGS),
--	COMPOSITE_FRACMUX(0, "clk_uart3_frac", "clk_uart3_div", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRACMUX(0, "clk_uart3_frac", "clk_uart3_div", 0,
- 			RK3399_CLKSEL_CON(103), 0,
- 			RK3399_CLKGATE_CON(9), 7, GFLAGS,
- 			&rk3399_uart3_fracmux),
 @@ -1168,7 +1168,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
  			RK3399_CLKSEL_CON(49), 8, 2, MFLAGS, 0, 8, DFLAGS,
  			RK3399_CLKGATE_CON(10), 12, GFLAGS),
  
--	COMPOSITE_FRACMUX_NOGATE(0, "dclk_vop0_frac", "dclk_vop0_div", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRACMUX_NOGATE(0, "dclk_vop0_frac", "dclk_vop0_div", 0,
+-	COMPOSITE_FRACMUX_NOGATE(0, "dclk_vop0_frac", "dclk_vop0_div", 0,
++	COMPOSITE_FRACMUX_NOGATE(DCLK_VOP0_FRAC, "dclk_vop0_frac", "dclk_vop0_div", 0,
  			RK3399_CLKSEL_CON(106), 0,
  			&rk3399_dclk_vop0_fracmux),
  
@@ -114,37 +38,10 @@ index ea32b7e..59417c5 100644
  			RK3399_CLKSEL_CON(50), 8, 2, MFLAGS, 0, 8, DFLAGS,
  			RK3399_CLKGATE_CON(10), 13, GFLAGS),
  
--	COMPOSITE_FRACMUX_NOGATE(0, "dclk_vop1_frac", "dclk_vop1_div", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRACMUX_NOGATE(0, "dclk_vop1_frac", "dclk_vop1_div", 0,
+-	COMPOSITE_FRACMUX_NOGATE(0, "dclk_vop1_frac", "dclk_vop1_div", 0,
++	COMPOSITE_FRACMUX_NOGATE(DCLK_VOP1_FRAC, "dclk_vop1_frac", "dclk_vop1_div", 0,
  			RK3399_CLKSEL_CON(107), 0,
  			&rk3399_dclk_vop1_fracmux),
  
-@@ -1312,7 +1312,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 	/* testout */
- 	MUX(0, "clk_test_pre", mux_pll_src_cpll_gpll_p, CLK_SET_RATE_PARENT,
- 			RK3399_CLKSEL_CON(58), 7, 1, MFLAGS),
--	COMPOSITE_FRAC(0, "clk_test_frac", "clk_test_pre", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRAC(0, "clk_test_frac", "clk_test_pre", 0,
- 			RK3399_CLKSEL_CON(105), 0,
- 			RK3399_CLKGATE_CON(13), 9, GFLAGS),
- 
-@@ -1417,7 +1417,7 @@ static struct rockchip_clk_branch rk3399_clk_pmu_branches[] __initdata = {
- 			RK3399_PMU_CLKSEL_CON(1), 13, 1, MFLAGS, 8, 5, DFLAGS,
- 			RK3399_PMU_CLKGATE_CON(0), 8, GFLAGS),
- 
--	COMPOSITE_FRACMUX_NOGATE(0, "clk_wifi_frac", "clk_wifi_div", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRACMUX_NOGATE(0, "clk_wifi_frac", "clk_wifi_div", 0,
- 			RK3399_PMU_CLKSEL_CON(7), 0,
- 			&rk3399_pmuclk_wifi_fracmux),
- 
-@@ -1445,7 +1445,7 @@ static struct rockchip_clk_branch rk3399_clk_pmu_branches[] __initdata = {
- 			RK3399_PMU_CLKSEL_CON(5), 10, 1, MFLAGS, 0, 7, DFLAGS,
- 			RK3399_PMU_CLKGATE_CON(0), 5, GFLAGS),
- 
--	COMPOSITE_FRACMUX(0, "clk_uart4_frac", "clk_uart4_div", CLK_SET_RATE_PARENT,
-+	COMPOSITE_FRACMUX(0, "clk_uart4_frac", "clk_uart4_div", 0,
- 			RK3399_PMU_CLKSEL_CON(6), 0,
- 			RK3399_PMU_CLKGATE_CON(0), 6, GFLAGS,
- 			&rk3399_uart4_pmu_fracmux),
 -- 
 1.9.1
