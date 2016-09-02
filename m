@@ -1,34 +1,133 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Fri, 2 Sep 2016 12:50:39 +0000
-Subject: [PATCH v2 1/3] ARM: dts: r7s72100: add ethernet clock to device
- tree
-In-Reply-To: <20160902082604.GD16669@verge.net.au>
-References: <20160901155430.23400-1-chris.brandt@renesas.com>
- <20160902014012.9383-1-chris.brandt@renesas.com>
- <20160902082604.GD16669@verge.net.au>
-Message-ID: <SG2PR06MB116533792940F6E3193E7EDB8AE50@SG2PR06MB1165.apcprd06.prod.outlook.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 02 Sep 2016 14:52:04 +0200
+Subject: [PATCH 7/8] iommu: of: Handle IOMMU lookup failure with deferred
+ probing or error
+In-Reply-To: <1470696550-3416-8-git-send-email-sricharan@codeaurora.org>
+References: <1470696550-3416-1-git-send-email-sricharan@codeaurora.org>
+ <1470696550-3416-8-git-send-email-sricharan@codeaurora.org>
+Message-ID: <17b1ff0a-6619-cd45-28cd-70bf79bdcc47@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/2/2016, Simon Horman wrote:
-> For future submissions please consider:
-> 1. Supplying a cover letter (git format-patch has a --cover-letter option)
->    for patch-sets comprising more than one patch. This allows you to describe
->    an overview of what the series as a whole achieves. And is also
->    convenient for maintainers to reply to when accepting your patches.
+Hi Sricharan,
 
-OK. I can do that.
+On 2016-08-09 00:49, Sricharan R wrote:
+ > From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+ >
+ > Failures to look up an IOMMU when parsing the DT iommus property need to
+ > be handled separately from the .of_xlate() failures to support deferred
+ > probing.
+ >
+ > The lack of a registered IOMMU can be caused by the lack of a driver for
+ > the IOMMU, the IOMMU device probe not having been performed yet, having
+ > been deferred, or having failed.
+ >
+ > The first case occurs when the device tree describes the bus master and
+ > IOMMU topology correctly but no device driver exists for the IOMMU yet
+ > or the device driver has not been compiled in. Return NULL, the caller
+ > will configure the device without an IOMMU.
+ >
+ > The second and third cases are handled by deferring the probe of the bus
+ > master device which will eventually get reprobed after the IOMMU.
+ >
+ > The last case is currently handled by deferring the probe of the bus
+ > master device as well. A mechanism to either configure the bus master
+ > device without an IOMMU or to fail the bus master device probe depending
+ > on whether the IOMMU is optional or mandatory would be a good
+ > enhancement.
+ >
+ > Signed-off-by: Laurent Pinchart 
+<laurent.pinchart+renesas@ideasonboard.com>
+
+It is a common practice to briefly describe here what has been changed
+since the original patch if you have modified it (see commit
+855ed04a3758b205e84b269f92d26ab36ed8e2f7 for the example).
+
+ > Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+ > ---
+ >  drivers/iommu/of_iommu.c | 21 +++++++++++++++++----
+ >  drivers/of/device.c      |  2 ++
+ >  2 files changed, 19 insertions(+), 4 deletions(-)
+ >
+ > diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+ > index 4c4219d..3994cf5 100644
+ > --- a/drivers/iommu/of_iommu.c
+ > +++ b/drivers/iommu/of_iommu.c
+ > @@ -149,7 +149,7 @@ const struct iommu_ops *of_iommu_configure(struct 
+device *dev,
+ >  {
+ >      struct of_phandle_args iommu_spec;
+ >      struct device_node *np = NULL;
+ > -    struct iommu_ops *ops = NULL;
+ > +    const struct iommu_ops *ops = NULL;
+ >      int idx = 0;
+ >
+ >      if (dev_is_pci(dev)) {
+ > @@ -189,8 +189,21 @@ const struct iommu_ops 
+*of_iommu_configure(struct device *dev,
+ >          np = iommu_spec.np;
+ >          ops = of_iommu_get_ops(np);
+ >
+ > -        if (!ops || !ops->of_xlate || ops->of_xlate(dev, &iommu_spec))
+ > +        if (!ops) {
+ > +            const struct of_device_id *oid;
+ > +
+ > +            oid = of_match_node(&__iommu_of_table, np);
+ > +            ops = oid ? ERR_PTR(-EPROBE_DEFER) : NULL;
+ >              goto err_put_node;
+ > +        }
+ > +
+ > +        if (!ops->of_xlate || ops->of_xlate(dev, &iommu_spec)) {
+ > +            ops = NULL;
+ > +            goto err_put_node;
+ > +        }
+ > +
+ > +        if (ops->add_device)
+ > +            ops = ops->add_device(dev) ? ops : NULL;
+
+ops->add_device() returns ZERO on success or error code on failure, so 
+the above
+line should be changed to:
+             ops = (ops->add_device(dev) == 0) ? ops : NULL;
 
 
-> 2. Starting a new thread for each new version of a patch/patch-set.
+ >          of_node_put(np);
+ >          idx++;
+ > @@ -200,7 +213,7 @@ const struct iommu_ops *of_iommu_configure(struct 
+device *dev,
+ >
+ >  err_put_node:
+ >      of_node_put(np);
+ > -    return NULL;
+ > +    return ops;
+ >  }
+ >
+ >  void __init of_iommu_init(void)
+ > @@ -211,7 +224,7 @@ void __init of_iommu_init(void)
+ >      for_each_matching_node_and_match(np, matches, &match) {
+ >          const of_iommu_init_fn init_fn = match->data;
+ >
+ > -        if (init_fn(np))
+ > +        if (init_fn && init_fn(np))
+ >              pr_err("Failed to initialise IOMMU %s\n",
+ >                  of_node_full_name(np));
+ >      }
+ > diff --git a/drivers/of/device.c b/drivers/of/device.c
+ > index e1fad50..92e02dc 100644
+ > --- a/drivers/of/device.c
+ > +++ b/drivers/of/device.c
+ > @@ -149,6 +149,8 @@ int of_dma_configure_ops(struct device *dev, 
+struct device_node *np)
+ >          coherent ? " " : " not ");
+ >
+ >      iommu = of_iommu_configure(dev, np);
+ > +    if (IS_ERR(iommu))
+ > +        return PTR_ERR(iommu);
+ >      dev_dbg(dev, "device is%sbehind an iommu\n",
+ >          iommu ? " " : " not ");
+ >
 
-Does that mean to NOT use --in-reply-to= when submitting a v2,v3,etc... ????
-
-
-
-One more question:
-Can I submit a patches series now that just adds all the MSTP clock nodes that I'll be working on for the next couple weeks? (USB, SDHI, MMC)
-Or, do I have to wait till I have the drivers working?
-Or, better yet, can I add all the MSTP clocks that will probably get used at some point (basically, everything that we're using today in our 3.14 BSP).
-
-Chris
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
