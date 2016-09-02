@@ -1,47 +1,176 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Thu, 01 Sep 2016 18:19:07 -0700
-Subject: [PATCH] ARM: imx: (trivial) fix a typo
-In-Reply-To: <20160901204816.GA8057@reykholt.kaiser.cx>
-References: <20160901204816.GA8057@reykholt.kaiser.cx>
-Message-ID: <1993847.IzPN1S0Ejq@diplodocus>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 2 Sep 2016 09:10:46 +0800
+Subject: [PATCH v6 0/8] power: add power sequence library
+In-Reply-To: <fd94340b-1c1d-2307-7e57-5b05f1655d2c@linaro.org>
+References: <1471252398-957-1-git-send-email-peter.chen@nxp.com>
+ <b1848eb2-9298-9089-ee4d-5356998c6c08@linaro.org>
+ <20160824085335.GB27233@shlinux2>
+ <20160829111045.GB3736@b29397-desktop>
+ <3a45793f-18d9-0688-d2ab-ef79432c473c@linaro.org>
+ <20160831095220.GA11938@b29397-desktop>
+ <fd94340b-1c1d-2307-7e57-5b05f1655d2c@linaro.org>
+Message-ID: <20160902011046.GB11262@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 01, 2016 10:48:16 PM Martin Kaiser wrote:
-> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
-> ---
->  arch/arm/mach-imx/hardware.h |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Wed, Aug 31, 2016 at 10:28:20PM +0530, Vaibhav Hiremath wrote:
 > 
-> diff --git a/arch/arm/mach-imx/hardware.h b/arch/arm/mach-imx/hardware.h
-> index a42a6df..2810ffc 100644
-> --- a/arch/arm/mach-imx/hardware.h
-> +++ b/arch/arm/mach-imx/hardware.h
-> @@ -120,7 +120,7 @@
->  	.type = _type,							\
->  }
->  
-> -/* There's a off-by-one betweem the gpio bank number and the gpiochip */
-> +/* There's a off-by-one between the gpio bank number and the gpiochip */
->  /* range e.g. GPIO_1_5 is gpio 5 under linux */
->  #define IMX_GPIO_NR(bank, nr)		(((bank) - 1) * 32 + (nr))
->  
 > 
-s/a/an/
+> On Wednesday 31 August 2016 03:22 PM, Peter Chen wrote:
+> >On Wed, Aug 31, 2016 at 01:46:30PM +0530, Vaibhav Hiremath wrote:
+> >>
+> >>On Monday 29 August 2016 04:40 PM, Peter Chen wrote:
+> >>>On Wed, Aug 24, 2016 at 04:53:35PM +0800, Peter Chen wrote:
+> >>>>On Tue, Aug 23, 2016 at 04:02:48PM +0530, Vaibhav Hiremath wrote:
+> >>>>>On Monday 15 August 2016 02:43 PM, Peter Chen wrote:
+> >>>>>>Hi all,
+> >>>>>>
+> >>>>>>This is a follow-up for my last power sequence framework patch set [1].
+> >>>>>>According to Rob Herring and Ulf Hansson's comments[2], I use a generic
+> >>>>>>power sequence library for parsing the power sequence elements on DT,
+> >>>>>>and implement generic power sequence on library. The host driver
+> >>>>>>can allocate power sequence instance, and calls pwrseq APIs accordingly.
+> >>>>>>
+> >>>>>>In future, if there are special power sequence requirements, the special
+> >>>>>>power sequence library can be created.
+> >>>>>>
+> >>>>>>This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+> >>>>>>two hot-plug devices to simulate this use case, the related binding
+> >>>>>>change is updated at patch [1/6], The udoo board changes were tested
+> >>>>>>using my last power sequence patch set.[3]
+> >>>>>>
+> >>>>>>Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
+> >>>>>>need to power on itself before it can be found by ULPI bus.
+> >>>>>>
+> >>>>>>[1]http://www.spinics.net/lists/linux-usb/msg142755.html
+> >>>>>>[2]http://www.spinics.net/lists/linux-usb/msg143106.html
+> >>>>>>[3]http://www.spinics.net/lists/linux-usb/msg142815.html
+> >>>>>(Please ignore my response on V2)
+> >>>>>
+> >>>>>Sorry being so late in the discussion...
+> >>>>>
+> >>>>>If I am not missing anything, then I am afraid to say that the
+> >>>>>generic library
+> >>>>>implementation in this patch series is not going to solve many of
+> >>>>>the custom
+> >>>>>requirement of power on, off, etc...
+> >>>>>I know you mentioned about adding another library when we come
+> >>>>>across such platforms, but should we not keep provision (or easy
+> >>>>>hooks/path)
+> >>>>>to enable that ?
+> >>>>>
+> >>>>>Let me bring in the use case I am dealing with,
+> >>>>>
+> >>>>>
+> >>>>>                               Host
+> >>>>>                                |
+> >>>>>                                V
+> >>>>>                            USB port
+> >>>>>------------------------------------------------------------
+> >>>>>                                |
+> >>>>>                                V
+> >>>>>                       USB HUB device (May need custom on/off seq)
+> >>>>>                                |
+> >>>>>                                V
+> >>>>>               =============================
+> >>>>>              |                             |
+> >>>>>              V                             V
+> >>>>>          Device-1                       Device-2
+> >>>>>(Needs special power               (Needs special power
+> >>>>>  on/off sequence.                   on/off sequence.
+> >>>>>  Also may need custom               Also, may need custom
+> >>>>>  sequence for                       sequence for
+> >>>>>  suspend/resume)                    suspend/resume)
+> >>>>>
+> >>>>>
+> >>>>>Note: Both Devices are connected to HUB via HSIC and may differ
+> >>>>>           in terms of functionality, features they support.
+> >>>>>
+> >>>>>In the above case, both Device-1 and Device-2, need separate
+> >>>>>power on/off sequence. So generic library currently we have in this
+> >>>>>patch series is not going to satisfy the need here.
+> >>>>>
+> >>>>>I looked at all 6 revisions of this patch-series, went through the
+> >>>>>review comments, and looked at MMC power sequence code;
+> >>>>>what I can say here is, we need something similar to
+> >>>>>MMC power sequence here, where every device can have its own
+> >>>>>power sequence (if needed).
+> >>>>>
+> >>>>>I know Rob is not in favor of creating platform device for
+> >>>>>this, and I understand his comment.
+> >>>>>If not platform device, but atleast we need mechanism to
+> >>>>>connect each device back to its of_node and its respective
+> >>>>>driver/library fns. For example, the Devices may support different
+> >>>>>boot modes, and platform driver needs to make sure that
+> >>>>>the right sequence is followed for booting.
+> >>>>>
+> >>>>>Peter, My apologies for taking you back again on this series.
+> >>>>>I am OK, if you wish to address this in incremental addition,
+> >>>>>but my point is, we know that the current generic way is not
+> >>>>>enough for us, so I think we should try to fix it in initial phase only.
+> >>>>>
+> >>>>Rob, it seems generic power sequence can't cover all cases.
+> >>>>Without information from DT, we can't know which power sequence
+> >>>>for which device.
+> >>>>
+> >>>Vaibhav, do you agree that I create pwrseq library list using postcore_initcall
+> >>>for each library, and choose pwrseq library according to compatible
+> >>>string first, if there is no compatible string for this library, just
+> >>>use generic pwrseq library.
+> >>>
+> >>Lets hear from MMC folks. Ulf, do you agree on approach
+> >>for pwr seq ??
+> >>
+> >>
+> >>With above approach, I kind of agree on it, but I have couple
+> >>of comments,
+> >>
+> >>  - How DTS looks like now ?? Can you put example here ?
+> >The dts is the same with current version.
+> 
+> How would consumer driver get the power sequence ?
+> You must point to right power sequence driver.
+> For example, in the above example, Device-1, should
+> get handle to pwrseq-1, and Device-2 to pwrseq-2.
 
-while we're in there fixing spelling let's fix the grammar too:
+According to compatible string at device's of_node, we will have a list
+for power sequence libraries which has index (or name), and matches
+compatible string.
 
- diff --git a/arch/arm/mach-imx/hardware.h b/arch/arm/mach-imx/hardware.h
- index a42a6df..2810ffc 100644
- --- a/arch/arm/mach-imx/hardware.h
- +++ b/arch/arm/mach-imx/hardware.h
- @@ -120,7 +120,7 @@
-  	.type = _type,							\
-  }
-  
- -/* There's a off-by-one betweem the gpio bank number and the gpiochip */
- +/* There's an off-by-one between the gpio bank number and the gpiochip */
-  /* range e.g. GPIO_1_5 is gpio 5 under linux */
-  #define IMX_GPIO_NR(bank, nr)		(((bank) - 1) * 32 + (nr))
-  
- 
+> 
+> >>  - Should we merge MMC power sequence in next series ?
+> >>    We also can take this as an incremental change, to avoid further
+> >>    delay :)
+> >We had an agreement that keep mmc's pwrseq framework unchanging.
+> >Unless Ulf and rob both agree to change.
+> 
+> Why 2 separate approach for same problem ?
+> And I see this as possible duplication of code/functionality :)
+
+How the new kernel compatibles old dts? If we do not need to
+consider this problem, the mmc can try to use power sequence library
+too in future.
+
+> 
+> >>  - Lets also add suspend/resume callback to struct pwrseq
+> >>
+> >Why suspend/resume can't do at related driver's suspend/resume API?
+> 
+> Nope...
+> The pwrseq library would have taken ownership of resources, so
+> related driver cannot suspend the device. Again it is architecture
+> specific, but we should have provision to handle this.
+> 
+> The system I am dealing with today, does need suspend/resume
+> callback. To be precise, suspend is close to off state for some devices or
+> they could enter standby or different low power state, but to do that,
+> we need same resource as used for ON/OFF functionality.
+> 
+
+Ok, I will have API for suspend/resume. You can implement it at your own
+library or generic one.
+
+-- 
+
+Best Regards,
+Peter Chen
