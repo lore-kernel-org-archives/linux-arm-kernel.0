@@ -1,235 +1,110 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 02 Sep 2016 17:53:40 +0900
-Subject: [PATCH 3/5] Documentation: bindings: add dt documentation for
- rk3399 dmc
-In-Reply-To: <1472769085-20715-4-git-send-email-hl@rock-chips.com>
-References: <1472769085-20715-1-git-send-email-hl@rock-chips.com>
- <CGME20160901223305epcas1p2ee606c93622d6dd2015a8748aa0a5428@epcas1p2.samsung.com>
- <1472769085-20715-4-git-send-email-hl@rock-chips.com>
-Message-ID: <57C93E14.5090500@samsung.com>
+Date: Fri, 02 Sep 2016 17:58:38 +0900
+Subject: [PATCH v2 3/3] ARM: dts: Set the clock rate for DREX block 800Mhz
+ on exynos5422-odroidxu3
+In-Reply-To: <20160827163310.GA8616@kozik-book>
+References: <1472108238-24309-1-git-send-email-cw00.choi@samsung.com>
+ <1472108238-24309-4-git-send-email-cw00.choi@samsung.com>
+ <CGME20160827163323epcas1p36e8aa80709136d2784f38f4531a5dab8@epcas1p3.samsung.com>
+ <20160827163310.GA8616@kozik-book>
+Message-ID: <57C93F3E.4030802@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016? 09? 02? 07:31, Lin Huang wrote:
-> This patch adds the documentation for rockchip rk3399 dmc driver.
+On 2016? 08? 28? 01:33, Krzysztof Kozlowski wrote:
+> On Thu, Aug 25, 2016 at 03:57:18PM +0900, Chanwoo Choi wrote:
+>> This patch sets the clock rate for DREX (DRAM Express) block
+>> on exynos5422-odroidxu3 board. In the exynos5422 TRM,
+>> DRAM clocks use BPLL clock and CMU_CDREX generates
+>> the 800MHz DRAM clock.
+>>
 > 
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> ---
-> Changes in v8:
-> - add ddr timing properties
-> 
-> Changes in v7:
-> -None
-> 
-> Changes in v6:
-> -Add more detail in Documentation
-> 
-> Changes in v5:
-> -None
-> 
-> Changes in v4:
-> -None
-> 
-> Changes in v3:
-> -None
-> 
-> Changes in v2:
-> -None 
-> 
-> Changes in v1:
-> -None
-> 
->  .../devicetree/bindings/devfreq/rk3399_dmc.txt     | 173 +++++++++++++++++++++
->  1 file changed, 173 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt b/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
-> new file mode 100644
-> index 0000000..1f39b5cb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
-> @@ -0,0 +1,173 @@
-> +* Rockchip rk3399 DMC(Dynamic Memory Controller) device
-> +
-> +Required properties:
-> +- compatible:		 Must be "rockchip,rk3399-dmc".
-> +- devfreq-events:	 Node to get DDR loading, Refer to
-> +			 Documentation/devicetree/bindings/devfreq/
-> +			 rockchip-dfi.txt
-> +- interrupts:		 The interrupt number to the CPU. The interrupt
-> +			 specifier format depends on the interrupt controller.
-> +			 It should be DCF interrupts, when DDR dvfs finish,
-> +			 it will happen.
-> +- clocks:		 Phandles for clock specified in "clock-names" property
-> +- clock-names :		 The name of clock used by the DFI, must be
-> +			 "pclk_ddr_mon";
-> +- operating-points-v2:	 Refer to Documentation/devicetree/bindings/power/opp.txt
-> +			 for details.
-> +- center-supply:	 DMC supply node.
-> +- status:		 Marks the node enabled/disabled.
-> +
-> +Following properties are ddr timing:
-> +
-> +- dram_speed_bin :	 Value is defined at include/dt-bindings/clock/ddr.h,
-> +			 it select ddr3 cl-trp-trcd type, default value
-> +			 "DDR3_DEFAULT".it must selected according to
-> +			 "Speed Bin" in ddr3 datasheet, DO NOT use smaller
-> +			 "Speed Bin" than ddr3 exactly is.
-> +
-> +- pd_idle :		 Config the PD_IDLE value, defined the power-down idle
-> +			 period, memories are places into power-down mode if
-> +			 bus is idle for PD_IDLE DFI clocks.
-> +
-> +- sr_idle :		 Configure the SR_IDLE value, defined the selfrefresh
-> +			 idle period, memories are places into self-refresh
-> +			 mode if bus is idle for SR_IDLE*1024 DFI clocks
-> +			 (DFI clocks freq is half of dram's clocks), defaule
-> +			 value is "0".
-> +
-> +- sr_mc_gate_idle :	 Defined the self-refresh with memory and controller
-> +			 clock gating idle period, memories are places into
-> +			 self-refresh mode and memory controller clock arg
-> +			 gating if bus is idle for sr_mc_gate_idle*1024 DFI
-> +			 clocks.
-> +
-> +- srpd_lite_idle :	 Defined the self-refresh power down idle period,
-> +			 memories are places into self-refresh power down
-> +			 mode if bus is idle for srpd_lite_idle*1024 DFI
-> +			 clocks. This parameter is for LPDDR4 only.
-> +
-> +- standby_idle :	 Defined the standby idle period, memories are places
-> +			 into self-refresh than controller, pi, phy and dram
-> +			 clock will gating if bus is idle for
-> +			 standby_idle * DFI clocks.
-> +
-> +- dram_dll_disb_freq :	 It's defined the DDR3 dll bypass frequency in MHz
-> +			 when ddr freq less than DRAM_DLL_DISB_FREQ, ddr3
-> +			 dll will bypssed note: if dll was bypassed, the
-> +			 odt also stop working.
-> +
-> +- phy_dll_disb_freq :	 Defined the PHY dll bypass frequency in MHz (Mega Hz),
-> +			 when ddr freq less than DRAM_DLL_DISB_FREQ, phy dll
-> +			 will bypssed. note: phy dll and phy odt are
-> +			 independent
-> +
-> +- ddr3_odt_disb_freq :	 When dram type is DDR3, this parameter defined the
-> +			 odt disable frequency in MHz (Mega Hz), when ddr
-> +			 frequency less then ddr3_odt_disb_freq, the odt
-> +			 on dram side and controller side are both disabled.
-> +
-> +- ddr3_drv :		 When dram type is DDR3, this parameter define the
-> +			 dram side driver stength in ohm, default value is
-> +			 DDR3_DS_40ohm.
-> +
-> +- ddr3_odt :		 When dram type is DDR3, this parameter define the
-> +			 dram side ODT stength in ohm, default value is
-> +			 DDR3_ODT_120ohm.
-> +
-> +- phy_ddr3_ca_drv :	 When dram type is DDR3, this parameter define the phy
-> +			 side CA line(incluing command line, address line and
-> +			 clock line) driver strength. default value is
-> +			 PHY_DRV_ODT_40.
-> +
-> +- phy_ddr3_dq_drv :	 When dram type is DDR3, this parameter define the phy
-> +			 side DQ line(incluing DQS/DQ/DM line) driver strength.
-> +			 default value is PHY_DRV_ODT_40.
-> +
-> +- phy_ddr3_odt : 	 When dram type is DDR3, this parameter define the
-> +			 phy side odt strength, default value is
-> +			 PHY_DRV_ODT_240.
-> +
-> +- lpddr3_odt_disb_freq : When dram type is LPDDR3, this parameter defined then
-> +			 odt disable frequency in MHz (Mega Hz), when ddr
-> +			 frequency less then ddr3_odt_disb_freq, the odt on
-> +			 dram side and controller side are both disabled.
-> +
-> +- lpddr3_drv :		 When dram type is LPDDR3, this parameter define the
-> +			 dram side driver stength in ohm, default value is
-> +			 LP3_DS_34ohm.
-> +
-> +- lpddr3_odt :		 When dram type is LPDDR3, this parameter define the
-> +			 dram side ODT stength in ohm, default value is
-> +			 LP3_ODT_240ohm.
-> +
-> +- phy_lpddr3_ca_drv :	 When dram type is LPDDR3, this parameter define the
-> +			 phy side CA line(incluing command line, address line
-> +			 and clock line) driver strength. default value is
-> +			 PHY_DRV_ODT_40.
-> +
-> +- phy_lpddr3_dq_drv :	 When dram type is LPDDR3, this parameter define the
-> +			 phy side DQ line(incluing DQS/DQ/DM line) driver
-> +			 strength. default value is PHY_DRV_ODT_40.
-> +
-> +- phy_lpddr3_odt : 	 When dram type is LPDDR3, this parameter define the phy
-> +			 side odt strength, default value is PHY_DRV_ODT_240.
-> +
-> +- lpddr4_odt_disb_freq : When dram type is LPDDR4, this parameter defined the
-> +			 odt disable frequency in MHz (Mega Hz), when ddr
-> +			 frequency less then ddr3_odt_disb_freq, the odt on
-> +			 dram side and controller side are both disabled.
-> +
-> +- lpddr4_drv :		 When dram type is LPDDR4, this parameter define the
-> +			 dram side driver stength in ohm, default value is
-> +			 LP4_PDDS_60ohm.
-> +
-> +- lpddr4_dq_odt : 	 When dram type is LPDDR4, this parameter define the
-> +			 dram side ODT on dqs/dq line stength in ohm, default
-> +			 value is LP4_DQ_ODT_40ohm.
-> +
-> +- lpddr4_ca_odt :	 When dram type is LPDDR4, this parameter define the
-> +			 dram side ODT on ca line stength in ohm, default value
-> +			 is LP4_CA_ODT_40ohm.
-> +
-> +- phy_lpddr4_ca_drv :	 When dram type is LPDDR4, this parameter define the
-> +			 phy side  CA line(incluing command address line)
-> +			 driver strength. default value is PHY_DRV_ODT_40.
-> +
-> +- phy_lpddr4_ck_cs_drv : When dram type is LPDDR4, this parameter define the
-> +			 phy side clock line and cs line driver strength.
-> +			 default value is PHY_DRV_ODT_80.
-> +
-> +- phy_lpddr4_dq_drv :	 When dram type is LPDDR4, this parameter define the
-> +			 phy side DQ line(incluing DQS/DQ/DM line) driver
-> +			 strength. default value is PHY_DRV_ODT_80.
-> +
-> +- phy_lpddr4_odt :	 When dram type is LPDDR4, this parameter define the
-> +			 phy side odt strength, default value is PHY_DRV_ODT_60.
+>>From the commit message I don't get two things:
+> 1. Why setting this on XU3-family of boards, not all 542x/5800?
 
-It is good to explain the each field for ddr timing.
-But, why you you drop the example for ddr timing values?
-I think that you better to add the example for ddr timing values
+I have the only xu3 board. I cannot test it on other boards.
 
-> +
-> +Example:
-> +	dmc_opp_table: dmc_opp_table {
-> +		compatible = "operating-points-v2";
-> +
-> +		opp00 {
-> +			opp-hz = /bits/ 64 <300000000>;
-> +			opp-microvolt = <900000>;
-> +		};
-> +		opp01 {
-> +			opp-hz = /bits/ 64 <666000000>;
-> +			opp-microvolt = <900000>;
-> +		};
-> +	};
-> +
-> +	dmc: dmc {
-> +		compatible = "rockchip,rk3399-dmc";
-> +		devfreq-events = <&dfi>;
-> +		interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru SCLK_DDRCLK>;
-> +		clock-names = "dmc_clk";
-> +		operating-points-v2 = <&dmc_opp_table>;
-> +		center-supply = <&ppvar_centerlogic>;
-> +		upthreshold = <15>;
-> +		downdifferential = <10>;
-> +		status = "disabled";
-> +	};
-> +
+> 2. Why this is needed? The commit msg lacks the answer to the "why".
+
+In the exynos5422's TRM, CMU_CDREX generates the 800MHz DRAM clock
+as above commit message. But, I'm missing what there is different
+before applying this patch. I add comment why we should set the 
+clock rate for DRAM on below.
+
 > 
+>> [clk_summary on exynos5422-odroidxu3 board]
+>> fout_bpll                             0            0   800000000          0 0
+>>     mout_bpll                          0            0   800000000          0 0
+>>        mout_mclk_cdrex                 0            0   800000000          0 0
+>>           dout_pclk_core_mem           0            0   200000000          0 0
+>>           dout_sclk_cdrex              0            0   800000000          0 0
+>>
+> 
+> What is the purpose of this dump of clk_summary? Is it a state before or
+> after the change? After it is quite obvious that it should have
+> 800MHz...
+
+I'm missing the difference before applying this patch.
+
+As I mentioned on v1[1] patch, if I don't set the clock rate for CDREX,
+the default clock is 825MHz instead of 800MHz. So, I set the clock rate
+on this patch.
+[1] https://lkml.org/lkml/2016/8/22/255
+
+If I don't apply this patch, the DREX clock is 825MHz.
+fout_bpll                             0            0   825000000          0 0  
+       mout_bpll                          0            0   825000000          0 0  
+          mout_mclk_cdrex                 0            0   825000000          0 0  
+             dout_pclk_core_mem           0            0   206250000          0 0  
+             dout_sclk_cdrex              0            0   825000000          0 0  
+                dout_clk2x_phy0           0            0   825000000          0 0  
+                   dout_aclk_cdrex1           0            0   412500000          0 0  
+                      dout_pclk_cdrex           0            0   103125000          0 0  
+                   dout_cclk_drex0           0            0   412500000          0 0  
 
 
--- 
+If you want to edit the commit message, I'll resend the v3 patch.
+
 Best Regards,
 Chanwoo Choi
+
+> 
+> Best regards,
+> Krzysztof
+> 
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>> index d56253049ccb..fd3f67c72039 100644
+>> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>> @@ -229,6 +229,11 @@
+>>  	status = "okay";
+>>  };
+>>  
+>> +&clock {
+>> +	assigned-clocks = <&clock CLK_DOUT_SCLK_CDREX>;
+>> +	assigned-clock-rates = <800000000>;
+>> +};
+>> +
+>>  &clock_audss {
+>>  	assigned-clocks = <&clock_audss EXYNOS_MOUT_AUDSS>,
+>>  			<&clock_audss EXYNOS_MOUT_I2S>,
+>> -- 
+>> 1.9.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> 
+> 
