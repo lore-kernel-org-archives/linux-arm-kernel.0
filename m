@@ -1,254 +1,306 @@
 From: yt.shen@mediatek.com (YT Shen)
-Date: Fri, 2 Sep 2016 19:24:42 +0800
-Subject: [PATCH v7 7/9] drm/mediatek: add dsi transfer function
+Date: Fri, 2 Sep 2016 19:24:43 +0800
+Subject: [PATCH v7 8/9] drm/mediatek: update DSI sub driver flow
 In-Reply-To: <1472815484-43821-1-git-send-email-yt.shen@mediatek.com>
 References: <1472815484-43821-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1472815484-43821-8-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1472815484-43821-9-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: shaoming chen <shaoming.chen@mediatek.com>
-
-add dsi read/write commands for transfer function
+This patch update enable/disable flow of DSI module and MIPI TX module
 
 Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
+Signed-off-by: YT Shen <yt.shen@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_dsi.c | 188 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 188 insertions(+)
+ drivers/gpu/drm/mediatek/mtk_dsi.c     | 102 +++++++++++++++++++++++++++------
+ drivers/gpu/drm/mediatek/mtk_mipi_tx.c |  32 ++++++-----
+ 2 files changed, 101 insertions(+), 33 deletions(-)
 
 diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-index d20f6f9..1103ff4 100644
+index 1103ff4..f807621 100644
 --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
 +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-@@ -24,6 +24,7 @@
- #include <linux/of_graph.h>
- #include <linux/phy/phy.h>
- #include <linux/platform_device.h>
-+#include <video/mipi_display.h>
- #include <video/videomode.h>
- 
- #include "mtk_drm_ddp_comp.h"
-@@ -81,8 +82,16 @@
- #define DSI_HBP_WC		0x54
- #define DSI_HFP_WC		0x58
- 
-+#define DSI_CMDQ_SIZE		0x60
-+#define CMDQ_SIZE		0x3f
-+
- #define DSI_HSTX_CKL_WC		0x64
- 
-+#define DSI_RX_DATA0		0x74
-+#define DSI_RX_DATA1		0x78
-+#define DSI_RX_DATA2		0x7c
-+#define DSI_RX_DATA3		0x80
-+
+@@ -95,6 +95,8 @@
  #define DSI_RACK		0x84
  #define RACK				BIT(0)
  
-@@ -118,8 +127,23 @@
++#define DSI_MEM_CONTI		0x90
++
+ #define DSI_PHY_LCCON		0x104
+ #define LC_HS_TX_EN			BIT(0)
+ #define LC_ULPM_EN			BIT(1)
+@@ -127,6 +129,10 @@
  #define CLK_HS_POST			(0xff << 8)
  #define CLK_HS_EXIT			(0xff << 16)
  
-+#define DSI_CMDQ0		0x180
-+#define CONFIG				(0xff << 0)
-+#define SHORT_PACKET			0
-+#define LONG_PACKET			2
-+#define BTA				BIT(2)
-+#define DATA_ID				(0xff << 8)
-+#define DATA_0				(0xff << 16)
-+#define DATA_1				(0xff << 24)
++#define DSI_VM_CMD_CON		0x130
++#define VM_CMD_EN			BIT(0)
++#define TS_VFP_EN			BIT(5)
 +
- #define NS_TO_CYCLE(n, c)    ((n) / (c) + (((n) % (c)) ? 1 : 0))
+ #define DSI_CMDQ0		0x180
+ #define CONFIG				(0xff << 0)
+ #define SHORT_PACKET			0
+@@ -251,7 +257,9 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
+ 	 * mipi_ratio is mipi clk coefficient for balance the pixel clk in mipi.
+ 	 * we set mipi_ratio is 1.05.
+ 	 */
+-	dsi->data_rate = dsi->vm.pixelclock * 3 * 21 / (1 * 1000 * 10);
++	dsi->data_rate = dsi->vm.pixelclock * 12 * 21;
++	dsi->data_rate /= (dsi->lanes * 1000 * 10);
++	dev_info(dev, "set mipitx's data rate: %dMHz\n", dsi->data_rate);
  
-+#define MTK_DSI_HOST_IS_READ(type) \
-+	((type == MIPI_DSI_GENERIC_READ_REQUEST_0_PARAM) || \
-+	(type == MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM) || \
-+	(type == MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM) || \
-+	(type == MIPI_DSI_DCS_READ))
-+
- struct phy;
+ 	ret = clk_set_rate(dsi->hs_clk, dsi->data_rate * 1000000);
+ 	if (ret < 0) {
+@@ -273,10 +281,6 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
+ 		goto err_disable_engine_clk;
+ 	}
  
- struct mtk_dsi {
-@@ -465,6 +489,11 @@ static void mtk_dsi_set_interrupt_enable(struct mtk_dsi *dsi)
- 	writel(inten, dsi->regs + DSI_INTEN);
- }
- 
-+static void mtk_dsi_irq_data_clear(struct mtk_dsi *dsi, u32 irq_bit)
-+{
-+	dsi->irq_data &= ~irq_bit;
-+}
-+
- static void mtk_dsi_irq_data_set(struct mtk_dsi *dsi, u32 irq_bit)
- {
- 	dsi->irq_data |= irq_bit;
-@@ -788,9 +817,168 @@ static int mtk_dsi_host_detach(struct mipi_dsi_host *host,
+-	mtk_dsi_enable(dsi);
+-	mtk_dsi_reset_engine(dsi);
+-	mtk_dsi_phy_timconfig(dsi);
+-
  	return 0;
+ 
+ err_disable_engine_clk:
+@@ -291,7 +295,7 @@ err_refcount:
+ static void mtk_dsi_clk_ulp_mode_enter(struct mtk_dsi *dsi)
+ {
+ 	mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_HS_TX_EN, 0);
+-	mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_ULPM_EN, 0);
++	mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_ULPM_EN, LC_ULPM_EN);
  }
  
-+static void mtk_dsi_wait_for_idle(struct mtk_dsi *dsi)
+ static void mtk_dsi_clk_ulp_mode_leave(struct mtk_dsi *dsi)
+@@ -304,7 +308,7 @@ static void mtk_dsi_clk_ulp_mode_leave(struct mtk_dsi *dsi)
+ static void mtk_dsi_lane0_ulp_mode_enter(struct mtk_dsi *dsi)
+ {
+ 	mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_HS_TX_EN, 0);
+-	mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_ULPM_EN, 0);
++	mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_ULPM_EN, LD0_ULPM_EN);
+ }
+ 
+ static void mtk_dsi_lane0_ulp_mode_leave(struct mtk_dsi *dsi)
+@@ -340,11 +344,21 @@ static void mtk_dsi_set_mode(struct mtk_dsi *dsi)
+ 		if ((dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) &&
+ 		    !(dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE))
+ 			vid_mode = BURST_MODE;
++		else
++			vid_mode = SYNC_EVENT_MODE;
+ 	}
+ 
+ 	writel(vid_mode, dsi->regs + DSI_MODE_CTRL);
+ }
+ 
++static void mtk_dsi_set_vm_cmd(struct mtk_dsi *dsi)
 +{
-+	u32 timeout_ms = 500000; /* total 1s ~ 2s timeout */
++	writel(0x3c, dsi->regs + DSI_MEM_CONTI);
 +
-+	while (timeout_ms--) {
-+		if (!(readl(dsi->regs + DSI_INTSTA) & DSI_BUSY))
-+			break;
-+
-+		usleep_range(2, 4);
-+	}
-+
-+	if (timeout_ms == 0) {
-+		dev_info(dsi->dev, "polling dsi wait not busy timeout!\n");
-+
-+		mtk_dsi_enable(dsi);
-+		mtk_dsi_reset_engine(dsi);
-+	}
++	mtk_dsi_mask(dsi, DSI_VM_CMD_CON, VM_CMD_EN, VM_CMD_EN);
++	mtk_dsi_mask(dsi, DSI_VM_CMD_CON, TS_VFP_EN, TS_VFP_EN);
 +}
 +
-+static s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi *dsi, u32 irq_flag,
-+				     unsigned int timeout)
+ static void mtk_dsi_ps_control_vact(struct mtk_dsi *dsi)
+ {
+ 	struct videomode *vm = &dsi->vm;
+@@ -401,6 +415,9 @@ static void mtk_dsi_rxtx_control(struct mtk_dsi *dsi)
+ 		break;
+ 	}
+ 
++	tmp_reg |= (dsi->mode_flags & MIPI_DSI_CLOCK_NON_CONTINUOUS) << 6;
++	tmp_reg |= (dsi->mode_flags & MIPI_DSI_MODE_EOT_PACKET) >> 3;
++
+ 	writel(tmp_reg, dsi->regs + DSI_TXRX_CTRL);
+ }
+ 
+@@ -479,6 +496,16 @@ static void mtk_dsi_start(struct mtk_dsi *dsi)
+ 	writel(1, dsi->regs + DSI_START);
+ }
+ 
++static void mtk_dsi_stop(struct mtk_dsi *dsi)
++{
++	writel(0, dsi->regs + DSI_START);
++}
++
++static void mtk_dsi_set_cmd_mode(struct mtk_dsi *dsi)
++{
++	writel(CMD_MODE, dsi->regs + DSI_MODE_CTRL);
++}
++
+ static void mtk_dsi_set_interrupt_enable(struct mtk_dsi *dsi)
+ {
+ 	u32 inten = DSI_INT_ALL_BITS;
+@@ -521,6 +548,25 @@ static irqreturn_t mtk_dsi_irq(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
++static void mtk_dsi_switch_to_cmd_mode(struct mtk_dsi *dsi)
 +{
 +	s32 ret = 0;
-+	unsigned long jiffies = msecs_to_jiffies(timeout);
++	unsigned long timeout = msecs_to_jiffies(500);
++
++	mtk_dsi_irq_data_clear(dsi, VM_DONE_INT_FLAG);
++	mtk_dsi_set_cmd_mode(dsi);
 +
 +	ret = wait_event_interruptible_timeout(_dsi_irq_wait_queue,
-+					       dsi->irq_data & irq_flag,
-+					       jiffies);
++					       dsi->irq_data & VM_DONE_INT_FLAG,
++					       timeout);
 +	if (ret == 0) {
-+		dev_info(dsi->dev, "Wait DSI IRQ(0x%08x) Timeout\n", irq_flag);
++		dev_info(dsi->dev, "dsi wait engine idle timeout\n");
 +
 +		mtk_dsi_enable(dsi);
 +		mtk_dsi_reset_engine(dsi);
 +	}
-+
-+	return ret;
 +}
 +
-+static u32 mtk_dsi_recv_cnt(u8 type, u8 *read_data)
-+{
-+	switch (type) {
-+	case MIPI_DSI_RX_GENERIC_SHORT_READ_RESPONSE_1BYTE:
-+	case MIPI_DSI_RX_DCS_SHORT_READ_RESPONSE_1BYTE:
-+		return 1;
-+	case MIPI_DSI_RX_GENERIC_SHORT_READ_RESPONSE_2BYTE:
-+	case MIPI_DSI_RX_DCS_SHORT_READ_RESPONSE_2BYTE:
-+		return 2;
-+	case MIPI_DSI_RX_GENERIC_LONG_READ_RESPONSE:
-+	case MIPI_DSI_RX_DCS_LONG_READ_RESPONSE:
-+		return read_data[1] + read_data[2] * 16;
-+	case MIPI_DSI_RX_ACKNOWLEDGE_AND_ERROR_REPORT:
-+		DRM_INFO("type is 0x02, try again\n");
-+		break;
-+	default:
-+		DRM_INFO("type(0x%x) cannot be non-recognite\n", type);
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
-+static void mtk_dsi_cmdq(struct mtk_dsi *dsi, const struct mipi_dsi_msg *msg)
-+{
-+	const char *tx_buf = msg->tx_buf;
-+	u8 config, cmdq_size, cmdq_off, type = msg->type;
-+	u32 reg_val, cmdq_mask, i;
-+
-+	if (MTK_DSI_HOST_IS_READ(type))
-+		config = BTA;
-+	else
-+		config = (msg->tx_len > 2) ? LONG_PACKET : SHORT_PACKET;
-+
-+	if (msg->tx_len > 2) {
-+		cmdq_size = 1 + (msg->tx_len + 3) / 4;
-+		cmdq_off = 4;
-+		cmdq_mask = CONFIG | DATA_ID | DATA_0 | DATA_1;
-+		reg_val = (msg->tx_len << 16) | (type << 8) | config;
-+	} else {
-+		cmdq_size = 1;
-+		cmdq_off = 2;
-+		cmdq_mask = CONFIG | DATA_ID;
-+		reg_val = (type << 8) | config;
-+	}
-+
-+	for (i = 0; i < msg->tx_len; i++)
-+		writeb(tx_buf[i], dsi->regs + DSI_CMDQ0 + cmdq_off + i);
-+
-+	mtk_dsi_mask(dsi, DSI_CMDQ0, cmdq_mask, reg_val);
-+	mtk_dsi_mask(dsi, DSI_CMDQ_SIZE, CMDQ_SIZE, cmdq_size);
-+}
-+
-+static ssize_t mtk_dsi_host_send_cmd(struct mtk_dsi *dsi,
-+				     const struct mipi_dsi_msg *msg, u8 flag)
-+{
-+	mtk_dsi_wait_for_idle(dsi);
-+	mtk_dsi_irq_data_clear(dsi, flag);
-+	mtk_dsi_cmdq(dsi, msg);
-+	mtk_dsi_start(dsi);
-+
-+	if (!mtk_dsi_wait_for_irq_done(dsi, flag, 2000))
-+		return -1;
-+	else
-+		return 0;
-+}
-+
-+static ssize_t mtk_dsi_host_transfer(struct mipi_dsi_host *host,
-+				     const struct mipi_dsi_msg *msg)
-+{
-+	struct mtk_dsi *dsi = host_to_dsi(host);
-+	u32 recv_cnt, i;
-+	u8 read_data[16];
-+	void *src_addr;
-+	u8 irq_flag = CMD_DONE_INT_FLAG;
-+
-+	if (readl(dsi->regs + DSI_MODE_CTRL) & MODE) {
-+		dev_info(dsi->dev, "dsi engine is not command mode\n");
-+		return -1;
-+	}
-+
-+	if (MTK_DSI_HOST_IS_READ(msg->type))
-+		irq_flag |= LPRX_RD_RDY_INT_FLAG;
-+
-+	if (mtk_dsi_host_send_cmd(dsi, msg, irq_flag) < 0)
-+		return -1;
-+
-+	if (!MTK_DSI_HOST_IS_READ(msg->type))
-+		return 0;
-+
-+	if (!msg->rx_buf) {
-+		dev_info(dsi->dev, "dsi receive buffer size may be NULL\n");
-+		return -1;
-+	}
-+
-+	for (i = 0; i < 16; i++)
-+		*(read_data + i) = readb(dsi->regs + DSI_RX_DATA0 + i);
-+
-+	recv_cnt = mtk_dsi_recv_cnt(read_data[0], read_data);
-+
-+	if (recv_cnt > 2)
-+		src_addr = &read_data[4];
-+	else
-+		src_addr = &read_data[1];
-+
-+	if (recv_cnt > 10)
-+		recv_cnt = 10;
-+
-+	if (recv_cnt > msg->rx_len)
-+		recv_cnt = msg->rx_len;
-+
-+	if (recv_cnt)
-+		memcpy(msg->rx_buf, src_addr, recv_cnt);
-+
-+	dev_info(dsi->dev, "dsi get %d byte data from the panel address(0x%x)\n",
-+		 recv_cnt, *((u8 *)(msg->tx_buf)));
-+
-+	return recv_cnt;
-+}
-+
- static const struct mipi_dsi_host_ops mtk_dsi_ops = {
- 	.attach = mtk_dsi_host_attach,
- 	.detach = mtk_dsi_host_detach,
-+	.transfer = mtk_dsi_host_transfer,
- };
+ static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
+ {
+ 	if (WARN_ON(dsi->refcount == 0))
+@@ -529,6 +575,17 @@ static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
+ 	if (--dsi->refcount != 0)
+ 		return;
  
- static int mtk_dsi_bind(struct device *dev, struct device *master, void *data)
++	mtk_dsi_switch_to_cmd_mode(dsi);
++
++	if (dsi->panel) {
++		if (drm_panel_unprepare(dsi->panel)) {
++			DRM_ERROR("failed to unprepare the panel\n");
++			return;
++		}
++	}
++
++	mtk_dsi_reset_engine(dsi);
++
+ 	mtk_dsi_lane0_ulp_mode_enter(dsi);
+ 	mtk_dsi_clk_ulp_mode_enter(dsi);
+ 
+@@ -547,29 +604,37 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi)
+ 	if (dsi->enabled)
+ 		return;
+ 
+-	if (dsi->panel) {
+-		if (drm_panel_prepare(dsi->panel)) {
+-			DRM_ERROR("failed to setup the panel\n");
+-			return;
+-		}
+-	}
+-
+ 	ret = mtk_dsi_poweron(dsi);
+ 	if (ret < 0) {
+ 		DRM_ERROR("failed to power on dsi\n");
+ 		return;
+ 	}
+ 
++	usleep_range(20000, 21000);
++
+ 	mtk_dsi_rxtx_control(dsi);
++	mtk_dsi_phy_timconfig(dsi);
++	mtk_dsi_ps_control_vact(dsi);
++	mtk_dsi_set_vm_cmd(dsi);
++	mtk_dsi_config_vdo_timing(dsi);
++	mtk_dsi_set_interrupt_enable(dsi);
+ 
++	mtk_dsi_enable(dsi);
+ 	mtk_dsi_clk_ulp_mode_leave(dsi);
+ 	mtk_dsi_lane0_ulp_mode_leave(dsi);
+ 	mtk_dsi_clk_hs_mode(dsi, 0);
+-	mtk_dsi_set_mode(dsi);
+ 
+-	mtk_dsi_ps_control_vact(dsi);
+-	mtk_dsi_config_vdo_timing(dsi);
+-	mtk_dsi_set_interrupt_enable(dsi);
++	if (dsi->panel) {
++		if (drm_panel_prepare(dsi->panel)) {
++			DRM_ERROR("failed to prepare the panel\n");
++			return;
++		}
++
++		if (drm_panel_enable(dsi->panel)) {
++			DRM_ERROR("failed to enable the panel\n");
++			return;
++		}
++	}
+ 
+ 	mtk_dsi_set_mode(dsi);
+ 	mtk_dsi_clk_hs_mode(dsi, 1);
+@@ -591,6 +656,7 @@ static void mtk_output_dsi_disable(struct mtk_dsi *dsi)
+ 		}
+ 	}
+ 
++	mtk_dsi_stop(dsi);
+ 	mtk_dsi_poweroff(dsi);
+ 
+ 	dsi->enabled = false;
+diff --git a/drivers/gpu/drm/mediatek/mtk_mipi_tx.c b/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
+index 108d31a..34e95c6 100644
+--- a/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
++++ b/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
+@@ -177,7 +177,9 @@ static int mtk_mipi_tx_pll_prepare(struct clk_hw *hw)
+ 
+ 	dev_dbg(mipi_tx->dev, "prepare: %u Hz\n", mipi_tx->data_rate);
+ 
+-	if (mipi_tx->data_rate >= 500000000) {
++	if (mipi_tx->data_rate > 1250000000) {
++		return -EINVAL;
++	} else if (mipi_tx->data_rate >= 500000000) {
+ 		txdiv = 1;
+ 		txdiv0 = 0;
+ 		txdiv1 = 0;
+@@ -201,6 +203,10 @@ static int mtk_mipi_tx_pll_prepare(struct clk_hw *hw)
+ 		return -EINVAL;
+ 	}
+ 
++	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_TOP_CON,
++				RG_DSI_LNT_IMP_CAL_CODE | RG_DSI_LNT_HS_BIAS_EN,
++				(8 << 4) | RG_DSI_LNT_HS_BIAS_EN);
++
+ 	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_BG_CON,
+ 				RG_DSI_VOUT_MSK |
+ 				RG_DSI_BG_CKEN | RG_DSI_BG_CORE_EN,
+@@ -210,24 +216,18 @@ static int mtk_mipi_tx_pll_prepare(struct clk_hw *hw)
+ 
+ 	usleep_range(30, 100);
+ 
+-	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_TOP_CON,
+-				RG_DSI_LNT_IMP_CAL_CODE | RG_DSI_LNT_HS_BIAS_EN,
+-				(8 << 4) | RG_DSI_LNT_HS_BIAS_EN);
+-
+-	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_DSI_CON,
+-			     RG_DSI_CKG_LDOOUT_EN | RG_DSI_LDOCORE_EN);
++	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_CON,
++				RG_DSI_CKG_LDOOUT_EN | RG_DSI_LDOCORE_EN,
++				RG_DSI_CKG_LDOOUT_EN | RG_DSI_LDOCORE_EN);
+ 
+ 	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_PLL_PWR,
+ 				RG_DSI_MPPLL_SDM_PWR_ON |
+ 				RG_DSI_MPPLL_SDM_ISO_EN,
+ 				RG_DSI_MPPLL_SDM_PWR_ON);
+ 
+-	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_DSI_PLL_CON0,
+-			       RG_DSI_MPPLL_PLL_EN);
+-
+ 	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_PLL_CON0,
+-				RG_DSI_MPPLL_TXDIV0 | RG_DSI_MPPLL_TXDIV1 |
+-				RG_DSI_MPPLL_PREDIV,
++				RG_DSI_MPPLL_PREDIV | RG_DSI_MPPLL_TXDIV0 |
++				RG_DSI_MPPLL_TXDIV1 | RG_DSI_MPPLL_POSDIV,
+ 				(txdiv0 << 3) | (txdiv1 << 5));
+ 
+ 	/*
+@@ -242,10 +242,12 @@ static int mtk_mipi_tx_pll_prepare(struct clk_hw *hw)
+ 		      26000000);
+ 	writel(pcw, mipi_tx->regs + MIPITX_DSI_PLL_CON2);
+ 
+-	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_DSI_PLL_CON1,
+-			     RG_DSI_MPPLL_SDM_FRA_EN);
++	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_PLL_CON1,
++				RG_DSI_MPPLL_SDM_FRA_EN,
++				RG_DSI_MPPLL_SDM_FRA_EN);
+ 
+-	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_DSI_PLL_CON0, RG_DSI_MPPLL_PLL_EN);
++	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_PLL_CON0,
++				RG_DSI_MPPLL_PLL_EN, RG_DSI_MPPLL_PLL_EN);
+ 
+ 	usleep_range(20, 100);
+ 
 -- 
 1.9.1
