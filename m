@@ -1,70 +1,27 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 2 Sep 2016 20:57:11 +0200 (CEST)
-Subject: [PATCH v3 2/9] drivers: irqchip: Add STM32 external interrupts
- support
-In-Reply-To: <1472830398-13275-3-git-send-email-alexandre.torgue@st.com>
-References: <1472830398-13275-1-git-send-email-alexandre.torgue@st.com>
- <1472830398-13275-3-git-send-email-alexandre.torgue@st.com>
-Message-ID: <alpine.DEB.2.20.1609022052470.5647@nanos>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 2 Sep 2016 19:59:40 +0100
+Subject: [PATCH 0/4] SA11x0 Clocks and removal of Neponset SMC91x hack
+In-Reply-To: <20160901.163241.42322670097531471.davem@davemloft.net>
+References: <20160829120531.GG1041@n2100.armlinux.org.uk>
+ <E1beLKT-0001U1-HK@rmk-PC.armlinux.org.uk>
+ <20160830105117.GM1041@n2100.armlinux.org.uk>
+ <20160901.163241.42322670097531471.davem@davemloft.net>
+Message-ID: <20160902185940.GG1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alexandre,
+On Thu, Sep 01, 2016 at 04:32:41PM -0700, David Miller wrote:
+> From: Russell King - ARM Linux <linux@armlinux.org.uk>
+> Date: Tue, 30 Aug 2016 11:51:17 +0100
+> 
+> > Please ack these changes; due to the dependencies, I wish to merge
+> > them through my tree.  Thanks.
+> 
+> Acked-by: David S. Miller <davem@davemloft.net>
 
-On Fri, 2 Sep 2016, Alexandre TORGUE wrote:
+Many thanks David, I'll add that only to the two SMC91x patches.
 
-This all looks very reasonable. The only complaint I have is your variable
-declaration ordering or the lack thereof.
-
-1)
-> +	struct irq_domain *domain = irq_desc_get_handler_data(desc);
-> +	struct irq_chip_generic *gc = domain->gc->gc[0];
-> +	struct irq_chip *chip = irq_desc_get_chip(desc);
-> +	unsigned long pending;
-> +	int n;
-
-2)
-> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(data);
-> +	u32 rtsr, ftsr;
-> +	int pin = data->hwirq;
-
-3)
-> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(data);
-> +	int pin = data->hwirq;
-> +	u32 emr;
-
-4)
-> +	irq_hw_number_t hwirq;
-> +	struct irq_fwspec *fwspec = data;
-> +	struct irq_chip_generic *gc = d->gc->gc[0];
-
-5)
-> +	int nr_irqs, nr_exti, ret, i;
-> +	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
-> +	struct irq_domain *domain;
-> +	struct irq_chip_generic *gc;
-> +	void *base;
-
-#1 and 3 have the ordering which is preferred in the irq code.
-
-#2, #4 and #5 are three permutations which are way harder to read.
-
-> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(data);
-> +	int pin = data->hwirq;
-> +	u32 rtsr, ftsr;
-
-> +	struct irq_chip_generic *gc = d->gc->gc[0];
-> +	struct irq_fwspec *fwspec = data;
-> +	irq_hw_number_t hwirq;
-
-> +	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
-> +	int nr_irqs, nr_exti, ret, i;
-> +	struct irq_chip_generic *gc;
-> +	struct irq_domain *domain;
-> +	void *base;
-
-Can you spot the difference?
-
-Thanks,
-
-	tglx
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
