@@ -1,82 +1,42 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 03 Sep 2016 01:09:26 +0300
-Subject: [PATCH 3/3] ARM: dts: wheat: add QSPI support
-In-Reply-To: <1648590.FPpmBRoQyh@wasted.cogentembedded.com>
-References: <1648590.FPpmBRoQyh@wasted.cogentembedded.com>
-Message-ID: <3191777.fJ30rYXr4J@wasted.cogentembedded.com>
+From: pku.leo@gmail.com (Leo Li)
+Date: Fri, 2 Sep 2016 17:16:31 -0500
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <6414695.LEIYfGPUEg@wuerfel>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <87vb31kdvh.fsf@intel.com>
+ <CADRPPNTQURmuwyuXCjHZcCq6jmQDFiyEUqfcqO-us15nosGCDA@mail.gmail.com>
+ <6414695.LEIYfGPUEg@wuerfel>
+Message-ID: <CADRPPNR1_6fbaHLvbmNZW+r7YWW=vOZ+wGCS-MAcNPi9gB3eOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Wheat board dependent part of the QSPI device node.
-Add device nodes for Spansion S25FL512S SPI flash and MTD partitions on it.
+On Fri, Sep 2, 2016 at 5:43 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday, September 1, 2016 5:14:28 PM CEST Leo Li wrote:
+>>
+>> Hi Felipe and Arnd,
+>>
+>> It has been a while since the last response to this discussion, but we
+>> haven't reached an agreement yet!  Can we get to a conclusion on if it
+>> is valid to create child platform device for abstraction purpose?  If
+>> yes, can this child device do DMA by itself?
+>
+> I'd say it's no problem for a driver to create child devices in order
+> to represent different aspects of a device, but you should not rely on
+> those devices working when used with the dma-mapping interfaces.
+>
+> This used to be simpler back when we could configure the kernel for
+> only one SoC platform at a time, and the platforms could provide their
+> own overrides for the dma-mapping interfaces. These days, we rely on
+> firmware or bootloader to describe various aspects of how DMA is done,
+> so you can't assume that passing a device without an of_node pointer
+> or ACPI data into those functions will do the right thing.
 
-Based  on the original (and large) patch by Vladimir Barinov
-<vladimir.barinov@cogentembedded.com>.
+Can we use the firmware or bootloader information to provide the
+default dma-mapping attributes for devices that doesn't have an
+of_node pointer or ACPI data?  This will at least restore what we had
+previously provided .  I'm concerned that changing all the drivers
+that are creating child device will be a big effort.  Like I mentioned
+in another thread, there are many instances of platform_device_add()
+under the drivers/ directory.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
----
- arch/arm/boot/dts/r8a7792-wheat.dts |   43 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7792-wheat.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7792-wheat.dts
-+++ renesas/arch/arm/boot/dts/r8a7792-wheat.dts
-@@ -132,6 +132,11 @@
- 		function = "sdhi0";
- 	};
- 
-+	qspi_pins: qspi {
-+		groups = "qspi_ctrl", "qspi_data4";
-+		function = "qspi";
-+	};
-+
- 	du0_pins: du0 {
- 		groups = "du0_rgb888", "du0_sync", "du0_disp";
- 		function = "du0";
-@@ -173,6 +178,44 @@
- 	status = "okay";
- };
- 
-+&qspi {
-+	pinctrl-0 = <&qspi_pins>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+
-+	flash at 0 {
-+		compatible = "spansion,s25fl512s", "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <30000000>;
-+		spi-tx-bus-width = <4>;
-+		spi-rx-bus-width = <4>;
-+		spi-cpol;
-+		spi-cpha;
-+		m25p,fast-read;
-+
-+		partitions {
-+			compatible = "fixed-partitions";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			partition at 0 {
-+				label = "loader";
-+				reg = <0x00000000 0x00040000>;
-+				read-only;
-+			};
-+			partition at 40000 {
-+				label = "user";
-+				reg = <0x00040000 0x00400000>;
-+				read-only;
-+			};
-+			partition at 440000 {
-+				label = "flash";
-+				reg = <0x00440000 0x03bc0000>;
-+			};
-+		};
-+	};
-+};
-+
- &i2c4 {
- 	status = "okay";
- 	clock-frequency = <400000>;
+- Leo
