@@ -1,80 +1,76 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri,  2 Sep 2016 16:02:06 +0100
-Subject: [PATCH v2 0/7] arm64: Privileged Access Never using TTBR0_EL1
- switching
-Message-ID: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
+Date: Fri,  2 Sep 2016 16:02:08 +0100
+Subject: [PATCH v2 2/7] arm64: Factor out TTBR0_EL1 post-update workaround
+ into a specific asm macro
+In-Reply-To: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
+References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1472828533-28197-3-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the second version of the arm64 PAN emulation by disabling
-TTBR0_EL1 accesses. The major change from v1 is the use of a thread_info
-member to store the real TTBR0_EL1 value. The advantage is slightly
-simpler assembler macros for uaccess_enable with the downside that
-switch_mm() must always update the saved ttbr0 even if there is no mm
-switch.
+This patch takes the errata workaround code out of cpu_do_switch_mm into
+a dedicated post_ttbr0_update_workaround macro which will be reused in a
+subsequent patch.
 
-Whether we could simplify these patches further to use some TCR_EL1.EPD0
-tricks remains to be confirmed with the ARM architects. However, it is
-unlikely that they would deem such idea architecturally safe, hence this
-series only switches TTBR0_EL1 in accordance with the ARM ARM.
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Kees Cook <keescook@chromium.org>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/include/asm/assembler.h | 21 +++++++++++++++++++++
+ arch/arm64/mm/proc.S               | 12 +-----------
+ 2 files changed, 22 insertions(+), 11 deletions(-)
 
-Changes since v1:
-
-- Using thread_info instead of per-CPU variable for the real TTBR0_EL1
-  value (mentioned above)
-
-- Factored out the cpu_do_switch_mm errata workaround to a separate
-  macro and avoided the "errata" argument to the uaccess_enable asm
-  macro
-
-- Fix build error with allnoconfig by moving the uaccess_* asm macros to
-  asm/uaccess.h and avoid some cyclic header includes
-
-- _PSR_PAN_BIT moved to the non-uapi ptrace.h
-
-- Use x21 instead of lr as temporary register in entry.S
-
-As per v1, the code requires more testing, especially for combinations
-where hardware PAN and/or UAO are present.
-
-The patches are also available on this branch:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux ttbr0-pan
-
-Thanks for reviewing/testing.
-
-Catalin Marinas (7):
-  arm64: Factor out PAN enabling/disabling into separate uaccess_* macros
-  arm64: Factor out TTBR0_EL1 post-update workaround into a specific asm macro
-  arm64: Introduce uaccess_{disable,enable} functionality based on TTBR0_EL1
-  arm64: Disable TTBR0_EL1 during normal kernel execution
-  arm64: Handle faults caused by inadvertent user access with PAN enabled
-  arm64: xen: Enable user access before a privcmd hvc call
-  arm64: Enable CONFIG_ARM64_TTBR0_PAN
-
- arch/arm64/Kconfig                      |   8 ++
- arch/arm64/include/asm/assembler.h      |  37 +++++++++
- arch/arm64/include/asm/cpufeature.h     |   6 ++
- arch/arm64/include/asm/efi.h            |  14 ++++
- arch/arm64/include/asm/futex.h          |  14 ++--
- arch/arm64/include/asm/kernel-pgtable.h |   7 ++
- arch/arm64/include/asm/mmu_context.h    |  32 ++++++--
- arch/arm64/include/asm/ptrace.h         |   2 +
- arch/arm64/include/asm/thread_info.h    |   3 +
- arch/arm64/include/asm/uaccess.h        | 136 ++++++++++++++++++++++++++++++--
- arch/arm64/kernel/armv8_deprecated.c    |  10 +--
- arch/arm64/kernel/asm-offsets.c         |   3 +
- arch/arm64/kernel/cpufeature.c          |   1 +
- arch/arm64/kernel/entry.S               |  71 ++++++++++++++++-
- arch/arm64/kernel/head.S                |   6 +-
- arch/arm64/kernel/setup.c               |   8 ++
- arch/arm64/kernel/vmlinux.lds.S         |   5 ++
- arch/arm64/lib/clear_user.S             |   8 +-
- arch/arm64/lib/copy_from_user.S         |   8 +-
- arch/arm64/lib/copy_in_user.S           |   8 +-
- arch/arm64/lib/copy_to_user.S           |   8 +-
- arch/arm64/mm/context.c                 |   7 +-
- arch/arm64/mm/fault.c                   |  22 ++++--
- arch/arm64/mm/proc.S                    |  12 +--
- arch/arm64/xen/hypercall.S              |  19 +++++
- 25 files changed, 381 insertions(+), 74 deletions(-)
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index d5025c69ca81..b16bbf1fb786 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -350,4 +350,25 @@ alternative_endif
+ 	movk	\reg, :abs_g0_nc:\val
+ 	.endm
+ 
++/*
++ * Errata workaround post TTBR0_EL1 update.
++ */
++	.macro	post_ttbr0_update_workaround, ret = 0
++alternative_if_not ARM64_WORKAROUND_CAVIUM_27456
++	.if	\ret
++	ret
++	.endif
++	nop
++	nop
++	nop
++alternative_else
++	ic	iallu
++	dsb	nsh
++	isb
++	.if	\ret
++	ret
++	.endif
++alternative_endif
++	.endm
++
+ #endif	/* __ASM_ASSEMBLER_H */
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 5bb61de23201..9359659f2559 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -125,17 +125,7 @@ ENTRY(cpu_do_switch_mm)
+ 	bfi	x0, x1, #48, #16		// set the ASID
+ 	msr	ttbr0_el1, x0			// set TTBR0
+ 	isb
+-alternative_if_not ARM64_WORKAROUND_CAVIUM_27456
+-	ret
+-	nop
+-	nop
+-	nop
+-alternative_else
+-	ic	iallu
+-	dsb	nsh
+-	isb
+-	ret
+-alternative_endif
++	post_ttbr0_update_workaround ret = 1
+ ENDPROC(cpu_do_switch_mm)
+ 
+ 	.pushsection ".idmap.text", "ax"
