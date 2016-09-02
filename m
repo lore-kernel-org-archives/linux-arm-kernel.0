@@ -1,45 +1,92 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 3 Sep 2016 03:05:35 +0800
-Subject: [PATCH 5/5] clocks: exynos5433: add runtime pm support
-In-Reply-To: <1472737551-15272-6-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <201609030204.kxxcESS2%fengguang.wu@intel.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 2 Sep 2016 21:10:43 +0200 (CEST)
+Subject: [PATCH v3 6/9] pinctrl: Add IRQ support to STM32 gpios
+In-Reply-To: <1472830398-13275-7-git-send-email-alexandre.torgue@st.com>
+References: <1472830398-13275-1-git-send-email-alexandre.torgue@st.com>
+ <1472830398-13275-7-git-send-email-alexandre.torgue@st.com>
+Message-ID: <alpine.DEB.2.20.1609022057490.5647@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Fri, 2 Sep 2016, Alexandre TORGUE wrote:
+> +static int stm32_gpio_domain_translate(struct irq_domain *d,
+> +				       struct irq_fwspec *fwspec,
+> +				       unsigned long *hwirq,
+> +				       unsigned int *type)
+> +{
+> +	if ((fwspec->param_count != 2) ||
+> +		(fwspec->param[0] >= STM32_GPIO_IRQ_LINE))
+> +		return -EINVAL;
 
-[auto build test WARNING on clk/clk-next]
-[also build test WARNING on v4.8-rc4 next-20160825]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-[Check https://git-scm.com/docs/git-format-patch for more information]
+Just a nitpick. This is unnecessarily hard to parse because you indented
+the line break like a conditional statement
 
-url:    https://github.com/0day-ci/linux/commits/Marek-Szyprowski/Add-runtime-PM-support-for-clocks-on-Exynos-SoC-example/20160901-215042
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: xtensa-allmodconfig (attached as .config)
-compiler: xtensa-linux-gcc (GCC) 4.9.0
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=xtensa 
+> +	if ((fwspec->param_count != 2) ||
+> +	    (fwspec->param[0] >= STM32_GPIO_IRQ_LINE))
+> +		return -EINVAL;
 
-All warnings (new ones prefixed by >>):
+Makes it immediately obvious that the second line belongs to the if.
 
->> WARNING: vmlinux.o(.data+0x1a3a38): Section mismatch in reference from the variable exynos5433_cmu_driver to the function .init.text:set_reset_devices()
-   The variable exynos5433_cmu_driver references
-   the function __init set_reset_devices()
-   If the reference is valid then annotate the
-   variable with or __refdata (see linux/init.h) or name the variable:
-   
+> +static void stm32_gpio_domain_activate(struct irq_domain *d,
+> +				       struct irq_data *irq_data)
+> +{
+> +	struct stm32_gpio_bank *bank = d->host_data;
+> +	struct stm32_pinctrl *pctl = dev_get_drvdata(bank->gpio_chip.parent);
+> +
+> +	if (gpiochip_lock_as_irq(&bank->gpio_chip, irq_data->hwirq)) {
+> +		dev_err(pctl->dev,
+> +			"Unable to configure STM32 %s%ld as IRQ\n",
+> +			bank->gpio_chip.label, irq_data->hwirq);
+> +		return;
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 46061 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160903/7281a9c1/attachment-0001.obj>
+Hmm, that's nasty. When an interrupt is mapped then we don't expect the
+activate function to fail. You really should lock that interrupt when it's
+mapped.
+
+> +	}
+> +	regmap_field_write(pctl->irqmux[irq_data->hwirq], bank->range.id);
+> +}
+
+> +static int stm32_gpio_domain_alloc(struct irq_domain *domain,
+> +				   unsigned int virq,
+> +				   unsigned int nr_irqs, void *data)
+> +{
+> +	struct irq_fwspec *fwspec = data;
+> +	struct irq_fwspec parent_fwspec;
+> +	struct stm32_pinctrl *pctl = domain->host_data;
+> +	irq_hw_number_t hwirq;
+> +	unsigned int i;
+> +
+> +	hwirq = fwspec->param[0];
+> +	for (i = 0; i < nr_irqs; i++)
+> +		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
+> +					      &stm32_gpio_irq_chip, pctl);
+> +
+> +	parent_fwspec.fwnode = domain->parent->fwnode;
+> +	parent_fwspec.param_count = 2;
+> +	parent_fwspec.param[0] = fwspec->param[0];
+> +	parent_fwspec.param[1] = fwspec->param[1];
+> +
+> +	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs,
+> +			&parent_fwspec);
+
+So doing it here would be probably the right thing to do:
+
+
+	ret = gpiochip_lock_as_irq();
+	if (ret)
+		return ret;
+
+   	ret = irq_domain_alloc_irqs_parent(domain, virq, nr_irqs,
+	      				   &parent_fwspec);
+	if (ret)
+		gpiochip_unlock_as_irq();
+
+	return ret;
+
+So of course you need your own free() function which undoes that lock
+thingy.
+
+Thanks,
+
+	tglx
