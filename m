@@ -1,58 +1,24 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Fri, 2 Sep 2016 15:58:00 +0200
-Subject: [GIT PULL] STi DT updates for v4.9
-Message-ID: <c83fda3c-5120-a55b-dfb0-f550cbaf777a@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 02 Sep 2016 16:01:07 +0200
+Subject: [PATCH 0/5] CCN fixes for 4.8
+In-Reply-To: <1471019156-5485-1-git-send-email-pawel.moll@arm.com>
+References: <1471019156-5485-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <4562884.ulVluvhm7B@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd and Kevin,
+On Friday, August 12, 2016 5:25:51 PM CEST Pawel Moll wrote:
+> Greetings, Arnd, Olof, Kevin,
+> 
+> This is a small set of various CCN driver fixes I accumulated over the
+> last few weeks.
+> 
+> I'll send a pull request later, probably next week, that will also
+> include Mark's patches he sent out yesterday.
+> 
 
-Please consider this first round of STi DT updates for v4.9:
+This seems to have gotten lost, I picked it up into the fixes branch now.
 
+Sorry for the delay.
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
-
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git
-
-for you to fetch changes up to ba5ba11906d5462993f5fd4e3da4d234505427a0:
-
-  ARM: dts: STiH41x-b2020: Update gpio specifier (2016-09-02 15:15:14 +0200)
-
-----------------------------------------------------------------
-
-STi dts fixes and new STi 96board support:
-
-Add thermal node for STiH407 family boards
-Add specific nodes for STMicroelectronics 96Board
-Add new B2260 STi board file = 96Board
-Fix ahci issue on STiH407 family
-Fix debugfs/pinctrl kernel warning
-Update gpio-cells and gpio specifier
-
-----------------------------------------------------------------
-Patrice Chotard (10):
-      ARM: dts: STiH407: Move pio20 node to fix kernel warning
-      ARM: dts: STiH410: Add thermal node
-      ARM: dts: STiH407-pinctrl: Add i2c2_alt2_1 node
-      ARM: dts: STiH407: Move non-removable property to board file
-      ARM: dts: STiH407-pinctrl: Add pinctrl_rgmii1_mdio_1 node
-      ARM: dts: STiH407-family: Add ports-implemented property in sata nodes
-      ARM: dts: STi: Introduce B2260 board
-      ARM: dts: STiH407-pinctrl: Update gpio-cells to 2
-      ARM: dts: STiH418-B2199: Update gpio specifier
-      ARM: dts: STiH41x-b2020: Update gpio specifier
-
- arch/arm/boot/dts/Makefile             |   1 +
- arch/arm/boot/dts/stih407-family.dtsi  |   5 +-
- arch/arm/boot/dts/stih407-pinctrl.dtsi |  82 ++++++++------
- arch/arm/boot/dts/stih410-b2260.dts    | 190 +++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/stih410.dtsi         |   8 ++
- arch/arm/boot/dts/stih418-b2199.dts    |   8 +-
- arch/arm/boot/dts/stih41x-b2020.dtsi   |   6 +-
- arch/arm/boot/dts/stihxxx-b2120.dtsi   |   1 +
- 8 files changed, 259 insertions(+), 42 deletions(-)
- create mode 100644 arch/arm/boot/dts/stih410-b2260.dts
+	Arnd
