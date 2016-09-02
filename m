@@ -1,62 +1,80 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 2 Sep 2016 09:04:25 +0200
-Subject: [PATCH v2 4/7] dts: sun8i-h3: add UART1-3 to Orange Pi Plus
-In-Reply-To: <1472671858-29220-5-git-send-email-jorik@kippendief.biz>
-References: <1472671858-29220-1-git-send-email-jorik@kippendief.biz>
- <1472671858-29220-5-git-send-email-jorik@kippendief.biz>
-Message-ID: <20160902070425.GB6313@lukather>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 2 Sep 2016 15:25:14 +0800
+Subject: [PATCH 1/6] clk: sunxi-ng: div: Add mux table macros
+In-Reply-To: <20160901141617.9777-2-maxime.ripard@free-electrons.com>
+References: <20160901141617.9777-1-maxime.ripard@free-electrons.com>
+ <20160901141617.9777-2-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v65LC_r_ppfm48xt8gsomGQPaTHg+F6CwFdeq9mvBiAGBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Sep 1, 2016 at 10:16 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Add some macros to ease the declaration of clocks that are using them.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-On Wed, Aug 31, 2016 at 09:30:55PM +0200, jorik at kippendief.biz wrote:
-> From: Jorik Jonker <jorik@kippendief.biz>
-> 
-> This board has UARTS1-3 exposed on its expansion header
-> 
-> Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+
 > ---
->  arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-> index b0cb417..7a17839 100644
-> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-> @@ -90,6 +90,21 @@
->  	};
->  };
->  
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart1_pins_a>;
-> +};
+>  drivers/clk/sunxi-ng/ccu_div.h | 28 +++++++++++++++++++++-------
+>  1 file changed, 21 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/clk/sunxi-ng/ccu_div.h b/drivers/clk/sunxi-ng/ccu_div.h
+> index 5d98549e23a6..a5c9eaf90e84 100644
+> --- a/drivers/clk/sunxi-ng/ccu_div.h
+> +++ b/drivers/clk/sunxi-ng/ccu_div.h
+> @@ -77,13 +77,16 @@ struct ccu_div {
+>                                       _shift, _width, _table, 0,        \
+>                                       _flags)
+>
+> -#define SUNXI_CCU_M_WITH_MUX_GATE(_struct, _name, _parents, _reg,      \
+> -                                 _mshift, _mwidth, _muxshift, _muxwidth, \
+> -                                 _gate, _flags)                        \
+> +#define SUNXI_CCU_M_WITH_MUX_TABLE_GATE(_struct, _name,                        \
+> +                                       _parents, _table,               \
+> +                                       _reg,                           \
+> +                                       _mshift, _mwidth,               \
+> +                                       _muxshift, _muxwidth,           \
+> +                                       _gate, _flags)                  \
+>         struct ccu_div _struct = {                                      \
+>                 .enable = _gate,                                        \
+>                 .div    = _SUNXI_CCU_DIV(_mshift, _mwidth),             \
+> -               .mux    = _SUNXI_CCU_MUX(_muxshift, _muxwidth),         \
+> +               .mux    = _SUNXI_CCU_MUX_TABLE(_muxshift, _muxwidth, _table), \
+>                 .common = {                                             \
+>                         .reg            = _reg,                         \
+>                         .hw.init        = CLK_HW_INIT_PARENTS(_name,    \
+> @@ -93,12 +96,23 @@ struct ccu_div {
+>                 },                                                      \
+>         }
+>
+> +#define SUNXI_CCU_M_WITH_MUX_GATE(_struct, _name, _parents, _reg,      \
+> +                                 _mshift, _mwidth, _muxshift, _muxwidth, \
+> +                                 _gate, _flags)                        \
+> +       SUNXI_CCU_M_WITH_MUX_TABLE_GATE(_struct, _name,                 \
+> +                                       _parents, NULL,                 \
+> +                                       _reg, _mshift, _mwidth,         \
+> +                                       _muxshift, _muxwidth,           \
+> +                                       _gate, _flags)
 > +
-> +&uart2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart2_pins_a>;
-> +};
-> +
-> +&uart3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart3_pins_a>;
-> +};
-> +
+>  #define SUNXI_CCU_M_WITH_MUX(_struct, _name, _parents, _reg,           \
+>                              _mshift, _mwidth, _muxshift, _muxwidth,    \
+>                              _flags)                                    \
+> -       SUNXI_CCU_M_WITH_MUX_GATE(_struct, _name, _parents, _reg,       \
+> -                                 _mshift, _mwidth, _muxshift, _muxwidth, \
+> -                                 0, _flags)
+> +       SUNXI_CCU_M_WITH_MUX_TABLE_GATE(_struct, _name,                 \
+> +                                       _parents, NULL,                 \
+> +                                       _reg, _mshift, _mwidth,         \
+> +                                       _muxshift, _muxwidth,           \
+> +                                       0, _flags)
 
-Unfortunately, these pins can be used for other purposes as well, so
-we cannot make force that decision down to our users.
+You probably didn't need to change this one though.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160902/b90f2714/attachment.sig>
+>
+>
+>  #define SUNXI_CCU_M_WITH_GATE(_struct, _name, _parent, _reg,           \
+> --
+> 2.9.2
+>
