@@ -1,133 +1,122 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 02 Sep 2016 14:52:04 +0200
-Subject: [PATCH 7/8] iommu: of: Handle IOMMU lookup failure with deferred
- probing or error
-In-Reply-To: <1470696550-3416-8-git-send-email-sricharan@codeaurora.org>
-References: <1470696550-3416-1-git-send-email-sricharan@codeaurora.org>
- <1470696550-3416-8-git-send-email-sricharan@codeaurora.org>
-Message-ID: <17b1ff0a-6619-cd45-28cd-70bf79bdcc47@samsung.com>
+From: mjaggi@caviumnetworks.com (Manish Jaggi)
+Date: Fri, 2 Sep 2016 18:23:25 +0530
+Subject: [PATCH v24 0/9] arm64: add kdump support
+In-Reply-To: <20160831053109.GR20080@linaro.org>
+References: <20160809015248.28414-1-takahiro.akashi@linaro.org>
+ <0267060a-d380-2e7a-0c33-0084bfc46d97@caviumnetworks.com>
+ <20160831053109.GR20080@linaro.org>
+Message-ID: <cca40a49-3500-ded8-35a7-053adf79d12b@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan,
-
-On 2016-08-09 00:49, Sricharan R wrote:
- > From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
- >
- > Failures to look up an IOMMU when parsing the DT iommus property need to
- > be handled separately from the .of_xlate() failures to support deferred
- > probing.
- >
- > The lack of a registered IOMMU can be caused by the lack of a driver for
- > the IOMMU, the IOMMU device probe not having been performed yet, having
- > been deferred, or having failed.
- >
- > The first case occurs when the device tree describes the bus master and
- > IOMMU topology correctly but no device driver exists for the IOMMU yet
- > or the device driver has not been compiled in. Return NULL, the caller
- > will configure the device without an IOMMU.
- >
- > The second and third cases are handled by deferring the probe of the bus
- > master device which will eventually get reprobed after the IOMMU.
- >
- > The last case is currently handled by deferring the probe of the bus
- > master device as well. A mechanism to either configure the bus master
- > device without an IOMMU or to fail the bus master device probe depending
- > on whether the IOMMU is optional or mandatory would be a good
- > enhancement.
- >
- > Signed-off-by: Laurent Pinchart 
-<laurent.pinchart+renesas@ideasonboard.com>
-
-It is a common practice to briefly describe here what has been changed
-since the original patch if you have modified it (see commit
-855ed04a3758b205e84b269f92d26ab36ed8e2f7 for the example).
-
- > Signed-off-by: Sricharan R <sricharan@codeaurora.org>
- > ---
- >  drivers/iommu/of_iommu.c | 21 +++++++++++++++++----
- >  drivers/of/device.c      |  2 ++
- >  2 files changed, 19 insertions(+), 4 deletions(-)
- >
- > diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
- > index 4c4219d..3994cf5 100644
- > --- a/drivers/iommu/of_iommu.c
- > +++ b/drivers/iommu/of_iommu.c
- > @@ -149,7 +149,7 @@ const struct iommu_ops *of_iommu_configure(struct 
-device *dev,
- >  {
- >      struct of_phandle_args iommu_spec;
- >      struct device_node *np = NULL;
- > -    struct iommu_ops *ops = NULL;
- > +    const struct iommu_ops *ops = NULL;
- >      int idx = 0;
- >
- >      if (dev_is_pci(dev)) {
- > @@ -189,8 +189,21 @@ const struct iommu_ops 
-*of_iommu_configure(struct device *dev,
- >          np = iommu_spec.np;
- >          ops = of_iommu_get_ops(np);
- >
- > -        if (!ops || !ops->of_xlate || ops->of_xlate(dev, &iommu_spec))
- > +        if (!ops) {
- > +            const struct of_device_id *oid;
- > +
- > +            oid = of_match_node(&__iommu_of_table, np);
- > +            ops = oid ? ERR_PTR(-EPROBE_DEFER) : NULL;
- >              goto err_put_node;
- > +        }
- > +
- > +        if (!ops->of_xlate || ops->of_xlate(dev, &iommu_spec)) {
- > +            ops = NULL;
- > +            goto err_put_node;
- > +        }
- > +
- > +        if (ops->add_device)
- > +            ops = ops->add_device(dev) ? ops : NULL;
-
-ops->add_device() returns ZERO on success or error code on failure, so 
-the above
-line should be changed to:
-             ops = (ops->add_device(dev) == 0) ? ops : NULL;
 
 
- >          of_node_put(np);
- >          idx++;
- > @@ -200,7 +213,7 @@ const struct iommu_ops *of_iommu_configure(struct 
-device *dev,
- >
- >  err_put_node:
- >      of_node_put(np);
- > -    return NULL;
- > +    return ops;
- >  }
- >
- >  void __init of_iommu_init(void)
- > @@ -211,7 +224,7 @@ void __init of_iommu_init(void)
- >      for_each_matching_node_and_match(np, matches, &match) {
- >          const of_iommu_init_fn init_fn = match->data;
- >
- > -        if (init_fn(np))
- > +        if (init_fn && init_fn(np))
- >              pr_err("Failed to initialise IOMMU %s\n",
- >                  of_node_full_name(np));
- >      }
- > diff --git a/drivers/of/device.c b/drivers/of/device.c
- > index e1fad50..92e02dc 100644
- > --- a/drivers/of/device.c
- > +++ b/drivers/of/device.c
- > @@ -149,6 +149,8 @@ int of_dma_configure_ops(struct device *dev, 
-struct device_node *np)
- >          coherent ? " " : " not ");
- >
- >      iommu = of_iommu_configure(dev, np);
- > +    if (IS_ERR(iommu))
- > +        return PTR_ERR(iommu);
- >      dev_dbg(dev, "device is%sbehind an iommu\n",
- >          iommu ? " " : " not ");
- >
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+On 08/31/2016 11:01 AM, AKASHI Takahiro wrote:
+> Manish,
+> 
+> Thank you for testing my kdump and reporting issues.
+> 
+> On Wed, Aug 31, 2016 at 09:11:52AM +0530, Manish Jaggi wrote:
+>> Hi Akashi,
+>>
+>> On 08/09/2016 07:22 AM, AKASHI Takahiro wrote:
+>>> This patch series adds kdump support on arm64.
+>>>
+>>> To load a crash-dump kernel to the systems, a series of patches to
+>>> kexec-tools, which have not yet been merged upstream, are needed.
+>>> Please use my kdump patches [1].
+>>>
+>>> To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
+>>>   - crash utility (coming v7.1.6 or later) [2]
+>>>     (Necessary patches have already been queued in the master.)
+>>>
+>>> [1] T.B.D.
+>>> [2] https://github.com/crash-utility/crash.git
+>>>
+>>> Changes for v24 (Aug 9, 2016):
+>>>   o Rebase to Linux-4.8-rc1
+>>>   o Update descriptions about newly added DT proerties
+>>>
+>>> Changes for v23 (July 26, 2016):
+>>>
+>>>   o Move memblock_reserve() to a single place in reserve_crashkernel()
+>>>   o Use  cpu_park_loop() in ipi_cpu_crash_stop()
+>>>   o Always enforce ARCH_LOW_ADDRESS_LIMIT to the memory range of crash kernel
+>>>   o Re-implement fdt_enforce_memory_region() to remove non-reserve regions
+>>>     (for ACPI) from usable memory at crash kernel
+>>>
+>>> Changes for v22 (July 12, 2016):
+>>>
+>>>   o Export "crashkernel-base" and "crashkernel-size" via device-tree,
+>>>     and add some descriptions about them in chosen.txt
+>>>   o Rename "usable-memory" to "usable-memory-range" to avoid inconsistency
+>>>     with powerpc's "usable-memory"
+>>>   o Make cosmetic changes regarding "ifdef" usage
+>>>   o Correct some wordings in kdump.txt
+>>>
+>>> Changes for v21 (July 6, 2016):
+>>>
+>>>   o Remove kexec patches.
+>>>   o Rebase to arm64's for-next/core (Linux-4.7-rc4 based).
+>>>   o Clarify the description about kvm in kdump.txt.
+>>>
+>>> See the following link [3] for older changes:
+>>> [3]  http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438780.html
+>>>
+>>> AKASHI Takahiro (8):
+>>>   arm64: kdump: reserve memory for crash dump kernel
+>>>   memblock: add memblock_cap_memory_range()
+>>>   arm64: limit memory regions based on DT property, usable-memory-range
+>>>   arm64: kdump: implement machine_crash_shutdown()
+>>>   arm64: kdump: add kdump support
+>>>   arm64: kdump: add VMCOREINFO's for user-space coredump tools
+>>>   arm64: kdump: enable kdump in the arm64 defconfig
+>>>   arm64: kdump: update a kernel doc
+>>>
+>>> James Morse (1):
+>>>   Documentation: dt: chosen properties for arm64 kdump
+>>>
+>>>  Documentation/devicetree/bindings/chosen.txt |  45 ++++++
+>>>  Documentation/kdump/kdump.txt                |  16 ++-
+>>>  arch/arm64/Kconfig                           |  11 ++
+>>>  arch/arm64/configs/defconfig                 |   1 +
+>>>  arch/arm64/include/asm/hardirq.h             |   2 +-
+>>>  arch/arm64/include/asm/kexec.h               |  41 +++++-
+>>>  arch/arm64/include/asm/smp.h                 |   2 +
+>>>  arch/arm64/kernel/Makefile                   |   1 +
+>>>  arch/arm64/kernel/crash_dump.c               |  71 ++++++++++
+>>>  arch/arm64/kernel/machine_kexec.c            |  67 ++++++++-
+>>>  arch/arm64/kernel/setup.c                    |   7 +-
+>>>  arch/arm64/kernel/smp.c                      |  63 +++++++++
+>>>  arch/arm64/mm/init.c                         | 202 +++++++++++++++++++++++++++
+>>>  include/linux/memblock.h                     |   1 +
+>>>  mm/memblock.c                                |  28 ++++
+>>>  15 files changed, 551 insertions(+), 7 deletions(-)
+>>>  create mode 100644 arch/arm64/kernel/crash_dump.c
+>>>
+>> Couple of points
+>> a) Just a note, while testing, the crashkernel reserved memory should be less than ARCH_LOW_ADDRESS_LIMIT (=arm64_dma_phys_limit).
+> 
+> I think that this is a common mistake not only for kdump, but also
+> for general kernels.
+> Since request_standard_resources() calls alloc_bootmem_low(),
+> the kernel will panic if any of usable "System RAM" is located
+> above ARCH_LOW_ADDRESS_LIMIT.
+> For kdump, using "crashkernel=SS" notation is a convenient way
+> to avoid this issue.
+> 
+>> b) Has anyone tested this on a SoC with Gicv3 ITS ?
+>> Should the GICD/R be reset prior to switching to crash kernel ?
+>> I am seeing lot of GICv3: RWP timeout, gone fishing while crash kernel boots.
+> 
+> I've never seen this kind of messages.
+> I usually do my testing on a fast model.
+> "compatible" of interrupt-controller is "arm,gic-v3."
+> 
+I suspect gic_cpu_pm_notifier is not being called on any of the cores prior to start of crash kernel.
+We might have to call it explicitly.
+> Thanks,
+> -Takahiro AKASHI
+> 
+>> Thanks,
+>> Manish
