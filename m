@@ -1,43 +1,59 @@
-From: chris.brandt@renesas.com (Chris Brandt)
-Date: Thu,  1 Sep 2016 21:40:11 -0400
-Subject: [PATCH v2 2/3] ARM: dts: r7s72100: add ethernet to device tree
-In-Reply-To: <20160902014012.9383-1-chris.brandt@renesas.com>
-References: <20160901155430.23400-1-chris.brandt@renesas.com>
- <20160902014012.9383-1-chris.brandt@renesas.com>
-Message-ID: <20160902014012.9383-2-chris.brandt@renesas.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 2 Sep 2016 09:44:17 +0800
+Subject: [linux-sunxi] [PATCH 6/7] ARM: sun8i: a33: Add RGB666 pins
+In-Reply-To: <20160901153204.11217-7-maxime.ripard@free-electrons.com>
+References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
+ <20160901153204.11217-7-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v64kbkyS8eDtNrsok5UU9BTVr0mJBi_4bn1TnaxHmzfSTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v2:
-* Removed MSTP7 clock node
----
- arch/arm/boot/dts/r7s72100.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Hi,
 
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index 6d29e8f..fb9ef9c 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -428,4 +428,17 @@
- 		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
-+
-+	ether: ethernet at e8203000 {
-+		compatible = "renesas,ether-r7s72100";
-+		reg = <0xe8203000 0x800>,
-+		      <0xe8204800 0x200>;
-+		interrupts = <GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp7_clks R7S72100_CLK_ETHER>;
-+		power-domains = <&cpg_clocks>;
-+		phy-mode = "mii";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
- };
--- 
-2.9.2
+On Thu, Sep 1, 2016 at 11:32 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The LCD output needs to be muxed. Add the proper pinctrl node.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun8i-a33.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
+> index 5f9dbd17eb50..d5f93c05846f 100644
+> --- a/arch/arm/boot/dts/sun8i-a33.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-a33.dtsi
+> @@ -300,6 +300,16 @@
+>         interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
+>                      <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+>
+> +       tcon0_rgb666_pins_a: tcon0_rgb666 at 0 {
+
+This is the only possible combination. You can drop the _a and @0.
+
+Also this can be shared with A23, as they are pin compatible, and I
+also matched the datasheets.
+
+Otherwise
+
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+
+> +               allwinner,pins = "PD2", "PD3", "PD4", "PD5", "PD6", "PD7",
+> +                                "PD10", "PD11", "PD12", "PD13", "PD14", "PD15",
+> +                                "PD18", "PD19", "PD20", "PD21", "PD22", "PD23",
+> +                                "PD24", "PD25", "PD26", "PD27";
+> +               allwinner,function = "lcd0";
+> +               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +       };
+> +
+>         uart0_pins_b: uart0 at 1 {
+>                 allwinner,pins = "PB0", "PB1";
+>                 allwinner,function = "uart0";
+> --
+> 2.9.2
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
