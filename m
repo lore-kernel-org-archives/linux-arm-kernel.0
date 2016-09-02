@@ -1,19 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 Sep 2016 18:31:55 +0200
-Subject: [GIT PULL] drop last omap3 board files for v4.8
-In-Reply-To: <20160902145717.gtyhz76bv575plch@atomide.com>
-References: <20160816155241.eka7c6p2rvp4q5zk@atomide.com>
- <4327380.4mS7Wg8her@wuerfel> <20160902145717.gtyhz76bv575plch@atomide.com>
-Message-ID: <5065725.hSDWXRnpuO@wuerfel>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 2 Sep 2016 18:32:44 +0200
+Subject: [GIT PULL 1/4] ARM: exynos: SoC/Mach for v4.9
+In-Reply-To: <5635206.ooNAZCeQOe@wuerfel>
+References: <1472548739-20050-1-git-send-email-k.kozlowski@samsung.com>
+ <1472548739-20050-5-git-send-email-k.kozlowski@samsung.com>
+ <5635206.ooNAZCeQOe@wuerfel>
+Message-ID: <20160902163244.GB5534@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 2, 2016 7:57:18 AM CEST Tony Lindgren wrote:
-> Sure thanks. Let's just not touch any of the now unused platform
-> data until v4.10 then. Otherwise we'll fast reach a point of no
-> return without reverting large patches.
+On Fri, Sep 02, 2016 at 06:26:42PM +0200, Arnd Bergmann wrote:
+> On Tuesday, August 30, 2016 11:18:59 AM CEST Krzysztof Kozlowski wrote:
+> > Samsung mach/soc update for v4.9:
+> > 1. Fix for DMA on S3C24xx. This was probably broken for long time, nobody runs
+> >    this code... till now.
+> 
+> Good to know. This reminds me that the s3c24xx DMA code is one of those
+> that need to be converted to dma_slave_map at some point. Maybe if someone
+> is now running that code, they could give that a try as well?
+> 
+> It shouldn't be hard to convert, let me know if you need more information.
 
-Ok, I've applied the branch to next/cleanup now,
-thanks a lot for getting omap to this point!
++Cc Sylwester,
 
-	Arnd
+Sylwester recently dig into this platform. I think he managed to play
+some audio.
+
+Best regards,
+Krzysztof
