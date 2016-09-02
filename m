@@ -1,40 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 Sep 2016 16:12:30 +0200
-Subject: [PATCH 0/5] CCN fixes for 4.8
-In-Reply-To: <1472825266.5415.89.camel@arm.com>
-References: <1471019156-5485-1-git-send-email-pawel.moll@arm.com>
- <4562884.ulVluvhm7B@wuerfel> <1472825266.5415.89.camel@arm.com>
-Message-ID: <33497551.k6YBegQHXJ@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 2 Sep 2016 15:15:17 +0100
+Subject: irq_create_fwspec_mapping() in 4.8-rc2
+In-Reply-To: <483F737F-9868-4E8A-A831-AA3F6F410AFF@gmail.com>
+References: <483F737F-9868-4E8A-A831-AA3F6F410AFF@gmail.com>
+Message-ID: <57C98975.5020607@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 2, 2016 3:07:46 PM CEST Pawel Moll wrote:
-> On Fri, 2016-09-02 at 16:01 +0200, Arnd Bergmann wrote:
-> > On Friday, August 12, 2016 5:25:51 PM CEST Pawel Moll wrote:
-> > > 
-> > > Greetings, Arnd, Olof, Kevin,
-> > > 
-> > > This is a small set of various CCN driver fixes I accumulated over
-> > > the
-> > > last few weeks.
-> > > 
-> > > I'll send a pull request later, probably next week, that will also
-> > > include Mark's patches he sent out yesterday.
-> > > 
-> > This seems to have gotten lost, I picked it up into the fixes branch
-> > now.
-> > 
-> > Sorry for the delay.
-> 
-> Cool, no problem - thanks!. Just want to make sure you pulled the
-> latest version, as described in the v2 request:
-> 
-> http://www.spinics.net/lists/arm-kernel/msg526595.html
-> 
+[cc-ing the maintainers of the code usually helps]
 
-I took the wrong one and applied the patches from the original
-series manually.
+On 02/09/16 07:51, Andras Szemzo wrote:
+> Hi,
+> 
+> I try to use 4.8-rc2 on my armv7m board, and I have a problem with GPIO IRQ.
+> In my device-tree, I define the ethernet PHY IRQ like this:
+> 
+>  pioC: gpio at 0x400e1200 {
+>     compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+>     reg = <0x400e1200 0x200>;
+>     interrupts = <12>;
+>     #gpio-cells = <2>;
+>     gpio-controller;
+>     interrupt-controller;
+>     #interrupt-cells = <2>;
+>     clocks = <&pioC_clk>;
+> };
+> ...
+> ethernet-phy at 1 {
+>      reg = <1>;
+>      interrupt-parent = <&pioC>;
+>      interrupts = <11 IRQ_TYPE_EDGE_FALLING>;
 
-I fixed it up now, thanks a lot for the heads-up!
+So this is the interrupt that gets a mismatch.
 
-	Arnd
+>      reset-gpios = <&pioC 10 GPIO_ACTIVE_HIGH>;
+> };
+> 
+> with the 4.8-rc2 kernel at boot it fails with error:
+> 
+> irq: type mismatch, failed to map hwirq-11 for /soc/pinctrl at 0x400e0e00/gpio at 0x400e1200!
+> 
+> This error comes from kernel/irq/irq_domain.c, irq_create_fwspec_mapping().
+> 
+> My quick hack was to replace this function from 4.6.0 (where with the same device-tree, same kernel config it works) 
+> and everything works as expected.
+> 
+> Maybe this hack is hiding a problem from somewhere else, but I can?t figure out what I missed.
+
+Is there any other device in your system that uses the same interrupt?
+Where can I see your full DT file?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
