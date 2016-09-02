@@ -1,89 +1,151 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Fri, 2 Sep 2016 06:02:14 +0000
-Subject: [PATCH v5] Axi-usb: Add support for 64-bit addressing.
-In-Reply-To: <20160901175636.GV16583@xsjsorenbubuntu>
-References: <1472719976-25410-1-git-send-email-navam@xilinx.com>
- <20160901175636.GV16583@xsjsorenbubuntu>
-Message-ID: <C89496FEAE474D468F30D558A9468D9F26D143CB@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 2 Sep 2016 14:02:30 +0800
+Subject: [PATCH 2/7] drm/sun4i: support A33 tcon
+In-Reply-To: <20160901153204.11217-3-maxime.ripard@free-electrons.com>
+References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
+ <20160901153204.11217-3-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v67boPYN5oYXzgcdzx8Tyx0FAO5do6mV193CsQ_OUuY-2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Soren,
+Hi,
 
-        Thanks for the review....
-
-> -----Original Message-----
-> From: S?ren Brinkmann [mailto:soren.brinkmann at xilinx.com]
-> Sent: Thursday, September 01, 2016 11:27 PM
-> To: Nava kishore Manne <navam@xilinx.com>
-> Cc: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
-> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; balbi at kernel.org;
-> gregkh at linuxfoundation.org; devicetree at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-
-> usb at vger.kernel.org; Nava kishore Manne <navam@xilinx.com>
-> Subject: Re: [PATCH v5] Axi-usb: Add support for 64-bit addressing.
+On Thu, Sep 1, 2016 at 11:31 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The A33 has a significantly different pipeline, with components that differ
+> too.
 >
-> On Thu, 2016-09-01 at 14:22:56 +0530, Nava kishore Manne wrote:
-> > This patch updates the driver to support 64-bit DMA addressing.
-> >
-> > Signed-off-by: Nava kishore Manne <navam@xilinx.com>
-> > Acked-by: Rob Herring <robh@kernel.org>
-> > ---
-> > Changes for v5:
-> >                 -None.
-> >
-> > Changes for v4:
-> >                 -Used boolen property insted of addrwith property in the DT
-> >                  as suggested by Arnd Bergmann.
-> >                 -Adopt the DT relevant changes into the driver.
-> >
-> > Changes for v3:
-> >                 -Added new compatable string for 5.00 IP version as suggested by
-> >                  Arnd Bergmann.
-> >                 -Used write_fn() insted of lo_hi_writeq() as suggested by
-> >                  Arnd Bergmann.
-> > Changes for v2:
-> >                 -Added dma-ranges property in device tree as suggested by
-> >                  Arnd Bergmann.
-> >                 -Modified the driver code based on the xlnx,addrwidth.
-> >
-> >  .../devicetree/bindings/usb/udc-xilinx.txt         |  5 ++-
-> >  drivers/usb/gadget/udc/udc-xilinx.c                | 52
-> +++++++++++++++++++++-
-> >  2 files changed, 54 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> > b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> > index 47b4e39..d08d972 100644
-> > --- a/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> > +++ b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> > @@ -1,12 +1,14 @@
-> >  Xilinx USB2 device controller
-> >
-> >  Required properties:
-> > -- compatible               : Should be "xlnx,usb2-device-4.00.a"
-> > +- compatible               : Should be "xlnx,usb2-device-4.00.a" or
-> > +                     "xlnx,usb2-device-5.00"
-> >  - reg                      : Physical base address and size of the USB2
-> >                       device registers map.
-> >  - interrupts               : Should contain single irq line of USB2 device
-> >                       controller
-> >  - xlnx,has-builtin-dma     : if DMA is included
-> > +- xlnx,has-64bit-dma       : if DMA is included 64-bit addressing support.
+> Make sure we had compatible for them.
 >
-> We add these properties to describe the IP configuration + we have the
-> version indicator in the compatible string. Do we really need both? It seems
-> that all versions use the same driver and differentiation is made through the
-> DT properties that describe the IP configuration parameters.
-> Wouldn't it be better to just have one generic 'xlnx,axi-usb2' (or
-> whatever) compatible string instead of patching the driver for each new
-> version without really needing to differentiate the IP versions through it?
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 7 ++++++-
+>  drivers/gpu/drm/sun4i/sun4i_backend.c                         | 1 +
+>  drivers/gpu/drm/sun4i/sun4i_drv.c                             | 8 +++++---
+>  drivers/gpu/drm/sun4i/sun4i_tcon.c                            | 8 +++++++-
+>  4 files changed, 19 insertions(+), 5 deletions(-)
 >
-I think matching on the version number is slightly better, as we have the version
-Already and it identifies the 64-bit  registers existence.
+> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> index df8f4aeefe4c..d467ea93ac08 100644
+> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> @@ -26,7 +26,9 @@ TCON
+>  The TCON acts as a timing controller for RGB, LVDS and TV interfaces.
+>
+>  Required properties:
+> - - compatible: value should be "allwinner,sun5i-a13-tcon".
+> + - compatible: value must be either:
+> +   * allwinner,sun5i-a13-tcon
+> +   * allwinner,sun8i-a23-tcon
 
-Regards,
-Navakishore
+>From what I can tell from the manuals, the A23 TCON and A33 TCON are
+slightly different. The A23 TCON has channel 1, and it also has DMA
+input. A33 has neither. (Though the DMA chart still lists the TCON DRQ.)
 
+I think we should have separate compatibles for them. If you think
+otherwise you should mention it in the commit message.
 
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+The rest looks good though.
+
+Regards
+ChenYu
+
+>   - reg: base address and size of memory-mapped region
+>   - interrupts: interrupt associated to this IP
+>   - clocks: phandles to the clocks feeding the TCON. Three are needed:
+> @@ -59,6 +61,7 @@ system.
+>  Required properties:
+>    - compatible: value must be one of:
+>      * allwinner,sun5i-a13-display-backend
+> +    * allwinner,sun8i-a33-display-backend
+>    - reg: base address and size of the memory-mapped region.
+>    - clocks: phandles to the clocks feeding the frontend and backend
+>      * ahb: the backend interface clock
+> @@ -80,6 +83,7 @@ deinterlacing and color space conversion.
+>  Required properties:
+>    - compatible: value must be one of:
+>      * allwinner,sun5i-a13-display-frontend
+> +    * allwinner,sun8i-a33-display-frontend
+>    - reg: base address and size of the memory-mapped region.
+>    - interrupts: interrupt associated to this IP
+>    - clocks: phandles to the clocks feeding the frontend and backend
+> @@ -104,6 +108,7 @@ extra node.
+>  Required properties:
+>    - compatible: value must be one of:
+>      * allwinner,sun5i-a13-display-engine
+> +    * allwinner,sun8i-a33-display-engine
+>
+>    - allwinner,pipelines: list of phandle to the display engine
+>      frontends available.
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> index 3ab560450a82..9bfd2e45fceb 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> @@ -345,6 +345,7 @@ static int sun4i_backend_remove(struct platform_device *pdev)
+>
+>  static const struct of_device_id sun4i_backend_of_table[] = {
+>         { .compatible = "allwinner,sun5i-a13-display-backend" },
+> +       { .compatible = "allwinner,sun8i-a33-display-backend" },
+>         { }
+>  };
+>  MODULE_DEVICE_TABLE(of, sun4i_backend_of_table);
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> index 942f62e2441c..26431c2b5670 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> @@ -199,13 +199,14 @@ static const struct component_master_ops sun4i_drv_master_ops = {
+>
+>  static bool sun4i_drv_node_is_frontend(struct device_node *node)
+>  {
+> -       return of_device_is_compatible(node,
+> -                                      "allwinner,sun5i-a13-display-frontend");
+> +       return of_device_is_compatible(node, "allwinner,sun5i-a13-display-frontend") ||
+> +               of_device_is_compatible(node, "allwinner,sun8i-a33-display-frontend");
+>  }
+>
+>  static bool sun4i_drv_node_is_tcon(struct device_node *node)
+>  {
+> -       return of_device_is_compatible(node, "allwinner,sun5i-a13-tcon");
+> +       return of_device_is_compatible(node, "allwinner,sun5i-a13-tcon") ||
+> +               of_device_is_compatible(node, "allwinner,sun8i-a23-tcon");
+>  }
+>
+>  static int compare_of(struct device *dev, void *data)
+> @@ -320,6 +321,7 @@ static int sun4i_drv_remove(struct platform_device *pdev)
+>
+>  static const struct of_device_id sun4i_drv_of_table[] = {
+>         { .compatible = "allwinner,sun5i-a13-display-engine" },
+> +       { .compatible = "allwinner,sun8i-a33-display-engine" },
+>         { }
+>  };
+>  MODULE_DEVICE_TABLE(of, sun4i_drv_of_table);
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> index fde6af1230d2..078328193168 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> @@ -488,8 +488,13 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+>         tcon->drm = drm;
+>         tcon->dev = dev;
+>
+> -       if (of_device_is_compatible(dev->of_node, "allwinner,sun5i-a13-tcon"))
+> +       if (of_device_is_compatible(dev->of_node, "allwinner,sun5i-a13-tcon")) {
+>                 tcon->has_mux = true;
+> +               tcon->has_channel_1 = true;
+> +       } else {
+> +               tcon->has_mux = false;
+> +               tcon->has_channel_1 = false;
+> +       }
+>
+>         tcon->lcd_rst = devm_reset_control_get(dev, "lcd");
+>         if (IS_ERR(tcon->lcd_rst)) {
+> @@ -585,6 +590,7 @@ static int sun4i_tcon_remove(struct platform_device *pdev)
+>
+>  static const struct of_device_id sun4i_tcon_of_table[] = {
+>         { .compatible = "allwinner,sun5i-a13-tcon" },
+> +       { .compatible = "allwinner,sun8i-a23-tcon" },
+>         { }
+>  };
+>  MODULE_DEVICE_TABLE(of, sun4i_tcon_of_table);
+> --
+> 2.9.2
+>
