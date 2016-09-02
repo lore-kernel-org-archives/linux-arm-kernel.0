@@ -1,126 +1,155 @@
 From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 2 Sep 2016 11:17:04 +0800
-Subject: [PATCH v3 10/22] usb: chipidea: Consolidate extcon notifiers
-In-Reply-To: <20160901004036.23936-11-stephen.boyd@linaro.org>
+Date: Fri, 2 Sep 2016 11:33:41 +0800
+Subject: [PATCH v3 18/22] usb: chipidea: msm: Add reset controller for
+ PHY POR bit
+In-Reply-To: <20160901004036.23936-19-stephen.boyd@linaro.org>
 References: <20160901004036.23936-1-stephen.boyd@linaro.org>
- <20160901004036.23936-11-stephen.boyd@linaro.org>
-Message-ID: <20160902031704.GC16876@shlinux2>
+ <20160901004036.23936-19-stephen.boyd@linaro.org>
+Message-ID: <20160902033341.GD16876@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 31, 2016 at 05:40:24PM -0700, Stephen Boyd wrote:
-> The two extcon notifiers are almost the same except for the
-> variable name for the cable structure and the id notifier inverts
-> the cable->state logic. Make it the same and replace two
-> functions with one to save some lines. This also makes it so that
-> the id cable state is true when the id pin is pulled low.
+On Wed, Aug 31, 2016 at 05:40:32PM -0700, Stephen Boyd wrote:
+> The MSM chipidea wrapper has two bits that are used to reset the
+> first or second phy. Add support for these bits via the reset
+> controller framework, so that phy drivers can reset their
+> hardware at the right time during initialization.
 > 
 > Cc: Peter Chen <peter.chen@nxp.com>
 > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: "Ivan T. Ivanov" <iivanov.xz@gmail.com>
 > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 > ---
->  drivers/usb/chipidea/core.c | 41 ++++++++++-------------------------------
->  drivers/usb/chipidea/otg.c  |  4 ++--
->  2 files changed, 12 insertions(+), 33 deletions(-)
+>  drivers/usb/chipidea/Kconfig       |  1 +
+>  drivers/usb/chipidea/ci_hdrc_msm.c | 50 ++++++++++++++++++++++++++++++++++++--
+>  2 files changed, 49 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> index f144e1bbcc82..f3b8d7488648 100644
-> --- a/drivers/usb/chipidea/core.c
-> +++ b/drivers/usb/chipidea/core.c
-> @@ -577,35 +577,14 @@ static irqreturn_t ci_irq(int irq, void *data)
+> diff --git a/drivers/usb/chipidea/Kconfig b/drivers/usb/chipidea/Kconfig
+> index 19c20eaa23f2..fc96f5cdcb5c 100644
+> --- a/drivers/usb/chipidea/Kconfig
+> +++ b/drivers/usb/chipidea/Kconfig
+> @@ -2,6 +2,7 @@ config USB_CHIPIDEA
+>  	tristate "ChipIdea Highspeed Dual Role Controller"
+>  	depends on ((USB_EHCI_HCD && USB_GADGET) || (USB_EHCI_HCD && !USB_GADGET) || (!USB_EHCI_HCD && USB_GADGET)) && HAS_DMA
+>  	select EXTCON
+> +	select RESET_CONTROLLER
+>  	help
+>  	  Say Y here if your system has a dual role high speed USB
+>  	  controller based on ChipIdea silicon IP. It supports:
+> diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
+> index 2489a63d3e75..fe96df7b530c 100644
+> --- a/drivers/usb/chipidea/ci_hdrc_msm.c
+> +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/regmap.h>
+>  #include <linux/io.h>
+> +#include <linux/reset-controller.h>
+>  #include <linux/extcon.h>
+>  #include <linux/of.h>
+>  
+> @@ -31,8 +32,10 @@
+>  #define HSPHY_SESS_VLD_CTRL		BIT(25)
+>  
+>  /* Vendor base starts at 0x200 beyond CI base */
+> +#define HS_PHY_CTRL			0x0040
+>  #define HS_PHY_SEC_CTRL			0x0078
+>  #define HS_PHY_DIG_CLAMP_N		BIT(16)
+> +#define HS_PHY_POR_ASSERT		BIT(0)
+>  
+>  struct ci_hdrc_msm {
+>  	struct platform_device *ci;
+> @@ -40,11 +43,43 @@ struct ci_hdrc_msm {
+>  	struct clk *iface_clk;
+>  	struct clk *fs_clk;
+>  	struct ci_hdrc_platform_data pdata;
+> +	struct reset_controller_dev rcdev;
+>  	bool secondary_phy;
+>  	bool hsic;
+>  	void __iomem *base;
+>  };
+>  
+> +static int
+> +ci_hdrc_msm_por_reset(struct reset_controller_dev *r, unsigned long id)
+> +{
+> +	struct ci_hdrc_msm *ci_msm = container_of(r, struct ci_hdrc_msm, rcdev);
+> +	void __iomem *addr = ci_msm->base;
+> +	u32 val;
+> +
+> +	if (id)
+> +		addr += HS_PHY_SEC_CTRL;
+> +	else
+> +		addr += HS_PHY_CTRL;
+> +
+> +	val = readl_relaxed(addr);
+> +	val |= HS_PHY_POR_ASSERT;
+> +	writel(val, addr);
+> +	/*
+> +	 * wait for minimum 10 microseconds as suggested by manual.
+> +	 * Use a slightly larger value since the exact value didn't
+> +	 * work 100% of the time.
+> +	 */
+> +	udelay(12);
+> +	val &= ~HS_PHY_POR_ASSERT;
+> +	writel(val, addr);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct reset_control_ops ci_hdrc_msm_reset_ops = {
+> +	.reset = ci_hdrc_msm_por_reset,
+> +};
+> +
+>  static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
+>  {
+>  	struct device *dev = ci->dev->parent;
+> @@ -186,10 +221,18 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+>  	if (!ci->base)
+>  		return -ENOMEM;
+>  
+> -	ret = clk_prepare_enable(ci->fs_clk);
+> +	ci->rcdev.owner = THIS_MODULE;
+> +	ci->rcdev.ops = &ci_hdrc_msm_reset_ops;
+> +	ci->rcdev.of_node = pdev->dev.of_node;
+> +	ci->rcdev.nr_resets = 2;
+> +	ret = reset_controller_register(&ci->rcdev);
+>  	if (ret)
+>  		return ret;
+>  
+> +	ret = clk_prepare_enable(ci->fs_clk);
+> +	if (ret)
+> +		goto err_fs;
+> +
+>  	reset_control_assert(reset);
+>  	usleep_range(10000, 12000);
+>  	reset_control_deassert(reset);
+> @@ -198,7 +241,7 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+>  
+>  	ret = clk_prepare_enable(ci->core_clk);
+>  	if (ret)
+> -		return ret;
+> +		goto err_fs;
+>  
+>  	ret = clk_prepare_enable(ci->iface_clk);
+>  	if (ret)
+> @@ -236,6 +279,8 @@ err_mux:
+>  	clk_disable_unprepare(ci->iface_clk);
+>  err_iface:
+>  	clk_disable_unprepare(ci->core_clk);
+> +err_fs:
+> +	reset_controller_unregister(&ci->rcdev);
 >  	return ret;
 >  }
 >  
-> -static int ci_vbus_notifier(struct notifier_block *nb, unsigned long event,
-> -			    void *ptr)
-> +static int ci_cable_notifier(struct notifier_block *nb, unsigned long event,
-> +			     void *ptr)
->  {
-> -	struct ci_hdrc_cable *vbus = container_of(nb, struct ci_hdrc_cable, nb);
-> -	struct ci_hdrc *ci = vbus->ci;
-> +	struct ci_hdrc_cable *cbl = container_of(nb, struct ci_hdrc_cable, nb);
-> +	struct ci_hdrc *ci = cbl->ci;
+> @@ -247,6 +292,7 @@ static int ci_hdrc_msm_remove(struct platform_device *pdev)
+>  	ci_hdrc_remove_device(ci->ci);
+>  	clk_disable_unprepare(ci->iface_clk);
+>  	clk_disable_unprepare(ci->core_clk);
+> +	reset_controller_unregister(&ci->rcdev);
 >  
-> -	if (event)
-> -		vbus->state = true;
-> -	else
-> -		vbus->state = false;
-> -
-> -	vbus->changed = true;
-> -
-> -	ci_irq(ci->irq, ci);
-> -	return NOTIFY_DONE;
-> -}
-> -
-> -static int ci_id_notifier(struct notifier_block *nb, unsigned long event,
-> -			  void *ptr)
-> -{
-> -	struct ci_hdrc_cable *id = container_of(nb, struct ci_hdrc_cable, nb);
-> -	struct ci_hdrc *ci = id->ci;
-> -
-> -	if (event)
-> -		id->state = false;
-> -	else
-> -		id->state = true;
-> -
-> -	id->changed = true;
-> +	cbl->state = event;
-> +	cbl->changed = true;
->  
->  	ci_irq(ci->irq, ci);
->  	return NOTIFY_DONE;
-> @@ -714,7 +693,7 @@ static int ci_get_platdata(struct device *dev,
->  	}
->  
->  	cable = &platdata->vbus_extcon;
-> -	cable->nb.notifier_call = ci_vbus_notifier;
-> +	cable->nb.notifier_call = ci_cable_notifier;
->  	cable->edev = ext_vbus;
->  
->  	if (!IS_ERR(ext_vbus)) {
-> @@ -726,15 +705,15 @@ static int ci_get_platdata(struct device *dev,
->  	}
->  
->  	cable = &platdata->id_extcon;
-> -	cable->nb.notifier_call = ci_id_notifier;
-> +	cable->nb.notifier_call = ci_cable_notifier;
->  	cable->edev = ext_id;
->  
->  	if (!IS_ERR(ext_id)) {
->  		ret = extcon_get_cable_state_(cable->edev, EXTCON_USB_HOST);
->  		if (ret)
-> -			cable->state = false;
-> -		else
->  			cable->state = true;
-> +		else
-> +			cable->state = false;
->  	}
 >  	return 0;
 >  }
-> diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-> index 0cf149edddd8..fb58d6b312c2 100644
-> --- a/drivers/usb/chipidea/otg.c
-> +++ b/drivers/usb/chipidea/otg.c
-> @@ -63,9 +63,9 @@ u32 hw_read_otgsc(struct ci_hdrc *ci, u32 mask)
->  			val &= ~OTGSC_IDIS;
->  
->  		if (cable->state)
-> -			val |= OTGSC_ID;
-> +			val &= ~OTGSC_ID; /* A device */
->  		else
-> -			val &= ~OTGSC_ID;
-> +			val |= OTGSC_ID; /* B device */
->  
->  		if (cable->enabled)
->  			val |= OTGSC_IDIE;
 
-/**
- * struct ci_hdrc_cable - structure for external connector cable state tracking
- * @state: current state of the line
-
-You may change the name of variable "state" to "connected", per I
-understand, it has changed to the meaning of connected status for your patch.
+Acked-by: Peter Chen <peter.chen@nxp.com>
 
 -- 
 
