@@ -1,36 +1,55 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 2 Sep 2016 09:39:48 -0500
-Subject: [PATCH v2 1/2] input: touchscreen: silead_gsl1680: Document
- firmware-name, fix implementation
-In-Reply-To: <20160829192937.32129-2-hdegoede@redhat.com>
-References: <20160829192937.32129-1-hdegoede@redhat.com>
- <20160829192937.32129-2-hdegoede@redhat.com>
-Message-ID: <20160902143948.GA6214@rob-hp-laptop>
+Date: Fri, 2 Sep 2016 09:45:06 -0500
+Subject: [PATCH 1/2] sdhci-of-arasan: Add device tree parameter
+ fails-without-test-cd bit
+In-Reply-To: <1472512857-13063-1-git-send-email-zach.brown@ni.com>
+References: <1472512857-13063-1-git-send-email-zach.brown@ni.com>
+Message-ID: <20160902144506.GA7795@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 09:29:36PM +0200, Hans de Goede wrote:
-> The driver has supported touchscreen-fw-name to specify the firmware to
-> load since it has been merged, but this was omitted from the dt-binding
-> documentation.
+On Mon, Aug 29, 2016 at 06:20:56PM -0500, Zach Brown wrote:
+> The sdhci controller on xilinx zynq devices will not function unless
+> the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
+> In cases where it is impossible to provide the CD bit in hardware,
+> setting the controller to test mode and then setting inserted to true
+> will get the controller to function without the CD bit.
 > 
-> During review of adding touchscreen-fw-name to the binding documentation
-> it was brought up that there is a standard property name called
-> "firmware-name" for this, which should be used.
+> The device property "fails-without-test-cd" will let the arasan driver know
+> the controller does not have the CD line wired and that the controller
+> does not function without it.
 > 
-> Since there are no users of touchscreen-fw-name yet, this commit
-> adds documentation of "firmware-name" to the dt-binding documentation
-> and switches the driver over to use this.
-> 
-> This commit also makes the driver add a "silead/" prefix to the
-> firmware name from dt before calling request_firmware. That the
-> firmware files are stored under /lib/firmware/silead under Linux
-> is an implementation detail and does not belong in devicetree.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Signed-off-by: Zach Brown <zach.brown@ni.com>
 > ---
->  .../devicetree/bindings/input/touchscreen/silead_gsl1680.txt         | 1 +
->  drivers/input/touchscreen/silead.c                                   | 5 +++--
->  2 files changed, 4 insertions(+), 2 deletions(-)
+> v2:
+>  * improved commit messages
+>  * removed fake-cd device property
+>  * removed fake-cd quirk
+>  * use broken-cd device property
+>  * documented new usage of broken-cd
+> v3:
+>  * removed new usage of broken-cd
+>  * created fails-without-test-cd device property
+>  * created arasan controller specific quirk
+> 
+> 
+>  Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> index 3404afa..ec0dc82 100644
+> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> @@ -21,6 +21,10 @@ Required Properties:
+>    - interrupts: Interrupt specifier
+>    - interrupt-parent: Phandle for the interrupt controller that services
+>  		      interrupts for this device.
+> +Optional Properties:
+> +- fails-without-test-cd: when present, the controller doesn't work when the CD
+> +  line is not connected properly, and the line is not connected properly. Test
+> +  mode can be used to force the controller to function.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Prefix with either arasan or xlnx. Seems more likely Xilinx specific to 
+me.
+
+Rob
