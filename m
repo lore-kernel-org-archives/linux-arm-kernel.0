@@ -1,60 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 Sep 2016 17:51:58 +0200
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <Pine.LNX.4.44L0.1609021019260.2027-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1609021019260.2027-100000@iolanthe.rowland.org>
-Message-ID: <5147808.apZTAZ3VPE@wuerfel>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 2 Sep 2016 17:07:06 +0100
+Subject: [PATCH 2/2] arm64: Use static keys for CPU features
+In-Reply-To: <20160902155224.GC391@e104818-lin.cambridge.arm.com>
+References: <1472145992-10660-1-git-send-email-catalin.marinas@arm.com>
+ <1472145992-10660-3-git-send-email-catalin.marinas@arm.com>
+ <f690f532-a05e-5c13-6b97-b94203701d3d@arm.com>
+ <20160902155224.GC391@e104818-lin.cambridge.arm.com>
+Message-ID: <827c65c6-9690-5805-8769-1159634a3c77@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 2, 2016 10:21:23 AM CEST Alan Stern wrote:
-> On Fri, 2 Sep 2016, Felipe Balbi wrote:
-> 
-> > Hi,
-> > 
-> > Russell King - ARM Linux <linux@armlinux.org.uk> writes:
-> > > On Fri, Sep 02, 2016 at 12:43:39PM +0200, Arnd Bergmann wrote:
-> > >> On Thursday, September 1, 2016 5:14:28 PM CEST Leo Li wrote:
-> > >> > 
-> > >> > Hi Felipe and Arnd,
-> > >> > 
-> > >> > It has been a while since the last response to this discussion, but we
-> > >> > haven't reached an agreement yet!  Can we get to a conclusion on if it
-> > >> > is valid to create child platform device for abstraction purpose?  If
-> > >> > yes, can this child device do DMA by itself?
-> > >> 
-> > >> I'd say it's no problem for a driver to create child devices in order
-> > >> to represent different aspects of a device, but you should not rely on
-> > >> those devices working when used with the dma-mapping interfaces.
-> > >
-> > > That's absolutely right.  Consider the USB model - only the USB host
-> > > controller can perform DMA, not the USB devices themselves.  All DMA
-> > > mappings need to be mapped using the USB host controller device struct
-> > > not the USB device struct.
-> > >
-> > > The same _should_ be true everywhere else: the struct device representing
-> > > the device performing DMA must be the one used to map the transfer.
-> > 
-> > How do we fix dwc3 in dual-role, then?
-> > 
-> > Peripheral-side dwc3 is easy, we just require a glue-layer to be present
-> > and use dwc3.ko's parent device (which will be the PCI device or OF
-> > device). But for host side dwc3, the problem is slightly more complex
-> > because we're using xhci-plat.ko by just instantiating a xhci-platform
-> > device so xhci-plat can probe.
-> > 
-> > xhci core has no means to know if its own device or the parent of its
-> > parent should be used for DMA. Any ideas?
-> 
-> In theory, you can store a flag somewhere in the platform device,
-> something that would tell xhci-hcd that it has to use the parent's
-> parent for DMA purposes.
-> 
-> I know it would be somewhat of a hack, but ought to work.
+On 02/09/16 16:52, Catalin Marinas wrote:
+> On Fri, Aug 26, 2016 at 10:22:13AM +0100, Suzuki K. Poulose wrote:
+>> On 25/08/16 18:26, Catalin Marinas wrote:
 
-Speaking of that flag, I suppose we need the same logic to know where
-to look for USB devices attached to a dwc3 host when we need to describe
-them in DT. By default we look for child device nodes under the
-node of the HCD device node, but that would be wrong here too.
+>>
+>> Just a heads up. I have a patch [1] which moves the "check_local_cpu_errata()"
+>> around to smp_prepare_boot_cpu(). This patch should still work fine with that
+>> case. Only that may be we could move the jump_lable_init() to smp_prepare_boot_cpu(),
+>> before we call "update_cpu_errata_work_arounds()" for Boot CPU.
+>
+> IIUC, we wouldn't call update_cpu_errata_work_arounds() until the CPU
+> feature infrastructure is initialised via cpuinfo_store_boot_cpu(). So
+> I don't think moving the jump_label_init() call above is necessary.
 
-	Arnd 
+Right, as I said, your patch should work fine even with that change. Its just that,
+jump_label_init() (a generic kernel setup) can be called from a better visible
+place (smp_prepare_boot_cpu()) than from a less interesting place with the patch
+below.
+
+Cheers
+Suzuki
+
+
+>
+>> [1] https://lkml.kernel.org/r/1471525832-21209-4-git-send-email-suzuki.poulose at arm.com
+>
