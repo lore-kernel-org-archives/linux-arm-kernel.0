@@ -1,104 +1,38 @@
 From: tiffany.lin@mediatek.com (Tiffany Lin)
-Date: Fri, 2 Sep 2016 20:19:53 +0800
-Subject: [PATCH v5 2/9] dt-bindings: Add a binding for Mediatek Video Decoder
-In-Reply-To: <1472818800-22558-2-git-send-email-tiffany.lin@mediatek.com>
+Date: Fri, 2 Sep 2016 20:19:57 +0800
+Subject: [PATCH v5 6/9] videodev2.h: add V4L2_PIX_FMT_VP9 format.
+In-Reply-To: <1472818800-22558-6-git-send-email-tiffany.lin@mediatek.com>
 References: <1472818800-22558-1-git-send-email-tiffany.lin@mediatek.com>
  <1472818800-22558-2-git-send-email-tiffany.lin@mediatek.com>
-Message-ID: <1472818800-22558-3-git-send-email-tiffany.lin@mediatek.com>
+ <1472818800-22558-3-git-send-email-tiffany.lin@mediatek.com>
+ <1472818800-22558-4-git-send-email-tiffany.lin@mediatek.com>
+ <1472818800-22558-5-git-send-email-tiffany.lin@mediatek.com>
+ <1472818800-22558-6-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <1472818800-22558-7-git-send-email-tiffany.lin@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a DT binding documentation of Video Decoder for the
-MT8173 SoC from Mediatek.
+From: Wu-Cheng Li <wuchengli@chromium.org>
 
+This adds VP9 video coding format, a successor to VP8.
+
+Signed-off-by: Wu-Cheng Li <wuchengli@chromium.org>
 Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
-Acked-by: Rob Herring <rob@kernel.org>
 ---
- .../devicetree/bindings/media/mediatek-vcodec.txt  |   57 ++++++++++++++++++--
- 1 file changed, 53 insertions(+), 4 deletions(-)
+ include/uapi/linux/videodev2.h |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/media/mediatek-vcodec.txt b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
-index 59a47a5..46c15c5 100644
---- a/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
-+++ b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
-@@ -1,25 +1,74 @@
- Mediatek Video Codec
+diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+index 5529741..43326c3 100644
+--- a/include/uapi/linux/videodev2.h
++++ b/include/uapi/linux/videodev2.h
+@@ -603,6 +603,7 @@ struct v4l2_pix_format {
+ #define V4L2_PIX_FMT_VC1_ANNEX_G v4l2_fourcc('V', 'C', '1', 'G') /* SMPTE 421M Annex G compliant stream */
+ #define V4L2_PIX_FMT_VC1_ANNEX_L v4l2_fourcc('V', 'C', '1', 'L') /* SMPTE 421M Annex L compliant stream */
+ #define V4L2_PIX_FMT_VP8      v4l2_fourcc('V', 'P', '8', '0') /* VP8 */
++#define V4L2_PIX_FMT_VP9      v4l2_fourcc('V', 'P', '9', '0') /* VP9 */
  
- Mediatek Video Codec is the video codec hw present in Mediatek SoCs which
--supports high resolution encoding functionalities.
-+supports high resolution encoding and decoding functionalities.
- 
- Required properties:
- - compatible : "mediatek,mt8173-vcodec-enc" for encoder
-+  "mediatek,mt8173-vcodec-dec" for decoder.
- - reg : Physical base address of the video codec registers and length of
-   memory mapped region.
- - interrupts : interrupt number to the cpu.
- - mediatek,larb : must contain the local arbiters in the current Socs.
- - clocks : list of clock specifiers, corresponding to entries in
-   the clock-names property.
--- clock-names: encoder must contain "venc_sel_src", "venc_sel",
--- "venc_lt_sel_src", "venc_lt_sel".
-+- clock-names: encoder must contain "venc_sel_src", "venc_sel",,
-+  "venc_lt_sel_src", "venc_lt_sel", decoder must contain "vcodecpll",
-+  "univpll_d2", "clk_cci400_sel", "vdec_sel", "vdecpll", "vencpll",
-+  "venc_lt_sel", "vdec_bus_clk_src".
- - iommus : should point to the respective IOMMU block with master port as
-   argument, see Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
-   for details.
- - mediatek,vpu : the node of video processor unit
- 
-+
- Example:
--vcodec_enc: vcodec at 0x18002000 {
-+
-+vcodec_dec: vcodec at 16000000 {
-+    compatible = "mediatek,mt8173-vcodec-dec";
-+    reg = <0 0x16000000 0 0x100>,   /*VDEC_SYS*/
-+          <0 0x16020000 0 0x1000>,  /*VDEC_MISC*/
-+          <0 0x16021000 0 0x800>,   /*VDEC_LD*/
-+          <0 0x16021800 0 0x800>,   /*VDEC_TOP*/
-+          <0 0x16022000 0 0x1000>,  /*VDEC_CM*/
-+          <0 0x16023000 0 0x1000>,  /*VDEC_AD*/
-+          <0 0x16024000 0 0x1000>,  /*VDEC_AV*/
-+          <0 0x16025000 0 0x1000>,  /*VDEC_PP*/
-+          <0 0x16026800 0 0x800>,   /*VP8_VD*/
-+          <0 0x16027000 0 0x800>,   /*VP6_VD*/
-+          <0 0x16027800 0 0x800>,   /*VP8_VL*/
-+          <0 0x16028400 0 0x400>;   /*VP9_VD*/
-+    interrupts = <GIC_SPI 204 IRQ_TYPE_LEVEL_LOW>;
-+    mediatek,larb = <&larb1>;
-+    iommus = <&iommu M4U_PORT_HW_VDEC_MC_EXT>,
-+             <&iommu M4U_PORT_HW_VDEC_PP_EXT>,
-+             <&iommu M4U_PORT_HW_VDEC_AVC_MV_EXT>,
-+             <&iommu M4U_PORT_HW_VDEC_PRED_RD_EXT>,
-+             <&iommu M4U_PORT_HW_VDEC_PRED_WR_EXT>,
-+             <&iommu M4U_PORT_HW_VDEC_UFO_EXT>,
-+             <&iommu M4U_PORT_HW_VDEC_VLD_EXT>,
-+             <&iommu M4U_PORT_HW_VDEC_VLD2_EXT>;
-+    mediatek,vpu = <&vpu>;
-+    power-domains = <&scpsys MT8173_POWER_DOMAIN_VDEC>;
-+    clocks = <&apmixedsys CLK_APMIXED_VCODECPLL>,
-+             <&topckgen CLK_TOP_UNIVPLL_D2>,
-+             <&topckgen CLK_TOP_CCI400_SEL>,
-+             <&topckgen CLK_TOP_VDEC_SEL>,
-+             <&topckgen CLK_TOP_VCODECPLL>,
-+             <&apmixedsys CLK_APMIXED_VENCPLL>,
-+             <&topckgen CLK_TOP_VENC_LT_SEL>,
-+             <&topckgen CLK_TOP_VCODECPLL_370P5>;
-+    clock-names = "vcodecpll",
-+                  "univpll_d2",
-+                  "clk_cci400_sel",
-+                  "vdec_sel",
-+                  "vdecpll",
-+                  "vencpll",
-+                  "venc_lt_sel",
-+                  "vdec_bus_clk_src";
-+  };
-+
-+  vcodec_enc: vcodec at 0x18002000 {
-     compatible = "mediatek,mt8173-vcodec-enc";
-     reg = <0 0x18002000 0 0x1000>,    /*VENC_SYS*/
-           <0 0x19002000 0 0x1000>;    /*VENC_LT_SYS*/
+ /*  Vendor-specific formats   */
+ #define V4L2_PIX_FMT_CPIA1    v4l2_fourcc('C', 'P', 'I', 'A') /* cpia1 YUV */
 -- 
 1.7.9.5
