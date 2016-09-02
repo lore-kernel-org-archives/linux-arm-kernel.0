@@ -1,580 +1,140 @@
-From: hl@rock-chips.com (Lin Huang)
-Date: Sat,  3 Sep 2016 05:08:44 +0800
-Subject: [PATCH v9 4/5] PM / devfreq: rockchip: add devfreq driver for rk3399
- dmc
-In-Reply-To: <1472850525-25273-1-git-send-email-hl@rock-chips.com>
-References: <1472850525-25273-1-git-send-email-hl@rock-chips.com>
-Message-ID: <1472850525-25273-5-git-send-email-hl@rock-chips.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 02 Sep 2016 23:21:12 +0200
+Subject: [PATCH 05/33] gpio: add generic single-register fixed-direction
+ GPIO driver
+In-Reply-To: <20160902185641.GF1041@n2100.armlinux.org.uk> (Russell King's
+ message of "Fri, 2 Sep 2016 19:56:41 +0100")
+References: <87k2eycip0.fsf@belgarion.home>
+ <20160830184612.GO1041@n2100.armlinux.org.uk>
+ <87fupmc59b.fsf@belgarion.home>
+ <20160831084938.GQ1041@n2100.armlinux.org.uk>
+ <20160831102721.GR1041@n2100.armlinux.org.uk>
+ <87twe0krym.fsf@belgarion.home>
+ <20160901092754.GU1041@n2100.armlinux.org.uk>
+ <87oa47l1tn.fsf@belgarion.home>
+ <20160901230248.GA1041@n2100.armlinux.org.uk>
+ <87inuekx78.fsf@belgarion.home>
+ <20160902185641.GF1041@n2100.armlinux.org.uk>
+Message-ID: <87zinqj8vr.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-base on dfi result, we do ddr frequency scaling, register
-dmc driver to devfreq framework, and use simple-ondemand
-policy.
+Russell King - ARM Linux <linux@armlinux.org.uk> writes:
 
-Signed-off-by: Lin Huang <hl@rock-chips.com>
-Signed-off-by: MyngJoo Ham <myngjoo.ham@samsung.com>
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
----
-Changes in v8:
-- None
+> On Fri, Sep 02, 2016 at 07:50:35PM +0200, Robert Jarzmik wrote:
+> It should enable the interrupt - the end of that does:
+>
+>         if (handle != handle_bad_irq && is_chained) {
+>                 irq_settings_set_noprobe(desc);
+>                 irq_settings_set_norequest(desc);
+>                 irq_settings_set_nothread(desc);
+>                 desc->action = &chained_action;
+>                 irq_startup(desc, true);
+>         }
+>
+> and indeed, I see that it gets enabled on Assabet.  That irq_startup()
+> should result in the irqchip's irq_startup, irq_enable, or irq_unmask
+> method being called.
+In my case, irq_startup() is never called for irq 305, ie. LUBBOCK_SA1111_IRQ.
+See deep down the mail for the cause ...
 
-Changes in v8:
-- do not use ddr_timing node, get ddr timing directly
+> So, that should result in the IRQ to which the sa1111 is connected
+> being unmasked.
+Hmm, it never happens to me ...
 
-Changes in v7:
-- remove a blank line
+> Chained interrupts don't appear in /proc/interrupts.
+Ah ok.
 
-Changes in v6:
-- fix some nit suggest by Chanwoo Choi
+>> I traced the code in the interrupt controller (pxa_cplds_irqs), the SA1111
+>> physical line is not set (even with an AT/2 keyboard connected, and I don't
+>> think anybody tried this AT/2 on a lubbock for a long time).
+>
+> Hmm.  Looking at pxa_cplds_irqs, that's trying to support the CPLD
+> interrupts using a very very old and inefficient technique.  The
+> whole point of the chained interrupt system is to avoid several
+> overheads in the system...  I'm curious why PXA moved away from that.
+I think I traced that in the commit message of :
+aa8d6b73ea33 ("ARM: pxa: pxa_cplds: add lubbock and mainstone IO")
 
-Changes in v5:
-- improve dmc driver suggest by Chanwoo Choi
+The concern I had was that the former mechanism was not working anymore as the
+chained handler was overwritten in gpio-pxa.c, and I wanted that gpio be
+possibly probed at device initcall time.
 
-Changes in v4:
-- use arm_smccc_smc() function talk to bl31
-- delete rockchip_dmc.c file and config
-- delete dmc_notify
-- adjust probe order
+> One of the problems is that we end up nesting irq_entry()/irq_exit()
+> which contains a lot of code, eg trying to run softirqs.  All that
+> stuff is pure overhead because we'll never get to run anything like
+> that in this path.
+>
+> I'm also very concerned that the conversion is wrong.  The old code
+> has this comment in the irq_unmask function:
+>
+> -       /* the irq can be acknowledged only if deasserted, so it's done here */
+> -       LUB_IRQ_SET_CLR &= ~(1 << lubbock_irq);
+>
+> In other words, we "acknowledge" (really clear the latched status) of
+> the interrupt _after_ we've serviced the peripheral, not before.
+> The new code tries to clear down the interrupt when masking it - in
+> other words, before the peripheral handler has had a chance to clear
+> down its interrupt.
 
-Changes in v3:
-- operate dram setting through sip call
-- imporve set rate flow
+I will check it more carefully. I remember having made tests, and cross-checked
+the user manual of the Cotulla Development board, chapter 3.4 "Managing
+Peripheral Interrupts", where there is no restriction on when the latched status
+can be cleared.
 
-Changes in v2:
-- None
+I understand the concern that clearing the status before the interrupt source is
+serviced can re-set the status during the peripheral handler, if it's a level
+interrupt.
 
-Changes in v1:
-- move dfi controller to event
-- fix set voltage sequence when set rate fail
-- change Kconfig type from tristate to bool
-- move unuse EXPORT_SYMBOL_GPL()
+Maybe it worked so far by sheer luck, or because the ethernet card was the only
+really tested interrupt.
 
- drivers/devfreq/Kconfig      |  11 +
- drivers/devfreq/Makefile     |   1 +
- drivers/devfreq/rk3399_dmc.c | 480 +++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 492 insertions(+)
- create mode 100644 drivers/devfreq/rk3399_dmc.c
+> I suspect you're seeing about twice as many interrupt counts on your
+> ethernet interface because of this - you'll be entering the handler
+> once for the real interrupt, but because the clear-down was ineffective,
+> you end up re-entering it a second time when hopefully the peripheral
+> is no longer asserting the interrupt.
+Mmm I will check, but see 2 cat /proc/interrupts in a row :
+307:       9384  pxa_cplds   3 Edge      eth0
+307:       9417  pxa_cplds   3 Edge      eth0
 
-diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
-index a5be56e..e848121 100644
---- a/drivers/devfreq/Kconfig
-+++ b/drivers/devfreq/Kconfig
-@@ -100,6 +100,17 @@ config ARM_TEGRA_DEVFREQ
-          It reads ACTMON counters of memory controllers and adjusts the
-          operating frequencies and voltages with OPP support.
- 
-+config ARM_RK3399_DMC_DEVFREQ
-+	tristate "ARM RK3399 DMC DEVFREQ Driver"
-+	depends on ARCH_ROCKCHIP
-+	select DEVFREQ_EVENT_ROCKCHIP_DFI
-+	select DEVFREQ_GOV_SIMPLE_ONDEMAND
-+	select PM_OPP
-+	help
-+          This adds the DEVFREQ driver for the RK3399 DMC(Dynamic Memory Controller).
-+          It sets the frequency for the memory controller and reads the usage counts
-+          from hardware.
-+
- source "drivers/devfreq/event/Kconfig"
- 
- endif # PM_DEVFREQ
-diff --git a/drivers/devfreq/Makefile b/drivers/devfreq/Makefile
-index 09f11d9..fbff40a 100644
---- a/drivers/devfreq/Makefile
-+++ b/drivers/devfreq/Makefile
-@@ -8,6 +8,7 @@ obj-$(CONFIG_DEVFREQ_GOV_PASSIVE)	+= governor_passive.o
- 
- # DEVFREQ Drivers
- obj-$(CONFIG_ARM_EXYNOS_BUS_DEVFREQ)	+= exynos-bus.o
-+obj-$(CONFIG_ARM_RK3399_DMC_DEVFREQ)	+= rk3399_dmc.o
- obj-$(CONFIG_ARM_TEGRA_DEVFREQ)		+= tegra-devfreq.o
- 
- # DEVFREQ Event Drivers
-diff --git a/drivers/devfreq/rk3399_dmc.c b/drivers/devfreq/rk3399_dmc.c
-new file mode 100644
-index 0000000..54d65f2
---- /dev/null
-+++ b/drivers/devfreq/rk3399_dmc.c
-@@ -0,0 +1,480 @@
-+/*
-+ * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd.
-+ * Author: Lin Huang <hl@rock-chips.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ */
-+
-+#include <linux/arm-smccc.h>
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/devfreq.h>
-+#include <linux/devfreq-event.h>
-+#include <linux/interrupt.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_opp.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/rwsem.h>
-+#include <linux/suspend.h>
-+
-+#include <soc/rockchip/rockchip_sip.h>
-+
-+struct dram_timing {
-+	unsigned int ddr3_speed_bin;
-+	unsigned int pd_idle;
-+	unsigned int sr_idle;
-+	unsigned int sr_mc_gate_idle;
-+	unsigned int srpd_lite_idle;
-+	unsigned int standby_idle;
-+	unsigned int auto_pd_dis_freq;
-+	unsigned int dram_dll_dis_freq;
-+	unsigned int phy_dll_dis_freq;
-+	unsigned int ddr3_odt_dis_freq;
-+	unsigned int ddr3_drv;
-+	unsigned int ddr3_odt;
-+	unsigned int phy_ddr3_ca_drv;
-+	unsigned int phy_ddr3_dq_drv;
-+	unsigned int phy_ddr3_odt;
-+	unsigned int lpddr3_odt_dis_freq;
-+	unsigned int lpddr3_drv;
-+	unsigned int lpddr3_odt;
-+	unsigned int phy_lpddr3_ca_drv;
-+	unsigned int phy_lpddr3_dq_drv;
-+	unsigned int phy_lpddr3_odt;
-+	unsigned int lpddr4_odt_dis_freq;
-+	unsigned int lpddr4_drv;
-+	unsigned int lpddr4_dq_odt;
-+	unsigned int lpddr4_ca_odt;
-+	unsigned int phy_lpddr4_ca_drv;
-+	unsigned int phy_lpddr4_ck_cs_drv;
-+	unsigned int phy_lpddr4_dq_drv;
-+	unsigned int phy_lpddr4_odt;
-+};
-+
-+struct rk3399_dmcfreq {
-+	struct device *dev;
-+	struct devfreq *devfreq;
-+	struct devfreq_simple_ondemand_data ondemand_data;
-+	struct clk *dmc_clk;
-+	struct devfreq_event_dev *edev;
-+	struct mutex lock;
-+	struct dram_timing timing;
-+
-+	/*
-+	 * DDR Converser of Frequency (DCF) is used to implement DDR frequency
-+	 * conversion without the participation of CPU, we will implement and
-+	 * control it in arm trust firmware.
-+	 */
-+	wait_queue_head_t	wait_dcf_queue;
-+	int irq;
-+	int wait_dcf_flag;
-+	struct regulator *vdd_center;
-+	unsigned long rate, target_rate;
-+	unsigned long volt, target_volt;
-+	struct dev_pm_opp *curr_opp;
-+};
-+
-+static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
-+				 u32 flags)
-+{
-+	struct rk3399_dmcfreq *dmcfreq = dev_get_drvdata(dev);
-+	struct dev_pm_opp *opp;
-+	unsigned long old_clk_rate = dmcfreq->rate;
-+	unsigned long target_volt, target_rate;
-+	int err;
-+
-+	rcu_read_lock();
-+	opp = devfreq_recommended_opp(dev, freq, flags);
-+	if (IS_ERR(opp)) {
-+		rcu_read_unlock();
-+		return PTR_ERR(opp);
-+	}
-+
-+	target_rate = dev_pm_opp_get_freq(opp);
-+	target_volt = dev_pm_opp_get_voltage(opp);
-+
-+	dmcfreq->rate = dev_pm_opp_get_freq(dmcfreq->curr_opp);
-+	dmcfreq->volt = dev_pm_opp_get_voltage(dmcfreq->curr_opp);
-+
-+	rcu_read_unlock();
-+
-+	if (dmcfreq->rate == target_rate)
-+		return 0;
-+
-+	mutex_lock(&dmcfreq->lock);
-+
-+	/*
-+	 * If frequency scaling from low to high, adjust voltage first.
-+	 * If frequency scaling from high to low, adjust frequency first.
-+	 */
-+	if (old_clk_rate < target_rate) {
-+		err = regulator_set_voltage(dmcfreq->vdd_center, target_volt,
-+					    target_volt);
-+		if (err) {
-+			dev_err(dev, "Cannot to set voltage %lu uV\n",
-+				target_volt);
-+			goto out;
-+		}
-+	}
-+	dmcfreq->wait_dcf_flag = 1;
-+
-+	err = clk_set_rate(dmcfreq->dmc_clk, target_rate);
-+	if (err) {
-+		dev_err(dev, "Cannot to set frequency %lu (%d)\n",
-+			target_rate, err);
-+		regulator_set_voltage(dmcfreq->vdd_center, dmcfreq->volt,
-+				      dmcfreq->volt);
-+		goto out;
-+	}
-+
-+	/*
-+	 * Wait until bcf irq happen, it means freq scaling finish in
-+	 * arm trust firmware, use 100ms as timeout time.
-+	 */
-+	if (!wait_event_timeout(dmcfreq->wait_dcf_queue,
-+				!dmcfreq->wait_dcf_flag, HZ / 10))
-+		dev_warn(dev, "Timeout waiting for dcf interrupt\n");
-+
-+	/*
-+	 * Check the dpll rate,
-+	 * There only two result we will get,
-+	 * 1. Ddr frequency scaling fail, we still get the old rate.
-+	 * 2. Ddr frequency scaling sucessful, we get the rate we set.
-+	 */
-+	dmcfreq->rate = clk_get_rate(dmcfreq->dmc_clk);
-+
-+	/* If get the incorrect rate, set voltage to old value. */
-+	if (dmcfreq->rate != target_rate) {
-+		dev_err(dev, "Get wrong ddr frequency, Request frequency %lu,\
-+			Current frequency %lu\n", target_rate, dmcfreq->rate);
-+		regulator_set_voltage(dmcfreq->vdd_center, dmcfreq->volt,
-+				      dmcfreq->volt);
-+		goto out;
-+	} else if (old_clk_rate > target_rate)
-+		err = regulator_set_voltage(dmcfreq->vdd_center, target_volt,
-+					    target_volt);
-+	if (err)
-+		dev_err(dev, "Cannot to set vol %lu uV\n", target_volt);
-+
-+	dmcfreq->curr_opp = opp;
-+out:
-+	mutex_unlock(&dmcfreq->lock);
-+	return err;
-+}
-+
-+static int rk3399_dmcfreq_get_dev_status(struct device *dev,
-+					 struct devfreq_dev_status *stat)
-+{
-+	struct rk3399_dmcfreq *dmcfreq = dev_get_drvdata(dev);
-+	struct devfreq_event_data edata;
-+	int ret = 0;
-+
-+	ret = devfreq_event_get_event(dmcfreq->edev, &edata);
-+	if (ret < 0)
-+		return ret;
-+
-+	stat->current_frequency = dmcfreq->rate;
-+	stat->busy_time = edata.load_count;
-+	stat->total_time = edata.total_count;
-+
-+	return ret;
-+}
-+
-+static int rk3399_dmcfreq_get_cur_freq(struct device *dev, unsigned long *freq)
-+{
-+	struct rk3399_dmcfreq *dmcfreq = dev_get_drvdata(dev);
-+
-+	*freq = dmcfreq->rate;
-+
-+	return 0;
-+}
-+
-+static struct devfreq_dev_profile rk3399_devfreq_dmc_profile = {
-+	.polling_ms	= 200,
-+	.target		= rk3399_dmcfreq_target,
-+	.get_dev_status	= rk3399_dmcfreq_get_dev_status,
-+	.get_cur_freq	= rk3399_dmcfreq_get_cur_freq,
-+};
-+
-+static __maybe_unused int rk3399_dmcfreq_suspend(struct device *dev)
-+{
-+	struct rk3399_dmcfreq *dmcfreq = dev_get_drvdata(dev);
-+	int ret = 0;
-+
-+	ret = devfreq_event_disable_edev(dmcfreq->edev);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to disable the devfreq-event devices\n");
-+		return ret;
-+	}
-+
-+	ret = devfreq_suspend_device(dmcfreq->devfreq);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to suspend the devfreq devices\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static __maybe_unused int rk3399_dmcfreq_resume(struct device *dev)
-+{
-+	struct rk3399_dmcfreq *dmcfreq = dev_get_drvdata(dev);
-+	int ret = 0;
-+
-+	ret = devfreq_event_enable_edev(dmcfreq->edev);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to enable the devfreq-event devices\n");
-+		return ret;
-+	}
-+
-+	ret = devfreq_resume_device(dmcfreq->devfreq);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to resume the devfreq devices\n");
-+		return ret;
-+	}
-+	return ret;
-+}
-+
-+static SIMPLE_DEV_PM_OPS(rk3399_dmcfreq_pm, rk3399_dmcfreq_suspend,
-+			 rk3399_dmcfreq_resume);
-+
-+static irqreturn_t rk3399_dmc_irq(int irq, void *dev_id)
-+{
-+	struct rk3399_dmcfreq *dmcfreq = dev_id;
-+	struct arm_smccc_res res;
-+
-+	dmcfreq->wait_dcf_flag = 0;
-+	wake_up(&dmcfreq->wait_dcf_queue);
-+
-+	/* Clear the DCF interrupt */
-+	arm_smccc_smc(ROCKCHIP_SIP_DRAM_FREQ, 0, 0,
-+		      ROCKCHIP_SIP_CONFIG_DRAM_CLR_IRQ,
-+		      0, 0, 0, 0, &res);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int of_get_ddr_timings(struct dram_timing *timing,
-+			      struct device_node *np)
-+{
-+	int ret = 0;
-+
-+	ret = of_property_read_u32(np, "rockchip,ddr3_speed_bin",
-+				   &timing->ddr3_speed_bin);
-+	ret |= of_property_read_u32(np, "rockchip,pd_idle",
-+				    &timing->pd_idle);
-+	ret |= of_property_read_u32(np, "rockchip,sr_idle",
-+				    &timing->sr_idle);
-+	ret |= of_property_read_u32(np, "rockchip,sr_mc_gate_idle",
-+				    &timing->sr_mc_gate_idle);
-+	ret |= of_property_read_u32(np, "rockchip,srpd_lite_idle",
-+				    &timing->srpd_lite_idle);
-+	ret |= of_property_read_u32(np, "rockchip,standby_idle",
-+				    &timing->standby_idle);
-+	ret |= of_property_read_u32(np, "rockchip,auto_pd_dis_freq",
-+				    &timing->auto_pd_dis_freq);
-+	ret |= of_property_read_u32(np, "rockchip,dram_dll_dis_freq",
-+				    &timing->dram_dll_dis_freq);
-+	ret |= of_property_read_u32(np, "rockchip,phy_dll_dis_freq",
-+				    &timing->phy_dll_dis_freq);
-+	ret |= of_property_read_u32(np, "rockchip,ddr3_odt_dis_freq",
-+				    &timing->ddr3_odt_dis_freq);
-+	ret |= of_property_read_u32(np, "rockchip,ddr3_drv",
-+				    &timing->ddr3_drv);
-+	ret |= of_property_read_u32(np, "rockchip,ddr3_odt",
-+				    &timing->ddr3_odt);
-+	ret |= of_property_read_u32(np, "rockchip,phy_ddr3_ca_drv",
-+				    &timing->phy_ddr3_ca_drv);
-+	ret |= of_property_read_u32(np, "rockchip,phy_ddr3_dq_drv",
-+				    &timing->phy_ddr3_dq_drv);
-+	ret |= of_property_read_u32(np, "rockchip,phy_ddr3_odt",
-+				    &timing->phy_ddr3_odt);
-+	ret |= of_property_read_u32(np, "rockchip,lpddr3_odt_dis_freq",
-+				    &timing->lpddr3_odt_dis_freq);
-+	ret |= of_property_read_u32(np, "rockchip,lpddr3_drv",
-+				    &timing->lpddr3_drv);
-+	ret |= of_property_read_u32(np, "rockchip,lpddr3_odt",
-+				    &timing->lpddr3_odt);
-+	ret |= of_property_read_u32(np, "rockchip,phy_lpddr3_ca_drv",
-+				    &timing->phy_lpddr3_ca_drv);
-+	ret |= of_property_read_u32(np, "rockchip,phy_lpddr3_dq_drv",
-+				    &timing->phy_lpddr3_dq_drv);
-+	ret |= of_property_read_u32(np, "rockchip,phy_lpddr3_odt",
-+				    &timing->phy_lpddr3_odt);
-+	ret |= of_property_read_u32(np, "rockchip,lpddr4_odt_dis_freq",
-+				    &timing->lpddr4_odt_dis_freq);
-+	ret |= of_property_read_u32(np, "rockchip,lpddr4_drv",
-+				    &timing->lpddr4_drv);
-+	ret |= of_property_read_u32(np, "rockchip,lpddr4_dq_odt",
-+				    &timing->lpddr4_dq_odt);
-+	ret |= of_property_read_u32(np, "rockchip,lpddr4_ca_odt",
-+				    &timing->lpddr4_ca_odt);
-+	ret |= of_property_read_u32(np, "rockchip,phy_lpddr4_ca_drv",
-+				    &timing->phy_lpddr4_ca_drv);
-+	ret |= of_property_read_u32(np, "rockchip,phy_lpddr4_ck_cs_drv",
-+				    &timing->phy_lpddr4_ck_cs_drv);
-+	ret |= of_property_read_u32(np, "rockchip,phy_lpddr4_dq_drv",
-+				    &timing->phy_lpddr4_dq_drv);
-+	ret |= of_property_read_u32(np, "rockchip,phy_lpddr4_odt",
-+				    &timing->phy_lpddr4_odt);
-+
-+	return ret;
-+}
-+
-+static int rk3399_dmcfreq_probe(struct platform_device *pdev)
-+{
-+	struct arm_smccc_res res;
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = pdev->dev.of_node;
-+	struct rk3399_dmcfreq *data;
-+	int ret, irq, index, size;
-+	uint32_t *timing;
-+	struct dev_pm_opp *opp;
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
-+		dev_err(&pdev->dev, "Cannot get the dmc interrupt resource\n");
-+		return -EINVAL;
-+	}
-+	data = devm_kzalloc(dev, sizeof(struct rk3399_dmcfreq), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	mutex_init(&data->lock);
-+
-+	data->vdd_center = devm_regulator_get(dev, "center");
-+	if (IS_ERR(data->vdd_center)) {
-+		dev_err(dev, "Cannot get the regulator \"center\"\n");
-+		return PTR_ERR(data->vdd_center);
-+	}
-+
-+	data->dmc_clk = devm_clk_get(dev, "dmc_clk");
-+	if (IS_ERR(data->dmc_clk)) {
-+		dev_err(dev, "Cannot get the clk dmc_clk\n");
-+		return PTR_ERR(data->dmc_clk);
-+	};
-+
-+	data->irq = irq;
-+	ret = devm_request_irq(dev, irq, rk3399_dmc_irq, 0,
-+			       dev_name(dev), data);
-+	if (ret) {
-+		dev_err(dev, "Failed to request dmc irq: %d\n", ret);
-+		return ret;
-+	}
-+
-+	init_waitqueue_head(&data->wait_dcf_queue);
-+	data->wait_dcf_flag = 0;
-+
-+	data->edev = devfreq_event_get_edev_by_phandle(dev, 0);
-+	if (IS_ERR(data->edev))
-+		return -EPROBE_DEFER;
-+
-+	ret = devfreq_event_enable_edev(data->edev);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to enable devfreq-event devices\n");
-+		return ret;
-+	}
-+
-+	/*
-+	 * Get dram timing and pass it to arm trust firmware,
-+	 * the dram drvier in arm trust firmware will get these
-+	 * timing and to do dram initial.
-+	 */
-+	if (!of_get_ddr_timings(&data->timing, np)) {
-+		timing = &data->timing.ddr3_speed_bin;
-+		size = sizeof(struct dram_timing) / 4;
-+		for (index = 0; index < size; index++) {
-+			arm_smccc_smc(ROCKCHIP_SIP_DRAM_FREQ, *timing++, index,
-+				      ROCKCHIP_SIP_CONFIG_DRAM_SET_PARAM,
-+				      0, 0, 0, 0, &res);
-+			if (res.a0) {
-+				dev_err(dev, "Failed to set dram param: %ld\n",
-+					res.a0);
-+				return -EINVAL;
-+			}
-+		}
-+	}
-+
-+	arm_smccc_smc(ROCKCHIP_SIP_DRAM_FREQ, 0, 0,
-+		      ROCKCHIP_SIP_CONFIG_DRAM_INIT,
-+		      0, 0, 0, 0, &res);
-+
-+	/*
-+	 * We add a devfreq driver to our parent since it has a device tree node
-+	 * with operating points.
-+	 */
-+	if (dev_pm_opp_of_add_table(dev)) {
-+		dev_err(dev, "Invalid operating-points in device tree.\n");
-+		rcu_read_unlock();
-+		return -EINVAL;
-+	}
-+
-+	of_property_read_u32(np, "upthreshold",
-+			     &data->ondemand_data.upthreshold);
-+	of_property_read_u32(np, "downdifferential",
-+			     &data->ondemand_data.downdifferential);
-+
-+	data->rate = clk_get_rate(data->dmc_clk);
-+
-+	rcu_read_lock();
-+	opp = devfreq_recommended_opp(dev, &data->rate, 0);
-+	if (IS_ERR(opp)) {
-+		rcu_read_unlock();
-+		return PTR_ERR(opp);
-+	}
-+	rcu_read_unlock();
-+	data->curr_opp = opp;
-+
-+	rk3399_devfreq_dmc_profile.initial_freq = data->rate;
-+
-+	data->devfreq = devfreq_add_device(dev,
-+					   &rk3399_devfreq_dmc_profile,
-+					   "simple_ondemand",
-+					   &data->ondemand_data);
-+	if (IS_ERR(data->devfreq))
-+		return PTR_ERR(data->devfreq);
-+	devm_devfreq_register_opp_notifier(dev, data->devfreq);
-+
-+	data->dev = dev;
-+	platform_set_drvdata(pdev, data);
-+
-+	return 0;
-+}
-+
-+static int rk3399_dmcfreq_remove(struct platform_device *pdev)
-+{
-+	struct rk3399_dmcfreq *dmcfreq = platform_get_drvdata(pdev);
-+
-+	regulator_put(dmcfreq->vdd_center);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id rk3399dmc_devfreq_of_match[] = {
-+	{ .compatible = "rockchip,rk3399-dmc" },
-+	{ },
-+};
-+
-+static struct platform_driver rk3399_dmcfreq_driver = {
-+	.probe	= rk3399_dmcfreq_probe,
-+	.remove	= rk3399_dmcfreq_remove,
-+	.driver = {
-+		.name	= "rk3399-dmc-freq",
-+		.pm	= &rk3399_dmcfreq_pm,
-+		.of_match_table = rk3399dmc_devfreq_of_match,
-+	},
-+};
-+module_platform_driver(rk3399_dmcfreq_driver);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Lin Huang <hl@rock-chips.com>");
-+MODULE_DESCRIPTION("RK3399 dmcfreq driver with devfreq framework");
+The difference is not a multiple of 2. I will check anyway.
+
+>> The interrupt is for sure masked, and therefore the SA1111 interrupts are not
+>> fired. Even if they would have been enabled, the "pending interrupts register"
+>> doesn't show any sa1111 interrupt pending, so there is something else.
+>
+> Masked where though - in the SA1111 or FPGA?
+In the FPGA.
+
+>> As I don't know if "enable_irq()" in sa1111.c would be an option as I have no
+>> sight on sa1111.c requirements, I would take any advice here.
+>
+> It shouldn't be required, as I say above, irq_set_chained_handler_and_data()
+> deals with unmasking the IRQ already.
+Ah I think I know what happens. The trick is that when this
+irq_set_chained_handler_and_data() is called, the irq_desc for irq 305 is not
+yet allocated (ie. is NULL). And it is not allocated because
+pxa_cplds_irqs.cplds_probe() was not yet called, and had not allocated the irq
+descriptors.
+
+I would bet that on neponset the input interrupt to the SA1111 is within
+0..NR_IRQS, which is not the case on lubbock anymore since the pxa_cplds_irqs
+conversion.
+
+It looks that I have an ordering problem :
+ - I want gpio-pxa.probe() to be called at device initcall time
+ - pxa_cplds_irqs.probe() cannot complete before gpio-pxa.probe() because it
+   needs GPIO0 as its interrupt source
+   => it might need to honor -EPROBE_DEFER
+ - sa1111.sa1111_probe() cannot complete before pxa_cplds_irqs.probe() because
+   it needs IRQ305 as its source
+   => it might need to honor -EPROBE_DEFER
+
+I fail to see how the "optimized" irq chained handler can be used in a
+device-tree type build, where I don't think the probe ordering is guaranteed.
+
+Cheers.
+
 -- 
-2.6.6
+Robert
