@@ -1,90 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 2 Sep 2016 16:49:33 +0100
-Subject: [PATCH] generic: Add the exception case checking routine for ppi
- interrupt
-In-Reply-To: <alpine.DEB.2.20.1609021436160.5647@nanos>
-References: <1472530639-21616-1-git-send-email-majun258@huawei.com>
- <57C548D0.3090700@arm.com> <57C5617B.6080801@huawei.com>
- <57C568F8.20802@arm.com> <20160830112113.GE1223@leverpostej>
- <57C67ABE.908@huawei.com> <57C696DA.4090301@arm.com>
- <57C7E3B6.1040605@huawei.com> <57C7EEE2.7080205@arm.com>
- <alpine.DEB.2.20.1609021436160.5647@nanos>
-Message-ID: <57C99F8D.9080503@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 2 Sep 2016 16:52:25 +0100
+Subject: [PATCH 2/2] arm64: Use static keys for CPU features
+In-Reply-To: <f690f532-a05e-5c13-6b97-b94203701d3d@arm.com>
+References: <1472145992-10660-1-git-send-email-catalin.marinas@arm.com>
+ <1472145992-10660-3-git-send-email-catalin.marinas@arm.com>
+ <f690f532-a05e-5c13-6b97-b94203701d3d@arm.com>
+Message-ID: <20160902155224.GC391@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/16 14:08, Thomas Gleixner wrote:
-> On Thu, 1 Sep 2016, Marc Zyngier wrote:
->> On 01/09/16 09:15, majun (F) wrote:
->> Well, this issue goes way beyond the hack you wanted to add to the
->> generic code, and it should probably be addressed in the GIC code
->> itself, as an implementation specific workaround. Without knowing the
->> details of the erratum, it is difficult to think of that would be
->> required. I can come up with something like this:
->>
->> 	irqnr = gic_read_iar();
->> 	if (unlikely(!is_enabled(irqnr))) {
->> 		gic_write_eoir(irqnr);
->> 		if (static_key_true(&supports_deactivate))
->> 			gic_write_dir(irqnr);
->> 		set_pending(irqnr);
->> 		continue;
->> 	}
->>
->> Performance will suffer (an extra MMIO access on the fast path). If LPIs
->> are also affected, then the ITS code also needs to be involved, and
->> that's not going to be pretty either. This code will have to be enabled
->> at runtime, and handled like other erratum we have in this code.
+On Fri, Aug 26, 2016 at 10:22:13AM +0100, Suzuki K. Poulose wrote:
+> On 25/08/16 18:26, Catalin Marinas wrote:
+> > static inline int __attribute_const__
+> >diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> >index 62272eac1352..919b2d0d68ae 100644
+> >--- a/arch/arm64/kernel/cpufeature.c
+> >+++ b/arch/arm64/kernel/cpufeature.c
+> >@@ -46,6 +46,9 @@ unsigned int compat_elf_hwcap2 __read_mostly;
+> >
+> > DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+> >
+> >+DEFINE_STATIC_KEY_ARRAY_FALSE(cpu_hwcap_keys, ARM64_NCAPS);
+> >+EXPORT_SYMBOL(cpu_hwcap_keys);
+> >+
+> > #define __ARM64_FTR_BITS(SIGNED, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
+> > 	{						\
+> > 		.sign = SIGNED,				\
+> >diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+> >index ed1b84fe6925..6a141e399daf 100644
+> >--- a/arch/arm64/kernel/cpuinfo.c
+> >+++ b/arch/arm64/kernel/cpuinfo.c
+> >@@ -377,6 +377,12 @@ void cpuinfo_store_cpu(void)
+> > void __init cpuinfo_store_boot_cpu(void)
+> > {
+> > 	struct cpuinfo_arm64 *info = &per_cpu(cpu_data, 0);
+> >+
+> >+	/*
+> >+	 * Initialise the static keys early as they may be enabled by
+> >+	 * check_local_cpu_errata() -> update_cpu_capabilities().
+> >+	 */
+> >+	jump_label_init();
+> > 	__cpuinfo_store_cpu(info);
 > 
-> So that's certainly a required workaround at the gic level. Though I really
-> think that we should make handle_percpu_devid_irq robust against a spurious
-> interrupt.
-> 
->>  void handle_percpu_devid_irq(unsigned int irq, struct irq_desc *desc)
->>  {
->> -	struct irq_chip *chip = irq_desc_get_chip(desc);
->> -	struct irqaction *action = desc->action;
->> -	void *dev_id = raw_cpu_ptr(action->percpu_dev_id);
->> +	struct irq_chip *chip = NULL;
->> +	struct irqaction *action;
->> +	void *dev_id;
->>  	irqreturn_t res;
->>  
->> +	action = desc->action;
->> +
->> +	/* Unexpected interrupt in some execption case
->> +	 * we just send eoi to end this interrupt
->> +	 */
->> +	if (unlikely(!action)) {
->> +		mask_irq(desc);
-> 
-> This is wrong. mask_irq() does not work for percpu interrupts. Aside of that
-> this completely lacks any debug information which tells us that there is
-> something wrong in the system. I'm going to apply the patch below for
-> robustness sake.
-> 
-> Thanks,
-> 
-> 	tglx
-> 
-> 8<----------------------
-> Subject: genirq: Robustify handle_percpu_devid_irq()
-> From: Thomas Gleixner <tglx@linutronix.de>
-> Date: Fri, 02 Sep 2016 14:45:19 +0200
-> 
-> The percpu_devid handler is not robust against spurious interrupts. If a
-> spurious interrupt happens and no action is installed then the handler crashes
-> with a NULL pointer dereference.
-> 
-> Add a sanity check for this and log the wreckage once in dmesg.
-> 
-> Reported-by: Majun <majun258@huawei.com>
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> Just a heads up. I have a patch [1] which moves the "check_local_cpu_errata()"
+> around to smp_prepare_boot_cpu(). This patch should still work fine with that
+> case. Only that may be we could move the jump_lable_init() to smp_prepare_boot_cpu(),
+> before we call "update_cpu_errata_work_arounds()" for Boot CPU.
 
-Looks fine to me.
+IIUC, we wouldn't call update_cpu_errata_work_arounds() until the CPU
+feature infrastructure is initialised via cpuinfo_store_boot_cpu(). So
+I don't think moving the jump_label_init() call above is necessary.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> [1] https://lkml.kernel.org/r/1471525832-21209-4-git-send-email-suzuki.poulose at arm.com
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
