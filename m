@@ -1,55 +1,77 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Fri, 2 Sep 2016 16:11:46 +0300
-Subject: [PATCH 0/3] gpio/pinctrl: imx: let IOMUX controller know about
- on-SoC GPIOs
-In-Reply-To: <1471644615-10320-1-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1471644615-10320-1-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <cc5ab313-c3c6-bfd4-d2b8-92a7d153cf05@mentor.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Fri, 2 Sep 2016 15:17:17 +0200
+Subject: [PATCH v4] thermal: tango: add resume support
+In-Reply-To: <57726196.5060909@free.fr>
+References: <57726196.5060909@free.fr>
+Message-ID: <57C97BDD.4030101@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn, Fabio,
+When this platform is suspended, firmware powers the entire SoC down,
+except a few hardware blocks waiting for wakeup events. There is no
+context to save for this particular block.
 
-On 08/20/2016 01:10 AM, Vladimir Zapolskiy wrote:
-> The change establishes a connection between on-SoC IOMUX controller(s)
-> and GPIO controllers found on some SoC from Freescale/NXP iMX series,
-> if a GPIO controller device node contains common gpio-ranges information.
->
-> The change is backward compatible with respect to potentially not updated
-> outdated DTB data without gpio-ranges propery, for such boards the only
-> functional change is lowered initcall priority of GPIO controller driver,
-> which in general anyway is exected to be used only after pinctrl/pinmux
-> controller.
->
-> If this change is applied the next interesting applications may be done
-> as a follow-up work, for example switching pad function to GPIO on gpiod
-> request, converting iomux controller driver to strict type and so on.
->
-> For actual values of gpio-ranges properties please reference series
-> "ARM: dts: imx: add gpio-ranges properties to some iMX GPIO controllers"
-> http://archive.arm.linux.org.uk/lurker/message/20160819.220621.86d845d1.en.html
->
-> Deepak Das (1):
->   gpio: mxc: lower level of gpio_mxc_init() initcall
->
-> Vladimir Zapolskiy (2):
->   pinctrl: imx: accept gpio request/free from pinctrl
->   gpio: mxc: add generic gpio request/free callbacks to pinctrl
->
->  drivers/gpio/gpio-mxc.c                 | 7 ++++++-
->  drivers/pinctrl/freescale/pinctrl-imx.c | 4 ++--
->  2 files changed, 8 insertions(+), 3 deletions(-)
->
+Therefore, there is nothing useful for the driver to do on suspend;
+so we define a NULL suspend hook. On resume, the driver initializes
+the block exactly as is done in the probe callback.
 
-no comments so far, please could you express your concerns about
-this change? IMHO it would be nice to have this feature enabled
-in v4.9.
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+---
+Earlier versions of this patch were reviewed by Kevin and Thierry.
+The current form is preferred by Arnd.
+---
+ drivers/thermal/tango_thermal.c | 19 +++++++++++++++++--
+ 1 file changed, 17 insertions(+), 2 deletions(-)
 
-I assume that the most worrisome commit is the change of GPIO controller
-driver init level, but I belive it is safe enough, no?
-
-Thank you.
-
---
-With best wishes,
-Vladimir
+diff --git a/drivers/thermal/tango_thermal.c b/drivers/thermal/tango_thermal.c
+index 70e0d9f406e9..201304aeafeb 100644
+--- a/drivers/thermal/tango_thermal.c
++++ b/drivers/thermal/tango_thermal.c
+@@ -64,6 +64,12 @@ static const struct thermal_zone_of_device_ops ops = {
+ 	.get_temp	= tango_get_temp,
+ };
+ 
++static void tango_thermal_init(struct tango_thermal_priv *priv)
++{
++	writel(0, priv->base + TEMPSI_CFG);
++	writel(CMD_ON, priv->base + TEMPSI_CMD);
++}
++
+ static int tango_thermal_probe(struct platform_device *pdev)
+ {
+ 	struct resource *res;
+@@ -79,14 +85,22 @@ static int tango_thermal_probe(struct platform_device *pdev)
+ 	if (IS_ERR(priv->base))
+ 		return PTR_ERR(priv->base);
+ 
++	platform_set_drvdata(pdev, priv);
+ 	priv->thresh_idx = IDX_MIN;
+-	writel(0, priv->base + TEMPSI_CFG);
+-	writel(CMD_ON, priv->base + TEMPSI_CMD);
++	tango_thermal_init(priv);
+ 
+ 	tzdev = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, priv, &ops);
+ 	return PTR_ERR_OR_ZERO(tzdev);
+ }
+ 
++static int __maybe_unused tango_thermal_resume(struct device *dev)
++{
++	tango_thermal_init(dev_get_drvdata(dev));
++	return 0;
++}
++
++static SIMPLE_DEV_PM_OPS(tango_thermal_pm, NULL, tango_thermal_resume);
++
+ static const struct of_device_id tango_sensor_ids[] = {
+ 	{
+ 		.compatible = "sigma,smp8758-thermal",
+@@ -99,6 +113,7 @@ static struct platform_driver tango_thermal_driver = {
+ 	.driver	= {
+ 		.name		= "tango-thermal",
+ 		.of_match_table	= tango_sensor_ids,
++		.pm		= &tango_thermal_pm,
+ 	},
+ };
+ 
+-- 
+2.9.0
