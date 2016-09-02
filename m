@@ -1,43 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 2 Sep 2016 11:26:18 +0100
-Subject: [PATCH] arm64/efi: efi_init error handling fix
-In-Reply-To: <1472811519-4897-1-git-send-email-xieyisheng1@huawei.com>
-References: <1472811519-4897-1-git-send-email-xieyisheng1@huawei.com>
-Message-ID: <20160902102618.GC17482@arm.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 2 Sep 2016 11:21:43 +0100
+Subject: [PATCH] arm64: dts: hi6220: add sd-uhs- properties into dwmmc_1
+In-Reply-To: <1472649058-22364-1-git-send-email-guodong.xu@linaro.org>
+References: <1472649058-22364-1-git-send-email-guodong.xu@linaro.org>
+Message-ID: <57C952B7.3010207@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 02, 2016 at 06:18:39PM +0800, Xie Yisheng wrote:
-> From: Yisheng Xie <xieyisheng1@huawei.com>
+Hi Guodong,
+
+On 31/08/2016 14:10, Guodong Xu wrote:
+> With these properties added, sd cards inserted into hikey can work at UHS
+> mode if they have such capability.
 > 
-> There's an early memmap leak in efi_init error path, fix it.
+> Note, this depends on HiKey UHS-SD support patch [1] to work properly.
+> If you didn't add this patch, but added sd-uhs- properties into dwmmc_1,
+> then sd cards cannot work. As of this post, patch [1] has been integrated
+> into maintainer's next branch [2].
 > 
-> Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
+> [1]: [V4] mmc: dw_mmc-k3: UHS-SD card for Hisilicon Hikey,
+>  https://patchwork.kernel.org/patch/9262515/
+> [2]: https://git.linaro.org/people/ulf.hansson/mmc.git next
+>  commit a8a5b2909cfc ("mmc: dw_mmc: k3: UHS-SD card for Hisilicon Hikey")
+> 
+> cc: Ulf Hansson <ulf.hansson@linaro.org>
+> cc: Jaehoon Chung <jh80.chung@samsung.com>
+> cc: Jinguojun <kid.jin@hisilicon.com>
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+
+Applied to the hisi-dt-4.9 branch.
+Thanks!
+
+Best Regards,
+Wei
+
 > ---
->  drivers/firmware/efi/arm-init.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-
-Adding linux-efi, Ard and Matt. Please try to CC the relevant people in
-future.
-
-Will
-
-> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-> index c49d50e..5080e40 100644
-> --- a/drivers/firmware/efi/arm-init.c
-> +++ b/drivers/firmware/efi/arm-init.c
-> @@ -243,8 +243,10 @@ void __init efi_init(void)
->  	     "Unexpected EFI_MEMORY_DESCRIPTOR version %ld",
->  	      efi.memmap.desc_version);
->  
-> -	if (uefi_init() < 0)
-> +	if (uefi_init() < 0) {
-> +		early_memunmap(efi.memmap.map, params.mmap_size);
->  		return;
-> +	}
->  
->  	reserve_regions();
->  	efi_memattr_init();
-> -- 
-> 1.7.12.4
+>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> index 63608e9..17839db 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> @@ -785,6 +785,9 @@
+>  			card-detect-delay = <200>;
+>  			hisilicon,peripheral-syscon = <&ao_ctrl>;
+>  			cap-sd-highspeed;
+> +			sd-uhs-sdr12;
+> +			sd-uhs-sdr25;
+> +			sd-uhs-sdr50;
+>  			reg = <0x0 0xf723e000 0x0 0x1000>;
+>  			interrupts = <0x0 0x49 0x4>;
+>  			#address-cells = <0x1>;
 > 
