@@ -1,77 +1,93 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 2 Sep 2016 12:55:33 +0100
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <87eg528te7.fsf@linux.intel.com>
-References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
- <87vb31kdvh.fsf@intel.com>
- <CADRPPNTQURmuwyuXCjHZcCq6jmQDFiyEUqfcqO-us15nosGCDA@mail.gmail.com>
- <6414695.LEIYfGPUEg@wuerfel> <87eg528te7.fsf@linux.intel.com>
-Message-ID: <956cf653-973a-3bfd-9aaa-bdc922995ea6@arm.com>
+From: wladislav.wiebe@nokia.com (Wiebe, Wladislav (Nokia - DE/Ulm))
+Date: Fri, 2 Sep 2016 12:02:43 +0000
+Subject: [PATCH] ARM: fix linker call for ARM_MODULE_PLTS
+In-Reply-To: <20160902092450.GB1041@n2100.armlinux.org.uk>
+References: <HE1PR07MB14835C6A5F6AA3A905E40018FAE50@HE1PR07MB1483.eurprd07.prod.outlook.com>
+ <20160902092450.GB1041@n2100.armlinux.org.uk>
+Message-ID: <HE1PR07MB1483372BB908734FF6459DD2FAE50@HE1PR07MB1483.eurprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/16 11:53, Felipe Balbi wrote:
+> From: Russell King - ARM Linux [mailto:linux at armlinux.org.uk]
+> Sent: Friday, September 02, 2016 11:25 AM
 > 
-> Hi,
+> On Fri, Sep 02, 2016 at 09:17:58AM +0000, Wiebe, Wladislav (Nokia - DE/Ulm)
+> wrote:
+> > module.lds script doesn't get called when
+> > CONFIG_ARM_MODULE_PLTS is enabled.
+> > Use KBUILD_LDFLAGS_MODULE to fix it.
 > 
-> Arnd Bergmann <arnd@arndb.de> writes:
->> On Thursday, September 1, 2016 5:14:28 PM CEST Leo Li wrote:
->>>
->>> Hi Felipe and Arnd,
->>>
->>> It has been a while since the last response to this discussion, but we
->>> haven't reached an agreement yet!  Can we get to a conclusion on if it
->>> is valid to create child platform device for abstraction purpose?  If
->>> yes, can this child device do DMA by itself?
->>
->> I'd say it's no problem for a driver to create child devices in order
->> to represent different aspects of a device, but you should not rely on
->> those devices working when used with the dma-mapping interfaces.
+> For those of us who haven't encountered this problem, could you include
+> some commentry in the commit message describing the failure mechanism
+> and why you think this is the correct solution?
 > 
-> heh, that looks like an excuse to me :-)
+> The final link for modules is:
 > 
-> This will always be a problem for e.g. MFD, for example. Are you saying
-> MFD child-devices shouldn't be allowed to do DMA? It becomes silly when
-> you read it that way, right?
+> quiet_cmd_ld_ko_o = LD [M]  $@
+>       cmd_ld_ko_o = $(LD) -r $(LDFLAGS)                                 \
+>                              $(KBUILD_LDFLAGS_MODULE) $(LDFLAGS_MODULE) \
+>                              -o $@ $(filter-out FORCE,$^)
 > 
->> This used to be simpler back when we could configure the kernel for
->> only one SoC platform at a time, and the platforms could provide their
->> own overrides for the dma-mapping interfaces. These days, we rely on
-> 
-> right, so we have a very old regression that just took a complex driver
-> such as dwc3 to trigger ;-)
-> 
->> firmware or bootloader to describe various aspects of how DMA is done,
-> 
-> there's no DMA description in DT. Every OF device gets the same 32-bit
-> DMA mask and that is, itself, wrong for several devices.
+> which seems to always include both flags.  Why is it ignored when it's
+> in LDFLAGS_MODULE?  What about the other flags we pass in
+> LDFLAGS_MODULE?
 
-Huh? There's only no DMA description in DT if the device can be assumed
-to be happy with the defaults. Anything else should be using
-"dma-ranges", "dma-coherent", etc. to describe non-default integration
-aspects. For devices with an inherent fixed addressing capability !=32
-bits, then it's down to the driver to call dma_set_mask() appropriately
-to override the default 32-bit mask (which is not unique to OF-probed
-devices either).
+aah -- just found an issue in my environment where LDFLAGS_MODULE gets overwritten
+due to a none upstream patch on scripts/Makefile.modpost.
 
-Sure, it's by no means a perfect API, but you're railing against
-untruths here.
+It worked only for me when using the KBUILD_LDFLAGS_MODULE
+and I did not get deep inside after I saw in 
+https://www.kernel.org/doc/Documentation/kbuild/makefiles.txt
++++++
+    KBUILD_LDFLAGS_MODULE   Options for $(LD) when linking modules
 
-Robin.
+	$(KBUILD_LDFLAGS_MODULE) is used to add arch-specific options
+	used when linking modules. This is often a linker script.
+	From commandline LDFLAGS_MODULE shall be used (see kbuild.txt).
++++++
 
->> so you can't assume that passing a device without an of_node pointer
->> or ACPI data into those functions will do the right thing.
+and found that all other architectures are also users of KBUILD_LDFLAGS_MODULE for that purpose
+$ git grep LDFLAGS_MODULE arch/
+arch/arm/Makefile:LDFLAGS_MODULE        += --be8
+arch/arm/Makefile:LDFLAGS_MODULE        += -T $(srctree)/arch/arm/kernel/module.lds
+arch/arm64/Makefile:KBUILD_LDFLAGS_MODULE       += -T $(srctree)/arch/arm64/kernel/module.lds
+arch/hexagon/Makefile:# LDFLAGS_MODULE += -shared
+arch/ia64/Makefile:KBUILD_LDFLAGS_MODULE += -T $(srctree)/arch/ia64/module.lds
+arch/m68k/Makefile:KBUILD_LDFLAGS_MODULE += -T $(srctree)/arch/m68k/kernel/module.lds
+arch/powerpc/Makefile:KBUILD_LDFLAGS_MODULE += arch/powerpc/lib/crtsavres.o
+arch/powerpc/Makefile:  KBUILD_LDFLAGS_MODULE += --ppc476-workaround \
+
+
+Anyway, feel free to ignore this patch and thanks a lot for the fast feedback.
+
+
+
 > 
-> That's not the problem, however. We can very easily pass along
-> ACPI_COMPANION() to any platform_device we want, but that's not enough
-> because DMA-related bits are passed along with archdata; but archdata
-> isn't generic in any way. Some arches (like x86) _do_ use it for DMA,
-> but some don't.
+> Thanks.
 > 
+> >
+> > Signed-off-by: Wladislav Wiebe <wladislav.wiebe@nokia.com>
+> > ---
+> >  arch/arm/Makefile | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> > index 61f6ccc..01c6025 100644
+> > --- a/arch/arm/Makefile
+> > +++ b/arch/arm/Makefile
+> > @@ -20,7 +20,7 @@ LDFLAGS_MODULE	+= --be8
+> >  endif
+> >
+> >  ifeq ($(CONFIG_ARM_MODULE_PLTS),y)
+> > -LDFLAGS_MODULE	+= -T $(srctree)/arch/arm/kernel/module.lds
+> > +KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm/kernel/module.lds
+> >  endif
+> >
+> >  OBJCOPYFLAGS	:=-O binary -R .comment -S
+> > --
+> > 1.7.12.4
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
