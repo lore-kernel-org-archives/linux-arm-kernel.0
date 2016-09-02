@@ -1,24 +1,29 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 2 Sep 2016 10:26:05 +0200
-Subject: [PATCH v2 1/3] ARM: dts: r7s72100: add ethernet clock to device
- tree
-In-Reply-To: <20160902014012.9383-1-chris.brandt@renesas.com>
-References: <20160901155430.23400-1-chris.brandt@renesas.com>
- <20160902014012.9383-1-chris.brandt@renesas.com>
-Message-ID: <20160902082604.GD16669@verge.net.au>
+From: martin@kaiser.cx (Martin Kaiser)
+Date: Fri,  2 Sep 2016 10:34:40 +0200
+Subject: [PATCH] ARM: imx: (trivial) fix typo and grammar
+In-Reply-To: <1993847.IzPN1S0Ejq@diplodocus>
+References: <1993847.IzPN1S0Ejq@diplodocus>
+Message-ID: <1472805280-5927-1-git-send-email-martin@kaiser.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Chris,
+Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+---
+ arch/arm/mach-imx/hardware.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I have queued up this and the following 2 patches for v4.9 (nothing more
-for you to do unless something goes wrong in which case I'll let you know).
-
-For future submissions please consider:
-1. Supplying a cover letter (git format-patch has a --cover-letter option)
-   for patch-sets comprising more than one patch. This allows you to describe
-   an overview of what the series as a whole achieves. And is also
-   convenient for maintainers to reply to when accepting your patches.
-2. Starting a new thread for each new version of a patch/patch-set.
-
-Different maintainers have different preferences. The above are mine.
+diff --git a/arch/arm/mach-imx/hardware.h b/arch/arm/mach-imx/hardware.h
+index a42a6df..90e10cb 100644
+--- a/arch/arm/mach-imx/hardware.h
++++ b/arch/arm/mach-imx/hardware.h
+@@ -120,7 +120,7 @@
+ 	.type = _type,							\
+ }
+ 
+-/* There's a off-by-one betweem the gpio bank number and the gpiochip */
++/* There's an off-by-one between the gpio bank number and the gpiochip */
+ /* range e.g. GPIO_1_5 is gpio 5 under linux */
+ #define IMX_GPIO_NR(bank, nr)		(((bank) - 1) * 32 + (nr))
+ 
+-- 
+1.7.10.4
