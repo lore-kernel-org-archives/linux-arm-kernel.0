@@ -1,91 +1,23 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 02 Sep 2016 11:50:15 +0100
-Subject: [PATCH V2] arm64:ftrace: add save_stack_trace_regs()
-In-Reply-To: <4f7d7a6bff7f06f814bf9a2bdc90bb0e3b833b66.1472734699.git.panand@redhat.com>
-References: <4f7d7a6bff7f06f814bf9a2bdc90bb0e3b833b66.1472734699.git.panand@redhat.com>
-Message-ID: <57C95967.9030308@arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 02 Sep 2016 12:53:04 +0200
+Subject: [PATCH] arm64: dts: rockchip: Add pinctrl entry for 32k clock on
+ rk3399
+In-Reply-To: <1472774002-25986-1-git-send-email-dianders@chromium.org>
+References: <1472774002-25986-1-git-send-email-dianders@chromium.org>
+Message-ID: <3854560.94E0h0U25i@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pratyush,
-
-On 01/09/16 14:35, Pratyush Anand wrote:
-> Implement save_stack_trace_regs, so that stacktrace of a kprobe events can be
-> obtained.
-
-Hmm, kconfig enables 'CONFIG_KPROBE_EVENT' if we select KPROBES and FTRACE, this
-calls save_stack_trace_regs(), which we haven't implemented, giving:
-[  373.406982] save_stack_trace_regs() not implemented yet.
-[  373.413020] ------------[ cut here ]------------
-[  373.417601] WARNING: CPU: 1 PID: 0 at ../kernel/stacktrace.c:74 save_stack_tr
-ace_regs+0x3c/0x48
-[  373.426212] Modules linked in:
-[  373.429238]
-[  373.430716] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.8.0-rc4-dirty #5128
-[  373.437606] Hardware name: ARM Juno development board (r1) (DT)
-[  373.443466] task: ffff800975dd1900 task.stack: ffff800975ddc000
-[  373.449327] PC is at save_stack_trace_regs+0x3c/0x48
-[  373.454242] LR is at save_stack_trace_regs+0x3c/0x48
-[  373.459156] pc : [<ffff000008126c64>] lr : [<ffff000008126c64>] pstate: 600003c5
-[  373.466476] sp : ffff80097ef52c00
-
-[  373.554836] Call trace:
-[  373.641153] [<ffff000008126c64>] save_stack_trace_regs+0x3c/0x48
-[  373.647104] [<ffff00000817a0b0>] __ftrace_trace_stack+0x168/0x208
-[  373.653138] [<ffff00000817ad40>] trace_buffer_unlock_commit_regs+0x5c/0x7c
-[  373.659946] [<ffff00000818d57c>] kprobe_trace_func+0x308/0x3d8
-[  373.665721] [<ffff00000818defc>] kprobe_dispatcher+0x58/0x60
-[  373.671327] [<ffff0000088d8cfc>] kprobe_breakpoint_handler+0xbc/0x18c
-[  373.677705] [<ffff0000080851b8>] brk_handler+0x50/0x90
-[  373.682792] [<ffff000008081300>] do_debug_exception+0x50/0xbc
-
-
-I guess hitting a WARN_ONCE() while using a 'kernel hacking' feature isn't
-serious enough to make this a fix.
-
-
-> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-> index d9751a4769e7..bd6d9d8087f0 100644
-> --- a/arch/arm64/kernel/stacktrace.c
-> +++ b/arch/arm64/kernel/stacktrace.c
-> @@ -152,6 +152,24 @@ static int save_trace(struct stackframe *frame, void *d)
->  	return trace->nr_entries >= trace->max_entries;
->  }
->  
-> +void save_stack_trace_regs(struct pt_regs *regs, struct stack_trace *trace)
-> +{
-> +	struct stack_trace_data data;
-> +	struct stackframe frame;
-> +
-> +	data.trace = trace;
-> +	data.skip = trace->skip;
-> +	data.no_sched_functions = 0;
-> +
-> +	frame.fp = regs->regs[29];
-> +	frame.sp = regs->sp;
-> +	frame.pc = regs->pc;
-
-What happens when a kprobe-event runs over a frame the function graph tracer has
-meddled with? You need:
-
-#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-	frame.graph = current->curr_ret_stack;
-#endif
-
-> +
-> +	walk_stackframe(current, &frame, save_trace, &data);
-> +	if (trace->nr_entries < trace->max_entries)
-> +		trace->entries[trace->nr_entries++] = ULONG_MAX;
-> +}
-> +
->  void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
->  {
->  	struct stack_trace_data data;
+Am Donnerstag, 1. September 2016, 16:53:22 schrieb Douglas Anderson:
+> On some rk3399 boards GPIO0_A0 is hooked up to a 32 kHz clock.  This can
+> be used as the source for various clocks in the system.
 > 
+> Add a pinmux so boards can get this pin properly configured.
+> 
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
 
-Reviewed-by: James Morse <james.morse@arm.com>
+applied to my dts64 branch for 4.9
 
 
-Thanks,
-
-James
+Thanks
+Heiko
