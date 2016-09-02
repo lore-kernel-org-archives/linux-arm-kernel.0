@@ -1,28 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 Sep 2016 17:36:03 +0200
-Subject: [PATCH 1/1 linux-next RESEND] ARM: multi_v7_defconfig: update
- XILINX_VDMA
-In-Reply-To: <1471282484-10810-1-git-send-email-fabf@skynet.be>
-References: <1471282484-10810-1-git-send-email-fabf@skynet.be>
-Message-ID: <6215142.AUZfTk6HDM@wuerfel>
+Date: Fri, 02 Sep 2016 17:38:46 +0200
+Subject: [RESEND PATCH] ARM: multi_v7_defconfig: Build Atmel maXTouch
+ driver as a module
+In-Reply-To: <1471360094-27637-1-git-send-email-javier@osg.samsung.com>
+References: <1471360094-27637-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <7304023.0tarkq2cRD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, August 15, 2016 7:34:44 PM CEST Fabian Frederick wrote:
-> Commit fde57a7c4474
-> ("dmaengine: xilinx: Rename driver and config")
+On Tuesday, August 16, 2016 11:08:14 AM CEST Javier Martinez Canillas wrote:
+> The driver is for a trackpad device so is not needed for booting and
+> makes more sense to have it as module to reduce the kernel image size.
 > 
-> renamed config XILINX_VDMA to config XILINX_DMA
-> Update defconfig accordingly.
+> It was probably enabled as built-in because module autoload was not
+> working when the I2C device was registered by OF but this got fixed
+> in commit b7d21058b40b ("Input: atmel_mxt_ts - add maxtouch to I2C
+> table for module autoload") so it's safe to enable as a module now.
 > 
-> Signed-off-by: Fabian Frederick <fabf@skynet.be>
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
 > ---
-> Sending to arm-soc (suggested by Shawn Guo)
-> 
 
-You did not actually address this to arm at kernel.org, but I found
-it and have now applied it to the fixes branch for v4.8.
+Applied to next/defconfig.
 
-Thanks!
+My preferred way is to get defconfig updates forwarded by the platform
+maintainers that are interested, but this seems to apply to multiple
+platforms, so I'm not asking you to pick one to resend it to.
 
 	Arnd
