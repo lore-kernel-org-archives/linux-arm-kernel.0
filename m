@@ -1,348 +1,351 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri,  2 Sep 2016 16:02:09 +0100
-Subject: [PATCH v2 3/7] arm64: Introduce uaccess_{disable,
- enable} functionality based on TTBR0_EL1
+Date: Fri,  2 Sep 2016 16:02:07 +0100
+Subject: [PATCH v2 1/7] arm64: Factor out PAN enabling/disabling into separate
+ uaccess_* macros
 In-Reply-To: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
 References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1472828533-28197-4-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1472828533-28197-2-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the uaccess macros/functions to disable access to user
-space by setting TTBR0_EL1 to a reserved zeroed page. Since the value
-written to TTBR0_EL1 must be a physical address, for simplicity this
-patch introduces a reserved_ttbr0 page at a constant offset from
-swapper_pg_dir. The uaccess_disable code uses the ttbr1_el1 value
-adjusted by the reserved_ttbr0 offset.
-
-Enabling access to user is done by restoring TTBR0_EL1 with the value
-from the struct thread_info ttbr0 variable. Interrupts must be disabled
-during the uaccess_ttbr0_enable code to ensure the atomicity of the
-thread_info.ttbr0 read and TTBR0_EL1 write.
+This patch moves the directly coded alternatives for turning PAN on/off
+into separate uaccess_{enable,disable} macros or functions. The asm
+macros take a few arguments which will be used in subsequent patches.
 
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: James Morse <james.morse@arm.com>
 Cc: Kees Cook <keescook@chromium.org>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/assembler.h      | 16 ++++++
- arch/arm64/include/asm/cpufeature.h     |  6 +++
- arch/arm64/include/asm/kernel-pgtable.h |  7 +++
- arch/arm64/include/asm/thread_info.h    |  3 ++
- arch/arm64/include/asm/uaccess.h        | 89 +++++++++++++++++++++++++++++++--
- arch/arm64/kernel/asm-offsets.c         |  3 ++
- arch/arm64/kernel/cpufeature.c          |  1 +
- arch/arm64/kernel/entry.S               |  4 --
- arch/arm64/kernel/head.S                |  6 +--
- arch/arm64/kernel/vmlinux.lds.S         |  5 ++
- 10 files changed, 129 insertions(+), 11 deletions(-)
+ arch/arm64/include/asm/futex.h       | 14 ++++-----
+ arch/arm64/include/asm/uaccess.h     | 55 ++++++++++++++++++++++++++++++------
+ arch/arm64/kernel/armv8_deprecated.c | 10 +++----
+ arch/arm64/lib/clear_user.S          |  8 ++----
+ arch/arm64/lib/copy_from_user.S      |  8 ++----
+ arch/arm64/lib/copy_in_user.S        |  8 ++----
+ arch/arm64/lib/copy_to_user.S        |  8 ++----
+ 7 files changed, 71 insertions(+), 40 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index b16bbf1fb786..bf1c797052dd 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -41,6 +41,15 @@
- 	msr	daifclr, #2
- 	.endm
+diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
+index f2585cdd32c2..7e5f236093be 100644
+--- a/arch/arm64/include/asm/futex.h
++++ b/arch/arm64/include/asm/futex.h
+@@ -27,9 +27,9 @@
+ #include <asm/sysreg.h>
  
-+	.macro	save_and_disable_irq, flags
-+	mrs	\flags, daif
-+	msr	daifset, #2
-+	.endm
-+
-+	.macro	restore_irq, flags
-+	msr	daif, \flags
-+	.endm
-+
- /*
-  * Enable and disable debug exceptions.
-  */
-@@ -351,6 +360,13 @@ alternative_endif
- 	.endm
+ #define __futex_atomic_op(insn, ret, oldval, uaddr, tmp, oparg)		\
++do {									\
++	uaccess_enable(ARM64_HAS_PAN);					\
+ 	asm volatile(							\
+-	ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,		\
+-		    CONFIG_ARM64_PAN)					\
+ "	prfm	pstl1strm, %2\n"					\
+ "1:	ldxr	%w1, %2\n"						\
+ 	insn "\n"							\
+@@ -44,11 +44,11 @@
+ "	.popsection\n"							\
+ 	_ASM_EXTABLE(1b, 4b)						\
+ 	_ASM_EXTABLE(2b, 4b)						\
+-	ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,		\
+-		    CONFIG_ARM64_PAN)					\
+ 	: "=&r" (ret), "=&r" (oldval), "+Q" (*uaddr), "=&r" (tmp)	\
+ 	: "r" (oparg), "Ir" (-EFAULT)					\
+-	: "memory")
++	: "memory");							\
++	uaccess_disable(ARM64_HAS_PAN);					\
++} while (0)
  
- /*
-+ * Return the current thread_info.
-+ */
-+	.macro	get_thread_info, rd
-+	mrs	\rd, sp_el0
-+	.endm
-+
-+/*
-  * Errata workaround post TTBR0_EL1 update.
-  */
- 	.macro	post_ttbr0_update_workaround, ret = 0
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 7099f26e3702..023066d9bf7f 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -216,6 +216,12 @@ static inline bool system_supports_mixed_endian_el0(void)
- 	return id_aa64mmfr0_mixed_endian_el0(read_system_reg(SYS_ID_AA64MMFR0_EL1));
- }
+ static inline int
+ futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
+@@ -118,8 +118,8 @@ futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
+ 	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
+ 		return -EFAULT;
  
-+static inline bool system_supports_ttbr0_pan(void)
-+{
-+	return IS_ENABLED(CONFIG_ARM64_TTBR0_PAN) &&
-+		!cpus_have_cap(ARM64_HAS_PAN);
-+}
-+
- #endif /* __ASSEMBLY__ */
++	uaccess_enable(ARM64_HAS_PAN);
+ 	asm volatile("// futex_atomic_cmpxchg_inatomic\n"
+-ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN, CONFIG_ARM64_PAN)
+ "	prfm	pstl1strm, %2\n"
+ "1:	ldxr	%w1, %2\n"
+ "	sub	%w3, %w1, %w4\n"
+@@ -134,10 +134,10 @@ ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN, CONFIG_ARM64_PAN)
+ "	.popsection\n"
+ 	_ASM_EXTABLE(1b, 4b)
+ 	_ASM_EXTABLE(2b, 4b)
+-ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN, CONFIG_ARM64_PAN)
+ 	: "+r" (ret), "=&r" (val), "+Q" (*uaddr), "=&r" (tmp)
+ 	: "r" (oldval), "r" (newval), "Ir" (-EFAULT)
+ 	: "memory");
++	uaccess_disable(ARM64_HAS_PAN);
  
- #endif
-diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
-index 7e51d1b57c0c..f825ffda9c52 100644
---- a/arch/arm64/include/asm/kernel-pgtable.h
-+++ b/arch/arm64/include/asm/kernel-pgtable.h
-@@ -19,6 +19,7 @@
- #ifndef __ASM_KERNEL_PGTABLE_H
- #define __ASM_KERNEL_PGTABLE_H
- 
-+#include <asm/pgtable.h>
- #include <asm/sparsemem.h>
- 
- /*
-@@ -54,6 +55,12 @@
- #define SWAPPER_DIR_SIZE	(SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
- #define IDMAP_DIR_SIZE		(IDMAP_PGTABLE_LEVELS * PAGE_SIZE)
- 
-+#ifdef CONFIG_ARM64_TTBR0_PAN
-+#define RESERVED_TTBR0_SIZE	(PAGE_SIZE)
-+#else
-+#define RESERVED_TTBR0_SIZE	(0)
-+#endif
-+
- /* Initial memory map size */
- #if ARM64_SWAPPER_USES_SECTION_MAPS
- #define SWAPPER_BLOCK_SHIFT	SECTION_SHIFT
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index abd64bd1f6d9..e4cff7307d28 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -47,6 +47,9 @@ typedef unsigned long mm_segment_t;
- struct thread_info {
- 	unsigned long		flags;		/* low level flags */
- 	mm_segment_t		addr_limit;	/* address limit */
-+#ifdef CONFIG_ARM64_TTBR0_PAN
-+	u64			ttbr0;		/* saved TTBR0_EL1 */
-+#endif
- 	struct task_struct	*task;		/* main task structure */
- 	int			preempt_count;	/* 0 => preemptable, <0 => bug */
- 	int			cpu;		/* cpu */
+ 	*uval = val;
+ 	return ret;
 diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index fde5f7a13030..3b2cc7787d5a 100644
+index c47257c91b77..fde5f7a13030 100644
 --- a/arch/arm64/include/asm/uaccess.h
 +++ b/arch/arm64/include/asm/uaccess.h
-@@ -29,6 +29,7 @@
+@@ -18,6 +18,8 @@
+ #ifndef __ASM_UACCESS_H
+ #define __ASM_UACCESS_H
  
- #include <asm/alternative.h>
- #include <asm/cpufeature.h>
-+#include <asm/kernel-pgtable.h>
- #include <asm/ptrace.h>
- #include <asm/sysreg.h>
- #include <asm/errno.h>
-@@ -116,16 +117,56 @@ static inline void set_fs(mm_segment_t fs)
++#ifndef __ASSEMBLY__
++
  /*
-  * User access enabling/disabling.
+  * User space memory access functions
   */
-+#ifdef CONFIG_ARM64_TTBR0_PAN
-+static inline void uaccess_ttbr0_disable(void)
-+{
-+	unsigned long ttbr;
-+
-+	/* reserved_ttbr0 placed at the end of swapper_pg_dir */
-+	ttbr = read_sysreg(ttbr1_el1) + SWAPPER_DIR_SIZE;
-+	write_sysreg(ttbr, ttbr0_el1);
-+	isb();
-+}
-+
-+static inline void uaccess_ttbr0_enable(void)
-+{
-+	unsigned long flags;
-+
-+	/*
-+	 * Disable interrupts to avoid preemption and potential saved
-+	 * TTBR0_EL1 updates between reading the variable and the MSR.
-+	 */
-+	local_irq_save(flags);
-+	write_sysreg(current_thread_info()->ttbr0, ttbr0_el1);
-+	isb();
-+	local_irq_restore(flags);
-+}
-+#else
-+static inline void uaccess_ttbr0_disable(void)
-+{
-+}
-+
-+static inline void uaccess_ttbr0_enable(void)
-+{
-+}
-+#endif
-+
- #define uaccess_disable(alt)						\
- do {									\
--	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), alt,			\
--			CONFIG_ARM64_PAN));				\
-+	if (system_supports_ttbr0_pan())				\
-+		uaccess_ttbr0_disable();				\
-+	else								\
-+		asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), alt,		\
-+				CONFIG_ARM64_PAN));			\
- } while (0)
- 
- #define uaccess_enable(alt)						\
- do {									\
--	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), alt,			\
--			CONFIG_ARM64_PAN));				\
-+	if (system_supports_ttbr0_pan())				\
-+		uaccess_ttbr0_enable();					\
-+	else								\
-+		asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), alt,		\
-+				CONFIG_ARM64_PAN));			\
- } while (0)
+@@ -112,6 +114,21 @@ static inline void set_fs(mm_segment_t fs)
+ 	"	.popsection\n"
  
  /*
-@@ -338,11 +379,36 @@ extern __must_check long strnlen_user(const char __user *str, long n);
++ * User access enabling/disabling.
++ */
++#define uaccess_disable(alt)						\
++do {									\
++	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), alt,			\
++			CONFIG_ARM64_PAN));				\
++} while (0)
++
++#define uaccess_enable(alt)						\
++do {									\
++	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), alt,			\
++			CONFIG_ARM64_PAN));				\
++} while (0)
++
++/*
+  * The "__xxx" versions of the user access functions do not verify the address
+  * space - it must have been done previously with a separate "access_ok()"
+  * call.
+@@ -138,8 +155,7 @@ static inline void set_fs(mm_segment_t fs)
+ do {									\
+ 	unsigned long __gu_val;						\
+ 	__chk_user_ptr(ptr);						\
+-	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_ALT_PAN_NOT_UAO,\
+-			CONFIG_ARM64_PAN));				\
++	uaccess_enable(ARM64_ALT_PAN_NOT_UAO);				\
+ 	switch (sizeof(*(ptr))) {					\
+ 	case 1:								\
+ 		__get_user_asm("ldrb", "ldtrb", "%w", __gu_val, (ptr),  \
+@@ -160,9 +176,8 @@ do {									\
+ 	default:							\
+ 		BUILD_BUG();						\
+ 	}								\
++	uaccess_disable(ARM64_ALT_PAN_NOT_UAO);				\
+ 	(x) = (__force __typeof__(*(ptr)))__gu_val;			\
+-	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_ALT_PAN_NOT_UAO,\
+-			CONFIG_ARM64_PAN));				\
+ } while (0)
  
- #include <asm/alternative.h>
+ #define __get_user(x, ptr)						\
+@@ -207,8 +222,7 @@ do {									\
+ do {									\
+ 	__typeof__(*(ptr)) __pu_val = (x);				\
+ 	__chk_user_ptr(ptr);						\
+-	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_ALT_PAN_NOT_UAO,\
+-			CONFIG_ARM64_PAN));				\
++	uaccess_enable(ARM64_ALT_PAN_NOT_UAO);				\
+ 	switch (sizeof(*(ptr))) {					\
+ 	case 1:								\
+ 		__put_user_asm("strb", "sttrb", "%w", __pu_val, (ptr),	\
+@@ -229,8 +243,7 @@ do {									\
+ 	default:							\
+ 		BUILD_BUG();						\
+ 	}								\
+-	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_ALT_PAN_NOT_UAO,\
+-			CONFIG_ARM64_PAN));				\
++	uaccess_disable(ARM64_ALT_PAN_NOT_UAO);				\
+ } while (0)
+ 
+ #define __put_user(x, ptr)						\
+@@ -321,4 +334,30 @@ extern long strncpy_from_user(char *dest, const char __user *src, long count);
+ extern __must_check long strlen_user(const char __user *str);
+ extern __must_check long strnlen_user(const char __user *str, long n);
+ 
++#else	/* __ASSEMBLY__ */
++
++#include <asm/alternative.h>
++#include <asm/assembler.h>
++
++/*
++ * User access enabling/disabling macros.
++ */
++	.macro	uaccess_disable, tmp1
++alternative_if_not ARM64_ALT_PAN_NOT_UAO
++	nop
++alternative_else
++	SET_PSTATE_PAN(1)
++alternative_endif
++	.endm
++
++	.macro	uaccess_enable, tmp1, tmp2
++alternative_if_not ARM64_ALT_PAN_NOT_UAO
++	nop
++alternative_else
++	SET_PSTATE_PAN(0)
++alternative_endif
++	.endm
++
++#endif	/* __ASSEMBLY__ */
++
+ #endif /* __ASM_UACCESS_H */
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+index 42ffdb54e162..3aaf2fafbc8a 100644
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -281,9 +281,9 @@ static void __init register_insn_emulation_sysctl(struct ctl_table *table)
+  * Error-checking SWP macros implemented using ldxr{b}/stxr{b}
+  */
+ #define __user_swpX_asm(data, addr, res, temp, B)		\
++do {								\
++	uaccess_enable(ARM64_HAS_PAN);				\
+ 	__asm__ __volatile__(					\
+-	ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,	\
+-		    CONFIG_ARM64_PAN)				\
+ 	"0:	ldxr"B"		%w2, [%3]\n"			\
+ 	"1:	stxr"B"		%w0, %w1, [%3]\n"		\
+ 	"	cbz		%w0, 2f\n"			\
+@@ -299,11 +299,11 @@ static void __init register_insn_emulation_sysctl(struct ctl_table *table)
+ 	"	.popsection"					\
+ 	_ASM_EXTABLE(0b, 4b)					\
+ 	_ASM_EXTABLE(1b, 4b)					\
+-	ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,	\
+-		CONFIG_ARM64_PAN)				\
+ 	: "=&r" (res), "+r" (data), "=&r" (temp)		\
+ 	: "r" (addr), "i" (-EAGAIN), "i" (-EFAULT)		\
+-	: "memory")
++	: "memory");						\
++	uaccess_disable(ARM64_HAS_PAN);				\
++} while (0)
+ 
+ #define __user_swp_asm(data, addr, res, temp) \
+ 	__user_swpX_asm(data, addr, res, temp, "")
+diff --git a/arch/arm64/lib/clear_user.S b/arch/arm64/lib/clear_user.S
+index 5d1cad3ce6d6..51577e84b0fe 100644
+--- a/arch/arm64/lib/clear_user.S
++++ b/arch/arm64/lib/clear_user.S
+@@ -17,10 +17,10 @@
+  */
+ #include <linux/linkage.h>
+ 
+-#include <asm/alternative.h>
  #include <asm/assembler.h>
-+#include <asm/kernel-pgtable.h>
+ #include <asm/cpufeature.h>
+ #include <asm/sysreg.h>
++#include <asm/uaccess.h>
+ 
+ 	.text
+ 
+@@ -33,8 +33,7 @@
+  * Alignment fixed up by hardware.
+  */
+ ENTRY(__clear_user)
+-ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
+-	    CONFIG_ARM64_PAN)
++	uaccess_enable x2, x3
+ 	mov	x2, x1			// save the size for fixup return
+ 	subs	x1, x1, #8
+ 	b.mi	2f
+@@ -54,8 +53,7 @@ uao_user_alternative 9f, strh, sttrh, wzr, x0, 2
+ 	b.mi	5f
+ uao_user_alternative 9f, strb, sttrb, wzr, x0, 0
+ 5:	mov	x0, #0
+-ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
+-	    CONFIG_ARM64_PAN)
++	uaccess_disable x2
+ 	ret
+ ENDPROC(__clear_user)
+ 
+diff --git a/arch/arm64/lib/copy_from_user.S b/arch/arm64/lib/copy_from_user.S
+index 0b90497d4424..41a614d63410 100644
+--- a/arch/arm64/lib/copy_from_user.S
++++ b/arch/arm64/lib/copy_from_user.S
+@@ -16,11 +16,11 @@
+ 
+ #include <linux/linkage.h>
+ 
+-#include <asm/alternative.h>
+ #include <asm/assembler.h>
+ #include <asm/cache.h>
+ #include <asm/cpufeature.h>
+ #include <asm/sysreg.h>
++#include <asm/uaccess.h>
  
  /*
-  * User access enabling/disabling macros.
-  */
-+	.macro	uaccess_ttbr0_disable, tmp1
-+	mrs	\tmp1, ttbr1_el1		// swapper_pg_dir
-+	add	\tmp1, \tmp1, #SWAPPER_DIR_SIZE	// reserved_ttbr0 at the end of swapper_pg_dir
-+	msr	ttbr0_el1, \tmp1		// set reserved TTBR0_EL1
-+	isb
-+	.endm
-+
-+	.macro	uaccess_ttbr0_enable, tmp1
-+	get_thread_info \tmp1
-+	ldr	\tmp1, [\tmp1, #TI_TTBR0]	// load saved TTBR0_EL1
-+	msr	ttbr0_el1, \tmp1		// set the non-PAN TTBR0_EL1
-+	isb
-+	.endm
-+
- 	.macro	uaccess_disable, tmp1
-+#ifdef CONFIG_ARM64_TTBR0_PAN
-+alternative_if_not ARM64_HAS_PAN
-+	uaccess_ttbr0_disable \tmp1
-+alternative_else
-+	nop
-+	nop
-+	nop
-+	nop
-+alternative_endif
-+#endif
- alternative_if_not ARM64_ALT_PAN_NOT_UAO
- 	nop
- alternative_else
-@@ -351,6 +417,21 @@ alternative_endif
- 	.endm
+  * Copy from user space to a kernel buffer (alignment handled by the hardware)
+@@ -67,12 +67,10 @@
  
- 	.macro	uaccess_enable, tmp1, tmp2
-+#ifdef CONFIG_ARM64_TTBR0_PAN
-+alternative_if_not ARM64_HAS_PAN
-+	save_and_disable_irq \tmp2		// avoid preemption
-+	uaccess_ttbr0_enable \tmp1
-+	restore_irq \tmp2
-+alternative_else
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+alternative_endif
-+#endif
- alternative_if_not ARM64_ALT_PAN_NOT_UAO
- 	nop
- alternative_else
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 05070b72fc28..0af4d9a6c10d 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -38,6 +38,9 @@ int main(void)
-   DEFINE(TI_FLAGS,		offsetof(struct thread_info, flags));
-   DEFINE(TI_PREEMPT,		offsetof(struct thread_info, preempt_count));
-   DEFINE(TI_ADDR_LIMIT,		offsetof(struct thread_info, addr_limit));
-+#ifdef CONFIG_ARM64_TTBR0_PAN
-+  DEFINE(TI_TTBR0,		offsetof(struct thread_info, ttbr0));
-+#endif
-   DEFINE(TI_TASK,		offsetof(struct thread_info, task));
-   DEFINE(TI_CPU,		offsetof(struct thread_info, cpu));
-   BLANK();
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 62272eac1352..fd0971afd142 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -45,6 +45,7 @@ unsigned int compat_elf_hwcap2 __read_mostly;
- #endif
+ end	.req	x5
+ ENTRY(__arch_copy_from_user)
+-ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
+-	    CONFIG_ARM64_PAN)
++	uaccess_enable x3, x4
+ 	add	end, x0, x2
+ #include "copy_template.S"
+-ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
+-	    CONFIG_ARM64_PAN)
++	uaccess_disable x3
+ 	mov	x0, #0				// Nothing to copy
+ 	ret
+ ENDPROC(__arch_copy_from_user)
+diff --git a/arch/arm64/lib/copy_in_user.S b/arch/arm64/lib/copy_in_user.S
+index f7292dd08c84..5493c427f538 100644
+--- a/arch/arm64/lib/copy_in_user.S
++++ b/arch/arm64/lib/copy_in_user.S
+@@ -18,11 +18,11 @@
  
- DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
-+EXPORT_SYMBOL(cpu_hwcaps);
+ #include <linux/linkage.h>
  
- #define __ARM64_FTR_BITS(SIGNED, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
- 	{						\
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 441420ca7d08..be1e3987c07a 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -190,10 +190,6 @@ alternative_endif
- 	eret					// return to kernel
- 	.endm
+-#include <asm/alternative.h>
+ #include <asm/assembler.h>
+ #include <asm/cache.h>
+ #include <asm/cpufeature.h>
+ #include <asm/sysreg.h>
++#include <asm/uaccess.h>
  
--	.macro	get_thread_info, rd
--	mrs	\rd, sp_el0
--	.endm
--
- 	.macro	irq_stack_entry
- 	mov	x19, sp			// preserve the original sp
+ /*
+  * Copy from user space to user space (alignment handled by the hardware)
+@@ -68,12 +68,10 @@
  
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 3e7b050e99dc..d4188396302f 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -320,14 +320,14 @@ __create_page_tables:
- 	 * dirty cache lines being evicted.
- 	 */
- 	mov	x0, x25
--	add	x1, x26, #SWAPPER_DIR_SIZE
-+	add	x1, x26, #SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE
- 	bl	__inval_cache_range
+ end	.req	x5
+ ENTRY(__copy_in_user)
+-ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
+-	    CONFIG_ARM64_PAN)
++	uaccess_enable x3, x4
+ 	add	end, x0, x2
+ #include "copy_template.S"
+-ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
+-	    CONFIG_ARM64_PAN)
++	uaccess_disable x3
+ 	mov	x0, #0
+ 	ret
+ ENDPROC(__copy_in_user)
+diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
+index 7a7efe255034..d6203c5f84bd 100644
+--- a/arch/arm64/lib/copy_to_user.S
++++ b/arch/arm64/lib/copy_to_user.S
+@@ -16,11 +16,11 @@
  
- 	/*
- 	 * Clear the idmap and swapper page tables.
- 	 */
- 	mov	x0, x25
--	add	x6, x26, #SWAPPER_DIR_SIZE
-+	add	x6, x26, #SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE
- 1:	stp	xzr, xzr, [x0], #16
- 	stp	xzr, xzr, [x0], #16
- 	stp	xzr, xzr, [x0], #16
-@@ -406,7 +406,7 @@ __create_page_tables:
- 	 * tables again to remove any speculatively loaded cache lines.
- 	 */
- 	mov	x0, x25
--	add	x1, x26, #SWAPPER_DIR_SIZE
-+	add	x1, x26, #SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE
- 	dmb	sy
- 	bl	__inval_cache_range
+ #include <linux/linkage.h>
  
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 659963d40bb4..fe393ccf9352 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -196,6 +196,11 @@ SECTIONS
- 	swapper_pg_dir = .;
- 	. += SWAPPER_DIR_SIZE;
+-#include <asm/alternative.h>
+ #include <asm/assembler.h>
+ #include <asm/cache.h>
+ #include <asm/cpufeature.h>
+ #include <asm/sysreg.h>
++#include <asm/uaccess.h>
  
-+#ifdef CONFIG_ARM64_TTBR0_PAN
-+	reserved_ttbr0 = .;
-+	. += PAGE_SIZE;
-+#endif
-+
- 	_end = .;
+ /*
+  * Copy to user space from a kernel buffer (alignment handled by the hardware)
+@@ -66,12 +66,10 @@
  
- 	STABS_DEBUG
+ end	.req	x5
+ ENTRY(__arch_copy_to_user)
+-ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
+-	    CONFIG_ARM64_PAN)
++	uaccess_enable x3, x4
+ 	add	end, x0, x2
+ #include "copy_template.S"
+-ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
+-	    CONFIG_ARM64_PAN)
++	uaccess_disable x3
+ 	mov	x0, #0
+ 	ret
+ ENDPROC(__arch_copy_to_user)
