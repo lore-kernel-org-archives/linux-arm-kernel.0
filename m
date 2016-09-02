@@ -1,45 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 Sep 2016 14:55:34 +0200
-Subject: [PATCH 12/18] arm64: ilp32: add sys_ilp32.c and a separate table
- (in entry.S) to use it
-In-Reply-To: <57C9587B.9080006@huawei.com>
-References: <1471434403-25291-1-git-send-email-ynorov@caviumnetworks.com>
- <1471434403-25291-13-git-send-email-ynorov@caviumnetworks.com>
- <57C9587B.9080006@huawei.com>
-Message-ID: <6815916.BISHOLF1Ut@wuerfel>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Fri, 02 Sep 2016 15:56:53 +0300
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <956cf653-973a-3bfd-9aaa-bdc922995ea6@arm.com>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <87vb31kdvh.fsf@intel.com>
+ <CADRPPNTQURmuwyuXCjHZcCq6jmQDFiyEUqfcqO-us15nosGCDA@mail.gmail.com>
+ <6414695.LEIYfGPUEg@wuerfel> <87eg528te7.fsf@linux.intel.com>
+ <956cf653-973a-3bfd-9aaa-bdc922995ea6@arm.com>
+Message-ID: <87wpiu794a.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 2, 2016 6:46:19 PM CEST Bamvor Jian Zhang wrote:
-> diff --git a/arch/arm64/include/uapi/asm/unistd.h b/arch/arm64/include/uapi/asm/unistd.h
-> index 043d17a..78bea1d 100644
-> --- a/arch/arm64/include/uapi/asm/unistd.h
-> +++ b/arch/arm64/include/uapi/asm/unistd.h
-> @@ -16,4 +16,9 @@
-> 
->  #define __ARCH_WANT_RENAMEAT
-> 
-> +/* We need to make sure it works for both userspace and kernel(sys_ilp32.c) */
-> +#if defined(__ILP32__) || defined(__SYSCALL_COMPAT)
-> +#define __ARCH_WANT_SYNC_FILE_RANGE2
-> +#endif
-> +
->  #include <asm-generic/unistd.h>
-> diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
-> index 10fc0ca..13c9c9d 100644
-> --- a/arch/arm64/kernel/sys_ilp32.c
-> +++ b/arch/arm64/kernel/sys_ilp32.c
-> @@ -42,7 +42,7 @@
->  #define compat_sys_pwrite64            compat_sys_pwrite64_wrapper
->  #define compat_sys_readahead           compat_sys_readahead_wrapper
->  #define compat_sys_shmat               sys_shmat
-> -#define compat_sys_sync_file_range     compat_sys_sync_file_range2_wrapper
-> +#define compat_sys_sync_file_range2    compat_sys_sync_file_range2_wrapper
->  #define compat_sys_truncate64          compat_sys_truncate64_wrapper
->  #define sys_mmap2                      compat_sys_mmap2_wrapper
->  #define sys_ptrace                     compat_sys_ptrace
-> 
 
-Looks good to me.
+Hi,
 
-	Arnd
+Robin Murphy <robin.murphy@arm.com> writes:
+>>>> It has been a while since the last response to this discussion, but we
+>>>> haven't reached an agreement yet!  Can we get to a conclusion on if it
+>>>> is valid to create child platform device for abstraction purpose?  If
+>>>> yes, can this child device do DMA by itself?
+>>>
+>>> I'd say it's no problem for a driver to create child devices in order
+>>> to represent different aspects of a device, but you should not rely on
+>>> those devices working when used with the dma-mapping interfaces.
+>> 
+>> heh, that looks like an excuse to me :-)
+>> 
+>> This will always be a problem for e.g. MFD, for example. Are you saying
+>> MFD child-devices shouldn't be allowed to do DMA? It becomes silly when
+>> you read it that way, right?
+>> 
+>>> This used to be simpler back when we could configure the kernel for
+>>> only one SoC platform at a time, and the platforms could provide their
+>>> own overrides for the dma-mapping interfaces. These days, we rely on
+>> 
+>> right, so we have a very old regression that just took a complex driver
+>> such as dwc3 to trigger ;-)
+>> 
+>>> firmware or bootloader to describe various aspects of how DMA is done,
+>> 
+>> there's no DMA description in DT. Every OF device gets the same 32-bit
+>> DMA mask and that is, itself, wrong for several devices.
+>
+> Huh? There's only no DMA description in DT if the device can be assumed
+> to be happy with the defaults. Anything else should be using
+> "dma-ranges", "dma-coherent", etc. to describe non-default integration
+
+heh, guilty as charged. I never noticed we had dma-ranges or
+dma-coherent.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160902/777330c0/attachment.sig>
