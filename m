@@ -1,76 +1,84 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Fri, 2 Sep 2016 11:46:31 -0700
-Subject: [GIT PULL] arm64: X-Gene platforms DTS changes queued for 4.9 - part1
-Message-ID: <CADaLNDkZdAipxx6cfLJ6yrzTrcLPS_Ciw8+T5EUFVcRRw+fjPw@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 2 Sep 2016 20:50:28 +0200 (CEST)
+Subject: [PATCH RFC 1/3] DT: bindings: mmc: Add property for 3.3V only
+ support
+In-Reply-To: <CAPDyKFr8X93oqiPzkQxPnfMGyV9UBEybvfODX5if3VwMbheKcw@mail.gmail.com>
+References: <1470488140-10104-1-git-send-email-stefan.wahren@i2se.com>
+ <1470488140-10104-2-git-send-email-stefan.wahren@i2se.com>
+ <20160810184451.GA13473@rob-hp-laptop>
+ <853617027.179290.63a6f478-ad48-40c8-82ca-760dd1afc040.open-xchange@email.1und1.de>
+ <CAL_JsqJ09hXYrp_pgAw9FXrBv+=grkm_zip6qB9XefujPECTxQ@mail.gmail.com>
+ <468a6704-a9f0-1715-ff64-9e331a6a80b1@rock-chips.com>
+ <8f87c885-3c55-cac8-a9f5-e121ae031f90@intel.com>
+ <CAPDyKFr8X93oqiPzkQxPnfMGyV9UBEybvfODX5if3VwMbheKcw@mail.gmail.com>
+Message-ID: <1736517218.106027.c3e46c0d-6759-48dd-92a9-ce98ef74d48a.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi Ulf, hi Rob
 
-This is the first part of DTS changes for X-Gene platforms targeted for 4.9.
+> Ulf Hansson <ulf.hansson@linaro.org> hat am 30. August 2016 um 11:26
+> geschrieben:
+> 
+> 
+> On 18 August 2016 at 14:25, Adrian Hunter <adrian.hunter@intel.com> wrote:
+> > On 11/08/16 03:48, Shawn Lin wrote:
+> >> + Adrian
+> >>
+> >> Let's queue Adrian here who now maintains SDHCI stuff.
+> >
+> > SDHCI drivers may not implement no-1-8-v in a consistent manner, but as far
+> > as I can see, the meaning is still clear: 1.8V will not be used for either
+> > supply or signaling.
+> 
+> Okay.
+> 
+> >
+> > SDHCI is complicated because the SDHCI specification does not cover eMMC.
+> > From the perspective of SDHCI, the only 1.8V modes are the UHS-I modes, so
+> > support for 1.8V signaling is the same as support for one of those modes
+> > (the spec even says as much).  But what happens is that the host controller
+> > can support those modes but the board can't supply 1.8V so the drivers
+> > remove capability for the modes.  Support for 1.8V supply has a capability
+> > bit which drivers can override if necessary but removable SD cards don't
+> > support 1.8V supply anyway, so the issue doesn't arise if the host
+> > controller is only used for uSD cards.
+> 
+> By looking how SDHCI uses the SDHCI_SUPPORT_DDR50 in conjunction with
+> SDHCI_QUIRK2_NO_1_8_V (which is set when no-1-8-v DT property is
+> provided), this becomes a bit messy.
+> 
+> From Adrian's summary above, it then seems appropriate to limit the
+> no-1-8-v DT property to apply only to capabilities related to SD
+> cards, as I assume that also was the original purpose.
+> 
+> Do you think it's possible to clean up this in sdhci when assigning
+> the caps masks, and then also clarify the no-1-8-v DT binding in the
+> documentation?
 
-The changes include:
-+ X-Gene Soc PMU support patch set from Tai Nguyen (v10 reviewed by
-Mark, DT binding document acked by Rob [1] and was suggested to merge
-via am-soc tree by Will [2])
-+ Follow up patch to enable DT entry for SoC PMU on X-Gene v2
-+ Correct PCIe legacy interrupt mode to level-active high
-+ DTS entry for X-Gene hwmon (v4 acked by Guenter, DT binding document
-and driver is in linux-next now [3])
+was the question addressed to me? I think this clean up should be a separate
+patch series. Unfortunately i don't have a clue about what exactly and how it
+should be fixed.
 
-Regards,
-Duc Dang.
+> 
+> Regarding the new DT binding proposed to be added, mmc-ddr-3_3v, it
+> seems we need this to be able to properly describe the HW.
+> Rob, do you have an issue with adding this binding? I am thinking that
+> we already have mmc-ddr-1_8v and mmc-ddr-1_2v, so it just follow
+> existing pattern.
 
-[1]: https://lkml.org/lkml/2016/7/15/563
-[2]: https://lkml.org/lkml/2016/7/20/224
-[3]: http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=893485e74c37669aeecf0b648dbfbd8e2f0471c3
-------
+@Rob: gently ping ...
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+Regards
+Stefan
 
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
-
-are available in the git repository at:
-
-  https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.9-part1
-
-for you to fetch changes up to 1c983fc9369420748192712bde2429af3e580390:
-
-  arm64: dts: apm: Add X-Gene SoC hwmon to device tree (2016-09-02
-10:43:41 -0700)
-
-----------------------------------------------------------------
-X-Gene DTS changes queued for v4.9 - part 1
-
-This patch set includes:
-+ X-Gene v1 SoC Performance Monitoring Unit (PMU) support
-+ DTS entry to enable SoC PMU for X-Gene v2 SoC
-+ PCIe legacy interrupt polarity fix for X-Gene
-+ X-Gene SoC hwmon DTS entry
-
-----------------------------------------------------------------
-Duc Dang (2):
-      arm64: dts: apm: Add APM X-Gene v2 SoC PMU DTS entries
-      arm64: dts: apm: Fix interrupt polarity for X-Gene PCIe legacy interrupts
-
-Tai Nguyen (4):
-      MAINTAINERS: Add entry for APM X-Gene SoC PMU driver
-      Documentation: Add documentation for APM X-Gene SoC PMU DTS binding
-      perf: xgene: Add APM X-Gene SoC Performance Monitoring Unit driver
-      arm64: dts: apm: Add APM X-Gene SoC PMU DTS entries
-
-hotran (1):
-      arm64: dts: apm: Add X-Gene SoC hwmon to device tree
-
- .../devicetree/bindings/perf/apm-xgene-pmu.txt     |  112 ++
- Documentation/perf/xgene-pmu.txt                   |   48 +
- MAINTAINERS                                        |    7 +
- arch/arm64/boot/dts/apm/apm-shadowcat.dtsi         |   79 +-
- arch/arm64/boot/dts/apm/apm-storm.dtsi             |  103 +-
- drivers/perf/Kconfig                               |    7 +
- drivers/perf/Makefile                              |    1 +
- drivers/perf/xgene_pmu.c                           | 1398 ++++++++++++++++++++
- 8 files changed, 1727 insertions(+), 28 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/perf/apm-xgene-pmu.txt
- create mode 100644 Documentation/perf/xgene-pmu.txt
- create mode 100644 drivers/perf/xgene_pmu.c
+> 
+> [...]
+> 
+> Kind regards
+> Uffe
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
