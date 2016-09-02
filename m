@@ -1,56 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 Sep 2016 16:05:26 +0200
-Subject: [GIT PULL] drop last omap3 board files for v4.8
-In-Reply-To: <20160901154057.y6hib3ckdjppehfl@atomide.com>
-References: <20160816155241.eka7c6p2rvp4q5zk@atomide.com>
- <20160901154057.y6hib3ckdjppehfl@atomide.com>
-Message-ID: <4327380.4mS7Wg8her@wuerfel>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 02 Sep 2016 15:07:46 +0100
+Subject: [PATCH 0/5] CCN fixes for 4.8
+In-Reply-To: <4562884.ulVluvhm7B@wuerfel>
+References: <1471019156-5485-1-git-send-email-pawel.moll@arm.com>
+ <4562884.ulVluvhm7B@wuerfel>
+Message-ID: <1472825266.5415.89.camel@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 1, 2016 8:40:57 AM CEST Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [160816 08:53]:
-> > The following changes since commit 79cdad3635b3a253d712aba115fa274ef94a8c6b:
+On Fri, 2016-09-02 at 16:01 +0200, Arnd Bergmann wrote:
+> On Friday, August 12, 2016 5:25:51 PM CEST Pawel Moll wrote:
 > > 
-> >   ir-rx51: use hrtimer instead of dmtimer (2016-06-29 21:54:35 -0700)
+> > Greetings, Arnd, Olof, Kevin,
 > > 
-> > are available in the git repository at:
+> > This is a small set of various CCN driver fixes I accumulated over
+> > the
+> > last few weeks.
 > > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.8/legacy-signed
+> > I'll send a pull request later, probably next week, that will also
+> > include Mark's patches he sent out yesterday.
 > > 
-> > for you to fetch changes up to e92fc4f04a34a407f5ff8acaa13127c62b7bec07:
-> > 
-> >   ARM: OMAP2+: Drop legacy board file for LDP (2016-07-10 23:47:38 -0700)
-> > 
-> > ----------------------------------------------------------------
-> > Remove the last two legacy board-*.c files for omap3 for legacy
-> > booting for v4.8 to allow making mach-omap2 device tree only for
-> > v4.9.
-> > 
-> > We've had Nokia N900 and omap3 LDP board-*.c files remaining
-> > while other omap3 devices have been device tree only for quite
-> > a while now. Also N900 and LDP have had device tree based booting
-> > working for years now, but few drivers for N900 were still only
-> > working in legacy only mode until recently. With the remaining
-> > issues out of the way, we discussed on the mailing lists that
-> > we're finally OK to remove the remaining board-*.c files.
-> > 
-> > For the timing of this pull request, I wanted to wait until
-> > v4.8-rc1 is out to make sure the legacy booting still works fine
-> > after the merge window before doing it.
-> > 
-> > And for v4.8, let's not touch any other platform data in case we
-> > still need to revert for some reason. This makes the revert just a
-> > question of adding back the legacy board-*.c files.
-> > 
-> > Then if no issues, we can remove the unused remaining platform
-> > data later on for v4.9.
+> This seems to have gotten lost, I picked it up into the fixes branch
+> now.
 > 
-> Naturally this can wait for v4.9 merge window too if considered
-> too intrusive this late.
+> Sorry for the delay.
 
-I'd prefer to do it as a cleanup for 4.9, and added the pull
-request to my todo folder for that now, will get to it along
-with the other pull requests.
+Cool, no problem - thanks!. Just want to make sure you pulled the
+latest version, as described in the v2 request:
 
-	Arnd
+http://www.spinics.net/lists/arm-kernel/msg526595.html
+
+Cheers!
+
+Pawe?
