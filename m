@@ -1,47 +1,83 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 2 Sep 2016 15:27:20 -0500
-Subject: [PATCH V2 1/5] Documentation: Add support for TI System Control
- Interface (TI-SCI) protocol
-In-Reply-To: <CAGo_u6q0xxnUj5ary82OU1uP=kTHfA_3N7_d7OiSEwS1_5dXuw@mail.gmail.com>
-References: <20160830130647.6828-1-nm@ti.com>
- <20160830130647.6828-2-nm@ti.com> <20160902150628.GA19493@rob-hp-laptop>
- <CAGo_u6q0xxnUj5ary82OU1uP=kTHfA_3N7_d7OiSEwS1_5dXuw@mail.gmail.com>
-Message-ID: <57C9E0A8.4010701@ti.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 2 Sep 2016 22:32:18 +0200
+Subject: [PATCH] rtc: constify rtc_class_ops structures
+In-Reply-To: <1472630725-25465-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1472630725-25465-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <20160902203218.swu3fcxb266jeq2s@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2016 12:07 PM, Nishanth Menon wrote:
-> Rob,
->
-> On Fri, Sep 2, 2016 at 10:06 AM, Rob Herring <robh@kernel.org> wrote:
->> On Tue, Aug 30, 2016 at 08:06:43AM -0500, Nishanth Menon wrote:
-> [...]
->>> +
->>> +TI-SCI Client Device Node:
->>> +========================
->>> +
->>> +Client nodes refer to the required TI-SCI device using the "ti,sci" property.
->>
->> As I mentioned for power domains, for clients that are self contained
->> (i.e. a single function) I think the should be child nodes.
->>
->
-> Thanks for the feedback. I think we should be able to do that and also
-> assume you have no further improvements you'd like to see here.
->
-> Looking at current Documentation/devicetree/bindings/arm/arm,scpi.txt
-> -> it makes sense to stick along the same lines as you mentioned.
->
-> Dave, Tero: do you guys have any objections?
-
-No objections, I think this is a logical move.
-
-Regards,
-Dave
-
->
->
+On 31/08/2016 at 10:05:25 +0200, Julia Lawall wrote :
+> Check for rtc_class_ops structures that are only passed to
+> devm_rtc_device_register, rtc_device_register,
+> platform_device_register_data, all of which declare the corresponding
+> parameter as const.  Declare rtc_class_ops structures that have these
+> properties as const.
+> 
+> The semantic patch that makes this change is as follows:
+> (http://coccinelle.lip6.fr/)
+> 
+> // <smpl>
+> @r disable optional_qualifier@
+> identifier i;
+> position p;
+> @@
+> static struct rtc_class_ops i at p = { ... };
+> 
+> @ok@
+> identifier r.i;
+> expression e1,e2,e3,e4;
+> position p;
+> @@
+> (
+> devm_rtc_device_register(e1,e2,&i at p,e3)
+> |
+> rtc_device_register(e1,e2,&i at p,e3)
+> |
+> platform_device_register_data(e1,e2,e3,&i at p,e4)
+> )
+> 
+> @bad@
+> position p != {r.p,ok.p};
+> identifier r.i;
+> @@
+> i at p
+> 
+> @depends on !bad disable optional_qualifier@
+> identifier r.i;
+> @@
+> static
+> +const
+>  struct rtc_class_ops i = { ... };
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+> 
 > ---
-> Regards,
-> Nishanth Menon
->
+>  drivers/rtc/rtc-at32ap700x.c |    2 +-
+>  drivers/rtc/rtc-coh901331.c  |    2 +-
+>  drivers/rtc/rtc-davinci.c    |    2 +-
+>  drivers/rtc/rtc-digicolor.c  |    2 +-
+>  drivers/rtc/rtc-ds1302.c     |    2 +-
+>  drivers/rtc/rtc-gemini.c     |    2 +-
+>  drivers/rtc/rtc-jz4740.c     |    2 +-
+>  drivers/rtc/rtc-mcp795.c     |    2 +-
+>  drivers/rtc/rtc-mt6397.c     |    2 +-
+>  drivers/rtc/rtc-nuc900.c     |    2 +-
+>  drivers/rtc/rtc-omap.c       |    2 +-
+>  drivers/rtc/rtc-palmas.c     |    2 +-
+>  drivers/rtc/rtc-pcf50633.c   |    2 +-
+>  drivers/rtc/rtc-rx6110.c     |    2 +-
+>  drivers/rtc/rtc-rx8025.c     |    2 +-
+>  drivers/rtc/rtc-spear.c      |    2 +-
+>  drivers/rtc/rtc-stmp3xxx.c   |    2 +-
+>  drivers/rtc/rtc-tegra.c      |    2 +-
+>  drivers/rtc/rtc-twl.c        |    2 +-
+>  19 files changed, 19 insertions(+), 19 deletions(-)
+> 
+Applied, thanks.
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
