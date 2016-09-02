@@ -1,37 +1,28 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Thu,  1 Sep 2016 16:53:22 -0700
-Subject: [PATCH] arm64: dts: rockchip: Add pinctrl entry for 32k clock on
- rk3399
-Message-ID: <1472774002-25986-1-git-send-email-dianders@chromium.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 1 Sep 2016 20:25:35 -0400
+Subject: [PATCH 2/2] PCI: add CRS support to error handling path
+In-Reply-To: <1472770801-30671-2-git-send-email-okaya@codeaurora.org>
+References: <1472770801-30671-1-git-send-email-okaya@codeaurora.org>
+ <1472770801-30671-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <95c0239b-76ef-aa95-0101-bcdb39ef1544@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some rk3399 boards GPIO0_A0 is hooked up to a 32 kHz clock.  This can
-be used as the source for various clocks in the system.
+On 9/1/2016 7:00 PM, Sinan Kaya wrote:
+>  	pcibios_reset_secondary_bus(dev);
+>  	pci_bus_restore(dev->bus);
+> +	pci_bus_probe_crs(dev->subordinate);
+>  }
 
-Add a pinmux so boards can get this pin properly configured.
+I should have done this instead.
 
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
----
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+  	pcibios_reset_secondary_bus(dev);
+ +	pci_bus_probe_crs(dev->subordinate);
+  	pci_bus_restore(dev->bus);
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 62d450935a57..13e2a440fe43 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1171,6 +1171,12 @@
- 			drive-strength = <13>;
- 		};
- 
-+		clock {
-+			clk_32k: clk-32k {
-+				rockchip,pins = <0 0 RK_FUNC_2 &pcfg_pull_none>;
-+			};
-+		};
-+
- 		i2c0 {
- 			i2c0_xfer: i2c0-xfer {
- 				rockchip,pins =
+I can fix it on the next version. Looking forward to feedback.
+
 -- 
-2.8.0.rc3.226.g39d4020
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
