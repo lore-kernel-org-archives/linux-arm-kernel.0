@@ -1,23 +1,59 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 1 Sep 2016 20:54:55 -0700
-Subject: [PATCH v5 2/4] ARM: dts: rockchip: update compatible strings for
- Rockchip efuse
-In-Reply-To: <1472786217-52214-3-git-send-email-finley.xiao@rock-chips.com>
-References: <1472786217-52214-1-git-send-email-finley.xiao@rock-chips.com>
- <1472786217-52214-3-git-send-email-finley.xiao@rock-chips.com>
-Message-ID: <CAD=FV=VjqCeXnGguJzYCRboSGkOst3Findp5PxsNC9zSDKUN=g@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 01 Sep 2016 21:23:52 -0700
+Subject: [PATCH v3 0/5] meson: Meson8b and GXBB DWMAC glue driver
+In-Reply-To: <20160830.215732.429612225008644820.davem@davemloft.net> (David
+ Miller's message of "Tue, 30 Aug 2016 21:57:32 -0700 (PDT)")
+References: <20160828161637.9941-1-martin.blumenstingl@googlemail.com>
+ <20160828.234008.445367966910278179.davem@davemloft.net>
+ <CAFBinCCmg-+8mjd0Xc5c7bEWL9_S_4kizs_UMiiW9ATBH_G8iw@mail.gmail.com>
+ <20160830.215732.429612225008644820.davem@davemloft.net>
+Message-ID: <m2poonexpj.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+David Miller <davem@davemloft.net> writes:
 
-On Thu, Sep 1, 2016 at 8:16 PM, Finley Xiao <finley.xiao@rock-chips.com> wrote:
-> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  arch/arm/boot/dts/rk3066a.dtsi | 2 +-
->  arch/arm/boot/dts/rk3188.dtsi  | 2 +-
->  arch/arm/boot/dts/rk3288.dtsi  | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
+> From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Date: Tue, 30 Aug 2016 20:49:28 +0200
+>
+>> On Mon, Aug 29, 2016 at 5:40 AM, David Miller <davem@davemloft.net> wrote:
+>>> From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>>> Date: Sun, 28 Aug 2016 18:16:32 +0200
+>>>
+>>>> This adds a DWMAC glue driver for the PRG_ETHERNET registers found in
+>>>> Meson8b and GXBB SoCs. Based on the "old" meson6b-dwmac glue driver
+>>>> the register layout is completely different.
+>>>> Thus I introduced a separate driver.
+>>>>
+>>>> Changes since v2:
+>>>> - fixed unloading the glue driver when built as module. This pulls in a
+>>>>   patch from Joachim Eastwood (thanks) to get our private data structure
+>>>>   (bsp_priv).
+>>>
+>>> This doesn't apply cleanly at all to the net-next tree, so I have
+>>> no idea where you expect these changes to be applied.
+>> OK, maybe Kevin can me help out here as I think the patches should go
+>> to various trees.
+>> 
+>> I think patches 1, 3 and 4 should go through the net-next tree (as
+>> these touch drivers/net/ethernet/stmicro/stmmac/ and the corresponding
+>> documentation).
+>> Patch 2 should probably go through clk-meson-gxbb / clk-next (just
+>> like the other clk changes we had).
+>> The last patch (patch 5) should probably go through the ARM SoC tree
+>> (just like the other dts changes we had).
+>> 
+>> @David, Kevin: would this be fine for you?
+>
+> I would prefer if all of the patches went through one tree, that way
+> all the dependencies are satisfied in one place.
 
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+David, with your ack on the drivers/net changes, I can take them through
+my tree for Amlogic SoCs (which then goes via the arm-soc tree.)
+
+Note that there may be some minor tweaks yet to the clock handling based
+on review comments.
+
+Thanks,
+
+Kevin
