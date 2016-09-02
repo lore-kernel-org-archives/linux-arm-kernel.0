@@ -1,64 +1,132 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Fri, 2 Sep 2016 08:52:10 -0500
-Subject: [PATCH 2/2] ARM: dts: am57xx-beagle-x15: Add support for rev B1
-In-Reply-To: <dd74f5e1-304f-661e-7fd9-f5f81bcfc55e@ti.com>
-References: <20160902090600.27262-1-nm@ti.com>
- <20160902090600.27262-3-nm@ti.com>
- <dd74f5e1-304f-661e-7fd9-f5f81bcfc55e@ti.com>
-Message-ID: <CAOCHtYiFjB-cuABmCiw96spc-De+qNNQYGrjp-MmNDuH2mJ9Bw@mail.gmail.com>
+From: afd@ti.com (Andrew F. Davis)
+Date: Fri, 2 Sep 2016 08:56:20 -0500
+Subject: [PATCH v11 3/4] tee: add OP-TEE driver
+In-Reply-To: <20160902104950.GA24088@ermac>
+References: <1471870856-18684-1-git-send-email-jens.wiklander@linaro.org>
+ <1471870856-18684-4-git-send-email-jens.wiklander@linaro.org>
+ <050a2ce4-e175-d09e-ddff-3b0cbe766d88@ti.com> <20160831135015.GB25472@ermac>
+ <fe88749e-82c7-c310-b2bc-4e73bf76302b@ti.com> <20160901092213.GA3968@ermac>
+ <0f9a528e-5288-ad4b-256e-f7a0b5952c3c@ti.com> <20160902104950.GA24088@ermac>
+Message-ID: <fb12fc08-c7fa-7906-a2c9-c8dadd590b70@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 2, 2016 at 5:41 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> + Robert Nelson
->
-> On Friday 02 September 2016 02:36 PM, Nishanth Menon wrote:
->
-> I understand that there are existing users of A2 boards and so we simply
-> cannot remove support for those boards (at least yet).
->
-> But given the small numbers of A2 boards, its also quite likely that we
-> will not have enough test coverage for those boards. Especially as years
-> pass and there are fewer and fewer people with access to working A2 boards.
+On 09/02/2016 05:49 AM, Jens Wiklander wrote:
+> On Thu, Sep 01, 2016 at 01:06:04PM -0500, Andrew F. Davis wrote:
+>> On 09/01/2016 04:22 AM, Jens Wiklander wrote:
+>>> On Wed, Aug 31, 2016 at 11:40:20AM -0500, Andrew F. Davis wrote:
+>>>> On 08/31/2016 08:50 AM, Jens Wiklander wrote:
+>>>>> On Tue, Aug 30, 2016 at 03:23:24PM -0500, Andrew F. Davis wrote:
+>>>>>> On 08/22/2016 08:00 AM, Jens Wiklander wrote:
+>>>>>>> +static struct tee_shm_pool *
+>>>>>>> +optee_config_shm_ioremap(struct device *dev, optee_invoke_fn *invoke_fn,
+>>>>>>> +			 void __iomem **ioremaped_shm)
+>>>>>>> +{
+>>>>>>> +	struct arm_smccc_res res;
+>>>>>>> +	struct tee_shm_pool *pool;
+>>>>>>> +	unsigned long vaddr;
+>>>>>>> +	phys_addr_t paddr;
+>>>>>>> +	size_t size;
+>>>>>>> +	phys_addr_t begin;
+>>>>>>> +	phys_addr_t end;
+>>>>>>> +	void __iomem *va;
+>>>>>>> +	struct tee_shm_pool_mem_info priv_info;
+>>>>>>> +	struct tee_shm_pool_mem_info dmabuf_info;
+>>>>>>> +
+>>>>>>> +	invoke_fn(OPTEE_SMC_GET_SHM_CONFIG, 0, 0, 0, 0, 0, 0, 0, &res);
+>>>>>>> +	if (res.a0 != OPTEE_SMC_RETURN_OK) {
+>>>>>>> +		dev_info(dev, "shm service not available\n");
+>>>>>>> +		return ERR_PTR(-ENOENT);
+>>>>>>> +	}
+>>>>>>> +
+>>>>>>> +	if (res.a3 != OPTEE_SMC_SHM_CACHED) {
+>>>>>>> +		dev_err(dev, "only normal cached shared memory supported\n");
+>>>>>>> +		return ERR_PTR(-EINVAL);
+>>>>>>> +	}
+>>>>>>> +
+>>>>>>> +	begin = roundup(res.a1, PAGE_SIZE);
+>>>>>>> +	end = rounddown(res.a1 + res.a2, PAGE_SIZE);
+>>>>>>
+>>>>>> res.a1/2/3 is really hard to review and understand, would it work better
+>>>>>> to use a union or cast for the output of invoke_fn based on the function
+>>>>>> type?
+>>>>>>
+>>>>>> In the header that defines what the returned info from these calls means
+>>>>>> add:
+>>>>>>
+>>>>>> struct OPTEE_SMC_GET_SHM_CONFIG_RESULT {
+>>>>>> 	unsigned long status;
+>>>>>> 	unsigned long start;
+>>>>>> 	unsigned long size;
+>>>>>> 	unsigned long settings;
+>>>>>> };
+>>>>>>
+>>>>>> then:
+>>>>>>
+>>>>>> union something result;
+>>>>>>
+>>>>>> begin = roundup(result.ret.start, PAGE_SIZE);
+>>>>>> end = rounddown(result.ret.start + result.ret.size, PAGE_SIZE);
+>>>>>>
+>>>>>> or similar with just casting to the better named struct type.
+>>>>>
+>>>>> optee_smc.h describes what's passed in the registers during an SMC I'd
+>>>>> rather not clutter it with structs that doesn't add any information
+>>>>> there. I'm not that happy with casting or using unions to alias struct
+>>>>> arm_smccc_res either. How about a simple wrapper function for this call
+>>>>> to deal with the details instead?
+>>>>>
+>>>>
+>>>> I think that would be a good idea anyway, for instance, someday if the
+>>>> interface changes slightly then you will be able to contain the
+>>>> compatibility fixes in the wrapper and not out here in the main driver.
+>>>
+>>> That interface is supposed to be a stable ABI, incompatible changes in
+>>> the ABI should be discouraged. If there's an incompatible change it has
+>>> to be dealt with in the main driver.
+>>
+>> Why? This driver is for "OPTEE" not "OPTEE v2.0.01.02", any minor ABI
+>> changes should be abstracted away as much as possible to keep the main
+>> driver logically simple, agnostic to any OPTEE version ABI quirks/handling.
+> 
+> Call me naive, but I don't expect any quirks. The ABI should only be
+> extended with new functions and old may be deprecated.
+> 
 
-I have a A1, A2 and a B1, that i use for testing for
-beagleboard.org...  The A1 use to be ssh-accessible for developers,
-but since moving to my new house, I haven't "yet" got that one setup
-for developers.  Right now i'm using the A2 & B1 for development of
-our default images.
+If only it was always this simple Linus would have nothing to yell about
+:), but sometimes ABI quirks happen. I can't really think of a good
+example right now, and I guess we can always add that level of
+indirection when/if we ever need it, so I'll drop this concern for now.
 
-Jason Kridner also has a number of boards
+> Take the function optee_config_shm_ioremap() as an example. That
+> function will not be used if OP-TEE doesn't use a specific shared memory
+> pool but instead allocate shared memory via vmalloc() or from user
+> space.
+> 
+> This kind of changes/extensions are expected, but that's probably things
+> the driver need to deal with directly since if change doesn't add
+> something significant it wouldn't be needed.
+> 
+>>
+>>> A small wrapper function in a
+>>> standalone header file has no chance here as it probably involves using
+>>> information gathered while probing secure world.
+>>>
+>>> What I meant was a small wrapper function just above 
+>>> optee_config_shm_ioremap() to deal with only this call.
+>>>
+>>
+>> This wouldn't do anything that a cast couldn't do. Why not put the
+>> wrapper function in the header as part of that OPTEE version's ABI
+>> definition?
+> 
+> Choosing between wrapper functions or structs in optee_smc.h I'd choose
+> structs. I'll add structs for the ABI functions where it helps, skipping
+> for instance the OPTEE_SMC_*UID and OPTEE_SMC_CALL_WITH_ARG functions.
+> Would that be OK?
+> 
 
-> Given that, aren't we increasing the chance of A2 breakage by creating a
-> common file - this essentially necessitates that any change to
-> am57xx-beagle-x15-common.dtsi is also tested on A2.
->
-> Instead, it seems to be easier for maintenance and safer overall if the
-> older version has a file of its own which can be kept alone.
->
-> Also, how about renaming the existing dts to am57xx-beagle-x15-reva2.dts
-> and let the production version be called am57xx-beagle-x15.dts? Surely
-> this will cause some inconvenience to A2 users. But there are few users
-> of those and it might be more intuitive for the majority users if the
-> file for production version is without a specific version string
-> attached. Just a thought though, not sure about it myself either.
+That's fine, it wouldn't add anything to name those return values.
 
-Nak, let's NOT do that to A2 users.
-
-The am57xx-beagle-x15.dts went mainline in v3.19, u-boot installed on
-devices would need to be updated and this would make bisecting a pain.
-;)
-
-Side note:
-
-A1/A2 boards (most i believe) did not have the eeprom programmed with an ID.
-
-Where as B1's have a default eeprom for identification:
-
-https://github.com/RobertCNelson/boot-scripts/blob/master/device/x15/X15_B1-eeprom.dump
-
-Regards,
-
--- 
-Robert Nelson
-https://rcn-ee.com/
+Thanks,
+Andrew
