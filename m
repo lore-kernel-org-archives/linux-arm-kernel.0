@@ -1,80 +1,62 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 02 Sep 2016 13:54:56 -0700
-Subject: [PATCH v4] thermal: tango: add resume support
-In-Reply-To: <57C97BDD.4030101@sigmadesigns.com> (Marc Gonzalez's message of
- "Fri, 2 Sep 2016 15:17:17 +0200")
-References: <57726196.5060909@free.fr> <57C97BDD.4030101@sigmadesigns.com>
-Message-ID: <7hpoom10pr.fsf@baylibre.com>
+From: hl@rock-chips.com (Lin Huang)
+Date: Sat,  3 Sep 2016 05:08:18 +0800
+Subject: [PATCH 0/5] rk3399 support ddr frequency scaling
+Message-ID: <1472850503-25232-1-git-send-email-hl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+rk3399 platform have dfi controller can monitor ddr load,
+and dcf controller to handle ddr register so we can get the
+right ddr frequency and make ddr controller happy work(which
+will implement in bl31). So we do ddr frequency scaling with
+following flow:
 
-> When this platform is suspended, firmware powers the entire SoC down,
-> except a few hardware blocks waiting for wakeup events. There is no
-> context to save for this particular block.
->
-> Therefore, there is nothing useful for the driver to do on suspend;
-> so we define a NULL suspend hook. On resume, the driver initializes
-> the block exactly as is done in the probe callback.
->
-> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+             kernel                                bl31
 
-Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+        monitor ddr load
+                |
+                |
+        get_target_rate
+                |
+                |           pass rate to bl31
+        clk_set_rate(ddr) --------------------->run dcf flow
+                |                                   |
+                |                                   |
+        wait dcf interrupt<-------------------trigger dcf interrupt
+                |
+                |
+              return
 
-> ---
-> Earlier versions of this patch were reviewed by Kevin and Thierry.
-> The current form is preferred by Arnd.
-> ---
->  drivers/thermal/tango_thermal.c | 19 +++++++++++++++++--
->  1 file changed, 17 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/thermal/tango_thermal.c b/drivers/thermal/tango_thermal.c
-> index 70e0d9f406e9..201304aeafeb 100644
-> --- a/drivers/thermal/tango_thermal.c
-> +++ b/drivers/thermal/tango_thermal.c
-> @@ -64,6 +64,12 @@ static const struct thermal_zone_of_device_ops ops = {
->  	.get_temp	= tango_get_temp,
->  };
->  
-> +static void tango_thermal_init(struct tango_thermal_priv *priv)
-> +{
-> +	writel(0, priv->base + TEMPSI_CFG);
-> +	writel(CMD_ON, priv->base + TEMPSI_CMD);
-> +}
-> +
->  static int tango_thermal_probe(struct platform_device *pdev)
->  {
->  	struct resource *res;
-> @@ -79,14 +85,22 @@ static int tango_thermal_probe(struct platform_device *pdev)
->  	if (IS_ERR(priv->base))
->  		return PTR_ERR(priv->base);
->  
-> +	platform_set_drvdata(pdev, priv);
->  	priv->thresh_idx = IDX_MIN;
-> -	writel(0, priv->base + TEMPSI_CFG);
-> -	writel(CMD_ON, priv->base + TEMPSI_CMD);
-> +	tango_thermal_init(priv);
->  
->  	tzdev = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, priv, &ops);
->  	return PTR_ERR_OR_ZERO(tzdev);
->  }
->  
-> +static int __maybe_unused tango_thermal_resume(struct device *dev)
-> +{
-> +	tango_thermal_init(dev_get_drvdata(dev));
-> +	return 0;
-> +}
-> +
-> +static SIMPLE_DEV_PM_OPS(tango_thermal_pm, NULL, tango_thermal_resume);
-> +
->  static const struct of_device_id tango_sensor_ids[] = {
->  	{
->  		.compatible = "sigma,smp8758-thermal",
-> @@ -99,6 +113,7 @@ static struct platform_driver tango_thermal_driver = {
->  	.driver	= {
->  		.name		= "tango-thermal",
->  		.of_match_table	= tango_sensor_ids,
-> +		.pm		= &tango_thermal_pm,
->  	},
->  };
+
+Lin Huang (5):
+  Documentation: bindings: add dt documentation for dfi controller
+  PM / devfreq: event: support rockchip dfi controller
+  Documentation: bindings: add dt documentation for rk3399 dmc
+  PM / devfreq: rockchip: add devfreq driver for rk3399 dmc
+  drm/rockchip: Add dmc notifier in vop driver
+
+Following patch:
+clk: rockchip: add new clock-type for the ddrclk
+clk: rockchip: rk3399: add SCLK_DDRCLK ID for ddrc
+clk: rockchip: rk3399: add ddrc clock support
+have applied to:
+http://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git/v4.9-clk/next
+
+
+ .../bindings/devfreq/event/rockchip-dfi.txt        |  19 +
+ .../devicetree/bindings/devfreq/rk3399_dmc.txt     | 173 ++++++++
+ drivers/devfreq/Kconfig                            |  11 +
+ drivers/devfreq/Makefile                           |   1 +
+ drivers/devfreq/event/Kconfig                      |   7 +
+ drivers/devfreq/event/Makefile                     |   1 +
+ drivers/devfreq/event/rockchip-dfi.c               | 256 +++++++++++
+ drivers/devfreq/rk3399_dmc.c                       | 480 +++++++++++++++++++++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        | 116 +++++
+ 9 files changed, 1064 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/devfreq/event/rockchip-dfi.txt
+ create mode 100644 Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
+ create mode 100644 drivers/devfreq/event/rockchip-dfi.c
+ create mode 100644 drivers/devfreq/rk3399_dmc.c
+
+-- 
+2.6.6
