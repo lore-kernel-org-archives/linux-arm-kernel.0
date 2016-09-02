@@ -1,99 +1,20 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 02 Sep 2016 10:46:09 +0900
-Subject: [PATCH 4/5] PM / devfreq: rockchip: add devfreq driver for rk3399
- dmc
-In-Reply-To: <8339852.vAWNvCSMju@diego>
-References: <1472769085-20715-1-git-send-email-hl@rock-chips.com>
- <1472769085-20715-5-git-send-email-hl@rock-chips.com>
- <CGME20160901231806epcas1p4c0184a2d47af524a99d162b3a5a5bf59@epcas1p4.samsung.com>
- <8339852.vAWNvCSMju@diego>
-Message-ID: <57C8D9E1.4070700@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 2 Sep 2016 09:47:06 +0800
+Subject: [PATCH 1/7] drm/sun4i: support TCONs without channel 1
+In-Reply-To: <20160901153204.11217-2-maxime.ripard@free-electrons.com>
+References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
+ <20160901153204.11217-2-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v67phF+AxN9jCoj_J7Sy=fDu22rWg=rDe7bqkAyMO4UU-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Thu, Sep 1, 2016 at 11:31 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Some Allwinner SoCs, such as the A33, have a variation of the TCON that
+> doesn't have a second channel (or it is not wired to anything).
+>
+> Make sure we can handle that case.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-On 2016? 09? 02? 08:17, Heiko St?bner wrote:
-> Am Freitag, 2. September 2016, 06:31:24 schrieb Lin Huang:
->> base on dfi result, we do ddr frequency scaling, register
->> dmc driver to devfreq framework, and use simple-ondemand
->> policy.
->>
->> Signed-off-by: Lin Huang <hl@rock-chips.com>
->> Signed-off-by: MyngJoo Ham <myngjoo.ham@samsung.com>
->> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
->> ---
-> 
-> [...]
-> 
->> diff --git a/drivers/devfreq/rk3399_dmc.c b/drivers/devfreq/rk3399_dmc.c
->> new file mode 100644
->> index 0000000..54d65f2
->> --- /dev/null
->> +++ b/drivers/devfreq/rk3399_dmc.c
->> @@ -0,0 +1,480 @@
->> +/*
->> + * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd.
->> + * Author: Lin Huang <hl@rock-chips.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms and conditions of the GNU General Public License,
->> + * version 2, as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope it will be useful, but WITHOUT
->> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
->> for + * more details.
->> + */
->> +
->> +#include <linux/arm-smccc.h>
->> +#include <linux/clk.h>
->> +#include <linux/delay.h>
->> +#include <linux/devfreq.h>
->> +#include <linux/devfreq-event.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/pm_opp.h>
->> +#include <linux/regulator/consumer.h>
->> +#include <linux/rwsem.h>
->> +#include <linux/suspend.h>
->> +
->> +#include <soc/rockchip/rockchip_sip.h>
-> 
-> (Repeated from previous version)
-> For the shared sip-interface header I've prepared a signed, stable tag
-> which can be pulled from
-> 
-> The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
-> 
->   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/rockchip-ddr-sip
-> 
-> for you to fetch changes up to 97dd82682f1a6174698fbea149a04b4cabc58c4f:
-> 
->   soc: rockchip: add header for ddr rate SIP interface (2016-08-31 18:53:24 +0200)
-> 
-> ----------------------------------------------------------------
-> Header file defining the SIP-interface to the ATF for DDR frequency changes
-> 
-> ----------------------------------------------------------------
-> Lin Huang (1):
->       soc: rockchip: add header for ddr rate SIP interface
-> 
->  include/soc/rockchip/rockchip_sip.h | 27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
->  create mode 100644 include/soc/rockchip/rockchip_sip.h
-> 
-> 
-> 
-
-Thanks for creating the immutable branch.
-
--- 
-Best Regards,
-Chanwoo Choi
+Acked-by: Chen-Yu Tsai <wens@csie.org>
