@@ -1,13 +1,13 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 03 Sep 2016 01:07:28 +0300
-Subject: [PATCH 1/3] ARM: dts: r8a7792: add QSPI clock
+Date: Sat, 03 Sep 2016 01:08:45 +0300
+Subject: [PATCH 2/3] ARM: dts: r8a7792: add QSPI support
 In-Reply-To: <1648590.FPpmBRoQyh@wasted.cogentembedded.com>
 References: <1648590.FPpmBRoQyh@wasted.cogentembedded.com>
-Message-ID: <4143164.BtXsTN0b8O@wasted.cogentembedded.com>
+Message-ID: <16566445.LA832Ff91Q@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the QSPI clock in the R8A7792 device tree.
+Define the generic R8A7792 part of the QSPI device node.
 
 Based  on the original (and large) patch by Vladimir Barinov
 <vladimir.barinov@cogentembedded.com>.
@@ -15,38 +15,40 @@ Based  on the original (and large) patch by Vladimir Barinov
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
- arch/arm/boot/dts/r8a7792.dtsi |    7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7792.dtsi |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
 Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
 ===================================================================
 --- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
 +++ renesas/arch/arm/boot/dts/r8a7792.dtsi
-@@ -860,6 +860,7 @@
- 			clocks = <&cp_clk>, <&cp_clk>, <&cp_clk>, <&cp_clk>,
- 				 <&cp_clk>, <&cp_clk>, <&cp_clk>, <&cp_clk>,
- 				 <&cp_clk>, <&cp_clk>, <&p_clk>, <&p_clk>,
-+				 <&cpg_clocks R8A7792_CLK_QSPI>,
- 				 <&cp_clk>, <&cp_clk>, <&hp_clk>, <&hp_clk>,
- 				 <&hp_clk>, <&hp_clk>, <&hp_clk>, <&hp_clk>;
- 			#clock-cells = <1>;
-@@ -870,6 +871,7 @@
- 				R8A7792_CLK_GPIO1 R8A7792_CLK_GPIO0
- 				R8A7792_CLK_GPIO11 R8A7792_CLK_GPIO10
- 				R8A7792_CLK_CAN1 R8A7792_CLK_CAN0
-+				R8A7792_CLK_QSPI_MOD
- 				R8A7792_CLK_GPIO9 R8A7792_CLK_GPIO8
- 				R8A7792_CLK_I2C5 R8A7792_CLK_I2C4
- 				R8A7792_CLK_I2C3 R8A7792_CLK_I2C2
-@@ -879,8 +881,9 @@
- 				"gpio7", "gpio6", "gpio5", "gpio4",
- 				"gpio3", "gpio2", "gpio1", "gpio0",
- 				"gpio11", "gpio10", "can1", "can0",
--				"gpio9", "gpio8", "i2c5", "i2c4",
--				"i2c3",	"i2c2", "i2c1", "i2c0";
-+				"qspi_mod", "gpio9", "gpio8",
-+				"i2c5", "i2c4", "i2c3", "i2c2",
-+				"i2c1", "i2c0";
+@@ -25,6 +25,7 @@
+ 		i2c3 = &i2c3;
+ 		i2c4 = &i2c4;
+ 		i2c5 = &i2c5;
++		spi0 = &qspi;
+ 		vin0 = &vin0;
+ 		vin1 = &vin1;
+ 		vin2 = &vin2;
+@@ -554,6 +555,21 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
++		};
++
++		qspi: spi at e6b10000 {
++			compatible = "renesas,qspi-r8a7792", "renesas,qspi";
++			reg = <0 0xe6b10000 0 0x2c>;
++			interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&mstp9_clks R8A7792_CLK_QSPI_MOD>;
++			dmas = <&dmac0 0x17>, <&dmac0 0x18>,
++			       <&dmac1 0x17>, <&dmac1 0x18>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
++			num-cs = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
  		};
- 	};
  
+ 		du: display at feb00000 {
