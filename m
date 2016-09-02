@@ -1,55 +1,62 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 2 Sep 2016 09:23:21 +0800
-Subject: [PATCH 4/5] PM / devfreq: rockchip: add devfreq driver for
- rk3399 dmc
-In-Reply-To: <1472769085-20715-5-git-send-email-hl@rock-chips.com>
-Message-ID: <201609020953.NltUDqVg%fengguang.wu@intel.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Fri, 02 Sep 2016 09:30:05 +0800
+Subject: [PATCH 0/7] drm/sun4i: Introduce A33 display driver
+In-Reply-To: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
+References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
+Message-ID: <18951472779805@web6g.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lin,
 
-[auto build test ERROR on next-20160825]
-[also build test ERROR on v4.8-rc4]
-[cannot apply to rockchip/for-next devfreq/for-rafael linus/master v4.8-rc4 v4.8-rc3 v4.8-rc2]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-[Check https://git-scm.com/docs/git-format-patch for more information]
 
-url:    https://github.com/0day-ci/linux/commits/Lin-Huang/rk3399-support-ddr-frequency-scaling/20160902-063701
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+01.09.2016, 23:40, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> Hi everyone,
+>
+> This serie introduces the support in the sun4i-drm driver for the A33.
+>
+> Beside the new IPs and special cases for the A33 new IPs, there's
+> nothing really outstanding, and is now at feature parity with the A13.
 
-All errors (new ones prefixed by >>):
+How can the driver be modified to support LVDS screen?
 
->> drivers/devfreq/rk3399_dmc.c:29:39: fatal error: soc/rockchip/rockchip_sip.h: No such file or directory
-   compilation terminated.
+I have an A33 tablet with a 1024x768 LVDS panel. (iNet D978 Rev2 board,
+which I pushed a dt a few days ago)
 
-vim +29 drivers/devfreq/rk3399_dmc.c
-
-    23	#include <linux/platform_device.h>
-    24	#include <linux/pm_opp.h>
-    25	#include <linux/regulator/consumer.h>
-    26	#include <linux/rwsem.h>
-    27	#include <linux/suspend.h>
-    28	
-  > 29	#include <soc/rockchip/rockchip_sip.h>
-    30	
-    31	struct dram_timing {
-    32		unsigned int ddr3_speed_bin;
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 58849 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160902/43c0050c/attachment-0001.obj>
+>
+> This serie is based on my A33 CCU patches posted earlier today here:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-September/453208.html
+>
+> Let me know what you think,
+> Maxime
+>
+> Maxime Ripard (7):
+> ??drm/sun4i: support TCONs without channel 1
+> ??drm/sun4i: support A33 tcon
+> ??drm/sun4i: Add SAT and DRC drivers
+> ??drm/panel: Add Sinlinx SinA33 7" panel
+> ??ARM: sun8i: a33: Add display pipeline
+> ??ARM: sun8i: a33: Add RGB666 pins
+> ??ARM: sun8i: sina33: Enable display
+>
+> ?.../bindings/display/sunxi/sun4i-drm.txt | 44 ++++-
+> ?arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 34 ++++
+> ?arch/arm/boot/dts/sun8i-a33.dtsi | 194 +++++++++++++++++++++
+> ?drivers/gpu/drm/panel/panel-simple.c | 26 +++
+> ?drivers/gpu/drm/sun4i/Makefile | 3 +-
+> ?drivers/gpu/drm/sun4i/sun4i_backend.c | 1 +
+> ?drivers/gpu/drm/sun4i/sun4i_drv.c | 8 +-
+> ?drivers/gpu/drm/sun4i/sun4i_tcon.c | 42 +++--
+> ?drivers/gpu/drm/sun4i/sun4i_tcon.h | 2 +
+> ?drivers/gpu/drm/sun4i/sun6i_drc.c | 117 +++++++++++++
+> ?drivers/gpu/drm/sun4i/sun8i_sat.c | 105 +++++++++++
+> ?11 files changed, 557 insertions(+), 19 deletions(-)
+> ?create mode 100644 drivers/gpu/drm/sun4i/sun6i_drc.c
+> ?create mode 100644 drivers/gpu/drm/sun4i/sun8i_sat.c
+>
+> --
+> 2.9.2
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
