@@ -1,28 +1,24 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 2 Sep 2016 10:17:58 +0200
-Subject: [PATCH v3 01/13] ARM: dts: lager: rename and reindex i2cexio
-In-Reply-To: <20160830151819.GA1695@katana>
-References: <1466567031-20381-1-git-send-email-horms+renesas@verge.net.au>
- <1466567031-20381-2-git-send-email-horms+renesas@verge.net.au>
- <20160830151819.GA1695@katana>
-Message-ID: <20160902081757.GB16669@verge.net.au>
+Date: Fri, 2 Sep 2016 10:26:05 +0200
+Subject: [PATCH v2 1/3] ARM: dts: r7s72100: add ethernet clock to device
+ tree
+In-Reply-To: <20160902014012.9383-1-chris.brandt@renesas.com>
+References: <20160901155430.23400-1-chris.brandt@renesas.com>
+ <20160902014012.9383-1-chris.brandt@renesas.com>
+Message-ID: <20160902082604.GD16669@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2016 at 05:29:08PM +0200, Wolfram Sang wrote:
-> Hi Simon,
-> 
-> >  		serial0 = &scif0;
-> >  		serial1 = &scifa1;
-> > -		i2c8 = "i2cexio";
-> > +		i2c10 = "i2cexio0";
-> 
-> Those should be pointers, i.e. "&i2cexio0;", here and in the rest of
-> your series. Sorry for the broken template!
+Thanks Chris,
 
-Thanks, got it.
+I have queued up this and the following 2 patches for v4.9 (nothing more
+for you to do unless something goes wrong in which case I'll let you know).
 
-> Did you have a chance to
-> test my fix for the demuxer?
+For future submissions please consider:
+1. Supplying a cover letter (git format-patch has a --cover-letter option)
+   for patch-sets comprising more than one patch. This allows you to describe
+   an overview of what the series as a whole achieves. And is also
+   convenient for maintainers to reply to when accepting your patches.
+2. Starting a new thread for each new version of a patch/patch-set.
 
-Sorry, not yet.
+Different maintainers have different preferences. The above are mine.
