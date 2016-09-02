@@ -1,75 +1,62 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 2 Sep 2016 15:01:08 +0800
-Subject: [PATCH 4/7] drm/panel: Add Sinlinx SinA33 7" panel
-In-Reply-To: <20160901153204.11217-5-maxime.ripard@free-electrons.com>
-References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
- <20160901153204.11217-5-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v66i3=qtOYJxFiJ7mLi4-ETRwhWn_-M=3ZwwAJ9JPnaKzw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 2 Sep 2016 09:04:25 +0200
+Subject: [PATCH v2 4/7] dts: sun8i-h3: add UART1-3 to Orange Pi Plus
+In-Reply-To: <1472671858-29220-5-git-send-email-jorik@kippendief.biz>
+References: <1472671858-29220-1-git-send-email-jorik@kippendief.biz>
+ <1472671858-29220-5-git-send-email-jorik@kippendief.biz>
+Message-ID: <20160902070425.GB6313@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 1, 2016 at 11:32 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The SinA33 has an unidentified panel. Add the timings for it under a new
-> compatible.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Hi,
+
+On Wed, Aug 31, 2016 at 09:30:55PM +0200, jorik at kippendief.biz wrote:
+> From: Jorik Jonker <jorik@kippendief.biz>
+> 
+> This board has UARTS1-3 exposed on its expansion header
+> 
+> Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
 > ---
->  drivers/gpu/drm/panel/panel-simple.c | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->
-> diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-> index 85143d1b9b31..af142e804245 100644
-> --- a/drivers/gpu/drm/panel/panel-simple.c
-> +++ b/drivers/gpu/drm/panel/panel-simple.c
-> @@ -1409,6 +1409,29 @@ static const struct panel_desc shelly_sca07010_bfn_lnn = {
->         .bus_format = MEDIA_BUS_FMT_RGB666_1X18,
+>  arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+> index b0cb417..7a17839 100644
+> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+> @@ -90,6 +90,21 @@
+>  	};
 >  };
->
-> +static const struct drm_display_mode sinlinx_sina33_lcd_7_mode = {
-
-Nit on the name: the lcd panel also works with sina31s. The only
-difference is the ribbon cable used to connect it to the board.
-Maybe sinlinx_sinaxx_lcd_7? Just a suggestion though, the patch
-looks fine.
-
-ChenYu
-
-> +       .clock = 66000,
-> +       .hdisplay = 1024,
-> +       .hsync_start = 1024 + 160,
-> +       .hsync_end = 1024 + 160 + 70,
-> +       .htotal = 1024 + 160 + 70 + 90,
-> +       .vdisplay = 600,
-> +       .vsync_start = 600 + 127,
-> +       .vsync_end = 600 + 127 + 20,
-> +       .vtotal = 600 + 127 + 20 + 3,
-> +       .vrefresh = 60,
+>  
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart1_pins_a>;
 > +};
 > +
-> +static const struct panel_desc sinlinx_sina33_lcd_7 = {
-> +       .modes = &sinlinx_sina33_lcd_7_mode,
-> +       .num_modes = 1,
-> +       .size = {
-> +               .width = 154,
-> +               .height = 87,
-> +       },
-> +       .bus_format = MEDIA_BUS_FMT_RGB666_1X18,
+> +&uart2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart2_pins_a>;
 > +};
 > +
->  static const struct drm_display_mode starry_kr122ea0sra_mode = {
->         .clock = 147000,
->         .hdisplay = 1920,
-> @@ -1644,6 +1667,9 @@ static const struct of_device_id platform_of_match[] = {
->                 .compatible = "shelly,sca07010-bfn-lnn",
->                 .data = &shelly_sca07010_bfn_lnn,
->         }, {
-> +               .compatible = "sinlinx,sina33-lcd-7",
-> +               .data = &sinlinx_sina33_lcd_7,
-> +       }, {
->                 .compatible = "starry,kr122ea0sra",
->                 .data = &starry_kr122ea0sra,
->         }, {
-> --
-> 2.9.2
->
+> +&uart3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart3_pins_a>;
+> +};
+> +
+
+Unfortunately, these pins can be used for other purposes as well, so
+we cannot make force that decision down to our users.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160902/b90f2714/attachment.sig>
