@@ -1,61 +1,60 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 2 Sep 2016 12:03:52 -0500
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Fri, 2 Sep 2016 10:05:53 -0700
 Subject: [GIT PULL] firmware: add support for TI System Control Interface
  (TI-SCI) protocol driver
-In-Reply-To: <375758c3-f5f2-b267-31c2-c28812ed3359@ti.com>
+In-Reply-To: <CAGo_u6rXd9=664xhVkvrtEymD=4LF1KbCj+go_Vnyv6t5j963w@mail.gmail.com>
 References: <375758c3-f5f2-b267-31c2-c28812ed3359@ti.com>
-Message-ID: <CAGo_u6rXd9=664xhVkvrtEymD=4LF1KbCj+go_Vnyv6t5j963w@mail.gmail.com>
+ <CAGo_u6rXd9=664xhVkvrtEymD=4LF1KbCj+go_Vnyv6t5j963w@mail.gmail.com>
+Message-ID: <4586973c-603b-b37a-d32f-c2bc5310e589@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 1, 2016 at 2:24 AM, Tero Kristo <t-kristo@ti.com> wrote:
-> Hi Santosh,
+On 9/2/2016 10:03 AM, Nishanth Menon wrote:
+> On Thu, Sep 1, 2016 at 2:24 AM, Tero Kristo <t-kristo@ti.com> wrote:
+>> Hi Santosh,
+>>
+>> The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+>>
+>>   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   https://github.com/t-kristo/linux-pm.git 4.8-rc1-ti-sci-fw
+>>
+>> for you to fetch changes up to 7a2c510cdfa6a4b2f4200c122a377c4d5f4af552:
+>>
+>>   firmware: ti_sci: Add support for reboot core service (2016-08-31 14:50:20
+>> +0300)
+>>
+>> ----------------------------------------------------------------
+>> Nishanth Menon (5):
+>>       Documentation: Add support for TI System Control Interface (TI-SCI)
+>> protocol
+>>       firmware: Add basic support for TI System Control Interface (TI-SCI)
+>> protocol
+>>       firmware: ti_sci: Add support for Device control
+>>       firmware: ti_sci: Add support for Clock control
+>>       firmware: ti_sci: Add support for reboot core service
+>>
+>>  .../devicetree/bindings/arm/keystone/ti,sci.txt    |   66 +
+>>  MAINTAINERS                                        |   10 +
+>>  drivers/firmware/Kconfig                           |   15 +
+>>  drivers/firmware/Makefile                          |    1 +
+>>  drivers/firmware/ti_sci.c                          | 1997
+>> ++++++++++++++++++++
+>>  drivers/firmware/ti_sci.h                          |  492 +++++
+>>  include/linux/soc/ti/ti_sci_protocol.h             |  249 +++
+>>  7 files changed, 2830 insertions(+)
+>>  create mode 100644
+>> Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+>>  create mode 100644 drivers/firmware/ti_sci.c
+>>  create mode 100644 drivers/firmware/ti_sci.h
+>>  create mode 100644 include/linux/soc/ti/ti_sci_protocol.h
+>>
 >
-> The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+> Folks, could you hold back on this pull request.. Rob did have a
+> comment on https://patchwork.kernel.org/patch/9305413/ which I think
+> should be discussed as well -> has implications to the driver arch
+> ofcourse.
 >
->   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
->
-> are available in the git repository at:
->
->   https://github.com/t-kristo/linux-pm.git 4.8-rc1-ti-sci-fw
->
-> for you to fetch changes up to 7a2c510cdfa6a4b2f4200c122a377c4d5f4af552:
->
->   firmware: ti_sci: Add support for reboot core service (2016-08-31 14:50:20
-> +0300)
->
-> ----------------------------------------------------------------
-> Nishanth Menon (5):
->       Documentation: Add support for TI System Control Interface (TI-SCI)
-> protocol
->       firmware: Add basic support for TI System Control Interface (TI-SCI)
-> protocol
->       firmware: ti_sci: Add support for Device control
->       firmware: ti_sci: Add support for Clock control
->       firmware: ti_sci: Add support for reboot core service
->
->  .../devicetree/bindings/arm/keystone/ti,sci.txt    |   66 +
->  MAINTAINERS                                        |   10 +
->  drivers/firmware/Kconfig                           |   15 +
->  drivers/firmware/Makefile                          |    1 +
->  drivers/firmware/ti_sci.c                          | 1997
-> ++++++++++++++++++++
->  drivers/firmware/ti_sci.h                          |  492 +++++
->  include/linux/soc/ti/ti_sci_protocol.h             |  249 +++
->  7 files changed, 2830 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
->  create mode 100644 drivers/firmware/ti_sci.c
->  create mode 100644 drivers/firmware/ti_sci.h
->  create mode 100644 include/linux/soc/ti/ti_sci_protocol.h
->
-
-Folks, could you hold back on this pull request.. Rob did have a
-comment on https://patchwork.kernel.org/patch/9305413/ which I think
-should be discussed as well -> has implications to the driver arch
-ofcourse.
-
--- 
----
-Regards,
-Nishanth Menon
+Sure !!
