@@ -1,53 +1,120 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 2 Sep 2016 10:21:23 -0400 (EDT)
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <87a8fq8spu.fsf@linux.intel.com>
-Message-ID: <Pine.LNX.4.44L0.1609021019260.2027-100000@iolanthe.rowland.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 2 Sep 2016 15:21:52 +0100
+Subject: [PATCH v5 02/16] dt/bindings: Update binding for PM domain idle
+ states
+In-Reply-To: <1472242678-33700-3-git-send-email-lina.iyer@linaro.org>
+References: <1472242678-33700-1-git-send-email-lina.iyer@linaro.org>
+ <1472242678-33700-3-git-send-email-lina.iyer@linaro.org>
+Message-ID: <0b233802-f459-c6bb-ff42-70745a225cfb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2 Sep 2016, Felipe Balbi wrote:
 
-> Hi,
-> 
-> Russell King - ARM Linux <linux@armlinux.org.uk> writes:
-> > On Fri, Sep 02, 2016 at 12:43:39PM +0200, Arnd Bergmann wrote:
-> >> On Thursday, September 1, 2016 5:14:28 PM CEST Leo Li wrote:
-> >> > 
-> >> > Hi Felipe and Arnd,
-> >> > 
-> >> > It has been a while since the last response to this discussion, but we
-> >> > haven't reached an agreement yet!  Can we get to a conclusion on if it
-> >> > is valid to create child platform device for abstraction purpose?  If
-> >> > yes, can this child device do DMA by itself?
-> >> 
-> >> I'd say it's no problem for a driver to create child devices in order
-> >> to represent different aspects of a device, but you should not rely on
-> >> those devices working when used with the dma-mapping interfaces.
-> >
-> > That's absolutely right.  Consider the USB model - only the USB host
-> > controller can perform DMA, not the USB devices themselves.  All DMA
-> > mappings need to be mapped using the USB host controller device struct
-> > not the USB device struct.
-> >
-> > The same _should_ be true everywhere else: the struct device representing
-> > the device performing DMA must be the one used to map the transfer.
-> 
-> How do we fix dwc3 in dual-role, then?
-> 
-> Peripheral-side dwc3 is easy, we just require a glue-layer to be present
-> and use dwc3.ko's parent device (which will be the PCI device or OF
-> device). But for host side dwc3, the problem is slightly more complex
-> because we're using xhci-plat.ko by just instantiating a xhci-platform
-> device so xhci-plat can probe.
-> 
-> xhci core has no means to know if its own device or the parent of its
-> parent should be used for DMA. Any ideas?
 
-In theory, you can store a flag somewhere in the platform device,
-something that would tell xhci-hcd that it has to use the parent's
-parent for DMA purposes.
+On 26/08/16 21:17, Lina Iyer wrote:
+> From: Axel Haslam <ahaslam+renesas@baylibre.com>
+>
+> Update DT bindings to describe idle states of PM domains.
+>
+> Cc: <devicetree@vger.kernel.org>
+> Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> [Lina: Added state properties, removed state names, wakeup-latency,
+> added of_pm_genpd_init() API, pruned commit text]
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> [Ulf: Moved around code to make it compile properly, rebased on top of multiple state support]
+> ---
+>  .../devicetree/bindings/power/power_domain.txt     | 57 ++++++++++++++++++++++
+>  1 file changed, 57 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+> index 025b5e7..4960486 100644
+> --- a/Documentation/devicetree/bindings/power/power_domain.txt
+> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
+> @@ -29,6 +29,10 @@ Optional properties:
+>     specified by this binding. More details about power domain specifier are
+>     available in the next section.
+>
+> +- domain-idle-states : A phandle of an idle-state that shall be soaked into a
+> +                generic domain power state. The idle state definitions are
+> +                compatible with arm,idle-state specified in [1].
+> +
+>  Example:
+>
+>  	power: power-controller at 12340000 {
+> @@ -59,6 +63,57 @@ The nodes above define two power controllers: 'parent' and 'child'.
+>  Domains created by the 'child' power controller are subdomains of '0' power
+>  domain provided by the 'parent' power controller.
+>
+> +Example 3: ARM v7 style CPU PM domains (Linux domain controller)
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		CPU0: cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7", "arm,armv7";
+> +			reg = <0x0>;
+> +			power-domains = <&a7_pd>;
+> +		};
+> +
+> +		CPU1: cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a15", "arm,armv7";
+> +			reg = <0x0>;
+> +			power-domains = <&a15_pd>;
+> +		};
+> +	};
+> +
+> +	pm-domains {
+> +		a15_pd: a15_pd {
+> +			/* will have A15 platform ARM_PD_METHOD_OF_DECLARE*/
+> +			compatible = "arm,cortex-a15";
+> +			#power-domain-cells = <0>;
+> +			domain-idle-states = <&CLUSTER_SLEEP_0>;
+> +		};
+> +
+> +		a7_pd: a7_pd {
+> +			/* will have a A7 platform ARM_PD_METHOD_OF_DECLARE*/
+> +			compatible = "arm,cortex-a7";
+> +			#power-domain-cells = <0>;
+> +			domain-idle-states = <&CLUSTER_SLEEP_0>, <&CLUSTER_SLEEP_1>;
+> +		};
+> +
+> +		CLUSTER_SLEEP_0: state0 {
+> +			compatible = "arm,idle-state";
+> +			entry-latency-us = <1000>;
+> +			exit-latency-us = <2000>;
+> +			min-residency-us = <10000>;
+> +		};
+> +
+> +		CLUSTER_SLEEP_1: state1 {
+> +			compatible = "arm,idle-state";
+> +			entry-latency-us = <5000>;
+> +			exit-latency-us = <5000>;
+> +			min-residency-us = <100000>;
+> +		};
+> +	};
+> +
 
-I know it would be somewhat of a hack, but ought to work.
+This version is *not very descriptive*. Also the discussion we had on v3
+version has not yet concluded IMO. So can I take that we agreed on what
+was proposed there or not ?
 
-Alan Stern
+We could have better example above *really* based on the discussions we
+had so far. This example always makes me think it's well crafted to
+avoid any sort of discussions. We need to consider different use-cases
+e.g. what about CPU level states ?
+
+IMO, we need to discuss this DT binding in detail and arrive at some
+conclusion before you take all the troubles to respin the series.
+Also it's better to keep the DT binding separate until we have some
+conclusion instead of posting the implementation for each version.
+That's just my opinion(I would be least bothered about implementation
+until I know it will be accepted before I can peek into the code, others
+may differ.
+
+-- 
+Regards,
+Sudeep
