@@ -1,27 +1,34 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 2 Sep 2016 15:48:54 +0530
-Subject: [PATCH 1/2] ARM: dts: am57xx-beagle-x15: Remove pinmux
- configurations
-In-Reply-To: <20160902090600.27262-2-nm@ti.com>
-References: <20160902090600.27262-1-nm@ti.com>
- <20160902090600.27262-2-nm@ti.com>
-Message-ID: <9bdf5693-ba02-8ce5-04b0-08875ccf7603@ti.com>
+From: xieyisheng1@huawei.com (Xie Yisheng)
+Date: Fri, 2 Sep 2016 18:18:39 +0800
+Subject: [PATCH] arm64/efi: efi_init error handling fix
+Message-ID: <1472811519-4897-1-git-send-email-xieyisheng1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 September 2016 02:35 PM, Nishanth Menon wrote:
-> pinmuxing for DRA7x/AM57x family of processors need to be done in IO
-> isolation as part of initial bootloader executed from SRAM. This is
-> done as part of iodelay configuration sequence and is required due to
-> the limitations introduced by erratum ID: i869[1] and elaborated in
-> the Technical Reference Manual[2] 18.4.6.1.7 Isolation Requirements.
-> 
-> Only peripheral that is permitted for dynamic pin mux configuration is
-> MMC. This is to accommodate the requirements for varied speeds (which
+From: Yisheng Xie <xieyisheng1@huawei.com>
 
-Actually its MMC and DCAN. DCAN because of i893 ("DCAN Initialization
-Sequence"). But I can see you may have omitted reference to it since
-DCAN is not really used on the x15.
+There's an early memmap leak in efi_init error path, fix it.
 
-Thanks,
-Sekhar
+Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
+---
+ drivers/firmware/efi/arm-init.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+index c49d50e..5080e40 100644
+--- a/drivers/firmware/efi/arm-init.c
++++ b/drivers/firmware/efi/arm-init.c
+@@ -243,8 +243,10 @@ void __init efi_init(void)
+ 	     "Unexpected EFI_MEMORY_DESCRIPTOR version %ld",
+ 	      efi.memmap.desc_version);
+ 
+-	if (uefi_init() < 0)
++	if (uefi_init() < 0) {
++		early_memunmap(efi.memmap.map, params.mmap_size);
+ 		return;
++	}
+ 
+ 	reserve_regions();
+ 	efi_memattr_init();
+-- 
+1.7.12.4
