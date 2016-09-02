@@ -1,27 +1,47 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 2 Sep 2016 19:59:40 +0100
-Subject: [PATCH 0/4] SA11x0 Clocks and removal of Neponset SMC91x hack
-In-Reply-To: <20160901.163241.42322670097531471.davem@davemloft.net>
-References: <20160829120531.GG1041@n2100.armlinux.org.uk>
- <E1beLKT-0001U1-HK@rmk-PC.armlinux.org.uk>
- <20160830105117.GM1041@n2100.armlinux.org.uk>
- <20160901.163241.42322670097531471.davem@davemloft.net>
-Message-ID: <20160902185940.GG1041@n2100.armlinux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 2 Sep 2016 21:06:06 +0200
+Subject: [PATCH 0/7] drm/sun4i: Introduce A33 display driver
+In-Reply-To: <18951472779805@web6g.yandex.ru>
+References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
+ <18951472779805@web6g.yandex.ru>
+Message-ID: <20160902190605.GF6313@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2016 at 04:32:41PM -0700, David Miller wrote:
-> From: Russell King - ARM Linux <linux@armlinux.org.uk>
-> Date: Tue, 30 Aug 2016 11:51:17 +0100
-> 
-> > Please ack these changes; due to the dependencies, I wish to merge
-> > them through my tree.  Thanks.
-> 
-> Acked-by: David S. Miller <davem@davemloft.net>
+Hi Icenowy,
 
-Many thanks David, I'll add that only to the two SMC91x patches.
+On Fri, Sep 02, 2016 at 09:30:05AM +0800, Icenowy Zheng wrote:
+> 
+> 
+> 01.09.2016, 23:40, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> > Hi everyone,
+> >
+> > This serie introduces the support in the sun4i-drm driver for the A33.
+> >
+> > Beside the new IPs and special cases for the A33 new IPs, there's
+> > nothing really outstanding, and is now at feature parity with the A13.
+> 
+> How can the driver be modified to support LVDS screen?
+> 
+> I have an A33 tablet with a 1024x768 LVDS panel. (iNet D978 Rev2 board,
+> which I pushed a dt a few days ago)
+
+Awesome, I don't have such a screen myself, so feel free to work on
+it.
+
+I haven't looked into the details of LVDS, but it should be something
+along the lines of commit 29e57fab97fc ("drm: sun4i: Add RGB output").
+
+Maxime
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160902/a1772678/attachment.sig>
