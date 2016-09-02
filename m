@@ -1,66 +1,34 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 2 Sep 2016 14:43:53 +0200
-Subject: [PATCH] mtd: mxc_nand: Set timing for v2 controllers
-In-Reply-To: <20160829105050.574a2b8a@bbrezillon>
-References: <1471948445-29936-1-git-send-email-s.hauer@pengutronix.de>
- <20160826094653.762be9fb@bbrezillon>
- <20160829083558.gfydmebh7bx3wdxz@pengutronix.de>
- <20160829105050.574a2b8a@bbrezillon>
-Message-ID: <20160902124353.w6tpaitbaflu6naj@pengutronix.de>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Fri, 2 Sep 2016 12:50:39 +0000
+Subject: [PATCH v2 1/3] ARM: dts: r7s72100: add ethernet clock to device
+ tree
+In-Reply-To: <20160902082604.GD16669@verge.net.au>
+References: <20160901155430.23400-1-chris.brandt@renesas.com>
+ <20160902014012.9383-1-chris.brandt@renesas.com>
+ <20160902082604.GD16669@verge.net.au>
+Message-ID: <SG2PR06MB116533792940F6E3193E7EDB8AE50@SG2PR06MB1165.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 10:50:50AM +0200, Boris Brezillon wrote:
-> Hi Sascha,
-> 
-> On Mon, 29 Aug 2016 10:35:58 +0200
-> Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> 
-> > Hi Boris,
-> > 
-> > On Fri, Aug 26, 2016 at 09:46:53AM +0200, Boris Brezillon wrote:
-> > > Hi Sascha,
-> > > 
-> > > On Tue, 23 Aug 2016 12:34:05 +0200
-> > > Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > > 
-> > > AFAIR, you should apply the new mode on the NAND side
-> > > (ONFI_FEATURE_ADDR_TIMING_MODE) before applying the new config to the
-> > > controller.
-> > > 
-> > > See what's done here [1].
-> > > 
-> > > Note that on all the NANDs I tested, it seems to work even if you don't
-> > > set ONFI_FEATURE_ADDR_TIMING_MODE, but the ONFI Spec describes the
-> > > procedure as:  
-> > 
-> > Indeed, works here without notifying the NAND chip aswell. I wasn't even
-> > aware that there is a possibility to notify the NAND chip.
-> > 
-> > > 
-> > > 1/ detect supported modes
-> > > 2/ select one
-> > > 3/ apply it to the NAND using set(ONFI_FEATURE_ADDR_TIMING_MODE)
-> > > 4/ release the CS
-> > > 5/ adjust the controller setting to match the new config
-> > > 
-> > > On a side note, I really think we should handle this timing selection in
-> > > the core, and only ask the NAND controller drivers to adapt the
-> > > controller settings.  
-> > 
-> > I agree that the core should do this. Do you already have any thoughts
-> > how the API could could look like?
-> 
-> I already provided a simple implementation a while ago [1]. Not sure it
-> handles all the corner cases though.
+On 9/2/2016, Simon Horman wrote:
+> For future submissions please consider:
+> 1. Supplying a cover letter (git format-patch has a --cover-letter option)
+>    for patch-sets comprising more than one patch. This allows you to describe
+>    an overview of what the series as a whole achieves. And is also
+>    convenient for maintainers to reply to when accepting your patches.
 
-I just picked up the patch and ported my mxc_nand patch over to it. See
-the result on the mailing list.
+OK. I can do that.
 
-Sascha
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 2. Starting a new thread for each new version of a patch/patch-set.
+
+Does that mean to NOT use --in-reply-to= when submitting a v2,v3,etc... ????
+
+
+
+One more question:
+Can I submit a patches series now that just adds all the MSTP clock nodes that I'll be working on for the next couple weeks? (USB, SDHI, MMC)
+Or, do I have to wait till I have the drivers working?
+Or, better yet, can I add all the MSTP clocks that will probably get used at some point (basically, everything that we're using today in our 3.14 BSP).
+
+Chris
