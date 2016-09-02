@@ -1,34 +1,17 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 2 Sep 2016 09:52:21 -0500
-Subject: [PATCH 1/2] ARM: dts: am57xx-beagle-x15: Remove pinmux
- configurations
-In-Reply-To: <9bdf5693-ba02-8ce5-04b0-08875ccf7603@ti.com>
-References: <20160902090600.27262-1-nm@ti.com>
- <20160902090600.27262-2-nm@ti.com>
- <9bdf5693-ba02-8ce5-04b0-08875ccf7603@ti.com>
-Message-ID: <007b3c61-ec4c-a89d-e80e-adcec314e298@ti.com>
+From: szemzo.andras@gmail.com (Andras Szemzo)
+Date: Fri, 2 Sep 2016 16:52:30 +0200
+Subject: irq_create_fwspec_mapping() in 4.8-rc2
+In-Reply-To: <57C99111.3030105@arm.com>
+References: <483F737F-9868-4E8A-A831-AA3F6F410AFF@gmail.com>
+ <57C98975.5020607@arm.com> <9FCA11A3-B677-42EA-80DB-674AC8E489E8@gmail.com>
+ <57C99111.3030105@arm.com>
+Message-ID: <F5716CCD-34FF-4CA8-B5F5-C2A33A5D9E91@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2016 05:18 AM, Sekhar Nori wrote:
-> On Friday 02 September 2016 02:35 PM, Nishanth Menon wrote:
->> pinmuxing for DRA7x/AM57x family of processors need to be done in IO
->> isolation as part of initial bootloader executed from SRAM. This is
->> done as part of iodelay configuration sequence and is required due to
->> the limitations introduced by erratum ID: i869[1] and elaborated in
->> the Technical Reference Manual[2] 18.4.6.1.7 Isolation Requirements.
->>
->> Only peripheral that is permitted for dynamic pin mux configuration is
->> MMC. This is to accommodate the requirements for varied speeds (which
->
-> Actually its MMC and DCAN. DCAN because of i893 ("DCAN Initialization
-> Sequence"). But I can see you may have omitted reference to it since
-> DCAN is not really used on the x15.
+> 
+> Can you try this patch and report the values you find?
+> 
+Sure, here is the output:
 
-True, I should add that for completeness. will do. thanks for catching 
-the same.
-
-
--- 
-Regards,
-Nishanth Menon
+irq: type mismatch (2/3), failed to map hwirq-11 for /soc/pinctrl at 0x400e0e00/gpio at 0x400e1200!
