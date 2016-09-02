@@ -1,118 +1,28 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 2 Sep 2016 15:08:01 +0200 (CEST)
-Subject: [PATCH] generic: Add the exception case checking routine for
- ppi interrupt
-In-Reply-To: <57C7EEE2.7080205@arm.com>
-References: <1472530639-21616-1-git-send-email-majun258@huawei.com>
- <57C548D0.3090700@arm.com> <57C5617B.6080801@huawei.com>
- <57C568F8.20802@arm.com> <20160830112113.GE1223@leverpostej>
- <57C67ABE.908@huawei.com> <57C696DA.4090301@arm.com>
- <57C7E3B6.1040605@huawei.com> <57C7EEE2.7080205@arm.com>
-Message-ID: <alpine.DEB.2.20.1609021436160.5647@nanos>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 02 Sep 2016 15:10:34 +0200
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <956cf653-973a-3bfd-9aaa-bdc922995ea6@arm.com>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <87eg528te7.fsf@linux.intel.com>
+ <956cf653-973a-3bfd-9aaa-bdc922995ea6@arm.com>
+Message-ID: <5224196.iEv3ICfjjt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Sep 2016, Marc Zyngier wrote:
-> On 01/09/16 09:15, majun (F) wrote:
-> Well, this issue goes way beyond the hack you wanted to add to the
-> generic code, and it should probably be addressed in the GIC code
-> itself, as an implementation specific workaround. Without knowing the
-> details of the erratum, it is difficult to think of that would be
-> required. I can come up with something like this:
+On Friday, September 2, 2016 12:55:33 PM CEST Robin Murphy wrote:
 > 
-> 	irqnr = gic_read_iar();
-> 	if (unlikely(!is_enabled(irqnr))) {
-> 		gic_write_eoir(irqnr);
-> 		if (static_key_true(&supports_deactivate))
-> 			gic_write_dir(irqnr);
-> 		set_pending(irqnr);
-> 		continue;
-> 	}
-> 
-> Performance will suffer (an extra MMIO access on the fast path). If LPIs
-> are also affected, then the ITS code also needs to be involved, and
-> that's not going to be pretty either. This code will have to be enabled
-> at runtime, and handled like other erratum we have in this code.
+> Huh? There's only no DMA description in DT if the device can be assumed
+> to be happy with the defaults. Anything else should be using
+> "dma-ranges", "dma-coherent", etc. to describe non-default integration
+> aspects. For devices with an inherent fixed addressing capability !=32
+> bits, then it's down to the driver to call dma_set_mask() appropriately
+> to override the default 32-bit mask (which is not unique to OF-probed
+> devices either).
 
-So that's certainly a required workaround at the gic level. Though I really
-think that we should make handle_percpu_devid_irq robust against a spurious
-interrupt.
+The iommu configuration would be the main other one worth mentioning.
 
->  void handle_percpu_devid_irq(unsigned int irq, struct irq_desc *desc)
->  {
-> -	struct irq_chip *chip = irq_desc_get_chip(desc);
-> -	struct irqaction *action = desc->action;
-> -	void *dev_id = raw_cpu_ptr(action->percpu_dev_id);
-> +	struct irq_chip *chip = NULL;
-> +	struct irqaction *action;
-> +	void *dev_id;
->  	irqreturn_t res;
->  
-> +	action = desc->action;
-> +
-> +	/* Unexpected interrupt in some execption case
-> +	 * we just send eoi to end this interrupt
-> +	 */
-> +	if (unlikely(!action)) {
-> +		mask_irq(desc);
+Note that there is a known bug with dma_set_mask(), which always succeeds
+at the moment, even if the dma-ranges limit the possible addresses
+in a way that should fail.
 
-This is wrong. mask_irq() does not work for percpu interrupts. Aside of that
-this completely lacks any debug information which tells us that there is
-something wrong in the system. I'm going to apply the patch below for
-robustness sake.
-
-Thanks,
-
-	tglx
-
-8<----------------------
-Subject: genirq: Robustify handle_percpu_devid_irq()
-From: Thomas Gleixner <tglx@linutronix.de>
-Date: Fri, 02 Sep 2016 14:45:19 +0200
-
-The percpu_devid handler is not robust against spurious interrupts. If a
-spurious interrupt happens and no action is installed then the handler crashes
-with a NULL pointer dereference.
-
-Add a sanity check for this and log the wreckage once in dmesg.
-
-Reported-by: Majun <majun258@huawei.com>
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
----
- kernel/irq/chip.c |   18 ++++++++++++++----
- 1 file changed, 14 insertions(+), 4 deletions(-)
-
---- a/kernel/irq/chip.c
-+++ b/kernel/irq/chip.c
-@@ -756,7 +756,6 @@ void handle_percpu_devid_irq(struct irq_
- {
- 	struct irq_chip *chip = irq_desc_get_chip(desc);
- 	struct irqaction *action = desc->action;
--	void *dev_id = raw_cpu_ptr(action->percpu_dev_id);
- 	unsigned int irq = irq_desc_get_irq(desc);
- 	irqreturn_t res;
- 
-@@ -765,9 +764,20 @@ void handle_percpu_devid_irq(struct irq_
- 	if (chip->irq_ack)
- 		chip->irq_ack(&desc->irq_data);
- 
--	trace_irq_handler_entry(irq, action);
--	res = action->handler(irq, dev_id);
--	trace_irq_handler_exit(irq, action, res);
-+	if (likely(action)) {
-+		trace_irq_handler_entry(irq, action);
-+		res = action->handler(irq, raw_cpu_ptr(action->percpu_dev_id));
-+		trace_irq_handler_exit(irq, action, res);
-+	} else {
-+		unsigned int cpu = smp_processor_id();
-+		bool enabled = cpumask_test_cpu(cpu, desc->percpu_enabled);
-+
-+		if (enabled)
-+			irq_percpu_disable(desc, cpu);
-+
-+		pr_err_once("Spurious%s percpu IRQ%u on CPU%u\n",
-+			    enabled ? " and unmasked" : "", irq, cpu);
-+	}
- 
- 	if (chip->irq_eoi)
- 		chip->irq_eoi(&desc->irq_data);
+	Arnd
