@@ -1,91 +1,47 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 2 Sep 2016 09:00:30 +0800
-Subject: [PATCH v6 1/8] binding-doc: power: pwrseq-generic: add binding
- doc for generic power sequence library
-In-Reply-To: <6832cc55-831a-1188-4878-bbbf0b3c3be8@linaro.org>
-References: <1471252398-957-1-git-send-email-peter.chen@nxp.com>
- <1471252398-957-2-git-send-email-peter.chen@nxp.com>
- <6832cc55-831a-1188-4878-bbbf0b3c3be8@linaro.org>
-Message-ID: <20160902010030.GA11262@shlinux2>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Thu, 01 Sep 2016 18:19:07 -0700
+Subject: [PATCH] ARM: imx: (trivial) fix a typo
+In-Reply-To: <20160901204816.GA8057@reykholt.kaiser.cx>
+References: <20160901204816.GA8057@reykholt.kaiser.cx>
+Message-ID: <1993847.IzPN1S0Ejq@diplodocus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2016 at 01:33:22PM +0530, Vaibhav Hiremath wrote:
+On Thursday, September 01, 2016 10:48:16 PM Martin Kaiser wrote:
+> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+> ---
+>  arch/arm/mach-imx/hardware.h |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
+> diff --git a/arch/arm/mach-imx/hardware.h b/arch/arm/mach-imx/hardware.h
+> index a42a6df..2810ffc 100644
+> --- a/arch/arm/mach-imx/hardware.h
+> +++ b/arch/arm/mach-imx/hardware.h
+> @@ -120,7 +120,7 @@
+>  	.type = _type,							\
+>  }
+>  
+> -/* There's a off-by-one betweem the gpio bank number and the gpiochip */
+> +/* There's a off-by-one between the gpio bank number and the gpiochip */
+>  /* range e.g. GPIO_1_5 is gpio 5 under linux */
+>  #define IMX_GPIO_NR(bank, nr)		(((bank) - 1) * 32 + (nr))
+>  
 > 
-> On Monday 15 August 2016 02:43 PM, Peter Chen wrote:
-> >Add binding doc for generic power sequence library.
-> >
-> >Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> >Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
-> >Acked-by: Rob Herring <robh@kernel.org>
-> >---
-> >  .../bindings/power/pwrseq/pwrseq-generic.txt       | 48 ++++++++++++++++++++++
-> >  1 file changed, 48 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
-> >
-> >diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
-> >new file mode 100644
-> >index 0000000..ebf0d47
-> >--- /dev/null
-> >+++ b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
-> >@@ -0,0 +1,48 @@
-> >+The generic power sequence library
-> >+
-> >+Some hard-wired devices (eg USB/MMC) need to do power sequence before
-> >+the device can be enumerated on the bus, the typical power sequence
-> >+like: enable USB PHY clock, toggle reset pin, etc. But current
-> >+Linux device driver lacks of such code to do it, it may cause some
-> >+hard-wired devices works abnormal or can't be recognized by
-> >+controller at all. The power sequence will be done before this device
-> >+can be found at the bus.
-> >+
-> >+The power sequence properties is under the device node.
-> >+
-> >+Optional properties:
-> >+- clocks: the input clocks for device.
-> >+- reset-gpios: Should specify the GPIO for reset.
-> >+- reset-duration-us: the duration in microsecond for assert reset signal.
-> >+
-> >+Below is the example of USB power sequence properties on USB device
-> >+nodes which have two level USB hubs.
-> >+
-> >+&usbotg1 {
-> >+	vbus-supply = <&reg_usb_otg1_vbus>;
-> >+	pinctrl-names = "default";
-> >+	pinctrl-0 = <&pinctrl_usb_otg1_id>;
-> >+	status = "okay";
-> >+
-> >+	#address-cells = <1>;
-> >+	#size-cells = <0>;
-> >+	genesys: hub at 1 {
-> >+		compatible = "usb5e3,608";
-> >+		reg = <1>;
-> >+
-> >+		clocks = <&clks IMX6SX_CLK_CKO>;
-> >+		reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
-> >+		reset-duration-us = <10>;
-> >+
-> >+		#address-cells = <1>;
-> >+		#size-cells = <0>;
-> >+		asix: ethernet at 1 {
-> >+			compatible = "usbb95,1708";
-> 
-> So I assume, with our recent discussion and the change
-> we are proposing, the library would have some knowledge
-> about this compatible string, right?
+s/a/an/
 
-Yes
+while we're in there fixing spelling let's fix the grammar too:
 
-> 
-> what I was asking on other email was, how are you connecting
-> multiple power sequence libraries to their respective consumers ?
-> 
-
-The consumers has its of_node, then it can find related power sequence
-library according to compatible string.
-
--- 
-
-Best Regards,
-Peter Chen
+ diff --git a/arch/arm/mach-imx/hardware.h b/arch/arm/mach-imx/hardware.h
+ index a42a6df..2810ffc 100644
+ --- a/arch/arm/mach-imx/hardware.h
+ +++ b/arch/arm/mach-imx/hardware.h
+ @@ -120,7 +120,7 @@
+  	.type = _type,							\
+  }
+  
+ -/* There's a off-by-one betweem the gpio bank number and the gpiochip */
+ +/* There's an off-by-one between the gpio bank number and the gpiochip */
+  /* range e.g. GPIO_1_5 is gpio 5 under linux */
+  #define IMX_GPIO_NR(bank, nr)		(((bank) - 1) * 32 + (nr))
+  
+ 
