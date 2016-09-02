@@ -1,38 +1,19 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 2 Sep 2016 18:30:25 +0200
-Subject: [GIT PULL 4/4] ARM: defconfig: Exynos for v4.9
-In-Reply-To: <4575445.BeuOIIGatt@wuerfel>
-References: <1472548739-20050-1-git-send-email-k.kozlowski@samsung.com>
- <1472548739-20050-2-git-send-email-k.kozlowski@samsung.com>
- <4575445.BeuOIIGatt@wuerfel>
-Message-ID: <20160902163025.GA5534@kozik-lap>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 02 Sep 2016 18:31:55 +0200
+Subject: [GIT PULL] drop last omap3 board files for v4.8
+In-Reply-To: <20160902145717.gtyhz76bv575plch@atomide.com>
+References: <20160816155241.eka7c6p2rvp4q5zk@atomide.com>
+ <4327380.4mS7Wg8her@wuerfel> <20160902145717.gtyhz76bv575plch@atomide.com>
+Message-ID: <5065725.hSDWXRnpuO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 02, 2016 at 05:47:11PM +0200, Arnd Bergmann wrote:
-> On Tuesday, August 30, 2016 11:18:56 AM CEST Krzysztof Kozlowski wrote:
-> > Expected conflict in multi_v7 - take all the changes:
-> > 
-> > --- a/arch/arm/configs/multi_v7_defconfig
-> > +++ b/arch/arm/configs/multi_v7_defconfig
-> > @@@ -135,8 -136,7 +136,8 @@@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=
-> >   CONFIG_CPU_FREQ_GOV_POWERSAVE=m
-> >   CONFIG_CPU_FREQ_GOV_USERSPACE=m
-> >   CONFIG_CPU_FREQ_GOV_CONSERVATIVE=m
-> > - CONFIG_CPU_FREQ_GOV_SCHEDUTIL=m
-> > + CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
-> >  +CONFIG_ARM_IMX6Q_CPUFREQ=y
-> >   CONFIG_QORIQ_CPUFREQ=y
-> >   CONFIG_CPU_IDLE=y
-> >   CONFIG_ARM_CPUIDLE=y
-> > 
-> > 
-> 
-> I pulled this into next/defconfig, but didn't see the conflict,
-> presumably I'll get it after merging the other branches?
+On Friday, September 2, 2016 7:57:18 AM CEST Tony Lindgren wrote:
+> Sure thanks. Let's just not touch any of the now unused platform
+> data until v4.10 then. Otherwise we'll fast reach a point of no
+> return without reverting large patches.
 
-The conflict is between my tree and imx-mxs tree so you might encounter
-it later when merging IMX changes.
+Ok, I've applied the branch to next/cleanup now,
+thanks a lot for getting omap to this point!
 
-Best regards,
-Krzysztof
+	Arnd
