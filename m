@@ -1,121 +1,90 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 2 Sep 2016 16:38:45 +0100
-Subject: [RFC PATCH V5 1/5] PCI: Embed pci_ecam_ops in pci_config_window
- structure
-In-Reply-To: <20160901182345.GA18461@localhost>
-References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
- <1470661541-26270-2-git-send-email-tn@semihalf.com>
- <20160901182345.GA18461@localhost>
-Message-ID: <20160902153845.GA11234@red-moon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 2 Sep 2016 16:49:33 +0100
+Subject: [PATCH] generic: Add the exception case checking routine for ppi
+ interrupt
+In-Reply-To: <alpine.DEB.2.20.1609021436160.5647@nanos>
+References: <1472530639-21616-1-git-send-email-majun258@huawei.com>
+ <57C548D0.3090700@arm.com> <57C5617B.6080801@huawei.com>
+ <57C568F8.20802@arm.com> <20160830112113.GE1223@leverpostej>
+ <57C67ABE.908@huawei.com> <57C696DA.4090301@arm.com>
+ <57C7E3B6.1040605@huawei.com> <57C7EEE2.7080205@arm.com>
+ <alpine.DEB.2.20.1609021436160.5647@nanos>
+Message-ID: <57C99F8D.9080503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2016 at 01:23:45PM -0500, Bjorn Helgaas wrote:
-> On Mon, Aug 08, 2016 at 03:05:37PM +0200, Tomasz Nowicki wrote:
-> > pci_config_window keeps pointer to pci_ecam_ops and every time
-> > we want to deallocate pci_config_window (pci_ecam_free()) we need to make
-> > sure to free pci_ecam_ops in case it was dynamically allocated prior to
-> > pci_ecam_create() call.
+On 02/09/16 14:08, Thomas Gleixner wrote:
+> On Thu, 1 Sep 2016, Marc Zyngier wrote:
+>> On 01/09/16 09:15, majun (F) wrote:
+>> Well, this issue goes way beyond the hack you wanted to add to the
+>> generic code, and it should probably be addressed in the GIC code
+>> itself, as an implementation specific workaround. Without knowing the
+>> details of the erratum, it is difficult to think of that would be
+>> required. I can come up with something like this:
+>>
+>> 	irqnr = gic_read_iar();
+>> 	if (unlikely(!is_enabled(irqnr))) {
+>> 		gic_write_eoir(irqnr);
+>> 		if (static_key_true(&supports_deactivate))
+>> 			gic_write_dir(irqnr);
+>> 		set_pending(irqnr);
+>> 		continue;
+>> 	}
+>>
+>> Performance will suffer (an extra MMIO access on the fast path). If LPIs
+>> are also affected, then the ITS code also needs to be involved, and
+>> that's not going to be pretty either. This code will have to be enabled
+>> at runtime, and handled like other erratum we have in this code.
 > 
-> I think this is a theoretical problem, right?  All the current callers
-> pass a pointer to a static pci_ecam_ops struct that does not need to
-> be deallocated.
+> So that's certainly a required workaround at the gic level. Though I really
+> think that we should make handle_percpu_devid_irq robust against a spurious
+> interrupt.
 > 
-> I see that the next patch uses a pci_ecam_ops struct on the stack,
-
-I asked Tomasz why we need to have pci_ecam_ops on the stack in the
-first place since I do not think it is needed, or nicer (actually I
-think it is not nice at all, what's the problem in making it static ?).
-
-Anyway, that's part of this thread but I think Tomasz was looking
-more for feedback/agreement on the whole quirks mechanism to check
-if it is fine, more below.
-
-> which would definitely cause issues without this patch, so I agree we
-> need something like this; I'm just trying to make the changelog make
-> more sense.
+>>  void handle_percpu_devid_irq(unsigned int irq, struct irq_desc *desc)
+>>  {
+>> -	struct irq_chip *chip = irq_desc_get_chip(desc);
+>> -	struct irqaction *action = desc->action;
+>> -	void *dev_id = raw_cpu_ptr(action->percpu_dev_id);
+>> +	struct irq_chip *chip = NULL;
+>> +	struct irqaction *action;
+>> +	void *dev_id;
+>>  	irqreturn_t res;
+>>  
+>> +	action = desc->action;
+>> +
+>> +	/* Unexpected interrupt in some execption case
+>> +	 * we just send eoi to end this interrupt
+>> +	 */
+>> +	if (unlikely(!action)) {
+>> +		mask_irq(desc);
 > 
-> > To avoid that extra effort, embed pci_ecam_ops in pci_config_window,
-> > instead of just a pointer.
-> > 
-> > Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> > To: Jayachandran C <jchandra@broadcom.com>
+> This is wrong. mask_irq() does not work for percpu interrupts. Aside of that
+> this completely lacks any debug information which tells us that there is
+> something wrong in the system. I'm going to apply the patch below for
+> robustness sake.
 > 
-> This looks like an editing mistake?
-
-Yes it is.
-
-I think the most important bit about this series is to agree on
-whether it is ok to keep quirks in drivers/pci/host/mcfg-quirks.c
-or we need to find a different dir for it, and of course to make
-sure the quirks mechanism is fine with everyone.
-
-Thanks !
-Lorenzo
-
-> >  arch/arm64/kernel/pci.c  | 2 +-
-> >  drivers/pci/ecam.c       | 6 +++---
-> >  include/linux/pci-ecam.h | 2 +-
-> >  3 files changed, 5 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> > index acf3872..981e828 100644
-> > --- a/arch/arm64/kernel/pci.c
-> > +++ b/arch/arm64/kernel/pci.c
-> > @@ -183,7 +183,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
-> >  		return NULL;
-> >  	}
-> >  
-> > -	acpi_pci_root_ops.pci_ops = &ri->cfg->ops->pci_ops;
-> > +	acpi_pci_root_ops.pci_ops = &ri->cfg->ops.pci_ops;
-> >  	bus = acpi_pci_root_create(root, &acpi_pci_root_ops, &ri->common,
-> >  				   ri->cfg);
-> >  	if (!bus)
-> > diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
-> > index 43ed08d..24242f0 100644
-> > --- a/drivers/pci/ecam.c
-> > +++ b/drivers/pci/ecam.c
-> > @@ -52,7 +52,7 @@ struct pci_config_window *pci_ecam_create(struct device *dev,
-> >  		return ERR_PTR(-ENOMEM);
-> >  
-> >  	cfg->parent = dev;
-> > -	cfg->ops = ops;
-> > +	cfg->ops = *ops;
-> >  	cfg->busr.start = busr->start;
-> >  	cfg->busr.end = busr->end;
-> >  	cfg->busr.flags = IORESOURCE_BUS;
-> > @@ -138,7 +138,7 @@ void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
-> >  			       int where)
-> >  {
-> >  	struct pci_config_window *cfg = bus->sysdata;
-> > -	unsigned int devfn_shift = cfg->ops->bus_shift - 8;
-> > +	unsigned int devfn_shift = cfg->ops.bus_shift - 8;
-> >  	unsigned int busn = bus->number;
-> >  	void __iomem *base;
-> >  
-> > @@ -149,7 +149,7 @@ void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
-> >  	if (per_bus_mapping)
-> >  		base = cfg->winp[busn];
-> >  	else
-> > -		base = cfg->win + (busn << cfg->ops->bus_shift);
-> > +		base = cfg->win + (busn << cfg->ops.bus_shift);
-> >  	return base + (devfn << devfn_shift) + where;
-> >  }
-> >  
-> > diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
-> > index 7adad20..0ce2920 100644
-> > --- a/include/linux/pci-ecam.h
-> > +++ b/include/linux/pci-ecam.h
-> > @@ -39,7 +39,7 @@ struct pci_config_window {
-> >  	struct resource			res;
-> >  	struct resource			busr;
-> >  	void				*priv;
-> > -	struct pci_ecam_ops		*ops;
-> > +	struct pci_ecam_ops		ops;
-> >  	union {
-> >  		void __iomem		*win;	/* 64-bit single mapping */
-> >  		void __iomem		**winp; /* 32-bit per-bus mapping */
-> > -- 
-> > 1.9.1
-> > 
+> Thanks,
 > 
+> 	tglx
+> 
+> 8<----------------------
+> Subject: genirq: Robustify handle_percpu_devid_irq()
+> From: Thomas Gleixner <tglx@linutronix.de>
+> Date: Fri, 02 Sep 2016 14:45:19 +0200
+> 
+> The percpu_devid handler is not robust against spurious interrupts. If a
+> spurious interrupt happens and no action is installed then the handler crashes
+> with a NULL pointer dereference.
+> 
+> Add a sanity check for this and log the wreckage once in dmesg.
+> 
+> Reported-by: Majun <majun258@huawei.com>
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+
+Looks fine to me.
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
