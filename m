@@ -1,30 +1,41 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri,  2 Sep 2016 16:02:46 +0100
-Subject: [PATCH] arm-cci: Fix typo in event name
-Message-ID: <1472828566-31533-1-git-send-email-suzuki.poulose@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri,  2 Sep 2016 16:02:13 +0100
+Subject: [PATCH v2 7/7] arm64: Enable CONFIG_ARM64_TTBR0_PAN
+In-Reply-To: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
+References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1472828533-28197-8-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes a typo in one of the event name for CCI
+This patch adds the Kconfig option to enable support for TTBR0 PAN. The
+option is default off because of a slight performance hit when enabled,
+caused by the additional TTBR0_EL1 switching during user access
+operations or exception entry/exit code.
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Kees Cook <keescook@chromium.org>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- drivers/bus/arm-cci.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/Kconfig | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 5755907f..ffa7c9d 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -551,7 +551,7 @@ static struct attribute *cci5xx_pmu_event_attrs[] = {
- 	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_wrq, 0xB),
- 	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_cd_hs, 0xC),
- 	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_rq_stall_addr_hazard, 0xD),
--	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snopp_rq_stall_tt_full, 0xE),
-+	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_rq_stall_tt_full, 0xE),
- 	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_rq_tzmp1_prot, 0xF),
- 	NULL
- };
--- 
-2.7.4
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index bc3f00f586f1..3fb9a6ce464d 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -785,6 +785,14 @@ config SETEND_EMULATION
+ 	  If unsure, say Y
+ endif
+ 
++config ARM64_TTBR0_PAN
++	bool "Priviledged Access Never using TTBR0_EL1 switching"
++	help
++	  Enabling this option prevents the kernel from accessing
++	  user-space memory directly by pointing TTBR0_EL1 to a reserved
++	  zeroed area and reserved ASID. The user access routines
++	  restore the valid TTBR0_EL1 temporarily.
++
+ menu "ARMv8.1 architectural features"
+ 
+ config ARM64_HW_AFDBM
