@@ -1,57 +1,27 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 2 Sep 2016 15:15:17 +0100
-Subject: irq_create_fwspec_mapping() in 4.8-rc2
-In-Reply-To: <483F737F-9868-4E8A-A831-AA3F6F410AFF@gmail.com>
-References: <483F737F-9868-4E8A-A831-AA3F6F410AFF@gmail.com>
-Message-ID: <57C98975.5020607@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 2 Sep 2016 09:16:31 -0500
+Subject: [PATCH v4 1/3] nvmem: rockchip-efuse: update compatible strings
+ for Rockchip efuse
+In-Reply-To: <1472464210-30252-2-git-send-email-finley.xiao@rock-chips.com>
+References: <1472464210-30252-1-git-send-email-finley.xiao@rock-chips.com>
+ <1472464210-30252-2-git-send-email-finley.xiao@rock-chips.com>
+Message-ID: <20160902141631.GA23238@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[cc-ing the maintainers of the code usually helps]
+On Mon, Aug 29, 2016 at 02:50:08AM -0700, Finley Xiao wrote:
+> Rk3399-efuse is organized as 32bits by 32 one-time programmable electrical
+> fuses. The efuse of earlier SoCs are organized as 32bits by 8 one-time
+> programmable electrical fuses with random access interface.
+> 
+> Add different device tree compatible string for different SoCs to be able
+> to differentiate between the two. The old binding is of course preserved,
+> though deprecated.
+> 
+> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt | 13 +++++++++++--
+>  1 file changed, 11 insertions(+), 2 deletions(-)
 
-On 02/09/16 07:51, Andras Szemzo wrote:
-> Hi,
-> 
-> I try to use 4.8-rc2 on my armv7m board, and I have a problem with GPIO IRQ.
-> In my device-tree, I define the ethernet PHY IRQ like this:
-> 
->  pioC: gpio at 0x400e1200 {
->     compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
->     reg = <0x400e1200 0x200>;
->     interrupts = <12>;
->     #gpio-cells = <2>;
->     gpio-controller;
->     interrupt-controller;
->     #interrupt-cells = <2>;
->     clocks = <&pioC_clk>;
-> };
-> ...
-> ethernet-phy at 1 {
->      reg = <1>;
->      interrupt-parent = <&pioC>;
->      interrupts = <11 IRQ_TYPE_EDGE_FALLING>;
-
-So this is the interrupt that gets a mismatch.
-
->      reset-gpios = <&pioC 10 GPIO_ACTIVE_HIGH>;
-> };
-> 
-> with the 4.8-rc2 kernel at boot it fails with error:
-> 
-> irq: type mismatch, failed to map hwirq-11 for /soc/pinctrl at 0x400e0e00/gpio at 0x400e1200!
-> 
-> This error comes from kernel/irq/irq_domain.c, irq_create_fwspec_mapping().
-> 
-> My quick hack was to replace this function from 4.6.0 (where with the same device-tree, same kernel config it works) 
-> and everything works as expected.
-> 
-> Maybe this hack is hiding a problem from somewhere else, but I can?t figure out what I missed.
-
-Is there any other device in your system that uses the same interrupt?
-Where can I see your full DT file?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Acked-by: Rob Herring <robh@kernel.org>
