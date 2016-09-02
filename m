@@ -1,93 +1,182 @@
-From: wladislav.wiebe@nokia.com (Wiebe, Wladislav (Nokia - DE/Ulm))
-Date: Fri, 2 Sep 2016 12:02:43 +0000
-Subject: [PATCH] ARM: fix linker call for ARM_MODULE_PLTS
-In-Reply-To: <20160902092450.GB1041@n2100.armlinux.org.uk>
-References: <HE1PR07MB14835C6A5F6AA3A905E40018FAE50@HE1PR07MB1483.eurprd07.prod.outlook.com>
- <20160902092450.GB1041@n2100.armlinux.org.uk>
-Message-ID: <HE1PR07MB1483372BB908734FF6459DD2FAE50@HE1PR07MB1483.eurprd07.prod.outlook.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Fri, 02 Sep 2016 13:04:17 +0100
+Subject: [PATCH] pcmcia: sa1111: fix propagation of lowlevel board init return
+ code
+Message-ID: <E1bfnCj-0006HT-12@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Russell King - ARM Linux [mailto:linux at armlinux.org.uk]
-> Sent: Friday, September 02, 2016 11:25 AM
-> 
-> On Fri, Sep 02, 2016 at 09:17:58AM +0000, Wiebe, Wladislav (Nokia - DE/Ulm)
-> wrote:
-> > module.lds script doesn't get called when
-> > CONFIG_ARM_MODULE_PLTS is enabled.
-> > Use KBUILD_LDFLAGS_MODULE to fix it.
-> 
-> For those of us who haven't encountered this problem, could you include
-> some commentry in the commit message describing the failure mechanism
-> and why you think this is the correct solution?
-> 
-> The final link for modules is:
-> 
-> quiet_cmd_ld_ko_o = LD [M]  $@
->       cmd_ld_ko_o = $(LD) -r $(LDFLAGS)                                 \
->                              $(KBUILD_LDFLAGS_MODULE) $(LDFLAGS_MODULE) \
->                              -o $@ $(filter-out FORCE,$^)
-> 
-> which seems to always include both flags.  Why is it ignored when it's
-> in LDFLAGS_MODULE?  What about the other flags we pass in
-> LDFLAGS_MODULE?
+When testing Lubbock, it was noticed that the sa1111 pcmcia driver bound
+but was not functional due to no sockets being registered.  This is
+because the return code from the lowlevel board initialisation was not
+being propagated out of the probe function.  Fix this.
 
-aah -- just found an issue in my environment where LDFLAGS_MODULE gets overwritten
-due to a none upstream patch on scripts/Makefile.modpost.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+Robert,
 
-It worked only for me when using the KBUILD_LDFLAGS_MODULE
-and I did not get deep inside after I saw in 
-https://www.kernel.org/doc/Documentation/kbuild/makefiles.txt
-+++++
-    KBUILD_LDFLAGS_MODULE   Options for $(LD) when linking modules
+I'd prefer this solution.  Please check that it resolves your issue,
+thanks.
 
-	$(KBUILD_LDFLAGS_MODULE) is used to add arch-specific options
-	used when linking modules. This is often a linker script.
-	From commandline LDFLAGS_MODULE shall be used (see kbuild.txt).
-+++++
+ drivers/pcmcia/sa1111_badge4.c     | 22 ++++++++--------------
+ drivers/pcmcia/sa1111_generic.c    | 22 +++++++++++++++++-----
+ drivers/pcmcia/sa1111_jornada720.c | 16 +++++-----------
+ drivers/pcmcia/sa1111_lubbock.c    | 14 ++++----------
+ drivers/pcmcia/sa1111_neponset.c   | 12 +++---------
+ 5 files changed, 37 insertions(+), 49 deletions(-)
 
-and found that all other architectures are also users of KBUILD_LDFLAGS_MODULE for that purpose
-$ git grep LDFLAGS_MODULE arch/
-arch/arm/Makefile:LDFLAGS_MODULE        += --be8
-arch/arm/Makefile:LDFLAGS_MODULE        += -T $(srctree)/arch/arm/kernel/module.lds
-arch/arm64/Makefile:KBUILD_LDFLAGS_MODULE       += -T $(srctree)/arch/arm64/kernel/module.lds
-arch/hexagon/Makefile:# LDFLAGS_MODULE += -shared
-arch/ia64/Makefile:KBUILD_LDFLAGS_MODULE += -T $(srctree)/arch/ia64/module.lds
-arch/m68k/Makefile:KBUILD_LDFLAGS_MODULE += -T $(srctree)/arch/m68k/kernel/module.lds
-arch/powerpc/Makefile:KBUILD_LDFLAGS_MODULE += arch/powerpc/lib/crtsavres.o
-arch/powerpc/Makefile:  KBUILD_LDFLAGS_MODULE += --ppc476-workaround \
-
-
-Anyway, feel free to ignore this patch and thanks a lot for the fast feedback.
-
-
-
-> 
-> Thanks.
-> 
-> >
-> > Signed-off-by: Wladislav Wiebe <wladislav.wiebe@nokia.com>
-> > ---
-> >  arch/arm/Makefile | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> > index 61f6ccc..01c6025 100644
-> > --- a/arch/arm/Makefile
-> > +++ b/arch/arm/Makefile
-> > @@ -20,7 +20,7 @@ LDFLAGS_MODULE	+= --be8
-> >  endif
-> >
-> >  ifeq ($(CONFIG_ARM_MODULE_PLTS),y)
-> > -LDFLAGS_MODULE	+= -T $(srctree)/arch/arm/kernel/module.lds
-> > +KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm/kernel/module.lds
-> >  endif
-> >
-> >  OBJCOPYFLAGS	:=-O binary -R .comment -S
-> > --
-> > 1.7.12.4
-> 
-> --
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+diff --git a/drivers/pcmcia/sa1111_badge4.c b/drivers/pcmcia/sa1111_badge4.c
+index 12f0dd091477..2f490930430d 100644
+--- a/drivers/pcmcia/sa1111_badge4.c
++++ b/drivers/pcmcia/sa1111_badge4.c
+@@ -134,20 +134,14 @@ static struct pcmcia_low_level badge4_pcmcia_ops = {
+ 
+ int pcmcia_badge4_init(struct sa1111_dev *dev)
+ {
+-	int ret = -ENODEV;
+-
+-	if (machine_is_badge4()) {
+-		printk(KERN_INFO
+-		       "%s: badge4_pcmvcc=%d, badge4_pcmvpp=%d, badge4_cfvcc=%d\n",
+-		       __func__,
+-		       badge4_pcmvcc, badge4_pcmvpp, badge4_cfvcc);
+-
+-		sa11xx_drv_pcmcia_ops(&badge4_pcmcia_ops);
+-		ret = sa1111_pcmcia_add(dev, &badge4_pcmcia_ops,
+-				sa11xx_drv_pcmcia_add_one);
+-	}
+-
+-	return ret;
++	printk(KERN_INFO
++	       "%s: badge4_pcmvcc=%d, badge4_pcmvpp=%d, badge4_cfvcc=%d\n",
++	       __func__,
++	       badge4_pcmvcc, badge4_pcmvpp, badge4_cfvcc);
++
++	sa11xx_drv_pcmcia_ops(&badge4_pcmcia_ops);
++	return sa1111_pcmcia_add(dev, &badge4_pcmcia_ops,
++				 sa11xx_drv_pcmcia_add_one);
+ }
+ 
+ static int __init pcmv_setup(char *s)
+diff --git a/drivers/pcmcia/sa1111_generic.c b/drivers/pcmcia/sa1111_generic.c
+index a1531feb8460..3d95dffcff7a 100644
+--- a/drivers/pcmcia/sa1111_generic.c
++++ b/drivers/pcmcia/sa1111_generic.c
+@@ -18,6 +18,7 @@
+ 
+ #include <mach/hardware.h>
+ #include <asm/hardware/sa1111.h>
++#include <asm/mach-types.h>
+ #include <asm/irq.h>
+ 
+ #include "sa1111_generic.h"
+@@ -203,19 +204,30 @@ static int pcmcia_probe(struct sa1111_dev *dev)
+ 	sa1111_writel(PCSSR_S0_SLEEP | PCSSR_S1_SLEEP, base + PCSSR);
+ 	sa1111_writel(PCCR_S0_FLT | PCCR_S1_FLT, base + PCCR);
+ 
++	ret = -ENODEV;
+ #ifdef CONFIG_SA1100_BADGE4
+-	pcmcia_badge4_init(dev);
++	if (machine_is_badge4())
++		ret = pcmcia_badge4_init(dev);
+ #endif
+ #ifdef CONFIG_SA1100_JORNADA720
+-	pcmcia_jornada720_init(dev);
++	if (machine_is_jornada720())
++		ret = pcmcia_jornada720_init(dev);
+ #endif
+ #ifdef CONFIG_ARCH_LUBBOCK
+-	pcmcia_lubbock_init(dev);
++	if (machine_is_lubbock())
++		ret = pcmcia_lubbock_init(dev);
+ #endif
+ #ifdef CONFIG_ASSABET_NEPONSET
+-	pcmcia_neponset_init(dev);
++	if (machine_is_assabet())
++		ret = pcmcia_neponset_init(dev);
+ #endif
+-	return 0;
++
++	if (ret) {
++		release_mem_region(dev->res.start, 512);
++		sa1111_disable_device(dev);
++	}
++
++	return ret;
+ }
+ 
+ static int pcmcia_remove(struct sa1111_dev *dev)
+diff --git a/drivers/pcmcia/sa1111_jornada720.c b/drivers/pcmcia/sa1111_jornada720.c
+index bfcb9fd43352..9ce146e018c0 100644
+--- a/drivers/pcmcia/sa1111_jornada720.c
++++ b/drivers/pcmcia/sa1111_jornada720.c
+@@ -127,16 +127,10 @@ static struct pcmcia_low_level jornada720_pcmcia_ops = {
+ 
+ int pcmcia_jornada720_init(struct sa1111_dev *sadev)
+ {
+-	int ret = -ENODEV;
++	/* Fixme: why messing around with SA11x0's GPIO1? */
++	GRER |= 0x00000002;
+ 
+-	if (machine_is_jornada720()) {
+-		/* Fixme: why messing around with SA11x0's GPIO1? */
+-		GRER |= 0x00000002;
+-
+-		sa11xx_drv_pcmcia_ops(&jornada720_pcmcia_ops);
+-		ret = sa1111_pcmcia_add(sadev, &jornada720_pcmcia_ops,
+-				sa11xx_drv_pcmcia_add_one);
+-	}
+-
+-	return ret;
++	sa11xx_drv_pcmcia_ops(&jornada720_pcmcia_ops);
++	return sa1111_pcmcia_add(sadev, &jornada720_pcmcia_ops,
++				 sa11xx_drv_pcmcia_add_one);
+ }
+diff --git a/drivers/pcmcia/sa1111_lubbock.c b/drivers/pcmcia/sa1111_lubbock.c
+index 9d5ffc71ae51..ccde1a8bba12 100644
+--- a/drivers/pcmcia/sa1111_lubbock.c
++++ b/drivers/pcmcia/sa1111_lubbock.c
+@@ -153,16 +153,10 @@ static struct pcmcia_low_level lubbock_pcmcia_ops = {
+ 
+ int pcmcia_lubbock_init(struct sa1111_dev *sadev)
+ {
+-	int ret = -ENODEV;
+-
+-	if (machine_is_lubbock()) {
+-		pxa2xx_drv_pcmcia_ops(&lubbock_pcmcia_ops);
+-		pxa2xx_configure_sockets(&sadev->dev);
+-		ret = sa1111_pcmcia_add(sadev, &lubbock_pcmcia_ops,
+-				pxa2xx_drv_pcmcia_add_one);
+-	}
+-
+-	return ret;
++	pxa2xx_drv_pcmcia_ops(&lubbock_pcmcia_ops);
++	pxa2xx_configure_sockets(&sadev->dev);
++	return sa1111_pcmcia_add(sadev, &lubbock_pcmcia_ops,
++				 pxa2xx_drv_pcmcia_add_one);
+ }
+ 
+ MODULE_LICENSE("GPL");
+diff --git a/drivers/pcmcia/sa1111_neponset.c b/drivers/pcmcia/sa1111_neponset.c
+index 30a1602dd984..795a85b158fb 100644
+--- a/drivers/pcmcia/sa1111_neponset.c
++++ b/drivers/pcmcia/sa1111_neponset.c
+@@ -76,13 +76,7 @@ static struct pcmcia_low_level neponset_pcmcia_ops = {
+ 
+ int pcmcia_neponset_init(struct sa1111_dev *sadev)
+ {
+-	int ret = -ENODEV;
+-
+-	if (machine_is_assabet()) {
+-		sa11xx_drv_pcmcia_ops(&neponset_pcmcia_ops);
+-		ret = sa1111_pcmcia_add(sadev, &neponset_pcmcia_ops,
+-				sa11xx_drv_pcmcia_add_one);
+-	}
+-
+-	return ret;
++	sa11xx_drv_pcmcia_ops(&neponset_pcmcia_ops);
++	return sa1111_pcmcia_add(sadev, &neponset_pcmcia_ops,
++				 sa11xx_drv_pcmcia_add_one);
+ }
+-- 
+2.1.0
