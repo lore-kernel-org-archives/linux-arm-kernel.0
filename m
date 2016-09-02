@@ -1,31 +1,28 @@
-From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Fri, 2 Sep 2016 17:33:18 +0200
-Subject: [PATCH v3 9/9] ARM: config: Enable GPIO Key driver in stm32_defconfig
-In-Reply-To: <1472830398-13275-1-git-send-email-alexandre.torgue@st.com>
-References: <1472830398-13275-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <1472830398-13275-10-git-send-email-alexandre.torgue@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 02 Sep 2016 17:36:03 +0200
+Subject: [PATCH 1/1 linux-next RESEND] ARM: multi_v7_defconfig: update
+ XILINX_VDMA
+In-Reply-To: <1471282484-10810-1-git-send-email-fabf@skynet.be>
+References: <1471282484-10810-1-git-send-email-fabf@skynet.be>
+Message-ID: <6215142.AUZfTk6HDM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+On Monday, August 15, 2016 7:34:44 PM CEST Fabian Frederick wrote:
+> Commit fde57a7c4474
+> ("dmaengine: xilinx: Rename driver and config")
+> 
+> renamed config XILINX_VDMA to config XILINX_DMA
+> Update defconfig accordingly.
+> 
+> Signed-off-by: Fabian Frederick <fabf@skynet.be>
+> ---
+> Sending to arm-soc (suggested by Shawn Guo)
+> 
 
-diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
-index 1e5ec2a..e7b56d4 100644
---- a/arch/arm/configs/stm32_defconfig
-+++ b/arch/arm/configs/stm32_defconfig
-@@ -38,7 +38,11 @@ CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_FW_LOADER is not set
- # CONFIG_BLK_DEV is not set
- CONFIG_EEPROM_93CX6=y
--# CONFIG_INPUT is not set
-+# CONFIG_INPUT_LEDS is not set
-+# CONFIG_INPUT_MOUSEDEV is not set
-+# CONFIG_KEYBOARD_ATKBD is not set
-+CONFIG_KEYBOARD_GPIO=y
-+# CONFIG_INPUT_MOUSE is not set
- # CONFIG_SERIO is not set
- # CONFIG_VT is not set
- # CONFIG_UNIX98_PTYS is not set
--- 
-1.9.1
+You did not actually address this to arm at kernel.org, but I found
+it and have now applied it to the fixes branch for v4.8.
+
+Thanks!
+
+	Arnd
