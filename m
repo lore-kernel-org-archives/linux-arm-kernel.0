@@ -1,56 +1,48 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 2 Sep 2016 10:24:50 +0100
-Subject: [PATCH] ARM: fix linker call for ARM_MODULE_PLTS
-In-Reply-To: <HE1PR07MB14835C6A5F6AA3A905E40018FAE50@HE1PR07MB1483.eurprd07.prod.outlook.com>
-References: <HE1PR07MB14835C6A5F6AA3A905E40018FAE50@HE1PR07MB1483.eurprd07.prod.outlook.com>
-Message-ID: <20160902092450.GB1041@n2100.armlinux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 2 Sep 2016 10:39:04 +0100
+Subject: [PATCHv4] arm: l2x0: add PMU support
+In-Reply-To: <20160901163802.ee39ea1a3c664fd182b97489@arm.com>
+References: <1472653416-774-1-git-send-email-mark.rutland@arm.com>
+ <20160901153706.GZ1041@n2100.armlinux.org.uk>
+ <20160901163802.ee39ea1a3c664fd182b97489@arm.com>
+Message-ID: <20160902093904.GA9261@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 02, 2016 at 09:17:58AM +0000, Wiebe, Wladislav (Nokia - DE/Ulm) wrote:
-> module.lds script doesn't get called when
-> CONFIG_ARM_MODULE_PLTS is enabled.
-> Use KBUILD_LDFLAGS_MODULE to fix it.
-
-For those of us who haven't encountered this problem, could you include
-some commentry in the commit message describing the failure mechanism
-and why you think this is the correct solution?
-
-The final link for modules is:
-
-quiet_cmd_ld_ko_o = LD [M]  $@
-      cmd_ld_ko_o = $(LD) -r $(LDFLAGS)                                 \
-                             $(KBUILD_LDFLAGS_MODULE) $(LDFLAGS_MODULE) \
-                             -o $@ $(filter-out FORCE,$^)
-
-which seems to always include both flags.  Why is it ignored when it's
-in LDFLAGS_MODULE?  What about the other flags we pass in LDFLAGS_MODULE?
-
-Thanks.
-
+On Thu, Sep 01, 2016 at 04:38:02PM -0500, Kim Phillips wrote:
+> On Thu, 1 Sep 2016 16:37:07 +0100
+> Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
 > 
-> Signed-off-by: Wladislav Wiebe <wladislav.wiebe@nokia.com>
-> ---
->  arch/arm/Makefile | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> > On Wed, Aug 31, 2016 at 03:23:36PM +0100, Mark Rutland wrote:
+> > > The L2C-220 (AKA L220) and L2C-310 (AKA PL310) cache controllers feature
+> > > a Performance Monitoring Unit (PMU), which can be useful for tuning
+> > > and/or debugging. This hardware is always present and the relevant
+> > > registers are accessible to non-secure accesses. Thus, no special
+> > > firmware interface is necessary.
+> > > 
+> > > This patch adds support for the PMU, plugging into the usual perf
+> > > infrastructure. The overflow interrupt is not always available (e.g. on
+> > > RealView PBX A9 it is not wired up at all), and the hardware counters
+> > > saturate, so the driver does not make use of this. Instead, the driver
+> > > periodically polls and reset counters as required to avoid losing
+> > > events due to saturation.
+> > > 
+> > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > > Acked-by: Pawel Moll <pawel.moll@arm.com>
+> > > Cc: Kim Phillips <kim.phillips@arm.com>
+> > > Cc: Russell King <linux@armlinux.org.uk>
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > 
+> > Much better, thanks.  When you're happy, please put it in the patch
+> > system, thanks.
 > 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 61f6ccc..01c6025 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -20,7 +20,7 @@ LDFLAGS_MODULE	+= --be8
->  endif
->  
->  ifeq ($(CONFIG_ARM_MODULE_PLTS),y)
-> -LDFLAGS_MODULE	+= -T $(srctree)/arch/arm/kernel/module.lds
-> +KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm/kernel/module.lds
->  endif
->  
->  OBJCOPYFLAGS	:=-O binary -R .comment -S
-> -- 
-> 1.7.12.4
+> feel free to tack on my:
+> 
+> Tested-by: Kim Phillips <kim.phillips@arm.com>
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Cheers!
+
+I've folded that in, and dropped this in the patch system as 8611/1.
+
+Thanks,
+Mark.
