@@ -1,55 +1,49 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 2 Sep 2016 09:45:06 -0500
-Subject: [PATCH 1/2] sdhci-of-arasan: Add device tree parameter
- fails-without-test-cd bit
-In-Reply-To: <1472512857-13063-1-git-send-email-zach.brown@ni.com>
-References: <1472512857-13063-1-git-send-email-zach.brown@ni.com>
-Message-ID: <20160902144506.GA7795@rob-hp-laptop>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 2 Sep 2016 15:47:45 +0100
+Subject: irq_create_fwspec_mapping() in 4.8-rc2
+In-Reply-To: <9FCA11A3-B677-42EA-80DB-674AC8E489E8@gmail.com>
+References: <483F737F-9868-4E8A-A831-AA3F6F410AFF@gmail.com>
+ <57C98975.5020607@arm.com> <9FCA11A3-B677-42EA-80DB-674AC8E489E8@gmail.com>
+Message-ID: <57C99111.3030105@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 06:20:56PM -0500, Zach Brown wrote:
-> The sdhci controller on xilinx zynq devices will not function unless
-> the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
-> In cases where it is impossible to provide the CD bit in hardware,
-> setting the controller to test mode and then setting inserted to true
-> will get the controller to function without the CD bit.
+On 02/09/16 15:29, Andras Szemzo wrote:
+> Hi,
 > 
-> The device property "fails-without-test-cd" will let the arasan driver know
-> the controller does not have the CD line wired and that the controller
-> does not function without it.
+>> On 02 Sep 2016, at 16:15, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>
+>> So this is the interrupt that gets a mismatch.
 > 
-> Signed-off-by: Zach Brown <zach.brown@ni.com>
-> ---
-> v2:
->  * improved commit messages
->  * removed fake-cd device property
->  * removed fake-cd quirk
->  * use broken-cd device property
->  * documented new usage of broken-cd
-> v3:
->  * removed new usage of broken-cd
->  * created fails-without-test-cd device property
->  * created arasan controller specific quirk
+> Yes.
 > 
+>> Is there any other device in your system that uses the same interrupt?
+>> Where can I see your full DT file?
 > 
->  Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 4 ++++
->  1 file changed, 4 insertions(+)
+> There is no other device using pioC 11.
+> Here is the DT:
 > 
-> diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> index 3404afa..ec0dc82 100644
-> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> @@ -21,6 +21,10 @@ Required Properties:
->    - interrupts: Interrupt specifier
->    - interrupt-parent: Phandle for the interrupt controller that services
->  		      interrupts for this device.
-> +Optional Properties:
-> +- fails-without-test-cd: when present, the controller doesn't work when the CD
-> +  line is not connected properly, and the line is not connected properly. Test
-> +  mode can be used to force the controller to function.
+> http://pastebin.com/G7Z0hF5v
 
-Prefix with either arasan or xlnx. Seems more likely Xilinx specific to 
-me.
+Can you try this patch and report the values you find?
 
-Rob
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index 4752b43..d79d780 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -623,7 +623,8 @@ unsigned int irq_create_fwspec_mapping(struct irq_fwspec *fwspec)
+ 			return virq;
+ 		}
+ 
+-		pr_warn("type mismatch, failed to map hwirq-%lu for %s!\n",
++		pr_warn("type mismatch (%u/%u), failed to map hwirq-%lu for %s!\n",
++			type, irq_get_trigger_type(virq),
+ 			hwirq, of_node_full_name(to_of_node(fwspec->fwnode)));
+ 		return 0;
+ 	}
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
