@@ -1,20 +1,52 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 03 Sep 2016 01:04:37 +0300
-Subject: [PATCH 0/3] Add R8A7792/Wheat QSPI support
-Message-ID: <1648590.FPpmBRoQyh@wasted.cogentembedded.com>
+Date: Sat, 03 Sep 2016 01:07:28 +0300
+Subject: [PATCH 1/3] ARM: dts: r8a7792: add QSPI clock
+In-Reply-To: <1648590.FPpmBRoQyh@wasted.cogentembedded.com>
+References: <1648590.FPpmBRoQyh@wasted.cogentembedded.com>
+Message-ID: <4143164.BtXsTN0b8O@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Describe the QSPI clock in the R8A7792 device tree.
 
-   Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
-'renesas-devel-20160902-v4.8-rc4' tag plus the Wheat board patches posted this
-week. We're adding the R8A7792/Wheat QSPI clocks and device nodes. The board
-patch depends on the PFC driver QSPI patch in order for the QSPI pins to be
-configured...
+Based  on the original (and large) patch by Vladimir Barinov
+<vladimir.barinov@cogentembedded.com>.
 
-[1/3] ARM: dts: r8a7792: add QSPI clock
-[2/3] ARM: dts: r8a7792: add QSPI support
-[3/3] ARM: dts: wheat: add QSPI support
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-WBR, Sergei
+---
+ arch/arm/boot/dts/r8a7792.dtsi |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
++++ renesas/arch/arm/boot/dts/r8a7792.dtsi
+@@ -860,6 +860,7 @@
+ 			clocks = <&cp_clk>, <&cp_clk>, <&cp_clk>, <&cp_clk>,
+ 				 <&cp_clk>, <&cp_clk>, <&cp_clk>, <&cp_clk>,
+ 				 <&cp_clk>, <&cp_clk>, <&p_clk>, <&p_clk>,
++				 <&cpg_clocks R8A7792_CLK_QSPI>,
+ 				 <&cp_clk>, <&cp_clk>, <&hp_clk>, <&hp_clk>,
+ 				 <&hp_clk>, <&hp_clk>, <&hp_clk>, <&hp_clk>;
+ 			#clock-cells = <1>;
+@@ -870,6 +871,7 @@
+ 				R8A7792_CLK_GPIO1 R8A7792_CLK_GPIO0
+ 				R8A7792_CLK_GPIO11 R8A7792_CLK_GPIO10
+ 				R8A7792_CLK_CAN1 R8A7792_CLK_CAN0
++				R8A7792_CLK_QSPI_MOD
+ 				R8A7792_CLK_GPIO9 R8A7792_CLK_GPIO8
+ 				R8A7792_CLK_I2C5 R8A7792_CLK_I2C4
+ 				R8A7792_CLK_I2C3 R8A7792_CLK_I2C2
+@@ -879,8 +881,9 @@
+ 				"gpio7", "gpio6", "gpio5", "gpio4",
+ 				"gpio3", "gpio2", "gpio1", "gpio0",
+ 				"gpio11", "gpio10", "can1", "can0",
+-				"gpio9", "gpio8", "i2c5", "i2c4",
+-				"i2c3",	"i2c2", "i2c1", "i2c0";
++				"qspi_mod", "gpio9", "gpio8",
++				"i2c5", "i2c4", "i2c3", "i2c2",
++				"i2c1", "i2c0";
+ 		};
+ 	};
+ 
