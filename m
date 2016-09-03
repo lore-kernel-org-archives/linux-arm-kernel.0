@@ -1,51 +1,28 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 02 Sep 2016 16:34:43 -0700
-Subject: [PATCH v2 0/3] Add Platform MHU mailbox driver for Amlogic GXBB
-In-Reply-To: <1471515027-3543-1-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Thu, 18 Aug 2016 12:10:24 +0200")
-References: <1471515027-3543-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <m24m5xc1v0.fsf@baylibre.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 02 Sep 2016 17:09:12 -0700 (PDT)
+Subject: [PATCH v4 0/6] Support the rk3399 gmac and pd function
+In-Reply-To: <1472752204-8924-1-git-send-email-wxt@rock-chips.com>
+References: <1472752204-8924-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <20160902.170912.186642163235206909.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
+From: Caesar Wang <wxt@rock-chips.com>
+Date: Fri,  2 Sep 2016 01:49:58 +0800
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+> This patch have the following changes:
+> 
+> 7edf13e net: stmmac: dwmac-rk: add rk3366 & rk3399 specific data
+> 26e004e net: stmmac: dwmac-rk: fixes the gmac resume after PD on/off
+> b216c2f net: stmmac: dwmac-rk: add pd_gmac support for rk3399
+> 848bb71 arm64: dts: rockchip: add the gmac power domain on rk3399
+> 508e41f arm64: dts: rockchip: add the gmac needed node for rk3399
+> fb26795 arm64: dts: rockchip: enable the gmac for rk3399 evb board
+> 
+> Hi David,
+> The patch 1,2,3 is related to the rockchip net/stammc driver,
+> 
+> Hi Heiko,
+> The patch 4,5,6 is related to the dts changes.
 
-> In order to support Mailbox links for the Amlogic GXBB SoC, add a generic
-> platform MHU driver based on arm_mhu.c.
->
-> This patchset follows a RFC thread along the GXBB SCPI support at :
-> http://lkml.kernel.org/r/1466503374-28841-1-git-send-email-narmstrong at baylibre.com
-> And specific MHU discussions at :
-> http://lkml.kernel.org/r/CABb+yY3HqJG2+GMWCWF9PomxobrwWGZ=TZe5NvXPcHMDdLhkcQ at mail.gmail.com
->
-> Changes since v1 at http://lkml.kernel.org/r/1470732737-18391-1-git-send-email-narmstrong at baylibre.com :
->  - Fix irq to signed to detect platform_get_irq() failures
->  - Introduced back the secure channel
->  - Fixed indexes
-
-How is this version looking to you?
-
-With your review/ack on the driver, I'd be happy to take it via the
-amlogic tree as there shouldn't be any conflicts with your tree.
-
-Kevin
-
-> Changes since RFC v2 :
->  - Rename to platform_mhu
->  - Sync all link functions with arm_mhu
->
-> Neil Armstrong (3):
->   mailbox: Add Platform Message-Handling-Unit variant driver
->   dt-bindings: mailbox: Add Amlogic Meson MHU Bindings
->   ARM64: dts: meson-gxbb: Add Meson MHU Node
->
->  .../devicetree/bindings/mailbox/meson-mhu.txt      |  34 ++++
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |   9 +
->  drivers/mailbox/Kconfig                            |  10 +
->  drivers/mailbox/Makefile                           |   2 +
->  drivers/mailbox/platform_mhu.c                     | 205 +++++++++++++++++++++
->  5 files changed, 260 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/meson-mhu.txt
->  create mode 100644 drivers/mailbox/platform_mhu.c
+Patches 1, 2, and 3 applied to net-next, thanks.
