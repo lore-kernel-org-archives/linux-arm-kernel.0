@@ -1,49 +1,51 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 3 Sep 2016 09:43:59 +0800
-Subject: [PATCH 0/7] drm/sun4i: Introduce A33 display driver
-In-Reply-To: <20160902190605.GF6313@lukather>
-References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
- <18951472779805@web6g.yandex.ru> <20160902190605.GF6313@lukather>
-Message-ID: <CAGb2v64p2MMvTpS8nNT2hGF3_jBa7Odr2qkOHD=N4iVXMDxrwA@mail.gmail.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Fri,  2 Sep 2016 22:56:04 -0500
+Subject: [GIT PULL] Qualcomm Driver Updates for v4.9
+Message-ID: <1472874964-17800-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 3, 2016 at 3:06 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Icenowy,
->
-> On Fri, Sep 02, 2016 at 09:30:05AM +0800, Icenowy Zheng wrote:
->>
->>
->> 01.09.2016, 23:40, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
->> > Hi everyone,
->> >
->> > This serie introduces the support in the sun4i-drm driver for the A33.
->> >
->> > Beside the new IPs and special cases for the A33 new IPs, there's
->> > nothing really outstanding, and is now at feature parity with the A13.
->>
->> How can the driver be modified to support LVDS screen?
->>
->> I have an A33 tablet with a 1024x768 LVDS panel. (iNet D978 Rev2 board,
->> which I pushed a dt a few days ago)
->
-> Awesome, I don't have such a screen myself, so feel free to work on
-> it.
->
-> I haven't looked into the details of LVDS, but it should be something
-> along the lines of commit 29e57fab97fc ("drm: sun4i: Add RGB output").
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
-The implementation might be along the lines of
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
 
-  1. having multiple output ports, each for a different interface type.
-     (Some platforms go this route)
+are available in the git repository at:
 
-Or
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.9
 
-  2. having a DT property describe what the output interface is.
+for you to fetch changes up to 23c282d62f573263db679e6b4c9f2da82aa24f96:
 
-The RGB/TCON driver would then setup the registers accordingly.
+  rtc: rtc-pm8xxx: Add support for pm8018 rtc (2016-09-02 13:44:16 -0500)
 
+----------------------------------------------------------------
+Qualcomm ARM Based Driver Updates for v4.9
 
-ChenYu
+* Silence smem probe defer messages
+* Make scm explicitly non-modular
+* Assorted SMD bug fixes and minor changes
+* Add PM8018 RTC support
+
+----------------------------------------------------------------
+Bjorn Andersson (5):
+      soc: qcom: smd: Correct compile stub prototypes
+      soc: qcom: smd: Simplify multi channel handling
+      soc: qcom: smd: Request irqs after parsing properties
+      soc: qcom: smd: Represent smd edges as devices
+      soc: qcom: smd: Reset rx tail rather than tx
+
+Neil Armstrong (1):
+      rtc: rtc-pm8xxx: Add support for pm8018 rtc
+
+Paul Gortmaker (1):
+      firmware: qcom_scm: make it explicitly non-modular
+
+Stephen Boyd (1):
+      soc: qcom: smem: Silence probe defer error
+
+ .../devicetree/bindings/mfd/qcom-pm8xxx.txt        |   1 +
+ drivers/firmware/qcom_scm.c                        |  19 +-
+ drivers/rtc/rtc-pm8xxx.c                           |   1 +
+ drivers/soc/qcom/smd.c                             | 265 ++++++++++++---------
+ drivers/soc/qcom/smem.c                            |   3 +-
+ include/linux/soc/qcom/smd.h                       |  29 ++-
+ 6 files changed, 191 insertions(+), 127 deletions(-)
