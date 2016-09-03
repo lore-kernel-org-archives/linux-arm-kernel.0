@@ -1,7 +1,7 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Fri,  2 Sep 2016 22:56:04 -0500
-Subject: [GIT PULL] Qualcomm Driver Updates for v4.9
-Message-ID: <1472874964-17800-1-git-send-email-andy.gross@linaro.org>
+Date: Fri,  2 Sep 2016 22:57:06 -0500
+Subject: [GIT PULL] Qualcomm SoC Updates for v4.9
+Message-ID: <1472875026-17912-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,41 +11,22 @@ The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.9
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-soc-for-4.9
 
-for you to fetch changes up to 23c282d62f573263db679e6b4c9f2da82aa24f96:
+for you to fetch changes up to 80483c3abf8423e6ec4fb63647a8e2e1f5976801:
 
-  rtc: rtc-pm8xxx: Add support for pm8018 rtc (2016-09-02 13:44:16 -0500)
-
-----------------------------------------------------------------
-Qualcomm ARM Based Driver Updates for v4.9
-
-* Silence smem probe defer messages
-* Make scm explicitly non-modular
-* Assorted SMD bug fixes and minor changes
-* Add PM8018 RTC support
+  ARM: qcom: Cleanup/Remove unnecessary board file (2016-08-23 15:46:05 -0500)
 
 ----------------------------------------------------------------
-Bjorn Andersson (5):
-      soc: qcom: smd: Correct compile stub prototypes
-      soc: qcom: smd: Simplify multi channel handling
-      soc: qcom: smd: Request irqs after parsing properties
-      soc: qcom: smd: Represent smd edges as devices
-      soc: qcom: smd: Reset rx tail rather than tx
+Qualcomm ARM Based SoC Updates for v4.9
 
-Neil Armstrong (1):
-      rtc: rtc-pm8xxx: Add support for pm8018 rtc
+* Remove unnecessary QCOM board file
 
-Paul Gortmaker (1):
-      firmware: qcom_scm: make it explicitly non-modular
+----------------------------------------------------------------
+Andy Gross (1):
+      ARM: qcom: Cleanup/Remove unnecessary board file
 
-Stephen Boyd (1):
-      soc: qcom: smem: Silence probe defer error
-
- .../devicetree/bindings/mfd/qcom-pm8xxx.txt        |   1 +
- drivers/firmware/qcom_scm.c                        |  19 +-
- drivers/rtc/rtc-pm8xxx.c                           |   1 +
- drivers/soc/qcom/smd.c                             | 265 ++++++++++++---------
- drivers/soc/qcom/smem.c                            |   3 +-
- include/linux/soc/qcom/smd.h                       |  29 ++-
- 6 files changed, 191 insertions(+), 127 deletions(-)
+ arch/arm/mach-qcom/Makefile |  1 -
+ arch/arm/mach-qcom/board.c  | 31 -------------------------------
+ 2 files changed, 32 deletions(-)
+ delete mode 100644 arch/arm/mach-qcom/board.c
