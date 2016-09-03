@@ -1,41 +1,41 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 3 Sep 2016 10:15:17 +0100
-Subject: [PATCH 05/33] gpio: add generic single-register fixed-direction
- GPIO driver
-In-Reply-To: <87zinqj8vr.fsf@belgarion.home>
-References: <87fupmc59b.fsf@belgarion.home>
- <20160831084938.GQ1041@n2100.armlinux.org.uk>
- <20160831102721.GR1041@n2100.armlinux.org.uk>
- <87twe0krym.fsf@belgarion.home>
- <20160901092754.GU1041@n2100.armlinux.org.uk>
- <87oa47l1tn.fsf@belgarion.home>
- <20160901230248.GA1041@n2100.armlinux.org.uk>
- <87inuekx78.fsf@belgarion.home>
- <20160902185641.GF1041@n2100.armlinux.org.uk>
- <87zinqj8vr.fsf@belgarion.home>
-Message-ID: <20160903091517.GJ1041@n2100.armlinux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 3 Sep 2016 11:13:48 +0100
+Subject: [GIT PULL] arm64+perf fixes 4.8-rc5
+Message-ID: <20160903101345.GA3868@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 02, 2016 at 11:21:12PM +0200, Robert Jarzmik wrote:
-> It looks that I have an ordering problem :
->  - I want gpio-pxa.probe() to be called at device initcall time
->  - pxa_cplds_irqs.probe() cannot complete before gpio-pxa.probe() because it
->    needs GPIO0 as its interrupt source
->    => it might need to honor -EPROBE_DEFER
->  - sa1111.sa1111_probe() cannot complete before pxa_cplds_irqs.probe() because
->    it needs IRQ305 as its source
->    => it might need to honor -EPROBE_DEFER
+Hi Linus,
 
-I wonder if we can work around that by adding this to sa1111_probe():
+Please pull the arm64 and arm/perf fixes below. Thanks.
 
-	if (!irq_get_chip(irq))
-		return -EPROBE_DEFER;
+The following changes since commit 3eab887a55424fc2c27553b7bfe32330df83f7b8:
 
-It's not particularly nice, but it should at least ensure that things
-happen in the right order.
+  Linux 4.8-rc4 (2016-08-28 15:04:33 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+
+for you to fetch changes up to 744c6c37cc18705d19e179622f927f5b781fe9cc:
+
+  arm64: kernel: Fix unmasked debug exceptions when restoring mdscr_el1 (2016-09-02 17:19:55 +0100)
+
+----------------------------------------------------------------
+- arm64 fix: debug exception unmasking on the CPU resume path
+- ARM PMU fixes: memory leak on error path and NULL pointer dereference
+
+----------------------------------------------------------------
+James Morse (1):
+      arm64: kernel: Fix unmasked debug exceptions when restoring mdscr_el1
+
+Stefan Wahren (2):
+      drivers/perf: arm_pmu: Fix leak in error path
+      drivers/perf: arm_pmu: Fix NULL pointer dereference during probe
+
+ arch/arm64/mm/proc.S   | 9 +++++++++
+ drivers/perf/arm_pmu.c | 3 ++-
+ 2 files changed, 11 insertions(+), 1 deletion(-)
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Catalin
