@@ -1,97 +1,53 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat,  3 Sep 2016 13:05:18 +0200
-Subject: [PATCH 2/2] ARM: dts: sun8i: Add dts file for the Orange Pi Plus2E SBC
-In-Reply-To: <20160903110518.8267-1-hdegoede@redhat.com>
-References: <20160903110518.8267-1-hdegoede@redhat.com>
-Message-ID: <20160903110518.8267-2-hdegoede@redhat.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 03 Sep 2016 13:31:21 +0200
+Subject: [PATCH 05/33] gpio: add generic single-register fixed-direction
+ GPIO driver
+In-Reply-To: <20160903102549.GK1041@n2100.armlinux.org.uk> (Russell King's
+ message of "Sat, 3 Sep 2016 11:25:49 +0100")
+References: <20160829102328.GA28796@n2100.armlinux.org.uk>
+ <E1beJjz-0000mA-0o@rmk-PC.armlinux.org.uk>
+ <87eg57e54l.fsf@belgarion.home>
+ <20160830091805.GL1041@n2100.armlinux.org.uk>
+ <87k2eycip0.fsf@belgarion.home>
+ <20160830184612.GO1041@n2100.armlinux.org.uk>
+ <87fupmc59b.fsf@belgarion.home>
+ <20160831084938.GQ1041@n2100.armlinux.org.uk>
+ <20160903102549.GK1041@n2100.armlinux.org.uk>
+Message-ID: <87pooljk3a.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Orange Pi Plus2E is an extended version of the Orange Pi Pc Plus,
-with 2G RAM and an external gbit ethernet phy.
+Russell King - ARM Linux <linux@armlinux.org.uk> writes:
 
-Note currently the dts is pretty much empty (except for including the
-pc-plus dts), I've a local patch which enables the emac actually making
-this dts different from the pc-plus one, but that needs the h3 emac
-driver to get merged first.
+> On Wed, Aug 31, 2016 at 09:49:38AM +0100, Russell King - ARM Linux wrote:
+>> On Tue, Aug 30, 2016 at 11:32:16PM +0200, Robert Jarzmik wrote:
+>> > Russell King - ARM Linux <linux@armlinux.org.uk> writes:
+>> > 
+>> > > If you can wait a day or two, I'll push a branch out for everything in
+>> > > all these multiple series.
+>> > Sure, just ping me when you have something.
+>> 
+>> git://git.armlinux.org.uk/~rmk/linux-arm.git sa1100
+>> 
+>> should get you something suitable to test.  It's based on 4.7-rc3 plus
+>> my fixes branch.
+>
+> Branch updated, hopefully with everything that we've agreed on so far,
+> all the bug fixes, plus a few extra bits...
+Good, I'll retest within the weekend.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/Makefile                     |  1 +
- arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts | 53 ++++++++++++++++++++++++++
- 2 files changed, 54 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts
+>> It would be great to have this tested on Lubbock, and get the PCMCIA
+>> issues fixed.  Maybe we can look at converting mainstone as well?
+>
+> ... like converting mainstone and pxaficp_ir on mainstone.
+>
+> I'm not going to be around for most of the rest of this weekend.
+Okay.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7dd4a07..bb906f2 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -798,6 +798,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-h3-orangepi-pc.dtb \
- 	sun8i-h3-orangepi-pc-plus.dtb \
- 	sun8i-h3-orangepi-plus.dtb \
-+	sun8i-h3-orangepi-plus2e.dtb \
- 	sun8i-r16-parrot.dtb
- dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb \
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts
-new file mode 100644
-index 0000000..5851a47
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts
-@@ -0,0 +1,53 @@
-+/*
-+ * Copyright (C) 2016 Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/*
-+ * The Orange Pi Plus 2E is an extended version of the Orange Pi PC Plus,
-+ * with 2G RAM and an external gbit ethernet phy.
-+ */
-+
-+#include "sun8i-h3-orangepi-pc-plus.dts"
-+
-+/ {
-+	model = "Xunlong Orange Pi Plus 2E";
-+	compatible = "xunlong,orangepi-plus2e", "allwinner,sun8i-h3";
-+};
+I'll repost on Monday for the latest branch test results and your idea about the
+irq_get_chip() workaround.
+
+Good week-end.
+
 -- 
-2.9.3
+Robert
