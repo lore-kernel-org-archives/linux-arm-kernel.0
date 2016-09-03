@@ -1,44 +1,28 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 3 Sep 2016 11:25:49 +0100
-Subject: [PATCH 05/33] gpio: add generic single-register fixed-direction
- GPIO driver
-In-Reply-To: <20160831084938.GQ1041@n2100.armlinux.org.uk>
-References: <20160829102328.GA28796@n2100.armlinux.org.uk>
- <E1beJjz-0000mA-0o@rmk-PC.armlinux.org.uk>
- <87eg57e54l.fsf@belgarion.home>
- <20160830091805.GL1041@n2100.armlinux.org.uk>
- <87k2eycip0.fsf@belgarion.home>
- <20160830184612.GO1041@n2100.armlinux.org.uk>
- <87fupmc59b.fsf@belgarion.home>
- <20160831084938.GQ1041@n2100.armlinux.org.uk>
-Message-ID: <20160903102549.GK1041@n2100.armlinux.org.uk>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Sat, 3 Sep 2016 12:47:19 +0200
+Subject: [PATCH v2 07/10] reset: stm32: add driver Kconfig option
+In-Reply-To: <1472545496-14373-7-git-send-email-p.zabel@pengutronix.de>
+References: <1472545496-14373-1-git-send-email-p.zabel@pengutronix.de>
+ <1472545496-14373-7-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <CALszF6B8Mco__5aSFUssM-q0Ha5ZyNV0f-BuaOqzWp2P-gsMuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 31, 2016 at 09:49:38AM +0100, Russell King - ARM Linux wrote:
-> On Tue, Aug 30, 2016 at 11:32:16PM +0200, Robert Jarzmik wrote:
-> > Russell King - ARM Linux <linux@armlinux.org.uk> writes:
-> > 
-> > > If you can wait a day or two, I'll push a branch out for everything in
-> > > all these multiple series.
-> > Sure, just ping me when you have something.
-> 
-> git://git.armlinux.org.uk/~rmk/linux-arm.git sa1100
-> 
-> should get you something suitable to test.  It's based on 4.7-rc3 plus
-> my fixes branch.
+2016-08-30 10:24 GMT+02:00 Philipp Zabel <p.zabel@pengutronix.de>:
+> Visible only if COMPILE_TEST is enabled, this allows to include the
+> driver in build tests.
+>
+> Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> Cc: Gabriel Fernandez <gabriel.fernandez@st.com>
+> Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+>  drivers/reset/Kconfig  | 6 ++++++
+>  drivers/reset/Makefile | 2 +-
+>  2 files changed, 7 insertions(+), 1 deletion(-)
 
-Branch updated, hopefully with everything that we've agreed on so far,
-all the bug fixes, plus a few extra bits...
+In line with what we did on other stm32 drivers:
+Reviewed-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 
-> It would be great to have this tested on Lubbock, and get the PCMCIA
-> issues fixed.  Maybe we can look at converting mainstone as well?
-
-... like converting mainstone and pxaficp_ir on mainstone.
-
-I'm not going to be around for most of the rest of this weekend.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks!
+Maxime
