@@ -1,7 +1,7 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Fri,  2 Sep 2016 22:57:06 -0500
-Subject: [GIT PULL] Qualcomm SoC Updates for v4.9
-Message-ID: <1472875026-17912-1-git-send-email-andy.gross@linaro.org>
+Date: Fri,  2 Sep 2016 22:57:40 -0500
+Subject: [GIT PULL] Qualcomm ARM64 Defconfig Updates for v4.9
+Message-ID: <1472875060-17967-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,22 +11,20 @@ The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-soc-for-4.9
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-defconfig-for-4.9
 
-for you to fetch changes up to 80483c3abf8423e6ec4fb63647a8e2e1f5976801:
+for you to fetch changes up to d11a544e3a1e579a218eda5ee5cf9f65e3289e84:
 
-  ARM: qcom: Cleanup/Remove unnecessary board file (2016-08-23 15:46:05 -0500)
-
-----------------------------------------------------------------
-Qualcomm ARM Based SoC Updates for v4.9
-
-* Remove unnecessary QCOM board file
+  arm64: defconfig: Enable QDF2432 config options (2016-08-23 15:39:48 -0500)
 
 ----------------------------------------------------------------
-Andy Gross (1):
-      ARM: qcom: Cleanup/Remove unnecessary board file
+Qualcomm ARM64 Based defconfig Updates for v4.9
 
- arch/arm/mach-qcom/Makefile |  1 -
- arch/arm/mach-qcom/board.c  | 31 -------------------------------
- 2 files changed, 32 deletions(-)
- delete mode 100644 arch/arm/mach-qcom/board.c
+* Enable defconfig options for QDF2432
+
+----------------------------------------------------------------
+Christopher Covington (1):
+      arm64: defconfig: Enable QDF2432 config options
+
+ arch/arm64/configs/defconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
