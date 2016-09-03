@@ -1,37 +1,177 @@
-From: jorik@kippendief.biz (Jorik Jonker)
-Date: Sat, 3 Sep 2016 14:09:32 +0200
-Subject: [PATCH v2 4/7] dts: sun8i-h3: add UART1-3 to Orange Pi Plus
-In-Reply-To: <20160902070425.GB6313@lukather>
-References: <1472671858-29220-1-git-send-email-jorik@kippendief.biz>
- <1472671858-29220-5-git-send-email-jorik@kippendief.biz>
- <20160902070425.GB6313@lukather>
-Message-ID: <20160903120932.GA6289@carbon.kippendief.biz>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Sat, 03 Sep 2016 14:48:47 +0200
+Subject: [PATCH v3 1/2] ARM: dts: Add MDM9615 dtsi
+In-Reply-To: <20160826175502.GY19826@codeaurora.org>
+References: <1471951850-29842-1-git-send-email-narmstrong@baylibre.com>
+ <1471951850-29842-2-git-send-email-narmstrong@baylibre.com>
+ <20160826175502.GY19826@codeaurora.org>
+Message-ID: <57CAC6AF.5090506@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 02, 2016 at 09:04:25AM +0200, Maxime Ripard wrote:
->Unfortunately, these pins can be used for other purposes as well, so
->we cannot make force that decision down to our users.
 
-Yes, but since the associated peripheral is disabled, the users are free 
-to configure other functions/peripherals, right? I mean something like 
-this in pseudo-DT:
 
- /soc/pio: pinctrl at 01c20800/uart1_pins:
-   allwinner,pins = "PG6, PG7";
- /soc/pio: pinctrl at 01c20800/foo0_pins:
-   allwinner,pins = "PG6, PG7";
-   ..
- /soc/uart1: serial at serial@01c28400:
-   pinctrl-0 = <&uart1_pins>;
-   status = "disabled";
- /soc/bar:
-   pinctrl-0 = <&uart1_pins>;
-   status = "disabled";
+Le 26/08/2016 19:55, Stephen Boyd a ?crit :
+> On 08/23, Neil Armstrong wrote:
+>> diff --git a/arch/arm/boot/dts/qcom-mdm9615.dtsi b/arch/arm/boot/dts/qcom-mdm9615.dtsi
+>> new file mode 100644
+>> index 0000000..e30bfbd
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/qcom-mdm9615.dtsi
+>> +/ {
+>> +	model = "Qualcomm MDM9615";
+>> +	compatible = "qcom,mdm9615";
+>> +	interrupt-parent = <&intc>;
+>> +
+>> +	cpus {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +
+>> +		cpu0: cpu at 0 {
+>> +			compatible = "arm,cortex-a5";
+>> +			device_type = "cpu";
+>> +			next-level-cache = <&L2>;
+>> +		};
+>> +	};
+>> +
+>> +	cpu-pmu {
+>> +		compatible = "arm,cortex-a5-pmu";
+>> +		interrupts = <GIC_SPI 10 0x304>;
+> 
+> Should be 0x104? Or GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH?
+Yes, and PPI also...
 
-Assuming Linux/DT allows this, this would force nothing, only offer 
-choice and ease of use.
+> 
+>> +	};
+>> +
+>> +	clocks {
+>> +		cxo_board {
+>> +			compatible = "fixed-clock";
+>> +			#clock-cells = <0>;
+>> +			clock-frequency = <19200000>;
+>> +		};
+>> +	};
+>> +
+>> +	regulators {
+> 
+> This doesn't need to be a simple bus? so that the child devices
+> probe? That's good if so.
 
-Best,
+It's correct, like the clocks node.
 
-Jorik
+> 
+>> +		vsdcc_fixed: vsdcc-regulator {
+>> +			compatible = "regulator-fixed";
+>> +			regulator-name = "SDCC Power";
+>> +			regulator-min-microvolt = <2700000>;
+>> +			regulator-max-microvolt = <2700000>;
+>> +			regulator-always-on;
+>> +		};
+>> +	};
+>> +
+>> +	soc: soc {
+> [...]
+>> +		L2: l2-cache {
+> 
+> Missing unit address.
+Done.
+
+> 
+>> +			compatible = "arm,pl310-cache";
+>> +			reg = <0x02040000 0x1000>;
+>> +			arm,data-latency = <2 2 0>;
+>> +			cache-unified;
+>> +			cache-level = <2>;
+>> +		};
+> [..]
+>> +
+>> +		qcom,ssbi at 500000 {
+>> +			compatible = "qcom,ssbi";
+>> +			reg = <0x500000 0x1000>;
+>> +			qcom,controller-type = "pmic-arbiter";
+>> +
+>> +			pmicintc: pmic at 0 {
+>> +				compatible = "qcom,pm8018", "qcom,pm8921";
+>> +				interrupts = <GIC_PPI 226 IRQ_TYPE_LEVEL_HIGH>;
+>> +				#interrupt-cells = <2>;
+>> +				interrupt-controller;
+>> +				#address-cells = <1>;
+>> +				#size-cells = <0>;
+>> +
+>> +				pwrkey at 1c {
+>> +					compatible = "qcom,pm8018-pwrkey", "qcom,pm8921-pwrkey";
+>> +					reg = <0x1c>;
+>> +					interrupt-parent = <&pmicintc>;
+>> +					interrupts = <50 IRQ_TYPE_NONE>,
+>> +						     <51 IRQ_TYPE_NONE>;
+> 
+> IRQ_TYPE_EDGE_RISING?
+Crap, I'll revert these.
+
+> 
+>> +					debounce = <15625>;
+>> +					pull-up;
+>> +				};
+>> +
+>> +				pmicmpp: mpp at 50 {
+>> +					compatible = "qcom,pm8018-mpp", "qcom,ssbi-mpp";
+>> +					interrupt-parent = <&pmicintc>;
+>> +					interrupts = <24 IRQ_TYPE_NONE>,
+>> +						     <25 IRQ_TYPE_NONE>,
+>> +						     <26 IRQ_TYPE_NONE>,
+>> +						     <27 IRQ_TYPE_NONE>,
+>> +						     <28 IRQ_TYPE_NONE>,
+>> +						     <29 IRQ_TYPE_NONE>;
+> 
+> These are right though.
+> 
+>> +					reg = <0x50>;
+>> +					gpio-controller;
+>> +					#gpio-cells = <2>;
+>> +				};
+>> +
+>> +				rtc at 11d {
+>> +					compatible = "qcom,pm8018-rtc", "qcom,pm8921-rtc";
+>> +					interrupt-parent = <&pmicintc>;
+>> +					interrupts = <39 IRQ_TYPE_NONE>;
+> 
+> IRQ_TYPE_EDGE_RISING?
+Crap, Crap, reverting...
+
+> 
+>> +					reg = <0x11d>;
+>> +					allow-set-time;
+>> +				};
+>> +
+>> +				pmicgpio: gpio at 150 {
+>> +					compatible = "qcom,pm8018-gpio", "qcom,ssbi-gpio";
+>> +					interrupt-parent = <&pmicintc>;
+>> +					interrupts = <24 IRQ_TYPE_NONE>,
+>> +						     <25 IRQ_TYPE_NONE>,
+>> +						     <26 IRQ_TYPE_NONE>,
+>> +						     <27 IRQ_TYPE_NONE>,
+>> +						     <28 IRQ_TYPE_NONE>,
+>> +						     <29 IRQ_TYPE_NONE>;
+> 
+> These are right though.
+> 
+>> +					gpio-controller;
+>> +					#gpio-cells = <2>;
+>> +				};
+>> +			};
+>> +		};
+>> +
+>> +		rpm: rpm at 108000 {
+>> +			compatible = "qcom,rpm-mdm9615";
+>> +			reg = <0x108000 0x1000>;
+>> +
+>> +			qcom,ipc = <&l2cc 0x8 2>;
+>> +
+>> +			interrupts = <0 19 0>, <0 21 0>, <0 22 0>;
+> 
+> IRQ_TYPE_EDGE_RISING and GIC_SPI?
+
+Exact, will beautify these.
+
+Thanks,
+Neil
