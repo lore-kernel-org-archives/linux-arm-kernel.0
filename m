@@ -1,37 +1,58 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Sat, 3 Sep 2016 11:03:54 +0530
-Subject: [PATCH v2 0/3] Add Platform MHU mailbox driver for Amlogic GXBB
-In-Reply-To: <m24m5xc1v0.fsf@baylibre.com>
-References: <1471515027-3543-1-git-send-email-narmstrong@baylibre.com>
- <m24m5xc1v0.fsf@baylibre.com>
-Message-ID: <CABb+yY2Cq5KaCCvoJ5afsLfqc5NEoPMkaaYk9GjFO8=N80eVBA@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Sat,  3 Sep 2016 10:22:23 +0200
+Subject: [PATCH 0/3] ARM64: amlogic: Add support for GXL SoC Family
+Message-ID: <20160903082227.30559-1-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 3, 2016 at 5:04 AM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Hi Jassi,
->
-> Neil Armstrong <narmstrong@baylibre.com> writes:
->
->> In order to support Mailbox links for the Amlogic GXBB SoC, add a generic
->> platform MHU driver based on arm_mhu.c.
->>
->> This patchset follows a RFC thread along the GXBB SCPI support at :
->> http://lkml.kernel.org/r/1466503374-28841-1-git-send-email-narmstrong at baylibre.com
->> And specific MHU discussions at :
->> http://lkml.kernel.org/r/CABb+yY3HqJG2+GMWCWF9PomxobrwWGZ=TZe5NvXPcHMDdLhkcQ at mail.gmail.com
->>
->> Changes since v1 at http://lkml.kernel.org/r/1470732737-18391-1-git-send-email-narmstrong at baylibre.com :
->>  - Fix irq to signed to detect platform_get_irq() failures
->>  - Introduced back the secure channel
->>  - Fixed indexes
->
-> How is this version looking to you?
->
-> With your review/ack on the driver, I'd be happy to take it via the
-> amlogic tree as there shouldn't be any conflicts with your tree.
->
-I am ok with the driver, but I don't understand how it helps going via
-amlogic tree. I would like to send a pull request every release ;)
+The new Amlogic GXL SoCs (S905X and S905D) are part of the Meson GX family and
+share some common features that can be described in a common GX dtsi file used
+by the Meson GXBB and Meson GXL Family dtsi.
 
-cheers.
+This patchset introduces the common GX dtsi and switches the GXBB to use
+the common GX dtsi.
+Then it introduces the GXL S905X SoC with the GXL common dtsi, then the S905D
+dtsi and the p212 board dts.
+Finally the GXL S905D SoC is introduced with a S905D dtsi using the GXL common
+and the p23x Board dtsi for the p231 and p230 development boards.
+
+Changes since RFC v1:
+ - Merge GX common and GXBB changes in a single patch
+ - Integrate GXL S905X patch
+ - Add support for S905D and the p23x boards
+
+Note: This patchset integrates the patch "ARM64: dts: amlogic: Add basic support for Amlogic S905X" [1]
+from Carlo Caione.
+
+[1] http://lkml.kernel.org/r/1472382113-10754-1-git-send-email-carlo at caione.org
+
+Carlo Caione (1):
+  ARM64: dts: amlogic: Add basic support for Amlogic S905X
+
+Neil Armstrong (2):
+  ARM64: dts: amlogic: Add Meson GX dtsi from GXBB
+  ARM64: dts: amlogic: Add basic support for Amlogic S905D
+
+ Documentation/devicetree/bindings/arm/amlogic.txt  |   8 +
+ arch/arm64/boot/dts/amlogic/Makefile               |   3 +
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi          | 181 ++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 320 +++++++--------------
+ .../boot/dts/amlogic/meson-gxl-s905d-p230.dts      |  51 ++++
+ .../boot/dts/amlogic/meson-gxl-s905d-p231.dts      |  51 ++++
+ .../boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi     |  64 +++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi   |  48 ++++
+ .../boot/dts/amlogic/meson-gxl-s905x-p212.dts      |  70 +++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi   |  48 ++++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         |  48 ++++
+ 11 files changed, 671 insertions(+), 221 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p231.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+
+-- 
+2.7.0
