@@ -1,28 +1,30 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 02 Sep 2016 17:09:12 -0700 (PDT)
-Subject: [PATCH v4 0/6] Support the rk3399 gmac and pd function
-In-Reply-To: <1472752204-8924-1-git-send-email-wxt@rock-chips.com>
-References: <1472752204-8924-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <20160902.170912.186642163235206909.davem@davemloft.net>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri,  2 Sep 2016 17:11:48 -0700
+Subject: [PATCH] arm64: defconfig: enable HW random as module
+Message-ID: <20160903001149.32130-1-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Caesar Wang <wxt@rock-chips.com>
-Date: Fri,  2 Sep 2016 01:49:58 +0800
+drivers/char/hw_random/Kconfig has 'default m', so
+simply removing this entry from the defconfig will
+enable building HW random drivers as modules.
 
-> This patch have the following changes:
-> 
-> 7edf13e net: stmmac: dwmac-rk: add rk3366 & rk3399 specific data
-> 26e004e net: stmmac: dwmac-rk: fixes the gmac resume after PD on/off
-> b216c2f net: stmmac: dwmac-rk: add pd_gmac support for rk3399
-> 848bb71 arm64: dts: rockchip: add the gmac power domain on rk3399
-> 508e41f arm64: dts: rockchip: add the gmac needed node for rk3399
-> fb26795 arm64: dts: rockchip: enable the gmac for rk3399 evb board
-> 
-> Hi David,
-> The patch 1,2,3 is related to the rockchip net/stammc driver,
-> 
-> Hi Heiko,
-> The patch 4,5,6 is related to the dts changes.
+Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+---
+ arch/arm64/configs/defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-Patches 1, 2, and 3 applied to net-next, thanks.
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 0555b7caaf2c..4bc1af4ae162 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -176,7 +176,6 @@ CONFIG_SERIAL_XILINX_PS_UART=y
+ CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
+ CONFIG_SERIAL_MVEBU_UART=y
+ CONFIG_VIRTIO_CONSOLE=y
+-# CONFIG_HW_RANDOM is not set
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_MUX=y
+ CONFIG_I2C_MUX_PCA954x=y
+-- 
+2.9.3
