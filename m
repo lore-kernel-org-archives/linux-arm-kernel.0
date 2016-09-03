@@ -1,85 +1,56 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Sat, 03 Sep 2016 08:13:17 +0800
-Subject: [PATCH v2 0/2] arm64: dts: rockchip: Support PMU for rk3399 SoCs
-In-Reply-To: <1467792357-9749-1-git-send-email-wxt@rock-chips.com>
-References: <1467792357-9749-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <57CA159D.8050103@rock-chips.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 02 Sep 2016 17:18:23 -0700
+Subject: [GIT PULL] Amlogic driver updates for v4.9
+Message-ID: <7hfuph25v4.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+Hello,
 
-What do you think of it?
-Maybe I need re-update these patches on next kernel, and re-test them.
+Below is a pull for Amlogic drivers for v4.9.  They all have acks from
+the corresponding maintainers.
 
-On 2016?07?06? 16:05, Caesar Wang wrote:
-> Hello Heiko, Marc & ARM guys
->
-> When Jay first submitted the rk3399.dtsi upstream
-> <https://patchwork.kernel.org/patch/8885821/> he had the PMU node in there,
-> but then took it out because the upstream binding wasn't done yet.
-> It looks as if the upstream stuff has landed, since in linux/master I see:
-> 287e9357abcc DT/arm,gic-v3: Documment PPI partition support
-> e3825ba1af3a irqchip/gic-v3: Add support for partitioned PPIs
-> 9e2c986cb460 irqchip: Add per-cpu interrupt partitioning library
-> 222df54fd8b7 genirq: Allow the affinity of a percpu interrupt to be set/retrieved
-> 651e8b54abde irqdomain: Allow domain matching on irq_fwspec
->
-> This series patches add to support the rk3399 SoCs PMU.
-> I pick up the https://patchwork.kernel.org/patch/9209369/.
->
-> As do some tests with ChromeOs for my rk3399 board.
-> Tested with linus master 4.7-rc6 kernel on rk3399 board.
-> https://github.com/Caesar-github/rockchip/tree/rk3399/pmu-upstream
->
-> localhost / # perf list
->
-> List of pre-defined events (to be used in -e):
-> cpu-cycles OR cycles [Hardware event]
-> instructions [Hardware event]
-> cache-references [Hardware event]
-> cache-misses [Hardware event]
-> branch-instructions OR branches [Hardware event]
-> branch-misses [Hardware event]
-> bus-cycles [Hardware event]
-> ...
->
-> perf stat --cpu 0/1/2/3..... to minitor
-> e.g. cpu0;
->
-> localhost / # perf stat --cpu 0
->
-> Performance counter stats for 'CPU(s) 0':
->
-> 3374.917571 task-clock (msec) # 1.001 CPUs utilized [100.00%]
-> 20 context-switches # 0.006 K/sec [100.00%]
-> 2 cpu-migrations # 0.001 K/sec [100.00%]
-> 55 page-faults # 0.016 K/sec
-> 7151843 cycles # 0.002 GHz [100.00%]
-> <not supported> stalled-cycles-frontend
-> <not supported> stalled-cycles-backend
-> 4272536 instructions # 0.60 insns per cycle [100.00%]
-> 568406 branches # 0.168 M/sec [100.00%]
-> 65652 branch-misses # 11.55% of all branches
->
-> Also, 'perf top' to monitor the PMU interrupts from cpus
->
-> -Caesar
->
->
-> Changes in v2:
-> - AS Mark comments on https://patchwork.kernel.org/patch/9209369/
->    remove the interrupt-affinity property, we need depend on Marc' perf
->    code on https://patchwork.kernel.org/patch/9209369/.
->
-> Caesar Wang (2):
->    arm64: dts: rockchip: change all interrupts cells for 4 on rk3399 SoCs
->    arm64: dts: rockchip: support the pmu node for rk3399
->
->   arch/arm64/boot/dts/rockchip/rk3399.dtsi | 118 ++++++++++++++++++-------------
->   1 file changed, 69 insertions(+), 49 deletions(-)
->
+Kevin
 
 
--- 
-caesar wang | software engineer | wxt at rock-chip.com
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-drivers
+
+for you to fetch changes up to ad855eae6caf0d1dd17bce5bcd8e07759adc9903:
+
+  nvmem: amlogic: Add Amlogic Meson EFUSE driver (2016-09-01 14:24:21 -0700)
+
+----------------------------------------------------------------
+Amlogic drivers for v4.9
+- add secure monitor and eFuse driver
+- add IR remote driver
+
+----------------------------------------------------------------
+Carlo Caione (2):
+      firmware: Amlogic: Add secure monitor driver
+      nvmem: amlogic: Add Amlogic Meson EFUSE driver
+
+Neil Armstrong (1):
+      media: rc: meson-ir: Add support for newer versions of the IR decoder
+
+ drivers/firmware/Kconfig                |   1 +
+ drivers/firmware/Makefile               |   1 +
+ drivers/firmware/meson/Kconfig          |   9 ++++
+ drivers/firmware/meson/Makefile         |   1 +
+ drivers/firmware/meson/meson_sm.c       | 248 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/media/rc/meson-ir.c             |  29 ++++++++++---
+ drivers/nvmem/Kconfig                   |  10 +++++
+ drivers/nvmem/Makefile                  |   2 +
+ drivers/nvmem/meson-efuse.c             |  93 +++++++++++++++++++++++++++++++++++++++++
+ include/linux/firmware/meson/meson_sm.h |  31 ++++++++++++++
+ 10 files changed, 420 insertions(+), 5 deletions(-)
+ create mode 100644 drivers/firmware/meson/Kconfig
+ create mode 100644 drivers/firmware/meson/Makefile
+ create mode 100644 drivers/firmware/meson/meson_sm.c
+ create mode 100644 drivers/nvmem/meson-efuse.c
+ create mode 100644 include/linux/firmware/meson/meson_sm.h
