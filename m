@@ -1,27 +1,82 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Sat, 03 Sep 2016 15:02:56 +0200
-Subject: [PATCH] clk: meson-gxbb: Export PWM related clocks for DT
-In-Reply-To: <1471870177-10609-1-git-send-email-narmstrong@baylibre.com>
-References: <1471870177-10609-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <57CACA00.9010306@baylibre.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 3 Sep 2016 17:24:43 +0100
+Subject: [PATCH] iio: adc: at91: Add support for Touchscreen Switches
+ Closure Time
+In-Reply-To: <20160830122701.19385-1-nicolas.ferre@atmel.com>
+References: <20160830122701.19385-1-nicolas.ferre@atmel.com>
+Message-ID: <b7dcd8e4-db9e-a9ee-352f-b7b77d57cc7a@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-Le 22/08/2016 14:49, Neil Armstrong a ?crit :
-> Add the PWM related clocks in order to be referenced as PWM source
-> clocks.
+On 30/08/16 13:27, Nicolas Ferre wrote:
+> On newer components compatible with the at91sam9x5, the Touchscreen
+> Switches Closure Time or TSSCTIM value of the Touchscreen Mode Register is
+> not filled at all.
+> On some hardware, having no time indicated for it may lead to incoherent
+> values and jitter.
+> We fix this time to 10us as it is usually difficult to retrieve impedance
+> values from LCD manufacturers.
 > 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Hi Nicolas,
+
+Stable / fixes material or just have it head for the next merge window?
+
+
+Jonathan
 > ---
->  drivers/clk/meson/gxbb.h              | 6 +++---
->  include/dt-bindings/clock/gxbb-clkc.h | 3 +++
->  2 files changed, 6 insertions(+), 3 deletions(-)
-
-Dear Clock Maintainers,
-
-Could you review this patch since it is a strong requirement to select the PWM clock parents over DT ?
-
-Thanks,
-Neil
+>  drivers/iio/adc/at91_adc.c | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+> index 0438c68015e8..bbdac07f4aaa 100644
+> --- a/drivers/iio/adc/at91_adc.c
+> +++ b/drivers/iio/adc/at91_adc.c
+> @@ -113,6 +113,7 @@
+>  #define		AT91_ADC_TSMR_TSAV	(3 << 4)	/* Averages samples */
+>  #define			AT91_ADC_TSMR_TSAV_(x)		((x) << 4)
+>  #define		AT91_ADC_TSMR_SCTIM	(0x0f << 16)	/* Switch closure time */
+> +#define			AT91_ADC_TSMR_SCTIM_(x)		((x) << 16)
+>  #define		AT91_ADC_TSMR_PENDBC	(0x0f << 28)	/* Pen Debounce time */
+>  #define			AT91_ADC_TSMR_PENDBC_(x)	((x) << 28)
+>  #define		AT91_ADC_TSMR_NOTSDMA	(1 << 22)	/* No Touchscreen DMA */
+> @@ -150,6 +151,7 @@
+>  #define MAX_RLPOS_BITS         10
+>  #define TOUCH_SAMPLE_PERIOD_US_RL      10000   /* 10ms, the SoC can't keep up with 2ms */
+>  #define TOUCH_SHTIM                    0xa
+> +#define TOUCH_SCTIM_US		10		/* 10us for the Touchscreen Switches Closure Time */
+>  
+>  /**
+>   * struct at91_adc_reg_desc - Various informations relative to registers
+> @@ -1001,7 +1003,9 @@ static void atmel_ts_close(struct input_dev *dev)
+>  
+>  static int at91_ts_hw_init(struct at91_adc_state *st, u32 adc_clk_khz)
+>  {
+> +	struct iio_dev *idev = iio_priv_to_dev(st);
+>  	u32 reg = 0;
+> +	u32 tssctim = 0;
+>  	int i = 0;
+>  
+>  	/* a Pen Detect Debounce Time is necessary for the ADC Touch to avoid
+> @@ -1034,11 +1038,20 @@ static int at91_ts_hw_init(struct at91_adc_state *st, u32 adc_clk_khz)
+>  		return 0;
+>  	}
+>  
+> +	/* Touchscreen Switches Closure time needed for allowing the value to
+> +	 * stabilize.
+> +	 * Switch Closure Time = (TSSCTIM * 4) ADCClock periods
+> +	 */
+> +	tssctim = DIV_ROUND_UP(TOUCH_SCTIM_US * adc_clk_khz / 1000, 4);
+> +	dev_dbg(&idev->dev, "adc_clk at: %d KHz, tssctim at: %d\n",
+> +		adc_clk_khz, tssctim);
+> +
+>  	if (st->touchscreen_type == ATMEL_ADC_TOUCHSCREEN_4WIRE)
+>  		reg = AT91_ADC_TSMR_TSMODE_4WIRE_PRESS;
+>  	else
+>  		reg = AT91_ADC_TSMR_TSMODE_5WIRE;
+>  
+> +	reg |= AT91_ADC_TSMR_SCTIM_(tssctim) & AT91_ADC_TSMR_SCTIM;
+>  	reg |= AT91_ADC_TSMR_TSAV_(st->caps->ts_filter_average)
+>  	       & AT91_ADC_TSMR_TSAV;
+>  	reg |= AT91_ADC_TSMR_PENDBC_(st->ts_pendbc) & AT91_ADC_TSMR_PENDBC;
+> 
