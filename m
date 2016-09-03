@@ -1,61 +1,142 @@
 From: hotran@apm.com (Hoan Tran)
-Date: Fri,  2 Sep 2016 17:40:53 -0700
-Subject: [PATCH v2 1/3] Documentation: dtb: xgene: Add PMD clock binding
+Date: Fri,  2 Sep 2016 17:40:55 -0700
+Subject: [PATCH v2 3/3] arm64: dts: xgene: Add DT node for APM X-Gene 2 CPU
+ clocks
 In-Reply-To: <1472863255-32337-1-git-send-email-hotran@apm.com>
 References: <1472863255-32337-1-git-send-email-hotran@apm.com>
-Message-ID: <1472863255-32337-2-git-send-email-hotran@apm.com>
+Message-ID: <1472863255-32337-4-git-send-email-hotran@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add APM X-Gene clock binding documentation for PMD clock.
+Add DT nodes to enable APM X-Gene 2 CPU clocks.
 
 Signed-off-by: Hoan Tran <hotran@apm.com>
 ---
- Documentation/devicetree/bindings/clock/xgene.txt | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 56 ++++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/xgene.txt b/Documentation/devicetree/bindings/clock/xgene.txt
-index 82f9638..e6e12ae 100644
---- a/Documentation/devicetree/bindings/clock/xgene.txt
-+++ b/Documentation/devicetree/bindings/clock/xgene.txt
-@@ -8,6 +8,7 @@ Required properties:
- - compatible : shall be one of the following:
- 	"apm,xgene-socpll-clock" - for a X-Gene SoC PLL clock
- 	"apm,xgene-pcppll-clock" - for a X-Gene PCP PLL clock
-+	"apm,xgene-pmd-clock" - for a X-Gene PMD clock
- 	"apm,xgene-device-clock" - for a X-Gene device clock
- 	"apm,xgene-socpll-v2-clock" - for a X-Gene SoC PLL v2 clock
- 	"apm,xgene-pcppll-v2-clock" - for a X-Gene PCP PLL v2 clock
-@@ -22,6 +23,15 @@ Required properties for SoC or PCP PLL clocks:
- Optional properties for PLL clocks:
- - clock-names : shall be the name of the PLL. If missing, use the device name.
+diff --git a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
+index 1425ed4..7b31895 100644
+--- a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
++++ b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
+@@ -26,6 +26,8 @@
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0x1 0x0000fff8>;
+ 			next-level-cache = <&xgene_L2_0>;
++			#clock-cells = <1>;
++			clocks = <&pmd0clk 0>;
+ 		};
+ 		cpu at 001 {
+ 			device_type = "cpu";
+@@ -34,6 +36,8 @@
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0x1 0x0000fff8>;
+ 			next-level-cache = <&xgene_L2_0>;
++			#clock-cells = <1>;
++			clocks = <&pmd0clk 0>;
+ 		};
+ 		cpu at 100 {
+ 			device_type = "cpu";
+@@ -42,6 +46,8 @@
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0x1 0x0000fff8>;
+ 			next-level-cache = <&xgene_L2_1>;
++			#clock-cells = <1>;
++			clocks = <&pmd1clk 0>;
+ 		};
+ 		cpu at 101 {
+ 			device_type = "cpu";
+@@ -50,6 +56,8 @@
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0x1 0x0000fff8>;
+ 			next-level-cache = <&xgene_L2_1>;
++			#clock-cells = <1>;
++			clocks = <&pmd1clk 0>;
+ 		};
+ 		cpu at 200 {
+ 			device_type = "cpu";
+@@ -58,6 +66,8 @@
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0x1 0x0000fff8>;
+ 			next-level-cache = <&xgene_L2_2>;
++			#clock-cells = <1>;
++			clocks = <&pmd2clk 0>;
+ 		};
+ 		cpu at 201 {
+ 			device_type = "cpu";
+@@ -66,6 +76,8 @@
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0x1 0x0000fff8>;
+ 			next-level-cache = <&xgene_L2_2>;
++			#clock-cells = <1>;
++			clocks = <&pmd2clk 0>;
+ 		};
+ 		cpu at 300 {
+ 			device_type = "cpu";
+@@ -74,6 +86,8 @@
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0x1 0x0000fff8>;
+ 			next-level-cache = <&xgene_L2_3>;
++			#clock-cells = <1>;
++			clocks = <&pmd3clk 0>;
+ 		};
+ 		cpu at 301 {
+ 			device_type = "cpu";
+@@ -82,6 +96,8 @@
+ 			enable-method = "spin-table";
+ 			cpu-release-addr = <0x1 0x0000fff8>;
+ 			next-level-cache = <&xgene_L2_3>;
++			#clock-cells = <1>;
++			clocks = <&pmd3clk 0>;
+ 		};
+ 		xgene_L2_0: l2-cache-0 {
+ 			compatible = "cache";
+@@ -223,6 +239,46 @@
+ 				clock-output-names = "refclk";
+ 			};
  
-+Required properties for PMD clocks:
-+- reg : shall be the physical register address for the pmd clock.
-+- clocks : shall be the input parent clock phandle for the clock.
-+- #clock-cells : shall be set to 1.
-+- clock-output-names : shall be the name of the clock referenced by derive
-+  clock.
-+Optional properties for PLL clocks:
-+- clock-names : shall be the name of the clock. If missing, use the device name.
++			pmdpll: pmdpll at 170000f0 {
++				compatible = "apm,xgene-pcppll-v2-clock";
++				#clock-cells = <1>;
++				clocks = <&refclk 0>;
++				reg = <0x0 0x170000f0 0x0 0x10>;
++				clock-output-names = "pmdpll";
++			};
 +
- Required properties for device clocks:
- - reg : shall be a list of address and length pairs describing the CSR
-          reset and/or the divider. Either may be omitted, but at least
-@@ -59,6 +69,14 @@ For example:
- 		type = <0>;
- 	};
- 
-+	pmd0clk: pmd0clk {
-+		compatible = "apm,xgene-pmd-clock";
-+		#clock-cells = <1>;
-+		clocks = <&pmdpll 0>;
-+		reg = <0x0 0x7E200200 0x0 0x10>;
-+		clock-output-names = "pmd0clk";
-+	};
++			pmd0clk: pmd0clk at 7e200200 {
++				compatible = "apm,xgene-pmd-clock";
++				#clock-cells = <1>;
++				clocks = <&pmdpll 0>;
++				reg = <0x0 0x7e200200 0x0 0x10>;
++				clock-output-names = "pmd0clk";
++			};
 +
- 	socpll: socpll at 17000120 {
- 		compatible = "apm,xgene-socpll-clock";
- 		#clock-cells = <1>;
++			pmd1clk: pmd1clk at 7e200210 {
++				compatible = "apm,xgene-pmd-clock";
++				#clock-cells = <1>;
++				clocks = <&pmdpll 0>;
++				reg = <0x0 0x7e200210 0x0 0x10>;
++				clock-output-names = "pmd1clk";
++			};
++
++			pmd2clk: pmd2clk at 7e200220 {
++				compatible = "apm,xgene-pmd-clock";
++				#clock-cells = <1>;
++				clocks = <&pmdpll 0>;
++				reg = <0x0 0x7e200220 0x0 0x10>;
++				clock-output-names = "pmd2clk";
++			};
++
++			pmd3clk: pmd3clk at 7e200230 {
++				compatible = "apm,xgene-pmd-clock";
++				#clock-cells = <1>;
++				clocks = <&pmdpll 0>;
++				reg = <0x0 0x7e200230 0x0 0x10>;
++				clock-output-names = "pmd3clk";
++			};
++
+ 			socpll: socpll at 17000120 {
+ 				compatible = "apm,xgene-socpll-v2-clock";
+ 				#clock-cells = <1>;
 -- 
 1.9.1
