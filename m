@@ -1,82 +1,180 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 3 Sep 2016 17:24:43 +0100
-Subject: [PATCH] iio: adc: at91: Add support for Touchscreen Switches
- Closure Time
-In-Reply-To: <20160830122701.19385-1-nicolas.ferre@atmel.com>
-References: <20160830122701.19385-1-nicolas.ferre@atmel.com>
-Message-ID: <b7dcd8e4-db9e-a9ee-352f-b7b77d57cc7a@kernel.org>
+Date: Sat, 3 Sep 2016 20:32:21 +0100
+Subject: [PATCH v3 1/4] hwmon: iio_hwmon: delay probing with late_initcall
+In-Reply-To: <394c711d-3c5b-01b2-9d4a-eb977653b5c2@free-electrons.com>
+References: <1469519027-11387-1-git-send-email-quentin.schulz@free-electrons.com>
+ <5277864.qlyRKbC1Zy@ws-stein>
+ <ed5c1761-bdc7-df9c-96c8-998e83c49c4c@free-electrons.com>
+ <2324970.FJcTUYNoO2@ws-stein> <20160726160410.GE30628@roeck-us.net>
+ <aa387c9c-8330-fd2a-67c1-0aa0b9a90794@kernel.org>
+ <20160815170730.GB32260@roeck-us.net>
+ <ECA41B39-BCC0-44D0-8B3D-838C48D713D0@kernel.org>
+ <3164bade-8022-8ad1-e327-f183128a3e88@free-electrons.com>
+ <394c711d-3c5b-01b2-9d4a-eb977653b5c2@free-electrons.com>
+Message-ID: <26c87c13-bedb-3b4d-8ea0-8f4db9cadef8@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/08/16 13:27, Nicolas Ferre wrote:
-> On newer components compatible with the at91sam9x5, the Touchscreen
-> Switches Closure Time or TSSCTIM value of the Touchscreen Mode Register is
-> not filled at all.
-> On some hardware, having no time indicated for it may lead to incoherent
-> values and jitter.
-> We fix this time to 10us as it is usually difficult to retrieve impedance
-> values from LCD manufacturers.
+On 01/09/16 10:03, Quentin Schulz wrote:
+> On 01/09/2016 09:15, Quentin Schulz wrote:
+>> On 15/08/2016 23:35, Jonathan Cameron wrote:
+>>>
+>>>
+>>> On 15 August 2016 18:07:30 BST, Guenter Roeck <linux@roeck-us.net> wrote:
+>>>> On Mon, Aug 15, 2016 at 04:40:21PM +0100, Jonathan Cameron wrote:
+>>>>> On 26/07/16 17:04, Guenter Roeck wrote:
+>>>>>> On Tue, Jul 26, 2016 at 12:00:33PM +0200, Alexander Stein wrote:
+>>>>>>> On Tuesday 26 July 2016 11:33:59, Quentin Schulz wrote:
+>>>>>>>> On 26/07/2016 11:05, Alexander Stein wrote:
+>>>>>>>>> On Tuesday 26 July 2016 10:24:48, Quentin Schulz wrote:
+>>>>>>>>>> On 26/07/2016 10:21, Alexander Stein wrote:
+>>>>>>>>>>> On Tuesday 26 July 2016 09:43:44, Quentin Schulz wrote:
+>>>>>>>>>>>> iio_channel_get_all returns -ENODEV when it cannot find
+>>>> either phandles
+>>>>>>>>>>>> and
+>>>>>>>>>>>> properties in the Device Tree or channels whose
+>>>> consumer_dev_name
+>>>>>>>>>>>> matches
+>>>>>>>>>>>> iio_hwmon in iio_map_list. The iio_map_list is filled in by
+>>>> iio drivers
+>>>>>>>>>>>> which might be probed after iio_hwmon.
+>>>>>>>>>>>
+>>>>>>>>>>> Would it work if iio_channel_get_all returning ENODEV is used
+>>>> for
+>>>>>>>>>>> returning
+>>>>>>>>>>> EPROBE_DEFER in iio_channel_get_all? Using late initcalls for
+>>>>>>>>>>> driver/device
+>>>>>>>>>>> dependencies seems not right for me at this place.
+>>>>>>>>>>
+>>>>>>>>>> Then what if the iio_channel_get_all is called outside of the
+>>>> probe of a
+>>>>>>>>>> driver? We'll have to change the error code, things we are
+>>>> apparently
+>>>>>>>>>> trying to avoid (see v2 patches' discussions).
+>>>>>>>>>
+>>>>>>>>> Maybe I didn't express my idea enough. I don't want to change
+>>>> the behavior
+>>>>>>>>> of iio_channel_get_all at all. Just the result evaluation of
+>>>>>>>>> iio_channel_get_all in iio_hwmon_probe. I have something link
+>>>> the patch
+>>>>>>>>> below in mind.
+>>>>>>>>>
+>>>>>>>>> Best regards,
+>>>>>>>>> Alexander
+>>>>>>>>> ---
+>>>>>>>>> diff --git a/drivers/hwmon/iio_hwmon.c
+>>>> b/drivers/hwmon/iio_hwmon.c
+>>>>>>>>> index b550ba5..e32d150 100644
+>>>>>>>>> --- a/drivers/hwmon/iio_hwmon.c
+>>>>>>>>> +++ b/drivers/hwmon/iio_hwmon.c
+>>>>>>>>> @@ -73,8 +73,12 @@ static int iio_hwmon_probe(struct
+>>>> platform_device
+>>>>>>>>> *pdev)
+>>>>>>>>>
+>>>>>>>>>                 name = dev->of_node->name;
+>>>>>>>>>         
+>>>>>>>>>         channels = iio_channel_get_all(dev);
+>>>>>>>>>
+>>>>>>>>> -       if (IS_ERR(channels))
+>>>>>>>>> -               return PTR_ERR(channels);
+>>>>>>>>> +       if (IS_ERR(channels)) {
+>>>>>>>>> +               if (PTR_ERR(channels) == -ENODEV)
+>>>>>>>>> +                       return -EPROBE_DEFER;
+>>>>>>>>> +               else
+>>>>>>>>> +                       return PTR_ERR(channels);
+>>>>>>>>> +       }
+>>>>>>>>>
+>>>>>>>>>         st = devm_kzalloc(dev, sizeof(*st), GFP_KERNEL);
+>>>>>>>>>         if (st == NULL) {
+>>>>>>>>
+>>>>>>>> Indeed, I misunderstood what you told me.
+>>>>>>>>
+>>>>>>>> Actually, the patch you proposed is part of my v1
+>>>>>>>> (https://lkml.org/lkml/2016/6/28/203) and v2
+>>>>>>>> (https://lkml.org/lkml/2016/7/15/215).
+>>>>>>>> Jonathan and Guenter didn't really like the idea of changing the
+>>>> -ENODEV
+>>>>>>>> in -EPROBE_DEFER.
+>>>>>>>
+>>>>>>> Thanks for the links.
+>>>>>>>
+>>>>>>>> What I thought you were proposing was to change the -ENODEV
+>>>> return code
+>>>>>>>> inside iio_channel_get_all. This cannot be an option since the
+>>>> function
+>>>>>>>> might be called outside of a probe (it is not yet, but might be
+>>>> in the
+>>>>>>>> future?).
+>>>>>>>
+>>>>>>> AFAICS this is a helper function not knowing about device probing
+>>>> itself. And 
+>>>>>>> it should stay at that.
+>>>>>>>
+>>>>>>>> Of what I understood, two possibilities are then possible
+>>>> (proposed
+>>>>>>>> either by Guenter or Jonathan): either rework the iio framework
+>>>> to
+>>>>>>>> register iio map array earlier or to use late_initcall instead of
+>>>> init
+>>>>>>>> for the driver consuming the iio channels.
+>>>>>>>
+>>>>>>> Interestingly using this problem would not arise due to module
+>>>> dependencies. 
+>>>>>>> But using late_initcall would mean this needs to be done on any
+>>>> driver using 
+>>>>>>> iio channels? I would rather keep those consumers simple.
+>>>>>>>
+>>>>>> Me too, but that would imply a solution in iio. The change you
+>>>> propose above
+>>>>>> isn't exactly simple either, and would also be needed in each
+>>>> consumer driver.
+>>>>>>
+>>>>>> Just for the record, I dislike the late_initcall solution as well,
+>>>> but I prefer
+>>>>>> it over blindly converting ENODEV to EPROBE_DEFER.
+>>>>> I'm falling on the other side on this one right now. Though I'd be
+>>>> tempted
+>>>>> to renaming the function to something like
+>>>> iio_channel_get_all_or_defer
+>>>>> to make it explicit that it can result in deferred probing.
+>>>>>
+>>>> Would this new function return -EPROBE_DEFER instead of -ENODEV ?
+>>> Yes. Though whether it really adds much over doing that in drivers isn't clear.
+>>>
+>>> Hmm. Needs more thought...
+>>
+>> Either we do the exact same "hack" as in the v2[1] in what you call
+>> iio_channel_get_all_or_defer or we duplicate the code from
+>> iio_channel_get_all in iio_channel_get_all_or_defer. Both do not seem
+>> right to me but I really dislike the late_initcall method. With this
+>> method we can only have one level of "channel dependency".
+>>
+>> This means if we ever create a new driver which depends on channels from
+>> the driver using late_initcall, we will also have to use late_initcall
+>> and we can't be sure the new driver will always be probed after the
+>> driver he depends on.
+>>
+>> [1] https://lkml.org/lkml/2016/7/15/215
+>>
+>> Quentin
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Hi Nicolas,
+> Should I revert back to the hack introduced in v2 then?
+I think so.  Sorry I didn't see this until after you'd sent v4.
 
-Stable / fixes material or just have it head for the next merge window?
-
+That hack had it's disadvantages but in many ways it was a least clean.
 
 Jonathan
-> ---
->  drivers/iio/adc/at91_adc.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
 > 
-> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-> index 0438c68015e8..bbdac07f4aaa 100644
-> --- a/drivers/iio/adc/at91_adc.c
-> +++ b/drivers/iio/adc/at91_adc.c
-> @@ -113,6 +113,7 @@
->  #define		AT91_ADC_TSMR_TSAV	(3 << 4)	/* Averages samples */
->  #define			AT91_ADC_TSMR_TSAV_(x)		((x) << 4)
->  #define		AT91_ADC_TSMR_SCTIM	(0x0f << 16)	/* Switch closure time */
-> +#define			AT91_ADC_TSMR_SCTIM_(x)		((x) << 16)
->  #define		AT91_ADC_TSMR_PENDBC	(0x0f << 28)	/* Pen Debounce time */
->  #define			AT91_ADC_TSMR_PENDBC_(x)	((x) << 28)
->  #define		AT91_ADC_TSMR_NOTSDMA	(1 << 22)	/* No Touchscreen DMA */
-> @@ -150,6 +151,7 @@
->  #define MAX_RLPOS_BITS         10
->  #define TOUCH_SAMPLE_PERIOD_US_RL      10000   /* 10ms, the SoC can't keep up with 2ms */
->  #define TOUCH_SHTIM                    0xa
-> +#define TOUCH_SCTIM_US		10		/* 10us for the Touchscreen Switches Closure Time */
->  
->  /**
->   * struct at91_adc_reg_desc - Various informations relative to registers
-> @@ -1001,7 +1003,9 @@ static void atmel_ts_close(struct input_dev *dev)
->  
->  static int at91_ts_hw_init(struct at91_adc_state *st, u32 adc_clk_khz)
->  {
-> +	struct iio_dev *idev = iio_priv_to_dev(st);
->  	u32 reg = 0;
-> +	u32 tssctim = 0;
->  	int i = 0;
->  
->  	/* a Pen Detect Debounce Time is necessary for the ADC Touch to avoid
-> @@ -1034,11 +1038,20 @@ static int at91_ts_hw_init(struct at91_adc_state *st, u32 adc_clk_khz)
->  		return 0;
->  	}
->  
-> +	/* Touchscreen Switches Closure time needed for allowing the value to
-> +	 * stabilize.
-> +	 * Switch Closure Time = (TSSCTIM * 4) ADCClock periods
-> +	 */
-> +	tssctim = DIV_ROUND_UP(TOUCH_SCTIM_US * adc_clk_khz / 1000, 4);
-> +	dev_dbg(&idev->dev, "adc_clk at: %d KHz, tssctim at: %d\n",
-> +		adc_clk_khz, tssctim);
-> +
->  	if (st->touchscreen_type == ATMEL_ADC_TOUCHSCREEN_4WIRE)
->  		reg = AT91_ADC_TSMR_TSMODE_4WIRE_PRESS;
->  	else
->  		reg = AT91_ADC_TSMR_TSMODE_5WIRE;
->  
-> +	reg |= AT91_ADC_TSMR_SCTIM_(tssctim) & AT91_ADC_TSMR_SCTIM;
->  	reg |= AT91_ADC_TSMR_TSAV_(st->caps->ts_filter_average)
->  	       & AT91_ADC_TSMR_TSAV;
->  	reg |= AT91_ADC_TSMR_PENDBC_(st->ts_pendbc) & AT91_ADC_TSMR_PENDBC;
+>>>>
+>>>> Thanks,
+>>>> Guenter
+>>>> --
+>>>> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+>>>> the body of a message to majordomo at vger.kernel.org
+>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
