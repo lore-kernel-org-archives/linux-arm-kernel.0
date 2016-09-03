@@ -1,73 +1,49 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Fri, 2 Sep 2016 18:14:25 -0700
-Subject: [PATCH v3 03/22] usb: ulpi: Support device discovery via device
- properties
-In-Reply-To: <20160902140922.GC21737@kuha.fi.intel.com>
-References: <20160901004036.23936-1-stephen.boyd@linaro.org>
- <20160901004036.23936-4-stephen.boyd@linaro.org>
- <20160902140922.GC21737@kuha.fi.intel.com>
-Message-ID: <CAJOFmgw-gCz_NnqHs2dzMJpt7WdTE0FGC6972fhFsXSg6eMaHw@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 3 Sep 2016 09:43:59 +0800
+Subject: [PATCH 0/7] drm/sun4i: Introduce A33 display driver
+In-Reply-To: <20160902190605.GF6313@lukather>
+References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
+ <18951472779805@web6g.yandex.ru> <20160902190605.GF6313@lukather>
+Message-ID: <CAGb2v64p2MMvTpS8nNT2hGF3_jBa7Odr2qkOHD=N4iVXMDxrwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 2, 2016 at 7:09 AM, Heikki Krogerus
-<heikki.krogerus@linux.intel.com> wrote:
-> Hi,
+On Sat, Sep 3, 2016 at 3:06 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Icenowy,
 >
-> On Wed, Aug 31, 2016 at 05:40:17PM -0700, Stephen Boyd wrote:
->> @@ -174,14 +219,37 @@ static int ulpi_register(struct device *dev, struct ulpi *ulpi)
->>       ulpi->id.product = ulpi_read(ulpi, ULPI_PRODUCT_ID_LOW);
->>       ulpi->id.product |= ulpi_read(ulpi, ULPI_PRODUCT_ID_HIGH) << 8;
+> On Fri, Sep 02, 2016 at 09:30:05AM +0800, Icenowy Zheng wrote:
 >>
->> +     return 0;
->> +}
->> +
->> +static int ulpi_register(struct device *dev, struct ulpi *ulpi)
->> +{
->> +     int ret;
->> +
->>       ulpi->dev.parent = dev;
->>       ulpi->dev.bus = &ulpi_bus;
->>       ulpi->dev.type = &ulpi_dev_type;
->>       dev_set_name(&ulpi->dev, "%s.ulpi", dev_name(dev));
 >>
->> +     if (IS_ENABLED(CONFIG_OF)) {
+>> 01.09.2016, 23:40, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>> > Hi everyone,
+>> >
+>> > This serie introduces the support in the sun4i-drm driver for the A33.
+>> >
+>> > Beside the new IPs and special cases for the A33 new IPs, there's
+>> > nothing really outstanding, and is now at feature parity with the A13.
+>>
+>> How can the driver be modified to support LVDS screen?
+>>
+>> I have an A33 tablet with a 1024x768 LVDS panel. (iNet D978 Rev2 board,
+>> which I pushed a dt a few days ago)
 >
-> I don't think you need to check that in this case.
+> Awesome, I don't have such a screen myself, so feel free to work on
+> it.
 >
->> +             ret = ulpi_of_register(ulpi);
->> +             if (ret)
->> +                     return ret;
->> +     }
->> +
->>       ACPI_COMPANION_SET(&ulpi->dev, ACPI_COMPANION(dev));
->
-> ACPI_COMPANION_SET will overwrite the primary fwnode unconditionally,
-> so just to play it safe, do this before you call ulpi_of_register().
+> I haven't looked into the details of LVDS, but it should be something
+> along the lines of commit 29e57fab97fc ("drm: sun4i: Add RGB output").
 
-Ok.
+The implementation might be along the lines of
 
->
->> -     request_module("ulpi:v%04xp%04x", ulpi->id.vendor, ulpi->id.product);
->> +     ret = ulpi_read_id(ulpi);
->> +     /*
->> +      * Ignore failure in case of DT node because the device may
->> +      * not be powered up yet but we can still match by compatible
->> +      */
->> +     if (ret && !ulpi->dev.of_node)
->> +             return ret;
->> +
->> +     if (of_device_request_module(&ulpi->dev))
->> +             request_module("ulpi:v%04xp%04x", ulpi->id.vendor,
->> +                            ulpi->id.product);
->
-> I don't think this works in all cases. If of_device_request_module()
-> fails and we don't have the id.vendor/product set, we should not
-> register the device. It also looks a bit messy.
->
-> How about just using of_device_request_module() call as fallback in
-> ulpi_read_id() and moving also request_module() call there:
+  1. having multiple output ports, each for a different interface type.
+     (Some platforms go this route)
 
-Sure I'll fold it in and test. Should we "goto err" if we can't read
-the scratch register though? I would think that's a "real" failure and
-we shouldn't try to support DT in that case.
+Or
+
+  2. having a DT property describe what the output interface is.
+
+The RGB/TCON driver would then setup the registers accordingly.
+
+
+ChenYu
