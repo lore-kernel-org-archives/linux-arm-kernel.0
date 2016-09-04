@@ -1,121 +1,170 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Sun,  4 Sep 2016 16:36:17 +0800
-Subject: [PATCH 4/4] ARM: dts: use definition in rockchip pinctrl header to
- describe gpios on Popmetal-RK3288
-In-Reply-To: <1472977937-758-1-git-send-email-andy.yan@rock-chips.com>
-References: <1472977937-758-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1472978177-970-1-git-send-email-andy.yan@rock-chips.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sun,  4 Sep 2016 13:04:03 +0200
+Subject: [PATCH v3 00/17] pinctrl: exynos/samsung: Add header with values used
+ for configuration
+Message-ID: <1472987060-28293-1-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use definition in rockchip pinctrl header to describe
-gpios, this will make it more clearer.
 
-Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
----
+Hi,
 
- arch/arm/boot/dts/rk3288-popmetal.dts | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+Changes since v2
+================
+1. Combine separate patchsets into one. Previously I sent separately the fixes
+   and changes for S3C platforms.
+2. Fix issues pointed during review.
+3. Add review tags.
 
-diff --git a/arch/arm/boot/dts/rk3288-popmetal.dts b/arch/arm/boot/dts/rk3288-popmetal.dts
-index 706c67c..88f4ad0 100644
---- a/arch/arm/boot/dts/rk3288-popmetal.dts
-+++ b/arch/arm/boot/dts/rk3288-popmetal.dts
-@@ -72,7 +72,7 @@
- 		pinctrl-0 = <&pwrbtn>;
- 
- 		power {
--			gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio0 GPIO_A5 GPIO_ACTIVE_LOW>;
- 			linux,code = <KEY_POWER>;
- 			label = "GPIO Key Power";
- 			linux,input-type = <1>;
-@@ -83,7 +83,7 @@
- 
- 	ir: ir-receiver {
- 		compatible = "gpio-ir-receiver";
--		gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
-+		gpios = <&gpio0 GPIO_A6 GPIO_ACTIVE_LOW>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&ir_int>;
+Changes since v1
+================
+1. Follow Arnd's suggestion about moving the macros to common place.
+2. Subjects: replace "GPIO" with "pinctrl".
+3. There were some major changes here so I did not add Javier's
+   reviewed-by and tested-by tags.
+
+Merging
+=======
+Patches #1 and #2 should probably go through pinctrl tree. In that case I would
+appreciate a stable branch/tag so DTS could base on top of it.
+
+Goal
+====
+Increase readability:
+ 	uart0_data: uart0-data {
+ 		samsung,pins = "gpa0-0", "gpa0-1";
+-		samsung,pin-function = <2>;
+-		samsung,pin-pud = <0>;
+-		samsung,pin-drv = <0>;
++		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
++		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
++		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
  	};
-@@ -98,7 +98,7 @@
- 
- 	vcc_sd: sdmmc-regulator {
- 		compatible = "regulator-fixed";
--		gpio = <&gpio7 11 GPIO_ACTIVE_LOW>;
-+		gpio = <&gpio7 GPIO_B3 GPIO_ACTIVE_LOW>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&sdmmc_pwr>;
- 		regulator-name = "vcc_sd";
-@@ -132,7 +132,7 @@
- 	vcc28_dvp: vcc28-dvp-regulator {
- 		compatible = "regulator-fixed";
- 		enable-active-high;
--		gpio = <&gpio0 17 GPIO_ACTIVE_HIGH>;
-+		gpio = <&gpio0 GPIO0_C1 GPIO_ACTIVE_HIGH>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&dvp_pwr>;
- 		regulator-name = "vcc28_dvp";
-@@ -178,7 +178,7 @@
- 	phy-supply = <&vcc_lan>;
- 	phy-mode = "rgmii";
- 	clock_in_out = "input";
--	snps,reset-gpio = <&gpio4 7 0>;
-+	snps,reset-gpio = <&gpio4 GPIO_B0 0>;
- 	snps,reset-active-low;
- 	snps,reset-delays-us = <0 10000 1000000>;
- 	assigned-clocks = <&cru SCLK_MAC>;
-@@ -447,43 +447,43 @@
- &pinctrl {
- 	ak8963 {
- 		comp_int: comp-int {
--			rockchip,pins = <8 1 RK_FUNC_GPIO &pcfg_pull_up>;
-+			rockchip,pins = <RK_GPIO8 GPIO_A1 RK_FUNC_GPIO &pcfg_pull_up>;
- 		};
- 	};
- 
- 	buttons {
- 		pwrbtn: pwrbtn {
--			rockchip,pins = <0 5 RK_FUNC_GPIO &pcfg_pull_up>;
-+			rockchip,pins = <RK_GPIO0 GPIO_A5 RK_FUNC_GPIO &pcfg_pull_up>;
- 		};
- 	};
- 
- 	dvp {
- 		dvp_pwr: dvp-pwr {
--			rockchip,pins = <0 17 RK_FUNC_GPIO &pcfg_pull_none>;
-+			rockchip,pins = <RK_GPIO0 GPIO_C1 RK_FUNC_GPIO &pcfg_pull_none>;
- 		};
- 	};
- 
- 	ir {
- 		ir_int: ir-int {
--			rockchip,pins = <0 6 RK_FUNC_GPIO &pcfg_pull_up>;
-+			rockchip,pins = <RK_GPIO0 GPIO_A6 RK_FUNC_GPIO &pcfg_pull_up>;
- 		};
- 	};
- 
- 	mma8452 {
- 		gsensor_int: gsensor-int {
--			rockchip,pins = <8 0 RK_FUNC_GPIO &pcfg_pull_up>;
-+			rockchip,pins = <RK_GPIO8 GPIO_A0 RK_FUNC_GPIO &pcfg_pull_up>;
- 		};
- 	};
- 
- 	pmic {
- 		pmic_int: pmic-int {
--			rockchip,pins = <RK_GPIO0 4 RK_FUNC_GPIO &pcfg_pull_up>;
-+			rockchip,pins = <RK_GPIO0 GPIO_A4 RK_FUNC_GPIO &pcfg_pull_up>;
- 		};
- 	};
- 
- 	sdmmc {
- 		sdmmc_pwr: sdmmc-pwr {
--			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
-+			rockchip,pins = <RK_GPIO7 GPIO_B3 RK_FUNC_GPIO &pcfg_pull_none>;
- 		};
- 	};
- };
+
+Everything generated with sed:
+sed -i -e 's/samsung,pin-pud = <0>;$/samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;/' arch/arm/boot/dts/exynos*
+sed -i -e 's/samsung,pin-pud = <1>;$/samsung,pin-pud = <EXYNOS_PIN_PULL_DOWN>;/' arch/arm/boot/dts/exynos*
+sed -i -e 's/samsung,pin-pud = <3>;$/samsung,pin-pud = <EXYNOS_PIN_PULL_UP>;/' arch/arm/boot/dts/exynos*
+
+sed -i -e 's/samsung,pin-drv = <0>;$/samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;/' arch/arm/boot/dts/exynos[34]* arch/arm/boot/dts/exynos5250*
+sed -i -e 's/samsung,pin-drv = <2>;$/samsung,pin-drv = <EXYNOS4_PIN_DRV_LV2>;/' arch/arm/boot/dts/exynos[34]* arch/arm/boot/dts/exynos5250*
+sed -i -e 's/samsung,pin-drv = <1>;$/samsung,pin-drv = <EXYNOS4_PIN_DRV_LV3>;/' arch/arm/boot/dts/exynos[34]* arch/arm/boot/dts/exynos5250*
+sed -i -e 's/samsung,pin-drv = <3>;$/samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;/' arch/arm/boot/dts/exynos[34]* arch/arm/boot/dts/exynos5250*
+
+sed -i -e 's/samsung,pin-drv = <0>;$/samsung,pin-drv = <EXYNOS5260_PIN_DRV_LV1>;/' arch/arm/boot/dts/exynos5260*
+sed -i -e 's/samsung,pin-drv = <1>;$/samsung,pin-drv = <EXYNOS5260_PIN_DRV_LV2>;/' arch/arm/boot/dts/exynos5260*
+sed -i -e 's/samsung,pin-drv = <2>;$/samsung,pin-drv = <EXYNOS5260_PIN_DRV_LV4>;/' arch/arm/boot/dts/exynos5260*
+sed -i -e 's/samsung,pin-drv = <3>;$/samsung,pin-drv = <EXYNOS5260_PIN_DRV_LV6>;/' arch/arm/boot/dts/exynos5260*
+
+sed -i -e 's/samsung,pin-drv = <0>;$/samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV1>;/' arch/arm/boot/dts/exynos5[48]*
+sed -i -e 's/samsung,pin-drv = <1>;$/samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV2>;/' arch/arm/boot/dts/exynos5[48]*
+sed -i -e 's/samsung,pin-drv = <2>;$/samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV3>;/' arch/arm/boot/dts/exynos5[48]*
+sed -i -e 's/samsung,pin-drv = <3>;$/samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV4>;/' arch/arm/boot/dts/exynos5[48]*
+
+sed -i -e 's/samsung,pin-function = <0>;$/samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;/' arch/arm/boot/dts/exynos*
+sed -i -e 's/samsung,pin-function = <1>;$/samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;/' arch/arm/boot/dts/exynos*
+
+sed -i -e 's/samsung,pin-function = <2>;$/samsung,pin-function = <EXYNOS_PIN_FUNC_2>;/' arch/arm/boot/dts/exynos*
+sed -i -e 's/samsung,pin-function = <\(0x\)\?2>;$/samsung,pin-function = <EXYNOS_PIN_FUNC_2>;/' arch/arm/boot/dts/exynos*
+sed -i -e 's/samsung,pin-function = <\(0x\)\?3>;$/samsung,pin-function = <EXYNOS_PIN_FUNC_3>;/' arch/arm/boot/dts/exynos*
+sed -i -e 's/samsung,pin-function = <3>;$/samsung,pin-function = <EXYNOS_PIN_FUNC_3>;/' arch/arm/boot/dts/exynos*
+sed -i -e 's/samsung,pin-function = <4>;$/samsung,pin-function = <EXYNOS_PIN_FUNC_4>;/' arch/arm/boot/dts/exynos*
+sed -i -e 's/samsung,pin-function = <5>;$/samsung,pin-function = <EXYNOS_PIN_FUNC_5>;/' arch/arm/boot/dts/exynos*
+sed -i -e 's/samsung,pin-function = <6>;$/samsung,pin-function = <EXYNOS_PIN_FUNC_6>;/' arch/arm/boot/dts/exynos*
+sed -i -e 's/samsung,pin-function = <0xf>;$/samsung,pin-function = <EXYNOS_PIN_FUNC_F>;/' arch/arm/boot/dts/exynos*
+
+sed -i -e 's/samsung,pin-drv = <0>;$/samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;/' arch/arm/boot/dts/s5p*
+sed -i -e 's/samsung,pin-drv = <2>;$/samsung,pin-drv = <EXYNOS4_PIN_DRV_LV2>;/' arch/arm/boot/dts/s5p*
+sed -i -e 's/samsung,pin-drv = <1>;$/samsung,pin-drv = <EXYNOS4_PIN_DRV_LV3>;/' arch/arm/boot/dts/s5p*
+sed -i -e 's/samsung,pin-drv = <3>;$/samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;/' arch/arm/boot/dts/s5p*
+
+sed -i -e 's/samsung,pin-pud = <0>;$/samsung,pin-pud = <S3C64XX_PIN_PULL_NONE>;/' arch/arm/boot/dts/s3c* arch/arm/boot/dts/s5p*
+sed -i -e 's/samsung,pin-pud = <1>;$/samsung,pin-pud = <S3C64XX_PIN_PULL_DOWN>;/' arch/arm/boot/dts/s3c* arch/arm/boot/dts/s5p*
+sed -i -e 's/samsung,pin-pud = <2>;$/samsung,pin-pud = <S3C64XX_PIN_PULL_UP>;/' arch/arm/boot/dts/s3c* arch/arm/boot/dts/s5p*
+
+sed -i -e 's/samsung,pin-function = <0>;$/samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;/' arch/arm/boot/dts/s3c* arch/arm/boot/dts/s5p*
+sed -i -e 's/samsung,pin-function = <2>;$/samsung,pin-function = <EXYNOS_PIN_FUNC_2>;/' arch/arm/boot/dts/s3c* arch/arm/boot/dts/s5p*
+sed -i -e 's/samsung,pin-function = <\(0x\)\?2>;$/samsung,pin-function = <EXYNOS_PIN_FUNC_2>;/' arch/arm/boot/dts/s3c* arch/arm/boot/dts/s5p*
+sed -i -e 's/samsung,pin-function = <\(0x\)\?3>;$/samsung,pin-function = <EXYNOS_PIN_FUNC_3>;/' arch/arm/boot/dts/s3c* arch/arm/boot/dts/s5p*
+sed -i -e 's/samsung,pin-function = <3>;$/samsung,pin-function = <EXYNOS_PIN_FUNC_3>;/' arch/arm/boot/dts/s3c* arch/arm/boot/dts/s5p*
+sed -i -e 's/samsung,pin-function = <4>;$/samsung,pin-function = <EXYNOS_PIN_FUNC_4>;/' arch/arm/boot/dts/s3c* arch/arm/boot/dts/s5p*
+sed -i -e 's/samsung,pin-function = <5>;$/samsung,pin-function = <EXYNOS_PIN_FUNC_5>;/' arch/arm/boot/dts/s3c* arch/arm/boot/dts/s5p*
+sed -i -e 's/samsung,pin-function = <6>;$/samsung,pin-function = <EXYNOS_PIN_FUNC_6>;/' arch/arm/boot/dts/s3c* arch/arm/boot/dts/s5p*
+sed -i -e 's/samsung,pin-function = <0xf>;$/samsung,pin-function = <EXYNOS_PIN_FUNC_F>;/' arch/arm/boot/dts/s3c* arch/arm/boot/dts/s5p*
+
+
+Tested with:
+rm -fr dts-old; cp -r out/arch/arm/boot/dts dts-old
+rm -fr dts-new; cp -r out/arch/arm/boot/dts dts-new
+for i in dts-old/exynos*dtb; do scripts/dtc/dtx_diff $i dts-new/$(basename $i);  done
+for i in dts-old/s3c*dtb; do scripts/dtc/dtx_diff $i dts-new/$(basename $i);  done
+for i in dts-old/s5p*dtb; do scripts/dtc/dtx_diff $i dts-new/$(basename $i);  done
+
+
+Best regards,
+Krzysztof
+
+
+Krzysztof Kozlowski (17):
+  pinctrl: dt-bindings: samsung: Add header with values used for
+    configuration
+  pinctrl: dt-bindings: samsung: Update documentation with new macros
+  ARM: dts: exynos: Use common macros for pinctrl configuration
+  ARM: dts: exynos: Use macros for pinctrl configuration on exynos3250
+  ARM: dts: exynos: Use macros for pinctrl configuration on exynos4210
+  ARM: dts: exynos: Use macros for pinctrl configuration on exynos4x12
+  ARM: dts: exynos: Use macros for pinctrl configuration on exynos4415
+  ARM: dts: exynos: Use macros for pinctrl configuration on exynos5250
+  ARM: dts: exynos: Use macros for pinctrl configuration on exynos5260
+  ARM: dts: exynos: Use macros for pinctrl configuration on exynos5410
+  ARM: dts: exynos: Use macros for pinctrl configuration on
+    exynos542x/exynos5800
+  ARM: dts: exynos: Fix mismatched value for SD4 pull up/down
+    configuration on exynos4210
+  ARM: dts: exynos: Fix mismatched values of SD drive strengh
+    configuration on exynos4415
+  ARM: dts: s3c64xx: Use common macros for pinctrl configuration
+  ARM: dts: s5pv210: Use macros for pinctrl configuration
+  ARM: dts: s3c2416: Use macros for pinctrl configuration
+  ARM: dts: s3c64xx: Use macros for pinctrl configuration
+
+ .../bindings/pinctrl/samsung-pinctrl.txt           |  44 +-
+ MAINTAINERS                                        |   2 +
+ arch/arm/boot/dts/exynos3250-pinctrl.dtsi          | 346 +++++++-------
+ arch/arm/boot/dts/exynos4210-pinctrl.dtsi          | 458 +++++++++---------
+ arch/arm/boot/dts/exynos4210-smdkv310.dts          |  12 +-
+ arch/arm/boot/dts/exynos4210-universal_c210.dts    |   8 +-
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi    |  14 +-
+ arch/arm/boot/dts/exynos4412-odroidx.dts           |   2 +-
+ arch/arm/boot/dts/exynos4412-origen.dts            |  12 +-
+ arch/arm/boot/dts/exynos4412-smdk4412.dts          |  12 +-
+ arch/arm/boot/dts/exynos4415-pinctrl.dtsi          | 296 ++++++------
+ arch/arm/boot/dts/exynos4x12-pinctrl.dtsi          | 525 ++++++++++-----------
+ arch/arm/boot/dts/exynos5250-pinctrl.dtsi          | 404 ++++++++--------
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |   6 +-
+ arch/arm/boot/dts/exynos5250-snow-common.dtsi      |  76 +--
+ arch/arm/boot/dts/exynos5250-snow-rev5.dts         |   6 +-
+ arch/arm/boot/dts/exynos5250-snow.dts              |   6 +-
+ arch/arm/boot/dts/exynos5250-spring.dts            |  72 +--
+ arch/arm/boot/dts/exynos5260-pinctrl.dtsi          | 280 ++++++-----
+ arch/arm/boot/dts/exynos5260-xyref5260.dts         |   6 +-
+ arch/arm/boot/dts/exynos5410-odroidxu.dts          |  30 +-
+ arch/arm/boot/dts/exynos5410-pinctrl.dtsi          | 182 +++----
+ arch/arm/boot/dts/exynos5410-smdk5410.dts          |  10 +-
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts      |   6 +-
+ arch/arm/boot/dts/exynos5420-peach-pit.dts         | 126 ++---
+ arch/arm/boot/dts/exynos5420-pinctrl.dtsi          | 356 +++++++-------
+ arch/arm/boot/dts/exynos5420-smdk5420.dts          |  18 +-
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  18 +-
+ arch/arm/boot/dts/exynos5800-peach-pi.dts          | 126 ++---
+ arch/arm/boot/dts/s3c2416-pinctrl.dtsi             |  38 +-
+ arch/arm/boot/dts/s3c6410-mini6410.dts             |   4 +-
+ arch/arm/boot/dts/s3c64xx-pinctrl.dtsi             | 356 +++++++-------
+ arch/arm/boot/dts/s5pv210-aquila.dts               |   4 +-
+ arch/arm/boot/dts/s5pv210-pinctrl.dtsi             | 476 +++++++++----------
+ include/dt-bindings/pinctrl/samsung.h              |  57 +++
+ 35 files changed, 2223 insertions(+), 2171 deletions(-)
+ create mode 100644 include/dt-bindings/pinctrl/samsung.h
+
 -- 
 2.7.4
