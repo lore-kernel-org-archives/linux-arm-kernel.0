@@ -1,81 +1,50 @@
-From: peter@korsgaard.com (Peter Korsgaard)
-Date: Sun, 04 Sep 2016 22:03:06 +0200
-Subject: [linux-sunxi] [PATCH 3/7] drm/sun4i: Add SAT and DRC drivers
-In-Reply-To: <20160901153204.11217-4-maxime.ripard@free-electrons.com> (Maxime
- Ripard's message of "Thu, 1 Sep 2016 17:32:00 +0200")
-References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
- <20160901153204.11217-4-maxime.ripard@free-electrons.com>
-Message-ID: <8737lfwhz9.fsf@dell.be.48ers.dk>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sun, 4 Sep 2016 21:08:27 +0100
+Subject: [PATCH 2/3] ARM: pxa: lubbock: add pcmcia clock
+In-Reply-To: <1473015587-15589-2-git-send-email-robert.jarzmik@free.fr>
+References: <1473015587-15589-1-git-send-email-robert.jarzmik@free.fr>
+ <1473015587-15589-2-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <20160904200827.GL1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Maxime" == Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+On Sun, Sep 04, 2016 at 08:59:46PM +0200, Robert Jarzmik wrote:
+> Add the clock provided to the PCMCIA block so that sa1111_pcmcia_add()
+> doesn't end up on error while probing "1800" device.
 
-Hi,
+I don't think this is correct - SA1111 is not really the PCMCIA
+controller - it's a load of logic which sits between the host
+device and the PCMCIA sockets to manage buffers and the PCMCIA
+socket control signals.
 
- > The A33 pipeline also has some new components called SAT and DRC. Even
- > though their exact features and programming model is not known (or
- > documented), they need to be clocked for the pipeline to carry the video
- > signal all the way.
+The timing is done by the SoC, and the PCMCIA driver needs a
+clock to compute the timing information for the PCMCIA interface.
+Originally, in 2.6.12-rc2, lubbock (and all of the PXA socket
+drivers) were using pxa2xx_base.c, which got the clock frequency
+via get_memclk_frequency_10khz().
 
- > Add minimal drivers for those that just claim the needed resources for the
- > pipeline to operate properly.
+In 2a125dd56b3a ("ARM: pxa: remove get_memclk_frequency_10khz()")
+this was changed to use the clk API, and added the "pxa2xx-pcmcia"
+clock.  However, it ignored Lubbock, because that doesn't use
+_that_ device, but the SA1111 PCMCIA sub-device "1800".  This commit
+should have introduced an identical entry for the SA1111 PCMCIA
+sub-device.
 
- > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
- > ---
- >  .../bindings/display/sunxi/sun4i-drm.txt           |  37 +++++++
- >  drivers/gpu/drm/sun4i/Makefile                     |   3 +-
- >  drivers/gpu/drm/sun4i/sun6i_drc.c                  | 117 +++++++++++++++++++++
- >  drivers/gpu/drm/sun4i/sun8i_sat.c                  | 105 ++++++++++++++++++
- >  4 files changed, 261 insertions(+), 1 deletion(-)
- >  create mode 100644 drivers/gpu/drm/sun4i/sun6i_drc.c
- >  create mode 100644 drivers/gpu/drm/sun4i/sun8i_sat.c
+This is actually one of the problems converting these platforms to
+DT - seemingly simple stuff is actually quite complex because the
+resources are spread around.  In the case of Lubbock, some of the
+resources are on the PXA255 SoC, others are on the SA1111 which
+requires a fair amount of initialisation to get to.  I think we're
+really into the "combine multiple devices into one logical device"
+game (iow, using the component helper), just like DRM and other
+subsystems.
 
- > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
- > index d467ea93ac08..87c3c8dd34cb 100644
- > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
- > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
- > @@ -51,6 +51,43 @@ Required properties:
- >    second the block connected to the TCON channel 1 (usually the TV
- >    encoder)
- 
- > +SAT
- > +---
- > +
- > +The SAT, found in the A33, allows to do some color correction.
- > +
- > +Required properties:
- > +  - compatible: value must be one of:
- > +    * allwinner,sun8i-a33-sat
- > +  - reg: base address and size of the memory-mapped region.
- > +  - clock: phandles to bus clock feeding the SAT
- > +  - resets: phandles to the reset line driving the SAT
- > +
- > +- ports: A ports node with endpoint definitions as defined in
- > +  Documentation/devicetree/bindings/media/video-interfaces.txt. The
- > +  first port should be the input endpoints, the second one the outputs
- > +
- > +DRC
- > +---
- > +
- > +The DRC, found in the latest Allwinner SoCs (A31, A23, A33), allows to
- > +do some backlight control to enhance the power consumption.
-
-'Enhance the power consumption'? That doesn't sound like something you
-would want ;) Presumably it is something to allow you to save power by
-dynamically adjusting LCD backlight and pixel brightness/contrast
-depending on screen content? I believe this is typically called content
-adaptive backlight control:
-
-https://www.ecnmag.com/article/2010/04/content-adaptive-lcd-backlight-control
-
-You spell out what DRC and SAT stands for in the driver source code,
-perhaps it also makes sense to do it here?
-
-Perhaps rewording it to something like this is clearer:
-
-.. allows to dynamically adjust pixel brightness/contrast based on
-histogram measurements for LCD content adaptive backlight control.
+The quick fix here is to add a clock for the SA1111 PCMCIA sub-device,
+but it still needs to be the SoC memory clock - iow, what
+get_memclk_frequency_10khz() would have returned as that's what
+pxa2xx_base.c wants.
 
 -- 
-Bye, Peter Korsgaard
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
