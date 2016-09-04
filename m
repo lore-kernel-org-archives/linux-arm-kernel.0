@@ -1,65 +1,31 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun,  4 Sep 2016 23:31:52 +0200
-Subject: [PATCH 7/7] ARM64: meson-gxbb-vega-s95: Enable USB Nodes
-In-Reply-To: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
-References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20160904213152.25837-8-martin.blumenstingl@googlemail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun, 04 Sep 2016 23:50:21 +0200
+Subject: [v2 PATCH 1/3] clk: rockchip: Fractional dividers can't set
+ parent rates
+In-Reply-To: <1472786785-2393-1-git-send-email-zyw@rock-chips.com>
+References: <1472786785-2393-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <3040422.nFj5Be1ODN@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable both gxbb USB controller and add a 5V regulator for the OTG port
-VBUS
+Am Donnerstag, 1. September 2016, 20:26:23 CEST schrieb Chris Zhong:
+> From: Douglas Anderson <dianders@chromium.org>
+> 
+> Currently the fractional divider clock time can't handle the
+> CLK_SET_RATE_PARENT flag. This is because, unlike normal dividers,
+> there is no clk_divider_bestdiv() function to try speeding up the parent
+> to see if it helps things.
+> 
+> Eventually someone could try to figure out how to make fractional
+> dividers able to use CLK_SET_RATE_PARENT, but until they do let's not
+> confuse the common clock framework (and anyone using it) by setting the
+> flag.
+> 
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      | 30 ++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+applied to my clk-branch for 4.9, after changing the subject to
+    clk: rockchip: drop CLK_SET_RATE_PARENT from rk3399 fractional dividers
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-index 463185d..bad32e6 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-@@ -77,6 +77,19 @@
- 		compatible = "mmc-pwrseq-emmc";
- 		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
- 	};
-+
-+	usb_vbus: regulator-usb0-vbus {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "USB0_VBUS";
-+
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+
-+		gpio = <&gpio GPIODV_24 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
- };
- 
- &uart_AO {
-@@ -133,3 +146,20 @@
- 	vmmc-supply = <&vcc_3v3>;
- 	vmmcq-sumpply = <&vcc_1v8>;
- };
-+
-+&usb0_phy {
-+	status = "okay";
-+	phy-supply = <&usb_vbus>;
-+};
-+
-+&usb1_phy {
-+	status = "okay";
-+};
-+
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
--- 
-2.9.3
+
+Heiko
