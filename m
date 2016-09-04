@@ -1,23 +1,39 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 4 Sep 2016 00:50:00 +0300
-Subject: [PATCH] ARM: dts: wheat: add CAN support
-In-Reply-To: <5729004.lSWLzbWbOW@wasted.cogentembedded.com>
-References: <34968644.DhifNderY8@wasted.cogentembedded.com>
- <5729004.lSWLzbWbOW@wasted.cogentembedded.com>
-Message-ID: <cc1d04e3-8083-f487-15b9-9feee84a0d60@cogentembedded.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat,  3 Sep 2016 22:33:31 -0700
+Subject: [PATCH] ARM: LPAE: initialize cachepolicy correctly
+Message-ID: <20160904053331.7264-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/29/2016 11:11 PM, Sergei Shtylyov wrote:
+The cachepolicy variable gets initialized using a masked pmd
+So far, the pmd has been masked with flags valid for the 2-page
+table format. In the LPAE case, this lead to a wrong assumption
+of what the initial cachepolicy has been used. Later a check
+forces the cache policy to writealloc and prints the following
+warning:
+Forcing write-allocate cache policy for SMP
 
-> Define the Wheat board dependent part of the CAN0/1 device nodes...
->
-> Based  on the original (and large) patch by Vladimir Barinov
-> <vladimir.barinov@cogentembedded.com>.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-[...]
+This patch uses PMD_SECT_WBWA to mask all cache setting flags.
+The define represents the complete mask of the cache relevant
+flags for both page table formats.
 
-    This patch seems stuck for no apparent reason...
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/mm/mmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-MBR, Sergei
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 724d6be..241e5e2 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -137,7 +137,7 @@ void __init init_default_cache_policy(unsigned long pmd)
+ 
+ 	initial_pmd_value = pmd;
+ 
+-	pmd &= PMD_SECT_TEX(1) | PMD_SECT_BUFFERABLE | PMD_SECT_CACHEABLE;
++	pmd &= PMD_SECT_WBWA;
+ 
+ 	for (i = 0; i < ARRAY_SIZE(cache_policies); i++)
+ 		if (cache_policies[i].pmd == pmd) {
+-- 
+2.9.0
