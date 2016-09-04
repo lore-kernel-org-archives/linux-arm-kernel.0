@@ -1,28 +1,26 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun,  4 Sep 2016 23:31:51 +0200
-Subject: [PATCH 6/7] ARM64: meson-gxbb-p20x: Enable USB Nodes
+Date: Sun,  4 Sep 2016 23:31:52 +0200
+Subject: [PATCH 7/7] ARM64: meson-gxbb-vega-s95: Enable USB Nodes
 In-Reply-To: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
 References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20160904213152.25837-7-martin.blumenstingl@googlemail.com>
+Message-ID: <20160904213152.25837-8-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-From: Jerome Brunet <jbrunet@baylibre.com>
 
 Enable both gxbb USB controller and add a 5V regulator for the OTG port
 VBUS
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi | 29 ++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      | 30 ++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-index ce105fe..4493bce 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-@@ -93,6 +93,18 @@
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+index 463185d..bad32e6 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+@@ -77,6 +77,19 @@
  		compatible = "mmc-pwrseq-emmc";
  		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
  	};
@@ -38,12 +36,13 @@ index ce105fe..4493bce 100644
 +		gpio = <&gpio GPIODV_24 GPIO_ACTIVE_HIGH>;
 +		enable-active-high;
 +	};
++
  };
  
- /* This UART is brought out to the DB9 connector */
-@@ -149,3 +161,20 @@
+ &uart_AO {
+@@ -133,3 +146,20 @@
  	vmmc-supply = <&vcc_3v3>;
- 	vmmcq-sumpply = <&vddio_boot>;
+ 	vmmcq-sumpply = <&vcc_1v8>;
  };
 +
 +&usb0_phy {
