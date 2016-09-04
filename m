@@ -1,55 +1,36 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 04 Sep 2016 21:04:59 +0200
-Subject: [PATCH 05/33] gpio: add generic single-register fixed-direction
- GPIO driver
-In-Reply-To: <20160903102549.GK1041@n2100.armlinux.org.uk> (Russell King's
- message of "Sat, 3 Sep 2016 11:25:49 +0100")
-References: <20160829102328.GA28796@n2100.armlinux.org.uk>
- <E1beJjz-0000mA-0o@rmk-PC.armlinux.org.uk>
- <87eg57e54l.fsf@belgarion.home>
- <20160830091805.GL1041@n2100.armlinux.org.uk>
- <87k2eycip0.fsf@belgarion.home>
- <20160830184612.GO1041@n2100.armlinux.org.uk>
- <87fupmc59b.fsf@belgarion.home>
- <20160831084938.GQ1041@n2100.armlinux.org.uk>
- <20160903102549.GK1041@n2100.armlinux.org.uk>
-Message-ID: <878tv7jxk4.fsf@belgarion.home>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 04 Sep 2016 22:55:37 +0300
+Subject: [PATCH] ARM: dts: r8a7794: fix PWM clock parent
+In-Reply-To: <1618499.8bcj8adpVO@wasted.cogentembedded.com>
+References: <1618499.8bcj8adpVO@wasted.cogentembedded.com>
+Message-ID: <1994467.CVFvpbaMyF@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@armlinux.org.uk> writes:
+When removing the non-existing thermal clock I forgot to remove its
+parent from the node's "clocks" property  -- this led to a wrong PWM
+clock's parent clock.
 
-> On Wed, Aug 31, 2016 at 09:49:38AM +0100, Russell King - ARM Linux wrote:
->> On Tue, Aug 30, 2016 at 11:32:16PM +0200, Robert Jarzmik wrote:
->> > Russell King - ARM Linux <linux@armlinux.org.uk> writes:
->> > 
->> > > If you can wait a day or two, I'll push a branch out for everything in
->> > > all these multiple series.
->> > Sure, just ping me when you have something.
->> 
->> git://git.armlinux.org.uk/~rmk/linux-arm.git sa1100
->> 
->> should get you something suitable to test.  It's based on 4.7-rc3 plus
->> my fixes branch.
->
-> Branch updated, hopefully with everything that we've agreed on so far,
-> all the bug fixes, plus a few extra bits...
+Fixes: 2a29f9d6fea8 ("ARM: dts: r8a7794: add MSTP5 clocks")
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-And retested with my 3 patches on top of it. Everything works fine :
- - CF insertion is correctly detected now !
- - AT/2 keyboard interrupts fire, keys are there, etc ...
- - the AT/2 warning is now gone
+---
+The patch is against the 'renesas-devel-20160902-v4.8-rc4' branch of Simon
+Horman's 'renesas.git' repo...
 
-The pxa_cplds_irqs patch will make it work as before, better than today for
-sure. I think edge type interrupts (such as sa1111), if they come close enough,
-might be lost with the current implementation, but anyway, that's for another
-time.
+arch/arm/boot/dts/r8a7794.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-There is one patch in my serie that I left up to you, as I wasn't very sure
-about the accuracy of my commit message, nor been able to write down all the
-requirements implied on sa1111 with this additional test.
-
-Cheers.
-
---
-Robert
+Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
++++ renesas/arch/arm/boot/dts/r8a7794.dtsi
+@@ -1251,7 +1251,7 @@
+ 		mstp5_clks: mstp5_clks at e6150144 {
+ 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
+-			clocks = <&hp_clk>, <&extal_clk>, <&p_clk>;
++			clocks = <&hp_clk>, <&p_clk>;
+ 			#clock-cells = <1>;
+ 			clock-indices = <R8A7794_CLK_AUDIO_DMAC0
+ 					 R8A7794_CLK_PWM>;
