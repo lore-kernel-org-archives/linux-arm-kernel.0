@@ -1,36 +1,81 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 04 Sep 2016 22:55:37 +0300
-Subject: [PATCH] ARM: dts: r8a7794: fix PWM clock parent
-In-Reply-To: <1618499.8bcj8adpVO@wasted.cogentembedded.com>
-References: <1618499.8bcj8adpVO@wasted.cogentembedded.com>
-Message-ID: <1994467.CVFvpbaMyF@wasted.cogentembedded.com>
+From: peter@korsgaard.com (Peter Korsgaard)
+Date: Sun, 04 Sep 2016 22:03:06 +0200
+Subject: [linux-sunxi] [PATCH 3/7] drm/sun4i: Add SAT and DRC drivers
+In-Reply-To: <20160901153204.11217-4-maxime.ripard@free-electrons.com> (Maxime
+ Ripard's message of "Thu, 1 Sep 2016 17:32:00 +0200")
+References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
+ <20160901153204.11217-4-maxime.ripard@free-electrons.com>
+Message-ID: <8737lfwhz9.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When removing the non-existing thermal clock I forgot to remove its
-parent from the node's "clocks" property  -- this led to a wrong PWM
-clock's parent clock.
+>>>>> "Maxime" == Maxime Ripard <maxime.ripard@free-electrons.com> writes:
 
-Fixes: 2a29f9d6fea8 ("ARM: dts: r8a7794: add MSTP5 clocks")
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Hi,
 
----
-The patch is against the 'renesas-devel-20160902-v4.8-rc4' branch of Simon
-Horman's 'renesas.git' repo...
+ > The A33 pipeline also has some new components called SAT and DRC. Even
+ > though their exact features and programming model is not known (or
+ > documented), they need to be clocked for the pipeline to carry the video
+ > signal all the way.
 
-arch/arm/boot/dts/r8a7794.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ > Add minimal drivers for those that just claim the needed resources for the
+ > pipeline to operate properly.
 
-Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-@@ -1251,7 +1251,7 @@
- 		mstp5_clks: mstp5_clks at e6150144 {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
--			clocks = <&hp_clk>, <&extal_clk>, <&p_clk>;
-+			clocks = <&hp_clk>, <&p_clk>;
- 			#clock-cells = <1>;
- 			clock-indices = <R8A7794_CLK_AUDIO_DMAC0
- 					 R8A7794_CLK_PWM>;
+ > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+ > ---
+ >  .../bindings/display/sunxi/sun4i-drm.txt           |  37 +++++++
+ >  drivers/gpu/drm/sun4i/Makefile                     |   3 +-
+ >  drivers/gpu/drm/sun4i/sun6i_drc.c                  | 117 +++++++++++++++++++++
+ >  drivers/gpu/drm/sun4i/sun8i_sat.c                  | 105 ++++++++++++++++++
+ >  4 files changed, 261 insertions(+), 1 deletion(-)
+ >  create mode 100644 drivers/gpu/drm/sun4i/sun6i_drc.c
+ >  create mode 100644 drivers/gpu/drm/sun4i/sun8i_sat.c
+
+ > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+ > index d467ea93ac08..87c3c8dd34cb 100644
+ > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+ > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+ > @@ -51,6 +51,43 @@ Required properties:
+ >    second the block connected to the TCON channel 1 (usually the TV
+ >    encoder)
+ 
+ > +SAT
+ > +---
+ > +
+ > +The SAT, found in the A33, allows to do some color correction.
+ > +
+ > +Required properties:
+ > +  - compatible: value must be one of:
+ > +    * allwinner,sun8i-a33-sat
+ > +  - reg: base address and size of the memory-mapped region.
+ > +  - clock: phandles to bus clock feeding the SAT
+ > +  - resets: phandles to the reset line driving the SAT
+ > +
+ > +- ports: A ports node with endpoint definitions as defined in
+ > +  Documentation/devicetree/bindings/media/video-interfaces.txt. The
+ > +  first port should be the input endpoints, the second one the outputs
+ > +
+ > +DRC
+ > +---
+ > +
+ > +The DRC, found in the latest Allwinner SoCs (A31, A23, A33), allows to
+ > +do some backlight control to enhance the power consumption.
+
+'Enhance the power consumption'? That doesn't sound like something you
+would want ;) Presumably it is something to allow you to save power by
+dynamically adjusting LCD backlight and pixel brightness/contrast
+depending on screen content? I believe this is typically called content
+adaptive backlight control:
+
+https://www.ecnmag.com/article/2010/04/content-adaptive-lcd-backlight-control
+
+You spell out what DRC and SAT stands for in the driver source code,
+perhaps it also makes sense to do it here?
+
+Perhaps rewording it to something like this is clearer:
+
+.. allows to dynamically adjust pixel brightness/contrast based on
+histogram measurements for LCD content adaptive backlight control.
+
+-- 
+Bye, Peter Korsgaard
