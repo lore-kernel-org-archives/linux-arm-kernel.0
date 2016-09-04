@@ -1,22 +1,29 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 04 Sep 2016 23:51:12 +0200
-Subject: [v2 PATCH 3/3] clk: rockchip: use the dclk_vop_frac clock ids
-In-Reply-To: <1472786785-2393-3-git-send-email-zyw@rock-chips.com>
-References: <1472786785-2393-1-git-send-email-zyw@rock-chips.com>
- <1472786785-2393-3-git-send-email-zyw@rock-chips.com>
-Message-ID: <2504148.HshbI1VF8K@phil>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sun, 4 Sep 2016 23:09:03 +0100
+Subject: [PATCH] ARM: LPAE: initialize cachepolicy correctly
+In-Reply-To: <20160904053331.7264-1-stefan@agner.ch>
+References: <20160904053331.7264-1-stefan@agner.ch>
+Message-ID: <20160904220903.GN1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 1. September 2016, 20:26:25 CEST schrieb Chris Zhong:
-> From: Yakir Yang <ykk@rock-chips.com>
+On Sat, Sep 03, 2016 at 10:33:31PM -0700, Stefan Agner wrote:
+> The cachepolicy variable gets initialized using a masked pmd
+> So far, the pmd has been masked with flags valid for the 2-page
+> table format. In the LPAE case, this lead to a wrong assumption
+> of what the initial cachepolicy has been used. Later a check
+> forces the cache policy to writealloc and prints the following
+> warning:
+> Forcing write-allocate cache policy for SMP
 > 
-> Export the dclk_vop_frac out, so we can set the dclk_vop as the
-> child of dclk_vop_frac, and then we can start to take use of
-> the fractional dividers.
-> 
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> This patch uses PMD_SECT_WBWA to mask all cache setting flags.
+> The define represents the complete mask of the cache relevant
+> flags for both page table formats.
 
-applied to my clk-branch for 4.9
+PMD_SECT_WBWA is just one possible combination, it's not a bit-mask.
+We need a new definition.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
