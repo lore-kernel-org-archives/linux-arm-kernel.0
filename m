@@ -1,48 +1,27 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Sun, 4 Sep 2016 11:05:44 +0530
-Subject: [PATCH v2 0/3] Add Platform MHU mailbox driver for Amlogic GXBB
-In-Reply-To: <CAOi56cVVY=XL1HFSNGS8H3Zq0KiNbAzvNxbOkW7NYsSOQ2n6_g@mail.gmail.com>
-References: <1471515027-3543-1-git-send-email-narmstrong@baylibre.com>
- <m24m5xc1v0.fsf@baylibre.com>
- <CABb+yY2Cq5KaCCvoJ5afsLfqc5NEoPMkaaYk9GjFO8=N80eVBA@mail.gmail.com>
- <CAOi56cVVY=XL1HFSNGS8H3Zq0KiNbAzvNxbOkW7NYsSOQ2n6_g@mail.gmail.com>
-Message-ID: <CABb+yY10d1+73wjAZCM6PqSXiVC05ZWehK+ugb7rMh8yOh9wNg@mail.gmail.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Sun,  4 Sep 2016 16:32:17 +0800
+Subject: [PATCH 0/4] One fix and some improvements for RK3288 Popmetal board
+Message-ID: <1472977937-758-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 4, 2016 at 2:15 AM, Kevin Hilman <khilman@baylibre.com> wrote:
-> On Fri, Sep 2, 2016 at 10:33 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->> On Sat, Sep 3, 2016 at 5:04 AM, Kevin Hilman <khilman@baylibre.com> wrote:
->>> Hi Jassi,
->>>
->>> Neil Armstrong <narmstrong@baylibre.com> writes:
->>>
->>>> In order to support Mailbox links for the Amlogic GXBB SoC, add a generic
->>>> platform MHU driver based on arm_mhu.c.
->>>>
->>>> This patchset follows a RFC thread along the GXBB SCPI support at :
->>>> http://lkml.kernel.org/r/1466503374-28841-1-git-send-email-narmstrong at baylibre.com
->>>> And specific MHU discussions at :
->>>> http://lkml.kernel.org/r/CABb+yY3HqJG2+GMWCWF9PomxobrwWGZ=TZe5NvXPcHMDdLhkcQ at mail.gmail.com
->>>>
->>>> Changes since v1 at http://lkml.kernel.org/r/1470732737-18391-1-git-send-email-narmstrong at baylibre.com :
->>>>  - Fix irq to signed to detect platform_get_irq() failures
->>>>  - Introduced back the secure channel
->>>>  - Fixed indexes
->>>
->>> How is this version looking to you?
->>>
->>> With your review/ack on the driver, I'd be happy to take it via the
->>> amlogic tree as there shouldn't be any conflicts with your tree.
->>>
->> I am ok with the driver, but I don't understand how it helps going via
->> amlogic tree. I would like to send a pull request every release ;)
->
-> That's fine with me too.  I offered tot take int just in case you had
-> already sent pull requests for this cycle, and also since I'll take
-> the DT changes through arm-soc.
->
-This revision came after rc2, so it wasn't included. I will queue
-patch-1 & 2 for next release, and you the patch-3.
 
-Thanks.
+This series fix one sensor i2c device address on Popmetal
+board, and change some pinctrl description to make it more
+clearly, also enable the usb otg function on this board.
+
+
+Andy Yan (4):
+  ARM: dts: rockchip: enable usbotg for Popemtal-rk3288 board
+  ARM: dts: rockchip: fix i2c address L3G4200D on PopMetal-RK3288 board
+  include: dt-bindings: Add more GPIO bank and index definition for
+    rockchip pinctrl
+  ARM: dts: use definition in rockchip pinctrl header to describe gpios
+    on Popmetal-RK3288
+
+ arch/arm/boot/dts/rk3288-popmetal.dts  | 36 +++++++++++++++++++++-------------
+ include/dt-bindings/pinctrl/rockchip.h | 35 +++++++++++++++++++++++++++++++++
+ 2 files changed, 57 insertions(+), 14 deletions(-)
+
+-- 
+2.7.4
