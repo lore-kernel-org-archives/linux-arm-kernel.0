@@ -1,39 +1,48 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sat,  3 Sep 2016 22:33:31 -0700
-Subject: [PATCH] ARM: LPAE: initialize cachepolicy correctly
-Message-ID: <20160904053331.7264-1-stefan@agner.ch>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Sun, 4 Sep 2016 11:05:44 +0530
+Subject: [PATCH v2 0/3] Add Platform MHU mailbox driver for Amlogic GXBB
+In-Reply-To: <CAOi56cVVY=XL1HFSNGS8H3Zq0KiNbAzvNxbOkW7NYsSOQ2n6_g@mail.gmail.com>
+References: <1471515027-3543-1-git-send-email-narmstrong@baylibre.com>
+ <m24m5xc1v0.fsf@baylibre.com>
+ <CABb+yY2Cq5KaCCvoJ5afsLfqc5NEoPMkaaYk9GjFO8=N80eVBA@mail.gmail.com>
+ <CAOi56cVVY=XL1HFSNGS8H3Zq0KiNbAzvNxbOkW7NYsSOQ2n6_g@mail.gmail.com>
+Message-ID: <CABb+yY10d1+73wjAZCM6PqSXiVC05ZWehK+ugb7rMh8yOh9wNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cachepolicy variable gets initialized using a masked pmd
-So far, the pmd has been masked with flags valid for the 2-page
-table format. In the LPAE case, this lead to a wrong assumption
-of what the initial cachepolicy has been used. Later a check
-forces the cache policy to writealloc and prints the following
-warning:
-Forcing write-allocate cache policy for SMP
+On Sun, Sep 4, 2016 at 2:15 AM, Kevin Hilman <khilman@baylibre.com> wrote:
+> On Fri, Sep 2, 2016 at 10:33 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>> On Sat, Sep 3, 2016 at 5:04 AM, Kevin Hilman <khilman@baylibre.com> wrote:
+>>> Hi Jassi,
+>>>
+>>> Neil Armstrong <narmstrong@baylibre.com> writes:
+>>>
+>>>> In order to support Mailbox links for the Amlogic GXBB SoC, add a generic
+>>>> platform MHU driver based on arm_mhu.c.
+>>>>
+>>>> This patchset follows a RFC thread along the GXBB SCPI support at :
+>>>> http://lkml.kernel.org/r/1466503374-28841-1-git-send-email-narmstrong at baylibre.com
+>>>> And specific MHU discussions at :
+>>>> http://lkml.kernel.org/r/CABb+yY3HqJG2+GMWCWF9PomxobrwWGZ=TZe5NvXPcHMDdLhkcQ at mail.gmail.com
+>>>>
+>>>> Changes since v1 at http://lkml.kernel.org/r/1470732737-18391-1-git-send-email-narmstrong at baylibre.com :
+>>>>  - Fix irq to signed to detect platform_get_irq() failures
+>>>>  - Introduced back the secure channel
+>>>>  - Fixed indexes
+>>>
+>>> How is this version looking to you?
+>>>
+>>> With your review/ack on the driver, I'd be happy to take it via the
+>>> amlogic tree as there shouldn't be any conflicts with your tree.
+>>>
+>> I am ok with the driver, but I don't understand how it helps going via
+>> amlogic tree. I would like to send a pull request every release ;)
+>
+> That's fine with me too.  I offered tot take int just in case you had
+> already sent pull requests for this cycle, and also since I'll take
+> the DT changes through arm-soc.
+>
+This revision came after rc2, so it wasn't included. I will queue
+patch-1 & 2 for next release, and you the patch-3.
 
-This patch uses PMD_SECT_WBWA to mask all cache setting flags.
-The define represents the complete mask of the cache relevant
-flags for both page table formats.
-
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/mm/mmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 724d6be..241e5e2 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -137,7 +137,7 @@ void __init init_default_cache_policy(unsigned long pmd)
- 
- 	initial_pmd_value = pmd;
- 
--	pmd &= PMD_SECT_TEX(1) | PMD_SECT_BUFFERABLE | PMD_SECT_CACHEABLE;
-+	pmd &= PMD_SECT_WBWA;
- 
- 	for (i = 0; i < ARRAY_SIZE(cache_policies); i++)
- 		if (cache_policies[i].pmd == pmd) {
--- 
-2.9.0
+Thanks.
