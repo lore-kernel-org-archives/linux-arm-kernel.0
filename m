@@ -1,42 +1,31 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun,  4 Sep 2016 20:59:47 +0200
-Subject: [PATCH 3/3] [DO_NOT_REVIEW] sa1111: left up to Russell King
+Date: Sun,  4 Sep 2016 20:59:46 +0200
+Subject: [PATCH 2/3] ARM: pxa: lubbock: add pcmcia clock
 In-Reply-To: <1473015587-15589-1-git-send-email-robert.jarzmik@free.fr>
 References: <1473015587-15589-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1473015587-15589-3-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1473015587-15589-2-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to cope with ordering problems, especially when the
-interrupt descriptor is allocated only after the sa1111 is probed, add a
-workaround to "wait" for the interrupt chip to be available.
+Add the clock provided to the PCMCIA block so that sa1111_pcmcia_add()
+doesn't end up on error while probing "1800" device.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- arch/arm/common/sa1111.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-pxa/lubbock.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
-index 1b03ff639836..abd94ff83a6c 100644
---- a/arch/arm/common/sa1111.c
-+++ b/arch/arm/common/sa1111.c
-@@ -21,6 +21,7 @@
- #include <linux/kernel.h>
- #include <linux/delay.h>
- #include <linux/errno.h>
-+#include <linux/interrupt.h>
- #include <linux/ioport.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
-@@ -1183,6 +1184,9 @@ static int sa1111_probe(struct platform_device *pdev)
- 	if (irq < 0)
- 		return irq;
+diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
+index cd401546cea8..0bcb107d69b4 100644
+--- a/arch/arm/mach-pxa/lubbock.c
++++ b/arch/arm/mach-pxa/lubbock.c
+@@ -491,6 +491,7 @@ static void __init lubbock_init(void)
+ 	gpiod_add_lookup_table(&sa1111_pcmcia_gpio_table);
  
-+	if (!irq_get_chip(irq))
-+		return -EPROBE_DEFER;
-+
- 	return __sa1111_probe(&pdev->dev, mem, irq);
- }
- 
+ 	clk_add_alias("SA1111_CLK", NULL, "GPIO11_CLK", NULL);
++	clk_add_alias(NULL, "1800", "SA1111_CLK", NULL);
+ 	pxa_set_udc_info(&udc_info);
+ 	pxa_set_fb_info(NULL, &sharp_lm8v31);
+ 	pxa_set_mci_info(&lubbock_mci_platform_data);
 -- 
 2.1.4
