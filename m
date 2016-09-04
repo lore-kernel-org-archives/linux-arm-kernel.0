@@ -1,51 +1,34 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 5 Sep 2016 01:31:22 +0200
-Subject: [RESEND PATCH] ARM: multi_v7_defconfig: Build Atmel maXTouch
- driver as a module
-In-Reply-To: <7304023.0tarkq2cRD@wuerfel>
-References: <1471360094-27637-1-git-send-email-javier@osg.samsung.com>
- <7304023.0tarkq2cRD@wuerfel>
-Message-ID: <d1992291-d314-0a08-bbb2-a1682bd126f8@osg.samsung.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sun, 04 Sep 2016 16:31:40 -0700
+Subject: [PATCH] ARM: LPAE: initialize cachepolicy correctly
+In-Reply-To: <20160904220903.GN1041@n2100.armlinux.org.uk>
+References: <20160904053331.7264-1-stefan@agner.ch>
+ <20160904220903.GN1041@n2100.armlinux.org.uk>
+Message-ID: <eb470e86a233b7bc8328c820527f53c1@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
-
-On 09/02/2016 05:38 PM, Arnd Bergmann wrote:
-> On Tuesday, August 16, 2016 11:08:14 AM CEST Javier Martinez Canillas wrote:
->> The driver is for a trackpad device so is not needed for booting and
->> makes more sense to have it as module to reduce the kernel image size.
+On 2016-09-04 15:09, Russell King - ARM Linux wrote:
+> On Sat, Sep 03, 2016 at 10:33:31PM -0700, Stefan Agner wrote:
+>> The cachepolicy variable gets initialized using a masked pmd
+>> So far, the pmd has been masked with flags valid for the 2-page
+>> table format. In the LPAE case, this lead to a wrong assumption
+>> of what the initial cachepolicy has been used. Later a check
+>> forces the cache policy to writealloc and prints the following
+>> warning:
+>> Forcing write-allocate cache policy for SMP
 >>
->> It was probably enabled as built-in because module autoload was not
->> working when the I2C device was registered by OF but this got fixed
->> in commit b7d21058b40b ("Input: atmel_mxt_ts - add maxtouch to I2C
->> table for module autoload") so it's safe to enable as a module now.
->>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>
->> ---
+>> This patch uses PMD_SECT_WBWA to mask all cache setting flags.
+>> The define represents the complete mask of the cache relevant
+>> flags for both page table formats.
 > 
-> Applied to next/defconfig.
-> 
+> PMD_SECT_WBWA is just one possible combination, it's not a bit-mask.
+> We need a new definition.
 
-Thanks.
+Agreed, it just happens to be the same as the bit-mask in both
+page-table layouts.
 
-> My preferred way is to get defconfig updates forwarded by the platform
-> maintainers that are interested, but this seems to apply to multiple
-> platforms, so I'm not asking you to pick one to resend it to.
-> 
+Does PMD_SECT_CACHE_MASK sounds like a reasonable identifier for it?
 
-Yes. I usually route defconfig patches through a platform maintainer, but as
-you said, this driver is used by different platforms so I decided to send it
-to you directly since I didn't know which platform to choose.
-
-Sorry if that caused inconveniences.
-
-> 	Arnd
-> 
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+--
+Stefan
