@@ -1,187 +1,65 @@
-From: james@innovum.com.au (James Pettigrew)
-Date: Mon,  5 Sep 2016 10:42:48 +1000
-Subject: [PATCH v2] ARM: dts: sun8i: Add dts file for the NanoPi NEO SBC
-In-Reply-To: <1472701734-1837-1-git-send-email-james@innovum.com.au>
-References: <1472701734-1837-1-git-send-email-james@innovum.com.au>
-Message-ID: <1473036168-20933-1-git-send-email-james@innovum.com.au>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 05 Sep 2016 09:49:19 +0900
+Subject: [PATCH 4/5] PM / devfreq: rockchip: add devfreq driver for rk3399
+ dmc
+In-Reply-To: <201609020953.NltUDqVg%fengguang.wu@intel.com>
+References: <CGME20160902012350epcas1p2045d076c7645d3880e95633d66aba0ae@epcas1p2.samsung.com>
+ <201609020953.NltUDqVg%fengguang.wu@intel.com>
+Message-ID: <57CCC10F.30704@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NanoPi NEO is a minimal H3 based SBC. It comes with 256/512M RAM, a
-micro SD slot, 10/100Mbit ethernet and a single USB-A port.
+Dear all,
 
-Signed-off-by: James Pettigrew <james@innovum.com.au>
----
+This patch rely on both rockchip.git and devfreq.git.
+Already, Rockchip SoC Maintainer (Heiko Stuebner) created
+the immutable branch[1]. When applying these patches
+on devfreq.git with pulling the immutable branch[1],
+It looks like that should not be a problem.
 
-Changes in v2:
+[1] http://www.spinics.net/lists/arm-kernel/msg528298.html
 
-As per Rask's review (thank you):
-	Added vendor prefix
-	Removed unncessary input.h include
-	Fixed underscores and unnecessary unit addresses in node names
-	Added GPIO pin comments to led nodes
+Best Regards,
+Chanwoo Choi
 
----
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts          | 125 +++++++++++++++++++++
- 3 files changed, 127 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
-
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 1992aa9..7b6bda3 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -98,6 +98,7 @@ ezchip	EZchip Semiconductor
- fcs	Fairchild Semiconductor
- firefly	Firefly
- focaltech	FocalTech Systems Co.,Ltd
-+friendlyarm	Guangzhou FriendlyARM Computer Tech Co., Ltd
- fsl	Freescale Semiconductor
- ge	General Electric Company
- geekbuying	GeekBuying
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7dd4a07..a35f986 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -792,6 +792,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-a83t-allwinner-h8homlet-v2.dtb \
- 	sun8i-a83t-cubietruck-plus.dtb \
- 	sun8i-h3-bananapi-m2-plus.dtb \
-+	sun8i-h3-nanopi-neo.dtb \
- 	sun8i-h3-orangepi-2.dtb \
- 	sun8i-h3-orangepi-lite.dtb \
- 	sun8i-h3-orangepi-one.dtb \
-diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
-new file mode 100644
-index 0000000..cf36696
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
-@@ -0,0 +1,125 @@
-+/*
-+ * Copyright (C) 2016 James Pettigrew <james@innovum.com.au>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun8i-h3.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "FriendlyARM NanoPi NEO";
-+	compatible = "friendlyarm,nanopi-neo", "allwinner,sun8i-h3";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&leds-opc>, <&leds-r-opc>;
-+
-+		pwr {
-+			label = "nanopi:green:pwr";
-+			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
-+			default-state = "on";
-+		};
-+
-+		status {
-+			label = "nanopi:blue:status";
-+			gpios = <&pio 0 10 GPIO_ACTIVE_HIGH>; /* PA10 */
-+		};
-+	};
-+};
-+
-+&ehci3 {
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&ohci3 {
-+	status = "okay";
-+};
-+
-+&pio {
-+	leds-opc: led-pins {
-+		allwinner,pins = "PA10";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&r_pio {
-+	leds-r-opc: led-pins {
-+		allwinner,pins = "PL10";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	/* USB VBUS is always on */
-+	status = "okay";
-+};
--- 
-1.9.1
+On 2016? 09? 02? 10:23, kbuild test robot wrote:
+> Hi Lin,
+> 
+> [auto build test ERROR on next-20160825]
+> [also build test ERROR on v4.8-rc4]
+> [cannot apply to rockchip/for-next devfreq/for-rafael linus/master v4.8-rc4 v4.8-rc3 v4.8-rc2]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> [Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
+> [Check https://git-scm.com/docs/git-format-patch for more information]
+> 
+> url:    https://github.com/0day-ci/linux/commits/Lin-Huang/rk3399-support-ddr-frequency-scaling/20160902-063701
+> config: arm-allmodconfig (attached as .config)
+> compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm 
+> 
+> All errors (new ones prefixed by >>):
+> 
+>>> drivers/devfreq/rk3399_dmc.c:29:39: fatal error: soc/rockchip/rockchip_sip.h: No such file or directory
+>    compilation terminated.
+> 
+> vim +29 drivers/devfreq/rk3399_dmc.c
+> 
+>     23	#include <linux/platform_device.h>
+>     24	#include <linux/pm_opp.h>
+>     25	#include <linux/regulator/consumer.h>
+>     26	#include <linux/rwsem.h>
+>     27	#include <linux/suspend.h>
+>     28	
+>   > 29	#include <soc/rockchip/rockchip_sip.h>
+>     30	
+>     31	struct dram_timing {
+>     32		unsigned int ddr3_speed_bin;
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> 
