@@ -1,84 +1,67 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 5 Sep 2016 13:09:32 +0200
-Subject: [PATCH 1/2] mtd: nand: automate NAND timings selection
-In-Reply-To: <20160905085146.239129bd@bbrezillon>
-References: <1472820149-24241-1-git-send-email-s.hauer@pengutronix.de>
- <1472820149-24241-2-git-send-email-s.hauer@pengutronix.de>
- <20160905085146.239129bd@bbrezillon>
-Message-ID: <20160905110932.jkt3ixxrsqj5emzu@pengutronix.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 5 Sep 2016 13:10:56 +0200
+Subject: [PATCH v4 14/17] pwm: sti: Add PWM Capture call-back
+In-Reply-To: <20160816093508.28307-15-lee.jones@linaro.org>
+References: <20160816093508.28307-1-lee.jones@linaro.org>
+ <20160816093508.28307-15-lee.jones@linaro.org>
+Message-ID: <20160905111056.GN31424@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 05, 2016 at 08:51:46AM +0200, Boris Brezillon wrote:
-> Hi Sascha,
+On Tue, Aug 16, 2016 at 10:35:05AM +0100, Lee Jones wrote:
+> Once a PWM Capture has been initiated, the capture call
+> enables a rising edge detection IRQ, then waits.  Once each
+> of the 3 phase changes have been recorded the thread then
+> wakes.  The remaining part of the call carries out the
+> relevant calculations and passes back a formatted string to
+> the caller.
 > 
-> It feels weird to review his own patch, but I have a few comments. :)
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/pwm/pwm-sti.c | 88 +++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 88 insertions(+)
 
-I know this feeling. Suddenly you have to criticise code you previously
-hoped to get through with ;)
+Applied with minor changes. See below.
 
-> 
-> On Fri,  2 Sep 2016 14:42:28 +0200
-> Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> 
-> > From: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > 
-> > The NAND framework provides several helpers to query timing modes supported
-> > by a NAND chip, but this implies that all NAND controller drivers have
-> > to implement the same timings selection dance.
-> > 
-> > Provide a common logic to select the best timings based on ONFI or
-> > ->onfi_timing_mode_default information.  
-> > NAND controller willing to support timings adjustment should just
-> > implement the ->setup_data_interface() method.
-> 
-> Now I remember one of the reason I did not post a v2 (apart from not
-> having the time).
-> 
-> If understand the ONFI spec correctly, when you reset the NAND chip,
-> you get back to SDR+timing-mode0. In the core we do not control when
-> the reset command (0xff) is issued, and this prevents us from
-> re-applying the correct timing mode after a reset.
-> 
-> Maybe we should provide a nand_reset() helper to hide this complexity,
-> and patch all ->cmdfunc(NAND_CMD_RESET) callers to call nand_reset()
-> instead.
-> 
-> Note that the interface+timing-mode config is not necessarily the only
-> thing we'll have to re-apply after a reset (especially on MLC NANDs), so
-> having place where we can put all operations that should be done after
-> a reset is a good thing.
+> diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
+[...]
+> +#define SECS_TO_NANOSECS(x) ((x) * 1000 * 1000 * 1000)
 
-Ouch, there are indeed some things wrong in this patch. We iterate over
-all chips and set the timing mode for each:
+I dropped this in favour of doing the multiplication by NSEC_PER_SEC in
+situ.
 
-+		if (modes != ONFI_TIMING_MODE_UNKNOWN) {
-+			/*
-+			 * FIXME: should we really set the timing mode on all
-+			 * dies?
-+			 */
-+			for (i = 0; i < chip->numchips; i++) {
-+				chip->select_chip(mtd, i);
-+				ret = chip->onfi_set_features(mtd, chip,
-+						ONFI_FEATURE_ADDR_TIMING_MODE,
-+						tmode_param);
-+			}
-+			chip->select_chip(mtd, -1);
-+		}
-+
+> +
+>  #define PWM_OUT_VAL(x)	(0x00 + (4 * (x))) /* Device's Duty Cycle register */
+>  #define PWM_CPT_VAL(x)	(0x10 + (4 * (x))) /* Capture value */
+>  #define PWM_CPT_EDGE(x) (0x30 + (4 * (x))) /* Edge to capture on */
+> @@ -305,7 +307,88 @@ static void sti_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
+>  	clear_bit(pwm->hwpwm, &pc->configured);
+>  }
+>  
+> +static int sti_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm,
+> +			   struct pwm_capture *result, unsigned long timeout)
+> +{
+> +	struct sti_pwm_chip *pc = to_sti_pwmchip(chip);
+> +	struct sti_pwm_compat_data *cdata = pc->cdata;
+> +	struct sti_cpt_ddata *ddata = pwm_get_chip_data(pwm);
+> +	struct device *dev = pc->dev;
+> +	unsigned int effective_ticks;
+> +	unsigned long long high, low;
+> +	int ret;
+> +
+> +	if (pwm->hwpwm > cdata->cpt_num_devs - 1) {
 
-Afterwards the code in nand_scan_ident() resets all chips while checking
-for a chip array, reverting the effect of the above code. Looking closer
-at it the above code has no effect anyway since it's executed when
-chip->numchips is not yet initialized and still 0.
+Turned this into:
 
-I think providing a nand_reset() function is a good idea. I'll implement
-one and see what I end up with.
+	if (pwm->hwpwm >= cdata->cpt_num_devs) {
 
-Sascha
+because I find that easier to read.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/9461fd18/attachment.sig>
