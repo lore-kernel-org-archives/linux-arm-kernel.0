@@ -1,73 +1,59 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 5 Sep 2016 09:46:36 +0800
-Subject: [PATCH v2 1/1] arm64: Add DTS support for FSL's LS1012A SoC
-In-Reply-To: <HE1PR0401MB2636B40376255680B6A58CFB8DE00@HE1PR0401MB2636.eurprd04.prod.outlook.com>
-References: <1472207241-18461-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
- <20160829095239.GM30790@tiger>
- <1472493061.13245.39.camel@buserror.net>
- <20160830120220.GC8363@tiger>
- <HE1PR0401MB2636B40376255680B6A58CFB8DE00@HE1PR0401MB2636.eurprd04.prod.outlook.com>
-Message-ID: <20160905014636.GB25778@tiger>
+Date: Mon, 5 Sep 2016 10:12:01 +0800
+Subject: [PATCH 0/3] gpio/pinctrl: imx: let IOMUX controller know about
+ on-SoC GPIOs
+In-Reply-To: <cc5ab313-c3c6-bfd4-d2b8-92a7d153cf05@mentor.com>
+References: <1471644615-10320-1-git-send-email-vladimir_zapolskiy@mentor.com>
+ <cc5ab313-c3c6-bfd4-d2b8-92a7d153cf05@mentor.com>
+Message-ID: <20160905021201.GC25778@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2016 at 02:07:17PM +0000, Stuart Yoder wrote:
-> > On Mon, Aug 29, 2016 at 12:51:01PM -0500, Scott Wood wrote:
-> > > On Mon, 2016-08-29 at 17:52 +0800, Shawn Guo wrote:
-> > > > On Fri, Aug 26, 2016 at 03:57:21PM +0530, Bhaskar Upadhaya wrote:
-> > > > >
-> > > > > +		clockgen: clocking at 1ee1000 {
-> > > > > +			compatible = "fsl,ls1012a-clockgen";
-> > > > The compatible cannot be found in binding docs.
-> > >
-> > > From?Documentation/devicetree/bindings/clock/qoriq-clock.txt:
-> > >
-> > > - compatible: Should contain a chip-specific clock block compatible
-> > > ????????string and (if applicable) may contain a chassis-version clock
-> > > ????????compatible string.
-> > >
-> > > ? ? ? ? Chip-specific strings are of the form "fsl,<chip>-clockgen", such as:
-> > > ????????* "fsl,p2041-clockgen"
-> > > ????????* "fsl,p3041-clockgen"
-> > > ????????* "fsl,p4080-clockgen"
-> > > ????????* "fsl,p5020-clockgen"
-> > > ????????* "fsl,p5040-clockgen"
-> > > ????????* "fsl,t4240-clockgen"
-> > > ????????* "fsl,b4420-clockgen"
-> > > ????????* "fsl,b4860-clockgen"
-> > > ????????* "fsl,ls1021a-clockgen"
-> > > ????????Chassis-version clock strings include:
-> > > ????????* "fsl,qoriq-clockgen-1.0": for chassis 1.0 clocks
-> > > ????????* "fsl,qoriq-clockgen-2.0": for chassis 2.0 clocks
-> > >
-> > > I really hope we don't have to update every single fsl,<chip>-whatever binding
-> > > every time a new chip comes out. ?There are already other chips not listed,
-> > > FWIW (e.g. t1040, t2080, ls1043a, and ls2080a). ?That's why it says "such as".
-> > 
-> > If I remember correctly, DT maintainers want every supported compatible
-> > string explicitly listed in bindings doc.  And they even added a check
-> > into checkpatch.pl with commit bff5da433525 ("checkpatch: add DT
-> > compatible string documentation checks").
+On Fri, Sep 02, 2016 at 04:11:46PM +0300, Vladimir Zapolskiy wrote:
+> Hi Shawn, Fabio,
 > 
-> See Documentation/devicetree/bindings/submitting-patches.txt:
+> On 08/20/2016 01:10 AM, Vladimir Zapolskiy wrote:
+> >The change establishes a connection between on-SoC IOMUX controller(s)
+> >and GPIO controllers found on some SoC from Freescale/NXP iMX series,
+> >if a GPIO controller device node contains common gpio-ranges information.
+> >
+> >The change is backward compatible with respect to potentially not updated
+> >outdated DTB data without gpio-ranges propery, for such boards the only
+> >functional change is lowered initcall priority of GPIO controller driver,
+> >which in general anyway is exected to be used only after pinctrl/pinmux
+> >controller.
+> >
+> >If this change is applied the next interesting applications may be done
+> >as a follow-up work, for example switching pad function to GPIO on gpiod
+> >request, converting iomux controller driver to strict type and so on.
+> >
+> >For actual values of gpio-ranges properties please reference series
+> >"ARM: dts: imx: add gpio-ranges properties to some iMX GPIO controllers"
+> >http://archive.arm.linux.org.uk/lurker/message/20160819.220621.86d845d1.en.html
+> >
+> >Deepak Das (1):
+> >  gpio: mxc: lower level of gpio_mxc_init() initcall
+> >
+> >Vladimir Zapolskiy (2):
+> >  pinctrl: imx: accept gpio request/free from pinctrl
+> >  gpio: mxc: add generic gpio request/free callbacks to pinctrl
+> >
+> > drivers/gpio/gpio-mxc.c                 | 7 ++++++-
+> > drivers/pinctrl/freescale/pinctrl-imx.c | 4 ++--
+> > 2 files changed, 8 insertions(+), 3 deletions(-)
+> >
 > 
->   5) The wildcard "<chip>" may be used in compatible strings, as in
->      the following example:
+> no comments so far, please could you express your concerns about
+> this change? IMHO it would be nice to have this feature enabled
+> in v4.9.
 > 
->          - compatible: Must contain '"nvidia,<chip>-pcie",
->            "nvidia,tegra20-pcie"' where <chip> is tegra30, tegra132, ...
-> 
->      As in the above example, the known values of "<chip>" should be
->      documented if it is used.
-> 
-> It _is_ allowed to use the <chip> wildcard, and so you will not find all
-> full compatible strings explicitly listed in bindings.  However, the
-> chips themselves "should" be listed.
+> I assume that the most worrisome commit is the change of GPIO controller
+> driver init level, but I belive it is safe enough, no?
 
-+ Rob and Mark
-
-Oops, I'm not aware of this DT document.  In that case, the DT document
-and checkpatch is basically asking for conflicting thing.  Rob, Mark,
-can you guys please clarify?
+If I understand it correctly, with the change, most of GPIO client
+device drivers use the same init level as GPIO driver.  So we are not
+sure if GPIO driver is ready when client drivers try to request GPIO.
+It shouldn't be a problem if every client driver handle the failure
+with deferred probing, but I'm not sure that's the case now.
 
 Shawn
