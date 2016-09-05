@@ -1,24 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 05 Sep 2016 12:53:00 +0200
-Subject: [PATCH v4 4/5] net: stmmac: add a glue driver for the Amlogic
- Meson 8b / GXBB DWMAC
-In-Reply-To: <201609050953.67GKeUAU%fengguang.wu@intel.com>
-References: <201609050953.67GKeUAU%fengguang.wu@intel.com>
-Message-ID: <14789887.lyko4Om94p@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon,  5 Sep 2016 11:56:05 +0100
+Subject: [PATCH] arm64: spinlocks: implement smp_mb__before_spinlock() as
+ smp_mb()
+Message-ID: <1473072965-7272-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 5, 2016 9:37:29 AM CEST kbuild test robot wrote:
-> All error/warnings (new ones prefixed by >>):
-> 
-> >> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:63:18: error: field 'm250_mux' has incomplete type
->      struct clk_mux  m250_mux;
->                      ^
-> >> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:67:21: error: field 'm250_div' has incomplete type
->      struct clk_divider m250_div;
->                         ^
-> 
+smp_mb__before_spinlock() is intended to upgrade a spin_lock() operation
+to a full barrier, such that prior stores are ordered with respect to
+loads and stores occuring inside the critical section.
 
-I think this needs a compile-time dependency on COMMON_CLK
+Unfortunately, the core code defines the barrier as smp_wmb(), which
+is insufficient to provide the required ordering guarantees when used in
+conjunction with our load-acquire-based spinlock implementation.
 
-	Arnd
+This patch overrides the arm64 definition of smp_mb__before_spinlock()
+to map to a full smp_mb().
+
+Cc: <stable@vger.kernel.org>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Reported-by: Alan Stern <stern@rowland.harvard.edu>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/spinlock.h | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
+index e875a5a551d7..89206b568cd4 100644
+--- a/arch/arm64/include/asm/spinlock.h
++++ b/arch/arm64/include/asm/spinlock.h
+@@ -363,4 +363,14 @@ static inline int arch_read_trylock(arch_rwlock_t *rw)
+ #define arch_read_relax(lock)	cpu_relax()
+ #define arch_write_relax(lock)	cpu_relax()
+ 
++/*
++ * Accesses appearing in program order before a spin_lock() operation
++ * can be reordered with accesses inside the critical section, by virtue
++ * of arch_spin_lock being constructed using acquire semantics.
++ *
++ * In cases where this is problematic (e.g. try_to_wake_up), an
++ * smp_mb__before_spinlock() can restore the required ordering.
++ */
++#define smp_mb__before_spinlock()	smp_mb()
++
+ #endif /* __ASM_SPINLOCK_H */
+-- 
+2.1.4
