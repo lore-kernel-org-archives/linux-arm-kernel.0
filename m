@@ -1,37 +1,42 @@
-From: shh.xie@gmail.com (shh.xie at gmail.com)
-Date: Mon, 5 Sep 2016 18:01:30 +0800
-Subject: [PATCH 2/7] [v2] dt-bindings: i2c: adds two more nxp devices
-In-Reply-To: <1473069695-33092-1-git-send-email-shh.xie@gmail.com>
-References: <1473069695-33092-1-git-send-email-shh.xie@gmail.com>
-Message-ID: <1473069695-33092-3-git-send-email-shh.xie@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 5 Sep 2016 12:15:09 +0200
+Subject: [PATCHv2] pwm: lpc-18xx: use pwm_set_chip_data
+In-Reply-To: <1472143629-29890-1-git-send-email-oliver@schinagl.nl>
+References: <1472143629-29890-1-git-send-email-oliver@schinagl.nl>
+Message-ID: <20160905101509.GE31424@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shaohui Xie <Shaohui.Xie@nxp.com>
+On Thu, Aug 25, 2016 at 06:47:09PM +0200, Olliver Schinagl wrote:
+> The lpc18xx driver currently manipulates the pwm_device struct directly
+> rather then using the pwm_set_chip_data. While the current method may
+> save a clock cycle or two, it is more obvious that data is set to
+> the local chip data pointer.
+> 
+> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+> ---
+> Hi,
+> 
+> This is a resend of a patch-series I sent last year. There was no technical
+> related feedback and so I am re-sending the patch as is. I did rebase it to
+> Linus's current master.
+> 
+> Changes since v1:
+> 	- removed wrongfully added sun4i patch
+> 	- split patch series into a single patch
+> 	- added author
+> 
+>  drivers/pwm/pwm-lpc18xx-sct.c | 11 +++++++----
+>  1 file changed, 7 insertions(+), 4 deletions(-)
 
-"nxp,pcf2127" and "nxp,pcf2129" are I2c devices, adds them to the list
-of trivial i2c devices.
+Applied with minor bikeshedding.
 
-Signed-off-by: Shaohui Xie <Shaohui.Xie@nxp.com>
----
-changes in V2:
-new patch.
-
- Documentation/devicetree/bindings/i2c/trivial-devices.txt | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-index 5c70ce9..677b168 100644
---- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-+++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-@@ -129,6 +129,8 @@ nuvoton,npct501		i2c trusted platform module (TPM)
- nuvoton,npct601		i2c trusted platform module (TPM2)
- nxp,pca9556		Octal SMBus and I2C registered interface
- nxp,pca9557		8-bit I2C-bus and SMBus I/O port with reset
-+nxp,pcf2127		Real-time clock
-+nxp,pcf2129		Real-time clock
- nxp,pcf8563		Real-time clock/calendar
- nxp,pcf85063		Tiny Real-Time Clock
- oki,ml86v7667		OKI ML86V7667 video decoder
--- 
-2.1.0.27.g96db324
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/e6185af0/attachment.sig>
