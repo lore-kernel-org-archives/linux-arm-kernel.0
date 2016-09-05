@@ -1,25 +1,33 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 5 Sep 2016 17:09:00 +0200
-Subject: [PATCH] dt-bindings: mvebu-odmi: fix example typo
-In-Reply-To: <0743fef6fe390bc4ae7cabd15c4836bbed98f7cf.1473087913.git.baruch@tkos.co.il>
-References: <0743fef6fe390bc4ae7cabd15c4836bbed98f7cf.1473087913.git.baruch@tkos.co.il>
-Message-ID: <20160905170900.3225b4b4@free-electrons.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon,  5 Sep 2016 16:27:53 +0100
+Subject: [PATCH] arm-cci: pmu: Fix typo in event name
+Message-ID: <1473089273-19311-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+For one of the CCI events exposed under sysfs, "snoop" was typo'd as
+"snopp". Correct this such that users see the expected event name when
+enumerating events via sysfs.
 
-On Mon,  5 Sep 2016 18:05:13 +0300, Baruch Siach wrote:
-> Make the example compatible string match its definition.
-> 
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+Cc: arm at kernel.org
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/bus/arm-cci.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Thanks!
-
-Thomas
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index 5755907f..ffa7c9d 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -551,7 +551,7 @@ static struct attribute *cci5xx_pmu_event_attrs[] = {
+ 	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_wrq, 0xB),
+ 	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_cd_hs, 0xC),
+ 	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_rq_stall_addr_hazard, 0xD),
+-	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snopp_rq_stall_tt_full, 0xE),
++	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_rq_stall_tt_full, 0xE),
+ 	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_rq_tzmp1_prot, 0xF),
+ 	NULL
+ };
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.7.4
