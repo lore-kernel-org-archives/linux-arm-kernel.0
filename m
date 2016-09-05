@@ -1,124 +1,271 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 5 Sep 2016 02:23:33 +0200
-Subject: [PATCH 5/7] ARM64: meson-gxbb: add USB Nodes
-In-Reply-To: <20160904213152.25837-6-martin.blumenstingl@googlemail.com>
-References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
- <20160904213152.25837-6-martin.blumenstingl@googlemail.com>
-Message-ID: <aa1ff8df-ab18-73e3-c39e-a1f75ab3eba0@suse.de>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 05 Sep 2016 09:38:24 +0900
+Subject: [PATCH v9 3/5] Documentation: bindings: add dt documentation for
+ rk3399 dmc
+In-Reply-To: <1472850525-25273-4-git-send-email-hl@rock-chips.com>
+References: <1472850525-25273-1-git-send-email-hl@rock-chips.com>
+ <CGME20160902210855epcas1p3b0a0db9c3e5d962024d6d10bce5262be@epcas1p3.samsung.com>
+ <1472850525-25273-4-git-send-email-hl@rock-chips.com>
+Message-ID: <57CCBE80.8060906@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+Hi Lin,
 
-Am 04.09.2016 um 23:31 schrieb Martin Blumenstingl:
-> Add the nodes for the dwc2 USB controller and the related USB PHYs.
-> Currently we force usb0 to host mode because OTG is currently not
-> working in our PHY driver.
+Looks good to me. I add one comment on below.
+
+If you modify it according to my comment, feel free to add my tag.
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+
+On 2016? 09? 03? 06:08, Lin Huang wrote:
+> This patch adds the documentation for rockchip rk3399 dmc driver.
 > 
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
 > ---
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 52 +++++++++++++++++++++++++++++
->  1 file changed, 52 insertions(+)
+> Changes in v9:
+> - add ddr timing property to node
 > 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> index 2e8a3d9..02dfc54 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> @@ -151,6 +151,34 @@
->  		#size-cells = <2>;
->  		ranges;
->  
-> +		usb-phys at c0000000 {
-> +			compatible = "simple-bus";
-> +			reg = <0x0 0xc0000000 0x0 0x40>;
-> +			#address-cells = <2>;
-> +			#size-cells = <2>;
-> +			ranges = <0x0 0x0 0x0 0xc0000000 0x0 0x40>;
+> Changes in v8:
+> - add ddr timing properties
+> 
+> Changes in v7:
+> - None
+> 
+> Changes in v6:
+> -Add more detail in Documentation
+> 
+> Changes in v5:
+> -None
+> 
+> Changes in v4:
+> -None
+> 
+> Changes in v3:
+> -None
+> 
+> Changes in v2:
+> -None 
+> 
+> Changes in v1:
+> -None
+>  .../devicetree/bindings/devfreq/rk3399_dmc.txt     | 202 +++++++++++++++++++++
+>  1 file changed, 202 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt b/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
+> new file mode 100644
+> index 0000000..f187c8fa
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
+> @@ -0,0 +1,202 @@
+> +* Rockchip rk3399 DMC(Dynamic Memory Controller) device
+> +
+> +Required properties:
+> +- compatible:		 Must be "rockchip,rk3399-dmc".
+> +- devfreq-events:	 Node to get DDR loading, Refer to
+> +			 Documentation/devicetree/bindings/devfreq/
+> +			 rockchip-dfi.txt
+> +- interrupts:		 The interrupt number to the CPU. The interrupt
+> +			 specifier format depends on the interrupt controller.
+> +			 It should be DCF interrupts, when DDR dvfs finish,
+> +			 it will happen.
+> +- clocks:		 Phandles for clock specified in "clock-names" property
+> +- clock-names :		 The name of clock used by the DFI, must be
+> +			 "pclk_ddr_mon";
+> +- operating-points-v2:	 Refer to Documentation/devicetree/bindings/power/opp.txt
+> +			 for details.
+> +- center-supply:	 DMC supply node.
+> +- status:		 Marks the node enabled/disabled.
+> +
+> +Following properties are ddr timing:
+> +
+> +- dram_speed_bin :	 Value is defined at include/dt-bindings/clock/ddr.h,
+> +			 it select ddr3 cl-trp-trcd type, default value
+> +			 "DDR3_DEFAULT".it must selected according to
+> +			 "Speed Bin" in ddr3 datasheet, DO NOT use smaller
+> +			 "Speed Bin" than ddr3 exactly is.
+> +
+> +- pd_idle :		 Config the PD_IDLE value, defined the power-down idle
+> +			 period, memories are places into power-down mode if
+> +			 bus is idle for PD_IDLE DFI clocks.
+> +
+> +- sr_idle :		 Configure the SR_IDLE value, defined the selfrefresh
+> +			 idle period, memories are places into self-refresh
+> +			 mode if bus is idle for SR_IDLE*1024 DFI clocks
+> +			 (DFI clocks freq is half of dram's clocks), defaule
+> +			 value is "0".
+> +
+> +- sr_mc_gate_idle :	 Defined the self-refresh with memory and controller
+> +			 clock gating idle period, memories are places into
+> +			 self-refresh mode and memory controller clock arg
+> +			 gating if bus is idle for sr_mc_gate_idle*1024 DFI
+> +			 clocks.
+> +
+> +- srpd_lite_idle :	 Defined the self-refresh power down idle period,
+> +			 memories are places into self-refresh power down
+> +			 mode if bus is idle for srpd_lite_idle*1024 DFI
+> +			 clocks. This parameter is for LPDDR4 only.
+> +
+> +- standby_idle :	 Defined the standby idle period, memories are places
+> +			 into self-refresh than controller, pi, phy and dram
+> +			 clock will gating if bus is idle for
+> +			 standby_idle * DFI clocks.
+> +
+> +- dram_dll_disb_freq :	 It's defined the DDR3 dll bypass frequency in MHz
+> +			 when ddr freq less than DRAM_DLL_DISB_FREQ, ddr3
+> +			 dll will bypssed note: if dll was bypassed, the
+> +			 odt also stop working.
+> +
+> +- phy_dll_disb_freq :	 Defined the PHY dll bypass frequency in MHz (Mega Hz),
+> +			 when ddr freq less than DRAM_DLL_DISB_FREQ, phy dll
+> +			 will bypssed. note: phy dll and phy odt are
+> +			 independent
+> +
+> +- ddr3_odt_disb_freq :	 When dram type is DDR3, this parameter defined the
+> +			 odt disable frequency in MHz (Mega Hz), when ddr
+> +			 frequency less then ddr3_odt_disb_freq, the odt
+> +			 on dram side and controller side are both disabled.
+> +
+> +- ddr3_drv :		 When dram type is DDR3, this parameter define the
+> +			 dram side driver stength in ohm, default value is
+> +			 DDR3_DS_40ohm.
+> +
+> +- ddr3_odt :		 When dram type is DDR3, this parameter define the
+> +			 dram side ODT stength in ohm, default value is
+> +			 DDR3_ODT_120ohm.
+> +
+> +- phy_ddr3_ca_drv :	 When dram type is DDR3, this parameter define the phy
+> +			 side CA line(incluing command line, address line and
+> +			 clock line) driver strength. default value is
+> +			 PHY_DRV_ODT_40.
+> +
+> +- phy_ddr3_dq_drv :	 When dram type is DDR3, this parameter define the phy
+> +			 side DQ line(incluing DQS/DQ/DM line) driver strength.
+> +			 default value is PHY_DRV_ODT_40.
+> +
+> +- phy_ddr3_odt : 	 When dram type is DDR3, this parameter define the
+> +			 phy side odt strength, default value is
+> +			 PHY_DRV_ODT_240.
+> +
+> +- lpddr3_odt_disb_freq : When dram type is LPDDR3, this parameter defined then
+> +			 odt disable frequency in MHz (Mega Hz), when ddr
+> +			 frequency less then ddr3_odt_disb_freq, the odt on
+> +			 dram side and controller side are both disabled.
+> +
+> +- lpddr3_drv :		 When dram type is LPDDR3, this parameter define the
+> +			 dram side driver stength in ohm, default value is
+> +			 LP3_DS_34ohm.
+> +
+> +- lpddr3_odt :		 When dram type is LPDDR3, this parameter define the
+> +			 dram side ODT stength in ohm, default value is
+> +			 LP3_ODT_240ohm.
+> +
+> +- phy_lpddr3_ca_drv :	 When dram type is LPDDR3, this parameter define the
+> +			 phy side CA line(incluing command line, address line
+> +			 and clock line) driver strength. default value is
+> +			 PHY_DRV_ODT_40.
+> +
+> +- phy_lpddr3_dq_drv :	 When dram type is LPDDR3, this parameter define the
+> +			 phy side DQ line(incluing DQS/DQ/DM line) driver
+> +			 strength. default value is PHY_DRV_ODT_40.
+> +
+> +- phy_lpddr3_odt : 	 When dram type is LPDDR3, this parameter define the phy
+> +			 side odt strength, default value is PHY_DRV_ODT_240.
+> +
+> +- lpddr4_odt_disb_freq : When dram type is LPDDR4, this parameter defined the
+> +			 odt disable frequency in MHz (Mega Hz), when ddr
+> +			 frequency less then ddr3_odt_disb_freq, the odt on
+> +			 dram side and controller side are both disabled.
+> +
+> +- lpddr4_drv :		 When dram type is LPDDR4, this parameter define the
+> +			 dram side driver stength in ohm, default value is
+> +			 LP4_PDDS_60ohm.
+> +
+> +- lpddr4_dq_odt : 	 When dram type is LPDDR4, this parameter define the
+> +			 dram side ODT on dqs/dq line stength in ohm, default
+> +			 value is LP4_DQ_ODT_40ohm.
+> +
+> +- lpddr4_ca_odt :	 When dram type is LPDDR4, this parameter define the
+> +			 dram side ODT on ca line stength in ohm, default value
+> +			 is LP4_CA_ODT_40ohm.
+> +
+> +- phy_lpddr4_ca_drv :	 When dram type is LPDDR4, this parameter define the
+> +			 phy side  CA line(incluing command address line)
+> +			 driver strength. default value is PHY_DRV_ODT_40.
+> +
+> +- phy_lpddr4_ck_cs_drv : When dram type is LPDDR4, this parameter define the
+> +			 phy side clock line and cs line driver strength.
+> +			 default value is PHY_DRV_ODT_80.
+> +
+> +- phy_lpddr4_dq_drv :	 When dram type is LPDDR4, this parameter define the
+> +			 phy side DQ line(incluing DQS/DQ/DM line) driver
+> +			 strength. default value is PHY_DRV_ODT_80.
+> +
+> +- phy_lpddr4_odt :	 When dram type is LPDDR4, this parameter define the
+> +			 phy side odt strength, default value is PHY_DRV_ODT_60.
 
-Does this correspond to any physical bus or could we drop this layer?
+You better to add the 'rockchip,' prefix to property for ddr timing
+because below example include the 'rockchip,'.
 
 > +
-> +			usb0_phy: usb_phy at 0 {
-
-phy at 0 to avoid the underscore in node name? dash otherwise.
-If dropping the bus, *phy at c0000000 obviously.
-
-> +				compatible = "amlogic,meson-gxbb-usb2-phy";
-> +				#phy-cells = <0>;
-> +				reg = <0x0 0x0 0x0 0x20>;
-> +				resets = <&reset 34>;
-> +				clocks = <&clkc CLKID_USB &clkc CLKID_USB0>;
-
-<&clkc CLKID_USB>, <&clkc CLKID_USB0> please.
-
-> +				clock-names = "usb_general", "usb";
-> +				status = "disabled";
-> +			};
+> +Example:
+> +	dmc_opp_table: dmc_opp_table {
+> +		compatible = "operating-points-v2";
 > +
-> +			usb1_phy: usb_phy at 20 {
-> +				compatible = "amlogic,meson-gxbb-usb2-phy";
-> +				#phy-cells = <0>;
-> +				reg = <0x0 0x20 0x0 0x20>;
-> +				resets = <&reset 34>;
-> +				clocks = <&clkc CLKID_USB &clkc CLKID_USB1>;
-
-Ditto
-
-> +				clock-names = "usb_general", "usb";
-> +				status = "disabled";
-> +			};
+> +		opp00 {
+> +			opp-hz = /bits/ 64 <300000000>;
+> +			opp-microvolt = <900000>;
 > +		};
-> +
->  		cbus: cbus at c1100000 {
->  			compatible = "simple-bus";
->  			reg = <0x0 0xc1100000 0x0 0x100000>;
-> @@ -496,6 +524,30 @@
->  			};
->  		};
->  
-> +		usb0: usb-controller at c9000000 {
-
-usb at c9000000 by convention.
-
-> +			compatible = "amlogic,meson-gxbb-usb", "snps,dwc2";
-> +			reg = <0x0 0xc9000000 0x0 0x40000>;
-> +			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&clkc CLKID_USB0_DDR_BRIDGE>;
-> +			clock-names = "otg";
-> +			phys = <&usb0_phy>;
-> +			phy-names = "usb2-phy";
-> +			dr_mode = "host";
-> +			status = "disabled";
+> +		opp01 {
+> +			opp-hz = /bits/ 64 <666000000>;
+> +			opp-microvolt = <900000>;
 > +		};
+> +	};
 > +
-> +		usb1: usb-controller at c9100000 {
-
-usb at c9100000
-
-> +			compatible = "amlogic,meson-gxbb-usb", "snps,dwc2";
-> +			reg = <0x0 0xc9100000 0x0 0x40000>;
-> +			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&clkc CLKID_USB1_DDR_BRIDGE>;
-> +			clock-names = "otg";
-> +			phys = <&usb1_phy>;
-> +			phy-names = "usb2-phy";
-> +			dr_mode = "host";
-> +			status = "disabled";
-> +		};
+> +	dmc: dmc {
+> +		compatible = "rockchip,rk3399-dmc";
+> +		devfreq-events = <&dfi>;
+> +		interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cru SCLK_DDRCLK>;
+> +		clock-names = "dmc_clk";
+> +		operating-points-v2 = <&dmc_opp_table>;
+> +		center-supply = <&ppvar_centerlogic>;
+> +		upthreshold = <15>;
+> +		downdifferential = <10>;
+> +		rockchip,ddr3_speed_bin = <21>;
+> +		rockchip,pd_idle = <0x40>;
+> +		rockchip,sr_idle = <0x2>;
+> +		rockchip,sr_mc_gate_idle = <0x3>;
+> +		rockchip,srpd_lite_idle	= <0x4>;
+> +		rockchip,standby_idle = <0x2000>;
+> +		rockchip,dram_dll_dis_freq = <300>;
+> +		rockchip,phy_dll_dis_freq = <125>;
+> +		rockchip,auto_pd_dis_freq = <666>;
+> +		rockchip,ddr3_odt_dis_freq = <333>;
+> +		rockchip,ddr3_drv = <DDR3_DS_40ohm>;
+> +		rockchip,ddr3_odt = <DDR3_ODT_120ohm>;
+> +		rockchip,phy_ddr3_ca_drv = <PHY_DRV_ODT_40>;
+> +		rockchip,phy_ddr3_dq_drv = <PHY_DRV_ODT_40>;
+> +		rockchip,phy_ddr3_odt = <PHY_DRV_ODT_240>;
+> +		rockchip,lpddr3_odt_dis_freq = <333>;
+> +		rockchip,lpddr3_drv = <LP3_DS_34ohm>;
+> +		rockchip,lpddr3_odt = <LP3_ODT_240ohm>;
+> +		rockchip,phy_lpddr3_ca_drv = <PHY_DRV_ODT_40>;
+> +		rockchip,phy_lpddr3_dq_drv = <PHY_DRV_ODT_40>;
+> +		rockchip,phy_lpddr3_odt = <PHY_DRV_ODT_240>;
+> +		rockchip,lpddr4_odt_dis_freq = <333>;
+> +		rockchip,lpddr4_drv = <LP4_PDDS_60ohm>;
+> +		rockchip,lpddr4_dq_odt = <LP4_DQ_ODT_40ohm>;
+> +		rockchip,lpddr4_ca_odt = <LP4_CA_ODT_40ohm>;
+> +		rockchip,phy_lpddr4_ca_drv = <PHY_DRV_ODT_40>;
+> +		rockchip,phy_lpddr4_ck_cs_drv = <PHY_DRV_ODT_80>;
+> +		rockchip,phy_lpddr4_dq_drv = <PHY_DRV_ODT_80>;
+> +		rockchip,phy_lpddr4_odt = <PHY_DRV_ODT_60>;
+> +		status = "disabled";
+> +	};
 > +
->  		ethmac: ethernet at c9410000 {
->  			compatible = "amlogic,meson-gxbb-dwmac", "snps,dwmac";
->  			reg = <0x0 0xc9410000 0x0 0x10000
-
-Thanks for the huge progress you guys have been making.
-
-This patchset will probably clash with Neil's GXL preparations?
-
-Regards,
-Andreas
+> 
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Best Regards,
+Chanwoo Choi
