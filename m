@@ -1,155 +1,117 @@
-From: pmeerw@pmeerw.net (Peter Meerwald-Stadler)
-Date: Mon, 5 Sep 2016 10:07:48 +0200 (CEST)
-Subject: [PATCH v4 3/3] iio: adc: add support for Allwinner SoCs ADC
-In-Reply-To: <aed1e00f-ceaa-27e9-502d-51428f59a84f@free-electrons.com>
-References: <1472738705-20145-1-git-send-email-quentin.schulz@free-electrons.com>
- <1472738705-20145-4-git-send-email-quentin.schulz@free-electrons.com>
- <alpine.DEB.2.02.1609041754350.2060@pmeerw.net>
- <aed1e00f-ceaa-27e9-502d-51428f59a84f@free-electrons.com>
-Message-ID: <alpine.DEB.2.02.1609050924370.12528@pmeerw.net>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 05 Sep 2016 17:08:28 +0900
+Subject: [PATCH v2 3/7] pinctrl: samsung: Add the support the multiple
+ IORESOURCE_MEM for one pin-bank
+In-Reply-To: <CA+Ln22Guw1LghdV64cSKjByDExr+2HnvEK7DNkYz+XPAmVuAzA@mail.gmail.com>
+References: <1472046551-703-1-git-send-email-cw00.choi@samsung.com>
+ <1472046551-703-4-git-send-email-cw00.choi@samsung.com>
+ <CA+Ln22Ew=8S382zn+M8Ys5vztqvzp1+3EOTKtd81WSfuSyvY6w@mail.gmail.com>
+ <CGME20160825144434epcas1p42890a972743a8c8787444651f91a4fa6@epcas1p4.samsung.com>
+ <CA+Ln22Guw1LghdV64cSKjByDExr+2HnvEK7DNkYz+XPAmVuAzA@mail.gmail.com>
+Message-ID: <57CD27FC.2020201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tomasz,
 
-> >> The Allwinner SoCs all have an ADC that can also act as a touchscreen
-> >> controller and a thermal sensor. This patch adds the ADC driver which is
-> >> based on the MFD for the same SoCs ADC.
-> > 
-> > nitpicking ahead
+I'm sorry for late reply.
 
-> [...]
-> >> +
-> >> +const unsigned int sun4i_gpadc_chan_select(unsigned int chan)
-> > 
-> > static instead of const?
-
-> static const then?
-
-no, the const is redundant and ignored
--Wignored-qualifiers gives a warning
-
-just static, no const
-
-see
-http://stackoverflow.com/questions/12052468/type-qualifiers-on-function-return-type
-
-> >> +{
-> >> +	return SUN6I_GPADC_CTRL1_ADC_CHAN_SELECT(chan);
-> >> +}
-> >> +
-> >> +struct soc_specific {
-> >> +	const int		temp_offset;
-> > 
-> > wondering why you constify every member?
-> > 
+On 2016? 08? 25? 23:41, Tomasz Figa wrote:
+> 2016-08-25 23:30 GMT+09:00 Tomasz Figa <tomasz.figa@gmail.com>:
+>>> +       }
+>>> +
+>>> +#define EXYNOS_PIN_BANK_EINTN_EXT(pins, reg, id, pctl_idx, eint_idx)   \
+>>> +       {                                               \
+>>> +               .type           = &bank_type_off,       \
+>>> +               .pctl_offset    = reg,                  \
+>>> +               .nr_pins        = pins,                 \
+>>> +               .eint_type      = EINT_TYPE_NONE,       \
+>>> +               .name           = id,                   \
+>>> +               .pctl_res_idx   = pctl_idx,             \
+>>> +               .eint_res_idx   = eint_dix              \
+>>> +       }
+>>
+>> Your patch 4/7 doesn't seem to use this one, so this is dead code for
+>> the time being. Please add when there is real need for it.
+>>
+>> Also it doesn't really make much sense to have index for both pctl and
+>> eint. Please define first entry of regs property as always pointing to
+>> pctl registers and by also eint registers for usual controllers. Then
+>> second regs entry would be eint registers for controllers with
+>> separate register blocks. Then there is only a need to have
+>> eint_res_idx in the driver and no need for pctl_res_idx, because it
+>> would be always 0.
 > 
-> Because they're supposed to be fixed values? It won't change in runtime.
-> Is there any reason why I shouldn't do that?
+> Ah, sorry, I got confused again by which registers are where in these
+> GPF banks. Let's make it the other way around and make DT contain eint
+> registers in first regs entry and hardcode eint_res_idx to 0 for the
+> time being.
 
-yes, but using the entire struct as const has the same effect;
-constifying individual members makes more sense if there are also 
-non-const members
+I got with slight confusion.
+Do you mean that you want to remove the 'eint_res_idx' because
+it is always zero(0) as your comment. And do you agree to add 'pctl_res_idx'?
 
-nothing wrong, just unusual
+Also, as you commented, the eint_res_idx for both GPA and GPFx is zero(0).
 
-> >> +	const int		temp_scale;
-> >> +	const unsigned int	tp_mode_en;
-> >> +	const unsigned int	tp_adc_select;
-> >> +	const unsigned int	(*adc_chan_select)(unsigned int chan);
-> >> +};
-> [...]
-> >> +static int sun4i_gpadc_read(struct iio_dev *indio_dev, int channel, int *val,
-> >> +			    unsigned int irq)
-> >> +{
-> >> +	struct sun4i_gpadc_dev *info = iio_priv(indio_dev);
-> >> +	int ret = 0;
-> >> +
-> >> +	pm_runtime_get_sync(indio_dev->dev.parent);
-> >> +	mutex_lock(&info->mutex);
-> >> +
-> >> +	reinit_completion(&info->completion);
-> >> +
-> >> +	regmap_write(info->regmap, SUN4I_GPADC_INT_FIFOC,
-> >> +		     SUN4I_GPADC_INT_FIFOC_TP_FIFO_TRIG_LEVEL(1) |
-> >> +		     SUN4I_GPADC_INT_FIFOC_TP_FIFO_FLUSH);
-> > 
-> > check retval? here and elsewhere for regmap_write()
-> > 
-> 
-> ACK. What should I do with the retval then?
-> 
-> There are some in:
-> - sun4i_gpadc_read called for read_raws => return which error code (or
-> -ret only?)?
+Example:
+	pinctrl_alive: pinctrl at 10580000 {
+		compatible = "samsung,exynos5433-pinctrl";
+                      /* ALIVE domain    ,  IMEM domain  */
+		reg = <0x10580000 0x1a20>, <0x11090000 0x100>;
 
-I'd just return ret; in the other cases I think it's ok to ignore errors
+		wakeup-interrupt-controller {
+			compatible = "samsung,exynos7-wakeup-eint";
+			interrupts = <GIC_SPI 16 0>;
+		};
+	};
 
-> - sun4i_gpadc_runtime_suspend => return value of ret, but that would
-> cancel the suspend right?
-> - sun4i_gpadc_runtime_resume => return value of ret, but that would
-> cancel resume right?
-> - sun4i_gpadc_probe in the error gotos => probe already failing so do we
-> actually care if regmap_update_bits fails? If yes, what's the expected
-> behaviour?
-> - sun4i_gpadc_remove => return value of ret, but that would mean the
-> remove failed right?
+	GPA's eint_res_idx is 0
+	GPA's pctl_res_idx is 0
+
+	GPFx's eint_res_idx is 0
+	GPFx's pctl_res_idx is 1
+
+
+ However it should be still beneficial to refactor the code
+> and calculate per-bank eint_base to avoid adding the offset every
+> time, similarly to pctl_base/offset, from my suggestion below.
+
+I agree. I'll modify it according to your comment.
+
 > 
-> [...]
-> >> +static int sun4i_gpadc_read_raw(struct iio_dev *indio_dev,
-> >> +				struct iio_chan_spec const *chan, int *val,
-> >> +				int *val2, long mask)
-> >> +{
-> >> +	int ret;
-> >> +
-> >> +	switch (mask) {
-> >> +	case IIO_CHAN_INFO_OFFSET:
-> >> +		ret = sun4i_gpadc_temp_offset(indio_dev, val);
-> >> +		if (ret)
-> >> +			return ret;
-> >> +
-> >> +		return IIO_VAL_INT;
-> >> +	case IIO_CHAN_INFO_RAW:
-> >> +		if (chan->type == IIO_VOLTAGE) {
-> >> +			ret = sun4i_gpadc_adc_read(indio_dev, chan->channel,
-> >> +						   val);
-> >> +			if (ret)
-> >> +				return ret;
-> > 
-> > could share the "if (ret) return ret;" between code path
-> > 
+>>> @@ -345,7 +346,8 @@ static void pin_to_reg_bank(struct samsung_pinctrl_drv_data *drvdata,
+>>>                         ((b->pin_base + b->nr_pins - 1) < pin))
+>>>                 b++;
+>>>
+>>> -       *reg = drvdata->virt_base + b->pctl_offset;
+>>> +       pctl_res_idx = b->pctl_res_idx;
+>>> +       *reg = drvdata->virt_base[pctl_res_idx] + b->pctl_offset;
+>>
+>> I suggested something slightly different. Instead of
+>> bank::pctl_res_idx, I proposed bank::pctl_base.
+>> bank_info::pctl_res_idx would be specified only in init driver data
+>> and bank::pctl_base would be calculated at probe time as
+>> drvdata->virt_base[bank_info->pctl_res_idx] + bank_info->pctl_offset.
+>> This would eliminate the need to do any indexing and adding further in
+>> the code and make things simpler.
+>>
+>> Taking my other comments above, pctl part would be unchanged and only
+>> eint addresses and offsets would be affected.
 > 
-> ACK.
+> Ah, scratch this one sentence. I got confused with the register layout
+> again, sorry. Please refactor both eint and pctl as I suggested in the
+> upper paragraph.
 > 
-> [...]
-> >> +static int sun4i_irq_init(struct platform_device *pdev, const char *name,
-> >> +			  irq_handler_t handler, const char *devname,
-> >> +			  unsigned int *irq, atomic_t *atomic)
-> >> +{
-> >> +	int ret;
-> >> +	struct sun4i_gpadc_mfd_dev *mfd_dev = dev_get_drvdata(pdev->dev.parent);
-> >> +	struct sun4i_gpadc_dev *info = iio_priv(dev_get_drvdata(&pdev->dev));
-> >> +
-> >> +	/*
-> >> +	 * Once the interrupt is activated, the IP continuously performs
-> >> +	 * conversions thus throws interrupts. The interrupt is activated right
-> >> +	 * after being requested but we want to control when these interrupts
-> >> +	 * occurs thus we disable it right after being requested. However, an
-> > 
-> > occur
-> > 
+> Best regards,
+> Tomasz
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> ACK for all typos.
-> Thanks!
 > 
-> Quentin
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
 
 -- 
-
-Peter Meerwald-Stadler
-+43-664-2444418 (mobile)
+Best Regards,
+Chanwoo Choi
