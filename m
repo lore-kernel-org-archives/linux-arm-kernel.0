@@ -1,31 +1,37 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  5 Sep 2016 10:23:17 +0100
-Subject: [PATCH] arm64: kernel: re-export _cpu_resume() from sleep.S
-Message-ID: <1473067397-2648-1-git-send-email-ard.biesheuvel@linaro.org>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Mon, 5 Sep 2016 17:26:18 +0800
+Subject: [PATCH 2/4] ARM: dts: rockchip: fix i2c address L3G4200D on
+ PopMetal-RK3288 board
+In-Reply-To: <2908713.CWeP2vUbBj@phil>
+References: <1472977937-758-1-git-send-email-andy.yan@rock-chips.com>
+ <1472978067-868-1-git-send-email-andy.yan@rock-chips.com>
+ <2908713.CWeP2vUbBj@phil>
+Message-ID: <29cd817f-bcef-2cba-643c-ac86e9bf28a4@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit b5fe242972ef ("arm64: kernel: fix style issues in sleep.S")
-changed the linkage of _cpu_resume() to local, even though the symbol
-is also referenced from hibernate.c. So revert this change.
+Hi Heiko:
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/sleep.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index 0f7e0b2ac64c..b8799e7c79de 100644
---- a/arch/arm64/kernel/sleep.S
-+++ b/arch/arm64/kernel/sleep.S
-@@ -107,7 +107,7 @@ ENDPROC(cpu_resume)
- 	.ltorg
- 	.popsection
- 
--_cpu_resume:
-+ENTRY(_cpu_resume)
- 	mrs	x1, mpidr_el1
- 	adr_l	x8, mpidr_hash		// x8 = struct mpidr_hash virt address
- 
--- 
-2.7.4
+
+On 2016?09?05? 17:12, Heiko Stuebner wrote:
+> Am Sonntag, 4. September 2016, 16:34:27 CEST schrieb Andy Yan:
+>> The i2c address of the three-axis digital gyroscope L3G4200D should be
+>> 0x69 according to hardware design.
+>> Also add power supply reference for L3G3200D and the 3-axis Electronic
+>> Compass AK8963.
+>>
+>> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> I've split this into two patches:
+> ARM: dts: rockchip: fix L3G4200D i2c address on PopMetal-RK3288 board
+> ARM: dts: rockchip: Add sensor-supplies on PopMetal-RK3288 board
+> and applied them to my dts32 branch for 4.9
+>
+> Please don't mix multiple changes into one patch in the future :-)
+>
+     Thanks, I'll keep this in mind.
+> Thanks
+> Heiko
+>
+>
+>
