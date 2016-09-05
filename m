@@ -1,149 +1,144 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Mon, 5 Sep 2016 20:51:17 +0100
-Subject: [PATCH v4 3/3] iio: adc: add support for Allwinner SoCs ADC
-In-Reply-To: <f085ee35-889f-58e3-15d6-e6f3c0d15a92@free-electrons.com>
-References: <1472738705-20145-1-git-send-email-quentin.schulz@free-electrons.com>
- <1472738705-20145-4-git-send-email-quentin.schulz@free-electrons.com>
- <272fb672-602c-1757-be9f-eadf928b330c@kernel.org>
- <f085ee35-889f-58e3-15d6-e6f3c0d15a92@free-electrons.com>
-Message-ID: <f7d115a6-29e3-6157-60a1-0dd47cef79e3@kernel.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 5 Sep 2016 21:58:14 +0200
+Subject: [PATCH 3/3] ARM: dts: sun8i-q8-common: Add support for SDIO wifi
+ controllers
+In-Reply-To: <1efbd549-a05b-713e-cbe2-7a5458beaaeb@redhat.com>
+References: <20160826145236.30210-1-hdegoede@redhat.com>
+ <20160826145236.30210-4-hdegoede@redhat.com>
+ <20160829065620.GC7612@lukather>
+ <724a6222-36e3-e230-5071-a7cb23c51697@redhat.com>
+ <20160901203733.GI20462@lukather>
+ <1efbd549-a05b-713e-cbe2-7a5458beaaeb@redhat.com>
+Message-ID: <20160905195814.GA8596@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/16 07:29, Quentin Schulz wrote:
-> On 04/09/2016 16:35, Jonathan Cameron wrote:
->> On 01/09/16 15:05, Quentin Schulz wrote:
->>> The Allwinner SoCs all have an ADC that can also act as a touchscreen
->>> controller and a thermal sensor. This patch adds the ADC driver which is
->>> based on the MFD for the same SoCs ADC.
->>>
->>> This also registers the thermal adc channel in the iio map array so
->>> iio_hwmon could use it without modifying the Device Tree. This registers
->>> the driver in the thermal framework.
->>>
->>> This driver probes on three different platform_device_id to take into
->>> account slight differences (registers bit and temperature computation)
->>> between Allwinner SoCs ADCs.
->>>
->>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->> One utterly trivial point about unrolling code ordering inline.
->>
->> Other than the bit about patch 1 I'm basically happy with this..
-> 
-> ACK. Will revert this patch in v5. Thanks.
-> 
->> However I would like some input (i.e. an Ack) from thermal given this
->> sets up a thermal zone.
->>
->> Zhang or Eduardo, could you take a quick look at this and confirm you
->> are happy with it?
->>
->> Thanks,
->>
->> Jonathan
-> [...]
->>> +
->>> +err_map:
->>> +	iio_map_array_unregister(indio_dev);
->>> +
->>> +err_fifo_irq:
->>> +	/* Disable FIFO_DATA_PENDING interrupt on hardware side. */
->>> +	regmap_update_bits(info->regmap, SUN4I_GPADC_INT_FIFOC,
->>> +			   SUN4I_GPADC_INT_FIFOC_TP_DATA_IRQ_EN,
->>> +			   0);
->>> +
->>> +err_temp_irq:
->>> +	/* Disable TEMP_DATA_PENDING interrupt on hardware side. */
->>> +	regmap_update_bits(info->regmap, SUN4I_GPADC_INT_FIFOC,
->>> +			   SUN4I_GPADC_INT_FIFOC_TEMP_IRQ_EN,
->>> +			   0);
->>> +
->>> +err:
->>> +	pm_runtime_put(&pdev->dev);
->>> +	pm_runtime_disable(&pdev->dev);
->>> +
->>> +	return ret;
->>> +}
->>> +
->>> +static int sun4i_gpadc_remove(struct platform_device *pdev)
->>> +{
->>> +	struct sun4i_gpadc_dev *info;
->>> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
->>> +
->>> +	info = iio_priv(indio_dev);
->>> +	iio_device_unregister(indio_dev);
->>> +	iio_map_array_unregister(indio_dev);
->>> +	pm_runtime_put(&pdev->dev);
->>> +	pm_runtime_disable(&pdev->dev);
->> Its really minor but in the interests of 'obviously correct' making
->> review easy I'd rather everything in the remove was in the reverse order
->> of probe (and hence the same as the error path in probe for most of it).
->>
->> That would put the pm_runtime stuff last I think..
->>
->> If you weren't rerolling anyway over patch 1 I'd probably have just let
->> this go, but might as well make this trivial change as well.
->>
-> 
-> I'm going with the following order:
-> pm_runtime_put
-> pm_runtime_disable
-> regmap_update_bits
-> iio_map_array_unregister
-> iio_device_unregister
-> 
-> Is that okay? (I don't really know which one of iio_map_array_unregister
-> or iio_device_unregister to put first, if it matters in any way).
-Unless we have a really complex race condition involving a client driver
-coming up just as the provider is unregistered I doubt it matters.
+Hi,
 
-At some point we should probably chase down any paths through that
-with some carefully crafted tests but it's in the seriously unlikely
-category!
+On Sat, Sep 03, 2016 at 01:33:50PM +0200, Hans de Goede wrote:
+> >On Mon, Aug 29, 2016 at 11:46:14AM +0200, Hans de Goede wrote:
+> >>On 29-08-16 08:56, Maxime Ripard wrote:
+> >>>On Fri, Aug 26, 2016 at 04:52:36PM +0200, Hans de Goede wrote:
+> >>>>Most of the sun8i q8 boards have an usb wifi controller, on the
+> >>>>variants which use an USB wifi controller, this will result in a
+> >>>>couple of error msg-s in dmesg when proving the sdio bus and
+> >>>>an used mmc controller.
+> >>>>
+> >>>>The best way to deal with wifi on this boards really is to simply
+> >>>>let the kernel auto-detect usb or sdio wifi controllers, so we
+> >>>>will just have to live with the few errors in dmesg.
+> >>>
+> >>>No, because that grabs PINs that might or might not be supposed to be
+> >>>used for that, it leaves clocks and regulators enabled, which draw
+> >>>power, to no end. And that's even worth since most boards will not use
+> >>>it.
+> >>>
+> >>>You can put the definition of the nodes in the DTSI, but the final
+> >>>status will have to be in the (relevant) DTS.
+> >>
+> >>This is again the q8-tablet thing where china produces a new variant
+> >>every 2 weeks. So we've sun8i-a23-q8-tablet.dts and sun8i-a33-q8-tablet.dts
+> >>which try to be generic dts files for these tablets, since creating
+> >>a custom dts per variant is madness.
+> >
+> >This is almost unrelated, and probably some wishful thinking, but I'd
+> >really prefer to support *one* board properly, with all its features,
+> >rather than supporting every random Allwinner device with half baked
+> >support, because no one ever updated the DT, or there's simply no
+> >driver. But hey, I can't force you to work on something either :)
+> 
+> The q8 tablets are somewhat special, to the end consumer they
+> are one board, but they differ a lot per badge. These are 40 (or less)
+> usd tablets, which get whatever wifi / touchscreen-controller /
+> accelerometer which is cheapest on the Chenzen market when the
+> badge gets produces.
+> 
+> For the end user to actually figure out what is in there requires
+> opening the tablet, or poking around with adb to learn the exact
+> internals / drivers used by android.
+> 
+> I actually own 10 of these (3 a13, 5 a23, 2 a33) and have access
+> to 2 more a33 models which friends of me have, and they are *all*
+> different. For a list of all tablets I've see:
+> https://github.com/jwrdegoede/sunxi-fedora-scripts/blob/master/hansg-tablet-info
+> 
+> Given the price of these they are really nice to thinker with /
+> turn into a little normal linux touch device, so I would like to
+> support them as best as we can in a somewhat user-friendly
+> way. Also see the RFC patch for the q8-hardwaremgr I posted
+> recently. In the end these tablets are the "*one* board"
+> which I'm trying to support properly, except that they are
+> only one board on the outside not on the outside.
+> 
+> TL;DR: q8 tablets are special, but also quite popular and
+> I would like to support them properly, which requires
+> some special handling.
+> 
+> >>This commit puts the node in sun8i-q8-common.dtsi because the
+> >>A23 and A33 are pin compatible and we've tablets where the
+> >>only difference is the SoC soldered on there, the use the _exact_
+> >>same PCB and components otherwise, so we have all the sun8i q8
+> >>stuff in a common place for sun8i-a23-q8-tablet.dts and
+> >>sun8i-a33-q8-tablet.dts, those are the only users of this
+> >>dtsi file.
+> >>
+> >>You've already merged the bits which handle the variants with
+> >>an USB attached wifi module (enabling ehci0 also on boards
+> >>where nothing is connected). This is the counter-part for
+> >>PCB's which use a sdio wifi module (about 90% of all boards
+> >>in my experience).
+> >
+> >I'm confused. Are most boards using an USB wifi chip, like you were
+> >stating in your commit log, or an SDIO wifi chip like you just said?
+> 
+> My bad, the commit msg. is wrong of the 9 sun8i q8 tablets I've
+> access to only 1 uses usb wifi.
+> 
+> So the first part of the commit msg should read
+> "Most of the sun8i q8 boards have a sdio wifi controller"
+> 
+> >>As for turning a regulator on unnecessary, both the wifi and sdio
+> >>wifi solution use the same regulator, so that is already turned on
+> >>through the usb bits and it needs to be in either case.
+> >
+> >Ok, so indeed, that's not as bad as it sounds.
+> >
+> >>The only downside of this approach is that we either have
+> >>the USB controller turned on unnecessarily (in most cases)
+> >>or the mmc controller (in the rare A23 tablet which still
+> >>uses an USB wifi module).
+> >>
+> >>This all actually fits neatly into the plans to do hardware
+> >>autodetection for these tablets which I'm working on, in
+> >>this case we can just let the kernel handle things without
+> >>additional code (think the beaglebone capemanager) since
+> >>both busses are discoverable.
+> >>
+> >>Once we have the q8-hardwaremgr I'm working on and hope
+> >>to post an RFC of soon, we could even make that turn off
+> >>the unused controller (as a future enhancement).
+> >
+> >If that's on your to-do-list, that's fine by me.
+> 
+> I've just added it to my to-do list :)
+> 
+> So I assume with that done, that you are ok with taking this
+> patch now ? Please fixup the commit msg mistake, or let
+> me know if you want a v2.
 
-Jonathan
-> 
-> Thanks!
-> Quentin
->>
->>> +	/*
->>> +	 * Disable TEMP_DATA_PENDING and FIFO_DATA_PENDING interrupts on
->>> +	 * hardware side.
->>> +	 */
->>> +	regmap_update_bits(info->regmap, SUN4I_GPADC_INT_FIFOC,
->>> +			   SUN4I_GPADC_INT_FIFOC_TEMP_IRQ_EN |
->>> +				SUN4I_GPADC_INT_FIFOC_TP_DATA_IRQ_EN,
->>> +			   0);
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static const struct platform_device_id sun4i_gpadc_id[] = {
->>> +	{ "sun4i-a10-gpadc-iio", (kernel_ulong_t)&sun4i_gpadc_soc_specific },
->>> +	{ "sun5i-a13-gpadc-iio", (kernel_ulong_t)&sun5i_gpadc_soc_specific },
->>> +	{ "sun6i-a31-gpadc-iio", (kernel_ulong_t)&sun6i_gpadc_soc_specific },
->>> +	{ /* sentinel */ },
->>> +};
->>> +
->>> +static struct platform_driver sun4i_gpadc_driver = {
->>> +	.driver = {
->>> +		.name = "sun4i-gpadc-iio",
->>> +		.pm = &sun4i_gpadc_pm_ops,
->>> +	},
->>> +	.id_table = sun4i_gpadc_id,
->>> +	.probe = sun4i_gpadc_probe,
->>> +	.remove = sun4i_gpadc_remove,
->>> +};
->>> +
->>> +module_platform_driver(sun4i_gpadc_driver);
->>> +
->>> +MODULE_DESCRIPTION("ADC driver for sunxi platforms");
->>> +MODULE_AUTHOR("Quentin Schulz <quentin.schulz@free-electrons.com>");
->>> +MODULE_LICENSE("GPL v2");
->>>
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Yeah, I just applied it and fixed the commit log.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/e13d4468/attachment.sig>
