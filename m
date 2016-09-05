@@ -1,76 +1,68 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Mon, 5 Sep 2016 15:20:23 +0200
-Subject: [PATCH v3 00/14] Clock improvement for video playback
-In-Reply-To: <1472473626-15398-1-git-send-email-gabriel.fernandez@st.com>
-References: <1472473626-15398-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <3588e4a5-7f80-a71d-9b56-a65dc8e5630d@st.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 5 Sep 2016 14:24:11 +0100
+Subject: [PATCH] arm64: mm: phys_mem_access_prot() reports non-kernel
+ memory as device memory
+In-Reply-To: <CAKv+Gu-eEodAFnXhAygzEFU34vZitzhH2yfU71=3gyVFBsdQYA@mail.gmail.com>
+References: <1473064984-9494-1-git-send-email-james.morse@arm.com>
+ <20160905103526.GD2649@arm.com> <57CD6D2E.70208@arm.com>
+ <CAKv+Gu-eEodAFnXhAygzEFU34vZitzhH2yfU71=3gyVFBsdQYA@mail.gmail.com>
+Message-ID: <20160905132411.GC10221@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabriel
+On Mon, Sep 05, 2016 at 02:10:54PM +0100, Ard Biesheuvel wrote:
+> On 5 September 2016 at 14:03, James Morse <james.morse@arm.com> wrote:
+> > On 05/09/16 11:35, Will Deacon wrote:
+> >> On Mon, Sep 05, 2016 at 09:43:03AM +0100, James Morse wrote:
+> >>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> >>> index 4989948d1feb..96a2f327fd2c 100644
+> >>> --- a/arch/arm64/mm/mmu.c
+> >>> +++ b/arch/arm64/mm/mmu.c
+> >>> @@ -63,7 +63,7 @@ static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss __maybe_unused;
+> >>>  pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+> >>>                            unsigned long size, pgprot_t vma_prot)
+> >>>  {
+> >>> -    if (!pfn_valid(pfn))
+> >>> +    if (!memblock_is_memory(pfn << PAGE_SHIFT))
+> >
+> >> Hmm, this looks pretty weird to me. pfn_valid currently calls
+> >> memblock_is_map_memory, so now we have this slightly paradoxical situation
+> >> of having some memory marked NOMAP but wanting to map it to userspace.
+> >
+> > Yup, crazy as it looks, that is what is happening.
+> >
+> 
+> Indeed. Formerly, we would remove this from memblock entirely,
+> resulting in the same situation, i.e., that the region is omitted from
+> the linear mapping. However, by doing that, we also lose the
+> annotation that the region was memory to begin with, resulting in the
+> ACPI layer using ioremap() rather than ioremap_cache() or memremap()
+> to map it.
+> 
+> So the whole point of introducing MEMBLOCK_NOMAP was to allow memory
+> to be kept in the memblock array, but with an annotation that it
+> should not be covered by the linear mapping.
+> 
+> >> So our abstractions don't seem to align with reality. Why are the ACPI
+> >> tables getting marked as NOMAP to being with?
+> >
+> > EFI adds any region we can map as normal memory to memblock.memory, it also adds
+> > anything it considers reserved to the memblock.nomap, e.g. the ACPI tables. This
+> > causes these regions be left out of the linear map.
+> > (I don't know why exactly, but assume its so that the attributes and permissions
+> > can be tweaked easily)
+> >
+> 
+> To prevent mismatched attributes between the linear mapping and
+> whatever mapping the firmware and/or ACPI are using. Also, going
+> through the trouble of mapping runtime services executable code with
+> R-X permissions and then having a writable alias is not great in terms
+> of security.
 
-For the whole series
+Ok, but with this patch we potentially have both of those problems
+(mismatched attributes and RWX permission) with the userspace mapping :/
 
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
+Is it worth trying to avoid any of this, or do we just throw our hands
+in the air and give up when /dev/mem is being used?
 
-Thanks
-
-
-
-On 08/29/2016 02:26 PM, gabriel.fernandez at st.com wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
->
-> v3:
->   - Rebase to v4.8-rc1
->   - Tipo fix in st,clkgen-pll.txt
->   - Add Ack of Peter for the series
->   - Add missed patch: "ARM: DT: STiH4xx: Simplify clock binding of STiH4xx platforms"
->
-> v2:
->   - Simpliflication of clock binding
->     remark from Rob https://lkml.org/lkml/2016/5/25/492
->   - Suppression of stih415-416 support for the clocks (in order
-> 	to help simplification of clock binding)
->     (others patchs for the machine and drivers will come)
->
-> This serie allows to increase video resolutions and make audio
-> adjustment during a video playback.
->
-> Gabriel Fernandez (14):
->   drivers: clk: st: Remove stih415-416 clock support
->   drivers: clk: st: Simplify clock binding of STiH4xx platforms
->   ARM: DT: STiH4xx: Simplify clock binding of STiH4xx platforms
->   drivers: clk: st: Add fs660c32 synthesizer algorithm
->   drivers: clk: st: Add clock propagation for audio clocks
->   drivers: clk: st: Handle clk synchronous mode for video clocks
->   ARM: DT: STiH407: Enable clock propagation for audio clocks
->   ARM: DT: STiH410: Enable clock propagation for audio clocks
->   ARM: DT: STiH418: Enable clock propagation for audio clocks
->   ARM: DT: STiH407: Enable synchronous clock mode for video clocks
->   ARM: DT: STiH410: Enable synchronous clock mode for video clocks
->   ARM: DT: STiH418: Enable synchronous clock mode for video clocks
->   ARM: DT: STi: STiH407: clock configuration to address 720p and 1080p
->   ARM: DT: STi: STiH410: clock configuration to address 720p and 1080p
->
->  .../bindings/clock/st/st,clkgen-divmux.txt         |  49 --
->  .../devicetree/bindings/clock/st/st,clkgen-mux.txt |  20 +-
->  .../devicetree/bindings/clock/st/st,clkgen-pll.txt |  35 +-
->  .../bindings/clock/st/st,clkgen-prediv.txt         |  36 -
->  .../devicetree/bindings/clock/st/st,clkgen-vcc.txt |  61 --
->  .../devicetree/bindings/clock/st/st,clkgen.txt     |  54 +-
->  .../devicetree/bindings/clock/st/st,flexgen.txt    |   4 +
->  .../devicetree/bindings/clock/st/st,quadfs.txt     |  31 +-
->  arch/arm/boot/dts/stih407-clock.dtsi               |  22 +-
->  arch/arm/boot/dts/stih407.dtsi                     |  16 +-
->  arch/arm/boot/dts/stih410-clock.dtsi               |  20 +-
->  arch/arm/boot/dts/stih410.dtsi                     |  16 +-
->  arch/arm/boot/dts/stih418-clock.dtsi               |  20 +-
->  drivers/clk/st/clk-flexgen.c                       |  63 +-
->  drivers/clk/st/clkgen-fsyn.c                       | 481 ++++---------
->  drivers/clk/st/clkgen-mux.c                        | 748 +--------------------
->  drivers/clk/st/clkgen-pll.c                        | 472 +------------
->  17 files changed, 323 insertions(+), 1825 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-divmux.txt
->  delete mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-prediv.txt
->  delete mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-vcc.txt
->
+Will
