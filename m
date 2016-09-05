@@ -1,43 +1,102 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  5 Sep 2016 16:27:48 -0300
-Subject: [PATCH v2 2/4] ARM: dts: imx28: Remove skeleton.dtsi inclusion
+Date: Mon,  5 Sep 2016 16:27:49 -0300
+Subject: [PATCH v2 3/4] ARM: dts: imx23: Fix build warnings with W=1
 In-Reply-To: <1473103670-15922-1-git-send-email-festevam@gmail.com>
 References: <1473103670-15922-1-git-send-email-festevam@gmail.com>
-Message-ID: <1473103670-15922-2-git-send-email-festevam@gmail.com>
+Message-ID: <1473103670-15922-3-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Remove skeleton.dtsi to avoid the following build warning with W=1:
+Fix the following build warnings with W=1:
 
 Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+
+While at it, also pass the 'device_type' property as recommended by the
+ePAPR specification.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
 Changes since v1:
-- Remove skeleton.dtsi dependency (Rob)
+- None
 
- arch/arm/boot/dts/imx28.dtsi | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx23-evk.dts           | 3 ++-
+ arch/arm/boot/dts/imx23-olinuxino.dts     | 3 ++-
+ arch/arm/boot/dts/imx23-sansa.dts         | 3 ++-
+ arch/arm/boot/dts/imx23-stmp378x_devb.dts | 3 ++-
+ arch/arm/boot/dts/imx23-xfi3.dts          | 3 ++-
+ 5 files changed, 10 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 0ad893b..3aabf65 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -10,10 +10,12 @@
-  */
+diff --git a/arch/arm/boot/dts/imx23-evk.dts b/arch/arm/boot/dts/imx23-evk.dts
+index 57e2997..bd06402 100644
+--- a/arch/arm/boot/dts/imx23-evk.dts
++++ b/arch/arm/boot/dts/imx23-evk.dts
+@@ -16,7 +16,8 @@
+ 	model = "Freescale i.MX23 Evaluation Kit";
+ 	compatible = "fsl,imx23-evk", "fsl,imx23";
  
- #include <dt-bindings/gpio/gpio.h>
--#include "skeleton.dtsi"
- #include "imx28-pinfunc.h"
+-	memory {
++	memory at 40000000 {
++		device_type = "memory";
+ 		reg = <0x40000000 0x08000000>;
+ 	};
  
- / {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
- 	interrupt-parent = <&icoll>;
+diff --git a/arch/arm/boot/dts/imx23-olinuxino.dts b/arch/arm/boot/dts/imx23-olinuxino.dts
+index a8b1c53..109f516 100644
+--- a/arch/arm/boot/dts/imx23-olinuxino.dts
++++ b/arch/arm/boot/dts/imx23-olinuxino.dts
+@@ -19,7 +19,8 @@
+ 	model = "i.MX23 Olinuxino Low Cost Board";
+ 	compatible = "olimex,imx23-olinuxino", "fsl,imx23";
  
- 	aliases {
+-	memory {
++	memory at 40000000 {
++		device_type = "memory";
+ 		reg = <0x40000000 0x04000000>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/imx23-sansa.dts b/arch/arm/boot/dts/imx23-sansa.dts
+index 4ec32f4..9cf40d3 100644
+--- a/arch/arm/boot/dts/imx23-sansa.dts
++++ b/arch/arm/boot/dts/imx23-sansa.dts
+@@ -48,7 +48,8 @@
+ 	model = "SanDisk Sansa Fuze+";
+ 	compatible = "sandisk,sansa_fuze_plus", "fsl,imx23";
+ 
+-	memory {
++	memory at 40000000 {
++		device_type = "memory";
+ 		reg = <0x40000000 0x04000000>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/imx23-stmp378x_devb.dts b/arch/arm/boot/dts/imx23-stmp378x_devb.dts
+index 455169e..aab0293 100644
+--- a/arch/arm/boot/dts/imx23-stmp378x_devb.dts
++++ b/arch/arm/boot/dts/imx23-stmp378x_devb.dts
+@@ -16,7 +16,8 @@
+ 	model = "Freescale STMP378x Development Board";
+ 	compatible = "fsl,stmp378x-devb", "fsl,imx23";
+ 
+-	memory {
++	memory at 40000000 {
++		device_type = "memory";
+ 		reg = <0x40000000 0x04000000>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/imx23-xfi3.dts b/arch/arm/boot/dts/imx23-xfi3.dts
+index 025cf94..2b5df8d 100644
+--- a/arch/arm/boot/dts/imx23-xfi3.dts
++++ b/arch/arm/boot/dts/imx23-xfi3.dts
+@@ -48,7 +48,8 @@
+ 	model = "Creative ZEN X-Fi3";
+ 	compatible = "creative,x-fi3", "fsl,imx23";
+ 
+-	memory {
++	memory at 40000000 {
++		device_type = "memory";
+ 		reg = <0x40000000 0x04000000>;
+ 	};
+ 
 -- 
 1.9.1
