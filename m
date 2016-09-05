@@ -1,95 +1,62 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 5 Sep 2016 10:26:08 +0200
-Subject: [PATCH] iio: adc: at91: Add support for Touchscreen Switches
- Closure Time
-In-Reply-To: <b7dcd8e4-db9e-a9ee-352f-b7b77d57cc7a@kernel.org>
-References: <20160830122701.19385-1-nicolas.ferre@atmel.com>
- <b7dcd8e4-db9e-a9ee-352f-b7b77d57cc7a@kernel.org>
-Message-ID: <51aeb56b-c2f7-461f-065d-c581d3837340@atmel.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon,  5 Sep 2016 09:43:03 +0100
+Subject: [PATCH] arm64: mm: phys_mem_access_prot() reports non-kernel memory
+ as device memory
+Message-ID: <1473064984-9494-1-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 03/09/2016 ? 18:24, Jonathan Cameron a ?crit :
-> On 30/08/16 13:27, Nicolas Ferre wrote:
->> On newer components compatible with the at91sam9x5, the Touchscreen
->> Switches Closure Time or TSSCTIM value of the Touchscreen Mode Register is
->> not filled at all.
->> On some hardware, having no time indicated for it may lead to incoherent
->> values and jitter.
->> We fix this time to 10us as it is usually difficult to retrieve impedance
->> values from LCD manufacturers.
->>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Hi Nicolas,
-> 
-> Stable / fixes material or just have it head for the next merge window?
+Running 'acpidump' on an arm64 system causes the program to SIGSEGV, and
+yield the following trace:
+[   71.623572] acpidump[2159]: unhandled alignment fault (11) at 0xffff8a4a909c, esr 0x92000021
+[   71.632030] pgd = ffff8003ecf7d000
+[   71.635420] [ffff8a4a909c] *pgd=00000083ec370003, *pud=00000083e7225003, *pmd=00000083ec3f1003, *pte=01600083ff1c3fc3
+[   71.646042]
+[   71.647524] CPU: 0 PID: 2159 Comm: acpidump Tainted: G        W I     4.8.0-rc4 #5081
+[   71.655352] Hardware name: AMD Overdrive/Supercharger/Default string, BIOS ROD1002C 04/08/2016
+[   71.663957] task: ffff8003eac41900 task.stack: ffff8003e7210000
+[   71.669871] PC is at 0xffff8a3c77d4
+[   71.673353] LR is at 0x404934
+[   71.676314] pc : [<0000ffff8a3c77d4>] lr : [<0000000000404934>] pstate: 00000000
+[   71.683702] sp : 0000ffffd0e39af0
 
-Well, I would say that it's an addition of a feature that fixes a bad
-behavior ;-)
-So, in summary, I would just add it to next kernel revision.
+Acpidump digs through /sys/ to find the physical address of the ACPI tables,
+then reads them from /dev/mem. The code that provides /dev/mem uses
+phys_mem_access_prot() to determine the protection type it should use.
 
-Thanks for the heads-up. Bye,
+Arm64's phys_mem_access_prot() reports any memory region that isn't part
+of the linear map as device memory. This breaks Acpidump as the acpi tables
+are neither device memory nor part of the linear map.
 
+Change this check to use memblock_is_memory() instead. On an EFI system
+any region the efi memory map described as any of WB/WC/WT appears in
+memblock.memory. On a non-EFI system, setup_machine_fdt() will cause
+memory nodes in the DT to be added to memblock.memory.
 
->> ---
->>  drivers/iio/adc/at91_adc.c | 13 +++++++++++++
->>  1 file changed, 13 insertions(+)
->>
->> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
->> index 0438c68015e8..bbdac07f4aaa 100644
->> --- a/drivers/iio/adc/at91_adc.c
->> +++ b/drivers/iio/adc/at91_adc.c
->> @@ -113,6 +113,7 @@
->>  #define		AT91_ADC_TSMR_TSAV	(3 << 4)	/* Averages samples */
->>  #define			AT91_ADC_TSMR_TSAV_(x)		((x) << 4)
->>  #define		AT91_ADC_TSMR_SCTIM	(0x0f << 16)	/* Switch closure time */
->> +#define			AT91_ADC_TSMR_SCTIM_(x)		((x) << 16)
->>  #define		AT91_ADC_TSMR_PENDBC	(0x0f << 28)	/* Pen Debounce time */
->>  #define			AT91_ADC_TSMR_PENDBC_(x)	((x) << 28)
->>  #define		AT91_ADC_TSMR_NOTSDMA	(1 << 22)	/* No Touchscreen DMA */
->> @@ -150,6 +151,7 @@
->>  #define MAX_RLPOS_BITS         10
->>  #define TOUCH_SAMPLE_PERIOD_US_RL      10000   /* 10ms, the SoC can't keep up with 2ms */
->>  #define TOUCH_SHTIM                    0xa
->> +#define TOUCH_SCTIM_US		10		/* 10us for the Touchscreen Switches Closure Time */
->>  
->>  /**
->>   * struct at91_adc_reg_desc - Various informations relative to registers
->> @@ -1001,7 +1003,9 @@ static void atmel_ts_close(struct input_dev *dev)
->>  
->>  static int at91_ts_hw_init(struct at91_adc_state *st, u32 adc_clk_khz)
->>  {
->> +	struct iio_dev *idev = iio_priv_to_dev(st);
->>  	u32 reg = 0;
->> +	u32 tssctim = 0;
->>  	int i = 0;
->>  
->>  	/* a Pen Detect Debounce Time is necessary for the ADC Touch to avoid
->> @@ -1034,11 +1038,20 @@ static int at91_ts_hw_init(struct at91_adc_state *st, u32 adc_clk_khz)
->>  		return 0;
->>  	}
->>  
->> +	/* Touchscreen Switches Closure time needed for allowing the value to
->> +	 * stabilize.
->> +	 * Switch Closure Time = (TSSCTIM * 4) ADCClock periods
->> +	 */
->> +	tssctim = DIV_ROUND_UP(TOUCH_SCTIM_US * adc_clk_khz / 1000, 4);
->> +	dev_dbg(&idev->dev, "adc_clk at: %d KHz, tssctim at: %d\n",
->> +		adc_clk_khz, tssctim);
->> +
->>  	if (st->touchscreen_type == ATMEL_ADC_TOUCHSCREEN_4WIRE)
->>  		reg = AT91_ADC_TSMR_TSMODE_4WIRE_PRESS;
->>  	else
->>  		reg = AT91_ADC_TSMR_TSMODE_5WIRE;
->>  
->> +	reg |= AT91_ADC_TSMR_SCTIM_(tssctim) & AT91_ADC_TSMR_SCTIM;
->>  	reg |= AT91_ADC_TSMR_TSAV_(st->caps->ts_filter_average)
->>  	       & AT91_ADC_TSMR_TSAV;
->>  	reg |= AT91_ADC_TSMR_PENDBC_(st->ts_pendbc) & AT91_ADC_TSMR_PENDBC;
->>
-> 
-> 
+/dev/mem is the only user of phys_mem_access_prot()
 
+Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+Stable?
+Acpi was introduced for v4.1 but hidden behind 'expert'.
+'expert' was removed for v4.7.
 
+ arch/arm64/mm/mmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 4989948d1feb..96a2f327fd2c 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -63,7 +63,7 @@ static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss __maybe_unused;
+ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+ 			      unsigned long size, pgprot_t vma_prot)
+ {
+-	if (!pfn_valid(pfn))
++	if (!memblock_is_memory(pfn << PAGE_SHIFT))
+ 		return pgprot_noncached(vma_prot);
+ 	else if (file->f_flags & O_SYNC)
+ 		return pgprot_writecombine(vma_prot);
 -- 
-Nicolas Ferre
+2.8.0.rc3
