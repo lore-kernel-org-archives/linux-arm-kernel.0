@@ -1,102 +1,60 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 5 Sep 2016 19:11:18 +0800
-Subject: [PATCH v4 01/15] drivers: iommu: add FWNODE_IOMMU fwnode type
-In-Reply-To: <1471274620-20754-2-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1471274620-20754-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1471274620-20754-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <448e5f36-3cfe-73e6-04da-b390ce078f22@linaro.org>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Mon, 5 Sep 2016 19:11:59 +0800
+Subject: [PATCH] arm64/efi: efi_init error handling fix
+In-Reply-To: <20160902102618.GC17482@arm.com>
+References: <1472811519-4897-1-git-send-email-xieyisheng1@huawei.com>
+ <20160902102618.GC17482@arm.com>
+Message-ID: <d8689621-2dc3-ccf8-c33b-68f0d6eab66b@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/8/15 23:23, Lorenzo Pieralisi wrote:
-> On systems booting with a device tree, every struct device is
-> associated with a struct device_node, that represents its DT
-> representation. The device node can be used in generic kernel
-> contexts (eg IRQ translation, IOMMU streamid mapping), to
-> retrieve the properties associated with the device and carry
-> out kernel operation accordingly. Owing to the 1:1 relationship
-> between the device and its device_node, the device_node can also
-> be used as a look-up token for the device (eg looking up a device
-> through its device_node), to retrieve the device in kernel paths
-> where the device_node is available.
->
-> On systems booting with ACPI, the same abstraction provided by
-> the device_node is required to provide look-up functionality.
->
-> Therefore, mirroring the approach implemented in the IRQ domain
-> kernel layer, this patch adds an additional fwnode type FWNODE_IOMMU.
->
-> This patch also implements a glue kernel layer that allows to
-> allocate/free FWNODE_IOMMU fwnode_handle structures and associate
-> them with IOMMU devices.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> ---
->  include/linux/fwnode.h |  1 +
->  include/linux/iommu.h  | 25 +++++++++++++++++++++++++
->  2 files changed, 26 insertions(+)
->
-> diff --git a/include/linux/fwnode.h b/include/linux/fwnode.h
-> index 8516717..6e10050 100644
-> --- a/include/linux/fwnode.h
-> +++ b/include/linux/fwnode.h
-> @@ -19,6 +19,7 @@ enum fwnode_type {
->  	FWNODE_ACPI_DATA,
->  	FWNODE_PDATA,
->  	FWNODE_IRQCHIP,
-> +	FWNODE_IOMMU,
->  };
->
->  struct fwnode_handle {
-> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> index a35fb8b..6f703cb 100644
-> --- a/include/linux/iommu.h
-> +++ b/include/linux/iommu.h
-> @@ -38,6 +38,7 @@ struct bus_type;
->  struct device;
->  struct iommu_domain;
->  struct notifier_block;
-> +struct fwnode_handle;
->
->  /* iommu fault flags */
->  #define IOMMU_FAULT_READ	0x0
-> @@ -543,4 +544,28 @@ static inline void iommu_device_unlink(struct device *dev, struct device *link)
->
->  #endif /* CONFIG_IOMMU_API */
->
-> +/* IOMMU fwnode handling */
-> +static inline bool is_fwnode_iommu(struct fwnode_handle *fwnode)
-> +{
-> +	return fwnode && fwnode->type == FWNODE_IOMMU;
-> +}
-> +
-> +static inline struct fwnode_handle *iommu_alloc_fwnode(void)
-> +{
-> +	struct fwnode_handle *fwnode;
-> +
-> +	fwnode = kzalloc(sizeof(struct fwnode_handle), GFP_ATOMIC);
-> +	fwnode->type = FWNODE_IOMMU;
-> +
-> +	return fwnode;
-> +}
-> +
-> +static inline void iommu_free_fwnode(struct fwnode_handle *fwnode)
-> +{
-> +	if (WARN_ON(!is_fwnode_iommu(fwnode)))
-> +		return;
-> +
-> +	kfree(fwnode);
-> +}
-> +
->  #endif /* __LINUX_IOMMU_H */
->
+Hi all,
+Could someone help to give some comments?
+Really thanks for that.
 
-This is the similar mechanism as FWNODE_IRQCHIP as mentioned in
-change log,
+Thanks.
+Xie Yisheng
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+On 2016/9/2 18:26, Will Deacon wrote:
+> On Fri, Sep 02, 2016 at 06:18:39PM +0800, Xie Yisheng wrote:
+>> From: Yisheng Xie <xieyisheng1@huawei.com>
+>>
+>> There's an early memmap leak in efi_init error path, fix it.
+>>
+>> Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
+>> ---
+>>  drivers/firmware/efi/arm-init.c | 4 +++-
+>>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> Adding linux-efi, Ard and Matt. Please try to CC the relevant people in
+> future.
+> 
+Hi Will,
+Thank you for your kind help. I will do more check about who to CC next time.
 
-Thanks
-Hanjun
+Thanks.
+
+> Will
+> 
+>> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+>> index c49d50e..5080e40 100644
+>> --- a/drivers/firmware/efi/arm-init.c
+>> +++ b/drivers/firmware/efi/arm-init.c
+>> @@ -243,8 +243,10 @@ void __init efi_init(void)
+>>  	     "Unexpected EFI_MEMORY_DESCRIPTOR version %ld",
+>>  	      efi.memmap.desc_version);
+>>  
+>> -	if (uefi_init() < 0)
+>> +	if (uefi_init() < 0) {
+>> +		early_memunmap(efi.memmap.map, params.mmap_size);
+>>  		return;
+>> +	}
+>>  
+>>  	reserve_regions();
+>>  	efi_memattr_init();
+>> -- 
+>> 1.7.12.4
+>>
+> 
+> .
+> 
