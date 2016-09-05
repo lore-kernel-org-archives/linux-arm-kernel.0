@@ -1,233 +1,89 @@
-From: sr@denx.de (Stefan Roese)
-Date: Mon,  5 Sep 2016 09:25:00 +0200
-Subject: [PATCH 2/2 v5] dmaengine: mv_xor: Add support for IO (PCIe) src/dst
- areas
-In-Reply-To: <20160905072500.30112-1-sr@denx.de>
-References: <20160905072500.30112-1-sr@denx.de>
-Message-ID: <20160905072500.30112-2-sr@denx.de>
+From: agraf@suse.de (Alexander Graf)
+Date: Mon, 5 Sep 2016 09:31:37 +0200
+Subject: [RFC/RFT PATCH] arm64: mm: allow userland to run with one fewer
+ translation level
+In-Reply-To: <CAKv+Gu-Z2eRVjxfY-ypQdTyevRgoWzLgqPZaLf-bq_cE0D9ABw@mail.gmail.com>
+References: <1471781914-16681-1-git-send-email-ard.biesheuvel@linaro.org>
+ <abe7c6e4-8898-3e9b-da66-dd3ca10f27b0@suse.de>
+ <CAKv+Gu-Z2eRVjxfY-ypQdTyevRgoWzLgqPZaLf-bq_cE0D9ABw@mail.gmail.com>
+Message-ID: <57CD1F59.2060301@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To enable the access to a specific area, the MVEBU XOR controllers needs
-to have this area enabled / mapped via an address window. Right now,
-only the DRAM memory area is enabled via such memory windows. So
-using this driver to DMA to / from a e.g. PCIe memory region is
-currently not supported.
+On 09/03/2016 10:42 AM, Ard Biesheuvel wrote:
+> On 2 September 2016 at 17:58, Alexander Graf <agraf@suse.de> wrote:
+>>
+>> On 21.08.16 14:18, Ard Biesheuvel wrote:
+>>> The choice of VA size is usually decided by the requirements on the kernel
+>>> side, particularly the size of the linear region, which must be large
+>>> enough to cover all of physical memory, including the holes in between,
+>>> which may be very large (~512 GB on some systems).
+>>>
+>>> Since running with more translation levels could potentially result in
+>>> a performance penalty due to additional TLB pressure, this patch allows the
+>>> kernel to be configured so that it runs with one fewer translation level on
+>>> the userland side. Rather than modifying all the compile time logic to deal
+>>> with folded PUDs or PMDs, we simply allocate the root table and the next
+>>> table adjacently, so that we can simply point TTBR0_EL1 to the next table
+>>> (and update TCR_EL1.T0SZ accordingly)
+>>>
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>> ---
+>>>
+>>> This is just a proof of concept. *If* there is a performance penalty associated
+>>> with using 4 translation levels instead of 3, I would expect this patch to
+>>> compensate for that, given that the additional TLB pressure should be on the
+>>> userland side primarily. Benchmark results are highly appreciated.
+>>>
+>>> As a bonus, this would fix the horrible yet real JIT issues we have been seeing
+>>> with 48-bit VA configurations. IOW, I expect this to be an easier sell than
+>>> simply limiting TASKSIZE to 47 bits (assuming anyone can show a benchmark where
+>>> this patch has a positive impact on the performance of a 48-bit/4 levels kernel)
+>>> and distros can ship kernels that work on all hardware (including Freescale and
+>>> Xgene with >= 64 GB) but don't break their JITs.
+>>>
+>>> This patch is most likely broken for 16k/47-bit configs, but I didn't bother to
+>>> fix that before having the discussion.
+>> Let's roll forward by a few years. In that time, there's a good chance
+>> you will have nvdimms in a good number of systems out there with massive
+>> address spaces that easily reach beyond the lousy 512GB you get with 3
+>> levels.
+>>
+> That still does not mean it makes sense for 48 bits to be the default
+> for every userland process.
 
-This patch now adds support for such PCIe / IO regions by checking
-if the src / dst address is located in an IO memory area in contrast
-to being located in DRAM. This is done by using the newly introduced
-MBus function mvebu_mbus_get_io_win_info(). If the src / dst address
-is located in such an IO area, a new address window is created in
-the XOR DMA controller. Enabling the controller to access this area.
+That depends on the overhead, so benchmark results really would be good 
+to have :).
 
-Signed-off-by: Stefan Roese <sr@denx.de>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Marcin Wojtas <mw@semihalf.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Vinod Koul <vinod.koul@intel.com>
----
-v4 -> v5:
-- Added Andrew to Cc
+>
+>> That means at that point we'd have to roll back and have 48 bits
+>> regardless - or add special attributes to have binaries that then can
+>> demand bigger address space. Overall that doesn't sound terribly
+>> appealing, so I'm not sure going for 39 as interim is a step into the
+>> right direction.
+>>
+>> That said, I'd be very happy to see benchmark results too :)
+>>
+> Well, my point is that there is no guaranteed minimum at the moment.
+> If you happen to be running on a 38-bit VA kernel, that is all you are
+> ever going to get. This means that either you deal with that, or you
+> need to signal in some way that 39-bit VA is insufficient.
+>
+> The longer we leave the current undefined state endure, the more hacks
+> will come into existence (using munmap() etc) to make inferences about
+> what the current system provide. So we need to select something, stick
+> with it for now, and in the future, when it becomes necessary, expose
+> the means for a userland process to convey its minimum VA size.
 
-v3 -> v4:
-- Don't try to add the IO windows on Armada 3700 which does not implement
-  the MBus driver
+I tend to agree (if the overhead is measurable).
 
-v2 -> v3:
-- Included separate patch to add a stub function for mvebu_mbus_get_io_win_info()
-  to this patch series
-- COMPILE_TEST added again, as the stub function now allows compilation on
-  all platforms
+Since you're always generating full sized page tables, can't we just 
+leave ASLR and default addresses in the lower 38 bits by default and 
+seamlessly enable the 4th level once we get an allocation we can't fulfill?
 
-v1 -> v2:
-- Removed COMPILE_TEST from Kconfig entry as this results in compilation
-  errors on non-Marvell platforms because of references to MBus driver
-  functions. Since this driver will never be used on non-Marvell platforms
-  this should be okay.
+Then the security impact of running with only 38 bits becomes a tunable 
+that people can set depending on their preferences and we stay in the 
+lower address range by default.
 
-RFC -> v1:
-- Use a cache for the already mapped areas for performance reasons, as
-  the MMIO registers don't need to get queried any more if the area is
-  already mapped now
-  
- drivers/dma/mv_xor.c | 95 +++++++++++++++++++++++++++++++++++++++++++++++++++-
- drivers/dma/mv_xor.h |  7 ++++
- 2 files changed, 101 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index f4c9f98..ff4a094 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -470,12 +470,90 @@ static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
- 	return mv_chan->slots_allocated ? : -ENOMEM;
- }
- 
-+/*
-+ * Check if source or destination is an PCIe/IO address (non-SDRAM) and add
-+ * a new MBus window if necessary. Use a cache for these check so that
-+ * the MMIO mapped registers don't have to be accessed for this check
-+ * to speed up this process.
-+ */
-+static int mv_xor_add_io_win(struct mv_xor_chan *mv_chan, u32 addr)
-+{
-+	struct mv_xor_device *xordev = mv_chan->xordev;
-+	void __iomem *base = mv_chan->mmr_high_base;
-+	u32 win_enable;
-+	u32 size;
-+	u8 target, attr;
-+	int ret;
-+	int i;
-+
-+	/* Nothing needs to get done for the Armada 3700 */
-+	if (xordev->xor_type == XOR_ARMADA_37XX)
-+		return 0;
-+
-+	/*
-+	 * Loop over the cached windows to check, if the requested area
-+	 * is already mapped. If this the case, nothing needs to be done
-+	 * and we can return.
-+	 */
-+	for (i = 0; i < WINDOW_COUNT; i++) {
-+		if (addr >= xordev->win_start[i] &&
-+		    addr <= xordev->win_end[i]) {
-+			/* Window is already mapped */
-+			return 0;
-+		}
-+	}
-+
-+	/*
-+	 * The window is not mapped, so we need to create the new mapping
-+	 */
-+
-+	/* If no IO window is found that addr has to be located in SDRAM */
-+	ret = mvebu_mbus_get_io_win_info(addr, &size, &target, &attr);
-+	if (ret < 0)
-+		return 0;
-+
-+	/*
-+	 * Mask the base addr 'addr' according to 'size' read back from the
-+	 * MBus window. Otherwise we might end up with an address located
-+	 * somewhere in the middle of this area here.
-+	 */
-+	size -= 1;
-+	addr &= ~size;
-+
-+	/*
-+	 * Reading one of both enabled register is enough, as they are always
-+	 * programmed to the identical values
-+	 */
-+	win_enable = readl(base + WINDOW_BAR_ENABLE(0));
-+
-+	/* Set 'i' to the first free window to write the new values to */
-+	i = ffs(~win_enable) - 1;
-+	if (i >= WINDOW_COUNT)
-+		return -ENOMEM;
-+
-+	writel((addr & 0xffff0000) | (attr << 8) | target,
-+	       base + WINDOW_BASE(i));
-+	writel(size & 0xffff0000, base + WINDOW_SIZE(i));
-+
-+	/* Fill the caching variables for later use */
-+	xordev->win_start[i] = addr;
-+	xordev->win_end[i] = addr + size;
-+
-+	win_enable |= (1 << i);
-+	win_enable |= 3 << (16 + (2 * i));
-+	writel(win_enable, base + WINDOW_BAR_ENABLE(0));
-+	writel(win_enable, base + WINDOW_BAR_ENABLE(1));
-+
-+	return 0;
-+}
-+
- static struct dma_async_tx_descriptor *
- mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
- 		    unsigned int src_cnt, size_t len, unsigned long flags)
- {
- 	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
- 	struct mv_xor_desc_slot *sw_desc;
-+	int ret;
- 
- 	if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
- 		return NULL;
-@@ -486,6 +564,11 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
- 		"%s src_cnt: %d len: %zu dest %pad flags: %ld\n",
- 		__func__, src_cnt, len, &dest, flags);
- 
-+	/* Check if a new window needs to get added for 'dest' */
-+	ret = mv_xor_add_io_win(mv_chan, dest);
-+	if (ret)
-+		return NULL;
-+
- 	sw_desc = mv_chan_alloc_slot(mv_chan);
- 	if (sw_desc) {
- 		sw_desc->type = DMA_XOR;
-@@ -493,8 +576,13 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
- 		mv_desc_init(sw_desc, dest, len, flags);
- 		if (mv_chan->op_in_desc == XOR_MODE_IN_DESC)
- 			mv_desc_set_mode(sw_desc);
--		while (src_cnt--)
-+		while (src_cnt--) {
-+			/* Check if a new window needs to get added for 'src' */
-+			ret = mv_xor_add_io_win(mv_chan, src[src_cnt]);
-+			if (ret)
-+				return NULL;
- 			mv_desc_set_src_addr(sw_desc, src_cnt, src[src_cnt]);
-+		}
- 	}
- 
- 	dev_dbg(mv_chan_to_devp(mv_chan),
-@@ -959,6 +1047,7 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
- 		mv_chan->op_in_desc = XOR_MODE_IN_DESC;
- 
- 	dma_dev = &mv_chan->dmadev;
-+	mv_chan->xordev = xordev;
- 
- 	/*
- 	 * These source and destination dummy buffers are used to implement
-@@ -1086,6 +1175,10 @@ mv_xor_conf_mbus_windows(struct mv_xor_device *xordev,
- 		       dram->mbus_dram_target_id, base + WINDOW_BASE(i));
- 		writel((cs->size - 1) & 0xffff0000, base + WINDOW_SIZE(i));
- 
-+		/* Fill the caching variables for later use */
-+		xordev->win_start[i] = cs->base;
-+		xordev->win_end[i] = cs->base + cs->size - 1;
-+
- 		win_enable |= (1 << i);
- 		win_enable |= 3 << (16 + (2 * i));
- 	}
-diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
-index bf56e08..88eeab2 100644
---- a/drivers/dma/mv_xor.h
-+++ b/drivers/dma/mv_xor.h
-@@ -80,12 +80,17 @@
- #define WINDOW_BAR_ENABLE(chan)	(0x40 + ((chan) << 2))
- #define WINDOW_OVERRIDE_CTRL(chan)	(0xA0 + ((chan) << 2))
- 
-+#define WINDOW_COUNT		8
-+
- struct mv_xor_device {
- 	void __iomem	     *xor_base;
- 	void __iomem	     *xor_high_base;
- 	struct clk	     *clk;
- 	struct mv_xor_chan   *channels[MV_XOR_MAX_CHANNELS];
- 	int		     xor_type;
-+
-+	u32                  win_start[WINDOW_COUNT];
-+	u32                  win_end[WINDOW_COUNT];
- };
- 
- /**
-@@ -127,6 +132,8 @@ struct mv_xor_chan {
- 	char			dummy_dst[MV_XOR_MIN_BYTE_COUNT];
- 	dma_addr_t		dummy_src_addr, dummy_dst_addr;
- 	u32                     saved_config_reg, saved_int_mask_reg;
-+
-+	struct mv_xor_device	*xordev;
- };
- 
- /**
--- 
-2.9.3
+Alex
