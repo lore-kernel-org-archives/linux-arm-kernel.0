@@ -1,49 +1,87 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 5 Sep 2016 09:22:29 +0200
-Subject: [PATCH] arm64: renesas: r8a7796/salvator-x: Add board part number
- to DT bindings
-In-Reply-To: <20160902151955.GA27150@rob-hp-laptop>
-References: <1472635054-24372-1-git-send-email-geert+renesas@glider.be>
- <20160902151955.GA27150@rob-hp-laptop>
-Message-ID: <CAMuHMdU_TE0RxDqOvYsUtBOX5p8T7RCuZgXg_uP7Jgn-Bf3NSg@mail.gmail.com>
+From: sr@denx.de (Stefan Roese)
+Date: Mon,  5 Sep 2016 09:24:59 +0200
+Subject: [PATCH 1/2 v3] bus: mvebu-mbus: Provide stub function for
+ mvebu_mbus_get_io_win_info()
+Message-ID: <20160905072500.30112-1-sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+This patch provides a stub function for mvebu_mbus_get_io_win_info(),
+which will be used for all non-Orion (ARM32 MVEBU) platforms for
+compile test coverage.
 
-On Fri, Sep 2, 2016 at 5:19 PM, Rob Herring <robh@kernel.org> wrote:
-> On Wed, Aug 31, 2016 at 11:17:34AM +0200, Geert Uytterhoeven wrote:
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> ---
->>  Documentation/devicetree/bindings/arm/shmobile.txt | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
->> index 90cf237ee5581978..42a046a97acba00f 100644
->> --- a/Documentation/devicetree/bindings/arm/shmobile.txt
->> +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
->> @@ -65,7 +65,7 @@ Boards:
->>      compatible = "renesas,porter", "renesas,r8a7791"
->>    - Salvator-X (RTP0RC7795SIPB0010S)
->>      compatible = "renesas,salvator-x", "renesas,r8a7795";
->> -  - Salvator-X
->> +  - Salvator-X (RTP0RC7796SIPB0011S)
->>      compatible = "renesas,salvator-x", "renesas,r8a7796";
->
-> Seems like these should be different compatibles rather than the
-> combination here defining exactly which board.
+On such platforms this function will return an error so that drivers
+might detect a potential problem.
 
-R-Car H3 (r8a7795) and R-Car M3-W (r8a7796) SiP are (sufficiently)
-pin-compatible that they use the same board. So the only difference is really
-the SoC.
+Signed-off-by: Stefan Roese <sr@denx.de>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Marcin Wojtas <mw@semihalf.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Vinod Koul <vinod.koul@intel.com>
+---
+v3:
+- Include errno.h to fix the compile breakage on ARM64
+- Change comment as suggested by Andrew
+- Added Andrew to Cc
 
-Gr{oetje,eeting}s,
+v2:
+- Return error code in stub function. This may be useful on Armada 3700
+  boards. As Armada 3700 does not implement the MBus driver but some
+  device driver might call into these functions anyways (e.g. mvneta).
 
-                        Geert
+ include/linux/mbus.h | 18 ++++++++++++++++--
+ 1 file changed, 16 insertions(+), 2 deletions(-)
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/include/linux/mbus.h b/include/linux/mbus.h
+index d610232..2931aa4 100644
+--- a/include/linux/mbus.h
++++ b/include/linux/mbus.h
+@@ -11,6 +11,8 @@
+ #ifndef __LINUX_MBUS_H
+ #define __LINUX_MBUS_H
+ 
++#include <linux/errno.h>
++
+ struct resource;
+ 
+ struct mbus_dram_target_info
+@@ -55,6 +57,8 @@ struct mbus_dram_target_info
+ #ifdef CONFIG_PLAT_ORION
+ extern const struct mbus_dram_target_info *mv_mbus_dram_info(void);
+ extern const struct mbus_dram_target_info *mv_mbus_dram_info_nooverlap(void);
++int mvebu_mbus_get_io_win_info(phys_addr_t phyaddr, u32 *size, u8 *target,
++			       u8 *attr);
+ #else
+ static inline const struct mbus_dram_target_info *mv_mbus_dram_info(void)
+ {
+@@ -64,14 +68,24 @@ static inline const struct mbus_dram_target_info *mv_mbus_dram_info_nooverlap(vo
+ {
+ 	return NULL;
+ }
++static inline int mvebu_mbus_get_io_win_info(phys_addr_t phyaddr, u32 *size,
++					     u8 *target, u8 *attr)
++{
++	/*
++	 * On all ARM32 MVEBU platforms with MBus support, this stub
++	 * function will not get called. The real function from the
++	 * MBus driver is called instead. ARM64 MVEBU platforms like
++	 * the Armada 3700 could use the mv_xor device driver which calls
++	 * into this function
++	 */
++	return -EINVAL;
++}
+ #endif
+ 
+ int mvebu_mbus_save_cpu_target(u32 __iomem *store_addr);
+ void mvebu_mbus_get_pcie_mem_aperture(struct resource *res);
+ void mvebu_mbus_get_pcie_io_aperture(struct resource *res);
+ int mvebu_mbus_get_dram_win_info(phys_addr_t phyaddr, u8 *target, u8 *attr);
+-int mvebu_mbus_get_io_win_info(phys_addr_t phyaddr, u32 *size, u8 *target,
+-			       u8 *attr);
+ int mvebu_mbus_add_window_remap_by_id(unsigned int target,
+ 				      unsigned int attribute,
+ 				      phys_addr_t base, size_t size,
+-- 
+2.9.3
