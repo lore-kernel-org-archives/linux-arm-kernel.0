@@ -1,52 +1,113 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 5 Sep 2016 08:53:08 +0200
-Subject: [PATCH v2] pwm: samsung: fix to use lowest div for large enough
- modulation bits
-In-Reply-To: <20160816142201.12672-1-sw0312.kim@samsung.com>
-References: <1470133006-4272-1-git-send-email-sw0312.kim@samsung.com>
- <20160816142201.12672-1-sw0312.kim@samsung.com>
-Message-ID: <20160905065308.GF3532@ulmo.ba.sec>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 5 Sep 2016 09:05:20 +0200
+Subject: [PATCH 2/2] mtd: mxc_nand: Set timing for v2 controllers
+In-Reply-To: <20160902161705.043eb3a5@ipc1.ka-ro>
+References: <1472820149-24241-1-git-send-email-s.hauer@pengutronix.de>
+ <1472820149-24241-3-git-send-email-s.hauer@pengutronix.de>
+ <20160902161705.043eb3a5@ipc1.ka-ro>
+Message-ID: <20160905070520.52kof6ajyrh7q24l@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 11:22:01PM +0900, Seung-Woo Kim wrote:
-> From pwm_samsung_calc_tin(), there is routine to find the lowest
-> divider possible to generate lower frequency than requested one.
-> But it is always possible to generate requested frequency with
-> large enough modulation bits except s3c24xx, so this patch fixes
-> to use lowest div for the case. This patch removes following UBSAN
-> warning:
+On Fri, Sep 02, 2016 at 04:17:05PM +0200, Lothar Wa?mann wrote:
+> Hi,
 > 
->    UBSAN: Undefined behaviour in drivers/pwm/pwm-samsung.c:197:13
->    shift exponent 32 is too large for 32-bit type 'long unsigned int'
->    [...]
->    [<c0670248>] (ubsan_epilogue) from [<c06707b4>] (__ubsan_handle_shift_out_of_bounds+0xd8/0x120)
->    [<c06707b4>] (__ubsan_handle_shift_out_of_bounds) from [<c0694b28>] (pwm_samsung_config+0x508/0x6a4)
->    [<c0694b28>] (pwm_samsung_config) from [<c069286c>] (pwm_apply_state+0x174/0x40c)
->    [<c069286c>] (pwm_apply_state) from [<c0b2e070>] (pwm_fan_probe+0xc8/0x488)
->    [<c0b2e070>] (pwm_fan_probe) from [<c07ba8b0>] (platform_drv_probe+0x70/0x150)
->    [...]
-> 
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
-> ---
-> Changes from v1
->  * Remove too complex condition, instead, just checking simple variant->bits as Krzysztof's suggestion
->  * Add comment from Tomasz
-> 
-> The UBSAN warning from ARM is reported with the patch in following link:
-> https://patchwork.kernel.org/patch/9189575/
-> ---
->  drivers/pwm/pwm-samsung.c | 15 ++++++++++++---
->  1 file changed, 12 insertions(+), 3 deletions(-)
+> On Fri,  2 Sep 2016 14:42:29 +0200 Sascha Hauer wrote:
+> > So far we relied on reset default or the bootloader to configure a
+> > suitable clk rate for the Nand controller. This works but we can
+> > optimize the timing for better performance. This sets the clk rate for
+> > v2 controllers (i.MX25/35) based on the timing mode read from the ONFI
+> > parameter page. This may also enable the symmetric mode (aks EDO mode)
+> > if necessary which reads one word per clock cycle.
+> > Tested on an i.MX25 with a Micron MT29F4G08ABBDAHC attached.
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  drivers/mtd/nand/mxc_nand.c | 80 +++++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 80 insertions(+)
+> > 
+> > diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+> > index 5173fad..3cd2696 100644
+> > --- a/drivers/mtd/nand/mxc_nand.c
+> > +++ b/drivers/mtd/nand/mxc_nand.c
+> > @@ -152,6 +152,9 @@ struct mxc_nand_devtype_data {
+> >  	void (*select_chip)(struct mtd_info *mtd, int chip);
+> >  	int (*correct_data)(struct mtd_info *mtd, u_char *dat,
+> >  			u_char *read_ecc, u_char *calc_ecc);
+> > +	int (*setup_data_interface)(struct mtd_info *mtd,
+> > +			  const struct nand_data_interface *conf,
+> > +			  bool check_only);
+> >  
+> <nit>
+> indentation inconsistent with the preceding line.
+> (<TAB><SPACE><SPACE> vs. <TABs> only)
+> </nit>
 
-Applied, thanks.
+Okay, will fix in the next version.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/ec8c43f2/attachment.sig>
+> > +	/*
+> > +	 * For tRC < 30ns we have to use EDO mode. In this case the controller
+> > +	 * does one access per clock cycle. Otherwise the controller does one
+> > +	 * access in two clock cycles, thus we have to double the rate to the
+> > +	 * controller.
+> > +	 */
+> > +	if (tRC_min_ns < 30) {
+> > +		rate_round = clk_round_rate(host->clk, rate);
+> > +		config1 |= NFC_V2_CONFIG1_ONE_CYCLE;
+> > +		tRC_ps = 1000000000 / (rate_round / 1000);
+> > +	} else {
+> > +		rate_round = clk_round_rate(host->clk, rate * 2);
+> > +		config1 &= ~NFC_V2_CONFIG1_ONE_CYCLE;
+> > +		tRC_ps = 1000000000 / (rate_round / 1000 / 2);
+> > +		rate *= 2;
+> >
+> You could save an extra lsl by doing the *2 first:
+> 		rate *= 2;
+> 		rate_round = clk_round_rate(host->clk, rate);
+
+Yep, looks better that way.
+
+> [...]
+> 
+> > +	/*
+> > +	 * The timing values compared against are from the i.MX25 Automotive
+> > +	 * datasheet, Table 50. NFC Timing Parameters
+> > +	 */
+> > +	if (timings->tCLS_min > tRC_ps - 1000 ||
+> > +	    timings->tCLH_min > tRC_ps - 2000 ||
+> > +	    timings->tCS_min > tRC_ps - 1000 ||
+> > +	    timings->tCH_min > tRC_ps - 2000 ||
+> > +	    timings->tWP_min > tRC_ps - 1500 ||
+> > +	    timings->tALS_min > tRC_ps ||
+> > +	    timings->tALH_min > tRC_ps - 3000 ||
+> > +	    timings->tDS_min > tRC_ps ||
+> > +	    timings->tDH_min > tRC_ps - 5000 ||
+> > +	    timings->tWC_min > 2 * tRC_ps ||
+> > +	    timings->tWH_min > tRC_ps - 2500 ||
+> > +	    timings->tRR_min > 6 * tRC_ps ||
+> > +	    timings->tRP_min > 3 * tRC_ps / 2 ||
+> > +	    timings->tRC_min > 2 * tRC_ps ||
+> > +	    timings->tREH_min > (tRC_ps / 2) - 2500) {
+> > +		dev_dbg(host->dev, "Timing out of bounds\n");
+> >
+> Since it is an error which prevents the driver from being loaded, the
+> message deserves to be printed with dev_err(), so that the user can see
+> why the driver failed (without having to recompile the kernel with
+> '#define DEBUG' added to the driver source).
+
+This error won't prevent the driver from loading. The nand core iterates
+over the different available timings calling this function for each
+until it finds a timing supported by the driver. If we turn this into
+dev_err we could end up seeing this message multiple times and still the
+driver works. In case the slowest timing isn't supported by the driver
+and the nand core bails out it will print:
+
+pr_err("Failed to configure data interface to SDR timing mode 0\n");
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
