@@ -1,96 +1,66 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon,  5 Sep 2016 15:36:15 +0300
-Subject: [PATCH v10 4/4] serial: pl011: add console matching function
-In-Reply-To: <20160905123617.18775-1-aleksey.makarov@linaro.org>
-References: <20160905123617.18775-1-aleksey.makarov@linaro.org>
-Message-ID: <20160905123617.18775-5-aleksey.makarov@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 5 Sep 2016 14:40:13 +0200
+Subject: irq_create_fwspec_mapping() in 4.8-rc2
+In-Reply-To: <57C99B3D.3010405@arm.com>
+References: <483F737F-9868-4E8A-A831-AA3F6F410AFF@gmail.com>
+ <57C98975.5020607@arm.com> <9FCA11A3-B677-42EA-80DB-674AC8E489E8@gmail.com>
+ <57C99111.3030105@arm.com> <F5716CCD-34FF-4CA8-B5F5-C2A33A5D9E91@gmail.com>
+ <57C9961F.8080602@arm.com> <B721D80D-B240-4779-8748-5CFAD330D986@gmail.com>
+ <57C99B3D.3010405@arm.com>
+Message-ID: <CACRpkdYjmkkDxVah1HUNxoGEQ9hJeE-J1TwZ1wNEKq=swnL9JQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds function pl011_console_match() that implements
-method match of struct console.  It allows to match consoles against
-data specified in a string, for example taken from command line or
-compiled by ACPI SPCR table handler.
+On Fri, Sep 2, 2016 at 5:31 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
-Tested-by: Christopher Covington <cov@codeaurora.org>
----
- drivers/tty/serial/amba-pl011.c | 55 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+> +Linus, Jean-Christophe, Jon
+>
+> On 02/09/16 16:15, Andras Szemzo wrote:
+>> Hi,
+>>
+>>> On 02 Sep 2016, at 17:09, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>
+>>> So something has already configured the interrupt to be
+>>> IRQ_TYPE_EDGE_BOTH, and this clashes with your
+>>> IRQ_TYPE_EDGE_FALLING.
+>>>
+>>> My bet is on this one:
+>>>
+>>> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+>>> index 80daead..9f09041 100644
+>>> --- a/drivers/pinctrl/pinctrl-at91.c
+>>> +++ b/drivers/pinctrl/pinctrl-at91.c
+>>> @@ -1614,7 +1614,7 @@ static int at91_gpio_of_irq_setup(struct platform_device *pdev,
+>>>                                 &gpio_irqchip,
+>>>                                 0,
+>>>                                 handle_edge_irq,
+>>> -                               IRQ_TYPE_EDGE_BOTH);
+>>> +                               IRQ_TYPE_NONE);
+>>>      if (ret) {
+>>>              dev_err(&pdev->dev, "at91_gpio.%d: Couldn't add irqchip to gpiochip.\n",
+>>>                      at91_gpio->pioc_idx);
+>>>
+>>> Can you give it a go and let me know what happens?
+>>
+>> yes, this fixed the problem. Thank you, it was fast!
+>
+> Right. So the at91 pinctlr seems to enforce a default configuration. The
+> question is *why*? All interrupts connected to it should provide their
+> own trigger coming from DT.
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 8a9e213..2f9af8a 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -2288,12 +2288,67 @@ static int __init pl011_console_setup(struct console *co, char *options)
- 	return uart_set_options(&uap->port, co, baud, parity, bits, flow);
- }
- 
-+/**
-+ *	pl011_console_match - non-standard console matching
-+ *	@co:	  registering console
-+ *	@name:	  name from console command line
-+ *	@idx:	  index from console command line
-+ *	@options: ptr to option string from console command line
-+ *
-+ *	Only attempts to match console command lines of the form:
-+ *	    console=pl011,mmio|mmio32,<addr>[,<options>]
-+ *	    console=pl011,0x<addr>[,<options>]
-+ *	This form is used to register an initial earlycon boot console and
-+ *	replace it with the amba_console at pl011 driver init.
-+ *
-+ *	Performs console setup for a match (as required by interface)
-+ *	If no <options> are specified, then assume the h/w is already setup.
-+ *
-+ *	Returns 0 if console matches; otherwise non-zero to use default matching
-+ */
-+static int __init pl011_console_match(struct console *co, char *name, int idx,
-+				      char *options)
-+{
-+	unsigned char iotype;
-+	unsigned long addr;
-+	int i;
-+
-+	if (strcmp(name, "pl011") != 0)
-+		return -ENODEV;
-+
-+	if (uart_parse_earlycon(options, &iotype, &addr, &options))
-+		return -ENODEV;
-+
-+	if (iotype != UPIO_MEM && iotype != UPIO_MEM32)
-+		return -ENODEV;
-+
-+	/* try to match the port specified on the command line */
-+	for (i = 0; i < ARRAY_SIZE(amba_ports); i++) {
-+		struct uart_port *port;
-+
-+		if (!amba_ports[i])
-+			continue;
-+
-+		port = &amba_ports[i]->port;
-+
-+		if (port->mapbase != addr)
-+			continue;
-+
-+		co->index = i;
-+		port->cons = co;
-+		return pl011_console_setup(co, options);
-+	}
-+
-+	return -ENODEV;
-+}
-+
- static struct uart_driver amba_reg;
- static struct console amba_console = {
- 	.name		= "ttyAMA",
- 	.write		= pl011_console_write,
- 	.device		= uart_console_device,
- 	.setup		= pl011_console_setup,
-+	.match		= pl011_console_match,
- 	.flags		= CON_PRINTBUFFER,
- 	.index		= -1,
- 	.data		= &amba_reg,
--- 
-2.9.3
+I guess for legacy boardfile usecases or just how it happened to end
+up during development.
+
+> As we now actually check that we have some consistency between what is
+> configured and what is requested, it is bound to fail, unless you happen
+> to match the default.
+
+Which is good!
+
+> What am I missing?
+
+Nothing, I am missing your patch on the mailing list with a Signed-off-by
+so I can apply it (unless the Atmel people have complaints).
+
+Yours,
+Linus Walleij
