@@ -1,47 +1,38 @@
-From: pmeerw@pmeerw.net (Peter Meerwald-Stadler)
-Date: Mon, 5 Sep 2016 11:02:21 +0200 (CEST)
-Subject: [PATCH v4 3/3] iio: adc: add support for Allwinner SoCs ADC
-In-Reply-To: <d40388ec-bf25-92b2-eeb6-39749d88c15c@free-electrons.com>
-References: <1472738705-20145-1-git-send-email-quentin.schulz@free-electrons.com>
- <1472738705-20145-4-git-send-email-quentin.schulz@free-electrons.com>
- <alpine.DEB.2.02.1609041754350.2060@pmeerw.net>
- <aed1e00f-ceaa-27e9-502d-51428f59a84f@free-electrons.com>
- <alpine.DEB.2.02.1609050924370.12528@pmeerw.net>
- <d40388ec-bf25-92b2-eeb6-39749d88c15c@free-electrons.com>
-Message-ID: <alpine.DEB.2.02.1609051101560.12528@pmeerw.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 5 Sep 2016 10:02:44 +0100
+Subject: [PATCH v3 1/7] arm64: kernel: fix style issues in sleep.S
+In-Reply-To: <CAKv+Gu-2zkhw++tBqP6BA+B_a5D6t0BpRg9KxqCgdLCHY53ADw@mail.gmail.com>
+References: <1472641517-15362-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1472641517-15362-2-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu-2zkhw++tBqP6BA+B_a5D6t0BpRg9KxqCgdLCHY53ADw@mail.gmail.com>
+Message-ID: <20160905090244.GA2649@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ard,
 
-> >>>> +{
-> >>>> +	return SUN6I_GPADC_CTRL1_ADC_CHAN_SELECT(chan);
-> >>>> +}
-> >>>> +
-> >>>> +struct soc_specific {
-> >>>> +	const int		temp_offset;
-> >>>
-> >>> wondering why you constify every member?
-> >>>
-> >>
-> >> Because they're supposed to be fixed values? It won't change in runtime.
-> >> Is there any reason why I shouldn't do that?
-> > 
-> > yes, but using the entire struct as const has the same effect;
-> > constifying individual members makes more sense if there are also 
-> > non-const members
-> > 
-> > nothing wrong, just unusual
-> > 
+On Sat, Sep 03, 2016 at 09:08:13PM +0100, Ard Biesheuvel wrote:
+> On 31 August 2016 at 12:05, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > This fixes a number of style issues in sleep.S. No functional changes are
+> > intended:
+> > - replace absolute literal references with relative references in
+> >   __cpu_suspend_enter(), which executes from its virtual address
+> > - replace explicit lr assignment plus branch with bl in cpu_resume(), which
+> >   aligns it with stext() and secondary_startup()
+> > - don't export _cpu_resume()
 > 
-> So I would let all members non-const and then when using the struct
-> soc_specific as a member in a struct or as a variable I would prefix it
-> with const? That's what you mean by using the entire struct as const?
+> Apologies, I sent out the wrong version of this patch in v3. Not
+> exporting _cpu_resume() breaks hibernate, so I dropped it from v2
+> (which is the version that Mark reviewed), but I reintroduced it by
+> accident.
 
-yes, exactly
+No problem, these things happen.
 
-thanks, p.
+> Please let me know how you would like to proceed, i.e., put a fixup on
+> top, or resend.
 
--- 
+I already pushed this out on for-next/core, so please send a fixup on top.
+I could've sworn I did an allmodconfig build test before pushing out, but
+apparently not.
 
-Peter Meerwald-Stadler
-+43-664-2444418 (mobile)
+Will
