@@ -1,109 +1,39 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Mon, 5 Sep 2016 18:22:46 +0800
-Subject: [PATCH 3/4] include: dt-bindings: Add more GPIO bank and index
- definition for rockchip pinctrl
-In-Reply-To: <3544284.90s5nXbktR@phil>
-References: <1472977937-758-1-git-send-email-andy.yan@rock-chips.com>
- <1472978130-919-1-git-send-email-andy.yan@rock-chips.com>
- <3544284.90s5nXbktR@phil>
-Message-ID: <0dbac4cd-7f67-5052-16e6-463896bf5929@rock-chips.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 5 Sep 2016 11:24:02 +0100
+Subject: [PATCH v3 9/9] arm64: Work around systems with mismatched cache
+ line sizes
+In-Reply-To: <CAKv+Gu92Z=k0NXSL2UayuxWv-=wH1aJ3r-ByXxexWmz6sfE7zw@mail.gmail.com>
+References: <1473069509-2317-1-git-send-email-suzuki.poulose@arm.com>
+ <1473069509-2317-10-git-send-email-suzuki.poulose@arm.com>
+ <CAKv+Gu92Z=k0NXSL2UayuxWv-=wH1aJ3r-ByXxexWmz6sfE7zw@mail.gmail.com>
+Message-ID: <d7277900-068a-98fc-4f52-4f619ba96cf8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko:
+On 05/09/16 11:10, Ard Biesheuvel wrote:
+> On 5 September 2016 at 10:58, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>> +/*
+>> + * read_ctr - read CTR_EL0. If the system has mismatched
+>> + * cache line sizes, provide the system wide safe value.
+>> + */
+>> +       .macro  read_ctr, reg
+>> +alternative_if_not ARM64_MISMATCHED_CACHE_LINE_SIZE
+>> +       mrs     \reg, ctr_el0                   // read CTR
+>> +       nop
+>> +       nop
+>> +alternative_else
+>> +       adr_l   \reg, arm64_ftr_reg_ctrel0      // Read system wide safe CTR value
+>> +       ldr     \reg, [\reg, #ARM64_FTR_SYSVAL] // from arm64_ftr_reg_ctrel0.sys_val
+>
+> You should be able to use
+>
+> ldr_l \reg, arm64_ftr_reg_ctrel0 + ARM64_FTR_SYSVAL
+>
+> here, and save one instruction.
 
+I had given a thought about that and chose the above to account for a
+rare chance of arm64_ftr_reg_ctrel0 spanning across a 4K boundary. But,
+you are right, ldr_l could treat (arm64_ftr_reg_ctrel0 + ARM64_FTR_SYSVAL)
+as the symbol address and still get the right offset.
 
-On 2016?09?05? 17:33, Heiko Stuebner wrote:
-> Hi Andy,
->
-> Am Sonntag, 4. September 2016, 16:35:30 CEST schrieb Andy Yan:
->> There are 8 gpio banks on RK3288, so add the missing
->> RK_GPIO7 and RK_GPIO8. Also add gpio index definition
->> to make it easier to description GPIO in dts.
->>
->> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-> I tend to disagree here.
->
-> I consider the bank defines RK_GPIOx to be deprecated and highly discourage
-> them being used in new boards. They only encode the same number again (2 ->
-> RK_GPIO2 etc) and therefore don't bring any useful addition over using the
-> bank number directly.
->
-> Slightly similar argument for the per-pin defines. While the external pins are
-> described in the A/B/C/Dx notation for pinmux purposes, the gpio controllers
-> on top use a regular 0-31 numbering. Also you cannot name constants generic
-> GPIO_x, simply because that may conflict with other overly generic constant
-> names.
->
-> So I'm not yet convinced that these improve readability, but they would
-> definitly need a RK_* prefix to make them specific.
->
->
-> Heiko
-
-         I consider for a people who doesn't familiar with rockchip 
-pinctrl, He
-  may don't know what does these number 2/4/17....stands for in the dts  
-like
-  rockchip,pins = <2 17 RK_FUNC_GPIO &pcfg_pull_up>.
-         But if we use meaningful macro here like : rockchip,pins = 
-<RK_GPIO2 RK_GPIO_C0 RK_FUNC_GPIO &pcfg_pull_up>, I think it easier to 
-tell people this GPIO is GPIO_C0 of BNAK2.
-Especially all the GPIOs in rockchip based schematic are described as 
-GPIOn_A/B/C/Dx. And it is also easier for people to directly use a macro 
-stands for 0~32 than translating A/B/C/Dx from the schematic to 0~32.
->> ---
->>
->>   include/dt-bindings/pinctrl/rockchip.h | 35
->> ++++++++++++++++++++++++++++++++++ 1 file changed, 35 insertions(+)
->>
->> diff --git a/include/dt-bindings/pinctrl/rockchip.h
->> b/include/dt-bindings/pinctrl/rockchip.h index 743e66a..fd35350 100644
->> --- a/include/dt-bindings/pinctrl/rockchip.h
->> +++ b/include/dt-bindings/pinctrl/rockchip.h
->> @@ -24,6 +24,41 @@
->>   #define RK_GPIO3	3
->>   #define RK_GPIO4	4
->>   #define RK_GPIO6	6
->> +#define RK_GPIO7	7
->> +#define RK_GPIO8	8
->> +
->> +#define GPIO_A0		0
->> +#define GPIO_A1		1
->> +#define GPIO_A2		2
->> +#define GPIO_A3		3
->> +#define GPIO_A4		4
->> +#define GPIO_A5		5
->> +#define GPIO_A6		6
->> +#define GPIO_A7		7
->> +#define GPIO_B0		8
->> +#define GPIO_B1		9
->> +#define GPIO_B2		10
->> +#define GPIO_B3		11
->> +#define GPIO_B4		12
->> +#define GPIO_B5		13
->> +#define GPIO_B6		14
->> +#define GPIO_B7		15
->> +#define GPIO_C0		16
->> +#define GPIO_C1		17
->> +#define GPIO_C2		18
->> +#define GPIO_C3		19
->> +#define GPIO_C4		20
->> +#define GPIO_C5		21
->> +#define GPIO_C6		22
->> +#define GPIO_C7		23
->> +#define GPIO_D0		24
->> +#define GPIO_D1		25
->> +#define GPIO_D2		26
->> +#define GPIO_D3		27
->> +#define GPIO_D4		28
->> +#define GPIO_D5		29
->> +#define GPIO_D6		30
->> +#define GPIO_D7		31
->>
->>   #define RK_FUNC_GPIO	0
->>   #define RK_FUNC_1	1
->
->
->
->
+Suzuki
