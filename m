@@ -1,38 +1,32 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon,  5 Sep 2016 14:16:51 +0100
-Subject: [PATCH v9 09/19] ARM: multi_v7_defconfig: Enable STi and simple-card
- drivers.
+Date: Mon,  5 Sep 2016 14:16:49 +0100
+Subject: [PATCH v9 07/19] MAINTAINERS: Add FDMA driver files to STi section.
 In-Reply-To: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
 References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1473081421-16555-10-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1473081421-16555-8-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the STi ALSA drivers found on STi platforms
-as well as the simple-card driver which is a dependency to have
-working sound.
+This patch adds the FDMA driver files to the STi
+section of the maintainers file.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 Acked-by: Lee Jones <lee.jones@linaro.org>
-Cc: arnaud.pouliquen at st.com
-Cc: broonie at kernel.org
 ---
- arch/arm/configs/multi_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 998578a..51a38b1 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -644,6 +644,9 @@ CONFIG_SND_SOC_AK4642=m
- CONFIG_SND_SOC_SGTL5000=m
- CONFIG_SND_SOC_SPDIF=m
- CONFIG_SND_SOC_WM8978=m
-+CONFIG_SND_SOC_STI=m
-+CONFIG_SND_SOC_STI_SAS=m
-+CONFIG_SND_SIMPLE_CARD=m
- CONFIG_USB=y
- CONFIG_USB_XHCI_HCD=y
- CONFIG_USB_XHCI_MVEBU=y
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 5dd3b24..d21a7b5 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1739,6 +1739,7 @@ F:	drivers/char/hw_random/st-rng.c
+ F:	drivers/clocksource/arm_global_timer.c
+ F:	drivers/clocksource/clksrc_st_lpc.c
+ F:	drivers/cpufreq/sti-cpufreq.c
++F:	drivers/dma/st_fdma*
+ F:	drivers/i2c/busses/i2c-st.c
+ F:	drivers/media/rc/st_rc.c
+ F:	drivers/media/platform/sti/c8sectpfe/
 -- 
 1.9.1
