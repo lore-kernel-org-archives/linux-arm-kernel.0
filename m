@@ -1,192 +1,56 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  5 Sep 2016 16:27:50 -0300
-Subject: [PATCH v2 4/4] ARM: dts: imx28: Fix build warnings with W=1
-In-Reply-To: <1473103670-15922-1-git-send-email-festevam@gmail.com>
-References: <1473103670-15922-1-git-send-email-festevam@gmail.com>
-Message-ID: <1473103670-15922-4-git-send-email-festevam@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 5 Sep 2016 21:31:11 +0200
+Subject: [PATCH v2 4/7] dts: sun8i-h3: add UART1-3 to Orange Pi Plus
+In-Reply-To: <20160903120932.GA6289@carbon.kippendief.biz>
+References: <1472671858-29220-1-git-send-email-jorik@kippendief.biz>
+ <1472671858-29220-5-git-send-email-jorik@kippendief.biz>
+ <20160902070425.GB6313@lukather>
+ <20160903120932.GA6289@carbon.kippendief.biz>
+Message-ID: <20160905193111.GC4728@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+Hi Jorik,
 
-Fix the following build warnings with W=1:
+On Sat, Sep 03, 2016 at 02:09:32PM +0200, Jorik Jonker wrote:
+> On Fri, Sep 02, 2016 at 09:04:25AM +0200, Maxime Ripard wrote:
+> >Unfortunately, these pins can be used for other purposes as well, so
+> >we cannot make force that decision down to our users.
+> 
+> Yes, but since the associated peripheral is disabled, the users are free to
+> configure other functions/peripherals, right? I mean something like this in
+> pseudo-DT:
+> 
+> /soc/pio: pinctrl at 01c20800/uart1_pins:
+>   allwinner,pins = "PG6, PG7";
+> /soc/pio: pinctrl at 01c20800/foo0_pins:
+>   allwinner,pins = "PG6, PG7";
+>   ..
+> /soc/uart1: serial at serial@01c28400:
+>   pinctrl-0 = <&uart1_pins>;
+>   status = "disabled";
+> /soc/bar:
+>   pinctrl-0 = <&uart1_pins>;
+>   status = "disabled";
+> 
+> Assuming Linux/DT allows this, this would force nothing, only offer choice
+> and ease of use.
 
-Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+Hmm, sorry, I went over your patches too quickly...
 
-While at it, also pass the 'device_type' property as recommended by the
-ePAPR specification.
+That's a great compromise I think. Chen-Yu, any opinion on this?
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-Changes since v1:
-- None
+Thanks,
+Maxime
 
- arch/arm/boot/dts/imx28-apf28.dts            | 3 ++-
- arch/arm/boot/dts/imx28-apx4devkit.dts       | 3 ++-
- arch/arm/boot/dts/imx28-cfa10036.dts         | 3 ++-
- arch/arm/boot/dts/imx28-duckbill.dts         | 3 ++-
- arch/arm/boot/dts/imx28-eukrea-mbmx283lc.dts | 3 ++-
- arch/arm/boot/dts/imx28-eukrea-mbmx287lc.dts | 3 ++-
- arch/arm/boot/dts/imx28-evk.dts              | 3 ++-
- arch/arm/boot/dts/imx28-m28.dtsi             | 3 ++-
- arch/arm/boot/dts/imx28-m28cu3.dts           | 3 ++-
- arch/arm/boot/dts/imx28-sps1.dts             | 3 ++-
- arch/arm/boot/dts/imx28-tx28.dts             | 3 ++-
- 11 files changed, 22 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx28-apf28.dts b/arch/arm/boot/dts/imx28-apf28.dts
-index 070e59c..b6976fb 100644
---- a/arch/arm/boot/dts/imx28-apf28.dts
-+++ b/arch/arm/boot/dts/imx28-apf28.dts
-@@ -16,7 +16,8 @@
- 	model = "Armadeus Systems APF28 module";
- 	compatible = "armadeus,imx28-apf28", "fsl,imx28";
- 
--	memory {
-+	memory at 40000000 {
-+		device_type = "memory";
- 		reg = <0x40000000 0x08000000>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/imx28-apx4devkit.dts b/arch/arm/boot/dts/imx28-apx4devkit.dts
-index 1092b76..ce6115e 100644
---- a/arch/arm/boot/dts/imx28-apx4devkit.dts
-+++ b/arch/arm/boot/dts/imx28-apx4devkit.dts
-@@ -5,7 +5,8 @@
- 	model = "Bluegiga APX4 Development Kit";
- 	compatible = "bluegiga,apx4devkit", "fsl,imx28";
- 
--	memory {
-+	memory at 40000000 {
-+		device_type = "memory";
- 		reg = <0x40000000 0x04000000>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/imx28-cfa10036.dts b/arch/arm/boot/dts/imx28-cfa10036.dts
-index 570aa33..d016a3b 100644
---- a/arch/arm/boot/dts/imx28-cfa10036.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10036.dts
-@@ -16,7 +16,8 @@
- 	model = "Crystalfontz CFA-10036 Board";
- 	compatible = "crystalfontz,cfa10036", "fsl,imx28";
- 
--	memory {
-+	memory at 40000000 {
-+		device_type = "memory";
- 		reg = <0x40000000 0x08000000>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/imx28-duckbill.dts b/arch/arm/boot/dts/imx28-duckbill.dts
-index ce1a7ef..b5bc3f5 100644
---- a/arch/arm/boot/dts/imx28-duckbill.dts
-+++ b/arch/arm/boot/dts/imx28-duckbill.dts
-@@ -16,7 +16,8 @@
- 	model = "I2SE Duckbill";
- 	compatible = "i2se,duckbill", "fsl,imx28";
- 
--	memory {
-+	memory at 40000000 {
-+		device_type = "memory";
- 		reg = <0x40000000 0x08000000>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/imx28-eukrea-mbmx283lc.dts b/arch/arm/boot/dts/imx28-eukrea-mbmx283lc.dts
-index 7c1572c..28dab6d 100644
---- a/arch/arm/boot/dts/imx28-eukrea-mbmx283lc.dts
-+++ b/arch/arm/boot/dts/imx28-eukrea-mbmx283lc.dts
-@@ -23,7 +23,8 @@
- 	model = "Eukrea Electromatique MBMX283LC";
- 	compatible = "eukrea,mbmx283lc", "eukrea,mbmx28lc", "fsl,imx28";
- 
--	memory {
-+	memory at 40000000 {
-+		device_type = "memory";
- 		reg = <0x40000000 0x04000000>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx28-eukrea-mbmx287lc.dts b/arch/arm/boot/dts/imx28-eukrea-mbmx287lc.dts
-index e773144..08125e5 100644
---- a/arch/arm/boot/dts/imx28-eukrea-mbmx287lc.dts
-+++ b/arch/arm/boot/dts/imx28-eukrea-mbmx287lc.dts
-@@ -22,7 +22,8 @@
- 	model = "Eukrea Electromatique MBMX287LC";
- 	compatible = "eukrea,mbmx287lc", "eukrea,mbmx283lc", "eukrea,mbmx28lc", "fsl,imx28";
- 
--	memory {
-+	memory at 40000000 {
-+		device_type = "memory";
- 		reg = <0x40000000 0x08000000>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index a5ba669..4cd8216 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -16,7 +16,8 @@
- 	model = "Freescale i.MX28 Evaluation Kit";
- 	compatible = "fsl,imx28-evk", "fsl,imx28";
- 
--	memory {
-+	memory at 40000000 {
-+		device_type = "memory";
- 		reg = <0x40000000 0x08000000>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/imx28-m28.dtsi b/arch/arm/boot/dts/imx28-m28.dtsi
-index 214bb15..1bcba90 100644
---- a/arch/arm/boot/dts/imx28-m28.dtsi
-+++ b/arch/arm/boot/dts/imx28-m28.dtsi
-@@ -15,7 +15,8 @@
- 	model = "DENX M28";
- 	compatible = "denx,m28", "fsl,imx28";
- 
--	memory {
-+	memory at 40000000 {
-+		device_type = "memory";
- 		reg = <0x40000000 0x08000000>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/imx28-m28cu3.dts b/arch/arm/boot/dts/imx28-m28cu3.dts
-index 2df63be..c4c4cc7 100644
---- a/arch/arm/boot/dts/imx28-m28cu3.dts
-+++ b/arch/arm/boot/dts/imx28-m28cu3.dts
-@@ -16,7 +16,8 @@
- 	model = "MSR M28CU3";
- 	compatible = "msr,m28cu3", "fsl,imx28";
- 
--	memory {
-+	memory at 40000000 {
-+		device_type = "memory";
- 		reg = <0x40000000 0x08000000>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/imx28-sps1.dts b/arch/arm/boot/dts/imx28-sps1.dts
-index 0ce3cb8..5ddfb16 100644
---- a/arch/arm/boot/dts/imx28-sps1.dts
-+++ b/arch/arm/boot/dts/imx28-sps1.dts
-@@ -16,7 +16,8 @@
- 	model = "SchulerControl GmbH, SC SPS 1";
- 	compatible = "schulercontrol,imx28-sps1", "fsl,imx28";
- 
--	memory {
-+	memory at 40000000 {
-+		device_type = "memory";
- 		reg = <0x40000000 0x08000000>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
-index 0ebbc83..b4d4dbb 100644
---- a/arch/arm/boot/dts/imx28-tx28.dts
-+++ b/arch/arm/boot/dts/imx28-tx28.dts
-@@ -35,7 +35,8 @@
- 		usbotg = &usb0;
- 	};
- 
--	memory {
-+	memory at 0 {
-+		device_type = "memory";
- 		reg = <0 0>; /* will be filled in by U-Boot */
- 	};
- 
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/5dfc6f12/attachment.sig>
