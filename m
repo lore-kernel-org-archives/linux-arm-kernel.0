@@ -1,83 +1,187 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 05 Sep 2016 09:31:12 +0900
-Subject: [PATCH v9 1/5] Documentation: bindings: add dt documentation for
- dfi controller
-In-Reply-To: <1472850525-25273-2-git-send-email-hl@rock-chips.com>
-References: <1472850525-25273-1-git-send-email-hl@rock-chips.com>
- <CGME20160902210852epcas1p412fe3480676c179ce68081fd6cea7996@epcas1p4.samsung.com>
- <1472850525-25273-2-git-send-email-hl@rock-chips.com>
-Message-ID: <57CCBCD0.9030607@samsung.com>
+From: james@innovum.com.au (James Pettigrew)
+Date: Mon,  5 Sep 2016 10:42:48 +1000
+Subject: [PATCH v2] ARM: dts: sun8i: Add dts file for the NanoPi NEO SBC
+In-Reply-To: <1472701734-1837-1-git-send-email-james@innovum.com.au>
+References: <1472701734-1837-1-git-send-email-james@innovum.com.au>
+Message-ID: <1473036168-20933-1-git-send-email-james@innovum.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lin,
+The NanoPi NEO is a minimal H3 based SBC. It comes with 256/512M RAM, a
+micro SD slot, 10/100Mbit ethernet and a single USB-A port.
 
-Looks good to me.
+Signed-off-by: James Pettigrew <james@innovum.com.au>
+---
 
-Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
+Changes in v2:
 
-Best Regards,
-Chanwoo Choi
+As per Rask's review (thank you):
+	Added vendor prefix
+	Removed unncessary input.h include
+	Fixed underscores and unnecessary unit addresses in node names
+	Added GPIO pin comments to led nodes
 
-On 2016? 09? 03? 06:08, Lin Huang wrote:
-> This patch adds the documentation for rockchip dfi devfreq-event driver.
-> 
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> ---
-> Changes in v9:
-> - reorder compatible and reg
-> 
-> Changes in v8:
-> - delete a unuse blank line
-> 
-> Changes in v7:
-> - None
-> 
-> Changes in v6:
-> - None
-> 
-> Changes in v5:
-> - None
-> 
-> Changes in v4:
-> - None
-> 
-> Changes in v3:
-> - None
-> 
-> Changes in v2:
-> - None 
-> 
-> Changes in v1:
-> - None
-> 
->  .../bindings/devfreq/event/rockchip-dfi.txt           | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/devfreq/event/rockchip-dfi.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/devfreq/event/rockchip-dfi.txt b/Documentation/devicetree/bindings/devfreq/event/rockchip-dfi.txt
-> new file mode 100644
-> index 0000000..f223313
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/devfreq/event/rockchip-dfi.txt
-> @@ -0,0 +1,19 @@
-> +
-> +* Rockchip rk3399 DFI device
-> +
-> +Required properties:
-> +- compatible: Must be "rockchip,rk3399-dfi".
-> +- reg: physical base address of each DFI and length of memory mapped region
-> +- rockchip,pmu: phandle to the syscon managing the "pmu general register files"
-> +- clocks: phandles for clock specified in "clock-names" property
-> +- clock-names : the name of clock used by the DFI, must be "pclk_ddr_mon";
-> +
-> +Example:
-> +	dfi: dfi at 0xff630000 {
-> +		compatible = "rockchip,rk3399-dfi";
-> +		reg = <0x00 0xff630000 0x00 0x4000>;
-> +		rockchip,pmu = <&pmugrf>;
-> +		clocks = <&cru PCLK_DDR_MON>;
-> +		clock-names = "pclk_ddr_mon";
-> +		status = "disabled";
-> +	};
-> 
+---
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts          | 125 +++++++++++++++++++++
+ 3 files changed, 127 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
+
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 1992aa9..7b6bda3 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -98,6 +98,7 @@ ezchip	EZchip Semiconductor
+ fcs	Fairchild Semiconductor
+ firefly	Firefly
+ focaltech	FocalTech Systems Co.,Ltd
++friendlyarm	Guangzhou FriendlyARM Computer Tech Co., Ltd
+ fsl	Freescale Semiconductor
+ ge	General Electric Company
+ geekbuying	GeekBuying
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 7dd4a07..a35f986 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -792,6 +792,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a83t-allwinner-h8homlet-v2.dtb \
+ 	sun8i-a83t-cubietruck-plus.dtb \
+ 	sun8i-h3-bananapi-m2-plus.dtb \
++	sun8i-h3-nanopi-neo.dtb \
+ 	sun8i-h3-orangepi-2.dtb \
+ 	sun8i-h3-orangepi-lite.dtb \
+ 	sun8i-h3-orangepi-one.dtb \
+diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
+new file mode 100644
+index 0000000..cf36696
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
+@@ -0,0 +1,125 @@
++/*
++ * Copyright (C) 2016 James Pettigrew <james@innovum.com.au>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun8i-h3.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++
++/ {
++	model = "FriendlyARM NanoPi NEO";
++	compatible = "friendlyarm,nanopi-neo", "allwinner,sun8i-h3";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&leds-opc>, <&leds-r-opc>;
++
++		pwr {
++			label = "nanopi:green:pwr";
++			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
++			default-state = "on";
++		};
++
++		status {
++			label = "nanopi:blue:status";
++			gpios = <&pio 0 10 GPIO_ACTIVE_HIGH>; /* PA10 */
++		};
++	};
++};
++
++&ehci3 {
++	status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
++	cd-inverted;
++	status = "okay";
++};
++
++&ohci3 {
++	status = "okay";
++};
++
++&pio {
++	leds-opc: led-pins {
++		allwinner,pins = "PA10";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++&r_pio {
++	leds-r-opc: led-pins {
++		allwinner,pins = "PL10";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usbphy {
++	/* USB VBUS is always on */
++	status = "okay";
++};
+-- 
+1.9.1
