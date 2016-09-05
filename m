@@ -1,104 +1,78 @@
 From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon,  5 Sep 2016 15:36:12 +0300
-Subject: [PATCH v10 1/4] of/serial: move earlycon early_param handling to
- serial
+Date: Mon,  5 Sep 2016 15:36:14 +0300
+Subject: [PATCH v10 3/4] ARM64: ACPI: enable ACPI_SPCR_TABLE
 In-Reply-To: <20160905123617.18775-1-aleksey.makarov@linaro.org>
 References: <20160905123617.18775-1-aleksey.makarov@linaro.org>
-Message-ID: <20160905123617.18775-2-aleksey.makarov@linaro.org>
+Message-ID: <20160905123617.18775-4-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Leif Lindholm <leif.lindholm@linaro.org>
+SBBR mentions SPCR as a mandatory ACPI table.  So enable it for ARM64
 
-We have multiple "earlycon" early_param handlers - merge the DT one into
-the main earlycon one.  It's a cleanup that also will be useful
-to defer setting up DT console until ACPI/DT decision is made.
+Earlycon should be set up as early as possible.  ACPI boot tables are
+mapped in arch/arm64/kernel/acpi.c:acpi_boot_table_init() that
+is called from setup_arch() and that's where we parse SPCR.
+So it has to be opted-in per-arch.
 
-Rename the exported function to avoid clashing with the function from
-arch/microblaze/kernel/prom.c
+When ACPI_SPCR_TABLE is defined initialization of DT earlycon is
+deferred until the DT/ACPI decision is done.  Initialize DT earlycon
+if ACPI is disabled.
 
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
 Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
 Tested-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 Tested-by: Christopher Covington <cov@codeaurora.org>
 ---
- drivers/of/fdt.c              | 11 +----------
- drivers/tty/serial/earlycon.c |  2 +-
- include/linux/of_fdt.h        |  3 +++
- 3 files changed, 5 insertions(+), 11 deletions(-)
+ arch/arm64/Kconfig       |  1 +
+ arch/arm64/kernel/acpi.c | 11 ++++++++++-
+ 2 files changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index 085c638..c89d5d2 100644
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -924,7 +924,7 @@ static inline void early_init_dt_check_for_initrd(unsigned long node)
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index bc3f00f..11a2d36 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -4,6 +4,7 @@ config ARM64
+ 	select ACPI_GENERIC_GSI if ACPI
+ 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+ 	select ACPI_MCFG if ACPI
++	select ACPI_SPCR_TABLE if ACPI
+ 	select ARCH_HAS_DEVMEM_IS_ALLOWED
+ 	select ARCH_HAS_ACPI_TABLE_UPGRADE if ACPI
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index 3e4f1a4..252a6d9 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -24,6 +24,7 @@
+ #include <linux/memblock.h>
+ #include <linux/of_fdt.h>
+ #include <linux/smp.h>
++#include <linux/serial_core.h>
  
- #ifdef CONFIG_SERIAL_EARLYCON
+ #include <asm/cputype.h>
+ #include <asm/cpu_ops.h>
+@@ -206,7 +207,7 @@ void __init acpi_boot_table_init(void)
+ 	if (param_acpi_off ||
+ 	    (!param_acpi_on && !param_acpi_force &&
+ 	     of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+-		return;
++		goto done;
  
--static int __init early_init_dt_scan_chosen_serial(void)
-+int __init early_init_dt_scan_chosen_stdout(void)
- {
- 	int offset;
- 	const char *p, *q, *options = NULL;
-@@ -968,15 +968,6 @@ static int __init early_init_dt_scan_chosen_serial(void)
+ 	/*
+ 	 * ACPI is disabled at this point. Enable it in order to parse
+@@ -226,6 +227,14 @@ void __init acpi_boot_table_init(void)
+ 		if (!param_acpi_force)
+ 			disable_acpi();
  	}
- 	return -ENODEV;
++
++done:
++	if (acpi_disabled) {
++		if (earlycon_init_is_deferred)
++			early_init_dt_scan_chosen_stdout();
++	} else {
++		parse_spcr(earlycon_init_is_deferred);
++	}
  }
--
--static int __init setup_of_earlycon(char *buf)
--{
--	if (buf)
--		return 0;
--
--	return early_init_dt_scan_chosen_serial();
--}
--early_param("earlycon", setup_of_earlycon);
- #endif
  
- /**
-diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
-index 067783f..7aae655 100644
---- a/drivers/tty/serial/earlycon.c
-+++ b/drivers/tty/serial/earlycon.c
-@@ -209,7 +209,7 @@ static int __init param_setup_earlycon(char *buf)
- 	 * don't generate a warning from parse_early_params() in that case
- 	 */
- 	if (!buf || !buf[0])
--		return 0;
-+		return early_init_dt_scan_chosen_stdout();
- 
- 	err = setup_earlycon(buf);
- 	if (err == -ENOENT || err == -EALREADY)
-diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-index 26c3302..4341f32 100644
---- a/include/linux/of_fdt.h
-+++ b/include/linux/of_fdt.h
-@@ -14,6 +14,7 @@
- 
- #include <linux/types.h>
- #include <linux/init.h>
-+#include <linux/errno.h>
- 
- /* Definitions used by the flattened device tree */
- #define OF_DT_HEADER		0xd00dfeed	/* marker */
-@@ -66,6 +67,7 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
- 				     int depth, void *data);
- extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
- 				     int depth, void *data);
-+extern int early_init_dt_scan_chosen_stdout(void);
- extern void early_init_fdt_scan_reserved_mem(void);
- extern void early_init_fdt_reserve_self(void);
- extern void early_init_dt_add_memory_arch(u64 base, u64 size);
-@@ -94,6 +96,7 @@ extern void early_get_first_memblock_info(void *, phys_addr_t *);
- extern u64 of_flat_dt_translate_address(unsigned long node);
- extern void of_fdt_limit_memory(int limit);
- #else /* CONFIG_OF_FLATTREE */
-+static inline int early_init_dt_scan_chosen_stdout(void) { return -ENODEV; }
- static inline void early_init_fdt_scan_reserved_mem(void) {}
- static inline void early_init_fdt_reserve_self(void) {}
- static inline const char *of_flat_dt_get_machine_name(void) { return NULL; }
+ #ifdef CONFIG_ACPI_APEI
 -- 
 2.9.3
