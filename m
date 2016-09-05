@@ -1,68 +1,89 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Sep 2016 14:24:11 +0100
-Subject: [PATCH] arm64: mm: phys_mem_access_prot() reports non-kernel
- memory as device memory
-In-Reply-To: <CAKv+Gu-eEodAFnXhAygzEFU34vZitzhH2yfU71=3gyVFBsdQYA@mail.gmail.com>
-References: <1473064984-9494-1-git-send-email-james.morse@arm.com>
- <20160905103526.GD2649@arm.com> <57CD6D2E.70208@arm.com>
- <CAKv+Gu-eEodAFnXhAygzEFU34vZitzhH2yfU71=3gyVFBsdQYA@mail.gmail.com>
-Message-ID: <20160905132411.GC10221@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 5 Sep 2016 15:26:31 +0200
+Subject: [PATCH 1/2] mtd: nand: automate NAND timings selection
+In-Reply-To: <20160905110932.jkt3ixxrsqj5emzu@pengutronix.de>
+References: <1472820149-24241-1-git-send-email-s.hauer@pengutronix.de>
+ <1472820149-24241-2-git-send-email-s.hauer@pengutronix.de>
+ <20160905085146.239129bd@bbrezillon>
+ <20160905110932.jkt3ixxrsqj5emzu@pengutronix.de>
+Message-ID: <20160905152631.5a1c9187@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 05, 2016 at 02:10:54PM +0100, Ard Biesheuvel wrote:
-> On 5 September 2016 at 14:03, James Morse <james.morse@arm.com> wrote:
-> > On 05/09/16 11:35, Will Deacon wrote:
-> >> On Mon, Sep 05, 2016 at 09:43:03AM +0100, James Morse wrote:
-> >>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> >>> index 4989948d1feb..96a2f327fd2c 100644
-> >>> --- a/arch/arm64/mm/mmu.c
-> >>> +++ b/arch/arm64/mm/mmu.c
-> >>> @@ -63,7 +63,7 @@ static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss __maybe_unused;
-> >>>  pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
-> >>>                            unsigned long size, pgprot_t vma_prot)
-> >>>  {
-> >>> -    if (!pfn_valid(pfn))
-> >>> +    if (!memblock_is_memory(pfn << PAGE_SHIFT))
-> >
-> >> Hmm, this looks pretty weird to me. pfn_valid currently calls
-> >> memblock_is_map_memory, so now we have this slightly paradoxical situation
-> >> of having some memory marked NOMAP but wanting to map it to userspace.
-> >
-> > Yup, crazy as it looks, that is what is happening.
-> >
-> 
-> Indeed. Formerly, we would remove this from memblock entirely,
-> resulting in the same situation, i.e., that the region is omitted from
-> the linear mapping. However, by doing that, we also lose the
-> annotation that the region was memory to begin with, resulting in the
-> ACPI layer using ioremap() rather than ioremap_cache() or memremap()
-> to map it.
-> 
-> So the whole point of introducing MEMBLOCK_NOMAP was to allow memory
-> to be kept in the memblock array, but with an annotation that it
-> should not be covered by the linear mapping.
-> 
-> >> So our abstractions don't seem to align with reality. Why are the ACPI
-> >> tables getting marked as NOMAP to being with?
-> >
-> > EFI adds any region we can map as normal memory to memblock.memory, it also adds
-> > anything it considers reserved to the memblock.nomap, e.g. the ACPI tables. This
-> > causes these regions be left out of the linear map.
-> > (I don't know why exactly, but assume its so that the attributes and permissions
-> > can be tweaked easily)
-> >
-> 
-> To prevent mismatched attributes between the linear mapping and
-> whatever mapping the firmware and/or ACPI are using. Also, going
-> through the trouble of mapping runtime services executable code with
-> R-X permissions and then having a writable alias is not great in terms
-> of security.
+On Mon, 5 Sep 2016 13:09:32 +0200
+Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-Ok, but with this patch we potentially have both of those problems
-(mismatched attributes and RWX permission) with the userspace mapping :/
+> On Mon, Sep 05, 2016 at 08:51:46AM +0200, Boris Brezillon wrote:
+> > Hi Sascha,
+> > 
+> > It feels weird to review his own patch, but I have a few comments. :)  
+> 
+> I know this feeling. Suddenly you have to criticise code you previously
+> hoped to get through with ;)
+> 
+> > 
+> > On Fri,  2 Sep 2016 14:42:28 +0200
+> > Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> >   
+> > > From: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > 
+> > > The NAND framework provides several helpers to query timing modes supported
+> > > by a NAND chip, but this implies that all NAND controller drivers have
+> > > to implement the same timings selection dance.
+> > > 
+> > > Provide a common logic to select the best timings based on ONFI or  
+> > > ->onfi_timing_mode_default information.    
+> > > NAND controller willing to support timings adjustment should just
+> > > implement the ->setup_data_interface() method.  
+> > 
+> > Now I remember one of the reason I did not post a v2 (apart from not
+> > having the time).
+> > 
+> > If understand the ONFI spec correctly, when you reset the NAND chip,
+> > you get back to SDR+timing-mode0. In the core we do not control when
+> > the reset command (0xff) is issued, and this prevents us from
+> > re-applying the correct timing mode after a reset.
+> > 
+> > Maybe we should provide a nand_reset() helper to hide this complexity,
+> > and patch all ->cmdfunc(NAND_CMD_RESET) callers to call nand_reset()
+> > instead.
+> > 
+> > Note that the interface+timing-mode config is not necessarily the only
+> > thing we'll have to re-apply after a reset (especially on MLC NANDs), so
+> > having place where we can put all operations that should be done after
+> > a reset is a good thing.  
+> 
+> Ouch, there are indeed some things wrong in this patch. We iterate over
+> all chips and set the timing mode for each:
+> 
+> +		if (modes != ONFI_TIMING_MODE_UNKNOWN) {
+> +			/*
+> +			 * FIXME: should we really set the timing mode on all
+> +			 * dies?
+> +			 */
+> +			for (i = 0; i < chip->numchips; i++) {
+> +				chip->select_chip(mtd, i);
+> +				ret = chip->onfi_set_features(mtd, chip,
+> +						ONFI_FEATURE_ADDR_TIMING_MODE,
+> +						tmode_param);
+> +			}
+> +			chip->select_chip(mtd, -1);
+> +		}
+> +
+> 
+> Afterwards the code in nand_scan_ident() resets all chips while checking
+> for a chip array, reverting the effect of the above code. Looking closer
+> at it the above code has no effect anyway since it's executed when
+> chip->numchips is not yet initialized and still 0.
 
-Is it worth trying to avoid any of this, or do we just throw our hands
-in the air and give up when /dev/mem is being used?
+Yep :-(.
 
-Will
+> 
+> I think providing a nand_reset() function is a good idea. I'll implement
+> one and see what I end up with.
+
+Thanks for looking into that, that's truly appreciated (I have so much
+things on my plate lately that the NAND framework rework I planned are
+constantly delayed).
+
+Boris
