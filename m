@@ -1,89 +1,82 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Mon, 5 Sep 2016 09:31:37 +0200
-Subject: [RFC/RFT PATCH] arm64: mm: allow userland to run with one fewer
- translation level
-In-Reply-To: <CAKv+Gu-Z2eRVjxfY-ypQdTyevRgoWzLgqPZaLf-bq_cE0D9ABw@mail.gmail.com>
-References: <1471781914-16681-1-git-send-email-ard.biesheuvel@linaro.org>
- <abe7c6e4-8898-3e9b-da66-dd3ca10f27b0@suse.de>
- <CAKv+Gu-Z2eRVjxfY-ypQdTyevRgoWzLgqPZaLf-bq_cE0D9ABw@mail.gmail.com>
-Message-ID: <57CD1F59.2060301@suse.de>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 5 Sep 2016 09:47:27 +0200
+Subject: [PATCH v3 2/9] drivers: irqchip: Add STM32 external interrupts
+ support
+In-Reply-To: <alpine.DEB.2.20.1609022052470.5647@nanos>
+References: <1472830398-13275-1-git-send-email-alexandre.torgue@st.com>
+ <1472830398-13275-3-git-send-email-alexandre.torgue@st.com>
+ <alpine.DEB.2.20.1609022052470.5647@nanos>
+Message-ID: <d790a3fd-766a-36d3-7a05-40b3198777c6@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/2016 10:42 AM, Ard Biesheuvel wrote:
-> On 2 September 2016 at 17:58, Alexander Graf <agraf@suse.de> wrote:
->>
->> On 21.08.16 14:18, Ard Biesheuvel wrote:
->>> The choice of VA size is usually decided by the requirements on the kernel
->>> side, particularly the size of the linear region, which must be large
->>> enough to cover all of physical memory, including the holes in between,
->>> which may be very large (~512 GB on some systems).
->>>
->>> Since running with more translation levels could potentially result in
->>> a performance penalty due to additional TLB pressure, this patch allows the
->>> kernel to be configured so that it runs with one fewer translation level on
->>> the userland side. Rather than modifying all the compile time logic to deal
->>> with folded PUDs or PMDs, we simply allocate the root table and the next
->>> table adjacently, so that we can simply point TTBR0_EL1 to the next table
->>> (and update TCR_EL1.T0SZ accordingly)
->>>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> ---
->>>
->>> This is just a proof of concept. *If* there is a performance penalty associated
->>> with using 4 translation levels instead of 3, I would expect this patch to
->>> compensate for that, given that the additional TLB pressure should be on the
->>> userland side primarily. Benchmark results are highly appreciated.
->>>
->>> As a bonus, this would fix the horrible yet real JIT issues we have been seeing
->>> with 48-bit VA configurations. IOW, I expect this to be an easier sell than
->>> simply limiting TASKSIZE to 47 bits (assuming anyone can show a benchmark where
->>> this patch has a positive impact on the performance of a 48-bit/4 levels kernel)
->>> and distros can ship kernels that work on all hardware (including Freescale and
->>> Xgene with >= 64 GB) but don't break their JITs.
->>>
->>> This patch is most likely broken for 16k/47-bit configs, but I didn't bother to
->>> fix that before having the discussion.
->> Let's roll forward by a few years. In that time, there's a good chance
->> you will have nvdimms in a good number of systems out there with massive
->> address spaces that easily reach beyond the lousy 512GB you get with 3
->> levels.
->>
-> That still does not mean it makes sense for 48 bits to be the default
-> for every userland process.
+Hi Thomas,
 
-That depends on the overhead, so benchmark results really would be good 
-to have :).
-
+On 09/02/2016 08:57 PM, Thomas Gleixner wrote:
+> Alexandre,
 >
->> That means at that point we'd have to roll back and have 48 bits
->> regardless - or add special attributes to have binaries that then can
->> demand bigger address space. Overall that doesn't sound terribly
->> appealing, so I'm not sure going for 39 as interim is a step into the
->> right direction.
->>
->> That said, I'd be very happy to see benchmark results too :)
->>
-> Well, my point is that there is no guaranteed minimum at the moment.
-> If you happen to be running on a 38-bit VA kernel, that is all you are
-> ever going to get. This means that either you deal with that, or you
-> need to signal in some way that 39-bit VA is insufficient.
+> On Fri, 2 Sep 2016, Alexandre TORGUE wrote:
 >
-> The longer we leave the current undefined state endure, the more hacks
-> will come into existence (using munmap() etc) to make inferences about
-> what the current system provide. So we need to select something, stick
-> with it for now, and in the future, when it becomes necessary, expose
-> the means for a userland process to convey its minimum VA size.
+> This all looks very reasonable. The only complaint I have is your variable
+> declaration ordering or the lack thereof.
+>
+> 1)
+>> +	struct irq_domain *domain = irq_desc_get_handler_data(desc);
+>> +	struct irq_chip_generic *gc = domain->gc->gc[0];
+>> +	struct irq_chip *chip = irq_desc_get_chip(desc);
+>> +	unsigned long pending;
+>> +	int n;
+>
+> 2)
+>> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(data);
+>> +	u32 rtsr, ftsr;
+>> +	int pin = data->hwirq;
+>
+> 3)
+>> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(data);
+>> +	int pin = data->hwirq;
+>> +	u32 emr;
+>
+> 4)
+>> +	irq_hw_number_t hwirq;
+>> +	struct irq_fwspec *fwspec = data;
+>> +	struct irq_chip_generic *gc = d->gc->gc[0];
+>
+> 5)
+>> +	int nr_irqs, nr_exti, ret, i;
+>> +	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
+>> +	struct irq_domain *domain;
+>> +	struct irq_chip_generic *gc;
+>> +	void *base;
+>
+> #1 and 3 have the ordering which is preferred in the irq code.
+>
+> #2, #4 and #5 are three permutations which are way harder to read.
+>
+>> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(data);
+>> +	int pin = data->hwirq;
+>> +	u32 rtsr, ftsr;
+>
+>> +	struct irq_chip_generic *gc = d->gc->gc[0];
+>> +	struct irq_fwspec *fwspec = data;
+>> +	irq_hw_number_t hwirq;
+>
+>> +	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
+>> +	int nr_irqs, nr_exti, ret, i;
+>> +	struct irq_chip_generic *gc;
+>> +	struct irq_domain *domain;
+>> +	void *base;
+>
+> Can you spot the difference?
 
-I tend to agree (if the overhead is measurable).
+Thanks for review and for proposal. It Will be in next version.
 
-Since you're always generating full sized page tables, can't we just 
-leave ASLR and default addresses in the lower 38 bits by default and 
-seamlessly enable the 4th level once we get an allocation we can't fulfill?
-
-Then the security impact of running with only 38 bits becomes a tunable 
-that people can set depending on their preferences and we stay in the 
-lower address range by default.
-
+Regards
 
 Alex
+
+>
+> Thanks,
+>
+> 	tglx
+>
