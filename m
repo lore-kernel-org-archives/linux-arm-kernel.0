@@ -1,50 +1,43 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 5 Sep 2016 10:52:39 +0100
-Subject: [PATCH] arm64: mm: drop fixup_init() and mm.h
-In-Reply-To: <1473067775-26284-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1473067775-26284-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <20160905095239.GA6826@leverpostej>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 5 Sep 2016 11:53:21 +0200
+Subject: [PATCH v3 1/4] pwm: Add support for Meson PWM Controller
+In-Reply-To: <CAFBinCA3PoR_=+f8aU-Trg8uKWWXkkBOtrQUaXbdsb8E-fdM0g@mail.gmail.com>
+References: <1471880193-21879-1-git-send-email-narmstrong@baylibre.com>
+ <1471880193-21879-2-git-send-email-narmstrong@baylibre.com>
+ <CAFBinCA3PoR_=+f8aU-Trg8uKWWXkkBOtrQUaXbdsb8E-fdM0g@mail.gmail.com>
+Message-ID: <20160905095321.GB31424@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 05, 2016 at 05:29:35PM +0800, Kefeng Wang wrote:
-> There is only fixup_init() in mm.h , and it is only called
-> in free_initmem(), so move the codes from fixup_init() into
-> free_initmem(), then drop fixup_init() and mm.h.
+On Sun, Aug 28, 2016 at 06:33:03PM +0200, Martin Blumenstingl wrote:
+> On Mon, Aug 22, 2016 at 5:36 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+> > Add support for the PWM controller found in the Amlogic SoCs.
+> > This driver supports the Meson8b and GXBB SoCs.
+> >
+> > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> I could enable the AP6330 SDIO wifi module with this on my
+> meson-gxbb-vega-s95-meta clone, which uses pwm_e to generate the LPO
+> clock for the wifi module (see [0] for the corresponding patches).
+> So thank you Neil, and:
+> Tested-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 
-[...]
+Hi Martin,
 
-> +++ b/arch/arm64/mm/init.c
-> @@ -47,8 +47,6 @@
->  #include <asm/tlb.h>
->  #include <asm/alternative.h>
->  
-> -#include "mm.h"
-> -
->  /*
->   * We need to be able to catch inadvertent references to memstart_addr
->   * that occur (potentially in generic code) before arm64_memblock_init()
-> @@ -485,7 +483,12 @@ void free_initmem(void)
->  {
->  	free_reserved_area(__va(__pa(__init_begin)), __va(__pa(__init_end)),
->  			   0, "unused kernel");
-> -	fixup_init();
-> +	/*
-> +	 * Unmap the __init region but leave the VM area in place. This
-> +	 * prevents the region from being reused for kernel modules, which
-> +	 * is not supported by kallsyms.
-> +	 */
-> +	unmap_kernel_range((u64)__init_begin, (u64)(__init_end - __init_begin));
+As mentioned in another reply in this thread I ended up restructuring
+the driver a little before applying it to the PWM tree. I don't /think/
+there are any functional changes, so I left your Tested-by in place, but
+it would be great if you could retest and confirm, just to make sure.
 
-Please also include <linux/vmalloc.h> above. That is where the prototype
-of unmap_kernel_range is defined.
+The driver is in the for-4.9/drivers branch of the PWM tree:
 
-We were getting away without that in mm/mmu.c, but we should fix it up
-now.
-
-Otherwise, the patch looks good to me. With the above fixed up:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+	https://git.kernel.org/cgit/linux/kernel/git/thierry.reding/linux-pwm.git/log/?h=for-4.9/drivers
 
 Thanks,
-Mark.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/6455a12d/attachment-0001.sig>
