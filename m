@@ -1,267 +1,39 @@
-From: andrej@inversepath.com (andrej at inversepath.com)
-Date: Mon,  5 Sep 2016 12:11:17 +0200
-Subject: [PATCH v3 2/2] ARM: dts: imx53: add support for USB armory board
-In-Reply-To: <20160905101117.27473-1-andrej@inversepath.com>
-References: <20160905101117.27473-1-andrej@inversepath.com>
-Message-ID: <20160905101117.27473-3-andrej@inversepath.com>
+From: shh.xie@gmail.com (shh.xie at gmail.com)
+Date: Mon, 5 Sep 2016 18:01:28 +0800
+Subject: [PATCH 0/7] [v2] arm64: dts: add QorIQ LS1046A SoC and boards support
+Message-ID: <1473069695-33092-1-git-send-email-shh.xie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrej Rosano <andrej@inversepath.com>
+From: Shaohui Xie <Shaohui.Xie@nxp.com>
 
-Add support for Inverse Path USB armory board, an open source
-flash-drive sized computer based on NXP i.MX53 SoC.
+This patchest adds support for QorIQ LS1046A SoC which is based on ARMv8
+architecture, also adds LS1046A-RDB and LS1046A-QDS board support.
 
-https://inversepath.com/usbarmory
+Also, updates bindings for SoC-specific devices SCFG and DCFG,
+and I2C devices.
 
-Signed-off-by: Andrej Rosano <andrej@inversepath.com>
----
- arch/arm/boot/dts/Makefile            |   1 +
- arch/arm/boot/dts/imx53-usbarmory.dts | 224 ++++++++++++++++++++++++++++++++++
- 2 files changed, 225 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx53-usbarmory.dts
+Mingkai Hu (2):
+  arm64: dts: add QorIQ LS1046A SoC support
+  arm64: dts: add LS1046A-RDB board support
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index faacd52..20790b8 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -315,6 +315,7 @@ dtb-$(CONFIG_SOC_IMX53) += \
- 	imx53-smd.dtb \
- 	imx53-tx53-x03x.dtb \
- 	imx53-tx53-x13x.dtb \
-+	imx53-usbarmory.dtb \
- 	imx53-voipac-bsb.dtb
- dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6dl-apf6dev.dtb \
-diff --git a/arch/arm/boot/dts/imx53-usbarmory.dts b/arch/arm/boot/dts/imx53-usbarmory.dts
-new file mode 100644
-index 0000000..6782d7f
---- /dev/null
-+++ b/arch/arm/boot/dts/imx53-usbarmory.dts
-@@ -0,0 +1,224 @@
-+/*
-+ * USB armory MkI device tree file
-+ * https://inversepath.com/usbarmory
-+ *
-+ * Copyright (C) 2015, Inverse Path
-+ * Andrej Rosano <andrej@inversepath.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "imx53.dtsi"
-+
-+/ {
-+	model = "Inverse Path USB armory";
-+	compatible = "inversepath,imx53-usbarmory", "fsl,imx53";
-+};
-+
-+/ {
-+	chosen {
-+		stdout-path = &uart1;
-+	};
-+
-+	memory {
-+		reg = <0x70000000 0x20000000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_led>;
-+
-+		user {
-+			label = "LED";
-+			gpios = <&gpio4 27 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+};
-+
-+/*
-+ * Not every i.MX53 P/N supports clock > 800MHz.
-+ * As USB armory does not mount a specific P/N set a safe clock upper limit.
-+ */
-+&cpu0 {
-+	operating-points = <
-+		/* kHz */
-+		166666  850000
-+		400000  900000
-+		800000 1050000
-+	>;
-+};
-+
-+&esdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc1>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl_esdhc1: esdhc1grp {
-+		fsl,pins = <
-+			MX53_PAD_SD1_DATA0__ESDHC1_DAT0		0x1d5
-+			MX53_PAD_SD1_DATA1__ESDHC1_DAT1		0x1d5
-+			MX53_PAD_SD1_DATA2__ESDHC1_DAT2		0x1d5
-+			MX53_PAD_SD1_DATA3__ESDHC1_DAT3		0x1d5
-+			MX53_PAD_SD1_CMD__ESDHC1_CMD		0x1d5
-+			MX53_PAD_SD1_CLK__ESDHC1_CLK		0x1d5
-+		>;
-+	};
-+
-+	pinctrl_i2c1_pmic: i2c1grp {
-+		fsl,pins = <
-+			MX53_PAD_EIM_D21__I2C1_SCL	0x80
-+			MX53_PAD_EIM_D28__I2C1_SDA	0x80
-+		>;
-+	};
-+
-+	pinctrl_led: ledgrp {
-+		fsl,pins = <
-+			MX53_PAD_DISP0_DAT6__GPIO4_27 0x1e4
-+		>;
-+	};
-+
-+	/*
-+	 * UART mode pin header configration
-+	 * 3 - GPIO5[26], pull-down 100K
-+	 * 4 - GPIO5[27], pull-down 100K
-+	 * 5 - TX, pull-up 100K
-+	 * 6 - RX, pull-up 100K
-+	 * 7 - GPIO5[30], pull-down 100K
-+	 */
-+	pinctrl_uart1: uart1grp {
-+		fsl,pins = <
-+			MX53_PAD_CSI0_DAT8__GPIO5_26		0xc0
-+			MX53_PAD_CSI0_DAT9__GPIO5_27		0xc0
-+			MX53_PAD_CSI0_DAT10__UART1_TXD_MUX	0x1e4
-+			MX53_PAD_CSI0_DAT11__UART1_RXD_MUX	0x1e4
-+			MX53_PAD_CSI0_DAT12__GPIO5_30		0xc0
-+		>;
-+	};
-+};
-+
-+&i2c1 {
-+	pinctrl-0 = <&pinctrl_i2c1_pmic>;
-+	status = "okay";
-+
-+	ltc3589: pmic at 34 {
-+		compatible = "lltc,ltc3589-2";
-+		reg = <0x34>;
-+
-+		regulators {
-+			sw1_reg: sw1 {
-+				regulator-min-microvolt = <591930>;
-+				regulator-max-microvolt = <1224671>;
-+				lltc,fb-voltage-divider = <100000 158000>;
-+				regulator-ramp-delay = <7000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <704123>;
-+				regulator-max-microvolt = <1456803>;
-+				lltc,fb-voltage-divider = <180000 191000>;
-+				regulator-ramp-delay = <7000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3_reg: sw3 {
-+				regulator-min-microvolt = <1341250>;
-+				regulator-max-microvolt = <2775000>;
-+				lltc,fb-voltage-divider = <270000 100000>;
-+				regulator-ramp-delay = <7000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			bb_out_reg: bb-out {
-+				regulator-min-microvolt = <3387341>;
-+				regulator-max-microvolt = <3387341>;
-+				lltc,fb-voltage-divider = <511000 158000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			ldo1_reg: ldo1 {
-+				regulator-min-microvolt = <1306329>;
-+				regulator-max-microvolt = <1306329>;
-+				lltc,fb-voltage-divider = <100000 158000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			ldo2_reg: ldo2 {
-+				regulator-min-microvolt = <704123>;
-+				regulator-max-microvolt = <1456806>;
-+				lltc,fb-voltage-divider = <180000 191000>;
-+				regulator-ramp-delay = <7000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			ldo3_reg: ldo3 {
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-boot-on;
-+			};
-+
-+			ldo4_reg: ldo4 {
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3200000>;
-+			};
-+		};
-+	};
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	dr_mode = "peripheral";
-+	status = "okay";
-+};
+Shaohui Xie (5):
+  dt-bindings: fsl: updates bindings for some SoC-specific devices
+  dt-bindings: i2c: adds two more nxp devices
+  Documentation: DT: Add entry for QorIQ LS1046A-RDB board
+  Documentation: DT: Add entry for QorIQ LS1046A-QDS board
+  arm64: dts: add LS1046A-QDS board support
+
+ Documentation/devicetree/bindings/arm/fsl.txt      |  20 +-
+ .../devicetree/bindings/i2c/trivial-devices.txt    |   2 +
+ arch/arm64/boot/dts/freescale/Makefile             |   2 +
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts  | 212 +++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts  | 150 ++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     | 511 +++++++++++++++++++++
+ 6 files changed, 894 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+
 -- 
-2.9.3
+2.1.0.27.g96db324
