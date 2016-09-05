@@ -1,43 +1,143 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 5 Sep 2016 11:53:21 +0200
-Subject: [PATCH v3 1/4] pwm: Add support for Meson PWM Controller
-In-Reply-To: <CAFBinCA3PoR_=+f8aU-Trg8uKWWXkkBOtrQUaXbdsb8E-fdM0g@mail.gmail.com>
-References: <1471880193-21879-1-git-send-email-narmstrong@baylibre.com>
- <1471880193-21879-2-git-send-email-narmstrong@baylibre.com>
- <CAFBinCA3PoR_=+f8aU-Trg8uKWWXkkBOtrQUaXbdsb8E-fdM0g@mail.gmail.com>
-Message-ID: <20160905095321.GB31424@ulmo.ba.sec>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 05 Sep 2016 12:54:09 +0300
+Subject: [PATCHv9 4/6] arm: dma-mapping: add {map,
+ unmap}_resource for iommu ops
+In-Reply-To: <20160823153136.GH2951@bigcity.dyn.berto.se>
+References: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
+ <20160810112219.17964-5-niklas.soderlund+renesas@ragnatech.se>
+ <20160823153136.GH2951@bigcity.dyn.berto.se>
+Message-ID: <1952161.FNa7jUW08f@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 28, 2016 at 06:33:03PM +0200, Martin Blumenstingl wrote:
-> On Mon, Aug 22, 2016 at 5:36 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
-> > Add support for the PWM controller found in the Amlogic SoCs.
-> > This driver supports the Meson8b and GXBB SoCs.
-> >
-> > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> I could enable the AP6330 SDIO wifi module with this on my
-> meson-gxbb-vega-s95-meta clone, which uses pwm_e to generate the LPO
-> clock for the wifi module (see [0] for the corresponding patches).
-> So thank you Neil, and:
-> Tested-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Hello Niklas and Russell,
 
-Hi Martin,
+On Tuesday 23 Aug 2016 17:31:36 Niklas S?derlund wrote:
+> Hi Russell,
+> 
+> If you have the time can you please have a look at this patch? This
+> series have been out for some time now and Vinod is willing to take it
+> through the dmaengine tree but a ACK is needed on this patch from you
+> first.
 
-As mentioned in another reply in this thread I ended up restructuring
-the driver a little before applying it to the PWM tree. I don't /think/
-there are any functional changes, so I left your Tested-by in place, but
-it would be great if you could retest and confirm, just to make sure.
+I've reviewed and acked all the patches touching the DMA mapping API (1/6 to 
+4/6). Russell, if you can find a bit of time to review this one it would be 
+very appreciated.
 
-The driver is in the for-4.9/drivers branch of the PWM tree:
+> On 2016-08-10 13:22:17 +0200, Niklas S?derlund wrote:
+> > Add methods to map/unmap device resources addresses for dma_map_ops that
+> > are IOMMU aware. This is needed to map a device MMIO register from a
+> > physical address.
+> > 
+> > Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+> > Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > ---
+> > 
+> >  arch/arm/mm/dma-mapping.c | 63 ++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 63 insertions(+)
+> > 
+> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> > index c6834c0..746eb29 100644
+> > --- a/arch/arm/mm/dma-mapping.c
+> > +++ b/arch/arm/mm/dma-mapping.c
+> > @@ -2014,6 +2014,63 @@ static void arm_iommu_unmap_page(struct device
+> > *dev, dma_addr_t handle,> 
+> >  	__free_iova(mapping, iova, len);
+> >  
+> >  }
+> > 
+> > +/**
+> > + * arm_iommu_map_resource - map a device resource for DMA
+> > + * @dev: valid struct device pointer
+> > + * @phys_addr: physical address of resource
+> > + * @size: size of resource to map
+> > + * @dir: DMA transfer direction
+> > + */
+> > +static dma_addr_t arm_iommu_map_resource(struct device *dev,
+> > +		phys_addr_t phys_addr, size_t size,
+> > +		enum dma_data_direction dir, unsigned long attrs)
+> > +{
+> > +	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
+> > +	dma_addr_t dma_addr;
+> > +	int ret, prot;
+> > +	phys_addr_t addr = phys_addr & PAGE_MASK;
+> > +	unsigned int offset = phys_addr & ~PAGE_MASK;
+> > +	size_t len = PAGE_ALIGN(size + offset);
+> > +
+> > +	dma_addr = __alloc_iova(mapping, len);
+> > +	if (dma_addr == DMA_ERROR_CODE)
+> > +		return dma_addr;
+> > +
+> > +	prot = __dma_direction_to_prot(dir) | IOMMU_MMIO;
+> > +
+> > +	ret = iommu_map(mapping->domain, dma_addr, addr, len, prot);
+> > +	if (ret < 0)
+> > +		goto fail;
+> > +
+> > +	return dma_addr + offset;
+> > +fail:
+> > +	__free_iova(mapping, dma_addr, len);
+> > +	return DMA_ERROR_CODE;
+> > +}
+> > +
+> > +/**
+> > + * arm_iommu_unmap_resource - unmap a device DMA resource
+> > + * @dev: valid struct device pointer
+> > + * @dma_handle: DMA address to resource
+> > + * @size: size of resource to map
+> > + * @dir: DMA transfer direction
+> > + */
+> > +static void arm_iommu_unmap_resource(struct device *dev, dma_addr_t
+> > dma_handle, +		size_t size, enum dma_data_direction dir,
+> > +		unsigned long attrs)
+> > +{
+> > +	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
+> > +	dma_addr_t iova = dma_handle & PAGE_MASK;
+> > +	unsigned int offset = dma_handle & ~PAGE_MASK;
+> > +	size_t len = PAGE_ALIGN(size + offset);
+> > +
+> > +	if (!iova)
+> > +		return;
+> > +
+> > +	iommu_unmap(mapping->domain, iova, len);
+> > +	__free_iova(mapping, iova, len);
+> > +}
+> > +
+> > 
+> >  static void arm_iommu_sync_single_for_cpu(struct device *dev,
+> >  
+> >  		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+> >  
+> >  {
+> > 
+> > @@ -2057,6 +2114,9 @@ struct dma_map_ops iommu_ops = {
+> > 
+> >  	.unmap_sg		= arm_iommu_unmap_sg,
+> >  	.sync_sg_for_cpu	= arm_iommu_sync_sg_for_cpu,
+> >  	.sync_sg_for_device	= arm_iommu_sync_sg_for_device,
+> > 
+> > +
+> > +	.map_resource		= arm_iommu_map_resource,
+> > +	.unmap_resource		= arm_iommu_unmap_resource,
+> > 
+> >  };
+> >  
+> >  struct dma_map_ops iommu_coherent_ops = {
+> > 
+> > @@ -2070,6 +2130,9 @@ struct dma_map_ops iommu_coherent_ops = {
+> > 
+> >  	.map_sg		= arm_coherent_iommu_map_sg,
+> >  	.unmap_sg	= arm_coherent_iommu_unmap_sg,
+> > 
+> > +
+> > +	.map_resource	= arm_iommu_map_resource,
+> > +	.unmap_resource	= arm_iommu_unmap_resource,
+> > 
+> >  };
+> >  
+> >  /**
 
-	https://git.kernel.org/cgit/linux/kernel/git/thierry.reding/linux-pwm.git/log/?h=for-4.9/drivers
+-- 
+Regards,
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/6455a12d/attachment-0001.sig>
+Laurent Pinchart
