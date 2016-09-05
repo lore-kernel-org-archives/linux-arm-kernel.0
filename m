@@ -1,23 +1,25 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 5 Sep 2016 14:01:04 +0200
-Subject: [PATCH 0/3] Add R8A7792/Wheat QSPI support
-In-Reply-To: <1648590.FPpmBRoQyh@wasted.cogentembedded.com>
-References: <1648590.FPpmBRoQyh@wasted.cogentembedded.com>
-Message-ID: <20160905120104.GB24256@verge.net.au>
+Date: Mon, 5 Sep 2016 14:03:51 +0200
+Subject: [PATCH] ARM: dts: wheat: add CAN support
+In-Reply-To: <cc1d04e3-8083-f487-15b9-9feee84a0d60@cogentembedded.com>
+References: <34968644.DhifNderY8@wasted.cogentembedded.com>
+ <5729004.lSWLzbWbOW@wasted.cogentembedded.com>
+ <cc1d04e3-8083-f487-15b9-9feee84a0d60@cogentembedded.com>
+Message-ID: <20160905120351.GC24256@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 03, 2016 at 01:04:37AM +0300, Sergei Shtylyov wrote:
-> Hello.
+On Sun, Sep 04, 2016 at 12:50:00AM +0300, Sergei Shtylyov wrote:
+> On 08/29/2016 11:11 PM, Sergei Shtylyov wrote:
 > 
->    Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
-> 'renesas-devel-20160902-v4.8-rc4' tag plus the Wheat board patches posted this
-> week. We're adding the R8A7792/Wheat QSPI clocks and device nodes. The board
-> patch depends on the PFC driver QSPI patch in order for the QSPI pins to be
-> configured...
+> >Define the Wheat board dependent part of the CAN0/1 device nodes...
+> >
+> >Based  on the original (and large) patch by Vladimir Barinov
+> ><vladimir.barinov@cogentembedded.com>.
+> >
+> >Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> [...]
 > 
-> [1/3] ARM: dts: r8a7792: add QSPI clock
-> [2/3] ARM: dts: r8a7792: add QSPI support
-> [3/3] ARM: dts: wheat: add QSPI support
+>    This patch seems stuck for no apparent reason...
 
-Thanks, I have queued these up.
+Thanks, I have queued this up.
