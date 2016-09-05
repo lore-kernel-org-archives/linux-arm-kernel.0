@@ -1,33 +1,132 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon,  5 Sep 2016 16:27:53 +0100
-Subject: [PATCH] arm-cci: pmu: Fix typo in event name
-Message-ID: <1473089273-19311-1-git-send-email-suzuki.poulose@arm.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Mon, 5 Sep 2016 23:31:32 +0800
+Subject: [Linaro-acpi] [PATCH V8 1/8] ACPI: I/O Remapping Table (IORT)
+ initial support
+In-Reply-To: <e287da4e-63bd-2d90-4fdd-dccce9b86459@semihalf.com>
+References: <1470909998-16710-1-git-send-email-tn@semihalf.com>
+ <1470909998-16710-2-git-send-email-tn@semihalf.com>
+ <CADyBb7u+PMFZ8kbSsxPpe8Ws3ik3HKpYakf066-sFd-9gv8_-w@mail.gmail.com>
+ <e287da4e-63bd-2d90-4fdd-dccce9b86459@semihalf.com>
+Message-ID: <CADyBb7uT3sOsnQmWTYDsBXBt+D60PgECxsCaziTb9Zw0bigHpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For one of the CCI events exposed under sysfs, "snoop" was typo'd as
-"snopp". Correct this such that users see the expected event name when
-enumerating events via sysfs.
+Hi Tomasz,
 
-Cc: arm at kernel.org
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- drivers/bus/arm-cci.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 5 September 2016 at 14:12, Tomasz Nowicki <tn@semihalf.com> wrote:
+> On 02.09.2016 13:52, Fu Wei wrote:
+>>
+>> Hi Tomasz,
+>>
+>> On 11 August 2016 at 18:06, Tomasz Nowicki <tn@semihalf.com> wrote:
+>>>
+>>> IORT shows representation of IO topology for ARM based systems.
+>>> It describes how various components are connected together on
+>>> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
+>>>
+>>> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
+>>>
+>>> Initial support allows to detect IORT table presence and save its
+>>> root pointer obtained through acpi_get_table(). The pointer validity
+>>> depends on acpi_gbl_permanent_mmap because if acpi_gbl_permanent_mmap
+>>> is not set while using IORT nodes we would dereference unmapped pointers.
+>>>
+>>> For the aforementioned reason call iort_table_detect() from acpi_init()
+>>> which guarantees acpi_gbl_permanent_mmap to be set at that point.
+>>>
+>>> Add generic helpers which are helpful for scanning and retrieving
+>>> information from IORT table content. List of the most important helpers:
+>>> - iort_find_dev_node() finds IORT node for a given device
+>>> - iort_node_map_rid() maps device RID and returns IORT node which
+>>> provides
+>>>   final translation
+>>>
+>>> IORT support is placed under drivers/acpi/arm64/ new directory due to its
+>>> ARM64 specific nature. The code there is considered only for ARM64.
+>>> The long term plan is to keep all ARM64 specific tables support
+>>> in this place e.g. GTDT table.
+>>>
+>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>> ---
+>>>  drivers/acpi/Kconfig        |   5 +
+>>>  drivers/acpi/Makefile       |   2 +
+>>>  drivers/acpi/arm64/Kconfig  |   6 ++
+>>>  drivers/acpi/arm64/Makefile |   1 +
+>>>  drivers/acpi/arm64/iort.c   | 218
+>>> ++++++++++++++++++++++++++++++++++++++++++++
+>>>  drivers/acpi/bus.c          |   2 +
+>>>  include/linux/iort.h        |  30 ++++++
+>>>  7 files changed, 264 insertions(+)
+>>>  create mode 100644 drivers/acpi/arm64/Kconfig
+>>>  create mode 100644 drivers/acpi/arm64/Makefile
+>>>  create mode 100644 drivers/acpi/arm64/iort.c
+>>>  create mode 100644 include/linux/iort.h
+>>>
+>>> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+>>> index 445ce28..6cef2d1 100644
+>>> --- a/drivers/acpi/Kconfig
+>>> +++ b/drivers/acpi/Kconfig
+>>> @@ -521,4 +521,9 @@ config ACPI_CONFIGFS
+>>>           userspace. The configurable ACPI groups will be visible under
+>>>           /config/acpi, assuming configfs is mounted under /config.
+>>>
+>>> +if ARM64
+>>> +source "drivers/acpi/arm64/Kconfig"
+>>> +
+>>> +endif
+>>> +
+>>>  endif  # ACPI
+>>> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+>>> index 5ae9d85..e5ada78 100644
+>>> --- a/drivers/acpi/Makefile
+>>> +++ b/drivers/acpi/Makefile
+>>> @@ -105,3 +105,5 @@ obj-$(CONFIG_ACPI_CONFIGFS) += acpi_configfs.o
+>>>
+>>>  video-objs                     += acpi_video.o video_detect.o
+>>>  obj-y                          += dptf/
+>>> +
+>>> +obj-$(CONFIG_ARM64)            += arm64/
+>>> diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
+>>> new file mode 100644
+>>> index 0000000..fc818dc
+>>> --- /dev/null
+>>> +++ b/drivers/acpi/arm64/Kconfig
+>>> @@ -0,0 +1,6 @@
+>>> +#
+>>> +# ACPI Configuration for ARM64
+>>> +#
+>>> +
+>>> +config IORT_TABLE
+>>
+>>
+>> Sorry for nit-picking, but is that better to use ACPI_IORT
+>> or maybe ARM64__IORT ??
+>
+>
+> ACPI_IORT sounds good.
 
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 5755907f..ffa7c9d 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -551,7 +551,7 @@ static struct attribute *cci5xx_pmu_event_attrs[] = {
- 	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_wrq, 0xB),
- 	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_cd_hs, 0xC),
- 	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_rq_stall_addr_hazard, 0xD),
--	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snopp_rq_stall_tt_full, 0xE),
-+	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_rq_stall_tt_full, 0xE),
- 	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_rq_tzmp1_prot, 0xF),
- 	NULL
- };
+Thanks, Tomasz :-)
+I have rebaseed my GTDT patchset on your v8 patchset,
+But before I post my new patchset, I  hope we can harmonize with each
+other on these:
+
+1. ACPI_IORT --  ACPI_GTDT
+2. for the file name,  maybe can follow "/drivers/acpi/acpi_*.c" like
+acpi_iort.c and acpi_gtdt.c
+or  follow "/drivers/acpi/apei/*.c" like iort.c and gtdt.c.
+
+looking forward to you new patchset :-)
+Thanks :-)
+
+>
+> Tomasz
+
+
+
 -- 
-2.7.4
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
