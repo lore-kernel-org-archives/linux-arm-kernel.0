@@ -1,105 +1,179 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 5 Sep 2016 11:51:54 +0200
-Subject: [PATCH 4/6] clk: sunxi-ng: Add A33 CCU support
-In-Reply-To: <CAGb2v66z4KMbfOr2kcNXSSXzVqXQ1uZ9p_-uNyvb_7_ACdNCqQ@mail.gmail.com>
-References: <20160901141617.9777-1-maxime.ripard@free-electrons.com>
- <20160901141617.9777-5-maxime.ripard@free-electrons.com>
- <CAGb2v66z4KMbfOr2kcNXSSXzVqXQ1uZ9p_-uNyvb_7_ACdNCqQ@mail.gmail.com>
-Message-ID: <20160905095153.GC6322@lukather>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 05 Sep 2016 12:52:44 +0300
+Subject: [PATCHv9 6/6] dmaengine: rcar-dmac: add iommu support for slave
+ transfers
+In-Reply-To: <20160810112219.17964-7-niklas.soderlund+renesas@ragnatech.se>
+References: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
+ <20160810112219.17964-7-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <6358234.jyTvyVnNF0@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+Hi Niklas,
 
-On Mon, Sep 05, 2016 at 02:34:21PM +0800, Chen-Yu Tsai wrote:
-> > +static SUNXI_CCU_NKMP_WITH_GATE_LOCK(pll_cpux_clk, "pll-cpux",
-> > +                                    "osc24M", 0x000,
-> > +                                    8, 5,              /* N */
-> > +                                    4, 2,              /* K */
-> > +                                    0, 2,              /* M */
-> > +                                    16, 2,             /* P */
+Thank you for the patch.
+
+On Wednesday 10 Aug 2016 13:22:19 Niklas S?derlund wrote:
+> Enable slave transfers to a device behind a IPMMU by mapping the slave
+> addresses using the dma-mapping API.
 > 
-> Manual says there's no divider for P = 0x3.
-> You'll need a table here.
-
-Hmmm, Indeed. Or rather, a max value. We discussed that in the past, I
-guess it's time to introduce it.
-
-> > +                                    BIT(31),           /* gate */
-> > +                                    BIT(28),           /* lock */
-> > +                                    0);
-> > +
-> > +/*
-> > + * The Audio PLL is supposed to have 4 outputs: 3 fixed factors from
-> > + * the base (2x, 4x and 8x), and one variable divider (the one true
-> > + * pll audio).
-> > + *
-> > + * We don't have any need for the variable divider for now, so we just
-> > + * hardcode it to match with the clock names
-> > + */
-> > +#define SUN8I_A33_PLL_AUDIO_REG        0x008
-> > +
-> > +static SUNXI_CCU_NM_WITH_GATE_LOCK(pll_audio_base_clk, "pll-audio-base",
-> > +                                  "osc24M", 0x008,
-> > +                                  8, 7,                /* N */
-> > +                                  0, 5,                /* M */
-> > +                                  BIT(31),             /* gate */
-> > +                                  BIT(28),             /* lock */
-> > +                                  CLK_SET_RATE_UNGATE);
+> Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+> ---
+> drivers/dma/sh/rcar-dmac.c | 82 ++++++++++++++++++++++++++++++++++++++-----
+> 1 file changed, 74 insertions(+), 8 deletions(-)
 > 
-> Are you sure about this? I suspect CLK_SET_RATE_GATE (clk must be
-> gated before set rate) is what you want, given the non-DVFS
-> nature of the PLL. Same for the other PLLs.
-
-Yes, I'm sure about it. The lock, on the A33 at least, this has to be
-confirmed on other SoCs, won't work if the clock is gated.
-
-So, every time we call clk_set_rate, we will hit the WARN_ON because
-of the lock timeout unless the clock runs.
-
-> > +static SUNXI_CCU_GATE(bus_mipi_dsi_clk,        "bus-mipi-dsi", "ahb1",
-> > +                     0x060, BIT(1), 0);
+> diff --git a/drivers/dma/sh/rcar-dmac.c b/drivers/dma/sh/rcar-dmac.c
+> index cf983a9..22a5e40 100644
+> --- a/drivers/dma/sh/rcar-dmac.c
+> +++ b/drivers/dma/sh/rcar-dmac.c
+> @@ -128,6 +128,18 @@ struct rcar_dmac_chan_slave {
+>  };
 > 
-> Nit: we know which bus these peripherals are on.
-> Can we be more explicit with the names?
-
-I wanted to be consistent with the datasheet, and would really prefer
-to stick to it.
-
-> > +static SUNXI_CCU_GATE(bus_ce_clk,      "bus-ce",       "ahb1",
-> > +                     0x060, BIT(5), 0);
+>  /*
+> + * struct rcar_dmac_chan_map - Map of slave device phys to dma address
+> + * @addr: slave dma address
+> + * @dir: direction of mapping
+> + * @slave: slave configuration that is mapped
+> + */
+> +struct rcar_dmac_chan_map {
+> +	dma_addr_t addr;
+> +	enum dma_data_direction dir;
+> +	struct rcar_dmac_chan_slave slave;
+> +};
+> +
+> +/*
+>   * struct rcar_dmac_chan - R-Car Gen2 DMA Controller Channel
+>   * @chan: base DMA channel object
+>   * @iomem: channel I/O memory base
+> @@ -152,6 +164,7 @@ struct rcar_dmac_chan {
 > 
-> Nit: manual says Security System.
+>  	struct rcar_dmac_chan_slave src;
+>  	struct rcar_dmac_chan_slave dst;
+> +	struct rcar_dmac_chan_map map;
+>  	int mid_rid;
 > 
-> (Maybe I should change the name on sun6i to say Crypto Engine
->  if that's what we're going with?)
-
-But I can't really use reject that argument there then :)
-
-The rationale was that it's called CE in the H3 which was already
-merged, but I'll change it.
-
-> [...]
+>  	spinlock_t lock;
+> @@ -1029,13 +1042,65 @@ rcar_dmac_prep_dma_memcpy(struct dma_chan *chan,
+> dma_addr_t dma_dest, DMA_MEM_TO_MEM, flags, false);
+>  }
 > 
-> > +static SUNXI_CCU_GATE(usb_hsic_12M_clk,        "usb-hsic-12M", "osc24M",
-> > +                     0x0cc, BIT(11), 0);
+> +static int rcar_dmac_map_slave_addr(struct dma_chan *chan,
+> +				    enum dma_transfer_direction dir)
+> +{
+> +	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
+> +	struct rcar_dmac_chan_map *map = &rchan->map;
+> +	phys_addr_t dev_addr;
+> +	size_t dev_size;
+> +	enum dma_data_direction dev_dir;
+> +
+> +	if (dir == DMA_DEV_TO_MEM) {
+> +		dev_addr = rchan->src.slave_addr;
+> +		dev_size = rchan->src.xfer_size;
+> +		dev_dir = DMA_TO_DEVICE;
+
+Shouldn't this be DMA_FROM_DEVICE, and DMA_TO_DEVICE below ?
+
+> +	} else {
+> +		dev_addr = rchan->dst.slave_addr;
+> +		dev_size = rchan->dst.xfer_size;
+> +		dev_dir = DMA_FROM_DEVICE;
+> +	}
+> +
+> +	/* Reuse current map if possible. */
+> +	if (dev_addr == map->slave.slave_addr &&
+> +	    dev_size == map->slave.xfer_size &&
+> +	    dev_dir == map->dir)
+> +		return 0;
+> +
+> +	/* Remove old mapping if present. */
+> +	if (map->slave.xfer_size)
+> +		dma_unmap_resource(chan->device->dev, map->addr,
+> +				   map->slave.xfer_size, map->dir, 0);
+
+Unless I'm mistaken the resource will not be unmapped when freeing channel 
+resources, will it ?
+
+> +	map->slave.xfer_size = 0;
+> +
+> +	/* Create new slave address map. */
+> +	map->addr = dma_map_resource(chan->device->dev, dev_addr, dev_size,
+> +				     dev_dir, 0);
+> +
+> +	if (dma_mapping_error(chan->device->dev, map->addr)) {
+> +		dev_err(chan->device->dev,
+> +			"chan%u: failed to map %zx@%pap", rchan->index,
+> +			dev_size, &dev_addr);
+> +		return -EIO;
+> +	}
+> +
+> +	dev_dbg(chan->device->dev, "chan%u: map %zx@%pap to %pad dir: %s\n",
+> +		rchan->index, dev_size, &dev_addr, &map->addr,
+> +		dev_dir == DMA_TO_DEVICE ? "DMA_TO_DEVICE" : 
+"DMA_FROM_DEVICE");
+> +
+> +	map->slave.slave_addr = dev_addr;
+> +	map->slave.xfer_size = dev_size;
+> +	map->dir = dev_dir;
+> +
+> +	return 0;
+> +}
+> +
+>  static struct dma_async_tx_descriptor *
+>  rcar_dmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+>  			unsigned int sg_len, enum dma_transfer_direction dir,
+>  			unsigned long flags, void *context)
+>  {
+>  	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
+> -	dma_addr_t dev_addr;
 > 
-> A TODO note saying we should have a fixed-factor-gate for this
-> would be nice.
-
-Hmmm? I'm not sure what you're saying.
-
-Thanks!
-Maxime
+>  	/* Someone calling slave DMA on a generic channel? */
+>  	if (rchan->mid_rid < 0 || !sg_len) {
+> @@ -1045,9 +1110,10 @@ rcar_dmac_prep_slave_sg(struct dma_chan *chan, struct
+> scatterlist *sgl, return NULL;
+>  	}
+> 
+> -	dev_addr = dir == DMA_DEV_TO_MEM
+> -		 ? rchan->src.slave_addr : rchan->dst.slave_addr;
+> -	return rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, dev_addr,
+> +	if (rcar_dmac_map_slave_addr(chan, dir))
+> +		return NULL;
+> +
+> +	return rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, rchan->map.addr,
+>  				      dir, flags, false);
+>  }
+> 
+> @@ -1061,7 +1127,6 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan,
+> dma_addr_t buf_addr, struct rcar_dmac_chan *rchan =
+> to_rcar_dmac_chan(chan);
+>  	struct dma_async_tx_descriptor *desc;
+>  	struct scatterlist *sgl;
+> -	dma_addr_t dev_addr;
+>  	unsigned int sg_len;
+>  	unsigned int i;
+> 
+> @@ -1073,6 +1138,9 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan,
+> dma_addr_t buf_addr, return NULL;
+>  	}
+> 
+> +	if (rcar_dmac_map_slave_addr(chan, dir))
+> +		return NULL;
+> +
+>  	sg_len = buf_len / period_len;
+>  	if (sg_len > RCAR_DMAC_MAX_SG_LEN) {
+>  		dev_err(chan->device->dev,
+> @@ -1100,9 +1168,7 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan,
+> dma_addr_t buf_addr, sg_dma_len(&sgl[i]) = period_len;
+>  	}
+> 
+> -	dev_addr = dir == DMA_DEV_TO_MEM
+> -		 ? rchan->src.slave_addr : rchan->dst.slave_addr;
+> -	desc = rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, dev_addr,
+> +	desc = rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, rchan->map.addr,
+>  				      dir, flags, true);
+> 
+>  	kfree(sgl);
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/d9a7c81e/attachment.sig>
+Regards,
+
+Laurent Pinchart
