@@ -1,62 +1,46 @@
 From: james.morse@arm.com (James Morse)
-Date: Mon,  5 Sep 2016 09:43:03 +0100
-Subject: [PATCH] arm64: mm: phys_mem_access_prot() reports non-kernel memory
- as device memory
-Message-ID: <1473064984-9494-1-git-send-email-james.morse@arm.com>
+Date: Mon,  5 Sep 2016 09:43:04 +0100
+Subject: [PATCH] arm64: Drop generic xlate_dev_mem_{k,}ptr()
+In-Reply-To: <1473064984-9494-1-git-send-email-james.morse@arm.com>
+References: <1473064984-9494-1-git-send-email-james.morse@arm.com>
+Message-ID: <1473064984-9494-2-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Running 'acpidump' on an arm64 system causes the program to SIGSEGV, and
-yield the following trace:
-[   71.623572] acpidump[2159]: unhandled alignment fault (11) at 0xffff8a4a909c, esr 0x92000021
-[   71.632030] pgd = ffff8003ecf7d000
-[   71.635420] [ffff8a4a909c] *pgd=00000083ec370003, *pud=00000083e7225003, *pmd=00000083ec3f1003, *pte=01600083ff1c3fc3
-[   71.646042]
-[   71.647524] CPU: 0 PID: 2159 Comm: acpidump Tainted: G        W I     4.8.0-rc4 #5081
-[   71.655352] Hardware name: AMD Overdrive/Supercharger/Default string, BIOS ROD1002C 04/08/2016
-[   71.663957] task: ffff8003eac41900 task.stack: ffff8003e7210000
-[   71.669871] PC is at 0xffff8a3c77d4
-[   71.673353] LR is at 0x404934
-[   71.676314] pc : [<0000ffff8a3c77d4>] lr : [<0000000000404934>] pstate: 00000000
-[   71.683702] sp : 0000ffffd0e39af0
+The code that provides /dev/mem uses xlate_dev_mem_{k,}ptr() to
+avoid making a cachable mapping of a non-cachable area on ia64.
+On arm64 we do this via phys_mem_access_prot() instead, but provide
+dummy versions of xlate_dev_mem_{k,}ptr().
 
-Acpidump digs through /sys/ to find the physical address of the ACPI tables,
-then reads them from /dev/mem. The code that provides /dev/mem uses
-phys_mem_access_prot() to determine the protection type it should use.
+These are the same as those in asm-generic/io.h, which we include from
+asm/io.h
 
-Arm64's phys_mem_access_prot() reports any memory region that isn't part
-of the linear map as device memory. This breaks Acpidump as the acpi tables
-are neither device memory nor part of the linear map.
-
-Change this check to use memblock_is_memory() instead. On an EFI system
-any region the efi memory map described as any of WB/WC/WT appears in
-memblock.memory. On a non-EFI system, setup_machine_fdt() will cause
-memory nodes in the DT to be added to memblock.memory.
-
-/dev/mem is the only user of phys_mem_access_prot()
-
-Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
-Stable?
-Acpi was introduced for v4.1 but hidden behind 'expert'.
-'expert' was removed for v4.7.
+ arch/arm64/include/asm/io.h | 11 -----------
+ 1 file changed, 11 deletions(-)
 
- arch/arm64/mm/mmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 4989948d1feb..96a2f327fd2c 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -63,7 +63,7 @@ static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss __maybe_unused;
- pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- 			      unsigned long size, pgprot_t vma_prot)
- {
--	if (!pfn_valid(pfn))
-+	if (!memblock_is_memory(pfn << PAGE_SHIFT))
- 		return pgprot_noncached(vma_prot);
- 	else if (file->f_flags & O_SYNC)
- 		return pgprot_writecombine(vma_prot);
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 9b6e408cfa51..ce20741b2cb5 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -184,17 +184,6 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
+ #define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
+ #define iowrite64be(v,p)	({ __iowmb(); __raw_writeq((__force __u64)cpu_to_be64(v), p); })
+ 
+-/*
+- * Convert a physical pointer to a virtual kernel pointer for /dev/mem
+- * access
+- */
+-#define xlate_dev_mem_ptr(p)	__va(p)
+-
+-/*
+- * Convert a virtual cached pointer to an uncached pointer
+- */
+-#define xlate_dev_kmem_ptr(p)	p
+-
+ #include <asm-generic/io.h>
+ 
+ /*
 -- 
 2.8.0.rc3
