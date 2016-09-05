@@ -1,151 +1,42 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Mon, 5 Sep 2016 10:35:17 +0800
-Subject: [PATCH v6, 5/5] arm64: dts: mediatek: add USB3 DRD driver
-In-Reply-To: <1473042917-27057-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1473042917-27057-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1473042917-27057-6-git-send-email-chunfeng.yun@mediatek.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 5 Sep 2016 10:35:54 +0800
+Subject: [PATCH v2] ARM: dts: sun8i: Add dts file for the NanoPi NEO SBC
+In-Reply-To: <1473036168-20933-1-git-send-email-james@innovum.com.au>
+Message-ID: <201609051025.IbTHt9ri%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-USB3 DRD driver is added for MT8173-EVB, and xHCI driver
-becomes its subnode
+Hi James,
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+[auto build test ERROR on mripard/sunxi/for-next]
+[also build test ERROR on v4.8-rc5 next-20160825]
+[cannot apply to robh/for-next]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
+[Check https://git-scm.com/docs/git-format-patch for more information]
+
+url:    https://github.com/0day-ci/linux/commits/James-Pettigrew/ARM-dts-sun8i-Add-dts-file-for-the-NanoPi-NEO-SBC/20160905-085509
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git sunxi/for-next
+config: arm-aspeed_g5_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts:65.21-22 syntax error
+   FATAL ERROR: Unable to parse input tree
+
 ---
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts |   46 +++++++++++++++++++++++++--
- arch/arm64/boot/dts/mediatek/mt8173.dtsi    |   29 +++++++++++++----
- 2 files changed, 66 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-index 7453a47..682dfd7 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-+++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-@@ -34,6 +34,11 @@
- 
- 	chosen { };
- 
-+	extcon_usb: extcon_iddig {
-+		compatible = "linux,extcon-usb-gpio";
-+		id-gpio = <&pio 16 GPIO_ACTIVE_HIGH>;
-+	};
-+
- 	usb_p1_vbus: regulator at 0 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "usb_vbus";
-@@ -42,6 +47,16 @@
- 		gpio = <&pio 130 GPIO_ACTIVE_HIGH>;
- 		enable-active-high;
- 	};
-+
-+	usb_p0_vbus: regulator at 1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&pio 9 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
- };
- 
- &i2c1 {
-@@ -205,6 +220,20 @@
- 			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
- 		};
- 	};
-+
-+	usb_id_pins_float: usb_iddig_pull_up {
-+		pins_iddig {
-+			pinmux = <MT8173_PIN_16_IDDIG__FUNC_IDDIG>;
-+			bias-pull-up;
-+		};
-+	};
-+
-+	usb_id_pins_ground: usb_iddig_pull_down {
-+		pins_iddig {
-+			pinmux = <MT8173_PIN_16_IDDIG__FUNC_IDDIG>;
-+			bias-pull-down;
-+		};
-+	};
- };
- 
- &pwm0 {
-@@ -431,12 +460,25 @@
- 	status = "okay";
- };
- 
-+&ssusb {
-+	vusb33-supply = <&mt6397_vusb_reg>;
-+	vbus-supply = <&usb_p0_vbus>;
-+	extcon = <&extcon_usb>;
-+	dr_mode = "otg";
-+	mediatek,enable-wakeup;
-+	pinctrl-names = "default", "id_float", "id_ground";
-+	pinctrl-0 = <&usb_id_pins_float>;
-+	pinctrl-1 = <&usb_id_pins_float>;
-+	pinctrl-2 = <&usb_id_pins_ground>;
-+	status = "okay";
-+};
-+
- &uart0 {
- 	status = "okay";
- };
- 
--&usb30 {
-+&usb_host {
- 	vusb33-supply = <&mt6397_vusb_reg>;
- 	vbus-supply = <&usb_p1_vbus>;
--	mediatek,wakeup-src = <1>;
-+	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 10f638f..925948a 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -668,11 +668,14 @@
- 			status = "disabled";
- 		};
- 
--		usb30: usb at 11270000 {
--			compatible = "mediatek,mt8173-xhci";
--			reg = <0 0x11270000 0 0x1000>,
-+		ssusb: usb at 11271000 {
-+			compatible = "mediatek,mt8173-mtu3";
-+			reg = <0 0x11271000 0 0x3000>,
- 			      <0 0x11280700 0 0x0100>;
--			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-+			reg-names = "mac", "ippc";
-+			interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_LOW>;
-+			phys = <&phy_port0 PHY_TYPE_USB3>,
-+			       <&phy_port1 PHY_TYPE_USB2>;
- 			power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
- 			clocks = <&topckgen CLK_TOP_USB30_SEL>,
- 				 <&pericfg CLK_PERI_USB0>,
-@@ -680,10 +683,22 @@
- 			clock-names = "sys_ck",
- 				      "wakeup_deb_p0",
- 				      "wakeup_deb_p1";
--			phys = <&phy_port0 PHY_TYPE_USB3>,
--			       <&phy_port1 PHY_TYPE_USB2>;
- 			mediatek,syscon-wakeup = <&pericfg>;
--			status = "okay";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges;
-+			status = "disabled";
-+
-+			usb_host: xhci at 11270000 {
-+				compatible = "mediatek,mt8173-xhci";
-+				reg = <0 0x11270000 0 0x1000>;
-+				reg-names = "mac";
-+				interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-+				clocks = <&topckgen CLK_TOP_USB30_SEL>;
-+				clock-names = "sys_ck";
-+				status = "disabled";
-+			};
- 		};
- 
- 		u3phy: usb-phy at 11290000 {
--- 
-1.7.9.5
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 7654 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/d12c98bc/attachment-0001.obj>
