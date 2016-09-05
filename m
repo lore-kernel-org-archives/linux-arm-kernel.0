@@ -1,13 +1,13 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon,  5 Sep 2016 18:43:03 +0200
-Subject: [PATCH 3.14 02/35] arm64: Define AT_VECTOR_SIZE_ARCH for ARCH_DLINFO
-In-Reply-To: <20160905163958.687259537@linuxfoundation.org>
-References: <20160905163958.687259537@linuxfoundation.org>
-Message-ID: <20160905163958.789715146@linuxfoundation.org>
+Date: Mon,  5 Sep 2016 18:43:06 +0200
+Subject: [PATCH 4.7 010/143] arm64: Define AT_VECTOR_SIZE_ARCH for ARCH_DLINFO
+In-Reply-To: <20160905164430.593075551@linuxfoundation.org>
+References: <20160905164430.593075551@linuxfoundation.org>
+Message-ID: <20160905164431.048184685@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.14-stable review patch.  If anyone has any objections, please let me know.
+4.7-stable review patch.  If anyone has any objections, please let me know.
 
 ------------------
 
@@ -41,7 +41,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 --- a/arch/arm64/include/asm/elf.h
 +++ b/arch/arm64/include/asm/elf.h
-@@ -137,6 +137,7 @@ extern unsigned long randomize_et_dyn(un
+@@ -140,6 +140,7 @@ typedef struct user_fpsimd_state elf_fpr
  
  #define SET_PERSONALITY(ex)		clear_thread_flag(TIF_32BIT);
  
