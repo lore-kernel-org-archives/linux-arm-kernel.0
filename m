@@ -1,124 +1,48 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Mon, 5 Sep 2016 21:01:46 +0200
-Subject: Fwd: [PATCH 1/3] ARM: dts: armv7-m: remove skeleton.dtsi include
-In-Reply-To: <20160830205250.15616-2-manabian@gmail.com>
-References: <20160830205250.15616-1-manabian@gmail.com>
- <20160830205250.15616-2-manabian@gmail.com>
-Message-ID: <CAGhQ9VxAgJ2YdsaPie+7cX1NyytqQYJHsEhCq0rxr-qZodH-LQ@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon,  5 Sep 2016 22:00:10 +0300
+Subject: [PATCH] dt-binding: mrvl-gpio: remove orion-gpio description
+Message-ID: <9d76063cb0b0a0ff96cfd6f389f3697db7734015.1473102010.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+The Orion GPIO controller binding description in mrvl-gpio.txt is obsolete, and
+duplicates the description in gpio-mvebu.txt.
 
-Just noticed that you were listed as a co-maintainer for stm32. Could
-you take a look and ack the patch below?
-
-You can find the cover letter for the series here:
-http://www.spinics.net/lists/arm-kernel/msg527580.html
-
-
-regards,
-Joachim Eastwood
-
-
----------- Forwarded message ----------
-From: Joachim Eastwood <manabian@gmail.com>
-Date: 30 August 2016 at 22:52
-Subject: [PATCH 1/3] ARM: dts: armv7-m: remove skeleton.dtsi include
-To: stefan at agner.ch, mcoquelin.stm32 at gmail.com,
-vladimir.murzin at arm.com, u.kleine-koenig at pengutronix.de
-Cc: Joachim Eastwood <manabian@gmail.com>,
-linux-arm-kernel at lists.infradead.org, robh+dt at kernel.org
-
-
-Remove skeleton.dtsi from the common ARM Cortex-M dtsi. This will allow
-us to remove skeleton.dtsi on a per platform basis and get rid of the
-unit address warning on the memory nodes without getting duplicate memory
-nodes.
-
-See 3ebee5a2e141 ("arm64: dts: kill skeleton.dtsi") for additional
-reasons not to use the skeleton.dtsi.
-
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
- arch/arm/boot/dts/armv7-m.dtsi   | 2 --
- arch/arm/boot/dts/efm32gg.dtsi   | 2 ++
- arch/arm/boot/dts/lpc18xx.dtsi   | 1 +
- arch/arm/boot/dts/mps2.dtsi      | 1 +
- arch/arm/boot/dts/stm32f429.dtsi | 1 +
- arch/arm/boot/dts/vf610m4.dtsi   | 1 +
- 6 files changed, 6 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/gpio/mrvl-gpio.txt         | 23 ----------------------
+ 1 file changed, 23 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armv7-m.dtsi b/arch/arm/boot/dts/armv7-m.dtsi
-index 16331aa..ba332e3 100644
---- a/arch/arm/boot/dts/armv7-m.dtsi
-+++ b/arch/arm/boot/dts/armv7-m.dtsi
-@@ -1,5 +1,3 @@
--#include "skeleton.dtsi"
+diff --git a/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt b/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
+index 98d198396956..c3d016532d8e 100644
+--- a/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
++++ b/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
+@@ -44,26 +44,3 @@ Example for a PXA3xx platform:
+ 		interrupt-controller;
+ 		#interrupt-cells = <0x2>;
+ 	};
 -
- / {
-        nvic: interrupt-controller at e000e100  {
-                compatible = "arm,armv7m-nvic";
-diff --git a/arch/arm/boot/dts/efm32gg.dtsi b/arch/arm/boot/dts/efm32gg.dtsi
-index c747983..d9dbf7f 100644
---- a/arch/arm/boot/dts/efm32gg.dtsi
-+++ b/arch/arm/boot/dts/efm32gg.dtsi
-@@ -4,6 +4,8 @@
-  * Documentation available from
-  * http://www.silabs.com/Support%20Documents/TechnicalDocs/EFM32GG-RM.pdf
-  */
-+
-+#include "skeleton.dtsi"
- #include "armv7-m.dtsi"
- #include "dt-bindings/clock/efm32-cmu.h"
-
-diff --git a/arch/arm/boot/dts/lpc18xx.dtsi b/arch/arm/boot/dts/lpc18xx.dtsi
-index 1cd39fd..a1ecfe3 100644
---- a/arch/arm/boot/dts/lpc18xx.dtsi
-+++ b/arch/arm/boot/dts/lpc18xx.dtsi
-@@ -11,6 +11,7 @@
-  *
-  */
-
-+#include "skeleton.dtsi"
- #include "armv7-m.dtsi"
-
- #include "dt-bindings/clock/lpc18xx-cgu.h"
-diff --git a/arch/arm/boot/dts/mps2.dtsi b/arch/arm/boot/dts/mps2.dtsi
-index e3fed8d..efb8a03 100644
---- a/arch/arm/boot/dts/mps2.dtsi
-+++ b/arch/arm/boot/dts/mps2.dtsi
-@@ -42,6 +42,7 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
-
-+#include "skeleton.dtsi"
- #include "armv7-m.dtsi"
-
- / {
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index 35df462..8e69328 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -45,6 +45,7 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
-
-+#include "skeleton.dtsi"
- #include "armv7-m.dtsi"
- #include <dt-bindings/pinctrl/stm32f429-pinfunc.h>
-
-diff --git a/arch/arm/boot/dts/vf610m4.dtsi b/arch/arm/boot/dts/vf610m4.dtsi
-index 9ffe2eb..9f2c731 100644
---- a/arch/arm/boot/dts/vf610m4.dtsi
-+++ b/arch/arm/boot/dts/vf610m4.dtsi
-@@ -42,6 +42,7 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
-
-+#include "skeleton.dtsi"
- #include "armv7-m.dtsi"
- #include "vfxxx.dtsi"
-
---
+-* Marvell Orion GPIO Controller
+-
+-Required properties:
+-- compatible         : Should be "marvell,orion-gpio"
+-- reg                : Address and length of the register set for controller.
+-- gpio-controller    : So we know this is a gpio controller.
+-- ngpio              : How many gpios this controller has.
+-- interrupts	     : Up to 4 Interrupts for the controller.
+-
+-Optional properties:
+-- mask-offset        : For SMP Orions, offset for Nth CPU
+-
+-Example:
+-
+-		gpio0: gpio at 10100 {
+-			compatible = "marvell,orion-gpio";
+-			#gpio-cells = <2>;
+-			gpio-controller;
+-			reg = <0x10100 0x40>;
+-			ngpio = <32>;
+-			interrupts = <35>, <36>, <37>, <38>;
+-		};
+-- 
 2.9.3
