@@ -1,37 +1,155 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 05 Sep 2016 10:06:14 +0200
-Subject: [GIT PULL 1/4] ARM: exynos: SoC/Mach for v4.9
-In-Reply-To: <20160902163244.GB5534@kozik-lap>
-References: <1472548739-20050-1-git-send-email-k.kozlowski@samsung.com>
- <1472548739-20050-5-git-send-email-k.kozlowski@samsung.com>
- <5635206.ooNAZCeQOe@wuerfel> <20160902163244.GB5534@kozik-lap>
-Message-ID: <08dfc5c7-e844-023c-b5a8-9996dfb403ff@samsung.com>
+From: pmeerw@pmeerw.net (Peter Meerwald-Stadler)
+Date: Mon, 5 Sep 2016 10:07:48 +0200 (CEST)
+Subject: [PATCH v4 3/3] iio: adc: add support for Allwinner SoCs ADC
+In-Reply-To: <aed1e00f-ceaa-27e9-502d-51428f59a84f@free-electrons.com>
+References: <1472738705-20145-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1472738705-20145-4-git-send-email-quentin.schulz@free-electrons.com>
+ <alpine.DEB.2.02.1609041754350.2060@pmeerw.net>
+ <aed1e00f-ceaa-27e9-502d-51428f59a84f@free-electrons.com>
+Message-ID: <alpine.DEB.2.02.1609050924370.12528@pmeerw.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2016 06:32 PM, Krzysztof Kozlowski wrote:
-> On Fri, Sep 02, 2016 at 06:26:42PM +0200, Arnd Bergmann wrote:
->> On Tuesday, August 30, 2016 11:18:59 AM CEST Krzysztof Kozlowski wrote:
->>> Samsung mach/soc update for v4.9:
->>> 1. Fix for DMA on S3C24xx. This was probably broken for long time, nobody runs
->>>    this code... till now.
->>
->> Good to know. This reminds me that the s3c24xx DMA code is one of those
->> that need to be converted to dma_slave_map at some point. Maybe if someone
->> is now running that code, they could give that a try as well?
->>
->> It shouldn't be hard to convert, let me know if you need more information.
-> 
-> +Cc Sylwester,
-> 
-> Sylwester recently dig into this platform. I think he managed to play
-> some audio.
 
-I revived this platform for testing ASoC changes.  I should find time
-to do that dma_slave_map refactoring sooner or later.
+> >> The Allwinner SoCs all have an ADC that can also act as a touchscreen
+> >> controller and a thermal sensor. This patch adds the ADC driver which is
+> >> based on the MFD for the same SoCs ADC.
+> > 
+> > nitpicking ahead
 
-Or if you would like to do it Sam please go ahead.
+> [...]
+> >> +
+> >> +const unsigned int sun4i_gpadc_chan_select(unsigned int chan)
+> > 
+> > static instead of const?
+
+> static const then?
+
+no, the const is redundant and ignored
+-Wignored-qualifiers gives a warning
+
+just static, no const
+
+see
+http://stackoverflow.com/questions/12052468/type-qualifiers-on-function-return-type
+
+> >> +{
+> >> +	return SUN6I_GPADC_CTRL1_ADC_CHAN_SELECT(chan);
+> >> +}
+> >> +
+> >> +struct soc_specific {
+> >> +	const int		temp_offset;
+> > 
+> > wondering why you constify every member?
+> > 
+> 
+> Because they're supposed to be fixed values? It won't change in runtime.
+> Is there any reason why I shouldn't do that?
+
+yes, but using the entire struct as const has the same effect;
+constifying individual members makes more sense if there are also 
+non-const members
+
+nothing wrong, just unusual
+
+> >> +	const int		temp_scale;
+> >> +	const unsigned int	tp_mode_en;
+> >> +	const unsigned int	tp_adc_select;
+> >> +	const unsigned int	(*adc_chan_select)(unsigned int chan);
+> >> +};
+> [...]
+> >> +static int sun4i_gpadc_read(struct iio_dev *indio_dev, int channel, int *val,
+> >> +			    unsigned int irq)
+> >> +{
+> >> +	struct sun4i_gpadc_dev *info = iio_priv(indio_dev);
+> >> +	int ret = 0;
+> >> +
+> >> +	pm_runtime_get_sync(indio_dev->dev.parent);
+> >> +	mutex_lock(&info->mutex);
+> >> +
+> >> +	reinit_completion(&info->completion);
+> >> +
+> >> +	regmap_write(info->regmap, SUN4I_GPADC_INT_FIFOC,
+> >> +		     SUN4I_GPADC_INT_FIFOC_TP_FIFO_TRIG_LEVEL(1) |
+> >> +		     SUN4I_GPADC_INT_FIFOC_TP_FIFO_FLUSH);
+> > 
+> > check retval? here and elsewhere for regmap_write()
+> > 
+> 
+> ACK. What should I do with the retval then?
+> 
+> There are some in:
+> - sun4i_gpadc_read called for read_raws => return which error code (or
+> -ret only?)?
+
+I'd just return ret; in the other cases I think it's ok to ignore errors
+
+> - sun4i_gpadc_runtime_suspend => return value of ret, but that would
+> cancel the suspend right?
+> - sun4i_gpadc_runtime_resume => return value of ret, but that would
+> cancel resume right?
+> - sun4i_gpadc_probe in the error gotos => probe already failing so do we
+> actually care if regmap_update_bits fails? If yes, what's the expected
+> behaviour?
+> - sun4i_gpadc_remove => return value of ret, but that would mean the
+> remove failed right?
+> 
+> [...]
+> >> +static int sun4i_gpadc_read_raw(struct iio_dev *indio_dev,
+> >> +				struct iio_chan_spec const *chan, int *val,
+> >> +				int *val2, long mask)
+> >> +{
+> >> +	int ret;
+> >> +
+> >> +	switch (mask) {
+> >> +	case IIO_CHAN_INFO_OFFSET:
+> >> +		ret = sun4i_gpadc_temp_offset(indio_dev, val);
+> >> +		if (ret)
+> >> +			return ret;
+> >> +
+> >> +		return IIO_VAL_INT;
+> >> +	case IIO_CHAN_INFO_RAW:
+> >> +		if (chan->type == IIO_VOLTAGE) {
+> >> +			ret = sun4i_gpadc_adc_read(indio_dev, chan->channel,
+> >> +						   val);
+> >> +			if (ret)
+> >> +				return ret;
+> > 
+> > could share the "if (ret) return ret;" between code path
+> > 
+> 
+> ACK.
+> 
+> [...]
+> >> +static int sun4i_irq_init(struct platform_device *pdev, const char *name,
+> >> +			  irq_handler_t handler, const char *devname,
+> >> +			  unsigned int *irq, atomic_t *atomic)
+> >> +{
+> >> +	int ret;
+> >> +	struct sun4i_gpadc_mfd_dev *mfd_dev = dev_get_drvdata(pdev->dev.parent);
+> >> +	struct sun4i_gpadc_dev *info = iio_priv(dev_get_drvdata(&pdev->dev));
+> >> +
+> >> +	/*
+> >> +	 * Once the interrupt is activated, the IP continuously performs
+> >> +	 * conversions thus throws interrupts. The interrupt is activated right
+> >> +	 * after being requested but we want to control when these interrupts
+> >> +	 * occurs thus we disable it right after being requested. However, an
+> > 
+> > occur
+> > 
+> 
+> ACK for all typos.
+> Thanks!
+> 
+> Quentin
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
 -- 
-Thanks,
-Sylwester
+
+Peter Meerwald-Stadler
++43-664-2444418 (mobile)
