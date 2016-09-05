@@ -1,284 +1,193 @@
-From: vagrant@debian.org (Vagrant Cascadian)
-Date: Mon, 05 Sep 2016 10:08:35 -0700
-Subject: [PATCH v3 2/2] ARM: dts: imx53: add support for USB armory board
-In-Reply-To: <20160905101117.27473-3-andrej@inversepath.com>
-References: <20160905101117.27473-1-andrej@inversepath.com>
- <20160905101117.27473-3-andrej@inversepath.com>
-Message-ID: <87wpiqjmuk.fsf@aikidev.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 5 Sep 2016 18:20:38 +0100
+Subject: [PATCH v2 3/7] arm64: Introduce uaccess_{disable, enable}
+ functionality based on TTBR0_EL1
+In-Reply-To: <1472828533-28197-4-git-send-email-catalin.marinas@arm.com>
+References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
+ <1472828533-28197-4-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20160905172038.GC27305@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-09-05, andrej at inversepath.com wrote:
-> From: Andrej Rosano <andrej@inversepath.com>
->
-> Add support for Inverse Path USB armory board, an open source
-> flash-drive sized computer based on NXP i.MX53 SoC.
->
-> https://inversepath.com/usbarmory
->
-> Signed-off-by: Andrej Rosano <andrej@inversepath.com>
+Hi Catalin,
 
-Boots with v4.8-rc5, USB OTG works, serial console works.
+On Fri, Sep 02, 2016 at 04:02:09PM +0100, Catalin Marinas wrote:
+> This patch adds the uaccess macros/functions to disable access to user
+> space by setting TTBR0_EL1 to a reserved zeroed page. Since the value
+> written to TTBR0_EL1 must be a physical address, for simplicity this
+> patch introduces a reserved_ttbr0 page at a constant offset from
+> swapper_pg_dir. The uaccess_disable code uses the ttbr1_el1 value
+> adjusted by the reserved_ttbr0 offset.
+> 
+> Enabling access to user is done by restoring TTBR0_EL1 with the value
+> from the struct thread_info ttbr0 variable. Interrupts must be disabled
+> during the uaccess_ttbr0_enable code to ensure the atomicity of the
+> thread_info.ttbr0 read and TTBR0_EL1 write.
 
-Tested-by: Vagrant Cascadian <vagrant@debian.org>
+[...]
 
-live well,
-  vagrant
-
-> ---
->  arch/arm/boot/dts/Makefile            |   1 +
->  arch/arm/boot/dts/imx53-usbarmory.dts | 224 ++++++++++++++++++++++++++++++++++
->  2 files changed, 225 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx53-usbarmory.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index faacd52..20790b8 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -315,6 +315,7 @@ dtb-$(CONFIG_SOC_IMX53) += \
->  	imx53-smd.dtb \
->  	imx53-tx53-x03x.dtb \
->  	imx53-tx53-x13x.dtb \
-> +	imx53-usbarmory.dtb \
->  	imx53-voipac-bsb.dtb
->  dtb-$(CONFIG_SOC_IMX6Q) += \
->  	imx6dl-apf6dev.dtb \
-> diff --git a/arch/arm/boot/dts/imx53-usbarmory.dts b/arch/arm/boot/dts/imx53-usbarmory.dts
-> new file mode 100644
-> index 0000000..6782d7f
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx53-usbarmory.dts
-> @@ -0,0 +1,224 @@
-> +/*
-> + * USB armory MkI device tree file
-> + * https://inversepath.com/usbarmory
-> + *
-> + * Copyright (C) 2015, Inverse Path
-> + * Andrej Rosano <andrej@inversepath.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
+>  /*
+> + * Return the current thread_info.
 > + */
-> +
-> +/dts-v1/;
-> +#include "imx53.dtsi"
-> +
-> +/ {
-> +	model = "Inverse Path USB armory";
-> +	compatible = "inversepath,imx53-usbarmory", "fsl,imx53";
-> +};
-> +
-> +/ {
-> +	chosen {
-> +		stdout-path = &uart1;
-> +	};
-> +
-> +	memory {
-> +		reg = <0x70000000 0x20000000>;
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_led>;
-> +
-> +		user {
-> +			label = "LED";
-> +			gpios = <&gpio4 27 GPIO_ACTIVE_LOW>;
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +	};
-> +};
-> +
+> +	.macro	get_thread_info, rd
+> +	mrs	\rd, sp_el0
+> +	.endm
+
+It may be worth noting in the commit message that we had to factor this
+out of entry.S, or doing that as a preparatory patch.
+
 > +/*
-> + * Not every i.MX53 P/N supports clock > 800MHz.
-> + * As USB armory does not mount a specific P/N set a safe clock upper limit.
-> + */
-> +&cpu0 {
-> +	operating-points = <
-> +		/* kHz */
-> +		166666  850000
-> +		400000  900000
-> +		800000 1050000
-> +	>;
-> +};
+>   * Errata workaround post TTBR0_EL1 update.
+>   */
+>  	.macro	post_ttbr0_update_workaround, ret = 0
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index 7099f26e3702..023066d9bf7f 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -216,6 +216,12 @@ static inline bool system_supports_mixed_endian_el0(void)
+>  	return id_aa64mmfr0_mixed_endian_el0(read_system_reg(SYS_ID_AA64MMFR0_EL1));
+>  }
+>  
+> +static inline bool system_supports_ttbr0_pan(void)
+> +{
+> +	return IS_ENABLED(CONFIG_ARM64_TTBR0_PAN) &&
+> +		!cpus_have_cap(ARM64_HAS_PAN);
+> +}
 > +
-> +&esdhc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_esdhc1>;
-> +	status = "okay";
-> +};
-> +
-> +&iomuxc {
-> +	pinctrl_esdhc1: esdhc1grp {
-> +		fsl,pins = <
-> +			MX53_PAD_SD1_DATA0__ESDHC1_DAT0		0x1d5
-> +			MX53_PAD_SD1_DATA1__ESDHC1_DAT1		0x1d5
-> +			MX53_PAD_SD1_DATA2__ESDHC1_DAT2		0x1d5
-> +			MX53_PAD_SD1_DATA3__ESDHC1_DAT3		0x1d5
-> +			MX53_PAD_SD1_CMD__ESDHC1_CMD		0x1d5
-> +			MX53_PAD_SD1_CLK__ESDHC1_CLK		0x1d5
-> +		>;
-> +	};
-> +
-> +	pinctrl_i2c1_pmic: i2c1grp {
-> +		fsl,pins = <
-> +			MX53_PAD_EIM_D21__I2C1_SCL	0x80
-> +			MX53_PAD_EIM_D28__I2C1_SDA	0x80
-> +		>;
-> +	};
-> +
-> +	pinctrl_led: ledgrp {
-> +		fsl,pins = <
-> +			MX53_PAD_DISP0_DAT6__GPIO4_27 0x1e4
-> +		>;
-> +	};
+
+Nit: s/supports/uses/ would be clearer.
+
+[...]
+
+> +#ifdef CONFIG_ARM64_TTBR0_PAN
+> +#define RESERVED_TTBR0_SIZE	(PAGE_SIZE)
+> +#else
+> +#define RESERVED_TTBR0_SIZE	(0)
+> +#endif
+
+I was going to suggest that we use the empty_zero_page, which we can
+address with an adrp, because I had forgotten that we need to generate
+the *physical* address.
+
+It would be good if we could have a description of why we need the new
+reserved page somewhere in the code. I'm sure I won't be the only one
+tripped up by this.
+
+It would be possible to use the existing empty_zero_page, if we're happy
+to have a MOVZ; MOVK; MOVK; MOVK sequence that we patch at boot-time.
+That could be faster than an MRS on some implementations.
+
+We don't (yet) have infrastructure for that, though.
+
+[...]
+
+> +static inline void uaccess_ttbr0_enable(void)
+> +{
+> +	unsigned long flags;
 > +
 > +	/*
-> +	 * UART mode pin header configration
-> +	 * 3 - GPIO5[26], pull-down 100K
-> +	 * 4 - GPIO5[27], pull-down 100K
-> +	 * 5 - TX, pull-up 100K
-> +	 * 6 - RX, pull-up 100K
-> +	 * 7 - GPIO5[30], pull-down 100K
+> +	 * Disable interrupts to avoid preemption and potential saved
+> +	 * TTBR0_EL1 updates between reading the variable and the MSR.
 > +	 */
-> +	pinctrl_uart1: uart1grp {
-> +		fsl,pins = <
-> +			MX53_PAD_CSI0_DAT8__GPIO5_26		0xc0
-> +			MX53_PAD_CSI0_DAT9__GPIO5_27		0xc0
-> +			MX53_PAD_CSI0_DAT10__UART1_TXD_MUX	0x1e4
-> +			MX53_PAD_CSI0_DAT11__UART1_RXD_MUX	0x1e4
-> +			MX53_PAD_CSI0_DAT12__GPIO5_30		0xc0
-> +		>;
-> +	};
-> +};
+> +	local_irq_save(flags);
+> +	write_sysreg(current_thread_info()->ttbr0, ttbr0_el1);
+> +	isb();
+> +	local_irq_restore(flags);
+> +}
+
+I don't follow what problem this actually protects us against. In the
+case of preemption everything should be saved+restored transparently, or
+things would go wrong as soon as we enable IRQs anyway.
+
+Is this a hold-over from a percpu approach rather than the
+current_thread_info() approach?
+
+What am I missing?
+
+> +#else
+> +static inline void uaccess_ttbr0_disable(void)
+> +{
+> +}
 > +
-> +&i2c1 {
-> +	pinctrl-0 = <&pinctrl_i2c1_pmic>;
-> +	status = "okay";
-> +
-> +	ltc3589: pmic at 34 {
-> +		compatible = "lltc,ltc3589-2";
-> +		reg = <0x34>;
-> +
-> +		regulators {
-> +			sw1_reg: sw1 {
-> +				regulator-min-microvolt = <591930>;
-> +				regulator-max-microvolt = <1224671>;
-> +				lltc,fb-voltage-divider = <100000 158000>;
-> +				regulator-ramp-delay = <7000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			sw2_reg: sw2 {
-> +				regulator-min-microvolt = <704123>;
-> +				regulator-max-microvolt = <1456803>;
-> +				lltc,fb-voltage-divider = <180000 191000>;
-> +				regulator-ramp-delay = <7000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			sw3_reg: sw3 {
-> +				regulator-min-microvolt = <1341250>;
-> +				regulator-max-microvolt = <2775000>;
-> +				lltc,fb-voltage-divider = <270000 100000>;
-> +				regulator-ramp-delay = <7000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			bb_out_reg: bb-out {
-> +				regulator-min-microvolt = <3387341>;
-> +				regulator-max-microvolt = <3387341>;
-> +				lltc,fb-voltage-divider = <511000 158000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			ldo1_reg: ldo1 {
-> +				regulator-min-microvolt = <1306329>;
-> +				regulator-max-microvolt = <1306329>;
-> +				lltc,fb-voltage-divider = <100000 158000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			ldo2_reg: ldo2 {
-> +				regulator-min-microvolt = <704123>;
-> +				regulator-max-microvolt = <1456806>;
-> +				lltc,fb-voltage-divider = <180000 191000>;
-> +				regulator-ramp-delay = <7000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			ldo3_reg: ldo3 {
-> +				regulator-min-microvolt = <2800000>;
-> +				regulator-max-microvolt = <2800000>;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			ldo4_reg: ldo4 {
-> +				regulator-min-microvolt = <1200000>;
-> +				regulator-max-microvolt = <3200000>;
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart1>;
-> +	status = "okay";
-> +};
-> +
-> +&usbotg {
-> +	dr_mode = "peripheral";
-> +	status = "okay";
-> +};
-> -- 
-> 2.9.3
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/37d62722/attachment.sig>
+> +static inline void uaccess_ttbr0_enable(void)
+> +{
+> +}
+> +#endif
+
+I think that it's better to drop the ifdef and add:
+
+	if (!IS_ENABLED(CONFIG_ARM64_TTBR0_PAN))
+		return;
+
+... at the start of each function. GCC should optimize the entire thing
+away when not used, but we'll get compiler coverage regardless, and
+therefore less breakage. All the symbols we required should exist
+regardless.
+
+[...]
+
+>  	.macro	uaccess_enable, tmp1, tmp2
+> +#ifdef CONFIG_ARM64_TTBR0_PAN
+> +alternative_if_not ARM64_HAS_PAN
+> +	save_and_disable_irq \tmp2		// avoid preemption
+> +	uaccess_ttbr0_enable \tmp1
+> +	restore_irq \tmp2
+> +alternative_else
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +alternative_endif
+> +#endif
+
+How about something like:
+
+	.macro alternative_endif_else_nop
+	alternative_else
+	.rept ((662b-661b) / 4)
+	       nop
+	.endr
+	alternative_endif
+	.endm
+
+So for the above we could have:
+
+	alternative_if_not ARM64_HAS_PAN
+		save_and_disable_irq \tmp2
+		uaccess_ttbr0_enable \tmp1
+		restore_irq \tmp2
+	alternative_endif_else_nop
+
+I'll see about spinning a patch, or discovering why that happens to be
+broken.
+
+[...]
+
+>  	 * tables again to remove any speculatively loaded cache lines.
+>  	 */
+>  	mov	x0, x25
+> -	add	x1, x26, #SWAPPER_DIR_SIZE
+> +	add	x1, x26, #SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE
+>  	dmb	sy
+>  	bl	__inval_cache_range
+>  
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index 659963d40bb4..fe393ccf9352 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -196,6 +196,11 @@ SECTIONS
+>  	swapper_pg_dir = .;
+>  	. += SWAPPER_DIR_SIZE;
+>  
+> +#ifdef CONFIG_ARM64_TTBR0_PAN
+> +	reserved_ttbr0 = .;
+> +	. += PAGE_SIZE;
+> +#endif
+
+Surely RESERVED_TTBR0_SIZE, as elsewhere?
+
+Thanks,
+Mark.
