@@ -1,98 +1,34 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon,  5 Sep 2016 14:09:53 +0100
-Subject: [PATCH] iommu/arm-smmu: Fix polling of command queue
-Message-ID: <20160905130953.1690-1-jean-philippe.brucker@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 05 Sep 2016 15:09:48 +0200
+Subject: [PATCH 1/2 v5] bus: qcom: add EBI2 device tree bindings
+In-Reply-To: <1473078565-24363-1-git-send-email-linus.walleij@linaro.org>
+References: <1473078565-24363-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <6058357.4to9qAiSEF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the SMMUv3 driver attempts to send a command, it adds an entry to the
-command queue. This is a circular buffer, where both the producer and
-consumer have a wrap bit. When producer.index == consumer.index and
-producer.wrap == consumer.wrap, the list is empty. When producer.index ==
-consumer.index and producer.wrap != consumer.wrap, the list is full.
+On Monday, September 5, 2016 2:29:24 PM CEST Linus Walleij wrote:
+> +Chip Select                     Physical address base
+> +CS0 GPIO134                     0x1a800000-0x1b000000 (8MB)
+> +CS1 GPIO39 (A) / GPIO123 (B)    0x1b000000-0x1b800000 (8MB)
+> +CS2 GPIO40 (A) / GPIO124 (B)    0x1b800000-0x1c000000 (8MB)
+> +CS3 GPIO133                     0x1d000000-0x25000000 (128 MB)
+> +CS4 GPIO132                     0x1c800000-0x1d000000 (8MB)
+> +CS5 GPIO131                     0x1c000000-0x1c800000 (8MB)
+> +
 
-If the list is full when the driver needs to add a command, it waits for
-the SMMU to consume one command, and advance the consumer pointer. The
-problem is that we currently rely on "X before Y" operation to know if
-entries have been consumed, which is a bit fiddly since it only makes
-sense when the distance between X and Y is less than or equal to the size
-of the queue. At the moment when the list is full, we use "Consumer before
-Producer + 1", which is out of range and returns a value opposite to what
-we expect: when the queue transitions to not full, we stay in the polling
-loop and time out, printing an error.
 
-Given that the actual bug was difficult to determine, simplify the polling
-logic by relying exclusively on queue_full and queue_empty, that don't
-have this range constraint. Polling the queue is now straightforward:
+> +- ranges: should be set to:
+> +  ranges = <0 0x0 0x1a800000 0x00800000>,
+> +           <1 0x0 0x1b000000 0x00800000>,
+> +           <2 0x0 0x1b800000 0x00800000>,
+> +           <3 0x0 0x1d000000 0x00800000>,
+> +           <4 0x0 0x1c800000 0x00800000>,
+> +           <5 0x0 0x1c000000 0x00800000>;
+> 
 
-* When we want to add a command and the list is full, wait until it isn't
-  full and retry.
-* After adding a sync, wait for the list to be empty before returning.
+The two lists don't seem to match here: why is the CS3 area only
+listed with an 8MB mapping here when the documentation says it's
+128 MB?
 
-Suggested-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
----
- drivers/iommu/arm-smmu-v3.c | 28 +++++++++-------------------
- 1 file changed, 9 insertions(+), 19 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index a60dea6..fc938008 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -868,19 +868,15 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
- 	writel(q->prod, q->prod_reg);
- }
- 
--static bool __queue_cons_before(struct arm_smmu_queue *q, u32 until)
--{
--	if (Q_WRP(q, q->cons) == Q_WRP(q, until))
--		return Q_IDX(q, q->cons) < Q_IDX(q, until);
--
--	return Q_IDX(q, q->cons) >= Q_IDX(q, until);
--}
--
--static int queue_poll_cons(struct arm_smmu_queue *q, u32 until, bool wfe)
-+/*
-+ * Wait for the SMMU to consume items. If drain is true, wait until the queue
-+ * is empty. Otherwise, wait until there is at least one free slot.
-+ */
-+static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
- {
- 	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
- 
--	while (queue_sync_cons(q), __queue_cons_before(q, until)) {
-+	while (queue_sync_cons(q), (drain ? !queue_empty(q) : queue_full(q))) {
- 		if (ktime_compare(ktime_get(), timeout) > 0)
- 			return -ETIMEDOUT;
- 
-@@ -1073,7 +1069,6 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
- static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
- 				    struct arm_smmu_cmdq_ent *ent)
- {
--	u32 until;
- 	u64 cmd[CMDQ_ENT_DWORDS];
- 	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
- 	struct arm_smmu_queue *q = &smmu->cmdq.q;
-@@ -1085,17 +1080,12 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
- 	}
- 
- 	spin_lock(&smmu->cmdq.lock);
--	while (until = q->prod + 1, queue_insert_raw(q, cmd) == -ENOSPC) {
--		/*
--		 * Keep the queue locked, otherwise the producer could wrap
--		 * twice and we could see a future consumer pointer that looks
--		 * like it's behind us.
--		 */
--		if (queue_poll_cons(q, until, wfe))
-+	while (queue_insert_raw(q, cmd) == -ENOSPC) {
-+		if (queue_poll_cons(q, false, wfe))
- 			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
- 	}
- 
--	if (ent->opcode == CMDQ_OP_CMD_SYNC && queue_poll_cons(q, until, wfe))
-+	if (ent->opcode == CMDQ_OP_CMD_SYNC && queue_poll_cons(q, true, wfe))
- 		dev_err_ratelimited(smmu->dev, "CMD_SYNC timeout\n");
- 	spin_unlock(&smmu->cmdq.lock);
- }
--- 
-2.9.2
+	Arnd
