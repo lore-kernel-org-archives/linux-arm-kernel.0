@@ -1,81 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon,  5 Sep 2016 18:25:47 +0100
-Subject: [PATCH v2 1/2] jump_labels: Allow array initialisers
-In-Reply-To: <1473096348-19548-1-git-send-email-catalin.marinas@arm.com>
-References: <1473096348-19548-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1473096348-19548-2-git-send-email-catalin.marinas@arm.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon,  5 Sep 2016 11:00:03 -0700
+Subject: [PATCH v2] ARM: LPAE: initialize cache policy correctly
+Message-ID: <20160905180003.30638-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The static key API is currently designed around single variable
-definitions. There are cases where an array of static keys is desirable,
-so extend the API to allow this rather than using the internal static
-key implementation directly.
+The cachepolicy variable gets initialized using a masked pmd
+value. So far, the pmd has been masked with flags valid for the
+2-page table format, but the 3-page table format requires a
+different mask. On LPAE, this lead to a wrong assumption of what
+initial cache policy has been used. Later a check forces the
+cache policy to writealloc and prints the following warning:
+Forcing write-allocate cache policy for SMP
 
-Suggested-by: Dave P Martin <Dave.Martin@arm.com>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Jason Baron <jbaron@akamai.com>
-Cc: Jonathan Corbet <corbet@lwn.net>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+This patch introduces a new definition PMD_SECT_CACHE_MASK for
+both page table formats which masks in all cache flags in both
+cases.
+
+Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- Documentation/static-keys.txt |  9 +++++++++
- include/linux/jump_label.h    | 12 ++++++++++++
- 2 files changed, 21 insertions(+)
+Changes since v1:
+- Introduce new definition PMD_SECT_CACHE_MASK
 
-diff --git a/Documentation/static-keys.txt b/Documentation/static-keys.txt
-index 477927becacb..ea8d7b4e53f0 100644
---- a/Documentation/static-keys.txt
-+++ b/Documentation/static-keys.txt
-@@ -15,6 +15,8 @@ The updated API replacements are:
+ arch/arm/include/asm/pgtable-2level-hwdef.h | 1 +
+ arch/arm/include/asm/pgtable-3level-hwdef.h | 1 +
+ arch/arm/mm/mmu.c                           | 2 +-
+ 3 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/include/asm/pgtable-2level-hwdef.h b/arch/arm/include/asm/pgtable-2level-hwdef.h
+index d0131ee..3f82e9d 100644
+--- a/arch/arm/include/asm/pgtable-2level-hwdef.h
++++ b/arch/arm/include/asm/pgtable-2level-hwdef.h
+@@ -47,6 +47,7 @@
+ #define PMD_SECT_WB		(PMD_SECT_CACHEABLE | PMD_SECT_BUFFERABLE)
+ #define PMD_SECT_MINICACHE	(PMD_SECT_TEX(1) | PMD_SECT_CACHEABLE)
+ #define PMD_SECT_WBWA		(PMD_SECT_TEX(1) | PMD_SECT_CACHEABLE | PMD_SECT_BUFFERABLE)
++#define PMD_SECT_CACHE_MASK	(PMD_SECT_TEX(1) | PMD_SECT_CACHEABLE | PMD_SECT_BUFFERABLE)
+ #define PMD_SECT_NONSHARED_DEV	(PMD_SECT_TEX(2))
  
- DEFINE_STATIC_KEY_TRUE(key);
- DEFINE_STATIC_KEY_FALSE(key);
-+DEFINE_STATIC_KEY_ARRAY_TRUE(keys, count);
-+DEFINE_STATIC_KEY_ARRAY_FALSE(keys, count);
- static_branch_likely()
- static_branch_unlikely()
+ /*
+diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h b/arch/arm/include/asm/pgtable-3level-hwdef.h
+index f8f1cff..4cd664a 100644
+--- a/arch/arm/include/asm/pgtable-3level-hwdef.h
++++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
+@@ -62,6 +62,7 @@
+ #define PMD_SECT_WT		(_AT(pmdval_t, 2) << 2)	/* normal inner write-through */
+ #define PMD_SECT_WB		(_AT(pmdval_t, 3) << 2)	/* normal inner write-back */
+ #define PMD_SECT_WBWA		(_AT(pmdval_t, 7) << 2)	/* normal inner write-alloc */
++#define PMD_SECT_CACHE_MASK	(_AT(pmdval_t, 7) << 2)
  
-@@ -140,6 +142,13 @@ static_branch_inc(), will change the branch back to true. Likewise, if the
- key is initialized false, a 'static_branch_inc()', will change the branch to
- true. And then a 'static_branch_dec()', will again make the branch false.
+ /*
+  * + Level 3 descriptor (PTE)
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 724d6be..4001dd1 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -137,7 +137,7 @@ void __init init_default_cache_policy(unsigned long pmd)
  
-+Where an array of keys is required, it can be defined as:
-+
-+	DEFINE_STATIC_KEY_ARRAY_TRUE(keys, count);
-+
-+or:
-+
-+	DEFINE_STATIC_KEY_ARRAY_FALSE(keys, count);
+ 	initial_pmd_value = pmd;
  
- 4) Architecture level code patching interface, 'jump labels'
+-	pmd &= PMD_SECT_TEX(1) | PMD_SECT_BUFFERABLE | PMD_SECT_CACHEABLE;
++	pmd &= PMD_SECT_CACHE_MASK;
  
-diff --git a/include/linux/jump_label.h b/include/linux/jump_label.h
-index 661af564fae8..a534c7f15a61 100644
---- a/include/linux/jump_label.h
-+++ b/include/linux/jump_label.h
-@@ -21,6 +21,8 @@
-  *
-  * DEFINE_STATIC_KEY_TRUE(key);
-  * DEFINE_STATIC_KEY_FALSE(key);
-+ * DEFINE_STATIC_KEY_ARRAY_TRUE(keys, count);
-+ * DEFINE_STATIC_KEY_ARRAY_FALSE(keys, count);
-  * static_branch_likely()
-  * static_branch_unlikely()
-  *
-@@ -270,6 +272,16 @@ struct static_key_false {
- #define DEFINE_STATIC_KEY_FALSE(name)	\
- 	struct static_key_false name = STATIC_KEY_FALSE_INIT
- 
-+#define DEFINE_STATIC_KEY_ARRAY_TRUE(name, count)		\
-+	struct static_key_true name[count] = {			\
-+		[0 ... (count) - 1] = STATIC_KEY_TRUE_INIT,	\
-+	}
-+
-+#define DEFINE_STATIC_KEY_ARRAY_FALSE(name, count)		\
-+	struct static_key_false name[count] = {			\
-+		[0 ... (count) - 1] = STATIC_KEY_FALSE_INIT,	\
-+	}
-+
- extern bool ____wrong_branch_error(void);
- 
- #define static_key_enabled(x)							\
+ 	for (i = 0; i < ARRAY_SIZE(cache_policies); i++)
+ 		if (cache_policies[i].pmd == pmd) {
+-- 
+2.9.3
