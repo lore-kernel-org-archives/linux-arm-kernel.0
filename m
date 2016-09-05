@@ -1,60 +1,85 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon,  5 Sep 2016 10:58:26 +0100
-Subject: [PATCH v3 6/9] arm64: alternative: Add support for patching adrp
- instructions
+Date: Mon,  5 Sep 2016 10:58:25 +0100
+Subject: [PATCH v3 5/9] arm64: insn: Add helpers for adrp offsets
 In-Reply-To: <1473069509-2317-1-git-send-email-suzuki.poulose@arm.com>
 References: <1473069509-2317-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1473069509-2317-7-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1473069509-2317-6-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-adrp uses PC-relative address offset to a page (of 4K size) of
-a symbol. If it appears in an alternative code patched in, we
-should adjust the offset to reflect the address where it will
-be run from. This patch adds support for fixing the offset
-for adrp instructions.
+Adds helpers for decoding/encoding the PC relative addresses for adrp.
+This will be used for handling dynamic patching of 'adrp' instructions
+in alternative code patching.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Andre Przywara <andre.przywara@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/alternative.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm64/include/asm/insn.h | 11 ++++++++++-
+ arch/arm64/kernel/insn.c      | 13 +++++++++++++
+ 2 files changed, 23 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-index 992918d..06d650f 100644
---- a/arch/arm64/kernel/alternative.c
-+++ b/arch/arm64/kernel/alternative.c
-@@ -58,6 +58,8 @@ static bool branch_insn_requires_update(struct alt_instr *alt, unsigned long pc)
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index 1dbaa90..bc85366 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -246,7 +246,8 @@ static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
+ static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
+ { return (val); }
+ 
+-__AARCH64_INSN_FUNCS(adr_adrp,	0x1F000000, 0x10000000)
++__AARCH64_INSN_FUNCS(adr,	0x9F000000, 0x10000000)
++__AARCH64_INSN_FUNCS(adrp,	0x9F000000, 0x90000000)
+ __AARCH64_INSN_FUNCS(prfm_lit,	0xFF000000, 0xD8000000)
+ __AARCH64_INSN_FUNCS(str_reg,	0x3FE0EC00, 0x38206800)
+ __AARCH64_INSN_FUNCS(ldr_reg,	0x3FE0EC00, 0x38606800)
+@@ -318,6 +319,11 @@ __AARCH64_INSN_FUNCS(msr_reg,	0xFFF00000, 0xD5100000)
+ bool aarch64_insn_is_nop(u32 insn);
+ bool aarch64_insn_is_branch_imm(u32 insn);
+ 
++static inline bool aarch64_insn_is_adr_adrp(u32 insn)
++{
++	return aarch64_insn_is_adr(insn) || aarch64_insn_is_adrp(insn);
++}
++
+ int aarch64_insn_read(void *addr, u32 *insnp);
+ int aarch64_insn_write(void *addr, u32 insn);
+ enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+@@ -398,6 +404,9 @@ int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
+ int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
+ int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
+ 
++s32 aarch64_insn_adrp_get_offset(u32 insn);
++u32 aarch64_insn_adrp_set_offset(u32 insn, s32 offset);
++
+ bool aarch32_insn_is_wide(u32 insn);
+ 
+ #define A32_RN_OFFSET	16
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index 178488f..6f2ac4f 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -1202,6 +1202,19 @@ u32 aarch64_set_branch_offset(u32 insn, s32 offset)
  	BUG();
  }
  
-+#define align_down(x, a)	((unsigned long)(x) & ~(((unsigned long)(a)) - 1))
++s32 aarch64_insn_adrp_get_offset(u32 insn)
++{
++	BUG_ON(!aarch64_insn_is_adrp(insn));
++	return aarch64_insn_decode_immediate(AARCH64_INSN_IMM_ADR, insn) << 12;
++}
 +
- static u32 get_alt_insn(struct alt_instr *alt, u32 *insnptr, u32 *altinsnptr)
- {
- 	u32 insn;
-@@ -79,6 +81,19 @@ static u32 get_alt_insn(struct alt_instr *alt, u32 *insnptr, u32 *altinsnptr)
- 			offset = target - (unsigned long)insnptr;
- 			insn = aarch64_set_branch_offset(insn, offset);
- 		}
-+	} else if (aarch64_insn_is_adrp(insn)) {
-+		s32 orig_offset, new_offset;
-+		unsigned long target;
++u32 aarch64_insn_adrp_set_offset(u32 insn, s32 offset)
++{
++	BUG_ON(!aarch64_insn_is_adrp(insn));
++	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_ADR, insn,
++						offset >> 12);
++}
 +
-+		/*
-+		 * If we're replacing an adrp instruction, which uses PC-relative
-+		 * immediate addressing, adjust the offset to reflect the new
-+		 * PC. adrp operates on 4K aligned addresses.
-+		 */
-+		orig_offset  = aarch64_insn_adrp_get_offset(insn);
-+		target = align_down(altinsnptr, SZ_4K) + orig_offset;
-+		new_offset = target - align_down(insnptr, SZ_4K);
-+		insn = aarch64_insn_adrp_set_offset(insn, new_offset);
- 	} else if (aarch64_insn_uses_literal(insn)) {
- 		/*
- 		 * Disallow patching unhandled instructions using PC relative
+ /*
+  * Extract the Op/CR data from a msr/mrs instruction.
+  */
 -- 
 2.7.4
