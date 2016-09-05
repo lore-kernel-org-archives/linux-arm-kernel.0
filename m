@@ -1,104 +1,210 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon,  5 Sep 2016 08:03:16 +0530
-Subject: [PATCH V3] arm64:ftrace: add save_stack_trace_regs()
-Message-ID: <12a4a8e304fb26dbe533be0ea68e448df462a7c5.1473038514.git.panand@redhat.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Sun, 4 Sep 2016 21:34:43 -0500
+Subject: [RFC PATCH V5 5/5] PCI: thunder-pem: Support quirky
+ configuration space access for ACPI based PCI host controller
+In-Reply-To: <1470661541-26270-6-git-send-email-tn@semihalf.com>
+References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
+ <1470661541-26270-6-git-send-email-tn@semihalf.com>
+Message-ID: <20160905023443.GF30488@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, enabling stacktrace of a kprobe events generates warning:
+On Mon, Aug 08, 2016 at 03:05:41PM +0200, Tomasz Nowicki wrote:
+> Add infrastructure to support ThunderX PEM specific PCI configuration space
+> access for ACPI based PCI host controller. This involves:
+> 1. New initialization call thunder_pem_cfg_init() to create configuration
+> space mapping based on hardcoded range addresses
+> 2. thunder_pem_init() ACPI extension to obtain hardcoded addresses for
+> PEM specific register ranges
+> 3. New quirk entry (for common quirk array) which identifies platform and
+> calls thunder_pem_cfg_init() from [1]
 
-echo stacktrace > /sys/kernel/debug/tracing/trace_options
-echo "p xhci_irq" > /sys/kernel/debug/tracing/kprobe_events
-echo 1 > /sys/kernel/debug/tracing/events/kprobes/enable
+Is it possible to split this up a little bit?  I *hope* most quirks
+aren't as complicated as all this.  It'd be nice to make the actual
+quirk patches as small as possible so they can be easily copied and
+adapted.
 
-save_stack_trace_regs() not implemented yet.
-------------[ cut here ]------------
-WARNING: CPU: 1 PID: 0 at ../kernel/stacktrace.c:74 save_stack_trace_regs+0x3c/0x48
-Modules linked in:
+Another question below...
 
-CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.8.0-rc4-dirty #5128
-Hardware name: ARM Juno development board (r1) (DT)
-task: ffff800975dd1900 task.stack: ffff800975ddc000
-PC is at save_stack_trace_regs+0x3c/0x48
-LR is at save_stack_trace_regs+0x3c/0x48
-pc : [<ffff000008126c64>] lr : [<ffff000008126c64>] pstate: 600003c5
-sp : ffff80097ef52c00
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> ---
+>  drivers/pci/host/mcfg-quirks.c     |  7 +++
+>  drivers/pci/host/mcfg-quirks.h     |  4 ++
+>  drivers/pci/host/pci-thunder-pem.c | 96 ++++++++++++++++++++++++++++++++------
+>  3 files changed, 94 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/pci/host/mcfg-quirks.c b/drivers/pci/host/mcfg-quirks.c
+> index aa9907b..2993a72 100644
+> --- a/drivers/pci/host/mcfg-quirks.c
+> +++ b/drivers/pci/host/mcfg-quirks.c
+> @@ -44,6 +44,13 @@ struct pci_cfg_fixup {
+>  
+>  static struct pci_cfg_fixup mcfg_quirks[] __initconst = {
+>  /*	{ OEM_ID, OEM_TABLE_ID, REV, DOMAIN, BUS_RANGE, pci_ops, init_hook }, */
+> +#ifdef CONFIG_PCI_HOST_THUNDER_PEM
+> +	/* Pass2.0 */
+> +	{ "CAVIUM", "THUNDERX", 1, MCFG_DOM_RANGE(4, 9), MCFG_BUS_ANY, NULL,
+> +	  thunder_pem_cfg_init },
+> +	{ "CAVIUM", "THUNDERX", 1, MCFG_DOM_RANGE(14, 19), MCFG_BUS_ANY, NULL,
+> +	  thunder_pem_cfg_init },
+> +#endif
+>  };
+>  
+>  static bool pci_mcfg_fixup_match(struct pci_cfg_fixup *f,
+> diff --git a/drivers/pci/host/mcfg-quirks.h b/drivers/pci/host/mcfg-quirks.h
+> index 45cbd16..411c667 100644
+> --- a/drivers/pci/host/mcfg-quirks.h
+> +++ b/drivers/pci/host/mcfg-quirks.h
+> @@ -16,5 +16,9 @@
+>  #define __MCFG_QUIRKS_H__
+>  
+>  /* MCFG quirks initialize call list */
+> +#ifdef CONFIG_PCI_HOST_THUNDER_PEM
+> +struct pci_config_window *
+> +thunder_pem_cfg_init(struct acpi_pci_root *root, struct pci_ops *ops);
+> +#endif
+>  
+>  #endif /* __MCFG_QUIRKS_H__ */
+> diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+> index 6abaf80..3f06e49 100644
+> --- a/drivers/pci/host/pci-thunder-pem.c
+> +++ b/drivers/pci/host/pci-thunder-pem.c
+> @@ -18,9 +18,12 @@
+>  #include <linux/init.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_pci.h>
+> +#include <linux/pci-acpi.h>
+>  #include <linux/pci-ecam.h>
+>  #include <linux/platform_device.h>
+>  
+> +#include "mcfg-quirks.h"
+> +
+>  #define PEM_CFG_WR 0x28
+>  #define PEM_CFG_RD 0x30
+>  
+> @@ -284,6 +287,37 @@ static int thunder_pem_config_write(struct pci_bus *bus, unsigned int devfn,
+>  	return pci_generic_config_write(bus, devfn, where, size, val);
+>  }
+>  
+> +#ifdef CONFIG_ACPI
+> +
+> +static struct resource thunder_pem_reg_res[] = {
+> +	[4] = DEFINE_RES_MEM(0x87e0c0000000UL, SZ_16M),
+> +	[5] = DEFINE_RES_MEM(0x87e0c1000000UL, SZ_16M),
+> +	[6] = DEFINE_RES_MEM(0x87e0c2000000UL, SZ_16M),
+> +	[7] = DEFINE_RES_MEM(0x87e0c3000000UL, SZ_16M),
+> +	[8] = DEFINE_RES_MEM(0x87e0c4000000UL, SZ_16M),
+> +	[9] = DEFINE_RES_MEM(0x87e0c5000000UL, SZ_16M),
+> +	[14] = DEFINE_RES_MEM(0x97e0c0000000UL, SZ_16M),
+> +	[15] = DEFINE_RES_MEM(0x97e0c1000000UL, SZ_16M),
+> +	[16] = DEFINE_RES_MEM(0x97e0c2000000UL, SZ_16M),
+> +	[17] = DEFINE_RES_MEM(0x97e0c3000000UL, SZ_16M),
+> +	[18] = DEFINE_RES_MEM(0x97e0c4000000UL, SZ_16M),
+> +	[19] = DEFINE_RES_MEM(0x97e0c5000000UL, SZ_16M),
+> +};
+> +
+> +static struct resource *thunder_pem_acpi_res(struct pci_config_window *cfg)
+> +{
+> +	struct acpi_device *adev = to_acpi_device(cfg->parent);
+> +	struct acpi_pci_root *root = acpi_driver_data(adev);
+> +
+> +	return &thunder_pem_reg_res[root->segment];
+> +}
+> +#else
+> +static struct resource *thunder_pem_acpi_res(struct pci_config_window *cfg)
+> +{
+> +	return NULL;
+> +}
+> +#endif
+> +
+>  static int thunder_pem_init(struct pci_config_window *cfg)
+>  {
+>  	struct device *dev = cfg->parent;
+> @@ -292,24 +326,24 @@ static int thunder_pem_init(struct pci_config_window *cfg)
+>  	struct thunder_pem_pci *pem_pci;
+>  	struct platform_device *pdev;
+>  
+> -	/* Only OF support for now */
+> -	if (!dev->of_node)
+> -		return -EINVAL;
+> -
+>  	pem_pci = devm_kzalloc(dev, sizeof(*pem_pci), GFP_KERNEL);
+>  	if (!pem_pci)
+>  		return -ENOMEM;
+>  
+> -	pdev = to_platform_device(dev);
+> -
+> -	/*
+> -	 * The second register range is the PEM bridge to the PCIe
+> -	 * bus.  It has a different config access method than those
+> -	 * devices behind the bridge.
+> -	 */
+> -	res_pem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +	if (acpi_disabled) {
+> +		pdev = to_platform_device(dev);
+> +
+> +		/*
+> +		 * The second register range is the PEM bridge to the PCIe
+> +		 * bus.  It has a different config access method than those
+> +		 * devices behind the bridge.
+> +		 */
+> +		res_pem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +	} else {
+> +		res_pem = thunder_pem_acpi_res(cfg);
+> +	}
+>  	if (!res_pem) {
+> -		dev_err(dev, "missing \"reg[1]\"property\n");
+> +		dev_err(dev, "missing configuration region\n");
+>  		return -EINVAL;
+>  	}
+>  
+> @@ -360,3 +394,39 @@ static struct platform_driver thunder_pem_driver = {
+>  	.probe = thunder_pem_probe,
+>  };
+>  builtin_platform_driver(thunder_pem_driver);
+> +
+> +#ifdef CONFIG_ACPI
+> +
+> +static struct resource thunder_pem_cfg_res[] = {
+> +	[4] = DEFINE_RES_MEM(0x88001f000000UL, 0x39 * SZ_16M),
+> +	[5] = DEFINE_RES_MEM(0x884057000000UL, 0x39 * SZ_16M),
+> +	[6] = DEFINE_RES_MEM(0x88808f000000UL, 0x39 * SZ_16M),
+> +	[7] = DEFINE_RES_MEM(0x89001f000000UL, 0x39 * SZ_16M),
+> +	[8] = DEFINE_RES_MEM(0x894057000000UL, 0x39 * SZ_16M),
+> +	[9] = DEFINE_RES_MEM(0x89808f000000UL, 0x39 * SZ_16M),
+> +	[14] = DEFINE_RES_MEM(0x98001f000000UL, 0x39 * SZ_16M),
+> +	[15] = DEFINE_RES_MEM(0x984057000000UL, 0x39 * SZ_16M),
+> +	[16] = DEFINE_RES_MEM(0x98808f000000UL, 0x39 * SZ_16M),
+> +	[17] = DEFINE_RES_MEM(0x99001f000000UL, 0x39 * SZ_16M),
+> +	[18] = DEFINE_RES_MEM(0x994057000000UL, 0x39 * SZ_16M),
+> +	[19] = DEFINE_RES_MEM(0x99808f000000UL, 0x39 * SZ_16M),
+> +};
+> +
+> +struct pci_config_window *
+> +thunder_pem_cfg_init(struct acpi_pci_root *root, struct pci_ops *ops)
+> +{
+> +	struct resource *bus_res = &root->secondary;
+> +	u16 seg = root->segment;
+> +	struct pci_config_window *cfg;
+> +
+> +	cfg = pci_ecam_create(&root->device->dev, &thunder_pem_cfg_res[seg],
+> +			      bus_res, &pci_thunder_pem_ops);
 
-Call trace:
-[<ffff000008126c64>] save_stack_trace_regs+0x3c/0x48
-[<ffff00000817a0b0>] __ftrace_trace_stack+0x168/0x208
-[<ffff00000817ad40>] trace_buffer_unlock_commit_regs+0x5c/0x7c
-[<ffff00000818d57c>] kprobe_trace_func+0x308/0x3d8
-[<ffff00000818defc>] kprobe_dispatcher+0x58/0x60
-[<ffff0000088d8cfc>] kprobe_breakpoint_handler+0xbc/0x18c
-[<ffff0000080851b8>] brk_handler+0x50/0x90
-[<ffff000008081300>] do_debug_exception+0x50/0xbc
+What happens when root->segment is not one of the values defined in
+thunder_pem_cfg_res[], say "0"?  I *think* pci_ecam_create() will see
+cfgres as all zeros, and the request_resource_conflict() will probably
+fail.  That doesn't seem like a very graceful way to report a firmware
+error.
 
-This patch implements save_stack_trace_regs(), so that stacktrace of a
-kprobe events can be obtained.
-
-After this patch, there is no warning and we can see the stacktrace for
-kprobe events in trace buffer.
-
-more /sys/kernel/debug/tracing/trace
-          <idle>-0     [004] d.h.  1356.000496: p_xhci_irq_0:(xhci_irq+0x0/0x9ac)
-          <idle>-0     [004] d.h.  1356.000497: <stack trace>
-  => xhci_irq
-  => __handle_irq_event_percpu
-  => handle_irq_event_percpu
-  => handle_irq_event
-  => handle_fasteoi_irq
-  => generic_handle_irq
-  => __handle_domain_irq
-  => gic_handle_irq
-  => el1_irq
-  => arch_cpu_idle
-  => default_idle_call
-  => cpu_startup_entry
-  => secondary_start_kernel
-  =>
-
-Tested-by: David A. Long <dave.long@linaro.org>
-Reviewed-by: James Morse <james.morse@arm.com>
-Signed-off-by: Pratyush Anand <panand@redhat.com>
----
-v1 to v2: Rebased with 4.8.0-rc4
-v2 to v3: CONFIG_FUNCTION_GRAPH_TRACER fixup and improved commit log
-
- arch/arm64/kernel/stacktrace.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
-
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index d9751a4769e7..ca01addf8c4c 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -152,6 +152,27 @@ static int save_trace(struct stackframe *frame, void *d)
- 	return trace->nr_entries >= trace->max_entries;
- }
- 
-+void save_stack_trace_regs(struct pt_regs *regs, struct stack_trace *trace)
-+{
-+	struct stack_trace_data data;
-+	struct stackframe frame;
-+
-+	data.trace = trace;
-+	data.skip = trace->skip;
-+	data.no_sched_functions = 0;
-+
-+	frame.fp = regs->regs[29];
-+	frame.sp = regs->sp;
-+	frame.pc = regs->pc;
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	frame.graph = current->curr_ret_stack;
-+#endif
-+
-+	walk_stackframe(current, &frame, save_trace, &data);
-+	if (trace->nr_entries < trace->max_entries)
-+		trace->entries[trace->nr_entries++] = ULONG_MAX;
-+}
-+
- void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
- {
- 	struct stack_trace_data data;
--- 
-2.7.4
+> +	if (IS_ERR(cfg)) {
+> +		dev_err(&root->device->dev, "%04x:%pR error %ld mapping ECAM\n",
+> +			seg, bus_res, PTR_ERR(cfg));
+> +		return NULL;
+> +	}
+> +
+> +	return cfg;
+> +}
+> +#endif
+> -- 
+> 1.9.1
+> 
