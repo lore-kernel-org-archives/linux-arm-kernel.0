@@ -1,48 +1,43 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon,  5 Sep 2016 22:00:10 +0300
-Subject: [PATCH] dt-binding: mrvl-gpio: remove orion-gpio description
-Message-ID: <9d76063cb0b0a0ff96cfd6f389f3697db7734015.1473102010.git.baruch@tkos.co.il>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Mon, 5 Sep 2016 21:07:03 +0200
+Subject: [PATCH v4 4/5] net: stmmac: add a glue driver for the Amlogic
+ Meson 8b / GXBB DWMAC
+In-Reply-To: <14789887.lyko4Om94p@wuerfel>
+References: <201609050953.67GKeUAU%fengguang.wu@intel.com>
+ <14789887.lyko4Om94p@wuerfel>
+Message-ID: <CAFBinCAC3c=o1=8DGfiPhw6w6V42jvYLUfHXHpHLe03pw8P=LQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Orion GPIO controller binding description in mrvl-gpio.txt is obsolete, and
-duplicates the description in gpio-mvebu.txt.
+On Mon, Sep 5, 2016 at 12:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday, September 5, 2016 9:37:29 AM CEST kbuild test robot wrote:
+>> All error/warnings (new ones prefixed by >>):
+>>
+>> >> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:63:18: error: field 'm250_mux' has incomplete type
+>>      struct clk_mux  m250_mux;
+>>                      ^
+>> >> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:67:21: error: field 'm250_div' has incomplete type
+>>      struct clk_divider m250_div;
+>>                         ^
+>>
+>
+> I think this needs a compile-time dependency on COMMON_CLK
+indeed, since we are also a clock provider we have to depend on
+CONFIG_COMMON_CLK.
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- .../devicetree/bindings/gpio/mrvl-gpio.txt         | 23 ----------------------
- 1 file changed, 23 deletions(-)
+That brings up a question though:
+so far the new driver uses the same Kconfig symbol as the "old" driver
+(CONFIG_DWMAC_MESON).
+The "old" driver does not need CONFIG_COMMON_CLK while the new one does.
+I see a few options here:
+1. simply adding the dependency (as most configurations will have
+CONFIG_COMMON_CLK enabled anyways)
+2. add some depends on COMMON_CLK || MACH_MESON6 || MACH_MESON8 foo
+3. use a new Kconfig symbol for new new driver (CONFIG_DWMAC_MESON8B?)
 
-diff --git a/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt b/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
-index 98d198396956..c3d016532d8e 100644
---- a/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
-+++ b/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
-@@ -44,26 +44,3 @@ Example for a PXA3xx platform:
- 		interrupt-controller;
- 		#interrupt-cells = <0x2>;
- 	};
--
--* Marvell Orion GPIO Controller
--
--Required properties:
--- compatible         : Should be "marvell,orion-gpio"
--- reg                : Address and length of the register set for controller.
--- gpio-controller    : So we know this is a gpio controller.
--- ngpio              : How many gpios this controller has.
--- interrupts	     : Up to 4 Interrupts for the controller.
--
--Optional properties:
--- mask-offset        : For SMP Orions, offset for Nth CPU
--
--Example:
--
--		gpio0: gpio at 10100 {
--			compatible = "marvell,orion-gpio";
--			#gpio-cells = <2>;
--			gpio-controller;
--			reg = <0x10100 0x40>;
--			ngpio = <32>;
--			interrupts = <35>, <36>, <37>, <38>;
--		};
--- 
-2.9.3
+And finally regarding your other mail: I have already changed
+WARN_ON(PTR_ERR_OR_ZERO(...)) to WARN_ON(IS_ERR(...)) in v4
+
+
+Regards,
+Martin
