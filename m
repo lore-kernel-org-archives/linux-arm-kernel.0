@@ -1,83 +1,69 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Mon, 5 Sep 2016 14:20:06 +0200
-Subject: [PATCH v8 15/18] ARM: STi: DT: STiH407: Add uniperif reader dt
- nodes
-In-Reply-To: <20160831112819.GJ27357@dell>
-References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
- <1472223413-7254-16-git-send-email-peter.griffin@linaro.org>
- <20160830100148.GO1661@dell>
- <20160830142112.GA22514@griffinp-ThinkPad-X1-Carbon-2nd>
- <20160831112819.GJ27357@dell>
-Message-ID: <ae089830-b7c8-ee83-f697-6ff93f2646ed@st.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 Sep 2016 13:26:12 +0100
+Subject: [PATCH 05/33] gpio: add generic single-register fixed-direction
+ GPIO driver
+In-Reply-To: <CACRpkdZBNH=4qZEfcLzqZAN=tum2f3YeoQj0D5PsH+P0Cf+7LQ@mail.gmail.com>
+References: <20160829102328.GA28796@n2100.armlinux.org.uk>
+ <E1beJjz-0000mA-0o@rmk-PC.armlinux.org.uk>
+ <87eg57e54l.fsf@belgarion.home>
+ <20160830091805.GL1041@n2100.armlinux.org.uk>
+ <87k2eycip0.fsf@belgarion.home>
+ <20160830184612.GO1041@n2100.armlinux.org.uk>
+ <87fupmc59b.fsf@belgarion.home>
+ <20160831084938.GQ1041@n2100.armlinux.org.uk>
+ <CACRpkdZBNH=4qZEfcLzqZAN=tum2f3YeoQj0D5PsH+P0Cf+7LQ@mail.gmail.com>
+Message-ID: <20160905122611.GO1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello ptere, Lee,
+On Mon, Sep 05, 2016 at 11:06:28AM +0200, Linus Walleij wrote:
+> I couldn't resist testing on the Compaq iPAQ h3600. It works the
+> same as before so:
+> Tested-by: Linus Walleij <linus.walleij@linaro.org> [for Compaq iPAQ H3600]
 
-Thanks for your remarks,
+Great news.  I've been thinking about digging out my h3600, but it's
+very old, and hasn't been turned on for many years.  I'm not sure what
+state it's in.
 
-Regards
-Arnaud
-On 08/31/2016 01:28 PM, Lee Jones wrote:
-> On Tue, 30 Aug 2016, Peter Griffin wrote:
->> Thanks for reviewing and your very valuable feedback.
->> On Tue, 30 Aug 2016, Lee Jones wrote:
->>> On Fri, 26 Aug 2016, Peter Griffin wrote:
->>>
->>>> This patch adds the DT node for the uniperif reader
->>>> IP block found on STiH407 family silicon.
->>>>
->>>> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
->>>> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
->>>> ---
->>>>  arch/arm/boot/dts/stih407-family.dtsi | 26 ++++++++++++++++++++++++++
->>>>  1 file changed, 26 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
->>>> index d263c96..bdddf2c 100644
->>>> --- a/arch/arm/boot/dts/stih407-family.dtsi
->>>> +++ b/arch/arm/boot/dts/stih407-family.dtsi
->>>> @@ -956,5 +956,31 @@
->>>>  			st,version = <5>;
->>>>  			st,mode = "SPDIF";
->>>>  		};
->>>> +
->>>> +		sti_uni_reader0: sti-uni-reader at 0 {
->>>> +			compatible = "st,sti-uni-reader";
->>>> +			status = "disabled";
->>>
->>> I find it's normally nicer to place the status of the node at the
->>> bottom, separated by a '\n'.
->>
->> Ok I'll add a superflous '\n' in the next version.
-> 
-> Everyone loves a smart arse!
-> 
-> In this case I believe the '\n' to be a functional separator and not
-> superfluous at all.
-> 
->>>> +			dai-name = "Uni Reader #0 (PCM IN)";
->>>
->>> Oooo, not seen something like this before.
->>>
->>> If it does not already have one, it would require a DT Ack.
->>
->> No idea, the driver got merged 1 year ago.
-This field could be suppressed and handled in source code, using
-st,uniperiph-id to retreive it.
->>
->> Arnaud did you get a DT ack when you merged this driver & binding? i if i remember well, i had  sent to Alsa mailing list only, I missed
-this obvious...
->>>
->>>> +			st,version = <3>;
->>>
->>> This will likely need a DT Ack too.  We usually encode this sort of
->>> information in the compatible string.
-yes, better to use compatibility
->>
->> See 05c1b4480e86a871b18030d6f3d532dc0ecdf38c
-> 
-> Well Rob's the boss.  We certainly never used to take 'device ID' or
-> 'version' attributes.  I guess something must have changed.
+I've been hoping to try booting some kernels with qemu-system-arm, but
+so far I've completely failed to get qemu-system-arm to do anything
+useful - it just sits there doing apparently nothing, irrespective of
+which platform I choose or which kernel I give it.
 
-I will try to provide patches for code and bindings rework this week.
+> The only news in the bootlog is this:
+> sa11x0-pcmcia: probe of sa11x0-pcmcia failed with error -2
+
+Not so great news - that's -ENOENT.  Did that happen before these
+changes?  That could be that the gpiod lookup table isn't found.
+However, if that were the case, I'd have expected an error message
+along the lines of:
+
+Failed to get GPIO for xxx: -nnn
+
+from soc_pcmcia_request_gpiods().  The other possibility is that
+we're not getting to sa11x0_drv_pcmcia_legacy_probe() but instead
+trying to initialise it as a generic sa11x0 socket, and
+sa11x0_pcmcia_hw_init() is failing as a result.
+
+We should be using the legacy probe on H3600, so sa11x0_pcmcia_hw_init()
+should never be reached.
+
+> This device does have a PCMCIA "sleeve" where I slotted in an
+> ethernet card at one time to see if I could network this thing.
+> But I never got the PCMCIA working. Now it seems like I could
+> actually start looking into that as the driver gives its first sign
+> of life.
+> 
+> I don't think PCMCIA ever worked on this thing upstream,
+> but I have a copy of the old linux-handheld kernel tree where
+> it supposedly was working at one point.
+
+Well, the H3600 PCMCIA driver raises lots of "that can't be right"
+questions for me, so I decided to leave most of the GPIO stuff alone
+there, and just convert only the bits which made sense to me - the
+detect and ready(irq) bits.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
