@@ -1,42 +1,77 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Mon, 5 Sep 2016 14:57:23 +0100
-Subject: [PATCH] arm64/efi: efi_init error handling fix
-In-Reply-To: <20160902102618.GC17482@arm.com>
-References: <1472811519-4897-1-git-send-email-xieyisheng1@huawei.com>
- <20160902102618.GC17482@arm.com>
-Message-ID: <20160905135723.GK32579@codeblueprint.co.uk>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 5 Sep 2016 22:00:01 +0800
+Subject: [PATCH 3/6] drm/panel: simple: Add A10 EVB 5 inch panel support
+In-Reply-To: <20160831081817.5191-4-maxime.ripard@free-electrons.com>
+References: <20160831081817.5191-1-maxime.ripard@free-electrons.com>
+ <20160831081817.5191-4-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v66GsA8uNaaZfnnHFgBLA-LChCnO3vLhdtfzHNU0nHXH4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 02 Sep, at 11:26:18AM, Will Deacon wrote:
-> On Fri, Sep 02, 2016 at 06:18:39PM +0800, Xie Yisheng wrote:
-> > From: Yisheng Xie <xieyisheng1@huawei.com>
-> > 
-> > There's an early memmap leak in efi_init error path, fix it.
-> > 
-> > Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
-> > ---
-> >  drivers/firmware/efi/arm-init.c | 4 +++-
-> >  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> Adding linux-efi, Ard and Matt. Please try to CC the relevant people in
-> future.
-> 
-> Will
-> 
-> > diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-> > index c49d50e..5080e40 100644
-> > --- a/drivers/firmware/efi/arm-init.c
-> > +++ b/drivers/firmware/efi/arm-init.c
-> > @@ -243,8 +243,10 @@ void __init efi_init(void)
-> >  	     "Unexpected EFI_MEMORY_DESCRIPTOR version %ld",
-> >  	      efi.memmap.desc_version);
-> >  
-> > -	if (uefi_init() < 0)
-> > +	if (uefi_init() < 0) {
-> > +		early_memunmap(efi.memmap.map, params.mmap_size);
-> >  		return;
-> > +	}
+On Wed, Aug 31, 2016 at 4:18 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The A10-EVB from Allwinner comes with an unidentified panel, with the only
+> mark on the PCB being A10-SUB-EVB-5LCD.
+>
+> Add timings to simple panel to handle it.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/gpu/drm/panel/panel-simple.c | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+> index 85143d1b9b31..be371b053aab 100644
+> --- a/drivers/gpu/drm/panel/panel-simple.c
+> +++ b/drivers/gpu/drm/panel/panel-simple.c
+> @@ -386,6 +386,29 @@ static void panel_simple_shutdown(struct device *dev)
+>         panel_simple_disable(&panel->base);
+>  }
+>
+> +static const struct drm_display_mode allwinner_a10_sub_evb_5lcd_mode = {
+> +       .clock = 33000,
+> +       .hdisplay = 800,
+> +       .hsync_start = 800 + 209,
+> +       .hsync_end = 800 + 209 + 1,
+> +       .htotal = 800 + 209 + 1 + 45,
+> +       .vdisplay = 480,
+> +       .vsync_start = 480 + 22,
+> +       .vsync_end = 480 + 22 + 1,
+> +       .vtotal = 480 + 22 + 1 + 22,
+> +       .vrefresh = 60,
 
-This should be a call to efi_memmap_unmap() because the EFI_MEMMAP
-flag also needs clearing.
+I assume the numbers came from the fex file? Allwinner LCD timing numbers
+aren't very precise. This seems to yield a refresh rate of 58.x Hz.
+The dot clock can go below MHz resolution, so it should be possible
+to set it to a more proper clock rate here.
+
+ChenYu
+
+> +};
+> +
+> +static const struct panel_desc allwinner_a10_sub_evb_5lcd = {
+> +       .modes = &allwinner_a10_sub_evb_5lcd_mode,
+> +       .num_modes = 1,
+> +       .size = {
+> +               .width = 110,
+> +               .height = 67,
+> +       },
+> +       .bus_format = MEDIA_BUS_FMT_RGB666_1X18,
+> +};
+> +
+>  static const struct drm_display_mode ampire_am800480r3tmqwa1h_mode = {
+>         .clock = 33333,
+>         .hdisplay = 800,
+> @@ -1515,6 +1538,9 @@ static const struct panel_desc urt_umsh_8596md_parallel = {
+>
+>  static const struct of_device_id platform_of_match[] = {
+>         {
+> +               .compatible = "allwinner,sun4i-a10-sub-evb-5-lcd",
+> +               .data = &allwinner_a10_sub_evb_5lcd,
+> +       }, {
+>                 .compatible = "ampire,am800480r3tmqwa1h",
+>                 .data = &ampire_am800480r3tmqwa1h,
+>         }, {
+> --
+> 2.9.2
+>
