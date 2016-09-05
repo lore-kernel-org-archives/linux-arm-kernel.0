@@ -1,176 +1,101 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon, 5 Sep 2016 08:48:51 +0200
-Subject: [PATCH v4 3/3] iio: adc: add support for Allwinner SoCs ADC
-In-Reply-To: <alpine.DEB.2.02.1609041754350.2060@pmeerw.net>
-References: <1472738705-20145-1-git-send-email-quentin.schulz@free-electrons.com>
- <1472738705-20145-4-git-send-email-quentin.schulz@free-electrons.com>
- <alpine.DEB.2.02.1609041754350.2060@pmeerw.net>
-Message-ID: <aed1e00f-ceaa-27e9-502d-51428f59a84f@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 5 Sep 2016 08:51:46 +0200
+Subject: [PATCH 1/2] mtd: nand: automate NAND timings selection
+In-Reply-To: <1472820149-24241-2-git-send-email-s.hauer@pengutronix.de>
+References: <1472820149-24241-1-git-send-email-s.hauer@pengutronix.de>
+ <1472820149-24241-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20160905085146.239129bd@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2016 18:12, Peter Meerwald-Stadler wrote:
+Hi Sascha,
+
+It feels weird to review his own patch, but I have a few comments. :)
+
+On Fri,  2 Sep 2016 14:42:28 +0200
+Sascha Hauer <s.hauer@pengutronix.de> wrote:
+
+> From: Boris Brezillon <boris.brezillon@free-electrons.com>
 > 
->> The Allwinner SoCs all have an ADC that can also act as a touchscreen
->> controller and a thermal sensor. This patch adds the ADC driver which is
->> based on the MFD for the same SoCs ADC.
+> The NAND framework provides several helpers to query timing modes supported
+> by a NAND chip, but this implies that all NAND controller drivers have
+> to implement the same timings selection dance.
 > 
-> nitpicking ahead
+> Provide a common logic to select the best timings based on ONFI or
+> ->onfi_timing_mode_default information.  
+> NAND controller willing to support timings adjustment should just
+> implement the ->setup_data_interface() method.
+
+Now I remember one of the reason I did not post a v2 (apart from not
+having the time).
+
+If understand the ONFI spec correctly, when you reset the NAND chip,
+you get back to SDR+timing-mode0. In the core we do not control when
+the reset command (0xff) is issued, and this prevents us from
+re-applying the correct timing mode after a reset.
+
+Maybe we should provide a nand_reset() helper to hide this complexity,
+and patch all ->cmdfunc(NAND_CMD_RESET) callers to call nand_reset()
+instead.
+
+Note that the interface+timing-mode config is not necessarily the only
+thing we'll have to re-apply after a reset (especially on MLC NANDs), so
+having place where we can put all operations that should be done after
+a reset is a good thing.
+
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/mtd/nand/nand_base.c | 196 ++++++++++++++++++++++++++++++++++++++++++-
+>  include/linux/mtd/nand.h     | 115 ++++++++++++++-----------
+>  2 files changed, 261 insertions(+), 50 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+> index 77533f7..018fd56 100644
+> --- a/drivers/mtd/nand/nand_base.c
+> +++ b/drivers/mtd/nand/nand_base.c
+> @@ -3322,6 +3322,148 @@ static void nand_onfi_detect_micron(struct nand_chip *chip,
+>  	chip->setup_read_retry = nand_setup_read_retry_micron;
+>  }
 >  
-[...]
->> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
->> new file mode 100644
->> index 0000000..a93d36d
->> --- /dev/null
->> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
->> @@ -0,0 +1,525 @@
->> +/* ADC driver for sunxi platforms' (A10, A13 and A31) GPADC
->> + *
->> + * Copyright (c) 2016 Quentin Schulz <quentin.schulz@free-electrons>
-> 
-> email address is incomplete
-> 
+> +/**
+> + * nand_setup_data_interface - Setup the data interface and timings on the
+> + *			       controller side
+> + * @mtd: MTD device structure
+> + * @conf: new configuration to apply
+> + *
+> + * Try to configure the NAND controller to support the provided data
+> + * interface configuration.
+> + *
+> + * Returns 0 in case of success or -ERROR_CODE.
+> + */
+> +static int nand_setup_data_interface(struct mtd_info *mtd,
+> +				     const struct nand_data_interface *conf)
+> +{
+> +	struct nand_chip *chip = mtd_to_nand(mtd);
+> +	int ret;
+> +
+> +	if (!chip->setup_data_interface)
+> +		return -ENOTSUPP;
+> +
+> +	ret = chip->setup_data_interface(mtd, conf, false);
+> +	if (ret)
+> +		return ret;
+> +
+> +	*chip->data_iface = *conf;
 
-As in my other patches, thanks!
+Maybe we can just switch the pointers here instead of copying its
+content.
+This would require turning the chip->data_iface into const, or passing
+non-const parameter to nand_setup_data_interface(), but I don't see any
+good reason to do this extra copy.
 
->> + *
->> + * This program is free software; you can redistribute it and/or modify it under
->> + * the terms of the GNU General Public License version 2 as published by the
->> + * Free Software Foundation.
->> + *
->> + * The Allwinner SoCs all have an ADC that can also act as a touchscreen
->> + * controller and a thermal sensor.
->> + * The thermal sensor works only when the ADC acts as a touchscreen controller
->> + * and is configured to throw an interrupt every fixed periods of time (let say
->> + * every X seconds).
->> + * One would be tempted to disable the IP on the hardware side rather than
->> + * disabling interrupts to save some power but that reset the internal clock of
-> 
-> resets
-> 
->> + * the IP, resulting in having to wait X seconds every time we want to read the
->> + * value of the thermal sensor.
->> + * This is also the reason of using autosuspend in pm_runtime. If there were no
-> 
-> there was no
-> 
-[...]
->> +
->> +const unsigned int sun4i_gpadc_chan_select(unsigned int chan)
-> 
-> static instead of const?
-> 
+> +
+> +	return 0;
+> +}
+> +
 
-static const then?
+Thanks,
 
->> +{
->> +	return SUN4I_GPADC_CTRL1_ADC_CHAN_SELECT(chan);
->> +}
->> +
->> +const unsigned int sun6i_gpadc_chan_select(unsigned int chan)
-> 
-> static instead of const?
-> 
-
-static const then?
-
->> +{
->> +	return SUN6I_GPADC_CTRL1_ADC_CHAN_SELECT(chan);
->> +}
->> +
->> +struct soc_specific {
->> +	const int		temp_offset;
-> 
-> wondering why you constify every member?
-> 
-
-Because they're supposed to be fixed values? It won't change in runtime.
-Is there any reason why I shouldn't do that?
-
->> +	const int		temp_scale;
->> +	const unsigned int	tp_mode_en;
->> +	const unsigned int	tp_adc_select;
->> +	const unsigned int	(*adc_chan_select)(unsigned int chan);
->> +};
-[...]
->> +static int sun4i_gpadc_read(struct iio_dev *indio_dev, int channel, int *val,
->> +			    unsigned int irq)
->> +{
->> +	struct sun4i_gpadc_dev *info = iio_priv(indio_dev);
->> +	int ret = 0;
->> +
->> +	pm_runtime_get_sync(indio_dev->dev.parent);
->> +	mutex_lock(&info->mutex);
->> +
->> +	reinit_completion(&info->completion);
->> +
->> +	regmap_write(info->regmap, SUN4I_GPADC_INT_FIFOC,
->> +		     SUN4I_GPADC_INT_FIFOC_TP_FIFO_TRIG_LEVEL(1) |
->> +		     SUN4I_GPADC_INT_FIFOC_TP_FIFO_FLUSH);
-> 
-> check retval? here and elsewhere for regmap_write()
-> 
-
-ACK. What should I do with the retval then?
-
-There are some in:
-- sun4i_gpadc_read called for read_raws => return which error code (or
--ret only?)?
-- sun4i_gpadc_runtime_suspend => return value of ret, but that would
-cancel the suspend right?
-- sun4i_gpadc_runtime_resume => return value of ret, but that would
-cancel resume right?
-- sun4i_gpadc_probe in the error gotos => probe already failing so do we
-actually care if regmap_update_bits fails? If yes, what's the expected
-behaviour?
-- sun4i_gpadc_remove => return value of ret, but that would mean the
-remove failed right?
-
-[...]
->> +static int sun4i_gpadc_read_raw(struct iio_dev *indio_dev,
->> +				struct iio_chan_spec const *chan, int *val,
->> +				int *val2, long mask)
->> +{
->> +	int ret;
->> +
->> +	switch (mask) {
->> +	case IIO_CHAN_INFO_OFFSET:
->> +		ret = sun4i_gpadc_temp_offset(indio_dev, val);
->> +		if (ret)
->> +			return ret;
->> +
->> +		return IIO_VAL_INT;
->> +	case IIO_CHAN_INFO_RAW:
->> +		if (chan->type == IIO_VOLTAGE) {
->> +			ret = sun4i_gpadc_adc_read(indio_dev, chan->channel,
->> +						   val);
->> +			if (ret)
->> +				return ret;
-> 
-> could share the "if (ret) return ret;" between code path
-> 
-
-ACK.
-
-[...]
->> +static int sun4i_irq_init(struct platform_device *pdev, const char *name,
->> +			  irq_handler_t handler, const char *devname,
->> +			  unsigned int *irq, atomic_t *atomic)
->> +{
->> +	int ret;
->> +	struct sun4i_gpadc_mfd_dev *mfd_dev = dev_get_drvdata(pdev->dev.parent);
->> +	struct sun4i_gpadc_dev *info = iio_priv(dev_get_drvdata(&pdev->dev));
->> +
->> +	/*
->> +	 * Once the interrupt is activated, the IP continuously performs
->> +	 * conversions thus throws interrupts. The interrupt is activated right
->> +	 * after being requested but we want to control when these interrupts
->> +	 * occurs thus we disable it right after being requested. However, an
-> 
-> occur
-> 
-
-ACK for all typos.
-Thanks!
-
-Quentin
+Boris
