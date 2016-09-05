@@ -1,44 +1,124 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Mon, 5 Sep 2016 20:56:41 +0200
-Subject: [PATCH 3/3] ARM: dts: efm32: remove skeleton.dtsi include and fix
- unit address warnings
-In-Reply-To: <20160905075650.exmgxv6ulrbeqw45@pengutronix.de>
+Date: Mon, 5 Sep 2016 21:01:46 +0200
+Subject: Fwd: [PATCH 1/3] ARM: dts: armv7-m: remove skeleton.dtsi include
+In-Reply-To: <20160830205250.15616-2-manabian@gmail.com>
 References: <20160830205250.15616-1-manabian@gmail.com>
- <20160830205250.15616-4-manabian@gmail.com>
- <20160905075650.exmgxv6ulrbeqw45@pengutronix.de>
-Message-ID: <CAGhQ9Vytu7BtRsfH62XD04CpMrjOG9a2XGbg=JvP9a017x0-gQ@mail.gmail.com>
+ <20160830205250.15616-2-manabian@gmail.com>
+Message-ID: <CAGhQ9VxAgJ2YdsaPie+7cX1NyytqQYJHsEhCq0rxr-qZodH-LQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi Alexandre,
 
-On 5 September 2016 at 09:56, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> On Tue, Aug 30, 2016 at 10:52:50PM +0200, Joachim Eastwood wrote:
->> Removale of skeleton.dtsi allows us also to fix the following
->> warning from the dts compiler:
->>   Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
->>
->> by adding proper unit addresses to the memory nodes. Also add missing
->> device_type to the memory node while at it.
->>
->> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
->> ---
->> Hi Uwe,
->>
->> If you want I can take this through the lpc18xx tree. There doesn't seem
->> too be many patches for efm32 lately (last one dates from 2014).
->
-> That's fine for me.
->
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Just noticed that you were listed as a co-maintainer for stm32. Could
+you take a look and ack the patch below?
 
-Thanks.
-
-Could you also ack patch number 1 that touches armv7-m.dtsi?
-I would like to have your ack since you are the originale author of
-that file and it touches efm32 as well.
+You can find the cover letter for the series here:
+http://www.spinics.net/lists/arm-kernel/msg527580.html
 
 
 regards,
 Joachim Eastwood
+
+
+---------- Forwarded message ----------
+From: Joachim Eastwood <manabian@gmail.com>
+Date: 30 August 2016 at 22:52
+Subject: [PATCH 1/3] ARM: dts: armv7-m: remove skeleton.dtsi include
+To: stefan at agner.ch, mcoquelin.stm32 at gmail.com,
+vladimir.murzin at arm.com, u.kleine-koenig at pengutronix.de
+Cc: Joachim Eastwood <manabian@gmail.com>,
+linux-arm-kernel at lists.infradead.org, robh+dt at kernel.org
+
+
+Remove skeleton.dtsi from the common ARM Cortex-M dtsi. This will allow
+us to remove skeleton.dtsi on a per platform basis and get rid of the
+unit address warning on the memory nodes without getting duplicate memory
+nodes.
+
+See 3ebee5a2e141 ("arm64: dts: kill skeleton.dtsi") for additional
+reasons not to use the skeleton.dtsi.
+
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+ arch/arm/boot/dts/armv7-m.dtsi   | 2 --
+ arch/arm/boot/dts/efm32gg.dtsi   | 2 ++
+ arch/arm/boot/dts/lpc18xx.dtsi   | 1 +
+ arch/arm/boot/dts/mps2.dtsi      | 1 +
+ arch/arm/boot/dts/stm32f429.dtsi | 1 +
+ arch/arm/boot/dts/vf610m4.dtsi   | 1 +
+ 6 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/armv7-m.dtsi b/arch/arm/boot/dts/armv7-m.dtsi
+index 16331aa..ba332e3 100644
+--- a/arch/arm/boot/dts/armv7-m.dtsi
++++ b/arch/arm/boot/dts/armv7-m.dtsi
+@@ -1,5 +1,3 @@
+-#include "skeleton.dtsi"
+-
+ / {
+        nvic: interrupt-controller at e000e100  {
+                compatible = "arm,armv7m-nvic";
+diff --git a/arch/arm/boot/dts/efm32gg.dtsi b/arch/arm/boot/dts/efm32gg.dtsi
+index c747983..d9dbf7f 100644
+--- a/arch/arm/boot/dts/efm32gg.dtsi
++++ b/arch/arm/boot/dts/efm32gg.dtsi
+@@ -4,6 +4,8 @@
+  * Documentation available from
+  * http://www.silabs.com/Support%20Documents/TechnicalDocs/EFM32GG-RM.pdf
+  */
++
++#include "skeleton.dtsi"
+ #include "armv7-m.dtsi"
+ #include "dt-bindings/clock/efm32-cmu.h"
+
+diff --git a/arch/arm/boot/dts/lpc18xx.dtsi b/arch/arm/boot/dts/lpc18xx.dtsi
+index 1cd39fd..a1ecfe3 100644
+--- a/arch/arm/boot/dts/lpc18xx.dtsi
++++ b/arch/arm/boot/dts/lpc18xx.dtsi
+@@ -11,6 +11,7 @@
+  *
+  */
+
++#include "skeleton.dtsi"
+ #include "armv7-m.dtsi"
+
+ #include "dt-bindings/clock/lpc18xx-cgu.h"
+diff --git a/arch/arm/boot/dts/mps2.dtsi b/arch/arm/boot/dts/mps2.dtsi
+index e3fed8d..efb8a03 100644
+--- a/arch/arm/boot/dts/mps2.dtsi
++++ b/arch/arm/boot/dts/mps2.dtsi
+@@ -42,6 +42,7 @@
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+
++#include "skeleton.dtsi"
+ #include "armv7-m.dtsi"
+
+ / {
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index 35df462..8e69328 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -45,6 +45,7 @@
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+
++#include "skeleton.dtsi"
+ #include "armv7-m.dtsi"
+ #include <dt-bindings/pinctrl/stm32f429-pinfunc.h>
+
+diff --git a/arch/arm/boot/dts/vf610m4.dtsi b/arch/arm/boot/dts/vf610m4.dtsi
+index 9ffe2eb..9f2c731 100644
+--- a/arch/arm/boot/dts/vf610m4.dtsi
++++ b/arch/arm/boot/dts/vf610m4.dtsi
+@@ -42,6 +42,7 @@
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+
++#include "skeleton.dtsi"
+ #include "armv7-m.dtsi"
+ #include "vfxxx.dtsi"
+
+--
+2.9.3
