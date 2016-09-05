@@ -1,42 +1,41 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 5 Sep 2016 23:41:14 +0200
-Subject: irq_create_fwspec_mapping() in 4.8-rc2
-In-Reply-To: <57CD6B87.5010502@arm.com>
-References: <483F737F-9868-4E8A-A831-AA3F6F410AFF@gmail.com>
- <57C98975.5020607@arm.com> <9FCA11A3-B677-42EA-80DB-674AC8E489E8@gmail.com>
- <57C99111.3030105@arm.com> <F5716CCD-34FF-4CA8-B5F5-C2A33A5D9E91@gmail.com>
- <57C9961F.8080602@arm.com> <B721D80D-B240-4779-8748-5CFAD330D986@gmail.com>
- <57C99B3D.3010405@arm.com>
- <CACRpkdYjmkkDxVah1HUNxoGEQ9hJeE-J1TwZ1wNEKq=swnL9JQ@mail.gmail.com>
- <57CD6B87.5010502@arm.com>
-Message-ID: <CACRpkdaUviHgUtLhTPTRuW5rk=tZsvgYAJLqNFtz1u+q2jbM2w@mail.gmail.com>
+Date: Mon, 5 Sep 2016 23:42:49 +0200
+Subject: [PATCH 1/2 v5] bus: qcom: add EBI2 device tree bindings
+In-Reply-To: <6058357.4to9qAiSEF@wuerfel>
+References: <1473078565-24363-1-git-send-email-linus.walleij@linaro.org>
+ <6058357.4to9qAiSEF@wuerfel>
+Message-ID: <CACRpkdZCgwK6vMXgu0UFghx0DaKMsnOq+w+jb=VFU8+LKu+B+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 5, 2016 at 2:56 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-
-> OK, I'll whip up a patch shortly. Should I also address the handful of
-> other non-TYPE_NONE that we have in the tree:
+On Mon, Sep 5, 2016 at 3:09 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday, September 5, 2016 2:29:24 PM CEST Linus Walleij wrote:
+>> +Chip Select                     Physical address base
+>> +CS0 GPIO134                     0x1a800000-0x1b000000 (8MB)
+>> +CS1 GPIO39 (A) / GPIO123 (B)    0x1b000000-0x1b800000 (8MB)
+>> +CS2 GPIO40 (A) / GPIO124 (B)    0x1b800000-0x1c000000 (8MB)
+>> +CS3 GPIO133                     0x1d000000-0x25000000 (128 MB)
+>> +CS4 GPIO132                     0x1c800000-0x1d000000 (8MB)
+>> +CS5 GPIO131                     0x1c000000-0x1c800000 (8MB)
+>> +
 >
->         drivers/gpio/gpio-sx150x.c
->         drivers/pinctrl/nomadik/pinctrl-nomadik.c
->         drivers/pinctrl/pinctrl-coh901.c
->         drivers/pinctrl/pinctrl-st.c
 >
-> But the bigger question is whether or not there is any value in the
-> pinctrl driver providing a default value at all. Do we have any case
-> where the trigger information is not provided by the firmware (DT or
-> ACPI), and where we rely on the default being set?
+>> +- ranges: should be set to:
+>> +  ranges = <0 0x0 0x1a800000 0x00800000>,
+>> +           <1 0x0 0x1b000000 0x00800000>,
+>> +           <2 0x0 0x1b800000 0x00800000>,
+>> +           <3 0x0 0x1d000000 0x00800000>,
+>> +           <4 0x0 0x1c800000 0x00800000>,
+>> +           <5 0x0 0x1c000000 0x00800000>;
+>>
+>
+> The two lists don't seem to match here: why is the CS3 area only
+> listed with an 8MB mapping here when the documentation says it's
+> 128 MB?
 
-That happened with boardfiles. Which used to be the case with
-some of these, but AFAICT not any longer. I am uncertain about
-sx150x though.
+Just my bad because I'm not using it, good catch!
 
-In the boardfile case, I think actually the driver is responsible to
-set up the kind of interrupt trigger it wants (well it still can...
-but it should nowadays trust what it is given) but very often that
-did not happen, instead the drivers relied on hacks like these to
-have set up a default trigger type.
+Resending.
 
 Yours,
 Linus Walleij
