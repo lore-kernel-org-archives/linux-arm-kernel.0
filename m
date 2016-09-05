@@ -1,34 +1,29 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 5 Sep 2016 11:10:35 +0200
-Subject: [PATCH 3/3] ARM: dts: wheat: add QSPI support
-In-Reply-To: <3191777.fJ30rYXr4J@wasted.cogentembedded.com>
-References: <1648590.FPpmBRoQyh@wasted.cogentembedded.com>
- <3191777.fJ30rYXr4J@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdW+82ePveuVbOrPU0uRj4Uu5f8+NvzHpjWQr8Wa_BoU+A@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 05 Sep 2016 11:12:49 +0200
+Subject: [PATCH 2/4] ARM: dts: rockchip: fix i2c address L3G4200D on
+ PopMetal-RK3288 board
+In-Reply-To: <1472978067-868-1-git-send-email-andy.yan@rock-chips.com>
+References: <1472977937-758-1-git-send-email-andy.yan@rock-chips.com>
+ <1472978067-868-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <2908713.CWeP2vUbBj@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 3, 2016 at 12:09 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Define the Wheat board dependent part of the QSPI device node.
-> Add device nodes for Spansion S25FL512S SPI flash and MTD partitions on it.
->
-> Based  on the original (and large) patch by Vladimir Barinov
-> <vladimir.barinov@cogentembedded.com>.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Am Sonntag, 4. September 2016, 16:34:27 CEST schrieb Andy Yan:
+> The i2c address of the three-axis digital gyroscope L3G4200D should be
+> 0x69 according to hardware design.
+> Also add power supply reference for L3G3200D and the 3-axis Electronic
+> Compass AK8963.
+> 
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+I've split this into two patches:
+ARM: dts: rockchip: fix L3G4200D i2c address on PopMetal-RK3288 board
+ARM: dts: rockchip: Add sensor-supplies on PopMetal-RK3288 board
+and applied them to my dts32 branch for 4.9
 
-Disclaimer: I have no board schematics nor manuals describing FLASH layout.
+Please don't mix multiple changes into one patch in the future :-)
 
-Gr{oetje,eeting}s,
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks
+Heiko
