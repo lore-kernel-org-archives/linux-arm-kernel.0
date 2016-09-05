@@ -1,148 +1,59 @@
-From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Mon,  5 Sep 2016 21:24:04 +0200
-Subject: [PATCH] ASoC: sun4i-codec: Distinguish sun4i from sun7i
-In-Reply-To: <20160905192404.13871-1-dannym@scratchpost.org>
-References: <20160905192404.13871-1-dannym@scratchpost.org>
-Message-ID: <20160905192404.13871-2-dannym@scratchpost.org>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 5 Sep 2016 20:37:08 +0100
+Subject: Tegra baseline test results for v4.8-rc4
+Message-ID: <1f415bf9-3f21-8516-e70c-e3bf65d7ea96@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ASoC: sun4i-codec: Distinguish sun4i from sun7i
+Here are some basic Tegra test results for Linux v4.8-rc4.
+Logs and other details at:
 
-Introduce mechanism to detect sun7i and provide a different regmap, codec
-and different controls for it - different compared to sun4i Allwinner A10.
+    https://nvtb.github.io//linux/test_v4.8-rc4/20160828153103/
 
-The controls will be extended in a forthcoming patch - it is necessary to
-distinguish between sun4i and sun7i controls because the mic gains are in
-different registers.
 
-Renamed SUN4I_CODEC_AC_SYS_VERI to SUN7I_CODEC_AC_DAC_CAL and renamed
-SUN4I_CODEC_AC_MIC_PHONE_CAL to SUN7I_CODEC_AC_MIC_PHONE_CAL because these
-are actually not present on Allwinner A10.
+Test summary
+------------
 
-Handle quirks by regmap config and codec and select the correct quirks
-automatically.
+Build: zImage:
+    FAIL: ( 1/ 2): multi_v7_defconfig
+    Pass: ( 1/ 2): tegra_defconfig
 
-Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
----
- sound/soc/sunxi/sun4i-codec.c | 66 +++++++++++++++++++++++++++++++++++--------
- 1 file changed, 54 insertions(+), 12 deletions(-)
+Build: Image:
+    Pass: ( 1/ 1): defconfig
 
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 0e19c50..8531c93 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -96,8 +96,8 @@
- /* Other various ADC registers */
- #define SUN4I_CODEC_DAC_TXCNT			(0x30)
- #define SUN4I_CODEC_ADC_RXCNT			(0x34)
--#define SUN4I_CODEC_AC_SYS_VERI			(0x38)
--#define SUN4I_CODEC_AC_MIC_PHONE_CAL		(0x3c)
-+#define SUN7I_CODEC_AC_DAC_CAL			(0x38)
-+#define SUN7I_CODEC_AC_MIC_PHONE_CAL		(0x3c)
- 
- struct sun4i_codec {
- 	struct device	*dev;
-@@ -509,10 +509,17 @@ static const struct snd_kcontrol_new sun4i_codec_pa_mute =
- 
- static DECLARE_TLV_DB_SCALE(sun4i_codec_pa_volume_scale, -6300, 100, 1);
- 
--static const struct snd_kcontrol_new sun4i_codec_widgets[] = {
--	SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,
--		       SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,
--		       sun4i_codec_pa_volume_scale),
-+#define SUN4I_COMMON_CODEC_CONTROLS \
-+	SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,\
-+		       SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,\
-+		       sun4i_codec_pa_volume_scale)
-+
-+static const struct snd_kcontrol_new sun4i_codec_controls[] = {
-+	SUN4I_COMMON_CODEC_CONTROLS,
-+};
-+
-+static const struct snd_kcontrol_new sun7i_codec_controls[] = {
-+	SUN4I_COMMON_CODEC_CONTROLS,
- };
- 
- static const struct snd_kcontrol_new sun4i_codec_left_mixer_controls[] = {
-@@ -629,8 +636,19 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
- 
- static struct snd_soc_codec_driver sun4i_codec_codec = {
- 	.component_driver = {
--		.controls		= sun4i_codec_widgets,
--		.num_controls		= ARRAY_SIZE(sun4i_codec_widgets),
-+		.controls		= sun4i_codec_controls,
-+		.num_controls		= ARRAY_SIZE(sun4i_codec_controls),
-+		.dapm_widgets		= sun4i_codec_codec_dapm_widgets,
-+		.num_dapm_widgets	= ARRAY_SIZE(sun4i_codec_codec_dapm_widgets),
-+		.dapm_routes		= sun4i_codec_codec_dapm_routes,
-+		.num_dapm_routes	= ARRAY_SIZE(sun4i_codec_codec_dapm_routes),
-+	},
-+};
-+
-+static struct snd_soc_codec_driver sun7i_codec_codec = {
-+	.component_driver = {
-+		.controls		= sun7i_codec_controls,
-+		.num_controls		= ARRAY_SIZE(sun7i_codec_controls),
- 		.dapm_widgets		= sun4i_codec_codec_dapm_widgets,
- 		.num_dapm_widgets	= ARRAY_SIZE(sun4i_codec_codec_dapm_widgets),
- 		.dapm_routes		= sun4i_codec_codec_dapm_routes,
-@@ -682,12 +700,34 @@ static const struct regmap_config sun4i_codec_regmap_config = {
- 	.reg_bits	= 32,
- 	.reg_stride	= 4,
- 	.val_bits	= 32,
--	.max_register	= SUN4I_CODEC_AC_MIC_PHONE_CAL,
-+	.max_register	= SUN4I_CODEC_ADC_RXCNT,
-+};
-+
-+static const struct regmap_config sun7i_codec_regmap_config = {
-+	.reg_bits	= 32,
-+	.reg_stride	= 4,
-+	.val_bits	= 32,
-+	.max_register	= SUN7I_CODEC_AC_MIC_PHONE_CAL,
-+};
-+
-+struct sun4i_quirks {
-+	const struct snd_soc_codec_driver *codec;
-+	const struct regmap_config *regmap_config;
-+};
-+
-+static const struct sun4i_quirks sun4i_quirks = {
-+	.codec = &sun4i_codec_codec,
-+	.regmap_config = &sun4i_codec_regmap_config,
-+};
-+
-+static const struct sun4i_quirks sun7i_quirks = {
-+	.codec = &sun7i_codec_codec,
-+	.regmap_config = &sun7i_codec_regmap_config,
- };
- 
- static const struct of_device_id sun4i_codec_of_match[] = {
--	{ .compatible = "allwinner,sun4i-a10-codec" },
--	{ .compatible = "allwinner,sun7i-a20-codec" },
-+	{ .compatible = "allwinner,sun4i-a10-codec", .data = &sun4i_quirks },
-+	{ .compatible = "allwinner,sun7i-a20-codec", .data = &sun7i_quirks },
- 	{}
- };
- MODULE_DEVICE_TABLE(of, sun4i_codec_of_match);
-@@ -760,6 +800,7 @@ static int sun4i_codec_probe(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card;
- 	struct sun4i_codec *scodec;
-+	struct sun4i_quirks *quirks;
- 	struct resource *res;
- 	void __iomem *base;
- 	int ret;
-@@ -777,8 +818,9 @@ static int sun4i_codec_probe(struct platform_device *pdev)
- 		return PTR_ERR(base);
- 	}
- 
-+	quirks = of_device_get_match_data(&pdev->dev);
- 	scodec->regmap = devm_regmap_init_mmio(&pdev->dev, base,
--					     &sun4i_codec_regmap_config);
-+					       quirks->regmap_config);
- 	if (IS_ERR(scodec->regmap)) {
- 		dev_err(&pdev->dev, "Failed to create our regmap\n");
- 		return PTR_ERR(scodec->regmap);
--- 
-2.1.4
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.8-rc3 (fa8410b355251fd30341662a40ac6b22d3e38468)):
+   text     data      bss    total  kernel
+    +27        0        0      +27  defconfig
+   +212        0        0     +212  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.8-rc3 (fa8410b355251fd30341662a40ac6b22d3e38468))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+
+--
+nvpublic
