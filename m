@@ -1,56 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 05 Sep 2016 17:39:27 +0200
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <CADRPPNR1_6fbaHLvbmNZW+r7YWW=vOZ+wGCS-MAcNPi9gB3eOw@mail.gmail.com>
-References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
- <6414695.LEIYfGPUEg@wuerfel>
- <CADRPPNR1_6fbaHLvbmNZW+r7YWW=vOZ+wGCS-MAcNPi9gB3eOw@mail.gmail.com>
-Message-ID: <4865343.bOXkeC8XtQ@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 5 Sep 2016 16:42:48 +0100
+Subject: [PATCH v8 15/18] ARM: STi: DT: STiH407: Add uniperif reader dt
+ nodes
+In-Reply-To: <ae089830-b7c8-ee83-f697-6ff93f2646ed@st.com>
+References: <1472223413-7254-1-git-send-email-peter.griffin@linaro.org>
+ <1472223413-7254-16-git-send-email-peter.griffin@linaro.org>
+ <20160830100148.GO1661@dell>
+ <20160830142112.GA22514@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20160831112819.GJ27357@dell>
+ <ae089830-b7c8-ee83-f697-6ff93f2646ed@st.com>
+Message-ID: <20160905154248.GU4921@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 2, 2016 5:16:31 PM CEST Leo Li wrote:
+On Mon, 05 Sep 2016, Arnaud Pouliquen wrote:
+> >>>> +			dai-name = "Uni Reader #0 (PCM IN)";
+> >>>
+> >>> Oooo, not seen something like this before.
+> >>>
+> >>> If it does not already have one, it would require a DT Ack.
+> >>
+> >> No idea, the driver got merged 1 year ago.
+> This field could be suppressed and handled in source code, using
+> st,uniperiph-id to retreive it.
+
+That would be better.
+
+> >> Arnaud did you get a DT ack when you merged this driver & binding? i if i remember well, i had  sent to Alsa mailing list only, I missed
+> this obvious...
+
+I'm surprised Mark didn't notice this.
+
+He's usually pretty good at picking stuff like that up.
+
+> >>>> +			st,version = <3>;
+> >>>
+> >>> This will likely need a DT Ack too.  We usually encode this sort of
+> >>> information in the compatible string.
+> yes, better to use compatibility
+> >>
+> >> See 05c1b4480e86a871b18030d6f3d532dc0ecdf38c
+> > 
+> > Well Rob's the boss.  We certainly never used to take 'device ID' or
+> > 'version' attributes.  I guess something must have changed.
 > 
-> Can we use the firmware or bootloader information to provide the
-> default dma-mapping attributes for devices that doesn't have an
-> of_node pointer or ACPI data?  This will at least restore what we had
-> previously provided .  I'm concerned that changing all the drivers
-> that are creating child device will be a big effort.  Like I mentioned
-> in another thread, there are many instances of platform_device_add()
-> under the drivers/ directory.
+> I will try to provide patches for code and bindings rework this week.
 
-Fortunately, there are not too many drivers that call platform_device_add
-*and* try to set up a dma mask for the child device:
+Wonderful.. Thanks Arnaud.
 
-git grep -wl dma_mask drivers | xargs grep -wl 'platform_device_\(add\|register\)'
-
-drivers/base/platform.c
-drivers/bcma/main.c
-drivers/eisa/virtual_root.c
-drivers/mfd/mfd-core.c
-drivers/mfd/omap-usb-host.c
-drivers/misc/mic/card/mic_x100.c
-drivers/platform/goldfish/pdev_bus.c
-drivers/ssb/main.c
-drivers/usb/chipidea/core.c
-drivers/usb/dwc3/dwc3-exynos.c
-drivers/usb/dwc3/host.c
-drivers/usb/gadget/udc/bdc/bdc_pci.c
-drivers/usb/host/bcma-hcd.c
-drivers/usb/host/fsl-mph-dr-of.c
-drivers/usb/host/ssb-hcd.c
-drivers/usb/misc/ftdi-elan.c
-drivers/usb/musb/blackfin.c
-drivers/usb/musb/musb_dsps.c
-drivers/usb/musb/omap2430.c
-drivers/usb/musb/ux500.c
-
-Most of these are probably never used with any nonstandard
-DMA settings (IOMMU, cache coherency, offset, ...).
-
-One thing we could possibly do is to go through these and
-replace the hardcoded dma mask setup with of_dma_configure()
-in all cases in which we actually use DT for probing, which
-should cover the interesting cases.
-
-	Arnd
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
