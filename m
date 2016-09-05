@@ -1,114 +1,90 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Mon, 5 Sep 2016 17:29:35 +0800
-Subject: [PATCH] arm64: mm: drop fixup_init() and mm.h
-Message-ID: <1473067775-26284-1-git-send-email-wangkefeng.wang@huawei.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 05 Sep 2016 11:33:18 +0200
+Subject: [PATCH 3/4] include: dt-bindings: Add more GPIO bank and index
+ definition for rockchip pinctrl
+In-Reply-To: <1472978130-919-1-git-send-email-andy.yan@rock-chips.com>
+References: <1472977937-758-1-git-send-email-andy.yan@rock-chips.com>
+ <1472978130-919-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <3544284.90s5nXbktR@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is only fixup_init() in mm.h , and it is only called
-in free_initmem(), so move the codes from fixup_init() into
-free_initmem(), then drop fixup_init() and mm.h.
+Hi Andy,
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- arch/arm64/mm/flush.c |  2 --
- arch/arm64/mm/init.c  |  9 ++++++---
- arch/arm64/mm/mm.h    |  2 --
- arch/arm64/mm/mmu.c   | 12 ------------
- arch/arm64/mm/pgd.c   |  2 --
- 5 files changed, 6 insertions(+), 21 deletions(-)
- delete mode 100644 arch/arm64/mm/mm.h
+Am Sonntag, 4. September 2016, 16:35:30 CEST schrieb Andy Yan:
+> There are 8 gpio banks on RK3288, so add the missing
+> RK_GPIO7 and RK_GPIO8. Also add gpio index definition
+> to make it easier to description GPIO in dts.
+> 
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 
-diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-index 43a76b0..8377329 100644
---- a/arch/arm64/mm/flush.c
-+++ b/arch/arm64/mm/flush.c
-@@ -25,8 +25,6 @@
- #include <asm/cachetype.h>
- #include <asm/tlbflush.h>
- 
--#include "mm.h"
--
- void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
- 		       unsigned long end)
- {
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index bbb7ee7..c9937fb 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -47,8 +47,6 @@
- #include <asm/tlb.h>
- #include <asm/alternative.h>
- 
--#include "mm.h"
--
- /*
-  * We need to be able to catch inadvertent references to memstart_addr
-  * that occur (potentially in generic code) before arm64_memblock_init()
-@@ -485,7 +483,12 @@ void free_initmem(void)
- {
- 	free_reserved_area(__va(__pa(__init_begin)), __va(__pa(__init_end)),
- 			   0, "unused kernel");
--	fixup_init();
-+	/*
-+	 * Unmap the __init region but leave the VM area in place. This
-+	 * prevents the region from being reused for kernel modules, which
-+	 * is not supported by kallsyms.
-+	 */
-+	unmap_kernel_range((u64)__init_begin, (u64)(__init_end - __init_begin));
- }
- 
- #ifdef CONFIG_BLK_DEV_INITRD
-diff --git a/arch/arm64/mm/mm.h b/arch/arm64/mm/mm.h
-deleted file mode 100644
-index 71fe989..0000000
---- a/arch/arm64/mm/mm.h
-+++ /dev/null
-@@ -1,2 +0,0 @@
--
--void fixup_init(void);
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 4989948..88f15c8 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -42,8 +42,6 @@
- #include <asm/memblock.h>
- #include <asm/mmu_context.h>
- 
--#include "mm.h"
--
- u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
- 
- u64 kimage_voffset __read_mostly;
-@@ -399,16 +397,6 @@ void mark_rodata_ro(void)
- 			    section_size, PAGE_KERNEL_RO);
- }
- 
--void fixup_init(void)
--{
--	/*
--	 * Unmap the __init region but leave the VM area in place. This
--	 * prevents the region from being reused for kernel modules, which
--	 * is not supported by kallsyms.
--	 */
--	unmap_kernel_range((u64)__init_begin, (u64)(__init_end - __init_begin));
--}
--
- static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
- 				      pgprot_t prot, struct vm_struct *vma)
- {
-diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
-index ae11d4e..371c5f0 100644
---- a/arch/arm64/mm/pgd.c
-+++ b/arch/arm64/mm/pgd.c
-@@ -26,8 +26,6 @@
- #include <asm/page.h>
- #include <asm/tlbflush.h>
- 
--#include "mm.h"
--
- static struct kmem_cache *pgd_cache;
- 
- pgd_t *pgd_alloc(struct mm_struct *mm)
--- 
-1.7.12.4
+I tend to disagree here.
+
+I consider the bank defines RK_GPIOx to be deprecated and highly discourage 
+them being used in new boards. They only encode the same number again (2 -> 
+RK_GPIO2 etc) and therefore don't bring any useful addition over using the 
+bank number directly.
+
+Slightly similar argument for the per-pin defines. While the external pins are 
+described in the A/B/C/Dx notation for pinmux purposes, the gpio controllers 
+on top use a regular 0-31 numbering. Also you cannot name constants generic 
+GPIO_x, simply because that may conflict with other overly generic constant 
+names.
+
+So I'm not yet convinced that these improve readability, but they would 
+definitly need a RK_* prefix to make them specific.
+
+
+Heiko
+
+> ---
+> 
+>  include/dt-bindings/pinctrl/rockchip.h | 35
+> ++++++++++++++++++++++++++++++++++ 1 file changed, 35 insertions(+)
+> 
+> diff --git a/include/dt-bindings/pinctrl/rockchip.h
+> b/include/dt-bindings/pinctrl/rockchip.h index 743e66a..fd35350 100644
+> --- a/include/dt-bindings/pinctrl/rockchip.h
+> +++ b/include/dt-bindings/pinctrl/rockchip.h
+> @@ -24,6 +24,41 @@
+>  #define RK_GPIO3	3
+>  #define RK_GPIO4	4
+>  #define RK_GPIO6	6
+> +#define RK_GPIO7	7
+> +#define RK_GPIO8	8
+> +
+> +#define GPIO_A0		0
+> +#define GPIO_A1		1
+> +#define GPIO_A2		2
+> +#define GPIO_A3		3
+> +#define GPIO_A4		4
+> +#define GPIO_A5		5
+> +#define GPIO_A6		6
+> +#define GPIO_A7		7
+> +#define GPIO_B0		8
+> +#define GPIO_B1		9
+> +#define GPIO_B2		10
+> +#define GPIO_B3		11
+> +#define GPIO_B4		12
+> +#define GPIO_B5		13
+> +#define GPIO_B6		14
+> +#define GPIO_B7		15
+> +#define GPIO_C0		16
+> +#define GPIO_C1		17
+> +#define GPIO_C2		18
+> +#define GPIO_C3		19
+> +#define GPIO_C4		20
+> +#define GPIO_C5		21
+> +#define GPIO_C6		22
+> +#define GPIO_C7		23
+> +#define GPIO_D0		24
+> +#define GPIO_D1		25
+> +#define GPIO_D2		26
+> +#define GPIO_D3		27
+> +#define GPIO_D4		28
+> +#define GPIO_D5		29
+> +#define GPIO_D6		30
+> +#define GPIO_D7		31
+> 
+>  #define RK_FUNC_GPIO	0
+>  #define RK_FUNC_1	1
