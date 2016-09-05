@@ -1,63 +1,37 @@
 From: shh.xie@gmail.com (shh.xie at gmail.com)
-Date: Mon, 5 Sep 2016 18:01:29 +0800
-Subject: [PATCH 1/7] [v2] dt-bindings: fsl: updates bindings for some
- SoC-specific devices
+Date: Mon, 5 Sep 2016 18:01:30 +0800
+Subject: [PATCH 2/7] [v2] dt-bindings: i2c: adds two more nxp devices
 In-Reply-To: <1473069695-33092-1-git-send-email-shh.xie@gmail.com>
 References: <1473069695-33092-1-git-send-email-shh.xie@gmail.com>
-Message-ID: <1473069695-33092-2-git-send-email-shh.xie@gmail.com>
+Message-ID: <1473069695-33092-3-git-send-email-shh.xie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shaohui Xie <Shaohui.Xie@nxp.com>
 
-SCFG and DCFG are SoC-specific devices can be found on SoCs like LS1021A,
-LS1043A and LS1046A, this patch updates bindings for SCFG and DCFG to
-reflect more SoCs.
+"nxp,pcf2127" and "nxp,pcf2129" are I2c devices, adds them to the list
+of trivial i2c devices.
 
 Signed-off-by: Shaohui Xie <Shaohui.Xie@nxp.com>
 ---
 changes in V2:
 new patch.
 
- Documentation/devicetree/bindings/arm/fsl.txt | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/i2c/trivial-devices.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index dbbc095..6f92d0b 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -97,7 +97,7 @@ Freescale LS1021A Platform Device Tree Bindings
- Required root node compatible properties:
-   - compatible = "fsl,ls1021a";
- 
--Freescale LS1021A SoC-specific Device Tree Bindings
-+Freescale SoC-specific Device Tree Bindings
- -------------------------------------------
- 
- Freescale SCFG
-@@ -105,7 +105,10 @@ Freescale SCFG
- configuration and status registers for the chip. Such as getting PEX port
- status.
-   Required properties:
--  - compatible: should be "fsl,ls1021a-scfg"
-+  - compatible: Should contain a chip-specific compatible string,
-+	Chip-specific strings are of the form "fsl,<chip>-scfg", such as:
-+	"fsl,ls1021a-scfg"
-+
-   - reg: should contain base address and length of SCFG memory-mapped registers
- 
- Example:
-@@ -119,7 +122,10 @@ Freescale DCFG
- configuration and status for the device. Such as setting the secondary
- core start address and release the secondary core from holdoff and startup.
-   Required properties:
--  - compatible: should be "fsl,ls1021a-dcfg"
-+  - compatible: Should contain a chip-specific compatible string,
-+	Chip-specific strings are of the form "fsl,<chip>-dcfg", such as:
-+	"fsl,ls1021a-dcfg"
-+
-   - reg : should contain base address and length of DCFG memory-mapped registers
- 
- Example:
+diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+index 5c70ce9..677b168 100644
+--- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
++++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+@@ -129,6 +129,8 @@ nuvoton,npct501		i2c trusted platform module (TPM)
+ nuvoton,npct601		i2c trusted platform module (TPM2)
+ nxp,pca9556		Octal SMBus and I2C registered interface
+ nxp,pca9557		8-bit I2C-bus and SMBus I/O port with reset
++nxp,pcf2127		Real-time clock
++nxp,pcf2129		Real-time clock
+ nxp,pcf8563		Real-time clock/calendar
+ nxp,pcf85063		Tiny Real-Time Clock
+ oki,ml86v7667		OKI ML86V7667 video decoder
 -- 
 2.1.0.27.g96db324
