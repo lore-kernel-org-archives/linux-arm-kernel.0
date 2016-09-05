@@ -1,30 +1,24 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 5 Sep 2016 12:53:17 +0200
-Subject: [PATCH v4 13/17] pwm: sti: Add support for PWM Capture IRQs
-In-Reply-To: <20160816093508.28307-14-lee.jones@linaro.org>
-References: <20160816093508.28307-1-lee.jones@linaro.org>
- <20160816093508.28307-14-lee.jones@linaro.org>
-Message-ID: <20160905105317.GM31424@ulmo.ba.sec>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 05 Sep 2016 12:53:00 +0200
+Subject: [PATCH v4 4/5] net: stmmac: add a glue driver for the Amlogic
+ Meson 8b / GXBB DWMAC
+In-Reply-To: <201609050953.67GKeUAU%fengguang.wu@intel.com>
+References: <201609050953.67GKeUAU%fengguang.wu@intel.com>
+Message-ID: <14789887.lyko4Om94p@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 10:35:04AM +0100, Lee Jones wrote:
-> Here we're requesting the PWM Capture IRQ and supplying the
-> handler which will be called in the event of an IRQ fire to
-> handle it.
+On Monday, September 5, 2016 9:37:29 AM CEST kbuild test robot wrote:
+> All error/warnings (new ones prefixed by >>):
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/pwm/pwm-sti.c | 92 ++++++++++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 91 insertions(+), 1 deletion(-)
+> >> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:63:18: error: field 'm250_mux' has incomplete type
+>      struct clk_mux  m250_mux;
+>                      ^
+> >> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:67:21: error: field 'm250_div' has incomplete type
+>      struct clk_divider m250_div;
+>                         ^
+> 
 
-Applied, thanks.
+I think this needs a compile-time dependency on COMMON_CLK
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/da4046a8/attachment.sig>
+	Arnd
