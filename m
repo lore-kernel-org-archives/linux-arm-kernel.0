@@ -1,137 +1,86 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Mon,  5 Sep 2016 15:22:52 +0100
-Subject: [PATCH v7 8/8] arm64: add sysfs cpu_capacity attribute
-In-Reply-To: <1473085372-2840-1-git-send-email-juri.lelli@arm.com>
-References: <1473085372-2840-1-git-send-email-juri.lelli@arm.com>
-Message-ID: <1473085372-2840-9-git-send-email-juri.lelli@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 5 Sep 2016 15:32:01 +0100
+Subject: [PATCH] drivers: acpi: fix GIC irq model default PCI IRQ polarity
+In-Reply-To: <1473084758-7377-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1473084758-7377-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <57CD81E1.4090705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a sysfs cpu_capacity attribute with which it is possible to read and
-write (thus over-writing default values) CPUs capacity. This might be
-useful in situations where values needs changing after boot.
+On 05/09/16 15:12, Lorenzo Pieralisi wrote:
+> On ACPI ARM based systems the GIC interrupt controller
+> and corresponding interrupt model permit only the high
+> polarity for level interrupts.
+> 
+> ACPI firmware describes PCI legacy IRQs through entries
+> in the _PRT objects. Entries in the _PRT can be of two types:
+> 
+> - Static: not configurable, trigger/polarity default to level-low,
+>   _PRT entry defines the global GSI interrupt number
+> - Configurable: _PRT interrupt entry contains a reference to the
+>   corresponding PCI interrupt link device (that in turn provides the
+>   interrupt descriptor through its _CRS/_PRS methods)
+> 
+> Configurable IRQ entries are not currently allowed by the ACPI
+> specification on ARM, since they can only be used for interrupt
+> pins that are routable, and ARM platforms GIC configurations
+> do not allow dynamic IRQ routing, routing is statically laid out
+> at synthesis time; therefore PCI interrupt links cannot be used
+> for PCI legacy IRQ descriptions in the _PRT on ARM systems.
+> 
+> On the other hand, current core ACPI code handling PCI legacy IRQs
+> consider IRQ trigger/polarity for static _PRT entries as level-low.
+> 
+> On ARM systems with a GIC interrupt controller and corresponding
+> ACPI interrupt model this does not work in that GIC interrupt
+> controller is only capable of handling level interrupts whose
+> polarity is high (for PCI legacy IRQs - that are level-low by
+> specification - this means that the legacy IRQs are inverted before
+> reaching the interrupt controller pin), resulting in IRQ allocation
+> failures such as:
+> 
+> genirq: Setting trigger mode 8 for irq 18 failed (gic_set_type+0x0/0x48)
+> 
+> Change the default polarity for PCI legacy IRQs to high on systems
+> booting wth ACPI on platforms with a GIC interrupt controller model,
+> fixing the discrepancy between specification and HW behaviour.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Duc Dang <dhdang@apm.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Sinan Kaya <okaya@codeaurora.org>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/acpi/pci_irq.c | 10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/acpi/pci_irq.c b/drivers/acpi/pci_irq.c
+> index 2c45dd3..c576a6f 100644
+> --- a/drivers/acpi/pci_irq.c
+> +++ b/drivers/acpi/pci_irq.c
+> @@ -411,7 +411,15 @@ int acpi_pci_irq_enable(struct pci_dev *dev)
+>  	int gsi;
+>  	u8 pin;
+>  	int triggering = ACPI_LEVEL_SENSITIVE;
+> -	int polarity = ACPI_ACTIVE_LOW;
+> +	/*
+> +	 * On ARM systems with the GIC interrupt model, level interrupts
+> +	 * are always polarity high by specification; PCI legacy
+> +	 * IRQs lines are inverted before reaching the interrupt
+> +	 * controller and must therefore be considered active high
+> +	 * as default.
+> +	 */
+> +	int polarity = acpi_irq_model == ACPI_IRQ_MODEL_GIC ?
+> +				      ACPI_ACTIVE_HIGH : ACPI_ACTIVE_LOW;
+>  	char *link = NULL;
+>  	char link_desc[16];
+>  	int rc;
+> 
 
-The new attribute shows up as:
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
- /sys/devices/system/cpu/cpu*/cpu_capacity
-
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Signed-off-by: Juri Lelli <juri.lelli@arm.com>
----
-
-Changes from v5:
-  - add mutex to protect cpu_scale (as pointed out by Morten off-line)
----
- arch/arm64/kernel/topology.c | 73 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 73 insertions(+)
-
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index b75b0ba2e113..cff34cc858b7 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -26,6 +26,7 @@
- #include <asm/topology.h>
- 
- static DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
-+static DEFINE_MUTEX(cpu_scale_mutex);
- 
- unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
- {
-@@ -37,6 +38,76 @@ static void set_capacity_scale(unsigned int cpu, unsigned long capacity)
- 	per_cpu(cpu_scale, cpu) = capacity;
- }
- 
-+#ifdef CONFIG_PROC_SYSCTL
-+#include <asm/cpu.h>
-+#include <linux/string.h>
-+static ssize_t show_cpu_capacity(struct device *dev,
-+				 struct device_attribute *attr,
-+				 char *buf)
-+{
-+	struct cpu *cpu = container_of(dev, struct cpu, dev);
-+	ssize_t rc;
-+	int cpunum = cpu->dev.id;
-+	unsigned long capacity = arch_scale_cpu_capacity(NULL, cpunum);
-+
-+	rc = sprintf(buf, "%lu\n", capacity);
-+
-+	return rc;
-+}
-+
-+static ssize_t store_cpu_capacity(struct device *dev,
-+				  struct device_attribute *attr,
-+				  const char *buf,
-+				  size_t count)
-+{
-+	struct cpu *cpu = container_of(dev, struct cpu, dev);
-+	int this_cpu = cpu->dev.id, i;
-+	unsigned long new_capacity;
-+	ssize_t ret;
-+
-+	if (count) {
-+		char *p = (char *) buf;
-+
-+		ret = kstrtoul(p, 0, &new_capacity);
-+		if (ret)
-+			return ret;
-+		if (new_capacity > SCHED_CAPACITY_SCALE)
-+			return -EINVAL;
-+
-+		mutex_lock(&cpu_scale_mutex);
-+		for_each_cpu(i, &cpu_topology[this_cpu].core_sibling)
-+			set_capacity_scale(i, new_capacity);
-+		mutex_unlock(&cpu_scale_mutex);
-+	}
-+
-+	return count;
-+}
-+
-+static DEVICE_ATTR(cpu_capacity,
-+		   0644,
-+		   show_cpu_capacity,
-+		   store_cpu_capacity);
-+
-+static int register_cpu_capacity_sysctl(void)
-+{
-+	int i;
-+	struct device *cpu;
-+
-+	for_each_possible_cpu(i) {
-+		cpu = get_cpu_device(i);
-+		if (!cpu) {
-+			pr_err("%s: too early to get CPU%d device!\n",
-+			       __func__, i);
-+			continue;
-+		}
-+		device_create_file(cpu, &dev_attr_cpu_capacity);
-+	}
-+
-+	return 0;
-+}
-+late_initcall(register_cpu_capacity_sysctl);
-+#endif
-+
- static u32 capacity_scale;
- static u32 *raw_capacity;
- static bool cap_parsing_failed;
-@@ -87,6 +158,7 @@ static void normalize_cpu_capacity(void)
- 		return;
- 
- 	pr_debug("cpu_capacity: capacity_scale=%u\n", capacity_scale);
-+	mutex_lock(&cpu_scale_mutex);
- 	for_each_possible_cpu(cpu) {
- 		pr_debug("cpu_capacity: cpu=%d raw_capacity=%u\n",
- 			 cpu, raw_capacity[cpu]);
-@@ -96,6 +168,7 @@ static void normalize_cpu_capacity(void)
- 		pr_debug("cpu_capacity: CPU%d cpu_capacity=%lu\n",
- 			cpu, arch_scale_cpu_capacity(NULL, cpu));
- 	}
-+	mutex_unlock(&cpu_scale_mutex);
- }
- 
- #ifdef CONFIG_CPU_FREQ
+	M.
 -- 
-2.7.0
+Jazz is not dead. It just smells funny...
