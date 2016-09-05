@@ -1,45 +1,54 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 5 Sep 2016 10:09:10 +0300
-Subject: [PATCH V2 1/5] Documentation: Add support for TI System Control
- Interface (TI-SCI) protocol
-In-Reply-To: <57C9E0A8.4010701@ti.com>
-References: <20160830130647.6828-1-nm@ti.com>
- <20160830130647.6828-2-nm@ti.com> <20160902150628.GA19493@rob-hp-laptop>
- <CAGo_u6q0xxnUj5ary82OU1uP=kTHfA_3N7_d7OiSEwS1_5dXuw@mail.gmail.com>
- <57C9E0A8.4010701@ti.com>
-Message-ID: <6c63b044-3db9-9202-b790-350a88b9eab0@ti.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Mon, 5 Sep 2016 09:11:47 +0200
+Subject: [PATCH v4 3/3] iio: adc: add support for Allwinner SoCs ADC
+In-Reply-To: <20160905070716.GA6322@lukather>
+References: <1472738705-20145-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1472738705-20145-4-git-send-email-quentin.schulz@free-electrons.com>
+ <20160905070716.GA6322@lukather>
+Message-ID: <9219f76c-384a-a7c3-5b13-ebaec980ab41@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/16 23:27, Dave Gerlach wrote:
-> On 09/02/2016 12:07 PM, Nishanth Menon wrote:
->> Rob,
->>
->> On Fri, Sep 2, 2016 at 10:06 AM, Rob Herring <robh@kernel.org> wrote:
->>> On Tue, Aug 30, 2016 at 08:06:43AM -0500, Nishanth Menon wrote:
->> [...]
->>>> +
->>>> +TI-SCI Client Device Node:
->>>> +========================
->>>> +
->>>> +Client nodes refer to the required TI-SCI device using the "ti,sci"
->>>> property.
->>>
->>> As I mentioned for power domains, for clients that are self contained
->>> (i.e. a single function) I think the should be child nodes.
->>>
->>
->> Thanks for the feedback. I think we should be able to do that and also
->> assume you have no further improvements you'd like to see here.
->>
->> Looking at current Documentation/devicetree/bindings/arm/arm,scpi.txt
->> -> it makes sense to stick along the same lines as you mentioned.
->>
->> Dave, Tero: do you guys have any objections?
->
-> No objections, I think this is a logical move.
+On 05/09/2016 09:07, Maxime Ripard wrote:
+> Hi,
+> 
+> Nitpicks ahead.
+> 
+> On Thu, Sep 01, 2016 at 04:05:05PM +0200, Quentin Schulz wrote:
+>> +	info->soc_specific = (struct soc_specific *)platform_get_device_id(pdev)->driver_data;
+> 
+> This line is still rather long. How about calling the field "data" and
+> the structure gpadc_data?
+> 
 
-Yea, sounds like a valid change. I believe you are going to post a new 
-version so I can modify the clock driver also accordingly?
+driver_data is coming from the platform_device_id
+(http://lxr.free-electrons.com/source/include/linux/mod_devicetable.h#L498)
+so can't really change that.
+I could change the structure to gpadc_data, that would save me 2
+characters, still 13 characters above the 80 characters limit however.
 
--Tero
+>> +
+>> +	tzd = devm_thermal_zone_of_sensor_register(pdev->dev.parent, 0, info,
+>> +						   &sun4i_ts_tz_ops);
+> 
+> A comment on why you put the parent device structure and not the
+> device itself like you're doing on all the other calls in that probe
+> would be nice.
+> 
+
+Indeed.
+
+Thanks,
+Quentin
+
+> Thanks!
+> Maxime
+> 
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/355a39fa/attachment.sig>
