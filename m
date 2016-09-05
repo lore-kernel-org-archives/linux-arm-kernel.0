@@ -1,18 +1,43 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 5 Sep 2016 21:28:13 +0200
-Subject: [PATCH] dt-binding: mrvl-gpio: remove orion-gpio description
-In-Reply-To: <9d76063cb0b0a0ff96cfd6f389f3697db7734015.1473102010.git.baruch@tkos.co.il>
-References: <9d76063cb0b0a0ff96cfd6f389f3697db7734015.1473102010.git.baruch@tkos.co.il>
-Message-ID: <20160905192813.GB2719@lunn.ch>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon,  5 Sep 2016 16:27:48 -0300
+Subject: [PATCH v2 2/4] ARM: dts: imx28: Remove skeleton.dtsi inclusion
+In-Reply-To: <1473103670-15922-1-git-send-email-festevam@gmail.com>
+References: <1473103670-15922-1-git-send-email-festevam@gmail.com>
+Message-ID: <1473103670-15922-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 05, 2016 at 10:00:10PM +0300, Baruch Siach wrote:
-> The Orion GPIO controller binding description in mrvl-gpio.txt is obsolete, and
-> duplicates the description in gpio-mvebu.txt.
-> 
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Remove skeleton.dtsi to avoid the following build warning with W=1:
 
-    Andrew
+Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+Changes since v1:
+- Remove skeleton.dtsi dependency (Rob)
+
+ arch/arm/boot/dts/imx28.dtsi | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 0ad893b..3aabf65 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -10,10 +10,12 @@
+  */
+ 
+ #include <dt-bindings/gpio/gpio.h>
+-#include "skeleton.dtsi"
+ #include "imx28-pinfunc.h"
+ 
+ / {
++	#address-cells = <1>;
++	#size-cells = <1>;
++
+ 	interrupt-parent = <&icoll>;
+ 
+ 	aliases {
+-- 
+1.9.1
