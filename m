@@ -1,153 +1,181 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 5 Sep 2016 13:02:26 +0900
-Subject: [PATCH v6 1/2] clk: uniphier: add core support code for UniPhier
- clock driver
-In-Reply-To: <20160829182200.GD19826@codeaurora.org>
-References: <1470112223-24835-1-git-send-email-yamada.masahiro@socionext.com>
- <1470112223-24835-2-git-send-email-yamada.masahiro@socionext.com>
- <20160819002507.GS361@codeaurora.org>
- <CAK7LNAQg-LcK-vsWVU-b0WsF=Y_NBNR_cWqNDJKyMqp7Svdvqg@mail.gmail.com>
- <20160819191612.GU361@codeaurora.org>
- <CAK7LNAQownrE0n8rAYGgUs9_byvok8W0V=c6gts_C=8Wvio86g@mail.gmail.com>
- <20160829182200.GD19826@codeaurora.org>
-Message-ID: <CAK7LNAQ9byodJTu-itbnhFrUGDQS5bxYUydyJ3zyZ+aLroQ6FA@mail.gmail.com>
+From: james@innovum.com.au (James Pettigrew)
+Date: Mon,  5 Sep 2016 14:31:47 +1000
+Subject: [PATCH v3] ARM: dts: sun8i: Add dts file for the NanoPi NEO SBC
+In-Reply-To: <1472701734-1837-1-git-send-email-james@innovum.com.au>
+References: <1472701734-1837-1-git-send-email-james@innovum.com.au>
+Message-ID: <1473049907-17540-1-git-send-email-james@innovum.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+The NanoPi NEO is a minimal H3 based SBC. It comes with 256/512M RAM, a
+micro SD slot, 10/100Mbit ethernet and a single USB-A port.
 
+Signed-off-by: James Pettigrew <james@innovum.com.au>
+---
+Changes in v3:
 
-2016-08-30 3:22 GMT+09:00 Stephen Boyd <sboyd@codeaurora.org>:
-> On 08/29, Masahiro Yamada wrote:
->> Hi Stephen,
->>
->>
->> 2016-08-20 4:16 GMT+09:00 Stephen Boyd <sboyd@codeaurora.org>:
->> >>
->> >> >> +
->> >> >> +     parent = of_get_parent(dev->of_node); /* parent should be syscon node */
->> >> >> +     regmap = syscon_node_to_regmap(parent);
->> >> >> +     of_node_put(parent);
->> >> >
->> >> > devm_get_regmap(dev->parent) should work then? Why do we need to
->> >> > use OF APIs?
->> >>
->> >> "git grep devm_get_regmap" did not hit anything.
->> >>
->> >> Where is it defined?
->> >>
->> >
->> > Sorry I meant dev_get_regmap().
->> >
->>
->> I tried this, but it did not work.
->>
->> To make dev_get_regmap() work,
->> the parent device needs to call dev_regmap_init_mmio() beforehand.
->>
->>
->> Since commit bdb0066df96e74a4002125467ebe459feff1ebef
->> (mfd: syscon: Decouple syscon interface from platform devices),
->> syscon_probe() is not called for platform devices,
->> so that never happens.
->>
->
-> Ok. Is the syscon also a simple-mfd?
->
-> It sounds like there's a device for the parent, but we've failed
-> to attach a regmap to it. Maybe the core DT code should assign
-> the regmap to the parent device when it creates it so that child
-> devices don't need to know this detail? It could look for
-> simple-mfd devices with compatible = "syscon" and then create the
-> regmap? Here's a totally untested patch for that.
->
-> ----8<----
-> diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-> index 2f2225e845ef..5f7d3f015b82 100644
-> --- a/drivers/mfd/syscon.c
-> +++ b/drivers/mfd/syscon.c
-> @@ -136,6 +136,17 @@ struct regmap *syscon_node_to_regmap(struct device_node *np)
->  }
->  EXPORT_SYMBOL_GPL(syscon_node_to_regmap);
->
-> +int device_attach_syscon(struct device *dev)
-> +{
-> +       struct regmap *regmap;
-> +
-> +       regmap = syscon_node_to_regmap(dev->of_node);
-> +       if (IS_ERR(regmap))
-> +               return PTR_ERR(regmap);
-> +
-> +       return regmap_attach_dev(dev, regmap, &syscon_regmap_config);
-> +}
-> +
->  struct regmap *syscon_regmap_lookup_by_compatible(const char *s)
->  {
->         struct device_node *syscon_np;
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 8aa197691074..58a018e15006 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -25,6 +25,7 @@
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
->  #include <linux/platform_device.h>
-> +#include <linux/mfd/syscon.h>
->
->  const struct of_device_id of_default_bus_match_table[] = {
->         { .compatible = "simple-bus", },
-> @@ -383,7 +384,12 @@ static int of_platform_bus_create(struct device_node *bus,
->                 return 0;
->         }
->
-> +
->         dev = of_platform_device_create_pdata(bus, bus_id, platform_data, parent);
-> +       if (of_device_is_compatible(bus, "simple-mfd") &&
-> +           of_device_is_compatible(bus, "syscon"))
-> +               device_attach_syscon(&dev->dev);
-> +
->         if (!dev || !of_match_node(matches, bus))
->                 return 0;
->
-> diff --git a/include/linux/mfd/syscon.h b/include/linux/mfd/syscon.h
-> index 40a76b97b7ab..e19e5d15f4e6 100644
-> --- a/include/linux/mfd/syscon.h
-> +++ b/include/linux/mfd/syscon.h
-> @@ -18,9 +18,11 @@
->  #include <linux/err.h>
->  #include <linux/errno.h>
->
-> +struct device;
->  struct device_node;
->
->  #ifdef CONFIG_MFD_SYSCON
-> +extern int device_attach_syscon(struct device *dev);
->  extern struct regmap *syscon_node_to_regmap(struct device_node *np);
->  extern struct regmap *syscon_regmap_lookup_by_compatible(const char *s);
->  extern struct regmap *syscon_regmap_lookup_by_pdevname(const char *s);
-> @@ -28,6 +30,11 @@ extern struct regmap *syscon_regmap_lookup_by_phandle(
->                                         struct device_node *np,
->                                         const char *property);
->  #else
-> +static inline int device_attach_syscon(struct device *dev)
-> +{
-> +       return 0;
-> +}
-> +
->  static inline struct regmap *syscon_node_to_regmap(struct device_node *np)
->  {
->         return ERR_PTR(-ENOTSUPP);
+Fixed syntax errors
+---
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts          | 125 +++++++++++++++++++++
+ 3 files changed, 127 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
 
-
-I was not quire sure about this,
-but maybe worth submitting to DT subsystem?
-
-Anyway, I will go with syscon_node_to_regmap() for v7.
-Of course, I am happy to replace it with dev_get_regmap()
-when the issue is solved in the mainline.
-
-
-
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 1992aa9..7b6bda3 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -98,6 +98,7 @@ ezchip	EZchip Semiconductor
+ fcs	Fairchild Semiconductor
+ firefly	Firefly
+ focaltech	FocalTech Systems Co.,Ltd
++friendlyarm	Guangzhou FriendlyARM Computer Tech Co., Ltd
+ fsl	Freescale Semiconductor
+ ge	General Electric Company
+ geekbuying	GeekBuying
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 7dd4a07..a35f986 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -792,6 +792,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a83t-allwinner-h8homlet-v2.dtb \
+ 	sun8i-a83t-cubietruck-plus.dtb \
+ 	sun8i-h3-bananapi-m2-plus.dtb \
++	sun8i-h3-nanopi-neo.dtb \
+ 	sun8i-h3-orangepi-2.dtb \
+ 	sun8i-h3-orangepi-lite.dtb \
+ 	sun8i-h3-orangepi-one.dtb \
+diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
+new file mode 100644
+index 0000000..3d64caf
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
+@@ -0,0 +1,125 @@
++/*
++ * Copyright (C) 2016 James Pettigrew <james@innovum.com.au>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun8i-h3.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++
++/ {
++	model = "FriendlyARM NanoPi NEO";
++	compatible = "friendlyarm,nanopi-neo", "allwinner,sun8i-h3";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&leds_opc>, <&leds_r_opc>;
++
++		pwr {
++			label = "nanopi:green:pwr";
++			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
++			default-state = "on";
++		};
++
++		status {
++			label = "nanopi:blue:status";
++			gpios = <&pio 0 10 GPIO_ACTIVE_HIGH>; /* PA10 */
++		};
++	};
++};
++
++&ehci3 {
++	status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
++	cd-inverted;
++	status = "okay";
++};
++
++&ohci3 {
++	status = "okay";
++};
++
++&pio {
++	leds_opc: led-pins {
++		allwinner,pins = "PA10";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++&r_pio {
++	leds_r_opc: led-pins {
++		allwinner,pins = "PL10";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usbphy {
++	/* USB VBUS is always on */
++	status = "okay";
++};
 -- 
-Best Regards
-Masahiro Yamada
+1.9.1
