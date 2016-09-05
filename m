@@ -1,46 +1,31 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Sun, 4 Sep 2016 21:27:53 -0500
-Subject: [RFC PATCH V5 4/5] ARM64/PCI: Start using quirks handling for
- ACPI based PCI host controller
-In-Reply-To: <1470661541-26270-5-git-send-email-tn@semihalf.com>
-References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
- <1470661541-26270-5-git-send-email-tn@semihalf.com>
-Message-ID: <20160905022753.GE30488@localhost>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 5 Sep 2016 10:31:09 +0800
+Subject: [PATCH] ARM: dts: imx6qdl: Fix SPDIF regression
+In-Reply-To: <1472651808-28034-1-git-send-email-fabio.estevam@nxp.com>
+References: <1472651808-28034-1-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <20160905023109.GG25778@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 08, 2016 at 03:05:40PM +0200, Tomasz Nowicki wrote:
-> Since there are platforms which have non-compliant ECAM space we need to
-> override these accessors prior to PCI buses enumeration. In order to do
-> that we call pci_mcfg_match_quirks() to retrieve custom
-> pci_config_window structure. If no correlated quirk on list, use
-> fully ECAM compliant generic PCI config accessors.
+On Wed, Aug 31, 2016 at 10:56:48AM -0300, Fabio Estevam wrote:
+> Commit 833f2cbf7091 ("ARM: dts: imx6: change the core clock of spdif")
+> changed many more clocks than only the SPDIF core clock as stated in
+> the commit message.
 > 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> ---
->  arch/arm64/kernel/pci.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
+> The MLB clock has been added and this causes SPDIF regression as
+> reported by Xavi Drudis Ferran and also in this forum post:
+> https://forum.digikey.com/thread/34240
 > 
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index 2e7bed4..aa734bd 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -139,8 +139,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->  	if (!ri)
->  		return NULL;
->  
-> -	ri->cfg = pci_acpi_setup_ecam_mapping(root,
-> -					      &pci_generic_ecam_ops.pci_ops);
-> +	ri->cfg = pci_mcfg_match_quirks(root);
+> The MX6Q Reference Manual does not mention that MLB is a clock related
+> to SPDIF, so change it back to a dummy clock to restore SPDIF
+> functionality.
+> 
+> Thanks to Ambika for providing the fix at:
+> https://community.nxp.com/thread/387131
+> 
+> Fixes: 833f2cbf7091 ("ARM: dts: imx6: change the core clock of spdif")
+> Cc: <stable@vger.kernel.org> # 4.4.x
+> Reported-by: Xavi Drudis Ferran <xdrudis@tinet.cat>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-I don't really like this part: previously it was obvious that we're
-setting up ECAM mappings, and now it's not.  I think the quirk
-functionality should be buried somewhere inside; it shouldn't be
-something this generic code has to worry about.
-
->  	if (!ri->cfg) {
->  		kfree(ri);
->  		return NULL;
-> -- 
-> 1.9.1
-> 
+Applied, thanks.
