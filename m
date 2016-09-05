@@ -1,28 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 6 Sep 2016 00:19:07 +0200
-Subject: [PATCH] pinctrl: imx: output one pin/config pair per line in
- pinconf-groups
-In-Reply-To: <1471644337-10162-1-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1471644337-10162-1-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <CACRpkdbwh=k3GD-7wSq9iBoBhyQ4SFD75xaLnx6g8WbRZ5X7Gg@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 06 Sep 2016 00:20:58 +0200
+Subject: [PATCH v3 1/2] arm64: dts: rockchip: change all interrupts cells
+ for 4 on rk3399 SoCs
+In-Reply-To: <1473099435-28198-2-git-send-email-wxt@rock-chips.com>
+References: <1473099435-28198-1-git-send-email-wxt@rock-chips.com>
+ <1473099435-28198-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <3069982.xePB5pcLZB@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 20, 2016 at 12:05 AM, Vladimir Zapolskiy
-<vladimir_zapolskiy@mentor.com> wrote:
+Am Dienstag, 6. September 2016, 02:17:14 CEST schrieb Caesar Wang:
+> Add the interrupts cells value for 4, and the 4th cell is zero.
+> 
+> Due to the doc[0] said:" the system requires describing PPI affinity,
+> then the value must be at least 4"
+> The 4th cell is a phandle to a node describing a set of CPUs this
+> interrupt is affine to. The interrupt must be a PPI, and the node
+> pointed must be a subnode of the "ppi-partitions" subnode. For
+> interrupt types other than PPI or PPIs that are not partitionned,
+> this cell must be zero. See the "ppi-partitions" node description
+> below.
+> 
+> [0]:
+> Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
+> 
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> CC: linux-arm-kernel at lists.infradead.org
 
-> cat /sys/kernel/debug/pinctrl/${pinctrl}/pinconf-groups output is
-> hardly readable, if a pin group contains more than one pin the output
-> is glued and looks like this:
->
->   MX6Q_PAD_SD1_DAT0: 0x17071MX6Q_PAD_SD1_CMD: 0x17071MX6Q_PAD_SD1_CLK: 0x17071
->
-> Add two space indentation and a new line separator to improve
-> readability of the output.
->
-> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+applied to my dts64 branch for 4.9
 
-Patch applied with Shawn's ACK.
-
-Yours,
-Linus Walleij
+Thanks
+Heiko
