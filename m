@@ -1,256 +1,109 @@
-From: shh.xie@gmail.com (shh.xie at gmail.com)
-Date: Mon, 5 Sep 2016 18:01:35 +0800
-Subject: [PATCH 7/7] [v2] arm64: dts: add LS1046A-QDS board support
-In-Reply-To: <1473069695-33092-1-git-send-email-shh.xie@gmail.com>
-References: <1473069695-33092-1-git-send-email-shh.xie@gmail.com>
-Message-ID: <1473069695-33092-8-git-send-email-shh.xie@gmail.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Mon, 5 Sep 2016 18:22:46 +0800
+Subject: [PATCH 3/4] include: dt-bindings: Add more GPIO bank and index
+ definition for rockchip pinctrl
+In-Reply-To: <3544284.90s5nXbktR@phil>
+References: <1472977937-758-1-git-send-email-andy.yan@rock-chips.com>
+ <1472978130-919-1-git-send-email-andy.yan@rock-chips.com>
+ <3544284.90s5nXbktR@phil>
+Message-ID: <0dbac4cd-7f67-5052-16e6-463896bf5929@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shaohui Xie <Shaohui.Xie@nxp.com>
+Hi Heiko:
 
-The LS1046A QorIQ development system (QDS) board is a high-performance
-computing, evaluation, development, and test platform supporting the
-LS1046A SoC.
 
-Signed-off-by: Shaohui Xie <Shaohui.Xie@nxp.com>
----
-changes in V2:
-1. updated aliases of serial nodes.
+On 2016?09?05? 17:33, Heiko Stuebner wrote:
+> Hi Andy,
+>
+> Am Sonntag, 4. September 2016, 16:35:30 CEST schrieb Andy Yan:
+>> There are 8 gpio banks on RK3288, so add the missing
+>> RK_GPIO7 and RK_GPIO8. Also add gpio index definition
+>> to make it easier to description GPIO in dts.
+>>
+>> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> I tend to disagree here.
+>
+> I consider the bank defines RK_GPIOx to be deprecated and highly discourage
+> them being used in new boards. They only encode the same number again (2 ->
+> RK_GPIO2 etc) and therefore don't bring any useful addition over using the
+> bank number directly.
+>
+> Slightly similar argument for the per-pin defines. While the external pins are
+> described in the A/B/C/Dx notation for pinmux purposes, the gpio controllers
+> on top use a regular 0-31 numbering. Also you cannot name constants generic
+> GPIO_x, simply because that may conflict with other overly generic constant
+> names.
+>
+> So I'm not yet convinced that these improve readability, but they would
+> definitly need a RK_* prefix to make them specific.
+>
+>
+> Heiko
 
- arch/arm64/boot/dts/freescale/Makefile            |   1 +
- arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts | 212 ++++++++++++++++++++++
- 2 files changed, 213 insertions(+)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
-
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index 9c81b9e..6602718 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -1,5 +1,6 @@
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-rdb.dtb
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1046a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1046a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
-new file mode 100644
-index 0000000..290e5b0
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
-@@ -0,0 +1,212 @@
-+/*
-+ * Device Tree Include file for Freescale Layerscape-1046A family SoC.
-+ *
-+ * Copyright 2016, Freescale Semiconductor, Inc.
-+ *
-+ * Shaohui Xie <Shaohui.Xie@nxp.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPLv2 or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "fsl-ls1046a.dtsi"
-+
-+/ {
-+	model = "LS1046A QDS Board";
-+	compatible = "fsl,ls1046a-qds", "fsl,ls1046a";
-+
-+	aliases {
-+		gpio0 = &gpio0;
-+		gpio1 = &gpio1;
-+		gpio2 = &gpio2;
-+		gpio3 = &gpio3;
-+		serial0 = &duart0;
-+		serial1 = &duart1;
-+		serial2 = &duart2;
-+		serial3 = &duart3;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&dspi {
-+	bus-num = <0>;
-+	status = "okay";
-+
-+	flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "n25q128a11", "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <10000000>;
-+	};
-+
-+	flash at 1 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "sst25wf040b", "jedec,spi-nor";
-+		spi-cpol;
-+		spi-cpha;
-+		reg = <1>;
-+		spi-max-frequency = <10000000>;
-+	};
-+
-+	flash at 2 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "en25s64", "jedec,spi-nor";
-+		spi-cpol;
-+		spi-cpha;
-+		reg = <2>;
-+		spi-max-frequency = <10000000>;
-+	};
-+};
-+
-+&duart0 {
-+	status = "okay";
-+};
-+
-+&duart1 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	pca9547 at 77 {
-+		compatible = "nxp,pca9547";
-+		reg = <0x77>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		i2c at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x2>;
-+
-+			ina220 at 40 {
-+				compatible = "ti,ina220";
-+				reg = <0x40>;
-+				shunt-resistor = <1000>;
-+			};
-+
-+			ina220 at 41 {
-+				compatible = "ti,ina220";
-+				reg = <0x41>;
-+				shunt-resistor = <1000>;
-+			};
-+		};
-+
-+		i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x3>;
-+
-+			rtc at 51 {
-+				compatible = "nxp,pcf2129";
-+				reg = <0x51>;
-+				/* IRQ10_B */
-+				interrupts = <0 150 0x4>;
-+			};
-+
-+			eeprom at 56 {
-+				compatible = "atmel,24c512";
-+				reg = <0x56>;
-+			};
-+
-+			eeprom at 57 {
-+				compatible = "atmel,24c512";
-+				reg = <0x57>;
-+			};
-+
-+			temp-sensor at 4c {
-+				compatible = "adi,adt7461a";
-+				reg = <0x4c>;
-+			};
-+		};
-+	};
-+};
-+
-+&ifc {
-+	#address-cells = <2>;
-+	#size-cells = <1>;
-+	/* NOR, NAND Flashes and FPGA on board */
-+	ranges = <0x0 0x0 0x0 0x60000000 0x08000000
-+		  0x1 0x0 0x0 0x7e800000 0x00010000
-+		  0x2 0x0 0x0 0x7fb00000 0x00000100>;
-+	status = "okay";
-+
-+	nor at 0,0 {
-+		compatible = "cfi-flash";
-+		reg = <0x0 0x0 0x8000000>;
-+		bank-width = <2>;
-+		device-width = <1>;
-+	};
-+
-+	nand at 1,0 {
-+		compatible = "fsl,ifc-nand";
-+		reg = <0x1 0x0 0x10000>;
-+	};
-+
-+	fpga: board-control at 2,0 {
-+		compatible = "fsl,ls1046aqds-fpga", "fsl,fpga-qixis";
-+		reg = <0x2 0x0 0x0000100>;
-+	};
-+};
-+
-+&lpuart0 {
-+	status = "okay";
-+};
-+
-+&qspi {
-+	num-cs = <2>;
-+	bus-num = <0>;
-+	status = "okay";
-+
-+	qflash0: s25fl128s at 0 {
-+		compatible = "spansion,m25p80";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+	};
-+};
--- 
-2.1.0.27.g96db324
+         I consider for a people who doesn't familiar with rockchip 
+pinctrl, He
+  may don't know what does these number 2/4/17....stands for in the dts  
+like
+  rockchip,pins = <2 17 RK_FUNC_GPIO &pcfg_pull_up>.
+         But if we use meaningful macro here like : rockchip,pins = 
+<RK_GPIO2 RK_GPIO_C0 RK_FUNC_GPIO &pcfg_pull_up>, I think it easier to 
+tell people this GPIO is GPIO_C0 of BNAK2.
+Especially all the GPIOs in rockchip based schematic are described as 
+GPIOn_A/B/C/Dx. And it is also easier for people to directly use a macro 
+stands for 0~32 than translating A/B/C/Dx from the schematic to 0~32.
+>> ---
+>>
+>>   include/dt-bindings/pinctrl/rockchip.h | 35
+>> ++++++++++++++++++++++++++++++++++ 1 file changed, 35 insertions(+)
+>>
+>> diff --git a/include/dt-bindings/pinctrl/rockchip.h
+>> b/include/dt-bindings/pinctrl/rockchip.h index 743e66a..fd35350 100644
+>> --- a/include/dt-bindings/pinctrl/rockchip.h
+>> +++ b/include/dt-bindings/pinctrl/rockchip.h
+>> @@ -24,6 +24,41 @@
+>>   #define RK_GPIO3	3
+>>   #define RK_GPIO4	4
+>>   #define RK_GPIO6	6
+>> +#define RK_GPIO7	7
+>> +#define RK_GPIO8	8
+>> +
+>> +#define GPIO_A0		0
+>> +#define GPIO_A1		1
+>> +#define GPIO_A2		2
+>> +#define GPIO_A3		3
+>> +#define GPIO_A4		4
+>> +#define GPIO_A5		5
+>> +#define GPIO_A6		6
+>> +#define GPIO_A7		7
+>> +#define GPIO_B0		8
+>> +#define GPIO_B1		9
+>> +#define GPIO_B2		10
+>> +#define GPIO_B3		11
+>> +#define GPIO_B4		12
+>> +#define GPIO_B5		13
+>> +#define GPIO_B6		14
+>> +#define GPIO_B7		15
+>> +#define GPIO_C0		16
+>> +#define GPIO_C1		17
+>> +#define GPIO_C2		18
+>> +#define GPIO_C3		19
+>> +#define GPIO_C4		20
+>> +#define GPIO_C5		21
+>> +#define GPIO_C6		22
+>> +#define GPIO_C7		23
+>> +#define GPIO_D0		24
+>> +#define GPIO_D1		25
+>> +#define GPIO_D2		26
+>> +#define GPIO_D3		27
+>> +#define GPIO_D4		28
+>> +#define GPIO_D5		29
+>> +#define GPIO_D6		30
+>> +#define GPIO_D7		31
+>>
+>>   #define RK_FUNC_GPIO	0
+>>   #define RK_FUNC_1	1
+>
+>
+>
+>
