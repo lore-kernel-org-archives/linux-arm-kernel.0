@@ -1,46 +1,68 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon,  5 Sep 2016 09:43:04 +0100
-Subject: [PATCH] arm64: Drop generic xlate_dev_mem_{k,}ptr()
-In-Reply-To: <1473064984-9494-1-git-send-email-james.morse@arm.com>
-References: <1473064984-9494-1-git-send-email-james.morse@arm.com>
-Message-ID: <1473064984-9494-2-git-send-email-james.morse@arm.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Mon, 5 Sep 2016 10:52:00 +0200
+Subject: [PATCH v4 3/3] iio: adc: add support for Allwinner SoCs ADC
+In-Reply-To: <alpine.DEB.2.02.1609050924370.12528@pmeerw.net>
+References: <1472738705-20145-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1472738705-20145-4-git-send-email-quentin.schulz@free-electrons.com>
+ <alpine.DEB.2.02.1609041754350.2060@pmeerw.net>
+ <aed1e00f-ceaa-27e9-502d-51428f59a84f@free-electrons.com>
+ <alpine.DEB.2.02.1609050924370.12528@pmeerw.net>
+Message-ID: <d40388ec-bf25-92b2-eeb6-39749d88c15c@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code that provides /dev/mem uses xlate_dev_mem_{k,}ptr() to
-avoid making a cachable mapping of a non-cachable area on ia64.
-On arm64 we do this via phys_mem_access_prot() instead, but provide
-dummy versions of xlate_dev_mem_{k,}ptr().
+On 05/09/2016 10:07, Peter Meerwald-Stadler wrote:
+> 
+>>>> The Allwinner SoCs all have an ADC that can also act as a touchscreen
+>>>> controller and a thermal sensor. This patch adds the ADC driver which is
+>>>> based on the MFD for the same SoCs ADC.
+>>>
+>>> nitpicking ahead
+> 
+>> [...]
+>>>> +
+>>>> +const unsigned int sun4i_gpadc_chan_select(unsigned int chan)
+>>>
+>>> static instead of const?
+> 
+>> static const then?
+> 
+> no, the const is redundant and ignored
+> -Wignored-qualifiers gives a warning
+> 
+> just static, no const
+> 
+> see
+> http://stackoverflow.com/questions/12052468/type-qualifiers-on-function-return-type
+> 
 
-These are the same as those in asm-generic/io.h, which we include from
-asm/io.h
+ACK. Thanks.
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/include/asm/io.h | 11 -----------
- 1 file changed, 11 deletions(-)
+>>>> +{
+>>>> +	return SUN6I_GPADC_CTRL1_ADC_CHAN_SELECT(chan);
+>>>> +}
+>>>> +
+>>>> +struct soc_specific {
+>>>> +	const int		temp_offset;
+>>>
+>>> wondering why you constify every member?
+>>>
+>>
+>> Because they're supposed to be fixed values? It won't change in runtime.
+>> Is there any reason why I shouldn't do that?
+> 
+> yes, but using the entire struct as const has the same effect;
+> constifying individual members makes more sense if there are also 
+> non-const members
+> 
+> nothing wrong, just unusual
+> 
 
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 9b6e408cfa51..ce20741b2cb5 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -184,17 +184,6 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
- #define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
- #define iowrite64be(v,p)	({ __iowmb(); __raw_writeq((__force __u64)cpu_to_be64(v), p); })
- 
--/*
-- * Convert a physical pointer to a virtual kernel pointer for /dev/mem
-- * access
-- */
--#define xlate_dev_mem_ptr(p)	__va(p)
--
--/*
-- * Convert a virtual cached pointer to an uncached pointer
-- */
--#define xlate_dev_kmem_ptr(p)	p
--
- #include <asm-generic/io.h>
- 
- /*
--- 
-2.8.0.rc3
+So I would let all members non-const and then when using the struct
+soc_specific as a member in a struct or as a variable I would prefix it
+with const? That's what you mean by using the entire struct as const?
+
+[...]
+
+Thanks,
+Quentin
