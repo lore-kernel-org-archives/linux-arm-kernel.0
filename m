@@ -1,54 +1,49 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon, 5 Sep 2016 09:11:47 +0200
-Subject: [PATCH v4 3/3] iio: adc: add support for Allwinner SoCs ADC
-In-Reply-To: <20160905070716.GA6322@lukather>
-References: <1472738705-20145-1-git-send-email-quentin.schulz@free-electrons.com>
- <1472738705-20145-4-git-send-email-quentin.schulz@free-electrons.com>
- <20160905070716.GA6322@lukather>
-Message-ID: <9219f76c-384a-a7c3-5b13-ebaec980ab41@free-electrons.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 5 Sep 2016 09:22:29 +0200
+Subject: [PATCH] arm64: renesas: r8a7796/salvator-x: Add board part number
+ to DT bindings
+In-Reply-To: <20160902151955.GA27150@rob-hp-laptop>
+References: <1472635054-24372-1-git-send-email-geert+renesas@glider.be>
+ <20160902151955.GA27150@rob-hp-laptop>
+Message-ID: <CAMuHMdU_TE0RxDqOvYsUtBOX5p8T7RCuZgXg_uP7Jgn-Bf3NSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2016 09:07, Maxime Ripard wrote:
-> Hi,
-> 
-> Nitpicks ahead.
-> 
-> On Thu, Sep 01, 2016 at 04:05:05PM +0200, Quentin Schulz wrote:
->> +	info->soc_specific = (struct soc_specific *)platform_get_device_id(pdev)->driver_data;
-> 
-> This line is still rather long. How about calling the field "data" and
-> the structure gpadc_data?
-> 
+Hi Rob,
 
-driver_data is coming from the platform_device_id
-(http://lxr.free-electrons.com/source/include/linux/mod_devicetable.h#L498)
-so can't really change that.
-I could change the structure to gpadc_data, that would save me 2
-characters, still 13 characters above the 80 characters limit however.
+On Fri, Sep 2, 2016 at 5:19 PM, Rob Herring <robh@kernel.org> wrote:
+> On Wed, Aug 31, 2016 at 11:17:34AM +0200, Geert Uytterhoeven wrote:
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>>  Documentation/devicetree/bindings/arm/shmobile.txt | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+>> index 90cf237ee5581978..42a046a97acba00f 100644
+>> --- a/Documentation/devicetree/bindings/arm/shmobile.txt
+>> +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+>> @@ -65,7 +65,7 @@ Boards:
+>>      compatible = "renesas,porter", "renesas,r8a7791"
+>>    - Salvator-X (RTP0RC7795SIPB0010S)
+>>      compatible = "renesas,salvator-x", "renesas,r8a7795";
+>> -  - Salvator-X
+>> +  - Salvator-X (RTP0RC7796SIPB0011S)
+>>      compatible = "renesas,salvator-x", "renesas,r8a7796";
+>
+> Seems like these should be different compatibles rather than the
+> combination here defining exactly which board.
 
->> +
->> +	tzd = devm_thermal_zone_of_sensor_register(pdev->dev.parent, 0, info,
->> +						   &sun4i_ts_tz_ops);
-> 
-> A comment on why you put the parent device structure and not the
-> device itself like you're doing on all the other calls in that probe
-> would be nice.
-> 
+R-Car H3 (r8a7795) and R-Car M3-W (r8a7796) SiP are (sufficiently)
+pin-compatible that they use the same board. So the only difference is really
+the SoC.
 
-Indeed.
+Gr{oetje,eeting}s,
 
-Thanks,
-Quentin
+                        Geert
 
-> Thanks!
-> Maxime
-> 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/355a39fa/attachment.sig>
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
