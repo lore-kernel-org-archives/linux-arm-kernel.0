@@ -1,188 +1,34 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Sun, 4 Sep 2016 21:25:29 -0500
-Subject: [RFC PATCH V5 3/5] PCI: Check platform specific ECAM quirks
-In-Reply-To: <1470661541-26270-4-git-send-email-tn@semihalf.com>
-References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
- <1470661541-26270-4-git-send-email-tn@semihalf.com>
-Message-ID: <20160905022529.GD30488@localhost>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 5 Sep 2016 10:25:38 +0800
+Subject: [PATCH v4 1/2] nxp/dts: add pcie aer interrupt-name property in
+ the dts
+In-Reply-To: <1472625442-23309-1-git-send-email-po.liu@nxp.com>
+References: <1465892645-32381-2-git-send-email-po.liu@nxp.com>
+ <1472625442-23309-1-git-send-email-po.liu@nxp.com>
+Message-ID: <20160905022537.GF25778@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 08, 2016 at 03:05:39PM +0200, Tomasz Nowicki wrote:
-> Some platforms may not be fully compliant with generic set of PCI config
-> accessors. For these cases we implement the way to overwrite accessors
-> set. Algorithm traverses available quirk list (static array),
-> matches against <oem_id, oem_table_id, rev, domain, bus number range> and
-> returns pci_config_window structure with fancy PCI config ops.
-> oem_id, oem_table_id and rev come from MCFG table standard header.
+On Wed, Aug 31, 2016 at 02:37:21PM +0800, Po Liu wrote:
+> NXP some platforms aer interrupt was not MSI/MSI-X/INTx
+> but using interrupt line independently. This patch add a "aer"
+> interrupt-names for aer interrupt.
+> With the interrupt-names "aer", code could probe aer interrupt
+> line for pcie root port, replace the aer interrupt service irq.
+> This is intend to fixup the Layerscape platforms which aer interrupt
+> was not MSI/MSI-X/INTx, but using interrupt line independently.
 > 
-> It is possible to define custom init call which is responsible for
-> setting up PCI configuration access accordingly to quirk requirements.
-> If custom init call is not defined, use standard pci_acpi_setup_ecam_mapping().
-> 
-> pci_generic_ecam_ops will be used for platforms free from quirks.
-> 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Signed-off-by: Dongdong Liu <liudongdong3@huawei.com>
-> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> Signed-off-by: Po Liu <po.liu@nxp.com>
 > ---
->  drivers/pci/host/Makefile      |  1 +
->  drivers/pci/host/mcfg-quirks.c | 86 ++++++++++++++++++++++++++++++++++++++++++
->  drivers/pci/host/mcfg-quirks.h | 20 ++++++++++
->  include/linux/pci-acpi.h       |  2 +
->  4 files changed, 109 insertions(+)
->  create mode 100644 drivers/pci/host/mcfg-quirks.c
->  create mode 100644 drivers/pci/host/mcfg-quirks.h
-
-If the object is to work around defects in the ACPI MCFG table, I
-think I'd put the quirks closer to drivers/acpi/pci_mcfg.c, where we
-parse that table.  What if we actually put them directly *in*
-drivers/acpi/pci_mcfg.c?
-
-> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-> index 8843410..500cf78 100644
-> --- a/drivers/pci/host/Makefile
-> +++ b/drivers/pci/host/Makefile
-> @@ -31,3 +31,4 @@ obj-$(CONFIG_PCI_HOST_THUNDER_ECAM) += pci-thunder-ecam.o
->  obj-$(CONFIG_PCI_HOST_THUNDER_PEM) += pci-thunder-pem.o
->  obj-$(CONFIG_PCIE_ARMADA_8K) += pcie-armada8k.o
->  obj-$(CONFIG_PCIE_ARTPEC6) += pcie-artpec6.o
-> +obj-$(CONFIG_ACPI_MCFG) += mcfg-quirks.o
-> diff --git a/drivers/pci/host/mcfg-quirks.c b/drivers/pci/host/mcfg-quirks.c
-> new file mode 100644
-> index 0000000..aa9907b
-> --- /dev/null
-> +++ b/drivers/pci/host/mcfg-quirks.c
-> @@ -0,0 +1,86 @@
-> +/*
-> + * Copyright (C) 2016 Semihalf
-> + *	Author: Tomasz Nowicki <tn@semihalf.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License, version 2, as
-> + * published by the Free Software Foundation (the "GPL").
-> + *
-> + * This program is distributed in the hope that it will be useful, but
-> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License version 2 (GPLv2) for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * version 2 (GPLv2) along with this source code.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/ioport.h>
-> +#include <linux/pci.h>
-> +#include <linux/pci-acpi.h>
-> +#include <linux/pci-ecam.h>
-> +
-> +#include "mcfg-quirks.h"
-> +
-> +struct pci_cfg_fixup {
-> +	char oem_id[ACPI_OEM_ID_SIZE + 1];
-> +	char oem_table_id[ACPI_OEM_TABLE_ID_SIZE + 1];
-> +	u32 oem_revision;
-> +	struct resource domain_range;
-> +	struct resource bus_range;
-> +	struct pci_ops *ops;
-> +	struct pci_config_window *(*init)(struct acpi_pci_root *root,
-> +					  struct pci_ops *ops);
-> +};
-> +
-> +#define MCFG_DOM_RANGE(start, end)	DEFINE_RES_NAMED((start),	\
-> +						((end) - (start) + 1), NULL, 0)
-> +#define MCFG_DOM_ANY			MCFG_DOM_RANGE(0x0, 0xffff)
-> +#define MCFG_BUS_RANGE(start, end)	DEFINE_RES_NAMED((start),	\
-> +						((end) - (start) + 1),	\
-> +						NULL, IORESOURCE_BUS)
-> +#define MCFG_BUS_ANY			MCFG_BUS_RANGE(0x0, 0xff)
-> +
-> +static struct pci_cfg_fixup mcfg_quirks[] __initconst = {
-> +/*	{ OEM_ID, OEM_TABLE_ID, REV, DOMAIN, BUS_RANGE, pci_ops, init_hook }, */
-> +};
-> +
-> +static bool pci_mcfg_fixup_match(struct pci_cfg_fixup *f,
-> +				 struct acpi_table_header *mcfg_header)
-> +{
-> +	return (!memcmp(f->oem_id, mcfg_header->oem_id, ACPI_OEM_ID_SIZE) &&
-> +		!memcmp(f->oem_table_id, mcfg_header->oem_table_id,
-> +			ACPI_OEM_TABLE_ID_SIZE) &&
-> +		f->oem_revision == mcfg_header->oem_revision);
-> +}
-> +
-> +struct pci_config_window *pci_mcfg_match_quirks(struct acpi_pci_root *root)
-> +{
-> +	struct resource dom_res = MCFG_DOM_RANGE(root->segment, root->segment);
-> +	struct resource *bus_res = &root->secondary;
-> +	struct pci_cfg_fixup *f = mcfg_quirks;
-> +	struct acpi_table_header *mcfg_header;
-> +	acpi_status status;
-> +	int i;
-> +
-> +	status = acpi_get_table(ACPI_SIG_MCFG, 0, &mcfg_header);
-> +	if (ACPI_FAILURE(status))
-> +		return NULL;
-> +
-> +	/*
-> +	 * First match against PCI topology <domain:bus> then use OEM ID, OEM
-> +	 * table ID, and OEM revision from MCFG table standard header.
-> +	 */
-> +	for (i = 0; i < ARRAY_SIZE(mcfg_quirks); i++, f++) {
-> +		if (resource_contains(&f->domain_range, &dom_res) &&
-> +		    resource_contains(&f->bus_range, bus_res) &&
-> +		    pci_mcfg_fixup_match(f, mcfg_header)) {
-
-I think I'd put all the quirk matching tests (domain, bus, OEM ID,
-table ID, etc) in the same place.
-
-> +			dev_info(&root->device->dev, "Applying PCI MCFG quirks for %s %s rev: %d\n",
-> +				 f->oem_id, f->oem_table_id, f->oem_revision);
-> +			return f->init ? f->init(root, f->ops) :
-> +				pci_acpi_setup_ecam_mapping(root, f->ops);
-> +		}
-> +	}
-> +	return pci_acpi_setup_ecam_mapping(root, &pci_generic_ecam_ops.pci_ops);
-> +}
-> diff --git a/drivers/pci/host/mcfg-quirks.h b/drivers/pci/host/mcfg-quirks.h
-> new file mode 100644
-> index 0000000..45cbd16
-> --- /dev/null
-> +++ b/drivers/pci/host/mcfg-quirks.h
-> @@ -0,0 +1,20 @@
-> +/*
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License, version 2, as
-> + * published by the Free Software Foundation (the "GPL").
-> + *
-> + * This program is distributed in the hope that it will be useful, but
-> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License version 2 (GPLv2) for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * version 2 (GPLv2) along with this source code.
-> + */
-> +
-> +#ifndef __MCFG_QUIRKS_H__
-> +#define __MCFG_QUIRKS_H__
-> +
-> +/* MCFG quirks initialize call list */
-> +
-> +#endif /* __MCFG_QUIRKS_H__ */
-> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-> index e9bfe00..28cdce4 100644
-> --- a/include/linux/pci-acpi.h
-> +++ b/include/linux/pci-acpi.h
-> @@ -25,6 +25,8 @@ static inline acpi_status pci_acpi_remove_pm_notifier(struct acpi_device *dev)
->  extern phys_addr_t acpi_pci_root_get_mcfg_addr(acpi_handle handle);
->  
->  extern phys_addr_t pci_mcfg_lookup(u16 domain, struct resource *bus_res);
-> +extern struct pci_config_window *
-> +pci_mcfg_match_quirks(struct acpi_pci_root *root);
->  
->  extern struct pci_config_window *
->  pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root, struct pci_ops *ops);
-> -- 
-> 1.9.1
+> changes for V4:
+> 	- Add comments explain why to add this patch
+> 	- Move the binding changes to pci code patch
 > 
+>  arch/arm/boot/dts/ls1021a.dtsi                 |  6 ++++--
+>  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 18 +++++++++---------
+>  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 16 ++++++++--------
+
+Do not mix up arm dts changes with arm64 ones.  Use separate patch
+please.
+
+Shawn
