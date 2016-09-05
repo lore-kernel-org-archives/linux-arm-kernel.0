@@ -1,60 +1,51 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon,  5 Sep 2016 18:43:06 +0200
-Subject: [PATCH 4.7 010/143] arm64: Define AT_VECTOR_SIZE_ARCH for ARCH_DLINFO
-In-Reply-To: <20160905164430.593075551@linuxfoundation.org>
-References: <20160905164430.593075551@linuxfoundation.org>
-Message-ID: <20160905164431.048184685@linuxfoundation.org>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Mon, 05 Sep 2016 09:47:12 -0700
+Subject: [PATCH v4 3/3] iio: adc: add support for Allwinner SoCs ADC
+In-Reply-To: <9219f76c-384a-a7c3-5b13-ebaec980ab41@free-electrons.com>
+References: <1472738705-20145-1-git-send-email-quentin.schulz@free-electrons.com>
+ <20160905070716.GA6322@lukather>
+ <9219f76c-384a-a7c3-5b13-ebaec980ab41@free-electrons.com>
+Message-ID: <1957122.9eY1bPBcZc@diplodocus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.7-stable review patch.  If anyone has any objections, please let me know.
+On Monday, September 05, 2016 09:11:47 AM Quentin Schulz wrote:
+> On 05/09/2016 09:07, Maxime Ripard wrote:
+> > Hi,
+> > 
+> > Nitpicks ahead.
+> > 
+> > On Thu, Sep 01, 2016 at 04:05:05PM +0200, Quentin Schulz wrote:
+> >> +	info->soc_specific = (struct soc_specific *)platform_get_device_id(pdev)->driver_data;
+> > 
+> > This line is still rather long. How about calling the field "data" and
+> > the structure gpadc_data?
+> > 
+> 
+> driver_data is coming from the platform_device_id
+> (http://lxr.free-electrons.com/source/include/linux/mod_devicetable.h#L498)
+> so can't really change that.
+> I could change the structure to gpadc_data, that would save me 2
+> characters, still 13 characters above the 80 characters limit however.
+> 
+I think Maxime meant to change member "soc_specific" to "data" of type
+struct gpadc_data
 
-------------------
-
-From: James Hogan <james.hogan@imgtec.com>
-
-commit 3146bc64d12377a74dbda12b96ea32da3774ae07 upstream.
-
-AT_VECTOR_SIZE_ARCH should be defined with the maximum number of
-NEW_AUX_ENT entries that ARCH_DLINFO can contain, but it wasn't defined
-for arm64 at all even though ARCH_DLINFO will contain one NEW_AUX_ENT
-for the VDSO address.
-
-This shouldn't be a problem as AT_VECTOR_SIZE_BASE includes space for
-AT_BASE_PLATFORM which arm64 doesn't use, but lets define it now and add
-the comment above ARCH_DLINFO as found in several other architectures to
-remind future modifiers of ARCH_DLINFO to keep AT_VECTOR_SIZE_ARCH up to
-date.
-
-Fixes: f668cd1673aa ("arm64: ELF definitions")
-Signed-off-by: James Hogan <james.hogan@imgtec.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- arch/arm64/include/asm/elf.h         |    1 +
- arch/arm64/include/uapi/asm/auxvec.h |    2 ++
- 2 files changed, 3 insertions(+)
-
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -140,6 +140,7 @@ typedef struct user_fpsimd_state elf_fpr
- 
- #define SET_PERSONALITY(ex)		clear_thread_flag(TIF_32BIT);
- 
-+/* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
- #define ARCH_DLINFO							\
- do {									\
- 	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
---- a/arch/arm64/include/uapi/asm/auxvec.h
-+++ b/arch/arm64/include/uapi/asm/auxvec.h
-@@ -19,4 +19,6 @@
- /* vDSO location */
- #define AT_SYSINFO_EHDR	33
- 
-+#define AT_VECTOR_SIZE_ARCH 1 /* entries in ARCH_DLINFO */
-+
- #endif
+> >> +
+> >> +	tzd = devm_thermal_zone_of_sensor_register(pdev->dev.parent, 0, info,
+> >> +						   &sun4i_ts_tz_ops);
+> > 
+> > A comment on why you put the parent device structure and not the
+> > device itself like you're doing on all the other calls in that probe
+> > would be nice.
+> > 
+> 
+> Indeed.
+> 
+> Thanks,
+> Quentin
+> 
+> > Thanks!
+> > Maxime
+> > 
+> 
