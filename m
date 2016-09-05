@@ -1,38 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Sep 2016 10:02:44 +0100
-Subject: [PATCH v3 1/7] arm64: kernel: fix style issues in sleep.S
-In-Reply-To: <CAKv+Gu-2zkhw++tBqP6BA+B_a5D6t0BpRg9KxqCgdLCHY53ADw@mail.gmail.com>
-References: <1472641517-15362-1-git-send-email-ard.biesheuvel@linaro.org>
- <1472641517-15362-2-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu-2zkhw++tBqP6BA+B_a5D6t0BpRg9KxqCgdLCHY53ADw@mail.gmail.com>
-Message-ID: <20160905090244.GA2649@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 5 Sep 2016 11:04:40 +0200
+Subject: [PATCH 1/3] ARM: dts: r8a7792: add QSPI clock
+In-Reply-To: <4143164.BtXsTN0b8O@wasted.cogentembedded.com>
+References: <1648590.FPpmBRoQyh@wasted.cogentembedded.com>
+ <4143164.BtXsTN0b8O@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdVHuKxAnmQcXzP9QqzKugXD1_f4h6Y3qEhBQBf6SG_SuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Sat, Sep 3, 2016 at 12:07 AM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Describe the QSPI clock in the R8A7792 device tree.
+>
+> Based  on the original (and large) patch by Vladimir Barinov
+> <vladimir.barinov@cogentembedded.com>.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-On Sat, Sep 03, 2016 at 09:08:13PM +0100, Ard Biesheuvel wrote:
-> On 31 August 2016 at 12:05, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > This fixes a number of style issues in sleep.S. No functional changes are
-> > intended:
-> > - replace absolute literal references with relative references in
-> >   __cpu_suspend_enter(), which executes from its virtual address
-> > - replace explicit lr assignment plus branch with bl in cpu_resume(), which
-> >   aligns it with stext() and secondary_startup()
-> > - don't export _cpu_resume()
-> 
-> Apologies, I sent out the wrong version of this patch in v3. Not
-> exporting _cpu_resume() breaks hibernate, so I dropped it from v2
-> (which is the version that Mark reviewed), but I reintroduced it by
-> accident.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-No problem, these things happen.
+Gr{oetje,eeting}s,
 
-> Please let me know how you would like to proceed, i.e., put a fixup on
-> top, or resend.
+                        Geert
 
-I already pushed this out on for-next/core, so please send a fixup on top.
-I could've sworn I did an allmodconfig build test before pushing out, but
-apparently not.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Will
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
