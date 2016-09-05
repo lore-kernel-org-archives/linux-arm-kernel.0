@@ -1,87 +1,142 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 5 Sep 2016 13:56:39 +0100
-Subject: irq_create_fwspec_mapping() in 4.8-rc2
-In-Reply-To: <CACRpkdYjmkkDxVah1HUNxoGEQ9hJeE-J1TwZ1wNEKq=swnL9JQ@mail.gmail.com>
-References: <483F737F-9868-4E8A-A831-AA3F6F410AFF@gmail.com>
- <57C98975.5020607@arm.com> <9FCA11A3-B677-42EA-80DB-674AC8E489E8@gmail.com>
- <57C99111.3030105@arm.com> <F5716CCD-34FF-4CA8-B5F5-C2A33A5D9E91@gmail.com>
- <57C9961F.8080602@arm.com> <B721D80D-B240-4779-8748-5CFAD330D986@gmail.com>
- <57C99B3D.3010405@arm.com>
- <CACRpkdYjmkkDxVah1HUNxoGEQ9hJeE-J1TwZ1wNEKq=swnL9JQ@mail.gmail.com>
-Message-ID: <57CD6B87.5010502@arm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 5 Sep 2016 21:00:09 +0800
+Subject: [PATCH v4 04/15] drivers: acpi: iort: add support for IOMMU
+ fwnode registration
+In-Reply-To: <1471274620-20754-5-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1471274620-20754-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1471274620-20754-5-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <408a90be-df15-b4fb-169d-81c1743c6c16@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/16 13:40, Linus Walleij wrote:
-> On Fri, Sep 2, 2016 at 5:31 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> 
->> +Linus, Jean-Christophe, Jon
->>
->> On 02/09/16 16:15, Andras Szemzo wrote:
->>> Hi,
->>>
->>>> On 02 Sep 2016, at 17:09, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>>
->>>> So something has already configured the interrupt to be
->>>> IRQ_TYPE_EDGE_BOTH, and this clashes with your
->>>> IRQ_TYPE_EDGE_FALLING.
->>>>
->>>> My bet is on this one:
->>>>
->>>> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
->>>> index 80daead..9f09041 100644
->>>> --- a/drivers/pinctrl/pinctrl-at91.c
->>>> +++ b/drivers/pinctrl/pinctrl-at91.c
->>>> @@ -1614,7 +1614,7 @@ static int at91_gpio_of_irq_setup(struct platform_device *pdev,
->>>>                                 &gpio_irqchip,
->>>>                                 0,
->>>>                                 handle_edge_irq,
->>>> -                               IRQ_TYPE_EDGE_BOTH);
->>>> +                               IRQ_TYPE_NONE);
->>>>      if (ret) {
->>>>              dev_err(&pdev->dev, "at91_gpio.%d: Couldn't add irqchip to gpiochip.\n",
->>>>                      at91_gpio->pioc_idx);
->>>>
->>>> Can you give it a go and let me know what happens?
->>>
->>> yes, this fixed the problem. Thank you, it was fast!
->>
->> Right. So the at91 pinctlr seems to enforce a default configuration. The
->> question is *why*? All interrupts connected to it should provide their
->> own trigger coming from DT.
-> 
-> I guess for legacy boardfile usecases or just how it happened to end
-> up during development.
-> 
->> As we now actually check that we have some consistency between what is
->> configured and what is requested, it is bound to fail, unless you happen
->> to match the default.
-> 
-> Which is good!
+On 2016/8/15 23:23, Lorenzo Pieralisi wrote:
+> The ACPI IORT table provide entries for IOMMU (aka SMMU in ARM world)
+> components that allow creating the kernel data structures required to
+> probe and initialize the IOMMU devices.
+>
+> This patch provides support in the IORT kernel code to register IOMMU
+> components and their respective fwnode.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Tomasz Nowicki <tn@semihalf.com>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> ---
+>  drivers/acpi/arm64/iort.c | 65 +++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/iort.h      |  8 ++++++
+>  2 files changed, 73 insertions(+)
+>
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index cad7d1d..01a5258 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -20,7 +20,9 @@
+>
+>  #include <linux/iort.h>
+>  #include <linux/kernel.h>
+> +#include <linux/list.h>
+>  #include <linux/pci.h>
+> +#include <linux/slab.h>
+>
+>  struct iort_its_msi_chip {
+>  	struct list_head	list;
+> @@ -28,6 +30,69 @@ struct iort_its_msi_chip {
+>  	u32			translation_id;
+>  };
+>
+> +struct iort_fwnode {
+> +	struct list_head list;
+> +	struct acpi_iort_node *iort_node;
+> +	struct fwnode_handle *fwnode;
+> +};
+> +static LIST_HEAD(iort_fwnode_list);
+> +static DEFINE_SPINLOCK(iort_fwnode_lock);
+> +
+> +/**
+> + * iort_set_fwnode() - Create iort_fwnode and use it to register
+> + *		       iommu data in the iort_fwnode_list
+> + *
+> + * @node: IORT table node associated with the IOMMU
+> + * @fwnode: fwnode associated with the IORT node
+> + *
+> + * Returns: 0 on success
+> + *          <0 on failure
+> + */
+> +int iort_set_fwnode(struct acpi_iort_node *iort_node,
+> +		    struct fwnode_handle *fwnode)
+> +{
+> +	struct iort_fwnode *np;
+> +
+> +	np = kzalloc(sizeof(struct iort_fwnode), GFP_ATOMIC);
+> +
+> +	if (WARN_ON(!np))
+> +		return -ENOMEM;
+> +
+> +	INIT_LIST_HEAD(&np->list);
+> +	np->iort_node = iort_node;
+> +	np->fwnode = fwnode;
+> +
+> +	spin_lock(&iort_fwnode_lock);
+> +	list_add_tail(&np->list, &iort_fwnode_list);
+> +	spin_unlock(&iort_fwnode_lock);
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+> + * iort_get_fwnode() - Retrieve fwnode associated with an IORT node
+> + *
+> + * @node: IORT table node to be looked-up
+> + *
+> + * Returns: fwnode_handle pointer on success, NULL on failure
+> +*/
+> +struct fwnode_handle *iort_get_fwnode(struct acpi_iort_node *node)
+> +{
+> +	struct iort_fwnode *curr;
+> +	struct fwnode_handle *fwnode = NULL;
+> +
+> +	spin_lock(&iort_fwnode_lock);
+> +	list_for_each_entry(curr, &iort_fwnode_list, list) {
+> +		if (curr->iort_node == node) {
+> +			fwnode = curr->fwnode;
+> +			break;
+> +		}
+> +	}
+> +	spin_unlock(&iort_fwnode_lock);
+> +
+> +	return fwnode;
+> +}
+> +
+>  typedef acpi_status (*iort_find_node_callback)
+>  	(struct acpi_iort_node *node, void *context);
+>
+> diff --git a/include/linux/iort.h b/include/linux/iort.h
+> index 9bb30c5..666a3de 100644
+> --- a/include/linux/iort.h
+> +++ b/include/linux/iort.h
+> @@ -30,12 +30,20 @@ struct fwnode_handle *iort_find_domain_token(int trans_id);
+>  void iort_table_detect(void);
+>  u32 iort_msi_map_rid(struct device *dev, u32 req_id);
+>  struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
+> +int iort_set_fwnode(struct acpi_iort_node *iort_node,
+> +		    struct fwnode_handle *fwnode);
+> +struct fwnode_handle *iort_get_fwnode(struct acpi_iort_node *node);
+>  #else
+>  static inline void iort_table_detect(void) { }
+>  static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+>  { return req_id; }
+>  static inline struct irq_domain *
+>  iort_get_device_domain(struct device *dev, u32 req_id) { return NULL; }
+> +static inline int iort_set_fwnode(struct acpi_iort_node *iort_node,
+> +				  struct fwnode_handle *fwnode)
+> +{ return -ENODEV; }
+> +static inline struct fwnode_handle *
+> +iort_get_fwnode(struct acpi_iort_node *node) { return NULL; }
+>  #endif
+>
+>  #define IORT_ACPI_DECLARE(name, table_id, fn)		\
 
-Oh, I'm glad we now have these checks in. We found quite a few oddities
-thanks to those.
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
->> What am I missing?
-> 
-> Nothing, I am missing your patch on the mailing list with a Signed-off-by
-> so I can apply it (unless the Atmel people have complaints).
-
-OK, I'll whip up a patch shortly. Should I also address the handful of
-other non-TYPE_NONE that we have in the tree:
-
-	drivers/gpio/gpio-sx150x.c
-	drivers/pinctrl/nomadik/pinctrl-nomadik.c
-	drivers/pinctrl/pinctrl-coh901.c
-	drivers/pinctrl/pinctrl-st.c
-
-But the bigger question is whether or not there is any value in the
-pinctrl driver providing a default value at all. Do we have any case
-where the trigger information is not provided by the firmware (DT or
-ACPI), and where we rely on the default being set?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks
+Hanjun
