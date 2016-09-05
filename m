@@ -1,184 +1,222 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 05 Sep 2016 10:28:54 +0900
-Subject: [v14 PATCH 2/5] phy: Add USB Type-C PHY driver for rk3399
-In-Reply-To: <1472015825-11365-3-git-send-email-zyw@rock-chips.com>
-References: <1472015825-11365-1-git-send-email-zyw@rock-chips.com>
- <CGME20160824051805epcas1p2e63c7c5a8cb28e34b7a96cef0bf20e01@epcas1p2.samsung.com>
- <1472015825-11365-3-git-send-email-zyw@rock-chips.com>
-Message-ID: <57CCCA56.5000702@samsung.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 5 Sep 2016 09:37:29 +0800
+Subject: [PATCH v4 4/5] net: stmmac: add a glue driver for the Amlogic
+ Meson 8b / GXBB DWMAC
+In-Reply-To: <20160904182320.671-5-martin.blumenstingl@googlemail.com>
+Message-ID: <201609050953.67GKeUAU%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
+Hi Martin,
 
-On 2016? 08? 24? 14:17, Chris Zhong wrote:
-> Add a PHY provider driver for the rk3399 SoC Type-c PHY. The USB
-> Type-C PHY is designed to support the USB3 and DP applications.
-> The USB3 operates in SuperSpeed mode and the DP can operate at RBR,
-> HBR and HBR2 data rates. This driver create 2 PHY devices separately
-> for USB3 and DisplyPort, and registers them under the child node.
-> 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> Reviewed-by: Guenter Roeck <groeck@chromium.org>
-> Tested-by: Guenter Roeck <groeck@chromium.org>
-> 
-> ---
-> 
-> Changes in v14:
-> - change the name of property from super speed to EXTCON_PROP_USB_SS
-> 
-> Changes in v13:
-> - add some description in front of driver
-> - change name of usb to usb3
-> - add a USB3 RX register configuration
-> - do not return err if nothing connected with Type-C, when usb phy power on,
->   since the USB core driver will call phy power without USB3 device connected.
-> 
-> Changes in v12:
-> - enable DP+USB3 mode, only when EXTCON_PROP_USB_SUPERSPEED equal 1
->   and DP is attached
-> 
-> Changes in v11:
-> - make a clearer demarcation between usb phy and dp phy.
-> 
-> Changes in v10:
-> - do not control dp select and hpd config in phy driver
-> 
-> Changes in v9:
-> - the new_mode should be int not u8
-> - move mutex_lock(&tcphy->lock); to earlier place. in
->   rockchip_usb3_phy_power_off
-> - better mutex lock for phy mode and flip
-> - split the Type-C PHY into two PHYs: USB3 and DP
-> 
-> Changes in v8:
-> - set the default cable id to EXTCON_USB_HOST
-> - optimization Error log
-> 
-> Changes in v7:
-> - support new API of extcon
-> 
-> Changes in v6:
-> - delete the support of PIN_ASSIGN_A/B
-> - set the default mode to MODE_DFP_USB
-> - disable DP PLL at USB3 only mode
-> 
-> Changes in v5:
-> - support get property from extcon
-> - remove PIN ASSIGN A/B support
-> 
-> Changes in v4:
-> - select EXTCON
-> - use phy framework to control the USB3 and DP function
-> - rename PIN_MAP_ to PIN_ASSIGN_
-> 
-> Changes in v3:
-> - remove the phy framework(Kishon Vijay Abraham I)
-> - add parentheses around the macro
-> - use a single space between type and name
-> - add spaces after opening and before closing braces.
-> - use u16 for register value
-> - remove type-c phy header file
-> - CodingStyle optimization
-> - use some cable extcon to get type-c port information
-> - add a extcon to notify Display Port
-> 
-> Changes in v2:
-> - select RESET_CONTROLLER
-> - alphabetic order
-> - modify some spelling mistakes
-> - make mode cleaner
-> - use bool for enable/disable
-> - check all of the return value
-> - return a better err number
-> - use more readx_poll_timeout()
-> - clk_disable_unprepare(tcphy->clk_ref);
-> - remove unuse functions, rockchip_typec_phy_power_on/off
-> - remove unnecessary typecast from void *
-> - use dts node to distinguish between phys.
-> 
-> Changes in v1:
-> - update the licence note
-> - init core clock to 50MHz
-> - use extcon API
-> - remove unused global
-> - add some comments for magic num
-> - change usleep_range(1000, 2000) tousleep_range(1000, 1050)
-> - remove __func__ from dev_err
-> - return err number when get clk failed
-> - remove ADDR_ADJ define
-> - use devm_clk_get(&pdev->dev, "tcpdcore")
-> 
->  drivers/phy/Kconfig              |    9 +
->  drivers/phy/Makefile             |    1 +
->  drivers/phy/phy-rockchip-typec.c | 1013 ++++++++++++++++++++++++++++++++++++++
->  3 files changed, 1023 insertions(+)
->  create mode 100644 drivers/phy/phy-rockchip-typec.c
-> 
+[auto build test ERROR on next-20160825]
+[also build test ERROR on v4.8-rc5]
+[cannot apply to robh/for-next net-next/master net/master v4.8-rc4 v4.8-rc3 v4.8-rc2]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
+[Check https://git-scm.com/docs/git-format-patch for more information]
 
-[snip]
+url:    https://github.com/0day-ci/linux/commits/Martin-Blumenstingl/meson-Meson8b-and-GXBB-DWMAC-glue-driver/20160905-023130
+config: sparc64-allyesconfig (attached as .config)
+compiler: sparc64-linux-gnu-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=sparc64 
 
-This patch rely on the extcon git repository to support the extcon property
-and USB 3.0 property. I created the immutable branch(ib-extcon-phy-4.9).
-I send this pull request to prevent the build error.
+All error/warnings (new ones prefixed by >>):
 
-(The patches of extcon property for USB 3.0 depend on the other extcon patches
-which are already merged. So, it is diffcult to separate the only patches
-of extcon property.)
+>> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:63:18: error: field 'm250_mux' has incomplete type
+     struct clk_mux  m250_mux;
+                     ^
+>> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:67:21: error: field 'm250_div' has incomplete type
+     struct clk_divider m250_div;
+                        ^
+>> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:70:21: error: field 'm25_div' has incomplete type
+     struct clk_divider m25_div;
+                        ^
+   drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c: In function 'meson8b_init_clk':
+>> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:88:23: error: storage size of 'init' isn't known
+     struct clk_init_data init;
+                          ^
+>> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:94:30: error: array type has incomplete element type 'struct clk_div_table'
+     static struct clk_div_table clk_25m_div_table[] = {
+                                 ^
+>> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:95:5: error: field name not in record or union initializer
+      { .val = 0, .div = 5 },
+        ^
+   drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:95:5: note: (near initialization for 'clk_25m_div_table')
+   drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:95:15: error: field name not in record or union initializer
+      { .val = 0, .div = 5 },
+                  ^
+   drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:95:15: note: (near initialization for 'clk_25m_div_table')
+   drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:96:5: error: field name not in record or union initializer
+      { .val = 1, .div = 10 },
+        ^
+   drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:96:5: note: (near initialization for 'clk_25m_div_table')
+   drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:96:15: error: field name not in record or union initializer
+      { .val = 1, .div = 10 },
+                  ^
+   drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:96:15: note: (near initialization for 'clk_25m_div_table')
+>> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:114:4: error: implicit declaration of function '__clk_get_name' [-Werror=implicit-function-declaration]
+       __clk_get_name(dwmac->m250_mux_parent[i]);
+       ^
+>> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:113:23: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+      mux_parent_names[i] =
+                          ^
+>> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:120:14: error: 'clk_mux_ops' undeclared (first use in this function)
+     init.ops = &clk_mux_ops;
+                 ^
+   drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:120:14: note: each undeclared identifier is reported only once for each function it appears in
+>> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:132:24: error: implicit declaration of function 'devm_clk_register' [-Werror=implicit-function-declaration]
+     dwmac->m250_mux_clk = devm_clk_register(dev, &dwmac->m250_mux.hw);
+                           ^
+>> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:139:14: error: 'clk_divider_ops' undeclared (first use in this function)
+     init.ops = &clk_divider_ops;
+                 ^
+>> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:140:15: error: 'CLK_SET_RATE_PARENT' undeclared (first use in this function)
+     init.flags = CLK_SET_RATE_PARENT;
+                  ^
+   drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:141:21: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+     clk_div_parents[0] = __clk_get_name(dwmac->m250_mux_clk);
+                        ^
+>> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:149:26: error: 'CLK_DIVIDER_ONE_BASED' undeclared (first use in this function)
+     dwmac->m250_div.flags = CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO;
+                             ^
+>> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:149:50: error: 'CLK_DIVIDER_ALLOW_ZERO' undeclared (first use in this function)
+     dwmac->m250_div.flags = CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO;
+                                                     ^
+>> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:159:15: error: 'CLK_IS_BASIC' undeclared (first use in this function)
+     init.flags = CLK_IS_BASIC | CLK_SET_RATE_PARENT;
+                  ^
+   drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:160:21: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+     clk_div_parents[0] = __clk_get_name(dwmac->m250_div_clk);
+                        ^
+>> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:94:30: warning: unused variable 'clk_25m_div_table' [-Wunused-variable]
+     static struct clk_div_table clk_25m_div_table[] = {
+                                 ^
+>> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:88:23: warning: unused variable 'init' [-Wunused-variable]
+     struct clk_init_data init;
+                          ^
+   cc1: some warnings being treated as errors
 
-Best Regards,
-Chanwoo Choi
+vim +/m250_mux +63 drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+    57		struct platform_device	*pdev;
+    58	
+    59		void __iomem		*regs;
+    60	
+    61		phy_interface_t		phy_mode;
+    62	
+  > 63		struct clk_mux		m250_mux;
+    64		struct clk		*m250_mux_clk;
+    65		struct clk		*m250_mux_parent[MUX_CLK_NUM_PARENTS];
+    66	
+  > 67		struct clk_divider	m250_div;
+    68		struct clk		*m250_div_clk;
+    69	
+  > 70		struct clk_divider	m25_div;
+    71		struct clk		*m25_div_clk;
+    72	};
+    73	
+    74	static void meson8b_dwmac_mask_bits(struct meson8b_dwmac *dwmac, u32 reg,
+    75					    u32 mask, u32 value)
+    76	{
+    77		u32 data;
+    78	
+    79		data = readl(dwmac->regs + reg);
+    80		data &= ~mask;
+    81		data |= (value & mask);
+    82	
+    83		writel(data, dwmac->regs + reg);
+    84	}
+    85	
+    86	static int meson8b_init_clk(struct meson8b_dwmac *dwmac)
+    87	{
+  > 88		struct clk_init_data init;
+    89		int i, ret;
+    90		struct device *dev = &dwmac->pdev->dev;
+    91		char clk_name[32];
+    92		const char *clk_div_parents[1];
+    93		const char *mux_parent_names[MUX_CLK_NUM_PARENTS];
+  > 94		static struct clk_div_table clk_25m_div_table[] = {
+  > 95			{ .val = 0, .div = 5 },
+  > 96			{ .val = 1, .div = 10 },
+    97			{ /* sentinel */ },
+    98		};
+    99	
+   100		/* get the mux parents from DT */
+   101		for (i = 0; i < MUX_CLK_NUM_PARENTS; i++) {
+   102			char name[16];
+   103	
+   104			snprintf(name, sizeof(name), "clkin%d", i);
+   105			dwmac->m250_mux_parent[i] = devm_clk_get(dev, name);
+   106			if (IS_ERR(dwmac->m250_mux_parent[i])) {
+   107				ret = PTR_ERR(dwmac->m250_mux_parent[i]);
+   108				if (ret != -EPROBE_DEFER)
+   109					dev_err(dev, "Missing clock %s\n", name);
+   110				return ret;
+   111			}
+   112	
+ > 113			mux_parent_names[i] =
+ > 114				__clk_get_name(dwmac->m250_mux_parent[i]);
+   115		}
+   116	
+   117		/* create the m250_mux */
+   118		snprintf(clk_name, sizeof(clk_name), "%s#m250_sel", dev_name(dev));
+   119		init.name = clk_name;
+ > 120		init.ops = &clk_mux_ops;
+   121		init.flags = 0;
+   122		init.parent_names = mux_parent_names;
+   123		init.num_parents = MUX_CLK_NUM_PARENTS;
+   124	
+   125		dwmac->m250_mux.reg = dwmac->regs + PRG_ETH0;
+   126		dwmac->m250_mux.shift = PRG_ETH0_CLK_M250_SEL_SHIFT;
+   127		dwmac->m250_mux.mask = PRG_ETH0_CLK_M250_SEL_MASK;
+   128		dwmac->m250_mux.flags = 0;
+   129		dwmac->m250_mux.table = NULL;
+   130		dwmac->m250_mux.hw.init = &init;
+   131	
+ > 132		dwmac->m250_mux_clk = devm_clk_register(dev, &dwmac->m250_mux.hw);
+   133		if (WARN_ON(IS_ERR(dwmac->m250_mux_clk)))
+   134			return PTR_ERR(dwmac->m250_mux_clk);
+   135	
+   136		/* create the m250_div */
+   137		snprintf(clk_name, sizeof(clk_name), "%s#m250_div", dev_name(dev));
+   138		init.name = devm_kstrdup(dev, clk_name, GFP_KERNEL);
+ > 139		init.ops = &clk_divider_ops;
+ > 140		init.flags = CLK_SET_RATE_PARENT;
+ > 141		clk_div_parents[0] = __clk_get_name(dwmac->m250_mux_clk);
+   142		init.parent_names = clk_div_parents;
+   143		init.num_parents = ARRAY_SIZE(clk_div_parents);
+   144	
+   145		dwmac->m250_div.reg = dwmac->regs + PRG_ETH0;
+   146		dwmac->m250_div.shift = PRG_ETH0_CLK_M250_DIV_SHIFT;
+   147		dwmac->m250_div.width = PRG_ETH0_CLK_M250_DIV_WIDTH;
+   148		dwmac->m250_div.hw.init = &init;
+ > 149		dwmac->m250_div.flags = CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO;
+   150	
+   151		dwmac->m250_div_clk = devm_clk_register(dev, &dwmac->m250_div.hw);
+   152		if (WARN_ON(IS_ERR(dwmac->m250_div_clk)))
+   153			return PTR_ERR(dwmac->m250_div_clk);
+   154	
+   155		/* create the m25_div */
+   156		snprintf(clk_name, sizeof(clk_name), "%s#m25_div", dev_name(dev));
+   157		init.name = devm_kstrdup(dev, clk_name, GFP_KERNEL);
+   158		init.ops = &clk_divider_ops;
+ > 159		init.flags = CLK_IS_BASIC | CLK_SET_RATE_PARENT;
+   160		clk_div_parents[0] = __clk_get_name(dwmac->m250_div_clk);
+   161		init.parent_names = clk_div_parents;
+   162		init.num_parents = ARRAY_SIZE(clk_div_parents);
 
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/chanwoo/extcon.git ib-extcon-phy-4.9
-
-for you to fetch changes up to 8457a1b49a2af0a0e71f80afed9f7c80de361610:
-
-  extcon: Introduce EXTCON_PROP_USB_SS property for SuperSpeed mode (2016-08-18 10:23:36 +0900)
-
-----------------------------------------------------------------
-Chanwoo Choi (12):
-      extcon: arizona: Remove the usage of extcon_update_state()
-      extcon: adc-jack: Remove the usage of extcon_set_state()
-      extcon: gpio: Remove the usage of extcon_set_state()
-      extcon: Remove the state_store() to prevent the wrong access
-      extcon: Block the bit masking operation for cable state except for extcon core
-      extcon: Add the extcon_type to gather each connector into five category
-      extcon: Add the support for extcon property according to extcon type
-      extcon: Add the support for the capability of each property
-      extcon: Rename the extcon_set/get_state() to maintain the function naming pattern
-      extcon: Add the synchronization extcon APIs to support the notification
-      extcon: Add new EXTCON_DISP_HMD for Head-mounted Display device
-      extcon: Add new EXTCON_CHG_WPT for Wireless Power Transfer device
-
-Charles Keepax (1):
-      extcon: arizona: Remove unneeded semi-colon
-
-Chris Zhong (1):
-      extcon: Add EXTCON_DISP_DP and the property for USB Type-C
-
-Guenter Roeck (1):
-      extcon: Introduce EXTCON_PROP_USB_SS property for SuperSpeed mode
-
-Maninder Singh (1):
-      extcon: Fix compile time warning
-
-Stephen Boyd (1):
-      extcon: Move extcon_get_edev_by_phandle() errors to dbg level
-
-Venkat Reddy Talla (1):
-      extcon: adc-jack: update cable state during boot
-
- drivers/extcon/extcon-adc-jack.c       |  27 +-
- drivers/extcon/extcon-arizona.c        |  13 +-
- drivers/extcon/extcon-gpio.c           |   2 +-
- drivers/extcon/extcon.c                | 774 ++++++++++++++++++++++++++-------
- include/linux/extcon.h                 | 181 +++++++-
- include/linux/extcon/extcon-adc-jack.h |   4 +-
- 6 files changed, 809 insertions(+), 192 deletions(-)
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 47275 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/62dbfa76/attachment-0001.obj>
