@@ -1,44 +1,99 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 5 Sep 2016 22:02:48 +0200
-Subject: [PATCH 4/7] drm/panel: Add Sinlinx SinA33 7" panel
-In-Reply-To: <66681473008583@web28j.yandex.ru>
-References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
- <20160901153204.11217-5-maxime.ripard@free-electrons.com>
- <66681473008583@web28j.yandex.ru>
-Message-ID: <20160905200248.GB8596@lukather>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Mon,  5 Sep 2016 22:05:32 +0200
+Subject: [PATCH V9 0/8] Introduce ACPI world to ITS irqchip
+Message-ID: <1473105940-9761-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The series builds the PCI/MSI domain stack based on initial IORT driver
+which is added in first place. As a reference please see IORT spec:
+http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
 
-On Mon, Sep 05, 2016 at 01:03:03AM +0800, Icenowy Zheng wrote:
-> Hi Everyone,
-> 
-> 01.09.2016, 23:40, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> > ?The SinA33 has an unidentified panel. Add the timings for it under a new
-> > ?compatible.
-> 
-> 
-> 
-> Excuse me...
-> I will ask a question which is not fully related to the patch here...
-> If I want to add a generic panel for Q8 tablets, what should it be called?
-> "allwinner,q8-lcd-panel-800x480"?
+Tested on Cavium ThunderX server and Qualcomm Technologies server platform QDF2XXX.
+The patches can be found here:
+https://github.com/semihalf-nowicki-tomasz/linux.git (its-acpi-v9)
 
-I guess it's more of a question for Thierry, but it seems like the
-trend is to put the diagonal rather than the resolution in the
-compatibles.
+v8 -> v9
+- rebased against v4.8-rc4
+- move root IORT pointer validation to one place iort_scan_node()
+- function names & Kconfig option name improvements
+- remove annoying dev_err() appearances for non-IORT users
+- for debug purpose print full ITS resource range
 
-Maxime
+v7 -> v8
+- rebased against v4.8-rc1
+- move IORT support under new drivers/acpi/arm64 directory
+- memory leak fix for iort_match_node_callback()
+- iort_node_map_rid() algorithm improvements
+- fix RID match check in iort_id_map()
+- fix typos and white spaces
+
+v6 -> v7
+- rebased against irq/irqchip-4.8
+- improvements for IORT ID mapping
+- call IORT init call from acpi_init() instead of arch_initcall()
+- split IORT driver in to two parts: core and ITS/MSI
+
+v5 -> v6
+- added locking mechanism for IORT list with domain token
+- IORT function name improvements
+- extended IORT RID mapping helper
+- reworked IORT to be more SMMU friendly
+- IORT functions which map RID and find corresponding domain are not
+  PCI specific any more (struct pci_dev -> struct device)
+- bug fixes
+
+v4 -> v5
+- rebased against v4.7-rc1
+- drop generic layer and call IORT functions directly
+- improve resource abstraction and string formatting
+
+v3 -> v4
+- rebased against v4.5
+- add ACPI support for IRQ domain handling on a per-device basis
+- reorder domain setup step
+- improve error handling
+- code style improvements
+
+v2 -> v3
+- rebased on top of 4.4
+- fixes and improvements for redistributor init via GICC structures
+- fixes as per kbuild reports
+
+v1 -> v2
+- rebased on top of 4.4-rc4
+- use pci_msi_domain_get_msi_rid for requester ID to device ID translation
+
+Tomasz Nowicki (8):
+  ACPI: I/O Remapping Table (IORT) initial support
+  ACPI: Add new IORT functions to support MSI domain handling
+  PCI/MSI: Setup MSI domain on a per-device basis using IORT ACPI table
+  irqchip/gicv3-its: Cleanup for ITS domain initialization
+  irqchip/gicv3-its: Refactor ITS DT init code to prepare for ACPI
+  irqchip/gicv3-its: Probe ITS in the ACPI way
+  irqchip/gicv3-its: Factor out PCI-MSI part that might be reused for
+    ACPI
+  irqchip/gicv3-its: Use MADT ITS subtable to do PCI/MSI domain
+    initialization
+
+ drivers/acpi/Kconfig                     |   4 +
+ drivers/acpi/Makefile                    |   2 +
+ drivers/acpi/arm64/Kconfig               |   6 +
+ drivers/acpi/arm64/Makefile              |   1 +
+ drivers/acpi/arm64/iort.c                | 378 +++++++++++++++++++++++++++++++
+ drivers/acpi/bus.c                       |   2 +
+ drivers/irqchip/Kconfig                  |   1 +
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c |  88 +++++--
+ drivers/irqchip/irq-gic-v3-its.c         | 171 ++++++++++----
+ drivers/irqchip/irq-gic-v3.c             |   7 +-
+ drivers/pci/msi.c                        |  11 +-
+ include/linux/iort.h                     |  41 ++++
+ include/linux/irqchip/arm-gic-v3.h       |   4 +-
+ 13 files changed, 646 insertions(+), 70 deletions(-)
+ create mode 100644 drivers/acpi/arm64/Kconfig
+ create mode 100644 drivers/acpi/arm64/Makefile
+ create mode 100644 drivers/acpi/arm64/iort.c
+ create mode 100644 include/linux/iort.h
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/29fbffe6/attachment-0001.sig>
+1.9.1
