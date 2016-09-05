@@ -1,107 +1,49 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 5 Sep 2016 13:29:04 +0200
-Subject: [PATCH v2 3/7] KVM: arm: vgic-new: improve compatibility with
- 32-bit
-In-Reply-To: <1471344418-19568-4-git-send-email-vladimir.murzin@arm.com>
+Date: Mon, 5 Sep 2016 13:29:09 +0200
+Subject: [PATCH v2 4/7] ARM: update MPIDR accessors macro
+In-Reply-To: <1471344418-19568-5-git-send-email-vladimir.murzin@arm.com>
 References: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
- <1471344418-19568-4-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20160905112904.GH26366@cbox>
+ <1471344418-19568-5-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20160905112909.GI26366@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+The title of this patch is quite generic, especially the 'update'.
+Perhaps say: 
 
-I think commit title is too vague, can you be more specific?
+"ARM: Change MPIDR_AFFINITY_LEVEL to ignore Aff3"
 
-On Tue, Aug 16, 2016 at 11:46:54AM +0100, Vladimir Murzin wrote:
-> We have couple of 64-bit register defined in GICv3 architecture, so
-
-'a couple',  'registers' (plural)
-
-> "unsigned long" kind of accessors wouldn't work for 32-bit. However,
-
-'wouldn't work for 32-bit' is kind of generic as well.  Perhaps you mean
-that unsigned long accesses to these registers will only access a single
-32-bit work of that register.
-
-> these registers can't be access as 64-bit in a one go if we run 32-bit
-
-'accessed', 's/in one go/with a single instruction/' ?
-
-'a 32-bit host'
-
-> host simply because KVM doesn't support multiple load/store on MMIO
-
-by 'multiple load/store' you mean the 'load/store multiple' instructions
-specifically, right?  Not a sequence of multiple loads and stores.  I
-think you should be more specific here as well, for example, I think
-ldrd and strd are problematic as well.
-
-> space.
-> 
-> It means that 32-bit guest access these registers in 32-bit chunks, so
-
-'a 32-bit guest', 'accesses'
-
-> the only thing we need to do is to ensure that extract_bytes() always
-> takes 64-bit data.
-> 
-> Since we are here fix couple of other width related issues by using
-> ULL variants over UL.
+On Tue, Aug 16, 2016 at 11:46:55AM +0100, Vladimir Murzin wrote:
+> vgic-v3 driver queries CPU affinity level up to Aff3, which is valid for arm64.
+> However, for arm up to Aff2 levels are supported, so querying for 3rd level
+> ends with upper bits of MPIDR are treated as valid affinity level which
+> is not true. So, report zero for any affinity level above 2.
 > 
 > Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 > ---
->  virt/kvm/arm/vgic/vgic-mmio-v3.c |    6 +++---
->  virt/kvm/arm/vgic/vgic-mmio.h    |    2 +-
->  2 files changed, 4 insertions(+), 4 deletions(-)
+>  arch/arm/include/asm/cputype.h |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> index ff668e0..cc20b60 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -23,7 +23,7 @@
->  #include "vgic-mmio.h"
+> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+> index 1ee94c7..96cef49 100644
+> --- a/arch/arm/include/asm/cputype.h
+> +++ b/arch/arm/include/asm/cputype.h
+> @@ -55,9 +55,10 @@
 >  
->  /* extract @num bytes at @offset bytes offset in data */
-> -unsigned long extract_bytes(unsigned long data, unsigned int offset,
-> +unsigned long extract_bytes(u64 data, unsigned int offset,
->  			    unsigned int num)
->  {
->  	return (data >> (offset * 8)) & GENMASK_ULL(num * 8 - 1, 0);
-> @@ -179,7 +179,7 @@ static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
->  	int target_vcpu_id = vcpu->vcpu_id;
->  	u64 value;
+>  #define MPIDR_LEVEL_BITS 8
+>  #define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
+> +#define MPIDR_LEVEL_SHIFT(level) (MPIDR_LEVEL_BITS * level)
 >  
-> -	value = (mpidr & GENMASK(23, 0)) << 32;
-> +	value = (mpidr & GENMASK_ULL(23, 0)) << 32;
+>  #define MPIDR_AFFINITY_LEVEL(mpidr, level) \
+> -	((mpidr >> (MPIDR_LEVEL_BITS * level)) & MPIDR_LEVEL_MASK)
+> +	((level < 3) ? ((mpidr >> MPIDR_LEVEL_SHIFT(level)) & MPIDR_LEVEL_MASK) : 0)
 
-why does this make a difference when mpidr is an unsigned long?
+Instead of using a conditional here, you could just apply the
+MPIDR_HWID_BITMASK to the mpidr argument instead.
 
->  	value |= ((target_vcpu_id & 0xffff) << 8);
->  	if (target_vcpu_id == atomic_read(&vcpu->kvm->online_vcpus) - 1)
->  		value |= GICR_TYPER_LAST;
-> @@ -603,7 +603,7 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
->  	bool broadcast;
 >  
->  	sgi = (reg & ICC_SGI1R_SGI_ID_MASK) >> ICC_SGI1R_SGI_ID_SHIFT;
-> -	broadcast = reg & BIT(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
-> +	broadcast = reg & BIT_ULL(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
->  	target_cpus = (reg & ICC_SGI1R_TARGET_LIST_MASK) >> ICC_SGI1R_TARGET_LIST_SHIFT;
->  	mpidr = SGI_AFFINITY_LEVEL(reg, 3);
->  	mpidr |= SGI_AFFINITY_LEVEL(reg, 2);
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-> index 0b3ecf9..80f92ce 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.h
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
-> @@ -96,7 +96,7 @@ unsigned long vgic_data_mmio_bus_to_host(const void *val, unsigned int len);
->  void vgic_data_host_to_mmio_bus(void *buf, unsigned int len,
->  				unsigned long data);
->  
-> -unsigned long extract_bytes(unsigned long data, unsigned int offset,
-> +unsigned long extract_bytes(u64 data, unsigned int offset,
->  			    unsigned int num);
->  
->  u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
+>  #define ARM_CPU_IMP_ARM			0x41
+>  #define ARM_CPU_IMP_INTEL		0x69
 > -- 
 > 1.7.9.5
 > 
