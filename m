@@ -1,30 +1,96 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 5 Sep 2016 08:27:21 -0300
-Subject: [PATCH] ARM: dts: imx6ul-pico-hobbit: add sgtl5000 sound card
- support
-In-Reply-To: <1473063707-31282-1-git-send-email-wente.wang@nxp.com>
-References: <1473063707-31282-1-git-send-email-wente.wang@nxp.com>
-Message-ID: <CAOMZO5CRQwOcHE1sHi35r6KjDvVh1Q5xTbBxL7gxZW2aNvgb6Q@mail.gmail.com>
+From: tiffany.lin@mediatek.com (Tiffany Lin)
+Date: Mon, 5 Sep 2016 19:30:36 +0800
+Subject: [PATCH v5 0/9] Add MT8173 Video Decoder Driver
+In-Reply-To: <f6a217b4-7343-4758-c179-c4cc25079620@xs4all.nl>
+References: <1472818800-22558-1-git-send-email-tiffany.lin@mediatek.com>
+ <616d95a4-e6f3-5c42-d435-eb73795bd82c@xs4all.nl>
+ <1473069011.23162.7.camel@mtksdaap41>
+ <2d332670-edfd-5f2e-2c7f-4346e60baf75@xs4all.nl>
+ <91bd60ab-868a-78b8-a09d-544376913387@xs4all.nl>
+ <1473072735.23162.12.camel@mtksdaap41>
+ <f6a217b4-7343-4758-c179-c4cc25079620@xs4all.nl>
+Message-ID: <1473075036.23162.14.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Winter,
+Hi Hans,
 
-On Mon, Sep 5, 2016 at 5:21 AM, Winter Wang <wente.wang@nxp.com> wrote:
-> use simple-audio-card to support sgtl5000 with SAI interface.
+On Mon, 2016-09-05 at 13:26 +0200, Hans Verkuil wrote:
+> On 09/05/2016 12:52 PM, Tiffany Lin wrote:
+> > Hi Hans,
+> > 
+> > On Mon, 2016-09-05 at 12:09 +0200, Hans Verkuil wrote:
+> >> On 09/05/2016 11:53 AM, Hans Verkuil wrote:
+> >>> On 09/05/2016 11:50 AM, Tiffany Lin wrote:
+> >>>> Hi Hans,
+> >>>>
+> >>>> On Mon, 2016-09-05 at 11:33 +0200, Hans Verkuil wrote:
+> >>>>> On 09/02/2016 02:19 PM, Tiffany Lin wrote:
+> >>>>>> ==============
+> >>>>>>  Introduction
+> >>>>>> ==============
+> >>>>>>
+> >>>>>> The purpose of this series is to add the driver for video codec hw embedded in the Mediatek's MT8173 SoCs.
+> >>>>>> Mediatek Video Codec is able to handle video decoding and encoding of in a range of formats.
+> >>>>>>
+> >>>>>> This patch series rely on MTK VPU driver that have been merged in v4.8-rc1.
+> >>>>>> Mediatek Video Decoder driver rely on VPU driver to load, communicate with VPU.
+> >>>>>>
+> >>>>>> Internally the driver uses videobuf2 framework, and MTK IOMMU and MTK SMI both have been merged in v4.6-rc1.
+> >>>>>>
+> >>>>>> [1]https://chromium-review.googlesource.com/#/c/245241/
+> >>>>>
+> >>>>> This patch series fails to apply to the media_tree master (patch 3/9). Can you rebase and repost?
+> >>>>>
+> >>>>> I'm ready to make a pull request for this, so I hope you can fix this soon.
+> >>>>>
+> >>>> I saw Encoder fix patches in fixes branch.
+> >>>> This patch series is base on Encoder fix patches. 
+> >>>>
+> >>>> [media] vcodec:mediatek: Refine VP8 encoder driver
+> >>>> [media] vcodec:mediatek: Refine H264 encoder driver
+> >>>> [media] vcodec:mediatek: change H264 profile default to profile high
+> >>>> [media] vcodec:mediatek: Add timestamp and timecode copy for V4L2
+> >>>> Encoder
+> >>>> [media] vcodec:mediatek: Fix visible_height larger than coded_height
+> >>>> issue in s_fmt_out
+> >>>> [media] vcodec:mediatek: Fix fops_vcodec_release flow for V4L2 Encoder
+> >>>> [media] vcodec:mediatek:code refine for v4l2 Encoder driver
+> >>>> [media] dvb_frontend: Use memdup_user() rather than duplicating its
+> >>>> implementation
+> >>>>
+> >>>>
+> >>>> If I do not rebase decoder patch series base on Encoder fix pathces.
+> >>>> Then it will fail after Encoder fix patches merged.
+> >>>>
+> >>>> May I know what parent patch I need to rebase to to fix this issue?
+> >>>
+> >>> Ah, OK. I will retest placing this on top of those fixes. I forgot about the
+> >>> pending fixes. I'll handle this.
+> >>
+> >> OK, that works much better when it is on top of the fixes.
+> >>
+> >> Only one thing is missing: an entry in the MAINTAINERS file. Strange that that
+> >> wasn't done for the encoder driver, we must have missed that. So can you make a
+> >> patch adding the en/decoder driver to this file? I'm ready to make the pull
+> >> request once I have that.
+> >>
+> > Got it. I will check and update it.
+> > 
+> > I have a question about decoder device node.
+> > In v5 decoder patch series, I do not add device node patch at end of
+> > patch series.
+> > I plain to put it in MT21C format patch series, is it ok?
+> 
+> What is the reason for not adding it in the decoder patch series?
+> 
 
-Is this really needed? Currently we get audio working via
-sound/soc/fsl/fsl-asoc-card.c driver.
+It is because our decoder HW only support MT21C format.
 
-> diff --git a/arch/arm/boot/dts/imx6ul-pinfunc.h b/arch/arm/boot/dts/imx6ul-pinfunc.h
-> index 0034eeb..3397b49 100644
-> --- a/arch/arm/boot/dts/imx6ul-pinfunc.h
-> +++ b/arch/arm/boot/dts/imx6ul-pinfunc.h
-> @@ -924,7 +924,7 @@
->  #define MX6UL_PAD_CSI_DATA06__ECSPI1_MOSI              0x01fc 0x0488 0x053c 3 1
->  #define MX6UL_PAD_CSI_DATA06__EIM_AD06                 0x01fc 0x0488 0x0000 4 0
->  #define MX6UL_PAD_CSI_DATA06__GPIO4_IO27               0x01fc 0x0488 0x0000 5 0
-> -#define MX6UL_PAD_CSI_DATA06__SAI1_RX_DATA             0x01fc 0x0488 0x0000 6 0
-> +#define MX6UL_PAD_CSI_DATA06__SAI1_RX_DATA             0x01fc 0x0488 0x05E4 6 1
 
-This should be a separate change and you need to explain it.
+best regards,
+Tiffany
+
+> Regards,
+> 
+> 	Hans
