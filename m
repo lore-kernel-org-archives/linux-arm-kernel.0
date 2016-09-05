@@ -1,59 +1,42 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 06 Sep 2016 00:33:05 +0300
-Subject: [PATCH] ARM: dts: wheat: add support for tactile switches
-In-Reply-To: <5383928.8UnDsUpmkz@wasted.cogentembedded.com>
-References: <5383928.8UnDsUpmkz@wasted.cogentembedded.com>
-Message-ID: <10465663.8teCsXZU7y@wasted.cogentembedded.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 5 Sep 2016 23:41:14 +0200
+Subject: irq_create_fwspec_mapping() in 4.8-rc2
+In-Reply-To: <57CD6B87.5010502@arm.com>
+References: <483F737F-9868-4E8A-A831-AA3F6F410AFF@gmail.com>
+ <57C98975.5020607@arm.com> <9FCA11A3-B677-42EA-80DB-674AC8E489E8@gmail.com>
+ <57C99111.3030105@arm.com> <F5716CCD-34FF-4CA8-B5F5-C2A33A5D9E91@gmail.com>
+ <57C9961F.8080602@arm.com> <B721D80D-B240-4779-8748-5CFAD330D986@gmail.com>
+ <57C99B3D.3010405@arm.com>
+ <CACRpkdYjmkkDxVah1HUNxoGEQ9hJeE-J1TwZ1wNEKq=swnL9JQ@mail.gmail.com>
+ <57CD6B87.5010502@arm.com>
+Message-ID: <CACRpkdaUviHgUtLhTPTRuW5rk=tZsvgYAJLqNFtz1u+q2jbM2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add  support for the  tactile switches  SW2/3 (on the debug board) as a
-virtual keyboard like it  was done with the Blanche board).
+On Mon, Sep 5, 2016 at 2:56 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> OK, I'll whip up a patch shortly. Should I also address the handful of
+> other non-TYPE_NONE that we have in the tree:
+>
+>         drivers/gpio/gpio-sx150x.c
+>         drivers/pinctrl/nomadik/pinctrl-nomadik.c
+>         drivers/pinctrl/pinctrl-coh901.c
+>         drivers/pinctrl/pinctrl-st.c
+>
+> But the bigger question is whether or not there is any value in the
+> pinctrl driver providing a default value at all. Do we have any case
+> where the trigger information is not provided by the firmware (DT or
+> ACPI), and where we rely on the default being set?
 
----
-This patch is against the 'renesas-devel-20160905-v4.8-rc5' of Simon Horman's
-'renesas.git' repo plus the Wheat DU patch...
+That happened with boardfiles. Which used to be the case with
+some of these, but AFAICT not any longer. I am uncertain about
+sx150x though.
 
- arch/arm/boot/dts/r8a7792-wheat.dts |   20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+In the boardfile case, I think actually the driver is responsible to
+set up the kind of interrupt trigger it wants (well it still can...
+but it should nowadays trust what it is given) but very often that
+did not happen, instead the drivers relied on hacks like these to
+have set up a default trigger type.
 
-Index: renesas/arch/arm/boot/dts/r8a7792-wheat.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7792-wheat.dts
-+++ renesas/arch/arm/boot/dts/r8a7792-wheat.dts
-@@ -12,6 +12,7 @@
- /dts-v1/;
- #include "r8a7792.dtsi"
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
- 
- / {
- 	model = "Wheat";
-@@ -56,6 +57,25 @@
- 		pinctrl-names = "default";
- 	};
- 
-+	keyboard {
-+		compatible = "gpio-keys";
-+
-+		key-a {
-+			linux,code = <KEY_A>;
-+			label = "SW2";
-+			wakeup-source;
-+			debounce-interval = <20>;
-+			gpios = <&gpio3 20 GPIO_ACTIVE_LOW>;
-+		};
-+		key-b {
-+			linux,code = <KEY_B>;
-+			label = "SW3";
-+			wakeup-source;
-+			debounce-interval = <20>;
-+			gpios = <&gpio11 2 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
- 	vcc_sdhi0: regulator-vcc-sdhi0 {
- 		compatible = "regulator-fixed";
- 
+Yours,
+Linus Walleij
