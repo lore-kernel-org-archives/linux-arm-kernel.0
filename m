@@ -1,68 +1,81 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon,  5 Sep 2016 11:00:03 -0700
-Subject: [PATCH v2] ARM: LPAE: initialize cache policy correctly
-Message-ID: <20160905180003.30638-1-stefan@agner.ch>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Tue,  6 Sep 2016 02:17:13 +0800
+Subject: [PATCH v3 0/2] arm64: dts: rockchip: Support PMU for rk3399 SoCs
+Message-ID: <1473099435-28198-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cachepolicy variable gets initialized using a masked pmd
-value. So far, the pmd has been masked with flags valid for the
-2-page table format, but the 3-page table format requires a
-different mask. On LPAE, this lead to a wrong assumption of what
-initial cache policy has been used. Later a check forces the
-cache policy to writealloc and prints the following warning:
-Forcing write-allocate cache policy for SMP
+Hello Heiko, ARM guys
 
-This patch introduces a new definition PMD_SECT_CACHE_MASK for
-both page table formats which masks in all cache flags in both
-cases.
+When Jay first submitted the rk3399.dtsi upstream
+<https://patchwork.kernel.org/patch/8885821/> he had the PMU node in there,
+but then took it out because the upstream binding wasn't done yet.
+It looks as if the upstream stuff has landed, since in linux/master I see:
+287e9357abcc DT/arm,gic-v3: Documment PPI partition support
+e3825ba1af3a irqchip/gic-v3: Add support for partitioned PPIs
+9e2c986cb460 irqchip: Add per-cpu interrupt partitioning library
+222df54fd8b7 genirq: Allow the affinity of a percpu interrupt to be set/retrieved
+651e8b54abde irqdomain: Allow domain matching on irq_fwspec
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-Changes since v1:
-- Introduce new definition PMD_SECT_CACHE_MASK
+This series patches add to support the rk3399 SoCs PMU.
+I pick up the https://patchwork.kernel.org/patch/9209369/.
 
- arch/arm/include/asm/pgtable-2level-hwdef.h | 1 +
- arch/arm/include/asm/pgtable-3level-hwdef.h | 1 +
- arch/arm/mm/mmu.c                           | 2 +-
- 3 files changed, 3 insertions(+), 1 deletion(-)
+As do some tests with ChromeOs for my rk3399 board.
+Tested with next-20160905 kernel on rk3399 board.
+https://github.com/Caesar-github/rockchip/tree/rk3399/pmu-upstream
 
-diff --git a/arch/arm/include/asm/pgtable-2level-hwdef.h b/arch/arm/include/asm/pgtable-2level-hwdef.h
-index d0131ee..3f82e9d 100644
---- a/arch/arm/include/asm/pgtable-2level-hwdef.h
-+++ b/arch/arm/include/asm/pgtable-2level-hwdef.h
-@@ -47,6 +47,7 @@
- #define PMD_SECT_WB		(PMD_SECT_CACHEABLE | PMD_SECT_BUFFERABLE)
- #define PMD_SECT_MINICACHE	(PMD_SECT_TEX(1) | PMD_SECT_CACHEABLE)
- #define PMD_SECT_WBWA		(PMD_SECT_TEX(1) | PMD_SECT_CACHEABLE | PMD_SECT_BUFFERABLE)
-+#define PMD_SECT_CACHE_MASK	(PMD_SECT_TEX(1) | PMD_SECT_CACHEABLE | PMD_SECT_BUFFERABLE)
- #define PMD_SECT_NONSHARED_DEV	(PMD_SECT_TEX(2))
- 
- /*
-diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h b/arch/arm/include/asm/pgtable-3level-hwdef.h
-index f8f1cff..4cd664a 100644
---- a/arch/arm/include/asm/pgtable-3level-hwdef.h
-+++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
-@@ -62,6 +62,7 @@
- #define PMD_SECT_WT		(_AT(pmdval_t, 2) << 2)	/* normal inner write-through */
- #define PMD_SECT_WB		(_AT(pmdval_t, 3) << 2)	/* normal inner write-back */
- #define PMD_SECT_WBWA		(_AT(pmdval_t, 7) << 2)	/* normal inner write-alloc */
-+#define PMD_SECT_CACHE_MASK	(_AT(pmdval_t, 7) << 2)
- 
- /*
-  * + Level 3 descriptor (PTE)
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 724d6be..4001dd1 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -137,7 +137,7 @@ void __init init_default_cache_policy(unsigned long pmd)
- 
- 	initial_pmd_value = pmd;
- 
--	pmd &= PMD_SECT_TEX(1) | PMD_SECT_BUFFERABLE | PMD_SECT_CACHEABLE;
-+	pmd &= PMD_SECT_CACHE_MASK;
- 
- 	for (i = 0; i < ARRAY_SIZE(cache_policies); i++)
- 		if (cache_policies[i].pmd == pmd) {
+localhost / # perf list
+
+List of pre-defined events (to be used in -e):
+cpu-cycles OR cycles [Hardware event]
+instructions [Hardware event]
+cache-references [Hardware event]
+cache-misses [Hardware event]
+branch-instructions OR branches [Hardware event]
+branch-misses [Hardware event]
+bus-cycles [Hardware event]
+...
+
+perf stat --cpu 0/1/2/3..... to minitor
+e.g. cpu0;
+
+localhost / # perf stat --cpu 0
+
+Performance counter stats for 'CPU(s) 0':
+
+3374.917571 task-clock (msec) # 1.001 CPUs utilized [100.00%]
+20 context-switches # 0.006 K/sec [100.00%]
+2 cpu-migrations # 0.001 K/sec [100.00%]
+55 page-faults # 0.016 K/sec
+7151843 cycles # 0.002 GHz [100.00%]
+<not supported> stalled-cycles-frontend
+<not supported> stalled-cycles-backend
+4272536 instructions # 0.60 insns per cycle [100.00%]
+568406 branches # 0.168 M/sec [100.00%]
+65652 branch-misses # 11.55% of all branches
+
+Also, 'perf top' to monitor the PMU interrupts from cpus
+
+-Caesar
+
+
+Changes in v3:
+- update with the lastest next kernel(20160905).
+- add Mark's ACK for PATCH[1/2].
+- updated on next kernel(20160905).
+- add the Mark's ACK for PATCH[2/2].
+
+Changes in v2:
+- AS Mark comments on https://patchwork.kernel.org/patch/9209369/
+  remove the interrupt-affinity property, we need depend on Marc' perf
+  code on https://patchwork.kernel.org/patch/9209369/.
+
+Caesar Wang (2):
+  arm64: dts: rockchip: change all interrupts cells for 4 on rk3399 SoCs
+  arm64: dts: rockchip: support the pmu node for rk3399
+
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 122 ++++++++++++++++++-------------
+ 1 file changed, 71 insertions(+), 51 deletions(-)
+
 -- 
-2.9.3
+1.9.1
