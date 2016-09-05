@@ -1,40 +1,104 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon,  5 Sep 2016 18:25:46 +0100
-Subject: [PATCH v2 0/2] arm64: Use static keys for CPU features
-Message-ID: <1473096348-19548-1-git-send-email-catalin.marinas@arm.com>
+Date: Mon,  5 Sep 2016 18:25:48 +0100
+Subject: [PATCH v2 2/2] arm64: Use static keys for CPU features
+In-Reply-To: <1473096348-19548-1-git-send-email-catalin.marinas@arm.com>
+References: <1473096348-19548-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1473096348-19548-3-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is aimed at optimising the arm64 cpus_have_cap()
-functionality (checking for the presence of certain CPU
-capabilities/features) to avoid a bitmap test and use a jump label
-instead, patched at boot time.
+This patch adds static keys transparently for all the cpu_hwcaps
+features by implementing an array of default-false static keys and
+enabling them when detected. The cpus_have_cap() check uses the static
+keys if the feature being checked is a constant, otherwise the compiler
+generates the bitmap test.
 
-While this series does not provide a significant performance improvement
-with the current kernel, it will be more beneficial with new features
-like TTBR0 PAN are which are used on hot paths (get_user/put_user,
-thread switching).
+Because of the early call to static_branch_enable() via
+check_local_cpu_errata() -> update_cpu_capabilities(), the jump labels
+are initialised in cpuinfo_store_boot_cpu().
 
-Jon, if you are happy with this patch (especially the documentation
-update), are ok for it to go into mainline via the arm64 tree?
-
-While there doesn't seem to be a specific maintainer for jump_label.*,
-cc'ing Peter and Jason for comments/acks/naks.
-
-Thanks.
-
-Changes since v1:
-- Moved the jump_label_init() call to smp_prepare_boot_cpu() following
-  Suzuki's suggestion
-- Fixed missing empty line in Documentation/static-keys.txt
-
-Catalin Marinas (2):
-  jump_labels: Allow array initialisers
-  arm64: Use static keys for CPU features
-
- Documentation/static-keys.txt       |  9 +++++++++
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Suzuki K. Poulose <Suzuki.Poulose@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
  arch/arm64/include/asm/cpufeature.h | 14 +++++++++++---
  arch/arm64/kernel/cpufeature.c      |  3 +++
  arch/arm64/kernel/smp.c             |  5 +++++
- include/linux/jump_label.h          | 12 ++++++++++++
- 5 files changed, 40 insertions(+), 3 deletions(-)
+ 3 files changed, 19 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 7099f26e3702..c9dfb1e4c435 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -9,6 +9,8 @@
+ #ifndef __ASM_CPUFEATURE_H
+ #define __ASM_CPUFEATURE_H
+ 
++#include <linux/jump_label.h>
++
+ #include <asm/hwcap.h>
+ #include <asm/sysreg.h>
+ 
+@@ -109,6 +111,7 @@ struct arm64_cpu_capabilities {
+ };
+ 
+ extern DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
++extern struct static_key_false cpu_hwcap_keys[ARM64_NCAPS];
+ 
+ bool this_cpu_has_cap(unsigned int cap);
+ 
+@@ -121,16 +124,21 @@ static inline bool cpus_have_cap(unsigned int num)
+ {
+ 	if (num >= ARM64_NCAPS)
+ 		return false;
+-	return test_bit(num, cpu_hwcaps);
++	if (__builtin_constant_p(num))
++		return static_branch_unlikely(&cpu_hwcap_keys[num]);
++	else
++		return test_bit(num, cpu_hwcaps);
+ }
+ 
+ static inline void cpus_set_cap(unsigned int num)
+ {
+-	if (num >= ARM64_NCAPS)
++	if (num >= ARM64_NCAPS) {
+ 		pr_warn("Attempt to set an illegal CPU capability (%d >= %d)\n",
+ 			num, ARM64_NCAPS);
+-	else
++	} else {
+ 		__set_bit(num, cpu_hwcaps);
++		static_branch_enable(&cpu_hwcap_keys[num]);
++	}
+ }
+ 
+ static inline int __attribute_const__
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 62272eac1352..919b2d0d68ae 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -46,6 +46,9 @@ unsigned int compat_elf_hwcap2 __read_mostly;
+ 
+ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+ 
++DEFINE_STATIC_KEY_ARRAY_FALSE(cpu_hwcap_keys, ARM64_NCAPS);
++EXPORT_SYMBOL(cpu_hwcap_keys);
++
+ #define __ARM64_FTR_BITS(SIGNED, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
+ 	{						\
+ 		.sign = SIGNED,				\
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index d93d43352504..c3c08368a685 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -437,6 +437,11 @@ void __init smp_cpus_done(unsigned int max_cpus)
+ void __init smp_prepare_boot_cpu(void)
+ {
+ 	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
++	/*
++	 * Initialise the static keys early as they may be enabled by the
++	 * cpufeature code.
++	 */
++	jump_label_init();
+ 	cpuinfo_store_boot_cpu();
+ 	save_boot_cpu_run_el();
+ }
