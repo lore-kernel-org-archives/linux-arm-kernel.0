@@ -1,47 +1,42 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Mon, 5 Sep 2016 10:39:35 +0800
-Subject: [PATCH v3 10/22] usb: chipidea: Consolidate extcon notifiers
-In-Reply-To: <CAJOFmgwcc95R8n9DGw0Er4icCMnd=Ku-J0Q7cMEOK212oUs62g@mail.gmail.com>
-References: <20160901004036.23936-1-stephen.boyd@linaro.org>
- <20160901004036.23936-11-stephen.boyd@linaro.org>
- <20160902031704.GC16876@shlinux2>
- <CAJOFmgwcc95R8n9DGw0Er4icCMnd=Ku-J0Q7cMEOK212oUs62g@mail.gmail.com>
-Message-ID: <20160905023935.GA24593@b29397-desktop>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 5 Sep 2016 10:54:45 +0800
+Subject: [GIT PULL] i.MX fixes for 4.8, 2nd round
+Message-ID: <20160905025445.GJ25778@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 02, 2016 at 06:03:06PM -0700, Stephen Boyd wrote:
-> On Thu, Sep 1, 2016 at 8:17 PM, Peter Chen <hzpeterchen@gmail.com> wrote:
-> > On Wed, Aug 31, 2016 at 05:40:24PM -0700, Stephen Boyd wrote:
-> >>
-> >>
-> >>               if (cable->state)
-> >> -                     val |= OTGSC_ID;
-> >> +                     val &= ~OTGSC_ID; /* A device */
-> >>               else
-> >> -                     val &= ~OTGSC_ID;
-> >> +                     val |= OTGSC_ID; /* B device */
+The following changes since commit cfee6b5874654fe4e7388bc3112d3afb76cd8b9e:
 
-One more comment, would you change the comment to "host" and "device"?
-Unless we are supporting OTG-compliance device, otherwise, we should
-not mention "A" or "B" for USB device.
+  ARM: imx6ul: populates platform device at .init_machine (2016-08-17 22:43:05 +0800)
 
-Peter
-> >>
-> >>               if (cable->enabled)
-> >>                       val |= OTGSC_IDIE;
-> >
-> > /**
-> >  * struct ci_hdrc_cable - structure for external connector cable state tracking
-> >  * @state: current state of the line
-> >
-> > You may change the name of variable "state" to "connected", per I
-> > understand, it has changed to the meaning of connected status for your patch.
-> >
-> 
-> Ok sure.
+are available in the git repository at:
 
--- 
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.8-2
 
-Best Regards,
-Peter Chen
+for you to fetch changes up to f065e9e4addd75c21bb976bb2558648bf4f61de6:
+
+  ARM: dts: imx6qdl: Fix SPDIF regression (2016-09-05 10:30:58 +0800)
+
+----------------------------------------------------------------
+i.MX fixes for 4.8, 2nd round:
+ - Fix misspelled "ti,x-plate-ohms" property name of touchscreen
+   controller for imx7d-sdb DTS.
+ - Add missing BM_CLPCR_BYPASS_PMIC_READY setting for i.MX6SX to get
+   suspend/resume work properly.
+ - Fix SPDIF regression on imx6qdl which caused by a clock update on
+   spdif device node.
+
+----------------------------------------------------------------
+Anson Huang (1):
+      ARM: imx6: add missing BM_CLPCR_BYPASS_PMIC_READY setting for imx6sx
+
+Fabio Estevam (1):
+      ARM: dts: imx6qdl: Fix SPDIF regression
+
+Vladimir Zapolskiy (1):
+      ARM: dts: imx7d-sdb: fix ti,x-plate-ohms property name
+
+ arch/arm/boot/dts/imx6qdl.dtsi  | 2 +-
+ arch/arm/boot/dts/imx7d-sdb.dts | 2 +-
+ arch/arm/mach-imx/pm-imx6.c     | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
