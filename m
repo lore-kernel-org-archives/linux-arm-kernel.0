@@ -1,101 +1,52 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 5 Sep 2016 08:51:46 +0200
-Subject: [PATCH 1/2] mtd: nand: automate NAND timings selection
-In-Reply-To: <1472820149-24241-2-git-send-email-s.hauer@pengutronix.de>
-References: <1472820149-24241-1-git-send-email-s.hauer@pengutronix.de>
- <1472820149-24241-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20160905085146.239129bd@bbrezillon>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 5 Sep 2016 08:53:08 +0200
+Subject: [PATCH v2] pwm: samsung: fix to use lowest div for large enough
+ modulation bits
+In-Reply-To: <20160816142201.12672-1-sw0312.kim@samsung.com>
+References: <1470133006-4272-1-git-send-email-sw0312.kim@samsung.com>
+ <20160816142201.12672-1-sw0312.kim@samsung.com>
+Message-ID: <20160905065308.GF3532@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
-
-It feels weird to review his own patch, but I have a few comments. :)
-
-On Fri,  2 Sep 2016 14:42:28 +0200
-Sascha Hauer <s.hauer@pengutronix.de> wrote:
-
-> From: Boris Brezillon <boris.brezillon@free-electrons.com>
+On Tue, Aug 16, 2016 at 11:22:01PM +0900, Seung-Woo Kim wrote:
+> From pwm_samsung_calc_tin(), there is routine to find the lowest
+> divider possible to generate lower frequency than requested one.
+> But it is always possible to generate requested frequency with
+> large enough modulation bits except s3c24xx, so this patch fixes
+> to use lowest div for the case. This patch removes following UBSAN
+> warning:
 > 
-> The NAND framework provides several helpers to query timing modes supported
-> by a NAND chip, but this implies that all NAND controller drivers have
-> to implement the same timings selection dance.
+>    UBSAN: Undefined behaviour in drivers/pwm/pwm-samsung.c:197:13
+>    shift exponent 32 is too large for 32-bit type 'long unsigned int'
+>    [...]
+>    [<c0670248>] (ubsan_epilogue) from [<c06707b4>] (__ubsan_handle_shift_out_of_bounds+0xd8/0x120)
+>    [<c06707b4>] (__ubsan_handle_shift_out_of_bounds) from [<c0694b28>] (pwm_samsung_config+0x508/0x6a4)
+>    [<c0694b28>] (pwm_samsung_config) from [<c069286c>] (pwm_apply_state+0x174/0x40c)
+>    [<c069286c>] (pwm_apply_state) from [<c0b2e070>] (pwm_fan_probe+0xc8/0x488)
+>    [<c0b2e070>] (pwm_fan_probe) from [<c07ba8b0>] (platform_drv_probe+0x70/0x150)
+>    [...]
 > 
-> Provide a common logic to select the best timings based on ONFI or
-> ->onfi_timing_mode_default information.  
-> NAND controller willing to support timings adjustment should just
-> implement the ->setup_data_interface() method.
-
-Now I remember one of the reason I did not post a v2 (apart from not
-having the time).
-
-If understand the ONFI spec correctly, when you reset the NAND chip,
-you get back to SDR+timing-mode0. In the core we do not control when
-the reset command (0xff) is issued, and this prevents us from
-re-applying the correct timing mode after a reset.
-
-Maybe we should provide a nand_reset() helper to hide this complexity,
-and patch all ->cmdfunc(NAND_CMD_RESET) callers to call nand_reset()
-instead.
-
-Note that the interface+timing-mode config is not necessarily the only
-thing we'll have to re-apply after a reset (especially on MLC NANDs), so
-having place where we can put all operations that should be done after
-a reset is a good thing.
-
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
 > ---
->  drivers/mtd/nand/nand_base.c | 196 ++++++++++++++++++++++++++++++++++++++++++-
->  include/linux/mtd/nand.h     | 115 ++++++++++++++-----------
->  2 files changed, 261 insertions(+), 50 deletions(-)
+> Changes from v1
+>  * Remove too complex condition, instead, just checking simple variant->bits as Krzysztof's suggestion
+>  * Add comment from Tomasz
 > 
-> diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-> index 77533f7..018fd56 100644
-> --- a/drivers/mtd/nand/nand_base.c
-> +++ b/drivers/mtd/nand/nand_base.c
-> @@ -3322,6 +3322,148 @@ static void nand_onfi_detect_micron(struct nand_chip *chip,
->  	chip->setup_read_retry = nand_setup_read_retry_micron;
->  }
->  
-> +/**
-> + * nand_setup_data_interface - Setup the data interface and timings on the
-> + *			       controller side
-> + * @mtd: MTD device structure
-> + * @conf: new configuration to apply
-> + *
-> + * Try to configure the NAND controller to support the provided data
-> + * interface configuration.
-> + *
-> + * Returns 0 in case of success or -ERROR_CODE.
-> + */
-> +static int nand_setup_data_interface(struct mtd_info *mtd,
-> +				     const struct nand_data_interface *conf)
-> +{
-> +	struct nand_chip *chip = mtd_to_nand(mtd);
-> +	int ret;
-> +
-> +	if (!chip->setup_data_interface)
-> +		return -ENOTSUPP;
-> +
-> +	ret = chip->setup_data_interface(mtd, conf, false);
-> +	if (ret)
-> +		return ret;
-> +
-> +	*chip->data_iface = *conf;
+> The UBSAN warning from ARM is reported with the patch in following link:
+> https://patchwork.kernel.org/patch/9189575/
+> ---
+>  drivers/pwm/pwm-samsung.c | 15 ++++++++++++---
+>  1 file changed, 12 insertions(+), 3 deletions(-)
 
-Maybe we can just switch the pointers here instead of copying its
-content.
-This would require turning the chip->data_iface into const, or passing
-non-const parameter to nand_setup_data_interface(), but I don't see any
-good reason to do this extra copy.
+Applied, thanks.
 
-> +
-> +	return 0;
-> +}
-> +
-
-Thanks,
-
-Boris
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/ec8c43f2/attachment.sig>
