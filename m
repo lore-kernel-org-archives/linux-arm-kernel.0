@@ -1,9 +1,9 @@
 From: juri.lelli@arm.com (Juri Lelli)
-Date: Mon,  5 Sep 2016 15:22:51 +0100
-Subject: [PATCH v7 7/8] arm: add sysfs cpu_capacity attribute
+Date: Mon,  5 Sep 2016 15:22:52 +0100
+Subject: [PATCH v7 8/8] arm64: add sysfs cpu_capacity attribute
 In-Reply-To: <1473085372-2840-1-git-send-email-juri.lelli@arm.com>
 References: <1473085372-2840-1-git-send-email-juri.lelli@arm.com>
-Message-ID: <1473085372-2840-8-git-send-email-juri.lelli@arm.com>
+Message-ID: <1473085372-2840-9-git-send-email-juri.lelli@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,29 +15,32 @@ The new attribute shows up as:
 
  /sys/devices/system/cpu/cpu*/cpu_capacity
 
-Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
 Signed-off-by: Juri Lelli <juri.lelli@arm.com>
 ---
 
 Changes from v5:
   - add mutex to protect cpu_scale (as pointed out by Morten off-line)
 ---
- arch/arm/kernel/topology.c | 73 ++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/topology.c | 73 ++++++++++++++++++++++++++++++++++++++++++++
  1 file changed, 73 insertions(+)
 
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index a26e787926dc..e79ac856eeef 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -41,6 +41,7 @@
-  * updated during this sequence.
-  */
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index b75b0ba2e113..cff34cc858b7 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -26,6 +26,7 @@
+ #include <asm/topology.h>
+ 
  static DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
 +static DEFINE_MUTEX(cpu_scale_mutex);
  
  unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
  {
-@@ -52,6 +53,76 @@ static void set_capacity_scale(unsigned int cpu, unsigned long capacity)
+@@ -37,6 +38,76 @@ static void set_capacity_scale(unsigned int cpu, unsigned long capacity)
  	per_cpu(cpu_scale, cpu) = capacity;
  }
  
@@ -111,18 +114,18 @@ index a26e787926dc..e79ac856eeef 100644
 +late_initcall(register_cpu_capacity_sysctl);
 +#endif
 +
- #ifdef CONFIG_OF
- struct cpu_efficiency {
- 	const char *compatible;
-@@ -131,6 +202,7 @@ static void normalize_cpu_capacity(void)
+ static u32 capacity_scale;
+ static u32 *raw_capacity;
+ static bool cap_parsing_failed;
+@@ -87,6 +158,7 @@ static void normalize_cpu_capacity(void)
  		return;
  
  	pr_debug("cpu_capacity: capacity_scale=%u\n", capacity_scale);
 +	mutex_lock(&cpu_scale_mutex);
  	for_each_possible_cpu(cpu) {
- 		capacity = (raw_capacity[cpu] << SCHED_CAPACITY_SHIFT)
- 			/ capacity_scale;
-@@ -138,6 +210,7 @@ static void normalize_cpu_capacity(void)
+ 		pr_debug("cpu_capacity: cpu=%d raw_capacity=%u\n",
+ 			 cpu, raw_capacity[cpu]);
+@@ -96,6 +168,7 @@ static void normalize_cpu_capacity(void)
  		pr_debug("cpu_capacity: CPU%d cpu_capacity=%lu\n",
  			cpu, arch_scale_cpu_capacity(NULL, cpu));
  	}
