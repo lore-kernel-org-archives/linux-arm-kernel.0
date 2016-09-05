@@ -1,25 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 5 Sep 2016 11:09:38 +0200
-Subject: [PATCH 0/6] SA11x0 serial updates
-In-Reply-To: <20160829120531.GG1041@n2100.armlinux.org.uk>
-References: <20160829100232.GC1041@n2100.armlinux.org.uk>
- <20160829102328.GA28796@n2100.armlinux.org.uk>
- <20160829110157.GE1041@n2100.armlinux.org.uk>
- <20160829112540.GF1041@n2100.armlinux.org.uk>
- <20160829120531.GG1041@n2100.armlinux.org.uk>
-Message-ID: <CACRpkdZFZVq92UAiq+dsHabyEk+_AbQ_B3SOETGru-8Kbp=h9Q@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 5 Sep 2016 11:10:35 +0200
+Subject: [PATCH 3/3] ARM: dts: wheat: add QSPI support
+In-Reply-To: <3191777.fJ30rYXr4J@wasted.cogentembedded.com>
+References: <1648590.FPpmBRoQyh@wasted.cogentembedded.com>
+ <3191777.fJ30rYXr4J@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdW+82ePveuVbOrPU0uRj4Uu5f8+NvzHpjWQr8Wa_BoU+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 2:05 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
+On Sat, Sep 3, 2016 at 12:09 AM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Define the Wheat board dependent part of the QSPI device node.
+> Add device nodes for Spansion S25FL512S SPI flash and MTD partitions on it.
+>
+> Based  on the original (and large) patch by Vladimir Barinov
+> <vladimir.barinov@cogentembedded.com>.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-> This series converts SA11x0 serial to make use of the mctrl helpers
-> where appropriate.  This allows us to remove several board-specific
-> callbacks.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
->From GPIO and H3600 point of view:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Disclaimer: I have no board schematics nor manuals describing FLASH layout.
 
-Yours,
-Linus Walleij
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
