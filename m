@@ -1,119 +1,94 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 5 Sep 2016 15:52:17 +0100
-Subject: [PATCH] arm64: mm: phys_mem_access_prot() reports non-kernel
- memory as device memory
-In-Reply-To: <20160905144225.GD10221@arm.com>
-References: <1473064984-9494-1-git-send-email-james.morse@arm.com>
- <20160905103526.GD2649@arm.com> <57CD6D2E.70208@arm.com>
- <CAKv+Gu-eEodAFnXhAygzEFU34vZitzhH2yfU71=3gyVFBsdQYA@mail.gmail.com>
- <20160905132411.GC10221@arm.com>
- <CAKv+Gu9+r1wwcmd60nZ+tuLgj=MzDdyzs9+pCjZr+6N_S+00xQ@mail.gmail.com>
- <20160905144225.GD10221@arm.com>
-Message-ID: <CAKv+Gu8a3faYt1ET4di2kvBScaNyuTR_QZ7-c8h7PuLrUjP+zA@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 5 Sep 2016 15:57:51 +0100
+Subject: [PATCH v4 05/15] drivers: platform: add fwnode base platform
+ devices retrieval
+In-Reply-To: <7659b956-c49d-bd0d-7a1d-8dfc3da6f409@linaro.org>
+References: <1471274620-20754-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1471274620-20754-6-git-send-email-lorenzo.pieralisi@arm.com>
+ <7659b956-c49d-bd0d-7a1d-8dfc3da6f409@linaro.org>
+Message-ID: <20160905145751.GA7480@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 September 2016 at 15:42, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Sep 05, 2016 at 02:41:16PM +0100, Ard Biesheuvel wrote:
->> On 5 September 2016 at 14:24, Will Deacon <will.deacon@arm.com> wrote:
->> > On Mon, Sep 05, 2016 at 02:10:54PM +0100, Ard Biesheuvel wrote:
->> >> On 5 September 2016 at 14:03, James Morse <james.morse@arm.com> wrote:
->> >> > On 05/09/16 11:35, Will Deacon wrote:
->> >> >> So our abstractions don't seem to align with reality. Why are the ACPI
->> >> >> tables getting marked as NOMAP to being with?
->> >> >
->> >> > EFI adds any region we can map as normal memory to memblock.memory, it also adds
->> >> > anything it considers reserved to the memblock.nomap, e.g. the ACPI tables. This
->> >> > causes these regions be left out of the linear map.
->> >> > (I don't know why exactly, but assume its so that the attributes and permissions
->> >> > can be tweaked easily)
->> >> >
->> >>
->> >> To prevent mismatched attributes between the linear mapping and
->> >> whatever mapping the firmware and/or ACPI are using. Also, going
->> >> through the trouble of mapping runtime services executable code with
->> >> R-X permissions and then having a writable alias is not great in terms
->> >> of security.
->> >
->> > Ok, but with this patch we potentially have both of those problems
->> > (mismatched attributes and RWX permission) with the userspace mapping :/
->> >
->> > Is it worth trying to avoid any of this, or do we just throw our hands
->> > in the air and give up when /dev/mem is being used?
->> >
->>
->> Well, I do think /dev/mem is a ridiculous hack, but it is arguably an
->> improvement to not map a region as device if we know it is backed by
->> memory.
->>
->> Leif already did a lot of work on dmidecode and related tools to get
->> rid of /dev/mem dependencies, especially because of the fact that it
->> used 'known' physical addresses to look for magic numbers identifying
->> SMBIOS tables etc. I am not sure if acpidump was on our radar yet, but
->> in the long term, we should be able to reduce the dependency on
->> /dev/mem for anything other than development use.
->
-> Judging by Leif's reply, acpidump has already been fixed too.
->
+On Mon, Sep 05, 2016 at 09:19:43PM +0800, Hanjun Guo wrote:
+> On 2016/8/15 23:23, Lorenzo Pieralisi wrote:
+> >The platform device kernel API does not provide functions to
+> >retrieve a platform device through the corresponding struct
+> >device fwnode pointer.
+> >
+> >Implement the fwnode platform_device look-up in drivers core
+> >code by using the bus_find_device() API and a corresponding
+> >matching function. The OF equivalent (eg of_find_device_by_node())
+> >will reuse the newly introduced function when OF code will
+> >take care of setting up the device->fwnode value that is
+> >currently left dangling for platform devices instantiated out
+> >of device tree nodes.
+> >
+> >Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> >Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> >---
+> > drivers/base/platform.c         | 23 +++++++++++++++++++++++
+> > include/linux/platform_device.h |  3 +++
+> > 2 files changed, 26 insertions(+)
+> >
+> >diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+> >index 6482d47..3ef150d 100644
+> >--- a/drivers/base/platform.c
+> >+++ b/drivers/base/platform.c
+> >@@ -760,6 +760,29 @@ err_out:
+> > }
+> > EXPORT_SYMBOL_GPL(__platform_create_bundle);
+> >
+> >+static int fwnode_dev_match(struct device *dev, void *data)
+> >+{
+> >+	return dev->fwnode == data;
+> >+}
+> >+
+> >+/**
+> >+ * platform_find_device_by_fwnode() - Find the platform_device associated
+> >+ *				      with a fwnode
+> >+ * @fwnode: Pointer to firmware node
+> >+ *
+> >+ * Returns platform_device pointer, or NULL if not found
+> >+ */
+> >+struct platform_device *
+> >+platform_find_device_by_fwnode(struct fwnode_handle *fwnode)
+> >+{
+> >+	struct device *dev;
+> >+
+> >+	dev = bus_find_device(&platform_bus_type, NULL, fwnode,
+> >+			      fwnode_dev_match);
+> >+	return dev ? to_platform_device(dev) : NULL;
+> >+}
+> >+EXPORT_SYMBOL(platform_find_device_by_fwnode);
+> 
+> As SMMU is registered as platform devices, I think we need such
+> API to retrieve the platform device with fwnode handle, actually
+> Kefeng introduced a similar patch [1], but your patch is more
+> generic, so this patch make sense to me,
+> 
+> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Fortunately, yes.
+Thanks ! Strictly speaking, with Robin's new series:
 
->> Would it help at all if we restricted these uses to read only? I am
->> not aware of any tools that require read/write access to memory in
->> this way.
+https://lists.linuxfoundation.org/pipermail/iommu/2016-August/018230.html
 
 
+(and corresponding v5 of this one that I have rebased on top of it) we
+do not need this patch any longer and it is not really that generic
+keeping in mind that it can't be used for DT matching (because in DT
+dev->fwnode is dangling); I will see if I keep this patch according
+to dependencies.
 
+Side note: I have a problem with [1], since that code is there to
+implement DT phandles in ACPI IIUC and we must really prevent that :)
 
->
-> I'd certainly be happier if we dropped the write permission and derived
-> the memory type from EFI for the NOMAP regions (it looks like ia64 tries
-> to do something like this, whereas we currently return non-cacheable if
-> O_SYNC is set on the fd).
->
+Thanks !
+Lorenzo
 
-The UEFI memory map describes the supported mapping types. I.e, most
-regions are listed as
-
-[Conventional Memory|   |  |  |  |  |  |  |   |WB|WT|WC|UC]
-
-which means that it is legal to map it as
-
-WB:
-Normal Memory
-Outer Write-back non-transient
-Inner Write-back non-transient
-
-WT:
-Normal Memory
-Outer Write-through non-transient
-Inner Write-through non-transient
-
-WC:
-Normal Memory
-Outer non-cacheable
-Inner non-cacheable
-
-UC:
-Device-nGnRnE
-
-(this is straight from the UEFI spec)
-
-So while WB is used in the majority of cases, this is not universally
-true, and the UEFI or ACPI layers may decide to use any of those for
-reserved regions.
-
-We already had a separate discussion whether it makes sense to include
-the UC attribute in ACPI memory regions. The problem here is that it
-is not unambiguously defined whether the attributes describe the
-nature of the memory regions (i.e, the backing) or the nature of the
-/contents/ of the memory regions. This is further complicated by the
-fact that occupied and available regions are described in the same
-way.
-
-The bottom line is that, in general, we cannot infer from the UEFI
-memory map how a region is currently mapped if it is not covered by
-the linear mapping. What we /could/ do is generally disallow device
-mappings for regions that can also be mapped as memory (i.e, not only
-for /dev/mem) (although I think ACPI RAS stipulates Device-nGnRnE in
-some cases.)
+> Thanks
+> Hanjun
+> 
+> [1]: https://patchwork.kernel.org/patch/7743661/
+> 
