@@ -1,109 +1,56 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 5 Sep 2016 16:38:28 +0100
-Subject: [PATCH v2 1/7] arm64: Factor out PAN enabling/disabling into
- separate uaccess_* macros
-In-Reply-To: <1472828533-28197-2-git-send-email-catalin.marinas@arm.com>
-References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
- <1472828533-28197-2-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20160905153828.GA27305@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 05 Sep 2016 17:39:27 +0200
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <CADRPPNR1_6fbaHLvbmNZW+r7YWW=vOZ+wGCS-MAcNPi9gB3eOw@mail.gmail.com>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <6414695.LEIYfGPUEg@wuerfel>
+ <CADRPPNR1_6fbaHLvbmNZW+r7YWW=vOZ+wGCS-MAcNPi9gB3eOw@mail.gmail.com>
+Message-ID: <4865343.bOXkeC8XtQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-On Fri, Sep 02, 2016 at 04:02:07PM +0100, Catalin Marinas wrote:
-> This patch moves the directly coded alternatives for turning PAN on/off
-> into separate uaccess_{enable,disable} macros or functions. The asm
-> macros take a few arguments which will be used in subsequent patches.
+On Friday, September 2, 2016 5:16:31 PM CEST Leo Li wrote:
 > 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: James Morse <james.morse@arm.com>
-> Cc: Kees Cook <keescook@chromium.org>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  arch/arm64/include/asm/futex.h       | 14 ++++-----
->  arch/arm64/include/asm/uaccess.h     | 55 ++++++++++++++++++++++++++++++------
->  arch/arm64/kernel/armv8_deprecated.c | 10 +++----
->  arch/arm64/lib/clear_user.S          |  8 ++----
->  arch/arm64/lib/copy_from_user.S      |  8 ++----
->  arch/arm64/lib/copy_in_user.S        |  8 ++----
->  arch/arm64/lib/copy_to_user.S        |  8 ++----
->  7 files changed, 71 insertions(+), 40 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
-> index f2585cdd32c2..7e5f236093be 100644
-> --- a/arch/arm64/include/asm/futex.h
-> +++ b/arch/arm64/include/asm/futex.h
-> @@ -27,9 +27,9 @@
->  #include <asm/sysreg.h>
->  
->  #define __futex_atomic_op(insn, ret, oldval, uaddr, tmp, oparg)		\
-> +do {									\
-> +	uaccess_enable(ARM64_HAS_PAN);					\
->  	asm volatile(							\
-> -	ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,		\
-> -		    CONFIG_ARM64_PAN)					\
->  "	prfm	pstl1strm, %2\n"					\
->  "1:	ldxr	%w1, %2\n"						\
->  	insn "\n"							\
-> @@ -44,11 +44,11 @@
->  "	.popsection\n"							\
->  	_ASM_EXTABLE(1b, 4b)						\
->  	_ASM_EXTABLE(2b, 4b)						\
-> -	ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,		\
-> -		    CONFIG_ARM64_PAN)					\
->  	: "=&r" (ret), "=&r" (oldval), "+Q" (*uaddr), "=&r" (tmp)	\
->  	: "r" (oparg), "Ir" (-EFAULT)					\
-> -	: "memory")
-> +	: "memory");							\
-> +	uaccess_disable(ARM64_HAS_PAN);					\
-> +} while (0)
+> Can we use the firmware or bootloader information to provide the
+> default dma-mapping attributes for devices that doesn't have an
+> of_node pointer or ACPI data?  This will at least restore what we had
+> previously provided .  I'm concerned that changing all the drivers
+> that are creating child device will be a big effort.  Like I mentioned
+> in another thread, there are many instances of platform_device_add()
+> under the drivers/ directory.
 
-It might be worth noting in the commit message that this change means
-that any memory accesses the compiler decides to spill between uaccess_*
-calls and the main asm block are unprotected, but that's unlikely to be
-an issue in practice.
+Fortunately, there are not too many drivers that call platform_device_add
+*and* try to set up a dma mask for the child device:
 
-[...]
+git grep -wl dma_mask drivers | xargs grep -wl 'platform_device_\(add\|register\)'
 
->  /*
-> + * User access enabling/disabling.
-> + */
-> +#define uaccess_disable(alt)						\
-> +do {									\
-> +	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), alt,			\
-> +			CONFIG_ARM64_PAN));				\
-> +} while (0)
-> +
-> +#define uaccess_enable(alt)						\
-> +do {									\
-> +	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), alt,			\
-> +			CONFIG_ARM64_PAN));				\
-> +} while (0)
+drivers/base/platform.c
+drivers/bcma/main.c
+drivers/eisa/virtual_root.c
+drivers/mfd/mfd-core.c
+drivers/mfd/omap-usb-host.c
+drivers/misc/mic/card/mic_x100.c
+drivers/platform/goldfish/pdev_bus.c
+drivers/ssb/main.c
+drivers/usb/chipidea/core.c
+drivers/usb/dwc3/dwc3-exynos.c
+drivers/usb/dwc3/host.c
+drivers/usb/gadget/udc/bdc/bdc_pci.c
+drivers/usb/host/bcma-hcd.c
+drivers/usb/host/fsl-mph-dr-of.c
+drivers/usb/host/ssb-hcd.c
+drivers/usb/misc/ftdi-elan.c
+drivers/usb/musb/blackfin.c
+drivers/usb/musb/musb_dsps.c
+drivers/usb/musb/omap2430.c
+drivers/usb/musb/ux500.c
 
-Passing the alternative down is somewhat confusing. e.g. in the futex
-case it looks like we're only doing something when PAN is present,
-whereas we'll manipulate TTBR0 in the absence of PAN.
+Most of these are probably never used with any nonstandard
+DMA settings (IOMMU, cache coherency, offset, ...).
 
-If I've understood correctly, we need this to distinguish regular
-load/store uaccess sequences (eg. the futex code) from potentially
-patched unprivileged load/store sequences (e.g. {get,put}_user) when
-poking PSTATE.PAN.
+One thing we could possibly do is to go through these and
+replace the hardcoded dma mask setup with of_dma_configure()
+in all cases in which we actually use DT for probing, which
+should cover the interesting cases.
 
-So perhaps we could ahve something like:
-
-* privileged_uaccess_{enable,disable}()
-  Which toggle TTBR0, or PAN (always).
-  These would handle cases like the futex/swp code.
- 
-* (unprivileged_)uaccess_{enable,disable}()
-  Which toggle TTBR0, or PAN (in the absence of UAO).
-  These would handle cases like the {get,put}_user sequences.
-
-Though perhaps that is just as confusing. ;)
-
-Otherwise, this looks like a nice centralisation of the PSTATE.PAN
-manipulation code.
-
-Thanks,
-Mark.
+	Arnd
