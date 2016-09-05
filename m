@@ -1,34 +1,124 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 04 Sep 2016 16:31:40 -0700
-Subject: [PATCH] ARM: LPAE: initialize cachepolicy correctly
-In-Reply-To: <20160904220903.GN1041@n2100.armlinux.org.uk>
-References: <20160904053331.7264-1-stefan@agner.ch>
- <20160904220903.GN1041@n2100.armlinux.org.uk>
-Message-ID: <eb470e86a233b7bc8328c820527f53c1@agner.ch>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 5 Sep 2016 02:23:33 +0200
+Subject: [PATCH 5/7] ARM64: meson-gxbb: add USB Nodes
+In-Reply-To: <20160904213152.25837-6-martin.blumenstingl@googlemail.com>
+References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
+ <20160904213152.25837-6-martin.blumenstingl@googlemail.com>
+Message-ID: <aa1ff8df-ab18-73e3-c39e-a1f75ab3eba0@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-09-04 15:09, Russell King - ARM Linux wrote:
-> On Sat, Sep 03, 2016 at 10:33:31PM -0700, Stefan Agner wrote:
->> The cachepolicy variable gets initialized using a masked pmd
->> So far, the pmd has been masked with flags valid for the 2-page
->> table format. In the LPAE case, this lead to a wrong assumption
->> of what the initial cachepolicy has been used. Later a check
->> forces the cache policy to writealloc and prints the following
->> warning:
->> Forcing write-allocate cache policy for SMP
->>
->> This patch uses PMD_SECT_WBWA to mask all cache setting flags.
->> The define represents the complete mask of the cache relevant
->> flags for both page table formats.
+Hi Martin,
+
+Am 04.09.2016 um 23:31 schrieb Martin Blumenstingl:
+> Add the nodes for the dwc2 USB controller and the related USB PHYs.
+> Currently we force usb0 to host mode because OTG is currently not
+> working in our PHY driver.
 > 
-> PMD_SECT_WBWA is just one possible combination, it's not a bit-mask.
-> We need a new definition.
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 52 +++++++++++++++++++++++++++++
+>  1 file changed, 52 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> index 2e8a3d9..02dfc54 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> @@ -151,6 +151,34 @@
+>  		#size-cells = <2>;
+>  		ranges;
+>  
+> +		usb-phys at c0000000 {
+> +			compatible = "simple-bus";
+> +			reg = <0x0 0xc0000000 0x0 0x40>;
+> +			#address-cells = <2>;
+> +			#size-cells = <2>;
+> +			ranges = <0x0 0x0 0x0 0xc0000000 0x0 0x40>;
 
-Agreed, it just happens to be the same as the bit-mask in both
-page-table layouts.
+Does this correspond to any physical bus or could we drop this layer?
 
-Does PMD_SECT_CACHE_MASK sounds like a reasonable identifier for it?
+> +
+> +			usb0_phy: usb_phy at 0 {
 
---
-Stefan
+phy at 0 to avoid the underscore in node name? dash otherwise.
+If dropping the bus, *phy at c0000000 obviously.
+
+> +				compatible = "amlogic,meson-gxbb-usb2-phy";
+> +				#phy-cells = <0>;
+> +				reg = <0x0 0x0 0x0 0x20>;
+> +				resets = <&reset 34>;
+> +				clocks = <&clkc CLKID_USB &clkc CLKID_USB0>;
+
+<&clkc CLKID_USB>, <&clkc CLKID_USB0> please.
+
+> +				clock-names = "usb_general", "usb";
+> +				status = "disabled";
+> +			};
+> +
+> +			usb1_phy: usb_phy at 20 {
+> +				compatible = "amlogic,meson-gxbb-usb2-phy";
+> +				#phy-cells = <0>;
+> +				reg = <0x0 0x20 0x0 0x20>;
+> +				resets = <&reset 34>;
+> +				clocks = <&clkc CLKID_USB &clkc CLKID_USB1>;
+
+Ditto
+
+> +				clock-names = "usb_general", "usb";
+> +				status = "disabled";
+> +			};
+> +		};
+> +
+>  		cbus: cbus at c1100000 {
+>  			compatible = "simple-bus";
+>  			reg = <0x0 0xc1100000 0x0 0x100000>;
+> @@ -496,6 +524,30 @@
+>  			};
+>  		};
+>  
+> +		usb0: usb-controller at c9000000 {
+
+usb at c9000000 by convention.
+
+> +			compatible = "amlogic,meson-gxbb-usb", "snps,dwc2";
+> +			reg = <0x0 0xc9000000 0x0 0x40000>;
+> +			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&clkc CLKID_USB0_DDR_BRIDGE>;
+> +			clock-names = "otg";
+> +			phys = <&usb0_phy>;
+> +			phy-names = "usb2-phy";
+> +			dr_mode = "host";
+> +			status = "disabled";
+> +		};
+> +
+> +		usb1: usb-controller at c9100000 {
+
+usb at c9100000
+
+> +			compatible = "amlogic,meson-gxbb-usb", "snps,dwc2";
+> +			reg = <0x0 0xc9100000 0x0 0x40000>;
+> +			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&clkc CLKID_USB1_DDR_BRIDGE>;
+> +			clock-names = "otg";
+> +			phys = <&usb1_phy>;
+> +			phy-names = "usb2-phy";
+> +			dr_mode = "host";
+> +			status = "disabled";
+> +		};
+> +
+>  		ethmac: ethernet at c9410000 {
+>  			compatible = "amlogic,meson-gxbb-dwmac", "snps,dwmac";
+>  			reg = <0x0 0xc9410000 0x0 0x10000
+
+Thanks for the huge progress you guys have been making.
+
+This patchset will probably clash with Neil's GXL preparations?
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
