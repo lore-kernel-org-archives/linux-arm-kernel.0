@@ -1,74 +1,53 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 5 Sep 2016 22:21:43 +0200
-Subject: [PATCH 5/7] ARM: sun8i: a33: Add display pipeline
-In-Reply-To: <CAGb2v66F+i=8SxrCN2+HNrjo5d=zXpCmbe9R=BT2sBxDXXXquw@mail.gmail.com>
+Date: Mon, 5 Sep 2016 22:22:18 +0200
+Subject: [PATCH 2/7] drm/sun4i: support A33 tcon
+In-Reply-To: <CAGb2v67boPYN5oYXzgcdzx8Tyx0FAO5do6mV193CsQ_OUuY-2g@mail.gmail.com>
 References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
- <20160901153204.11217-6-maxime.ripard@free-electrons.com>
- <CAGb2v66F+i=8SxrCN2+HNrjo5d=zXpCmbe9R=BT2sBxDXXXquw@mail.gmail.com>
-Message-ID: <20160905202143.GC8596@lukather>
+ <20160901153204.11217-3-maxime.ripard@free-electrons.com>
+ <CAGb2v67boPYN5oYXzgcdzx8Tyx0FAO5do6mV193CsQ_OUuY-2g@mail.gmail.com>
+Message-ID: <20160905202218.GD8596@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Sep 02, 2016 at 02:28:54PM +0800, Chen-Yu Tsai wrote:
-> > +               be0: display-backend at 01e60000 {
-> > +                       compatible = "allwinner,sun8i-a33-display-backend";
-> > +                       reg = <0x01e60000 0x10000>;
+On Fri, Sep 02, 2016 at 02:02:30PM +0800, Chen-Yu Tsai wrote:
+> Hi,
 > 
-> Please also list the interrupt, even though we don't use it yet.
-> The manual says it's 127 - 32 = 95.
-
-Yep, you're right.
-
-> > +               sat0: sat at 01e80000 {
-> > +                       compatible = "allwinner,sun8i-a33-sat";
-> > +                       reg = <0x01e80000 0x1000>;
-> > +                       clocks = <&ccu CLK_BUS_SAT>;
-> > +                       resets = <&ccu RST_BUS_SAT>;
-> > +
-> > +                       ports {
-> > +                               #address-cells = <1>;
-> > +                               #size-cells = <0>;
-> > +
-> > +                               sat0_in: port at 0 {
-> > +                                       #address-cells = <1>;
-> > +                                       #size-cells = <0>;
-> > +                                       reg = <0>;
-> > +
-> > +                                       sat0_in_fe0: endpoint at 0 {
-> > +                                               reg = <0>;
-> > +                                               remote-endpoint = <&fe0_out_sat0>;
-> > +                                       };
-> > +                               };
-> > +
-> > +                               sat0_out: port at 1 {
-> > +                                       #address-cells = <1>;
-> > +                                       #size-cells = <0>;
-> > +                                       reg = <1>;
-> > +
-> > +                                       sat0_out_be0: endpoint at 0 {
-> > +                                               reg = <0>;
-> > +                                               remote-endpoint = <&be0_in_sat0>;
-> > +                                       };
-> > +                               };
+> On Thu, Sep 1, 2016 at 11:31 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The A33 has a significantly different pipeline, with components that differ
+> > too.
+> >
+> > Make sure we had compatible for them.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 7 ++++++-
+> >  drivers/gpu/drm/sun4i/sun4i_backend.c                         | 1 +
+> >  drivers/gpu/drm/sun4i/sun4i_drv.c                             | 8 +++++---
+> >  drivers/gpu/drm/sun4i/sun4i_tcon.c                            | 8 +++++++-
+> >  4 files changed, 19 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > index df8f4aeefe4c..d467ea93ac08 100644
+> > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > @@ -26,7 +26,9 @@ TCON
+> >  The TCON acts as a timing controller for RGB, LVDS and TV interfaces.
+> >
+> >  Required properties:
+> > - - compatible: value should be "allwinner,sun5i-a13-tcon".
+> > + - compatible: value must be either:
+> > +   * allwinner,sun5i-a13-tcon
+> > +   * allwinner,sun8i-a23-tcon
 > 
-> I'm worried about the representation here.
+> From what I can tell from the manuals, the A23 TCON and A33 TCON are
+> slightly different. The A23 TCON has channel 1, and it also has DMA
+> input. A33 has neither. (Though the DMA chart still lists the TCON DRQ.)
 > 
-> In the user manuals, the SAT is shown as part of the BE.  Look at it
-> this way: if it did come before the BE and is independent, we
-> shouldn't have to bring the SAT out of reset for simplefb to work.
+> I think we should have separate compatibles for them. If you think
+> otherwise you should mention it in the commit message.
 
-Indeed.
-
-> For comparison, a similar function unit called "CMU" found on the
-> other post-sun6i SoCs has the same function description as SAT on
-> the A33. It uses the reserved registers at the beginning of the BE
-> address space.
-
-Hmm, ok, so you would essentially, merge the backend and sat nodes?
-
-That wouldn't be very hard to do, i'll do it.
+Ack, i will change it in the v2.
 
 Thanks!
 Maxime
@@ -83,4 +62,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/edb8a22f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/954bf4e8/attachment-0001.sig>
