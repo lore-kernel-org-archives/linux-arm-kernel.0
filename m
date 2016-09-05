@@ -1,35 +1,26 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 5 Sep 2016 08:36:05 +0200
-Subject: [PATCH V2 2/3] pwm: Add MediaTek MT2701 display PWM driver support
-In-Reply-To: <1468225089-28576-3-git-send-email-weiqing.kong@mediatek.com>
-References: <1468225089-28576-1-git-send-email-weiqing.kong@mediatek.com>
- <1468225089-28576-3-git-send-email-weiqing.kong@mediatek.com>
-Message-ID: <20160905063605.GC3532@ulmo.ba.sec>
+From: sophian.yoma@gmail.com (yoma sophian)
+Date: Mon, 5 Sep 2016 14:36:18 +0800
+Subject: about kernel configuration CONFIG_CPU_ARM_CORTEX_A15
+Message-ID: <CADUS3omWW=cKszst9KJ-kD4vNNv0BrawPeEnhLuMvES34SBQNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 04:18:08PM +0800, Weiqing Kong wrote:
-> Use the mtk_pwm_data struction to define different registers
-> and add MT2701 specific register operations, such as MT2701
-> doesn't have commit register, needs to disable double buffer
-> before writing register, and needs to select manual mode
-> and use PWM_PERIOD/PWM_HIGH_WIDTH.
-> 
-> Signed-off-by: Weiqing Kong <weiqing.kong@mediatek.com>
-> ---
->  drivers/pwm/pwm-mtk-disp.c | 99 +++++++++++++++++++++++++++++++++++++---------
->  1 file changed, 80 insertions(+), 19 deletions(-)
+hi all:
+if we run cortex-a53 in aarch32 mode, shall we enable
+"CONFIG_CPU_ARM_CORTEX_A15" this compile option when generating kernel
+image?
 
-Applied. This had a few inconsistencies in how things were parameterized
-and I fixed those up. Please check that everything still works as
-expected.
+>From below gcc path
+https://gcc.gnu.org/git/?p=gcc.git;a=blob;f=gcc/config/arm/cortex-a15.md;h=ccab7cbe90621459ad7356074d1543be59d5d929;hb=gcc-4_7-branch
+, the  "CONFIG_CPU_ARM_CORTEX_A15" seems used to optimize cotex a15
+code flow based on its pipeline architecture.
+if pipeline architecture is the only consideration for enable
+"CONFIG_CPU_ARM_CORTEX_A15" and if cortex a53 in aarch32 mode has the
+same pipeline architecture as cortex a15, does that mean we could
+enable "CONFIG_CPU_ARM_CORTEX_A15" ?
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/34acc7e4/attachment.sig>
+Meanwhile, how about other armv8-a processor, such as cortex a57, a72, etc.?
+shall we enable "CONFIG_CPU_ARM_CORTEX_A15" for them when running
+kernel in aarch32 mode?
+
+appreciate your kind help in advance,
