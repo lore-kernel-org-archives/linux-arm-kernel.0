@@ -1,101 +1,86 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Mon, 5 Sep 2016 21:12:07 +0100
-Subject: [PATCH] iio: adc: at91: Add support for Touchscreen Switches
- Closure Time
-In-Reply-To: <51aeb56b-c2f7-461f-065d-c581d3837340@atmel.com>
-References: <20160830122701.19385-1-nicolas.ferre@atmel.com>
- <b7dcd8e4-db9e-a9ee-352f-b7b77d57cc7a@kernel.org>
- <51aeb56b-c2f7-461f-065d-c581d3837340@atmel.com>
-Message-ID: <21de9d89-8c28-a750-f74c-ef6953a430dc@kernel.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 5 Sep 2016 22:21:43 +0200
+Subject: [PATCH 5/7] ARM: sun8i: a33: Add display pipeline
+In-Reply-To: <CAGb2v66F+i=8SxrCN2+HNrjo5d=zXpCmbe9R=BT2sBxDXXXquw@mail.gmail.com>
+References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
+ <20160901153204.11217-6-maxime.ripard@free-electrons.com>
+ <CAGb2v66F+i=8SxrCN2+HNrjo5d=zXpCmbe9R=BT2sBxDXXXquw@mail.gmail.com>
+Message-ID: <20160905202143.GC8596@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/16 09:26, Nicolas Ferre wrote:
-> Le 03/09/2016 ? 18:24, Jonathan Cameron a ?crit :
->> On 30/08/16 13:27, Nicolas Ferre wrote:
->>> On newer components compatible with the at91sam9x5, the Touchscreen
->>> Switches Closure Time or TSSCTIM value of the Touchscreen Mode Register is
->>> not filled at all.
->>> On some hardware, having no time indicated for it may lead to incoherent
->>> values and jitter.
->>> We fix this time to 10us as it is usually difficult to retrieve impedance
->>> values from LCD manufacturers.
->>>
->>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Hi Nicolas,
->>
->> Stable / fixes material or just have it head for the next merge window?
-> 
-> Well, I would say that it's an addition of a feature that fixes a bad
-> behavior ;-)
-> So, in summary, I would just add it to next kernel revision.
-> 
-> Thanks for the heads-up. Bye,
-Thanks
+Hi,
 
-Applied to the togreg branch of iio.git - initially pushed out
-as testing for the autobuilders to play with it.
+On Fri, Sep 02, 2016 at 02:28:54PM +0800, Chen-Yu Tsai wrote:
+> > +               be0: display-backend at 01e60000 {
+> > +                       compatible = "allwinner,sun8i-a33-display-backend";
+> > +                       reg = <0x01e60000 0x10000>;
+> 
+> Please also list the interrupt, even though we don't use it yet.
+> The manual says it's 127 - 32 = 95.
 
-Jonathan
+Yep, you're right.
+
+> > +               sat0: sat at 01e80000 {
+> > +                       compatible = "allwinner,sun8i-a33-sat";
+> > +                       reg = <0x01e80000 0x1000>;
+> > +                       clocks = <&ccu CLK_BUS_SAT>;
+> > +                       resets = <&ccu RST_BUS_SAT>;
+> > +
+> > +                       ports {
+> > +                               #address-cells = <1>;
+> > +                               #size-cells = <0>;
+> > +
+> > +                               sat0_in: port at 0 {
+> > +                                       #address-cells = <1>;
+> > +                                       #size-cells = <0>;
+> > +                                       reg = <0>;
+> > +
+> > +                                       sat0_in_fe0: endpoint at 0 {
+> > +                                               reg = <0>;
+> > +                                               remote-endpoint = <&fe0_out_sat0>;
+> > +                                       };
+> > +                               };
+> > +
+> > +                               sat0_out: port at 1 {
+> > +                                       #address-cells = <1>;
+> > +                                       #size-cells = <0>;
+> > +                                       reg = <1>;
+> > +
+> > +                                       sat0_out_be0: endpoint at 0 {
+> > +                                               reg = <0>;
+> > +                                               remote-endpoint = <&be0_in_sat0>;
+> > +                                       };
+> > +                               };
 > 
+> I'm worried about the representation here.
 > 
->>> ---
->>>  drivers/iio/adc/at91_adc.c | 13 +++++++++++++
->>>  1 file changed, 13 insertions(+)
->>>
->>> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
->>> index 0438c68015e8..bbdac07f4aaa 100644
->>> --- a/drivers/iio/adc/at91_adc.c
->>> +++ b/drivers/iio/adc/at91_adc.c
->>> @@ -113,6 +113,7 @@
->>>  #define		AT91_ADC_TSMR_TSAV	(3 << 4)	/* Averages samples */
->>>  #define			AT91_ADC_TSMR_TSAV_(x)		((x) << 4)
->>>  #define		AT91_ADC_TSMR_SCTIM	(0x0f << 16)	/* Switch closure time */
->>> +#define			AT91_ADC_TSMR_SCTIM_(x)		((x) << 16)
->>>  #define		AT91_ADC_TSMR_PENDBC	(0x0f << 28)	/* Pen Debounce time */
->>>  #define			AT91_ADC_TSMR_PENDBC_(x)	((x) << 28)
->>>  #define		AT91_ADC_TSMR_NOTSDMA	(1 << 22)	/* No Touchscreen DMA */
->>> @@ -150,6 +151,7 @@
->>>  #define MAX_RLPOS_BITS         10
->>>  #define TOUCH_SAMPLE_PERIOD_US_RL      10000   /* 10ms, the SoC can't keep up with 2ms */
->>>  #define TOUCH_SHTIM                    0xa
->>> +#define TOUCH_SCTIM_US		10		/* 10us for the Touchscreen Switches Closure Time */
->>>  
->>>  /**
->>>   * struct at91_adc_reg_desc - Various informations relative to registers
->>> @@ -1001,7 +1003,9 @@ static void atmel_ts_close(struct input_dev *dev)
->>>  
->>>  static int at91_ts_hw_init(struct at91_adc_state *st, u32 adc_clk_khz)
->>>  {
->>> +	struct iio_dev *idev = iio_priv_to_dev(st);
->>>  	u32 reg = 0;
->>> +	u32 tssctim = 0;
->>>  	int i = 0;
->>>  
->>>  	/* a Pen Detect Debounce Time is necessary for the ADC Touch to avoid
->>> @@ -1034,11 +1038,20 @@ static int at91_ts_hw_init(struct at91_adc_state *st, u32 adc_clk_khz)
->>>  		return 0;
->>>  	}
->>>  
->>> +	/* Touchscreen Switches Closure time needed for allowing the value to
->>> +	 * stabilize.
->>> +	 * Switch Closure Time = (TSSCTIM * 4) ADCClock periods
->>> +	 */
->>> +	tssctim = DIV_ROUND_UP(TOUCH_SCTIM_US * adc_clk_khz / 1000, 4);
->>> +	dev_dbg(&idev->dev, "adc_clk at: %d KHz, tssctim at: %d\n",
->>> +		adc_clk_khz, tssctim);
->>> +
->>>  	if (st->touchscreen_type == ATMEL_ADC_TOUCHSCREEN_4WIRE)
->>>  		reg = AT91_ADC_TSMR_TSMODE_4WIRE_PRESS;
->>>  	else
->>>  		reg = AT91_ADC_TSMR_TSMODE_5WIRE;
->>>  
->>> +	reg |= AT91_ADC_TSMR_SCTIM_(tssctim) & AT91_ADC_TSMR_SCTIM;
->>>  	reg |= AT91_ADC_TSMR_TSAV_(st->caps->ts_filter_average)
->>>  	       & AT91_ADC_TSMR_TSAV;
->>>  	reg |= AT91_ADC_TSMR_PENDBC_(st->ts_pendbc) & AT91_ADC_TSMR_PENDBC;
->>>
->>
->>
-> 
-> 
+> In the user manuals, the SAT is shown as part of the BE.  Look at it
+> this way: if it did come before the BE and is independent, we
+> shouldn't have to bring the SAT out of reset for simplefb to work.
+
+Indeed.
+
+> For comparison, a similar function unit called "CMU" found on the
+> other post-sun6i SoCs has the same function description as SAT on
+> the A33. It uses the reserved registers at the beginning of the BE
+> address space.
+
+Hmm, ok, so you would essentially, merge the backend and sat nodes?
+
+That wouldn't be very hard to do, i'll do it.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160905/edb8a22f/attachment.sig>
