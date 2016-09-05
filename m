@@ -1,249 +1,60 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon,  5 Sep 2016 17:31:36 +0100
-Subject: [RFC v2 PATCH 6/7] arm64: KVM: Handle trappable TLB instructions
-In-Reply-To: <1473093097-30932-1-git-send-email-punit.agrawal@arm.com>
-References: <1473093097-30932-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <1473093097-30932-7-git-send-email-punit.agrawal@arm.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon,  5 Sep 2016 18:43:03 +0200
+Subject: [PATCH 3.14 02/35] arm64: Define AT_VECTOR_SIZE_ARCH for ARCH_DLINFO
+In-Reply-To: <20160905163958.687259537@linuxfoundation.org>
+References: <20160905163958.687259537@linuxfoundation.org>
+Message-ID: <20160905163958.789715146@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARMv8 architecture allows trapping of TLB maintenane instructions
-from EL0/EL1 to higher exception levels. On encountering a trappable TLB
-instruction in a guest, an exception is taken to EL2.
+3.14-stable review patch.  If anyone has any objections, please let me know.
 
-Add functionality to handle emulating the TLB instructions.
+------------------
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+From: James Hogan <james.hogan@imgtec.com>
+
+commit 3146bc64d12377a74dbda12b96ea32da3774ae07 upstream.
+
+AT_VECTOR_SIZE_ARCH should be defined with the maximum number of
+NEW_AUX_ENT entries that ARCH_DLINFO can contain, but it wasn't defined
+for arm64 at all even though ARCH_DLINFO will contain one NEW_AUX_ENT
+for the VDSO address.
+
+This shouldn't be a problem as AT_VECTOR_SIZE_BASE includes space for
+AT_BASE_PLATFORM which arm64 doesn't use, but lets define it now and add
+the comment above ARCH_DLINFO as found in several other architectures to
+remind future modifiers of ARCH_DLINFO to keep AT_VECTOR_SIZE_ARCH up to
+date.
+
+Fixes: f668cd1673aa ("arm64: ELF definitions")
+Signed-off-by: James Hogan <james.hogan@imgtec.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
 ---
- arch/arm64/include/asm/kvm_asm.h |  1 +
- arch/arm64/kvm/hyp/tlb.c         | 69 ++++++++++++++++++++++++++++++++++
- arch/arm64/kvm/sys_regs.c        | 81 ++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kvm/trace.h           | 16 ++++++++
- 4 files changed, 167 insertions(+)
+ arch/arm64/include/asm/elf.h         |    1 +
+ arch/arm64/include/uapi/asm/auxvec.h |    2 ++
+ 2 files changed, 3 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index 7561f63..1ac1cc3 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -49,6 +49,7 @@ extern char __kvm_hyp_vector[];
- extern void __kvm_flush_vm_context(void);
- extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
- extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
-+extern void __kvm_emulate_tlb_invalidate(struct kvm *kvm, u32 sysreg, u64 regval);
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -137,6 +137,7 @@ extern unsigned long randomize_et_dyn(un
  
- extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+ #define SET_PERSONALITY(ex)		clear_thread_flag(TIF_32BIT);
  
-diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
-index 4cda100..1210f58 100644
---- a/arch/arm64/kvm/hyp/tlb.c
-+++ b/arch/arm64/kvm/hyp/tlb.c
-@@ -78,3 +78,72 @@ static void __hyp_text __tlb_flush_vm_context(void)
- }
++/* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
+ #define ARCH_DLINFO							\
+ do {									\
+ 	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
+--- a/arch/arm64/include/uapi/asm/auxvec.h
++++ b/arch/arm64/include/uapi/asm/auxvec.h
+@@ -19,4 +19,6 @@
+ /* vDSO location */
+ #define AT_SYSINFO_EHDR	33
  
- __alias(__tlb_flush_vm_context) void __kvm_flush_vm_context(void);
++#define AT_VECTOR_SIZE_ARCH 1 /* entries in ARCH_DLINFO */
 +
-+/* Intentionally empty functions */
-+static void __hyp_text __switch_to_hyp_role_nvhe(void) { }
-+static void __hyp_text __switch_to_host_role_nvhe(void) { }
-+
-+static void __hyp_text __switch_to_hyp_role_vhe(void)
-+{
-+	u64 hcr = read_sysreg(hcr_el2);
-+
-+	hcr &= ~HCR_TGE;
-+	write_sysreg(hcr, hcr_el2);
-+}
-+
-+static void __hyp_text __switch_to_host_role_vhe(void)
-+{
-+	u64 hcr = read_sysreg(hcr_el2);
-+
-+	hcr |= HCR_TGE;
-+	write_sysreg(hcr, hcr_el2);
-+}
-+
-+static hyp_alternate_select(__switch_to_hyp_role,
-+			    __switch_to_hyp_role_nvhe,
-+			    __switch_to_hyp_role_vhe,
-+			    ARM64_HAS_VIRT_HOST_EXTN);
-+
-+static hyp_alternate_select(__switch_to_host_role,
-+			    __switch_to_host_role_nvhe,
-+			    __switch_to_host_role_vhe,
-+			    ARM64_HAS_VIRT_HOST_EXTN);
-+
-+static void __hyp_text __switch_to_guest_regime(struct kvm *kvm)
-+{
-+	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-+	__switch_to_hyp_role();
-+	isb();
-+}
-+
-+static void __hyp_text __switch_to_host_regime(void)
-+{
-+	__switch_to_host_role();
-+	write_sysreg(0, vttbr_el2);
-+}
-+
-+void __hyp_text
-+__kvm_emulate_tlb_invalidate(struct kvm *kvm, u32 sys_op, u64 regval)
-+{
-+	kvm = kern_hyp_va(kvm);
-+
-+	/*
-+	 * Switch to the guest before performing any TLB operations to
-+	 * target the appropriate VMID
-+	 */
-+	__switch_to_guest_regime(kvm);
-+
-+	/*
-+	 *  TLB maintenance operations are broadcast to
-+	 *  inner-shareable domain when HCR_FB is set (default for
-+	 *  KVM).
-+	 *
-+	 *  Nuke all Stage 1 TLB entries for the VM. This will kill
-+	 *  performance but it's always safe to do as we don't leave
-+	 *  behind any strays in the TLB
-+	 */
-+	__tlbi(vmalle1is);
-+	isb();
-+
-+	__switch_to_host_regime();
-+}
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index e51367d..0e70da9 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -790,6 +790,18 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	return true;
- }
- 
-+static bool emulate_tlb_invalidate(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-+				  const struct sys_reg_desc *r)
-+{
-+	u32 opcode = sys_reg(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
-+
-+	kvm_call_hyp(__kvm_emulate_tlb_invalidate,
-+		     vcpu->kvm, opcode, p->regval);
-+	trace_kvm_tlb_invalidate(*vcpu_pc(vcpu), opcode);
-+
-+	return true;
-+}
-+
- /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
- #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
- 	/* DBGBVRn_EL1 */						\
-@@ -841,6 +853,35 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ Op0(0b01), Op1(0b000), CRn(0b0111), CRm(0b1110), Op2(0b010),
- 	  access_dcsw },
- 
-+	/*
-+	 * ARMv8 ARM: Table C5-4 TLB maintenance instructions
-+	 * (Ref: ARMv8 ARM C5.1 version: ARM DDI 0487A.j)
-+	 */
-+	/* TLBI VMALLE1IS */
-+	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(0), emulate_tlb_invalidate },
-+	/* TLBI VAE1IS */
-+	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(1), emulate_tlb_invalidate },
-+	/* TLBI ASIDE1IS */
-+	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(2), emulate_tlb_invalidate },
-+	/* TLBI VAAE1IS */
-+	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(3), emulate_tlb_invalidate },
-+	/* TLBI VALE1IS */
-+	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(5), emulate_tlb_invalidate },
-+	/* TLBI VAALE1IS */
-+	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(7), emulate_tlb_invalidate },
-+	/* TLBI VMALLE1 */
-+	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(0), emulate_tlb_invalidate },
-+	/* TLBI VAE1 */
-+	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(1), emulate_tlb_invalidate },
-+	/* TLBI ASIDE1 */
-+	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(2), emulate_tlb_invalidate },
-+	/* TLBI VAAE1 */
-+	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(3), emulate_tlb_invalidate },
-+	/* TLBI VALE1 */
-+	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(5), emulate_tlb_invalidate },
-+	/* TLBI VAALE1 */
-+	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(7), emulate_tlb_invalidate },
-+
- 	DBG_BCR_BVR_WCR_WVR_EL1(0),
- 	DBG_BCR_BVR_WCR_WVR_EL1(1),
- 	/* MDCCINT_EL1 */
-@@ -1329,6 +1370,46 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	{ Op1( 0), CRn( 7), CRm(10), Op2( 2), access_dcsw },
- 	{ Op1( 0), CRn( 7), CRm(14), Op2( 2), access_dcsw },
- 
-+	/*
-+	 * TLB operations
-+	 */
-+	/* TLBIALLIS */
-+	{ Op1( 0), CRn( 8), CRm( 3), Op2( 0), emulate_tlb_invalidate},
-+	/* TLBIMVAIS */
-+	{ Op1( 0), CRn( 8), CRm( 3), Op2( 1), emulate_tlb_invalidate},
-+	/* TLBIASIDIS */
-+	{ Op1( 0), CRn( 8), CRm( 3), Op2( 2), emulate_tlb_invalidate},
-+	/* TLBIMVAAIS */
-+	{ Op1( 0), CRn( 8), CRm( 3), Op2( 3), emulate_tlb_invalidate},
-+	/* TLBIMVALIS */
-+	{ Op1( 0), CRn( 8), CRm( 3), Op2( 5), emulate_tlb_invalidate},
-+	/* TLBIMVAALIS */
-+	{ Op1( 0), CRn( 8), CRm( 3), Op2( 7), emulate_tlb_invalidate},
-+	/* ITLBIALL */
-+	{ Op1( 0), CRn( 8), CRm( 5), Op2( 0), emulate_tlb_invalidate},
-+	/* ITLBIMVA */
-+	{ Op1( 0), CRn( 8), CRm( 5), Op2( 1), emulate_tlb_invalidate},
-+	/* ITLBIASID */
-+	{ Op1( 0), CRn( 8), CRm( 5), Op2( 2), emulate_tlb_invalidate},
-+	/* DTLBIALL */
-+	{ Op1( 0), CRn( 8), CRm( 6), Op2( 0), emulate_tlb_invalidate},
-+	/* DTLBIMVA */
-+	{ Op1( 0), CRn( 8), CRm( 6), Op2( 1), emulate_tlb_invalidate},
-+	/* DTLBIASID */
-+	{ Op1( 0), CRn( 8), CRm( 6), Op2( 2), emulate_tlb_invalidate},
-+	/* TLBIALL */
-+	{ Op1( 0), CRn( 8), CRm( 7), Op2( 0), emulate_tlb_invalidate},
-+	/* TLBIMVA */
-+	{ Op1( 0), CRn( 8), CRm( 7), Op2( 1), emulate_tlb_invalidate},
-+	/* TLBIASID */
-+	{ Op1( 0), CRn( 8), CRm( 7), Op2( 2), emulate_tlb_invalidate},
-+	/* TLBIMVAA */
-+	{ Op1( 0), CRn( 8), CRm( 7), Op2( 3), emulate_tlb_invalidate},
-+	/* TLBIMVAL */
-+	{ Op1( 0), CRn( 8), CRm( 7), Op2( 5), emulate_tlb_invalidate},
-+	/* TLBIMVAAL */
-+	{ Op1( 0), CRn( 8), CRm( 7), Op2( 7), emulate_tlb_invalidate},
-+
- 	/* PMU */
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmcr },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), access_pmcnten },
-diff --git a/arch/arm64/kvm/trace.h b/arch/arm64/kvm/trace.h
-index 7fb0008..c4d577f 100644
---- a/arch/arm64/kvm/trace.h
-+++ b/arch/arm64/kvm/trace.h
-@@ -166,6 +166,22 @@ TRACE_EVENT(kvm_set_guest_debug,
- 	TP_printk("vcpu: %p, flags: 0x%08x", __entry->vcpu, __entry->guest_debug)
- );
- 
-+TRACE_EVENT(kvm_tlb_invalidate,
-+	TP_PROTO(unsigned long vcpu_pc, u32 opcode),
-+	TP_ARGS(vcpu_pc, opcode),
-+
-+	TP_STRUCT__entry(
-+		__field(unsigned long, vcpu_pc)
-+		__field(u32, opcode)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->vcpu_pc = vcpu_pc;
-+		__entry->opcode = opcode;
-+	),
-+
-+	TP_printk("vcpu_pc=0x%16lx opcode=%08x", __entry->vcpu_pc, __entry->opcode)
-+);
- 
- #endif /* _TRACE_ARM64_KVM_H */
- 
--- 
-2.8.1
+ #endif
