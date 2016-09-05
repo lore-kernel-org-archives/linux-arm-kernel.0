@@ -1,142 +1,86 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 5 Sep 2016 21:00:09 +0800
-Subject: [PATCH v4 04/15] drivers: acpi: iort: add support for IOMMU
- fwnode registration
-In-Reply-To: <1471274620-20754-5-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1471274620-20754-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1471274620-20754-5-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <408a90be-df15-b4fb-169d-81c1743c6c16@linaro.org>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 05 Sep 2016 14:03:42 +0100
+Subject: [PATCH] arm64: mm: phys_mem_access_prot() reports non-kernel
+ memory as device memory
+In-Reply-To: <20160905103526.GD2649@arm.com>
+References: <1473064984-9494-1-git-send-email-james.morse@arm.com>
+ <20160905103526.GD2649@arm.com>
+Message-ID: <57CD6D2E.70208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/8/15 23:23, Lorenzo Pieralisi wrote:
-> The ACPI IORT table provide entries for IOMMU (aka SMMU in ARM world)
-> components that allow creating the kernel data structures required to
-> probe and initialize the IOMMU devices.
->
-> This patch provides support in the IORT kernel code to register IOMMU
-> components and their respective fwnode.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Tomasz Nowicki <tn@semihalf.com>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> ---
->  drivers/acpi/arm64/iort.c | 65 +++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/iort.h      |  8 ++++++
->  2 files changed, 73 insertions(+)
->
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index cad7d1d..01a5258 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -20,7 +20,9 @@
->
->  #include <linux/iort.h>
->  #include <linux/kernel.h>
-> +#include <linux/list.h>
->  #include <linux/pci.h>
-> +#include <linux/slab.h>
->
->  struct iort_its_msi_chip {
->  	struct list_head	list;
-> @@ -28,6 +30,69 @@ struct iort_its_msi_chip {
->  	u32			translation_id;
->  };
->
-> +struct iort_fwnode {
-> +	struct list_head list;
-> +	struct acpi_iort_node *iort_node;
-> +	struct fwnode_handle *fwnode;
-> +};
-> +static LIST_HEAD(iort_fwnode_list);
-> +static DEFINE_SPINLOCK(iort_fwnode_lock);
-> +
-> +/**
-> + * iort_set_fwnode() - Create iort_fwnode and use it to register
-> + *		       iommu data in the iort_fwnode_list
-> + *
-> + * @node: IORT table node associated with the IOMMU
-> + * @fwnode: fwnode associated with the IORT node
-> + *
-> + * Returns: 0 on success
-> + *          <0 on failure
-> + */
-> +int iort_set_fwnode(struct acpi_iort_node *iort_node,
-> +		    struct fwnode_handle *fwnode)
-> +{
-> +	struct iort_fwnode *np;
-> +
-> +	np = kzalloc(sizeof(struct iort_fwnode), GFP_ATOMIC);
-> +
-> +	if (WARN_ON(!np))
-> +		return -ENOMEM;
-> +
-> +	INIT_LIST_HEAD(&np->list);
-> +	np->iort_node = iort_node;
-> +	np->fwnode = fwnode;
-> +
-> +	spin_lock(&iort_fwnode_lock);
-> +	list_add_tail(&np->list, &iort_fwnode_list);
-> +	spin_unlock(&iort_fwnode_lock);
-> +
-> +	return 0;
-> +}
-> +
-> +/**
-> + * iort_get_fwnode() - Retrieve fwnode associated with an IORT node
-> + *
-> + * @node: IORT table node to be looked-up
-> + *
-> + * Returns: fwnode_handle pointer on success, NULL on failure
-> +*/
-> +struct fwnode_handle *iort_get_fwnode(struct acpi_iort_node *node)
-> +{
-> +	struct iort_fwnode *curr;
-> +	struct fwnode_handle *fwnode = NULL;
-> +
-> +	spin_lock(&iort_fwnode_lock);
-> +	list_for_each_entry(curr, &iort_fwnode_list, list) {
-> +		if (curr->iort_node == node) {
-> +			fwnode = curr->fwnode;
-> +			break;
-> +		}
-> +	}
-> +	spin_unlock(&iort_fwnode_lock);
-> +
-> +	return fwnode;
-> +}
-> +
->  typedef acpi_status (*iort_find_node_callback)
->  	(struct acpi_iort_node *node, void *context);
->
-> diff --git a/include/linux/iort.h b/include/linux/iort.h
-> index 9bb30c5..666a3de 100644
-> --- a/include/linux/iort.h
-> +++ b/include/linux/iort.h
-> @@ -30,12 +30,20 @@ struct fwnode_handle *iort_find_domain_token(int trans_id);
->  void iort_table_detect(void);
->  u32 iort_msi_map_rid(struct device *dev, u32 req_id);
->  struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
-> +int iort_set_fwnode(struct acpi_iort_node *iort_node,
-> +		    struct fwnode_handle *fwnode);
-> +struct fwnode_handle *iort_get_fwnode(struct acpi_iort_node *node);
->  #else
->  static inline void iort_table_detect(void) { }
->  static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
->  { return req_id; }
->  static inline struct irq_domain *
->  iort_get_device_domain(struct device *dev, u32 req_id) { return NULL; }
-> +static inline int iort_set_fwnode(struct acpi_iort_node *iort_node,
-> +				  struct fwnode_handle *fwnode)
-> +{ return -ENODEV; }
-> +static inline struct fwnode_handle *
-> +iort_get_fwnode(struct acpi_iort_node *node) { return NULL; }
->  #endif
->
->  #define IORT_ACPI_DECLARE(name, table_id, fn)		\
+Hi Will,
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+(CC: Ard and Mark, get_maintainer.pl didn't apply common sense for me...)
 
-Thanks
-Hanjun
+On 05/09/16 11:35, Will Deacon wrote:
+> On Mon, Sep 05, 2016 at 09:43:03AM +0100, James Morse wrote:
+>> Running 'acpidump' on an arm64 system causes the program to SIGSEGV, and
+>> yield the following trace:
+>> [   71.623572] acpidump[2159]: unhandled alignment fault (11) at 0xffff8a4a909c, esr 0x92000021
+>> [   71.632030] pgd = ffff8003ecf7d000
+>> [   71.635420] [ffff8a4a909c] *pgd=00000083ec370003, *pud=00000083e7225003, *pmd=00000083ec3f1003, *pte=01600083ff1c3fc3
+>> [   71.646042]
+>> [   71.647524] CPU: 0 PID: 2159 Comm: acpidump Tainted: G        W I     4.8.0-rc4 #5081
+>> [   71.655352] Hardware name: AMD Overdrive/Supercharger/Default string, BIOS ROD1002C 04/08/2016
+>> [   71.663957] task: ffff8003eac41900 task.stack: ffff8003e7210000
+>> [   71.669871] PC is at 0xffff8a3c77d4
+>> [   71.673353] LR is at 0x404934
+>> [   71.676314] pc : [<0000ffff8a3c77d4>] lr : [<0000000000404934>] pstate: 00000000
+>> [   71.683702] sp : 0000ffffd0e39af0
+>>
+>> Acpidump digs through /sys/ to find the physical address of the ACPI tables,
+>> then reads them from /dev/mem. The code that provides /dev/mem uses
+>> phys_mem_access_prot() to determine the protection type it should use.
+>>
+>> Arm64's phys_mem_access_prot() reports any memory region that isn't part
+>> of the linear map as device memory. This breaks Acpidump as the acpi tables
+>> are neither device memory nor part of the linear map.
+>>
+>> Change this check to use memblock_is_memory() instead. On an EFI system
+>> any region the efi memory map described as any of WB/WC/WT appears in
+>> memblock.memory. On a non-EFI system, setup_machine_fdt() will cause
+>> memory nodes in the DT to be added to memblock.memory.
+>>
+>> /dev/mem is the only user of phys_mem_access_prot()
+
+>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>> index 4989948d1feb..96a2f327fd2c 100644
+>> --- a/arch/arm64/mm/mmu.c
+>> +++ b/arch/arm64/mm/mmu.c
+>> @@ -63,7 +63,7 @@ static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss __maybe_unused;
+>>  pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+>>  			      unsigned long size, pgprot_t vma_prot)
+>>  {
+>> -	if (!pfn_valid(pfn))
+>> +	if (!memblock_is_memory(pfn << PAGE_SHIFT))
+
+> Hmm, this looks pretty weird to me. pfn_valid currently calls
+> memblock_is_map_memory, so now we have this slightly paradoxical situation
+> of having some memory marked NOMAP but wanting to map it to userspace.
+
+Yup, crazy as it looks, that is what is happening.
+
+
+> So our abstractions don't seem to align with reality. Why are the ACPI
+> tables getting marked as NOMAP to being with?
+
+EFI adds any region we can map as normal memory to memblock.memory, it also adds
+anything it considers reserved to the memblock.nomap, e.g. the ACPI tables. This
+causes these regions be left out of the linear map.
+(I don't know why exactly, but assume its so that the attributes and permissions
+can be tweaked easily)
+
+Nomap here means 'not in the linear map'. When we call phys_mem_access_prot(),
+or acpi_os_ioremap() we are accessing these pages and want to know the
+attributes to map with. For phys_mem_access_prot() 'not in the linear map' means
+'device memory', which causes acpidump to crash as it makes unaligned accesses.
+(We had similar problems with acpica in the kernel and acpi_os_ioremap(), which
+[0] fixes).
+
+
+Thanks,
+
+James
+
+[0] https://www.spinics.net/lists/arm-kernel/msg525369.html
