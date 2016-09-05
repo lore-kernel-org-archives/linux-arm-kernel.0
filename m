@@ -1,100 +1,94 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Mon, 5 Sep 2016 15:36:32 +0100
-Subject: [PATCH] arm64: mm: phys_mem_access_prot() reports non-kernel
- memory as device memory
-In-Reply-To: <CAKv+Gu9+r1wwcmd60nZ+tuLgj=MzDdyzs9+pCjZr+6N_S+00xQ@mail.gmail.com>
-References: <1473064984-9494-1-git-send-email-james.morse@arm.com>
- <20160905103526.GD2649@arm.com> <57CD6D2E.70208@arm.com>
- <CAKv+Gu-eEodAFnXhAygzEFU34vZitzhH2yfU71=3gyVFBsdQYA@mail.gmail.com>
- <20160905132411.GC10221@arm.com>
- <CAKv+Gu9+r1wwcmd60nZ+tuLgj=MzDdyzs9+pCjZr+6N_S+00xQ@mail.gmail.com>
-Message-ID: <20160905141509.GA16080@bivouac.eciton.net>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 05 Sep 2016 16:37:23 +0200
+Subject: [PATCH 2/3] ARM: pxa: lubbock: add pcmcia clock
+References: <1473015587-15589-1-git-send-email-robert.jarzmik@free.fr>
+ <1473015587-15589-2-git-send-email-robert.jarzmik@free.fr>
+ <20160904200827.GL1041@n2100.armlinux.org.uk>
+Message-ID: <877faqjtuk.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 05, 2016 at 02:41:16PM +0100, Ard Biesheuvel wrote:
-> On 5 September 2016 at 14:24, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Sep 05, 2016 at 02:10:54PM +0100, Ard Biesheuvel wrote:
-> >> On 5 September 2016 at 14:03, James Morse <james.morse@arm.com> wrote:
-> >> > On 05/09/16 11:35, Will Deacon wrote:
-> >> >> On Mon, Sep 05, 2016 at 09:43:03AM +0100, James Morse wrote:
-> >> >>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> >> >>> index 4989948d1feb..96a2f327fd2c 100644
-> >> >>> --- a/arch/arm64/mm/mmu.c
-> >> >>> +++ b/arch/arm64/mm/mmu.c
-> >> >>> @@ -63,7 +63,7 @@ static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss __maybe_unused;
-> >> >>>  pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
-> >> >>>                            unsigned long size, pgprot_t vma_prot)
-> >> >>>  {
-> >> >>> -    if (!pfn_valid(pfn))
-> >> >>> +    if (!memblock_is_memory(pfn << PAGE_SHIFT))
-> >> >
-> >> >> Hmm, this looks pretty weird to me. pfn_valid currently calls
-> >> >> memblock_is_map_memory, so now we have this slightly paradoxical situation
-> >> >> of having some memory marked NOMAP but wanting to map it to userspace.
-> >> >
-> >> > Yup, crazy as it looks, that is what is happening.
-> >> >
-> >>
-> >> Indeed. Formerly, we would remove this from memblock entirely,
-> >> resulting in the same situation, i.e., that the region is omitted from
-> >> the linear mapping. However, by doing that, we also lose the
-> >> annotation that the region was memory to begin with, resulting in the
-> >> ACPI layer using ioremap() rather than ioremap_cache() or memremap()
-> >> to map it.
-> >>
-> >> So the whole point of introducing MEMBLOCK_NOMAP was to allow memory
-> >> to be kept in the memblock array, but with an annotation that it
-> >> should not be covered by the linear mapping.
-> >>
-> >> >> So our abstractions don't seem to align with reality. Why are the ACPI
-> >> >> tables getting marked as NOMAP to being with?
-> >> >
-> >> > EFI adds any region we can map as normal memory to memblock.memory, it also adds
-> >> > anything it considers reserved to the memblock.nomap, e.g. the ACPI tables. This
-> >> > causes these regions be left out of the linear map.
-> >> > (I don't know why exactly, but assume its so that the attributes and permissions
-> >> > can be tweaked easily)
-> >> >
-> >>
-> >> To prevent mismatched attributes between the linear mapping and
-> >> whatever mapping the firmware and/or ACPI are using. Also, going
-> >> through the trouble of mapping runtime services executable code with
-> >> R-X permissions and then having a writable alias is not great in terms
-> >> of security.
-> >
-> > Ok, but with this patch we potentially have both of those problems
-> > (mismatched attributes and RWX permission) with the userspace mapping :/
-> >
-> > Is it worth trying to avoid any of this, or do we just throw our hands
-> > in the air and give up when /dev/mem is being used?
-> 
-> Well, I do think /dev/mem is a ridiculous hack, but it is arguably an
-> improvement to not map a region as device if we know it is backed by
-> memory.
-> 
-> Leif already did a lot of work on dmidecode and related tools to get
-> rid of /dev/mem dependencies, especially because of the fact that it
-> used 'known' physical addresses to look for magic numbers identifying
-> SMBIOS tables etc. I am not sure if acpidump was on our radar yet, but
+Russell King - ARM Linux <linux@armlinux.org.uk> writes:
 
-Yeah, Roy did acpidump last year:
-https://lists.linaro.org/pipermail/linaro-uefi/2015-June/000906.html
+> On Sun, Sep 04, 2016 at 08:59:46PM +0200, Robert Jarzmik wrote:
+>> Add the clock provided to the PCMCIA block so that sa1111_pcmcia_add()
+>> doesn't end up on error while probing "1800" device.
+>
+> I don't think this is correct - SA1111 is not really the PCMCIA
+> controller - it's a load of logic which sits between the host
+> device and the PCMCIA sockets to manage buffers and the PCMCIA
+> socket control signals.
 
-> in the long term, we should be able to reduce the dependency on
-> /dev/mem for anything other than development use.
+Gah I was naively thinking the SA1111 clock was used in the SA1111 to sample the
+CF lines, and as a consequence, that the asynchronous nPIOWait, nPIORead,
+nPIOWrite were derived from it.
 
-On x86 there are certain legacy reasons why they need to keep the
-interface enabled (for now) - but on ARM the only use for it is not
-wanting to bother with creating a driver for poking various
-controllers from userland. It has no business being enabled in a
-distro kernel. It is the opposite of what an operating system is for.
+I suppose the SA1111 takes 2 clocks, one for PS/2 etc ..., and SDCLK<1> for the
+PCMCIA operations, while I was thinking SDCLK<1> input to SA1111 was only for
+alternate bus-master operations.
 
-> Would it help at all if we restricted these uses to read only? I am
-> not aware of any tools that require read/write access to memory in
-> this way.
+> The quick fix here is to add a clock for the SA1111 PCMCIA sub-device,
+> but it still needs to be the SoC memory clock - iow, what
+> get_memclk_frequency_10khz() would have returned as that's what
+> pxa2xx_base.c wants.
+Right.
 
-If any such utilities remain, we need to fix them.
+Would grant your sign-off to your patch in [1], if the commit message is good
+enough for you (I can fix it up if the wording is too ... french) ?
 
-/
-    Leif
+Cheers.
+
+-- 
+Robert
+
+[1]
+---8>---
+>From f8ba8367164056d7a79052b2b10fcecabd8e854d Mon Sep 17 00:00:00 2001
+From: Russell King <rmk+kernel@armlinux.org.uk>
+Date: Sun, 4 Sep 2016 19:59:19 +0200
+Subject: [PATCH] ARM: pxa: lubbock: add pcmcia clock
+
+Add the clock provided to the PCMCIA block so that sa1111_pcmcia_add()
+doesn't end up on error while probing "1800" device.
+
+[To be confirmed] Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/mach-pxa/lubbock.c | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
+index cd401546cea8..d7c5fb00da7a 100644
+--- a/arch/arm/mach-pxa/lubbock.c
++++ b/arch/arm/mach-pxa/lubbock.c
+@@ -149,6 +149,20 @@ static struct gpiod_lookup_table sa1111_pcmcia_gpio_table = {
+ 	},
+ };
+ 
++static void lubbock_init_pcmcia(void)
++{
++	struct clk *clk;
++
++	gpiod_add_lookup_table(&sa1111_pcmcia_gpio_table);
++
++	/* Add an alias for the SA1111 PCMCIA clock */
++	clk = clk_get_sys("pxa2xx-pcmcia", NULL);
++	if (!IS_ERR(clk)) {
++		clkdev_create(clk, NULL, "1800");
++		clk_put(clk);
++	}
++}
++
+ static struct resource sa1111_resources[] = {
+ 	[0] = {
+ 		.start	= 0x10000000,
+@@ -488,7 +502,7 @@ static void __init lubbock_init(void)
+ 	pxa_set_btuart_info(NULL);
+ 	pxa_set_stuart_info(NULL);
+ 
+-	gpiod_add_lookup_table(&sa1111_pcmcia_gpio_table);
++	lubbock_init_pcmcia();
+ 
+ 	clk_add_alias("SA1111_CLK", NULL, "GPIO11_CLK", NULL);
+ 	pxa_set_udc_info(&udc_info);
+-- 
+2.1.4
