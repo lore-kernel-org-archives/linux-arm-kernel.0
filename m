@@ -1,87 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 5 Sep 2016 17:11:17 +0100
-Subject: [PATCH v2 2/7] arm64: Factor out TTBR0_EL1 post-update
- workaround into a specific asm macro
-In-Reply-To: <1472828533-28197-3-git-send-email-catalin.marinas@arm.com>
-References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
- <1472828533-28197-3-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20160905161117.GB27305@leverpostej>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 Sep 2016 17:22:00 +0100
+Subject: [PATCH] ARM: LPAE: initialize cachepolicy correctly
+In-Reply-To: <eb470e86a233b7bc8328c820527f53c1@agner.ch>
+References: <20160904053331.7264-1-stefan@agner.ch>
+ <20160904220903.GN1041@n2100.armlinux.org.uk>
+ <eb470e86a233b7bc8328c820527f53c1@agner.ch>
+Message-ID: <20160905162200.GR1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin, 
+On Sun, Sep 04, 2016 at 04:31:40PM -0700, Stefan Agner wrote:
+> On 2016-09-04 15:09, Russell King - ARM Linux wrote:
+> > On Sat, Sep 03, 2016 at 10:33:31PM -0700, Stefan Agner wrote:
+> >> The cachepolicy variable gets initialized using a masked pmd
+> >> So far, the pmd has been masked with flags valid for the 2-page
+> >> table format. In the LPAE case, this lead to a wrong assumption
+> >> of what the initial cachepolicy has been used. Later a check
+> >> forces the cache policy to writealloc and prints the following
+> >> warning:
+> >> Forcing write-allocate cache policy for SMP
+> >>
+> >> This patch uses PMD_SECT_WBWA to mask all cache setting flags.
+> >> The define represents the complete mask of the cache relevant
+> >> flags for both page table formats.
+> > 
+> > PMD_SECT_WBWA is just one possible combination, it's not a bit-mask.
+> > We need a new definition.
+> 
+> Agreed, it just happens to be the same as the bit-mask in both
+> page-table layouts.
+> 
+> Does PMD_SECT_CACHE_MASK sounds like a reasonable identifier for it?
 
-On Fri, Sep 02, 2016 at 04:02:08PM +0100, Catalin Marinas wrote:
-> This patch takes the errata workaround code out of cpu_do_switch_mm into
-> a dedicated post_ttbr0_update_workaround macro which will be reused in a
-> subsequent patch.
+Yep, thanks.
 
-> +/*
-> + * Errata workaround post TTBR0_EL1 update.
-> + */
-> +	.macro	post_ttbr0_update_workaround, ret = 0
-> +alternative_if_not ARM64_WORKAROUND_CAVIUM_27456
-> +	.if	\ret
-> +	ret
-> +	.endif
-> +	nop
-> +	nop
-> +	nop
-> +alternative_else
-> +	ic	iallu
-> +	dsb	nsh
-> +	isb
-> +	.if	\ret
-> +	ret
-> +	.endif
-> +alternative_endif
-> +	.endm
-
-IMO, the ret parameter makes the callers harder to read. Can we leave
-the ret up to the caller and suffer the marginal penalty of a few nops
-in a slow(ish) path? 
-
-We can get rid of them in the !CONFIG_CAVIUM_ERRATUM_27456 case with a
-simple ifdef:
-
-	.macro post_ttbr0_update_workaround	
-#ifdef CONFIG_CAVIUM_ERRATUM_27456
-alternative_if_not ARM64_WORKAROUND_CAVIUM_27456
-	nop
-	nop
-	nop
-alternative_else
-	ic	iallu
-	dsb	nsh
-	isb
-alternative_endif
-#endif
-	.endm
-
-> +
->  #endif	/* __ASM_ASSEMBLER_H */
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index 5bb61de23201..9359659f2559 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -125,17 +125,7 @@ ENTRY(cpu_do_switch_mm)
->  	bfi	x0, x1, #48, #16		// set the ASID
->  	msr	ttbr0_el1, x0			// set TTBR0
->  	isb
-> -alternative_if_not ARM64_WORKAROUND_CAVIUM_27456
-> -	ret
-> -	nop
-> -	nop
-> -	nop
-> -alternative_else
-> -	ic	iallu
-> -	dsb	nsh
-> -	isb
-> -	ret
-> -alternative_endif
-> +	post_ttbr0_update_workaround ret = 1
-
-+	ret
-
-Thanks,
-Mark,
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
