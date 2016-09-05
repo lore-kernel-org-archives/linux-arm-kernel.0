@@ -1,67 +1,30 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 Sep 2016 13:26:12 +0100
-Subject: [PATCH 05/33] gpio: add generic single-register fixed-direction
- GPIO driver
-In-Reply-To: <CACRpkdZBNH=4qZEfcLzqZAN=tum2f3YeoQj0D5PsH+P0Cf+7LQ@mail.gmail.com>
-References: <20160829102328.GA28796@n2100.armlinux.org.uk>
- <E1beJjz-0000mA-0o@rmk-PC.armlinux.org.uk>
- <87eg57e54l.fsf@belgarion.home>
- <20160830091805.GL1041@n2100.armlinux.org.uk>
- <87k2eycip0.fsf@belgarion.home>
- <20160830184612.GO1041@n2100.armlinux.org.uk>
- <87fupmc59b.fsf@belgarion.home>
- <20160831084938.GQ1041@n2100.armlinux.org.uk>
- <CACRpkdZBNH=4qZEfcLzqZAN=tum2f3YeoQj0D5PsH+P0Cf+7LQ@mail.gmail.com>
-Message-ID: <20160905122611.GO1041@n2100.armlinux.org.uk>
+Date: Mon, 5 Sep 2016 13:28:10 +0100
+Subject: [PATCH 0/6] SA11x0 serial updates
+In-Reply-To: <CACRpkdZFZVq92UAiq+dsHabyEk+_AbQ_B3SOETGru-8Kbp=h9Q@mail.gmail.com>
+References: <20160829100232.GC1041@n2100.armlinux.org.uk>
+ <20160829102328.GA28796@n2100.armlinux.org.uk>
+ <20160829110157.GE1041@n2100.armlinux.org.uk>
+ <20160829112540.GF1041@n2100.armlinux.org.uk>
+ <20160829120531.GG1041@n2100.armlinux.org.uk>
+ <CACRpkdZFZVq92UAiq+dsHabyEk+_AbQ_B3SOETGru-8Kbp=h9Q@mail.gmail.com>
+Message-ID: <20160905122810.GP1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 05, 2016 at 11:06:28AM +0200, Linus Walleij wrote:
-> I couldn't resist testing on the Compaq iPAQ h3600. It works the
-> same as before so:
-> Tested-by: Linus Walleij <linus.walleij@linaro.org> [for Compaq iPAQ H3600]
-
-Great news.  I've been thinking about digging out my h3600, but it's
-very old, and hasn't been turned on for many years.  I'm not sure what
-state it's in.
-
-I've been hoping to try booting some kernels with qemu-system-arm, but
-so far I've completely failed to get qemu-system-arm to do anything
-useful - it just sits there doing apparently nothing, irrespective of
-which platform I choose or which kernel I give it.
-
-> The only news in the bootlog is this:
-> sa11x0-pcmcia: probe of sa11x0-pcmcia failed with error -2
-
-Not so great news - that's -ENOENT.  Did that happen before these
-changes?  That could be that the gpiod lookup table isn't found.
-However, if that were the case, I'd have expected an error message
-along the lines of:
-
-Failed to get GPIO for xxx: -nnn
-
-from soc_pcmcia_request_gpiods().  The other possibility is that
-we're not getting to sa11x0_drv_pcmcia_legacy_probe() but instead
-trying to initialise it as a generic sa11x0 socket, and
-sa11x0_pcmcia_hw_init() is failing as a result.
-
-We should be using the legacy probe on H3600, so sa11x0_pcmcia_hw_init()
-should never be reached.
-
-> This device does have a PCMCIA "sleeve" where I slotted in an
-> ethernet card at one time to see if I could network this thing.
-> But I never got the PCMCIA working. Now it seems like I could
-> actually start looking into that as the driver gives its first sign
-> of life.
+On Mon, Sep 05, 2016 at 11:09:38AM +0200, Linus Walleij wrote:
+> On Mon, Aug 29, 2016 at 2:05 PM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
 > 
-> I don't think PCMCIA ever worked on this thing upstream,
-> but I have a copy of the old linux-handheld kernel tree where
-> it supposedly was working at one point.
+> > This series converts SA11x0 serial to make use of the mctrl helpers
+> > where appropriate.  This allows us to remove several board-specific
+> > callbacks.
+> 
+> >From GPIO and H3600 point of view:
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Well, the H3600 PCMCIA driver raises lots of "that can't be right"
-questions for me, so I decided to leave most of the GPIO stuff alone
-there, and just convert only the bits which made sense to me - the
-detect and ready(irq) bits.
+Thanks - did you check that the appropriate GPIOs were claimed for
+serial in gpio's debugfs?
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
