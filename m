@@ -1,266 +1,257 @@
 From: hl@rock-chips.com (Lin Huang)
-Date: Mon,  5 Sep 2016 13:06:09 +0800
-Subject: [PATCH v10 3/5] Documentation: bindings: add dt documentation for
- rk3399 dmc
+Date: Mon,  5 Sep 2016 13:06:11 +0800
+Subject: [PATCH v10 5/5] drm/rockchip: Add dmc notifier in vop driver
 In-Reply-To: <1473051971-5500-1-git-send-email-hl@rock-chips.com>
 References: <1473051971-5500-1-git-send-email-hl@rock-chips.com>
-Message-ID: <1473051971-5500-4-git-send-email-hl@rock-chips.com>
+Message-ID: <1473051971-5500-6-git-send-email-hl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the documentation for rockchip rk3399 dmc driver.
+when in ddr frequency scaling process, vop can not do enable or
+disable operation, since in dcf we check vop clock to see whether
+vop work. If vop work, dcf do ddr frequency scaling when vop
+in vblank status, and we need to read vop register to check whether
+vop go into vblank status. If vop not work, dcf can do ddr frequency
+any time. So when do ddr frequency scaling, you disabled or enable
+vop, there may two bad thing happen: 1, the panel flicker(when vop from
+disable status change to enable). 2, kernel hang (when vop from enable
+status change to disable, dcf need to read vblank status, but if you disable
+vop clock, it can not get the status, it will lead soc dead) So we need
+register to devfreq notifier, and we can get the dmc status. Also, when
+there have two vop enabled, we need to disable dmc, since dcf only base
+on one vop vblank time, so the other panel will flicker when do ddr
+frequency scaling.
 
 Signed-off-by: Lin Huang <hl@rock-chips.com>
 Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
 Changes in v10:
-- add rockchip prefix in property describe
+- None
 
 Changes in v9:
-- add ddr timing property to node
+- None
 
 Changes in v8:
-- add ddr timing properties
+- None
 
 Changes in v7:
 - None
 
 Changes in v6:
--Add more detail in Documentation
+- fix a build error
 
 Changes in v5:
--None
+- improve some nits
 
 Changes in v4:
--None
+- register notifier to devfreq_register_notifier
+- use DEVFREQ_PRECHANGE and DEVFREQ_POSTCHANGE to get dmc status
+- when two vop enable, disable dmc
+- when two vop back to one vop, enable dmc
 
 Changes in v3:
--None
+- when do vop eanble/disable, dmc will wait until it finish
 
 Changes in v2:
--None 
+- None
 
 Changes in v1:
--None
- .../devicetree/bindings/devfreq/rk3399_dmc.txt     | 202 +++++++++++++++++++++
- 1 file changed, 202 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
+- use wait_event instead usleep
 
-diff --git a/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt b/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
-new file mode 100644
-index 0000000..84660a3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
-@@ -0,0 +1,210 @@
-+* Rockchip rk3399 DMC(Dynamic Memory Controller) device
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 116 ++++++++++++++++++++++++++++
+ 1 file changed, 116 insertions(+)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index efbc41a..a73f3aa 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -19,6 +19,8 @@
+ #include <drm/drm_crtc_helper.h>
+ #include <drm/drm_plane_helper.h>
+ 
++#include <linux/devfreq.h>
++#include <linux/devfreq-event.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+@@ -118,6 +120,13 @@ struct vop {
+ 
+ 	const struct vop_data *data;
+ 
++	struct devfreq *devfreq;
++	struct devfreq_event_dev *devfreq_event_dev;
++	struct notifier_block dmc_nb;
++	int dmc_in_process;
++	int vop_switch_status;
++	wait_queue_head_t wait_dmc_queue;
++	wait_queue_head_t wait_vop_switch_queue;
+ 	uint32_t *regsbak;
+ 	void __iomem *regs;
+ 
+@@ -428,11 +437,47 @@ static void vop_dsp_hold_valid_irq_disable(struct vop *vop)
+ 	spin_unlock_irqrestore(&vop->irq_lock, flags);
+ }
+ 
++static int dmc_notify(struct notifier_block *nb, unsigned long event,
++		      void *data)
++{
++	struct vop *vop = container_of(nb, struct vop, dmc_nb);
 +
-+Required properties:
-+- compatible:		 Must be "rockchip,rk3399-dmc".
-+- devfreq-events:	 Node to get DDR loading, Refer to
-+			 Documentation/devicetree/bindings/devfreq/
-+			 rockchip-dfi.txt
-+- interrupts:		 The interrupt number to the CPU. The interrupt
-+			 specifier format depends on the interrupt controller.
-+			 It should be DCF interrupts, when DDR dvfs finish,
-+			 it will happen.
-+- clocks:		 Phandles for clock specified in "clock-names" property
-+- clock-names :		 The name of clock used by the DFI, must be
-+			 "pclk_ddr_mon";
-+- operating-points-v2:	 Refer to Documentation/devicetree/bindings/power/opp.txt
-+			 for details.
-+- center-supply:	 DMC supply node.
-+- status:		 Marks the node enabled/disabled.
++	if (event == DEVFREQ_PRECHANGE) {
++		/*
++		 * check if vop in enable or disable process,
++		 * if yes, wait until it finishes, use 200ms as
++		 * timeout.
++		 */
++		if (!wait_event_timeout(vop->wait_vop_switch_queue,
++					!vop->vop_switch_status, HZ / 5))
++			dev_warn(vop->dev,
++				 "Timeout waiting for vop swtich status\n");
++		vop->dmc_in_process = 1;
++	} else if (event == DEVFREQ_POSTCHANGE) {
++		vop->dmc_in_process = 0;
++		wake_up(&vop->wait_dmc_queue);
++	}
 +
-+Following properties are ddr timing:
++	return NOTIFY_OK;
++}
 +
-+- rockchip,dram_speed_bin :	  Value reference include/dt-bindings/clock/ddr.h,
-+				  it select ddr3 cl-trp-trcd type, default value
-+				  "DDR3_DEFAULT".it must selected according to
-+				  "Speed Bin" in ddr3 datasheet, DO NOT use
-+				  smaller "Speed Bin" than ddr3 exactly is.
+ static int vop_enable(struct drm_crtc *crtc)
+ {
+ 	struct vop *vop = to_vop(crtc);
++	int num_enabled_crtc = 0;
+ 	int ret;
+ 
++	/*
++	 * if in dmc scaling frequency process, wait until it finishes
++	 * use 200ms as timeout time.
++	 */
++	if (!wait_event_timeout(vop->wait_dmc_queue,
++				!vop->dmc_in_process, HZ / 5))
++		dev_warn(vop->dev,
++			 "Timeout waiting for dmc when vop enable\n");
 +
-+- rockchip,pd_idle :		  Config the PD_IDLE value, defined the power-down
-+				  idle period, memories are places into power-down
-+				  mode if bus is idle for PD_IDLE DFI clocks.
++	vop->vop_switch_status = 1;
 +
-+- rockchip,sr_idle :		  Configure the SR_IDLE value, defined the
-+				  selfrefresh idle period, memories are places
-+				  into self-refresh mode if bus is idle for
-+				  SR_IDLE*1024 DFI clocks (DFI clocks freq is
-+				  half of dram's clocks), defaule value is "0".
+ 	ret = pm_runtime_get_sync(vop->dev);
+ 	if (ret < 0) {
+ 		dev_err(vop->dev, "failed to get pm runtime: %d\n", ret);
+@@ -479,6 +524,21 @@ static int vop_enable(struct drm_crtc *crtc)
+ 
+ 	drm_crtc_vblank_on(crtc);
+ 
++	vop->vop_switch_status = 0;
++	wake_up(&vop->wait_vop_switch_queue);
 +
-+- rockchip,sr_mc_gate_idle :	  Defined the self-refresh with memory and
-+				  controller clock gating idle period, memories
-+				  are places into self-refresh mode and memory
-+				  controller clock arg gating if bus is idle for
-+				  sr_mc_gate_idle*1024 DFI clocks.
++	/* check how many VOPs in use now */
++	drm_for_each_crtc(crtc, vop->drm_dev) {
++		if (crtc->state->enable)
++			num_enabled_crtc++;
++	}
 +
-+- rockchip,srpd_lite_idle :	  Defined the self-refresh power down idle
-+				  period, memories are places into self-refresh
-+				  power down mode if bus is idle for
-+				  srpd_lite_idle*1024 DFI clocks. This parameter
-+				  is for LPDDR4 only.
++	/* if enable two vop, need to disable dmc */
++	if ((num_enabled_crtc > 1) && vop->devfreq) {
++		if (vop->devfreq_event_dev)
++			devfreq_event_disable_edev(vop->devfreq_event_dev);
++		devfreq_suspend_device(vop->devfreq);
++	}
+ 	return 0;
+ 
+ err_disable_aclk:
+@@ -489,17 +549,31 @@ err_disable_hclk:
+ 	clk_disable(vop->hclk);
+ err_put_pm_runtime:
+ 	pm_runtime_put_sync(vop->dev);
++	vop->vop_switch_status = 0;
++	wake_up(&vop->wait_vop_switch_queue);
+ 	return ret;
+ }
+ 
+ static void vop_crtc_disable(struct drm_crtc *crtc)
+ {
+ 	struct vop *vop = to_vop(crtc);
++	int num_enabled_crtc = 0;
+ 	int i;
+ 
+ 	WARN_ON(vop->event);
+ 
+ 	/*
++	 * if in dmc scaling frequency process, wait until it finish
++	 * use 200ms as timeout time.
++	 */
++	if (!wait_event_timeout(vop->wait_dmc_queue,
++				!vop->dmc_in_process, HZ / 5))
++		dev_warn(vop->dev,
++			 "Timeout waiting for dmc when vop disable\n");
 +
-+- rockchip,standby_idle :	  Defined the standby idle period, memories are
-+				  places into self-refresh than controller, pi,
-+				  phy and dram clock will gating if bus is idle
-+				  for standby_idle * DFI clocks.
++	vop->vop_switch_status = 1;
 +
-+- rockchip,dram_dll_disb_freq :  It's defined the DDR3 dll bypass frequency in
-+				  MHz, when ddr freq less than DRAM_DLL_DISB_FREQ,
-+				  ddr3 dll will bypssed note: if dll was bypassed,
-+				  the odt also stop working.
++	/*
+ 	 * We need to make sure that all windows are disabled before we
+ 	 * disable that crtc. Otherwise we might try to scan from a destroyed
+ 	 * buffer later.
+@@ -555,6 +629,24 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
+ 		spin_unlock_irq(&crtc->dev->event_lock);
+ 
+ 		crtc->state->event = NULL;
 +
-+- rockchip,phy_dll_disb_freq :	  Defined the PHY dll bypass frequency in
-+				  MHz (Mega Hz), when ddr freq less than
-+				  DRAM_DLL_DISB_FREQ, phy dll will bypssed.
-+				  note: phy dll and phy odt are independent.
++	vop->vop_switch_status = 0;
++	wake_up(&vop->wait_vop_switch_queue);
 +
-+- rockchip,ddr3_odt_disb_freq :  When dram type is DDR3, this parameter defined
-+				  the odt disable frequency in MHz (Mega Hz),
-+				  when ddr frequency less then ddr3_odt_disb_freq,
-+				  the odt on dram side and controller side are
-+				  both disabled.
++	/* check how many VOPs in use now */
++	drm_for_each_crtc(crtc, vop->drm_dev) {
++		if (crtc->state->enable)
++			num_enabled_crtc++;
++	}
 +
-+- rockchip,ddr3_drv :		  When dram type is DDR3, this parameter define
-+				  the dram side driver stength in ohm, default
-+				  value is DDR3_DS_40ohm.
++	/*
++	 * if num_enabled_crtc = 1 now, it means 2 vop enabled
++	 * change to 1 vop enabled  need to enable dmc again.
++	 */
++	if ((num_enabled_crtc == 1) && vop->devfreq) {
++		if (vop->devfreq_event_dev)
++			devfreq_event_enable_edev(vop->devfreq_event_dev);
++		devfreq_resume_device(vop->devfreq);
+ 	}
+ }
+ 
+@@ -1413,6 +1505,8 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
+ 	struct drm_device *drm_dev = data;
+ 	struct vop *vop;
+ 	struct resource *res;
++	struct devfreq *devfreq;
++	struct devfreq_event_dev *event_dev;
+ 	size_t alloc_size;
+ 	int ret, irq;
+ 
+@@ -1474,6 +1568,28 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
+ 		return ret;
+ 
+ 	pm_runtime_enable(&pdev->dev);
 +
-+- rockchip,ddr3_odt :		  When dram type is DDR3, this parameter define
-+				  the dram side ODT stength in ohm, default value
-+				  is DDR3_ODT_120ohm.
++	init_waitqueue_head(&vop->wait_vop_switch_queue);
++	vop->vop_switch_status = 0;
++	init_waitqueue_head(&vop->wait_dmc_queue);
++	vop->dmc_in_process = 0;
 +
-+- rockchip,phy_ddr3_ca_drv :	  When dram type is DDR3, this parameter define
-+				  the phy side CA line(incluing command line,
-+				  address line and clock line) driver strength.
-+				  Default value is PHY_DRV_ODT_40.
++	devfreq = devfreq_get_devfreq_by_phandle(dev, 0);
++	if (IS_ERR(devfreq))
++		goto out;
 +
-+- rockchip,phy_ddr3_dq_drv :	  When dram type is DDR3, this parameter define
-+				  the phy side DQ line(incluing DQS/DQ/DM line)
-+				  driver strength. default value is PHY_DRV_ODT_40.
++	vop->devfreq = devfreq;
++	vop->dmc_nb.notifier_call = dmc_notify;
++	devfreq_register_notifier(vop->devfreq, &vop->dmc_nb,
++				  DEVFREQ_TRANSITION_NOTIFIER);
 +
-+- rockchip,phy_ddr3_odt : 	  When dram type is DDR3, this parameter define the
-+				  phy side odt strength, default value is
-+				  PHY_DRV_ODT_240.
++	event_dev = devfreq_event_get_edev_by_phandle(vop->devfreq->dev.parent,
++						      0);
++	if (IS_ERR(event_dev))
++		goto out;
 +
-+- rockchip,lpddr3_odt_disb_freq : When dram type is LPDDR3, this parameter defined
-+				  then odt disable frequency in MHz (Mega Hz),
-+				  when ddr frequency less then ddr3_odt_disb_freq,
-+				  the odt on dram side and controller side are
-+				  both disabled.
-+
-+- rockchip,lpddr3_drv :	  When dram type is LPDDR3, this parameter define
-+				  the dram side driver stength in ohm, default
-+				  value is LP3_DS_34ohm.
-+
-+- rockchip,lpddr3_odt :	  When dram type is LPDDR3, this parameter define
-+				  the dram side ODT stength in ohm, default value
-+				  is LP3_ODT_240ohm.
-+
-+- rockchip,phy_lpddr3_ca_drv :	  When dram type is LPDDR3, this parameter define
-+				  the phy side CA line(incluing command line,
-+				  address line and clock line) driver strength.
-+				  default value is PHY_DRV_ODT_40.
-+
-+- rockchip,phy_lpddr3_dq_drv :	  When dram type is LPDDR3, this parameter define
-+				  the phy side DQ line(incluing DQS/DQ/DM line)
-+				  driver strength. default value is
-+				  PHY_DRV_ODT_40.
-+
-+- rockchip,phy_lpddr3_odt : 	  When dram type is LPDDR3, this parameter define
-+				  the phy side odt strength, default value is
-+				  PHY_DRV_ODT_240.
-+
-+- rockchip,lpddr4_odt_disb_freq : When dram type is LPDDR4, this parameter
-+				  defined the odt disable frequency in
-+				  MHz (Mega Hz), when ddr frequency less then
-+				  ddr3_odt_disb_freq, the odt on dram side and
-+				  controller side are both disabled.
-+
-+- rockchip,lpddr4_drv :	  When dram type is LPDDR4, this parameter define
-+				  the dram side driver stength in ohm, default
-+				  value is LP4_PDDS_60ohm.
-+
-+- rockchip,lpddr4_dq_odt : 	  When dram type is LPDDR4, this parameter define
-+				  the dram side ODT on dqs/dq line stength in ohm,
-+				  default value is LP4_DQ_ODT_40ohm.
-+
-+- rockchip,lpddr4_ca_odt :	  When dram type is LPDDR4, this parameter define
-+				  the dram side ODT on ca line stength in ohm,
-+				  default value is LP4_CA_ODT_40ohm.
-+
-+- rockchip,phy_lpddr4_ca_drv :	  When dram type is LPDDR4, this parameter define
-+				  the phy side  CA line(incluing command address
-+				  line) driver strength. default value is
-+				  PHY_DRV_ODT_40.
-+
-+- rockchip,phy_lpddr4_ck_cs_drv : When dram type is LPDDR4, this parameter define
-+				  the phy side clock line and cs line driver
-+				  strength. default value is PHY_DRV_ODT_80.
-+
-+- rockchip,phy_lpddr4_dq_drv :	  When dram type is LPDDR4, this parameter define
-+				  the phy side DQ line(incluing DQS/DQ/DM line)
-+				  driver strength. default value is PHY_DRV_ODT_80.
-+
-+- rockchip,phy_lpddr4_odt :	  When dram type is LPDDR4, this parameter define
-+				  the phy side odt strength, default value is
-+				  PHY_DRV_ODT_60.
-+
-+Example:
-+	dmc_opp_table: dmc_opp_table {
-+		compatible = "operating-points-v2";
-+
-+		opp00 {
-+			opp-hz = /bits/ 64 <300000000>;
-+			opp-microvolt = <900000>;
-+		};
-+		opp01 {
-+			opp-hz = /bits/ 64 <666000000>;
-+			opp-microvolt = <900000>;
-+		};
-+	};
-+
-+	dmc: dmc {
-+		compatible = "rockchip,rk3399-dmc";
-+		devfreq-events = <&dfi>;
-+		interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_DDRCLK>;
-+		clock-names = "dmc_clk";
-+		operating-points-v2 = <&dmc_opp_table>;
-+		center-supply = <&ppvar_centerlogic>;
-+		upthreshold = <15>;
-+		downdifferential = <10>;
-+		rockchip,ddr3_speed_bin = <21>;
-+		rockchip,pd_idle = <0x40>;
-+		rockchip,sr_idle = <0x2>;
-+		rockchip,sr_mc_gate_idle = <0x3>;
-+		rockchip,srpd_lite_idle	= <0x4>;
-+		rockchip,standby_idle = <0x2000>;
-+		rockchip,dram_dll_dis_freq = <300>;
-+		rockchip,phy_dll_dis_freq = <125>;
-+		rockchip,auto_pd_dis_freq = <666>;
-+		rockchip,ddr3_odt_dis_freq = <333>;
-+		rockchip,ddr3_drv = <DDR3_DS_40ohm>;
-+		rockchip,ddr3_odt = <DDR3_ODT_120ohm>;
-+		rockchip,phy_ddr3_ca_drv = <PHY_DRV_ODT_40>;
-+		rockchip,phy_ddr3_dq_drv = <PHY_DRV_ODT_40>;
-+		rockchip,phy_ddr3_odt = <PHY_DRV_ODT_240>;
-+		rockchip,lpddr3_odt_dis_freq = <333>;
-+		rockchip,lpddr3_drv = <LP3_DS_34ohm>;
-+		rockchip,lpddr3_odt = <LP3_ODT_240ohm>;
-+		rockchip,phy_lpddr3_ca_drv = <PHY_DRV_ODT_40>;
-+		rockchip,phy_lpddr3_dq_drv = <PHY_DRV_ODT_40>;
-+		rockchip,phy_lpddr3_odt = <PHY_DRV_ODT_240>;
-+		rockchip,lpddr4_odt_dis_freq = <333>;
-+		rockchip,lpddr4_drv = <LP4_PDDS_60ohm>;
-+		rockchip,lpddr4_dq_odt = <LP4_DQ_ODT_40ohm>;
-+		rockchip,lpddr4_ca_odt = <LP4_CA_ODT_40ohm>;
-+		rockchip,phy_lpddr4_ca_drv = <PHY_DRV_ODT_40>;
-+		rockchip,phy_lpddr4_ck_cs_drv = <PHY_DRV_ODT_80>;
-+		rockchip,phy_lpddr4_dq_drv = <PHY_DRV_ODT_80>;
-+		rockchip,phy_lpddr4_odt = <PHY_DRV_ODT_60>;
-+		status = "disabled";
-+	};
-+
++	vop->devfreq_event_dev = event_dev;
++out:
+ 	return 0;
+ }
+ 
 -- 
 2.6.6
