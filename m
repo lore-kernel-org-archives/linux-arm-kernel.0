@@ -1,74 +1,76 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 5 Sep 2016 21:19:43 +0800
-Subject: [PATCH v4 05/15] drivers: platform: add fwnode base platform
- devices retrieval
-In-Reply-To: <1471274620-20754-6-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1471274620-20754-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1471274620-20754-6-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <7659b956-c49d-bd0d-7a1d-8dfc3da6f409@linaro.org>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Mon, 5 Sep 2016 15:20:23 +0200
+Subject: [PATCH v3 00/14] Clock improvement for video playback
+In-Reply-To: <1472473626-15398-1-git-send-email-gabriel.fernandez@st.com>
+References: <1472473626-15398-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <3588e4a5-7f80-a71d-9b56-a65dc8e5630d@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/8/15 23:23, Lorenzo Pieralisi wrote:
-> The platform device kernel API does not provide functions to
-> retrieve a platform device through the corresponding struct
-> device fwnode pointer.
->
-> Implement the fwnode platform_device look-up in drivers core
-> code by using the bus_find_device() API and a corresponding
-> matching function. The OF equivalent (eg of_find_device_by_node())
-> will reuse the newly introduced function when OF code will
-> take care of setting up the device->fwnode value that is
-> currently left dangling for platform devices instantiated out
-> of device tree nodes.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> ---
->  drivers/base/platform.c         | 23 +++++++++++++++++++++++
->  include/linux/platform_device.h |  3 +++
->  2 files changed, 26 insertions(+)
->
-> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-> index 6482d47..3ef150d 100644
-> --- a/drivers/base/platform.c
-> +++ b/drivers/base/platform.c
-> @@ -760,6 +760,29 @@ err_out:
->  }
->  EXPORT_SYMBOL_GPL(__platform_create_bundle);
->
-> +static int fwnode_dev_match(struct device *dev, void *data)
-> +{
-> +	return dev->fwnode == data;
-> +}
-> +
-> +/**
-> + * platform_find_device_by_fwnode() - Find the platform_device associated
-> + *				      with a fwnode
-> + * @fwnode: Pointer to firmware node
-> + *
-> + * Returns platform_device pointer, or NULL if not found
-> + */
-> +struct platform_device *
-> +platform_find_device_by_fwnode(struct fwnode_handle *fwnode)
-> +{
-> +	struct device *dev;
-> +
-> +	dev = bus_find_device(&platform_bus_type, NULL, fwnode,
-> +			      fwnode_dev_match);
-> +	return dev ? to_platform_device(dev) : NULL;
-> +}
-> +EXPORT_SYMBOL(platform_find_device_by_fwnode);
+Hi Gabriel
 
-As SMMU is registered as platform devices, I think we need such
-API to retrieve the platform device with fwnode handle, actually
-Kefeng introduced a similar patch [1], but your patch is more
-generic, so this patch make sense to me,
+For the whole series
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
 
 Thanks
-Hanjun
 
-[1]: https://patchwork.kernel.org/patch/7743661/
+
+
+On 08/29/2016 02:26 PM, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+>
+> v3:
+>   - Rebase to v4.8-rc1
+>   - Tipo fix in st,clkgen-pll.txt
+>   - Add Ack of Peter for the series
+>   - Add missed patch: "ARM: DT: STiH4xx: Simplify clock binding of STiH4xx platforms"
+>
+> v2:
+>   - Simpliflication of clock binding
+>     remark from Rob https://lkml.org/lkml/2016/5/25/492
+>   - Suppression of stih415-416 support for the clocks (in order
+> 	to help simplification of clock binding)
+>     (others patchs for the machine and drivers will come)
+>
+> This serie allows to increase video resolutions and make audio
+> adjustment during a video playback.
+>
+> Gabriel Fernandez (14):
+>   drivers: clk: st: Remove stih415-416 clock support
+>   drivers: clk: st: Simplify clock binding of STiH4xx platforms
+>   ARM: DT: STiH4xx: Simplify clock binding of STiH4xx platforms
+>   drivers: clk: st: Add fs660c32 synthesizer algorithm
+>   drivers: clk: st: Add clock propagation for audio clocks
+>   drivers: clk: st: Handle clk synchronous mode for video clocks
+>   ARM: DT: STiH407: Enable clock propagation for audio clocks
+>   ARM: DT: STiH410: Enable clock propagation for audio clocks
+>   ARM: DT: STiH418: Enable clock propagation for audio clocks
+>   ARM: DT: STiH407: Enable synchronous clock mode for video clocks
+>   ARM: DT: STiH410: Enable synchronous clock mode for video clocks
+>   ARM: DT: STiH418: Enable synchronous clock mode for video clocks
+>   ARM: DT: STi: STiH407: clock configuration to address 720p and 1080p
+>   ARM: DT: STi: STiH410: clock configuration to address 720p and 1080p
+>
+>  .../bindings/clock/st/st,clkgen-divmux.txt         |  49 --
+>  .../devicetree/bindings/clock/st/st,clkgen-mux.txt |  20 +-
+>  .../devicetree/bindings/clock/st/st,clkgen-pll.txt |  35 +-
+>  .../bindings/clock/st/st,clkgen-prediv.txt         |  36 -
+>  .../devicetree/bindings/clock/st/st,clkgen-vcc.txt |  61 --
+>  .../devicetree/bindings/clock/st/st,clkgen.txt     |  54 +-
+>  .../devicetree/bindings/clock/st/st,flexgen.txt    |   4 +
+>  .../devicetree/bindings/clock/st/st,quadfs.txt     |  31 +-
+>  arch/arm/boot/dts/stih407-clock.dtsi               |  22 +-
+>  arch/arm/boot/dts/stih407.dtsi                     |  16 +-
+>  arch/arm/boot/dts/stih410-clock.dtsi               |  20 +-
+>  arch/arm/boot/dts/stih410.dtsi                     |  16 +-
+>  arch/arm/boot/dts/stih418-clock.dtsi               |  20 +-
+>  drivers/clk/st/clk-flexgen.c                       |  63 +-
+>  drivers/clk/st/clkgen-fsyn.c                       | 481 ++++---------
+>  drivers/clk/st/clkgen-mux.c                        | 748 +--------------------
+>  drivers/clk/st/clkgen-pll.c                        | 472 +------------
+>  17 files changed, 323 insertions(+), 1825 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-divmux.txt
+>  delete mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-prediv.txt
+>  delete mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-vcc.txt
+>
