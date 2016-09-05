@@ -1,78 +1,72 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon,  5 Sep 2016 15:12:38 +0100
-Subject: [PATCH] drivers: acpi: fix GIC irq model default PCI IRQ polarity
-Message-ID: <1473084758-7377-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Mon,  5 Sep 2016 15:22:44 +0100
+Subject: [PATCH v7 0/8] CPUs capacity information for heterogeneous systems
+Message-ID: <1473085372-2840-1-git-send-email-juri.lelli@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ACPI ARM based systems the GIC interrupt controller
-and corresponding interrupt model permit only the high
-polarity for level interrupts.
+Hi all,
 
-ACPI firmware describes PCI legacy IRQs through entries
-in the _PRT objects. Entries in the _PRT can be of two types:
+version 7 of "CPUs capacity information for heterogeneous systems" patchset [1]
+(please refer to previous postings to get some context).
 
-- Static: not configurable, trigger/polarity default to level-low,
-  _PRT entry defines the global GSI interrupt number
-- Configurable: _PRT interrupt entry contains a reference to the
-  corresponding PCI interrupt link device (that in turn provides the
-  interrupt descriptor through its _CRS/_PRS methods)
+A few changes from v6:
 
-Configurable IRQ entries are not currently allowed by the ACPI
-specification on ARM, since they can only be used for interrupt
-pins that are routable, and ARM platforms GIC configurations
-do not allow dynamic IRQ routing, routing is statically laid out
-at synthesis time; therefore PCI interrupt links cannot be used
-for PCI legacy IRQ descriptions in the _PRT on ARM systems.
+ - rebase on top of mainline (4.8-rc5)
+ - some ACKs collected
+ - changelogs fixes
+ - use cpuinfo.max_freq
+ - add delayed work to unregister notifier
 
-On the other hand, current core ACPI code handling PCI legacy IRQs
-consider IRQ trigger/polarity for static _PRT entries as level-low.
+Patches high level description:
 
-On ARM systems with a GIC interrupt controller and corresponding
-ACPI interrupt model this does not work in that GIC interrupt
-controller is only capable of handling level interrupts whose
-polarity is high (for PCI legacy IRQs - that are level-low by
-specification - this means that the legacy IRQs are inverted before
-reaching the interrupt controller pin), resulting in IRQ allocation
-failures such as:
+ o 01/08 introduces documentation for the new optional DT binding
+ o [02-06]/08 add cpu-capacity attribute to TC2, Juno and Juno r2 DTs and
+   provide parsing of such information at boot time
+ o [07-08]/08 introduce sysfs attribute
 
-genirq: Setting trigger mode 8 for irq 18 failed (gic_set_type+0x0/0x48)
+In case you would like to test this out, I pushed a branch here:
 
-Change the default polarity for PCI legacy IRQs to high on systems
-booting wth ACPI on platforms with a GIC interrupt controller model,
-fixing the discrepancy between specification and HW behaviour.
+ git://linux-arm.org/linux-jl.git upstream/default_caps_v7
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Duc Dang <dhdang@apm.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Sinan Kaya <okaya@codeaurora.org>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/acpi/pci_irq.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+This branch contains additional patches, useful to better understand how CPU
+capacity information is actually used by the scheduler.
 
-diff --git a/drivers/acpi/pci_irq.c b/drivers/acpi/pci_irq.c
-index 2c45dd3..c576a6f 100644
---- a/drivers/acpi/pci_irq.c
-+++ b/drivers/acpi/pci_irq.c
-@@ -411,7 +411,15 @@ int acpi_pci_irq_enable(struct pci_dev *dev)
- 	int gsi;
- 	u8 pin;
- 	int triggering = ACPI_LEVEL_SENSITIVE;
--	int polarity = ACPI_ACTIVE_LOW;
-+	/*
-+	 * On ARM systems with the GIC interrupt model, level interrupts
-+	 * are always polarity high by specification; PCI legacy
-+	 * IRQs lines are inverted before reaching the interrupt
-+	 * controller and must therefore be considered active high
-+	 * as default.
-+	 */
-+	int polarity = acpi_irq_model == ACPI_IRQ_MODEL_GIC ?
-+				      ACPI_ACTIVE_HIGH : ACPI_ACTIVE_LOW;
- 	char *link = NULL;
- 	char link_desc[16];
- 	int rc;
+These patches also form the basis for Morten/Dietmar's "Clean-ups and
+asymmetric cpu capacity support" series [2] (and the EAS stack in general).
+
+Best,
+
+- Juri
+
+[1] v1 - https://lkml.org/lkml/2015/11/23/391
+    v2 - https://lkml.org/lkml/2016/1/8/417
+    v3 - https://lkml.org/lkml/2016/2/3/405
+    v4 - https://lkml.org/lkml/2016/3/18/350
+    v5 - https://lkml.org/lkml/2016/6/15/291
+    v6 - https://lkml.org/lkml/2016/7/19/419
+[2] https://lkml.org/lkml/2016/8/31/292 
+
+
+Juri Lelli (8):
+  Documentation: arm: define DT cpu capacity-dmips-mhz bindings
+  arm: parse cpu capacity-dmips-mhz from DT
+  arm, dts: add TC2 cpu capacity-dmips-mhz information
+  arm64: parse cpu capacity-dmips-mhz from DT
+  arm64, dts: add Juno cpu capacity-dmips-mhz information
+  arm64, dts: add Juno r2 cpu capacity-dmips-mhz information
+  arm: add sysfs cpu_capacity attribute
+  arm64: add sysfs cpu_capacity attribute
+
+ .../devicetree/bindings/arm/cpu-capacity.txt       | 236 +++++++++++++++++++++
+ Documentation/devicetree/bindings/arm/cpus.txt     |  10 +
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |   5 +
+ arch/arm/kernel/topology.c                         | 228 +++++++++++++++++++-
+ arch/arm64/boot/dts/arm/juno-r2.dts                |   6 +
+ arch/arm64/boot/dts/arm/juno.dts                   |   6 +
+ arch/arm64/kernel/topology.c                       | 232 +++++++++++++++++++-
+ 7 files changed, 721 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/cpu-capacity.txt
+
 -- 
-2.6.4
+2.7.0
