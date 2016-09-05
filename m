@@ -1,91 +1,101 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon,  5 Sep 2016 22:05:40 +0200
-Subject: [PATCH V9 8/8] irqchip/gicv3-its: Use MADT ITS subtable to do PCI/MSI
- domain initialization
-In-Reply-To: <1473105940-9761-1-git-send-email-tn@semihalf.com>
-References: <1473105940-9761-1-git-send-email-tn@semihalf.com>
-Message-ID: <1473105940-9761-9-git-send-email-tn@semihalf.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Mon, 5 Sep 2016 21:12:07 +0100
+Subject: [PATCH] iio: adc: at91: Add support for Touchscreen Switches
+ Closure Time
+In-Reply-To: <51aeb56b-c2f7-461f-065d-c581d3837340@atmel.com>
+References: <20160830122701.19385-1-nicolas.ferre@atmel.com>
+ <b7dcd8e4-db9e-a9ee-352f-b7b77d57cc7a@kernel.org>
+ <51aeb56b-c2f7-461f-065d-c581d3837340@atmel.com>
+Message-ID: <21de9d89-8c28-a750-f74c-ef6953a430dc@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let ACPI build ITS PCI MSI domain. ACPI code is responsible for retrieving
-inner domain token and passing it on to its_pci_msi_init_one generic
-init call.
+On 05/09/16 09:26, Nicolas Ferre wrote:
+> Le 03/09/2016 ? 18:24, Jonathan Cameron a ?crit :
+>> On 30/08/16 13:27, Nicolas Ferre wrote:
+>>> On newer components compatible with the at91sam9x5, the Touchscreen
+>>> Switches Closure Time or TSSCTIM value of the Touchscreen Mode Register is
+>>> not filled at all.
+>>> On some hardware, having no time indicated for it may lead to incoherent
+>>> values and jitter.
+>>> We fix this time to 10us as it is usually difficult to retrieve impedance
+>>> values from LCD manufacturers.
+>>>
+>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Hi Nicolas,
+>>
+>> Stable / fixes material or just have it head for the next merge window?
+> 
+> Well, I would say that it's an addition of a feature that fixes a bad
+> behavior ;-)
+> So, in summary, I would just add it to next kernel revision.
+> 
+> Thanks for the heads-up. Bye,
+Thanks
 
-IORT maintains list of registered domain tokens and allows to find
-corresponding domain based on MADT ITS subtable ID info.
+Applied to the togreg branch of iio.git - initially pushed out
+as testing for the autobuilders to play with it.
 
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/irqchip/irq-gic-v3-its-pci-msi.c | 44 ++++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
-
-diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-index d2c2496..ae7221c 100644
---- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-@@ -15,6 +15,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/iort.h>
- #include <linux/msi.h>
- #include <linux/of.h>
- #include <linux/of_irq.h>
-@@ -144,9 +145,52 @@ static int __init its_pci_of_msi_init(void)
- 	return 0;
- }
- 
-+#ifdef CONFIG_ACPI
-+
-+static int __init
-+its_pci_msi_parse_madt(struct acpi_subtable_header *header,
-+		       const unsigned long end)
-+{
-+	struct acpi_madt_generic_translator *its_entry;
-+	struct fwnode_handle *dom_handle;
-+	const char *node_name;
-+	int err = -ENXIO;
-+
-+	its_entry = (struct acpi_madt_generic_translator *)header;
-+	node_name = kasprintf(GFP_KERNEL, "ITS at 0x%lx",
-+			      (long)its_entry->base_address);
-+	dom_handle = iort_find_domain_token(its_entry->translation_id);
-+	if (!dom_handle) {
-+		pr_err("%s: Unable to locate ITS domain handle\n", node_name);
-+		goto out;
-+	}
-+
-+	err = its_pci_msi_init_one(dom_handle, node_name);
-+	if (!err)
-+		pr_info("PCI/MSI: %s domain created\n", node_name);
-+
-+out:
-+	kfree(node_name);
-+	return err;
-+}
-+
-+static int __init its_pci_acpi_msi_init(void)
-+{
-+	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
-+			      its_pci_msi_parse_madt, 0);
-+	return 0;
-+}
-+#else
-+static int __init its_pci_acpi_msi_init(void)
-+{
-+	return 0;
-+}
-+#endif
-+
- static int __init its_pci_msi_init(void)
- {
- 	its_pci_of_msi_init();
-+	its_pci_acpi_msi_init();
- 
- 	return 0;
- }
--- 
-1.9.1
+Jonathan
+> 
+> 
+>>> ---
+>>>  drivers/iio/adc/at91_adc.c | 13 +++++++++++++
+>>>  1 file changed, 13 insertions(+)
+>>>
+>>> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+>>> index 0438c68015e8..bbdac07f4aaa 100644
+>>> --- a/drivers/iio/adc/at91_adc.c
+>>> +++ b/drivers/iio/adc/at91_adc.c
+>>> @@ -113,6 +113,7 @@
+>>>  #define		AT91_ADC_TSMR_TSAV	(3 << 4)	/* Averages samples */
+>>>  #define			AT91_ADC_TSMR_TSAV_(x)		((x) << 4)
+>>>  #define		AT91_ADC_TSMR_SCTIM	(0x0f << 16)	/* Switch closure time */
+>>> +#define			AT91_ADC_TSMR_SCTIM_(x)		((x) << 16)
+>>>  #define		AT91_ADC_TSMR_PENDBC	(0x0f << 28)	/* Pen Debounce time */
+>>>  #define			AT91_ADC_TSMR_PENDBC_(x)	((x) << 28)
+>>>  #define		AT91_ADC_TSMR_NOTSDMA	(1 << 22)	/* No Touchscreen DMA */
+>>> @@ -150,6 +151,7 @@
+>>>  #define MAX_RLPOS_BITS         10
+>>>  #define TOUCH_SAMPLE_PERIOD_US_RL      10000   /* 10ms, the SoC can't keep up with 2ms */
+>>>  #define TOUCH_SHTIM                    0xa
+>>> +#define TOUCH_SCTIM_US		10		/* 10us for the Touchscreen Switches Closure Time */
+>>>  
+>>>  /**
+>>>   * struct at91_adc_reg_desc - Various informations relative to registers
+>>> @@ -1001,7 +1003,9 @@ static void atmel_ts_close(struct input_dev *dev)
+>>>  
+>>>  static int at91_ts_hw_init(struct at91_adc_state *st, u32 adc_clk_khz)
+>>>  {
+>>> +	struct iio_dev *idev = iio_priv_to_dev(st);
+>>>  	u32 reg = 0;
+>>> +	u32 tssctim = 0;
+>>>  	int i = 0;
+>>>  
+>>>  	/* a Pen Detect Debounce Time is necessary for the ADC Touch to avoid
+>>> @@ -1034,11 +1038,20 @@ static int at91_ts_hw_init(struct at91_adc_state *st, u32 adc_clk_khz)
+>>>  		return 0;
+>>>  	}
+>>>  
+>>> +	/* Touchscreen Switches Closure time needed for allowing the value to
+>>> +	 * stabilize.
+>>> +	 * Switch Closure Time = (TSSCTIM * 4) ADCClock periods
+>>> +	 */
+>>> +	tssctim = DIV_ROUND_UP(TOUCH_SCTIM_US * adc_clk_khz / 1000, 4);
+>>> +	dev_dbg(&idev->dev, "adc_clk at: %d KHz, tssctim at: %d\n",
+>>> +		adc_clk_khz, tssctim);
+>>> +
+>>>  	if (st->touchscreen_type == ATMEL_ADC_TOUCHSCREEN_4WIRE)
+>>>  		reg = AT91_ADC_TSMR_TSMODE_4WIRE_PRESS;
+>>>  	else
+>>>  		reg = AT91_ADC_TSMR_TSMODE_5WIRE;
+>>>  
+>>> +	reg |= AT91_ADC_TSMR_SCTIM_(tssctim) & AT91_ADC_TSMR_SCTIM;
+>>>  	reg |= AT91_ADC_TSMR_TSAV_(st->caps->ts_filter_average)
+>>>  	       & AT91_ADC_TSMR_TSAV;
+>>>  	reg |= AT91_ADC_TSMR_PENDBC_(st->ts_pendbc) & AT91_ADC_TSMR_PENDBC;
+>>>
+>>
+>>
+> 
+> 
