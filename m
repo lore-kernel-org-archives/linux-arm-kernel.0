@@ -1,156 +1,156 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 05 Sep 2016 12:39:06 +0300
-Subject: [PATCHv9 2/6] dma-debug: add support for resource mappings
-In-Reply-To: <20160810112219.17964-3-niklas.soderlund+renesas@ragnatech.se>
-References: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
- <20160810112219.17964-3-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <2296171.Os8u9NTgGI@avalon>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 5 Sep 2016 17:41:37 +0800
+Subject: [PATCH v4 00/15] ACPI IORT ARM SMMU v3 support
+In-Reply-To: <1471274620-20754-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1471274620-20754-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <e12c4831-f625-ca39-0f8c-9ff3f8ebaa53@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Niklas,
+On 2016/8/15 23:23, Lorenzo Pieralisi wrote:
+> This patch series is v4 of a previous posting:
+>
+> https://lkml.org/lkml/2016/7/20/248
+>
+> v3 -> v4
+> 	- Added single mapping API (for IORT named components)
 
-Thank you for the patch.
+Thanks, and it works for my platform msi patch set too :)
 
-On Wednesday 10 Aug 2016 13:22:15 Niklas S?derlund wrote:
-> A MMIO mapped resource can not be represented by a struct page so a new
-> debug type is needed to handle this. This patch add such type and
-> functionality to add/remove entries and how to translate them to a
-> physical address.
-> 
-> Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+> 	- Fixed arm_smmu_iort_xlate() return value
+> 	- Reworked fwnode registration and platform device creation
+> 	  ordering to fix probe ordering dependencies
+> 	- Added code to keep device_node ref count with new iommu
+> 	  fwspec API
+> 	- Added patch to make iommu_fwspec arch agnostic
+> 	- Dropped RFC status
+> 	- Rebased against v4.8-rc2
+>
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+[...]
+>
+> The ACPI IORT table provides information that allows instantiating
+> ARM SMMU devices and carrying out id mappings between components on
+> ARM based systems (devices, IOMMUs, interrupt controllers).
+>
+> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
+>
+> Building on basic IORT support, available through [2],
+> this patchset enables ARM SMMU v3 support on ACPI systems.
+>
+> Most of the code is aimed at building the required generic ACPI
+> infrastructure to create and enable IOMMU components and to bring
+> the IOMMU infrastructure for ACPI on par with DT, which is going to
+> make future ARM SMMU components easier to integrate.
 
-> ---
->  include/linux/dma-debug.h | 19 +++++++++++++++++
->  lib/dma-debug.c           | 52 +++++++++++++++++++++++++++++++++++++++++--
->  2 files changed, 69 insertions(+), 2 deletions(-)
-> 
-> diff --git a/include/linux/dma-debug.h b/include/linux/dma-debug.h
-> index fe8cb61..c7d844f 100644
-> --- a/include/linux/dma-debug.h
-> +++ b/include/linux/dma-debug.h
-> @@ -56,6 +56,13 @@ extern void debug_dma_alloc_coherent(struct device *dev,
-> size_t size, extern void debug_dma_free_coherent(struct device *dev, size_t
-> size, void *virt, dma_addr_t addr);
-> 
-> +extern void debug_dma_map_resource(struct device *dev, phys_addr_t addr,
-> +				   size_t size, int direction,
-> +				   dma_addr_t dma_addr);
-> +
-> +extern void debug_dma_unmap_resource(struct device *dev, dma_addr_t
-> dma_addr, +				     size_t size, int direction);
-> +
->  extern void debug_dma_sync_single_for_cpu(struct device *dev,
->  					  dma_addr_t dma_handle, size_t size,
->  					  int direction);
-> @@ -141,6 +148,18 @@ static inline void debug_dma_free_coherent(struct
-> device *dev, size_t size, {
->  }
-> 
-> +static inline void debug_dma_map_resource(struct device *dev, phys_addr_t
-> addr, +					  size_t size, int direction,
-> +					  dma_addr_t dma_addr)
-> +{
-> +}
-> +
-> +static inline void debug_dma_unmap_resource(struct device *dev,
-> +					    dma_addr_t dma_addr, size_t size,
-> +					    int direction)
-> +{
-> +}
-> +
->  static inline void debug_dma_sync_single_for_cpu(struct device *dev,
->  						 dma_addr_t dma_handle,
->  						 size_t size, int direction)
-> diff --git a/lib/dma-debug.c b/lib/dma-debug.c
-> index fcfa193..2ba086b 100644
-> --- a/lib/dma-debug.c
-> +++ b/lib/dma-debug.c
-> @@ -43,6 +43,7 @@ enum {
->  	dma_debug_page,
->  	dma_debug_sg,
->  	dma_debug_coherent,
-> +	dma_debug_resource,
->  };
-> 
->  enum map_err_types {
-> @@ -150,8 +151,9 @@ static const char *const maperr2str[] = {
->  	[MAP_ERR_CHECKED] = "dma map error checked",
->  };
-> 
-> -static const char *type2name[4] = { "single", "page",
-> -				    "scather-gather", "coherent" };
-> +static const char *type2name[5] = { "single", "page",
-> +				    "scather-gather", "coherent",
-> +				    "resource" };
-> 
->  static const char *dir2name[4] = { "DMA_BIDIRECTIONAL", "DMA_TO_DEVICE",
->  				   "DMA_FROM_DEVICE", "DMA_NONE" };
-> @@ -399,6 +401,9 @@ static void hash_bucket_del(struct dma_debug_entry
-> *entry)
-> 
->  static unsigned long long phys_addr(struct dma_debug_entry *entry)
->  {
-> +	if (entry->type == dma_debug_resource)
-> +		return __pfn_to_phys(entry->pfn) + entry->offset;
-> +
->  	return page_to_phys(pfn_to_page(entry->pfn)) + entry->offset;
->  }
-> 
-> @@ -1495,6 +1500,49 @@ void debug_dma_free_coherent(struct device *dev,
-> size_t size, }
->  EXPORT_SYMBOL(debug_dma_free_coherent);
-> 
-> +void debug_dma_map_resource(struct device *dev, phys_addr_t addr, size_t
-> size, +			    int direction, dma_addr_t dma_addr)
-> +{
-> +	struct dma_debug_entry *entry;
-> +
-> +	if (unlikely(dma_debug_disabled()))
-> +		return;
-> +
-> +	entry = dma_entry_alloc();
-> +	if (!entry)
-> +		return;
-> +
-> +	entry->type		= dma_debug_resource;
-> +	entry->dev		= dev;
-> +	entry->pfn		= __phys_to_pfn(addr);
-> +	entry->offset		= offset_in_page(addr);
-> +	entry->size		= size;
-> +	entry->dev_addr		= dma_addr;
-> +	entry->direction	= direction;
-> +	entry->map_err_type	= MAP_ERR_NOT_CHECKED;
-> +
-> +	add_dma_entry(entry);
-> +}
-> +EXPORT_SYMBOL(debug_dma_map_resource);
-> +
-> +void debug_dma_unmap_resource(struct device *dev, dma_addr_t dma_addr,
-> +			      size_t size, int direction)
-> +{
-> +	struct dma_debug_entry ref = {
-> +		.type           = dma_debug_resource,
-> +		.dev            = dev,
-> +		.dev_addr       = dma_addr,
-> +		.size           = size,
-> +		.direction      = direction,
-> +	};
-> +
-> +	if (unlikely(dma_debug_disabled()))
-> +		return;
-> +
-> +	check_unmap(&ref);
-> +}
-> +EXPORT_SYMBOL(debug_dma_unmap_resource);
-> +
->  void debug_dma_sync_single_for_cpu(struct device *dev, dma_addr_t
-> dma_handle, size_t size, int direction)
->  {
+[...]
+>
+> This patchset is built on top and depends on these two patch series:
+>
+> [1] R.Murphy "Generic DT bindings for PCI and ARM SMMU v3" v4
+>     https://marc.info/?l=devicetree&m=146739193215518&w=2
+>
+> [2] T.Nowicki "Introduce ACPI world to ITS irqchip" v8
+>     https://marc.info/?l=linux-kernel&m=147091000919640&w=2
+>
+> and is provided for early review/testing purposes here:
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git acpi/iort-smmu-v4
+>
+> Tested on FVP models for ARM SMMU v3 probing path.
 
--- 
-Regards,
+I tested this patch set on Hisilicon D03 board, with the ehci platform
+driver loaded, on D03, ehci is using stream id 0x40080 when SMMU is
+enabled, here is the IORT table entries I used:
 
-Laurent Pinchart
+[0004]                          Signature : "IORT"    [IO Remapping Table]
+[0004]                       Table Length : 0000029e
+[0001]                           Revision : 00
+[0001]                           Checksum : BC
+[0006]                             Oem ID : "HISI "
+[0008]                       Oem Table ID : "HISI1610"
+[0004]                       Oem Revision : 00000000
+[0004]                    Asl Compiler ID : "INTL"
+[0004]              Asl Compiler Revision : 20151124
+
+[0004]                         Node Count : 00000008
+[0004]                        Node Offset : 00000034
+[0004]                           Reserved : 00000000
+[0004]                   Optional Padding : 00 00 00 00
+
+/* ITS 0, for dsa */
+[0001]                               Type : 00
+[0002]                             Length : 0018
+[0001]                           Revision : 00
+[0004]                           Reserved : 00000000
+[0004]                      Mapping Count : 00000000
+[0004]                     Mapping Offset : 00000000
+
+[0004]                           ItsCount : 00000001
+[0004]                        Identifiers : 00000000
+
+/* SMMU PCIE */
+[0001]                               Type : 04
+[0002]                             Length : 003C
+[0001]                           Revision : 00
+[0004]                           Reserved : 00000000
+[0004]                      Mapping Count : 00000001
+[0004]                     Mapping Offset : 0000003C
+
+[0008]                       Base Address : A0040000
+[0004]              Flags (decoded below) : 00000001
+                           COHACC Override : 1
+                             HTTU Override : 0
+[0004]                           Reserved : 00000000
+[0008]                      VATOS Address : 0
+[0004]                              Model : 00000000
+[0004]                    Event Interrupt : 00000000
+[0004]                      PRI Interrupt : 00000000
+[0004]                     GERR Interrupt : 00000000
+[0004]                     Sync Interrupt : 00000000
+
+[...]
+
+/* usb named component */
+[0001]                               Type : 01
+[0002]                             Length : 0046
+[0001]                           Revision : 00
+[0004]                           Reserved : 00000000
+[0004]                      Mapping Count : 00000001
+[0004]                     Mapping Offset : 00000032
+
+[0004]                         Node Flags : 00000000
+[0008]                  Memory Properties : [IORT Memory Access Properties]
+[0004]                    Cache Coherency : 00000000
+[0001]              Hints (decoded below) : 00
+                                 Transient : 0
+                            Write Allocate : 0
+                             Read Allocate : 0
+                                  Override : 0
+[0002]                           Reserved : 0000
+[0001]       Memory Flags (decoded below) : 00
+                                 Coherency : 0
+                          Device Attribute : 0
+[0001]                  Memory Size Limit : 00
+[0016]                        Device Name : "\_SB_.USB0"
+[0004]                            Padding : 00 00 00 00
+
+[0004]                         Input base : 00000000
+[0004]                           ID Count : 00000001
+[0004]                        Output Base : 00040080
+[0004]                   Output Reference : 0000004C /* point to smmu 
+pcie */
+[0004]              Flags (decoded below) : 00000001
+                            Single Mapping : 1
+
+I mounted a USB storage and copy the data (should trigger the DMA :)),
+and it works fine (if the wrong stream id is configured, I can't
+find the USB storage). So with this patch set:
+
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+
+I think I also test Robin's SMMUv3 patchset for supporting no-pci
+devices.
+
+Thanks
+Hanjun
