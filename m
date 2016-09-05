@@ -1,94 +1,29 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 5 Sep 2016 15:57:51 +0100
-Subject: [PATCH v4 05/15] drivers: platform: add fwnode base platform
- devices retrieval
-In-Reply-To: <7659b956-c49d-bd0d-7a1d-8dfc3da6f409@linaro.org>
-References: <1471274620-20754-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1471274620-20754-6-git-send-email-lorenzo.pieralisi@arm.com>
- <7659b956-c49d-bd0d-7a1d-8dfc3da6f409@linaro.org>
-Message-ID: <20160905145751.GA7480@red-moon>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon,  5 Sep 2016 18:05:13 +0300
+Subject: [PATCH] dt-bindings: mvebu-odmi: fix example typo
+Message-ID: <0743fef6fe390bc4ae7cabd15c4836bbed98f7cf.1473087913.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 05, 2016 at 09:19:43PM +0800, Hanjun Guo wrote:
-> On 2016/8/15 23:23, Lorenzo Pieralisi wrote:
-> >The platform device kernel API does not provide functions to
-> >retrieve a platform device through the corresponding struct
-> >device fwnode pointer.
-> >
-> >Implement the fwnode platform_device look-up in drivers core
-> >code by using the bus_find_device() API and a corresponding
-> >matching function. The OF equivalent (eg of_find_device_by_node())
-> >will reuse the newly introduced function when OF code will
-> >take care of setting up the device->fwnode value that is
-> >currently left dangling for platform devices instantiated out
-> >of device tree nodes.
-> >
-> >Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> >Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> >---
-> > drivers/base/platform.c         | 23 +++++++++++++++++++++++
-> > include/linux/platform_device.h |  3 +++
-> > 2 files changed, 26 insertions(+)
-> >
-> >diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-> >index 6482d47..3ef150d 100644
-> >--- a/drivers/base/platform.c
-> >+++ b/drivers/base/platform.c
-> >@@ -760,6 +760,29 @@ err_out:
-> > }
-> > EXPORT_SYMBOL_GPL(__platform_create_bundle);
-> >
-> >+static int fwnode_dev_match(struct device *dev, void *data)
-> >+{
-> >+	return dev->fwnode == data;
-> >+}
-> >+
-> >+/**
-> >+ * platform_find_device_by_fwnode() - Find the platform_device associated
-> >+ *				      with a fwnode
-> >+ * @fwnode: Pointer to firmware node
-> >+ *
-> >+ * Returns platform_device pointer, or NULL if not found
-> >+ */
-> >+struct platform_device *
-> >+platform_find_device_by_fwnode(struct fwnode_handle *fwnode)
-> >+{
-> >+	struct device *dev;
-> >+
-> >+	dev = bus_find_device(&platform_bus_type, NULL, fwnode,
-> >+			      fwnode_dev_match);
-> >+	return dev ? to_platform_device(dev) : NULL;
-> >+}
-> >+EXPORT_SYMBOL(platform_find_device_by_fwnode);
-> 
-> As SMMU is registered as platform devices, I think we need such
-> API to retrieve the platform device with fwnode handle, actually
-> Kefeng introduced a similar patch [1], but your patch is more
-> generic, so this patch make sense to me,
-> 
-> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+Make the example compatible string match its definition.
 
-Thanks ! Strictly speaking, with Robin's new series:
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ .../bindings/interrupt-controller/marvell,odmi-controller.txt           | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-https://lists.linuxfoundation.org/pipermail/iommu/2016-August/018230.html
-
-
-(and corresponding v5 of this one that I have rebased on top of it) we
-do not need this patch any longer and it is not really that generic
-keeping in mind that it can't be used for DT matching (because in DT
-dev->fwnode is dangling); I will see if I keep this patch according
-to dependencies.
-
-Side note: I have a problem with [1], since that code is there to
-implement DT phandles in ACPI IIUC and we must really prevent that :)
-
-Thanks !
-Lorenzo
-
-> Thanks
-> Hanjun
-> 
-> [1]: https://patchwork.kernel.org/patch/7743661/
-> 
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,odmi-controller.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,odmi-controller.txt
+index 8af0a8e613ab..3f6442c7f867 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/marvell,odmi-controller.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,odmi-controller.txt
+@@ -31,7 +31,7 @@ Required properties:
+ Example:
+ 
+ 	odmi: odmi at 300000 {
+-		compatible = "marvell,ap806-odm-controller",
++		compatible = "marvell,ap806-odmi-controller",
+ 			     "marvell,odmi-controller";
+ 		interrupt-controller;
+ 		msi-controller;
+-- 
+2.9.3
