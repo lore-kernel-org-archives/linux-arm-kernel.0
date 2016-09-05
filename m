@@ -1,61 +1,73 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 5 Sep 2016 11:53:48 +0200
-Subject: [PATCH v5 0/9] Add MT8173 Video Decoder Driver
-In-Reply-To: <1473069011.23162.7.camel@mtksdaap41>
-References: <1472818800-22558-1-git-send-email-tiffany.lin@mediatek.com>
- <616d95a4-e6f3-5c42-d435-eb73795bd82c@xs4all.nl>
- <1473069011.23162.7.camel@mtksdaap41>
-Message-ID: <2d332670-edfd-5f2e-2c7f-4346e60baf75@xs4all.nl>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon,  5 Sep 2016 10:58:20 +0100
+Subject: [PATCH v3 0/9] arm64: Work around for mismatched cache line size
+Message-ID: <1473069509-2317-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/2016 11:50 AM, Tiffany Lin wrote:
-> Hi Hans,
-> 
-> On Mon, 2016-09-05 at 11:33 +0200, Hans Verkuil wrote:
->> On 09/02/2016 02:19 PM, Tiffany Lin wrote:
->>> ==============
->>>  Introduction
->>> ==============
->>>
->>> The purpose of this series is to add the driver for video codec hw embedded in the Mediatek's MT8173 SoCs.
->>> Mediatek Video Codec is able to handle video decoding and encoding of in a range of formats.
->>>
->>> This patch series rely on MTK VPU driver that have been merged in v4.8-rc1.
->>> Mediatek Video Decoder driver rely on VPU driver to load, communicate with VPU.
->>>
->>> Internally the driver uses videobuf2 framework, and MTK IOMMU and MTK SMI both have been merged in v4.6-rc1.
->>>
->>> [1]https://chromium-review.googlesource.com/#/c/245241/
->>
->> This patch series fails to apply to the media_tree master (patch 3/9). Can you rebase and repost?
->>
->> I'm ready to make a pull request for this, so I hope you can fix this soon.
->>
-> I saw Encoder fix patches in fixes branch.
-> This patch series is base on Encoder fix patches. 
-> 
-> [media] vcodec:mediatek: Refine VP8 encoder driver
-> [media] vcodec:mediatek: Refine H264 encoder driver
-> [media] vcodec:mediatek: change H264 profile default to profile high
-> [media] vcodec:mediatek: Add timestamp and timecode copy for V4L2
-> Encoder
-> [media] vcodec:mediatek: Fix visible_height larger than coded_height
-> issue in s_fmt_out
-> [media] vcodec:mediatek: Fix fops_vcodec_release flow for V4L2 Encoder
-> [media] vcodec:mediatek:code refine for v4l2 Encoder driver
-> [media] dvb_frontend: Use memdup_user() rather than duplicating its
-> implementation
-> 
-> 
-> If I do not rebase decoder patch series base on Encoder fix pathces.
-> Then it will fail after Encoder fix patches merged.
-> 
-> May I know what parent patch I need to rebase to to fix this issue?
+This series adds a work around for systems with mismatched {I,D}-cache
+line sizes. When a thread of execution gets migrated to a different CPU,
+the cache line size it had cached could be larger than that of the new
+CPU. This could cause data corruption issues. We work around this by
 
-Ah, OK. I will retest placing this on top of those fixes. I forgot about the
-pending fixes. I'll handle this.
+ - Dynamically patching the kernel to use the smallest line size on the
+   system (from the CPU feature infrastructure)
+ - Trapping the userspace access to CTR_EL0 (by clearing SCTLR_EL1.UCT) and
+   emulating it with the system wide safe value of CTR.
 
-Regards,
+The series also adds support for alternative code patching of adrp
+instructions by adjusting the PC-relative address offset to reflect
+the new PC.
 
-	Hans
+The series has been tested on Juno with a hack to forced enabling
+of the capability.
+
+Applies on aarch64 for-next/core.
+ The tree is avaiable at :
+  git://linux-arm.org/linux-skp.git ctr-v3
+
+Changes since V2:
+ - Rebase to for-next/core which contains Ard's series for refactoring
+   the arm64_ftr_reg [1]
+
+Changes since V1:
+
+ - Replace adr_adrp insn helper with seperate helpers for adr and adrp.
+ - Add/use align_down() macro for adjusting the page address for adrp offsets.
+ - Add comments for existing ISS field defintions.
+ - Added a patch to disallow silent patching of unhandled pc relative
+   instructions in alternative code patching.
+
+[1] http://marc.info/?l=linux-arm-kernel&m=147263959504998&w=2
+
+
+Suzuki K Poulose (9):
+  arm64: Set the safe value for L1 icache policy
+  arm64: Use consistent naming for errata handling
+  arm64: Rearrange CPU errata workaround checks
+  arm64: alternative: Disallow patching instructions using literals
+  arm64: insn: Add helpers for adrp offsets
+  arm64: alternative: Add support for patching adrp instructions
+  arm64: Introduce raw_{d,i}cache_line_size
+  arm64: Refactor sysinstr exception handling
+  arm64: Work around systems with mismatched cache line sizes
+
+ arch/arm64/include/asm/assembler.h  | 45 +++++++++++++++++--
+ arch/arm64/include/asm/cpufeature.h | 13 +++---
+ arch/arm64/include/asm/esr.h        | 84 +++++++++++++++++++++++++++++++----
+ arch/arm64/include/asm/insn.h       | 11 ++++-
+ arch/arm64/include/asm/sysreg.h     |  1 +
+ arch/arm64/kernel/alternative.c     | 21 +++++++++
+ arch/arm64/kernel/asm-offsets.c     |  2 +
+ arch/arm64/kernel/cpu_errata.c      | 26 ++++++++++-
+ arch/arm64/kernel/cpufeature.c      | 35 ++++++++++-----
+ arch/arm64/kernel/cpuinfo.c         |  2 -
+ arch/arm64/kernel/hibernate-asm.S   |  2 +-
+ arch/arm64/kernel/insn.c            | 13 ++++++
+ arch/arm64/kernel/relocate_kernel.S |  2 +-
+ arch/arm64/kernel/smp.c             |  8 +++-
+ arch/arm64/kernel/traps.c           | 87 ++++++++++++++++++++++++++-----------
+ 15 files changed, 287 insertions(+), 65 deletions(-)
+
+-- 
+2.7.4
