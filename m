@@ -1,82 +1,86 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Tue,  6 Sep 2016 19:04:38 +0200
-Subject: [PATCH 02/21] ARM: shmobile: Convert to hotplug state machine
+Date: Tue,  6 Sep 2016 19:04:39 +0200
+Subject: [PATCH 03/21] ARM: OMAP: wakeupgen: Convert to hotplug state machine
 In-Reply-To: <20160906170457.32393-1-bigeasy@linutronix.de>
 References: <20160906170457.32393-1-bigeasy@linutronix.de>
-Message-ID: <20160906170457.32393-3-bigeasy@linutronix.de>
+Message-ID: <20160906170457.32393-4-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Install the callbacks via the state machine.
 
-Cc: Simon Horman <horms@verge.net.au>
-Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: linux-omap at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-sh at vger.kernel.org
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- arch/arm/mach-shmobile/platsmp-scu.c | 26 ++++++++------------------
+ arch/arm/mach-omap2/omap-wakeupgen.c | 35 +++++++++++++----------------------
  include/linux/cpuhotplug.h           |  1 +
- 2 files changed, 9 insertions(+), 18 deletions(-)
+ 2 files changed, 14 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/platsmp-scu.c b/arch/arm/mach-shmobile/platsmp-scu.c
-index 8d478f1da265..d1ecaf37d142 100644
---- a/arch/arm/mach-shmobile/platsmp-scu.c
-+++ b/arch/arm/mach-shmobile/platsmp-scu.c
-@@ -21,26 +21,14 @@
- static phys_addr_t shmobile_scu_base_phys;
- static void __iomem *shmobile_scu_base;
+diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
+index 0c4754386532..369f95a703ac 100644
+--- a/arch/arm/mach-omap2/omap-wakeupgen.c
++++ b/arch/arm/mach-omap2/omap-wakeupgen.c
+@@ -322,34 +322,25 @@ static void irq_save_secure_context(void)
+ #endif
  
--static int shmobile_smp_scu_notifier_call(struct notifier_block *nfb,
--					  unsigned long action, void *hcpu)
-+static int shmobile_scu_cpu_prepare(unsigned int cpu)
+ #ifdef CONFIG_HOTPLUG_CPU
+-static int irq_cpu_hotplug_notify(struct notifier_block *self,
+-				  unsigned long action, void *hcpu)
++static int omap_wakeupgen_cpu_online(unsigned int cpu)
  {
--	unsigned int cpu = (long)hcpu;
+-	unsigned int cpu = (unsigned int)hcpu;
 -
+-	/*
+-	 * Corresponding FROZEN transitions do not have to be handled,
+-	 * they are handled by at a higher level
+-	 * (drivers/cpuidle/coupled.c).
+-	 */
 -	switch (action) {
--	case CPU_UP_PREPARE:
--		/* For this particular CPU register SCU SMP boot vector */
--		shmobile_smp_hook(cpu, virt_to_phys(shmobile_boot_scu),
--				  shmobile_scu_base_phys);
+-	case CPU_ONLINE:
+-		wakeupgen_irqmask_all(cpu, 0);
 -		break;
--	};
--
+-	case CPU_DEAD:
+-		wakeupgen_irqmask_all(cpu, 1);
+-		break;
+-	}
 -	return NOTIFY_OK;
-+	/* For this particular CPU register SCU SMP boot vector */
-+	shmobile_smp_hook(cpu, virt_to_phys(shmobile_boot_scu),
-+			  shmobile_scu_base_phys);
++	wakeupgen_irqmask_all(cpu, 0);
 +	return 0;
  }
  
--static struct notifier_block shmobile_smp_scu_notifier = {
--	.notifier_call = shmobile_smp_scu_notifier_call,
+-static struct notifier_block irq_hotplug_notifier = {
+-	.notifier_call = irq_cpu_hotplug_notify,
 -};
--
- void __init shmobile_smp_scu_prepare_cpus(phys_addr_t scu_base_phys,
- 					  unsigned int max_cpus)
++static int omap_wakeupgen_cpu_dead(unsigned int cpu)
++{
++	wakeupgen_irqmask_all(cpu, 1);
++	return 0;
++}
+ 
+ static void __init irq_hotplug_init(void)
  {
-@@ -54,7 +42,9 @@ void __init shmobile_smp_scu_prepare_cpus(phys_addr_t scu_base_phys,
- 	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
- 
- 	/* Use CPU notifier for reset vector control */
--	register_cpu_notifier(&shmobile_smp_scu_notifier);
-+	cpuhp_setup_state_nocalls(CPUHP_ARM_SHMOBILE_SCU_PREPARE,
-+				  "arm/shmobile-scu:prepare",
-+				  shmobile_scu_cpu_prepare, NULL);
+-	register_hotcpu_notifier(&irq_hotplug_notifier);
++	cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN, "arm/omap-wake:online",
++				  omap_wakeupgen_cpu_online, NULL);
++	cpuhp_setup_state_nocalls(CPUHP_ARM_OMAP_WAKE_DEAD,
++				  "arm/omap-wake:dead", NULL,
++				  omap_wakeupgen_cpu_dead);
  }
- 
- #ifdef CONFIG_HOTPLUG_CPU
+ #else
+ static void __init irq_hotplug_init(void)
 diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-index 0da071ff36d2..008eed0c0787 100644
+index 008eed0c0787..35859aafbbfc 100644
 --- a/include/linux/cpuhotplug.h
 +++ b/include/linux/cpuhotplug.h
-@@ -35,6 +35,7 @@ enum cpuhp_state {
- 	CPUHP_POWERPC_PMAC_PREPARE,
- 	CPUHP_POWERPC_MMU_CTX_PREPARE,
- 	CPUHP_NOTIFY_PREPARE,
-+	CPUHP_ARM_SHMOBILE_SCU_PREPARE,
- 	CPUHP_TIMERS_DEAD,
- 	CPUHP_BRINGUP_CPU,
- 	CPUHP_AP_IDLE_DEAD,
+@@ -21,6 +21,7 @@ enum cpuhp_state {
+ 	CPUHP_NET_MVNETA_DEAD,
+ 	CPUHP_CPUIDLE_DEAD,
+ 	CPUHP_ARM64_FPSIMD_DEAD,
++	CPUHP_ARM_OMAP_WAKE_DEAD,
+ 	CPUHP_WORKQUEUE_PREP,
+ 	CPUHP_POWER_NUMA_PREPARE,
+ 	CPUHP_HRTIMERS_PREPARE,
 -- 
 2.9.3
