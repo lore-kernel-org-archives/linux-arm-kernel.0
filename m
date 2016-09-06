@@ -1,31 +1,33 @@
 From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Tue, 6 Sep 2016 18:45:41 +0200
-Subject: [PATCH v4 9/9] ARM: config: Enable GPIO Key driver in stm32_defconfig
+Date: Tue, 6 Sep 2016 18:45:36 +0200
+Subject: [PATCH v4 4/9] ARM: dts: Add EXTI controller node to stm32f429
 In-Reply-To: <1473180341-1999-1-git-send-email-alexandre.torgue@st.com>
 References: <1473180341-1999-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <1473180341-1999-10-git-send-email-alexandre.torgue@st.com>
+Message-ID: <1473180341-1999-5-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
-index 1e5ec2a..e7b56d4 100644
---- a/arch/arm/configs/stm32_defconfig
-+++ b/arch/arm/configs/stm32_defconfig
-@@ -38,7 +38,11 @@ CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_FW_LOADER is not set
- # CONFIG_BLK_DEV is not set
- CONFIG_EEPROM_93CX6=y
--# CONFIG_INPUT is not set
-+# CONFIG_INPUT_LEDS is not set
-+# CONFIG_INPUT_MOUSEDEV is not set
-+# CONFIG_KEYBOARD_ATKBD is not set
-+CONFIG_KEYBOARD_GPIO=y
-+# CONFIG_INPUT_MOUSE is not set
- # CONFIG_SERIO is not set
- # CONFIG_VT is not set
- # CONFIG_UNIX98_PTYS is not set
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index 35df462..1a189d4 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -176,6 +176,14 @@
+ 			reg = <0x40013800 0x400>;
+ 		};
+ 
++		exti: interrupt-controller at 40013c00 {
++			compatible = "st,stm32-exti";
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			reg = <0x40013C00 0x400>;
++			interrupts = <1>, <2>, <3>, <6>, <7>, <8>, <9>, <10>, <23>, <40>, <41>, <42>, <62>, <76>;
++		};
++
+ 		pin-controller {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
 -- 
 1.9.1
