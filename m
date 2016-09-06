@@ -1,75 +1,150 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 6 Sep 2016 12:04:38 +0200
-Subject: [PATCH v3 1/4] pwm: Add support for Meson PWM Controller
-In-Reply-To: <a43f6e6e-05f6-cefe-451d-528588b85a8c@baylibre.com>
-References: <1471880193-21879-1-git-send-email-narmstrong@baylibre.com>
- <1471880193-21879-2-git-send-email-narmstrong@baylibre.com>
- <20160905090052.GG3532@ulmo.ba.sec>
- <bd7ea1db-d8f9-f075-14ef-732d9bb65e77@baylibre.com>
- <20160906090749.GA15644@ulmo.ba.sec>
- <a43f6e6e-05f6-cefe-451d-528588b85a8c@baylibre.com>
-Message-ID: <20160906100438.GE15644@ulmo.ba.sec>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 06 Sep 2016 11:05:17 +0100
+Subject: [RFC v2 PATCH 4/7] arm64: tlbflush.h: add __tlbi() macro
+In-Reply-To: <20160906063830.GC30513@cbox> (Christoffer Dall's message of
+ "Tue, 6 Sep 2016 08:38:30 +0200")
+References: <1473093097-30932-1-git-send-email-punit.agrawal@arm.com>
+ <1473093097-30932-5-git-send-email-punit.agrawal@arm.com>
+ <20160906063830.GC30513@cbox>
+Message-ID: <87d1khjqci.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2016 at 11:14:45AM +0200, Neil Armstrong wrote:
-> On 09/06/2016 11:07 AM, Thierry Reding wrote:
-> > On Tue, Sep 06, 2016 at 10:36:49AM +0200, Neil Armstrong wrote:
-> >> Hi Thierry,
-> >>
-> [...]
-> > 
-> >>
-> >> The second bug is in probe(), I understand the point to allocate
-> >> dynamically the channels and attach them to each pwm chip, but when
-> >> calling meson_pwm_init_channels() we get an OOPS because
-> >> meson->chip.pwms[i] are allocated in pwmchip_add(). Moving
-> >> meson_pwm_init_channels() would fix this, but in case of a clk
-> >> PROBE_DEFER, we would need to remove back the pwmchip, which is a
-> >> quite a bad design decision....
-> > 
-> > Ah yes... that one again. I remember running into that a while ago with
-> > some other driver. To be honest, I think that's a short-coming of the
-> > PWM subsystem and the fix would be for PWM chip registration to be split
-> > into two parts: pwm_chip_init() and pwm_chip_add(). That way, a chip
-> > would be initialized using pwm_chip_init() where the pwms array would be
-> > allocated, and pwm_chip_add() would register the chip with the system.
-> > 
-> > Currently a few drivers might be vulnerable to a race condition between
-> > registration and implementation (i.e. PWM channels aren't fully set up
-> > when they are exposed to users and sysfs).
-> > 
-> >> The smartest fix I found was to allocate channels in probe, init them
-> >> them attach them after pwmchip_add():
-> >>
-> [...]
-> 
-> > 
-> > That's the race I was talking about above. I suppose it's not too big an
-> > issue since other drivers seem to manage, so I'm going to merge your
-> > fixed driver.
-> 
-> ok thanks !
+Christoffer Dall <christoffer.dall@linaro.org> writes:
 
-I've made a few tiny changes (reg -> offset, temporary variable to track
-&channels[i], ...) and pushed it all out. Hopefully that now fixes any
-of the remaining issues.
+> On Mon, Sep 05, 2016 at 05:31:34PM +0100, Punit Agrawal wrote:
+>> From: Mark Rutland <mark.rutland@arm.com>
+>> 
+>> As with dsb() and isb(), add a __tlbi() helper so that we can avoid
+>> distracting asm boilerplate every time we want a TLBI. As some TLBI
+>> operations take an argument while others do not, some pre-processor is
+>> used to handle these two cases with different assembly blocks.
+>> 
+>> The existing tlbflush.h code is moved over to use the helper.
+>> 
+>> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> [ rename helper to __tlbi, update commit log ]
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> ---
+>>  arch/arm64/include/asm/tlbflush.h | 31 +++++++++++++++++++++++--------
+>>  1 file changed, 23 insertions(+), 8 deletions(-)
+>> 
+>> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+>> index b460ae2..e9e42a7 100644
+>> --- a/arch/arm64/include/asm/tlbflush.h
+>> +++ b/arch/arm64/include/asm/tlbflush.h
+>> @@ -25,6 +25,21 @@
+>>  #include <asm/cputype.h>
+>>  
+>>  /*
+>> + * Raw TLBI operations. Drivers and most kernel code should use the TLB
+>> + * management routines below in preference to these. Where necessary, these can
+>
+> in preference to these?
+>
+>> + * be used to avoid asm() boilerplate.
+>
+> 'these' seem to be a bit overloaded in this commentary.
+>
 
-> > Unless you feel like taking a stab at the pwm_chip_init()/pwm_chip_add()
-> > split, in which case your driver would be the first to be race-free. =)
-> 
-> Having he driver upstream is a priority, but having it completely
-> race-free would be great! I'll be happy to collaborate to a race-free
-> pwmchip probe somehow !
+I've locally updated the comment to - 
 
-Fair enough. I'll do some prototyping and keep you in the loop if I come
-up with something that I think will do.
+"Raw TLBI operations.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160906/089d2a89/attachment.sig>
+Where necessary, use the __tlbi macro to avoid asm()
+boilerplate. *Note:* Drivers and most kernel code should use the
+TLB management routines in preference to the macros."
+
+Is that better?
+
+>> + *
+>> + * Can be used as __tlbi(op) or __tlbi(op, arg), depending on whether a
+>> + * particular TLBI op takes an argument or not. The macros below handle invoking
+>> + * the asm with or without the register argument as appropriate.
+>> + */
+>> +#define __TLBI_0(op, arg)		asm ("tlbi " #op)
+>> +#define __TLBI_1(op, arg)		asm ("tlbi " #op ", %0" : : "r" (arg))
+>> +#define __TLBI_N(op, arg, n, ...)	__TLBI_##n(op, arg)
+>> +
+>> +#define __tlbi(op, ...)		__TLBI_N(op, ##__VA_ARGS__, 1, 0)
+>> +
+>> +/*
+>>   *	TLB Management
+>>   *	==============
+>>   *
+>> @@ -66,7 +81,7 @@
+>>  static inline void local_flush_tlb_all(void)
+>>  {
+>>  	dsb(nshst);
+>> -	asm("tlbi	vmalle1");
+>> +	__tlbi(vmalle1);
+>>  	dsb(nsh);
+>>  	isb();
+>>  }
+>> @@ -74,7 +89,7 @@ static inline void local_flush_tlb_all(void)
+>>  static inline void flush_tlb_all(void)
+>>  {
+>>  	dsb(ishst);
+>> -	asm("tlbi	vmalle1is");
+>> +	__tlbi(vmalle1is);
+>>  	dsb(ish);
+>>  	isb();
+>>  }
+>> @@ -84,7 +99,7 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
+>>  	unsigned long asid = ASID(mm) << 48;
+>>  
+>>  	dsb(ishst);
+>> -	asm("tlbi	aside1is, %0" : : "r" (asid));
+>> +	__tlbi(aside1is, asid);
+>>  	dsb(ish);
+>>  }
+>>  
+>> @@ -94,7 +109,7 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
+>>  	unsigned long addr = uaddr >> 12 | (ASID(vma->vm_mm) << 48);
+>>  
+>>  	dsb(ishst);
+>> -	asm("tlbi	vale1is, %0" : : "r" (addr));
+>> +	__tlbi(vale1is, addr);
+>>  	dsb(ish);
+>>  }
+>>  
+>> @@ -122,9 +137,9 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
+>>  	dsb(ishst);
+>>  	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12)) {
+>>  		if (last_level)
+>> -			asm("tlbi vale1is, %0" : : "r"(addr));
+>> +			__tlbi(vale1is, addr);
+>>  		else
+>> -			asm("tlbi vae1is, %0" : : "r"(addr));
+>> +			__tlbi(vae1is, addr);
+>>  	}
+>>  	dsb(ish);
+>>  }
+>> @@ -149,7 +164,7 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
+>>  
+>>  	dsb(ishst);
+>>  	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
+>> -		asm("tlbi vaae1is, %0" : : "r"(addr));
+>> +		__tlbi(vaae1is, addr);
+>>  	dsb(ish);
+>>  	isb();
+>>  }
+>> @@ -163,7 +178,7 @@ static inline void __flush_tlb_pgtable(struct mm_struct *mm,
+>>  {
+>>  	unsigned long addr = uaddr >> 12 | (ASID(mm) << 48);
+>>  
+>> -	asm("tlbi	vae1is, %0" : : "r" (addr));
+>> +	__tlbi(vae1is, addr);
+>>  	dsb(ish);
+>>  }
+>>  
+>> -- 
+>> 2.8.1
+>> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
