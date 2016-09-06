@@ -1,40 +1,26 @@
-From: bauerman@linux.vnet.ibm.com (Thiago Jung Bauermann)
-Date: Tue, 06 Sep 2016 20:33:20 -0300
-Subject: Kexec regression in next-20160906
-In-Reply-To: <20160906220936.4txqzodkgknhjiyh@atomide.com>
-References: <20160906220936.4txqzodkgknhjiyh@atomide.com>
-Message-ID: <2229914.bQjEFCIRgO@hactar>
+From: fengguang.wu@intel.com (Fengguang Wu)
+Date: Wed, 7 Sep 2016 07:47:05 +0800
+Subject: [arm:sa1100 33/97] arch/arm/common/sa1111.c:515:19: error:
+ 'irqbase' undeclared
+In-Reply-To: <20160906222245.GH1041@n2100.armlinux.org.uk>
+References: <201609070356.QKsjqKNj%fengguang.wu@intel.com>
+ <20160906222245.GH1041@n2100.armlinux.org.uk>
+Message-ID: <20160906234705.wrqvupyhninqc2xz@wfg-t540p.sh.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tony,
+Hi Russell King,
 
-Am Dienstag, 06 September 2016, 15:09:37 schrieb Tony Lindgren:
-> Looks like commit 5c01cdd2d4bc ("kexec_file: allow skipping checksum
-> calculation for some segments") makes next-20160916 stop working for
-> me at least on ARM.
-> 
-> I now get "kexec_load failed: Invalid argument error" on loading the
-> new kernel to memory with kexec -l.
-> 
-> Reverting the following two commits makes things work for me again:
-> 
-> d2bf993afdf1 ("kexec_file: add mechanism to update kexec segments")
-> 5c01cdd2d4bc ("kexec_file: allow skipping checksum calculation for
-> some segments")
+On Tue, Sep 06, 2016 at 11:22:45PM +0100, Russell King - ARM Linux wrote:
+>On Wed, Sep 07, 2016 at 03:29:58AM +0800, kbuild test robot wrote:
+>> tree:   http://repo.or.cz/linux-2.6/linux-2.6-arm.git sa1100
+>
+>Please use git://git.armlinux.org.uk/~rmk/linux-arm.git instead -
+>the new machine is in place and should be able to cope just fine with
+>whatever git load, so there should be no need to use mirrors anymore.
+>I think you're using that already for some reports anyway.
 
-Thanks for reporting the problem and finding the commit that caused it.
-The only thing in commit 5c01cdd2d4bc which can affect kexec_load is the 
-fact that struct kexec_segment has a new member.
+Thanks for the info, I've updated the tree URL accordingly.
 
-This is probably breaking the ABI on ARM, then. I verified that kexec_load 
-kept working on ppc64le with a kexec binary compiled with the original 
-struct kexec_segment definition, but apparently I got lucky.
-
-I'll prepare a new version of the kexec buffer hand-over series which 
-doesn't touch struct kexec_segment.
-
--- 
-[]'s
-Thiago Jung Bauermann
-IBM Linux Technology Center
+Regards,
+Fengguang
