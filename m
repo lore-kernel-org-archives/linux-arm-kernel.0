@@ -1,89 +1,52 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Tue,  6 Sep 2016 23:38:43 +0200
-Subject: [PATCH v5 1/6] net: dt-bindings: Document the new Meson8b and GXBB
- DWMAC bindings
+Date: Tue,  6 Sep 2016 23:38:47 +0200
+Subject: [PATCH v5 5/6] ARM64: dts: meson-gxbb: use the new GXBB DWMAC glue
+ driver
 In-Reply-To: <20160906213848.17785-1-martin.blumenstingl@googlemail.com>
 References: <20160904182320.671-1-martin.blumenstingl@googlemail.com>
  <20160906213848.17785-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20160906213848.17785-2-martin.blumenstingl@googlemail.com>
+Message-ID: <20160906213848.17785-6-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the documentation for the DWMAC ethernet controller
-found in Amlogic Meson 8b (S805) and GXBB (S905) SoCs.
-The main difference between the Meson6 glue is that different registers
-(with different layout) are used.
+The Amlogic reference driver uses the "mc_val" devicetree property to
+configure the PRG_ETHERNET_ADDR0 register. Unfortunately it uses magic
+values for this configuration.
+According to the datasheet the PRG_ETHERNET_ADDR0 register is at address
+0xc8834108. However, the reference driver uses 0xc8834540 instead.
+According to my tests, the value from the reference driver is correct.
+
+No changes are required to the board dts files because the only
+required configuration option is the phy-mode, which had to be
+configured correctly before as well.
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: David S. Miller <davem@davemloft.net>
 ---
- .../devicetree/bindings/net/meson-dwmac.txt        | 45 ++++++++++++++++++----
- 1 file changed, 37 insertions(+), 8 deletions(-)
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/net/meson-dwmac.txt b/Documentation/devicetree/bindings/net/meson-dwmac.txt
-index ec633d7..89e62dd 100644
---- a/Documentation/devicetree/bindings/net/meson-dwmac.txt
-+++ b/Documentation/devicetree/bindings/net/meson-dwmac.txt
-@@ -1,18 +1,32 @@
- * Amlogic Meson DWMAC Ethernet controller
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 2b47415..2e8a3d9 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -497,13 +497,15 @@
+ 		};
  
- The device inherits all the properties of the dwmac/stmmac devices
--described in the file net/stmmac.txt with the following changes.
-+described in the file stmmac.txt in the current directory with the
-+following changes.
- 
--Required properties:
-+Required properties on all platforms:
- 
--- compatible: should be "amlogic,meson6-dwmac" along with "snps,dwmac"
--	      and any applicable more detailed version number
--	      described in net/stmmac.txt
-+- compatible:	Depending on the platform this should be one of:
-+			- "amlogic,meson6-dwmac"
-+			- "amlogic,meson8b-dwmac"
-+			- "amlogic,meson-gxbb-dwmac"
-+		Additionally "snps,dwmac" and any applicable more
-+		detailed version number described in net/stmmac.txt
-+		should be used.
- 
--- reg: should contain a register range for the dwmac controller and
--       another one for the Amlogic specific configuration
-+- reg:	The first register range should be the one of the DWMAC
-+	controller. The second range is is for the Amlogic specific
-+	configuration (for example the PRG_ETHERNET register range
-+	on Meson8b and newer)
- 
--Example:
-+Required properties on Meson8b and newer:
-+- clock-names:	Should contain the following:
-+		- "stmmaceth" - see stmmac.txt
-+		- "clkin0" - first parent clock of the internal mux
-+		- "clkin1" - second parent clock of the internal mux
-+
-+
-+Example for Meson6:
- 
- 	ethmac: ethernet at c9410000 {
- 		compatible = "amlogic,meson6-dwmac", "snps,dwmac";
-@@ -23,3 +37,18 @@ Example:
- 		clocks = <&clk81>;
- 		clock-names = "stmmaceth";
- 	}
-+
-+Example for GXBB:
-+	ethmac: ethernet at c9410000 {
-+		compatible = "amlogic,meson-gxbb-dwmac", "snps,dwmac";
-+		reg = <0x0 0xc9410000 0x0 0x10000>,
-+			<0x0 0xc8834540 0x0 0x8>;
-+		interrupts = <0 8 1>;
-+		interrupt-names = "macirq";
-+		clocks = <&clkc CLKID_ETH>,
-+				<&clkc CLKID_FCLK_DIV2>,
-+				<&clkc CLKID_MPLL2>;
-+		clock-names = "stmmaceth", "clkin0", "clkin1";
-+		phy-mode = "rgmii";
-+		status = "disabled";
-+	};
+ 		ethmac: ethernet at c9410000 {
+-			compatible = "amlogic,meson6-dwmac", "snps,dwmac";
++			compatible = "amlogic,meson-gxbb-dwmac", "snps,dwmac";
+ 			reg = <0x0 0xc9410000 0x0 0x10000
+ 			       0x0 0xc8834540 0x0 0x4>;
+ 			interrupts = <0 8 1>;
+ 			interrupt-names = "macirq";
+-			clocks = <&clkc CLKID_ETH>;
+-			clock-names = "stmmaceth";
++			clocks = <&clkc CLKID_ETH>,
++				 <&clkc CLKID_FCLK_DIV2>,
++				 <&clkc CLKID_MPLL2>;
++			clock-names = "stmmaceth", "clkin0", "clkin1";
+ 			phy-mode = "rgmii";
+ 			status = "disabled";
+ 		};
 -- 
 2.9.3
