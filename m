@@ -1,76 +1,49 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 6 Sep 2016 09:28:57 -0600
-Subject: [PATCH] coresight: tmc: mark symbols static where possible
-In-Reply-To: <1473149030-25576-1-git-send-email-baoyou.xie@linaro.org>
-References: <1473149030-25576-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <CANLsYkw+kHpdate2UAb8BFViaqgYkAmrvsYCBumgPXKa_cWYHg@mail.gmail.com>
+From: wens213@gmail.com (wens Tsai)
+Date: Tue, 6 Sep 2016 23:31:36 +0800
+Subject: [linux-sunxi] sunxi: Endless musb_bus_suspend warnings when
+ booting A23 tablet with OTG
+In-Reply-To: <6a0822df-92bd-29dc-6eea-0a000baee666@redhat.com>
+References: <CAGb2v648CnhjvEtrxdXxRYFjW_Oe-Rqf3DkiHwNR9uWt7FC3hA@mail.gmail.com>
+ <6a0822df-92bd-29dc-6eea-0a000baee666@redhat.com>
+Message-ID: <CAGb2v65Ar203_qc43jp-E+WjXROWTtM4rKKDemJ6DSi4pK7RrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 September 2016 at 02:03, Baoyou Xie <baoyou.xie@linaro.org> wrote:
-> We get a few warnings when building kernel with W=1:
-> drivers/hwtracing/coresight/coresight-tmc-etr.c:23:6: warning: no previous prototype for 'tmc_etr_enable_hw' [-Wmissing-prototypes]
-> drivers/hwtracing/coresight/coresight-tmc-etf.c:25:6: warning: no previous prototype for 'tmc_etb_enable_hw' [-Wmissing-prototypes]
-> ...
+On Tue, Sep 6, 2016 at 7:28 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
 >
-> In fact, these functions are only used in the file in which they are
-> declared and don't need a declaration, but can be made static.
-> so this patch marks these functions with 'static'.
+> On 06-09-16 13:02, wens Tsai wrote:
+>>
+>> Hi Hans,
+>>
+>> I've built the latest sunxi-next branches of Linux and U-boot and
+>> tried it on my Q8 A23 tablet. My tablet has an OTG adapter with a
+>> USB ethernet adapter connected all the time. Upon booting into
+>> Linux I get an endless stream of:
+>>
+>>     musb_bus_suspend 2586: trying to suspend as a_wait_bcon while active
+>>
+>> messages. To get out of this I have to physically remove the OTG
+>> adapter. Booting without the OTG adapter to begin with also gets
+>> rid of the problem.
+>>
+>> Have you run into this problem? I wonder if we should disable VBUS
+>> just before leaving U-boot? Now that we support DRIVEVBUS this
+>> shouldn't be a problem.
 >
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-> ---
->  drivers/hwtracing/coresight/coresight-tmc-etf.c | 2 +-
->  drivers/hwtracing/coresight/coresight-tmc-etr.c | 2 +-
->  drivers/hwtracing/coresight/coresight-tmc.c     | 4 ++--
->  3 files changed, 4 insertions(+), 4 deletions(-)
 >
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> index 466af86..a9a525f 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> @@ -22,7 +22,7 @@
->  #include "coresight-priv.h"
->  #include "coresight-tmc.h"
->
-> -void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
-> +static void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
->  {
->         CS_UNLOCK(drvdata->base);
->
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> index 688be9e..1ff5451 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> @@ -20,7 +20,7 @@
->  #include "coresight-priv.h"
->  #include "coresight-tmc.h"
->
-> -void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
-> +static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
->  {
->         u32 axictl;
->
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-> index 9e02ac9..45947f3 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-> @@ -249,8 +249,8 @@ static struct attribute *coresight_tmc_mgmt_attrs[] = {
->         NULL,
->  };
->
-> -ssize_t trigger_cntr_show(struct device *dev,
-> -                         struct device_attribute *attr, char *buf)
-> +static ssize_t trigger_cntr_show(struct device *dev,
-> +                                struct device_attribute *attr, char *buf)
->  {
->         struct tmc_drvdata *drvdata = dev_get_drvdata(dev->parent);
->         unsigned long val = drvdata->trigger_cntr;
-> --
-> 2.7.4
->
+> I've not seen such a problem. I'm fine with disabling Vbus when
+> leaving u-boot, that certainly is the safe thing to do anyways.
 
-I have applied this patch but modified the commit log to include the
-warning triggered by the last snipped.
+Seems there's no distinction between "USB reset" and leaving
+U-boot, as you mentioned in your patch removing the "power off"
+code from the USB drivers. Are you OK with power cycling during
+USB reset as well?
 
-Thanks,
-Mathieu
+> I guess I'll get a u-boot patch from you if that indeed fixes
+> things ?
+
+Yup. In progress. Though my ethernet adapter is acting up, so I'll
+need to swap in something else to test it properly.
+
+ChenYu
