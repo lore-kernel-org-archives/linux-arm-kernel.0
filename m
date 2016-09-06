@@ -1,116 +1,106 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 6 Sep 2016 14:34:53 +0200
-Subject: [PATCH 2/2] arm64: dts: rockchip: add eMMC's power domain support
- for rk3399
-In-Reply-To: <10dfff58-88b2-a397-ef2e-9cd451253c40@rock-chips.com>
-References: <20160827134103.28160-1-xzy.xu@rock-chips.com>
- <20160827134103.28160-3-xzy.xu@rock-chips.com>
- <2ab8ab94-fa4d-2cd6-5805-a92ac5f9697e@rock-chips.com>
- <57C3A30B.5080707@rock-chips.com>
- <ceba6a89-6945-58c5-62e4-7d842cfa2312@rock-chips.com>
- <CAD=FV=W=LkVAm187hxp0Kbjxi5kSThwKnCMX+tr8SXQ-v_xQTQ@mail.gmail.com>
- <77f5cff1-80a2-76b3-40e9-f77caced2257@rock-chips.com>
- <12451b81-321e-b661-8f1c-25c91bffba54@rock-chips.com>
- <CAPDyKFqwqdu=9PSzD32aOYAeBVRMQ0s8oKA29JGBsMsRMsDz4w@mail.gmail.com>
- <CAD=FV=VQ7Gf33fH8=FM_Lj-r9uovoEHxusMrFQrDwf2rxeiecg@mail.gmail.com>
- <CAPDyKFra7L5iUJegHH43mF4Dw=wYo0PmH2g_96fNL_=oRnGgug@mail.gmail.com>
- <10dfff58-88b2-a397-ef2e-9cd451253c40@rock-chips.com>
-Message-ID: <CAPDyKFrAJW9D49wEgQXiuPFrgbVq6HjtQbTwj8FL6c_mx8o-wg@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 6 Sep 2016 13:41:37 +0100
+Subject: [PATCH v2 3/7] KVM: arm: vgic-new: improve compatibility with
+ 32-bit
+In-Reply-To: <20160905112904.GH26366@cbox>
+References: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
+ <1471344418-19568-4-git-send-email-vladimir.murzin@arm.com>
+ <20160905112904.GH26366@cbox>
+Message-ID: <57CEB981.6060600@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 September 2016 at 16:23, Ziyuan Xu <xzy.xu@rock-chips.com> wrote:
-> Hi Ulf,
->
->
-> On 2016?09?02? 18:24, Ulf Hansson wrote:
+Hi Christoffer,
+
+On 05/09/16 12:29, Christoffer Dall wrote:
+> Hi Vladimir,
+> 
+> I think commit title is too vague, can you be more specific?
+> 
+
+KVM: arm: vgic-new: make extract_bytes to always work on 64-bit data
+
+is it better?
+
+> On Tue, Aug 16, 2016 at 11:46:54AM +0100, Vladimir Murzin wrote:
+>> We have couple of 64-bit register defined in GICv3 architecture, so
+> 
+> 'a couple',  'registers' (plural)
+> 
+>> "unsigned long" kind of accessors wouldn't work for 32-bit. However,
+> 
+> 'wouldn't work for 32-bit' is kind of generic as well.  Perhaps you mean
+> that unsigned long accesses to these registers will only access a single
+> 32-bit work of that register.
+> 
+>> these registers can't be access as 64-bit in a one go if we run 32-bit
+> 
+> 'accessed', 's/in one go/with a single instruction/' ?
+> 
+> 'a 32-bit host'
+> 
+>> host simply because KVM doesn't support multiple load/store on MMIO
+> 
+> by 'multiple load/store' you mean the 'load/store multiple' instructions
+> specifically, right?  Not a sequence of multiple loads and stores.  I
+> think you should be more specific here as well, for example, I think
+> ldrd and strd are problematic as well.
+> 
+>> space.
 >>
->> On 1 September 2016 at 23:50, Doug Anderson<dianders@chromium.org>  wrote:
->>>
->>> >Hi,
->>> >
->>> >On Thu, Sep 1, 2016 at 6:45 AM, Ulf Hansson<ulf.hansson@linaro.org>
->>> > wrote:
->>>>
->>>> >>I was reading the discussion regarding this change and browsing the DT
->>>> >>documentation around this... Can you guys explain what really goes on
->>>> >>here, please.
->>>> >>
->>>> >>To me, it seems like you are managing one device's resources in one
->>>> >>separate genpd. One genpd per device. Is that correct?
->>>> >>
->>>> >>Perhaps each device actually has its own PM domain and thus it makes
->>>> >>sense to assign one genpd per device?
->>>
->>> >
->>> >I'm not as familiar with genpd as I should be, so hopefully this makes
->>> > sense.
->>> >
->>> >...in hardware there is a "pd_emmc" that is the power domain for just
->>> >eMMC.  That will be referenced hooked up via device tree, like:
->>> >
->>> >power-domains = <&power RK3399_PD_EMMC>;
+>> It means that 32-bit guest access these registers in 32-bit chunks, so
+> 
+> 'a 32-bit guest', 'accesses'
+> 
+
+all suggestions you've made above are true. I'll rework commit message
+to be more precise.
+
+>> the only thing we need to do is to ensure that extract_bytes() always
+>> takes 64-bit data.
 >>
->> Yes, I noticed that and this is what puzzles me a bit.
+>> Since we are here fix couple of other width related issues by using
+>> ULL variants over UL.
 >>
->>> >
->>> >I believe that means that power will automatically be removed whenever
->>> >the device is runtime suspended or suspended.
+>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+>> ---
+>>  virt/kvm/arm/vgic/vgic-mmio-v3.c |    6 +++---
+>>  virt/kvm/arm/vgic/vgic-mmio.h    |    2 +-
+>>  2 files changed, 4 insertions(+), 4 deletions(-)
 >>
->> Well, it depends if the genpd has a subdomain or other devices in it
->> being runtime resumed.
->> The genpd will not power off unless all devices within it are runtime
->> enabled+suspended and that its subdomains are also powered off.
->>
->> So, in case you only have one device and no subdomains, then your
->> statement is correct.
->
->
-> Yup, pd_emmc is a individual power domain which is only deployed to eMMC on
-> rk3399. It has no subdomains.
->
->>
->>> >
->>> >If w're not supporting "autosuspend" and nobody is tweaking anything
->>
->> I guess you mean runtime PM autosuspend? Then why don't you support this?
->>
->> Wouldn't that allow you to avoid wasting power in runtime when the
->> device is idle?
->
->
-> pd_emmc manages the sdhci controller, phy and corecfg_* stuff, if we support
+>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> index ff668e0..cc20b60 100644
+>> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> @@ -23,7 +23,7 @@
+>>  #include "vgic-mmio.h"
+>>  
+>>  /* extract @num bytes at @offset bytes offset in data */
+>> -unsigned long extract_bytes(unsigned long data, unsigned int offset,
+>> +unsigned long extract_bytes(u64 data, unsigned int offset,
+>>  			    unsigned int num)
+>>  {
+>>  	return (data >> (offset * 8)) & GENMASK_ULL(num * 8 - 1, 0);
+>> @@ -179,7 +179,7 @@ static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
+>>  	int target_vcpu_id = vcpu->vcpu_id;
+>>  	u64 value;
+>>  
+>> -	value = (mpidr & GENMASK(23, 0)) << 32;
+>> +	value = (mpidr & GENMASK_ULL(23, 0)) << 32;
+> 
+> why does this make a difference when mpidr is an unsigned long?
 
-Ohh, there are already mmc drivers dealing with phys. We can add this
-for you driver as well.
+because we access a little bit further than unsigned long can accommodate
 
-Regarding corecfg_*, unless that also can be managed via a generic
-interface (perhaps through syscon), then you need to manage that via
-genpd. Is that the case?
+  CC      arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-mmio-v3.o
+arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-mmio-v3.c: In function
+'vgic_mmio_read_v3r_typer':
+arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-mmio-v3.c:184:35: warning:
+left shift count >= width of type [-Wshift-count-overflow]
+  value = (mpidr & GENMASK(23, 0)) << 32;
+                                   ^
 
-> autosuspend in driver, we have to re-init context. I didn't test the
+I can include this warning in commit message or maybe you want a
+separate patch?
 
-Yes, that's a common scenario, many device drivers do this - as to
-avoid wasting power.
-
-> latency, if it's acceptable, we will apply it.:-)
-
-Latency constraints may be controlled via the genpd governor.
-
-Moreover we also have the runtime PM autosuspend feature, which is
-useful when you don't wont to runtime suspend the device between each
-and every request. Thus avoiding latencies when there are a "burst" of
-requests.
-
-> But it's not a blocker, right?
->
-
-Hmm, I just want to make sure we do the right things. Else it might
-just bite us in the other end.
-
-Again, my recommendation is to start with runtime PM then continue
-with system PM. I can imagine you will get system PM "free" if using
-the runtime PM centric approach.
-
-Kind regards
-Uffe
+Vladimir
