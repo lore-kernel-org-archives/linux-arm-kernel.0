@@ -1,182 +1,262 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 6 Sep 2016 15:48:34 +0530
-Subject: [PATCH v6 0/8] power: add power sequence library
-In-Reply-To: <20160902011046.GB11262@shlinux2>
-References: <1471252398-957-1-git-send-email-peter.chen@nxp.com>
- <b1848eb2-9298-9089-ee4d-5356998c6c08@linaro.org>
- <20160824085335.GB27233@shlinux2> <20160829111045.GB3736@b29397-desktop>
- <3a45793f-18d9-0688-d2ab-ef79432c473c@linaro.org>
- <20160831095220.GA11938@b29397-desktop>
- <fd94340b-1c1d-2307-7e57-5b05f1655d2c@linaro.org>
- <20160902011046.GB11262@shlinux2>
-Message-ID: <eb032ff2-dac4-5efe-dda0-96404f290aa8@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 6 Sep 2016 12:21:13 +0200
+Subject: [RFC v2 PATCH 6/7] arm64: KVM: Handle trappable TLB instructions
+In-Reply-To: <1473093097-30932-7-git-send-email-punit.agrawal@arm.com>
+References: <1473093097-30932-1-git-send-email-punit.agrawal@arm.com>
+ <1473093097-30932-7-git-send-email-punit.agrawal@arm.com>
+Message-ID: <20160906102113.GE30513@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-a
+On Mon, Sep 05, 2016 at 05:31:36PM +0100, Punit Agrawal wrote:
+> The ARMv8 architecture allows trapping of TLB maintenane instructions
+> from EL0/EL1 to higher exception levels. On encountering a trappable TLB
+> instruction in a guest, an exception is taken to EL2.
+> 
+> Add functionality to handle emulating the TLB instructions.
+> 
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/kvm_asm.h |  1 +
+>  arch/arm64/kvm/hyp/tlb.c         | 69 ++++++++++++++++++++++++++++++++++
+>  arch/arm64/kvm/sys_regs.c        | 81 ++++++++++++++++++++++++++++++++++++++++
+>  arch/arm64/kvm/trace.h           | 16 ++++++++
+>  4 files changed, 167 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> index 7561f63..1ac1cc3 100644
+> --- a/arch/arm64/include/asm/kvm_asm.h
+> +++ b/arch/arm64/include/asm/kvm_asm.h
+> @@ -49,6 +49,7 @@ extern char __kvm_hyp_vector[];
+>  extern void __kvm_flush_vm_context(void);
+>  extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+>  extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+> +extern void __kvm_emulate_tlb_invalidate(struct kvm *kvm, u32 sysreg, u64 regval);
+>  
+>  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+>  
+> diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+> index 4cda100..1210f58 100644
+> --- a/arch/arm64/kvm/hyp/tlb.c
+> +++ b/arch/arm64/kvm/hyp/tlb.c
+> @@ -78,3 +78,72 @@ static void __hyp_text __tlb_flush_vm_context(void)
+>  }
+>  
+>  __alias(__tlb_flush_vm_context) void __kvm_flush_vm_context(void);
+> +
+> +/* Intentionally empty functions */
+> +static void __hyp_text __switch_to_hyp_role_nvhe(void) { }
+> +static void __hyp_text __switch_to_host_role_nvhe(void) { }
+> +
+> +static void __hyp_text __switch_to_hyp_role_vhe(void)
+> +{
+> +	u64 hcr = read_sysreg(hcr_el2);
+> +
+> +	hcr &= ~HCR_TGE;
+> +	write_sysreg(hcr, hcr_el2);
 
-On Friday 02 September 2016 06:40 AM, Peter Chen wrote:
-> On Wed, Aug 31, 2016 at 10:28:20PM +0530, Vaibhav Hiremath wrote:
->>
->> On Wednesday 31 August 2016 03:22 PM, Peter Chen wrote:
->>> On Wed, Aug 31, 2016 at 01:46:30PM +0530, Vaibhav Hiremath wrote:
->>>> On Monday 29 August 2016 04:40 PM, Peter Chen wrote:
->>>>> On Wed, Aug 24, 2016 at 04:53:35PM +0800, Peter Chen wrote:
->>>>>> On Tue, Aug 23, 2016 at 04:02:48PM +0530, Vaibhav Hiremath wrote:
->>>>>>> veOn Monday 15 August 2016 02:43 PM, Peter Chen wrote:
->>>>>>>> Hi all,
->>>>>>>>
->>>>>>>> This is a follow-up for my last power sequence framework patch set [1].
->>>>>>>> According to Rob Herring and Ulf Hansson's comments[2], I use a generic
->>>>>>>> power sequence library for parsing the power sequence elements on DT,
->>>>>>>> and implement generic power sequence on library. The host driver
->>>>>>>> can allocate power sequence instance, and calls pwrseq APIs accordingly.
->>>>>>>>
->>>>>>>> In future, if there are special power sequence requirements, the special
->>>>>>>> power sequence library can be created.
->>>>>>>>
->>>>>>>> This patch set is tested on i.mx6 sabresx evk using a dts change, I use
->>>>>>>> two hot-plug devices to simulate this use case, the related binding
->>>>>>>> change is updated at patch [1/6], The udoo board changes were tested
->>>>>>>> using my last power sequence patch set.[3]
->>>>>>>>
->>>>>>>> Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
->>>>>>>> need to power on itself before it can be found by ULPI bus.
->>>>>>>>
->>>>>>>> [1]http://www.spinics.net/lists/linux-usb/msg142755.html
->>>>>>>> [2]http://www.spinics.net/lists/linux-usb/msg143106.html
->>>>>>>> [3]http://www.spinics.net/lists/linux-usb/msg142815.html
->>>>>>> (Please ignore my response on V2)
->>>>>>>
->>>>>>> Sorry being so late in the discussion...
->>>>>>>
->>>>>>> If I am not missing anything, then I am afraid to say that the
->>>>>>> generic library
->>>>>>> implementation in this patch series is not going to solve many of
->>>>>>> the custom
->>>>>>> requirement of power on, off, etc...
->>>>>>> I know you mentioned about adding another library when we come
->>>>>>> across such platforms, but should we not keep provision (or easy
->>>>>>> hooks/path)
->>>>>>> to enable that ?
->>>>>>>
->>>>>>> Let me bring in the use case I am dealing with,
->>>>>>>
->>>>>>>
->>>>>>>                                Host
->>>>>>>                                 |
->>>>>>>                                 V
->>>>>>>                             USB port
->>>>>>> ------------------------------------------------------------
->>>>>>>                                 |
->>>>>>>                                 V
->>>>>>>                        USB HUB device (May need custom on/off seq)
->>>>>>>                                 |
->>>>>>>                                 V
->>>>>>>                =============================
->>>>>>>               |                             |
->>>>>>>               V                             V
->>>>>>>           Device-1                       Device-2
->>>>>>> (Needs special power               (Needs special power
->>>>>>>   on/off sequence.                   on/off sequence.
->>>>>>>   Also may need custom               Also, may need custom
->>>>>>>   sequence for                       sequence for
->>>>>>>   suspend/resume)                    suspend/resume)
->>>>>>>
->>>>>>>
->>>>>>> Note: Both Devices are connected to HUB via HSIC and may differ
->>>>>>>            in terms of functionality, features they support.
->>>>>>>
->>>>>>> In the above case, both Device-1 and Device-2, need separate
->>>>>>> power on/off sequence. So generic library currently we have in this
->>>>>>> patch series is not going to satisfy the need here.
->>>>>>>
->>>>>>> I looked at all 6 revisions of this patch-series, went through the
->>>>>>> review comments, and looked at MMC power sequence code;
->>>>>>> what I can say here is, we need something similar to
->>>>>>> MMC power sequence here, where every device can have its own
->>>>>>> power sequence (if needed).
->>>>>>>
->>>>>>> I know Rob is not in favor of creating platform device for
->>>>>>> this, and I understand his comment.
->>>>>>> If not platform device, but atleast we need mechanism to
->>>>>>> connect each device back to its of_node and its respective
->>>>>>> driver/library fns. For example, the Devices may support different
->>>>>>> boot modes, and platform driver needs to make sure that
->>>>>>> the right sequence is followed for booting.
->>>>>>>
->>>>>>> Peter, My apologies for taking you back again on this series.
->>>>>>> I am OK, if you wish to address this in incremental addition,
->>>>>>> but my point is, we know that the current generic way is not
->>>>>>> enough for us, so I think we should try to fix it in initial phase only.
->>>>>>>
->>>>>> Rob, it seems generic power sequence can't cover all cases.
->>>>>> Without information from DT, we can't know which power sequence
->>>>>> for which device.
->>>>>>
->>>>> Vaibhav, do you agree that I create pwrseq library list using postcore_initcall
->>>>> for each library, and choose pwrseq library according to compatible
->>>>> string first, if there is no compatible string for this library, just
->>>>> use generic pwrseq library.
->>>>>
->>>> Lets hear from MMC folks. Ulf, do you agree on approach
->>>> for pwr seq ??
->>>>
->>>>
->>>> With above approach, I kind of agree on it, but I have couple
->>>> of comments,
->>>>
->>>>   - How DTS looks like now ?? Can you put example here ?
->>> The dts is the same with current version.
->> How would consumer driver get the power sequence ?
->> You must point to right power sequence driver.
->> For example, in the above example, Device-1, should
->> get handle to pwrseq-1, and Device-2 to pwrseq-2.
-> According to compatible string at device's of_node, we will have a list
-> for power sequence libraries which has index (or name), and matches
-> compatible string.
->
->>>>   - Should we merge MMC power sequence in next series ?
->>>>     We also can take this as an incremental change, to avoid further
->>>>     delay :)
->>> We had an agreement that keep mmc's pwrseq framework unchanging.
->>> Unless Ulf and rob both agree to change.
->> Why 2 separate approach for same problem ?
->> And I see this as possible duplication of code/functionality :)
-> How the new kernel compatibles old dts? If we do not need to
-> consider this problem, the mmc can try to use power sequence library
-> too in future.
+why do we need to clear TGE for the TLB maintenance instructions to
+work?
 
-I think we should attempt to get both MMC and USB power seq
-come on one agreement, so that it can be reused.
+Perhaps this is worth explaining in a comment.
 
-MMC Power Seq :
-  It is based on platform_device/platform_driver approach,
+Otherwise this looks ok to me.
 
-USB Power seq :
-  We are trying to propose library approach, with compatible string match.
+-Christoffer
 
-We should try to have one approach.
->
->>>>   - Lets also add suspend/resume callback to struct pwrseq
->>>>
->>> Why suspend/resume can't do at related driver's suspend/resume API?
->> Nope...
->> The pwrseq library would have taken ownership of resources, so
->> related driver cannot suspend the device. Again it is architecture
->> specific, but we should have provision to handle this.
->>
->> The system I am dealing with today, does need suspend/resume
->> callback. To be precise, suspend is close to off state for some devices or
->> they could enter standby or different low power state, but to do that,
->> we need same resource as used for ON/OFF functionality.
->>
-> Ok, I will have API for suspend/resume. You can implement it at your own
-> library or generic one.
->
-
-Yeup. Sure.
-
--- 
-Thanks,
-Vaibhav
+> +}
+> +
+> +static void __hyp_text __switch_to_host_role_vhe(void)
+> +{
+> +	u64 hcr = read_sysreg(hcr_el2);
+> +
+> +	hcr |= HCR_TGE;
+> +	write_sysreg(hcr, hcr_el2);
+> +}
+> +
+> +static hyp_alternate_select(__switch_to_hyp_role,
+> +			    __switch_to_hyp_role_nvhe,
+> +			    __switch_to_hyp_role_vhe,
+> +			    ARM64_HAS_VIRT_HOST_EXTN);
+> +
+> +static hyp_alternate_select(__switch_to_host_role,
+> +			    __switch_to_host_role_nvhe,
+> +			    __switch_to_host_role_vhe,
+> +			    ARM64_HAS_VIRT_HOST_EXTN);
+> +
+> +static void __hyp_text __switch_to_guest_regime(struct kvm *kvm)
+> +{
+> +	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+> +	__switch_to_hyp_role();
+> +	isb();
+> +}
+> +
+> +static void __hyp_text __switch_to_host_regime(void)
+> +{
+> +	__switch_to_host_role();
+> +	write_sysreg(0, vttbr_el2);
+> +}
+> +
+> +void __hyp_text
+> +__kvm_emulate_tlb_invalidate(struct kvm *kvm, u32 sys_op, u64 regval)
+> +{
+> +	kvm = kern_hyp_va(kvm);
+> +
+> +	/*
+> +	 * Switch to the guest before performing any TLB operations to
+> +	 * target the appropriate VMID
+> +	 */
+> +	__switch_to_guest_regime(kvm);
+> +
+> +	/*
+> +	 *  TLB maintenance operations are broadcast to
+> +	 *  inner-shareable domain when HCR_FB is set (default for
+> +	 *  KVM).
+> +	 *
+> +	 *  Nuke all Stage 1 TLB entries for the VM. This will kill
+> +	 *  performance but it's always safe to do as we don't leave
+> +	 *  behind any strays in the TLB
+> +	 */
+> +	__tlbi(vmalle1is);
+> +	isb();
+> +
+> +	__switch_to_host_regime();
+> +}
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index e51367d..0e70da9 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -790,6 +790,18 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>  	return true;
+>  }
+>  
+> +static bool emulate_tlb_invalidate(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+> +				  const struct sys_reg_desc *r)
+> +{
+> +	u32 opcode = sys_reg(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
+> +
+> +	kvm_call_hyp(__kvm_emulate_tlb_invalidate,
+> +		     vcpu->kvm, opcode, p->regval);
+> +	trace_kvm_tlb_invalidate(*vcpu_pc(vcpu), opcode);
+> +
+> +	return true;
+> +}
+> +
+>  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+>  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+>  	/* DBGBVRn_EL1 */						\
+> @@ -841,6 +853,35 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  	{ Op0(0b01), Op1(0b000), CRn(0b0111), CRm(0b1110), Op2(0b010),
+>  	  access_dcsw },
+>  
+> +	/*
+> +	 * ARMv8 ARM: Table C5-4 TLB maintenance instructions
+> +	 * (Ref: ARMv8 ARM C5.1 version: ARM DDI 0487A.j)
+> +	 */
+> +	/* TLBI VMALLE1IS */
+> +	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(0), emulate_tlb_invalidate },
+> +	/* TLBI VAE1IS */
+> +	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(1), emulate_tlb_invalidate },
+> +	/* TLBI ASIDE1IS */
+> +	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(2), emulate_tlb_invalidate },
+> +	/* TLBI VAAE1IS */
+> +	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(3), emulate_tlb_invalidate },
+> +	/* TLBI VALE1IS */
+> +	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(5), emulate_tlb_invalidate },
+> +	/* TLBI VAALE1IS */
+> +	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(7), emulate_tlb_invalidate },
+> +	/* TLBI VMALLE1 */
+> +	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(0), emulate_tlb_invalidate },
+> +	/* TLBI VAE1 */
+> +	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(1), emulate_tlb_invalidate },
+> +	/* TLBI ASIDE1 */
+> +	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(2), emulate_tlb_invalidate },
+> +	/* TLBI VAAE1 */
+> +	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(3), emulate_tlb_invalidate },
+> +	/* TLBI VALE1 */
+> +	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(5), emulate_tlb_invalidate },
+> +	/* TLBI VAALE1 */
+> +	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(7), emulate_tlb_invalidate },
+> +
+>  	DBG_BCR_BVR_WCR_WVR_EL1(0),
+>  	DBG_BCR_BVR_WCR_WVR_EL1(1),
+>  	/* MDCCINT_EL1 */
+> @@ -1329,6 +1370,46 @@ static const struct sys_reg_desc cp15_regs[] = {
+>  	{ Op1( 0), CRn( 7), CRm(10), Op2( 2), access_dcsw },
+>  	{ Op1( 0), CRn( 7), CRm(14), Op2( 2), access_dcsw },
+>  
+> +	/*
+> +	 * TLB operations
+> +	 */
+> +	/* TLBIALLIS */
+> +	{ Op1( 0), CRn( 8), CRm( 3), Op2( 0), emulate_tlb_invalidate},
+> +	/* TLBIMVAIS */
+> +	{ Op1( 0), CRn( 8), CRm( 3), Op2( 1), emulate_tlb_invalidate},
+> +	/* TLBIASIDIS */
+> +	{ Op1( 0), CRn( 8), CRm( 3), Op2( 2), emulate_tlb_invalidate},
+> +	/* TLBIMVAAIS */
+> +	{ Op1( 0), CRn( 8), CRm( 3), Op2( 3), emulate_tlb_invalidate},
+> +	/* TLBIMVALIS */
+> +	{ Op1( 0), CRn( 8), CRm( 3), Op2( 5), emulate_tlb_invalidate},
+> +	/* TLBIMVAALIS */
+> +	{ Op1( 0), CRn( 8), CRm( 3), Op2( 7), emulate_tlb_invalidate},
+> +	/* ITLBIALL */
+> +	{ Op1( 0), CRn( 8), CRm( 5), Op2( 0), emulate_tlb_invalidate},
+> +	/* ITLBIMVA */
+> +	{ Op1( 0), CRn( 8), CRm( 5), Op2( 1), emulate_tlb_invalidate},
+> +	/* ITLBIASID */
+> +	{ Op1( 0), CRn( 8), CRm( 5), Op2( 2), emulate_tlb_invalidate},
+> +	/* DTLBIALL */
+> +	{ Op1( 0), CRn( 8), CRm( 6), Op2( 0), emulate_tlb_invalidate},
+> +	/* DTLBIMVA */
+> +	{ Op1( 0), CRn( 8), CRm( 6), Op2( 1), emulate_tlb_invalidate},
+> +	/* DTLBIASID */
+> +	{ Op1( 0), CRn( 8), CRm( 6), Op2( 2), emulate_tlb_invalidate},
+> +	/* TLBIALL */
+> +	{ Op1( 0), CRn( 8), CRm( 7), Op2( 0), emulate_tlb_invalidate},
+> +	/* TLBIMVA */
+> +	{ Op1( 0), CRn( 8), CRm( 7), Op2( 1), emulate_tlb_invalidate},
+> +	/* TLBIASID */
+> +	{ Op1( 0), CRn( 8), CRm( 7), Op2( 2), emulate_tlb_invalidate},
+> +	/* TLBIMVAA */
+> +	{ Op1( 0), CRn( 8), CRm( 7), Op2( 3), emulate_tlb_invalidate},
+> +	/* TLBIMVAL */
+> +	{ Op1( 0), CRn( 8), CRm( 7), Op2( 5), emulate_tlb_invalidate},
+> +	/* TLBIMVAAL */
+> +	{ Op1( 0), CRn( 8), CRm( 7), Op2( 7), emulate_tlb_invalidate},
+> +
+>  	/* PMU */
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmcr },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), access_pmcnten },
+> diff --git a/arch/arm64/kvm/trace.h b/arch/arm64/kvm/trace.h
+> index 7fb0008..c4d577f 100644
+> --- a/arch/arm64/kvm/trace.h
+> +++ b/arch/arm64/kvm/trace.h
+> @@ -166,6 +166,22 @@ TRACE_EVENT(kvm_set_guest_debug,
+>  	TP_printk("vcpu: %p, flags: 0x%08x", __entry->vcpu, __entry->guest_debug)
+>  );
+>  
+> +TRACE_EVENT(kvm_tlb_invalidate,
+> +	TP_PROTO(unsigned long vcpu_pc, u32 opcode),
+> +	TP_ARGS(vcpu_pc, opcode),
+> +
+> +	TP_STRUCT__entry(
+> +		__field(unsigned long, vcpu_pc)
+> +		__field(u32, opcode)
+> +	),
+> +
+> +	TP_fast_assign(
+> +		__entry->vcpu_pc = vcpu_pc;
+> +		__entry->opcode = opcode;
+> +	),
+> +
+> +	TP_printk("vcpu_pc=0x%16lx opcode=%08x", __entry->vcpu_pc, __entry->opcode)
+> +);
+>  
+>  #endif /* _TRACE_ARM64_KVM_H */
+>  
+> -- 
+> 2.8.1
+> 
