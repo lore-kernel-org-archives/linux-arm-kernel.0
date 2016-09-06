@@ -1,71 +1,40 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  6 Sep 2016 16:46:20 +0200
-Subject: [PATCH v2 9/9] ARM: sun8i: sina33: Enable display
+Date: Tue,  6 Sep 2016 16:46:19 +0200
+Subject: [PATCH v2 8/9] ARM: sun8i: a23/a33: Add RGB666 pins
 In-Reply-To: <20160906144620.6322-1-maxime.ripard@free-electrons.com>
 References: <20160906144620.6322-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160906144620.6322-10-maxime.ripard@free-electrons.com>
+Message-ID: <20160906144620.6322-9-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the display pipeline with the associated 7" panel sold with the
-SinA33.
+The LCD output needs to be muxed. Add the proper pinctrl node.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 34 ++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-index fef6abc0a703..fa8024072025 100644
---- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-+++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-@@ -61,6 +61,27 @@
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
+diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+index 7246663bacdd..7ea6de12040e 100644
+--- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+@@ -302,6 +302,16 @@
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
 +
-+	panel {
-+		compatible = "netron-dy,e231732";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		port at 0 {
-+			reg = <0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			panel_input: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&tcon0_out_panel>;
++			lcd_rgb666_pins: lcd-rgb666 at 0 {
++				allwinner,pins = "PD2", "PD3", "PD4", "PD5", "PD6", "PD7",
++						 "PD10", "PD11", "PD12", "PD13", "PD14", "PD15",
++			                         "PD18", "PD19", "PD20", "PD21", "PD22", "PD23",
++			                         "PD24", "PD25", "PD26", "PD27";
++				allwinner,function = "lcd0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 +			};
-+		};
-+	};
-+};
-+
-+&de {
-+	status = "okay";
- };
+ 		};
  
- &ehci0 {
-@@ -207,6 +228,19 @@
- 	regulator-name = "vcc-rtc";
- };
- 
-+&tcon0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&lcd_rgb666_pins>;
-+	status = "okay";
-+};
-+
-+&tcon0_out {
-+	tcon0_out_panel: endpoint at 0 {
-+		reg = <0>;
-+		remote-endpoint = <&panel_input>;
-+	};
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_b>;
+ 		timer at 01c20c00 {
 -- 
 2.9.3
