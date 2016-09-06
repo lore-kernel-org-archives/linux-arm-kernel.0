@@ -1,98 +1,48 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue,  6 Sep 2016 16:33:36 +0100
-Subject: [PATCH v6 03/20] iommu/of: Handle iommu-map property for PCI
+Date: Tue,  6 Sep 2016 16:33:40 +0100
+Subject: [PATCH v6 07/20] iommu/arm-smmu: Set PRIVCFG in stage 1 STEs
 In-Reply-To: <cover.1473173789.git.robin.murphy@arm.com>
 References: <cover.1473173789.git.robin.murphy@arm.com>
-Message-ID: <bccaa06e5b64d338d7f171fa50e27d6ef05d4c7d.1473173789.git.robin.murphy@arm.com>
+Message-ID: <df5e1a0f2a2d779ad467a691203bcbc74d75690e.1473173789.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a way to pick up the RID translation and target IOMMU,
-hook up of_iommu_configure() to bring PCI devices into the of_xlate
-mechanism and allow them IOMMU-backed DMA ops without the need for
-driver-specific handling.
+Implement the SMMUv3 equivalent of d346180e70b9 ("iommu/arm-smmu: Treat
+all device transactions as unprivileged"), so that once again those
+pesky DMA controllers with their privileged instruction fetches don't
+unexpectedly fault in stage 1 domains due to VMSAv8 rules.
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-
 ---
+ drivers/iommu/arm-smmu-v3.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-- Split PCI handling into a separate function
----
- drivers/iommu/of_iommu.c | 46 +++++++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 41 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index 57f23eaaa2f9..19e1e8f2f871 100644
---- a/drivers/iommu/of_iommu.c
-+++ b/drivers/iommu/of_iommu.c
-@@ -22,6 +22,7 @@
- #include <linux/limits.h>
- #include <linux/of.h>
- #include <linux/of_iommu.h>
-+#include <linux/of_pci.h>
- #include <linux/slab.h>
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index d294a0aea253..1f350a50b35d 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -263,6 +263,9 @@
+ #define STRTAB_STE_1_SHCFG_INCOMING	1UL
+ #define STRTAB_STE_1_SHCFG_SHIFT	44
  
- static const struct of_device_id __iommu_of_table_sentinel
-@@ -134,6 +135,45 @@ const struct iommu_ops *of_iommu_get_ops(struct device_node *np)
- 	return ops;
- }
++#define STRTAB_STE_1_PRIVCFG_UNPRIV	2UL
++#define STRTAB_STE_1_PRIVCFG_SHIFT	48
++
+ #define STRTAB_STE_2_S2VMID_SHIFT	0
+ #define STRTAB_STE_2_S2VMID_MASK	0xffffUL
+ #define STRTAB_STE_2_VTCR_SHIFT		32
+@@ -1063,7 +1066,9 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+ #ifdef CONFIG_PCI_ATS
+ 			 STRTAB_STE_1_EATS_TRANS << STRTAB_STE_1_EATS_SHIFT |
+ #endif
+-			 STRTAB_STE_1_STRW_NSEL1 << STRTAB_STE_1_STRW_SHIFT);
++			 STRTAB_STE_1_STRW_NSEL1 << STRTAB_STE_1_STRW_SHIFT |
++			 STRTAB_STE_1_PRIVCFG_UNPRIV <<
++			 STRTAB_STE_1_PRIVCFG_SHIFT);
  
-+static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
-+{
-+	struct of_phandle_args *iommu_spec = data;
-+
-+	iommu_spec->args[0] = alias;
-+	return iommu_spec->np == pdev->bus->dev.of_node;
-+}
-+
-+static const struct iommu_ops
-+*of_pci_iommu_configure(struct pci_dev *pdev, struct device_node *bridge_np)
-+{
-+	const struct iommu_ops *ops;
-+	struct of_phandle_args iommu_spec;
-+
-+	/*
-+	 * Start by tracing the RID alias down the PCI topology as
-+	 * far as the host bridge whose OF node we have...
-+	 * (we're not even attempting to handle multi-alias devices yet)
-+	 */
-+	iommu_spec.args_count = 1;
-+	iommu_spec.np = bridge_np;
-+	pci_for_each_dma_alias(pdev, __get_pci_rid, &iommu_spec);
-+	/*
-+	 * ...then find out what that becomes once it escapes the PCI
-+	 * bus into the system beyond, and which IOMMU it ends up at.
-+	 */
-+	iommu_spec.np = NULL;
-+	if (of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
-+			   "iommu-map-mask", &iommu_spec.np, iommu_spec.args))
-+		return NULL;
-+
-+	ops = of_iommu_get_ops(iommu_spec.np);
-+	if (!ops || !ops->of_xlate || ops->of_xlate(&pdev->dev, &iommu_spec))
-+		ops = NULL;
-+
-+	of_node_put(iommu_spec.np);
-+	return ops;
-+}
-+
- const struct iommu_ops *of_iommu_configure(struct device *dev,
- 					   struct device_node *master_np)
- {
-@@ -142,12 +182,8 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
- 	const struct iommu_ops *ops = NULL;
- 	int idx = 0;
- 
--	/*
--	 * We can't do much for PCI devices without knowing how
--	 * device IDs are wired up from the PCI bus to the IOMMU.
--	 */
- 	if (dev_is_pci(dev))
--		return NULL;
-+		return of_pci_iommu_configure(to_pci_dev(dev), master_np);
- 
- 	/*
- 	 * We don't currently walk up the tree looking for a parent IOMMU.
+ 		if (smmu->features & ARM_SMMU_FEAT_STALLS)
+ 			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
 -- 
 2.8.1.dirty
