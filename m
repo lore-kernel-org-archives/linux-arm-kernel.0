@@ -1,152 +1,73 @@
-From: pku.leo@gmail.com (Leo Li)
-Date: Tue, 6 Sep 2016 18:14:42 -0500
-Subject: [PATCH v5] i2c: imx: make bus recovery through pinctrl optional
-In-Reply-To: <20160906210735.6wl5x2mdhnhdnh7y@pengutronix.de>
-References: <1471644322-22670-1-git-send-email-leoyang.li@nxp.com>
- <20160906185849.27pjhawadca5pwow@pengutronix.de>
- <CADRPPNQ+1qBNL5WA=Jo_keE7BPnoOs7a2T6CpTuciiF16qK6xQ@mail.gmail.com>
- <20160906210735.6wl5x2mdhnhdnh7y@pengutronix.de>
-Message-ID: <CADRPPNQNFyAE3Thn+LYUVU5m-RPwkMAkfGfZ5PkNj8Dno-p7Rg@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 07 Sep 2016 01:24:40 +0200
+Subject: [PATCH v2 08/10] PM core: Fix restoring devices with links during
+ system PM transition
+In-Reply-To: <1466144820-6286-9-git-send-email-m.szyprowski@samsung.com>
+References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
+ <1466144820-6286-9-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1509709.za4jzbeXig@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 6, 2016 at 4:07 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> On Tue, Sep 06, 2016 at 03:06:41PM -0500, Leo Li wrote:
->> On Tue, Sep 6, 2016 at 1:58 PM, Uwe Kleine-K?nig
->> <u.kleine-koenig@pengutronix.de> wrote:
->> > On Fri, Aug 19, 2016 at 05:05:22PM -0500, Li Yang wrote:
->> >> Since commit 1c4b6c3bcf30 ("i2c: imx: implement bus recovery") the
->> >> driver starts to use gpio/pinctrl to do i2c bus recovery.  But pinctrl
->> >> is not always available for platforms with this controller such as ls1021a
->> >> and ls1043a, and the device tree binding also mentioned this gpio based
->> >> recovery mechanism as optional.  The patch makes it really optional that
->> >> the probe function won't bailout but just disable the bus recovery function
->> >> when pinctrl is not available.
->> >>
->> >> Signed-off-by: Li Yang <leoyang.li@nxp.com>
->> >> Cc: Gao Pan <pandy.gao@nxp.com>
->> >> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->> >> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->> >> ---
->> >> v5:
->> >> Revert the last minute change of recovery info initialization timing, it
->> >> will cause problem if initialized after i2c_add_numbered_adapter()
->> >>
->> >> v4:
->> >> Remove the use of IS_ERR_OR_NULL
->> >> Move the condition judgement to i2c_imx_init_recovery_info()
->> >> Change the timing of recovery initialization to be after bus registration
->> >>
->> >> v3:
->> >> Rebased to Wolfram's for-next branch
->> >> Added acked-by from Linus Walleij
->> >> Update to use new nxp email addresses due to company merge
->> >>
->> >>  drivers/i2c/busses/i2c-imx.c | 15 ++++++++++++++-
->> >>  1 file changed, 14 insertions(+), 1 deletion(-)
->> >>
->> >> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
->> >> index 1844bc9..7ae7992 100644
->> >> --- a/drivers/i2c/busses/i2c-imx.c
->> >> +++ b/drivers/i2c/busses/i2c-imx.c
->> >> @@ -989,6 +989,15 @@ static void i2c_imx_init_recovery_info(struct imx_i2c_struct *i2c_imx,
->> >>  {
->> >>       struct i2c_bus_recovery_info *rinfo = &i2c_imx->rinfo;
->> >>
->> >> +     /* if pinctrl is not supported on the system */
->> >> +     if (IS_ERR(i2c_imx->pinctrl))
->> >> +             i2c_imx->pinctrl = NULL;
->> >> +
->> >> +     if (!i2c_imx->pinctrl) {
->> >> +             dev_info(&pdev->dev, "can't get pinctrl, bus recovery not supported\n");
->> >> +             return;
->> >> +     }
->> >> +
->> >>       i2c_imx->pinctrl_pins_default = pinctrl_lookup_state(i2c_imx->pinctrl,
->> >>                       PINCTRL_STATE_DEFAULT);
->> >>       i2c_imx->pinctrl_pins_gpio = pinctrl_lookup_state(i2c_imx->pinctrl,
->> >> @@ -1081,8 +1090,11 @@ static int i2c_imx_probe(struct platform_device *pdev)
->> >>               return ret;
->> >>       }
->> >>
->> >> +     /* optional bus recovery feature through pinctrl */
->> >>       i2c_imx->pinctrl = devm_pinctrl_get(&pdev->dev);
->> >> -     if (IS_ERR(i2c_imx->pinctrl)) {
->> >> +     /* bailout on -ENOMEM or -EPROBE_DEFER, continue for other errors */
->> >> +     if (PTR_ERR(i2c_imx->pinctrl) == -ENOMEM ||
->> >> +                     PTR_ERR(i2c_imx->pinctrl) == -EPROBE_DEFER) {
->> >>               ret = PTR_ERR(i2c_imx->pinctrl);
->> >>               goto clk_disable;
->> >>       }
->> >
->> > devm_pinctrl_get might return the following error-valued pointers:
->> >  - -EINVAL
->> >  - -ENOMEM
->> >  - -ENODEV
->> >  - -EPROBE_DEFER
->> >
->> > There are several error paths returning -EINVAL, one is when an invalid
->> > phandle is used. Do you really want to ignore that?
->> >
->> > IMO error handling is better done with inverse logic, that is continue
->> > on some explicit error, bail out on all unknown stuff. This tends to be
->> > more robust. Also the comment should be improved to not explain that for
->> > -ENOMEM and -EPROBE_DEFER we bail out (which should be obvious for
->> > anyone who can read C) but to explain why.
->>
->> What you said is true for normal error handling, but in this scenario
->> it is intentional to ignore all pinctrl related errors except critical
->> ones because failing to have pinctrl for an optional feature shouldn't
->> impact the function of normal i2c.  We choose to catch -ENOMEM because
->> the error could also cause problem for i2c probe, and -EPROBE_DEFER
->> because it's possible that the pinctrl will be ready later and we want
->> to give it a chance.  The i2c driver really don't care why the pinctrl
->> was not usable.  I thought I added comment before the
->> devm_pinctrl_get() to explain that the pinctrl is optional.  Hopefully
->> you are not suggesting to explain what -ENOMEM and -EPROBE_DEFER mean
->> in the comment. :)
->
-> You wrote
->
->         /* optional bus recovery feature through pinctrl */
->
-> there. I'd expect to read something like:
->
->         /*
->          * If pinctrl is available it might be possible to switch the
->          * SDA and SCL lines to their GPIO functions and do a recovery
->          * procedure in this mode. If there is anything wrong with
->          * pinctrl we cannot do this and simply skip it.
->          */
+On Friday, June 17, 2016 08:26:58 AM Marek Szyprowski wrote:
+> When devices are being runtime resumed during the system PM transition to
+> suspend state, the link suppliers might be already resumed and
+> have runtime pm disabled. This is normal case. This patch adds special
+> support for such case. Simple call to pm_runtime_get_sync returns error
+> when device has runtime PM disabled, what results in incorrect runtime PM
+> state during system wide PM transition.
 
-Thanks.  I will use this.  This does looks more clear.  And more verbose too. :)
+The problem is real, but the proposed solution is questionable.
 
->
->> > Also I'd put
->> >
->> >         i2c_imx->pinctrl = NULL;
->> >
->> > directly after devm_pinctrl_get() which I consider the more obvious
->> > place for this.
->>
->> On the other hand, put it together with the actually judgement can
->> make it clear that it is catching both IS_ERR and NULL returns from
->> devm_pinctrl_get()?
->
-> When you do it immediately, you have:
->
->         if (i2c_imx->pinctrl)
->                 use_it();
->         else
->                 ignore_it();
->
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/base/power/runtime.c | 22 +++++++++++++++++++++-
+>  1 file changed, 21 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+> index 0ea00d442e0f..d00b079fad88 100644
+> --- a/drivers/base/power/runtime.c
+> +++ b/drivers/base/power/runtime.c
+> @@ -261,6 +261,26 @@ static int rpm_check_suspend_allowed(struct device *dev)
+>  }
+>  
+>  /**
+> + * __pm_runtime_force_resume - force resume of the device
+> + * @dev: Device to resume
+> + *
+> + * This function works like __pm_runtime_resume(dev, RPM_GET_PUT), but
+> + * also handles devices with runtime PM disabled. This allows to properly
+> + * control all devices during preparation for system PM transition.
+> + */
+> +static int __pm_runtime_force_resume(struct device *dev)
+> +{
+> +	if (!dev->power.disable_depth)
+> +		return pm_runtime_get_sync(dev);
+> +
+> +	if (dev->power.runtime_status != RPM_ACTIVE ||
+> +	    atomic_inc_not_zero(&dev->power.usage_count) == 0)
+> +		return -EINVAL;
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+>   * __rpm_callback - Run a given runtime PM callback for a given device.
+>   * @cb: Runtime PM callback to run.
+>   * @dev: Device to run the callback for.
+> @@ -291,7 +311,7 @@ static int __rpm_callback(int (*cb)(struct device *), struct device *dev)
+>  				if ((link->flags & DEVICE_LINK_PM_RUNTIME)
+>  				    && link->status != DEVICE_LINK_SUPPLIER_UNBIND
+>  				    && !link->rpm_active) {
+> -					retval = pm_runtime_get_sync(link->supplier);
+> +					retval = __pm_runtime_force_resume(link->supplier);
+>  					if (retval < 0) {
+>  						pm_runtime_put_noidle(link->supplier);
+>  						goto fail;
 
-But you suggested the other way last time "Or maybe make
-i2c_imx_init_recovery_info aware of this situation to keep the caller
-simple?"  :)  Either way I think it is just personal preferences with
-both subtle pros and cons.  I don't think we should spend too much
-time on this.
+The reason why power.disable_depth is different from 0 may not be system suspend,
+in which case it should fail even if the status happens to be RPM_ACTIVE.
 
-Regards,
-Leo
+Thanks,
+Rafael
