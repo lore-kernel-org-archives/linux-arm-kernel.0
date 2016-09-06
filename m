@@ -1,53 +1,72 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 6 Sep 2016 14:55:36 -0500
-Subject: [PATCH V2 1/5] Documentation: Add support for TI System Control
- Interface (TI-SCI) protocol
-In-Reply-To: <6c63b044-3db9-9202-b790-350a88b9eab0@ti.com>
-References: <20160830130647.6828-1-nm@ti.com>
- <20160830130647.6828-2-nm@ti.com> <20160902150628.GA19493@rob-hp-laptop>
- <CAGo_u6q0xxnUj5ary82OU1uP=kTHfA_3N7_d7OiSEwS1_5dXuw@mail.gmail.com>
- <57C9E0A8.4010701@ti.com> <6c63b044-3db9-9202-b790-350a88b9eab0@ti.com>
-Message-ID: <1a382d12-e5d8-7403-6a0f-a1a8a35bd571@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 6 Sep 2016 22:01:08 +0200
+Subject: [PATCH v2 4/7] dts: sun8i-h3: add UART1-3 to Orange Pi Plus
+In-Reply-To: <20160906085202.GA4854@carbon.kippendief.biz>
+References: <1472671858-29220-1-git-send-email-jorik@kippendief.biz>
+ <1472671858-29220-5-git-send-email-jorik@kippendief.biz>
+ <20160902070425.GB6313@lukather>
+ <20160903120932.GA6289@carbon.kippendief.biz>
+ <20160905193111.GC4728@lukather>
+ <CAGb2v67dnnxOp_yPyC8icu-m0WZ-Rs1STs1tnxJMOLfcRfRzUg@mail.gmail.com>
+ <20160906085202.GA4854@carbon.kippendief.biz>
+Message-ID: <20160906200108.GK9040@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/2016 02:09 AM, Tero Kristo wrote:
-> On 02/09/16 23:27, Dave Gerlach wrote:
->> On 09/02/2016 12:07 PM, Nishanth Menon wrote:
->>> Rob,
->>>
->>> On Fri, Sep 2, 2016 at 10:06 AM, Rob Herring <robh@kernel.org> wrote:
->>>> On Tue, Aug 30, 2016 at 08:06:43AM -0500, Nishanth Menon wrote:
->>> [...]
->>>>> +
->>>>> +TI-SCI Client Device Node:
->>>>> +========================
->>>>> +
->>>>> +Client nodes refer to the required TI-SCI device using the "ti,sci"
->>>>> property.
->>>>
->>>> As I mentioned for power domains, for clients that are self contained
->>>> (i.e. a single function) I think the should be child nodes.
->>>>
->>>
->>> Thanks for the feedback. I think we should be able to do that and also
->>> assume you have no further improvements you'd like to see here.
->>>
->>> Looking at current Documentation/devicetree/bindings/arm/arm,scpi.txt
->>> -> it makes sense to stick along the same lines as you mentioned.
->>>
->>> Dave, Tero: do you guys have any objections?
->>
->> No objections, I think this is a logical move.
->
-> Yea, sounds like a valid change. I believe you are going to post a new
-> version so I can modify the clock driver also accordingly?
+On Tue, Sep 06, 2016 at 10:52:02AM +0200, Jorik Jonker wrote:
+> On Tue, Sep 06, 2016 at 11:04:38AM +0800, Chen-Yu Tsai wrote:
+> >In short, I'm ok with it. But please put an explicit
+> >
+> >   status = "disabled";
+> >
+> >and probably a comment about how/where the peripheral can be
+> >used in the board dts.
+> 
+> Allright, I will do that in v3.
+> 
+> >I intended to do this for the Banana Pis. Though my original plan
+> >was to enable Raspberry Pi compatible peripherals by default, and
+> >list the other peripherals that are defined by the vendor as
+> >"disabled".
+> >
+> >"Defined by the vendor" means that the vendor has some sort of
+> >document associating the gpio header pins with the peripherals,
+> >as shown in:
+> >
+> >   http://www.orangepi.org/Docs/Pindefinition.html#CON3_Definition
+> >
+> >This should make it easier for the average user to enable the
+> >peripherals. I'm not sure we should list _all_ possible ones
+> >though. That would make the list very large, and some might
+> >end up never being used.
+> 
+> This is exactly what I was thinking, albeit I wanted to go a bit 'bigger':
+> move all unambiguous pinmux/peripheral associations from the H3 DTS files to
+> the DTSI, complete them with known associations for which there are drivers,
+> and have all of these disabled. Reduce the existing blocks in the DTS files
+> to just "status = okay".
+> 
+> Peripherals requiring board-specific things (like emac, USB, voltage
+> regulators, displays) stay put in the DTS.
+> 
+> It will explodes the scope of my proposed change a bit, but if you are OK
+> with this, I will gladly do it.
+> 
+> Maxime, Chen-Yu: what do you think of this?
 
-Just closing the loop here: https://lkml.org/lkml/2016/9/6/747 posted. 
-the changes are in binding - clk driver itself should'nt by itself 
-have any changes.
+I'm not exactly sure what you have in mind. Please send a patch, and
+we'll see then :)
 
+Maxime
 
 -- 
-Regards,
-Nishanth Menon
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160906/52ae5713/attachment.sig>
