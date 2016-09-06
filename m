@@ -1,79 +1,42 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue,  6 Sep 2016 10:19:23 -0600
-Subject: [PATCH V3] perf tools: adding support for address filters
-Message-ID: <1473178763-2870-1-git-send-email-mathieu.poirier@linaro.org>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 6 Sep 2016 21:50:12 +0530
+Subject: [GIT PULL] Mailbox fixes for v4.8-rc
+Message-ID: <CABb+yY09Kx+ymqZ9a0a6cN=x7eVwJK9si398cOFZM_wWA-PPcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes it possible to use the current filter
-framework with address filters.  That way address filters for
-HW tracers such as CoreSight and IntelPT can be communicated
-to the kernel drivers.
+Hi Linus,
 
-CC: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Acked-by: Jiri Olsa <jolsa@kernel.org>
----
-Changes for V3:
- - Added Jiri's ack.
- - Rebased to v4.8-rc5.
+The following changes since commit 5e608a027082ae426e100a582031e0ff40becc83:
 
-Changes for V2:
- - Rebased to v4.8-rc4.
- - Revisited error path.
+  Merge branch 'akpm' (patches from Andrew) (2016-08-26 23:12:12 -0700)
 
----
- tools/perf/util/parse-events.c | 30 +++++++++++++++++++++++++-----
- 1 file changed, 25 insertions(+), 5 deletions(-)
+are available in the git repository at:
 
-diff --git a/tools/perf/util/parse-events.c b/tools/perf/util/parse-events.c
-index 2eb8b1ed4cc8..1df413fbf7f8 100644
---- a/tools/perf/util/parse-events.c
-+++ b/tools/perf/util/parse-events.c
-@@ -1760,12 +1760,26 @@ foreach_evsel_in_last_glob(struct perf_evlist *evlist,
- static int set_filter(struct perf_evsel *evsel, const void *arg)
- {
- 	const char *str = arg;
-+	bool found = false;
-+	int nr_addr_filters = 0;
-+	struct perf_pmu *pmu = NULL;
- 
--	if (evsel == NULL || evsel->attr.type != PERF_TYPE_TRACEPOINT) {
--		fprintf(stderr,
--			"--filter option should follow a -e tracepoint option\n");
--		return -1;
--	}
-+	if (evsel == NULL)
-+		goto err;
-+
-+	while ((pmu = perf_pmu__scan(pmu)) != NULL)
-+		if (pmu->type == evsel->attr.type) {
-+			found = true;
-+			break;
-+		}
-+
-+	if (found)
-+		perf_pmu__scan_file(pmu, "nr_addr_filters",
-+				    "%d", &nr_addr_filters);
-+
-+
-+	if (evsel->attr.type != PERF_TYPE_TRACEPOINT && !nr_addr_filters)
-+		goto err;
- 
- 	if (perf_evsel__append_filter(evsel, "&&", str) < 0) {
- 		fprintf(stderr,
-@@ -1774,6 +1788,12 @@ static int set_filter(struct perf_evsel *evsel, const void *arg)
- 	}
- 
- 	return 0;
-+
-+err:
-+	fprintf(stderr,
-+		"--filter option should follow a -e tracepoint or HW tracer option\n");
-+
-+	return -1;
- }
- 
- int parse_filter(const struct option *opt, const char *str,
--- 
-2.7.4
+  git://git.linaro.org/landing-teams/working/fujitsu/integration.git
+mailbox-devel
+
+for you to fetch changes up to a75e4a85f49e7f5d71cf0e425bc009c15ad3b5c4:
+
+  fix:mailbox:bcm-pdc-mailbox:mark symbols static where possible
+(2016-08-29 18:43:39 +0530)
+
+----------------------------------------------------------------
+* Misc fixes for BCM mailbox driver
+     Fix build warnings by making static functions used within the file.
+     Check for potential NULL before dereferencing
+     Fix link error by defining HAS_DMA dependency
+
+----------------------------------------------------------------
+Baoyou Xie (1):
+      fix:mailbox:bcm-pdc-mailbox:mark symbols static where possible
+
+Dan Carpenter (1):
+      mailbox: bcm-pdc: potential NULL dereference in pdc_shutdown()
+
+Rob Rice (1):
+      mailbox: Add HAS_DMA Kconfig dependency to BCM_PDC_MBOX
+
+ drivers/mailbox/Kconfig           |  1 +
+ drivers/mailbox/bcm-pdc-mailbox.c | 11 ++++++-----
+ 2 files changed, 7 insertions(+), 5 deletions(-)
