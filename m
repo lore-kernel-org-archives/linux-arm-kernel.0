@@ -1,135 +1,17 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 06 Sep 2016 16:22:17 +0100
-Subject: [RFC v2 PATCH 2/7] KVM: Track the pid of the VM process
-In-Reply-To: <20160906112203.GO30513@cbox> (Christoffer Dall's message of
- "Tue, 6 Sep 2016 13:22:03 +0200")
-References: <1473093097-30932-1-git-send-email-punit.agrawal@arm.com>
- <1473093097-30932-3-git-send-email-punit.agrawal@arm.com>
- <20160906062252.GA30513@cbox>
- <87poohjqzk.fsf@e105922-lin.cambridge.arm.com>
- <20160906102542.GG30513@cbox>
- <877fapjng0.fsf@e105922-lin.cambridge.arm.com>
- <20160906112203.GO30513@cbox>
-Message-ID: <87poohhx3q.fsf@e105922-lin.cambridge.arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 6 Sep 2016 23:24:48 +0800
+Subject: [PATCH v2 7/9] ARM: sun8i: a33: Add display pipeline
+In-Reply-To: <20160906144620.6322-8-maxime.ripard@free-electrons.com>
+References: <20160906144620.6322-1-maxime.ripard@free-electrons.com>
+ <20160906144620.6322-8-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v66cFjnvc=vimxmj_1OWhdKjwQ-d6nDMRJvhjxuqEcfd=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Christoffer Dall <christoffer.dall@linaro.org> writes:
-
-> On Tue, Sep 06, 2016 at 12:07:59PM +0100, Punit Agrawal wrote:
->> Christoffer Dall <christoffer.dall@linaro.org> writes:
->> 
->> > On Tue, Sep 06, 2016 at 10:51:27AM +0100, Punit Agrawal wrote:
->> >> Hi Christoffer,
->> >> 
->> >> Christoffer Dall <christoffer.dall@linaro.org> writes:
->> >> 
->> >> > On Mon, Sep 05, 2016 at 05:31:32PM +0100, Punit Agrawal wrote:
->> >> >> Userspace tools such as perf can be used to profile individual
->> >> >> processes.
->> >> >> 
->> >> >> Track the PID of the virtual machine process to match profiling requests
->> >> >> targeted at it. This can be used to take appropriate action to enable
->> >> >> the requested profiling operations for the VMs of interest.
->> >> >> 
->> >> >> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> >> >> Cc: Paolo Bonzini <pbonzini@redhat.com>
->> >> >> Cc: "Radim Kr?m??" <rkrcmar@redhat.com>
->> >> >> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->> >> >> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> >> >> ---
->> >> >>  include/linux/kvm_host.h | 1 +
->> >> >>  virt/kvm/kvm_main.c      | 2 ++
->> >> >>  2 files changed, 3 insertions(+)
->> >> >> 
->> >> >> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
->> >> >> index 9c28b4d..7c42c94 100644
->> >> >> --- a/include/linux/kvm_host.h
->> >> >> +++ b/include/linux/kvm_host.h
->> >> >> @@ -374,6 +374,7 @@ struct kvm_memslots {
->> >> >>  struct kvm {
->> >> >>  	spinlock_t mmu_lock;
->> >> >>  	struct mutex slots_lock;
->> >> >> +	struct pid *pid;
->> >> >>  	struct mm_struct *mm; /* userspace tied to this vm */
->> >> >>  	struct kvm_memslots *memslots[KVM_ADDRESS_SPACE_NUM];
->> >> >>  	struct srcu_struct srcu;
->> >> >> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
->> >> >> index 1950782..ab2535a 100644
->> >> >> --- a/virt/kvm/kvm_main.c
->> >> >> +++ b/virt/kvm/kvm_main.c
->> >> >> @@ -613,6 +613,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
->> >> >>  	spin_lock_init(&kvm->mmu_lock);
->> >> >>  	atomic_inc(&current->mm->mm_count);
->> >> >>  	kvm->mm = current->mm;
->> >> >> +	kvm->pid = get_task_pid(current, PIDTYPE_PID);
->> >> >
->> >> > How dooes this deal with threading?  Is the idea that the user by
->> >> > specifying the main thread's pid will enable trapping for all vcpu
->> >> > threads belonging to that VM?
->> >> 
->> >> Yes that's correct - specifying the main thread PID will enable trapping
->> >> for the VM (all vcpus).
->> >> 
->> >> I am happy to move to a more suitable identifier if available.
->> >> 
->> >
->> > What is the 'main thread' ?
->> >
->> > Does something mandate that the VM is created by the thread group
->> > leader?  If not, is it not a bit strange from a user perspective, that
->> > you have to find the specific subthread pid that created the vm to
->> > enable this tracing for all vcpu threads and that the tgid doesn't work
->> > in this case?
->> 
->> Let me correct my terminology usage - the value recorded above (and used
->> to identify the VM) should be the tgid. It is confusing because 'ps'
->> reports it as pid.
->> 
->> I picked the value as existing KVM code already uses the PID of the
->> creating task (see kvm_create_vm_debugfs) to export VM statistics in
->> debugfs.
->> 
->> If I've got this wrong, then kvm_create_vm_debugfs also likely needs an
->> update.
->> 
->> What do you think?
->> 
-> When you do get_task_pid(current, PIDTYPE_PID) it actually gets the
-> kernel view of a PID which is the thead-id from userspace's point of
-> view, right?
-
-That makes sense. It seems to works here because the pid of the first
-task is also the tgid of the group. And I reckon it's the same
-assumption being made with debugfs code (more below).
-
-I've changed the first argument of the call to get_task_pid to
-current->group_leader.
-
+On Tue, Sep 6, 2016 at 10:46 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Add all the needed blocks to the A33 DTSI.
 >
-> I don't see why this has to be the same as the debugfs code, as there it
-> makes potentially more sense to thread-specific, but for your case, are
-> you not targeting the behavior that a user can do "ps aux | grep qemu"
-> or whatever, and then set tracing for the reported PID (which is
-> actually a tgid)?
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-The debugfs stats are not thread (vcpu) specific but for the VM.
-
-Both values, debugfs and here, are being used to represent the VM to the
-user. A mismatch in these identifiers will be very confusing.
-
-If you agree, I can separately send a patch to address this for VM
-debugfs directory as well.
-
->
-> If this is indeed the case, then I don't think the current code supports
-> this if QEMU was ever changed to create the VM with a different thread
-> than the tgl.
->
-> That being said, I'm typically wrong when I talk about userspace.
->
-> -Christoffer
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+Acked-by: Chen-Yu Tsai <wens@csie.org>
