@@ -1,141 +1,46 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue,  6 Sep 2016 11:08:56 +0200
-Subject: [PATCH V10 6/8] irqchip/gicv3-its: Probe ITS in the ACPI way
-In-Reply-To: <1473152938-17388-1-git-send-email-tn@semihalf.com>
-References: <1473152938-17388-1-git-send-email-tn@semihalf.com>
-Message-ID: <1473152938-17388-7-git-send-email-tn@semihalf.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 6 Sep 2016 11:12:24 +0200
+Subject: [PATCH 4/7] drm/panel: Add Sinlinx SinA33 7" panel
+In-Reply-To: <20160905200248.GB8596@lukather>
+References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
+ <20160901153204.11217-5-maxime.ripard@free-electrons.com>
+ <66681473008583@web28j.yandex.ru> <20160905200248.GB8596@lukather>
+Message-ID: <20160906091224.GC15644@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ITS is prepared for being initialized different than DT,
-therefore we can initialize it in ACPI way. We collect register base
-address from MADT table and pass mandatory info to firmware-agnostic
-ITS init call.
+On Mon, Sep 05, 2016 at 10:02:48PM +0200, Maxime Ripard wrote:
+> Hi,
+> 
+> On Mon, Sep 05, 2016 at 01:03:03AM +0800, Icenowy Zheng wrote:
+> > Hi Everyone,
+> > 
+> > 01.09.2016, 23:40, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> > > ?The SinA33 has an unidentified panel. Add the timings for it under a new
+> > > ?compatible.
+> > 
+> > 
+> > 
+> > Excuse me...
+> > I will ask a question which is not fully related to the patch here...
+> > If I want to add a generic panel for Q8 tablets, what should it be called?
+> > "allwinner,q8-lcd-panel-800x480"?
+> 
+> I guess it's more of a question for Thierry, but it seems like the
+> trend is to put the diagonal rather than the resolution in the
+> compatibles.
 
-Use here IORT lib to register ITS domain which then can be found and
-used on to build another PCI MSI domain in hierarchical stack domain.
+Compatible strings should contain the model number of the panel. There
+is no such thing as a "generic panel for Q8 tablets".
 
-NOTE: Waiting for proper ITS and NUMA node relation description in IORT
-table, we pass around NUMA_NO_NODE to the its_probe_one init call.
-This means that Cavium ThunderX erratum 23144 (pass1.1 only)
-is not supported for ACPI boot method yet.
+Also, how is it that these panels are unidentified? Has nobody tried to
+open them up and look at the panel to find a model number?
 
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/irqchip/Kconfig          |  1 +
- drivers/irqchip/irq-gic-v3-its.c | 61 +++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 61 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 7f87289..9aeea1d8 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -39,6 +39,7 @@ config ARM_GIC_V3_ITS
- 	bool
- 	depends on PCI
- 	depends on PCI_MSI
-+	select ACPI_IORT if ACPI
- 
- config ARM_NVIC
- 	bool
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index c7518c7..35c851c 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -15,10 +15,13 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/acpi.h>
- #include <linux/bitmap.h>
- #include <linux/cpu.h>
- #include <linux/delay.h>
- #include <linux/interrupt.h>
-+#include <linux/irqdomain.h>
-+#include <linux/acpi_iort.h>
- #include <linux/log2.h>
- #include <linux/mm.h>
- #include <linux/msi.h>
-@@ -1438,6 +1441,11 @@ static int its_irq_gic_domain_alloc(struct irq_domain *domain,
- 		fwspec.param[0] = GIC_IRQ_TYPE_LPI;
- 		fwspec.param[1] = hwirq;
- 		fwspec.param[2] = IRQ_TYPE_EDGE_RISING;
-+	} else if (is_fwnode_irqchip(domain->parent->fwnode)) {
-+		fwspec.fwnode = domain->parent->fwnode;
-+		fwspec.param_count = 2;
-+		fwspec.param[0] = hwirq;
-+		fwspec.param[1] = IRQ_TYPE_EDGE_RISING;
- 	} else {
- 		return -EINVAL;
- 	}
-@@ -1797,6 +1805,57 @@ static int __init its_of_probe(struct device_node *node)
- 	return 0;
- }
- 
-+#ifdef CONFIG_ACPI
-+
-+#define ACPI_GICV3_ITS_MEM_SIZE (SZ_128K)
-+
-+static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
-+					  const unsigned long end)
-+{
-+	struct acpi_madt_generic_translator *its_entry;
-+	struct fwnode_handle *dom_handle;
-+	struct resource res;
-+	int err;
-+
-+	its_entry = (struct acpi_madt_generic_translator *)header;
-+	memset(&res, 0, sizeof(res));
-+	res.start = its_entry->base_address;
-+	res.end = its_entry->base_address + ACPI_GICV3_ITS_MEM_SIZE - 1;
-+	res.flags = IORESOURCE_MEM;
-+
-+	dom_handle = irq_domain_alloc_fwnode((void *)its_entry->base_address);
-+	if (!dom_handle) {
-+		pr_err("ITS@%pa: Unable to allocate GICv3 ITS domain token\n",
-+		       &res.start);
-+		return -ENOMEM;
-+	}
-+
-+	err = iort_register_domain_token(its_entry->translation_id, dom_handle);
-+	if (err) {
-+		pr_err("ITS@%pa: Unable to register GICv3 ITS domain token (ITS ID %d) to IORT\n",
-+		       &res.start, its_entry->translation_id);
-+		goto dom_err;
-+	}
-+
-+	err = its_probe_one(&res, dom_handle, NUMA_NO_NODE);
-+	if (!err)
-+		return 0;
-+
-+	iort_deregister_domain_token(its_entry->translation_id);
-+dom_err:
-+	irq_domain_free_fwnode(dom_handle);
-+	return err;
-+}
-+
-+static void __init its_acpi_probe(void)
-+{
-+	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
-+			      gic_acpi_parse_madt_its, 0);
-+}
-+#else
-+static void __init its_acpi_probe(void) { }
-+#endif
-+
- int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
- 		    struct irq_domain *parent_domain)
- {
-@@ -1807,7 +1866,7 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
- 	if (of_node)
- 		its_of_probe(of_node);
- 	else
--		return -ENODEV;
-+		its_acpi_probe();
- 
- 	if (list_empty(&its_nodes)) {
- 		pr_warn("ITS: No ITS available, not enabling LPIs\n");
--- 
-1.9.1
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160906/830350c8/attachment.sig>
