@@ -1,39 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  6 Sep 2016 15:01:10 +0200
-Subject: [PATCH] clk: meson: fix CLKID_GCLK_VENCI_INT typo
-Message-ID: <20160906130130.1645496-1-arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  6 Sep 2016 14:01:59 +0100
+Subject: [PATCH 01/19] arm64: KVM: Rename HCR_VA to HCR_VSE
+In-Reply-To: <1473166937-15271-1-git-send-email-marc.zyngier@arm.com>
+References: <1473166937-15271-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1473166937-15271-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The addition of many gate clocks added two entries in an array for
-the same value:
+HCR_VA is a leftover from ARMv7, On ARMv8, this is HCR_VSE
+(which stands for Virtual System Error), and has better
+defined semantics.
 
-drivers/clk/meson/meson8b.c:479:10: error: initialized field overwritten [-Werror=override-init]
-   [CLKID_GCLK_VENCI_INT]     = &meson8b_gclk_venci_int.hw,
-   [CLKID_GCLK_VENCI_INT]     = &meson8b_gclk_vencp_int.hw,
+Let's rename the constant.
 
-This was clearly an accident, and since all other identifiers are
-listed in the order in which they are defined, I'm changing the
-first one to CLKID_GCLK_VENCI_INT0, making it all consistent again.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: e31a1900c1ff ("meson: clk: Add support for clock gates")
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/clk/meson/meson8b.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/include/asm/kvm_arm.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
-index e1d4aa145a03..0d45ec20c737 100644
---- a/drivers/clk/meson/meson8b.c
-+++ b/drivers/clk/meson/meson8b.c
-@@ -476,7 +476,7 @@ static struct clk_hw_onecell_data meson8b_hw_onecell_data = {
- 		[CLKID_VCLK2_VENCP0]	    = &meson8b_vclk2_vencp0.hw,
- 		[CLKID_VCLK2_VENCP1]	    = &meson8b_vclk2_vencp1.hw,
- 		[CLKID_GCLK_VENCI_INT]	    = &meson8b_gclk_venci_int.hw,
--		[CLKID_GCLK_VENCI_INT]	    = &meson8b_gclk_vencp_int.hw,
-+		[CLKID_GCLK_VENCP_INT]	    = &meson8b_gclk_vencp_int.hw,
- 		[CLKID_DAC_CLK]		    = &meson8b_dac_clk.hw,
- 		[CLKID_AOCLK_GATE]	    = &meson8b_aoclk_gate.hw,
- 		[CLKID_IEC958_GATE]	    = &meson8b_iec958_gate.hw,
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 4b5c977..2a2752b 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -50,7 +50,7 @@
+ #define HCR_BSU		(3 << 10)
+ #define HCR_BSU_IS	(UL(1) << 10)
+ #define HCR_FB		(UL(1) << 9)
+-#define HCR_VA		(UL(1) << 8)
++#define HCR_VSE		(UL(1) << 8)
+ #define HCR_VI		(UL(1) << 7)
+ #define HCR_VF		(UL(1) << 6)
+ #define HCR_AMO		(UL(1) << 5)
+@@ -80,7 +80,7 @@
+ #define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWE | HCR_TWI | HCR_VM | \
+ 			 HCR_TVM | HCR_BSU_IS | HCR_FB | HCR_TAC | \
+ 			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW)
+-#define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
++#define HCR_VIRT_EXCP_MASK (HCR_VSE | HCR_VI | HCR_VF)
+ #define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
+ #define HCR_HOST_VHE_FLAGS (HCR_RW | HCR_TGE | HCR_E2H)
+ 
 -- 
-2.9.0
+2.1.4
