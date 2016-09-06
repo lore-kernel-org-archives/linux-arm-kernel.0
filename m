@@ -1,167 +1,157 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Tue,  6 Sep 2016 10:00:20 -0700
-Subject: [RESEND v14 PATCH 1/5] Documentation: bindings: add dt doc for
- Rockchip USB Type-C PHY
-In-Reply-To: <1472015825-11365-2-git-send-email-zyw@rock-chips.com>
-References: <1472015825-11365-2-git-send-email-zyw@rock-chips.com>
-Message-ID: <1473181220-15123-1-git-send-email-zyw@rock-chips.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 06 Sep 2016 18:03:39 +0100
+Subject: [RFC v2 PATCH 2/7] KVM: Track the pid of the VM process
+In-Reply-To: <20160906165749.GH23592@cbox> (Christoffer Dall's message of
+ "Tue, 6 Sep 2016 18:57:49 +0200")
+References: <1473093097-30932-1-git-send-email-punit.agrawal@arm.com>
+ <1473093097-30932-3-git-send-email-punit.agrawal@arm.com>
+ <20160906062252.GA30513@cbox>
+ <87poohjqzk.fsf@e105922-lin.cambridge.arm.com>
+ <20160906102542.GG30513@cbox>
+ <877fapjng0.fsf@e105922-lin.cambridge.arm.com>
+ <20160906112203.GO30513@cbox>
+ <87poohhx3q.fsf@e105922-lin.cambridge.arm.com>
+ <20160906165749.GH23592@cbox>
+Message-ID: <878tv5hses.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a binding that describes the Rockchip USB Type-C PHY
-for rk3399
+Christoffer Dall <christoffer.dall@linaro.org> writes:
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-Reviewed-by: Tomasz Figa <tfiga@chromium.org>
-Reviewed-by: Kever Yang <kever.yang@rock-chips.com>
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-Acked-by: Rob Herring <robh@kernel.org>
+> On Tue, Sep 06, 2016 at 04:22:17PM +0100, Punit Agrawal wrote:
+>> Christoffer Dall <christoffer.dall@linaro.org> writes:
+>> 
+>> > On Tue, Sep 06, 2016 at 12:07:59PM +0100, Punit Agrawal wrote:
+>> >> Christoffer Dall <christoffer.dall@linaro.org> writes:
+>> >> 
+>> >> > On Tue, Sep 06, 2016 at 10:51:27AM +0100, Punit Agrawal wrote:
+>> >> >> Hi Christoffer,
+>> >> >> 
+>> >> >> Christoffer Dall <christoffer.dall@linaro.org> writes:
+>> >> >> 
+>> >> >> > On Mon, Sep 05, 2016 at 05:31:32PM +0100, Punit Agrawal wrote:
+>> >> >> >> Userspace tools such as perf can be used to profile individual
+>> >> >> >> processes.
+>> >> >> >> 
+>> >> >> >> Track the PID of the virtual machine process to match profiling requests
+>> >> >> >> targeted at it. This can be used to take appropriate action to enable
+>> >> >> >> the requested profiling operations for the VMs of interest.
+>> >> >> >> 
+>> >> >> >> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> >> >> >> Cc: Paolo Bonzini <pbonzini@redhat.com>
+>> >> >> >> Cc: "Radim Kr?m??" <rkrcmar@redhat.com>
+>> >> >> >> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>> >> >> >> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> >> >> >> ---
+>> >> >> >>  include/linux/kvm_host.h | 1 +
+>> >> >> >>  virt/kvm/kvm_main.c      | 2 ++
+>> >> >> >>  2 files changed, 3 insertions(+)
+>> >> >> >> 
+>> >> >> >> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+>> >> >> >> index 9c28b4d..7c42c94 100644
+>> >> >> >> --- a/include/linux/kvm_host.h
+>> >> >> >> +++ b/include/linux/kvm_host.h
+>> >> >> >> @@ -374,6 +374,7 @@ struct kvm_memslots {
+>> >> >> >>  struct kvm {
+>> >> >> >>  	spinlock_t mmu_lock;
+>> >> >> >>  	struct mutex slots_lock;
+>> >> >> >> +	struct pid *pid;
+>> >> >> >>  	struct mm_struct *mm; /* userspace tied to this vm */
+>> >> >> >>  	struct kvm_memslots *memslots[KVM_ADDRESS_SPACE_NUM];
+>> >> >> >>  	struct srcu_struct srcu;
+>> >> >> >> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+>> >> >> >> index 1950782..ab2535a 100644
+>> >> >> >> --- a/virt/kvm/kvm_main.c
+>> >> >> >> +++ b/virt/kvm/kvm_main.c
+>> >> >> >> @@ -613,6 +613,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
+>> >> >> >>  	spin_lock_init(&kvm->mmu_lock);
+>> >> >> >>  	atomic_inc(&current->mm->mm_count);
+>> >> >> >>  	kvm->mm = current->mm;
+>> >> >> >> +	kvm->pid = get_task_pid(current, PIDTYPE_PID);
+>> >> >> >
+>> >> >> > How dooes this deal with threading?  Is the idea that the user by
+>> >> >> > specifying the main thread's pid will enable trapping for all vcpu
+>> >> >> > threads belonging to that VM?
+>> >> >> 
+>> >> >> Yes that's correct - specifying the main thread PID will enable trapping
+>> >> >> for the VM (all vcpus).
+>> >> >> 
+>> >> >> I am happy to move to a more suitable identifier if available.
+>> >> >> 
+>> >> >
+>> >> > What is the 'main thread' ?
+>> >> >
+>> >> > Does something mandate that the VM is created by the thread group
+>> >> > leader?  If not, is it not a bit strange from a user perspective, that
+>> >> > you have to find the specific subthread pid that created the vm to
+>> >> > enable this tracing for all vcpu threads and that the tgid doesn't work
+>> >> > in this case?
+>> >> 
+>> >> Let me correct my terminology usage - the value recorded above (and used
+>> >> to identify the VM) should be the tgid. It is confusing because 'ps'
+>> >> reports it as pid.
+>> >> 
+>> >> I picked the value as existing KVM code already uses the PID of the
+>> >> creating task (see kvm_create_vm_debugfs) to export VM statistics in
+>> >> debugfs.
+>> >> 
+>> >> If I've got this wrong, then kvm_create_vm_debugfs also likely needs an
+>> >> update.
+>> >> 
+>> >> What do you think?
+>> >> 
+>> > When you do get_task_pid(current, PIDTYPE_PID) it actually gets the
+>> > kernel view of a PID which is the thead-id from userspace's point of
+>> > view, right?
+>> 
+>> That makes sense. It seems to works here because the pid of the first
+>> task is also the tgid of the group. And I reckon it's the same
+>> assumption being made with debugfs code (more below).
+>
+> That is probably the implementation of all QEMU versions and kvmtool
+> versions out there.
+>
+>> 
+>> I've changed the first argument of the call to get_task_pid to
+>> current->group_leader.
+>> 
+>> >
+>> > I don't see why this has to be the same as the debugfs code, as there it
+>> > makes potentially more sense to thread-specific, but for your case, are
+>> > you not targeting the behavior that a user can do "ps aux | grep qemu"
+>> > or whatever, and then set tracing for the reported PID (which is
+>> > actually a tgid)?
+>> 
+>> The debugfs stats are not thread (vcpu) specific but for the VM.
+>> 
+>> Both values, debugfs and here, are being used to represent the VM to the
+>> user. A mismatch in these identifiers will be very confusing.
+>> 
+>> If you agree, I can separately send a patch to address this for VM
+>> debugfs directory as well.
+>> 
+>
+> I don't know how the debugfs stuff is used or was intended, so I really
+> can't speak for that.  It seems less weird to me with debugfs, because I
+> imagine it can be used by simply looking at what exists in the debugfs
+> directory and mapping that to a VM.
 
----
+Ok, I'll let debugfs stuff be as is then.
 
-Changes in v14: None
-Changes in v13: None
-Changes in v12: None
-Changes in v11:
-- make a clearer emarcation between usb phy and dp phy
+>
+> In your case, there's a clear expectation from the user that using the
+> tgid should cover this VM, and it will be weird if that's not the
+> case.
 
-Changes in v10:
-- remove rockchip,uphy-dp-sel property
+Right. Switching over to current->group_leader should avert problems if
+userspace tools do things differently.
 
-Changes in v9:
-- change #phy-cells to 1
+Thanks,
+Punit
 
-Changes in v8: None
-Changes in v7: None
-Changes in v6:
-- add assigned-clocks and assigned-clock-rates
-
-Changes in v5: None
-Changes in v4:
-- add a #phy-cells node
-
-Changes in v3:
-- use compatible: rockchip,rk3399-typec-phy
-- use dashes instead of underscores.
-
-Changes in v2:
-- add some registers description
-
-Changes in v1:
-- add extcon node description
-- move the registers in phy driver
-- remove the suffix of reset
-
- .../devicetree/bindings/phy/phy-rockchip-typec.txt | 101 +++++++++++++++++++++
- 1 file changed, 101 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-
-diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-new file mode 100644
-index 0000000..6ea867e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-@@ -0,0 +1,101 @@
-+* ROCKCHIP type-c PHY
-+---------------------
-+
-+Required properties:
-+ - compatible : must be "rockchip,rk3399-typec-phy"
-+ - reg: Address and length of the usb phy control register set
-+ - rockchip,grf : phandle to the syscon managing the "general
-+   register files"
-+ - clocks : phandle + clock specifier for the phy clocks
-+ - clock-names : string, clock name, must be "tcpdcore", "tcpdphy-ref";
-+ - assigned-clocks: main clock, should be <&cru SCLK_UPHY0_TCPDCORE> or
-+		    <&cru SCLK_UPHY1_TCPDCORE>;
-+ - assigned-clock-rates : the phy core clk frequency, shall be: 50000000
-+ - resets : a list of phandle + reset specifier pairs
-+ - reset-names : string reset name, must be:
-+		 "uphy", "uphy-pipe", "uphy-tcphy"
-+ - extcon : extcon specifier for the Power Delivery
-+
-+Note, there are 2 type-c phys for RK3399, and they are almost identical, except
-+these registers(description below), every register node contains 3 sections:
-+offset, enable bit, write mask bit.
-+ - rockchip,typec-conn-dir : the register of type-c connector direction,
-+   for type-c phy0, it must be <0xe580 0 16>;
-+   for type-c phy1, it must be <0xe58c 0 16>;
-+ - rockchip,usb3tousb2-en : the register of type-c force usb3 to usb2 enable
-+   control.
-+   for type-c phy0, it must be <0xe580 3 19>;
-+   for type-c phy1, it must be <0xe58c 3 19>;
-+ - rockchip,external-psm : the register of type-c phy external psm clock
-+   selection.
-+   for type-c phy0, it must be <0xe588 14 30>;
-+   for type-c phy1, it must be <0xe594 14 30>;
-+ - rockchip,pipe-status : the register of type-c phy pipe status.
-+   for type-c phy0, it must be <0xe5c0 0 0>;
-+   for type-c phy1, it must be <0xe5c0 16 16>;
-+
-+Required nodes : a sub-node is required for each port the phy provides.
-+		 The sub-node name is used to identify dp or usb3 port,
-+		 and shall be the following entries:
-+	* "dp-port" : the name of DP port.
-+	* "usb3-port" : the name of USB3 port.
-+
-+Required properties (port (child) node):
-+- #phy-cells : must be 0, See ./phy-bindings.txt for details.
-+
-+Example:
-+	tcphy0: phy at ff7c0000 {
-+		compatible = "rockchip,rk3399-typec-phy";
-+		reg = <0x0 0xff7c0000 0x0 0x40000>;
-+		rockchip,grf = <&grf>;
-+		extcon = <&fusb0>;
-+		clocks = <&cru SCLK_UPHY0_TCPDCORE>,
-+			 <&cru SCLK_UPHY0_TCPDPHY_REF>;
-+		clock-names = "tcpdcore", "tcpdphy-ref";
-+		assigned-clocks = <&cru SCLK_UPHY0_TCPDCORE>;
-+		assigned-clock-rates = <50000000>;
-+		resets = <&cru SRST_UPHY0>,
-+			 <&cru SRST_UPHY0_PIPE_L00>,
-+			 <&cru SRST_P_UPHY0_TCPHY>;
-+		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
-+		rockchip,typec-conn-dir = <0xe580 0 16>;
-+		rockchip,usb3tousb2-en = <0xe580 3 19>;
-+		rockchip,external-psm = <0xe588 14 30>;
-+		rockchip,pipe-status = <0xe5c0 0 0>;
-+
-+		tcphy0_dp: dp-port {
-+			#phy-cells = <0>;
-+		};
-+
-+		tcphy0_usb3: usb3-port {
-+			#phy-cells = <0>;
-+		};
-+	};
-+
-+	tcphy1: phy at ff800000 {
-+		compatible = "rockchip,rk3399-typec-phy";
-+		reg = <0x0 0xff800000 0x0 0x40000>;
-+		rockchip,grf = <&grf>;
-+		extcon = <&fusb1>;
-+		clocks = <&cru SCLK_UPHY1_TCPDCORE>,
-+			 <&cru SCLK_UPHY1_TCPDPHY_REF>;
-+		clock-names = "tcpdcore", "tcpdphy-ref";
-+		assigned-clocks = <&cru SCLK_UPHY1_TCPDCORE>;
-+		assigned-clock-rates = <50000000>;
-+		resets = <&cru SRST_UPHY1>,
-+			 <&cru SRST_UPHY1_PIPE_L00>,
-+			 <&cru SRST_P_UPHY1_TCPHY>;
-+		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
-+		rockchip,typec-conn-dir = <0xe58c 0 16>;
-+		rockchip,usb3tousb2-en = <0xe58c 3 19>;
-+		rockchip,external-psm = <0xe594 14 30>;
-+		rockchip,pipe-status = <0xe5c0 16 16>;
-+
-+		tcphy1_dp: dp-port {
-+			#phy-cells = <0>;
-+		};
-+
-+		tcphy1_usb3: usb3-port {
-+			#phy-cells = <0>;
-+		};
-+	};
--- 
-1.9.1
+>
+> -Christoffer
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
