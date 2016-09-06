@@ -1,274 +1,252 @@
-From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Tue, 6 Sep 2016 18:45:38 +0200
-Subject: [PATCH v4 6/9] pinctrl: Add IRQ support to STM32 gpios
-In-Reply-To: <1473180341-1999-1-git-send-email-alexandre.torgue@st.com>
-References: <1473180341-1999-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <1473180341-1999-7-git-send-email-alexandre.torgue@st.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 6 Sep 2016 18:49:26 +0200
+Subject: [PATCH v2 6/7] ARM: KVM: Get ready to use vgic-v3
+In-Reply-To: <57CEC0C7.6090603@arm.com>
+References: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
+ <1471344418-19568-7-git-send-email-vladimir.murzin@arm.com>
+ <20160905112920.GK26366@cbox> <57CEC0C7.6090603@arm.com>
+Message-ID: <20160906164926.GE23592@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds IRQ support to STM32 gpios.
+On Tue, Sep 06, 2016 at 02:12:39PM +0100, Vladimir Murzin wrote:
+> On 05/09/16 12:29, Christoffer Dall wrote:
+> > On Tue, Aug 16, 2016 at 11:46:57AM +0100, Vladimir Murzin wrote:
+> >> We need to take care we have everything vgic-v3 expects from us before
+> >> a quantum leap:
+> >> - provide required macros via uapi.h
+> >> - handle access to GICv3 cpu interface from the guest
+> >> - provide mapping between arm64 version of GICv3 cpu registers and arm's
+> >>
+> >> The later is handled via redirection of read{write}_gicreg() and
+> > 
+> > 'The latter'
+> > 
+> 
+> Fixed.
+> 
+> >> required mainly because 64-bit wide ICH_LR is split in two 32-bit
+> >> halves (ICH_LR and ICH_LRC) accessed independently.
+> >>
+> >> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> >> ---
+> >>  arch/arm/include/asm/arch_gicv3.h |   64 +++++++++++++++++++++++++++++++++++++
+> >>  arch/arm/include/asm/kvm_asm.h    |    3 ++
+> >>  arch/arm/include/uapi/asm/kvm.h   |    7 ++++
+> >>  arch/arm/kvm/coproc.c             |   36 +++++++++++++++++++++
+> >>  4 files changed, 110 insertions(+)
+> >>
+> >> diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
+> >> index af25c32..f93f6bd 100644
+> >> --- a/arch/arm/include/asm/arch_gicv3.h
+> >> +++ b/arch/arm/include/asm/arch_gicv3.h
+> >> @@ -96,6 +96,70 @@
+> >>  #define ICH_AP1R2			__AP1Rx(2)
+> >>  #define ICH_AP1R3			__AP1Rx(3)
+> >>  
+> >> +/* A32-to-A64 mappings used by VGIC save/restore */
+> >> +
+> >> +#define CPUIF_MAP(a32, a64)			\
+> >> +static inline void write_ ## a64(u32 val)	\
+> >> +{						\
+> >> +	write_sysreg(val, a32);			\
+> >> +}						\
+> >> +static inline u32 read_ ## a64(void)		\
+> >> +{						\
+> >> +	return read_sysreg(a32); 		\
+> >> +}						\
+> >> +
+> >> +#define CPUIF_MAP_LO_HI(a32lo, a32hi, a64)	\
+> >> +static inline void write_ ## a64(u64 val)	\
+> >> +{						\
+> >> +	write_sysreg((u32)val, a32lo);		\
+> >> +	write_sysreg((u32)(val >> 32), a32hi);	\
+> >> +}						\
+> >> +static inline u64 read_ ## a64(void)		\
+> >> +{						\
+> >> +	u64 val = read_sysreg(a32lo);		\
+> >> +						\
+> >> +	val |=	(u64)read_sysreg(a32hi) << 32;	\
+> >> +						\
+> >> +	return val; 				\
+> >> +}
+> > 
+> > I really don't like that we're defining new functions using a macro.
+> 
+> I can expand it manually if think it'd look better. I can also suggest
+> to prefix generated functions with underscore.
+> 
 
-The EXTI controller has 16 lines dedicated to GPIOs.
-EXTI line n can be connected to only line n of one of the GPIO ports, for
-example EXTI0 can be connected to either PA0, or PB0, or PC0...
-This port selection is done by specifying the port number into System
-Config registers.
+I understand the desire to avoid manually writing all these static
+functions.
 
-Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+> > 
+> > Why can't you just do whatever series of actions and/or type
+> > conversions using familiar tricks such as 'do { foo; } while (0);'
+> > and so on ?
+> 
+> Probably, because I don't how to apply these tricks here to keep
+> virt/kvm/arm/hyp/vgic-v3-sr.c unchanged. If you have something
+> particular in mind, please, suggest!
+> 
 
-diff --git a/drivers/pinctrl/stm32/Kconfig b/drivers/pinctrl/stm32/Kconfig
-index 4c40dae..40d5abc 100644
---- a/drivers/pinctrl/stm32/Kconfig
-+++ b/drivers/pinctrl/stm32/Kconfig
-@@ -6,6 +6,8 @@ config PINCTRL_STM32
- 	select PINMUX
- 	select GENERIC_PINCONF
- 	select GPIOLIB
-+	select GPIOLIB_IRQCHIP
-+	select MFD_SYSCON
- 
- config PINCTRL_STM32F429
- 	bool "STMicroelectronics STM32F429 pin control" if COMPILE_TEST && !MACH_STM32F429
-diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.c b/drivers/pinctrl/stm32/pinctrl-stm32.c
-index 4ae596b..9154bca 100644
---- a/drivers/pinctrl/stm32/pinctrl-stm32.c
-+++ b/drivers/pinctrl/stm32/pinctrl-stm32.c
-@@ -8,6 +8,8 @@
- #include <linux/clk.h>
- #include <linux/gpio/driver.h>
- #include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-@@ -20,6 +22,7 @@
- #include <linux/pinctrl/pinctrl.h>
- #include <linux/pinctrl/pinmux.h>
- #include <linux/platform_device.h>
-+#include <linux/regmap.h>
- #include <linux/reset.h>
- #include <linux/slab.h>
- 
-@@ -40,6 +43,7 @@
- #define STM32_GPIO_AFRH		0x24
- 
- #define STM32_GPIO_PINS_PER_BANK 16
-+#define STM32_GPIO_IRQ_LINE	 16
- 
- #define gpio_range_to_bank(chip) \
- 		container_of(chip, struct stm32_gpio_bank, range)
-@@ -65,6 +69,7 @@ struct stm32_gpio_bank {
- 	spinlock_t lock;
- 	struct gpio_chip gpio_chip;
- 	struct pinctrl_gpio_range range;
-+	struct fwnode_handle *fwnode;
- };
- 
- struct stm32_pinctrl {
-@@ -77,6 +82,9 @@ struct stm32_pinctrl {
- 	struct stm32_gpio_bank *banks;
- 	unsigned nbanks;
- 	const struct stm32_pinctrl_match_data *match_data;
-+	struct irq_domain	*domain;
-+	struct regmap		*regmap;
-+	struct regmap_field	*irqmux[STM32_GPIO_PINS_PER_BANK];
- };
- 
- static inline int stm32_gpio_pin(int gpio)
-@@ -174,6 +182,20 @@ static int stm32_gpio_direction_output(struct gpio_chip *chip,
- 	return 0;
- }
- 
-+
-+static int stm32_gpio_to_irq(struct gpio_chip *chip, unsigned int offset)
-+{
-+	struct stm32_gpio_bank *bank = gpiochip_get_data(chip);
-+	struct irq_fwspec fwspec;
-+
-+	fwspec.fwnode = bank->fwnode;
-+	fwspec.param_count = 2;
-+	fwspec.param[0] = offset;
-+	fwspec.param[1] = IRQ_TYPE_NONE;
-+
-+	return irq_create_fwspec_mapping(&fwspec);
-+}
-+
- static struct gpio_chip stm32_gpio_template = {
- 	.request		= stm32_gpio_request,
- 	.free			= stm32_gpio_free,
-@@ -181,10 +203,92 @@ static struct gpio_chip stm32_gpio_template = {
- 	.set			= stm32_gpio_set,
- 	.direction_input	= stm32_gpio_direction_input,
- 	.direction_output	= stm32_gpio_direction_output,
-+	.to_irq			= stm32_gpio_to_irq,
- };
- 
--/* Pinctrl functions */
-+static struct irq_chip stm32_gpio_irq_chip = {
-+	.name           = "stm32gpio",
-+	.irq_eoi	= irq_chip_eoi_parent,
-+	.irq_mask       = irq_chip_mask_parent,
-+	.irq_unmask     = irq_chip_unmask_parent,
-+	.irq_set_type   = irq_chip_set_type_parent,
-+};
-+
-+static int stm32_gpio_domain_translate(struct irq_domain *d,
-+				       struct irq_fwspec *fwspec,
-+				       unsigned long *hwirq,
-+				       unsigned int *type)
-+{
-+	if ((fwspec->param_count != 2) ||
-+	    (fwspec->param[0] >= STM32_GPIO_IRQ_LINE))
-+		return -EINVAL;
-+
-+	*hwirq = fwspec->param[0];
-+	*type = fwspec->param[1];
-+	return 0;
-+}
- 
-+static void stm32_gpio_domain_activate(struct irq_domain *d,
-+				       struct irq_data *irq_data)
-+{
-+	struct stm32_gpio_bank *bank = d->host_data;
-+	struct stm32_pinctrl *pctl = dev_get_drvdata(bank->gpio_chip.parent);
-+
-+	regmap_field_write(pctl->irqmux[irq_data->hwirq], bank->range.id);
-+}
-+
-+static int stm32_gpio_domain_alloc(struct irq_domain *d,
-+				   unsigned int virq,
-+				   unsigned int nr_irqs, void *data)
-+{
-+	struct stm32_gpio_bank *bank = d->host_data;
-+	struct stm32_pinctrl *pctl = dev_get_drvdata(bank->gpio_chip.parent);
-+	struct irq_fwspec *fwspec = data;
-+	struct irq_fwspec parent_fwspec;
-+	irq_hw_number_t hwirq;
-+	int ret;
-+
-+	hwirq = fwspec->param[0];
-+	parent_fwspec.fwnode = d->parent->fwnode;
-+	parent_fwspec.param_count = 2;
-+	parent_fwspec.param[0] = fwspec->param[0];
-+	parent_fwspec.param[1] = fwspec->param[1];
-+
-+	irq_domain_set_hwirq_and_chip(d, virq, hwirq, &stm32_gpio_irq_chip,
-+				      bank);
-+
-+	ret = gpiochip_lock_as_irq(&bank->gpio_chip, hwirq);
-+	if (ret) {
-+		dev_err(pctl->dev, "Unable to configure STM32 %s%ld as IRQ\n",
-+			bank->gpio_chip.label, hwirq);
-+		return ret;
-+	}
-+
-+	ret = irq_domain_alloc_irqs_parent(d, virq, nr_irqs, &parent_fwspec);
-+	if (ret)
-+		gpiochip_unlock_as_irq(&bank->gpio_chip, hwirq);
-+
-+	return ret;
-+}
-+
-+static void stm32_gpio_domain_free(struct irq_domain *d, unsigned int virq,
-+				   unsigned int nr_irqs)
-+{
-+	struct stm32_gpio_bank *bank = d->host_data;
-+	struct irq_data *data = irq_get_irq_data(virq);
-+
-+	irq_domain_free_irqs_common(d, virq, nr_irqs);
-+	gpiochip_unlock_as_irq(&bank->gpio_chip, data->hwirq);
-+}
-+
-+static const struct irq_domain_ops stm32_gpio_domain_ops = {
-+	.translate      = stm32_gpio_domain_translate,
-+	.alloc          = stm32_gpio_domain_alloc,
-+	.free           = stm32_gpio_domain_free,
-+	.activate	= stm32_gpio_domain_activate,
-+};
-+
-+/* Pinctrl functions */
- static struct stm32_pinctrl_group *
- stm32_pctrl_find_group_by_pin(struct stm32_pinctrl *pctl, u32 pin)
- {
-@@ -857,6 +961,17 @@ static int stm32_gpiolib_register_bank(struct stm32_pinctrl *pctl,
- 	range->pin_base = range->base = range->id * STM32_GPIO_PINS_PER_BANK;
- 	range->npins = bank->gpio_chip.ngpio;
- 	range->gc = &bank->gpio_chip;
-+
-+	/* create irq hierarchical domain */
-+	bank->fwnode = of_node_to_fwnode(np);
-+
-+	bank->gpio_chip.irqdomain = irq_domain_create_hierarchy(pctl->domain,
-+					0, STM32_GPIO_IRQ_LINE, bank->fwnode,
-+					&stm32_gpio_domain_ops, bank);
-+
-+	if (!bank->gpio_chip.irqdomain)
-+		return -ENODEV;
-+
- 	err = gpiochip_add_data(&bank->gpio_chip, bank);
- 	if (err) {
- 		dev_err(dev, "Failed to add gpiochip(%d)!\n", bank_nr);
-@@ -867,6 +982,47 @@ static int stm32_gpiolib_register_bank(struct stm32_pinctrl *pctl,
- 	return 0;
- }
- 
-+static int stm32_pctrl_dt_setup_irq(struct platform_device *pdev,
-+			   struct stm32_pinctrl *pctl)
-+{
-+	struct device_node *np = pdev->dev.of_node, *parent;
-+	struct device *dev = &pdev->dev;
-+	struct regmap *rm;
-+	int offset, ret, i;
-+
-+	parent = of_irq_find_parent(np);
-+	if (!parent)
-+		return -ENXIO;
-+
-+	pctl->domain = irq_find_host(parent);
-+	if (!pctl->domain)
-+		return -ENXIO;
-+
-+	pctl->regmap = syscon_regmap_lookup_by_phandle(np, "st,syscfg");
-+	if (IS_ERR(pctl->regmap))
-+		return PTR_ERR(pctl->regmap);
-+
-+	rm = pctl->regmap;
-+
-+	ret = of_property_read_u32_index(np, "st,syscfg", 1, &offset);
-+	if (ret)
-+		return ret;
-+
-+	for (i = 0; i < STM32_GPIO_PINS_PER_BANK; i++) {
-+		struct reg_field mux;
-+
-+		mux.reg = offset + (i / 4) * 4;
-+		mux.lsb = (i % 4) * 4;
-+		mux.msb = mux.lsb + 3;
-+
-+		pctl->irqmux[i] = devm_regmap_field_alloc(dev, rm, mux);
-+		if (IS_ERR(pctl->irqmux[i]))
-+			return PTR_ERR(pctl->irqmux[i]);
-+	}
-+
-+	return 0;
-+}
-+
- static int stm32_pctrl_build_state(struct platform_device *pdev)
- {
- 	struct stm32_pinctrl *pctl = platform_get_drvdata(pdev);
-@@ -935,6 +1091,10 @@ int stm32_pctl_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
-+	ret = stm32_pctrl_dt_setup_irq(pdev, pctl);
-+	if (ret)
-+		return ret;
-+
- 	for_each_child_of_node(np, child)
- 		if (of_property_read_bool(child, "gpio-controller"))
- 			banks++;
--- 
-1.9.1
+Hmmm, no I see now what you're doing, by defining all those static
+inlines, you're effectively creating a mapping with a function for each
+register mapping the 32-bit to the 64-bit accessors.
+
+I guess this makes sense and that is probably why you call this _MAP.
+
+I wish there were a good/better/cleaner way to do this, but I can live
+with it.
+
+Thanks,
+-Christoffer
+
+
+> > 
+> >> +
+> >> +CPUIF_MAP(ICH_HCR, ICH_HCR_EL2)
+> >> +CPUIF_MAP(ICH_VTR, ICH_VTR_EL2)
+> >> +CPUIF_MAP(ICH_MISR, ICH_MISR_EL2)
+> >> +CPUIF_MAP(ICH_EISR, ICH_EISR_EL2)
+> >> +CPUIF_MAP(ICH_ELSR, ICH_ELSR_EL2)
+> >> +CPUIF_MAP(ICH_VMCR, ICH_VMCR_EL2)
+> >> +CPUIF_MAP(ICH_AP0R3, ICH_AP0R3_EL2)
+> >> +CPUIF_MAP(ICH_AP0R2, ICH_AP0R2_EL2)
+> >> +CPUIF_MAP(ICH_AP0R1, ICH_AP0R1_EL2)
+> >> +CPUIF_MAP(ICH_AP0R0, ICH_AP0R0_EL2)
+> >> +CPUIF_MAP(ICH_AP1R3, ICH_AP1R3_EL2)
+> >> +CPUIF_MAP(ICH_AP1R2, ICH_AP1R2_EL2)
+> >> +CPUIF_MAP(ICH_AP1R1, ICH_AP1R1_EL2)
+> >> +CPUIF_MAP(ICH_AP1R0, ICH_AP1R0_EL2)
+> >> +CPUIF_MAP(ICC_HSRE, ICC_SRE_EL2)
+> >> +CPUIF_MAP(ICC_SRE, ICC_SRE_EL1)
+> >> +
+> >> +CPUIF_MAP_LO_HI(ICH_LR15, ICH_LRC15, ICH_LR15_EL2)
+> >> +CPUIF_MAP_LO_HI(ICH_LR14, ICH_LRC14, ICH_LR14_EL2)
+> >> +CPUIF_MAP_LO_HI(ICH_LR13, ICH_LRC13, ICH_LR13_EL2)
+> >> +CPUIF_MAP_LO_HI(ICH_LR12, ICH_LRC12, ICH_LR12_EL2)
+> >> +CPUIF_MAP_LO_HI(ICH_LR11, ICH_LRC11, ICH_LR11_EL2)
+> >> +CPUIF_MAP_LO_HI(ICH_LR10, ICH_LRC10, ICH_LR10_EL2)
+> >> +CPUIF_MAP_LO_HI(ICH_LR9, ICH_LRC9, ICH_LR9_EL2)
+> >> +CPUIF_MAP_LO_HI(ICH_LR8, ICH_LRC8, ICH_LR8_EL2)
+> >> +CPUIF_MAP_LO_HI(ICH_LR7, ICH_LRC7, ICH_LR7_EL2)
+> >> +CPUIF_MAP_LO_HI(ICH_LR6, ICH_LRC6, ICH_LR6_EL2)
+> >> +CPUIF_MAP_LO_HI(ICH_LR5, ICH_LRC5, ICH_LR5_EL2)
+> >> +CPUIF_MAP_LO_HI(ICH_LR4, ICH_LRC4, ICH_LR4_EL2)
+> >> +CPUIF_MAP_LO_HI(ICH_LR3, ICH_LRC3, ICH_LR3_EL2)
+> >> +CPUIF_MAP_LO_HI(ICH_LR2, ICH_LRC2, ICH_LR2_EL2)
+> >> +CPUIF_MAP_LO_HI(ICH_LR1, ICH_LRC1, ICH_LR1_EL2)
+> >> +CPUIF_MAP_LO_HI(ICH_LR0, ICH_LRC0, ICH_LR0_EL2)
+> >> +
+> >> +#define read_gicreg(r)                 read_##r()
+> >> +#define write_gicreg(v, r)             write_##r(v)
+> >> +
+> >>  /* Low-level accessors */
+> >>  
+> >>  static inline void gic_write_eoir(u32 irq)
+> >> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+> >> index 58faff5..dfccf94 100644
+> >> --- a/arch/arm/include/asm/kvm_asm.h
+> >> +++ b/arch/arm/include/asm/kvm_asm.h
+> >> @@ -68,6 +68,9 @@ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+> >>  extern void __init_stage2_translation(void);
+> >>  
+> >>  extern void __kvm_hyp_reset(unsigned long);
+> >> +
+> >> +extern u64 __vgic_v3_get_ich_vtr_el2(void);
+> >> +extern void __vgic_v3_init_lrs(void);
+> >>  #endif
+> >>  
+> >>  #endif /* __ARM_KVM_ASM_H__ */
+> >> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+> >> index a2b3eb3..b38c10c 100644
+> >> --- a/arch/arm/include/uapi/asm/kvm.h
+> >> +++ b/arch/arm/include/uapi/asm/kvm.h
+> >> @@ -84,6 +84,13 @@ struct kvm_regs {
+> >>  #define KVM_VGIC_V2_DIST_SIZE		0x1000
+> >>  #define KVM_VGIC_V2_CPU_SIZE		0x2000
+> >>  
+> >> +/* Supported VGICv3 address types  */
+> >> +#define KVM_VGIC_V3_ADDR_TYPE_DIST	2
+> >> +#define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
+> >> +
+> >> +#define KVM_VGIC_V3_DIST_SIZE		SZ_64K
+> >> +#define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
+> >> +
+> >>  #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+> >>  #define KVM_ARM_VCPU_PSCI_0_2		1 /* CPU uses PSCI v0.2 */
+> >>  
+> >> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+> >> index 1bb2b79..10c0244 100644
+> >> --- a/arch/arm/kvm/coproc.c
+> >> +++ b/arch/arm/kvm/coproc.c
+> >> @@ -228,6 +228,36 @@ bool access_vm_reg(struct kvm_vcpu *vcpu,
+> >>  	return true;
+> >>  }
+> >>  
+> >> +static bool access_gic_sgi(struct kvm_vcpu *vcpu,
+> >> +			   const struct coproc_params *p,
+> >> +			   const struct coproc_reg *r)
+> >> +{
+> >> +	u64 reg;
+> >> +
+> >> +	if (!p->is_write)
+> >> +		return read_from_write_only(vcpu, p);
+> >> +
+> >> +	reg = *vcpu_reg(vcpu, p->Rt2);
+> >> +	reg <<= 32;
+> >> +	reg |= *vcpu_reg(vcpu, p->Rt1) ;
+> >> +
+> >> +	vgic_v3_dispatch_sgi(vcpu, reg);
+> >> +
+> >> +	return true;
+> >> +}
+> >> +
+> >> +static bool access_gic_sre(struct kvm_vcpu *vcpu,
+> >> +			   const struct coproc_params *p,
+> >> +			   const struct coproc_reg *r)
+> >> +{
+> >> +	if (p->is_write)
+> >> +		return ignore_write(vcpu, p);
+> >> +
+> >> +	*vcpu_reg(vcpu, p->Rt1) = vcpu->arch.vgic_cpu.vgic_v3.vgic_sre;
+> >> +
+> >> +	return true;
+> >> +}
+> >> +
+> >>  /*
+> >>   * We could trap ID_DFR0 and tell the guest we don't support performance
+> >>   * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
+> >> @@ -361,10 +391,16 @@ static const struct coproc_reg cp15_regs[] = {
+> >>  	{ CRn(10), CRm( 3), Op1( 0), Op2( 1), is32,
+> >>  			access_vm_reg, reset_unknown, c10_AMAIR1},
+> >>  
+> >> +	/* ICC_SGI1R */
+> >> +	{ CRm64(12), Op1( 0), is64, access_gic_sgi},
+> >> +
+> >>  	/* VBAR: swapped by interrupt.S. */
+> >>  	{ CRn(12), CRm( 0), Op1( 0), Op2( 0), is32,
+> >>  			NULL, reset_val, c12_VBAR, 0x00000000 },
+> >>  
+> >> +	/* ICC_SRE */
+> >> +	{ CRn(12), CRm(12), Op1( 0), Op2(5), is32, access_gic_sre },
+> >> +
+> >>  	/* CONTEXTIDR/TPIDRURW/TPIDRURO/TPIDRPRW: swapped by interrupt.S. */
+> >>  	{ CRn(13), CRm( 0), Op1( 0), Op2( 1), is32,
+> >>  			access_vm_reg, reset_val, c13_CID, 0x00000000 },
+> >> -- 
+> >> 1.7.9.5
+> >>
+> > 
+> > Otherwise this looks correct.
+> 
+> Thanks
+> Vladimir
+> 
+> > 
+> > Thanks,
+> > -Christoffer
+> > 
+> > 
+> 
