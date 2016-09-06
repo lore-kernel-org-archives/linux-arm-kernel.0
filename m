@@ -1,32 +1,50 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue, 6 Sep 2016 10:48:19 -0700
-Subject: [PATCH v3 10/22] usb: chipidea: Consolidate extcon notifiers
-In-Reply-To: <20160905023935.GA24593@b29397-desktop>
-References: <20160901004036.23936-1-stephen.boyd@linaro.org>
- <20160901004036.23936-11-stephen.boyd@linaro.org>
- <20160902031704.GC16876@shlinux2>
- <CAJOFmgwcc95R8n9DGw0Er4icCMnd=Ku-J0Q7cMEOK212oUs62g@mail.gmail.com>
- <20160905023935.GA24593@b29397-desktop>
-Message-ID: <CAJOFmgxWPU1-ugB8+Nr1KDBz0xX1-WaeYVCj6hxEq9UU14Y4Hg@mail.gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 6 Sep 2016 19:49:49 +0200
+Subject: [RFC PATCH V5 3/5] PCI: Check platform specific ECAM quirks
+In-Reply-To: <20160905022529.GD30488@localhost>
+References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
+ <1470661541-26270-4-git-send-email-tn@semihalf.com>
+ <20160905022529.GD30488@localhost>
+Message-ID: <34416dae-31e6-93b6-2ba8-f42ba61ede4f@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 4, 2016 at 7:39 PM, Peter Chen <hzpeterchen@gmail.com> wrote:
-> On Fri, Sep 02, 2016 at 06:03:06PM -0700, Stephen Boyd wrote:
->> On Thu, Sep 1, 2016 at 8:17 PM, Peter Chen <hzpeterchen@gmail.com> wrote:
->> > On Wed, Aug 31, 2016 at 05:40:24PM -0700, Stephen Boyd wrote:
->> >>
->> >>
->> >>               if (cable->state)
->> >> -                     val |= OTGSC_ID;
->> >> +                     val &= ~OTGSC_ID; /* A device */
->> >>               else
->> >> -                     val &= ~OTGSC_ID;
->> >> +                     val |= OTGSC_ID; /* B device */
+On 05.09.2016 04:25, Bjorn Helgaas wrote:
+> On Mon, Aug 08, 2016 at 03:05:39PM +0200, Tomasz Nowicki wrote:
+>> Some platforms may not be fully compliant with generic set of PCI config
+>> accessors. For these cases we implement the way to overwrite accessors
+>> set. Algorithm traverses available quirk list (static array),
+>> matches against <oem_id, oem_table_id, rev, domain, bus number range> and
+>> returns pci_config_window structure with fancy PCI config ops.
+>> oem_id, oem_table_id and rev come from MCFG table standard header.
+>>
+>> It is possible to define custom init call which is responsible for
+>> setting up PCI configuration access accordingly to quirk requirements.
+>> If custom init call is not defined, use standard pci_acpi_setup_ecam_mapping().
+>>
+>> pci_generic_ecam_ops will be used for platforms free from quirks.
+>>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> Signed-off-by: Dongdong Liu <liudongdong3@huawei.com>
+>> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+>> ---
+>>  drivers/pci/host/Makefile      |  1 +
+>>  drivers/pci/host/mcfg-quirks.c | 86 ++++++++++++++++++++++++++++++++++++++++++
+>>  drivers/pci/host/mcfg-quirks.h | 20 ++++++++++
+>>  include/linux/pci-acpi.h       |  2 +
+>>  4 files changed, 109 insertions(+)
+>>  create mode 100644 drivers/pci/host/mcfg-quirks.c
+>>  create mode 100644 drivers/pci/host/mcfg-quirks.h
 >
-> One more comment, would you change the comment to "host" and "device"?
-> Unless we are supporting OTG-compliance device, otherwise, we should
-> not mention "A" or "B" for USB device.
->
+> If the object is to work around defects in the ACPI MCFG table, I
+> think I'd put the quirks closer to drivers/acpi/pci_mcfg.c, where we
+> parse that table.  What if we actually put them directly *in*
+> drivers/acpi/pci_mcfg.c?
 
-Done
+Then we need to export quirk init calls or ecam ops from 
+drivers/pci/host/* directory.
+
+Currently we keep mcfg quirk handling code and related drivers in one 
+place drivers/pci/host/
+
+Tomasz
