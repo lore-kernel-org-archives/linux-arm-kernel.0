@@ -1,28 +1,61 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Sep 2016 15:24:42 +0100
-Subject: [PATCH] ARM: mmp: replace NO_IRQ
-In-Reply-To: <20160906140808.2883875-1-arnd@arndb.de>
-References: <20160906140808.2883875-1-arnd@arndb.de>
-Message-ID: <20160906142442.GY1041@n2100.armlinux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 6 Sep 2016 16:33:17 +0200
+Subject: [PATCH 4/7] drm/panel: Add Sinlinx SinA33 7" panel
+In-Reply-To: <20160906091224.GC15644@ulmo.ba.sec>
+References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
+ <20160901153204.11217-5-maxime.ripard@free-electrons.com>
+ <66681473008583@web28j.yandex.ru> <20160905200248.GB8596@lukather>
+ <20160906091224.GC15644@ulmo.ba.sec>
+Message-ID: <20160906143317.GG9040@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2016 at 04:07:56PM +0200, Arnd Bergmann wrote:
-> The mmp platform has its own definitions with the old NO_IRQ meaning,
-> but compares against the global NO_IRQ macro that we should have
-> removed long ago.
+On Tue, Sep 06, 2016 at 11:12:24AM +0200, Thierry Reding wrote:
+> On Mon, Sep 05, 2016 at 10:02:48PM +0200, Maxime Ripard wrote:
+> > Hi,
+> > 
+> > On Mon, Sep 05, 2016 at 01:03:03AM +0800, Icenowy Zheng wrote:
+> > > Hi Everyone,
+> > > 
+> > > 01.09.2016, 23:40, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> > > > ?The SinA33 has an unidentified panel. Add the timings for it under a new
+> > > > ?compatible.
+> > > 
+> > > 
+> > > 
+> > > Excuse me...
+> > > I will ask a question which is not fully related to the patch here...
+> > > If I want to add a generic panel for Q8 tablets, what should it be called?
+> > > "allwinner,q8-lcd-panel-800x480"?
+> > 
+> > I guess it's more of a question for Thierry, but it seems like the
+> > trend is to put the diagonal rather than the resolution in the
+> > compatibles.
 > 
-> The specific usage in arch/arm/mach-mmp/devices.c is awkward, but
-> fixing it properly would require a larger scale rewrite of the entire
-> file, or even using devicetree for all machines. As I'm not able to
-> do that any time soon, let's make the current behavior more explit
-> instead and avoid the literal use of NO_IRQ.
+> Compatible strings should contain the model number of the panel. There
+> is no such thing as a "generic panel for Q8 tablets".
+> 
+> Also, how is it that these panels are unidentified? Has nobody tried to
+> open them up and look at the panel to find a model number?
 
-So this probably continues to be a problem, but we hide it from the
-NO_IRQ brigade.  I think it would be better to leave it as-is until
-it can be fixed up correctly, rather than trying to hide it.
+It is not always possible without breaking the device apart. And I can
+understand not a lot of people want to do that.
+
+But on that particular patch, I had a bunch of spare ones, and ended
+up doing just that. The reference is from an unknown brand, but at
+least the part number shows up on Google, I'll use that.
+
+Maxime
+
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160906/dcec7aca/attachment.sig>
