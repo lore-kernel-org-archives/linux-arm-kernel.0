@@ -1,48 +1,119 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 6 Sep 2016 17:34:34 +0100
-Subject: [PATCH 4/5] arm64: Handle TRAP_BRKPT for user mode as well
-In-Reply-To: <9737ec351e2f9f2e7472d8d7133568f7915f20aa.1470114993.git.panand@redhat.com>
-References: <cover.1470114993.git.panand@redhat.com>
- <9737ec351e2f9f2e7472d8d7133568f7915f20aa.1470114993.git.panand@redhat.com>
-Message-ID: <20160906163434.GH19605@e104818-lin.cambridge.arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue,  6 Sep 2016 10:37:12 -0600
+Subject: [RESEND][PATCH V7 0/5] perf: Driver specific configuration for PMU
+Message-ID: <1473179837-3293-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 02, 2016 at 11:00:08AM +0530, Pratyush Anand wrote:
-> --- a/arch/arm64/kernel/debug-monitors.c
-> +++ b/arch/arm64/kernel/debug-monitors.c
-> @@ -326,16 +326,20 @@ NOKPROBE_SYMBOL(call_break_hook);
->  static int brk_handler(unsigned long addr, unsigned int esr,
->  		       struct pt_regs *regs)
->  {
-> -	if (user_mode(regs)) {
-> -		send_user_sigtrap(TRAP_BRKPT);
-> -	}
-> +	bool handler_found = false;
-> +
->  #ifdef	CONFIG_KPROBES
-> -	else if ((esr & BRK64_ESR_MASK) == BRK64_ESR_KPROBES) {
-> -		if (kprobe_breakpoint_handler(regs, esr) != DBG_HOOK_HANDLED)
-> -			return -EFAULT;
-> +	if ((esr & BRK64_ESR_MASK) == BRK64_ESR_KPROBES) {
-> +		if (kprobe_breakpoint_handler(regs, esr) == DBG_HOOK_HANDLED)
-> +			handler_found = true;
->  	}
->  #endif
-> -	else if (call_break_hook(regs, esr) != DBG_HOOK_HANDLED) {
-> +	if (!handler_found && call_break_hook(regs, esr) == DBG_HOOK_HANDLED)
-> +		handler_found = true;
-> +
-> +	if (!handler_found && user_mode(regs)) {
-> +		send_user_sigtrap(TRAP_BRKPT);
-> +	} else if (!handler_found) {
->  		pr_warn("Unexpected kernel BRK exception at EL1\n");
->  		return -EFAULT;
->  	}
+Original blurb:
+---------------
 
-I think we could do the same here with a single call_break_hook() and
-making sure that the corresponding handlers check the esr for the
-corresponding BRK encoding.
+This patchset adds the possiblity of specifying PMU driver configuration
+directly from the perf command line.  Anything that falls within the
+event specifiers '/.../' and that is preceded by the '@' symbol is
+treated as a configurable.  Two formats are supported, @cfg and
+@cfg=config.
+
+For example:
+
+perf record -e some_event/@cfg1/ ...
+
+or
+
+perf record -e some_event/@cfg2=config/ ...
+
+or
+
+perf record -e some_event/@cfg1, at cfg2=config/ ...
+
+The above are all valid configuration and will see the strings 'cfg1'
+and 'cfg2=config' sent to the PMU driver for parsing and interpretation
+using the existing ioctl() mechanism.
+
+The primary customers for this feature are the CoreSight drivers where
+the selection of a sink (where trace data is accumulated) needs to be
+done in a previous, and separated step, from the launching of the perf
+command.
+
+As such something that used to be a two-step process:
+
+# echo 1 > /sys/bus/coresight/devices/20070000.etr/enable_sink
+# perf record -e cs_etm//u --per-thread  uname
+
+is integrated in a single command:
+
+# perf record -e cs_etm/@20070000.etr/u --per-thread  uname
+
+Thanks,
+Mathieu
+
+Changes for V7:
+- Got rid of a miscellaneous debug message.
+- Rebased to v4.8-rc4
+- Added Jiri Olsa's Acked-by.
+
+Changes for V6:
+- Using sysFS rather than an ioctl() to communicate command line
+  parameters to the CoreSight PMU.
+
+Changes for V5:
+- Made commit log in 5/9 more descriptive.
+- Addressed missing return code in builtin-top.c.
+- Overhauled the kernel portion to do parsing in the core.
+
+Changes for V4:
+- Pushing PMU driver configuration for 'perf top'.
+- Rebased to the latest perf/core branch[1]. 
+
+Changes for V3:
+- Added comment for function drv_str() that explains the reason for
+  keeping the entire token intact.
+- Added driver config terms to the existing list of config terms.
+- Added documenation for driver specific configuration.
+- Pushing PMU driver configuration for 'perf stat' as well.  
+- Preventing users from selecting a sink from sysFS _and_ perf.
+
+Changes for V2:
+- Rebased to [1] as per Jiri's request.
+
+
+Mathieu Poirier (5):
+  perf tools: making coresight PMU listable
+  perf tools: adding coresight etm PMU record capabilities
+  perf tools: add infrastructure for PMU specific configuration
+  perf tools: Pushing configuration down to PMU driver
+  perf tools: adding sink configuration for cs_etm PMU
+
+ MAINTAINERS                              |   5 +
+ tools/perf/Documentation/perf-record.txt |  12 +
+ tools/perf/Makefile.config               |  11 +-
+ tools/perf/arch/arm/util/Build           |   2 +
+ tools/perf/arch/arm/util/auxtrace.c      |  54 +++
+ tools/perf/arch/arm/util/cs-etm.c        | 615 +++++++++++++++++++++++++++++++
+ tools/perf/arch/arm/util/cs-etm.h        |  26 ++
+ tools/perf/arch/arm/util/pmu.c           |  37 ++
+ tools/perf/arch/arm64/util/Build         |   4 +
+ tools/perf/builtin-record.c              |   9 +
+ tools/perf/builtin-stat.c                |   8 +
+ tools/perf/builtin-top.c                 |  12 +
+ tools/perf/util/auxtrace.c               |   1 +
+ tools/perf/util/auxtrace.h               |   1 +
+ tools/perf/util/cs-etm.h                 |  74 ++++
+ tools/perf/util/evlist.c                 |  18 +
+ tools/perf/util/evlist.h                 |   3 +
+ tools/perf/util/evsel.c                  |  40 ++
+ tools/perf/util/evsel.h                  |   4 +
+ tools/perf/util/parse-events.c           |   7 +-
+ tools/perf/util/parse-events.h           |   1 +
+ tools/perf/util/parse-events.l           |  22 ++
+ tools/perf/util/parse-events.y           |  11 +
+ tools/perf/util/pmu.h                    |   2 +
+ 24 files changed, 974 insertions(+), 5 deletions(-)
+ create mode 100644 tools/perf/arch/arm/util/auxtrace.c
+ create mode 100644 tools/perf/arch/arm/util/cs-etm.c
+ create mode 100644 tools/perf/arch/arm/util/cs-etm.h
+ create mode 100644 tools/perf/arch/arm/util/pmu.c
+ create mode 100644 tools/perf/util/cs-etm.h
 
 -- 
-Catalin
+2.7.4
