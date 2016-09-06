@@ -1,100 +1,32 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 6 Sep 2016 13:29:09 +0200
-Subject: [PATCH V10 7/8] irqchip/gicv3-its: Factor out PCI-MSI part that
- might be reused for ACPI
-In-Reply-To: <292d1dd1-0084-d796-b852-6cad2099eb66@semihalf.com>
-References: <1473152938-17388-1-git-send-email-tn@semihalf.com>
- <1473152938-17388-8-git-send-email-tn@semihalf.com>
- <alpine.DEB.2.20.1609061149090.5647@nanos>
- <292d1dd1-0084-d796-b852-6cad2099eb66@semihalf.com>
-Message-ID: <CAJZ5v0iYc=1CN546MaabJdoNBUW8JbeD_qt8hSSDBPLJnB8Hug@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 06 Sep 2016 13:30:12 +0200
+Subject: [PATCH] ARM: dts: exynos: Add entries for sound support on
+ Odroid-XU board
+In-Reply-To: <05c45777-732b-3701-36dc-2448003acd50@samsung.com>
+References: <1471883654-2113-1-git-send-email-s.nawrocki@samsung.com>
+ <05c45777-732b-3701-36dc-2448003acd50@samsung.com>
+Message-ID: <bc8544f0-6a28-532f-cfdb-7ca28270b662@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 6, 2016 at 12:22 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
-> Hi Thomas,
->
->
-> On 06.09.2016 11:50, Thomas Gleixner wrote:
->>
->> On Tue, 6 Sep 2016, Tomasz Nowicki wrote:
->>>
->>> -static int __init its_pci_msi_init(void)
->>> +static int __init its_pci_msi_init_one(struct fwnode_handle *handle,
->>> +                                      const char *name)
->>>  {
->>> -       struct device_node *np;
->>>         struct irq_domain *parent;
->>>
->>> +       parent = irq_find_matching_fwnode(handle, DOMAIN_BUS_NEXUS);
->>> +       if (!parent || !msi_get_domain_info(parent)) {
->>> +               pr_err("%s: Unable to locate ITS domain\n", name);
->>> +               return -ENXIO;
->>> +       }
->>> +
->>> +       if (!pci_msi_create_irq_domain(handle, &its_pci_msi_domain_info,
->>> +                                      parent)) {
->>> +               pr_err("%s: Unable to create PCI domain\n", name);
->>> +               return -ENOMEM;
->>
->>
->> So you have error codes here.
->>
->>> +       }
->>> +
->>> +       return 0;
->>> +}
->>> +
->>> +static int __init its_pci_of_msi_init(void)
->>> +{
->>> +       struct device_node *np;
->>> +
->>>         for (np = of_find_matching_node(NULL, its_device_id); np;
->>>              np = of_find_matching_node(np, its_device_id)) {
->>>                 if (!of_property_read_bool(np, "msi-controller"))
->>>                         continue;
->>>
->>> -               parent = irq_find_matching_host(np, DOMAIN_BUS_NEXUS);
->>> -               if (!parent || !msi_get_domain_info(parent)) {
->>> -                       pr_err("%s: unable to locate ITS domain\n",
->>> -                              np->full_name);
->>> +               if (its_pci_msi_init_one(of_node_to_fwnode(np),
->>> np->full_name))
->>>                         continue;
->>> -               }
->>> -
->>> -               if (!pci_msi_create_irq_domain(of_node_to_fwnode(np),
->>> -                                              &its_pci_msi_domain_info,
->>> -                                              parent)) {
->>> -                       pr_err("%s: unable to create PCI domain\n",
->>> -                              np->full_name);
->>> -                       continue;
->>> -               }
->>>
->>>                 pr_info("PCI/MSI: %s domain created\n", np->full_name);
->>>         }
->>>
->>>         return 0;
->>
->>
->> And no matter what you return success
->>
->>>  }
->>> +
->>> +static int __init its_pci_msi_init(void)
->>> +{
->>> +       its_pci_of_msi_init();
->>
->>
->> Which you subsequently ignore here. What's the point?
->>
->
-> Well, this patch is meant to refactor the code. It does not change the error
-> handing nor the functionality. However, you have got a point but IMO it
-> should be fixed in separate patch if possible.
+On 08/30/2016 08:42 AM, Krzysztof Kozlowski wrote:
+>> +&clock {
+>> > +       clocks = <&fin_pll>;
+> I dig into it and I have some questions:
+> 1. Missing clock-names?
+> 2. What code parses it?
+> 3. Don't we need it also for other SoC/boards?
 
-But you are refactoring the code, so it would make sense to clean it
-up while at it.  Perhaps add one more patch to the series?
+Apologies, I missed this one.
 
-Thanks,
-Rafael
+Ad.1. clock-names is not needed as there will be only one clock and there
+is no need to get the clock by name.  If it bothers you we could add e.g.
+clock-names = "osc", but IMO it's just an unnecessary complication.
+
+Ad.2 of_clk_get() called from within of_clk_init() and exynos5410_clk_init.
+
+Ad.2. I think it makes sense to add it for all Exynos SoCs where it's missing.
+
+-- 
+Regards,
+Sylwester
