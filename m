@@ -1,35 +1,67 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Tue, 6 Sep 2016 13:03:42 -0700
-Subject: [PATCH] ARM: mmp: replace NO_IRQ
-In-Reply-To: <20160906194443.GC1041@n2100.armlinux.org.uk>
-References: <20160906140808.2883875-1-arnd@arndb.de>
- <20160906142442.GY1041@n2100.armlinux.org.uk>
- <6239709.hYdxF7WW9G@wuerfel> <20160906194443.GC1041@n2100.armlinux.org.uk>
-Message-ID: <CA+55aFyrGTG3xzecScrTQKaqkZ96DizeH2aSjJENKB_DCD6hxA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 6 Sep 2016 13:05:53 -0700
+Subject: [PATCH 2/2] ARM: dts: am57xx-beagle-x15: Add support for rev B1
+In-Reply-To: <84be68f4-c5a6-0afe-c402-1adba9172918@ti.com>
+References: <20160902090600.27262-1-nm@ti.com>
+ <20160902090600.27262-3-nm@ti.com>
+ <dd74f5e1-304f-661e-7fd9-f5f81bcfc55e@ti.com>
+ <CAOCHtYiFjB-cuABmCiw96spc-De+qNNQYGrjp-MmNDuH2mJ9Bw@mail.gmail.com>
+ <84be68f4-c5a6-0afe-c402-1adba9172918@ti.com>
+Message-ID: <20160906200553.wqkvwsfww3rllhd5@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 6, 2016 at 12:44 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
->
-> My point still stands though.  Merely hiding it doesn't make the problem
-> go away - it's just the same problem but now it won't be as visible, and
-> as such it'll probably never get resolved.
+Hi,
 
-How much of a legacy thing is this?
+* Sekhar Nori <nsekhar@ti.com> [160906 03:11]:
+> On Friday 02 September 2016 07:22 PM, Robert Nelson wrote:
+> > On Fri, Sep 2, 2016 at 5:41 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+> >> + Robert Nelson
+> >>
+> >> On Friday 02 September 2016 02:36 PM, Nishanth Menon wrote:
+> >>
+> >> I understand that there are existing users of A2 boards and so we simply
+> >> cannot remove support for those boards (at least yet).
+> >>
+> >> But given the small numbers of A2 boards, its also quite likely that we
+> >> will not have enough test coverage for those boards. Especially as years
+> >> pass and there are fewer and fewer people with access to working A2 boards.
+> > 
+> > I have a A1, A2 and a B1, that i use for testing for
+> > beagleboard.org...  The A1 use to be ssh-accessible for developers,
+> > but since moving to my new house, I haven't "yet" got that one setup
+> > for developers.  Right now i'm using the A2 & B1 for development of
+> > our default images.
+> > 
+> > Jason Kridner also has a number of boards
+> 
+> Availability of hardware _somewhere_ is one aspect. I am still worried
+> about the big difference in scale. A2 are ~200 in number where as the
+> production version should be in thousands.
+> 
+> Reuse is meant to reduce maintenance cost. In this case though, it seems
+> like it will do exactly the opposite - making anyone with a production
+> version rely on few with a non-production version to make any updates at
+> all.
+> 
+> IMHO, a common .dtsi made sense if both the boards went to production
+> and are largely available.
 
-The main reason I'd like to _really_ make NO_IRQ go away is that it
-seems that some people copy it from existing drivers, or just think
-it's the RightThing(tm) to do because it looks so plausible.
+Shared dtsi files are essential for us from maintenance point of view
+as maintaining non-shared dtsi files is way more work and churn.
 
-So in that sense I wouldn't actually mind "merely hiding it".
+> device-tree sources continue to get updates even though hardware itself
+> is pretty much frozen. am335x-bone-common.dtsi created 3 years back is
+> receiving updates still - as recently as 3 months back. So, I do expect
+> that A2 will need to get tested in many years to come. Not sure if it
+> really worth that much effort.
 
-It may not *fix* that particular driver or subsystem, but if it's
-sufficiently well hidden or specialized, at least it won't cause the
-pattern to be copied in the future, I'd hope.
+And the am335x shared dtsi files are not enough. It's silly how many
+times we're duplicating the same things over and over again for USB
+setup for various am335x boards for example.
 
-So hiding things inside a particular driver (or a particular
-subsystem) may be hacky from the standpoint of that particular driver
-or subsystem, but from a "big issue" standpoint I don't mind at all.
+So my take is that we need more shared dtsi files, not less.
 
-           Linus
+Regards,
+
+Tony
