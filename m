@@ -1,33 +1,78 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 6 Sep 2016 10:48:31 +0300
-Subject: [PATCH] dt-bindings: mvebu-odmi: fix example typo
-In-Reply-To: <20160905170900.3225b4b4@free-electrons.com>
-References: <0743fef6fe390bc4ae7cabd15c4836bbed98f7cf.1473087913.git.baruch@tkos.co.il>
- <20160905170900.3225b4b4@free-electrons.com>
-Message-ID: <20160906074831.7mlgufxlirm5yuv2@tarshish>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 6 Sep 2016 09:49:02 +0200
+Subject: [PATCH/RFT v2 0/8] Add SDHI to r8a7796/salvator-x
+In-Reply-To: <2032317.SOiUovHhFZ@avalon>
+References: <1471938590-10650-1-git-send-email-horms+renesas@verge.net.au>
+ <2032317.SOiUovHhFZ@avalon>
+Message-ID: <20160906074901.GE17888@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On Mon, Sep 05, 2016 at 05:09:00PM +0200, Thomas Petazzoni wrote:
-> On Mon,  5 Sep 2016 18:05:13 +0300, Baruch Siach wrote:
-> > Make the example compatible string match its definition.
-> > 
-> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+On Tue, Sep 06, 2016 at 03:34:41AM +0300, Laurent Pinchart wrote:
+> Hi Simon,
 > 
-> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Thank you for the patches.
+> 
+> On Tuesday 23 Aug 2016 09:49:42 Simon Horman wrote:
+> > Hi,
+> > 
+> > this patch set updates drivers, documentation and DT to
+> > enable SDHI0 & 3 on the r8a7796/salvator-x. This includes
+> > defining nodes for all available SDHI and GPIO devices.
+> > 
+> > I have boot-tested this which seems successful.
+> > However, I do not have physical access to an r8a7796/salvator-x board
+> > and the one that I have remote access to does not appear to have
+> > any SD cards present. I would be grateful of any testing anyone
+> > can provide.
+> > 
+> > Based on renesas-drivers-2016-08-09-v4.8-rc1
+> 
+> For patches 1/8, 4/8 and 6/8, applied on top of your devel branch (with the 
+> gpio-ranges property removed from 6/8 due to the lack of PFC support),
+> 
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Tested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Thanks, Thomas.
+Thanks.
 
-mvebu maintainers: Unfortunately I forgot to Cc irqchip maintainers on this 
-patch (except Jason, who is in both), sorry about that. Should I resend? Would 
-any of you pick it up?
+> I've tested the patches with ethernet support that uses GPIO-2-11 as an 
+> interrupt pin (I'll post the ethernet patches for r8a7796 soon).
 
-Thanks,
-baruch
+Great! I have a use for them and was planing to make some myself.
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+> > Provided for testing as the topic/r8a7796-sdhi-v2 branch in
+> > my renesas tree on kernel.org.
+> > 
+> > Changes since v1 noted in individual changelogs.
+> > Acks from v1 also added.
+> > 
+> > Ai Kyuse (1):
+> >   mmc: sh_mobile_sdhi: Add r8a7796 support
+> > 
+> > Simon Horman (4):
+> >   clk: renesas: r8a7796: Add SDIF clocks
+> >   gpio: rcar: Add r8a7796 (R-Car M3-W) support
+> >   arm64: dts: r8a7796: add SDHI nodes
+> >   arm64: dts: r8a7796: salvator-x: enable SDHI0 & 3
+> > 
+> > Takeshi Kihara (3):
+> >   clk: renesas: r8a7796: Add GPIO clocks
+> >   pinctrl: sh-pfc: r8a7796: Add SDHI pins, groups and functions
+> >   arm64: dts: r8a7796: Add GPIO device nodes
+> > 
+> >  .../devicetree/bindings/gpio/renesas,gpio-rcar.txt |   1 +
+> >  Documentation/devicetree/bindings/mmc/tmio_mmc.txt |   1 +
+> >  arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts |  84 +++++++
+> >  arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 154 ++++++++++++
+> >  drivers/clk/renesas/r8a7796-cpg-mssr.c             |  18 ++
+> >  drivers/gpio/gpio-rcar.c                           |   4 +
+> >  drivers/mmc/host/sh_mobile_sdhi.c                  |   1 +
+> >  drivers/pinctrl/sh-pfc/pfc-r8a7796.c               | 275 ++++++++++++++++++
+> >  8 files changed, 538 insertions(+)
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
