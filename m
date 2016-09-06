@@ -1,159 +1,79 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Tue,  6 Sep 2016 21:25:50 +0800
-Subject: [PATCH v11 6/8] acpi/arm64: Add memory-mapped timer support in GTDT
- driver
-In-Reply-To: <1473168352-5156-1-git-send-email-fu.wei@linaro.org>
-References: <1473168352-5156-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1473168352-5156-7-git-send-email-fu.wei@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Sep 2016 15:27:43 +0200
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <87d1khmhdj.fsf@linux.intel.com>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <4416687.vUjZzKWZG6@wuerfel> <87d1khmhdj.fsf@linux.intel.com>
+Message-ID: <20562703.Glp77l1PBf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+On Tuesday, September 6, 2016 1:50:48 PM CEST Felipe Balbi wrote:
+> Hi,
+> 
+> Arnd Bergmann <arnd@arndb.de> writes:
+> > On Tuesday, September 6, 2016 9:40:19 AM CEST Felipe Balbi wrote:
+> >> 
+> >> this only solves the problem for DT devices. Legacy devices and
+> >> PCI-based systems will still suffer from the same problem. At least for
+> >> dwc3, I will only be taking patches that solve the problem for all
+> >> users, not a subset of them.
+> >
+> > I don't think legacy devices are a worry, because they wouldn't
+> > have this problem. For the PCI case, you are right that it cannot
+> > work, in particular for machines that have complex IOMMU setup.
+> >
+> > Some architectures (at least arm64 and sparc) check the bus_type of
+> > a device in order to find the correct set of dma_map_ops for that
+> > device, so there is no real way to handle this as long as you
+> > pass a platform_device into an API that expects a pci_device.
+> 
+> Then I guess we're left with adding a "struct device *dma_dev" to struct
+> dwc3 and trying to figure out if we should use parent or self. Does
+> anybody see any problems with that?
 
-On platforms booting with ACPI, architected memory-mapped timers'
-configuration data is provided by firmware through the ACPI GTDT
-static table.
+I think we actually need the device pointer in the usb_hcd structure,
+so it can be passed in these API calls from the USB core
 
-The clocksource architected timer kernel driver requires a firmware
-interface to collect timer configuration and configure its driver.
-this infrastructure is present for device tree systems, but it is
-missing on systems booting with ACPI.
+drivers/usb/core/buffer.c:      return dma_alloc_coherent(hcd->self.controller, size, dma, mem_flags);
+drivers/usb/core/buffer.c:      dma_free_coherent(hcd->self.controller, size, addr, dma);
+drivers/usb/core/buffer.c:          (!hcd->self.controller->dma_mask &&
+drivers/usb/core/buffer.c:              hcd->pool[i] = dma_pool_create(name, hcd->self.controller,
+drivers/usb/core/hcd.c:                 urb->setup_dma = dma_map_single(
+drivers/usb/core/hcd.c:                 if (dma_mapping_error(hcd->self.controller,
+drivers/usb/core/hcd.c:                         n = dma_map_sg(
+drivers/usb/core/hcd.c:                         urb->transfer_dma = dma_map_page(
+drivers/usb/core/hcd.c:                         if (dma_mapping_error(hcd->self.controller,
+drivers/usb/core/hcd.c:                         urb->transfer_dma = dma_map_single(
+drivers/usb/core/hcd.c:                         if (dma_mapping_error(hcd->self.controller,
+drivers/usb/core/usb.c:         urb->transfer_dma = dma_map_single(controller,
+drivers/usb/core/usb.c: return dma_map_sg(controller, sg, nents,
+drivers/usb/core/usb.c:         dma_sync_single_for_cpu(controller,
+drivers/usb/core/usb.c:                 dma_sync_single_for_cpu(controller,
+drivers/usb/core/usb.c: dma_sync_sg_for_cpu(controller, sg, n_hw_ents,
 
-Implement the kernel infrastructure required to parse the static
-ACPI GTDT table so that the architected timer clocksource driver can
-make use of it on systems booting with ACPI, therefore enabling
-the corresponding timers configuration.
+as these are all called on behalf of the host controller node.
+Looking for more instances of hcd->self.controller, I find this
+instance:
 
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/acpi/arm64/gtdt.c            | 70 ++++++++++++++++++++++++++++++++++++
- include/clocksource/arm_arch_timer.h | 15 ++++++++
- include/linux/acpi.h                 |  1 +
- 3 files changed, 86 insertions(+)
+drivers/usb/core/hcd.c:         struct usb_phy *phy = usb_get_phy_dev(hcd->self.controller, 0);
+drivers/usb/core/hcd.c:         struct phy *phy = phy_get(hcd->self.controller, "usb");
 
-diff --git a/drivers/acpi/arm64/gtdt.c b/drivers/acpi/arm64/gtdt.c
-index b24844d..b6021db 100644
---- a/drivers/acpi/arm64/gtdt.c
-+++ b/drivers/acpi/arm64/gtdt.c
-@@ -150,3 +150,73 @@ int __init acpi_gtdt_init(struct acpi_table_header *table)
- 
- 	return gtdt->platform_timer_count;
- }
-+
-+static int __init gtdt_parse_gt_block(struct acpi_gtdt_timer_block *block,
-+				      struct gt_block_data *data)
-+{
-+	struct acpi_gtdt_timer_entry *frame;
-+	int i;
-+
-+	if (!block || !data)
-+		return -EINVAL;
-+
-+	if (!block->block_address || !block->timer_count)
-+		return -EINVAL;
-+
-+	data->cntctlbase_phy = (phys_addr_t)block->block_address;
-+	data->timer_count = block->timer_count;
-+
-+	frame = (void *)block + block->timer_offset;
-+	if (frame + block->timer_count != (void *)block + block->header.length)
-+		return -EINVAL;
-+
-+	/*
-+	 * Get the GT timer Frame data for every GT Block Timer
-+	 */
-+	for (i = 0; i < block->timer_count; i++, frame++) {
-+		if (!frame->base_address || !frame->timer_interrupt)
-+			return -EINVAL;
-+
-+		data->timer[i].irq = map_gt_gsi(frame->timer_interrupt,
-+						frame->timer_flags);
-+		if (data->timer[i].irq <= 0)
-+			return -EINVAL;
-+
-+		if (frame->virtual_timer_interrupt) {
-+			data->timer[i].virtual_irq =
-+				map_gt_gsi(frame->virtual_timer_interrupt,
-+					   frame->virtual_timer_flags);
-+			if (data->timer[i].virtual_irq <= 0)
-+				return -EINVAL;
-+		}
-+
-+		data->timer[i].frame_nr = frame->frame_number;
-+		data->timer[i].cntbase_phy = frame->base_address;
-+	}
-+
-+	return 0;
-+}
-+
-+/*
-+ * Get the GT block info for memory-mapped timer from GTDT table.
-+ */
-+int __init gtdt_arch_timer_mem_init(struct gt_block_data *data)
-+{
-+	void *platform_timer;
-+	int index = 0;
-+	int ret;
-+
-+	for_each_platform_timer(platform_timer) {
-+		if (!is_timer_block(platform_timer))
-+			continue;
-+		ret = gtdt_parse_gt_block(platform_timer, data + index);
-+		if (ret)
-+			return ret;
-+		index++;
-+	}
-+
-+	if (index)
-+		pr_info("found %d memory-mapped timer block(s).\n", index);
-+
-+	return index;
-+}
-diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-index 16dcd10..94a5d14 100644
---- a/include/clocksource/arm_arch_timer.h
-+++ b/include/clocksource/arm_arch_timer.h
-@@ -56,6 +56,8 @@ enum spi_nr {
- #define ARCH_TIMER_MEM_PHYS_ACCESS	2
- #define ARCH_TIMER_MEM_VIRT_ACCESS	3
- 
-+#define ARCH_TIMER_MEM_MAX_FRAME	8
-+
- #define ARCH_TIMER_USR_PCT_ACCESS_EN	(1 << 0) /* physical counter */
- #define ARCH_TIMER_USR_VCT_ACCESS_EN	(1 << 1) /* virtual counter */
- #define ARCH_TIMER_VIRT_EVT_EN		(1 << 2)
-@@ -71,6 +73,19 @@ struct arch_timer_kvm_info {
- 	int virtual_irq;
- };
- 
-+struct gt_timer_data {
-+	int frame_nr;
-+	phys_addr_t cntbase_phy;
-+	int irq;
-+	int virtual_irq;
-+};
-+
-+struct gt_block_data {
-+	phys_addr_t cntctlbase_phy;
-+	int timer_count;
-+	struct gt_timer_data timer[ARCH_TIMER_MEM_MAX_FRAME];
-+};
-+
- #ifdef CONFIG_ARM_ARCH_TIMER
- 
- extern u32 arch_timer_get_rate(void);
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index e2f9841..5dc0b85 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -571,6 +571,7 @@ int acpi_reconfig_notifier_unregister(struct notifier_block *nb);
- int acpi_gtdt_init(struct acpi_table_header *table);
- int acpi_gtdt_map_ppi(int type);
- bool acpi_gtdt_c3stop(void);
-+int gtdt_arch_timer_mem_init(struct gt_block_data *data);
- #endif
- 
- #else	/* !CONFIG_ACPI */
--- 
-2.7.4
+I'm unsure which device pointer we want here, but I suspect this also
+needs to be the one that has the device node in order to make the lookup
+of the phy structure by device node work right. Can you clarify how
+this works today?
+
+We probably also need to add the of_node of the host controller device
+to struct usb_hcd in order to make usb_of_get_child_node() work
+in the case where the hcd itself is not device that is listed
+in DT. It might be a good idea to use 'struct fwnode_handle' for that,
+so we can in the future also allow ACPI platforms to specify 
+
+> Note, we would NOT be passing device pointers are platform_data, we
+> would have dwc3.ko figure out if it should use self or its parent device
+> for dma.
+
+Ok, sounds good.
+
+	Arnd
