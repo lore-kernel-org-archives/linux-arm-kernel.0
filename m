@@ -1,115 +1,93 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 6 Sep 2016 16:09:10 +0200
-Subject: [PATCH 2/7] mtd: nand: Introduce nand_data_interface
-In-Reply-To: <20160906154622.7ec5f281@bbrezillon>
-References: <1473158355-22451-1-git-send-email-s.hauer@pengutronix.de>
- <1473158355-22451-3-git-send-email-s.hauer@pengutronix.de>
- <20160906132118.17e2e8f8@bbrezillon>
- <20160906133444.7rwncblrgqsfw7ee@pengutronix.de>
- <20160906154622.7ec5f281@bbrezillon>
-Message-ID: <20160906140910.esm7p4tggik72vzr@pengutronix.de>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Tue, 6 Sep 2016 19:42:19 +0530
+Subject: [RFC PATCH v3 5/5] arm/arm64: vgic-new: Implement
+ KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
+In-Reply-To: <20160830140034.GK10162@cbox>
+References: <1472037609-4164-1-git-send-email-vijay.kilari@gmail.com>
+ <1472037609-4164-6-git-send-email-vijay.kilari@gmail.com>
+ <20160830140034.GK10162@cbox>
+Message-ID: <CALicx6scWWykb9Zc45gVkKDo71nVMDRGoa0vo54xDC2FoLJZRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2016 at 03:46:22PM +0200, Boris Brezillon wrote:
-> On Tue, 6 Sep 2016 15:34:44 +0200
-> Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> 
-> > On Tue, Sep 06, 2016 at 01:21:18PM +0200, Boris Brezillon wrote:
-> > > On Tue,  6 Sep 2016 12:39:10 +0200
-> > > Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > >   
-> > > > Currently we have no data structure to fully describe a NAND timing.
-> > > > We only have struct nand_sdr_timings for NAND timings in SDR mode,
-> > > > but nothing for DDR mode and also no container to store both types
-> > > > of timing.
-> > > > This patch adds struct nand_data_interface which stores the timing
-> > > > type and a union of different timings. This can be used to pass to
-> > > > drivers in order to configure the timing.
-> > > > 
-> > > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > > > ---
-> > > >  include/linux/mtd/nand.h | 109 ++++++++++++++++++++++++++---------------------
-> > > >  1 file changed, 60 insertions(+), 49 deletions(-)
-> > > > 
-> > > > diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-> > > > index 9af9575..19c73ef 100644
-> > > > --- a/include/linux/mtd/nand.h
-> > > > +++ b/include/linux/mtd/nand.h
-> > > > @@ -568,6 +568,66 @@ struct nand_buffers {
-> > > >  	uint8_t *databuf;
-> > > >  };
-> > > >  
-> > > > +/*
-> > > > + * struct nand_sdr_timings - SDR NAND chip timings
-> > > > + *
-> > > > + * This struct defines the timing requirements of a SDR NAND chip.
-> > > > + * These information can be found in every NAND datasheets and the timings
-> > > > + * meaning are described in the ONFI specifications:
-> > > > + * www.onfi.org/~/media/ONFI/specs/onfi_3_1_spec.pdf (chapter 4.15 Timing
-> > > > + * Parameters)
-> > > > + *
-> > > > + * All these timings are expressed in picoseconds.
-> > > > + */
-> > > > +
-> > > > +struct nand_sdr_timings {
-> > > > +	u32 tALH_min;
-> > > > +	u32 tADL_min;
-> > > > +	u32 tALS_min;
-> > > > +	u32 tAR_min;
-> > > > +	u32 tCEA_max;
-> > > > +	u32 tCEH_min;
-> > > > +	u32 tCH_min;
-> > > > +	u32 tCHZ_max;
-> > > > +	u32 tCLH_min;
-> > > > +	u32 tCLR_min;
-> > > > +	u32 tCLS_min;
-> > > > +	u32 tCOH_min;
-> > > > +	u32 tCS_min;
-> > > > +	u32 tDH_min;
-> > > > +	u32 tDS_min;
-> > > > +	u32 tFEAT_max;
-> > > > +	u32 tIR_min;
-> > > > +	u32 tITC_max;
-> > > > +	u32 tRC_min;
-> > > > +	u32 tREA_max;
-> > > > +	u32 tREH_min;
-> > > > +	u32 tRHOH_min;
-> > > > +	u32 tRHW_min;
-> > > > +	u32 tRHZ_max;
-> > > > +	u32 tRLOH_min;
-> > > > +	u32 tRP_min;
-> > > > +	u32 tRR_min;
-> > > > +	u64 tRST_max;
-> > > > +	u32 tWB_max;
-> > > > +	u32 tWC_min;
-> > > > +	u32 tWH_min;
-> > > > +	u32 tWHR_min;
-> > > > +	u32 tWP_min;
-> > > > +	u32 tWW_min;
-> > > > +};
-> > > > +
-> > > > +enum nand_data_interface_type {
-> > > > +	NAND_SDR_IFACE,
-> > > > +};
-> > > > +  
-> > > 
-> > > I know this is my code, and I'm the one to blame here, but can you
-> > > document the nand_data_interface fields (kerneldoc format)?  
-> > 
-> > Sure, can do. Do you know what tCEH is? This one is not documented in
-> > the ONFI spec.
-> 
-> Maybe you're not looking at the latest ONFI spec ;). Anyway, I was not
-> asking you to document the nand_sdr_timings fields (pointing to the
-> spec should be enough), just the nand_data_interface ones.
+On Tue, Aug 30, 2016 at 7:30 PM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+>
+> On Wed, Aug 24, 2016 at 04:50:09PM +0530, vijay.kilari at gmail.com wrote:
+> > From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> >  }
+> > diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> > index 61abea0..fde1472 100644
+> > --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> > +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> > @@ -789,3 +789,22 @@ int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+> >
+> >       return vgic_v3_uaccess(vcpu, dev, is_write, offset, val);
+> >  }
+> > +
+> > +int vgic_v3_line_level_info_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+> > +                                 u32 intid, u32 *val)
+> > +{
+> > +     unsigned int len = 4;
+> > +     u8 buf[4];
+> > +     int ret;
+> > +
+> > +     if (is_write) {
+> > +             vgic_data_host_to_mmio_bus(buf, len, *val);
+>
+> why do you involve the mmio bus in this?
 
-I realized that when writing the last mail, but I already added it ;)
+This is doing LE conversion. This is being done by vgic_uaccess function.
+IRC, This sys register access in not following vgic_uaccess path. Hence
+added it here.
+>
+>
+> > +             ret = vgic_write_irq_line_level_info(vcpu, intid, len, buf);
+> > +     } else {
+> > +             ret = vgic_read_irq_line_level_info(vcpu, intid, len, buf);
+> > +             if (!ret)
+> > +                     *val = vgic_data_mmio_bus_to_host(buf, len);
+> > +     }
+> > +
+> > +     return ret;
+> > +}
+> > diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> > index 38f2c75..74d0449 100644
+> > --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> > +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> > @@ -391,6 +391,40 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
+> >       }
+> >  }
+> >
+> > +int vgic_read_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
+> > +                               unsigned int len, void *val)
+> > +{
+> > +     unsigned long data = 0;
+> > +     int i;
+> > +
+> > +     for (i = 0; i < len * 8; i++) {
+> > +             struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> > +
+> > +             if (irq->line_level)
+> > +                     data |= (1U << i);
+> > +     }
+> > +     vgic_data_host_to_mmio_bus(val, len, data);
+>
+> why???
 
-Sascha
+Same as above reason
+>
+>
+> > +
+> > +     return 0;
+> > +}
+> > +
+> > +int vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
+> > +                                unsigned int len, const void *val)
+> > +{
+> > +     int i;
+> > +     unsigned long data = vgic_data_mmio_bus_to_host(val, len);
+>
+> why???
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Same as above reason
