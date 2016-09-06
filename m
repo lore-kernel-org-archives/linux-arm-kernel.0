@@ -1,103 +1,55 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 6 Sep 2016 21:20:32 +0200
-Subject: [RFC PATCH v3 5/5] arm/arm64: vgic-new: Implement
- KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
-In-Reply-To: <CALicx6scWWykb9Zc45gVkKDo71nVMDRGoa0vo54xDC2FoLJZRg@mail.gmail.com>
-References: <1472037609-4164-1-git-send-email-vijay.kilari@gmail.com>
- <1472037609-4164-6-git-send-email-vijay.kilari@gmail.com>
- <20160830140034.GK10162@cbox>
- <CALicx6scWWykb9Zc45gVkKDo71nVMDRGoa0vo54xDC2FoLJZRg@mail.gmail.com>
-Message-ID: <20160906192032.GN23592@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Sep 2016 21:28:17 +0200
+Subject: [PATCH] ARM: mmp: replace NO_IRQ
+In-Reply-To: <20160906142442.GY1041@n2100.armlinux.org.uk>
+References: <20160906140808.2883875-1-arnd@arndb.de>
+ <20160906142442.GY1041@n2100.armlinux.org.uk>
+Message-ID: <6239709.hYdxF7WW9G@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2016 at 07:42:19PM +0530, Vijay Kilari wrote:
-> On Tue, Aug 30, 2016 at 7:30 PM, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
-> >
-> > On Wed, Aug 24, 2016 at 04:50:09PM +0530, vijay.kilari at gmail.com wrote:
-> > > From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
-> > >  }
-> > > diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> > > index 61abea0..fde1472 100644
-> > > --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> > > +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> > > @@ -789,3 +789,22 @@ int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-> > >
-> > >       return vgic_v3_uaccess(vcpu, dev, is_write, offset, val);
-> > >  }
-> > > +
-> > > +int vgic_v3_line_level_info_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-> > > +                                 u32 intid, u32 *val)
-> > > +{
-> > > +     unsigned int len = 4;
-> > > +     u8 buf[4];
-> > > +     int ret;
-> > > +
-> > > +     if (is_write) {
-> > > +             vgic_data_host_to_mmio_bus(buf, len, *val);
-> >
-> > why do you involve the mmio bus in this?
+On Tuesday, September 6, 2016 3:24:42 PM CEST Russell King - ARM Linux wrote:
+> On Tue, Sep 06, 2016 at 04:07:56PM +0200, Arnd Bergmann wrote:
+> > The mmp platform has its own definitions with the old NO_IRQ meaning,
+> > but compares against the global NO_IRQ macro that we should have
+> > removed long ago.
+> > 
+> > The specific usage in arch/arm/mach-mmp/devices.c is awkward, but
+> > fixing it properly would require a larger scale rewrite of the entire
+> > file, or even using devicetree for all machines. As I'm not able to
+> > do that any time soon, let's make the current behavior more explit
+> > instead and avoid the literal use of NO_IRQ.
 > 
-> This is doing LE conversion. This is being done by vgic_uaccess function.
-> IRC, This sys register access in not following vgic_uaccess path. Hence
-> added it here.
+> So this probably continues to be a problem, but we hide it from the
+> NO_IRQ brigade.  I think it would be better to leave it as-is until
+> it can be fixed up correctly, rather than trying to hide it.
 
-See my e-mail on the other patch.  I think this is all just legacy from
-the time where we didn't distinguish between uaccess and mmio
-dispatches.
+Linus explicitly asked for NO_IRQ to be finally killed off last week[1],
+and I've prepared all patches for that now, this is the last one
+aside from removing the macro.
 
-> >
-> >
-> > > +             ret = vgic_write_irq_line_level_info(vcpu, intid, len, buf);
-> > > +     } else {
-> > > +             ret = vgic_read_irq_line_level_info(vcpu, intid, len, buf);
-> > > +             if (!ret)
-> > > +                     *val = vgic_data_mmio_bus_to_host(buf, len);
-> > > +     }
-> > > +
-> > > +     return ret;
-> > > +}
-> > > diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> > > index 38f2c75..74d0449 100644
-> > > --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> > > +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> > > @@ -391,6 +391,40 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
-> > >       }
-> > >  }
-> > >
-> > > +int vgic_read_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
-> > > +                               unsigned int len, void *val)
-> > > +{
-> > > +     unsigned long data = 0;
-> > > +     int i;
-> > > +
-> > > +     for (i = 0; i < len * 8; i++) {
-> > > +             struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> > > +
-> > > +             if (irq->line_level)
-> > > +                     data |= (1U << i);
-> > > +     }
-> > > +     vgic_data_host_to_mmio_bus(val, len, data);
-> >
-> > why???
-> 
-> Same as above reason
-> >
-> >
-> > > +
-> > > +     return 0;
-> > > +}
-> > > +
-> > > +int vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
-> > > +                                unsigned int len, const void *val)
-> > > +{
-> > > +     int i;
-> > > +     unsigned long data = vgic_data_mmio_bus_to_host(val, len);
-> >
-> > why???
-> 
-> Same as above reason
+The patches I sent last week for this have already been accepted into
+linux-next, these are the remaining ones:
 
-Thanks,
--Christoffer
+001d34e3d6e1 ARM: remove NO_IRQ definition
+106bee9d4f69 [SUBMITTED 20160906] ARM: mmp: replace NO_IRQ
+96d744cef97a [SUBMITTED 20160906] ARM: orion5x: remove extraneous NO_IRQ
+0dadcd937ef8 [SUBMITTED 20160906] ARM: orion5x: avoid NO_IRQ in orion_ge00_switch_init
+fb0558152b70 [SUBMITTED 20160906] ARM: mvebu/orion: remove NO_IRQ check from device init
+309ac9ebb2eb [SUBMITTED 20160906] ARM: mv78xx0: simplify ethernet device creation
+c50d19cfb4c8 [SUBMITTED 20160906] pcmcia: soc-common: remove incorrect NO_IRQ use
+c9f05678577e [SUBMITTED 20160906] mfd: ucb1x00: remove NO_IRQ check
+393ce6162224 [SUBMITTED 20160906] ARM: common/locomo: remove NO_IRQ check
+1c78db6236a8 [SUBMITTED 20160906] ARM: common/sa1111: remove NO_IRQ check
+ed8f68ba549b [SUBMITTED 20160906] ptp: ixp46x: remove NO_IRQ handling
+ed4cdcd25a34 [SUBMITTED 20160906] mmc: davinci: remove incorrect NO_IRQ use
+95ddf97fc805 [SUBMITTED 20160903] crypto: mv_cesa: remove NO_IRQ reference
+
+I'm experimenting with cleaning up the file some more, but it's unclear
+if doing it another way is an actual improvement, or if a larger change
+is worth the risk for regressions, given how little interest there is
+in this platform in general.
+
+	Arnd
+
+[1] https://lists.linuxfoundation.org/pipermail/ksummit-discuss/2016-September/003803.html
