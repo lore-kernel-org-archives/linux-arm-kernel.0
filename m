@@ -1,54 +1,96 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 6 Sep 2016 07:53:41 +0200
-Subject: irq_create_fwspec_mapping() in 4.8-rc2
-In-Reply-To: <CACRpkdaUviHgUtLhTPTRuW5rk=tZsvgYAJLqNFtz1u+q2jbM2w@mail.gmail.com>
-References: <483F737F-9868-4E8A-A831-AA3F6F410AFF@gmail.com>
- <57C98975.5020607@arm.com> <9FCA11A3-B677-42EA-80DB-674AC8E489E8@gmail.com>
- <57C99111.3030105@arm.com> <F5716CCD-34FF-4CA8-B5F5-C2A33A5D9E91@gmail.com>
- <57C9961F.8080602@arm.com> <B721D80D-B240-4779-8748-5CFAD330D986@gmail.com>
- <57C99B3D.3010405@arm.com>
- <CACRpkdYjmkkDxVah1HUNxoGEQ9hJeE-J1TwZ1wNEKq=swnL9JQ@mail.gmail.com>
- <57CD6B87.5010502@arm.com>
- <CACRpkdaUviHgUtLhTPTRuW5rk=tZsvgYAJLqNFtz1u+q2jbM2w@mail.gmail.com>
-Message-ID: <7fc3ddc5-bb20-be88-f62e-72f0176011db@atmel.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Tue, 6 Sep 2016 11:34:08 +0530
+Subject: [PATCH v6 1/8] binding-doc: power: pwrseq-generic: add binding
+ doc for generic power sequence library
+In-Reply-To: <20160902010030.GA11262@shlinux2>
+References: <1471252398-957-1-git-send-email-peter.chen@nxp.com>
+ <1471252398-957-2-git-send-email-peter.chen@nxp.com>
+ <6832cc55-831a-1188-4878-bbbf0b3c3be8@linaro.org>
+ <20160902010030.GA11262@shlinux2>
+Message-ID: <3b904eb8-8f32-845e-8b9d-78b7d79ef024@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 05/09/2016 ? 23:41, Linus Walleij a ?crit :
-> On Mon, Sep 5, 2016 at 2:56 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> 
->> OK, I'll whip up a patch shortly. Should I also address the handful of
->> other non-TYPE_NONE that we have in the tree:
+
+
+On Friday 02 September 2016 06:30 AM, Peter Chen wrote:
+> On Thu, Sep 01, 2016 at 01:33:22PM +0530, Vaibhav Hiremath wrote:
 >>
->>         drivers/gpio/gpio-sx150x.c
->>         drivers/pinctrl/nomadik/pinctrl-nomadik.c
->>         drivers/pinctrl/pinctrl-coh901.c
->>         drivers/pinctrl/pinctrl-st.c
+>> On Monday 15 August 2016 02:43 PM, Peter Chen wrote:
+>>> Add binding doc for generic power sequence library.
+>>>
+>>> Signed-off-by: Peter Chen <peter.chen@nxp.com>
+>>> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+>>> Acked-by: Rob Herring <robh@kernel.org>
+>>> ---
+>>>   .../bindings/power/pwrseq/pwrseq-generic.txt       | 48 ++++++++++++++++++++++
+>>>   1 file changed, 48 insertions(+)
+>>>   create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+>>> new file mode 100644
+>>> index 0000000..ebf0d47
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+>>> @@ -0,0 +1,48 @@
+>>> +The generic power sequence library
+>>> +
+>>> +Some hard-wired devices (eg USB/MMC) need to do power sequence before
+>>> +the device can be enumerated on the bus, the typical power sequence
+>>> +like: enable USB PHY clock, toggle reset pin, etc. But current
+>>> +Linux device driver lacks of such code to do it, it may cause some
+>>> +hard-wired devices works abnormal or can't be recognized by
+>>> +controller at all. The power sequence will be done before this device
+>>> +can be found at the bus.
+>>> +
+>>> +The power sequence properties is under the device node.
+>>> +
+>>> +Optional properties:
+>>> +- clocks: the input clocks for device.
+>>> +- reset-gpios: Should specify the GPIO for reset.
+>>> +- reset-duration-us: the duration in microsecond for assert reset signal.
+>>> +
+>>> +Below is the example of USB power sequence properties on USB device
+>>> +nodes which have two level USB hubs.
+>>> +
+>>> +&usbotg1 {
+>>> +	vbus-supply = <&reg_usb_otg1_vbus>;
+>>> +	pinctrl-names = "default";
+>>> +	pinctrl-0 = <&pinctrl_usb_otg1_id>;
+>>> +	status = "okay";
+>>> +
+>>> +	#address-cells = <1>;
+>>> +	#size-cells = <0>;
+>>> +	genesys: hub at 1 {
+>>> +		compatible = "usb5e3,608";
+>>> +		reg = <1>;
+>>> +
+>>> +		clocks = <&clks IMX6SX_CLK_CKO>;
+>>> +		reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
+>>> +		reset-duration-us = <10>;
+>>> +
+>>> +		#address-cells = <1>;
+>>> +		#size-cells = <0>;
+>>> +		asix: ethernet at 1 {
+>>> +			compatible = "usbb95,1708";
+>> So I assume, with our recent discussion and the change
+>> we are proposing, the library would have some knowledge
+>> about this compatible string, right?
+> Yes
+>
+>> what I was asking on other email was, how are you connecting
+>> multiple power sequence libraries to their respective consumers ?
 >>
->> But the bigger question is whether or not there is any value in the
->> pinctrl driver providing a default value at all. Do we have any case
->> where the trigger information is not provided by the firmware (DT or
->> ACPI), and where we rely on the default being set?
-> 
-> That happened with boardfiles. Which used to be the case with
-> some of these, but AFAICT not any longer. I am uncertain about
-> sx150x though.
+> The consumers has its of_node, then it can find related power sequence
+> library according to compatible string.
+>
 
-FYI: Must have been this boardfile historical reason for at91 as well.
-As we only rely on DT now, we're safe.
+Exactly. Thats what I was referring and wanted to confirm.
 
-Bye,
-
-> In the boardfile case, I think actually the driver is responsible to
-> set up the kind of interrupt trigger it wants (well it still can...
-> but it should nowadays trust what it is given) but very often that
-> did not happen, instead the drivers relied on hacks like these to
-> have set up a default trigger type.
-> 
-> Yours,
-> Linus Walleij
-> 
+Thanks,
+Vaibhav
 
 
 -- 
-Nicolas Ferre
+Thanks,
+Vaibhav
