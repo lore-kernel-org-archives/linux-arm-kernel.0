@@ -1,243 +1,66 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue,  6 Sep 2016 11:08:52 +0200
-Subject: [PATCH V10 2/8] ACPI: Add new IORT functions to support MSI domain
- handling
+Date: Tue,  6 Sep 2016 11:08:53 +0200
+Subject: [PATCH V10 3/8] PCI/MSI: Setup MSI domain on a per-device basis using
+ IORT ACPI table
 In-Reply-To: <1473152938-17388-1-git-send-email-tn@semihalf.com>
 References: <1473152938-17388-1-git-send-email-tn@semihalf.com>
-Message-ID: <1473152938-17388-3-git-send-email-tn@semihalf.com>
+Message-ID: <1473152938-17388-4-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For ITS, MSI functionality consists on building domain stack and
-during that process we need to reference to domain stack components
-e.g. before we create new DOMAIN_BUS_PCI_MSI domain we need to specify
-its DOMAIN_BUS_NEXUS parent domain. In order to manage that process
-properly, maintain list which elements contain domain token
-(unique for MSI domain stack) and ITS ID: iort_register_domain_token()
-and iort_deregister_domain_token(). Then retrieve domain token
-any time later with ITS ID being key off: iort_find_domain_token().
-With domain token and domain type we are able to find corresponding
-IRQ domain.
+It is possible to provide information about which MSI controller to
+use on a per-device basis for DT. This patch supply this with ACPI support.
 
-Since IORT is prepared to describe MSI domain on a per-device basis,
-use existing IORT helpers and implement two calls:
-1. iort_msi_map_rid() to map MSI RID for a device
-2. iort_get_device_domain() to find domain token for a device
+Currently, IORT is the only one ACPI table which can provide such mapping.
+In order to plug IORT into MSI infrastructure we are adding ACPI
+equivalents for finding PCI device domain and its RID translation
+(pci_msi_domain_get_msi_rid and pci_msi_domain_get_msi_rid calls).
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-
-Conflicts:
-	drivers/acpi/arm64/iort.c
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
- drivers/acpi/arm64/iort.c | 152 ++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/acpi_iort.h |  12 ++++
- 2 files changed, 164 insertions(+)
+ drivers/pci/msi.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 34b8425..a6fba4d 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -22,6 +22,12 @@
- #include <linux/kernel.h>
- #include <linux/pci.h>
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index 98f1222..137b4c5 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -19,6 +19,7 @@
+ #include <linux/smp.h>
+ #include <linux/errno.h>
+ #include <linux/io.h>
++#include <linux/acpi_iort.h>
+ #include <linux/slab.h>
+ #include <linux/irqdomain.h>
+ #include <linux/of_irq.h>
+@@ -1502,8 +1503,8 @@ u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
+ 	pci_for_each_dma_alias(pdev, get_msi_id_cb, &rid);
  
-+struct iort_its_msi_chip {
-+	struct list_head	list;
-+	struct fwnode_handle	*fw_node;
-+	u32			translation_id;
-+};
-+
- typedef acpi_status (*iort_find_node_callback)
- 	(struct acpi_iort_node *node, void *context);
+ 	of_node = irq_domain_get_of_node(domain);
+-	if (of_node)
+-		rid = of_msi_map_rid(&pdev->dev, of_node, rid);
++	rid = of_node ? of_msi_map_rid(&pdev->dev, of_node, rid) :
++			iort_msi_map_rid(&pdev->dev, rid);
  
-@@ -31,6 +37,76 @@ static struct acpi_table_header *iort_table;
- static LIST_HEAD(iort_msi_chip_list);
- static DEFINE_SPINLOCK(iort_msi_chip_lock);
- 
-+/**
-+ * iort_register_domain_token() - register domain token and related ITS ID
-+ * to the list from where we can get it back later on.
-+ * @trans_id: ITS ID.
-+ * @fw_node: Domain token.
-+ *
-+ * Returns: 0 on success, -ENOMEM if no memory when allocating list element
-+ */
-+int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
-+{
-+	struct iort_its_msi_chip *its_msi_chip;
-+
-+	its_msi_chip = kzalloc(sizeof(*its_msi_chip), GFP_KERNEL);
-+	if (!its_msi_chip)
-+		return -ENOMEM;
-+
-+	its_msi_chip->fw_node = fw_node;
-+	its_msi_chip->translation_id = trans_id;
-+
-+	spin_lock(&iort_msi_chip_lock);
-+	list_add(&its_msi_chip->list, &iort_msi_chip_list);
-+	spin_unlock(&iort_msi_chip_lock);
-+
-+	return 0;
-+}
-+
-+/**
-+ * iort_deregister_domain_token() - Deregister domain token based on ITS ID
-+ * @trans_id: ITS ID.
-+ *
-+ * Returns: none.
-+ */
-+void iort_deregister_domain_token(int trans_id)
-+{
-+	struct iort_its_msi_chip *its_msi_chip, *t;
-+
-+	spin_lock(&iort_msi_chip_lock);
-+	list_for_each_entry_safe(its_msi_chip, t, &iort_msi_chip_list, list) {
-+		if (its_msi_chip->translation_id == trans_id) {
-+			list_del(&its_msi_chip->list);
-+			kfree(its_msi_chip);
-+			break;
-+		}
-+	}
-+	spin_unlock(&iort_msi_chip_lock);
-+}
-+
-+/**
-+ * iort_find_domain_token() - Find domain token based on given ITS ID
-+ * @trans_id: ITS ID.
-+ *
-+ * Returns: domain token when find on the list, NULL otherwise
-+ */
-+struct fwnode_handle *iort_find_domain_token(int trans_id)
-+{
-+	struct fwnode_handle *fw_node = NULL;
-+	struct iort_its_msi_chip *its_msi_chip;
-+
-+	spin_lock(&iort_msi_chip_lock);
-+	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
-+		if (its_msi_chip->translation_id == trans_id) {
-+			fw_node = its_msi_chip->fw_node;
-+			break;
-+		}
-+	}
-+	spin_unlock(&iort_msi_chip_lock);
-+
-+	return fw_node;
-+}
-+
- static struct acpi_iort_node *iort_scan_node(enum acpi_iort_node_type type,
- 					     iort_find_node_callback callback,
- 					     void *context)
-@@ -207,6 +283,82 @@ static struct acpi_iort_node *iort_find_dev_node(struct device *dev)
- 			      iort_match_node_callback, &pbus->dev);
+ 	return rid;
  }
- 
-+/**
-+ * iort_msi_map_rid() - Map a MSI requester ID for a device
-+ * @dev: The device for which the mapping is to be done.
-+ * @req_id: The device requester ID.
-+ *
-+ * Returns: mapped MSI RID on success, input requester ID otherwise
-+ */
-+u32 iort_msi_map_rid(struct device *dev, u32 req_id)
-+{
-+	struct acpi_iort_node *node;
-+	u32 dev_id;
-+
-+	node = iort_find_dev_node(dev);
-+	if (!node)
-+		return req_id;
-+
-+	iort_node_map_rid(node, req_id, &dev_id, ACPI_IORT_NODE_ITS_GROUP);
-+	return dev_id;
-+}
-+
-+/**
-+ * iort_dev_find_its_id() - Find the ITS identifier for a device
-+ * @dev: The device.
-+ * @idx: Index of the ITS identifier list.
-+ * @its_id: ITS identifier.
-+ *
-+ * Returns: 0 on success, appropriate error value otherwise
-+ */
-+static int iort_dev_find_its_id(struct device *dev, u32 req_id,
-+				unsigned int idx, int *its_id)
-+{
-+	struct acpi_iort_its_group *its;
-+	struct acpi_iort_node *node;
-+
-+	node = iort_find_dev_node(dev);
-+	if (!node)
-+		return -ENXIO;
-+
-+	node = iort_node_map_rid(node, req_id, NULL, ACPI_IORT_NODE_ITS_GROUP);
-+	if (!node)
-+		return -ENXIO;
-+
-+	/* Move to ITS specific data */
-+	its = (struct acpi_iort_its_group *)node->node_data;
-+	if (idx > its->its_count) {
-+		dev_err(dev, "requested ITS ID index [%d] is greater than available [%d]\n",
-+			idx, its->its_count);
-+		return -ENXIO;
-+	}
-+
-+	*its_id = its->identifiers[idx];
-+	return 0;
-+}
-+
-+/**
-+ * iort_get_device_domain() - Find MSI domain related to a device
-+ * @dev: The device.
-+ * @req_id: Requester ID for the device.
-+ *
-+ * Returns: the MSI domain for this device, NULL otherwise
-+ */
-+struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id)
-+{
-+	static struct fwnode_handle *handle;
-+	int its_id;
-+
-+	if (iort_dev_find_its_id(dev, req_id, 0, &its_id))
-+		return NULL;
-+
-+	handle = iort_find_domain_token(its_id);
-+	if (!handle)
-+		return NULL;
-+
-+	return irq_find_matching_fwnode(handle, DOMAIN_BUS_PCI_MSI);
-+}
-+
- void __init acpi_iort_init(void)
+@@ -1519,9 +1520,13 @@ u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
+  */
+ struct irq_domain *pci_msi_get_device_domain(struct pci_dev *pdev)
  {
- 	acpi_status status;
-diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-index fcacaf7..0e32dac 100644
---- a/include/linux/acpi_iort.h
-+++ b/include/linux/acpi_iort.h
-@@ -20,11 +20,23 @@
- #define __ACPI_IORT_H__
++	struct irq_domain *dom;
+ 	u32 rid = 0;
  
- #include <linux/acpi.h>
-+#include <linux/fwnode.h>
-+#include <linux/irqdomain.h>
- 
-+int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
-+void iort_deregister_domain_token(int trans_id);
-+struct fwnode_handle *iort_find_domain_token(int trans_id);
- #ifdef CONFIG_ACPI_IORT
- void acpi_iort_init(void);
-+u32 iort_msi_map_rid(struct device *dev, u32 req_id);
-+struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
- #else
- static inline void acpi_iort_init(void) { }
-+static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
-+{ return req_id; }
-+static inline struct irq_domain *iort_get_device_domain(struct device *dev,
-+							u32 req_id)
-+{ return NULL; }
- #endif
- 
- #endif /* __ACPI_IORT_H__ */
+ 	pci_for_each_dma_alias(pdev, get_msi_id_cb, &rid);
+-	return of_msi_map_get_device_domain(&pdev->dev, rid);
++	dom = of_msi_map_get_device_domain(&pdev->dev, rid);
++	if (!dom)
++		dom = iort_get_device_domain(&pdev->dev, rid);
++	return dom;
+ }
+ #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
 -- 
 1.9.1
