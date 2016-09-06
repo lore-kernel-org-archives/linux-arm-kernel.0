@@ -1,88 +1,77 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 6 Sep 2016 12:22:57 +0200
-Subject: [PATCH V10 7/8] irqchip/gicv3-its: Factor out PCI-MSI part that
- might be reused for ACPI
-In-Reply-To: <alpine.DEB.2.20.1609061149090.5647@nanos>
-References: <1473152938-17388-1-git-send-email-tn@semihalf.com>
- <1473152938-17388-8-git-send-email-tn@semihalf.com>
- <alpine.DEB.2.20.1609061149090.5647@nanos>
-Message-ID: <292d1dd1-0084-d796-b852-6cad2099eb66@semihalf.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 6 Sep 2016 12:25:42 +0200
+Subject: [RFC v2 PATCH 2/7] KVM: Track the pid of the VM process
+In-Reply-To: <87poohjqzk.fsf@e105922-lin.cambridge.arm.com>
+References: <1473093097-30932-1-git-send-email-punit.agrawal@arm.com>
+ <1473093097-30932-3-git-send-email-punit.agrawal@arm.com>
+ <20160906062252.GA30513@cbox>
+ <87poohjqzk.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20160906102542.GG30513@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Tue, Sep 06, 2016 at 10:51:27AM +0100, Punit Agrawal wrote:
+> Hi Christoffer,
+> 
+> Christoffer Dall <christoffer.dall@linaro.org> writes:
+> 
+> > On Mon, Sep 05, 2016 at 05:31:32PM +0100, Punit Agrawal wrote:
+> >> Userspace tools such as perf can be used to profile individual
+> >> processes.
+> >> 
+> >> Track the PID of the virtual machine process to match profiling requests
+> >> targeted at it. This can be used to take appropriate action to enable
+> >> the requested profiling operations for the VMs of interest.
+> >> 
+> >> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> >> Cc: Paolo Bonzini <pbonzini@redhat.com>
+> >> Cc: "Radim Kr?m??" <rkrcmar@redhat.com>
+> >> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> >> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  include/linux/kvm_host.h | 1 +
+> >>  virt/kvm/kvm_main.c      | 2 ++
+> >>  2 files changed, 3 insertions(+)
+> >> 
+> >> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+> >> index 9c28b4d..7c42c94 100644
+> >> --- a/include/linux/kvm_host.h
+> >> +++ b/include/linux/kvm_host.h
+> >> @@ -374,6 +374,7 @@ struct kvm_memslots {
+> >>  struct kvm {
+> >>  	spinlock_t mmu_lock;
+> >>  	struct mutex slots_lock;
+> >> +	struct pid *pid;
+> >>  	struct mm_struct *mm; /* userspace tied to this vm */
+> >>  	struct kvm_memslots *memslots[KVM_ADDRESS_SPACE_NUM];
+> >>  	struct srcu_struct srcu;
+> >> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+> >> index 1950782..ab2535a 100644
+> >> --- a/virt/kvm/kvm_main.c
+> >> +++ b/virt/kvm/kvm_main.c
+> >> @@ -613,6 +613,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
+> >>  	spin_lock_init(&kvm->mmu_lock);
+> >>  	atomic_inc(&current->mm->mm_count);
+> >>  	kvm->mm = current->mm;
+> >> +	kvm->pid = get_task_pid(current, PIDTYPE_PID);
+> >
+> > How dooes this deal with threading?  Is the idea that the user by
+> > specifying the main thread's pid will enable trapping for all vcpu
+> > threads belonging to that VM?
+> 
+> Yes that's correct - specifying the main thread PID will enable trapping
+> for the VM (all vcpus).
+> 
+> I am happy to move to a more suitable identifier if available.
+> 
 
-On 06.09.2016 11:50, Thomas Gleixner wrote:
-> On Tue, 6 Sep 2016, Tomasz Nowicki wrote:
->> -static int __init its_pci_msi_init(void)
->> +static int __init its_pci_msi_init_one(struct fwnode_handle *handle,
->> +				       const char *name)
->>  {
->> -	struct device_node *np;
->>  	struct irq_domain *parent;
->>
->> +	parent = irq_find_matching_fwnode(handle, DOMAIN_BUS_NEXUS);
->> +	if (!parent || !msi_get_domain_info(parent)) {
->> +		pr_err("%s: Unable to locate ITS domain\n", name);
->> +		return -ENXIO;
->> +	}
->> +
->> +	if (!pci_msi_create_irq_domain(handle, &its_pci_msi_domain_info,
->> +				       parent)) {
->> +		pr_err("%s: Unable to create PCI domain\n", name);
->> +		return -ENOMEM;
->
-> So you have error codes here.
->
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static int __init its_pci_of_msi_init(void)
->> +{
->> +	struct device_node *np;
->> +
->>  	for (np = of_find_matching_node(NULL, its_device_id); np;
->>  	     np = of_find_matching_node(np, its_device_id)) {
->>  		if (!of_property_read_bool(np, "msi-controller"))
->>  			continue;
->>
->> -		parent = irq_find_matching_host(np, DOMAIN_BUS_NEXUS);
->> -		if (!parent || !msi_get_domain_info(parent)) {
->> -			pr_err("%s: unable to locate ITS domain\n",
->> -			       np->full_name);
->> +		if (its_pci_msi_init_one(of_node_to_fwnode(np), np->full_name))
->>  			continue;
->> -		}
->> -
->> -		if (!pci_msi_create_irq_domain(of_node_to_fwnode(np),
->> -					       &its_pci_msi_domain_info,
->> -					       parent)) {
->> -			pr_err("%s: unable to create PCI domain\n",
->> -			       np->full_name);
->> -			continue;
->> -		}
->>
->>  		pr_info("PCI/MSI: %s domain created\n", np->full_name);
->>  	}
->>
->>  	return 0;
->
-> And no matter what you return success
->
->>  }
->> +
->> +static int __init its_pci_msi_init(void)
->> +{
->> +	its_pci_of_msi_init();
->
-> Which you subsequently ignore here. What's the point?
->
+What is the 'main thread' ?
 
-Well, this patch is meant to refactor the code. It does not change the 
-error handing nor the functionality. However, you have got a point but 
-IMO it should be fixed in separate patch if possible.
+Does something mandate that the VM is created by the thread group
+leader?  If not, is it not a bit strange from a user perspective, that
+you have to find the specific subthread pid that created the vm to
+enable this tracing for all vcpu threads and that the tgid doesn't work
+in this case?
 
 Thanks,
-Tomasz
+-Christoffer
