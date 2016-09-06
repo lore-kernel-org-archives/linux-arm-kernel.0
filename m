@@ -1,55 +1,347 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Sep 2016 21:14:27 +0200
-Subject: [RFC PATCH V5 3/5] PCI: Check platform specific ECAM quirks
-In-Reply-To: <34416dae-31e6-93b6-2ba8-f42ba61ede4f@semihalf.com>
-References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
- <20160905022529.GD30488@localhost>
- <34416dae-31e6-93b6-2ba8-f42ba61ede4f@semihalf.com>
-Message-ID: <6146693.UZIeGQtNL9@wuerfel>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 6 Sep 2016 21:19:18 +0200
+Subject: [RFC PATCH v3 4/5] arm/arm64: vgic-new: Implement VGICv3 CPU
+ interface access
+In-Reply-To: <CALicx6s=ih2E-KrCD=J2beJ_=PmSUcf55T77A00USwu1WiJbxw@mail.gmail.com>
+References: <1472037609-4164-1-git-send-email-vijay.kilari@gmail.com>
+ <1472037609-4164-5-git-send-email-vijay.kilari@gmail.com>
+ <20160830134514.GJ10162@cbox>
+ <CALicx6vW9Lu7nNu86d-+a985iSH2vZ7ekb_5AgCxct-z90M7Wg@mail.gmail.com>
+ <CALicx6s=ih2E-KrCD=J2beJ_=PmSUcf55T77A00USwu1WiJbxw@mail.gmail.com>
+Message-ID: <20160906191918.GM23592@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 6, 2016 7:49:49 PM CEST Tomasz Nowicki wrote:
-> On 05.09.2016 04:25, Bjorn Helgaas wrote:
-> > On Mon, Aug 08, 2016 at 03:05:39PM +0200, Tomasz Nowicki wrote:
-> >> Some platforms may not be fully compliant with generic set of PCI config
-> >> accessors. For these cases we implement the way to overwrite accessors
-> >> set. Algorithm traverses available quirk list (static array),
-> >> matches against <oem_id, oem_table_id, rev, domain, bus number range> and
-> >> returns pci_config_window structure with fancy PCI config ops.
-> >> oem_id, oem_table_id and rev come from MCFG table standard header.
-> >>
-> >> It is possible to define custom init call which is responsible for
-> >> setting up PCI configuration access accordingly to quirk requirements.
-> >> If custom init call is not defined, use standard pci_acpi_setup_ecam_mapping().
-> >>
-> >> pci_generic_ecam_ops will be used for platforms free from quirks.
-> >>
-> >> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> >> Signed-off-by: Dongdong Liu <liudongdong3@huawei.com>
-> >> Signed-off-by: Christopher Covington <cov@codeaurora.org>
-> >> ---
-> >>  drivers/pci/host/Makefile      |  1 +
-> >>  drivers/pci/host/mcfg-quirks.c | 86 ++++++++++++++++++++++++++++++++++++++++++
-> >>  drivers/pci/host/mcfg-quirks.h | 20 ++++++++++
-> >>  include/linux/pci-acpi.h       |  2 +
-> >>  4 files changed, 109 insertions(+)
-> >>  create mode 100644 drivers/pci/host/mcfg-quirks.c
-> >>  create mode 100644 drivers/pci/host/mcfg-quirks.h
+On Tue, Sep 06, 2016 at 07:43:23PM +0530, Vijay Kilari wrote:
+> Resending in plain text mode
+> 
+> On Tue, Sep 6, 2016 at 7:18 PM, Vijay Kilari <vijay.kilari@gmail.com> wrote:
 > >
-> > If the object is to work around defects in the ACPI MCFG table, I
-> > think I'd put the quirks closer to drivers/acpi/pci_mcfg.c, where we
-> > parse that table.  What if we actually put them directly *in*
-> > drivers/acpi/pci_mcfg.c?
-> 
-> Then we need to export quirk init calls or ecam ops from 
-> drivers/pci/host/* directory.
-> 
-> Currently we keep mcfg quirk handling code and related drivers in one 
-> place drivers/pci/host/
+> >
+> > On Tue, Aug 30, 2016 at 7:15 PM, Christoffer Dall
+> > <christoffer.dall@linaro.org> wrote:
+> >>
+> >> On Wed, Aug 24, 2016 at 04:50:08PM +0530, vijay.kilari at gmail.com wrote:
+> >> > From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> >
+> >
+> >>
+> >> > diff --git a/virt/kvm/arm/vgic/vgic-sys-reg-v3.c
+> >> > b/virt/kvm/arm/vgic/vgic-sys-reg-v3.c
+> >>
+> >> > new file mode 100644
+> >> > index 0000000..581d053
+> >> > --- /dev/null
+> >> > +++ b/virt/kvm/arm/vgic/vgic-sys-reg-v3.c
+> >> > @@ -0,0 +1,211 @@
+> >> > +#include <linux/irqchip/arm-gic-v3.h>
+> >> > +#include <linux/kvm.h>
+> >> > +#include <linux/kvm_host.h>
+> >> > +#include <kvm/iodev.h>
+> >> > +#include <kvm/arm_vgic.h>
+> >> > +#include <asm/kvm_emulate.h>
+> >> > +#include <asm/kvm_arm.h>
+> >> > +#include <asm/kvm_mmu.h>
+> >> > +
+> >> > +#include "vgic.h"
+> >> > +#include "vgic-mmio.h"
+> >> > +#include "sys_regs.h"
+> >> > +
+> >> > +static bool access_gic_ctlr(struct kvm_vcpu *vcpu, struct
+> >> > sys_reg_params *p,
+> >> > +                         const struct sys_reg_desc *r)
+> >> > +{
+> >> > +     struct vgic_vmcr vmcr;
+> >> > +
+> >> > +     vgic_get_vmcr(vcpu, &vmcr);
+> >> > +     if (p->is_write) {
+> >> > +             vmcr.ctlr = (u32)p->regval;
+> >> > +             vgic_set_vmcr(vcpu, &vmcr);
+> >> > +     } else {
+> >> > +             p->regval = vmcr.ctlr;
+> >> > +     }
+> >> > +
+> >>
+> >> really?  Have you looked at the spec and implementation of this or did
+> >> you just copy the v2 code?
+> >>
+> >> The ICH_VMCR_EL2 register field mappings are not identical to the ctlr
+> >> mappings.  I think this causes some rework for much of this patch, so
+> >> I'll have a look at the next revision.
+> >
+> >
+> >   ICH_VMCR_EL2.VEOIM &  ICH_VMCR_EL2.CBPR holds
+> > ICC_CTLR_EL1.EOImode & ICC_CTLR_EL1.CBPR  respectively.
+> > Remaining fields are Readonly except PHME. AFAIK, vgic is not
+> > holding ICC_CTLR_EL1 except the fields in ICH_VMCR_EL2.
 
-I think that's the wrong place to have it, it just leads to people
-trying to share code with the host drivers in that directory, which
-hasn't really worked out so far, it just adds complexity.
+This function implements the accessor for ICC_CTLR_EL1 according to your
+own comment (and the system register encoding).
 
-	Arnd
+If you planned on exposing ICH_VMCR_EL2 to userspace, then why did you
+expose it for the encoding of ICC_CTLR_EL1?
+
+More to the point, you're exposing the *VM's* state of the GIC, not
+details about the hypervisor implementation.
+
+> >> > +     return true;
+> >> > +}
+> >> > +
+> >> > +static bool access_gic_pmr(struct kvm_vcpu *vcpu, struct sys_reg_params
+> >> > *p,
+> >> > +                        const struct sys_reg_desc *r)
+> >> > +{
+> >> > +     struct vgic_vmcr vmcr;
+> >> > +
+> >> > +     vgic_get_vmcr(vcpu, &vmcr);
+> >> > +     if (p->is_write) {
+> >> > +             vmcr.pmr = (u32)p->regval;
+> >> > +             vgic_set_vmcr(vcpu, &vmcr);
+> >> > +     } else {
+> >> > +             p->regval = vmcr.pmr;
+> >> > +     }
+> >> > +
+> >> > +     return true;
+> >> > +}
+> >> > +
+> >> > +static bool access_gic_bpr0(struct kvm_vcpu *vcpu, struct
+> >> > sys_reg_params *p,
+> >> > +                         const struct sys_reg_desc *r)
+> >> > +{
+> >> > +     struct vgic_vmcr vmcr;
+> >> > +
+> >> > +     vgic_get_vmcr(vcpu, &vmcr);
+> >> > +     if (p->is_write) {
+> >> > +             vmcr.bpr = (u32)p->regval;
+> >> > +             vgic_set_vmcr(vcpu, &vmcr);
+> >> > +     } else {
+> >> > +             p->regval = vmcr.bpr;
+> >> > +     }
+> >> > +
+> >> > +     return true;
+> >> > +}
+> >> > +
+> >> > +static bool access_gic_bpr1(struct kvm_vcpu *vcpu, struct
+> >> > sys_reg_params *p,
+> >> > +                         const struct sys_reg_desc *r)
+> >> > +{
+> >> > +     struct vgic_vmcr vmcr;
+> >> > +
+> >> > +     vgic_get_vmcr(vcpu, &vmcr);
+> >> > +     if (p->is_write) {
+> >> > +             vmcr.abpr = (u32)p->regval;
+> >> > +             vgic_set_vmcr(vcpu, &vmcr);
+> >> > +     } else {
+> >> > +             p->regval = vmcr.abpr;
+> >> > +     }
+> >> > +
+> >> > +     return true;
+> >> > +}
+> >> > +
+> >> > +static bool access_gic_grpen0(struct kvm_vcpu *vcpu, struct
+> >> > sys_reg_params *p,
+> >> > +                           const struct sys_reg_desc *r)
+> >> > +{
+> >> > +     struct vgic_v3_cpu_if *vgicv3 = &vcpu->arch.vgic_cpu.vgic_v3;
+> >> > +
+> >> > +     if (p->is_write) {
+> >> > +             vgicv3->vgic_vmcr &= ~ICH_VMCR_ENG0;
+> >> > +             vgicv3->vgic_vmcr |= (p->regval << ICH_VMCR_ENG0_SHIFT) &
+> >> > +                                   ICH_VMCR_ENG0;
+> >> > +     } else {
+> >> > +             p->regval = (vgicv3->vgic_vmcr & ICH_VMCR_ENG0) >>
+> >> > +                          ICH_VMCR_ENG0_SHIFT;
+> >> > +     }
+> >>
+> >> so for example, why shouldn't these go through the vgic_set/get_vmcr
+> >> wrappers?
+> >
+> >
+> > The vgic_vmcr struct as below is not managing ENG0 and ENG1 fields.
+> > So could not use vgic_set/get wrappers.
+
+eh, but you could expand this structure, right?
+
+It's strange that some things go through access functions, while others
+do not.  If there is a good reason for that, then document that somehow.
+
+> >
+> > struct vgic_vmcr {
+> >         u32     ctlr;
+> >         u32     abpr;
+> >         u32     bpr;
+> >         u32     pmr;
+> > };
+> >
+> >
+> >>
+> >>
+> >> > +
+> >> > +     return true;
+> >> > +}
+> >> > +
+> >> > +static bool access_gic_grpen1(struct kvm_vcpu *vcpu, struct
+> >> > sys_reg_params *p,
+> >> > +                           const struct sys_reg_desc *r)
+> >> > +{
+> >> > +     struct vgic_v3_cpu_if *vgicv3 = &vcpu->arch.vgic_cpu.vgic_v3;
+> >> > +
+> >> > +     if (p->is_write) {
+> >> > +             vgicv3->vgic_vmcr &= ~ICH_VMCR_ENG1;
+> >> > +             vgicv3->vgic_vmcr |= (p->regval << ICH_VMCR_ENG1_SHIFT) &
+> >> > +                                   ICH_VMCR_ENG1;
+> >> > +     } else {
+> >> > +             p->regval = (vgicv3->vgic_vmcr & ICH_VMCR_ENG1) >>
+> >> > +                          ICH_VMCR_ENG1_SHIFT;
+> >> > +     }
+> >> > +
+> >> > +     return true;
+> >> > +}
+> >> > +
+> >> > +static bool access_gic_ap0r(struct kvm_vcpu *vcpu, struct
+> >> > sys_reg_params *p,
+> >> > +                         const struct sys_reg_desc *r)
+> >> > +{
+> >> > +     struct vgic_v3_cpu_if *vgicv3 = &vcpu->arch.vgic_cpu.vgic_v3;
+> >> > +     u8 idx = r->Op2 & 3;
+> >> > +
+> >> > +     if (p->is_write)
+> >> > +             vgicv3->vgic_ap0r[idx] = p->regval;
+> >> > +     else
+> >> > +             p->regval = vgicv3->vgic_ap0r[idx];
+> >> > +
+> >> > +     return true;
+> >> > +}
+> >> > +
+> >> > +static bool access_gic_ap1r(struct kvm_vcpu *vcpu, struct
+> >> > sys_reg_params *p,
+> >> > +                         const struct sys_reg_desc *r)
+> >> > +{
+> >> > +     struct vgic_v3_cpu_if *vgicv3 = &vcpu->arch.vgic_cpu.vgic_v3;
+> >> > +     u8 idx = r->Op2 & 3;
+> >> > +
+> >> > +     if (p->is_write)
+> >> > +             vgicv3->vgic_ap1r[idx] = p->regval;
+> >> > +     else
+> >> > +             p->regval = vgicv3->vgic_ap1r[idx];
+> >> > +
+> >> > +     return true;
+> >> > +}
+> >> > +
+> >> > +static const struct sys_reg_desc gic_v3_icc_reg_descs[] = {
+> >> > +     /* ICC_PMR_EL1 */
+> >> > +     { Op0(3), Op1(0), CRn(4), CRm(6), Op2(0), access_gic_pmr },
+> >> > +     /* ICC_BPR0_EL1 */
+> >> > +     { Op0(3), Op1(0), CRn(12), CRm(8), Op2(3), access_gic_bpr0 },
+> >> > +     /* ICC_AP0R0_EL1 */
+> >> > +     { Op0(3), Op1(0), CRn(12), CRm(8), Op2(4), access_gic_ap0r },
+> >> > +     /* ICC_AP0R1_EL1 */
+> >> > +     { Op0(3), Op1(0), CRn(12), CRm(8), Op2(5), access_gic_ap0r },
+> >> > +     /* ICC_AP0R2_EL1 */
+> >> > +     { Op0(3), Op1(0), CRn(12), CRm(8), Op2(6), access_gic_ap0r },
+> >> > +     /* ICC_AP0R3_EL1 */
+> >> > +     { Op0(3), Op1(0), CRn(12), CRm(8), Op2(7), access_gic_ap0r },
+> >> > +     /* ICC_AP1R0_EL1 */
+> >> > +     { Op0(3), Op1(0), CRn(12), CRm(9), Op2(0), access_gic_ap1r },
+> >> > +     /* ICC_AP1R1_EL1 */
+> >> > +     { Op0(3), Op1(0), CRn(12), CRm(9), Op2(1), access_gic_ap1r },
+> >> > +     /* ICC_AP1R2_EL1 */
+> >> > +     { Op0(3), Op1(0), CRn(12), CRm(9), Op2(2), access_gic_ap1r },
+> >> > +     /* ICC_AP1R3_EL1 */
+> >> > +     { Op0(3), Op1(0), CRn(12), CRm(9), Op2(3), access_gic_ap1r },
+> >> > +     /* ICC_BPR1_EL1 */
+> >> > +     { Op0(3), Op1(0), CRn(12), CRm(12), Op2(3), access_gic_bpr1 },
+> >> > +     /* ICC_CTLR_EL1 */
+> >> > +     { Op0(3), Op1(0), CRn(12), CRm(12), Op2(4), access_gic_ctlr },
+> >> > +     /* ICC_IGRPEN0_EL1 */
+> >> > +     { Op0(3), Op1(0), CRn(12), CRm(12), Op2(6), access_gic_grpen0 },
+> >> > +     /* ICC_GRPEN1_EL1 */
+> >> > +     { Op0(3), Op1(0), CRn(12), CRm(12), Op2(7), access_gic_grpen1 },
+> >>
+> >> Do we need to allow userspace to at least read ICC_SRE_EL1?
+> >
+> >
+> > ICC_SRE_EL1.SRE is enabled at vgic initialization and DIB and FDB are not
+> > configured.
+> >     So save and restore does not make any effect.
+
+I know, but that doesn't mean that userspace shouldn't be able to tell
+what the result of the vgic initialization was by looking at the
+register.
+
+So I am looking for slightly better arguments than 'it doesn't seem to
+matter in practice right now'.
+
+> >
+> >>
+> >> Should we verify that the DIB and FDB fields of that register are
+> >> written as the system understands them (clear, WI)?
+> >
+> >
+> >   What kind of verification we can do on DIB and FDB by userspace?.
+
+That userspace tries to write a value as it thinks they should be and
+the kernel code checks that this corresponds to the underlying hardware.
+
+> >>
+> >>
+> >> > +
+> >> > +int vgic_v3_cpu_sysregs_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+> >> > u64 id,
+> >> > +                             u64 *reg)
+> >> > +{
+> >> > +     struct sys_reg_params params;
+> >> > +     const struct sys_reg_desc *r;
+> >> > +
+> >> > +     if (is_write)
+> >> > +             params.regval = le64_to_cpu(*reg);
+> >>
+> >> why do we need this conversion here?
+> >>
+> >    The registers are managed in LE mode.
+
+What do you mean?  They are stored as typed values, right?  Why is
+endianness a factor here.
+
+System registers are registers, they do not have an endianness.
+
+
+> >  So here the value to be
+> > writtern is coverted to LE mode and similarly on reading back it is
+> > converted
+> > from LE.
+> >
+
+I don't understand where you feel the mismatch in endianness comes from?
+
+The reason why we use vgic_data_host_to_mmio_bus() is historic and I
+think we can actually get rid of that in the uaccess part.  (Looking at
+the symmetry between vgic_uaccess and vgic_mmio_uaccess_{read,write}
+should tell us that this is completely unnecessary and we can just
+replace the prototype to take an unsigned long instead of a void * for
+the val parameter.)
+
+Can you provide an example of how it goes bad if you don't have this
+conversion?
+
+Thanks,
+-Christoffer
+
+> >> > +     params.is_write = is_write;
+> >> > +     params.is_aarch32 = false;
+> >> > +     params.is_32bit = false;
+> >> > +
+> >> > +     r = find_reg_by_id(id, &params, gic_v3_icc_reg_descs,
+> >> > +                        ARRAY_SIZE(gic_v3_icc_reg_descs));
+> >> > +     if (!r)
+> >> > +             return -ENXIO;
+> >> > +
+> >> > +     if (!r->access(vcpu, &params, r))
+> >> > +             return -EINVAL;
+> >> > +
+> >> > +     if (!is_write)
+> >> > +             *reg = cpu_to_le64(params.regval);
+> >>
+> >> same question as above
+> >>
+> >
