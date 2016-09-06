@@ -1,158 +1,104 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 6 Sep 2016 11:27:42 +0100
-Subject: [PATCH v2 3/7] arm64: Introduce uaccess_{disable, enable}
- functionality based on TTBR0_EL1
-In-Reply-To: <20160905172038.GC27305@leverpostej>
-References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
- <1472828533-28197-4-git-send-email-catalin.marinas@arm.com>
- <20160905172038.GC27305@leverpostej>
-Message-ID: <20160906102741.GF19605@e104818-lin.cambridge.arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 6 Sep 2016 11:32:14 +0100
+Subject: [PATCH v2 3/6] dt/bindings: Add bindings for Tegra GMI controller
+In-Reply-To: <CALw8SCUYQGWXn7=Jpn=uvFvvPRVFQGrtSNot+-tVgP73yAEEOQ@mail.gmail.com>
+References: <1472045838-22628-1-git-send-email-mirza.krak@gmail.com>
+ <1472045838-22628-4-git-send-email-mirza.krak@gmail.com>
+ <de2fb909-829e-6c04-4f6a-442cbb9171c9@nvidia.com>
+ <CALw8SCVcPymDZ8NyUbeanRF0TCT1TZzL6iRDticYA42FWrEWqw@mail.gmail.com>
+ <20160830170636.GA8741@rob-hp-laptop>
+ <CALw8SCUYQGWXn7=Jpn=uvFvvPRVFQGrtSNot+-tVgP73yAEEOQ@mail.gmail.com>
+Message-ID: <a3a2371b-5d98-db2d-b7e4-be6d08cb7271@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 05, 2016 at 06:20:38PM +0100, Mark Rutland wrote:
-> On Fri, Sep 02, 2016 at 04:02:09PM +0100, Catalin Marinas wrote:
-> > +#ifdef CONFIG_ARM64_TTBR0_PAN
-> > +#define RESERVED_TTBR0_SIZE	(PAGE_SIZE)
-> > +#else
-> > +#define RESERVED_TTBR0_SIZE	(0)
-> > +#endif
-> 
-> I was going to suggest that we use the empty_zero_page, which we can
-> address with an adrp, because I had forgotten that we need to generate
-> the *physical* address.
-> 
-> It would be good if we could have a description of why we need the new
-> reserved page somewhere in the code. I'm sure I won't be the only one
-> tripped up by this.
-> 
-> It would be possible to use the existing empty_zero_page, if we're happy
-> to have a MOVZ; MOVK; MOVK; MOVK sequence that we patch at boot-time.
-> That could be faster than an MRS on some implementations.
 
-I was trying to keep the number of instructions to a minimum in
-preference to potentially slightly faster sequence (I haven't done any
-benchmarks). On ARMv8.1+ implementations, we just end up with more nops.
+On 31/08/16 12:22, Mirza Krak wrote:
+> 2016-08-30 19:06 GMT+02:00 Rob Herring <robh@kernel.org>:
 
-We could also do an ldr from a PC-relative address, it's one instruction
-and it may not be (significantly) slower than MRS + ADD.
+...
 
-> > +static inline void uaccess_ttbr0_enable(void)
-> > +{
-> > +	unsigned long flags;
-> > +
-> > +	/*
-> > +	 * Disable interrupts to avoid preemption and potential saved
-> > +	 * TTBR0_EL1 updates between reading the variable and the MSR.
-> > +	 */
-> > +	local_irq_save(flags);
-> > +	write_sysreg(current_thread_info()->ttbr0, ttbr0_el1);
-> > +	isb();
-> > +	local_irq_restore(flags);
-> > +}
-> 
-> I don't follow what problem this actually protects us against. In the
-> case of preemption everything should be saved+restored transparently, or
-> things would go wrong as soon as we enable IRQs anyway.
-> 
-> Is this a hold-over from a percpu approach rather than the
-> current_thread_info() approach?
+>>>                  nvidia,snor-cs = <4>;
+>>
+>> NAK, no custom CS properties.
 
-If we get preempted between reading current_thread_info()->ttbr0 and
-writing TTBR0_EL1, a series of context switches could lead to the update
-of the ASID part of ttbr0. The actual MSR would store an old ASID in
-TTBR0_EL1.
+Ok, so ...
 
-> > +#else
-> > +static inline void uaccess_ttbr0_disable(void)
-> > +{
-> > +}
-> > +
-> > +static inline void uaccess_ttbr0_enable(void)
-> > +{
-> > +}
-> > +#endif
+> gmi at 70090000 {
+>         compatible = "nvidia,tegra20-gmi";
+>         reg = <0x70009000 0x1000>;
+>         #address-cells = <2>;
+>         #size-cells = <1>;
+>         clocks = <&tegra_car TEGRA20_CLK_NOR>;
+>         clock-names = "gmi";
+>         resets = <&tegra_car 42>;
+>         reset-names = "gmi";
+>         ranges = <4 0 0xd0000000 0xfffffff>;
 > 
-> I think that it's better to drop the ifdef and add:
+>         status = "okay";
 > 
-> 	if (!IS_ENABLED(CONFIG_ARM64_TTBR0_PAN))
-> 		return;
+>         bus at 4,0 {
+>                 compatible = "simple-bus";
+>                 #address-cells = <1>;
+>                 #size-cells = <1>;
+>                 ranges = <0 4 0 0x40000>;
 > 
-> ... at the start of each function. GCC should optimize the entire thing
-> away when not used, but we'll get compiler coverage regardless, and
-> therefore less breakage. All the symbols we required should exist
-> regardless.
+>                 nvidia,snor-mux-mode;
+>                 nvidia,snor-adv-inv;
+> 
+>                 can at 0 {
+>                         reg = <0 0x100>;
+>                         ...
+>                 };
+> 
+>                 can at 40000 {
+>                         reg = <0x40000 0x100>;
+>                         ...
+>                 };
+>         };
+> };
+> 
+> Have I understood you correct?
+> 
+> Also wanted to verify the example case where you only have on device
+> connected to one CS#, from what I see in other implementations it
+> seems OK to put the CS# in the reg property in that case. Is this
+> correct?
+> 
+> Example with one SJA1000 CAN controller connected to the GMI bus
+> on CS4:
+> 
+> gmi at 70090000 {
+>         compatible = "nvidia,tegra20-gmi";
+>         reg = <0x70009000 0x1000>;
+>         #address-cells = <2>;
+>         #size-cells = <1>;
+>         clocks = <&tegra_car TEGRA20_CLK_NOR>;
+>         clock-names = "gmi";
+>         resets = <&tegra_car 42>;
+>         reset-names = "gmi";
+>         ranges = <4 0 0xd0000000 0xfffffff>;
+> 
+>         status = "okay";
+> 
+>         can at 4,0 {
+>                 reg = <4 0 0x100>;
+>                 nvidia,snor-mux-mode;
+>                 nvidia,snor-adv-inv;
+>                 ...
+>         };
+> };
+> 
+> Jon, to be able to handle both cases in the driver we would first
+> attempt to decode the CS# from the ranges property, and fallback to
+> reg property if no ranges are defined. Does that sound reasonable?
 
-The reason for this is that thread_info.ttbr0 is conditionally defined.
-I don't think the compiler would ignore it.
+Given the above examples that may be supported, is there a
+better/simpler way to extract the CS# than what Mirza is proposing? For
+example, from the node-name unit-address?
 
-> >  	.macro	uaccess_enable, tmp1, tmp2
-> > +#ifdef CONFIG_ARM64_TTBR0_PAN
-> > +alternative_if_not ARM64_HAS_PAN
-> > +	save_and_disable_irq \tmp2		// avoid preemption
-> > +	uaccess_ttbr0_enable \tmp1
-> > +	restore_irq \tmp2
-> > +alternative_else
-> > +	nop
-> > +	nop
-> > +	nop
-> > +	nop
-> > +	nop
-> > +	nop
-> > +	nop
-> > +alternative_endif
-> > +#endif
-> 
-> How about something like:
-> 
-> 	.macro alternative_endif_else_nop
-> 	alternative_else
-> 	.rept ((662b-661b) / 4)
-> 	       nop
-> 	.endr
-> 	alternative_endif
-> 	.endm
-> 
-> So for the above we could have:
-> 
-> 	alternative_if_not ARM64_HAS_PAN
-> 		save_and_disable_irq \tmp2
-> 		uaccess_ttbr0_enable \tmp1
-> 		restore_irq \tmp2
-> 	alternative_endif_else_nop
-> 
-> I'll see about spinning a patch, or discovering why that happens to be
-> broken.
-
-This looks better. Minor comment, I would actually name the ending
-statement alternative_else_nop_endif to match the order in which you'd
-normally write them.
-
-> >  	 * tables again to remove any speculatively loaded cache lines.
-> >  	 */
-> >  	mov	x0, x25
-> > -	add	x1, x26, #SWAPPER_DIR_SIZE
-> > +	add	x1, x26, #SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE
-> >  	dmb	sy
-> >  	bl	__inval_cache_range
-> >  
-> > diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> > index 659963d40bb4..fe393ccf9352 100644
-> > --- a/arch/arm64/kernel/vmlinux.lds.S
-> > +++ b/arch/arm64/kernel/vmlinux.lds.S
-> > @@ -196,6 +196,11 @@ SECTIONS
-> >  	swapper_pg_dir = .;
-> >  	. += SWAPPER_DIR_SIZE;
-> >  
-> > +#ifdef CONFIG_ARM64_TTBR0_PAN
-> > +	reserved_ttbr0 = .;
-> > +	. += PAGE_SIZE;
-> > +#endif
-> 
-> Surely RESERVED_TTBR0_SIZE, as elsewhere?
-
-I'll try to move it somewhere where it can be included in vmlinux.lds.S
-(I can probably include cpufeature.h directly).
+Cheers
+Jon
 
 -- 
-Catalin
+nvpublic
