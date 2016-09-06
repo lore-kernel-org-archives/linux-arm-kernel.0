@@ -1,26 +1,58 @@
-From: fengguang.wu@intel.com (Fengguang Wu)
-Date: Wed, 7 Sep 2016 07:47:05 +0800
-Subject: [arm:sa1100 33/97] arch/arm/common/sa1111.c:515:19: error:
- 'irqbase' undeclared
-In-Reply-To: <20160906222245.GH1041@n2100.armlinux.org.uk>
-References: <201609070356.QKsjqKNj%fengguang.wu@intel.com>
- <20160906222245.GH1041@n2100.armlinux.org.uk>
-Message-ID: <20160906234705.wrqvupyhninqc2xz@wfg-t540p.sh.intel.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 07 Sep 2016 01:57:11 +0200
+Subject: [PATCH v2 02/10] driver core: Functional dependencies tracking
+ support
+In-Reply-To: <20160728152831.GA1929@wunner.de>
+References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
+ <2841548.NIYVpJFBcH@vostro.rjw.lan> <20160728152831.GA1929@wunner.de>
+Message-ID: <1546158.G8Vnv1pldV@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell King,
+On Thursday, July 28, 2016 05:28:31 PM Lukas Wunner wrote:
+> On Thu, Jul 28, 2016 at 02:30:31AM +0200, Rafael J. Wysocki wrote:
+> > On Monday, July 25, 2016 12:48:32 AM Lukas Wunner wrote:
+> > > On Thu, Jul 21, 2016 at 02:25:15AM +0200, Rafael J. Wysocki wrote:
+> > > > On Thursday, July 21, 2016 01:25:53 AM Lukas Wunner wrote:
+> > > > > I guess I could amend portdrv to return -EPROBE_DEFER on Macs if
+> > > > > no driver is bound to the NHI. Doesn't feel pretty to me though.
+> > > > > 
+> > > > > Ultimately this seems to be the same issue as with calling
+> > > > > dev_pm_domain_set() for a bound device. Perhaps device_link_add()
+> > > > > can likewise be allowed if a runtime PM ref is held for the devices
+> > > > > and the call happens under lock_system_sleep()?
+> > > > 
+> > > > No, the whole synchronization scheme in the links code would have had to be
+> > > > changed for that to really work.
+> > > > 
+> > > > And it really is about what is needed (at least in principle) to run your
+> > > > device.  If you think you need device X with a driver to handle device Y
+> > > > correctly, then either you need it all the time, from probe to remove, or
+> > > > you just don't really need it at all.
+> > > 
+> > > Real life isn't as simple as that.
+> > > 
+> > > In this case, we have consumers (hotplug ports) which are doing fine
+> > > if the driver for the supplier (NHI) is not loaded. But once it loads,
+> > > the links must be in place.
+> > 
+> > Hmm.
+> > 
+> > What if it is not loaded and the system suspends.  Will everything work
+> > as expected after the subsequent resume?
+> 
+> The short answer is yes.
 
-On Tue, Sep 06, 2016 at 11:22:45PM +0100, Russell King - ARM Linux wrote:
->On Wed, Sep 07, 2016 at 03:29:58AM +0800, kbuild test robot wrote:
->> tree:   http://repo.or.cz/linux-2.6/linux-2.6-arm.git sa1100
->
->Please use git://git.armlinux.org.uk/~rmk/linux-arm.git instead -
->the new machine is in place and should be able to cope just fine with
->whatever git load, so there should be no need to use mirrors anymore.
->I think you're using that already for some reports anyway.
+OK
 
-Thanks for the info, I've updated the tree URL accordingly.
+I think it's possible to add a link flag to address this case.
 
-Regards,
-Fengguang
+Namely, if that flag is passed to device_link_add(), the link will be
+added in the DEVICE_LINK_ACTIVE state right away, but that will need to
+be synchronized against all possible transitions of the consumer device
+(at least).
+
+It's better to do that in a separate patch for this reason IMO.
+
+Thanks,
+Rafael
