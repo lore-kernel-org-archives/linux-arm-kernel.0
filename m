@@ -1,34 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 6 Sep 2016 13:21:10 +0000
-Subject: [PATCH] dt-bindings: mvebu-odmi: fix example typo
-In-Reply-To: <20160906074831.7mlgufxlirm5yuv2@tarshish>
-References: <0743fef6fe390bc4ae7cabd15c4836bbed98f7cf.1473087913.git.baruch@tkos.co.il>
- <20160905170900.3225b4b4@free-electrons.com>
- <20160906074831.7mlgufxlirm5yuv2@tarshish>
-Message-ID: <20160906132110.GO10637@io.lakedaemon.net>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 6 Sep 2016 14:23:16 +0100
+Subject: [PATCH v2 7/7] ARM: KVM: Unlock vgic-v3 support
+In-Reply-To: <20160905112927.GL26366@cbox>
+References: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
+ <1471344418-19568-8-git-send-email-vladimir.murzin@arm.com>
+ <20160905112927.GL26366@cbox>
+Message-ID: <57CEC344.7030706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
 
-On Tue, Sep 06, 2016 at 10:48:31AM +0300, Baruch Siach wrote:
-> On Mon, Sep 05, 2016 at 05:09:00PM +0200, Thomas Petazzoni wrote:
-> > On Mon,  5 Sep 2016 18:05:13 +0300, Baruch Siach wrote:
-> > > Make the example compatible string match its definition.
-> > > 
-> > > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > 
-> > Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Sorry, missed this one
+
+On 05/09/16 12:29, Christoffer Dall wrote:
+>>  
+>> > +static bool __hyp_text __has_useable_gicv3_cpuif(void)
+>> > +{
+>> > +	if (IS_ENABLED(CONFIG_ARM_GIC_V3) && (read_sysreg(ID_PFR1) >> 28))
+> Do we have a define for bit 28 we could use?
+
+I'll check it.
+
 > 
-> Thanks, Thomas.
-> 
-> mvebu maintainers: Unfortunately I forgot to Cc irqchip maintainers on this 
-> patch (except Jason, who is in both), sorry about that. Should I resend? Would 
-> any of you pick it up?
+> Does this actually work on all v7 boards?  The v7 ARM ARM seems to state
+> that this bitfield is Reserved, UNK.  Does that somehow mean 'is going
+> to be zero'?
 
-Don't sweat it, I'll pick it up with the other mvebu changes I have this
-cycle (for irqchip).
+It is how v7ARM ARM I have defines UNK
 
-thx,
+An abbreviation indicating that software must treat a field as
+containing an UNKNOWN value. Hardware must implement the bit as read as
+0, or all 0s for a bit field. Software must not rely on the field
+reading as zero.
 
-Jason.
+It seems goes under 'is going to be zero' case, no?
+
+Cheers
+Vladimir
