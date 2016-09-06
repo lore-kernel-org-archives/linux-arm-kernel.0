@@ -1,45 +1,75 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 6 Sep 2016 17:44:15 +0100
-Subject: [PATCH v2] kvm: arm: Enforce some NS-SVC initialisation
-In-Reply-To: <20160906164145.GD23592@cbox>
-References: <5322cdb9cb397741d15b60c6693ad39dbf74b6d5.1469101945.git.robin.murphy@arm.com>
- <6d030bee2db08c2fe1b7569e692e8f66800b1e4c.1471369569.git.robin.murphy@arm.com>
- <20160817113249.GA5909@cbox> <20160906164145.GD23592@cbox>
-Message-ID: <8e0b62de-63dd-4635-14b3-a70726bc1798@arm.com>
+From: alexandre.torgue@st.com (Alexandre TORGUE)
+Date: Tue, 6 Sep 2016 18:45:32 +0200
+Subject: [PATCH v4 0/9] Add STM32 EXTI interrupt controller support
+Message-ID: <1473180341-1999-1-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+Hi,
 
-On 06/09/16 17:41, Christoffer Dall wrote:
-> On Wed, Aug 17, 2016 at 01:32:49PM +0200, Christoffer Dall wrote:
->> Hi Russell,
->>
->> On Tue, Aug 16, 2016 at 06:49:18PM +0100, Robin Murphy wrote:
->>> Since the non-secure copies of banked registers lack architecturally
->>> defined reset values, there is no actual guarantee when entering in Hyp
->>> from secure-only firmware that the Non-Secure PL1 state will look the
->>> way that kernel entry (in particular the decompressor stub) expects.
->>> So far, we've been getting away with it thanks to implementation details
->>> of ARMv7 cores and/or bootloader behaviour, but for the sake of forwards
->>> compatibility let's try to ensure that we have a minimally sane state
->>> before dropping down into it.
->>>
->>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>
->> Can we have your acked-by on this patch to merge it via the KVM tree or
->> do you prefer merging this one directly yourself?
->>
-> I have queued this via the KVM/ARM tree.  If you have any objections,
-> please let me know asap.
+According to Thomas Gleixner remarks, I add modification on usage of gpiochip_lock_as_irq
+/unlock. For that I adds light modifications in stm32 pinctrl driver and
+stm32 exti driver allocation/free irq domain callbacks.
 
-Ah, I should have replied on this thread - I put this one into Russell's
-patch system the other week, and it's in -next already.
+The series adds support to EXTI interrupt controller and GPIO IRQ support in
+STM32 pinctrl driver.
 
-Sorry for the lack of communication,
-Robin.
+The STM32 external interrupt controller consists of edge detectors that
+generate interrupts requests or wake-up events.
 
-> 
-> Thanks,
-> -Christoffer
-> 
+Each line can be independently configured as interrupt or wake-up source,
+and triggers either on rising, fallin or both edges. Each line can also
+be masked independently.
+
+Regards 
+
+Alex
+
+Changes since v3:
+-----------------
+ - Review domain dealloc/free irq in stm32 pinctrl driver
+ - Review domain dealloc/free irq in stm32 exti driver
+ - Fix remarks on coding style
+
+Changes since v2:
+-----------------
+ - Define irq_chip for GPIO banks
+ - Use hierarchical domain for GPIO banks
+ - Improve search loop inside stm32_exti handler 
+ - Rebased on top of v4.8-rc1
+
+Changes since v1:
+-----------------
+ - Rebased on top of v4.6-rc1
+ - Change variable name from virq to irq (Linus W.)
+
+Alexandre TORGUE (9):
+  Documentation: dt-bindings: Document STM32 EXTI controller bindings
+  drivers: irqchip: Add STM32 external interrupts support
+  ARM: STM32: Select external interrupts controller
+  ARM: dts: Add EXTI controller node to stm32f429
+  Documentation: dt-bindings: Add IRQ related properties of STM32
+    pinctrl
+  pinctrl: Add IRQ support to STM32 gpios
+  ARM: dts: Add GPIO irq support to STM2F429
+  ARM: dts: Declare push button as GPIO key on stm32f429 boards
+  ARM: config: Enable GPIO Key driver in stm32_defconfig
+
+ .../interrupt-controller/st,stm32-exti.txt         |  20 ++
+ .../bindings/pinctrl/st,stm32-pinctrl.txt          |   3 +
+ arch/arm/Kconfig                                   |   1 +
+ arch/arm/boot/dts/stm32429i-eval.dts               |  18 ++
+ arch/arm/boot/dts/stm32f429-disco.dts              |  13 ++
+ arch/arm/boot/dts/stm32f429.dtsi                   |  10 +
+ arch/arm/configs/stm32_defconfig                   |   6 +-
+ drivers/irqchip/Kconfig                            |   4 +
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-stm32-exti.c                   | 203 +++++++++++++++++++++
+ drivers/pinctrl/stm32/Kconfig                      |   2 +
+ drivers/pinctrl/stm32/pinctrl-stm32.c              | 162 +++++++++++++++-
+ 12 files changed, 441 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt
+ create mode 100644 drivers/irqchip/irq-stm32-exti.c
+
+-- 
+1.9.1
