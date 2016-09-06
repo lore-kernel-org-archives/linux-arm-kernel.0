@@ -1,36 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  6 Sep 2016 14:53:25 +0200
-Subject: [PATCH] ARM: imx: build cpuidle-imx6sx.o for imx6ul
-Message-ID: <20160906125338.1530603-1-arnd@arndb.de>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 6 Sep 2016 14:55:48 +0200
+Subject: [PATCH] pwm: meson: handle unknown ID values
+In-Reply-To: <20160906125106.1511562-1-arnd@arndb.de>
+References: <20160906125106.1511562-1-arnd@arndb.de>
+Message-ID: <ecab427a-7d1e-c42c-e562-06b63bf9fef4@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx6ul soc code gained support for cpuidle, but that causes
-a link failure if CONFIG_SOC_IMX6SX is disabled:
+On 09/06/2016 02:50 PM, Arnd Bergmann wrote:
+> When building with -Wmaybe-uninitialized, we get a couple of harmless
+> warnings about three functions in this new driver that don't look
+> safe to the compiler:
+> 
+> drivers/pwm/pwm-meson.c: In function 'meson_pwm_get_state':
+> drivers/pwm/pwm-meson.c:355:26: error: 'mask' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> drivers/pwm/pwm-meson.c: In function 'meson_pwm_disable':
+> drivers/pwm/pwm-meson.c:263:13: error: 'enable' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> drivers/pwm/pwm-meson.c: In function 'meson_pwm_apply':
+> drivers/pwm/pwm-meson.c:231:13: error: 'clk_shift' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> drivers/pwm/pwm-meson.c:231:36: error: 'enable' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> drivers/pwm/pwm-meson.c:231:24: error: 'clk_enable' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> 
+> Specifically, if we have a device with an id other than 0 or 1,
+> this would result in undefined behavior. This is currently not
+> possible, but the compiler cannot be expected to know this.
+> 
+> This patch adds a 'default' clause to let the compiler know
+> what to do instead, which shuts up the warning and makes the
+> code slightly more resiliant in case it gets extended to other
+> identifiers.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/pwm/pwm-meson.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/drivers/pwm/pwm-meson.c b/drivers/pwm/pwm-meson.c
+> index 566f5cb81021..25abd95dcc7b 100644
+> --- a/drivers/pwm/pwm-meson.c
+> +++ b/drivers/pwm/pwm-meson.c
+> @@ -242,6 +242,9 @@ static void meson_pwm_enable(struct meson_pwm *meson,
+>  		clk_enable = MISC_B_CLK_EN;
+>  		enable = MISC_B_EN;
+>  		break;
+> +
+> +	default:
+> +		return;
+>  	}
+>  
+>  	value = readl(meson->base + REG_MISC_AB);
+> @@ -270,6 +273,9 @@ static void meson_pwm_disable(struct meson_pwm *meson, unsigned int id)
+>  	case 1:
+>  		enable = MISC_B_EN;
+>  		break;
+> +
+> +	default:
+> +		return;
+>  	}
+>  
+>  	value = readl(meson->base + REG_MISC_AB);
+> @@ -349,6 +355,10 @@ static void meson_pwm_get_state(struct pwm_chip *chip, struct pwm_device *pwm,
+>  	case 1:
+>  		mask = MISC_B_EN;
+>  		break;
+> +
+> +	default:
+> +		state->enabled = 0;
+> +		return;
+>  	}
+>  
+>  	value = readl(meson->base + REG_MISC_AB);
+> 
 
-arch/arm/mach-imx/mach-imx6ul.o: In function `imx6ul_init_late':
-mach-imx6ul.c:(.init.text+0xc): undefined reference to `imx6sx_cpuidle_init'
-
-This adds the file containing the imx6sx_cpuidle_init function
-to the kernel for 6ul-only configurations.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 547e8f526959 ("ARM: imx: add cpuidle support for i.mx6ul")
----
- arch/arm/mach-imx/Makefile | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index edce8dfa581d..737450fe790c 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -27,6 +27,7 @@ obj-$(CONFIG_SOC_IMX5) += cpuidle-imx5.o
- obj-$(CONFIG_SOC_IMX6Q) += cpuidle-imx6q.o
- obj-$(CONFIG_SOC_IMX6SL) += cpuidle-imx6sl.o
- obj-$(CONFIG_SOC_IMX6SX) += cpuidle-imx6sx.o
-+obj-$(CONFIG_SOC_IMX6UL) += cpuidle-imx6sx.o
- endif
- 
- ifdef CONFIG_SND_IMX_SOC
--- 
-2.9.0
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
