@@ -1,45 +1,67 @@
 From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Tue, 6 Sep 2016 12:53:12 -0300
-Subject: [PATCH 6/9] ARM: dts: imx27: Remove skeleton.dtsi
+Date: Tue, 6 Sep 2016 12:53:11 -0300
+Subject: [PATCH 5/9] ARM: dts: imx25: Fix memory node build warnings with W=1
 In-Reply-To: <1473177196-29371-1-git-send-email-fabio.estevam@nxp.com>
 References: <1473177196-29371-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <1473177196-29371-6-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <1473177196-29371-5-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The inclusion of skeleton.dtsi causes the following build warning:
+Fix the following build warnings with W=1:
 
 Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
 
-Instead of fixing skeleton.dtsi, just add the top level definitions
-for address-cells and size-cell and remove its inclusion.
+While at it, also pass the 'device_type' property as recommended by the
+ePAPR specification.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx27.dtsi | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi | 3 ++-
+ arch/arm/boot/dts/imx25-karo-tx25.dts        | 3 ++-
+ arch/arm/boot/dts/imx25-pdk.dts              | 3 ++-
+ 3 files changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index f818ea4..9d8b596 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -9,7 +9,6 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
+diff --git a/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi b/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi
+index d6f2764..e4d7da2 100644
+--- a/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi
++++ b/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi
+@@ -17,7 +17,8 @@
+ 	model = "Eukrea CPUIMX25";
+ 	compatible = "eukrea,cpuimx25", "fsl,imx25";
  
--#include "skeleton.dtsi"
- #include "imx27-pinfunc.h"
+-	memory {
++	memory at 80000000 {
++		device_type = "memory";
+ 		reg = <0x80000000 0x4000000>; /* 64M */
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx25-karo-tx25.dts b/arch/arm/boot/dts/imx25-karo-tx25.dts
+index 9b31faa..d8ec158 100644
+--- a/arch/arm/boot/dts/imx25-karo-tx25.dts
++++ b/arch/arm/boot/dts/imx25-karo-tx25.dts
+@@ -36,7 +36,8 @@
+ 		};
+ 	};
  
- #include <dt-bindings/clock/imx27-clock.h>
-@@ -18,6 +17,9 @@
- #include <dt-bindings/interrupt-controller/irq.h>
+-	memory {
++	memory at 80000000 {
++		device_type = "memory";
+ 		reg = <0x80000000 0x02000000 0x90000000 0x02000000>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
+index 7029210..8ce72fa 100644
+--- a/arch/arm/boot/dts/imx25-pdk.dts
++++ b/arch/arm/boot/dts/imx25-pdk.dts
+@@ -18,7 +18,8 @@
+ 	model = "Freescale i.MX25 Product Development Kit";
+ 	compatible = "fsl,imx25-pdk", "fsl,imx25";
  
- / {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
- 	aliases {
- 		ethernet0 = &fec;
- 		gpio0 = &gpio1;
+-	memory {
++	memory at 80000000 {
++		device_type = "memory";
+ 		reg = <0x80000000 0x4000000>;
+ 	};
+ 
 -- 
 1.9.1
