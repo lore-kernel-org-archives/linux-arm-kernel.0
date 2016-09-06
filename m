@@ -1,34 +1,112 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 06 Sep 2016 17:37:48 +0100
-Subject: [PATCH 4/8] ARM: sa1111: fix error code propagation in sa1111_probe()
+Date: Tue, 06 Sep 2016 17:37:58 +0100
+Subject: [PATCH 6/8] ARM: sa1111: fix pcmcia suspend/resume
 In-Reply-To: <20160906163711.GB1041@n2100.armlinux.org.uk>
 References: <20160906163711.GB1041@n2100.armlinux.org.uk>
-Message-ID: <E1bhJNc-0008D0-CW@rmk-PC.armlinux.org.uk>
+Message-ID: <E1bhJNm-0008DE-SS@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure that we propagate the platform_get_irq() error code out of the
-probe function.  This allows probe deferrals to work correctly should
-platform_get_irq() not be able to resolve the interrupt in a DT
-environment at probe time.
+SA1111 PCMCIA was broken when PCMCIA switched to using dev_pm_ops for
+the PCMCIA socket class.  PCMCIA used to handle suspend/resume via the
+socket hosting device, which happened at normal device suspend/resume
+time.
 
+However, the referenced commit changed this: much of the resume now
+happens much earlier, in the noirq resume handler of dev_pm_ops.
+
+However, on SA1111, the PCMCIA device is not accessible as the SA1111
+has not been resumed at _noirq time.  It's slightly worse than that,
+because the SA1111 has already been put to sleep at _noirq time, so
+suspend doesn't work properly.
+
+Fix this by converting the core SA1111 code to use dev_pm_ops as well,
+and performing its own suspend/resume at noirq time.
+
+This fixes these errors in the kernel log:
+
+pcmcia_socket pcmcia_socket0: time out after reset
+pcmcia_socket pcmcia_socket1: time out after reset
+
+and the resulting lack of PCMCIA cards after a S2RAM cycle.
+
+Fixes: d7646f7632549 ("pcmcia: use dev_pm_ops for class pcmcia_socket_class")
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/common/sa1111.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/common/sa1111.c | 22 +++++++++++++---------
+ 1 file changed, 13 insertions(+), 9 deletions(-)
 
 diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
-index fb0a0a4dfea4..332b92317fd8 100644
+index cfa61b857cad..7838659b870a 100644
 --- a/arch/arm/common/sa1111.c
 +++ b/arch/arm/common/sa1111.c
-@@ -1017,7 +1017,7 @@ static int sa1111_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0)
--		return -ENXIO;
-+		return irq;
+@@ -869,9 +869,9 @@ struct sa1111_save_data {
  
- 	return __sa1111_probe(&pdev->dev, mem, irq);
+ #ifdef CONFIG_PM
+ 
+-static int sa1111_suspend(struct platform_device *dev, pm_message_t state)
++static int sa1111_suspend_noirq(struct device *dev)
+ {
+-	struct sa1111 *sachip = platform_get_drvdata(dev);
++	struct sa1111 *sachip = dev_get_drvdata(dev);
+ 	struct sa1111_save_data *save;
+ 	unsigned long flags;
+ 	unsigned int val;
+@@ -934,9 +934,9 @@ static int sa1111_suspend(struct platform_device *dev, pm_message_t state)
+  *	restored by their respective drivers, and must be called
+  *	via LDM after this function.
+  */
+-static int sa1111_resume(struct platform_device *dev)
++static int sa1111_resume_noirq(struct device *dev)
+ {
+-	struct sa1111 *sachip = platform_get_drvdata(dev);
++	struct sa1111 *sachip = dev_get_drvdata(dev);
+ 	struct sa1111_save_data *save;
+ 	unsigned long flags, id;
+ 	void __iomem *base;
+@@ -952,7 +952,7 @@ static int sa1111_resume(struct platform_device *dev)
+ 	id = sa1111_readl(sachip->base + SA1111_SKID);
+ 	if ((id & SKID_ID_MASK) != SKID_SA1111_ID) {
+ 		__sa1111_remove(sachip);
+-		platform_set_drvdata(dev, NULL);
++		dev_set_drvdata(dev, NULL);
+ 		kfree(save);
+ 		return 0;
+ 	}
+@@ -1003,8 +1003,8 @@ static int sa1111_resume(struct platform_device *dev)
  }
+ 
+ #else
+-#define sa1111_suspend NULL
+-#define sa1111_resume  NULL
++#define sa1111_suspend_noirq NULL
++#define sa1111_resume_noirq  NULL
+ #endif
+ 
+ static int sa1111_probe(struct platform_device *pdev)
+@@ -1038,6 +1038,11 @@ static int sa1111_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static struct dev_pm_ops sa1111_pm_ops = {
++	.suspend_noirq = sa1111_suspend_noirq,
++	.resume_noirq = sa1111_resume_noirq,
++};
++
+ /*
+  *	Not sure if this should be on the system bus or not yet.
+  *	We really want some way to register a system device at
+@@ -1050,10 +1055,9 @@ static int sa1111_remove(struct platform_device *pdev)
+ static struct platform_driver sa1111_device_driver = {
+ 	.probe		= sa1111_probe,
+ 	.remove		= sa1111_remove,
+-	.suspend	= sa1111_suspend,
+-	.resume		= sa1111_resume,
+ 	.driver		= {
+ 		.name	= "sa1111",
++		.pm	= &sa1111_pm_ops,
+ 	},
+ };
+ 
 -- 
 2.1.0
