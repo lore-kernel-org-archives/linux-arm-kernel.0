@@ -1,34 +1,36 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 6 Sep 2016 18:41:45 +0200
-Subject: [PATCH v2] kvm: arm: Enforce some NS-SVC initialisation
-In-Reply-To: <20160817113249.GA5909@cbox>
-References: <5322cdb9cb397741d15b60c6693ad39dbf74b6d5.1469101945.git.robin.murphy@arm.com>
- <6d030bee2db08c2fe1b7569e692e8f66800b1e4c.1471369569.git.robin.murphy@arm.com>
- <20160817113249.GA5909@cbox>
-Message-ID: <20160906164145.GD23592@cbox>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Tue, 06 Sep 2016 17:37:53 +0100
+Subject: [PATCH 5/8] ARM: sa1111: fix pcmcia interrupt mask polarity
+In-Reply-To: <20160906163711.GB1041@n2100.armlinux.org.uk>
+References: <20160906163711.GB1041@n2100.armlinux.org.uk>
+Message-ID: <E1bhJNh-0008D8-OQ@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2016 at 01:32:49PM +0200, Christoffer Dall wrote:
-> Hi Russell,
-> 
-> On Tue, Aug 16, 2016 at 06:49:18PM +0100, Robin Murphy wrote:
-> > Since the non-secure copies of banked registers lack architecturally
-> > defined reset values, there is no actual guarantee when entering in Hyp
-> > from secure-only firmware that the Non-Secure PL1 state will look the
-> > way that kernel entry (in particular the decompressor stub) expects.
-> > So far, we've been getting away with it thanks to implementation details
-> > of ARMv7 cores and/or bootloader behaviour, but for the sake of forwards
-> > compatibility let's try to ensure that we have a minimally sane state
-> > before dropping down into it.
-> > 
-> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> 
-> Can we have your acked-by on this patch to merge it via the KVM tree or
-> do you prefer merging this one directly yourself?
-> 
-I have queued this via the KVM/ARM tree.  If you have any objections,
-please let me know asap.
+The polarity of the high IRQs was being calculated using
+SA1111_IRQMASK_HI(), but this assumes a Linux interrupt number, not a
+hardware interrupt number.  Hence, the resulting mask was incorrect.
+Fix this.
 
-Thanks,
--Christoffer
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/common/sa1111.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
+index 332b92317fd8..cfa61b857cad 100644
+--- a/arch/arm/common/sa1111.c
++++ b/arch/arm/common/sa1111.c
+@@ -472,8 +472,8 @@ static int sa1111_setup_irq(struct sa1111 *sachip, unsigned irq_base)
+ 	 * specifies that S0ReadyInt and S1ReadyInt should be '1'.
+ 	 */
+ 	sa1111_writel(0, irqbase + SA1111_INTPOL0);
+-	sa1111_writel(SA1111_IRQMASK_HI(IRQ_S0_READY_NINT) |
+-		      SA1111_IRQMASK_HI(IRQ_S1_READY_NINT),
++	sa1111_writel(BIT(IRQ_S0_READY_NINT & 31) |
++		      BIT(IRQ_S1_READY_NINT & 31),
+ 		      irqbase + SA1111_INTPOL1);
+ 
+ 	/* clear all IRQs */
+-- 
+2.1.0
