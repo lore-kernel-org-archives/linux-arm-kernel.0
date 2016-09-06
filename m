@@ -1,39 +1,88 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 6 Sep 2016 08:11:19 +0200
-Subject: [PATCH 1/1] Add PPD device tree
-In-Reply-To: <1470403887-15190-1-git-send-email-fabien.lahoudere@collabora.co.uk>
-References: <1470403887-15190-1-git-send-email-fabien.lahoudere@collabora.co.uk>
-Message-ID: <20160906061119.aeycuk3cdckyuh7e@pengutronix.de>
+From: dhdang@apm.com (Duc Dang)
+Date: Mon, 5 Sep 2016 23:16:26 -0700
+Subject: [PATCH] drivers: acpi: fix GIC irq model default PCI IRQ polarity
+In-Reply-To: <1473084758-7377-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1473084758-7377-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <CADaLNDmAZ-fiiNoJhqJ9iaZAj4qTJ9vYc1efiU_d73xETG+U7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Sep 5, 2016 at 7:12 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On ACPI ARM based systems the GIC interrupt controller
+> and corresponding interrupt model permit only the high
+> polarity for level interrupts.
+>
+> ACPI firmware describes PCI legacy IRQs through entries
+> in the _PRT objects. Entries in the _PRT can be of two types:
+>
+> - Static: not configurable, trigger/polarity default to level-low,
+>   _PRT entry defines the global GSI interrupt number
+> - Configurable: _PRT interrupt entry contains a reference to the
+>   corresponding PCI interrupt link device (that in turn provides the
+>   interrupt descriptor through its _CRS/_PRS methods)
+>
+> Configurable IRQ entries are not currently allowed by the ACPI
+> specification on ARM, since they can only be used for interrupt
+> pins that are routable, and ARM platforms GIC configurations
+> do not allow dynamic IRQ routing, routing is statically laid out
+> at synthesis time; therefore PCI interrupt links cannot be used
+> for PCI legacy IRQ descriptions in the _PRT on ARM systems.
+>
+> On the other hand, current core ACPI code handling PCI legacy IRQs
+> consider IRQ trigger/polarity for static _PRT entries as level-low.
+>
+> On ARM systems with a GIC interrupt controller and corresponding
+> ACPI interrupt model this does not work in that GIC interrupt
+> controller is only capable of handling level interrupts whose
+> polarity is high (for PCI legacy IRQs - that are level-low by
+> specification - this means that the legacy IRQs are inverted before
+> reaching the interrupt controller pin), resulting in IRQ allocation
+> failures such as:
+>
+> genirq: Setting trigger mode 8 for irq 18 failed (gic_set_type+0x0/0x48)
+>
+> Change the default polarity for PCI legacy IRQs to high on systems
+> booting wth ACPI on platforms with a GIC interrupt controller model,
+> fixing the discrepancy between specification and HW behaviour.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Duc Dang <dhdang@apm.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Sinan Kaya <okaya@codeaurora.org>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/acpi/pci_irq.c | 10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/acpi/pci_irq.c b/drivers/acpi/pci_irq.c
+> index 2c45dd3..c576a6f 100644
+> --- a/drivers/acpi/pci_irq.c
+> +++ b/drivers/acpi/pci_irq.c
+> @@ -411,7 +411,15 @@ int acpi_pci_irq_enable(struct pci_dev *dev)
+>         int gsi;
+>         u8 pin;
+>         int triggering = ACPI_LEVEL_SENSITIVE;
+> -       int polarity = ACPI_ACTIVE_LOW;
+> +       /*
+> +        * On ARM systems with the GIC interrupt model, level interrupts
+> +        * are always polarity high by specification; PCI legacy
+> +        * IRQs lines are inverted before reaching the interrupt
+> +        * controller and must therefore be considered active high
+> +        * as default.
+> +        */
+> +       int polarity = acpi_irq_model == ACPI_IRQ_MODEL_GIC ?
+> +                                     ACPI_ACTIVE_HIGH : ACPI_ACTIVE_LOW;
+>         char *link = NULL;
+>         char link_desc[16];
+>         int rc;
 
-On Fri, Aug 05, 2016 at 03:31:25PM +0200, Fabien Lahoudere wrote:
-> diff --git a/arch/arm/boot/dts/imx53-ppd.dts b/arch/arm/boot/dts/imx53-ppd.dts
-> new file mode 100644
-> index 0000000..51f33d5
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx53-ppd.dts
-> @@ -0,0 +1,1024 @@
-> +/*
-> + * Copyright 2014 General Electric Company
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
+Tested-by: Duc Dang <dhdang@apm.com>
 
-This doesn't fix the version of the GPL this file is licensed under, yet
-for Freescale content this is the lawyer-approved version. Is this true
-for your case, too?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> --
+> 2.6.4
+>
+Regards,
+Duc Dang.
