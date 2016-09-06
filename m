@@ -1,87 +1,80 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 06 Sep 2016 10:51:27 +0100
-Subject: [RFC v2 PATCH 2/7] KVM: Track the pid of the VM process
-In-Reply-To: <20160906062252.GA30513@cbox> (Christoffer Dall's message of
- "Tue, 6 Sep 2016 08:22:52 +0200")
-References: <1473093097-30932-1-git-send-email-punit.agrawal@arm.com>
- <1473093097-30932-3-git-send-email-punit.agrawal@arm.com>
- <20160906062252.GA30513@cbox>
-Message-ID: <87poohjqzk.fsf@e105922-lin.cambridge.arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 6 Sep 2016 11:50:17 +0200 (CEST)
+Subject: [PATCH V10 7/8] irqchip/gicv3-its: Factor out PCI-MSI part that
+ might be reused for ACPI
+In-Reply-To: <1473152938-17388-8-git-send-email-tn@semihalf.com>
+References: <1473152938-17388-1-git-send-email-tn@semihalf.com>
+ <1473152938-17388-8-git-send-email-tn@semihalf.com>
+Message-ID: <alpine.DEB.2.20.1609061149090.5647@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+On Tue, 6 Sep 2016, Tomasz Nowicki wrote:
+> -static int __init its_pci_msi_init(void)
+> +static int __init its_pci_msi_init_one(struct fwnode_handle *handle,
+> +				       const char *name)
+>  {
+> -	struct device_node *np;
+>  	struct irq_domain *parent;
+>  
+> +	parent = irq_find_matching_fwnode(handle, DOMAIN_BUS_NEXUS);
+> +	if (!parent || !msi_get_domain_info(parent)) {
+> +		pr_err("%s: Unable to locate ITS domain\n", name);
+> +		return -ENXIO;
+> +	}
+> +
+> +	if (!pci_msi_create_irq_domain(handle, &its_pci_msi_domain_info,
+> +				       parent)) {
+> +		pr_err("%s: Unable to create PCI domain\n", name);
+> +		return -ENOMEM;
 
-Christoffer Dall <christoffer.dall@linaro.org> writes:
+So you have error codes here.
 
-> On Mon, Sep 05, 2016 at 05:31:32PM +0100, Punit Agrawal wrote:
->> Userspace tools such as perf can be used to profile individual
->> processes.
->> 
->> Track the PID of the virtual machine process to match profiling requests
->> targeted at it. This can be used to take appropriate action to enable
->> the requested profiling operations for the VMs of interest.
->> 
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> Cc: Paolo Bonzini <pbonzini@redhat.com>
->> Cc: "Radim Kr?m??" <rkrcmar@redhat.com>
->> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  include/linux/kvm_host.h | 1 +
->>  virt/kvm/kvm_main.c      | 2 ++
->>  2 files changed, 3 insertions(+)
->> 
->> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
->> index 9c28b4d..7c42c94 100644
->> --- a/include/linux/kvm_host.h
->> +++ b/include/linux/kvm_host.h
->> @@ -374,6 +374,7 @@ struct kvm_memslots {
->>  struct kvm {
->>  	spinlock_t mmu_lock;
->>  	struct mutex slots_lock;
->> +	struct pid *pid;
->>  	struct mm_struct *mm; /* userspace tied to this vm */
->>  	struct kvm_memslots *memslots[KVM_ADDRESS_SPACE_NUM];
->>  	struct srcu_struct srcu;
->> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
->> index 1950782..ab2535a 100644
->> --- a/virt/kvm/kvm_main.c
->> +++ b/virt/kvm/kvm_main.c
->> @@ -613,6 +613,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
->>  	spin_lock_init(&kvm->mmu_lock);
->>  	atomic_inc(&current->mm->mm_count);
->>  	kvm->mm = current->mm;
->> +	kvm->pid = get_task_pid(current, PIDTYPE_PID);
->
-> How dooes this deal with threading?  Is the idea that the user by
-> specifying the main thread's pid will enable trapping for all vcpu
-> threads belonging to that VM?
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int __init its_pci_of_msi_init(void)
+> +{
+> +	struct device_node *np;
+> +
+>  	for (np = of_find_matching_node(NULL, its_device_id); np;
+>  	     np = of_find_matching_node(np, its_device_id)) {
+>  		if (!of_property_read_bool(np, "msi-controller"))
+>  			continue;
+>  
+> -		parent = irq_find_matching_host(np, DOMAIN_BUS_NEXUS);
+> -		if (!parent || !msi_get_domain_info(parent)) {
+> -			pr_err("%s: unable to locate ITS domain\n",
+> -			       np->full_name);
+> +		if (its_pci_msi_init_one(of_node_to_fwnode(np), np->full_name))
+>  			continue;
+> -		}
+> -
+> -		if (!pci_msi_create_irq_domain(of_node_to_fwnode(np),
+> -					       &its_pci_msi_domain_info,
+> -					       parent)) {
+> -			pr_err("%s: unable to create PCI domain\n",
+> -			       np->full_name);
+> -			continue;
+> -		}
+>  
+>  		pr_info("PCI/MSI: %s domain created\n", np->full_name);
+>  	}
+>  
+>  	return 0;
 
-Yes that's correct - specifying the main thread PID will enable trapping
-for the VM (all vcpus).
+And no matter what you return success
 
-I am happy to move to a more suitable identifier if available.
+>  }
+> +
+> +static int __init its_pci_msi_init(void)
+> +{
+> +	its_pci_of_msi_init();
+
+Which you subsequently ignore here. What's the point?
 
 Thanks,
-Punit
 
->
->>  	kvm_eventfd_init(kvm);
->>  	mutex_init(&kvm->lock);
->>  	mutex_init(&kvm->irq_lock);
->> @@ -712,6 +713,7 @@ static void kvm_destroy_vm(struct kvm *kvm)
->>  	int i;
->>  	struct mm_struct *mm = kvm->mm;
->>  
->> +	put_pid(kvm->pid);
->>  	kvm_destroy_vm_debugfs(kvm);
->>  	kvm_arch_sync_events(kvm);
->>  	spin_lock(&kvm_lock);
->> -- 
->> 2.8.1
->> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+	tglx
