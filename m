@@ -1,94 +1,46 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue,  6 Sep 2016 17:51:03 +0100
-Subject: [PATCH v2] drivers: acpi: fix GIC irq model default PCI IRQ polarity
-Message-ID: <1473180663-20590-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 6 Sep 2016 18:55:27 +0200
+Subject: [PATCH v2 7/7] ARM: KVM: Unlock vgic-v3 support
+In-Reply-To: <57CEC344.7030706@arm.com>
+References: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
+ <1471344418-19568-8-git-send-email-vladimir.murzin@arm.com>
+ <20160905112927.GL26366@cbox> <57CEC344.7030706@arm.com>
+Message-ID: <20160906165527.GG23592@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ACPI ARM based systems the GIC interrupt controller
-and corresponding interrupt model permit only the high
-polarity for level interrupts.
+On Tue, Sep 06, 2016 at 02:23:16PM +0100, Vladimir Murzin wrote:
+> 
+> Sorry, missed this one
+> 
+> On 05/09/16 12:29, Christoffer Dall wrote:
+> >>  
+> >> > +static bool __hyp_text __has_useable_gicv3_cpuif(void)
+> >> > +{
+> >> > +	if (IS_ENABLED(CONFIG_ARM_GIC_V3) && (read_sysreg(ID_PFR1) >> 28))
+> > Do we have a define for bit 28 we could use?
+> 
+> I'll check it.
+> 
+> > 
+> > Does this actually work on all v7 boards?  The v7 ARM ARM seems to state
+> > that this bitfield is Reserved, UNK.  Does that somehow mean 'is going
+> > to be zero'?
+> 
+> It is how v7ARM ARM I have defines UNK
+> 
+> An abbreviation indicating that software must treat a field as
+> containing an UNKNOWN value. Hardware must implement the bit as read as
+> 0, or all 0s for a bit field. Software must not rely on the field
+> reading as zero.
+> 
+> It seems goes under 'is going to be zero' case, no?
+> 
+The last sentence is disturbing to me, and feels slightly contradicting
+itself.  Reading the UNKNOWN description doesn't help much either.
 
-ACPI firmware describes PCI legacy IRQs through entries
-in the _PRT objects. Entries in the _PRT can be of two types:
+Perhaps you can ask around internally and figure out what the precise
+answer to this is?
 
-- Static: not configurable, trigger/polarity default to level-low,
-  _PRT entry defines the global GSI interrupt number
-- Configurable: _PRT interrupt entry contains a reference to the
-  corresponding PCI interrupt link device (that in turn provides the
-  interrupt descriptor through its _CRS/_PRS methods)
-
-Configurable IRQ entries are not currently allowed by the ACPI
-specification on ARM since they can only be used for interrupt pins that
-are routable, as per ACPI specifications (version 6.1, 6.2.13):
-
-"[...] There are two ways that _PRT can be used. Typically, the
-interrupt input that a given PCI interrupt is on is configurable. For
-example, a given PCI interrupt might be configured for either IRQ 10 or
-11 on an 8259 interrupt controller. In this model, each interrupt is
-represented in the ACPI namespace as a PCI Interrupt Link Device. [...]"
-
-ARM platforms GIC configurations do not allow dynamic IRQ routing,
-since routing is statically laid out at synthesis time; therefore PCI
-interrupt links cannot be used for PCI legacy IRQ descriptions in the
-_PRT on ARM systems.
-
-On the other hand, current core ACPI code handling PCI legacy IRQs
-consider IRQ trigger/polarity for static _PRT entries as level-low.
-
-On ARM systems with a GIC interrupt controller and corresponding
-ACPI interrupt model this does not work in that GIC interrupt
-controller is only capable of handling level interrupts whose
-polarity is high (for PCI legacy IRQs - that are level-low by
-specification - this means that the legacy IRQs are inverted before
-reaching the interrupt controller pin), resulting in IRQ allocation
-failures such as:
-
-genirq: Setting trigger mode 8 for irq 18 failed (gic_set_type+0x0/0x48)
-
-Change the default polarity for PCI legacy IRQs to high on systems
-booting wth ACPI on platforms with a GIC interrupt controller model,
-fixing the discrepancy between specification and HW behaviour.
-
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Tested-by: Duc Dang <dhdang@apm.com>
-Cc: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Duc Dang <dhdang@apm.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Sinan Kaya <okaya@codeaurora.org>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
-v1 -> v2:
-
-- Added ACPI specs PCI Interrupt Link device usage restrictions in
-  the patch commit log for explanation
-- Added review tags
-
- drivers/acpi/pci_irq.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/acpi/pci_irq.c b/drivers/acpi/pci_irq.c
-index 2c45dd3..c576a6f 100644
---- a/drivers/acpi/pci_irq.c
-+++ b/drivers/acpi/pci_irq.c
-@@ -411,7 +411,15 @@ int acpi_pci_irq_enable(struct pci_dev *dev)
- 	int gsi;
- 	u8 pin;
- 	int triggering = ACPI_LEVEL_SENSITIVE;
--	int polarity = ACPI_ACTIVE_LOW;
-+	/*
-+	 * On ARM systems with the GIC interrupt model, level interrupts
-+	 * are always polarity high by specification; PCI legacy
-+	 * IRQs lines are inverted before reaching the interrupt
-+	 * controller and must therefore be considered active high
-+	 * as default.
-+	 */
-+	int polarity = acpi_irq_model == ACPI_IRQ_MODEL_GIC ?
-+				      ACPI_ACTIVE_HIGH : ACPI_ACTIVE_LOW;
- 	char *link = NULL;
- 	char link_desc[16];
- 	int rc;
--- 
-2.6.4
+Thanks,
+-Christoffer
