@@ -1,18 +1,15 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 6 Sep 2016 09:07:47 +0200
-Subject: [PATCH 1/2] ARM: dts: r8a7792: add MSIOF clocks
-In-Reply-To: <1642221.rsatzvhHS5@wasted.cogentembedded.com>
+Date: Tue, 6 Sep 2016 09:10:21 +0200
+Subject: [PATCH 2/2] ARM: dts: r8a7792: add MSIOF support
+In-Reply-To: <2787067.j1BQ6sZInq@wasted.cogentembedded.com>
 References: <2481458.x1iQg26kO7@wasted.cogentembedded.com>
- <1642221.rsatzvhHS5@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdUy83QMc--X+eGmEzO0ZyO-iVL_u7-GhvfFWN9+c1-g1w@mail.gmail.com>
+ <2787067.j1BQ6sZInq@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdWb0+tMUoQW70kUSGp=OFyzgM7A2Nitbp4GQVZTor8qXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Sep 5, 2016 at 10:55 PM, Sergei Shtylyov
 <sergei.shtylyov@cogentembedded.com> wrote:
-> Describe the MSIOF0/1 clocks and their parent, MP clock in the R8A7792
-> device  tree.
->
 > Based  on the original (and large) patch by Vladimir Barinov
 > <vladimir.barinov@cogentembedded.com>.
 >
