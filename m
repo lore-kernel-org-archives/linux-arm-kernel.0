@@ -1,49 +1,52 @@
 From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Tue, 6 Sep 2016 16:28:16 +0800
-Subject: [v11, 1/8] dt: bindings: update Freescale DCFG compatible
+Date: Tue, 6 Sep 2016 16:28:17 +0800
+Subject: [v11, 2/8] ARM64: dts: ls2080a: add device configuration node
 In-Reply-To: <1473150503-9550-1-git-send-email-yangbo.lu@nxp.com>
 References: <1473150503-9550-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1473150503-9550-2-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <1473150503-9550-3-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update Freescale DCFG compatible with 'fsl,<chip>-dcfg' instead
-of 'fsl,ls1021a-dcfg' to include more chips such as ls1021a,
-ls1043a, and ls2080a.
+Add the dts node for device configuration unit that provides
+general purpose configuration and status for the device.
 
 Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Scott Wood <oss@buserror.net>
+Acked-by: Scott Wood <oss@buserror.net>
 ---
-Changes for v8:
+Changes for v5:
 	- Added this patch
+Changes for v6:
+	- None
+Changes for v7:
+	- None
+Changes for v8:
+	- Added 'Acked-by: Scott Wood'
 Changes for v9:
-	- Added a list for the possible compatibles
+	- None
 Changes for v10:
 	- None
 Changes for v11:
-	- Added 'Acked-by: Rob Herring'
-	- Updated commit message by Scott
+	- None
 ---
- Documentation/devicetree/bindings/arm/fsl.txt | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index dbbc095..713c1ae 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -119,7 +119,11 @@ Freescale DCFG
- configuration and status for the device. Such as setting the secondary
- core start address and release the secondary core from holdoff and startup.
-   Required properties:
--  - compatible: should be "fsl,ls1021a-dcfg"
-+  - compatible: should be "fsl,<chip>-dcfg"
-+    Possible compatibles:
-+	"fsl,ls1021a-dcfg"
-+	"fsl,ls1043a-dcfg"
-+	"fsl,ls2080a-dcfg"
-   - reg : should contain base address and length of DCFG memory-mapped registers
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index 21023a3..39f7743 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -215,6 +215,12 @@
+ 			clocks = <&sysclk>;
+ 		};
  
- Example:
++		dcfg: dcfg at 1e00000 {
++			compatible = "fsl,ls2080a-dcfg", "syscon";
++			reg = <0x0 0x1e00000 0x0 0x10000>;
++			little-endian;
++		};
++
+ 		serial0: serial at 21c0500 {
+ 			compatible = "fsl,ns16550", "ns16550a";
+ 			reg = <0x0 0x21c0500 0x0 0x100>;
 -- 
 2.1.0.27.g96db324
