@@ -1,149 +1,75 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 6 Sep 2016 23:07:35 +0200
-Subject: [PATCH v5] i2c: imx: make bus recovery through pinctrl optional
-In-Reply-To: <CADRPPNQ+1qBNL5WA=Jo_keE7BPnoOs7a2T6CpTuciiF16qK6xQ@mail.gmail.com>
-References: <1471644322-22670-1-git-send-email-leoyang.li@nxp.com>
- <20160906185849.27pjhawadca5pwow@pengutronix.de>
- <CADRPPNQ+1qBNL5WA=Jo_keE7BPnoOs7a2T6CpTuciiF16qK6xQ@mail.gmail.com>
-Message-ID: <20160906210735.6wl5x2mdhnhdnh7y@pengutronix.de>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Sep 2016 22:22:06 +0100
+Subject: [PATCH] ARM: mmp: replace NO_IRQ
+In-Reply-To: <CA+55aFyrGTG3xzecScrTQKaqkZ96DizeH2aSjJENKB_DCD6hxA@mail.gmail.com>
+References: <20160906140808.2883875-1-arnd@arndb.de>
+ <20160906142442.GY1041@n2100.armlinux.org.uk>
+ <6239709.hYdxF7WW9G@wuerfel>
+ <20160906194443.GC1041@n2100.armlinux.org.uk>
+ <CA+55aFyrGTG3xzecScrTQKaqkZ96DizeH2aSjJENKB_DCD6hxA@mail.gmail.com>
+Message-ID: <20160906212206.GF1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2016 at 03:06:41PM -0500, Leo Li wrote:
-> On Tue, Sep 6, 2016 at 1:58 PM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > On Fri, Aug 19, 2016 at 05:05:22PM -0500, Li Yang wrote:
-> >> Since commit 1c4b6c3bcf30 ("i2c: imx: implement bus recovery") the
-> >> driver starts to use gpio/pinctrl to do i2c bus recovery.  But pinctrl
-> >> is not always available for platforms with this controller such as ls1021a
-> >> and ls1043a, and the device tree binding also mentioned this gpio based
-> >> recovery mechanism as optional.  The patch makes it really optional that
-> >> the probe function won't bailout but just disable the bus recovery function
-> >> when pinctrl is not available.
-> >>
-> >> Signed-off-by: Li Yang <leoyang.li@nxp.com>
-> >> Cc: Gao Pan <pandy.gao@nxp.com>
-> >> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> >> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> >> ---
-> >> v5:
-> >> Revert the last minute change of recovery info initialization timing, it
-> >> will cause problem if initialized after i2c_add_numbered_adapter()
-> >>
-> >> v4:
-> >> Remove the use of IS_ERR_OR_NULL
-> >> Move the condition judgement to i2c_imx_init_recovery_info()
-> >> Change the timing of recovery initialization to be after bus registration
-> >>
-> >> v3:
-> >> Rebased to Wolfram's for-next branch
-> >> Added acked-by from Linus Walleij
-> >> Update to use new nxp email addresses due to company merge
-> >>
-> >>  drivers/i2c/busses/i2c-imx.c | 15 ++++++++++++++-
-> >>  1 file changed, 14 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-> >> index 1844bc9..7ae7992 100644
-> >> --- a/drivers/i2c/busses/i2c-imx.c
-> >> +++ b/drivers/i2c/busses/i2c-imx.c
-> >> @@ -989,6 +989,15 @@ static void i2c_imx_init_recovery_info(struct imx_i2c_struct *i2c_imx,
-> >>  {
-> >>       struct i2c_bus_recovery_info *rinfo = &i2c_imx->rinfo;
-> >>
-> >> +     /* if pinctrl is not supported on the system */
-> >> +     if (IS_ERR(i2c_imx->pinctrl))
-> >> +             i2c_imx->pinctrl = NULL;
-> >> +
-> >> +     if (!i2c_imx->pinctrl) {
-> >> +             dev_info(&pdev->dev, "can't get pinctrl, bus recovery not supported\n");
-> >> +             return;
-> >> +     }
-> >> +
-> >>       i2c_imx->pinctrl_pins_default = pinctrl_lookup_state(i2c_imx->pinctrl,
-> >>                       PINCTRL_STATE_DEFAULT);
-> >>       i2c_imx->pinctrl_pins_gpio = pinctrl_lookup_state(i2c_imx->pinctrl,
-> >> @@ -1081,8 +1090,11 @@ static int i2c_imx_probe(struct platform_device *pdev)
-> >>               return ret;
-> >>       }
-> >>
-> >> +     /* optional bus recovery feature through pinctrl */
-> >>       i2c_imx->pinctrl = devm_pinctrl_get(&pdev->dev);
-> >> -     if (IS_ERR(i2c_imx->pinctrl)) {
-> >> +     /* bailout on -ENOMEM or -EPROBE_DEFER, continue for other errors */
-> >> +     if (PTR_ERR(i2c_imx->pinctrl) == -ENOMEM ||
-> >> +                     PTR_ERR(i2c_imx->pinctrl) == -EPROBE_DEFER) {
-> >>               ret = PTR_ERR(i2c_imx->pinctrl);
-> >>               goto clk_disable;
-> >>       }
+On Tue, Sep 06, 2016 at 01:03:42PM -0700, Linus Torvalds wrote:
+> On Tue, Sep 6, 2016 at 12:44 PM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
 > >
-> > devm_pinctrl_get might return the following error-valued pointers:
-> >  - -EINVAL
-> >  - -ENOMEM
-> >  - -ENODEV
-> >  - -EPROBE_DEFER
-> >
-> > There are several error paths returning -EINVAL, one is when an invalid
-> > phandle is used. Do you really want to ignore that?
-> >
-> > IMO error handling is better done with inverse logic, that is continue
-> > on some explicit error, bail out on all unknown stuff. This tends to be
-> > more robust. Also the comment should be improved to not explain that for
-> > -ENOMEM and -EPROBE_DEFER we bail out (which should be obvious for
-> > anyone who can read C) but to explain why.
+> > My point still stands though.  Merely hiding it doesn't make the problem
+> > go away - it's just the same problem but now it won't be as visible, and
+> > as such it'll probably never get resolved.
 > 
-> What you said is true for normal error handling, but in this scenario
-> it is intentional to ignore all pinctrl related errors except critical
-> ones because failing to have pinctrl for an optional feature shouldn't
-> impact the function of normal i2c.  We choose to catch -ENOMEM because
-> the error could also cause problem for i2c probe, and -EPROBE_DEFER
-> because it's possible that the pinctrl will be ready later and we want
-> to give it a chance.  The i2c driver really don't care why the pinctrl
-> was not usable.  I thought I added comment before the
-> devm_pinctrl_get() to explain that the pinctrl is optional.  Hopefully
-> you are not suggesting to explain what -ENOMEM and -EPROBE_DEFER mean
-> in the comment. :)
+> How much of a legacy thing is this?
 
-You wrote
+I thought we'd got it down to just being a legacy issue, and I thought
+there was concensus on "no new NO_IRQ users" as well.  What we probably
+failed to do was to get a rule into checkpatch to pick up on new users
+of the macro.
 
-	/* optional bus recovery feature through pinctrl */
+> It may not *fix* that particular driver or subsystem, but if it's
+> sufficiently well hidden or specialized, at least it won't cause the
+> pattern to be copied in the future, I'd hope.
 
-there. I'd expect to read something like:
+The thing that I'm really worried about is this is going to cause
+regressions, especially when the "lets get rid of NO_IRQ" involves
+converting from "irq == NO_IRQ" to "!irq" - which is logically a
+completely different test - especially if there's cases where irq
+can end up being "NO_IRQ" and the definition of NO_IRQ is -1.
 
-	/*
-	 * If pinctrl is available it might be possible to switch the
-	 * SDA and SCL lines to their GPIO functions and do a recovery
-	 * procedure in this mode. If there is anything wrong with
-	 * pinctrl we cannot do this and simply skip it.
-	 */
- 
-> > Also I'd put
-> >
-> >         i2c_imx->pinctrl = NULL;
-> >
-> > directly after devm_pinctrl_get() which I consider the more obvious
-> > place for this.
-> 
-> On the other hand, put it together with the actually judgement can
-> make it clear that it is catching both IS_ERR and NULL returns from
-> devm_pinctrl_get()?
+I think I said last time that such conversions should be done in a
+mindful way of that - converting these places to be <= 0 so we catch
+_both_ the !irq and irq == NO_IRQ cases until we've killed NO_IRQ off
+and are using irq == 0 meaning "there is no IRQ" universally.
 
-When you do it immediately, you have:
+The reason for this is that there's some _really_ awkward cases.
+For example:
 
-	if (i2c_imx->pinctrl)
-		use_it();
-	else
-		ignore_it();
+drivers/scsi/arm/oak.c: host->irq = NO_IRQ;
+drivers/scsi/NCR5380.c: tmp[0] = IDENTIFY(((instance->irq == NO_IRQ) ? 0 : 1), cmd->device->lun);
 
-which looks clean. And if later another piece of code is added that
-works on the pinctrl value, you don't have to care about the order (or
-set it to NULL at two places). Instead you can consider the value const
-in the complete driver apart from the little snippet that assigns to it
-in .probe().
+oak uses NCR5380.  NCR5380 is shared across multiple architectures
+which have a random selection of NO_IRQ defined as 0 or -1.  To
+convert this without regression takes a multi-step process:
 
-Best regards
-Uwe
+1. Verify all architectures using NCR5380 never pass 0 as a valid IRQ
+   (they shouldn't today - I think this is true for ARM in this
+   instance.)
+2. change NCR5380 to recognise both -1 and 0 as being invalid IRQs
+   (with a <= 0 test) and kill NO_IRQ in the NCR5380 code.
+3. Kill off the uses of NO_IRQ being passed into the NCR5380 code,
+   passing 0 instead.
+4. Optionally (and preferably) change the test to be !instance->irq.
+
+If we just do the "eliminate NO_IRQ by changing it to constant 0" in
+either NCR5380 or oak.c on its own, we're going to end up with a
+regression - at least until the other catches up.
+
+This is my concern - some of the interactions are not simple, and it's
+certainly not a case that merely replacing each NO_IRQ with 0 or -1
+resolves the problem - and it's clear that doing such a thing will
+cause regressions.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
