@@ -1,40 +1,33 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 6 Sep 2016 16:40:04 +0800
-Subject: [PATCH 01/10] ARM: dts: berlin2q: Remove skeleton.dtsi inclusion
+Date: Tue, 6 Sep 2016 16:40:07 +0800
+Subject: [PATCH 04/10] ARM: dts: berlin2q: Add missing unit name to /soc node
 In-Reply-To: <20160906084013.2887-1-jszhang@marvell.com>
 References: <20160906084013.2887-1-jszhang@marvell.com>
-Message-ID: <20160906084013.2887-2-jszhang@marvell.com>
+Message-ID: <20160906084013.2887-5-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As noted in [1], "there are a number of problems with skeleton.dtsi,
-and it would be prefereable to remove it entirely." This patch is to
-remove skeleton.dtsi inclusion from berlin2q.
+This patch fixes the following DTC warning with W=1:
 
-[1] http://www.spinics.net/lists/arm-kernel/msg528080.html
+"Node /soc has a reg or ranges property, but no unit name"
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- arch/arm/boot/dts/berlin2q.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/berlin2q.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 2c34bfb..4554945 100644
+index 4554945..6bd92ffd 100644
 --- a/arch/arm/boot/dts/berlin2q.dtsi
 +++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -37,11 +37,11 @@
- #include <dt-bindings/clock/berlin2q.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
+@@ -99,7 +99,7 @@
+ 		clock-frequency = <25000000>;
+ 	};
  
--#include "skeleton.dtsi"
--
- / {
- 	model = "Marvell Armada 1500 pro (BG2-Q) SoC";
- 	compatible = "marvell,berlin2q", "marvell,berlin";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
- 
- 	aliases {
- 		serial0 = &uart0;
+-	soc {
++	soc at f7000000 {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
 -- 
 2.9.3
