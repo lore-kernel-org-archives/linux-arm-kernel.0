@@ -1,51 +1,33 @@
-From: harinikatakamlinux@gmail.com (Harini Katakam)
-Date: Tue, 6 Sep 2016 13:13:19 +0530
-Subject: [RFC PATCH 2/2] macb: Enable 1588 support in SAMA5D2 platform.
-In-Reply-To: <1472820817-21874-2-git-send-email-andrei.pistirica@microchip.com>
-References: <1472820817-21874-1-git-send-email-andrei.pistirica@microchip.com>
- <1472820817-21874-2-git-send-email-andrei.pistirica@microchip.com>
-Message-ID: <CAFcVECLWQy-25zjvBa9dVvtCFsgpLcuhOm4sOzKv4qt=+R5-TQ@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 6 Sep 2016 10:48:31 +0300
+Subject: [PATCH] dt-bindings: mvebu-odmi: fix example typo
+In-Reply-To: <20160905170900.3225b4b4@free-electrons.com>
+References: <0743fef6fe390bc4ae7cabd15c4836bbed98f7cf.1473087913.git.baruch@tkos.co.il>
+ <20160905170900.3225b4b4@free-electrons.com>
+Message-ID: <20160906074831.7mlgufxlirm5yuv2@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrei,
+Hi Thomas,
 
-+Richard Cochran
+On Mon, Sep 05, 2016 at 05:09:00PM +0200, Thomas Petazzoni wrote:
+> On Mon,  5 Sep 2016 18:05:13 +0300, Baruch Siach wrote:
+> > Make the example compatible string match its definition.
+> > 
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> 
+> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-On Fri, Sep 2, 2016 at 6:23 PM, Andrei Pistirica
-<andrei.pistirica@microchip.com> wrote:
-> Hardware time stamp on the PTP Ethernet packets are received using the
-> SO_TIMESTAMPING API. Timers are obtained from the PTP event/peer
-> gem registers.
->
-> Signed-off-by: Andrei Pistirica <andrei.pistirica@microchip.com>
-> ---
-> Integration with SAMA5D2 only. This feature wasn't tested on any
-> other platform that might use cadence/gem.
->
-> Patch is not completely ported to the very latest version of net-next,
-> and it will be after review.
->
-<snip>
-> @@ -853,6 +858,11 @@ static int gem_rx(struct macb *bp, int budget)
->                     GEM_BFEXT(RX_CSUM, ctrl) & GEM_RX_CSUM_CHECKED_MASK)
->                         skb->ip_summed = CHECKSUM_UNNECESSARY;
->
-> +/* guard the hot-path */
-> +#ifdef CONFIG_MACB_USE_HWSTAMP
-> +               if (bp->hwts_rx_en)
-> +                       macb_ptp_do_rxstamp(bp, skb);
-> +#endif
+Thanks, Thomas.
 
-I'm just wondering if the same #ifdef can be used for timestamping
-in all versions of this IP.
-As you know, ZynqMP uses the timestamp from BD and older
-versions of do not have an indication or extended BD support.
-So, it might useful to add a dependency/check on the product family,
-through config structure.
-That way, both version can use their respective RX timestamp methods
-based on the compatible string.
-Please let me know if you have any other ideas.
+mvebu maintainers: Unfortunately I forgot to Cc irqchip maintainers on this 
+patch (except Jason, who is in both), sorry about that. Should I resend? Would 
+any of you pick it up?
 
-Regards,
-Harini
+Thanks,
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
