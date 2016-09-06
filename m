@@ -1,98 +1,96 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 6 Sep 2016 14:05:21 +0200
-Subject: [PATCH 6/7] mtd: nand: mxc: implement onfi get/set features
-In-Reply-To: <1473158355-22451-7-git-send-email-s.hauer@pengutronix.de>
-References: <1473158355-22451-1-git-send-email-s.hauer@pengutronix.de>
- <1473158355-22451-7-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20160906140521.508a2861@bbrezillon>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 6 Sep 2016 20:08:12 +0800
+Subject: [PATCH v4 05/15] drivers: platform: add fwnode base platform
+ devices retrieval
+In-Reply-To: <20160905145751.GA7480@red-moon>
+References: <1471274620-20754-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1471274620-20754-6-git-send-email-lorenzo.pieralisi@arm.com>
+ <7659b956-c49d-bd0d-7a1d-8dfc3da6f409@linaro.org>
+ <20160905145751.GA7480@red-moon>
+Message-ID: <06a6d839-639f-8a86-14a5-4c43bff593b7@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  6 Sep 2016 12:39:14 +0200
-Sascha Hauer <s.hauer@pengutronix.de> wrote:
+On 2016/9/5 22:57, Lorenzo Pieralisi wrote:
+> On Mon, Sep 05, 2016 at 09:19:43PM +0800, Hanjun Guo wrote:
+>> On 2016/8/15 23:23, Lorenzo Pieralisi wrote:
+>>> The platform device kernel API does not provide functions to
+>>> retrieve a platform device through the corresponding struct
+>>> device fwnode pointer.
+>>>
+>>> Implement the fwnode platform_device look-up in drivers core
+>>> code by using the bus_find_device() API and a corresponding
+>>> matching function. The OF equivalent (eg of_find_device_by_node())
+>>> will reuse the newly introduced function when OF code will
+>>> take care of setting up the device->fwnode value that is
+>>> currently left dangling for platform devices instantiated out
+>>> of device tree nodes.
+>>>
+>>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>>> ---
+>>> drivers/base/platform.c         | 23 +++++++++++++++++++++++
+>>> include/linux/platform_device.h |  3 +++
+>>> 2 files changed, 26 insertions(+)
+>>>
+>>> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+>>> index 6482d47..3ef150d 100644
+>>> --- a/drivers/base/platform.c
+>>> +++ b/drivers/base/platform.c
+>>> @@ -760,6 +760,29 @@ err_out:
+>>> }
+>>> EXPORT_SYMBOL_GPL(__platform_create_bundle);
+>>>
+>>> +static int fwnode_dev_match(struct device *dev, void *data)
+>>> +{
+>>> +	return dev->fwnode == data;
+>>> +}
+>>> +
+>>> +/**
+>>> + * platform_find_device_by_fwnode() - Find the platform_device associated
+>>> + *				      with a fwnode
+>>> + * @fwnode: Pointer to firmware node
+>>> + *
+>>> + * Returns platform_device pointer, or NULL if not found
+>>> + */
+>>> +struct platform_device *
+>>> +platform_find_device_by_fwnode(struct fwnode_handle *fwnode)
+>>> +{
+>>> +	struct device *dev;
+>>> +
+>>> +	dev = bus_find_device(&platform_bus_type, NULL, fwnode,
+>>> +			      fwnode_dev_match);
+>>> +	return dev ? to_platform_device(dev) : NULL;
+>>> +}
+>>> +EXPORT_SYMBOL(platform_find_device_by_fwnode);
+>>
+>> As SMMU is registered as platform devices, I think we need such
+>> API to retrieve the platform device with fwnode handle, actually
+>> Kefeng introduced a similar patch [1], but your patch is more
+>> generic, so this patch make sense to me,
+>>
+>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+>
+> Thanks ! Strictly speaking, with Robin's new series:
+>
+> https://lists.linuxfoundation.org/pipermail/iommu/2016-August/018230.html
+>
+>
+> (and corresponding v5 of this one that I have rebased on top of it) we
+> do not need this patch any longer and it is not really that generic
+> keeping in mind that it can't be used for DT matching (because in DT
+> dev->fwnode is dangling); I will see if I keep this patch according
+> to dependencies.
 
-> To be able to support different ONFI timing modes we have to implement
-> the onfi_set_features and onfi_get_features. Tested on an i.MX25 SoC.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  drivers/mtd/nand/mxc_nand.c | 53 +++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 53 insertions(+)
-> 
-> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-> index 5173fad..1db8299 100644
-> --- a/drivers/mtd/nand/mxc_nand.c
-> +++ b/drivers/mtd/nand/mxc_nand.c
-> @@ -1239,6 +1239,57 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
->  	}
->  }
->  
-> +static int mxc_nand_onfi_set_features(struct mtd_info *mtd, struct nand_chip *chip,
-> +			int addr, uint8_t *subfeature_param)
-> +{
-> +	struct nand_chip *nand_chip = mtd_to_nand(mtd);
-> +	struct mxc_nand_host *host = nand_get_controller_data(nand_chip);
-> +	int i;
-> +
-> +	if (!chip->onfi_version ||
-> +	    !(le16_to_cpu(chip->onfi_params.opt_cmd)
-> +	      & ONFI_OPT_CMD_SET_GET_FEATURES))
-> +		return -EINVAL;
-> +
-> +	host->buf_start = 0;
-> +
-> +	for (i = 0; i < ONFI_SUBFEATURE_PARAM_LEN; ++i)
-> +		chip->write_byte(mtd, subfeature_param[i]);
-> +
-> +	memcpy32_toio(host->main_area0, host->data_buf, mtd->writesize);
-> +	host->devtype_data->send_cmd(host, NAND_CMD_SET_FEATURES, false);
-> +	mxc_do_addr_cycle(mtd, addr, -1);
-> +	host->devtype_data->send_page(mtd, NFC_INPUT);
-> +
-> +	return 0;
-> +}
-> +
-> +static int mxc_nand_onfi_get_features(struct mtd_info *mtd, struct nand_chip *chip,
-> +			int addr, uint8_t *subfeature_param)
-> +{
-> +	struct nand_chip *nand_chip = mtd_to_nand(mtd);
-> +	struct mxc_nand_host *host = nand_get_controller_data(nand_chip);
-> +	int i;
-> +
-> +	if (!chip->onfi_version ||
-> +	    !(le16_to_cpu(chip->onfi_params.opt_cmd)
-> +	      & ONFI_OPT_CMD_SET_GET_FEATURES))
-> +		return -EINVAL;
-> +
-> +	*(uint32_t *)host->main_area0 = 0xdeadbeef;
-> +
-> +	host->devtype_data->send_cmd(host, NAND_CMD_GET_FEATURES, false);
-> +	mxc_do_addr_cycle(mtd, addr, -1);
-> +	host->devtype_data->send_page(mtd, NFC_OUTPUT);
-> +	memcpy32_fromio(host->data_buf, host->main_area0, 512);
-> +	host->buf_start = 0;
-> +
-> +	for (i = 0; i < ONFI_SUBFEATURE_PARAM_LEN; ++i)
-> +		*subfeature_param++ = chip->read_byte(mtd);
-> +
-> +	return 0;
-> +}
-> +
->  /*
->   * The generic flash bbt decriptors overlap with our ecc
->   * hardware, so define some i.MX specific ones.
-> @@ -1513,6 +1564,8 @@ static int mxcnd_probe(struct platform_device *pdev)
->  	this->read_word = mxc_nand_read_word;
->  	this->write_buf = mxc_nand_write_buf;
->  	this->read_buf = mxc_nand_read_buf;
-> +	this->onfi_set_features = mxc_nand_onfi_set_features;
-> +	this->onfi_get_features = mxc_nand_onfi_get_features;
+OK, I think I will wait for your new version, then try another test
+and review it, does it make sense?
 
-Do you really have to re-implement ->onfi_{set,get}_features()?
-How about adding support for this command in your ->cmdfunc()
-implementation and relying on the default ->onfi_{set,get}_features()
-provided by the core?
+>
+> Side note: I have a problem with [1], since that code is there to
+> implement DT phandles in ACPI IIUC and we must really prevent that :)
 
->  
->  	host->clk = devm_clk_get(&pdev->dev, NULL);
->  	if (IS_ERR(host->clk))
+Agreed :)
+
+Thanks
+Hanjun
