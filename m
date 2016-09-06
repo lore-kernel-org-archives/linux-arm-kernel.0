@@ -1,42 +1,157 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 6 Sep 2016 17:11:39 +0100
-Subject: [PATCH 3/5] arm64: Handle TRAP_HWBRKPT for user mode as well
-In-Reply-To: <ebc25cc4a2ea95cace064aa1c3a2407885623d16.1470114993.git.panand@redhat.com>
-References: <cover.1470114993.git.panand@redhat.com>
- <ebc25cc4a2ea95cace064aa1c3a2407885623d16.1470114993.git.panand@redhat.com>
-Message-ID: <20160906161139.GG19605@e104818-lin.cambridge.arm.com>
+From: mjaggi@caviumnetworks.com (Manish Jaggi)
+Date: Tue, 6 Sep 2016 21:45:36 +0530
+Subject: [PATCH v24 0/9] arm64: add kdump support
+In-Reply-To: <57CEE1E5.7040206@arm.com>
+References: <20160809015248.28414-1-takahiro.akashi@linaro.org>
+ <0267060a-d380-2e7a-0c33-0084bfc46d97@caviumnetworks.com>
+ <20160831053109.GR20080@linaro.org>
+ <cca40a49-3500-ded8-35a7-053adf79d12b@caviumnetworks.com>
+ <20160905081501.GA16712@linaro.org>
+ <976ca1f8-5efb-b45c-19b8-bde7bd06f5b8@caviumnetworks.com>
+ <57CEE1E5.7040206@arm.com>
+Message-ID: <35f81eb9-8bd0-16ae-e04d-5ea4b30c0ad6@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 02, 2016 at 11:00:07AM +0530, Pratyush Anand wrote:
-> --- a/arch/arm64/kernel/debug-monitors.c
-> +++ b/arch/arm64/kernel/debug-monitors.c
-> @@ -246,6 +246,8 @@ static void send_user_sigtrap(int si_code)
->  static int single_step_handler(unsigned long addr, unsigned int esr,
->  			       struct pt_regs *regs)
->  {
-> +	bool handler_found = false;
-> +
->  	/*
->  	 * If we are stepping a pending breakpoint, call the hw_breakpoint
->  	 * handler first.
-> @@ -253,7 +255,14 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
->  	if (!reinstall_suspended_bps(regs))
->  		return 0;
->  
-> -	if (user_mode(regs)) {
-> +#ifdef	CONFIG_KPROBES
-> +	if (kprobe_single_step_handler(regs, esr) == DBG_HOOK_HANDLED)
-> +		handler_found = true;
-> +#endif
-> +	if (!handler_found && call_step_hook(regs, esr) == DBG_HOOK_HANDLED)
-> +		handler_found = true;
-> +
-> +	if (!handler_found && user_mode(regs)) {
->  		send_user_sigtrap(TRAP_HWBKPT);
 
-Could we register kprobe_single_step_handler() via register_set_hook()
-and only invoke call_step_hook() above?
 
--- 
-Catalin
+On 09/06/2016 09:03 PM, Marc Zyngier wrote:
+> On 05/09/16 13:42, Manish Jaggi wrote:
+>>
+>>
+>> On 09/05/2016 01:45 PM, AKASHI Takahiro wrote:
+>>> [Cc: Marc]
+>>>
+>>> On Fri, Sep 02, 2016 at 06:23:25PM +0530, Manish Jaggi wrote:
+>>>>
+>>>>
+>>>> On 08/31/2016 11:01 AM, AKASHI Takahiro wrote:
+>>>>> Manish,
+>>>>>
+>>>>> Thank you for testing my kdump and reporting issues.
+>>>>>
+>>>>> On Wed, Aug 31, 2016 at 09:11:52AM +0530, Manish Jaggi wrote:
+>>>>>> Hi Akashi,
+>>>>>>
+>>>>>> On 08/09/2016 07:22 AM, AKASHI Takahiro wrote:
+>>>>>>> This patch series adds kdump support on arm64.
+>>>>>>>
+>>>>>>> To load a crash-dump kernel to the systems, a series of patches to
+>>>>>>> kexec-tools, which have not yet been merged upstream, are needed.
+>>>>>>> Please use my kdump patches [1].
+>>>>>>>
+>>>>>>> To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
+>>>>>>>   - crash utility (coming v7.1.6 or later) [2]
+>>>>>>>     (Necessary patches have already been queued in the master.)
+>>>>>>>
+>>>>>>> [1] T.B.D.
+>>>>>>> [2] https://github.com/crash-utility/crash.git
+>>>>>>>
+>>>>>>> Changes for v24 (Aug 9, 2016):
+>>>>>>>   o Rebase to Linux-4.8-rc1
+>>>>>>>   o Update descriptions about newly added DT proerties
+>>>>>>>
+>>>>>>> Changes for v23 (July 26, 2016):
+>>>>>>>
+>>>>>>>   o Move memblock_reserve() to a single place in reserve_crashkernel()
+>>>>>>>   o Use  cpu_park_loop() in ipi_cpu_crash_stop()
+>>>>>>>   o Always enforce ARCH_LOW_ADDRESS_LIMIT to the memory range of crash kernel
+>>>>>>>   o Re-implement fdt_enforce_memory_region() to remove non-reserve regions
+>>>>>>>     (for ACPI) from usable memory at crash kernel
+>>>>>>>
+>>>>>>> Changes for v22 (July 12, 2016):
+>>>>>>>
+>>>>>>>   o Export "crashkernel-base" and "crashkernel-size" via device-tree,
+>>>>>>>     and add some descriptions about them in chosen.txt
+>>>>>>>   o Rename "usable-memory" to "usable-memory-range" to avoid inconsistency
+>>>>>>>     with powerpc's "usable-memory"
+>>>>>>>   o Make cosmetic changes regarding "ifdef" usage
+>>>>>>>   o Correct some wordings in kdump.txt
+>>>>>>>
+>>>>>>> Changes for v21 (July 6, 2016):
+>>>>>>>
+>>>>>>>   o Remove kexec patches.
+>>>>>>>   o Rebase to arm64's for-next/core (Linux-4.7-rc4 based).
+>>>>>>>   o Clarify the description about kvm in kdump.txt.
+>>>>>>>
+>>>>>>> See the following link [3] for older changes:
+>>>>>>> [3]  http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438780.html
+>>>>>>>
+>>>>>>> AKASHI Takahiro (8):
+>>>>>>>   arm64: kdump: reserve memory for crash dump kernel
+>>>>>>>   memblock: add memblock_cap_memory_range()
+>>>>>>>   arm64: limit memory regions based on DT property, usable-memory-range
+>>>>>>>   arm64: kdump: implement machine_crash_shutdown()
+>>>>>>>   arm64: kdump: add kdump support
+>>>>>>>   arm64: kdump: add VMCOREINFO's for user-space coredump tools
+>>>>>>>   arm64: kdump: enable kdump in the arm64 defconfig
+>>>>>>>   arm64: kdump: update a kernel doc
+>>>>>>>
+>>>>>>> James Morse (1):
+>>>>>>>   Documentation: dt: chosen properties for arm64 kdump
+>>>>>>>
+>>>>>>>  Documentation/devicetree/bindings/chosen.txt |  45 ++++++
+>>>>>>>  Documentation/kdump/kdump.txt                |  16 ++-
+>>>>>>>  arch/arm64/Kconfig                           |  11 ++
+>>>>>>>  arch/arm64/configs/defconfig                 |   1 +
+>>>>>>>  arch/arm64/include/asm/hardirq.h             |   2 +-
+>>>>>>>  arch/arm64/include/asm/kexec.h               |  41 +++++-
+>>>>>>>  arch/arm64/include/asm/smp.h                 |   2 +
+>>>>>>>  arch/arm64/kernel/Makefile                   |   1 +
+>>>>>>>  arch/arm64/kernel/crash_dump.c               |  71 ++++++++++
+>>>>>>>  arch/arm64/kernel/machine_kexec.c            |  67 ++++++++-
+>>>>>>>  arch/arm64/kernel/setup.c                    |   7 +-
+>>>>>>>  arch/arm64/kernel/smp.c                      |  63 +++++++++
+>>>>>>>  arch/arm64/mm/init.c                         | 202 +++++++++++++++++++++++++++
+>>>>>>>  include/linux/memblock.h                     |   1 +
+>>>>>>>  mm/memblock.c                                |  28 ++++
+>>>>>>>  15 files changed, 551 insertions(+), 7 deletions(-)
+>>>>>>>  create mode 100644 arch/arm64/kernel/crash_dump.c
+>>>>>>>
+>>>>>> Couple of points
+>>>>>> a) Just a note, while testing, the crashkernel reserved memory should be less than ARCH_LOW_ADDRESS_LIMIT (=arm64_dma_phys_limit).
+>>>>>
+>>>>> I think that this is a common mistake not only for kdump, but also
+>>>>> for general kernels.
+>>>>> Since request_standard_resources() calls alloc_bootmem_low(),
+>>>>> the kernel will panic if any of usable "System RAM" is located
+>>>>> above ARCH_LOW_ADDRESS_LIMIT.
+>>>>> For kdump, using "crashkernel=SS" notation is a convenient way
+>>>>> to avoid this issue.
+>>>>>
+>>>>>> b) Has anyone tested this on a SoC with Gicv3 ITS ?
+>>>>>> Should the GICD/R be reset prior to switching to crash kernel ?
+>>>>>> I am seeing lot of GICv3: RWP timeout, gone fishing while crash kernel boots.
+>>>>>
+>>>>> I've never seen this kind of messages.
+>>>>> I usually do my testing on a fast model.
+>>>>> "compatible" of interrupt-controller is "arm,gic-v3."
+>>>>>
+>>>> I suspect gic_cpu_pm_notifier is not being called on any of the cores prior to start of crash kernel.
+>>>> We might have to call it explicitly.
+>>>
+>>> I'm not sure that it is the cause, but anyway none of any cpu_pm_notifier's
+>>> will be called at panic. That is the reason why "maxcpus=1" should be
+>>> specified (for kdump on arm64).
+>>>
+>> What I meant was that since cpu_pm_notifier is not called before
+>> crash kernel is started, GIC Distributor/re-distributor/ITS is not
+>> set in quiescent state.
+> 
+> Which is fine, they are not expected to be in a sane state anyway
+> (that's what a crash is about...). The ITS now has provision to be put
+> in a disabled state before being reinitialized. As for GICD, it is
+> disabled before being reprogrammed, which should be enough.
+> 
+>> In my setup the GICD_CTRL[RWP] bit is not cleared in the
+>> crashkernels' distributor init function.
+> 
+> Which instance is failing? The initial one (just after the initial
+> disable)? Or the one called from gic_dist_config()?
+> 
+In crash kernel, when the GICD_CTRL is set to 0x0, RWP is not getting clear.
+And is never cleared for any subsequent writes.
+> Thanks,
+> 
+> 	M.
+> 
