@@ -1,158 +1,39 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 6 Sep 2016 12:39:26 +0200
-Subject: [RFC v2 PATCH 4/7] arm64: tlbflush.h: add __tlbi() macro
-In-Reply-To: <87d1khjqci.fsf@e105922-lin.cambridge.arm.com>
-References: <1473093097-30932-1-git-send-email-punit.agrawal@arm.com>
- <1473093097-30932-5-git-send-email-punit.agrawal@arm.com>
- <20160906063830.GC30513@cbox>
- <87d1khjqci.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <20160906103926.GH30513@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Sep 2016 12:38:29 +0200
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <20160906063529.GA22312@b29397-desktop>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <4865343.bOXkeC8XtQ@wuerfel> <20160906063529.GA22312@b29397-desktop>
+Message-ID: <5844875.KucAoPMrXi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2016 at 11:05:17AM +0100, Punit Agrawal wrote:
-> Christoffer Dall <christoffer.dall@linaro.org> writes:
-> 
-> > On Mon, Sep 05, 2016 at 05:31:34PM +0100, Punit Agrawal wrote:
-> >> From: Mark Rutland <mark.rutland@arm.com>
-> >> 
-> >> As with dsb() and isb(), add a __tlbi() helper so that we can avoid
-> >> distracting asm boilerplate every time we want a TLBI. As some TLBI
-> >> operations take an argument while others do not, some pre-processor is
-> >> used to handle these two cases with different assembly blocks.
-> >> 
-> >> The existing tlbflush.h code is moved over to use the helper.
-> >> 
-> >> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> >> Cc: Will Deacon <will.deacon@arm.com>
-> >> [ rename helper to __tlbi, update commit log ]
-> >> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> >> ---
-> >>  arch/arm64/include/asm/tlbflush.h | 31 +++++++++++++++++++++++--------
-> >>  1 file changed, 23 insertions(+), 8 deletions(-)
-> >> 
-> >> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-> >> index b460ae2..e9e42a7 100644
-> >> --- a/arch/arm64/include/asm/tlbflush.h
-> >> +++ b/arch/arm64/include/asm/tlbflush.h
-> >> @@ -25,6 +25,21 @@
-> >>  #include <asm/cputype.h>
-> >>  
-> >>  /*
-> >> + * Raw TLBI operations. Drivers and most kernel code should use the TLB
-> >> + * management routines below in preference to these. Where necessary, these can
-> >
-> > in preference to these?
-> >
-> >> + * be used to avoid asm() boilerplate.
-> >
-> > 'these' seem to be a bit overloaded in this commentary.
-> >
-> 
-> I've locally updated the comment to - 
-> 
-> "Raw TLBI operations.
-> 
-> Where necessary, use the __tlbi macro to avoid asm()
-> boilerplate. *Note:* Drivers and most kernel code should use the
-> TLB management routines in preference to the macros."
-> 
-> Is that better?
+On Tuesday, September 6, 2016 2:35:29 PM CEST Peter Chen wrote:
+> On Mon, Sep 05, 2016 at 05:39:27PM +0200, Arnd Bergmann wrote:
+> > On Friday, September 2, 2016 5:16:31 PM CEST Leo Li wrote:
 
-Yes.  I would get rid of the *Note:* part, but that's really
-nit-picking.
-
-Thanks,
--Christoffer
-
+> > 
+> > Most of these are probably never used with any nonstandard
+> > DMA settings (IOMMU, cache coherency, offset, ...).
+> > 
+> > One thing we could possibly do is to go through these and
+> > replace the hardcoded dma mask setup with of_dma_configure()
+> > in all cases in which we actually use DT for probing, which
+> > should cover the interesting cases.
+> > 
 > 
-> >> + *
-> >> + * Can be used as __tlbi(op) or __tlbi(op, arg), depending on whether a
-> >> + * particular TLBI op takes an argument or not. The macros below handle invoking
-> >> + * the asm with or without the register argument as appropriate.
-> >> + */
-> >> +#define __TLBI_0(op, arg)		asm ("tlbi " #op)
-> >> +#define __TLBI_1(op, arg)		asm ("tlbi " #op ", %0" : : "r" (arg))
-> >> +#define __TLBI_N(op, arg, n, ...)	__TLBI_##n(op, arg)
-> >> +
-> >> +#define __tlbi(op, ...)		__TLBI_N(op, ##__VA_ARGS__, 1, 0)
-> >> +
-> >> +/*
-> >>   *	TLB Management
-> >>   *	==============
-> >>   *
-> >> @@ -66,7 +81,7 @@
-> >>  static inline void local_flush_tlb_all(void)
-> >>  {
-> >>  	dsb(nshst);
-> >> -	asm("tlbi	vmalle1");
-> >> +	__tlbi(vmalle1);
-> >>  	dsb(nsh);
-> >>  	isb();
-> >>  }
-> >> @@ -74,7 +89,7 @@ static inline void local_flush_tlb_all(void)
-> >>  static inline void flush_tlb_all(void)
-> >>  {
-> >>  	dsb(ishst);
-> >> -	asm("tlbi	vmalle1is");
-> >> +	__tlbi(vmalle1is);
-> >>  	dsb(ish);
-> >>  	isb();
-> >>  }
-> >> @@ -84,7 +99,7 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
-> >>  	unsigned long asid = ASID(mm) << 48;
-> >>  
-> >>  	dsb(ishst);
-> >> -	asm("tlbi	aside1is, %0" : : "r" (asid));
-> >> +	__tlbi(aside1is, asid);
-> >>  	dsb(ish);
-> >>  }
-> >>  
-> >> @@ -94,7 +109,7 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
-> >>  	unsigned long addr = uaddr >> 12 | (ASID(vma->vm_mm) << 48);
-> >>  
-> >>  	dsb(ishst);
-> >> -	asm("tlbi	vale1is, %0" : : "r" (addr));
-> >> +	__tlbi(vale1is, addr);
-> >>  	dsb(ish);
-> >>  }
-> >>  
-> >> @@ -122,9 +137,9 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
-> >>  	dsb(ishst);
-> >>  	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12)) {
-> >>  		if (last_level)
-> >> -			asm("tlbi vale1is, %0" : : "r"(addr));
-> >> +			__tlbi(vale1is, addr);
-> >>  		else
-> >> -			asm("tlbi vae1is, %0" : : "r"(addr));
-> >> +			__tlbi(vae1is, addr);
-> >>  	}
-> >>  	dsb(ish);
-> >>  }
-> >> @@ -149,7 +164,7 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
-> >>  
-> >>  	dsb(ishst);
-> >>  	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
-> >> -		asm("tlbi vaae1is, %0" : : "r"(addr));
-> >> +		__tlbi(vaae1is, addr);
-> >>  	dsb(ish);
-> >>  	isb();
-> >>  }
-> >> @@ -163,7 +178,7 @@ static inline void __flush_tlb_pgtable(struct mm_struct *mm,
-> >>  {
-> >>  	unsigned long addr = uaddr >> 12 | (ASID(mm) << 48);
-> >>  
-> >> -	asm("tlbi	vae1is, %0" : : "r" (addr));
-> >> +	__tlbi(vae1is, addr);
-> >>  	dsb(ish);
-> >>  }
-> >>  
-> >> -- 
-> >> 2.8.1
-> >> 
-> > _______________________________________________
-> > kvmarm mailing list
-> > kvmarm at lists.cs.columbia.edu
-> > https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> One case I am going to work is to let USB chipidea driver support iommu,
+> the chipidea core device is no of_node, and created by
+> platform_add_device on the runtime. Using of_dma_configure with parent
+> of_node is a solution from my point, like [1].
+> 
+> https://lkml.org/lkml/2016/2/22/7
+
+Right, that should make it work with iommu as well. However, it does
+not solve the other issue I mentioned above, with boards that have
+USB devices hardwired to a chipidea host controller that need
+configuration from DT. For that, we still need to come up with another
+way to associate the DT hierarchy in the host bridge node with
+the Linux platform_device.
+
+	Arnd
