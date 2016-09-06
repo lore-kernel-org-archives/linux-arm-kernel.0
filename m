@@ -1,26 +1,25 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 6 Sep 2016 13:32:53 +0100
-Subject: [PATCH v2 0/7] ARM: KVM: Support for vgic-v3
-In-Reply-To: <20160905112853.GF26366@cbox>
+Date: Tue, 6 Sep 2016 13:33:30 +0100
+Subject: [PATCH v2 1/7] arm64: KVM: Move GIC accessors to arch_gicv3.h
+In-Reply-To: <20160905112859.GG26366@cbox>
 References: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
- <20160905112853.GF26366@cbox>
-Message-ID: <57CEB775.5060209@arm.com>
+ <1471344418-19568-2-git-send-email-vladimir.murzin@arm.com>
+ <20160905112859.GG26366@cbox>
+Message-ID: <57CEB79A.4070902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 05/09/16 12:28, Christoffer Dall wrote:
-> On Tue, Aug 16, 2016 at 11:46:51AM +0100, Vladimir Murzin wrote:
->> Hi,
+> On Tue, Aug 16, 2016 at 11:46:52AM +0100, Vladimir Murzin wrote:
+>> Since we are going to share vgic-v3 save/restore code with ARM
+>> keep arch specific accessors separately.
 >>
->> This is an attempt to make use vgic-v3 under arch/arm since save-restore
->> functionality got re-written in C and can be shared between arm/arm64
->> like it has already been done for vgic-v2 and timer.
->>
->> With this patches I'm able to get 32 core ARMv7 guest boot:
+>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 > 
-> Is it really an ARMv7 guest or an AArch32 ARMv8 guest?
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> 
 > 
 
-It is an AArch32 ARMv8 guest.
+Thanks!
 
 Vladimir
