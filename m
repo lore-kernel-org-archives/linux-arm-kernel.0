@@ -1,75 +1,45 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 6 Sep 2016 14:55:48 +0200
-Subject: [PATCH] pwm: meson: handle unknown ID values
-In-Reply-To: <20160906125106.1511562-1-arnd@arndb.de>
-References: <20160906125106.1511562-1-arnd@arndb.de>
-Message-ID: <ecab427a-7d1e-c42c-e562-06b63bf9fef4@baylibre.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 6 Sep 2016 14:58:29 +0200
+Subject: [PULL] drm/atmel-hlcdc: fixes for 4.8-rc6
+Message-ID: <20160906145829.528ebfc9@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/2016 02:50 PM, Arnd Bergmann wrote:
-> When building with -Wmaybe-uninitialized, we get a couple of harmless
-> warnings about three functions in this new driver that don't look
-> safe to the compiler:
-> 
-> drivers/pwm/pwm-meson.c: In function 'meson_pwm_get_state':
-> drivers/pwm/pwm-meson.c:355:26: error: 'mask' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-> drivers/pwm/pwm-meson.c: In function 'meson_pwm_disable':
-> drivers/pwm/pwm-meson.c:263:13: error: 'enable' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-> drivers/pwm/pwm-meson.c: In function 'meson_pwm_apply':
-> drivers/pwm/pwm-meson.c:231:13: error: 'clk_shift' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-> drivers/pwm/pwm-meson.c:231:36: error: 'enable' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-> drivers/pwm/pwm-meson.c:231:24: error: 'clk_enable' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-> 
-> Specifically, if we have a device with an id other than 0 or 1,
-> this would result in undefined behavior. This is currently not
-> possible, but the compiler cannot be expected to know this.
-> 
-> This patch adds a 'default' clause to let the compiler know
-> what to do instead, which shuts up the warning and makes the
-> code slightly more resiliant in case it gets extended to other
-> identifiers.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/pwm/pwm-meson.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/drivers/pwm/pwm-meson.c b/drivers/pwm/pwm-meson.c
-> index 566f5cb81021..25abd95dcc7b 100644
-> --- a/drivers/pwm/pwm-meson.c
-> +++ b/drivers/pwm/pwm-meson.c
-> @@ -242,6 +242,9 @@ static void meson_pwm_enable(struct meson_pwm *meson,
->  		clk_enable = MISC_B_CLK_EN;
->  		enable = MISC_B_EN;
->  		break;
-> +
-> +	default:
-> +		return;
->  	}
->  
->  	value = readl(meson->base + REG_MISC_AB);
-> @@ -270,6 +273,9 @@ static void meson_pwm_disable(struct meson_pwm *meson, unsigned int id)
->  	case 1:
->  		enable = MISC_B_EN;
->  		break;
-> +
-> +	default:
-> +		return;
->  	}
->  
->  	value = readl(meson->base + REG_MISC_AB);
-> @@ -349,6 +355,10 @@ static void meson_pwm_get_state(struct pwm_chip *chip, struct pwm_device *pwm,
->  	case 1:
->  		mask = MISC_B_EN;
->  		break;
-> +
-> +	default:
-> +		state->enabled = 0;
-> +		return;
->  	}
->  
->  	value = readl(meson->base + REG_MISC_AB);
-> 
+Hi Dave,
 
-Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+Here are two fixes for 4.8-rc6. I was supposed to send this PR just
+after -rc1, but I completely forgot, so if you feel it's too late
+for this release, I can queue them for 4.9 (note that the fixes are
+trivial, and I don't think they can introduce a regression).
+
+Regards,
+
+Boris
+
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+
+are available in the git repository at:
+
+  git at github.com:bbrezillon/linux-at91.git tags/drm/atmel-hlcdc/4.8-fixes
+
+for you to fetch changes up to 1ba7db07ccc2825669d6e376632316813a072887:
+
+  drm/atmel-hlcdc: Make ->reset() implementation static (2016-09-06 14:46:16 +0200)
+
+----------------------------------------------------------------
+Two fixes for 4.8:
+- missing static specifier on atmel_hlcdc_crtc_reset()
+- bug in the hardware scaling logic
+
+----------------------------------------------------------------
+Jan Leupold (1):
+      drm: atmel-hlcdc: Fix vertical scaling
+
+Thierry Reding (1):
+      drm/atmel-hlcdc: Make ->reset() implementation static
+
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c  |  2 +-
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 10 +++++-----
+ 2 files changed, 6 insertions(+), 6 deletions(-)
