@@ -1,34 +1,42 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 6 Sep 2016 16:40:11 +0800
-Subject: [PATCH 08/10] ARM: dts: chromecast: add missing unit name to /memory
- node
+Date: Tue, 6 Sep 2016 16:40:06 +0800
+Subject: [PATCH 03/10] ARM: dts: berlin2: Remove skeleton.dtsi inclusion
 In-Reply-To: <20160906084013.2887-1-jszhang@marvell.com>
 References: <20160906084013.2887-1-jszhang@marvell.com>
-Message-ID: <20160906084013.2887-9-jszhang@marvell.com>
+Message-ID: <20160906084013.2887-4-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the following DTC warning with W=1:
+As noted in [1], "there are a number of problems with skeleton.dtsi,
+and it would be prefereable to remove it entirely." This patch is to
+remove skeleton.dtsi inclusion from berlin2.
 
-"Node /memory has a reg or ranges property, but no unit name"
+[1] http://www.spinics.net/lists/arm-kernel/msg528080.html
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- arch/arm/boot/dts/berlin2cd-google-chromecast.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/berlin2.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
-index 8ba8b50..ca24def 100644
---- a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
-+++ b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
-@@ -50,7 +50,7 @@
- 		stdout-path = "serial0:115200n8";
- 	};
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index ae81009..c89a441 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
+@@ -39,13 +39,14 @@
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
  
--	memory {
-+	memory at 0 {
- 		device_type = "memory";
- 		reg = <0x00000000 0x20000000>; /* 512 MB */
- 	};
+-#include "skeleton.dtsi"
+ #include <dt-bindings/clock/berlin2.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ 
+ / {
+ 	model = "Marvell Armada 1500 (BG2) SoC";
+ 	compatible = "marvell,berlin2", "marvell,berlin";
++	#address-cells = <1>;
++	#size-cells = <1>;
+ 
+ 	aliases {
+ 		serial0 = &uart0;
 -- 
 2.9.3
