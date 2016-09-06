@@ -1,118 +1,110 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 6 Sep 2016 13:18:51 +0200
-Subject: [PATCH 1/7] mtd: nand: Create a NAND reset function
-In-Reply-To: <1473158355-22451-2-git-send-email-s.hauer@pengutronix.de>
-References: <1473158355-22451-1-git-send-email-s.hauer@pengutronix.de>
- <1473158355-22451-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20160906131851.34fa77a9@bbrezillon>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 6 Sep 2016 13:22:03 +0200
+Subject: [RFC v2 PATCH 2/7] KVM: Track the pid of the VM process
+In-Reply-To: <877fapjng0.fsf@e105922-lin.cambridge.arm.com>
+References: <1473093097-30932-1-git-send-email-punit.agrawal@arm.com>
+ <1473093097-30932-3-git-send-email-punit.agrawal@arm.com>
+ <20160906062252.GA30513@cbox>
+ <87poohjqzk.fsf@e105922-lin.cambridge.arm.com>
+ <20160906102542.GG30513@cbox>
+ <877fapjng0.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20160906112203.GO30513@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  6 Sep 2016 12:39:09 +0200
-Sascha Hauer <s.hauer@pengutronix.de> wrote:
-
-> When NAND devices are resetted some initialization may have to be done,
-> like for example they have to be configured for the timing mode that
-> shall be used. To get a common place where this initialization can be
-> implemented create a nand_reset() function. This currently only issues
-> a NAND_CMD_RESET to the NAND device. The places issuing this command
-> manually are replaced with a call to nand_reset().
+On Tue, Sep 06, 2016 at 12:07:59PM +0100, Punit Agrawal wrote:
+> Christoffer Dall <christoffer.dall@linaro.org> writes:
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  drivers/mtd/nand/nand_base.c | 23 ++++++++++++++++++-----
->  include/linux/mtd/nand.h     |  3 +++
->  2 files changed, 21 insertions(+), 5 deletions(-)
+> > On Tue, Sep 06, 2016 at 10:51:27AM +0100, Punit Agrawal wrote:
+> >> Hi Christoffer,
+> >> 
+> >> Christoffer Dall <christoffer.dall@linaro.org> writes:
+> >> 
+> >> > On Mon, Sep 05, 2016 at 05:31:32PM +0100, Punit Agrawal wrote:
+> >> >> Userspace tools such as perf can be used to profile individual
+> >> >> processes.
+> >> >> 
+> >> >> Track the PID of the virtual machine process to match profiling requests
+> >> >> targeted at it. This can be used to take appropriate action to enable
+> >> >> the requested profiling operations for the VMs of interest.
+> >> >> 
+> >> >> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> >> >> Cc: Paolo Bonzini <pbonzini@redhat.com>
+> >> >> Cc: "Radim Kr?m??" <rkrcmar@redhat.com>
+> >> >> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> >> >> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >> >> ---
+> >> >>  include/linux/kvm_host.h | 1 +
+> >> >>  virt/kvm/kvm_main.c      | 2 ++
+> >> >>  2 files changed, 3 insertions(+)
+> >> >> 
+> >> >> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+> >> >> index 9c28b4d..7c42c94 100644
+> >> >> --- a/include/linux/kvm_host.h
+> >> >> +++ b/include/linux/kvm_host.h
+> >> >> @@ -374,6 +374,7 @@ struct kvm_memslots {
+> >> >>  struct kvm {
+> >> >>  	spinlock_t mmu_lock;
+> >> >>  	struct mutex slots_lock;
+> >> >> +	struct pid *pid;
+> >> >>  	struct mm_struct *mm; /* userspace tied to this vm */
+> >> >>  	struct kvm_memslots *memslots[KVM_ADDRESS_SPACE_NUM];
+> >> >>  	struct srcu_struct srcu;
+> >> >> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+> >> >> index 1950782..ab2535a 100644
+> >> >> --- a/virt/kvm/kvm_main.c
+> >> >> +++ b/virt/kvm/kvm_main.c
+> >> >> @@ -613,6 +613,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
+> >> >>  	spin_lock_init(&kvm->mmu_lock);
+> >> >>  	atomic_inc(&current->mm->mm_count);
+> >> >>  	kvm->mm = current->mm;
+> >> >> +	kvm->pid = get_task_pid(current, PIDTYPE_PID);
+> >> >
+> >> > How dooes this deal with threading?  Is the idea that the user by
+> >> > specifying the main thread's pid will enable trapping for all vcpu
+> >> > threads belonging to that VM?
+> >> 
+> >> Yes that's correct - specifying the main thread PID will enable trapping
+> >> for the VM (all vcpus).
+> >> 
+> >> I am happy to move to a more suitable identifier if available.
+> >> 
+> >
+> > What is the 'main thread' ?
+> >
+> > Does something mandate that the VM is created by the thread group
+> > leader?  If not, is it not a bit strange from a user perspective, that
+> > you have to find the specific subthread pid that created the vm to
+> > enable this tracing for all vcpu threads and that the tgid doesn't work
+> > in this case?
 > 
-> diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-> index 77533f7..20151fc 100644
-> --- a/drivers/mtd/nand/nand_base.c
-> +++ b/drivers/mtd/nand/nand_base.c
-> @@ -948,6 +948,19 @@ static int nand_wait(struct mtd_info *mtd, struct nand_chip *chip)
->  }
->  
->  /**
-> + * nand_reset - Reset and initialize a NAND device
-> + * @mtd: mtd info
-> + *
-> + * Returns 0 for success or negative error code otherwise
-> + */
-> +int nand_reset(struct mtd_info *mtd)
+> Let me correct my terminology usage - the value recorded above (and used
+> to identify the VM) should be the tgid. It is confusing because 'ps'
+> reports it as pid.
+> 
+> I picked the value as existing KVM code already uses the PID of the
+> creating task (see kvm_create_vm_debugfs) to export VM statistics in
+> debugfs.
+> 
+> If I've got this wrong, then kvm_create_vm_debugfs also likely needs an
+> update.
+> 
+> What do you think?
+> 
+When you do get_task_pid(current, PIDTYPE_PID) it actually gets the
+kernel view of a PID which is the thead-id from userspace's point of
+view, right?
 
-Can we pass a struct nand_chip * here?
+I don't see why this has to be the same as the debugfs code, as there it
+makes potentially more sense to thread-specific, but for your case, are
+you not targeting the behavior that a user can do "ps aux | grep qemu"
+or whatever, and then set tracing for the reported PID (which is
+actually a tgid)?
 
-> +{
-> +	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
+If this is indeed the case, then I don't think the current code supports
+this if QEMU was ever changed to create the VM with a different thread
+than the tgl.
 
-You miss the chip variable.
+That being said, I'm typically wrong when I talk about userspace.
 
-> +
-> +	return 0;
-> +}
-> +
-> +/**
->   * __nand_unlock - [REPLACEABLE] unlocks specified locked blocks
->   * @mtd: mtd info
->   * @ofs: offset to start unlock from
-> @@ -1025,7 +1038,7 @@ int nand_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
->  	 * some operation can also clear the bit 7 of status register
->  	 * eg. erase/program a locked block
->  	 */
-> -	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
-> +	nand_reset(mtd);
->  
->  	/* Check, if it is write protected */
->  	if (nand_check_wp(mtd)) {
-> @@ -1084,7 +1097,7 @@ int nand_lock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
->  	 * some operation can also clear the bit 7 of status register
->  	 * eg. erase/program a locked block
->  	 */
-> -	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
-> +	nand_reset(mtd);
->  
->  	/* Check, if it is write protected */
->  	if (nand_check_wp(mtd)) {
-> @@ -2788,7 +2801,7 @@ static int nand_do_write_oob(struct mtd_info *mtd, loff_t to,
->  	 * if we don't do this. I have no clue why, but I seem to have 'fixed'
->  	 * it in the doc2000 driver in August 1999.  dwmw2.
->  	 */
-> -	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
-> +	nand_reset(mtd);
->  
->  	/* Check, if it is write protected */
->  	if (nand_check_wp(mtd)) {
-> @@ -3829,7 +3842,7 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
->  	 * Reset the chip, required by some chips (e.g. Micron MT29FxGxxxxx)
->  	 * after power-up.
->  	 */
-> -	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
-> +	nand_reset(mtd);
->  
->  	/* Send the command for reading device ID */
->  	chip->cmdfunc(mtd, NAND_CMD_READID, 0x00, -1);
-> @@ -4161,7 +4174,7 @@ int nand_scan_ident(struct mtd_info *mtd, int maxchips,
->  	for (i = 1; i < maxchips; i++) {
->  		chip->select_chip(mtd, i);
->  		/* See comment in nand_get_flash_type for reset */
-> -		chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
-> +		nand_reset(mtd);
->  		/* Send the command for reading device ID */
->  		chip->cmdfunc(mtd, NAND_CMD_READID, 0x00, -1);
->  		/* Read manufacturer and device IDs */
-> diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-> index 8dd6e01..9af9575 100644
-> --- a/include/linux/mtd/nand.h
-> +++ b/include/linux/mtd/nand.h
-> @@ -50,6 +50,9 @@ extern int nand_lock(struct mtd_info *mtd, loff_t ofs, uint64_t len);
->  /* unlocks specified locked blocks */
->  extern int nand_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len);
->  
-> +/* Reset and initialize a NAND device */
-> +extern int nand_reset(struct mtd_info *mtd);
-
-The extern keyword is not needed here.
-
-> +
->  /* The maximum number of NAND chips in an array */
->  #define NAND_MAX_CHIPS		8
->  
+-Christoffer
