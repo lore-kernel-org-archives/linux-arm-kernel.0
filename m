@@ -1,26 +1,41 @@
 From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Tue, 6 Sep 2016 18:45:35 +0200
-Subject: [PATCH v4 3/9] ARM: STM32: Select external interrupts controller
+Date: Tue, 6 Sep 2016 18:45:33 +0200
+Subject: [PATCH v4 1/9] Documentation: dt-bindings: Document STM32 EXTI
+ controller bindings
 In-Reply-To: <1473180341-1999-1-git-send-email-alexandre.torgue@st.com>
 References: <1473180341-1999-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <1473180341-1999-4-git-send-email-alexandre.torgue@st.com>
+Message-ID: <1473180341-1999-2-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 2d601d7..157cea9 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -877,6 +877,7 @@ config ARCH_STM32
- 	select CLKSRC_STM32
- 	select PINCTRL
- 	select RESET_CONTROLLER
-+	select STM32_EXTI
- 	help
- 	  Support for STMicroelectronics STM32 processors.
- 
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt b/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt
+new file mode 100644
+index 0000000..6e7703d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt
+@@ -0,0 +1,20 @@
++STM32 External Interrupt Controller
++
++Required properties:
++
++- compatible: Should be "st,stm32-exti"
++- reg: Specifies base physical address and size of the registers
++- interrupt-controller: Indentifies the node as an interrupt controller
++- #interrupt-cells: Specifies the number of cells to encode an interrupt
++  specifier, shall be 2
++- interrupts: interrupts references to primary interrupt controller
++
++Example:
++
++exti: interrupt-controller at 40013c00 {
++	compatible = "st,stm32-exti";
++	interrupt-controller;
++	#interrupt-cells = <2>;
++	reg = <0x40013C00 0x400>;
++	interrupts = <1>, <2>, <3>, <6>, <7>, <8>, <9>, <10>, <23>, <40>, <41>, <42>, <62>, <76>;
++};
 -- 
 1.9.1
