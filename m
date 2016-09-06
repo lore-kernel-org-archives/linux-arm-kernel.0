@@ -1,32 +1,104 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 06 Sep 2016 13:30:12 +0200
-Subject: [PATCH] ARM: dts: exynos: Add entries for sound support on
- Odroid-XU board
-In-Reply-To: <05c45777-732b-3701-36dc-2448003acd50@samsung.com>
-References: <1471883654-2113-1-git-send-email-s.nawrocki@samsung.com>
- <05c45777-732b-3701-36dc-2448003acd50@samsung.com>
-Message-ID: <bc8544f0-6a28-532f-cfdb-7ca28270b662@samsung.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 06 Sep 2016 12:33:29 +0100
+Subject: [RFC v2 PATCH 7/7] arm64: KVM: Enable selective trapping of TLB
+ instructions
+In-Reply-To: <20160906102404.GF30513@cbox> (Christoffer Dall's message of
+ "Tue, 6 Sep 2016 12:24:04 +0200")
+References: <1473093097-30932-1-git-send-email-punit.agrawal@arm.com>
+ <1473093097-30932-8-git-send-email-punit.agrawal@arm.com>
+ <20160906102404.GF30513@cbox>
+Message-ID: <871t0xjm9i.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/30/2016 08:42 AM, Krzysztof Kozlowski wrote:
->> +&clock {
->> > +       clocks = <&fin_pll>;
-> I dig into it and I have some questions:
-> 1. Missing clock-names?
-> 2. What code parses it?
-> 3. Don't we need it also for other SoC/boards?
+Christoffer Dall <christoffer.dall@linaro.org> writes:
 
-Apologies, I missed this one.
+> On Mon, Sep 05, 2016 at 05:31:37PM +0100, Punit Agrawal wrote:
+>> The TTLB bit of Hypervisor Control Register (HCR_EL2) controls the
+>> trapping of guest TLB maintenance instructions. Taking the trap requires
+>> a switch to the hypervisor and is an expensive operation.
+>> 
+>> Enable selective trapping of guest TLB instructions when the associated
+>> perf trace event is enabled for a specific virtual machine.
+>> 
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/perf_trace.c | 32 ++++++++++++++++++++++++++++++++
+>>  1 file changed, 32 insertions(+)
+>> 
+>> diff --git a/arch/arm64/kvm/perf_trace.c b/arch/arm64/kvm/perf_trace.c
+>> index 8bacd18..f26da1d 100644
+>> --- a/arch/arm64/kvm/perf_trace.c
+>> +++ b/arch/arm64/kvm/perf_trace.c
+>> @@ -17,6 +17,8 @@
+>>  #include <linux/kvm_host.h>
+>>  #include <linux/trace_events.h>
+>>  
+>> +#include <asm/kvm_emulate.h>
+>> +
+>>  typedef int (*perf_trace_callback_fn)(struct kvm *kvm, bool enable);
+>>  
+>>  struct kvm_trace_hook {
+>> @@ -24,7 +26,37 @@ struct kvm_trace_hook {
+>>  	perf_trace_callback_fn setup_fn;
+>>  };
+>>  
+>> +static int tlb_invalidate_trap(struct kvm *kvm, bool enable)
+>> +{
+>> +	int i;
+>> +	struct kvm_vcpu *vcpu;
+>> +
+>> +	/*
+>> +	 * Halt the VM to ensure atomic update across all vcpus (this
+>> +	 * avoids racy behaviour against other modifications of
+>> +	 * HCR_EL2 such as kvm_toggle_cache/kvm_set_way_flush).
+>> +	 */
+>> +	kvm_arm_halt_guest(kvm);
+>> +	kvm_for_each_vcpu(i, vcpu, kvm) {
+>> +		unsigned long hcr = vcpu_get_hcr(vcpu);
+>> +
+>> +		if (enable)
+>> +			hcr |= HCR_TTLB;
+>> +		else
+>> +			hcr &= ~HCR_TTLB;
+>> +
+>> +		vcpu_set_hcr(vcpu, hcr);
+>> +	}
+>> +	kvm_arm_resume_guest(kvm);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>  static struct kvm_trace_hook trace_hook[] = {
+>> +	{
+>> +		.key = "kvm_tlb_invalidate",
+>
+> is this key defined elsewhere?  If not, I think the name is ambiguous,
+> because it's unclear if this means 'kvm the subsystem' or 'a kvm guest',
+> by looking purely at the string.
 
-Ad.1. clock-names is not needed as there will be only one clock and there
-is no need to get the clock by name.  If it bothers you we could add e.g.
-clock-names = "osc", but IMO it's just an unnecessary complication.
+The key is the name of the tracepoint that the callback is executed
+against. Here it is the tracepoint defined in Patch 6/7.
 
-Ad.2 of_clk_get() called from within of_clk_init() and exynos5410_clk_init.
+I've now added a comment to the definition of "struct kvm_trace_hook" to
+explain what the key is.
 
-Ad.2. I think it makes sense to add it for all Exynos SoCs where it's missing.
-
--- 
-Regards,
-Sylwester
+>
+>> +		.setup_fn = tlb_invalidate_trap,
+>> +	},
+>>  	{ },
+>>  };
+>>  
+>> -- 
+>> 2.8.1
+>> 
+>
+> Otherwise looks ok to me.
+>
+> -Christoffer
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
