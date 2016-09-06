@@ -1,150 +1,53 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 06 Sep 2016 11:05:17 +0100
-Subject: [RFC v2 PATCH 4/7] arm64: tlbflush.h: add __tlbi() macro
-In-Reply-To: <20160906063830.GC30513@cbox> (Christoffer Dall's message of
- "Tue, 6 Sep 2016 08:38:30 +0200")
-References: <1473093097-30932-1-git-send-email-punit.agrawal@arm.com>
- <1473093097-30932-5-git-send-email-punit.agrawal@arm.com>
- <20160906063830.GC30513@cbox>
-Message-ID: <87d1khjqci.fsf@e105922-lin.cambridge.arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 6 Sep 2016 15:40:51 +0530
+Subject: [PATCH 2/2] ARM: dts: am57xx-beagle-x15: Add support for rev B1
+In-Reply-To: <CAOCHtYiFjB-cuABmCiw96spc-De+qNNQYGrjp-MmNDuH2mJ9Bw@mail.gmail.com>
+References: <20160902090600.27262-1-nm@ti.com>
+ <20160902090600.27262-3-nm@ti.com>
+ <dd74f5e1-304f-661e-7fd9-f5f81bcfc55e@ti.com>
+ <CAOCHtYiFjB-cuABmCiw96spc-De+qNNQYGrjp-MmNDuH2mJ9Bw@mail.gmail.com>
+Message-ID: <84be68f4-c5a6-0afe-c402-1adba9172918@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Christoffer Dall <christoffer.dall@linaro.org> writes:
+On Friday 02 September 2016 07:22 PM, Robert Nelson wrote:
+> On Fri, Sep 2, 2016 at 5:41 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+>> + Robert Nelson
+>>
+>> On Friday 02 September 2016 02:36 PM, Nishanth Menon wrote:
+>>
+>> I understand that there are existing users of A2 boards and so we simply
+>> cannot remove support for those boards (at least yet).
+>>
+>> But given the small numbers of A2 boards, its also quite likely that we
+>> will not have enough test coverage for those boards. Especially as years
+>> pass and there are fewer and fewer people with access to working A2 boards.
+> 
+> I have a A1, A2 and a B1, that i use for testing for
+> beagleboard.org...  The A1 use to be ssh-accessible for developers,
+> but since moving to my new house, I haven't "yet" got that one setup
+> for developers.  Right now i'm using the A2 & B1 for development of
+> our default images.
+> 
+> Jason Kridner also has a number of boards
 
-> On Mon, Sep 05, 2016 at 05:31:34PM +0100, Punit Agrawal wrote:
->> From: Mark Rutland <mark.rutland@arm.com>
->> 
->> As with dsb() and isb(), add a __tlbi() helper so that we can avoid
->> distracting asm boilerplate every time we want a TLBI. As some TLBI
->> operations take an argument while others do not, some pre-processor is
->> used to handle these two cases with different assembly blocks.
->> 
->> The existing tlbflush.h code is moved over to use the helper.
->> 
->> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> [ rename helper to __tlbi, update commit log ]
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> ---
->>  arch/arm64/include/asm/tlbflush.h | 31 +++++++++++++++++++++++--------
->>  1 file changed, 23 insertions(+), 8 deletions(-)
->> 
->> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
->> index b460ae2..e9e42a7 100644
->> --- a/arch/arm64/include/asm/tlbflush.h
->> +++ b/arch/arm64/include/asm/tlbflush.h
->> @@ -25,6 +25,21 @@
->>  #include <asm/cputype.h>
->>  
->>  /*
->> + * Raw TLBI operations. Drivers and most kernel code should use the TLB
->> + * management routines below in preference to these. Where necessary, these can
->
-> in preference to these?
->
->> + * be used to avoid asm() boilerplate.
->
-> 'these' seem to be a bit overloaded in this commentary.
->
+Availability of hardware _somewhere_ is one aspect. I am still worried
+about the big difference in scale. A2 are ~200 in number where as the
+production version should be in thousands.
 
-I've locally updated the comment to - 
+Reuse is meant to reduce maintenance cost. In this case though, it seems
+like it will do exactly the opposite - making anyone with a production
+version rely on few with a non-production version to make any updates at
+all.
 
-"Raw TLBI operations.
+IMHO, a common .dtsi made sense if both the boards went to production
+and are largely available.
 
-Where necessary, use the __tlbi macro to avoid asm()
-boilerplate. *Note:* Drivers and most kernel code should use the
-TLB management routines in preference to the macros."
+device-tree sources continue to get updates even though hardware itself
+is pretty much frozen. am335x-bone-common.dtsi created 3 years back is
+receiving updates still - as recently as 3 months back. So, I do expect
+that A2 will need to get tested in many years to come. Not sure if it
+really worth that much effort.
 
-Is that better?
-
->> + *
->> + * Can be used as __tlbi(op) or __tlbi(op, arg), depending on whether a
->> + * particular TLBI op takes an argument or not. The macros below handle invoking
->> + * the asm with or without the register argument as appropriate.
->> + */
->> +#define __TLBI_0(op, arg)		asm ("tlbi " #op)
->> +#define __TLBI_1(op, arg)		asm ("tlbi " #op ", %0" : : "r" (arg))
->> +#define __TLBI_N(op, arg, n, ...)	__TLBI_##n(op, arg)
->> +
->> +#define __tlbi(op, ...)		__TLBI_N(op, ##__VA_ARGS__, 1, 0)
->> +
->> +/*
->>   *	TLB Management
->>   *	==============
->>   *
->> @@ -66,7 +81,7 @@
->>  static inline void local_flush_tlb_all(void)
->>  {
->>  	dsb(nshst);
->> -	asm("tlbi	vmalle1");
->> +	__tlbi(vmalle1);
->>  	dsb(nsh);
->>  	isb();
->>  }
->> @@ -74,7 +89,7 @@ static inline void local_flush_tlb_all(void)
->>  static inline void flush_tlb_all(void)
->>  {
->>  	dsb(ishst);
->> -	asm("tlbi	vmalle1is");
->> +	__tlbi(vmalle1is);
->>  	dsb(ish);
->>  	isb();
->>  }
->> @@ -84,7 +99,7 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
->>  	unsigned long asid = ASID(mm) << 48;
->>  
->>  	dsb(ishst);
->> -	asm("tlbi	aside1is, %0" : : "r" (asid));
->> +	__tlbi(aside1is, asid);
->>  	dsb(ish);
->>  }
->>  
->> @@ -94,7 +109,7 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
->>  	unsigned long addr = uaddr >> 12 | (ASID(vma->vm_mm) << 48);
->>  
->>  	dsb(ishst);
->> -	asm("tlbi	vale1is, %0" : : "r" (addr));
->> +	__tlbi(vale1is, addr);
->>  	dsb(ish);
->>  }
->>  
->> @@ -122,9 +137,9 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
->>  	dsb(ishst);
->>  	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12)) {
->>  		if (last_level)
->> -			asm("tlbi vale1is, %0" : : "r"(addr));
->> +			__tlbi(vale1is, addr);
->>  		else
->> -			asm("tlbi vae1is, %0" : : "r"(addr));
->> +			__tlbi(vae1is, addr);
->>  	}
->>  	dsb(ish);
->>  }
->> @@ -149,7 +164,7 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
->>  
->>  	dsb(ishst);
->>  	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
->> -		asm("tlbi vaae1is, %0" : : "r"(addr));
->> +		__tlbi(vaae1is, addr);
->>  	dsb(ish);
->>  	isb();
->>  }
->> @@ -163,7 +178,7 @@ static inline void __flush_tlb_pgtable(struct mm_struct *mm,
->>  {
->>  	unsigned long addr = uaddr >> 12 | (ASID(mm) << 48);
->>  
->> -	asm("tlbi	vae1is, %0" : : "r" (addr));
->> +	__tlbi(vae1is, addr);
->>  	dsb(ish);
->>  }
->>  
->> -- 
->> 2.8.1
->> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+Thanks,
+Sekhar
