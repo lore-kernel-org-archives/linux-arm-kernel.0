@@ -1,39 +1,57 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 6 Sep 2016 14:23:16 +0100
-Subject: [PATCH v2 7/7] ARM: KVM: Unlock vgic-v3 support
-In-Reply-To: <20160905112927.GL26366@cbox>
-References: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
- <1471344418-19568-8-git-send-email-vladimir.murzin@arm.com>
- <20160905112927.GL26366@cbox>
-Message-ID: <57CEC344.7030706@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue,  6 Sep 2016 15:24:00 +0200
+Subject: [PATCH] mfd: exynos-lpass: mark PM functions as __maybe_unused
+Message-ID: <20160906132432.2083493-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The newly added exynos lpass driver produces a build warning when
+CONFIG_PM is disabled since the only callers of exynos_lpass_disable
+are under an #ifdef:
 
-Sorry, missed this one
+drivers/mfd/exynos-lpass.c:93:13: error: 'exynos_lpass_disable' defined but not used [-Werror=unused-function]
+ static void exynos_lpass_disable(struct exynos_lpass *lpass)
 
-On 05/09/16 12:29, Christoffer Dall wrote:
->>  
->> > +static bool __hyp_text __has_useable_gicv3_cpuif(void)
->> > +{
->> > +	if (IS_ENABLED(CONFIG_ARM_GIC_V3) && (read_sysreg(ID_PFR1) >> 28))
-> Do we have a define for bit 28 we could use?
+This removes the #ifdef and replaces it with __maybe_unused annotations
+so the compiler can leave out the unused code silently with less
+room for mistakes.
 
-I'll check it.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 36c26760bba8 ("mfd: Add Samsung Exynos Low Power Audio Subsystem driver")
+---
+ drivers/mfd/exynos-lpass.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-> 
-> Does this actually work on all v7 boards?  The v7 ARM ARM seems to state
-> that this bitfield is Reserved, UNK.  Does that somehow mean 'is going
-> to be zero'?
-
-It is how v7ARM ARM I have defines UNK
-
-An abbreviation indicating that software must treat a field as
-containing an UNKNOWN value. Hardware must implement the bit as read as
-0, or all 0s for a bit field. Software must not rely on the field
-reading as zero.
-
-It seems goes under 'is going to be zero' case, no?
-
-Cheers
-Vladimir
+diff --git a/drivers/mfd/exynos-lpass.c b/drivers/mfd/exynos-lpass.c
+index 578ac7b57b96..2e064fb8826f 100644
+--- a/drivers/mfd/exynos-lpass.c
++++ b/drivers/mfd/exynos-lpass.c
+@@ -144,8 +144,7 @@ static int exynos_lpass_probe(struct platform_device *pdev)
+ 	return of_platform_populate(dev->of_node, NULL, NULL, dev);
+ }
+ 
+-#ifdef CONFIG_PM_SLEEP
+-static int exynos_lpass_suspend(struct device *dev)
++static int __maybe_unused exynos_lpass_suspend(struct device *dev)
+ {
+ 	struct exynos_lpass *lpass = dev_get_drvdata(dev);
+ 
+@@ -154,7 +153,7 @@ static int exynos_lpass_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int exynos_lpass_resume(struct device *dev)
++static int __maybe_unused exynos_lpass_resume(struct device *dev)
+ {
+ 	struct exynos_lpass *lpass = dev_get_drvdata(dev);
+ 
+@@ -162,7 +161,6 @@ static int exynos_lpass_resume(struct device *dev)
+ 
+ 	return 0;
+ }
+-#endif
+ 
+ static SIMPLE_DEV_PM_OPS(lpass_pm_ops, exynos_lpass_suspend,
+ 					exynos_lpass_resume);
+-- 
+2.9.0
