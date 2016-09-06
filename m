@@ -1,88 +1,68 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Mon, 5 Sep 2016 23:16:26 -0700
-Subject: [PATCH] drivers: acpi: fix GIC irq model default PCI IRQ polarity
-In-Reply-To: <1473084758-7377-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1473084758-7377-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <CADaLNDmAZ-fiiNoJhqJ9iaZAj4qTJ9vYc1efiU_d73xETG+U7A@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 6 Sep 2016 08:22:52 +0200
+Subject: [RFC v2 PATCH 2/7] KVM: Track the pid of the VM process
+In-Reply-To: <1473093097-30932-3-git-send-email-punit.agrawal@arm.com>
+References: <1473093097-30932-1-git-send-email-punit.agrawal@arm.com>
+ <1473093097-30932-3-git-send-email-punit.agrawal@arm.com>
+Message-ID: <20160906062252.GA30513@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 5, 2016 at 7:12 AM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On ACPI ARM based systems the GIC interrupt controller
-> and corresponding interrupt model permit only the high
-> polarity for level interrupts.
->
-> ACPI firmware describes PCI legacy IRQs through entries
-> in the _PRT objects. Entries in the _PRT can be of two types:
->
-> - Static: not configurable, trigger/polarity default to level-low,
->   _PRT entry defines the global GSI interrupt number
-> - Configurable: _PRT interrupt entry contains a reference to the
->   corresponding PCI interrupt link device (that in turn provides the
->   interrupt descriptor through its _CRS/_PRS methods)
->
-> Configurable IRQ entries are not currently allowed by the ACPI
-> specification on ARM, since they can only be used for interrupt
-> pins that are routable, and ARM platforms GIC configurations
-> do not allow dynamic IRQ routing, routing is statically laid out
-> at synthesis time; therefore PCI interrupt links cannot be used
-> for PCI legacy IRQ descriptions in the _PRT on ARM systems.
->
-> On the other hand, current core ACPI code handling PCI legacy IRQs
-> consider IRQ trigger/polarity for static _PRT entries as level-low.
->
-> On ARM systems with a GIC interrupt controller and corresponding
-> ACPI interrupt model this does not work in that GIC interrupt
-> controller is only capable of handling level interrupts whose
-> polarity is high (for PCI legacy IRQs - that are level-low by
-> specification - this means that the legacy IRQs are inverted before
-> reaching the interrupt controller pin), resulting in IRQ allocation
-> failures such as:
->
-> genirq: Setting trigger mode 8 for irq 18 failed (gic_set_type+0x0/0x48)
->
-> Change the default polarity for PCI legacy IRQs to high on systems
-> booting wth ACPI on platforms with a GIC interrupt controller model,
-> fixing the discrepancy between specification and HW behaviour.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Duc Dang <dhdang@apm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Sinan Kaya <okaya@codeaurora.org>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+On Mon, Sep 05, 2016 at 05:31:32PM +0100, Punit Agrawal wrote:
+> Userspace tools such as perf can be used to profile individual
+> processes.
+> 
+> Track the PID of the virtual machine process to match profiling requests
+> targeted at it. This can be used to take appropriate action to enable
+> the requested profiling operations for the VMs of interest.
+> 
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Paolo Bonzini <pbonzini@redhat.com>
+> Cc: "Radim Kr?m??" <rkrcmar@redhat.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
 > Cc: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  drivers/acpi/pci_irq.c | 10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/acpi/pci_irq.c b/drivers/acpi/pci_irq.c
-> index 2c45dd3..c576a6f 100644
-> --- a/drivers/acpi/pci_irq.c
-> +++ b/drivers/acpi/pci_irq.c
-> @@ -411,7 +411,15 @@ int acpi_pci_irq_enable(struct pci_dev *dev)
->         int gsi;
->         u8 pin;
->         int triggering = ACPI_LEVEL_SENSITIVE;
-> -       int polarity = ACPI_ACTIVE_LOW;
-> +       /*
-> +        * On ARM systems with the GIC interrupt model, level interrupts
-> +        * are always polarity high by specification; PCI legacy
-> +        * IRQs lines are inverted before reaching the interrupt
-> +        * controller and must therefore be considered active high
-> +        * as default.
-> +        */
-> +       int polarity = acpi_irq_model == ACPI_IRQ_MODEL_GIC ?
-> +                                     ACPI_ACTIVE_HIGH : ACPI_ACTIVE_LOW;
->         char *link = NULL;
->         char link_desc[16];
->         int rc;
+>  include/linux/kvm_host.h | 1 +
+>  virt/kvm/kvm_main.c      | 2 ++
+>  2 files changed, 3 insertions(+)
+> 
+> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+> index 9c28b4d..7c42c94 100644
+> --- a/include/linux/kvm_host.h
+> +++ b/include/linux/kvm_host.h
+> @@ -374,6 +374,7 @@ struct kvm_memslots {
+>  struct kvm {
+>  	spinlock_t mmu_lock;
+>  	struct mutex slots_lock;
+> +	struct pid *pid;
+>  	struct mm_struct *mm; /* userspace tied to this vm */
+>  	struct kvm_memslots *memslots[KVM_ADDRESS_SPACE_NUM];
+>  	struct srcu_struct srcu;
+> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+> index 1950782..ab2535a 100644
+> --- a/virt/kvm/kvm_main.c
+> +++ b/virt/kvm/kvm_main.c
+> @@ -613,6 +613,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
+>  	spin_lock_init(&kvm->mmu_lock);
+>  	atomic_inc(&current->mm->mm_count);
+>  	kvm->mm = current->mm;
+> +	kvm->pid = get_task_pid(current, PIDTYPE_PID);
 
-Tested-by: Duc Dang <dhdang@apm.com>
+How dooes this deal with threading?  Is the idea that the user by
+specifying the main thread's pid will enable trapping for all vcpu
+threads belonging to that VM?
 
-> --
-> 2.6.4
->
-Regards,
-Duc Dang.
+>  	kvm_eventfd_init(kvm);
+>  	mutex_init(&kvm->lock);
+>  	mutex_init(&kvm->irq_lock);
+> @@ -712,6 +713,7 @@ static void kvm_destroy_vm(struct kvm *kvm)
+>  	int i;
+>  	struct mm_struct *mm = kvm->mm;
+>  
+> +	put_pid(kvm->pid);
+>  	kvm_destroy_vm_debugfs(kvm);
+>  	kvm_arch_sync_events(kvm);
+>  	spin_lock(&kvm_lock);
+> -- 
+> 2.8.1
+> 
