@@ -1,9 +1,9 @@
 From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Tue, 6 Sep 2016 12:53:14 -0300
+Date: Tue, 6 Sep 2016 12:53:15 -0300
 Subject: [PATCH 8/9] ARM: dts: imx27: Fix memory node build warnings with W=1
 In-Reply-To: <1473177196-29371-1-git-send-email-fabio.estevam@nxp.com>
 References: <1473177196-29371-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <1473177196-29371-8-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <1473177196-29371-9-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
