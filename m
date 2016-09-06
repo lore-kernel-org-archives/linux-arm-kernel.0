@@ -1,66 +1,55 @@
-From: harinikatakamlinux@gmail.com (Harini Katakam)
-Date: Tue, 6 Sep 2016 13:06:53 +0530
-Subject: [RFC PATCH 1/2] macb: Add 1588 support in Cadence GEM.
-In-Reply-To: <1472820817-21874-1-git-send-email-andrei.pistirica@microchip.com>
-References: <1472820817-21874-1-git-send-email-andrei.pistirica@microchip.com>
-Message-ID: <CAFcVECJ5s_fboK5Q_etSw3APYxCNPTnX_CzZB3FsEMzK4vW6mA@mail.gmail.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Tue, 6 Sep 2016 15:39:06 +0800
+Subject: [PATCH v7 4/9] drm/mediatek: update display module connections
+In-Reply-To: <1472815484-43821-5-git-send-email-yt.shen@mediatek.com>
+References: <1472815484-43821-1-git-send-email-yt.shen@mediatek.com>
+ <1472815484-43821-5-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1473147546.11736.7.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrei,
+Hi, YT:
 
-Adding Richard Cochran for PTP.
-
-On Fri, Sep 2, 2016 at 6:23 PM, Andrei Pistirica
-<andrei.pistirica@microchip.com> wrote:
-> From: Harini Katakam <harinik@xilinx.com>
->
-> Cadence GEM provides a 102 bit time counter with 48 bits for seconds,
-> 30 bits for nsecs and 24 bits for sub-nsecs to control 1588 timestamping.
->
-> This patch does the following:
-> - Registers to ptp clock framework
-> - Timer initialization is done by writing time of day to the timer counter.
-> - ns increment register is programmed as NSEC_PER_SEC/TSU_CLK.
->   For a 24 bit subns precision, the subns increment equals
->   remainder of (NS_PER_SEC/TSU_CLK) * (2^24).
-> - HW time stamp capabilities are advertised via ethtool and macb ioctl is
->   updated accordingly.
-> - Timestamps are obtained from the TX/RX PTP event/PEER registers.
->   The timestamp obtained thus is updated in skb for upper layers to access.
-> - The drivers register functions with ptp to perform time and frequency
->   adjustment.
-> - Time adjustment is done by writing to the 1558_ADJUST register.
->   The controller will read the delta in this register and update the timer
->   counter register. Alternatively, for large time offset adjustments,
->   the driver reads the secs and nsecs counter values, adds/subtracts the
->   delta and updates the timer counter.
-> - Frequency adjustment is not directly supported by this IP.
->   addend is the initial value ns increment and similarly addendesub.
->   The ppb (parts per billion) provided is used as
->   ns_incr = addend +/- (ppb/rate).
->   Similarly the remainder of the above is used to populate subns increment.
->   In case the ppb requested is negative AND subns adjustment greater than
->   the addendsub, ns_incr is reduced by 1 and subns_incr is adjusted in
->   positive accordingly.
->
-> Signed-off-by: Harini Katakam <harinik@xilinx.com>
-> Signed-off-by: Andrei Pistirica <andrei.pistirica@microchip.com>
+On Fri, 2016-09-02 at 19:24 +0800, YT Shen wrote:
+> update connections for OVL, RDMA, BLS, DSI
+> 
+> Signed-off-by: YT Shen <yt.shen@mediatek.com>
 > ---
-> This patch is based on original Harini's patch, implemented in a
-> separate file to ease the review/maintanance and integration with
-> other platforms (e.g. Zynq Ultrascale+ MPSoC).
-> Feature was tested on SAMA5D2 platform using ptp4l v1.6 from linuxptp
-> project and also with ptpd2 version 2.3.1. PTP was tested over
-> IPv4,IPv6 and 802.3 protocols.
->
-> Hariani, please let me know if you are ok with this patch, and if you
-> want to be stated as author/signed-off?
->
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+> 
 
-Thanks for the patch. It seems ok. I'm making some changes on
-top of this, especially in your second patch for picking RX timestamp,
-since that is handled from indication in the BD for ZynqMP.
+[snip...]
+
+> @@ -111,6 +119,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+>  	if (cur == DDP_COMPONENT_OVL0 && next == DDP_COMPONENT_COLOR0) {
+>  		*addr = DISP_REG_CONFIG_DISP_OVL0_MOUT_EN;
+>  		value = OVL0_MOUT_EN_COLOR0;
+> +	} else if (cur == DDP_COMPONENT_OVL0 && next == DDP_COMPONENT_RDMA0) {
+> +		*addr = DISP_REG_CONFIG_DISP_OVL_MOUT_EN;
+> +		value = OVL_MOUT_EN_RDMA;
+>  	} else if (cur == DDP_COMPONENT_OD && next == DDP_COMPONENT_RDMA0) {
+>  		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
+>  		value = OD_MOUT_EN_RDMA0;
+> @@ -148,6 +159,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
+>  	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
+>  		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
+>  		value = COLOR1_SEL_IN_OVL1;
+> +	} else if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0) {
+
+DDP_COMPONENT_BLS is a new symbol which is defined in 9th patch of this
+series. I think the definition of DDP_COMPONENT_BLS should be in front
+of this patch.
+
+> +		*addr = DISP_REG_CONFIG_DSI_SEL;
+> +		value = DSI_SEL_IN_BLS;
+>  	} else {
+>  		value = 0;
+>  	}
+> @@ -155,6 +169,15 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
+>  	return value;
+>  }
+>  
 
 Regards,
-Harini
+CK
