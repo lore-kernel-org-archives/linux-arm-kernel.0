@@ -1,50 +1,111 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 6 Sep 2016 19:49:49 +0200
-Subject: [RFC PATCH V5 3/5] PCI: Check platform specific ECAM quirks
-In-Reply-To: <20160905022529.GD30488@localhost>
-References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
- <1470661541-26270-4-git-send-email-tn@semihalf.com>
- <20160905022529.GD30488@localhost>
-Message-ID: <34416dae-31e6-93b6-2ba8-f42ba61ede4f@semihalf.com>
+From: dave.long@linaro.org (David Long)
+Date: Tue,  6 Sep 2016 13:54:59 -0400
+Subject: [PATCH v2] arm64: Improve kprobes test for atomic sequence
+Message-ID: <1473184499-6018-1-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.09.2016 04:25, Bjorn Helgaas wrote:
-> On Mon, Aug 08, 2016 at 03:05:39PM +0200, Tomasz Nowicki wrote:
->> Some platforms may not be fully compliant with generic set of PCI config
->> accessors. For these cases we implement the way to overwrite accessors
->> set. Algorithm traverses available quirk list (static array),
->> matches against <oem_id, oem_table_id, rev, domain, bus number range> and
->> returns pci_config_window structure with fancy PCI config ops.
->> oem_id, oem_table_id and rev come from MCFG table standard header.
->>
->> It is possible to define custom init call which is responsible for
->> setting up PCI configuration access accordingly to quirk requirements.
->> If custom init call is not defined, use standard pci_acpi_setup_ecam_mapping().
->>
->> pci_generic_ecam_ops will be used for platforms free from quirks.
->>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> Signed-off-by: Dongdong Liu <liudongdong3@huawei.com>
->> Signed-off-by: Christopher Covington <cov@codeaurora.org>
->> ---
->>  drivers/pci/host/Makefile      |  1 +
->>  drivers/pci/host/mcfg-quirks.c | 86 ++++++++++++++++++++++++++++++++++++++++++
->>  drivers/pci/host/mcfg-quirks.h | 20 ++++++++++
->>  include/linux/pci-acpi.h       |  2 +
->>  4 files changed, 109 insertions(+)
->>  create mode 100644 drivers/pci/host/mcfg-quirks.c
->>  create mode 100644 drivers/pci/host/mcfg-quirks.h
->
-> If the object is to work around defects in the ACPI MCFG table, I
-> think I'd put the quirks closer to drivers/acpi/pci_mcfg.c, where we
-> parse that table.  What if we actually put them directly *in*
-> drivers/acpi/pci_mcfg.c?
+From: "David A. Long" <dave.long@linaro.org>
 
-Then we need to export quirk init calls or ecam ops from 
-drivers/pci/host/* directory.
+Kprobes searches backwards a finite number of instructions to determine if
+there is an attempt to probe a load/store exclusive sequence. It stops when
+it hits the maximum number of instructions or a load or store exclusive.
+However this means it can run up past the beginning of the function and
+start looking at literal constants. This has been shown to cause a false
+positive and blocks insertion of the probe. To fix this, further limit the
+backwards search to stop if it hits a symbol address from kallsyms. The
+presumption is that this is the entry point to this code (particularly for
+the common case of placing probes at the beginning of functions).
 
-Currently we keep mcfg quirk handling code and related drivers in one 
-place drivers/pci/host/
+This also improves efficiency by not searching code that is not part of the
+function. There may be some possibility that the label might not denote the
+entry path to the probed instruction but the likelihood seems low and this
+is just another example of how the kprobes user really needs to be
+careful about what they are doing.
 
-Tomasz
+Signed-off-by: David A. Long <dave.long@linaro.org>
+---
+ arch/arm64/kernel/probes/decode-insn.c | 48 +++++++++++++++++++++++-----------
+ 1 file changed, 33 insertions(+), 15 deletions(-)
+
+diff --git a/arch/arm64/kernel/probes/decode-insn.c b/arch/arm64/kernel/probes/decode-insn.c
+index 37e47a9..356ee52 100644
+--- a/arch/arm64/kernel/probes/decode-insn.c
++++ b/arch/arm64/kernel/probes/decode-insn.c
+@@ -16,6 +16,7 @@
+ #include <linux/kernel.h>
+ #include <linux/kprobes.h>
+ #include <linux/module.h>
++#include <linux/kallsyms.h>
+ #include <asm/kprobes.h>
+ #include <asm/insn.h>
+ #include <asm/sections.h>
+@@ -122,7 +123,7 @@ arm_probe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ static bool __kprobes
+ is_probed_address_atomic(kprobe_opcode_t *scan_start, kprobe_opcode_t *scan_end)
+ {
+-	while (scan_start > scan_end) {
++	while (scan_start >= scan_end) {
+ 		/*
+ 		 * atomic region starts from exclusive load and ends with
+ 		 * exclusive store.
+@@ -144,26 +145,43 @@ arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi)
+ 	kprobe_opcode_t insn = le32_to_cpu(*addr);
+ 	kprobe_opcode_t *scan_start = addr - 1;
+ 	kprobe_opcode_t *scan_end = addr - MAX_ATOMIC_CONTEXT_SIZE;
++	unsigned long size = 0, offset = 0;
+ #if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
+ 	struct module *mod;
+ #endif
+ 
+-	if (addr >= (kprobe_opcode_t *)_text &&
+-	    scan_end < (kprobe_opcode_t *)_text)
+-		scan_end = (kprobe_opcode_t *)_text;
++	/*
++	 * If there's a symbol defined in front of and near enough to
++	 * the probe address assume it is the entry point to this
++	 * code and use it to further limit how far back we search
++	 * when determining if we're in an atomic sequence.
++	 */
++	if (kallsyms_lookup_size_offset((unsigned long) addr, &size, &offset))
++		if (offset < (MAX_ATOMIC_CONTEXT_SIZE*sizeof(kprobe_opcode_t)))
++			scan_end = addr - (offset / sizeof(kprobe_opcode_t));
++
++	if (scan_end <= scan_start) {
++		if (addr >= (kprobe_opcode_t *)_text &&
++		    scan_end < (kprobe_opcode_t *)_text)
++			scan_end = (kprobe_opcode_t *)_text;
+ #if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
+-	else {
+-		preempt_disable();
+-		mod = __module_address((unsigned long)addr);
+-		if (mod && within_module_init((unsigned long)addr, mod) &&
+-			!within_module_init((unsigned long)scan_end, mod))
+-			scan_end = (kprobe_opcode_t *)mod->init_layout.base;
+-		else if (mod && within_module_core((unsigned long)addr, mod) &&
+-			!within_module_core((unsigned long)scan_end, mod))
+-			scan_end = (kprobe_opcode_t *)mod->core_layout.base;
+-		preempt_enable();
+-	}
++		else {
++			preempt_disable();
++			mod = __module_address((unsigned long)addr);
++			if (mod &&
++			    within_module_init((unsigned long)addr, mod) &&
++			    !within_module_init((unsigned long)scan_end, mod))
++				scan_end =
++				    (kprobe_opcode_t *)mod->init_layout.base;
++			else if (mod &&
++			    within_module_core((unsigned long)addr, mod) &&
++			    !within_module_core((unsigned long)scan_end, mod))
++				scan_end =
++				    (kprobe_opcode_t *)mod->core_layout.base;
++			preempt_enable();
++		}
+ #endif
++	}
+ 	decoded = arm_probe_decode_insn(insn, asi);
+ 
+ 	if (decoded == INSN_REJECTED ||
+-- 
+2.5.0
