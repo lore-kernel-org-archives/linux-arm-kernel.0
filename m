@@ -1,119 +1,31 @@
-From: dawei.chien@mediatek.com (Dawei Chien)
-Date: Tue, 6 Sep 2016 11:28:30 +0800
-Subject: [PATCH v2 3/3] arm: dts: thermal: add thermal/auxadc node.
-In-Reply-To: <1473121807.2201.23.camel@intel.com>
-References: <1471492253-7185-1-git-send-email-dawei.chien@mediatek.com>
- <1471492253-7185-4-git-send-email-dawei.chien@mediatek.com>
- <1473121447.2201.20.camel@intel.com> <1473121807.2201.23.camel@intel.com>
-Message-ID: <1473132510.15922.13.camel@mtksdaap41>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 6 Sep 2016 11:29:52 +0800
+Subject: [PATCH] ASoC: sun4i-codec: Distinguish sun4i from sun7i
+In-Reply-To: <20160905192404.13871-2-dannym@scratchpost.org>
+References: <20160905192404.13871-1-dannym@scratchpost.org>
+ <20160905192404.13871-2-dannym@scratchpost.org>
+Message-ID: <CAGb2v67yFx1VxGFWQk-Z9V=BQN0kfj1YJWfqb5RCNRUwVWrjbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Rui,
+On Tue, Sep 6, 2016 at 3:24 AM, Danny Milosavljevic
+<dannym@scratchpost.org> wrote:
+> ASoC: sun4i-codec: Distinguish sun4i from sun7i
+>
+> Introduce mechanism to detect sun7i and provide a different regmap, codec
+> and different controls for it - different compared to sun4i Allwinner A10.
+>
+> The controls will be extended in a forthcoming patch - it is necessary to
+> distinguish between sun4i and sun7i controls because the mic gains are in
+> different registers.
+>
+> Renamed SUN4I_CODEC_AC_SYS_VERI to SUN7I_CODEC_AC_DAC_CAL and renamed
+> SUN4I_CODEC_AC_MIC_PHONE_CAL to SUN7I_CODEC_AC_MIC_PHONE_CAL because these
+> are actually not present on Allwinner A10.
+>
+> Handle quirks by regmap config and codec and select the correct quirks
+> automatically.
+>
+> Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
 
-On Tue, 2016-09-06 at 08:30 +0800, Zhang Rui wrote:
-> On ?, 2016-09-06 at 08:24 +0800, Zhang Rui wrote:
-> > On ?, 2016-08-18 at 11:50 +0800, Dawei Chien wrote:
-> > > 
-> > > This adds the thermal controller and auxadc nodes
-> > > to the Mediatek MT2701 dtsi file.
-> > > 
-> > > Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
-> > > ---
-> > > This patch depned on:
-> > > https://patchwork.kernel.org/patch/9249589/
-> > > https://patchwork.kernel.org/patch/9249589/
-> > Hmm, does this mean that I should take all these three patches and
-> > hold
-> > the patches in next merge window until the above patch has been
-> > merged?
-> > 
-Yes, this patch is base on auxadc patchset.
-
-> Patch 3/3 can not be applied on top of upstream kernel, so I guess it
-> still has some other dependencies.
-> I think I can apply patch 1, 2 first. And patch 3/3 should be handled
-> in the dt tree.
-
-Sorry, this patch is also need Mediatek's clock patchset what I miss to
-add in dependency list, I would resend this dt tree once clock patch
-merge, or resend this for right dependency on next version, thank you.
-
-> thanks,
-> rui
-> > thanks,
-> > rui 
-> > > 
-> > > ---
-> > >  arch/arm/boot/dts/mt2701.dtsi |   44
-> > > +++++++++++++++++++++++++++++++++++++++++
-> > >  1 file changed, 44 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/mt2701.dtsi
-> > > b/arch/arm/boot/dts/mt2701.dtsi
-> > > index e9150a4..cee4724 100644
-> > > --- a/arch/arm/boot/dts/mt2701.dtsi
-> > > +++ b/arch/arm/boot/dts/mt2701.dtsi
-> > > @@ -87,6 +87,36 @@
-> > >  		clock-output-names = "rtc32k";
-> > >  	};
-> > >  
-> > > +	thermal-zones {
-> > > +		cpu_thermal: cpu_thermal {
-> > > +			polling-delay-passive = <1000>; /*
-> > > milliseconds */
-> > > +			polling-delay = <1000>; /* milliseconds */
-> > > +
-> > > +			thermal-sensors = <&thermal 0>;
-> > > +			sustainable-power = <1000>;
-> > > +
-> > > +			trips {
-> > > +				threshold: trip-point at 0 {
-> > > +					temperature = <68000>;
-> > > +					hysteresis = <2000>;
-> > > +					type = "passive";
-> > > +				};
-> > > +
-> > > +				target: trip-point at 1 {
-> > > +					temperature = <85000>;
-> > > +					hysteresis = <2000>;
-> > > +					type = "passive";
-> > > +				};
-> > > +
-> > > +				cpu_crit: cpu_crit at 0 {
-> > > +					temperature = <115000>;
-> > > +					hysteresis = <2000>;
-> > > +					type = "critical";
-> > > +				};
-> > > +			};
-> > > +		};
-> > > +	};
-> > > +
-> > >  	timer {
-> > >  		compatible = "arm,armv7-timer";
-> > >  		interrupt-parent = <&gic>;
-> > > @@ -222,4 +252,18 @@
-> > >  		clock-names = "baud", "bus";
-> > >  		status = "disabled";
-> > >  	};
-> > > +
-> > > +	thermal: thermal at 1100b000 {
-> > > +		#thermal-sensor-cells = <0>;
-> > > +		compatible = "mediatek,mt2701-thermal";
-> > > +		reg = <0 0x1100b000 0 0x1000>;
-> > > +		interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
-> > > +		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg
-> > > CLK_PERI_AUXADC>;
-> > > +		clock-names = "therm", "auxadc";
-> > > +		resets = <&pericfg 0x10>;
-> > > +		reset-names = "therm";
-> > > +		mediatek,auxadc = <&auxadc>;
-> > > +		mediatek,apmixedsys = <&apmixedsys>;
-> > > +	};
-> > > +
-> > >  };
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-pm"
-> > in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Acked-by: Chen-Yu Tsai <wens@csie.org>
