@@ -1,119 +1,36 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 6 Sep 2016 14:52:37 +0200
-Subject: [PATCH 6/7] mtd: nand: mxc: implement onfi get/set features
-In-Reply-To: <20160906124714.5bidphcpp2oa5yxn@pengutronix.de>
-References: <1473158355-22451-1-git-send-email-s.hauer@pengutronix.de>
- <1473158355-22451-7-git-send-email-s.hauer@pengutronix.de>
- <20160906140521.508a2861@bbrezillon>
- <20160906124714.5bidphcpp2oa5yxn@pengutronix.de>
-Message-ID: <20160906145237.0d2c936b@bbrezillon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue,  6 Sep 2016 14:53:25 +0200
+Subject: [PATCH] ARM: imx: build cpuidle-imx6sx.o for imx6ul
+Message-ID: <20160906125338.1530603-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 6 Sep 2016 14:47:14 +0200
-Sascha Hauer <s.hauer@pengutronix.de> wrote:
+The imx6ul soc code gained support for cpuidle, but that causes
+a link failure if CONFIG_SOC_IMX6SX is disabled:
 
-> On Tue, Sep 06, 2016 at 02:05:21PM +0200, Boris Brezillon wrote:
-> > On Tue,  6 Sep 2016 12:39:14 +0200
-> > Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> >   
-> > > To be able to support different ONFI timing modes we have to implement
-> > > the onfi_set_features and onfi_get_features. Tested on an i.MX25 SoC.
-> > > 
-> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > > ---
-> > >  drivers/mtd/nand/mxc_nand.c | 53 +++++++++++++++++++++++++++++++++++++++++++++
-> > >  1 file changed, 53 insertions(+)
-> > > 
-> > > diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-> > > index 5173fad..1db8299 100644
-> > > --- a/drivers/mtd/nand/mxc_nand.c
-> > > +++ b/drivers/mtd/nand/mxc_nand.c
-> > > @@ -1239,6 +1239,57 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
-> > >  	}
-> > >  }
-> > >  
-> > > +static int mxc_nand_onfi_set_features(struct mtd_info *mtd, struct nand_chip *chip,
-> > > +			int addr, uint8_t *subfeature_param)
-> > > +{
-> > > +	struct nand_chip *nand_chip = mtd_to_nand(mtd);
-> > > +	struct mxc_nand_host *host = nand_get_controller_data(nand_chip);
-> > > +	int i;
-> > > +
-> > > +	if (!chip->onfi_version ||
-> > > +	    !(le16_to_cpu(chip->onfi_params.opt_cmd)
-> > > +	      & ONFI_OPT_CMD_SET_GET_FEATURES))
-> > > +		return -EINVAL;
-> > > +
-> > > +	host->buf_start = 0;
-> > > +
-> > > +	for (i = 0; i < ONFI_SUBFEATURE_PARAM_LEN; ++i)
-> > > +		chip->write_byte(mtd, subfeature_param[i]);
-> > > +
-> > > +	memcpy32_toio(host->main_area0, host->data_buf, mtd->writesize);
-> > > +	host->devtype_data->send_cmd(host, NAND_CMD_SET_FEATURES, false);
-> > > +	mxc_do_addr_cycle(mtd, addr, -1);
-> > > +	host->devtype_data->send_page(mtd, NFC_INPUT);
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +
-> > > +static int mxc_nand_onfi_get_features(struct mtd_info *mtd, struct nand_chip *chip,
-> > > +			int addr, uint8_t *subfeature_param)
-> > > +{
-> > > +	struct nand_chip *nand_chip = mtd_to_nand(mtd);
-> > > +	struct mxc_nand_host *host = nand_get_controller_data(nand_chip);
-> > > +	int i;
-> > > +
-> > > +	if (!chip->onfi_version ||
-> > > +	    !(le16_to_cpu(chip->onfi_params.opt_cmd)
-> > > +	      & ONFI_OPT_CMD_SET_GET_FEATURES))
-> > > +		return -EINVAL;
-> > > +
-> > > +	*(uint32_t *)host->main_area0 = 0xdeadbeef;  
-> 
-> This line should be removed by the way.
-> 
-> > > +
-> > > +	host->devtype_data->send_cmd(host, NAND_CMD_GET_FEATURES, false);
-> > > +	mxc_do_addr_cycle(mtd, addr, -1);
-> > > +	host->devtype_data->send_page(mtd, NFC_OUTPUT);
-> > > +	memcpy32_fromio(host->data_buf, host->main_area0, 512);
-> > > +	host->buf_start = 0;
-> > > +
-> > > +	for (i = 0; i < ONFI_SUBFEATURE_PARAM_LEN; ++i)
-> > > +		*subfeature_param++ = chip->read_byte(mtd);
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +
-> > >  /*
-> > >   * The generic flash bbt decriptors overlap with our ecc
-> > >   * hardware, so define some i.MX specific ones.
-> > > @@ -1513,6 +1564,8 @@ static int mxcnd_probe(struct platform_device *pdev)
-> > >  	this->read_word = mxc_nand_read_word;
-> > >  	this->write_buf = mxc_nand_write_buf;
-> > >  	this->read_buf = mxc_nand_read_buf;
-> > > +	this->onfi_set_features = mxc_nand_onfi_set_features;
-> > > +	this->onfi_get_features = mxc_nand_onfi_get_features;  
-> > 
-> > Do you really have to re-implement ->onfi_{set,get}_features()?
-> > How about adding support for this command in your ->cmdfunc()
-> > implementation and relying on the default ->onfi_{set,get}_features()
-> > provided by the core?  
-> 
-> I probably could. The problem is that the generic
-> nand_onfi_set_features() first sends the command then afterwards uses
-> chip->write_byte to actually send the data. This is not how the mxc_nand
-> controller works. On mxc_nand I first need the data before I can issue
-> the command.
-> I could implement it in the ->cmdfunc() like: When NAND_CMD_SET_FEATURES
-> is issued, track that information. Then I have to count how many times
-> ->write_byte() has been called and when I reach  
-> ONFI_SUBFEATURE_PARAM_LEN I have to send the command. While that would
-> probably work I was glad that I could avoid that. It's one of the
-> places where one realizes that the nand core layer is built around the
-> nand controllers of the late nineties.
+arch/arm/mach-imx/mach-imx6ul.o: In function `imx6ul_init_late':
+mach-imx6ul.c:(.init.text+0xc): undefined reference to `imx6sx_cpuidle_init'
 
-Okay. Actually I have some plans for these problems, but let's stick to
-mxc_nand_onfi_{set,get}_features() for now.
+This adds the file containing the imx6sx_cpuidle_init function
+to the kernel for 6ul-only configurations.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 547e8f526959 ("ARM: imx: add cpuidle support for i.mx6ul")
+---
+ arch/arm/mach-imx/Makefile | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index edce8dfa581d..737450fe790c 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -27,6 +27,7 @@ obj-$(CONFIG_SOC_IMX5) += cpuidle-imx5.o
+ obj-$(CONFIG_SOC_IMX6Q) += cpuidle-imx6q.o
+ obj-$(CONFIG_SOC_IMX6SL) += cpuidle-imx6sl.o
+ obj-$(CONFIG_SOC_IMX6SX) += cpuidle-imx6sx.o
++obj-$(CONFIG_SOC_IMX6UL) += cpuidle-imx6sx.o
+ endif
+ 
+ ifdef CONFIG_SND_IMX_SOC
+-- 
+2.9.0
