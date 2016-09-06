@@ -1,145 +1,334 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue,  6 Sep 2016 16:33:45 +0100
-Subject: [PATCH v6 12/20] iommu/arm-smmu: Streamline SMMU data lookups
+Date: Tue,  6 Sep 2016 16:33:52 +0100
+Subject: [PATCH v6 19/20] iommu/dma: Add support for mapping MSIs
 In-Reply-To: <cover.1473173789.git.robin.murphy@arm.com>
 References: <cover.1473173789.git.robin.murphy@arm.com>
-Message-ID: <5a73b1090f3645b0cb67e3752b1a0f565ddddf9f.1473173789.git.robin.murphy@arm.com>
+Message-ID: <2da5fca62886afd46cd2a5f7da1da872ee4a833d.1473173789.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify things somewhat by stashing our arm_smmu_device instance in
-drvdata, so that it's readily available to our driver model callbacks.
-Then we can excise the private list entirely, since the driver core
-already has a perfectly good list of SMMU devices we can use in the one
-instance we actually need to. Finally, make a further modest code saving
-with the relatively new of_device_get_match_data() helper.
+When an MSI doorbell is located downstream of an IOMMU, attaching
+devices to a DMA ops domain and switching on translation leads to a rude
+shock when their attempt to write to the physical address returned by
+the irqchip driver faults (or worse, writes into some already-mapped
+buffer) and no interrupt is forthcoming.
 
-Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Address this by adding a hook for relevant irqchip drivers to call from
+their compose_msi_msg() callback, to swizzle the physical address with
+an appropriatly-mapped IOVA for any device attached to one of our DMA
+ops domains.
+
+CC: Thomas Gleixner <tglx@linutronix.de>
+CC: Jason Cooper <jason@lakedaemon.net>
+CC: Marc Zyngier <marc.zyngier@arm.com>
+CC: linux-kernel at vger.kernel.org
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/arm-smmu.c | 44 +++++++++++---------------------------------
- 1 file changed, 11 insertions(+), 33 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 0a628f2c9297..3962add0c33b 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -41,6 +41,7 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/of_device.h>
- #include <linux/pci.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
-@@ -370,8 +371,6 @@ struct arm_smmu_device {
- 	u32				num_context_irqs;
- 	unsigned int			*irqs;
+---
+
+- Rework map_page() helper function plus insane lookup logic into
+  straightforward get_page() helper
+- Use phys_addr_t to further simplify address matching
+- Fix the bit where I neglected to actually round the doorbell
+  address to a page boundary (oops!)
+---
+ drivers/iommu/dma-iommu.c        | 130 ++++++++++++++++++++++++++++++++++-----
+ drivers/irqchip/irq-gic-v2m.c    |   3 +
+ drivers/irqchip/irq-gic-v3-its.c |   3 +
+ include/linux/dma-iommu.h        |   9 +++
+ 4 files changed, 130 insertions(+), 15 deletions(-)
+
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 00c8a08d56e7..90f9c6b7d472 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -25,10 +25,28 @@
+ #include <linux/huge_mm.h>
+ #include <linux/iommu.h>
+ #include <linux/iova.h>
++#include <linux/irq.h>
+ #include <linux/mm.h>
+ #include <linux/scatterlist.h>
+ #include <linux/vmalloc.h>
  
--	struct list_head		list;
--
- 	u32				cavium_id_base; /* Specific to Cavium */
- };
++struct iommu_dma_msi_page {
++	struct list_head	list;
++	dma_addr_t		iova;
++	phys_addr_t		phys;
++};
++
++struct iommu_dma_cookie {
++	struct iova_domain	iovad;
++	struct list_head	msi_page_list;
++	spinlock_t		msi_lock;
++};
++
++static inline struct iova_domain *cookie_iovad(struct iommu_domain *domain)
++{
++	return &((struct iommu_dma_cookie *)domain->iova_cookie)->iovad;
++}
++
+ int iommu_dma_init(void)
+ {
+ 	return iova_cache_get();
+@@ -43,15 +61,19 @@ int iommu_dma_init(void)
+  */
+ int iommu_get_dma_cookie(struct iommu_domain *domain)
+ {
+-	struct iova_domain *iovad;
++	struct iommu_dma_cookie *cookie;
  
-@@ -409,9 +408,6 @@ struct arm_smmu_domain {
- 	struct iommu_domain		domain;
- };
+ 	if (domain->iova_cookie)
+ 		return -EEXIST;
  
--static DEFINE_SPINLOCK(arm_smmu_devices_lock);
--static LIST_HEAD(arm_smmu_devices);
--
- struct arm_smmu_option_prop {
- 	u32 opt;
- 	const char *prop;
-@@ -478,6 +474,8 @@ static int __find_legacy_master_phandle(struct device *dev, void *data)
- 	return err;
+-	iovad = kzalloc(sizeof(*iovad), GFP_KERNEL);
+-	domain->iova_cookie = iovad;
++	cookie = kzalloc(sizeof(*cookie), GFP_KERNEL);
++	if (!cookie)
++		return -ENOMEM;
+ 
+-	return iovad ? 0 : -ENOMEM;
++	spin_lock_init(&cookie->msi_lock);
++	INIT_LIST_HEAD(&cookie->msi_page_list);
++	domain->iova_cookie = cookie;
++	return 0;
+ }
+ EXPORT_SYMBOL(iommu_get_dma_cookie);
+ 
+@@ -63,14 +85,20 @@ EXPORT_SYMBOL(iommu_get_dma_cookie);
+  */
+ void iommu_put_dma_cookie(struct iommu_domain *domain)
+ {
+-	struct iova_domain *iovad = domain->iova_cookie;
++	struct iommu_dma_cookie *cookie = domain->iova_cookie;
++	struct iommu_dma_msi_page *msi, *tmp;
+ 
+-	if (!iovad)
++	if (!cookie)
+ 		return;
+ 
+-	if (iovad->granule)
+-		put_iova_domain(iovad);
+-	kfree(iovad);
++	if (cookie->iovad.granule)
++		put_iova_domain(&cookie->iovad);
++
++	list_for_each_entry_safe(msi, tmp, &cookie->msi_page_list, list) {
++		list_del(&msi->list);
++		kfree(msi);
++	}
++	kfree(cookie);
+ 	domain->iova_cookie = NULL;
+ }
+ EXPORT_SYMBOL(iommu_put_dma_cookie);
+@@ -88,7 +116,7 @@ EXPORT_SYMBOL(iommu_put_dma_cookie);
+  */
+ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base, u64 size)
+ {
+-	struct iova_domain *iovad = domain->iova_cookie;
++	struct iova_domain *iovad = cookie_iovad(domain);
+ 	unsigned long order, base_pfn, end_pfn;
+ 
+ 	if (!iovad)
+@@ -155,7 +183,7 @@ int dma_direction_to_prot(enum dma_data_direction dir, bool coherent)
+ static struct iova *__alloc_iova(struct iommu_domain *domain, size_t size,
+ 		dma_addr_t dma_limit)
+ {
+-	struct iova_domain *iovad = domain->iova_cookie;
++	struct iova_domain *iovad = cookie_iovad(domain);
+ 	unsigned long shift = iova_shift(iovad);
+ 	unsigned long length = iova_align(iovad, size) >> shift;
+ 
+@@ -171,7 +199,7 @@ static struct iova *__alloc_iova(struct iommu_domain *domain, size_t size,
+ /* The IOVA allocator knows what we mapped, so just unmap whatever that was */
+ static void __iommu_dma_unmap(struct iommu_domain *domain, dma_addr_t dma_addr)
+ {
+-	struct iova_domain *iovad = domain->iova_cookie;
++	struct iova_domain *iovad = cookie_iovad(domain);
+ 	unsigned long shift = iova_shift(iovad);
+ 	unsigned long pfn = dma_addr >> shift;
+ 	struct iova *iova = find_iova(iovad, pfn);
+@@ -294,7 +322,7 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
+ 		void (*flush_page)(struct device *, const void *, phys_addr_t))
+ {
+ 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+-	struct iova_domain *iovad = domain->iova_cookie;
++	struct iova_domain *iovad = cookie_iovad(domain);
+ 	struct iova *iova;
+ 	struct page **pages;
+ 	struct sg_table sgt;
+@@ -386,7 +414,7 @@ dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
+ {
+ 	dma_addr_t dma_addr;
+ 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+-	struct iova_domain *iovad = domain->iova_cookie;
++	struct iova_domain *iovad = cookie_iovad(domain);
+ 	phys_addr_t phys = page_to_phys(page) + offset;
+ 	size_t iova_off = iova_offset(iovad, phys);
+ 	size_t len = iova_align(iovad, size + iova_off);
+@@ -495,7 +523,7 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
+ 		int nents, int prot)
+ {
+ 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+-	struct iova_domain *iovad = domain->iova_cookie;
++	struct iova_domain *iovad = cookie_iovad(domain);
+ 	struct iova *iova;
+ 	struct scatterlist *s, *prev = NULL;
+ 	dma_addr_t dma_addr;
+@@ -587,3 +615,75 @@ int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
+ {
+ 	return dma_addr == DMA_ERROR_CODE;
+ }
++
++static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
++		phys_addr_t msi_addr, struct iommu_domain *domain)
++{
++	struct iommu_dma_cookie *cookie = domain->iova_cookie;
++	struct iommu_dma_msi_page *msi_page;
++	struct iova_domain *iovad = &cookie->iovad;
++	struct iova *iova;
++	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
++
++	msi_addr &= ~(phys_addr_t)iova_mask(iovad);
++	list_for_each_entry(msi_page, &cookie->msi_page_list, list)
++		if (msi_page->phys == msi_addr)
++			return msi_page;
++
++	msi_page = kzalloc(sizeof(*msi_page), GFP_ATOMIC);
++	if (!msi_page)
++		return NULL;
++
++	iova = __alloc_iova(domain, iovad->granule, dma_get_mask(dev));
++	if (!iova)
++		goto out_free_page;
++
++	msi_page->phys = msi_addr;
++	msi_page->iova = iova_dma_addr(iovad, iova);
++	if (iommu_map(domain, msi_page->iova, msi_addr, iovad->granule, prot))
++		goto out_free_iova;
++
++	INIT_LIST_HEAD(&msi_page->list);
++	list_add(&msi_page->list, &cookie->msi_page_list);
++	return msi_page;
++
++out_free_iova:
++	__free_iova(iovad, iova);
++out_free_page:
++	kfree(msi_page);
++	return NULL;
++}
++
++void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg)
++{
++	struct device *dev = msi_desc_to_dev(irq_get_msi_desc(irq));
++	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
++	struct iommu_dma_cookie *cookie;
++	struct iommu_dma_msi_page *msi_page;
++	phys_addr_t msi_addr = (u64)msg->address_hi << 32 | msg->address_lo;
++
++	if (!domain || !domain->iova_cookie)
++		return;
++
++	cookie = domain->iova_cookie;
++
++	spin_lock(&cookie->msi_lock);
++	msi_page = iommu_dma_get_msi_page(dev, msi_addr, domain);
++	spin_unlock(&cookie->msi_lock);
++
++	if (WARN_ON(!msi_page)) {
++		/*
++		 * We're called from a void callback, so the best we can do is
++		 * 'fail' by filling the message with obviously bogus values.
++		 * Since we got this far due to an IOMMU being present, it's
++		 * not like the existing address would have worked anyway...
++		 */
++		msg->address_hi = ~0U;
++		msg->address_lo = ~0U;
++		msg->data = ~0U;
++	} else {
++		msg->address_hi = upper_32_bits(msi_page->iova);
++		msg->address_lo &= iova_mask(&cookie->iovad);
++		msg->address_lo += lower_32_bits(msi_page->iova);
++	}
++}
+diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+index 35eb7ac5d21f..863e073c6f7f 100644
+--- a/drivers/irqchip/irq-gic-v2m.c
++++ b/drivers/irqchip/irq-gic-v2m.c
+@@ -16,6 +16,7 @@
+ #define pr_fmt(fmt) "GICv2m: " fmt
+ 
+ #include <linux/acpi.h>
++#include <linux/dma-iommu.h>
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
+ #include <linux/kernel.h>
+@@ -108,6 +109,8 @@ static void gicv2m_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
+ 
+ 	if (v2m->flags & GICV2M_NEEDS_SPI_OFFSET)
+ 		msg->data -= v2m->spi_offset;
++
++	iommu_dma_map_msi_msg(data->irq, msg);
  }
  
-+static struct platform_driver arm_smmu_driver;
+ static struct irq_chip gicv2m_irq_chip = {
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 36b9c28a5c91..98ff669d5962 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -18,6 +18,7 @@
+ #include <linux/bitmap.h>
+ #include <linux/cpu.h>
+ #include <linux/delay.h>
++#include <linux/dma-iommu.h>
+ #include <linux/interrupt.h>
+ #include <linux/log2.h>
+ #include <linux/mm.h>
+@@ -655,6 +656,8 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
+ 	msg->address_lo		= addr & ((1UL << 32) - 1);
+ 	msg->address_hi		= addr >> 32;
+ 	msg->data		= its_get_event_id(d);
 +
- static int arm_smmu_register_legacy_master(struct device *dev)
- {
- 	struct arm_smmu_device *smmu;
-@@ -495,19 +493,16 @@ static int arm_smmu_register_legacy_master(struct device *dev)
- 	}
- 
- 	it.node = np;
--	spin_lock(&arm_smmu_devices_lock);
--	list_for_each_entry(smmu, &arm_smmu_devices, list) {
--		err = __find_legacy_master_phandle(smmu->dev, &data);
--		if (err)
--			break;
--	}
--	spin_unlock(&arm_smmu_devices_lock);
-+	err = driver_for_each_device(&arm_smmu_driver.driver, NULL, &data,
-+				     __find_legacy_master_phandle);
- 	of_node_put(np);
- 	if (err == 0)
- 		return -ENODEV;
- 	if (err < 0)
- 		return err;
- 
-+	smmu = dev_get_drvdata(data);
-+
- 	if (it.cur_count > MAX_MASTER_STREAMIDS) {
- 		dev_err(smmu->dev,
- 			"reached maximum number (%d) of stream IDs for master device %s\n",
-@@ -1816,7 +1811,6 @@ MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
- 
- static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- {
--	const struct of_device_id *of_id;
- 	const struct arm_smmu_match_data *data;
- 	struct resource *res;
- 	struct arm_smmu_device *smmu;
-@@ -1830,8 +1824,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 	}
- 	smmu->dev = dev;
- 
--	of_id = of_match_node(arm_smmu_of_match, dev->of_node);
--	data = of_id->data;
-+	data = of_device_get_match_data(dev);
- 	smmu->version = data->version;
- 	smmu->model = data->model;
- 
-@@ -1904,35 +1897,20 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	INIT_LIST_HEAD(&smmu->list);
--	spin_lock(&arm_smmu_devices_lock);
--	list_add(&smmu->list, &arm_smmu_devices);
--	spin_unlock(&arm_smmu_devices_lock);
--
-+	platform_set_drvdata(pdev, smmu);
- 	arm_smmu_device_reset(smmu);
- 	return 0;
++	iommu_dma_map_msi_msg(d->irq, msg);
  }
  
- static int arm_smmu_device_remove(struct platform_device *pdev)
+ static struct irq_chip its_irq_chip = {
+diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+index 81c5c8d167ad..5ee806e41b5c 100644
+--- a/include/linux/dma-iommu.h
++++ b/include/linux/dma-iommu.h
+@@ -21,6 +21,7 @@
+ 
+ #ifdef CONFIG_IOMMU_DMA
+ #include <linux/iommu.h>
++#include <linux/msi.h>
+ 
+ int iommu_dma_init(void);
+ 
+@@ -62,9 +63,13 @@ void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+ int iommu_dma_supported(struct device *dev, u64 mask);
+ int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr);
+ 
++/* The DMA API isn't _quite_ the whole story, though... */
++void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg);
++
+ #else
+ 
+ struct iommu_domain;
++struct msi_msg;
+ 
+ static inline int iommu_dma_init(void)
  {
--	struct device *dev = &pdev->dev;
--	struct arm_smmu_device *curr, *smmu = NULL;
--
--	spin_lock(&arm_smmu_devices_lock);
--	list_for_each_entry(curr, &arm_smmu_devices, list) {
--		if (curr->dev == dev) {
--			smmu = curr;
--			list_del(&smmu->list);
--			break;
--		}
--	}
--	spin_unlock(&arm_smmu_devices_lock);
-+	struct arm_smmu_device *smmu = platform_get_drvdata(pdev);
+@@ -80,6 +85,10 @@ static inline void iommu_put_dma_cookie(struct iommu_domain *domain)
+ {
+ }
  
- 	if (!smmu)
- 		return -ENODEV;
- 
- 	if (!bitmap_empty(smmu->context_map, ARM_SMMU_MAX_CBS))
--		dev_err(dev, "removing device with active domains!\n");
-+		dev_err(&pdev->dev, "removing device with active domains!\n");
- 
- 	/* Turn the thing off */
- 	writel(sCR0_CLIENTPD, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
++static inline void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg)
++{
++}
++
+ #endif	/* CONFIG_IOMMU_DMA */
+ #endif	/* __KERNEL__ */
+ #endif	/* __DMA_IOMMU_H */
 -- 
 2.8.1.dirty
