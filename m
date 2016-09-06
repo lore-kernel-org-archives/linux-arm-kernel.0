@@ -1,32 +1,66 @@
 From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Tue,  6 Sep 2016 15:56:37 +0800
-Subject: [PATCH] drivers/hwtracing: add missing header dependencies
-Message-ID: <1473148597-25478-1-git-send-email-baoyou.xie@linaro.org>
+Date: Tue,  6 Sep 2016 16:03:50 +0800
+Subject: [PATCH] coresight: tmc: mark symbols static where possible
+Message-ID: <1473149030-25576-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We get 1 warning when building kernel with W=1:
-drivers/hwtracing/coresight/coresight-etm-perf.c:345:5: warning: no previous prototype for 'etm_perf_symlink' [-Wmissing-prototypes]
+We get a few warnings when building kernel with W=1:
+drivers/hwtracing/coresight/coresight-tmc-etr.c:23:6: warning: no previous prototype for 'tmc_etr_enable_hw' [-Wmissing-prototypes]
+drivers/hwtracing/coresight/coresight-tmc-etf.c:25:6: warning: no previous prototype for 'tmc_etb_enable_hw' [-Wmissing-prototypes]
+...
 
-In fact, this function is declared in coresight-etm-perf.h, so this patch
-add missing header dependencies.
+In fact, these functions are only used in the file in which they are
+declared and don't need a declaration, but can be made static.
+so this patch marks these functions with 'static'.
 
 Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm-perf.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/hwtracing/coresight/coresight-tmc-etf.c | 2 +-
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 2 +-
+ drivers/hwtracing/coresight/coresight-tmc.c     | 4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index 755125f..d936e82 100644
---- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -28,6 +28,7 @@
- #include <linux/workqueue.h>
- 
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+index 466af86..a9a525f 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+@@ -22,7 +22,7 @@
  #include "coresight-priv.h"
-+#include "coresight-etm-perf.h"
+ #include "coresight-tmc.h"
  
- static struct pmu etm_pmu;
- static bool etm_perf_up;
+-void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
++static void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
+ {
+ 	CS_UNLOCK(drvdata->base);
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 688be9e..1ff5451 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -20,7 +20,7 @@
+ #include "coresight-priv.h"
+ #include "coresight-tmc.h"
+ 
+-void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
++static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
+ {
+ 	u32 axictl;
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index 9e02ac9..45947f3 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -249,8 +249,8 @@ static struct attribute *coresight_tmc_mgmt_attrs[] = {
+ 	NULL,
+ };
+ 
+-ssize_t trigger_cntr_show(struct device *dev,
+-			  struct device_attribute *attr, char *buf)
++static ssize_t trigger_cntr_show(struct device *dev,
++				 struct device_attribute *attr, char *buf)
+ {
+ 	struct tmc_drvdata *drvdata = dev_get_drvdata(dev->parent);
+ 	unsigned long val = drvdata->trigger_cntr;
 -- 
 2.7.4
