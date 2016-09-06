@@ -1,119 +1,35 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue,  6 Sep 2016 10:37:12 -0600
-Subject: [RESEND][PATCH V7 0/5] perf: Driver specific configuration for PMU
-Message-ID: <1473179837-3293-1-git-send-email-mathieu.poirier@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Sep 2016 17:37:11 +0100
+Subject: [PATCH 0/8] More SA11x0/PXA related fixes
+Message-ID: <20160906163711.GB1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Original blurb:
----------------
+More fixes for SA11x0/PXA:
 
-This patchset adds the possiblity of specifying PMU driver configuration
-directly from the perf command line.  Anything that falls within the
-event specifiers '/.../' and that is preceded by the '@' symbol is
-treated as a configurable.  Two formats are supported, @cfg and
-@cfg=config.
+* Locomo blows up because it uses the wrong data for the handler,
+  overwriting the chip's data.
 
-For example:
+* Fixes for PCMCIA problems discovered by Robert.
 
-perf record -e some_event/@cfg1/ ...
+* Fixing SA1111 suspend/resume
 
-or
+Can I have acks for these please, so I can push them to Linus later
+this week.  Thanks.
 
-perf record -e some_event/@cfg2=config/ ...
-
-or
-
-perf record -e some_event/@cfg1, at cfg2=config/ ...
-
-The above are all valid configuration and will see the strings 'cfg1'
-and 'cfg2=config' sent to the PMU driver for parsing and interpretation
-using the existing ioctl() mechanism.
-
-The primary customers for this feature are the CoreSight drivers where
-the selection of a sink (where trace data is accumulated) needs to be
-done in a previous, and separated step, from the launching of the perf
-command.
-
-As such something that used to be a two-step process:
-
-# echo 1 > /sys/bus/coresight/devices/20070000.etr/enable_sink
-# perf record -e cs_etm//u --per-thread  uname
-
-is integrated in a single command:
-
-# perf record -e cs_etm/@20070000.etr/u --per-thread  uname
-
-Thanks,
-Mathieu
-
-Changes for V7:
-- Got rid of a miscellaneous debug message.
-- Rebased to v4.8-rc4
-- Added Jiri Olsa's Acked-by.
-
-Changes for V6:
-- Using sysFS rather than an ioctl() to communicate command line
-  parameters to the CoreSight PMU.
-
-Changes for V5:
-- Made commit log in 5/9 more descriptive.
-- Addressed missing return code in builtin-top.c.
-- Overhauled the kernel portion to do parsing in the core.
-
-Changes for V4:
-- Pushing PMU driver configuration for 'perf top'.
-- Rebased to the latest perf/core branch[1]. 
-
-Changes for V3:
-- Added comment for function drv_str() that explains the reason for
-  keeping the entire token intact.
-- Added driver config terms to the existing list of config terms.
-- Added documenation for driver specific configuration.
-- Pushing PMU driver configuration for 'perf stat' as well.  
-- Preventing users from selecting a sink from sysFS _and_ perf.
-
-Changes for V2:
-- Rebased to [1] as per Jiri's request.
-
-
-Mathieu Poirier (5):
-  perf tools: making coresight PMU listable
-  perf tools: adding coresight etm PMU record capabilities
-  perf tools: add infrastructure for PMU specific configuration
-  perf tools: Pushing configuration down to PMU driver
-  perf tools: adding sink configuration for cs_etm PMU
-
- MAINTAINERS                              |   5 +
- tools/perf/Documentation/perf-record.txt |  12 +
- tools/perf/Makefile.config               |  11 +-
- tools/perf/arch/arm/util/Build           |   2 +
- tools/perf/arch/arm/util/auxtrace.c      |  54 +++
- tools/perf/arch/arm/util/cs-etm.c        | 615 +++++++++++++++++++++++++++++++
- tools/perf/arch/arm/util/cs-etm.h        |  26 ++
- tools/perf/arch/arm/util/pmu.c           |  37 ++
- tools/perf/arch/arm64/util/Build         |   4 +
- tools/perf/builtin-record.c              |   9 +
- tools/perf/builtin-stat.c                |   8 +
- tools/perf/builtin-top.c                 |  12 +
- tools/perf/util/auxtrace.c               |   1 +
- tools/perf/util/auxtrace.h               |   1 +
- tools/perf/util/cs-etm.h                 |  74 ++++
- tools/perf/util/evlist.c                 |  18 +
- tools/perf/util/evlist.h                 |   3 +
- tools/perf/util/evsel.c                  |  40 ++
- tools/perf/util/evsel.h                  |   4 +
- tools/perf/util/parse-events.c           |   7 +-
- tools/perf/util/parse-events.h           |   1 +
- tools/perf/util/parse-events.l           |  22 ++
- tools/perf/util/parse-events.y           |  11 +
- tools/perf/util/pmu.h                    |   2 +
- 24 files changed, 974 insertions(+), 5 deletions(-)
- create mode 100644 tools/perf/arch/arm/util/auxtrace.c
- create mode 100644 tools/perf/arch/arm/util/cs-etm.c
- create mode 100644 tools/perf/arch/arm/util/cs-etm.h
- create mode 100644 tools/perf/arch/arm/util/pmu.c
- create mode 100644 tools/perf/util/cs-etm.h
+ arch/arm/common/locomo.c           |  5 ++---
+ arch/arm/common/sa1111.c           | 32 +++++++++++++++++++-------------
+ arch/arm/mach-pxa/lubbock.c        | 14 ++++++++++++++
+ drivers/pcmcia/pxa2xx_base.c       |  9 +++++----
+ drivers/pcmcia/pxa2xx_base.h       |  2 +-
+ drivers/pcmcia/sa1111_badge4.c     | 22 ++++++++--------------
+ drivers/pcmcia/sa1111_generic.c    | 22 +++++++++++++++++-----
+ drivers/pcmcia/sa1111_jornada720.c | 25 ++++++++++---------------
+ drivers/pcmcia/sa1111_lubbock.c    | 32 +++++++++++++-------------------
+ drivers/pcmcia/sa1111_neponset.c   | 26 ++++++++++----------------
+ 10 files changed, 99 insertions(+), 90 deletions(-)
 
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
