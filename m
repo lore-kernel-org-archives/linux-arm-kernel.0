@@ -1,68 +1,96 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 6 Sep 2016 11:14:45 +0200
-Subject: [PATCH v3 1/4] pwm: Add support for Meson PWM Controller
-In-Reply-To: <20160906090749.GA15644@ulmo.ba.sec>
-References: <1471880193-21879-1-git-send-email-narmstrong@baylibre.com>
- <1471880193-21879-2-git-send-email-narmstrong@baylibre.com>
- <20160905090052.GG3532@ulmo.ba.sec>
- <bd7ea1db-d8f9-f075-14ef-732d9bb65e77@baylibre.com>
- <20160906090749.GA15644@ulmo.ba.sec>
-Message-ID: <a43f6e6e-05f6-cefe-451d-528588b85a8c@baylibre.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 6 Sep 2016 11:30:36 +0200
+Subject: [PATCH 1/2] mtd: nand: automate NAND timings selection
+In-Reply-To: <20160906104130.61605fa4@bbrezillon>
+References: <1472820149-24241-1-git-send-email-s.hauer@pengutronix.de>
+ <1472820149-24241-2-git-send-email-s.hauer@pengutronix.de>
+ <20160906082302.4itzqv4ldd3foazu@pengutronix.de>
+ <20160906104130.61605fa4@bbrezillon>
+Message-ID: <20160906093036.32uka4klt2x2ottt@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/2016 11:07 AM, Thierry Reding wrote:
-> On Tue, Sep 06, 2016 at 10:36:49AM +0200, Neil Armstrong wrote:
->> Hi Thierry,
->>
-[...]
+On Tue, Sep 06, 2016 at 10:41:30AM +0200, Boris Brezillon wrote:
+> On Tue, 6 Sep 2016 10:23:02 +0200
+> Sascha Hauer <s.hauer@pengutronix.de> wrote:
 > 
->>
->> The second bug is in probe(), I understand the point to allocate
->> dynamically the channels and attach them to each pwm chip, but when
->> calling meson_pwm_init_channels() we get an OOPS because
->> meson->chip.pwms[i] are allocated in pwmchip_add(). Moving
->> meson_pwm_init_channels() would fix this, but in case of a clk
->> PROBE_DEFER, we would need to remove back the pwmchip, which is a
->> quite a bad design decision....
+> > Hi Boris,
+> > 
+> > On Fri, Sep 02, 2016 at 02:42:28PM +0200, Sascha Hauer wrote:
+> > > +static int nand_configure_data_interface(struct mtd_info *mtd)
+> > > +{
+> > > +	struct nand_chip *chip = mtd_to_nand(mtd);
+> > > +	struct nand_data_interface *conf;
+> > > +	int modes, mode, ret = -EINVAL;
+> > > +	uint8_t tmode_param[ONFI_SUBFEATURE_PARAM_LEN] = { };
+> > > +	int i;
+> > > +
+> > > +	conf = kzalloc(sizeof(*conf), GFP_KERNEL);
+> > > +	if (!conf)
+> > > +		return -ENOMEM;
+> > > +
+> > > +	/* TODO: support DDR interfaces */
+> > > +	conf->type = NAND_SDR_IFACE;
+> > > +
+> > > +	/*
+> > > +	 * First try to identify the best timings from ONFI parameters and
+> > > +	 * if the NAND does not support ONFI, fallback to the default ONFI
+> > > +	 * timing mode.
+> > > +	 */
+> > > +	modes = onfi_get_async_timing_mode(chip);
+> > > +	if (modes == ONFI_TIMING_MODE_UNKNOWN) {
+> > > +		mode = chip->onfi_timing_mode_default;
+> > > +		conf->timings.sdr =
+> > > +				*onfi_async_timing_mode_to_sdr_timings(mode);
+> > > +
+> > > +		ret = nand_check_data_interface(mtd, conf);
+> > > +	} else {
+> > > +		for (mode = fls(modes) - 1; mode >= 0; mode--) {
+> > > +			conf->timings.sdr =
+> > > +				*onfi_async_timing_mode_to_sdr_timings(mode);
+> > > +
+> > > +			ret = nand_check_data_interface(mtd, conf);
+> > > +			if (!ret)
+> > > +				break;
+> > > +		}
+> > > +	}  
+> > 
+> > I wonder if this works good for non ONFI NANDs. In the ONFI case we
+> > iterate over all modes supported by the NAND until we find one that also
+> > suits the driver. By doing so we inherently assume that not all drivers
+> > support all modes. In the non ONFI case instead we hardcode a single
+> > timing into the nand_id table, what if the driver does not support this
+> > timing? It will fail in this case without ever trying slower timings.
+> > Shouldn't we encode the mode bitmask into the nand_id table rather than
+> > a single timing?
 > 
-> Ah yes... that one again. I remember running into that a while ago with
-> some other driver. To be honest, I think that's a short-coming of the
-> PWM subsystem and the fix would be for PWM chip registration to be split
-> into two parts: pwm_chip_init() and pwm_chip_add(). That way, a chip
-> would be initialized using pwm_chip_init() where the pwms array would be
-> allocated, and pwm_chip_add() would register the chip with the system.
+> IIRC, this is what I proposed in my first patch (having a bitmask
+> encoding supported modes), but Brian suggested to directly put the
+> highest supported mode.
 > 
-> Currently a few drivers might be vulnerable to a race condition between
-> registration and implementation (i.e. PWM channels aren't fully set up
-> when they are exposed to users and sysfs).
+> Anyway, I don't think a NAND can support higher modes without
+> supporting lower ones, so extracting the supported modes info from the
+> default_onfi_timing_mode should be pretty easy:
 > 
->> The smartest fix I found was to allocate channels in probe, init them
->> them attach them after pwmchip_add():
->>
-[...]
+> 	supported_modes = GENMASK(default_onfi_timing_mode, 0);
+
+Ok, if you think we can assume this then I'll do it like that.
 
 > 
-> That's the race I was talking about above. I suppose it's not too big an
-> issue since other drivers seem to manage, so I'm going to merge your
-> fixed driver.
-
-ok thanks !
-
+> > I cannot find a chip in the nand_id table which actually sets
+> > onfi_timing_mode_default, but since you introduced the field in the
+> > nand_id table with commit 57a94e24bc92 you can probably tell me more.
 > 
-> Unless you feel like taking a stab at the pwm_chip_init()/pwm_chip_add()
-> split, in which case your driver would be the first to be race-free. =)
-
-Having he driver upstream is a priority, but having it completely race-free would be great!
-I'll be happy to collaborate to a race-free pwmchip probe somehow !
-
-But there is still a glitch, when pwmadd_chip() returns, pwm_get_chip_data(pwm) will still
-return crap until meson_pwm_add_channels_data() is called in the following instructions...
-
-The pwm_chip_init()/pwm_chip_add() would be the only solution !
-
-> Thierry
+> Hm, this one [1] is defining timing mode 4.
 > 
+> [1]http://lxr.free-electrons.com/source/drivers/mtd/nand/nand_ids.c#L51
 
-Thanks,
-Neil
+Uh, yes. I'm so glad we have C99 initializers mostly nowadays :)
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
