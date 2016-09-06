@@ -1,33 +1,42 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 6 Sep 2016 16:40:03 +0800
-Subject: [PATCH 00/10] ARM: dts: berlin: fix dtc warnings
-Message-ID: <20160906084013.2887-1-jszhang@marvell.com>
+Date: Tue, 6 Sep 2016 16:40:05 +0800
+Subject: [PATCH 02/10] ARM: dts: berlin2cd: Remove skeleton.dtsi inclusion
+In-Reply-To: <20160906084013.2887-1-jszhang@marvell.com>
+References: <20160906084013.2887-1-jszhang@marvell.com>
+Message-ID: <20160906084013.2887-3-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a clean up series to fix berlin arm platforms dtc warnings.
-Firstly we remove skeleton.dtsi inclusion. Then add missing unit name
-of /soc node and /memory node. Lastly, we fix regulators' name
+As noted in [1], "there are a number of problems with skeleton.dtsi,
+and it would be prefereable to remove it entirely." This patch is to
+remove skeleton.dtsi inclusion from berlin2cd.
 
-Jisheng Zhang (10):
-  ARM: dts: berlin2q: Remove skeleton.dtsi inclusion
-  ARM: dts: berlin2cd: Remove skeleton.dtsi inclusion
-  ARM: dts: berlin2: Remove skeleton.dtsi inclusion
-  ARM: dts: berlin2q: Add missing unit name to /soc node
-  ARM: dts: berlin2cd: Add missing unit name to /soc node
-  ARM: dts: berlin2: Add missing unit name to /soc node
-  ARM: dts: berlin2q-marvell-dmp: add missing unit name to /memory node
-  ARM: dts: chromecast: add missing unit name to /memory node
-  ARM: dts: sony-nsz-gs7: add missing unit name to /memory node
-  ARM: dts: berlin2q-marvell-dmp: fix regulators' name
+[1] http://www.spinics.net/lists/arm-kernel/msg528080.html
 
- arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts        |  2 +-
- arch/arm/boot/dts/berlin2.dtsi                    |  5 +++--
- arch/arm/boot/dts/berlin2cd-google-chromecast.dts |  2 +-
- arch/arm/boot/dts/berlin2cd.dtsi                  |  5 +++--
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts        | 12 ++++++------
- arch/arm/boot/dts/berlin2q.dtsi                   |  6 +++---
- 6 files changed, 17 insertions(+), 15 deletions(-)
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ arch/arm/boot/dts/berlin2cd.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
+index 6d06b61..d2bf390 100644
+--- a/arch/arm/boot/dts/berlin2cd.dtsi
++++ b/arch/arm/boot/dts/berlin2cd.dtsi
+@@ -39,13 +39,14 @@
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+ 
+-#include "skeleton.dtsi"
+ #include <dt-bindings/clock/berlin2.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ 
+ / {
+ 	model = "Marvell Armada 1500-mini (BG2CD) SoC";
+ 	compatible = "marvell,berlin2cd", "marvell,berlin";
++	#address-cells = <1>;
++	#size-cells = <1>;
+ 
+ 	aliases {
+ 		serial0 = &uart0;
 -- 
 2.9.3
