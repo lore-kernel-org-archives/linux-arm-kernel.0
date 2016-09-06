@@ -1,53 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Sep 2016 15:09:37 -0700
-Subject: Kexec regression in next-20160906
-Message-ID: <20160906220936.4txqzodkgknhjiyh@atomide.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Sep 2016 23:22:45 +0100
+Subject: [arm:sa1100 33/97] arch/arm/common/sa1111.c:515:19: error:
+ 'irqbase' undeclared
+In-Reply-To: <201609070356.QKsjqKNj%fengguang.wu@intel.com>
+References: <201609070356.QKsjqKNj%fengguang.wu@intel.com>
+Message-ID: <20160906222245.GH1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Sep 07, 2016 at 03:29:58AM +0800, kbuild test robot wrote:
+> tree:   http://repo.or.cz/linux-2.6/linux-2.6-arm.git sa1100
 
-Looks like commit 5c01cdd2d4bc ("kexec_file: allow skipping checksum
-calculation for some segments") makes next-20160916 stop working for
-me at least on ARM.
+Please use git://git.armlinux.org.uk/~rmk/linux-arm.git instead -
+the new machine is in place and should be able to cope just fine with
+whatever git load, so there should be no need to use mirrors anymore.
+I think you're using that already for some reports anyway.
 
-I now get "kexec_load failed: Invalid argument error" on loading the
-new kernel to memory with kexec -l.
+> head:   8712f29f4497fc83173d512149d3949b6f87e2dd
+> commit: 31dbff2701e82c42bb210a7e310abe63c0a96c66 [33/97] ARM: sa1111: move irq cleanup to separate function
+> config: arm-sa1100 (attached as .config)
+> compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         git checkout 31dbff2701e82c42bb210a7e310abe63c0a96c66
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm 
 
-Reverting the following two commits makes things work for me again:
+ETOOMANYPATCHES. :p
 
-d2bf993afdf1 ("kexec_file: add mechanism to update kexec segments")
-5c01cdd2d4bc ("kexec_file: allow skipping checksum calculation for
-some segments")
+Thanks, should be fixed now.
 
-Regards,
-
-Tony
-
-8< -------
-kernel: 0xb6b77008 kernel_size: 0x3aa538
-MEMORY RANGES
-0000000080000000-00000000ffcfffff (0)
-00000000fff00000-00000000ffffefff (0)
-kexec_load: entry = 0x80008000 flags = 0x280000
-nr_segments = 2
-segment[0].buf   = 0xb6b77008
-segment[0].bufsz = 0x3aa538
-segment[0].mem   = 0x80008000
-segment[0].memsz = 0x3ab000
-segment[1].buf   = 0xadf80
-segment[1].bufsz = 0x16080
-segment[1].mem   = 0x81709000
-segment[1].memsz = 0x17000
-kexec_load failed: Invalid argument
-entry       = 0x80008000 flags = 0x280000
-nr_segments = 2
-segment[0].buf   = 0xb6b77008
-segment[0].bufsz = 0x3aa538
-segment[0].mem   = 0x80008000
-segment[0].memsz = 0x3ab000
-segment[1].buf   = 0xadf80
-segment[1].bufsz = 0x16080
-segment[1].mem   = 0x81709000
-segment[1].memsz = 0x17000
-Nothing has been loaded!
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
