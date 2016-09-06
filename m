@@ -1,98 +1,153 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  6 Sep 2016 09:28:46 +0100
-Subject: [PATCH v2 6/7] arm64: KVM: vgic-v2: Add GICV access from HYP
-In-Reply-To: <1473150527-4729-1-git-send-email-marc.zyngier@arm.com>
-References: <1473150527-4729-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1473150527-4729-7-git-send-email-marc.zyngier@arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 6 Sep 2016 10:36:49 +0200
+Subject: [PATCH v3 1/4] pwm: Add support for Meson PWM Controller
+In-Reply-To: <20160905090052.GG3532@ulmo.ba.sec>
+References: <1471880193-21879-1-git-send-email-narmstrong@baylibre.com>
+ <1471880193-21879-2-git-send-email-narmstrong@baylibre.com>
+ <20160905090052.GG3532@ulmo.ba.sec>
+Message-ID: <bd7ea1db-d8f9-f075-14ef-732d9bb65e77@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have the necessary infrastructure to handle MMIO accesses
-in HYP, perform the GICV access on behalf of the guest. This requires
-checking that the access is strictly 32bit, properly aligned, and
-falls within the expected range.
+Hi Thierry,
 
-When all condition are satisfied, we perform the access and tell
-the rest of the HYP code that the instruction has been correctly
-emulated.
+On 09/05/2016 11:00 AM, Thierry Reding wrote:
+> On Mon, Aug 22, 2016 at 05:36:30PM +0200, Neil Armstrong wrote:
+>> Add support for the PWM controller found in the Amlogic SoCs.
+>> This driver supports the Meson8b and GXBB SoCs.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  drivers/pwm/Kconfig     |   9 +
+>>  drivers/pwm/Makefile    |   1 +
+>>  drivers/pwm/pwm-meson.c | 528 ++++++++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 538 insertions(+)
+>>  create mode 100644 drivers/pwm/pwm-meson.c
+> 
+> Hi Neil,
+> 
+> sorry for taking so long to review this. I had actually started to write
+> a review email since I had noticed a couple of slight oddities about the
+> driver structure (primarily this was about how channel-specific data was
+> split between struct meson_pwm_channel and struct meson_pwm_chip), but I
+> ended up making some changes to the driver in order to see what my
+> suggestions would look like, and if they would indeed improve things.
+> But once I had done that, I thought it a bit pointless to make that into
+> review comments and decided to just push what I had done and ask you to
+> take a look, and if you had no objections to the changes take the driver
+> for a spin to see if it still worked as expected.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- include/kvm/arm_vgic.h        |  3 +++
- virt/kvm/arm/hyp/vgic-v2-sr.c | 39 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 42 insertions(+)
+We re-run our tests and I found 2 bugs, the first one is in meson_pwm_enable(),
+only the channel A was setup, the fix is :
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 8eb1501..bb46c03 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -50,6 +50,9 @@ struct vgic_global {
- 	/* Physical address of vgic virtual cpu interface */
- 	phys_addr_t		vcpu_base;
- 
-+	/* GICV mapping */
-+	void __iomem		*vcpu_base_va;
+static void meson_pwm_enable(...)
+-	u32 value, clk_shift, clk_enable, enable;
++	u32 reg, value, clk_shift, clk_enable, enable;
+
+ 	switch (id) {
+ 	case 0:
+[...]
++		reg = REG_PWM_A;
+ 		break;
+ 	case 1:
+[...]
++		reg = REG_PWM_B;
+ 		break;
+ 	}
+[...]
+-	writel(value, meson->base + REG_PWM_A);
++	writel(value, meson->base + reg);
+
+The second bug is in probe(), I understand the point to allocate dynamically the channels
+and attach them to each pwm chip, but when calling meson_pwm_init_channels() we get an OOPS
+because meson->chip.pwms[i] are allocated in pwmchip_add().
+Moving meson_pwm_init_channels() would fix this, but in case of a clk PROBE_DEFER, we would need
+to remove back the pwmchip, which is a quite a bad design decision....
+
+The smartest fix I found was to allocate channels in probe, init them them attach them after pwmchip_add():
+
+static int meson_pwm_init_channels(..., struct meson_pwm_channel *channels)
+{
++	struct meson_pwm_channel *channels;
+[...]
+-	for (i = 0; i < meson->chip.npwm; i++) {
+-		struct pwm_device *pwm = &meson->chip.pwms[i];
+-		struct meson_pwm_channel *channel;
+-
+-		channel = devm_kzalloc(dev, sizeof(*channel), GFP_KERNEL);
+-		if (!channel)
+-			return -ENOMEM;
++	if (!channels)
++		return -EINVAL;
+
++	for (i = 0; i < meson->chip.npwm; i++) {
+[...]
++		memset(&channels[i], 0, sizeof(struct meson_pwm_channel));
+[...]
+//Rename "channel->" into "channels[i]."//
+[...]
+-		pwm_set_chip_data(pwm, channel);
+ 	}
+
+ 	return 0;
+}
+
++static void meson_pwm_add_channels_data(struct meson_pwm *meson,
++					struct meson_pwm_channel *channels)
++{
++	unsigned int i;
 +
- 	/* virtual control interface mapping */
- 	void __iomem		*vctrl_base;
- 
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index 3e2a62e..a052f20 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -19,6 +19,7 @@
- #include <linux/irqchip/arm-gic.h>
- #include <linux/kvm_host.h>
- 
-+#include <asm/kvm_emulate.h>
- #include <asm/kvm_hyp.h>
- 
- static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
-@@ -171,6 +172,44 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
- #ifdef CONFIG_ARM64
- bool __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
- {
-+	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
-+	struct vgic_dist *vgic = &kvm->arch.vgic;
-+	phys_addr_t fault_ipa;
-+	void __iomem *addr;
-+	int rd;
++	for (i = 0; i < meson->chip.npwm; i++)
++		pwm_set_chip_data(&meson->chip.pwms[i], &channels[i]);
++}
+
+static int meson_pwm_probe(struct platform_device *pdev)
+{
++	struct meson_pwm_channel *channels;
+[...]
+-	err = meson_pwm_init_channels(meson);
+-	if (err < 0)
+-		return err;
+-
+ 	meson->chip.dev = &pdev->dev;
+[...]
+ 	meson->chip.of_pwm_n_cells = 3;
+
++	channels = devm_kmalloc_array(&pdev->dev, 2, sizeof(*meson),
++				      GFP_KERNEL);
++	if (!channels)
++		return -ENOMEM;
 +
-+	/* Build the full address */
-+	fault_ipa  = kvm_vcpu_get_fault_ipa(vcpu);
-+	fault_ipa |= kvm_vcpu_get_hfar(vcpu) & GENMASK(11, 0);
++	err = meson_pwm_init_channels(meson, channels);
++	if (err < 0)
++		return err;
 +
-+	/* If not for GICV, move on */
-+	if (fault_ipa <  vgic->vgic_cpu_base ||
-+	    fault_ipa >= (vgic->vgic_cpu_base + KVM_VGIC_V2_CPU_SIZE))
- 		return false;
+ 	err = pwmchip_add(&meson->chip);
+[...]
++	meson_pwm_add_channels_data(meson, channels);
 +
-+	/* Reject anything but a 32bit access */
-+	if (kvm_vcpu_dabt_get_as(vcpu) != sizeof(u32))
-+		return false;
-+
-+	/* Not aligned? Don't bother */
-+	if (fault_ipa & 3)
-+		return false;
-+
-+	rd = kvm_vcpu_dabt_get_rd(vcpu);
-+	addr  = kern_hyp_va((kern_hyp_va(&kvm_vgic_global_state))->vcpu_base_va);
-+	addr += fault_ipa - vgic->vgic_cpu_base;
-+
-+	if (kvm_vcpu_dabt_iswrite(vcpu)) {
-+		u32 data = vcpu_data_guest_to_host(vcpu,
-+						   vcpu_get_reg(vcpu, rd),
-+						   sizeof(u32));
-+		writel_relaxed(data, addr);
-+	} else {
-+		u32 data = readl_relaxed(addr);
-+		vcpu_set_reg(vcpu, rd, vcpu_data_host_to_guest(vcpu, data,
-+							       sizeof(u32)));
-+	}
-+
-+	return true;
- }
- #endif
--- 
-2.1.4
+ 	platform_set_drvdata(pdev, meson);
+
+ 	return 0;
+}
+
+The fix driver is in a separate branch, rebased on your for-next :
+https://github.com/superna9999/linux/tree/amlogic/v4.8/pwm-for-next
+
+and in a signed tag I can transform in a pull request if needed :
+https://github.com/superna9999/linux/releases/tag/amlogic/v4.8/pwm-for-next-for-v4
+
+[...]
+> 
+> I've pushed my modifications to the driver to the linux-pwm repository:
+> 
+> 	https://git.kernel.org/cgit/linux/kernel/git/thierry.reding/linux-pwm.git/log/?h=for-next
+> 
+> Alternatively you can also take a look at the for-4.9/drivers branch,
+> but they're currently the same thing.
+> 
+> Thierry
+> 
+
+Thanks,
+Neil
