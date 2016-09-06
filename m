@@ -1,82 +1,30 @@
 From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Tue, 6 Sep 2016 18:45:40 +0200
-Subject: [PATCH v4 8/9] ARM: dts: Declare push button as GPIO key on stm32f429
- boards
+Date: Tue, 6 Sep 2016 18:45:37 +0200
+Subject: [PATCH v4 5/9] Documentation: dt-bindings: Add IRQ related properties
+ of STM32 pinctrl
 In-Reply-To: <1473180341-1999-1-git-send-email-alexandre.torgue@st.com>
 References: <1473180341-1999-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <1473180341-1999-9-git-send-email-alexandre.torgue@st.com>
+Message-ID: <1473180341-1999-6-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
-index 6bfc595..0fd78e4 100644
---- a/arch/arm/boot/dts/stm32429i-eval.dts
-+++ b/arch/arm/boot/dts/stm32429i-eval.dts
-@@ -47,6 +47,7 @@
+diff --git a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+index 587bffb..a0eed99 100644
+--- a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+@@ -14,6 +14,9 @@ Required properies:
+  - #size-cells	: The value of this property must be 1
+  - ranges	: defines mapping between pin controller node (parent) to
+    gpio-bank node (children).
++ - interrupt-parent: phandle of the interrupt parent to which the external
++   GPIO interrupts are forwarded to.
++ - st,syscfg: phandle of the syscfg node used for IRQ mux selection.
+  - pins-are-numbered: Specify the subnodes are using numbered pinmux to
+    specify pins.
  
- /dts-v1/;
- #include "stm32f429.dtsi"
-+#include <dt-bindings/input/input.h>
- 
- / {
- 	model = "STMicroelectronics STM32429i-EVAL board";
-@@ -82,6 +83,23 @@
- 		};
- 	};
- 
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		autorepeat;
-+		button at 0 {
-+			label = "Wake up";
-+			linux,code = <KEY_WAKEUP>;
-+			gpios = <&gpioa 0 0>;
-+		};
-+		button at 1 {
-+			label = "Tamper";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&gpioc 13 0>;
-+		};
-+	};
-+
- 	usbotg_hs_phy: usbphy {
- 		#phy-cells = <0>;
- 		compatible = "usb-nop-xceiv";
-diff --git a/arch/arm/boot/dts/stm32f429-disco.dts b/arch/arm/boot/dts/stm32f429-disco.dts
-index 0140807..7d0415e 100644
---- a/arch/arm/boot/dts/stm32f429-disco.dts
-+++ b/arch/arm/boot/dts/stm32f429-disco.dts
-@@ -47,6 +47,7 @@
- 
- /dts-v1/;
- #include "stm32f429.dtsi"
-+#include <dt-bindings/input/input.h>
- 
- / {
- 	model = "STMicroelectronics STM32F429i-DISCO board";
-@@ -75,6 +76,18 @@
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		autorepeat;
-+		button at 0 {
-+			label = "User";
-+			linux,code = <KEY_HOME>;
-+			gpios = <&gpioa 0 0>;
-+		};
-+	};
- };
- 
- &clk_hse {
 -- 
 1.9.1
