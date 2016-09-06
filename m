@@ -1,24 +1,25 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 6 Sep 2016 22:08:05 +0800
-Subject: [PATCH v2 7/7] ARM: sun8i: Convert the A23 and A33 to the CCU
-In-Reply-To: <20160906121837.7517-8-maxime.ripard@free-electrons.com>
-References: <20160906121837.7517-1-maxime.ripard@free-electrons.com>
- <20160906121837.7517-8-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v64r-vURPZNhPhKv2+7kByckdxW=fPH-9qAfBLxH992qWQ@mail.gmail.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Tue, 06 Sep 2016 16:08:44 +0200
+Subject: [PATCH, RESEND] drm: exynos: avoid unused function warning
+In-Reply-To: <20160906133027.2206326-1-arnd@arndb.de>
+References: <20160906133027.2206326-1-arnd@arndb.de>
+Message-ID: <d20955a1-f7b4-895e-55ce-34784d39e0be@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 6, 2016 at 8:18 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Now that we have support for the CCU driver in sunxi-ng, convert the A23
-> and A33 DTs to that driver.
+On 09/06/2016 03:30 PM, Arnd Bergmann wrote:
+> When CONFIG_PM is not set, we get a warning about an unused function:
 >
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-
-TODO note for later:
-
-    The usb_otg and usbphy node definitions can be moved to the common dtsi
-    file, and there compatibles and regs (for usbphy) defined in the SoC
-    dtsi.
+> drivers/gpu/drm/exynos/exynos_drm_gsc.c:1219:12: error: 'gsc_clk_ctrl' defined but not used [-Werror=unused-function]
+>  static int gsc_clk_ctrl(struct gsc_context *ctx, bool enable)
+>             ^~~~~~~~~~~~
+>
+> This removes the two #ifdef checks in this file and instead marks the
+> functions as __maybe_unused, which is a more reliable way of doing the
+> same, allowing better build coverage and avoiding the warning above.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+--
+Regards
+Andrzej
