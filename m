@@ -1,56 +1,188 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Sep 2016 11:37:58 +0200
-Subject: [PATCH v4 4/5] net: stmmac: add a glue driver for the Amlogic
- Meson 8b / GXBB DWMAC
-In-Reply-To: <CAFBinCAC3c=o1=8DGfiPhw6w6V42jvYLUfHXHpHLe03pw8P=LQ@mail.gmail.com>
-References: <201609050953.67GKeUAU%fengguang.wu@intel.com>
- <14789887.lyko4Om94p@wuerfel>
- <CAFBinCAC3c=o1=8DGfiPhw6w6V42jvYLUfHXHpHLe03pw8P=LQ@mail.gmail.com>
-Message-ID: <16206001.1636ZmhtjK@wuerfel>
+From: horia.geanta@nxp.com (Horia Geanta Neag)
+Date: Tue, 6 Sep 2016 09:43:20 +0000
+Subject: [linux-devel] [PATCH 10/10] dt-bindings: sec: Update bindings for
+ LS1012A
+References: <1472207269-18499-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
+ <1472207269-18499-10-git-send-email-Bhaskar.Upadhaya@nxp.com>
+Message-ID: <DB4PR04MB0847FF62F710EE46700387EA98F90@DB4PR04MB0847.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 5, 2016 9:07:03 PM CEST Martin Blumenstingl wrote:
-> On Mon, Sep 5, 2016 at 12:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday, September 5, 2016 9:37:29 AM CEST kbuild test robot wrote:
-> >> All error/warnings (new ones prefixed by >>):
-> >>
-> >> >> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:63:18: error: field 'm250_mux' has incomplete type
-> >>      struct clk_mux  m250_mux;
-> >>                      ^
-> >> >> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:67:21: error: field 'm250_div' has incomplete type
-> >>      struct clk_divider m250_div;
-> >>                         ^
-> >>
-> >
-> > I think this needs a compile-time dependency on COMMON_CLK
-> indeed, since we are also a clock provider we have to depend on
-> CONFIG_COMMON_CLK.
+On 8/26/2016 6:36 PM, Bhaskar Upadhaya wrote:
+> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
+> ---
+>  .../devicetree/bindings/crypto/fsl-sec5.txt        | 153 +++++++++++++++++++++
+>  1 file changed, 153 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/crypto/fsl-sec5.txt
 > 
-> That brings up a question though:
-> so far the new driver uses the same Kconfig symbol as the "old" driver
-> (CONFIG_DWMAC_MESON).
-> The "old" driver does not need CONFIG_COMMON_CLK while the new one does.
-> I see a few options here:
-> 1. simply adding the dependency (as most configurations will have
-> CONFIG_COMMON_CLK enabled anyways)
+> diff --git a/Documentation/devicetree/bindings/crypto/fsl-sec5.txt b/Documentation/devicetree/bindings/crypto/fsl-sec5.txt
+> new file mode 100644
+> index 0000000..7bcaa6f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/crypto/fsl-sec5.txt
+> @@ -0,0 +1,153 @@
+> +SEC 5 is Freescale's Cryptographic Accelerator and Assurance Module (CAAM).
+> +Currently Freescale arm chip LS1012A is embedded with SEC 5.
+This sounds like LS1012A is the only platform with SEC5, which is far
+from the truth.
 
-I think that's fine. At least on both ARM multiplatform and ARM64 it is
-always defined by definition, and when build testing, it should be possible
-to enable it on other architectures as well.
+> +SEC 5 device tree binding include:
+> +   -SEC 5 Node
+> +   -Job Ring Node
+> +   -Full Example
+> +
+> +=====================================================================
+> +SEC 5 Node
+> +
+> +Description
+> +
+> +    Node defines the base address of the SEC 5 block.
+> +    This block specifies the address range of all global
+> +    configuration registers for the SEC 5 block.
+> +    For example, In LS1012A, we could see three SEC 5 node.
+There's only one SEC / CAAM crypto engine, thus only one node.
+Copy & paste typo from SEC6 binding?
 
-> 2. add some depends on COMMON_CLK || MACH_MESON6 || MACH_MESON8 foo
+> +
+> +PROPERTIES
+> +
+> +   - compatible
+> +      Usage: required
+> +      Value type: <string>
+> +      Definition: Must include "fsl,sec-v5.4".
+Since you are adding a binding for SEC5, make sure you are accounting
+for already-existing trees that are using "fsl,sec-v5.0",
+"fsl,sec-v5.2", "fsl,sec-v5.3".
+See SoCs in arch/powerpc/boot/dts/fsl/
 
-That doesn't work unless you also put the calls into the clk interface
-inside of ugly #ifdef
-
-> 3. use a new Kconfig symbol for new new driver (CONFIG_DWMAC_MESON8B?)
-
-That would be ok as well, probably not necessary.
-
-> And finally regarding your other mail: I have already changed
-> WARN_ON(PTR_ERR_OR_ZERO(...)) to WARN_ON(IS_ERR(...)) in v4
-
-Ok, thanks.
-
-	Arnd
+> +
+> +   - fsl,sec-era
+> +      Usage: optional
+> +      Value type: <u32>
+> +      Definition: A standard property. Define the 'ERA' of the SEC
+> +          device.
+> +
+> +   - #address-cells
+> +       Usage: required
+> +       Value type: <u32>
+> +       Definition: A standard property.  Defines the number of cells
+> +           for representing physical addresses in child nodes.
+> +
+> +   - #size-cells
+> +       Usage: required
+> +       Value type: <u32>
+> +       Definition: A standard property.  Defines the number of cells
+> +           for representing the size of physical addresses in
+> +           child nodes.
+> +
+> +   - reg
+> +      Usage: required
+> +      Value type: <prop-encoded-array>
+> +      Definition: A standard property.  Specifies the physical
+> +          address and length of the SEC 5 configuration registers.
+> +
+> +   - ranges
+> +       Usage: required
+> +       Value type: <prop-encoded-array>
+> +       Definition: A standard property.  Specifies the physical address
+> +           range of the SEC 5.0 register space (-SNVS not included).  A
+> +           triplet that includes the child address, parent address, &
+> +           length.
+> +
+> +   Note: All other standard properties (see the ePAPR) are allowed
+> +   but are optional.
+> +
+> +EXAMPLE
+> +	crypto: crypto at 1700000 {
+> +                        compatible = "fsl,sec-v5.4", "fsl,sec-v5.0",
+> +                                     "fsl,sec-v4.0";
+> +                        fsl,sec-era = <8>;
+> +                        #address-cells = <1>;
+> +                        #size-cells = <1>;
+> +                        ranges = <0x0 0x00 0x1700000 0x100000>;
+> +                        reg = <0x00 0x1700000 0x0 0x100000>;
+> +                        interrupts = <0 75 0x4>;
+> +	}
+> +
+> +=====================================================================
+> +Job Ring (JR) Node
+> +
+> +    Child of the crypto node defines data processing interface to SEC 5
+> +    across the peripheral bus for purposes of processing
+> +    cryptographic descriptors. The specified address
+> +    range can be made visible to one (or more) cores.
+> +    The interrupt defined for this node is controlled within
+> +    the address range of this node.
+> +
+> +  - compatible
+> +      Usage: required
+> +      Value type: <string>
+> +      Definition: Must include "fsl,sec-v5.4-job-ring".
+> +
+> +  - reg
+> +      Usage: required
+> +      Value type: <prop-encoded-array>
+> +      Definition: Specifies a two JR parameters:  an offset from
+> +           the parent physical address and the length the JR registers.
+> +
+> +   - interrupts
+> +      Usage: required
+> +      Value type: <prop_encoded-array>
+> +      Definition:  Specifies the interrupts generated by this
+> +           device.  The value of the interrupts property
+> +           consists of one interrupt specifier. The format
+> +           of the specifier is defined by the binding document
+> +           describing the node's interrupt parent.
+> +
+> +EXAMPLE
+> +	sec_jr0: jr at 10000 {
+> +		compatible = "fsl,sec-v5.4-job-ring",
+> +			"fsl,sec-v5.0-job-ring",
+> +			"fsl,sec-v4.0-job-ring";
+> +			reg = <0x10000 0x10000>;
+> +			interrupts = <0 71 0x4>;
+> +	};
+> +
+> +===================================================================
+> +Full Example
+> +
+> +Since some chips may contain more than one SEC, the dtsi contains
+> +only the node contents, not the node itself.  A chip using the SEC
+> +should include the dtsi inside each SEC node.  Example:
+> +
+> +In fsl-ls1012a.dtsi:
+> +
+> +	compatible = "fsl,sec-v5.4";
+> +	fsl,sec-era = <8>;
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +
+> +	sec_jr0: jr at 10000 {
+> +		compatible = "fsl,sec-v5.4-job-ring",
+> +			"fsl,sec-v5.0-job-ring",
+> +			"fsl,sec-v4.0-job-ring";
+> +			reg = <0x10000 0x10000>;
+> +			interrupts = <0 71 0x4>;
+> +	};
+> +	sec_jr1: jr at 20000 {
+> +		compatible = "fsl,sec-v5.4-job-ring",
+> +			"fsl,sec-v5.0-job-ring",
+> +			"fsl,sec-v4.0-job-ring";
+> +			reg = <0x20000 0x10000>;
+> +			interrupts = <0 72 0x4>;
+> +	};
+> +	sec_jr2: jr at 30000 {
+> +		compatible = "fsl,sec-v5.4-job-ring",
+> +			"fsl,sec-v5.0-job-ring",
+> +			"fsl,sec-v4.0-job-ring";
+> +			reg = <0x30000 0x10000>;
+> +			interrupts = <0 73 0x4>;
+> +	};
+> +	sec_jr3: jr at 40000 {
+> +		compatible = "fsl,sec-v5.4-job-ring",
+> +			"fsl,sec-v5.0-job-ring",
+> +			"fsl,sec-v4.0-job-ring";
+> +			reg = <0x40000 0x10000>;
+> +			interrupts = <0 74 0x4>;
+> +	};
+> 
