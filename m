@@ -1,38 +1,70 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 6 Sep 2016 10:53:43 +0800
-Subject: [PATCH 4/7] drm/panel: Add Sinlinx SinA33 7" panel
-In-Reply-To: <20160905200248.GB8596@lukather>
-References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
- <20160901153204.11217-5-maxime.ripard@free-electrons.com>
- <66681473008583@web28j.yandex.ru> <20160905200248.GB8596@lukather>
-Message-ID: <CAGb2v64Qbhd+MnbzEoN-51GYo5AYOXkEu+=ku_Gbq7-ww7GLPQ@mail.gmail.com>
+Date: Tue, 6 Sep 2016 11:04:38 +0800
+Subject: [PATCH v2 4/7] dts: sun8i-h3: add UART1-3 to Orange Pi Plus
+In-Reply-To: <20160905193111.GC4728@lukather>
+References: <1472671858-29220-1-git-send-email-jorik@kippendief.biz>
+ <1472671858-29220-5-git-send-email-jorik@kippendief.biz>
+ <20160902070425.GB6313@lukather>
+ <20160903120932.GA6289@carbon.kippendief.biz> <20160905193111.GC4728@lukather>
+Message-ID: <CAGb2v67dnnxOp_yPyC8icu-m0WZ-Rs1STs1tnxJMOLfcRfRzUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 6, 2016 at 4:02 AM, Maxime Ripard
+On Tue, Sep 6, 2016 at 3:31 AM, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
-> Hi,
+> Hi Jorik,
 >
-> On Mon, Sep 05, 2016 at 01:03:03AM +0800, Icenowy Zheng wrote:
->> Hi Everyone,
+> On Sat, Sep 03, 2016 at 02:09:32PM +0200, Jorik Jonker wrote:
+>> On Fri, Sep 02, 2016 at 09:04:25AM +0200, Maxime Ripard wrote:
+>> >Unfortunately, these pins can be used for other purposes as well, so
+>> >we cannot make force that decision down to our users.
 >>
->> 01.09.2016, 23:40, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
->> >  The SinA33 has an unidentified panel. Add the timings for it under a new
->> >  compatible.
+>> Yes, but since the associated peripheral is disabled, the users are free to
+>> configure other functions/peripherals, right? I mean something like this in
+>> pseudo-DT:
 >>
+>> /soc/pio: pinctrl at 01c20800/uart1_pins:
+>>   allwinner,pins = "PG6, PG7";
+>> /soc/pio: pinctrl at 01c20800/foo0_pins:
+>>   allwinner,pins = "PG6, PG7";
+>>   ..
+>> /soc/uart1: serial at serial@01c28400:
+>>   pinctrl-0 = <&uart1_pins>;
+>>   status = "disabled";
+>> /soc/bar:
+>>   pinctrl-0 = <&uart1_pins>;
+>>   status = "disabled";
 >>
->>
->> Excuse me...
->> I will ask a question which is not fully related to the patch here...
->> If I want to add a generic panel for Q8 tablets, what should it be called?
->> "allwinner,q8-lcd-panel-800x480"?
+>> Assuming Linux/DT allows this, this would force nothing, only offer choice
+>> and ease of use.
 >
-> I guess it's more of a question for Thierry, but it seems like the
-> trend is to put the diagonal rather than the resolution in the
-> compatibles.
+> Hmm, sorry, I went over your patches too quickly...
+>
+> That's a great compromise I think. Chen-Yu, any opinion on this?
 
-I think Hans (CC-ed) has some q8 tablet that has a 1024x600 LCD.
-Both variants are 7". Without the exact model number we would need
-the resolution to tell them apart.
+In short, I'm ok with it. But please put an explicit
 
+    status = "disabled";
+
+and probably a comment about how/where the peripheral can be
+used in the board dts.
+
+I intended to do this for the Banana Pis. Though my original plan
+was to enable Raspberry Pi compatible peripherals by default, and
+list the other peripherals that are defined by the vendor as
+"disabled".
+
+"Defined by the vendor" means that the vendor has some sort of
+document associating the gpio header pins with the peripherals,
+as shown in:
+
+    http://www.orangepi.org/Docs/Pindefinition.html#CON3_Definition
+
+This should make it easier for the average user to enable the
+peripherals. I'm not sure we should list _all_ possible ones
+though. That would make the list very large, and some might
+end up never being used.
+
+
+Regards
 ChenYu
