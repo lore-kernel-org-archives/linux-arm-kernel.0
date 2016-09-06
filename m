@@ -1,240 +1,260 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  6 Sep 2016 14:18:34 +0200
-Subject: [PATCH v2 4/7] clk: sunxi-ng: Add N-class clocks support
+Date: Tue,  6 Sep 2016 14:18:32 +0200
+Subject: [PATCH v2 2/7] clk: sunxi-ng: div: Allow to set a maximum
 In-Reply-To: <20160906121837.7517-1-maxime.ripard@free-electrons.com>
 References: <20160906121837.7517-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160906121837.7517-5-maxime.ripard@free-electrons.com>
+Message-ID: <20160906121837.7517-3-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the class with a single factor, N, being a multiplier.
+Some dividers might have a maximum value that is lower than the width of
+the register.
+
+Add a field to _ccu_div to handle those case properly. If the field is set
+to 0, the code will assume that the maximum value is the maximum one that
+can be used with the field register width.
+
+Otherwise, we'll use whatever value has been set.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi-ng/Kconfig    |   4 ++
- drivers/clk/sunxi-ng/Makefile   |   1 +
- drivers/clk/sunxi-ng/ccu_mult.c | 133 ++++++++++++++++++++++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu_mult.h |  35 +++++++++++
- 4 files changed, 173 insertions(+)
- create mode 100644 drivers/clk/sunxi-ng/ccu_mult.c
+ drivers/clk/sunxi-ng/ccu_div.h  | 21 +++++++++++++++++----
+ drivers/clk/sunxi-ng/ccu_mp.c   | 23 +++++++++++++----------
+ drivers/clk/sunxi-ng/ccu_nkm.c  |  4 ++--
+ drivers/clk/sunxi-ng/ccu_nkmp.c | 21 ++++++++++-----------
+ drivers/clk/sunxi-ng/ccu_nm.c   | 16 ++++++++++------
+ 5 files changed, 52 insertions(+), 33 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
-index a1dee861474c..c7258779daa8 100644
---- a/drivers/clk/sunxi-ng/Kconfig
-+++ b/drivers/clk/sunxi-ng/Kconfig
-@@ -19,6 +19,10 @@ config SUNXI_CCU_GATE
- config SUNXI_CCU_MUX
- 	bool
+diff --git a/drivers/clk/sunxi-ng/ccu_div.h b/drivers/clk/sunxi-ng/ccu_div.h
+index a5c9eaf90e84..ea693d00be81 100644
+--- a/drivers/clk/sunxi-ng/ccu_div.h
++++ b/drivers/clk/sunxi-ng/ccu_div.h
+@@ -23,6 +23,8 @@ struct _ccu_div {
+ 	u8			shift;
+ 	u8			width;
  
-+config SUNXI_CCU_MULT
-+	bool
-+	select SUNXI_CCU_MUX
++	u32			max;
 +
- config SUNXI_CCU_PHASE
- 	bool
+ 	u32			flags;
  
-diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-index 261438b00215..462a5f8383ed 100644
---- a/drivers/clk/sunxi-ng/Makefile
-+++ b/drivers/clk/sunxi-ng/Makefile
-@@ -7,6 +7,7 @@ obj-$(CONFIG_SUNXI_CCU_DIV)	+= ccu_div.o
- obj-$(CONFIG_SUNXI_CCU_FRAC)	+= ccu_frac.o
- obj-$(CONFIG_SUNXI_CCU_GATE)	+= ccu_gate.o
- obj-$(CONFIG_SUNXI_CCU_MUX)	+= ccu_mux.o
-+obj-$(CONFIG_SUNXI_CCU_MULT)	+= ccu_mult.o
- obj-$(CONFIG_SUNXI_CCU_PHASE)	+= ccu_phase.o
- 
- # Multi-factor clocks
-diff --git a/drivers/clk/sunxi-ng/ccu_mult.c b/drivers/clk/sunxi-ng/ccu_mult.c
-new file mode 100644
-index 000000000000..119b190c0eb5
---- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu_mult.c
-@@ -0,0 +1,133 @@
-+/*
-+ * Copyright (C) 2016 Maxime Ripard
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of
-+ * the License, or (at your option) any later version.
-+ */
-+
-+#include <linux/clk-provider.h>
-+
-+#include "ccu_gate.h"
-+#include "ccu_mult.h"
-+
-+static void ccu_mult_find_best(unsigned long parent, unsigned long rate,
-+			       unsigned int max_n, unsigned int *n)
-+{
-+	*n = rate / parent;
-+}
-+
-+static unsigned long ccu_mult_round_rate(struct ccu_mux_internal *mux,
-+					unsigned long parent_rate,
-+					unsigned long rate,
-+					void *data)
-+{
-+	struct ccu_mult *cm = data;
-+	unsigned int n;
-+
-+	ccu_mult_find_best(parent_rate, rate, 1 << cm->mult.width, &n);
-+
-+	return parent_rate * n;
-+}
-+
-+static void ccu_mult_disable(struct clk_hw *hw)
-+{
-+	struct ccu_mult *cm = hw_to_ccu_mult(hw);
-+
-+	return ccu_gate_helper_disable(&cm->common, cm->enable);
-+}
-+
-+static int ccu_mult_enable(struct clk_hw *hw)
-+{
-+	struct ccu_mult *cm = hw_to_ccu_mult(hw);
-+
-+	return ccu_gate_helper_enable(&cm->common, cm->enable);
-+}
-+
-+static int ccu_mult_is_enabled(struct clk_hw *hw)
-+{
-+	struct ccu_mult *cm = hw_to_ccu_mult(hw);
-+
-+	return ccu_gate_helper_is_enabled(&cm->common, cm->enable);
-+}
-+
-+static unsigned long ccu_mult_recalc_rate(struct clk_hw *hw,
-+					unsigned long parent_rate)
-+{
-+	struct ccu_mult *cm = hw_to_ccu_mult(hw);
-+	unsigned long val;
-+	u32 reg;
-+
-+	reg = readl(cm->common.base + cm->common.reg);
-+	val = reg >> cm->mult.shift;
-+	val &= (1 << cm->mult.width) - 1;
-+
-+	ccu_mux_helper_adjust_parent_for_prediv(&cm->common, &cm->mux, -1,
-+						&parent_rate);
-+
-+	return parent_rate * (val + 1);
-+}
-+
-+static int ccu_mult_determine_rate(struct clk_hw *hw,
-+				struct clk_rate_request *req)
-+{
-+	struct ccu_mult *cm = hw_to_ccu_mult(hw);
-+
-+	return ccu_mux_helper_determine_rate(&cm->common, &cm->mux,
-+					     req, ccu_mult_round_rate, cm);
-+}
-+
-+static int ccu_mult_set_rate(struct clk_hw *hw, unsigned long rate,
-+			   unsigned long parent_rate)
-+{
-+	struct ccu_mult *cm = hw_to_ccu_mult(hw);
-+	unsigned long flags;
-+	unsigned int n;
-+	u32 reg;
-+
-+	ccu_mux_helper_adjust_parent_for_prediv(&cm->common, &cm->mux, -1,
-+						&parent_rate);
-+	
-+	ccu_mult_find_best(parent_rate, rate, 1 << cm->mult.width, &n);
-+
-+	spin_lock_irqsave(cm->common.lock, flags);
-+
-+	reg = readl(cm->common.base + cm->common.reg);
-+	reg &= ~GENMASK(cm->mult.width + cm->mult.shift - 1, cm->mult.shift);
-+
-+	writel(reg | ((n - 1) << cm->mult.shift),
-+	       cm->common.base + cm->common.reg);
-+
-+	spin_unlock_irqrestore(cm->common.lock, flags);
-+
-+	return 0;
-+}
-+
-+static u8 ccu_mult_get_parent(struct clk_hw *hw)
-+{
-+	struct ccu_mult *cm = hw_to_ccu_mult(hw);
-+
-+	return ccu_mux_helper_get_parent(&cm->common, &cm->mux);
-+}
-+
-+static int ccu_mult_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct ccu_mult *cm = hw_to_ccu_mult(hw);
-+
-+	return ccu_mux_helper_set_parent(&cm->common, &cm->mux, index);
-+}
-+
-+const struct clk_ops ccu_mult_ops = {
-+	.disable	= ccu_mult_disable,
-+	.enable		= ccu_mult_enable,
-+	.is_enabled	= ccu_mult_is_enabled,
-+
-+	.get_parent	= ccu_mult_get_parent,
-+	.set_parent	= ccu_mult_set_parent,
-+
-+	.determine_rate	= ccu_mult_determine_rate,
-+	.recalc_rate	= ccu_mult_recalc_rate,
-+	.set_rate	= ccu_mult_set_rate,
-+};
-diff --git a/drivers/clk/sunxi-ng/ccu_mult.h b/drivers/clk/sunxi-ng/ccu_mult.h
-index 609db6610880..5d2c8dc14073 100644
---- a/drivers/clk/sunxi-ng/ccu_mult.h
-+++ b/drivers/clk/sunxi-ng/ccu_mult.h
-@@ -1,6 +1,9 @@
- #ifndef _CCU_MULT_H_
- #define _CCU_MULT_H_
- 
-+#include "ccu_common.h"
-+#include "ccu_mux.h"
-+
- struct _ccu_mult {
- 	u8	shift;
- 	u8	width;
-@@ -12,4 +15,36 @@ struct _ccu_mult {
- 		.width	= _width,		\
+ 	struct clk_div_table	*table;
+@@ -36,14 +38,25 @@ struct _ccu_div {
+ 		.table	= _table,					\
  	}
  
-+struct ccu_mult {
-+	u32			enable;
-+
-+	struct _ccu_mult	mult;
-+	struct ccu_mux_internal	mux;
-+	struct ccu_common	common;
-+};
-+
-+#define SUNXI_CCU_N_WITH_GATE_LOCK(_struct, _name, _parent, _reg,	\
-+				   _mshift, _mwidth, _gate, _lock,	\
-+				   _flags)				\
-+	struct ccu_mult _struct = {					\
-+		.enable	= _gate,					\
-+		.mult	= _SUNXI_CCU_MULT(_mshift, _mwidth),		\
-+		.common	= {						\
-+			.reg		= _reg,				\
-+			.hw.init	= CLK_HW_INIT(_name,		\
-+						      _parent,		\
-+						      &ccu_mult_ops,	\
-+						      _flags),		\
-+		},							\
+-#define _SUNXI_CCU_DIV_FLAGS(_shift, _width, _flags)			\
+-	_SUNXI_CCU_DIV_TABLE_FLAGS(_shift, _width, NULL, _flags)
+-
+ #define _SUNXI_CCU_DIV_TABLE(_shift, _width, _table)			\
+ 	_SUNXI_CCU_DIV_TABLE_FLAGS(_shift, _width, _table, 0)
+ 
++#define _SUNXI_CCU_DIV_MAX_FLAGS(_shift, _width, _max, _flags) \
++	{								\
++		.shift	= _shift,					\
++		.width	= _width,					\
++		.flags	= _flags,					\
++		.max	= _max,						\
 +	}
 +
-+static inline struct ccu_mult *hw_to_ccu_mult(struct clk_hw *hw)
-+{
-+	struct ccu_common *common = hw_to_ccu_common(hw);
++#define _SUNXI_CCU_DIV_FLAGS(_shift, _width, _flags)			\
++	_SUNXI_CCU_DIV_MAX_FLAGS(_shift, _width, 0, _flags)
 +
-+	return container_of(common, struct ccu_mult, common);
-+}
++#define _SUNXI_CCU_DIV_MAX(_shift, _width, _max)			\
++	_SUNXI_CCU_DIV_MAX_FLAGS(_shift, _width, _max, 0)
 +
-+extern const struct clk_ops ccu_mult_ops;
+ #define _SUNXI_CCU_DIV(_shift, _width)					\
+-	_SUNXI_CCU_DIV_TABLE_FLAGS(_shift, _width, NULL, 0)
++	_SUNXI_CCU_DIV_FLAGS(_shift, _width, 0)
+ 
+ struct ccu_div {
+ 	u32			enable;
+diff --git a/drivers/clk/sunxi-ng/ccu_mp.c b/drivers/clk/sunxi-ng/ccu_mp.c
+index cbf33ef5faa9..ebb1b31568a5 100644
+--- a/drivers/clk/sunxi-ng/ccu_mp.c
++++ b/drivers/clk/sunxi-ng/ccu_mp.c
+@@ -21,9 +21,9 @@ static void ccu_mp_find_best(unsigned long parent, unsigned long rate,
+ 	unsigned int best_m = 0, best_p = 0;
+ 	unsigned int _m, _p;
+ 
+-	for (_p = 0; _p <= max_p; _p++) {
++	for (_p = 1; _p <= max_p; _p <<= 1) {
+ 		for (_m = 1; _m <= max_m; _m++) {
+-			unsigned long tmp_rate = (parent >> _p) / _m;
++			unsigned long tmp_rate = parent / _p / _m;
+ 
+ 			if (tmp_rate > rate)
+ 				continue;
+@@ -46,13 +46,15 @@ static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
+ 				       void *data)
+ {
+ 	struct ccu_mp *cmp = data;
++	unsigned int max_m, max_p;
+ 	unsigned int m, p;
+ 
+-	ccu_mp_find_best(parent_rate, rate,
+-			 1 << cmp->m.width, (1 << cmp->p.width) - 1,
+-			 &m, &p);
++	max_m = cmp->m.max ?: 1 << cmp->m.width;
++	max_p = cmp->p.max ?: 1 << ((1 << cmp->p.width) - 1);
+ 
+-	return (parent_rate >> p) / m;
++	ccu_mp_find_best(parent_rate, rate, max_m, max_p, &m, &p);
 +
- #endif /* _CCU_MULT_H_ */
++	return parent_rate / p / m;
+ }
+ 
+ static void ccu_mp_disable(struct clk_hw *hw)
+@@ -108,13 +110,14 @@ static int ccu_mp_set_rate(struct clk_hw *hw, unsigned long rate,
+ {
+ 	struct ccu_mp *cmp = hw_to_ccu_mp(hw);
+ 	unsigned long flags;
++	unsigned int max_m, max_p;
+ 	unsigned int m, p;
+ 	u32 reg;
+ 
+-	ccu_mp_find_best(parent_rate, rate,
+-			 1 << cmp->m.width, (1 << cmp->p.width) - 1,
+-			 &m, &p);
++	max_m = cmp->m.max ?: 1 << cmp->m.width;
++	max_p = cmp->p.max ?: 1 << ((1 << cmp->p.width) - 1);
+ 
++	ccu_mp_find_best(parent_rate, rate, max_m, max_p, &m, &p);
+ 
+ 	spin_lock_irqsave(cmp->common.lock, flags);
+ 
+@@ -122,7 +125,7 @@ static int ccu_mp_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	reg &= ~GENMASK(cmp->m.width + cmp->m.shift - 1, cmp->m.shift);
+ 	reg &= ~GENMASK(cmp->p.width + cmp->p.shift - 1, cmp->p.shift);
+ 
+-	writel(reg | (p << cmp->p.shift) | ((m - 1) << cmp->m.shift),
++	writel(reg | (ilog2(p) << cmp->p.shift) | ((m - 1) << cmp->m.shift),
+ 	       cmp->common.base + cmp->common.reg);
+ 
+ 	spin_unlock_irqrestore(cmp->common.lock, flags);
+diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
+index 182452919ede..059fdc3b4f96 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkm.c
++++ b/drivers/clk/sunxi-ng/ccu_nkm.c
+@@ -103,7 +103,7 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
+ 
+ 	_nkm.max_n = 1 << nkm->n.width;
+ 	_nkm.max_k = 1 << nkm->k.width;
+-	_nkm.max_m = 1 << nkm->m.width;
++	_nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
+ 
+ 	ccu_nkm_find_best(parent_rate, rate, &_nkm);
+ 
+@@ -129,7 +129,7 @@ static int ccu_nkm_set_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 	_nkm.max_n = 1 << nkm->n.width;
+ 	_nkm.max_k = 1 << nkm->k.width;
+-	_nkm.max_m = 1 << nkm->m.width;
++	_nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
+ 
+ 	ccu_nkm_find_best(parent_rate, rate, &_nkm);
+ 
+diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
+index 9f2b98e19dc9..9769dee99511 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkmp.c
++++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
+@@ -29,14 +29,14 @@ static void ccu_nkmp_find_best(unsigned long parent, unsigned long rate,
+ 	unsigned long _n, _k, _m, _p;
+ 
+ 	for (_k = 1; _k <= nkmp->max_k; _k++) {
+-		for (_p = 0; _p <= nkmp->max_p; _p++) {
++		for (_p = 1; _p <= nkmp->max_p; _p <<= 1) {
+ 			unsigned long tmp_rate;
+ 
+-			rational_best_approximation(rate / _k, parent >> _p,
++			rational_best_approximation(rate / _k, parent / _p,
+ 						    nkmp->max_n, nkmp->max_m,
+ 						    &_n, &_m);
+ 
+-			tmp_rate = (parent * _n * _k >> _p) / _m;
++			tmp_rate = parent * _n * _k / (_m * _p);
+ 
+ 			if (tmp_rate > rate)
+ 				continue;
+@@ -110,13 +110,12 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 	_nkmp.max_n = 1 << nkmp->n.width;
+ 	_nkmp.max_k = 1 << nkmp->k.width;
+-	_nkmp.max_m = 1 << nkmp->m.width;
+-	_nkmp.max_p = (1 << nkmp->p.width) - 1;
++	_nkmp.max_m = nkmp->m.max ?: 1 << nkmp->m.width;
++	_nkmp.max_p = nkmp->p.max ?: 1 << ((1 << nkmp->p.width) - 1);
+ 
+-	ccu_nkmp_find_best(*parent_rate, rate,
+-			   &_nkmp);
++	ccu_nkmp_find_best(*parent_rate, rate, &_nkmp);
+ 
+-	return (*parent_rate * _nkmp.n * _nkmp.k >> _nkmp.p) / _nkmp.m;
++	return *parent_rate * _nkmp.n * _nkmp.k / (_nkmp.m * _nkmp.p);
+ }
+ 
+ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
+@@ -129,8 +128,8 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 	_nkmp.max_n = 1 << nkmp->n.width;
+ 	_nkmp.max_k = 1 << nkmp->k.width;
+-	_nkmp.max_m = 1 << nkmp->m.width;
+-	_nkmp.max_p = (1 << nkmp->p.width) - 1;
++	_nkmp.max_m = nkmp->m.max ?: 1 << nkmp->m.width;
++	_nkmp.max_p = nkmp->p.max ?: 1 << ((1 << nkmp->p.width) - 1);
+ 
+ 	ccu_nkmp_find_best(parent_rate, rate, &_nkmp);
+ 
+@@ -145,7 +144,7 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	reg |= (_nkmp.n - 1) << nkmp->n.shift;
+ 	reg |= (_nkmp.k - 1) << nkmp->k.shift;
+ 	reg |= (_nkmp.m - 1) << nkmp->m.shift;
+-	reg |= _nkmp.p << nkmp->p.shift;
++	reg |= ilog2(_nkmp.p) << nkmp->p.shift;
+ 
+ 	writel(reg, nkmp->common.base + nkmp->common.reg);
+ 
+diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
+index e35ddd8eec8b..b61bdd8c7a7f 100644
+--- a/drivers/clk/sunxi-ng/ccu_nm.c
++++ b/drivers/clk/sunxi-ng/ccu_nm.c
+@@ -61,11 +61,13 @@ static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
+ 			      unsigned long *parent_rate)
+ {
+ 	struct ccu_nm *nm = hw_to_ccu_nm(hw);
++	unsigned long max_n, max_m;
+ 	unsigned long n, m;
+ 
+-	rational_best_approximation(rate, *parent_rate,
+-				    1 << nm->n.width, 1 << nm->m.width,
+-				    &n, &m);
++	max_n = 1 << nm->n.width;
++	max_m = nm->m.max ?: 1 << nm->m.width;
++
++	rational_best_approximation(rate, *parent_rate, max_n, max_m, &n, &m);
+ 
+ 	return *parent_rate * n / m;
+ }
+@@ -75,6 +77,7 @@ static int ccu_nm_set_rate(struct clk_hw *hw, unsigned long rate,
+ {
+ 	struct ccu_nm *nm = hw_to_ccu_nm(hw);
+ 	unsigned long flags;
++	unsigned long max_n, max_m;
+ 	unsigned long n, m;
+ 	u32 reg;
+ 
+@@ -83,9 +86,10 @@ static int ccu_nm_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	else
+ 		ccu_frac_helper_disable(&nm->common, &nm->frac);
+ 
+-	rational_best_approximation(rate, parent_rate,
+-				    1 << nm->n.width, 1 << nm->m.width,
+-				    &n, &m);
++	max_n = 1 << nm->n.width;
++	max_m = nm->m.max ?: 1 << nm->m.width;
++
++	rational_best_approximation(rate, parent_rate, max_n, max_m, &n, &m);
+ 
+ 	spin_lock_irqsave(nm->common.lock, flags);
+ 
 -- 
 2.9.3
