@@ -1,304 +1,210 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Tue, 6 Sep 2016 18:37:18 +0200
-Subject: [RFC PATCH 2/2] macb: Enable 1588 support in SAMA5D2 platform.
-In-Reply-To: <1472820817-21874-2-git-send-email-andrei.pistirica@microchip.com>
-References: <1472820817-21874-1-git-send-email-andrei.pistirica@microchip.com>
- <1472820817-21874-2-git-send-email-andrei.pistirica@microchip.com>
-Message-ID: <20160906163718.GB7012@localhost.localdomain>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue,  6 Sep 2016 10:37:15 -0600
+Subject: [RESEND][PATCH V7 3/5] perf tools: add infrastructure for PMU
+ specific configuration
+In-Reply-To: <1473179837-3293-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1473179837-3293-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1473179837-3293-4-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 02, 2016 at 02:53:37PM +0200, Andrei Pistirica wrote:
-> Hardware time stamp on the PTP Ethernet packets are received using the
-> SO_TIMESTAMPING API. Timers are obtained from the PTP event/peer
-> gem registers.
-> 
-> Signed-off-by: Andrei Pistirica <andrei.pistirica@microchip.com>
-> ---
-> Integration with SAMA5D2 only. This feature wasn't tested on any
-> other platform that might use cadence/gem.
+This patch adds PMU driver specific configuration to the parser
+infrastructure by preceding any term with the '@' letter.  As such
+doing something like:
 
-What does that mean?  I didn't see any references to SAMA5D2 anywhere
-in your patch.
+perf record -e some_event/@cfg1, at cfg2=config/ ...
 
-The driver needs to positively identify the HW that supports this
-feature.
+will see 'cfg1' and 'cfg2=config' being added to the list of evsel config
+terms.  Token 'cfg1' and 'cfg2=config' are not processed in user space
+and are meant to be interpreted by the PMU driver.
 
-> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-> index 8d54e7b..18f0715 100644
-> --- a/drivers/net/ethernet/cadence/macb.c
-> +++ b/drivers/net/ethernet/cadence/macb.c
-> @@ -697,6 +697,11 @@ static void macb_tx_interrupt(struct macb_queue *queue)
->  
->  			/* First, update TX stats if needed */
->  			if (skb) {
-> +/* guard the hot-path */
-> +#ifdef CONFIG_MACB_USE_HWSTAMP
-> +				if (bp->hwts_tx_en)
-> +					macb_ptp_do_txstamp(bp, skb);
-> +#endif
+First the lexer/parser are supplemented with the required definitions to
+recognise the driver specific configuration.  From there they are simply
+added to the list of event terms.  The bulk of the work is done in
+function "parse_events_add_pmu()" where driver config event terms are
+added to a new list of driver config terms, which in turn spliced with
+the event's new driver configuration list.
 
-Pull the test into the helper function, and then you can drop the
-ifdef and the funny comment.
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Acked-by: Jiri Olsa <jolsa@kernel.org>
+---
+ tools/perf/Documentation/perf-record.txt | 12 ++++++++++++
+ tools/perf/util/evsel.h                  |  2 ++
+ tools/perf/util/parse-events.c           |  7 ++++++-
+ tools/perf/util/parse-events.h           |  1 +
+ tools/perf/util/parse-events.l           | 22 ++++++++++++++++++++++
+ tools/perf/util/parse-events.y           | 11 +++++++++++
+ 6 files changed, 54 insertions(+), 1 deletion(-)
 
->  				netdev_vdbg(bp->dev, "skb %u (data %p) TX complete\n",
->  					    macb_tx_ring_wrap(tail), skb->data);
->  				bp->stats.tx_packets++;
-> @@ -853,6 +858,11 @@ static int gem_rx(struct macb *bp, int budget)
->  		    GEM_BFEXT(RX_CSUM, ctrl) & GEM_RX_CSUM_CHECKED_MASK)
->  			skb->ip_summed = CHECKSUM_UNNECESSARY;
->  
-> +/* guard the hot-path */
-> +#ifdef CONFIG_MACB_USE_HWSTAMP
-> +		if (bp->hwts_rx_en)
-> +			macb_ptp_do_rxstamp(bp, skb);
-> +#endif
-
-Same here.
-
->  		bp->stats.rx_packets++;
->  		bp->stats.rx_bytes += skb->len;
->  
-> @@ -1723,6 +1733,11 @@ static void macb_init_hw(struct macb *bp)
->  
->  	/* Enable TX and RX */
->  	macb_writel(bp, NCR, MACB_BIT(RE) | MACB_BIT(TE) | MACB_BIT(MPE));
-> +
-> +#ifdef CONFIG_MACB_USE_HWSTAMP
-> +	bp->hwts_tx_en = 0;
-> +	bp->hwts_rx_en = 0;
-> +#endif
-
-We don't initialize to zero unless we have to.
-
->  }
->  
->  /*
-> @@ -1885,6 +1900,8 @@ static int macb_open(struct net_device *dev)
->  
->  	netif_tx_start_all_queues(dev);
->  
-> +	macb_ptp_init(dev);
-> +
->  	return 0;
->  }
->  
-> @@ -2143,7 +2160,7 @@ static const struct ethtool_ops gem_ethtool_ops = {
->  	.get_regs_len		= macb_get_regs_len,
->  	.get_regs		= macb_get_regs,
->  	.get_link		= ethtool_op_get_link,
-> -	.get_ts_info		= ethtool_op_get_ts_info,
-> +	.get_ts_info		= macb_get_ts_info,
->  	.get_ethtool_stats	= gem_get_ethtool_stats,
->  	.get_strings		= gem_get_ethtool_strings,
->  	.get_sset_count		= gem_get_sset_count,
-> @@ -2157,6 +2174,12 @@ static int macb_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
->  	if (!netif_running(dev))
->  		return -EINVAL;
->  
-> +	if (cmd == SIOCSHWTSTAMP)
-> +		return macb_hwtst_set(dev, rq, cmd);
-> +
-> +	if (cmd == SIOCGHWTSTAMP)
-> +		return macb_hwtst_get(dev, rq);
-
-switch/case?
-
-> +
->  	if (!phydev)
->  		return -ENODEV;
->  
-> diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
-> index 8c3779d..555316a 100644
-> --- a/drivers/net/ethernet/cadence/macb.h
-> +++ b/drivers/net/ethernet/cadence/macb.h
-> @@ -920,8 +920,21 @@ struct macb {
->  
->  #ifdef CONFIG_MACB_USE_HWSTAMP
->  void macb_ptp_init(struct net_device *ndev);
-> +void macb_ptp_do_rxstamp(struct macb *bp, struct sk_buff *skb);
-> +void macb_ptp_do_txstamp(struct macb *bp, struct sk_buff *skb);
-> +int macb_ptp_get_ts_info(struct net_device *dev, struct ethtool_ts_info *info);
-> +#define macb_get_ts_info macb_ptp_get_ts_info
-> +int macb_hwtst_set(struct net_device *netdev, struct ifreq *ifr, int cmd);
-> +int macb_hwtst_get(struct net_device *netdev, struct ifreq *ifr);
->  #else
->  void macb_ptp_init(struct net_device *ndev) { }
-> +void macb_ptp_do_rxstamp(struct macb *bp, struct sk_buff *skb) { }
-> +void macb_ptp_do_txstamp(struct macb *bp, struct sk_buff *skb) { }
-> +#define macb_get_ts_info ethtool_op_get_ts_info
-> +int macb_hwtst_set(struct net_device *netdev, struct ifreq *ifr, int cmd)
-> +	{ return -1; }
-> +int macb_hwtst_get(struct net_device *netdev, struct ifreq *ifr)
-> +	{ return -1; }
-
-Use a proper return code please.
-
->  #endif
->  
->  static inline bool macb_is_gem(struct macb *bp)
-> diff --git a/drivers/net/ethernet/cadence/macb_ptp.c b/drivers/net/ethernet/cadence/macb_ptp.c
-> index 6d6a6ec..e3f784a 100644
-> --- a/drivers/net/ethernet/cadence/macb_ptp.c
-> +++ b/drivers/net/ethernet/cadence/macb_ptp.c
-> @@ -5,6 +5,7 @@
->   * Copyright (C) 2016 Microchip Technology
->   *
->   * Authors: Harini Katakam <harinik@xilinx.com>
-> + *	    Andrei Pistirica <andrei.pistirica@microchip.com>
-
-We don't add additional authors any more, because git tells us that info.
-
->   *
->   * This file is licensed under the terms of the GNU General Public
->   * License version 2. This program is licensed "as is" without any
-> @@ -222,3 +223,219 @@ void macb_ptp_init(struct net_device *ndev)
->  
->  	dev_info(&bp->pdev->dev, "%s ptp clock registered.\n", GMAC_TIMER_NAME);
->  }
-> +
-> +/* While the GEM can timestamp PTP packets, it does not mark the RX descriptor
-> + * to identify them. This is entirely the wrong place to be parsing UDP
-> + * headers, but some minimal effort must be made.
-
-If you must parse, then it isn't the wrong place.
-
-> + *
-> + * Note: Inspired from drivers/net/ethernet/ti/cpts.c
-> + */
-> +static inline int macb_get_ptp_peer(struct sk_buff *skb, int ptp_class)
-
-Leave off inline, let the compiler decide.
-
-> +{
-> +	unsigned int offset = 0;
-> +	u8 *msgtype, *data = skb->data;
-> +
-> +	if (ptp_class == PTP_CLASS_NONE)
-> +		return -1;
-> +
-> +	if (ptp_class & PTP_CLASS_VLAN)
-> +		offset += VLAN_HLEN;
-> +
-> +	switch (ptp_class & PTP_CLASS_PMASK) {
-> +	case PTP_CLASS_IPV4:
-> +		offset += ETH_HLEN + IPV4_HLEN(data + offset) + UDP_HLEN;
-> +	break;
-> +	case PTP_CLASS_IPV6:
-> +		offset += ETH_HLEN + IP6_HLEN + UDP_HLEN;
-> +	break;
-> +	case PTP_CLASS_L2:
-> +		offset += ETH_HLEN;
-> +		break;
-> +
-> +	/* something went wrong! */
-> +	default:
-> +		return -1;
-> +	}
-> +
-> +	if (skb->len + ETH_HLEN < offset + OFF_PTP_SEQUENCE_ID)
-> +		return -1;
-> +
-> +	if (unlikely(ptp_class & PTP_CLASS_V1))
-> +		msgtype = data + offset + OFF_PTP_CONTROL;
-> +	else
-> +		msgtype = data + offset;
-> +
-> +	return (*msgtype) & 0x2;
-> +}
-> +
-> +static inline void macb_ptp_tx_hwtstamp(struct macb *bp, struct sk_buff *skb,
-> +					int peer_ev)
-
-no 'inline' please
-
-> +{
-> +	struct skb_shared_hwtstamps *shhwtstamps = skb_hwtstamps(skb);
-> +	struct timespec64 ts;
-> +	u64 ns;
-> +
-> +	/* PTP Peer Event Frame packets */
-> +	if (peer_ev) {
-> +		ts.tv_sec = gem_readl(bp, PEFTSL);
-> +		ts.tv_nsec = gem_readl(bp, PEFTN);
-> +
-> +	/* PTP Event Frame packets */
-> +	} else {
-> +		ts.tv_sec = gem_readl(bp, EFTSL);
-> +		ts.tv_nsec = gem_readl(bp, EFTN);
-> +	}
-> +	ns = timespec64_to_ns(&ts);
-> +
-> +	memset(shhwtstamps, 0, sizeof(struct skb_shared_hwtstamps));
-> +	shhwtstamps->hwtstamp = ns_to_ktime(ns);
-> +	skb_tstamp_tx(skb, skb_hwtstamps(skb));
-> +}
-> +
-> +inline void macb_ptp_do_txstamp(struct macb *bp, struct sk_buff *skb)
-
-s/inline/static/
-
-> +{
-> +	if (skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) {
-> +		int class = ptp_classify_raw(skb);
-> +		int peer;
-> +
-> +		peer = macb_get_ptp_peer(skb, class);
-> +		if (peer < 0)
-> +			return;
-> +
-> +		/* Timestamp this packet */
-> +		macb_ptp_tx_hwtstamp(bp, skb, peer);
-> +	}
-> +}
-> +
-> +static inline void macb_ptp_rx_hwtstamp(struct macb *bp, struct sk_buff *skb,
-> +					int peer_ev)
-> +{
-> +	struct skb_shared_hwtstamps *shhwtstamps = skb_hwtstamps(skb);
-> +	struct timespec64 ts;
-> +	u64 ns;
-> +
-> +	if (peer_ev) {
-> +		/* PTP Peer Event Frame packets */
-> +		ts.tv_sec = gem_readl(bp, PEFRSL);
-> +		ts.tv_nsec = gem_readl(bp, PEFRN);
-> +	} else {
-> +		/* PTP Event Frame packets */
-> +		ts.tv_sec = gem_readl(bp, EFRSL);
-> +		ts.tv_nsec = gem_readl(bp, EFRN);
-> +	}
-
-So you say the HW provides no matching information?  Then it is really
-poor.  I surely don't want to let this out into the wild.  I'll get
-questions on the linuxptp list, like "PTP on mainline Linux is
-mysteriously broken!"
-
-> +	ns = timespec64_to_ns(&ts);
-> +
-> +	memset(shhwtstamps, 0, sizeof(struct skb_shared_hwtstamps));
-> +	shhwtstamps->hwtstamp = ns_to_ktime(ns);
-> +}
-> +
-> +inline void macb_ptp_do_rxstamp(struct macb *bp, struct sk_buff *skb)
-> +{
-> +	int class;
-> +	int peer;
-> +
-> +	/* ffs !!! */
-
-What is this comment for?
-
-> +	__skb_push(skb, ETH_HLEN);
-> +	class = ptp_classify_raw(skb);
-> +	__skb_pull(skb, ETH_HLEN);
-> +
-> +	peer = macb_get_ptp_peer(skb, class);
-> +	if (peer < 0)
-> +		return;
-> +
-> +	macb_ptp_rx_hwtstamp(bp, skb, peer);
-> +}
-
-Thanks,
-Richard
+diff --git a/tools/perf/Documentation/perf-record.txt b/tools/perf/Documentation/perf-record.txt
+index 379a2bed07c0..1a24f4d64328 100644
+--- a/tools/perf/Documentation/perf-record.txt
++++ b/tools/perf/Documentation/perf-record.txt
+@@ -60,6 +60,18 @@ OPTIONS
+ 	  Note: If user explicitly sets options which conflict with the params,
+ 	  the value set by the params will be overridden.
+ 
++	  Also not defined in .../<pmu>/format/* are PMU driver specific
++	  configuration parameters.  Any configuration parameter preceded by
++	  the letter '@' is not interpreted in user space and sent down directly
++	  to the PMU driver.  For example:
++
++	  perf record -e some_event/@cfg1, at cfg2=config/ ...
++
++	  will see 'cfg1' and 'cfg2=config' pushed to the PMU driver associated
++	  with the event for further processing.  There is no restriction on
++	  what the configuration parameters are, as long as their semantic is
++	  understood and supported by the PMU driver.
++
+         - a hardware breakpoint event in the form of '\mem:addr[/len][:access]'
+           where addr is the address in memory you want to break in.
+           Access is the memory access type (read, write, execute) it can
+diff --git a/tools/perf/util/evsel.h b/tools/perf/util/evsel.h
+index 4d44129e050b..323806082c58 100644
+--- a/tools/perf/util/evsel.h
++++ b/tools/perf/util/evsel.h
+@@ -46,6 +46,7 @@ enum {
+ 	PERF_EVSEL__CONFIG_TERM_INHERIT,
+ 	PERF_EVSEL__CONFIG_TERM_MAX_STACK,
+ 	PERF_EVSEL__CONFIG_TERM_OVERWRITE,
++	PERF_EVSEL__CONFIG_TERM_DRV_CFG,
+ 	PERF_EVSEL__CONFIG_TERM_MAX,
+ };
+ 
+@@ -57,6 +58,7 @@ struct perf_evsel_config_term {
+ 		u64	freq;
+ 		bool	time;
+ 		char	*callgraph;
++		char	*drv_cfg;
+ 		u64	stack_user;
+ 		int	max_stack;
+ 		bool	inherit;
+diff --git a/tools/perf/util/parse-events.c b/tools/perf/util/parse-events.c
+index 6c913c3914fb..2eb8b1ed4cc8 100644
+--- a/tools/perf/util/parse-events.c
++++ b/tools/perf/util/parse-events.c
+@@ -904,6 +904,7 @@ static const char *config_term_names[__PARSE_EVENTS__TERM_TYPE_NR] = {
+ 	[PARSE_EVENTS__TERM_TYPE_MAX_STACK]		= "max-stack",
+ 	[PARSE_EVENTS__TERM_TYPE_OVERWRITE]		= "overwrite",
+ 	[PARSE_EVENTS__TERM_TYPE_NOOVERWRITE]		= "no-overwrite",
++	[PARSE_EVENTS__TERM_TYPE_DRV_CFG]		= "driver-config",
+ };
+ 
+ static bool config_term_shrinked;
+@@ -1034,7 +1035,8 @@ static int config_term_pmu(struct perf_event_attr *attr,
+ 			   struct parse_events_term *term,
+ 			   struct parse_events_error *err)
+ {
+-	if (term->type_term == PARSE_EVENTS__TERM_TYPE_USER)
++	if (term->type_term == PARSE_EVENTS__TERM_TYPE_USER ||
++	    term->type_term == PARSE_EVENTS__TERM_TYPE_DRV_CFG)
+ 		/*
+ 		 * Always succeed for sysfs terms, as we dont know
+ 		 * at this point what type they need to have.
+@@ -1134,6 +1136,9 @@ do {								\
+ 		case PARSE_EVENTS__TERM_TYPE_NOOVERWRITE:
+ 			ADD_CONFIG_TERM(OVERWRITE, overwrite, term->val.num ? 0 : 1);
+ 			break;
++		case PARSE_EVENTS__TERM_TYPE_DRV_CFG:
++			ADD_CONFIG_TERM(DRV_CFG, drv_cfg, term->val.str);
++			break;
+ 		default:
+ 			break;
+ 		}
+diff --git a/tools/perf/util/parse-events.h b/tools/perf/util/parse-events.h
+index d1edbf8cc66a..8d09a976fca8 100644
+--- a/tools/perf/util/parse-events.h
++++ b/tools/perf/util/parse-events.h
+@@ -71,6 +71,7 @@ enum {
+ 	PARSE_EVENTS__TERM_TYPE_MAX_STACK,
+ 	PARSE_EVENTS__TERM_TYPE_NOOVERWRITE,
+ 	PARSE_EVENTS__TERM_TYPE_OVERWRITE,
++	PARSE_EVENTS__TERM_TYPE_DRV_CFG,
+ 	__PARSE_EVENTS__TERM_TYPE_NR,
+ };
+ 
+diff --git a/tools/perf/util/parse-events.l b/tools/perf/util/parse-events.l
+index 7a2519435da0..9f43fda2570f 100644
+--- a/tools/perf/util/parse-events.l
++++ b/tools/perf/util/parse-events.l
+@@ -53,6 +53,26 @@ static int str(yyscan_t scanner, int token)
+ 	return token;
+ }
+ 
++/*
++ * This function is called when the parser gets two kind of input:
++ *
++ * 	@cfg1 or @cfg2=config
++ *
++ * The leading '@' is stripped off before 'cfg1' and 'cfg2=config' are given to
++ * bison.  In the latter case it is necessary to keep the string intact so that
++ * the PMU kernel driver can determine what configurable is associated to
++ * 'config'.
++ */
++static int drv_str(yyscan_t scanner, int token)
++{
++	YYSTYPE *yylval = parse_events_get_lval(scanner);
++	char *text = parse_events_get_text(scanner);
++
++	/* Strip off the '@' */
++	yylval->str = strdup(text + 1);
++	return token;
++}
++
+ #define REWIND(__alloc)				\
+ do {								\
+ 	YYSTYPE *__yylval = parse_events_get_lval(yyscanner);	\
+@@ -124,6 +144,7 @@ num_hex		0x[a-fA-F0-9]+
+ num_raw_hex	[a-fA-F0-9]+
+ name		[a-zA-Z_*?][a-zA-Z0-9_*?.]*
+ name_minus	[a-zA-Z_*?][a-zA-Z0-9\-_*?.:]*
++drv_cfg_term	[a-zA-Z0-9_\.]+(=[a-zA-Z0-9_*?\.:]+)?
+ /* If you add a modifier you need to update check_modifier() */
+ modifier_event	[ukhpPGHSDI]+
+ modifier_bp	[rwx]{1,3}
+@@ -209,6 +230,7 @@ no-overwrite		{ return term(yyscanner, PARSE_EVENTS__TERM_TYPE_NOOVERWRITE); }
+ {name_minus}		{ return str(yyscanner, PE_NAME); }
+ \[all\]			{ return PE_ARRAY_ALL; }
+ "["			{ BEGIN(array); return '['; }
++@{drv_cfg_term}		{ return drv_str(yyscanner, PE_DRV_CFG_TERM); }
+ }
+ 
+ <mem>{
+diff --git a/tools/perf/util/parse-events.y b/tools/perf/util/parse-events.y
+index 5be4a5f216d6..879115f93edc 100644
+--- a/tools/perf/util/parse-events.y
++++ b/tools/perf/util/parse-events.y
+@@ -49,6 +49,7 @@ static void inc_group_count(struct list_head *list,
+ %token PE_ERROR
+ %token PE_PMU_EVENT_PRE PE_PMU_EVENT_SUF PE_KERNEL_PMU_EVENT
+ %token PE_ARRAY_ALL PE_ARRAY_RANGE
++%token PE_DRV_CFG_TERM
+ %type <num> PE_VALUE
+ %type <num> PE_VALUE_SYM_HW
+ %type <num> PE_VALUE_SYM_SW
+@@ -63,6 +64,7 @@ static void inc_group_count(struct list_head *list,
+ %type <str> PE_MODIFIER_BP
+ %type <str> PE_EVENT_NAME
+ %type <str> PE_PMU_EVENT_PRE PE_PMU_EVENT_SUF PE_KERNEL_PMU_EVENT
++%type <str> PE_DRV_CFG_TERM
+ %type <num> value_sym
+ %type <head> event_config
+ %type <head> opt_event_config
+@@ -599,6 +601,15 @@ PE_NAME array '=' PE_VALUE
+ 	term->array = $2;
+ 	$$ = term;
+ }
++|
++PE_DRV_CFG_TERM
++{
++	struct parse_events_term *term;
++
++	ABORT_ON(parse_events_term__str(&term, PARSE_EVENTS__TERM_TYPE_DRV_CFG,
++					$1, $1, &@1, NULL));
++	$$ = term;
++}
+ 
+ array:
+ '[' array_terms ']'
+-- 
+2.7.4
