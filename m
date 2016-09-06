@@ -1,157 +1,76 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 06 Sep 2016 18:03:39 +0100
-Subject: [RFC v2 PATCH 2/7] KVM: Track the pid of the VM process
-In-Reply-To: <20160906165749.GH23592@cbox> (Christoffer Dall's message of
- "Tue, 6 Sep 2016 18:57:49 +0200")
-References: <1473093097-30932-1-git-send-email-punit.agrawal@arm.com>
- <1473093097-30932-3-git-send-email-punit.agrawal@arm.com>
- <20160906062252.GA30513@cbox>
- <87poohjqzk.fsf@e105922-lin.cambridge.arm.com>
- <20160906102542.GG30513@cbox>
- <877fapjng0.fsf@e105922-lin.cambridge.arm.com>
- <20160906112203.GO30513@cbox>
- <87poohhx3q.fsf@e105922-lin.cambridge.arm.com>
- <20160906165749.GH23592@cbox>
-Message-ID: <878tv5hses.fsf@e105922-lin.cambridge.arm.com>
+From: scott.wood@nxp.com (Scott Wood)
+Date: Tue, 6 Sep 2016 17:05:35 +0000
+Subject: [linux-devel] [PATCH v2 1/1] arm64: Add DTS support for FSL's
+ LS1012A SoC
+References: <1472207241-18461-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
+ <20160829095239.GM30790@tiger> <1472493061.13245.39.camel@buserror.net>
+ <20160830120220.GC8363@tiger>
+ <HE1PR0401MB2636B40376255680B6A58CFB8DE00@HE1PR0401MB2636.eurprd04.prod.outlook.com>
+ <20160905014636.GB25778@tiger>
+Message-ID: <DB5PR0401MB1928BE0E1C08DD2FAC582FE191F90@DB5PR0401MB1928.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Christoffer Dall <christoffer.dall@linaro.org> writes:
+On 09/04/2016 08:47 PM, Shawn Guo wrote:
+> On Tue, Aug 30, 2016 at 02:07:17PM +0000, Stuart Yoder wrote:
+>>> On Mon, Aug 29, 2016 at 12:51:01PM -0500, Scott Wood wrote:
+>>>> On Mon, 2016-08-29 at 17:52 +0800, Shawn Guo wrote:
+>>>>> On Fri, Aug 26, 2016 at 03:57:21PM +0530, Bhaskar Upadhaya wrote:
+>>>>>>
+>>>>>> +		clockgen: clocking at 1ee1000 {
+>>>>>> +			compatible = "fsl,ls1012a-clockgen";
+>>>>> The compatible cannot be found in binding docs.
+>>>>
+>>>> From Documentation/devicetree/bindings/clock/qoriq-clock.txt:
+>>>>
+>>>> - compatible: Should contain a chip-specific clock block compatible
+>>>>         string and (if applicable) may contain a chassis-version clock
+>>>>         compatible string.
+>>>>
+>>>>         Chip-specific strings are of the form "fsl,<chip>-clockgen", such as:
+>>>>         * "fsl,p2041-clockgen"
+>>>>         * "fsl,p3041-clockgen"
+>>>>         * "fsl,p4080-clockgen"
+>>>>         * "fsl,p5020-clockgen"
+>>>>         * "fsl,p5040-clockgen"
+>>>>         * "fsl,t4240-clockgen"
+>>>>         * "fsl,b4420-clockgen"
+>>>>         * "fsl,b4860-clockgen"
+>>>>         * "fsl,ls1021a-clockgen"
+>>>>         Chassis-version clock strings include:
+>>>>         * "fsl,qoriq-clockgen-1.0": for chassis 1.0 clocks
+>>>>         * "fsl,qoriq-clockgen-2.0": for chassis 2.0 clocks
+>>>>
+>>>> I really hope we don't have to update every single fsl,<chip>-whatever binding
+>>>> every time a new chip comes out.  There are already other chips not listed,
+>>>> FWIW (e.g. t1040, t2080, ls1043a, and ls2080a).  That's why it says "such as".
+>>>
+>>> If I remember correctly, DT maintainers want every supported compatible
+>>> string explicitly listed in bindings doc.  And they even added a check
+>>> into checkpatch.pl with commit bff5da433525 ("checkpatch: add DT
+>>> compatible string documentation checks").
+>>
+>> See Documentation/devicetree/bindings/submitting-patches.txt:
+>>
+>>   5) The wildcard "<chip>" may be used in compatible strings, as in
+>>      the following example:
+>>
+>>          - compatible: Must contain '"nvidia,<chip>-pcie",
+>>            "nvidia,tegra20-pcie"' where <chip> is tegra30, tegra132, ...
+>>
+>>      As in the above example, the known values of "<chip>" should be
+>>      documented if it is used.
+>>
+>> It _is_ allowed to use the <chip> wildcard, and so you will not find all
+>> full compatible strings explicitly listed in bindings.  However, the
+>> chips themselves "should" be listed.
+> 
+> + Rob and Mark
+> 
+> Oops, I'm not aware of this DT document.  In that case, the DT document
+> and checkpatch is basically asking for conflicting thing.  Rob, Mark,
+> can you guys please clarify?
 
-> On Tue, Sep 06, 2016 at 04:22:17PM +0100, Punit Agrawal wrote:
->> Christoffer Dall <christoffer.dall@linaro.org> writes:
->> 
->> > On Tue, Sep 06, 2016 at 12:07:59PM +0100, Punit Agrawal wrote:
->> >> Christoffer Dall <christoffer.dall@linaro.org> writes:
->> >> 
->> >> > On Tue, Sep 06, 2016 at 10:51:27AM +0100, Punit Agrawal wrote:
->> >> >> Hi Christoffer,
->> >> >> 
->> >> >> Christoffer Dall <christoffer.dall@linaro.org> writes:
->> >> >> 
->> >> >> > On Mon, Sep 05, 2016 at 05:31:32PM +0100, Punit Agrawal wrote:
->> >> >> >> Userspace tools such as perf can be used to profile individual
->> >> >> >> processes.
->> >> >> >> 
->> >> >> >> Track the PID of the virtual machine process to match profiling requests
->> >> >> >> targeted at it. This can be used to take appropriate action to enable
->> >> >> >> the requested profiling operations for the VMs of interest.
->> >> >> >> 
->> >> >> >> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> >> >> >> Cc: Paolo Bonzini <pbonzini@redhat.com>
->> >> >> >> Cc: "Radim Kr?m??" <rkrcmar@redhat.com>
->> >> >> >> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->> >> >> >> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> >> >> >> ---
->> >> >> >>  include/linux/kvm_host.h | 1 +
->> >> >> >>  virt/kvm/kvm_main.c      | 2 ++
->> >> >> >>  2 files changed, 3 insertions(+)
->> >> >> >> 
->> >> >> >> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
->> >> >> >> index 9c28b4d..7c42c94 100644
->> >> >> >> --- a/include/linux/kvm_host.h
->> >> >> >> +++ b/include/linux/kvm_host.h
->> >> >> >> @@ -374,6 +374,7 @@ struct kvm_memslots {
->> >> >> >>  struct kvm {
->> >> >> >>  	spinlock_t mmu_lock;
->> >> >> >>  	struct mutex slots_lock;
->> >> >> >> +	struct pid *pid;
->> >> >> >>  	struct mm_struct *mm; /* userspace tied to this vm */
->> >> >> >>  	struct kvm_memslots *memslots[KVM_ADDRESS_SPACE_NUM];
->> >> >> >>  	struct srcu_struct srcu;
->> >> >> >> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
->> >> >> >> index 1950782..ab2535a 100644
->> >> >> >> --- a/virt/kvm/kvm_main.c
->> >> >> >> +++ b/virt/kvm/kvm_main.c
->> >> >> >> @@ -613,6 +613,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
->> >> >> >>  	spin_lock_init(&kvm->mmu_lock);
->> >> >> >>  	atomic_inc(&current->mm->mm_count);
->> >> >> >>  	kvm->mm = current->mm;
->> >> >> >> +	kvm->pid = get_task_pid(current, PIDTYPE_PID);
->> >> >> >
->> >> >> > How dooes this deal with threading?  Is the idea that the user by
->> >> >> > specifying the main thread's pid will enable trapping for all vcpu
->> >> >> > threads belonging to that VM?
->> >> >> 
->> >> >> Yes that's correct - specifying the main thread PID will enable trapping
->> >> >> for the VM (all vcpus).
->> >> >> 
->> >> >> I am happy to move to a more suitable identifier if available.
->> >> >> 
->> >> >
->> >> > What is the 'main thread' ?
->> >> >
->> >> > Does something mandate that the VM is created by the thread group
->> >> > leader?  If not, is it not a bit strange from a user perspective, that
->> >> > you have to find the specific subthread pid that created the vm to
->> >> > enable this tracing for all vcpu threads and that the tgid doesn't work
->> >> > in this case?
->> >> 
->> >> Let me correct my terminology usage - the value recorded above (and used
->> >> to identify the VM) should be the tgid. It is confusing because 'ps'
->> >> reports it as pid.
->> >> 
->> >> I picked the value as existing KVM code already uses the PID of the
->> >> creating task (see kvm_create_vm_debugfs) to export VM statistics in
->> >> debugfs.
->> >> 
->> >> If I've got this wrong, then kvm_create_vm_debugfs also likely needs an
->> >> update.
->> >> 
->> >> What do you think?
->> >> 
->> > When you do get_task_pid(current, PIDTYPE_PID) it actually gets the
->> > kernel view of a PID which is the thead-id from userspace's point of
->> > view, right?
->> 
->> That makes sense. It seems to works here because the pid of the first
->> task is also the tgid of the group. And I reckon it's the same
->> assumption being made with debugfs code (more below).
->
-> That is probably the implementation of all QEMU versions and kvmtool
-> versions out there.
->
->> 
->> I've changed the first argument of the call to get_task_pid to
->> current->group_leader.
->> 
->> >
->> > I don't see why this has to be the same as the debugfs code, as there it
->> > makes potentially more sense to thread-specific, but for your case, are
->> > you not targeting the behavior that a user can do "ps aux | grep qemu"
->> > or whatever, and then set tracing for the reported PID (which is
->> > actually a tgid)?
->> 
->> The debugfs stats are not thread (vcpu) specific but for the VM.
->> 
->> Both values, debugfs and here, are being used to represent the VM to the
->> user. A mismatch in these identifiers will be very confusing.
->> 
->> If you agree, I can separately send a patch to address this for VM
->> debugfs directory as well.
->> 
->
-> I don't know how the debugfs stuff is used or was intended, so I really
-> can't speak for that.  It seems less weird to me with debugfs, because I
-> imagine it can be used by simply looking at what exists in the debugfs
-> directory and mapping that to a VM.
+Checkpatch is a useful tool but it can't get everything right all the time.
 
-Ok, I'll let debugfs stuff be as is then.
-
->
-> In your case, there's a clear expectation from the user that using the
-> tgid should cover this VM, and it will be weird if that's not the
-> case.
-
-Right. Switching over to current->group_leader should avert problems if
-userspace tools do things differently.
-
-Thanks,
-Punit
-
->
-> -Christoffer
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+-Scott
