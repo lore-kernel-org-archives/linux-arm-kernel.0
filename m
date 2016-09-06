@@ -1,62 +1,100 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 6 Sep 2016 13:42:18 +0100
-Subject: [PATCH v2 4/7] ARM: update MPIDR accessors macro
-In-Reply-To: <20160905112909.GI26366@cbox>
-References: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
- <1471344418-19568-5-git-send-email-vladimir.murzin@arm.com>
- <20160905112909.GI26366@cbox>
-Message-ID: <57CEB9AA.6080109@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Sep 2016 14:46:08 +0200
+Subject: [v11, 7/8] base: soc: introduce soc_device_match() interface
+In-Reply-To: <CAPDyKFrvg3Qr5m3xXvywsCoVvaiF7ggHAj0Aw=WCOXg65Pt0PQ@mail.gmail.com>
+References: <1473150503-9550-1-git-send-email-yangbo.lu@nxp.com>
+ <1473150503-9550-8-git-send-email-yangbo.lu@nxp.com>
+ <CAPDyKFrvg3Qr5m3xXvywsCoVvaiF7ggHAj0Aw=WCOXg65Pt0PQ@mail.gmail.com>
+Message-ID: <6515108.aCEls7dUuW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/16 12:29, Christoffer Dall wrote:
-> The title of this patch is quite generic, especially the 'update'.
-> Perhaps say: 
-> 
-> "ARM: Change MPIDR_AFFINITY_LEVEL to ignore Aff3"
-> 
+On Tuesday, September 6, 2016 1:44:23 PM CEST Ulf Hansson wrote:
+> On 6 September 2016 at 10:28, Yangbo Lu <yangbo.lu@nxp.com> wrote:
+> > We keep running into cases where device drivers want to know the exact
+> > version of the a SoC they are currently running on. In the past, this has
+> > usually been done through a vendor specific API that can be called by a
+> > driver, or by directly accessing some kind of version register that is
+> > not part of the device itself but that belongs to a global register area
+> > of the chip.
 
-Fixed.
+Please add "From: Arnd Bergmann <arnd@arndb.de>" as the first line, to
+preserve authorship. If you use "git send-email" or "git format-patch",
+that should happen automatically if the author field is set right
+(if not, use 'git commit --amend --author="Arnd Bergmann <arnd@arndb.de>"'
+to fix it).
 
-> On Tue, Aug 16, 2016 at 11:46:55AM +0100, Vladimir Murzin wrote:
->> vgic-v3 driver queries CPU affinity level up to Aff3, which is valid for arm64.
->> However, for arm up to Aff2 levels are supported, so querying for 3rd level
->> ends with upper bits of MPIDR are treated as valid affinity level which
->> is not true. So, report zero for any affinity level above 2.
->>
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->> ---
->>  arch/arm/include/asm/cputype.h |    3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
->> index 1ee94c7..96cef49 100644
->> --- a/arch/arm/include/asm/cputype.h
->> +++ b/arch/arm/include/asm/cputype.h
->> @@ -55,9 +55,10 @@
->>  
->>  #define MPIDR_LEVEL_BITS 8
->>  #define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
->> +#define MPIDR_LEVEL_SHIFT(level) (MPIDR_LEVEL_BITS * level)
->>  
->>  #define MPIDR_AFFINITY_LEVEL(mpidr, level) \
->> -	((mpidr >> (MPIDR_LEVEL_BITS * level)) & MPIDR_LEVEL_MASK)
->> +	((level < 3) ? ((mpidr >> MPIDR_LEVEL_SHIFT(level)) & MPIDR_LEVEL_MASK) : 0)
+> > +
+> > +/*
+> > + * soc_device_match - identify the SoC in the machine
+> > + * @matches: zero-terminated array of possible matches
 > 
-> Instead of using a conditional here, you could just apply the
-> MPIDR_HWID_BITMASK to the mpidr argument instead.
-> 
+> Perhaps also express the constraint on the matching entries. As you
+> need at least one of the ->machine(), ->family(), ->revision() or
+> ->soc_id() callbacks implemented, right!?
 
-Fixed.
+They are not callbacks, just strings. Having an empty entry indicates
+the end of the array, and this is not called.
 
-Thanks
-Vladimir
+> > + *
+> > + * returns the first matching entry of the argument array, or NULL
+> > + * if none of them match.
+> > + *
+> > + * This function is meant as a helper in place of of_match_node()
+> > + * in cases where either no device tree is available or the information
+> > + * in a device node is insufficient to identify a particular variant
+> > + * by its compatible strings or other properties. For new devices,
+> > + * the DT binding should always provide unique compatible strings
+> > + * that allow the use of of_match_node() instead.
+> > + *
+> > + * The calling function can use the .data entry of the
+> > + * soc_device_attribute to pass a structure or function pointer for
+> > + * each entry.
+> 
+> I don't get the use case behind this, could you elaborate?
+> 
+> Perhaps we should postpone adding the .data entry until we actually
+> see a need for it?
 
->>  
->>  #define ARM_CPU_IMP_ARM			0x41
->>  #define ARM_CPU_IMP_INTEL		0x69
->> -- 
->> 1.7.9.5
->>
+I think the interface is rather useless without a way to figure
+out which entry you got. Almost all users of of_match_node()
+actually use the returned ->data field, and I expect this to
+be the same here.
+
+> > + */
+> > +const struct soc_device_attribute *soc_device_match(
+> > +       const struct soc_device_attribute *matches)
+> > +{
+> > +       struct device *dev;
+> > +       int ret;
+> > +
+> > +       for (ret = 0; ret == 0; matches++) {
 > 
+> This loop looks a bit weird and unsafe.
+
+Ah, and I thought I was being clever ;-)
+
+> 1) Perhaps using a while loop makes this more readable?
+> 2) As this is an exported API, I guess validation of the ->matches
+> pointer needs to be done before accessing it.
+
+Sounds fine.
+
+> > +               if (!(matches->machine || matches->family ||
+> > +                     matches->revision || matches->soc_id))
+> > +                       return NULL;
+> > +               dev = NULL;
 > 
+> There's no need to use a struct device just to assign it to NULL.
+> Instead just provide the function below with NULL.
+>
+> > +               ret = bus_for_each_dev(&soc_bus_type, dev, (void *)matches,
+> > +                                      soc_device_match_one);
+
+
+I don't remember what led to this, I think you are right, we should
+just pass NULL as most other callers.
+
+Thanks for the review.
+
+	ARnd
