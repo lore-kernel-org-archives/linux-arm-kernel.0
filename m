@@ -1,157 +1,45 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 6 Sep 2016 13:21:18 +0200
-Subject: [PATCH 2/7] mtd: nand: Introduce nand_data_interface
-In-Reply-To: <1473158355-22451-3-git-send-email-s.hauer@pengutronix.de>
-References: <1473158355-22451-1-git-send-email-s.hauer@pengutronix.de>
- <1473158355-22451-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20160906132118.17e2e8f8@bbrezillon>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 6 Sep 2016 13:21:59 +0200
+Subject: [PATCH/RFT v2 0/8] Add SDHI to r8a7796/salvator-x
+In-Reply-To: <20160906104715.GE16304@verge.net.au>
+References: <1471938590-10650-1-git-send-email-horms+renesas@verge.net.au>
+ <2032317.SOiUovHhFZ@avalon> <20160906074901.GE17888@verge.net.au>
+ <20160906104715.GE16304@verge.net.au>
+Message-ID: <20160906112137.GA14960@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  6 Sep 2016 12:39:10 +0200
-Sascha Hauer <s.hauer@pengutronix.de> wrote:
-
-> Currently we have no data structure to fully describe a NAND timing.
-> We only have struct nand_sdr_timings for NAND timings in SDR mode,
-> but nothing for DDR mode and also no container to store both types
-> of timing.
-> This patch adds struct nand_data_interface which stores the timing
-> type and a union of different timings. This can be used to pass to
-> drivers in order to configure the timing.
+On Tue, Sep 06, 2016 at 12:47:16PM +0200, Simon Horman wrote:
+> On Tue, Sep 06, 2016 at 09:49:02AM +0200, Simon Horman wrote:
+> > On Tue, Sep 06, 2016 at 03:34:41AM +0300, Laurent Pinchart wrote:
+> > > Hi Simon,
+> > > 
+> > > Thank you for the patches.
+> > > 
+> > > On Tuesday 23 Aug 2016 09:49:42 Simon Horman wrote:
+> > > > Hi,
+> > > > 
+> > > > this patch set updates drivers, documentation and DT to
+> > > > enable SDHI0 & 3 on the r8a7796/salvator-x. This includes
+> > > > defining nodes for all available SDHI and GPIO devices.
+> > > > 
+> > > > I have boot-tested this which seems successful.
+> > > > However, I do not have physical access to an r8a7796/salvator-x board
+> > > > and the one that I have remote access to does not appear to have
+> > > > any SD cards present. I would be grateful of any testing anyone
+> > > > can provide.
+> > > > 
+> > > > Based on renesas-drivers-2016-08-09-v4.8-rc1
+> > > 
+> > > For patches 1/8, 4/8 and 6/8, applied on top of your devel branch (with the 
+> > > gpio-ranges property removed from 6/8 due to the lack of PFC support),
+> > > 
+> > > Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > > Tested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > 
+> > Thanks.
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  include/linux/mtd/nand.h | 109 ++++++++++++++++++++++++++---------------------
->  1 file changed, 60 insertions(+), 49 deletions(-)
-> 
-> diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-> index 9af9575..19c73ef 100644
-> --- a/include/linux/mtd/nand.h
-> +++ b/include/linux/mtd/nand.h
-> @@ -568,6 +568,66 @@ struct nand_buffers {
->  	uint8_t *databuf;
->  };
->  
-> +/*
-> + * struct nand_sdr_timings - SDR NAND chip timings
-> + *
-> + * This struct defines the timing requirements of a SDR NAND chip.
-> + * These information can be found in every NAND datasheets and the timings
-> + * meaning are described in the ONFI specifications:
-> + * www.onfi.org/~/media/ONFI/specs/onfi_3_1_spec.pdf (chapter 4.15 Timing
-> + * Parameters)
-> + *
-> + * All these timings are expressed in picoseconds.
-> + */
-> +
-> +struct nand_sdr_timings {
-> +	u32 tALH_min;
-> +	u32 tADL_min;
-> +	u32 tALS_min;
-> +	u32 tAR_min;
-> +	u32 tCEA_max;
-> +	u32 tCEH_min;
-> +	u32 tCH_min;
-> +	u32 tCHZ_max;
-> +	u32 tCLH_min;
-> +	u32 tCLR_min;
-> +	u32 tCLS_min;
-> +	u32 tCOH_min;
-> +	u32 tCS_min;
-> +	u32 tDH_min;
-> +	u32 tDS_min;
-> +	u32 tFEAT_max;
-> +	u32 tIR_min;
-> +	u32 tITC_max;
-> +	u32 tRC_min;
-> +	u32 tREA_max;
-> +	u32 tREH_min;
-> +	u32 tRHOH_min;
-> +	u32 tRHW_min;
-> +	u32 tRHZ_max;
-> +	u32 tRLOH_min;
-> +	u32 tRP_min;
-> +	u32 tRR_min;
-> +	u64 tRST_max;
-> +	u32 tWB_max;
-> +	u32 tWC_min;
-> +	u32 tWH_min;
-> +	u32 tWHR_min;
-> +	u32 tWP_min;
-> +	u32 tWW_min;
-> +};
-> +
-> +enum nand_data_interface_type {
-> +	NAND_SDR_IFACE,
-> +};
-> +
+> I have queued up 6/8 and 7/8 in a branch based on
+> sh-pfc-for-v4.9-tag2.
 
-I know this is my code, and I'm the one to blame here, but can you
-document the nand_data_interface fields (kerneldoc format)?
-
-> +struct nand_data_interface {
-> +	enum nand_data_interface_type type;
-> +	union {
-> +		struct nand_sdr_timings sdr;
-> +	} timings;
-> +};
-> +
->  /**
->   * struct nand_chip - NAND Private Flash Chip Data
->   * @mtd:		MTD device registered to the MTD framework
-> @@ -1026,55 +1086,6 @@ static inline int jedec_feature(struct nand_chip *chip)
->  		: 0;
->  }
->  
-> -/*
-> - * struct nand_sdr_timings - SDR NAND chip timings
-> - *
-> - * This struct defines the timing requirements of a SDR NAND chip.
-> - * These informations can be found in every NAND datasheets and the timings
-> - * meaning are described in the ONFI specifications:
-> - * www.onfi.org/~/media/ONFI/specs/onfi_3_1_spec.pdf (chapter 4.15 Timing
-> - * Parameters)
-> - *
-> - * All these timings are expressed in picoseconds.
-> - */
-> -
-> -struct nand_sdr_timings {
-> -	u32 tALH_min;
-> -	u32 tADL_min;
-> -	u32 tALS_min;
-> -	u32 tAR_min;
-> -	u32 tCEA_max;
-> -	u32 tCEH_min;
-> -	u32 tCH_min;
-> -	u32 tCHZ_max;
-> -	u32 tCLH_min;
-> -	u32 tCLR_min;
-> -	u32 tCLS_min;
-> -	u32 tCOH_min;
-> -	u32 tCS_min;
-> -	u32 tDH_min;
-> -	u32 tDS_min;
-> -	u32 tFEAT_max;
-> -	u32 tIR_min;
-> -	u32 tITC_max;
-> -	u32 tRC_min;
-> -	u32 tREA_max;
-> -	u32 tREH_min;
-> -	u32 tRHOH_min;
-> -	u32 tRHW_min;
-> -	u32 tRHZ_max;
-> -	u32 tRLOH_min;
-> -	u32 tRP_min;
-> -	u32 tRR_min;
-> -	u64 tRST_max;
-> -	u32 tWB_max;
-> -	u32 tWC_min;
-> -	u32 tWH_min;
-> -	u32 tWHR_min;
-> -	u32 tWP_min;
-> -	u32 tWW_min;
-> -};
-> -
->  /* get timing characteristics from ONFI timing mode. */
->  const struct nand_sdr_timings *onfi_async_timing_mode_to_sdr_timings(int mode);
->  
+I was a little hasty there. I have queued up 6/8 (GPIO) only.
