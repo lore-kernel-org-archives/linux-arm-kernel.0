@@ -1,38 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 6 Sep 2016 12:49:38 +0200
-Subject: [PATCH v2 1/3] ARM: dts: r7s72100: add ethernet clock to device
- tree
-In-Reply-To: <SG2PR06MB116533792940F6E3193E7EDB8AE50@SG2PR06MB1165.apcprd06.prod.outlook.com>
-References: <20160901155430.23400-1-chris.brandt@renesas.com>
- <20160902014012.9383-1-chris.brandt@renesas.com>
- <20160902082604.GD16669@verge.net.au>
- <SG2PR06MB116533792940F6E3193E7EDB8AE50@SG2PR06MB1165.apcprd06.prod.outlook.com>
-Message-ID: <20160906104937.GF16304@verge.net.au>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 6 Sep 2016 12:53:37 +0200
+Subject: [PATCH v2 5/7] arm64: KVM: vgic-v2: Add the GICV emulation
+ infrastructure
+In-Reply-To: <1473150527-4729-6-git-send-email-marc.zyngier@arm.com>
+References: <1473150527-4729-1-git-send-email-marc.zyngier@arm.com>
+ <1473150527-4729-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160906105337.GK30513@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 02, 2016 at 12:50:39PM +0000, Chris Brandt wrote:
-> On 9/2/2016, Simon Horman wrote:
-> > For future submissions please consider:
-> > 1. Supplying a cover letter (git format-patch has a --cover-letter option)
-> >    for patch-sets comprising more than one patch. This allows you to describe
-> >    an overview of what the series as a whole achieves. And is also
-> >    convenient for maintainers to reply to when accepting your patches.
+On Tue, Sep 06, 2016 at 09:28:45AM +0100, Marc Zyngier wrote:
+> In order to efficiently perform the GICV access on behalf of the
+> guest, we need to be able to avoid going back all the way to
+> the host kernel.
 > 
-> OK. I can do that.
+> For this, we introduce a new hook in the world switch code,
+> conveniently placed just after populating the fault info.
+> At that point, we only have saved/restored the GP registers,
+> and we can quickly perform all the required checks (data abort,
+> translation fault, valid faulting syndrome, not an external
+> abort, not a PTW).
 > 
+> Coming back from the emulation code, we need to skip the emulated
+> instruction. This involves an additional bit of save/restore in
+> order to be able to access the guest's PC (and possibly CPSR if
+> this is a 32bit guest).
 > 
-> > 2. Starting a new thread for each new version of a patch/patch-set.
+> At this stage, no emulation code is provided.
 > 
-> Does that mean to NOT use --in-reply-to= when submitting a v2,v3,etc... ????
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-I think so.
-
-> One more question:
-> Can I submit a patches series now that just adds all the MSTP clock nodes that I'll be working on for the next couple weeks? (USB, SDHI, MMC)
-> Or, do I have to wait till I have the drivers working?
-> Or, better yet, can I add all the MSTP clocks that will probably get used at some point (basically, everything that we're using today in our 3.14 BSP).
-
-I think that would be ok. I would slightly prefer that MSTP patches are
-added in such a way that they can be tested. But in this case I'm not
-sure anyone would test them :^)
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
