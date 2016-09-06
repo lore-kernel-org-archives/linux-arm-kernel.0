@@ -1,45 +1,37 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 6 Sep 2016 11:22:08 +0100
-Subject: [PATCH 1/3] arm64: dts: berlin4ct: add missing unit name to /soc
- node
-In-Reply-To: <20160906085557.4019-2-jszhang@marvell.com>
-References: <20160906085557.4019-1-jszhang@marvell.com>
- <20160906085557.4019-2-jszhang@marvell.com>
-Message-ID: <20160906102208.GB1425@leverpostej>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 6 Sep 2016 12:20:09 +0200 (CEST)
+Subject: [PATCH V10 2/8] ACPI: Add new IORT functions to support MSI
+ domain handling
+In-Reply-To: <1473152938-17388-3-git-send-email-tn@semihalf.com>
+References: <1473152938-17388-1-git-send-email-tn@semihalf.com>
+ <1473152938-17388-3-git-send-email-tn@semihalf.com>
+Message-ID: <alpine.DEB.2.20.1609061219230.5647@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2016 at 04:55:55PM +0800, Jisheng Zhang wrote:
-> This patch fixes the following DTC warning with W=1:
-> 
-> "Node /soc has a reg or ranges property, but no unit name"
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+On Tue, 6 Sep 2016, Tomasz Nowicki wrote:
+> +/**
+> + * iort_get_device_domain() - Find MSI domain related to a device
+> + * @dev: The device.
+> + * @req_id: Requester ID for the device.
+> + *
+> + * Returns: the MSI domain for this device, NULL otherwise
+> + */
+> +struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id)
+> +{
+> +	static struct fwnode_handle *handle;
 
-The node is only compatible with simple-bus, and so shouldn't have a
-reg.
+static ??????
 
-Why not remove the reg?
+> +	int its_id;
+> +
+> +	if (iort_dev_find_its_id(dev, req_id, 0, &its_id))
+> +		return NULL;
+> +
+> +	handle = iort_find_domain_token(its_id);
 
-Mark
+You reevaluate that on every call.
 
-> ---
->  arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> index 099ad93..2d6f91f 100644
-> --- a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> @@ -134,7 +134,7 @@
->  			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
->  	};
->  
-> -	soc {
-> +	soc at f7000000 {
->  		compatible = "simple-bus";
->  		#address-cells = <1>;
->  		#size-cells = <1>;
-> -- 
-> 2.9.3
-> 
+Thanks,
+
+	tglx
