@@ -1,51 +1,89 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Tue,  6 Sep 2016 23:38:42 +0200
-Subject: [PATCH v5 0/6] meson: Meson8b and GXBB DWMAC glue driver
-In-Reply-To: <20160904182320.671-1-martin.blumenstingl@googlemail.com>
+Date: Tue,  6 Sep 2016 23:38:43 +0200
+Subject: [PATCH v5 1/6] net: dt-bindings: Document the new Meson8b and GXBB
+ DWMAC bindings
+In-Reply-To: <20160906213848.17785-1-martin.blumenstingl@googlemail.com>
 References: <20160904182320.671-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20160906213848.17785-1-martin.blumenstingl@googlemail.com>
+ <20160906213848.17785-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20160906213848.17785-2-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a DWMAC glue driver for the PRG_ETHERNET registers found in
-Meson8b and GXBB SoCs. Based on the "old" meson6b-dwmac glue driver
-the register layout is completely different.
-Thus I introduced a separate driver.
+This patch adds the documentation for the DWMAC ethernet controller
+found in Amlogic Meson 8b (S805) and GXBB (S905) SoCs.
+The main difference between the Meson6 glue is that different registers
+(with different layout) are used.
 
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: David S. Miller <davem@davemloft.net>
+---
+ .../devicetree/bindings/net/meson-dwmac.txt        | 45 ++++++++++++++++++----
+ 1 file changed, 37 insertions(+), 8 deletions(-)
 
-Changes since v4:
-- DWMAC_MESON now depends on COMMON_CLK because the new glue driver is
-  also a clock provider (which requires COMMON_CLK)
-- use Meson8b and GXBB in the module description (instead of the
-  marketing names S805 and S905)
-- fixed a trivial typo (retrive -> retrieve) in the
-  get_stmmac_bsp_priv() helper patch
-- added a new patch to update the module description of the dwmac-meson
-  driver to indicate which SoCs are supported exactly (this patch is
-  optional and does not affect the rest of the series)
-
-
-Joachim Eastwood (1):
-  stmmac: introduce get_stmmac_bsp_priv() helper
-
-Martin Blumenstingl (5):
-  net: dt-bindings: Document the new Meson8b and GXBB DWMAC bindings
-  clk: gxbb: expose MPLL2 clock for use by DT
-  net: stmmac: add a glue driver for the Amlogic Meson 8b / GXBB DWMAC
-  ARM64: dts: meson-gxbb: use the new GXBB DWMAC glue driver
-  net: stmmac: update the module description of the dwmac-meson driver
-
- .../devicetree/bindings/net/meson-dwmac.txt        |  45 ++-
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |   8 +-
- drivers/clk/meson/gxbb.h                           |   2 +-
- drivers/net/ethernet/stmicro/stmmac/Kconfig        |   6 +-
- drivers/net/ethernet/stmicro/stmmac/Makefile       |   2 +-
- drivers/net/ethernet/stmicro/stmmac/dwmac-meson.c  |   4 +-
- .../net/ethernet/stmicro/stmmac/dwmac-meson8b.c    | 324 +++++++++++++++++++++
- .../net/ethernet/stmicro/stmmac/stmmac_platform.h  |   8 +
- include/dt-bindings/clock/gxbb-clkc.h              |   1 +
- 9 files changed, 382 insertions(+), 18 deletions(-)
- create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
-
+diff --git a/Documentation/devicetree/bindings/net/meson-dwmac.txt b/Documentation/devicetree/bindings/net/meson-dwmac.txt
+index ec633d7..89e62dd 100644
+--- a/Documentation/devicetree/bindings/net/meson-dwmac.txt
++++ b/Documentation/devicetree/bindings/net/meson-dwmac.txt
+@@ -1,18 +1,32 @@
+ * Amlogic Meson DWMAC Ethernet controller
+ 
+ The device inherits all the properties of the dwmac/stmmac devices
+-described in the file net/stmmac.txt with the following changes.
++described in the file stmmac.txt in the current directory with the
++following changes.
+ 
+-Required properties:
++Required properties on all platforms:
+ 
+-- compatible: should be "amlogic,meson6-dwmac" along with "snps,dwmac"
+-	      and any applicable more detailed version number
+-	      described in net/stmmac.txt
++- compatible:	Depending on the platform this should be one of:
++			- "amlogic,meson6-dwmac"
++			- "amlogic,meson8b-dwmac"
++			- "amlogic,meson-gxbb-dwmac"
++		Additionally "snps,dwmac" and any applicable more
++		detailed version number described in net/stmmac.txt
++		should be used.
+ 
+-- reg: should contain a register range for the dwmac controller and
+-       another one for the Amlogic specific configuration
++- reg:	The first register range should be the one of the DWMAC
++	controller. The second range is is for the Amlogic specific
++	configuration (for example the PRG_ETHERNET register range
++	on Meson8b and newer)
+ 
+-Example:
++Required properties on Meson8b and newer:
++- clock-names:	Should contain the following:
++		- "stmmaceth" - see stmmac.txt
++		- "clkin0" - first parent clock of the internal mux
++		- "clkin1" - second parent clock of the internal mux
++
++
++Example for Meson6:
+ 
+ 	ethmac: ethernet at c9410000 {
+ 		compatible = "amlogic,meson6-dwmac", "snps,dwmac";
+@@ -23,3 +37,18 @@ Example:
+ 		clocks = <&clk81>;
+ 		clock-names = "stmmaceth";
+ 	}
++
++Example for GXBB:
++	ethmac: ethernet at c9410000 {
++		compatible = "amlogic,meson-gxbb-dwmac", "snps,dwmac";
++		reg = <0x0 0xc9410000 0x0 0x10000>,
++			<0x0 0xc8834540 0x0 0x8>;
++		interrupts = <0 8 1>;
++		interrupt-names = "macirq";
++		clocks = <&clkc CLKID_ETH>,
++				<&clkc CLKID_FCLK_DIV2>,
++				<&clkc CLKID_MPLL2>;
++		clock-names = "stmmaceth", "clkin0", "clkin1";
++		phy-mode = "rgmii";
++		status = "disabled";
++	};
 -- 
 2.9.3
