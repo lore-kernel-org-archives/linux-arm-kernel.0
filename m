@@ -1,37 +1,38 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  6 Sep 2016 14:02:02 +0100
-Subject: [PATCH 04/19] arm64: KVM: Add exception code to report EL1
- asynchronous aborts
+Date: Tue,  6 Sep 2016 14:02:11 +0100
+Subject: [PATCH 13/19] arm: KVM: Allow an exit code to be tagged with a
+ Virtual Abort
 In-Reply-To: <1473166937-15271-1-git-send-email-marc.zyngier@arm.com>
 References: <1473166937-15271-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1473166937-15271-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1473166937-15271-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, we don't have a code to indicate that we've taken an
-asynchronous abort from EL1. Let's add one.
+An asynchronous abort can also be triggered whilst running at EL2.
+But instead of making that a new error code, we need to communicate
+it to the rest of KVM together with the exit reason.
+So let's hijack a single bit that allows the exception code to be
+tagged with a "pending Abort" information.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_asm.h | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/kvm_asm.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index 7561f63..d177e7e 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -21,9 +21,10 @@
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 58faff5..05e47fa 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -21,6 +21,10 @@
+ 
  #include <asm/virt.h>
  
- #define ARM_EXCEPTION_IRQ	  0
--#define ARM_EXCEPTION_TRAP	  1
-+#define ARM_EXCEPTION_EL1_SERROR  1
-+#define ARM_EXCEPTION_TRAP	  2
- /* The hyp-stub will return this for any kvm_call_hyp() call */
--#define ARM_EXCEPTION_HYP_GONE	  2
-+#define ARM_EXCEPTION_HYP_GONE	  3
- 
- #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
- #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
++#define ARM_EXIT_WITH_ABORT_BIT  31
++#define ARM_EXCEPTION_CODE(x)	  ((x) & ~(1U << ARM_EXIT_WITH_ABORT_BIT))
++#define ARM_ABORT_PENDING(x)	  !!((x) & (1U << ARM_EXIT_WITH_ABORT_BIT))
++
+ #define ARM_EXCEPTION_RESET	  0
+ #define ARM_EXCEPTION_UNDEFINED   1
+ #define ARM_EXCEPTION_SOFTWARE    2
 -- 
 2.1.4
