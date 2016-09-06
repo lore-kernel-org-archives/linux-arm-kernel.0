@@ -1,152 +1,269 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 6 Sep 2016 16:33:57 +0100
-Subject: [PATCH v24 0/9] arm64: add kdump support
-In-Reply-To: <976ca1f8-5efb-b45c-19b8-bde7bd06f5b8@caviumnetworks.com>
-References: <20160809015248.28414-1-takahiro.akashi@linaro.org>
- <0267060a-d380-2e7a-0c33-0084bfc46d97@caviumnetworks.com>
- <20160831053109.GR20080@linaro.org>
- <cca40a49-3500-ded8-35a7-053adf79d12b@caviumnetworks.com>
- <20160905081501.GA16712@linaro.org>
- <976ca1f8-5efb-b45c-19b8-bde7bd06f5b8@caviumnetworks.com>
-Message-ID: <57CEE1E5.7040206@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue,  6 Sep 2016 16:33:35 +0100
+Subject: [PATCH v6 02/20] of/irq: Break out msi-map lookup (again)
+In-Reply-To: <cover.1473173789.git.robin.murphy@arm.com>
+References: <cover.1473173789.git.robin.murphy@arm.com>
+Message-ID: <a35a859255623a1e1da0dbc8a080229251c4ac9c.1473173789.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/16 13:42, Manish Jaggi wrote:
-> 
-> 
-> On 09/05/2016 01:45 PM, AKASHI Takahiro wrote:
->> [Cc: Marc]
->>
->> On Fri, Sep 02, 2016 at 06:23:25PM +0530, Manish Jaggi wrote:
->>>
->>>
->>> On 08/31/2016 11:01 AM, AKASHI Takahiro wrote:
->>>> Manish,
->>>>
->>>> Thank you for testing my kdump and reporting issues.
->>>>
->>>> On Wed, Aug 31, 2016 at 09:11:52AM +0530, Manish Jaggi wrote:
->>>>> Hi Akashi,
->>>>>
->>>>> On 08/09/2016 07:22 AM, AKASHI Takahiro wrote:
->>>>>> This patch series adds kdump support on arm64.
->>>>>>
->>>>>> To load a crash-dump kernel to the systems, a series of patches to
->>>>>> kexec-tools, which have not yet been merged upstream, are needed.
->>>>>> Please use my kdump patches [1].
->>>>>>
->>>>>> To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
->>>>>>   - crash utility (coming v7.1.6 or later) [2]
->>>>>>     (Necessary patches have already been queued in the master.)
->>>>>>
->>>>>> [1] T.B.D.
->>>>>> [2] https://github.com/crash-utility/crash.git
->>>>>>
->>>>>> Changes for v24 (Aug 9, 2016):
->>>>>>   o Rebase to Linux-4.8-rc1
->>>>>>   o Update descriptions about newly added DT proerties
->>>>>>
->>>>>> Changes for v23 (July 26, 2016):
->>>>>>
->>>>>>   o Move memblock_reserve() to a single place in reserve_crashkernel()
->>>>>>   o Use  cpu_park_loop() in ipi_cpu_crash_stop()
->>>>>>   o Always enforce ARCH_LOW_ADDRESS_LIMIT to the memory range of crash kernel
->>>>>>   o Re-implement fdt_enforce_memory_region() to remove non-reserve regions
->>>>>>     (for ACPI) from usable memory at crash kernel
->>>>>>
->>>>>> Changes for v22 (July 12, 2016):
->>>>>>
->>>>>>   o Export "crashkernel-base" and "crashkernel-size" via device-tree,
->>>>>>     and add some descriptions about them in chosen.txt
->>>>>>   o Rename "usable-memory" to "usable-memory-range" to avoid inconsistency
->>>>>>     with powerpc's "usable-memory"
->>>>>>   o Make cosmetic changes regarding "ifdef" usage
->>>>>>   o Correct some wordings in kdump.txt
->>>>>>
->>>>>> Changes for v21 (July 6, 2016):
->>>>>>
->>>>>>   o Remove kexec patches.
->>>>>>   o Rebase to arm64's for-next/core (Linux-4.7-rc4 based).
->>>>>>   o Clarify the description about kvm in kdump.txt.
->>>>>>
->>>>>> See the following link [3] for older changes:
->>>>>> [3]  http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438780.html
->>>>>>
->>>>>> AKASHI Takahiro (8):
->>>>>>   arm64: kdump: reserve memory for crash dump kernel
->>>>>>   memblock: add memblock_cap_memory_range()
->>>>>>   arm64: limit memory regions based on DT property, usable-memory-range
->>>>>>   arm64: kdump: implement machine_crash_shutdown()
->>>>>>   arm64: kdump: add kdump support
->>>>>>   arm64: kdump: add VMCOREINFO's for user-space coredump tools
->>>>>>   arm64: kdump: enable kdump in the arm64 defconfig
->>>>>>   arm64: kdump: update a kernel doc
->>>>>>
->>>>>> James Morse (1):
->>>>>>   Documentation: dt: chosen properties for arm64 kdump
->>>>>>
->>>>>>  Documentation/devicetree/bindings/chosen.txt |  45 ++++++
->>>>>>  Documentation/kdump/kdump.txt                |  16 ++-
->>>>>>  arch/arm64/Kconfig                           |  11 ++
->>>>>>  arch/arm64/configs/defconfig                 |   1 +
->>>>>>  arch/arm64/include/asm/hardirq.h             |   2 +-
->>>>>>  arch/arm64/include/asm/kexec.h               |  41 +++++-
->>>>>>  arch/arm64/include/asm/smp.h                 |   2 +
->>>>>>  arch/arm64/kernel/Makefile                   |   1 +
->>>>>>  arch/arm64/kernel/crash_dump.c               |  71 ++++++++++
->>>>>>  arch/arm64/kernel/machine_kexec.c            |  67 ++++++++-
->>>>>>  arch/arm64/kernel/setup.c                    |   7 +-
->>>>>>  arch/arm64/kernel/smp.c                      |  63 +++++++++
->>>>>>  arch/arm64/mm/init.c                         | 202 +++++++++++++++++++++++++++
->>>>>>  include/linux/memblock.h                     |   1 +
->>>>>>  mm/memblock.c                                |  28 ++++
->>>>>>  15 files changed, 551 insertions(+), 7 deletions(-)
->>>>>>  create mode 100644 arch/arm64/kernel/crash_dump.c
->>>>>>
->>>>> Couple of points
->>>>> a) Just a note, while testing, the crashkernel reserved memory should be less than ARCH_LOW_ADDRESS_LIMIT (=arm64_dma_phys_limit).
->>>>
->>>> I think that this is a common mistake not only for kdump, but also
->>>> for general kernels.
->>>> Since request_standard_resources() calls alloc_bootmem_low(),
->>>> the kernel will panic if any of usable "System RAM" is located
->>>> above ARCH_LOW_ADDRESS_LIMIT.
->>>> For kdump, using "crashkernel=SS" notation is a convenient way
->>>> to avoid this issue.
->>>>
->>>>> b) Has anyone tested this on a SoC with Gicv3 ITS ?
->>>>> Should the GICD/R be reset prior to switching to crash kernel ?
->>>>> I am seeing lot of GICv3: RWP timeout, gone fishing while crash kernel boots.
->>>>
->>>> I've never seen this kind of messages.
->>>> I usually do my testing on a fast model.
->>>> "compatible" of interrupt-controller is "arm,gic-v3."
->>>>
->>> I suspect gic_cpu_pm_notifier is not being called on any of the cores prior to start of crash kernel.
->>> We might have to call it explicitly.
->>
->> I'm not sure that it is the cause, but anyway none of any cpu_pm_notifier's
->> will be called at panic. That is the reason why "maxcpus=1" should be
->> specified (for kdump on arm64).
->>
-> What I meant was that since cpu_pm_notifier is not called before
-> crash kernel is started, GIC Distributor/re-distributor/ITS is not
-> set in quiescent state.
+The PCI msi-map code is already doing double-duty translating IDs and
+retrieving MSI parents, which unsurprisingly is the same functionality
+we need for the identically-formatted PCI iommu-map property. Drag the
+core parsing routine up yet another layer into the general OF-PCI code,
+and further generalise it for either kind of lookup in either flavour
+of map property.
 
-Which is fine, they are not expected to be in a sane state anyway
-(that's what a crash is about...). The ITS now has provision to be put
-in a disabled state before being reinitialized. As for GICD, it is
-disabled before being reprogrammed, which should be enough.
+Acked-by: Rob Herring <robh+dt@kernel.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/of/irq.c       |  78 ++-----------------------------------
+ drivers/of/of_pci.c    | 102 +++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of_pci.h |  10 +++++
+ 3 files changed, 116 insertions(+), 74 deletions(-)
 
-> In my setup the GICD_CTRL[RWP] bit is not cleared in the
-> crashkernels' distributor init function.
-
-Which instance is failing? The initial one (just after the initial
-disable)? Or the one called from gic_dist_config()?
-
-Thanks,
-
-	M.
+diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+index a2e68f740eda..393fea85eb4e 100644
+--- a/drivers/of/irq.c
++++ b/drivers/of/irq.c
+@@ -26,6 +26,7 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_irq.h>
++#include <linux/of_pci.h>
+ #include <linux/string.h>
+ #include <linux/slab.h>
+ 
+@@ -592,87 +593,16 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
+ 			    u32 rid_in)
+ {
+ 	struct device *parent_dev;
+-	struct device_node *msi_controller_node;
+-	struct device_node *msi_np = *np;
+-	u32 map_mask, masked_rid, rid_base, msi_base, rid_len, phandle;
+-	int msi_map_len;
+-	bool matched;
+ 	u32 rid_out = rid_in;
+-	const __be32 *msi_map = NULL;
+ 
+ 	/*
+ 	 * Walk up the device parent links looking for one with a
+ 	 * "msi-map" property.
+ 	 */
+-	for (parent_dev = dev; parent_dev; parent_dev = parent_dev->parent) {
+-		if (!parent_dev->of_node)
+-			continue;
+-
+-		msi_map = of_get_property(parent_dev->of_node,
+-					  "msi-map", &msi_map_len);
+-		if (!msi_map)
+-			continue;
+-
+-		if (msi_map_len % (4 * sizeof(__be32))) {
+-			dev_err(parent_dev, "Error: Bad msi-map length: %d\n",
+-				msi_map_len);
+-			return rid_out;
+-		}
+-		/* We have a good parent_dev and msi_map, let's use them. */
+-		break;
+-	}
+-	if (!msi_map)
+-		return rid_out;
+-
+-	/* The default is to select all bits. */
+-	map_mask = 0xffffffff;
+-
+-	/*
+-	 * Can be overridden by "msi-map-mask" property.  If
+-	 * of_property_read_u32() fails, the default is used.
+-	 */
+-	of_property_read_u32(parent_dev->of_node, "msi-map-mask", &map_mask);
+-
+-	masked_rid = map_mask & rid_in;
+-	matched = false;
+-	while (!matched && msi_map_len >= 4 * sizeof(__be32)) {
+-		rid_base = be32_to_cpup(msi_map + 0);
+-		phandle = be32_to_cpup(msi_map + 1);
+-		msi_base = be32_to_cpup(msi_map + 2);
+-		rid_len = be32_to_cpup(msi_map + 3);
+-
+-		if (rid_base & ~map_mask) {
+-			dev_err(parent_dev,
+-				"Invalid msi-map translation - msi-map-mask (0x%x) ignores rid-base (0x%x)\n",
+-				map_mask, rid_base);
+-			return rid_out;
+-		}
+-
+-		msi_controller_node = of_find_node_by_phandle(phandle);
+-
+-		matched = (masked_rid >= rid_base &&
+-			   masked_rid < rid_base + rid_len);
+-		if (msi_np)
+-			matched &= msi_np == msi_controller_node;
+-
+-		if (matched && !msi_np) {
+-			*np = msi_np = msi_controller_node;
++	for (parent_dev = dev; parent_dev; parent_dev = parent_dev->parent)
++		if (!of_pci_map_rid(parent_dev->of_node, rid_in, "msi-map",
++				    "msi-map-mask", np, &rid_out))
+ 			break;
+-		}
+-
+-		of_node_put(msi_controller_node);
+-		msi_map_len -= 4 * sizeof(__be32);
+-		msi_map += 4;
+-	}
+-	if (!matched)
+-		return rid_out;
+-
+-	rid_out = masked_rid - rid_base + msi_base;
+-	dev_dbg(dev,
+-		"msi-map at: %s, using mask %08x, rid-base: %08x, msi-base: %08x, length: %08x, rid: %08x -> %08x\n",
+-		dev_name(parent_dev), map_mask, rid_base, msi_base,
+-		rid_len, rid_in, rid_out);
+-
+ 	return rid_out;
+ }
+ 
+diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+index 589b30c68e14..b58be12ab277 100644
+--- a/drivers/of/of_pci.c
++++ b/drivers/of/of_pci.c
+@@ -308,3 +308,105 @@ struct msi_controller *of_pci_find_msi_chip_by_node(struct device_node *of_node)
+ EXPORT_SYMBOL_GPL(of_pci_find_msi_chip_by_node);
+ 
+ #endif /* CONFIG_PCI_MSI */
++
++/**
++ * of_pci_map_rid - Translate a requester ID through a downstream mapping.
++ * @np: root complex device node.
++ * @rid: PCI requester ID to map.
++ * @map_name: property name of the map to use.
++ * @map_mask_name: optional property name of the mask to use.
++ * @target: optional pointer to a target device node.
++ * @id_out: optional pointer to receive the translated ID.
++ *
++ * Given a PCI requester ID, look up the appropriate implementation-defined
++ * platform ID and/or the target device which receives transactions on that
++ * ID, as per the "iommu-map" and "msi-map" bindings. Either of @target or
++ * @id_out may be NULL if only the other is required. If @target points to
++ * a non-NULL device node pointer, only entries targeting that node will be
++ * matched; if it points to a NULL value, it will receive the device node of
++ * the first matching target phandle, with a reference held.
++ *
++ * Return: 0 on success or a standard error code on failure.
++ */
++int of_pci_map_rid(struct device_node *np, u32 rid,
++		   const char *map_name, const char *map_mask_name,
++		   struct device_node **target, u32 *id_out)
++{
++	u32 map_mask, masked_rid;
++	int map_len;
++	const __be32 *map = NULL;
++
++	if (!np || !map_name || (!target && !id_out))
++		return -EINVAL;
++
++	map = of_get_property(np, map_name, &map_len);
++	if (!map) {
++		if (target)
++			return -ENODEV;
++		/* Otherwise, no map implies no translation */
++		*id_out = rid;
++		return 0;
++	}
++
++	if (!map_len || map_len % (4 * sizeof(*map))) {
++		pr_err("%s: Error: Bad %s length: %d\n", np->full_name,
++			map_name, map_len);
++		return -EINVAL;
++	}
++
++	/* The default is to select all bits. */
++	map_mask = 0xffffffff;
++
++	/*
++	 * Can be overridden by "{iommu,msi}-map-mask" property.
++	 * If of_property_read_u32() fails, the default is used.
++	 */
++	if (map_mask_name)
++		of_property_read_u32(np, map_mask_name, &map_mask);
++
++	masked_rid = map_mask & rid;
++	for ( ; map_len > 0; map_len -= 4 * sizeof(*map), map += 4) {
++		struct device_node *phandle_node;
++		u32 rid_base = be32_to_cpup(map + 0);
++		u32 phandle = be32_to_cpup(map + 1);
++		u32 out_base = be32_to_cpup(map + 2);
++		u32 rid_len = be32_to_cpup(map + 3);
++
++		if (rid_base & ~map_mask) {
++			pr_err("%s: Invalid %s translation - %s-mask (0x%x) ignores rid-base (0x%x)\n",
++				np->full_name, map_name, map_name,
++				map_mask, rid_base);
++			return -EFAULT;
++		}
++
++		if (masked_rid < rid_base || masked_rid >= rid_base + rid_len)
++			continue;
++
++		phandle_node = of_find_node_by_phandle(phandle);
++		if (!phandle_node)
++			return -ENODEV;
++
++		if (target) {
++			if (*target)
++				of_node_put(phandle_node);
++			else
++				*target = phandle_node;
++
++			if (*target != phandle_node)
++				continue;
++		}
++
++		if (id_out)
++			*id_out = masked_rid - rid_base + out_base;
++
++		pr_debug("%s: %s, using mask %08x, rid-base: %08x, out-base: %08x, length: %08x, rid: %08x -> %08x\n",
++			np->full_name, map_name, map_mask, rid_base, out_base,
++			rid_len, rid, *id_out);
++		return 0;
++	}
++
++	pr_err("%s: Invalid %s translation - no match for rid 0x%x on %s\n",
++		np->full_name, map_name, rid,
++		target && *target ? (*target)->full_name : "any target");
++	return -EFAULT;
++}
+diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+index b969e9443962..7fd5cfce9140 100644
+--- a/include/linux/of_pci.h
++++ b/include/linux/of_pci.h
+@@ -17,6 +17,9 @@ int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
+ int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
+ int of_get_pci_domain_nr(struct device_node *node);
+ void of_pci_check_probe_only(void);
++int of_pci_map_rid(struct device_node *np, u32 rid,
++		   const char *map_name, const char *map_mask_name,
++		   struct device_node **target, u32 *id_out);
+ #else
+ static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
+ {
+@@ -52,6 +55,13 @@ of_get_pci_domain_nr(struct device_node *node)
+ 	return -1;
+ }
+ 
++static inline int of_pci_map_rid(struct device_node *np, u32 rid,
++			const char *map_name, const char *map_mask_name,
++			struct device_node **target, u32 *id_out)
++{
++	return -EINVAL;
++}
++
+ static inline void of_pci_check_probe_only(void) { }
+ #endif
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.8.1.dirty
