@@ -1,61 +1,59 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Tue, 06 Sep 2016 07:27:10 +0800
-Subject: [PATCH v3 2/2] arm64: dts: rockchip: support the pmu node for
- rk3399
-In-Reply-To: <1666797.JgSRLN1JIq@phil>
-References: <1473099435-28198-1-git-send-email-wxt@rock-chips.com>
- <1473099435-28198-3-git-send-email-wxt@rock-chips.com>
- <1666797.JgSRLN1JIq@phil>
-Message-ID: <57CDFF4E.9090907@rock-chips.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 6 Sep 2016 09:29:59 +0900
+Subject: Memory range end be inclusive or exclusive? Re: [PATCH v1 1/4]
+ kexec: (bugfix) calc correct end address of memory ranges in device tree
+In-Reply-To: <20160801045240.GD7995@linaro.org>
+References: <cover.1468970114.git.geoff@infradead.org>
+ <3562841.ROYbCgkeeq@hactar>
+ <20160727232331.GY1041@n2100.armlinux.org.uk>
+ <1860371.lT9GInp2C3@hactar>
+ <20160729082714.GA1041@n2100.armlinux.org.uk>
+ <1469812346.16559.40.camel@infradead.org>
+ <20160729172356.GD1041@n2100.armlinux.org.uk>
+ <20160801045240.GD7995@linaro.org>
+Message-ID: <20160906002958.GB16712@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Simon,
 
-On 2016?09?06? 06:27, Heiko Stuebner wrote:
-> Am Dienstag, 6. September 2016, 02:17:15 CEST schrieb Caesar Wang:
->> This patch adds to enable the ARM Performance Monitor Units for rk3399.
->> ARM cores often have a PMU for counting cpu and cache events like cache
->> misses and hits.
->>
->> Also, as the Marc posted the patches [0] to support Partitioning per-cpu
->> interrupts. Let's add this patch to match it on rk3399 SoCs.
->>
->> [0]:
->> https://lkml.org/lkml/2016/4/11/182
->>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->> Acked-by: Mark Rutland <mark.rutland@arm.com>
->> Cc: Heiko Stuebner <heiko@sntech.de>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> CC: linux-arm-kernel at lists.infradead.org
-> I've applied this one but did some corrections [0]:
->
-> - ppi-partitions is supposed to be a subnode of the gic, that is why the code
-> also start search for it starting from the gic node - I've moved it
-> - I've renamed the phandles taking part0/part1 from the example feels a bit to
-> generic, so it's now ppi_cluster0 and ppi_cluster1 matching the cpu-clusters
->
-> I've gave this a spin on my rk3399evb and the ppi-partitions got recognized
-> as well as the pmu instances got created, but please also double check again.
+What is your opinion on this issue?
 
+On Mon, Aug 01, 2016 at 01:52:40PM +0900, AKASHI Takahiro wrote:
+> On Fri, Jul 29, 2016 at 06:23:56PM +0100, Russell King - ARM Linux wrote:
+> > On Fri, Jul 29, 2016 at 10:12:26AM -0700, Geoff Levand wrote:
+> > > On Fri, 2016-07-29 at 09:27 +0100, Russell King - ARM Linux wrote:
+> > > 
+> > > > So, these functions are a mess and need fixing.
+> > > 
+> > > Since this change isn't really related to arm64 support, I'll
+> > > drop this patch from my series.
+> > 
+> > Do you have a case which triggers bugs in this code?
+> 
+> Actually, this patch was necessary when my kdump used "usable-memory"
+> properties in "memory" nodes, as on ppc64, to limit the usable memory
+> regions that can be used by crash dump kernel.
+> Since then, I've moved to the approach of using "mem=" kernel parameter,
+> then introducing a new property, "linux,usable-memory-range," under /chosen
+> and now we don't need this patch any more.
+> 
+> So, we can drop it but I still believe that it is buggy.
 
-Yup, thanks the fixes.
+Due to the discussions[1], I may want to re-enable "usable-memory"
+property on arm64. In addition, I would like to add a function,
+dtb_add_usable_memory_properties(), a variant of
+add_usable_memory_properties(), to kexec/dt-ops.c.
+So this issue is quite crucial now.
 
->
->
-> Thanks
-> Heiko
->
->
-> [0] https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/
-> commit/?id=48120b1af6f072bfd6b075bf9be560ad6fda2faa
->
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/452685.html
 
+-Takahiro AKASHI
 
--- 
-caesar wang | software engineer | wxt at rock-chip.com
+> Thanks,
+> -Takahiro AKASHI
+> 
+> > -- 
+> > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> > FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> > according to speedtest.net.
