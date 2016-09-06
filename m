@@ -1,139 +1,45 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 06 Sep 2016 17:37:37 +0100
-Subject: [PATCH 2/8] pcmcia: lubbock: fix sockets configuration
+Date: Tue, 06 Sep 2016 17:37:42 +0100
+Subject: [PATCH 3/8] ARM: locomo: fix locomo irq handling
 In-Reply-To: <20160906163711.GB1041@n2100.armlinux.org.uk>
 References: <20160906163711.GB1041@n2100.armlinux.org.uk>
-Message-ID: <E1bhJNR-0008Co-KL@rmk-PC.armlinux.org.uk>
+Message-ID: <E1bhJNW-0008Cu-Vo@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robert Jarzmik <robert.jarzmik@free.fr>
+Accidentally booting Collie on Assabet reveals that the locomo driver
+incorrectly overwrites gpio-sa1100's chip data for its parent interrupt,
+leading to oops in sa1100_gpio_unmask() and sa1100_update_edge_regs()
+when "gpio: sa1100: convert to use IO accessors" is applied.  Fix locomo
+to use the handler data rather than chip data for its parent interrupt.
 
-On lubbock board, the probe of the driver crashes by dereferencing very
-early a platform_data structure which is not set, in
-pxa2xx_configure_sockets().
-
-The stack fixed is :
-[    0.244353] SA1111 Microprocessor Companion Chip: silicon revision 1, metal revision 1
-[    0.256321] sa1111 sa1111: Providing IRQ336-390
-[    0.340899] clocksource: Switched to clocksource oscr0
-[    0.472263] Unable to handle kernel NULL pointer dereference at virtual address 00000004
-[    0.480469] pgd = c0004000
-[    0.483432] [00000004] *pgd=00000000
-[    0.487105] Internal error: Oops: f5 [#1] ARM
-[    0.491497] Modules linked in:
-[    0.494650] CPU: 0 PID: 1 Comm: swapper Not tainted 4.8.0-rc3-00080-g1aaa68426f0c-dirty #2068
-[    0.503229] Hardware name: Intel DBPXA250 Development Platform (aka Lubbock)
-[    0.510344] task: c3e42000 task.stack: c3e44000
-[    0.514984] PC is at pxa2xx_configure_sockets+0x4/0x24 (drivers/pcmcia/pxa2xx_base.c:227)
-[    0.520193] LR is at pcmcia_lubbock_init+0x1c/0x38
-[    0.525079] pc : [<c0247c30>]    lr : [<c02479b0>]    psr: a0000053
-[    0.525079] sp : c3e45e70  ip : 100019ff  fp : 00000000
-[    0.536651] r10: c0828900  r9 : c0434838  r8 : 00000000
-[    0.541953] r7 : c0820700  r6 : c0857b30  r5 : c3ec1400  r4 : c0820758
-[    0.548549] r3 : 00000000  r2 : 0000000c  r1 : c3c09c40  r0 : c3ec1400
-[    0.555154] Flags: NzCv  IRQs on  FIQs off  Mode SVC_32  ISA ARM  Segment none
-[    0.562450] Control: 0000397f  Table: a0004000  DAC: 00000053
-[    0.568257] Process swapper (pid: 1, stack limit = 0xc3e44190)
-[    0.574154] Stack: (0xc3e45e70 to 0xc3e46000)
-[    0.578610] 5e60:                                     c4849800 00000000 c3ec1400 c024769c
-[    0.586928] 5e80: 00000000 c3ec140c c3c0ee0c c3ec1400 c3ec1434 c020c410 c3ec1400 c3ec1434
-[    0.595244] 5ea0: c0820700 c080b408 c0828900 c020c5f8 00000000 c0820700 c020c578 c020ac5c
-[    0.603560] 5ec0: c3e687cc c3e71e10 c0820700 00000000 c3c02de0 c020bae4 c03c62f7 c03c62f7
-[    0.611872] 5ee0: c3e68780 c0820700 c042e034 00000000 c043c440 c020cdec c080b408 00000005
-[    0.620188] 5f00: c042e034 c00096c0 c0034440 c01c730c 20000053 ffffffff 00000000 00000000
-[    0.628502] 5f20: 00000000 c3ffcb87 c3ffcb90 c00346ac c3e66ba0 c03f7914 00000092 00000005
-[    0.636811] 5f40: 00000005 c03f847c 00000091 c03f847c 00000000 00000005 c0434828 00000005
-[    0.645125] 5f60: c043482c 00000092 c043c440 c0828900 c0434838 c0418d2c 00000005 00000005
-[    0.653430] 5f80: 00000000 c041858c 00000000 c032e9f0 00000000 00000000 00000000 00000000
-[    0.661729] 5fa0: 00000000 c032e9f8 00000000 c000f0f0 00000000 00000000 00000000 00000000
-[    0.670020] 5fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-[    0.678311] 5fe0: 00000000 00000000 00000000 00000000 00000013 00000000 00000000 00000000
-[    0.686673] (pxa2xx_configure_sockets) from pcmcia_lubbock_init (/drivers/pcmcia/sa1111_lubbock.c:161)
-[    0.696026] (pcmcia_lubbock_init) from pcmcia_probe (/drivers/pcmcia/sa1111_generic.c:213)
-[    0.704358] (pcmcia_probe) from driver_probe_device (/drivers/base/dd.c:378 /drivers/base/dd.c:499)
-[    0.712848] (driver_probe_device) from __driver_attach (/./include/linux/device.h:983 /drivers/base/dd.c:733)
-[    0.721414] (__driver_attach) from bus_for_each_dev (/drivers/base/bus.c:313)
-[    0.729723] (bus_for_each_dev) from bus_add_driver (/drivers/base/bus.c:708)
-[    0.738036] (bus_add_driver) from driver_register (/drivers/base/driver.c:169)
-[    0.746185] (driver_register) from do_one_initcall (/init/main.c:778)
-[    0.754561] (do_one_initcall) from kernel_init_freeable (/init/main.c:843 /init/main.c:851 /init/main.c:869 /init/main.c:1016)
-[    0.763409] (kernel_init_freeable) from kernel_init (/init/main.c:944)
-[    0.771660] (kernel_init) from ret_from_fork (/arch/arm/kernel/entry-common.S:119)
-[ 0.779347] Code: c03c6305 c03c631e c03c632e e5903048 (e993000c)
-All code
-========
-   0:	c03c6305 	eorsgt	r6, ip, r5, lsl #6
-   4:	c03c631e 	eorsgt	r6, ip, lr, lsl r3
-   8:	c03c632e 	eorsgt	r6, ip, lr, lsr #6
-   c:	e5903048 	ldr	r3, [r0, #72]	; 0x48
-  10:*	e993000c 	ldmib	r3, {r2, r3}		<-- trapping instruction
-
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/pcmcia/pxa2xx_base.c    | 9 +++++----
- drivers/pcmcia/pxa2xx_base.h    | 2 +-
- drivers/pcmcia/sa1111_lubbock.c | 2 +-
- 3 files changed, 7 insertions(+), 6 deletions(-)
+ arch/arm/common/locomo.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
-index 483f919e0d2e..91b5f5724cba 100644
---- a/drivers/pcmcia/pxa2xx_base.c
-+++ b/drivers/pcmcia/pxa2xx_base.c
-@@ -214,9 +214,8 @@ pxa2xx_pcmcia_frequency_change(struct soc_pcmcia_socket *skt,
- }
- #endif
+diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
+index 0e97b4b871f9..6c7b06854fce 100644
+--- a/arch/arm/common/locomo.c
++++ b/arch/arm/common/locomo.c
+@@ -140,7 +140,7 @@ static struct locomo_dev_info locomo_devices[] = {
  
--void pxa2xx_configure_sockets(struct device *dev)
-+void pxa2xx_configure_sockets(struct device *dev, struct pcmcia_low_level *ops)
+ static void locomo_handler(struct irq_desc *desc)
  {
--	struct pcmcia_low_level *ops = dev->platform_data;
- 	/*
- 	 * We have at least one socket, so set MECR:CIT
- 	 * (Card Is There)
-@@ -322,7 +321,7 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
- 			goto err1;
- 	}
+-	struct locomo *lchip = irq_desc_get_chip_data(desc);
++	struct locomo *lchip = irq_desc_get_handler_data(desc);
+ 	int req, i;
  
--	pxa2xx_configure_sockets(&dev->dev);
-+	pxa2xx_configure_sockets(&dev->dev, ops);
- 	dev_set_drvdata(&dev->dev, sinfo);
+ 	/* Acknowledge the parent IRQ */
+@@ -200,8 +200,7 @@ static void locomo_setup_irq(struct locomo *lchip)
+ 	 * Install handler for IRQ_LOCOMO_HW.
+ 	 */
+ 	irq_set_irq_type(lchip->irq, IRQ_TYPE_EDGE_FALLING);
+-	irq_set_chip_data(lchip->irq, lchip);
+-	irq_set_chained_handler(lchip->irq, locomo_handler);
++	irq_set_chained_handler_and_data(lchip->irq, locomo_handler, lchip);
  
- 	return 0;
-@@ -348,7 +347,9 @@ static int pxa2xx_drv_pcmcia_remove(struct platform_device *dev)
- 
- static int pxa2xx_drv_pcmcia_resume(struct device *dev)
- {
--	pxa2xx_configure_sockets(dev);
-+	struct pcmcia_low_level *ops = (struct pcmcia_low_level *)dev->platform_data;
-+
-+	pxa2xx_configure_sockets(dev, ops);
- 	return 0;
- }
- 
-diff --git a/drivers/pcmcia/pxa2xx_base.h b/drivers/pcmcia/pxa2xx_base.h
-index b609b45469ed..e58c7a415418 100644
---- a/drivers/pcmcia/pxa2xx_base.h
-+++ b/drivers/pcmcia/pxa2xx_base.h
-@@ -1,4 +1,4 @@
- int pxa2xx_drv_pcmcia_add_one(struct soc_pcmcia_socket *skt);
- void pxa2xx_drv_pcmcia_ops(struct pcmcia_low_level *ops);
--void pxa2xx_configure_sockets(struct device *dev);
-+void pxa2xx_configure_sockets(struct device *dev, struct pcmcia_low_level *ops);
- 
-diff --git a/drivers/pcmcia/sa1111_lubbock.c b/drivers/pcmcia/sa1111_lubbock.c
-index df2b6b28b1d1..e741f499c875 100644
---- a/drivers/pcmcia/sa1111_lubbock.c
-+++ b/drivers/pcmcia/sa1111_lubbock.c
-@@ -222,7 +222,7 @@ int pcmcia_lubbock_init(struct sa1111_dev *sadev)
- 	lubbock_set_misc_wr((1 << 15) | (1 << 14), 0);
- 
- 	pxa2xx_drv_pcmcia_ops(&lubbock_pcmcia_ops);
--	pxa2xx_configure_sockets(&sadev->dev);
-+	pxa2xx_configure_sockets(&sadev->dev, &lubbock_pcmcia_ops);
- 	return sa1111_pcmcia_add(sadev, &lubbock_pcmcia_ops,
- 				 pxa2xx_drv_pcmcia_add_one);
- }
+ 	/* Install handlers for IRQ_LOCOMO_* */
+ 	for ( ; irq <= lchip->irq_base + 3; irq++) {
 -- 
 2.1.0
