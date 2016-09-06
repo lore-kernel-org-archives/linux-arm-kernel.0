@@ -1,53 +1,281 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 Sep 2016 19:26:03 +0100
-Subject: linux-next: manual merge of the arm-soc tree with Linus' tree
-In-Reply-To: <20160905105803.13ed27ff@canb.auug.org.au>
-References: <20160905105803.13ed27ff@canb.auug.org.au>
-Message-ID: <20160905182603.GS1041@n2100.armlinux.org.uk>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 6 Sep 2016 09:24:35 +0200
+Subject: [PATCH V9 1/8] ACPI: I/O Remapping Table (IORT) initial support
+In-Reply-To: <CAJZ5v0iJGycCVaQ9gdpWL55wFcX5X=RXTze_-Fw+5TaSvjH3yQ@mail.gmail.com>
+References: <1473105940-9761-1-git-send-email-tn@semihalf.com>
+ <1473105940-9761-2-git-send-email-tn@semihalf.com>
+ <CAJZ5v0iJGycCVaQ9gdpWL55wFcX5X=RXTze_-Fw+5TaSvjH3yQ@mail.gmail.com>
+Message-ID: <a950814b-6bfb-7435-b137-c42cf2c1908c@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 05, 2016 at 10:58:03AM +1000, Stephen Rothwell wrote:
-> I fixed it up (I deleted the file) and can carry the fix as
-> necessary. This is now fixed as far as linux-next is concerned, but any
-> non trivial conflicts should be mentioned to your upstream maintainer
-> when your tree is submitted for merging.  You may also want to consider
-> cooperating with the maintainer of the conflicting tree to minimise any
-> particularly complex conflicts.
+Hi Rafael,
 
-That's the "simple" way of making the conflict go away, but I'm afraid
-it's really not that simple.
+On 05.09.2016 22:29, Rafael J. Wysocki wrote:
+> On Mon, Sep 5, 2016 at 10:05 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
+>> IORT shows representation of IO topology for ARM based systems.
+>> It describes how various components are connected together on
+>> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
+>> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
+>>
+>> Initial support allows to detect IORT table presence and save its
+>> root pointer obtained through acpi_get_table(). The pointer validity
+>> depends on acpi_gbl_permanent_mmap because if acpi_gbl_permanent_mmap
+>> is not set while using IORT nodes we would dereference unmapped pointers.
+>>
+>> For the aforementioned reason call iort_table_detect() from acpi_init()
+>> which guarantees acpi_gbl_permanent_mmap to be set at that point.
+>>
+>> Add generic helpers which are helpful for scanning and retrieving
+>> information from IORT table content. List of the most important helpers:
+>> - iort_find_dev_node() finds IORT node for a given device
+>> - iort_node_map_rid() maps device RID and returns IORT node which provides
+>>   final translation
+>>
+>> IORT support is placed under drivers/acpi/arm64/ new directory due to its
+>> ARM64 specific nature. The code there is considered only for ARM64.
+>> The long term plan is to keep all ARM64 specific tables support
+>> in this place e.g. GTDT table.
+>>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>
+> Some cosmetic stuff below.
+>
 
-Having just looked at the SMC91x definition for realview, it shows that
-the SMC91x binding, like many of the conversions that the patch in my
-tree fixes, has been created without a proper understanding of the
-hardware.  To put it simply, it is broken.
+[...]
 
-The binding only allows _one_ register width to be specified, which is
-completely incorrect: the binding _must_ allow multiple register widths
-to be specified.  This is what SMC91x has always expected: to be told
-which register access widths it is permitted to make.
+>> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+>> new file mode 100644
+>> index 0000000..82d5e7d
+>> --- /dev/null
+>> +++ b/drivers/acpi/arm64/iort.c
+>> @@ -0,0 +1,221 @@
+>> +/*
+>> + * Copyright (C) 2016, Semihalf
+>> + *     Author: Tomasz Nowicki <tn@semihalf.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify it
+>> + * under the terms and conditions of the GNU General Public License,
+>> + * version 2, as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope it will be useful, but WITHOUT
+>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+>> + * more details.
+>> + *
+>> + * This file implements early detection/parsing of I/O mapping
+>> + * reported to OS through firmware via I/O Remapping Table (IORT)
+>> + * IORT document number: ARM DEN 0049A
+>> + */
+>> +
+>> +#define pr_fmt(fmt)    "ACPI: IORT: " fmt
+>> +
+>> +#include <linux/iort.h>
+>
+> Do we need a separate header file for this?
 
-That must include at least one of 8 or 16 bit accesses, but 32-bit
-access is optional.
+IMO yes. It's well isolated functionality and more will be added in 
+patch 2 and IOMMU support by Lorenzo. Also, it's the same convention as 
+for DMAR support.
 
-The result will be that - despite I've fixed up all the static platform
-data to be correct, there's no way to fix up the DT binding without
-inventing a new one.
+>
+>> +#include <linux/kernel.h>
+>> +#include <linux/pci.h>
+>> +
+>> +typedef acpi_status (*iort_find_node_callback)
+>> +       (struct acpi_iort_node *node, void *context);
+>> +
+>> +/* Root pointer to the mapped IORT table */
+>> +static struct acpi_table_header *iort_table;
+>> +
+>> +static struct acpi_iort_node *
+>> +iort_scan_node(enum acpi_iort_node_type type,
+>
+> Please do not break function headers like this.  Specifically, the
+> return type and the name should be located in the same line.
 
-So, deleting the Realview (and other) board files results in platforms
-that can't use networking - it's worse than that, because the smc91x
-driver will BUG() as a result of this at boot time.
+OK
 
-Since the patch in my tree is fixing a regression caused by the broken
-conversions, I'm not mindful to drop it from the merge window - I
-actually want to push it into -rc kernels.  We _do_ need to fix the
-DT regressions, and quickly though, and push those with this patch.
+>
+>> +              iort_find_node_callback callback, void *context)
+>> +{
+>> +       struct acpi_iort_node *iort_node, *iort_end;
+>> +       struct acpi_table_iort *iort;
+>> +       int i;
+>> +
+>> +       if (!iort_table)
+>> +               return NULL;
+>> +
+>> +       /* Get the first IORT node */
+>> +       iort = (struct acpi_table_iort *)iort_table;
+>> +       iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort,
+>> +                                iort->node_offset);
+>> +       iort_end = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
+>> +                               iort_table->length);
+>> +
+>> +       for (i = 0; i < iort->node_count; i++) {
+>> +               if (WARN_TAINT(iort_node >= iort_end, TAINT_FIRMWARE_WORKAROUND,
+>> +                              "IORT node pointer overflows, bad table!\n"))
+>> +                       return NULL;
+>> +
+>> +               if (iort_node->type == type) {
+>> +                       if (ACPI_SUCCESS(callback(iort_node, context)))
+>> +                               return iort_node;
+>
+> It's better to write this as
+>
+> if (iort_node->type == type && ACPI_SUCCESS(callback(iort_node, context))
+>         return iort_node;
 
-Since I don't use the SMC91x with DT, that's outside of what I can
-test, so consider this a call for help on that subject.
+OK
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>
+>> +               }
+>> +
+>> +               iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
+>> +                                        iort_node->length);
+>> +       }
+>> +
+>> +       return NULL;
+>> +}
+>> +
+>> +static acpi_status
+>> +iort_match_node_callback(struct acpi_iort_node *node, void *context)
+>> +{
+>> +       struct device *dev = context;
+>> +
+>> +       switch (node->type) {
+>> +       case ACPI_IORT_NODE_NAMED_COMPONENT: {
+>> +               struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+>> +               struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
+>> +               struct acpi_iort_named_component *ncomp;
+>> +
+>> +               if (!adev)
+>> +                       break;
+>> +
+>> +               ncomp = (struct acpi_iort_named_component *)node->node_data;
+>> +
+>> +               if (ACPI_FAILURE(acpi_get_name(adev->handle,
+>> +                                              ACPI_FULL_PATHNAME, &buffer))) {
+>> +                       dev_warn(dev, "Can't get device full path name\n");
+>
+> I'd switch the branches so that the one to be executed on success goes first.
+>
+> Also consider using acpi_status variables for things like this.
+>
+>         status = acpi_get_name(adev->handle, ACPI_FULL_PATHNAME, &buffer);
+>         if (ACPI_SUCCESS(status)) {
+>
+> is much easier to follow than what you are doing here.
+
+Agree, actually I rewrite this function as follow:
+
+static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
+					    void *context)
+{
+	struct device *dev = context;
+	acpi_status status = AE_NOT_FOUND;
+
+	switch (node->type) {
+	case ACPI_IORT_NODE_NAMED_COMPONENT: {
+		struct acpi_buffer buf = { ACPI_ALLOCATE_BUFFER, NULL };
+		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
+		struct acpi_iort_named_component *ncomp;
+
+		if (!adev)
+			break;
+
+		status = acpi_get_name(adev->handle, ACPI_FULL_PATHNAME, &buf);
+		if (ACPI_FAILURE(status)) {
+			dev_warn(dev, "Can't get device full path name\n");
+			break;
+		}
+
+		ncomp = (struct acpi_iort_named_component *)node->node_data;
+		if (!strcmp(ncomp->device_name, buf.pointer))
+			status = AE_OK;
+
+		acpi_os_free(buf.pointer);
+		break;
+	}
+	case ACPI_IORT_NODE_PCI_ROOT_COMPLEX: {
+		struct acpi_iort_root_complex *pci_rc;
+		struct pci_bus *bus;
+
+		bus = to_pci_bus(dev);
+		pci_rc = (struct acpi_iort_root_complex *)node->node_data;
+
+		/*
+		 * It is assumed that PCI segment numbers maps one-to-one
+		 * with root complexes. Each segment number can represent only
+		 * one root complex.
+		 */
+		if (pci_rc->pci_segment_number == pci_domain_nr(bus))
+			status = AE_OK;
+
+		break;
+	}
+	}
+
+	return status;
+}
+
+>
+>> +               } else {
+>> +                       int match;
+>> +
+>> +                       match = !strcmp(ncomp->device_name, buffer.pointer);
+>> +                       acpi_os_free(buffer.pointer);
+>> +
+>> +                       if (match)
+>> +                               return AE_OK;
+>> +               }
+>> +
+>> +               break;
+>> +       }
+>> +       case ACPI_IORT_NODE_PCI_ROOT_COMPLEX: {
+>
+> What is the brace for?
+
+To create namespace for below local variables. The same for 
+ACPI_IORT_NODE_NAMED_COMPONENT case.
+
+>
+>> +               struct acpi_iort_root_complex *pci_rc;
+>> +               struct pci_bus *bus;
+>> +
+>> +               bus = to_pci_bus(dev);
+>> +               pci_rc = (struct acpi_iort_root_complex *)node->node_data;
+>> +
+>> +               /*
+>> +                * It is assumed that PCI segment numbers maps one-to-one
+>> +                * with root complexes. Each segment number can represent only
+>> +                * one root complex.
+>> +                */
+>> +               if (pci_rc->pci_segment_number == pci_domain_nr(bus))
+>> +                       return AE_OK;
+>> +
+>> +               break;
+>> +       }
+>> +       }
+>> +
+>> +       return AE_NOT_FOUND;
+>> +}
+>> +
+
+[...]
+
+>> diff --git a/include/linux/iort.h b/include/linux/iort.h
+>> new file mode 100644
+>> index 0000000..f4d5d45
+>> --- /dev/null
+>> +++ b/include/linux/iort.h
+>
+> If the new file header is necessary, it should be called acpi_iort.h IMO.
+
+OK
+
+Thanks,
+Tomasz
