@@ -1,128 +1,72 @@
-From: zach.brown@ni.com (Zach Brown)
-Date: Tue, 6 Sep 2016 13:51:08 -0500
-Subject: [PATCH 2/2] sdhci-of-arasan: Set controller to test mode when
- fails-without-test-cd is present
-In-Reply-To: <13c1a30f-fb4f-a813-df0a-3ac9914cfa61@xilinx.com>
-References: <1472512857-13063-1-git-send-email-zach.brown@ni.com>
- <1472512857-13063-2-git-send-email-zach.brown@ni.com>
- <13c1a30f-fb4f-a813-df0a-3ac9914cfa61@xilinx.com>
-Message-ID: <20160906185107.GA5124@zach-desktop>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 6 Sep 2016 20:54:52 +0200
+Subject: [PATCH 0/7] drm/sun4i: Introduce A33 display driver
+In-Reply-To: <CAGb2v65Ui5ys_=5fmW4FkfR+oc7sCnwq0cHbgGFt3r-Kgg=k5w@mail.gmail.com>
+References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
+ <18951472779805@web6g.yandex.ru> <20160902190605.GF6313@lukather>
+ <CAGb2v64p2MMvTpS8nNT2hGF3_jBa7Odr2qkOHD=N4iVXMDxrwA@mail.gmail.com>
+ <20160905203707.GF8596@lukather>
+ <CAGb2v65Ui5ys_=5fmW4FkfR+oc7sCnwq0cHbgGFt3r-Kgg=k5w@mail.gmail.com>
+Message-ID: <20160906185452.GI9040@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2016 at 07:47:17AM +0200, Michal Simek wrote:
-> On 30.8.2016 01:20, Zach Brown wrote:
-> > The sdhci controller on xilinx zynq devices will not function unless
-> > the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
-> > In cases where it is impossible to provide the CD bit in hardware,
-> > setting the controller to test mode and then setting inserted to true
-> > will get the controller to function without the CD bit.
-> > 
-> > When the device has the property fails-without-test-cd the driver
-> > changes the controller to test mode and sets test inserted to true to
-> > make the controller function.
-> > 
-> > Signed-off-by: Zach Brown <zach.brown@ni.com>
-> > ---
-> >  drivers/mmc/host/sdhci-of-arasan.c | 34 +++++++++++++++++++++++++++++++++-
-> >  drivers/mmc/host/sdhci.h           |  2 ++
-> >  2 files changed, 35 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> > index e0f193f..c3e5145 100644
-> > --- a/drivers/mmc/host/sdhci-of-arasan.c
-> > +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> > @@ -26,6 +26,7 @@
-> >  #include <linux/phy/phy.h>
-> >  #include <linux/regmap.h>
-> >  #include "sdhci-pltfm.h"
-> > +#include <linux/of.h>
-> > 
-> >  #define SDHCI_ARASAN_CLK_CTRL_OFFSET	0x2c
-> >  #define SDHCI_ARASAN_VENDOR_REGISTER	0x78
-> > @@ -92,6 +93,12 @@ struct sdhci_arasan_data {
-> > 
-> >  	struct regmap	*soc_ctl_base;
-> >  	const struct sdhci_arasan_soc_ctl_map *soc_ctl_map;
-> > +
-> > +	unsigned int arasan_quirks; /* Arasan deviations from spec */
-> > +
-> > +/* Controller does not have CD wired and will not function normally without */
-> > +#define SDHCI_ARASAN_QUIRK_FAILS_WITHOUT_TEST_CD (1<<0)
+On Tue, Sep 06, 2016 at 10:50:09AM +0800, Chen-Yu Tsai wrote:
+> >> The implementation might be along the lines of
+> >>
+> >>   1. having multiple output ports, each for a different interface type.
+> >>      (Some platforms go this route)
+> >>
+> >> Or
+> >>
+> >>   2. having a DT property describe what the output interface is.
+> >>
+> >> The RGB/TCON driver would then setup the registers accordingly.
+> >
+> > Hmmm, yeah, we would need to adjust the bindings too...
+> >
+> > I guess I'd prefer 1), but that would also be the most invasive
+> > solution. I'm not sure how the DT maintainers feel about that.
 > 
-> Bit macro instead?
-> 
+> I wonder if the TCON could use its 2 channels simultaneously?
 
-Setting bits with notations like (1<<0) is the style which is used for quirks
-in sdhci.h Is there a reason it should be different here?
-> > +
-> 
-> remove this line.
-> 
-> >  };
-> > 
-> >  static const struct sdhci_arasan_soc_ctl_map rk3399_soc_ctl_map = {
-> > @@ -203,12 +210,32 @@ static void sdhci_arasan_hs400_enhanced_strobe(struct mmc_host *mmc,
-> >  	writel(vendor, host->ioaddr + SDHCI_ARASAN_VENDOR_REGISTER);
-> >  }
-> > 
-> > +void sdhci_arasan_reset(struct sdhci_host *host, u8 mask)
-> > +{
-> > +	u8 ctrl;
-> > +	struct sdhci_pltfm_host *pltfm_host;
-> > +	struct sdhci_arasan_data *sdhci_arasan;
-> > +
-> > +	sdhci_reset(host, mask);
-> > +
-> > +	pltfm_host = sdhci_priv(host);
-> > +	sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
-> > +
-> > +	if (sdhci_arasan->arasan_quirks &
-> > +	    SDHCI_ARASAN_QUIRK_FAILS_WITHOUT_TEST_CD) {
-> > +		ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
-> > +		ctrl |= SDHCI_CTRL_CDTEST_INS |
-> > +			SDHCI_CTRL_CDTEST_EN;
-> > +		sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
-> > +	}
-> > +}
-> > +
-> >  static struct sdhci_ops sdhci_arasan_ops = {
-> >  	.set_clock = sdhci_arasan_set_clock,
-> >  	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
-> >  	.get_timeout_clock = sdhci_arasan_get_timeout_clock,
-> >  	.set_bus_width = sdhci_set_bus_width,
-> > -	.reset = sdhci_reset,
-> > +	.reset = sdhci_arasan_reset,
-> >  	.set_uhs_signaling = sdhci_set_uhs_signaling,
-> >  };
-> > 
-> > @@ -516,6 +543,11 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
-> >  	}
-> > 
-> >  	sdhci_get_of_property(pdev);
-> > +
-> > +	if (of_get_property(pdev->dev.of_node, "fails-without-test-cd", NULL))
-> > +		sdhci_arasan->arasan_quirks |=
-> > +				SDHCI_ARASAN_QUIRK_FAILS_WITHOUT_TEST_CD;
-> > +
-> >  	pltfm_host->clk = clk_xin;
-> > 
-> >  	sdhci_arasan_update_baseclkfreq(host);
-> > diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> > index 0411c9f..8d92d6e9 100644
-> > --- a/drivers/mmc/host/sdhci.h
-> > +++ b/drivers/mmc/host/sdhci.h
-> > @@ -84,6 +84,8 @@
-> >  #define   SDHCI_CTRL_ADMA32	0x10
-> >  #define   SDHCI_CTRL_ADMA64	0x18
-> >  #define   SDHCI_CTRL_8BITBUS	0x20
-> > +#define  SDHCI_CTRL_CDTEST_INS   0x40
-> > +#define  SDHCI_CTRL_CDTEST_EN     0x80
-> 
-> You should follow coding style above.
+No, it's mutually exclusive.
 
-I don't understand the issue you're raising. Could you elaborate?
+> Like output to one LCD, then mirror through HDMI/VGA?
+> The first option would be able to cover this better?
+
+Even if it wasn't exclusive, that wouldn't be possible
+unfortunately. Or rather, this would be possible if the LCD and the
+HDMI screen had the same timings, which is very unlikely.
+
+> And you still need to add outgoing endpoints for the HDMI block.
+
+Indeed.
+
+> In addition we'll have to rework the TV encoder binding as well.
 > 
-> Thanks,
-> Michal
-> 
+> The 2 TV encoders (on the A20) each have four DACs, which map
+> onto 4 external pins. The address space includes a not so easy
+> to use mux. More importantly, the binding needs to specify which
+> pin is used for what signal (RGB, YUV, S/Video, composite).
+> There seems to be an implicit rule that 1 pin is always used
+> for composite, and the 3 others RGB, though.
+
+I'm not sure why we would need to rework this one though. We have no
+way to detect whether the screen is connected or not on either
+connectors, and we can't have both output running at the same time for
+the same reason than mention above.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160906/906fe9ee/attachment.sig>
