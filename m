@@ -1,57 +1,74 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  6 Sep 2016 14:02:04 +0100
-Subject: [PATCH 06/19] arm64: KVM: Route asynchronous aborts
-In-Reply-To: <1473166937-15271-1-git-send-email-marc.zyngier@arm.com>
-References: <1473166937-15271-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1473166937-15271-7-git-send-email-marc.zyngier@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 6 Sep 2016 15:02:43 +0200
+Subject: [PATCH 1/7] mtd: nand: Create a NAND reset function
+In-Reply-To: <20160906131851.34fa77a9@bbrezillon>
+References: <1473158355-22451-1-git-send-email-s.hauer@pengutronix.de>
+ <1473158355-22451-2-git-send-email-s.hauer@pengutronix.de>
+ <20160906131851.34fa77a9@bbrezillon>
+Message-ID: <20160906130243.33si26g2jy54grvx@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we now have some basic handling to EL1-triggered aborts, we can
-actually report them to KVM.
+On Tue, Sep 06, 2016 at 01:18:51PM +0200, Boris Brezillon wrote:
+> On Tue,  6 Sep 2016 12:39:09 +0200
+> Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> 
+> > When NAND devices are resetted some initialization may have to be done,
+> > like for example they have to be configured for the timing mode that
+> > shall be used. To get a common place where this initialization can be
+> > implemented create a nand_reset() function. This currently only issues
+> > a NAND_CMD_RESET to the NAND device. The places issuing this command
+> > manually are replaced with a call to nand_reset().
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  drivers/mtd/nand/nand_base.c | 23 ++++++++++++++++++-----
+> >  include/linux/mtd/nand.h     |  3 +++
+> >  2 files changed, 21 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+> > index 77533f7..20151fc 100644
+> > --- a/drivers/mtd/nand/nand_base.c
+> > +++ b/drivers/mtd/nand/nand_base.c
+> > @@ -948,6 +948,19 @@ static int nand_wait(struct mtd_info *mtd, struct nand_chip *chip)
+> >  }
+> >  
+> >  /**
+> > + * nand_reset - Reset and initialize a NAND device
+> > + * @mtd: mtd info
+> > + *
+> > + * Returns 0 for success or negative error code otherwise
+> > + */
+> > +int nand_reset(struct mtd_info *mtd)
+> 
+> Can we pass a struct nand_chip * here?
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kvm/hyp/hyp-entry.S | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+Instead of or additionally to truct mtd_info *? One should be enough,
+although most functions take both.
 
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index d6cae54..d2f6640 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -120,6 +120,12 @@ el1_irq:
- 	mov	x0, #ARM_EXCEPTION_IRQ
- 	b	__guest_exit
- 
-+el1_error:
-+	stp     x0, x1, [sp, #-16]!
-+	mrs	x1, tpidr_el2
-+	mov	x0, #ARM_EXCEPTION_EL1_SERROR
-+	b	__guest_exit
-+
- ENTRY(__hyp_do_panic)
- 	mov	lr, #(PSR_F_BIT | PSR_I_BIT | PSR_A_BIT | PSR_D_BIT |\
- 		      PSR_MODE_EL1h)
-@@ -148,7 +154,6 @@ ENDPROC(\label)
- 	invalid_vector	el1_sync_invalid
- 	invalid_vector	el1_irq_invalid
- 	invalid_vector	el1_fiq_invalid
--	invalid_vector	el1_error_invalid
- 
- 	.ltorg
- 
-@@ -168,10 +173,10 @@ ENTRY(__kvm_hyp_vector)
- 	ventry	el1_sync			// Synchronous 64-bit EL1
- 	ventry	el1_irq				// IRQ 64-bit EL1
- 	ventry	el1_fiq_invalid			// FIQ 64-bit EL1
--	ventry	el1_error_invalid		// Error 64-bit EL1
-+	ventry	el1_error			// Error 64-bit EL1
- 
- 	ventry	el1_sync			// Synchronous 32-bit EL1
- 	ventry	el1_irq				// IRQ 32-bit EL1
- 	ventry	el1_fiq_invalid			// FIQ 32-bit EL1
--	ventry	el1_error_invalid		// Error 32-bit EL1
-+	ventry	el1_error			// Error 32-bit EL1
- ENDPROC(__kvm_hyp_vector)
+> 
+> > +{
+> > +	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
+> 
+> You miss the chip variable.
+
+Yeah, the missing hunk is probably in one of the other patches ;) Will
+fix.
+
+> >  extern int nand_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len);
+> >  
+> > +/* Reset and initialize a NAND device */
+> > +extern int nand_reset(struct mtd_info *mtd);
+> 
+> The extern keyword is not needed here.
+
+Nope, just added it because the other functions have it aswell. Do we care
+to remove the extern from the other function declarations?
+
+Sascha
+
 -- 
-2.1.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
