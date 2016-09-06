@@ -1,125 +1,81 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Tue, 6 Sep 2016 16:28:23 +0800
-Subject: [v11, 8/8] mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
-In-Reply-To: <1473150503-9550-1-git-send-email-yangbo.lu@nxp.com>
-References: <1473150503-9550-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1473150503-9550-9-git-send-email-yangbo.lu@nxp.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 6 Sep 2016 10:41:30 +0200
+Subject: [PATCH 1/2] mtd: nand: automate NAND timings selection
+In-Reply-To: <20160906082302.4itzqv4ldd3foazu@pengutronix.de>
+References: <1472820149-24241-1-git-send-email-s.hauer@pengutronix.de>
+ <1472820149-24241-2-git-send-email-s.hauer@pengutronix.de>
+ <20160906082302.4itzqv4ldd3foazu@pengutronix.de>
+Message-ID: <20160906104130.61605fa4@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The eSDHC of T4240-R1.0-R2.0 has incorrect vender version and spec version.
-Acturally the right version numbers should be VVN=0x13 and SVN = 0x1.
-This patch adds the GUTS driver support for eSDHC driver to match SoC.
-And fix host version to avoid that incorrect version numbers break down
-the ADMA data transfer.
+On Tue, 6 Sep 2016 10:23:02 +0200
+Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
-Acked-by: Scott Wood <oss@buserror.net>
----
-Changes for v2:
-	- Got SVR through iomap instead of dts
-Changes for v3:
-	- Managed GUTS through syscon instead of iomap in eSDHC driver
-Changes for v4:
-	- Got SVR by GUTS driver instead of SYSCON
-Changes for v5:
-	- Changed to get SVR through API fsl_guts_get_svr()
-	- Combined patch 4, patch 5 and patch 6 into one
-Changes for v6:
-	- Added 'Acked-by: Ulf Hansson'
-Changes for v7:
-	- None
-Changes for v8:
-	- Added 'Acked-by: Scott Wood'
-Changes for v9:
-	- None
-Changes for v10:
-	- None
-Changes for v11:
-	- Changed to use soc_device_match
----
- drivers/mmc/host/Kconfig          |  1 +
- drivers/mmc/host/sdhci-of-esdhc.c | 20 ++++++++++++++++++++
- 2 files changed, 21 insertions(+)
+> Hi Boris,
+> 
+> On Fri, Sep 02, 2016 at 02:42:28PM +0200, Sascha Hauer wrote:
+> > +static int nand_configure_data_interface(struct mtd_info *mtd)
+> > +{
+> > +	struct nand_chip *chip = mtd_to_nand(mtd);
+> > +	struct nand_data_interface *conf;
+> > +	int modes, mode, ret = -EINVAL;
+> > +	uint8_t tmode_param[ONFI_SUBFEATURE_PARAM_LEN] = { };
+> > +	int i;
+> > +
+> > +	conf = kzalloc(sizeof(*conf), GFP_KERNEL);
+> > +	if (!conf)
+> > +		return -ENOMEM;
+> > +
+> > +	/* TODO: support DDR interfaces */
+> > +	conf->type = NAND_SDR_IFACE;
+> > +
+> > +	/*
+> > +	 * First try to identify the best timings from ONFI parameters and
+> > +	 * if the NAND does not support ONFI, fallback to the default ONFI
+> > +	 * timing mode.
+> > +	 */
+> > +	modes = onfi_get_async_timing_mode(chip);
+> > +	if (modes == ONFI_TIMING_MODE_UNKNOWN) {
+> > +		mode = chip->onfi_timing_mode_default;
+> > +		conf->timings.sdr =
+> > +				*onfi_async_timing_mode_to_sdr_timings(mode);
+> > +
+> > +		ret = nand_check_data_interface(mtd, conf);
+> > +	} else {
+> > +		for (mode = fls(modes) - 1; mode >= 0; mode--) {
+> > +			conf->timings.sdr =
+> > +				*onfi_async_timing_mode_to_sdr_timings(mode);
+> > +
+> > +			ret = nand_check_data_interface(mtd, conf);
+> > +			if (!ret)
+> > +				break;
+> > +		}
+> > +	}  
+> 
+> I wonder if this works good for non ONFI NANDs. In the ONFI case we
+> iterate over all modes supported by the NAND until we find one that also
+> suits the driver. By doing so we inherently assume that not all drivers
+> support all modes. In the non ONFI case instead we hardcode a single
+> timing into the nand_id table, what if the driver does not support this
+> timing? It will fail in this case without ever trying slower timings.
+> Shouldn't we encode the mode bitmask into the nand_id table rather than
+> a single timing?
 
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index 5274f50..a1135a9 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -144,6 +144,7 @@ config MMC_SDHCI_OF_ESDHC
- 	depends on MMC_SDHCI_PLTFM
- 	depends on PPC || ARCH_MXC || ARCH_LAYERSCAPE
- 	select MMC_SDHCI_IO_ACCESSORS
-+	select FSL_GUTS
- 	help
- 	  This selects the Freescale eSDHC controller support.
- 
-diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
-index fb71c86..0a31aa5 100644
---- a/drivers/mmc/host/sdhci-of-esdhc.c
-+++ b/drivers/mmc/host/sdhci-of-esdhc.c
-@@ -18,6 +18,7 @@
- #include <linux/of.h>
- #include <linux/delay.h>
- #include <linux/module.h>
-+#include <linux/sys_soc.h>
- #include <linux/mmc/host.h>
- #include "sdhci-pltfm.h"
- #include "sdhci-esdhc.h"
-@@ -28,6 +29,7 @@
- struct sdhci_esdhc {
- 	u8 vendor_ver;
- 	u8 spec_ver;
-+	bool quirk_incorrect_hostver;
- };
- 
- /**
-@@ -73,6 +75,8 @@ static u32 esdhc_readl_fixup(struct sdhci_host *host,
- static u16 esdhc_readw_fixup(struct sdhci_host *host,
- 				     int spec_reg, u32 value)
- {
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct sdhci_esdhc *esdhc = sdhci_pltfm_priv(pltfm_host);
- 	u16 ret;
- 	int shift = (spec_reg & 0x2) * 8;
- 
-@@ -80,6 +84,12 @@ static u16 esdhc_readw_fixup(struct sdhci_host *host,
- 		ret = value & 0xffff;
- 	else
- 		ret = (value >> shift) & 0xffff;
-+	/* Workaround for T4240-R1.0-R2.0 eSDHC which has incorrect
-+	 * vendor version and spec version information.
-+	 */
-+	if ((spec_reg == SDHCI_HOST_VERSION) &&
-+	    (esdhc->quirk_incorrect_hostver))
-+		ret = (VENDOR_V_23 << SDHCI_VENDOR_VER_SHIFT) | SDHCI_SPEC_200;
- 	return ret;
- }
- 
-@@ -558,6 +568,12 @@ static const struct sdhci_pltfm_data sdhci_esdhc_le_pdata = {
- 	.ops = &sdhci_esdhc_le_ops,
- };
- 
-+static struct soc_device_attribute soc_incorrect_hostver[] = {
-+	{ .soc_id = "*name:T4240*", .revision = "1.0", },
-+	{ .soc_id = "*name:T4240*", .revision = "2.0", },
-+	{ },
-+};
-+
- static void esdhc_init(struct platform_device *pdev, struct sdhci_host *host)
- {
- 	struct sdhci_pltfm_host *pltfm_host;
-@@ -571,6 +587,10 @@ static void esdhc_init(struct platform_device *pdev, struct sdhci_host *host)
- 	esdhc->vendor_ver = (host_ver & SDHCI_VENDOR_VER_MASK) >>
- 			     SDHCI_VENDOR_VER_SHIFT;
- 	esdhc->spec_ver = host_ver & SDHCI_SPEC_VER_MASK;
-+	if (soc_device_match(soc_incorrect_hostver))
-+		esdhc->quirk_incorrect_hostver = true;
-+	else
-+		esdhc->quirk_incorrect_hostver = false;
- }
- 
- static int sdhci_esdhc_probe(struct platform_device *pdev)
--- 
-2.1.0.27.g96db324
+IIRC, this is what I proposed in my first patch (having a bitmask
+encoding supported modes), but Brian suggested to directly put the
+highest supported mode.
+
+Anyway, I don't think a NAND can support higher modes without
+supporting lower ones, so extracting the supported modes info from the
+default_onfi_timing_mode should be pretty easy:
+
+	supported_modes = GENMASK(default_onfi_timing_mode, 0);
+
+> I cannot find a chip in the nand_id table which actually sets
+> onfi_timing_mode_default, but since you introduced the field in the
+> nand_id table with commit 57a94e24bc92 you can probably tell me more.
+
+Hm, this one [1] is defining timing mode 4.
+
+[1]http://lxr.free-electrons.com/source/drivers/mtd/nand/nand_ids.c#L51
