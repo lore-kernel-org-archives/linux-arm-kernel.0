@@ -1,55 +1,51 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 6 Sep 2016 15:39:06 +0800
-Subject: [PATCH v7 4/9] drm/mediatek: update display module connections
-In-Reply-To: <1472815484-43821-5-git-send-email-yt.shen@mediatek.com>
-References: <1472815484-43821-1-git-send-email-yt.shen@mediatek.com>
- <1472815484-43821-5-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1473147546.11736.7.camel@mtksdaap41>
+From: harinikatakamlinux@gmail.com (Harini Katakam)
+Date: Tue, 6 Sep 2016 13:13:19 +0530
+Subject: [RFC PATCH 2/2] macb: Enable 1588 support in SAMA5D2 platform.
+In-Reply-To: <1472820817-21874-2-git-send-email-andrei.pistirica@microchip.com>
+References: <1472820817-21874-1-git-send-email-andrei.pistirica@microchip.com>
+ <1472820817-21874-2-git-send-email-andrei.pistirica@microchip.com>
+Message-ID: <CAFcVECLWQy-25zjvBa9dVvtCFsgpLcuhOm4sOzKv4qt=+R5-TQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, YT:
+Hi Andrei,
 
-On Fri, 2016-09-02 at 19:24 +0800, YT Shen wrote:
-> update connections for OVL, RDMA, BLS, DSI
-> 
-> Signed-off-by: YT Shen <yt.shen@mediatek.com>
++Richard Cochran
+
+On Fri, Sep 2, 2016 at 6:23 PM, Andrei Pistirica
+<andrei.pistirica@microchip.com> wrote:
+> Hardware time stamp on the PTP Ethernet packets are received using the
+> SO_TIMESTAMPING API. Timers are obtained from the PTP event/peer
+> gem registers.
+>
+> Signed-off-by: Andrei Pistirica <andrei.pistirica@microchip.com>
 > ---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
-> 
+> Integration with SAMA5D2 only. This feature wasn't tested on any
+> other platform that might use cadence/gem.
+>
+> Patch is not completely ported to the very latest version of net-next,
+> and it will be after review.
+>
+<snip>
+> @@ -853,6 +858,11 @@ static int gem_rx(struct macb *bp, int budget)
+>                     GEM_BFEXT(RX_CSUM, ctrl) & GEM_RX_CSUM_CHECKED_MASK)
+>                         skb->ip_summed = CHECKSUM_UNNECESSARY;
+>
+> +/* guard the hot-path */
+> +#ifdef CONFIG_MACB_USE_HWSTAMP
+> +               if (bp->hwts_rx_en)
+> +                       macb_ptp_do_rxstamp(bp, skb);
+> +#endif
 
-[snip...]
-
-> @@ -111,6 +119,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
->  	if (cur == DDP_COMPONENT_OVL0 && next == DDP_COMPONENT_COLOR0) {
->  		*addr = DISP_REG_CONFIG_DISP_OVL0_MOUT_EN;
->  		value = OVL0_MOUT_EN_COLOR0;
-> +	} else if (cur == DDP_COMPONENT_OVL0 && next == DDP_COMPONENT_RDMA0) {
-> +		*addr = DISP_REG_CONFIG_DISP_OVL_MOUT_EN;
-> +		value = OVL_MOUT_EN_RDMA;
->  	} else if (cur == DDP_COMPONENT_OD && next == DDP_COMPONENT_RDMA0) {
->  		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
->  		value = OD_MOUT_EN_RDMA0;
-> @@ -148,6 +159,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
->  	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
->  		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
->  		value = COLOR1_SEL_IN_OVL1;
-> +	} else if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0) {
-
-DDP_COMPONENT_BLS is a new symbol which is defined in 9th patch of this
-series. I think the definition of DDP_COMPONENT_BLS should be in front
-of this patch.
-
-> +		*addr = DISP_REG_CONFIG_DSI_SEL;
-> +		value = DSI_SEL_IN_BLS;
->  	} else {
->  		value = 0;
->  	}
-> @@ -155,6 +169,15 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
->  	return value;
->  }
->  
+I'm just wondering if the same #ifdef can be used for timestamping
+in all versions of this IP.
+As you know, ZynqMP uses the timestamp from BD and older
+versions of do not have an indication or extended BD support.
+So, it might useful to add a dependency/check on the product family,
+through config structure.
+That way, both version can use their respective RX timestamp methods
+based on the compatible string.
+Please let me know if you have any other ideas.
 
 Regards,
-CK
+Harini
