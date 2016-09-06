@@ -1,111 +1,54 @@
-From: dave.long@linaro.org (David Long)
-Date: Tue,  6 Sep 2016 13:54:59 -0400
-Subject: [PATCH v2] arm64: Improve kprobes test for atomic sequence
-Message-ID: <1473184499-6018-1-git-send-email-dave.long@linaro.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 06 Sep 2016 10:56:18 -0700
+Subject: [PATCH v2 0/3] Add Platform MHU mailbox driver for Amlogic GXBB
+In-Reply-To: <CABb+yY10d1+73wjAZCM6PqSXiVC05ZWehK+ugb7rMh8yOh9wNg@mail.gmail.com>
+ (Jassi Brar's message of "Sun, 4 Sep 2016 11:05:44 +0530")
+References: <1471515027-3543-1-git-send-email-narmstrong@baylibre.com>
+ <m24m5xc1v0.fsf@baylibre.com>
+ <CABb+yY2Cq5KaCCvoJ5afsLfqc5NEoPMkaaYk9GjFO8=N80eVBA@mail.gmail.com>
+ <CAOi56cVVY=XL1HFSNGS8H3Zq0KiNbAzvNxbOkW7NYsSOQ2n6_g@mail.gmail.com>
+ <CABb+yY10d1+73wjAZCM6PqSXiVC05ZWehK+ugb7rMh8yOh9wNg@mail.gmail.com>
+Message-ID: <7hpoogzzct.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "David A. Long" <dave.long@linaro.org>
+Jassi Brar <jassisinghbrar@gmail.com> writes:
 
-Kprobes searches backwards a finite number of instructions to determine if
-there is an attempt to probe a load/store exclusive sequence. It stops when
-it hits the maximum number of instructions or a load or store exclusive.
-However this means it can run up past the beginning of the function and
-start looking at literal constants. This has been shown to cause a false
-positive and blocks insertion of the probe. To fix this, further limit the
-backwards search to stop if it hits a symbol address from kallsyms. The
-presumption is that this is the entry point to this code (particularly for
-the common case of placing probes at the beginning of functions).
+> On Sun, Sep 4, 2016 at 2:15 AM, Kevin Hilman <khilman@baylibre.com> wrote:
+>> On Fri, Sep 2, 2016 at 10:33 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>> On Sat, Sep 3, 2016 at 5:04 AM, Kevin Hilman <khilman@baylibre.com> wrote:
+>>>> Hi Jassi,
+>>>>
+>>>> Neil Armstrong <narmstrong@baylibre.com> writes:
+>>>>
+>>>>> In order to support Mailbox links for the Amlogic GXBB SoC, add a generic
+>>>>> platform MHU driver based on arm_mhu.c.
+>>>>>
+>>>>> This patchset follows a RFC thread along the GXBB SCPI support at :
+>>>>> http://lkml.kernel.org/r/1466503374-28841-1-git-send-email-narmstrong at baylibre.com
+>>>>> And specific MHU discussions at :
+>>>>> http://lkml.kernel.org/r/CABb+yY3HqJG2+GMWCWF9PomxobrwWGZ=TZe5NvXPcHMDdLhkcQ at mail.gmail.com
+>>>>>
+>>>>> Changes since v1 at http://lkml.kernel.org/r/1470732737-18391-1-git-send-email-narmstrong at baylibre.com :
+>>>>>  - Fix irq to signed to detect platform_get_irq() failures
+>>>>>  - Introduced back the secure channel
+>>>>>  - Fixed indexes
+>>>>
+>>>> How is this version looking to you?
+>>>>
+>>>> With your review/ack on the driver, I'd be happy to take it via the
+>>>> amlogic tree as there shouldn't be any conflicts with your tree.
+>>>>
+>>> I am ok with the driver, but I don't understand how it helps going via
+>>> amlogic tree. I would like to send a pull request every release ;)
+>>
+>> That's fine with me too.  I offered tot take int just in case you had
+>> already sent pull requests for this cycle, and also since I'll take
+>> the DT changes through arm-soc.
+>>
+> This revision came after rc2, so it wasn't included. I will queue
+> patch-1 & 2 for next release, and you the patch-3.
 
-This also improves efficiency by not searching code that is not part of the
-function. There may be some possibility that the label might not denote the
-entry path to the probed instruction but the likelihood seems low and this
-is just another example of how the kprobes user really needs to be
-careful about what they are doing.
+OK, sounds good.  Thanks,
 
-Signed-off-by: David A. Long <dave.long@linaro.org>
----
- arch/arm64/kernel/probes/decode-insn.c | 48 +++++++++++++++++++++++-----------
- 1 file changed, 33 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm64/kernel/probes/decode-insn.c b/arch/arm64/kernel/probes/decode-insn.c
-index 37e47a9..356ee52 100644
---- a/arch/arm64/kernel/probes/decode-insn.c
-+++ b/arch/arm64/kernel/probes/decode-insn.c
-@@ -16,6 +16,7 @@
- #include <linux/kernel.h>
- #include <linux/kprobes.h>
- #include <linux/module.h>
-+#include <linux/kallsyms.h>
- #include <asm/kprobes.h>
- #include <asm/insn.h>
- #include <asm/sections.h>
-@@ -122,7 +123,7 @@ arm_probe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- static bool __kprobes
- is_probed_address_atomic(kprobe_opcode_t *scan_start, kprobe_opcode_t *scan_end)
- {
--	while (scan_start > scan_end) {
-+	while (scan_start >= scan_end) {
- 		/*
- 		 * atomic region starts from exclusive load and ends with
- 		 * exclusive store.
-@@ -144,26 +145,43 @@ arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi)
- 	kprobe_opcode_t insn = le32_to_cpu(*addr);
- 	kprobe_opcode_t *scan_start = addr - 1;
- 	kprobe_opcode_t *scan_end = addr - MAX_ATOMIC_CONTEXT_SIZE;
-+	unsigned long size = 0, offset = 0;
- #if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
- 	struct module *mod;
- #endif
- 
--	if (addr >= (kprobe_opcode_t *)_text &&
--	    scan_end < (kprobe_opcode_t *)_text)
--		scan_end = (kprobe_opcode_t *)_text;
-+	/*
-+	 * If there's a symbol defined in front of and near enough to
-+	 * the probe address assume it is the entry point to this
-+	 * code and use it to further limit how far back we search
-+	 * when determining if we're in an atomic sequence.
-+	 */
-+	if (kallsyms_lookup_size_offset((unsigned long) addr, &size, &offset))
-+		if (offset < (MAX_ATOMIC_CONTEXT_SIZE*sizeof(kprobe_opcode_t)))
-+			scan_end = addr - (offset / sizeof(kprobe_opcode_t));
-+
-+	if (scan_end <= scan_start) {
-+		if (addr >= (kprobe_opcode_t *)_text &&
-+		    scan_end < (kprobe_opcode_t *)_text)
-+			scan_end = (kprobe_opcode_t *)_text;
- #if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
--	else {
--		preempt_disable();
--		mod = __module_address((unsigned long)addr);
--		if (mod && within_module_init((unsigned long)addr, mod) &&
--			!within_module_init((unsigned long)scan_end, mod))
--			scan_end = (kprobe_opcode_t *)mod->init_layout.base;
--		else if (mod && within_module_core((unsigned long)addr, mod) &&
--			!within_module_core((unsigned long)scan_end, mod))
--			scan_end = (kprobe_opcode_t *)mod->core_layout.base;
--		preempt_enable();
--	}
-+		else {
-+			preempt_disable();
-+			mod = __module_address((unsigned long)addr);
-+			if (mod &&
-+			    within_module_init((unsigned long)addr, mod) &&
-+			    !within_module_init((unsigned long)scan_end, mod))
-+				scan_end =
-+				    (kprobe_opcode_t *)mod->init_layout.base;
-+			else if (mod &&
-+			    within_module_core((unsigned long)addr, mod) &&
-+			    !within_module_core((unsigned long)scan_end, mod))
-+				scan_end =
-+				    (kprobe_opcode_t *)mod->core_layout.base;
-+			preempt_enable();
-+		}
- #endif
-+	}
- 	decoded = arm_probe_decode_insn(insn, asi);
- 
- 	if (decoded == INSN_REJECTED ||
--- 
-2.5.0
+Kevin
