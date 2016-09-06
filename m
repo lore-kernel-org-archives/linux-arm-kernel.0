@@ -1,51 +1,149 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 6 Sep 2016 23:02:08 +0200
-Subject: [PATCH v2] drivers: acpi: fix GIC irq model default PCI IRQ
- polarity
-In-Reply-To: <20160906171401.GA7554@localhost>
-References: <1473180663-20590-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20160906171401.GA7554@localhost>
-Message-ID: <CAJZ5v0i1VV1poabr3ZUvDdSGR9NN=tj6GoXM98rsrU6M-f_pOA@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 6 Sep 2016 23:07:35 +0200
+Subject: [PATCH v5] i2c: imx: make bus recovery through pinctrl optional
+In-Reply-To: <CADRPPNQ+1qBNL5WA=Jo_keE7BPnoOs7a2T6CpTuciiF16qK6xQ@mail.gmail.com>
+References: <1471644322-22670-1-git-send-email-leoyang.li@nxp.com>
+ <20160906185849.27pjhawadca5pwow@pengutronix.de>
+ <CADRPPNQ+1qBNL5WA=Jo_keE7BPnoOs7a2T6CpTuciiF16qK6xQ@mail.gmail.com>
+Message-ID: <20160906210735.6wl5x2mdhnhdnh7y@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 6, 2016 at 7:14 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> On Tue, Sep 06, 2016 at 05:51:03PM +0100, Lorenzo Pieralisi wrote:
->> On ACPI ARM based systems the GIC interrupt controller
->> and corresponding interrupt model permit only the high
->> polarity for level interrupts.
->>
->> ACPI firmware describes PCI legacy IRQs through entries
->> in the _PRT objects. Entries in the _PRT can be of two types:
->>
->> - Static: not configurable, trigger/polarity default to level-low,
->>   _PRT entry defines the global GSI interrupt number
->> - Configurable: _PRT interrupt entry contains a reference to the
->>   corresponding PCI interrupt link device (that in turn provides the
->>   interrupt descriptor through its _CRS/_PRS methods)
->>
->> Configurable IRQ entries are not currently allowed by the ACPI
->> specification on ARM since they can only be used for interrupt pins that
->> are routable, as per ACPI specifications (version 6.1, 6.2.13):
->>
->> "[...] There are two ways that _PRT can be used. Typically, the
->> interrupt input that a given PCI interrupt is on is configurable. For
->> example, a given PCI interrupt might be configured for either IRQ 10 or
->> 11 on an 8259 interrupt controller. In this model, each interrupt is
->> represented in the ACPI namespace as a PCI Interrupt Link Device. [...]"
->
-> Thanks for the reference!  I wouldn't read that as actually
-> *disallowing* Interrupt Links for non-configurable interrupts.
->
-> But regardless, I do understand that even if we assume Interrupt Links
-> are allowed, there is firmware in the field that doesn't use them, and
-> I think this patch is really targeted at *them*.
+On Tue, Sep 06, 2016 at 03:06:41PM -0500, Leo Li wrote:
+> On Tue, Sep 6, 2016 at 1:58 PM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> > On Fri, Aug 19, 2016 at 05:05:22PM -0500, Li Yang wrote:
+> >> Since commit 1c4b6c3bcf30 ("i2c: imx: implement bus recovery") the
+> >> driver starts to use gpio/pinctrl to do i2c bus recovery.  But pinctrl
+> >> is not always available for platforms with this controller such as ls1021a
+> >> and ls1043a, and the device tree binding also mentioned this gpio based
+> >> recovery mechanism as optional.  The patch makes it really optional that
+> >> the probe function won't bailout but just disable the bus recovery function
+> >> when pinctrl is not available.
+> >>
+> >> Signed-off-by: Li Yang <leoyang.li@nxp.com>
+> >> Cc: Gao Pan <pandy.gao@nxp.com>
+> >> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> >> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> >> ---
+> >> v5:
+> >> Revert the last minute change of recovery info initialization timing, it
+> >> will cause problem if initialized after i2c_add_numbered_adapter()
+> >>
+> >> v4:
+> >> Remove the use of IS_ERR_OR_NULL
+> >> Move the condition judgement to i2c_imx_init_recovery_info()
+> >> Change the timing of recovery initialization to be after bus registration
+> >>
+> >> v3:
+> >> Rebased to Wolfram's for-next branch
+> >> Added acked-by from Linus Walleij
+> >> Update to use new nxp email addresses due to company merge
+> >>
+> >>  drivers/i2c/busses/i2c-imx.c | 15 ++++++++++++++-
+> >>  1 file changed, 14 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+> >> index 1844bc9..7ae7992 100644
+> >> --- a/drivers/i2c/busses/i2c-imx.c
+> >> +++ b/drivers/i2c/busses/i2c-imx.c
+> >> @@ -989,6 +989,15 @@ static void i2c_imx_init_recovery_info(struct imx_i2c_struct *i2c_imx,
+> >>  {
+> >>       struct i2c_bus_recovery_info *rinfo = &i2c_imx->rinfo;
+> >>
+> >> +     /* if pinctrl is not supported on the system */
+> >> +     if (IS_ERR(i2c_imx->pinctrl))
+> >> +             i2c_imx->pinctrl = NULL;
+> >> +
+> >> +     if (!i2c_imx->pinctrl) {
+> >> +             dev_info(&pdev->dev, "can't get pinctrl, bus recovery not supported\n");
+> >> +             return;
+> >> +     }
+> >> +
+> >>       i2c_imx->pinctrl_pins_default = pinctrl_lookup_state(i2c_imx->pinctrl,
+> >>                       PINCTRL_STATE_DEFAULT);
+> >>       i2c_imx->pinctrl_pins_gpio = pinctrl_lookup_state(i2c_imx->pinctrl,
+> >> @@ -1081,8 +1090,11 @@ static int i2c_imx_probe(struct platform_device *pdev)
+> >>               return ret;
+> >>       }
+> >>
+> >> +     /* optional bus recovery feature through pinctrl */
+> >>       i2c_imx->pinctrl = devm_pinctrl_get(&pdev->dev);
+> >> -     if (IS_ERR(i2c_imx->pinctrl)) {
+> >> +     /* bailout on -ENOMEM or -EPROBE_DEFER, continue for other errors */
+> >> +     if (PTR_ERR(i2c_imx->pinctrl) == -ENOMEM ||
+> >> +                     PTR_ERR(i2c_imx->pinctrl) == -EPROBE_DEFER) {
+> >>               ret = PTR_ERR(i2c_imx->pinctrl);
+> >>               goto clk_disable;
+> >>       }
+> >
+> > devm_pinctrl_get might return the following error-valued pointers:
+> >  - -EINVAL
+> >  - -ENOMEM
+> >  - -ENODEV
+> >  - -EPROBE_DEFER
+> >
+> > There are several error paths returning -EINVAL, one is when an invalid
+> > phandle is used. Do you really want to ignore that?
+> >
+> > IMO error handling is better done with inverse logic, that is continue
+> > on some explicit error, bail out on all unknown stuff. This tends to be
+> > more robust. Also the comment should be improved to not explain that for
+> > -ENOMEM and -EPROBE_DEFER we bail out (which should be obvious for
+> > anyone who can read C) but to explain why.
+> 
+> What you said is true for normal error handling, but in this scenario
+> it is intentional to ignore all pinctrl related errors except critical
+> ones because failing to have pinctrl for an optional feature shouldn't
+> impact the function of normal i2c.  We choose to catch -ENOMEM because
+> the error could also cause problem for i2c probe, and -EPROBE_DEFER
+> because it's possible that the pinctrl will be ready later and we want
+> to give it a chance.  The i2c driver really don't care why the pinctrl
+> was not usable.  I thought I added comment before the
+> devm_pinctrl_get() to explain that the pinctrl is optional.  Hopefully
+> you are not suggesting to explain what -ENOMEM and -EPROBE_DEFER mean
+> in the comment. :)
 
-Right.  That's my understanding too.
+You wrote
 
-So, generally speaking, it would be good to make interrupt links work
-without _PRS, _SRS under them etc. and use link objects to address
-this case in the future.
+	/* optional bus recovery feature through pinctrl */
 
-Thanks,
-Rafael
+there. I'd expect to read something like:
+
+	/*
+	 * If pinctrl is available it might be possible to switch the
+	 * SDA and SCL lines to their GPIO functions and do a recovery
+	 * procedure in this mode. If there is anything wrong with
+	 * pinctrl we cannot do this and simply skip it.
+	 */
+ 
+> > Also I'd put
+> >
+> >         i2c_imx->pinctrl = NULL;
+> >
+> > directly after devm_pinctrl_get() which I consider the more obvious
+> > place for this.
+> 
+> On the other hand, put it together with the actually judgement can
+> make it clear that it is catching both IS_ERR and NULL returns from
+> devm_pinctrl_get()?
+
+When you do it immediately, you have:
+
+	if (i2c_imx->pinctrl)
+		use_it();
+	else
+		ignore_it();
+
+which looks clean. And if later another piece of code is added that
+works on the pinctrl value, you don't have to care about the order (or
+set it to NULL at two places). Instead you can consider the value const
+in the complete driver apart from the little snippet that assigns to it
+in .probe().
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
