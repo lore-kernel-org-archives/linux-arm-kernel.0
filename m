@@ -1,35 +1,41 @@
 From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Tue, 6 Sep 2016 12:53:09 -0300
-Subject: [PATCH 3/9] ARM: dts: imx1: Fix cpu node build warnings with W=1
+Date: Tue, 6 Sep 2016 12:53:10 -0300
+Subject: [PATCH 4/9] ARM: dts: imx25: Remove skeleton.dtsi
 In-Reply-To: <1473177196-29371-1-git-send-email-fabio.estevam@nxp.com>
 References: <1473177196-29371-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <1473177196-29371-3-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <1473177196-29371-4-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following build warnings with W=1:
+The inclusion of skeleton.dtsi causes the following build warning:
 
-Warning (unit_address_vs_reg): Node /cpus/cpu at 0 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+
+Instead of fixing skeleton.dtsi, just add the top level definitions
+for address-cells and size-cell and remove its inclusion.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx1.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx25.dtsi | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx1.dtsi b/arch/arm/boot/dts/imx1.dtsi
-index b792eee..dd3de38 100644
---- a/arch/arm/boot/dts/imx1.dtsi
-+++ b/arch/arm/boot/dts/imx1.dtsi
-@@ -43,8 +43,9 @@
- 		#size-cells = <0>;
- 		#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index af6af87..831d09a 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -9,10 +9,12 @@
+  * http://www.gnu.org/copyleft/gpl.html
+  */
  
--		cpu: cpu at 0 {
-+		cpu at 0 {
- 			device_type = "cpu";
-+			reg = <0>;
- 			compatible = "arm,arm920t";
- 			operating-points = <200000 1900000>;
- 			clock-latency = <62500>;
+-#include "skeleton.dtsi"
+ #include "imx25-pinfunc.h"
+ 
+ / {
++	#address-cells = <1>;
++	#size-cells = <1>;
++
+ 	aliases {
+ 		ethernet0 = &fec;
+ 		gpio0 = &gpio1;
 -- 
 1.9.1
