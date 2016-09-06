@@ -1,98 +1,114 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 6 Sep 2016 15:59:39 +0200
-Subject: [linux-sunxi] [PATCH 3/7] drm/sun4i: Add SAT and DRC drivers
-In-Reply-To: <8737lfwhz9.fsf@dell.be.48ers.dk>
-References: <20160901153204.11217-1-maxime.ripard@free-electrons.com>
- <20160901153204.11217-4-maxime.ripard@free-electrons.com>
- <8737lfwhz9.fsf@dell.be.48ers.dk>
-Message-ID: <20160906135939.GF9040@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue,  6 Sep 2016 16:06:20 +0200
+Subject: [PATCH 1/4] ARM: mv78xx0: simplify ethernet device creation
+Message-ID: <20160906140623.2853066-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Out of the four ethernet devices on mv78xx0, only the first one
+has an error interrupt line, for the other ones we pass NO_IRQ
+and then ignore the argument.
 
-On Sun, Sep 04, 2016 at 10:03:06PM +0200, Peter Korsgaard wrote:
-> >>>>> "Maxime" == Maxime Ripard <maxime.ripard@free-electrons.com> writes:
-> 
-> Hi,
-> 
->  > The A33 pipeline also has some new components called SAT and DRC. Even
->  > though their exact features and programming model is not known (or
->  > documented), they need to be clocked for the pipeline to carry the video
->  > signal all the way.
-> 
->  > Add minimal drivers for those that just claim the needed resources for the
->  > pipeline to operate properly.
-> 
->  > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->  > ---
->  >  .../bindings/display/sunxi/sun4i-drm.txt           |  37 +++++++
->  >  drivers/gpu/drm/sun4i/Makefile                     |   3 +-
->  >  drivers/gpu/drm/sun4i/sun6i_drc.c                  | 117 +++++++++++++++++++++
->  >  drivers/gpu/drm/sun4i/sun8i_sat.c                  | 105 ++++++++++++++++++
->  >  4 files changed, 261 insertions(+), 1 deletion(-)
->  >  create mode 100644 drivers/gpu/drm/sun4i/sun6i_drc.c
->  >  create mode 100644 drivers/gpu/drm/sun4i/sun8i_sat.c
-> 
->  > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
->  > index d467ea93ac08..87c3c8dd34cb 100644
->  > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
->  > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
->  > @@ -51,6 +51,43 @@ Required properties:
->  >    second the block connected to the TCON channel 1 (usually the TV
->  >    encoder)
->  
->  > +SAT
->  > +---
->  > +
->  > +The SAT, found in the A33, allows to do some color correction.
->  > +
->  > +Required properties:
->  > +  - compatible: value must be one of:
->  > +    * allwinner,sun8i-a33-sat
->  > +  - reg: base address and size of the memory-mapped region.
->  > +  - clock: phandles to bus clock feeding the SAT
->  > +  - resets: phandles to the reset line driving the SAT
->  > +
->  > +- ports: A ports node with endpoint definitions as defined in
->  > +  Documentation/devicetree/bindings/media/video-interfaces.txt. The
->  > +  first port should be the input endpoints, the second one the outputs
->  > +
->  > +DRC
->  > +---
->  > +
->  > +The DRC, found in the latest Allwinner SoCs (A31, A23, A33), allows to
->  > +do some backlight control to enhance the power consumption.
-> 
-> 'Enhance the power consumption'? That doesn't sound like something you
-> would want ;) Presumably it is something to allow you to save power by
-> dynamically adjusting LCD backlight and pixel brightness/contrast
-> depending on screen content? I believe this is typically called content
-> adaptive backlight control:
-> 
-> https://www.ecnmag.com/article/2010/04/content-adaptive-lcd-backlight-control
-> 
-> You spell out what DRC and SAT stands for in the driver source code,
-> perhaps it also makes sense to do it here?
-> 
-> Perhaps rewording it to something like this is clearer:
-> 
-> .. allows to dynamically adjust pixel brightness/contrast based on
-> histogram measurements for LCD content adaptive backlight control.
+In order to get closer to complete remove of NO_IRQ, this simply
+drops the unused function arguments.
 
-You're right, I changed it.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-mv78xx0/common.c            | 9 ++-------
+ arch/arm/plat-orion/common.c              | 7 ++-----
+ arch/arm/plat-orion/include/plat/common.h | 7 ++-----
+ 3 files changed, 6 insertions(+), 17 deletions(-)
 
-Thanks!
-Maxime
-
+diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
+index 6af5430d0d97..f72e1e9f5fc5 100644
+--- a/arch/arm/mach-mv78xx0/common.c
++++ b/arch/arm/mach-mv78xx0/common.c
+@@ -219,7 +219,6 @@ void __init mv78xx0_ge01_init(struct mv643xx_eth_platform_data *eth_data)
+ {
+ 	orion_ge01_init(eth_data,
+ 			GE01_PHYS_BASE, IRQ_MV78XX0_GE01_SUM,
+-			NO_IRQ,
+ 			MV643XX_TX_CSUM_DEFAULT_LIMIT);
+ }
+ 
+@@ -242,9 +241,7 @@ void __init mv78xx0_ge10_init(struct mv643xx_eth_platform_data *eth_data)
+ 		eth_data->duplex = DUPLEX_FULL;
+ 	}
+ 
+-	orion_ge10_init(eth_data,
+-			GE10_PHYS_BASE, IRQ_MV78XX0_GE10_SUM,
+-			NO_IRQ);
++	orion_ge10_init(eth_data, GE10_PHYS_BASE, IRQ_MV78XX0_GE10_SUM);
+ }
+ 
+ 
+@@ -266,9 +263,7 @@ void __init mv78xx0_ge11_init(struct mv643xx_eth_platform_data *eth_data)
+ 		eth_data->duplex = DUPLEX_FULL;
+ 	}
+ 
+-	orion_ge11_init(eth_data,
+-			GE11_PHYS_BASE, IRQ_MV78XX0_GE11_SUM,
+-			NO_IRQ);
++	orion_ge11_init(eth_data, GE11_PHYS_BASE, IRQ_MV78XX0_GE11_SUM);
+ }
+ 
+ /*****************************************************************************
+diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+index 78c8bf4043c0..7757f71fe709 100644
+--- a/arch/arm/plat-orion/common.c
++++ b/arch/arm/plat-orion/common.c
+@@ -354,7 +354,6 @@ static struct platform_device orion_ge01 = {
+ void __init orion_ge01_init(struct mv643xx_eth_platform_data *eth_data,
+ 			    unsigned long mapbase,
+ 			    unsigned long irq,
+-			    unsigned long irq_err,
+ 			    unsigned int tx_csum_limit)
+ {
+ 	fill_resources(&orion_ge01_shared, orion_ge01_shared_resources,
+@@ -404,8 +403,7 @@ static struct platform_device orion_ge10 = {
+ 
+ void __init orion_ge10_init(struct mv643xx_eth_platform_data *eth_data,
+ 			    unsigned long mapbase,
+-			    unsigned long irq,
+-			    unsigned long irq_err)
++			    unsigned long irq)
+ {
+ 	fill_resources(&orion_ge10_shared, orion_ge10_shared_resources,
+ 		       mapbase + 0x2000, SZ_16K - 1, NO_IRQ);
+@@ -453,8 +451,7 @@ static struct platform_device orion_ge11 = {
+ 
+ void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
+ 			    unsigned long mapbase,
+-			    unsigned long irq,
+-			    unsigned long irq_err)
++			    unsigned long irq)
+ {
+ 	fill_resources(&orion_ge11_shared, orion_ge11_shared_resources,
+ 		       mapbase + 0x2000, SZ_16K - 1, NO_IRQ);
+diff --git a/arch/arm/plat-orion/include/plat/common.h b/arch/arm/plat-orion/include/plat/common.h
+index 9e6d76ad48a9..8519727faa5e 100644
+--- a/arch/arm/plat-orion/include/plat/common.h
++++ b/arch/arm/plat-orion/include/plat/common.h
+@@ -47,18 +47,15 @@ void __init orion_ge00_init(struct mv643xx_eth_platform_data *eth_data,
+ void __init orion_ge01_init(struct mv643xx_eth_platform_data *eth_data,
+ 			    unsigned long mapbase,
+ 			    unsigned long irq,
+-			    unsigned long irq_err,
+ 			    unsigned int tx_csum_limit);
+ 
+ void __init orion_ge10_init(struct mv643xx_eth_platform_data *eth_data,
+ 			    unsigned long mapbase,
+-			    unsigned long irq,
+-			    unsigned long irq_err);
++			    unsigned long irq);
+ 
+ void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
+ 			    unsigned long mapbase,
+-			    unsigned long irq,
+-			    unsigned long irq_err);
++			    unsigned long irq);
+ 
+ void __init orion_ge00_switch_init(struct dsa_platform_data *d,
+ 				   int irq);
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160906/35bfc0a5/attachment.sig>
+2.9.0
