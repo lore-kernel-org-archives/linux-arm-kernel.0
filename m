@@ -1,21 +1,23 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 6 Sep 2016 09:10:21 +0200
-Subject: [PATCH 2/2] ARM: dts: r8a7792: add MSIOF support
-In-Reply-To: <2787067.j1BQ6sZInq@wasted.cogentembedded.com>
-References: <2481458.x1iQg26kO7@wasted.cogentembedded.com>
- <2787067.j1BQ6sZInq@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdWb0+tMUoQW70kUSGp=OFyzgM7A2Nitbp4GQVZTor8qXA@mail.gmail.com>
+Date: Tue, 6 Sep 2016 09:11:41 +0200
+Subject: [PATCH] ARM: dts: wheat: add support for tactile switches
+In-Reply-To: <10465663.8teCsXZU7y@wasted.cogentembedded.com>
+References: <5383928.8UnDsUpmkz@wasted.cogentembedded.com>
+ <10465663.8teCsXZU7y@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdUyF6+T3EumGy5eyfqcio+n506fCTn1N40LEsbD2o_UYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 5, 2016 at 10:55 PM, Sergei Shtylyov
+On Mon, Sep 5, 2016 at 11:33 PM, Sergei Shtylyov
 <sergei.shtylyov@cogentembedded.com> wrote:
-> Based  on the original (and large) patch by Vladimir Barinov
-> <vladimir.barinov@cogentembedded.com>.
+> Add  support for the  tactile switches  SW2/3 (on the debug board) as a
+> virtual keyboard like it  was done with the Blanche board).
 >
 > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+DT syntax looks OK to me, I have no board schematics or documentation.
 
 Gr{oetje,eeting}s,
 
