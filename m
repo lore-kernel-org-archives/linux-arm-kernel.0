@@ -1,244 +1,283 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Tue, 6 Sep 2016 17:48:09 +0200
-Subject: [RFC PATCH 1/2] macb: Add 1588 support in Cadence GEM.
-In-Reply-To: <1472820817-21874-1-git-send-email-andrei.pistirica@microchip.com>
-References: <1472820817-21874-1-git-send-email-andrei.pistirica@microchip.com>
-Message-ID: <20160906154809.GA7012@localhost.localdomain>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 06 Sep 2016 16:44:11 +0100
+Subject: [RFC v2 PATCH 6/7] arm64: KVM: Handle trappable TLB instructions
+In-Reply-To: <20160906102113.GE30513@cbox> (Christoffer Dall's message of
+ "Tue, 6 Sep 2016 12:21:13 +0200")
+References: <1473093097-30932-1-git-send-email-punit.agrawal@arm.com>
+ <1473093097-30932-7-git-send-email-punit.agrawal@arm.com>
+ <20160906102113.GE30513@cbox>
+Message-ID: <87inu9hw38.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Christoffer Dall <christoffer.dall@linaro.org> writes:
 
-I have some issues with this patch...
+> On Mon, Sep 05, 2016 at 05:31:36PM +0100, Punit Agrawal wrote:
+>> The ARMv8 architecture allows trapping of TLB maintenane instructions
+>> from EL0/EL1 to higher exception levels. On encountering a trappable TLB
+>> instruction in a guest, an exception is taken to EL2.
+>> 
+>> Add functionality to handle emulating the TLB instructions.
+>> 
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/include/asm/kvm_asm.h |  1 +
+>>  arch/arm64/kvm/hyp/tlb.c         | 69 ++++++++++++++++++++++++++++++++++
+>>  arch/arm64/kvm/sys_regs.c        | 81 ++++++++++++++++++++++++++++++++++++++++
+>>  arch/arm64/kvm/trace.h           | 16 ++++++++
+>>  4 files changed, 167 insertions(+)
+>> 
+>> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+>> index 7561f63..1ac1cc3 100644
+>> --- a/arch/arm64/include/asm/kvm_asm.h
+>> +++ b/arch/arm64/include/asm/kvm_asm.h
+>> @@ -49,6 +49,7 @@ extern char __kvm_hyp_vector[];
+>>  extern void __kvm_flush_vm_context(void);
+>>  extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+>>  extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+>> +extern void __kvm_emulate_tlb_invalidate(struct kvm *kvm, u32 sysreg, u64 regval);
+>>  
+>>  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+>>  
+>> diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+>> index 4cda100..1210f58 100644
+>> --- a/arch/arm64/kvm/hyp/tlb.c
+>> +++ b/arch/arm64/kvm/hyp/tlb.c
+>> @@ -78,3 +78,72 @@ static void __hyp_text __tlb_flush_vm_context(void)
+>>  }
+>>  
+>>  __alias(__tlb_flush_vm_context) void __kvm_flush_vm_context(void);
+>> +
+>> +/* Intentionally empty functions */
+>> +static void __hyp_text __switch_to_hyp_role_nvhe(void) { }
+>> +static void __hyp_text __switch_to_host_role_nvhe(void) { }
+>> +
+>> +static void __hyp_text __switch_to_hyp_role_vhe(void)
+>> +{
+>> +	u64 hcr = read_sysreg(hcr_el2);
+>> +
+>> +	hcr &= ~HCR_TGE;
+>> +	write_sysreg(hcr, hcr_el2);
+>
+> why do we need to clear TGE for the TLB maintenance instructions to
+> work?
+>
+> Perhaps this is worth explaining in a comment.
 
-On Fri, Sep 02, 2016 at 02:53:36PM +0200, Andrei Pistirica wrote:
+I've added the following comment before clearing TGE bit.
 
-> - Frequency adjustment is not directly supported by this IP.
->   addend is the initial value ns increment and similarly addendesub.
->   The ppb (parts per billion) provided is used as
->   ns_incr = addend +/- (ppb/rate).
->   Similarly the remainder of the above is used to populate subns increment.
->   In case the ppb requested is negative AND subns adjustment greater than
->   the addendsub, ns_incr is reduced by 1 and subns_incr is adjusted in
->   positive accordingly.
+"When VHE is enabled and HCR_EL2.TGE=1, EL1&0 TLB operations
+apply to EL2&0 translation regime. As we prepare to emulate
+guest TLB operation clear HCR_TGE to target TLB operations
+to EL1&0 (guest)."
 
-This makes no sense.  If you cannot adjust the frequency, then you
-must implement a timecounter/cyclecounter and do in software.
+>
+> Otherwise this looks ok to me.
 
-> diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
-> index 3f385ab..8c3779d 100644
-> --- a/drivers/net/ethernet/cadence/macb.h
-> +++ b/drivers/net/ethernet/cadence/macb.h
-> @@ -10,6 +10,12 @@
->  #ifndef _MACB_H
->  #define _MACB_H
->  
-> +#include <linux/net_tstamp.h>
-> +#include <linux/ptp_clock.h>
-> +#include <linux/ptp_clock_kernel.h>
-> +#include <linux/skbuff.h>
-> +#include <linux/timecounter.h>
+Thanks for taking a look.
 
-Here in the header file, you only need ptp_clock_kernel.h.  You don't
-need all the others here.  Move them to the .c file, but only if
-really needed.  (timecounter.h isn't used, now is it?)
+Punit
 
-> @@ -129,6 +135,20 @@
->  #define GEM_RXIPCCNT		0x01a8 /* IP header Checksum Error Counter */
->  #define GEM_RXTCPCCNT		0x01ac /* TCP Checksum Error Counter */
->  #define GEM_RXUDPCCNT		0x01b0 /* UDP Checksum Error Counter */
-
-> +#define GEM_TISUBN		0x01bc /* 1588 Timer Increment Sub-ns */
-
-This regsiter does not exist.  Looking at
- 
-   Zynq-7000 AP SoC Technical Reference Manual
-   UG585 (v1.10) February 23, 2015
-
-starting on page 1273 we see:
-
-udp_csum_errors 0x000001B0 32 ro    0x00000000 UDP checksum error
-timer_strobe_s  0x000001C8 32 rw    0x00000000 1588 timer sync strobe seconds
-timer_strobe_ns 0x000001CC 32 mixed 0x00000000 1588 timer sync strobe nanoseconds
-timer_s         0x000001D0 32 rw    0x00000000 1588 timer seconds
-timer_ns        0x000001D4 32 mixed 0x00000000 1588 timer nanoseconds
-timer_adjust    0x000001D8 32 mixed 0x00000000 1588 timer adjust
-timer_incr      0x000001DC 32 mixed 0x00000000 1588 timer increment
-
-There is no register at 0x1BC.
-
-> +#define GEM_TSH			0x01c0 /* 1588 Timer Seconds High */
-
-This one doesn't exist either.  What is going on here?
-
-> +#define GEM_TSL			0x01d0 /* 1588 Timer Seconds Low */
-> +#define GEM_TN			0x01d4 /* 1588 Timer Nanoseconds */
-> +#define GEM_TA			0x01d8 /* 1588 Timer Adjust */
-> +#define GEM_TI			0x01dc /* 1588 Timer Increment */
-> +#define GEM_EFTSL		0x01e0 /* PTP Event Frame Tx Seconds Low */
-> +#define GEM_EFTN		0x01e4 /* PTP Event Frame Tx Nanoseconds */
-> +#define GEM_EFRSL		0x01e8 /* PTP Event Frame Rx Seconds Low */
-> +#define GEM_EFRN		0x01ec /* PTP Event Frame Rx Nanoseconds */
-> +#define GEM_PEFTSL		0x01f0 /* PTP Peer Event Frame Tx Secs Low */
-> +#define GEM_PEFTN		0x01f4 /* PTP Peer Event Frame Tx Ns */
-> +#define GEM_PEFRSL		0x01f8 /* PTP Peer Event Frame Rx Sec Low */
-> +#define GEM_PEFRN		0x01fc /* PTP Peer Event Frame Rx Ns */
-
-BTW, it is really annoying that you invent new register names.  Why
-can't you use the names from the TRM?
-
-> +#ifdef CONFIG_MACB_USE_HWSTAMP
-> +void macb_ptp_init(struct net_device *ndev);
-> +#else
-> +void macb_ptp_init(struct net_device *ndev) { }
-
-This should be static inline.
-
-> +#endif
-
-> diff --git a/drivers/net/ethernet/cadence/macb_ptp.c b/drivers/net/ethernet/cadence/macb_ptp.c
-> new file mode 100644
-> index 0000000..6d6a6ec
-> --- /dev/null
-> +++ b/drivers/net/ethernet/cadence/macb_ptp.c
-> @@ -0,0 +1,224 @@
-> +/*
-> + * PTP 1588 clock for SAMA5D2 platform.
-> + *
-> + * Copyright (C) 2015 Xilinx Inc.
-> + * Copyright (C) 2016 Microchip Technology
-> + *
-> + * Authors: Harini Katakam <harinik@xilinx.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/device.h>
-> +#include <linux/etherdevice.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/time64.h>
-> +#include <linux/ptp_classify.h>
-> +#include <linux/if_ether.h>
-> +#include <linux/if_vlan.h>
-> +
-> +#include "macb.h"
-> +
-> +#define  GMAC_TIMER_NAME "gmac-ptp"
-> +
-> +static inline void macb_tsu_get_time(struct macb *bp, struct timespec64 *ts)
-> +{
-> +	u64 sech, secl;
-> +
-> +	/* get GEM internal time */
-> +	sech = gem_readl(bp, TSH);
-> +	secl = gem_readl(bp, TSL);
-
-Does reading TSH latch the time?  The TRM is silent about that, and
-most other designs latch on reading the LSB.
-
-> +	ts->tv_sec = (sech << 32) | secl;
-> +	ts->tv_nsec = gem_readl(bp, TN);
-> +}
-> +
-> +static inline void macb_tsu_set_time(struct macb *bp,
-> +				     const struct timespec64 *ts)
-> +{
-> +	u32 ns, sech, secl;
-> +	s64 word_mask = 0xffffffff;
-> +
-> +	sech = (u32)ts->tv_sec;
-> +	secl = (u32)ts->tv_sec;
-> +	ns = ts->tv_nsec;
-> +	if (ts->tv_sec > word_mask)
-> +		sech = (ts->tv_sec >> 32);
-> +
-> +	/* set GEM internal time */
-
-Writing three registers is supposed to be one operation, and yet you
-have no mutex or spinlock to protect against concurrent settime calls.
-
-> +	gem_writel(bp, TSH, sech);
-> +	gem_writel(bp, TSL, secl);
-> +	gem_writel(bp, TN, ns);
-
-Also, how does the HW behave here?  Latch on TN write?
-
-> +}
-> +
-> +static int macb_ptp_adjfreq(struct ptp_clock_info *ptp, s32 ppb)
-> +{
-> +	struct macb *bp = container_of(ptp, struct macb, ptp_caps);
-> +	unsigned long rate = bp->tsu_rate;
-> +	u64 adjsub;
-> +	u32 addend, addendsub, diff, rem, diffsub, subnsreg;
-> +	bool neg_adj = false;
-> +
-> +	if (ppb < 0) {
-> +		neg_adj = true;
-> +		ppb = -ppb;
-> +	}
-> +
-> +	addend = bp->ns_incr;
-> +	addendsub = bp->subns_incr;
-> +
-> +	diff = div_u64_rem(ppb, rate, &rem);
-
-One ...
-
-> +	addend = neg_adj ? addend - diff : addend + diff;
-> +
-> +	if (rem) {
-> +		adjsub = rem;
-> +		/* Multiple by 2^24 as subns field is 24 bits */
-> +		adjsub = adjsub << 24;
-> +
-> +		diffsub = div_u64(adjsub, rate);
-
-... Two ...
-
-> +	} else {
-> +		diffsub = 0;
-> +	}
-> +
-> +	if (neg_adj && (diffsub > addendsub)) {
-> +		addend -= 1;
-> +		rem = (NSEC_PER_SEC - rem);
-> +		neg_adj = false;
-> +
-> +		adjsub = rem;
-> +		adjsub = adjsub << 24;
-> +		diffsub = div_u64(adjsub, rate);
-
-Three.  You need three 64 bit divisions?  There must be a better way.
-
-If I guess correctly, the nsincr/subnsincr value is added to the
-device's time on every clock.  So scaling these effectively adjusts
-the frequency.  Here is an idea for you.
-
-You have a 24 bit fractional field.  Combine that with 8 bits of whole
-nanoseconds to form one 32 tuning word.  Restrict the nanoseconds to 8
-bits in the setup code. (8 bits allows input clocks down to 4 MHz.)
-
-Multiply the tuning word by the 32 ppb variable, keeping the 64 bit
-result.  Divide the result by 10^9 and that gives you the delta to add
-to (or subtract from) the nominal tuning word.
-
-See gianfar.c for an example.
-
-> +	}
-> +
-> +	addendsub = neg_adj ? addendsub - diffsub : addendsub + diffsub;
-> +	/* RegBit[15:0] = Subns[23:8]; RegBit[31:24] = Subns[7:0] */
-> +	subnsreg = ((addendsub & GEM_SUBNSINCL_MASK) << GEM_SUBNSINCL_SHFT) |
-> +		   ((addendsub & GEM_SUBNSINCH_MASK) >> GEM_SUBNSINCH_SHFT);
-> +
-> +	gem_writel(bp, TISUBN, subnsreg);
-> +	gem_writel(bp, TI, GEM_BF(NSINCR, addend));
-> +
-> +	return 0;
-> +}
-
-Thanks,
-Richard
+>
+> -Christoffer
+>
+>> +}
+>> +
+>> +static void __hyp_text __switch_to_host_role_vhe(void)
+>> +{
+>> +	u64 hcr = read_sysreg(hcr_el2);
+>> +
+>> +	hcr |= HCR_TGE;
+>> +	write_sysreg(hcr, hcr_el2);
+>> +}
+>> +
+>> +static hyp_alternate_select(__switch_to_hyp_role,
+>> +			    __switch_to_hyp_role_nvhe,
+>> +			    __switch_to_hyp_role_vhe,
+>> +			    ARM64_HAS_VIRT_HOST_EXTN);
+>> +
+>> +static hyp_alternate_select(__switch_to_host_role,
+>> +			    __switch_to_host_role_nvhe,
+>> +			    __switch_to_host_role_vhe,
+>> +			    ARM64_HAS_VIRT_HOST_EXTN);
+>> +
+>> +static void __hyp_text __switch_to_guest_regime(struct kvm *kvm)
+>> +{
+>> +	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+>> +	__switch_to_hyp_role();
+>> +	isb();
+>> +}
+>> +
+>> +static void __hyp_text __switch_to_host_regime(void)
+>> +{
+>> +	__switch_to_host_role();
+>> +	write_sysreg(0, vttbr_el2);
+>> +}
+>> +
+>> +void __hyp_text
+>> +__kvm_emulate_tlb_invalidate(struct kvm *kvm, u32 sys_op, u64 regval)
+>> +{
+>> +	kvm = kern_hyp_va(kvm);
+>> +
+>> +	/*
+>> +	 * Switch to the guest before performing any TLB operations to
+>> +	 * target the appropriate VMID
+>> +	 */
+>> +	__switch_to_guest_regime(kvm);
+>> +
+>> +	/*
+>> +	 *  TLB maintenance operations are broadcast to
+>> +	 *  inner-shareable domain when HCR_FB is set (default for
+>> +	 *  KVM).
+>> +	 *
+>> +	 *  Nuke all Stage 1 TLB entries for the VM. This will kill
+>> +	 *  performance but it's always safe to do as we don't leave
+>> +	 *  behind any strays in the TLB
+>> +	 */
+>> +	__tlbi(vmalle1is);
+>> +	isb();
+>> +
+>> +	__switch_to_host_regime();
+>> +}
+>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+>> index e51367d..0e70da9 100644
+>> --- a/arch/arm64/kvm/sys_regs.c
+>> +++ b/arch/arm64/kvm/sys_regs.c
+>> @@ -790,6 +790,18 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>>  	return true;
+>>  }
+>>  
+>> +static bool emulate_tlb_invalidate(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>> +				  const struct sys_reg_desc *r)
+>> +{
+>> +	u32 opcode = sys_reg(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
+>> +
+>> +	kvm_call_hyp(__kvm_emulate_tlb_invalidate,
+>> +		     vcpu->kvm, opcode, p->regval);
+>> +	trace_kvm_tlb_invalidate(*vcpu_pc(vcpu), opcode);
+>> +
+>> +	return true;
+>> +}
+>> +
+>>  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+>>  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+>>  	/* DBGBVRn_EL1 */						\
+>> @@ -841,6 +853,35 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>>  	{ Op0(0b01), Op1(0b000), CRn(0b0111), CRm(0b1110), Op2(0b010),
+>>  	  access_dcsw },
+>>  
+>> +	/*
+>> +	 * ARMv8 ARM: Table C5-4 TLB maintenance instructions
+>> +	 * (Ref: ARMv8 ARM C5.1 version: ARM DDI 0487A.j)
+>> +	 */
+>> +	/* TLBI VMALLE1IS */
+>> +	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(0), emulate_tlb_invalidate },
+>> +	/* TLBI VAE1IS */
+>> +	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(1), emulate_tlb_invalidate },
+>> +	/* TLBI ASIDE1IS */
+>> +	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(2), emulate_tlb_invalidate },
+>> +	/* TLBI VAAE1IS */
+>> +	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(3), emulate_tlb_invalidate },
+>> +	/* TLBI VALE1IS */
+>> +	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(5), emulate_tlb_invalidate },
+>> +	/* TLBI VAALE1IS */
+>> +	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(7), emulate_tlb_invalidate },
+>> +	/* TLBI VMALLE1 */
+>> +	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(0), emulate_tlb_invalidate },
+>> +	/* TLBI VAE1 */
+>> +	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(1), emulate_tlb_invalidate },
+>> +	/* TLBI ASIDE1 */
+>> +	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(2), emulate_tlb_invalidate },
+>> +	/* TLBI VAAE1 */
+>> +	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(3), emulate_tlb_invalidate },
+>> +	/* TLBI VALE1 */
+>> +	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(5), emulate_tlb_invalidate },
+>> +	/* TLBI VAALE1 */
+>> +	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(7), emulate_tlb_invalidate },
+>> +
+>>  	DBG_BCR_BVR_WCR_WVR_EL1(0),
+>>  	DBG_BCR_BVR_WCR_WVR_EL1(1),
+>>  	/* MDCCINT_EL1 */
+>> @@ -1329,6 +1370,46 @@ static const struct sys_reg_desc cp15_regs[] = {
+>>  	{ Op1( 0), CRn( 7), CRm(10), Op2( 2), access_dcsw },
+>>  	{ Op1( 0), CRn( 7), CRm(14), Op2( 2), access_dcsw },
+>>  
+>> +	/*
+>> +	 * TLB operations
+>> +	 */
+>> +	/* TLBIALLIS */
+>> +	{ Op1( 0), CRn( 8), CRm( 3), Op2( 0), emulate_tlb_invalidate},
+>> +	/* TLBIMVAIS */
+>> +	{ Op1( 0), CRn( 8), CRm( 3), Op2( 1), emulate_tlb_invalidate},
+>> +	/* TLBIASIDIS */
+>> +	{ Op1( 0), CRn( 8), CRm( 3), Op2( 2), emulate_tlb_invalidate},
+>> +	/* TLBIMVAAIS */
+>> +	{ Op1( 0), CRn( 8), CRm( 3), Op2( 3), emulate_tlb_invalidate},
+>> +	/* TLBIMVALIS */
+>> +	{ Op1( 0), CRn( 8), CRm( 3), Op2( 5), emulate_tlb_invalidate},
+>> +	/* TLBIMVAALIS */
+>> +	{ Op1( 0), CRn( 8), CRm( 3), Op2( 7), emulate_tlb_invalidate},
+>> +	/* ITLBIALL */
+>> +	{ Op1( 0), CRn( 8), CRm( 5), Op2( 0), emulate_tlb_invalidate},
+>> +	/* ITLBIMVA */
+>> +	{ Op1( 0), CRn( 8), CRm( 5), Op2( 1), emulate_tlb_invalidate},
+>> +	/* ITLBIASID */
+>> +	{ Op1( 0), CRn( 8), CRm( 5), Op2( 2), emulate_tlb_invalidate},
+>> +	/* DTLBIALL */
+>> +	{ Op1( 0), CRn( 8), CRm( 6), Op2( 0), emulate_tlb_invalidate},
+>> +	/* DTLBIMVA */
+>> +	{ Op1( 0), CRn( 8), CRm( 6), Op2( 1), emulate_tlb_invalidate},
+>> +	/* DTLBIASID */
+>> +	{ Op1( 0), CRn( 8), CRm( 6), Op2( 2), emulate_tlb_invalidate},
+>> +	/* TLBIALL */
+>> +	{ Op1( 0), CRn( 8), CRm( 7), Op2( 0), emulate_tlb_invalidate},
+>> +	/* TLBIMVA */
+>> +	{ Op1( 0), CRn( 8), CRm( 7), Op2( 1), emulate_tlb_invalidate},
+>> +	/* TLBIASID */
+>> +	{ Op1( 0), CRn( 8), CRm( 7), Op2( 2), emulate_tlb_invalidate},
+>> +	/* TLBIMVAA */
+>> +	{ Op1( 0), CRn( 8), CRm( 7), Op2( 3), emulate_tlb_invalidate},
+>> +	/* TLBIMVAL */
+>> +	{ Op1( 0), CRn( 8), CRm( 7), Op2( 5), emulate_tlb_invalidate},
+>> +	/* TLBIMVAAL */
+>> +	{ Op1( 0), CRn( 8), CRm( 7), Op2( 7), emulate_tlb_invalidate},
+>> +
+>>  	/* PMU */
+>>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmcr },
+>>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), access_pmcnten },
+>> diff --git a/arch/arm64/kvm/trace.h b/arch/arm64/kvm/trace.h
+>> index 7fb0008..c4d577f 100644
+>> --- a/arch/arm64/kvm/trace.h
+>> +++ b/arch/arm64/kvm/trace.h
+>> @@ -166,6 +166,22 @@ TRACE_EVENT(kvm_set_guest_debug,
+>>  	TP_printk("vcpu: %p, flags: 0x%08x", __entry->vcpu, __entry->guest_debug)
+>>  );
+>>  
+>> +TRACE_EVENT(kvm_tlb_invalidate,
+>> +	TP_PROTO(unsigned long vcpu_pc, u32 opcode),
+>> +	TP_ARGS(vcpu_pc, opcode),
+>> +
+>> +	TP_STRUCT__entry(
+>> +		__field(unsigned long, vcpu_pc)
+>> +		__field(u32, opcode)
+>> +	),
+>> +
+>> +	TP_fast_assign(
+>> +		__entry->vcpu_pc = vcpu_pc;
+>> +		__entry->opcode = opcode;
+>> +	),
+>> +
+>> +	TP_printk("vcpu_pc=0x%16lx opcode=%08x", __entry->vcpu_pc, __entry->opcode)
+>> +);
+>>  
+>>  #endif /* _TRACE_ARM64_KVM_H */
+>>  
+>> -- 
+>> 2.8.1
+>> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
