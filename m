@@ -1,167 +1,104 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 6 Sep 2016 11:07:49 +0200
-Subject: [PATCH v3 1/4] pwm: Add support for Meson PWM Controller
-In-Reply-To: <bd7ea1db-d8f9-f075-14ef-732d9bb65e77@baylibre.com>
-References: <1471880193-21879-1-git-send-email-narmstrong@baylibre.com>
- <1471880193-21879-2-git-send-email-narmstrong@baylibre.com>
- <20160905090052.GG3532@ulmo.ba.sec>
- <bd7ea1db-d8f9-f075-14ef-732d9bb65e77@baylibre.com>
-Message-ID: <20160906090749.GA15644@ulmo.ba.sec>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue,  6 Sep 2016 11:08:50 +0200
+Subject: [PATCH V10 0/8] Introduce ACPI world to ITS irqchip
+Message-ID: <1473152938-17388-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2016 at 10:36:49AM +0200, Neil Armstrong wrote:
-> Hi Thierry,
-> 
-> On 09/05/2016 11:00 AM, Thierry Reding wrote:
-> > On Mon, Aug 22, 2016 at 05:36:30PM +0200, Neil Armstrong wrote:
-> >> Add support for the PWM controller found in the Amlogic SoCs.
-> >> This driver supports the Meson8b and GXBB SoCs.
-> >>
-> >> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> >> ---
-> >>  drivers/pwm/Kconfig     |   9 +
-> >>  drivers/pwm/Makefile    |   1 +
-> >>  drivers/pwm/pwm-meson.c | 528 ++++++++++++++++++++++++++++++++++++++++++++++++
-> >>  3 files changed, 538 insertions(+)
-> >>  create mode 100644 drivers/pwm/pwm-meson.c
-> > 
-> > Hi Neil,
-> > 
-> > sorry for taking so long to review this. I had actually started to write
-> > a review email since I had noticed a couple of slight oddities about the
-> > driver structure (primarily this was about how channel-specific data was
-> > split between struct meson_pwm_channel and struct meson_pwm_chip), but I
-> > ended up making some changes to the driver in order to see what my
-> > suggestions would look like, and if they would indeed improve things.
-> > But once I had done that, I thought it a bit pointless to make that into
-> > review comments and decided to just push what I had done and ask you to
-> > take a look, and if you had no objections to the changes take the driver
-> > for a spin to see if it still worked as expected.
-> 
-> We re-run our tests and I found 2 bugs, the first one is in meson_pwm_enable(),
-> only the channel A was setup, the fix is :
-> 
-> static void meson_pwm_enable(...)
-> -	u32 value, clk_shift, clk_enable, enable;
-> +	u32 reg, value, clk_shift, clk_enable, enable;
-> 
->  	switch (id) {
->  	case 0:
-> [...]
-> +		reg = REG_PWM_A;
->  		break;
->  	case 1:
-> [...]
-> +		reg = REG_PWM_B;
->  		break;
->  	}
-> [...]
-> -	writel(value, meson->base + REG_PWM_A);
-> +	writel(value, meson->base + reg);
+The series builds the PCI/MSI domain stack based on initial IORT driver
+which is added in first place. As a reference please see IORT spec:
+http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
 
-Ah indeed. Good catch.
+Tested on Cavium ThunderX server and Qualcomm Technologies server platform QDF2XXX.
+The patches can be found here:
+https://github.com/semihalf-nowicki-tomasz/linux.git (its-acpi-v10)
 
-> 
-> The second bug is in probe(), I understand the point to allocate
-> dynamically the channels and attach them to each pwm chip, but when
-> calling meson_pwm_init_channels() we get an OOPS because
-> meson->chip.pwms[i] are allocated in pwmchip_add(). Moving
-> meson_pwm_init_channels() would fix this, but in case of a clk
-> PROBE_DEFER, we would need to remove back the pwmchip, which is a
-> quite a bad design decision....
+v9 -> v10
+- error handling improvements for iort_match_node_callback() but no functional changes
+- iort.h -> acpi_iort.h header name change
+- style improvements
 
-Ah yes... that one again. I remember running into that a while ago with
-some other driver. To be honest, I think that's a short-coming of the
-PWM subsystem and the fix would be for PWM chip registration to be split
-into two parts: pwm_chip_init() and pwm_chip_add(). That way, a chip
-would be initialized using pwm_chip_init() where the pwms array would be
-allocated, and pwm_chip_add() would register the chip with the system.
+v8 -> v9
+- rebased against v4.8-rc4
+- move root IORT pointer validation to one place iort_scan_node()
+- function names & Kconfig option name improvements
+- remove annoying dev_err() appearances for non-IORT users
+- for debug purpose print full ITS resource range
 
-Currently a few drivers might be vulnerable to a race condition between
-registration and implementation (i.e. PWM channels aren't fully set up
-when they are exposed to users and sysfs).
+v7 -> v8
+- rebased against v4.8-rc1
+- move IORT support under new drivers/acpi/arm64 directory
+- memory leak fix for iort_match_node_callback()
+- iort_node_map_rid() algorithm improvements
+- fix RID match check in iort_id_map()
+- fix typos and white spaces
 
-> The smartest fix I found was to allocate channels in probe, init them
-> them attach them after pwmchip_add():
-> 
-> static int meson_pwm_init_channels(..., struct meson_pwm_channel *channels)
-> {
-> +	struct meson_pwm_channel *channels;
-> [...]
-> -	for (i = 0; i < meson->chip.npwm; i++) {
-> -		struct pwm_device *pwm = &meson->chip.pwms[i];
-> -		struct meson_pwm_channel *channel;
-> -
-> -		channel = devm_kzalloc(dev, sizeof(*channel), GFP_KERNEL);
-> -		if (!channel)
-> -			return -ENOMEM;
-> +	if (!channels)
-> +		return -EINVAL;
-> 
-> +	for (i = 0; i < meson->chip.npwm; i++) {
-> [...]
-> +		memset(&channels[i], 0, sizeof(struct meson_pwm_channel));
-> [...]
-> //Rename "channel->" into "channels[i]."//
-> [...]
-> -		pwm_set_chip_data(pwm, channel);
->  	}
-> 
->  	return 0;
-> }
-> 
-> +static void meson_pwm_add_channels_data(struct meson_pwm *meson,
-> +					struct meson_pwm_channel *channels)
-> +{
-> +	unsigned int i;
-> +
-> +	for (i = 0; i < meson->chip.npwm; i++)
-> +		pwm_set_chip_data(&meson->chip.pwms[i], &channels[i]);
-> +}
-> 
-> static int meson_pwm_probe(struct platform_device *pdev)
-> {
-> +	struct meson_pwm_channel *channels;
-> [...]
-> -	err = meson_pwm_init_channels(meson);
-> -	if (err < 0)
-> -		return err;
-> -
->  	meson->chip.dev = &pdev->dev;
-> [...]
->  	meson->chip.of_pwm_n_cells = 3;
-> 
-> +	channels = devm_kmalloc_array(&pdev->dev, 2, sizeof(*meson),
-> +				      GFP_KERNEL);
-> +	if (!channels)
-> +		return -ENOMEM;
-> +
-> +	err = meson_pwm_init_channels(meson, channels);
-> +	if (err < 0)
-> +		return err;
-> +
->  	err = pwmchip_add(&meson->chip);
-> [...]
-> +	meson_pwm_add_channels_data(meson, channels);
-> +
->  	platform_set_drvdata(pdev, meson);
-> 
->  	return 0;
-> }
+v6 -> v7
+- rebased against irq/irqchip-4.8
+- improvements for IORT ID mapping
+- call IORT init call from acpi_init() instead of arch_initcall()
+- split IORT driver in to two parts: core and ITS/MSI
 
-That's the race I was talking about above. I suppose it's not too big an
-issue since other drivers seem to manage, so I'm going to merge your
-fixed driver.
+v5 -> v6
+- added locking mechanism for IORT list with domain token
+- IORT function name improvements
+- extended IORT RID mapping helper
+- reworked IORT to be more SMMU friendly
+- IORT functions which map RID and find corresponding domain are not
+  PCI specific any more (struct pci_dev -> struct device)
+- bug fixes
 
-Unless you feel like taking a stab at the pwm_chip_init()/pwm_chip_add()
-split, in which case your driver would be the first to be race-free. =)
+v4 -> v5
+- rebased against v4.7-rc1
+- drop generic layer and call IORT functions directly
+- improve resource abstraction and string formatting
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160906/d1978589/attachment-0001.sig>
+v3 -> v4
+- rebased against v4.5
+- add ACPI support for IRQ domain handling on a per-device basis
+- reorder domain setup step
+- improve error handling
+- code style improvements
+
+v2 -> v3
+- rebased on top of 4.4
+- fixes and improvements for redistributor init via GICC structures
+- fixes as per kbuild reports
+
+v1 -> v2
+- rebased on top of 4.4-rc4
+- use pci_msi_domain_get_msi_rid for requester ID to device ID translation
+
+Tomasz Nowicki (8):
+  ACPI: I/O Remapping Table (IORT) initial support
+  ACPI: Add new IORT functions to support MSI domain handling
+  PCI/MSI: Setup MSI domain on a per-device basis using IORT ACPI table
+  irqchip/gicv3-its: Cleanup for ITS domain initialization
+  irqchip/gicv3-its: Refactor ITS DT init code to prepare for ACPI
+  irqchip/gicv3-its: Probe ITS in the ACPI way
+  irqchip/gicv3-its: Factor out PCI-MSI part that might be reused for
+    ACPI
+  irqchip/gicv3-its: Use MADT ITS subtable to do PCI/MSI domain
+    initialization
+
+ drivers/acpi/Kconfig                     |   4 +
+ drivers/acpi/Makefile                    |   2 +
+ drivers/acpi/arm64/Kconfig               |   6 +
+ drivers/acpi/arm64/Makefile              |   1 +
+ drivers/acpi/arm64/iort.c                | 371 +++++++++++++++++++++++++++++++
+ drivers/acpi/bus.c                       |   2 +
+ drivers/irqchip/Kconfig                  |   1 +
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c |  88 ++++++--
+ drivers/irqchip/irq-gic-v3-its.c         | 171 ++++++++++----
+ drivers/irqchip/irq-gic-v3.c             |   7 +-
+ drivers/pci/msi.c                        |  11 +-
+ include/linux/acpi_iort.h                |  42 ++++
+ include/linux/irqchip/arm-gic-v3.h       |   4 +-
+ 13 files changed, 640 insertions(+), 70 deletions(-)
+ create mode 100644 drivers/acpi/arm64/Kconfig
+ create mode 100644 drivers/acpi/arm64/Makefile
+ create mode 100644 drivers/acpi/arm64/iort.c
+ create mode 100644 include/linux/acpi_iort.h
+
+-- 
+1.9.1
