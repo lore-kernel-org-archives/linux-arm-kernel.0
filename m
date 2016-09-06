@@ -1,23 +1,34 @@
-From: barry.schumacher@honorablenintcheu.com (FedEx Ground)
-Date: Tue, 6 Sep 2016 17:02:43 +0000
-Subject: Shipment delivery problem #00362106
-Message-ID: <dffdaae9fa75d2a1167e7ad1dfa75c3f@honorablenintcheu.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Sep 2016 19:11:46 +0100
+Subject: [PATCH v2 1/2] jump_labels: Allow array initialisers
+In-Reply-To: <1473096348-19548-2-git-send-email-catalin.marinas@arm.com>
+References: <1473096348-19548-1-git-send-email-catalin.marinas@arm.com>
+ <1473096348-19548-2-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20160906181146.GD29382@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Customer,
+On Mon, Sep 05, 2016 at 06:25:47PM +0100, Catalin Marinas wrote:
+> The static key API is currently designed around single variable
+> definitions. There are cases where an array of static keys is desirable,
+> so extend the API to allow this rather than using the internal static
+> key implementation directly.
+> 
+> Suggested-by: Dave P Martin <Dave.Martin@arm.com>
+> Cc: Peter Zijlstra <peterz@infradead.org>
+> Cc: Jason Baron <jbaron@akamai.com>
+> Cc: Jonathan Corbet <corbet@lwn.net>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  Documentation/static-keys.txt |  9 +++++++++
+>  include/linux/jump_label.h    | 12 ++++++++++++
+>  2 files changed, 21 insertions(+)
 
-Courier was unable to deliver the parcel to you.
-Shipment Label is attached to email.
+This looks pretty straightforward to me, and I'd like to take it via
+the arm64 tree given that your subsequent patch depends on it.
 
-Yours trully,
-Barry Schumacher,
-FedEx Station Manager.
+Peter -- are you ok with this?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: FedEx_ID_00362106.zip
-Type: application/zip
-Size: 3601 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160906/618bd3e9/attachment.zip>
+Cheers,
+
+Will
