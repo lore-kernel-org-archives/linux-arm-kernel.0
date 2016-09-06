@@ -1,51 +1,52 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  6 Sep 2016 14:02:13 +0100
-Subject: [PATCH 15/19] arm: KVM: Inject a Virtual Abort if it was pending
+Date: Tue,  6 Sep 2016 14:02:09 +0100
+Subject: [PATCH 11/19] arm: KVM: Add Virtual Abort injection helper
 In-Reply-To: <1473166937-15271-1-git-send-email-marc.zyngier@arm.com>
 References: <1473166937-15271-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1473166937-15271-16-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1473166937-15271-12-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we have caught an Abort whilst exiting, we've tagged the
-exit code with the pending information. In that case, let's
-re-inject the error into the guest, after having adjusted
-the PC if required.
+Now that we're able to context switch the HCR.VA bit, let's
+introduce a helper that injects an Abort into a vcpu.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/handle_exit.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/include/asm/kvm_emulate.h |  1 +
+ arch/arm/kvm/emulate.c             | 12 ++++++++++++
+ 2 files changed, 13 insertions(+)
 
-diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
-index 863fdf4..4eacb5c 100644
---- a/arch/arm/kvm/handle_exit.c
-+++ b/arch/arm/kvm/handle_exit.c
-@@ -144,6 +144,25 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- {
- 	exit_handle_fn exit_handler;
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index 448d63c..9a8a45a 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -43,6 +43,7 @@ static inline void vcpu_set_reg(struct kvm_vcpu *vcpu, u8 reg_num,
+ bool kvm_condition_valid32(const struct kvm_vcpu *vcpu);
+ void kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr);
+ void kvm_inject_undefined(struct kvm_vcpu *vcpu);
++void kvm_inject_vabt(struct kvm_vcpu *vcpu);
+ void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
+ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
  
-+	if (ARM_ABORT_PENDING(exception_index)) {
-+		u8 hsr_ec = kvm_vcpu_trap_get_class(vcpu);
+diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
+index ff9acd1..0064b86 100644
+--- a/arch/arm/kvm/emulate.c
++++ b/arch/arm/kvm/emulate.c
+@@ -303,3 +303,15 @@ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
+ {
+ 	inject_abt(vcpu, true, addr);
+ }
 +
-+		/*
-+		 * HVC/SMC already have an adjusted PC, which we need
-+		 * to correct in order to return to after having
-+		 * injected the abort.
-+		 */
-+		if (hsr_ec == HSR_EC_HVC || hsr_ec == HSR_EC_SMC) {
-+			u32 adj =  kvm_vcpu_trap_il_is32bit(vcpu) ? 4 : 2;
-+			*vcpu_pc(vcpu) -= adj;
-+		}
-+
-+		kvm_inject_vabt(vcpu);
-+		return 1;
-+	}
-+
-+	exception_index = ARM_EXCEPTION_CODE(exception_index);
-+
- 	switch (exception_index) {
- 	case ARM_EXCEPTION_IRQ:
- 		return 1;
++/**
++ * kvm_inject_vabt - inject an async abort / SError into the guest
++ * @vcpu: The VCPU to receive the exception
++ *
++ * It is assumed that this code is called from the VCPU thread and that the
++ * VCPU therefore is not currently executing guest code.
++ */
++void kvm_inject_vabt(struct kvm_vcpu *vcpu)
++{
++	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VA);
++}
 -- 
 2.1.4
