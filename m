@@ -1,96 +1,140 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 6 Sep 2016 11:30:36 +0200
-Subject: [PATCH 1/2] mtd: nand: automate NAND timings selection
-In-Reply-To: <20160906104130.61605fa4@bbrezillon>
-References: <1472820149-24241-1-git-send-email-s.hauer@pengutronix.de>
- <1472820149-24241-2-git-send-email-s.hauer@pengutronix.de>
- <20160906082302.4itzqv4ldd3foazu@pengutronix.de>
- <20160906104130.61605fa4@bbrezillon>
-Message-ID: <20160906093036.32uka4klt2x2ottt@pengutronix.de>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Tue, 6 Sep 2016 17:33:53 +0800
+Subject: [PATCH 3/4] include: dt-bindings: Add more GPIO bank and index
+ definition for rockchip pinctrl
+In-Reply-To: <5785582.C1XOtVbxro@phil>
+References: <1472977937-758-1-git-send-email-andy.yan@rock-chips.com>
+ <3544284.90s5nXbktR@phil>
+ <0dbac4cd-7f67-5052-16e6-463896bf5929@rock-chips.com>
+ <5785582.C1XOtVbxro@phil>
+Message-ID: <b8fd0df8-5f5b-b699-e4c9-fea7387b8277@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2016 at 10:41:30AM +0200, Boris Brezillon wrote:
-> On Tue, 6 Sep 2016 10:23:02 +0200
-> Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> 
-> > Hi Boris,
-> > 
-> > On Fri, Sep 02, 2016 at 02:42:28PM +0200, Sascha Hauer wrote:
-> > > +static int nand_configure_data_interface(struct mtd_info *mtd)
-> > > +{
-> > > +	struct nand_chip *chip = mtd_to_nand(mtd);
-> > > +	struct nand_data_interface *conf;
-> > > +	int modes, mode, ret = -EINVAL;
-> > > +	uint8_t tmode_param[ONFI_SUBFEATURE_PARAM_LEN] = { };
-> > > +	int i;
-> > > +
-> > > +	conf = kzalloc(sizeof(*conf), GFP_KERNEL);
-> > > +	if (!conf)
-> > > +		return -ENOMEM;
-> > > +
-> > > +	/* TODO: support DDR interfaces */
-> > > +	conf->type = NAND_SDR_IFACE;
-> > > +
-> > > +	/*
-> > > +	 * First try to identify the best timings from ONFI parameters and
-> > > +	 * if the NAND does not support ONFI, fallback to the default ONFI
-> > > +	 * timing mode.
-> > > +	 */
-> > > +	modes = onfi_get_async_timing_mode(chip);
-> > > +	if (modes == ONFI_TIMING_MODE_UNKNOWN) {
-> > > +		mode = chip->onfi_timing_mode_default;
-> > > +		conf->timings.sdr =
-> > > +				*onfi_async_timing_mode_to_sdr_timings(mode);
-> > > +
-> > > +		ret = nand_check_data_interface(mtd, conf);
-> > > +	} else {
-> > > +		for (mode = fls(modes) - 1; mode >= 0; mode--) {
-> > > +			conf->timings.sdr =
-> > > +				*onfi_async_timing_mode_to_sdr_timings(mode);
-> > > +
-> > > +			ret = nand_check_data_interface(mtd, conf);
-> > > +			if (!ret)
-> > > +				break;
-> > > +		}
-> > > +	}  
-> > 
-> > I wonder if this works good for non ONFI NANDs. In the ONFI case we
-> > iterate over all modes supported by the NAND until we find one that also
-> > suits the driver. By doing so we inherently assume that not all drivers
-> > support all modes. In the non ONFI case instead we hardcode a single
-> > timing into the nand_id table, what if the driver does not support this
-> > timing? It will fail in this case without ever trying slower timings.
-> > Shouldn't we encode the mode bitmask into the nand_id table rather than
-> > a single timing?
-> 
-> IIRC, this is what I proposed in my first patch (having a bitmask
-> encoding supported modes), but Brian suggested to directly put the
-> highest supported mode.
-> 
-> Anyway, I don't think a NAND can support higher modes without
-> supporting lower ones, so extracting the supported modes info from the
-> default_onfi_timing_mode should be pretty easy:
-> 
-> 	supported_modes = GENMASK(default_onfi_timing_mode, 0);
+Hi Heiko:
 
-Ok, if you think we can assume this then I'll do it like that.
 
-> 
-> > I cannot find a chip in the nand_id table which actually sets
-> > onfi_timing_mode_default, but since you introduced the field in the
-> > nand_id table with commit 57a94e24bc92 you can probably tell me more.
-> 
-> Hm, this one [1] is defining timing mode 4.
-> 
-> [1]http://lxr.free-electrons.com/source/drivers/mtd/nand/nand_ids.c#L51
+On 2016?09?06? 06:10, Heiko Stuebner wrote:
+> Am Montag, 5. September 2016, 18:22:46 CEST schrieb Andy Yan:
+>> Hi Heiko:
+>>
+>> On 2016?09?05? 17:33, Heiko Stuebner wrote:
+>>> Hi Andy,
+>>>
+>>> Am Sonntag, 4. September 2016, 16:35:30 CEST schrieb Andy Yan:
+>>>> There are 8 gpio banks on RK3288, so add the missing
+>>>> RK_GPIO7 and RK_GPIO8. Also add gpio index definition
+>>>> to make it easier to description GPIO in dts.
+>>>>
+>>>> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+>>> I tend to disagree here.
+>>>
+>>> I consider the bank defines RK_GPIOx to be deprecated and highly
+>>> discourage
+>>> them being used in new boards. They only encode the same number again (2
+>>> ->
+>>> RK_GPIO2 etc) and therefore don't bring any useful addition over using the
+>>> bank number directly.
+>>>
+>>> Slightly similar argument for the per-pin defines. While the external pins
+>>> are described in the A/B/C/Dx notation for pinmux purposes, the gpio
+>>> controllers on top use a regular 0-31 numbering. Also you cannot name
+>>> constants generic GPIO_x, simply because that may conflict with other
+>>> overly generic constant names.
+>>>
+>>> So I'm not yet convinced that these improve readability, but they would
+>>> definitly need a RK_* prefix to make them specific.
+>>>
+>>>
+>>> Heiko
+>>           I consider for a people who doesn't familiar with rockchip
+>> pinctrl, He
+>>    may don't know what does these number 2/4/17....stands for in the dts
+>> like
+>>    rockchip,pins = <2 17 RK_FUNC_GPIO &pcfg_pull_up>.
+> That person shouldn't work on devicetrees anyway :-) ... or simply read the
+> dt-binding for the pinctrl at first ... which should normally really be the
+> first step, otherwise we wouldn't need the binding documentation.
 
-Uh, yes. I'm so glad we have C99 initializers mostly nowadays :)
+     It's true that people who wants to develop in the kernel should 
+know the technical detail  as much as possible.
+But I still thinks it's a good thing if we can write code more clearly 
+to  let people know what it stands for at first sight.
+>>           But if we use meaningful macro here like : rockchip,pins =
+>> <RK_GPIO2 RK_GPIO_C0 RK_FUNC_GPIO &pcfg_pull_up>, I think it easier to
+>> tell people this GPIO is GPIO_C0 of BNAK2.
+> I definitly don't agree for the gpio-bank number, see above .
+>
+>> Especially all the GPIOs in rockchip based schematic are described as
+>> GPIOn_A/B/C/Dx. And it is also easier for people to directly use a macro
+>> stands for 0~32 than translating A/B/C/Dx from the schematic to 0~32.
+> But the pins might in fact really be helpful, but definitly need a prefix and
+> maybe even distinguish between pin and gpio, aka RK_PIN_A0 etc?
+>
 
-Sascha
+     Anyway, very glad to see you think the pin definition is helpful, 
+so let's move on.
+I'll send a new version with the prefix as your suggested  like 
+RK_PA/B/C/Dx.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+     Thanks.
+> Heiko
+>
+>>>> ---
+>>>>
+>>>>    include/dt-bindings/pinctrl/rockchip.h | 35
+>>>>
+>>>> ++++++++++++++++++++++++++++++++++ 1 file changed, 35 insertions(+)
+>>>>
+>>>> diff --git a/include/dt-bindings/pinctrl/rockchip.h
+>>>> b/include/dt-bindings/pinctrl/rockchip.h index 743e66a..fd35350 100644
+>>>> --- a/include/dt-bindings/pinctrl/rockchip.h
+>>>> +++ b/include/dt-bindings/pinctrl/rockchip.h
+>>>> @@ -24,6 +24,41 @@
+>>>>
+>>>>    #define RK_GPIO3	3
+>>>>    #define RK_GPIO4	4
+>>>>    #define RK_GPIO6	6
+>>>>
+>>>> +#define RK_GPIO7	7
+>>>> +#define RK_GPIO8	8
+>>>> +
+>>>> +#define GPIO_A0		0
+>>>> +#define GPIO_A1		1
+>>>> +#define GPIO_A2		2
+>>>> +#define GPIO_A3		3
+>>>> +#define GPIO_A4		4
+>>>> +#define GPIO_A5		5
+>>>> +#define GPIO_A6		6
+>>>> +#define GPIO_A7		7
+>>>> +#define GPIO_B0		8
+>>>> +#define GPIO_B1		9
+>>>> +#define GPIO_B2		10
+>>>> +#define GPIO_B3		11
+>>>> +#define GPIO_B4		12
+>>>> +#define GPIO_B5		13
+>>>> +#define GPIO_B6		14
+>>>> +#define GPIO_B7		15
+>>>> +#define GPIO_C0		16
+>>>> +#define GPIO_C1		17
+>>>> +#define GPIO_C2		18
+>>>> +#define GPIO_C3		19
+>>>> +#define GPIO_C4		20
+>>>> +#define GPIO_C5		21
+>>>> +#define GPIO_C6		22
+>>>> +#define GPIO_C7		23
+>>>> +#define GPIO_D0		24
+>>>> +#define GPIO_D1		25
+>>>> +#define GPIO_D2		26
+>>>> +#define GPIO_D3		27
+>>>> +#define GPIO_D4		28
+>>>> +#define GPIO_D5		29
+>>>> +#define GPIO_D6		30
+>>>> +#define GPIO_D7		31
+>>>>
+>>>>    #define RK_FUNC_GPIO	0
+>>>>    #define RK_FUNC_1	1
+>
+>
+>
+>
