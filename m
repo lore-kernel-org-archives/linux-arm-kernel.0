@@ -1,131 +1,27 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 6 Sep 2016 11:45:14 +0100
-Subject: [PATCH v2 3/7] arm64: Introduce uaccess_{disable, enable}
- functionality based on TTBR0_EL1
-In-Reply-To: <20160906102741.GF19605@e104818-lin.cambridge.arm.com>
-References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
- <1472828533-28197-4-git-send-email-catalin.marinas@arm.com>
- <20160905172038.GC27305@leverpostej>
- <20160906102741.GF19605@e104818-lin.cambridge.arm.com>
-Message-ID: <20160906104514.GC1425@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Sep 2016 12:46:06 +0200
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <87bn01o7jg.fsf@linux.intel.com>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <20160906063529.GA22312@b29397-desktop> <87bn01o7jg.fsf@linux.intel.com>
+Message-ID: <4416687.vUjZzKWZG6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2016 at 11:27:42AM +0100, Catalin Marinas wrote:
-> On Mon, Sep 05, 2016 at 06:20:38PM +0100, Mark Rutland wrote:
-> > On Fri, Sep 02, 2016 at 04:02:09PM +0100, Catalin Marinas wrote:
-> > > +static inline void uaccess_ttbr0_enable(void)
-> > > +{
-> > > +	unsigned long flags;
-> > > +
-> > > +	/*
-> > > +	 * Disable interrupts to avoid preemption and potential saved
-> > > +	 * TTBR0_EL1 updates between reading the variable and the MSR.
-> > > +	 */
-> > > +	local_irq_save(flags);
-> > > +	write_sysreg(current_thread_info()->ttbr0, ttbr0_el1);
-> > > +	isb();
-> > > +	local_irq_restore(flags);
-> > > +}
-> > 
-> > I don't follow what problem this actually protects us against. In the
-> > case of preemption everything should be saved+restored transparently, or
-> > things would go wrong as soon as we enable IRQs anyway.
-> > 
-> > Is this a hold-over from a percpu approach rather than the
-> > current_thread_info() approach?
+On Tuesday, September 6, 2016 9:40:19 AM CEST Felipe Balbi wrote:
 > 
-> If we get preempted between reading current_thread_info()->ttbr0 and
-> writing TTBR0_EL1, a series of context switches could lead to the update
-> of the ASID part of ttbr0. The actual MSR would store an old ASID in
-> TTBR0_EL1.
+> this only solves the problem for DT devices. Legacy devices and
+> PCI-based systems will still suffer from the same problem. At least for
+> dwc3, I will only be taking patches that solve the problem for all
+> users, not a subset of them.
 
-Ah! Can you fold something about racing with an ASID update into the
-description?
+I don't think legacy devices are a worry, because they wouldn't
+have this problem. For the PCI case, you are right that it cannot
+work, in particular for machines that have complex IOMMU setup.
 
-> > > +#else
-> > > +static inline void uaccess_ttbr0_disable(void)
-> > > +{
-> > > +}
-> > > +
-> > > +static inline void uaccess_ttbr0_enable(void)
-> > > +{
-> > > +}
-> > > +#endif
-> > 
-> > I think that it's better to drop the ifdef and add:
-> > 
-> > 	if (!IS_ENABLED(CONFIG_ARM64_TTBR0_PAN))
-> > 		return;
-> > 
-> > ... at the start of each function. GCC should optimize the entire thing
-> > away when not used, but we'll get compiler coverage regardless, and
-> > therefore less breakage. All the symbols we required should exist
-> > regardless.
-> 
-> The reason for this is that thread_info.ttbr0 is conditionally defined.
-> I don't think the compiler would ignore it.
+Some architectures (at least arm64 and sparc) check the bus_type of
+a device in order to find the correct set of dma_map_ops for that
+device, so there is no real way to handle this as long as you
+pass a platform_device into an API that expects a pci_device.
 
-Good point; I missed that.
-
-[...]
-
-> > How about something like:
-> > 
-> > 	.macro alternative_endif_else_nop
-> > 	alternative_else
-> > 	.rept ((662b-661b) / 4)
-> > 	       nop
-> > 	.endr
-> > 	alternative_endif
-> > 	.endm
-> > 
-> > So for the above we could have:
-> > 
-> > 	alternative_if_not ARM64_HAS_PAN
-> > 		save_and_disable_irq \tmp2
-> > 		uaccess_ttbr0_enable \tmp1
-> > 		restore_irq \tmp2
-> > 	alternative_endif_else_nop
-> > 
-> > I'll see about spinning a patch, or discovering why that happens to be
-> > broken.
-> 
-> This looks better. Minor comment, I would actually name the ending
-> statement alternative_else_nop_endif to match the order in which you'd
-> normally write them.
-
-Completely agreed. I already made this change locally, immediately after
-sending the suggestion. :)
-
-> > >  	 * tables again to remove any speculatively loaded cache lines.
-> > >  	 */
-> > >  	mov	x0, x25
-> > > -	add	x1, x26, #SWAPPER_DIR_SIZE
-> > > +	add	x1, x26, #SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE
-> > >  	dmb	sy
-> > >  	bl	__inval_cache_range
-> > >  
-> > > diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> > > index 659963d40bb4..fe393ccf9352 100644
-> > > --- a/arch/arm64/kernel/vmlinux.lds.S
-> > > +++ b/arch/arm64/kernel/vmlinux.lds.S
-> > > @@ -196,6 +196,11 @@ SECTIONS
-> > >  	swapper_pg_dir = .;
-> > >  	. += SWAPPER_DIR_SIZE;
-> > >  
-> > > +#ifdef CONFIG_ARM64_TTBR0_PAN
-> > > +	reserved_ttbr0 = .;
-> > > +	. += PAGE_SIZE;
-> > > +#endif
-> > 
-> > Surely RESERVED_TTBR0_SIZE, as elsewhere?
-> 
-> I'll try to move it somewhere where it can be included in vmlinux.lds.S
-> (I can probably include cpufeature.h directly).
-
-Our vmlinux.lds.S already includes <asm/kernel-pagetable.h>, so I think
-that should work already.
-
-Thanks,
-Mark.
+	Arnd
