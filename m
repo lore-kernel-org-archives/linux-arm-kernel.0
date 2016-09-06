@@ -1,59 +1,93 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 6 Sep 2016 09:29:59 +0900
-Subject: Memory range end be inclusive or exclusive? Re: [PATCH v1 1/4]
- kexec: (bugfix) calc correct end address of memory ranges in device tree
-In-Reply-To: <20160801045240.GD7995@linaro.org>
-References: <cover.1468970114.git.geoff@infradead.org>
- <3562841.ROYbCgkeeq@hactar>
- <20160727232331.GY1041@n2100.armlinux.org.uk>
- <1860371.lT9GInp2C3@hactar>
- <20160729082714.GA1041@n2100.armlinux.org.uk>
- <1469812346.16559.40.camel@infradead.org>
- <20160729172356.GD1041@n2100.armlinux.org.uk>
- <20160801045240.GD7995@linaro.org>
-Message-ID: <20160906002958.GB16712@linaro.org>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Tue, 06 Sep 2016 08:24:07 +0800
+Subject: [PATCH v2 3/3] arm: dts: thermal: add thermal/auxadc node.
+In-Reply-To: <1471492253-7185-4-git-send-email-dawei.chien@mediatek.com>
+References: <1471492253-7185-1-git-send-email-dawei.chien@mediatek.com>
+ <1471492253-7185-4-git-send-email-dawei.chien@mediatek.com>
+Message-ID: <1473121447.2201.20.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simon,
-
-What is your opinion on this issue?
-
-On Mon, Aug 01, 2016 at 01:52:40PM +0900, AKASHI Takahiro wrote:
-> On Fri, Jul 29, 2016 at 06:23:56PM +0100, Russell King - ARM Linux wrote:
-> > On Fri, Jul 29, 2016 at 10:12:26AM -0700, Geoff Levand wrote:
-> > > On Fri, 2016-07-29 at 09:27 +0100, Russell King - ARM Linux wrote:
-> > > 
-> > > > So, these functions are a mess and need fixing.
-> > > 
-> > > Since this change isn't really related to arm64 support, I'll
-> > > drop this patch from my series.
-> > 
-> > Do you have a case which triggers bugs in this code?
+On ?, 2016-08-18 at 11:50 +0800, Dawei Chien wrote:
+> This adds the thermal controller and auxadc nodes
+> to the Mediatek MT2701 dtsi file.
 > 
-> Actually, this patch was necessary when my kdump used "usable-memory"
-> properties in "memory" nodes, as on ppc64, to limit the usable memory
-> regions that can be used by crash dump kernel.
-> Since then, I've moved to the approach of using "mem=" kernel parameter,
-> then introducing a new property, "linux,usable-memory-range," under /chosen
-> and now we don't need this patch any more.
+> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
+> ---
+> This patch depned on:
+> https://patchwork.kernel.org/patch/9249589/
+> https://patchwork.kernel.org/patch/9249589/
+
+Hmm, does this mean that I should take all these three patches and hold
+the patches in next merge window until the above patch has been merged?
+
+thanks,
+rui?
+> ---
+> ?arch/arm/boot/dts/mt2701.dtsi |???44
+> +++++++++++++++++++++++++++++++++++++++++
+> ?1 file changed, 44 insertions(+)
 > 
-> So, we can drop it but I still believe that it is buggy.
-
-Due to the discussions[1], I may want to re-enable "usable-memory"
-property on arm64. In addition, I would like to add a function,
-dtb_add_usable_memory_properties(), a variant of
-add_usable_memory_properties(), to kexec/dt-ops.c.
-So this issue is quite crucial now.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/452685.html
-
--Takahiro AKASHI
-
-> Thanks,
-> -Takahiro AKASHI
-> 
-> > -- 
-> > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> > FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> > according to speedtest.net.
+> diff --git a/arch/arm/boot/dts/mt2701.dtsi
+> b/arch/arm/boot/dts/mt2701.dtsi
+> index e9150a4..cee4724 100644
+> --- a/arch/arm/boot/dts/mt2701.dtsi
+> +++ b/arch/arm/boot/dts/mt2701.dtsi
+> @@ -87,6 +87,36 @@
+> ?		clock-output-names = "rtc32k";
+> ?	};
+> ?
+> +	thermal-zones {
+> +		cpu_thermal: cpu_thermal {
+> +			polling-delay-passive = <1000>; /*
+> milliseconds */
+> +			polling-delay = <1000>; /* milliseconds */
+> +
+> +			thermal-sensors = <&thermal 0>;
+> +			sustainable-power = <1000>;
+> +
+> +			trips {
+> +				threshold: trip-point at 0 {
+> +					temperature = <68000>;
+> +					hysteresis = <2000>;
+> +					type = "passive";
+> +				};
+> +
+> +				target: trip-point at 1 {
+> +					temperature = <85000>;
+> +					hysteresis = <2000>;
+> +					type = "passive";
+> +				};
+> +
+> +				cpu_crit: cpu_crit at 0 {
+> +					temperature = <115000>;
+> +					hysteresis = <2000>;
+> +					type = "critical";
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+> ?	timer {
+> ?		compatible = "arm,armv7-timer";
+> ?		interrupt-parent = <&gic>;
+> @@ -222,4 +252,18 @@
+> ?		clock-names = "baud", "bus";
+> ?		status = "disabled";
+> ?	};
+> +
+> +	thermal: thermal at 1100b000 {
+> +		#thermal-sensor-cells = <0>;
+> +		compatible = "mediatek,mt2701-thermal";
+> +		reg = <0 0x1100b000 0 0x1000>;
+> +		interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg
+> CLK_PERI_AUXADC>;
+> +		clock-names = "therm", "auxadc";
+> +		resets = <&pericfg 0x10>;
+> +		reset-names = "therm";
+> +		mediatek,auxadc = <&auxadc>;
+> +		mediatek,apmixedsys = <&apmixedsys>;
+> +	};
+> +
+> ?};
