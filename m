@@ -1,75 +1,42 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 6 Sep 2016 15:06:35 +0200
-Subject: [PATCH 1/7] mtd: nand: Create a NAND reset function
-In-Reply-To: <20160906130243.33si26g2jy54grvx@pengutronix.de>
-References: <1473158355-22451-1-git-send-email-s.hauer@pengutronix.de>
- <1473158355-22451-2-git-send-email-s.hauer@pengutronix.de>
- <20160906131851.34fa77a9@bbrezillon>
- <20160906130243.33si26g2jy54grvx@pengutronix.de>
-Message-ID: <20160906150635.282ab003@bbrezillon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 6 Sep 2016 14:08:10 +0100
+Subject: [PATCH v2 7/7] ARM: KVM: Unlock vgic-v3 support
+In-Reply-To: <20160905112927.GL26366@cbox>
+References: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
+ <1471344418-19568-8-git-send-email-vladimir.murzin@arm.com>
+ <20160905112927.GL26366@cbox>
+Message-ID: <57CEBFBA.6060109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 6 Sep 2016 15:02:43 +0200
-Sascha Hauer <s.hauer@pengutronix.de> wrote:
+On 05/09/16 12:29, Christoffer Dall wrote:
+> On Tue, Aug 16, 2016 at 11:46:58AM +0100, Vladimir Murzin wrote:
+>> It is time to get access to common version of vgic-v3.
+> 
+> common version?
+> 
+>>
+>> We basically would need to tell build system how to pick it up and
+>> undo KVM_ARM_VGIC_V3 guarding introduced in 4f64cb6 ("arm/arm64: KVM:
+>> Only allow 64bit hosts to build VGICv3") and remove stubs. However,
+>> since vgic got ITS support KVM_ARM_VGIC_V3 tend to protect a little
+>> bit more than just plain vgic-v3 - this guard is used for ITS too
+>> which is not supported in 32-bit world yet.  So, along with removal of
+>> KVM_ARM_VGIC_V3 guard introduce the new one - KVM_ARM_VGIC_V3_ITS to
+>> protect ITS related code.
+> 
+> I don't find this paragraph particularly helpful, I'm afraid.
+> 
+>>
+>> The only unpleasant part is how we decide which save/restore sequence to
+>> use under __vgic_save_state() - we don't have patching framework in hand
+>> like arm64, so have to check runtime on every invocation.
+> 
+> Do static keys work on 32-bit arm?
 
-> On Tue, Sep 06, 2016 at 01:18:51PM +0200, Boris Brezillon wrote:
-> > On Tue,  6 Sep 2016 12:39:09 +0200
-> > Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> >   
-> > > When NAND devices are resetted some initialization may have to be done,
-> > > like for example they have to be configured for the timing mode that
-> > > shall be used. To get a common place where this initialization can be
-> > > implemented create a nand_reset() function. This currently only issues
-> > > a NAND_CMD_RESET to the NAND device. The places issuing this command
-> > > manually are replaced with a call to nand_reset().
-> > > 
-> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > > ---
-> > >  drivers/mtd/nand/nand_base.c | 23 ++++++++++++++++++-----
-> > >  include/linux/mtd/nand.h     |  3 +++
-> > >  2 files changed, 21 insertions(+), 5 deletions(-)
-> > > 
-> > > diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-> > > index 77533f7..20151fc 100644
-> > > --- a/drivers/mtd/nand/nand_base.c
-> > > +++ b/drivers/mtd/nand/nand_base.c
-> > > @@ -948,6 +948,19 @@ static int nand_wait(struct mtd_info *mtd, struct nand_chip *chip)
-> > >  }
-> > >  
-> > >  /**
-> > > + * nand_reset - Reset and initialize a NAND device
-> > > + * @mtd: mtd info
-> > > + *
-> > > + * Returns 0 for success or negative error code otherwise
-> > > + */
-> > > +int nand_reset(struct mtd_info *mtd)  
-> > 
-> > Can we pass a struct nand_chip * here?  
-> 
-> Instead of or additionally to truct mtd_info *? One should be enough,
-> although most functions take both.
+They do. It'd be interesting to see if we could move both architectures
+to use static keys for selecting the GIC backend.
 
-'Instead of'. mtd can be extracted from chip.
-
-> 
-> >   
-> > > +{
-> > > +	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);  
-> > 
-> > You miss the chip variable.  
-> 
-> Yeah, the missing hunk is probably in one of the other patches ;) Will
-> fix.
-> 
-> > >  extern int nand_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len);
-> > >  
-> > > +/* Reset and initialize a NAND device */
-> > > +extern int nand_reset(struct mtd_info *mtd);  
-> > 
-> > The extern keyword is not needed here.  
-> 
-> Nope, just added it because the other functions have it aswell. Do we care
-> to remove the extern from the other function declarations?
-
-You can, if you want.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
