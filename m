@@ -1,188 +1,74 @@
-From: horia.geanta@nxp.com (Horia Geanta Neag)
-Date: Tue, 6 Sep 2016 09:43:20 +0000
-Subject: [linux-devel] [PATCH 10/10] dt-bindings: sec: Update bindings for
- LS1012A
-References: <1472207269-18499-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
- <1472207269-18499-10-git-send-email-Bhaskar.Upadhaya@nxp.com>
-Message-ID: <DB4PR04MB0847FF62F710EE46700387EA98F90@DB4PR04MB0847.eurprd04.prod.outlook.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 6 Sep 2016 10:43:32 +0100
+Subject: VM is unable to shutdown on Mustang
+In-Reply-To: <c2ba4c69-9936-f7ce-65ac-cf5d55ba4d07@riken.jp>
+References: <c2ba4c69-9936-f7ce-65ac-cf5d55ba4d07@riken.jp>
+Message-ID: <4d2c8f39-251a-6576-c9e8-b011a73c9c11@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/26/2016 6:36 PM, Bhaskar Upadhaya wrote:
-> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
-> ---
->  .../devicetree/bindings/crypto/fsl-sec5.txt        | 153 +++++++++++++++++++++
->  1 file changed, 153 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/crypto/fsl-sec5.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/crypto/fsl-sec5.txt b/Documentation/devicetree/bindings/crypto/fsl-sec5.txt
-> new file mode 100644
-> index 0000000..7bcaa6f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/crypto/fsl-sec5.txt
-> @@ -0,0 +1,153 @@
-> +SEC 5 is Freescale's Cryptographic Accelerator and Assurance Module (CAAM).
-> +Currently Freescale arm chip LS1012A is embedded with SEC 5.
-This sounds like LS1012A is the only platform with SEC5, which is far
-from the truth.
+On 06/09/16 08:51, Itaru Kitayama wrote:
+> Hi,
+>
+> Observed with kvm-arm-for-v4.8-rc3 when enabling memory debugging options on top of defconfig. defconfig'ed kernel does not have
+> such issue though.
+>
+> Below is the console log:
+>
+> [  757.644120] Unable to handle kernel paging request at virtual address ffff800661e00000
+> [  757.652046] pgd = ffff20000b1a2000
+> [  757.655471] [ffff800661e00000] *pgd=00000047fffe3003, *pud=00000047fcd8c003, *pmd=00000047fcc7c003, *pte=00e8004661e00712
+> [  757.666492] Internal error: Oops: 96000147 [#3] PREEMPT SMP
+> [  757.672041] Modules linked in:
+> [  757.675100] CPU: 7 PID: 3630 Comm: qemu-system-aar Tainted: G      D        4.8.0-rc1 #3
+> [  757.683240] Hardware name: AppliedMicro X-Gene Mustang Board/X-Gene Mustang Board, BIOS 3.06.15 Aug 19 2016
+> [  757.692938] task: ffff80069cdd3580 task.stack: ffff8006adb7c000
+> [  757.698840] PC is at __flush_dcache_area+0x1c/0x40
+> [  757.703613] LR is at kvm_flush_dcache_pmd+0x60/0x70
+> [  757.708469] pc : [<ffff20000809dbdc>] lr : [<ffff2000080b4a70>] pstate: 20000145
+> [  757.715830] sp : ffff8006adb7f8b0
+> [  757.719130] x29: ffff8006adb7f8b0 x28: ffff200008cd6520
+> [  757.724445] x27: ffff80069cce4568 x26: ffff80069cce4480
+> [  757.729756] x25: 0000000000000000 x24: 0000000000000000
+> [  757.735065] x23: ffff8006ac0f0000 x22: 000000000069fce8
+> [  757.740376] x21: ffff80069fce8000 x20: ffff200009635000
+> [  757.745690] x19: 0000000004661e00 x18: 0000000000000000
+> [  757.751005] x17: 0000000000000000 x16: 000000007f02ac80
+> [  757.756316] x15: 0000000000000000 x14: 0000000000000000
+> [  757.761625] x13: 0000000000000000 x12: ffffffffffffffff
+> [  757.766936] x11: 0000000000000040 x10: 1ffff000d5b6fefe
+> [  757.772247] x9 : ffff8006adb7f650 x8 : dfff200000000000
+> [  757.777558] x7 : ffff2000081665f8 x6 : 0000000000000000
+> [  757.782870] x5 : 0000000000000003 x4 : 0000000000000000
+> [  757.788181] x3 : 000000000000003f x2 : 0000000000000040
+> [  757.793491] x1 : ffff800662000000 x0 : ffff800661e00000
+> [  757.798800]
+> [  757.800286] Process qemu-system-aar (pid: 3630, stack limit = 0xffff8006adb7c020)
+> [  757.807735] Stack: (0xffff8006adb7f8b0 to 0xffff8006adb80000)
 
-> +SEC 5 device tree binding include:
-> +   -SEC 5 Node
-> +   -Job Ring Node
-> +   -Full Example
-> +
-> +=====================================================================
-> +SEC 5 Node
-> +
-> +Description
-> +
-> +    Node defines the base address of the SEC 5 block.
-> +    This block specifies the address range of all global
-> +    configuration registers for the SEC 5 block.
-> +    For example, In LS1012A, we could see three SEC 5 node.
-There's only one SEC / CAAM crypto engine, thus only one node.
-Copy & paste typo from SEC6 binding?
+...
 
-> +
-> +PROPERTIES
-> +
-> +   - compatible
-> +      Usage: required
-> +      Value type: <string>
-> +      Definition: Must include "fsl,sec-v5.4".
-Since you are adding a binding for SEC5, make sure you are accounting
-for already-existing trees that are using "fsl,sec-v5.0",
-"fsl,sec-v5.2", "fsl,sec-v5.3".
-See SoCs in arch/powerpc/boot/dts/fsl/
+> [  758.357249] [<ffff20000809dbdc>] __flush_dcache_area+0x1c/0x40
+> [  758.363059] [<ffff2000080b6748>] unmap_stage2_range+0x458/0x5f0
+> [  758.368954] [<ffff2000080b708c>] kvm_free_stage2_pgd+0x34/0x60
+> [  758.374761] [<ffff2000080b2280>] kvm_arch_destroy_vm+0x20/0x68
+> [  758.380570] [<ffff2000080aa330>] kvm_put_kvm+0x210/0x358
+> [  758.385860] [<ffff2000080aa524>] kvm_vm_release+0x2c/0x40
+> [  758.391239] [<ffff2000082ad234>] __fput+0x114/0x2e8
+> [  758.396096] [<ffff2000082ad46c>] ____fput+0xc/0x18
+> [  758.400869] [<ffff200008104658>] task_work_run+0x108/0x138
+> [  758.406332] [<ffff2000080dc8ec>] do_exit+0x48c/0x10e8
+> [  758.411363] [<ffff2000080dd5fc>] do_group_exit+0x6c/0x130
+> [  758.416739] [<ffff2000080ed924>] get_signal+0x284/0xa18
+> [  758.421943] [<ffff20000808a098>] do_signal+0x158/0x860
+> [  758.427060] [<ffff20000808aad4>] do_notify_resume+0x6c/0x88
+> [  758.432608] [<ffff200008083624>] work_pending+0x10/0x14
+> [  758.437812] Code: 9ac32042 8b010001 d1000443 8a230000 (d50b7e20)
+> [  758.444093] ---[ end trace cdfa1c3f20ed57a1 ]---
+> [  758.448709] Fixing recursive fault but reboot is needed!
+> [  770.500031] xgene-enet 1f610000.ethernet eth3: Link is Up - 10Gbps
 
-> +
-> +   - fsl,sec-era
-> +      Usage: optional
-> +      Value type: <u32>
-> +      Definition: A standard property. Define the 'ERA' of the SEC
-> +          device.
-> +
-> +   - #address-cells
-> +       Usage: required
-> +       Value type: <u32>
-> +       Definition: A standard property.  Defines the number of cells
-> +           for representing physical addresses in child nodes.
-> +
-> +   - #size-cells
-> +       Usage: required
-> +       Value type: <u32>
-> +       Definition: A standard property.  Defines the number of cells
-> +           for representing the size of physical addresses in
-> +           child nodes.
-> +
-> +   - reg
-> +      Usage: required
-> +      Value type: <prop-encoded-array>
-> +      Definition: A standard property.  Specifies the physical
-> +          address and length of the SEC 5 configuration registers.
-> +
-> +   - ranges
-> +       Usage: required
-> +       Value type: <prop-encoded-array>
-> +       Definition: A standard property.  Specifies the physical address
-> +           range of the SEC 5.0 register space (-SNVS not included).  A
-> +           triplet that includes the child address, parent address, &
-> +           length.
-> +
-> +   Note: All other standard properties (see the ePAPR) are allowed
-> +   but are optional.
-> +
-> +EXAMPLE
-> +	crypto: crypto at 1700000 {
-> +                        compatible = "fsl,sec-v5.4", "fsl,sec-v5.0",
-> +                                     "fsl,sec-v4.0";
-> +                        fsl,sec-era = <8>;
-> +                        #address-cells = <1>;
-> +                        #size-cells = <1>;
-> +                        ranges = <0x0 0x00 0x1700000 0x100000>;
-> +                        reg = <0x00 0x1700000 0x0 0x100000>;
-> +                        interrupts = <0 75 0x4>;
-> +	}
-> +
-> +=====================================================================
-> +Job Ring (JR) Node
-> +
-> +    Child of the crypto node defines data processing interface to SEC 5
-> +    across the peripheral bus for purposes of processing
-> +    cryptographic descriptors. The specified address
-> +    range can be made visible to one (or more) cores.
-> +    The interrupt defined for this node is controlled within
-> +    the address range of this node.
-> +
-> +  - compatible
-> +      Usage: required
-> +      Value type: <string>
-> +      Definition: Must include "fsl,sec-v5.4-job-ring".
-> +
-> +  - reg
-> +      Usage: required
-> +      Value type: <prop-encoded-array>
-> +      Definition: Specifies a two JR parameters:  an offset from
-> +           the parent physical address and the length the JR registers.
-> +
-> +   - interrupts
-> +      Usage: required
-> +      Value type: <prop_encoded-array>
-> +      Definition:  Specifies the interrupts generated by this
-> +           device.  The value of the interrupts property
-> +           consists of one interrupt specifier. The format
-> +           of the specifier is defined by the binding document
-> +           describing the node's interrupt parent.
-> +
-> +EXAMPLE
-> +	sec_jr0: jr at 10000 {
-> +		compatible = "fsl,sec-v5.4-job-ring",
-> +			"fsl,sec-v5.0-job-ring",
-> +			"fsl,sec-v4.0-job-ring";
-> +			reg = <0x10000 0x10000>;
-> +			interrupts = <0 71 0x4>;
-> +	};
-> +
-> +===================================================================
-> +Full Example
-> +
-> +Since some chips may contain more than one SEC, the dtsi contains
-> +only the node contents, not the node itself.  A chip using the SEC
-> +should include the dtsi inside each SEC node.  Example:
-> +
-> +In fsl-ls1012a.dtsi:
-> +
-> +	compatible = "fsl,sec-v5.4";
-> +	fsl,sec-era = <8>;
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +
-> +	sec_jr0: jr at 10000 {
-> +		compatible = "fsl,sec-v5.4-job-ring",
-> +			"fsl,sec-v5.0-job-ring",
-> +			"fsl,sec-v4.0-job-ring";
-> +			reg = <0x10000 0x10000>;
-> +			interrupts = <0 71 0x4>;
-> +	};
-> +	sec_jr1: jr at 20000 {
-> +		compatible = "fsl,sec-v5.4-job-ring",
-> +			"fsl,sec-v5.0-job-ring",
-> +			"fsl,sec-v4.0-job-ring";
-> +			reg = <0x20000 0x10000>;
-> +			interrupts = <0 72 0x4>;
-> +	};
-> +	sec_jr2: jr at 30000 {
-> +		compatible = "fsl,sec-v5.4-job-ring",
-> +			"fsl,sec-v5.0-job-ring",
-> +			"fsl,sec-v4.0-job-ring";
-> +			reg = <0x30000 0x10000>;
-> +			interrupts = <0 73 0x4>;
-> +	};
-> +	sec_jr3: jr at 40000 {
-> +		compatible = "fsl,sec-v5.4-job-ring",
-> +			"fsl,sec-v5.0-job-ring",
-> +			"fsl,sec-v4.0-job-ring";
-> +			reg = <0x40000 0x10000>;
-> +			interrupts = <0 74 0x4>;
-> +	};
-> 
+I can reproduce this on Juno-r0 with 4.8-rc4 + defconfig + DEBUG_PAGEALLOC. I will take a
+look at it.
+
+Suzuki
