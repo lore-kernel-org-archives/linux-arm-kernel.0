@@ -1,100 +1,120 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Sep 2016 14:46:08 +0200
-Subject: [v11, 7/8] base: soc: introduce soc_device_match() interface
-In-Reply-To: <CAPDyKFrvg3Qr5m3xXvywsCoVvaiF7ggHAj0Aw=WCOXg65Pt0PQ@mail.gmail.com>
-References: <1473150503-9550-1-git-send-email-yangbo.lu@nxp.com>
- <1473150503-9550-8-git-send-email-yangbo.lu@nxp.com>
- <CAPDyKFrvg3Qr5m3xXvywsCoVvaiF7ggHAj0Aw=WCOXg65Pt0PQ@mail.gmail.com>
-Message-ID: <6515108.aCEls7dUuW@wuerfel>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 6 Sep 2016 14:47:14 +0200
+Subject: [PATCH 6/7] mtd: nand: mxc: implement onfi get/set features
+In-Reply-To: <20160906140521.508a2861@bbrezillon>
+References: <1473158355-22451-1-git-send-email-s.hauer@pengutronix.de>
+ <1473158355-22451-7-git-send-email-s.hauer@pengutronix.de>
+ <20160906140521.508a2861@bbrezillon>
+Message-ID: <20160906124714.5bidphcpp2oa5yxn@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 6, 2016 1:44:23 PM CEST Ulf Hansson wrote:
-> On 6 September 2016 at 10:28, Yangbo Lu <yangbo.lu@nxp.com> wrote:
-> > We keep running into cases where device drivers want to know the exact
-> > version of the a SoC they are currently running on. In the past, this has
-> > usually been done through a vendor specific API that can be called by a
-> > driver, or by directly accessing some kind of version register that is
-> > not part of the device itself but that belongs to a global register area
-> > of the chip.
-
-Please add "From: Arnd Bergmann <arnd@arndb.de>" as the first line, to
-preserve authorship. If you use "git send-email" or "git format-patch",
-that should happen automatically if the author field is set right
-(if not, use 'git commit --amend --author="Arnd Bergmann <arnd@arndb.de>"'
-to fix it).
-
-> > +
-> > +/*
-> > + * soc_device_match - identify the SoC in the machine
-> > + * @matches: zero-terminated array of possible matches
+On Tue, Sep 06, 2016 at 02:05:21PM +0200, Boris Brezillon wrote:
+> On Tue,  6 Sep 2016 12:39:14 +0200
+> Sascha Hauer <s.hauer@pengutronix.de> wrote:
 > 
-> Perhaps also express the constraint on the matching entries. As you
-> need at least one of the ->machine(), ->family(), ->revision() or
-> ->soc_id() callbacks implemented, right!?
-
-They are not callbacks, just strings. Having an empty entry indicates
-the end of the array, and this is not called.
-
-> > + *
-> > + * returns the first matching entry of the argument array, or NULL
-> > + * if none of them match.
-> > + *
-> > + * This function is meant as a helper in place of of_match_node()
-> > + * in cases where either no device tree is available or the information
-> > + * in a device node is insufficient to identify a particular variant
-> > + * by its compatible strings or other properties. For new devices,
-> > + * the DT binding should always provide unique compatible strings
-> > + * that allow the use of of_match_node() instead.
-> > + *
-> > + * The calling function can use the .data entry of the
-> > + * soc_device_attribute to pass a structure or function pointer for
-> > + * each entry.
-> 
-> I don't get the use case behind this, could you elaborate?
-> 
-> Perhaps we should postpone adding the .data entry until we actually
-> see a need for it?
-
-I think the interface is rather useless without a way to figure
-out which entry you got. Almost all users of of_match_node()
-actually use the returned ->data field, and I expect this to
-be the same here.
-
-> > + */
-> > +const struct soc_device_attribute *soc_device_match(
-> > +       const struct soc_device_attribute *matches)
+> > To be able to support different ONFI timing modes we have to implement
+> > the onfi_set_features and onfi_get_features. Tested on an i.MX25 SoC.
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  drivers/mtd/nand/mxc_nand.c | 53 +++++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 53 insertions(+)
+> > 
+> > diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+> > index 5173fad..1db8299 100644
+> > --- a/drivers/mtd/nand/mxc_nand.c
+> > +++ b/drivers/mtd/nand/mxc_nand.c
+> > @@ -1239,6 +1239,57 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
+> >  	}
+> >  }
+> >  
+> > +static int mxc_nand_onfi_set_features(struct mtd_info *mtd, struct nand_chip *chip,
+> > +			int addr, uint8_t *subfeature_param)
 > > +{
-> > +       struct device *dev;
-> > +       int ret;
+> > +	struct nand_chip *nand_chip = mtd_to_nand(mtd);
+> > +	struct mxc_nand_host *host = nand_get_controller_data(nand_chip);
+> > +	int i;
 > > +
-> > +       for (ret = 0; ret == 0; matches++) {
+> > +	if (!chip->onfi_version ||
+> > +	    !(le16_to_cpu(chip->onfi_params.opt_cmd)
+> > +	      & ONFI_OPT_CMD_SET_GET_FEATURES))
+> > +		return -EINVAL;
+> > +
+> > +	host->buf_start = 0;
+> > +
+> > +	for (i = 0; i < ONFI_SUBFEATURE_PARAM_LEN; ++i)
+> > +		chip->write_byte(mtd, subfeature_param[i]);
+> > +
+> > +	memcpy32_toio(host->main_area0, host->data_buf, mtd->writesize);
+> > +	host->devtype_data->send_cmd(host, NAND_CMD_SET_FEATURES, false);
+> > +	mxc_do_addr_cycle(mtd, addr, -1);
+> > +	host->devtype_data->send_page(mtd, NFC_INPUT);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int mxc_nand_onfi_get_features(struct mtd_info *mtd, struct nand_chip *chip,
+> > +			int addr, uint8_t *subfeature_param)
+> > +{
+> > +	struct nand_chip *nand_chip = mtd_to_nand(mtd);
+> > +	struct mxc_nand_host *host = nand_get_controller_data(nand_chip);
+> > +	int i;
+> > +
+> > +	if (!chip->onfi_version ||
+> > +	    !(le16_to_cpu(chip->onfi_params.opt_cmd)
+> > +	      & ONFI_OPT_CMD_SET_GET_FEATURES))
+> > +		return -EINVAL;
+> > +
+> > +	*(uint32_t *)host->main_area0 = 0xdeadbeef;
+
+This line should be removed by the way.
+
+> > +
+> > +	host->devtype_data->send_cmd(host, NAND_CMD_GET_FEATURES, false);
+> > +	mxc_do_addr_cycle(mtd, addr, -1);
+> > +	host->devtype_data->send_page(mtd, NFC_OUTPUT);
+> > +	memcpy32_fromio(host->data_buf, host->main_area0, 512);
+> > +	host->buf_start = 0;
+> > +
+> > +	for (i = 0; i < ONFI_SUBFEATURE_PARAM_LEN; ++i)
+> > +		*subfeature_param++ = chip->read_byte(mtd);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> >  /*
+> >   * The generic flash bbt decriptors overlap with our ecc
+> >   * hardware, so define some i.MX specific ones.
+> > @@ -1513,6 +1564,8 @@ static int mxcnd_probe(struct platform_device *pdev)
+> >  	this->read_word = mxc_nand_read_word;
+> >  	this->write_buf = mxc_nand_write_buf;
+> >  	this->read_buf = mxc_nand_read_buf;
+> > +	this->onfi_set_features = mxc_nand_onfi_set_features;
+> > +	this->onfi_get_features = mxc_nand_onfi_get_features;
 > 
-> This loop looks a bit weird and unsafe.
+> Do you really have to re-implement ->onfi_{set,get}_features()?
+> How about adding support for this command in your ->cmdfunc()
+> implementation and relying on the default ->onfi_{set,get}_features()
+> provided by the core?
 
-Ah, and I thought I was being clever ;-)
+I probably could. The problem is that the generic
+nand_onfi_set_features() first sends the command then afterwards uses
+chip->write_byte to actually send the data. This is not how the mxc_nand
+controller works. On mxc_nand I first need the data before I can issue
+the command.
+I could implement it in the ->cmdfunc() like: When NAND_CMD_SET_FEATURES
+is issued, track that information. Then I have to count how many times
+->write_byte() has been called and when I reach
+ONFI_SUBFEATURE_PARAM_LEN I have to send the command. While that would
+probably work I was glad that I could avoid that. It's one of the
+places where one realizes that the nand core layer is built around the
+nand controllers of the late nineties.
 
-> 1) Perhaps using a while loop makes this more readable?
-> 2) As this is an exported API, I guess validation of the ->matches
-> pointer needs to be done before accessing it.
+Sascha
 
-Sounds fine.
-
-> > +               if (!(matches->machine || matches->family ||
-> > +                     matches->revision || matches->soc_id))
-> > +                       return NULL;
-> > +               dev = NULL;
-> 
-> There's no need to use a struct device just to assign it to NULL.
-> Instead just provide the function below with NULL.
->
-> > +               ret = bus_for_each_dev(&soc_bus_type, dev, (void *)matches,
-> > +                                      soc_device_match_one);
-
-
-I don't remember what led to this, I think you are right, we should
-just pass NULL as most other callers.
-
-Thanks for the review.
-
-	ARnd
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
