@@ -1,43 +1,35 @@
 From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Tue, 6 Sep 2016 12:53:07 -0300
-Subject: [PATCH 1/9] ARM: dts: imx1: Remove skeleton.dtsi
-Message-ID: <1473177196-29371-1-git-send-email-fabio.estevam@nxp.com>
+Date: Tue, 6 Sep 2016 12:53:09 -0300
+Subject: [PATCH 3/9] ARM: dts: imx1: Fix cpu node build warnings with W=1
+In-Reply-To: <1473177196-29371-1-git-send-email-fabio.estevam@nxp.com>
+References: <1473177196-29371-1-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <1473177196-29371-3-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The inclusion of skeleton.dtsi causes the following build warning:
+Fix the following build warnings with W=1:
 
-Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
-
-Instead of fixing skeleton.dtsi, just add the top level definitions
-for address-cells and size-cell and remove its inclusion.
+Warning (unit_address_vs_reg): Node /cpus/cpu at 0 has a unit name, but no reg property
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx1.dtsi | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx1.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/imx1.dtsi b/arch/arm/boot/dts/imx1.dtsi
-index 22f5d1d..b792eee 100644
+index b792eee..dd3de38 100644
 --- a/arch/arm/boot/dts/imx1.dtsi
 +++ b/arch/arm/boot/dts/imx1.dtsi
-@@ -9,7 +9,6 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
+@@ -43,8 +43,9 @@
+ 		#size-cells = <0>;
+ 		#address-cells = <1>;
  
--#include "skeleton.dtsi"
- #include "imx1-pinfunc.h"
- 
- #include <dt-bindings/clock/imx1-clock.h>
-@@ -17,6 +16,9 @@
- #include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
- 	aliases {
- 		gpio0 = &gpio1;
- 		gpio1 = &gpio2;
+-		cpu: cpu at 0 {
++		cpu at 0 {
+ 			device_type = "cpu";
++			reg = <0>;
+ 			compatible = "arm,arm920t";
+ 			operating-points = <200000 1900000>;
+ 			clock-latency = <62500>;
 -- 
-1.9.
+1.9.1
