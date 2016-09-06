@@ -1,134 +1,37 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Mon,  5 Sep 2016 21:48:55 -0700
-Subject: [PATCH 2/2] ASoC: rockchip: Add DP dai-links to the rk3399-gru
- machine driver
-In-Reply-To: <1473137335-14541-1-git-send-email-zyw@rock-chips.com>
-References: <1473137335-14541-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1473137335-14541-3-git-send-email-zyw@rock-chips.com>
+From: radioconfusion@gmail.com (radioconfusion at gmail.com)
+Date: Tue, 06 Sep 2016 08:27:49 +0300
+Subject: [crypto] [marvell-cesa] Possible regression after Linux 4.7
+Message-ID: <57ce53d6.0a28190a.3d6d2.44b2@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DP audio output support to the rk3300-gru machine
-driver.
+Hello,
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-hychao at chromium.org, broonie at kernel.org
----
+I'm testing the marvell-cesa -driver on Armada 385 board and I think I've found
+a regression between Linux 4.7 and 4.8-rc4.
+I want to accelerate my curl connections. So I compiled the 4.8-rc4 with
+marvell-cesa enabled and HEAD revision of cryptodev-linux.
 
- .../bindings/sound/rockchip,rk3399-gru-sound.txt   | 13 +++---
- sound/soc/rockchip/rk3399_gru_sound.c              | 48 ++++++++++++++++++++++
- 2 files changed, 55 insertions(+), 6 deletions(-)
+Here is my output:
 
-diff --git a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-index f19b6c8..222124b 100644
---- a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-+++ b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-@@ -1,15 +1,16 @@
--ROCKCHIP with MAX98357A/RT5514/DA7219 codecs on GRU boards
-+ROCKCHIP with MAX98357A/RT5514/DA7219 codecs and DP via spdif on GRU boards
- 
- Required properties:
- - compatible: "rockchip,rk3399-gru-sound"
--- rockchip,cpu: The phandle of the Rockchip I2S controller that's
--  connected to the codecs
--- rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs
-+- rockchip,cpu: The phandle of the Rockchip I2S controller controller that's
-+  connected to the codecs, and the SPDIF controller that's connected to DP
-+- rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs and of the
-+  DP encoder node
- 
- Example:
- 
- sound {
- 	compatible = "rockchip,rk3399-gru-sound";
--	rockchip,cpu = <&i2s0>;
--	rockchip,codec = <&max98357a &rt5514 &da7219>;
-+	rockchip,cpu = <&i2s0 &spdif>;
-+	rockchip,codec = <&max98357a &rt5514 &da7219 &cdn_dp 1>;
- };
-diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
-index 164b6da..50e5d9a 100644
---- a/sound/soc/rockchip/rk3399_gru_sound.c
-+++ b/sound/soc/rockchip/rk3399_gru_sound.c
-@@ -25,6 +25,7 @@
- #include <linux/spi/spi.h>
- #include <sound/core.h>
- #include <sound/jack.h>
-+#include <sound/hdmi-codec.h>
- #include <sound/pcm.h>
- #include <sound/pcm_params.h>
- #include <sound/soc.h>
-@@ -226,10 +227,30 @@ static struct snd_soc_ops rockchip_sound_da7219_ops = {
- 	.hw_params = rockchip_sound_da7219_hw_params,
- };
- 
-+static struct snd_soc_jack cdn_dp_card_jack;
-+
-+static int cdn_dp_init(struct snd_soc_pcm_runtime *runtime)
-+{
-+	struct snd_soc_card *card = runtime->card;
-+	struct snd_soc_codec *codec = runtime->codec;
-+	int ret;
-+
-+	/* enable jack detection */
-+	ret = snd_soc_card_jack_new(card, "DP Jack", SND_JACK_LINEOUT,
-+				    &cdn_dp_card_jack, NULL, 0);
-+	if (ret) {
-+		dev_err(card->dev, "Can't new DP Jack %d\n", ret);
-+		return ret;
-+	}
-+
-+	return hdmi_codec_set_jack_detect(codec, &cdn_dp_card_jack);
-+}
-+
- enum {
- 	DAILINK_MAX98357A,
- 	DAILINK_RT5514,
- 	DAILINK_DA7219,
-+	DAILINK_CDNDP,
- 	DAILINK_RT5514_DSP,
- };
- 
-@@ -264,6 +285,14 @@ static struct snd_soc_dai_link rockchip_dailinks[] = {
- 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
- 			SND_SOC_DAIFMT_CBS_CFS,
- 	},
-+	[DAILINK_CDNDP] = {
-+		.name = "DP",
-+		.stream_name = "DP PCM",
-+		.codec_dai_name = "spdif-hifi",
-+		.init = cdn_dp_init,
-+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
-+			SND_SOC_DAIFMT_CBS_CFS,
-+	},
- 	/* RT5514 DSP for voice wakeup via spi bus */
- 	[DAILINK_RT5514_DSP] = {
- 		.name = "RT5514 DSP",
-@@ -334,6 +363,25 @@ static int rockchip_sound_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
-+	cpu_node = of_parse_phandle(pdev->dev.of_node, "rockchip,cpu", 1);
-+	if (!cpu_node) {
-+		dev_err(&pdev->dev, "Property 'rockchip,cpu 1' missing or invalid\n");
-+		return -EINVAL;
-+	}
-+
-+	rockchip_dailinks[DAILINK_CDNDP].platform_of_node = cpu_node;
-+	rockchip_dailinks[DAILINK_CDNDP].cpu_of_node = cpu_node;
-+
-+	rockchip_dailinks[DAILINK_CDNDP].codec_of_node =
-+		of_parse_phandle(pdev->dev.of_node, "rockchip,codec",
-+				 DAILINK_CDNDP);
-+	if (!rockchip_dailinks[DAILINK_CDNDP].codec_of_node) {
-+		dev_err(&pdev->dev,
-+			"Property[%d] 'rockchip,codec' missing or invalid\n",
-+			DAILINK_CDNDP);
-+		return -EINVAL;
-+	}
-+
- 	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
- 	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_dai_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
- 	rockchip_dailinks[DAILINK_RT5514_DSP].platform_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
--- 
-1.9.1
+~# uname -r
+4.8.0-rc4
+~# modprobe cryptodev
+~# modprobe marvell-cesa
+~# curl -k --ciphers AES256-SHA256 https://myserver/myfile >/dev/null
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+ 19  200M   19 39.7M    0     0  16.2M      0  0:00:12  0:00:02  0:00:10 16.2M
+curl: (56) SSL read: error:1408F119:SSL routines:SSL3_GET_RECORD:decryption
+failed or bad record mac, errno 0
+
+This error is quite easy to reproduce. Especially if you have some other
+connections open at same time or two simultaneous curl-connections.
+I had a ssh-connection running top(1).
+
+I can not reproduce this with Linux 4.7 or without modprobing marvell-cesa.
+
+I'm not using any special kernel parameter, patches, custom dts, etc.
+
+Best Regards,
+Jussi
