@@ -1,96 +1,53 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 6 Sep 2016 21:51:49 +0200
-Subject: [PATCH 1/2] pwm: sunxi: allow the pwm to finish its pulse before
- disable
-In-Reply-To: <1473145976.731.20.camel@schinagl.nl>
-References: <1472147411-30424-1-git-send-email-oliver@schinagl.nl>
- <1472147411-30424-2-git-send-email-oliver@schinagl.nl>
- <20160826221900.GG3165@lukather>
- <1473145976.731.20.camel@schinagl.nl>
-Message-ID: <20160906195149.GJ9040@lukather>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 6 Sep 2016 14:55:36 -0500
+Subject: [PATCH V2 1/5] Documentation: Add support for TI System Control
+ Interface (TI-SCI) protocol
+In-Reply-To: <6c63b044-3db9-9202-b790-350a88b9eab0@ti.com>
+References: <20160830130647.6828-1-nm@ti.com>
+ <20160830130647.6828-2-nm@ti.com> <20160902150628.GA19493@rob-hp-laptop>
+ <CAGo_u6q0xxnUj5ary82OU1uP=kTHfA_3N7_d7OiSEwS1_5dXuw@mail.gmail.com>
+ <57C9E0A8.4010701@ti.com> <6c63b044-3db9-9202-b790-350a88b9eab0@ti.com>
+Message-ID: <1a382d12-e5d8-7403-6a0f-a1a8a35bd571@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2016 at 09:12:56AM +0200, Olliver Schinagl wrote:
-> Hi Maxime!,
-> 
-> On za, 2016-08-27 at 00:19 +0200, Maxime Ripard wrote:
-> > On Thu, Aug 25, 2016 at 07:50:10PM +0200, Olliver Schinagl wrote:
-> > > 
-> > > When we inform the PWM block to stop toggeling the output, we may
-> > > end up
-> > > in a state where the output is not what we would expect (e.g. not
-> > > the
-> > > low-pulse) but whatever the output was at when the clock got
-> > > disabled.
-> > > 
-> > > To counter this we have to wait for maximally the time of one whole
-> > > period to ensure the pwm hardware was able to finish. Since we
-> > > already
-> > > told the PWM hardware to disable it self, it will not continue
-> > > toggling
-> > > but merly finish its current pulse.
-> > > 
-> > > If a whole period is considered to much, it may be contemplated to
-> > > use a
-> > > half period + a little bit to ensure we get passed the transition.
-> > > 
-> > > Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
-> > > ---
-> > > ?drivers/pwm/pwm-sun4i.c | 11 +++++++++++
-> > > ?1 file changed, 11 insertions(+)
-> > > 
-> > > diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
-> > > index 03a99a5..5e97c8a 100644
-> > > --- a/drivers/pwm/pwm-sun4i.c
-> > > +++ b/drivers/pwm/pwm-sun4i.c
-> > > @@ -8,6 +8,7 @@
-> > > ?
-> > > ?#include <linux/bitops.h>
-> > > ?#include <linux/clk.h>
-> > > +#include <linux/delay.h>
-> > > ?#include <linux/err.h>
-> > > ?#include <linux/io.h>
-> > > ?#include <linux/module.h>
-> > > @@ -245,6 +246,16 @@ static void sun4i_pwm_disable(struct pwm_chip
-> > > *chip, struct pwm_device *pwm)
-> > > ?	spin_lock(&sun4i_pwm->ctrl_lock);
-> > > ?	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
-> > > ?	val &= ~BIT_CH(PWM_EN, pwm->hwpwm);
-> > > +	sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
-> > > +	spin_unlock(&sun4i_pwm->ctrl_lock);
-> > > +
-> > > +	/* Allow for the PWM hardware to finish its last toggle.
-> > > The pulse
-> > > +	?* may have just started and thus we should wait a full
-> > > period.
-> > > +	?*/
-> > > +	ndelay(pwm_get_period(pwm));
-> > 
-> > Can't that use the ready bit as well?
-> It depends whatever is cheaper. If we disable the pwm, we have to
-> commit that request to hardware first. Then we have to read back the
-> has ready and in the strange situation it is not, wait for it to become
-> ready?
+On 09/05/2016 02:09 AM, Tero Kristo wrote:
+> On 02/09/16 23:27, Dave Gerlach wrote:
+>> On 09/02/2016 12:07 PM, Nishanth Menon wrote:
+>>> Rob,
+>>>
+>>> On Fri, Sep 2, 2016 at 10:06 AM, Rob Herring <robh@kernel.org> wrote:
+>>>> On Tue, Aug 30, 2016 at 08:06:43AM -0500, Nishanth Menon wrote:
+>>> [...]
+>>>>> +
+>>>>> +TI-SCI Client Device Node:
+>>>>> +========================
+>>>>> +
+>>>>> +Client nodes refer to the required TI-SCI device using the "ti,sci"
+>>>>> property.
+>>>>
+>>>> As I mentioned for power domains, for clients that are self contained
+>>>> (i.e. a single function) I think the should be child nodes.
+>>>>
+>>>
+>>> Thanks for the feedback. I think we should be able to do that and also
+>>> assume you have no further improvements you'd like to see here.
+>>>
+>>> Looking at current Documentation/devicetree/bindings/arm/arm,scpi.txt
+>>> -> it makes sense to stick along the same lines as you mentioned.
+>>>
+>>> Dave, Tero: do you guys have any objections?
+>>
+>> No objections, I think this is a logical move.
+>
+> Yea, sounds like a valid change. I believe you are going to post a new
+> version so I can modify the clock driver also accordingly?
 
-If it works like you were suggesting, yes.
+Just closing the loop here: https://lkml.org/lkml/2016/9/6/747 posted. 
+the changes are in binding - clk driver itself should'nt by itself 
+have any changes.
 
-> Also, that would mean we would loop in a spin lock, or keep
-> setting/clearing an additional spinlock to read the ready bit.
-
-You're using a spin_lock, so it's not that bad, but I was just
-suggesting replacing the ndelay.
-
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160906/70528e0f/attachment.sig>
+Regards,
+Nishanth Menon
