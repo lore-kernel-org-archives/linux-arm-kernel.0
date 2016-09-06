@@ -1,40 +1,158 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 6 Sep 2016 12:27:11 +0200
-Subject: [PATCH V10 2/8] ACPI: Add new IORT functions to support MSI
- domain handling
-In-Reply-To: <alpine.DEB.2.20.1609061219230.5647@nanos>
-References: <1473152938-17388-1-git-send-email-tn@semihalf.com>
- <1473152938-17388-3-git-send-email-tn@semihalf.com>
- <alpine.DEB.2.20.1609061219230.5647@nanos>
-Message-ID: <f469f024-b1c9-8616-c841-663e3e3d0731@semihalf.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 6 Sep 2016 11:27:42 +0100
+Subject: [PATCH v2 3/7] arm64: Introduce uaccess_{disable, enable}
+ functionality based on TTBR0_EL1
+In-Reply-To: <20160905172038.GC27305@leverpostej>
+References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
+ <1472828533-28197-4-git-send-email-catalin.marinas@arm.com>
+ <20160905172038.GC27305@leverpostej>
+Message-ID: <20160906102741.GF19605@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.09.2016 12:20, Thomas Gleixner wrote:
-> On Tue, 6 Sep 2016, Tomasz Nowicki wrote:
->> +/**
->> + * iort_get_device_domain() - Find MSI domain related to a device
->> + * @dev: The device.
->> + * @req_id: Requester ID for the device.
->> + *
->> + * Returns: the MSI domain for this device, NULL otherwise
->> + */
->> +struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id)
->> +{
->> +	static struct fwnode_handle *handle;
->
-> static ??????
->
->> +	int its_id;
->> +
->> +	if (iort_dev_find_its_id(dev, req_id, 0, &its_id))
->> +		return NULL;
->> +
->> +	handle = iort_find_domain_token(its_id);
->
-> You reevaluate that on every call.
->
+On Mon, Sep 05, 2016 at 06:20:38PM +0100, Mark Rutland wrote:
+> On Fri, Sep 02, 2016 at 04:02:09PM +0100, Catalin Marinas wrote:
+> > +#ifdef CONFIG_ARM64_TTBR0_PAN
+> > +#define RESERVED_TTBR0_SIZE	(PAGE_SIZE)
+> > +#else
+> > +#define RESERVED_TTBR0_SIZE	(0)
+> > +#endif
+> 
+> I was going to suggest that we use the empty_zero_page, which we can
+> address with an adrp, because I had forgotten that we need to generate
+> the *physical* address.
+> 
+> It would be good if we could have a description of why we need the new
+> reserved page somewhere in the code. I'm sure I won't be the only one
+> tripped up by this.
+> 
+> It would be possible to use the existing empty_zero_page, if we're happy
+> to have a MOVZ; MOVK; MOVK; MOVK sequence that we patch at boot-time.
+> That could be faster than an MRS on some implementations.
 
-Obviously it is the bug. Thanks for spotting this.
+I was trying to keep the number of instructions to a minimum in
+preference to potentially slightly faster sequence (I haven't done any
+benchmarks). On ARMv8.1+ implementations, we just end up with more nops.
 
-Tomasz
+We could also do an ldr from a PC-relative address, it's one instruction
+and it may not be (significantly) slower than MRS + ADD.
+
+> > +static inline void uaccess_ttbr0_enable(void)
+> > +{
+> > +	unsigned long flags;
+> > +
+> > +	/*
+> > +	 * Disable interrupts to avoid preemption and potential saved
+> > +	 * TTBR0_EL1 updates between reading the variable and the MSR.
+> > +	 */
+> > +	local_irq_save(flags);
+> > +	write_sysreg(current_thread_info()->ttbr0, ttbr0_el1);
+> > +	isb();
+> > +	local_irq_restore(flags);
+> > +}
+> 
+> I don't follow what problem this actually protects us against. In the
+> case of preemption everything should be saved+restored transparently, or
+> things would go wrong as soon as we enable IRQs anyway.
+> 
+> Is this a hold-over from a percpu approach rather than the
+> current_thread_info() approach?
+
+If we get preempted between reading current_thread_info()->ttbr0 and
+writing TTBR0_EL1, a series of context switches could lead to the update
+of the ASID part of ttbr0. The actual MSR would store an old ASID in
+TTBR0_EL1.
+
+> > +#else
+> > +static inline void uaccess_ttbr0_disable(void)
+> > +{
+> > +}
+> > +
+> > +static inline void uaccess_ttbr0_enable(void)
+> > +{
+> > +}
+> > +#endif
+> 
+> I think that it's better to drop the ifdef and add:
+> 
+> 	if (!IS_ENABLED(CONFIG_ARM64_TTBR0_PAN))
+> 		return;
+> 
+> ... at the start of each function. GCC should optimize the entire thing
+> away when not used, but we'll get compiler coverage regardless, and
+> therefore less breakage. All the symbols we required should exist
+> regardless.
+
+The reason for this is that thread_info.ttbr0 is conditionally defined.
+I don't think the compiler would ignore it.
+
+> >  	.macro	uaccess_enable, tmp1, tmp2
+> > +#ifdef CONFIG_ARM64_TTBR0_PAN
+> > +alternative_if_not ARM64_HAS_PAN
+> > +	save_and_disable_irq \tmp2		// avoid preemption
+> > +	uaccess_ttbr0_enable \tmp1
+> > +	restore_irq \tmp2
+> > +alternative_else
+> > +	nop
+> > +	nop
+> > +	nop
+> > +	nop
+> > +	nop
+> > +	nop
+> > +	nop
+> > +alternative_endif
+> > +#endif
+> 
+> How about something like:
+> 
+> 	.macro alternative_endif_else_nop
+> 	alternative_else
+> 	.rept ((662b-661b) / 4)
+> 	       nop
+> 	.endr
+> 	alternative_endif
+> 	.endm
+> 
+> So for the above we could have:
+> 
+> 	alternative_if_not ARM64_HAS_PAN
+> 		save_and_disable_irq \tmp2
+> 		uaccess_ttbr0_enable \tmp1
+> 		restore_irq \tmp2
+> 	alternative_endif_else_nop
+> 
+> I'll see about spinning a patch, or discovering why that happens to be
+> broken.
+
+This looks better. Minor comment, I would actually name the ending
+statement alternative_else_nop_endif to match the order in which you'd
+normally write them.
+
+> >  	 * tables again to remove any speculatively loaded cache lines.
+> >  	 */
+> >  	mov	x0, x25
+> > -	add	x1, x26, #SWAPPER_DIR_SIZE
+> > +	add	x1, x26, #SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE
+> >  	dmb	sy
+> >  	bl	__inval_cache_range
+> >  
+> > diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> > index 659963d40bb4..fe393ccf9352 100644
+> > --- a/arch/arm64/kernel/vmlinux.lds.S
+> > +++ b/arch/arm64/kernel/vmlinux.lds.S
+> > @@ -196,6 +196,11 @@ SECTIONS
+> >  	swapper_pg_dir = .;
+> >  	. += SWAPPER_DIR_SIZE;
+> >  
+> > +#ifdef CONFIG_ARM64_TTBR0_PAN
+> > +	reserved_ttbr0 = .;
+> > +	. += PAGE_SIZE;
+> > +#endif
+> 
+> Surely RESERVED_TTBR0_SIZE, as elsewhere?
+
+I'll try to move it somewhere where it can be included in vmlinux.lds.S
+(I can probably include cpufeature.h directly).
+
+-- 
+Catalin
