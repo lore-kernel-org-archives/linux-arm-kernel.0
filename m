@@ -1,110 +1,71 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Tue, 06 Sep 2016 08:30:07 +0800
-Subject: [PATCH v2 3/3] arm: dts: thermal: add thermal/auxadc node.
-In-Reply-To: <1473121447.2201.20.camel@intel.com>
-References: <1471492253-7185-1-git-send-email-dawei.chien@mediatek.com>
- <1471492253-7185-4-git-send-email-dawei.chien@mediatek.com>
- <1473121447.2201.20.camel@intel.com>
-Message-ID: <1473121807.2201.23.camel@intel.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 06 Sep 2016 03:34:41 +0300
+Subject: [PATCH/RFT v2 0/8] Add SDHI to r8a7796/salvator-x
+In-Reply-To: <1471938590-10650-1-git-send-email-horms+renesas@verge.net.au>
+References: <1471938590-10650-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <2032317.SOiUovHhFZ@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?, 2016-09-06 at 08:24 +0800, Zhang Rui wrote:
-> On ?, 2016-08-18 at 11:50 +0800, Dawei Chien wrote:
-> > 
-> > This adds the thermal controller and auxadc nodes
-> > to the Mediatek MT2701 dtsi file.
-> > 
-> > Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
-> > ---
-> > This patch depned on:
-> > https://patchwork.kernel.org/patch/9249589/
-> > https://patchwork.kernel.org/patch/9249589/
-> Hmm, does this mean that I should take all these three patches and
-> hold
-> the patches in next merge window until the above patch has been
-> merged?
-> 
-Patch 3/3 can not be applied on top of upstream kernel, so I guess it
-still has some other dependencies.
-I think I can apply patch 1, 2 first. And patch 3/3 should be handled
-in the dt tree.
+Hi Simon,
 
-thanks,
-rui
-> thanks,
-> rui?
-> > 
-> > ---
-> > ?arch/arm/boot/dts/mt2701.dtsi |???44
-> > +++++++++++++++++++++++++++++++++++++++++
-> > ?1 file changed, 44 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/mt2701.dtsi
-> > b/arch/arm/boot/dts/mt2701.dtsi
-> > index e9150a4..cee4724 100644
-> > --- a/arch/arm/boot/dts/mt2701.dtsi
-> > +++ b/arch/arm/boot/dts/mt2701.dtsi
-> > @@ -87,6 +87,36 @@
-> > ?		clock-output-names = "rtc32k";
-> > ?	};
-> > ?
-> > +	thermal-zones {
-> > +		cpu_thermal: cpu_thermal {
-> > +			polling-delay-passive = <1000>; /*
-> > milliseconds */
-> > +			polling-delay = <1000>; /* milliseconds */
-> > +
-> > +			thermal-sensors = <&thermal 0>;
-> > +			sustainable-power = <1000>;
-> > +
-> > +			trips {
-> > +				threshold: trip-point at 0 {
-> > +					temperature = <68000>;
-> > +					hysteresis = <2000>;
-> > +					type = "passive";
-> > +				};
-> > +
-> > +				target: trip-point at 1 {
-> > +					temperature = <85000>;
-> > +					hysteresis = <2000>;
-> > +					type = "passive";
-> > +				};
-> > +
-> > +				cpu_crit: cpu_crit at 0 {
-> > +					temperature = <115000>;
-> > +					hysteresis = <2000>;
-> > +					type = "critical";
-> > +				};
-> > +			};
-> > +		};
-> > +	};
-> > +
-> > ?	timer {
-> > ?		compatible = "arm,armv7-timer";
-> > ?		interrupt-parent = <&gic>;
-> > @@ -222,4 +252,18 @@
-> > ?		clock-names = "baud", "bus";
-> > ?		status = "disabled";
-> > ?	};
-> > +
-> > +	thermal: thermal at 1100b000 {
-> > +		#thermal-sensor-cells = <0>;
-> > +		compatible = "mediatek,mt2701-thermal";
-> > +		reg = <0 0x1100b000 0 0x1000>;
-> > +		interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
-> > +		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg
-> > CLK_PERI_AUXADC>;
-> > +		clock-names = "therm", "auxadc";
-> > +		resets = <&pericfg 0x10>;
-> > +		reset-names = "therm";
-> > +		mediatek,auxadc = <&auxadc>;
-> > +		mediatek,apmixedsys = <&apmixedsys>;
-> > +	};
-> > +
-> > ?};
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at??http://vger.kernel.org/majordomo-info.html
+Thank you for the patches.
+
+On Tuesday 23 Aug 2016 09:49:42 Simon Horman wrote:
+> Hi,
+> 
+> this patch set updates drivers, documentation and DT to
+> enable SDHI0 & 3 on the r8a7796/salvator-x. This includes
+> defining nodes for all available SDHI and GPIO devices.
+> 
+> I have boot-tested this which seems successful.
+> However, I do not have physical access to an r8a7796/salvator-x board
+> and the one that I have remote access to does not appear to have
+> any SD cards present. I would be grateful of any testing anyone
+> can provide.
+> 
+> Based on renesas-drivers-2016-08-09-v4.8-rc1
+
+For patches 1/8, 4/8 and 6/8, applied on top of your devel branch (with the 
+gpio-ranges property removed from 6/8 due to the lack of PFC support),
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Tested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+I've tested the patches with ethernet support that uses GPIO-2-11 as an 
+interrupt pin (I'll post the ethernet patches for r8a7796 soon).
+
+> Provided for testing as the topic/r8a7796-sdhi-v2 branch in
+> my renesas tree on kernel.org.
+> 
+> Changes since v1 noted in individual changelogs.
+> Acks from v1 also added.
+> 
+> Ai Kyuse (1):
+>   mmc: sh_mobile_sdhi: Add r8a7796 support
+> 
+> Simon Horman (4):
+>   clk: renesas: r8a7796: Add SDIF clocks
+>   gpio: rcar: Add r8a7796 (R-Car M3-W) support
+>   arm64: dts: r8a7796: add SDHI nodes
+>   arm64: dts: r8a7796: salvator-x: enable SDHI0 & 3
+> 
+> Takeshi Kihara (3):
+>   clk: renesas: r8a7796: Add GPIO clocks
+>   pinctrl: sh-pfc: r8a7796: Add SDHI pins, groups and functions
+>   arm64: dts: r8a7796: Add GPIO device nodes
+> 
+>  .../devicetree/bindings/gpio/renesas,gpio-rcar.txt |   1 +
+>  Documentation/devicetree/bindings/mmc/tmio_mmc.txt |   1 +
+>  arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts |  84 +++++++
+>  arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 154 ++++++++++++
+>  drivers/clk/renesas/r8a7796-cpg-mssr.c             |  18 ++
+>  drivers/gpio/gpio-rcar.c                           |   4 +
+>  drivers/mmc/host/sh_mobile_sdhi.c                  |   1 +
+>  drivers/pinctrl/sh-pfc/pfc-r8a7796.c               | 275 ++++++++++++++++++
+>  8 files changed, 538 insertions(+)
+
+-- 
+Regards,
+
+Laurent Pinchart
