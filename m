@@ -1,79 +1,79 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Sep 2016 15:27:43 +0200
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <87d1khmhdj.fsf@linux.intel.com>
-References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
- <4416687.vUjZzKWZG6@wuerfel> <87d1khmhdj.fsf@linux.intel.com>
-Message-ID: <20562703.Glp77l1PBf@wuerfel>
+Date: Tue,  6 Sep 2016 15:30:07 +0200
+Subject: [PATCH, RESEND] drm: exynos: avoid unused function warning
+Message-ID: <20160906133027.2206326-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 6, 2016 1:50:48 PM CEST Felipe Balbi wrote:
-> Hi,
-> 
-> Arnd Bergmann <arnd@arndb.de> writes:
-> > On Tuesday, September 6, 2016 9:40:19 AM CEST Felipe Balbi wrote:
-> >> 
-> >> this only solves the problem for DT devices. Legacy devices and
-> >> PCI-based systems will still suffer from the same problem. At least for
-> >> dwc3, I will only be taking patches that solve the problem for all
-> >> users, not a subset of them.
-> >
-> > I don't think legacy devices are a worry, because they wouldn't
-> > have this problem. For the PCI case, you are right that it cannot
-> > work, in particular for machines that have complex IOMMU setup.
-> >
-> > Some architectures (at least arm64 and sparc) check the bus_type of
-> > a device in order to find the correct set of dma_map_ops for that
-> > device, so there is no real way to handle this as long as you
-> > pass a platform_device into an API that expects a pci_device.
-> 
-> Then I guess we're left with adding a "struct device *dma_dev" to struct
-> dwc3 and trying to figure out if we should use parent or self. Does
-> anybody see any problems with that?
+When CONFIG_PM is not set, we get a warning about an unused function:
 
-I think we actually need the device pointer in the usb_hcd structure,
-so it can be passed in these API calls from the USB core
+drivers/gpu/drm/exynos/exynos_drm_gsc.c:1219:12: error: 'gsc_clk_ctrl' defined but not used [-Werror=unused-function]
+ static int gsc_clk_ctrl(struct gsc_context *ctx, bool enable)
+            ^~~~~~~~~~~~
 
-drivers/usb/core/buffer.c:      return dma_alloc_coherent(hcd->self.controller, size, dma, mem_flags);
-drivers/usb/core/buffer.c:      dma_free_coherent(hcd->self.controller, size, addr, dma);
-drivers/usb/core/buffer.c:          (!hcd->self.controller->dma_mask &&
-drivers/usb/core/buffer.c:              hcd->pool[i] = dma_pool_create(name, hcd->self.controller,
-drivers/usb/core/hcd.c:                 urb->setup_dma = dma_map_single(
-drivers/usb/core/hcd.c:                 if (dma_mapping_error(hcd->self.controller,
-drivers/usb/core/hcd.c:                         n = dma_map_sg(
-drivers/usb/core/hcd.c:                         urb->transfer_dma = dma_map_page(
-drivers/usb/core/hcd.c:                         if (dma_mapping_error(hcd->self.controller,
-drivers/usb/core/hcd.c:                         urb->transfer_dma = dma_map_single(
-drivers/usb/core/hcd.c:                         if (dma_mapping_error(hcd->self.controller,
-drivers/usb/core/usb.c:         urb->transfer_dma = dma_map_single(controller,
-drivers/usb/core/usb.c: return dma_map_sg(controller, sg, nents,
-drivers/usb/core/usb.c:         dma_sync_single_for_cpu(controller,
-drivers/usb/core/usb.c:                 dma_sync_single_for_cpu(controller,
-drivers/usb/core/usb.c: dma_sync_sg_for_cpu(controller, sg, n_hw_ents,
+This removes the two #ifdef checks in this file and instead marks the
+functions as __maybe_unused, which is a more reliable way of doing the
+same, allowing better build coverage and avoiding the warning above.
 
-as these are all called on behalf of the host controller node.
-Looking for more instances of hcd->self.controller, I find this
-instance:
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/gpu/drm/exynos/exynos_drm_gsc.c | 12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
 
-drivers/usb/core/hcd.c:         struct usb_phy *phy = usb_get_phy_dev(hcd->self.controller, 0);
-drivers/usb/core/hcd.c:         struct phy *phy = phy_get(hcd->self.controller, "usb");
+Originally sent on July 11, but I just got this again and noticed
+it had never been applied, and I didn't get any reply for the patch.
 
-I'm unsure which device pointer we want here, but I suspect this also
-needs to be the one that has the device node in order to make the lookup
-of the phy structure by device node work right. Can you clarify how
-this works today?
-
-We probably also need to add the of_node of the host controller device
-to struct usb_hcd in order to make usb_of_get_child_node() work
-in the case where the hcd itself is not device that is listed
-in DT. It might be a good idea to use 'struct fwnode_handle' for that,
-so we can in the future also allow ACPI platforms to specify 
-
-> Note, we would NOT be passing device pointers are platform_data, we
-> would have dwc3.ko figure out if it should use self or its parent device
-> for dma.
-
-Ok, sounds good.
-
-	Arnd
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_gsc.c b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
+index 5d20da8f957e..b0a773790f85 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_gsc.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
+@@ -1760,8 +1760,7 @@ static int gsc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM_SLEEP
+-static int gsc_suspend(struct device *dev)
++static int __maybe_unused gsc_suspend(struct device *dev)
+ {
+ 	struct gsc_context *ctx = get_gsc_context(dev);
+ 
+@@ -1773,7 +1772,7 @@ static int gsc_suspend(struct device *dev)
+ 	return gsc_clk_ctrl(ctx, false);
+ }
+ 
+-static int gsc_resume(struct device *dev)
++static int __maybe_unused gsc_resume(struct device *dev)
+ {
+ 	struct gsc_context *ctx = get_gsc_context(dev);
+ 
+@@ -1784,10 +1783,8 @@ static int gsc_resume(struct device *dev)
+ 
+ 	return 0;
+ }
+-#endif
+ 
+-#ifdef CONFIG_PM
+-static int gsc_runtime_suspend(struct device *dev)
++static int __maybe_unused gsc_runtime_suspend(struct device *dev)
+ {
+ 	struct gsc_context *ctx = get_gsc_context(dev);
+ 
+@@ -1796,7 +1793,7 @@ static int gsc_runtime_suspend(struct device *dev)
+ 	return  gsc_clk_ctrl(ctx, false);
+ }
+ 
+-static int gsc_runtime_resume(struct device *dev)
++static int __maybe_unused gsc_runtime_resume(struct device *dev)
+ {
+ 	struct gsc_context *ctx = get_gsc_context(dev);
+ 
+@@ -1804,7 +1801,6 @@ static int gsc_runtime_resume(struct device *dev)
+ 
+ 	return  gsc_clk_ctrl(ctx, true);
+ }
+-#endif
+ 
+ static const struct dev_pm_ops gsc_pm_ops = {
+ 	SET_SYSTEM_SLEEP_PM_OPS(gsc_suspend, gsc_resume)
+-- 
+2.9.0
