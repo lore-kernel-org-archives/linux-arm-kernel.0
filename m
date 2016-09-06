@@ -1,96 +1,108 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 6 Sep 2016 20:08:12 +0800
-Subject: [PATCH v4 05/15] drivers: platform: add fwnode base platform
- devices retrieval
-In-Reply-To: <20160905145751.GA7480@red-moon>
-References: <1471274620-20754-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1471274620-20754-6-git-send-email-lorenzo.pieralisi@arm.com>
- <7659b956-c49d-bd0d-7a1d-8dfc3da6f409@linaro.org>
- <20160905145751.GA7480@red-moon>
-Message-ID: <06a6d839-639f-8a86-14a5-4c43bff593b7@linaro.org>
+From: jbrunet@baylibre.com (jbrunet)
+Date: Tue, 06 Sep 2016 14:11:20 +0200
+Subject: [PATCH v3 1/4] pwm: Add support for Meson PWM Controller
+In-Reply-To: <20160906100438.GE15644@ulmo.ba.sec>
+References: <1471880193-21879-1-git-send-email-narmstrong@baylibre.com>
+ <1471880193-21879-2-git-send-email-narmstrong@baylibre.com>
+ <20160905090052.GG3532@ulmo.ba.sec>
+ <bd7ea1db-d8f9-f075-14ef-732d9bb65e77@baylibre.com>
+ <20160906090749.GA15644@ulmo.ba.sec>
+ <a43f6e6e-05f6-cefe-451d-528588b85a8c@baylibre.com>
+ <20160906100438.GE15644@ulmo.ba.sec>
+Message-ID: <1473163880.7003.5.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/9/5 22:57, Lorenzo Pieralisi wrote:
-> On Mon, Sep 05, 2016 at 09:19:43PM +0800, Hanjun Guo wrote:
->> On 2016/8/15 23:23, Lorenzo Pieralisi wrote:
->>> The platform device kernel API does not provide functions to
->>> retrieve a platform device through the corresponding struct
->>> device fwnode pointer.
->>>
->>> Implement the fwnode platform_device look-up in drivers core
->>> code by using the bus_find_device() API and a corresponding
->>> matching function. The OF equivalent (eg of_find_device_by_node())
->>> will reuse the newly introduced function when OF code will
->>> take care of setting up the device->fwnode value that is
->>> currently left dangling for platform devices instantiated out
->>> of device tree nodes.
->>>
->>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
->>> ---
->>> drivers/base/platform.c         | 23 +++++++++++++++++++++++
->>> include/linux/platform_device.h |  3 +++
->>> 2 files changed, 26 insertions(+)
->>>
->>> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
->>> index 6482d47..3ef150d 100644
->>> --- a/drivers/base/platform.c
->>> +++ b/drivers/base/platform.c
->>> @@ -760,6 +760,29 @@ err_out:
->>> }
->>> EXPORT_SYMBOL_GPL(__platform_create_bundle);
->>>
->>> +static int fwnode_dev_match(struct device *dev, void *data)
->>> +{
->>> +	return dev->fwnode == data;
->>> +}
->>> +
->>> +/**
->>> + * platform_find_device_by_fwnode() - Find the platform_device associated
->>> + *				      with a fwnode
->>> + * @fwnode: Pointer to firmware node
->>> + *
->>> + * Returns platform_device pointer, or NULL if not found
->>> + */
->>> +struct platform_device *
->>> +platform_find_device_by_fwnode(struct fwnode_handle *fwnode)
->>> +{
->>> +	struct device *dev;
->>> +
->>> +	dev = bus_find_device(&platform_bus_type, NULL, fwnode,
->>> +			      fwnode_dev_match);
->>> +	return dev ? to_platform_device(dev) : NULL;
->>> +}
->>> +EXPORT_SYMBOL(platform_find_device_by_fwnode);
->>
->> As SMMU is registered as platform devices, I think we need such
->> API to retrieve the platform device with fwnode handle, actually
->> Kefeng introduced a similar patch [1], but your patch is more
->> generic, so this patch make sense to me,
->>
->> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
->
-> Thanks ! Strictly speaking, with Robin's new series:
->
-> https://lists.linuxfoundation.org/pipermail/iommu/2016-August/018230.html
->
->
-> (and corresponding v5 of this one that I have rebased on top of it) we
-> do not need this patch any longer and it is not really that generic
-> keeping in mind that it can't be used for DT matching (because in DT
-> dev->fwnode is dangling); I will see if I keep this patch according
-> to dependencies.
+On Tue, 2016-09-06 at 12:04 +0200, Thierry Reding wrote:
+> On Tue, Sep 06, 2016 at 11:14:45AM +0200, Neil Armstrong wrote:
+> > 
+> > On 09/06/2016 11:07 AM, Thierry Reding wrote:
+> > > 
+> > > On Tue, Sep 06, 2016 at 10:36:49AM +0200, Neil Armstrong wrote:
+> > > > 
+> > > > Hi Thierry,
+> > > > 
+> > [...]
+> > > 
+> > > 
+> > > > 
+> > > > 
+> > > > The second bug is in probe(), I understand the point to
+> > > > allocate
+> > > > dynamically the channels and attach them to each pwm chip, but
+> > > > when
+> > > > calling meson_pwm_init_channels() we get an OOPS because
+> > > > meson->chip.pwms[i] are allocated in pwmchip_add(). Moving
+> > > > meson_pwm_init_channels() would fix this, but in case of a clk
+> > > > PROBE_DEFER, we would need to remove back the pwmchip, which is
+> > > > a
+> > > > quite a bad design decision....
+> > > 
+> > > Ah yes... that one again. I remember running into that a while
+> > > ago with
+> > > some other driver. To be honest, I think that's a short-coming of
+> > > the
+> > > PWM subsystem and the fix would be for PWM chip registration to
+> > > be split
+> > > into two parts: pwm_chip_init() and pwm_chip_add(). That way, a
+> > > chip
+> > > would be initialized using pwm_chip_init() where the pwms array
+> > > would be
+> > > allocated, and pwm_chip_add() would register the chip with the
+> > > system.
+> > > 
+> > > Currently a few drivers might be vulnerable to a race condition
+> > > between
+> > > registration and implementation (i.e. PWM channels aren't fully
+> > > set up
+> > > when they are exposed to users and sysfs).
+> > > 
+> > > > 
+> > > > The smartest fix I found was to allocate channels in probe,
+> > > > init them
+> > > > them attach them after pwmchip_add():
+> > > > 
+> > [...]
+> > 
+> > > 
+> > > 
+> > > That's the race I was talking about above. I suppose it's not too
+> > > big an
+> > > issue since other drivers seem to manage, so I'm going to merge
+> > > your
+> > > fixed driver.
+> > 
+> > ok thanks !
+> 
+> I've made a few tiny changes (reg -> offset, temporary variable to
+> track
+> &channels[i], ...) and pushed it all out. Hopefully that now fixes
+> any
+> of the remaining issues.
+> 
+> > 
+> > > 
+> > > Unless you feel like taking a stab at the
+> > > pwm_chip_init()/pwm_chip_add()
+> > > split, in which case your driver would be the first to be race-
+> > > free. =)
+> > 
+> > Having he driver upstream is a priority, but having it completely
+> > race-free would be great! I'll be happy to collaborate to a race-
+> > free
+> > pwmchip probe somehow !
+> 
+> Fair enough. I'll do some prototyping and keep you in the loop if I
+> come
+> up with something that I think will do.
+> 
+> Thierry
 
-OK, I think I will wait for your new version, then try another test
-and review it, does it make sense?
+Hi Thierry,
 
->
-> Side note: I have a problem with [1], since that code is there to
-> implement DT phandles in ACPI IIUC and we must really prevent that :)
+I have tested the latest version on the P200 (S905), channels E and F.
+It works as expected.
 
-Agreed :)
+Regards
 
-Thanks
-Hanjun
+Tested-by: Jerome Brunet <jbrunet@baylibre.com>
