@@ -1,140 +1,56 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Tue, 6 Sep 2016 17:33:53 +0800
-Subject: [PATCH 3/4] include: dt-bindings: Add more GPIO bank and index
- definition for rockchip pinctrl
-In-Reply-To: <5785582.C1XOtVbxro@phil>
-References: <1472977937-758-1-git-send-email-andy.yan@rock-chips.com>
- <3544284.90s5nXbktR@phil>
- <0dbac4cd-7f67-5052-16e6-463896bf5929@rock-chips.com>
- <5785582.C1XOtVbxro@phil>
-Message-ID: <b8fd0df8-5f5b-b699-e4c9-fea7387b8277@rock-chips.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Sep 2016 11:37:58 +0200
+Subject: [PATCH v4 4/5] net: stmmac: add a glue driver for the Amlogic
+ Meson 8b / GXBB DWMAC
+In-Reply-To: <CAFBinCAC3c=o1=8DGfiPhw6w6V42jvYLUfHXHpHLe03pw8P=LQ@mail.gmail.com>
+References: <201609050953.67GKeUAU%fengguang.wu@intel.com>
+ <14789887.lyko4Om94p@wuerfel>
+ <CAFBinCAC3c=o1=8DGfiPhw6w6V42jvYLUfHXHpHLe03pw8P=LQ@mail.gmail.com>
+Message-ID: <16206001.1636ZmhtjK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko:
+On Monday, September 5, 2016 9:07:03 PM CEST Martin Blumenstingl wrote:
+> On Mon, Sep 5, 2016 at 12:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday, September 5, 2016 9:37:29 AM CEST kbuild test robot wrote:
+> >> All error/warnings (new ones prefixed by >>):
+> >>
+> >> >> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:63:18: error: field 'm250_mux' has incomplete type
+> >>      struct clk_mux  m250_mux;
+> >>                      ^
+> >> >> drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c:67:21: error: field 'm250_div' has incomplete type
+> >>      struct clk_divider m250_div;
+> >>                         ^
+> >>
+> >
+> > I think this needs a compile-time dependency on COMMON_CLK
+> indeed, since we are also a clock provider we have to depend on
+> CONFIG_COMMON_CLK.
+> 
+> That brings up a question though:
+> so far the new driver uses the same Kconfig symbol as the "old" driver
+> (CONFIG_DWMAC_MESON).
+> The "old" driver does not need CONFIG_COMMON_CLK while the new one does.
+> I see a few options here:
+> 1. simply adding the dependency (as most configurations will have
+> CONFIG_COMMON_CLK enabled anyways)
 
+I think that's fine. At least on both ARM multiplatform and ARM64 it is
+always defined by definition, and when build testing, it should be possible
+to enable it on other architectures as well.
 
-On 2016?09?06? 06:10, Heiko Stuebner wrote:
-> Am Montag, 5. September 2016, 18:22:46 CEST schrieb Andy Yan:
->> Hi Heiko:
->>
->> On 2016?09?05? 17:33, Heiko Stuebner wrote:
->>> Hi Andy,
->>>
->>> Am Sonntag, 4. September 2016, 16:35:30 CEST schrieb Andy Yan:
->>>> There are 8 gpio banks on RK3288, so add the missing
->>>> RK_GPIO7 and RK_GPIO8. Also add gpio index definition
->>>> to make it easier to description GPIO in dts.
->>>>
->>>> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
->>> I tend to disagree here.
->>>
->>> I consider the bank defines RK_GPIOx to be deprecated and highly
->>> discourage
->>> them being used in new boards. They only encode the same number again (2
->>> ->
->>> RK_GPIO2 etc) and therefore don't bring any useful addition over using the
->>> bank number directly.
->>>
->>> Slightly similar argument for the per-pin defines. While the external pins
->>> are described in the A/B/C/Dx notation for pinmux purposes, the gpio
->>> controllers on top use a regular 0-31 numbering. Also you cannot name
->>> constants generic GPIO_x, simply because that may conflict with other
->>> overly generic constant names.
->>>
->>> So I'm not yet convinced that these improve readability, but they would
->>> definitly need a RK_* prefix to make them specific.
->>>
->>>
->>> Heiko
->>           I consider for a people who doesn't familiar with rockchip
->> pinctrl, He
->>    may don't know what does these number 2/4/17....stands for in the dts
->> like
->>    rockchip,pins = <2 17 RK_FUNC_GPIO &pcfg_pull_up>.
-> That person shouldn't work on devicetrees anyway :-) ... or simply read the
-> dt-binding for the pinctrl at first ... which should normally really be the
-> first step, otherwise we wouldn't need the binding documentation.
+> 2. add some depends on COMMON_CLK || MACH_MESON6 || MACH_MESON8 foo
 
-     It's true that people who wants to develop in the kernel should 
-know the technical detail  as much as possible.
-But I still thinks it's a good thing if we can write code more clearly 
-to  let people know what it stands for at first sight.
->>           But if we use meaningful macro here like : rockchip,pins =
->> <RK_GPIO2 RK_GPIO_C0 RK_FUNC_GPIO &pcfg_pull_up>, I think it easier to
->> tell people this GPIO is GPIO_C0 of BNAK2.
-> I definitly don't agree for the gpio-bank number, see above .
->
->> Especially all the GPIOs in rockchip based schematic are described as
->> GPIOn_A/B/C/Dx. And it is also easier for people to directly use a macro
->> stands for 0~32 than translating A/B/C/Dx from the schematic to 0~32.
-> But the pins might in fact really be helpful, but definitly need a prefix and
-> maybe even distinguish between pin and gpio, aka RK_PIN_A0 etc?
->
+That doesn't work unless you also put the calls into the clk interface
+inside of ugly #ifdef
 
-     Anyway, very glad to see you think the pin definition is helpful, 
-so let's move on.
-I'll send a new version with the prefix as your suggested  like 
-RK_PA/B/C/Dx.
+> 3. use a new Kconfig symbol for new new driver (CONFIG_DWMAC_MESON8B?)
 
-     Thanks.
-> Heiko
->
->>>> ---
->>>>
->>>>    include/dt-bindings/pinctrl/rockchip.h | 35
->>>>
->>>> ++++++++++++++++++++++++++++++++++ 1 file changed, 35 insertions(+)
->>>>
->>>> diff --git a/include/dt-bindings/pinctrl/rockchip.h
->>>> b/include/dt-bindings/pinctrl/rockchip.h index 743e66a..fd35350 100644
->>>> --- a/include/dt-bindings/pinctrl/rockchip.h
->>>> +++ b/include/dt-bindings/pinctrl/rockchip.h
->>>> @@ -24,6 +24,41 @@
->>>>
->>>>    #define RK_GPIO3	3
->>>>    #define RK_GPIO4	4
->>>>    #define RK_GPIO6	6
->>>>
->>>> +#define RK_GPIO7	7
->>>> +#define RK_GPIO8	8
->>>> +
->>>> +#define GPIO_A0		0
->>>> +#define GPIO_A1		1
->>>> +#define GPIO_A2		2
->>>> +#define GPIO_A3		3
->>>> +#define GPIO_A4		4
->>>> +#define GPIO_A5		5
->>>> +#define GPIO_A6		6
->>>> +#define GPIO_A7		7
->>>> +#define GPIO_B0		8
->>>> +#define GPIO_B1		9
->>>> +#define GPIO_B2		10
->>>> +#define GPIO_B3		11
->>>> +#define GPIO_B4		12
->>>> +#define GPIO_B5		13
->>>> +#define GPIO_B6		14
->>>> +#define GPIO_B7		15
->>>> +#define GPIO_C0		16
->>>> +#define GPIO_C1		17
->>>> +#define GPIO_C2		18
->>>> +#define GPIO_C3		19
->>>> +#define GPIO_C4		20
->>>> +#define GPIO_C5		21
->>>> +#define GPIO_C6		22
->>>> +#define GPIO_C7		23
->>>> +#define GPIO_D0		24
->>>> +#define GPIO_D1		25
->>>> +#define GPIO_D2		26
->>>> +#define GPIO_D3		27
->>>> +#define GPIO_D4		28
->>>> +#define GPIO_D5		29
->>>> +#define GPIO_D6		30
->>>> +#define GPIO_D7		31
->>>>
->>>>    #define RK_FUNC_GPIO	0
->>>>    #define RK_FUNC_1	1
->
->
->
->
+That would be ok as well, probably not necessary.
+
+> And finally regarding your other mail: I have already changed
+> WARN_ON(PTR_ERR_OR_ZERO(...)) to WARN_ON(IS_ERR(...)) in v4
+
+Ok, thanks.
+
+	Arnd
