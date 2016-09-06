@@ -1,74 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 6 Sep 2016 15:02:43 +0200
-Subject: [PATCH 1/7] mtd: nand: Create a NAND reset function
-In-Reply-To: <20160906131851.34fa77a9@bbrezillon>
-References: <1473158355-22451-1-git-send-email-s.hauer@pengutronix.de>
- <1473158355-22451-2-git-send-email-s.hauer@pengutronix.de>
- <20160906131851.34fa77a9@bbrezillon>
-Message-ID: <20160906130243.33si26g2jy54grvx@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  6 Sep 2016 14:02:05 +0100
+Subject: [PATCH 07/19] arm64: KVM: Allow an exit code to be tagged with an
+ SError
+In-Reply-To: <1473166937-15271-1-git-send-email-marc.zyngier@arm.com>
+References: <1473166937-15271-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1473166937-15271-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2016 at 01:18:51PM +0200, Boris Brezillon wrote:
-> On Tue,  6 Sep 2016 12:39:09 +0200
-> Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> 
-> > When NAND devices are resetted some initialization may have to be done,
-> > like for example they have to be configured for the timing mode that
-> > shall be used. To get a common place where this initialization can be
-> > implemented create a nand_reset() function. This currently only issues
-> > a NAND_CMD_RESET to the NAND device. The places issuing this command
-> > manually are replaced with a call to nand_reset().
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  drivers/mtd/nand/nand_base.c | 23 ++++++++++++++++++-----
-> >  include/linux/mtd/nand.h     |  3 +++
-> >  2 files changed, 21 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-> > index 77533f7..20151fc 100644
-> > --- a/drivers/mtd/nand/nand_base.c
-> > +++ b/drivers/mtd/nand/nand_base.c
-> > @@ -948,6 +948,19 @@ static int nand_wait(struct mtd_info *mtd, struct nand_chip *chip)
-> >  }
-> >  
-> >  /**
-> > + * nand_reset - Reset and initialize a NAND device
-> > + * @mtd: mtd info
-> > + *
-> > + * Returns 0 for success or negative error code otherwise
-> > + */
-> > +int nand_reset(struct mtd_info *mtd)
-> 
-> Can we pass a struct nand_chip * here?
+Similarily to EL1, an asynchronous abort can be triggered whilst
+running at EL2. But instead of making that a new error code,
+we need to communicate it to the rest of KVM together with
+the exit reason. So let's hijack a single bit that allows the
+exception code to be tagged with a "pending SError" information.
 
-Instead of or additionally to truct mtd_info *? One should be enough,
-although most functions take both.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/kvm_asm.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-> 
-> > +{
-> > +	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
-> 
-> You miss the chip variable.
-
-Yeah, the missing hunk is probably in one of the other patches ;) Will
-fix.
-
-> >  extern int nand_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len);
-> >  
-> > +/* Reset and initialize a NAND device */
-> > +extern int nand_reset(struct mtd_info *mtd);
-> 
-> The extern keyword is not needed here.
-
-Nope, just added it because the other functions have it aswell. Do we care
-to remove the extern from the other function declarations?
-
-Sascha
-
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index d177e7e..18f7465 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -20,6 +20,10 @@
+ 
+ #include <asm/virt.h>
+ 
++#define ARM_EXIT_WITH_SERROR_BIT  31
++#define ARM_EXCEPTION_CODE(x)	  ((x) & ~(1U << ARM_EXIT_WITH_SERROR_BIT))
++#define ARM_SERROR_PENDING(x)	  !!((x) & (1U << ARM_EXIT_WITH_SERROR_BIT))
++
+ #define ARM_EXCEPTION_IRQ	  0
+ #define ARM_EXCEPTION_EL1_SERROR  1
+ #define ARM_EXCEPTION_TRAP	  2
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.1.4
