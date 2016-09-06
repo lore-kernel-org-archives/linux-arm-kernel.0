@@ -1,83 +1,184 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Tue, 06 Sep 2016 09:40:19 +0300
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <20160906063529.GA22312@b29397-desktop>
-References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
- <6414695.LEIYfGPUEg@wuerfel>
- <CADRPPNR1_6fbaHLvbmNZW+r7YWW=vOZ+wGCS-MAcNPi9gB3eOw@mail.gmail.com>
- <4865343.bOXkeC8XtQ@wuerfel> <20160906063529.GA22312@b29397-desktop>
-Message-ID: <87bn01o7jg.fsf@linux.intel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 6 Sep 2016 08:42:06 +0200
+Subject: [PATCH] ARM: imx: use IS_ENABLED() instead of checking for
+ built-in or module
+In-Reply-To: <1472463131-29899-1-git-send-email-javier@dowhile0.org>
+References: <1472463131-29899-1-git-send-email-javier@dowhile0.org>
+Message-ID: <20160906064206.7mme3s2pu2s7y465@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Javier,
 
-Hi,
+On Mon, Aug 29, 2016 at 11:32:11AM +0200, Javier Martinez Canillas wrote:
+> From: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> The IS_ENABLED() macro checks if a Kconfig symbol has been enabled either
+> built-in or as a module, use that macro instead of open coding the same.
+> 
+> Using the macro makes the code more readable by helping abstract away some
+> of the Kconfig built-in and module enable details.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
 
-Peter Chen <hzpeterchen@gmail.com> writes:
-> On Mon, Sep 05, 2016 at 05:39:27PM +0200, Arnd Bergmann wrote:
->> On Friday, September 2, 2016 5:16:31 PM CEST Leo Li wrote:
->> > 
->> > Can we use the firmware or bootloader information to provide the
->> > default dma-mapping attributes for devices that doesn't have an
->> > of_node pointer or ACPI data?  This will at least restore what we had
->> > previously provided .  I'm concerned that changing all the drivers
->> > that are creating child device will be a big effort.  Like I mentioned
->> > in another thread, there are many instances of platform_device_add()
->> > under the drivers/ directory.
->> 
->> Fortunately, there are not too many drivers that call platform_device_add
->> *and* try to set up a dma mask for the child device:
->> 
->> git grep -wl dma_mask drivers | xargs grep -wl 'platform_device_\(add\|register\)'
->> 
->> drivers/base/platform.c
->> drivers/bcma/main.c
->> drivers/eisa/virtual_root.c
->> drivers/mfd/mfd-core.c
->> drivers/mfd/omap-usb-host.c
->> drivers/misc/mic/card/mic_x100.c
->> drivers/platform/goldfish/pdev_bus.c
->> drivers/ssb/main.c
->> drivers/usb/chipidea/core.c
->> drivers/usb/dwc3/dwc3-exynos.c
->> drivers/usb/dwc3/host.c
->> drivers/usb/gadget/udc/bdc/bdc_pci.c
->> drivers/usb/host/bcma-hcd.c
->> drivers/usb/host/fsl-mph-dr-of.c
->> drivers/usb/host/ssb-hcd.c
->> drivers/usb/misc/ftdi-elan.c
->> drivers/usb/musb/blackfin.c
->> drivers/usb/musb/musb_dsps.c
->> drivers/usb/musb/omap2430.c
->> drivers/usb/musb/ux500.c
->> 
->> Most of these are probably never used with any nonstandard
->> DMA settings (IOMMU, cache coherency, offset, ...).
->> 
->> One thing we could possibly do is to go through these and
->> replace the hardcoded dma mask setup with of_dma_configure()
->> in all cases in which we actually use DT for probing, which
->> should cover the interesting cases.
->> 
->
-> One case I am going to work is to let USB chipidea driver support iommu,
-> the chipidea core device is no of_node, and created by
-> platform_add_device on the runtime. Using of_dma_configure with parent
-> of_node is a solution from my point, like [1].
->
-> https://lkml.org/lkml/2016/2/22/7
+The following patch should do the same (untested though) and the source
+looks still better:
 
-this only solves the problem for DT devices. Legacy devices and
-PCI-based systems will still suffer from the same problem. At least for
-dwc3, I will only be taking patches that solve the problem for all
-users, not a subset of them.
+diff --git a/arch/arm/mach-imx/mach-kzm_arm11_01.c b/arch/arm/mach-imx/mach-kzm_arm11_01.c
+index 31df4361996f..48f794dbf293 100644
+--- a/arch/arm/mach-imx/mach-kzm_arm11_01.c
++++ b/arch/arm/mach-imx/mach-kzm_arm11_01.c
+@@ -63,7 +63,6 @@
+  */
+ #define KZM_ARM11_16550		(MX31_CS4_BASE_ADDR + 0x1050)
+ 
+-#if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
+ /*
+  * KZM-ARM11-01 has an external UART on FPGA
+  */
+@@ -106,37 +105,35 @@ static struct platform_device serial_device = {
+ 
+ static int __init kzm_init_ext_uart(void)
+ {
+-	u8 tmp;
+-
+-	/*
+-	 * GPIO 1-1: external UART interrupt line
+-	 */
+-	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_GPIO1_1, IOMUX_CONFIG_GPIO));
+-	gpio_request(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1), "ext-uart-int");
+-	gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1));
+-
+-	/*
+-	 * Unmask UART interrupt
+-	 */
+-	tmp = __raw_readb(KZM_ARM11_IO_ADDRESS(KZM_ARM11_CTL1));
+-	tmp |= 0x2;
+-	__raw_writeb(tmp, KZM_ARM11_IO_ADDRESS(KZM_ARM11_CTL1));
+-
+-	serial_platform_data[0].irq =
+-			gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1));
+-	serial8250_resources[1].start =
+-			gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1));
+-	serial8250_resources[1].end =
+-			gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1));
+-
+-	return platform_device_register(&serial_device);
++	if (IS_ENABLED(CONFIG_SERIAL_8250)) {
++		u8 tmp;
++
++		/*
++		 * GPIO 1-1: external UART interrupt line
++		 */
++		mxc_iomux_mode(IOMUX_MODE(MX31_PIN_GPIO1_1, IOMUX_CONFIG_GPIO));
++		gpio_request(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1), "ext-uart-int");
++		gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1));
++
++		/*
++		 * Unmask UART interrupt
++		 */
++		tmp = __raw_readb(KZM_ARM11_IO_ADDRESS(KZM_ARM11_CTL1));
++		tmp |= 0x2;
++		__raw_writeb(tmp, KZM_ARM11_IO_ADDRESS(KZM_ARM11_CTL1));
++
++		serial_platform_data[0].irq =
++				gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1));
++		serial8250_resources[1].start =
++				gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1));
++		serial8250_resources[1].end =
++				gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1));
++
++		return platform_device_register(&serial_device);
++	} else {
++		return 0;
++	}
+ }
+-#else
+-static inline int kzm_init_ext_uart(void)
+-{
+-	return 0;
+-}
+-#endif
+ 
+ /*
+  * SMSC LAN9118
+@@ -178,44 +175,39 @@ static struct regulator_consumer_supply dummy_supplies[] = {
+ 
+ static int __init kzm_init_smsc9118(void)
+ {
+-	/*
+-	 * GPIO 1-2: SMSC9118 interrupt line
+-	 */
+-	mxc_iomux_mode(IOMUX_MODE(MX31_PIN_GPIO1_2, IOMUX_CONFIG_GPIO));
+-	gpio_request(IOMUX_TO_GPIO(MX31_PIN_GPIO1_2), "smsc9118-int");
+-	gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_GPIO1_2));
+-
+-	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
+-
+-	kzm_smsc9118_resources[1].start =
+-			gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_GPIO1_2));
+-	kzm_smsc9118_resources[1].end =
+-			gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_GPIO1_2));
+-
+-	return platform_device_register(&kzm_smsc9118_device);
++	if (IS_ENABLED(CONFIG_SMSC911X)) {
++		/*
++		 * GPIO 1-2: SMSC9118 interrupt line
++		 */
++		mxc_iomux_mode(IOMUX_MODE(MX31_PIN_GPIO1_2, IOMUX_CONFIG_GPIO));
++		gpio_request(IOMUX_TO_GPIO(MX31_PIN_GPIO1_2), "smsc9118-int");
++		gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_GPIO1_2));
++
++		regulator_register_fixed(0, dummy_supplies,
++					 ARRAY_SIZE(dummy_supplies));
++
++		kzm_smsc9118_resources[1].start =
++				gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_GPIO1_2));
++		kzm_smsc9118_resources[1].end =
++				gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_GPIO1_2));
++
++		return platform_device_register(&kzm_smsc9118_device);
++	} else {
++		return 0;
++	}
+ }
+-#else
+-static inline int kzm_init_smsc9118(void)
+-{
+-	return 0;
+-}
+-#endif
+ 
+-#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
+ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
+ };
+ 
+ static void __init kzm_init_imx_uart(void)
+ {
+-	imx31_add_imx_uart0(&uart_pdata);
+-	imx31_add_imx_uart1(&uart_pdata);
+-}
+-#else
+-static inline void kzm_init_imx_uart(void)
+-{
++	if (IS_ENABLED(CONFIG_SERIAL_IMX)) {
++		imx31_add_imx_uart0(&uart_pdata);
++		imx31_add_imx_uart1(&uart_pdata);
++	}
+ }
+-#endif
+ 
+ static int kzm_pins[] __initdata = {
+ 	MX31_PIN_CTS1__CTS1,
+
+Having said that, just dropping the #ifdefs and registering the devices
+even without the matching driver is fine for me, too.
+
+Best regards
+Uwe
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160906/ccfce4b7/attachment.sig>
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
