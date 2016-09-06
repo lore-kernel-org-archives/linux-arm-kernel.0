@@ -1,136 +1,235 @@
-From: pku.leo@gmail.com (Leo Li)
-Date: Tue, 6 Sep 2016 17:40:26 -0500
-Subject: [PATCH v5] i2c: imx: make bus recovery through pinctrl optional
-In-Reply-To: <87ca69fb85848a0a86b34a9a9037a57b@agner.ch>
-References: <1471644322-22670-1-git-send-email-leoyang.li@nxp.com>
- <20160906185849.27pjhawadca5pwow@pengutronix.de>
- <CADRPPNQ+1qBNL5WA=Jo_keE7BPnoOs7a2T6CpTuciiF16qK6xQ@mail.gmail.com>
- <87ca69fb85848a0a86b34a9a9037a57b@agner.ch>
-Message-ID: <CADRPPNSPye45bmFshfwb+gDA0x0ygs4Ofa6HMYbKt9ER0oeccg@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed,  7 Sep 2016 07:52:24 +0900
+Subject: [PATCH] [media] squash lines for simple wrapper functions
+Message-ID: <1473202344-5218-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 6, 2016 at 4:51 PM, Stefan Agner <stefan@agner.ch> wrote:
-> On 2016-09-06 13:06, Leo Li wrote:
->> On Tue, Sep 6, 2016 at 1:58 PM, Uwe Kleine-K?nig
->> <u.kleine-koenig@pengutronix.de> wrote:
->>> On Fri, Aug 19, 2016 at 05:05:22PM -0500, Li Yang wrote:
->>>> Since commit 1c4b6c3bcf30 ("i2c: imx: implement bus recovery") the
->>>> driver starts to use gpio/pinctrl to do i2c bus recovery.  But pinctrl
->>>> is not always available for platforms with this controller such as ls1021a
->>>> and ls1043a, and the device tree binding also mentioned this gpio based
->>>> recovery mechanism as optional.  The patch makes it really optional that
->>>> the probe function won't bailout but just disable the bus recovery function
->>>> when pinctrl is not available.
->>>>
->>>> Signed-off-by: Li Yang <leoyang.li@nxp.com>
->>>> Cc: Gao Pan <pandy.gao@nxp.com>
->>>> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->>>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->>>> ---
->>>> v5:
->>>> Revert the last minute change of recovery info initialization timing, it
->>>> will cause problem if initialized after i2c_add_numbered_adapter()
->>>>
->>>> v4:
->>>> Remove the use of IS_ERR_OR_NULL
->>>> Move the condition judgement to i2c_imx_init_recovery_info()
->>>> Change the timing of recovery initialization to be after bus registration
->>>>
->>>> v3:
->>>> Rebased to Wolfram's for-next branch
->>>> Added acked-by from Linus Walleij
->>>> Update to use new nxp email addresses due to company merge
->>>>
->>>>  drivers/i2c/busses/i2c-imx.c | 15 ++++++++++++++-
->>>>  1 file changed, 14 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
->>>> index 1844bc9..7ae7992 100644
->>>> --- a/drivers/i2c/busses/i2c-imx.c
->>>> +++ b/drivers/i2c/busses/i2c-imx.c
->>>> @@ -989,6 +989,15 @@ static void i2c_imx_init_recovery_info(struct imx_i2c_struct *i2c_imx,
->>>>  {
->>>>       struct i2c_bus_recovery_info *rinfo = &i2c_imx->rinfo;
->>>>
->>>> +     /* if pinctrl is not supported on the system */
->>>> +     if (IS_ERR(i2c_imx->pinctrl))
->>>> +             i2c_imx->pinctrl = NULL;
->>>> +
->>>> +     if (!i2c_imx->pinctrl) {
->>>> +             dev_info(&pdev->dev, "can't get pinctrl, bus recovery not supported\n");
->>>> +             return;
->>>> +     }
->>>> +
->>>>       i2c_imx->pinctrl_pins_default = pinctrl_lookup_state(i2c_imx->pinctrl,
->>>>                       PINCTRL_STATE_DEFAULT);
->>>>       i2c_imx->pinctrl_pins_gpio = pinctrl_lookup_state(i2c_imx->pinctrl,
->>>> @@ -1081,8 +1090,11 @@ static int i2c_imx_probe(struct platform_device *pdev)
->>>>               return ret;
->>>>       }
->>>>
->>>> +     /* optional bus recovery feature through pinctrl */
->>>>       i2c_imx->pinctrl = devm_pinctrl_get(&pdev->dev);
->>>> -     if (IS_ERR(i2c_imx->pinctrl)) {
->>>> +     /* bailout on -ENOMEM or -EPROBE_DEFER, continue for other errors */
->>>> +     if (PTR_ERR(i2c_imx->pinctrl) == -ENOMEM ||
->>>> +                     PTR_ERR(i2c_imx->pinctrl) == -EPROBE_DEFER) {
->>>>               ret = PTR_ERR(i2c_imx->pinctrl);
->>>>               goto clk_disable;
->>>>       }
->>>
->>> devm_pinctrl_get might return the following error-valued pointers:
->>>  - -EINVAL
->>>  - -ENOMEM
->>>  - -ENODEV
->>>  - -EPROBE_DEFER
->>>
->>> There are several error paths returning -EINVAL, one is when an invalid
->>> phandle is used. Do you really want to ignore that?
->>>
->>> IMO error handling is better done with inverse logic, that is continue
->>> on some explicit error, bail out on all unknown stuff. This tends to be
->>> more robust. Also the comment should be improved to not explain that for
->>> -ENOMEM and -EPROBE_DEFER we bail out (which should be obvious for
->>> anyone who can read C) but to explain why.
->>
->> What you said is true for normal error handling, but in this scenario
->> it is intentional to ignore all pinctrl related errors except critical
->> ones because failing to have pinctrl for an optional feature shouldn't
->> impact the function of normal i2c.  We choose to catch -ENOMEM because
->> the error could also cause problem for i2c probe, and -EPROBE_DEFER
->> because it's possible that the pinctrl will be ready later and we want
->> to give it a chance.  The i2c driver really don't care why the pinctrl
->> was not usable.  I thought I added comment before the
->
-> I don't agree. E.g. -EINVAL would appear if you pass devm_pinctrl_get an
-> invalid device. Currently you would silently ignore that, which is not
-> what you want.
+Remove unneeded variables and assignments.
 
-It is not silently ignored, there will be a message printed out saying
-pinctrl is not available and bus recovery is not supported.  On the
-contrary, without this change the entire i2c driver fails to work
-silently if pinctrl is somehow not working.  And if the system is so
-broken that the pointer to the i2c device is NULL, the probe of i2c
-would have already failed before this point.  We shouldn't count on an
-optional function of the driver to catch fundamental issues like this.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
->
-> You want to get the pinctrl in any case expect there isn't one. And that
-> is how you should formulate your if statement.
->
-> /*
->  * It is ok if no pinctrl device is available. We'll not be able to use
-> the
->  * bus recovery feature, but otherwise the driver works fine...
->  */
-> if (PTR_ERR(i2c_imx->pinctrl) != -ENODEV)
+ drivers/media/dvb-core/dvb_frontend.c             |  8 ++------
+ drivers/media/pci/meye/meye.c                     |  5 +----
+ drivers/media/pci/ttpci/av7110.c                  |  4 +---
+ drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c | 17 +++--------------
+ drivers/media/platform/ti-vpe/cal.c               |  6 +-----
+ drivers/media/rc/fintek-cir.c                     |  6 +-----
+ drivers/media/usb/dvb-usb-v2/lmedm04.c            | 14 ++++++--------
+ drivers/media/usb/dvb-usb/m920x.c                 | 10 +++-------
+ drivers/media/usb/gspca/jl2005bcd.c               |  5 +----
+ drivers/media/usb/gspca/sq905c.c                  |  5 +----
+ 10 files changed, 20 insertions(+), 60 deletions(-)
 
-I agree that there could be other possibilities that the pinctrl
-failed to work beside the reason I described in the commit
-message(platform doesn't support pinctrl at all).  But I don't think
-any of them other than the -ENOMEM and -EPROBE_DEFER deserves a bail
-out for the entire i2c driver.
-
-Regards,
-Leo
+diff --git a/drivers/media/dvb-core/dvb_frontend.c b/drivers/media/dvb-core/dvb_frontend.c
+index be99c8d..43fcbb8 100644
+--- a/drivers/media/dvb-core/dvb_frontend.c
++++ b/drivers/media/dvb-core/dvb_frontend.c
+@@ -1515,12 +1515,8 @@ static int dtv_set_frontend(struct dvb_frontend *fe);
+ 
+ static bool is_dvbv3_delsys(u32 delsys)
+ {
+-	bool status;
+-
+-	status = (delsys == SYS_DVBT) || (delsys == SYS_DVBC_ANNEX_A) ||
+-		 (delsys == SYS_DVBS) || (delsys == SYS_ATSC);
+-
+-	return status;
++	return (delsys == SYS_DVBT) || (delsys == SYS_DVBC_ANNEX_A) ||
++	       (delsys == SYS_DVBS) || (delsys == SYS_ATSC);
+ }
+ 
+ /**
+diff --git a/drivers/media/pci/meye/meye.c b/drivers/media/pci/meye/meye.c
+index ba887e8..7727d59 100644
+--- a/drivers/media/pci/meye/meye.c
++++ b/drivers/media/pci/meye/meye.c
+@@ -587,10 +587,7 @@ static void mchip_hic_stop(void)
+ /* get the next ready frame from the dma engine */
+ static u32 mchip_get_frame(void)
+ {
+-	u32 v;
+-
+-	v = mchip_read(MCHIP_MM_FIR(meye.mchip_fnum));
+-	return v;
++	return mchip_read(MCHIP_MM_FIR(meye.mchip_fnum));
+ }
+ 
+ /* frees the current frame from the dma engine */
+diff --git a/drivers/media/pci/ttpci/av7110.c b/drivers/media/pci/ttpci/av7110.c
+index 382caf2..aee26af 100644
+--- a/drivers/media/pci/ttpci/av7110.c
++++ b/drivers/media/pci/ttpci/av7110.c
+@@ -2930,9 +2930,7 @@ static struct saa7146_extension av7110_extension_driver = {
+ 
+ static int __init av7110_init(void)
+ {
+-	int retval;
+-	retval = saa7146_register_extension(&av7110_extension_driver);
+-	return retval;
++	return saa7146_register_extension(&av7110_extension_driver);
+ }
+ 
+ 
+diff --git a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+index 0912d0a..a1d823a 100644
+--- a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
++++ b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+@@ -178,20 +178,12 @@ void exynos4_jpeg_set_interrupt(void __iomem *base, unsigned int version)
+ 
+ unsigned int exynos4_jpeg_get_int_status(void __iomem *base)
+ {
+-	unsigned int	int_status;
+-
+-	int_status = readl(base + EXYNOS4_INT_STATUS_REG);
+-
+-	return int_status;
++	return readl(base + EXYNOS4_INT_STATUS_REG);
+ }
+ 
+ unsigned int exynos4_jpeg_get_fifo_status(void __iomem *base)
+ {
+-	unsigned int fifo_status;
+-
+-	fifo_status = readl(base + EXYNOS4_FIFO_STATUS_REG);
+-
+-	return fifo_status;
++	return readl(base + EXYNOS4_FIFO_STATUS_REG);
+ }
+ 
+ void exynos4_jpeg_set_huf_table_enable(void __iomem *base, int value)
+@@ -296,10 +288,7 @@ void exynos4_jpeg_set_encode_hoff_cnt(void __iomem *base, unsigned int fmt)
+ 
+ unsigned int exynos4_jpeg_get_stream_size(void __iomem *base)
+ {
+-	unsigned int size;
+-
+-	size = readl(base + EXYNOS4_BITSTREAM_SIZE_REG);
+-	return size;
++	return readl(base + EXYNOS4_BITSTREAM_SIZE_REG);
+ }
+ 
+ void exynos4_jpeg_set_dec_bitstream_size(void __iomem *base, unsigned int size)
+diff --git a/drivers/media/platform/ti-vpe/cal.c b/drivers/media/platform/ti-vpe/cal.c
+index e967fcf..2a9de42 100644
+--- a/drivers/media/platform/ti-vpe/cal.c
++++ b/drivers/media/platform/ti-vpe/cal.c
+@@ -483,11 +483,7 @@ static void cal_get_hwinfo(struct cal_dev *dev)
+ 
+ static inline int cal_runtime_get(struct cal_dev *dev)
+ {
+-	int r;
+-
+-	r = pm_runtime_get_sync(&dev->pdev->dev);
+-
+-	return r;
++	return pm_runtime_get_sync(&dev->pdev->dev);
+ }
+ 
+ static inline void cal_runtime_put(struct cal_dev *dev)
+diff --git a/drivers/media/rc/fintek-cir.c b/drivers/media/rc/fintek-cir.c
+index bd7b3bd..ecab69e 100644
+--- a/drivers/media/rc/fintek-cir.c
++++ b/drivers/media/rc/fintek-cir.c
+@@ -104,11 +104,7 @@ static inline void fintek_cir_reg_write(struct fintek_dev *fintek, u8 val, u8 of
+ /* read val from cir config register */
+ static u8 fintek_cir_reg_read(struct fintek_dev *fintek, u8 offset)
+ {
+-	u8 val;
+-
+-	val = inb(fintek->cir_addr + offset);
+-
+-	return val;
++	return inb(fintek->cir_addr + offset);
+ }
+ 
+ /* dump current cir register contents */
+diff --git a/drivers/media/usb/dvb-usb-v2/lmedm04.c b/drivers/media/usb/dvb-usb-v2/lmedm04.c
+index 3721ee6..8a28e87 100644
+--- a/drivers/media/usb/dvb-usb-v2/lmedm04.c
++++ b/drivers/media/usb/dvb-usb-v2/lmedm04.c
+@@ -156,21 +156,19 @@ struct lme2510_state {
+ static int lme2510_bulk_write(struct usb_device *dev,
+ 				u8 *snd, int len, u8 pipe)
+ {
+-	int ret, actual_l;
++	int actual_l;
+ 
+-	ret = usb_bulk_msg(dev, usb_sndbulkpipe(dev, pipe),
+-				snd, len , &actual_l, 100);
+-	return ret;
++	return usb_bulk_msg(dev, usb_sndbulkpipe(dev, pipe),
++			    snd, len, &actual_l, 100);
+ }
+ 
+ static int lme2510_bulk_read(struct usb_device *dev,
+ 				u8 *rev, int len, u8 pipe)
+ {
+-	int ret, actual_l;
++	int actual_l;
+ 
+-	ret = usb_bulk_msg(dev, usb_rcvbulkpipe(dev, pipe),
+-				 rev, len , &actual_l, 200);
+-	return ret;
++	return usb_bulk_msg(dev, usb_rcvbulkpipe(dev, pipe),
++			    rev, len, &actual_l, 200);
+ }
+ 
+ static int lme2510_usb_talk(struct dvb_usb_device *d,
+diff --git a/drivers/media/usb/dvb-usb/m920x.c b/drivers/media/usb/dvb-usb/m920x.c
+index eafc5c8..70672e1 100644
+--- a/drivers/media/usb/dvb-usb/m920x.c
++++ b/drivers/media/usb/dvb-usb/m920x.c
+@@ -55,13 +55,9 @@ static inline int m920x_read(struct usb_device *udev, u8 request, u16 value,
+ static inline int m920x_write(struct usb_device *udev, u8 request,
+ 			      u16 value, u16 index)
+ {
+-	int ret;
+-
+-	ret = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
+-			      request, USB_TYPE_VENDOR | USB_DIR_OUT,
+-			      value, index, NULL, 0, 2000);
+-
+-	return ret;
++	return usb_control_msg(udev, usb_sndctrlpipe(udev, 0), request,
++			       USB_TYPE_VENDOR | USB_DIR_OUT, value, index,
++			       NULL, 0, 2000);
+ }
+ 
+ static inline int m920x_write_seq(struct usb_device *udev, u8 request,
+diff --git a/drivers/media/usb/gspca/jl2005bcd.c b/drivers/media/usb/gspca/jl2005bcd.c
+index 5b481fa..229c66a 100644
+--- a/drivers/media/usb/gspca/jl2005bcd.c
++++ b/drivers/media/usb/gspca/jl2005bcd.c
+@@ -300,10 +300,7 @@ static int jl2005c_stream_start_cif_small(struct gspca_dev *gspca_dev)
+ 
+ static int jl2005c_stop(struct gspca_dev *gspca_dev)
+ {
+-	int retval;
+-
+-	retval = jl2005c_write_reg(gspca_dev, 0x07, 0x00);
+-	return retval;
++	return jl2005c_write_reg(gspca_dev, 0x07, 0x00);
+ }
+ 
+ /*
+diff --git a/drivers/media/usb/gspca/sq905c.c b/drivers/media/usb/gspca/sq905c.c
+index aa21edc..9eaed32 100644
+--- a/drivers/media/usb/gspca/sq905c.c
++++ b/drivers/media/usb/gspca/sq905c.c
+@@ -257,11 +257,8 @@ static void sd_stop0(struct gspca_dev *gspca_dev)
+ /* this function is called at probe and resume time */
+ static int sd_init(struct gspca_dev *gspca_dev)
+ {
+-	int ret;
+-
+ 	/* connect to the camera and reset it. */
+-	ret = sq905c_command(gspca_dev, SQ905C_CLEAR, 0);
+-	return ret;
++	return sq905c_command(gspca_dev, SQ905C_CLEAR, 0);
+ }
+ 
+ /* Set up for getting frames. */
+-- 
+1.9.1
