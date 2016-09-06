@@ -1,215 +1,94 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 6 Sep 2016 18:52:06 +0200
-Subject: [PATCH v2 7/7] ARM: KVM: Unlock vgic-v3 support
-In-Reply-To: <57CEC212.401@arm.com>
-References: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
- <1471344418-19568-8-git-send-email-vladimir.murzin@arm.com>
- <20160905112927.GL26366@cbox> <57CEC212.401@arm.com>
-Message-ID: <20160906165206.GF23592@cbox>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue,  6 Sep 2016 17:51:03 +0100
+Subject: [PATCH v2] drivers: acpi: fix GIC irq model default PCI IRQ polarity
+Message-ID: <1473180663-20590-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2016 at 02:18:10PM +0100, Vladimir Murzin wrote:
-> On 05/09/16 12:29, Christoffer Dall wrote:
-> > On Tue, Aug 16, 2016 at 11:46:58AM +0100, Vladimir Murzin wrote:
-> >> It is time to get access to common version of vgic-v3.
-> > 
-> > common version?
-> > 
-> 
-> Since patch#2 it not private to arm64 or I should rephrase this?
-> 
+On ACPI ARM based systems the GIC interrupt controller
+and corresponding interrupt model permit only the high
+polarity for level interrupts.
 
-I think you should just use the full path of the file or say something
-like:
+ACPI firmware describes PCI legacy IRQs through entries
+in the _PRT objects. Entries in the _PRT can be of two types:
 
-Now when vgic-v3-sr.c can be shared between arm and arm64, we have to
-blah blah blah...
+- Static: not configurable, trigger/polarity default to level-low,
+  _PRT entry defines the global GSI interrupt number
+- Configurable: _PRT interrupt entry contains a reference to the
+  corresponding PCI interrupt link device (that in turn provides the
+  interrupt descriptor through its _CRS/_PRS methods)
 
-> >>
-> >> We basically would need to tell build system how to pick it up and
-> >> undo KVM_ARM_VGIC_V3 guarding introduced in 4f64cb6 ("arm/arm64: KVM:
-> >> Only allow 64bit hosts to build VGICv3") and remove stubs. However,
-> >> since vgic got ITS support KVM_ARM_VGIC_V3 tend to protect a little
-> >> bit more than just plain vgic-v3 - this guard is used for ITS too
-> >> which is not supported in 32-bit world yet.  So, along with removal of
-> >> KVM_ARM_VGIC_V3 guard introduce the new one - KVM_ARM_VGIC_V3_ITS to
-> >> protect ITS related code.
-> > 
-> > I don't find this paragraph particularly helpful, I'm afraid.
-> > 
-> 
-> Sorry for that. It seems to much for one patch, I'll split it per your
-> suggestion bellow.
-> 
-> >>
-> >> The only unpleasant part is how we decide which save/restore sequence to
-> >> use under __vgic_save_state() - we don't have patching framework in hand
-> >> like arm64, so have to check runtime on every invocation.
-> > 
-> > Do static keys work on 32-bit arm?
-> > 
-> 
-> I'll try to use them.
-> 
-> >>
-> >> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> >> ---
-> >>  arch/arm/include/asm/kvm_host.h     |    4 +++
-> >>  arch/arm/include/asm/kvm_hyp.h      |    5 ++++
-> >>  arch/arm/kvm/Makefile               |    2 ++
-> >>  arch/arm/kvm/hyp/Makefile           |    1 +
-> >>  arch/arm/kvm/hyp/switch.c           |   20 +++++++++++--
-> >>  arch/arm64/kvm/Kconfig              |    4 +--
-> >>  include/kvm/arm_vgic.h              |    8 ------
-> >>  virt/kvm/arm/vgic/vgic-kvm-device.c |   10 ++-----
-> >>  virt/kvm/arm/vgic/vgic-mmio-v3.c    |    2 ++
-> >>  virt/kvm/arm/vgic/vgic-mmio.c       |    2 --
-> >>  virt/kvm/arm/vgic/vgic-mmio.h       |    3 --
-> >>  virt/kvm/arm/vgic/vgic.h            |   54 ++---------------------------------
-> >>  12 files changed, 38 insertions(+), 77 deletions(-)
-> >>
-> >> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> >> index de338d9..1312597 100644
-> >> --- a/arch/arm/include/asm/kvm_host.h
-> >> +++ b/arch/arm/include/asm/kvm_host.h
-> >> @@ -39,7 +39,11 @@
-> >>  
-> >>  #include <kvm/arm_vgic.h>
-> >>  
-> >> +#ifdef CONFIG_ARM_GIC_V3
-> >> +#define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
-> >> +#else
-> >>  #define KVM_MAX_VCPUS VGIC_V2_MAX_CPUS
-> >> +#endif
-> >>  
-> >>  #define KVM_REQ_VCPU_EXIT	8
-> >>  
-> >> diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
-> >> index e604ad68..95669b3 100644
-> >> --- a/arch/arm/include/asm/kvm_hyp.h
-> >> +++ b/arch/arm/include/asm/kvm_hyp.h
-> >> @@ -88,6 +88,8 @@
-> >>  
-> >>  #define VFP_FPEXC	__ACCESS_VFP(FPEXC)
-> >>  
-> >> +#define ID_PFR1		__ACCESS_CP15(c0, 0, c1, 1)
-> >> +
-> >>  /* AArch64 compatibility macros, only for the timer so far */
-> >>  #define read_sysreg_el0(r)		read_sysreg(r##_el0)
-> >>  #define write_sysreg_el0(v, r)		write_sysreg(v, r##_el0)
-> >> @@ -103,6 +105,9 @@ void __timer_restore_state(struct kvm_vcpu *vcpu);
-> >>  void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
-> >>  void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
-> >>  
-> >> +void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
-> >> +void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
-> >> +
-> >>  void __sysreg_save_state(struct kvm_cpu_context *ctxt);
-> >>  void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
-> >>  
-> >> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-> >> index 10d77a6..043d817f 100644
-> >> --- a/arch/arm/kvm/Makefile
-> >> +++ b/arch/arm/kvm/Makefile
-> >> @@ -26,8 +26,10 @@ obj-y += $(KVM)/arm/vgic/vgic.o
-> >>  obj-y += $(KVM)/arm/vgic/vgic-init.o
-> >>  obj-y += $(KVM)/arm/vgic/vgic-irqfd.o
-> >>  obj-y += $(KVM)/arm/vgic/vgic-v2.o
-> >> +obj-y += $(KVM)/arm/vgic/vgic-v3.o
-> >>  obj-y += $(KVM)/arm/vgic/vgic-mmio.o
-> >>  obj-y += $(KVM)/arm/vgic/vgic-mmio-v2.o
-> >> +obj-y += $(KVM)/arm/vgic/vgic-mmio-v3.o
-> >>  obj-y += $(KVM)/arm/vgic/vgic-kvm-device.o
-> >>  obj-y += $(KVM)/irqchip.o
-> >>  obj-y += $(KVM)/arm/arch_timer.o
-> >> diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
-> >> index 8dfa5f7..3023bb5 100644
-> >> --- a/arch/arm/kvm/hyp/Makefile
-> >> +++ b/arch/arm/kvm/hyp/Makefile
-> >> @@ -5,6 +5,7 @@
-> >>  KVM=../../../../virt/kvm
-> >>  
-> >>  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
-> >> +obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
-> >>  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/timer-sr.o
-> >>  
-> >>  obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
-> >> diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
-> >> index b13caa9..9666bae 100644
-> >> --- a/arch/arm/kvm/hyp/switch.c
-> >> +++ b/arch/arm/kvm/hyp/switch.c
-> >> @@ -15,6 +15,8 @@
-> >>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >>   */
-> >>  
-> >> +#include <linux/irqchip/arm-gic-v3.h>
-> >> +
-> >>  #include <asm/kvm_asm.h>
-> >>  #include <asm/kvm_hyp.h>
-> >>  
-> >> @@ -74,14 +76,28 @@ static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
-> >>  	write_sysreg(read_sysreg(MIDR), VPIDR);
-> >>  }
-> >>  
-> >> +static bool __hyp_text __has_useable_gicv3_cpuif(void)
-> >> +{
-> >> +	if (IS_ENABLED(CONFIG_ARM_GIC_V3) && (read_sysreg(ID_PFR1) >> 28))
-> > 
-> > Do we have a define for bit 28 we could use?
-> > 
-> > Does this actually work on all v7 boards?  The v7 ARM ARM seems to state
-> > that this bitfield is Reserved, UNK.  Does that somehow mean 'is going
-> > to be zero'?
-> > 
+Configurable IRQ entries are not currently allowed by the ACPI
+specification on ARM since they can only be used for interrupt pins that
+are routable, as per ACPI specifications (version 6.1, 6.2.13):
 
-Any thoughts on this one?
+"[...] There are two ways that _PRT can be used. Typically, the
+interrupt input that a given PCI interrupt is on is configurable. For
+example, a given PCI interrupt might be configured for either IRQ 10 or
+11 on an 8259 interrupt controller. In this model, each interrupt is
+represented in the ACPI namespace as a PCI Interrupt Link Device. [...]"
 
-> >> +		return !!(read_sysreg(ICC_HSRE) & ICC_SRE_EL2_SRE);
-> >> +	else
-> >> +		return false;
-> >> +}
-> >> +
-> >>  static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
-> >>  {
-> >> -	__vgic_v2_save_state(vcpu);
-> >> +	if (__has_useable_gicv3_cpuif())
-> >> +		__vgic_v3_save_state(vcpu);
-> >> +	else
-> >> +		__vgic_v2_save_state(vcpu);
-> >>  }
-> >>  
-> >>  static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
-> >>  {
-> >> -	__vgic_v2_restore_state(vcpu);
-> >> +	if (__has_useable_gicv3_cpuif())
-> >> +		__vgic_v3_restore_state(vcpu);
-> >> +	else
-> >> +		__vgic_v2_restore_state(vcpu);
-> >>  }
-> >>  
-> >>  static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
-> >> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-> >> index 9c9edc9..6eaf12c 100644
-> >> --- a/arch/arm64/kvm/Kconfig
-> >> +++ b/arch/arm64/kvm/Kconfig
-> >> @@ -16,7 +16,7 @@ menuconfig VIRTUALIZATION
-> >>  
-> >>  if VIRTUALIZATION
-> >>  
-> >> -config KVM_ARM_VGIC_V3
-> >> +config KVM_ARM_VGIC_V3_ITS
-> > 
-> > I feel like this could have been simplified with adding the new ITS
-> > guard in a separate patch.
-> > 
-> > In fact, you could then have a separate patch that enables compilation
-> > of the gicv3 code and removes the static inlines etc., and then finally
-> > a patch that adds in the logic for the world switch.
-> 
-> Agree. Will rework this patch.
-> 
+ARM platforms GIC configurations do not allow dynamic IRQ routing,
+since routing is statically laid out at synthesis time; therefore PCI
+interrupt links cannot be used for PCI legacy IRQ descriptions in the
+_PRT on ARM systems.
 
-Thanks, sounds good!
+On the other hand, current core ACPI code handling PCI legacy IRQs
+consider IRQ trigger/polarity for static _PRT entries as level-low.
 
--Christoffer
+On ARM systems with a GIC interrupt controller and corresponding
+ACPI interrupt model this does not work in that GIC interrupt
+controller is only capable of handling level interrupts whose
+polarity is high (for PCI legacy IRQs - that are level-low by
+specification - this means that the legacy IRQs are inverted before
+reaching the interrupt controller pin), resulting in IRQ allocation
+failures such as:
+
+genirq: Setting trigger mode 8 for irq 18 failed (gic_set_type+0x0/0x48)
+
+Change the default polarity for PCI legacy IRQs to high on systems
+booting wth ACPI on platforms with a GIC interrupt controller model,
+fixing the discrepancy between specification and HW behaviour.
+
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Tested-by: Duc Dang <dhdang@apm.com>
+Cc: Punit Agrawal <punit.agrawal@arm.com>
+Cc: Duc Dang <dhdang@apm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Sinan Kaya <okaya@codeaurora.org>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+---
+v1 -> v2:
+
+- Added ACPI specs PCI Interrupt Link device usage restrictions in
+  the patch commit log for explanation
+- Added review tags
+
+ drivers/acpi/pci_irq.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/acpi/pci_irq.c b/drivers/acpi/pci_irq.c
+index 2c45dd3..c576a6f 100644
+--- a/drivers/acpi/pci_irq.c
++++ b/drivers/acpi/pci_irq.c
+@@ -411,7 +411,15 @@ int acpi_pci_irq_enable(struct pci_dev *dev)
+ 	int gsi;
+ 	u8 pin;
+ 	int triggering = ACPI_LEVEL_SENSITIVE;
+-	int polarity = ACPI_ACTIVE_LOW;
++	/*
++	 * On ARM systems with the GIC interrupt model, level interrupts
++	 * are always polarity high by specification; PCI legacy
++	 * IRQs lines are inverted before reaching the interrupt
++	 * controller and must therefore be considered active high
++	 * as default.
++	 */
++	int polarity = acpi_irq_model == ACPI_IRQ_MODEL_GIC ?
++				      ACPI_ACTIVE_HIGH : ACPI_ACTIVE_LOW;
+ 	char *link = NULL;
+ 	char link_desc[16];
+ 	int rc;
+-- 
+2.6.4
