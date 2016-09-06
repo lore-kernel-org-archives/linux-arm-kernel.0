@@ -1,79 +1,103 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  6 Sep 2016 15:30:07 +0200
-Subject: [PATCH, RESEND] drm: exynos: avoid unused function warning
-Message-ID: <20160906133027.2206326-1-arnd@arndb.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 6 Sep 2016 15:34:44 +0200
+Subject: [PATCH 2/7] mtd: nand: Introduce nand_data_interface
+In-Reply-To: <20160906132118.17e2e8f8@bbrezillon>
+References: <1473158355-22451-1-git-send-email-s.hauer@pengutronix.de>
+ <1473158355-22451-3-git-send-email-s.hauer@pengutronix.de>
+ <20160906132118.17e2e8f8@bbrezillon>
+Message-ID: <20160906133444.7rwncblrgqsfw7ee@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_PM is not set, we get a warning about an unused function:
+On Tue, Sep 06, 2016 at 01:21:18PM +0200, Boris Brezillon wrote:
+> On Tue,  6 Sep 2016 12:39:10 +0200
+> Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> 
+> > Currently we have no data structure to fully describe a NAND timing.
+> > We only have struct nand_sdr_timings for NAND timings in SDR mode,
+> > but nothing for DDR mode and also no container to store both types
+> > of timing.
+> > This patch adds struct nand_data_interface which stores the timing
+> > type and a union of different timings. This can be used to pass to
+> > drivers in order to configure the timing.
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  include/linux/mtd/nand.h | 109 ++++++++++++++++++++++++++---------------------
+> >  1 file changed, 60 insertions(+), 49 deletions(-)
+> > 
+> > diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
+> > index 9af9575..19c73ef 100644
+> > --- a/include/linux/mtd/nand.h
+> > +++ b/include/linux/mtd/nand.h
+> > @@ -568,6 +568,66 @@ struct nand_buffers {
+> >  	uint8_t *databuf;
+> >  };
+> >  
+> > +/*
+> > + * struct nand_sdr_timings - SDR NAND chip timings
+> > + *
+> > + * This struct defines the timing requirements of a SDR NAND chip.
+> > + * These information can be found in every NAND datasheets and the timings
+> > + * meaning are described in the ONFI specifications:
+> > + * www.onfi.org/~/media/ONFI/specs/onfi_3_1_spec.pdf (chapter 4.15 Timing
+> > + * Parameters)
+> > + *
+> > + * All these timings are expressed in picoseconds.
+> > + */
+> > +
+> > +struct nand_sdr_timings {
+> > +	u32 tALH_min;
+> > +	u32 tADL_min;
+> > +	u32 tALS_min;
+> > +	u32 tAR_min;
+> > +	u32 tCEA_max;
+> > +	u32 tCEH_min;
+> > +	u32 tCH_min;
+> > +	u32 tCHZ_max;
+> > +	u32 tCLH_min;
+> > +	u32 tCLR_min;
+> > +	u32 tCLS_min;
+> > +	u32 tCOH_min;
+> > +	u32 tCS_min;
+> > +	u32 tDH_min;
+> > +	u32 tDS_min;
+> > +	u32 tFEAT_max;
+> > +	u32 tIR_min;
+> > +	u32 tITC_max;
+> > +	u32 tRC_min;
+> > +	u32 tREA_max;
+> > +	u32 tREH_min;
+> > +	u32 tRHOH_min;
+> > +	u32 tRHW_min;
+> > +	u32 tRHZ_max;
+> > +	u32 tRLOH_min;
+> > +	u32 tRP_min;
+> > +	u32 tRR_min;
+> > +	u64 tRST_max;
+> > +	u32 tWB_max;
+> > +	u32 tWC_min;
+> > +	u32 tWH_min;
+> > +	u32 tWHR_min;
+> > +	u32 tWP_min;
+> > +	u32 tWW_min;
+> > +};
+> > +
+> > +enum nand_data_interface_type {
+> > +	NAND_SDR_IFACE,
+> > +};
+> > +
+> 
+> I know this is my code, and I'm the one to blame here, but can you
+> document the nand_data_interface fields (kerneldoc format)?
 
-drivers/gpu/drm/exynos/exynos_drm_gsc.c:1219:12: error: 'gsc_clk_ctrl' defined but not used [-Werror=unused-function]
- static int gsc_clk_ctrl(struct gsc_context *ctx, bool enable)
-            ^~~~~~~~~~~~
+Sure, can do. Do you know what tCEH is? This one is not documented in
+the ONFI spec.
 
-This removes the two #ifdef checks in this file and instead marks the
-functions as __maybe_unused, which is a more reliable way of doing the
-same, allowing better build coverage and avoiding the warning above.
+Sascha
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/gpu/drm/exynos/exynos_drm_gsc.c | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
-
-Originally sent on July 11, but I just got this again and noticed
-it had never been applied, and I didn't get any reply for the patch.
-
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_gsc.c b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-index 5d20da8f957e..b0a773790f85 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-@@ -1760,8 +1760,7 @@ static int gsc_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--#ifdef CONFIG_PM_SLEEP
--static int gsc_suspend(struct device *dev)
-+static int __maybe_unused gsc_suspend(struct device *dev)
- {
- 	struct gsc_context *ctx = get_gsc_context(dev);
- 
-@@ -1773,7 +1772,7 @@ static int gsc_suspend(struct device *dev)
- 	return gsc_clk_ctrl(ctx, false);
- }
- 
--static int gsc_resume(struct device *dev)
-+static int __maybe_unused gsc_resume(struct device *dev)
- {
- 	struct gsc_context *ctx = get_gsc_context(dev);
- 
-@@ -1784,10 +1783,8 @@ static int gsc_resume(struct device *dev)
- 
- 	return 0;
- }
--#endif
- 
--#ifdef CONFIG_PM
--static int gsc_runtime_suspend(struct device *dev)
-+static int __maybe_unused gsc_runtime_suspend(struct device *dev)
- {
- 	struct gsc_context *ctx = get_gsc_context(dev);
- 
-@@ -1796,7 +1793,7 @@ static int gsc_runtime_suspend(struct device *dev)
- 	return  gsc_clk_ctrl(ctx, false);
- }
- 
--static int gsc_runtime_resume(struct device *dev)
-+static int __maybe_unused gsc_runtime_resume(struct device *dev)
- {
- 	struct gsc_context *ctx = get_gsc_context(dev);
- 
-@@ -1804,7 +1801,6 @@ static int gsc_runtime_resume(struct device *dev)
- 
- 	return  gsc_clk_ctrl(ctx, true);
- }
--#endif
- 
- static const struct dev_pm_ops gsc_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(gsc_suspend, gsc_resume)
 -- 
-2.9.0
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
