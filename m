@@ -1,34 +1,44 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Sep 2016 19:11:46 +0100
-Subject: [PATCH v2 1/2] jump_labels: Allow array initialisers
-In-Reply-To: <1473096348-19548-2-git-send-email-catalin.marinas@arm.com>
-References: <1473096348-19548-1-git-send-email-catalin.marinas@arm.com>
- <1473096348-19548-2-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20160906181146.GD29382@arm.com>
+Date: Tue, 6 Sep 2016 19:14:59 +0100
+Subject: [PATCH 01/21] arm64: FP/SIMD: Convert to hotplug state machine
+In-Reply-To: <20160906170457.32393-2-bigeasy@linutronix.de>
+References: <20160906170457.32393-1-bigeasy@linutronix.de>
+ <20160906170457.32393-2-bigeasy@linutronix.de>
+Message-ID: <20160906181459.GE29382@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 05, 2016 at 06:25:47PM +0100, Catalin Marinas wrote:
-> The static key API is currently designed around single variable
-> definitions. There are cases where an array of static keys is desirable,
-> so extend the API to allow this rather than using the internal static
-> key implementation directly.
+On Tue, Sep 06, 2016 at 07:04:37PM +0200, Sebastian Andrzej Siewior wrote:
+> Install the callbacks via the state machine.
 > 
-> Suggested-by: Dave P Martin <Dave.Martin@arm.com>
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: Jason Baron <jbaron@akamai.com>
-> Cc: Jonathan Corbet <corbet@lwn.net>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 > ---
->  Documentation/static-keys.txt |  9 +++++++++
->  include/linux/jump_label.h    | 12 ++++++++++++
->  2 files changed, 21 insertions(+)
+>  arch/arm64/kernel/fpsimd.c | 22 +++++-----------------
+>  include/linux/cpuhotplug.h |  1 +
+>  2 files changed, 6 insertions(+), 17 deletions(-)
 
-This looks pretty straightforward to me, and I'd like to take it via
-the arm64 tree given that your subsequent patch depends on it.
+Looks fine to me:
 
-Peter -- are you ok with this?
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Cheers,
+> diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+> index afd59e2ca4b3..0da071ff36d2 100644
+> --- a/include/linux/cpuhotplug.h
+> +++ b/include/linux/cpuhotplug.h
+> @@ -20,6 +20,7 @@ enum cpuhp_state {
+>  	CPUHP_SOFTIRQ_DEAD,
+>  	CPUHP_NET_MVNETA_DEAD,
+>  	CPUHP_CPUIDLE_DEAD,
+> +	CPUHP_ARM64_FPSIMD_DEAD,
+>  	CPUHP_WORKQUEUE_PREP,
+>  	CPUHP_POWER_NUMA_PREPARE,
+>  	CPUHP_HRTIMERS_PREPARE,
+
+Are you planning to take this via your tree? The arm64 queue already
+touches cpuhotplug.h for the hw-breakpoint and debugmon changes, so
+there's a simple conflict to address here.
 
 Will
