@@ -1,96 +1,41 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 6 Sep 2016 11:34:08 +0530
-Subject: [PATCH v6 1/8] binding-doc: power: pwrseq-generic: add binding
- doc for generic power sequence library
-In-Reply-To: <20160902010030.GA11262@shlinux2>
-References: <1471252398-957-1-git-send-email-peter.chen@nxp.com>
- <1471252398-957-2-git-send-email-peter.chen@nxp.com>
- <6832cc55-831a-1188-4878-bbbf0b3c3be8@linaro.org>
- <20160902010030.GA11262@shlinux2>
-Message-ID: <3b904eb8-8f32-845e-8b9d-78b7d79ef024@linaro.org>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Tue,  6 Sep 2016 14:04:18 +0800
+Subject: [PATCH v4 0/3] Add ZTE ZX296718 support
+Message-ID: <1473141861-5033-1-git-send-email-jun.nie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Changes in version4:
+  - Change dts file name to align with compatible name.
+  - Reorder dts nodes with reg address sequence.
+  - Move nodes out of soc, which do not have soc simple
+    bus address or share soc interrupt.
+  - Change some nodes name to align with convention.
+
+Changes in version3:
+  - Remove unnecessary flag of gic in dts.
+
+Changes in version2:
+  - Use more precise cpu and pmu compatible name in dts.
+  - fix minor coding style issue.
 
 
-On Friday 02 September 2016 06:30 AM, Peter Chen wrote:
-> On Thu, Sep 01, 2016 at 01:33:22PM +0530, Vaibhav Hiremath wrote:
->>
->> On Monday 15 August 2016 02:43 PM, Peter Chen wrote:
->>> Add binding doc for generic power sequence library.
->>>
->>> Signed-off-by: Peter Chen <peter.chen@nxp.com>
->>> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
->>> Acked-by: Rob Herring <robh@kernel.org>
->>> ---
->>>   .../bindings/power/pwrseq/pwrseq-generic.txt       | 48 ++++++++++++++++++++++
->>>   1 file changed, 48 insertions(+)
->>>   create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
->>> new file mode 100644
->>> index 0000000..ebf0d47
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
->>> @@ -0,0 +1,48 @@
->>> +The generic power sequence library
->>> +
->>> +Some hard-wired devices (eg USB/MMC) need to do power sequence before
->>> +the device can be enumerated on the bus, the typical power sequence
->>> +like: enable USB PHY clock, toggle reset pin, etc. But current
->>> +Linux device driver lacks of such code to do it, it may cause some
->>> +hard-wired devices works abnormal or can't be recognized by
->>> +controller at all. The power sequence will be done before this device
->>> +can be found at the bus.
->>> +
->>> +The power sequence properties is under the device node.
->>> +
->>> +Optional properties:
->>> +- clocks: the input clocks for device.
->>> +- reset-gpios: Should specify the GPIO for reset.
->>> +- reset-duration-us: the duration in microsecond for assert reset signal.
->>> +
->>> +Below is the example of USB power sequence properties on USB device
->>> +nodes which have two level USB hubs.
->>> +
->>> +&usbotg1 {
->>> +	vbus-supply = <&reg_usb_otg1_vbus>;
->>> +	pinctrl-names = "default";
->>> +	pinctrl-0 = <&pinctrl_usb_otg1_id>;
->>> +	status = "okay";
->>> +
->>> +	#address-cells = <1>;
->>> +	#size-cells = <0>;
->>> +	genesys: hub at 1 {
->>> +		compatible = "usb5e3,608";
->>> +		reg = <1>;
->>> +
->>> +		clocks = <&clks IMX6SX_CLK_CKO>;
->>> +		reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
->>> +		reset-duration-us = <10>;
->>> +
->>> +		#address-cells = <1>;
->>> +		#size-cells = <0>;
->>> +		asix: ethernet at 1 {
->>> +			compatible = "usbb95,1708";
->> So I assume, with our recent discussion and the change
->> we are proposing, the library would have some knowledge
->> about this compatible string, right?
-> Yes
->
->> what I was asking on other email was, how are you connecting
->> multiple power sequence libraries to their respective consumers ?
->>
-> The consumers has its of_node, then it can find related power sequence
-> library according to compatible string.
->
+Jun Nie (3):
+  arm64: add ZTE ZX SoC family
+  arm64: dts: Add ZTE ZX296718 SoC dts and Makefile
+  arm64: defconfig: enable ZTE ZX related config
 
-Exactly. Thats what I was referring and wanted to confirm.
-
-Thanks,
-Vaibhav
-
+ Documentation/devicetree/bindings/arm/zte.txt |  24 +++
+ arch/arm64/Kconfig.platforms                  |   5 +
+ arch/arm64/boot/dts/Makefile                  |   1 +
+ arch/arm64/boot/dts/zte/Makefile              |   5 +
+ arch/arm64/boot/dts/zte/zx296718-evb.dts      |  25 +++
+ arch/arm64/boot/dts/zte/zx296718.dtsi         | 254 ++++++++++++++++++++++++++
+ arch/arm64/configs/defconfig                  |   1 +
+ 7 files changed, 315 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/zte/Makefile
+ create mode 100644 arch/arm64/boot/dts/zte/zx296718-evb.dts
+ create mode 100644 arch/arm64/boot/dts/zte/zx296718.dtsi
 
 -- 
-Thanks,
-Vaibhav
+1.9.1
