@@ -1,44 +1,124 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 6 Sep 2016 15:26:10 +0800
-Subject: [PATCH v7 2/9] drm/mediatek: add *driver_data for different
- hardware settings
-In-Reply-To: <1472815484-43821-3-git-send-email-yt.shen@mediatek.com>
-References: <1472815484-43821-1-git-send-email-yt.shen@mediatek.com>
- <1472815484-43821-3-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1473146770.11736.3.camel@mtksdaap41>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 6 Sep 2016 09:29:25 +0200
+Subject: [PATCH 1/3] ARM: dts: armv7-m: remove skeleton.dtsi include
+In-Reply-To: <09f062bb82a99d393c38acfbfebc8cad@agner.ch>
+References: <20160830205250.15616-1-manabian@gmail.com>
+ <20160830205250.15616-2-manabian@gmail.com>
+ <09f062bb82a99d393c38acfbfebc8cad@agner.ch>
+Message-ID: <76d2fe53-dccb-b28b-a5c9-3d248387e85a@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, YT:
+Hi Joachim,
 
-On Fri, 2016-09-02 at 19:24 +0800, YT Shen wrote:
-> There are some hardware settings changed, between MT8173 & MT2701:
-> DISP_OVL address offset changed, color format definition changed.
-> DISP_RDMA fifo size changed.
-> DISP_COLOR offset changed.
-> MIPI_TX pll setting changed.
-> And add prefix for mtk_ddp_main & mtk_ddp_ext & mutex_mod.
-> 
-> Signed-off-by: YT Shen <yt.shen@mediatek.com>
-> ---
+On 08/31/2016 12:14 AM, Stefan Agner wrote:
+> On 2016-08-30 13:52, Joachim Eastwood wrote:
+>> Remove skeleton.dtsi from the common ARM Cortex-M dtsi. This will allow
+>> us to remove skeleton.dtsi on a per platform basis and get rid of the
+>> unit address warning on the memory nodes without getting duplicate memory
+>> nodes.
+>>
+>> See 3ebee5a2e141 ("arm64: dts: kill skeleton.dtsi") for additional
+>> reasons not to use the skeleton.dtsi.
+>>
+>> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/armv7-m.dtsi   | 2 --
+>>  arch/arm/boot/dts/efm32gg.dtsi   | 2 ++
+>>  arch/arm/boot/dts/lpc18xx.dtsi   | 1 +
+>>  arch/arm/boot/dts/mps2.dtsi      | 1 +
+>>  arch/arm/boot/dts/stm32f429.dtsi | 1 +
+>>  arch/arm/boot/dts/vf610m4.dtsi   | 1 +
+>
+> For VF610:
+>
+> Acked-by: Stefan Agner <stefan@agner.ch>
+>
+>>  6 files changed, 6 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/armv7-m.dtsi b/arch/arm/boot/dts/armv7-m.dtsi
+>> index 16331aa..ba332e3 100644
+>> --- a/arch/arm/boot/dts/armv7-m.dtsi
+>> +++ b/arch/arm/boot/dts/armv7-m.dtsi
+>> @@ -1,5 +1,3 @@
+>> -#include "skeleton.dtsi"
+>> -
+>>  / {
+>>  	nvic: interrupt-controller at e000e100  {
+>>  		compatible = "arm,armv7m-nvic";
+>> diff --git a/arch/arm/boot/dts/efm32gg.dtsi b/arch/arm/boot/dts/efm32gg.dtsi
+>> index c747983..d9dbf7f 100644
+>> --- a/arch/arm/boot/dts/efm32gg.dtsi
+>> +++ b/arch/arm/boot/dts/efm32gg.dtsi
+>> @@ -4,6 +4,8 @@
+>>   * Documentation available from
+>>   * http://www.silabs.com/Support%20Documents/TechnicalDocs/EFM32GG-RM.pdf
+>>   */
+>> +
+>> +#include "skeleton.dtsi"
+>>  #include "armv7-m.dtsi"
+>>  #include "dt-bindings/clock/efm32-cmu.h"
+>>
+>> diff --git a/arch/arm/boot/dts/lpc18xx.dtsi b/arch/arm/boot/dts/lpc18xx.dtsi
+>> index 1cd39fd..a1ecfe3 100644
+>> --- a/arch/arm/boot/dts/lpc18xx.dtsi
+>> +++ b/arch/arm/boot/dts/lpc18xx.dtsi
+>> @@ -11,6 +11,7 @@
+>>   *
+>>   */
+>>
+>> +#include "skeleton.dtsi"
+>>  #include "armv7-m.dtsi"
+>>
+>>  #include "dt-bindings/clock/lpc18xx-cgu.h"
+>> diff --git a/arch/arm/boot/dts/mps2.dtsi b/arch/arm/boot/dts/mps2.dtsi
+>> index e3fed8d..efb8a03 100644
+>> --- a/arch/arm/boot/dts/mps2.dtsi
+>> +++ b/arch/arm/boot/dts/mps2.dtsi
+>> @@ -42,6 +42,7 @@
+>>   *     OTHER DEALINGS IN THE SOFTWARE.
+>>   */
+>>
+>> +#include "skeleton.dtsi"
+>>  #include "armv7-m.dtsi"
+>>
+>>  / {
+>> diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+>> index 35df462..8e69328 100644
+>> --- a/arch/arm/boot/dts/stm32f429.dtsi
+>> +++ b/arch/arm/boot/dts/stm32f429.dtsi
+>> @@ -45,6 +45,7 @@
+>>   *     OTHER DEALINGS IN THE SOFTWARE.
+>>   */
+>>
+>> +#include "skeleton.dtsi"
+>>  #include "armv7-m.dtsi"
+>>  #include <dt-bindings/pinctrl/stm32f429-pinfunc.h>
+>>
 
-[snip...]
+For stm32f429 platform:
 
->  
-> @@ -185,7 +183,8 @@ static void mtk_ovl_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
->  	writel_relaxed(pitch, comp->regs + DISP_REG_OVL_PITCH(idx));
->  	writel_relaxed(src_size, comp->regs + DISP_REG_OVL_SRC_SIZE(idx));
->  	writel_relaxed(offset, comp->regs + DISP_REG_OVL_OFFSET(idx));
-> -	writel_relaxed(addr, comp->regs + DISP_REG_OVL_ADDR(idx));
+Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-DISP_REG_OVL_ADDR() is useless, so remove it.
+Regards
 
-> +	writel_relaxed(addr, comp->regs + comp->data->ovl.addr_offset
-> +					+ idx * 0x20);
->  
->  	if (pending->enable)
->  		mtk_ovl_layer_on(comp, idx);
+Alex
 
 
-Regards,
-CK
+>> diff --git a/arch/arm/boot/dts/vf610m4.dtsi b/arch/arm/boot/dts/vf610m4.dtsi
+>> index 9ffe2eb..9f2c731 100644
+>> --- a/arch/arm/boot/dts/vf610m4.dtsi
+>> +++ b/arch/arm/boot/dts/vf610m4.dtsi
+>> @@ -42,6 +42,7 @@
+>>   *     OTHER DEALINGS IN THE SOFTWARE.
+>>   */
+>>
+>> +#include "skeleton.dtsi"
+>>  #include "armv7-m.dtsi"
+>>  #include "vfxxx.dtsi"
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
