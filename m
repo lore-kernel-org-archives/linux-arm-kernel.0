@@ -1,55 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Sep 2016 09:50:04 +0200
-Subject: [PATCH 17/26] ARM: dts: r7s72100: add ethernet clock to device tree
+Date: Wed,  7 Sep 2016 09:50:07 +0200
+Subject: [PATCH 20/26] ARM: dts: r8a7794: fix PWM clock parent
 In-Reply-To: <cover.1473234371.git.horms+renesas@verge.net.au>
 References: <cover.1473234371.git.horms+renesas@verge.net.au>
-Message-ID: <969244f9c72057b2c32b650b2d75a04d612c603c.1473234372.git.horms+renesas@verge.net.au>
+Message-ID: <059baea1d33a64e752af201140ef122e29f2a19a.1473234372.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Brandt <chris.brandt@renesas.com>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+When removing the non-existing thermal clock I forgot to remove its
+parent from the node's "clocks" property  -- this led to a wrong PWM
+clock's parent clock.
+
+Fixes: 2a29f9d6fea8 ("ARM: dts: r8a7794: add MSTP5 clocks")
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r7s72100.dtsi            | 9 +++++++++
- include/dt-bindings/clock/r7s72100-clock.h | 3 +++
- 2 files changed, 12 insertions(+)
+ arch/arm/boot/dts/r8a7794.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index e8e2a5d71976..6d29e8ffa0d9 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -108,6 +108,15 @@
- 			clock-output-names = "scif0", "scif1", "scif2", "scif3", "scif4", "scif5", "scif6", "scif7";
- 		};
- 
-+		mstp7_clks: mstp7_clks at fcfe0430 {
-+			#clock-cells = <1>;
-+			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
-+			reg = <0xfcfe0430 4>;
-+			clocks = <&p0_clk>;
-+			clock-indices = <R7S72100_CLK_ETHER>;
-+			clock-output-names = "ether";
-+		};
-+
- 		mstp9_clks: mstp9_clks at fcfe0438 {
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 611ec6df5cf6..9365580a194f 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -1251,7 +1251,7 @@
+ 		mstp5_clks: mstp5_clks at e6150144 {
+ 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
+-			clocks = <&hp_clk>, <&extal_clk>, <&p_clk>;
++			clocks = <&hp_clk>, <&p_clk>;
  			#clock-cells = <1>;
- 			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
-diff --git a/include/dt-bindings/clock/r7s72100-clock.h b/include/dt-bindings/clock/r7s72100-clock.h
-index 5128f4d94f44..3cd813896d08 100644
---- a/include/dt-bindings/clock/r7s72100-clock.h
-+++ b/include/dt-bindings/clock/r7s72100-clock.h
-@@ -25,6 +25,9 @@
- #define R7S72100_CLK_SCIF6	1
- #define R7S72100_CLK_SCIF7	0
- 
-+/* MSTP7 */
-+#define R7S72100_CLK_ETHER	4
-+
- /* MSTP9 */
- #define R7S72100_CLK_I2C0	7
- #define R7S72100_CLK_I2C1	6
+ 			clock-indices = <R8A7794_CLK_AUDIO_DMAC0
+ 					 R8A7794_CLK_PWM>;
 -- 
 2.7.0.rc3.207.g0ac5344
