@@ -1,198 +1,243 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 7 Sep 2016 12:57:14 +0100
-Subject: [PATCH] pcie: qcom: add support to msm8996 PCIE controller
-In-Reply-To: <1473246412-24616-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1473246412-24616-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <34872e94-9679-5572-e39b-e962842b074e@arm.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed,  7 Sep 2016 13:58:13 +0200
+Subject: [UPDATE PATCH V10 2/8] ACPI: Add new IORT functions to support MSI
+ domain handling
+In-Reply-To: <1473152938-17388-3-git-send-email-tn@semihalf.com>
+References: <1473152938-17388-3-git-send-email-tn@semihalf.com>
+Message-ID: <1473249493-20271-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/16 12:06, Srinivas Kandagatla wrote:
-> This patch adds support to msm8996/apq8096 pcie, MSM8996 supports
-> Gen 1/2, One lane, 3 pcie root-complex with support to MSI and
-> legacy interrupts and it conforms to PCI Express Base 2.1 specification.
-> 
-> This patch adds post_init callback to qcom_pcie_ops, as this is pcie
-> pipe clocks and smmu configuration are only setup after the phy is
-> powered on. It also adds ltssm_enable callback as it is very much
-> different to other supported SOCs in the driver.
-> 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
-> 
-> I tested this patch along with phy driver patch on DB820c based on
-> APQ8096 on port A and port B using sata and ethernet controllers.
-> 
-> Thanks
-> srini
-> 
->  .../devicetree/bindings/pci/qcom,pcie.txt          |  88 +++++++-
->  drivers/pci/host/pcie-qcom.c                       | 237 ++++++++++++++++++++-
->  2 files changed, 318 insertions(+), 7 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/qcom,pcie.txt b/Documentation/devicetree/bindings/pci/qcom,pcie.txt
-> index 4059a6f..1ddfcb4 100644
-> --- a/Documentation/devicetree/bindings/pci/qcom,pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/qcom,pcie.txt
-> @@ -92,6 +92,18 @@
->  			- "aux"		Auxiliary (AUX) clock
->  			- "bus_master"	Master AXI clock
->  			- "bus_slave"	Slave AXI clock
-> +
-> +- clock-names:
-> +	Usage: required for msm8996/apq8096
-> +	Value type: <stringlist>
-> +	Definition: Should contain the following entries
-> +			- "aux"		Auxiliary (AUX) clock
-> +			- "bus_master"	Master AXI clock
-> +			- "bus_slave"	Slave AXI clock
-> +			- "pipe"	Pipe Clock driving internal logic.
-> +			- "cfg"		Configuration clk.
-> +			- "snoc_axi"	SNOC AXI clk
-> +			- "cnoc_ahb"	CNOC AHB clk
->  - resets:
->  	Usage: required
->  	Value type: <prop-encoded-array>
-> @@ -114,8 +126,15 @@
->  	Definition: Should contain the following entries
->  			- "core" Core reset
->  
-> +- iommus:
-> +	Usage: required for msm8996/apq8096
-> +	Value type: <prop-encoded-array>
-> +	Definition: Should point to the respective IOMMU block with master port
-> +		    as argument, see Documentation/devicetree/bindings/iommu/
-> +		    mediatek,iommu.txt for details.
+For ITS, MSI functionality consists on building domain stack and
+during that process we need to reference to domain stack components
+e.g. before we create new DOMAIN_BUS_PCI_MSI domain we need to specify
+its DOMAIN_BUS_NEXUS parent domain. In order to manage that process
+properly, maintain list which elements contain domain token
+(unique for MSI domain stack) and ITS ID: iort_register_domain_token()
+and iort_deregister_domain_token(). Then retrieve domain token
+any time later with ITS ID being key off: iort_find_domain_token().
+With domain token and domain type we are able to find corresponding
+IRQ domain.
 
-Qualcomm have cross-licensed the M4U!? :P
+Since IORT is prepared to describe MSI domain on a per-device basis,
+use existing IORT helpers and implement two calls:
+1. iort_msi_map_rid() to map MSI RID for a device
+2. iort_get_device_domain() to find domain token for a device
 
-In seriousness, though, it seems a bit odd to list "iommus" as a
-required property - unless the IOMMU is actually an integral part of the
-PCIe root complex being described (in which case it wants its own
-binding documenting as well), then the relationship is merely a
-circumstance of integration of those particular SoCs.
+Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-> +
->  - power-domains:
-> -	Usage: required for apq8084
-> +	Usage: required for apq8084 and msm8996/apq8096
->  	Value type: <prop-encoded-array>
->  	Definition: A phandle and power domain specifier pair to the
->  		    power domain which is responsible for collapsing
-> @@ -137,6 +156,11 @@
->  	Definition: A phandle to the analog power supply for IC which generates
->  		    reference clock
->  
-> +- vdda_1p8-supply:
-> +	Usage: required for msm8996/apq8096
-> +	Value type: <phandle>
-> +	Definition: A phandle to the analog power supply for PCIE_1P8
-> +
->  - phys:
->  	Usage: required for apq8084
->  	Value type: <phandle>
-> @@ -231,3 +255,65 @@
->  		pinctrl-0 = <&pcie0_pins_default>;
->  		pinctrl-names = "default";
->  	};
-> +
-> +* Example for apq8096:
-> +	pcie1: qcom,pcie at 00608000 {
-> +		compatible = "qcom,pcie-msm8996", "snps,dw-pcie";
-> +		power-domains = <&gcc PCIE1_GDSC>;
-> +		bus-range = <0x00 0xff>;
-> +		num-lanes = <1>;
-> +
-> +		status  = "disabled";
-> +
-> +		reg = <0x00608000 0x2000>,
-> +		      <0x0d000000 0xf1d>,
-> +		      <0x0d000f20 0xa8>,
-> +		      <0x0d100000 0x100000>;
-> +
-> +		reg-names = "parf", "dbi", "elbi","config";
-> +
-> +		phys = <&pcie_phy 1>;
-> +		phy-names = "pciephy";
-> +
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		ranges = <0x01000000 0x0 0x0d200000 0x0d200000 0x0 0x100000>,
-> +			<0x02000000 0x0 0x0d300000 0x0d300000 0x0 0xd00000>;
-> +
-> +		interrupts = <GIC_SPI 413 IRQ_TYPE_NONE>;
-> +		interrupt-names = "msi";
-> +		#interrupt-cells = <1>;
-> +		interrupt-map-mask = <0 0 0 0x7>;
-> +		interrupt-map = <0 0 0 1 &intc 0 272 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
-> +				<0 0 0 2 &intc 0 273 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
-> +				<0 0 0 3 &intc 0 274 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
-> +				<0 0 0 4 &intc 0 275 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
-> +
-> +		pinctrl-names = "default", "sleep";
-> +		pinctrl-0 = <&pcie1_clkreq_default &pcie1_perst_default &pcie1_wake_default>;
-> +		pinctrl-1 = <&pcie1_clkreq_sleep &pcie1_perst_default &pcie1_wake_sleep>;
-> +
-> +
-> +		vreg-1.8-supply = <&pm8994_l12>;
-> +		vreg-0.9-supply = <&pm8994_l28>;
-> +		iommus = <&anoc0_smmu>;
+Conflicts:
+	drivers/acpi/arm64/iort.c
+---
+ drivers/acpi/arm64/iort.c | 152 ++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/acpi_iort.h |  12 ++++
+ 2 files changed, 164 insertions(+)
 
-Furthermore, the exact meaning of "iommus" is defined by the relevant
-IOMMU's binding itself - at face value here, you're missing the LARB
-port number :P - but more generally a bare phandle with no arguments for
-something as busy as a root complex smells a bit off.
-
-> +
-> +		linux,pci-domain = <1>;
-> +
-> +		clocks = <&gcc GCC_PCIE_1_PIPE_CLK>,
-> +			<&gcc GCC_PCIE_1_AUX_CLK>,
-> +			<&gcc GCC_PCIE_1_CFG_AHB_CLK>,
-> +			<&gcc GCC_PCIE_1_MSTR_AXI_CLK>,
-> +			<&gcc GCC_PCIE_1_SLV_AXI_CLK>,
-> +			<&gcc GCC_AGGRE0_SNOC_AXI_CLK>,
-> +			<&gcc GCC_AGGRE0_CNOC_AHB_CLK>;
-> +
-> +		clock-names =  "pipe",
-> +				"aux",
-> +				"cfg",
-> +				"bus_master",
-> +				"bus_slave",
-> +				"snoc_axi",
-> +				"cnoc_ahb";
-> +
-> +	};
-> diff --git a/drivers/pci/host/pcie-qcom.c b/drivers/pci/host/pcie-qcom.c
-> index f2f90c5..7748c11 100644
-> --- a/drivers/pci/host/pcie-qcom.c
-> +++ b/drivers/pci/host/pcie-qcom.c
-[...]
-> +static int qcom_pcie_post_init_msm8996(struct qcom_pcie *pcie)
-> +{
-> +	struct qcom_pcie_resources_msm8996 *res = &pcie->res.msm8996;
-> +	struct device *dev = pcie->dev;
-> +	int ret;
-> +
-> +	ret = clk_prepare_enable(res->pipe_clk);
-> +	if (ret) {
-> +		dev_err(dev, "cannot prepare/enable pipe clock\n");
-> +		return ret;
-> +	}
-> +	/* SMMU specific registers */
-> +	writel(0, pcie->parf + PCIE20_PARF_BDF_TRANSLATE_CFG);
-> +	writel(0, pcie->parf +	PCIE20_PARF_SID_OFFSET);
-
-Ah, so it's another of these RID->SID lookup-table-type things. That
-would be more appropriately described with "iommu-map"[1], particularly
-if you want things to actually work as expected[2]. There is of course a
-fun circular dependency there in that the DT becomes more of a promise
-than an actual description of the hardware state, since the latter
-doesn't necessarily exist until the driver programs it here. It might
-ultimately be cleaner to have the firmware program this and repaint the
-DT accordingly, so that things do look fixed from Linux's perspective.
-
-Robin.
-
-[1]:http://www.mail-archive.com/iommu at lists.linux-foundation.org/msg14165.html
-[2]:http://www.mail-archive.com/iommu at lists.linux-foundation.org/msg14162.html
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index e28e256..8d672cf 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -22,6 +22,12 @@
+ #include <linux/kernel.h>
+ #include <linux/pci.h>
+ 
++struct iort_its_msi_chip {
++	struct list_head	list;
++	struct fwnode_handle	*fw_node;
++	u32			translation_id;
++};
++
+ typedef acpi_status (*iort_find_node_callback)
+ 	(struct acpi_iort_node *node, void *context);
+ 
+@@ -31,6 +37,76 @@ static struct acpi_table_header *iort_table;
+ static LIST_HEAD(iort_msi_chip_list);
+ static DEFINE_SPINLOCK(iort_msi_chip_lock);
+ 
++/**
++ * iort_register_domain_token() - register domain token and related ITS ID
++ * to the list from where we can get it back later on.
++ * @trans_id: ITS ID.
++ * @fw_node: Domain token.
++ *
++ * Returns: 0 on success, -ENOMEM if no memory when allocating list element
++ */
++int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
++{
++	struct iort_its_msi_chip *its_msi_chip;
++
++	its_msi_chip = kzalloc(sizeof(*its_msi_chip), GFP_KERNEL);
++	if (!its_msi_chip)
++		return -ENOMEM;
++
++	its_msi_chip->fw_node = fw_node;
++	its_msi_chip->translation_id = trans_id;
++
++	spin_lock(&iort_msi_chip_lock);
++	list_add(&its_msi_chip->list, &iort_msi_chip_list);
++	spin_unlock(&iort_msi_chip_lock);
++
++	return 0;
++}
++
++/**
++ * iort_deregister_domain_token() - Deregister domain token based on ITS ID
++ * @trans_id: ITS ID.
++ *
++ * Returns: none.
++ */
++void iort_deregister_domain_token(int trans_id)
++{
++	struct iort_its_msi_chip *its_msi_chip, *t;
++
++	spin_lock(&iort_msi_chip_lock);
++	list_for_each_entry_safe(its_msi_chip, t, &iort_msi_chip_list, list) {
++		if (its_msi_chip->translation_id == trans_id) {
++			list_del(&its_msi_chip->list);
++			kfree(its_msi_chip);
++			break;
++		}
++	}
++	spin_unlock(&iort_msi_chip_lock);
++}
++
++/**
++ * iort_find_domain_token() - Find domain token based on given ITS ID
++ * @trans_id: ITS ID.
++ *
++ * Returns: domain token when find on the list, NULL otherwise
++ */
++struct fwnode_handle *iort_find_domain_token(int trans_id)
++{
++	struct fwnode_handle *fw_node = NULL;
++	struct iort_its_msi_chip *its_msi_chip;
++
++	spin_lock(&iort_msi_chip_lock);
++	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
++		if (its_msi_chip->translation_id == trans_id) {
++			fw_node = its_msi_chip->fw_node;
++			break;
++		}
++	}
++	spin_unlock(&iort_msi_chip_lock);
++
++	return fw_node;
++}
++
+ static struct acpi_iort_node *iort_scan_node(enum acpi_iort_node_type type,
+ 					     iort_find_node_callback callback,
+ 					     void *context)
+@@ -201,6 +277,82 @@ static struct acpi_iort_node *iort_find_dev_node(struct device *dev)
+ 			      iort_match_node_callback, &pbus->dev);
+ }
+ 
++/**
++ * iort_msi_map_rid() - Map a MSI requester ID for a device
++ * @dev: The device for which the mapping is to be done.
++ * @req_id: The device requester ID.
++ *
++ * Returns: mapped MSI RID on success, input requester ID otherwise
++ */
++u32 iort_msi_map_rid(struct device *dev, u32 req_id)
++{
++	struct acpi_iort_node *node;
++	u32 dev_id;
++
++	node = iort_find_dev_node(dev);
++	if (!node)
++		return req_id;
++
++	iort_node_map_rid(node, req_id, &dev_id, ACPI_IORT_NODE_ITS_GROUP);
++	return dev_id;
++}
++
++/**
++ * iort_dev_find_its_id() - Find the ITS identifier for a device
++ * @dev: The device.
++ * @idx: Index of the ITS identifier list.
++ * @its_id: ITS identifier.
++ *
++ * Returns: 0 on success, appropriate error value otherwise
++ */
++static int iort_dev_find_its_id(struct device *dev, u32 req_id,
++				unsigned int idx, int *its_id)
++{
++	struct acpi_iort_its_group *its;
++	struct acpi_iort_node *node;
++
++	node = iort_find_dev_node(dev);
++	if (!node)
++		return -ENXIO;
++
++	node = iort_node_map_rid(node, req_id, NULL, ACPI_IORT_NODE_ITS_GROUP);
++	if (!node)
++		return -ENXIO;
++
++	/* Move to ITS specific data */
++	its = (struct acpi_iort_its_group *)node->node_data;
++	if (idx > its->its_count) {
++		dev_err(dev, "requested ITS ID index [%d] is greater than available [%d]\n",
++			idx, its->its_count);
++		return -ENXIO;
++	}
++
++	*its_id = its->identifiers[idx];
++	return 0;
++}
++
++/**
++ * iort_get_device_domain() - Find MSI domain related to a device
++ * @dev: The device.
++ * @req_id: Requester ID for the device.
++ *
++ * Returns: the MSI domain for this device, NULL otherwise
++ */
++struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id)
++{
++	struct fwnode_handle *handle;
++	int its_id;
++
++	if (iort_dev_find_its_id(dev, req_id, 0, &its_id))
++		return NULL;
++
++	handle = iort_find_domain_token(its_id);
++	if (!handle)
++		return NULL;
++
++	return irq_find_matching_fwnode(handle, DOMAIN_BUS_PCI_MSI);
++}
++
+ void __init acpi_iort_init(void)
+ {
+ 	acpi_status status;
+diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
+index fcacaf7..0e32dac 100644
+--- a/include/linux/acpi_iort.h
++++ b/include/linux/acpi_iort.h
+@@ -20,11 +20,23 @@
+ #define __ACPI_IORT_H__
+ 
+ #include <linux/acpi.h>
++#include <linux/fwnode.h>
++#include <linux/irqdomain.h>
+ 
++int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
++void iort_deregister_domain_token(int trans_id);
++struct fwnode_handle *iort_find_domain_token(int trans_id);
+ #ifdef CONFIG_ACPI_IORT
+ void acpi_iort_init(void);
++u32 iort_msi_map_rid(struct device *dev, u32 req_id);
++struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
+ #else
+ static inline void acpi_iort_init(void) { }
++static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
++{ return req_id; }
++static inline struct irq_domain *iort_get_device_domain(struct device *dev,
++							u32 req_id)
++{ return NULL; }
+ #endif
+ 
+ #endif /* __ACPI_IORT_H__ */
+-- 
+1.9.1
