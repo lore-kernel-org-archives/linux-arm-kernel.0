@@ -1,7 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue,  6 Sep 2016 18:59:15 -0700
-Subject: [GIT PULL 1/4] Broadcom soc changes for 4.9
-Message-ID: <1473213558-11782-1-git-send-email-f.fainelli@gmail.com>
+Date: Tue,  6 Sep 2016 18:59:16 -0700
+Subject: [GIT PULL 2/4] Broadcom soc-arm64 changes for 4.9
+In-Reply-To: <1473213558-11782-1-git-send-email-f.fainelli@gmail.com>
+References: <1473213558-11782-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1473213558-11782-2-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,34 +13,23 @@ The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
 are available in the git repository at:
 
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.9/soc
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.9/soc-arm64
 
-for you to fetch changes up to 4ebd50472899eb07d5dfc24f2015dce6fe3c5cb8:
+for you to fetch changes up to 37eb56dc79a8e841f3801f9364de8a70189c306f:
 
-  ARM: BCM53573: Initial support for Broadcom BCM53573 SoCs (2016-08-22 15:58:27 -0700)
+  arm64: Add Broadcom Set Top Box Kconfig entry point (2016-08-08 11:11:53 -0700)
 
 ----------------------------------------------------------------
-This pull request contains Broadcom ARM-based SoC changes for 4.9, please pull
+This pull request contains Broadcom ARM64-based SoC changes for 4.9, please pull
 the following:
 
-- Rafal adds preliminary support for the new BCM53573 Wi-Fi SoC based on a
-  single core Cortex A7 and re-using a bunch of iProc peripherals
-
-- Florian adds support for earlyprintk on Broadcom STB/CM ARM-based chips by
-  reading the chip family_id value from a known location and deriving the UART
-  based address
+- collective effort from Florian, Doug and Markus to add the ARCH_BRCMSTB Kconfig
+  symbol to the ARM64 kernel build, which is purposedly the same as the ARM/Linux
+  one in order not to update any driver dependencies
 
 ----------------------------------------------------------------
 Florian Fainelli (1):
-      ARM: brcmstb: Add earlyprintk support using run-time checks
+      arm64: Add Broadcom Set Top Box Kconfig entry point
 
-Rafa? Mi?ecki (1):
-      ARM: BCM53573: Initial support for Broadcom BCM53573 SoCs
-
- MAINTAINERS                      |   7 ++
- arch/arm/Kconfig.debug           |  14 ++--
- arch/arm/include/debug/brcmstb.S | 145 +++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-bcm/Kconfig        |  14 ++++
- arch/arm/mach-bcm/brcmstb.c      |  16 +++++
- 5 files changed, 189 insertions(+), 7 deletions(-)
- create mode 100644 arch/arm/include/debug/brcmstb.S
+ arch/arm64/Kconfig.platforms | 7 +++++++
+ 1 file changed, 7 insertions(+)
