@@ -1,293 +1,183 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed,  7 Sep 2016 14:35:18 -0700
-Subject: [PATCH v4 21/22] phy: Add support for Qualcomm's USB HSIC phy
+Date: Wed,  7 Sep 2016 14:35:16 -0700
+Subject: [PATCH v4 19/22] usb: chipidea: msm: Handle phy power states
 In-Reply-To: <20160907213519.27340-1-stephen.boyd@linaro.org>
 References: <20160907213519.27340-1-stephen.boyd@linaro.org>
-Message-ID: <20160907213519.27340-22-stephen.boyd@linaro.org>
+Message-ID: <20160907213519.27340-20-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HSIC USB controller on qcom SoCs has an integrated all
-digital phy controlled via the ULPI viewport.
+The ULPI phy on qcom platforms needs to be initialized and
+powered on after a USB reset and before we toggle the run/stop
+bit. Otherwise, the phy locks up and doesn't work properly. Hook
+the phy initialization into the RESET event and the phy power off
+into the STOPPED event.
 
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
-Cc: <devicetree@vger.kernel.org>
-Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+Acked-by: Peter Chen <peter.chen@nxp.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- .../devicetree/bindings/phy/qcom,usb-hsic-phy.txt  |  65 +++++++++
- drivers/phy/Kconfig                                |   7 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-qcom-usb-hsic.c                    | 160 +++++++++++++++++++++
- 4 files changed, 233 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
- create mode 100644 drivers/phy/phy-qcom-usb-hsic.c
+ drivers/usb/chipidea/ci_hdrc_msm.c | 40 +++++++++++++++++++-------------------
+ drivers/usb/chipidea/core.c        |  8 ++++++--
+ drivers/usb/chipidea/host.c        |  8 ++++++--
+ include/linux/usb/chipidea.h       |  2 +-
+ 4 files changed, 33 insertions(+), 25 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt b/Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
-new file mode 100644
-index 000000000000..3c7cb2be4b12
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
-@@ -0,0 +1,65 @@
-+Qualcomm's USB HSIC PHY
-+
-+PROPERTIES
-+
-+- compatible:
-+    Usage: required
-+    Value type: <string>
-+    Definition: Should contain "qcom,usb-hsic-phy" and more specifically one of the
-+		following:
-+
-+			"qcom,usb-hsic-phy-mdm9615"
-+			"qcom,usb-hsic-phy-msm8974"
-+
-+- #phy-cells:
-+    Usage: required
-+    Value type: <u32>
-+    Definition: Should contain 0
-+
-+- clocks:
-+    Usage: required
-+    Value type: <prop-encoded-array>
-+    Definition: Should contain clock specifier for phy, calibration and
-+                a calibration sleep clock
-+
-+- clock-names:
-+    Usage: required
-+    Value type: <stringlist>
-+    Definition: Should contain "phy, "cal" and "cal_sleep"
-+
-+- pinctrl-names:
-+    Usage: required
-+    Value type: <stringlist>
-+    Definition: Should contain "init" and "default" in that order
-+
-+- pinctrl-0:
-+    Usage: required
-+    Value type: <prop-encoded-array>
-+    Definition: List of pinctrl settings to apply to keep HSIC pins in a glitch
-+                free state
-+
-+- pinctrl-1:
-+    Usage: required
-+    Value type: <prop-encoded-array>
-+    Definition: List of pinctrl settings to apply to mux out the HSIC pins
-+
-+EXAMPLE
-+
-+usb-controller {
-+	ulpi {
-+		phy {
-+			compatible = "qcom,usb-hsic-phy-msm8974",
-+				     "qcom,usb-hsic-phy";
-+			#phy-cells = <0>;
-+			pinctrl-names = "init", "default";
-+			pinctrl-0 = <&hsic_sleep>;
-+			pinctrl-1 = <&hsic_default>;
-+			clocks = <&gcc GCC_USB_HSIC_CLK>,
-+				 <&gcc GCC_USB_HSIC_IO_CAL_CLK>,
-+				 <&gcc GCC_USB_HSIC_IO_CAL_SLEEP_CLK>;
-+			clock-names = "phy", "cal", "cal_sleep";
-+			assigned-clocks = <&gcc GCC_USB_HSIC_IO_CAL_CLK>;
-+			assigned-clock-rates = <960000>;
-+		};
-+	};
-+};
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index 19bff3a10f69..830c443eeabf 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -417,6 +417,13 @@ config PHY_QCOM_UFS
- 	help
- 	  Support for UFS PHY on QCOM chipsets.
+diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
+index fe96df7b530c..316044dba0ac 100644
+--- a/drivers/usb/chipidea/ci_hdrc_msm.c
++++ b/drivers/usb/chipidea/ci_hdrc_msm.c
+@@ -80,20 +80,33 @@ static const struct reset_control_ops ci_hdrc_msm_reset_ops = {
+ 	.reset = ci_hdrc_msm_por_reset,
+ };
  
-+config PHY_QCOM_USB_HSIC
-+	tristate "Qualcomm USB HSIC ULPI PHY module"
-+	depends on USB_ULPI_BUS
-+	select GENERIC_PHY
-+	help
-+	  Support for the USB HSIC ULPI compliant PHY on QCOM chipsets.
-+
- config PHY_TUSB1210
- 	tristate "TI TUSB1210 ULPI PHY module"
- 	depends on USB_ULPI_BUS
-diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-index 90ae19879b0a..5422f543d17d 100644
---- a/drivers/phy/Makefile
-+++ b/drivers/phy/Makefile
-@@ -50,6 +50,7 @@ obj-$(CONFIG_PHY_STIH41X_USB)		+= phy-stih41x-usb.o
- obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs.o
- obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs-qmp-20nm.o
- obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs-qmp-14nm.o
-+obj-$(CONFIG_PHY_QCOM_USB_HSIC) 	+= phy-qcom-usb-hsic.o
- obj-$(CONFIG_PHY_TUSB1210)		+= phy-tusb1210.o
- obj-$(CONFIG_PHY_BRCM_SATA)		+= phy-brcm-sata.o
- obj-$(CONFIG_PHY_PISTACHIO_USB)		+= phy-pistachio-usb.o
-diff --git a/drivers/phy/phy-qcom-usb-hsic.c b/drivers/phy/phy-qcom-usb-hsic.c
-new file mode 100644
-index 000000000000..47690f9945b9
---- /dev/null
-+++ b/drivers/phy/phy-qcom-usb-hsic.c
-@@ -0,0 +1,160 @@
-+/**
-+ * Copyright (C) 2016 Linaro Ltd
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/module.h>
-+#include <linux/ulpi/driver.h>
-+#include <linux/ulpi/regs.h>
-+#include <linux/pinctrl/consumer.h>
-+#include <linux/pinctrl/pinctrl-state.h>
-+#include <linux/delay.h>
-+#include <linux/clk.h>
-+
-+#include "ulpi_phy.h"
-+
-+#define ULPI_HSIC_CFG		0x30
-+#define ULPI_HSIC_IO_CAL	0x33
-+
-+struct qcom_usb_hsic_phy {
-+	struct ulpi *ulpi;
-+	struct phy *phy;
-+	struct pinctrl *pctl;
-+	struct clk *phy_clk;
-+	struct clk *cal_clk;
-+	struct clk *cal_sleep_clk;
-+};
-+
-+static int qcom_usb_hsic_phy_power_on(struct phy *phy)
-+{
-+	struct qcom_usb_hsic_phy *uphy = phy_get_drvdata(phy);
-+	struct ulpi *ulpi = uphy->ulpi;
-+	struct pinctrl_state *pins_default;
+-static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
++static int ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
+ {
+ 	struct device *dev = ci->dev->parent;
+ 	struct ci_hdrc_msm *msm_ci = dev_get_drvdata(dev);
 +	int ret;
+ 
+ 	switch (event) {
+ 	case CI_HDRC_CONTROLLER_RESET_EVENT:
+ 		dev_dbg(dev, "CI_HDRC_CONTROLLER_RESET_EVENT received\n");
 +
-+	ret = clk_prepare_enable(uphy->phy_clk);
-+	if (ret)
-+		return ret;
++		hw_phymode_configure(ci);
+ 		if (msm_ci->secondary_phy) {
+ 			u32 val = readl_relaxed(msm_ci->base + HS_PHY_SEC_CTRL);
+ 			val |= HS_PHY_DIG_CLAMP_N;
+ 			writel_relaxed(val, msm_ci->base + HS_PHY_SEC_CTRL);
+ 		}
+ 
++		ret = phy_init(ci->phy);
++		if (ret)
++			return ret;
 +
-+	ret = clk_prepare_enable(uphy->cal_clk);
-+	if (ret)
-+		goto err_cal;
++		ret = phy_power_on(ci->phy);
++		if (ret) {
++			phy_exit(ci->phy);
++			return ret;
++		}
 +
-+	ret = clk_prepare_enable(uphy->cal_sleep_clk);
-+	if (ret)
-+		goto err_sleep;
-+
-+	/* Set periodic calibration interval to ~2.048sec in HSIC_IO_CAL_REG */
-+	ret = ulpi_write(ulpi, ULPI_HSIC_IO_CAL, 0xff);
-+	if (ret)
-+		goto err_ulpi;
-+
-+	/* Enable periodic IO calibration in HSIC_CFG register */
-+	ret = ulpi_write(ulpi, ULPI_HSIC_CFG, 0xa8);
-+	if (ret)
-+		goto err_ulpi;
-+
-+	/* Configure pins for HSIC functionality */
-+	pins_default = pinctrl_lookup_state(uphy->pctl, PINCTRL_STATE_DEFAULT);
-+	if (IS_ERR(pins_default))
-+		return PTR_ERR(pins_default);
-+
-+	ret = pinctrl_select_state(uphy->pctl, pins_default);
-+	if (ret)
-+		goto err_ulpi;
-+
-+	 /* Enable HSIC mode in HSIC_CFG register */
-+	ret = ulpi_write(ulpi, ULPI_SET(ULPI_HSIC_CFG), 0x01);
-+	if (ret)
-+		goto err_ulpi;
-+
-+	/* Disable auto-resume */
-+	ret = ulpi_write(ulpi, ULPI_CLR(ULPI_IFC_CTRL),
-+			 ULPI_IFC_CTRL_AUTORESUME);
-+	if (ret)
-+		goto err_ulpi;
-+
-+	return ret;
-+err_ulpi:
-+	clk_disable_unprepare(uphy->cal_sleep_clk);
-+err_sleep:
-+	clk_disable_unprepare(uphy->cal_clk);
-+err_cal:
-+	clk_disable_unprepare(uphy->phy_clk);
-+	return ret;
-+}
-+
-+static int qcom_usb_hsic_phy_power_off(struct phy *phy)
-+{
-+	struct qcom_usb_hsic_phy *uphy = phy_get_drvdata(phy);
-+
-+	clk_disable_unprepare(uphy->cal_sleep_clk);
-+	clk_disable_unprepare(uphy->cal_clk);
-+	clk_disable_unprepare(uphy->phy_clk);
+ 		/* use AHB transactor, allow posted data writes */
+ 		hw_write_id_reg(ci, HS_PHY_AHB_MODE, 0xffffffff, 0x8);
+ 
+@@ -113,21 +126,18 @@ static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
+ 				 HSPHY_SESS_VLD_CTRL);
+ 
+ 		}
+-
+-		usb_phy_init(ci->usb_phy);
+ 		break;
+ 	case CI_HDRC_CONTROLLER_STOPPED_EVENT:
+ 		dev_dbg(dev, "CI_HDRC_CONTROLLER_STOPPED_EVENT received\n");
+-		/*
+-		 * Put the phy in non-driving mode. Otherwise host
+-		 * may not detect soft-disconnection.
+-		 */
+-		usb_phy_notify_disconnect(ci->usb_phy, USB_SPEED_UNKNOWN);
++		phy_power_off(ci->phy);
++		phy_exit(ci->phy);
+ 		break;
+ 	default:
+ 		dev_dbg(dev, "unknown ci_hdrc event\n");
+ 		break;
+ 	}
 +
 +	return 0;
-+}
-+
-+static const struct phy_ops qcom_usb_hsic_phy_ops = {
-+	.power_on = qcom_usb_hsic_phy_power_on,
-+	.power_off = qcom_usb_hsic_phy_power_off,
-+	.owner = THIS_MODULE,
-+};
-+
-+static int qcom_usb_hsic_phy_probe(struct ulpi *ulpi)
-+{
-+	struct qcom_usb_hsic_phy *uphy;
-+	struct phy_provider *p;
-+	struct clk *clk;
-+
-+	uphy = devm_kzalloc(&ulpi->dev, sizeof(*uphy), GFP_KERNEL);
-+	if (!uphy)
-+		return -ENOMEM;
-+	ulpi_set_drvdata(ulpi, uphy);
-+
-+	uphy->ulpi = ulpi;
-+	uphy->pctl = devm_pinctrl_get(&ulpi->dev);
-+	if (IS_ERR(uphy->pctl))
-+		return PTR_ERR(uphy->pctl);
-+
-+	uphy->phy_clk = clk = devm_clk_get(&ulpi->dev, "phy");
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	uphy->cal_clk = clk = devm_clk_get(&ulpi->dev, "cal");
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	uphy->cal_sleep_clk = clk = devm_clk_get(&ulpi->dev, "cal_sleep");
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	uphy->phy = devm_phy_create(&ulpi->dev, ulpi->dev.of_node,
-+				    &qcom_usb_hsic_phy_ops);
-+	if (IS_ERR(uphy->phy))
-+		return PTR_ERR(uphy->phy);
-+	phy_set_drvdata(uphy->phy, uphy);
-+
-+	p = devm_of_phy_provider_register(&ulpi->dev, of_phy_simple_xlate);
-+	return PTR_ERR_OR_ZERO(p);
-+}
-+
-+static const struct of_device_id qcom_usb_hsic_phy_match[] = {
-+	{ .compatible = "qcom,usb-hsic-phy", },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, qcom_usb_hsic_phy_match);
-+
-+static struct ulpi_driver qcom_usb_hsic_phy_driver = {
-+	.probe = qcom_usb_hsic_phy_probe,
-+	.driver = {
-+		.name = "qcom_usb_hsic_phy",
-+		.of_match_table = qcom_usb_hsic_phy_match,
-+	},
-+};
-+module_ulpi_driver(qcom_usb_hsic_phy_driver);
-+
-+MODULE_DESCRIPTION("Qualcomm USB HSIC phy");
-+MODULE_LICENSE("GPL v2");
+ }
+ 
+ static int ci_hdrc_msm_mux_phy(struct ci_hdrc_msm *ci,
+@@ -167,7 +177,6 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+ {
+ 	struct ci_hdrc_msm *ci;
+ 	struct platform_device *plat_ci;
+-	struct usb_phy *phy;
+ 	struct clk *clk;
+ 	struct reset_control *reset;
+ 	struct resource *res;
+@@ -181,21 +190,12 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	platform_set_drvdata(pdev, ci);
+ 
+-	/*
+-	 * OTG(PHY) driver takes care of PHY initialization, clock management,
+-	 * powering up VBUS, mapping of registers address space and power
+-	 * management.
+-	 */
+-	phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
+-	if (IS_ERR(phy))
+-		return PTR_ERR(phy);
+-
+ 	ci->pdata.name = "ci_hdrc_msm";
+ 	ci->pdata.capoffset = DEF_CAPOFFSET;
+ 	ci->pdata.flags	= CI_HDRC_REGS_SHARED | CI_HDRC_DISABLE_STREAMING |
+-			  CI_HDRC_OVERRIDE_AHB_BURST;
++			  CI_HDRC_OVERRIDE_AHB_BURST |
++			  CI_HDRC_OVERRIDE_PHY_CONTROL;
+ 	ci->pdata.notify_event = ci_hdrc_msm_notify_event;
+-	ci->pdata.usb_phy = phy;
+ 
+ 	reset = devm_reset_control_get(&pdev->dev, "core");
+ 	if (IS_ERR(reset))
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 83bc2f2dd6a8..ba3a43bbe0ea 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -327,6 +327,7 @@ void hw_phymode_configure(struct ci_hdrc *ci)
+ 			hw_write(ci, OP_PORTSC, PORTSC_STS, PORTSC_STS);
+ 	}
+ }
++EXPORT_SYMBOL_GPL(hw_phymode_configure);
+ 
+ /**
+  * _ci_usb_phy_init: initialize phy taking in account both phy and usb_phy
+@@ -503,9 +504,12 @@ int hw_device_reset(struct ci_hdrc *ci)
+ 		return ret;
+ 	}
+ 
+-	if (ci->platdata->notify_event)
+-		ci->platdata->notify_event(ci,
++	if (ci->platdata->notify_event) {
++		ret = ci->platdata->notify_event(ci,
+ 			CI_HDRC_CONTROLLER_RESET_EVENT);
++		if (ret)
++			return ret;
++	}
+ 
+ 	/* USBMODE should be configured step by step */
+ 	hw_write(ci, OP_USBMODE, USBMODE_CM, USBMODE_CM_IDLE);
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index a1d8551ca79d..844be1d02d38 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -87,8 +87,12 @@ static int ehci_ci_reset(struct usb_hcd *hcd)
+ 	if (ret)
+ 		return ret;
+ 
+-	if (ci->platdata->notify_event)
+-		ci->platdata->notify_event(ci, CI_HDRC_CONTROLLER_RESET_EVENT);
++	if (ci->platdata->notify_event) {
++		ret = ci->platdata->notify_event(ci,
++				CI_HDRC_CONTROLLER_RESET_EVENT);
++		if (ret)
++			return ret;
++	}
+ 
+ 	ci_platform_configure(ci);
+ 
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index 7e3daa37cf60..c5fdfcf99828 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -61,7 +61,7 @@ struct ci_hdrc_platform_data {
+ 	enum usb_dr_mode	dr_mode;
+ #define CI_HDRC_CONTROLLER_RESET_EVENT		0
+ #define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
+-	void	(*notify_event) (struct ci_hdrc *ci, unsigned event);
++	int	(*notify_event) (struct ci_hdrc *ci, unsigned event);
+ 	struct regulator	*reg_vbus;
+ 	struct usb_otg_caps	ci_otg_caps;
+ 	bool			tpl_support;
 -- 
 2.9.0.rc2.8.ga28705d
