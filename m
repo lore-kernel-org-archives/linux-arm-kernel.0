@@ -1,77 +1,116 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 7 Sep 2016 18:21:55 +0100
-Subject: [PATCH 09/19] arm64: KVM: Handle async aborts delivered while at
- EL2
-In-Reply-To: <20160907170304.GT23592@cbox>
-References: <1473166937-15271-1-git-send-email-marc.zyngier@arm.com>
- <1473166937-15271-10-git-send-email-marc.zyngier@arm.com>
- <20160907170304.GT23592@cbox>
-Message-ID: <57D04CB3.1030208@arm.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Wed, 7 Sep 2016 19:28:24 +0200
+Subject: [PATCH 3/3] tty/serial: at91: fix hardware handshake when DMA is
+ not used
+In-Reply-To: <20160907161324.27774-3-richard.genoud@gmail.com>
+References: <20160907161324.27774-1-richard.genoud@gmail.com>
+ <20160907161324.27774-3-richard.genoud@gmail.com>
+Message-ID: <15e0dbe0-6636-6bec-9622-be00056dae5e@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/16 18:03, Christoffer Dall wrote:
-> On Tue, Sep 06, 2016 at 02:02:07PM +0100, Marc Zyngier wrote:
->> If EL1 generates an asynchronous abort and then traps into EL2
->> before the abort has been delivered, we may end-up with the
->> abort firing at the worse possible place: on the host.
->>
->> In order to avoid this, it is necessary to take the abort at EL2,
->> by clearing the PSTATE.A bit. In order to survive this abort,
->> we do it at a point where we're in a known state with respect
->> to the world switch, and handle the resulting exception,
->> overloading the exit code in the process.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/kvm/hyp/entry.S     | 33 ++++++++++++++++++++++++++++++++-
->>  arch/arm64/kvm/hyp/hyp-entry.S | 25 +++++++++++++++++++++++--
->>  arch/arm64/kvm/hyp/switch.c    |  6 ++++++
->>  3 files changed, 61 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
->> index 3967c231..7662ef5 100644
->> --- a/arch/arm64/kvm/hyp/entry.S
->> +++ b/arch/arm64/kvm/hyp/entry.S
->> @@ -122,7 +122,38 @@ ENTRY(__guest_exit)
->>  	// Now restore the host regs
->>  	restore_callee_saved_regs x2
->>  
->> -	ret
->> +	// If we have a pending asynchronous abort, now is the
->> +	// time to find out. From your VAXorcist book, page 666:
->> +	// "Threaten me not, oh Evil one!  For I speak with
->> +	// the power of DEC, and I command thee to show thyself!"
->> +	mrs	x2, elr_el2
->> +	mrs	x3, esr_el2
->> +	mrs	x4, spsr_el2
->> +	mov	x5, x0
->> +
->> +	dsb	sy		// Synchronize against in-flight ld/st
->> +	msr	daifclr, #4	// Unmask aborts
->> +
->> +	// This is our single instruction exception window. A pending
->> +	// SError is guaranteed to occur at the earliest when we unmask
->> +	// it, and at the latest just after the ISB.
+Hi Richard,
+
+For usart without FIFOs (hence before sama5d2), according to our designers, the
+RTS line could only been controlled by an internal PDC signal which doesn't
+exist with the DMA controller. Referring to its datasheet, the sam9g35 embeds
+DMA controllers. So if you enable the hardware handshaking feature on some
+usart, its RTS line won't be monitored at all. The hardware handshaking is
+broken on all SoCs using DMA controllers instead of PDC.
+
+With the sama5d2, our latest MPU, we fixed this issue by introducing an
+alternative mechanism which relies on 2 thresholds on the RX FIFO. So when
+FIFOs are available, those thresholds can be used to control the level of RTS
+line.
+
+Indeed I think a better test should be:
+if (!atmel_use_pdc_rx(port) && !atmel_use_fifo(port)) {
+	dev_info(port->dev, "not enabling hardware flow control because neither the PDC nor the FIFO are available");
+	termios->c_cflags &= ~CRTSCTS;
+}
+
+We can double check once again with our designers to confirm that without FIFO
+the only way for the hardware handshaking to work is to use a PDC.
+So IMHO, your patch should not be applied, sorry!
+
+Best regards,
+
+Cyrille
+
+Le 07/09/2016 ? 18:13, Richard Genoud a ?crit :
+> Commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when
+> hardware handshake is enabled") broke the hardware handshake when
+> DMA is not used.
 > 
-> Why is it guaranteed to to occur at the latest after the ISB?  I thought
-> that asynchronous exceptions could in theory be deferred until forever,
-> but I am probably wrong about this.
-
-The DSB is going to force all transactions to be completed and at that
-point, we shouldn't have anything being further delayed (this is not an
-architectural guarantee, but something that happens to work on the cores
-I have access to), and the potential exception becomes pending.
-
-At this point, we perform the unmask. A pending exception *can* fire at
-that point, but is not guaranteed to do so. But the ISB, being a
-"context synchronization event", guarantees that the exception fires
-before the first instruction that follows the ISB (see D1.14.4). This is
-what gives us this one instruction window (after the unmask, or after
-the isb).
-
-Hope this helps,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> So, here's a summary:
+> If DMA is NOT USED the mode should be ATMEL_US_USMODE_NORMAL because the
+> controller can't drive the RTS pin (there's no way for it to know when
+> we can't receive data anymore).
+> 
+> If DMA is USED along with FIFOs, the mode should be ATMEL_US_USMODE_HWHS
+> because when there's a FIFO, it can know when it's full and then drive
+> the RTS pin accordingly.
+> NB: I didn't test this mode since my board (at91sam9g35-cm) has not the
+> FIFO mechanism.
+> 
+> If DMA is USED WITHOUT FIFOs, then this is the bad case: the controller
+> can't control the RTS pin, and we can't control it either by hand. So,
+> the hardware handshake is disabled. (that's what commit 5be605ac9af9
+> ("tty/serial: atmel: fix hardware handshake selection") did).
+> 
+> There's still something obscure to me:
+> In the SAM9G35 datasheet, it's said that
+> "Setting the USART to operate with hardware handshaking is performed by
+> writing the USART_MODE field in US_MR to the value 0x2.
+> [..] Using this mode requires using the DMA channel for reception."
+> 
+> So, according to this, it *should* be possible to use automatic hardware
+> handshake with the DMA and without FIFO (sam9x5 have no FIFOs like
+> samad controllers)
+> 
+> NB: -stable is not Cced because it doesn't cleanly apply on 4.1+
+> 
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> Fixes: 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when hardware handshake is enabled")
+> ---
+>  drivers/tty/serial/atmel_serial.c | 24 ++++++++++++++++++------
+>  1 file changed, 18 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index e9b4fbf88c2d..503fbc623227 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -2130,14 +2130,26 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+>  	} else if ((termios->c_cflag & CRTSCTS) &&
+>  		   !mctrl_gpio_use_rtscts(atmel_port->gpios)) {
+>  		/*
+> -		 * RS232 with hardware handshake (RTS/CTS)
+> -		 * handled by the controller.
+> +		 * Automatic hardware handshake (RTS/CTS) only work with
+> +		 * DMA enabled and FIFOs.
+> +		 * TODO: sam9x5 controllers don't have FIFOs like samad
+> +		 * controllers, and yet, the datasheet says that the
+> +		 * ATMEL_US_USMODE_HWHS can be used with (and only with) a DMA
+> +		 * channel for reception.
+>  		 */
+> -		if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
+> -			dev_info(port->dev, "not enabling hardware flow control because DMA is used");
+> -			termios->c_cflag &= ~CRTSCTS;
+> +		if (atmel_use_dma_rx(port)) {
+> +			if (atmel_use_fifo(port)) {
+> +				mode |= ATMEL_US_USMODE_HWHS;
+> +			} else {
+> +				dev_info(port->dev, "not enabling hardware flow control because DMA is used without fifo");
+> +				termios->c_cflag &= ~CRTSCTS;
+> +			}
+>  		} else {
+> -			mode |= ATMEL_US_USMODE_HWHS;
+> +			/*
+> +			 * if DMA is not used, tell the controller that it
+> +			 * should not handle the RTS pin automatically
+> +			 */
+> +			mode |= ATMEL_US_USMODE_NORMAL;
+>  		}
+>  	} else {
+>  		/* RS232 without hadware handshake or controlled by GPIOs */
+> 
