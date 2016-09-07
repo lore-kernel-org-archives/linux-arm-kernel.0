@@ -1,19 +1,35 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 7 Sep 2016 21:19:42 +0800
-Subject: [PATCH] char: hw_random: bcm2835: handle of_iomap failures in
- bcm2835 driver
-In-Reply-To: <1472490616-9597-1-git-send-email-arvind.yadav.cs@gmail.com>
-References: <1472490616-9597-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <20160907131942.GE17176@gondor.apana.org.au>
+Date: Wed, 7 Sep 2016 21:29:40 +0800
+Subject: [PATCHv3 03/11] crypto: omap-sham: implement context
+ export/import APIs
+In-Reply-To: <0e19ed55-f24b-ad98-215b-1eb318193f06@ti.com>
+References: <d828fca9-a97a-7722-c4cb-24e07816cbc4@ti.com>
+ <20160901033320.GA650@gondor.apana.org.au>
+ <60a5ed40-5552-3ec8-fa21-7e6fb8213fc3@ti.com>
+ <20160901061630.GB650@gondor.apana.org.au>
+ <70468d4d-9f26-1bad-ace1-4b7c5cf43b52@ti.com>
+ <20160901071958.GA2076@gondor.apana.org.au>
+ <4c45de7f-002c-48b5-c950-f445354adb09@ti.com>
+ <20160901073113.GA2232@gondor.apana.org.au>
+ <9af173f7-cc94-a92f-80ee-c746d97ab110@ti.com>
+ <0e19ed55-f24b-ad98-215b-1eb318193f06@ti.com>
+Message-ID: <20160907132940.GA17927@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 10:40:16PM +0530, Arvind Yadav wrote:
-> Check return value of of_iomap and handle errors correctly.
+On Mon, Sep 05, 2016 at 03:06:05PM +0300, Tero Kristo wrote:
+>
+> Additional request, would it be possible for you to check the rest
+> of the series and just ignore patches #2 and #3 for now, the rest
+> don't have any dependencies against these and can be applied cleanly
+> without.
 > 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> I would like to see these move forward while I figure out how to
+> handle the buffer / export+import...
 
-Patch applied.  Thanks.
+Sure I'll review them again.
+
+Cheers,
 -- 
 Email: Herbert Xu <herbert@gondor.apana.org.au>
 Home Page: http://gondor.apana.org.au/~herbert/
