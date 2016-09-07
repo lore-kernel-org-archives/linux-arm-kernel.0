@@ -1,49 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 Sep 2016 21:45:55 +0200
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <Pine.LNX.4.44L0.1609071158160.2115-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1609071158160.2115-100000@iolanthe.rowland.org>
-Message-ID: <2360127.zmY5dTBf6B@wuerfel>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 07 Sep 2016 12:51:31 -0700
+Subject: [PATCH] clk: meson-gxbb: Export PWM related clocks for DT
+In-Reply-To: <20160907005208.GS12510@codeaurora.org> (Stephen Boyd's message
+ of "Tue, 6 Sep 2016 17:52:08 -0700")
+References: <1471870177-10609-1-git-send-email-narmstrong@baylibre.com>
+ <20160907005208.GS12510@codeaurora.org>
+Message-ID: <7ha8fjtrng.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 7, 2016 12:08:20 PM CEST Alan Stern wrote:
-> On Wed, 7 Sep 2016, Arnd Bergmann wrote:
-> 
-> >  drivers/usb/host/ehci-fsl.c    |  4 ++--
-> 
-> How did this driver end up in the patch?
+Stephen Boyd <sboyd@codeaurora.org> writes:
+
+> On 08/22, Neil Armstrong wrote:
+>> Add the PWM related clocks in order to be referenced as PWM source
+>> clocks.
+>> 
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
 >
-> > diff --git a/drivers/usb/host/ehci-fsl.c b/drivers/usb/host/ehci-fsl.c
-> > index 9f5ffb629973..b2419950221f 100644
-> > --- a/drivers/usb/host/ehci-fsl.c
-> > +++ b/drivers/usb/host/ehci-fsl.c
-> > @@ -96,8 +96,8 @@ static int fsl_ehci_drv_probe(struct platform_device *pdev)
-> >  	}
-> >  	irq = res->start;
-> >  
-> > -	hcd = usb_create_hcd(&fsl_ehci_hc_driver, &pdev->dev,
-> > -				dev_name(&pdev->dev));
-> > +	hcd = __usb_create_hcd(&fsl_ehci_hc_driver, &pdev->dev.parent,
-> > +				&pdev->dev, dev_name(&pdev->dev), NULL);
-> 
-> Based on the
-> 
-> 	if (of_device_is_compatible(dev->parent->of_node,
-> 				    "fsl,mpc5121-usb2-dr")) {
-> 
-> lines in the driver?
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+>
+> With some more thought, it should go through whatever tree takes
+> the dts changes. Conflicts in these header files should be
+> managed by the same person and that person is the platform
+> maintainer.
 
-No, based on the "fsl-ehci" name, which is only used as a child
-of the drivers/usb/host/fsl-mph-dr-of.c dual-role driver.
+OK, I'll pick this up and take it through the amlogic -> arm-soc path.
 
-I looked for drivers that call platform_device_add() and manipulate
-the dma_mask of that child.
+Thanks,
 
-Sorry for missing this one when I did the description. I believe
-it is correct though. The DMA settings on powerpc are probably correct
-in this case, but the existing code doesn't allow you to describe
-on-board USB devices with additional properties as children of
-the dual-role device node.
-
-	Arnd
+Kevin
