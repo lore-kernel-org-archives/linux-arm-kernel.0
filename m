@@ -1,36 +1,55 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Sep 2016 09:49:59 +0200
-Subject: [PATCH 12/26] ARM: dts: document Wheat board
+Date: Wed,  7 Sep 2016 09:50:04 +0200
+Subject: [PATCH 17/26] ARM: dts: r7s72100: add ethernet clock to device tree
 In-Reply-To: <cover.1473234371.git.horms+renesas@verge.net.au>
 References: <cover.1473234371.git.horms+renesas@verge.net.au>
-Message-ID: <e6835b3e7bc6552faab1667d44e8a6786f60c590.1473234371.git.horms+renesas@verge.net.au>
+Message-ID: <969244f9c72057b2c32b650b2d75a04d612c603c.1473234372.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Chris Brandt <chris.brandt@renesas.com>
 
-Document the Wheat device tree bindings, listing it as a supported board.
-
-This allows to use checkpatch.pl to validate .dts files referring to the
-Wheat board.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/r7s72100.dtsi            | 9 +++++++++
+ include/dt-bindings/clock/r7s72100-clock.h | 3 +++
+ 2 files changed, 12 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index 1df32d339da5..90cf237ee558 100644
---- a/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -69,3 +69,5 @@ Boards:
-     compatible = "renesas,salvator-x", "renesas,r8a7796";
-   - SILK (RTP0RC7794LCB00011S)
-     compatible = "renesas,silk", "renesas,r8a7794"
-+  - Wheat
-+    compatible = "renesas,wheat", "renesas,r8a7792"
+diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
+index e8e2a5d71976..6d29e8ffa0d9 100644
+--- a/arch/arm/boot/dts/r7s72100.dtsi
++++ b/arch/arm/boot/dts/r7s72100.dtsi
+@@ -108,6 +108,15 @@
+ 			clock-output-names = "scif0", "scif1", "scif2", "scif3", "scif4", "scif5", "scif6", "scif7";
+ 		};
+ 
++		mstp7_clks: mstp7_clks at fcfe0430 {
++			#clock-cells = <1>;
++			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0xfcfe0430 4>;
++			clocks = <&p0_clk>;
++			clock-indices = <R7S72100_CLK_ETHER>;
++			clock-output-names = "ether";
++		};
++
+ 		mstp9_clks: mstp9_clks at fcfe0438 {
+ 			#clock-cells = <1>;
+ 			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
+diff --git a/include/dt-bindings/clock/r7s72100-clock.h b/include/dt-bindings/clock/r7s72100-clock.h
+index 5128f4d94f44..3cd813896d08 100644
+--- a/include/dt-bindings/clock/r7s72100-clock.h
++++ b/include/dt-bindings/clock/r7s72100-clock.h
+@@ -25,6 +25,9 @@
+ #define R7S72100_CLK_SCIF6	1
+ #define R7S72100_CLK_SCIF7	0
+ 
++/* MSTP7 */
++#define R7S72100_CLK_ETHER	4
++
+ /* MSTP9 */
+ #define R7S72100_CLK_I2C0	7
+ #define R7S72100_CLK_I2C1	6
 -- 
 2.7.0.rc3.207.g0ac5344
