@@ -1,40 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Sep 2016 09:50:06 +0200
-Subject: [PATCH 19/26] ARM: dts: rskrza1: add ethernet DT support
+Date: Wed,  7 Sep 2016 09:49:58 +0200
+Subject: [PATCH 11/26] ARM: dts: blanche: add support for general purpose LEDs
 In-Reply-To: <cover.1473234371.git.horms+renesas@verge.net.au>
 References: <cover.1473234371.git.horms+renesas@verge.net.au>
-Message-ID: <0aa8d831e75ec8b6c003943ece980535ab6cc94f.1473234372.git.horms+renesas@verge.net.au>
+Message-ID: <996453571b33ba2ae07211ff9e8a09b28e49aec5.1473234371.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Brandt <chris.brandt@renesas.com>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Add support for the general purpose LEDs on the Blanche board.
+
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r7s72100-rskrza1.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/r8a7792-blanche.dts | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r7s72100-rskrza1.dts b/arch/arm/boot/dts/r7s72100-rskrza1.dts
-index aabfa0459dc1..e5dea5bb4032 100644
---- a/arch/arm/boot/dts/r7s72100-rskrza1.dts
-+++ b/arch/arm/boot/dts/r7s72100-rskrza1.dts
-@@ -47,6 +47,15 @@
- 	status = "okay";
- };
+diff --git a/arch/arm/boot/dts/r8a7792-blanche.dts b/arch/arm/boot/dts/r8a7792-blanche.dts
+index 3c6f42b9fe9f..f3ea43b7b724 100644
+--- a/arch/arm/boot/dts/r8a7792-blanche.dts
++++ b/arch/arm/boot/dts/r8a7792-blanche.dts
+@@ -159,6 +159,23 @@
+ 		};
+ 	};
  
-+&ether {
-+	status = "okay";
-+	renesas,no-ether-link;
-+	phy-handle = <&phy0>;
-+	phy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
-+};
++	leds {
++		compatible = "gpio-leds";
 +
- &scif2 {
- 	status = "okay";
- };
++		led17 {
++			gpios = <&gpio10 10 GPIO_ACTIVE_HIGH>;
++		};
++		led18 {
++			gpios = <&gpio10 11 GPIO_ACTIVE_HIGH>;
++		};
++		led19 {
++			gpios = <&gpio10 12 GPIO_ACTIVE_HIGH>;
++		};
++		led20 {
++			gpios = <&gpio10 23 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
+ 	vcc_sdhi0: regulator-vcc-sdhi0 {
+ 		compatible = "regulator-fixed";
+ 
 -- 
 2.7.0.rc3.207.g0ac5344
