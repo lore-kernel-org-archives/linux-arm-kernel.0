@@ -1,45 +1,58 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed, 7 Sep 2016 11:18:19 +0200
-Subject: [PATCH v11 3/4] tee: add OP-TEE driver
-In-Reply-To: <49a564fc-0d45-9981-b357-a1046a135d33@hisilicon.com>
-References: <1471870856-18684-1-git-send-email-jens.wiklander@linaro.org>
- <1471870856-18684-4-git-send-email-jens.wiklander@linaro.org>
- <49a564fc-0d45-9981-b357-a1046a135d33@hisilicon.com>
-Message-ID: <20160907091818.GA15580@ermac>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Wed, 7 Sep 2016 17:23:43 +0800
+Subject: [PATCH v11 5/8] clocksource/drivers/arm_arch_timer: Simplify ACPI
+ support code.
+In-Reply-To: <alpine.DEB.2.20.1609061635000.5647@nanos>
+References: <1473168352-5156-1-git-send-email-fu.wei@linaro.org>
+ <1473168352-5156-6-git-send-email-fu.wei@linaro.org>
+ <alpine.DEB.2.20.1609061635000.5647@nanos>
+Message-ID: <CADyBb7uX79UP=mUxvP-EPGi56-46y2SCMPsWO=Uw-=N0GQERhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zengtao,
+Hi Thomas
 
-On Wed, Sep 07, 2016 at 03:49:38PM +0800, Zeng Tao wrote:
-> Hi all:
-> 
-> I have gone through the patch, and i find one limit for RPC call from
-> TEE to REE.  In this patch, RPC commands are fixed and it supports a
-> limited set of commands.  If you want to add your own RPC command then
-> you need to change the source code of the driver.
+On 6 September 2016 at 22:36, Thomas Gleixner <tglx@linutronix.de> wrote:
+> On Tue, 6 Sep 2016, fu.wei at linaro.org wrote:
+>> +     if (timer_count < 0)
+>> +             pr_err("Failed to get platform timer info, skipping.\n");
+>
+> So this prints something about skipping. But then it continues as if
+> nothing went wrong. That's either wrong or confusing or both.
 
-All unknown RPC of the OPTEE_SMC_RPC_FUNC_CMD type are forwarded to the
-supplicant in user space. So there's the option to extend with the
-supplicant if needed.
+yes, you are right, this info is confusing.
+maybe we just delete the "skipping" ?
 
-It is true that the RPCs which are dealt with in the driver are fixed.
+?timer_count < 0? is caused by some firmware bug, in gtdt.c:
+----
+int __init acpi_gtdt_init(struct acpi_table_header *table)
+{
+......
+        if (start < (void *)table + sizeof(struct acpi_table_gtdt)) {
+        pr_err(FW_BUG "Failed to retrieve timer info from firmware:
+invalid data.\n");
+        return -EINVAL;
+......
+}
+----
 
-> 
-> I don't know how much work to do, but unless we are sure that the RPC
-> now are enough to cover all, we 'd better make the RPC more
-> extensible.
+But in this situation( without platform timers ), system still can work.
+So I thing we just need to print a error.
 
-It's handle_rpc_func_cmd() that could support dynamic registration of
-RPC commands. Doing so in optee_handle_rpc() also should be avoided as
-it involves updates of an eventual hypervisor.
+>
+>> -     arch_timer_init();
+>> -     return 0;
+>> +     return arch_timer_init();
+>
+> Thanks,
+>
+>         tglx
 
-I'm trying to keep this initial patch set as small as possible to not
-make it harder than it already is to review it. If possible I'd like to
-wait with new features until after this patch set has been accepted.
 
-Thanks,
-Jens
 
-> 
-> BR zengtao
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
