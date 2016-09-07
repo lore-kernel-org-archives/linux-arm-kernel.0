@@ -1,42 +1,69 @@
-From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Wed, 07 Sep 2016 16:17:17 +0200
-Subject: [PATCH V3 RFT 3/5] ARM64: dts: bcm283x: Use dtsi for USB host mode
-In-Reply-To: <18641a83-ddd7-1689-535a-c5a15b8a54f9@i2se.com>
-References: <1471792204-21908-1-git-send-email-stefan.wahren@i2se.com>
- <1471792204-21908-4-git-send-email-stefan.wahren@i2se.com>
- <bb073ea3-2f89-4fc5-e3af-2e27c54f221e@i2se.com>
- <1473245956.28663.50.camel@redhat.com>
- <18641a83-ddd7-1689-535a-c5a15b8a54f9@i2se.com>
-Message-ID: <1473257837.28663.80.camel@redhat.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Wed, 7 Sep 2016 15:20:14 +0100
+Subject: [PATCH v2 7/7] ARM: KVM: Unlock vgic-v3 support
+In-Reply-To: <20160907125856.GP23592@cbox>
+References: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
+ <1471344418-19568-8-git-send-email-vladimir.murzin@arm.com>
+ <20160905112927.GL26366@cbox> <57CEC344.7030706@arm.com>
+ <20160906165527.GG23592@cbox>
+ <57CFF094.5000704@arm.com> <20160907125856.GP23592@cbox>
+Message-ID: <CAFEAcA9oXc6bO55p=vqgrzQLFGT+zvg+E2nucOvPvb7RetN3RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Hi,
+On 7 September 2016 at 13:58, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Wed, Sep 07, 2016 at 11:48:52AM +0100, Vladimir Murzin wrote:
+>> On 06/09/16 17:55, Christoffer Dall wrote:
+>> > On Tue, Sep 06, 2016 at 02:23:16PM +0100, Vladimir Murzin wrote:
+>> >>
+>> >> Sorry, missed this one
+>> >>
+>> >> On 05/09/16 12:29, Christoffer Dall wrote:
+>> >>>>
+>> >>>>> +static bool __hyp_text __has_useable_gicv3_cpuif(void)
+>> >>>>> +{
+>> >>>>> +       if (IS_ENABLED(CONFIG_ARM_GIC_V3) && (read_sysreg(ID_PFR1) >> 28))
+>> >>> Do we have a define for bit 28 we could use?
+>> >>
+>> >> I'll check it.
+>> >>
+>> >>>
+>> >>> Does this actually work on all v7 boards?  The v7 ARM ARM seems to state
+>> >>> that this bitfield is Reserved, UNK.  Does that somehow mean 'is going
+>> >>> to be zero'?
+>> >>
+>> >> It is how v7ARM ARM I have defines UNK
+>> >>
+>> >> An abbreviation indicating that software must treat a field as
+>> >> containing an UNKNOWN value. Hardware must implement the bit as read as
+>> >> 0, or all 0s for a bit field. Software must not rely on the field
+>> >> reading as zero.
+>> >>
+>> >> It seems goes under 'is going to be zero' case, no?
+>> >>
+>> > The last sentence is disturbing to me, and feels slightly contradicting
+>> > itself.  Reading the UNKNOWN description doesn't help much either.
+>> >
+>> > Perhaps you can ask around internally and figure out what the precise
+>> > answer to this is?
+>>
+>> Since it is kind of implementation dependant thing the precise answer
+>> from here hardly help, IMO. We still have non-zero chance to see
+>> something scary.
+>
+> Well, if the precise answer is: This will actually always return 0
+> because of X and Y, then your code is fine.
 
-> ARM: dts: Remove use of skeleton.dtsi from bcm283x.dtsi
-> ARM64: dts: bcm: Use a symlink to R-Pi dtsi files from arch=arm
+I think the "must not rely on the field reading as zero" wording
+in the case of the ID registers is intended to mean "in a
+future rev of the architecture we may assign these bits,
+and your code mustn't do something that will break if the
+bits then read as something other than zero". (And indeed
+in v8 bits 28..31 have an assigned meaning.) It doesn't
+mean there'll be v7 hardware out there with non-zero
+values, because that would be breaking the hardware's part
+of the UNKNOWN contract ("must implement the bit as read as 0").
 
-Picked them up.
-
-> In case of a multiplatform config with following settings the driver
-> isn't able to "detect" the role:
-> 
-> CONFIG_USB=y
-> CONFIG_USB_OTG=y
-> CONFIG_USB_DWC2=y
-> CONFIG_USB_DWC2_DUAL_ROLE=y
-> CONFIG_USB_PHY=y
-> CONFIG_NOP_USB_XCEIV=y
-> CONFIG_USB_GADGET=y
-> CONFIG_USB_ZERO=y
-
-Configured my kernel that way so the test actually tests something ;)
-
-And ... everything looks fine.  usb ethernet works, and so does the usb
-keyboard.  /proc/device-tree/soc/usb at 7e980000/dr_mode exists and
-contains "host".
-
-Tested-by: Gerd Hoffmann <kraxel@redhat.com>
-
-cheers,
-  Gerd
+thanks
+-- PMM
