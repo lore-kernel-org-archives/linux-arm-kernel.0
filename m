@@ -1,58 +1,26 @@
-From: zach.brown@ni.com (Zach Brown)
-Date: Wed, 7 Sep 2016 17:22:40 -0500
-Subject: [PATCH v5 1/2] sdhci-of-arasan: Add device tree parameter
- xlnx-fails-without-test-cd bit
-Message-ID: <1473286961-19608-1-git-send-email-zach.brown@ni.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 8 Sep 2016 00:25:48 +0200
+Subject: [PATCH 01/33] gpio: sa1100: fix irq probing for ucb1x00
+In-Reply-To: <E1beJje-0000lm-Ei@rmk-PC.armlinux.org.uk>
+References: <20160829102328.GA28796@n2100.armlinux.org.uk>
+ <E1beJje-0000lm-Ei@rmk-PC.armlinux.org.uk>
+Message-ID: <CACRpkdbuU4uE-OYNhK4Pk+nwQO2r9BW5m0cM_qGx6KrYTxQVsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sdhci controller on xilinx zynq devices will not function unless
-the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
-In cases where it is impossible to provide the CD bit in hardware,
-setting the controller to test mode and then setting inserted to true
-will get the controller to function without the CD bit.
+On Mon, Aug 29, 2016 at 12:24 PM, Russell King
+<rmk+kernel@armlinux.org.uk> wrote:
 
-The device property "xlnx-fails-without-test-cd" will let the arasan
-driver know the controller does not have the CD line wired and that the
-controller does not function without it.
+> ucb1x00 has used IRQ probing since it's dawn to find the GPIO interrupt
+> that it's connected to.  However, commit 23393d49fb75 ("gpio: kill off
+> set_irq_flags usage") broke this by disabling IRQ probing on GPIO
+> interrupts.  Fix this.
+>
+> Fixes: 23393d49fb75 ("gpio: kill off set_irq_flags usage")
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-Signed-off-by: Zach Brown <zach.brown@ni.com>
----
-v2:
- * improved commit messages
- * removed fake-cd device property
- * removed fake-cd quirk
- * use broken-cd device property
- * documented new usage of broken-cd
-v3:
- * removed new usage of broken-cd
- * created fails-without-test-cd device property
- * created arasan controller specific quirk
-v4:
- * changed fails-without-test-cd to xlnx-fails-without-test-cd
- * removed extra blank line
-v5:
- * Fixed style mistake
- * Changed (1 << 0 ) to BIT(0)
+Patch applied per Russell's request. Trying to get this tested
+and upstream ASAP.
 
-
- Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-index 31b35c3..7407450 100644
---- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-+++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-@@ -17,6 +17,10 @@ Required Properties:
-   - interrupts: Interrupt specifier
-   - interrupt-parent: Phandle for the interrupt controller that services
- 		      interrupts for this device.
-+Optional Properties:
-+- xlnx-fails-without-test-cd: when present, the controller doesn't work when
-+  the CD line is not connected properly, and the line is not connected
-+  properly. Test mode can be used to force the controller to function.
- 
- Required Properties for "arasan,sdhci-5.1":
-   - phys: From PHY bindings: Phandle for the Generic PHY for arasan.
--- 
-2.7.4
+Yours,
+Linus Walleij
