@@ -1,39 +1,18 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 07 Sep 2016 13:19:21 -0700
-Subject: [PATCH v3 0/4] pwm: Add Amlogic Meson SoC PWM Controller
-In-Reply-To: <1471880193-21879-1-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Mon, 22 Aug 2016 17:36:29 +0200")
-References: <1471880193-21879-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <7hshtbsbsm.fsf@baylibre.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed,  7 Sep 2016 22:20:36 +0200
+Subject: [PATCH resend 0/5] phy-sun4i-usb: Add support for phy_set_mode
+Message-ID: <20160907202041.17656-1-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+Hi Kishon,
 
-> Add support for the PWM controller found in Amlogic Meson SoCs.
-> This controller provides a dual PWM output with 4 selectable clock source
-> and a two level divider to achieve a better PWM range.
->
-> Currently Meson8b and GXBB SoCs are supported.
->
-> Changes since v2 at http://lkml.kernel.org/r/1471718083-11516-1-git-send-email-narmstrong at baylibre.com :
-> - Switch to apply() callback only, this fixes the setup sequence
-> - Implement get_state
-> - Make clock parent names as DT match data
->
-> Changes since v1 at http://lkml.kernel.org/r/1466173784-15625-1-git-send-email-narmstrong at baylibre.com :
-> - fix meson8b dtsi
->
-> Neil Armstrong (4):
->   pwm: Add support for Meson PWM Controller
->   dt-bindings: pwm: Add bindings for Meson PWM Controller
+There was some discussion about the 6th patch in this set, so I've
+dropped this for now (needs a universal dt binding), but the other
+5 are still useful without this patch and are ready for merging.
 
-Looks like Thierry has picked up these two into his for-4.9/drivers
-branch...
+Can you please add these 5 to your next branch ?
 
->   ARM64: dts: meson-gxbb: Add Meson GXBB PWM Controller nodes
->   ARM: dts: meson8b: Add Meson8b PWM Controller nodes
+Thanks & Regards,
 
-... so I've picked up these into the amlogic tree.
-
-Kevin
+Hans
