@@ -1,61 +1,34 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 7 Sep 2016 11:48:52 +0100
-Subject: [PATCH v2 7/7] ARM: KVM: Unlock vgic-v3 support
-In-Reply-To: <20160906165527.GG23592@cbox>
-References: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
- <1471344418-19568-8-git-send-email-vladimir.murzin@arm.com>
- <20160905112927.GL26366@cbox> <57CEC344.7030706@arm.com>
- <20160906165527.GG23592@cbox>
-Message-ID: <57CFF094.5000704@arm.com>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Wed,  7 Sep 2016 18:53:00 +0800
+Subject: [PATCH] drm/rockchip: add missing header dependencies
+Message-ID: <1473245580-538-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/16 17:55, Christoffer Dall wrote:
-> On Tue, Sep 06, 2016 at 02:23:16PM +0100, Vladimir Murzin wrote:
->>
->> Sorry, missed this one
->>
->> On 05/09/16 12:29, Christoffer Dall wrote:
->>>>  
->>>>> +static bool __hyp_text __has_useable_gicv3_cpuif(void)
->>>>> +{
->>>>> +	if (IS_ENABLED(CONFIG_ARM_GIC_V3) && (read_sysreg(ID_PFR1) >> 28))
->>> Do we have a define for bit 28 we could use?
->>
->> I'll check it.
->>
->>>
->>> Does this actually work on all v7 boards?  The v7 ARM ARM seems to state
->>> that this bitfield is Reserved, UNK.  Does that somehow mean 'is going
->>> to be zero'?
->>
->> It is how v7ARM ARM I have defines UNK
->>
->> An abbreviation indicating that software must treat a field as
->> containing an UNKNOWN value. Hardware must implement the bit as read as
->> 0, or all 0s for a bit field. Software must not rely on the field
->> reading as zero.
->>
->> It seems goes under 'is going to be zero' case, no?
->>
-> The last sentence is disturbing to me, and feels slightly contradicting
-> itself.  Reading the UNKNOWN description doesn't help much either.
-> 
-> Perhaps you can ask around internally and figure out what the precise
-> answer to this is?
+We get 2 warnings when building kernel with W=1:
+drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c:130:5: warning: no previous prototype for 'rockchip_drm_fbdev_init' [-Wmissing-prototypes]
+drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c:173:6: warning: no previous prototype for 'rockchip_drm_fbdev_fini' [-Wmissing-prototypes]
 
-Since it is kind of implementation dependant thing the precise answer
-from here hardly help, IMO. We still have non-zero chance to see
-something scary.
+In fact, these functions are declared
+in drivers/gpu/drm/rockchip/rockchip_drm_fbdev.h,
+so this patch adds missing header dependencies.
 
-OTOH, why do we care of all v7 boards if none of them have
-CONFIG_ARM_GIC_V3 defined?
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Cheers
-Vladimir
-
-> 
-> Thanks,
-> -Christoffer
-> 
-> 
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
+index 207e01d..a16c69f 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
+@@ -20,6 +20,7 @@
+ #include "rockchip_drm_drv.h"
+ #include "rockchip_drm_gem.h"
+ #include "rockchip_drm_fb.h"
++#include "rockchip_drm_fbdev.h"
+ 
+ #define PREFERRED_BPP		32
+ #define to_drm_private(x) \
+-- 
+2.7.4
