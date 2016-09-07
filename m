@@ -1,72 +1,41 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed,  7 Sep 2016 22:20:40 +0200
-Subject: [PATCH resend 4/5] phy-sun4i-usb: Add support for phy_set_mode
-In-Reply-To: <20160907202041.17656-1-hdegoede@redhat.com>
-References: <20160907202041.17656-1-hdegoede@redhat.com>
-Message-ID: <20160907202041.17656-5-hdegoede@redhat.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 7 Sep 2016 22:20:52 +0200
+Subject: [PATCH v2 00/10] pinctrl: exynos/samsung: Add header with values
+ used for configuration
+In-Reply-To: <1472714638-15676-1-git-send-email-k.kozlowski@samsung.com>
+References: <1472714638-15676-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <CACRpkdZuRym=SuAiBA_UsNmKd7N5n9g=z=ZxwcEk7J0BcXDsFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Together with some musb sunxi glue changes this allows run-time dr_mode
-switching support via the "mode" musb sysfs attribute.
+I have one comment though, if you're anyway making changes to all
+the DTS files:
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2:
--No changes
-Changes in v3:
--Fix switch-case code style
----
- drivers/phy/phy-sun4i-usb.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+On Thu, Sep 1, 2016 at 9:23 AM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
 
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index fb2d4f3..af42f8d 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -427,6 +427,35 @@ static int sun4i_usb_phy_power_off(struct phy *_phy)
- 	return 0;
- }
- 
-+static int sun4i_usb_phy_set_mode(struct phy *_phy, enum phy_mode mode)
-+{
-+	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
-+	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
-+
-+	if (phy->index != 0)
-+		return -EINVAL;
-+
-+	switch (mode) {
-+	case PHY_MODE_USB_HOST:
-+		data->dr_mode = USB_DR_MODE_HOST;
-+		break;
-+	case PHY_MODE_USB_DEVICE:
-+		data->dr_mode = USB_DR_MODE_PERIPHERAL;
-+		break;
-+	case PHY_MODE_USB_OTG:
-+		data->dr_mode = USB_DR_MODE_OTG;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	dev_info(&_phy->dev, "Changing dr_mode to %d\n", (int)data->dr_mode);
-+	data->force_session_end = true;
-+	queue_delayed_work(system_wq, &data->detect, 0);
-+
-+	return 0;
-+}
-+
- void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
- {
- 	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
-@@ -440,6 +469,7 @@ static const struct phy_ops sun4i_usb_phy_ops = {
- 	.exit		= sun4i_usb_phy_exit,
- 	.power_on	= sun4i_usb_phy_power_on,
- 	.power_off	= sun4i_usb_phy_power_off,
-+	.set_mode	= sun4i_usb_phy_set_mode,
- 	.owner		= THIS_MODULE,
- };
- 
--- 
-2.9.3
+> -               samsung,pin-function = <2>;
+> -               samsung,pin-pud = <0>;
+> -               samsung,pin-drv = <0>;
+> +               samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
+> +               samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+> +               samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
+
+Nowadays we have standard bindings for this, see
+Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+
+Section "Generic pin multiplexing node content".
+
+By patching the driver and bindings to accept also the standard
+bindings with just function and pins and also adding support
+for standard pin configurations like bias-disable
+bias-pull-up with the old samsung,* bindings as a fallback
+etc you can actually modernize the whole binding and
+DTS looks to something simpler.
+
+You will find that this is how newer platforms do it.
+
+But it is admittedly a bigger project.
+
+Yours,
+Linus Walleij
