@@ -1,9 +1,9 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed,  7 Sep 2016 17:13:40 +0200
-Subject: [PATCH 4/7] spi: meson: Add GXBB compatible
+Date: Wed,  7 Sep 2016 17:13:41 +0200
+Subject: [PATCH 5/7] dt-bindings: spi-meson: Add GXBB Compatible string
 In-Reply-To: <1473261223-15412-1-git-send-email-jbrunet@baylibre.com>
 References: <1473261223-15412-1-git-send-email-jbrunet@baylibre.com>
-Message-ID: <1473261223-15412-5-git-send-email-jbrunet@baylibre.com>
+Message-ID: <1473261223-15412-6-git-send-email-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,20 +11,21 @@ From: Neil Armstrong <narmstrong@baylibre.com>
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/spi/spi-meson-spifc.c | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/spi/spi-meson.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/spi/spi-meson-spifc.c b/drivers/spi/spi-meson-spifc.c
-index 2465259..616566e 100644
---- a/drivers/spi/spi-meson-spifc.c
-+++ b/drivers/spi/spi-meson-spifc.c
-@@ -442,6 +442,7 @@ static const struct dev_pm_ops meson_spifc_pm_ops = {
+diff --git a/Documentation/devicetree/bindings/spi/spi-meson.txt b/Documentation/devicetree/bindings/spi/spi-meson.txt
+index bb52a86..dc6d031 100644
+--- a/Documentation/devicetree/bindings/spi/spi-meson.txt
++++ b/Documentation/devicetree/bindings/spi/spi-meson.txt
+@@ -7,7 +7,7 @@ NOR memories, without DMA support and a 64-byte unified transmit /
+ receive buffer.
  
- static const struct of_device_id meson_spifc_dt_match[] = {
- 	{ .compatible = "amlogic,meson6-spifc", },
-+	{ .compatible = "amlogic,meson-gxbb-spifc", },
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, meson_spifc_dt_match);
+ Required properties:
+- - compatible: should be "amlogic,meson6-spifc"
++ - compatible: should be "amlogic,meson6-spifc" or "amlogic,meson-gxbb-spifc"
+  - reg: physical base address and length of the controller registers
+  - clocks: phandle of the input clock for the baud rate generator
+  - #address-cells: should be 1
 -- 
 2.7.4
