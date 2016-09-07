@@ -1,48 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 Sep 2016 10:29:25 +0200
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <340685cd-7f06-21db-94cb-a87d0df36286@ti.com>
-References: <Pine.LNX.4.44L0.1609021019260.2027-100000@iolanthe.rowland.org>
- <5147808.apZTAZ3VPE@wuerfel> <340685cd-7f06-21db-94cb-a87d0df36286@ti.com>
-Message-ID: <8802454.xFheq55hVP@wuerfel>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Wed, 7 Sep 2016 10:30:41 +0200
+Subject: [RESEND PATCH v4] thermal: tango: add resume support
+Message-ID: <57CFD031.7020500@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 7, 2016 10:17:31 AM CEST Roger Quadros wrote:
-> > 
-> > Speaking of that flag, I suppose we need the same logic to know where
-> > to look for USB devices attached to a dwc3 host when we need to describe
-> > them in DT. By default we look for child device nodes under the
-> > node of the HCD device node, but that would be wrong here too.
-> 
-> I didn't get this part. Information about USB devices attached to a USB host
-> is never provided in DT because they are always dynamically created via
-> usb_new_device(), whether they are hard-wired on the board or hot-plugged.
-> 
-> These USB devices inherit their DMA masks in the usb_alloc_dev() routine
-> whereas each interface within the USB device inherits its DMA mask in
-> usb_set_configuration().
+When this platform is suspended, firmware powers the entire SoC down,
+except a few hardware blocks waiting for wakeup events. There is no
+context to save for this particular block.
 
-We had talked about adding support for this for at least six years (probably
-much more), but Peter Chen finally added it this year in commit 69bec72598
-("USB: core: let USB device know device node").
+Therefore, there is nothing useful for the driver to do on suspend;
+so we define a NULL suspend hook. On resume, the driver initializes
+the block exactly as is done in the probe callback.
 
-The main use for it is to let you specify a MAC address for on-board
-ethernet devices that lack an EPROM, but any other information can be
-added that way too.
+Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+---
+Add Kevin's Reviewed-by tag.
+Earlier versions of this patch were reviewed by Kevin and Thierry.
+The current form is preferred by Arnd.
+Rui, could you take this patch before the next merge window opens?
+---
+ drivers/thermal/tango_thermal.c | 19 +++++++++++++++++--
+ 1 file changed, 17 insertions(+), 2 deletions(-)
 
-> There is a bug  in the USB core because of which the ISB device and interfaces
-> do not inherit dma_pfn_offset correctly for which I've sent a patch
-> https://lkml.org/lkml/2016/8/17/275
-
-I'm a bit skeptical about this. Clearly if we set the dma_mask, we should
-also set the dma_pfn_offset, but what exactly is this used for in USB
-devices?
-
-As I understand it, the dma_mask/dma_pfn_offset etc is used for the DMA
-mapping interface, but that can't really be used on USB devices, which
-I assume use usb_alloc_coherent() and the URB interfaces for passing data
-between a USB driver and the HCD. My knowledge of USB device drivers
-is a bit lacking, so it's possible I'm misunderstanding things here.
-
-	Arnd
+diff --git a/drivers/thermal/tango_thermal.c b/drivers/thermal/tango_thermal.c
+index 70e0d9f406e9..201304aeafeb 100644
+--- a/drivers/thermal/tango_thermal.c
++++ b/drivers/thermal/tango_thermal.c
+@@ -64,6 +64,12 @@ static const struct thermal_zone_of_device_ops ops = {
+ 	.get_temp	= tango_get_temp,
+ };
+ 
++static void tango_thermal_init(struct tango_thermal_priv *priv)
++{
++	writel(0, priv->base + TEMPSI_CFG);
++	writel(CMD_ON, priv->base + TEMPSI_CMD);
++}
++
+ static int tango_thermal_probe(struct platform_device *pdev)
+ {
+ 	struct resource *res;
+@@ -79,14 +85,22 @@ static int tango_thermal_probe(struct platform_device *pdev)
+ 	if (IS_ERR(priv->base))
+ 		return PTR_ERR(priv->base);
+ 
++	platform_set_drvdata(pdev, priv);
+ 	priv->thresh_idx = IDX_MIN;
+-	writel(0, priv->base + TEMPSI_CFG);
+-	writel(CMD_ON, priv->base + TEMPSI_CMD);
++	tango_thermal_init(priv);
+ 
+ 	tzdev = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, priv, &ops);
+ 	return PTR_ERR_OR_ZERO(tzdev);
+ }
+ 
++static int __maybe_unused tango_thermal_resume(struct device *dev)
++{
++	tango_thermal_init(dev_get_drvdata(dev));
++	return 0;
++}
++
++static SIMPLE_DEV_PM_OPS(tango_thermal_pm, NULL, tango_thermal_resume);
++
+ static const struct of_device_id tango_sensor_ids[] = {
+ 	{
+ 		.compatible = "sigma,smp8758-thermal",
+@@ -99,6 +113,7 @@ static struct platform_driver tango_thermal_driver = {
+ 	.driver	= {
+ 		.name		= "tango-thermal",
+ 		.of_match_table	= tango_sensor_ids,
++		.pm		= &tango_thermal_pm,
+ 	},
+ };
+ 
+-- 
+2.9.0
