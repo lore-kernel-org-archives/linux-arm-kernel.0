@@ -1,22 +1,80 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Sep 2016 10:50:29 +0100
-Subject: [PATCH 0/4] Input updates for Jornada720
-Message-ID: <20160907095029.GL1041@n2100.armlinux.org.uk>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Wed, 07 Sep 2016 10:51:09 +0100
+Subject: [PATCH 2/4] Input: jornada720_kbd - get rid of mach/irqs.h include
+In-Reply-To: <20160907095029.GL1041@n2100.armlinux.org.uk>
+References: <20160907095029.GL1041@n2100.armlinux.org.uk>
+Message-ID: <E1bhZVd-0005cZ-5z@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmitry,
+Switch the jornada720 keyboard driver to obtain its interrupt from the
+platform device, rather than via a hard-coded interrupt number obtained
+from the mach/irqs.h header.
 
-Please apply this tested series of patches for Jornada 720 input support.
+Tested-by: Adam Wysocki <armlinux@chmurka.net>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/mach-sa1100/jornada720.c       |  6 ++++++
+ drivers/input/keyboard/jornada720_kbd.c | 11 +++++++----
+ 2 files changed, 13 insertions(+), 4 deletions(-)
 
-Thanks.
-
- arch/arm/mach-sa1100/jornada720.c         | 16 +++++++++++
- drivers/input/keyboard/jornada720_kbd.c   | 48 ++++++++++---------------------
- drivers/input/touchscreen/jornada720_ts.c | 21 +++++++++-----
- 3 files changed, 45 insertions(+), 40 deletions(-)
-
+diff --git a/arch/arm/mach-sa1100/jornada720.c b/arch/arm/mach-sa1100/jornada720.c
+index c0b1f5bafae4..2b96f7bc16bd 100644
+--- a/arch/arm/mach-sa1100/jornada720.c
++++ b/arch/arm/mach-sa1100/jornada720.c
+@@ -217,9 +217,15 @@ static struct platform_device jornada_ssp_device = {
+ 	.id             = -1,
+ };
+ 
++static struct resource jornada_kbd_resources[] = {
++	DEFINE_RES_IRQ(IRQ_GPIO0),
++};
++
+ static struct platform_device jornada_kbd_device = {
+ 	.name		= "jornada720_kbd",
+ 	.id		= -1,
++	.num_resources	= ARRAY_SIZE(jornada_kbd_resources),
++	.resource	= jornada_kbd_resources,
+ };
+ 
+ static struct platform_device jornada_ts_device = {
+diff --git a/drivers/input/keyboard/jornada720_kbd.c b/drivers/input/keyboard/jornada720_kbd.c
+index 4b2e9ff18ba1..6ac9fee1d8fa 100644
+--- a/drivers/input/keyboard/jornada720_kbd.c
++++ b/drivers/input/keyboard/jornada720_kbd.c
+@@ -26,7 +26,6 @@
+ 
+ #include <mach/jornada720.h>
+ #include <mach/hardware.h>
+-#include <mach/irqs.h>
+ 
+ MODULE_AUTHOR("Kristoffer Ericson <Kristoffer.Ericson@gmail.com>");
+ MODULE_DESCRIPTION("HP Jornada 710/720/728 keyboard driver");
+@@ -98,7 +97,11 @@ static int jornada720_kbd_probe(struct platform_device *pdev)
+ {
+ 	struct jornadakbd *jornadakbd;
+ 	struct input_dev *input_dev;
+-	int i, err;
++	int i, err, irq;
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq <= 0)
++		return irq < 0 ? irq : -EINVAL;
+ 
+ 	jornadakbd = devm_kzalloc(&pdev->dev, sizeof(*jornadakbd), GFP_KERNEL);
+ 	input_dev = devm_input_allocate_device(&pdev->dev);
+@@ -126,10 +129,10 @@ static int jornada720_kbd_probe(struct platform_device *pdev)
+ 
+ 	input_set_capability(input_dev, EV_MSC, MSC_SCAN);
+ 
+-	err = devm_request_irq(&pdev->dev, IRQ_GPIO0, jornada720_kbd_interrupt,
++	err = devm_request_irq(&pdev->dev, irq, jornada720_kbd_interrupt,
+ 			       IRQF_TRIGGER_FALLING, "jornadakbd", pdev);
+ 	if (err) {
+-		printk(KERN_INFO "jornadakbd720_kbd: Unable to grab IRQ\n");
++		dev_err(&pdev->dev, "unable to grab IRQ%d: %d\n", irq, err);
+ 		return err;
+ 	}
+ 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.1.0
