@@ -1,44 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Sep 2016 09:49:58 +0200
-Subject: [PATCH 11/26] ARM: dts: blanche: add support for general purpose LEDs
+Date: Wed,  7 Sep 2016 09:50:13 +0200
+Subject: [PATCH 26/26] ARM: dts: wheat: add support for tactile switches
 In-Reply-To: <cover.1473234371.git.horms+renesas@verge.net.au>
 References: <cover.1473234371.git.horms+renesas@verge.net.au>
-Message-ID: <996453571b33ba2ae07211ff9e8a09b28e49aec5.1473234371.git.horms+renesas@verge.net.au>
+Message-ID: <fa8f4aba72e6d619c003dab60f58ab6c7410e465.1473234372.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Add support for the general purpose LEDs on the Blanche board.
+Add  support for the  tactile switches  SW2/3 (on the debug board) as a
+virtual keyboard like it  was done with the Blanche board).
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7792-blanche.dts | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/boot/dts/r8a7792-wheat.dts | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7792-blanche.dts b/arch/arm/boot/dts/r8a7792-blanche.dts
-index 3c6f42b9fe9f..f3ea43b7b724 100644
---- a/arch/arm/boot/dts/r8a7792-blanche.dts
-+++ b/arch/arm/boot/dts/r8a7792-blanche.dts
-@@ -159,6 +159,23 @@
- 		};
+diff --git a/arch/arm/boot/dts/r8a7792-wheat.dts b/arch/arm/boot/dts/r8a7792-wheat.dts
+index 0ec4bc606c61..6dbb94114a93 100644
+--- a/arch/arm/boot/dts/r8a7792-wheat.dts
++++ b/arch/arm/boot/dts/r8a7792-wheat.dts
+@@ -12,6 +12,7 @@
+ /dts-v1/;
+ #include "r8a7792.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
+ 
+ / {
+ 	model = "Wheat";
+@@ -56,6 +57,25 @@
+ 		pinctrl-names = "default";
  	};
  
-+	leds {
-+		compatible = "gpio-leds";
++	keyboard {
++		compatible = "gpio-keys";
 +
-+		led17 {
-+			gpios = <&gpio10 10 GPIO_ACTIVE_HIGH>;
++		key-a {
++			linux,code = <KEY_A>;
++			label = "SW2";
++			wakeup-source;
++			debounce-interval = <20>;
++			gpios = <&gpio3 20 GPIO_ACTIVE_LOW>;
 +		};
-+		led18 {
-+			gpios = <&gpio10 11 GPIO_ACTIVE_HIGH>;
-+		};
-+		led19 {
-+			gpios = <&gpio10 12 GPIO_ACTIVE_HIGH>;
-+		};
-+		led20 {
-+			gpios = <&gpio10 23 GPIO_ACTIVE_HIGH>;
++		key-b {
++			linux,code = <KEY_B>;
++			label = "SW3";
++			wakeup-source;
++			debounce-interval = <20>;
++			gpios = <&gpio11 2 GPIO_ACTIVE_LOW>;
 +		};
 +	};
 +
