@@ -1,135 +1,48 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Sep 2016 09:49:49 +0200
-Subject: [PATCH 02/26] ARM: dts: alt: add SDHI0 and 1 support
-In-Reply-To: <cover.1473234371.git.horms+renesas@verge.net.au>
-References: <cover.1473234371.git.horms+renesas@verge.net.au>
-Message-ID: <2b41091b896bb99ec1da1ed30113603fc91b84d6.1473234371.git.horms+renesas@verge.net.au>
+From: jorik@kippendief.biz (jorik at kippendief.biz)
+Date: Wed,  7 Sep 2016 09:58:53 +0200
+Subject: [PATCH v4 0/8] dts: sun8i-h3: complete UART I2C definitions for H3
+Message-ID: <1473235141-12768-1-git-send-email-jorik@kippendief.biz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Alt board dependent part of the SDHI0 and 1
-device nodes along with the necessary voltage regulators.
+From: Jorik Jonker <jorik@kippendief.biz>
 
-Based on work by the original patch by Vladimir Barinov and
-Sergei Shtylyov for the Silk board.
+Of course, minutes after sending you notice a huge copy/paste error in
+the submitted patch. Mae culpa, and here is a new version.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7794-alt.dts | 81 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 81 insertions(+)
+This is my fourth attempt to complete the UART/I2C definitions on H3.
+Changes since v3:
+ * I was sloppy when I copy/pasted the i2c2 peripheral, so it had to
+   share clocks/resets and interrupts with i2c1. This is fixed now.
 
-diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
-index 1ad37d431a2a..fe7c128cc965 100644
---- a/arch/arm/boot/dts/r8a7794-alt.dts
-+++ b/arch/arm/boot/dts/r8a7794-alt.dts
-@@ -10,6 +10,7 @@
- 
- /dts-v1/;
- #include "r8a7794.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "Alt";
-@@ -29,6 +30,54 @@
- 		reg = <0 0x40000000 0 0x40000000>;
- 	};
- 
-+	vcc_sdhi0: regulator-vcc-sdhi0 {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "SDHI0 Vcc";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpio = <&gpio2 26 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	vccq_sdhi0: regulator-vccq-sdhi0 {
-+		compatible = "regulator-gpio";
-+
-+		regulator-name = "SDHI0 VccQ";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpios = <&gpio2 29 GPIO_ACTIVE_HIGH>;
-+		gpios-states = <1>;
-+		states = <3300000 1
-+			  1800000 0>;
-+	};
-+
-+	vcc_sdhi1: regulator-vcc-sdhi1 {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "SDHI1 Vcc";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpio = <&gpio4 26 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	vccq_sdhi1: regulator-vccq-sdhi1 {
-+		compatible = "regulator-gpio";
-+
-+		regulator-name = "SDHI1 VccQ";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpios = <&gpio4 29 GPIO_ACTIVE_HIGH>;
-+		gpios-states = <1>;
-+		states = <3300000 1
-+			  1800000 0>;
-+	};
-+
- 	lbsc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -140,6 +189,16 @@
- 		groups = "vin0_data8", "vin0_clk";
- 		function = "vin0";
- 	};
-+
-+	sdhi0_pins: sd0 {
-+		groups = "sdhi0_data4", "sdhi0_ctrl";
-+		function = "sdhi0";
-+	};
-+
-+	sdhi1_pins: sd1 {
-+		groups = "sdhi1_data4", "sdhi1_ctrl";
-+		function = "sdhi1";
-+	};
- };
- 
- &cmt0 {
-@@ -169,6 +228,28 @@
- 	};
- };
- 
-+&sdhi0 {
-+	pinctrl-0 = <&sdhi0_pins>;
-+	pinctrl-names = "default";
-+
-+	vmmc-supply = <&vcc_sdhi0>;
-+	vqmmc-supply = <&vccq_sdhi0>;
-+	cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
-+	wp-gpios = <&gpio6 7 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
-+&sdhi1 {
-+	pinctrl-0 = <&sdhi1_pins>;
-+	pinctrl-names = "default";
-+
-+	vmmc-supply = <&vcc_sdhi1>;
-+	vqmmc-supply = <&vccq_sdhi1>;
-+	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
-+	wp-gpios = <&gpio6 15 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
- &i2c1 {
- 	pinctrl-0 = <&i2c1_pins>;
- 	pinctrl-names = "default";
+Changes since v2:
+ * I have moved the pinmux/peripheral associations to the H3 DTSI file,
+   including already existing associations for UART0 and UART1.
+ * I have left out _a and @0 prefixes where there is only one option
+ * I have added i2c2, since it is there (although not exposed on my test
+   board)
+
+Best,
+
+Jorik
+
+
+Jorik Jonker (8):
+  dts: sun8i-h3: drop _a and address suffix from uart0 pinmux
+  dts: sun8i-h3: clarify uart1 pinmux definition name
+  dts: sun8i-h3: move uart0 pinmux/peripheral assocation to DSTI
+  dts: sun8i-h3: move uart1 pinmux/peripheral assocation to DSTI
+  dts: sun8i-h3: add pinmux definitions for UART2-3
+  dts: sun8i-h3: associate pinmux/peripherals for UART2-3
+  dts: sun8i-h3: add pinmux definitions for I2C0-2
+  dts: sun8i-h3: add I2C0-2 peripherals to H3 SOC
+
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts |  4 --
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts       |  2 -
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts     |  2 -
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts      |  2 -
+ arch/arm/boot/dts/sun8i-h3.dtsi                 | 86 ++++++++++++++++++++++++-
+ 5 files changed, 84 insertions(+), 12 deletions(-)
+
 -- 
-2.7.0.rc3.207.g0ac5344
+2.7.4
