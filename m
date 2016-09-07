@@ -1,33 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Sep 2016 09:44:37 +0100
-Subject: [PATCH v3 8/9] arm64: Refactor sysinstr exception handling
-In-Reply-To: <1473069509-2317-9-git-send-email-suzuki.poulose@arm.com>
-References: <1473069509-2317-1-git-send-email-suzuki.poulose@arm.com>
- <1473069509-2317-9-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160907084436.GD32499@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 07 Sep 2016 10:48:06 +0200
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <20160907063313.GA13903@b29397-desktop>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <5844875.KucAoPMrXi@wuerfel> <20160907063313.GA13903@b29397-desktop>
+Message-ID: <12021424.cItk3A7CfE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 05, 2016 at 10:58:28AM +0100, Suzuki K Poulose wrote:
-> Right now we trap some of the user space data cache operations
-> based on a few Errata (ARM 819472, 826319, 827319 and 824069).
-> We need to trap userspace access to CTR_EL0, if we detect mismatched
-> cache line size. Since both these traps share the EC, refactor
-> the handler a little bit to make it a bit more reader friendly.
+On Wednesday, September 7, 2016 2:33:13 PM CEST Peter Chen wrote:
+> > 
+> > Right, that should make it work with iommu as well. However, it does
+> > not solve the other issue I mentioned above, with boards that have
+> > USB devices hardwired to a chipidea host controller that need
+> > configuration from DT. For that, we still need to come up with another
+> > way to associate the DT hierarchy in the host bridge node with
+> > the Linux platform_device.
+> > 
 > 
-> Cc: Andre Przywara <andre.przywara@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/include/asm/esr.h | 76 ++++++++++++++++++++++++++++++++++++++------
->  arch/arm64/kernel/traps.c    | 73 +++++++++++++++++++++++++++---------------
->  2 files changed, 114 insertions(+), 35 deletions(-)
+> Why? The DMA configuration is for host controller, not for USB device.
+> No matter there is hardwired or hotplug devices, the DMA configuration
+> for host controller are both inherited from glue layer platform devices,
+> current implementation is at function ci_hdrc_add_device,
+> drivers/usb/chipidea/core.c.
 
-This looks fine to me, but I'd really like to see Andre's ack on the
-refactoring of the errata workarounds.
+I wasn't referring to DMA configuration there, but only to how we
+set the of_node pointer in register_root_hub, which you added in
+dc5878abf49 ("usb: core: move root hub's device node assignment after
+it is added to bus") as:
 
-Andre, can you take a look please?
+	usb_dev->dev.of_node = parent_dev->of_node;
 
-Will
+As I understand, parent_dev (aka hcd->self.controller) here
+refers to the device that you add in ci_hdrc_add_device(),
+which does not have an of_node pointer, so we actually
+want parent_dev->parent->of_node.
+
+I'm sure you understand that code better than me, so let me
+know what my mistake is if this indeed works correctly.
+
+
+
+Regarding the DMA configuration that you mention in ci_hdrc_add_device(),
+I think we should replace 
+
+        pdev->dev.dma_mask = dev->dma_mask;
+        pdev->dev.dma_parms = dev->dma_parms;
+        dma_set_coherent_mask(&pdev->dev, dev->coherent_dma_mask);
+
+with of_dma_configure(), which has the chance to configure more than
+just those three, as the dma API might look into different aspects:
+
+- iommu specific configuration
+- cache coherency information
+- bus type
+- dma offset
+- dma_map_ops pointer
+
+We try to handle everything in of_dma_configure() at configuration
+time, and that would be the place to add anything else that we might
+need in the future.
+
+	Arnd
