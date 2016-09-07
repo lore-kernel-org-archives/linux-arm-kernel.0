@@ -1,61 +1,63 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 7 Sep 2016 12:44:03 +0200
-Subject: [linux-sunxi] sunxi: Endless musb_bus_suspend warnings when
- booting A23 tablet with OTG
-In-Reply-To: <CAGb2v65Ar203_qc43jp-E+WjXROWTtM4rKKDemJ6DSi4pK7RrA@mail.gmail.com>
-References: <CAGb2v648CnhjvEtrxdXxRYFjW_Oe-Rqf3DkiHwNR9uWt7FC3hA@mail.gmail.com>
- <6a0822df-92bd-29dc-6eea-0a000baee666@redhat.com>
- <CAGb2v65Ar203_qc43jp-E+WjXROWTtM4rKKDemJ6DSi4pK7RrA@mail.gmail.com>
-Message-ID: <475d1d75-9dc9-c91e-04f1-3ce5dab60226@redhat.com>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Wed, 07 Sep 2016 13:47:22 +0300
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <75ca65eb-e8c4-bc3f-e00b-b0cba46d28c6@arm.com>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <5844875.KucAoPMrXi@wuerfel> <20160907063313.GA13903@b29397-desktop>
+ <12021424.cItk3A7CfE@wuerfel> <20160907095549.GD13903@b29397-desktop>
+ <75ca65eb-e8c4-bc3f-e00b-b0cba46d28c6@arm.com>
+Message-ID: <874m5skmv9.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+
 Hi,
 
-On 06-09-16 17:31, wens Tsai wrote:
-> On Tue, Sep 6, 2016 at 7:28 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->> On 06-09-16 13:02, wens Tsai wrote:
+Robin Murphy <robin.murphy@arm.com> writes:
+> On 07/09/16 10:55, Peter Chen wrote:
+> [...]
+>>> Regarding the DMA configuration that you mention in ci_hdrc_add_device(),
+>>> I think we should replace 
 >>>
->>> Hi Hans,
+>>>         pdev->dev.dma_mask = dev->dma_mask;
+>>>         pdev->dev.dma_parms = dev->dma_parms;
+>>>         dma_set_coherent_mask(&pdev->dev, dev->coherent_dma_mask);
 >>>
->>> I've built the latest sunxi-next branches of Linux and U-boot and
->>> tried it on my Q8 A23 tablet. My tablet has an OTG adapter with a
->>> USB ethernet adapter connected all the time. Upon booting into
->>> Linux I get an endless stream of:
+>>> with of_dma_configure(), which has the chance to configure more than
+>>> just those three, as the dma API might look into different aspects:
 >>>
->>>     musb_bus_suspend 2586: trying to suspend as a_wait_bcon while active
+>>> - iommu specific configuration
+>>> - cache coherency information
+>>> - bus type
+>>> - dma offset
+>>> - dma_map_ops pointer
 >>>
->>> messages. To get out of this I have to physically remove the OTG
->>> adapter. Booting without the OTG adapter to begin with also gets
->>> rid of the problem.
+>>> We try to handle everything in of_dma_configure() at configuration
+>>> time, and that would be the place to add anything else that we might
+>>> need in the future.
 >>>
->>> Have you run into this problem? I wonder if we should disable VBUS
->>> just before leaving U-boot? Now that we support DRIVEVBUS this
->>> shouldn't be a problem.
->>
->>
->> I've not seen such a problem. I'm fine with disabling Vbus when
->> leaving u-boot, that certainly is the safe thing to do anyways.
+>> 
+>> Yes, I agree with you, but just like Felipe mentioned, we also need to
+>> consider PCI device, can we do something like gpiod_get_index does? Are
+>> there any similar APIs like of_dma_configure for ACPI?
 >
-> Seems there's no distinction between "USB reset" and leaving
-> U-boot, as you mentioned in your patch removing the "power off"
-> code from the USB drivers. Are you OK with power cycling during
-> USB reset as well?
-
-I would prefer not too, but if it is hard to get around that
-I can live with it.
-
+> Not yet, but Lorenzo has one in progress[1], primarily for the sake of
+> abstracting away the IOMMU configuration.
 >
->> I guess I'll get a u-boot patch from you if that indeed fixes
->> things ?
+> Robin.
 >
-> Yup. In progress. Though my ethernet adapter is acting up, so I'll
-> need to swap in something else to test it properly.
+> [1]:http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1209911.html
 
-Cool.
+not exported for drivers to use. If Lorenzo is trying to making a
+matching API for ACPI systems, then it needs to follow what
+of_dma_configure() is doing, and add an EXPORT_SYMBOL_GPL()
 
-Thanks & Regards,
-
-Hans
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160907/7e2c94c2/attachment.sig>
