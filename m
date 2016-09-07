@@ -1,23 +1,32 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 6 Sep 2016 17:33:55 -0700
-Subject: [PATCH 1/7] clk: gxbb: expose USB clocks
-In-Reply-To: <20160904213152.25837-2-martin.blumenstingl@googlemail.com>
-References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
- <20160904213152.25837-2-martin.blumenstingl@googlemail.com>
-Message-ID: <20160907003355.GQ12510@codeaurora.org>
+Date: Tue, 6 Sep 2016 17:34:52 -0700
+Subject: [PATCH] clk: meson-gxbb: Export PWM related clocks for DT
+In-Reply-To: <57CACA00.9010306@baylibre.com>
+References: <1471870177-10609-1-git-send-email-narmstrong@baylibre.com>
+ <57CACA00.9010306@baylibre.com>
+Message-ID: <20160907003452.GR12510@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04, Martin Blumenstingl wrote:
-> USB0_DDR_BRIDGE and USB1_DDR_BRIDGE1 are needed for the related
-> dwc2 usb controller. USB, USB0 and USB1 are needed for the PHYs.
-> Expose these clocks to DT and comment out in clk driver.
+On 09/03, Neil Armstrong wrote:
 > 
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> 
+> Le 22/08/2016 14:49, Neil Armstrong a ?crit :
+> > Add the PWM related clocks in order to be referenced as PWM source
+> > clocks.
+> > 
+> > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> > ---
+> >  drivers/clk/meson/gxbb.h              | 6 +++---
+> >  include/dt-bindings/clock/gxbb-clkc.h | 3 +++
+> >  2 files changed, 6 insertions(+), 3 deletions(-)
+> 
+> Dear Clock Maintainers,
+> 
+> Could you review this patch since it is a strong requirement to select the PWM clock parents over DT ?
+> 
 
-Is authorship correct on this patch? Did Jerome author it
-instead?
+Looks fine to me. Did you want an ack or an immutable branch?
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
