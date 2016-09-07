@@ -1,34 +1,35 @@
-From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Wed,  7 Sep 2016 18:53:00 +0800
-Subject: [PATCH] drm/rockchip: add missing header dependencies
-Message-ID: <1473245580-538-1-git-send-email-baoyou.xie@linaro.org>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Wed, 07 Sep 2016 12:59:16 +0200
+Subject: [PATCH V3 RFT 3/5] ARM64: dts: bcm283x: Use dtsi for USB host mode
+In-Reply-To: <bb073ea3-2f89-4fc5-e3af-2e27c54f221e@i2se.com>
+References: <1471792204-21908-1-git-send-email-stefan.wahren@i2se.com>
+ <1471792204-21908-4-git-send-email-stefan.wahren@i2se.com>
+ <bb073ea3-2f89-4fc5-e3af-2e27c54f221e@i2se.com>
+Message-ID: <1473245956.28663.50.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We get 2 warnings when building kernel with W=1:
-drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c:130:5: warning: no previous prototype for 'rockchip_drm_fbdev_init' [-Wmissing-prototypes]
-drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c:173:6: warning: no previous prototype for 'rockchip_drm_fbdev_fini' [-Wmissing-prototypes]
+On Mi, 2016-08-31 at 09:59 +0200, Stefan Wahren wrote:
+> Hi Gerd,
+> 
+> Am 21.08.2016 um 17:10 schrieb Stefan Wahren:
+> > In case dr_mode isn't passed via DT, the dwc2 driver defaults
+> > to OTG mode. But the Raspberry Pi 3 is designed only for host mode.
+> > So fix this issue by linking to the dtsi file which set the dr_mode
+> > to host.
+> 
+> this patch is pending and the rest has been merged. Since i don't have a
+> RPi 3 it's only compile tested.
+> 
+> Could you please test it (requires patch 1 and 2 of this series) on your
+> RPi 3?
 
-In fact, these functions are declared
-in drivers/gpu/drm/rockchip/rockchip_drm_fbdev.h,
-so this patch adds missing header dependencies.
+Have a git tree to test?  Patch doesn't apply cleanly (using 4.8-rc5
+with eric's for-next branch which already has 1+2), seems to depend on
+more device tree changes.
 
-Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
----
- drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c | 1 +
- 1 file changed, 1 insertion(+)
+Also usb is working fine for me on the rpi3 even without this, so why is
+this needed?  Is dwc2 defaulting to otg mode a recent change?
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
-index 207e01d..a16c69f 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
-@@ -20,6 +20,7 @@
- #include "rockchip_drm_drv.h"
- #include "rockchip_drm_gem.h"
- #include "rockchip_drm_fb.h"
-+#include "rockchip_drm_fbdev.h"
- 
- #define PREFERRED_BPP		32
- #define to_drm_private(x) \
--- 
-2.7.4
+cheers,
+  Gerd
