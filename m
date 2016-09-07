@@ -1,57 +1,59 @@
-From: sugar.zhang@rock-chips.com (Sugar Zhang)
-Date: Wed,  7 Sep 2016 14:30:21 +0800
-Subject: [PATCH v3] ASoC: rockchip: spdif: restore register during
- runtime_suspend/resume cycle
-Message-ID: <1473229821-54139-1-git-send-email-sugar.zhang@rock-chips.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 7 Sep 2016 14:45:21 +0800
+Subject: [PATCH v2 4/7] clk: sunxi-ng: Add N-class clocks support
+In-Reply-To: <20160906121837.7517-5-maxime.ripard@free-electrons.com>
+References: <20160906121837.7517-1-maxime.ripard@free-electrons.com>
+ <20160906121837.7517-5-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v67tM_3Q81=Mb1Nf0cja+oxBjJi=6mhkkpnvRM2i0BAmiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-when step into runtime_suspend, spdif pd will be disabled and loss state.
-so need to restore register when runtime_resume.
+On Tue, Sep 6, 2016 at 8:18 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Add support for the class with a single factor, N, being a multiplier.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> ---
 
-Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
+[...]
 
----
+> diff --git a/drivers/clk/sunxi-ng/ccu_mult.c b/drivers/clk/sunxi-ng/ccu_mult.c
+> new file mode 100644
+> index 000000000000..119b190c0eb5
+> --- /dev/null
+> +++ b/drivers/clk/sunxi-ng/ccu_mult.c
 
-Changes in v3:
-- remove unneeded initialization
+[...]
 
-Changes in v2:
-- remove system suspend/resume and restore register
-  in runtime_suspend/resume per Doug Anderson's suggestion
+> +static int ccu_mult_set_rate(struct clk_hw *hw, unsigned long rate,
+> +                          unsigned long parent_rate)
+> +{
+> +       struct ccu_mult *cm = hw_to_ccu_mult(hw);
+> +       unsigned long flags;
+> +       unsigned int n;
+> +       u32 reg;
+> +
+> +       ccu_mux_helper_adjust_parent_for_prediv(&cm->common, &cm->mux, -1,
+> +                                               &parent_rate);
+> +
 
- sound/soc/rockchip/rockchip_spdif.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+Git complains about extra whitespace here.
+You can keep my ack after fixing it.
 
-diff --git a/sound/soc/rockchip/rockchip_spdif.c b/sound/soc/rockchip/rockchip_spdif.c
-index 4ca2657..fa8101d 100644
---- a/sound/soc/rockchip/rockchip_spdif.c
-+++ b/sound/soc/rockchip/rockchip_spdif.c
-@@ -65,6 +65,7 @@ static int __maybe_unused rk_spdif_runtime_suspend(struct device *dev)
- {
- 	struct rk_spdif_dev *spdif = dev_get_drvdata(dev);
- 
-+	regcache_cache_only(spdif->regmap, true);
- 	clk_disable_unprepare(spdif->mclk);
- 	clk_disable_unprepare(spdif->hclk);
- 
-@@ -88,7 +89,16 @@ static int __maybe_unused rk_spdif_runtime_resume(struct device *dev)
- 		return ret;
- 	}
- 
--	return 0;
-+	regcache_cache_only(spdif->regmap, false);
-+	regcache_mark_dirty(spdif->regmap);
-+
-+	ret = regcache_sync(spdif->regmap);
-+	if (ret) {
-+		clk_disable_unprepare(spdif->mclk);
-+		clk_disable_unprepare(spdif->hclk);
-+	}
-+
-+	return ret;
- }
- 
- static int rk_spdif_hw_params(struct snd_pcm_substream *substream,
--- 
-1.9.1
+ChenYu
+
+> +       ccu_mult_find_best(parent_rate, rate, 1 << cm->mult.width, &n);
+> +
+> +       spin_lock_irqsave(cm->common.lock, flags);
+> +
+> +       reg = readl(cm->common.base + cm->common.reg);
+> +       reg &= ~GENMASK(cm->mult.width + cm->mult.shift - 1, cm->mult.shift);
+> +
+> +       writel(reg | ((n - 1) << cm->mult.shift),
+> +              cm->common.base + cm->common.reg);
+> +
+> +       spin_unlock_irqrestore(cm->common.lock, flags);
+> +
+> +       return 0;
+> +}
