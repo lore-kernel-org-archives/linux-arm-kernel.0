@@ -1,34 +1,57 @@
-From: martin@sperl.org (Martin Sperl)
-Date: Wed, 7 Sep 2016 11:08:47 +0200
-Subject: [PATCH v3 0/4] clk: bcm2835: critical clocks and parent selection
-In-Reply-To: <1464807936-532-1-git-send-email-eric@anholt.net>
-References: <1464807936-532-1-git-send-email-eric@anholt.net>
-Message-ID: <69F741EC-D4BB-461E-B3BA-FEF73DA70F2E@sperl.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed,  7 Sep 2016 17:09:19 +0800
+Subject: [PATCH] simplefb: Disable and release clocks and regulators in
+ destroy callback
+Message-ID: <20160907090919.27187-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+simplefb gets unregister when a proper framebuffer driver comes in and
+kicks it out. However the claimed clocks and regulators stay enabled
+as they are only released in the platform device remove function, which
+in theory would never get called.
 
-> On 01.06.2016, at 21:05, Eric Anholt <eric@anholt.net> wrote:
-> 
-> I figured out another critical clock (patch 3), but didn't use the
-> CLK_IS_CRITICAL flag since I want to just protect whatever clock
-> happens to be the parent (there are #ifdefs in the firmware indicating
-> that they've experimented with using different clocks as the parent).
-> 
-> I think these fixes are all suitable for 4.7.
-> 
-> Eric Anholt (4):
->  clk: bcm2835: Mark the VPU clock as critical
->  clk: bcm2835: Mark GPIO clocks enabled at boot as critical
->  clk: bcm2835: Mark the CM SDRAM clock's parent as critical
->  clk: bcm2835: Skip PLLC clocks when deciding on a new clock parent
-> 
-> drivers/clk/bcm/clk-bcm2835.c | 63 +++++++++++++++++++++++++++++++++++++++++--
-> 1 file changed, 61 insertions(+), 2 deletions(-)
+Move the clock/regulator cleanup into the framebuffer destroy callback,
+which gets called as part of the framebuffer unregister process.
 
-Whole series:
-Acked-by: Martin Sperl <kernel@martin.sperl.org>
+Note this introduces asymmetry in how the resources are claimed and
+released.
 
-Note that these patches are also seeing more testing downstream in 4.7
-and there have been no hiccups seen either. Clock selection is working
-as expected for I2S as well.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/video/fbdev/simplefb.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
+index e9cf19977285..3620d10a0d00 100644
+--- a/drivers/video/fbdev/simplefb.c
++++ b/drivers/video/fbdev/simplefb.c
+@@ -74,8 +74,14 @@ static int simplefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+ 	return 0;
+ }
+ 
++struct simplefb_par;
++static void simplefb_clocks_destroy(struct simplefb_par *par);
++static void simplefb_regulators_destroy(struct simplefb_par *par);
++
+ static void simplefb_destroy(struct fb_info *info)
+ {
++	simplefb_regulators_destroy(info->par);
++	simplefb_clocks_destroy(info->par);
+ 	if (info->screen_base)
+ 		iounmap(info->screen_base);
+ }
+@@ -487,11 +493,8 @@ error_fb_release:
+ static int simplefb_remove(struct platform_device *pdev)
+ {
+ 	struct fb_info *info = platform_get_drvdata(pdev);
+-	struct simplefb_par *par = info->par;
+ 
+ 	unregister_framebuffer(info);
+-	simplefb_regulators_destroy(par);
+-	simplefb_clocks_destroy(par);
+ 	framebuffer_release(info);
+ 
+ 	return 0;
+-- 
+2.9.3
