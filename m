@@ -1,145 +1,107 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed,  7 Sep 2016 14:35:12 -0700
-Subject: [PATCH v4 15/22] usb: chipidea: msm: Mux over secondary phy at the
- right time
+Date: Wed,  7 Sep 2016 14:35:13 -0700
+Subject: [PATCH v4 16/22] usb: chipidea: msm: Restore wrapper settings after
+ reset
 In-Reply-To: <20160907213519.27340-1-stephen.boyd@linaro.org>
 References: <20160907213519.27340-1-stephen.boyd@linaro.org>
-Message-ID: <20160907213519.27340-16-stephen.boyd@linaro.org>
+Message-ID: <20160907213519.27340-17-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to pick the correct phy at runtime based on how the SoC
-has been wired onto the board. If the secondary phy is used, take
-it out of reset and mux over to it by writing into the TCSR
-register. Make sure to do this on reset too, because this
-register is reset to the default value (primary phy) after the
-RESET bit is set in USBCMD.
+When the RESET bit is set in the USBCMD register it resets quite
+a few of the wrapper's registers to their reset state. This
+includes the GENCONFIG and GENCONFIG2 registers. Currently this
+is done by the usb phy and ehci-msm drivers writing into the
+controller wrapper's MMIO address space. Let's consolidate the
+register writes into the wrapper driver instead so that we
+clearly split the wrapper from the phys.
 
 Acked-by: Peter Chen <peter.chen@nxp.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/usb/chipidea/ci_hdrc_msm.c | 62 ++++++++++++++++++++++++++++++++++++--
- 1 file changed, 60 insertions(+), 2 deletions(-)
+ drivers/usb/chipidea/ci_hdrc_msm.c | 39 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
 diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
-index 7e870a253f55..4b0aadc2be2f 100644
+index 4b0aadc2be2f..333817291798 100644
 --- a/drivers/usb/chipidea/ci_hdrc_msm.c
 +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
-@@ -8,29 +8,44 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
--#include <linux/usb/gadget.h>
- #include <linux/usb/chipidea.h>
- #include <linux/clk.h>
- #include <linux/reset.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/regmap.h>
-+#include <linux/io.h>
+@@ -14,11 +14,22 @@
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
+ #include <linux/io.h>
++#include <linux/extcon.h>
++#include <linux/of.h>
  
  #include "ci.h"
  
  #define HS_PHY_AHB_MODE			0x0098
  
-+/* Vendor base starts at 0x200 beyond CI base */
-+#define HS_PHY_SEC_CTRL			0x0078
-+#define HS_PHY_DIG_CLAMP_N		BIT(16)
++#define HS_PHY_GENCONFIG		0x009c
++#define HS_PHY_TXFIFO_IDLE_FORCE_DIS	BIT(4)
 +
- struct ci_hdrc_msm {
- 	struct platform_device *ci;
- 	struct clk *core_clk;
++#define HS_PHY_GENCONFIG_2		0x00a0
++#define HS_PHY_SESS_VLD_CTRL_EN		BIT(7)
++#define HS_PHY_ULPI_TX_PKT_EN_CLR_FIX	BIT(19)
++
++#define HSPHY_SESS_VLD_CTRL		BIT(25)
++
+ /* Vendor base starts at 0x200 beyond CI base */
+ #define HS_PHY_SEC_CTRL			0x0078
+ #define HS_PHY_DIG_CLAMP_N		BIT(16)
+@@ -29,6 +40,7 @@ struct ci_hdrc_msm {
  	struct clk *iface_clk;
  	struct clk *fs_clk;
-+	bool secondary_phy;
-+	void __iomem *base;
+ 	bool secondary_phy;
++	bool hsic;
+ 	void __iomem *base;
  };
  
- static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
- {
--	struct device *dev = ci->gadget.dev.parent;
-+	struct device *dev = ci->dev->parent;
-+	struct ci_hdrc_msm *msm_ci = dev_get_drvdata(dev);
+@@ -48,6 +60,24 @@ static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
  
- 	switch (event) {
- 	case CI_HDRC_CONTROLLER_RESET_EVENT:
- 		dev_dbg(dev, "CI_HDRC_CONTROLLER_RESET_EVENT received\n");
-+		if (msm_ci->secondary_phy) {
-+			u32 val = readl_relaxed(msm_ci->base + HS_PHY_SEC_CTRL);
-+			val |= HS_PHY_DIG_CLAMP_N;
-+			writel_relaxed(val, msm_ci->base + HS_PHY_SEC_CTRL);
-+		}
-+
  		/* use AHB transactor, allow posted data writes */
  		hw_write_id_reg(ci, HS_PHY_AHB_MODE, 0xffffffff, 0x8);
++
++		/* workaround for rx buffer collision issue */
++		hw_write_id_reg(ci, HS_PHY_GENCONFIG,
++				HS_PHY_TXFIFO_IDLE_FORCE_DIS, 0);
++
++		if (!msm_ci->hsic)
++			hw_write_id_reg(ci, HS_PHY_GENCONFIG_2,
++					HS_PHY_ULPI_TX_PKT_EN_CLR_FIX, 0);
++
++		if (!IS_ERR(ci->platdata->vbus_extcon.edev)) {
++			hw_write_id_reg(ci, HS_PHY_GENCONFIG_2,
++					HS_PHY_SESS_VLD_CTRL_EN,
++					HS_PHY_SESS_VLD_CTRL_EN);
++			hw_write(ci, OP_USBCMD, HSPHY_SESS_VLD_CTRL,
++				 HSPHY_SESS_VLD_CTRL);
++
++		}
++
  		usb_phy_init(ci->usb_phy);
-@@ -59,6 +74,39 @@ static struct ci_hdrc_platform_data ci_hdrc_msm_platdata = {
- 	.notify_event		= ci_hdrc_msm_notify_event,
- };
- 
-+static int ci_hdrc_msm_mux_phy(struct ci_hdrc_msm *ci,
-+			       struct platform_device *pdev)
-+{
-+	struct regmap *regmap;
-+	struct device *dev = &pdev->dev;
-+	struct of_phandle_args args;
-+	u32 val;
-+	int ret;
-+
-+	ret = of_parse_phandle_with_fixed_args(dev->of_node, "phy-select", 2, 0,
-+					       &args);
-+	if (ret)
-+		return 0;
-+
-+	regmap = syscon_node_to_regmap(args.np);
-+	of_node_put(args.np);
-+	if (IS_ERR(regmap))
-+		return PTR_ERR(regmap);
-+
-+	ret = regmap_write(regmap, args.args[0], args.args[1]);
-+	if (ret)
-+		return ret;
-+
-+	ci->secondary_phy = !!args.args[1];
-+	if (ci->secondary_phy) {
-+		val = readl_relaxed(ci->base + HS_PHY_SEC_CTRL);
-+		val |= HS_PHY_DIG_CLAMP_N;
-+		writel_relaxed(val, ci->base + HS_PHY_SEC_CTRL);
-+	}
-+
-+	return 0;
-+}
-+
- static int ci_hdrc_msm_probe(struct platform_device *pdev)
- {
- 	struct ci_hdrc_msm *ci;
-@@ -66,6 +114,7 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
- 	struct usb_phy *phy;
- 	struct clk *clk;
+ 		break;
+ 	case CI_HDRC_CONTROLLER_STOPPED_EVENT:
+@@ -116,6 +146,7 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
  	struct reset_control *reset;
-+	struct resource *res;
+ 	struct resource *res;
  	int ret;
++	struct device_node *ulpi_node, *phy_node;
  
  	dev_dbg(&pdev->dev, "ci_hdrc_msm_probe\n");
-@@ -105,6 +154,11 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
- 		ci->fs_clk = NULL;
- 	}
  
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	ci->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (!ci->base)
-+		return -ENOMEM;
-+
- 	ret = clk_prepare_enable(ci->fs_clk);
+@@ -181,6 +212,14 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
  	if (ret)
- 		return ret;
-@@ -123,6 +177,10 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_iface;
+ 		goto err_mux;
  
-+	ret = ci_hdrc_msm_mux_phy(ci, pdev);
-+	if (ret)
-+		goto err_mux;
++	ulpi_node = of_find_node_by_name(pdev->dev.of_node, "ulpi");
++	if (ulpi_node) {
++		phy_node = of_get_next_available_child(ulpi_node, NULL);
++		ci->hsic = of_device_is_compatible(phy_node, "qcom,usb-hsic-phy");
++		of_node_put(phy_node);
++	}
++	of_node_put(ulpi_node);
 +
  	plat_ci = ci_hdrc_add_device(&pdev->dev,
  				pdev->resource, pdev->num_resources,
