@@ -1,69 +1,91 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Sep 2016 09:49:54 +0200
-Subject: [PATCH 07/26] ARM: dts: blanche: add SDHI0 support
+Date: Wed,  7 Sep 2016 09:49:53 +0200
+Subject: [PATCH 06/26] ARM: dts: blanche: add support for general purpose
+ switches
 In-Reply-To: <cover.1473234371.git.horms+renesas@verge.net.au>
 References: <cover.1473234371.git.horms+renesas@verge.net.au>
-Message-ID: <eed3da2cf3897de7ed3e5e4ea3cd323946ca87e0.1473234371.git.horms+renesas@verge.net.au>
+Message-ID: <1c7f349a896330b05754fd63938c9b1218e35c73.1473234371.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Define the Blanche board dependent part of the SDHI0 (connected to the
-micro-SD slot) device node along with  the necessary voltage regulator.
+Add support  for the  general purpose  software switches  SW2 and tactile
+switches SW24/25 as a virtual keyboard (like it was done with the Lager/
+Koelsch boards).
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7792-blanche.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/r8a7792-blanche.dts | 49 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7792-blanche.dts b/arch/arm/boot/dts/r8a7792-blanche.dts
-index 808a6aab7e5e..436d44ea3c12 100644
+index eeffba870211..808a6aab7e5e 100644
 --- a/arch/arm/boot/dts/r8a7792-blanche.dts
 +++ b/arch/arm/boot/dts/r8a7792-blanche.dts
-@@ -103,6 +103,17 @@
- 			gpios = <&gpio11 2 GPIO_ACTIVE_LOW>;
- 		};
+@@ -11,6 +11,8 @@
+ 
+ /dts-v1/;
+ #include "r8a7792.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
+ 
+ / {
+ 	model = "Blanche";
+@@ -54,6 +56,53 @@
+ 		pinctrl-0 = <&lan89218_pins>;
+ 		pinctrl-names = "default";
  	};
 +
-+	vcc_sdhi0: regulator-vcc-sdhi0 {
-+		compatible = "regulator-fixed";
++	keyboard {
++		compatible = "gpio-keys";
 +
-+		regulator-name = "SDHI0 Vcc";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpio = <&gpio11 12 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
++		key-1 {
++			linux,code = <KEY_1>;
++			label = "SW2-1";
++			wakeup-source;
++			debounce-interval = <20>;
++			gpios = <&gpio3 10 GPIO_ACTIVE_LOW>;
++		};
++		key-2 {
++			linux,code = <KEY_2>;
++			label = "SW2-2";
++			wakeup-source;
++			debounce-interval = <20>;
++			gpios = <&gpio3 11 GPIO_ACTIVE_LOW>;
++		};
++		key-3 {
++			linux,code = <KEY_3>;
++			label = "SW2-3";
++			wakeup-source;
++			debounce-interval = <20>;
++			gpios = <&gpio3 12 GPIO_ACTIVE_LOW>;
++		};
++		key-4 {
++			linux,code = <KEY_4>;
++			label = "SW2-4";
++			wakeup-source;
++			debounce-interval = <20>;
++			gpios = <&gpio3 15 GPIO_ACTIVE_LOW>;
++		};
++		key-a {
++			linux,code = <KEY_A>;
++			label = "SW24";
++			wakeup-source;
++			debounce-interval = <20>;
++			gpios = <&gpio3 20 GPIO_ACTIVE_LOW>;
++		};
++		key-b {
++			linux,code = <KEY_B>;
++			label = "SW25";
++			wakeup-source;
++			debounce-interval = <20>;
++			gpios = <&gpio11 2 GPIO_ACTIVE_LOW>;
++		};
 +	};
  };
  
  &extal_clk {
-@@ -139,6 +150,11 @@
- 		groups = "can0_data", "can_clk";
- 		function = "can0";
- 	};
-+
-+	sdhi0_pins: sdhi0 {
-+		groups = "sdhi0_data4", "sdhi0_ctrl";
-+		function = "sdhi0";
-+	};
- };
- 
- &scif0 {
-@@ -161,3 +177,12 @@
- 
- 	status = "okay";
- };
-+
-+&sdhi0 {
-+	pinctrl-0 = <&sdhi0_pins>;
-+	pinctrl-names = "default";
-+
-+	vmmc-supply = <&vcc_sdhi0>;
-+	cd-gpios = <&gpio11 11 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
 -- 
 2.7.0.rc3.207.g0ac5344
