@@ -1,380 +1,69 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Wed, 7 Sep 2016 14:27:27 -0400
-Subject: [PATCH v10 5/5] drm/rockchip: Add dmc notifier in vop driver
-In-Reply-To: <CAGAzgsoqRBLk60cVLtX4vvy6_+xe8Yd31dye3ki8OhQ+jEms5g@mail.gmail.com>
-References: <1473051971-5500-1-git-send-email-hl@rock-chips.com>
- <1473051971-5500-6-git-send-email-hl@rock-chips.com>
- <CAOw6vb+N4ASTAu49VBPyOAUH=S4rrUBOgZOEP-RTvijEgeN7HA@mail.gmail.com>
- <57CF07C4.30508@rock-chips.com>
- <CAOw6vbL6AxWRm7kovjwstW+qCd_9Wta3H_gvZswjeqqq9g-P8w@mail.gmail.com>
- <57CF1282.3000607@rock-chips.com>
- <CAOw6vbLjmLi1a=VPAh0xmvWf8wZt=BBgc5LvSTFknpGMykR5qQ@mail.gmail.com>
- <CAGAzgsoqRBLk60cVLtX4vvy6_+xe8Yd31dye3ki8OhQ+jEms5g@mail.gmail.com>
-Message-ID: <CAOw6vb+HUef6aC9iipg_h-EMJD+_mRY_ce=7=yoWcGqcHBwC-Q@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 8 Sep 2016 02:37:36 +0800
+Subject: [PATCH 1/3] serial: mctrl_gpio: implement mctrl_gpio_use_rtscts
+In-Reply-To: <20160907161324.27774-1-richard.genoud@gmail.com>
+Message-ID: <201609080259.I6IbJUFg%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 7, 2016 at 2:07 PM, dbasehore . <dbasehore@chromium.org> wrote:
-> On Tue, Sep 6, 2016 at 12:07 PM, Sean Paul <seanpaul@google.com> wrote:
->> On Tue, Sep 6, 2016 at 3:01 PM, hl <hl@rock-chips.com> wrote:
->>> Hi
->>>
->>>
->>> On 2016?09?07? 02:55, Sean Paul wrote:
->>>>
->>>> On Tue, Sep 6, 2016 at 2:15 PM, hl <hl@rock-chips.com> wrote:
->>>>>
->>>>> Hi Sean,
->>>>>
->>>>>
->>>>> On 2016?09?07? 01:18, Sean Paul wrote:
->>>>>>
->>>>>> On Mon, Sep 5, 2016 at 1:06 AM, Lin Huang <hl@rock-chips.com> wrote:
->>>>>>>
->>>>>>> when in ddr frequency scaling process, vop can not do enable or
->>>>>>> disable operation, since in dcf we check vop clock to see whether
->>>>>>> vop work. If vop work, dcf do ddr frequency scaling when vop
->>>>>>> in vblank status, and we need to read vop register to check whether
->>>>>>> vop go into vblank status. If vop not work, dcf can do ddr frequency
->>>>>>> any time. So when do ddr frequency scaling, you disabled or enable
->>>>>>> vop, there may two bad thing happen: 1, the panel flicker(when vop from
->>>>>>> disable status change to enable). 2, kernel hang (when vop from enable
->>>>>>> status change to disable, dcf need to read vblank status, but if you
->>>>>>> disable
->>>>>>> vop clock, it can not get the status, it will lead soc dead) So we need
->>>>>>> register to devfreq notifier, and we can get the dmc status. Also, when
->>>>>>> there have two vop enabled, we need to disable dmc, since dcf only base
->>>>>>> on one vop vblank time, so the other panel will flicker when do ddr
->>>>>>> frequency scaling.
->>>>>>>
->>>>>>> Signed-off-by: Lin Huang <hl@rock-chips.com>
->>>>>>> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>>>>> ---
->>>>>>> Changes in v10:
->>>>>>> - None
->>>>>>>
->>>>>>> Changes in v9:
->>>>>>> - None
->>>>>>>
->>>>>>> Changes in v8:
->>>>>>> - None
->>>>>>>
->>>>>>> Changes in v7:
->>>>>>> - None
->>>>>>>
->>>>>>> Changes in v6:
->>>>>>> - fix a build error
->>>>>>>
->>>>>>> Changes in v5:
->>>>>>> - improve some nits
->>>>>>>
->>>>>>> Changes in v4:
->>>>>>> - register notifier to devfreq_register_notifier
->>>>>>> - use DEVFREQ_PRECHANGE and DEVFREQ_POSTCHANGE to get dmc status
->>>>>>> - when two vop enable, disable dmc
->>>>>>> - when two vop back to one vop, enable dmc
->>>>>>>
->>>>>>> Changes in v3:
->>>>>>> - when do vop eanble/disable, dmc will wait until it finish
->>>>>>>
->>>>>>> Changes in v2:
->>>>>>> - None
->>>>>>>
->>>>>>> Changes in v1:
->>>>>>> - use wait_event instead usleep
->>>>>>>
->>>>>>>    drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 116
->>>>>>> ++++++++++++++++++++++++++++
->>>>>>>    1 file changed, 116 insertions(+)
->>>>>>>
->>>>>>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->>>>>>> b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->>>>>>> index efbc41a..a73f3aa 100644
->>>>>>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->>>>>>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->>>>>>> @@ -19,6 +19,8 @@
->>>>>>>    #include <drm/drm_crtc_helper.h>
->>>>>>>    #include <drm/drm_plane_helper.h>
->>>>>>>
->>>>>>> +#include <linux/devfreq.h>
->>>>>>> +#include <linux/devfreq-event.h>
->>>>>>>    #include <linux/kernel.h>
->>>>>>>    #include <linux/module.h>
->>>>>>>    #include <linux/platform_device.h>
->>>>>>> @@ -118,6 +120,13 @@ struct vop {
->>>>>>>
->>>>>>>           const struct vop_data *data;
->>>>>>>
->>>>>>> +       struct devfreq *devfreq;
->>>>>>> +       struct devfreq_event_dev *devfreq_event_dev;
->>>>>>> +       struct notifier_block dmc_nb;
->>>>>>> +       int dmc_in_process;
->>>>>>> +       int vop_switch_status;
->>>>>>> +       wait_queue_head_t wait_dmc_queue;
->>>>>>> +       wait_queue_head_t wait_vop_switch_queue;
->>>>>>>           uint32_t *regsbak;
->>>>>>>           void __iomem *regs;
->>>>>>>
->>>>>>> @@ -428,11 +437,47 @@ static void vop_dsp_hold_valid_irq_disable(struct
->>>>>>> vop *vop)
->>>>>>>           spin_unlock_irqrestore(&vop->irq_lock, flags);
->>>>>>>    }
->>>>>>>
->>>>>>> +static int dmc_notify(struct notifier_block *nb, unsigned long event,
->>>>>>> +                     void *data)
->>>>>>> +{
->>>>>>> +       struct vop *vop = container_of(nb, struct vop, dmc_nb);
->>>>>>> +
->>>>>>> +       if (event == DEVFREQ_PRECHANGE) {
->>>>>>> +               /*
->>>>>>> +                * check if vop in enable or disable process,
->>>>>>> +                * if yes, wait until it finishes, use 200ms as
->>>>>>> +                * timeout.
->>>>>>> +                */
->>>>>>> +               if (!wait_event_timeout(vop->wait_vop_switch_queue,
->>>>>>> +                                       !vop->vop_switch_status, HZ /
->>>>>>> 5))
->>>>>>> +                       dev_warn(vop->dev,
->>>>>>> +                                "Timeout waiting for vop swtich
->>>>>>> status\n");
->>>>>>> +               vop->dmc_in_process = 1;
->>>>>>> +       } else if (event == DEVFREQ_POSTCHANGE) {
->>>>>>> +               vop->dmc_in_process = 0;
->>>>>>> +               wake_up(&vop->wait_dmc_queue);
->>>>>>> +       }
->>>>>>> +
->>>>>>> +       return NOTIFY_OK;
->>>>>>> +}
->>>>>>> +
->>>>>>>    static int vop_enable(struct drm_crtc *crtc)
->>>>>>>    {
->>>>>>>           struct vop *vop = to_vop(crtc);
->>>>>>> +       int num_enabled_crtc = 0;
->>>>>>>           int ret;
->>>>>>>
->>>>>>> +       /*
->>>>>>> +        * if in dmc scaling frequency process, wait until it finishes
->>>>>>> +        * use 200ms as timeout time.
->>>>>>> +        */
->>>>>>> +       if (!wait_event_timeout(vop->wait_dmc_queue,
->>>>>>> +                               !vop->dmc_in_process, HZ / 5))
->>>>>>> +               dev_warn(vop->dev,
->>>>>>> +                        "Timeout waiting for dmc when vop enable\n");
->>>>>>> +
->>>>>>
->>>>>>
->>>>>> This wait_event_timeout code is terribly racey (same goes above and
->>>>>> below).
->>>>>
->>>>>    No i use the vop_switch_status and dmc_in_progress to handle the vop
->>>>> and
->>>>> dmc racey,
->>>>
->>>>
->>>> So what happens if dmc_in_progress becomes 1 right here, or anywhere
->>>> during vop_enable()?
->>>
->>> In dmc_notify(), i will check the vop_switch_status, so in the vop_enable()
->>> and vop_crtc_disable(),
->>> the dmc_in_progress can not change value.
->>>
->>
->>
->> THREAD 1 - wait_event_timeout (vop_switch_status)
->> THREAD 2 - wait_event_timeout(wait_dmc_queue)
->> THREAD 2 - vop_switch_status = 1
->> THREAD 1 - dmc_in_progress = 1
->>
->> Sean
->>
->
-> I've thought about how to handle these timeout conditions, and it
-> might be best to get rid of them. These would actually be error
-> conditions, and we don't plan to hit them.
->
-> Also, if something goes wrong with DMC frequency transitions, we are
-> likely out of luck and going to panic anyways.
+Hi Richard,
 
-Yeah, I'm not sure if the timeouts are recoverable (makes sense that
-they're not), but this code has several different variations of the
-race I described above.
+[auto build test WARNING on abelloni/rtc-next]
+[also build test WARNING on v4.8-rc5 next-20160907]
+[cannot apply to tty/tty-testing]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
+[Check https://git-scm.com/docs/git-format-patch for more information]
 
-I'm working on something a little more buttoned down to hopefully sync
-things up better.
+url:    https://github.com/0day-ci/linux/commits/Richard-Genoud/serial-mctrl_gpio-implement-mctrl_gpio_use_rtscts/20160908-002703
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git rtc-next
+config: sh-titan_defconfig (attached as .config)
+compiler: sh4-linux-gnu-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=sh 
 
-Sean
+All warnings (new ones prefixed by >>):
 
+   In file included from drivers/tty/serial/sh-sci.c:60:0:
+   drivers/tty/serial/serial_mctrl_gpio.h: In function 'mctrl_gpio_use_rtscts':
+>> drivers/tty/serial/serial_mctrl_gpio.h:162:1: warning: no return statement in function returning non-void [-Wreturn-type]
+    }
+    ^
 
->
->>
->>>> Sean
->>>>
->>>>
->>>>
->>>>
->>>>>     I assume this can fix the racey now. I do not better a idea now.
->>>>>>
->>>>>>
->>>>>>
->>>>>>> +       vop->vop_switch_status = 1;
->>>>>>> +
->>>>>>>           ret = pm_runtime_get_sync(vop->dev);
->>>>>>>           if (ret < 0) {
->>>>>>>                   dev_err(vop->dev, "failed to get pm runtime: %d\n",
->>>>>>> ret);
->>>>>>> @@ -479,6 +524,21 @@ static int vop_enable(struct drm_crtc *crtc)
->>>>>>>
->>>>>>>           drm_crtc_vblank_on(crtc);
->>>>>>>
->>>>>>> +       vop->vop_switch_status = 0;
->>>>>>> +       wake_up(&vop->wait_vop_switch_queue);
->>>>>>> +
->>>>>>> +       /* check how many VOPs in use now */
->>>>>>> +       drm_for_each_crtc(crtc, vop->drm_dev) {
->>>>>>> +               if (crtc->state->enable)
->>>>>>
->>>>>> I think you really want to check active, instead of enable.
->>>>>
->>>>> Okay, i will check it, thanks.
->>>>>
->>>>>>> +                       num_enabled_crtc++;
->>>>>>> +       }
->>>>>>> +
->>>>>>> +       /* if enable two vop, need to disable dmc */
->>>>>>> +       if ((num_enabled_crtc > 1) && vop->devfreq) {
->>>>>>> +               if (vop->devfreq_event_dev)
->>>>>>> +
->>>>>>> devfreq_event_disable_edev(vop->devfreq_event_dev);
->>>>>>> +               devfreq_suspend_device(vop->devfreq);
->>>>>>> +       }
->>>>>>
->>>>>> This really feels like something that should be handled somewhere
->>>>>> else. I don't fully understand how this works, but it seems like this
->>>>>> dependency should be handled where it actually matters, rather than
->>>>>> building in a seemingly arbitrary restriction in the vop driver.
->>>>>>
->>>>>> Even if this is the best place for it, this needs to be refactored to
->>>>>> eliminate the races that exist now.
->>>>>>
->>>>>> Sean
->>>>>>
->>>>>>>           return 0;
->>>>>>>
->>>>>>>    err_disable_aclk:
->>>>>>> @@ -489,17 +549,31 @@ err_disable_hclk:
->>>>>>>           clk_disable(vop->hclk);
->>>>>>>    err_put_pm_runtime:
->>>>>>>           pm_runtime_put_sync(vop->dev);
->>>>>>> +       vop->vop_switch_status = 0;
->>>>>>> +       wake_up(&vop->wait_vop_switch_queue);
->>>>>>>           return ret;
->>>>>>>    }
->>>>>>>
->>>>>>>    static void vop_crtc_disable(struct drm_crtc *crtc)
->>>>>>>    {
->>>>>>>           struct vop *vop = to_vop(crtc);
->>>>>>> +       int num_enabled_crtc = 0;
->>>>>>>           int i;
->>>>>>>
->>>>>>>           WARN_ON(vop->event);
->>>>>>>
->>>>>>>           /*
->>>>>>> +        * if in dmc scaling frequency process, wait until it finish
->>>>>>> +        * use 200ms as timeout time.
->>>>>>> +        */
->>>>>>> +       if (!wait_event_timeout(vop->wait_dmc_queue,
->>>>>>> +                               !vop->dmc_in_process, HZ / 5))
->>>>>>> +               dev_warn(vop->dev,
->>>>>>> +                        "Timeout waiting for dmc when vop disable\n");
->>>>>>> +
->>>>>>> +       vop->vop_switch_status = 1;
->>>>>>> +
->>>>>>> +       /*
->>>>>>>            * We need to make sure that all windows are disabled before
->>>>>>> we
->>>>>>>            * disable that crtc. Otherwise we might try to scan from a
->>>>>>> destroyed
->>>>>>>            * buffer later.
->>>>>>> @@ -555,6 +629,24 @@ static void vop_crtc_disable(struct drm_crtc
->>>>>>> *crtc)
->>>>>>>                   spin_unlock_irq(&crtc->dev->event_lock);
->>>>>>>
->>>>>>>                   crtc->state->event = NULL;
->>>>>>> +
->>>>>>> +       vop->vop_switch_status = 0;
->>>>>>> +       wake_up(&vop->wait_vop_switch_queue);
->>>>>>> +
->>>>>>> +       /* check how many VOPs in use now */
->>>>>>> +       drm_for_each_crtc(crtc, vop->drm_dev) {
->>>>>>> +               if (crtc->state->enable)
->>>>>>> +                       num_enabled_crtc++;
->>>>>>> +       }
->>>>>>> +
->>>>>>> +       /*
->>>>>>> +        * if num_enabled_crtc = 1 now, it means 2 vop enabled
->>>>>>> +        * change to 1 vop enabled  need to enable dmc again.
->>>>>>> +        */
->>>>>>> +       if ((num_enabled_crtc == 1) && vop->devfreq) {
->>>>>>> +               if (vop->devfreq_event_dev)
->>>>>>> +
->>>>>>> devfreq_event_enable_edev(vop->devfreq_event_dev);
->>>>>>> +               devfreq_resume_device(vop->devfreq);
->>>>>>>           }
->>>>>>>    }
->>>>>>>
->>>>>>> @@ -1413,6 +1505,8 @@ static int vop_bind(struct device *dev, struct
->>>>>>> device *master, void *data)
->>>>>>>           struct drm_device *drm_dev = data;
->>>>>>>           struct vop *vop;
->>>>>>>           struct resource *res;
->>>>>>> +       struct devfreq *devfreq;
->>>>>>> +       struct devfreq_event_dev *event_dev;
->>>>>>>           size_t alloc_size;
->>>>>>>           int ret, irq;
->>>>>>>
->>>>>>> @@ -1474,6 +1568,28 @@ static int vop_bind(struct device *dev, struct
->>>>>>> device *master, void *data)
->>>>>>>                   return ret;
->>>>>>>
->>>>>>>           pm_runtime_enable(&pdev->dev);
->>>>>>> +
->>>>>>> +       init_waitqueue_head(&vop->wait_vop_switch_queue);
->>>>>>> +       vop->vop_switch_status = 0;
->>>>>>> +       init_waitqueue_head(&vop->wait_dmc_queue);
->>>>>>> +       vop->dmc_in_process = 0;
->>>>>>> +
->>>>>>> +       devfreq = devfreq_get_devfreq_by_phandle(dev, 0);
->>>>>>> +       if (IS_ERR(devfreq))
->>>>>>> +               goto out;
->>>>>>> +
->>>>>>> +       vop->devfreq = devfreq;
->>>>>>> +       vop->dmc_nb.notifier_call = dmc_notify;
->>>>>>> +       devfreq_register_notifier(vop->devfreq, &vop->dmc_nb,
->>>>>>> +                                 DEVFREQ_TRANSITION_NOTIFIER);
->>>>>>> +
->>>>>>> +       event_dev =
->>>>>>> devfreq_event_get_edev_by_phandle(vop->devfreq->dev.parent,
->>>>>>> +                                                     0);
->>>>>>> +       if (IS_ERR(event_dev))
->>>>>>> +               goto out;
->>>>>>> +
->>>>>>> +       vop->devfreq_event_dev = event_dev;
->>>>>>> +out:
->>>>>>>           return 0;
->>>>>>>    }
->>>>>>>
->>>>>>> --
->>>>>>> 2.6.6
->>>>>>>
->>>>>>
->>>>> --
->>>>> Lin Huang
->>>>>
->>>>>
->>>>
->>>>
->>>
->>> --
->>> Lin Huang
->>>
->>>
+vim +162 drivers/tty/serial/serial_mctrl_gpio.h
+
+   146	
+   147	static inline
+   148	void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
+   149	{
+   150	}
+   151	
+   152	static inline void mctrl_gpio_enable_ms(struct mctrl_gpios *gpios)
+   153	{
+   154	}
+   155	
+   156	static inline void mctrl_gpio_disable_ms(struct mctrl_gpios *gpios)
+   157	{
+   158	}
+   159	
+   160	static inline bool mctrl_gpio_use_rtscts(struct mctrl_gpios *gpios)
+   161	{
+ > 162	}
+   163	
+   164	#endif /* GPIOLIB */
+   165	
+   166	#endif
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 15819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/0ef0b669/attachment-0001.obj>
