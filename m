@@ -1,74 +1,67 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Sep 2016 09:49:50 +0200
-Subject: [PATCH 03/26] ARM: dts: alt: add MMCIF support
+Date: Wed,  7 Sep 2016 09:49:52 +0200
+Subject: [PATCH 05/26] ARM: dts: r8a7791: Remove obsolete vsp1 properties
 In-Reply-To: <cover.1473234371.git.horms+renesas@verge.net.au>
 References: <cover.1473234371.git.horms+renesas@verge.net.au>
-Message-ID: <e6ed3f533d54a92f8d67d301f9209ca64d593e03.1473234371.git.horms+renesas@verge.net.au>
+Message-ID: <17d9af9e069f2982f578c65e987df309d1736eb5.1473234371.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Alt board dependent part of the MMCIF device node.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Like the Silk the board has eMMC chip along with the  necessary voltage
-regulator (note that the Vcc/Vccq regulator is dummy -- it's required by
-the MMCIF driver but doesn't actually exist on the board).
+As of commit 5aa2eb3c86d4fd16 ("[media] v4l: vsp1: Configure device
+based on IP version"), the DT properties to identify the exact VSP
+device instance features are no longer used. Hence remove them.
 
-Based on work for the Silk board by Vladimir Barinov and Sergei Shtylyov.
-
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794-alt.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/r8a7791.dtsi | 18 ------------------
+ 1 file changed, 18 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
-index fe7c128cc965..8d1b35afaf82 100644
---- a/arch/arm/boot/dts/r8a7794-alt.dts
-+++ b/arch/arm/boot/dts/r8a7794-alt.dts
-@@ -30,6 +30,15 @@
- 		reg = <0 0x40000000 0 0x40000000>;
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 8f0086bbd96b..162b55c665a3 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -983,12 +983,6 @@
+ 		interrupts = <GIC_SPI 267 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp1_clks R8A7791_CLK_VSP1_S>;
+ 		power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
+-
+-		renesas,has-lut;
+-		renesas,has-sru;
+-		renesas,#rpf = <5>;
+-		renesas,#uds = <3>;
+-		renesas,#wpf = <4>;
  	};
  
-+	d3_3v: regulator-d3-3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "D3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
- 	vcc_sdhi0: regulator-vcc-sdhi0 {
- 		compatible = "regulator-fixed";
- 
-@@ -190,6 +199,11 @@
- 		function = "vin0";
+ 	vsp1 at fe930000 {
+@@ -997,12 +991,6 @@
+ 		interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp1_clks R8A7791_CLK_VSP1_DU0>;
+ 		power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
+-
+-		renesas,has-lif;
+-		renesas,has-lut;
+-		renesas,#rpf = <4>;
+-		renesas,#uds = <1>;
+-		renesas,#wpf = <4>;
  	};
  
-+	mmcif0_pins: mmcif0 {
-+		groups = "mmc_data8", "mmc_ctrl";
-+		function = "mmc";
-+	};
-+
- 	sdhi0_pins: sd0 {
- 		groups = "sdhi0_data4", "sdhi0_ctrl";
- 		function = "sdhi0";
-@@ -228,6 +242,17 @@
+ 	vsp1 at fe938000 {
+@@ -1011,12 +999,6 @@
+ 		interrupts = <GIC_SPI 247 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp1_clks R8A7791_CLK_VSP1_DU1>;
+ 		power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
+-
+-		renesas,has-lif;
+-		renesas,has-lut;
+-		renesas,#rpf = <4>;
+-		renesas,#uds = <1>;
+-		renesas,#wpf = <4>;
  	};
- };
  
-+&mmcif0 {
-+	pinctrl-0 = <&mmcif0_pins>;
-+	pinctrl-names = "default";
-+
-+	vmmc-supply = <&d3_3v>;
-+	vqmmc-supply = <&d3_3v>;
-+	bus-width = <8>;
-+	non-removable;
-+	status = "okay";
-+};
-+
- &sdhi0 {
- 	pinctrl-0 = <&sdhi0_pins>;
- 	pinctrl-names = "default";
+ 	du: display at feb00000 {
 -- 
 2.7.0.rc3.207.g0ac5344
