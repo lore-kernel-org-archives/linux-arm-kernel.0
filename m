@@ -1,111 +1,61 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 7 Sep 2016 11:36:37 +0100
-Subject: [PATCH v3 2/9] arm64: Use consistent naming for errata handling
-In-Reply-To: <1473069509-2317-3-git-send-email-suzuki.poulose@arm.com>
-References: <1473069509-2317-1-git-send-email-suzuki.poulose@arm.com>
- <1473069509-2317-3-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <67318cf8-36fd-bc0a-e15e-21c30d01dccf@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 7 Sep 2016 12:44:03 +0200
+Subject: [linux-sunxi] sunxi: Endless musb_bus_suspend warnings when
+ booting A23 tablet with OTG
+In-Reply-To: <CAGb2v65Ar203_qc43jp-E+WjXROWTtM4rKKDemJ6DSi4pK7RrA@mail.gmail.com>
+References: <CAGb2v648CnhjvEtrxdXxRYFjW_Oe-Rqf3DkiHwNR9uWt7FC3hA@mail.gmail.com>
+ <6a0822df-92bd-29dc-6eea-0a000baee666@redhat.com>
+ <CAGb2v65Ar203_qc43jp-E+WjXROWTtM4rKKDemJ6DSi4pK7RrA@mail.gmail.com>
+Message-ID: <475d1d75-9dc9-c91e-04f1-3ce5dab60226@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 05/09/16 10:58, Suzuki K Poulose wrote:
-> This is a cosmetic change to rename the functions dealing with
-> the errata work arounds to be more consistent with their naming.
-> 
-> 1) check_local_cpu_errata() => update_cpu_errata_workarounds()
-> check_local_cpu_errata() actually updates the system's errata work
-> arounds. So rename it to reflect the same.
+On 06-09-16 17:31, wens Tsai wrote:
+> On Tue, Sep 6, 2016 at 7:28 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi,
+>>
+>> On 06-09-16 13:02, wens Tsai wrote:
+>>>
+>>> Hi Hans,
+>>>
+>>> I've built the latest sunxi-next branches of Linux and U-boot and
+>>> tried it on my Q8 A23 tablet. My tablet has an OTG adapter with a
+>>> USB ethernet adapter connected all the time. Upon booting into
+>>> Linux I get an endless stream of:
+>>>
+>>>     musb_bus_suspend 2586: trying to suspend as a_wait_bcon while active
+>>>
+>>> messages. To get out of this I have to physically remove the OTG
+>>> adapter. Booting without the OTG adapter to begin with also gets
+>>> rid of the problem.
+>>>
+>>> Have you run into this problem? I wonder if we should disable VBUS
+>>> just before leaving U-boot? Now that we support DRIVEVBUS this
+>>> shouldn't be a problem.
+>>
+>>
+>> I've not seen such a problem. I'm fine with disabling Vbus when
+>> leaving u-boot, that certainly is the safe thing to do anyways.
+>
+> Seems there's no distinction between "USB reset" and leaving
+> U-boot, as you mentioned in your patch removing the "power off"
+> code from the USB drivers. Are you OK with power cycling during
+> USB reset as well?
 
-Which was a pretty obvious misnomer as its only action is to call
-update_cpu_capabilities() ;-)
+I would prefer not too, but if it is hard to get around that
+I can live with it.
 
-> 
-> 2) verify_local_cpu_errata() => verify_local_cpu_errata_workarounds()
-> Use errata_workarounds instead of _errata.
+>
+>> I guess I'll get a u-boot patch from you if that indeed fixes
+>> things ?
+>
+> Yup. In progress. Though my ethernet adapter is acting up, so I'll
+> need to swap in something else to test it properly.
 
-Yes, this makes sense.
+Cool.
 
-Acked-by: Andre Przywara <andre.przywara@arm.com>
+Thanks & Regards,
 
-Thanks!
-Andre.
-
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Andre Przywara <andre.przywara@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/include/asm/cpufeature.h | 4 ++--
->  arch/arm64/kernel/cpu_errata.c      | 4 ++--
->  arch/arm64/kernel/cpufeature.c      | 2 +-
->  arch/arm64/kernel/cpuinfo.c         | 2 +-
->  4 files changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index df47969..8289295 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -194,10 +194,10 @@ void __init setup_cpu_features(void);
->  void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
->  			    const char *info);
->  void enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps);
-> -void check_local_cpu_errata(void);
-> +void update_cpu_errata_workarounds(void);
->  void __init enable_errata_workarounds(void);
->  
-> -void verify_local_cpu_errata(void);
-> +void verify_local_cpu_errata_workarounds(void);
->  void verify_local_cpu_capabilities(void);
->  
->  u64 read_system_reg(u32 id);
-> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> index 82b0fc2..5836b3d 100644
-> --- a/arch/arm64/kernel/cpu_errata.c
-> +++ b/arch/arm64/kernel/cpu_errata.c
-> @@ -116,7 +116,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
->   * and the related information is freed soon after. If the new CPU requires
->   * an errata not detected at boot, fail this CPU.
->   */
-> -void verify_local_cpu_errata(void)
-> +void verify_local_cpu_errata_workarounds(void)
->  {
->  	const struct arm64_cpu_capabilities *caps = arm64_errata;
->  
-> @@ -131,7 +131,7 @@ void verify_local_cpu_errata(void)
->  		}
->  }
->  
-> -void check_local_cpu_errata(void)
-> +void update_cpu_errata_workarounds(void)
->  {
->  	update_cpu_capabilities(arm64_errata, "enabling workaround for");
->  }
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 4a19138d..643c856 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -1018,7 +1018,7 @@ void verify_local_cpu_capabilities(void)
->  	if (!sys_caps_initialised)
->  		return;
->  
-> -	verify_local_cpu_errata();
-> +	verify_local_cpu_errata_workarounds();
->  	verify_local_cpu_features(arm64_features);
->  	verify_local_elf_hwcaps(arm64_elf_hwcaps);
->  	if (system_supports_32bit_el0())
-> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> index ed1b84f..4fa7b73 100644
-> --- a/arch/arm64/kernel/cpuinfo.c
-> +++ b/arch/arm64/kernel/cpuinfo.c
-> @@ -364,7 +364,7 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
->  
->  	cpuinfo_detect_icache_policy(info);
->  
-> -	check_local_cpu_errata();
-> +	update_cpu_errata_workarounds();
->  }
->  
->  void cpuinfo_store_cpu(void)
-> 
+Hans
