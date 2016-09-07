@@ -1,57 +1,39 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed,  7 Sep 2016 22:09:57 +0200
-Subject: [PATCH resend fixes for 4.8 2/2] input: touchscreen: silead_gsl1680:
- Use "silead/" prefix for firmware loading
-In-Reply-To: <20160907200957.3341-1-hdegoede@redhat.com>
-References: <20160907200957.3341-1-hdegoede@redhat.com>
-Message-ID: <20160907200957.3341-3-hdegoede@redhat.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 07 Sep 2016 13:19:21 -0700
+Subject: [PATCH v3 0/4] pwm: Add Amlogic Meson SoC PWM Controller
+In-Reply-To: <1471880193-21879-1-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Mon, 22 Aug 2016 17:36:29 +0200")
+References: <1471880193-21879-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <7hshtbsbsm.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The silead touch-controller ICs use a different firmware per digitizer /
-tablet model. So there are going to be quite a few of then and they really
-should be under a separate subdir.
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-This commit prefixes the default firmware names with "silead/" just like
-we are already doing for devicetree specified firmware names.
+> Add support for the PWM controller found in Amlogic Meson SoCs.
+> This controller provides a dual PWM output with 4 selectable clock source
+> and a two level divider to achieve a better PWM range.
+>
+> Currently Meson8b and GXBB SoCs are supported.
+>
+> Changes since v2 at http://lkml.kernel.org/r/1471718083-11516-1-git-send-email-narmstrong at baylibre.com :
+> - Switch to apply() callback only, this fixes the setup sequence
+> - Implement get_state
+> - Make clock parent names as DT match data
+>
+> Changes since v1 at http://lkml.kernel.org/r/1466173784-15625-1-git-send-email-narmstrong at baylibre.com :
+> - fix meson8b dtsi
+>
+> Neil Armstrong (4):
+>   pwm: Add support for Meson PWM Controller
+>   dt-bindings: pwm: Add bindings for Meson PWM Controller
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/input/touchscreen/silead.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+Looks like Thierry has picked up these two into his for-4.9/drivers
+branch...
 
-diff --git a/drivers/input/touchscreen/silead.c b/drivers/input/touchscreen/silead.c
-index 7709f5b..c6a1ae9 100644
---- a/drivers/input/touchscreen/silead.c
-+++ b/drivers/input/touchscreen/silead.c
-@@ -414,14 +414,14 @@ static int silead_ts_set_default_fw_name(struct silead_ts_data *data,
- 		if (!acpi_id)
- 			return -ENODEV;
- 
--		snprintf(data->fw_name, sizeof(data->fw_name), "%s.fw",
--			acpi_id->id);
-+		snprintf(data->fw_name, sizeof(data->fw_name),
-+			 "silead/%s.fw", acpi_id->id);
- 
- 		for (i = 0; i < strlen(data->fw_name); i++)
- 			data->fw_name[i] = tolower(data->fw_name[i]);
- 	} else {
--		snprintf(data->fw_name, sizeof(data->fw_name), "%s.fw",
--			id->name);
-+		snprintf(data->fw_name, sizeof(data->fw_name),
-+			 "silead/%s.fw", id->name);
- 	}
- 
- 	return 0;
-@@ -430,7 +430,8 @@ static int silead_ts_set_default_fw_name(struct silead_ts_data *data,
- static int silead_ts_set_default_fw_name(struct silead_ts_data *data,
- 					 const struct i2c_device_id *id)
- {
--	snprintf(data->fw_name, sizeof(data->fw_name), "%s.fw", id->name);
-+	snprintf(data->fw_name, sizeof(data->fw_name),
-+		 "silead/%s.fw", id->name);
- 	return 0;
- }
- #endif
--- 
-2.9.3
+>   ARM64: dts: meson-gxbb: Add Meson GXBB PWM Controller nodes
+>   ARM: dts: meson8b: Add Meson8b PWM Controller nodes
+
+... so I've picked up these into the amlogic tree.
+
+Kevin
