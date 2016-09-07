@@ -1,55 +1,42 @@
 From: balbi@kernel.org (Felipe Balbi)
-Date: Wed, 07 Sep 2016 13:24:07 +0300
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <12021424.cItk3A7CfE@wuerfel>
-References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
- <5844875.KucAoPMrXi@wuerfel> <20160907063313.GA13903@b29397-desktop>
- <12021424.cItk3A7CfE@wuerfel>
-Message-ID: <87inu8kny0.fsf@linux.intel.com>
+Date: Wed, 07 Sep 2016 13:29:54 +0300
+Subject: [RFT PATCH v4 0/3] usb: dwc2: Fix core reset and force mode delays
+In-Reply-To: <110609329.215940.91637ce0-69a6-4591-a597-b694e410dfca.open-xchange@email.1und1.de>
+References: <cover.1472763969.git.johnyoun@synopsys.com>
+ <110609329.215940.91637ce0-69a6-4591-a597-b694e410dfca.open-xchange@email.1und1.de>
+Message-ID: <87d1kgknod.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Hi,
 
-Arnd Bergmann <arnd@arndb.de> writes:
-
-[...]
-
-> Regarding the DMA configuration that you mention in ci_hdrc_add_device(),
-> I think we should replace 
+Stefan Wahren <stefan.wahren@i2se.com> writes:
+> Hi John,
 >
->         pdev->dev.dma_mask = dev->dma_mask;
->         pdev->dev.dma_parms = dev->dma_parms;
->         dma_set_coherent_mask(&pdev->dev, dev->coherent_dma_mask);
+>> John Youn <johnyoun@synopsys.com> hat am 1. September 2016 um 23:07
+>> geschrieben:
+>> 
+>> 
+>> This series accounts for the delay from the IDDIG debounce filter when
+>> switching modes. This delay is a function of the PHY clock speed and
+>> can range from 5-50 ms. This delay must be taken into account on core
+>> reset and force modes. A full explanation is provided in the patch
+>> commit log and code comments.
+>> 
+>> This revision of the series increases the IDDIG delay to 100 ms. Some
+>> rockchip platforms seem to timeout even with 50 ms so I have doubled
+>> this.
+>> 
+>> Appreciate any testing on RK3188 and RPi platforms.
 >
-> with of_dma_configure(), which has the chance to configure more than
-> just those three, as the dma API might look into different aspects:
+> i tested the whole series successful with a Raspberry Pi B in dr_mode "host" and
+> "otg"
 >
-> - iommu specific configuration
-> - cache coherency information
-> - bus type
-> - dma offset
-> - dma_map_ops pointer
->
-> We try to handle everything in of_dma_configure() at configuration
-> time, and that would be the place to add anything else that we might
-> need in the future.
+> Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
 
-There are a couple problems with this:
-
-1) won't work for PCI-based systems.
-
-DWC3 is used in production PCI-based HW and also in Synopsys HAPS DX
-platform (FPGA that appears like a PCI card to host PC)
-
-
-2) not very robust solution
-
-of_dma_configure() will hardcode 32-bit DMA dmask for xhci-plat because
-that's not created by DT. The only reason why this works at all is
-because of the default 32-bit dma mask thing :-) So, how is it any
-different than copying 32-bit dma mask from parent?
+John, when you're happy with the series, please resend without RFT so I
+can apply :-)
 
 -- 
 balbi
@@ -59,4 +46,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 800 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160907/f2ae3b10/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160907/a3bc229d/attachment.sig>
