@@ -1,52 +1,68 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed,  7 Sep 2016 16:02:31 +0100
-Subject: [PATCH] arm64: Remove shadowed asm-generic headers
-Message-ID: <4c44ef91680ce29dd1c45ef8de846d94f197d381.1473260551.git.robin.murphy@arm.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 7 Sep 2016 10:04:37 -0500
+Subject: [PATCH v2 2/2] cpufreq: ti: Add cpufreq driver to determine
+ available OPPs at runtime
+In-Reply-To: <20160907052053.GO27345@vireshk-i7>
+References: <20160901025328.376-1-d-gerlach@ti.com>
+ <20160901025328.376-3-d-gerlach@ti.com> <20160907052053.GO27345@vireshk-i7>
+Message-ID: <57D02C85.7020300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've grown our own versions of bug.h, ftrace.h, pci.h and topology.h,
-so generating the generic ones as well is unnecessary and a potential
-source of build hiccups. At the very least, having them present has
-confused my source-indexing tool, and that simply will not do.
+On 09/07/2016 12:20 AM, Viresh Kumar wrote:
+> On 31-08-16, 21:53, Dave Gerlach wrote:
+>> Some TI SoCs, like those in the AM335x, AM437x, DRA7x, and AM57x families,
+>> have different OPPs available for the MPU depending on which specific
+>> variant of the SoC is in use. This can be determined through use of the
+>> revision and an eFuse register present in the silicon. Introduce a
+>> ti-cpufreq driver that can read the aformentioned values and provide
+>> them as version matching data to the opp framework. Through this the
+>> opp-supported-hw dt binding that is part of the operating-points-v2
+>> table can be used to indicate availability of OPPs for each device.
+>>
+>> This driver also creates the "cpufreq-dt" platform_device after passing
+>> the version matching data to the OPP framework so that the cpufreq-dt
+>> handles the actual cpufreq implementation. Even without the necessary
+>> data to pass the version matching data the driver will still create this
+>> device to maintain backwards compatibility with operating-points v1
+>> tables.
+>>
+>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>> ---
+>> v1->v2:
+>> 	- Convert to module_platform_driver to match against new compatibles
+>> 	  in patch 1
+>> 	- Cleaned up some bit shifts
+>> 	- of_property_read_u32_array used rather than reading values individually
+>>
+>>   drivers/cpufreq/Kconfig.arm  |  11 ++
+>>   drivers/cpufreq/Makefile     |   1 +
+>>   drivers/cpufreq/ti-cpufreq.c | 308 +++++++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 320 insertions(+)
+>>   create mode 100644 drivers/cpufreq/ti-cpufreq.c
+>
+> I am wondering if we should start writing OPP drivers instead. As this
+> patch doesn't have anything to do with cpufreq really :)
+>
+> But its fine for now..
+>
+>> +static const struct of_device_id ti_cpufreq_of_match[] = {
+>> +	{ .compatible = "operating-points-v2-ti-am3352-cpu",
+>> +	  .data = &am3x_soc_data, },
+>> +	{ .compatible = "operating-points-v2-ti-am4372-cpu",
+>> +	  .data = &am4x_soc_data, },
+>> +	{ .compatible = "operating-points-v2-ti-dra7-cpu",
+>> +	  .data = &dra7_soc_data },
+>
+> You should be using your SoC compatible strings here. OPP compatible
+> property isn't supposed to be (mis)used for this purpose.
+>
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- arch/arm64/include/asm/Kbuild | 4 ----
- 1 file changed, 4 deletions(-)
+Referring to my comments in patch 1, what if we end up changing the 
+bindings based on DT maintainer comments? We will have these compatible 
+strings, and at that point is it acceptable to match against them? Or is 
+it still better to match to SoC compatibles? I think it makes sense to 
+just probe against these.
 
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index f43d2c44c765..b7cc08abdb26 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -1,4 +1,3 @@
--generic-y += bug.h
- generic-y += bugs.h
- generic-y += clkdev.h
- generic-y += cputime.h
-@@ -10,7 +9,6 @@ generic-y += dma-contiguous.h
- generic-y += early_ioremap.h
- generic-y += emergency-restart.h
- generic-y += errno.h
--generic-y += ftrace.h
- generic-y += hw_irq.h
- generic-y += ioctl.h
- generic-y += ioctls.h
-@@ -27,7 +25,6 @@ generic-y += mman.h
- generic-y += msgbuf.h
- generic-y += msi.h
- generic-y += mutex.h
--generic-y += pci.h
- generic-y += poll.h
- generic-y += preempt.h
- generic-y += resource.h
-@@ -45,7 +42,6 @@ generic-y += swab.h
- generic-y += switch_to.h
- generic-y += termbits.h
- generic-y += termios.h
--generic-y += topology.h
- generic-y += trace_clock.h
- generic-y += types.h
- generic-y += unaligned.h
--- 
-2.8.1.dirty
+Regards,
+Dave
