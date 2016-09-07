@@ -1,342 +1,86 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed,  7 Sep 2016 10:55:41 +0100
-Subject: [PATCH v6.1] iommu/dma: Add support for mapping MSIs
-In-Reply-To: <2da5fca62886afd46cd2a5f7da1da872ee4a833d.1473173789.git.robin.murphy@arm.com>
-References: <cover.1473173789.git.robin.murphy@arm.com>
- <2da5fca62886afd46cd2a5f7da1da872ee4a833d.1473173789.git.robin.murphy@arm.com>
-Message-ID: <33fb440d91a5fe8c3e7dc8a5e12d83a5253911dd.1473242018.git.robin.murphy@arm.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Wed, 7 Sep 2016 17:55:49 +0800
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <12021424.cItk3A7CfE@wuerfel>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <5844875.KucAoPMrXi@wuerfel>
+ <20160907063313.GA13903@b29397-desktop>
+ <12021424.cItk3A7CfE@wuerfel>
+Message-ID: <20160907095549.GD13903@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an MSI doorbell is located downstream of an IOMMU, attaching
-devices to a DMA ops domain and switching on translation leads to a rude
-shock when their attempt to write to the physical address returned by
-the irqchip driver faults (or worse, writes into some already-mapped
-buffer) and no interrupt is forthcoming.
+On Wed, Sep 07, 2016 at 10:48:06AM +0200, Arnd Bergmann wrote:
+> On Wednesday, September 7, 2016 2:33:13 PM CEST Peter Chen wrote:
+> > > 
+> > > Right, that should make it work with iommu as well. However, it does
+> > > not solve the other issue I mentioned above, with boards that have
+> > > USB devices hardwired to a chipidea host controller that need
+> > > configuration from DT. For that, we still need to come up with another
+> > > way to associate the DT hierarchy in the host bridge node with
+> > > the Linux platform_device.
+> > > 
+> > 
+> > Why? The DMA configuration is for host controller, not for USB device.
+> > No matter there is hardwired or hotplug devices, the DMA configuration
+> > for host controller are both inherited from glue layer platform devices,
+> > current implementation is at function ci_hdrc_add_device,
+> > drivers/usb/chipidea/core.c.
+> 
+> I wasn't referring to DMA configuration there, but only to how we
+> set the of_node pointer in register_root_hub, which you added in
+> dc5878abf49 ("usb: core: move root hub's device node assignment after
+> it is added to bus") as:
+> 
+> 	usb_dev->dev.of_node = parent_dev->of_node;
+> 
+> As I understand, parent_dev (aka hcd->self.controller) here
+> refers to the device that you add in ci_hdrc_add_device(),
+> which does not have an of_node pointer, so we actually
+> want parent_dev->parent->of_node.
 
-Address this by adding a hook for relevant irqchip drivers to call from
-their compose_msi_msg() callback, to swizzle the physical address with
-an appropriatly-mapped IOVA for any device attached to one of our DMA
-ops domains.
+For platform devices, like chipidea and dwc3, it is correct, since
+they don't have of_node. If the host controller has of_node, it
+is controller's of_node. In order to let USB HCD core life be easy,
+we need to let hcd->self.controller own of_node when it is added
+to HCD core, no matter it has from the dts or get it dynamically.
 
-CC: Thomas Gleixner <tglx@linutronix.de>
-CC: Jason Cooper <jason@lakedaemon.net>
-CC: Marc Zyngier <marc.zyngier@arm.com>
-CC: linux-kernel at vger.kernel.org
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> 
+> I'm sure you understand that code better than me, so let me
+> know what my mistake is if this indeed works correctly.
+> 
 
----
+Your understanding is correct, just some have of_node from dts, some
+(chipidea/dwc3) need to have assignment at its driver.
 
-- Rework map_page() helper function plus insane lookup logic into
-  straightforward get_page() helper
-- Use phys_addr_t to further simplify address matching
-- Fix the bit where I neglected to actually round the doorbell
-  address to a page boundary (oops!)
-- Make the locking hardirq-safe to satisfy lockdep
----
- drivers/iommu/dma-iommu.c        | 136 ++++++++++++++++++++++++++++++++++-----
- drivers/irqchip/irq-gic-v2m.c    |   3 +
- drivers/irqchip/irq-gic-v3-its.c |   3 +
- include/linux/dma-iommu.h        |   9 +++
- 4 files changed, 136 insertions(+), 15 deletions(-)
+> 
+> 
+> Regarding the DMA configuration that you mention in ci_hdrc_add_device(),
+> I think we should replace 
+> 
+>         pdev->dev.dma_mask = dev->dma_mask;
+>         pdev->dev.dma_parms = dev->dma_parms;
+>         dma_set_coherent_mask(&pdev->dev, dev->coherent_dma_mask);
+> 
+> with of_dma_configure(), which has the chance to configure more than
+> just those three, as the dma API might look into different aspects:
+> 
+> - iommu specific configuration
+> - cache coherency information
+> - bus type
+> - dma offset
+> - dma_map_ops pointer
+> 
+> We try to handle everything in of_dma_configure() at configuration
+> time, and that would be the place to add anything else that we might
+> need in the future.
+> 
 
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index 00c8a08d56e7..4329d18080cf 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -25,10 +25,28 @@
- #include <linux/huge_mm.h>
- #include <linux/iommu.h>
- #include <linux/iova.h>
-+#include <linux/irq.h>
- #include <linux/mm.h>
- #include <linux/scatterlist.h>
- #include <linux/vmalloc.h>
- 
-+struct iommu_dma_msi_page {
-+	struct list_head	list;
-+	dma_addr_t		iova;
-+	phys_addr_t		phys;
-+};
-+
-+struct iommu_dma_cookie {
-+	struct iova_domain	iovad;
-+	struct list_head	msi_page_list;
-+	spinlock_t		msi_lock;
-+};
-+
-+static inline struct iova_domain *cookie_iovad(struct iommu_domain *domain)
-+{
-+	return &((struct iommu_dma_cookie *)domain->iova_cookie)->iovad;
-+}
-+
- int iommu_dma_init(void)
- {
- 	return iova_cache_get();
-@@ -43,15 +61,19 @@ int iommu_dma_init(void)
-  */
- int iommu_get_dma_cookie(struct iommu_domain *domain)
- {
--	struct iova_domain *iovad;
-+	struct iommu_dma_cookie *cookie;
- 
- 	if (domain->iova_cookie)
- 		return -EEXIST;
- 
--	iovad = kzalloc(sizeof(*iovad), GFP_KERNEL);
--	domain->iova_cookie = iovad;
-+	cookie = kzalloc(sizeof(*cookie), GFP_KERNEL);
-+	if (!cookie)
-+		return -ENOMEM;
- 
--	return iovad ? 0 : -ENOMEM;
-+	spin_lock_init(&cookie->msi_lock);
-+	INIT_LIST_HEAD(&cookie->msi_page_list);
-+	domain->iova_cookie = cookie;
-+	return 0;
- }
- EXPORT_SYMBOL(iommu_get_dma_cookie);
- 
-@@ -63,14 +85,20 @@ EXPORT_SYMBOL(iommu_get_dma_cookie);
-  */
- void iommu_put_dma_cookie(struct iommu_domain *domain)
- {
--	struct iova_domain *iovad = domain->iova_cookie;
-+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
-+	struct iommu_dma_msi_page *msi, *tmp;
- 
--	if (!iovad)
-+	if (!cookie)
- 		return;
- 
--	if (iovad->granule)
--		put_iova_domain(iovad);
--	kfree(iovad);
-+	if (cookie->iovad.granule)
-+		put_iova_domain(&cookie->iovad);
-+
-+	list_for_each_entry_safe(msi, tmp, &cookie->msi_page_list, list) {
-+		list_del(&msi->list);
-+		kfree(msi);
-+	}
-+	kfree(cookie);
- 	domain->iova_cookie = NULL;
- }
- EXPORT_SYMBOL(iommu_put_dma_cookie);
-@@ -88,7 +116,7 @@ EXPORT_SYMBOL(iommu_put_dma_cookie);
-  */
- int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base, u64 size)
- {
--	struct iova_domain *iovad = domain->iova_cookie;
-+	struct iova_domain *iovad = cookie_iovad(domain);
- 	unsigned long order, base_pfn, end_pfn;
- 
- 	if (!iovad)
-@@ -155,7 +183,7 @@ int dma_direction_to_prot(enum dma_data_direction dir, bool coherent)
- static struct iova *__alloc_iova(struct iommu_domain *domain, size_t size,
- 		dma_addr_t dma_limit)
- {
--	struct iova_domain *iovad = domain->iova_cookie;
-+	struct iova_domain *iovad = cookie_iovad(domain);
- 	unsigned long shift = iova_shift(iovad);
- 	unsigned long length = iova_align(iovad, size) >> shift;
- 
-@@ -171,7 +199,7 @@ static struct iova *__alloc_iova(struct iommu_domain *domain, size_t size,
- /* The IOVA allocator knows what we mapped, so just unmap whatever that was */
- static void __iommu_dma_unmap(struct iommu_domain *domain, dma_addr_t dma_addr)
- {
--	struct iova_domain *iovad = domain->iova_cookie;
-+	struct iova_domain *iovad = cookie_iovad(domain);
- 	unsigned long shift = iova_shift(iovad);
- 	unsigned long pfn = dma_addr >> shift;
- 	struct iova *iova = find_iova(iovad, pfn);
-@@ -294,7 +322,7 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
- 		void (*flush_page)(struct device *, const void *, phys_addr_t))
- {
- 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
--	struct iova_domain *iovad = domain->iova_cookie;
-+	struct iova_domain *iovad = cookie_iovad(domain);
- 	struct iova *iova;
- 	struct page **pages;
- 	struct sg_table sgt;
-@@ -386,7 +414,7 @@ dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
- {
- 	dma_addr_t dma_addr;
- 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
--	struct iova_domain *iovad = domain->iova_cookie;
-+	struct iova_domain *iovad = cookie_iovad(domain);
- 	phys_addr_t phys = page_to_phys(page) + offset;
- 	size_t iova_off = iova_offset(iovad, phys);
- 	size_t len = iova_align(iovad, size + iova_off);
-@@ -495,7 +523,7 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
- 		int nents, int prot)
- {
- 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
--	struct iova_domain *iovad = domain->iova_cookie;
-+	struct iova_domain *iovad = cookie_iovad(domain);
- 	struct iova *iova;
- 	struct scatterlist *s, *prev = NULL;
- 	dma_addr_t dma_addr;
-@@ -587,3 +615,81 @@ int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
- {
- 	return dma_addr == DMA_ERROR_CODE;
- }
-+
-+static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
-+		phys_addr_t msi_addr, struct iommu_domain *domain)
-+{
-+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
-+	struct iommu_dma_msi_page *msi_page;
-+	struct iova_domain *iovad = &cookie->iovad;
-+	struct iova *iova;
-+	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-+
-+	msi_addr &= ~(phys_addr_t)iova_mask(iovad);
-+	list_for_each_entry(msi_page, &cookie->msi_page_list, list)
-+		if (msi_page->phys == msi_addr)
-+			return msi_page;
-+
-+	msi_page = kzalloc(sizeof(*msi_page), GFP_ATOMIC);
-+	if (!msi_page)
-+		return NULL;
-+
-+	iova = __alloc_iova(domain, iovad->granule, dma_get_mask(dev));
-+	if (!iova)
-+		goto out_free_page;
-+
-+	msi_page->phys = msi_addr;
-+	msi_page->iova = iova_dma_addr(iovad, iova);
-+	if (iommu_map(domain, msi_page->iova, msi_addr, iovad->granule, prot))
-+		goto out_free_iova;
-+
-+	INIT_LIST_HEAD(&msi_page->list);
-+	list_add(&msi_page->list, &cookie->msi_page_list);
-+	return msi_page;
-+
-+out_free_iova:
-+	__free_iova(iovad, iova);
-+out_free_page:
-+	kfree(msi_page);
-+	return NULL;
-+}
-+
-+void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg)
-+{
-+	struct device *dev = msi_desc_to_dev(irq_get_msi_desc(irq));
-+	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
-+	struct iommu_dma_cookie *cookie;
-+	struct iommu_dma_msi_page *msi_page;
-+	phys_addr_t msi_addr = (u64)msg->address_hi << 32 | msg->address_lo;
-+	unsigned long flags;
-+
-+	if (!domain || !domain->iova_cookie)
-+		return;
-+
-+	cookie = domain->iova_cookie;
-+
-+	/*
-+	 * We disable IRQs to rule out a possible inversion against
-+	 * irq_desc_lock if, say, someone tries to retarget the affinity
-+	 * of an MSI from within an IPI handler.
-+	 */
-+	spin_lock_irqsave(&cookie->msi_lock, flags);
-+	msi_page = iommu_dma_get_msi_page(dev, msi_addr, domain);
-+	spin_unlock_irqrestore(&cookie->msi_lock, flags);
-+
-+	if (WARN_ON(!msi_page)) {
-+		/*
-+		 * We're called from a void callback, so the best we can do is
-+		 * 'fail' by filling the message with obviously bogus values.
-+		 * Since we got this far due to an IOMMU being present, it's
-+		 * not like the existing address would have worked anyway...
-+		 */
-+		msg->address_hi = ~0U;
-+		msg->address_lo = ~0U;
-+		msg->data = ~0U;
-+	} else {
-+		msg->address_hi = upper_32_bits(msi_page->iova);
-+		msg->address_lo &= iova_mask(&cookie->iovad);
-+		msg->address_lo += lower_32_bits(msi_page->iova);
-+	}
-+}
-diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-index 35eb7ac5d21f..863e073c6f7f 100644
---- a/drivers/irqchip/irq-gic-v2m.c
-+++ b/drivers/irqchip/irq-gic-v2m.c
-@@ -16,6 +16,7 @@
- #define pr_fmt(fmt) "GICv2m: " fmt
- 
- #include <linux/acpi.h>
-+#include <linux/dma-iommu.h>
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
- #include <linux/kernel.h>
-@@ -108,6 +109,8 @@ static void gicv2m_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
- 
- 	if (v2m->flags & GICV2M_NEEDS_SPI_OFFSET)
- 		msg->data -= v2m->spi_offset;
-+
-+	iommu_dma_map_msi_msg(data->irq, msg);
- }
- 
- static struct irq_chip gicv2m_irq_chip = {
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 36b9c28a5c91..98ff669d5962 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -18,6 +18,7 @@
- #include <linux/bitmap.h>
- #include <linux/cpu.h>
- #include <linux/delay.h>
-+#include <linux/dma-iommu.h>
- #include <linux/interrupt.h>
- #include <linux/log2.h>
- #include <linux/mm.h>
-@@ -655,6 +656,8 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
- 	msg->address_lo		= addr & ((1UL << 32) - 1);
- 	msg->address_hi		= addr >> 32;
- 	msg->data		= its_get_event_id(d);
-+
-+	iommu_dma_map_msi_msg(d->irq, msg);
- }
- 
- static struct irq_chip its_irq_chip = {
-diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
-index 81c5c8d167ad..5ee806e41b5c 100644
---- a/include/linux/dma-iommu.h
-+++ b/include/linux/dma-iommu.h
-@@ -21,6 +21,7 @@
- 
- #ifdef CONFIG_IOMMU_DMA
- #include <linux/iommu.h>
-+#include <linux/msi.h>
- 
- int iommu_dma_init(void);
- 
-@@ -62,9 +63,13 @@ void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
- int iommu_dma_supported(struct device *dev, u64 mask);
- int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr);
- 
-+/* The DMA API isn't _quite_ the whole story, though... */
-+void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg);
-+
- #else
- 
- struct iommu_domain;
-+struct msi_msg;
- 
- static inline int iommu_dma_init(void)
- {
-@@ -80,6 +85,10 @@ static inline void iommu_put_dma_cookie(struct iommu_domain *domain)
- {
- }
- 
-+static inline void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg)
-+{
-+}
-+
- #endif	/* CONFIG_IOMMU_DMA */
- #endif	/* __KERNEL__ */
- #endif	/* __DMA_IOMMU_H */
+Yes, I agree with you, but just like Felipe mentioned, we also need to
+consider PCI device, can we do something like gpiod_get_index does? Are
+there any similar APIs like of_dma_configure for ACPI?
+
 -- 
-2.8.1.dirty
+
+Best Regards,
+Peter Chen
