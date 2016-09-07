@@ -1,77 +1,92 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Sep 2016 09:50:09 +0200
-Subject: [PATCH 22/26] ARM: dts: wheat: add SDHI0 support
-In-Reply-To: <cover.1473234371.git.horms+renesas@verge.net.au>
-References: <cover.1473234371.git.horms+renesas@verge.net.au>
-Message-ID: <0c157ad23bb02fbda8b9cee82941d7c5ecac26f1.1473234372.git.horms+renesas@verge.net.au>
+From: jorik@kippendief.biz (jorik at kippendief.biz)
+Date: Wed,  7 Sep 2016 09:58:56 +0200
+Subject: [PATCH v4 3/8] dts: sun8i-h3: move uart0 pinmux/peripheral assocation
+ to DSTI
+In-Reply-To: <1473235141-12768-1-git-send-email-jorik@kippendief.biz>
+References: <1473235141-12768-1-git-send-email-jorik@kippendief.biz>
+Message-ID: <1473235141-12768-4-git-send-email-jorik@kippendief.biz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Jorik Jonker <jorik@kippendief.biz>
 
-Define the Wheat board dependent  part of  the SDHI0 (connected to the
-micro-SD slot)  device node along with the necessary voltage regulator.
+This is the only sensible pinmux/peripheral association for uart0, so I have
+moved it from the board specific DTS to the DTSI. It is still up to the boards
+to enable it, though.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
 ---
- arch/arm/boot/dts/r8a7792-wheat.dts | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts | 2 --
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts       | 2 --
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts     | 2 --
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts      | 2 --
+ arch/arm/boot/dts/sun8i-h3.dtsi                 | 2 ++
+ 5 files changed, 2 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7792-wheat.dts b/arch/arm/boot/dts/r8a7792-wheat.dts
-index 65d13c83d424..ff37de35c57c 100644
---- a/arch/arm/boot/dts/r8a7792-wheat.dts
-+++ b/arch/arm/boot/dts/r8a7792-wheat.dts
-@@ -11,6 +11,7 @@
- 
- /dts-v1/;
- #include "r8a7792.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "Wheat";
-@@ -54,6 +55,17 @@
- 		pinctrl-0 = <&lan89218_pins>;
- 		pinctrl-names = "default";
- 	};
-+
-+	vcc_sdhi0: regulator-vcc-sdhi0 {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "SDHI0 Vcc";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpio = <&gpio11 12 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
+diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+index 45f623b..c874270 100644
+--- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+@@ -178,8 +178,6 @@
  };
  
- &extal_clk {
-@@ -86,6 +98,11 @@
- 		groups = "can1_data";
- 		function = "can1";
- 	};
-+
-+	sdhi0_pins: sdhi0 {
-+		groups = "sdhi0_data4", "sdhi0_ctrl";
-+		function = "sdhi0";
-+	};
- };
- 
- &scif0 {
-@@ -108,3 +125,12 @@
- 
+ &uart0 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&uart0_pins>;
  	status = "okay";
  };
-+
-+&sdhi0 {
-+	pinctrl-0 = <&sdhi0_pins>;
-+	pinctrl-names = "default";
-+
-+	vmmc-supply = <&vcc_sdhi0>;
-+	cd-gpios = <&gpio11 11 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
+ 
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
+index 6cb29f3..c9c0014 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
+@@ -171,8 +171,6 @@
+ };
+ 
+ &uart0 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&uart0_pins>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+index a1423cc..c830ff9 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+@@ -134,8 +134,6 @@
+ };
+ 
+ &uart0 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&uart0_pins>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+index 772239e..ae87061 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+@@ -156,8 +156,6 @@
+ };
+ 
+ &uart0 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&uart0_pins>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index 933d42c..6635f3d 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -399,6 +399,8 @@
+ 			resets = <&ccu RST_BUS_UART0>;
+ 			dmas = <&dma 6>, <&dma 6>;
+ 			dma-names = "rx", "tx";
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart0_pins>;
+ 			status = "disabled";
+ 		};
+ 
 -- 
-2.7.0.rc3.207.g0ac5344
+2.7.4
