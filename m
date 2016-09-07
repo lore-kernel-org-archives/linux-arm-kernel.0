@@ -1,25 +1,23 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 Sep 2016 23:19:16 +0200
-Subject: [PATCH v3 02/17] pinctrl: dt-bindings: samsung: Update
- documentation with new macros
-In-Reply-To: <1472987060-28293-3-git-send-email-krzk@kernel.org>
-References: <1472987060-28293-1-git-send-email-krzk@kernel.org>
- <1472987060-28293-3-git-send-email-krzk@kernel.org>
-Message-ID: <CACRpkdbfqEjdpr_=f7q8gp=fx84PQpq8bQfOG-rk5a3VPXQ9Xw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 7 Sep 2016 14:27:20 -0700
+Subject: [PATCH v5 2/6] clk: gxbb: expose MPLL2 clock for use by DT
+In-Reply-To: <20160906213848.17785-3-martin.blumenstingl@googlemail.com>
+References: <20160904182320.671-1-martin.blumenstingl@googlemail.com>
+ <20160906213848.17785-1-martin.blumenstingl@googlemail.com>
+ <20160906213848.17785-3-martin.blumenstingl@googlemail.com>
+Message-ID: <20160907212720.GZ12510@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 4, 2016 at 1:04 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+On 09/06, Martin Blumenstingl wrote:
+> This exposes the MPLL2 clock as this is one of the input clocks of the
+> ethernet controller's internal mux.
+> 
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
 
-> From: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->
-> Update examples in Samsung pinctrl dt-bindings with new macros coming
-> from header file.
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
