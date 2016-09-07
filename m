@@ -1,38 +1,39 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Wed,  7 Sep 2016 12:31:25 +0200
-Subject: [PATCH 4/8] ARM: dts: bcm283x: Add a new EMMC pin group from the
- downstream tree.
+Date: Wed,  7 Sep 2016 12:31:27 +0200
+Subject: [PATCH 6/8] ARM: dts: bcm283x: add pinctrl group to &i2c0,
+ drop pins from &gpio
 In-Reply-To: <1473244289-20728-1-git-send-email-kraxel@redhat.com>
 References: <1473244289-20728-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1473244289-20728-5-git-send-email-kraxel@redhat.com>
+Message-ID: <1473244289-20728-7-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Anholt <eric@anholt.net>
-
-This will be used for having EMMC (sdhci-bcm2835.c) drive the
-wireless.
-
-Signed-off-by: Eric Anholt <eric@anholt.net>
+Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
 ---
- arch/arm/boot/dts/bcm283x.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/bcm2835-rpi.dtsi | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index 062d09db..b6b1950 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -257,6 +257,11 @@
- 				brcm,pins = <32 33>;
- 				brcm,function = <BCM2835_FSEL_ALT3>;
- 			};
-+			emmc_gpio34: emmc_gpio34 {
-+				brcm,pins = <34 35 36 37 38 39>;
-+				brcm,function = <BCM2835_FSEL_ALT3>;
-+				brcm,pull = <0 2 2 2 2 2>;
-+			};
- 			emmc_gpio48: emmc_gpio48 {
- 				brcm,pins = <48 49 50 51 52 53>;
- 				brcm,function = <BCM2835_FSEL_ALT3>;
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index ff62236..b936978 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -38,7 +38,7 @@
+ 	};
+ 
+ 	alt0: alt0 {
+-		brcm,pins = <0 1 2 3 4 5 7 8 9 10 11>;
++		brcm,pins = <2 3 4 5 7 8 9 10 11>;
+ 		brcm,function = <BCM2835_FSEL_ALT0>;
+ 	};
+ 
+@@ -49,6 +49,8 @@
+ };
+ 
+ &i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_gpio0>;
+ 	status = "okay";
+ 	clock-frequency = <100000>;
+ };
 -- 
 1.8.3.1
