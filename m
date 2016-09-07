@@ -1,68 +1,75 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 7 Sep 2016 10:04:37 -0500
-Subject: [PATCH v2 2/2] cpufreq: ti: Add cpufreq driver to determine
- available OPPs at runtime
-In-Reply-To: <20160907052053.GO27345@vireshk-i7>
-References: <20160901025328.376-1-d-gerlach@ti.com>
- <20160901025328.376-3-d-gerlach@ti.com> <20160907052053.GO27345@vireshk-i7>
-Message-ID: <57D02C85.7020300@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 07 Sep 2016 17:06:04 +0200
+Subject: [PATCH V2 1/4] ARM64 LPC: Indirect ISA port IO introduced
+In-Reply-To: <1473255233-154297-2-git-send-email-yuanzhichang@hisilicon.com>
+References: <1473255233-154297-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1473255233-154297-2-git-send-email-yuanzhichang@hisilicon.com>
+Message-ID: <3419224.SdRtVQMJCi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/2016 12:20 AM, Viresh Kumar wrote:
-> On 31-08-16, 21:53, Dave Gerlach wrote:
->> Some TI SoCs, like those in the AM335x, AM437x, DRA7x, and AM57x families,
->> have different OPPs available for the MPU depending on which specific
->> variant of the SoC is in use. This can be determined through use of the
->> revision and an eFuse register present in the silicon. Introduce a
->> ti-cpufreq driver that can read the aformentioned values and provide
->> them as version matching data to the opp framework. Through this the
->> opp-supported-hw dt binding that is part of the operating-points-v2
->> table can be used to indicate availability of OPPs for each device.
->>
->> This driver also creates the "cpufreq-dt" platform_device after passing
->> the version matching data to the OPP framework so that the cpufreq-dt
->> handles the actual cpufreq implementation. Even without the necessary
->> data to pass the version matching data the driver will still create this
->> device to maintain backwards compatibility with operating-points v1
->> tables.
->>
->> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->> ---
->> v1->v2:
->> 	- Convert to module_platform_driver to match against new compatibles
->> 	  in patch 1
->> 	- Cleaned up some bit shifts
->> 	- of_property_read_u32_array used rather than reading values individually
->>
->>   drivers/cpufreq/Kconfig.arm  |  11 ++
->>   drivers/cpufreq/Makefile     |   1 +
->>   drivers/cpufreq/ti-cpufreq.c | 308 +++++++++++++++++++++++++++++++++++++++++++
->>   3 files changed, 320 insertions(+)
->>   create mode 100644 drivers/cpufreq/ti-cpufreq.c
->
-> I am wondering if we should start writing OPP drivers instead. As this
-> patch doesn't have anything to do with cpufreq really :)
->
-> But its fine for now..
->
->> +static const struct of_device_id ti_cpufreq_of_match[] = {
->> +	{ .compatible = "operating-points-v2-ti-am3352-cpu",
->> +	  .data = &am3x_soc_data, },
->> +	{ .compatible = "operating-points-v2-ti-am4372-cpu",
->> +	  .data = &am4x_soc_data, },
->> +	{ .compatible = "operating-points-v2-ti-dra7-cpu",
->> +	  .data = &dra7_soc_data },
->
-> You should be using your SoC compatible strings here. OPP compatible
-> property isn't supposed to be (mis)used for this purpose.
->
+On Wednesday, September 7, 2016 9:33:50 PM CEST Zhichang Yuan wrote:
+> +#ifdef CONFIG_ARM64_INDIRECT_PIO
+> +
+> +typedef u64 (*inhook)(void *devobj, unsigned long ptaddr, void *inbuf,
+> +                               size_t dlen, unsigned int count);
+> +typedef void (*outhook)(void *devobj, unsigned long ptaddr,
+> +                               const void *outbuf, size_t dlen,
+> +                               unsigned int count);
+> +
+> +struct extio_ops {
+> +       inhook  pfin;
+> +       outhook pfout;
+> +       void *devpara;
+> +};
+> +
+> +extern struct extio_ops *arm64_simops __refdata;
+> +
+> +/*Up to now, only applied to Hip06 LPC. Define as static here.*/
+> +static inline void arm64_set_simops(struct extio_ops *ops)
+> +{
+> +       if (ops)
+> +               WRITE_ONCE(arm64_simops, ops);
+> +}
+> +
+> +
+> +#define BUILDIO(bw, type)                                              \
+> +static inline type in##bw(unsigned long addr)                          \
+> +{                                                                      \
+> +       if (addr >= PCIBIOS_MIN_IO)                                     \
+> +               return read##bw(PCI_IOBASE + addr);                     \
+> +       return (arm64_simops && arm64_simops->pfin) ?                   \
+> +               arm64_simops->pfin(arm64_simops->devpara, addr, NULL,   \
+> +                                       sizeof(type), 1) : -1;          \
+> +}                                                      \
+> 
 
-Referring to my comments in patch 1, what if we end up changing the 
-bindings based on DT maintainer comments? We will have these compatible 
-strings, and at that point is it acceptable to match against them? Or is 
-it still better to match to SoC compatibles? I think it makes sense to 
-just probe against these.
+Hmm, the way this is done, enabling CONFIG_ARM64_INDIRECT_PIO at
+compile time means that only the dynamically registered PIO support
+is possible for I/O port ranges 0-0xfff.
 
-Regards,
-Dave
+I think the runtime check should better test if simops was defined
+first and fall back to normal PIO otherwise, in order to allow
+LPC implementations on a PCI-LPC bridge.
+
+How about allowing an I/O port range to be defined along with
+the operations and check against that?
+
+u8 intb(unsigned long port)
+{
+	if (arm64_simops &&
+	    (port >= arm64_simops->min) && 
+	    (port <= arm64_simops->max))
+		return arm64_simops->pfin(arm64_simops, port, 1);
+	else
+		return readb(PCI_IOBASE + addr);
+}
+
+The other advantage of that is that you can dynamically register
+a translation for the LPC port range into the Linux I/O port range
+like PCI hosts do.
+
+We may also want to move the inb/outb definitions into a .c file
+as they are getting rather big.
+
+	Arnd
