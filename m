@@ -1,139 +1,58 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed,  7 Sep 2016 14:35:01 -0700
-Subject: [PATCH v4 04/22] usb: chipidea: Only read/write OTGSC from one place
+Date: Wed,  7 Sep 2016 14:35:04 -0700
+Subject: [PATCH v4 07/22] usb: chipidea: Notify events when switching host mode
 In-Reply-To: <20160907213519.27340-1-stephen.boyd@linaro.org>
 References: <20160907213519.27340-1-stephen.boyd@linaro.org>
-Message-ID: <20160907213519.27340-5-stephen.boyd@linaro.org>
+Message-ID: <20160907213519.27340-8-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the id and vbus detection done via extcon we need to make
-sure we poll the status of OTGSC properly by considering what the
-extcon is saying, and not just what the register is saying. Let's
-move this hw_wait_reg() function to the only place it's used and
-simplify it for polling the OTGSC register. Then we can make
-certain we only use the hw_read_otgsc() API to read OTGSC, which
-will make sure we properly handle extcon events.
+The chipidea/udc.c file sends a CI_HDRC_CONTROLLER_RESET_EVENT to
+the wrapper drivers when it calls hw_device_reset(), but that
+function is not called from chipidea/host.c. And the udc.c file
+sends the CI_HDRC_CONTROLLER_STOPPED_EVENT but the host.c file
+doesn't do anything.
+
+The intent of the reset event is to allow the wrapper driver to
+do any wrapper specific things after the reset bit has been set
+in the usb command register. Therefore, add this event hook in
+the host role after we toggle that bit.
+
+Similarly, the intent of the stopped event is to allow the
+wrapper driver to do any wrapper specific things after the device
+is stopped. So when we stop the host role, send the stopped
+event.
 
 Acked-by: Peter Chen <peter.chen@nxp.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: "Ivan T. Ivanov" <iivanov.xz@gmail.com>
-Fixes: 3ecb3e09b042 ("usb: chipidea: Use extcon framework for VBUS and ID detect")
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/usb/chipidea/ci.h   |  3 ---
- drivers/usb/chipidea/core.c | 32 --------------------------------
- drivers/usb/chipidea/otg.c  | 34 ++++++++++++++++++++++++++++++----
- 3 files changed, 30 insertions(+), 39 deletions(-)
+ drivers/usb/chipidea/host.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-index cd414559040f..05bc4d631cb9 100644
---- a/drivers/usb/chipidea/ci.h
-+++ b/drivers/usb/chipidea/ci.h
-@@ -428,9 +428,6 @@ int hw_port_test_set(struct ci_hdrc *ci, u8 mode);
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index 053bac9d983c..a1d8551ca79d 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -87,6 +87,9 @@ static int ehci_ci_reset(struct usb_hcd *hcd)
+ 	if (ret)
+ 		return ret;
  
- u8 hw_port_test_get(struct ci_hdrc *ci);
- 
--int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
--				u32 value, unsigned int timeout_ms);
--
- void ci_platform_configure(struct ci_hdrc *ci);
- 
- int dbg_create_files(struct ci_hdrc *ci);
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 69426e644d17..01390e02ee53 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -516,38 +516,6 @@ int hw_device_reset(struct ci_hdrc *ci)
- 	return 0;
- }
- 
--/**
-- * hw_wait_reg: wait the register value
-- *
-- * Sometimes, it needs to wait register value before going on.
-- * Eg, when switch to device mode, the vbus value should be lower
-- * than OTGSC_BSV before connects to host.
-- *
-- * @ci: the controller
-- * @reg: register index
-- * @mask: mast bit
-- * @value: the bit value to wait
-- * @timeout_ms: timeout in millisecond
-- *
-- * This function returns an error code if timeout
-- */
--int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
--				u32 value, unsigned int timeout_ms)
--{
--	unsigned long elapse = jiffies + msecs_to_jiffies(timeout_ms);
--
--	while (hw_read(ci, reg, mask) != value) {
--		if (time_after(jiffies, elapse)) {
--			dev_err(ci->dev, "timeout waiting for %08x in %d\n",
--					mask, reg);
--			return -ETIMEDOUT;
--		}
--		msleep(20);
--	}
--
--	return 0;
--}
--
- static irqreturn_t ci_irq(int irq, void *data)
- {
- 	struct ci_hdrc *ci = data;
-diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-index 03b6743461d1..a829607c3e4d 100644
---- a/drivers/usb/chipidea/otg.c
-+++ b/drivers/usb/chipidea/otg.c
-@@ -104,7 +104,31 @@ void ci_handle_vbus_change(struct ci_hdrc *ci)
- 		usb_gadget_vbus_disconnect(&ci->gadget);
- }
- 
--#define CI_VBUS_STABLE_TIMEOUT_MS 5000
-+/**
-+ * When we switch to device mode, the vbus value should be lower
-+ * than OTGSC_BSV before connecting to host.
-+ *
-+ * @ci: the controller
-+ *
-+ * This function returns an error code if timeout
-+ */
-+static int hw_wait_vbus_lower_bsv(struct ci_hdrc *ci)
-+{
-+	unsigned long elapse = jiffies + msecs_to_jiffies(5000);
-+	u32 mask = OTGSC_BSV;
++	if (ci->platdata->notify_event)
++		ci->platdata->notify_event(ci, CI_HDRC_CONTROLLER_RESET_EVENT);
 +
-+	while (hw_read_otgsc(ci, mask)) {
-+		if (time_after(jiffies, elapse)) {
-+			dev_err(ci->dev, "timeout waiting for %08x in OTGSC\n",
-+					mask);
-+			return -ETIMEDOUT;
-+		}
-+		msleep(20);
-+	}
-+
-+	return 0;
-+}
-+
- static void ci_handle_id_switch(struct ci_hdrc *ci)
- {
- 	enum ci_role role = ci_otg_role(ci);
-@@ -116,9 +140,11 @@ static void ci_handle_id_switch(struct ci_hdrc *ci)
- 		ci_role_stop(ci);
+ 	ci_platform_configure(ci);
  
- 		if (role == CI_ROLE_GADGET)
--			/* wait vbus lower than OTGSC_BSV */
--			hw_wait_reg(ci, OP_OTGSC, OTGSC_BSV, 0,
--					CI_VBUS_STABLE_TIMEOUT_MS);
-+			/*
-+			 * wait vbus lower than OTGSC_BSV before connecting
-+			 * to host
-+			 */
-+			hw_wait_vbus_lower_bsv(ci);
+ 	return ret;
+@@ -184,6 +187,9 @@ static void host_stop(struct ci_hdrc *ci)
+ 	struct usb_hcd *hcd = ci->hcd;
  
- 		ci_role_start(ci, role);
- 	}
+ 	if (hcd) {
++		if (ci->platdata->notify_event)
++			ci->platdata->notify_event(ci,
++				CI_HDRC_CONTROLLER_STOPPED_EVENT);
+ 		usb_remove_hcd(hcd);
+ 		usb_put_hcd(hcd);
+ 		if (ci->platdata->reg_vbus && !ci_otg_is_fsm_mode(ci) &&
 -- 
 2.9.0.rc2.8.ga28705d
