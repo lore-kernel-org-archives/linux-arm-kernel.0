@@ -1,42 +1,31 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Wed,  7 Sep 2016 16:06:17 -0700
-Subject: [PATCH v2 2/2] arm64: dts: rk3399: add powerdomain for typec
-In-Reply-To: <1473289577-14101-1-git-send-email-zyw@rock-chips.com>
-References: <1473289577-14101-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1473289577-14101-2-git-send-email-zyw@rock-chips.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 8 Sep 2016 01:09:29 +0200
+Subject: [PATCH v2 3/4] pinctrl: sunxi: Remove unsupported PWM channel
+ pinmux in H3
+In-Reply-To: <20160831082520.25962-4-woogyom.kim@gmail.com>
+References: <20160831082520.25962-1-woogyom.kim@gmail.com>
+ <20160831082520.25962-4-woogyom.kim@gmail.com>
+Message-ID: <CACRpkda8uMuOi41O5Cq3o-PXynoZfkxAD7P2fHS-uCUQt_B_kA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tcpc power domain will try to power up/down the power of Type-C PHY.
-Hence, we need control it in Type-C PHY driver with the pm_runtime helper.
+On Wed, Aug 31, 2016 at 10:25 AM, Milo Kim <woogyom.kim@gmail.com> wrote:
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
----
+> H3 has single PWM channel. The second PWM channel is not supported,
+> so the pinctrl function should be removed.
+>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: Icenowy Zheng <icenowy@aosc.xyz>
+> Cc: Jens Kuske <jenskuske@gmail.com>
+> Cc: Krzysztof Adamski <k@japko.eu>
+> Cc: linux-gpio at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
 
-Changes in v2: None
+Patch applied with Chen-Yu's ACK.
 
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 8c51095..3eb52b3 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1262,6 +1262,7 @@
- 		clock-names = "tcpdcore", "tcpdphy-ref";
- 		assigned-clocks = <&cru SCLK_UPHY0_TCPDCORE>;
- 		assigned-clock-rates = <50000000>;
-+		power-domains = <&power RK3399_PD_TCPD0>;
- 		resets = <&cru SRST_UPHY0>,
- 			 <&cru SRST_UPHY0_PIPE_L00>,
- 			 <&cru SRST_P_UPHY0_TCPHY>;
-@@ -1290,6 +1291,7 @@
- 		clock-names = "tcpdcore", "tcpdphy-ref";
- 		assigned-clocks = <&cru SCLK_UPHY1_TCPDCORE>;
- 		assigned-clock-rates = <50000000>;
-+		power-domains = <&power RK3399_PD_TCPD1>;
- 		resets = <&cru SRST_UPHY1>,
- 			 <&cru SRST_UPHY1_PIPE_L00>,
- 			 <&cru SRST_P_UPHY1_TCPHY>;
--- 
-1.9.1
+Yours,
+Linus Walleij
