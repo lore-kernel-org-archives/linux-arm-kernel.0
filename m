@@ -1,38 +1,44 @@
-From: pku.leo@gmail.com (Leo Li)
-Date: Wed, 7 Sep 2016 11:40:32 -0500
-Subject: [PATCH v5] i2c: imx: make bus recovery through pinctrl optional
-In-Reply-To: <CAChUvXMPDZB7=ZArQ5+6ae42N=Bsgv_OczGXnyhBjEdjt_yvsw@mail.gmail.com>
-References: <1471644322-22670-1-git-send-email-leoyang.li@nxp.com>
- <20160906185849.27pjhawadca5pwow@pengutronix.de>
- <CADRPPNQ+1qBNL5WA=Jo_keE7BPnoOs7a2T6CpTuciiF16qK6xQ@mail.gmail.com>
- <87ca69fb85848a0a86b34a9a9037a57b@agner.ch>
- <CADRPPNSPye45bmFshfwb+gDA0x0ygs4Ofa6HMYbKt9ER0oeccg@mail.gmail.com>
- <CAChUvXOGjTn6K5588UVgjbRWUY+weDtk2qbOU-NM4=kA2znh=Q@mail.gmail.com>
- <20160907055547.opp57zyxhlplhxhm@pengutronix.de>
- <CAChUvXMPDZB7=ZArQ5+6ae42N=Bsgv_OczGXnyhBjEdjt_yvsw@mail.gmail.com>
-Message-ID: <CADRPPNRppCf4v7S_i69XOmY8X6YwUeiwdkaRZwSDaao5XHKChQ@mail.gmail.com>
+From: john@metanate.com (John Keeping)
+Date: Wed,  7 Sep 2016 17:53:30 +0100
+Subject: [PATCH 2/2] clk: rockchip: use identifiers for rk3288 I2S clocks
+In-Reply-To: <20160907165330.14607-1-john@metanate.com>
+References: <20160907165330.14607-1-john@metanate.com>
+Message-ID: <20160907165330.14607-2-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 7, 2016 at 5:07 AM, Tracy Smith <tlsmith3777@gmail.com> wrote:
-> Hello, bus recovery is needed generally speaking because of potential
-> protocol errors that might cause a failure condition hanging the bus.
->
-> It happens frequently during bring-up of new I2C devices because firmware in
-> I2C controllers fail to handle properly protocol errors.
->
-> Can NXP add bus recovery for the LS1021A and LS1043A in a separate patch--
-> unless there is no HW bus recovery mechanism?
->
-> The concern is while fixing I.MX, NXP will fail to fix the driver bus
-> recovery for the LS1021A and LS1043A and the bus will hang.
->
-> If bus recovery is supported on the LS1021A and the LS1043A, a patch should
-> be provided or added in this patch instead of simply disabling bus recovery.
-> Request NXP to consider the patch if there is HW support for bus recovery.
+Export these so that the rates can be set via the device tree.
 
-I'm not the right person to answer if this is possible.  I will
-forward your request to the related developer.
+Signed-off-by: John Keeping <john@metanate.com>
+---
+ drivers/clk/rockchip/clk-rk3288.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Thanks,
-Leo
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index 39af05a589b3..8817a5b3bd0f 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -229,7 +229,7 @@ static struct clk_div_table div_hclk_cpu_t[] = {
+ #define IFLAGS ROCKCHIP_INVERTER_HIWORD_MASK
+ 
+ static struct rockchip_clk_branch rk3288_i2s_fracmux __initdata =
+-	MUX(0, "i2s_pre", mux_i2s_pre_p, CLK_SET_RATE_PARENT,
++	MUX(SCLK_I2S_PRE, "i2s_pre", mux_i2s_pre_p, CLK_SET_RATE_PARENT,
+ 			RK3288_CLKSEL_CON(4), 8, 2, MFLAGS);
+ 
+ static struct rockchip_clk_branch rk3288_spdif_fracmux __initdata =
+@@ -338,10 +338,10 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 
+ 	FACTOR(0, "xin12m", "xin24m", 0, 1, 2),
+ 
+-	COMPOSITE(0, "i2s_src", mux_pll_src_cpll_gpll_p, 0,
++	COMPOSITE(SCLK_I2S_SRC, "i2s_src", mux_pll_src_cpll_gpll_p, 0,
+ 			RK3288_CLKSEL_CON(4), 15, 1, MFLAGS, 0, 7, DFLAGS,
+ 			RK3288_CLKGATE_CON(4), 1, GFLAGS),
+-	COMPOSITE_FRACMUX(0, "i2s_frac", "i2s_src", CLK_SET_RATE_PARENT,
++	COMPOSITE_FRACMUX(SCLK_I2S_FRAC, "i2s_frac", "i2s_src", CLK_SET_RATE_PARENT,
+ 			RK3288_CLKSEL_CON(8), 0,
+ 			RK3288_CLKGATE_CON(4), 2, GFLAGS,
+ 			&rk3288_i2s_fracmux),
+-- 
+2.9.3.728.g30b24b4.dirty
