@@ -1,239 +1,34 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 7 Sep 2016 12:29:49 +0100
-Subject: [PATCH v3 8/9] arm64: Refactor sysinstr exception handling
-In-Reply-To: <1473069509-2317-9-git-send-email-suzuki.poulose@arm.com>
-References: <1473069509-2317-1-git-send-email-suzuki.poulose@arm.com>
- <1473069509-2317-9-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <2b2fbec9-9339-d2fe-86c5-7299b1e83cfc@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 7 Sep 2016 13:29:50 +0200
+Subject: [PATCH] simplefb: Disable and release clocks and regulators in
+ destroy callback
+In-Reply-To: <CAMuHMdU3dgPzvHkd8qti1pwzf1aeUhyv7gdpufYkqxHPS4=VTw@mail.gmail.com>
+References: <20160907090919.27187-1-wens@csie.org>
+ <CAMuHMdU3dgPzvHkd8qti1pwzf1aeUhyv7gdpufYkqxHPS4=VTw@mail.gmail.com>
+Message-ID: <dc027024-c2ad-85fa-8671-53781c95c584@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 05/09/16 10:58, Suzuki K Poulose wrote:
-> Right now we trap some of the user space data cache operations
-> based on a few Errata (ARM 819472, 826319, 827319 and 824069).
-> We need to trap userspace access to CTR_EL0, if we detect mismatched
-> cache line size. Since both these traps share the EC, refactor
-> the handler a little bit to make it a bit more reader friendly.
+On 07-09-16 13:12, Geert Uytterhoeven wrote:
+> On Wed, Sep 7, 2016 at 11:09 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+>> simplefb gets unregister when a proper framebuffer driver comes in and
+>> kicks it out. However the claimed clocks and regulators stay enabled
+>> as they are only released in the platform device remove function, which
+>> in theory would never get called.
+>>
+>> Move the clock/regulator cleanup into the framebuffer destroy callback,
+>> which gets called as part of the framebuffer unregister process.
+>
+> Is this called before or after the new proper framebuffer driver kicks in?
+> If before, it may cause glitches.
 
-Apart from the fact that this now slightly more bloa^Wsophisticated, the
-code effectively seems to do the same as before.
+It is called by the new proper framebuffer driver's probe method,
+so it can make sure that it has already claimed / enabled the
+clocks/regulators before it calls remove_conlicting_framebuffers,
+avoiding the glitch.
 
-I gave it a quick test on my Juno r0 and can confirm that the userspace
-cache maintenance instructions trapping still works as expected.
+Regards,
 
-Acked-by: Andre Przywara <andre.przywara@arm.com>
-
-Cheers,
-Andre.
-
-> 
-> Cc: Andre Przywara <andre.przywara@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/include/asm/esr.h | 76 ++++++++++++++++++++++++++++++++++++++------
->  arch/arm64/kernel/traps.c    | 73 +++++++++++++++++++++++++++---------------
->  2 files changed, 114 insertions(+), 35 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-> index f772e15..9875b32 100644
-> --- a/arch/arm64/include/asm/esr.h
-> +++ b/arch/arm64/include/asm/esr.h
-> @@ -78,6 +78,23 @@
->  
->  #define ESR_ELx_IL		(UL(1) << 25)
->  #define ESR_ELx_ISS_MASK	(ESR_ELx_IL - 1)
-> +
-> +/* ISS field definitions shared by different classes */
-> +#define ESR_ELx_WNR		(UL(1) << 6)
-> +
-> +/* Shared ISS field definitions for Data/Instruction aborts */
-> +#define ESR_ELx_EA		(UL(1) << 9)
-> +#define ESR_ELx_S1PTW		(UL(1) << 7)
-> +
-> +/* Shared ISS fault status code(IFSC/DFSC) for Data/Instruction aborts */
-> +#define ESR_ELx_FSC		(0x3F)
-> +#define ESR_ELx_FSC_TYPE	(0x3C)
-> +#define ESR_ELx_FSC_EXTABT	(0x10)
-> +#define ESR_ELx_FSC_ACCESS	(0x08)
-> +#define ESR_ELx_FSC_FAULT	(0x04)
-> +#define ESR_ELx_FSC_PERM	(0x0C)
-> +
-> +/* ISS field definitions for Data Aborts */
->  #define ESR_ELx_ISV		(UL(1) << 24)
->  #define ESR_ELx_SAS_SHIFT	(22)
->  #define ESR_ELx_SAS		(UL(3) << ESR_ELx_SAS_SHIFT)
-> @@ -86,16 +103,9 @@
->  #define ESR_ELx_SRT_MASK	(UL(0x1F) << ESR_ELx_SRT_SHIFT)
->  #define ESR_ELx_SF 		(UL(1) << 15)
->  #define ESR_ELx_AR 		(UL(1) << 14)
-> -#define ESR_ELx_EA 		(UL(1) << 9)
->  #define ESR_ELx_CM 		(UL(1) << 8)
-> -#define ESR_ELx_S1PTW 		(UL(1) << 7)
-> -#define ESR_ELx_WNR		(UL(1) << 6)
-> -#define ESR_ELx_FSC		(0x3F)
-> -#define ESR_ELx_FSC_TYPE	(0x3C)
-> -#define ESR_ELx_FSC_EXTABT	(0x10)
-> -#define ESR_ELx_FSC_ACCESS	(0x08)
-> -#define ESR_ELx_FSC_FAULT	(0x04)
-> -#define ESR_ELx_FSC_PERM	(0x0C)
-> +
-> +/* ISS field definitions for exceptions taken in to Hyp */
->  #define ESR_ELx_CV		(UL(1) << 24)
->  #define ESR_ELx_COND_SHIFT	(20)
->  #define ESR_ELx_COND_MASK	(UL(0xF) << ESR_ELx_COND_SHIFT)
-> @@ -109,6 +119,54 @@
->  	((ESR_ELx_EC_BRK64 << ESR_ELx_EC_SHIFT) | ESR_ELx_IL |	\
->  	 ((imm) & 0xffff))
->  
-> +/* ISS field definitions for System instruction traps */
-> +#define ESR_ELx_SYS64_ISS_RES0_SHIFT	22
-> +#define ESR_ELx_SYS64_ISS_RES0_MASK	(UL(0x7) << ESR_ELx_SYS64_ISS_RES0_SHIFT)
-> +#define ESR_ELx_SYS64_ISS_DIR_MASK	0x1
-> +#define ESR_ELx_SYS64_ISS_DIR_READ	0x1
-> +#define ESR_ELx_SYS64_ISS_DIR_WRITE	0x0
-> +
-> +#define ESR_ELx_SYS64_ISS_RT_SHIFT	5
-> +#define ESR_ELx_SYS64_ISS_RT_MASK	(UL(0x1f) << ESR_ELx_SYS64_ISS_RT_SHIFT)
-> +#define ESR_ELx_SYS64_ISS_CRM_SHIFT	1
-> +#define ESR_ELx_SYS64_ISS_CRM_MASK	(UL(0xf) << ESR_ELx_SYS64_ISS_CRM_SHIFT)
-> +#define ESR_ELx_SYS64_ISS_CRN_SHIFT	10
-> +#define ESR_ELx_SYS64_ISS_CRN_MASK	(UL(0xf) << ESR_ELx_SYS64_ISS_CRN_SHIFT)
-> +#define ESR_ELx_SYS64_ISS_OP1_SHIFT	14
-> +#define ESR_ELx_SYS64_ISS_OP1_MASK	(UL(0x7) << ESR_ELx_SYS64_ISS_OP1_SHIFT)
-> +#define ESR_ELx_SYS64_ISS_OP2_SHIFT	17
-> +#define ESR_ELx_SYS64_ISS_OP2_MASK	(UL(0x7) << ESR_ELx_SYS64_ISS_OP2_SHIFT)
-> +#define ESR_ELx_SYS64_ISS_OP0_SHIFT	20
-> +#define ESR_ELx_SYS64_ISS_OP0_MASK	(UL(0x3) << ESR_ELx_SYS64_ISS_OP0_SHIFT)
-> +#define ESR_ELx_SYS64_ISS_SYS_MASK	(ESR_ELx_SYS64_ISS_OP0_MASK | \
-> +					 ESR_ELx_SYS64_ISS_OP1_MASK | \
-> +					 ESR_ELx_SYS64_ISS_OP2_MASK | \
-> +					 ESR_ELx_SYS64_ISS_CRN_MASK | \
-> +					 ESR_ELx_SYS64_ISS_CRM_MASK)
-> +#define ESR_ELx_SYS64_ISS_SYS_VAL(op0, op1, op2, crn, crm) \
-> +					(((op0) << ESR_ELx_SYS64_ISS_OP0_SHIFT) | \
-> +					 ((op1) << ESR_ELx_SYS64_ISS_OP1_SHIFT) | \
-> +					 ((op2) << ESR_ELx_SYS64_ISS_OP2_SHIFT) | \
-> +					 ((crn) << ESR_ELx_SYS64_ISS_CRN_SHIFT) | \
-> +					 ((crm) << ESR_ELx_SYS64_ISS_CRM_SHIFT))
-> +/*
-> + * User space cache operations have the following sysreg encoding
-> + * in System instructions.
-> + * op0=1, op1=3, op2=1, crn=7, crm={ 5, 10, 11, 14 }, WRITE (L=0)
-> + */
-> +#define ESR_ELx_SYS64_ISS_CRM_DC_CIVAC	14
-> +#define ESR_ELx_SYS64_ISS_CRM_DC_CVAU	11
-> +#define ESR_ELx_SYS64_ISS_CRM_DC_CVAC	10
-> +#define ESR_ELx_SYS64_ISS_CRM_IC_IVAU	5
-> +
-> +#define ESR_ELx_SYS64_ISS_EL0_CACHE_OP_MASK	(ESR_ELx_SYS64_ISS_OP0_MASK | \
-> +						 ESR_ELx_SYS64_ISS_OP1_MASK | \
-> +						 ESR_ELx_SYS64_ISS_OP2_MASK | \
-> +						 ESR_ELx_SYS64_ISS_CRN_MASK | \
-> +						 ESR_ELx_SYS64_ISS_DIR_MASK)
-> +#define ESR_ELx_SYS64_ISS_EL0_CACHE_OP_VAL \
-> +				(ESR_ELx_SYS64_ISS_SYS_VAL(1, 3, 1, 7, 0) | \
-> +				 ESR_ELx_SYS64_ISS_DIR_WRITE)
->  #ifndef __ASSEMBLY__
->  #include <asm/types.h>
->  
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index e04f838..224f64e 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -447,36 +447,29 @@ void cpu_enable_cache_maint_trap(void *__unused)
->  		: "=r" (res)					\
->  		: "r" (address), "i" (-EFAULT) )
->  
-> -asmlinkage void __exception do_sysinstr(unsigned int esr, struct pt_regs *regs)
-> +static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
->  {
->  	unsigned long address;
-> -	int ret;
-> +	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
-> +	int crm = (esr & ESR_ELx_SYS64_ISS_CRM_MASK) >> ESR_ELx_SYS64_ISS_CRM_SHIFT;
-> +	int ret = 0;
->  
-> -	/* if this is a write with: Op0=1, Op2=1, Op1=3, CRn=7 */
-> -	if ((esr & 0x01fffc01) == 0x0012dc00) {
-> -		int rt = (esr >> 5) & 0x1f;
-> -		int crm = (esr >> 1) & 0x0f;
-> +	address = (rt == 31) ? 0 : regs->regs[rt];
->  
-> -		address = (rt == 31) ? 0 : regs->regs[rt];
-> -
-> -		switch (crm) {
-> -		case 11:		/* DC CVAU, gets promoted */
-> -			__user_cache_maint("dc civac", address, ret);
-> -			break;
-> -		case 10:		/* DC CVAC, gets promoted */
-> -			__user_cache_maint("dc civac", address, ret);
-> -			break;
-> -		case 14:		/* DC CIVAC */
-> -			__user_cache_maint("dc civac", address, ret);
-> -			break;
-> -		case 5:			/* IC IVAU */
-> -			__user_cache_maint("ic ivau", address, ret);
-> -			break;
-> -		default:
-> -			force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
-> -			return;
-> -		}
-> -	} else {
-> +	switch (crm) {
-> +	case ESR_ELx_SYS64_ISS_CRM_DC_CVAU:	/* DC CVAU, gets promoted */
-> +		__user_cache_maint("dc civac", address, ret);
-> +		break;
-> +	case ESR_ELx_SYS64_ISS_CRM_DC_CVAC:	/* DC CVAC, gets promoted */
-> +		__user_cache_maint("dc civac", address, ret);
-> +		break;
-> +	case ESR_ELx_SYS64_ISS_CRM_DC_CIVAC:	/* DC CIVAC */
-> +		__user_cache_maint("dc civac", address, ret);
-> +		break;
-> +	case ESR_ELx_SYS64_ISS_CRM_IC_IVAU:	/* IC IVAU */
-> +		__user_cache_maint("ic ivau", address, ret);
-> +		break;
-> +	default:
->  		force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
->  		return;
->  	}
-> @@ -487,6 +480,34 @@ asmlinkage void __exception do_sysinstr(unsigned int esr, struct pt_regs *regs)
->  		regs->pc += 4;
->  }
->  
-> +struct sys64_hook {
-> +	unsigned int esr_mask;
-> +	unsigned int esr_val;
-> +	void (*handler)(unsigned int esr, struct pt_regs *regs);
-> +};
-> +
-> +static struct sys64_hook sys64_hooks[] = {
-> +	{
-> +		.esr_mask = ESR_ELx_SYS64_ISS_EL0_CACHE_OP_MASK,
-> +		.esr_val = ESR_ELx_SYS64_ISS_EL0_CACHE_OP_VAL,
-> +		.handler = user_cache_maint_handler,
-> +	},
-> +	{},
-> +};
-> +
-> +asmlinkage void __exception do_sysinstr(unsigned int esr, struct pt_regs *regs)
-> +{
-> +	struct sys64_hook *hook;
-> +
-> +	for (hook = sys64_hooks; hook->handler; hook++)
-> +		if ((hook->esr_mask & esr) == hook->esr_val) {
-> +			hook->handler(esr, regs);
-> +			return;
-> +		}
-> +
-> +	force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
-> +}
-> +
->  long compat_arm_syscall(struct pt_regs *regs);
->  
->  asmlinkage long do_ni_syscall(struct pt_regs *regs)
-> 
+Hans
