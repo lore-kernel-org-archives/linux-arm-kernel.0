@@ -1,27 +1,26 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 7 Sep 2016 16:51:55 +0200
-Subject: [PATCH 5/6] ARM: dts: Add NextThing GR8 dtsi
-In-Reply-To: <20160831081817.5191-6-maxime.ripard@free-electrons.com>
-References: <20160831081817.5191-1-maxime.ripard@free-electrons.com>
- <20160831081817.5191-6-maxime.ripard@free-electrons.com>
-Message-ID: <CABxcv=kJCuP==QVRqyuoORSoWKAEqXmt5iRjdvDcCcr4MSm0gQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 07 Sep 2016 16:52:26 +0200
+Subject: [PATCH V2 4/4] ARM64 LPC: support earlycon for UART connected to
+ LPC
+In-Reply-To: <1473255233-154297-5-git-send-email-yuanzhichang@hisilicon.com>
+References: <1473255233-154297-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1473255233-154297-5-git-send-email-yuanzhichang@hisilicon.com>
+Message-ID: <4291379.IHAA72aKCk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Maxime,
+On Wednesday, September 7, 2016 9:33:53 PM CEST Zhichang Yuan wrote:
+> From: "zhichang.yuan" <yuanzhichang@hisilicon.com>
+> 
+> This patch support the earlycon for UART connected to LPC on Hip06.
+> This patch is depended on the LPC driver.
+> 
+> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
+> 
 
-On Wed, Aug 31, 2016 at 10:18 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+I'm skeptical about this too. Is this just needed because the 8250
+earlycon support comes before the lpc bus initialization?
 
-[snip]
+Could we start the LPC driver earlier to work around that?
 
-> +
-> +#include "skeleton.dtsi"
-> +
-
-The skeleton.dtsi has been deprecated and shouldn't be used in new DTS files:
-
-http://www.spinics.net/lists/arm-kernel/msg528080.html
-
-Best regards,
-Javier
+	Arnd
