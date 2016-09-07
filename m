@@ -1,31 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 8 Sep 2016 01:09:29 +0200
-Subject: [PATCH v2 3/4] pinctrl: sunxi: Remove unsupported PWM channel
- pinmux in H3
-In-Reply-To: <20160831082520.25962-4-woogyom.kim@gmail.com>
-References: <20160831082520.25962-1-woogyom.kim@gmail.com>
- <20160831082520.25962-4-woogyom.kim@gmail.com>
-Message-ID: <CACRpkda8uMuOi41O5Cq3o-PXynoZfkxAD7P2fHS-uCUQt_B_kA@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 7 Sep 2016 16:20:55 -0700
+Subject: [PATCH v2 0/7] arm64: Privileged Access Never using TTBR0_EL1
+ switching
+In-Reply-To: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
+References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <CAGXu5j++0LgDEv=m1yQb4hB57MQ2MYVCpeex9TFTRmQpNYhNsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 31, 2016 at 10:25 AM, Milo Kim <woogyom.kim@gmail.com> wrote:
+On Fri, Sep 2, 2016 at 8:02 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> This is the second version of the arm64 PAN emulation by disabling
+> TTBR0_EL1 accesses. The major change from v1 is the use of a thread_info
+> member to store the real TTBR0_EL1 value. The advantage is slightly
+> simpler assembler macros for uaccess_enable with the downside that
+> switch_mm() must always update the saved ttbr0 even if there is no mm
+> switch.
 
-> H3 has single PWM channel. The second PWM channel is not supported,
-> so the pinctrl function should be removed.
->
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: Icenowy Zheng <icenowy@aosc.xyz>
-> Cc: Jens Kuske <jenskuske@gmail.com>
-> Cc: Krzysztof Adamski <k@japko.eu>
-> Cc: linux-gpio at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+Is arm64 thread_info attached to the kernel stack? (i.e. is this
+introducing a valuable target for stack-based attacks?)
 
-Patch applied with Chen-Yu's ACK.
+-Kees
 
-Yours,
-Linus Walleij
+-- 
+Kees Cook
+Nexus Security
