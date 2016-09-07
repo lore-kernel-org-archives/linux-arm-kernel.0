@@ -1,33 +1,39 @@
-From: john@metanate.com (John Keeping)
-Date: Wed,  7 Sep 2016 17:53:29 +0100
-Subject: [PATCH 1/2] clk: rockchip: add I2S internal clock IDs for rk3288
-Message-ID: <20160907165330.14607-1-john@metanate.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 7 Sep 2016 18:59:18 +0200
+Subject: [PATCH 3/3] tty/serial: at91: fix hardware handshake when DMA is
+ not used
+In-Reply-To: <20160907161324.27774-3-richard.genoud@gmail.com>
+References: <20160907161324.27774-1-richard.genoud@gmail.com>
+ <20160907161324.27774-3-richard.genoud@gmail.com>
+Message-ID: <20160907165918.xog3poqstw434r2j@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To minimize jitter on the I2S clocks, it is important that the
-denominator in the fractional divider is much greater than the
-numerator.  Add identifiers for these internal clocks so that the
-specific clock topology and rates can be specified in the device tree.
+Hi,
 
-Signed-off-by: John Keeping <john@metanate.com>
----
- include/dt-bindings/clock/rk3288-cru.h | 3 +++
- 1 file changed, 3 insertions(+)
+On 07/09/2016 at 18:13:24 +0200, Richard Genoud wrote :
+> Commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when
+> hardware handshake is enabled") broke the hardware handshake when
+> DMA is not used.
+> 
+> So, here's a summary:
+> If DMA is NOT USED the mode should be ATMEL_US_USMODE_NORMAL because the
+> controller can't drive the RTS pin (there's no way for it to know when
+> we can't receive data anymore).
+> 
 
-diff --git a/include/dt-bindings/clock/rk3288-cru.h b/include/dt-bindings/clock/rk3288-cru.h
-index 9a586e2d9c91..9526653383d9 100644
---- a/include/dt-bindings/clock/rk3288-cru.h
-+++ b/include/dt-bindings/clock/rk3288-cru.h
-@@ -88,6 +88,9 @@
- #define SCLK_PVTM_GPU		124
- #define SCLK_CRYPTO		125
- #define SCLK_MIPIDSI_24M	126
-+#define SCLK_I2S_PRE		127
-+#define SCLK_I2S_SRC		128
-+#define SCLK_I2S_FRAC		129
- 
- #define SCLK_MAC		151
- #define SCLK_MACREF_OUT		152
+You forgot that the PDC can properly drive the RTS pin so all the
+platforms that are using the PDC will break after your patch.
+
+Also, I believe the controller is able to drive the RTS and CTS pins
+when simply using PIOs (it knows when one complete character has been
+received and US_RHR has not yet been read). However, I didn't test.
+Maybe someone at Atmel can confirm.
+
+I think that 5be605ac9af9 is doing the right thing but I still can be
+convince otherwise ;).
+
 -- 
-2.9.3.728.g30b24b4.dirty
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
