@@ -1,44 +1,235 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 7 Sep 2016 08:58:19 -0700
-Subject: [PATCH v3 0/4] clk: bcm2835: critical clocks and parent selection
-In-Reply-To: <69F741EC-D4BB-461E-B3BA-FEF73DA70F2E@sperl.org>
-References: <1464807936-532-1-git-send-email-eric@anholt.net>
- <69F741EC-D4BB-461E-B3BA-FEF73DA70F2E@sperl.org>
-Message-ID: <20160907155819.GX12510@codeaurora.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 7 Sep 2016 17:59:17 +0200
+Subject: [PATCH 3/7] mtd: nand: automate NAND timings selection
+In-Reply-To: <20160907165951.51f15505@bbrezillon>
+References: <1473250902-31139-1-git-send-email-s.hauer@pengutronix.de>
+ <1473250902-31139-4-git-send-email-s.hauer@pengutronix.de>
+ <20160907154114.1aae0462@bbrezillon>
+ <20160907143615.cholyvh6zyk7rnfj@pengutronix.de>
+ <20160907165951.51f15505@bbrezillon>
+Message-ID: <20160907175917.2a4791d3@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07, Martin Sperl wrote:
+On Wed, 7 Sep 2016 16:59:51 +0200
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+
+> On Wed, 7 Sep 2016 16:36:15 +0200
+> Sascha Hauer <s.hauer@pengutronix.de> wrote:
 > 
-> > On 01.06.2016, at 21:05, Eric Anholt <eric@anholt.net> wrote:
+> > On Wed, Sep 07, 2016 at 03:41:14PM +0200, Boris Brezillon wrote:  
+> > > On Wed,  7 Sep 2016 14:21:38 +0200
+> > > Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > >     
+> > > > From: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > > 
+> > > > The NAND framework provides several helpers to query timing modes supported
+> > > > by a NAND chip, but this implies that all NAND controller drivers have
+> > > > to implement the same timings selection dance. Also currently NAND
+> > > > devices can be resetted at arbitrary places which also resets the timing
+> > > > for ONFI chips to timing mode 0.
+> > > > 
+> > > > Provide a common logic to select the best timings based on ONFI or    
+> > > > ->onfi_timing_mode_default information. Hook this into nand_reset()      
+> > > > to make sure the new timing is applied each time during a reset.
+> > > > 
+> > > > NAND controller willing to support timings adjustment should just
+> > > > implement the ->setup_data_interface() method.
+> > > > 
+> > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > > > ---
+> > > >  drivers/mtd/nand/nand_base.c | 134 +++++++++++++++++++++++++++++++++++++++++++
+> > > >  include/linux/mtd/nand.h     |  12 ++--
+> > > >  2 files changed, 142 insertions(+), 4 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+> > > > index 1f704cc..c9bc988 100644
+> > > > --- a/drivers/mtd/nand/nand_base.c
+> > > > +++ b/drivers/mtd/nand/nand_base.c
+> > > > @@ -948,6 +948,130 @@ static int nand_wait(struct mtd_info *mtd, struct nand_chip *chip)
+> > > >  }
+> > > >  
+> > > >  /**
+> > > > + * nand_reset_data_interface - Reset data interface and timings
+> > > > + * @chip: The NAND chip
+> > > > + *
+> > > > + * Reset the Data interface and timings to ONFI mode 0.
+> > > > + *
+> > > > + * Returns 0 for success or negative error code otherwise.
+> > > > + */
+> > > > +static int nand_reset_data_interface(struct nand_chip *chip)
+> > > > +{
+> > > > +	struct mtd_info *mtd = &chip->mtd;
+> > > > +	struct nand_data_interface *conf;
+> > > > +	int ret;
+> > > > +
+> > > > +	if (!chip->setup_data_interface)
+> > > > +		return 0;
+> > > > +
+> > > > +	conf = kzalloc(sizeof(*conf), GFP_KERNEL);
+> > > > +	if (!conf)
+> > > > +		return -ENOMEM;
+> > > > +
+> > > > +	/*
+> > > > +	 * The ONFI specification says:
+> > > > +	 * "
+> > > > +	 * To transition from NV-DDR or NV-DDR2 to the SDR data
+> > > > +	 * interface, the host shall use the Reset (FFh) command
+> > > > +	 * using SDR timing mode 0. A device in any timing mode is
+> > > > +	 * required to recognize Reset (FFh) command issued in SDR
+> > > > +	 * timing mode 0.
+> > > > +	 * "
+> > > > +	 *
+> > > > +	 * Configure the data interface in SDR mode and set the
+> > > > +	 * timings to timing mode 0.
+> > > > +	 */
+> > > > +
+> > > > +	conf->type = NAND_SDR_IFACE,
+> > > > +	conf->timings.sdr = *onfi_async_timing_mode_to_sdr_timings(0);
+> > > > +
+> > > > +	ret = chip->setup_data_interface(mtd, conf, false);
+> > > > +	if (ret)
+> > > > +		pr_err("Failed to configure data interface to SDR timing mode 0\n");    
+> > > 
+> > > I just realized that going back to timing mode 0 is not needed if your
+> > > chip is not ONFI or JEDEC compliant. But that's not really an issue.
+> > >     
+> > > > +
+> > > > +	kfree(conf);
+> > > > +
+> > > > +	return ret;
+> > > > +}
+> > > > +
+> > > > +/**
+> > > > + * nand_setup_data_interface - Setup the best data interface and timings
+> > > > + * @chip: The NAND chip
+> > > > + *
+> > > > + * Find and configure the best data interface and NAND timings supported by
+> > > > + * the chip and the driver.
+> > > > + * First tries to retrieve supported timing modes from ONFI information,
+> > > > + * and if the NAND chip does not support ONFI, relies on the
+> > > > + * ->onfi_timing_mode_default specified in the nand_ids table.
+> > > > + *
+> > > > + * Returns 0 for success or negative error code otherwise.
+> > > > + */
+> > > > +static int nand_setup_data_interface(struct nand_chip *chip)
+> > > > +{
+> > > > +	struct mtd_info *mtd = &chip->mtd;
+> > > > +	struct nand_data_interface *conf;
+> > > > +	int modes, mode, ret;
+> > > > +
+> > > > +	if (!chip->setup_data_interface)
+> > > > +		return 0;
+> > > > +
+> > > > +	/*
+> > > > +	 * First try to identify the best timings from ONFI parameters and
+> > > > +	 * if the NAND does not support ONFI, fallback to the default ONFI
+> > > > +	 * timing mode.
+> > > > +	 */
+> > > > +	modes = onfi_get_async_timing_mode(chip);
+> > > > +	if (modes == ONFI_TIMING_MODE_UNKNOWN) {
+> > > > +		if (!chip->onfi_timing_mode_default)
+> > > > +			return 0;
+> > > > +
+> > > > +		modes = GENMASK(chip->onfi_timing_mode_default, 0);
+> > > > +	}    
+> > > 
+> > > This implementation is assuming the chip is either ONFI compliant or
+> > > not compliant with JEDEC and ONFI, but JEDEC chips also provides
+> > > 'timing modes', except it's called 'speed grades'. Not sure how they
+> > > match to the ONFI timing modes, and I'm definitely not asking you to
+> > > support that right now, but that would be good to split the different
+> > > cases (ONFI compliant, JEDEC compliant and not compliant with JEDEC or
+> > > ONFI) in different functions.
+> > > 
+> > > Those functions would just fill in the nand_data_interface object, and 
+> > > nand_setup_data_interface() (or nand_select_data_interface(), if we
+> > > decide to split the logic in 2 different functions as suggested below)
+> > > would call one of them depending on the ->{jedec,onfo}_version values.
+> > >     
+> > > > +
+> > > > +	conf = kzalloc(sizeof(*conf), GFP_KERNEL);
+> > > > +	if (!conf)
+> > > > +		return -ENOMEM;
+> > > > +
+> > > > +	ret = -EINVAL;
+> > > > +	for (mode = fls(modes) - 1; mode >= 0; mode--) {
+> > > > +		conf->type = NAND_SDR_IFACE,
+> > > > +		conf->timings.sdr = *onfi_async_timing_mode_to_sdr_timings(mode);
+> > > > +
+> > > > +		ret = chip->setup_data_interface(mtd, conf, true);
+> > > > +		if (!ret) {
+> > > > +			chip->onfi_timing_mode_default = mode;
+> > > > +			break;
+> > > > +		}
+> > > > +	}
+> > > > +
+> > > > +	if (ret)
+> > > > +		goto err;    
+> > > 
+> > > The data interface config selection only has to be done once: when you
+> > > discover/init the chip...
+> > >     
+> > > > +
+> > > > +	/*
+> > > > +	 * Ensure the timing mode has been changed on the chip side
+> > > > +	 * before changing timings on the controller side.
+> > > > +	 */
+> > > > +	if (chip->onfi_version) {
+> > > > +		uint8_t tmode_param[ONFI_SUBFEATURE_PARAM_LEN] = {
+> > > > +			chip->onfi_timing_mode_default,
+> > > > +		};
+> > > > +
+> > > > +		ret = chip->onfi_set_features(mtd, chip,
+> > > > +				ONFI_FEATURE_ADDR_TIMING_MODE,
+> > > > +				tmode_param);
+> > > > +		if (ret)
+> > > > +			goto err;
+> > > > +	}
+> > > > +
+> > > > +	ret = chip->setup_data_interface(mtd, conf, false);    
+> > > 
+> > > ... but the setup will be done each time you reset the chip.
+> > > 
+> > > Maybe that's what you were trying to explain me yesterday.    
 > > 
-> > I figured out another critical clock (patch 3), but didn't use the
-> > CLK_IS_CRITICAL flag since I want to just protect whatever clock
-> > happens to be the parent (there are #ifdefs in the firmware indicating
-> > that they've experimented with using different clocks as the parent).
+> > Indeed.
+> >   
+> > > 
+> > > Anyway, I really think we should keep the default/best data interface
+> > > config in nand_chip so that we can later re-use it without have to go
+> > > through the supported timing detection logic.    
 > > 
-> > I think these fixes are all suitable for 4.7.
-> > 
-> > Eric Anholt (4):
-> >  clk: bcm2835: Mark the VPU clock as critical
-> >  clk: bcm2835: Mark GPIO clocks enabled at boot as critical
-> >  clk: bcm2835: Mark the CM SDRAM clock's parent as critical
-> >  clk: bcm2835: Skip PLLC clocks when deciding on a new clock parent
-> > 
-> > drivers/clk/bcm/clk-bcm2835.c | 63 +++++++++++++++++++++++++++++++++++++++++--
-> > 1 file changed, 61 insertions(+), 2 deletions(-)
+> > Ok, I think now we are understanding each other. So I keep two timing
+> > instances in struct nand_chip, one for initialization and one optimized
+> > timing. They both get initialized once during chip detection and can be
+> > reused when needed.  
 > 
-> Whole series:
-> Acked-by: Martin Sperl <kernel@martin.sperl.org>
+> Hm, not sure we need to keep 2 instances around, all we need to save is
+> the 'best_onfi_timing_mode', or we can just update
+> ->default_onfi_timing_mode based on the result of the timing mode  
+> detection, so that, when nand_setup_data_interface() is called, all we
+> have to do is:
 > 
-> Note that these patches are also seeing more testing downstream in 4.7
-> and there have been no hiccups seen either. Clock selection is working
-> as expected for I2S as well.
-> 
+> 	conf = chip->data_iface_conf;
+> 	conf->type = NAND_SDR_IFACE,
+> 	conf->timings.sdr = *onfi_async_timing_mode_to_sdr_timings(chip->default_onfi_timing_mode);
+> 	chip->setup_data_interface(mtd, conf, false);
 > 
 
-Ok. Applied all of them to clk-next
+After the discussion we had on IRC, I want to reconsider what I said.
+How about having a global nand_default_data_iface_config that would
+work will all chips (probably exposing mode 0 timings and an SDR
+interface).
+This one will be used even for DDR NANDs, because after a reset they
+return back to SDR mode, timing mode 0.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Now, I keep thinking that other timing modes should not be directly
+exposed.
+
+Doing that should solve the problem you mentioned: when interacting with
+multi-dies chips, chip->data_iface content is changed N times from mode
+0 to mode X during a reset (where N is the number of dies in your chip).
+
+Let me know what you think.
