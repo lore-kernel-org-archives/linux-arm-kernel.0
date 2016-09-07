@@ -1,23 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 Sep 2016 22:07:55 +0200
-Subject: [PATCH v2 00/10] pinctrl: exynos/samsung: Add header with values
- used for configuration
-In-Reply-To: <1472714638-15676-1-git-send-email-k.kozlowski@samsung.com>
-References: <1472714638-15676-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CACRpkdZaPFbaf6YcPtb5BFWRuUg59cYircp=09zHuMhhYAXoYA@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 07 Sep 2016 13:08:23 -0700
+Subject: [PATCH v2 3/3] ARM64: dts: meson-gxbb: Add Meson MHU Node
+In-Reply-To: <1471515027-3543-4-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Thu, 18 Aug 2016 12:10:27 +0200")
+References: <1471515027-3543-1-git-send-email-narmstrong@baylibre.com>
+ <1471515027-3543-4-git-send-email-narmstrong@baylibre.com>
+Message-ID: <7hwpinscaw.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 1, 2016 at 9:23 AM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-> Patch #1 should probably go through pinctrl tree. In that case I would
-> appreciate a stable branch/tag so DTS could base on top of it.
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 
-I don't see why. I have no changes in this area in the pinctrl tree
-for v4.9, so take it all through the ARM SoC DTS Exynos tree thing.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-for all patches, if the maintainer likes them.
+Applied,
 
-Yours.
-Linus Walleij
+Kevin
+
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> index e502c24..bdbf6e7 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> @@ -321,6 +321,15 @@
+>  				#clock-cells = <1>;
+>  				reg = <0x0 0x0 0x0 0x3db>;
+>  			};
+> +
+> +			mailbox: mailbox at 404 {
+> +				compatible = "amlogic,meson-gxbb-mhu";
+> +				reg = <0 0x404 0 0x4c>;
+> +				interrupts = <0 208 IRQ_TYPE_EDGE_RISING>,
+> +					     <0 209 IRQ_TYPE_EDGE_RISING>,
+> +					     <0 210 IRQ_TYPE_EDGE_RISING>;
+> +				#mbox-cells = <1>;
+> +			};
+>  		};
+>  
+>  		apb: apb at d0000000 {
