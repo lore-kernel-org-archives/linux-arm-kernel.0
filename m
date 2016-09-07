@@ -1,75 +1,60 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 7 Sep 2016 19:43:09 +0200
-Subject: [PATCH 2/3] tty/serial: at91: fix hardware handshake with GPIOs
-In-Reply-To: <20160907161324.27774-2-richard.genoud@gmail.com>
-References: <20160907161324.27774-1-richard.genoud@gmail.com>
- <20160907161324.27774-2-richard.genoud@gmail.com>
-Message-ID: <20160907174309.4xyd276rwbzd57sb@piout.net>
+From: ccc94453@vip.cybercity.dk (Rask Ingemann Lambertsen)
+Date: Wed, 7 Sep 2016 19:51:48 +0200
+Subject: [PATCH 5/6] ARM: dts: Add NextThing GR8 dtsi
+In-Reply-To: <20160831081817.5191-6-maxime.ripard@free-electrons.com>
+Message-ID: <20160907175148.c3fioqbr2k2pdqri@x1-6-00-0f-9f-c6-3e-90.cpe.webspeed.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2016 at 18:13:23 +0200, Richard Genoud wrote :
-> Commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when
-> hardware handshake is enabled") broke the hardware handshake when GPIOs
-> where used.
-> 
-> Hardware handshake with GPIOs used to work before this commit because
-> the CRTSCTS flag (termios->c_cflag) was set, but not the
-> ATMEL_US_USMODE_HWHS flag (controller register) ; so hardware handshake
-> enabled, but not handled by the controller.
-> 
-> This commit restores this behaviour.
-> 
-> NB: -stable is not Cced because it doesn't cleanly apply on 4.1+
-> and it will also need previous commit:
-> "serial: mctrl_gpio: implement mctrl_gpio_use_rtscts"
-> 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> Fixes: 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when hardware handshake is enabled")
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
+On Wed, Aug 31, 2016 at 4:18 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> From: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+>
+> The GR8 is an SoC made by Nextthing loosely based on the sun5i family.
+>
+> Since it's not clear yet what we can factor out and merge with the A10s and
+> A13 support, let's keep it out of the sun5i.dtsi include tree. We will
+> figure out what can be shared when things settle down.
+>
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->  drivers/tty/serial/atmel_serial.c | 11 ++++++++---
->  1 file changed, 8 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index 2eaa18ddef61..e9b4fbf88c2d 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -2025,6 +2025,7 @@ static void atmel_serial_pm(struct uart_port *port, unsigned int state,
->  static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  			      struct ktermios *old)
->  {
-> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
->  	unsigned long flags;
->  	unsigned int old_mode, mode, imr, quot, baud;
->  
-> @@ -2126,8 +2127,12 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  		atmel_uart_writel(port, ATMEL_US_TTGR,
->  				  port->rs485.delay_rts_after_send);
->  		mode |= ATMEL_US_USMODE_RS485;
-> -	} else if (termios->c_cflag & CRTSCTS) {
-> -		/* RS232 with hardware handshake (RTS/CTS) */
-> +	} else if ((termios->c_cflag & CRTSCTS) &&
-> +		   !mctrl_gpio_use_rtscts(atmel_port->gpios)) {
-> +		/*
-> +		 * RS232 with hardware handshake (RTS/CTS)
-> +		 * handled by the controller.
-> +		 */
->  		if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
->  			dev_info(port->dev, "not enabling hardware flow control because DMA is used");
->  			termios->c_cflag &= ~CRTSCTS;
-> @@ -2135,7 +2140,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  			mode |= ATMEL_US_USMODE_HWHS;
->  		}
->  	} else {
-> -		/* RS232 without hadware handshake */
-> +		/* RS232 without hadware handshake or controlled by GPIOs */
->  		mode |= ATMEL_US_USMODE_NORMAL;
->  	}
->  
+>  arch/arm/boot/dts/gr8.dtsi | 1080 ++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 1080 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/gr8.dtsi
+>
+> diff --git a/arch/arm/boot/dts/gr8.dtsi b/arch/arm/boot/dts/gr8.dtsi
+> new file mode 100644
+> index 000000000000..d21cfa3f3c14
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/gr8.dtsi
+
+In the node names, you sometimes use underscores and sometimes use hyphens.
+Here are the ones I spotted:
+
+> +               osc3M: osc3M_clk {
+> +               pll3x2: pll3x2_clk {
+> +               pll7x2: pll7x2_clk {
+> +       display-engine {
+> +               sram-controller at 01c00000 {
+> +                               otg_sram: sram-section at 0000 {
+> +               dma: dma-controller at 01c02000 {
+> +               tve0: tv-encoder at 01c0a000 {
+> +               tcon0: lcd-controller at 01c0c000 {
+> +               intc: interrupt-controller at 01c20400 {
+> +                       lcd_rgb666_pins: lcd_rgb666 at 0 {
+> +                       nand_pins_a: nand_base0 at 0 {
+> +                       nand_cs0_pins_a: nand_cs at 0 {
+> +                       nand_rb0_pins_a: nand_rb at 0 {
+> +                       uart1_cts_rts_pins_a: uart1-cts-rts at 0 {
+> +               fe0: display-frontend at 01e00000 {
+> +               be0: display-backend at 01e60000 {
+
+Underscores should not be used in node names. [1][2] Since you're adding a
+new file here, please use hyphens instead.
+
+[1] https://www.mail-archive.com/linux-kernel%40vger.kernel.org/msg1122967.html
+[2] https://www.mail-archive.com/linux-kernel%40vger.kernel.org/msg1145633.html
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Rask Ingemann Lambertsen
