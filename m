@@ -1,57 +1,33 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  7 Sep 2016 17:09:19 +0800
-Subject: [PATCH] simplefb: Disable and release clocks and regulators in
- destroy callback
-Message-ID: <20160907090919.27187-1-wens@csie.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Sep 2016 10:10:27 +0100
+Subject: [PATCH 8/8] ARM: pxa/lubbock: add pcmcia clock
+In-Reply-To: <87a8flhrsa.fsf@belgarion.home>
+References: <20160906163711.GB1041@n2100.armlinux.org.uk>
+ <E1bhJNx-0008DR-2l@rmk-PC.armlinux.org.uk>
+ <87a8flhrsa.fsf@belgarion.home>
+Message-ID: <20160907091027.GI1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-simplefb gets unregister when a proper framebuffer driver comes in and
-kicks it out. However the claimed clocks and regulators stay enabled
-as they are only released in the platform device remove function, which
-in theory would never get called.
+On Tue, Sep 06, 2016 at 07:17:09PM +0200, Robert Jarzmik wrote:
+> Russell King <rmk+kernel@armlinux.org.uk> writes:
+> 
+> > Add the required PCMCIA clock for the SA1111 "1800" device.  This clock
+> > is used to compute timing information for the PCMCIA interface in the
+> > SoC device, rather than the SA1111.  Hence, the provision of this clock
+> > is a convenience for the driver and does not reflect the hardware, so
+> > this must not be copied into DT.
+> >
+> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> But more importantly:
+> Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-Move the clock/regulator cleanup into the framebuffer destroy callback,
-which gets called as part of the framebuffer unregister process.
+Thanks Robert.  I guess no one else is be interested in these patches,
+so I'm going to drop them into -next today, and send them on Friday or
+over this weekend.
 
-Note this introduces asymmetry in how the resources are claimed and
-released.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/video/fbdev/simplefb.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-index e9cf19977285..3620d10a0d00 100644
---- a/drivers/video/fbdev/simplefb.c
-+++ b/drivers/video/fbdev/simplefb.c
-@@ -74,8 +74,14 @@ static int simplefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
- 	return 0;
- }
- 
-+struct simplefb_par;
-+static void simplefb_clocks_destroy(struct simplefb_par *par);
-+static void simplefb_regulators_destroy(struct simplefb_par *par);
-+
- static void simplefb_destroy(struct fb_info *info)
- {
-+	simplefb_regulators_destroy(info->par);
-+	simplefb_clocks_destroy(info->par);
- 	if (info->screen_base)
- 		iounmap(info->screen_base);
- }
-@@ -487,11 +493,8 @@ error_fb_release:
- static int simplefb_remove(struct platform_device *pdev)
- {
- 	struct fb_info *info = platform_get_drvdata(pdev);
--	struct simplefb_par *par = info->par;
- 
- 	unregister_framebuffer(info);
--	simplefb_regulators_destroy(par);
--	simplefb_clocks_destroy(par);
- 	framebuffer_release(info);
- 
- 	return 0;
 -- 
-2.9.3
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
