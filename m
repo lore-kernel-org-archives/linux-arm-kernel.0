@@ -1,41 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 Sep 2016 22:20:52 +0200
-Subject: [PATCH v2 00/10] pinctrl: exynos/samsung: Add header with values
- used for configuration
-In-Reply-To: <1472714638-15676-1-git-send-email-k.kozlowski@samsung.com>
-References: <1472714638-15676-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CACRpkdZuRym=SuAiBA_UsNmKd7N5n9g=z=ZxwcEk7J0BcXDsFw@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed,  7 Sep 2016 22:20:41 +0200
+Subject: [PATCH resend 5/5] phy-sun4i-usb: Warn when external vbus is detected
+In-Reply-To: <20160907202041.17656-1-hdegoede@redhat.com>
+References: <20160907202041.17656-1-hdegoede@redhat.com>
+Message-ID: <20160907202041.17656-6-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have one comment though, if you're anyway making changes to all
-the DTS files:
+Warn when external vbus is detected when we're trying to enable our
+own vbus.
 
-On Thu, Sep 1, 2016 at 9:23 AM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v2:
+-No changes
+Changes in v3:
+-No changes
+---
+ drivers/phy/phy-sun4i-usb.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-> -               samsung,pin-function = <2>;
-> -               samsung,pin-pud = <0>;
-> -               samsung,pin-drv = <0>;
-> +               samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
-> +               samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
-> +               samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
-
-Nowadays we have standard bindings for this, see
-Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-
-Section "Generic pin multiplexing node content".
-
-By patching the driver and bindings to accept also the standard
-bindings with just function and pins and also adding support
-for standard pin configurations like bias-disable
-bias-pull-up with the old samsung,* bindings as a fallback
-etc you can actually modernize the whole binding and
-DTS looks to something simpler.
-
-You will find that this is how newer platforms do it.
-
-But it is admittedly a bigger project.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index af42f8d..03f030b 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -390,8 +390,10 @@ static int sun4i_usb_phy_power_on(struct phy *_phy)
+ 
+ 	/* For phy0 only turn on Vbus if we don't have an ext. Vbus */
+ 	if (phy->index == 0 && sun4i_usb_phy0_have_vbus_det(data) &&
+-				data->vbus_det)
++				data->vbus_det) {
++		dev_warn(&_phy->dev, "External vbus detected, not enabling our own vbus\n");
+ 		return 0;
++	}
+ 
+ 	ret = regulator_enable(phy->vbus);
+ 	if (ret)
+-- 
+2.9.3
