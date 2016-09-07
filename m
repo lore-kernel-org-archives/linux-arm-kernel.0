@@ -1,59 +1,90 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Sep 2016 09:50:11 +0200
-Subject: [PATCH 24/26] ARM: dts: r8a7792: add QSPI support
-In-Reply-To: <cover.1473234371.git.horms+renesas@verge.net.au>
-References: <cover.1473234371.git.horms+renesas@verge.net.au>
-Message-ID: <c9acea6efdd7b08bf80a3721a44970252935621b.1473234372.git.horms+renesas@verge.net.au>
+From: jorik@kippendief.biz (jorik at kippendief.biz)
+Date: Wed,  7 Sep 2016 09:58:54 +0200
+Subject: [PATCH v4 1/8] dts: sun8i-h3: drop _a and address suffix from uart0
+ pinmux
+In-Reply-To: <1473235141-12768-1-git-send-email-jorik@kippendief.biz>
+References: <1473235141-12768-1-git-send-email-jorik@kippendief.biz>
+Message-ID: <1473235141-12768-2-git-send-email-jorik@kippendief.biz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Jorik Jonker <jorik@kippendief.biz>
 
-Define the generic R8A7792 part of the QSPI device node.
+These are the only possible pins for UART0 on H3
 
-Based  on the original (and large) patch by Vladimir Barinov
-<vladimir.barinov@cogentembedded.com>.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
 ---
- arch/arm/boot/dts/r8a7792.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts | 2 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts       | 2 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts     | 2 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts      | 2 +-
+ arch/arm/boot/dts/sun8i-h3.dtsi                 | 2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
-index 6ff3e365d56a..713141d38b3e 100644
---- a/arch/arm/boot/dts/r8a7792.dtsi
-+++ b/arch/arm/boot/dts/r8a7792.dtsi
-@@ -25,6 +25,7 @@
- 		i2c3 = &i2c3;
- 		i2c4 = &i2c4;
- 		i2c5 = &i2c5;
-+		spi0 = &qspi;
- 		vin0 = &vin0;
- 		vin1 = &vin1;
- 		vin2 = &vin2;
-@@ -556,6 +557,21 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+index f3b1d5f..3779280 100644
+--- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+@@ -179,7 +179,7 @@
  
-+		qspi: spi at e6b10000 {
-+			compatible = "renesas,qspi-r8a7792", "renesas,qspi";
-+			reg = <0 0xe6b10000 0 0x2c>;
-+			interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&mstp9_clks R8A7792_CLK_QSPI_MOD>;
-+			dmas = <&dmac0 0x17>, <&dmac0 0x18>,
-+			       <&dmac1 0x17>, <&dmac1 0x18>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+			num-cs = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		du: display at feb00000 {
- 			compatible = "renesas,du-r8a7792";
- 			reg = <0 0xfeb00000 0 0x40000>;
+ &uart0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&uart0_pins_a>;
++	pinctrl-0 = <&uart0_pins>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
+index f93f5d1..6cb29f3 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
+@@ -172,7 +172,7 @@
+ 
+ &uart0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&uart0_pins_a>;
++	pinctrl-0 = <&uart0_pins>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+index 0adf932..a1423cc 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+@@ -135,7 +135,7 @@
+ 
+ &uart0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&uart0_pins_a>;
++	pinctrl-0 = <&uart0_pins>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+index daf50b9..772239e 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+@@ -157,7 +157,7 @@
+ 
+ &uart0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&uart0_pins_a>;
++	pinctrl-0 = <&uart0_pins>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index fdf9fdb..ee10004 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -360,7 +360,7 @@
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
+ 
+-			uart0_pins_a: uart0 at 0 {
++			uart0_pins: uart0 {
+ 				allwinner,pins = "PA4", "PA5";
+ 				allwinner,function = "uart0";
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 -- 
-2.7.0.rc3.207.g0ac5344
+2.7.4
