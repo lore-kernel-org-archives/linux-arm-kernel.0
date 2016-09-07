@@ -1,141 +1,115 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  7 Sep 2016 11:07:08 +0100
-Subject: [PATCH 1/3] arm64: alternative: add auto-nop infrastructure
+Date: Wed,  7 Sep 2016 11:07:09 +0100
+Subject: [PATCH 2/3] arm64: use alternative auto-nop
 In-Reply-To: <1473242830-26246-1-git-send-email-mark.rutland@arm.com>
 References: <1473242830-26246-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1473242830-26246-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <1473242830-26246-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some cases, one side of an alternative sequence is simply a number of
-NOPs used to balance the other side. Keeping track of this manually is
-tedious, and the presence of large chains of NOPs makes the code more
-painful to read than necessary.
+Make use of the new alternative_if and alternative_else_nop_endif and
+get rid of our homebew NOP sleds, making the code simpler to read.
 
-To ameliorate matters, this patch adds a new alternative_else_nop_endif,
-which automatically balances an alternative sequence with a trivial NOP
-sled.
-
-In many cases, we would like a NOP-sled in the default case, and
-instructions patched in in the presence of a feature. To enable the NOPs
-to be generated automatically for this case, this patch also adds a new
-alternative_if, and updates alternative_else and alternative_endif to
-work with either alternative_if or alternative_endif.
+Note that for cpu_do_switch_mm the ret has been moved out of the
+alternative sequence, and in the default case there will be three
+additional NOPs executed.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Andre Przywara <andre.przywara@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Dave Martin <dave.martin@arm.com>
 Cc: James Morse <james.morse@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/alternative.h | 71 +++++++++++++++++++++++++++---------
- 1 file changed, 54 insertions(+), 17 deletions(-)
+ arch/arm64/kernel/entry.S  | 10 ++--------
+ arch/arm64/lib/copy_page.S | 13 ++++---------
+ arch/arm64/mm/proc.S       |  9 ++-------
+ 3 files changed, 8 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-index 8746ff6..4ddbf1c 100644
---- a/arch/arm64/include/asm/alternative.h
-+++ b/arch/arm64/include/asm/alternative.h
-@@ -90,34 +90,55 @@ void apply_alternatives(void *start, size_t length);
- .endm
- 
- /*
-- * Begin an alternative code sequence.
-+ * Alternative sequences
-+ *
-+ * The code for the case where the capability is not present will be
-+ * assembled and linked as normal. There are no restrictions on this
-+ * code.
-+ *
-+ * The code for the case where the capability is present will be
-+ * assembled into a special section to be used for dynamic patching.
-+ * Code for that case must:
-+ *
-+ * 1. Be exactly the same length (in bytes) as the default code
-+ *    sequence.
-  *
-- * The code that follows this macro will be assembled and linked as
-- * normal. There are no restrictions on this code.
-+ * 2. Not contain a branch target that is used outside of the
-+ *    alternative sequence it is defined in (branches into an
-+ *    alternative sequence are not fixed up).
-+ */
-+
-+/*
-+ * Begin an alternative code sequence.
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 441420c..1c76066 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -150,13 +150,7 @@
+ 	ldr	x23, [sp, #S_SP]		// load return stack pointer
+ 	msr	sp_el0, x23
+ #ifdef CONFIG_ARM64_ERRATUM_845719
+-alternative_if_not ARM64_WORKAROUND_845719
+-	nop
+-	nop
+-#ifdef CONFIG_PID_IN_CONTEXTIDR
+-	nop
+-#endif
+-alternative_else
++alternative_if ARM64_WORKAROUND_845719
+ 	tbz	x22, #4, 1f
+ #ifdef CONFIG_PID_IN_CONTEXTIDR
+ 	mrs	x29, contextidr_el1
+@@ -165,7 +159,7 @@ alternative_else
+ 	msr contextidr_el1, xzr
+ #endif
+ 1:
+-alternative_endif
++alternative_else_nop_endif
+ #endif
+ 	.endif
+ 	msr	elr_el1, x21			// set up the return data
+diff --git a/arch/arm64/lib/copy_page.S b/arch/arm64/lib/copy_page.S
+index 4c1e700..c3cd65e 100644
+--- a/arch/arm64/lib/copy_page.S
++++ b/arch/arm64/lib/copy_page.S
+@@ -29,14 +29,11 @@
+  *	x1 - src
   */
- .macro alternative_if_not cap
-+	.set .Lasm_alt_mode, 0
- 	.pushsection .altinstructions, "a"
- 	altinstruction_entry 661f, 663f, \cap, 662f-661f, 664f-663f
- 	.popsection
- 661:
- .endm
+ ENTRY(copy_page)
+-alternative_if_not ARM64_HAS_NO_HW_PREFETCH
+-	nop
+-	nop
+-alternative_else
++alternative_if ARM64_HAS_NO_HW_PREFETCH
+ 	# Prefetch two cache lines ahead.
+ 	prfm    pldl1strm, [x1, #128]
+ 	prfm    pldl1strm, [x1, #256]
+-alternative_endif
++alternative_else_nop_endif
  
-+.macro alternative_if cap
-+	.set .Lasm_alt_mode, 1
-+	.pushsection .altinstructions, "a"
-+	altinstruction_entry 663f, 661f, \cap, 664f-663f, 662f-661f
-+	.popsection
-+	.pushsection .altinstr_replacement, "ax"
-+	.align 2	/* So GAS knows label 661 is suitably aligned */
-+661:
-+.endm
-+
- /*
-- * Provide the alternative code sequence.
-- *
-- * The code that follows this macro is assembled into a special
-- * section to be used for dynamic patching. Code that follows this
-- * macro must:
-- *
-- * 1. Be exactly the same length (in bytes) as the default code
-- *    sequence.
-- *
-- * 2. Not contain a branch target that is used outside of the
-- *    alternative sequence it is defined in (branches into an
-- *    alternative sequence are not fixed up).
-+ * Provide the other half of the alternative code sequence.
-  */
- .macro alternative_else
--662:	.pushsection .altinstr_replacement, "ax"
-+662:
-+	.if .Lasm_alt_mode==0
-+	.pushsection .altinstr_replacement, "ax"
-+	.else
-+	.popsection
-+	.endif
- 663:
- .endm
+ 	ldp	x2, x3, [x1]
+ 	ldp	x4, x5, [x1, #16]
+@@ -52,11 +49,9 @@ alternative_endif
+ 1:
+ 	subs	x18, x18, #128
  
-@@ -125,11 +146,27 @@ void apply_alternatives(void *start, size_t length);
-  * Complete an alternative code sequence.
-  */
- .macro alternative_endif
--664:	.popsection
-+664:
-+	.if .Lasm_alt_mode==0
-+	.popsection
-+	.endif
- 	.org	. - (664b-663b) + (662b-661b)
- 	.org	. - (662b-661b) + (664b-663b)
- .endm
+-alternative_if_not ARM64_HAS_NO_HW_PREFETCH
+-	nop
+-alternative_else
++alternative_if ARM64_HAS_NO_HW_PREFETCH
+ 	prfm    pldl1strm, [x1, #384]
+-alternative_endif
++alternative_else_nop_endif
  
-+/*
-+ * Provides a trivial alternative or default sequence consisting solely
-+ * of NOPs. The number of NOPs is chosen automatically to match the
-+ * previous case.
-+ */
-+.macro alternative_else_nop_endif
-+alternative_else
-+.rept (662b-661b) / 4
-+	nop
-+.endr
-+alternative_endif
-+.endm
-+
- #define _ALTERNATIVE_CFG(insn1, insn2, cap, cfg, ...)	\
- 	alternative_insn insn1, insn2, cap, IS_ENABLED(cfg)
+ 	stnp	x2, x3, [x0]
+ 	ldp	x2, x3, [x1]
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 5bb61de..2bb088f 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -125,17 +125,12 @@ ENTRY(cpu_do_switch_mm)
+ 	bfi	x0, x1, #48, #16		// set the ASID
+ 	msr	ttbr0_el1, x0			// set TTBR0
+ 	isb
+-alternative_if_not ARM64_WORKAROUND_CAVIUM_27456
+-	ret
+-	nop
+-	nop
+-	nop
+-alternative_else
++alternative_if ARM64_WORKAROUND_CAVIUM_27456
+ 	ic	iallu
+ 	dsb	nsh
+ 	isb
++alternative_else_nop_endif
+ 	ret
+-alternative_endif
+ ENDPROC(cpu_do_switch_mm)
  
+ 	.pushsection ".idmap.text", "ax"
 -- 
 1.9.1
