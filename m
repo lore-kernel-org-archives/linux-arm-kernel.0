@@ -1,29 +1,42 @@
-From: voker57@gmail.com (Iaroslav Gridin)
-Date: Wed, 7 Sep 2016 19:20:26 +0300
-Subject: [PATCH] ARM: dts: msm8974: Add definitions for QCE & cryptobam
-In-Reply-To: <32148db3-74b8-c81f-9688-b286d9516b9d@mm-sol.com>
-References: <20160830153740.13275-1-voker57@gmail.com>
- <32148db3-74b8-c81f-9688-b286d9516b9d@mm-sol.com>
-Message-ID: <20160907162025.3t5t6ghposbzc43r@localhost>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 7 Sep 2016 11:22:02 -0500
+Subject: [PATCH 0/5] Use mmio-sram driver for Keystone MSMC RAM
+In-Reply-To: <d797bb0d-41b5-45a7-6faf-95baaab0215b@oracle.com>
+References: <20160901225846.31058-1-s-anna@ti.com>
+ <d797bb0d-41b5-45a7-6faf-95baaab0215b@oracle.com>
+Message-ID: <f6920801-554d-18e8-f140-44aeeb2f878e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Santosh,
 
-> > +			clocks = <&gcc GCC_CE2_AHB_CLK>,
-> > +				 <&gcc GCC_CE2_AXI_CLK>,
-> > +				 <&gcc GCC_CE2_CLK>;
-> > +			clock-names = "bam_clk", "axi_clk", "core_clk";
-> > +			#dma-cells = <1>;
-> > +			qcom,ee = <1>;
-> > +			qcom,controlled-remotely;
-> > +			};
+On 09/07/2016 11:11 AM, Santosh Shilimkar wrote:
+> Hi Suman,
 > 
-> indentation please.
+> On 9/1/2016 3:58 PM, Suman Anna wrote:
+>> Hi,
+>>
+>> The Keystone 2 family of SoCs have an on-chip RAM called the
+>> Multicore Shared Memory (MSM) RAM. This RAM is accessible through
+>> the Multicore Shared Memory Controller (MSMC). This series represents
+>> these on-chip RAMs as sram nodes so that the memory allocations
+>> can be managed by the in-kernel mmio-sram driver.
+>>
+>> The first 4 patches adds the basic SRAM nodes on each of the SoCs,
+>> and the last patch enables the generic on-chip SRAM driver for
+>> keystone defconfig.
+>>
+> The series looks good in general but I would like to understand
+> the users of this memory in kernel. Is that going to be posted
+> as a follow up patch ? Is the Power controller going to make
+> use of this SRAM for PM code ?
 
-Similar indentation (tabs then spaces to align) is used all over dts, am I doing it wrong or is
-this bad practice?
+Yes, the users will eventually follow. Power Controller code is not
+gonna be using this SRAM, it has its own RAM. This memory is gonna be
+split between various functional features like IPC, OPTEE integration,
+we already have the Boot Monitor code using this. We will have the
+memory split by either having static child nodes or drivers requesting
+the memory using gen_pool API.
 
-Example @ line 334:
-
->				interrupts = <0 8 0x4>,
->					     <0 7 0x4>;
+regards
+Suman
