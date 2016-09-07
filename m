@@ -1,38 +1,93 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Sep 2016 09:50:07 +0200
-Subject: [PATCH 20/26] ARM: dts: r8a7794: fix PWM clock parent
+Date: Wed,  7 Sep 2016 09:50:01 +0200
+Subject: [PATCH 14/26] ARM: dts: wheat: add Ethernet support
 In-Reply-To: <cover.1473234371.git.horms+renesas@verge.net.au>
 References: <cover.1473234371.git.horms+renesas@verge.net.au>
-Message-ID: <059baea1d33a64e752af201140ef122e29f2a19a.1473234372.git.horms+renesas@verge.net.au>
+Message-ID: <1d9a17dd3f98e3e8d5484224bc9e96f6cb30288b.1473234371.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-When removing the non-existing thermal clock I forgot to remove its
-parent from the node's "clocks" property  -- this led to a wrong PWM
-clock's parent clock.
+R8A7792  SoC  doesn't have the  EtherMAC core, so SMSC LAN89218 Ethernet
+chip was used instead on the Wheat debug board; this chip is compatible
+with SMSC LAN9115 for which  there's a (device  tree aware)  driver.
+Describe the chip  in the Wheat device tree unconditionally (the driver
+should fail the probe if the debug board isn't connected); enable DHCP and
+NFS root in the command line for the kernel boot...
 
-Fixes: 2a29f9d6fea8 ("ARM: dts: r8a7794: add MSTP5 clocks")
+Based  on the original (and large) patch by Vladimir Barinov
+<vladimir.barinov@cogentembedded.com>.
+
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7792-wheat.dts | 38 ++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 37 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 611ec6df5cf6..9365580a194f 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -1251,7 +1251,7 @@
- 		mstp5_clks: mstp5_clks at e6150144 {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
--			clocks = <&hp_clk>, <&extal_clk>, <&p_clk>;
-+			clocks = <&hp_clk>, <&p_clk>;
- 			#clock-cells = <1>;
- 			clock-indices = <R8A7794_CLK_AUDIO_DMAC0
- 					 R8A7794_CLK_PWM>;
+diff --git a/arch/arm/boot/dts/r8a7792-wheat.dts b/arch/arm/boot/dts/r8a7792-wheat.dts
+index 22ae14ffc917..e214d707f81d 100644
+--- a/arch/arm/boot/dts/r8a7792-wheat.dts
++++ b/arch/arm/boot/dts/r8a7792-wheat.dts
+@@ -21,7 +21,7 @@
+ 	};
+ 
+ 	chosen {
+-		bootargs = "ignore_loglevel";
++		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
+@@ -29,6 +29,31 @@
+ 		device_type = "memory";
+ 		reg = <0 0x40000000 0 0x40000000>;
+ 	};
++
++	d3_3v: regulator-3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "D3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	ethernet at 18000000 {
++		compatible = "smsc,lan89218", "smsc,lan9115";
++		reg = <0 0x18000000 0 0x100>;
++		phy-mode = "mii";
++		interrupt-parent = <&irqc>;
++		interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
++		smsc,irq-push-pull;
++		smsc,save-mac-address;
++		reg-io-width = <4>;
++		vddvario-supply = <&d3_3v>;
++		vdd33a-supply = <&d3_3v>;
++
++		pinctrl-0 = <&lan89218_pins>;
++		pinctrl-names = "default";
++	};
+ };
+ 
+ &extal_clk {
+@@ -40,6 +65,17 @@
+ 		groups = "scif0_data";
+ 		function = "scif0";
+ 	};
++
++	lan89218_pins: lan89218 {
++		intc {
++			groups = "intc_irq0";
++			function = "intc";
++		};
++		lbsc {
++			groups = "lbsc_ex_cs0";
++			function = "lbsc";
++		};
++	};
+ };
+ 
+ &scif0 {
 -- 
 2.7.0.rc3.207.g0ac5344
