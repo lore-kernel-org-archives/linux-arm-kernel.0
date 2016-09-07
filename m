@@ -1,64 +1,33 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 7 Sep 2016 10:33:52 +0800
-Subject: [PATCH v7 7/9] drm/mediatek: add dsi transfer function
-In-Reply-To: <1472815484-43821-8-git-send-email-yt.shen@mediatek.com>
-References: <1472815484-43821-1-git-send-email-yt.shen@mediatek.com>
- <1472815484-43821-8-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1473215632.11736.21.camel@mtksdaap41>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Wed, 7 Sep 2016 18:30:44 +0800
+Subject: [PATCH] ARM: imx: build cpuidle-imx6sx.c for imx6ul
+Message-ID: <1473244244-8002-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, YT:
+Fix build error when CONFIG_SOC_IMX6SX is disabled,
+as i.MX6UL reuses i.MX6SX's cpuidle driver.
 
-On Fri, 2016-09-02 at 19:24 +0800, YT Shen wrote:
-> From: shaoming chen <shaoming.chen@mediatek.com>
-> 
-> add dsi read/write commands for transfer function
-> 
-> Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_dsi.c | 188 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 188 insertions(+)
-> 
+arch/arm/mach-imx/built-in.o: In function `imx6ul_init_late':
+platform-spi_imx.c:(.init.text+0x445c): undefined reference to `imx6sx_cpuidle_init'
+make: *** [vmlinux] Error 1
 
-[snip...]
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ arch/arm/mach-imx/Makefile | 1 +
+ 1 file changed, 1 insertion(+)
 
->  
-> +static void mtk_dsi_irq_data_clear(struct mtk_dsi *dsi, u32 irq_bit)
-> +{
-> +	dsi->irq_data &= ~irq_bit;
-> +}
-> +
-
-[snip...]
-
-> +
-> +static s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi *dsi, u32 irq_flag,
-> +				     unsigned int timeout)
-> +{
-> +	s32 ret = 0;
-> +	unsigned long jiffies = msecs_to_jiffies(timeout);
-> +
-> +	ret = wait_event_interruptible_timeout(_dsi_irq_wait_queue,
-> +					       dsi->irq_data & irq_flag,
-> +					       jiffies);
-> +	if (ret == 0) {
-> +		dev_info(dsi->dev, "Wait DSI IRQ(0x%08x) Timeout\n", irq_flag);
-> +
-> +		mtk_dsi_enable(dsi);
-> +		mtk_dsi_reset_engine(dsi);
-> +	}
-> +
-> +	return ret;
-> +}
-
-I think mtk_dsi_irq_data_clear() and mtk_dsi_wait_for_irq_done() should
-be moved to the 6th patch [1] of this series because these two functions
-deal the irq control.
-
-
-[1] https://patchwork.kernel.org/patch/9310819/
-
-
-Regards,
-CK
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 2636adf..cab1289 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -27,6 +27,7 @@ obj-$(CONFIG_SOC_IMX5) += cpuidle-imx5.o
+ obj-$(CONFIG_SOC_IMX6Q) += cpuidle-imx6q.o
+ obj-$(CONFIG_SOC_IMX6SL) += cpuidle-imx6sl.o
+ obj-$(CONFIG_SOC_IMX6SX) += cpuidle-imx6sx.o
++obj-$(CONFIG_SOC_IMX6UL) += cpuidle-imx6sx.o
+ endif
+ 
+ ifdef CONFIG_SND_IMX_SOC
+-- 
+1.9.1
