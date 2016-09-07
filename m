@@ -1,81 +1,42 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Wed,  7 Sep 2016 16:06:16 -0700
-Subject: [PATCH v2 1/2] phy: rockchip-typec: add pm runtime support
-Message-ID: <1473289577-14101-1-git-send-email-zyw@rock-chips.com>
+Date: Wed,  7 Sep 2016 16:06:17 -0700
+Subject: [PATCH v2 2/2] arm64: dts: rk3399: add powerdomain for typec
+In-Reply-To: <1473289577-14101-1-git-send-email-zyw@rock-chips.com>
+References: <1473289577-14101-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <1473289577-14101-2-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds pm_runtime support for rockchip Type-C, so that power domain is
-enabled only when there is a transaction going on to help save power.
+The tcpc power domain will try to power up/down the power of Type-C PHY.
+Hence, we need control it in Type-C PHY driver with the pm_runtime helper.
 
 Signed-off-by: Chris Zhong <zyw@rock-chips.com>
 ---
 
-Changes in v2:
--- add pm_runtime_put_sync in err case
+Changes in v2: None
 
- drivers/phy/phy-rockchip-typec.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/phy/phy-rockchip-typec.c b/drivers/phy/phy-rockchip-typec.c
-index fb58a27..0b2f528 100644
---- a/drivers/phy/phy-rockchip-typec.c
-+++ b/drivers/phy/phy-rockchip-typec.c
-@@ -552,6 +552,12 @@ static int tcphy_phy_init(struct rockchip_typec_phy *tcphy, u8 mode)
- 		goto err_clk_core;
- 	}
- 
-+	ret = pm_runtime_get_sync(tcphy->dev);
-+	if (ret < 0) {
-+		dev_err(tcphy->dev, "cannot get pm runtime %d\n", ret);
-+		goto err_clk_ref;
-+	}
-+
- 	reset_control_deassert(tcphy->tcphy_rst);
- 
- 	property_enable(tcphy, &cfg->typec_conn_dir, tcphy->flip);
-@@ -600,8 +606,10 @@ static int tcphy_phy_init(struct rockchip_typec_phy *tcphy, u8 mode)
- 	return 0;
- 
- err_wait_pma:
-+	pm_runtime_put_sync(tcphy->dev);
- 	reset_control_assert(tcphy->uphy_rst);
- 	reset_control_assert(tcphy->tcphy_rst);
-+err_clk_ref:
- 	clk_disable_unprepare(tcphy->clk_ref);
- err_clk_core:
- 	clk_disable_unprepare(tcphy->clk_core);
-@@ -610,6 +618,7 @@ err_clk_core:
- 
- static void tcphy_phy_deinit(struct rockchip_typec_phy *tcphy)
- {
-+	pm_runtime_put_sync(tcphy->dev);
- 	reset_control_assert(tcphy->tcphy_rst);
- 	reset_control_assert(tcphy->uphy_rst);
- 	reset_control_assert(tcphy->pipe_rst);
-@@ -987,6 +996,15 @@ static int rockchip_typec_phy_probe(struct platform_device *pdev)
- 		return PTR_ERR(phy_provider);
- 	}
- 
-+	pm_runtime_enable(dev);
-+
-+	return 0;
-+}
-+
-+static int rockchip_typec_phy_remove(struct platform_device *pdev)
-+{
-+	pm_runtime_disable(&pdev->dev);
-+
- 	return 0;
- }
- 
-@@ -999,6 +1017,7 @@ MODULE_DEVICE_TABLE(of, rockchip_typec_phy_dt_ids);
- 
- static struct platform_driver rockchip_typec_phy_driver = {
- 	.probe		= rockchip_typec_phy_probe,
-+	.remove		= rockchip_typec_phy_remove,
- 	.driver		= {
- 		.name	= "rockchip-typec-phy",
- 		.of_match_table = rockchip_typec_phy_dt_ids,
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 8c51095..3eb52b3 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -1262,6 +1262,7 @@
+ 		clock-names = "tcpdcore", "tcpdphy-ref";
+ 		assigned-clocks = <&cru SCLK_UPHY0_TCPDCORE>;
+ 		assigned-clock-rates = <50000000>;
++		power-domains = <&power RK3399_PD_TCPD0>;
+ 		resets = <&cru SRST_UPHY0>,
+ 			 <&cru SRST_UPHY0_PIPE_L00>,
+ 			 <&cru SRST_P_UPHY0_TCPHY>;
+@@ -1290,6 +1291,7 @@
+ 		clock-names = "tcpdcore", "tcpdphy-ref";
+ 		assigned-clocks = <&cru SCLK_UPHY1_TCPDCORE>;
+ 		assigned-clock-rates = <50000000>;
++		power-domains = <&power RK3399_PD_TCPD1>;
+ 		resets = <&cru SRST_UPHY1>,
+ 			 <&cru SRST_UPHY1_PIPE_L00>,
+ 			 <&cru SRST_P_UPHY1_TCPHY>;
 -- 
 1.9.1
