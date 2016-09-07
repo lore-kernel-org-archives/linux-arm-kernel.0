@@ -1,60 +1,78 @@
-From: ccc94453@vip.cybercity.dk (Rask Ingemann Lambertsen)
-Date: Wed, 7 Sep 2016 19:51:48 +0200
-Subject: [PATCH 5/6] ARM: dts: Add NextThing GR8 dtsi
-In-Reply-To: <20160831081817.5191-6-maxime.ripard@free-electrons.com>
-Message-ID: <20160907175148.c3fioqbr2k2pdqri@x1-6-00-0f-9f-c6-3e-90.cpe.webspeed.dk>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 8 Sep 2016 01:51:54 +0800
+Subject: [PATCH V2 2/4] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <1473255233-154297-3-git-send-email-yuanzhichang@hisilicon.com>
+Message-ID: <201609080140.jX9o5nfX%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 31, 2016 at 4:18 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> From: Myl?ne Josserand <mylene.josserand@free-electrons.com>
->
-> The GR8 is an SoC made by Nextthing loosely based on the sun5i family.
->
-> Since it's not clear yet what we can factor out and merge with the A10s and
-> A13 support, let's keep it out of the sun5i.dtsi include tree. We will
-> figure out what can be shared when things settle down.
->
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm/boot/dts/gr8.dtsi | 1080 ++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 1080 insertions(+)
->  create mode 100644 arch/arm/boot/dts/gr8.dtsi
->
-> diff --git a/arch/arm/boot/dts/gr8.dtsi b/arch/arm/boot/dts/gr8.dtsi
-> new file mode 100644
-> index 000000000000..d21cfa3f3c14
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/gr8.dtsi
+Hi zhichang.yuan,
 
-In the node names, you sometimes use underscores and sometimes use hyphens.
-Here are the ones I spotted:
+[auto build test WARNING on linus/master]
+[also build test WARNING on v4.8-rc5 next-20160907]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
+[Check https://git-scm.com/docs/git-format-patch for more information]
 
-> +               osc3M: osc3M_clk {
-> +               pll3x2: pll3x2_clk {
-> +               pll7x2: pll7x2_clk {
-> +       display-engine {
-> +               sram-controller at 01c00000 {
-> +                               otg_sram: sram-section at 0000 {
-> +               dma: dma-controller at 01c02000 {
-> +               tve0: tv-encoder at 01c0a000 {
-> +               tcon0: lcd-controller at 01c0c000 {
-> +               intc: interrupt-controller at 01c20400 {
-> +                       lcd_rgb666_pins: lcd_rgb666 at 0 {
-> +                       nand_pins_a: nand_base0 at 0 {
-> +                       nand_cs0_pins_a: nand_cs at 0 {
-> +                       nand_rb0_pins_a: nand_rb at 0 {
-> +                       uart1_cts_rts_pins_a: uart1-cts-rts at 0 {
-> +               fe0: display-frontend at 01e00000 {
-> +               be0: display-backend at 01e60000 {
+url:    https://github.com/0day-ci/linux/commits/Zhichang-Yuan/ARM64-LPC-legacy-ISA-I-O-support/20160907-212837
+config: arm64-allmodconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-Underscores should not be used in node names. [1][2] Since you're adding a
-new file here, please use hyphens instead.
+All warnings (new ones prefixed by >>):
 
-[1] https://www.mail-archive.com/linux-kernel%40vger.kernel.org/msg1122967.html
-[2] https://www.mail-archive.com/linux-kernel%40vger.kernel.org/msg1145633.html
+   drivers/staging/xgifb/vb_init.c: In function 'XGIInitNew':
+>> drivers/staging/xgifb/vb_init.c:1363:1: warning: the frame size of 8496 bytes is larger than 8192 bytes [-Wframe-larger-than=]
+    } /* end of init */
+    ^
+--
+   drivers/video/fbdev/s3fb.c: In function 's3fb_set_par':
+>> drivers/video/fbdev/s3fb.c:911:1: warning: the frame size of 12320 bytes is larger than 8192 bytes [-Wframe-larger-than=]
+    }
+    ^
+--
+   drivers/video/fbdev/cirrusfb.c: In function 'cirrusfb_set_par_foo':
+>> drivers/video/fbdev/cirrusfb.c:1266:1: warning: the frame size of 8880 bytes is larger than 8192 bytes [-Wframe-larger-than=]
+    }
+    ^
 
--- 
-Rask Ingemann Lambertsen
+vim +1363 drivers/staging/xgifb/vb_init.c
+
+d7636e0b apatard at mandriva.com 2010-05-19  1347  
+bf32fcb9 Kenji Toyama         2011-04-23  1348  	XGINew_SetDRAMDefaultRegister340(HwDeviceExtension,
+bf32fcb9 Kenji Toyama         2011-04-23  1349  					 pVBInfo->P3d4,
+bf32fcb9 Kenji Toyama         2011-04-23  1350  					 pVBInfo);
+d7636e0b apatard at mandriva.com 2010-05-19  1351  
+fab04b97 Aaro Koskinen        2011-12-06  1352  	XGINew_SetDRAMSize_340(xgifb_info, HwDeviceExtension, pVBInfo);
+d7636e0b apatard at mandriva.com 2010-05-19  1353  
+38c09652 Aaro Koskinen        2012-11-04  1354  	xgifb_reg_set(pVBInfo->P3c4, 0x22, 0xfa);
+38c09652 Aaro Koskinen        2012-11-04  1355  	xgifb_reg_set(pVBInfo->P3c4, 0x21, 0xa3);
+d7636e0b apatard at mandriva.com 2010-05-19  1356  
+b053af16 Aaro Koskinen        2013-07-16  1357  	XGINew_ChkSenseStatus(pVBInfo);
+b053af16 Aaro Koskinen        2013-07-16  1358  	XGINew_SetModeScratch(pVBInfo);
+a24d60f4 Prashant P. Shah     2010-09-02  1359  
+8104e329 Aaro Koskinen        2011-03-13  1360  	xgifb_reg_set(pVBInfo->P3d4, 0x8c, 0x87);
+d7636e0b apatard at mandriva.com 2010-05-19  1361  
+b9ebf5e5 Aaro Koskinen        2011-03-13  1362  	return 1;
+b9ebf5e5 Aaro Koskinen        2011-03-13 @1363  } /* end of init */
+
+:::::: The code at line 1363 was first introduced by commit
+:::::: b9ebf5e5913307e67d226e61d953c3c4fd48de99 staging: xgifb: vb_init: move functions to avoid forward declarations
+
+:::::: TO: Aaro Koskinen <aaro.koskinen@iki.fi>
+:::::: CC: Greg Kroah-Hartman <gregkh@suse.de>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 51358 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/98f4ec17/attachment-0001.obj>
