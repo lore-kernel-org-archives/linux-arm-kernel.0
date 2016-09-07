@@ -1,39 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Sep 2016 09:41:28 +0200
-Subject: [PATCH 2/2] arm64: defconfig: Enable SDHI and GPIO_REGULATOR
-In-Reply-To: <cover.1473233745.git.horms+renesas@verge.net.au>
-References: <cover.1473233745.git.horms+renesas@verge.net.au>
-Message-ID: <6c04d2f7f1038bf6e5561827f862c6aa2beb4b37.1473233745.git.horms+renesas@verge.net.au>
+Date: Wed,  7 Sep 2016 09:41:38 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Updates for v4.9
+Message-ID: <cover.1473233986.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows use of the SDHI SD/SDIO controller present on R-Car Gen3 SoCs
-and already enabled in the DT of the r8a7795/salvator-x (H3).
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+Please consider these Renesas ARM based SoC updates for v4.9.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 458d891aaa8e..2c0be455230f 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -229,6 +229,7 @@ CONFIG_REGULATOR=y
- CONFIG_MFD_CROS_EC=y
- CONFIG_MFD_CROS_EC_I2C=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_HI655X=y
- CONFIG_REGULATOR_MAX77620=y
- CONFIG_REGULATOR_PWM=y
-@@ -287,6 +288,7 @@ CONFIG_MMC_SDHCI_OF_ESDHC=y
- CONFIG_MMC_SDHCI_TEGRA=y
- CONFIG_MMC_SDHCI_MSM=y
- CONFIG_MMC_SPI=y
-+CONFIG_MMC_SDHI=y
- CONFIG_MMC_DW=y
- CONFIG_MMC_DW_EXYNOS=y
- CONFIG_MMC_DW_K3=y
--- 
-2.7.0.rc3.207.g0ac5344
+
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v4.9
+
+for you to fetch changes up to 82acc69402d91bde8657c0db26e5211943de65fd:
+
+  ARM: shmobile: r8a7791: only use smp_init when SMP is selected (2016-08-24 09:08:57 +0200)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Updates for v4.9
+
+Clean-up:
+* Only use smp_init when SMP is selected
+
+Enablement:
+* Add debug-ll support for r8a7992
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: debug-ll: Add support for r8a7992
+
+Wolfram Sang (2):
+      ARM: shmobile: r8a7790: only use smp_init when SMP is selected
+      ARM: shmobile: r8a7791: only use smp_init when SMP is selected
+
+ arch/arm/Kconfig.debug                 | 8 ++++----
+ arch/arm/mach-shmobile/setup-r8a7790.c | 2 +-
+ arch/arm/mach-shmobile/setup-r8a7791.c | 2 +-
+ 3 files changed, 6 insertions(+), 6 deletions(-)
