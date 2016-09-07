@@ -1,52 +1,35 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 7 Sep 2016 11:59:08 +0200
-Subject: [PATCH] pinctrl/at91: Don't provide a default trigger type
-In-Reply-To: <1473170295-16712-1-git-send-email-marc.zyngier@arm.com>
-References: <1473170295-16712-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <97541e82-fe22-f6c0-075a-034ba821227c@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed,  7 Sep 2016 11:07:07 +0100
+Subject: [PATCH 0/3] arm64: alternative: add auto-nop support
+Message-ID: <1473242830-26246-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 06/09/2016 ? 15:58, Marc Zyngier a ?crit :
-> at91 used to set a default trigger type for GPIO interrupts in
-> order to cope with the old board files. These days are long gone,
-> and it all gets probed through DT.
-> 
-> Andras Szemzo reported that the Ethernet device on his board was
-> bailing to be probed, due to a conflict in interrupt trigger.
-> Surely enough, this is due to this default trigger still being
-> present, and turning this into a IRQ_TYPE_NONE fixes the issue.
-> 
-> Reported-by: Andras Szemzo <szemzo.andras@gmail.com>
-> Tested-by: Andras Szemzo <szemzo.andras@gmail.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+In some cases where we use pairs of alternative sequences, only one sequence
+does valuable work, and the other consists solely of NOPs. We have to manually
+ensure that both sequences are the same size, and some NOP sleds are partially
+contained unddef ifdefs.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Maintaining this balance is tedious, and the presence of these makes the code
+more painful to read than is necessary. These patches add helpers to handle
+these cases automatically, making the code more maintainable, and easier to
+read.
 
-Thanks, bye,
+Thanks,
+Mark.
 
-> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/pinctrl/pinctrl-at91.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index 80daead..9f09041 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -1614,7 +1614,7 @@ static int at91_gpio_of_irq_setup(struct platform_device *pdev,
->  				   &gpio_irqchip,
->  				   0,
->  				   handle_edge_irq,
-> -				   IRQ_TYPE_EDGE_BOTH);
-> +				   IRQ_TYPE_NONE);
->  	if (ret) {
->  		dev_err(&pdev->dev, "at91_gpio.%d: Couldn't add irqchip to gpiochip.\n",
->  			at91_gpio->pioc_idx);
-> 
+Mark Rutland (3):
+  arm64: alternative: add auto-nop infrastructure
+  arm64: use alternative auto-nop
+  arm64/kvm: use alternative auto-nop
 
+ arch/arm64/include/asm/alternative.h | 71 +++++++++++++++++++++++++++---------
+ arch/arm64/include/asm/kvm_mmu.h     | 10 ++---
+ arch/arm64/kernel/entry.S            | 10 +----
+ arch/arm64/kvm/hyp.S                 |  6 +--
+ arch/arm64/lib/copy_page.S           | 13 ++-----
+ arch/arm64/mm/proc.S                 |  9 +----
+ 6 files changed, 66 insertions(+), 53 deletions(-)
 
 -- 
-Nicolas Ferre
+1.9.1
