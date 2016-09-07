@@ -1,61 +1,57 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Sep 2016 09:50:13 +0200
-Subject: [PATCH 26/26] ARM: dts: wheat: add support for tactile switches
+Date: Wed,  7 Sep 2016 09:50:10 +0200
+Subject: [PATCH 23/26] ARM: dts: r8a7792: add QSPI clock
 In-Reply-To: <cover.1473234371.git.horms+renesas@verge.net.au>
 References: <cover.1473234371.git.horms+renesas@verge.net.au>
-Message-ID: <fa8f4aba72e6d619c003dab60f58ab6c7410e465.1473234372.git.horms+renesas@verge.net.au>
+Message-ID: <4719d8f9356a9ea8287ebdac04d759482524e67c.1473234372.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Add  support for the  tactile switches  SW2/3 (on the debug board) as a
-virtual keyboard like it  was done with the Blanche board).
+Describe the QSPI clock in the R8A7792 device tree.
+
+Based  on the original (and large) patch by Vladimir Barinov
+<vladimir.barinov@cogentembedded.com>.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7792-wheat.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/r8a7792.dtsi | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7792-wheat.dts b/arch/arm/boot/dts/r8a7792-wheat.dts
-index 0ec4bc606c61..6dbb94114a93 100644
---- a/arch/arm/boot/dts/r8a7792-wheat.dts
-+++ b/arch/arm/boot/dts/r8a7792-wheat.dts
-@@ -12,6 +12,7 @@
- /dts-v1/;
- #include "r8a7792.dtsi"
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
- 
- / {
- 	model = "Wheat";
-@@ -56,6 +57,25 @@
- 		pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
+index ff47755fb01e..6ff3e365d56a 100644
+--- a/arch/arm/boot/dts/r8a7792.dtsi
++++ b/arch/arm/boot/dts/r8a7792.dtsi
+@@ -860,6 +860,7 @@
+ 			clocks = <&cp_clk>, <&cp_clk>, <&cp_clk>, <&cp_clk>,
+ 				 <&cp_clk>, <&cp_clk>, <&cp_clk>, <&cp_clk>,
+ 				 <&cp_clk>, <&cp_clk>, <&p_clk>, <&p_clk>,
++				 <&cpg_clocks R8A7792_CLK_QSPI>,
+ 				 <&cp_clk>, <&cp_clk>, <&hp_clk>, <&hp_clk>,
+ 				 <&hp_clk>, <&hp_clk>, <&hp_clk>, <&hp_clk>;
+ 			#clock-cells = <1>;
+@@ -870,6 +871,7 @@
+ 				R8A7792_CLK_GPIO1 R8A7792_CLK_GPIO0
+ 				R8A7792_CLK_GPIO11 R8A7792_CLK_GPIO10
+ 				R8A7792_CLK_CAN1 R8A7792_CLK_CAN0
++				R8A7792_CLK_QSPI_MOD
+ 				R8A7792_CLK_GPIO9 R8A7792_CLK_GPIO8
+ 				R8A7792_CLK_I2C5 R8A7792_CLK_I2C4
+ 				R8A7792_CLK_I2C3 R8A7792_CLK_I2C2
+@@ -879,8 +881,9 @@
+ 				"gpio7", "gpio6", "gpio5", "gpio4",
+ 				"gpio3", "gpio2", "gpio1", "gpio0",
+ 				"gpio11", "gpio10", "can1", "can0",
+-				"gpio9", "gpio8", "i2c5", "i2c4",
+-				"i2c3",	"i2c2", "i2c1", "i2c0";
++				"qspi_mod", "gpio9", "gpio8",
++				"i2c5", "i2c4", "i2c3", "i2c2",
++				"i2c1", "i2c0";
+ 		};
  	};
- 
-+	keyboard {
-+		compatible = "gpio-keys";
-+
-+		key-a {
-+			linux,code = <KEY_A>;
-+			label = "SW2";
-+			wakeup-source;
-+			debounce-interval = <20>;
-+			gpios = <&gpio3 20 GPIO_ACTIVE_LOW>;
-+		};
-+		key-b {
-+			linux,code = <KEY_B>;
-+			label = "SW3";
-+			wakeup-source;
-+			debounce-interval = <20>;
-+			gpios = <&gpio11 2 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
- 	vcc_sdhi0: regulator-vcc-sdhi0 {
- 		compatible = "regulator-fixed";
  
 -- 
 2.7.0.rc3.207.g0ac5344
