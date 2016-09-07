@@ -1,36 +1,45 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Sep 2016 09:41:39 +0200
-Subject: [PATCH 3/3] ARM: shmobile: r8a7791: only use smp_init when SMP is
- selected
-In-Reply-To: <cover.1473233986.git.horms+renesas@verge.net.au>
-References: <cover.1473233986.git.horms+renesas@verge.net.au>
-Message-ID: <82acc69402d91bde8657c0db26e5211943de65fd.1473233986.git.horms+renesas@verge.net.au>
+From: jorik@kippendief.biz (jorik at kippendief.biz)
+Date: Wed,  7 Sep 2016 09:41:40 +0200
+Subject: [PATCH v3 2/8] dts: sun8i-h3: clarify uart1 pinmux definition name
+In-Reply-To: <1473234106-32330-1-git-send-email-jorik@kippendief.biz>
+References: <1473234106-32330-1-git-send-email-jorik@kippendief.biz>
+Message-ID: <1473234106-32330-3-git-send-email-jorik@kippendief.biz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+From: Jorik Jonker <jorik@kippendief.biz>
 
-We use the helper function which populates the smp_init pointer only in
-case of SMP.
-
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
 ---
- arch/arm/mach-shmobile/setup-r8a7791.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts | 2 +-
+ arch/arm/boot/dts/sun8i-h3.dtsi                 | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7791.c b/arch/arm/mach-shmobile/setup-r8a7791.c
-index 110e8b588e56..26e2d181a190 100644
---- a/arch/arm/mach-shmobile/setup-r8a7791.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7791.c
-@@ -29,7 +29,7 @@ static const char *const r8a7791_boards_compat_dt[] __initconst = {
+diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+index 3779280..45f623b 100644
+--- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+@@ -185,7 +185,7 @@
+ 
+ &uart1 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&uart1_pins_a>;
++	pinctrl-0 = <&uart1_rts_cts_pins>;
+ 	status = "okay";
  };
  
- DT_MACHINE_START(R8A7791_DT, "Generic R8A7791 (Flattened Device Tree)")
--	.smp_init	= shmobile_smp_init_fallback_ops,
-+	.smp_init	= smp_init_ops(shmobile_smp_init_fallback_ops),
- 	.smp		= smp_ops(r8a7791_smp_ops),
- 	.init_early	= shmobile_init_delay,
- 	.init_time	= rcar_gen2_timer_init,
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index ee10004..933d42c 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -367,7 +367,7 @@
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
+ 
+-			uart1_pins_a: uart1 at 0 {
++			uart1_rts_cts_pins: uart1_rts_cts {
+ 				allwinner,pins = "PG6", "PG7", "PG8", "PG9";
+ 				allwinner,function = "uart1";
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 -- 
-2.7.0.rc3.207.g0ac5344
+2.7.4
