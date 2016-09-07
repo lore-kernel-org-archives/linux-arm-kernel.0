@@ -1,113 +1,47 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 7 Sep 2016 14:31:43 +0200
-Subject: [PATCH 1/7] mtd: nand: Create a NAND reset function
-In-Reply-To: <1473250902-31139-2-git-send-email-s.hauer@pengutronix.de>
-References: <1473250902-31139-1-git-send-email-s.hauer@pengutronix.de>
- <1473250902-31139-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20160907143143.55cfd7d2@bbrezillon>
+From: wente.wang@nxp.com (Winter Wang)
+Date: Wed, 7 Sep 2016 12:53:04 +0000
+Subject: [PATCH] ARM: dts: imx6ul-pico-hobbit: add sgtl5000 sound card
+ support
+In-Reply-To: <CAOMZO5CRQwOcHE1sHi35r6KjDvVh1Q5xTbBxL7gxZW2aNvgb6Q@mail.gmail.com>
+References: <1473063707-31282-1-git-send-email-wente.wang@nxp.com>
+ <CAOMZO5CRQwOcHE1sHi35r6KjDvVh1Q5xTbBxL7gxZW2aNvgb6Q@mail.gmail.com>
+Message-ID: <AM3PR04MB52998B7D202FC6F1EFB8BC38FF80@AM3PR04MB529.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  7 Sep 2016 14:21:36 +0200
-Sascha Hauer <s.hauer@pengutronix.de> wrote:
-
-> When NAND devices are resetted some initialization may have to be done,
-> like for example they have to be configured for the timing mode that
-> shall be used. To get a common place where this initialization can be
-> implemented create a nand_reset() function. This currently only issues
-> a NAND_CMD_RESET to the NAND device. The places issuing this command
-> manually are replaced with a call to nand_reset().
+> -----Original Message-----
+> From: Fabio Estevam [mailto:festevam at gmail.com]
+> To: Wente Wang <wente.wang@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>; Fabio Estevam <fabio.estevam@nxp.com>;
+> Sascha Hauer <kernel@pengutronix.de>; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org
+> Subject: Re: [PATCH] ARM: dts: imx6ul-pico-hobbit: add sgtl5000 sound card
+> support
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  drivers/mtd/nand/nand_base.c | 23 ++++++++++++++++++-----
->  include/linux/mtd/nand.h     |  4 ++++
->  2 files changed, 22 insertions(+), 5 deletions(-)
+> Hi Winter,
 > 
-> diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-> index 77533f7..1f704cc 100644
-> --- a/drivers/mtd/nand/nand_base.c
-> +++ b/drivers/mtd/nand/nand_base.c
-> @@ -948,6 +948,19 @@ static int nand_wait(struct mtd_info *mtd, struct nand_chip *chip)
->  }
->  
->  /**
-> + * nand_reset - Reset and initialize a NAND device
-> + * @chip: The NAND chip
-> + *
-> + * Returns 0 for success or negative error code otherwise
-> + */
-> +int nand_reset(struct nand_chip *chip)
-> +{
-> +	chip->cmdfunc(&chip->mtd, NAND_CMD_RESET, -1, -1);
-
-		      ^ nand_to_mtd(chip)
-
-Otherwise, the patch looks good.
-
-> +
-> +	return 0;
-> +}
-> +
-> +/**
->   * __nand_unlock - [REPLACEABLE] unlocks specified locked blocks
->   * @mtd: mtd info
->   * @ofs: offset to start unlock from
-> @@ -1025,7 +1038,7 @@ int nand_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
->  	 * some operation can also clear the bit 7 of status register
->  	 * eg. erase/program a locked block
->  	 */
-> -	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
-> +	nand_reset(chip);
->  
->  	/* Check, if it is write protected */
->  	if (nand_check_wp(mtd)) {
-> @@ -1084,7 +1097,7 @@ int nand_lock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
->  	 * some operation can also clear the bit 7 of status register
->  	 * eg. erase/program a locked block
->  	 */
-> -	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
-> +	nand_reset(chip);
->  
->  	/* Check, if it is write protected */
->  	if (nand_check_wp(mtd)) {
-> @@ -2788,7 +2801,7 @@ static int nand_do_write_oob(struct mtd_info *mtd, loff_t to,
->  	 * if we don't do this. I have no clue why, but I seem to have 'fixed'
->  	 * it in the doc2000 driver in August 1999.  dwmw2.
->  	 */
-> -	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
-> +	nand_reset(chip);
->  
->  	/* Check, if it is write protected */
->  	if (nand_check_wp(mtd)) {
-> @@ -3829,7 +3842,7 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
->  	 * Reset the chip, required by some chips (e.g. Micron MT29FxGxxxxx)
->  	 * after power-up.
->  	 */
-> -	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
-> +	nand_reset(chip);
->  
->  	/* Send the command for reading device ID */
->  	chip->cmdfunc(mtd, NAND_CMD_READID, 0x00, -1);
-> @@ -4161,7 +4174,7 @@ int nand_scan_ident(struct mtd_info *mtd, int maxchips,
->  	for (i = 1; i < maxchips; i++) {
->  		chip->select_chip(mtd, i);
->  		/* See comment in nand_get_flash_type for reset */
-> -		chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
-> +		nand_reset(chip);
->  		/* Send the command for reading device ID */
->  		chip->cmdfunc(mtd, NAND_CMD_READID, 0x00, -1);
->  		/* Read manufacturer and device IDs */
-> diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-> index 8dd6e01..9890df2 100644
-> --- a/include/linux/mtd/nand.h
-> +++ b/include/linux/mtd/nand.h
-> @@ -1093,4 +1093,8 @@ int nand_read_oob_std(struct mtd_info *mtd, struct nand_chip *chip, int page);
->  /* Default read_oob syndrome implementation */
->  int nand_read_oob_syndrome(struct mtd_info *mtd, struct nand_chip *chip,
->  			   int page);
-> +
-> +/* Reset and initialize a NAND device */
-> +int nand_reset(struct nand_chip *chip);
-> +
->  #endif /* __LINUX_MTD_NAND_H */
+> On Mon, Sep 5, 2016 at 5:21 AM, Winter Wang <wente.wang@nxp.com> wrote:
+> > use simple-audio-card to support sgtl5000 with SAI interface.
+> 
+> Is this really needed? Currently we get audio working via sound/soc/fsl/fsl-
+> asoc-card.c driver.
+> > diff --git a/arch/arm/boot/dts/imx6ul-pinfunc.h
+> > b/arch/arm/boot/dts/imx6ul-pinfunc.h
+> > index 0034eeb..3397b49 100644
+> > --- a/arch/arm/boot/dts/imx6ul-pinfunc.h
+> > +++ b/arch/arm/boot/dts/imx6ul-pinfunc.h
+> > @@ -924,7 +924,7 @@
+> >  #define MX6UL_PAD_CSI_DATA06__ECSPI1_MOSI              0x01fc 0x0488
+> 0x053c 3 1
+> >  #define MX6UL_PAD_CSI_DATA06__EIM_AD06                 0x01fc 0x0488
+> 0x0000 4 0
+> >  #define MX6UL_PAD_CSI_DATA06__GPIO4_IO27               0x01fc 0x0488
+> 0x0000 5 0
+> > -#define MX6UL_PAD_CSI_DATA06__SAI1_RX_DATA             0x01fc 0x0488
+> 0x0000 6 0
+> > +#define MX6UL_PAD_CSI_DATA06__SAI1_RX_DATA             0x01fc 0x0488
+> 0x05E4 6 1
+> 
+> This should be a separate change and you need to explain it.
+I'm trying to enable pico's sgtl5000 on 4.4 kernel, but recording is not working sometimes.
+I think it may related with pinfunc.h, will check that.
