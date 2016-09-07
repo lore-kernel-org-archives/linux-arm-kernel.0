@@ -1,14 +1,14 @@
 From: andy.yan@rock-chips.com (Andy Yan)
-Date: Wed,  7 Sep 2016 19:46:30 +0800
-Subject: [PATCH 1/2] arm64: defconfig: enable I2C and DW MMC controller on
- rockchip platform
-Message-ID: <1473248790-27101-1-git-send-email-andy.yan@rock-chips.com>
+Date: Wed,  7 Sep 2016 19:50:28 +0800
+Subject: [PATCH 2/2] arm64: defconfig: enable MFD RK808 and RK808 regulator
+In-Reply-To: <1473248790-27101-1-git-send-email-andy.yan@rock-chips.com>
+References: <1473248790-27101-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1473249028-27161-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I2C and MMC are very basic modules for a board to bootup, as I2C always
-used to configure PMIC and MMC devices often used to store filesytem.
-So enable them here to let the rockchip based arm64 boards can bootup.
+Many rockchip based arm64 boards use RK808 as PMIC, so
+enabe it here let the board bootup normally.
 
 Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 ---
@@ -17,24 +17,24 @@ Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
  1 file changed, 2 insertions(+)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index eadf485..427b6dc 100644
+index 427b6dc..4b61ed9 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -222,6 +222,7 @@ CONFIG_I2C_QUP=y
- CONFIG_I2C_TEGRA=y
- CONFIG_I2C_UNIPHIER_F=y
- CONFIG_I2C_RCAR=y
-+CONFIG_I2C_RK3X=y
- CONFIG_I2C_CROS_EC_TUNNEL=y
- CONFIG_SPI=y
- CONFIG_SPI_ORION=y
-@@ -323,6 +324,7 @@ CONFIG_MMC_SPI=y
- CONFIG_MMC_DW=y
- CONFIG_MMC_DW_EXYNOS=y
- CONFIG_MMC_DW_K3=y
-+CONFIG_MMC_DW_ROCKCHIP=y
- CONFIG_MMC_SUNXI=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
+@@ -258,6 +258,7 @@ CONFIG_WATCHDOG=y
+ CONFIG_RENESAS_WDT=y
+ CONFIG_S3C2410_WATCHDOG=y
+ CONFIG_MFD_MAX77620=y
++CONFIG_MFD_RK808=y
+ CONFIG_MFD_SPMI_PMIC=y
+ CONFIG_MFD_SEC_CORE=y
+ CONFIG_MFD_HI655X_PMIC=y
+@@ -270,6 +271,7 @@ CONFIG_REGULATOR_MAX77620=y
+ CONFIG_REGULATOR_PWM=y
+ CONFIG_REGULATOR_QCOM_SMD_RPM=y
+ CONFIG_REGULATOR_QCOM_SPMI=y
++CONFIG_REGULATOR_RK808=y
+ CONFIG_REGULATOR_S2MPS11=y
+ CONFIG_DRM=m
+ CONFIG_DRM_NOUVEAU=m
 -- 
 2.7.4
