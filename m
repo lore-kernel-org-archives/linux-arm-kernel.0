@@ -1,136 +1,76 @@
-From: zach.brown@ni.com (Zach Brown)
-Date: Wed, 7 Sep 2016 11:06:21 -0500
-Subject: [PATCH v4 2/2] sdhci-of-arasan: Set controller to test mode when
- xlnx-fails-without-test-cd is present
-In-Reply-To: <43273dd9-16d9-e6cb-49cd-fb924310a386@xilinx.com>
-References: <1473194084-14485-1-git-send-email-zach.brown@ni.com>
- <1473194084-14485-2-git-send-email-zach.brown@ni.com>
- <43273dd9-16d9-e6cb-49cd-fb924310a386@xilinx.com>
-Message-ID: <20160907160620.GA26308@zach-desktop>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 7 Sep 2016 12:08:20 -0400 (EDT)
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <3189648.KnWLgq0lTY@wuerfel>
+Message-ID: <Pine.LNX.4.44L0.1609071158160.2115-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2016 at 07:15:02AM +0200, Michal Simek wrote:
-> On 6.9.2016 22:34, Zach Brown wrote:
-> > The sdhci controller on xilinx zynq devices will not function unless
-> > the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
-> > In cases where it is impossible to provide the CD bit in hardware,
-> > setting the controller to test mode and then setting inserted to true
-> > will get the controller to function without the CD bit.
-> > 
-> > When the device has the property xlnx-fails-without-test-cd the driver
-> > changes the controller to test mode and sets test inserted to true to
-> > make the controller function.
-> > 
-> > Signed-off-by: Zach Brown <zach.brown@ni.com>
-> > ---
-> >  drivers/mmc/host/sdhci-of-arasan.c | 34 +++++++++++++++++++++++++++++++++-
-> >  drivers/mmc/host/sdhci.h           |  2 ++
-> >  2 files changed, 35 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> > index b6f4c1d..63b0c2a 100644
-> > --- a/drivers/mmc/host/sdhci-of-arasan.c
-> > +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> > @@ -23,6 +23,7 @@
-> >  #include <linux/of_device.h>
-> >  #include <linux/phy/phy.h>
-> >  #include "sdhci-pltfm.h"
-> > +#include <linux/of.h>
-> >  
-> >  #define SDHCI_ARASAN_CLK_CTRL_OFFSET	0x2c
-> >  
-> > @@ -38,6 +39,10 @@
-> >  struct sdhci_arasan_data {
-> >  	struct clk	*clk_ahb;
-> >  	struct phy	*phy;
-> > +	unsigned int arasan_quirks; /* Arasan deviations from spec */
-> > +
-> > +/* Controller does not have CD wired and will not function normally without */
-> > +#define SDHCI_ARASAN_QUIRK_FAILS_WITHOUT_TEST_CD (1<<0)
-> 
-> Also here. If it is fine not to use BIT macro here you should at least
-> fix coding style (1 << 0)
-> 
-> 
-> >  };
+On Wed, 7 Sep 2016, Arnd Bergmann wrote:
 
-I'll make sure to fix that if I end up not using the BIT macro. Thank you.
-> >  
-> >  static unsigned int sdhci_arasan_get_timeout_clock(struct sdhci_host *host)
-> > @@ -79,12 +84,32 @@ static void sdhci_arasan_set_clock(struct sdhci_host *host, unsigned int clock)
-> >  	}
-> >  }
-> >  
-> > +void sdhci_arasan_reset(struct sdhci_host *host, u8 mask)
-> > +{
-> > +	u8 ctrl;
-> > +	struct sdhci_pltfm_host *pltfm_host;
-> > +	struct sdhci_arasan_data *sdhci_arasan;
-> > +
-> > +	sdhci_reset(host, mask);
-> > +
-> > +	pltfm_host = sdhci_priv(host);
-> > +	sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
-> > +
-> > +	if (sdhci_arasan->arasan_quirks &
-> > +	     SDHCI_ARASAN_QUIRK_FAILS_WITHOUT_TEST_CD) {
-> > +		ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
-> > +		ctrl |= SDHCI_CTRL_CDTEST_INS |
-> > +			SDHCI_CTRL_CDTEST_EN;
-> > +		sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
-> > +	}
-> > +}
-> > +
-> >  static struct sdhci_ops sdhci_arasan_ops = {
-> >  	.set_clock = sdhci_arasan_set_clock,
-> >  	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
-> >  	.get_timeout_clock = sdhci_arasan_get_timeout_clock,
-> >  	.set_bus_width = sdhci_set_bus_width,
-> > -	.reset = sdhci_reset,
-> > +	.reset = sdhci_arasan_reset,
-> >  	.set_uhs_signaling = sdhci_set_uhs_signaling,
-> >  };
-> >  
-> > @@ -179,6 +204,7 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
-> >  	struct sdhci_host *host;
-> >  	struct sdhci_pltfm_host *pltfm_host;
-> >  	struct sdhci_arasan_data *sdhci_arasan;
-> > +	struct device_node *np = pdev->dev.of_node;
-> >  
-> >  	host = sdhci_pltfm_init(pdev, &sdhci_arasan_pdata,
-> >  				sizeof(*sdhci_arasan));
-> > @@ -215,6 +241,12 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
-> >  	}
-> >  
-> >  	sdhci_get_of_property(pdev);
-> > +
-> > +	if (of_get_property(np, "xlnx-fails-without-test-cd", NULL)) {
-> > +		sdhci_arasan->arasan_quirks |=
-> > +				SDHCI_ARASAN_QUIRK_FAILS_WITHOUT_TEST_CD;
-> > +	}
-> > +
-> >  	pltfm_host->clk = clk_xin;
-> >  
-> >  	ret = mmc_of_parse(host->mmc);
-> > diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> > index 609f87c..ac0ba18 100644
-> > --- a/drivers/mmc/host/sdhci.h
-> > +++ b/drivers/mmc/host/sdhci.h
-> > @@ -84,6 +84,8 @@
-> >  #define   SDHCI_CTRL_ADMA32	0x10
-> >  #define   SDHCI_CTRL_ADMA64	0x18
-> >  #define   SDHCI_CTRL_8BITBUS	0x20
-> > +#define  SDHCI_CTRL_CDTEST_INS   0x40
-> > +#define  SDHCI_CTRL_CDTEST_EN    0x80
+> However, to summarize the discussion so far, I agree that
+> of_dma_configure() is not the solution to these problems, and I think
+> we can do much better:
 > 
-> The issue is still present here.
+> Splitting the usb_bus->controller field into the Linux-internal device
+> (used for the sysfs hierarchy, for printks and for power management)
+> and a new pointer (used for DMA, DT enumeration and phy lookup) probably
+> covers all that we really need.
 > 
-Sorry for not getting it last time. Your last email cleared it up for me. I
-have corrected the issue with my editor. The style will be fixed in the next
-version. Thank you for pointing it out.
+> I've prototyped it below, with the dwc3, xhci and chipidea changes
+> together with the core changes. I've surely made mistakes there and
+> don't expect it to work out of the box, but this should give an
+> idea of how I think this can all be solved in the least invasive
+> way.
+> 
+> I noticed that the gadget interface already has a way to handle the
+> DMA allocation by device, so I added that in as well.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+>  drivers/usb/chipidea/core.c    |  4 ----
+>  drivers/usb/chipidea/host.c    |  3 ++-
+>  drivers/usb/chipidea/udc.c     |  8 ++++----
+>  drivers/usb/core/buffer.c      | 12 ++++++------
+>  drivers/usb/core/hcd.c         | 48 +++++++++++++++++++++++++++++-------------------
+>  drivers/usb/core/usb.c         | 16 ++++++++--------
+>  drivers/usb/dwc3/core.c        | 28 +++++++++++++++-------------
+>  drivers/usb/dwc3/core.h        |  1 +
+>  drivers/usb/dwc3/dwc3-exynos.c | 10 ----------
+>  drivers/usb/dwc3/dwc3-st.c     |  1 -
+>  drivers/usb/dwc3/ep0.c         |  8 ++++----
+>  drivers/usb/dwc3/gadget.c      | 34 +++++++++++++++++-----------------
+>  drivers/usb/dwc3/host.c        | 13 ++++---------
+>  drivers/usb/host/ehci-fsl.c    |  4 ++--
 
-> Thanks,
-> Michal
-> 
-> 
+How did this driver end up in the patch?
+
+>  drivers/usb/host/xhci-plat.c   | 32 +++++++++++++++++++++++++-------
+>  include/linux/usb.h            |  1 +
+>  include/linux/usb/hcd.h        |  3 +++
+
+> diff --git a/drivers/usb/host/ehci-fsl.c b/drivers/usb/host/ehci-fsl.c
+> index 9f5ffb629973..b2419950221f 100644
+> --- a/drivers/usb/host/ehci-fsl.c
+> +++ b/drivers/usb/host/ehci-fsl.c
+> @@ -96,8 +96,8 @@ static int fsl_ehci_drv_probe(struct platform_device *pdev)
+>  	}
+>  	irq = res->start;
+>  
+> -	hcd = usb_create_hcd(&fsl_ehci_hc_driver, &pdev->dev,
+> -				dev_name(&pdev->dev));
+> +	hcd = __usb_create_hcd(&fsl_ehci_hc_driver, &pdev->dev.parent,
+> +				&pdev->dev, dev_name(&pdev->dev), NULL);
+
+Based on the
+
+	if (of_device_is_compatible(dev->parent->of_node,
+				    "fsl,mpc5121-usb2-dr")) {
+
+lines in the driver?
+
+>  	if (!hcd) {
+>  		retval = -ENOMEM;
+>  		goto err1;
+
+Alan Stern
