@@ -1,75 +1,66 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Wed,  7 Sep 2016 11:17:25 -0700
-Subject: [PATCH] phy: rockchip-typec: add pm runtime support
-Message-ID: <1473272245-28841-1-git-send-email-zyw@rock-chips.com>
+From: john@metanate.com (John Keeping)
+Date: Wed, 7 Sep 2016 19:18:23 +0100
+Subject: [PATCH 1/2] clk: rockchip: add I2S internal clock IDs for rk3288
+In-Reply-To: <2003903.QOgKKA6m1b@phil>
+References: <20160907165330.14607-1-john@metanate.com>
+ <2003903.QOgKKA6m1b@phil>
+Message-ID: <20160907191823.7f955ae2.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds pm_runtime support for rockchip Type-C, so that power domain is
-enabled only when there is a transaction going on to help save power.
+On Wed, 07 Sep 2016 19:58:31 +0200, Heiko Stuebner wrote:
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
----
+> Am Mittwoch, 7. September 2016, 17:53:29 CEST schrieb John Keeping:
+> > To minimize jitter on the I2S clocks, it is important that the
+> > denominator in the fractional divider is much greater than the
+> > numerator.  Add identifiers for these internal clocks so that the
+> > specific clock topology and rates can be specified in the device tree.  
+> 
+> The TRM states that the denominator must be bigger than 20. Is this the one 
+> you found or did you find further constraints?
 
- drivers/phy/phy-rockchip-typec.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+Is it not that the denominator must be bigger than 20 times the
+numerator?  That's what we found, although it seems that the greater the
+divisor the better, so our aim is dividing down from 594MHz from GPLL to
+the target rate in i2s_frac.
 
-diff --git a/drivers/phy/phy-rockchip-typec.c b/drivers/phy/phy-rockchip-typec.c
-index fb58a27..e1a07aa 100644
---- a/drivers/phy/phy-rockchip-typec.c
-+++ b/drivers/phy/phy-rockchip-typec.c
-@@ -552,6 +552,12 @@ static int tcphy_phy_init(struct rockchip_typec_phy *tcphy, u8 mode)
- 		goto err_clk_core;
- 	}
- 
-+	ret = pm_runtime_get_sync(tcphy->dev);
-+	if (ret < 0) {
-+		dev_err(tcphy->dev, "cannot get pm runtime %d\n", ret);
-+		goto err_clk_ref;
-+	}
-+
- 	reset_control_deassert(tcphy->tcphy_rst);
- 
- 	property_enable(tcphy, &cfg->typec_conn_dir, tcphy->flip);
-@@ -602,6 +608,7 @@ static int tcphy_phy_init(struct rockchip_typec_phy *tcphy, u8 mode)
- err_wait_pma:
- 	reset_control_assert(tcphy->uphy_rst);
- 	reset_control_assert(tcphy->tcphy_rst);
-+err_clk_ref:
- 	clk_disable_unprepare(tcphy->clk_ref);
- err_clk_core:
- 	clk_disable_unprepare(tcphy->clk_core);
-@@ -610,6 +617,7 @@ err_clk_core:
- 
- static void tcphy_phy_deinit(struct rockchip_typec_phy *tcphy)
- {
-+	pm_runtime_put_sync(tcphy->dev);
- 	reset_control_assert(tcphy->tcphy_rst);
- 	reset_control_assert(tcphy->uphy_rst);
- 	reset_control_assert(tcphy->pipe_rst);
-@@ -987,6 +995,15 @@ static int rockchip_typec_phy_probe(struct platform_device *pdev)
- 		return PTR_ERR(phy_provider);
- 	}
- 
-+	pm_runtime_enable(dev);
-+
-+	return 0;
-+}
-+
-+static int rockchip_typec_phy_remove(struct platform_device *pdev)
-+{
-+	pm_runtime_disable(&pdev->dev);
-+
- 	return 0;
- }
- 
-@@ -999,6 +1016,7 @@ MODULE_DEVICE_TABLE(of, rockchip_typec_phy_dt_ids);
- 
- static struct platform_driver rockchip_typec_phy_driver = {
- 	.probe		= rockchip_typec_phy_probe,
-+	.remove		= rockchip_typec_phy_remove,
- 	.driver		= {
- 		.name	= "rockchip-typec-phy",
- 		.of_match_table = rockchip_typec_phy_dt_ids,
--- 
-1.9.1
+> Did you try teaching the fractional divider to handle these constraints before 
+> going this way?
+
+No, I hadn't looked at doing that.  I'm not sure how that would work,
+we'd need to add support for fractional divider changing the parent rate
+wouldn't we?
+
+> Exporting the internal clocks really would be sort of plan d or e, after 
+> handling this in the clock framework failed. Especially as i2s rates are 
+> probably dependant on the media being handled (frequencies and such), so 
+> setting fractional rates statically in the dts won't help you much in the 
+> general case, as any new playback could trigger a clk_set_rate call anyway?
+
+We're not setting the fractional rate specifically, instead we're
+setting the i2s_pre rate and parent explicitly and banning the i2s_src
+mux setting to i2s_pre, which means that clk_set_rate on sclk_i2s0 will
+always change i2s_frac but leave i2s_pre alone.
+
+> > Signed-off-by: John Keeping <john@metanate.com>
+> > ---
+> >  include/dt-bindings/clock/rk3288-cru.h | 3 +++
+> >  1 file changed, 3 insertions(+)
+> > 
+> > diff --git a/include/dt-bindings/clock/rk3288-cru.h
+> > b/include/dt-bindings/clock/rk3288-cru.h index 9a586e2d9c91..9526653383d9
+> > 100644
+> > --- a/include/dt-bindings/clock/rk3288-cru.h
+> > +++ b/include/dt-bindings/clock/rk3288-cru.h
+> > @@ -88,6 +88,9 @@
+> >  #define SCLK_PVTM_GPU		124
+> >  #define SCLK_CRYPTO		125
+> >  #define SCLK_MIPIDSI_24M	126
+> > +#define SCLK_I2S_PRE		127
+> > +#define SCLK_I2S_SRC		128
+> > +#define SCLK_I2S_FRAC		129
+> > 
+> >  #define SCLK_MAC		151
+> >  #define SCLK_MACREF_OUT		152  
+> 
+> 
