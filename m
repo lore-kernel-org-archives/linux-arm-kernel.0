@@ -1,32 +1,49 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 07 Sep 2016 12:51:31 -0700
-Subject: [PATCH] clk: meson-gxbb: Export PWM related clocks for DT
-In-Reply-To: <20160907005208.GS12510@codeaurora.org> (Stephen Boyd's message
- of "Tue, 6 Sep 2016 17:52:08 -0700")
-References: <1471870177-10609-1-git-send-email-narmstrong@baylibre.com>
- <20160907005208.GS12510@codeaurora.org>
-Message-ID: <7ha8fjtrng.fsf@baylibre.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 7 Sep 2016 21:54:53 +0200
+Subject: [PATCH v2 3/4] pinctrl: sunxi: Remove unsupported PWM channel
+ pinmux in H3
+In-Reply-To: <CACRpkdb7rr8Lpc6VZ4Ba=_YOwFDqVwwut1w_BDAfYHm6Qp=W_g@mail.gmail.com>
+References: <20160831082520.25962-1-woogyom.kim@gmail.com>
+ <20160831082520.25962-4-woogyom.kim@gmail.com>
+ <CACRpkdb7rr8Lpc6VZ4Ba=_YOwFDqVwwut1w_BDAfYHm6Qp=W_g@mail.gmail.com>
+Message-ID: <20160907195453.GE28134@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Boyd <sboyd@codeaurora.org> writes:
+Hi,
 
-> On 08/22, Neil Armstrong wrote:
->> Add the PWM related clocks in order to be referenced as PWM source
->> clocks.
->> 
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
->
-> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
->
-> With some more thought, it should go through whatever tree takes
-> the dts changes. Conflicts in these header files should be
-> managed by the same person and that person is the platform
-> maintainer.
+On Wed, Sep 07, 2016 at 09:41:19PM +0200, Linus Walleij wrote:
+> On Wed, Aug 31, 2016 at 10:25 AM, Milo Kim <woogyom.kim@gmail.com> wrote:
+> 
+> > H3 has single PWM channel. The second PWM channel is not supported,
+> > so the pinctrl function should be removed.
+> >
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Cc: Chen-Yu Tsai <wens@csie.org>
+> > Cc: Icenowy Zheng <icenowy@aosc.xyz>
+> > Cc: Jens Kuske <jenskuske@gmail.com>
+> > Cc: Krzysztof Adamski <k@japko.eu>
+> > Cc: linux-gpio at vger.kernel.org
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: linux-kernel at vger.kernel.org
+> > Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+> 
+> Maxime what is your opinion on this patch?
 
-OK, I'll pick this up and take it through the amlogic -> arm-soc path.
+Chen-Yu is the Allwinner co-maintainer, so you can trust his Acked-by,
+but you have mine too.
 
-Thanks,
+Maxime
 
-Kevin
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160907/8cd97ef6/attachment.sig>
