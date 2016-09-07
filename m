@@ -1,22 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 Sep 2016 10:55:05 +0200
-Subject: [RESEND PATCH v4] thermal: tango: add resume support
-In-Reply-To: <57CFD031.7020500@sigmadesigns.com>
-References: <57CFD031.7020500@sigmadesigns.com>
-Message-ID: <6763387.6QdSyfOt0d@wuerfel>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 7 Sep 2016 16:54:41 +0800
+Subject: [PATCH v4 4/8] dts: sun8i-h3: move uart1 pinmux/peripheral
+ assocation to DSTI
+In-Reply-To: <1473235141-12768-5-git-send-email-jorik@kippendief.biz>
+References: <1473235141-12768-1-git-send-email-jorik@kippendief.biz>
+ <1473235141-12768-5-git-send-email-jorik@kippendief.biz>
+Message-ID: <CAGb2v64PWJdeqBcKDJe05a6yct3_JcztSR9GDH4YXBCny9zb5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 7, 2016 10:30:41 AM CEST Marc Gonzalez wrote:
-> When this platform is suspended, firmware powers the entire SoC down,
-> except a few hardware blocks waiting for wakeup events. There is no
-> context to save for this particular block.
-> 
-> Therefore, there is nothing useful for the driver to do on suspend;
-> so we define a NULL suspend hook. On resume, the driver initializes
-> the block exactly as is done in the probe callback.
-> 
-> Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+On Wed, Sep 7, 2016 at 3:58 PM,  <jorik@kippendief.biz> wrote:
+> From: Jorik Jonker <jorik@kippendief.biz>
+>
+> Users using this UART without RTS/CTS should override the association in
+> their board specific DTS. All (1) board using this UART uses RTS/CTS, so
+> this breaks nothing.
 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+I'd prefer we only do this for peripherals that have absolutely one
+possible setting, like RSB, or I2C with only one group of pins.
+UARTs with 2/4/8 pin configurations don't fall in this category.
+
+ChenYu
