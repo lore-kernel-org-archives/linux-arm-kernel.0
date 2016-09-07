@@ -1,102 +1,52 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Wed, 7 Sep 2016 11:59:19 +0530
-Subject: [PATCH 7/8] iommu: of: Handle IOMMU lookup failure with deferred
- probing or error
-In-Reply-To: <17b1ff0a-6619-cd45-28cd-70bf79bdcc47@samsung.com>
-References: <1470696550-3416-1-git-send-email-sricharan@codeaurora.org>
- <1470696550-3416-8-git-send-email-sricharan@codeaurora.org>
- <17b1ff0a-6619-cd45-28cd-70bf79bdcc47@samsung.com>
-Message-ID: <003101d208d1$2dc79f90$8956deb0$@codeaurora.org>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Wed, 7 Sep 2016 14:33:13 +0800
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <5844875.KucAoPMrXi@wuerfel>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <4865343.bOXkeC8XtQ@wuerfel>
+ <20160906063529.GA22312@b29397-desktop>
+ <5844875.KucAoPMrXi@wuerfel>
+Message-ID: <20160907063313.GA13903@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Tue, Sep 06, 2016 at 12:38:29PM +0200, Arnd Bergmann wrote:
+> On Tuesday, September 6, 2016 2:35:29 PM CEST Peter Chen wrote:
+> > On Mon, Sep 05, 2016 at 05:39:27PM +0200, Arnd Bergmann wrote:
+> > > On Friday, September 2, 2016 5:16:31 PM CEST Leo Li wrote:
+> 
+> > > 
+> > > Most of these are probably never used with any nonstandard
+> > > DMA settings (IOMMU, cache coherency, offset, ...).
+> > > 
+> > > One thing we could possibly do is to go through these and
+> > > replace the hardcoded dma mask setup with of_dma_configure()
+> > > in all cases in which we actually use DT for probing, which
+> > > should cover the interesting cases.
+> > > 
+> > 
+> > One case I am going to work is to let USB chipidea driver support iommu,
+> > the chipidea core device is no of_node, and created by
+> > platform_add_device on the runtime. Using of_dma_configure with parent
+> > of_node is a solution from my point, like [1].
+> > 
+> > https://lkml.org/lkml/2016/2/22/7
+> 
+> Right, that should make it work with iommu as well. However, it does
+> not solve the other issue I mentioned above, with boards that have
+> USB devices hardwired to a chipidea host controller that need
+> configuration from DT. For that, we still need to come up with another
+> way to associate the DT hierarchy in the host bridge node with
+> the Linux platform_device.
+> 
 
->Hi Sricharan,
->
->On 2016-08-09 00:49, Sricharan R wrote:
-> > From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> >
-> > Failures to look up an IOMMU when parsing the DT iommus property need to
-> > be handled separately from the .of_xlate() failures to support deferred
-> > probing.
-> >
-> > The lack of a registered IOMMU can be caused by the lack of a driver for
-> > the IOMMU, the IOMMU device probe not having been performed yet, having
-> > been deferred, or having failed.
-> >
-> > The first case occurs when the device tree describes the bus master and
-> > IOMMU topology correctly but no device driver exists for the IOMMU yet
-> > or the device driver has not been compiled in. Return NULL, the caller
-> > will configure the device without an IOMMU.
-> >
-> > The second and third cases are handled by deferring the probe of the bus
-> > master device which will eventually get reprobed after the IOMMU.
-> >
-> > The last case is currently handled by deferring the probe of the bus
-> > master device as well. A mechanism to either configure the bus master
-> > device without an IOMMU or to fail the bus master device probe depending
-> > on whether the IOMMU is optional or mandatory would be a good
-> > enhancement.
-> >
-> > Signed-off-by: Laurent Pinchart
-><laurent.pinchart+renesas@ideasonboard.com>
->
->It is a common practice to briefly describe here what has been changed
->since the original patch if you have modified it (see commit
->855ed04a3758b205e84b269f92d26ab36ed8e2f7 for the example).
->
- Sorry i missed updating it. i will update the log.
+Why? The DMA configuration is for host controller, not for USB device.
+No matter there is hardwired or hotplug devices, the DMA configuration
+for host controller are both inherited from glue layer platform devices,
+current implementation is at function ci_hdrc_add_device,
+drivers/usb/chipidea/core.c.
 
-> > Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> > ---
-> >  drivers/iommu/of_iommu.c | 21 +++++++++++++++++----
-> >  drivers/of/device.c      |  2 ++
-> >  2 files changed, 19 insertions(+), 4 deletions(-)
-> >
-> > diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> > index 4c4219d..3994cf5 100644
-> > --- a/drivers/iommu/of_iommu.c
-> > +++ b/drivers/iommu/of_iommu.c
-> > @@ -149,7 +149,7 @@ const struct iommu_ops *of_iommu_configure(struct
->device *dev,
-> >  {
-> >      struct of_phandle_args iommu_spec;
-> >      struct device_node *np = NULL;
-> > -    struct iommu_ops *ops = NULL;
-> > +    const struct iommu_ops *ops = NULL;
-> >      int idx = 0;
-> >
-> >      if (dev_is_pci(dev)) {
-> > @@ -189,8 +189,21 @@ const struct iommu_ops
->*of_iommu_configure(struct device *dev,
-> >          np = iommu_spec.np;
-> >          ops = of_iommu_get_ops(np);
-> >
-> > -        if (!ops || !ops->of_xlate || ops->of_xlate(dev, &iommu_spec))
-> > +        if (!ops) {
-> > +            const struct of_device_id *oid;
-> > +
-> > +            oid = of_match_node(&__iommu_of_table, np);
-> > +            ops = oid ? ERR_PTR(-EPROBE_DEFER) : NULL;
-> >              goto err_put_node;
-> > +        }
-> > +
-> > +        if (!ops->of_xlate || ops->of_xlate(dev, &iommu_spec)) {
-> > +            ops = NULL;
-> > +            goto err_put_node;
-> > +        }
-> > +
-> > +        if (ops->add_device)
-> > +            ops = ops->add_device(dev) ? ops : NULL;
->
->ops->add_device() returns ZERO on success or error code on failure, so
->the above
->line should be changed to:
->             ops = (ops->add_device(dev) == 0) ? ops : NULL;
+-- 
 
- Yes, i fixed it while testing, but somehow have missed it while sending it.
-  will fix it.
-
-Regards,
- Sricharan
+Best Regards,
+Peter Chen
