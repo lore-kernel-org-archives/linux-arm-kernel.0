@@ -1,114 +1,153 @@
-From: jbaron@akamai.com (Jason Baron)
-Date: Wed, 7 Sep 2016 12:59:52 -0400
-Subject: [PATCH v2 2/2] arm64: Use static keys for CPU features
-In-Reply-To: <1473096348-19548-3-git-send-email-catalin.marinas@arm.com>
-References: <1473096348-19548-1-git-send-email-catalin.marinas@arm.com>
- <1473096348-19548-3-git-send-email-catalin.marinas@arm.com>
-Message-ID: <48d10fa1-ee4c-e398-b5ae-9815bf0f18eb@akamai.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 7 Sep 2016 19:03:04 +0200
+Subject: [PATCH 09/19] arm64: KVM: Handle async aborts delivered while at
+ EL2
+In-Reply-To: <1473166937-15271-10-git-send-email-marc.zyngier@arm.com>
+References: <1473166937-15271-1-git-send-email-marc.zyngier@arm.com>
+ <1473166937-15271-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160907170304.GT23592@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/2016 01:25 PM, Catalin Marinas wrote:
-> This patch adds static keys transparently for all the cpu_hwcaps
-> features by implementing an array of default-false static keys and
-> enabling them when detected. The cpus_have_cap() check uses the static
-> keys if the feature being checked is a constant, otherwise the compiler
-> generates the bitmap test.
->
-> Because of the early call to static_branch_enable() via
-> check_local_cpu_errata() -> update_cpu_capabilities(), the jump labels
-> are initialised in cpuinfo_store_boot_cpu().
-
-Was there a reason the jump_label_init() couldn't be moved
-earlier in the common code?
-
-Thanks,
-
--Jason
-
->
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Suzuki K. Poulose <Suzuki.Poulose@arm.com>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+On Tue, Sep 06, 2016 at 02:02:07PM +0100, Marc Zyngier wrote:
+> If EL1 generates an asynchronous abort and then traps into EL2
+> before the abort has been delivered, we may end-up with the
+> abort firing at the worse possible place: on the host.
+> 
+> In order to avoid this, it is necessary to take the abort at EL2,
+> by clearing the PSTATE.A bit. In order to survive this abort,
+> we do it at a point where we're in a known state with respect
+> to the world switch, and handle the resulting exception,
+> overloading the exit code in the process.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->   arch/arm64/include/asm/cpufeature.h | 14 +++++++++++---
->   arch/arm64/kernel/cpufeature.c      |  3 +++
->   arch/arm64/kernel/smp.c             |  5 +++++
->   3 files changed, 19 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index 7099f26e3702..c9dfb1e4c435 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -9,6 +9,8 @@
->   #ifndef __ASM_CPUFEATURE_H
->   #define __ASM_CPUFEATURE_H
->   
-> +#include <linux/jump_label.h>
+>  arch/arm64/kvm/hyp/entry.S     | 33 ++++++++++++++++++++++++++++++++-
+>  arch/arm64/kvm/hyp/hyp-entry.S | 25 +++++++++++++++++++++++--
+>  arch/arm64/kvm/hyp/switch.c    |  6 ++++++
+>  3 files changed, 61 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+> index 3967c231..7662ef5 100644
+> --- a/arch/arm64/kvm/hyp/entry.S
+> +++ b/arch/arm64/kvm/hyp/entry.S
+> @@ -122,7 +122,38 @@ ENTRY(__guest_exit)
+>  	// Now restore the host regs
+>  	restore_callee_saved_regs x2
+>  
+> -	ret
+> +	// If we have a pending asynchronous abort, now is the
+> +	// time to find out. From your VAXorcist book, page 666:
+> +	// "Threaten me not, oh Evil one!  For I speak with
+> +	// the power of DEC, and I command thee to show thyself!"
+> +	mrs	x2, elr_el2
+> +	mrs	x3, esr_el2
+> +	mrs	x4, spsr_el2
+> +	mov	x5, x0
 > +
->   #include <asm/hwcap.h>
->   #include <asm/sysreg.h>
->   
-> @@ -109,6 +111,7 @@ struct arm64_cpu_capabilities {
->   };
->   
->   extern DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
-> +extern struct static_key_false cpu_hwcap_keys[ARM64_NCAPS];
->   
->   bool this_cpu_has_cap(unsigned int cap);
->   
-> @@ -121,16 +124,21 @@ static inline bool cpus_have_cap(unsigned int num)
->   {
->   	if (num >= ARM64_NCAPS)
->   		return false;
-> -	return test_bit(num, cpu_hwcaps);
-> +	if (__builtin_constant_p(num))
-> +		return static_branch_unlikely(&cpu_hwcap_keys[num]);
-> +	else
-> +		return test_bit(num, cpu_hwcaps);
->   }
->   
->   static inline void cpus_set_cap(unsigned int num)
->   {
-> -	if (num >= ARM64_NCAPS)
-> +	if (num >= ARM64_NCAPS) {
->   		pr_warn("Attempt to set an illegal CPU capability (%d >= %d)\n",
->   			num, ARM64_NCAPS);
-> -	else
-> +	} else {
->   		__set_bit(num, cpu_hwcaps);
-> +		static_branch_enable(&cpu_hwcap_keys[num]);
-> +	}
->   }
->   
->   static inline int __attribute_const__
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 62272eac1352..919b2d0d68ae 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -46,6 +46,9 @@ unsigned int compat_elf_hwcap2 __read_mostly;
->   
->   DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
->   
-> +DEFINE_STATIC_KEY_ARRAY_FALSE(cpu_hwcap_keys, ARM64_NCAPS);
-> +EXPORT_SYMBOL(cpu_hwcap_keys);
+> +	dsb	sy		// Synchronize against in-flight ld/st
+> +	msr	daifclr, #4	// Unmask aborts
 > +
->   #define __ARM64_FTR_BITS(SIGNED, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
->   	{						\
->   		.sign = SIGNED,				\
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index d93d43352504..c3c08368a685 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -437,6 +437,11 @@ void __init smp_cpus_done(unsigned int max_cpus)
->   void __init smp_prepare_boot_cpu(void)
->   {
->   	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
+> +	// This is our single instruction exception window. A pending
+> +	// SError is guaranteed to occur at the earliest when we unmask
+> +	// it, and at the latest just after the ISB.
+
+Why is it guaranteed to to occur at the latest after the ISB?  I thought
+that asynchronous exceptions could in theory be deferred until forever,
+but I am probably wrong about this.
+
+
+Otherwise, this looks good!
+
+-Christoffer
+
+> +	.global	abort_guest_exit_start
+> +abort_guest_exit_start:
+> +
+> +	isb
+> +
+> +	.global	abort_guest_exit_end
+> +abort_guest_exit_end:
+> +
+> +	// If the exception took place, restore the EL1 exception
+> +	// context so that we can report some information.
+> +	// Merge the exception code with the SError pending bit.
+> +	tbz	x0, #ARM_EXIT_WITH_SERROR_BIT, 1f
+> +	msr	elr_el2, x2
+> +	msr	esr_el2, x3
+> +	msr	spsr_el2, x4
+> +	orr	x0, x0, x5
+> +1:	ret
+>  ENDPROC(__guest_exit)
+>  
+>  ENTRY(__fpsimd_guest_restore)
+> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+> index d2f6640..4e92399 100644
+> --- a/arch/arm64/kvm/hyp/hyp-entry.S
+> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
+> @@ -126,6 +126,28 @@ el1_error:
+>  	mov	x0, #ARM_EXCEPTION_EL1_SERROR
+>  	b	__guest_exit
+>  
+> +el2_error:
 > +	/*
-> +	 * Initialise the static keys early as they may be enabled by the
-> +	 * cpufeature code.
+> +	 * Only two possibilities:
+> +	 * 1) Either we come from the exit path, having just unmasked
+> +	 *    PSTATE.A: change the return code to an EL2 fault, and
+> +	 *    carry on, as we're already in a sane state to handle it.
+> +	 * 2) Or we come from anywhere else, and that's a bug: we panic.
+> +	 *
+> +	 * For (1), x0 contains the original return code and x1 doesn't
+> +	 * contain anything meaningful at that stage. We can reuse them
+> +	 * as temp registers.
+> +	 * For (2), who cares?
 > +	 */
-> +	jump_label_init();
->   	cpuinfo_store_boot_cpu();
->   	save_boot_cpu_run_el();
->   }
+> +	mrs	x0, elr_el2
+> +	adr	x1, abort_guest_exit_start
+> +	cmp	x0, x1
+> +	adr	x1, abort_guest_exit_end
+> +	ccmp	x0, x1, #4, ne
+> +	b.ne	__hyp_panic
+> +	mov	x0, #(1 << ARM_EXIT_WITH_SERROR_BIT)
+> +	eret
+> +
+>  ENTRY(__hyp_do_panic)
+>  	mov	lr, #(PSR_F_BIT | PSR_I_BIT | PSR_A_BIT | PSR_D_BIT |\
+>  		      PSR_MODE_EL1h)
+> @@ -150,7 +172,6 @@ ENDPROC(\label)
+>  	invalid_vector	el2h_sync_invalid
+>  	invalid_vector	el2h_irq_invalid
+>  	invalid_vector	el2h_fiq_invalid
+> -	invalid_vector	el2h_error_invalid
+>  	invalid_vector	el1_sync_invalid
+>  	invalid_vector	el1_irq_invalid
+>  	invalid_vector	el1_fiq_invalid
+> @@ -168,7 +189,7 @@ ENTRY(__kvm_hyp_vector)
+>  	ventry	el2h_sync_invalid		// Synchronous EL2h
+>  	ventry	el2h_irq_invalid		// IRQ EL2h
+>  	ventry	el2h_fiq_invalid		// FIQ EL2h
+> -	ventry	el2h_error_invalid		// Error EL2h
+> +	ventry	el2_error			// Error EL2h
+>  
+>  	ventry	el1_sync			// Synchronous 64-bit EL1
+>  	ventry	el1_irq				// IRQ 64-bit EL1
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 5148b06..1233a55 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -292,6 +292,12 @@ again:
+>  	exit_code = __guest_enter(vcpu, host_ctxt);
+>  	/* And we're baaack! */
+>  
+> +	/*
+> +	 * We're using the raw exception code in order to only process
+> +	 * the trap if no SError is pending. We will come back to the
+> +	 * same PC once the SError has been injected, and replay the
+> +	 * trapping instruction.
+> +	 */
+>  	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
+>  		goto again;
+>  
+> -- 
+> 2.1.4
+> 
