@@ -1,132 +1,34 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Wed, 7 Sep 2016 14:52:44 +0900
-Subject: [PATCH v2] arm64: Improve kprobes test for atomic sequence
-In-Reply-To: <1473184499-6018-1-git-send-email-dave.long@linaro.org>
-References: <1473184499-6018-1-git-send-email-dave.long@linaro.org>
-Message-ID: <20160907145244.ea997984134c15c12793ca74@kernel.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 7 Sep 2016 07:55:47 +0200
+Subject: [PATCH v5] i2c: imx: make bus recovery through pinctrl optional
+In-Reply-To: <CAChUvXOGjTn6K5588UVgjbRWUY+weDtk2qbOU-NM4=kA2znh=Q@mail.gmail.com>
+References: <1471644322-22670-1-git-send-email-leoyang.li@nxp.com>
+ <20160906185849.27pjhawadca5pwow@pengutronix.de>
+ <CADRPPNQ+1qBNL5WA=Jo_keE7BPnoOs7a2T6CpTuciiF16qK6xQ@mail.gmail.com>
+ <87ca69fb85848a0a86b34a9a9037a57b@agner.ch>
+ <CADRPPNSPye45bmFshfwb+gDA0x0ygs4Ofa6HMYbKt9ER0oeccg@mail.gmail.com>
+ <CAChUvXOGjTn6K5588UVgjbRWUY+weDtk2qbOU-NM4=kA2znh=Q@mail.gmail.com>
+Message-ID: <20160907055547.opp57zyxhlplhxhm@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  6 Sep 2016 13:54:59 -0400
-David Long <dave.long@linaro.org> wrote:
+Hello,
 
-> From: "David A. Long" <dave.long@linaro.org>
+On Tue, Sep 06, 2016 at 06:35:38PM -0500, Tracy Smith wrote:
+> >The patch makes it really optional that
+> >the probe function won't bailout but just disable the bus recovery function
+> >when pinctrl is not available.
 > 
-> Kprobes searches backwards a finite number of instructions to determine if
-> there is an attempt to probe a load/store exclusive sequence. It stops when
-> it hits the maximum number of instructions or a load or store exclusive.
-> However this means it can run up past the beginning of the function and
-> start looking at literal constants. This has been shown to cause a false
-> positive and blocks insertion of the probe. To fix this, further limit the
-> backwards search to stop if it hits a symbol address from kallsyms. The
-> presumption is that this is the entry point to this code (particularly for
-> the common case of placing probes at the beginning of functions).
-> 
-> This also improves efficiency by not searching code that is not part of the
-> function. There may be some possibility that the label might not denote the
-> entry path to the probed instruction but the likelihood seems low and this
-> is just another example of how the kprobes user really needs to be
-> careful about what they are doing.
+> in the case of the LS1043A and LS1021A, if the bus recovery function is
+> disabled, how will bus recovery occur?  Is there no option to recover the
+> bus for the LS1021a and LS1043a?
 
-Hi Dave,
+Right. That's the situation that we had for all drivers some time ago.
+Most of the time this is no problem.
 
-kallsyms_lookup_size_offset() part looks good to me. By the way,
-is there any reason we'll check the _text and module's base address
-boundary? 
-I think those are already searced by kallsyms_lookup_size_offset(),
-so you don't need to check those. If the address is not found by
-kallsyms_lookup_size_offset(), that address maybe out-of-text.
-
-Thank you,
-> 
-> Signed-off-by: David A. Long <dave.long@linaro.org>
-> ---
->  arch/arm64/kernel/probes/decode-insn.c | 48 +++++++++++++++++++++++-----------
->  1 file changed, 33 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/probes/decode-insn.c b/arch/arm64/kernel/probes/decode-insn.c
-> index 37e47a9..356ee52 100644
-> --- a/arch/arm64/kernel/probes/decode-insn.c
-> +++ b/arch/arm64/kernel/probes/decode-insn.c
-> @@ -16,6 +16,7 @@
->  #include <linux/kernel.h>
->  #include <linux/kprobes.h>
->  #include <linux/module.h>
-> +#include <linux/kallsyms.h>
->  #include <asm/kprobes.h>
->  #include <asm/insn.h>
->  #include <asm/sections.h>
-> @@ -122,7 +123,7 @@ arm_probe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
->  static bool __kprobes
->  is_probed_address_atomic(kprobe_opcode_t *scan_start, kprobe_opcode_t *scan_end)
->  {
-> -	while (scan_start > scan_end) {
-> +	while (scan_start >= scan_end) {
->  		/*
->  		 * atomic region starts from exclusive load and ends with
->  		 * exclusive store.
-> @@ -144,26 +145,43 @@ arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi)
->  	kprobe_opcode_t insn = le32_to_cpu(*addr);
->  	kprobe_opcode_t *scan_start = addr - 1;
->  	kprobe_opcode_t *scan_end = addr - MAX_ATOMIC_CONTEXT_SIZE;
-> +	unsigned long size = 0, offset = 0;
->  #if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
->  	struct module *mod;
->  #endif
->  
-> -	if (addr >= (kprobe_opcode_t *)_text &&
-> -	    scan_end < (kprobe_opcode_t *)_text)
-> -		scan_end = (kprobe_opcode_t *)_text;
-> +	/*
-> +	 * If there's a symbol defined in front of and near enough to
-> +	 * the probe address assume it is the entry point to this
-> +	 * code and use it to further limit how far back we search
-> +	 * when determining if we're in an atomic sequence.
-> +	 */
-> +	if (kallsyms_lookup_size_offset((unsigned long) addr, &size, &offset))
-> +		if (offset < (MAX_ATOMIC_CONTEXT_SIZE*sizeof(kprobe_opcode_t)))
-> +			scan_end = addr - (offset / sizeof(kprobe_opcode_t));
-> +
-> +	if (scan_end <= scan_start) {
-> +		if (addr >= (kprobe_opcode_t *)_text &&
-> +		    scan_end < (kprobe_opcode_t *)_text)
-> +			scan_end = (kprobe_opcode_t *)_text;
->  #if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
-> -	else {
-> -		preempt_disable();
-> -		mod = __module_address((unsigned long)addr);
-> -		if (mod && within_module_init((unsigned long)addr, mod) &&
-> -			!within_module_init((unsigned long)scan_end, mod))
-> -			scan_end = (kprobe_opcode_t *)mod->init_layout.base;
-> -		else if (mod && within_module_core((unsigned long)addr, mod) &&
-> -			!within_module_core((unsigned long)scan_end, mod))
-> -			scan_end = (kprobe_opcode_t *)mod->core_layout.base;
-> -		preempt_enable();
-> -	}
-> +		else {
-> +			preempt_disable();
-> +			mod = __module_address((unsigned long)addr);
-> +			if (mod &&
-> +			    within_module_init((unsigned long)addr, mod) &&
-> +			    !within_module_init((unsigned long)scan_end, mod))
-> +				scan_end =
-> +				    (kprobe_opcode_t *)mod->init_layout.base;
-> +			else if (mod &&
-> +			    within_module_core((unsigned long)addr, mod) &&
-> +			    !within_module_core((unsigned long)scan_end, mod))
-> +				scan_end =
-> +				    (kprobe_opcode_t *)mod->core_layout.base;
-> +			preempt_enable();
-> +		}
->  #endif
-> +	}
->  	decoded = arm_probe_decode_insn(insn, asi);
->  
->  	if (decoded == INSN_REJECTED ||
-> -- 
-> 2.5.0
-> 
-
+Best regards
+Uwe
 
 -- 
-Masami Hiramatsu <mhiramat@kernel.org>
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
