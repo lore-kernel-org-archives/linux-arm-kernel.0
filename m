@@ -1,58 +1,78 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 07 Sep 2016 01:57:11 +0200
-Subject: [PATCH v2 02/10] driver core: Functional dependencies tracking
- support
-In-Reply-To: <20160728152831.GA1929@wunner.de>
-References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
- <2841548.NIYVpJFBcH@vostro.rjw.lan> <20160728152831.GA1929@wunner.de>
-Message-ID: <1546158.G8Vnv1pldV@vostro.rjw.lan>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 7 Sep 2016 08:26:05 +0800
+Subject: [arm:drm-tda998x-devel 2/3]
+ drivers/gpu/drm/i2c/tda998x_drv.c:1326:2: warning: initialization from
+ incompatible pointer type
+Message-ID: <201609070857.liwBwL9k%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 28, 2016 05:28:31 PM Lukas Wunner wrote:
-> On Thu, Jul 28, 2016 at 02:30:31AM +0200, Rafael J. Wysocki wrote:
-> > On Monday, July 25, 2016 12:48:32 AM Lukas Wunner wrote:
-> > > On Thu, Jul 21, 2016 at 02:25:15AM +0200, Rafael J. Wysocki wrote:
-> > > > On Thursday, July 21, 2016 01:25:53 AM Lukas Wunner wrote:
-> > > > > I guess I could amend portdrv to return -EPROBE_DEFER on Macs if
-> > > > > no driver is bound to the NHI. Doesn't feel pretty to me though.
-> > > > > 
-> > > > > Ultimately this seems to be the same issue as with calling
-> > > > > dev_pm_domain_set() for a bound device. Perhaps device_link_add()
-> > > > > can likewise be allowed if a runtime PM ref is held for the devices
-> > > > > and the call happens under lock_system_sleep()?
-> > > > 
-> > > > No, the whole synchronization scheme in the links code would have had to be
-> > > > changed for that to really work.
-> > > > 
-> > > > And it really is about what is needed (at least in principle) to run your
-> > > > device.  If you think you need device X with a driver to handle device Y
-> > > > correctly, then either you need it all the time, from probe to remove, or
-> > > > you just don't really need it at all.
-> > > 
-> > > Real life isn't as simple as that.
-> > > 
-> > > In this case, we have consumers (hotplug ports) which are doing fine
-> > > if the driver for the supplier (NHI) is not loaded. But once it loads,
-> > > the links must be in place.
-> > 
-> > Hmm.
-> > 
-> > What if it is not loaded and the system suspends.  Will everything work
-> > as expected after the subsequent resume?
-> 
-> The short answer is yes.
+tree:   http://repo.or.cz/linux-2.6/linux-2.6-arm.git drm-tda998x-devel
+head:   3e980591945eadbfdf4cbc05d56e5f44010a5a87
+commit: 82299b9bb080785cae12273d7796c2b681727e7e [2/3] drm/i2c: tda998x: Register ASoC hdmi-codec and add audio DT binding
+config: xtensa-allmodconfig (attached as .config)
+compiler: xtensa-linux-gcc (GCC) 4.9.0
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 82299b9bb080785cae12273d7796c2b681727e7e
+        # save the attached .config to linux build tree
+        make.cross ARCH=xtensa 
 
-OK
+All warnings (new ones prefixed by >>):
 
-I think it's possible to add a link flag to address this case.
+>> drivers/gpu/drm/i2c/tda998x_drv.c:1326:2: warning: initialization from incompatible pointer type
+     .hw_params = tda998x_audio_hw_params,
+     ^
+   drivers/gpu/drm/i2c/tda998x_drv.c:1326:2: warning: (near initialization for 'audio_codec_ops.hw_params')
+   drivers/gpu/drm/i2c/tda998x_drv.c:1327:2: warning: initialization from incompatible pointer type
+     .audio_shutdown = tda998x_audio_shutdown,
+     ^
+   drivers/gpu/drm/i2c/tda998x_drv.c:1327:2: warning: (near initialization for 'audio_codec_ops.audio_shutdown')
+   drivers/gpu/drm/i2c/tda998x_drv.c:1328:2: warning: initialization from incompatible pointer type
+     .digital_mute = tda998x_audio_digital_mute,
+     ^
+   drivers/gpu/drm/i2c/tda998x_drv.c:1328:2: warning: (near initialization for 'audio_codec_ops.digital_mute')
+   drivers/gpu/drm/i2c/tda998x_drv.c:1329:2: warning: initialization from incompatible pointer type
+     .get_eld = tda998x_audio_get_eld,
+     ^
+   drivers/gpu/drm/i2c/tda998x_drv.c:1329:2: warning: (near initialization for 'audio_codec_ops.get_eld')
 
-Namely, if that flag is passed to device_link_add(), the link will be
-added in the DEVICE_LINK_ACTIVE state right away, but that will need to
-be synchronized against all possible transitions of the consumer device
-(at least).
+vim +1326 drivers/gpu/drm/i2c/tda998x_drv.c
 
-It's better to do that in a separate patch for this reason IMO.
+  1310		int ret = -ENODEV;
+  1311	
+  1312		mutex_lock(&config->mutex);
+  1313		list_for_each_entry(connector, &config->connector_list, head) {
+  1314			if (&priv->encoder == connector->encoder) {
+  1315				memcpy(buf, connector->eld,
+  1316				       min(sizeof(connector->eld), len));
+  1317				ret = 0;
+  1318			}
+  1319		}
+  1320		mutex_unlock(&config->mutex);
+  1321	
+  1322		return ret;
+  1323	}
+  1324	
+  1325	static const struct hdmi_codec_ops audio_codec_ops = {
+> 1326		.hw_params = tda998x_audio_hw_params,
+  1327		.audio_shutdown = tda998x_audio_shutdown,
+  1328		.digital_mute = tda998x_audio_digital_mute,
+  1329		.get_eld = tda998x_audio_get_eld,
+  1330	};
+  1331	
+  1332	static int tda998x_audio_codec_init(struct tda998x_priv *priv,
+  1333					    struct device *dev)
+  1334	{
 
-Thanks,
-Rafael
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 45338 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160907/f0903074/attachment-0001.obj>
