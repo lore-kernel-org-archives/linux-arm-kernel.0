@@ -1,25 +1,25 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 7 Sep 2016 12:58:03 +0800
-Subject: [PATCH v7 8/9] drm/mediatek: update DSI sub driver flow
-In-Reply-To: <1472815484-43821-9-git-send-email-yt.shen@mediatek.com>
-References: <1472815484-43821-1-git-send-email-yt.shen@mediatek.com>
- <1472815484-43821-9-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1473224283.11736.27.camel@mtksdaap41>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 7 Sep 2016 10:39:26 +0530
+Subject: [PATCH 2/2] ARM: dts: am57xx-beagle-x15: Add support for rev B1
+In-Reply-To: <20160906200553.wqkvwsfww3rllhd5@atomide.com>
+References: <20160902090600.27262-1-nm@ti.com>
+ <20160902090600.27262-3-nm@ti.com>
+ <dd74f5e1-304f-661e-7fd9-f5f81bcfc55e@ti.com>
+ <CAOCHtYiFjB-cuABmCiw96spc-De+qNNQYGrjp-MmNDuH2mJ9Bw@mail.gmail.com>
+ <84be68f4-c5a6-0afe-c402-1adba9172918@ti.com>
+ <20160906200553.wqkvwsfww3rllhd5@atomide.com>
+Message-ID: <dc4ed90a-223d-69c0-d350-39b6a9d5ce6f@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, YT:
-
-On Fri, 2016-09-02 at 19:24 +0800, YT Shen wrote:
-> This patch update enable/disable flow of DSI module and MIPI TX module
+On Wednesday 07 September 2016 01:35 AM, Tony Lindgren wrote:
+> And the am335x shared dtsi files are not enough. It's silly how many
+> times we're duplicating the same things over and over again for USB
+> setup for various am335x boards for example.
 > 
-> Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
-> Signed-off-by: YT Shen <yt.shen@mediatek.com>
-> ---
+> So my take is that we need more shared dtsi files, not less.
 
-I think the description is too simple. Please briefly describe WHY of
-this patch. The original enable/disable flow is workable, so why do you
-need this patch? Without this patch, what problem would happen?
+Alright, thanks for weighing in, Tony.
 
 Regards,
-CK
+Sekhar
