@@ -1,48 +1,43 @@
 From: jorik@kippendief.biz (jorik at kippendief.biz)
-Date: Wed,  7 Sep 2016 09:58:57 +0200
-Subject: [PATCH v4 4/8] dts: sun8i-h3: move uart1 pinmux/peripheral assocation
- to DSTI
+Date: Wed,  7 Sep 2016 09:58:59 +0200
+Subject: [PATCH v4 6/8] dts: sun8i-h3: associate pinmux/peripherals for UART2-3
 In-Reply-To: <1473235141-12768-1-git-send-email-jorik@kippendief.biz>
 References: <1473235141-12768-1-git-send-email-jorik@kippendief.biz>
-Message-ID: <1473235141-12768-5-git-send-email-jorik@kippendief.biz>
+Message-ID: <1473235141-12768-7-git-send-email-jorik@kippendief.biz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jorik Jonker <jorik@kippendief.biz>
 
-Users using this UART without RTS/CTS should override the association in
-their board specific DTS. All (1) board using this UART uses RTS/CTS, so
-this breaks nothing.
+Although these peripherals are disabled, they are associated to the
+pinmux definitions. Again, these are the full pinmux defs which include
+RTS/CTS. One could narrow this down to RX/TX only in a board specific
+DTS.
 
 Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
 ---
- arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts | 2 --
- arch/arm/boot/dts/sun8i-h3.dtsi                 | 2 ++
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sun8i-h3.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-index c874270..4c86e45 100644
---- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-@@ -182,8 +182,6 @@
- };
- 
- &uart1 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&uart1_rts_cts_pins>;
- 	status = "okay";
- };
- 
 diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 6635f3d..685755c 100644
+index 5cde54c..e9528d1 100644
 --- a/arch/arm/boot/dts/sun8i-h3.dtsi
 +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -414,6 +414,8 @@
- 			resets = <&ccu RST_BUS_UART1>;
- 			dmas = <&dma 7>, <&dma 7>;
+@@ -443,6 +443,8 @@
+ 			resets = <&ccu RST_BUS_UART2>;
+ 			dmas = <&dma 8>, <&dma 8>;
  			dma-names = "rx", "tx";
 +			pinctrl-names = "default";
-+			pinctrl-0 = <&uart1_rts_cts_pins>;
++			pinctrl-0 = <&uart2_rts_cts_pins>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -456,6 +458,8 @@
+ 			resets = <&ccu RST_BUS_UART3>;
+ 			dmas = <&dma 9>, <&dma 9>;
+ 			dma-names = "rx", "tx";
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart3_rts_cts_pins>;
  			status = "disabled";
  		};
  
