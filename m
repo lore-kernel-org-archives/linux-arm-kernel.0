@@ -1,111 +1,79 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 7 Sep 2016 09:49:31 +0200
-Subject: [PATCH V10 7/8] irqchip/gicv3-its: Factor out PCI-MSI part that
- might be reused for ACPI
-In-Reply-To: <CAJZ5v0iYc=1CN546MaabJdoNBUW8JbeD_qt8hSSDBPLJnB8Hug@mail.gmail.com>
-References: <1473152938-17388-1-git-send-email-tn@semihalf.com>
- <1473152938-17388-8-git-send-email-tn@semihalf.com>
- <alpine.DEB.2.20.1609061149090.5647@nanos>
- <292d1dd1-0084-d796-b852-6cad2099eb66@semihalf.com>
- <CAJZ5v0iYc=1CN546MaabJdoNBUW8JbeD_qt8hSSDBPLJnB8Hug@mail.gmail.com>
-Message-ID: <c3228e58-5fbe-692f-5047-df4cff12d1f8@semihalf.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed,  7 Sep 2016 09:49:51 +0200
+Subject: [PATCH 04/26] ARM: dts: r8a7790: Remove obsolete vsp1 properties
+In-Reply-To: <cover.1473234371.git.horms+renesas@verge.net.au>
+References: <cover.1473234371.git.horms+renesas@verge.net.au>
+Message-ID: <7b2d7a214708e06d89fd8019aa6f3acf744a3446.1473234371.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.09.2016 13:29, Rafael J. Wysocki wrote:
-> On Tue, Sep 6, 2016 at 12:22 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
->> Hi Thomas,
->>
->>
->> On 06.09.2016 11:50, Thomas Gleixner wrote:
->>>
->>> On Tue, 6 Sep 2016, Tomasz Nowicki wrote:
->>>>
->>>> -static int __init its_pci_msi_init(void)
->>>> +static int __init its_pci_msi_init_one(struct fwnode_handle *handle,
->>>> +                                      const char *name)
->>>>  {
->>>> -       struct device_node *np;
->>>>         struct irq_domain *parent;
->>>>
->>>> +       parent = irq_find_matching_fwnode(handle, DOMAIN_BUS_NEXUS);
->>>> +       if (!parent || !msi_get_domain_info(parent)) {
->>>> +               pr_err("%s: Unable to locate ITS domain\n", name);
->>>> +               return -ENXIO;
->>>> +       }
->>>> +
->>>> +       if (!pci_msi_create_irq_domain(handle, &its_pci_msi_domain_info,
->>>> +                                      parent)) {
->>>> +               pr_err("%s: Unable to create PCI domain\n", name);
->>>> +               return -ENOMEM;
->>>
->>>
->>> So you have error codes here.
->>>
->>>> +       }
->>>> +
->>>> +       return 0;
->>>> +}
->>>> +
->>>> +static int __init its_pci_of_msi_init(void)
->>>> +{
->>>> +       struct device_node *np;
->>>> +
->>>>         for (np = of_find_matching_node(NULL, its_device_id); np;
->>>>              np = of_find_matching_node(np, its_device_id)) {
->>>>                 if (!of_property_read_bool(np, "msi-controller"))
->>>>                         continue;
->>>>
->>>> -               parent = irq_find_matching_host(np, DOMAIN_BUS_NEXUS);
->>>> -               if (!parent || !msi_get_domain_info(parent)) {
->>>> -                       pr_err("%s: unable to locate ITS domain\n",
->>>> -                              np->full_name);
->>>> +               if (its_pci_msi_init_one(of_node_to_fwnode(np),
->>>> np->full_name))
->>>>                         continue;
->>>> -               }
->>>> -
->>>> -               if (!pci_msi_create_irq_domain(of_node_to_fwnode(np),
->>>> -                                              &its_pci_msi_domain_info,
->>>> -                                              parent)) {
->>>> -                       pr_err("%s: unable to create PCI domain\n",
->>>> -                              np->full_name);
->>>> -                       continue;
->>>> -               }
->>>>
->>>>                 pr_info("PCI/MSI: %s domain created\n", np->full_name);
->>>>         }
->>>>
->>>>         return 0;
->>>
->>>
->>> And no matter what you return success
->>>
->>>>  }
->>>> +
->>>> +static int __init its_pci_msi_init(void)
->>>> +{
->>>> +       its_pci_of_msi_init();
->>>
->>>
->>> Which you subsequently ignore here. What's the point?
->>>
->>
->> Well, this patch is meant to refactor the code. It does not change the error
->> handing nor the functionality. However, you have got a point but IMO it
->> should be fixed in separate patch if possible.
->
-> But you are refactoring the code, so it would make sense to clean it
-> up while at it.  Perhaps add one more patch to the series?
->
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-I have a look at the code again and come to the conclusion the code is 
-fine now. We iterate over available its nodes and try to probe driver. 
-There might be an error for one of it (print error message) but we keep 
-trying for the rest. One of it might be probed successfully. So there is 
-no reason to escape in half way. Since its_pci_of_msi_init() always 
-returns 0 I can remove return statement so we would have:
-void its_pci_of_msi_init(void) instead.
+As of commit 5aa2eb3c86d4fd16 ("[media] v4l: vsp1: Configure device
+based on IP version"), the DT properties to identify the exact VSP
+device instance features are no longer used. Hence remove them.
 
-Thanks,
-Tomasz
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7790.dtsi | 23 -----------------------
+ 1 file changed, 23 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index d18558f21102..351fcc2f87df 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -944,11 +944,6 @@
+ 		interrupts = <GIC_SPI 266 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp1_clks R8A7790_CLK_VSP1_R>;
+ 		power-domains = <&sysc R8A7790_PD_ALWAYS_ON>;
+-
+-		renesas,has-sru;
+-		renesas,#rpf = <5>;
+-		renesas,#uds = <1>;
+-		renesas,#wpf = <4>;
+ 	};
+ 
+ 	vsp1 at fe928000 {
+@@ -957,12 +952,6 @@
+ 		interrupts = <GIC_SPI 267 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp1_clks R8A7790_CLK_VSP1_S>;
+ 		power-domains = <&sysc R8A7790_PD_ALWAYS_ON>;
+-
+-		renesas,has-lut;
+-		renesas,has-sru;
+-		renesas,#rpf = <5>;
+-		renesas,#uds = <3>;
+-		renesas,#wpf = <4>;
+ 	};
+ 
+ 	vsp1 at fe930000 {
+@@ -971,12 +960,6 @@
+ 		interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp1_clks R8A7790_CLK_VSP1_DU0>;
+ 		power-domains = <&sysc R8A7790_PD_ALWAYS_ON>;
+-
+-		renesas,has-lif;
+-		renesas,has-lut;
+-		renesas,#rpf = <4>;
+-		renesas,#uds = <1>;
+-		renesas,#wpf = <4>;
+ 	};
+ 
+ 	vsp1 at fe938000 {
+@@ -985,12 +968,6 @@
+ 		interrupts = <GIC_SPI 247 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp1_clks R8A7790_CLK_VSP1_DU1>;
+ 		power-domains = <&sysc R8A7790_PD_ALWAYS_ON>;
+-
+-		renesas,has-lif;
+-		renesas,has-lut;
+-		renesas,#rpf = <4>;
+-		renesas,#uds = <1>;
+-		renesas,#wpf = <4>;
+ 	};
+ 
+ 	du: display at feb00000 {
+-- 
+2.7.0.rc3.207.g0ac5344
