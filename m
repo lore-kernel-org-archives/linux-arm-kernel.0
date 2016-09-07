@@ -1,71 +1,445 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  7 Sep 2016 16:53:58 +0200
-Subject: [PATCH v2 2/4] ARM: sunxi: Support the Nextthing GR8
+Date: Wed,  7 Sep 2016 16:54:00 +0200
+Subject: [PATCH v2 4/4] ARM: dts: gr8: Add support for the GR8 evaluation board
 In-Reply-To: <20160907145400.27192-1-maxime.ripard@free-electrons.com>
 References: <20160907145400.27192-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160907145400.27192-3-maxime.ripard@free-electrons.com>
+Message-ID: <20160907145400.27192-5-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GR8 is an SoC made by Nextthing Co, loosely based on the sun5i family.
+From: Myl?ne Josserand <mylene.josserand@free-electrons.com>
 
-It has a number of new controllers compared to the A10s and A13 (SPDIF, I2S),
-but some controllers missing too (Ethernet, less I2C, less UARTs).
+The GR8-EVB is a small board with an NextThing GR8, an Hynix MLC NAND,
+an AXP209 PMIC, USB host and OTG, an SPDIF output and a connectors for CSI,
+I2S and LCD.
 
+Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/arm/sunxi/README                  | 2 ++
- Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
- MAINTAINERS                                     | 1 +
- arch/arm/mach-sunxi/sunxi.c                     | 1 +
- 4 files changed, 5 insertions(+)
+ arch/arm/boot/dts/Makefile        |   1 +
+ arch/arm/boot/dts/ntc-gr8-evb.dts | 342 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/ntc-gr8.dtsi    |  14 +-
+ 3 files changed, 350 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/boot/dts/ntc-gr8-evb.dts
 
-diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
-index e5a115f24471..77f57efbea83 100644
---- a/Documentation/arm/sunxi/README
-+++ b/Documentation/arm/sunxi/README
-@@ -31,6 +31,8 @@ SunXi family
-         + User Manual
-           http://dl.linux-sunxi.org/A13/A13%20User%20Manual%20-%20v1.2%20%282013-01-08%29.pdf
- 
-+      - Next Thing Co GR8 (sun5i)
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index bb906f23d161..b2814271b397 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -719,6 +719,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
+ 	sun4i-a10-pcduino2.dtb \
+ 	sun4i-a10-pov-protab2-ips9.dtb
+ dtb-$(CONFIG_MACH_SUN5I) += \
++	ntc-gr8-evb.dtb \
+ 	sun5i-a10s-auxtek-t003.dtb \
+ 	sun5i-a10s-auxtek-t004.dtb \
+ 	sun5i-a10s-mk802.dtb \
+diff --git a/arch/arm/boot/dts/ntc-gr8-evb.dts b/arch/arm/boot/dts/ntc-gr8-evb.dts
+new file mode 100644
+index 000000000000..7da1afddcab5
+--- /dev/null
++++ b/arch/arm/boot/dts/ntc-gr8-evb.dts
+@@ -0,0 +1,342 @@
++/*
++ * Copyright 2016 Free Electrons
++ * Copyright 2016 NextThing Co
++ *
++ * Myl?ne Josserand <mylene.josserand@free-electrons.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-     * Dual ARM Cortex-A7 based SoCs
-       - Allwinner A20 (sun7i)
-         + User Manual
-diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-index 7e79fcc36b0d..3975d0a0e4c2 100644
---- a/Documentation/devicetree/bindings/arm/sunxi.txt
-+++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-@@ -14,3 +14,4 @@ using one of the following compatible strings:
-   allwinner,sun8i-a83t
-   allwinner,sun8i-h3
-   allwinner,sun9i-a80
-+  nextthing,gr8
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 20bb1d00098c..7be47efb2159 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -982,6 +982,7 @@ M:	Chen-Yu Tsai <wens@csie.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- N:	sun[x456789]i
-+F:	arch/arm/boot/dts/ntc-gr8*
++/dts-v1/;
++#include "ntc-gr8.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++
++/ {
++	model = "NextThing GR8-EVB";
++	compatible = "nextthing,gr8-evb", "nextthing,gr8";
++
++	aliases {
++		i2c0 = &i2c0;
++		i2c1 = &i2c1;
++		i2c2 = &i2c2;
++		serial0 = &uart1;
++		serial1 = &uart2;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm 0 10000 0>;
++		enable-gpios = <&axp_gpio 1 GPIO_ACTIVE_HIGH>;
++
++		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
++		default-brightness-level = <8>;
++	};
++};
++
++&be0 {
++	status = "okay";
++};
++
++&codec {
++	status = "okay";
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	status = "okay";
++
++	axp209: pmic at 34 {
++		reg = <0x34>;
++
++		/*
++		* The interrupt is routed through the "External Fast
++		* Interrupt Request" pin (ball G13 of the module)
++		* directly to the main interrupt controller, without
++		* any other controller interfering.
++		*/
++		interrupts = <0>;
++	};
++};
++
++#include "axp209.dtsi"
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_a>;
++	status = "okay";
++
++	pcf8563: rtc at 51 {
++		compatible = "phg,pcf8563";
++		reg = <0x51>;
++	};
++
++	wm8978: codec at 1a {
++		#sound-dai-cells = <0>;
++		compatible = "wlf,wm8978";
++		reg = <0x1a>;
++	};
++};
++
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins_a>;
++	status = "okay";
++};
++
++&i2s0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2s0_pins_a>;
++	status = "okay";
++};
++
++&ir0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&ir0_rx_pins_a>;
++	status = "okay";
++};
++
++&lradc {
++	vref-supply = <&reg_ldo2>;
++	status = "okay";
++
++	button at 190 {
++		label = "Volume Up";
++		linux,code = <KEY_VOLUMEUP>;
++		channel = <0>;
++		voltage = <190000>;
++	};
++
++	button at 390 {
++		label = "Volume Down";
++		linux,code = <KEY_VOLUMEDOWN>;
++		channel = <0>;
++		voltage = <390000>;
++	};
++
++	button at 600 {
++		label = "Menu";
++		linux,code = <KEY_MENU>;
++		channel = <0>;
++		voltage = <600000>;
++	};
++
++	button at 800 {
++		label = "Search";
++		linux,code = <KEY_SEARCH>;
++		channel = <0>;
++		voltage = <800000>;
++	};
++
++	button at 980 {
++		label = "Home";
++		linux,code = <KEY_HOMEPAGE>;
++		channel = <0>;
++		voltage = <980000>;
++	};
++
++	button at 1180 {
++		label = "Esc";
++		linux,code = <KEY_ESC>;
++		channel = <0>;
++		voltage = <1180000>;
++	};
++
++	button at 1400 {
++		label = "Enter";
++		linux,code = <KEY_ENTER>;
++		channel = <0>;
++		voltage = <1400000>;
++	};
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_gr8_evb>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 6 0 GPIO_ACTIVE_HIGH>; /* PG0 */
++	cd-inverted;
++	status = "okay";
++};
++
++&nfc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&nand_pins_a &nand_cs0_pins_a &nand_rb0_pins_a>;
++
++	/* MLC Support sucks for now */
++	status = "disabled";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&otg_sram {
++	status = "okay";
++};
++
++&pio {
++	mmc0_cd_pin_gr8_evb: mmc0-cd-pin at 0 {
++		allwinner,pins = "PG0";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	usb0_id_pin_gr8_evb: usb0-id-pin at 0 {
++		allwinner,pins = "PG2";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	usb0_vbus_det_pin_gr8_evb: usb0-vbus-det-pin at 0 {
++		allwinner,pins = "PG1";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	usb1_vbus_pin_gr8_evb: usb1-vbus-pin at 0 {
++		allwinner,pins = "PG13";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++&pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm0_pins_a>;
++	status = "okay";
++};
++
++&reg_dcdc2 {
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-cpu";
++	regulator-always-on;
++};
++
++&reg_dcdc3 {
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1300000>;
++	regulator-name = "vdd-sys";
++	regulator-always-on;
++};
++
++&reg_ldo1 {
++	regulator-name = "vdd-rtc";
++};
++
++&reg_ldo2 {
++	regulator-min-microvolt = <2700000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "avcc";
++	regulator-always-on;
++};
++
++&reg_usb1_vbus {
++	pinctrl-0 = <&usb1_vbus_pin_gr8_evb>;
++	gpio = <&pio 6 13 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++};
++
++&rtp {
++	allwinner,ts-attached;
++};
++
++&spdif {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spdif_tx_pins_a>;
++	status = "okay";
++};
++
++&tve0 {
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins_a>, <&uart1_cts_rts_pins_a>;
++	status = "okay";
++};
++
++&usb_otg {
++	/*
++	 * The GR8-EVB has a somewhat interesting design. There's a
++	 * pin supposed to control VBUS, an ID pin, a VBUS detect pin,
++	 * so everything should work just fine.
++	 *
++	 * Except that the pin supposed to control VBUS is not
++	 * connected to any controllable output, neither to the SoC
++	 * through a GPIO or to the PMIC, and it is pulled down,
++	 * meaning that we will never be able to enable VBUS on this
++	 * board.
++	 */
++	dr_mode = "otg";
++	status = "okay";
++};
++
++&usb_power_supply {
++	status = "okay";
++};
++
++&usbphy {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb0_id_pin_gr8_evb>, <&usb0_vbus_det_pin_gr8_evb>;
++	usb0_id_det-gpio = <&pio 6 2 GPIO_ACTIVE_HIGH>; /* PG2 */
++	usb0_vbus_det-gpio = <&pio 6 1 GPIO_ACTIVE_HIGH>; /* PG1 */
++	usb0_vbus_power-supply = <&usb_power_supply>;
++	usb1_vbus-supply = <&reg_usb1_vbus>;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/ntc-gr8.dtsi b/arch/arm/boot/dts/ntc-gr8.dtsi
+index d21cfa3f3c14..cdb7a12946c4 100644
+--- a/arch/arm/boot/dts/ntc-gr8.dtsi
++++ b/arch/arm/boot/dts/ntc-gr8.dtsi
+@@ -228,7 +228,7 @@
  
- ARM/Allwinner SoC Clock Support
- M:	Emilio L?pez <emilio@elopez.com.ar>
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index 95dca8c2c9ed..2e2bde271205 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -22,6 +22,7 @@ static const char * const sunxi_board_dt_compat[] = {
- 	"allwinner,sun5i-a10s",
- 	"allwinner,sun5i-a13",
- 	"allwinner,sun5i-r8",
-+	"nextthing,gr8",
- 	NULL,
- };
+ 		axi_gates: clk at 01c2005c {
+ 			#clock-cells = <1>;
+-			compatible = "allwinner,sun4i-a10-axi-gates-clk";
++			compatible = "allwinner,sun4i-a10-gates-clk";
+ 			reg = <0x01c2005c 0x4>;
+ 			clocks = <&axi>;
+ 			clock-indices = <0>;
+@@ -244,7 +244,7 @@
+ 					<2>, <5>, <6>,
+ 					<7>, <8>, <9>,
+ 					<10>, <13>,
+-					<14>, <20>,
++					<14>, <17>, <20>,
+ 					<21>, <22>,
+ 					<28>, <32>, <34>,
+ 					<36>, <40>, <44>,
+@@ -254,7 +254,7 @@
+ 					     "ahb_ohci", "ahb_ss", "ahb_dma",
+ 					     "ahb_bist", "ahb_mmc0", "ahb_mmc1",
+ 					     "ahb_mmc2", "ahb_nand",
+-					     "ahb_sdram", "ahb_spi0",
++					     "ahb_sdram", "ahb_sdram", "ahb_spi0",
+ 					     "ahb_spi1", "ahb_spi2",
+ 					     "ahb_stimer", "ahb_ve", "ahb_tve",
+ 					     "ahb_lcd", "ahb_csi", "ahb_de_be",
+@@ -264,7 +264,7 @@
  
+ 		apb0_gates: clk at 01c20068 {
+ 			#clock-cells = <1>;
+-			compatible = "allwinner,sun5i-a13-apb0-gates-clk";
++			compatible = "allwinner,sun4i-a10-gates-clk";
+ 			reg = <0x01c20068 0x4>;
+ 			clocks = <&apb0>;
+ 			clock-indices = <0>, <3>,
+@@ -275,15 +275,15 @@
+ 
+ 		apb1_gates: clk at 01c2006c {
+ 			#clock-cells = <1>;
+-			compatible = "allwinner,sun5i-a13-apb1-gates-clk";
++			compatible = "allwinner,sun4i-a10-gates-clk";
+ 			reg = <0x01c2006c 0x4>;
+ 			clocks = <&apb1>;
+ 			clock-indices = <0>, <1>,
+ 					<2>, <17>,
+-					<18>;
++					<18>, <19>;
+ 			clock-output-names = "apb1_i2c0", "apb1_i2c1",
+ 					     "apb1_i2c2", "apb1_uart1",
+-					     "apb1_uart2";
++					     "apb1_uart2", "apb1_uart3";
+ 		};
+ 
+ 		nand_clk: clk at 01c20080 {
 -- 
 2.9.3
