@@ -1,146 +1,127 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 7 Sep 2016 11:43:08 +0200
-Subject: [PATCH v2 3/7] KVM: arm: vgic-new: improve compatibility with
- 32-bit
-In-Reply-To: <57CFD899.5020805@arm.com>
-References: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
- <1471344418-19568-4-git-send-email-vladimir.murzin@arm.com>
- <20160905112904.GH26366@cbox> <57CEB981.6060600@arm.com>
- <20160906132219.GA23592@cbox> <57CECA79.3040204@arm.com>
- <20160906163108.GB23592@cbox> <57CFD899.5020805@arm.com>
-Message-ID: <20160907094308.GO23592@cbox>
+From: dawei.chien@mediatek.com (Dawei Chien)
+Date: Wed, 7 Sep 2016 17:47:11 +0800
+Subject: [PATCH v2 3/3] arm: dts: thermal: add thermal/auxadc node.
+In-Reply-To: <1473132510.15922.13.camel@mtksdaap41>
+References: <1471492253-7185-1-git-send-email-dawei.chien@mediatek.com>
+ <1471492253-7185-4-git-send-email-dawei.chien@mediatek.com>
+ <1473121447.2201.20.camel@intel.com> <1473121807.2201.23.camel@intel.com>
+ <1473132510.15922.13.camel@mtksdaap41>
+Message-ID: <1473241631.8994.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2016 at 10:06:33AM +0100, Vladimir Murzin wrote:
-> On 06/09/16 17:31, Christoffer Dall wrote:
-> > On Tue, Sep 06, 2016 at 02:54:01PM +0100, Vladimir Murzin wrote:
-> >> On 06/09/16 14:22, Christoffer Dall wrote:
-> >>> On Tue, Sep 06, 2016 at 01:41:37PM +0100, Vladimir Murzin wrote:
-> >>>> Hi Christoffer,
-> >>>>
-> >>>> On 05/09/16 12:29, Christoffer Dall wrote:
-> >>>>> Hi Vladimir,
-> >>>>>
-> >>>>> I think commit title is too vague, can you be more specific?
-> >>>>>
-> >>>>
-> >>>> KVM: arm: vgic-new: make extract_bytes to always work on 64-bit data
-> >>>>
-> >>>> is it better?
-> >>>
-> >>> I would suggest:
-> >>>
-> >>> KVM: arm: vgic: Support 64-bit data manipulation on 32-bit host systems
-> >>>
-> >>>>
-> >>>>> On Tue, Aug 16, 2016 at 11:46:54AM +0100, Vladimir Murzin wrote:
-> >>>>>> We have couple of 64-bit register defined in GICv3 architecture, so
-> >>>>>
-> >>>>> 'a couple',  'registers' (plural)
-> >>>>>
-> >>>>>> "unsigned long" kind of accessors wouldn't work for 32-bit. However,
-> >>>>>
-> >>>>> 'wouldn't work for 32-bit' is kind of generic as well.  Perhaps you mean
-> >>>>> that unsigned long accesses to these registers will only access a single
-> >>>>> 32-bit work of that register.
-> >>>>>
-> >>>>>> these registers can't be access as 64-bit in a one go if we run 32-bit
-> >>>>>
-> >>>>> 'accessed', 's/in one go/with a single instruction/' ?
-> >>>>>
-> >>>>> 'a 32-bit host'
-> >>>>>
-> >>>>>> host simply because KVM doesn't support multiple load/store on MMIO
-> >>>>>
-> >>>>> by 'multiple load/store' you mean the 'load/store multiple' instructions
-> >>>>> specifically, right?  Not a sequence of multiple loads and stores.  I
-> >>>>> think you should be more specific here as well, for example, I think
-> >>>>> ldrd and strd are problematic as well.
-> >>>>>
-> >>>>>> space.
-> >>>>>>
-> >>>>>> It means that 32-bit guest access these registers in 32-bit chunks, so
-> >>>>>
-> >>>>> 'a 32-bit guest', 'accesses'
-> >>>>>
-> >>>>
-> >>>> all suggestions you've made above are true. I'll rework commit message
-> >>>> to be more precise.
-> >>>>
-> >>>
-> >>> Thanks!
-> >>>
-> >>>>>> the only thing we need to do is to ensure that extract_bytes() always
-> >>>>>> takes 64-bit data.
-> >>>>>>
-> >>>>>> Since we are here fix couple of other width related issues by using
-> >>>>>> ULL variants over UL.
-> >>>>>>
-> >>>>>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> >>>>>> ---
-> >>>>>>  virt/kvm/arm/vgic/vgic-mmio-v3.c |    6 +++---
-> >>>>>>  virt/kvm/arm/vgic/vgic-mmio.h    |    2 +-
-> >>>>>>  2 files changed, 4 insertions(+), 4 deletions(-)
-> >>>>>>
-> >>>>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> >>>>>> index ff668e0..cc20b60 100644
-> >>>>>> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> >>>>>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> >>>>>> @@ -23,7 +23,7 @@
-> >>>>>>  #include "vgic-mmio.h"
-> >>>>>>  
-> >>>>>>  /* extract @num bytes at @offset bytes offset in data */
-> >>>>>> -unsigned long extract_bytes(unsigned long data, unsigned int offset,
-> >>>>>> +unsigned long extract_bytes(u64 data, unsigned int offset,
-> >>>>>>  			    unsigned int num)
-> >>>>>>  {
-> >>>>>>  	return (data >> (offset * 8)) & GENMASK_ULL(num * 8 - 1, 0);
-> >>>>>> @@ -179,7 +179,7 @@ static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
-> >>>>>>  	int target_vcpu_id = vcpu->vcpu_id;
-> >>>>>>  	u64 value;
-> >>>>>>  
-> >>>>>> -	value = (mpidr & GENMASK(23, 0)) << 32;
-> >>>>>> +	value = (mpidr & GENMASK_ULL(23, 0)) << 32;
-> >>>>>
-> >>>>> why does this make a difference when mpidr is an unsigned long?
-> >>>>
-> >>>> because we access a little bit further than unsigned long can accommodate
-> >>>>
-> >>>>   CC      arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-mmio-v3.o
-> >>>> arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-mmio-v3.c: In function
-> >>>> 'vgic_mmio_read_v3r_typer':
-> >>>> arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-mmio-v3.c:184:35: warning:
-> >>>> left shift count >= width of type [-Wshift-count-overflow]
-> >>>>   value = (mpidr & GENMASK(23, 0)) << 32;
-> >>>>                                    ^
-> >>>>
-> >>>> I can include this warning in commit message or maybe you want a
-> >>>> separate patch?
-> >>>>
-> >>> My point was that the code doesn't really make sense when compiled on a
-> >>> 32-bit platform without also modifing the type for the mpidr variable.
-> >>> Am I missing something?
-> >>
-> >> I've not seen any difference in generated code, but for consistency I'll
-> >> update mpidr variable to u64.
-> >>
-> > 
-> > That could be because you need to update kvm_vcpu_get_mpidr_aff() to
-> > return a u64 as well.
+On Tue, 2016-09-06 at 11:28 +0800, Dawei Chien wrote:
+> Dear Rui,
 > 
-> I think we don't need to update the type of mpidr. mpidr fits in
-> "unsigned long" nicely and kvm_vcpu_get_mpidr_aff() applies
-> MPIDR_HWID_BITMASK mask anyway.
+> On Tue, 2016-09-06 at 08:30 +0800, Zhang Rui wrote:
+> > On ?, 2016-09-06 at 08:24 +0800, Zhang Rui wrote:
+> > > On ?, 2016-08-18 at 11:50 +0800, Dawei Chien wrote:
+> > > > 
+> > > > This adds the thermal controller and auxadc nodes
+> > > > to the Mediatek MT2701 dtsi file.
+> > > > 
+> > > > Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
+> > > > ---
+> > > > This patch depned on:
+> > > > https://patchwork.kernel.org/patch/9249589/
+> > > > https://patchwork.kernel.org/patch/9249589/
+> > > Hmm, does this mean that I should take all these three patches and
+> > > hold
+> > > the patches in next merge window until the above patch has been
+> > > merged?
+> > > 
+> Yes, this patch is base on auxadc patchset.
 > 
-> In my patch I just abused GENMASK_ULL() and the proper fix for warning
-> produced by gcc should be
+> > Patch 3/3 can not be applied on top of upstream kernel, so I guess it
+> > still has some other dependencies.
+> > I think I can apply patch 1, 2 first. And patch 3/3 should be handled
+> > in the dt tree.
 > 
-> +	value = (u64)(mpidr & GENMASK(23, 0)) << 32;
-> 
-> 
-Ah, right, this is all the 32-bit include files I should be looking at,
-so this makes sense.
+> Sorry, this patch is also need Mediatek's clock patchset what I miss to
+> add in dependency list, I would resend this dt tree once clock patch
+> merge, or resend this for right dependency on next version, thank you.
 
-Thanks,
--Christoffer
+Actually, since patch1/patch2 would be OK so far, I would just only
+resend patch3 after MTK clock pathcset ready, I prefer to merge
+patch1/patch2 if possible, thank you.
+
+
+> > thanks,
+> > rui
+> > > thanks,
+> > > rui 
+> > > > 
+> > > > ---
+> > > >  arch/arm/boot/dts/mt2701.dtsi |   44
+> > > > +++++++++++++++++++++++++++++++++++++++++
+> > > >  1 file changed, 44 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/mt2701.dtsi
+> > > > b/arch/arm/boot/dts/mt2701.dtsi
+> > > > index e9150a4..cee4724 100644
+> > > > --- a/arch/arm/boot/dts/mt2701.dtsi
+> > > > +++ b/arch/arm/boot/dts/mt2701.dtsi
+> > > > @@ -87,6 +87,36 @@
+> > > >  		clock-output-names = "rtc32k";
+> > > >  	};
+> > > >  
+> > > > +	thermal-zones {
+> > > > +		cpu_thermal: cpu_thermal {
+> > > > +			polling-delay-passive = <1000>; /*
+> > > > milliseconds */
+> > > > +			polling-delay = <1000>; /* milliseconds */
+> > > > +
+> > > > +			thermal-sensors = <&thermal 0>;
+> > > > +			sustainable-power = <1000>;
+> > > > +
+> > > > +			trips {
+> > > > +				threshold: trip-point at 0 {
+> > > > +					temperature = <68000>;
+> > > > +					hysteresis = <2000>;
+> > > > +					type = "passive";
+> > > > +				};
+> > > > +
+> > > > +				target: trip-point at 1 {
+> > > > +					temperature = <85000>;
+> > > > +					hysteresis = <2000>;
+> > > > +					type = "passive";
+> > > > +				};
+> > > > +
+> > > > +				cpu_crit: cpu_crit at 0 {
+> > > > +					temperature = <115000>;
+> > > > +					hysteresis = <2000>;
+> > > > +					type = "critical";
+> > > > +				};
+> > > > +			};
+> > > > +		};
+> > > > +	};
+> > > > +
+> > > >  	timer {
+> > > >  		compatible = "arm,armv7-timer";
+> > > >  		interrupt-parent = <&gic>;
+> > > > @@ -222,4 +252,18 @@
+> > > >  		clock-names = "baud", "bus";
+> > > >  		status = "disabled";
+> > > >  	};
+> > > > +
+> > > > +	thermal: thermal at 1100b000 {
+> > > > +		#thermal-sensor-cells = <0>;
+> > > > +		compatible = "mediatek,mt2701-thermal";
+> > > > +		reg = <0 0x1100b000 0 0x1000>;
+> > > > +		interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
+> > > > +		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg
+> > > > CLK_PERI_AUXADC>;
+> > > > +		clock-names = "therm", "auxadc";
+> > > > +		resets = <&pericfg 0x10>;
+> > > > +		reset-names = "therm";
+> > > > +		mediatek,auxadc = <&auxadc>;
+> > > > +		mediatek,apmixedsys = <&apmixedsys>;
+> > > > +	};
+> > > > +
+> > > >  };
+> > > --
+> > > To unsubscribe from this list: send the line "unsubscribe linux-pm"
+> > > in
+> > > the body of a message to majordomo at vger.kernel.org
+> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
