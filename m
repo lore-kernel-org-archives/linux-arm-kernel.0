@@ -1,26 +1,64 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 7 Sep 2016 16:20:55 -0700
-Subject: [PATCH v2 0/7] arm64: Privileged Access Never using TTBR0_EL1
- switching
-In-Reply-To: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
-References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <CAGXu5j++0LgDEv=m1yQb4hB57MQ2MYVCpeex9TFTRmQpNYhNsQ@mail.gmail.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Thu, 8 Sep 2016 02:46:28 +0300
+Subject: [RESEND PATCH] ARM: dts: lpc32xx: set default parent clock for
+ pwm1 & pwm2
+In-Reply-To: <1473277073-12093-1-git-send-email-slemieux.tyco@gmail.com>
+References: <1473277073-12093-1-git-send-email-slemieux.tyco@gmail.com>
+Message-ID: <edf2ee45-7793-7564-9318-ee08909d0ff5@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 2, 2016 at 8:02 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> This is the second version of the arm64 PAN emulation by disabling
-> TTBR0_EL1 accesses. The major change from v1 is the use of a thread_info
-> member to store the real TTBR0_EL1 value. The advantage is slightly
-> simpler assembler macros for uaccess_enable with the downside that
-> switch_mm() must always update the saved ttbr0 even if there is no mm
-> switch.
+Hi Sylvain,
 
-Is arm64 thread_info attached to the kernel stack? (i.e. is this
-introducing a valuable target for stack-based attacks?)
+On 07.09.2016 22:37, Sylvain Lemieux wrote:
+> From: Sylvain Lemieux <slemieux@tycoint.com>
+> 
+> The change setup the peripheral clock (PERIPH_CLK) as the default 
+> parent clock for PWM1 & PWM2.
+> 
+> Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
+> ---
+>  arch/arm/boot/dts/lpc32xx.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
+> index e295e1e..ed85b95 100644
+> --- a/arch/arm/boot/dts/lpc32xx.dtsi
+> +++ b/arch/arm/boot/dts/lpc32xx.dtsi
+> @@ -469,6 +469,9 @@
+>  				compatible = "nxp,lpc3220-pwm";
+>  				reg = <0x4005C000 0x4>;
+>  				clocks = <&clk LPC32XX_CLK_PWM1>;
+> +				assigned-clocks = <&clk LPC32XX_CLK_PWM1>,
+> +						  <&clk LPC32XX_CLK_PERIPH>;
 
--Kees
+I believe here "assigned-clocks = <&clk LPC32XX_CLK_PWM1>;" would be
+good enough. In this context the second clock could be potentially
+specified, if you are going to set its rate, but because it is a common
+clock for many controllers it should not be done from a PWM device node.
 
--- 
-Kees Cook
-Nexus Security
+> +				assigned-clock-parents = <&clk LPC32XX_CLK_PERIPH>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -476,6 +479,9 @@
+>  				compatible = "nxp,lpc3220-pwm";
+>  				reg = <0x4005C004 0x4>;
+>  				clocks = <&clk LPC32XX_CLK_PWM2>;
+> +				assigned-clocks = <&clk LPC32XX_CLK_PWM2>,
+> +						  <&clk LPC32XX_CLK_PERIPH>;
+
+Same as above.
+
+Please remove the second <&clk LPC32XX_CLK_PERIPH> value from the
+assigned-clocks property.
+
+> +				assigned-clock-parents = <&clk LPC32XX_CLK_PERIPH>;
+>  				status = "disabled";
+>  			};
+>  
+> 
+
+--
+With best wishes,
+Vladimir
