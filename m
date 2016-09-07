@@ -1,25 +1,24 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 7 Sep 2016 10:39:26 +0530
-Subject: [PATCH 2/2] ARM: dts: am57xx-beagle-x15: Add support for rev B1
-In-Reply-To: <20160906200553.wqkvwsfww3rllhd5@atomide.com>
-References: <20160902090600.27262-1-nm@ti.com>
- <20160902090600.27262-3-nm@ti.com>
- <dd74f5e1-304f-661e-7fd9-f5f81bcfc55e@ti.com>
- <CAOCHtYiFjB-cuABmCiw96spc-De+qNNQYGrjp-MmNDuH2mJ9Bw@mail.gmail.com>
- <84be68f4-c5a6-0afe-c402-1adba9172918@ti.com>
- <20160906200553.wqkvwsfww3rllhd5@atomide.com>
-Message-ID: <dc4ed90a-223d-69c0-d350-39b6a9d5ce6f@ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 7 Sep 2016 10:42:15 +0530
+Subject: [PATCH v2 1/2] Documentation: dt: add bindings for ti-cpufreq
+In-Reply-To: <20160901025328.376-2-d-gerlach@ti.com>
+References: <20160901025328.376-1-d-gerlach@ti.com>
+ <20160901025328.376-2-d-gerlach@ti.com>
+Message-ID: <20160907051215.GN27345@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 September 2016 01:35 AM, Tony Lindgren wrote:
-> And the am335x shared dtsi files are not enough. It's silly how many
-> times we're duplicating the same things over and over again for USB
-> setup for various am335x boards for example.
-> 
-> So my take is that we need more shared dtsi files, not less.
+On 31-08-16, 21:53, Dave Gerlach wrote:
+> +In 'operating-points-v2' table:
+> +- compatible: Should be
+> +	- 'operating-points-v2-ti-am3352-cpu' for am335x SoCs
+> +	- 'operating-points-v2-ti-am4372-cpu' for am43xx SoCs
+> +	- 'operating-points-v2-ti-dra7-cpu' for dra7xx/am57xx SoCs
 
-Alright, thanks for weighing in, Tony.
+Why do you need SoC specific compatible here? Are you defining new
+fields in OPP tables for your SoC ? How are the tables for your case
+going to differ from the ones using "operating-points-v2" compatible
+string?
 
-Regards,
-Sekhar
+-- 
+viresh
