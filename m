@@ -1,46 +1,45 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Sep 2016 09:08:07 +0100
-Subject: Kexec regression in next-20160906
-In-Reply-To: <2229914.bQjEFCIRgO@hactar>
-References: <20160906220936.4txqzodkgknhjiyh@atomide.com>
- <2229914.bQjEFCIRgO@hactar>
-Message-ID: <20160907080807.GD5783@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed,  7 Sep 2016 09:12:11 +0100
+Subject: [PATCH v2] gpio/gpiolib: Forbid irqchip default trigger if probed
+ over DT
+Message-ID: <1473235931-19079-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2016 at 08:33:20PM -0300, Thiago Jung Bauermann wrote:
-> Thanks for reporting the problem and finding the commit that caused it.
-> The only thing in commit 5c01cdd2d4bc which can affect kexec_load is the 
-> fact that struct kexec_segment has a new member.
-> 
-> This is probably breaking the ABI on ARM, then. I verified that kexec_load 
-> kept working on ppc64le with a kexec binary compiled with the original 
-> struct kexec_segment definition, but apparently I got lucky.
+Using a default trigger is a bad idea if using DT to configure
+interrupts, as the device's interrupt specifier will always contain
+the trigger configuration.
 
-That _will_ definitely break the ABI on ARM, and pretty much all
-32-bit architectures.  It's a silly thing to do, and I'm really
-surprised that it passed through review without being spotted.
+Let's warn about that particular situation, and revert to not
+having a default. Hopefully, the couple of drivers still using
+this feature will quickly be fixed.
 
-The reason you "got lucky" with ppc64le is that there was probably
-padding in the structure, and you happened to place your new member
-in that padding, so the structure size didn't change.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+Send the tested patch this time around...
 
-For 32-bit architectures, there will be no padding - both the pointers
-and size_t members will be 32-bit, and will be naturally aligned, and
-hence there will be no padding.  Any addition to the structure will
-change the size of the structure.
+ drivers/gpio/gpiolib.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Any change to a UAPI header needs to be carefully considered and
-questioned as it is always a potential userspace breakage - and in
-the kernel, we're supposed to be doing our up-most to avoid
-breaking userspace.
-
-It's not like it was in the old days when we didn't have the UAPI
-seperate - today, we can find these things by looking at the patch
-diffstat and seeing whether any file in "uapi" is touched.  That
-should be the trigger for a really in-depth review of the change.
-
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index 53ff25a..5707b5d 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -1617,6 +1617,15 @@ int _gpiochip_irqchip_add(struct gpio_chip *gpiochip,
+ 	if (gpiochip->of_node)
+ 		of_node = gpiochip->of_node;
+ #endif
++	/*
++	 * Specifying a default trigger is a terrible idea if DT is
++	 * used to configure the interrupts, as you may end-up with
++	 * conflicting triggers. Tell the user, and reset to NONE.
++	 */
++	if (WARN(of_node && type != IRQ_TYPE_NONE,
++		 "%s: Ignoring %d default trigger\n", of_node->full_name, type))
++		type = IRQ_TYPE_NONE;
++
+ 	gpiochip->irqchip = irqchip;
+ 	gpiochip->irq_handler = handler;
+ 	gpiochip->irq_default_type = type;
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
