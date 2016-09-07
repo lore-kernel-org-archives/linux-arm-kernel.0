@@ -1,51 +1,35 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed,  7 Sep 2016 17:34:29 +0200
-Subject: [PATCH v3 0/8] scpi: Add support for legacy SCPI protocol
-Message-ID: <1473262477-18045-1-git-send-email-narmstrong@baylibre.com>
+Date: Wed,  7 Sep 2016 17:34:32 +0200
+Subject: [PATCH v3 3/8] scpi: Do not fail if get_capabilities is not
+ implemented
+In-Reply-To: <1473262477-18045-1-git-send-email-narmstrong@baylibre.com>
+References: <1473262477-18045-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1473262477-18045-4-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset aims to support the legacy SCPI firmware implementation that was
-delivered as early technology preview for the JUNO platform.
+On Amlogic SCPI legacy implementation, the GET_CAPABILITIES is not
+supported, failover by using 0.0.0 version.
 
-Finally a stable, maintained and public implementation for the SCPI protocol
-has been upstreamed part of the JUNO support and it is the recommended way
-of implementing SCP communication on ARMv8 platforms.
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ drivers/firmware/arm_scpi.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-The Amlogic GXBB platform is using this legacy protocol, as the RK3368 & RK3399
-platforms. This patchset will only add support for Amlogic GXBB SoC.
-
-This patchset add support for the legacy protocol in the arm_scpi.c file,
-avoiding code duplication.
-
-Last RFC discution tread can be found at : https://lkml.org/lkml/2016/8/9/210
-
-Changes since v2 at : http://lkml.kernel.org/r/1471952816-30877-1-git-send-email-narmstrong at baylibre.com
- - Added command indirection table and use it in each commands
- - Added bitmap for high priority commands
- - Cleaned up legacy tx_prepare/handle_message to align to standard functions
- - Dropped legacy_scpi_ops
-
-Changes since v1 at : http://lkml.kernel.org/r/1471515066-3626-1-git-send-email-narmstrong at baylibre.com
- - Dropped vendor_send_message and rockchip vendor mechanism patches
- - Merged alternate functions into main functions using is_legacy boolean
- - Added DT match table to set is_legacy to true
- - Kept alternate scpi_ops structure for legacy
-
-Neil Armstrong (8):
-  scpi: Add cmd indirection table to prepare for legacy commands
-  scpi: Add alternative legacy structures, functions and macros
-  scpi: Do not fail if get_capabilities is not implemented
-  scpi: Add support for Legacy match table for Amlogic GXBB SoC
-  scpi: grow MAX_DVFS_OPPS to 16 entries
-  dt-bindings: Add support for Amlogic GXBB SCPI Interface
-  ARM64: dts: meson-gxbb: Add SRAM node
-  ARM64: dts: meson-gxbb: Add SCPI with cpufreq & sensors Nodes
-
- Documentation/devicetree/bindings/arm/arm,scpi.txt |   8 +-
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  45 +++
- drivers/firmware/arm_scpi.c                        | 378 +++++++++++++++++++--
- 3 files changed, 402 insertions(+), 29 deletions(-)
-
+diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+index 9ba1020..6a16100 100644
+--- a/drivers/firmware/arm_scpi.c
++++ b/drivers/firmware/arm_scpi.c
+@@ -891,6 +891,10 @@ static int scpi_init_versions(struct scpi_drvinfo *info)
+ 		info->protocol_version = le32_to_cpu(caps.protocol_version);
+ 		info->firmware_version = le32_to_cpu(caps.platform_version);
+ 	}
++	/* Ignore error if not implemented */
++	if (scpi_info->is_legacy && ret == -EOPNOTSUPP)
++		return 0;
++
+ 	return ret;
+ }
+ 
 -- 
 1.9.1
