@@ -1,87 +1,57 @@
-From: amakarov.linux@gmail.com (Aleksey Makarov)
-Date: Wed, 7 Sep 2016 12:30:19 +0300
-Subject: [PATCH v10 3/4] ARM64: ACPI: enable ACPI_SPCR_TABLE
-In-Reply-To: <20160905123617.18775-4-aleksey.makarov@linaro.org>
-References: <20160905123617.18775-1-aleksey.makarov@linaro.org>
- <20160905123617.18775-4-aleksey.makarov@linaro.org>
-Message-ID: <7e5486cc-4080-2d1e-8f6d-98874379887d@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Sep 2016 10:35:26 +0100
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <20160907092901.GC13903@b29397-desktop>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <20562703.Glp77l1PBf@wuerfel>
+ <20160907074428.GB13903@b29397-desktop>
+ <4780626.ofOZnpf19s@wuerfel>
+ <20160907092901.GC13903@b29397-desktop>
+Message-ID: <20160907093525.GK1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 09/05/2016 03:36 PM, Aleksey Makarov wrote:
-> SBBR mentions SPCR as a mandatory ACPI table.  So enable it for ARM64
+On Wed, Sep 07, 2016 at 05:29:01PM +0800, Peter Chen wrote:
+> On Wed, Sep 07, 2016 at 10:52:46AM +0200, Arnd Bergmann wrote:
+> > On Wednesday, September 7, 2016 3:44:28 PM CEST Peter Chen wrote:
+> > > 
+> > > The pre-condition of DT function at USB HCD core works is the host
+> > > controller device has of_node, since it is the root node for USB tree
+> > > described at DT. If the host controller device is not at DT, it needs
+> > > to try to get its of_node, the chipidea driver gets it through its
+> > > parent node [1]
+> > 
+> > > 
+> > > [1] https://lkml.org/lkml/2016/8/8/119
+> > > 
+> > 
+> > Ah, this is what I was referring to in the other mail.
+> > 
+> > However, the way you set the of_node might be dangerous too:
+> > We should generally not have two platform_device structures with
+> > the same of_node pointer, most importantly it may cause the
+> > child device to be bound to the same driver as the parent
+> > device since the probing is done by compatible string.
+> > 
+> > As you tested it successfully, it must work at the moment on your
+> > machine, but it could easily break depending on deferred probing
+> > or module load order.
+> > 
 > 
-> Earlycon should be set up as early as possible.  ACPI boot tables are
-> mapped in arch/arm64/kernel/acpi.c:acpi_boot_table_init() that
-> is called from setup_arch() and that's where we parse SPCR.
-> So it has to be opted-in per-arch.
+> Currently, I work around above problems by setting core device of_node
+> as NULL at both probe error path and platform driver .remove routine.
 > 
-> When ACPI_SPCR_TABLE is defined initialization of DT earlycon is
-> deferred until the DT/ACPI decision is done.  Initialize DT earlycon
-> if ACPI is disabled.
+> I admit it is not a good way, but if we only have of_node at device's
+> life periods after probe, it seems ok currently. It is hard to create
+> of_node dynamically when create device, and keep some contents
+> of parent's of_node, and some are not.
 
-Hi Will, Catalin,
+How about turning dwc3 into a library which can be used by a range of
+platform devices?  Wouldn't that solve all the current problems, and
+completely avoid the need to copy resources from one platform device
+to another?
 
-Can you review this patch and consider ACKing it please?
-
-Thank you
-Aleksey Makarov
-
-> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-> Tested-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> Tested-by: Christopher Covington <cov@codeaurora.org>
-> ---
->  arch/arm64/Kconfig       |  1 +
->  arch/arm64/kernel/acpi.c | 11 ++++++++++-
->  2 files changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index bc3f00f..11a2d36 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -4,6 +4,7 @@ config ARM64
->  	select ACPI_GENERIC_GSI if ACPI
->  	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
->  	select ACPI_MCFG if ACPI
-> +	select ACPI_SPCR_TABLE if ACPI
->  	select ARCH_HAS_DEVMEM_IS_ALLOWED
->  	select ARCH_HAS_ACPI_TABLE_UPGRADE if ACPI
->  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index 3e4f1a4..252a6d9 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -24,6 +24,7 @@
->  #include <linux/memblock.h>
->  #include <linux/of_fdt.h>
->  #include <linux/smp.h>
-> +#include <linux/serial_core.h>
->  
->  #include <asm/cputype.h>
->  #include <asm/cpu_ops.h>
-> @@ -206,7 +207,7 @@ void __init acpi_boot_table_init(void)
->  	if (param_acpi_off ||
->  	    (!param_acpi_on && !param_acpi_force &&
->  	     of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
-> -		return;
-> +		goto done;
->  
->  	/*
->  	 * ACPI is disabled at this point. Enable it in order to parse
-> @@ -226,6 +227,14 @@ void __init acpi_boot_table_init(void)
->  		if (!param_acpi_force)
->  			disable_acpi();
->  	}
-> +
-> +done:
-> +	if (acpi_disabled) {
-> +		if (earlycon_init_is_deferred)
-> +			early_init_dt_scan_chosen_stdout();
-> +	} else {
-> +		parse_spcr(earlycon_init_is_deferred);
-> +	}
->  }
->  
->  #ifdef CONFIG_ACPI_APEI
-> 
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
