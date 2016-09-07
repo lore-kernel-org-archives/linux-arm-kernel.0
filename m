@@ -1,62 +1,56 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 07 Sep 2016 20:12:23 +0200
-Subject: [PATCH v4 5/6] arm64: dts: rockchip: add the gmac needed node for
- rk3399
-In-Reply-To: <1472752204-8924-6-git-send-email-wxt@rock-chips.com>
-References: <1472752204-8924-1-git-send-email-wxt@rock-chips.com>
- <1472752204-8924-6-git-send-email-wxt@rock-chips.com>
-Message-ID: <2189752.joCqtnIJ7y@phil>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 7 Sep 2016 20:13:32 +0200 (CEST)
+Subject: [PATCH 4/8] ARM: dts: bcm283x: Add a new EMMC pin group from
+ the downstream tree.
+In-Reply-To: <1473244289-20728-5-git-send-email-kraxel@redhat.com>
+References: <1473244289-20728-1-git-send-email-kraxel@redhat.com>
+ <1473244289-20728-5-git-send-email-kraxel@redhat.com>
+Message-ID: <87650770.23554.026b1e4b-e35d-48e6-9394-7eeea0ff9add.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 2. September 2016, 01:50:03 CEST schrieb Caesar Wang:
-> From: Roger Chen <roger.chen@rock-chips.com>
+
+> Gerd Hoffmann <kraxel@redhat.com> hat am 7. September 2016 um 12:31
+> geschrieben:
 > 
-> The RK3399 GMAC Ethernet Controller provides a complete Ethernet interface
-> from processor to a Reduced Media Independent Interface (RMII) and Reduced
-> Gigabit Media Independent Interface (RGMII) compliant Ethernet PHY.
 > 
-> This patch adds the related needed device information.
-> e.g.: interrupts, grf, clocks, pinctrl and so on.
+> From: Eric Anholt <eric@anholt.net>
 > 
-> The full details are in [0].
+> This will be used for having EMMC (sdhci-bcm2835.c) drive the
+> wireless.
+
+sdhci-bcm2835.c has been replaced by sdhci-iproc.c
+
 > 
-> [0]:
-> Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-> 
-> Signed-off-by: Roger Chen <roger.chen@rock-chips.com>
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 > ---
+>  arch/arm/boot/dts/bcm283x.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> Changes in v4:
-> - The Roger had posted patch on https://patchwork.kernel.org/patch/9274561/.
-> - re-fixup to original author.
-> 
-> Changes in v3:
-> - generate a patch from https://patchwork.kernel.org/patch/9306339/.
-> 
-> Changes in v2: None
-> 
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 80
-> ++++++++++++++++++++++++++++++++ 1 file changed, 80 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index 2ab233f..092bb45 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> @@ -200,6 +200,26 @@
->  		};
->  	};
-> 
-> +	gmac: ethernet at fe300000 {
-> +		compatible = "rockchip,rk3399-gmac";
-> +		reg = <0x0 0xfe300000 0x0 0x10000>;
-> +		interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
+> diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+> index 062d09db..b6b1950 100644
+> --- a/arch/arm/boot/dts/bcm283x.dtsi
+> +++ b/arch/arm/boot/dts/bcm283x.dtsi
+> @@ -257,6 +257,11 @@
+>  				brcm,pins = <32 33>;
+>  				brcm,function = <BCM2835_FSEL_ALT3>;
+>  			};
+> +			emmc_gpio34: emmc_gpio34 {
+> +				brcm,pins = <34 35 36 37 38 39>;
+> +				brcm,function = <BCM2835_FSEL_ALT3>;
+> +				brcm,pull = <0 2 2 2 2 2>;
 
-applied to my dts64 branch, after making this a
-+		interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH 0>;
+How about adding pull defines to include/dt-bindings/pinctrl/bcm2835.h?
 
-(due to the 4-cell interrupt change)
-
-
-Heiko
+> +			};
+>  			emmc_gpio48: emmc_gpio48 {
+>  				brcm,pins = <48 49 50 51 52 53>;
+>  				brcm,function = <BCM2835_FSEL_ALT3>;
+> -- 
+> 1.8.3.1
+> 
+> 
+> _______________________________________________
+> linux-rpi-kernel mailing list
+> linux-rpi-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rpi-kernel
