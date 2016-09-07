@@ -1,63 +1,61 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Wed, 07 Sep 2016 13:47:22 +0300
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <75ca65eb-e8c4-bc3f-e00b-b0cba46d28c6@arm.com>
-References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
- <5844875.KucAoPMrXi@wuerfel> <20160907063313.GA13903@b29397-desktop>
- <12021424.cItk3A7CfE@wuerfel> <20160907095549.GD13903@b29397-desktop>
- <75ca65eb-e8c4-bc3f-e00b-b0cba46d28c6@arm.com>
-Message-ID: <874m5skmv9.fsf@linux.intel.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 7 Sep 2016 11:48:52 +0100
+Subject: [PATCH v2 7/7] ARM: KVM: Unlock vgic-v3 support
+In-Reply-To: <20160906165527.GG23592@cbox>
+References: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
+ <1471344418-19568-8-git-send-email-vladimir.murzin@arm.com>
+ <20160905112927.GL26366@cbox> <57CEC344.7030706@arm.com>
+ <20160906165527.GG23592@cbox>
+Message-ID: <57CFF094.5000704@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 06/09/16 17:55, Christoffer Dall wrote:
+> On Tue, Sep 06, 2016 at 02:23:16PM +0100, Vladimir Murzin wrote:
+>>
+>> Sorry, missed this one
+>>
+>> On 05/09/16 12:29, Christoffer Dall wrote:
+>>>>  
+>>>>> +static bool __hyp_text __has_useable_gicv3_cpuif(void)
+>>>>> +{
+>>>>> +	if (IS_ENABLED(CONFIG_ARM_GIC_V3) && (read_sysreg(ID_PFR1) >> 28))
+>>> Do we have a define for bit 28 we could use?
+>>
+>> I'll check it.
+>>
+>>>
+>>> Does this actually work on all v7 boards?  The v7 ARM ARM seems to state
+>>> that this bitfield is Reserved, UNK.  Does that somehow mean 'is going
+>>> to be zero'?
+>>
+>> It is how v7ARM ARM I have defines UNK
+>>
+>> An abbreviation indicating that software must treat a field as
+>> containing an UNKNOWN value. Hardware must implement the bit as read as
+>> 0, or all 0s for a bit field. Software must not rely on the field
+>> reading as zero.
+>>
+>> It seems goes under 'is going to be zero' case, no?
+>>
+> The last sentence is disturbing to me, and feels slightly contradicting
+> itself.  Reading the UNKNOWN description doesn't help much either.
+> 
+> Perhaps you can ask around internally and figure out what the precise
+> answer to this is?
 
-Hi,
+Since it is kind of implementation dependant thing the precise answer
+from here hardly help, IMO. We still have non-zero chance to see
+something scary.
 
-Robin Murphy <robin.murphy@arm.com> writes:
-> On 07/09/16 10:55, Peter Chen wrote:
-> [...]
->>> Regarding the DMA configuration that you mention in ci_hdrc_add_device(),
->>> I think we should replace 
->>>
->>>         pdev->dev.dma_mask = dev->dma_mask;
->>>         pdev->dev.dma_parms = dev->dma_parms;
->>>         dma_set_coherent_mask(&pdev->dev, dev->coherent_dma_mask);
->>>
->>> with of_dma_configure(), which has the chance to configure more than
->>> just those three, as the dma API might look into different aspects:
->>>
->>> - iommu specific configuration
->>> - cache coherency information
->>> - bus type
->>> - dma offset
->>> - dma_map_ops pointer
->>>
->>> We try to handle everything in of_dma_configure() at configuration
->>> time, and that would be the place to add anything else that we might
->>> need in the future.
->>>
->> 
->> Yes, I agree with you, but just like Felipe mentioned, we also need to
->> consider PCI device, can we do something like gpiod_get_index does? Are
->> there any similar APIs like of_dma_configure for ACPI?
->
-> Not yet, but Lorenzo has one in progress[1], primarily for the sake of
-> abstracting away the IOMMU configuration.
->
-> Robin.
->
-> [1]:http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1209911.html
+OTOH, why do we care of all v7 boards if none of them have
+CONFIG_ARM_GIC_V3 defined?
 
-not exported for drivers to use. If Lorenzo is trying to making a
-matching API for ACPI systems, then it needs to follow what
-of_dma_configure() is doing, and add an EXPORT_SYMBOL_GPL()
+Cheers
+Vladimir
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160907/7e2c94c2/attachment.sig>
+> 
+> Thanks,
+> -Christoffer
+> 
+> 
