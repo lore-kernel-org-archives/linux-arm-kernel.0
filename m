@@ -1,93 +1,62 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Sep 2016 09:50:03 +0200
-Subject: [PATCH 16/26] ARM: dts: rskrza1: initial device tree
+Date: Wed,  7 Sep 2016 09:50:08 +0200
+Subject: [PATCH 21/26] ARM: dts: wheat: add CAN support
 In-Reply-To: <cover.1473234371.git.horms+renesas@verge.net.au>
 References: <cover.1473234371.git.horms+renesas@verge.net.au>
-Message-ID: <e83c05a7160681f554476e9d44b7b77053efc21a.1473234372.git.horms+renesas@verge.net.au>
+Message-ID: <4ea71e6df8c22f90665394476c433cad3b4394b6.1473234372.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Brandt <chris.brandt@renesas.com>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Add the initial device tree for the RZ/A1 based development board (RSK).
+Define the Wheat board dependent part of the CAN0/1 device nodes...
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Based  on the original (and large) patch by Vladimir Barinov
+<vladimir.barinov@cogentembedded.com>.
+
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/Makefile             |  1 +
- arch/arm/boot/dts/r7s72100-rskrza1.dts | 52 ++++++++++++++++++++++++++++++++++
- 2 files changed, 53 insertions(+)
- create mode 100644 arch/arm/boot/dts/r7s72100-rskrza1.dts
+ arch/arm/boot/dts/r8a7792-wheat.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d289ec733d2e..80193b3a450b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -651,6 +651,7 @@ dtb-$(CONFIG_ARCH_S5PV210) += \
- dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
- 	emev2-kzm9d.dtb \
- 	r7s72100-genmai.dtb \
-+	r7s72100-rskrza1.dtb \
- 	r8a73a4-ape6evm.dtb \
- 	r8a7740-armadillo800eva.dtb \
- 	r8a7778-bockw.dtb \
-diff --git a/arch/arm/boot/dts/r7s72100-rskrza1.dts b/arch/arm/boot/dts/r7s72100-rskrza1.dts
-new file mode 100644
-index 000000000000..aabfa0459dc1
---- /dev/null
-+++ b/arch/arm/boot/dts/r7s72100-rskrza1.dts
-@@ -0,0 +1,52 @@
-+/*
-+ * Device Tree Source for the RZ/A1H RSK board
-+ *
-+ * Copyright (C) 2016 Renesas Electronics
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
+diff --git a/arch/arm/boot/dts/r8a7792-wheat.dts b/arch/arm/boot/dts/r8a7792-wheat.dts
+index e214d707f81d..65d13c83d424 100644
+--- a/arch/arm/boot/dts/r8a7792-wheat.dts
++++ b/arch/arm/boot/dts/r8a7792-wheat.dts
+@@ -76,6 +76,16 @@
+ 			function = "lbsc";
+ 		};
+ 	};
 +
-+/dts-v1/;
-+#include "r7s72100.dtsi"
-+
-+/ {
-+	model = "RSKRZA1";
-+	compatible = "renesas,rskrza1", "renesas,r7s72100";
-+
-+	aliases {
-+		serial0 = &scif2;
++	can0_pins: can0 {
++		groups = "can0_data";
++		function = "can0";
 +	};
 +
-+	chosen {
-+		bootargs = "ignore_loglevel";
-+		stdout-path = "serial0:115200n8";
++	can1_pins: can1 {
++		groups = "can1_data";
++		function = "can1";
 +	};
+ };
+ 
+ &scif0 {
+@@ -84,3 +94,17 @@
+ 
+ 	status = "okay";
+ };
 +
-+	memory at 8000000 {
-+		device_type = "memory";
-+		reg = <0x08000000 0x02000000>;
-+	};
++&can0 {
++	pinctrl-0 = <&can0_pins>;
++	pinctrl-names = "default";
 +
-+	lbsc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <13330000>;
-+};
-+
-+&usb_x1_clk {
-+	clock-frequency = <48000000>;
-+};
-+
-+&mtu2 {
 +	status = "okay";
 +};
 +
-+&scif2 {
++&can1 {
++	pinctrl-0 = <&can1_pins>;
++	pinctrl-names = "default";
++
 +	status = "okay";
 +};
 -- 
