@@ -1,63 +1,135 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Sep 2016 09:50:08 +0200
-Subject: [PATCH 21/26] ARM: dts: wheat: add CAN support
+Date: Wed,  7 Sep 2016 09:49:49 +0200
+Subject: [PATCH 02/26] ARM: dts: alt: add SDHI0 and 1 support
 In-Reply-To: <cover.1473234371.git.horms+renesas@verge.net.au>
 References: <cover.1473234371.git.horms+renesas@verge.net.au>
-Message-ID: <4ea71e6df8c22f90665394476c433cad3b4394b6.1473234372.git.horms+renesas@verge.net.au>
+Message-ID: <2b41091b896bb99ec1da1ed30113603fc91b84d6.1473234371.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Define the Alt board dependent part of the SDHI0 and 1
+device nodes along with the necessary voltage regulators.
 
-Define the Wheat board dependent part of the CAN0/1 device nodes...
+Based on work by the original patch by Vladimir Barinov and
+Sergei Shtylyov for the Silk board.
 
-Based  on the original (and large) patch by Vladimir Barinov
-<vladimir.barinov@cogentembedded.com>.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7792-wheat.dts | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm/boot/dts/r8a7794-alt.dts | 81 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 81 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7792-wheat.dts b/arch/arm/boot/dts/r8a7792-wheat.dts
-index e214d707f81d..65d13c83d424 100644
---- a/arch/arm/boot/dts/r8a7792-wheat.dts
-+++ b/arch/arm/boot/dts/r8a7792-wheat.dts
-@@ -76,6 +76,16 @@
- 			function = "lbsc";
- 		};
+diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
+index 1ad37d431a2a..fe7c128cc965 100644
+--- a/arch/arm/boot/dts/r8a7794-alt.dts
++++ b/arch/arm/boot/dts/r8a7794-alt.dts
+@@ -10,6 +10,7 @@
+ 
+ /dts-v1/;
+ #include "r8a7794.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	model = "Alt";
+@@ -29,6 +30,54 @@
+ 		reg = <0 0x40000000 0 0x40000000>;
+ 	};
+ 
++	vcc_sdhi0: regulator-vcc-sdhi0 {
++		compatible = "regulator-fixed";
++
++		regulator-name = "SDHI0 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpio = <&gpio2 26 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	vccq_sdhi0: regulator-vccq-sdhi0 {
++		compatible = "regulator-gpio";
++
++		regulator-name = "SDHI0 VccQ";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpios = <&gpio2 29 GPIO_ACTIVE_HIGH>;
++		gpios-states = <1>;
++		states = <3300000 1
++			  1800000 0>;
++	};
++
++	vcc_sdhi1: regulator-vcc-sdhi1 {
++		compatible = "regulator-fixed";
++
++		regulator-name = "SDHI1 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpio = <&gpio4 26 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	vccq_sdhi1: regulator-vccq-sdhi1 {
++		compatible = "regulator-gpio";
++
++		regulator-name = "SDHI1 VccQ";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpios = <&gpio4 29 GPIO_ACTIVE_HIGH>;
++		gpios-states = <1>;
++		states = <3300000 1
++			  1800000 0>;
++	};
++
+ 	lbsc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -140,6 +189,16 @@
+ 		groups = "vin0_data8", "vin0_clk";
+ 		function = "vin0";
  	};
 +
-+	can0_pins: can0 {
-+		groups = "can0_data";
-+		function = "can0";
++	sdhi0_pins: sd0 {
++		groups = "sdhi0_data4", "sdhi0_ctrl";
++		function = "sdhi0";
 +	};
 +
-+	can1_pins: can1 {
-+		groups = "can1_data";
-+		function = "can1";
++	sdhi1_pins: sd1 {
++		groups = "sdhi1_data4", "sdhi1_ctrl";
++		function = "sdhi1";
 +	};
  };
  
- &scif0 {
-@@ -84,3 +94,17 @@
- 
- 	status = "okay";
+ &cmt0 {
+@@ -169,6 +228,28 @@
+ 	};
  };
-+
-+&can0 {
-+	pinctrl-0 = <&can0_pins>;
+ 
++&sdhi0 {
++	pinctrl-0 = <&sdhi0_pins>;
 +	pinctrl-names = "default";
 +
++	vmmc-supply = <&vcc_sdhi0>;
++	vqmmc-supply = <&vccq_sdhi0>;
++	cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&gpio6 7 GPIO_ACTIVE_LOW>;
 +	status = "okay";
 +};
 +
-+&can1 {
-+	pinctrl-0 = <&can1_pins>;
++&sdhi1 {
++	pinctrl-0 = <&sdhi1_pins>;
 +	pinctrl-names = "default";
 +
++	vmmc-supply = <&vcc_sdhi1>;
++	vqmmc-supply = <&vccq_sdhi1>;
++	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&gpio6 15 GPIO_ACTIVE_LOW>;
 +	status = "okay";
 +};
++
+ &i2c1 {
+ 	pinctrl-0 = <&i2c1_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.7.0.rc3.207.g0ac5344
