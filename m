@@ -1,29 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 7 Sep 2016 19:58:46 +0100
-Subject: [PATCH 4/7] spi: meson: Add GXBB compatible
-In-Reply-To: <1473261223-15412-5-git-send-email-jbrunet@baylibre.com>
-References: <1473261223-15412-1-git-send-email-jbrunet@baylibre.com>
- <1473261223-15412-5-git-send-email-jbrunet@baylibre.com>
-Message-ID: <20160907185846.GE3950@sirena.org.uk>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 07 Sep 2016 12:07:39 -0700
+Subject: [PATCH 1/2] pinctrl: meson-gxbb: add the pins for the
+ SDIO/sd_emmc_a controller
+In-Reply-To: <CACRpkdbPVeUA+BSPgQ1XmFJw_J6-V_2BM9h3kO2yq-vUfySsGQ@mail.gmail.com>
+ (Linus Walleij's message of "Wed, 7 Sep 2016 16:24:29 +0200")
+References: <20160828164725.19429-1-martin.blumenstingl@googlemail.com>
+ <20160828164725.19429-2-martin.blumenstingl@googlemail.com>
+ <CACRpkdbPVeUA+BSPgQ1XmFJw_J6-V_2BM9h3kO2yq-vUfySsGQ@mail.gmail.com>
+Message-ID: <7hk2enttok.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2016 at 05:13:40PM +0200, Jerome Brunet wrote:
-> From: Neil Armstrong <narmstrong@baylibre.com>
-> 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-I can't do anything with this, you've not provided a signoff.  Please
-resend with a signoff - see SubmittingPatches for details on what this
-means and why it's important.
+> On Sun, Aug 28, 2016 at 6:47 PM, Martin Blumenstingl
+> <martin.blumenstingl@googlemail.com> wrote:
+>
+>> sd_emmc_a is used a controller for the SDIO modules. This adds the pin
+>> configuration for the SDIO controller.
+>>
+>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>
+> No reply from maintainers, but you obviously know what you're doing so
+> patch applied.
 
-I also only have patches 4 and 5 of this series and no cover letter,
-what is going on there?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160907/51af4fec/attachment.sig>
+Oh, I thought Neil already responded, but I'm not seeing it now.  This
+patch is missing the SDIO IRQ line.
+
+Martin can you respin?
+
+Sorry for the lag, I'm still catching up after some vacation,
+
+Kevin
