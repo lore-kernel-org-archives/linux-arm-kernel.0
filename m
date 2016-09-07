@@ -1,38 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Sep 2016 09:41:26 +0200
-Subject: [GIT PULL] Renesas ARM64 Based SoC Defconfig Updates for v4.9
-Message-ID: <cover.1473233745.git.horms+renesas@verge.net.au>
+Date: Wed,  7 Sep 2016 09:41:27 +0200
+Subject: [PATCH 1/2] arm64: defconfig: Add Renesas R-Car HSUSB driver support
+ as module
+In-Reply-To: <cover.1473233745.git.horms+renesas@verge.net.au>
+References: <cover.1473233745.git.horms+renesas@verge.net.au>
+Message-ID: <94106a8dbaf56b50ba35faa32baae4ad8dcf17ed.1473233745.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-Please consider these Renesas ARM64 based SoC defconfig updates for v4.9.
+Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/configs/defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
-
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-defconfig-for-v4.9
-
-for you to fetch changes up to 6c04d2f7f1038bf6e5561827f862c6aa2beb4b37:
-
-  arm64: defconfig: Enable SDHI and GPIO_REGULATOR (2016-09-01 16:32:46 +0200)
-
-----------------------------------------------------------------
-Renesas ARM64 Based SoC Defconfig Updates for v4.9
-
-* Enable HSUSB and SDHI
-
-----------------------------------------------------------------
-Simon Horman (1):
-      arm64: defconfig: Enable SDHI and GPIO_REGULATOR
-
-Yoshihiro Shimoda (1):
-      arm64: defconfig: Add Renesas R-Car HSUSB driver support as module
-
- arch/arm64/configs/defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 0555b7caaf2c..458d891aaa8e 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -265,6 +265,7 @@ CONFIG_USB_EHCI_HCD_PLATFORM=y
+ CONFIG_USB_OHCI_EXYNOS=y
+ CONFIG_USB_OHCI_HCD=y
+ CONFIG_USB_OHCI_HCD_PLATFORM=y
++CONFIG_USB_RENESAS_USBHS=m
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_DWC2=y
+ CONFIG_USB_DWC3=y
+@@ -276,6 +277,7 @@ CONFIG_USB_HSIC_USB3503=y
+ CONFIG_USB_MSM_OTG=y
+ CONFIG_USB_ULPI=y
+ CONFIG_USB_GADGET=y
++CONFIG_USB_RENESAS_USBHS_UDC=m
+ CONFIG_MMC=y
+ CONFIG_MMC_BLOCK_MINORS=32
+ CONFIG_MMC_ARMMMCI=y
+-- 
+2.7.0.rc3.207.g0ac5344
