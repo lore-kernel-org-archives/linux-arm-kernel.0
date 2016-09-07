@@ -1,35 +1,44 @@
-From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Wed, 07 Sep 2016 12:59:16 +0200
-Subject: [PATCH V3 RFT 3/5] ARM64: dts: bcm283x: Use dtsi for USB host mode
-In-Reply-To: <bb073ea3-2f89-4fc5-e3af-2e27c54f221e@i2se.com>
-References: <1471792204-21908-1-git-send-email-stefan.wahren@i2se.com>
- <1471792204-21908-4-git-send-email-stefan.wahren@i2se.com>
- <bb073ea3-2f89-4fc5-e3af-2e27c54f221e@i2se.com>
-Message-ID: <1473245956.28663.50.camel@redhat.com>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Wed,  7 Sep 2016 19:01:28 +0800
+Subject: [PATCH] drm/rockchip: mark symbols static where possible
+Message-ID: <1473246088-780-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mi, 2016-08-31 at 09:59 +0200, Stefan Wahren wrote:
-> Hi Gerd,
-> 
-> Am 21.08.2016 um 17:10 schrieb Stefan Wahren:
-> > In case dr_mode isn't passed via DT, the dwc2 driver defaults
-> > to OTG mode. But the Raspberry Pi 3 is designed only for host mode.
-> > So fix this issue by linking to the dtsi file which set the dr_mode
-> > to host.
-> 
-> this patch is pending and the rest has been merged. Since i don't have a
-> RPi 3 it's only compile tested.
-> 
-> Could you please test it (requires patch 1 and 2 of this series) on your
-> RPi 3?
+We get 2 warnings when building kernel with W=1:
+drivers/gpu/drm/rockchip/rockchip_drm_drv.c:309:6: warning: no previous prototype for 'rockchip_drm_fb_suspend' [-Wmissing-prototypes]
+drivers/gpu/drm/rockchip/rockchip_drm_drv.c:318:6: warning: no previous prototype for 'rockchip_drm_fb_resume' [-Wmissing-prototypes]
 
-Have a git tree to test?  Patch doesn't apply cleanly (using 4.8-rc5
-with eric's for-next branch which already has 1+2), seems to depend on
-more device tree changes.
+In fact, these functions are only used in the file in which they are
+declared and don't need a declaration, but can be made static.
+So this patch marks these functions with 'static'.
 
-Also usb is working fine for me on the rpi3 even without this, so why is
-this needed?  Is dwc2 defaulting to otg mode a recent change?
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-cheers,
-  Gerd
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index a822d49..3723683 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -306,7 +306,7 @@ static struct drm_driver rockchip_drm_driver = {
+ };
+ 
+ #ifdef CONFIG_PM_SLEEP
+-void rockchip_drm_fb_suspend(struct drm_device *drm)
++static void rockchip_drm_fb_suspend(struct drm_device *drm)
+ {
+ 	struct rockchip_drm_private *priv = drm->dev_private;
+ 
+@@ -315,7 +315,7 @@ void rockchip_drm_fb_suspend(struct drm_device *drm)
+ 	console_unlock();
+ }
+ 
+-void rockchip_drm_fb_resume(struct drm_device *drm)
++static void rockchip_drm_fb_resume(struct drm_device *drm)
+ {
+ 	struct rockchip_drm_private *priv = drm->dev_private;
+ 
+-- 
+2.7.4
