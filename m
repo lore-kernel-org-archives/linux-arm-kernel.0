@@ -1,183 +1,37 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed,  7 Sep 2016 14:35:16 -0700
-Subject: [PATCH v4 19/22] usb: chipidea: msm: Handle phy power states
+Date: Wed,  7 Sep 2016 14:35:17 -0700
+Subject: [PATCH v4 20/22] usb: chipidea: msm: Be silent on probe defer errors
 In-Reply-To: <20160907213519.27340-1-stephen.boyd@linaro.org>
 References: <20160907213519.27340-1-stephen.boyd@linaro.org>
-Message-ID: <20160907213519.27340-20-stephen.boyd@linaro.org>
+Message-ID: <20160907213519.27340-21-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ULPI phy on qcom platforms needs to be initialized and
-powered on after a USB reset and before we toggle the run/stop
-bit. Otherwise, the phy locks up and doesn't work properly. Hook
-the phy initialization into the RESET event and the phy power off
-into the STOPPED event.
+If something fails in ci_hdrc_add_device() due to probe defer, we
+shouldn't print an error message. Be silent in this case as we'll
+try probe again later.
 
 Acked-by: Peter Chen <peter.chen@nxp.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/usb/chipidea/ci_hdrc_msm.c | 40 +++++++++++++++++++-------------------
- drivers/usb/chipidea/core.c        |  8 ++++++--
- drivers/usb/chipidea/host.c        |  8 ++++++--
- include/linux/usb/chipidea.h       |  2 +-
- 4 files changed, 33 insertions(+), 25 deletions(-)
+ drivers/usb/chipidea/ci_hdrc_msm.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
-index fe96df7b530c..316044dba0ac 100644
+index 316044dba0ac..f1ede7909f54 100644
 --- a/drivers/usb/chipidea/ci_hdrc_msm.c
 +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
-@@ -80,20 +80,33 @@ static const struct reset_control_ops ci_hdrc_msm_reset_ops = {
- 	.reset = ci_hdrc_msm_por_reset,
- };
- 
--static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
-+static int ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
- {
- 	struct device *dev = ci->dev->parent;
- 	struct ci_hdrc_msm *msm_ci = dev_get_drvdata(dev);
-+	int ret;
- 
- 	switch (event) {
- 	case CI_HDRC_CONTROLLER_RESET_EVENT:
- 		dev_dbg(dev, "CI_HDRC_CONTROLLER_RESET_EVENT received\n");
-+
-+		hw_phymode_configure(ci);
- 		if (msm_ci->secondary_phy) {
- 			u32 val = readl_relaxed(msm_ci->base + HS_PHY_SEC_CTRL);
- 			val |= HS_PHY_DIG_CLAMP_N;
- 			writel_relaxed(val, msm_ci->base + HS_PHY_SEC_CTRL);
- 		}
- 
-+		ret = phy_init(ci->phy);
-+		if (ret)
-+			return ret;
-+
-+		ret = phy_power_on(ci->phy);
-+		if (ret) {
-+			phy_exit(ci->phy);
-+			return ret;
-+		}
-+
- 		/* use AHB transactor, allow posted data writes */
- 		hw_write_id_reg(ci, HS_PHY_AHB_MODE, 0xffffffff, 0x8);
- 
-@@ -113,21 +126,18 @@ static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
- 				 HSPHY_SESS_VLD_CTRL);
- 
- 		}
--
--		usb_phy_init(ci->usb_phy);
- 		break;
- 	case CI_HDRC_CONTROLLER_STOPPED_EVENT:
- 		dev_dbg(dev, "CI_HDRC_CONTROLLER_STOPPED_EVENT received\n");
--		/*
--		 * Put the phy in non-driving mode. Otherwise host
--		 * may not detect soft-disconnection.
--		 */
--		usb_phy_notify_disconnect(ci->usb_phy, USB_SPEED_UNKNOWN);
-+		phy_power_off(ci->phy);
-+		phy_exit(ci->phy);
- 		break;
- 	default:
- 		dev_dbg(dev, "unknown ci_hdrc event\n");
- 		break;
- 	}
-+
-+	return 0;
- }
- 
- static int ci_hdrc_msm_mux_phy(struct ci_hdrc_msm *ci,
-@@ -167,7 +177,6 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
- {
- 	struct ci_hdrc_msm *ci;
- 	struct platform_device *plat_ci;
--	struct usb_phy *phy;
- 	struct clk *clk;
- 	struct reset_control *reset;
- 	struct resource *res;
-@@ -181,21 +190,12 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	platform_set_drvdata(pdev, ci);
- 
--	/*
--	 * OTG(PHY) driver takes care of PHY initialization, clock management,
--	 * powering up VBUS, mapping of registers address space and power
--	 * management.
--	 */
--	phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
--	if (IS_ERR(phy))
--		return PTR_ERR(phy);
--
- 	ci->pdata.name = "ci_hdrc_msm";
- 	ci->pdata.capoffset = DEF_CAPOFFSET;
- 	ci->pdata.flags	= CI_HDRC_REGS_SHARED | CI_HDRC_DISABLE_STREAMING |
--			  CI_HDRC_OVERRIDE_AHB_BURST;
-+			  CI_HDRC_OVERRIDE_AHB_BURST |
-+			  CI_HDRC_OVERRIDE_PHY_CONTROL;
- 	ci->pdata.notify_event = ci_hdrc_msm_notify_event;
--	ci->pdata.usb_phy = phy;
- 
- 	reset = devm_reset_control_get(&pdev->dev, "core");
- 	if (IS_ERR(reset))
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 83bc2f2dd6a8..ba3a43bbe0ea 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -327,6 +327,7 @@ void hw_phymode_configure(struct ci_hdrc *ci)
- 			hw_write(ci, OP_PORTSC, PORTSC_STS, PORTSC_STS);
- 	}
- }
-+EXPORT_SYMBOL_GPL(hw_phymode_configure);
- 
- /**
-  * _ci_usb_phy_init: initialize phy taking in account both phy and usb_phy
-@@ -503,9 +504,12 @@ int hw_device_reset(struct ci_hdrc *ci)
- 		return ret;
+@@ -262,8 +262,9 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+ 	plat_ci = ci_hdrc_add_device(&pdev->dev, pdev->resource,
+ 				     pdev->num_resources, &ci->pdata);
+ 	if (IS_ERR(plat_ci)) {
+-		dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
+ 		ret = PTR_ERR(plat_ci);
++		if (ret != -EPROBE_DEFER)
++			dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
+ 		goto err_mux;
  	}
  
--	if (ci->platdata->notify_event)
--		ci->platdata->notify_event(ci,
-+	if (ci->platdata->notify_event) {
-+		ret = ci->platdata->notify_event(ci,
- 			CI_HDRC_CONTROLLER_RESET_EVENT);
-+		if (ret)
-+			return ret;
-+	}
- 
- 	/* USBMODE should be configured step by step */
- 	hw_write(ci, OP_USBMODE, USBMODE_CM, USBMODE_CM_IDLE);
-diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-index a1d8551ca79d..844be1d02d38 100644
---- a/drivers/usb/chipidea/host.c
-+++ b/drivers/usb/chipidea/host.c
-@@ -87,8 +87,12 @@ static int ehci_ci_reset(struct usb_hcd *hcd)
- 	if (ret)
- 		return ret;
- 
--	if (ci->platdata->notify_event)
--		ci->platdata->notify_event(ci, CI_HDRC_CONTROLLER_RESET_EVENT);
-+	if (ci->platdata->notify_event) {
-+		ret = ci->platdata->notify_event(ci,
-+				CI_HDRC_CONTROLLER_RESET_EVENT);
-+		if (ret)
-+			return ret;
-+	}
- 
- 	ci_platform_configure(ci);
- 
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index 7e3daa37cf60..c5fdfcf99828 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -61,7 +61,7 @@ struct ci_hdrc_platform_data {
- 	enum usb_dr_mode	dr_mode;
- #define CI_HDRC_CONTROLLER_RESET_EVENT		0
- #define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
--	void	(*notify_event) (struct ci_hdrc *ci, unsigned event);
-+	int	(*notify_event) (struct ci_hdrc *ci, unsigned event);
- 	struct regulator	*reg_vbus;
- 	struct usb_otg_caps	ci_otg_caps;
- 	bool			tpl_support;
 -- 
 2.9.0.rc2.8.ga28705d
