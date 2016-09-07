@@ -1,26 +1,68 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 6 Sep 2016 17:52:08 -0700
-Subject: [PATCH] clk: meson-gxbb: Export PWM related clocks for DT
-In-Reply-To: <1471870177-10609-1-git-send-email-narmstrong@baylibre.com>
-References: <1471870177-10609-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20160907005208.GS12510@codeaurora.org>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Wed,  7 Sep 2016 09:00:53 +0800
+Subject: [PATCH v1 1/2] include: dt-bindings: Add GPIO pin index definition
+ for rockchip pinctrl
+Message-ID: <1473210053-23743-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22, Neil Armstrong wrote:
-> Add the PWM related clocks in order to be referenced as PWM source
-> clocks.
-> 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
+Add gpio pin index definition to make it easier to describe
+GPIO in dts.
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 
-With some more thought, it should go through whatever tree takes
-the dts changes. Conflicts in these header files should be
-managed by the same person and that person is the platform
-maintainer.
+---
 
+Changes in v1:
+- remove gpio bank definition RK_GPIO7/8
+- redefine GPIO PIN as RK_PA/B/C/Dx
+
+ include/dt-bindings/pinctrl/rockchip.h | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+
+diff --git a/include/dt-bindings/pinctrl/rockchip.h b/include/dt-bindings/pinctrl/rockchip.h
+index 743e66a..aaec8ba 100644
+--- a/include/dt-bindings/pinctrl/rockchip.h
++++ b/include/dt-bindings/pinctrl/rockchip.h
+@@ -25,6 +25,39 @@
+ #define RK_GPIO4	4
+ #define RK_GPIO6	6
+ 
++#define RK_PA0		0
++#define RK_PA1		1
++#define RK_PA2		2
++#define RK_PA3		3
++#define RK_PA4		4
++#define RK_PA5		5
++#define RK_PA6		6
++#define RK_PA7		7
++#define RK_PB0		8
++#define RK_PB1		9
++#define RK_PB2		10
++#define RK_PB3		11
++#define RK_PB4		12
++#define RK_PB5		13
++#define RK_PB6		14
++#define RK_PB7		15
++#define RK_PC0		16
++#define RK_PC1		17
++#define RK_PC2		18
++#define RK_PC3		19
++#define RK_PC4		20
++#define RK_PC5		21
++#define RK_PC6		22
++#define RK_PC7		23
++#define RK_PD0		24
++#define RK_PD1		25
++#define RK_PD2		26
++#define RK_PD3		27
++#define RK_PD4		28
++#define RK_PD5		29
++#define RK_PD6		30
++#define RK_PD7		31
++
+ #define RK_FUNC_GPIO	0
+ #define RK_FUNC_1	1
+ #define RK_FUNC_2	2
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.7.4
