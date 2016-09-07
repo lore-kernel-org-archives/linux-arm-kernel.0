@@ -1,37 +1,119 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Sep 2016 09:41:04 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.8
-Message-ID: <cover.1473232298.git.horms+renesas@verge.net.au>
+Date: Wed,  7 Sep 2016 09:41:09 +0200
+Subject: [PATCH] ARM: shmobile: fix regulator quirk for Gen2
+In-Reply-To: <cover.1473232298.git.horms+renesas@verge.net.au>
+References: <cover.1473232298.git.horms+renesas@verge.net.au>
+Message-ID: <c2f321126e31cd69365e65ecd4a7c774e4fc71d2.1473232298.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Please consider these Renesas ARM based SoC fixes for v4.8.
+The current implementation only works if the da9xxx devices are added
+before their drivers are registered. Only then it can apply the fixes to
+both devices. Otherwise, the driver for the first device gets probed
+before the fix for the second device can be applied. This is what
+fails when using the IP core switcher or when having the i2c master
+driver as a module.
 
-This relaxes the requirement that all da9xxx devices are added before
-the drivers for any are initialised.
+So, we need to disable both da9xxx once we detected one of them. We now
+use i2c_transfer with hardcoded i2c_messages and device addresses, so we
+don't need the da9xxx client devices to be instantiated. Because the
+fixup is used on specific boards only, the addresses are not going to
+change.
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
-
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v4.8
-
-for you to fetch changes up to c2f321126e31cd69365e65ecd4a7c774e4fc71d2:
-
-  ARM: shmobile: fix regulator quirk for Gen2 (2016-09-02 10:15:38 +0200)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Fixes for v4.8
-
-* Correct R-Car Gen2 regulator quirk
-
-----------------------------------------------------------------
-Wolfram Sang (1):
-      ARM: shmobile: fix regulator quirk for Gen2
-
+Fixes: 663fbb52159cca ("ARM: shmobile: R-Car Gen2: Add da9063/da9210 regulator quirk")
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Tested-by: Geert Uytterhoeven <geert+renesas@glider.be> (r8a7791/koelsch)
+Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c | 62 +++++++++-------------
  1 file changed, 26 insertions(+), 36 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
+index 62437b57813e..73e3adbc1330 100644
+--- a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
+@@ -41,39 +41,26 @@
+ 
+ #define REGULATOR_IRQ_MASK	BIT(2)	/* IRQ2, active low */
+ 
+-static void __iomem *irqc;
+-
+-static const u8 da9063_mask_regs[] = {
+-	DA9063_REG_IRQ_MASK_A,
+-	DA9063_REG_IRQ_MASK_B,
+-	DA9063_REG_IRQ_MASK_C,
+-	DA9063_REG_IRQ_MASK_D,
+-};
+-
+-/* DA9210 System Control and Event Registers */
++/* start of DA9210 System Control and Event Registers */
+ #define DA9210_REG_MASK_A		0x54
+-#define DA9210_REG_MASK_B		0x55
+-
+-static const u8 da9210_mask_regs[] = {
+-	DA9210_REG_MASK_A,
+-	DA9210_REG_MASK_B,
+-};
+-
+-static void da9xxx_mask_irqs(struct i2c_client *client, const u8 regs[],
+-			     unsigned int nregs)
+-{
+-	unsigned int i;
+ 
+-	dev_info(&client->dev, "Masking %s interrupt sources\n", client->name);
++static void __iomem *irqc;
+ 
+-	for (i = 0; i < nregs; i++) {
+-		int error = i2c_smbus_write_byte_data(client, regs[i], ~0);
+-		if (error) {
+-			dev_err(&client->dev, "i2c error %d\n", error);
+-			return;
+-		}
+-	}
+-}
++/* first byte sets the memory pointer, following are consecutive reg values */
++static u8 da9063_irq_clr[] = { DA9063_REG_IRQ_MASK_A, 0xff, 0xff, 0xff, 0xff };
++static u8 da9210_irq_clr[] = { DA9210_REG_MASK_A, 0xff, 0xff };
++
++static struct i2c_msg da9xxx_msgs[2] = {
++	{
++		.addr = 0x58,
++		.len = ARRAY_SIZE(da9063_irq_clr),
++		.buf = da9063_irq_clr,
++	}, {
++		.addr = 0x68,
++		.len = ARRAY_SIZE(da9210_irq_clr),
++		.buf = da9210_irq_clr,
++	},
++};
+ 
+ static int regulator_quirk_notify(struct notifier_block *nb,
+ 				  unsigned long action, void *data)
+@@ -93,12 +80,15 @@ static int regulator_quirk_notify(struct notifier_block *nb,
+ 	client = to_i2c_client(dev);
+ 	dev_dbg(dev, "Detected %s\n", client->name);
+ 
+-	if ((client->addr == 0x58 && !strcmp(client->name, "da9063")))
+-		da9xxx_mask_irqs(client, da9063_mask_regs,
+-				 ARRAY_SIZE(da9063_mask_regs));
+-	else if (client->addr == 0x68 && !strcmp(client->name, "da9210"))
+-		da9xxx_mask_irqs(client, da9210_mask_regs,
+-				 ARRAY_SIZE(da9210_mask_regs));
++	if ((client->addr == 0x58 && !strcmp(client->name, "da9063")) ||
++	    (client->addr == 0x68 && !strcmp(client->name, "da9210"))) {
++		int ret;
++
++		dev_info(&client->dev, "clearing da9063/da9210 interrupts\n");
++		ret = i2c_transfer(client->adapter, da9xxx_msgs, ARRAY_SIZE(da9xxx_msgs));
++		if (ret != ARRAY_SIZE(da9xxx_msgs))
++			dev_err(&client->dev, "i2c error %d\n", ret);
++	}
+ 
+ 	mon = ioread32(irqc + IRQC_MONITOR);
+ 	if (mon & REGULATOR_IRQ_MASK)
+-- 
+2.7.0.rc3.207.g0ac5344
