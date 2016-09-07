@@ -1,91 +1,58 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Sep 2016 09:49:53 +0200
-Subject: [PATCH 06/26] ARM: dts: blanche: add support for general purpose
- switches
+Date: Wed,  7 Sep 2016 09:49:57 +0200
+Subject: [PATCH 10/26] ARM: dts: r8a7792: add VSP1V support
 In-Reply-To: <cover.1473234371.git.horms+renesas@verge.net.au>
 References: <cover.1473234371.git.horms+renesas@verge.net.au>
-Message-ID: <1c7f349a896330b05754fd63938c9b1218e35c73.1473234371.git.horms+renesas@verge.net.au>
+Message-ID: <9e1019c690ab0d7829e8d795cc46dba23728d997.1473234371.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Add support  for the  general purpose  software switches  SW2 and tactile
-switches SW24/25 as a virtual keyboard (like it was done with the Lager/
-Koelsch boards).
+Describe  3 instances (VSPS, VSPD0, and VSPD1) of the VSP1V in the R8A7792
+device tree.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7792-blanche.dts | 49 +++++++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+ arch/arm/boot/dts/r8a7792.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7792-blanche.dts b/arch/arm/boot/dts/r8a7792-blanche.dts
-index eeffba870211..808a6aab7e5e 100644
---- a/arch/arm/boot/dts/r8a7792-blanche.dts
-+++ b/arch/arm/boot/dts/r8a7792-blanche.dts
-@@ -11,6 +11,8 @@
+diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
+index 856e6c5b94bc..ff47755fb01e 100644
+--- a/arch/arm/boot/dts/r8a7792.dtsi
++++ b/arch/arm/boot/dts/r8a7792.dtsi
+@@ -668,6 +668,30 @@
+ 			status = "disabled";
+ 		};
  
- /dts-v1/;
- #include "r8a7792.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
- 
- / {
- 	model = "Blanche";
-@@ -54,6 +56,53 @@
- 		pinctrl-0 = <&lan89218_pins>;
- 		pinctrl-names = "default";
- 	};
++		vsp1 at fe928000 {
++			compatible = "renesas,vsp1";
++			reg = <0 0xfe928000 0 0x8000>;
++			interrupts = <GIC_SPI 267 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&mstp1_clks R8A7792_CLK_VSP1_SY>;
++			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
++		};
 +
-+	keyboard {
-+		compatible = "gpio-keys";
++		vsp1 at fe930000 {
++			compatible = "renesas,vsp1";
++			reg = <0 0xfe930000 0 0x8000>;
++			interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&mstp1_clks R8A7792_CLK_VSP1DU0>;
++			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
++		};
 +
-+		key-1 {
-+			linux,code = <KEY_1>;
-+			label = "SW2-1";
-+			wakeup-source;
-+			debounce-interval = <20>;
-+			gpios = <&gpio3 10 GPIO_ACTIVE_LOW>;
++		vsp1 at fe938000 {
++			compatible = "renesas,vsp1";
++			reg = <0 0xfe938000 0 0x8000>;
++			interrupts = <GIC_SPI 247 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&mstp1_clks R8A7792_CLK_VSP1DU1>;
++			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
 +		};
-+		key-2 {
-+			linux,code = <KEY_2>;
-+			label = "SW2-2";
-+			wakeup-source;
-+			debounce-interval = <20>;
-+			gpios = <&gpio3 11 GPIO_ACTIVE_LOW>;
-+		};
-+		key-3 {
-+			linux,code = <KEY_3>;
-+			label = "SW2-3";
-+			wakeup-source;
-+			debounce-interval = <20>;
-+			gpios = <&gpio3 12 GPIO_ACTIVE_LOW>;
-+		};
-+		key-4 {
-+			linux,code = <KEY_4>;
-+			label = "SW2-4";
-+			wakeup-source;
-+			debounce-interval = <20>;
-+			gpios = <&gpio3 15 GPIO_ACTIVE_LOW>;
-+		};
-+		key-a {
-+			linux,code = <KEY_A>;
-+			label = "SW24";
-+			wakeup-source;
-+			debounce-interval = <20>;
-+			gpios = <&gpio3 20 GPIO_ACTIVE_LOW>;
-+		};
-+		key-b {
-+			linux,code = <KEY_B>;
-+			label = "SW25";
-+			wakeup-source;
-+			debounce-interval = <20>;
-+			gpios = <&gpio11 2 GPIO_ACTIVE_LOW>;
-+		};
-+	};
- };
- 
- &extal_clk {
++
+ 		/* Special CPG clocks */
+ 		cpg_clocks: cpg_clocks at e6150000 {
+ 			compatible = "renesas,r8a7792-cpg-clocks",
 -- 
 2.7.0.rc3.207.g0ac5344
