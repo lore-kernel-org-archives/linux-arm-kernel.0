@@ -1,32 +1,50 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 7 Sep 2016 13:12:20 +0200
-Subject: [PATCH] simplefb: Disable and release clocks and regulators in
- destroy callback
-In-Reply-To: <20160907090919.27187-1-wens@csie.org>
-References: <20160907090919.27187-1-wens@csie.org>
-Message-ID: <CAMuHMdU3dgPzvHkd8qti1pwzf1aeUhyv7gdpufYkqxHPS4=VTw@mail.gmail.com>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Wed, 7 Sep 2016 19:15:48 +0800
+Subject: [PATCH] arm64/efi: efi_init error handling fix
+In-Reply-To: <20160905135723.GK32579@codeblueprint.co.uk>
+References: <1472811519-4897-1-git-send-email-xieyisheng1@huawei.com>
+ <20160902102618.GC17482@arm.com> <20160905135723.GK32579@codeblueprint.co.uk>
+Message-ID: <c57dfbbe-a2a7-e8af-7d94-20f86126053c@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 7, 2016 at 11:09 AM, Chen-Yu Tsai <wens@csie.org> wrote:
-> simplefb gets unregister when a proper framebuffer driver comes in and
-> kicks it out. However the claimed clocks and regulators stay enabled
-> as they are only released in the platform device remove function, which
-> in theory would never get called.
->
-> Move the clock/regulator cleanup into the framebuffer destroy callback,
-> which gets called as part of the framebuffer unregister process.
 
-Is this called before or after the new proper framebuffer driver kicks in?
-If before, it may cause glitches.
 
-Gr{oetje,eeting}s,
+On 2016/9/5 21:57, Matt Fleming wrote:
+> On Fri, 02 Sep, at 11:26:18AM, Will Deacon wrote:
+>> On Fri, Sep 02, 2016 at 06:18:39PM +0800, Xie Yisheng wrote:
+>>> From: Yisheng Xie <xieyisheng1@huawei.com>
+>>>
+>>> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+>>> index c49d50e..5080e40 100644
+>>> --- a/drivers/firmware/efi/arm-init.c
+>>> +++ b/drivers/firmware/efi/arm-init.c
+>>> @@ -243,8 +243,10 @@ void __init efi_init(void)
+>>>  	     "Unexpected EFI_MEMORY_DESCRIPTOR version %ld",
+>>>  	      efi.memmap.desc_version);
+>>>  
+>>> -	if (uefi_init() < 0)
+>>> +	if (uefi_init() < 0) {
+>>> +		early_memunmap(efi.memmap.map, params.mmap_size);
+>>>  		return;
+>>> +	}
+> 
+> This should be a call to efi_memmap_unmap() because the EFI_MEMMAP
+> flag also needs clearing.
+> 
+Hi Matt,
+Thanks for your reply.
+You mean call the function efi_unmap_memmap() like x86?
 
-                        Geert
+however, it seems no need to clear EFI_MEMMAP here. For arm*, the flag
+EFI_MEMMAP is set in function reserve_regions(), which is called
+only when uefi_init() return 0:
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+efi_init()
+   -> reserve_regions()
+       -> set_bit(EFI_MEMMAP, &efi.flags);
+Thanks
+Xie Yisheng.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> .
+> 
