@@ -1,65 +1,77 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  7 Sep 2016 11:07:10 +0100
-Subject: [PATCH 3/3] arm64/kvm: use alternative auto-nop
-In-Reply-To: <1473242830-26246-1-git-send-email-mark.rutland@arm.com>
-References: <1473242830-26246-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1473242830-26246-4-git-send-email-mark.rutland@arm.com>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Wed, 07 Sep 2016 13:18:26 +0300
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <20160907093525.GK1041@n2100.armlinux.org.uk>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <20562703.Glp77l1PBf@wuerfel> <20160907074428.GB13903@b29397-desktop>
+ <4780626.ofOZnpf19s@wuerfel> <20160907092901.GC13903@b29397-desktop>
+ <20160907093525.GK1041@n2100.armlinux.org.uk>
+Message-ID: <87lgz4ko7h.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make use of the new alternative_if and alternative_else_nop_endif and
-get rid of our homebew NOP sleds, making the code simpler to read.
 
-Note that for __kvm_call_hyp the branch to __vhe_hyp_call has been moved
-out of the alternative sequence, and in the default case there will be
-four additional NOPs executed.
+Hi,
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: kvmarm at lists.cs.columbia.edu
----
- arch/arm64/include/asm/kvm_mmu.h | 10 +++-------
- arch/arm64/kvm/hyp.S             |  6 +-----
- 2 files changed, 4 insertions(+), 12 deletions(-)
+Russell King - ARM Linux <linux@armlinux.org.uk> writes:
+> On Wed, Sep 07, 2016 at 05:29:01PM +0800, Peter Chen wrote:
+>> On Wed, Sep 07, 2016 at 10:52:46AM +0200, Arnd Bergmann wrote:
+>> > On Wednesday, September 7, 2016 3:44:28 PM CEST Peter Chen wrote:
+>> > > 
+>> > > The pre-condition of DT function at USB HCD core works is the host
+>> > > controller device has of_node, since it is the root node for USB tree
+>> > > described at DT. If the host controller device is not at DT, it needs
+>> > > to try to get its of_node, the chipidea driver gets it through its
+>> > > parent node [1]
+>> > 
+>> > > 
+>> > > [1] https://lkml.org/lkml/2016/8/8/119
+>> > > 
+>> > 
+>> > Ah, this is what I was referring to in the other mail.
+>> > 
+>> > However, the way you set the of_node might be dangerous too:
+>> > We should generally not have two platform_device structures with
+>> > the same of_node pointer, most importantly it may cause the
+>> > child device to be bound to the same driver as the parent
+>> > device since the probing is done by compatible string.
+>> > 
+>> > As you tested it successfully, it must work at the moment on your
+>> > machine, but it could easily break depending on deferred probing
+>> > or module load order.
+>> > 
+>> 
+>> Currently, I work around above problems by setting core device of_node
+>> as NULL at both probe error path and platform driver .remove routine.
+>> 
+>> I admit it is not a good way, but if we only have of_node at device's
+>> life periods after probe, it seems ok currently. It is hard to create
+>> of_node dynamically when create device, and keep some contents
+>> of parent's of_node, and some are not.
+>
+> How about turning dwc3 into a library which can be used by a range of
+> platform devices?  Wouldn't that solve all the current problems, and
+> completely avoid the need to copy resources from one platform device
+> to another?
 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index b6bb834..dff1098 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -99,14 +99,10 @@
- .macro kern_hyp_va	reg
- alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
- 	and     \reg, \reg, #HYP_PAGE_OFFSET_HIGH_MASK
--alternative_else
--	nop
--alternative_endif
--alternative_if_not ARM64_HYP_OFFSET_LOW
--	nop
--alternative_else
-+alternative_else_nop_endif
-+alternative_if ARM64_HYP_OFFSET_LOW
- 	and     \reg, \reg, #HYP_PAGE_OFFSET_LOW_MASK
--alternative_endif
-+alternative_else_nop_endif
- .endm
- 
- #else
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 7ce9315..2726635 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -46,10 +46,6 @@ alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
- 	hvc	#0
- 	ldr     lr, [sp], #16
- 	ret
--alternative_else
-+alternative_else_nop_endif
- 	b	__vhe_hyp_call
--	nop
--	nop
--	nop
--alternative_endif
- ENDPROC(__kvm_call_hyp)
+This will break all existing DTs out there. Also, there are other
+benefits from keeping current design, these have been discussed before
+but here's a short summary:
+
+. PM callbacks are kept simple
+. We avoid abuse of internal dwc3 functions
+. It's a lot less work to "port" dwc3 to "your SoC"
+. We prevent another MUSB (drivers/usb/musb/)
+
+And few others. Sure, they are rather subjective benefits, but it has
+worked well so far. Also, breaking DT ABI is kind of a big deal.
+
 -- 
-1.9.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160907/7405dd65/attachment.sig>
