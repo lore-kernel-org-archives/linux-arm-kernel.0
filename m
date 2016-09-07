@@ -1,208 +1,90 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed,  7 Sep 2016 14:21:37 +0200
-Subject: [PATCH 2/7] mtd: nand: Introduce nand_data_interface
+Date: Wed,  7 Sep 2016 14:21:40 +0200
+Subject: [PATCH 5/7] mtd: nand: mxc: implement onfi get/set features
 In-Reply-To: <1473250902-31139-1-git-send-email-s.hauer@pengutronix.de>
 References: <1473250902-31139-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1473250902-31139-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1473250902-31139-6-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we have no data structure to fully describe a NAND timing.
-We only have struct nand_sdr_timings for NAND timings in SDR mode,
-but nothing for DDR mode and also no container to store both types
-of timing.
-This patch adds struct nand_data_interface which stores the timing
-type and a union of different timings. This can be used to pass to
-drivers in order to configure the timing.
-Add kerneldoc for struct nand_sdr_timings while touching it anyway.
+To be able to support different ONFI timing modes we have to implement
+the onfi_set_features and onfi_get_features. Tested on an i.MX25 SoC.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- include/linux/mtd/nand.h | 165 +++++++++++++++++++++++++++++++++--------------
- 1 file changed, 116 insertions(+), 49 deletions(-)
+ drivers/mtd/nand/mxc_nand.c | 53 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
 
-diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-index 9890df2..f305bed 100644
---- a/include/linux/mtd/nand.h
-+++ b/include/linux/mtd/nand.h
-@@ -566,6 +566,122 @@ struct nand_buffers {
- };
- 
- /**
-+ * struct nand_sdr_timings - SDR NAND chip timings
-+ *
-+ * This struct defines the timing requirements of a SDR NAND chip.
-+ * These information can be found in every NAND datasheets and the timings
-+ * meaning are described in the ONFI specifications:
-+ * www.onfi.org/~/media/ONFI/specs/onfi_3_1_spec.pdf (chapter 4.15 Timing
-+ * Parameters)
-+ *
-+ * All these timings are expressed in picoseconds.
-+ *
-+ * @tALH_min: ALE hold time
-+ * @tADL_min: ALE to data loading time
-+ * @tALS_min: ALE setup time
-+ * @tAR_min: ALE to RE# delay
-+ * @tCEA_max: CE# access time
-+ * @tCEH_min:
-+ * @tCH_min:  CE# hold time
-+ * @tCHZ_max: CE# high to output hi-Z
-+ * @tCLH_min: CLE hold time
-+ * @tCLR_min: CLE to RE# delay
-+ * @tCLS_min: CLE setup time
-+ * @tCOH_min: CE# high to output hold
-+ * @tCS_min: CE# setup time
-+ * @tDH_min: Data hold time
-+ * @tDS_min: Data setup time
-+ * @tFEAT_max: Busy time for Set Features and Get Features
-+ * @tIR_min: Output hi-Z to RE# low
-+ * @tITC_max: Interface and Timing Mode Change time
-+ * @tRC_min: RE# cycle time
-+ * @tREA_max: RE# access time
-+ * @tREH_min: RE# high hold time
-+ * @tRHOH_min: RE# high to output hold
-+ * @tRHW_min: RE# high to WE# low
-+ * @tRHZ_max: RE# high to output hi-Z
-+ * @tRLOH_min: RE# low to output hold
-+ * @tRP_min: RE# pulse width
-+ * @tRR_min: Ready to RE# low (data only)
-+ * @tRST_max: Device reset time, measured from the falling edge of R/B# to the rising edge of R/B#.
-+ * @tWB_max: WE# high to SR[6] low
-+ * @tWC_min: WE# cycle time
-+ * @tWH_min: WE# high hold time
-+ * @tWHR_min: WE# high to RE# low
-+ * @tWP_min: WE# pulse width
-+ * @tWW_min: WP# transition to WE# low
-+ */
-+struct nand_sdr_timings {
-+	u32 tALH_min;
-+	u32 tADL_min;
-+	u32 tALS_min;
-+	u32 tAR_min;
-+	u32 tCEA_max;
-+	u32 tCEH_min;
-+	u32 tCH_min;
-+	u32 tCHZ_max;
-+	u32 tCLH_min;
-+	u32 tCLR_min;
-+	u32 tCLS_min;
-+	u32 tCOH_min;
-+	u32 tCS_min;
-+	u32 tDH_min;
-+	u32 tDS_min;
-+	u32 tFEAT_max;
-+	u32 tIR_min;
-+	u32 tITC_max;
-+	u32 tRC_min;
-+	u32 tREA_max;
-+	u32 tREH_min;
-+	u32 tRHOH_min;
-+	u32 tRHW_min;
-+	u32 tRHZ_max;
-+	u32 tRLOH_min;
-+	u32 tRP_min;
-+	u32 tRR_min;
-+	u64 tRST_max;
-+	u32 tWB_max;
-+	u32 tWC_min;
-+	u32 tWH_min;
-+	u32 tWHR_min;
-+	u32 tWP_min;
-+	u32 tWW_min;
-+};
-+
-+/**
-+ * enum nand_data_interface_type - NAND interface timing type
-+ * @NAND_SDR_IFACE:	Single Data Rate interface
-+ */
-+enum nand_data_interface_type {
-+	NAND_SDR_IFACE,
-+};
-+
-+/**
-+ * struct nand_data_interface - NAND interface timing
-+ * @type:	type of the timing
-+ * @timings:	The timing, type according to @type
-+ */
-+struct nand_data_interface {
-+	enum nand_data_interface_type type;
-+	union {
-+		struct nand_sdr_timings sdr;
-+	} timings;
-+};
-+
-+/**
-+ * nand_get_sdr_timings - get SDR timing from data interface
-+ * @conf:	The data interface
-+ */
-+static inline const struct nand_sdr_timings *
-+nand_get_sdr_timings(const struct nand_data_interface *conf)
-+{
-+	if (conf->type != NAND_SDR_IFACE)
-+		return ERR_PTR(-EINVAL);
-+
-+	return &conf->timings.sdr;
-+}
-+
-+/**
-  * struct nand_chip - NAND Private Flash Chip Data
-  * @mtd:		MTD device registered to the MTD framework
-  * @IO_ADDR_R:		[BOARDSPECIFIC] address to read the 8 I/O lines of the
-@@ -1023,55 +1139,6 @@ static inline int jedec_feature(struct nand_chip *chip)
- 		: 0;
+diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+index 5173fad..1db8299 100644
+--- a/drivers/mtd/nand/mxc_nand.c
++++ b/drivers/mtd/nand/mxc_nand.c
+@@ -1239,6 +1239,57 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
+ 	}
  }
  
--/*
-- * struct nand_sdr_timings - SDR NAND chip timings
-- *
-- * This struct defines the timing requirements of a SDR NAND chip.
-- * These informations can be found in every NAND datasheets and the timings
-- * meaning are described in the ONFI specifications:
-- * www.onfi.org/~/media/ONFI/specs/onfi_3_1_spec.pdf (chapter 4.15 Timing
-- * Parameters)
-- *
-- * All these timings are expressed in picoseconds.
-- */
--
--struct nand_sdr_timings {
--	u32 tALH_min;
--	u32 tADL_min;
--	u32 tALS_min;
--	u32 tAR_min;
--	u32 tCEA_max;
--	u32 tCEH_min;
--	u32 tCH_min;
--	u32 tCHZ_max;
--	u32 tCLH_min;
--	u32 tCLR_min;
--	u32 tCLS_min;
--	u32 tCOH_min;
--	u32 tCS_min;
--	u32 tDH_min;
--	u32 tDS_min;
--	u32 tFEAT_max;
--	u32 tIR_min;
--	u32 tITC_max;
--	u32 tRC_min;
--	u32 tREA_max;
--	u32 tREH_min;
--	u32 tRHOH_min;
--	u32 tRHW_min;
--	u32 tRHZ_max;
--	u32 tRLOH_min;
--	u32 tRP_min;
--	u32 tRR_min;
--	u64 tRST_max;
--	u32 tWB_max;
--	u32 tWC_min;
--	u32 tWH_min;
--	u32 tWHR_min;
--	u32 tWP_min;
--	u32 tWW_min;
--};
--
- /* get timing characteristics from ONFI timing mode. */
- const struct nand_sdr_timings *onfi_async_timing_mode_to_sdr_timings(int mode);
++static int mxc_nand_onfi_set_features(struct mtd_info *mtd, struct nand_chip *chip,
++			int addr, uint8_t *subfeature_param)
++{
++	struct nand_chip *nand_chip = mtd_to_nand(mtd);
++	struct mxc_nand_host *host = nand_get_controller_data(nand_chip);
++	int i;
++
++	if (!chip->onfi_version ||
++	    !(le16_to_cpu(chip->onfi_params.opt_cmd)
++	      & ONFI_OPT_CMD_SET_GET_FEATURES))
++		return -EINVAL;
++
++	host->buf_start = 0;
++
++	for (i = 0; i < ONFI_SUBFEATURE_PARAM_LEN; ++i)
++		chip->write_byte(mtd, subfeature_param[i]);
++
++	memcpy32_toio(host->main_area0, host->data_buf, mtd->writesize);
++	host->devtype_data->send_cmd(host, NAND_CMD_SET_FEATURES, false);
++	mxc_do_addr_cycle(mtd, addr, -1);
++	host->devtype_data->send_page(mtd, NFC_INPUT);
++
++	return 0;
++}
++
++static int mxc_nand_onfi_get_features(struct mtd_info *mtd, struct nand_chip *chip,
++			int addr, uint8_t *subfeature_param)
++{
++	struct nand_chip *nand_chip = mtd_to_nand(mtd);
++	struct mxc_nand_host *host = nand_get_controller_data(nand_chip);
++	int i;
++
++	if (!chip->onfi_version ||
++	    !(le16_to_cpu(chip->onfi_params.opt_cmd)
++	      & ONFI_OPT_CMD_SET_GET_FEATURES))
++		return -EINVAL;
++
++	*(uint32_t *)host->main_area0 = 0xdeadbeef;
++
++	host->devtype_data->send_cmd(host, NAND_CMD_GET_FEATURES, false);
++	mxc_do_addr_cycle(mtd, addr, -1);
++	host->devtype_data->send_page(mtd, NFC_OUTPUT);
++	memcpy32_fromio(host->data_buf, host->main_area0, 512);
++	host->buf_start = 0;
++
++	for (i = 0; i < ONFI_SUBFEATURE_PARAM_LEN; ++i)
++		*subfeature_param++ = chip->read_byte(mtd);
++
++	return 0;
++}
++
+ /*
+  * The generic flash bbt decriptors overlap with our ecc
+  * hardware, so define some i.MX specific ones.
+@@ -1513,6 +1564,8 @@ static int mxcnd_probe(struct platform_device *pdev)
+ 	this->read_word = mxc_nand_read_word;
+ 	this->write_buf = mxc_nand_write_buf;
+ 	this->read_buf = mxc_nand_read_buf;
++	this->onfi_set_features = mxc_nand_onfi_set_features;
++	this->onfi_get_features = mxc_nand_onfi_get_features;
  
+ 	host->clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(host->clk))
 -- 
 2.8.1
