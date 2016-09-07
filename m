@@ -1,58 +1,71 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  7 Sep 2016 16:53:56 +0200
-Subject: [PATCH v2 0/4] Introduce NextThing GR8 support
-Message-ID: <20160907145400.27192-1-maxime.ripard@free-electrons.com>
+Date: Wed,  7 Sep 2016 16:53:58 +0200
+Subject: [PATCH v2 2/4] ARM: sunxi: Support the Nextthing GR8
+In-Reply-To: <20160907145400.27192-1-maxime.ripard@free-electrons.com>
+References: <20160907145400.27192-1-maxime.ripard@free-electrons.com>
+Message-ID: <20160907145400.27192-3-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The GR8 is an SoC made by Nextthing Co, loosely based on the sun5i family.
 
-This serie introduces the support for the NextThing GR8.
+It has a number of new controllers compared to the A10s and A13 (SPDIF, I2S),
+but some controllers missing too (Ethernet, less I2C, less UARTs).
 
-This SoC is loosely based on the SoCs of the Allwinner sun5i family,
-hence we can use most of the support already there. Compared to the
-already existing A10s and A13/R8, the pin layout completely changed,
-meaning that also the set of available controllers is changed.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+---
+ Documentation/arm/sunxi/README                  | 2 ++
+ Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+ MAINTAINERS                                     | 1 +
+ arch/arm/mach-sunxi/sunxi.c                     | 1 +
+ 4 files changed, 5 insertions(+)
 
-There's some new controllers (SPDIF) and some are gone. This also
-introduces the support for the GR8 Evaluation Board.
-
-Even though it's not been tested yet, the SPDIF and I2S-related
-components have been listed but we do not create a card from them, so
-they won't be usable.
-
-Let me know if you have any questions,
-Maxime
-
-Changes from v1:
-  - Removed the panel part for now
-  - Added a few missing gates
-  - Changed the gate clocks compatible to the generic one
-  - Switched to the OTG mode
-
-Maxime Ripard (1):
-  ARM: sunxi: Support the Nextthing GR8
-
-Myl?ne Josserand (3):
-  pinctrl: sunxi: Add GR8 controller support
-  ARM: dts: Add NextThing GR8 dtsi
-  ARM: dts: gr8: Add support for the GR8 evaluation board
-
- Documentation/arm/sunxi/README                     |    2 +
- Documentation/devicetree/bindings/arm/sunxi.txt    |    1 +
- .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |    1 +
- MAINTAINERS                                        |    1 +
- arch/arm/boot/dts/Makefile                         |    1 +
- arch/arm/boot/dts/ntc-gr8-evb.dts                  |  342 +++++++
- arch/arm/boot/dts/ntc-gr8.dtsi                     | 1080 ++++++++++++++++++++
- arch/arm/mach-sunxi/sunxi.c                        |    1 +
- drivers/pinctrl/sunxi/Kconfig                      |    4 +
- drivers/pinctrl/sunxi/Makefile                     |    1 +
- drivers/pinctrl/sunxi/pinctrl-gr8.c                |  541 ++++++++++
- 11 files changed, 1975 insertions(+)
- create mode 100644 arch/arm/boot/dts/ntc-gr8-evb.dts
- create mode 100644 arch/arm/boot/dts/ntc-gr8.dtsi
- create mode 100644 drivers/pinctrl/sunxi/pinctrl-gr8.c
-
+diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
+index e5a115f24471..77f57efbea83 100644
+--- a/Documentation/arm/sunxi/README
++++ b/Documentation/arm/sunxi/README
+@@ -31,6 +31,8 @@ SunXi family
+         + User Manual
+           http://dl.linux-sunxi.org/A13/A13%20User%20Manual%20-%20v1.2%20%282013-01-08%29.pdf
+ 
++      - Next Thing Co GR8 (sun5i)
++
+     * Dual ARM Cortex-A7 based SoCs
+       - Allwinner A20 (sun7i)
+         + User Manual
+diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+index 7e79fcc36b0d..3975d0a0e4c2 100644
+--- a/Documentation/devicetree/bindings/arm/sunxi.txt
++++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+@@ -14,3 +14,4 @@ using one of the following compatible strings:
+   allwinner,sun8i-a83t
+   allwinner,sun8i-h3
+   allwinner,sun9i-a80
++  nextthing,gr8
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 20bb1d00098c..7be47efb2159 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -982,6 +982,7 @@ M:	Chen-Yu Tsai <wens@csie.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ N:	sun[x456789]i
++F:	arch/arm/boot/dts/ntc-gr8*
+ 
+ ARM/Allwinner SoC Clock Support
+ M:	Emilio L?pez <emilio@elopez.com.ar>
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 95dca8c2c9ed..2e2bde271205 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -22,6 +22,7 @@ static const char * const sunxi_board_dt_compat[] = {
+ 	"allwinner,sun5i-a10s",
+ 	"allwinner,sun5i-a13",
+ 	"allwinner,sun5i-r8",
++	"nextthing,gr8",
+ 	NULL,
+ };
+ 
 -- 
 2.9.3
