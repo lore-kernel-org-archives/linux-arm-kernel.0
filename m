@@ -1,48 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 Sep 2016 16:38:40 +0200
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <632cd67b-34de-2177-529f-e1437924bae2@ti.com>
-References: <Pine.LNX.4.44L0.1609021019260.2027-100000@iolanthe.rowland.org>
- <8802454.xFheq55hVP@wuerfel> <632cd67b-34de-2177-529f-e1437924bae2@ti.com>
-Message-ID: <4842968.834OEr0s9G@wuerfel>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 7 Sep 2016 16:47:25 +0200
+Subject: [PATCH v2 7/7] ARM: KVM: Unlock vgic-v3 support
+In-Reply-To: <CAFEAcA9oXc6bO55p=vqgrzQLFGT+zvg+E2nucOvPvb7RetN3RQ@mail.gmail.com>
+References: <1471344418-19568-1-git-send-email-vladimir.murzin@arm.com>
+ <1471344418-19568-8-git-send-email-vladimir.murzin@arm.com>
+ <20160905112927.GL26366@cbox> <57CEC344.7030706@arm.com>
+ <20160906165527.GG23592@cbox> <57CFF094.5000704@arm.com>
+ <20160907125856.GP23592@cbox>
+ <CAFEAcA9oXc6bO55p=vqgrzQLFGT+zvg+E2nucOvPvb7RetN3RQ@mail.gmail.com>
+Message-ID: <20160907144725.GS23592@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 7, 2016 4:04:52 PM CEST Roger Quadros wrote:
-> > The main use for it is to let you specify a MAC address for on-board
-> > ethernet devices that lack an EPROM, but any other information can be
-> > added that way too.
-> > 
-> >> There is a bug  in the USB core because of which the ISB device and interfaces
-> >> do not inherit dma_pfn_offset correctly for which I've sent a patch
-> >> https://lkml.org/lkml/2016/8/17/275
-> > 
-> > I'm a bit skeptical about this. Clearly if we set the dma_mask, we should
-> > also set the dma_pfn_offset, but what exactly is this used for in USB
-> > devices?
+On Wed, Sep 07, 2016 at 03:20:14PM +0100, Peter Maydell wrote:
+> On 7 September 2016 at 13:58, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+> > On Wed, Sep 07, 2016 at 11:48:52AM +0100, Vladimir Murzin wrote:
+> >> On 06/09/16 17:55, Christoffer Dall wrote:
+> >> > On Tue, Sep 06, 2016 at 02:23:16PM +0100, Vladimir Murzin wrote:
+> >> >>
+> >> >> Sorry, missed this one
+> >> >>
+> >> >> On 05/09/16 12:29, Christoffer Dall wrote:
+> >> >>>>
+> >> >>>>> +static bool __hyp_text __has_useable_gicv3_cpuif(void)
+> >> >>>>> +{
+> >> >>>>> +       if (IS_ENABLED(CONFIG_ARM_GIC_V3) && (read_sysreg(ID_PFR1) >> 28))
+> >> >>> Do we have a define for bit 28 we could use?
+> >> >>
+> >> >> I'll check it.
+> >> >>
+> >> >>>
+> >> >>> Does this actually work on all v7 boards?  The v7 ARM ARM seems to state
+> >> >>> that this bitfield is Reserved, UNK.  Does that somehow mean 'is going
+> >> >>> to be zero'?
+> >> >>
+> >> >> It is how v7ARM ARM I have defines UNK
+> >> >>
+> >> >> An abbreviation indicating that software must treat a field as
+> >> >> containing an UNKNOWN value. Hardware must implement the bit as read as
+> >> >> 0, or all 0s for a bit field. Software must not rely on the field
+> >> >> reading as zero.
+> >> >>
+> >> >> It seems goes under 'is going to be zero' case, no?
+> >> >>
+> >> > The last sentence is disturbing to me, and feels slightly contradicting
+> >> > itself.  Reading the UNKNOWN description doesn't help much either.
+> >> >
+> >> > Perhaps you can ask around internally and figure out what the precise
+> >> > answer to this is?
+> >>
+> >> Since it is kind of implementation dependant thing the precise answer
+> >> from here hardly help, IMO. We still have non-zero chance to see
+> >> something scary.
+> >
+> > Well, if the precise answer is: This will actually always return 0
+> > because of X and Y, then your code is fine.
 > 
-> Consider the mass storage device case.
-> USB storage driver creates a scsi host for the mass storage interface in
-> drivers/usb/storage/usb.c
-> The scsi host parent device is nothing but the the USB interface device.
+> I think the "must not rely on the field reading as zero" wording
+> in the case of the ID registers is intended to mean "in a
+> future rev of the architecture we may assign these bits,
+> and your code mustn't do something that will break if the
+> bits then read as something other than zero". (And indeed
+> in v8 bits 28..31 have an assigned meaning.) It doesn't
+> mean there'll be v7 hardware out there with non-zero
+> values, because that would be breaking the hardware's part
+> of the UNKNOWN contract ("must implement the bit as read as 0").
 > 
-> Now, __scsi_init_queue() calls scsi_calculate_bounce_limit() to find out
-> and set the block layer bounce limit.
-> 
-> scsi_calculate_bounce_limit() uses dma_max_pfn(host_dev) to get the bounce_limit.
-> 
-> host_dev is nothing but the device representing the mass storage interface.
-> 
-> If that device doesn't have the right dma_pfn_offset, then dma_max_pfn()
-> is messed up and the bounce buffer limit is wrong.
+ok, that was the kind of answer I was hoping for.  In that case, this is
+a non-issue.
 
-I see. The same thing probably happens in the network and mmc subsystems,
-which have similar code.
+Thanks for the clarification.
 
-This shows the inconsistencies we have in the handling for bounce buffers
-in the kernel, which are sometimes handled by subsystems but sometimes
-rely on swiotlb instead. I don't have any better idea than your patch
-here, but maybe we should add a comment explaining that next to the
-code.
-
-	Arnd
+-Christoffer
