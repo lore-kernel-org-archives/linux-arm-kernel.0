@@ -1,224 +1,147 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed,  7 Sep 2016 14:21:38 +0200
-Subject: [PATCH 3/7] mtd: nand: automate NAND timings selection
+Date: Wed,  7 Sep 2016 14:21:41 +0200
+Subject: [PATCH 6/7] mtd: nand: mxc: Add timing setup for v2 controllers
 In-Reply-To: <1473250902-31139-1-git-send-email-s.hauer@pengutronix.de>
 References: <1473250902-31139-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1473250902-31139-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1473250902-31139-7-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris Brezillon <boris.brezillon@free-electrons.com>
+So far we relied on reset default or the bootloader to configure a
+suitable clk rate for the Nand controller. This works but we can
+optimize the timing for better performance. This sets the clk rate for
+v2 controllers (i.MX25/35) based on the timing mode read from the ONFI
+parameter page. This may also enable the symmetric mode (aks EDO mode)
+if necessary which reads one word per clock cycle.
+Tested on an i.MX25 with a Micron MT29F4G08ABBDAHC attached.
 
-The NAND framework provides several helpers to query timing modes supported
-by a NAND chip, but this implies that all NAND controller drivers have
-to implement the same timings selection dance. Also currently NAND
-devices can be resetted at arbitrary places which also resets the timing
-for ONFI chips to timing mode 0.
-
-Provide a common logic to select the best timings based on ONFI or
-->onfi_timing_mode_default information. Hook this into nand_reset()
-to make sure the new timing is applied each time during a reset.
-
-NAND controller willing to support timings adjustment should just
-implement the ->setup_data_interface() method.
-
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/mtd/nand/nand_base.c | 134 +++++++++++++++++++++++++++++++++++++++++++
- include/linux/mtd/nand.h     |  12 ++--
- 2 files changed, 142 insertions(+), 4 deletions(-)
+ drivers/mtd/nand/mxc_nand.c | 84 +++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 82 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-index 1f704cc..c9bc988 100644
---- a/drivers/mtd/nand/nand_base.c
-+++ b/drivers/mtd/nand/nand_base.c
-@@ -948,6 +948,130 @@ static int nand_wait(struct mtd_info *mtd, struct nand_chip *chip)
- }
- 
- /**
-+ * nand_reset_data_interface - Reset data interface and timings
-+ * @chip: The NAND chip
-+ *
-+ * Reset the Data interface and timings to ONFI mode 0.
-+ *
-+ * Returns 0 for success or negative error code otherwise.
-+ */
-+static int nand_reset_data_interface(struct nand_chip *chip)
-+{
-+	struct mtd_info *mtd = &chip->mtd;
-+	struct nand_data_interface *conf;
-+	int ret;
-+
-+	if (!chip->setup_data_interface)
-+		return 0;
-+
-+	conf = kzalloc(sizeof(*conf), GFP_KERNEL);
-+	if (!conf)
-+		return -ENOMEM;
-+
-+	/*
-+	 * The ONFI specification says:
-+	 * "
-+	 * To transition from NV-DDR or NV-DDR2 to the SDR data
-+	 * interface, the host shall use the Reset (FFh) command
-+	 * using SDR timing mode 0. A device in any timing mode is
-+	 * required to recognize Reset (FFh) command issued in SDR
-+	 * timing mode 0.
-+	 * "
-+	 *
-+	 * Configure the data interface in SDR mode and set the
-+	 * timings to timing mode 0.
-+	 */
-+
-+	conf->type = NAND_SDR_IFACE,
-+	conf->timings.sdr = *onfi_async_timing_mode_to_sdr_timings(0);
-+
-+	ret = chip->setup_data_interface(mtd, conf, false);
-+	if (ret)
-+		pr_err("Failed to configure data interface to SDR timing mode 0\n");
-+
-+	kfree(conf);
-+
-+	return ret;
-+}
-+
-+/**
-+ * nand_setup_data_interface - Setup the best data interface and timings
-+ * @chip: The NAND chip
-+ *
-+ * Find and configure the best data interface and NAND timings supported by
-+ * the chip and the driver.
-+ * First tries to retrieve supported timing modes from ONFI information,
-+ * and if the NAND chip does not support ONFI, relies on the
-+ * ->onfi_timing_mode_default specified in the nand_ids table.
-+ *
-+ * Returns 0 for success or negative error code otherwise.
-+ */
-+static int nand_setup_data_interface(struct nand_chip *chip)
-+{
-+	struct mtd_info *mtd = &chip->mtd;
-+	struct nand_data_interface *conf;
-+	int modes, mode, ret;
-+
-+	if (!chip->setup_data_interface)
-+		return 0;
-+
-+	/*
-+	 * First try to identify the best timings from ONFI parameters and
-+	 * if the NAND does not support ONFI, fallback to the default ONFI
-+	 * timing mode.
-+	 */
-+	modes = onfi_get_async_timing_mode(chip);
-+	if (modes == ONFI_TIMING_MODE_UNKNOWN) {
-+		if (!chip->onfi_timing_mode_default)
-+			return 0;
-+
-+		modes = GENMASK(chip->onfi_timing_mode_default, 0);
-+	}
-+
-+	conf = kzalloc(sizeof(*conf), GFP_KERNEL);
-+	if (!conf)
-+		return -ENOMEM;
-+
-+	ret = -EINVAL;
-+	for (mode = fls(modes) - 1; mode >= 0; mode--) {
-+		conf->type = NAND_SDR_IFACE,
-+		conf->timings.sdr = *onfi_async_timing_mode_to_sdr_timings(mode);
-+
-+		ret = chip->setup_data_interface(mtd, conf, true);
-+		if (!ret) {
-+			chip->onfi_timing_mode_default = mode;
-+			break;
-+		}
-+	}
-+
-+	if (ret)
-+		goto err;
-+
-+	/*
-+	 * Ensure the timing mode has been changed on the chip side
-+	 * before changing timings on the controller side.
-+	 */
-+	if (chip->onfi_version) {
-+		uint8_t tmode_param[ONFI_SUBFEATURE_PARAM_LEN] = {
-+			chip->onfi_timing_mode_default,
-+		};
-+
-+		ret = chip->onfi_set_features(mtd, chip,
-+				ONFI_FEATURE_ADDR_TIMING_MODE,
-+				tmode_param);
-+		if (ret)
-+			goto err;
-+	}
-+
-+	ret = chip->setup_data_interface(mtd, conf, false);
-+
-+err:
-+	kfree(conf);
-+
-+	return ret;
-+}
-+
-+/**
-  * nand_reset - Reset and initialize a NAND device
-  * @chip: The NAND chip
-  *
-@@ -955,8 +1079,18 @@ static int nand_wait(struct mtd_info *mtd, struct nand_chip *chip)
-  */
- int nand_reset(struct nand_chip *chip)
- {
-+	int ret;
-+
-+	ret = nand_reset_data_interface(chip);
-+	if (ret)
-+		return ret;
-+
- 	chip->cmdfunc(&chip->mtd, NAND_CMD_RESET, -1, -1);
- 
-+	ret = nand_setup_data_interface(chip);
-+	if (ret)
-+		return ret;
-+
- 	return 0;
- }
- 
-diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-index f305bed..9f3d7be 100644
---- a/include/linux/mtd/nand.h
-+++ b/include/linux/mtd/nand.h
-@@ -743,10 +743,9 @@ nand_get_sdr_timings(const struct nand_data_interface *conf)
-  *                      also from the datasheet. It is the recommended ECC step
-  *			size, if known; if unknown, set to zero.
-  * @onfi_timing_mode_default: [INTERN] default ONFI timing mode. This field is
-- *			      either deduced from the datasheet if the NAND
-- *			      chip is not ONFI compliant or set to 0 if it is
-- *			      (an ONFI chip is always configured in mode 0
-- *			      after a NAND reset)
-+ * 			      set to the actually used ONFI mode if the chip is
-+ * 			      ONFI compliant or deduced from the datasheet if
-+ * 			      the NAND chip is not ONFI compliant.
-  * @numchips:		[INTERN] number of physical chips
-  * @chipsize:		[INTERN] the size of one chip for multichip arrays
-  * @pagemask:		[INTERN] page number mask = number of (pages / chip) - 1
-@@ -766,6 +765,7 @@ nand_get_sdr_timings(const struct nand_data_interface *conf)
-  * @read_retries:	[INTERN] the number of read retry modes supported
-  * @onfi_set_features:	[REPLACEABLE] set the features for ONFI nand
-  * @onfi_get_features:	[REPLACEABLE] get the features for ONFI nand
-+ * @setup_data_interface: [OPTIONAL] setup the data interface and timing
-  * @bbt:		[INTERN] bad block table pointer
-  * @bbt_td:		[REPLACEABLE] bad block table descriptor for flash
-  *			lookup.
-@@ -812,6 +812,10 @@ struct nand_chip {
- 	int (*onfi_get_features)(struct mtd_info *mtd, struct nand_chip *chip,
- 			int feature_addr, uint8_t *subfeature_para);
- 	int (*setup_read_retry)(struct mtd_info *mtd, int retry_mode);
+diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+index 1db8299..0d34d72 100644
+--- a/drivers/mtd/nand/mxc_nand.c
++++ b/drivers/mtd/nand/mxc_nand.c
+@@ -152,6 +152,9 @@ struct mxc_nand_devtype_data {
+ 	void (*select_chip)(struct mtd_info *mtd, int chip);
+ 	int (*correct_data)(struct mtd_info *mtd, u_char *dat,
+ 			u_char *read_ecc, u_char *calc_ecc);
 +	int (*setup_data_interface)(struct mtd_info *mtd,
-+				    const struct nand_data_interface *conf,
-+				    bool check_only);
-+
++			const struct nand_data_interface *conf,
++			bool check_only);
  
- 	int chip_delay;
- 	unsigned int options;
+ 	/*
+ 	 * On i.MX21 the CONFIG2:INT bit cannot be read if interrupts are masked
+@@ -1012,6 +1015,82 @@ static void preset_v1(struct mtd_info *mtd)
+ 	writew(0x4, NFC_V1_V2_WRPROT);
+ }
+ 
++static int mxc_nand_v2_setup_data_interface(struct mtd_info *mtd,
++					    const struct nand_data_interface *conf,
++					    bool check_only)
++{
++	struct nand_chip *nand_chip = mtd_to_nand(mtd);
++	struct mxc_nand_host *host = nand_get_controller_data(nand_chip);
++	int tRC_min_ns, tRC_ps, ret;
++	unsigned long rate, rate_round;
++	const struct nand_sdr_timings *timings;
++	uint16_t config1;
++
++	timings = nand_get_sdr_timings(conf);
++	if (IS_ERR(timings))
++		return -ENOTSUPP;
++
++	config1 = readw(NFC_V1_V2_CONFIG1);
++
++	tRC_min_ns = timings->tRC_min / 1000;
++	rate = 1000000000 / tRC_min_ns;
++
++	/*
++	 * For tRC < 30ns we have to use EDO mode. In this case the controller
++	 * does one access per clock cycle. Otherwise the controller does one
++	 * access in two clock cycles, thus we have to double the rate to the
++	 * controller.
++	 */
++	if (tRC_min_ns < 30) {
++		rate_round = clk_round_rate(host->clk, rate);
++		config1 |= NFC_V2_CONFIG1_ONE_CYCLE;
++		tRC_ps = 1000000000 / (rate_round / 1000);
++	} else {
++		rate *= 2;
++		rate_round = clk_round_rate(host->clk, rate);
++		config1 &= ~NFC_V2_CONFIG1_ONE_CYCLE;
++		tRC_ps = 1000000000 / (rate_round / 1000 / 2);
++	}
++
++	/*
++	 * The timing values compared against are from the i.MX25 Automotive
++	 * datasheet, Table 50. NFC Timing Parameters
++	 */
++	if (timings->tCLS_min > tRC_ps - 1000 ||
++	    timings->tCLH_min > tRC_ps - 2000 ||
++	    timings->tCS_min > tRC_ps - 1000 ||
++	    timings->tCH_min > tRC_ps - 2000 ||
++	    timings->tWP_min > tRC_ps - 1500 ||
++	    timings->tALS_min > tRC_ps ||
++	    timings->tALH_min > tRC_ps - 3000 ||
++	    timings->tDS_min > tRC_ps ||
++	    timings->tDH_min > tRC_ps - 5000 ||
++	    timings->tWC_min > 2 * tRC_ps ||
++	    timings->tWH_min > tRC_ps - 2500 ||
++	    timings->tRR_min > 6 * tRC_ps ||
++	    timings->tRP_min > 3 * tRC_ps / 2 ||
++	    timings->tRC_min > 2 * tRC_ps ||
++	    timings->tREH_min > (tRC_ps / 2) - 2500) {
++		dev_dbg(host->dev, "Timing out of bounds\n");
++		return -EINVAL;
++	}
++
++	if (check_only)
++		return 0;
++
++	ret = clk_set_rate(host->clk, rate);
++	if (ret)
++		return ret;
++
++	writew(config1, NFC_V1_V2_CONFIG1);
++
++	dev_dbg(host->dev, "Setting rate to %ldHz, %s mode\n", rate_round,
++		config1 & NFC_V2_CONFIG1_ONE_CYCLE ? "One cycle (EDO)" :
++		"normal");
++
++	return 0;
++}
++
+ static void preset_v2(struct mtd_info *mtd)
+ {
+ 	struct nand_chip *nand_chip = mtd_to_nand(mtd);
+@@ -1276,8 +1355,6 @@ static int mxc_nand_onfi_get_features(struct mtd_info *mtd, struct nand_chip *ch
+ 	      & ONFI_OPT_CMD_SET_GET_FEATURES))
+ 		return -EINVAL;
+ 
+-	*(uint32_t *)host->main_area0 = 0xdeadbeef;
+-
+ 	host->devtype_data->send_cmd(host, NAND_CMD_GET_FEATURES, false);
+ 	mxc_do_addr_cycle(mtd, addr, -1);
+ 	host->devtype_data->send_page(mtd, NFC_OUTPUT);
+@@ -1378,6 +1455,7 @@ static const struct mxc_nand_devtype_data imx25_nand_devtype_data = {
+ 	.ooblayout = &mxc_v2_ooblayout_ops,
+ 	.select_chip = mxc_nand_select_chip_v2,
+ 	.correct_data = mxc_nand_correct_data_v2_v3,
++	.setup_data_interface = mxc_nand_v2_setup_data_interface,
+ 	.irqpending_quirk = 0,
+ 	.needs_ip = 0,
+ 	.regs_offset = 0x1e00,
+@@ -1586,6 +1664,8 @@ static int mxcnd_probe(struct platform_device *pdev)
+ 	if (err < 0)
+ 		return err;
+ 
++	this->setup_data_interface = host->devtype_data->setup_data_interface;
++
+ 	if (host->devtype_data->needs_ip) {
+ 		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 		host->regs_ip = devm_ioremap_resource(&pdev->dev, res);
 -- 
 2.8.1
