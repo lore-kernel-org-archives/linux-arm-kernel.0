@@ -1,11 +1,11 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 Sep 2016 22:40:17 +0200
-Subject: [PATCH 1/3] pinctrl: ns2: constify pinctrl_ops and pinmux_ops
+Date: Wed, 7 Sep 2016 22:41:03 +0200
+Subject: [PATCH 2/3] pinctrl: nsp: constify pinctrl_ops and pinmux_ops
  structures
-In-Reply-To: <1472755341-9995-2-git-send-email-Julia.Lawall@lip6.fr>
+In-Reply-To: <1472755341-9995-3-git-send-email-Julia.Lawall@lip6.fr>
 References: <1472755341-9995-1-git-send-email-Julia.Lawall@lip6.fr>
- <1472755341-9995-2-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <CACRpkda4cY9KbhOmS-vC6YiDHHvU+27_MwkZEbfbHRnNFjigKA@mail.gmail.com>
+ <1472755341-9995-3-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <CACRpkdZSE=o_qSuBUkTA3FOpunaf7maNsue07L7ZGHyzc4xgMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
