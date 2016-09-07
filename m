@@ -1,24 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 Sep 2016 16:50:01 +0200
-Subject: [PATCH V2 3/4] ARM64 LPC: support serial based on low-pin-count
-In-Reply-To: <1473255233-154297-4-git-send-email-yuanzhichang@hisilicon.com>
-References: <1473255233-154297-1-git-send-email-yuanzhichang@hisilicon.com>
- <1473255233-154297-4-git-send-email-yuanzhichang@hisilicon.com>
-Message-ID: <5345060.9D0B4ujt5e@wuerfel>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 7 Sep 2016 16:51:55 +0200
+Subject: [PATCH 5/6] ARM: dts: Add NextThing GR8 dtsi
+In-Reply-To: <20160831081817.5191-6-maxime.ripard@free-electrons.com>
+References: <20160831081817.5191-1-maxime.ripard@free-electrons.com>
+ <20160831081817.5191-6-maxime.ripard@free-electrons.com>
+Message-ID: <CABxcv=kJCuP==QVRqyuoORSoWKAEqXmt5iRjdvDcCcr4MSm0gQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 7, 2016 9:33:52 PM CEST Zhichang Yuan wrote:
-> From: "zhichang.yuan" <yuanzhichang@hisilicon.com>
-> 
-> On Hip06 platform, a 16550 compatible UART is connected to low-pin-count and
-> controlled through the LPC I/O cycles. This patch drives the UART port with
-> the specific serial in/out function pair based on the indirect-IO mechanism
-> introduced by Hip06 LPC driver.
-> 
-> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
+Hello Maxime,
 
-Any reason this cannot just use the regular drivers/tty/serial/8250/8250_of.c
-driver?
+On Wed, Aug 31, 2016 at 10:18 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
-	Arnd
+[snip]
+
+> +
+> +#include "skeleton.dtsi"
+> +
+
+The skeleton.dtsi has been deprecated and shouldn't be used in new DTS files:
+
+http://www.spinics.net/lists/arm-kernel/msg528080.html
+
+Best regards,
+Javier
