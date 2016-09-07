@@ -1,70 +1,86 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 7 Sep 2016 16:04:52 +0300
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <8802454.xFheq55hVP@wuerfel>
-References: <Pine.LNX.4.44L0.1609021019260.2027-100000@iolanthe.rowland.org>
- <5147808.apZTAZ3VPE@wuerfel> <340685cd-7f06-21db-94cb-a87d0df36286@ti.com>
- <8802454.xFheq55hVP@wuerfel>
-Message-ID: <632cd67b-34de-2177-529f-e1437924bae2@ti.com>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Wed, 7 Sep 2016 16:09:47 +0300
+Subject: [PATCH] ARM: dts: msm8974: Add definitions for QCE & cryptobam
+In-Reply-To: <20160830153740.13275-1-voker57@gmail.com>
+References: <20160830153740.13275-1-voker57@gmail.com>
+Message-ID: <32148db3-74b8-c81f-9688-b286d9516b9d@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/16 11:29, Arnd Bergmann wrote:
-> On Wednesday, September 7, 2016 10:17:31 AM CEST Roger Quadros wrote:
->>>
->>> Speaking of that flag, I suppose we need the same logic to know where
->>> to look for USB devices attached to a dwc3 host when we need to describe
->>> them in DT. By default we look for child device nodes under the
->>> node of the HCD device node, but that would be wrong here too.
->>
->> I didn't get this part. Information about USB devices attached to a USB host
->> is never provided in DT because they are always dynamically created via
->> usb_new_device(), whether they are hard-wired on the board or hot-plugged.
->>
->> These USB devices inherit their DMA masks in the usb_alloc_dev() routine
->> whereas each interface within the USB device inherits its DMA mask in
->> usb_set_configuration().
+Hi Iaroslav,
+
+On 08/30/2016 06:37 PM, Iaroslav Gridin wrote:
+> From: Voker57 <voker57@gmail.com>
 > 
-> We had talked about adding support for this for at least six years (probably
-> much more), but Peter Chen finally added it this year in commit 69bec72598
-> ("USB: core: let USB device know device node").
-
-OK. Thanks for this pointer.
+> Add device tree definitions for Qualcomm Cryptography engine and its BAM
+> Signed-off-by: Iaroslav Gridin <voker57@gmail.com>
+> ---
+>  arch/arm/boot/dts/qcom-msm8974.dtsi | 42 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
 > 
-> The main use for it is to let you specify a MAC address for on-board
-> ethernet devices that lack an EPROM, but any other information can be
-> added that way too.
-> 
->> There is a bug  in the USB core because of which the ISB device and interfaces
->> do not inherit dma_pfn_offset correctly for which I've sent a patch
->> https://lkml.org/lkml/2016/8/17/275
-> 
-> I'm a bit skeptical about this. Clearly if we set the dma_mask, we should
-> also set the dma_pfn_offset, but what exactly is this used for in USB
-> devices?
+> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> index 561d4d1..c0da739 100644
+> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
+> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> @@ -287,6 +287,48 @@
+>  			reg = <0xf9011000 0x1000>;
+>  		};
+>  
+> +		cryptobam: dma at fd444000 {
+> +			compatible = "qcom,bam-v1.4.0";
+> +			reg = <0xfd444000 0x15000>;
+> +			interrupts = <0 236 0>;
 
-Consider the mass storage device case.
-USB storage driver creates a scsi host for the mass storage interface in
-drivers/usb/storage/usb.c
-The scsi host parent device is nothing but the the USB interface device.
+should be
 
-Now, __scsi_init_queue() calls scsi_calculate_bounce_limit() to find out
-and set the block layer bounce limit.
+interrupts = <GIC_SPI 236 IRQ_NONE>;
 
-scsi_calculate_bounce_limit() uses dma_max_pfn(host_dev) to get the bounce_limit.
+> +			clocks = <&gcc GCC_CE2_AHB_CLK>,
+> +				 <&gcc GCC_CE2_AXI_CLK>,
+> +				 <&gcc GCC_CE2_CLK>;
+> +			clock-names = "bam_clk", "axi_clk", "core_clk";
+> +			#dma-cells = <1>;
+> +			qcom,ee = <1>;
+> +			qcom,controlled-remotely;
+> +			};
 
-host_dev is nothing but the device representing the mass storage interface.
+indentation please.
 
-If that device doesn't have the right dma_pfn_offset, then dma_max_pfn()
-is messed up and the bounce buffer limit is wrong.
+> +
+> +		qcom,qcrypto at fd440000 {
+> +			compatible = "qcom,crypto-v5.1";
+> +			reg = <0xfd45a000 0x6000>;
+> +			reg-names = "crypto-base";
+> +			interrupts = <0 236 0>;
+> +			qcom,bam-pipe-pair = <2>;
+> +			qcom,ce-hw-instance = <1>;
+> +			qcom,ce-device = <0>;
 
-> 
-> As I understand it, the dma_mask/dma_pfn_offset etc is used for the DMA
-> mapping interface, but that can't really be used on USB devices, which
-> I assume use usb_alloc_coherent() and the URB interfaces for passing data
-> between a USB driver and the HCD. My knowledge of USB device drivers
-> is a bit lacking, so it's possible I'm misunderstanding things here.
-> 
+You are getting those 3 properties from qcom downstream kernel, so they
+are not relevant to qce in mainline kernel, please drop them.
 
-cheers,
--roger
+> +			clocks = <&gcc GCC_CE2_CLK>,
+> +				 <&gcc GCC_CE2_AHB_CLK>,
+> +				 <&gcc GCC_CE2_AXI_CLK>,
+> +				 <&gcc CE2_CLK_SRC>;
+> +
+> +			dmas = <&cryptobam 2>, <&cryptobam 3>;
+> +			dma-names = "rx", "tx";
+> +			clock-names = "core", "iface", "bus", "core_src";
+
+from here to ...
+> +			qcom,clk-mgmt-sus-res;
+> +			qcom,msm-bus,name = "qcrypto-noc";
+> +
+> +			qcom,msm-bus,num-cases = <2>;
+> +			qcom,msm-bus,num-paths = <1>;
+> +			qcom,use-sw-aes-cbc-ecb-ctr-algo;
+> +			qcom,use-sw-aes-xts-algo;
+> +			qcom,use-sw-ahash-algo;
+> +			qcom,msm-bus,vectors-KBps = <56 512 0 0>,
+> +						    <56 512 3936000 393600>;
+
+... here, please drop these properties they are no parsed and useful.
+
+regards,
+Stan
