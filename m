@@ -1,90 +1,113 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed,  7 Sep 2016 14:21:40 +0200
-Subject: [PATCH 5/7] mtd: nand: mxc: implement onfi get/set features
-In-Reply-To: <1473250902-31139-1-git-send-email-s.hauer@pengutronix.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 7 Sep 2016 14:31:43 +0200
+Subject: [PATCH 1/7] mtd: nand: Create a NAND reset function
+In-Reply-To: <1473250902-31139-2-git-send-email-s.hauer@pengutronix.de>
 References: <1473250902-31139-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1473250902-31139-6-git-send-email-s.hauer@pengutronix.de>
+ <1473250902-31139-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20160907143143.55cfd7d2@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To be able to support different ONFI timing modes we have to implement
-the onfi_set_features and onfi_get_features. Tested on an i.MX25 SoC.
+On Wed,  7 Sep 2016 14:21:36 +0200
+Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/mtd/nand/mxc_nand.c | 53 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+> When NAND devices are resetted some initialization may have to be done,
+> like for example they have to be configured for the timing mode that
+> shall be used. To get a common place where this initialization can be
+> implemented create a nand_reset() function. This currently only issues
+> a NAND_CMD_RESET to the NAND device. The places issuing this command
+> manually are replaced with a call to nand_reset().
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/mtd/nand/nand_base.c | 23 ++++++++++++++++++-----
+>  include/linux/mtd/nand.h     |  4 ++++
+>  2 files changed, 22 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+> index 77533f7..1f704cc 100644
+> --- a/drivers/mtd/nand/nand_base.c
+> +++ b/drivers/mtd/nand/nand_base.c
+> @@ -948,6 +948,19 @@ static int nand_wait(struct mtd_info *mtd, struct nand_chip *chip)
+>  }
+>  
+>  /**
+> + * nand_reset - Reset and initialize a NAND device
+> + * @chip: The NAND chip
+> + *
+> + * Returns 0 for success or negative error code otherwise
+> + */
+> +int nand_reset(struct nand_chip *chip)
+> +{
+> +	chip->cmdfunc(&chip->mtd, NAND_CMD_RESET, -1, -1);
 
-diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 5173fad..1db8299 100644
---- a/drivers/mtd/nand/mxc_nand.c
-+++ b/drivers/mtd/nand/mxc_nand.c
-@@ -1239,6 +1239,57 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
- 	}
- }
- 
-+static int mxc_nand_onfi_set_features(struct mtd_info *mtd, struct nand_chip *chip,
-+			int addr, uint8_t *subfeature_param)
-+{
-+	struct nand_chip *nand_chip = mtd_to_nand(mtd);
-+	struct mxc_nand_host *host = nand_get_controller_data(nand_chip);
-+	int i;
-+
-+	if (!chip->onfi_version ||
-+	    !(le16_to_cpu(chip->onfi_params.opt_cmd)
-+	      & ONFI_OPT_CMD_SET_GET_FEATURES))
-+		return -EINVAL;
-+
-+	host->buf_start = 0;
-+
-+	for (i = 0; i < ONFI_SUBFEATURE_PARAM_LEN; ++i)
-+		chip->write_byte(mtd, subfeature_param[i]);
-+
-+	memcpy32_toio(host->main_area0, host->data_buf, mtd->writesize);
-+	host->devtype_data->send_cmd(host, NAND_CMD_SET_FEATURES, false);
-+	mxc_do_addr_cycle(mtd, addr, -1);
-+	host->devtype_data->send_page(mtd, NFC_INPUT);
-+
-+	return 0;
-+}
-+
-+static int mxc_nand_onfi_get_features(struct mtd_info *mtd, struct nand_chip *chip,
-+			int addr, uint8_t *subfeature_param)
-+{
-+	struct nand_chip *nand_chip = mtd_to_nand(mtd);
-+	struct mxc_nand_host *host = nand_get_controller_data(nand_chip);
-+	int i;
-+
-+	if (!chip->onfi_version ||
-+	    !(le16_to_cpu(chip->onfi_params.opt_cmd)
-+	      & ONFI_OPT_CMD_SET_GET_FEATURES))
-+		return -EINVAL;
-+
-+	*(uint32_t *)host->main_area0 = 0xdeadbeef;
-+
-+	host->devtype_data->send_cmd(host, NAND_CMD_GET_FEATURES, false);
-+	mxc_do_addr_cycle(mtd, addr, -1);
-+	host->devtype_data->send_page(mtd, NFC_OUTPUT);
-+	memcpy32_fromio(host->data_buf, host->main_area0, 512);
-+	host->buf_start = 0;
-+
-+	for (i = 0; i < ONFI_SUBFEATURE_PARAM_LEN; ++i)
-+		*subfeature_param++ = chip->read_byte(mtd);
-+
-+	return 0;
-+}
-+
- /*
-  * The generic flash bbt decriptors overlap with our ecc
-  * hardware, so define some i.MX specific ones.
-@@ -1513,6 +1564,8 @@ static int mxcnd_probe(struct platform_device *pdev)
- 	this->read_word = mxc_nand_read_word;
- 	this->write_buf = mxc_nand_write_buf;
- 	this->read_buf = mxc_nand_read_buf;
-+	this->onfi_set_features = mxc_nand_onfi_set_features;
-+	this->onfi_get_features = mxc_nand_onfi_get_features;
- 
- 	host->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(host->clk))
--- 
-2.8.1
+		      ^ nand_to_mtd(chip)
+
+Otherwise, the patch looks good.
+
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+>   * __nand_unlock - [REPLACEABLE] unlocks specified locked blocks
+>   * @mtd: mtd info
+>   * @ofs: offset to start unlock from
+> @@ -1025,7 +1038,7 @@ int nand_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
+>  	 * some operation can also clear the bit 7 of status register
+>  	 * eg. erase/program a locked block
+>  	 */
+> -	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
+> +	nand_reset(chip);
+>  
+>  	/* Check, if it is write protected */
+>  	if (nand_check_wp(mtd)) {
+> @@ -1084,7 +1097,7 @@ int nand_lock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
+>  	 * some operation can also clear the bit 7 of status register
+>  	 * eg. erase/program a locked block
+>  	 */
+> -	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
+> +	nand_reset(chip);
+>  
+>  	/* Check, if it is write protected */
+>  	if (nand_check_wp(mtd)) {
+> @@ -2788,7 +2801,7 @@ static int nand_do_write_oob(struct mtd_info *mtd, loff_t to,
+>  	 * if we don't do this. I have no clue why, but I seem to have 'fixed'
+>  	 * it in the doc2000 driver in August 1999.  dwmw2.
+>  	 */
+> -	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
+> +	nand_reset(chip);
+>  
+>  	/* Check, if it is write protected */
+>  	if (nand_check_wp(mtd)) {
+> @@ -3829,7 +3842,7 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
+>  	 * Reset the chip, required by some chips (e.g. Micron MT29FxGxxxxx)
+>  	 * after power-up.
+>  	 */
+> -	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
+> +	nand_reset(chip);
+>  
+>  	/* Send the command for reading device ID */
+>  	chip->cmdfunc(mtd, NAND_CMD_READID, 0x00, -1);
+> @@ -4161,7 +4174,7 @@ int nand_scan_ident(struct mtd_info *mtd, int maxchips,
+>  	for (i = 1; i < maxchips; i++) {
+>  		chip->select_chip(mtd, i);
+>  		/* See comment in nand_get_flash_type for reset */
+> -		chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
+> +		nand_reset(chip);
+>  		/* Send the command for reading device ID */
+>  		chip->cmdfunc(mtd, NAND_CMD_READID, 0x00, -1);
+>  		/* Read manufacturer and device IDs */
+> diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
+> index 8dd6e01..9890df2 100644
+> --- a/include/linux/mtd/nand.h
+> +++ b/include/linux/mtd/nand.h
+> @@ -1093,4 +1093,8 @@ int nand_read_oob_std(struct mtd_info *mtd, struct nand_chip *chip, int page);
+>  /* Default read_oob syndrome implementation */
+>  int nand_read_oob_syndrome(struct mtd_info *mtd, struct nand_chip *chip,
+>  			   int page);
+> +
+> +/* Reset and initialize a NAND device */
+> +int nand_reset(struct nand_chip *chip);
+> +
+>  #endif /* __LINUX_MTD_NAND_H */
