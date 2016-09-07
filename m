@@ -1,19 +1,23 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 7 Sep 2016 14:27:54 -0700
-Subject: [PATCH 3/7] clk: gxbb: expose spifc clock
-In-Reply-To: <1473261223-15412-4-git-send-email-jbrunet@baylibre.com>
-References: <1473261223-15412-1-git-send-email-jbrunet@baylibre.com>
- <1473261223-15412-4-git-send-email-jbrunet@baylibre.com>
-Message-ID: <20160907212754.GB12510@codeaurora.org>
+Date: Wed, 7 Sep 2016 14:28:36 -0700
+Subject: [PATCH 1/7] clk: gxbb: expose USB clocks
+In-Reply-To: <20160904213152.25837-2-martin.blumenstingl@googlemail.com>
+References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
+ <20160904213152.25837-2-martin.blumenstingl@googlemail.com>
+Message-ID: <20160907212836.GC12510@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07, Jerome Brunet wrote:
-> SPI clock is needed for the spifc driver, expose to DT
-> (and comment out in the clk driver)
+On 09/04, Martin Blumenstingl wrote:
+> USB0_DDR_BRIDGE and USB1_DDR_BRIDGE1 are needed for the related
+> dwc2 usb controller. USB, USB0 and USB1 are needed for the PHYs.
+> Expose these clocks to DT and comment out in clk driver.
 > 
 > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 > ---
+
+Assuming authorship is resolved:
 
 Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
