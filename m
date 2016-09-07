@@ -1,53 +1,55 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Wed, 7 Sep 2016 18:31:15 +0300
-Subject: [PATCH v2 0/7] ARM: dts: imx: add gpio-ranges properties to some
- iMX GPIO controllers
-In-Reply-To: <1471723491-15330-1-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1471723491-15330-1-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <a97478e5-e423-2c9b-de71-3341c76ff4fe@mentor.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed,  7 Sep 2016 17:34:33 +0200
+Subject: [PATCH v3 4/8] scpi: Add support for Legacy match table for Amlogic
+ GXBB SoC
+In-Reply-To: <1473262477-18045-1-git-send-email-narmstrong@baylibre.com>
+References: <1473262477-18045-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1473262477-18045-5-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn, Fabio.
+Add new DT match table to setup the is_legacy boolean value across
+the scpi functions.
+Add the Amlogic GXBB SoC compatible for platform and as legacy match entry.
 
-On 08/20/2016 11:04 PM, Vladimir Zapolskiy wrote:
-> % gawk -n '{ sub(/.*__/, ""); if ($1 ~ "^GPIO") print $1, $2/4}' \
-> 	arch/arm/boot/dts/imxXX-pinfunc.h | sort -n
->
-> Note that this means that potential errors in arch/arm/boot/dts/imx*-pinfunc.h
-> descriptions may migrate to this change, please double check the values.
->
-> If needed similar changes may be done for the rest of iMX SoCs.
->
-> Changes from v1 to v2:
-> * in copy-pasted commit messages corrected SoC names
->
-> Vladimir Zapolskiy (7):
->   ARM: dts: add gpio-ranges property to iMX50 GPIO controllers
->   ARM: dts: add gpio-ranges property to iMX6Q/D GPIO controllers
->   ARM: dts: add gpio-ranges property to iMX6DL/S GPIO controllers
->   ARM: dts: add gpio-ranges property to iMX6SL GPIO controllers
->   ARM: dts: add gpio-ranges property to iMX6SX GPIO controllers
->   ARM: dts: add gpio-ranges property to iMX6UL GPIO controllers
->   ARM: dts: add gpio-ranges property to iMX7D/S GPIO controllers
->
->  arch/arm/boot/dts/imx50.dtsi  | 16 +++++++++++++
->  arch/arm/boot/dts/imx6dl.dtsi | 53 +++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/imx6q.dtsi  | 37 ++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/imx6sl.dtsi | 52 ++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/imx6sx.dtsi | 14 ++++++++++++
->  arch/arm/boot/dts/imx6ul.dtsi | 11 +++++++++
->  arch/arm/boot/dts/imx7s.dtsi  | 14 ++++++++++++
->  7 files changed, 197 insertions(+)
->
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ drivers/firmware/arm_scpi.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Gentle ping, please provide review comments, the change would be good
-to have in v4.9.
-
-This is a DTS change, therefore it is a pure hardware description
-independent on any particular users, and it can be used by bootloaders,
-Linux and other kernels.
-
---
-With best wishes,
-Vladimir
+diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+index 6a16100..60a76e63 100644
+--- a/drivers/firmware/arm_scpi.c
++++ b/drivers/firmware/arm_scpi.c
+@@ -979,6 +979,11 @@ static int scpi_alloc_xfer_list(struct device *dev, struct scpi_chan *ch)
+ 	return 0;
+ }
+ 
++static const struct of_device_id legacy_scpi_of_match[] = {
++	{.compatible = "amlogic,meson-gxbb-scpi"},
++	{},
++};
++
+ static int scpi_probe(struct platform_device *pdev)
+ {
+ 	int count, idx, ret;
+@@ -991,6 +996,9 @@ static int scpi_probe(struct platform_device *pdev)
+ 	if (!scpi_info)
+ 		return -ENOMEM;
+ 
++	if (of_match_device(legacy_scpi_of_match, &pdev->dev))
++		scpi_info->is_legacy = true;
++
+ 	count = of_count_phandle_with_args(np, "mboxes", "#mbox-cells");
+ 	if (count < 0) {
+ 		dev_err(dev, "no mboxes property in '%s'\n", np->full_name);
+@@ -1097,6 +1105,7 @@ err:
+ 
+ static const struct of_device_id scpi_of_match[] = {
+ 	{.compatible = "arm,scpi"},
++	{.compatible = "amlogic,meson-gxbb-scpi"},
+ 	{},
+ };
+ 
+-- 
+1.9.1
