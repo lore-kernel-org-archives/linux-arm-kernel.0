@@ -1,39 +1,38 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Wed,  7 Sep 2016 12:31:26 +0200
-Subject: [PATCH 5/8] ARM: dts: bcm283x: add pinctrl group to &pwm,
- drop pins from &gpio
+Date: Wed,  7 Sep 2016 12:31:24 +0200
+Subject: [PATCH 3/8] ARM: dts: bcm283x: Add a group for mapping pins 48-53 to
+ sdhost.
 In-Reply-To: <1473244289-20728-1-git-send-email-kraxel@redhat.com>
 References: <1473244289-20728-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1473244289-20728-6-git-send-email-kraxel@redhat.com>
+Message-ID: <1473244289-20728-4-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
----
- arch/arm/boot/dts/bcm2835-rpi.dtsi | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+From: Eric Anholt <eric@anholt.net>
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index 88bcd0c..ff62236 100644
---- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -38,7 +38,7 @@
- 	};
- 
- 	alt0: alt0 {
--		brcm,pins = <0 1 2 3 4 5 7 8 9 10 11 40 45>;
-+		brcm,pins = <0 1 2 3 4 5 7 8 9 10 11>;
- 		brcm,function = <BCM2835_FSEL_ALT0>;
- 	};
- 
-@@ -68,6 +68,8 @@
- };
- 
- &pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
- 	status = "okay";
- };
- 
+This pin group definition comes from downstream.  We don't have a
+driver for sdhost integrated yet, but they've been experimenting with
+it and it sounds useful to bring over.
+
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ arch/arm/boot/dts/bcm283x.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index 164d962..062d09db 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -212,6 +212,10 @@
+ 				brcm,pins = <45>;
+ 				brcm,function = <BCM2835_FSEL_ALT0>;
+ 			};
++			sdhost_gpio48: sdhost_gpio48 {
++				brcm,pins = <48 49 50 51 52 53>;
++				brcm,function = <BCM2835_FSEL_ALT0>;
++			};
+ 			i2c0_gpio44: i2c0_gpio44 {
+ 				brcm,pins = <44 45>;
+ 				brcm,function = <BCM2835_FSEL_ALT1>;
 -- 
 1.8.3.1
