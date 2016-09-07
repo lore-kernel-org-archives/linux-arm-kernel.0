@@ -1,67 +1,172 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  7 Sep 2016 09:49:52 +0200
-Subject: [PATCH 05/26] ARM: dts: r8a7791: Remove obsolete vsp1 properties
+Date: Wed,  7 Sep 2016 09:49:55 +0200
+Subject: [PATCH 08/26] ARM: dts: blanche: add DU support
 In-Reply-To: <cover.1473234371.git.horms+renesas@verge.net.au>
 References: <cover.1473234371.git.horms+renesas@verge.net.au>
-Message-ID: <17d9af9e069f2982f578c65e987df309d1736eb5.1473234371.git.horms+renesas@verge.net.au>
+Message-ID: <a66f74f464fb1e501d1b448c99e8f9ae4e64da2b.1473234371.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-As of commit 5aa2eb3c86d4fd16 ("[media] v4l: vsp1: Configure device
-based on IP version"), the DT properties to identify the exact VSP
-device instance features are no longer used. Hence remove them.
+Define  the  Blanche board dependent part of the DU device node.
+Add the device nodes for the  Analog Devices ADV7511W  HDMI transmitter
+(connected to DU0) and ADV7123 video DAC (connected to DU1).  Add the
+necessary subnodes to interconnect DU, HDMI/VDAC devices, and HDMI/VGA
+connectors.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 18 ------------------
- 1 file changed, 18 deletions(-)
+ arch/arm/boot/dts/r8a7792-blanche.dts | 125 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 125 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 8f0086bbd96b..162b55c665a3 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -983,12 +983,6 @@
- 		interrupts = <GIC_SPI 267 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp1_clks R8A7791_CLK_VSP1_S>;
- 		power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
--
--		renesas,has-lut;
--		renesas,has-sru;
--		renesas,#rpf = <5>;
--		renesas,#uds = <3>;
--		renesas,#wpf = <4>;
+diff --git a/arch/arm/boot/dts/r8a7792-blanche.dts b/arch/arm/boot/dts/r8a7792-blanche.dts
+index 436d44ea3c12..3c6f42b9fe9f 100644
+--- a/arch/arm/boot/dts/r8a7792-blanche.dts
++++ b/arch/arm/boot/dts/r8a7792-blanche.dts
+@@ -57,6 +57,61 @@
+ 		pinctrl-names = "default";
  	};
  
- 	vsp1 at fe930000 {
-@@ -997,12 +991,6 @@
- 		interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp1_clks R8A7791_CLK_VSP1_DU0>;
- 		power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
--
--		renesas,has-lif;
--		renesas,has-lut;
--		renesas,#rpf = <4>;
--		renesas,#uds = <1>;
--		renesas,#wpf = <4>;
- 	};
++	vga-encoder {
++		compatible = "adi,adv7123";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				adv7123_in: endpoint {
++					remote-endpoint = <&du_out_rgb1>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				adv7123_out: endpoint {
++					remote-endpoint = <&vga_in>;
++				};
++			};
++		};
++	};
++
++	hdmi-out {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con: endpoint {
++				remote-endpoint = <&adv7511_out>;
++			};
++		};
++	};
++
++	vga {
++		compatible = "vga-connector";
++
++		port {
++			vga_in: endpoint {
++				remote-endpoint = <&adv7123_out>;
++			};
++		};
++	};
++
++	x1_clk: x1 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <74250000>;
++	};
++
++	x2_clk: x2 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <65000000>;
++	};
++
+ 	keyboard {
+ 		compatible = "gpio-keys";
  
- 	vsp1 at fe938000 {
-@@ -1011,12 +999,6 @@
- 		interrupts = <GIC_SPI 247 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp1_clks R8A7791_CLK_VSP1_DU1>;
- 		power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
--
--		renesas,has-lif;
--		renesas,has-lut;
--		renesas,#rpf = <4>;
--		renesas,#uds = <1>;
--		renesas,#wpf = <4>;
+@@ -155,6 +210,16 @@
+ 		groups = "sdhi0_data4", "sdhi0_ctrl";
+ 		function = "sdhi0";
  	};
++
++	du0_pins: du0 {
++		groups = "du0_rgb888", "du0_sync", "du0_disp";
++		function = "du0";
++	};
++
++	du1_pins: du1 {
++		groups = "du1_rgb666", "du1_sync", "du1_disp";
++		function = "du1";
++	};
+ };
  
- 	du: display at feb00000 {
+ &scif0 {
+@@ -186,3 +251,63 @@
+ 	cd-gpios = <&gpio11 11 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
++
++&i2c1 {
++	status = "okay";
++	clock-frequency = <400000>;
++
++	hdmi at 39 {
++		compatible = "adi,adv7511w";
++		reg = <0x39>;
++		interrupt-parent = <&irqc>;
++		interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
++
++		adi,input-depth = <8>;
++		adi,input-colorspace = "rgb";
++		adi,input-clock = "1x";
++		adi,input-style = <1>;
++		adi,input-justification = "evenly";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				adv7511_in: endpoint {
++					remote-endpoint = <&du_out_rgb0>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++				adv7511_out: endpoint {
++					remote-endpoint = <&hdmi_con>;
++				};
++			};
++		};
++	};
++};
++
++&du {
++	pinctrl-0 = <&du0_pins &du1_pins>;
++	pinctrl-names = "default";
++
++	clocks = <&mstp7_clks R8A7792_CLK_DU0>, <&mstp7_clks R8A7792_CLK_DU1>,
++		 <&x1_clk>, <&x2_clk>;
++	clock-names = "du.0", "du.1", "dclkin.0", "dclkin.1";
++	status = "okay";
++
++	ports {
++		port at 0 {
++			endpoint {
++				remote-endpoint = <&adv7511_in>;
++			};
++		};
++		port at 1 {
++			endpoint {
++				remote-endpoint = <&adv7123_in>;
++			};
++		};
++	};
++};
 -- 
 2.7.0.rc3.207.g0ac5344
