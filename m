@@ -1,33 +1,64 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 7 Sep 2016 04:03:16 +0200
-Subject: [PATCH 3/4] ARM: orion5x: avoid NO_IRQ in orion_ge00_switch_init
-In-Reply-To: <20160906140623.2853066-3-arnd@arndb.de>
-References: <20160906140623.2853066-1-arnd@arndb.de>
- <20160906140623.2853066-3-arnd@arndb.de>
-Message-ID: <20160907020316.GC10007@lunn.ch>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Wed, 7 Sep 2016 10:33:52 +0800
+Subject: [PATCH v7 7/9] drm/mediatek: add dsi transfer function
+In-Reply-To: <1472815484-43821-8-git-send-email-yt.shen@mediatek.com>
+References: <1472815484-43821-1-git-send-email-yt.shen@mediatek.com>
+ <1472815484-43821-8-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1473215632.11736.21.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2016 at 04:06:22PM +0200, Arnd Bergmann wrote:
-> As of commit 5be9fc23cdb4 ("ARM: orion5x: fix legacy orion5x IRQ numbers"),
-> IRQ zero is no longer a valid interrupt on Orion5x, so we can use the
-> normal convention of using '0' to indicate an invalid interrupt, rather
-> than the deprecated NO_IRQ constant
+Hi, YT:
+
+On Fri, 2016-09-02 at 19:24 +0800, YT Shen wrote:
+> From: shaoming chen <shaoming.chen@mediatek.com>
 > 
-> My first approach was to pass a pointer to the resource into
-> orion_ge00_switch_init(), but it seemed to just add complexity
-> for no good.
+> add dsi read/write commands for transfer function
+> 
+> Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_dsi.c | 188 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 188 insertions(+)
+> 
 
-Hi Arnd
+[snip...]
 
-You can simply this. DSA has never as far as i remember used an
-interrupt passed via platform data. Two boards do seem to pass an
-interrupt via a GPIO line, but it has never been used.
+>  
+> +static void mtk_dsi_irq_data_clear(struct mtk_dsi *dsi, u32 irq_bit)
+> +{
+> +	dsi->irq_data &= ~irq_bit;
+> +}
+> +
 
-So if you want, you could strip all this interrupt code out.
+[snip...]
 
-There might be some patches coming soon which does add interrupt
-support to DSA, but it will only be via device tree, since i don't
-have a platform which is capable of using platform data for DSA.
+> +
+> +static s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi *dsi, u32 irq_flag,
+> +				     unsigned int timeout)
+> +{
+> +	s32 ret = 0;
+> +	unsigned long jiffies = msecs_to_jiffies(timeout);
+> +
+> +	ret = wait_event_interruptible_timeout(_dsi_irq_wait_queue,
+> +					       dsi->irq_data & irq_flag,
+> +					       jiffies);
+> +	if (ret == 0) {
+> +		dev_info(dsi->dev, "Wait DSI IRQ(0x%08x) Timeout\n", irq_flag);
+> +
+> +		mtk_dsi_enable(dsi);
+> +		mtk_dsi_reset_engine(dsi);
+> +	}
+> +
+> +	return ret;
+> +}
 
-   Andrew
+I think mtk_dsi_irq_data_clear() and mtk_dsi_wait_for_irq_done() should
+be moved to the 6th patch [1] of this series because these two functions
+deal the irq control.
+
+
+[1] https://patchwork.kernel.org/patch/9310819/
+
+
+Regards,
+CK
