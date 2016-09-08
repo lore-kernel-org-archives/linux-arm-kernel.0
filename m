@@ -1,68 +1,48 @@
-From: vkuznets@redhat.com (Vitaly Kuznetsov)
-Date: Thu,  8 Sep 2016 11:48:28 +0200
-Subject: [PATCH] arm/xen: fix SMP guests boot
-Message-ID: <1473328108-30658-1-git-send-email-vkuznets@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu,  8 Sep 2016 11:48:37 +0200
+Subject: [PATCH v3 2/8] clk: sunxi-ng: div: Add kerneldoc for the _ccu_div
+ structure
+In-Reply-To: <20160908094843.14710-1-maxime.ripard@free-electrons.com>
+References: <20160908094843.14710-1-maxime.ripard@free-electrons.com>
+Message-ID: <20160908094843.14710-3-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 88e957d6e47f ("xen: introduce xen_vcpu_id mapping") broke SMP ARM
-guests on Xen. When FIFO-based event channels are in use (this is the
-default), evtchn_fifo_alloc_control_block() is called on CPU_UP_PREPARE
-event and this happens before we set up xen_vcpu_id mapping in
-xen_starting_cpu. Temporary fix the issue by setting direct Linux CPU id
-<-> Xen vCPU id mapping for all possible CPUs at boot. We don't currently
-support kexec/kdump on Xen/ARM so these ids always match.
+The internal _ccu_div structure is meant to be embedded into other
+structures to combine the various dividers and to form the clock classes
+support.
 
-In future, we have several ways to solve the issue, e.g.:
-- Eliminate all hypercalls from CPU_UP_PREPARE, do them from the starting
-CPU. This can probably be done for both x86 and ARM and, if done, will
-allow us to get Xen's idea of vCPU id from CPUID/MPIDR on the starting CPU
-directly, no messing with ACPI/device tree required.
-- Save vCPU id information from ACPI/device tree on ARM and use it to
-initialize xen_vcpu_id mapping. This is the same trick we currently do on
-x86.
+Start to document those structures by using kerneldoc.
 
-Reported-by: Julien Grall <julien.grall@arm.com>
-Tested-by: Wei Chen <Wei.Chen@arm.com>
-Signed-off-by: Vitaly Kuznetsov <vkuznets@redhat.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
-It would be nice if this patch could still make it to 4.8 as all SMP
-ARM/Xen guests are currently broken.
----
- arch/arm/xen/enlighten.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ drivers/clk/sunxi-ng/ccu_div.h | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 3d2cef6..f193414 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -170,9 +170,6 @@ static int xen_starting_cpu(unsigned int cpu)
- 	pr_info("Xen: initializing cpu%d\n", cpu);
- 	vcpup = per_cpu_ptr(xen_vcpu_info, cpu);
+diff --git a/drivers/clk/sunxi-ng/ccu_div.h b/drivers/clk/sunxi-ng/ccu_div.h
+index a5c9eaf90e84..e1b1326e68a1 100644
+--- a/drivers/clk/sunxi-ng/ccu_div.h
++++ b/drivers/clk/sunxi-ng/ccu_div.h
+@@ -19,6 +19,20 @@
+ #include "ccu_common.h"
+ #include "ccu_mux.h"
  
--	/* Direct vCPU id mapping for ARM guests. */
--	per_cpu(xen_vcpu_id, cpu) = cpu;
--
- 	info.mfn = virt_to_gfn(vcpup);
- 	info.offset = xen_offset_in_page(vcpup);
- 
-@@ -330,6 +327,7 @@ static int __init xen_guest_init(void)
- {
- 	struct xen_add_to_physmap xatp;
- 	struct shared_info *shared_info_page = NULL;
-+	int cpu;
- 
- 	if (!xen_domain())
- 		return 0;
-@@ -380,7 +378,8 @@ static int __init xen_guest_init(void)
- 		return -ENOMEM;
- 
- 	/* Direct vCPU id mapping for ARM guests. */
--	per_cpu(xen_vcpu_id, 0) = 0;
-+	for_each_possible_cpu(cpu)
-+		per_cpu(xen_vcpu_id, cpu) = cpu;
- 
- 	xen_auto_xlat_grant_frames.count = gnttab_max_grant_frames();
- 	if (xen_xlate_map_ballooned_pages(&xen_auto_xlat_grant_frames.pfn,
++/**
++ * struct _ccu_div - Internal divider description
++ * @shift: Bit offset of the divider in its register
++ * @width: Width of the divider field in its register
++ * @flags: clk_divider flags to apply on this divider
++ * @table: Divider table pointer (if applicable)
++ *
++ * That structure represents a single divider, and is meant to be
++ * embedded in other structures representing the various clock
++ * classes.
++ *
++ * It is basically a wrapper around the clk_divider functions
++ * arguments.
++ */
+ struct _ccu_div {
+ 	u8			shift;
+ 	u8			width;
 -- 
-2.7.4
+2.9.3
