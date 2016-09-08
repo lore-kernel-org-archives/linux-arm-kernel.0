@@ -1,46 +1,77 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 8 Sep 2016 10:28:01 +0800
-Subject: [PATCH v2 0/3] gpio/pinctrl: imx: let IOMUX controller know
- about on-SoC GPIOs
-In-Reply-To: <1473299296-22458-1-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1473299296-22458-1-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <20160908022800.GB2533@x250>
+Date: Thu, 8 Sep 2016 10:30:27 +0800
+Subject: [PATCH 1/7] [v2] dt-bindings: fsl: updates bindings for some
+ SoC-specific devices
+In-Reply-To: <1473069695-33092-2-git-send-email-shh.xie@gmail.com>
+References: <1473069695-33092-1-git-send-email-shh.xie@gmail.com>
+ <1473069695-33092-2-git-send-email-shh.xie@gmail.com>
+Message-ID: <20160908023026.GC2533@x250>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2016 at 04:48:13AM +0300, Vladimir Zapolskiy wrote:
-> The change establishes a connection between on-SoC IOMUX controller(s)
-> and GPIO controllers found on some SoC from Freescale/NXP iMX series,
-> if a GPIO controller device node contains common gpio-ranges information.
+On Mon, Sep 05, 2016 at 06:01:29PM +0800, shh.xie at gmail.com wrote:
+> From: Shaohui Xie <Shaohui.Xie@nxp.com>
 > 
-> The change is backward compatible with respect to potentially not updated
-> outdated DTB data without gpio-ranges propery, for such boards the only
-> functional change is lowered initcall priority of GPIO controller driver,
-> which in general anyway is exected to be used only after pinctrl/pinmux
-> controller.
+> SCFG and DCFG are SoC-specific devices can be found on SoCs like LS1021A,
+> LS1043A and LS1046A, this patch updates bindings for SCFG and DCFG to
+> reflect more SoCs.
 > 
-> If this change is applied the next interesting applications may be done
-> as a follow-up work, for example switching pad function to GPIO on gpiod
-> request, converting iomux controller driver to strict type and so on.
+> Signed-off-by: Shaohui Xie <Shaohui.Xie@nxp.com>
+> ---
+> changes in V2:
+> new patch.
 > 
-> For actual values of gpio-ranges properties please reference series
-> "ARM: dts: imx: add gpio-ranges properties to some iMX GPIO controllers"
-> http://www.spinics.net/lists/arm-kernel/msg525258.html
+>  Documentation/devicetree/bindings/arm/fsl.txt | 12 +++++++++---
+>  1 file changed, 9 insertions(+), 3 deletions(-)
 > 
-> Changes from v1 to v2:
-> * replaced 2/3 by an own change providing a better commit description
->   and which moves gpio_mxc_init() call to subsys_initcall() instead of
->   apparently too late device_initcall(), this mitigates Shawn's
->   expressed concern about the change.
+> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+> index dbbc095..6f92d0b 100644
+> --- a/Documentation/devicetree/bindings/arm/fsl.txt
+> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
+> @@ -97,7 +97,7 @@ Freescale LS1021A Platform Device Tree Bindings
+>  Required root node compatible properties:
+>    - compatible = "fsl,ls1021a";
+>  
+> -Freescale LS1021A SoC-specific Device Tree Bindings
+> +Freescale SoC-specific Device Tree Bindings
+>  -------------------------------------------
+>  
+>  Freescale SCFG
+> @@ -105,7 +105,10 @@ Freescale SCFG
+>  configuration and status registers for the chip. Such as getting PEX port
+>  status.
+>    Required properties:
+> -  - compatible: should be "fsl,ls1021a-scfg"
+> +  - compatible: Should contain a chip-specific compatible string,
+> +	Chip-specific strings are of the form "fsl,<chip>-scfg", such as:
+> +	"fsl,ls1021a-scfg"
 
-Yes, this is more conservative and stands less chance to cause regression.
+Per Documentation/devicetree/bindings/submitting-patches.txt, the known
+values of "<chip>" should be documented.
 
+Shawn
+
+> +
+>    - reg: should contain base address and length of SCFG memory-mapped registers
+>  
+>  Example:
+> @@ -119,7 +122,10 @@ Freescale DCFG
+>  configuration and status for the device. Such as setting the secondary
+>  core start address and release the secondary core from holdoff and startup.
+>    Required properties:
+> -  - compatible: should be "fsl,ls1021a-dcfg"
+> +  - compatible: Should contain a chip-specific compatible string,
+> +	Chip-specific strings are of the form "fsl,<chip>-dcfg", such as:
+> +	"fsl,ls1021a-dcfg"
+> +
+>    - reg : should contain base address and length of DCFG memory-mapped registers
+>  
+>  Example:
+> -- 
+> 2.1.0.27.g96db324
 > 
-> Vladimir Zapolskiy (3):
->   pinctrl: imx: accept gpio request/free from pinctrl
->   gpio: mxc: shift gpio_mxc_init() to subsys_initcall level
->   gpio: mxc: add generic gpio request/free callbacks to pinctrl
-
-For the series,
-
-Acked-by: Shawn Guo <shawnguo@kernel.org>
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
