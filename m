@@ -1,32 +1,40 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 08 Sep 2016 11:17:08 -0700
-Subject: [PATCH 0/2] spi: meson: Add Amlogic GXBB compatible
-In-Reply-To: <4a199a95-3ee6-a3a0-bc8a-63bd0912e7d2@suse.de> ("Andreas
- =?utf-8?Q?F=C3=A4rber=22's?= message of "Thu, 8 Sep 2016 14:50:37 +0200")
-References: <1473321206-32284-1-git-send-email-narmstrong@baylibre.com>
- <293061a8-e867-4d91-20cb-6e5df8e9b543@suse.de>
- <4a199a95-3ee6-a3a0-bc8a-63bd0912e7d2@suse.de>
-Message-ID: <m2r38umf2z.fsf@baylibre.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 8 Sep 2016 20:18:18 +0200
+Subject: [PATCH] ARM: imx35: add iim module to imx35.dtsi
+In-Reply-To: <CAOMZO5BLJvL3ad5An2n=h0K+15qOZfWDVLbUz+fe_4Mz7NLMXw@mail.gmail.com>
+References: <1473326895-19189-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CAOMZO5DmaLsxAsjORCauxBkqAmOMQxu4HTASo+jxBsoo+iL8Ow@mail.gmail.com>
+ <20160908175546.lvc5qehbekx7s2ty@pengutronix.de>
+ <CAOMZO5BLJvL3ad5An2n=h0K+15qOZfWDVLbUz+fe_4Mz7NLMXw@mail.gmail.com>
+Message-ID: <20160908181818.lxx6gi2surk6sl5v@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas F?rber <afaerber@suse.de> writes:
+Hello Fabio,
 
-> Am 08.09.2016 um 14:04 schrieb Andreas F?rber:
->> Am 08.09.2016 um 09:53 schrieb Neil Armstrong:
->>> This patchset adds a specific compatible string in the Meson SPIFC driver for
->>> the Amlogic Meson GXBB SoC.
->> 
->> Any particular reason? We could just reuse the meson6 one since there
->> appear to be no code changes so far.
->
-> So Neil is essentially telling me they don't know whether there are any
-> differences in the IP block, so a separate compatible string was chosen.
->
-> No objection from my side, but a general clarification from device tree
-> maintainers when and when not to would be appreciated. (+ devicetree)
+On Thu, Sep 08, 2016 at 03:09:17PM -0300, Fabio Estevam wrote:
+> On Thu, Sep 8, 2016 at 2:55 PM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> 
+> >> Where is "fsl,imx35-iim" defined?
+> >
+> > right next to the other fsl,imx*-iim :-)
+> 
+> Ok,  "fsl,imx35-iim" is not being used arch/arm/mach-imx/cpu-imx35.c currently.
+> 
+> I suppose you want to replace
+>  "rev = imx_readl(MX35_IO_ADDRESS(MX35_IIM_BASE_ADDR + MXC_IIMSREV));"
+> 
+> by retrieving the base address via dt, like we do in
+> imx5_read_srev_reg() at arch/arm/mach-imx/cpu-imx5.c.
 
-I'm not sure what the "right" way is (Rob?) but I think the usual way is
-to add new compatibles when needed.
+Yes, that's the plan, imx5_read_srev_reg could even be used for this, so
+I intend to rename it and move it to a place where it is compiled for
+i.MX[23]5.
 
-Kevin
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
