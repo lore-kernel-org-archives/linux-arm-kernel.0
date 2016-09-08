@@ -1,18 +1,19 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 08 Sep 2016 16:10:35 +0200
-Subject: [GIT PULL 2/3] Rockchip dts32 changes for 4.9
+Date: Thu, 08 Sep 2016 16:11:52 +0200
+Subject: [GIT PULL 3/3] Rockchip dts64 changes for 4.9
 In-Reply-To: <1770547.rOXegfrGOH@phil>
 References: <1770547.rOXegfrGOH@phil>
-Message-ID: <1481725.D51jRkC1a3@phil>
+Message-ID: <5210110.HMx7zZ3pZH@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Kevin, Olof,
 
-below you can find a pull request for 32bit devicetree changes which
-the tag will hopefully explain sufficiently.
+please find below main 64 bit devicetree changes for 4.9.
 
+So if nothing stands out, please pull
 
+Thanks
 Heiko
 
 The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
@@ -21,57 +22,78 @@ The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.9-rockchip-dts32-1
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.9-rockchip-dts64-1
 
-for you to fetch changes up to 4314f4b6720d96b0504da30112b6d42d13c3e50f:
+for you to fetch changes up to f606193a10e7d0eb6766ae525e9051417a59f8d9:
 
-  ARM: dts: rockchip: Add sensor-supplies on PopMetal-RK3288 board (2016-09-05 11:09:41 +0200)
-
-----------------------------------------------------------------
-32bit Rockchip devicetree changes containing two new rk3288 boards (Fennec
-and Firefly-reload), display support for the rk3288-evb, support for the
-recently added firmware reboot-flag support and some housekeeping cleanups.
+  arm64: dts: rockchip: add Type-C phy for RK3399 (2016-09-07 20:20:08 +0200)
 
 ----------------------------------------------------------------
-Andy Yan (5):
+64bit Rockchip devicetree changes containing support for the recently
+added firmware reboot-flag support, one new board the Tronsmart Orion
+based on the rk3368 and a large number of newly supported peripherals
+for the rk3399 (type-c phy, usb2 phy, pcie controller and pcie phy,
+gmac, arm-pmu using ppi partitioning, efuse, saradc) as well as some
+smaller housekeeping and non-critical fixes.
+
+----------------------------------------------------------------
+Andy Yan (2):
       soc: rockchip: add reboot-mode header
-      ARM: dts: rockchip: add syscon-reboot-mode DT node
-      ARM: dts: rockchip: enable usbotg for Popemtal-rk3288 board
-      ARM: dts: rockchip: fix L3G4200D i2c address on PopMetal-RK3288 board
-      ARM: dts: rockchip: Add sensor-supplies on PopMetal-RK3288 board
+      arm64: dts: rockchip: add syscon-reboot-mode DT node
 
-Heiko Stuebner (2):
-      ARM: dts: rockchip: move rk3288 usbphy under the GRF node
-      Merge branch 'v4.9-shared/soc-hdr' into v4.9-armsoc/dts32
+Caesar Wang (5):
+      arm64: dts: rockchip: add the saradc for rk3399
+      arm64: dts: rockchip: add the gmac power domain on rk3399
+      arm64: dts: rockchip: add the tcpc for rk3399 power domain
+      arm64: dts: rockchip: change all interrupts cells to 4 on rk3399 SoCs
+      arm64: dts: rockchip: support the pmu node for rk3399
 
-Randy Li (3):
-      ARM: dts: rockchip: add rk3288-firefly-reload
-      ARM: dts: rockchip: remove excess sd properties from firefly reload
-      ARM: dts: rockchip: add missing regulators for firefly reload board
+Chris Zhong (1):
+      arm64: dts: rockchip: add Type-C phy for RK3399
+
+Douglas Anderson (1):
+      arm64: dts: rockchip: Add pinctrl entry for 32k clock on rk3399
+
+Elaine Zhang (1):
+      arm64: dts: rockchip: add the power domain node for rk3399
+
+Finley Xiao (1):
+      arm64: dts: rockchip: add efuse0 device node for rk3399
+
+Frank Wang (2):
+      arm64: dts: rockchip: add usb2-phy support for rk3399
+      arm64: dts: rockchip: configure usb2-phy support for rk3399-evb
+
+Heiko Stuebner (1):
+      Merge branch 'v4.9-shared/soc-hdr' into v4.9-armsoc/dts64
+
+Matthias Brugger (1):
+      arm64: dts: rockchip: Add basic support for orion-r68
+
+Roger Chen (2):
+      arm64: dts: rockchip: add the gmac needed node for rk3399
+      arm64: dts: rockchip: enable the gmac for rk3399 evb board
+
+Shawn Lin (4):
+      arm64: dts: rockchip: remove broken-cd from sdio0
+      arm64: dts: rockchip: add the PCIe PHY for RK3399
+      arm64: dts: rockchip: add the PCIe controller support for RK3399
+      arm64: dts: rockchip: configure PCIe support for rk3399-evb
+
+Shunqian Zheng (1):
+      arm64: dts: rockchip: set to CCI clock of RK3399 to 600M
 
 Xing Zheng (1):
-      ARM: dts: rockchip: add dts for RK3288-Fennec boards
+      arm64: dts: rockchip: fix the address map for WDT0 and WDT1
 
-Yakir Yang (3):
-      ARM: dts: rockchip: add eDP/panel display device nodes for rk3288-evb
-      ARM: dts: rockchip: add the panel power supply for rk3288-evb board with act8846 pmu
-      ARM: dts: rockchip: add the panel power supply for rk3288-evb board with rk808 pmu
-
- Documentation/devicetree/bindings/arm/rockchip.txt |   8 +
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/rk3036.dtsi                      |  12 +-
- arch/arm/boot/dts/rk3288-evb-act8846.dts           |   4 +
- arch/arm/boot/dts/rk3288-evb-rk808.dts             |   4 +
- arch/arm/boot/dts/rk3288-evb.dtsi                  |  45 ++-
- arch/arm/boot/dts/rk3288-fennec.dts                | 382 +++++++++++++++++++
- arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi  | 310 ++++++++++++++++
- arch/arm/boot/dts/rk3288-firefly-reload.dts        | 403 +++++++++++++++++++++
- arch/arm/boot/dts/rk3288-popmetal.dts              |  12 +-
- arch/arm/boot/dts/rk3288.dtsi                      |  73 ++--
- arch/arm/boot/dts/rk3xxx.dtsi                      |  12 +-
+ Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+ arch/arm64/boot/dts/rockchip/Makefile              |   1 +
+ .../boot/dts/rockchip/rk3368-orion-r68-meta.dts    | 382 +++++++++++++
+ arch/arm64/boot/dts/rockchip/rk3368-r88.dts        |   1 -
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi           |  10 +
+ arch/arm64/boot/dts/rockchip/rk3399-evb.dts        |  87 +++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 607 +++++++++++++++++++--
  include/dt-bindings/soc/rockchip,boot-mode.h       |  15 +
- 13 files changed, 1245 insertions(+), 37 deletions(-)
- create mode 100644 arch/arm/boot/dts/rk3288-fennec.dts
- create mode 100644 arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
- create mode 100644 arch/arm/boot/dts/rk3288-firefly-reload.dts
+ 8 files changed, 1053 insertions(+), 54 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-orion-r68-meta.dts
  create mode 100644 include/dt-bindings/soc/rockchip,boot-mode.h
