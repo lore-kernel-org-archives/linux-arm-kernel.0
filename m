@@ -1,129 +1,30 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  8 Sep 2016 10:11:36 +0100
-Subject: [PATCH 4/4] mmc: sdhci-st: Handle interconnect clock
-In-Reply-To: <20160908091136.17301-1-lee.jones@linaro.org>
-References: <20160908091136.17301-1-lee.jones@linaro.org>
-Message-ID: <20160908091136.17301-5-lee.jones@linaro.org>
+From: vincent.siles@provenrun.com (Vincent Siles)
+Date: Thu, 8 Sep 2016 11:15:20 +0200
+Subject: lsl / lsr possible confusion in v7_flush_dcache_all
+Message-ID: <20160908091520.GE14909@vsiles-Desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some ST platforms contain interconnect (ICN) clocks which must be handed
-correctly in order to obtain full functionality of a given IP.  In this
-case, if the ICN clocks are not handled properly by the ST SDHCI driver
-MMC will break and the following output can be observed:
+Hi !
+While reading the v7_flush_dcache_all (arch/arm/mm/cache-v7.S), I
+stumbled upon this line:
 
-    [   13.916949] mmc0: Timeout waiting for hardware interrupt.
-    [   13.922349] sdhci: =========== REGISTER DUMP (mmc0)===========
-    [   13.928175] sdhci: Sys addr: 0x00000000 | Version:  0x00001002
-    [   13.933999] sdhci: Blk size: 0x00007040 | Blk cnt:  0x00000001
-    [   13.939825] sdhci: Argument: 0x00fffff0 | Trn mode: 0x00000013
-    [   13.945650] sdhci: Present:  0x1fff0206 | Host ctl: 0x00000011
-    [   13.951475] sdhci: Power:    0x0000000f | Blk gap:  0x00000080
-    [   13.957300] sdhci: Wake-up:  0x00000000 | Clock:    0x00003f07
-    [   13.963126] sdhci: Timeout:  0x00000004 | Int stat: 0x00000000
-    [   13.968952] sdhci: Int enab: 0x02ff008b | Sig enab: 0x02ff008b
-    [   13.974777] sdhci: AC12 err: 0x00000000 | Slot int: 0x00000000
-    [   13.980602] sdhci: Caps:     0x21ed3281 | Caps_1:   0x00000000
-    [   13.986428] sdhci: Cmd:      0x0000063a | Max curr: 0x00000000
-    [   13.992252] sdhci: Host ctl2: 0x00000000
-    [   13.996166] sdhci: ADMA Err: 0x00000000 | ADMA Ptr: 0x7c048200
-    [   14.001990] sdhci: ===========================================
-    [   14.009802] mmc0: Got data interrupt 0x02000000 even though no data operation was in progress.
+# r10 is the current cache level
+127: add    r2, r10, r10, lsr #1	    @ work out 3x current cache level
 
-A decent point was raised about minimising the use of a local variable that
-we 'could' do without.  I've chosen consistency over the possibility of
-reducing the local variable count by 1.  Thinking that it's more important
-for the code to be grouped and authoured in a similar manner/style for
-greater maintainability/readability.
+If we want r2 to be 3 * r10, we should compute r10 + (r10 << 1), which
+is lsl, not lsr.
 
-Cc: stable at vger.kernel.org
-Tested-by: Peter Griffin <peter.griffin@linaro.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mmc/host/sdhci-st.c | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+I check for a recent kernel, the issue seems to still be here:
+repo:       git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+revision:   d71f058617564750261b673ea9b3352382b9cde4
 
-diff --git a/drivers/mmc/host/sdhci-st.c b/drivers/mmc/host/sdhci-st.c
-index c95ba83..ed92ce7 100644
---- a/drivers/mmc/host/sdhci-st.c
-+++ b/drivers/mmc/host/sdhci-st.c
-@@ -28,6 +28,7 @@
- 
- struct st_mmc_platform_data {
- 	struct  reset_control *rstc;
-+	struct  clk *icnclk;
- 	void __iomem *top_ioaddr;
- };
- 
-@@ -353,7 +354,7 @@ static int sdhci_st_probe(struct platform_device *pdev)
- 	struct sdhci_host *host;
- 	struct st_mmc_platform_data *pdata;
- 	struct sdhci_pltfm_host *pltfm_host;
--	struct clk *clk;
-+	struct clk *clk, *icnclk;
- 	int ret = 0;
- 	u16 host_version;
- 	struct resource *res;
-@@ -365,6 +366,11 @@ static int sdhci_st_probe(struct platform_device *pdev)
- 		return PTR_ERR(clk);
- 	}
- 
-+	/* ICN clock isn't compulsory, but use it if it's provided. */
-+	icnclk = devm_clk_get(&pdev->dev, "icn");
-+	if (IS_ERR(icnclk))
-+		icnclk = NULL;
-+
- 	rstc = devm_reset_control_get(&pdev->dev, NULL);
- 	if (IS_ERR(rstc))
- 		rstc = NULL;
-@@ -389,6 +395,7 @@ static int sdhci_st_probe(struct platform_device *pdev)
- 	}
- 
- 	clk_prepare_enable(clk);
-+	clk_prepare_enable(icnclk);
- 
- 	/* Configure the FlashSS Top registers for setting eMMC TX/RX delay */
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-@@ -400,6 +407,7 @@ static int sdhci_st_probe(struct platform_device *pdev)
- 	}
- 
- 	pltfm_host->clk = clk;
-+	pdata->icnclk = icnclk;
- 
- 	/* Configure the Arasan HC inside the flashSS */
- 	st_mmcss_cconfig(np, host);
-@@ -422,6 +430,7 @@ static int sdhci_st_probe(struct platform_device *pdev)
- 	return 0;
- 
- err_out:
-+	clk_disable_unprepare(icnclk);
- 	clk_disable_unprepare(clk);
- err_of:
- 	sdhci_pltfm_free(pdev);
-@@ -442,6 +451,8 @@ static int sdhci_st_remove(struct platform_device *pdev)
- 
- 	ret = sdhci_pltfm_unregister(pdev);
- 
-+	clk_disable_unprepare(pdata->icnclk);
-+
- 	if (rstc)
- 		reset_control_assert(rstc);
- 
-@@ -462,6 +473,7 @@ static int sdhci_st_suspend(struct device *dev)
- 	if (pdata->rstc)
- 		reset_control_assert(pdata->rstc);
- 
-+	clk_disable_unprepare(pdata->icnclk);
- 	clk_disable_unprepare(pltfm_host->clk);
- out:
- 	return ret;
-@@ -475,6 +487,7 @@ static int sdhci_st_resume(struct device *dev)
- 	struct device_node *np = dev->of_node;
- 
- 	clk_prepare_enable(pltfm_host->clk);
-+	clk_prepare_enable(pdata->icnclk);
- 
- 	if (pdata->rstc)
- 		reset_control_deassert(pdata->rstc);
--- 
-2.9.3
+Best regards,
+Vincent Siles
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/ea8d9bbd/attachment.sig>
