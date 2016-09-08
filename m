@@ -1,41 +1,43 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 8 Sep 2016 17:26:58 +0800
-Subject: [PATCH V2 4/4] ARM64 LPC: support earlycon for UART connected to
- LPC
-In-Reply-To: <1473255233-154297-5-git-send-email-yuanzhichang@hisilicon.com>
-Message-ID: <201609081710.ReJKhJQT%fengguang.wu@intel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 8 Sep 2016 11:27:52 +0200
+Subject: [PATCH 3/3] soc: ti: Add ti_sci_pm_domains driver
+In-Reply-To: <7h4m5rv9kz.fsf@baylibre.com>
+References: <20160819235653.26355-1-nm@ti.com>
+ <20160819235653.26355-4-nm@ti.com>
+ <CAPDyKFooDUOPT9dP8HaW3YBO9PsX-1+96PPE7CRMyjEkra7cBQ@mail.gmail.com>
+ <57C0D2C9.1030801@ti.com> <57C5E1DA.2040405@ti.com>
+ <CAPDyKFqszM48nXnnA9D8iCp34k-ZmNvOkHPCc=Fya4nJA7PvBQ@mail.gmail.com>
+ <57CF26DB.4020807@ti.com> <7h4m5rv9kz.fsf@baylibre.com>
+Message-ID: <CAPDyKFo0Cb90BbY7ra6VDjb5frC5=VtmE3V6tDK=VosfPmod7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi zhichang.yuan,
+[...]
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.8-rc5 next-20160908]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-[Check https://git-scm.com/docs/git-format-patch for more information]
+>
+> One more idea...
+>
+> Since you don't really have a domain (a group of devices), what you
+> really have is each device having an independent power switch, so as Ulf
+> suggested, what you really need is for all the devices to share the same
+> set of runtime PM callbacks that call SCI.  The only difference is the
+> unique ID.
+>
+> Rather than using all of genpd, you could also just use a pm_domain
+> which is what genpd is built on top of (and also omap_device, which
+> you're probably familiar with also.)
 
-url:    https://github.com/0day-ci/linux/commits/Zhichang-Yuan/ARM64-LPC-legacy-ISA-I-O-support/20160907-212837
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Even if this would work as well, the downside would be that you need
+to re-invent the parts related to the DT parsing, the probing/removal
+and attaching/detaching of the device to the PM domain.
 
-All errors (new ones prefixed by >>):
+You probably don't want to go there... :-)
 
-   drivers/built-in.o: In function `early_hisilpc8250_setup':
->> binder.c:(.init.text+0x479c): undefined reference to `early_serial8250_setup'
+>
+> That would allow you to keep the drivers completely generic, yet share
+> all the SCI specific "domain" code inside a pm_domain.
+>
+> Kevin
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 51359 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/229e3918/attachment-0001.obj>
+Kind regards
+Uffe
