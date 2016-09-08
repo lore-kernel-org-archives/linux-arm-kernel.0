@@ -1,54 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 8 Sep 2016 11:20:24 +0200
-Subject: [PATCH v2 6/7] clk: sunxi-ng: Add A23 CCU
-In-Reply-To: <CAGb2v64JhY7KoaxGkpeGinLZ2GoYWyDj+UjE_JwLW_4sVYd_9w@mail.gmail.com>
-References: <20160906121837.7517-1-maxime.ripard@free-electrons.com>
- <20160906121837.7517-7-maxime.ripard@free-electrons.com>
- <CAGb2v64jDTWB4faaBdCBCcFrt1WNf=PYwc16kpgsUhaMRudHnQ@mail.gmail.com>
- <20160908082939.GJ8913@lukather>
- <CAGb2v64JhY7KoaxGkpeGinLZ2GoYWyDj+UjE_JwLW_4sVYd_9w@mail.gmail.com>
-Message-ID: <20160908092024.GM8913@lukather>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 8 Sep 2016 11:23:54 +0200
+Subject: [PATCH] pwm: meson: handle unknown ID values
+In-Reply-To: <20160906125106.1511562-1-arnd@arndb.de>
+References: <20160906125106.1511562-1-arnd@arndb.de>
+Message-ID: <20160908092354.GB24112@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2016 at 04:32:25PM +0800, Chen-Yu Tsai wrote:
-> On Thu, Sep 8, 2016 at 4:29 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Wed, Sep 07, 2016 at 03:24:11PM +0800, Chen-Yu Tsai wrote:
-> >> > +               [CLK_BUS_MSGBOX]        = &bus_msgbox_clk.common.hw,
-> >>
-> >> A23 manual and Allwinner sources say there is a bus gate for SPINLOCK.
-> >> Tested it myself, and it indeed exists.
-> >
-> > Yes, sorry. It was supposed to be spinlock instead of msgbox.
-> >
-> >> > +       [RST_BUS_SPINLOCK]      =  { 0x2c4, BIT(22) },
-> >>
-> >> Allwinner sources say there is a reset control for MSGBOX.
-> >> Tested it myself, and it indeed exists.
-> >
-> > However, the msgbox is mentionned nowhere in the datasheet.
-> >
-> > I'd prefer to be able to test that it actually works before adding it
-> > to the clock driver.
+On Tue, Sep 06, 2016 at 02:50:47PM +0200, Arnd Bergmann wrote:
+> When building with -Wmaybe-uninitialized, we get a couple of harmless
+> warnings about three functions in this new driver that don't look
+> safe to the compiler:
 > 
-> I did in fact test it. With reset asserted, writes get ignored,
-> and reads produce all 0s. With the reset deasserted and clock
-> enabled, reads give the default value and writes stick. Afterwards
-> when I toggle the reset, the values revert to the default.
+> drivers/pwm/pwm-meson.c: In function 'meson_pwm_get_state':
+> drivers/pwm/pwm-meson.c:355:26: error: 'mask' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> drivers/pwm/pwm-meson.c: In function 'meson_pwm_disable':
+> drivers/pwm/pwm-meson.c:263:13: error: 'enable' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> drivers/pwm/pwm-meson.c: In function 'meson_pwm_apply':
+> drivers/pwm/pwm-meson.c:231:13: error: 'clk_shift' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> drivers/pwm/pwm-meson.c:231:36: error: 'enable' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> drivers/pwm/pwm-meson.c:231:24: error: 'clk_enable' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> 
+> Specifically, if we have a device with an id other than 0 or 1,
+> this would result in undefined behavior. This is currently not
+> possible, but the compiler cannot be expected to know this.
+> 
+> This patch adds a 'default' clause to let the compiler know
+> what to do instead, which shuts up the warning and makes the
+> code slightly more resiliant in case it gets extended to other
+> identifiers.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/pwm/pwm-meson.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 
-Ok.
+Applied, though I left out the dummy assignment of state->enabled = 0
+because that's dead code anyway.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks,
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
+Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/97a9d8d9/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/2815d65e/attachment-0001.sig>
