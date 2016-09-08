@@ -1,41 +1,174 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 8 Sep 2016 21:35:27 +0800
-Subject: [PATCH v10 3/4] ARM64: ACPI: enable ACPI_SPCR_TABLE
-In-Reply-To: <20160908111654.GH1493@arm.com>
-References: <20160905123617.18775-1-aleksey.makarov@linaro.org>
- <20160905123617.18775-4-aleksey.makarov@linaro.org>
- <7e5486cc-4080-2d1e-8f6d-98874379887d@gmail.com>
- <20160908111654.GH1493@arm.com>
-Message-ID: <b1064bed-3823-392d-e4c1-cf82f06712ff@linaro.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 8 Sep 2016 19:06:50 +0530
+Subject: [RESEND v14 PATCH 1/5] Documentation: bindings: add dt doc for
+ Rockchip USB Type-C PHY
+In-Reply-To: <1473181220-15123-1-git-send-email-zyw@rock-chips.com>
+References: <1472015825-11365-2-git-send-email-zyw@rock-chips.com>
+ <1473181220-15123-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <57D16972.9040801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/9/8 19:16, Will Deacon wrote:
-> On Wed, Sep 07, 2016 at 12:30:19PM +0300, Aleksey Makarov wrote:
->>
->> On 09/05/2016 03:36 PM, Aleksey Makarov wrote:
->>> SBBR mentions SPCR as a mandatory ACPI table.  So enable it for ARM64
->>>
->>> Earlycon should be set up as early as possible.  ACPI boot tables are
->>> mapped in arch/arm64/kernel/acpi.c:acpi_boot_table_init() that
->>> is called from setup_arch() and that's where we parse SPCR.
->>> So it has to be opted-in per-arch.
->>>
->>> When ACPI_SPCR_TABLE is defined initialization of DT earlycon is
->>> deferred until the DT/ACPI decision is done.  Initialize DT earlycon
->>> if ACPI is disabled.
->>
->> Hi Will, Catalin,
->>
->> Can you review this patch and consider ACKing it please?
->
-> Hanjun, Al, Mark, Graeme -- any comments on this?
 
-We tested this patch on D02, although d02 is 8250 based
-uart, but this patch is the core part, which makes sense
-to me,
 
-Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+On Tuesday 06 September 2016 10:30 PM, Chris Zhong wrote:
+> This patch adds a binding that describes the Rockchip USB Type-C PHY
+> for rk3399
+> 
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> Reviewed-by: Tomasz Figa <tfiga@chromium.org>
+> Reviewed-by: Kever Yang <kever.yang@rock-chips.com>
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Thanks
-Hanjun
+merged, thanks.
+
+-Kishon
+> 
+> ---
+> 
+> Changes in v14: None
+> Changes in v13: None
+> Changes in v12: None
+> Changes in v11:
+> - make a clearer emarcation between usb phy and dp phy
+> 
+> Changes in v10:
+> - remove rockchip,uphy-dp-sel property
+> 
+> Changes in v9:
+> - change #phy-cells to 1
+> 
+> Changes in v8: None
+> Changes in v7: None
+> Changes in v6:
+> - add assigned-clocks and assigned-clock-rates
+> 
+> Changes in v5: None
+> Changes in v4:
+> - add a #phy-cells node
+> 
+> Changes in v3:
+> - use compatible: rockchip,rk3399-typec-phy
+> - use dashes instead of underscores.
+> 
+> Changes in v2:
+> - add some registers description
+> 
+> Changes in v1:
+> - add extcon node description
+> - move the registers in phy driver
+> - remove the suffix of reset
+> 
+>  .../devicetree/bindings/phy/phy-rockchip-typec.txt | 101 +++++++++++++++++++++
+>  1 file changed, 101 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> new file mode 100644
+> index 0000000..6ea867e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> @@ -0,0 +1,101 @@
+> +* ROCKCHIP type-c PHY
+> +---------------------
+> +
+> +Required properties:
+> + - compatible : must be "rockchip,rk3399-typec-phy"
+> + - reg: Address and length of the usb phy control register set
+> + - rockchip,grf : phandle to the syscon managing the "general
+> +   register files"
+> + - clocks : phandle + clock specifier for the phy clocks
+> + - clock-names : string, clock name, must be "tcpdcore", "tcpdphy-ref";
+> + - assigned-clocks: main clock, should be <&cru SCLK_UPHY0_TCPDCORE> or
+> +		    <&cru SCLK_UPHY1_TCPDCORE>;
+> + - assigned-clock-rates : the phy core clk frequency, shall be: 50000000
+> + - resets : a list of phandle + reset specifier pairs
+> + - reset-names : string reset name, must be:
+> +		 "uphy", "uphy-pipe", "uphy-tcphy"
+> + - extcon : extcon specifier for the Power Delivery
+> +
+> +Note, there are 2 type-c phys for RK3399, and they are almost identical, except
+> +these registers(description below), every register node contains 3 sections:
+> +offset, enable bit, write mask bit.
+> + - rockchip,typec-conn-dir : the register of type-c connector direction,
+> +   for type-c phy0, it must be <0xe580 0 16>;
+> +   for type-c phy1, it must be <0xe58c 0 16>;
+> + - rockchip,usb3tousb2-en : the register of type-c force usb3 to usb2 enable
+> +   control.
+> +   for type-c phy0, it must be <0xe580 3 19>;
+> +   for type-c phy1, it must be <0xe58c 3 19>;
+> + - rockchip,external-psm : the register of type-c phy external psm clock
+> +   selection.
+> +   for type-c phy0, it must be <0xe588 14 30>;
+> +   for type-c phy1, it must be <0xe594 14 30>;
+> + - rockchip,pipe-status : the register of type-c phy pipe status.
+> +   for type-c phy0, it must be <0xe5c0 0 0>;
+> +   for type-c phy1, it must be <0xe5c0 16 16>;
+> +
+> +Required nodes : a sub-node is required for each port the phy provides.
+> +		 The sub-node name is used to identify dp or usb3 port,
+> +		 and shall be the following entries:
+> +	* "dp-port" : the name of DP port.
+> +	* "usb3-port" : the name of USB3 port.
+> +
+> +Required properties (port (child) node):
+> +- #phy-cells : must be 0, See ./phy-bindings.txt for details.
+> +
+> +Example:
+> +	tcphy0: phy at ff7c0000 {
+> +		compatible = "rockchip,rk3399-typec-phy";
+> +		reg = <0x0 0xff7c0000 0x0 0x40000>;
+> +		rockchip,grf = <&grf>;
+> +		extcon = <&fusb0>;
+> +		clocks = <&cru SCLK_UPHY0_TCPDCORE>,
+> +			 <&cru SCLK_UPHY0_TCPDPHY_REF>;
+> +		clock-names = "tcpdcore", "tcpdphy-ref";
+> +		assigned-clocks = <&cru SCLK_UPHY0_TCPDCORE>;
+> +		assigned-clock-rates = <50000000>;
+> +		resets = <&cru SRST_UPHY0>,
+> +			 <&cru SRST_UPHY0_PIPE_L00>,
+> +			 <&cru SRST_P_UPHY0_TCPHY>;
+> +		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
+> +		rockchip,typec-conn-dir = <0xe580 0 16>;
+> +		rockchip,usb3tousb2-en = <0xe580 3 19>;
+> +		rockchip,external-psm = <0xe588 14 30>;
+> +		rockchip,pipe-status = <0xe5c0 0 0>;
+> +
+> +		tcphy0_dp: dp-port {
+> +			#phy-cells = <0>;
+> +		};
+> +
+> +		tcphy0_usb3: usb3-port {
+> +			#phy-cells = <0>;
+> +		};
+> +	};
+> +
+> +	tcphy1: phy at ff800000 {
+> +		compatible = "rockchip,rk3399-typec-phy";
+> +		reg = <0x0 0xff800000 0x0 0x40000>;
+> +		rockchip,grf = <&grf>;
+> +		extcon = <&fusb1>;
+> +		clocks = <&cru SCLK_UPHY1_TCPDCORE>,
+> +			 <&cru SCLK_UPHY1_TCPDPHY_REF>;
+> +		clock-names = "tcpdcore", "tcpdphy-ref";
+> +		assigned-clocks = <&cru SCLK_UPHY1_TCPDCORE>;
+> +		assigned-clock-rates = <50000000>;
+> +		resets = <&cru SRST_UPHY1>,
+> +			 <&cru SRST_UPHY1_PIPE_L00>,
+> +			 <&cru SRST_P_UPHY1_TCPHY>;
+> +		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
+> +		rockchip,typec-conn-dir = <0xe58c 0 16>;
+> +		rockchip,usb3tousb2-en = <0xe58c 3 19>;
+> +		rockchip,external-psm = <0xe594 14 30>;
+> +		rockchip,pipe-status = <0xe5c0 16 16>;
+> +
+> +		tcphy1_dp: dp-port {
+> +			#phy-cells = <0>;
+> +		};
+> +
+> +		tcphy1_usb3: usb3-port {
+> +			#phy-cells = <0>;
+> +		};
+> +	};
+> 
