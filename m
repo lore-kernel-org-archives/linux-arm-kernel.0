@@ -1,159 +1,102 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 8 Sep 2016 09:41:55 +0200
-Subject: [PATCH v2 3/4] ARM: dts: Add NextThing GR8 dtsi
-In-Reply-To: <CAGb2v67WLn6Sv9ie9CrA52zHf0xbwVd7YrJ_2pF3UW8LmxVvRQ@mail.gmail.com>
-References: <20160907145400.27192-1-maxime.ripard@free-electrons.com>
- <20160907145400.27192-4-maxime.ripard@free-electrons.com>
- <CAGb2v67WLn6Sv9ie9CrA52zHf0xbwVd7YrJ_2pF3UW8LmxVvRQ@mail.gmail.com>
-Message-ID: <20160908074155.GH8913@lukather>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu,  8 Sep 2016 09:43:24 +0200
+Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.9
+Message-ID: <cover.1473320411.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2016 at 12:32:48AM +0800, Chen-Yu Tsai wrote:
-> On Wed, Sep 7, 2016 at 10:53 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > From: Myl?ne Josserand <mylene.josserand@free-electrons.com>
-> >
-> > The GR8 is an SoC made by Nextthing loosely based on the sun5i family.
-> >
-> > Since it's not clear yet what we can factor out and merge with the A10s and
-> > A13 support, let's keep it out of the sun5i.dtsi include tree. We will
-> > figure out what can be shared when things settle down.
-> >
-> > Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/ntc-gr8.dtsi | 1080 ++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 1080 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/ntc-gr8.dtsi
-> >
-> > diff --git a/arch/arm/boot/dts/ntc-gr8.dtsi b/arch/arm/boot/dts/ntc-gr8.dtsi
-> > new file mode 100644
-> > index 000000000000..d21cfa3f3c14
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/ntc-gr8.dtsi
-> > @@ -0,0 +1,1080 @@
-> 
-> [...]
-> 
-> > +               pll3x2: pll3x2_clk {
-> > +                       compatible = "fixed-factor-clock";
-> 
-> I think you want "allwinner,sun4i-a10-pll3-2x-clk"?
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Indeed.
+Please consider these Renesas ARM64 based SoC DT updates for v4.9.
 
-> > +               tcon_ch1_clk: clk at 01c2012c {
-> > +                       #clock-cells = <0>;
-> > +                       compatible = "allwinner,sun4i-a10-tcon-ch1-clk";
-> > +                       reg = <0x01c2012c 0x4>;
-> > +                       clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
-> > +                       clock-output-names = "tcon-ch1-sclk";
-> > +               };
-> 
-> Nit: Is there a ve_clk we could add?
+This pull request is based on the sh-pfc-for-v4.9-tag2 of
+Geert Uytterhoeven's renesas-driver's tree which is included in the
+devel and for-next branches of Linus Walleij's linux-pinctrl tree.
 
-I don't know. No one uses it, and the next item on my todo list is to
-move the sun5i SoCs to sunxi-ng, so it seems a bit useless to add that
-one.
 
-> 
-> [...]
-> 
-> > +               pio: pinctrl at 01c20800 {
-> > +                       compatible = "nextthing,gr8-pinctrl";
-> > +                       reg = <0x01c20800 0x400>;
-> > +                       interrupts = <28>;
-> > +                       clocks = <&apb0_gates 5>;
-> > +                       gpio-controller;
-> > +                       interrupt-controller;
-> > +                       #interrupt-cells = <3>;
-> > +                       #gpio-cells = <3>;
-> > +
-> > +                       i2c0_pins_a: i2c0 at 0 {
-> > +                               allwinner,pins = "PB0", "PB1";
-> > +                               allwinner,function = "i2c0";
-> > +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> > +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> > +                       };
-> > +
-> > +                       i2c1_pins_a: i2c1 at 0 {
-> > +                               allwinner,pins = "PB15", "PB16";
-> > +                               allwinner,function = "i2c1";
-> > +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> > +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> > +                       };
-> > +
-> > +                       i2c2_pins_a: i2c2 at 0 {
-> > +                               allwinner,pins = "PB17", "PB18";
-> > +                               allwinner,function = "i2c2";
-> > +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> > +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> > +                       };
-> > +
-> > +                       i2s0_pins_a: i2s0 at 0 {
-> > +                               allwinner,pins = "PB5", "PB6", "PB7", "PB8", "PB9";
-> > +                               allwinner,function = "i2s0";
-> > +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> > +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> > +                       };
-> 
-> You may want to split out the MCLK pin. Some codecs don't need it, and the
-> pin can be allocated for other uses.
+The following changes since commit 374cf6992de89fc38d4d923c89b40816d341d678:
 
-ACK.
+  pinctrl: sh-pfc: r8a7796: Add SDHI pins, groups and functions (2016-08-19 09:37:20 +0200)
 
-> 
-> > +
-> > +                       ir0_rx_pins_a: ir0 at 0 {
-> > +                               allwinner,pins = "PB4";
-> > +                               allwinner,function = "ir0";
-> > +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> > +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> > +                       };
-> > +
-> > +                       lcd_rgb666_pins: lcd_rgb666 at 0 {
-> > +                               allwinner,pins = "PD2", "PD3", "PD4", "PD5", "PD6", "PD7",
-> > +                                                "PD10", "PD11", "PD12", "PD13", "PD14", "PD15",
-> > +                                                "PD18", "PD19", "PD20", "PD21", "PD22", "PD23",
-> > +                                                "PD24", "PD25", "PD26", "PD27";
-> > +                               allwinner,function = "lcd0";
-> > +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> > +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> > +                       };
-> > +
-> > +                       mmc0_pins_a: mmc0 at 0 {
-> > +                               allwinner,pins = "PF0", "PF1", "PF2", "PF3",
-> > +                                                "PF4", "PF5";
-> > +                               allwinner,function = "mmc0";
-> > +                               allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-> > +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> > +                       };
-> > +
-> > +                       nand_pins_a: nand_base0 at 0 {
-> > +                               allwinner,pins = "PC0", "PC1", "PC2",
-> > +                                               "PC5", "PC8", "PC9", "PC10",
-> > +                                               "PC11", "PC12", "PC13", "PC14",
-> > +                                               "PC15";
-> > +                               allwinner,function = "nand0";
-> > +                               allwinner,drive = <0>;
-> > +                               allwinner,pull = <0>;
-> 
-> Macros for the nand pins?
+are available in the git repository at:
 
-Indeed.
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.9
 
-Thanks!
-Maxime
+for you to fetch changes up to fa765e5ef49d57834ee66690ba8ed5932edb7968:
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/678c08b7/attachment.sig>
+  arm64: dts: r8a7796: Add GPIO device nodes (2016-09-08 09:35:27 +0200)
+
+----------------------------------------------------------------
+Renesas ARM64 Based SoC DT Updates for v4.9
+
+Clean up:
+* Remove unnecessary cap-mmc-highspeed property from SDHI nodes on r8a7795 SoC
+* Add SoC-specific compatible property to audio-dmac nodes on r8a7795 SoC
+
+New Board:
+* Add r8a7794/h3ulcb board
+
+Enablement:
+* Add PFC and GPIO to r8a7796 SoC
+* Enable DU and USB 2.0 on r8a7795/salvator-x board
+* Add VTP, FCPV, FCPF and FDP1 to r8a7795 SoC
+* Set maximum frequency for SDHI clocks on r8a7795 SoC
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      arm64: dts: r8a7795: Add SoC-specific compatible property to audio-dmac nodes
+
+Kieran Bingham (2):
+      arm64: dts: r8a7795: add FCPF device nodes
+      arm64: dts: r8a7795: add FDP1 device nodes
+
+Laurent Pinchart (5):
+      arm64: dts: renesas: r8a7795: Add FCPV nodes
+      arm64: dts: renesas: r8a7795: Add VSP instances
+      arm64: dts: renesas: r8a7795: Add DU device to DT
+      arm64: dts: r8a7795: renesas: salvator-x: Enable DU
+      arm64: dts: r8a7795: salvator-x: Configure pins for the DU RGB output
+
+Simon Horman (1):
+      arm64: dts: r8a7795: remove unnecessary cap-mmc-highspeed property
+
+Takeshi Kihara (2):
+      arm64: dts: r8a7796: Add pinctrl device node
+      arm64: dts: r8a7796: Add GPIO device nodes
+
+Ulrich Hecht (1):
+      arm64: dts: r8a7796: salvator-x: add serial console pins
+
+Vladimir Barinov (13):
+      arm64: dts: h3ulcb: add H3ULCB board DT bindings
+      arm64: dts: h3ulcb: initial device tree
+      arm64: dts: h3ulcb: enable SCIF clk and pins
+      arm64: dts: h3ulcb: enable EthernetAVB
+      arm64: dts: h3ulcb: enable I2C2
+      arm64: dts: h3ulcb: enable EXTALR clk
+      arm64: dts: h3ulcb: enable WDT
+      arm64: dts: h3ulcb: enable USB2 PHY of channel 1
+      arm64: dts: h3ulcb: enable USB2.0 Host channel 1
+      arm64: dts: h3ulcb: enable GPIO keys
+      arm64: dts: h3ulcb: enable SDHI0
+      arm64: dts: h3ulcb: Sound SSI support
+      arm64: dts: h3ulcb: enable GPIO leds
+
+Wolfram Sang (1):
+      arm64: dts: r8a7795: set maximum frequency for SDHI clocks
+
+Yoshihiro Shimoda (4):
+      arm64: dts: r8a7795: Add HSUSB device node
+      arm64: dts: r8a7795: salvator-x: enable usb2_phy of channel 0
+      arm64: dts: r8a7795: salvator-x: enable USB 2.0 Host channel 0
+      arm64: dts: r8a7795: salvator-x: enable HSUSB
+
+ Documentation/devicetree/bindings/arm/shmobile.txt |   2 +
+ arch/arm64/boot/dts/renesas/Makefile               |   2 +-
+ arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts     | 328 +++++++++++++++++++++
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts |  87 ++++++
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 276 ++++++++++++++++-
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts |  16 +
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 117 ++++++++
+ 7 files changed, 823 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
