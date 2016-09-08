@@ -1,63 +1,44 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 8 Sep 2016 21:20:12 +0100
-Subject: [PATCH 4/7] phy: meson: add USB2 PHY support for Meson8b and GXBB
-In-Reply-To: <CAFBinCA4Yvw5pbOFmJ8SqyOASADavyEPmHywSdOiUazcqe_Zmg@mail.gmail.com>
-References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
- <20160904213152.25837-5-martin.blumenstingl@googlemail.com>
- <m260q6jibf.fsf@baylibre.com>
- <CAFBinCA4Yvw5pbOFmJ8SqyOASADavyEPmHywSdOiUazcqe_Zmg@mail.gmail.com>
-Message-ID: <e3b1f611-d6f6-c98b-a53b-98e94ef5bd96@codethink.co.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Sep 2016 22:22:14 +0200
+Subject: [RFC 1/7] Make Hi3620 explicit, remove wildcards
+In-Reply-To: <df45ed73-0f7a-89d0-7cc5-5b6549f2b0f9@gmail.com>
+References: <20160908172346.27506-1-netz.kernel@gmail.com>
+ <4234280.g2uciTKcvR@wuerfel> <df45ed73-0f7a-89d0-7cc5-5b6549f2b0f9@gmail.com>
+Message-ID: <6260903.qUKuQuTBEX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/16 20:52, Martin Blumenstingl wrote:
-> On Thu, Sep 8, 2016 at 9:35 PM, Kevin Hilman <khilman@baylibre.com> wrote:
->>> +     phy = devm_phy_create(&pdev->dev, NULL, &phy_meson_usb2_ops);
->>> +     if (IS_ERR(phy)) {
->>> +             dev_err(&pdev->dev, "failed to create PHY\n");
->>> +             return PTR_ERR(phy);
->>> +     }
->>> +
->>> +     if (usb_reset_refcnt++ == 0) {
->>> +             ret = device_reset(&pdev->dev);
->>> +             if (ret) {
->>> +                     dev_err(&phy->dev, "Failed to reset USB PHY\n");
->>> +                     return ret;
->>> +             }
->>> +     }
->>
->> The ref count + reset here looks like something that could/should be
->> handled in a runtime PM callback.
-> Unfortunately that doesn't work (as Jerome found out) because both
-> PHYs are sharing the same reset line.
-> So if the second PHY would call device_reset then it would also reset
-> the first PHY!
->
-> There's a comment above the declaration of usb_reset_refcnt which
-> tries to explain this:
-> "The PHYs are sharing a common reset line -> we are only allowed to
-> reset once for all PHYs."
-> Maybe I should move this comment to the "if (usb_reset_refcnt++ == 0)
-> {" line to make it easier to see?
->
+On Thursday, September 8, 2016 3:12:26 PM CEST Marty Plummer wrote:
+> So, in this case it should be one single patch? Geeze this is hella
+> complicated to just get a name changed 
 
-pm-runtime has refcounting in it. When one of the nodes turns on,
-the pm-runtime will call your driver to say there is a user when
-this first use turns up.
+Yes and yes. Sometimes it's easier to leave an slightly misleading
+name than to change it. ;-)
 
-If all the sub-phys turn off and drop their refcount then the driver
-is called to say there are no more users and you can go to sleep.
+If there is any relation between Hi3620 and Hi3520, we could also
+decide to use the "HI3xxx" name for both after all, and just
+change the Kconfig files like
 
-So, in phy_meson_usb2_power_on() you could do:
 
-pm_runtime_get_sync(pdev);
+config ARCH_HI3xxx
+        bool "Hisilicon Hi36xx family"
+        depends on ARCH_MULTI_V5 || ARCH_MULTI_V6 || ARCH_MULTI_V7
+        select CACHE_L2X0 if CPU_V7
+        select HAVE_ARM_SCU if SMP
 
-and in phy_meson_usb2_power_off
+...
+        config DEBUG_HI3520_UART
+                bool "Hisilicon HI3520 Debug UART"
+                depends on ARCH_HI3xxx
+                select DEBUG_UART_PL01X
+                help
+                  Say Y here if you want kernel low-level debugging support
 
-pm_runtime_put(pdev);
+        config DEBUG_HI3620_UART
+                bool "Hisilicon HI3620 Debug UART"
+                depends on ARCH_HI3xxx
+                select DEBUG_UART_PL01X
+                help
+                  Say Y here if you want kernel low-level debugging support
 
-https://www.kernel.org/doc/Documentation/power/runtime_pm.txt
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+	Arnd
