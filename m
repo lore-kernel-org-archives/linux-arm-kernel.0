@@ -1,53 +1,24 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  8 Sep 2016 09:43:19 +0200
-Subject: [PATCH 23/30] arm64: dts: h3ulcb: enable GPIO keys
-In-Reply-To: <cover.1473320411.git.horms+renesas@verge.net.au>
-References: <cover.1473320411.git.horms+renesas@verge.net.au>
-Message-ID: <0e3886a981e062740fbb89670f79fd57caed8137.1473320411.git.horms+renesas@verge.net.au>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu,  8 Sep 2016 09:53:24 +0200
+Subject: [PATCH 0/2] spi: meson: Add Amlogic GXBB compatible
+Message-ID: <1473321206-32284-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+This patchset adds a specific compatible string in the Meson SPIFC driver for
+the Amlogic Meson GXBB SoC.
 
-This supports GPIO keys on H3ULCB board
+This patchset is SPI-only respin from Jerome Brunet patchset at [1].
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+[1] http://lkml.kernel.org/r/1473261223-15412-1-git-send-email-jbrunet at baylibre.com
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-index 234b66a9e163..adf2b0e44dac 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-@@ -12,6 +12,7 @@
- /dts-v1/;
- #include "r8a7795.dtsi"
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
- 
- / {
- 	model = "Renesas H3ULCB board based on r8a7795";
-@@ -31,6 +32,18 @@
- 		/* first 128MB is reserved for secure area. */
- 		reg = <0x0 0x48000000 0x0 0x38000000>;
- 	};
-+
-+	keyboard {
-+		compatible = "gpio-keys";
-+
-+		key-1 {
-+			linux,code = <KEY_1>;
-+			label = "SW3";
-+			wakeup-source;
-+			debounce-interval = <20>;
-+			gpios = <&gpio6 11 GPIO_ACTIVE_LOW>;
-+		};
-+	};
- };
- 
- &extal_clk {
+Neil Armstrong (2):
+  dt-bindings: spi-meson: Add GXBB Compatible string
+  spi: meson: Add GXBB compatible
+
+ Documentation/devicetree/bindings/spi/spi-meson.txt | 2 +-
+ drivers/spi/spi-meson-spifc.c                       | 1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
 -- 
-2.7.0.rc3.207.g0ac5344
+1.9.1
