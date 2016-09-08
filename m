@@ -1,102 +1,79 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 8 Sep 2016 15:59:19 +0300
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <20160908122810.GA14132@b29397-desktop>
-References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
- <2733202.7lpFC7RnDm@wuerfel> <87lgz2iv6d.fsf@linux.intel.com>
- <4934737.egJZVdaLZs@wuerfel> <20160908122810.GA14132@b29397-desktop>
-Message-ID: <72263b67-6b33-de44-d568-a967ee3503ae@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 8 Sep 2016 14:02:45 +0100
+Subject: [PATCH] arm64: use preempt_disable_notrace in _percpu_read/write
+In-Reply-To: <1473338802-18712-1-git-send-email-zhang.chunyan@linaro.org>
+References: <1473338802-18712-1-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <20160908130245.GD26570@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/2016 03:28 PM, Peter Chen wrote:
-> On Thu, Sep 08, 2016 at 12:17:21PM +0200, Arnd Bergmann wrote:
->> On Thursday, September 8, 2016 12:43:06 PM CEST Felipe Balbi wrote:
->>> Arnd Bergmann <arnd@arndb.de> writes:
->>>> On Thursday, September 8, 2016 11:29:04 AM CEST Felipe Balbi wrote:
->>>>>> If we do that, we have to put child devices of the dwc3 devices into
->>>>>> the platform glue, and it also breaks those dwc3 devices that don't
->>>>>> have a parent driver.
->>>>>
->>>>> Well, this is easy to fix:
->>>>>
->>>>>         if (dwc->dev->parent) {
->>>>>                 dwc->sysdev = dwc->dev->parent;
->>>>>         } else {
->>>>>                 dev_info(dwc->dev, "Please provide a glue layer!\n");
->>>>>                 dwc->sysdev = dwc->dev;
->>>>>         }
->>>>
->>>> I don't understand. Do you mean we should have an extra level of
->>>> stacking and splitting "static struct platform_driver dwc3_driver"
->>>> in two so instead of
->>>>
->>>>       "qcom,dwc3" -> "snps,dwc3" (usb_bus.sysdev) -> "xhci" (usb_bus.dev)
->>>>
->>>> we do this?
->>>>
->>>>       "qcom,dwc3" -> "snps,dwc3" (usb_bus.sysdev) -> "dwc3-glue" -> "xhci" (usb_bus.dev)
->>>
->>> no 
->>>
->>> If we have a parent device, use that as sysdev, otherwise use self as
->>> sysdev.
->>
->> But there is often a parent device in DT, as the xhci device is
->> attached to some internal bus that gets turned into a platform_device
->> as well, so checking whether there is a parent will get the wrong
->> device node.
+Hi,
+
+In future, please ensure that you include the arm64 maintainers when
+sending changes to core arm64 code. I've copied Catalin and Will for you
+this time.
+
+Thanks,
+Mark.
+
+On Thu, Sep 08, 2016 at 08:46:42PM +0800, Chunyan Zhang wrote:
+> When debug preempt or preempt tracer is enabled, preempt_count_add/sub()
+> can be traced by function and function graph tracing, and
+> preempt_disable/enable() would call preempt_count_add/sub(), so in Ftrace
+> subsystem we should use preempt_disable/enable_notrace instead.
 > 
-> From my point, all platform and firmware information at dwc3 are
-> correct, so we don't need to change dwc3/core.c, only changing for
-> xhci-plat.c is ok.
+> In the commit 345ddcc882d8 ("ftrace: Have set_ftrace_pid use the bitmap
+> like events do") the function this_cpu_read() was added to
+> trace_graph_entry(), and if this_cpu_read() calls preempt_disable(), graph
+> tracer will go into a recursive loop, even if the tracing_on is
+> disabled.
 > 
-> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> index ed56bf9..fd57c0d 100644
-> --- a/drivers/usb/host/xhci-plat.c
-> +++ b/drivers/usb/host/xhci-plat.c
-> @@ -145,6 +145,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
->  	struct clk              *clk;
->  	int			ret;
->  	int			irq;
-> +	struct device *dev = &pdev->dev, *sysdev;
+> So this patch change to use preempt_enable/disable_notrace instead in
+> this_cpu_read().
+> 
+> Since Yonghui Yang helped a lot to find the root cause of this problem,
+> so also add his SOB.
+> 
+> Signed-off-by: Yonghui Yang <mark.yang@spreadtrum.com>
+> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+> ---
+>  arch/arm64/include/asm/percpu.h | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
+> index 0a456be..2fee2f5 100644
+> --- a/arch/arm64/include/asm/percpu.h
+> +++ b/arch/arm64/include/asm/percpu.h
+> @@ -199,19 +199,19 @@ static inline unsigned long __percpu_xchg(void *ptr, unsigned long val,
+>  #define _percpu_read(pcp)						\
+>  ({									\
+>  	typeof(pcp) __retval;						\
+> -	preempt_disable();						\
+> +	preempt_disable_notrace();					\
+>  	__retval = (typeof(pcp))__percpu_read(raw_cpu_ptr(&(pcp)), 	\
+>  					      sizeof(pcp));		\
+> -	preempt_enable();						\
+> +	preempt_enable_notrace();					\
+>  	__retval;							\
+>  })
 >  
->  	if (usb_disabled())
->  		return -ENODEV;
-> @@ -155,6 +156,12 @@ static int xhci_plat_probe(struct platform_device *pdev)
->  	if (irq < 0)
->  		return -ENODEV;
+>  #define _percpu_write(pcp, val)						\
+>  do {									\
+> -	preempt_disable();						\
+> +	preempt_disable_notrace();					\
+>  	__percpu_write(raw_cpu_ptr(&(pcp)), (unsigned long)(val), 	\
+>  				sizeof(pcp));				\
+> -	preempt_enable();						\
+> +	preempt_enable_notrace();					\
+>  } while(0)								\
 >  
-> +	if (dev->parent) {
-> +		sysdev = dev->parent;
-> +	} else {
-> +        	sysdev = dev;
-> +	}
-> +
-
-Shouldn't we be more careful with that?
-
-armada-375.dtsi
-
-	soc {
-		compatible = "marvell,armada375-mbus", "simple-bus";
-
-		internal-regs {
-			compatible = "simple-bus";
-
-			usb3 at 58000 {
-				compatible = "marvell,armada-375-xhci";
-				reg = <0x58000 0x20000>,<0x5b880 0x80>;
-				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-				clocks = <&gateclk 16>;
-				phys = <&usbcluster PHY_TYPE_USB3>;
-				phy-names = "usb";
-				status = "disabled";
-			};
-
-
-What will be the parent dev in above case?
-
--- 
-regards,
--grygorii
+>  #define _pcp_protect(operation, pcp, val)			\
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
