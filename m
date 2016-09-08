@@ -1,108 +1,107 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 8 Sep 2016 12:16:12 +0200
-Subject: [PATCH] phy: sun4i-usb: Use spinlock to guard phyctl register
- access
-In-Reply-To: <20160908031418.12627-1-wens@csie.org>
-References: <20160908031418.12627-1-wens@csie.org>
-Message-ID: <883333c3-5685-905f-3e96-2c2498a22b8a@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Sep 2016 12:17:21 +0200
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <87lgz2iv6d.fsf@linux.intel.com>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <2733202.7lpFC7RnDm@wuerfel> <87lgz2iv6d.fsf@linux.intel.com>
+Message-ID: <4934737.egJZVdaLZs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thursday, September 8, 2016 12:43:06 PM CEST Felipe Balbi wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> > On Thursday, September 8, 2016 11:29:04 AM CEST Felipe Balbi wrote:
+> >> > If we do that, we have to put child devices of the dwc3 devices into
+> >> > the platform glue, and it also breaks those dwc3 devices that don't
+> >> > have a parent driver.
+> >> 
+> >> Well, this is easy to fix:
+> >> 
+> >>         if (dwc->dev->parent) {
+> >>                 dwc->sysdev = dwc->dev->parent;
+> >>         } else {
+> >>                 dev_info(dwc->dev, "Please provide a glue layer!\n");
+> >>                 dwc->sysdev = dwc->dev;
+> >>         }
+> >
+> > I don't understand. Do you mean we should have an extra level of
+> > stacking and splitting "static struct platform_driver dwc3_driver"
+> > in two so instead of
+> >
+> >       "qcom,dwc3" -> "snps,dwc3" (usb_bus.sysdev) -> "xhci" (usb_bus.dev)
+> >
+> > we do this?
+> >
+> >       "qcom,dwc3" -> "snps,dwc3" (usb_bus.sysdev) -> "dwc3-glue" -> "xhci" (usb_bus.dev)
+> 
+> no 
+> 
+> If we have a parent device, use that as sysdev, otherwise use self as
+> sysdev.
 
-On 08-09-16 05:14, Chen-Yu Tsai wrote:
-> The musb driver calls into this phy driver to disable/enable squelch
-> detection. This function was introduced in 24fe86a617c5 ("phy: sun4i-usb:
-> Add a sunxi specific function for setting squelch-detect"). This
-> function in turn calls sun4i_usb_phy_write, which uses a mutex to
-> guard the common access register. Unfortunately musb does this
-> in atomic context, which results in the following warning with lock
-> debugging enabled:
->
-> BUG: sleeping function called from invalid context at kernel/locking/mutex.c:97
-> in_atomic(): 1, irqs_disabled(): 128, pid: 96, name: kworker/0:2
-> CPU: 0 PID: 96 Comm: kworker/0:2 Not tainted 4.8.0-rc4-00181-gd502f8ad1c3e #13
-> Hardware name: Allwinner sun8i Family
-> Workqueue: events musb_deassert_reset
-> [<c010bc01>] (unwind_backtrace) from [<c0109237>] (show_stack+0xb/0xc)
-> [<c0109237>] (show_stack) from [<c02a669b>] (dump_stack+0x67/0x74)
-> [<c02a669b>] (dump_stack) from [<c05d68c9>] (mutex_lock+0x15/0x2c)
-> [<c05d68c9>] (mutex_lock) from [<c02c3589>] (sun4i_usb_phy_write+0x39/0xec)
-> [<c02c3589>] (sun4i_usb_phy_write) from [<c03e6327>] (musb_port_reset+0xfb/0x184)
-> [<c03e6327>] (musb_port_reset) from [<c03e4917>] (musb_deassert_reset+0x1f/0x2c)
-> [<c03e4917>] (musb_deassert_reset) from [<c012ecb5>] (process_one_work+0x129/0x2b8)
-> [<c012ecb5>] (process_one_work) from [<c012f5e3>] (worker_thread+0xf3/0x424)
-> [<c012f5e3>] (worker_thread) from [<c0132dbd>] (kthread+0xa1/0xb8)
-> [<c0132dbd>] (kthread) from [<c0105f31>] (ret_from_fork+0x11/0x20)
->
-> Since the register access is mmio, we can use a spinlock to guard this
-> specific access, rather than the mutex that guards the entire phy.
->
-> Fixes: ba4bdc9e1dc0 ("PHY: sunxi: Add driver for sunxi usb phy")
-> Cc: Hans de Goede <hdegoede@redhat.com>
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+But there is often a parent device in DT, as the xhci device is
+attached to some internal bus that gets turned into a platform_device
+as well, so checking whether there is a parent will get the wrong
+device node.
 
-Good catch, but you're actually replacing the locking calls in the only
-user of sun4i_usb_phy_data.mutex, so after your patch it is no longer
-used anywhere. Can you do a v2 just outright replacing it with a
-spinlock please ?
+> > That sounds a bit clumsy for the sake of consistency with PCI.
+> > The advantage is that xhci can always use the grandparent device
+> > as sysdev whenever it isn't probed through PCI or firmware
+> > itself, but the purpose of the dwc3-glue is otherwise questionable.
+> >
+> > How about adding a 'compatible="snps,dwc3-pci"' property for the dwc3
+> > device when that is created from the PCI driver and checking for that
+> > with the device property interface instead? If it's "snps,dwc3"
+> > we use the device itself while for "snps,dwc3-pci", we use the parent?
+> 
+> Any reason why we wouldn't use e.g. dwc3-omap.dev as sysdev?
 
-Thanks,
+That would be incompatible with the USB binding, as the sysdev
+is assumed to be a USB host controller with #address-cells=<1>
+and #size-cells=<0> in order to hold the child devices, for
+example:
 
-Hans
+/ {
+     omap_dwc3_1: omap_dwc3_1 at 48880000 {
+        compatible = "ti,dwc3";
+        #address-cells = <1>;
+        #size-cells = <1>;
+        ranges;
+        usb1: usb at 48890000 {
+                compatible = "snps,dwc3";
+                reg = <0x48890000 0x17000>;
+                #address-cells = <1>;
+                #size-cells = <0>;
+                interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>,
+                             <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>,
+                             <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
+                interrupt-names = "peripheral",
+                                  "host",
+                                  "otg";
+                phys = <&usb2_phy1>, <&usb3_phy1>;
+                phy-names = "usb2-phy", "usb3-phy";
 
+                hub at 1 {
+                        compatible = "usb5e3,608";
+                        reg = <1>;
+                        #address-cells = <1>;
+                        #size-cells = <0>;
 
+                        ethernet at 1 {
+                                compatible = "usb424,ec00";
+                                mac-address = [00 11 22 33 44 55];
+                                reg = <1>;
+                        };
+                };
+        };
+};
 
-> ---
->  drivers/phy/phy-sun4i-usb.c | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index fcf4d95ecc6d..ae4ac5457c64 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -40,6 +40,7 @@
->  #include <linux/power_supply.h>
->  #include <linux/regulator/consumer.h>
->  #include <linux/reset.h>
-> +#include <linux/spinlock.h>
->  #include <linux/usb/of.h>
->  #include <linux/workqueue.h>
->
-> @@ -115,6 +116,7 @@ struct sun4i_usb_phy_data {
->  	const struct sun4i_usb_phy_cfg *cfg;
->  	enum usb_dr_mode dr_mode;
->  	struct mutex mutex;
-> +	spinlock_t reg_lock; /* guard access to phyctl reg */
->  	struct sun4i_usb_phy {
->  		struct phy *phy;
->  		void __iomem *pmu;
-> @@ -183,7 +185,7 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
->  	void __iomem *phyctl = phy_data->base + phy_data->cfg->phyctl_offset;
->  	int i;
->
-> -	mutex_lock(&phy_data->mutex);
-> +	spin_lock(&phy_data->reg_lock);
->
->  	if (phy_data->cfg->type == sun8i_a33_phy ||
->  	    phy_data->cfg->type == sun50i_a64_phy) {
-> @@ -221,7 +223,8 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
->
->  		data >>= 1;
->  	}
-> -	mutex_unlock(&phy_data->mutex);
-> +
-> +	spin_unlock(&phy_data->reg_lock);
->  }
->
->  static void sun4i_usb_phy_passby(struct sun4i_usb_phy *phy, int enable)
-> @@ -583,6 +586,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->
->  	mutex_init(&data->mutex);
-> +	spin_lock_init(&data->reg_lock);
->  	INIT_DELAYED_WORK(&data->detect, sun4i_usb_phy0_id_vbus_det_scan);
->  	dev_set_drvdata(dev, data);
->  	data->cfg = of_device_get_match_data(dev);
->
+It's also the node that contains the "phys" properties and
+presumably other properties like "otg-rev", "maximum-speed"
+etc.
+
+If we make the sysdev point to the parent, then we can no longer
+look up those properties and child devices from the USB core code
+by looking at "sysdev->of_node".
+
+	Arnd
