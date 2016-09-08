@@ -1,166 +1,60 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Thu, 8 Sep 2016 09:23:48 +0800
-Subject: [PATCH v4 10/22] usb: chipidea: Consolidate extcon notifiers
-In-Reply-To: <20160907213519.27340-11-stephen.boyd@linaro.org>
-References: <20160907213519.27340-1-stephen.boyd@linaro.org>
- <20160907213519.27340-11-stephen.boyd@linaro.org>
-Message-ID: <20160908012348.GF13903@b29397-desktop>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 8 Sep 2016 09:41:07 +0800
+Subject: [PATCH 0/3] gpio/pinctrl: imx: let IOMUX controller know about
+ on-SoC GPIOs
+In-Reply-To: <1c1d23a0-9656-2682-e573-13385a002998@mentor.com>
+References: <1471644615-10320-1-git-send-email-vladimir_zapolskiy@mentor.com>
+ <cc5ab313-c3c6-bfd4-d2b8-92a7d153cf05@mentor.com>
+ <20160905021201.GC25778@tiger>
+ <1c1d23a0-9656-2682-e573-13385a002998@mentor.com>
+Message-ID: <20160908014107.GA2533@x250>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2016 at 02:35:07PM -0700, Stephen Boyd wrote:
-> The two extcon notifiers are almost the same except for the
-> variable name for the cable structure and the id notifier inverts
-> the cable->state logic. Make it the same and replace two
-> functions with one to save some lines. This also makes it so that
-> the id cable state is true when the id pin is pulled low, so we
-> change the name of ->state to ->connected to properly reflect
-> that we're interested in the cable being connected.
+On Mon, Sep 05, 2016 at 02:49:16PM +0300, Vladimir Zapolskiy wrote:
+> >If I understand it correctly, with the change, most of GPIO client
+> >device drivers use the same init level as GPIO driver.  So we are not
+> >sure if GPIO driver is ready when client drivers try to request GPIO.
 > 
-> Cc: Peter Chen <peter.chen@nxp.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: "Ivan T. Ivanov" <iivanov.xz@gmail.com>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
->  drivers/usb/chipidea/core.c  | 45 ++++++++++++--------------------------------
->  drivers/usb/chipidea/otg.c   |  8 ++++----
->  include/linux/usb/chipidea.h |  4 ++--
->  3 files changed, 18 insertions(+), 39 deletions(-)
+> please give it a test run (with and without DTS gpio-ranges changes,
+> or just 2/3 from the series), I've tested on iMX6Q SabreLite, SabreAuto,
+> SabreSD and I don't see any regressions or noticeable increase of
+> -EPROBE_DEFER hits due to not ready GPIOs.
 > 
-> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> index f144e1bbcc82..83bc2f2dd6a8 100644
-> --- a/drivers/usb/chipidea/core.c
-> +++ b/drivers/usb/chipidea/core.c
-> @@ -577,35 +577,14 @@ static irqreturn_t ci_irq(int irq, void *data)
->  	return ret;
->  }
->  
-> -static int ci_vbus_notifier(struct notifier_block *nb, unsigned long event,
-> -			    void *ptr)
-> +static int ci_cable_notifier(struct notifier_block *nb, unsigned long event,
-> +			     void *ptr)
->  {
-> -	struct ci_hdrc_cable *vbus = container_of(nb, struct ci_hdrc_cable, nb);
-> -	struct ci_hdrc *ci = vbus->ci;
-> +	struct ci_hdrc_cable *cbl = container_of(nb, struct ci_hdrc_cable, nb);
-> +	struct ci_hdrc *ci = cbl->ci;
->  
-> -	if (event)
-> -		vbus->state = true;
-> -	else
-> -		vbus->state = false;
-> -
-> -	vbus->changed = true;
-> -
-> -	ci_irq(ci->irq, ci);
-> -	return NOTIFY_DONE;
-> -}
-> -
-> -static int ci_id_notifier(struct notifier_block *nb, unsigned long event,
-> -			  void *ptr)
-> -{
-> -	struct ci_hdrc_cable *id = container_of(nb, struct ci_hdrc_cable, nb);
-> -	struct ci_hdrc *ci = id->ci;
-> -
-> -	if (event)
-> -		id->state = false;
-> -	else
-> -		id->state = true;
-> -
-> -	id->changed = true;
-> +	cbl->connected = event;
-> +	cbl->changed = true;
->  
->  	ci_irq(ci->irq, ci);
->  	return NOTIFY_DONE;
-> @@ -714,27 +693,27 @@ static int ci_get_platdata(struct device *dev,
->  	}
->  
->  	cable = &platdata->vbus_extcon;
-> -	cable->nb.notifier_call = ci_vbus_notifier;
-> +	cable->nb.notifier_call = ci_cable_notifier;
->  	cable->edev = ext_vbus;
->  
->  	if (!IS_ERR(ext_vbus)) {
->  		ret = extcon_get_cable_state_(cable->edev, EXTCON_USB);
->  		if (ret)
-> -			cable->state = true;
-> +			cable->connected = true;
->  		else
-> -			cable->state = false;
-> +			cable->connected = false;
->  	}
->  
->  	cable = &platdata->id_extcon;
-> -	cable->nb.notifier_call = ci_id_notifier;
-> +	cable->nb.notifier_call = ci_cable_notifier;
->  	cable->edev = ext_id;
->  
->  	if (!IS_ERR(ext_id)) {
->  		ret = extcon_get_cable_state_(cable->edev, EXTCON_USB_HOST);
->  		if (ret)
-> -			cable->state = false;
-> +			cable->connected = true;
->  		else
-> -			cable->state = true;
-> +			cable->connected = false;
->  	}
->  	return 0;
->  }
-> diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-> index 0cf149edddd8..695f3fe3ae21 100644
-> --- a/drivers/usb/chipidea/otg.c
-> +++ b/drivers/usb/chipidea/otg.c
-> @@ -44,7 +44,7 @@ u32 hw_read_otgsc(struct ci_hdrc *ci, u32 mask)
->  		else
->  			val &= ~OTGSC_BSVIS;
->  
-> -		if (cable->state)
-> +		if (cable->connected)
->  			val |= OTGSC_BSV;
->  		else
->  			val &= ~OTGSC_BSV;
-> @@ -62,10 +62,10 @@ u32 hw_read_otgsc(struct ci_hdrc *ci, u32 mask)
->  		else
->  			val &= ~OTGSC_IDIS;
->  
-> -		if (cable->state)
-> -			val |= OTGSC_ID;
-> +		if (cable->connected)
-> +			val &= ~OTGSC_ID; /* host */
->  		else
-> -			val &= ~OTGSC_ID;
-> +			val |= OTGSC_ID; /* device */
->  
->  		if (cable->enabled)
->  			val |= OTGSC_IDIE;
-> diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-> index d07b162073f7..7e3daa37cf60 100644
-> --- a/include/linux/usb/chipidea.h
-> +++ b/include/linux/usb/chipidea.h
-> @@ -12,7 +12,7 @@ struct ci_hdrc;
->  
->  /**
->   * struct ci_hdrc_cable - structure for external connector cable state tracking
-> - * @state: current state of the line
-> + * @connected: true if cable is connected, false otherwise
->   * @changed: set to true when extcon event happen
->   * @enabled: set to true if we've enabled the vbus or id interrupt
->   * @edev: device which generate events
-> @@ -21,7 +21,7 @@ struct ci_hdrc;
->   * @conn: used for notification registration
->   */
->  struct ci_hdrc_cable {
-> -	bool				state;
-> +	bool				connected;
->  	bool				changed;
->  	bool				enabled;
->  	struct extcon_dev		*edev;
-> -- 
+> >most of GPIO client device drivers use the same init level as GPIO driver.
+> 
+> IMHO that will be the case, if the change 2/3 from the series is applied.
+> 
+> Statisticaly most of GPIO consumers should settle on device_initcall or
+> module_init level, the latter one is translated to device_initcall if
+> a driver is built-in, so the proposed downgrading of GPIO controller
+> driver init call level looks to be appropriate.
+> 
+> However pinctrl/pinmux driver should definitely have higher init level
+> priority in comparison to GPIO controller driver, every GPIO consumer
+> is a pinctrl/pinmux consumer as well, most of iMX pinctrl/pinmux drivers
+> are initialized at arch_initcall level, so there is a plenty of options
+> to satisfy (GPIO driver initcall) < (pinmux/pinctrl driver initcall)
+> equation:
+> * change pinmux/pinctrl driver initcall level to postcore_initcall
+>   and GPIO driver initcall level to arch_initcall or lower one,
+> * keep pinmux/pinctrl driver at arch_initcall level, set GPIO driver
+>   initcall level to any lower than arch_initcall (e.g. device_initcall)
+> * keep everything as is, drop 2/3 and rely on -EPROBE_DEFER from
+>   GPIO driver probe due to not yet initialized pinctrl driver.
+> 
+> >It shouldn't be a problem if every client driver handle the failure
+> >with deferred probing, but I'm not sure that's the case now.
+> >
+> 
+> From what I see it is the case for the most critical drivers, for the
+> rest I believe it is a bug, which can be revealed by shifting GPIO
+> driver initcall level and fixed, see also
+> 
+> https://lists.linuxfoundation.org/pipermail/ksummit-discuss/2016-August/003419.html
 
-Acked-by: Peter Chen <peter.chen@nxp.com>
+Okay, fair enough.
 
--- 
+For the series,
 
-Best Regards,
-Peter Chen
+Acked-by: Shawn Guo <shawnguo@kernel.org>
