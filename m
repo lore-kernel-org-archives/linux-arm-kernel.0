@@ -1,61 +1,23 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 8 Sep 2016 15:12:42 +0100
-Subject: [PATCH 1/6] arm64: sysreg: allow write_sysreg to use XZR
-In-Reply-To: <1473339339-32334-2-git-send-email-mark.rutland@arm.com>
-References: <1473339339-32334-1-git-send-email-mark.rutland@arm.com>
- <1473339339-32334-2-git-send-email-mark.rutland@arm.com>
-Message-ID: <da00f46c-7e32-b33f-67cd-0ea1aa54c0bc@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 8 Sep 2016 22:13:17 +0800
+Subject: [PATCH] ARM: imx: build cpuidle-imx6sx.o for imx6ul
+In-Reply-To: <20160906125338.1530603-1-arnd@arndb.de>
+References: <20160906125338.1530603-1-arnd@arndb.de>
+Message-ID: <20160908141317.GF16911@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/16 13:55, Mark Rutland wrote:
-> Currently write_sysreg has to allocate a temporary register to write
-> zero to a system register, which is unfortunate given that the MSR
-> instruction accepts XZR as an operand.
+On Tue, Sep 06, 2016 at 02:53:25PM +0200, Arnd Bergmann wrote:
+> The imx6ul soc code gained support for cpuidle, but that causes
+> a link failure if CONFIG_SOC_IMX6SX is disabled:
 > 
-> Allow XZR to be used when appropriate by fiddling with the assembly
-> constraints.
+> arch/arm/mach-imx/mach-imx6ul.o: In function `imx6ul_init_late':
+> mach-imx6ul.c:(.init.text+0xc): undefined reference to `imx6sx_cpuidle_init'
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/sysreg.h | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
+> This adds the file containing the imx6sx_cpuidle_init function
+> to the kernel for 6ul-only configurations.
 > 
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index cc06794..39fed2e 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -273,10 +273,14 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
->  	__val;							\
->  })
->  
-> +/*
-> + * The "Z" constraint normally means a zero immediate, but when combined with
-> + * the "%x0" template means XZR.
-> + */
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 547e8f526959 ("ARM: imx: add cpuidle support for i.mx6ul")
 
-Personally I find that comment more confusing than useful - "Z" is
-documented for AArch64 as "Integer constant zero", which to me doesn't
-necessarily imply an immediate; it's just not necessarily immediately
-intuitive that that can be an immediate constant or a 'register
-constant' depending on exactly how it is referenced.
-
-Either way, though:
-
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
->  #define write_sysreg(v, r) do {					\
->  	u64 __val = (u64)v;					\
-> -	asm volatile("msr " __stringify(r) ", %0"		\
-> -		     : : "r" (__val));				\
-> +	asm volatile("msr " __stringify(r) ", %x0"		\
-> +		     : : "rZ" (__val));				\
->  } while (0)
->  
->  #endif
-> 
+Applied, thanks.
