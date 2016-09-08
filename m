@@ -1,23 +1,50 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 8 Sep 2016 22:13:17 +0800
-Subject: [PATCH] ARM: imx: build cpuidle-imx6sx.o for imx6ul
-In-Reply-To: <20160906125338.1530603-1-arnd@arndb.de>
-References: <20160906125338.1530603-1-arnd@arndb.de>
-Message-ID: <20160908141317.GF16911@tiger>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 8 Sep 2016 16:25:25 +0200
+Subject: [PATCH] KVM: arm/arm64: arch_timer: remove unused error handling
+In-Reply-To: <20160908135908.1312349-1-arnd@arndb.de>
+References: <20160908135908.1312349-1-arnd@arndb.de>
+Message-ID: <20160908142525.GB9940@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2016 at 02:53:25PM +0200, Arnd Bergmann wrote:
-> The imx6ul soc code gained support for cpuidle, but that causes
-> a link failure if CONFIG_SOC_IMX6SX is disabled:
+Hi Arnd,
+
+On Thu, Sep 08, 2016 at 03:58:44PM +0200, Arnd Bergmann wrote:
+> A cleanup removed the call to create_singlethread_workqueue(), but did not
+> remove the code that was used in case it failed:
 > 
-> arch/arm/mach-imx/mach-imx6ul.o: In function `imx6ul_init_late':
-> mach-imx6ul.c:(.init.text+0xc): undefined reference to `imx6sx_cpuidle_init'
+> virt/kvm/arm/arch_timer.c: In function 'kvm_timer_hyp_init':
+> virt/kvm/arm/arch_timer.c:457:1: error: label 'out_free' defined but not used [-Werror=unused-label]
 > 
-> This adds the file containing the imx6sx_cpuidle_init function
-> to the kernel for 6ul-only configurations.
+> This removes the now dead code too.
+
+Paolo beat you to it:
+https://lists.cs.columbia.edu/pipermail/kvmarm/2016-September/021626.html
+
+Thanks,
+-Christoffer
+
 > 
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 547e8f526959 ("ARM: imx: add cpuidle support for i.mx6ul")
-
-Applied, thanks.
+> Fixes: 3706feacd007 ("KVM: Remove deprecated create_singlethread_workqueue")
+> ---
+>  virt/kvm/arm/arch_timer.c | 3 ---
+>  1 file changed, 3 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 4309b60ebf17..46980a49a3bb 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -453,9 +453,6 @@ int kvm_timer_hyp_init(void)
+>  	cpuhp_setup_state(CPUHP_AP_KVM_ARM_TIMER_STARTING,
+>  			  "AP_KVM_ARM_TIMER_STARTING", kvm_timer_starting_cpu,
+>  			  kvm_timer_dying_cpu);
+> -	goto out;
+> -out_free:
+> -	free_percpu_irq(host_vtimer_irq, kvm_get_running_vcpus());
+>  out:
+>  	return err;
+>  }
+> -- 
+> 2.9.0
+> 
