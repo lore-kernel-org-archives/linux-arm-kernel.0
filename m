@@ -1,320 +1,52 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  8 Sep 2016 13:55:38 +0100
-Subject: [PATCH 5/6] arm64: simplify sysreg manipulation
+Date: Thu,  8 Sep 2016 13:55:39 +0100
+Subject: [PATCH 6/6] arm64: simplify contextidr_thread_switch
 In-Reply-To: <1473339339-32334-1-git-send-email-mark.rutland@arm.com>
 References: <1473339339-32334-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1473339339-32334-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <1473339339-32334-7-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A while back we added {read,write}_sysreg accessors to handle accesses
-to system registers, without the usual boilerplate asm volatile,
-temporary variable, etc.
+When CONFIG_PID_IN_CONTEXTIDR is not selected, we use an empty stub
+definition of contextidr_thread_switch(). As everything we rely upon
+exists regardless of CONFIG_PID_IN_CONTEXTIDR, we don't strictly require
+an empty stub.
 
-This patch makes use of these across arm64 to make code shorter and
-clearer. For sequences with a trailing ISB, the existing isb() macro is
-also used so that asm blocks can be removed entirely.
-
-A few uses of inline assembly for msr/mrs are left as-is. Those
-manipulating sp_el0 for the current thread_info value have special
-clobber requiremends.
+By using IS_ENABLED() rather than ifdeffery, we avoid duplication, and
+get compiler coverage on all the code even when CONFIG_PID_IN_CONTEXTIDR
+is not selected and the code is optimised away.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/hw_breakpoint.h | 13 +++++++------
- arch/arm64/include/asm/mmu_context.h   | 27 ++++++++++-----------------
- arch/arm64/include/asm/pgtable-hwdef.h |  1 +
- arch/arm64/include/asm/sysreg.h        | 20 ++++++++++----------
- arch/arm64/include/asm/thread_info.h   |  3 +++
- arch/arm64/kernel/cacheinfo.c          |  8 +++-----
- arch/arm64/kernel/debug-monitors.c     |  8 +++-----
- arch/arm64/kernel/process.c            | 14 ++++++--------
- arch/arm64/kernel/sys_compat.c         |  2 +-
- 9 files changed, 44 insertions(+), 52 deletions(-)
+ arch/arm64/include/asm/mmu_context.h | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
-index 115ea2a..783ba7d 100644
---- a/arch/arm64/include/asm/hw_breakpoint.h
-+++ b/arch/arm64/include/asm/hw_breakpoint.h
-@@ -18,6 +18,7 @@
- 
- #include <asm/cputype.h>
- #include <asm/cpufeature.h>
-+#include <asm/sysreg.h>
- #include <asm/virt.h>
- 
- #ifdef __KERNEL__
-@@ -98,18 +99,18 @@ static inline void decode_ctrl_reg(u32 reg,
- #define AARCH64_DBG_REG_WCR	(AARCH64_DBG_REG_WVR + ARM_MAX_WRP)
- 
- /* Debug register names. */
--#define AARCH64_DBG_REG_NAME_BVR	"bvr"
--#define AARCH64_DBG_REG_NAME_BCR	"bcr"
--#define AARCH64_DBG_REG_NAME_WVR	"wvr"
--#define AARCH64_DBG_REG_NAME_WCR	"wcr"
-+#define AARCH64_DBG_REG_NAME_BVR	bvr
-+#define AARCH64_DBG_REG_NAME_BCR	bcr
-+#define AARCH64_DBG_REG_NAME_WVR	wvr
-+#define AARCH64_DBG_REG_NAME_WCR	wcr
- 
- /* Accessor macros for the debug registers. */
- #define AARCH64_DBG_READ(N, REG, VAL) do {\
--	asm volatile("mrs %0, dbg" REG #N "_el1" : "=r" (VAL));\
-+	VAL = read_sysreg(dbg##REG##N##_el1);\
- } while (0)
- 
- #define AARCH64_DBG_WRITE(N, REG, VAL) do {\
--	asm volatile("msr dbg" REG #N "_el1, %0" :: "r" (VAL));\
-+	write_sysreg(VAL, dbg##REG##N##_el1);\
- } while (0)
- 
- struct task_struct;
 diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index b1892a0..e5c24b4 100644
+index e5c24b4..a501853 100644
 --- a/arch/arm64/include/asm/mmu_context.h
 +++ b/arch/arm64/include/asm/mmu_context.h
-@@ -27,16 +27,14 @@
- #include <asm-generic/mm_hooks.h>
- #include <asm/cputype.h>
- #include <asm/pgtable.h>
-+#include <asm/sysreg.h>
+@@ -30,17 +30,14 @@
+ #include <asm/sysreg.h>
  #include <asm/tlbflush.h>
  
- #ifdef CONFIG_PID_IN_CONTEXTIDR
+-#ifdef CONFIG_PID_IN_CONTEXTIDR
  static inline void contextidr_thread_switch(struct task_struct *next)
  {
--	asm(
--	"	msr	contextidr_el1, %0\n"
--	"	isb"
--	:
--	: "r" (task_pid_nr(next)));
-+	write_sysreg(task_pid_nr(next), contextidr_el1);
-+	isb();
- }
- #else
- static inline void contextidr_thread_switch(struct task_struct *next)
-@@ -51,11 +49,8 @@ static inline void cpu_set_reserved_ttbr0(void)
- {
- 	unsigned long ttbr = virt_to_phys(empty_zero_page);
- 
--	asm(
--	"	msr	ttbr0_el1, %0			// set TTBR0\n"
--	"	isb"
--	:
--	: "r" (ttbr));
-+	write_sysreg(ttbr, ttbr0_el1);
-+	isb();
- }
- 
- /*
-@@ -81,13 +76,11 @@ static inline void __cpu_set_tcr_t0sz(unsigned long t0sz)
- 	if (!__cpu_uses_extended_idmap())
- 		return;
- 
--	asm volatile (
--	"	mrs	%0, tcr_el1	;"
--	"	bfi	%0, %1, %2, %3	;"
--	"	msr	tcr_el1, %0	;"
--	"	isb"
--	: "=&r" (tcr)
--	: "r"(t0sz), "I"(TCR_T0SZ_OFFSET), "I"(TCR_TxSZ_WIDTH));
-+	tcr = read_sysreg(tcr_el1);
-+	tcr &= ~TCR_T0SZ_MASK;
-+	tcr |= t0sz << TCR_T0SZ_OFFSET;
-+	write_sysreg(tcr, tcr_el1);
-+	isb();
- }
- 
- #define cpu_set_default_tcr_t0sz()	__cpu_set_tcr_t0sz(TCR_T0SZ(VA_BITS))
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index c3ae239..eb0c2bd 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -208,6 +208,7 @@
- #define TCR_T1SZ(x)		((UL(64) - (x)) << TCR_T1SZ_OFFSET)
- #define TCR_TxSZ(x)		(TCR_T0SZ(x) | TCR_T1SZ(x))
- #define TCR_TxSZ_WIDTH		6
-+#define TCR_T0SZ_MASK		(((UL(1) << TCR_TxSZ_WIDTH) - 1) << TCR_T0SZ_OFFSET)
- 
- #define TCR_IRGN0_SHIFT		8
- #define TCR_IRGN0_MASK		(UL(3) << TCR_IRGN0_SHIFT)
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 39fed2e..e91aef2b 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -253,16 +253,6 @@ asm(
- "	.endm\n"
- );
- 
--static inline void config_sctlr_el1(u32 clear, u32 set)
--{
--	u32 val;
--
--	asm volatile("mrs %0, sctlr_el1" : "=r" (val));
--	val &= ~clear;
--	val |= set;
--	asm volatile("msr sctlr_el1, %0" : : "r" (val));
--}
--
- /*
-  * Unlike read_cpuid, calls to read_sysreg are never expected to be
-  * optimized away or replaced with synthetic values.
-@@ -283,6 +273,16 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
- 		     : : "rZ" (__val));				\
- } while (0)
- 
-+static inline void config_sctlr_el1(u32 clear, u32 set)
-+{
-+	u32 val;
++	if (!IS_ENABLED(CONFIG_PID_IN_CONTEXTIDR))
++		return;
 +
-+	val = read_sysreg(sctlr_el1);
-+	val &= ~clear;
-+	val |= set;
-+	write_sysreg(val, sctlr_el1);
-+}
-+
- #endif
- 
- #endif	/* __ASM_SYSREG_H */
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index abd64bd..e9ea5a6 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -75,6 +75,9 @@ static inline struct thread_info *current_thread_info(void) __attribute_const__;
- 
- /*
-  * struct thread_info can be accessed directly via sp_el0.
-+ *
-+ * We don't use read_sysreg() as we want the compiler to cache the value where
-+ * possible.
-  */
- static inline struct thread_info *current_thread_info(void)
- {
-diff --git a/arch/arm64/kernel/cacheinfo.c b/arch/arm64/kernel/cacheinfo.c
-index b8629d5..9617301 100644
---- a/arch/arm64/kernel/cacheinfo.c
-+++ b/arch/arm64/kernel/cacheinfo.c
-@@ -39,7 +39,7 @@ static inline enum cache_type get_cache_type(int level)
- 
- 	if (level > MAX_CACHE_LEVEL)
- 		return CACHE_TYPE_NOCACHE;
--	asm volatile ("mrs     %x0, clidr_el1" : "=r" (clidr));
-+	clidr = read_sysreg(clidr_el1);
- 	return CLIDR_CTYPE(clidr, level);
- }
- 
-@@ -55,11 +55,9 @@ u64 __attribute_const__ cache_get_ccsidr(u64 csselr)
- 
- 	WARN_ON(preemptible());
- 
--	/* Put value into CSSELR */
--	asm volatile("msr csselr_el1, %x0" : : "r" (csselr));
-+	write_sysreg(csselr, csselr_el1);
+ 	write_sysreg(task_pid_nr(next), contextidr_el1);
  	isb();
--	/* Read result out of CCSIDR */
--	asm volatile("mrs %x0, ccsidr_el1" : "=r" (ccsidr));
-+	ccsidr = read_sysreg(ccsidr_el1);
- 
- 	return ccsidr;
  }
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index 91fff48..c2cd1c3 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -46,16 +46,14 @@ static void mdscr_write(u32 mdscr)
- {
- 	unsigned long flags;
- 	local_dbg_save(flags);
--	asm volatile("msr mdscr_el1, %0" :: "r" (mdscr));
-+	write_sysreg(mdscr, mdscr_el1);
- 	local_dbg_restore(flags);
- }
- NOKPROBE_SYMBOL(mdscr_write);
+-#else
+-static inline void contextidr_thread_switch(struct task_struct *next)
+-{
+-}
+-#endif
  
- static u32 mdscr_read(void)
- {
--	u32 mdscr;
--	asm volatile("mrs %0, mdscr_el1" : "=r" (mdscr));
--	return mdscr;
-+	return read_sysreg(mdscr_el1);
- }
- NOKPROBE_SYMBOL(mdscr_read);
- 
-@@ -134,7 +132,7 @@ NOKPROBE_SYMBOL(disable_debug_monitors);
-  */
- static void clear_os_lock(void *unused)
- {
--	asm volatile("msr oslar_el1, %0" : : "r" (0));
-+	write_sysreg(0, oslar_el1);
- }
- 
- static int os_lock_notify(struct notifier_block *self,
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 6cd2612..a4f5f76 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -202,7 +202,7 @@ void show_regs(struct pt_regs * regs)
- 
- static void tls_thread_flush(void)
- {
--	asm ("msr tpidr_el0, xzr");
-+	write_sysreg(0, tpidr_el0);
- 
- 	if (is_compat_task()) {
- 		current->thread.tp_value = 0;
-@@ -213,7 +213,7 @@ static void tls_thread_flush(void)
- 		 * with a stale shadow state during context switch.
- 		 */
- 		barrier();
--		asm ("msr tpidrro_el0, xzr");
-+		write_sysreg(0, tpidrro_el0);
- 	}
- }
- 
-@@ -253,7 +253,7 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
- 		 * Read the current TLS pointer from tpidr_el0 as it may be
- 		 * out-of-sync with the saved value.
- 		 */
--		asm("mrs %0, tpidr_el0" : "=r" (*task_user_tls(p)));
-+		*task_user_tls(p) = read_sysreg(tpidr_el0);
- 
- 		if (stack_start) {
- 			if (is_compat_thread(task_thread_info(p)))
-@@ -289,17 +289,15 @@ static void tls_thread_switch(struct task_struct *next)
- {
- 	unsigned long tpidr, tpidrro;
- 
--	asm("mrs %0, tpidr_el0" : "=r" (tpidr));
-+	tpidr = read_sysreg(tpidr_el0);
- 	*task_user_tls(current) = tpidr;
- 
- 	tpidr = *task_user_tls(next);
- 	tpidrro = is_compat_thread(task_thread_info(next)) ?
- 		  next->thread.tp_value : 0;
- 
--	asm(
--	"	msr	tpidr_el0, %0\n"
--	"	msr	tpidrro_el0, %1"
--	: : "r" (tpidr), "r" (tpidrro));
-+	write_sysreg(tpidr, tpidr_el0);
-+	write_sysreg(tpidrro, tpidrro_el0);
- }
- 
- /* Restore the UAO state depending on next's addr_limit */
-diff --git a/arch/arm64/kernel/sys_compat.c b/arch/arm64/kernel/sys_compat.c
-index 28c511b..abaf582 100644
---- a/arch/arm64/kernel/sys_compat.c
-+++ b/arch/arm64/kernel/sys_compat.c
-@@ -94,7 +94,7 @@ long compat_arm_syscall(struct pt_regs *regs)
- 		 * See comment in tls_thread_flush.
- 		 */
- 		barrier();
--		asm ("msr tpidrro_el0, %0" : : "r" (regs->regs[0]));
-+		write_sysreg(regs->regs[0], tpidrro_el0);
- 		return 0;
- 
- 	default:
+ /*
+  * Set TTBR0 to empty_zero_page. No translations will be possible via TTBR0.
 -- 
 1.9.1
