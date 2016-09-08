@@ -1,64 +1,99 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  8 Sep 2016 11:30:32 +0200
-Subject: [PATCH 1/2] ARM: dts: fix RealView EB SMSC ethernet version
-Message-ID: <1473327032-31852-1-git-send-email-linus.walleij@linaro.org>
+Date: Thu,  8 Sep 2016 11:30:43 +0200
+Subject: [PATCH 2/2] ARM: dts: add device tree for the RealView EB Rev D
+Message-ID: <1473327043-31903-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ethernet version in the earlier RealView EB variants is
-LAN91C111 and not LAN9118 according to ARM DUI 0303E
-"RealView Emulation Baseboard User Guide" page 3-57.
+The RealView EB revision D is a special case as it appears to be
+undocumented in ARM official documents, while the Linux kernel
+still contains special code for handling it.
 
-Make sure that this is used for the base variant of the board.
+commit be4f3c8691492934c8ee03dbecb3a3a865ac6cd6
+"Add RealView/EB support for the LAN9118 Ethernet chip"
+adds support for the SMSC LAN9118 chip used on the D revision,
+but no other traces of hardware deviations for this variant
+can be found.
 
-As the DT bindings for LAN91C111 does not specify any power
-supplies, these need to be deleted from the DTS file.
+This created a separate top-level .dts file especially for this
+board version, so that it gets registered with the right type
+of ethernet controller.
 
-Fixes: 2440d29d2ae2 ("ARM: dts: realview: support all the RealView EB board variants")
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-ARM SoC people: please apply this directly with the second patch.
+ARM SoC people: please apply this directly with the first patch.
 ---
- arch/arm/boot/dts/arm-realview-eb.dtsi | 17 ++---------------
- 1 file changed, 2 insertions(+), 15 deletions(-)
+ arch/arm/boot/dts/Makefile                 |  1 +
+ arch/arm/boot/dts/arm-realview-eb-revd.dts | 49 ++++++++++++++++++++++++++++++
+ 2 files changed, 50 insertions(+)
+ create mode 100644 arch/arm/boot/dts/arm-realview-eb-revd.dts
 
-diff --git a/arch/arm/boot/dts/arm-realview-eb.dtsi b/arch/arm/boot/dts/arm-realview-eb.dtsi
-index 1c6a040218e3..22f6a4f201b7 100644
---- a/arch/arm/boot/dts/arm-realview-eb.dtsi
-+++ b/arch/arm/boot/dts/arm-realview-eb.dtsi
-@@ -51,14 +51,6 @@
- 		regulator-boot-on;
-         };
- 
--	veth: fixedregulator at 0 {
--		compatible = "regulator-fixed";
--		regulator-name = "veth";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--		regulator-boot-on;
--	};
--
- 	xtal24mhz: xtal24mhz at 24M {
- 		#clock-cells = <0>;
- 		compatible = "fixed-clock";
-@@ -134,16 +126,11 @@
- 		bank-width = <4>;
- 	};
- 
--	/* SMSC 9118 ethernet with PHY and EEPROM */
-+	/* SMSC LAN91C111 ethernet with PHY and EEPROM */
- 	ethernet: ethernet at 4e000000 {
--		compatible = "smsc,lan9118", "smsc,lan9115";
-+		compatible = "smsc,lan91c111";
- 		reg = <0x4e000000 0x10000>;
--		phy-mode = "mii";
- 		reg-io-width = <4>;
--		smsc,irq-active-high;
--		smsc,irq-push-pull;
--		vdd33a-supply = <&veth>;
--		vddvario-supply = <&veth>;
- 	};
- 
- 	usb: usb at 4f000000 {
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index faacd52370d2..43d2c379d034 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -608,6 +608,7 @@ dtb-$(CONFIG_ARCH_REALVIEW) += \
+ 	arm-realview-pb1176.dtb \
+ 	arm-realview-pb11mp.dtb \
+ 	arm-realview-eb.dtb \
++	arm-realview-eb-revd.dtb \
+ 	arm-realview-eb-11mp.dtb \
+ 	arm-realview-eb-11mp-revb.dtb \
+ 	arm-realview-eb-a9mp.dtb \
+diff --git a/arch/arm/boot/dts/arm-realview-eb-revd.dts b/arch/arm/boot/dts/arm-realview-eb-revd.dts
+new file mode 100644
+index 000000000000..2142deffbe4c
+--- /dev/null
++++ b/arch/arm/boot/dts/arm-realview-eb-revd.dts
+@@ -0,0 +1,49 @@
++/*
++ * Copyright 2016 Linaro Ltd
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a copy
++ * of this software and associated documentation files (the "Software"), to deal
++ * in the Software without restriction, including without limitation the rights
++ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++ * copies of the Software, and to permit persons to whom the Software is
++ * furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
++ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
++ * THE SOFTWARE.
++ */
++
++#include "arm-realview-eb.dts"
++
++/ {
++	model = "ARM RealView Emulation Baseboard Rev D";
++
++	/* Introduce a fixed regulator for the new ethernet controller */
++	veth: fixedregulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "veth";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++	};
++};
++
++/*
++ * The revision D has a different ethernet controller that the elder boards:
++ * the older board uses LAN91C111 but the new one uses LAN9118.
++ */
++&ethernet {
++	compatible = "smsc,lan9118", "smsc,lan9115";
++	phy-mode = "mii";
++	smsc,irq-active-high;
++	smsc,irq-push-pull;
++	vdd33a-supply = <&veth>;
++	vddvario-supply = <&veth>;
++};
 -- 
 2.7.4
