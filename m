@@ -1,35 +1,45 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Thu, 8 Sep 2016 14:04:40 +0200
-Subject: [PATCH 0/2] spi: meson: Add Amlogic GXBB compatible
-In-Reply-To: <1473321206-32284-1-git-send-email-narmstrong@baylibre.com>
-References: <1473321206-32284-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <293061a8-e867-4d91-20cb-6e5df8e9b543@suse.de>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 8 Sep 2016 14:06:52 +0200
+Subject: [PATCH 4/8] ARM: dts: bcm283x: Add a new EMMC pin group from the
+ downstream tree.
+In-Reply-To: <1473320687.6698.25.camel@redhat.com>
+References: <1473244289-20728-1-git-send-email-kraxel@redhat.com>
+ <1473244289-20728-5-git-send-email-kraxel@redhat.com>
+ <87650770.23554.026b1e4b-e35d-48e6-9394-7eeea0ff9add.open-xchange@email.1und1.de>
+ <1473320687.6698.25.camel@redhat.com>
+Message-ID: <429647ef-ff1e-4999-5b19-3b4529ad3872@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 08.09.2016 um 09:53 schrieb Neil Armstrong:
-> This patchset adds a specific compatible string in the Meson SPIFC driver for
-> the Amlogic Meson GXBB SoC.
+Am 08.09.2016 um 09:44 schrieb Gerd Hoffmann:
+> On Mi, 2016-09-07 at 20:13 +0200, Stefan Wahren wrote:
+>>> Gerd Hoffmann <kraxel@redhat.com> hat am 7. September 2016 um 12:31
+>>> geschrieben:
+>>>
+>>>
+>>> From: Eric Anholt <eric@anholt.net>
+>>>
+>>> This will be used for having EMMC (sdhci-bcm2835.c) drive the
+>>> wireless.
+>> sdhci-bcm2835.c has been replaced by sdhci-iproc.c
+> Ah, right, I'll update the commit msg for v2.
+>
+>> How about adding pull defines to include/dt-bindings/pinctrl/bcm2835.h?
+> Already there (or do you mean something other than '#define
+> BCM2835_FSEL_*' ?)
 
-Any particular reason? We could just reuse the meson6 one since there
-appear to be no code changes so far.
+No, i thought of the GPIO pull up/down register values:
 
-Regards,
-Andreas
+BCM2835_PUD_OFF 0
+BCM2835_PUD_DOWN 1
+BCM2835_PUD_UP 2
 
-> This patchset is SPI-only respin from Jerome Brunet patchset at [1].
-> 
-> [1] http://lkml.kernel.org/r/1473261223-15412-1-git-send-email-jbrunet at baylibre.com
-> 
-> Neil Armstrong (2):
->   dt-bindings: spi-meson: Add GXBB Compatible string
->   spi: meson: Add GXBB compatible
-> 
->  Documentation/devicetree/bindings/spi/spi-meson.txt | 2 +-
->  drivers/spi/spi-meson-spifc.c                       | 1 +
->  2 files changed, 2 insertions(+), 1 deletion(-)
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+>
+> cheers,
+>   Gerd
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
