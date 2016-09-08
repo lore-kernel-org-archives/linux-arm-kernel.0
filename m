@@ -1,76 +1,178 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  8 Sep 2016 09:43:12 +0200
-Subject: [PATCH 16/30] arm64: dts: h3ulcb: enable EthernetAVB
+Date: Thu,  8 Sep 2016 09:43:05 +0200
+Subject: [PATCH 09/30] arm64: dts: renesas: r8a7795: Add VSP instances
 In-Reply-To: <cover.1473320411.git.horms+renesas@verge.net.au>
 References: <cover.1473320411.git.horms+renesas@verge.net.au>
-Message-ID: <144bf6ccb13fc661a2d18ae8b13f25e61015331b.1473320411.git.horms+renesas@verge.net.au>
+Message-ID: <9f8573e38a0b377aa092db96be140be4d59a7fae.1473320411.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-This supports Ethernet AVB on H3ULCB board
+The r8a7795 has 9 VSP instances.
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts | 32 ++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 90 ++++++++++++++++++++++++++++++++
+ 1 file changed, 90 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-index 67ce368ff9ee..fb694b8c6f59 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-@@ -19,6 +19,7 @@
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index fe7725d1d131..19daa6a88312 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -1295,6 +1295,16 @@
+ 			status = "disabled";
+ 		};
  
- 	aliases {
- 		serial0 = &scif2;
-+		ethernet0 = &avb;
- 	};
++		vspbc: vsp at fe920000 {
++			compatible = "renesas,vsp2";
++			reg = <0 0xfe920000 0 0x8000>;
++			interrupts = <GIC_SPI 465 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 624>;
++			power-domains = <&sysc R8A7795_PD_A3VP>;
++
++			renesas,fcp = <&fcpvb1>;
++		};
++
+ 		fcpvb1: fcp at fe92f000 {
+ 			compatible = "renesas,r8a7795-fcpv", "renesas,fcpv";
+ 			reg = <0 0xfe92f000 0 0x200>;
+@@ -1323,6 +1333,16 @@
+ 			power-domains = <&sysc R8A7795_PD_A3VP>;
+ 		};
  
- 	chosen {
-@@ -49,6 +50,11 @@
- 		groups = "scif_clk_a";
- 		function = "scif_clk";
- 	};
++		vspbd: vsp at fe960000 {
++			compatible = "renesas,vsp2";
++			reg = <0 0xfe960000 0 0x8000>;
++			interrupts = <GIC_SPI 266 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 626>;
++			power-domains = <&sysc R8A7795_PD_A3VP>;
 +
-+	avb_pins: avb {
-+		groups = "avb_mdc";
-+		function = "avb";
-+	};
- };
++			renesas,fcp = <&fcpvb0>;
++		};
++
+ 		fcpvb0: fcp at fe96f000 {
+ 			compatible = "renesas,r8a7795-fcpv", "renesas,fcpv";
+ 			reg = <0 0xfe96f000 0 0x200>;
+@@ -1330,6 +1350,16 @@
+ 			power-domains = <&sysc R8A7795_PD_A3VP>;
+ 		};
  
- &scif2 {
-@@ -62,3 +68,29 @@
- 	clock-frequency = <14745600>;
- 	status = "okay";
- };
++		vspi0: vsp at fe9a0000 {
++			compatible = "renesas,vsp2";
++			reg = <0 0xfe9a0000 0 0x8000>;
++			interrupts = <GIC_SPI 444 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 631>;
++			power-domains = <&sysc R8A7795_PD_A3VP>;
 +
-+&avb {
-+	pinctrl-0 = <&avb_pins>;
-+	pinctrl-names = "default";
-+	renesas,no-ether-link;
-+	phy-handle = <&phy0>;
-+	status = "okay";
++			renesas,fcp = <&fcpvi0>;
++		};
 +
-+	phy0: ethernet-phy at 0 {
-+		rxc-skew-ps = <900>;
-+		rxdv-skew-ps = <0>;
-+		rxd0-skew-ps = <0>;
-+		rxd1-skew-ps = <0>;
-+		rxd2-skew-ps = <0>;
-+		rxd3-skew-ps = <0>;
-+		txc-skew-ps = <900>;
-+		txen-skew-ps = <0>;
-+		txd0-skew-ps = <0>;
-+		txd1-skew-ps = <0>;
-+		txd2-skew-ps = <0>;
-+		txd3-skew-ps = <0>;
-+		reg = <0>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
+ 		fcpvi0: fcp at fe9af000 {
+ 			compatible = "renesas,r8a7795-fcpv", "renesas,fcpv";
+ 			reg = <0 0xfe9af000 0 0x200>;
+@@ -1337,6 +1367,16 @@
+ 			power-domains = <&sysc R8A7795_PD_A3VP>;
+ 		};
+ 
++		vspi1: vsp at fe9b0000 {
++			compatible = "renesas,vsp2";
++			reg = <0 0xfe9b0000 0 0x8000>;
++			interrupts = <GIC_SPI 445 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 630>;
++			power-domains = <&sysc R8A7795_PD_A3VP>;
++
++			renesas,fcp = <&fcpvi1>;
++		};
++
+ 		fcpvi1: fcp at fe9bf000 {
+ 			compatible = "renesas,r8a7795-fcpv", "renesas,fcpv";
+ 			reg = <0 0xfe9bf000 0 0x200>;
+@@ -1344,6 +1384,16 @@
+ 			power-domains = <&sysc R8A7795_PD_A3VP>;
+ 		};
+ 
++		vspi2: vsp at fe9c0000 {
++			compatible = "renesas,vsp2";
++			reg = <0 0xfe9c0000 0 0x8000>;
++			interrupts = <GIC_SPI 446 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 629>;
++			power-domains = <&sysc R8A7795_PD_A3VP>;
++
++			renesas,fcp = <&fcpvi2>;
++		};
++
+ 		fcpvi2: fcp at fe9cf000 {
+ 			compatible = "renesas,r8a7795-fcpv", "renesas,fcpv";
+ 			reg = <0 0xfe9cf000 0 0x200>;
+@@ -1351,6 +1401,16 @@
+ 			power-domains = <&sysc R8A7795_PD_A3VP>;
+ 		};
+ 
++		vspd0: vsp at fea20000 {
++			compatible = "renesas,vsp2";
++			reg = <0 0xfea20000 0 0x4000>;
++			interrupts = <GIC_SPI 466 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 623>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++
++			renesas,fcp = <&fcpvd0>;
++		};
++
+ 		fcpvd0: fcp at fea27000 {
+ 			compatible = "renesas,r8a7795-fcpv", "renesas,fcpv";
+ 			reg = <0 0xfea27000 0 0x200>;
+@@ -1358,6 +1418,16 @@
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 		};
+ 
++		vspd1: vsp at fea28000 {
++			compatible = "renesas,vsp2";
++			reg = <0 0xfea28000 0 0x4000>;
++			interrupts = <GIC_SPI 467 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 622>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++
++			renesas,fcp = <&fcpvd1>;
++		};
++
+ 		fcpvd1: fcp at fea2f000 {
+ 			compatible = "renesas,r8a7795-fcpv", "renesas,fcpv";
+ 			reg = <0 0xfea2f000 0 0x200>;
+@@ -1365,6 +1435,16 @@
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 		};
+ 
++		vspd2: vsp at fea30000 {
++			compatible = "renesas,vsp2";
++			reg = <0 0xfea30000 0 0x4000>;
++			interrupts = <GIC_SPI 468 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 621>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++
++			renesas,fcp = <&fcpvd2>;
++		};
++
+ 		fcpvd2: fcp at fea37000 {
+ 			compatible = "renesas,r8a7795-fcpv", "renesas,fcpv";
+ 			reg = <0 0xfea37000 0 0x200>;
+@@ -1372,6 +1452,16 @@
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 		};
+ 
++		vspd3: vsp at fea38000 {
++			compatible = "renesas,vsp2";
++			reg = <0 0xfea38000 0 0x4000>;
++			interrupts = <GIC_SPI 469 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 620>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++
++			renesas,fcp = <&fcpvd3>;
++		};
++
+ 		fcpvd3: fcp at fea3f000 {
+ 			compatible = "renesas,r8a7795-fcpv", "renesas,fcpv";
+ 			reg = <0 0xfea3f000 0 0x200>;
 -- 
 2.7.0.rc3.207.g0ac5344
