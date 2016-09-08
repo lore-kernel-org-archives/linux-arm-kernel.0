@@ -1,49 +1,75 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 08 Sep 2016 10:38:27 -0700
-Subject: [PATCH 3/3] soc: ti: Add ti_sci_pm_domains driver
-In-Reply-To: <CAPDyKFo0Cb90BbY7ra6VDjb5frC5=VtmE3V6tDK=VosfPmod7Q@mail.gmail.com>
- (Ulf Hansson's message of "Thu, 8 Sep 2016 11:27:52 +0200")
-References: <20160819235653.26355-1-nm@ti.com>
- <20160819235653.26355-4-nm@ti.com>
- <CAPDyKFooDUOPT9dP8HaW3YBO9PsX-1+96PPE7CRMyjEkra7cBQ@mail.gmail.com>
- <57C0D2C9.1030801@ti.com> <57C5E1DA.2040405@ti.com>
- <CAPDyKFqszM48nXnnA9D8iCp34k-ZmNvOkHPCc=Fya4nJA7PvBQ@mail.gmail.com>
- <57CF26DB.4020807@ti.com> <7h4m5rv9kz.fsf@baylibre.com>
- <CAPDyKFo0Cb90BbY7ra6VDjb5frC5=VtmE3V6tDK=VosfPmod7Q@mail.gmail.com>
-Message-ID: <m2mvjinvfw.fsf@baylibre.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 8 Sep 2016 17:47:56 +0000
+Subject: [RFC 1/7] Make Hi3620 explicit, remove wildcards
+In-Reply-To: <20160908172346.27506-1-netz.kernel@gmail.com>
+References: <20160908172346.27506-1-netz.kernel@gmail.com>
+Message-ID: <20160908174756.GC12916@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf Hansson <ulf.hansson@linaro.org> writes:
+Hi Marty,
 
-> [...]
->
->>
->> One more idea...
->>
->> Since you don't really have a domain (a group of devices), what you
->> really have is each device having an independent power switch, so as Ulf
->> suggested, what you really need is for all the devices to share the same
->> set of runtime PM callbacks that call SCI.  The only difference is the
->> unique ID.
->>
->> Rather than using all of genpd, you could also just use a pm_domain
->> which is what genpd is built on top of (and also omap_device, which
->> you're probably familiar with also.)
->
-> Even if this would work as well, the downside would be that you need
-> to re-invent the parts related to the DT parsing, the probing/removal
-> and attaching/detaching of the device to the PM domain.
->
-> You probably don't want to go there... :-)
++ Andrew, Russell,
 
-All you'd need to read from DT would be the device-specific ID for
-TI-SCI, and that could be done at bind time with a notifier.  The, in
-that same notifier, if a TI-SCI ID exists, it would get added to the
-pm_domain.
 
-Anyways, your original proposal is much preferred if it can work.  I'm
-just throwing out another option because I really don't like one genpd
-per device.
+Since this is your first series, I'll go ahead and gather a few comments
+right here:
 
-Kevin
+- Make sure to change the subject line for each patch.
+
+The subject is retrieved from the first line of the commit.  you can
+look at the output of 'git log --oneline' to see a nice, concise view of
+your series.
+
+- Include 'PATCH' or 'Patch' inside the square brackets on the subject
+  line.
+
+When you use the prefix option, as you did, it *replaces* 'PATCH', so
+you need '--subject-prefix="RFC PATCH"' or '--subject-prefix="RFC PATCH V2"'
+
+- Please Cc Andrew, Russell and myself on future series.
+
+Personally, I do that at the 'send-email' stage instead of
+'format-patch'.  But whichever you prefer.  Don't be shy about Cc'ing.
+We all are accustomed to handling lots of email.  It makes it easier for
+us to spot stuff we are actively involved in. :-)
+
+thx,
+
+Jason.
+
+On Thu, Sep 08, 2016 at 12:23:40PM -0500, Marty Plummer wrote:
+> This is a preparatory series for adding the ARMv5/v6 hi3520 SoCs.
+> Assumptions were made when adding hi3620 that don't hold water in
+> light of adding support for the hi3520 SoC.  Fix the issue by renaming
+> config options and other namespaces to avoid collisions with the new
+> work.
+> 
+> Only internal APIs are modified with this series.
+> 
+> Signed-off-by: Marty Plummer <netz.kernel@gmail.com>
+> ---
+>  arch/arm/Kconfig.debug | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index a9693b6..9094ca6 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -280,7 +280,7 @@ choice
+>  
+>  	config DEBUG_HI3620_UART
+>  		bool "Hisilicon HI3620 Debug UART"
+> -		depends on ARCH_HI3xxx
+> +		depends on ARCH_HI3620
+>  		select DEBUG_UART_PL01X
+>  		help
+>  		  Say Y here if you want kernel low-level debugging support
+> -- 
+> 2.9.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
