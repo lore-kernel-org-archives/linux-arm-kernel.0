@@ -1,28 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Sep 2016 10:02:25 +0200
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <20160908011535.GE13903@b29397-desktop>
-References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
- <3189648.KnWLgq0lTY@wuerfel> <20160908011535.GE13903@b29397-desktop>
-Message-ID: <3677438.L3Nmh9fM1W@wuerfel>
+From: jorik@kippendief.biz (Jorik Jonker)
+Date: Thu, 8 Sep 2016 10:02:13 +0200
+Subject: [PATCH v4 4/8] dts: sun8i-h3: move uart1 pinmux/peripheral
+ assocation to DSTI
+In-Reply-To: <20160908062317.GD8913@lukather>
+References: <1473235141-12768-1-git-send-email-jorik@kippendief.biz>
+ <1473235141-12768-5-git-send-email-jorik@kippendief.biz>
+ <20160908062317.GD8913@lukather>
+Message-ID: <20160908080213.GA32547@carbon.kippendief.biz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 8, 2016 9:15:36 AM CEST Peter Chen wrote:
-> > 
-> > Right, I was specifically talking about the code in chipidea here,
-> > which I think is never used on the PCI bus, and how the current
-> > code is broken. We can probably do better than of_dma_configure()
-> > (see below), but it would be an improvement.
-> 
-> Chipidea is also used at PCI bus too, see drivers/usb/chipidea/ci_hdrc_pci.c
-> 
+Maxime, Chen-Yu: thanks for taking the effort to go through my patches 
+again!
 
-Ok, I see.
+On Thu, Sep 08, 2016 at 08:23:17AM +0200, Maxime Ripard wrote:
+>On Wed, Sep 07, 2016 at 09:58:57AM +0200, jorik at kippendief.biz wrote:
+>> From: Jorik Jonker <jorik@kippendief.biz>
+>>
+>> Users using this UART without RTS/CTS should override the association in
+>> their board specific DTS. All (1) board using this UART uses RTS/CTS, so
+>> this breaks nothing.
+>
+>Using RTS / CTS is very rare among the boards. Forcing it down the
+>throat of every user doesn't seem like the right thing to do.
 
-The experimental patch I posted should actually handle this just fine,
-as it simply assumes that dev->parent is the device used for the DMA
-API in chipidea, and I think this holds true for both the PCI and the
-DT based uses of this driver.
+So, I'm going for a v5, with these changes:
+- rename uart0_pins to uart0_pa_pins (as there could be a pf)
+- associate uart0_pa_pins with uart0 on all H3 board DTS files
+- put rts/cts in seperate pinmux sets for uart1 (2,3: see below)
+- associate rx/tx for uart1-3 in H3 DTSI (this is the only option)
+- associate UART1 rts/cts as pinctrl-1 in sun8i-h3-bananapi-m2-plus
+  (to prevent breakage for existing users)
 
-	Arnd
+I am a bit in doubt if I should include pinmux definitions for the 
+following things, as Chen-Yu said to only include stuff that is actually 
+used in a board:
+
+- uart0_pf_pins, since there is no board using it
+- uart{2,3}_rts_cts, as I agree RTS/CTS is a bit exotic
+
+Maxime/Chen-Yu: what do you think of this?
+
+Best,
+Jorik
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/6efb4bf1/attachment-0001.sig>
