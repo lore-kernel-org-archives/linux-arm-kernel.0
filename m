@@ -1,29 +1,35 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Thu, 8 Sep 2016 13:18:28 -0400
-Subject: [PATCH 2/2] ARM: lpc32xx: remove unused header file clock.h
-In-Reply-To: <1473303609-20076-2-git-send-email-vz@mleia.com>
-References: <1473303609-20076-1-git-send-email-vz@mleia.com>
- <1473303609-20076-2-git-send-email-vz@mleia.com>
-Message-ID: <00ff01d209f5$047798f0$0d66cad0$@gmail.com>
+From: netz.kernel@gmail.com (Marty Plummer)
+Date: Thu,  8 Sep 2016 12:23:40 -0500
+Subject: [RFC 1/7] Make Hi3620 explicit, remove wildcards
+Message-ID: <20160908172346.27506-1-netz.kernel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-09-08 at 06:00 +0300, Vladimir Zapolskiy wrote:
-> The removed clock.h file is a leftover after moving the platform to a
-common
-> clock framework driver, it contains unused "struct clk"
-> definition, which under circumstances may coalesce with a generic "struct
-clk"
-> declaration for clock consumers. Also remove useless include of the
-removed
-> local file from a single source file mach-lpc32xx/pm.c.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> ---
->  arch/arm/mach-lpc32xx/clock.h | 38 --------------------------------------
->  arch/arm/mach-lpc32xx/pm.c    |  1 -
->  2 files changed, 39 deletions(-)
->  delete mode 100644 arch/arm/mach-lpc32xx/clock.h
-...
+This is a preparatory series for adding the ARMv5/v6 hi3520 SoCs.
+Assumptions were made when adding hi3620 that don't hold water in
+light of adding support for the hi3520 SoC.  Fix the issue by renaming
+config options and other namespaces to avoid collisions with the new
+work.
 
-Acked-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
+Only internal APIs are modified with this series.
+
+Signed-off-by: Marty Plummer <netz.kernel@gmail.com>
+---
+ arch/arm/Kconfig.debug | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index a9693b6..9094ca6 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -280,7 +280,7 @@ choice
+ 
+ 	config DEBUG_HI3620_UART
+ 		bool "Hisilicon HI3620 Debug UART"
+-		depends on ARCH_HI3xxx
++		depends on ARCH_HI3620
+ 		select DEBUG_UART_PL01X
+ 		help
+ 		  Say Y here if you want kernel low-level debugging support
+-- 
+2.9.3
