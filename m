@@ -1,39 +1,60 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Thu, 8 Sep 2016 14:25:26 +0100
-Subject: [PATCH v10 3/4] ARM64: ACPI: enable ACPI_SPCR_TABLE
-In-Reply-To: <20160908111654.GH1493@arm.com>
-References: <20160905123617.18775-1-aleksey.makarov@linaro.org>
- <20160905123617.18775-4-aleksey.makarov@linaro.org>
- <7e5486cc-4080-2d1e-8f6d-98874379887d@gmail.com>
- <20160908111654.GH1493@arm.com>
-Message-ID: <20160908132526.GA2171@xora-monster>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 8 Sep 2016 14:13:26 +0100
+Subject: [PATCH 3/7] [v2] arm64: dts: add QorIQ LS1046A SoC support
+In-Reply-To: <1473069695-33092-4-git-send-email-shh.xie@gmail.com>
+References: <1473069695-33092-1-git-send-email-shh.xie@gmail.com>
+ <1473069695-33092-4-git-send-email-shh.xie@gmail.com>
+Message-ID: <20160908131326.GE26570@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2016 at 12:16:55PM +0100, Will Deacon wrote:
-> On Wed, Sep 07, 2016 at 12:30:19PM +0300, Aleksey Makarov wrote:
-> > 
-> > On 09/05/2016 03:36 PM, Aleksey Makarov wrote:
-> > > SBBR mentions SPCR as a mandatory ACPI table.  So enable it for ARM64
-> > > 
-> > > Earlycon should be set up as early as possible.  ACPI boot tables are
-> > > mapped in arch/arm64/kernel/acpi.c:acpi_boot_table_init() that
-> > > is called from setup_arch() and that's where we parse SPCR.
-> > > So it has to be opted-in per-arch.
-> > > 
-> > > When ACPI_SPCR_TABLE is defined initialization of DT earlycon is
-> > > deferred until the DT/ACPI decision is done.  Initialize DT earlycon
-> > > if ACPI is disabled.
-> > 
-> > Hi Will, Catalin,
-> > 
-> > Can you review this patch and consider ACKing it please?
-> 
-> Hanjun, Al, Mark, Graeme -- any comments on this?
-> 
-We have been using this series internally for a long while for boards
-with SBSA UART. So IMO it is good to go. We have worked with some OEMs
-to fix firmware bugs discovered with this patch series so it should work
-with machines in the wild.
+On Mon, Sep 05, 2016 at 06:01:31PM +0800, shh.xie at gmail.com wrote:
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu0: cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a72";
+> +			reg = <0x0>;
+> +			clocks = <&clockgen 1 0>;
+> +			next-level-cache = <&l2>;
+> +			cpu-idle-states = <&CPU_PH20>;
+> +		};
 
-Graeme
+[...]
+
+> +	};
+> +
+> +	idle-states {
+> +		entry-method = "arm,psci";
+> +
+> +		CPU_PH20: cpu-ph20 {
+> +			compatible = "arm,idle-state";
+> +			idle-state-name = "PH20";
+> +			arm,psci-suspend-param = <0x00010000>;
+> +			entry-latency-us = <1000>;
+> +			exit-latency-us = <1000>;
+> +			min-residency-us = <3000>;
+> +		};
+> +	};
+
+There's no PSCI node in this file, and none from am included file, so
+this doesn't look right.
+
+> +	pmu {
+> +		compatible = "arm,armv8-pmuv3";
+> +		interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-affinity = <&cpu0>,
+> +				     <&cpu1>,
+> +				     <&cpu2>,
+> +				     <&cpu3>;
+> +	};
+
+The compatible string should be "arm,cortex-a72-pmu".
+
+Thanks,
+Mark.
