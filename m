@@ -1,34 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Sep 2016 11:58:08 +0200
-Subject: [PATCH V2 3/4] ARM64 LPC: support serial based on low-pin-count
-In-Reply-To: <57D1349D.8070905@gmail.com>
-References: <1473255233-154297-1-git-send-email-yuanzhichang@hisilicon.com>
- <5345060.9D0B4ujt5e@wuerfel> <57D1349D.8070905@gmail.com>
-Message-ID: <2531252.L41vzyMSKX@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 8 Sep 2016 11:57:46 +0200
+Subject: [PATCH 5/6] ARM: dts: Add NextThing GR8 dtsi
+In-Reply-To: <CABxcv=kJCuP==QVRqyuoORSoWKAEqXmt5iRjdvDcCcr4MSm0gQ@mail.gmail.com>
+References: <20160831081817.5191-1-maxime.ripard@free-electrons.com>
+ <20160831081817.5191-6-maxime.ripard@free-electrons.com>
+ <CABxcv=kJCuP==QVRqyuoORSoWKAEqXmt5iRjdvDcCcr4MSm0gQ@mail.gmail.com>
+Message-ID: <20160908095746.GN8913@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 8, 2016 5:51:25 PM CEST zhichang wrote:
-> On 2016?09?07? 22:50, Arnd Bergmann wrote:
-> > On Wednesday, September 7, 2016 9:33:52 PM CEST Zhichang Yuan wrote:
-> >> From: "zhichang.yuan" <yuanzhichang@hisilicon.com>
-> >>
-> >> On Hip06 platform, a 16550 compatible UART is connected to low-pin-count and
-> >> controlled through the LPC I/O cycles. This patch drives the UART port with
-> >> the specific serial in/out function pair based on the indirect-IO mechanism
-> >> introduced by Hip06 LPC driver.
-> >>
-> >> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
-> > 
-> > Any reason this cannot just use the regular drivers/tty/serial/8250/8250_of.c
-> > driver?
-> I think two reasons for that:
-> 1. 8250_of.c is only for devicetree, but we need to support ACPI device too;
+Hi Javier,
 
-ACPI has its own way of describing serial ports, use that instead.
+On Wed, Sep 07, 2016 at 04:51:55PM +0200, Javier Martinez Canillas wrote:
+> Hello Maxime,
+> 
+> On Wed, Aug 31, 2016 at 10:18 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> 
+> [snip]
+> 
+> > +
+> > +#include "skeleton.dtsi"
+> > +
+> 
+> The skeleton.dtsi has been deprecated and shouldn't be used in new DTS files:
+> 
+> http://www.spinics.net/lists/arm-kernel/msg528080.html
 
-> 2. It seems UPIO_PORT is not supported there.
+Ok, thanks, I'll change it in the v3.
 
-Should be easy enough to add.
+Maxime
 
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/d7268678/attachment.sig>
