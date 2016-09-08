@@ -1,25 +1,41 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 7 Sep 2016 20:31:07 -0700
-Subject: [PATCH V2] ARM: BCM5301X: Add basic dts for BCM53573 based Tenda
- AC9
-In-Reply-To: <20160823053746.14521-1-zajec5@gmail.com>
-References: <1469654305-1700-1-git-send-email-zajec5@gmail.com>
- <20160823053746.14521-1-zajec5@gmail.com>
-Message-ID: <a10d2d61-158f-2f03-fe77-9cbb0603e715@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 8 Sep 2016 09:05:57 +0530
+Subject: [PATCH v2 1/2] Documentation: dt: add bindings for ti-cpufreq
+In-Reply-To: <57D025E8.6030202@ti.com>
+References: <20160901025328.376-1-d-gerlach@ti.com>
+ <20160901025328.376-2-d-gerlach@ti.com>
+ <20160907051215.GN27345@vireshk-i7> <57D025E8.6030202@ti.com>
+Message-ID: <20160908033557.GQ27345@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 22/08/2016 ? 22:37, Rafa? Mi?ecki a ?crit :
-> BCM53573 seems to be low priced alternative for Northstar chipsts. It
-> uses single core Cortex-A7 and doesn't have SDU or local (TWD) timer. It
-> was also stripped out of independent SPI controller and 2 GMACs.
+On 07-09-16, 09:36, Dave Gerlach wrote:
+> On 09/07/2016 12:12 AM, Viresh Kumar wrote:
+> >On 31-08-16, 21:53, Dave Gerlach wrote:
+> >>+In 'operating-points-v2' table:
+> >>+- compatible: Should be
+> >>+	- 'operating-points-v2-ti-am3352-cpu' for am335x SoCs
+> >>+	- 'operating-points-v2-ti-am4372-cpu' for am43xx SoCs
+> >>+	- 'operating-points-v2-ti-dra7-cpu' for dra7xx/am57xx SoCs
+> >
+> >Why do you need SoC specific compatible here? Are you defining new
+> >fields in OPP tables for your SoC ? How are the tables for your case
+> >going to differ from the ones using "operating-points-v2" compatible
+> >string?
+> >
 > 
-> DTS for Tenda AC9 isn't completed yet. It misses e.g. switch entry (we
-> still need some b53 fixes) and probably some clocks. It adds support for
-> basic features however and can be improved later.
-> 
-> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> I thought you had suggested that I do this in your comments from v1, but I
+> guess that was dependent on whether or not I put the properties I have
+> inserted into the cpu node into the operating-points table instead.
 
-Applied, thanks!
+Yes.
+
+> I still
+> have gotten no comments from any DT maintainers so I left it as is. I am
+> still not sure if that is acceptable.
+
+@Rob: Can you please share your views on the new properties being
+added to the CPU node ?
+
 -- 
-Florian
+viresh
