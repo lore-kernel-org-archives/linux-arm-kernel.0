@@ -1,49 +1,77 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  8 Sep 2016 09:43:02 +0200
-Subject: [PATCH 06/30] arm64: dts: r8a7795: salvator-x: enable USB 2.0 Host
- channel 0
+Date: Thu,  8 Sep 2016 09:43:07 +0200
+Subject: [PATCH 11/30] arm64: dts: r8a7795: renesas: salvator-x: Enable DU
 In-Reply-To: <cover.1473320411.git.horms+renesas@verge.net.au>
 References: <cover.1473320411.git.horms+renesas@verge.net.au>
-Message-ID: <34ccd788a38983249727b081b2bf92ab54bfa27c.1473320411.git.horms+renesas@verge.net.au>
+Message-ID: <aadc4ee00a0ec4de5e4aea9f879ab738fd34d0e1.1473320411.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-We have to set SW15 to pin 2-3 side on the board before we use CN9
-as USB host or peripheral.
+Only the VGA output is supported for now.
 
-Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 44 ++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index 8c8bfdccdc2b..c0e6e8f7c7d8 100644
+index 4332ec7bb38c..64a29a87a724 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
 +++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -407,6 +407,10 @@
- 	status = "okay";
- };
- 
-+&ehci0 {
-+	status = "okay";
+@@ -146,6 +146,50 @@
+ 			sound-dai = <&ak4613>;
+ 		};
+ 	};
++
++	vga-encoder {
++		compatible = "adi,adv7123";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				adv7123_in: endpoint {
++					remote-endpoint = <&du_out_rgb>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				adv7123_out: endpoint {
++					remote-endpoint = <&vga_in>;
++				};
++			};
++		};
++	};
++
++	vga {
++		compatible = "vga-connector";
++
++		port {
++			vga_in: endpoint {
++				remote-endpoint = <&adv7123_out>;
++			};
++		};
++	};
 +};
 +
- &ehci1 {
- 	status = "okay";
- };
-@@ -415,6 +419,10 @@
- 	status = "okay";
++&du {
++	status = "okay";
++
++	ports {
++		port at 0 {
++			endpoint {
++				remote-endpoint = <&adv7123_in>;
++			};
++		};
++	};
  };
  
-+&ohci0 {
-+	status = "okay";
-+};
-+
- &ohci1 {
- 	status = "okay";
- };
+ &extal_clk {
 -- 
 2.7.0.rc3.207.g0ac5344
