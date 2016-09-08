@@ -1,37 +1,126 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 8 Sep 2016 19:46:34 +0800
-Subject: [PATCH v4 1/4] arm64: arch_timer: Add device tree binding for
- A-008585 erratum
-In-Reply-To: <e69db8b1-5fe2-ed0a-b073-de3efdd854d2@suse.com>
-References: <1467877572-10817-1-git-send-email-oss@buserror.net>
- <e69db8b1-5fe2-ed0a-b073-de3efdd854d2@suse.com>
-Message-ID: <57D14F9A.2050007@huawei.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 8 Sep 2016 13:49:14 +0200
+Subject: [PATCH 08/10] PM / Domains: Add support for removing PM domains
+In-Reply-To: <1471340976-5379-9-git-send-email-jonathanh@nvidia.com>
+References: <1471340976-5379-1-git-send-email-jonathanh@nvidia.com>
+ <1471340976-5379-9-git-send-email-jonathanh@nvidia.com>
+Message-ID: <CAPDyKFrVO9wb3ffmxA7HUUDt1_aYxe=aqa1v+xNpdrYiLt_m0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping
+On 16 August 2016 at 11:49, Jon Hunter <jonathanh@nvidia.com> wrote:
+> The genpd framework allows users to add PM domains via the pm_genpd_init()
+> function, however, there is no corresponding function to remove a PM
+> domain. For most devices this may be fine as the PM domains are never
+> removed, however, for devices that wish to populate the PM domains from
+> within a driver, having the ability to remove a PM domain if the probing
+> of the device fails or the driver is unloaded is necessary.
+>
+> Add the function pm_genpd_remove() to remove a PM domain by referencing
+> it's generic_pm_domain structure.
+>
+> PM domains can only be removed if they are not a parent domain to
+> another PM domain and have no devices associated with them.
 
-On 2016/8/25 19:04, Matthias Brugger wrote:
-> Hi all,
-> 
-> On 07/07/16 09:46, Scott Wood wrote:
->> This erratum describes a bug in logic outside the core, so MIDR can't be
->> used to identify its presence, and reading an SoC-specific revision
->> register from common arch timer code would be awkward.  So, describe it
->> in the device tree.
->>
->> Signed-off-by: Scott Wood <oss@buserror.net>
->> Acked-by: Rob Herring <robh@kernel.org>
->> ---
-> 
-> As of today I wasn't able to find this series in linux-next. Was this series somehow forgotten? Scott maybe you can resend the patches adding the clocksource maintainer.
-> 
-> Regards,
-> Matthias
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+I think we should also check if the there's is a provider registered
+for the genpd, as it should also prevent the genpd from being removed.
+Right?
+
+I noticed that you are adding the ->provider pointer to the genpd
+struct in patch 9/10. Perhaps re-structure $subject patch and 9/10 a
+bit to deal with this, so we can add the pm_genpd_remove() API in a
+more safe manner.
+
+Kind regards
+Uffe
+
+>
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> ---
+>  drivers/base/power/domain.c | 46 +++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/pm_domain.h   |  5 +++++
+>  2 files changed, 51 insertions(+)
+>
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 7ce4608bbbe0..72b973539205 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1356,6 +1356,52 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
+>  }
+>  EXPORT_SYMBOL_GPL(pm_genpd_init);
+>
+> +/**
+> + * pm_genpd_remove - Remove a generic I/O PM domain
+> + * @genpd: Pointer to PM domain that is to be removed.
+> + *
+> + * To remove the PM domain, this function:
+> + *  - Removes the PM domain as a subdomain to any parent domains,
+> + *    if it was added.
+> + *  - Removes the PM domain from the list of registered PM domains.
+> + *
+> + * The PM domain will only be removed, if it is not a parent to any
+> + * other PM domain and has no devices associated with it.
+> + */
+> +int pm_genpd_remove(struct generic_pm_domain *genpd)
+> +{
+> +       struct gpd_link *l, *link;
+> +       int ret = 0;
+> +
+> +       if (IS_ERR_OR_NULL(genpd))
+> +               return -EINVAL;
+> +
+> +       mutex_lock(&gpd_list_lock);
+> +       mutex_lock(&genpd->lock);
+> +
+> +       if (!list_empty(&genpd->master_links) || genpd->device_count) {
+> +               mutex_unlock(&genpd->lock);
+> +               mutex_unlock(&gpd_list_lock);
+> +               pr_err("%s: unable to remove %s\n", __func__, genpd->name);
+> +               return -EBUSY;
+> +       }
+> +
+> +       list_for_each_entry_safe(link, l, &genpd->slave_links, slave_node) {
+> +               list_del(&link->master_node);
+> +               list_del(&link->slave_node);
+> +               kfree(link);
+> +       }
+> +
+> +       list_del(&genpd->gpd_list_node);
+> +       mutex_unlock(&genpd->lock);
+> +       cancel_work_sync(&genpd->power_off_work);
+> +       mutex_unlock(&gpd_list_lock);
+> +       pr_debug("%s: removed %s\n", __func__, genpd->name);
+> +
+> +       return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(pm_genpd_remove);
+> +
+>  #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
+>
+>  typedef struct generic_pm_domain *(*genpd_xlate_t)(struct of_phandle_args *args,
+> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+> index f103869db443..fbdc5c4588ef 100644
+> --- a/include/linux/pm_domain.h
+> +++ b/include/linux/pm_domain.h
+> @@ -128,6 +128,7 @@ extern int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
+>                                      struct generic_pm_domain *target);
+>  extern int pm_genpd_init(struct generic_pm_domain *genpd,
+>                          struct dev_power_governor *gov, bool is_off);
+> +extern int pm_genpd_remove(struct generic_pm_domain *genpd);
+>
+>  extern struct dev_power_governor simple_qos_governor;
+>  extern struct dev_power_governor pm_domain_always_on_gov;
+> @@ -163,6 +164,10 @@ static inline int pm_genpd_init(struct generic_pm_domain *genpd,
+>  {
+>         return -ENOSYS;
+>  }
+> +static inline int pm_genpd_remove(struct generic_pm_domain *genpd)
+> +{
+> +       return -ENOTSUPP;
+> +}
+>  #endif
+>
+>  static inline int pm_genpd_add_device(struct generic_pm_domain *genpd,
+> --
+> 2.1.4
+>
